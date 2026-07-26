@@ -1,0 +1,628 @@
+#include "host_config.h"
+
+#include "aeron/config_file.h"
+#include "aeron/log.h"
+
+#include <float.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <yaml.h>
+
+static int host_config_error(char* error, size_t error_size, const char* message, const char* detail) {
+	if (error && error_size) {
+		snprintf(error, error_size, message, detail ? detail : "");
+	}
+	return 0;
+}
+
+static int host_config_optional_path(const AeronConfigFile* config, const char* key, char* out,
+									 size_t capacity, char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	const char* value;
+
+	if (!node) {
+		out[0] = '\0';
+		return 1;
+	}
+	value = AeronConfigNode_String(node, NULL);
+	if (!value) {
+		return host_config_error(error, error_size, "invalid path setting '%s'", key);
+	}
+	if (!value[0]) {
+		out[0] = '\0';
+		return 1;
+	}
+	if (strlen(value) >= capacity) {
+		return host_config_error(error, error_size, "configured path is too long: '%s'", key);
+	}
+	snprintf(out, capacity, "%s", value);
+	return 1;
+}
+
+static int host_config_simulation_step(const AeronConfigFile* config, int* out, char* error,
+									   size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, "flight.simulation_step_ticks");
+	int64_t value;
+
+	if (!node) {
+		*out = 1;
+		return 1;
+	}
+	value = AeronConfigNode_Int(node, 0);
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || (value != 1 && value != 4 && value != 8)) {
+		return host_config_error(error, error_size,
+								 "invalid 'flight.simulation_step_ticks': expected integer %s", "1, 4, or 8");
+	}
+	*out = (int)value;
+	return 1;
+}
+
+static int host_config_model_smoothing(const AeronConfigFile* config, int required, float* out,
+									   char* error, size_t error_size) {
+	const char* key = "models.smooth_angle_degrees";
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	double value;
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+		}
+		return 1;
+	}
+	value = AeronConfigNode_Float(node, NAN);
+	if (!isfinite(value) || value < 0.0 || value > 180.0) {
+		return host_config_error(error, error_size,
+								 "invalid 'models.smooth_angle_degrees': expected numeric value %s",
+								 "from 0 through 180");
+	}
+	*out = (float)value;
+	return 1;
+}
+
+static int host_config_opt_emissive_strength(const AeronConfigFile* config, int required, float* out,
+											 char* error, size_t error_size) {
+	const char* key = "models.opt_emissive_strength";
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	double value;
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+		}
+		return 1;
+	}
+	value = AeronConfigNode_Float(node, NAN);
+	if (!isfinite(value) || value < 0.0 || value > FLT_MAX) {
+		return host_config_error(error, error_size,
+								 "invalid 'models.opt_emissive_strength': expected numeric value %s",
+								 "greater than or equal to 0");
+	}
+	*out = (float)value;
+	return 1;
+}
+
+static int host_config_opt_projectile_emissive_strength(const AeronConfigFile* config, int required,
+														float* out, char* error, size_t error_size) {
+	const char* key = "models.opt_projectile_emissive_strength";
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	double value;
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+		}
+		return 1;
+	}
+	value = AeronConfigNode_Float(node, NAN);
+	if (!isfinite(value) || value < 0.0 || value > FLT_MAX) {
+		return host_config_error(
+			error, error_size, "invalid 'models.opt_projectile_emissive_strength': expected numeric value %s",
+			"greater than or equal to 0");
+	}
+	*out = (float)value;
+	return 1;
+}
+
+static int host_config_force_opt(const AeronConfigFile* config, int required, int* out, char* error,
+								 size_t error_size) {
+	const char* key = "models.force_opt";
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+		}
+		return 1;
+	}
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+		return host_config_error(error, error_size, "invalid 'models.force_opt': expected %s", "boolean");
+	}
+	*out = AeronConfigNode_Bool(node, 0);
+	return 1;
+}
+
+static int host_config_prefer_original_2d(const AeronConfigFile* config, int required, int* out,
+										  char* error, size_t error_size) {
+	const char* key = "assets.prefer_original_2d";
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+		}
+		return 1;
+	}
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+		return host_config_error(error, error_size, "invalid 'assets.prefer_original_2d': expected %s",
+								 "boolean");
+	}
+	*out = AeronConfigNode_Bool(node, 0);
+	return 1;
+}
+
+static int host_config_remaster_options(const AeronConfigFile* config, int required, XwaHostConfig* out,
+										char* error, size_t error_size) {
+	return host_config_model_smoothing(config, required, &out->model_smooth_angle_degrees, error,
+									   error_size) &&
+		   host_config_opt_emissive_strength(config, required, &out->model_opt_emissive_strength, error,
+											 error_size) &&
+		   host_config_opt_projectile_emissive_strength(
+			   config, required, &out->model_opt_projectile_emissive_strength, error, error_size) &&
+		   host_config_force_opt(config, required, &out->force_opt_models, error, error_size) &&
+		   host_config_prefer_original_2d(config, required, &out->prefer_original_2d, error, error_size);
+}
+
+static int host_config_load_remaster_profile(AeronVfs* vfs, XwaHostConfig* out, char* error,
+											 size_t error_size) {
+	static const char* path = "remaster/flight/render.yaml";
+	AeronConfigFile* config = NULL;
+	int valid;
+
+	if (!AeronConfigFile_LoadYaml(vfs, AERON_VFS_ROOT_RESOURCE, path, &config)) {
+		return host_config_error(error, error_size, "required remaster profile unavailable or invalid: %s",
+								 path);
+	}
+	if (AeronConfigNode_Type(AeronConfigFile_Root(config)) != AERON_CONFIG_MAP) {
+		AeronConfigFile_Destroy(config);
+		return host_config_error(error, error_size, "required remaster profile root must be a mapping: %s",
+								 path);
+	}
+	valid = host_config_remaster_options(config, 1, out, error, error_size);
+	AeronConfigFile_Destroy(config);
+	return valid;
+}
+
+static int host_config_named_value(const AeronConfigFile* config, const char* key, const char* const* names,
+								   size_t name_count, int* out, unsigned int override_bit,
+								   unsigned int* override_mask, char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	const char* value;
+	size_t index;
+
+	if (!node) {
+		return 1;
+	}
+	if (AeronConfigNode_Type(node) == AERON_CONFIG_BOOL && !AeronConfigNode_Bool(node, 1) && name_count > 0 &&
+		strcmp(names[0], "off") == 0) {
+		*out = 0;
+		*override_mask |= override_bit;
+		return 1;
+	}
+	value = AeronConfigNode_String(node, NULL);
+	if (!value) {
+		return host_config_error(error, error_size, "invalid video setting '%s'", key);
+	}
+	for (index = 0; index < name_count; ++index) {
+		if (strcmp(value, names[index]) == 0) {
+			*out = (int)index;
+			*override_mask |= override_bit;
+			return 1;
+		}
+	}
+	return host_config_error(error, error_size, "invalid video setting '%s'", key);
+}
+
+static int host_config_video_options(const AeronConfigFile* config, XwaModernVideoOptions* out,
+									 unsigned int* override_mask, char* error, size_t error_size) {
+	static const char* const window_mode_names[] = { "windowed", "fullscreen" };
+	static const char* const quality_names[] = { "off", "low", "high" };
+	static const char* const fsr_names[] = { "off", "performance", "balanced", "quality", "native_aa" };
+	static const char* const msaa_names[] = { "off", "2x", "4x", "8x" };
+	const char* hdr_key = "video.hdr_output";
+	const AeronConfigNode* hdr_node;
+	int value;
+
+	*override_mask = 0;
+	value = 0;
+	if (!host_config_named_value(config, "video.window_mode", window_mode_names,
+								 sizeof window_mode_names / sizeof window_mode_names[0], &value,
+								 XWA_MODERN_VIDEO_OVERRIDE_WINDOW_MODE, override_mask, error, error_size)) {
+		return 0;
+	}
+	out->window_mode = (XwaModernWindowMode)value;
+
+	value = 0;
+	if (!host_config_named_value(config, "video.ssao_quality", quality_names,
+								 sizeof quality_names / sizeof quality_names[0], &value,
+								 XWA_MODERN_VIDEO_OVERRIDE_SSAO, override_mask, error, error_size)) {
+		return 0;
+	}
+	out->ssao_quality = (XwaModernSsaoQuality)value;
+
+	value = 0;
+	if (!host_config_named_value(config, "video.fsr_upscaling", fsr_names,
+								 sizeof fsr_names / sizeof fsr_names[0], &value,
+								 XWA_MODERN_VIDEO_OVERRIDE_FSR, override_mask, error, error_size)) {
+		return 0;
+	}
+	out->fsr_upscaling = (XwaModernFsrUpscaling)value;
+
+	value = 0;
+	if (!host_config_named_value(config, "video.msaa", msaa_names, sizeof msaa_names / sizeof msaa_names[0],
+								 &value, XWA_MODERN_VIDEO_OVERRIDE_MSAA, override_mask, error, error_size)) {
+		return 0;
+	}
+	out->msaa = (XwaModernMsaa)value;
+	if (out->fsr_upscaling != XWA_MODERN_FSR_OFF && out->msaa != XWA_MODERN_MSAA_OFF) {
+		return host_config_error(error, error_size, "%s",
+								 "video.fsr_upscaling and video.msaa cannot both be enabled");
+	}
+
+	value = 0;
+	if (!host_config_named_value(config, "video.motion_blur_quality", quality_names,
+								 sizeof quality_names / sizeof quality_names[0], &value,
+								 XWA_MODERN_VIDEO_OVERRIDE_MOTION_BLUR, override_mask, error, error_size)) {
+		return 0;
+	}
+	out->motion_blur_quality = (XwaModernMotionBlurQuality)value;
+
+	hdr_node = AeronConfigFile_GetNode(config, hdr_key);
+	if (hdr_node) {
+		if (AeronConfigNode_Type(hdr_node) != AERON_CONFIG_BOOL) {
+			return host_config_error(error, error_size, "invalid video setting '%s'", hdr_key);
+		}
+		out->hdr_output = AeronConfigNode_Bool(hdr_node, 0);
+		*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_HDR;
+	}
+	return 1;
+}
+
+int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size) {
+	static const char* path = "config.yaml";
+	AeronConfigFile* config = NULL;
+	if (!vfs || !out) {
+		return host_config_error(error, error_size, "cannot load %s", path);
+	}
+	memset(out, 0, sizeof *out);
+	out->flight_simulation_step_ticks = 1;
+	if (!host_config_load_remaster_profile(vfs, out, error, error_size)) {
+		return 0;
+	}
+	if (!AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, path)) {
+		return 1;
+	}
+	if (!AeronConfigFile_LoadYaml(vfs, AERON_VFS_ROOT_USER, path, &config)) {
+		return host_config_error(error, error_size, "user configuration is invalid: %s", path);
+	}
+	if (AeronConfigNode_Type(AeronConfigFile_Root(config)) != AERON_CONFIG_MAP) {
+		AeronConfigFile_Destroy(config);
+		return host_config_error(error, error_size, "user configuration root must be a mapping: %s", path);
+	}
+	{
+		const AeronConfigNode* version = AeronConfigFile_GetNode(config, "version");
+		const AeronConfigNode* paths = AeronConfigFile_GetNode(config, "paths");
+		const AeronConfigNode* models = AeronConfigFile_GetNode(config, "models");
+		const AeronConfigNode* assets = AeronConfigFile_GetNode(config, "assets");
+		const AeronConfigNode* video = AeronConfigFile_GetNode(config, "video");
+		if (version &&
+			(AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1)) {
+			AeronConfigFile_Destroy(config);
+			return host_config_error(error, error_size, "unsupported configuration version in %s", path);
+		}
+		if (paths && AeronConfigNode_Type(paths) != AERON_CONFIG_MAP) {
+			AeronConfigFile_Destroy(config);
+			return host_config_error(error, error_size, "'paths' must be a mapping in %s", path);
+		}
+		if (models && AeronConfigNode_Type(models) != AERON_CONFIG_MAP) {
+			AeronConfigFile_Destroy(config);
+			return host_config_error(error, error_size, "'models' must be a mapping in %s", path);
+		}
+		if (assets && AeronConfigNode_Type(assets) != AERON_CONFIG_MAP) {
+			AeronConfigFile_Destroy(config);
+			return host_config_error(error, error_size, "'assets' must be a mapping in %s", path);
+		}
+		if (video && AeronConfigNode_Type(video) != AERON_CONFIG_MAP) {
+			AeronConfigFile_Destroy(config);
+			return host_config_error(error, error_size, "'video' must be a mapping in %s", path);
+		}
+	}
+	if (AeronConfigFile_GetNode(config, "paths.resources")) {
+		Aeron_Log("xwa.config",
+				  "deprecated setting 'paths.resources' is ignored; resources are application-owned");
+	}
+	const int valid =
+		host_config_optional_path(config, "paths.game_data", out->game_data_path, sizeof out->game_data_path,
+								  error, error_size) &&
+		host_config_simulation_step(config, &out->flight_simulation_step_ticks, error, error_size) &&
+		host_config_remaster_options(config, 0, out, error, error_size) &&
+		host_config_video_options(config, &out->video_options, &out->video_options_override_mask, error,
+								  error_size);
+	AeronConfigFile_Destroy(config);
+	return valid;
+}
+
+static int host_yaml_scalar_equals(const yaml_node_t* node, const char* value) {
+	const size_t length = strlen(value);
+	return node && node->type == YAML_SCALAR_NODE && node->data.scalar.length == length &&
+		   memcmp(node->data.scalar.value, value, length) == 0;
+}
+
+static int host_yaml_mapping_value(const yaml_document_t* document, int mapping_id, const char* key,
+								   size_t* pair_index) {
+	yaml_node_t* mapping = yaml_document_get_node((yaml_document_t*)document, mapping_id);
+	yaml_node_pair_t* pair;
+
+	if (!mapping || mapping->type != YAML_MAPPING_NODE) {
+		return 0;
+	}
+	for (pair = mapping->data.mapping.pairs.start; pair < mapping->data.mapping.pairs.top; ++pair) {
+		if (host_yaml_scalar_equals(yaml_document_get_node((yaml_document_t*)document, pair->key), key)) {
+			if (pair_index) {
+				*pair_index = (size_t)(pair - mapping->data.mapping.pairs.start);
+			}
+			return pair->value;
+		}
+	}
+	return 0;
+}
+
+static int host_yaml_add_scalar(yaml_document_t* document, const char* value, yaml_scalar_style_t style) {
+	return yaml_document_add_scalar(document, (yaml_char_t*)YAML_STR_TAG, (const yaml_char_t*)value,
+									(int)strlen(value), style);
+}
+
+static int host_yaml_get_or_add_mapping(yaml_document_t* document, int parent_id, const char* key) {
+	int mapping_id;
+
+	mapping_id = host_yaml_mapping_value(document, parent_id, key, NULL);
+	if (mapping_id) {
+		yaml_node_t* mapping = yaml_document_get_node(document, mapping_id);
+		return mapping && mapping->type == YAML_MAPPING_NODE ? mapping_id : 0;
+	}
+	mapping_id = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_BLOCK_MAPPING_STYLE);
+	if (mapping_id) {
+		const int key_id = host_yaml_add_scalar(document, key, YAML_PLAIN_SCALAR_STYLE);
+		if (key_id && yaml_document_append_mapping_pair(document, parent_id, key_id, mapping_id)) {
+			return mapping_id;
+		}
+	}
+	return 0;
+}
+
+static int host_yaml_set_scalar(yaml_document_t* document, int mapping_id, const char* key, const char* value,
+								yaml_scalar_style_t style) {
+	size_t pair_index = 0;
+	const int existing_value_id = host_yaml_mapping_value(document, mapping_id, key, &pair_index);
+	const int value_id = host_yaml_add_scalar(document, value, style);
+
+	if (!value_id) {
+		return 0;
+	}
+	if (existing_value_id) {
+		yaml_node_t* mapping = yaml_document_get_node(document, mapping_id);
+		mapping->data.mapping.pairs.start[pair_index].value = value_id;
+		return 1;
+	}
+	{
+		const int key_id = host_yaml_add_scalar(document, key, YAML_PLAIN_SCALAR_STYLE);
+		return key_id && yaml_document_append_mapping_pair(document, mapping_id, key_id, value_id);
+	}
+}
+
+static int host_yaml_set_game_data(yaml_document_t* document, const char* path) {
+	yaml_node_t* root = yaml_document_get_root_node(document);
+	int paths_id;
+
+	if (!root || root->type != YAML_MAPPING_NODE) {
+		return 0;
+	}
+	paths_id = host_yaml_get_or_add_mapping(document, 1, "paths");
+	return paths_id &&
+		   host_yaml_set_scalar(document, paths_id, "game_data", path, YAML_SINGLE_QUOTED_SCALAR_STYLE);
+}
+
+static int host_yaml_set_video_options(yaml_document_t* document, const XwaModernVideoOptions* options) {
+	static const char* const window_mode_names[] = { "windowed", "fullscreen" };
+	static const char* const quality_names[] = { "off", "low", "high" };
+	static const char* const fsr_names[] = { "off", "performance", "balanced", "quality", "native_aa" };
+	static const char* const msaa_names[] = { "off", "2x", "4x", "8x" };
+	yaml_node_t* root = yaml_document_get_root_node(document);
+	int video_id;
+
+	if (!root || root->type != YAML_MAPPING_NODE || !options ||
+		options->window_mode < XWA_MODERN_WINDOW_MODE_WINDOWED ||
+		options->window_mode > XWA_MODERN_WINDOW_MODE_FULLSCREEN ||
+		options->ssao_quality < XWA_MODERN_SSAO_OFF || options->ssao_quality > XWA_MODERN_SSAO_HIGH ||
+		options->fsr_upscaling < XWA_MODERN_FSR_OFF || options->fsr_upscaling > XWA_MODERN_FSR_NATIVE_AA ||
+		options->msaa < XWA_MODERN_MSAA_OFF || options->msaa > XWA_MODERN_MSAA_8X ||
+		(options->fsr_upscaling != XWA_MODERN_FSR_OFF && options->msaa != XWA_MODERN_MSAA_OFF) ||
+		options->motion_blur_quality < XWA_MODERN_MOTION_BLUR_OFF ||
+		options->motion_blur_quality > XWA_MODERN_MOTION_BLUR_HIGH) {
+		return 0;
+	}
+	video_id = host_yaml_get_or_add_mapping(document, 1, "video");
+	return video_id &&
+		   host_yaml_set_scalar(document, video_id, "window_mode", window_mode_names[options->window_mode],
+								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, video_id, "ssao_quality", quality_names[options->ssao_quality],
+								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, video_id, "fsr_upscaling", fsr_names[options->fsr_upscaling],
+								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, video_id, "msaa", msaa_names[options->msaa],
+								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, video_id, "motion_blur_quality",
+								quality_names[options->motion_blur_quality],
+								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, video_id, "hdr_output", options->hdr_output ? "true" : "false",
+								YAML_PLAIN_SCALAR_STYLE);
+}
+
+static int host_yaml_create_document(yaml_document_t* document) {
+	int root_id;
+	int version_key_id;
+	int version_value_id;
+
+	if (!yaml_document_initialize(document, NULL, NULL, NULL, 1, 1)) {
+		return 0;
+	}
+	root_id = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_BLOCK_MAPPING_STYLE);
+	version_key_id = host_yaml_add_scalar(document, "version", YAML_PLAIN_SCALAR_STYLE);
+	version_value_id = host_yaml_add_scalar(document, "1", YAML_PLAIN_SCALAR_STYLE);
+	if (!root_id || !version_key_id || !version_value_id ||
+		!yaml_document_append_mapping_pair(document, root_id, version_key_id, version_value_id)) {
+		yaml_document_delete(document);
+		return 0;
+	}
+	return 1;
+}
+
+static int host_yaml_load_document(AeronVfs* vfs, yaml_document_t* document) {
+	uint8_t* data = NULL;
+	size_t data_size = 0;
+	yaml_parser_t parser;
+	yaml_document_t extra_document;
+	int document_loaded = 0;
+	int loaded = 0;
+
+	memset(document, 0, sizeof *document);
+	memset(&extra_document, 0, sizeof extra_document);
+	if (!AeronVfs_ReadAll(vfs, AERON_VFS_ROOT_USER, "config.yaml", 1024 * 1024, &data, &data_size) ||
+		!yaml_parser_initialize(&parser)) {
+		free(data);
+		return 0;
+	}
+	yaml_parser_set_input_string(&parser, data, data_size);
+	if (yaml_parser_load(&parser, document)) {
+		document_loaded = 1;
+	}
+	if (document_loaded && yaml_parser_load(&parser, &extra_document)) {
+		yaml_node_t* root = yaml_document_get_root_node(document);
+		if (root && root->type == YAML_MAPPING_NODE && !yaml_document_get_root_node(&extra_document)) {
+			loaded = 1;
+		}
+	}
+	if (document_loaded && !loaded) {
+		yaml_document_delete(document);
+	}
+	yaml_document_delete(&extra_document);
+	yaml_parser_delete(&parser);
+	free(data);
+	return loaded;
+}
+
+static int host_yaml_write(void* data, unsigned char* buffer, size_t size) {
+	AeronFile* file = (AeronFile*)data;
+	return AeronVfs_Write(file, buffer, size, NULL);
+}
+
+static int host_yaml_save_document(AeronVfs* vfs, yaml_document_t* document, char* error, size_t error_size) {
+	static const char* path = "config.yaml";
+	static const char* temporary_path = "config.yaml.tmp";
+	yaml_emitter_t emitter;
+	AeronFile* file = NULL;
+	int emitter_initialized = 0;
+	int document_owned = 1;
+	int ok = 0;
+
+	if (!AeronVfs_Open(vfs, AERON_VFS_ROOT_USER, temporary_path, AERON_VFS_WRITE, &file) ||
+		!yaml_emitter_initialize(&emitter)) {
+		goto cleanup;
+	}
+	emitter_initialized = 1;
+	yaml_emitter_set_output(&emitter, host_yaml_write, file);
+	yaml_emitter_set_indent(&emitter, 2);
+	yaml_emitter_set_unicode(&emitter, 1);
+	if (!yaml_emitter_open(&emitter)) {
+		goto cleanup;
+	}
+	document_owned = 0;
+	if (!yaml_emitter_dump(&emitter, document) || !yaml_emitter_close(&emitter) || !AeronVfs_Flush(file)) {
+		goto cleanup;
+	}
+	{
+		const int close_ok = AeronVfs_Close(file);
+		file = NULL;
+		if (!close_ok) {
+			goto cleanup;
+		}
+	}
+	if (!AeronVfs_Rename(vfs, AERON_VFS_ROOT_USER, temporary_path, path)) {
+		goto cleanup;
+	}
+	ok = 1;
+
+cleanup:
+	if (file) {
+		AeronVfs_Close(file);
+	}
+	if (emitter_initialized) {
+		yaml_emitter_delete(&emitter);
+	}
+	if (document_owned) {
+		yaml_document_delete(document);
+	}
+	if (!ok) {
+		AeronVfs_Remove(vfs, AERON_VFS_ROOT_USER, temporary_path);
+		host_config_error(error, error_size, "could not save user configuration: %s", path);
+	}
+	return ok;
+}
+
+static int host_yaml_prepare_user_document(AeronVfs* vfs, yaml_document_t* document, char* error,
+										   size_t error_size) {
+	static const char* path = "config.yaml";
+
+	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, path)) {
+		if (host_yaml_load_document(vfs, document)) {
+			return 1;
+		}
+		return host_config_error(error, error_size, "could not update user configuration: %s", path);
+	}
+	if (host_yaml_create_document(document)) {
+		return 1;
+	}
+	return host_config_error(error, error_size, "could not create user configuration: %s", path);
+}
+
+int XwaHostConfig_SaveGameDataPath(AeronVfs* vfs, const char* game_data_path, char* error,
+								   size_t error_size) {
+	yaml_document_t document;
+
+	if (!vfs || !game_data_path || !game_data_path[0] ||
+		strlen(game_data_path) >= XWA_HOST_CONFIG_PATH_CAPACITY) {
+		return host_config_error(error, error_size, "cannot save invalid path to %s", "config.yaml");
+	}
+	if (!host_yaml_prepare_user_document(vfs, &document, error, error_size)) {
+		return 0;
+	}
+	if (!host_yaml_set_game_data(&document, game_data_path)) {
+		yaml_document_delete(&document);
+		return host_config_error(error, error_size, "could not update user configuration: %s", "config.yaml");
+	}
+	return host_yaml_save_document(vfs, &document, error, error_size);
+}
+
+int XwaHostConfig_SaveVideoOptions(AeronVfs* vfs, const XwaModernVideoOptions* options, char* error,
+								   size_t error_size) {
+	yaml_document_t document;
+
+	if (!vfs || !options) {
+		return host_config_error(error, error_size, "cannot save invalid video settings to %s",
+								 "config.yaml");
+	}
+	if (!host_yaml_prepare_user_document(vfs, &document, error, error_size)) {
+		return 0;
+	}
+	if (!host_yaml_set_video_options(&document, options)) {
+		yaml_document_delete(&document);
+		return host_config_error(error, error_size, "could not update user configuration: %s", "config.yaml");
+	}
+	return host_yaml_save_document(vfs, &document, error, error_size);
+}

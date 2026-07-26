@@ -1,0 +1,9 @@
+*.swp
+.DS_Store
+.idea/
+__pycache__/
+*.py[cod]
+build/
+imgui.ini
+.decompmatch/
+cmake-build-*/

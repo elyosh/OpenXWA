@@ -1,0 +1,133 @@
+# XWA remaster shipped profile.
+# This file is mandatory; config.yaml may override documented user settings.
+models:
+  smooth_angle_degrees: 90
+  force_opt: true
+  opt_emissive_strength: 1.5
+  opt_projectile_emissive_strength: 5.0
+assets:
+  prefer_original_2d: false
+presentation:
+  # 1 renders at the display refresh rate; 2 renders at half refresh.
+  vsync_divisor: 1
+  # Required shipped baseline; user config.yaml may override both values.
+  msaa_samples: 2
+  hdr_output: true
+texture_filtering:
+  anisotropic: true
+  max_anisotropy: 8.0
+ssao:
+  quality: 2
+  intensity: 1.0
+  power: 3.0
+  radius_view: 2048.0
+  bias_view: 0.0
+  direct: 1.0
+  debug_viz: false
+  # Screen-space radius clamp (fractions of NDC half-width; 0 = off). A
+  # world-space radius shrinks to sub-texel on distant hulls, where the kernel
+  # aliases into a grid. min_screen_frac raises the effective radius on far
+  # surfaces (footprint floor ~= frac * ao_w texels) to remove that grid;
+  # max_screen_frac caps it on near surfaces so the finite tap set stays dense.
+  min_screen_frac: 0.00
+  #max_screen_frac: 0.25
+  max_screen_frac: 0.1
+  # Per-pixel kernel-radius jitter [0,1]. Breaks the discrete taps into blur-
+  # smoothable noise so a large sampling footprint does not resolve into
+  # separate offset occlusions on near surfaces. 0 = off.
+  sample_jitter: 0.2
+shadows:
+  mode: "pcf"
+  atlas_size: 4096
+  cascade_count: 4
+  # stable, frustum, or scene_dependent. Scene-dependent PSSM focuses each
+  # cascade on relevant visible receivers while retaining off-screen casters.
+  fit_mode: "scene_dependent"
+  max_distance: 262144.0
+  split_lambda: 0.80
+  # When enabled, these normalized positions replace split_lambda.
+  explicit_splits: true
+  split_1: 0.005
+  split_2: 0.035
+  split_3: 0.180
+  filter_quality: 2
+  filter_radius: 2.0
+  contact_hardening: true
+  light_angular_radius_degrees: 0.6
+  max_filter_radius: 8.0
+  pcss_min_filter_radius: 0.75
+  normal_bias: 4.0
+  normal_bias_face_normal: true
+  depth_bias_texels: 1.0
+  slope_bias: 1.0
+  receiver_plane_bias: 1.0
+  caster_constant_bias: 1.0
+  caster_slope_bias: 1.5
+  transition_fraction: 0.10
+  distance_fade_fraction: 0.10
+  debug_cascades: false
+hangar_lighting:
+  # Artificial ceiling source for the enclosed hangar. The launch-reference
+  # backdrop receives shadows but does not cast into this light.
+  enabled: true
+  direction_x: 0.0
+  direction_y: 0.0
+  direction_z: 1.0
+  intensity: 0.8
+  color_r: 1.0
+  color_g: 1.0
+  color_b: 1.0
+  # Linear ambient cube: +Z ceiling fill, horizontal wall bounce, -Z floor bounce.
+  ambient_ceiling: 0.16
+  ambient_sides: 0.10
+  ambient_floor: 0.06
+  shadow_filter_radius: 2.0
+skybox:
+  enabled: true
+  exposure: 1.0
+  path: "flight/skyboxes/stars.ktx2"
+  # Sky source: "cube" uses the authored cube map at `path`; "stars"
+  # (alias "procedural") uses the GPU twinkling starfield reproducing the
+  # classic CPU FlightStarfield_Render. The star_* knobs apply to "stars".
+  mode: "stars"
+  star_brightness: 1.0   # peak star brightness (tuned for the tonemap)
+  star_density: 0.4      # grid-cell occupancy; star count ~= 6*grid^2*density
+  star_grid: 32          # cells per cube-face edge (angular spacing)
+  # Dot geometry in CLASSIC VIEWPORT PIXELS, scaled by the viewport->render
+  # upscale at draw time so a star matches the classic single-pixel look at
+  # any resolution. 0.5 half-extent = one classic pixel.
+  star_core_px: 0.5      # star dot half-extent (classic px); 0.5 = 1 pixel
+  star_feather: 0.25     # dot antialias edge (classic px)
+  star_flare: 1.0        # bright-star flare brightness (0 = off); exact
+                         # DrawBrightStarFlare ±1px plus/L pattern
+point_lights:
+  enabled: true
+  scale: 1.0
+  range_scale: 1.0
+  min_distance: 64.0
+  spec_weight: 1.0
+  diffuse_wrap: 1.0
+  contrib_cap: 1.0
+lighting:
+  intensity: 0.8
+  spec_mul: 1.0
+  wrap: 0.0
+  spec_geom_adapt: true
+  ambient_r: 0.08
+  ambient_g: 0.08
+  ambient_b: 0.08
+bloom:
+  intensity: 0.5
+temporal_upscaling:
+  # off, native_aa, quality, balanced, or performance.
+  mode: "off"
+  # Positive values enable FSR's RCAS pass.
+  sharpness: 0.0
+motion_blur:
+  quality: 2
+  shutter: 0.5
+  camera_blur: true
+  pause_keep_blur: true
+  velocity_viz: false
+  # Consume FSR's retained render-resolution motion without a full-size copy.
+  fsr_direct_motion: true
