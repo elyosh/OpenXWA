@@ -1,0 +1,149 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  linux:
+    name: Linux ${{ matrix.build-type }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build-type: [Release, Debug]
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Determine release version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build package
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packaging/linux/Dockerfile
+          platforms: linux/amd64
+          target: artifact
+          build-args: |
+            XWA_BUILD_TYPE=${{ matrix.build-type }}
+            XWA_VERSION=${{ steps.version.outputs.version }}
+          outputs: type=local,dest=build/artifacts
+          cache-from: type=gha,scope=linux
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: openxwa-linux-x86_64-${{ matrix.build-type == 'Debug' && 'debug' || 'release' }}
+          path: build/artifacts/*.tar.xz
+          if-no-files-found: error
+
+  windows:
+    name: Windows ${{ matrix.build-type }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build-type: [Release, Debug]
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Determine release version
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build package
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: packaging/windows/Dockerfile
+          platforms: linux/amd64
+          target: artifact
+          build-args: |
+            XWA_BUILD_TYPE=${{ matrix.build-type }}
+            XWA_VERSION=${{ steps.version.outputs.version }}
+          outputs: type=local,dest=build/artifacts
+          cache-from: type=gha,scope=windows
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: openxwa-windows-x86_64-${{ matrix.build-type == 'Debug' && 'debug' || 'release' }}
+          path: build/artifacts/*.zip
+          if-no-files-found: error
+
+  macos:
+    name: macOS ${{ matrix.build-type }}
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        build-type: [Release, Debug]
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: brew install cmake ninja pkg-config
+
+      - name: Restore dependency caches
+        uses: actions/cache@v4
+        with:
+          path: |
+            build/cache/macos-arm64/sources
+            build/cache/macos-arm64/dependencies
+            build/cache/macos-arm64/tools
+            build/cache/macos-arm64/build/sdl
+            build/cache/macos-arm64/build/zstd
+            build/cache/macos-arm64/build/ffmpeg
+            build/cache/macos-arm64/build/shadercross
+          key: macos-arm64-deps-${{ hashFiles('packaging/macos/build-package.sh', 'packaging/common/shadercross-fsr3.patch') }}
+
+      - name: Build package
+        env:
+          XWA_BUILD_TYPE: ${{ matrix.build-type }}
+          XWA_MACOS_BUILD_VERSION: ${{ github.run_number }}
+        run: |
+          XWA_VERSION="${GITHUB_REF_NAME#v}" ./packaging/macos/build-package.sh
+
+      - name: Upload package
+        uses: actions/upload-artifact@v4
+        with:
+          name: openxwa-macos-arm64-${{ matrix.build-type == 'Debug' && 'debug' || 'release' }}
+          path: build/artifacts/*.dmg
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --title "OpenXWA ${GITHUB_REF_NAME}" \
+              --draft \
+              --verify-tag \
+              --generate-notes \
+              artifacts/*

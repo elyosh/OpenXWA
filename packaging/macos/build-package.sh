@@ -11,30 +11,43 @@ ffmpeg_version="${FFMPEG_VERSION:-8.0.1}"
 shadercross_commit="${SHADERCROSS_COMMIT:-6b06e55c7c5d7e7a09a8a14f76e866dcfad5ab99}"
 deployment_target="${XWA_MACOS_DEPLOYMENT_TARGET:-13.0}"
 architecture="${XWA_MACOS_ARCHITECTURE:-$(uname -m)}"
-application_version="${XWA_VERSION:-0.1.0}"
+application_version="${XWA_VERSION:-0.0.0-dev}"
 build_version="${XWA_MACOS_BUILD_VERSION:-1}"
+build_type="${XWA_BUILD_TYPE:-Release}"
 bundle_identifier="${XWA_MACOS_BUNDLE_IDENTIFIER:-org.openxwa.openxwa}"
 sign_identity="${XWA_MACOS_SIGN_IDENTITY:--}"
 notary_profile="${XWA_MACOS_NOTARY_PROFILE:-}"
+notary_apple_id="${XWA_MACOS_NOTARY_APPLE_ID:-}"
+notary_team_id="${XWA_MACOS_NOTARY_TEAM_ID:-}"
+notary_password="${XWA_MACOS_NOTARY_PASSWORD:-}"
 
-work_root="${XWA_MACOS_BUILD_ROOT:-${repo_root}/build/macos-${architecture}}"
-artifact_dir="${XWA_MACOS_ARTIFACT_DIR:-${repo_root}/build/macos-package}"
+# The Debug variant enables the in-game debug UI and packages an OpenXWA.dSYM
+# debug-symbol bundle beside the application. Dependencies are always built in
+# Release mode; only OpenXWA changes configuration, so both variants share the
+# dependency and shader-tool build trees.
+case "${build_type}" in
+    Release) build_variant=release; debug_ui=OFF ;;
+    Debug) build_variant=debug; debug_ui=ON ;;
+    *) echo "XWA_BUILD_TYPE must be Release or Debug" >&2; exit 2 ;;
+esac
+
+work_root="${XWA_MACOS_BUILD_ROOT:-${repo_root}/build/cache/macos-${architecture}}"
+artifact_dir="${XWA_MACOS_ARTIFACT_DIR:-${repo_root}/build/artifacts}"
 source_root="${work_root}/sources"
 dependency_prefix="${work_root}/dependencies"
 tool_prefix="${work_root}/tools"
 build_root="${work_root}/build"
-stage_root="${work_root}/stage"
+stage_root="${work_root}/stage-${build_variant}"
 application="${stage_root}/OpenXWA.app"
-archive="${artifact_dir}/openxwa-macos-${architecture}.zip"
+dmg="${artifact_dir}/openxwa-${application_version}-macos-${architecture}-${build_variant}.dmg"
+dmg_volume_name="OpenXWA"
+dmg_extras="${script_dir}/dmg"
+dsym_bundle=""
 
 jobs=""
 
-require_command() {
-    if ! command -v "$1" >/dev/null 2>&1; then
-        echo "Required command not found: $1" >&2
-        exit 1
-    fi
-}
+# Shared signing, notarization, and DMG helpers.
+source "${script_dir}/common.sh"
 
 clone_tag() {
     local repository="$1"
@@ -176,23 +189,31 @@ build_application() {
     export PKG_CONFIG_PATH="${dependency_prefix}/lib/pkgconfig"
 
     cmake -S "${repo_root}" \
-        -B "${build_root}/xwa" \
+        -B "${build_root}/xwa-${build_variant}" \
         -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release \
+        "-DCMAKE_BUILD_TYPE=${build_type}" \
         "-DCMAKE_INSTALL_PREFIX=${stage_root}" \
         "-DCMAKE_PREFIX_PATH=${dependency_prefix}" \
         "-DCMAKE_OSX_ARCHITECTURES=${architecture}" \
         "-DCMAKE_OSX_DEPLOYMENT_TARGET=${deployment_target}" \
         "-DAERON_SHADERCROSS_EXECUTABLE=${build_root}/shadercross/shadercross" \
         -DXWA_BUILD_TOOLS=OFF \
-        -DXWA_ENABLE_DEBUG_UI=OFF \
+        "-DXWA_ENABLE_DEBUG_UI=${debug_ui}" \
         "-DXWA_MACOS_BUILD_VERSION=${build_version}" \
         "-DXWA_MACOS_BUNDLE_IDENTIFIER=${bundle_identifier}" \
         "-DXWA_VERSION=${application_version}"
-    cmake --build "${build_root}/xwa" --target xwa --parallel "${jobs}"
+    cmake --build "${build_root}/xwa-${build_variant}" --target xwa \
+        --parallel "${jobs}"
 
     cmake -E remove_directory "${stage_root}"
-    cmake --install "${build_root}/xwa"
+    cmake --install "${build_root}/xwa-${build_variant}"
+
+    # On Apple platforms DWARF stays in the object files; a distributable
+    # debug package needs the linked debug info extracted into a dSYM bundle.
+    if [[ "${build_type}" == Debug ]]; then
+        dsym_bundle="${stage_root}/OpenXWA.dSYM"
+        dsymutil "${application}/Contents/MacOS/OpenXWA" -o "${dsym_bundle}"
+    fi
 }
 
 stage_licenses() {
@@ -231,37 +252,21 @@ validate_bundle_paths() {
     fi
 }
 
-sign_bundle() {
-    local sign_arguments=(--force --sign "${sign_identity}")
-    local item
-
-    if [[ "${sign_identity}" != "-" ]]; then
-        sign_arguments+=(--options runtime --timestamp)
-    fi
-
-    while IFS= read -r item; do
-        if file "${item}" | grep -q "Mach-O"; then
-            codesign "${sign_arguments[@]}" "${item}"
-        fi
-    done < <(find "${application}/Contents/Frameworks" -type f -print)
-
-    codesign "${sign_arguments[@]}" "${application}"
-    codesign --verify --deep --strict --verbose=2 "${application}"
-}
-
-create_archive() {
-    mkdir -p "${artifact_dir}"
-    rm -f "${archive}"
-    ditto -c -k --sequesterRsrc --keepParent "${application}" "${archive}"
-}
-
 main() {
     local host_architecture
+    local application_uuid
+    local dsym_uuid
 
-    for command in clang cmake codesign ditto file git make ninja otool \
-            pkg-config plutil sysctl xcrun; do
+    for command in clang cmake codesign ditto file git hdiutil make ninja \
+            otool pkg-config plutil sysctl xcrun; do
         require_command "${command}"
     done
+    if [[ "${build_type}" == Debug ]]; then
+        require_command dsymutil
+        require_command dwarfdump
+    fi
+
+    resolve_notary_arguments
 
     host_architecture="$(uname -m)"
     if [[ "${architecture}" != "${host_architecture}" ]]; then
@@ -283,25 +288,31 @@ main() {
     test -f "${application}/Contents/Resources/resources/remaster/flight/render.yaml"
     test -f "${application}/Contents/Resources/shaders/hyperspace_streak.vert.msl"
     plutil -lint "${application}/Contents/Info.plist"
-    validate_bundle_paths
-    sign_bundle
-    create_archive
-
-    if [[ -n "${notary_profile}" ]]; then
-        if [[ "${sign_identity}" == "-" ]]; then
-            echo "Notarization requires XWA_MACOS_SIGN_IDENTITY" >&2
+    if [[ "${build_type}" == Debug ]]; then
+        application_uuid="$(dwarfdump --uuid \
+            "${application}/Contents/MacOS/OpenXWA" | awk 'NR == 1 {print $2}')"
+        dsym_uuid="$(dwarfdump --uuid "${dsym_bundle}" \
+            | awk 'NR == 1 {print $2}')"
+        if [[ -z "${application_uuid}" ||
+                "${application_uuid}" != "${dsym_uuid}" ]]; then
+            echo "OpenXWA.dSYM does not match the built executable" >&2
             exit 1
         fi
-        xcrun notarytool submit "${archive}" \
-            --keychain-profile "${notary_profile}" \
-            --wait
-        xcrun stapler staple "${application}"
-        xcrun stapler validate "${application}"
-        spctl --assess --type execute --verbose=4 "${application}"
-        create_archive
+    fi
+    validate_bundle_paths
+    sign_bundle
+
+    if [[ "${notarize_enabled}" -eq 1 ]]; then
+        notarize_application
     fi
 
-    echo "Created ${archive}"
+    create_dmg
+
+    if [[ "${notarize_enabled}" -eq 1 ]]; then
+        notarize_dmg
+    fi
+
+    echo "Created ${dmg}"
     echo "Application bundle: ${application}"
 }
 

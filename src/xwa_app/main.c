@@ -1,6 +1,7 @@
 #include "aeron/aeron.h"
 #include "host_config.h"
 #include "setup.h"
+#include "window_icon.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/runtime/presentation.h"
@@ -224,12 +225,14 @@ int main(int argc, char** argv) {
 		return 2;
 	}
 	memset(&config, 0, sizeof(config));
-	config.org_name = "FlightGroup";
+	config.org_name = "TotallyOpen";
 	config.app_name = "OpenXWA";
 	config.resource_root = launch.resource_root[0] ? launch.resource_root : NULL;
 	config.resource_path = "resources";
 	config.shader_path = "shaders";
 	config.window_title = "OpenXWA";
+	config.window_icon_bmp = xwa_window_icon_bmp;
+	config.window_icon_bmp_size = sizeof(xwa_window_icon_bmp);
 	config.window_width = 1920;
 	config.window_height = 1080;
 	config.logical_width = XWA_PRESENTATION_WIDTH;

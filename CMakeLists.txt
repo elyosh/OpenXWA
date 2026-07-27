@@ -321,8 +321,9 @@ target_include_directories(xwa PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/aeron/third_party/libyaml/include)
 target_compile_definitions(xwa PRIVATE YAML_DECLARE_STATIC)
 
+set(XWA_VERSION "0.0.0-dev" CACHE STRING "OpenXWA application version")
+
 if(APPLE)
-    set(XWA_VERSION "0.1.0" CACHE STRING "OpenXWA application version")
     set(XWA_MACOS_BUILD_VERSION "1" CACHE STRING
         "OpenXWA macOS bundle build version")
     if(NOT DEFINED XWA_MACOS_BUNDLE_IDENTIFIER)
@@ -341,6 +342,11 @@ if(APPLE)
             "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/Info.plist.in"
         INSTALL_RPATH "@executable_path/../Frameworks"
     )
+
+    set(XWA_MACOS_ICON "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/OpenXWA.icns")
+    target_sources(xwa PRIVATE "${XWA_MACOS_ICON}")
+    set_source_files_properties("${XWA_MACOS_ICON}" PROPERTIES
+        MACOSX_PACKAGE_LOCATION Resources)
 
     add_custom_command(TARGET xwa POST_BUILD
         COMMAND ${CMAKE_COMMAND}
@@ -372,6 +378,27 @@ else()
             $<TARGET_FILE_DIR:xwa>/resources
         COMMENT "Staging OpenXWA application resources"
     )
+endif()
+
+if(WIN32)
+    # Executable icon and VERSIONINFO resource. FILEVERSION needs numeric
+    # components; non-release versions such as 0.0.0-dev fall back to 0.0.0.
+    enable_language(RC)
+    if(XWA_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)")
+        set(XWA_VERSION_MAJOR ${CMAKE_MATCH_1})
+        set(XWA_VERSION_MINOR ${CMAKE_MATCH_2})
+        set(XWA_VERSION_PATCH ${CMAKE_MATCH_3})
+    else()
+        set(XWA_VERSION_MAJOR 0)
+        set(XWA_VERSION_MINOR 0)
+        set(XWA_VERSION_PATCH 0)
+    endif()
+    set(XWA_WINDOWS_ICON "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/openxwa.ico")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/xwa.rc.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/xwa.rc"
+        @ONLY)
+    target_sources(xwa PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/xwa.rc")
 endif()
 
 if(XWA_BUILD_TOOLS)

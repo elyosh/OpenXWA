@@ -9,6 +9,8 @@
     <string>OpenXWA</string>
     <key>CFBundleExecutable</key>
     <string>@MACOSX_BUNDLE_EXECUTABLE_NAME@</string>
+    <key>CFBundleIconFile</key>
+    <string>OpenXWA</string>
     <key>CFBundleIdentifier</key>
     <string>@XWA_MACOS_BUNDLE_IDENTIFIER@</string>
     <key>CFBundleInfoDictionaryVersion</key>

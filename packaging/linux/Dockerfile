@@ -49,7 +49,10 @@ ARG ZSTD_VERSION=1.5.7
 ARG FFMPEG_VERSION=8.0.1
 ARG SHADERCROSS_COMMIT=6b06e55c7c5d7e7a09a8a14f76e866dcfad5ab99
 
-FROM build-base AS dependencies
+# The dependencies build as independent stages so that a version bump only
+# rebuilds the affected dependency and so that cold builds run concurrently.
+
+FROM build-base AS sdl-build
 
 RUN git clone --branch "release-${SDL_VERSION}" --depth 1 \
         https://github.com/libsdl-org/SDL.git /deps/SDL \
@@ -63,6 +66,8 @@ RUN git clone --branch "release-${SDL_VERSION}" --depth 1 \
     && cmake --build /build/sdl --parallel \
     && cmake --install /build/sdl
 
+FROM build-base AS zstd-build
+
 RUN git clone --branch "v${ZSTD_VERSION}" --depth 1 \
         https://github.com/facebook/zstd.git /deps/zstd \
     && cmake -S /deps/zstd/build/cmake -B /build/zstd -G Ninja \
@@ -74,6 +79,8 @@ RUN git clone --branch "v${ZSTD_VERSION}" --depth 1 \
         -DZSTD_BUILD_TESTS=OFF \
     && cmake --build /build/zstd --parallel \
     && cmake --install /build/zstd
+
+FROM build-base AS ffmpeg-build
 
 RUN git clone --branch "n${FFMPEG_VERSION}" --depth 1 \
         https://github.com/FFmpeg/FFmpeg.git /deps/FFmpeg \
@@ -95,10 +102,10 @@ RUN git clone --branch "n${FFMPEG_VERSION}" --depth 1 \
         --enable-pic \
         --enable-pthreads \
         --enable-shared \
-    && make -j2 \
+    && make -j"$(nproc)" \
     && make install
 
-FROM dependencies AS shader-tools
+FROM build-base AS shader-tools
 
 COPY packaging/common/shadercross-fsr3.patch /tmp/shadercross-fsr3.patch
 
@@ -110,6 +117,9 @@ ARG DXC_LINUX_X64_SHA256=e0580d90dbf6053a783ddd8d5153285f0606e5deaad17a7a6452f03
 ADD --checksum=sha256:${DXC_LINUX_X64_SHA256} \
     https://github.com/microsoft/DirectXShaderCompiler/releases/download/v${DXC_VERSION}/${DXC_LINUX_X64_ARCHIVE} \
     /tmp/dxc.tar.gz
+
+# shadercross links SDL but needs neither zstd nor FFmpeg.
+COPY --from=sdl-build /opt/xwa-linux /opt/xwa-linux
 
 RUN git clone https://github.com/libsdl-org/SDL_shadercross.git /deps/SDL_shadercross \
     && git -C /deps/SDL_shadercross checkout "${SHADERCROSS_COMMIT}" \
@@ -152,17 +162,19 @@ RUN git clone https://github.com/libsdl-org/SDL_shadercross.git /deps/SDL_shader
 FROM build-base AS xwa-build
 
 ARG XWA_BUILD_TYPE=Release
+ARG XWA_VERSION=0.0.0-dev
 
-COPY --from=dependencies /opt/xwa-linux /opt/xwa-linux
-COPY --from=dependencies /deps/SDL/LICENSE.txt /opt/xwa-licenses/SDL3.txt
-COPY --from=dependencies /deps/zstd/LICENSE /opt/xwa-licenses/zstd.txt
-COPY --from=dependencies /deps/FFmpeg/COPYING.LGPLv2.1 /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt
+COPY --from=sdl-build /opt/xwa-linux /opt/xwa-linux
+COPY --from=zstd-build /opt/xwa-linux /opt/xwa-linux
+COPY --from=ffmpeg-build /opt/xwa-linux /opt/xwa-linux
+COPY --from=sdl-build /deps/SDL/LICENSE.txt /opt/xwa-licenses/SDL3.txt
+COPY --from=zstd-build /deps/zstd/LICENSE /opt/xwa-licenses/zstd.txt
+COPY --from=ffmpeg-build /deps/FFmpeg/COPYING.LGPLv2.1 /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt
 COPY --from=shader-tools /opt/xwa-tools /opt/xwa-tools
 COPY CMakeLists.txt /src/CMakeLists.txt
 COPY README.md /src/README.md
 COPY aeron /src/aeron
 COPY cmake /src/cmake
-COPY packaging /src/packaging
 COPY resources /src/resources
 COPY shaders /src/shaders
 COPY src /src/src
@@ -244,7 +256,7 @@ RUN test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.vert.s
     else \
         artifact_variant=release; \
     fi \
-    && package_name="openxwa-linux-x86_64-${artifact_variant}" \
+    && package_name="openxwa-${XWA_VERSION}-linux-x86_64-${artifact_variant}" \
     && mv /build/package/openxwa-linux-x86_64 "/build/package/${package_name}" \
     && mkdir -p /build/artifacts \
     && tar \

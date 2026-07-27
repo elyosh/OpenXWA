@@ -90,7 +90,11 @@ RUN git clone https://github.com/libsdl-org/SDL_shadercross.git /deps/SDL_shader
         /deps/SDL_shadercross/external/DirectXShaderCompiler-binaries/linux/lib/libdxil.so \
         /opt/xwa-host/lib/
 
-FROM build-base AS target-dependencies
+# The Windows target dependencies build as independent stages so that a
+# version bump only rebuilds the affected dependency and so that cold builds
+# run concurrently.
+
+FROM build-base AS sdl-windows
 
 COPY cmake/toolchains/mingw-w64-x86_64.cmake /opt/xwa-toolchain.cmake
 COPY packaging/common/sdl-gpu-d3d12-hdr.patch /tmp/sdl-gpu-d3d12-hdr.patch
@@ -112,6 +116,10 @@ RUN git clone --branch "release-${SDL_VERSION}" --depth 1 \
     && cmake --build /build/sdl-windows --parallel \
     && cmake --install /build/sdl-windows
 
+FROM build-base AS zstd-windows
+
+COPY cmake/toolchains/mingw-w64-x86_64.cmake /opt/xwa-toolchain.cmake
+
 RUN git clone --branch "v${ZSTD_VERSION}" --depth 1 \
         https://github.com/facebook/zstd.git /deps/zstd \
     && cmake -S /deps/zstd/build/cmake -B /build/zstd-windows -G Ninja \
@@ -124,6 +132,8 @@ RUN git clone --branch "v${ZSTD_VERSION}" --depth 1 \
         -DZSTD_BUILD_TESTS=OFF \
     && cmake --build /build/zstd-windows --parallel \
     && cmake --install /build/zstd-windows
+
+FROM build-base AS ffmpeg-windows
 
 RUN git clone --branch "n${FFMPEG_VERSION}" --depth 1 \
         https://github.com/FFmpeg/FFmpeg.git /deps/FFmpeg \
@@ -147,7 +157,7 @@ RUN git clone --branch "n${FFMPEG_VERSION}" --depth 1 \
         --enable-decoder=sanm \
         --enable-demuxer=smush \
         --enable-w32threads \
-    && make -j2 \
+    && make -j"$(nproc)" \
     && make install
 
 FROM build-base AS xwa-host-tools
@@ -168,18 +178,20 @@ RUN cmake -S /src/aeron -B /build/aeron-host -G Ninja \
 FROM build-base AS xwa-build
 
 ARG XWA_BUILD_TYPE=Release
+ARG XWA_VERSION=0.0.0-dev
 
 COPY --from=xwa-host-tools /opt/xwa-host /opt/xwa-host
-COPY --from=target-dependencies /opt/xwa-windows /opt/xwa-windows
-COPY --from=target-dependencies /deps/SDL/LICENSE.txt /opt/xwa-licenses/SDL3.txt
-COPY --from=target-dependencies /deps/zstd/LICENSE /opt/xwa-licenses/zstd.txt
-COPY --from=target-dependencies /deps/FFmpeg/COPYING.LGPLv2.1 /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt
+COPY --from=sdl-windows /opt/xwa-windows /opt/xwa-windows
+COPY --from=zstd-windows /opt/xwa-windows /opt/xwa-windows
+COPY --from=ffmpeg-windows /opt/xwa-windows /opt/xwa-windows
+COPY --from=sdl-windows /deps/SDL/LICENSE.txt /opt/xwa-licenses/SDL3.txt
+COPY --from=zstd-windows /deps/zstd/LICENSE /opt/xwa-licenses/zstd.txt
+COPY --from=ffmpeg-windows /deps/FFmpeg/COPYING.LGPLv2.1 /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt
 COPY cmake/toolchains/mingw-w64-x86_64.cmake /opt/xwa-toolchain.cmake
 COPY CMakeLists.txt /src/CMakeLists.txt
 COPY README.md /src/README.md
 COPY aeron /src/aeron
 COPY cmake /src/cmake
-COPY packaging /src/packaging
 COPY resources /src/resources
 COPY shaders /src/shaders
 COPY src /src/src
@@ -198,6 +210,7 @@ RUN case "${XWA_BUILD_TYPE}" in \
         -DAERON_SHADERCROSS_EXECUTABLE=/opt/xwa-host/bin/shadercross \
         -DXWA_BUILD_TOOLS=OFF \
         -DXWA_ENABLE_DEBUG_UI="${xwa_debug_ui}" \
+        -DXWA_VERSION="${XWA_VERSION}" \
     && cmake --build /build/xwa --target xwa --parallel
 
 RUN mkdir -p /build/package/openxwa-windows-x86_64/licenses \
@@ -241,7 +254,7 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
     else \
         artifact_variant=release; \
     fi \
-    && package_name="openxwa-windows-x86_64-${artifact_variant}" \
+    && package_name="openxwa-${XWA_VERSION}-windows-x86_64-${artifact_variant}" \
     && mv /build/package/openxwa-windows-x86_64 "/build/package/${package_name}" \
     && find "/build/package/${package_name}" \
         -exec touch -h -d "@315532800" {} + \
