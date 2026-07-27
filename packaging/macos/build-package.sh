@@ -165,6 +165,9 @@ build_dependencies() {
 build_shadercross() {
     prepare_shadercross
 
+    # LLVM_APPEND_VC_REV makes the vendored DXC configure run git describe,
+    # which can fail transiently (5-second timeout) and change the generated
+    # version headers, forcing a full DXC rebuild despite warm build trees.
     cmake -S "${source_root}/SDL_shadercross" \
         -B "${build_root}/shadercross" \
         -G Ninja \
@@ -173,6 +176,7 @@ build_shadercross() {
         "-DCMAKE_PREFIX_PATH=${dependency_prefix}" \
         "-DCMAKE_OSX_ARCHITECTURES=${architecture}" \
         "-DCMAKE_OSX_DEPLOYMENT_TARGET=${deployment_target}" \
+        -DLLVM_APPEND_VC_REV=OFF \
         -DSDLSHADERCROSS_CLI=ON \
         -DSDLSHADERCROSS_DXC=ON \
         -DSDLSHADERCROSS_INSTALL=ON \
