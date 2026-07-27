@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 int XwaFrontendTask_Init(void);
+void XwaFrontendTask_Shutdown(void);
 void XwaFrontendTask_Tick(void);
 void XwaFrontendTask_ServiceFrameSystems(void);
 void XwaFrontendTask_Pause(void);

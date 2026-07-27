@@ -9,6 +9,10 @@ extern "C" {
 #include <stdint.h>
 #include <stdio.h>
 
+#ifdef XWA_MODERN
+#include "aeron/sync.h"
+#endif
+
 typedef int (*ImHostCallback)(void);
 
 typedef struct ImHostServices {
@@ -276,15 +280,42 @@ typedef struct ImTimeCaps {
 } ImTimeCaps;
 
 typedef struct ImCriticalSection {
+#ifdef XWA_MODERN
+	void* mutex; /* AeronMutex* */
+#else
 	void*    debugInfo;
 	int32_t  lockCount;
 	int32_t  recursionCount;
 	void*    owningThread;
 	void*    lockSemaphore;
 	uintptr_t spinCount;
+#endif
 } ImCriticalSection;
 
-extern int      g_imBusyCount;
+#ifdef XWA_MODERN
+/* Backs the wave, nav and mcmp critical sections. Enter/Leave on an
+   uninitialised section are no-ops. */
+void ImPlatformCsInit(ImCriticalSection* critSec);
+void ImPlatformCsEnter(ImCriticalSection* critSec);
+void ImPlatformCsLeave(ImCriticalSection* critSec);
+void ImPlatformCsDelete(ImCriticalSection* critSec);
+
+/* Marks globals shared between the game thread and the iMUSE timer thread. */
+#define IM_CROSS_THREAD volatile
+
+#define IM_ATOMIC_LOAD(v) Aeron_AtomicLoad((volatile int*)&(v))
+#define IM_ATOMIC_STORE(v, x) Aeron_AtomicStore((volatile int*)&(v), (int)(x))
+#define IM_ATOMIC_INC(v) ((void)Aeron_AtomicAdd((volatile int*)&(v), 1))
+#define IM_ATOMIC_DEC(v) ((void)Aeron_AtomicAdd((volatile int*)&(v), -1))
+#else
+#define IM_CROSS_THREAD
+#define IM_ATOMIC_LOAD(v) (v)
+#define IM_ATOMIC_STORE(v, x) ((void)((v) = (x)))
+#define IM_ATOMIC_INC(v) ((void)++(v))
+#define IM_ATOMIC_DEC(v) ((void)--(v))
+#endif
+
+extern IM_CROSS_THREAD int g_imBusyCount;
 extern void*    g_imDirectSoundDevice;
 extern int      g_imRunning;
 extern int      g_imInitialized;
@@ -326,7 +357,7 @@ extern int           g_imMaxTracks[7];
 extern ImTrack       g_imTrackPool[16];
 extern int           g_imEnginePaused;
 extern int           g_imLastHeartbeatMs;
-extern int           g_imHeartbeatGuard;
+extern IM_CROSS_THREAD int g_imHeartbeatGuard;
 extern int           g_imPauseCount;
 extern int           g_imTriggerClockAccum;
 extern int           g_imVolDuckClockAccum;
@@ -377,7 +408,7 @@ extern int          g_imDSWriteBlock;
 extern int          g_imDSWriteCursor;
 extern uint32_t     g_imDSLockBytes2;
 extern unsigned int uDelay;
-extern unsigned int g_imTimerTicks;
+extern IM_CROSS_THREAD unsigned int g_imTimerTicks;
 extern int          g_imDSBlockCount;
 extern ImCriticalSection g_imWaveCritSec;
 extern int          g_imDSPlayCursor;
@@ -386,9 +417,9 @@ extern unsigned int uPeriod;
 extern unsigned int uTimerID;
 extern void*        g_imDirectSound;
 extern void*        g_imDSoundBuffer;
-extern int          g_imDSPaused;
+extern IM_CROSS_THREAD int g_imDSPaused;
 extern void*        hObject;
-extern int          g_imWaveCsInitialized;
+extern IM_CROSS_THREAD int g_imWaveCsInitialized;
 extern int          g_imDSFillToggle;
 extern int          g_imDSLocked;
 extern void*        g_imDSLockPtr1;

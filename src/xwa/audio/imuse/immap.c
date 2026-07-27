@@ -61,13 +61,9 @@ ImNavCriticalSectionFn LeaveCriticalSection;
 #define ImNavEnterCriticalSection EnterCriticalSection
 #define ImNavLeaveCriticalSection LeaveCriticalSection
 #else
-static void IM_NAV_STDCALL ImNavInitializeCriticalSection(ImCriticalSection* critSec) {
-	memset(critSec, 0, sizeof(*critSec));
-}
-
-static void IM_NAV_STDCALL ImNavEnterCriticalSection(ImCriticalSection* critSec) { (void)critSec; }
-
-static void IM_NAV_STDCALL ImNavLeaveCriticalSection(ImCriticalSection* critSec) { (void)critSec; }
+#define ImNavInitializeCriticalSection ImPlatformCsInit
+#define ImNavEnterCriticalSection ImPlatformCsEnter
+#define ImNavLeaveCriticalSection ImPlatformCsLeave
 #endif
 
 // FLAGS: /O2 /Og- /Oi-

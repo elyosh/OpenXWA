@@ -294,6 +294,7 @@ void XwaPort_Shutdown(void) {
 	}
 	XwaMovieTask_Shutdown();
 	Pilot_Save(0);
+	XwaFrontendTask_Shutdown();
 	FlightDisplay_FreeSurfaces();
 	FrontendDisplay_FreeSurfaces();
 	XwaPort_FreeStartupAssets();

@@ -75,7 +75,7 @@ void* g_imDirectSoundDevice;
 // GLOBAL: XWA 0x605680
 int g_imLastHeartbeatMs = -1;
 // GLOBAL: XWA 0x605684
-int g_imBusyCount;
+IM_CROSS_THREAD int g_imBusyCount = 1;
 // GLOBAL: XWA 0x784C70
 ImHostServices* g_imHostServicesPtr;
 // GLOBAL: XWA 0x60539C
@@ -103,7 +103,7 @@ int g_imRunning;
 // GLOBAL: XWA 0x78607C
 int g_imInitialized;
 // GLOBAL: XWA 0x786080
-int g_imHeartbeatGuard;
+IM_CROSS_THREAD int g_imHeartbeatGuard;
 // GLOBAL: XWA 0x786070
 int g_imPauseCount;
 // GLOBAL: XWA 0x785F70
@@ -561,13 +561,9 @@ ImMcmpCriticalSectionFn LeaveCriticalSection;
 #define ImMcmpEnterCriticalSection EnterCriticalSection
 #define ImMcmpLeaveCriticalSection LeaveCriticalSection
 #else
-static void ImMcmpInitializeCriticalSection(ImCriticalSection* critSec) {
-	memset(critSec, 0, sizeof(*critSec));
-}
-
-static void ImMcmpEnterCriticalSection(ImCriticalSection* critSec) { (void)critSec; }
-
-static void ImMcmpLeaveCriticalSection(ImCriticalSection* critSec) { (void)critSec; }
+#define ImMcmpInitializeCriticalSection ImPlatformCsInit
+#define ImMcmpEnterCriticalSection ImPlatformCsEnter
+#define ImMcmpLeaveCriticalSection ImPlatformCsLeave
 #endif
 
 #ifdef XWA_MODERN
@@ -914,7 +910,7 @@ int ImInitSubsystems(void) {
 	g_imTriggerClockAccum = 0;
 	g_imVolDuckClockAccum = 0;
 	if (!ImGroupsInit() && !ImFadesInit() && !ImTriggersInit() && !ImTracksInit()) {
-		g_imBusyCount = 0;
+		IM_ATOMIC_STORE(g_imBusyCount, 0);
 		g_imHeartbeatGuard = 0;
 		g_imPauseCount = 0;
 		g_imInitialized = 1;
@@ -1019,14 +1015,14 @@ int ImSwitchStream(int curSoundId, int newSoundId, int fadeMs, unsigned int swit
 
 // FUNCTION: XWA 0x586B3F
 int ImIncBusyCount(void) {
-	++g_imBusyCount;
-	return g_imBusyCount;
+	IM_ATOMIC_INC(g_imBusyCount);
+	return IM_ATOMIC_LOAD(g_imBusyCount);
 }
 
 // FUNCTION: XWA 0x586B51
 void ImDecBusyCount(void) {
-	if (g_imBusyCount) {
-		--g_imBusyCount;
+	if (IM_ATOMIC_LOAD(g_imBusyCount)) {
+		IM_ATOMIC_DEC(g_imBusyCount);
 	}
 }
 

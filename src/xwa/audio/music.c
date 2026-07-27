@@ -1,7 +1,6 @@
 #include "xwa/audio/music.h"
 
 #include "aeron/log.h"
-#include "aeron/time.h"
 #include "xwa/assets/model_mesh.h"
 #include "xwa/audio/imuse/imhost.h"
 #include "xwa/audio/imuse/imuse.h"
@@ -116,36 +115,6 @@ void Music_Shutdown(void) {
 		ImSetState(0);
 		g_imApiTable.shutdown();
 		g_musicInitialized = 0;
-	}
-}
-
-/* Drives the iMUSE render heartbeat (ImHeartbeat renders audio into the streaming
-   ring and processes fades/triggers). The original ran it on a 20 ms multimedia
-   timer; the port replicates that rate single-threaded from the per-frame music
-   update using the monotonic host clock, so iMUSE never runs on the audio
-   thread. Each heartbeat accounts a fixed 20 ms, so it must fire at true 20 ms
-   intervals (catch-up loop), not once per video frame. */
-static void Music_PumpHeartbeat(void) {
-	static uint64_t lastUs;
-	static int accumUs;
-	uint64_t now = Aeron_NowUs();
-	int elapsedUs;
-	int heartbeats = 0;
-
-	if (lastUs == 0) {
-		lastUs = now;
-		return;
-	}
-	elapsedUs = (int)(now - lastUs);
-	lastUs = now;
-	if (elapsedUs > 200000) {
-		elapsedUs = 200000; /* cap catch-up after a long stall */
-	}
-	accumUs += elapsedUs;
-	while (accumUs >= 20000 && heartbeats < 16) {
-		ImHeartbeat();
-		accumUs -= 20000;
-		++heartbeats;
 	}
 }
 
@@ -342,7 +311,4 @@ void Music_Update(void) {
 		return;
 	}
 	ImUpdate();
-#ifdef XWA_MODERN
-	Music_PumpHeartbeat();
-#endif
 }

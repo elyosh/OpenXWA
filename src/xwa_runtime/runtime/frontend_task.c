@@ -43,6 +43,10 @@ static void XwaFrontendTask_SetInitialCallbacks(FrontendScreenUpdateFn updateFn,
 	g_frameCounter = 0;
 }
 
+/* TODO: Port the rest of FrontendDisplay_Shutdown @ 0x53E160 (fonts, screen-stack images,
+   resource tables, string table, surface/device release). */
+void XwaFrontendTask_Shutdown(void) { FrontendSound_ShutdownDirectSound(); }
+
 /* Tick-model replacement for the non-returning original FrontendDisplay_Init @ 0x53ED60
    entry into FrontendDisplay_RunMainLoop @ 0x53E760. */
 int XwaFrontendTask_Init(void) {
@@ -87,16 +91,19 @@ int XwaFrontendTask_Init(void) {
 	   then g_directDraw = g_directDrawPrimary); its Win32 window creation is owned by
 	   Aeron in the port, so only the device bring-up is reproduced here. */
 	if (DirectDrawCreate_Compat(NULL, &g_directDrawPrimary, NULL)) {
+		XwaFrontendTask_Shutdown();
 		return 0;
 	}
 	g_directDraw = g_directDrawPrimary;
 	/* Enumerate WinMM joysticks (original FrontendDisplay_InitMainWindow also calls this). */
 	Joystick_InitDevices();
 	if (!FrontendDisplay_InitSurfaces()) {
+		XwaFrontendTask_Shutdown();
 		return 0;
 	}
 	if (FrontendText_LoadFont(20) != 1) {
 		FrontendDisplay_FreeSurfaces();
+		XwaFrontendTask_Shutdown();
 		return 0;
 	}
 	FrontendCursor_Init();
@@ -105,6 +112,7 @@ int XwaFrontendTask_Init(void) {
 	XwaFrontendTask_SetInitialCallbacks(updateFn, exitFn);
 	if (modeInitFn != 0 && modeInitFn()) {
 		FrontendDisplay_FreeSurfaces();
+		XwaFrontendTask_Shutdown();
 		return 0;
 	}
 

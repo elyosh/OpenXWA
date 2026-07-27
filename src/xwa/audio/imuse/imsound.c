@@ -1,5 +1,10 @@
 #include "xwa/audio/imuse/imuse.h"
 
+#ifdef XWA_MODERN
+#include "aeron/sync.h"
+#include "aeron/time.h"
+#endif
+
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
@@ -94,7 +99,7 @@ ImStreamSlot g_imStreamSlots[3];
 // GLOBAL: XWA 0x7B0EC0
 unsigned int uDelay;
 // GLOBAL: XWA 0x7B0EC4
-unsigned int g_imTimerTicks;
+IM_CROSS_THREAD unsigned int g_imTimerTicks;
 // GLOBAL: XWA 0x7B0ED0
 int g_imDSBlockCount;
 // GLOBAL: XWA 0x7B0EF4
@@ -114,11 +119,11 @@ int g_imDSWriteCursor;
 // GLOBAL: XWA 0x7B0ECC
 uint32_t g_imDSLockBytes2;
 // GLOBAL: XWA 0x7B0F08
-int g_imDSPaused;
+IM_CROSS_THREAD int g_imDSPaused;
 // GLOBAL: XWA 0x7B0F0C
 void* hObject;
 // GLOBAL: XWA 0x7B0F14
-int g_imWaveCsInitialized;
+IM_CROSS_THREAD int g_imWaveCsInitialized;
 // GLOBAL: XWA 0x7B0F18
 int g_imDSFillToggle;
 // GLOBAL: XWA 0x7B0F1C
@@ -141,9 +146,6 @@ int g_imMixBuffer[4096];
 int16_t g_imOutputStage[4096];
 // GLOBAL: XWA 0x7B0EF8
 uint32_t g_imDSLockBytes1;
-
-static int g_imTimerArmed;
-static unsigned int g_imCompatTime;
 
 static void** ImComVtable(void* object) {
 	if (!object) {
@@ -240,19 +242,28 @@ ImTimeGetTimeFn timeGetTime;
 #define ImTimeKillEvent timeKillEvent
 #define ImTimeGetTime timeGetTime
 #else
-static void ImInitializeCriticalSection(ImCriticalSection* critSec) { memset(critSec, 0, sizeof(*critSec)); }
+void ImPlatformCsInit(ImCriticalSection* critSec) { critSec->mutex = Aeron_MutexCreate(); }
 
-static void ImEnterCriticalSection(ImCriticalSection* critSec) { (void)critSec; }
+void ImPlatformCsEnter(ImCriticalSection* critSec) { Aeron_MutexLock((AeronMutex*)critSec->mutex); }
 
-static void ImLeaveCriticalSection(ImCriticalSection* critSec) { (void)critSec; }
+void ImPlatformCsLeave(ImCriticalSection* critSec) { Aeron_MutexUnlock((AeronMutex*)critSec->mutex); }
 
-static void ImDeleteCriticalSection(ImCriticalSection* critSec) { memset(critSec, 0, sizeof(*critSec)); }
+void ImPlatformCsDelete(ImCriticalSection* critSec) {
+	Aeron_MutexDestroy((AeronMutex*)critSec->mutex);
+	critSec->mutex = NULL;
+}
+
+#define ImInitializeCriticalSection ImPlatformCsInit
+#define ImEnterCriticalSection ImPlatformCsEnter
+#define ImLeaveCriticalSection ImPlatformCsLeave
+#define ImDeleteCriticalSection ImPlatformCsDelete
 
 static int ImCloseHandle(void* handle) {
 	(void)handle;
 	return 1;
 }
 
+/* Resolves to uPeriod = 50 in ImWaveOutStart, hence uDelay = 20 ms. */
 static int ImTimeGetDevCaps(ImTimeCaps* caps, unsigned int size) {
 	(void)size;
 	caps->wPeriodMin = 1;
@@ -260,6 +271,7 @@ static int ImTimeGetDevCaps(ImTimeCaps* caps, unsigned int size) {
 	return 0;
 }
 
+/* Aeron timers are already high resolution; no global timer period to adjust. */
 static unsigned int ImTimeBeginPeriod(unsigned int period) {
 	(void)period;
 	return 0;
@@ -270,37 +282,32 @@ static unsigned int ImTimeEndPeriod(unsigned int period) {
 	return 0;
 }
 
+/* iMUSE installs a single timer, and ImTimerCallback ignores every argument, so
+   the ids are passed as zero. */
+static ImTimerCallbackFn g_imTimerCallback;
+
+static void ImTimerTrampoline(void* user) {
+	(void)user;
+	if (g_imTimerCallback) {
+		g_imTimerCallback(0, 0, 15, 0, 0);
+	}
+}
+
 static unsigned int ImTimeSetEvent(unsigned int delay, unsigned int resolution, ImTimerCallbackFn callback,
 								   uintptr_t user, unsigned int eventFlags) {
-	(void)delay;
 	(void)resolution;
-	(void)callback;
 	(void)user;
 	(void)eventFlags;
-	g_imTimerArmed = 1;
-	return 1;
+	g_imTimerCallback = callback;
+	return (unsigned int)Aeron_TimerCreate(delay, ImTimerTrampoline, NULL);
 }
 
 static unsigned int ImTimeKillEvent(unsigned int timerId) {
-	(void)timerId;
-	g_imTimerArmed = 0;
+	Aeron_TimerDestroy((AeronTimer)timerId);
 	return 0;
 }
 
-static unsigned int ImTimeGetTime(void) {
-	g_imCompatTime += 50;
-	/* The port has no real multimedia timer. ImWaveOutStart's init spin only
-	 * waits for g_imTimerTicks to confirm the timer fires, so set it directly.
-	 * Deliberately do NOT run ImTimerCallback/ImHeartbeat here: that would render
-	 * (ImRenderFrame -> ImServiceStreamJumps) synchronously inside ImTracksInit,
-	 * before the dispatch tracks are bound (imuse.c ImTracksInit binds them only
-	 * after ImWaveInit returns). The ongoing heartbeat is driven post-init by
-	 * Music_PumpHeartbeat, when the engine is fully set up. */
-	if (g_imTimerArmed && !g_imTimerTicks) {
-		g_imTimerTicks = 1;
-	}
-	return g_imCompatTime;
-}
+static unsigned int ImTimeGetTime(void) { return (unsigned int)(Aeron_NowUs() / 1000u); }
 #endif
 
 // FLAGS: /O2 /Og- /Oi-
@@ -418,14 +425,14 @@ void ImHeartbeat(void) {
 	int nextGroup4Volume;
 
 	nowMs = ImTimeGetTime();
-	if (g_imHeartbeatGuard || g_imBusyCount ||
+	if (g_imHeartbeatGuard || IM_ATOMIC_LOAD(g_imBusyCount) ||
 		(g_imLastHeartbeatMs >= 0 && nowMs - (unsigned int)g_imLastHeartbeatMs < 20u)) {
 		return;
 	}
 
 	g_imLastHeartbeatMs = (int)nowMs;
 	g_imHeartbeatGuard = 1;
-	if (!g_imBusyCount) {
+	if (!IM_ATOMIC_LOAD(g_imBusyCount)) {
 		ImRenderFrame();
 	}
 
@@ -1368,7 +1375,7 @@ void ImServiceDSBuffer(void** outPtr, unsigned int* outLen, int* outRate) {
 	if (!g_imDSoundBuffer) {
 		return;
 	}
-	if (g_imDSPaused) {
+	if (IM_ATOMIC_LOAD(g_imDSPaused)) {
 		return;
 	}
 
@@ -1419,13 +1426,13 @@ void ImServiceDSBuffer(void** outPtr, unsigned int* outLen, int* outRate) {
 
 // FUNCTION: XWA 0x5929C0
 int ImWaveInit(void) {
-	g_imDSPaused = 1;
+	IM_ATOMIC_STORE(g_imDSPaused, 1);
 	g_imDirectSound = g_imDirectSoundDevice;
 	g_imDSWriteBlock = -1;
 	ImCreateSoundBuffer(5);
 	if (!g_imDSoundBuffer) {
 	} else {
-		g_imDSPaused = 0;
+		IM_ATOMIC_STORE(g_imDSPaused, 0);
 		if (!ImWaveOutStart()) {
 		} else {
 			return 0;
@@ -1452,7 +1459,7 @@ int ImWaveOutStart(void) {
 				return 0;
 			}
 
-			g_imTimerTicks = 0;
+			IM_ATOMIC_STORE(g_imTimerTicks, 0);
 			uPeriod = (caps.wPeriodMin > 50 ? caps.wPeriodMin : 50) < caps.wPeriodMax
 						  ? (caps.wPeriodMin > 50 ? caps.wPeriodMin : 50)
 						  : caps.wPeriodMax;
@@ -1466,12 +1473,12 @@ int ImWaveOutStart(void) {
 			}
 
 			startTime = ImTimeGetTime();
-			g_imTimerTicks = 0;
+			IM_ATOMIC_STORE(g_imTimerTicks, 0);
 			retries = 3;
-			while (retries-- && !g_imTimerTicks) {
-				while (ImTimeGetTime() - startTime < 4000 && !g_imTimerTicks) {
+			while (retries-- && !IM_ATOMIC_LOAD(g_imTimerTicks)) {
+				while (ImTimeGetTime() - startTime < 4000 && !IM_ATOMIC_LOAD(g_imTimerTicks)) {
 				}
-				if (!g_imTimerTicks) {
+				if (!IM_ATOMIC_LOAD(g_imTimerTicks)) {
 					if (retries == 2) {
 						ImLog("iMUSE timer bug encountered, if you get sound this time, please note it in "
 							  "the bug "
@@ -1490,7 +1497,7 @@ int ImWaveOutStart(void) {
 				}
 			}
 
-			if (!g_imTimerTicks) {
+			if (!IM_ATOMIC_LOAD(g_imTimerTicks)) {
 				return 0;
 			}
 
@@ -1509,7 +1516,7 @@ void IM_STDCALL ImTimerCallback(unsigned int timerId, unsigned int msg, uintptr_
 	(void)dw1;
 	(void)dw2;
 
-	if (g_imDSPaused) {
+	if (IM_ATOMIC_LOAD(g_imDSPaused)) {
 		return;
 	}
 	if (!g_imWaveCsInitialized) {
@@ -1517,16 +1524,16 @@ void IM_STDCALL ImTimerCallback(unsigned int timerId, unsigned int msg, uintptr_
 	}
 
 	ImEnterCriticalSection(&g_imWaveCritSec);
-	if (!g_imDSPaused) {
+	if (!IM_ATOMIC_LOAD(g_imDSPaused)) {
 		ImHeartbeat();
 	}
 	ImLeaveCriticalSection(&g_imWaveCritSec);
-	++g_imTimerTicks;
+	IM_ATOMIC_INC(g_imTimerTicks);
 }
 
 // FUNCTION: XWA 0x592E4F
 int ImWaveTerminate(void) {
-	g_imDSPaused = 1;
+	IM_ATOMIC_STORE(g_imDSPaused, 1);
 	ImWaveOutStop();
 	if (hObject) {
 		ImCloseHandle(hObject);
@@ -1548,10 +1555,19 @@ void ImWaveOutStop(void) {
 	if (g_imDSoundBuffer) {
 		ImCallStop(g_imDSoundBuffer);
 	}
+#ifdef XWA_MODERN
+	/* DEVIATION: killed outside g_imWaveCritSec, unlike the original. ImTimeKillEvent
+	   waits for an in-flight callback, which takes that same section. */
+	ImTimeKillEvent(uTimerID);
+	ImEnterCriticalSection(&g_imWaveCritSec);
+	ImTimeEndPeriod(uPeriod);
+	ImLeaveCriticalSection(&g_imWaveCritSec);
+#else
 	ImEnterCriticalSection(&g_imWaveCritSec);
 	ImTimeKillEvent(uTimerID);
 	ImTimeEndPeriod(uPeriod);
 	ImLeaveCriticalSection(&g_imWaveCritSec);
+#endif
 	if (g_imWaveCsInitialized) {
 		ImDeleteCriticalSection(&g_imWaveCritSec);
 		g_imWaveCsInitialized = 0;
