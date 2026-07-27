@@ -1,5 +1,7 @@
 # OpenXWA
 
+![Screenshot of the Azzameen hangar in OpenXWA](assets/openxwa_hangar.jpg)
+
 OpenXWA is a portable, source-level reimplementation of the *Star Wars:
 X-Wing Alliance* engine. Its goal is to preserve the original game's behavior,
 data formats, simulation, user interface, and classic rendering while also
