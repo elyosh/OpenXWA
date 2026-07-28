@@ -18,6 +18,7 @@ typedef struct XwaHostConfig {
 	float model_smooth_angle_degrees;
 	float model_opt_emissive_strength;
 	float model_opt_projectile_emissive_strength;
+	float model_engine_emissive_strength;
 	int force_opt_models;
 	int prefer_original_2d;
 	XwaModernVideoOptions video_options;

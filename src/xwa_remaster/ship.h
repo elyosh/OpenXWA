@@ -10,11 +10,11 @@
  */
 
 #include "aeron/render.h"
-#include "aeron/scene/scene3d.h"
 #include "aeron/scene/billboard.h"
 #include "aeron/scene/mesh.h"
-#include "xwa_runtime/snapshot/snapshot.h"
+#include "aeron/scene/scene3d.h"
 #include "xwa_remaster/assets.h"
+#include "xwa_runtime/snapshot/snapshot.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,16 +23,14 @@ extern "C" {
 /* Mirror the classic engine's live processed-OPT set published in the
  * snapshot. Reconciliation performs every disk read, conversion and GPU
  * upload before scene rendering; MeshForName is lookup-only. */
-int             XwaRemasterShip_AssetsNeedSync(const XwaSnapshot* snapshot);
+int XwaRemasterShip_AssetsNeedSync(const XwaSnapshot* snapshot);
 typedef enum XwaRemasterShipSyncResult {
 	XWA_REMASTER_SHIP_SYNC_FAILED = -1,
 	XWA_REMASTER_SHIP_SYNC_MORE = 0,
 	XWA_REMASTER_SHIP_SYNC_COMPLETE = 1
 } XwaRemasterShipSyncResult;
-XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd,
-													  const XwaSnapshot* snapshot,
-													  uint64_t byte_budget,
-													  uint32_t copy_budget);
+XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
+													 uint64_t byte_budget, uint32_t copy_budget);
 /* Commit a successfully submitted synchronization batch. A complete target
  * generation is published atomically; an incomplete one remains staged for
  * the next host frame. */
@@ -41,12 +39,11 @@ AeronSceneMesh* XwaRemasterShip_MeshForName(const char* name);
 /* Same lookup with source metadata; out_runtime_opt is 1 only for an
  * in-memory OPT conversion, never for an authored GLB. */
 AeronSceneMesh* XwaRemasterShip_MeshForNameWithSource(const char* name, int* out_runtime_opt);
-float           XwaRemasterShip_OptProjectileEmissiveStrength(void);
-void            XwaRemasterShip_Shutdown(void);
-void            XwaRemasterShip_Configure(float opt_smooth_angle_degrees,
-										  float opt_emissive_strength,
-										  float opt_projectile_emissive_strength,
-										  int force_opt_models);
+float XwaRemasterShip_OptProjectileEmissiveStrength(void);
+void XwaRemasterShip_Shutdown(void);
+void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissive_strength,
+							   float opt_projectile_emissive_strength, float engine_emissive_strength,
+							   int force_opt_models);
 
 /* Projectiles render as ordinary scene instances (roll-aligned by the
  * flight driver). Runtime-converted OPTs receive a genus-driven
@@ -109,10 +106,10 @@ void XwaRemasterShip_GetPbrTuningDefault(XwaShipPbrTuning* out);
  * FlightPbrAoParams). NULL disables AO (intensity 0): the FS leaves
  * the ambient term untouched and the bound AO texture reads as 1. */
 typedef struct XwaShipAoParams {
-	float intensity; /* 0 = off; else ambient-occlusion lerp weight */
-	float power;     /* pow(ao, power) contrast — 1 = linear */
+	float intensity;  /* 0 = off; else ambient-occlusion lerp weight */
+	float power;      /* pow(ao, power) contrast — 1 = linear */
 	float rt_w, rt_h; /* scene RT dimensions (screen-UV denominator) */
-	float direct;    /* AO weight on direct diffuse (0 = ambient-only) */
+	float direct;     /* AO weight on direct diffuse (0 = ambient-only) */
 } XwaShipAoParams;
 
 /* One frame-global punctual light for the PBR env (world space, HDR
@@ -153,16 +150,14 @@ typedef struct XwaShipAmbientCube {
  * (no throttle/flicker — those belong to the glow SIZE law). Color
  * carries the classic intensity premultiplied (linear HDR); the
  * caller applies its global scale knobs. Returns lights appended. */
-uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh,
-													  const float transform[16],
+uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh, const float transform[16],
 													  const AeronSceneMeshTable* table,
-													  const XwaFlightObject* f,
-													  XwaShipPointLight* out, uint32_t max);
+													  const XwaFlightObject* f, XwaShipPointLight* out,
+													  uint32_t max);
 
 /* Select the semantic key directional: the brightest active sun
  * backdrop when present, otherwise the greatest linear luminance. */
-const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* lights,
-															 uint32_t light_count);
+const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* lights, uint32_t light_count);
 
 /* Queue the shared PBR fragment environment (PbrLightFS b1, including
  * lighting tuning) as a scene frame uniform, built from the snapshot's
@@ -181,9 +176,8 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
  * records are submitted separately through AeronScene_AddLight;
  * `point_tuning` controls their evaluation. `ambient_cube` optionally
  * replaces the uniform ambient fill for scene-specific environments. */
-void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights,
-							   uint32_t light_count, const float cam_rows[9],
-							   const float cam_pos[3], const XwaShipAoParams* ao,
+void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, uint32_t light_count,
+							   const float cam_rows[9], const float cam_pos[3], const XwaShipAoParams* ao,
 							   const XwaShipPointLightTuning* point_tuning,
 							   const XwaShipAmbientCube* ambient_cube);
 
@@ -216,10 +210,8 @@ float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f);
  * identity camera, space == eye — preview PiP). */
 void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh* mesh,
 									   const float transform[16], float model_scale,
-									   const AeronSceneMeshTable* table,
-									   uint32_t knockout_mask, float scale,
-									   const float crows[9], const float cam_pos[3],
-									   const XwaAssetRef* tex);
+									   const AeronSceneMeshTable* table, uint32_t knockout_mask, float scale,
+									   const float crows[9], const float cam_pos[3], const XwaAssetRef* tex);
 
 #ifdef __cplusplus
 }

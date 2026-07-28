@@ -3,8 +3,8 @@
 #include "xwa_remaster/ship.h"
 
 #include "aeron/aeron.h"
-#include "aeron/scene/gltf_mesh.h"
 #include "aeron/scene/billboard.h"
+#include "aeron/scene/gltf_mesh.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/glow_marks.h"
 #include "xwa_remaster/opt_mesh.h"
@@ -39,16 +39,18 @@ static int s_batch_completes_generation;
 static float s_opt_smooth_angle_degrees;
 static float s_opt_emissive_strength;
 static float s_opt_projectile_emissive_strength;
+static float s_engine_emissive_strength;
 static int s_force_opt_models;
 static XwaShipPbrTuning g_pbr_tuning_default;
 static XwaShipPbrTuning g_pbr_tuning;
 
 void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissive_strength,
-							   float opt_projectile_emissive_strength,
+							   float opt_projectile_emissive_strength, float engine_emissive_strength,
 							   int force_opt_models) {
 	s_opt_smooth_angle_degrees = opt_smooth_angle_degrees;
 	s_opt_emissive_strength = opt_emissive_strength;
 	s_opt_projectile_emissive_strength = opt_projectile_emissive_strength;
+	s_engine_emissive_strength = engine_emissive_strength;
 	s_force_opt_models = force_opt_models != 0;
 }
 
@@ -91,9 +93,8 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 	}
 
 	char opt_error[256];
-	if (!XwaRemasterOptMesh_Build(Aeron_GetVfs(), key, s_opt_smooth_angle_degrees,
-								  s_opt_emissive_strength, &model, opt_error,
-								  sizeof opt_error)) {
+	if (!XwaRemasterOptMesh_Build(Aeron_GetVfs(), key, s_opt_smooth_angle_degrees, s_opt_emissive_strength,
+								  &model, opt_error, sizeof opt_error)) {
 		Aeron_LogWarn("xwa.remaster", "mesh: OPT load failed '%s': %s", key, opt_error);
 		return NULL;
 	}
@@ -101,16 +102,14 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 	AeronSceneMesh* mesh = AeronScene_MeshCreate(cmd, &model, key, &create_status);
 	Aeron_GltfMeshFree(&model);
 	if (!mesh) {
-		Aeron_LogError("xwa.remaster", "mesh: OPT resource creation failed '%s' status=%d",
-				  key, (int)create_status);
+		Aeron_LogError("xwa.remaster", "mesh: OPT resource creation failed '%s' status=%d", key,
+					   (int)create_status);
 	} else {
 		if (out_runtime_opt) {
 			*out_runtime_opt = 1;
 		}
-		Aeron_LogVerbose("xwa.remaster",
-				  "mesh: '%s' source=OPT smooth_angle=%.3g emissive_strength=%.3g",
-				  key, (double)s_opt_smooth_angle_degrees,
-				  (double)s_opt_emissive_strength);
+		Aeron_LogVerbose("xwa.remaster", "mesh: '%s' source=OPT smooth_angle=%.3g emissive_strength=%.3g",
+						 key, (double)s_opt_smooth_angle_degrees, (double)s_opt_emissive_strength);
 	}
 	return mesh;
 }
@@ -140,10 +139,8 @@ static void ship_pending_discard(void) {
 	s_pending_generation = UINT64_MAX;
 }
 
-XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd,
-													  const XwaSnapshot* snapshot,
-													  uint64_t byte_budget,
-													  uint32_t copy_budget) {
+XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
+													 uint64_t byte_budget, uint32_t copy_budget) {
 	if (!cmd || !snapshot || !XwaRemasterShip_AssetsNeedSync(snapshot)) {
 		return XWA_REMASTER_SHIP_SYNC_COMPLETE;
 	}
@@ -302,9 +299,7 @@ AeronSceneMesh* XwaRemasterShip_MeshForName(const char* name) {
 	return XwaRemasterShip_MeshForNameWithSource(name, NULL);
 }
 
-float XwaRemasterShip_OptProjectileEmissiveStrength(void) {
-	return s_opt_projectile_emissive_strength;
-}
+float XwaRemasterShip_OptProjectileEmissiveStrength(void) { return s_opt_projectile_emissive_strength; }
 
 void XwaRemasterShip_Shutdown(void) {
 	ship_pending_discard();
@@ -396,8 +391,7 @@ static float ship_directional_light_luminance(const XwaDirLight* light) {
 }
 
 static int ship_directional_light_is_sun(const XwaDirLight* light) {
-	return light &&
-		   light->source_backdrop_model_type >= XWA_SNAP_TYPE_BACKDROP_SUN_FIRST &&
+	return light && light->source_backdrop_model_type >= XWA_SNAP_TYPE_BACKDROP_SUN_FIRST &&
 		   light->source_backdrop_model_type <= XWA_SNAP_TYPE_BACKDROP_SUN_LAST;
 }
 
@@ -406,8 +400,7 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
 	if (!lights) {
 		return NULL;
 	}
-	const uint32_t count =
-		light_count > XWA_SNAP_MAX_DIR_LIGHTS ? XWA_SNAP_MAX_DIR_LIGHTS : light_count;
+	const uint32_t count = light_count > XWA_SNAP_MAX_DIR_LIGHTS ? XWA_SNAP_MAX_DIR_LIGHTS : light_count;
 	const XwaDirLight* brightest = NULL;
 	const XwaDirLight* brightest_sun = NULL;
 	float brightest_luminance = 0.0f;
@@ -418,8 +411,7 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
 			brightest = &lights[i];
 			brightest_luminance = luminance;
 		}
-		if (ship_directional_light_is_sun(&lights[i]) &&
-			luminance > brightest_sun_luminance) {
+		if (ship_directional_light_is_sun(&lights[i]) && luminance > brightest_sun_luminance) {
 			brightest_sun = &lights[i];
 			brightest_sun_luminance = luminance;
 		}
@@ -450,8 +442,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	env.global_spec_mul = g_pbr_tuning.global_spec_mul;
 	env.light_wrap = g_pbr_tuning.light_wrap;
 	env.spec_geom_adapt = g_pbr_tuning.spec_geom_adapt;
-	AeronScene_SetPbrDebugViews(
-		scene, env.debug_isolate_term != 0.0f || env.spec_geom_adapt == 0.0f);
+	AeronScene_SetPbrDebugViews(scene, env.debug_isolate_term != 0.0f || env.spec_geom_adapt == 0.0f);
 
 	/* HD relight: authored ambient fill (tuning.ambient, linear) plus
 	 * sun = decode(classic light color) x intensity. The game state
@@ -490,8 +481,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	const XwaDirLight* sorted[XWA_SNAP_MAX_DIR_LIGHTS];
 	float sorted_luminance[XWA_SNAP_MAX_DIR_LIGHTS];
 	const uint32_t n =
-		!lights ? 0 :
-		(light_count > XWA_SNAP_MAX_DIR_LIGHTS ? XWA_SNAP_MAX_DIR_LIGHTS : light_count);
+		!lights ? 0 : (light_count > XWA_SNAP_MAX_DIR_LIGHTS ? XWA_SNAP_MAX_DIR_LIGHTS : light_count);
 	const XwaDirLight* key = XwaRemasterShip_SelectKeyDirectionalLight(lights, n);
 	for (uint32_t i = 0; i < n; i++) {
 		sorted[i] = &lights[i];
@@ -593,11 +583,9 @@ static void ship_mat3x4_mul(float out[3][4], const float lhs[3][4], const float 
 	float result[3][4];
 	for (int r = 0; r < 3; r++) {
 		for (int c = 0; c < 3; c++) {
-			result[r][c] = lhs[r][0] * rhs[0][c] + lhs[r][1] * rhs[1][c] +
-							 lhs[r][2] * rhs[2][c];
+			result[r][c] = lhs[r][0] * rhs[0][c] + lhs[r][1] * rhs[1][c] + lhs[r][2] * rhs[2][c];
 		}
-		result[r][3] = lhs[r][0] * rhs[0][3] + lhs[r][1] * rhs[1][3] +
-						 lhs[r][2] * rhs[2][3] + lhs[r][3];
+		result[r][3] = lhs[r][0] * rhs[0][3] + lhs[r][1] * rhs[1][3] + lhs[r][2] * rhs[2][3] + lhs[r][3];
 	}
 	memcpy(out, result, sizeof result);
 }
@@ -638,8 +626,7 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 		 * number of transposes. EngineGlow_MeshRotationAngleQ16's
 		 * explicit -meshRotation corroborates. Our table is consumed
 		 * straight (v' = R v), so negate here. */
-		const float angle =
-			(float)f->mesh_rotation[mi] * (-2.0f * 3.14159265358979323846f / 256.0f);
+		const float angle = (float)f->mesh_rotation[mi] * (-2.0f * 3.14159265358979323846f / 256.0f);
 		ship_mat3x4_rotation_about_pivot(out->rows[mi], r->axis, r->pivot, angle);
 		any = 1;
 	}
@@ -690,8 +677,7 @@ int XwaRemasterShip_BuildDebrisMeshTable(const XwaFlightObject* f, AeronSceneMes
 		 * classic applies both. renderOffset/spin_axis are OPT-native
 		 * model space, the cooked mesh's runtime space (the loader's
 		 * swap_yz3 round-trips the glTF axis swap). */
-		const float angle =
-			(float)f->spin_angle * (-2.0f * 3.14159265358979323846f / 65536.0f);
+		const float angle = (float)f->spin_angle * (-2.0f * 3.14159265358979323846f / 65536.0f);
 		ship_mat3x4_rotation_about_pivot(out->rows[comp], f->spin_axis, f->render_offset, angle);
 	}
 	return 1;
@@ -723,7 +709,7 @@ int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaC
 			beam_rot = r;
 			if (c->aim_angle_b != 0) {
 				ship_mat3x4_rotation_about_pivot(out->rows[mi], r->axis, r->pivot,
-											 (float)c->aim_angle_b * q16);
+												 (float)c->aim_angle_b * q16);
 				any = 1;
 			}
 			continue;
@@ -737,13 +723,11 @@ int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaC
 			float own[3][4];
 			ship_mat3x4_identity(own);
 			if (c->aim_angle_a != 0) {
-				ship_mat3x4_rotation_about_pivot(own, r->axis, r->pivot,
-											 (float)-c->aim_angle_a * q16);
+				ship_mat3x4_rotation_about_pivot(own, r->axis, r->pivot, (float)-c->aim_angle_a * q16);
 			}
 			if (inherited_angle != 0.0f) {
 				float inherited[3][4];
-				ship_mat3x4_rotation_about_pivot(inherited, beam_rot->axis, beam_rot->pivot,
-											 inherited_angle);
+				ship_mat3x4_rotation_about_pivot(inherited, beam_rot->axis, beam_rot->pivot, inherited_angle);
 				ship_mat3x4_mul(out->rows[mi], inherited, own);
 			} else if (c->aim_angle_a != 0) {
 				memcpy(out->rows[mi], own, sizeof own);
@@ -802,7 +786,8 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 									   const float transform[16], float model_scale,
 									   const AeronSceneMeshTable* table, uint32_t knockout_mask, float scale,
 									   const float crows[9], const float cam_pos[3], const XwaAssetRef* tex) {
-	if (!scene || !mesh || !mesh->engine_glow_count || !transform || scale <= 0.0f || !tex || !tex->texture) {
+	if (!scene || !mesh || !mesh->engine_glow_count || !transform || scale <= 0.0f ||
+		s_engine_emissive_strength <= 0.0f || !tex || !tex->texture) {
 		return;
 	}
 	const float k = model_scale > 0.0f ? model_scale : 1.0f;
@@ -972,13 +957,14 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 		 * glow atlas is PREMULTIPLIED (imgbake KTX2 convention), so the
 		 * PMA blend + tint RGB pre-scaled by tint alpha keep the
 		 * classic straight-alpha modulate (straight blending crushed
-		 * the soft glow rims by applying alpha twice). */
+		 * the soft glow rims by applying alpha twice). Emissive strength
+		 * boosts HDR RGB without changing alpha coverage. */
 		float core[4], outer[4];
 		core[3] = g->core_rgba[3];
 		outer[3] = g->outer_rgba[3];
 		for (int ch = 0; ch < 3; ch++) {
-			core[ch] = XwaRemaster_SrgbToLinear(g->core_rgba[ch]) * core[3];
-			outer[ch] = XwaRemaster_SrgbToLinear(g->outer_rgba[ch]) * outer[3];
+			core[ch] = XwaRemaster_SrgbToLinear(g->core_rgba[ch]) * core[3] * s_engine_emissive_strength;
+			outer[ch] = XwaRemaster_SrgbToLinear(g->outer_rgba[ch]) * outer[3] * s_engine_emissive_strength;
 		}
 
 		AeronSceneBillboardDesc d;

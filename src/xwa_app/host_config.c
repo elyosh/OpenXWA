@@ -59,8 +59,8 @@ static int host_config_simulation_step(const AeronConfigFile* config, int* out, 
 	return 1;
 }
 
-static int host_config_model_smoothing(const AeronConfigFile* config, int required, float* out,
-									   char* error, size_t error_size) {
+static int host_config_model_smoothing(const AeronConfigFile* config, int required, float* out, char* error,
+									   size_t error_size) {
 	const char* key = "models.smooth_angle_degrees";
 	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
 	double value;
@@ -122,6 +122,27 @@ static int host_config_opt_projectile_emissive_strength(const AeronConfigFile* c
 	return 1;
 }
 
+static int host_config_engine_emissive_strength(const AeronConfigFile* config, int required, float* out,
+												char* error, size_t error_size) {
+	const char* key = "models.engine_emissive_strength";
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	double value;
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+		}
+		return 1;
+	}
+	value = AeronConfigNode_Float(node, NAN);
+	if (!isfinite(value) || value < 0.0 || value > FLT_MAX) {
+		return host_config_error(error, error_size,
+								 "invalid 'models.engine_emissive_strength': expected numeric value %s",
+								 "greater than or equal to 0");
+	}
+	*out = (float)value;
+	return 1;
+}
+
 static int host_config_force_opt(const AeronConfigFile* config, int required, int* out, char* error,
 								 size_t error_size) {
 	const char* key = "models.force_opt";
@@ -139,8 +160,8 @@ static int host_config_force_opt(const AeronConfigFile* config, int required, in
 	return 1;
 }
 
-static int host_config_prefer_original_2d(const AeronConfigFile* config, int required, int* out,
-										  char* error, size_t error_size) {
+static int host_config_prefer_original_2d(const AeronConfigFile* config, int required, int* out, char* error,
+										  size_t error_size) {
 	const char* key = "assets.prefer_original_2d";
 	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
 	if (!node) {
@@ -165,6 +186,8 @@ static int host_config_remaster_options(const AeronConfigFile* config, int requi
 											 error_size) &&
 		   host_config_opt_projectile_emissive_strength(
 			   config, required, &out->model_opt_projectile_emissive_strength, error, error_size) &&
+		   host_config_engine_emissive_strength(config, required, &out->model_engine_emissive_strength, error,
+												error_size) &&
 		   host_config_force_opt(config, required, &out->force_opt_models, error, error_size) &&
 		   host_config_prefer_original_2d(config, required, &out->prefer_original_2d, error, error_size);
 }
@@ -407,7 +430,7 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 	}
 	if (AeronConfigFile_GetNode(config, "paths.resources")) {
 		Aeron_LogWarn("xwa.config",
-				  "deprecated setting 'paths.resources' is ignored; resources are application-owned");
+					  "deprecated setting 'paths.resources' is ignored; resources are application-owned");
 	}
 	const int valid =
 		host_config_optional_path(config, "paths.game_data", out->game_data_path, sizeof out->game_data_path,

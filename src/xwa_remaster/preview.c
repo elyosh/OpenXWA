@@ -24,6 +24,7 @@
 #include "xwa_remaster/preview.h"
 
 #include "aeron/aeron.h"
+#include "aeron/scene/bloom.h"
 #include "aeron/scene/present.h"
 #include "aeron/scene/scene3d.h"
 #include "xwa_remaster/flight.h"
@@ -41,6 +42,7 @@
 static struct {
 	AeronScene3D* scene; /* shared; color/depth transient per record */
 	AeronRenderTarget* present[PREVIEW_SLOTS];
+	AeronSceneBloom* bloom;
 	AeronScenePresentChain* chain;
 	AeronSampler* chain_sampler;
 	AeronSampleCount scene_requested_samples;
@@ -48,8 +50,8 @@ static struct {
 
 static int preview_ensure(void) {
 	const AeronSampleCount requested_samples = XwaRemaster_MsaaSampleCount();
-	if (s.scene && s.scene_requested_samples == requested_samples) {
-		return s.chain && s.chain_sampler;
+	if (s.scene && s.scene_requested_samples == requested_samples && s.bloom && s.chain && s.chain_sampler) {
+		return 1;
 	}
 	if (s.scene) {
 		AeronScene_Destroy(s.scene);
@@ -74,6 +76,9 @@ static int preview_ensure(void) {
 	if (!s.chain) {
 		s.chain = AeronScenePresentChain_Create(AERON_TEXTURE_FORMAT_RGBA16_FLOAT);
 	}
+	if (!s.bloom) {
+		s.bloom = AeronSceneBloom_Create(PREVIEW_RT_W, PREVIEW_RT_H);
+	}
 	if (!s.chain_sampler) {
 		s.chain_sampler =
 			Aeron_CreateSampler(&(AeronSamplerDesc) { .min_filter = AERON_FILTER_LINEAR,
@@ -83,6 +88,10 @@ static int preview_ensure(void) {
 	}
 	if (!s.chain || !s.chain_sampler) {
 		Aeron_LogError("xwa.remaster", "preview: present resources create failed");
+		return 0;
+	}
+	if (!s.bloom) {
+		Aeron_LogError("xwa.remaster", "preview: bloom resources create failed");
 		return 0;
 	}
 	return 1;
@@ -227,13 +236,27 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 		return NULL;
 	}
 
-	/* Tonemap into the slot's present RT (no bloom; src_coverage keeps
-	 * the transparent background). The scene color RT is transient —
+	/* Bloom and tonemap into the slot's present RT; src_coverage keeps
+	 * the transparent background. The scene color RT is transient —
 	 * the next record's render reuses it. */
 	AeronTexture* scene_tex = Aeron_RenderTargetGetTexture(AeronScene_SceneRt(s.scene));
 	if (!scene_tex) {
 		Aeron_CommandBufferSetFailure(cmd, "Model-preview scene produced no output");
 		return NULL;
+	}
+	AeronTexture* bloom_tex = NULL;
+	const float bloom_intensity = AeronSceneBloom_Intensity();
+	if (bloom_intensity > 0.0f) {
+		if (!AeronSceneBloom_Apply(s.bloom, cmd, scene_tex, PREVIEW_RT_W, PREVIEW_RT_H, PREVIEW_RT_H)) {
+			Aeron_CommandBufferSetFailure(cmd, "Model-preview bloom recording failed");
+			return NULL;
+		}
+		AeronRenderTarget* bloom_rt = AeronSceneBloom_ColorRt(s.bloom);
+		bloom_tex = bloom_rt ? Aeron_RenderTargetGetTexture(bloom_rt) : NULL;
+		if (!bloom_tex) {
+			Aeron_CommandBufferSetFailure(cmd, "Model-preview bloom produced no output");
+			return NULL;
+		}
 	}
 	AeronRenderPass* pp = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
 		.color_target = s.present[slot],
@@ -246,7 +269,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 		return NULL;
 	}
 	static const float tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	AeronScenePresentChain_Draw(s.chain, pp, scene_tex, s.chain_sampler, /*bloom_tex=*/NULL, 0.0f,
+	AeronScenePresentChain_Draw(s.chain, pp, scene_tex, s.chain_sampler, bloom_tex, bloom_intensity,
 								PREVIEW_RT_W, PREVIEW_RT_H, /*bar_y_uv=*/1.0f, tint,
 								/*src_coverage=*/1);
 	Aeron_EndRenderPass(pp);
@@ -262,6 +285,9 @@ void XwaRemasterPreview_Shutdown(void) {
 	}
 	if (s.chain_sampler) {
 		Aeron_DestroySampler(s.chain_sampler);
+	}
+	if (s.bloom) {
+		AeronSceneBloom_Destroy(s.bloom);
 	}
 	if (s.chain) {
 		AeronScenePresentChain_Destroy(s.chain);

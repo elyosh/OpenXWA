@@ -1,5 +1,5 @@
-#include "aeron/aeron.h"
 #include "aeron/main.h"
+#include "aeron/aeron.h"
 #include "host_config.h"
 #include "setup.h"
 #include "window_icon.h"
@@ -84,15 +84,15 @@ static int select_game_data(AeronVfs* vfs, char* selected, size_t selected_capac
 			return 0;
 		}
 		do {
-				Aeron_BeginFrame();
-				status = Aeron_PollFolderDialog(dialog, candidate, sizeof candidate, dialog_error,
-												sizeof dialog_error);
-				if (!Aeron_Present()) {
-					snprintf(error, error_size, "Renderer failure while displaying the folder picker: %s",
-							 Aeron_RenderLastError());
-					Aeron_DestroyFolderDialog(dialog);
-					return 0;
-				}
+			Aeron_BeginFrame();
+			status = Aeron_PollFolderDialog(dialog, candidate, sizeof candidate, dialog_error,
+											sizeof dialog_error);
+			if (!Aeron_Present()) {
+				snprintf(error, error_size, "Renderer failure while displaying the folder picker: %s",
+						 Aeron_RenderLastError());
+				Aeron_DestroyFolderDialog(dialog);
+				return 0;
+			}
 			if (status == AERON_FOLDER_DIALOG_WAITING) {
 				Aeron_WaitForNextFrame(Aeron_NowUs() + 16667);
 			}
@@ -283,16 +283,21 @@ int main(int argc, char** argv) {
 	Aeron_LogInfo("xwa.config", "resources: %s", Aeron_ResourceRoot());
 	Aeron_LogInfo("xwa.config", "flight simulation step: %d ticks", host_config.flight_simulation_step_ticks);
 	Aeron_LogInfo("xwa.config", "OPT smoothing angle: %.3g degrees",
-			  (double)host_config.model_smooth_angle_degrees);
-	Aeron_LogInfo("xwa.config", "OPT emissive strength: %.3g", (double)host_config.model_opt_emissive_strength);
+				  (double)host_config.model_smooth_angle_degrees);
+	Aeron_LogInfo("xwa.config", "OPT emissive strength: %.3g",
+				  (double)host_config.model_opt_emissive_strength);
 	Aeron_LogInfo("xwa.config", "OPT projectile emissive strength: %.3g",
-			  (double)host_config.model_opt_projectile_emissive_strength);
+				  (double)host_config.model_opt_projectile_emissive_strength);
+	Aeron_LogInfo("xwa.config", "engine emissive strength: %.3g",
+				  (double)host_config.model_engine_emissive_strength);
 	Aeron_LogInfo("xwa.config", "force OPT models: %s", host_config.force_opt_models ? "yes" : "no");
-	Aeron_LogInfo("xwa.config", "prefer original 2D assets: %s", host_config.prefer_original_2d ? "yes" : "no");
+	Aeron_LogInfo("xwa.config", "prefer original 2D assets: %s",
+				  host_config.prefer_original_2d ? "yes" : "no");
 	const XwaRemasterInitOptions remaster_options = {
 		.opt_smooth_angle_degrees = host_config.model_smooth_angle_degrees,
 		.opt_emissive_strength = host_config.model_opt_emissive_strength,
 		.opt_projectile_emissive_strength = host_config.model_opt_projectile_emissive_strength,
+		.engine_emissive_strength = host_config.model_engine_emissive_strength,
 		.force_opt_models = host_config.force_opt_models,
 		.prefer_original_2d = host_config.prefer_original_2d,
 		.video_options = host_config.video_options,
