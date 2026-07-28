@@ -49,6 +49,18 @@ typedef enum XwaModernSdrGamma {
 	XWA_MODERN_SDR_GAMMA_SRGB,
 } XwaModernSdrGamma;
 
+/* Reference white for HDR output. AUTO follows the OS SDR white level (the
+ * Windows SDR-content-brightness slider); the fixed steps are in nits. */
+typedef enum XwaModernPaperWhite {
+	XWA_MODERN_PAPER_WHITE_AUTO = 0,
+	XWA_MODERN_PAPER_WHITE_100,
+	XWA_MODERN_PAPER_WHITE_150,
+	XWA_MODERN_PAPER_WHITE_200,
+	XWA_MODERN_PAPER_WHITE_250,
+	XWA_MODERN_PAPER_WHITE_300,
+	XWA_MODERN_PAPER_WHITE_400,
+} XwaModernPaperWhite;
+
 typedef struct XwaModernVideoOptions {
 	XwaModernWindowMode window_mode;
 	XwaModernSsaoQuality ssao_quality;
@@ -57,6 +69,7 @@ typedef struct XwaModernVideoOptions {
 	XwaModernMotionBlurQuality motion_blur_quality;
 	int hdr_output;
 	XwaModernSdrGamma sdr_gamma;
+	XwaModernPaperWhite paper_white;
 } XwaModernVideoOptions;
 
 enum {
@@ -67,6 +80,7 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_WINDOW_MODE = 1u << 4,
 	XWA_MODERN_VIDEO_OVERRIDE_MSAA = 1u << 5,
 	XWA_MODERN_VIDEO_OVERRIDE_SDR_GAMMA = 1u << 6,
+	XWA_MODERN_VIDEO_OVERRIDE_PAPER_WHITE = 1u << 7,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

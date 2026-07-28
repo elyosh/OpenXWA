@@ -618,6 +618,20 @@ static void xwa_tool_hdr(int* open, void* user) {
 						   "composition — SDR composition.",
 						   Aeron_RenderDriverName());
 	}
+	float paper_white = Aeron_OutputPaperWhiteNits();
+	bool auto_white = paper_white <= 0.0f;
+	if (ImGui::Checkbox("Auto paper white (OS SDR white)", &auto_white)) {
+		Aeron_SetOutputPaperWhiteNits(auto_white ? 0.0f : 200.0f);
+		paper_white = Aeron_OutputPaperWhiteNits();
+	}
+	if (!auto_white) {
+		if (ImGui::SliderFloat("Paper white", &paper_white, 80.0f, 400.0f, "%.0f nits")) {
+			Aeron_SetOutputPaperWhiteNits(paper_white);
+		}
+	}
+	ImGui::Text("SDR white %.2fx, headroom %.2fx", (double)Aeron_OutputSdrWhiteLevel(),
+				(double)Aeron_OutputHdrHeadroom());
+
 	static const char* vsync_names[] = { "Full refresh", "Half refresh" };
 	int vsync_rate = Aeron_PresentationVsyncDivisor() - 1;
 	if (ImGui::Combo("VSync rate", &vsync_rate, vsync_names, 2)) {

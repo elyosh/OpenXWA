@@ -93,6 +93,8 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	 * config.yaml 'srgb' value (and the fixed Apple behavior) still displays
 	 * truthfully — any left/right press moves into the offered pair. */
 	static const char* const sdr_gamma_texts[] = { "2.2", "2.4", "sRGB" };
+	static const char* const paper_white_texts[] = { "Auto",     "100 nits", "150 nits", "200 nits",
+													 "250 nits", "300 nits", "400 nits" };
 	XwaModernVideoOptions options;
 	char key_state;
 	const char* text;
@@ -105,7 +107,8 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	uint8_t motion_blur;
 	uint8_t hdr;
 	uint8_t sdr_gamma;
-	int sdr_gamma_disabled;
+	uint8_t paper_white;
+	int hdr_rows_disabled;
 	int y;
 	int row_index;
 	int changed;
@@ -128,6 +131,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	motion_blur = (uint8_t)options.motion_blur_quality;
 	hdr = (uint8_t)(options.hdr_output != 0);
 	sdr_gamma = (uint8_t)options.sdr_gamma;
+	paper_white = (uint8_t)options.paper_white;
 	y = 140;
 	row_index = 0;
 	changed = 0;
@@ -137,13 +141,13 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		Keyboard_FlushCharBuffer();
 		key_state = 0;
 		if (--*cursor_row < 0) {
-			*cursor_row = 7;
+			*cursor_row = 8;
 		}
 	} else if (key_state == XWA_MODERN_MENU_KEY_DOWN) {
 		FrontendSound_PlayUISound("configsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
 		Keyboard_FlushCharBuffer();
 		key_state = 0;
-		if (++*cursor_row >= 8) {
+		if (++*cursor_row >= 9) {
 			*cursor_row = 0;
 		}
 	}
@@ -174,19 +178,22 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 													 &row_index, *cursor_row, &key_state, 65,
 													 !Aeron_OutputSupportsHdr());
 #if defined(__APPLE__)
-	/* Fixed platform behavior (piecewise sRGB, matching the compositor's own
-	 * SDR presentation); shown for parity with other platforms. */
-	sdr_gamma_disabled = 1;
+	/* Fixed platform behavior (piecewise sRGB, EDR white following system
+	 * brightness); shown for parity with other platforms. */
+	hdr_rows_disabled = 1;
 #else
 	/* Greyed while the HDR composition is not actually running (HDR Output
 	 * off, or the display is in SDR mode): SDR presentation is byte-exact,
-	 * so the decode choice has no effect there. Enabling HDR Output above
-	 * un-greys the row once the deferred swapchain flip applies. */
-	sdr_gamma_disabled = !Aeron_OutputHdrEnabled();
+	 * so neither choice has an effect there. Enabling HDR Output above
+	 * un-greys the rows once the deferred swapchain flip applies. */
+	hdr_rows_disabled = !Aeron_OutputHdrEnabled();
 #endif
 	changed |= XwaModernVideoOptionsScreen_DrawCycle(&sdr_gamma, "SDR Content Gamma", sdr_gamma_texts, 2,
 													 menu_center_x, &y, &row_index, *cursor_row, &key_state,
-													 66, sdr_gamma_disabled);
+													 66, hdr_rows_disabled);
+	changed |= XwaModernVideoOptionsScreen_DrawCycle(&paper_white, "HDR Paper White", paper_white_texts, 7,
+													 menu_center_x, &y, &row_index, *cursor_row, &key_state,
+													 67, hdr_rows_disabled);
 
 	if (changed) {
 		if (msaa != original_msaa && msaa != XWA_MODERN_MSAA_OFF) {
@@ -201,13 +208,14 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		options.motion_blur_quality = (XwaModernMotionBlurQuality)motion_blur;
 		options.hdr_output = hdr != 0;
 		options.sdr_gamma = (XwaModernSdrGamma)sdr_gamma;
+		options.paper_white = (XwaModernPaperWhite)paper_white;
 		XwaModernVideoOptions_Set(&options);
 	}
 
 	text = FrontendString_Get(STR_BACK);
 	text_x = menu_center_x - (int)(FrontendText_MeasureWidth(text, 15) >> 1);
 	button_pressed =
-		FrontendButton_DrawMenuButton(text_x, y, text, 15, g_colorPaleBlue, 67, 0, "settingsound");
+		FrontendButton_DrawMenuButton(text_x, y, text, 15, g_colorPaleBlue, 68, 0, "settingsound");
 	if (*cursor_row == row_index) {
 		FrontendText_Draw(15, text, text_x, y, g_colorGreen);
 		if (key_state == XWA_MODERN_MENU_KEY_ENTER) {

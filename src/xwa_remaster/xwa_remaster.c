@@ -31,6 +31,7 @@
 #include "xwa_runtime/runtime/presentation.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -185,6 +186,33 @@ static float XwaRemaster_SdrGammaToDecode(XwaModernSdrGamma gamma) {
 	return 0.0f;
 }
 
+/* Aeron's paper white (nits, 0 = follow OS SDR white) <-> the option steps. */
+static const float g_paperWhiteNits[] = { 0.0f, 100.0f, 150.0f, 200.0f, 250.0f, 300.0f, 400.0f };
+
+static XwaModernPaperWhite XwaRemaster_PaperWhiteFromNits(float nits) {
+	size_t best = 1;
+	size_t i;
+
+	if (nits <= 0.0f) {
+		return XWA_MODERN_PAPER_WHITE_AUTO;
+	}
+	/* Snap to the nearest step; only exact values round-trip from the store,
+	 * but the debug tool can leave arbitrary nits in Aeron. */
+	for (i = 2; i < sizeof g_paperWhiteNits / sizeof g_paperWhiteNits[0]; ++i) {
+		if (fabsf(g_paperWhiteNits[i] - nits) < fabsf(g_paperWhiteNits[best] - nits)) {
+			best = i;
+		}
+	}
+	return (XwaModernPaperWhite)best;
+}
+
+static float XwaRemaster_PaperWhiteToNits(XwaModernPaperWhite paper_white) {
+	if (paper_white < XWA_MODERN_PAPER_WHITE_AUTO || paper_white > XWA_MODERN_PAPER_WHITE_400) {
+		return 0.0f;
+	}
+	return g_paperWhiteNits[paper_white];
+}
+
 static int XwaRemaster_VideoOptionsValid(const XwaModernVideoOptions* options) {
 	return options && options->ssao_quality >= XWA_MODERN_SSAO_OFF &&
 		   options->ssao_quality <= XWA_MODERN_SSAO_HIGH && options->fsr_upscaling >= XWA_MODERN_FSR_OFF &&
@@ -193,7 +221,9 @@ static int XwaRemaster_VideoOptionsValid(const XwaModernVideoOptions* options) {
 		   (options->fsr_upscaling == XWA_MODERN_FSR_OFF || options->msaa == XWA_MODERN_MSAA_OFF) &&
 		   options->motion_blur_quality >= XWA_MODERN_MOTION_BLUR_OFF &&
 		   options->motion_blur_quality <= XWA_MODERN_MOTION_BLUR_HIGH &&
-		   options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 && options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB;
+		   options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 && options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB &&
+		   options->paper_white >= XWA_MODERN_PAPER_WHITE_AUTO &&
+		   options->paper_white <= XWA_MODERN_PAPER_WHITE_400;
 }
 
 void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
@@ -216,6 +246,7 @@ void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
 	out->motion_blur_quality = (XwaModernMotionBlurQuality)motion_blur.quality;
 	out->hdr_output = XwaRemaster_GetHdrDesired();
 	out->sdr_gamma = XwaRemaster_SdrGammaFromDecode(Aeron_OutputSdrContentGamma());
+	out->paper_white = XwaRemaster_PaperWhiteFromNits(Aeron_OutputPaperWhiteNits());
 }
 
 void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
@@ -240,10 +271,12 @@ void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
 	XwaRemasterFlight_SetTemporal(&temporal);
 
 #if !defined(__APPLE__)
-	/* Apple keeps Aeron's piecewise platform default: the compositor presents
-	 * SDR content with the piecewise curve, so diverging would make HDR and
-	 * SDR output disagree there. The option is shown disabled in the UI. */
+	/* Apple keeps Aeron's platform defaults for both: the compositor presents
+	 * SDR content with the piecewise curve, and EDR reference white follows
+	 * the system brightness rather than absolute nits. The options are shown
+	 * disabled in the UI. */
 	Aeron_SetOutputSdrContentGamma(XwaRemaster_SdrGammaToDecode(options->sdr_gamma));
+	Aeron_SetOutputPaperWhiteNits(XwaRemaster_PaperWhiteToNits(options->paper_white));
 #endif
 
 	XwaRemaster_SetHdrDesired(options->hdr_output);
@@ -299,6 +332,9 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	}
 	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_SDR_GAMMA) {
 		video_options.sdr_gamma = options->video_options.sdr_gamma;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_PAPER_WHITE) {
+		video_options.paper_white = options->video_options.paper_white;
 	}
 	XwaRemaster_SetVideoOptions(&video_options);
 	g.hdr_apply_pending = 0;
