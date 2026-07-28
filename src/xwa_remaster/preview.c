@@ -26,6 +26,7 @@
 #include "aeron/aeron.h"
 #include "aeron/scene/present.h"
 #include "aeron/scene/scene3d.h"
+#include "xwa_remaster/flight.h"
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/xwa_remaster.h"
 
@@ -58,8 +59,9 @@ static int preview_ensure(void) {
 		.rt_width = PREVIEW_RT_W,
 		.rt_height = PREVIEW_RT_H,
 		.color_format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
-		.with_normal_rt = 0, /* no post on previews — monolithic 1-RT */
+		.with_normal_rt = 1,
 		.sample_count = requested_samples,
+		.view_space_to_meters = 1.0f / 40.96f,
 	});
 	if (!s.scene) {
 		Aeron_LogError("xwa.remaster", "preview: scene create failed");
@@ -132,10 +134,36 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 		return NULL;
 	}
 
+	XwaFlightSsaoParams ssao = { 0 };
+	XwaRemasterFlight_GetSsao(&ssao);
+	AeronScene_SetPost(s.scene, &(AeronScenePostDesc) {
+									.ssao_quality = ssao.quality,
+									.ssao_intensity = ssao.intensity,
+									.ssao_power = ssao.power,
+									.ssao_radius_view = ssao.radius_view,
+									.ssao_bias_view = ssao.bias_view,
+									.ssao_direct = ssao.direct,
+									.ssao_debug_viz = ssao.debug_viz,
+									.ssao_min_screen_frac = ssao.min_screen_frac,
+									.ssao_max_screen_frac = ssao.max_screen_frac,
+									.ssao_sample_jitter = ssao.sample_jitter,
+								});
+	int render_w;
+	int render_h;
+	AeronScene_RenderDims(s.scene, &render_w, &render_h);
+	const XwaShipAoParams ao = {
+		.intensity = ssao.intensity,
+		.power = ssao.power,
+		.rt_w = (float)render_w,
+		.rt_h = (float)render_h,
+		.direct = ssao.direct,
+	};
+	const int ao_on = ssao.quality > 0 && ssao.intensity > 0.0f;
+
 	/* Eye-space lighting env: the engine's own preview light
 	 * (world-space dir_lights channel) rotated by this view's captured
 	 * camera; camera at the origin. */
-	XwaRemasterShip_SetPbrEnv(s.scene, lights, light_count, p->cam_rows, NULL, /*ao=*/NULL,
+	XwaRemasterShip_SetPbrEnv(s.scene, lights, light_count, p->cam_rows, NULL, ao_on ? &ao : NULL,
 							  /*point_tuning=*/NULL, /*ambient_cube=*/NULL);
 
 	/* Model->eye ("world") instance. The engine consumes the captured
