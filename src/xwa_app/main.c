@@ -1,4 +1,5 @@
 #include "aeron/aeron.h"
+#include "aeron/main.h"
 #include "host_config.h"
 #include "setup.h"
 #include "window_icon.h"

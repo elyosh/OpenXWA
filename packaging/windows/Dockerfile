@@ -244,6 +244,9 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
     && test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert.spv \
     && test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.frag.spv \
     && test -f /build/package/openxwa-windows-x86_64/resources/remaster/flight/render.yaml \
+    && x86_64-w64-mingw32-objdump -p \
+        /build/package/openxwa-windows-x86_64/OpenXWA.exe \
+        | grep -Eq 'Subsystem[[:space:]]+00000002' \
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
         x86_64-w64-mingw32-objdump -h \
             /build/package/openxwa-windows-x86_64/OpenXWA.exe \

@@ -381,6 +381,8 @@ else()
 endif()
 
 if(WIN32)
+    set_target_properties(xwa PROPERTIES WIN32_EXECUTABLE TRUE)
+
     # Executable icon and VERSIONINFO resource. FILEVERSION needs numeric
     # components; non-release versions such as 0.0.0-dev fall back to 0.0.0.
     enable_language(RC)
