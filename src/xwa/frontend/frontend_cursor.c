@@ -70,8 +70,17 @@ int FrontendCursor_IsVisible(void) { return g_cursorVisible; }
 // FLAGS: /O2 /G6
 // FUNCTION: XWA 0x55BBF0
 int FrontendCursor_SetLabel(const void* text) {
+#ifdef XWA_MODERN
+	size_t length;
+
+	/* Avoid the original fixed-width source over-read for ordinary C strings. */
+	length = strnlen((const char*)text, sizeof(g_cursorLabelText) - 1);
+	memcpy(g_cursorLabelText, text, length);
+	g_cursorLabelText[length] = 0;
+#else
 	memcpy(g_cursorLabelText, text, 255);
 	g_cursorLabelText[255] = 0;
+#endif
 	return 1;
 }
 
