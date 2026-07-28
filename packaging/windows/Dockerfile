@@ -160,6 +160,25 @@ RUN git clone --branch "n${FFMPEG_VERSION}" --depth 1 \
     && make -j"$(nproc)" \
     && make install
 
+FROM build-base AS winpix-windows
+
+ARG WINPIX_VERSION=1.0.240308001
+ARG WINPIX_NUPKG_SHA256=726acc93d6968e2146261a1e415521747d50ad69894c2b42b5d0d4c29fd66ec4
+
+# SDL's D3D12 backend emits SDL_Push/PopGPUDebugGroup and
+# SDL_InsertGPUDebugLabel through WinPixEventRuntime.dll, loaded at runtime.
+# MIT-licensed since 1.0.240308001. Shipped with Debug packages only: Release
+# builds compile the label calls out (AERON_GPU_DEBUG_LABELS), so the DLL is
+# staged outside /opt/xwa-windows to keep it clear of the wildcard DLL copy.
+ADD --checksum=sha256:${WINPIX_NUPKG_SHA256} \
+    https://globalcdn.nuget.org/packages/winpixeventruntime.${WINPIX_VERSION}.nupkg \
+    /tmp/winpix.nupkg
+
+RUN mkdir -p /deps/winpix /opt/winpix/bin \
+    && unzip -q /tmp/winpix.nupkg -d /deps/winpix \
+    && install -m 644 /deps/winpix/bin/x64/WinPixEventRuntime.dll \
+        /opt/winpix/bin/
+
 FROM build-base AS xwa-host-tools
 
 COPY --from=host-tools /opt/xwa-host /opt/xwa-host
@@ -187,6 +206,9 @@ COPY --from=ffmpeg-windows /opt/xwa-windows /opt/xwa-windows
 COPY --from=sdl-windows /deps/SDL/LICENSE.txt /opt/xwa-licenses/SDL3.txt
 COPY --from=zstd-windows /deps/zstd/LICENSE /opt/xwa-licenses/zstd.txt
 COPY --from=ffmpeg-windows /deps/FFmpeg/COPYING.LGPLv2.1 /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt
+COPY --from=winpix-windows /opt/winpix /opt/winpix
+COPY --from=winpix-windows /deps/winpix/license.txt /opt/xwa-licenses/WinPixEventRuntime.txt
+COPY --from=winpix-windows /deps/winpix/ThirdPartyNotices.txt /opt/xwa-licenses/WinPixEventRuntime-ThirdPartyNotices.txt
 COPY cmake/toolchains/mingw-w64-x86_64.cmake /opt/xwa-toolchain.cmake
 COPY CMakeLists.txt /src/CMakeLists.txt
 COPY README.md /src/README.md
@@ -237,7 +259,15 @@ RUN mkdir -p /build/package/openxwa-windows-x86_64/licenses \
     && cp "$(x86_64-w64-mingw32-g++ -print-file-name=libstdc++-6.dll)" \
         /build/package/openxwa-windows-x86_64/ \
     && cp "$(x86_64-w64-mingw32-g++ -print-file-name=libwinpthread-1.dll)" \
-        /build/package/openxwa-windows-x86_64/
+        /build/package/openxwa-windows-x86_64/ \
+    && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
+        cp /opt/winpix/bin/WinPixEventRuntime.dll \
+            /build/package/openxwa-windows-x86_64/ \
+        && cp /opt/xwa-licenses/WinPixEventRuntime.txt \
+            /build/package/openxwa-windows-x86_64/licenses/WinPixEventRuntime.txt \
+        && cp /opt/xwa-licenses/WinPixEventRuntime-ThirdPartyNotices.txt \
+            /build/package/openxwa-windows-x86_64/licenses/WinPixEventRuntime-ThirdPartyNotices.txt; \
+    fi
 
 RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert.dxil \
     && test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.frag.dxil \
@@ -250,7 +280,8 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
         x86_64-w64-mingw32-objdump -h \
             /build/package/openxwa-windows-x86_64/OpenXWA.exe \
-            | grep -q '\.debug_info'; \
+            | grep -q '\.debug_info' \
+        && test -f /build/package/openxwa-windows-x86_64/WinPixEventRuntime.dll; \
     fi \
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
         artifact_variant=debug; \
