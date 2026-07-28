@@ -7,6 +7,7 @@
  * scene_kind to the peer drivers:
  *   FRONTEND -> frontend.c (2D reconstruction)
  *   LOADING  -> frontend.c (last presented 2D loading frame)
+ *   FRONTEND_MODAL -> frontend.c (in-flight options/name-prompt UI)
  *   FLIGHT   -> flight.c   (full-frame 3D scene)
  *   CUTSCENE -> cutscene.c (transparent HD subtitle overlay)
  * Any other kind (or an unrenderable mode) submits nothing — the
@@ -56,6 +57,7 @@ static struct {
 	/* Last scene render, re-submitted on host frames between sim
 	 * ticks (both drivers return persistent textures). */
 	AeronTexture* scene_tex;
+	XwaSceneKind scene_kind;
 	int scene_is_direct;
 	/* HDR output: desired flag + deferred apply (see the header). */
 	int hdr_desired;
@@ -353,7 +355,7 @@ static void XwaRemaster_TogglePrimaryView(void) {
 static int XwaRemaster_CanSuppressClassicFlight(void) {
 	const XwaSnapshot* snap = XwaSnapshot_Current();
 	return snap && snap->scene_kind == XWA_SCENE_FLIGHT && snap->flight_camera_valid && g.scene_tex &&
-		   g.mode == RM_VIEW_HD && g.ramp.alpha >= 1.0f;
+		   g.scene_kind == XWA_SCENE_FLIGHT && g.mode == RM_VIEW_HD && g.ramp.alpha >= 1.0f;
 }
 
 static int XwaRemaster_CanPresentFlightDirect(const XwaSnapshot* snap) {
@@ -444,12 +446,18 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		g.force_scene_render = 0;
 	}
 
-	/* Render on new sim ticks; reuse the persistent texture between
-	 * them. A scene-kind change invalidates the reuse. */
+	/* Render on new sim ticks and reuse the persistent texture between them.
+	 * Keep the last complete render across a scene transition until the new
+	 * scene has finished any incremental asset synchronization. */
 	if (snap->scene_kind != g.last_kind) {
 		g.last_kind = snap->scene_kind;
-		g.scene_tex = NULL;
-		g.scene_is_direct = 0;
+		/* Cutscenes supply their opaque video independently of scene_tex; their
+		 * optional subtitle texture is not a valid transition background. */
+		if (snap->scene_kind == XWA_SCENE_CUTSCENE ||
+			(g.scene_tex && g.scene_kind == XWA_SCENE_CUTSCENE)) {
+			g.scene_tex = NULL;
+			g.scene_is_direct = 0;
+		}
 	}
 	const int flight_render_needed =
 		snap->scene_kind != XWA_SCENE_FLIGHT || g.mode != RM_VIEW_CLASSIC || g.ramp.alpha > 0.0f;
@@ -470,7 +478,15 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	}
 	const int direct_present = XwaRemaster_CanPresentFlightDirect(snap);
 	const int presentation_change =
-		snap->scene_kind == XWA_SCENE_FLIGHT && g.scene_tex && direct_present != g.scene_is_direct;
+		snap->scene_kind == XWA_SCENE_FLIGHT && g.scene_tex && g.scene_kind == XWA_SCENE_FLIGHT &&
+		direct_present != g.scene_is_direct;
+	/* Flight shutdown commits once after the task has released its camera and
+	 * before the frontend callback draws its first frame. Preserve and, when
+	 * necessary, resolve the last complete flight image before its assets are
+	 * eligible for reconciliation. */
+	const int retain_invalid_flight_frame =
+		snap->scene_kind == XWA_SCENE_FLIGHT && !snap->flight_camera_valid && g.scene_tex &&
+		g.scene_kind == XWA_SCENE_FLIGHT;
 
 	/* Classic OPT and texture-model lifetimes drive HD residency. While a
 	 * settled CLASSIC flight suspends HD work, generation changes remain dirty
@@ -482,11 +498,15 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		flight_render_needed && XwaRemasterAssets_FlightTexturesNeedSync(g.assets, snap);
 	const int process_assets_need_prepare = flight_render_needed && snap->scene_kind == XWA_SCENE_LOADING &&
 											XwaRemasterFlight_ProcessAssetsNeedPrepare();
-	const int assets_need_sync = frontend_assets_need_sync || ship_assets_need_sync ||
-								 texture_assets_need_sync || process_assets_need_prepare;
+	const int assets_need_sync =
+		!retain_invalid_flight_frame &&
+		(frontend_assets_need_sync || ship_assets_need_sync || texture_assets_need_sync ||
+		 process_assets_need_prepare);
 	const int render_snapshot = snap->tick_index != g.last_tick || g.force_scene_render;
-	int retain_loading_frame =
-		!render_snapshot || (snap->scene_kind == XWA_SCENE_LOADING && !XwaRemaster_SnapshotHasPresent(snap));
+	const int retain_scene_frame =
+		!render_snapshot || (snap->scene_kind == XWA_SCENE_LOADING && !XwaRemaster_SnapshotHasPresent(snap)) ||
+		retain_invalid_flight_frame;
+	int assets_pending = 0;
 
 	if (flight_render_needed && assets_need_sync) {
 		XwaRemasterShipSyncResult ship_sync = XWA_REMASTER_SHIP_SYNC_COMPLETE;
@@ -553,28 +573,29 @@ void XwaRemaster_Frame(int32_t delta_us) {
 					  upload_usage.largest_upload_bytes);
 		}
 		if (ship_sync == XWA_REMASTER_SHIP_SYNC_MORE) {
-			return;
+			assets_pending = 1;
 		}
 	}
 
 	/* Required classic output is re-submitted on idle game ticks. Opaque HD
 	 * flight frames omit that layer; the remaster texture below then owns the
 	 * complete presentation frame. */
-	if (flight_render_needed && (render_snapshot || presentation_change) &&
-		(!retain_loading_frame || presentation_change)) {
+	if (!assets_pending && flight_render_needed && (render_snapshot || presentation_change) &&
+		(!retain_scene_frame || presentation_change)) {
 		AeronTexture* next_scene_tex = g.scene_tex;
 		int next_scene_is_direct = g.scene_is_direct;
-		int render_output_required = retain_loading_frame;
+		int render_output_required = retain_scene_frame;
 		AeronCommandBuffer* cmd = Aeron_AcquireCommandBuffer();
 		if (!cmd) {
 			XwaRemaster_FatalGpu("HD frame command-buffer acquisition");
 			return;
 		}
 		Aeron_GpuDebugPush(cmd, "OpenXWA HD frame");
-		if (!retain_loading_frame) {
+		if (!retain_scene_frame) {
 			switch (snap->scene_kind) {
 				case XWA_SCENE_FRONTEND:
 				case XWA_SCENE_LOADING:
+				case XWA_SCENE_FRONTEND_MODAL:
 					render_output_required = 1;
 					Aeron_GpuDebugPush(cmd, "OpenXWA frontend reconstruction");
 					next_scene_tex = XwaRemasterFrontend_Render(cmd, snap, g.assets);
@@ -625,17 +646,16 @@ void XwaRemaster_Frame(int32_t delta_us) {
 			return;
 		}
 		g.scene_tex = next_scene_tex;
+		g.scene_kind = snap->scene_kind;
 		g.scene_is_direct = next_scene_is_direct;
 		g.last_tick = snap->tick_index;
 		g.force_scene_render = 0;
-	} else if (flight_render_needed && render_snapshot && retain_loading_frame) {
+	} else if (!assets_pending && flight_render_needed && render_snapshot && retain_scene_frame) {
 		g.last_tick = snap->tick_index;
 		g.force_scene_render = 0;
 	}
 
 	if (snap->scene_kind == XWA_SCENE_CUTSCENE) {
-		g.ramp.target = 0.0f;
-		Aeron_BlendRampAdvance(&g.ramp, delta_us, 0.0f);
 		if (g.mode == RM_VIEW_HD && g.scene_tex) {
 			const XwaPresentationRect safe = XwaPresentation_ClassicSafeFrame();
 			const AeronTextureLayerDesc layer = {
@@ -664,7 +684,8 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		return; /* classic only — submit nothing */
 	}
 	if (g.scene_is_direct) {
-		if (direct_present && !XwaRemasterFlight_SubmitDirectPresentation()) {
+		if ((g.scene_kind != snap->scene_kind || direct_present) &&
+			!XwaRemasterFlight_SubmitDirectPresentation()) {
 			XwaRemaster_FatalGpu("direct flight presentation");
 		}
 		return;
@@ -674,7 +695,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	 * safe frame. Modern flight owns the full presentation frame; HUD
 	 * profiles change only the authored overlay layout. */
 	const XwaPresentationRect pr =
-		snap->scene_kind == XWA_SCENE_FLIGHT ? XwaPresentation_Frame() : XwaPresentation_ClassicSafeFrame();
+		g.scene_kind == XWA_SCENE_FLIGHT ? XwaPresentation_Frame() : XwaPresentation_ClassicSafeFrame();
 	AeronTextureLayerDesc layer = {
 		.texture = g.scene_tex,
 		.logical_rect = { pr.x, pr.y, pr.width, pr.height },

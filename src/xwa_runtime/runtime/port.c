@@ -187,6 +187,8 @@ static void XwaPort_TickBody(int32_t delta_us) {
 			XwaTime_AdvanceHostClock(delta_us);
 			XwaFrontendTask_ServiceFrameSystems();
 			if (!FlightDisplay_PumpFrontendModal()) {
+				XwaSnapshot_SetSceneKind(XWA_SCENE_FRONTEND_MODAL);
+				FrontendDisplay_ClearPresentFrameReady();
 				XwaSnapshot_Commit();
 				return;
 			}
@@ -212,12 +214,21 @@ static void XwaPort_TickBody(int32_t delta_us) {
 		XwaFlightTask_Tick();
 		if (XwaFlightTask_IsComplete()) {
 			flightResult = XwaFlightTask_Shutdown();
+			/* Shutdown ends the flight-only suppression scope. Frontend surface
+			   initialization below must populate its GPU flip chain normally. */
+			XwaPort_ApplyClassicFlightRenderingPolicy();
 			FrontendFlight_CompleteLaunchSession(flightResult);
 			/* The original launch callback returns 1 after flight result 2,
 			   terminating the frontend main loop. */
 			if (flightResult == 2) {
 				g_xwaPortShouldQuit = 1;
 			}
+		} else if (FlightDisplay_IsFrontendModalActive()) {
+			/* In-flight frontend modals emit the same fixed 640x480 draw stream
+			   as the normal frontend. Route it through the HD frontend
+			   reconstruction instead of presenting a flight-resolution surface. */
+			XwaSnapshot_SetSceneKind(XWA_SCENE_FRONTEND_MODAL);
+			FrontendDisplay_ClearPresentFrameReady();
 		} else if (FlightLoading_AreFrontendSurfacesAttached()) {
 			/* The loading screen is frontend 2D rendered into surfaces temporarily
 			   attached to flight. Its snapshot already contains the sprite/glyph/PRESENT

@@ -234,11 +234,13 @@ void DDrawCompat_ResubmitIfIdle(void) {
  * surface is the persistent composition buffer, so every blit into it -- the
  * frontend background bitmap (offscreen->front) then the 2D UI (back->front) --
  * accumulates on the render target underneath / over the 3D. Honors the source
- * color key so the keyed preview rect reveals the 3D. Returns 1 if it handled the
- * blit. */
-static int DDShim_ComposeOntoRenderTarget(DDrawSurfaceShim* dst, DDrawSurfaceShim* src, int colorKey) {
+ * rectangle, destination offset, and color key so attached frontend surfaces keep
+ * the original DirectDraw placement. Returns 1 if it handled the blit. */
+static int DDShim_ComposeOntoRenderTarget(DDrawSurfaceShim* dst, DDrawSurfaceShim* src, int dstX, int dstY,
+										  const AeronSurfaceRect* srcRect, int colorKey) {
 	AeronPixelFrameView view;
 	AeronPixelLayerDesc layer;
+	int bytesPerPixel;
 
 	if (!dst->rt || !src || !src->cpu) {
 		return 0;
@@ -246,7 +248,7 @@ static int DDShim_ComposeOntoRenderTarget(DDrawSurfaceShim* dst, DDrawSurfaceShi
 	if (g_ddClassicFlightRenderingSuppressed) {
 		const uint32_t flags = colorKey && src->has_colorkey ? AERON_SURFACE_BLIT_COLOR_KEY : 0;
 		if (!DDShim_EnsureRenderTargetStaging(dst) ||
-			!AeronSurface_Blit(dst->cpu, 0, 0, src->cpu, NULL, flags)) {
+			!AeronSurface_Blit(dst->cpu, dstX, dstY, src->cpu, srcRect, flags)) {
 			return 0;
 		}
 		dst->cpu_dirty = 1;
@@ -255,8 +257,21 @@ static int DDShim_ComposeOntoRenderTarget(DDrawSurfaceShim* dst, DDrawSurfaceShi
 	if (!AeronSurface_GetFrameView(src->cpu, &view)) {
 		return 0;
 	}
+	if (srcRect) {
+		bytesPerPixel = view.bpp / 8;
+		if (bytesPerPixel <= 0 || srcRect->x < 0 || srcRect->y < 0 || srcRect->w <= 0 || srcRect->h <= 0 ||
+			srcRect->x + srcRect->w > view.width || srcRect->y + srcRect->h > view.height) {
+			return 0;
+		}
+		view.pixels = (const unsigned char*)view.pixels + (size_t)srcRect->y * (size_t)view.pitch +
+					  (size_t)srcRect->x * (size_t)bytesPerPixel;
+		view.width = srcRect->w;
+		view.height = srcRect->h;
+	}
 	memset(&layer, 0, sizeof(layer));
 	layer.frame = view;
+	layer.logical_rect.x = dstX;
+	layer.logical_rect.y = dstY;
 	layer.logical_rect.width = view.width;
 	layer.logical_rect.height = view.height;
 	layer.sampling = AERON_PIXEL_SAMPLING_SHARP_BILINEAR;
@@ -283,34 +298,16 @@ static int DDShim_ComposeOntoRenderTarget(DDrawSurfaceShim* dst, DDrawSurfaceShi
 	return 1;
 }
 
-/* Clears a render target to a raw 16bpp fill value (the surface's RGB565/RGB555
- * format), matching a DirectDraw DDBLT_COLORFILL on the 3D back buffer. Keep the
- * CPU staging synchronized with the known GPU clear so the original CPU starfield
- * can lock it without downloading the same clear image. Depth is left untouched
- * (std3D clears it separately). */
-static int DDShim_ClearRenderTargetColor(DDrawSurfaceShim* s, uint32_t fill) {
+static int DDShim_ClearGpuTargetColor(const DDrawSurfaceShim* s, AeronRenderTarget* target,
+									  uint32_t fill) {
 	AeronCommandBuffer* command_buffer;
 	AeronRenderPass* pass;
 	float rgba[4];
-	int staging_cleared;
 	int r;
 	int g;
 	int b;
 
-	if (!s->rt) {
-		return 0;
-	}
-	staging_cleared = DDShim_EnsureRenderTargetStaging(s) && AeronSurface_Clear(s->cpu, fill);
-	if (g_ddClassicFlightRenderingSuppressed) {
-		if (staging_cleared) {
-			s->cpu_dirty = 1;
-			s->gpu_dirty = 0;
-		}
-		return staging_cleared;
-	}
-	/* End any open scene pass before clearing so the load-op clear is not sequenced
-	 * against an in-flight render pass on the same target. */
-	if (!D3DCompat_FlushRenderTargetPass(s)) {
+	if (!s || !target) {
 		return 0;
 	}
 	if (s->format == AERON_PIXEL_FORMAT_RGB555) {
@@ -336,7 +333,7 @@ static int DDShim_ClearRenderTargetColor(DDrawSurfaceShim* s, uint32_t fill) {
 		return 0;
 	}
 	pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
-		.color_target = s->rt,
+		.color_target = target,
 		.depth_target = NULL,
 		.viewport = { 0, 0, s->width, s->height },
 		.scissor = { 0, 0, s->width, s->height },
@@ -354,6 +351,33 @@ static int DDShim_ClearRenderTargetColor(DDrawSurfaceShim* s, uint32_t fill) {
 		Aeron_RequestFatalRendererError("DirectDraw render-target clear submission");
 		return 0;
 	}
+	return 1;
+}
+
+/* Clears a render target to a raw 16bpp fill value (the surface's RGB565/RGB555
+ * format), matching a DirectDraw DDBLT_COLORFILL on the 3D back buffer. Keep the
+ * CPU staging synchronized with the known GPU clear so the original CPU starfield
+ * can lock it without downloading the same clear image. Depth is left untouched
+ * (std3D clears it separately). */
+static int DDShim_ClearRenderTargetColor(DDrawSurfaceShim* s, uint32_t fill) {
+	int staging_cleared;
+
+	if (!s->rt) {
+		return 0;
+	}
+	staging_cleared = DDShim_EnsureRenderTargetStaging(s) && AeronSurface_Clear(s->cpu, fill);
+	if (g_ddClassicFlightRenderingSuppressed) {
+		if (staging_cleared) {
+			s->cpu_dirty = 1;
+			s->gpu_dirty = 0;
+		}
+		return staging_cleared;
+	}
+	/* End any open scene pass before clearing so the load-op clear is not sequenced
+	 * against an in-flight render pass on the same target. */
+	if (!D3DCompat_FlushRenderTargetPass(s) || !DDShim_ClearGpuTargetColor(s, s->rt, fill)) {
+		return 0;
+	}
 	if (staging_cleared) {
 		/* Both representations contain the exact same full-surface clear. */
 		s->gpu_dirty = 0;
@@ -365,6 +389,23 @@ static int DDShim_ClearRenderTargetColor(DDrawSurfaceShim* s, uint32_t fill) {
 	return 1;
 }
 
+/* A primary surface is a presentation sink in the shim, so its visible pixels
+ * live in the attached render surface's completed half. The original clears the
+ * primary and back buffer separately before an attached frontend sequence; honor
+ * the primary clear without disturbing the current work target. */
+static int DDShim_ClearPrimaryColor(DDrawSurfaceShim* primary, uint32_t fill) {
+	DDrawSurfaceShim* frame;
+
+	if (!primary || primary->kind != DDSHIM_PRIMARY) {
+		return 0;
+	}
+	frame = primary->attached;
+	if (!frame || frame->kind != DDSHIM_RENDER_TARGET || !frame->rt_back) {
+		return 1;
+	}
+	return DDShim_ClearGpuTargetColor(frame, frame->rt_back, fill);
+}
+
 void DDShim_WritebackRenderTarget(DDrawSurfaceShim* s) {
 	if (g_ddClassicFlightRenderingSuppressed || !s || !s->rt || !s->cpu || !s->cpu_dirty) {
 		return;
@@ -373,7 +414,7 @@ void DDShim_WritebackRenderTarget(DDrawSurfaceShim* s) {
 	 * readback). Compose it opaquely into the color target -- the same display-space
 	 * preserve-encoded path as a background restore -- so the GPU pass or present
 	 * that follows sees the CPU content. The color target is now authoritative. */
-	if (!DDShim_ComposeOntoRenderTarget(s, s, 0)) {
+	if (!DDShim_ComposeOntoRenderTarget(s, s, 0, 0, NULL, 0)) {
 		return;
 	}
 	s->cpu_dirty = 0;
@@ -533,6 +574,15 @@ static HRESULT XWA_DXAPI DDSurface_Blt(IDirectDrawSurface* self, void* dstRect, 
 	if (flags & DDBLT_COLORFILL) {
 		uint32_t color = fx ? fx->dwFillColor : 0;
 		AeronSurfaceRect r;
+		if (d->kind == DDSHIM_PRIMARY) {
+			/* The presentation proxy can model a full visible-surface clear through
+			 * the completed flip-chain target. Partial primary fills are unused by
+			 * the recovered flight paths and have no proxy backing to modify. */
+			if (dstRect) {
+				return DX_DD_OK;
+			}
+			return DDShim_ClearPrimaryColor(d, color) ? DX_DD_OK : DX_E_FAIL;
+		}
 		/* On a render target the fill clears the GPU color target (the flight 3D back
 		 * buffer clear, matching the original DDBLT_COLORFILL on g_flightBackBuffer). */
 		if (d->kind == DDSHIM_RENDER_TARGET && d->rt) {
@@ -569,7 +619,8 @@ static HRESULT XWA_DXAPI DDSurface_Blt(IDirectDrawSurface* self, void* dstRect, 
 		if (d->kind == DDSHIM_RENDER_TARGET && !D3DCompat_FlushRenderTargetPass(d)) {
 			return DX_E_FAIL;
 		}
-		if (DDShim_ComposeOntoRenderTarget(d, s, flags & DDBLT_KEYSRC)) {
+		if (DDShim_ComposeOntoRenderTarget(d, s, dr ? dr->left : 0, dr ? dr->top : 0, have_sr ? &sr : NULL,
+										   flags & DDBLT_KEYSRC)) {
 			return DX_DD_OK;
 		}
 		if (Aeron_FatalErrorRequested()) {
@@ -599,7 +650,8 @@ static HRESULT XWA_DXAPI DDSurface_BltFast(IDirectDrawSurface* self, uint32_t x,
 	if (d->kind == DDSHIM_RENDER_TARGET && !D3DCompat_FlushRenderTargetPass(d)) {
 		return DX_E_FAIL;
 	}
-	if (DDShim_ComposeOntoRenderTarget(d, s, flags & DDBLTFAST_SRCCOLORKEY)) {
+	if (DDShim_ComposeOntoRenderTarget(d, s, (int)x, (int)y, have_sr ? &sr : NULL,
+									   flags & DDBLTFAST_SRCCOLORKEY)) {
 		return DX_DD_OK;
 	}
 	if (Aeron_FatalErrorRequested()) {

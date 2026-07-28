@@ -29,6 +29,7 @@ typedef enum XwaSceneKind {
 	XWA_SCENE_FLIGHT,   /* in-mission simulation (incl. hangar / DS) */
 	XWA_SCENE_CUTSCENE, /* SMUSH playback */
 	XWA_SCENE_LOADING,  /* flight mission loading UI on attached frontend surfaces */
+	XWA_SCENE_FRONTEND_MODAL, /* frontend UI temporarily attached to an active flight */
 } XwaSceneKind;
 
 /* ---- 2D draw records (frontend channel) ----------------------------
