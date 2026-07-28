@@ -398,7 +398,13 @@ char std3D_SetInitialRenderState(void) {
 	*(uint32_t*)(cursor + 4) = ((g_std3DCapFlags & STD3D_RS_TEXTURE_MAG_LINEAR) != 0) + 1;
 	cursor += sizeof(D3DSTATE);
 	*(uint32_t*)cursor = D3DRENDERSTATE_TEXTUREMIN;
+#ifdef XWA_MODERN
+	*(uint32_t*)(cursor + 4) = (g_std3DCapFlags & STD3D_RS_TEXTURE_MIN_LINEAR) != 0
+								   ? (uint32_t)g_d3dTexFilterLinear
+								   : (uint32_t)g_d3dTexFilterPoint;
+#else
 	*(uint32_t*)(cursor + 4) = ((g_std3DCapFlags & STD3D_RS_TEXTURE_MIN_LINEAR) != 0) + 1;
+#endif
 	cursor += sizeof(D3DSTATE);
 	*(uint32_t*)cursor = D3DRENDERSTATE_SUBPIXEL;
 	*(uint32_t*)(cursor + 4) = (g_std3DCapFlags & 0x10u) != 0;

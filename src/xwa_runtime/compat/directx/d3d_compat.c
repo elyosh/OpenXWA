@@ -727,7 +727,6 @@ static AeronFilter D3DCompat_MinFilter(int filter) {
 	switch (filter) {
 		case D3D_FILTER_LINEAR:
 		case D3D_FILTER_MIPLINEAR:
-		case D3D_FILTER_LINEARMIPNEAREST:
 		case D3D_FILTER_LINEARMIPLINEAR:
 			return AERON_FILTER_LINEAR;
 		default:
@@ -737,7 +736,7 @@ static AeronFilter D3DCompat_MinFilter(int filter) {
 
 static AeronFilter D3DCompat_MipFilter(int filter) {
 	switch (filter) {
-		case D3D_FILTER_MIPLINEAR:
+		case D3D_FILTER_LINEARMIPNEAREST:
 		case D3D_FILTER_LINEARMIPLINEAR:
 			return AERON_FILTER_LINEAR;
 		default:
@@ -775,8 +774,8 @@ static AeronSampler* D3DCompat_GetSampler(const D3DRenderState* state) {
 		.address_w = key.address_mode,
 		.min_lod = 0.0f,
 		.max_lod = D3DCompat_FilterUsesMipmaps(key.min_filter) ? 16.0f : 0.0f,
-		.enable_anisotropy = key.min_filter == D3D_FILTER_LINEARMIPLINEAR,
-		.max_anisotropy = 8.0f,
+		.enable_anisotropy = 0,
+		.max_anisotropy = 0.0f,
 	});
 	if (!sampler) {
 		Aeron_LogError("xwa.d3d", "Failed to create std3D sampler");
@@ -1131,8 +1130,8 @@ static int D3DCompat_ExecuteBuffer(D3DDeviceShim* d, D3DExecBufShim* buf) {
 	if (!buf || !buf->data) {
 		return 0;
 	}
-	if (buf->vertex_count == 0 || buf->vertex_count > (uint32_t)UINT16_MAX + 1u) {
-		return buf->vertex_count == 0 ? 1 : 0;
+	if (buf->vertex_count > (uint32_t)UINT16_MAX + 1u) {
+		return 0;
 	}
 	if (buf->instruction_offset > buf->size ||
 		buf->instruction_length > buf->size - buf->instruction_offset) {
@@ -1141,7 +1140,7 @@ static int D3DCompat_ExecuteBuffer(D3DDeviceShim* d, D3DExecBufShim* buf) {
 	if (!d->scene_active) {
 		return 0;
 	}
-	if (DDrawCompat_IsClassicFlightRenderingSuppressed()) {
+	if (buf->vertex_count == 0 || DDrawCompat_IsClassicFlightRenderingSuppressed()) {
 		return D3DCompat_ExecuteStateOnly(d, buf);
 	}
 	if (!D3DCompat_StartSceneSegment(d)) {
