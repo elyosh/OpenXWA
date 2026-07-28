@@ -503,7 +503,7 @@ static int cmd_ensure_targets(int width, int height) {
 																  .address_u = AERON_ADDRESS_CLAMP_TO_EDGE,
 																  .address_v = AERON_ADDRESS_CLAMP_TO_EDGE });
 	if (!s_cmd.present || !s_cmd.sampler) {
-		Aeron_Log("xwa.hud", "CMD PiP present chain creation failed");
+		Aeron_LogError("xwa.hud", "CMD PiP present chain creation failed");
 		return 0;
 	}
 	const AeronSampleCount requested_samples = XwaRemaster_MsaaSampleCount();
@@ -522,7 +522,7 @@ static int cmd_ensure_targets(int width, int height) {
 															.format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
 															.debug_name = "xwa.hud.cmd_present" });
 	if (!s_cmd.scene || !s_cmd.present_rt) {
-		Aeron_Log("xwa.hud", "CMD PiP target creation failed at %dx%d", width, height);
+		Aeron_LogError("xwa.hud", "CMD PiP target creation failed at %dx%d", width, height);
 		cmd_destroy_targets();
 		return 0;
 	}

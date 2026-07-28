@@ -610,7 +610,7 @@ static int D3DCompat_EnsureShaders(void) {
 			.uniform_buffer_count = 1,
 		});
 		if (!g_d3dVertexShader) {
-			Aeron_Log("xwa.d3d", "Failed to load XWA D3D projected triangle vertex shader");
+			Aeron_LogError("xwa.d3d", "Failed to load XWA D3D projected triangle vertex shader");
 			return 0;
 		}
 	}
@@ -622,7 +622,7 @@ static int D3DCompat_EnsureShaders(void) {
 			.uniform_buffer_count = 1,
 		});
 		if (!g_d3dFragmentShader) {
-			Aeron_Log("xwa.d3d", "Failed to load XWA D3D projected triangle fragment shader");
+			Aeron_LogError("xwa.d3d", "Failed to load XWA D3D projected triangle fragment shader");
 			return 0;
 		}
 	}
@@ -703,7 +703,7 @@ static AeronGraphicsPipeline* D3DCompat_GetPipeline(AeronTextureFormat color_for
 				   .alpha_op = AERON_BLEND_OP_ADD },
 	});
 	if (!pipeline) {
-		Aeron_Log("xwa.d3d", "Failed to create projected triangle pipeline");
+		Aeron_LogError("xwa.d3d", "Failed to create projected triangle pipeline");
 		return NULL;
 	}
 
@@ -779,7 +779,7 @@ static AeronSampler* D3DCompat_GetSampler(const D3DRenderState* state) {
 		.max_anisotropy = 8.0f,
 	});
 	if (!sampler) {
-		Aeron_Log("xwa.d3d", "Failed to create std3D sampler");
+		Aeron_LogError("xwa.d3d", "Failed to create std3D sampler");
 		return NULL;
 	}
 
@@ -822,7 +822,7 @@ static int D3DCompat_EnsureBuffer(AeronBuffer** buffer, uint32_t* current_size, 
 		.debug_name = name,
 	});
 	if (!*buffer) {
-		Aeron_Log("xwa.d3d", "Failed to create %s buffer for %u bytes", name, allocation_size);
+		Aeron_LogError("xwa.d3d", "Failed to create %s buffer for %u bytes", name, allocation_size);
 		return 0;
 	}
 	*current_size = allocation_size;
@@ -1031,7 +1031,7 @@ static void D3DCompat_ApplyRenderState(D3DRenderState* rs, uint32_t* texture_han
 			break;
 		case D3DRENDERSTATE_FOGENABLE:
 			if (value) {
-				Aeron_Log("xwa.d3d", "std3D fog is not implemented yet");
+				Aeron_LogWarn("xwa.d3d", "std3D fog is not implemented yet");
 			}
 			break;
 		case D3DRENDERSTATE_FOGCOLOR:
@@ -1040,7 +1040,7 @@ static void D3DCompat_ApplyRenderState(D3DRenderState* rs, uint32_t* texture_han
 		case D3DRENDERSTATE_FOGTABLEEND:
 			break;
 		default:
-			Aeron_Log("xwa.d3d", "Unexpected D3DRENDERSTATE token %u in execute buffer", token);
+			Aeron_LogWarn("xwa.d3d", "Unexpected D3DRENDERSTATE token %u in execute buffer", token);
 			break;
 	}
 }
@@ -1098,7 +1098,7 @@ static int D3DCompat_ExecuteStateOnly(D3DDeviceShim* d, const D3DExecBufShim* bu
 				exited = 1;
 				break;
 			default:
-				Aeron_Log("xwa.d3d", "Unexpected execute-buffer opcode %u", insn->bOpcode);
+				Aeron_LogWarn("xwa.d3d", "Unexpected execute-buffer opcode %u", insn->bOpcode);
 				break;
 		}
 		ip = payload + payload_size;
@@ -1217,7 +1217,7 @@ static int D3DCompat_ExecuteBuffer(D3DDeviceShim* d, D3DExecBufShim* buf) {
 				exited = 1;
 				break;
 			default:
-				Aeron_Log("xwa.d3d", "Unexpected execute-buffer opcode %u", insn->bOpcode);
+				Aeron_LogWarn("xwa.d3d", "Unexpected execute-buffer opcode %u", insn->bOpcode);
 				break;
 		}
 		ip = payload + (uint32_t)insn->wCount * insn->bSize;

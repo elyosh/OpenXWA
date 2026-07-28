@@ -18,6 +18,7 @@ PaiContext g_paiContext;
 // counterpart in the original binary.
 int g_paiTrace = 0;
 
+#if !defined(NDEBUG)
 // Flight group to trace, by name (only consulted when g_paiTrace != 0).
 static const char* g_paiTraceFgName = "Selu";
 
@@ -79,7 +80,7 @@ void pai_TraceManeuverTick(char maneuverResult) {
 								controller->aimPointZ - tgt->world_z);
 		}
 
-		Aeron_Log("xwa.ai.trace",
+		Aeron_LogTrace("xwa.ai.trace",
 				  "TICK fg=%u(%s) obj=%u plan='%s' mode=%u phase=%d distAim=%d tgtDist=%d aimOff=%d "
 				  "yaw=0x%04x tgtYaw=0x%04x yawErr=0x%04x throttle=%u speed=%u mScale=0x%04x "
 				  "turnRate=%d turnStep=0x%04x turnAccel=0x%04x turnState=%d ret=%d",
@@ -96,6 +97,11 @@ void pai_TraceManeuverTick(char maneuverResult) {
 				  (int)maneuverResult);
 	}
 }
+#else
+void pai_TraceManeuverTick(char maneuverResult) {
+	(void)maneuverResult;
+}
+#endif
 
 // GLOBAL: XWA 0x7B4BF8
 int g_targetRangeScore;
@@ -227,9 +233,9 @@ void pai_ProcessPlan(void) {
 		if (g_orderTable[orderId]()) {
 			nextPlanPtr = g_paiContext.planCursor;
 			if (strcmp(g_planTable[*nextPlanPtr].name, "nullpln") != 0) {
-#ifdef XWA_MODERN
+#if defined(XWA_MODERN) && !defined(NDEBUG)
 				if (pai_TraceThisCraft()) {
-					Aeron_Log("xwa.ai.trace", "TRANSITION fg=%u(%s) obj=%u order=%u '%s' -> '%s'",
+					Aeron_LogTrace("xwa.ai.trace", "TRANSITION fg=%u(%s) obj=%u order=%u '%s' -> '%s'",
 							  (unsigned)g_paiContext.curOrderCoord.fields.flightGroupIdx,
 							  g_missionFlightGroups[g_paiContext.curOrderCoord.fields.flightGroupIdx].fg.name,
 							  (unsigned)g_paiContext.aiObjIdx, (unsigned)orderId,

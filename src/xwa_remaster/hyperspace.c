@@ -177,7 +177,7 @@ XwaRemasterHyperspace* XwaRemasterHyperspace_Create(void) {
 												.usage = AERON_BUFFER_USAGE_VERTEX,
 												.debug_name = "xwa.hyperspace.texture_vertices" });
 	if (!h->streak_vs || !h->streak_fs || !h->texture_vs || !h->texture_fs || !h->sampler || !h->texture_vb) {
-		Aeron_Log("xwa.remaster", "hyperspace: GPU resource creation failed");
+		Aeron_LogError("xwa.remaster", "hyperspace: GPU resource creation failed");
 		XwaRemasterHyperspace_Destroy(h);
 		return NULL;
 	}

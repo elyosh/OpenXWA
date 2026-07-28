@@ -399,7 +399,7 @@ static void rm_push_save(AeronCommandBuffer* cmd, const XwaSurfaceEvent* e, int 
 	if (g.save_depth >= RM_SAVE_STACK_CAP) {
 		if (!g.warned_save_stack) {
 			g.warned_save_stack = 1;
-			Aeron_Log("xwa.remaster", "screen save stack overflow");
+			Aeron_LogError("xwa.remaster", "screen save stack overflow");
 		}
 		return;
 	}
@@ -729,7 +729,7 @@ static int rm_ensure(void) {
 	g.list = AeronDrawList_Create(32768);
 	g.screen_needs_clear = 1;
 	if (!g.screen_rt || !g.output_rt || !g.list) {
-		Aeron_Log("xwa.remaster", "frontend overlay init failed");
+		Aeron_LogError("xwa.remaster", "frontend overlay init failed");
 	}
 	return g.screen_rt != NULL && g.output_rt != NULL && g.list != NULL;
 }
@@ -769,7 +769,7 @@ AeronTexture* XwaRemasterFrontend_Render(AeronCommandBuffer* cmd, const XwaSnaps
 	}
 	/* Resolver coverage heartbeat (~ every 10 s at 30 Hz). */
 	if (++g.stat_ticks >= 300) {
-		Aeron_Log("xwa.remaster", "sprite resolve: %u hit, %u miss (last %u ticks; e.g. %s | %s | %s | %s)",
+		Aeron_LogDebug("xwa.remaster", "sprite resolve: %u hit, %u miss (last %u ticks; e.g. %s | %s | %s | %s)",
 				  g.stat_hits, g.stat_misses, g.stat_ticks,
 				  g.stat_miss_key_count > 0 ? g.stat_miss_keys[0] : "-",
 				  g.stat_miss_key_count > 1 ? g.stat_miss_keys[1] : "-",

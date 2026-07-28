@@ -135,6 +135,7 @@ typedef struct XwaFlightTaskLoopTiming {
 
 static void XwaFlightTask_RequestInstanceCleanup(int restartMission);
 
+#if !defined(NDEBUG)
 static const char* XwaFlightTask_PhaseName(XwaFlightTaskPhase phase) {
 	switch (phase) {
 		case XWA_FLIGHT_TASK_PHASE_INACTIVE:
@@ -163,11 +164,16 @@ static const char* XwaFlightTask_PhaseName(XwaFlightTaskPhase phase) {
 }
 
 static void XwaFlightTask_Log(const char* event) {
-	Aeron_Log("xwa.flight.task", "%s: phase=%s active=%d complete=%d now=%llu next=%llu input=%d game=%d",
+	Aeron_LogTrace("xwa.flight.task", "%s: phase=%s active=%d complete=%d now=%llu next=%llu input=%d game=%d",
 			  event, XwaFlightTask_PhaseName(g_xwaFlightTaskPhase), g_xwaFlightTaskActive,
 			  g_xwaFlightTaskComplete, (unsigned long long)Aeron_NowUs(),
 			  (unsigned long long)g_xwaFlightTaskNextWakeUs, g_inputTimestamp, g_gameTime);
 }
+#else
+static void XwaFlightTask_Log(const char* event) {
+	(void)event;
+}
+#endif
 
 static void XwaFlightTask_LogPhaseEntry(void) {
 	if (g_xwaFlightTaskPhase != g_xwaFlightTaskLastLoggedPhase) {

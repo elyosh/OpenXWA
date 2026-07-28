@@ -364,7 +364,7 @@ void XwaRemasterParticles_Prepare(XwaRemasterParticles* particles, AeronCommandB
 		}
 	}
 	if (particles->dropped)
-		Aeron_Log("xwa.remaster", "prepared particle quad cap (%u) hit", particles->capacity);
+		Aeron_LogWarn("xwa.remaster", "prepared particle quad cap (%u) hit", particles->capacity);
 }
 
 static int particle_hidden_for_view(const PreparedParticleQuad* q, const XwaSnapshot* snapshot) {
@@ -646,7 +646,7 @@ void XwaRemasterTrails_Prepare(XwaRemasterTrails* trails, AeronCommandBuffer* cm
 							 &snapshot->trail_points[emitter->first_point], &ref);
 	}
 	if (trails->dropped)
-		Aeron_Log("xwa.remaster", "prepared trail quad cap (%u) hit", EFFECT_MAX_TRAIL_QUADS);
+		Aeron_LogWarn("xwa.remaster", "prepared trail quad cap (%u) hit", EFFECT_MAX_TRAIL_QUADS);
 }
 
 static void trails_submit_quad(AeronScene3D* scene, const PreparedTrailQuad* q) {

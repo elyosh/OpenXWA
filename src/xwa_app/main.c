@@ -162,7 +162,7 @@ static int resolve_game_data(const XwaLaunchOptions* launch, const XwaHostConfig
 									  error_size)) {
 			return 1;
 		}
-		Aeron_Log("xwa.config", "saved game-data path is no longer valid: %s", error);
+		Aeron_LogWarn("xwa.config", "saved game-data path is no longer valid: %s", error);
 		for (;;) {
 			static const AeronMessageBoxButton buttons[] = {
 				{ XWA_SETUP_TRY_AGAIN, "Try Again", 1, 0 },
@@ -221,7 +221,7 @@ int main(int argc, char** argv) {
 	int setup_cancelled;
 
 	if (!XwaLaunchOptions_Parse(argc, argv, &launch, config_error, sizeof config_error)) {
-		fprintf(stderr, "OpenXWA: %s\n", config_error);
+		Aeron_LogError("xwa.config", "%s", config_error);
 		return 2;
 	}
 	memset(&config, 0, sizeof(config));
@@ -251,7 +251,7 @@ int main(int argc, char** argv) {
 		char message[1536];
 		snprintf(message, sizeof message, "%s\nConfiguration path: %s/config.yaml", config_error,
 				 Aeron_UserPath());
-		Aeron_Log("xwa.config", "%s", message);
+		Aeron_LogError("xwa.config", "%s", message);
 		Aeron_FatalError("OpenXWA", message);
 		Aeron_Shutdown();
 		return 1;
@@ -264,7 +264,7 @@ int main(int argc, char** argv) {
 	if (!resolve_game_data(&launch, &host_config, selected_game_data, sizeof selected_game_data,
 						   &setup_cancelled, config_error, sizeof config_error)) {
 		if (!setup_cancelled) {
-			Aeron_Log("xwa.config", "%s", config_error);
+			Aeron_LogError("xwa.config", "%s", config_error);
 			Aeron_FatalError("OpenXWA", config_error);
 		}
 		Aeron_Shutdown();
@@ -273,22 +273,22 @@ int main(int argc, char** argv) {
 	if (strcmp(host_config.game_data_path, selected_game_data) != 0 &&
 		!XwaHostConfig_SaveGameDataPath(Aeron_GetVfs(), selected_game_data, config_error,
 										sizeof config_error)) {
-		Aeron_Log("xwa.config", "%s", config_error);
+		Aeron_LogError("xwa.config", "%s", config_error);
 		Aeron_FatalError("OpenXWA", config_error);
 		Aeron_Shutdown();
 		return 1;
 	}
 	Aeron_SetFullscreen(initial_window_mode == XWA_MODERN_WINDOW_MODE_FULLSCREEN);
-	Aeron_Log("xwa.config", "game data: %s", selected_game_data);
-	Aeron_Log("xwa.config", "resources: %s", Aeron_ResourceRoot());
-	Aeron_Log("xwa.config", "flight simulation step: %d ticks", host_config.flight_simulation_step_ticks);
-	Aeron_Log("xwa.config", "OPT smoothing angle: %.3g degrees",
+	Aeron_LogInfo("xwa.config", "game data: %s", selected_game_data);
+	Aeron_LogInfo("xwa.config", "resources: %s", Aeron_ResourceRoot());
+	Aeron_LogInfo("xwa.config", "flight simulation step: %d ticks", host_config.flight_simulation_step_ticks);
+	Aeron_LogInfo("xwa.config", "OPT smoothing angle: %.3g degrees",
 			  (double)host_config.model_smooth_angle_degrees);
-	Aeron_Log("xwa.config", "OPT emissive strength: %.3g", (double)host_config.model_opt_emissive_strength);
-	Aeron_Log("xwa.config", "OPT projectile emissive strength: %.3g",
+	Aeron_LogInfo("xwa.config", "OPT emissive strength: %.3g", (double)host_config.model_opt_emissive_strength);
+	Aeron_LogInfo("xwa.config", "OPT projectile emissive strength: %.3g",
 			  (double)host_config.model_opt_projectile_emissive_strength);
-	Aeron_Log("xwa.config", "force OPT models: %s", host_config.force_opt_models ? "yes" : "no");
-	Aeron_Log("xwa.config", "prefer original 2D assets: %s", host_config.prefer_original_2d ? "yes" : "no");
+	Aeron_LogInfo("xwa.config", "force OPT models: %s", host_config.force_opt_models ? "yes" : "no");
+	Aeron_LogInfo("xwa.config", "prefer original 2D assets: %s", host_config.prefer_original_2d ? "yes" : "no");
 	const XwaRemasterInitOptions remaster_options = {
 		.opt_smooth_angle_degrees = host_config.model_smooth_angle_degrees,
 		.opt_emissive_strength = host_config.model_opt_emissive_strength,
@@ -339,7 +339,7 @@ int main(int argc, char** argv) {
 				paused = !paused;
 				toggled = 1;
 				Aeron_AudioSetPaused(paused);
-				Aeron_Log("xwa", "%s", paused ? "paused" : "resumed");
+				Aeron_LogInfo("xwa", "%s", paused ? "paused" : "resumed");
 			}
 			/* Ctrl+Alt+L is a portable alias for the original Scroll Lock cockpit
 			 * mouse-look action. Queue the original action so its gameplay gates remain

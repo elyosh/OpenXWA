@@ -223,7 +223,7 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 		return g.assets != NULL;
 	}
 	if (!options) {
-		Aeron_Log("xwa.remaster", "resolved initialization options are required");
+		Aeron_LogError("xwa.remaster", "resolved initialization options are required");
 		return 0;
 	}
 	g.initialized = 1;
@@ -269,10 +269,10 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	 * the request if the display's HDR state changes later, so a failure here
 	 * means the swapchain could not be configured at all. */
 	if (!Aeron_SetOutputHdr(g.hdr_desired)) {
-		Aeron_Log("xwa.remaster", "HDR output initialization failed");
+		Aeron_LogError("xwa.remaster", "HDR output initialization failed");
 		return 0;
 	}
-	Aeron_Log("xwa.remaster", "HDR output: desired %s, %s (headroom %.2f)", g.hdr_desired ? "on" : "off",
+	Aeron_LogInfo("xwa.remaster", "HDR output: desired %s, %s (headroom %.2f)", g.hdr_desired ? "on" : "off",
 			  Aeron_OutputHdrStatusName(Aeron_OutputHdrStatus()), (double)Aeron_OutputHdrHeadroom());
 	char remaster_root[1024];
 	snprintf(remaster_root, sizeof remaster_root, "%s/remaster", Aeron_AssetRoot());
@@ -287,7 +287,7 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	g.observed_pixel_width = g.render_pixel_width;
 	g.observed_pixel_height = g.render_pixel_height;
 	if (!g.assets) {
-		Aeron_Log("xwa.remaster", "asset resolver init failed");
+		Aeron_LogError("xwa.remaster", "asset resolver init failed");
 	}
 #ifdef AERON_DEBUG_UI
 	XwaRemasterDebugTools_Register();
@@ -306,7 +306,7 @@ static void XwaRemaster_SetViewMode(RmViewMode mode, int fade) {
 		XwaRemaster_SetBlendEndpoint(mode);
 	}
 	g.mode = mode;
-	Aeron_Log("xwa.remaster", "view mode: %s",
+	Aeron_LogInfo("xwa.remaster", "view mode: %s",
 			  g.mode == RM_VIEW_HD ? "HD" : (g.mode == RM_VIEW_SPLIT ? "SPLIT" : "CLASSIC"));
 }
 
@@ -395,7 +395,7 @@ static void XwaRemaster_UpdateRenderSize(void) {
 		g.force_scene_render = 1;
 		g.scene_tex = NULL;
 	}
-	Aeron_Log("xwa.remaster", "physical render size: %dx%d", width, height);
+	Aeron_LogInfo("xwa.remaster", "physical render size: %dx%d", width, height);
 }
 
 void XwaRemaster_BeginFrame(const AeronInputSnapshot* input) {
@@ -565,7 +565,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 			XwaRemasterFlight_CommitProcessAssets();
 		}
 		if (upload_usage.staged_bytes >= 16u * 1024u * 1024u || upload_usage.copy_count >= 64u) {
-			Aeron_Log("xwa.remaster",
+			Aeron_LogDebug("xwa.remaster",
 					  "asset upload batch: staged=%llu reserved=%llu chunks=%u copies=%u passes=%u largest=%u",
 					  (unsigned long long)upload_usage.staged_bytes,
 					  (unsigned long long)upload_usage.reserved_bytes, upload_usage.chunk_count,

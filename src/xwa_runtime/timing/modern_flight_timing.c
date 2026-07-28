@@ -57,7 +57,7 @@ void XwaModernFlightTiming_BeginSession(int player_count) {
 		g_timingReason = XWA_MODERN_TIMING_CONFIGURED;
 	}
 
-	Aeron_Log("xwa.flight.timing", "session requested=%d effective=%d reason=%s", g_requestedStepTicks,
+	Aeron_LogInfo("xwa.flight.timing", "session requested=%d effective=%d reason=%s", g_requestedStepTicks,
 			  g_effectiveStepTicks, XwaModernFlightTiming_ReasonName(g_timingReason));
 }
 

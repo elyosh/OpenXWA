@@ -935,7 +935,7 @@ static int FrontImage_LoadResourceListImpl(char* fileName, int unload) {
 
 	stream = FrontImage_OpenRead(AERON_VFS_ROOT_ASSET, fileName);
 	if (stream == NULL) {
-		Aeron_Log("xwa.assets", "Failed to open frontend resource list '%s'", fileName);
+		Aeron_LogError("xwa.assets", "Failed to open frontend resource list '%s'", fileName);
 		return 0;
 	}
 
@@ -949,7 +949,7 @@ static int FrontImage_LoadResourceListImpl(char* fileName, int unload) {
 				FrontImage_FreeResourceByName(name);
 			} else {
 				if (!FrontImage_RegisterResource(buffer, name, 0, id)) {
-					Aeron_Log("xwa.assets", "Failed to register frontend resource '%s' from '%s' (id %d)",
+					Aeron_LogError("xwa.assets", "Failed to register frontend resource '%s' from '%s' (id %d)",
 							  name, buffer, id);
 				}
 				Music_Update();
@@ -4601,7 +4601,7 @@ int FrontImage_RegisterResource(const char* fileName, const char* name, int flag
 		int result = FrontImage_RegisterFlicResource((char*)fileName, (char*)name, flags, id);
 #ifdef XWA_MODERN
 		if (!result) {
-			Aeron_Log("xwa.assets", "Failed to load FLIC frontend resource '%s' as '%s'", fileName, name);
+			Aeron_LogError("xwa.assets", "Failed to load FLIC frontend resource '%s' as '%s'", fileName, name);
 		}
 		if (result) {
 			FrontImage_NoteSnapshotResourceBinding(fileName, name);
@@ -4618,7 +4618,7 @@ int FrontImage_RegisterResource(const char* fileName, const char* name, int flag
 	memset(image, 0, sizeof(*image));
 	if (!FrontImage_LoadBmpFile((char*)fileName, image, flags, id)) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "Failed to load BMP frontend resource '%s' as '%s'", fileName, name);
+		Aeron_LogError("xwa.assets", "Failed to load BMP frontend resource '%s' as '%s'", fileName, name);
 #endif
 		Mem_Free(image);
 		return 0;
@@ -4656,7 +4656,7 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 
 	if (*fileName == '\0') {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "Failed to register default frontend resource with empty file name as '%s'",
+		Aeron_LogError("xwa.assets", "Failed to register default frontend resource with empty file name as '%s'",
 				  name);
 #endif
 		return 0;
@@ -4664,7 +4664,7 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 
 	if (*name == '\0') {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "Failed to register default frontend resource '%s' with empty name",
+		Aeron_LogError("xwa.assets", "Failed to register default frontend resource '%s' with empty name",
 				  fileName);
 #endif
 		return 0;
@@ -4672,7 +4672,7 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 
 	if (g_resourceCount >= FRONT_IMAGE_MAX_RESOURCES) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "No free frontend resource slots for default resource '%s' as '%s'", fileName,
+		Aeron_LogWarn("xwa.assets", "No free frontend resource slots for default resource '%s' as '%s'", fileName,
 				  name);
 #endif
 		return 0;
@@ -4680,7 +4680,7 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 
 	if (FrontImage_FindResourceByName(name) != -1) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "Default frontend resource name '%s' is already registered from '%s'", name,
+		Aeron_LogWarn("xwa.assets", "Default frontend resource name '%s' is already registered from '%s'", name,
 				  fileName);
 #endif
 		return 0;
@@ -4703,7 +4703,7 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 		int result = FrontImage_RegisterFlicResource((char*)fileName, (char*)name, 1, 1);
 #ifdef XWA_MODERN
 		if (!result) {
-			Aeron_Log("xwa.assets", "Failed to load default FLIC frontend resource '%s' as '%s'", fileName,
+			Aeron_LogError("xwa.assets", "Failed to load default FLIC frontend resource '%s' as '%s'", fileName,
 					  name);
 		}
 		if (result) {
@@ -4716,7 +4716,7 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 	image = (ImageResource*)Mem_Alloc(sizeof(*image));
 	if (image == NULL) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "Failed to allocate default frontend resource image '%s' as '%s'", fileName,
+		Aeron_LogError("xwa.assets", "Failed to allocate default frontend resource image '%s' as '%s'", fileName,
 				  name);
 #endif
 		return 0;
@@ -4725,7 +4725,7 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 	memset(image, 0, sizeof(*image));
 	if (!FrontImage_LoadBmpFile((char*)fileName, image, 1, 1)) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "Failed to load default BMP frontend resource '%s' as '%s'", fileName, name);
+		Aeron_LogError("xwa.assets", "Failed to load default BMP frontend resource '%s' as '%s'", fileName, name);
 #endif
 		Mem_Free(image);
 		return 0;
@@ -4734,7 +4734,7 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 	desc = (ResourceDescriptor*)Mem_Alloc(sizeof(*desc));
 	if (desc == NULL) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "Failed to allocate default frontend resource descriptor '%s' as '%s'",
+		Aeron_LogError("xwa.assets", "Failed to allocate default frontend resource descriptor '%s' as '%s'",
 				  fileName, name);
 #endif
 		Mem_Free(image->pixels);

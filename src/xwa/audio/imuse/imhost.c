@@ -128,7 +128,7 @@ int ImHost_GetTime(void) { return g_gameTime; }
 XwaFile* ImHost_OpenFile(const char* path, const char* mode) {
 #ifdef XWA_MODERN
 	XwaFile* stream = File_OpenAsset(ImHost_FileRootForMode(mode), path, mode);
-	Aeron_Log("xwa.music", "iMUSE open '%s' (%s) -> %s", path, mode, stream ? "ok" : "FAIL");
+	Aeron_LogVerbose("xwa.music", "iMUSE open '%s' (%s) -> %s", path, mode, stream ? "ok" : "FAIL");
 	return stream;
 #else
 	return (XwaFile*)fopen(path, mode);

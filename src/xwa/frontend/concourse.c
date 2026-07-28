@@ -244,7 +244,7 @@ int Concourse_LoadNextTourMission(void) {
 
 			missionLoaded = FrontendMission_LoadCurrent();
 			if (!missionLoaded) {
-				Aeron_Log("xwa.frontend", "Failed to load selected tour mission %d", g_currentMissionId);
+				Aeron_LogError("xwa.frontend", "Failed to load selected tour mission %d", g_currentMissionId);
 			}
 			g_frontendMissionLoaded = missionLoaded != 0;
 		}

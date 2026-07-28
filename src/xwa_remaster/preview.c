@@ -62,7 +62,7 @@ static int preview_ensure(void) {
 		.sample_count = requested_samples,
 	});
 	if (!s.scene) {
-		Aeron_Log("xwa.remaster", "preview: scene create failed");
+		Aeron_LogError("xwa.remaster", "preview: scene create failed");
 		return 0;
 	}
 	s.scene_requested_samples = requested_samples;
@@ -80,7 +80,7 @@ static int preview_ensure(void) {
 													  .address_v = AERON_ADDRESS_CLAMP_TO_EDGE });
 	}
 	if (!s.chain || !s.chain_sampler) {
-		Aeron_Log("xwa.remaster", "preview: present resources create failed");
+		Aeron_LogError("xwa.remaster", "preview: present resources create failed");
 		return 0;
 	}
 	return 1;

@@ -136,7 +136,7 @@ void FlightDebug_SetJoystickTraceEnabled(int enabled) {
 	g_modernJoystickTraceEnabled = enabled;
 	memset(g_modernJoystickInputSamples, 0, sizeof(g_modernJoystickInputSamples));
 	g_modernJoystickInputSampleCursor = 0;
-	Aeron_Log("xwa.input.trace", "JOYTRACE state=%s", enabled ? "on" : "off");
+	Aeron_LogTrace("xwa.input.trace", "JOYTRACE state=%s", enabled ? "on" : "off");
 }
 
 static void FlightDebug_CaptureJoystickInputSample(int timestamp) {
@@ -195,7 +195,7 @@ static void FlightDebug_LogJoystickIntegration(const ModernJoystickIntegrationTr
 		sample = &fallback;
 	}
 
-	Aeron_Log("xwa.input.trace",
+	Aeron_LogTrace("xwa.input.trace",
 			  "JOYTRACE ts=%d dt=%u joy=%d sdl=%d:%d,%d:%d,%d:%d wm=%u,%u,%u xwa=%d,%d,%d "
 			  "pk=%d,%d,%d sc_ypr=%d,%d,%d tgt_ypr=%d,%d,%d sm_ypr=%d,%d,%d step_ypr=%d,%d,%d "
 			  "ang_pyr=%u,%u,%u>%u,%u,%u",

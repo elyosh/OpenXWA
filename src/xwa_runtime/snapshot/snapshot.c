@@ -318,7 +318,7 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 				(double)m->layer_uv_scale, m->persistent_until_cleared);
 	}
 	fclose(fp);
-	Aeron_Log("xwa.snapshot", "dumped tick %llu to %s", (unsigned long long)s->tick_index, path);
+	Aeron_LogInfo("xwa.snapshot", "dumped tick %llu to %s", (unsigned long long)s->tick_index, path);
 }
 
 static int g_dump_ticks[8];
@@ -406,7 +406,7 @@ void XwaSnapshot_Commit(void) {
 		for (uint32_t i = 0; i < s->paint_cmd_count; i++) {
 			paint_kinds[s->paint_cmds[i].kind & 7]++;
 		}
-		Aeron_Log("xwa.snapshot",
+		Aeron_LogWarn("xwa.snapshot",
 				  "tick %llu: %u 2D records dropped (caps %d/%d); kept draws "
 				  "spr=%u opq=%u trl=%u rect=%u rtint=%u rblend=%u rtb=%u atlas=%u | paints "
 				  "hl=%u vl=%u ln=%u aa=%u ftr=%u fill=%u out=%u px=%u | glyphs=%u",
@@ -563,7 +563,7 @@ void XwaSnapshot_NoteResourceBinding(const char* fileName, const char* name, int
 		}
 	}
 	if (inactive_index < 0 && g_binding_count >= XWA_SNAP_MAX_BINDINGS) {
-		Aeron_Log("xwa.snapshot", "resource-binding table full; '%s' unmapped", name);
+		Aeron_LogWarn("xwa.snapshot", "resource-binding table full; '%s' unmapped", name);
 		return;
 	}
 	XwaResourceBinding* b =

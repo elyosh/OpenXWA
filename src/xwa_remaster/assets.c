@@ -131,7 +131,7 @@ XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_origina
 	a->generation = ++assets_next_generation;
 	if (!a->generation)
 		a->generation = ++assets_next_generation;
-	Aeron_Log("xwa.remaster", "2D asset policy: prefer=%s alternate=%s",
+	Aeron_LogInfo("xwa.remaster", "2D asset policy: prefer=%s alternate=%s",
 			  a->prefer_original_2d ? "original" : "remastered",
 			  a->prefer_original_2d ? "remastered" : "original");
 	return a;
@@ -443,14 +443,14 @@ static AssetLoadStatus assets_load_original_group(XwaRemasterAssets* a, AeronCom
 			a->original_reader, slot->group, &frames, error, sizeof error));
 	if (status != ASSET_LOAD_SUCCESS) {
 		if (status != ASSET_LOAD_MISSING)
-			Aeron_Log("xwa.remaster", "2D group %d: original load failed: %s", slot->group, error);
+			Aeron_LogWarn("xwa.remaster", "2D group %d: original load failed: %s", slot->group, error);
 		return status;
 	}
 	XwaRuntimeAtlas* atlas = flight ? &slot->flight_original_atlas : &slot->frontend_original_atlas;
 	const int loaded = XwaRuntimeAtlas_Build(atlas, cmd, &frames, flight, "XWA original DAT group");
 	Xwa2dFrameSet_Free(&frames);
 	if (loaded) {
-		Aeron_Log("xwa.remaster", "2D group %d: source=original pages=%d time_us=%llu", slot->group,
+		Aeron_LogInfo("xwa.remaster", "2D group %d: source=original pages=%d time_us=%llu", slot->group,
 				  atlas->layout.page_count, (unsigned long long)(Aeron_NowUs() - start_us));
 	}
 	return loaded ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
@@ -537,13 +537,13 @@ static AssetLoadStatus assets_load_original_file(XwaRemasterAssets* a, AeronComm
 			a->original_reader, slot->source_file, &frames, error, sizeof error));
 	if (status != ASSET_LOAD_SUCCESS) {
 		if (status != ASSET_LOAD_MISSING)
-			Aeron_Log("xwa.remaster", "2D file '%s': original load failed: %s", slot->key, error);
+			Aeron_LogWarn("xwa.remaster", "2D file '%s': original load failed: %s", slot->key, error);
 		return status;
 	}
 	const int loaded = XwaRuntimeAtlas_Build(&slot->original_atlas, cmd, &frames, 0, slot->source_file);
 	Xwa2dFrameSet_Free(&frames);
 	if (loaded) {
-		Aeron_Log("xwa.remaster", "2D file '%s': source=original pages=%d time_us=%llu", slot->key,
+		Aeron_LogInfo("xwa.remaster", "2D file '%s': source=original pages=%d time_us=%llu", slot->key,
 				  slot->original_atlas.layout.page_count, (unsigned long long)(Aeron_NowUs() - start_us));
 	}
 	return loaded ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
@@ -621,11 +621,11 @@ int XwaRemasterAssets_SyncFrontendAssets(XwaRemasterAssets* a, AeronCommandBuffe
 			const AssetLoadStatus status =
 				assets_choose_frontend_file(a, cmd, slot, asset->frame_count, &source);
 			if (status != ASSET_LOAD_SUCCESS && status != ASSET_LOAD_MISSING) {
-				Aeron_Log("xwa.remaster", "2D file '%s': load failed", slot->key);
+				Aeron_LogError("xwa.remaster", "2D file '%s': load failed", slot->key);
 				return 0;
 			}
 			slot->resident_source = source;
-			Aeron_Log("xwa.remaster", "2D file '%s': source=%s", slot->key,
+			Aeron_LogInfo("xwa.remaster", "2D file '%s': source=%s", slot->key,
 					  assets_source_name(slot->resident_source));
 		}
 	}
@@ -643,11 +643,11 @@ int XwaRemasterAssets_SyncFrontendAssets(XwaRemasterAssets* a, AeronCommandBuffe
 			const AssetLoadStatus status =
 				assets_choose_group(a, cmd, slot, 0, &slot->frontend_source);
 			if (status != ASSET_LOAD_SUCCESS && status != ASSET_LOAD_MISSING) {
-				Aeron_Log("xwa.remaster", "frontend group %d: load failed", slot->group);
+				Aeron_LogError("xwa.remaster", "frontend group %d: load failed", slot->group);
 				return 0;
 			}
 			slot->frontend_resident = 1;
-			Aeron_Log("xwa.remaster", "frontend group %d: source=%s", slot->group,
+			Aeron_LogInfo("xwa.remaster", "frontend group %d: source=%s", slot->group,
 					  assets_source_name(slot->frontend_source));
 		}
 	}
@@ -682,7 +682,7 @@ int XwaRemasterAssets_SyncFrontendAssets(XwaRemasterAssets* a, AeronCommandBuffe
 
 	if (!assets_prepare_frontend_fonts(a, cmd))
 		return 0;
-	Aeron_Log("xwa.remaster", "frontend assets prepared: generation=%llu files=%u groups=%u textures=%u",
+	Aeron_LogInfo("xwa.remaster", "frontend assets prepared: generation=%llu files=%u groups=%u textures=%u",
 			  (unsigned long long)snapshot->frontend_asset_generation, file_count, group_count,
 			  texture_count);
 	return 1;
@@ -759,11 +759,11 @@ int XwaRemasterAssets_SyncFlightTextures(XwaRemasterAssets* a, AeronCommandBuffe
 			const AssetLoadStatus status =
 				assets_choose_group(a, cmd, slot, 1, &slot->flight_source);
 			if (status != ASSET_LOAD_SUCCESS && status != ASSET_LOAD_MISSING) {
-				Aeron_Log("xwa.remaster", "flight group %d: load failed", slot->group);
+				Aeron_LogError("xwa.remaster", "flight group %d: load failed", slot->group);
 				return 0;
 			}
 			slot->flight_resident = 1;
-			Aeron_Log("xwa.remaster", "flight group %d: source=%s", slot->group,
+			Aeron_LogInfo("xwa.remaster", "flight group %d: source=%s", slot->group,
 					  assets_source_name(slot->flight_source));
 		}
 	}
@@ -781,7 +781,7 @@ int XwaRemasterAssets_SyncFlightTextures(XwaRemasterAssets* a, AeronCommandBuffe
 		}
 	}
 
-	Aeron_Log("xwa.remaster", "flight texture assets prepared: generation=%llu live_types=%u pages=%u",
+	Aeron_LogInfo("xwa.remaster", "flight texture assets prepared: generation=%llu live_types=%u pages=%u",
 			  (unsigned long long)snapshot->texture_asset_generation, live_type_count, page_count);
 	return 1;
 }
@@ -791,7 +791,7 @@ void XwaRemasterAssets_CommitFrontendAssets(XwaRemasterAssets* a, uint64_t gener
 		return;
 	}
 	a->frontend_asset_generation = generation;
-	Aeron_Log("xwa.remaster", "frontend assets committed: generation=%llu",
+	Aeron_LogInfo("xwa.remaster", "frontend assets committed: generation=%llu",
 			  (unsigned long long)a->frontend_asset_generation);
 }
 
@@ -804,7 +804,7 @@ void XwaRemasterAssets_CommitFlightTextures(XwaRemasterAssets* a, uint64_t gener
 	if (!a->generation) {
 		a->generation++;
 	}
-	Aeron_Log("xwa.remaster", "flight texture assets committed: generation=%llu",
+	Aeron_LogInfo("xwa.remaster", "flight texture assets committed: generation=%llu",
 			  (unsigned long long)a->texture_asset_generation);
 }
 
@@ -952,11 +952,11 @@ static AssetLoadStatus assets_load_original_flight_font(XwaRemasterAssets* a, Ae
 			a->original_reader, 16000, &group, error, sizeof error));
 	if (status != ASSET_LOAD_SUCCESS) {
 		if (status != ASSET_LOAD_MISSING)
-			Aeron_Log("xwa.remaster", "flight font tier %d: original load failed: %s", tier, error);
+			Aeron_LogWarn("xwa.remaster", "flight font tier %d: original load failed: %s", tier, error);
 		return status;
 	}
 	if (!Xwa2d_BuildFlightFontTier(&group, tier, &font, error, sizeof error)) {
-		Aeron_Log("xwa.remaster", "flight font tier %d: original data invalid: %s", tier, error);
+		Aeron_LogWarn("xwa.remaster", "flight font tier %d: original data invalid: %s", tier, error);
 		Xwa2dFrameSet_Free(&group);
 		Xwa2dFontAtlas_Free(&font);
 		return ASSET_LOAD_FAILED;
@@ -1069,15 +1069,15 @@ static AssetLoadStatus assets_load_flight_font(XwaRemasterAssets* a, AeronComman
 		if (status == ASSET_LOAD_SUCCESS) {
 			slot->source = (uint8_t)source;
 			slot->loaded = 1;
-			Aeron_Log("xwa.remaster", "flight font tier %d: source=%s", tier, assets_source_name(source));
+			Aeron_LogInfo("xwa.remaster", "flight font tier %d: source=%s", tier, assets_source_name(source));
 			return ASSET_LOAD_SUCCESS;
 		}
 		if (status != ASSET_LOAD_MISSING) {
-			Aeron_Log("xwa.remaster", "flight font tier %d: load failed", tier);
+			Aeron_LogError("xwa.remaster", "flight font tier %d: load failed", tier);
 			return status;
 		}
 	}
-	Aeron_Log("xwa.remaster", "flight font tier %d: source=missing", tier);
+	Aeron_LogWarn("xwa.remaster", "flight font tier %d: source=missing", tier);
 	return ASSET_LOAD_MISSING;
 }
 
@@ -1112,7 +1112,7 @@ static AssetLoadStatus assets_load_original_frontend_font(XwaRemasterAssets* a,
 			a->original_reader, font_size, &font, error, sizeof error));
 	if (status != ASSET_LOAD_SUCCESS) {
 		if (status != ASSET_LOAD_MISSING)
-			Aeron_Log("xwa.remaster", "frontend font %d: original load failed: %s", font_size, error);
+			Aeron_LogWarn("xwa.remaster", "frontend font %d: original load failed: %s", font_size, error);
 		return status;
 	}
 	AeronFontGlyph* glyphs = NULL;
@@ -1174,17 +1174,17 @@ static AssetLoadStatus assets_load_frontend_font(XwaRemasterAssets* a, AeronComm
 		}
 		if (status == ASSET_LOAD_SUCCESS) {
 			slot->source = (uint8_t)source;
-			Aeron_Log("xwa.remaster", "frontend font %d: source=%s", font_size, assets_source_name(source));
+			Aeron_LogInfo("xwa.remaster", "frontend font %d: source=%s", font_size, assets_source_name(source));
 			*out = &slot->atlas;
 			return ASSET_LOAD_SUCCESS;
 		}
 		memset(&slot->atlas, 0, sizeof slot->atlas);
 		if (status != ASSET_LOAD_MISSING) {
-			Aeron_Log("xwa.remaster", "frontend font %d: load failed", font_size);
+			Aeron_LogError("xwa.remaster", "frontend font %d: load failed", font_size);
 			return status;
 		}
 	}
-	Aeron_Log("xwa.remaster", "frontend font %d: source=missing", font_size);
+	Aeron_LogWarn("xwa.remaster", "frontend font %d: source=missing", font_size);
 	return ASSET_LOAD_MISSING;
 }
 
@@ -1203,7 +1203,7 @@ static int assets_prepare_frontend_fonts(XwaRemasterAssets* a, AeronCommandBuffe
 		loaded += font != NULL;
 	}
 	a->frontend_fonts_prepared = 1;
-	Aeron_Log("xwa.remaster", "frontend fonts: %d/%u sizes loaded", loaded,
+	Aeron_LogInfo("xwa.remaster", "frontend fonts: %d/%u sizes loaded", loaded,
 			  (unsigned)(sizeof font_sizes / sizeof font_sizes[0]));
 	return 1;
 }

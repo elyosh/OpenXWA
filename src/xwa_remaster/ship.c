@@ -79,14 +79,14 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 			AeronSceneMesh* mesh = AeronScene_MeshCreate(cmd, &model, key, &create_status);
 			Aeron_GltfMeshFree(&model);
 			if (mesh) {
-				Aeron_Log("xwa.remaster", "mesh: '%s' source=GLB", key);
+				Aeron_LogVerbose("xwa.remaster", "mesh: '%s' source=GLB", key);
 				return mesh;
 			}
 			if (create_status != AERON_SCENE_MESH_CREATE_INVALID_SOURCE) {
-				Aeron_Log("xwa.remaster", "mesh: GLB resource creation failed '%s'", path);
+				Aeron_LogWarn("xwa.remaster", "mesh: GLB resource creation failed '%s'", path);
 				return NULL;
 			}
-			Aeron_Log("xwa.remaster", "mesh: GLB content invalid '%s'; trying OPT", path);
+			Aeron_LogWarn("xwa.remaster", "mesh: GLB content invalid '%s'; trying OPT", path);
 		}
 	}
 
@@ -94,20 +94,20 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 	if (!XwaRemasterOptMesh_Build(Aeron_GetVfs(), key, s_opt_smooth_angle_degrees,
 								  s_opt_emissive_strength, &model, opt_error,
 								  sizeof opt_error)) {
-		Aeron_Log("xwa.remaster", "mesh: OPT load failed '%s': %s", key, opt_error);
+		Aeron_LogWarn("xwa.remaster", "mesh: OPT load failed '%s': %s", key, opt_error);
 		return NULL;
 	}
 	AeronSceneMeshCreateStatus create_status;
 	AeronSceneMesh* mesh = AeronScene_MeshCreate(cmd, &model, key, &create_status);
 	Aeron_GltfMeshFree(&model);
 	if (!mesh) {
-		Aeron_Log("xwa.remaster", "mesh: OPT resource creation failed '%s' status=%d",
+		Aeron_LogError("xwa.remaster", "mesh: OPT resource creation failed '%s' status=%d",
 				  key, (int)create_status);
 	} else {
 		if (out_runtime_opt) {
 			*out_runtime_opt = 1;
 		}
-		Aeron_Log("xwa.remaster",
+		Aeron_LogVerbose("xwa.remaster",
 				  "mesh: '%s' source=OPT smooth_angle=%.3g emissive_strength=%.3g",
 				  key, (double)s_opt_smooth_angle_degrees,
 				  (double)s_opt_emissive_strength);
@@ -148,7 +148,7 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd,
 		return XWA_REMASTER_SHIP_SYNC_COMPLETE;
 	}
 	if (s_batch_active) {
-		Aeron_Log("xwa.remaster", "mesh asset synchronization started with an unfinished batch");
+		Aeron_LogError("xwa.remaster", "mesh asset synchronization started with an unfinished batch");
 		return XWA_REMASTER_SHIP_SYNC_FAILED;
 	}
 
@@ -195,7 +195,7 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd,
 			continue;
 		}
 		if (s_pending_mesh_count >= XWA_SNAP_MAX_OPT_ASSETS) {
-			Aeron_Log("xwa.remaster", "mesh asset registry capacity exceeded");
+			Aeron_LogError("xwa.remaster", "mesh asset registry capacity exceeded");
 			return XWA_REMASTER_SHIP_SYNC_FAILED;
 		}
 		ShipMeshAsset* asset = &s_pending_meshes[s_pending_mesh_count];
@@ -274,8 +274,8 @@ void XwaRemasterShip_CommitSyncBatch(void) {
 		s_pending_mesh_count = 0;
 		s_pending_generation = UINT64_MAX;
 		s_opt_asset_generation = s_batch_generation;
-		Aeron_Log("xwa.remaster", "mesh assets: generation=%llu unique=%u",
-				  (unsigned long long)s_opt_asset_generation, s_mesh_count);
+		Aeron_LogDebug("xwa.remaster", "mesh assets: generation=%llu unique=%u",
+					   (unsigned long long)s_opt_asset_generation, s_mesh_count);
 	}
 	s_batch_active = 0;
 	s_batch_completes_generation = 0;

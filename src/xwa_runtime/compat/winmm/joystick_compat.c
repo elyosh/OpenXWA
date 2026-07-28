@@ -142,13 +142,13 @@ static void Winmm_JoyParseAxes(const AeronConfigNode* axesNode) {
 		int targetAxis;
 
 		if (sourceAxis >= AERON_GAMEPAD_AXIS_COUNT) {
-			Aeron_Log("xwa.input", "Ignoring unknown gamepad axis '%s' in input.yaml", key ? key : "");
+			Aeron_LogWarn("xwa.input", "Ignoring unknown gamepad axis '%s' in input.yaml", key ? key : "");
 			continue;
 		}
 		targetName = AeronConfigNode_String(AeronConfigNode_MapGet(value, "target"), NULL);
 		targetAxis = Winmm_AxisTargetFromName(targetName);
 		if (targetAxis == WINMM_JOY_AXIS_NONE) {
-			Aeron_Log("xwa.input", "Ignoring axis '%s' with unknown XWA target '%s'", key ? key : "",
+			Aeron_LogWarn("xwa.input", "Ignoring axis '%s' with unknown XWA target '%s'", key ? key : "",
 					  targetName ? targetName : "");
 			continue;
 		}
@@ -172,12 +172,12 @@ static void Winmm_JoyParseButtons(const AeronConfigNode* buttonsNode) {
 		int64_t targetButton;
 
 		if (button >= AERON_GAMEPAD_BUTTON_COUNT) {
-			Aeron_Log("xwa.input", "Ignoring unknown gamepad button '%s' in input.yaml", key ? key : "");
+			Aeron_LogWarn("xwa.input", "Ignoring unknown gamepad button '%s' in input.yaml", key ? key : "");
 			continue;
 		}
 		targetButton = AeronConfigNode_Int(AeronConfigNode_MapValueAt(buttonsNode, i), 0);
 		if (targetButton < 0 || targetButton > WINMM_JOY_MAX_BUTTONS) {
-			Aeron_Log("xwa.input", "Ignoring button '%s' with out-of-range XWA button %lld", key ? key : "",
+			Aeron_LogWarn("xwa.input", "Ignoring button '%s' with out-of-range XWA button %lld", key ? key : "",
 					  (long long)targetButton);
 			continue;
 		}
@@ -191,12 +191,12 @@ static AeronConfigFile* Winmm_JoyLoadYamlIfExists(const char* path) {
 
 	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, path) &&
 		AeronConfigFile_LoadYaml(vfs, AERON_VFS_ROOT_USER, path, &config)) {
-		Aeron_Log("xwa.input", "Loaded joystick mapping from user config '%s'", path);
+		Aeron_LogInfo("xwa.input", "Loaded joystick mapping from user config '%s'", path);
 		return config;
 	}
 	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_ASSET, path) &&
 		AeronConfigFile_LoadYaml(vfs, AERON_VFS_ROOT_ASSET, path, &config)) {
-		Aeron_Log("xwa.input", "Loaded joystick mapping from asset config '%s'", path);
+		Aeron_LogInfo("xwa.input", "Loaded joystick mapping from asset config '%s'", path);
 		return config;
 	}
 	return NULL;

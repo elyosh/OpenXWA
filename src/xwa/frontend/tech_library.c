@@ -339,7 +339,7 @@ int TechLibrary_LoadSpecTextTable(void) {
 
 	stream = File_Open(AERON_VFS_ROOT_ASSET, path, "r");
 	if (stream == NULL) {
-		Aeron_Log("xwa.assets", "Failed to open tech library spec text table '%s'", path);
+		Aeron_LogError("xwa.assets", "Failed to open tech library spec text table '%s'", path);
 		return 0;
 	}
 
@@ -350,7 +350,7 @@ int TechLibrary_LoadSpecTextTable(void) {
 
 	g_techLibrarySpecTextTable = (TechLibrarySpecText*)Mem_Alloc(sizeof(TechLibrarySpecText) * 256u);
 	if (g_techLibrarySpecTextTable == NULL) {
-		Aeron_Log("xwa.assets", "Failed to allocate tech library spec text table '%s'", path);
+		Aeron_LogError("xwa.assets", "Failed to allocate tech library spec text table '%s'", path);
 		File_Close(stream);
 		return 0;
 	}
@@ -363,7 +363,7 @@ int TechLibrary_LoadSpecTextTable(void) {
 			size_t length;
 
 			if (!File_ReadLine(stream, line, sizeof(line))) {
-				Aeron_Log("xwa.assets", "Short tech library spec text table '%s' at entry %d field %d", path,
+				Aeron_LogError("xwa.assets", "Short tech library spec text table '%s' at entry %d field %d", path,
 						  entryIndex, fieldIndex);
 				File_Close(stream);
 				return 1;

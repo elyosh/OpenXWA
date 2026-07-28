@@ -83,7 +83,7 @@ int Music_Init(void* directSound) {
 	result = ImInit(&g_imHostServices, &g_imApiTable);
 	if (result != 0) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.music", "Music_Init: ImInit failed");
+		Aeron_LogError("xwa.music", "Music_Init: ImInit failed");
 #endif
 		return 0;
 	}
@@ -91,7 +91,7 @@ int Music_Init(void* directSound) {
 	result = g_imApiTable.startup();
 	if (result != 0) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.music", "Music_Init: ImStartup failed");
+		Aeron_LogError("xwa.music", "Music_Init: ImStartup failed");
 #endif
 		return 0;
 	}
@@ -104,7 +104,7 @@ int Music_Init(void* directSound) {
 	g_setMusicState = MUSIC_STATE_NONE;
 	g_musicInitialized = 1;
 #ifdef XWA_MODERN
-	Aeron_Log("xwa.music", "Music_Init: OK");
+	Aeron_LogInfo("xwa.music", "Music_Init: OK");
 #endif
 	return 1;
 }
@@ -169,7 +169,7 @@ int Music_SetState(int state) {
 
 void Music_SetDatapadState(int state) {
 	musicState = state;
-	Aeron_Log("xwa.music", "SetDatapadState(%d) enabled=%d vol=%d", state, g_gameConfig.datapadMusicEnabled,
+	Aeron_LogDebug("xwa.music", "SetDatapadState(%d) enabled=%d vol=%d", state, g_gameConfig.datapadMusicEnabled,
 			  g_gameConfig.datapadMusicVolume);
 	if (g_gameConfig.datapadMusicEnabled) {
 		Music_SetState(state);

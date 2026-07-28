@@ -2642,7 +2642,7 @@ void FlightDebug_SetGimbalLockFixEnabled(int enabled) {
 		return;
 	}
 	g_gimbalLockFixEnabled = enabled;
-	Aeron_Log("xwa.input.orientation", "ORIENTFIX state=%s", enabled ? "on" : "off");
+	Aeron_LogInfo("xwa.input.orientation", "ORIENTFIX state=%s", enabled ? "on" : "off");
 }
 #endif
 

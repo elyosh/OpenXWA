@@ -35,7 +35,7 @@ void XwaModernVideoOptions_Configure(const XwaModernVideoOptions* options, XwaMo
 									 XwaModernVideoOptionsPersistFn persist) {
 	memset(&g_modernVideoOptions, 0, sizeof g_modernVideoOptions);
 	if (!XwaModernVideoOptions_IsValid(options)) {
-		Aeron_Log("xwa.config", "cannot configure invalid modern video options");
+		Aeron_LogError("xwa.config", "cannot configure invalid modern video options");
 		return;
 	}
 
@@ -79,12 +79,12 @@ int XwaModernVideoOptions_Flush(void) {
 		return 1;
 	}
 	if (!g_modernVideoOptions.persist) {
-		Aeron_Log("xwa.config", "modern video options are dirty but no persistence callback is registered");
+		Aeron_LogWarn("xwa.config", "modern video options are dirty but no persistence callback is registered");
 		return 0;
 	}
 	error[0] = '\0';
 	if (!g_modernVideoOptions.persist(&g_modernVideoOptions.options, error, sizeof error)) {
-		Aeron_Log("xwa.config", "%s",
+		Aeron_LogError("xwa.config", "%s",
 				  error[0] ? error : "could not persist modern video options to user configuration");
 		return 0;
 	}

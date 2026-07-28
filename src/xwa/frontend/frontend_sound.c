@@ -380,7 +380,7 @@ static int DirectSound_LoadFileAndFindAudioData(int unused, char* fileName, DSWa
 #endif
 	if (stream == NULL) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.audio", "sound file not found: %s", fileName);
+		Aeron_LogError("xwa.audio", "sound file not found: %s", fileName);
 #endif
 		return 0;
 	}
@@ -401,7 +401,7 @@ static int DirectSound_LoadFileAndFindAudioData(int unused, char* fileName, DSWa
 	}
 
 #ifdef XWA_MODERN
-	Aeron_Log("xwa.audio", "could not read/parse WAV: %s", fileName);
+	Aeron_LogError("xwa.audio", "could not read/parse WAV: %s", fileName);
 #endif
 	File_Close(stream);
 	return 0;

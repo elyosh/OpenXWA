@@ -844,14 +844,14 @@ int FrontendMission_LoadFile(char* fileName) {
 
 	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
 	if (stream == NULL) {
-		Aeron_Log("xwa.frontend", "Failed to open frontend mission '%s'", fileName);
+		Aeron_LogError("xwa.frontend", "Failed to open frontend mission '%s'", fileName);
 		return 0;
 	}
 
 	memset(g_frontendMission, 0, sizeof(*g_frontendMission));
 	File_ReadWord(stream, &g_frontendMission->formatVersion);
 	if (!FrontendMission_IsSupportedFormat(g_frontendMission->formatVersion)) {
-		Aeron_Log("xwa.frontend", "Unsupported frontend mission format %u in '%s'",
+		Aeron_LogError("xwa.frontend", "Unsupported frontend mission format %u in '%s'",
 				  (unsigned int)g_frontendMission->formatVersion, fileName);
 		File_Close(stream);
 		return 0;
@@ -924,7 +924,7 @@ int FrontendMission_LoadCurrent(void) {
 		}
 	} else {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.frontend",
+		Aeron_LogError("xwa.frontend",
 				  "Cannot load current frontend mission: mission list for directory %d is missing",
 				  missionDirectoryId);
 		return 0;
@@ -959,7 +959,7 @@ int FrontendMission_LoadCurrent(void) {
 
 #ifdef XWA_MODERN
 	if (missionListIndex >= (unsigned int)g_missionCount) {
-		Aeron_Log("xwa.frontend",
+		Aeron_LogError("xwa.frontend",
 				  "Cannot load current frontend mission: mission id %d not found in directory %d",
 				  g_pilotData.missionDescriptionIds[missionDirectoryId], missionDirectoryId);
 		return 0;

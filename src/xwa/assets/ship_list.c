@@ -40,7 +40,7 @@ int ShipList_Load(void) {
 #endif
 	if (stream == NULL) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "Failed to open ship list 'ALLIANCE/SHIPLIST.TXT'");
+		Aeron_LogError("xwa.assets", "Failed to open ship list 'ALLIANCE/SHIPLIST.TXT'");
 #endif
 		return 0;
 	}
@@ -49,7 +49,7 @@ int ShipList_Load(void) {
 	g_shipList = list;
 	if (list == NULL) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "Failed to allocate ship list");
+		Aeron_LogError("xwa.assets", "Failed to allocate ship list");
 		File_Close(stream);
 #endif
 		return 0;

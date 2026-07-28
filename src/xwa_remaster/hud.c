@@ -167,30 +167,30 @@ int XwaRemasterHud_Init(AeronVfs* vfs) {
 	if (hud_initialized)
 		return 1;
 	if (!XwaRemasterHud_ValidateWidgetRegistry(error, sizeof error)) {
-		Aeron_Log("xwa.hud", "widget registry invalid: %s", error);
+		Aeron_LogError("xwa.hud", "widget registry invalid: %s", error);
 		return 0;
 	}
 	XwaRemasterHudLayout_Init(&hud_layout);
 	if (!XwaRemasterHudFixed_Init()) {
-		Aeron_Log("xwa.hud", "fixed-widget draw list initialization failed");
+		Aeron_LogError("xwa.hud", "fixed-widget draw list initialization failed");
 		return 0;
 	}
 	if (!XwaRemasterHudBoxes_Init()) {
 		XwaRemasterHudFixed_Shutdown();
-		Aeron_Log("xwa.hud", "target-box draw list initialization failed");
+		Aeron_LogError("xwa.hud", "target-box draw list initialization failed");
 		return 0;
 	}
 	if (!XwaRemasterHudCmd_Init()) {
 		XwaRemasterHudBoxes_Shutdown();
 		XwaRemasterHudFixed_Shutdown();
-		Aeron_Log("xwa.hud", "CMD PiP initialization failed");
+		Aeron_LogError("xwa.hud", "CMD PiP initialization failed");
 		return 0;
 	}
 	if (!XwaRemasterHudText_Init()) {
 		XwaRemasterHudCmd_Shutdown();
 		XwaRemasterHudBoxes_Shutdown();
 		XwaRemasterHudFixed_Shutdown();
-		Aeron_Log("xwa.hud", "pane-glyph draw list initialization failed");
+		Aeron_LogError("xwa.hud", "pane-glyph draw list initialization failed");
 		return 0;
 	}
 	hud_initialized = 1;

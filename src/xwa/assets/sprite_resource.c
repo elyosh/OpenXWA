@@ -560,7 +560,7 @@ int SpriteResource_LoadCatalog(char* listFile) {
 
 	listStream = SpriteResource_OpenRead(g_resdataPath);
 	if (listStream == NULL) {
-		Aeron_Log("xwa.assets", "Failed to open sprite resource catalog '%s'", g_resdataPath);
+		Aeron_LogError("xwa.assets", "Failed to open sprite resource catalog '%s'", g_resdataPath);
 		return -1;
 	}
 
@@ -570,7 +570,7 @@ int SpriteResource_LoadCatalog(char* listFile) {
 	}
 	if (listSize > 0 && !File_ReadCount(listStream, listBuffer, (size_t)listSize)) {
 		File_Close(listStream);
-		Aeron_Log("xwa.assets", "Failed to read sprite resource catalog '%s'", g_resdataPath);
+		Aeron_LogError("xwa.assets", "Failed to read sprite resource catalog '%s'", g_resdataPath);
 		return -1;
 	}
 	File_Close(listStream);
@@ -594,7 +594,7 @@ int SpriteResource_LoadCatalog(char* listFile) {
 		if (datStream != NULL) {
 			if (!SpriteResource_ReadDatDirectory(datStream, entries, 512, &entryCount, &recordFormat)) {
 				File_Close(datStream);
-				Aeron_Log("xwa.assets", "Failed to read sprite DAT directory '%s'", path);
+				Aeron_LogError("xwa.assets", "Failed to read sprite DAT directory '%s'", path);
 				return -1;
 			}
 
@@ -977,7 +977,7 @@ int16_t SpriteResource_LoadGroup(int16_t groupId) {
 	}
 
 	if (indexSize + dataSize == 0) {
-		Aeron_Log("xwa.assets", "Sprite group %d not found in catalog '%s'", groupId, g_resdataPath);
+		Aeron_LogError("xwa.assets", "Sprite group %d not found in catalog '%s'", groupId, g_resdataPath);
 		return SPRITE_RESOURCE_GROUP_NOT_FOUND;
 	}
 
@@ -990,7 +990,7 @@ int16_t SpriteResource_LoadGroup(int16_t groupId) {
 	group->hGlobal = (unsigned char*)malloc((size_t)indexSize + (size_t)dataSize);
 	if (group->hGlobal == NULL) {
 		SpriteResource_ResetGroup(group);
-		Aeron_Log("xwa.assets", "Failed to allocate sprite group %d (%d bytes)", groupId,
+		Aeron_LogError("xwa.assets", "Failed to allocate sprite group %d (%d bytes)", groupId,
 				  indexSize + dataSize);
 		return -1;
 	}
@@ -1002,7 +1002,7 @@ int16_t SpriteResource_LoadGroup(int16_t groupId) {
 	listStream = SpriteResource_OpenRead(g_resdataPath);
 	if (listStream == NULL) {
 		SpriteResource_ResetGroup(group);
-		Aeron_Log("xwa.assets", "Failed to reopen sprite resource catalog '%s'", g_resdataPath);
+		Aeron_LogError("xwa.assets", "Failed to reopen sprite resource catalog '%s'", g_resdataPath);
 		return -1;
 	}
 
@@ -1013,7 +1013,7 @@ int16_t SpriteResource_LoadGroup(int16_t groupId) {
 	if (listSize > 0 && !File_ReadCount(listStream, listBuffer, (size_t)listSize)) {
 		File_Close(listStream);
 		SpriteResource_ResetGroup(group);
-		Aeron_Log("xwa.assets", "Failed to read sprite resource catalog '%s'", g_resdataPath);
+		Aeron_LogError("xwa.assets", "Failed to read sprite resource catalog '%s'", g_resdataPath);
 		return -1;
 	}
 	File_Close(listStream);
@@ -1036,14 +1036,14 @@ int16_t SpriteResource_LoadGroup(int16_t groupId) {
 			datStream = SpriteResource_OpenRead(path);
 			if (datStream == NULL) {
 				SpriteResource_ResetGroup(group);
-				Aeron_Log("xwa.assets", "Failed to open sprite DAT '%s' for group %d", path, groupId);
+				Aeron_LogError("xwa.assets", "Failed to open sprite DAT '%s' for group %d", path, groupId);
 				return -1;
 			}
 
 			if (!SpriteResource_ReadDatDirectory(datStream, entries, 512, &entryCount, &recordFormat)) {
 				File_Close(datStream);
 				SpriteResource_ResetGroup(group);
-				Aeron_Log("xwa.assets", "Failed to read sprite DAT directory '%s' for group %d", path,
+				Aeron_LogError("xwa.assets", "Failed to read sprite DAT directory '%s' for group %d", path,
 						  groupId);
 				return -1;
 			}
@@ -1052,7 +1052,7 @@ int16_t SpriteResource_LoadGroup(int16_t groupId) {
 			if (entryIndex < 0) {
 				File_Close(datStream);
 				SpriteResource_ResetGroup(group);
-				Aeron_Log("xwa.assets", "Sprite group %d missing from DAT '%s'", groupId, path);
+				Aeron_LogError("xwa.assets", "Sprite group %d missing from DAT '%s'", groupId, path);
 				return SPRITE_RESOURCE_GROUP_NOT_FOUND;
 			}
 

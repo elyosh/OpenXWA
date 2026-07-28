@@ -332,7 +332,7 @@ static void fl_format_fsr_reset_reasons(uint32_t reasons, char* text, size_t cap
 static void fl_report_fsr_reset(int reset_requested) {
 	if (!reset_requested) {
 		if (s.fsr_consecutive_reset_frames > 1) {
-			Aeron_Log("xwa.remaster", "FSR history reset condition cleared after %u consecutive frames",
+			Aeron_LogDebug("xwa.remaster", "FSR history reset condition cleared after %u consecutive frames",
 					  s.fsr_consecutive_reset_frames);
 		}
 		s.fsr_last_reset_reasons = 0;
@@ -354,7 +354,7 @@ static void fl_report_fsr_reset(int reset_requested) {
 	char text[512];
 	fl_format_fsr_reset_reasons(reasons, text, sizeof text);
 
-	Aeron_Log("xwa.remaster", "FSR history reset frame %u: %s", s.fsr_consecutive_reset_frames,
+	Aeron_LogDebug("xwa.remaster", "FSR history reset frame %u: %s", s.fsr_consecutive_reset_frames,
 			  text[0] ? text : "unknown reason");
 }
 
@@ -550,12 +550,12 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	static const char* path = "remaster/flight/render.yaml";
 	AeronConfigFile* cf = NULL;
 	if (!vfs || !AeronConfigFile_LoadYaml(vfs, AERON_VFS_ROOT_RESOURCE, path, &cf)) {
-		Aeron_Log("xwa.remaster", "required render configuration unavailable or invalid: %s", path);
+		Aeron_LogError("xwa.remaster", "required render configuration unavailable or invalid: %s", path);
 		return 0;
 	}
 	const char* error_path = NULL;
 	if (!fl_cfg_validate(cf, &error_path)) {
-		Aeron_Log("xwa.remaster", "%s: missing or invalid required setting '%s'", path, error_path);
+		Aeron_LogError("xwa.remaster", "%s: missing or invalid required setting '%s'", path, error_path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -564,7 +564,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	 * as configuration fallbacks. */
 	const int vsync_divisor = (int)AeronConfigFile_GetInt(cf, "presentation.vsync_divisor", 0);
 	if (!Aeron_SetPresentationVsyncDivisor(vsync_divisor)) {
-		Aeron_Log("xwa.remaster", "%s: presentation.vsync_divisor must be 1 or 2", path);
+		Aeron_LogError("xwa.remaster", "%s: presentation.vsync_divisor must be 1 or 2", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -583,7 +583,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 			s.configured_msaa_samples = AERON_SAMPLE_COUNT_8;
 			break;
 		default:
-			Aeron_Log("xwa.remaster", "%s: presentation.msaa_samples must be 1, 2, 4, or 8", path);
+			Aeron_LogError("xwa.remaster", "%s: presentation.msaa_samples must be 1, 2, 4, or 8", path);
 			AeronConfigFile_Destroy(cf);
 			return 0;
 	}
@@ -599,7 +599,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.ssao.max_screen_frac = (float)AeronConfigFile_GetFloat(cf, "ssao.max_screen_frac", 0.0);
 	s.ssao.sample_jitter = (float)AeronConfigFile_GetFloat(cf, "ssao.sample_jitter", 0.0);
 	if (!fl_ssao_config_valid(&s.ssao)) {
-		Aeron_Log("xwa.remaster", "%s: invalid ssao settings", path);
+		Aeron_LogError("xwa.remaster", "%s: invalid ssao settings", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -609,7 +609,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	} else if (strcmp(shadow_mode, "pcf") == 0) {
 		s.shadows.mode = XWA_FLIGHT_SHADOWS_PCF;
 	} else {
-		Aeron_Log("xwa.remaster", "%s: shadows.mode must be 'off' or 'pcf'", path);
+		Aeron_LogError("xwa.remaster", "%s: shadows.mode must be 'off' or 'pcf'", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -623,7 +623,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	} else if (strcmp(shadow_fit_mode, "scene_dependent") == 0) {
 		s.shadows.fit_mode = AERON_SCENE_SHADOW_FIT_SCENE_DEPENDENT;
 	} else {
-		Aeron_Log("xwa.remaster", "%s: shadows.fit_mode must be 'stable', 'frustum', or 'scene_dependent'",
+		Aeron_LogError("xwa.remaster", "%s: shadows.fit_mode must be 'stable', 'frustum', or 'scene_dependent'",
 				  path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
@@ -659,7 +659,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.shadows.debug_cascades = AeronConfigFile_GetBool(cf, "shadows.debug_cascades", 0);
 	s.shadows.debug_atlas_cascade = -1;
 	if (!fl_shadows_config_valid(&s.shadows)) {
-		Aeron_Log("xwa.remaster", "%s: invalid shadows settings", path);
+		Aeron_LogError("xwa.remaster", "%s: invalid shadows settings", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -691,7 +691,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 			  s.hangar_lighting.direction[1] * s.hangar_lighting.direction[1] +
 			  s.hangar_lighting.direction[2] * s.hangar_lighting.direction[2]);
 	if (!fl_hangar_lighting_config_valid(&s.hangar_lighting, hangar_direction_length)) {
-		Aeron_Log("xwa.remaster", "%s: invalid hangar_lighting settings", path);
+		Aeron_LogError("xwa.remaster", "%s: invalid hangar_lighting settings", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -706,7 +706,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.plight.diffuse_wrap = (float)AeronConfigFile_GetFloat(cf, "point_lights.diffuse_wrap", 0.0);
 	s.plight.contrib_cap = (float)AeronConfigFile_GetFloat(cf, "point_lights.contrib_cap", 0.0);
 	if (!fl_point_lights_config_valid(&s.plight)) {
-		Aeron_Log("xwa.remaster", "%s: invalid point_lights settings", path);
+		Aeron_LogError("xwa.remaster", "%s: invalid point_lights settings", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -714,7 +714,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.texture_filtering.max_anisotropy =
 		(float)AeronConfigFile_GetFloat(cf, "texture_filtering.max_anisotropy", 0.0);
 	if (s.texture_filtering.max_anisotropy < 1.0f || s.texture_filtering.max_anisotropy > 16.0f) {
-		Aeron_Log("xwa.remaster", "%s: texture_filtering.max_anisotropy must be between 1 and 16", path);
+		Aeron_LogError("xwa.remaster", "%s: texture_filtering.max_anisotropy must be between 1 and 16", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -722,7 +722,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.sky_exposure = (float)AeronConfigFile_GetFloat(cf, "skybox.exposure", 0.0);
 	const char* sky_path = AeronConfigFile_GetString(cf, "skybox.path", NULL);
 	if (!sky_path[0] || strlen(sky_path) >= sizeof s.sky_path) {
-		Aeron_Log("xwa.remaster", "%s: skybox.path must be non-empty and shorter than %zu bytes", path,
+		Aeron_LogError("xwa.remaster", "%s: skybox.path must be non-empty and shorter than %zu bytes", path,
 				  sizeof s.sky_path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
@@ -737,7 +737,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	} else if (strcmp(sky_mode, "stars") == 0 || strcmp(sky_mode, "procedural") == 0) {
 		s.sky_mode = 1;
 	} else {
-		Aeron_Log("xwa.remaster", "%s: skybox.mode must be 'cube', 'stars' or 'procedural'", path);
+		Aeron_LogError("xwa.remaster", "%s: skybox.mode must be 'cube', 'stars' or 'procedural'", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -748,7 +748,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.star_feather = (float)AeronConfigFile_GetFloat(cf, "skybox.star_feather", 0.0);
 	s.star_flare = (float)AeronConfigFile_GetFloat(cf, "skybox.star_flare", 0.0);
 	if (!fl_sky_config_valid()) {
-		Aeron_Log("xwa.remaster", "%s: invalid skybox settings", path);
+		Aeron_LogError("xwa.remaster", "%s: invalid skybox settings", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -763,7 +763,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	pbr.ambient[1] = (float)AeronConfigFile_GetFloat(cf, "lighting.ambient_g", 0.0);
 	pbr.ambient[2] = (float)AeronConfigFile_GetFloat(cf, "lighting.ambient_b", 0.0);
 	if (!fl_pbr_config_valid(&pbr)) {
-		Aeron_Log("xwa.remaster", "%s: invalid lighting settings", path);
+		Aeron_LogError("xwa.remaster", "%s: invalid lighting settings", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -773,7 +773,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	 * chain skipped). */
 	const float bloom_intensity = (float)AeronConfigFile_GetFloat(cf, "bloom.intensity", 0.0);
 	if (!isfinite(bloom_intensity) || bloom_intensity < 0.0f) {
-		Aeron_Log("xwa.remaster", "%s: bloom.intensity must be finite and non-negative", path);
+		Aeron_LogError("xwa.remaster", "%s: bloom.intensity must be finite and non-negative", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -781,13 +781,13 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 
 	s.mb_quality = (int)AeronConfigFile_GetInt(cf, "motion_blur.quality", 0);
 	if (s.mb_quality < 0 || s.mb_quality > 2) {
-		Aeron_Log("xwa.remaster", "%s: motion_blur.quality must be between 0 and 2", path);
+		Aeron_LogError("xwa.remaster", "%s: motion_blur.quality must be between 0 and 2", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
 	s.mb_shutter = (float)AeronConfigFile_GetFloat(cf, "motion_blur.shutter", 0.0);
 	if (!isfinite(s.mb_shutter) || s.mb_shutter < 0.0f) {
-		Aeron_Log("xwa.remaster", "%s: motion_blur.shutter must be finite and non-negative", path);
+		Aeron_LogError("xwa.remaster", "%s: motion_blur.shutter must be finite and non-negative", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -798,19 +798,19 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 
 	const char* fsr_mode = AeronConfigFile_GetString(cf, "temporal_upscaling.mode", NULL);
 	if (!AeronTemporal_ParseMode(fsr_mode, &s.fsr_mode)) {
-		Aeron_Log("xwa.remaster", "%s: invalid temporal_upscaling.mode '%s'", path, fsr_mode);
+		Aeron_LogError("xwa.remaster", "%s: invalid temporal_upscaling.mode '%s'", path, fsr_mode);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
 	if (s.fsr_mode != AERON_TEMPORAL_OFF && s.configured_msaa_samples != AERON_SAMPLE_COUNT_1) {
-		Aeron_Log("xwa.remaster",
+		Aeron_LogError("xwa.remaster",
 				  "%s: temporal_upscaling.mode and presentation.msaa_samples cannot both be enabled", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
 	s.fsr_sharpness = (float)AeronConfigFile_GetFloat(cf, "temporal_upscaling.sharpness", 0.0);
 	if (s.fsr_sharpness < 0.0f || s.fsr_sharpness > 1.0f) {
-		Aeron_Log("xwa.remaster", "%s: temporal_upscaling.sharpness %.3f must be between 0 and 1", path,
+		Aeron_LogError("xwa.remaster", "%s: temporal_upscaling.sharpness %.3f must be between 0 and 1", path,
 				  (double)s.fsr_sharpness);
 		AeronConfigFile_Destroy(cf);
 		return 0;
@@ -823,20 +823,20 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	fl_request_fsr_reset(FL_FSR_RESET_INITIAL);
 	AeronConfigFile_Destroy(cf);
 	s.config_loaded = 1;
-	Aeron_Log("xwa.remaster",
+	Aeron_LogInfo("xwa.remaster",
 			  "flight ssao: quality %d intensity %.2f power %.2f radius %.1f bias %.2f "
 			  "direct %.2f%s",
 			  s.ssao.quality, (double)s.ssao.intensity, (double)s.ssao.power, (double)s.ssao.radius_view,
 			  (double)s.ssao.bias_view, (double)s.ssao.direct, s.ssao.debug_viz ? " (debug viz)" : "");
 	if (s.texture_filtering.anisotropic) {
-		Aeron_Log("xwa.remaster", "flight mesh filtering: trilinear + %.0fx anisotropic",
+		Aeron_LogInfo("xwa.remaster", "flight mesh filtering: trilinear + %.0fx anisotropic",
 				  (double)s.texture_filtering.max_anisotropy);
 	} else {
-		Aeron_Log("xwa.remaster", "flight mesh filtering: trilinear");
+		Aeron_LogInfo("xwa.remaster", "flight mesh filtering: trilinear");
 	}
-	Aeron_Log("xwa.remaster", "flight FSR 3.1.4 mode: %s%s", AeronTemporal_ModeName(s.fsr_mode),
+	Aeron_LogInfo("xwa.remaster", "flight FSR 3.1.4 mode: %s%s", AeronTemporal_ModeName(s.fsr_mode),
 			  s.fsr_sharpness > 0.0f ? " with RCAS" : "");
-	Aeron_Log("xwa.remaster", "presentation: %.2f Hz display, VSync divisor %d, %.2f fps target",
+	Aeron_LogInfo("xwa.remaster", "presentation: %.2f Hz display, VSync divisor %d, %.2f fps target",
 			  Aeron_DisplayRefreshRate(), Aeron_PresentationVsyncDivisor(), Aeron_PresentationRate());
 	return 1;
 }
@@ -870,7 +870,7 @@ int XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterA
 	for (int tier = 0; tier < 3; tier++) {
 		loaded_font_tiers += XwaRemasterAssets_FlightFont(assets, tier) != NULL;
 	}
-	Aeron_Log("xwa.remaster", "flight HUD fonts: %d/3 tiers loaded", loaded_font_tiers);
+	Aeron_LogInfo("xwa.remaster", "flight HUD fonts: %d/3 tiers loaded", loaded_font_tiers);
 	if (loaded_font_tiers != 3) {
 		return 0;
 	}
@@ -881,12 +881,12 @@ int XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterA
 		char sky_path[600];
 		snprintf(sky_path, sizeof sky_path, "%s/%s", XwaRemasterAssets_Root(assets), s.sky_path);
 		s.sky_cube = Aeron_ImageLoadCubemapKtx2(cmd, sky_path);
-		Aeron_Log("xwa.remaster", "flight skybox %s: %s", s.sky_cube ? "loaded" : "load failed", sky_path);
+		Aeron_LogWarn("xwa.remaster", "flight skybox %s: %s", s.sky_cube ? "loaded" : "load failed", sky_path);
 		if (!s.sky_cube) {
 			return 0;
 		}
 	} else {
-		Aeron_Log("xwa.remaster", "flight sky: procedural starfield (cube map not loaded)");
+		Aeron_LogInfo("xwa.remaster", "flight sky: procedural starfield (cube map not loaded)");
 	}
 	return 1;
 }
@@ -1074,14 +1074,14 @@ static int fl_apply_texture_filtering(const XwaFlightTextureFilteringParams* in)
 			.max_anisotropy = in->max_anisotropy,
 		});
 		if (!sampler) {
-			Aeron_Log("xwa.remaster",
+			Aeron_LogWarn("xwa.remaster",
 					  "flight: anisotropic mesh sampler creation failed; keeping previous filtering");
 			return 0;
 		}
 	}
 	if (s.scene && !AeronScene_SetMeshSampler(s.scene, sampler)) {
 		Aeron_DestroySampler(sampler);
-		Aeron_Log("xwa.remaster", "flight: mesh sampler configuration failed");
+		Aeron_LogError("xwa.remaster", "flight: mesh sampler configuration failed");
 		return 0;
 	}
 	if (s.mesh_sampler) {
@@ -1168,7 +1168,7 @@ void XwaRemasterFlight_SetTemporal(const XwaFlightTemporalParams* in) {
 		mode = AERON_TEMPORAL_OFF;
 	}
 	if (mode != AERON_TEMPORAL_OFF && XwaRemaster_MsaaSampleCount() != AERON_SAMPLE_COUNT_1) {
-		Aeron_Log("xwa.remaster", "FSR cannot be enabled while MSAA is active");
+		Aeron_LogWarn("xwa.remaster", "FSR cannot be enabled while MSAA is active");
 		mode = AERON_TEMPORAL_OFF;
 	}
 	if (mode != s.fsr_mode) {
@@ -1234,28 +1234,28 @@ static int fl_ensure(int target_w, int target_h) {
 	if (!s.trails) {
 		s.trails = XwaRemasterTrails_Create();
 		if (!s.trails) {
-			Aeron_Log("xwa.remaster", "flight: trail renderer create failed");
+			Aeron_LogError("xwa.remaster", "flight: trail renderer create failed");
 			return 0;
 		}
 	}
 	if (!s.particles) {
 		s.particles = XwaRemasterParticles_Create();
 		if (!s.particles) {
-			Aeron_Log("xwa.remaster", "flight: particle renderer create failed");
+			Aeron_LogError("xwa.remaster", "flight: particle renderer create failed");
 			return 0;
 		}
 	}
 	if (!s.hyperspace) {
 		s.hyperspace = XwaRemasterHyperspace_Create();
 		if (!s.hyperspace) {
-			Aeron_Log("xwa.remaster", "flight: hyperspace renderer create failed");
+			Aeron_LogError("xwa.remaster", "flight: hyperspace renderer create failed");
 			return 0;
 		}
 	}
 	if (s.sky_mode == 1 && !s.sky_stars) {
 		s.sky_stars = XwaRemasterSkyStars_Create();
 		if (!s.sky_stars) {
-			Aeron_Log("xwa.remaster", "flight: starfield renderer create failed");
+			Aeron_LogError("xwa.remaster", "flight: starfield renderer create failed");
 			return 0;
 		}
 	}
@@ -1270,7 +1270,7 @@ static int fl_ensure(int target_w, int target_h) {
 													  .address_v = AERON_ADDRESS_CLAMP_TO_EDGE });
 	}
 	if (!s.present || !s.present_sampler) {
-		Aeron_Log("xwa.remaster", "flight: present resources create failed");
+		Aeron_LogError("xwa.remaster", "flight: present resources create failed");
 		return 0;
 	}
 	const AeronSampleCount requested_samples = XwaRemaster_MsaaSampleCount();
@@ -1292,7 +1292,7 @@ static int fl_ensure(int target_w, int target_h) {
 		.view_space_to_meters = 1.0f / 40.96f,
 	});
 	if (!s.scene) {
-		Aeron_Log("xwa.remaster", "flight: scene create failed at %dx%d", target_w, target_h);
+		Aeron_LogError("xwa.remaster", "flight: scene create failed at %dx%d", target_w, target_h);
 		s.rt_w = s.rt_h = 0;
 		return 0;
 	}
@@ -1301,7 +1301,7 @@ static int fl_ensure(int target_w, int target_h) {
 	const float classic_clear_blue = powf(2.0f / 31.0f, 2.2f);
 	AeronScene_SetClearColor(s.scene, (const float[4]) { 0.0f, 0.0f, classic_clear_blue, 1.0f });
 	if (s.mesh_sampler && !AeronScene_SetMeshSampler(s.scene, s.mesh_sampler)) {
-		Aeron_Log("xwa.remaster", "flight: scene mesh sampler configuration failed");
+		Aeron_LogError("xwa.remaster", "flight: scene mesh sampler configuration failed");
 		return 0;
 	}
 
@@ -1312,14 +1312,14 @@ static int fl_ensure(int target_w, int target_h) {
 															.format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
 															.debug_name = "xwa.flight.present" });
 	if (!s.bloom) {
-		Aeron_Log("xwa.remaster", "flight: bloom create failed");
+		Aeron_LogError("xwa.remaster", "flight: bloom create failed");
 		return 0;
 	}
 	if (!s.present_rt) {
-		Aeron_Log("xwa.remaster", "flight: present target create failed");
+		Aeron_LogError("xwa.remaster", "flight: present target create failed");
 		return 0;
 	}
-	Aeron_Log("xwa.remaster", "flight render targets: %dx%d", target_w, target_h);
+	Aeron_LogInfo("xwa.remaster", "flight render targets: %dx%d", target_w, target_h);
 	return 1;
 }
 

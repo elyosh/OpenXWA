@@ -70,11 +70,11 @@ static int XwaMovieTask_ResolveManifestAssetPath(const AeronConfigNode* entry, c
 	if (configured_path == NULL || configured_path[0] == '\0' ||
 		snprintf(path, path_size, "%s", configured_path) >= (int)path_size) {
 		path[0] = '\0';
-		Aeron_Log("xwa.movie", "Ignoring invalid %s for '%s'", field, name);
+		Aeron_LogWarn("xwa.movie", "Ignoring invalid %s for '%s'", field, name);
 		return 0;
 	}
 	if (!AeronVfs_Exists(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, path)) {
-		Aeron_Log("xwa.movie", "Configured %s '%s' for '%s' is unavailable", field, path, name);
+		Aeron_LogWarn("xwa.movie", "Configured %s '%s' for '%s' is unavailable", field, path, name);
 		path[0] = '\0';
 		return 0;
 	}
@@ -169,7 +169,7 @@ static int XwaMovieTask_LoadSubtitleTrack(void) {
 		if (Movie_LoadSubtitles(g_xwaMovieTask.subtitle_path)) {
 			return 1;
 		}
-		Aeron_Log("xwa.movie", "Could not load configured subtitles '%s'; trying automatic lookup",
+		Aeron_LogWarn("xwa.movie", "Could not load configured subtitles '%s'; trying automatic lookup",
 				  g_xwaMovieTask.subtitle_path);
 	}
 	if (Movie_LoadSubtitles(g_xwaMovieTask.path)) {
@@ -198,7 +198,7 @@ int XwaMovieTask_Begin(const char* name, int noFade) {
 	if (!XwaMovieTask_ResolveAsset(name, g_xwaMovieTask.path, sizeof(g_xwaMovieTask.path),
 								   g_xwaMovieTask.original_path, sizeof(g_xwaMovieTask.original_path),
 								   g_xwaMovieTask.subtitle_path, sizeof(g_xwaMovieTask.subtitle_path))) {
-		Aeron_Log("xwa.movie", "Movie asset '%s' was not found", name);
+		Aeron_LogError("xwa.movie", "Movie asset '%s' was not found", name);
 		return 0;
 	}
 
@@ -234,7 +234,7 @@ int XwaMovieTask_Begin(const char* name, int noFade) {
 		return 0;
 	}
 	g_xwaMovieTask.active = 1;
-	Aeron_Log("xwa.movie", "Playing '%s' from %s", name, g_xwaMovieTask.path);
+	Aeron_LogInfo("xwa.movie", "Playing '%s' from %s", name, g_xwaMovieTask.path);
 	return 1;
 }
 
@@ -356,7 +356,7 @@ void XwaMovieTask_Tick(void) {
 
 	state = Aeron_VideoGetState(g_xwaMovieTask.player);
 	if (state == AERON_VIDEO_ERROR) {
-		Aeron_Log("xwa.movie", "%s", Aeron_VideoGetError(g_xwaMovieTask.player));
+		Aeron_LogError("xwa.movie", "%s", Aeron_VideoGetError(g_xwaMovieTask.player));
 		XwaMovieTask_Finish(0, 0);
 		return;
 	}

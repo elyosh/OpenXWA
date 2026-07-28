@@ -230,7 +230,7 @@ char File_GetCdDriveLetter(void) { return g_cdDriveLetter; }
 
 // FUNCTION: XWA 0x50E5A0
 void File_PrintFatalMessageAndExit(char* message, int exitCode) {
-	Aeron_Log("xwa.file", "%s", message != NULL ? message : "");
+	Aeron_LogInfo("xwa.file", "%s", message != NULL ? message : "");
 #ifdef XWA_MODERN
 	Aeron_FatalError("OpenXWA", message != NULL ? message : "");
 #else

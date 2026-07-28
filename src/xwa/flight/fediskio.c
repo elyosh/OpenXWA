@@ -3170,7 +3170,7 @@ void FeDiskIo_FatalError(uint16_t errorCode) {
 	}
 
 	exitCode = -255 - (int)errorCode;
-	Aeron_Log("xwa.file", "%s", message);
+	Aeron_LogInfo("xwa.file", "%s", message);
 #ifdef XWA_MODERN
 	Aeron_FatalError("OpenXWA", message);
 #else

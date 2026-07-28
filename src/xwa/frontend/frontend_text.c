@@ -298,7 +298,7 @@ int FrontendText_LoadFontAtlasFile(const char* fileName, int slotIndex) {
 #endif
 	if (stream == NULL) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "Failed to open frontend font '%s'", fileName);
+		Aeron_LogError("xwa.assets", "Failed to open frontend font '%s'", fileName);
 #endif
 		return 0;
 	}
@@ -315,7 +315,7 @@ int FrontendText_LoadFontAtlasFile(const char* fileName, int slotIndex) {
 	font->pGlyphBits = glyphBits;
 	if (glyphBits == NULL) {
 #ifdef XWA_MODERN
-		Aeron_Log("xwa.assets", "Failed to allocate frontend font '%s' glyph data (%zu bytes)", fileName,
+		Aeron_LogError("xwa.assets", "Failed to allocate frontend font '%s' glyph data (%zu bytes)", fileName,
 				  glyphBlobSize);
 #endif
 		font->inUse = 0;

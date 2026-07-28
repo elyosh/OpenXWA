@@ -203,7 +203,7 @@ int FrontendWaveStream_PlayWaveFile(char* fileName, int loopMode, char driveSele
 		(void)driveSelect;
 		stream = FrontendSound_OpenAsset(fileName, "rb");
 		if (stream == NULL) {
-			Aeron_Log("xwa.audio", "wave stream file not found: %s", fileName);
+			Aeron_LogError("xwa.audio", "wave stream file not found: %s", fileName);
 		}
 #else
 		if (driveSelect == 1) {

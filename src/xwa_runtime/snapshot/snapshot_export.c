@@ -430,7 +430,7 @@ void XwaSnapshot_NoteOptLoad(uint16_t public_handle, const char* file_name) {
 		}
 	}
 	if (!state) {
-		Aeron_Log("xwa.snapshot", "processed-OPT registry full; '%s' untracked", file_name);
+		Aeron_LogWarn("xwa.snapshot", "processed-OPT registry full; '%s' untracked", file_name);
 		return;
 	}
 	/* Basename without directories or extension. */

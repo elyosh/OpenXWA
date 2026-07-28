@@ -1,5 +1,9 @@
 #include "xwa/audio/imuse/imuse.h"
 
+#ifdef XWA_MODERN
+#include "aeron/log.h"
+#endif
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -745,7 +749,7 @@ int ImBuildSyncChunk(char* dst, char* pcmData, unsigned int sampleRate, unsigned
 #ifndef XWA_MODERN
 		printf("File is corrupt %c\n", 7, 7, 7, 7, 7, 7, 7, 7, 7, 7);
 #else
-		printf("File is corrupt %c\n", 7);
+		Aeron_LogError("xwa.audio", "IMC file is corrupt");
 #endif
 		return 0;
 	}

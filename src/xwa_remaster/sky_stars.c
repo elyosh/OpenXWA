@@ -86,7 +86,7 @@ XwaRemasterSkyStars* XwaRemasterSkyStars_Create(void) {
 		.uniform_buffer_count = 1,
 	});
 	if (!stars->vertex_shader || !stars->fragment_shader) {
-		Aeron_Log("xwa.remaster", "starfield: GPU resource creation failed");
+		Aeron_LogError("xwa.remaster", "starfield: GPU resource creation failed");
 		XwaRemasterSkyStars_Destroy(stars);
 		return NULL;
 	}

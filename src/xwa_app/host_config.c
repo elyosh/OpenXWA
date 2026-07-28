@@ -334,7 +334,7 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		}
 	}
 	if (AeronConfigFile_GetNode(config, "paths.resources")) {
-		Aeron_Log("xwa.config",
+		Aeron_LogWarn("xwa.config",
 				  "deprecated setting 'paths.resources' is ignored; resources are application-owned");
 	}
 	const int valid =

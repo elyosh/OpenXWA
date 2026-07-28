@@ -44,7 +44,7 @@ static int cutscene_ensure(int width, int height) {
 		g_cutscene.draw_list = AeronDrawList_Create(XWA_SNAP_MAX_GLYPHS);
 	}
 	if (!g_cutscene.target || !g_cutscene.draw_list) {
-		Aeron_Log("xwa.remaster", "cutscene subtitle overlay initialization failed");
+		Aeron_LogError("xwa.remaster", "cutscene subtitle overlay initialization failed");
 	}
 	return g_cutscene.target != NULL && g_cutscene.draw_list != NULL;
 }

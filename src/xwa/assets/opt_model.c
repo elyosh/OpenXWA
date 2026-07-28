@@ -272,7 +272,7 @@ static NativeOptNode* OptModel_ParseNode(NativeOptimizedPolyObject* native, uint
 	int i;
 
 	if (!OptModel_AddressToOffset(native, address, 24, &offset)) {
-		Aeron_Log("xwa.assets", "Invalid OPT node address 0x%08x", address);
+		Aeron_LogError("xwa.assets", "Invalid OPT node address 0x%08x", address);
 		return NULL;
 	}
 
@@ -290,7 +290,7 @@ static NativeOptNode* OptModel_ParseNode(NativeOptimizedPolyObject* native, uint
 	param2Address = ByteOrder_ReadU32Le(raw + 20);
 
 	if (childCount < 0) {
-		Aeron_Log("xwa.assets", "Invalid OPT node child count %d at 0x%08x", childCount, address);
+		Aeron_LogError("xwa.assets", "Invalid OPT node child count %d at 0x%08x", childCount, address);
 		return NULL;
 	}
 
@@ -340,7 +340,7 @@ static NativeOptNode* OptModel_ParseNode(NativeOptimizedPolyObject* native, uint
 		uint8_t* children =
 			(uint8_t*)OptModel_AddressToPtr(native, childrenAddress, (uint32_t)childCount * 4);
 		if (children == NULL) {
-			Aeron_Log("xwa.assets", "Invalid OPT children table 0x%08x", childrenAddress);
+			Aeron_LogError("xwa.assets", "Invalid OPT children table 0x%08x", childrenAddress);
 			return NULL;
 		}
 
@@ -371,7 +371,7 @@ static int OptModel_BuildNativeGraph(NativeOptimizedPolyObject* native) {
 	OptModel_FreeNativeGraph(native);
 
 	if (native->model.rootNodeCount < 0) {
-		Aeron_Log("xwa.assets", "Invalid OPT root node count %d", native->model.rootNodeCount);
+		Aeron_LogError("xwa.assets", "Invalid OPT root node count %d", native->model.rootNodeCount);
 		return 0;
 	}
 
@@ -382,7 +382,7 @@ static int OptModel_BuildNativeGraph(NativeOptimizedPolyObject* native) {
 	rootTable = (uint8_t*)OptModel_AddressToPtr(native, native->rootNodesAddress,
 												(uint32_t)native->model.rootNodeCount * 4);
 	if (rootTable == NULL) {
-		Aeron_Log("xwa.assets", "Invalid OPT root node table 0x%08x", native->rootNodesAddress);
+		Aeron_LogError("xwa.assets", "Invalid OPT root node table 0x%08x", native->rootNodesAddress);
 		return 0;
 	}
 
@@ -900,12 +900,12 @@ uint16_t OptModel_LoadFileToHandle(const char* fileName, int* outVersion) {
 
 	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
 	if (stream == NULL) {
-		Aeron_Log("xwa.assets", "Failed to open OPT '%s'", fileName);
+		Aeron_LogError("xwa.assets", "Failed to open OPT '%s'", fileName);
 		return 0;
 	}
 
 	if (!File_ReadCount(stream, header, sizeof(header))) {
-		Aeron_Log("xwa.assets", "Failed to read OPT '%s' header", fileName);
+		Aeron_LogError("xwa.assets", "Failed to read OPT '%s' header", fileName);
 		File_Close(stream);
 		return 0;
 	}
@@ -917,7 +917,7 @@ uint16_t OptModel_LoadFileToHandle(const char* fileName, int* outVersion) {
 	} else {
 		version = -firstDword;
 		if (!File_ReadCount(stream, header, sizeof(header))) {
-			Aeron_Log("xwa.assets", "Failed to read OPT '%s' size", fileName);
+			Aeron_LogError("xwa.assets", "Failed to read OPT '%s' size", fileName);
 			File_Close(stream);
 			return 0;
 		}
@@ -926,19 +926,19 @@ uint16_t OptModel_LoadFileToHandle(const char* fileName, int* outVersion) {
 
 	if (version < 2 || payloadSize <= 0) {
 		File_Close(stream);
-		Aeron_Log("xwa.assets", "Unsupported OPT '%s' version %d size %d", fileName, version, payloadSize);
+		Aeron_LogError("xwa.assets", "Unsupported OPT '%s' version %d size %d", fileName, version, payloadSize);
 		return 0;
 	}
 
 	payload = (uint8_t*)malloc((size_t)payloadSize);
 	if (payload == NULL) {
-		Aeron_Log("xwa.assets", "Failed to allocate %d bytes for OPT '%s'", payloadSize, fileName);
+		Aeron_LogError("xwa.assets", "Failed to allocate %d bytes for OPT '%s'", payloadSize, fileName);
 		File_Close(stream);
 		return 0;
 	}
 
 	if (!File_ReadCount(stream, payload, (size_t)payloadSize)) {
-		Aeron_Log("xwa.assets", "Failed to read OPT '%s' payload size %d", fileName, payloadSize);
+		Aeron_LogError("xwa.assets", "Failed to read OPT '%s' payload size %d", fileName, payloadSize);
 		free(payload);
 		File_Close(stream);
 		return 0;
@@ -952,21 +952,21 @@ uint16_t OptModel_LoadFileToHandle(const char* fileName, int* outVersion) {
 
 	handle = Memory_AllocHandle(0, sizeof(NativeOptimizedPolyObject));
 	if (handle == 0) {
-		Aeron_Log("xwa.assets", "Failed to allocate native OPT handle for '%s'", fileName);
+		Aeron_LogError("xwa.assets", "Failed to allocate native OPT handle for '%s'", fileName);
 		free(payload);
 		return 0;
 	}
 
 	native = (NativeOptimizedPolyObject*)Memory_LockHandle(handle);
 	if (native == NULL) {
-		Aeron_Log("xwa.assets", "Failed to lock native OPT handle %u for '%s'", (unsigned)handle, fileName);
+		Aeron_LogError("xwa.assets", "Failed to lock native OPT handle %u for '%s'", (unsigned)handle, fileName);
 		Memory_FreeHandle(0, handle);
 		free(payload);
 		return 0;
 	}
 
 	if (!OptModel_InitNativeModelFromBytes(native, payload, payloadSize)) {
-		Aeron_Log("xwa.assets", "Failed to parse OPT '%s' payload size %d", fileName, payloadSize);
+		Aeron_LogError("xwa.assets", "Failed to parse OPT '%s' payload size %d", fileName, payloadSize);
 		if (native != NULL) {
 			OptModel_DestroyNativeModel(native);
 			Memory_UnlockHandle(handle);
@@ -1737,7 +1737,7 @@ int OptModel_UploadTextureNodesRecursive(OptNode* node, intptr_t* textureIds, in
 		textureData = (OptTextureData*)node->param2;
 		palette = (uint16_t*)OptModel_AddressToPtr(g_optTextureUploadNative, textureData->paletteAddress, 2);
 		if (palette == NULL) {
-			Aeron_Log("xwa.assets", "Invalid OPT texture palette address 0x%08x",
+			Aeron_LogError("xwa.assets", "Invalid OPT texture palette address 0x%08x",
 					  textureData->paletteAddress);
 			textureIds[textureCount] = 0;
 			return textureCount + 1;
@@ -2050,7 +2050,7 @@ uint16_t OptModel_LoadHandle(const char* fileName) {
 						  modelNative->model.rootNodes[0]->nodeType == OPT_TEXTURE_REF)) {
 		--meshCount;
 	}
-	Aeron_Log("xwa.assets",
+	Aeron_LogInfo("xwa.assets",
 			  "Loaded OPT '%s' handle=%u public=0x%04x version=%d roots=%d meshes=%d hardware=%d", fileName,
 			  (unsigned)modelHandle, (unsigned)(modelHandle | 0x8000), version,
 			  modelNative->model.rootNodeCount, meshCount, g_useHardware3D);

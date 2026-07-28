@@ -84,19 +84,19 @@ int XwaPort_Init(void) {
 	XwaTime_Reset();
 	File_SetVfs(Aeron_GetVfs());
 	if (SpriteResource_LoadCatalog("ALLIANCE/RESDATA.TXT") != 0) {
-		Aeron_Log("xwa.assets", "Failed to load required sprite catalog 'ALLIANCE/RESDATA.TXT'");
+		Aeron_LogError("xwa.assets", "Failed to load required sprite catalog 'ALLIANCE/RESDATA.TXT'");
 	}
 	Linez_LoadDict("xwa.tab");
 	/* Original _WinMain@16 gives the string loader a valid initial handle. Large
 	   string tables replace this allocation after measuring the file. */
 	g_stringDataHandle = Memory_AllocHandle(XWA_STRING_DATA_TAG, XWA_STRING_DATA_INITIAL_BYTES);
 	if (g_stringDataHandle == 0) {
-		Aeron_Log("xwa.assets", "Failed to allocate initial game string data buffer");
+		Aeron_LogError("xwa.assets", "Failed to allocate initial game string data buffer");
 		XwaPort_FreeStartupAssets();
 		return 0;
 	}
 	if (StringTable_LoadGameStrings() != 0) {
-		Aeron_Log("xwa.assets", "Failed to load game string table 'ALLIANCE/STRINGS.TXT'");
+		Aeron_LogError("xwa.assets", "Failed to load game string table 'ALLIANCE/STRINGS.TXT'");
 		XwaPort_FreeStartupAssets();
 		return 0;
 	}
@@ -134,7 +134,7 @@ int XwaPort_QueueMouseLookToggle(void) {
 	}
 
 	if (g_injectedKeyCount >= (int)(sizeof g_injectedKeyStack / sizeof g_injectedKeyStack[0])) {
-		Aeron_Log("xwa", "could not queue cockpit mouse-look toggle: flight key stack is full");
+		Aeron_LogWarn("xwa", "could not queue cockpit mouse-look toggle: flight key stack is full");
 		return 1;
 	}
 
@@ -144,7 +144,7 @@ int XwaPort_QueueMouseLookToggle(void) {
 
 void XwaPort_ToggleMouseCapture(void) {
 	g_xwaPortMouseCaptureSuspended = !g_xwaPortMouseCaptureSuspended;
-	Aeron_Log("xwa", "%s", g_xwaPortMouseCaptureSuspended ? "mouse released to OS" : "mouse captured");
+	Aeron_LogInfo("xwa", "%s", g_xwaPortMouseCaptureSuspended ? "mouse released to OS" : "mouse captured");
 }
 
 int XwaPort_IsMouseCaptureSuspended(void) { return g_xwaPortMouseCaptureSuspended; }
@@ -200,7 +200,7 @@ static void XwaPort_TickBody(int32_t delta_us) {
 			if (g_xwaPortMouseCaptureSuspended && input != 0 && input->has_focus &&
 				input->mouse.inside_content && input->mouse.pressed_buttons != 0u) {
 				g_xwaPortMouseCaptureSuspended = 0;
-				Aeron_Log("xwa", "mouse captured");
+				Aeron_LogInfo("xwa", "mouse captured");
 			}
 			const int capture = input != 0 && input->has_focus && !g_xwaPortMouseCaptureSuspended;
 			Aeron_SetRelativeMouseMode(capture);
