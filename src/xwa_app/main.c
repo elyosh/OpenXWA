@@ -279,6 +279,10 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 	Aeron_SetFullscreen(initial_window_mode == XWA_MODERN_WINDOW_MODE_FULLSCREEN);
+	/* The setup dialogs above are separate OS windows; on some platforms
+	 * (macOS) closing them does not re-key the game window, which would start
+	 * the game inside its unfocused pause. Ask for input focus back. */
+	Aeron_RaiseWindow();
 	Aeron_LogInfo("xwa.config", "game data: %s", selected_game_data);
 	Aeron_LogInfo("xwa.config", "resources: %s", Aeron_ResourceRoot());
 	Aeron_LogInfo("xwa.config", "flight simulation step: %d ticks", host_config.flight_simulation_step_ticks);

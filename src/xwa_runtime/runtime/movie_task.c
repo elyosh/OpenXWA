@@ -13,6 +13,7 @@
 #include "xwa/movie/movie.h"
 #include "xwa/util/memory.h"
 #include "xwa_runtime/runtime/frontend_task.h"
+#include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/runtime/presentation.h"
 
 #include <ctype.h>
@@ -337,7 +338,7 @@ void XwaMovieTask_Tick(void) {
 	FrontendFileStream_ServiceSlots();
 	XwaFrontendTask_ServiceFrameSystems();
 	input = Aeron_InputSnapshot();
-	if (input != NULL && !input->has_focus) {
+	if (input != NULL && !input->has_focus && XwaPort_EverHadFocus()) {
 		if (!g_xwaMovieTask.playback_paused) {
 			Aeron_VideoPause(g_xwaMovieTask.player);
 			g_xwaMovieTask.playback_paused = 1;

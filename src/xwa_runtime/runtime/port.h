@@ -30,6 +30,10 @@ int XwaPort_QueueMouseLookToggle(void);
  * click inside the window, or when the session leaves flight. */
 void XwaPort_ToggleMouseCapture(void);
 int XwaPort_IsMouseCaptureSuspended(void);
+/* Nonzero once the window has held input focus at least once since
+ * XwaPort_Init. The frontend/movie focus pause is gated on this so a launch
+ * where the OS never handed focus back does not begin as a silent freeze. */
+int XwaPort_EverHadFocus(void);
 void XwaPort_Shutdown(void);
 int XwaPort_ShouldQuit(void);
 int XwaPort_GetExitCode(void);

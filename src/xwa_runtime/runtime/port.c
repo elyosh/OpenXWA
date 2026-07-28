@@ -31,6 +31,11 @@
 static int g_xwaPortInitialized;
 static int g_xwaPortShouldQuit;
 static int g_xwaPortHadFocus;
+/* One-way latch: the window has held input focus at least once since init.
+ * The frontend/movie focus pause only engages after this is set, so a launch
+ * where the OS never handed focus back (setup dialogs, background start) does
+ * not begin as a silent freeze. */
+static int g_xwaPortEverHadFocus;
 static int g_xwaPortClassicFlightRenderingEnabled = 1;
 static char g_xwaPortCommandLine[1024];
 /* Flight mouse capture. Relative mode is re-asserted on every flight tick, so a
@@ -116,9 +121,12 @@ int XwaPort_Init(void) {
 	g_xwaPortInitialized = 1;
 	g_xwaPortShouldQuit = 0;
 	g_xwaPortHadFocus = 1;
+	g_xwaPortEverHadFocus = 0;
 	g_xwaPortClassicFlightRenderingEnabled = 1;
 	return 1;
 }
+
+int XwaPort_EverHadFocus(void) { return g_xwaPortEverHadFocus; }
 
 static void XwaPort_SetHostCursorVisible(int visible) {
 	visible = visible != 0;
@@ -157,6 +165,11 @@ static void XwaPort_TickBody(int32_t delta_us) {
 		return;
 	}
 	XwaPort_ApplyClassicFlightRenderingPolicy();
+
+	input = Aeron_InputSnapshot();
+	if (input != 0 && input->has_focus) {
+		g_xwaPortEverHadFocus = 1;
+	}
 
 	XwaSnapshot_BeginTick();
 
@@ -250,7 +263,7 @@ static void XwaPort_TickBody(int32_t delta_us) {
 	g_xwaPortMouseCaptureSuspended = 0;
 	input = Aeron_InputSnapshot();
 	XwaInputBridge_UpdateFrontend(input);
-	if (input != 0 && !input->has_focus) {
+	if (input != 0 && !input->has_focus && g_xwaPortEverHadFocus) {
 		g_xwaPortHadFocus = 0;
 		XwaFrontendTask_Pause();
 		XwaSnapshot_Commit();
@@ -312,6 +325,7 @@ void XwaPort_Shutdown(void) {
 	g_xwaPortInitialized = 0;
 	g_xwaPortShouldQuit = 0;
 	g_xwaPortHadFocus = 0;
+	g_xwaPortEverHadFocus = 0;
 	g_xwaPortClassicFlightRenderingEnabled = 1;
 	DDrawCompat_SetClassicFlightRenderingSuppressed(0);
 }
