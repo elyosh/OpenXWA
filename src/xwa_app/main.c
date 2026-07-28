@@ -257,8 +257,7 @@ int main(int argc, char** argv) {
 		Aeron_Shutdown();
 		return 1;
 	}
-	initial_window_mode =
-		Aeron_Fullscreen() ? XWA_MODERN_WINDOW_MODE_FULLSCREEN : XWA_MODERN_WINDOW_MODE_WINDOWED;
+	initial_window_mode = XWA_MODERN_WINDOW_MODE_FULLSCREEN;
 	if (host_config.video_options_override_mask & XWA_MODERN_VIDEO_OVERRIDE_WINDOW_MODE) {
 		initial_window_mode = host_config.video_options.window_mode;
 	}
