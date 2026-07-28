@@ -59,6 +59,11 @@ static struct {
 	AeronTexture* scene_tex;
 	XwaSceneKind scene_kind;
 	int scene_is_direct;
+	/* Nonzero when scene_tex holds tonemapped scene output (flight),
+	 * whose display model the tonemapper already applied; zero for
+	 * decoded sRGB art (frontend, cutscene subtitles), which presents
+	 * as LINEAR_DISPLAY so HDR output can remap its display gamma. */
+	int scene_is_tonemapped;
 	/* HDR output: desired flag + deferred apply (see the header). */
 	int hdr_desired;
 	int hdr_apply_pending;
@@ -160,6 +165,26 @@ static XwaModernFsrUpscaling XwaRemaster_FromTemporalMode(AeronTemporalMode mode
 	}
 }
 
+/* Aeron's decode gamma (0 = piecewise) <-> the discrete option values. */
+static XwaModernSdrGamma XwaRemaster_SdrGammaFromDecode(float gamma) {
+	if (gamma <= 0.0f) {
+		return XWA_MODERN_SDR_GAMMA_SRGB;
+	}
+	return gamma >= 2.3f ? XWA_MODERN_SDR_GAMMA_2_4 : XWA_MODERN_SDR_GAMMA_2_2;
+}
+
+static float XwaRemaster_SdrGammaToDecode(XwaModernSdrGamma gamma) {
+	switch (gamma) {
+		case XWA_MODERN_SDR_GAMMA_2_2:
+			return 2.2f;
+		case XWA_MODERN_SDR_GAMMA_2_4:
+			return 2.4f;
+		case XWA_MODERN_SDR_GAMMA_SRGB:
+			break;
+	}
+	return 0.0f;
+}
+
 static int XwaRemaster_VideoOptionsValid(const XwaModernVideoOptions* options) {
 	return options && options->ssao_quality >= XWA_MODERN_SSAO_OFF &&
 		   options->ssao_quality <= XWA_MODERN_SSAO_HIGH && options->fsr_upscaling >= XWA_MODERN_FSR_OFF &&
@@ -167,7 +192,8 @@ static int XwaRemaster_VideoOptionsValid(const XwaModernVideoOptions* options) {
 		   options->msaa <= XWA_MODERN_MSAA_8X &&
 		   (options->fsr_upscaling == XWA_MODERN_FSR_OFF || options->msaa == XWA_MODERN_MSAA_OFF) &&
 		   options->motion_blur_quality >= XWA_MODERN_MOTION_BLUR_OFF &&
-		   options->motion_blur_quality <= XWA_MODERN_MOTION_BLUR_HIGH;
+		   options->motion_blur_quality <= XWA_MODERN_MOTION_BLUR_HIGH &&
+		   options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 && options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB;
 }
 
 void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
@@ -189,6 +215,7 @@ void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
 	out->msaa = XwaRemaster_FromSampleCount(XwaRemaster_MsaaSampleCount());
 	out->motion_blur_quality = (XwaModernMotionBlurQuality)motion_blur.quality;
 	out->hdr_output = XwaRemaster_GetHdrDesired();
+	out->sdr_gamma = XwaRemaster_SdrGammaFromDecode(Aeron_OutputSdrContentGamma());
 }
 
 void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
@@ -211,6 +238,13 @@ void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
 	XwaRemasterFlight_GetTemporal(&temporal);
 	temporal.mode = XwaRemaster_ToTemporalMode(options->fsr_upscaling);
 	XwaRemasterFlight_SetTemporal(&temporal);
+
+#if !defined(__APPLE__)
+	/* Apple keeps Aeron's piecewise platform default: the compositor presents
+	 * SDR content with the piecewise curve, so diverging would make HDR and
+	 * SDR output disagree there. The option is shown disabled in the UI. */
+	Aeron_SetOutputSdrContentGamma(XwaRemaster_SdrGammaToDecode(options->sdr_gamma));
+#endif
 
 	XwaRemaster_SetHdrDesired(options->hdr_output);
 }
@@ -262,6 +296,9 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	}
 	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_HDR) {
 		video_options.hdr_output = options->video_options.hdr_output;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_SDR_GAMMA) {
+		video_options.sdr_gamma = options->video_options.sdr_gamma;
 	}
 	XwaRemaster_SetVideoOptions(&video_options);
 	g.hdr_apply_pending = 0;
@@ -583,7 +620,8 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	if (!assets_pending && flight_render_needed && (render_snapshot || presentation_change) &&
 		(!retain_scene_frame || presentation_change)) {
 		AeronTexture* next_scene_tex = g.scene_tex;
-		int next_scene_is_direct = g.scene_is_direct;
+		int next_scene_is_direct     = g.scene_is_direct;
+		int next_scene_is_tonemapped = g.scene_is_tonemapped;
 		int render_output_required = retain_scene_frame;
 		AeronCommandBuffer* cmd = Aeron_AcquireCommandBuffer();
 		if (!cmd) {
@@ -599,7 +637,8 @@ void XwaRemaster_Frame(int32_t delta_us) {
 					render_output_required = 1;
 					Aeron_GpuDebugPush(cmd, "OpenXWA frontend reconstruction");
 					next_scene_tex = XwaRemasterFrontend_Render(cmd, snap, g.assets);
-					next_scene_is_direct = 0;
+					next_scene_is_direct     = 0;
+					next_scene_is_tonemapped = 0;
 					Aeron_GpuDebugPop(cmd);
 					break;
 				case XWA_SCENE_FLIGHT:
@@ -613,18 +652,21 @@ void XwaRemaster_Frame(int32_t delta_us) {
 							: NULL;
 					next_scene_is_direct =
 						next_scene_tex && XwaRemasterFlight_DirectPresentationReady();
+					next_scene_is_tonemapped = next_scene_tex != NULL;
 					Aeron_GpuDebugPop(cmd);
 					break;
 				case XWA_SCENE_CUTSCENE:
 					Aeron_GpuDebugPush(cmd, "OpenXWA cutscene subtitles");
 					next_scene_tex = XwaRemasterCutscene_Render(
 						cmd, snap, g.assets, g.render_pixel_width, g.render_pixel_height);
-					next_scene_is_direct = 0;
+					next_scene_is_direct     = 0;
+					next_scene_is_tonemapped = 0;
 					Aeron_GpuDebugPop(cmd);
 					break;
 				default:
-					next_scene_tex = NULL;
-					next_scene_is_direct = 0;
+					next_scene_tex           = NULL;
+					next_scene_is_direct     = 0;
+					next_scene_is_tonemapped = 0;
 					break;
 			}
 		} else {
@@ -633,6 +675,8 @@ void XwaRemaster_Frame(int32_t delta_us) {
 			next_scene_tex = XwaRemasterFlight_ResolvePresentation(cmd, direct_present);
 			next_scene_is_direct =
 				next_scene_tex && XwaRemasterFlight_DirectPresentationReady();
+			/* Retained/transition frames are flight output: tonemapped. */
+			next_scene_is_tonemapped = next_scene_tex != NULL;
 			Aeron_GpuDebugPop(cmd);
 		}
 		Aeron_GpuDebugPop(cmd);
@@ -647,7 +691,8 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		}
 		g.scene_tex = next_scene_tex;
 		g.scene_kind = snap->scene_kind;
-		g.scene_is_direct = next_scene_is_direct;
+		g.scene_is_direct     = next_scene_is_direct;
+		g.scene_is_tonemapped = next_scene_is_tonemapped;
 		g.last_tick = snap->tick_index;
 		g.force_scene_render = 0;
 	} else if (!assets_pending && flight_render_needed && render_snapshot && retain_scene_frame) {
@@ -662,7 +707,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 				.texture = g.scene_tex,
 				.logical_rect = { safe.x, safe.y, safe.width, safe.height },
 				.blend_mode = AERON_LAYER_BLEND_PREMULTIPLIED,
-				.color_space = AERON_COLOR_SPACE_LINEAR_SRGB,
+				.color_space = AERON_COLOR_SPACE_LINEAR_DISPLAY,
 			};
 			if (!Aeron_SubmitTextureLayer(&layer)) {
 				XwaRemaster_FatalGpu("cutscene subtitle presentation");
@@ -700,7 +745,13 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		.texture = g.scene_tex,
 		.logical_rect = { pr.x, pr.y, pr.width, pr.height },
 		.blend_mode = AERON_LAYER_BLEND_PREMULTIPLIED,
-		.color_space = AERON_COLOR_SPACE_LINEAR_SRGB,
+		/* Tonemapped flight output already carries its display model —
+		 * a LINEAR_DISPLAY remap would apply the display gamma twice
+		 * and make the texture path diverge from direct presentation
+		 * (visible when SPLIT view forces this path under HDR). The
+		 * remap is only for decoded sRGB art. */
+		.color_space = g.scene_is_tonemapped ? AERON_COLOR_SPACE_LINEAR_SRGB
+											 : AERON_COLOR_SPACE_LINEAR_DISPLAY,
 		.tint_enabled = 1,
 		.tint_rgba = { g.ramp.alpha, g.ramp.alpha, g.ramp.alpha, g.ramp.alpha },
 	};

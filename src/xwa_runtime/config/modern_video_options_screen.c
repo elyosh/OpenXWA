@@ -1,5 +1,6 @@
 #include "xwa_runtime/config/modern_video_options_screen.h"
 
+#include "aeron/render.h"
 #include "xwa/assets/string_table.h"
 #include "xwa/config/game_config.h"
 #include "xwa/frontend/frontend_button.h"
@@ -24,7 +25,7 @@ enum {
 static int XwaModernVideoOptionsScreen_DrawCycle(uint8_t* value, const char* label,
 												 const char* const* value_texts, int option_count,
 												 int menu_center_x, int* y, int* row_index, int cursor_row,
-												 char* key_state, int button_id) {
+												 char* key_state, int button_id, int disabled) {
 	const char* value_text;
 	int label_x;
 	int value_x;
@@ -32,6 +33,16 @@ static int XwaModernVideoOptionsScreen_DrawCycle(uint8_t* value, const char* lab
 
 	label_x = menu_center_x - FrontendText_MeasureWidth(label, 15) - 10;
 	changed = 0;
+	if (disabled) {
+		/* Same greyed treatment as the original menus (for example the video
+		 * display driver while in flight): the row keeps its cursor slot and
+		 * layout but takes no input. */
+		FrontendText_Draw(15, label, label_x, *y, cursor_row == *row_index ? 0xffff : g_colorGray);
+		FrontendText_Draw(15, value_texts[*value], menu_center_x + 10, *y, g_colorGray);
+		*y += 20;
+		++*row_index;
+		return 0;
+	}
 	if (cursor_row == *row_index) {
 		FrontendText_Draw(15, label, label_x, *y, g_colorGreen);
 		if (*key_state == XWA_MODERN_MENU_KEY_LEFT) {
@@ -78,6 +89,10 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	static const char* const fsr_texts[] = { "Off", "Performance", "Balanced", "Quality", "Native AA" };
 	static const char* const msaa_texts[] = { "Off", "2x", "4x", "8x" };
 	static const char* const toggle_texts[] = { "Off", "On" };
+	/* The cycle covers 2.2/2.4 only (option_count 2); index 2 exists so a
+	 * config.yaml 'srgb' value (and the fixed Apple behavior) still displays
+	 * truthfully — any left/right press moves into the offered pair. */
+	static const char* const sdr_gamma_texts[] = { "2.2", "2.4", "sRGB" };
 	XwaModernVideoOptions options;
 	char key_state;
 	const char* text;
@@ -89,6 +104,8 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	uint8_t original_msaa;
 	uint8_t motion_blur;
 	uint8_t hdr;
+	uint8_t sdr_gamma;
+	int sdr_gamma_disabled;
 	int y;
 	int row_index;
 	int changed;
@@ -110,6 +127,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	original_msaa = msaa;
 	motion_blur = (uint8_t)options.motion_blur_quality;
 	hdr = (uint8_t)(options.hdr_output != 0);
+	sdr_gamma = (uint8_t)options.sdr_gamma;
 	y = 140;
 	row_index = 0;
 	changed = 0;
@@ -119,13 +137,13 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		Keyboard_FlushCharBuffer();
 		key_state = 0;
 		if (--*cursor_row < 0) {
-			*cursor_row = 6;
+			*cursor_row = 7;
 		}
 	} else if (key_state == XWA_MODERN_MENU_KEY_DOWN) {
 		FrontendSound_PlayUISound("configsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
 		Keyboard_FlushCharBuffer();
 		key_state = 0;
-		if (++*cursor_row >= 7) {
+		if (++*cursor_row >= 8) {
 			*cursor_row = 0;
 		}
 	}
@@ -140,18 +158,35 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 
 	changed |=
 		XwaModernVideoOptionsScreen_DrawCycle(&window_mode, "Window Mode", window_mode_texts, 2,
-											  menu_center_x, &y, &row_index, *cursor_row, &key_state, 60);
+											  menu_center_x, &y, &row_index, *cursor_row, &key_state, 60, 0);
 	changed |= XwaModernVideoOptionsScreen_DrawCycle(&ssao, "SSAO", quality_texts, 3, menu_center_x, &y,
-													 &row_index, *cursor_row, &key_state, 61);
+													 &row_index, *cursor_row, &key_state, 61, 0);
 	changed |= XwaModernVideoOptionsScreen_DrawCycle(&fsr, "FSR Upscaling", fsr_texts, 5, menu_center_x, &y,
-													 &row_index, *cursor_row, &key_state, 62);
+													 &row_index, *cursor_row, &key_state, 62, 0);
 	changed |= XwaModernVideoOptionsScreen_DrawCycle(&msaa, "MSAA", msaa_texts, 4, menu_center_x, &y,
-													 &row_index, *cursor_row, &key_state, 63);
+													 &row_index, *cursor_row, &key_state, 63, 0);
 	changed |=
 		XwaModernVideoOptionsScreen_DrawCycle(&motion_blur, "Motion Blur", quality_texts, 3, menu_center_x,
-											  &y, &row_index, *cursor_row, &key_state, 64);
+											  &y, &row_index, *cursor_row, &key_state, 64, 0);
+	/* Greyed while the display cannot present HDR (OS HDR disabled or the
+	 * display is not HDR-capable — the backend cannot distinguish the two). */
 	changed |= XwaModernVideoOptionsScreen_DrawCycle(&hdr, "HDR Output", toggle_texts, 2, menu_center_x, &y,
-													 &row_index, *cursor_row, &key_state, 65);
+													 &row_index, *cursor_row, &key_state, 65,
+													 !Aeron_OutputSupportsHdr());
+#if defined(__APPLE__)
+	/* Fixed platform behavior (piecewise sRGB, matching the compositor's own
+	 * SDR presentation); shown for parity with other platforms. */
+	sdr_gamma_disabled = 1;
+#else
+	/* Greyed while the HDR composition is not actually running (HDR Output
+	 * off, or the display is in SDR mode): SDR presentation is byte-exact,
+	 * so the decode choice has no effect there. Enabling HDR Output above
+	 * un-greys the row once the deferred swapchain flip applies. */
+	sdr_gamma_disabled = !Aeron_OutputHdrEnabled();
+#endif
+	changed |= XwaModernVideoOptionsScreen_DrawCycle(&sdr_gamma, "SDR Content Gamma", sdr_gamma_texts, 2,
+													 menu_center_x, &y, &row_index, *cursor_row, &key_state,
+													 66, sdr_gamma_disabled);
 
 	if (changed) {
 		if (msaa != original_msaa && msaa != XWA_MODERN_MSAA_OFF) {
@@ -165,13 +200,14 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		options.msaa = (XwaModernMsaa)msaa;
 		options.motion_blur_quality = (XwaModernMotionBlurQuality)motion_blur;
 		options.hdr_output = hdr != 0;
+		options.sdr_gamma = (XwaModernSdrGamma)sdr_gamma;
 		XwaModernVideoOptions_Set(&options);
 	}
 
 	text = FrontendString_Get(STR_BACK);
 	text_x = menu_center_x - (int)(FrontendText_MeasureWidth(text, 15) >> 1);
 	button_pressed =
-		FrontendButton_DrawMenuButton(text_x, y, text, 15, g_colorPaleBlue, 66, 0, "settingsound");
+		FrontendButton_DrawMenuButton(text_x, y, text, 15, g_colorPaleBlue, 67, 0, "settingsound");
 	if (*cursor_row == row_index) {
 		FrontendText_Draw(15, text, text_x, y, g_colorGreen);
 		if (key_state == XWA_MODERN_MENU_KEY_ENTER) {

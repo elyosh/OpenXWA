@@ -92,9 +92,10 @@ static RmState g;
 /* The 2D compose domain is LINEAR (TIE invariant): sprite textures are
  * BC7_SRGB (hardware-decoded to linear on sample), the RTs are
  * RGBA8_SRGB (hardware-encoded on write), and the output layer is
- * declared LINEAR_SRGB so present encodes exactly once. Solid engine
- * colors are sRGB-encoded and must be converted before entering the
- * shader domain. */
+ * declared LINEAR_DISPLAY so present encodes exactly once and may remap
+ * the display gamma for HDR output. Solid engine colors are
+ * sRGB-encoded and must be converted before entering the shader
+ * domain. */
 /* Engine 16bpp color -> linear RGB floats (alpha separate). */
 static void rm_color_linear(uint32_t engine_color, float out_rgb[3]) {
 	uint8_t rgba[4];

@@ -281,6 +281,41 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 		out->hdr_output = AeronConfigNode_Bool(hdr_node, 0);
 		*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_HDR;
 	}
+
+	/* video.sdr_content_gamma accepts 'srgb', '2.2', or '2.4'. Unquoted
+	 * 2.2/2.4 parse as YAML floats, so both scalar shapes are accepted for
+	 * hand edits. Ignored on Apple, where the platform behavior stays
+	 * piecewise. */
+	{
+		const char* gamma_key = "video.sdr_content_gamma";
+		const AeronConfigNode* gamma_node = AeronConfigFile_GetNode(config, gamma_key);
+		if (gamma_node) {
+			const char* text = AeronConfigNode_String(gamma_node, NULL);
+			if (text) {
+				if (strcmp(text, "srgb") == 0) {
+					out->sdr_gamma = XWA_MODERN_SDR_GAMMA_SRGB;
+				} else if (strcmp(text, "2.2") == 0) {
+					out->sdr_gamma = XWA_MODERN_SDR_GAMMA_2_2;
+				} else if (strcmp(text, "2.4") == 0) {
+					out->sdr_gamma = XWA_MODERN_SDR_GAMMA_2_4;
+				} else {
+					return host_config_error(error, error_size, "invalid video setting '%s'", gamma_key);
+				}
+			} else if (AeronConfigNode_Type(gamma_node) == AERON_CONFIG_FLOAT) {
+				const double gamma = AeronConfigNode_Float(gamma_node, 0.0);
+				if (gamma > 2.19 && gamma < 2.21) {
+					out->sdr_gamma = XWA_MODERN_SDR_GAMMA_2_2;
+				} else if (gamma > 2.39 && gamma < 2.41) {
+					out->sdr_gamma = XWA_MODERN_SDR_GAMMA_2_4;
+				} else {
+					return host_config_error(error, error_size, "invalid video setting '%s'", gamma_key);
+				}
+			} else {
+				return host_config_error(error, error_size, "invalid video setting '%s'", gamma_key);
+			}
+			*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_SDR_GAMMA;
+		}
+	}
 	return 1;
 }
 
@@ -433,6 +468,7 @@ static int host_yaml_set_video_options(yaml_document_t* document, const XwaModer
 	static const char* const quality_names[] = { "off", "low", "high" };
 	static const char* const fsr_names[] = { "off", "performance", "balanced", "quality", "native_aa" };
 	static const char* const msaa_names[] = { "off", "2x", "4x", "8x" };
+	static const char* const sdr_gamma_names[] = { "2.2", "2.4", "srgb" };
 	yaml_node_t* root = yaml_document_get_root_node(document);
 	int video_id;
 
@@ -444,7 +480,8 @@ static int host_yaml_set_video_options(yaml_document_t* document, const XwaModer
 		options->msaa < XWA_MODERN_MSAA_OFF || options->msaa > XWA_MODERN_MSAA_8X ||
 		(options->fsr_upscaling != XWA_MODERN_FSR_OFF && options->msaa != XWA_MODERN_MSAA_OFF) ||
 		options->motion_blur_quality < XWA_MODERN_MOTION_BLUR_OFF ||
-		options->motion_blur_quality > XWA_MODERN_MOTION_BLUR_HIGH) {
+		options->motion_blur_quality > XWA_MODERN_MOTION_BLUR_HIGH ||
+		options->sdr_gamma < XWA_MODERN_SDR_GAMMA_2_2 || options->sdr_gamma > XWA_MODERN_SDR_GAMMA_SRGB) {
 		return 0;
 	}
 	video_id = host_yaml_get_or_add_mapping(document, 1, "video");
@@ -461,7 +498,9 @@ static int host_yaml_set_video_options(yaml_document_t* document, const XwaModer
 								quality_names[options->motion_blur_quality],
 								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
 		   host_yaml_set_scalar(document, video_id, "hdr_output", options->hdr_output ? "true" : "false",
-								YAML_PLAIN_SCALAR_STYLE);
+								YAML_PLAIN_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, video_id, "sdr_content_gamma", sdr_gamma_names[options->sdr_gamma],
+								YAML_SINGLE_QUOTED_SCALAR_STYLE);
 }
 
 static int host_yaml_create_document(yaml_document_t* document) {

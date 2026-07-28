@@ -39,6 +39,16 @@ typedef enum XwaModernWindowMode {
 	XWA_MODERN_WINDOW_MODE_FULLSCREEN,
 } XwaModernWindowMode;
 
+/* Decode gamma for SDR-authored content under HDR output. SRGB (the piecewise
+ * curve) is last so the in-game cycle covers only 2.2/2.4: it is accepted from
+ * config.yaml and is the fixed platform behavior on Apple, but is not offered
+ * interactively — under Windows HDR it reproduces DWM's washed-out SDR look. */
+typedef enum XwaModernSdrGamma {
+	XWA_MODERN_SDR_GAMMA_2_2 = 0,
+	XWA_MODERN_SDR_GAMMA_2_4,
+	XWA_MODERN_SDR_GAMMA_SRGB,
+} XwaModernSdrGamma;
+
 typedef struct XwaModernVideoOptions {
 	XwaModernWindowMode window_mode;
 	XwaModernSsaoQuality ssao_quality;
@@ -46,6 +56,7 @@ typedef struct XwaModernVideoOptions {
 	XwaModernMsaa msaa;
 	XwaModernMotionBlurQuality motion_blur_quality;
 	int hdr_output;
+	XwaModernSdrGamma sdr_gamma;
 } XwaModernVideoOptions;
 
 enum {
@@ -55,6 +66,7 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_HDR = 1u << 3,
 	XWA_MODERN_VIDEO_OVERRIDE_WINDOW_MODE = 1u << 4,
 	XWA_MODERN_VIDEO_OVERRIDE_MSAA = 1u << 5,
+	XWA_MODERN_VIDEO_OVERRIDE_SDR_GAMMA = 1u << 6,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

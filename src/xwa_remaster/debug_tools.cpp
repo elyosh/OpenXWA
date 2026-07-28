@@ -625,6 +625,28 @@ static void xwa_tool_hdr(int* open, void* user) {
 	}
 
 	ImGui::Separator();
+	ImGui::TextUnformatted("SDR content decode (HDR composition)");
+	float content_gamma = Aeron_OutputSdrContentGamma();
+	bool power_decode = content_gamma > 0.0f;
+	if (ImGui::RadioButton("Piecewise sRGB", !power_decode) && power_decode) {
+		Aeron_SetOutputSdrContentGamma(0.0f);
+	}
+	ImGui::SameLine();
+	if (ImGui::RadioButton("Power gamma", power_decode) && !power_decode) {
+		Aeron_SetOutputSdrContentGamma(2.2f);
+	}
+	if (power_decode) {
+		if (ImGui::SliderFloat("##sdrcontentgamma", &content_gamma, 1.8f, 2.6f, "%.2f")) {
+			Aeron_SetOutputSdrContentGamma(content_gamma);
+		}
+	}
+	ImGui::TextDisabled("Decode curve for frontend/classic (display-referred) layers.");
+	if (!hdr_active) {
+		ImGui::TextColored(ImVec4(1, 0.7f, 0.3f, 1),
+						   "SDR composition active — the piecewise curve is in use regardless.");
+	}
+
+	ImGui::Separator();
 	ImGui::TextUnformatted("Tonemap operator");
 	int op = AeronScenePresent_TonemapOp();
 	int new_op = op;

@@ -21,14 +21,16 @@ static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 		   options->msaa <= XWA_MODERN_MSAA_8X &&
 		   (options->fsr_upscaling == XWA_MODERN_FSR_OFF || options->msaa == XWA_MODERN_MSAA_OFF) &&
 		   options->motion_blur_quality >= XWA_MODERN_MOTION_BLUR_OFF &&
-		   options->motion_blur_quality <= XWA_MODERN_MOTION_BLUR_HIGH;
+		   options->motion_blur_quality <= XWA_MODERN_MOTION_BLUR_HIGH &&
+		   options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 && options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB;
 }
 
 static int XwaModernVideoOptions_AreEqual(const XwaModernVideoOptions* lhs,
 										  const XwaModernVideoOptions* rhs) {
 	return lhs->window_mode == rhs->window_mode && lhs->ssao_quality == rhs->ssao_quality &&
 		   lhs->fsr_upscaling == rhs->fsr_upscaling && lhs->msaa == rhs->msaa &&
-		   lhs->motion_blur_quality == rhs->motion_blur_quality && lhs->hdr_output == rhs->hdr_output;
+		   lhs->motion_blur_quality == rhs->motion_blur_quality && lhs->hdr_output == rhs->hdr_output &&
+		   lhs->sdr_gamma == rhs->sdr_gamma;
 }
 
 void XwaModernVideoOptions_Configure(const XwaModernVideoOptions* options, XwaModernVideoOptionsApplyFn apply,
