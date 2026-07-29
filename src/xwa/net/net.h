@@ -199,7 +199,7 @@ int Net_IsHost(void);
 int Net_HasQueuedPacketTypeOrBacklog(int packetType);
 int Net_HasQueuedJoinRequestOrBacklog(void);
 int Net_SendPacketAndFlush(int toPlayerId, const void* packet, unsigned int packetSize);
-int Net_SendDirectPlayPacket(int destPlayerId, const void* packet, int packetSize);
+int Net_SendDirectPlayPacket(int destPlayerId, const void* packet, int packetSize, int flags);
 int Net_SendSequencedDirectPlayPacket(int destPlayerId, int sequenceMode, int sequenceId, const void* packet,
 									  unsigned int packetSize);
 int NetSession_SendPacket(int directPlayId, const uint32_t* payload, int payloadSize);

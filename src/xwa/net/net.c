@@ -8,6 +8,7 @@
 #include "xwa/frontend/frontend_display.h"
 #include "xwa/frontend/frontend_draw.h"
 #include "xwa/frontend/frontend_net.h"
+#include "xwa/frontend/frontend_resources.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/flight/mission/mission.h"
 #include "xwa/flight/player/player.h"
@@ -21,7 +22,17 @@
 typedef struct XwaDirectPlay4 XwaDirectPlay4;
 
 typedef struct XwaDirectPlay4Vtbl {
-	void* reserved[26];
+	void* reserved0[2];
+	uint32_t(XWA_DXAPI* Release)(XwaDirectPlay4* self);
+	void* reserved3;
+	HRESULT(XWA_DXAPI* Close)(XwaDirectPlay4* self);
+	HRESULT(XWA_DXAPI* CreateGroup)(XwaDirectPlay4* self, int32_t* outGroupId, void* name, void* data,
+								   uint32_t dataSize, uint32_t flags);
+	void* reserved6[3];
+	HRESULT(XWA_DXAPI* DestroyPlayer)(XwaDirectPlay4* self, int32_t playerId);
+	void* reserved10[4];
+	HRESULT(XWA_DXAPI* GetCaps)(XwaDirectPlay4* self, void* caps, uint32_t flags);
+	void* reserved15[11];
 	HRESULT(XWA_DXAPI* Send)(XwaDirectPlay4* self, int32_t fromPlayerId, int32_t toPlayerId, uint32_t flags,
 							 void* data, uint32_t dataSize);
 } XwaDirectPlay4Vtbl;
@@ -32,6 +43,39 @@ struct XwaDirectPlay4 {
 
 // GLOBAL: XWA 0xA21449
 void* g_netDirectPlayInterface;
+#ifndef XWA_MODERN
+// GLOBAL: XWA 0xA21445
+XwaDirectPlay4* g_netTempDirectPlayInterface;
+// GLOBAL: XWA 0xA2144D
+XwaDirectPlay4* g_netUnusedComInterface;
+// GLOBAL: XWA 0xA21459
+XwaGuid g_netAppGuid;
+// GLOBAL: XWA 0xA21479
+int g_netHostPlayerId;
+// GLOBAL: XWA 0xA2147D
+int g_netGroupDplayId;
+// GLOBAL: XWA 0xA2148D
+char g_netSessionName[32];
+// GLOBAL: XWA 0x7829D8
+int g_netActiveTransportType;
+// GLOBAL: XWA 0x7829DC
+int g_netSessionStartContinue;
+// GLOBAL: XWA 0xAA5E05
+NetQueuedPacket g_netRuntimeRecvHistory[128];
+// GLOBAL: XWA 0xAB6605
+int g_netRuntimeRecvHistoryCount;
+// GLOBAL: XWA 0xABC315
+NetQueuedPacket* g_netExportRecvQueuePtr;
+// GLOBAL: XWA 0xABC319
+int g_netExportRecvQueueHighWater;
+// GLOBAL: XWA 0x5AB8D0
+const XwaGuid g_netXwaDirectPlayAppGuid = {
+	0x09438c20u,
+	0xe01fu,
+	0x11cfu,
+	{ 0x86u, 0x81u, 0x11u, 0xaau, 0x15u, 0x3du, 0x4eu, 0x58u },
+};
+#endif
 // GLOBAL: XWA 0xA214AD
 NetPlayerInfo g_netPlayers[32];
 // GLOBAL: XWA 0xA219AD
@@ -130,6 +174,39 @@ typedef struct FlightNetTauntPacket {
 	uint32_t playerIdx;
 	char taunts[280];
 } FlightNetTauntPacket;
+
+#ifndef XWA_MODERN
+typedef struct NetDirectPlayCaps {
+	uint32_t size;
+	uint32_t fields[9];
+} NetDirectPlayCaps;
+
+typedef struct NetRosterPeerRecord {
+	int32_t directPlayId;
+	uint8_t prevRecvSeqChannelA;
+	uint8_t prevRecvSeqChannelB;
+	uint8_t recvSeqChannelA;
+	uint8_t recvSeqChannelB;
+} NetRosterPeerRecord;
+
+typedef struct NetRosterSyncPacket {
+	uint32_t packetType;
+	uint32_t unused;
+	uint32_t peerCount;
+	uint32_t hostTimestamp;
+	NetRosterPeerRecord peers[40];
+} NetRosterSyncPacket;
+
+void Net_DisableAutoDialRegistrySetting(void);
+void Net_RestoreAutoDialRegistrySetting(void);
+const XwaGuid* Net_GetDirectPlayServiceProviderGuid(int networkType);
+int Net_OpenDirectPlaySession(XwaGuid appGuid, int hostFlag, const char* sessionName, int networkType,
+							  const char* connectionAddress, const void* joinSessionInstanceGuid);
+int Net_CreateDirectPlayPlayer(const char* localPlayerInfo, const char* localPlayerName);
+int Net_RefreshPlayerRoster(void);
+int* Net_WaitForAppPacket(int* outPlayerId, int* outPacketType, int timeoutSeconds);
+HRESULT XWA_DXAPI DirectPlayCreate(const XwaGuid* providerGuid, XwaDirectPlay4** outDirectPlay, void* outer);
+#endif
 #pragma pack(pop)
 
 typedef char flight_net_options_wire_size[(sizeof(FlightNetOptionsWire) == 52) ? 1 : -1];
@@ -158,25 +235,352 @@ int Net_SetNetworkPort(const unsigned short* port) {
 	return 1;
 }
 
+#ifdef XWA_MODERN
 // FUNCTION: XWA 0x52B3A0
 int Net_StartNetworkSession(XwaGuid appGuid, const char* localPlayerInfo, const char* localPlayerName,
 							int hostFlag, const char* sessionName, int networkType, int waitForPlayerCount,
 							int unusedA11, const char* connectionAddress,
 							const void* joinSessionInstanceGuid) {
-	(void)appGuid;
-	(void)localPlayerInfo;
-	(void)localPlayerName;
-	(void)hostFlag;
-	(void)sessionName;
-	(void)networkType;
-	(void)waitForPlayerCount;
 	(void)unusedA11;
-	(void)connectionAddress;
-	(void)joinSessionInstanceGuid;
+	{
+		char displaySessionName[32];
 
-	/* TODO: Reimplement Net_StartNetworkSession @ 0x52B3A0. */
-	return 0;
+		(void)appGuid;
+		(void)joinSessionInstanceGuid;
+		if (networkType == NET_TRANSPORT_TCPIP) {
+			strcpy(displaySessionName, "TCPIP game.");
+		} else if (networkType == NET_TRANSPORT_MODEM) {
+			strcpy(displaySessionName, "Dial a New Number.");
+		} else if (networkType == NET_TRANSPORT_SERIAL) {
+			strcpy(displaySessionName, "Direct serial game.");
+		} else if (sessionName[0] != '\0') {
+			strncpy(displaySessionName, sessionName, sizeof(displaySessionName));
+			displaySessionName[sizeof(displaySessionName) - 1] = '\0';
+		} else {
+			snprintf(displaySessionName, sizeof(displaySessionName), "%s's Game.", localPlayerName);
+		}
+
+		g_netIsHost = hostFlag;
+		if (!NetSession_InitGameSession(displaySessionName, localPlayerName, 1, sessionName,
+										connectionAddress, waitForPlayerCount > 0 ? waitForPlayerCount : 1,
+										0)) {
+			return 0;
+		}
+		strncpy(g_netPlayers[0].playerName, localPlayerInfo, sizeof(g_netPlayers[0].playerName));
+		g_netPlayers[0].playerName[sizeof(g_netPlayers[0].playerName) - 1] = '\0';
+		strncpy(g_netPlayers[0].sessionName, localPlayerName, sizeof(g_netPlayers[0].sessionName));
+		g_netPlayers[0].sessionName[sizeof(g_netPlayers[0].sessionName) - 1] = '\0';
+		return 1;
+	}
 }
+#else
+// FUNCTION: XWA 0x52B3A0
+int Net_StartNetworkSession(XwaGuid appGuid, const char* localPlayerInfo, const char* localPlayerName,
+							int hostFlag, const char* sessionName, int networkType, int waitForPlayerCount,
+							int unusedA11, const char* connectionAddress,
+							const void* joinSessionInstanceGuid) {
+	(void)unusedA11;
+	{
+		uint32_t startTick;
+		int hostPlayerId;
+		uint32_t hostTimestamp;
+		int wasBackBufferLocked;
+		char modemSessionName[32] = "Dial a New Number.";
+		char tcpIpSessionName[32] = "TCPIP game.";
+		int packetType;
+		uint32_t ackPacket[6];
+		char displaySessionName[32];
+		char serialSessionName[32] = "Direct serial game.";
+		NetDirectPlayCaps caps;
+		NetReliablePeerSlot savedHostPeer;
+		char errorText[256];
+		g_netSessionStartContinue = 1;
+		startTick = GetTickCount();
+		for (;;) {
+			unsigned int slot;
+			const XwaGuid* providerGuid;
+			int localPlayerId;
+			wasBackBufferLocked = g_backBufferLocked.word & 0xff;
+			FrontendDisplay_UnlockBackBuffer();
+			Net_DisableAutoDialRegistrySetting();
+			g_netAppGuid = g_netXwaDirectPlayAppGuid;
+			g_netRuntimeRecvHistoryCount = 0;
+			g_netDirectPlayRuntimeState.broadcastSeqCounter = 0;
+			g_netDirectPlayRuntimeState.broadcastPendingPayload.pendingFlush = 1;
+			g_netDirectPlayRuntimeState.broadcastPendingPayload.payload[0] = 57;
+			g_netDirectPlayRuntimeState.broadcastPendingPayload.payloadLength = 1;
+			g_netDirectPlayRuntimeState.groupSeqCounter = 0;
+			g_netDirectPlayRuntimeState.groupPendingPayload.pendingFlush = 1;
+			g_netDirectPlayRuntimeState.groupPendingPayload.payload[0] = 57;
+			g_netDirectPlayRuntimeState.groupPendingPayload.payloadLength = 1;
+			g_netSequenceCount = 0;
+			g_netDirectPlayRuntimeState.reliableRetryLongTimeoutMode = 0;
+			g_netGroupDplayId = 0;
+			g_netHostPlayerId = 0;
+			g_netExportRecvQueuePtr = NULL;
+			g_netExportRecvQueueHighWater = 0;
+
+			for (slot = 0; slot < 40; ++slot) {
+				NetReliablePeerSlot* peer;
+
+				peer = &g_netRuntimeReliablePeerSlots[slot];
+				peer->prevRecvSeqDefault = 127;
+				peer->prevRecvSeqChannelA = 127;
+				peer->prevRecvSeqChannelB = 127;
+				peer->recvSeqDefault = 127;
+				peer->recvSeqChannelA = 127;
+				peer->recvSeqChannelB = 127;
+				peer->sendSeq = 0;
+				peer->directPlayId = 0;
+				peer->lastPiggybackType = 57;
+				peer->piggybackLength = 1;
+				peer->lastActivityMs = 0;
+				peer->lastKeepaliveMs = 0;
+				peer->packetCount = 0;
+				peer->packetDropCount = 0;
+				peer->packetRetryCount = 0;
+			}
+			memset(g_netRuntimeRecvHistory, 0, sizeof(g_netRuntimeRecvHistory));
+			memset(g_netPlayerConnectionStats, 0, sizeof(g_netPlayerConnectionStats));
+			g_directDraw->lpVtbl->FlipToGDISurface(g_directDraw);
+
+			if (g_netDirectPlayInterface != NULL) {
+				goto initialSessionFailure;
+			}
+			providerGuid = Net_GetDirectPlayServiceProviderGuid(networkType);
+			if (providerGuid == NULL) {
+				goto initialSessionFailure;
+			}
+			localPlayerId = DirectPlayCreate(providerGuid, &g_netTempDirectPlayInterface, NULL);
+			if (localPlayerId != 0) {
+				if (!ErrorText_LoadLine(6, errorText)) {
+					FrontendDisplay_ShowGameMessageBox(
+						"WARNING:  Connection failure!\n\nMake sure your Windows 95/98 network\n"
+						"settings are properly configured\nfor this type of network game.\n\n"
+						"Press Enter to continue.");
+				} else {
+					FrontendDisplay_ShowGameMessageBox(errorText);
+				}
+				if (wasBackBufferLocked) {
+					g_drawSurfacePtr = FrontendDisplay_LockBackBuffer();
+				}
+				Net_RestoreAutoDialRegistrySetting();
+				return 0;
+			}
+
+			g_netTempDirectPlayInterface->lpVtbl->Release(g_netTempDirectPlayInterface);
+			g_netTempDirectPlayInterface = NULL;
+			g_netIsHost = hostFlag;
+			strncpy(g_netPlayers[0].playerName, localPlayerInfo, 16);
+			g_netPlayers[0].playerName[15] = '\0';
+			strncpy(g_netPlayers[0].sessionName, localPlayerName, 16);
+			g_netPlayers[0].sessionName[15] = '\0';
+
+			{
+				const char* selectedSessionName;
+
+				if (networkType == NET_TRANSPORT_TCPIP) {
+					selectedSessionName = tcpIpSessionName;
+				} else if (networkType == NET_TRANSPORT_MODEM) {
+					selectedSessionName = modemSessionName;
+				} else if (networkType == NET_TRANSPORT_SERIAL) {
+					selectedSessionName = serialSessionName;
+				} else if (sessionName[0] != '\0') {
+					selectedSessionName = sessionName;
+				} else {
+					sprintf(displaySessionName, "%s's Game.", localPlayerName);
+					selectedSessionName = displaySessionName;
+				}
+				if (selectedSessionName != displaySessionName) {
+					strcpy(displaySessionName, selectedSessionName);
+				}
+			}
+			strncpy(g_netSessionName, displaySessionName, 32);
+			g_netSessionName[31] = '\0';
+
+			localPlayerId = Net_OpenDirectPlaySession(appGuid, hostFlag, displaySessionName, networkType,
+													 connectionAddress, joinSessionInstanceGuid);
+			if (localPlayerId == 0) {
+				goto initialSessionFailure;
+			}
+			memset(&caps, 0, sizeof(caps));
+			caps.size = sizeof(caps);
+			((XwaDirectPlay4*)g_netDirectPlayInterface)
+				->lpVtbl->GetCaps((XwaDirectPlay4*)g_netDirectPlayInterface, &caps, 0);
+
+			localPlayerId = Net_CreateDirectPlayPlayer(localPlayerInfo, localPlayerName);
+			if (localPlayerId == 0) {
+				((XwaDirectPlay4*)g_netDirectPlayInterface)
+					->lpVtbl->Close((XwaDirectPlay4*)g_netDirectPlayInterface);
+				((XwaDirectPlay4*)g_netDirectPlayInterface)
+					->lpVtbl->Release((XwaDirectPlay4*)g_netDirectPlayInterface);
+				g_netDirectPlayInterface = NULL;
+				if (g_netUnusedComInterface != NULL) {
+					g_netUnusedComInterface->lpVtbl->Release(g_netUnusedComInterface);
+					g_netUnusedComInterface = NULL;
+				}
+				goto initialSessionFailure;
+			}
+			goto localPlayerCreated;
+
+initialSessionFailure:
+			if (wasBackBufferLocked) {
+				g_drawSurfacePtr = FrontendDisplay_LockBackBuffer();
+			}
+			Net_RestoreAutoDialRegistrySetting();
+			if (g_netSessionStartContinue == 0) {
+				return 0;
+			}
+			g_netSessionStartContinue = 0;
+			if ((int)(GetTickCount() - startTick) >= 60000) {
+				return 0;
+			}
+			continue;
+
+localPlayerCreated:
+			g_netPlayers[0].playerId = localPlayerId;
+			g_netDirectPlayRuntimeState.localPlayer = g_netPlayers[0];
+			if (hostFlag != 0) {
+				localPlayerId =
+					((XwaDirectPlay4*)g_netDirectPlayInterface)
+						->lpVtbl->CreateGroup((XwaDirectPlay4*)g_netDirectPlayInterface,
+											 &g_netGroupDplayId, NULL, NULL, 0, 0);
+				if (localPlayerId != 0) {
+					goto destroyLocalPlayer;
+				}
+				g_netRuntimeReliablePeerSlots[0].directPlayId = g_netGroupDplayId;
+				g_netSequenceCount = 1;
+			}
+
+			g_netPlayerCount = 1;
+			Net_RefreshPlayerRoster();
+			g_netDirectPlayRuntimeState.recvQueueWriteIndex = 0;
+			g_netDirectPlayRuntimeState.recvQueueReadIndex = 0;
+			g_netDirectPlayRuntimeState.recvQueueCount = 0;
+			if (waitForPlayerCount > 0) {
+				while (Net_GetPlayerCount() < waitForPlayerCount) {
+					Net_PumpIncomingPackets();
+				}
+				goto sessionStarted;
+			}
+			if (hostFlag != 0) {
+				g_netHostPlayerId = g_netDirectPlayRuntimeState.localPlayer.playerId;
+				goto sessionStarted;
+			}
+			{
+				const NetRosterSyncPacket* rosterPacket;
+				int* packetData;
+
+				do {
+					packetData = Net_WaitForAppPacket(&hostPlayerId, &packetType, 5);
+					if (packetData == NULL) {
+						break;
+					}
+				} while (packetData[0] != 59);
+				if (packetData != NULL) {
+					unsigned int peerCount;
+
+					g_netHostPlayerId = hostPlayerId;
+					memset(&savedHostPeer, 0, sizeof(savedHostPeer));
+					for (slot = 0; slot < g_netSequenceCount; ++slot) {
+						if (g_netRuntimeReliablePeerSlots[slot].directPlayId == hostPlayerId) {
+							savedHostPeer = g_netRuntimeReliablePeerSlots[slot];
+							break;
+						}
+					}
+
+					rosterPacket = (const NetRosterSyncPacket*)packetData;
+					peerCount = rosterPacket->peerCount;
+					g_netSequenceCount = peerCount;
+					hostTimestamp = rosterPacket->hostTimestamp;
+					for (slot = 0; slot < peerCount; ++slot) {
+						g_netRuntimeReliablePeerSlots[slot].directPlayId =
+							rosterPacket->peers[slot].directPlayId;
+						g_netRuntimeReliablePeerSlots[slot].prevRecvSeqChannelA =
+							rosterPacket->peers[slot].prevRecvSeqChannelA;
+						g_netRuntimeReliablePeerSlots[slot].prevRecvSeqChannelB =
+							rosterPacket->peers[slot].prevRecvSeqChannelB;
+						g_netRuntimeReliablePeerSlots[slot].recvSeqChannelA =
+							rosterPacket->peers[slot].recvSeqChannelA;
+						g_netRuntimeReliablePeerSlots[slot].recvSeqChannelB =
+							rosterPacket->peers[slot].recvSeqChannelB;
+						g_netRuntimeReliablePeerSlots[slot].prevRecvSeqDefault = 127;
+						g_netRuntimeReliablePeerSlots[slot].recvSeqDefault = 127;
+						g_netRuntimeReliablePeerSlots[slot].sendSeq = 0;
+						g_netRuntimeReliablePeerSlots[slot].lastPiggybackType = 57;
+						g_netRuntimeReliablePeerSlots[slot].piggybackLength = 1;
+						g_netRuntimeReliablePeerSlots[slot].lastActivityMs = GetTickCount();
+						g_netRuntimeReliablePeerSlots[slot].lastKeepaliveMs = GetTickCount();
+						peerCount = g_netSequenceCount;
+					}
+
+					if (savedHostPeer.directPlayId != 0) {
+						for (slot = 0; slot < peerCount; ++slot) {
+							if (g_netHostPlayerId == g_netRuntimeReliablePeerSlots[slot].directPlayId) {
+								g_netRuntimeReliablePeerSlots[slot].prevRecvSeqDefault =
+									savedHostPeer.prevRecvSeqDefault;
+								g_netRuntimeReliablePeerSlots[slot].recvSeqDefault =
+									savedHostPeer.recvSeqDefault;
+								g_netRuntimeReliablePeerSlots[slot].sendSeq = savedHostPeer.sendSeq;
+								memcpy(&g_netRuntimeReliablePeerSlots[slot].lastPiggybackType,
+									   &savedHostPeer.lastPiggybackType,
+									   savedHostPeer.piggybackLength);
+								g_netRuntimeReliablePeerSlots[slot].piggybackLength =
+									savedHostPeer.piggybackLength;
+								g_netRuntimeReliablePeerSlots[slot].lastActivityMs =
+									savedHostPeer.lastActivityMs;
+								g_netRuntimeReliablePeerSlots[slot].lastKeepaliveMs =
+									savedHostPeer.lastKeepaliveMs;
+								peerCount = g_netSequenceCount;
+							}
+						}
+					}
+
+					ackPacket[0] = 54;
+					ackPacket[1] = hostTimestamp;
+					memset(&ackPacket[2], 0, 3 * sizeof(ackPacket[0]));
+					Net_SendDirectPlayPacket(g_netHostPlayerId, ackPacket, 20, 0);
+					goto sessionStarted;
+				}
+
+destroyLocalPlayer:
+				((XwaDirectPlay4*)g_netDirectPlayInterface)
+					->lpVtbl->DestroyPlayer((XwaDirectPlay4*)g_netDirectPlayInterface,
+											g_netDirectPlayRuntimeState.localPlayer.playerId);
+				((XwaDirectPlay4*)g_netDirectPlayInterface)
+					->lpVtbl->Close((XwaDirectPlay4*)g_netDirectPlayInterface);
+				((XwaDirectPlay4*)g_netDirectPlayInterface)
+					->lpVtbl->Release((XwaDirectPlay4*)g_netDirectPlayInterface);
+				g_netDirectPlayInterface = NULL;
+				if (g_netUnusedComInterface != NULL) {
+					g_netUnusedComInterface->lpVtbl->Release(g_netUnusedComInterface);
+					g_netUnusedComInterface = NULL;
+				}
+				if (wasBackBufferLocked) {
+					g_drawSurfacePtr = FrontendDisplay_LockBackBuffer();
+				}
+				Net_RestoreAutoDialRegistrySetting();
+				if (g_netSessionStartContinue == 0) {
+					return 0;
+				}
+				g_netSessionStartContinue = 0;
+				if ((int)(GetTickCount() - startTick) >= 60000) {
+					return 0;
+				}
+				continue;
+			}
+
+sessionStarted:
+			if (wasBackBufferLocked) {
+				g_drawSurfacePtr = FrontendDisplay_LockBackBuffer();
+			}
+			Net_RestoreAutoDialRegistrySetting();
+			g_netActiveTransportType = networkType;
+			return 1;
+		}
+	}
+}
+#endif
 
 // FUNCTION: XWA 0x52EFF0
 int Net_GetLocalPlayerId(void) { return g_netPlayers[0].playerId; }
@@ -1086,7 +1490,7 @@ int* NetSession_ReceivePacket(int* outSenderDirectPlayId, int* outPayloadSize) {
 }
 
 // FUNCTION: XWA 0x52D6F0
-int Net_SendDirectPlayPacket(int destPlayerId, const void* packet, int packetSize) {
+int Net_SendDirectPlayPacket(int destPlayerId, const void* packet, int packetSize, int flags) {
 	uint8_t compactPacket[1024];
 	uint32_t packetType;
 	uint16_t compactType;
@@ -1095,6 +1499,7 @@ int Net_SendDirectPlayPacket(int destPlayerId, const void* packet, int packetSiz
 	int payloadSize;
 	int compactSize;
 
+	(void)flags;
 	if (g_netSessionState.dplayInterface == NULL) {
 		return 1;
 	}
@@ -1219,7 +1624,7 @@ int Net_SendSequencedDirectPlayPacket(int destPlayerId, int sequenceMode, int se
 
 // FUNCTION: XWA 0x49E040
 int NetSession_SendCompactGamePacket(int destDplayId, const uint32_t* packet, int packetSize) {
-	return Net_SendDirectPlayPacket(destDplayId, packet, packetSize);
+	return Net_SendDirectPlayPacket(destDplayId, packet, packetSize, 0);
 }
 
 // FUNCTION: XWA 0x49E160
