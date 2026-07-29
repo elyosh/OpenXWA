@@ -155,6 +155,7 @@ int Config_DrawOptionSliderDisabled(uint8_t* value, UIString labelId, UIString r
 									int* y, int* rowIndex, char* keyState, int buttonId);
 int Config_DrawOptionSliderImpl(uint8_t* value, UIString labelId, UIString rangeLabelId, int notchCount,
 								int* y, int* rowIndex, char* keyState, int buttonId, int disabled);
+int Config_DrawSoftwareVideoAdvancedRows(int profileIdx, int* y, int* rowIndex, char* keyState);
 int Config_DrawOptionTextEdit(char* text, unsigned int maxLen, int unused, char* label, int* y, int* rowIndex,
 							  char* keyState, int buttonId);
 int Config_DrawHardwareVideoAdvancedRows(int profileIdx, int* y, int* rowIndex, char* keyState);

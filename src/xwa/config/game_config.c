@@ -1722,7 +1722,162 @@ int Config_MultiplayerVideoOptionsScreen(void) {
 
 // FUNCTION: XWA 0x521E70
 int Config_SinglePlayerSoftwareVideoScreen(void) {
-	/* TODO: Reimplement Config_SinglePlayerSoftwareVideoScreen @ 0x521E70. */
+	char keyState;
+	const char* text;
+	int y;
+	int rowIndex;
+	int action;
+	int dialogResult;
+	int textX;
+	int buttonPressed;
+	unsigned int titleWidth;
+	FrontendRect rect;
+
+	rowIndex = 0;
+	action = 0;
+	y = 170;
+	keyState = (char)Config_GetMenuNavKey();
+	if (keyState == CONFIG_KEY_VK_UP) {
+		FrontendSound_PlayUISound("configsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+		Keyboard_FlushCharBuffer();
+		keyState = 0;
+		if (--g_menuCursorRow < 0) {
+			g_menuCursorRow = 4;
+		}
+	} else if (keyState == CONFIG_KEY_VK_DOWN) {
+		FrontendSound_PlayUISound("configsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+		Keyboard_FlushCharBuffer();
+		keyState = 0;
+		if (++g_menuCursorRow >= 5) {
+			g_menuCursorRow = 0;
+		}
+	}
+
+	FrontendDraw_RectAssign(&rect, 0, y, 639, y + 15);
+	FrontendText_DrawCentered(15, FrontendString_Get(STR_CONFIG_SP_SOFTWARE_VIDEO_OPTIONS), &rect,
+							  g_colorLightBlue);
+	titleWidth = FrontendText_MeasureWidth(FrontendString_Get(STR_CONFIG_SP_SOFTWARE_VIDEO_OPTIONS), 20);
+	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+	FrontendDraw_Line(textX, y + 17, textX + (int)titleWidth, y + 17, g_colorLightBlue);
+	y += 20;
+
+	Config_DrawSoftwareVideoAdvancedRows(0, &y, &rowIndex, &keyState);
+
+	if (g_configRestrictedOptionsModalActive) {
+		text = FrontendString_Get(STR_CONFIG_SAME_AS_MULTIPLAYER);
+		titleWidth = (unsigned int)FrontendText_MeasureWidth(text, 15);
+		textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+		if (g_menuCursorRow == rowIndex) {
+			FrontendText_Draw(15, text, textX, y, 0xffff);
+		} else {
+			FrontendText_Draw(15, text, textX, y, g_colorGray);
+		}
+	} else {
+		text = FrontendString_Get(STR_CONFIG_SAME_AS_MULTIPLAYER);
+		titleWidth = (unsigned int)FrontendText_MeasureWidth(text, 15);
+		textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+		buttonPressed =
+			FrontendButton_DrawMenuButton(textX, y, text, 15, g_colorPaleBlue, 21, 0, "settingsound");
+		if (g_menuCursorRow == rowIndex) {
+			FrontendText_Draw(15, text, textX, y, g_colorGreen);
+			if (keyState == CONFIG_KEY_ENTER) {
+				FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+				Keyboard_FlushCharBuffer();
+				keyState = 0;
+				buttonPressed |= 1;
+			}
+		}
+		if (buttonPressed) {
+			action = 1;
+		}
+	}
+	y += 20;
+	++rowIndex;
+
+	if (g_configRestrictedOptionsModalActive) {
+		text = FrontendString_Get(STR_CONFIG_RESTORE_DEFAULTS);
+		titleWidth = FrontendText_MeasureWidth(text, 15);
+		FrontendText_Draw(15, text, g_configMenuCenterX - (int)(titleWidth >> 1), y, g_colorGray);
+	} else {
+		text = FrontendString_Get(STR_CONFIG_RESTORE_DEFAULTS);
+		titleWidth = (unsigned int)FrontendText_MeasureWidth(text, 15);
+		textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+		buttonPressed =
+			FrontendButton_DrawMenuButton(textX, y, text, 15, g_colorPaleBlue, 22, 0, "settingsound");
+		if (g_menuCursorRow == rowIndex) {
+			FrontendText_Draw(15, text, textX, y, g_colorGreen);
+			if (keyState == CONFIG_KEY_ENTER) {
+				FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+				Keyboard_FlushCharBuffer();
+				keyState = 0;
+				buttonPressed |= 1;
+			}
+		}
+		if (buttonPressed) {
+			action = 2;
+		}
+	}
+	y += 20;
+	++rowIndex;
+
+	text = FrontendString_Get(STR_BACK);
+	titleWidth = (unsigned int)FrontendText_MeasureWidth(text, 15);
+	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+	buttonPressed = FrontendButton_DrawMenuButton(textX, y, text, 15, g_colorPaleBlue, 23, 0, "settingsound");
+	if (g_menuCursorRow == rowIndex) {
+		FrontendText_Draw(15, text, textX, y, g_colorGreen);
+		if (keyState == CONFIG_KEY_ENTER) {
+			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+			Keyboard_FlushCharBuffer();
+			keyState = 0;
+			buttonPressed |= 1;
+		}
+	}
+	if (keyState == CONFIG_KEY_ESCAPE) {
+		Keyboard_FlushCharBuffer();
+		keyState = 0;
+		buttonPressed = 1;
+	}
+	if (buttonPressed) {
+		g_pendingMenuScreen = 7;
+		g_menuCursorRow = 14;
+	}
+
+	if (action == 1) {
+		dialogResult = FrontendDialog_ShowConfirmDialog(
+			FrontendString_Get(STR_CONFIG_OVERWRITE1), FrontendString_Get(STR_CONFIG_OVERWRITE2),
+			FrontendString_Get(STR_CONFIG_OVERWRITE3), FrontendString_Get(STR_OKAY),
+			FrontendString_Get(STR_CANCEL));
+		if (dialogResult != 0) {
+			g_gameConfig.mipmap[0] = g_gameConfig.mipmap[1];
+			g_gameConfig.specular[0] = g_gameConfig.specular[1];
+			return 0;
+		}
+	} else if (action == 2) {
+		dialogResult = FrontendDialog_ShowConfirmDialog(
+			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL1),
+			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL2),
+			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL3), FrontendString_Get(STR_OKAY),
+			FrontendString_Get(STR_CANCEL));
+		if (dialogResult != 0) {
+			g_gameConfig.mipmap[0] = 10;
+			g_gameConfig.specular[0] = 1;
+			switch (g_gameConfig.performance) {
+				case 0:
+					Config_SetDetailDefaultsLow(4);
+					break;
+				case 1:
+					Config_SetDetailDefaultsMedium(4);
+					return 0;
+				case 2:
+					Config_SetDetailDefaultsHigh(4);
+					return 0;
+				default:
+					break;
+			}
+		}
+	}
+
 	return 0;
 }
 
@@ -2563,6 +2718,19 @@ int Config_DrawOptionCycle(uint8_t* value, UIString labelId, int valueBaseStrId,
 						   int* rowIndex, char* keyState, int buttonId) {
 	return Config_DrawOptionCycleImpl(value, labelId, valueBaseStrId, optionCount, y, rowIndex, keyState,
 									  buttonId, 0);
+}
+
+// FUNCTION: XWA 0x523200
+int Config_DrawSoftwareVideoAdvancedRows(int profileIdx, int* y, int* rowIndex, char* keyState) {
+	int drawY;
+
+	drawY = *y;
+	Config_DrawOptionSlider(&g_gameConfig.mipmap[profileIdx], STR_MIP_MAPPING, STR_BLURRY, 20, &drawY,
+							rowIndex, keyState, 24);
+	Config_DrawOptionCycle(&g_gameConfig.specular[profileIdx], STR_SPECULAR_HIGHLIGHTS, STR_OFF, 2, &drawY,
+						   rowIndex, keyState, 25);
+	*y = drawY;
+	return 0;
 }
 
 // FUNCTION: XWA 0x5232B0
