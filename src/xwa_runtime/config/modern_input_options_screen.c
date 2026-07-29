@@ -91,6 +91,7 @@ int XwaModernInputOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	int changed;
 	int text_x;
 	int button_pressed;
+	int result;
 	unsigned int title_width;
 	FrontendRect rect;
 
@@ -112,19 +113,19 @@ int XwaModernInputOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		Keyboard_FlushCharBuffer();
 		key_state = 0;
 		if (--*cursor_row < 0) {
-			*cursor_row = 4;
+			*cursor_row = 5;
 		}
 	} else if (key_state == XWA_MODERN_MENU_KEY_DOWN) {
 		FrontendSound_PlayUISound("configsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
 		Keyboard_FlushCharBuffer();
 		key_state = 0;
-		if (++*cursor_row >= 5) {
+		if (++*cursor_row >= 6) {
 			*cursor_row = 0;
 		}
 	}
 
 	FrontendDraw_RectAssign(&rect, 0, y, 639, y + 15);
-	text = "OpenXWA Input Options";
+	text = FrontendString_Get(STR_CONFIG_GAME_CONTROLLER_OPTIONS);
 	FrontendText_DrawCentered(15, text, &rect, g_colorLightBlue);
 	title_width = FrontendText_MeasureWidth(text, 20);
 	FrontendDraw_Line(menu_center_x - (int)(title_width >> 1), y + 17,
@@ -152,6 +153,26 @@ int XwaModernInputOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		XwaModernInputOptions_Set(&options);
 	}
 
+	result = 0;
+	text = "Controller Setup";
+	text_x = menu_center_x - (int)(FrontendText_MeasureWidth(text, 15) >> 1);
+	button_pressed =
+		FrontendButton_DrawMenuButton(text_x, y, text, 15, g_colorPaleBlue, 75, 0, "settingsound");
+	if (*cursor_row == row_index) {
+		FrontendText_Draw(15, text, text_x, y, g_colorGreen);
+		if (key_state == XWA_MODERN_MENU_KEY_ENTER) {
+			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+			Keyboard_FlushCharBuffer();
+			key_state = 0;
+			button_pressed |= 1;
+		}
+	}
+	if (button_pressed) {
+		result = 2;
+	}
+	y += 20;
+	++row_index;
+
 	text = FrontendString_Get(STR_BACK);
 	text_x = menu_center_x - (int)(FrontendText_MeasureWidth(text, 15) >> 1);
 	button_pressed =
@@ -169,10 +190,13 @@ int XwaModernInputOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		Keyboard_FlushCharBuffer();
 		button_pressed = 1;
 	}
-	if (!button_pressed) {
+	if (button_pressed && result == 0) {
+		result = 1;
+	}
+	if (!result) {
 		return 0;
 	}
 
 	XwaModernInputOptions_Flush();
-	return 1;
+	return result;
 }

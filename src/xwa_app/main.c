@@ -3,7 +3,9 @@
 #include "host_config.h"
 #include "setup.h"
 #include "window_icon.h"
+#include "xwa/config/game_config.h"
 #include "xwa_remaster/xwa_remaster.h"
+#include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/runtime/presentation.h"
@@ -33,6 +35,10 @@ static int persist_modern_video_options(const XwaModernVideoOptions* options, ch
 
 static void apply_modern_input_options(const XwaModernInputOptions* options) {
 	XwaMouseFlight_SetOptions(options);
+	if (options) {
+		XwaControllerMapping_SetOptions(&options->controller);
+		Config_ApplyModernInputOptions(options);
+	}
 }
 
 static int persist_modern_input_options(const XwaModernInputOptions* options, char* error,
@@ -331,8 +337,8 @@ int main(int argc, char** argv) {
 		XwaModernVideoOptions_Configure(&effective_video_options, apply_modern_video_options,
 										persist_modern_video_options);
 	}
-	XwaModernInputOptions_Configure(&host_config.input_options, apply_modern_input_options,
-									persist_modern_input_options);
+	XwaModernInputOptions_Configure(&host_config.input_defaults, &host_config.input_options,
+									apply_modern_input_options, persist_modern_input_options);
 	apply_modern_input_options(&host_config.input_options);
 	Aeron_LogInfo(
 		"xwa.config", "mouse flight control: %s (%s mode, sensitivity %d, invert Y: %s)",

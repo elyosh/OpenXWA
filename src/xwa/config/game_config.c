@@ -34,10 +34,12 @@
 #include "xwa/util/time.h"
 
 #ifdef XWA_MODERN
+#include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_input_options_screen.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/config/modern_video_options_screen.h"
+#include "xwa_runtime/input/controller_mapping.h"
 #endif
 
 #include <ctype.h>
@@ -94,6 +96,7 @@ static int g_configCutscenePlaybackIndex;
 #endif
 #ifdef XWA_MODERN
 static int g_configJoystickActionPickerRunActive;
+static int g_configJoystickActionPickerCompleted;
 static int g_configJoystickActionPickerSavedGlyphGradientBg;
 #endif
 #ifdef XWA_MODERN
@@ -866,6 +869,21 @@ int Config_SoundOptionsScreen(void) {
 
 // FUNCTION: XWA 0x51F300
 int Config_ControllerOptionsScreen(void) {
+#ifdef XWA_MODERN
+	switch (XwaModernInputOptionsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
+		case 1:
+			g_pendingMenuScreen = 0;
+			g_menuCursorRow = 4;
+			break;
+		case 2:
+			g_pendingMenuScreen = 20;
+			g_menuCursorRow = 0;
+			break;
+		default:
+			break;
+	}
+	return 0;
+#else
 	char keyState;
 	const char* text;
 	int y;
@@ -885,21 +903,13 @@ int Config_ControllerOptionsScreen(void) {
 		Keyboard_FlushCharBuffer();
 		keyState = 0;
 		if (--g_menuCursorRow < 0) {
-#ifdef XWA_MODERN
-			g_menuCursorRow = 9;
-#else
 			g_menuCursorRow = 8;
-#endif
 		}
 	} else if (keyState == CONFIG_KEY_VK_DOWN) {
 		FrontendSound_PlayUISound("configsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
 		Keyboard_FlushCharBuffer();
 		keyState = 0;
-#ifdef XWA_MODERN
-		if (++g_menuCursorRow >= 10) {
-#else
 		if (++g_menuCursorRow >= 9) {
-#endif
 			g_menuCursorRow = 0;
 		}
 	}
@@ -924,28 +934,6 @@ int Config_ControllerOptionsScreen(void) {
 							&keyState, 24);
 	Config_DrawOptionCycle(&g_gameConfig.flipY, STR_CONFIG_FLIP_Y_AXIS, STR_CONFIG_NO, 2, &y, &rowIndex,
 						   &keyState, 25);
-
-#ifdef XWA_MODERN
-	text = "OpenXWA Input Options";
-	textX = g_configMenuCenterX - (int)((unsigned int)FrontendText_MeasureWidth(text, 15) >> 1);
-	buttonPressed = FrontendButton_DrawMenuButton(textX, y, text, 15, g_colorPaleBlue, 51, 0, "settingsound");
-	if (g_menuCursorRow == rowIndex) {
-		FrontendText_Draw(15, text, textX, y, g_colorGreen);
-		if (keyState == CONFIG_KEY_ENTER) {
-			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
-			Keyboard_FlushCharBuffer();
-			keyState = 0;
-			buttonPressed |= 1;
-		}
-	}
-	if (buttonPressed) {
-		g_pendingMenuScreen = 19;
-		g_menuCursorRow = 0;
-	}
-	y += 20;
-	++rowIndex;
-#endif
-
 	text = FrontendString_Get(STR_CONFIG_REMAP_JOYSTICK_BUTTONS);
 	textX = g_configMenuCenterX - (int)((unsigned int)FrontendText_MeasureWidth(text, 15) >> 1);
 	buttonPressed = FrontendButton_DrawMenuButton(textX, y, text, 15, g_colorPaleBlue, 48, 0, "settingsound");
@@ -1029,10 +1017,16 @@ int Config_ControllerOptionsScreen(void) {
 	}
 
 	return 0;
+#endif
 }
 
 // FUNCTION: XWA 0x51F870
 int Config_JoystickRemapScreen(void) {
+#ifdef XWA_MODERN
+	g_pendingMenuScreen = 22;
+	g_menuCursorRow = 0;
+	return 0;
+#else
 	unsigned int totalButtonRows;
 	int physicalButtonCount;
 	unsigned int displayedPhysicalButtonCount;
@@ -1183,11 +1177,11 @@ int Config_JoystickRemapScreen(void) {
 	}
 
 	if (restoreDefaults == 1) {
-		dialogResult =
-			FrontendDialog_ShowConfirmDialog(FrontendString_Get(STR_RESTORING_DEFAULTS_WILL1),
-											 FrontendString_Get(STR_RESTORING_DEFAULTS_WILL2),
-											 FrontendString_Get(STR_RESTORING_DEFAULTS_WILL3),
-											 FrontendString_Get(STR_OKAY), FrontendString_Get(STR_CANCEL));
+		dialogResult = FrontendDialog_ShowConfirmDialog(
+			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL1),
+			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL2),
+			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL3), FrontendString_Get(STR_OKAY),
+			FrontendString_Get(STR_CANCEL));
 		if (dialogResult != 0) {
 			memset(g_gameConfig.joyButtons, 0, sizeof(g_gameConfig.joyButtons));
 			for (defaultIndex = 0; defaultIndex < 16; ++defaultIndex) {
@@ -1254,6 +1248,7 @@ int Config_JoystickRemapScreen(void) {
 	}
 
 	return 0;
+#endif
 }
 
 // FUNCTION: XWA 0x51FF30
@@ -1854,11 +1849,11 @@ int Config_SinglePlayerSoftwareVideoScreen(void) {
 			return 0;
 		}
 	} else if (action == 2) {
-		dialogResult = FrontendDialog_ShowConfirmDialog(
-			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL1),
-			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL2),
-			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL3), FrontendString_Get(STR_OKAY),
-			FrontendString_Get(STR_CANCEL));
+		dialogResult =
+			FrontendDialog_ShowConfirmDialog(FrontendString_Get(STR_RESTORING_DEFAULTS_WILL1),
+											 FrontendString_Get(STR_RESTORING_DEFAULTS_WILL2),
+											 FrontendString_Get(STR_RESTORING_DEFAULTS_WILL3),
+											 FrontendString_Get(STR_OKAY), FrontendString_Get(STR_CANCEL));
 		if (dialogResult != 0) {
 			g_gameConfig.mipmap[0] = 10;
 			g_gameConfig.specular[0] = 1;
@@ -2499,9 +2494,35 @@ int Config_OptionsDatapadUpdate(int frameState) {
 			}
 			done = 0;
 			break;
-		case 19:
-			if (XwaModernInputOptionsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
-				g_pendingMenuScreen = 4;
+		case 20:
+			switch (XwaModernControllerOptionsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
+				case XWA_MODERN_CONTROLLER_SCREEN_BACK:
+					g_pendingMenuScreen = 4;
+					g_menuCursorRow = 4;
+					break;
+				case XWA_MODERN_CONTROLLER_SCREEN_AXES:
+					g_pendingMenuScreen = 21;
+					g_menuCursorRow = 0;
+					break;
+				case XWA_MODERN_CONTROLLER_SCREEN_BUTTONS:
+					g_pendingMenuScreen = 22;
+					g_menuCursorRow = 0;
+					break;
+				default:
+					break;
+			}
+			done = 0;
+			break;
+		case 21:
+			if (XwaModernControllerAxesScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
+				g_pendingMenuScreen = 20;
+				g_menuCursorRow = 5;
+			}
+			done = 0;
+			break;
+		case 22:
+			if (XwaModernControllerButtonsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
+				g_pendingMenuScreen = 20;
 				g_menuCursorRow = 6;
 			}
 			done = 0;
@@ -4676,7 +4697,7 @@ int Config_JoystickActionPickerUpdate(int frameState) {
 }
 
 #ifdef XWA_MODERN
-static void Config_FinishJoystickActionPickerModal(void) {
+static void Config_CleanupJoystickActionPickerModal(void) {
 	if (!g_configJoystickActionPickerRunActive) {
 		return;
 	}
@@ -4684,26 +4705,26 @@ static void Config_FinishJoystickActionPickerModal(void) {
 	FrontendText_ResetGlyphScratch();
 	FrontendText_SetGlyphGradientBg(g_configJoystickActionPickerSavedGlyphGradientBg);
 	FrontendDisplay_ResetScreenClipRect();
-	g_configJoystickActionPickerRunActive = 0;
+	g_configJoystickActionPickerCompleted = 1;
 }
 #endif
 
 // FUNCTION: XWA 0x5263C0
 int Config_RunJoystickActionPicker(const char* title, uint16_t* boundActionCode) {
 #ifdef XWA_MODERN
-	FrontendScreenModalStatus modalStatus;
 	FrontendRect rect;
 
 	if (g_configJoystickActionPickerRunActive) {
-		modalStatus = FrontendScreen_GetModalStatus();
-		if (modalStatus != FRONTEND_SCREEN_MODAL_INACTIVE && modalStatus != FRONTEND_SCREEN_MODAL_DONE) {
+		if (!g_configJoystickActionPickerCompleted) {
 			return 0;
 		}
 
-		Config_FinishJoystickActionPickerModal();
+		g_configJoystickActionPickerRunActive = 0;
+		g_configJoystickActionPickerCompleted = 0;
 		return 1;
 	}
 
+	g_configJoystickActionPickerCompleted = 0;
 	g_configJoystickActionPickerSavedGlyphGradientBg = FrontendText_GetGlyphGradientBg();
 	FrontendText_SetGlyphGradientBg(FrontendDisplay_PackRGB(0x10, 0x10, 0x20));
 	FrontendButton_IsOverlayTextEnabled();
@@ -4711,7 +4732,7 @@ int Config_RunJoystickActionPicker(const char* title, uint16_t* boundActionCode)
 	strcpy(g_frontendScratchBuffer, title);
 	g_configJoystickActionPickerBoundActionCode = boundActionCode;
 	if (!FrontendScreen_BeginModalWithCleanup(Config_JoystickActionPickerUpdate, &rect,
-											  Config_FinishJoystickActionPickerModal)) {
+											  Config_CleanupJoystickActionPickerModal)) {
 		FrontendText_ResetGlyphScratch();
 		FrontendText_SetGlyphGradientBg(g_configJoystickActionPickerSavedGlyphGradientBg);
 		FrontendDisplay_ResetScreenClipRect();
@@ -5055,7 +5076,9 @@ static const char* const g_configKeywords[CONFIG_KEY_COUNT + 1] = {
 	"",
 };
 
+#ifndef XWA_MODERN
 static int Config_GetJoystickButtonCount(int joystickIndex) { return Joystick_GetButtonCount(joystickIndex); }
+#endif
 
 static void Config_CopyFixedText(char* dst, size_t dstSize, const char* src) {
 	size_t length;
@@ -5202,6 +5225,7 @@ static void Config_SetInitialGraphicsDefaults(void) {
 	   compatibility UI still needs a stable hardware-device index. */
 }
 
+#ifndef XWA_MODERN
 static void Config_SetInitialJoystickDefaults(void) {
 	static const uint16_t defaultButtons[] = { 156, 157, 114, 108, 101, 105, 91, 8, 13, 93 };
 	int buttonCount;
@@ -5226,6 +5250,41 @@ static void Config_SetInitialJoystickDefaults(void) {
 	g_gameConfig.joyButtons[18] = 180;
 	g_gameConfig.joyButtons[19] = 182;
 }
+#else
+void Config_ApplyModernInputOptions(const XwaModernInputOptions* options) {
+	static XwaControllerDeviceSelector previousDevice;
+	static int previousRumbleEnabled;
+	static int previousRumbleStrength;
+	static int configured;
+	int reconfigureRumble;
+
+	if (!options) {
+		return;
+	}
+	reconfigureRumble = configured && (previousRumbleEnabled != options->controller.rumble_enabled ||
+									   strcmp(previousDevice.guid, options->controller.device.guid) != 0 ||
+									   strcmp(previousDevice.path, options->controller.device.path) != 0 ||
+									   previousDevice.ordinal != options->controller.device.ordinal);
+	g_gameConfig.rudderEnabled = (uint8_t)options->controller.roll_enabled;
+	/* Axis inversion is applied at the Aeron-to-WinMM mapping boundary. */
+	g_gameConfig.flipRudder = 0;
+	g_gameConfig.flipY = 0;
+	g_gameConfig.ffEnabled = (uint8_t)options->controller.rumble_enabled;
+	g_gameConfig.ffStrength = (uint8_t)options->controller.rumble_strength;
+	g_gameConfig.ffCenter = 0;
+	XwaControllerMapping_CopySelectedActions(g_gameConfig.joyButtons);
+	if (configured && previousRumbleStrength != options->controller.rumble_strength && !reconfigureRumble) {
+		ForceFeedback_SetStrength(1250u * (unsigned int)options->controller.rumble_strength);
+	}
+	previousDevice = options->controller.device;
+	previousRumbleEnabled = options->controller.rumble_enabled;
+	previousRumbleStrength = options->controller.rumble_strength;
+	configured = 1;
+	if (reconfigureRumble) {
+		ForceFeedback_Reconfigure();
+	}
+}
+#endif
 
 static void Config_SetInitialDefaults(void) {
 	int systemRamMb;
@@ -5285,12 +5344,14 @@ static void Config_SetInitialDefaults(void) {
 	g_gameConfig.tourInvulnerable = 0;
 	g_gameConfig.tourUnlimitedAmmo = 0;
 	g_gameConfig.laps = 3;
+#ifndef XWA_MODERN
 	g_gameConfig.rudderEnabled = 1;
 	g_gameConfig.ffStrength = 6;
 	g_gameConfig.ffCenter = 0;
 	g_gameConfig.flipRudder = 0;
 	g_gameConfig.ffEnabled = (uint8_t)ForceFeedback_CheckDevice();
 	g_gameConfig.flipY = 0;
+#endif
 	g_gameConfig.sound3dEnabled = 0;
 	g_gameConfig.numberOfSfx = 8;
 	g_gameConfig.sfxQuality = 0;
@@ -5303,7 +5364,15 @@ static void Config_SetInitialDefaults(void) {
 	g_gameConfig.presetShield[1] = 2;
 	g_gameConfig.presetBeam[1] = 2;
 
+#ifdef XWA_MODERN
+	{
+		XwaModernInputOptions options;
+		XwaModernInputOptions_Get(&options);
+		Config_ApplyModernInputOptions(&options);
+	}
+#else
 	Config_SetInitialJoystickDefaults();
+#endif
 	g_gameConfig.goalType = 0;
 
 	Config_CopyFixedText(g_gameConfig.taunt1, sizeof(g_gameConfig.taunt1), FrontendString_Get(STR_TAUNT1));
@@ -5518,6 +5587,7 @@ static void Config_ApplyKeywordValue(int keyword, const char* value) {
 		case CONFIG_KEY_BILINEAR2:
 			g_gameConfig.bilinear[keyword == CONFIG_KEY_BILINEAR2] = parsedU8;
 			break;
+#ifndef XWA_MODERN
 		case CONFIG_KEY_RUDDER_ENABLED:
 			g_gameConfig.rudderEnabled = parsedU8;
 			break;
@@ -5536,6 +5606,7 @@ static void Config_ApplyKeywordValue(int keyword, const char* value) {
 		case CONFIG_KEY_FLIP_Y:
 			g_gameConfig.flipY = parsedU8;
 			break;
+#endif
 		case CONFIG_KEY_3D_SOUND_ENABLED:
 			g_gameConfig.sound3dEnabled = parsedU8;
 			break;
@@ -5670,9 +5741,12 @@ static void Config_ApplyKeywordValue(int keyword, const char* value) {
 			g_gameConfig.timeLimit = parsedU8;
 			break;
 		default:
+#ifndef XWA_MODERN
 			if (keyword >= CONFIG_KEY_JOYBUTTON1 && keyword <= CONFIG_KEY_JOYBUTTON20) {
 				g_gameConfig.joyButtons[keyword - CONFIG_KEY_JOYBUTTON1] = Config_ReadU16(value);
-			} else if (keyword >= CONFIG_KEY_TAUNT1 && keyword <= CONFIG_KEY_TAUNT4) {
+			} else
+#endif
+				if (keyword >= CONFIG_KEY_TAUNT1 && keyword <= CONFIG_KEY_TAUNT4) {
 				Config_CopyLoadedText(&g_gameConfig.taunt1[(keyword - CONFIG_KEY_TAUNT1) * 70], 70, value);
 			} else if (keyword >= CONFIG_KEY_TEAM_GOAL1 && keyword <= CONFIG_KEY_TEAM_GOAL8) {
 				g_gameConfig.teamGoals[keyword - CONFIG_KEY_TEAM_GOAL1] = parsedU8;
@@ -5738,9 +5812,11 @@ int Config_SetDetailDefaultsLow(char groupMask) {
 		g_gameConfig.musicEnabled = 0;
 		g_gameConfig.musicVolume = 0;
 	}
+#ifndef XWA_MODERN
 	if (groupMask & 0x80) {
 		g_gameConfig.ffEnabled = 0;
 	}
+#endif
 
 	g_gameConfig.performance = 0;
 	return 1;
@@ -5804,9 +5880,11 @@ int Config_SetDetailDefaultsMedium(char groupMask) {
 		g_gameConfig.musicVolume = 5;
 		g_gameConfig.numberOfSfx = 12;
 	}
+#ifndef XWA_MODERN
 	if (groupMask & 0x80) {
 		g_gameConfig.ffEnabled = (uint8_t)ForceFeedback_CheckDevice();
 	}
+#endif
 
 	g_gameConfig.performance = 1;
 	return 1;
@@ -5870,9 +5948,11 @@ int Config_SetDetailDefaultsHigh(char groupMask) {
 		g_gameConfig.musicVolume = 5;
 		g_gameConfig.numberOfSfx = 16;
 	}
+#ifndef XWA_MODERN
 	if (groupMask & 0x80) {
 		g_gameConfig.ffEnabled = (uint8_t)ForceFeedback_CheckDevice();
 	}
+#endif
 
 	g_gameConfig.performance = 2;
 	return 1;
@@ -5995,9 +6075,11 @@ int Config_Write(void) {
 	Config_Printf(stream, "datapad_music_volume %d\n", g_gameConfig.datapadMusicVolume);
 	Config_Printf(stream, "datapad_music %d\n", g_gameConfig.datapadMusicEnabled);
 
+#ifndef XWA_MODERN
 	for (i = 0; i < 20; ++i) {
 		Config_Printf(stream, "joybutton%d %d\n", i + 1, g_gameConfig.joyButtons[i]);
 	}
+#endif
 
 	Config_Printf(stream, "difficulty %d\n", g_gameConfig.difficulty);
 	Config_Printf(stream, "collisions %d\n", g_gameConfig.collisions);
@@ -6023,12 +6105,14 @@ int Config_Write(void) {
 	Config_Printf(stream, "taunt2 %s\n", g_gameConfig.taunt2);
 	Config_Printf(stream, "taunt3 %s\n", g_gameConfig.taunt3);
 	Config_Printf(stream, "taunt4 %s\n", g_gameConfig.taunt4);
+#ifndef XWA_MODERN
 	Config_Printf(stream, "rudder_enabled %d\n", g_gameConfig.rudderEnabled);
 	Config_Printf(stream, "flip_rudder %d\n", g_gameConfig.flipRudder);
 	Config_Printf(stream, "ff_strength %d\n", g_gameConfig.ffStrength);
 	Config_Printf(stream, "ff_center %d\n", g_gameConfig.ffCenter);
 	Config_Printf(stream, "ff_enabled %d\n", g_gameConfig.ffEnabled);
 	Config_Printf(stream, "flip_y %d\n", g_gameConfig.flipY);
+#endif
 	Config_Printf(stream, "3d_sound_enabled %d\n", g_gameConfig.sound3dEnabled);
 	Config_Printf(stream, "number_of_sfx %d\n", g_gameConfig.numberOfSfx);
 	Config_Printf(stream, "goaltype %d\n", g_gameConfig.goalType);

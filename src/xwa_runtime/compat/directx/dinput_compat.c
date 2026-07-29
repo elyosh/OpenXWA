@@ -14,6 +14,7 @@
 
 #include "aeron/aeron.h"
 #include "aeron/input.h"
+#include "xwa_runtime/input/controller_mapping.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -523,7 +524,7 @@ typedef struct DInputFFDeviceShim {
 	const IDirectInputDevice2AVtbl* lpVtbl;
 	int refcount;
 	int acquired;
-	int gamepad_slot;                /* Aeron gamepad slot to rumble, or -1 */
+	uint32_t controller_instance_id; /* Selected Aeron controller, or zero. */
 	uint32_t device_gain;            /* DIPROP_FFGAIN, 0..10000 */
 	struct DInputEffectShim* active; /* effect currently driving rumble */
 } DInputFFDeviceShim;
@@ -537,16 +538,6 @@ typedef struct DInputEffectShim {
 	uint32_t gain;      /* DIEFFECT.dwGain, 0..10000 */
 	uint32_t duration;  /* microseconds, or DI_INFINITE */
 } DInputEffectShim;
-
-static int DInputShim_FirstRumbleGamepad(void) {
-	int slot;
-	for (slot = 0; slot < AERON_GAMEPAD_MAX; ++slot) {
-		if (Aeron_GamepadHasRumble(slot)) {
-			return slot;
-		}
-	}
-	return -1;
-}
 
 /* Extract the effect's base magnitude (0..10000) from its type-specific parameters. */
 static void DInputEffect_ReadMagnitude(DInputEffectShim* fx, const DIEFFECT* eff) {
@@ -569,7 +560,9 @@ static void DInputEffect_Trigger(DInputEffectShim* fx) {
 	uint32_t motor;
 	uint32_t duration_ms;
 
-	if (!dev || dev->gamepad_slot < 0 || fx->kind == DINPUT_FX_CONDITION) {
+	if (!dev || dev->controller_instance_id == 0 ||
+		dev->controller_instance_id != XwaControllerMapping_SelectedInstanceId() ||
+		!XwaControllerMapping_SelectedHasRumble() || fx->kind == DINPUT_FX_CONDITION) {
 		return;
 	}
 	amplitude = fx->magnitude;
@@ -583,7 +576,7 @@ static void DInputEffect_Trigger(DInputEffectShim* fx) {
 	if (duration_ms == 0) {
 		duration_ms = 1;
 	}
-	Aeron_RumbleGamepad(dev->gamepad_slot, (uint16_t)motor, (uint16_t)motor, duration_ms);
+	XwaControllerMapping_Rumble((uint16_t)motor, (uint16_t)motor, duration_ms);
 	dev->active = fx;
 }
 
@@ -637,8 +630,10 @@ static HRESULT XWA_DXAPI DInputEffect_Start(IDirectInputEffect* self, uint32_t i
 }
 static HRESULT XWA_DXAPI DInputEffect_Stop(IDirectInputEffect* self) {
 	DInputEffectShim* fx = (DInputEffectShim*)self;
-	if (fx->device && fx->device->gamepad_slot >= 0 && fx->device->active == fx) {
-		Aeron_RumbleGamepad(fx->device->gamepad_slot, 0, 0, 0);
+	if (fx->device && fx->device->controller_instance_id != 0 && fx->device->active == fx) {
+		if (fx->device->controller_instance_id == XwaControllerMapping_SelectedInstanceId()) {
+			XwaControllerMapping_Rumble(0, 0, 0);
+		}
 		fx->device->active = NULL;
 	}
 	return DI_OK;
@@ -825,8 +820,10 @@ static HRESULT XWA_DXAPI DInputFFDevice_SendForceFeedbackCommand(IDirectInputDev
 																 uint32_t command) {
 	DInputFFDeviceShim* dev = (DInputFFDeviceShim*)self;
 	/* Any command other than CONTINUE (reset/stop/pause/actuators-off) silences rumble. */
-	if (command != DISFFC_CONTINUE && dev->gamepad_slot >= 0) {
-		Aeron_RumbleGamepad(dev->gamepad_slot, 0, 0, 0);
+	if (command != DISFFC_CONTINUE && dev->controller_instance_id != 0) {
+		if (dev->controller_instance_id == XwaControllerMapping_SelectedInstanceId()) {
+			XwaControllerMapping_Rumble(0, 0, 0);
+		}
 		dev->active = NULL;
 	}
 	return DI_OK;
@@ -968,7 +965,7 @@ static HRESULT DInput_CreateFFDevice(IDirectInputDeviceA** out) {
 	}
 	dev->lpVtbl = &g_dinputFFDeviceVtbl;
 	dev->refcount = 1;
-	dev->gamepad_slot = DInputShim_FirstRumbleGamepad();
+	dev->controller_instance_id = XwaControllerMapping_SelectedInstanceId();
 	dev->device_gain = 10000;
 	/* IDirectInputDevice2A shares the IDirectInputDeviceA prefix; the recovered enum
 	 * callback QueryInterface's this to IID_IDirectInputDevice2A before use. */
@@ -1058,11 +1055,10 @@ static HRESULT XWA_DXAPI DInput_EnumDevices(IDirectInputA* s, uint32_t devType,
 											LPDIENUMDEVICESCALLBACKA callback, void* ctx, uint32_t flags) {
 	(void)s;
 	(void)devType;
-	/* Force-feedback enumeration: present the first rumble-capable gamepad as a single
+	/* Force-feedback enumeration: present the selected rumble-capable controller as a single
 	 * force-feedback joystick so the recovered init can create and QueryInterface it. */
 	if (callback && (flags & DIEDFL_FORCEFEEDBACK)) {
-		int slot = DInputShim_FirstRumbleGamepad();
-		if (slot >= 0) {
+		if (XwaControllerMapping_SelectedHasRumble()) {
 			DIDEVICEINSTANCEA inst;
 			memset(&inst, 0, sizeof(inst));
 			inst.dwSize = (uint32_t)sizeof(inst);

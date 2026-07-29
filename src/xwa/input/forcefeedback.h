@@ -10,6 +10,7 @@ extern "C" {
 uint8_t ForceFeedback_CheckDevice(void);
 int ForceFeedback_Init(void);
 void ForceFeedback_ShutdownDevice(void);
+void ForceFeedback_Reconfigure(void);
 unsigned int ForceFeedback_GetStrength(void);
 unsigned int ForceFeedback_GetCenteringStrength(void);
 uint8_t ForceFeedback_SetStrength(unsigned int strength);

@@ -303,6 +303,18 @@ void ForceFeedback_ShutdownDevice(void) {
 	}
 }
 
+void ForceFeedback_Reconfigure(void) {
+	const int was_initialized = g_directInputInterface != NULL || g_forceFeedbackDevice != NULL;
+
+	if (!was_initialized) {
+		return;
+	}
+	ForceFeedback_ShutdownDevice();
+	if (g_gameConfig.ffEnabled) {
+		ForceFeedback_Init();
+	}
+}
+
 // FUNCTION: XWA 0x435AE0
 int ForceFeedback_InitEffect(void) {
 	int32_t dir[2];

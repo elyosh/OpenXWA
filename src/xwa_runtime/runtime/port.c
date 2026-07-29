@@ -6,20 +6,25 @@
 #include "xwa/assets/opt_model.h"
 #include "xwa/assets/sprite_resource.h"
 #include "xwa/assets/string_table.h"
+#include "xwa/config/game_config.h"
 #include "xwa/config/pilot.h"
 #include "xwa/flight/flight.h"
 #include "xwa/flight/flight_display.h"
 #include "xwa/frontend/flight_loading.h"
 #include "xwa/frontend/frontend_display.h"
 #include "xwa/frontend/frontend_flight.h"
+#include "xwa/frontend/frontend_input.h"
 #include "xwa/frontend/frontend_resources.h"
+#include "xwa/input/forcefeedback.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/memory.h"
 #include "xwa/xwa_options.h"
 #include "xwa_runtime/compat/directx/ddraw.h"
 #include "xwa_runtime/compat/directx/dinput.h"
+#include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
+#include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/input_bridge.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/runtime/flight_task.h"
@@ -165,6 +170,18 @@ static void XwaPort_TickBody(int32_t delta_us) {
 
 	if (!g_xwaPortInitialized) {
 		return;
+	}
+	if (XwaControllerMapping_ConsumeSelectionChange()) {
+		XwaModernControllerOptionsScreen_ResetCapture();
+		Joystick_ReinitializeDevices();
+		if (XwaFlightTask_IsActive()) {
+			/* Flight normally detects a joystick only during initialization. */
+			const uint16_t joystickActive = (uint16_t)Input_DetectActiveJoystick();
+			g_joystickDetectResultWord = joystickActive;
+			g_joystickEnabled = joystickActive != 0;
+		}
+		XwaControllerMapping_CopySelectedActions(g_gameConfig.joyButtons);
+		ForceFeedback_Reconfigure();
 	}
 	XwaPort_ApplyClassicFlightRenderingPolicy();
 

@@ -6,6 +6,107 @@ input:
   mouse_mode: 'position'
   mouse_sensitivity: 5
   mouse_invert_y: true
+  controller:
+    device:
+      # Empty GUID selects the first connected controller.
+      guid: ''
+      path: ''
+      ordinal: 0
+    roll_enabled: true
+    rumble_enabled: true
+    rumble_strength: 6
+    gamepad:
+      axes:
+        yaw: { source: 'leftx', invert: false, deadzone: 0.08 }
+        pitch: { source: 'lefty', invert: true, deadzone: 0.08 }
+        throttle: { source: 'righttrigger', invert: false, deadzone: 0.0 }
+        roll: { source: 'rightx', invert: false, deadzone: 0.08 }
+      buttons:
+        '1': 'south'
+        '2': 'east'
+        '3': 'west'
+        '4': 'north'
+        '5': 'leftshoulder'
+        '6': 'rightshoulder'
+        '7': 'back'
+        '8': 'start'
+        '9': 'none'
+        '10': 'none'
+        '11': 'none'
+        '12': 'none'
+        '13': 'none'
+        '14': 'none'
+        '15': 'none'
+        '16': 'none'
+      pov: 'dpad'
+      # Button slots 1-16, then D-pad up, right, down, and left.
+      actions:
+        - 156
+        - 157
+        - 114
+        - 108
+        - 101
+        - 105
+        - 91
+        - 8
+        - 13
+        - 93
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 186
+        - 184
+        - 180
+        - 182
+    joystick:
+      axes:
+        yaw: { source: 0, invert: false, deadzone: 0.08 }
+        pitch: { source: 1, invert: true, deadzone: 0.08 }
+        throttle: { source: 2, invert: false, deadzone: 0.08 }
+        roll: { source: 3, invert: false, deadzone: 0.08 }
+      buttons:
+        '1': 0
+        '2': 1
+        '3': 2
+        '4': 3
+        '5': 4
+        '6': 5
+        '7': 6
+        '8': 7
+        '9': 8
+        '10': 9
+        '11': 10
+        '12': 11
+        '13': 12
+        '14': 13
+        '15': 14
+        '16': 15
+      pov_hat: 0
+      # Button slots 1-16, then hat up, right, down, and left.
+      actions:
+        - 156
+        - 157
+        - 114
+        - 108
+        - 101
+        - 105
+        - 91
+        - 8
+        - 13
+        - 93
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 0
+        - 186
+        - 184
+        - 180
+        - 182
 models:
   smooth_angle_degrees: 90
   force_opt: true

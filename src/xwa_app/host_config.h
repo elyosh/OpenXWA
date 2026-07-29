@@ -24,6 +24,7 @@ typedef struct XwaHostConfig {
 	int prefer_original_2d;
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
+	XwaModernInputOptions input_defaults;
 	XwaModernInputOptions input_options;
 } XwaHostConfig;
 

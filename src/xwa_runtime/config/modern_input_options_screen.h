@@ -5,8 +5,8 @@
 extern "C" {
 #endif
 
-/* Draws and updates the original-widget OpenXWA input options screen.
- * Returns nonzero when the caller should return to the parent controller menu. */
+/* Draws and updates the modern Game Controller Options screen.
+ * Returns 1 for Back or 2 for Controller Setup. */
 int XwaModernInputOptionsScreen_Update(int menu_center_x, int* cursor_row);
 
 #ifdef __cplusplus

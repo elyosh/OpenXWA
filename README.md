@@ -61,8 +61,8 @@ Single-player flight can run at a higher simulation rate for smoother input and
 motion on modern displays. A classic timing mode is available when the original
 timing is preferred.
 
-Keyboard, mouse, joystick, and gamepad input are handled through SDL3.
-Original force-feedback effects are translated to rumble on supported gamepads.
+Flight mouse controls (absolute and relative modes) have been added.
+Gamepads are supported, with force-feedback effects translated to rumble.
 
 ## Original game data
 

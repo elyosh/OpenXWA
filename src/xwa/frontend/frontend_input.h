@@ -85,6 +85,7 @@ int Keyboard_FlushCharBuffer(void);
 int Keyboard_BufferContains(char ch);
 int Keyboard_IsKeyDown(unsigned char virtualKey);
 int Joystick_InitDevices(void);
+void Joystick_ReinitializeDevices(void);
 unsigned int Joystick_GetDeviceId(int joySlot);
 void Joystick_UpdateState(int joySlot);
 int Joystick_GetCount(void);

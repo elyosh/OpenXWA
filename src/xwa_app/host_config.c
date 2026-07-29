@@ -217,6 +217,9 @@ static int host_config_load_shipped_config(AeronVfs* vfs, XwaHostConfig* out, ch
 	}
 	valid = host_config_remaster_options(config, 1, out, error, error_size) &&
 			host_config_input_options(config, 1, &out->input_options, error, error_size);
+	if (valid) {
+		out->input_defaults = out->input_options;
+	}
 	AeronConfigFile_Destroy(config);
 	return valid;
 }
@@ -388,28 +391,304 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 	return 1;
 }
 
+static int host_config_input_missing(int required, const char* key, char* error, size_t error_size) {
+	return !required ||
+		   host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'", key);
+}
+
+static int host_config_input_bool(const AeronConfigFile* config, const char* key, int required, int* out,
+								  char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+
+	if (!node) {
+		return host_config_input_missing(required, key, error, error_size);
+	}
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+		return host_config_error(error, error_size, "invalid input setting '%s'", key);
+	}
+	*out = AeronConfigNode_Bool(node, 0);
+	return 1;
+}
+
+static int host_config_input_int(const AeronConfigFile* config, const char* key, int required, int min_value,
+								 int max_value, int* out, char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	int64_t value;
+
+	if (!node) {
+		return host_config_input_missing(required, key, error, error_size);
+	}
+	value = AeronConfigNode_Int(node, 0);
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || value < min_value || value > max_value) {
+		return host_config_error(error, error_size, "invalid input setting '%s'", key);
+	}
+	*out = (int)value;
+	return 1;
+}
+
+static int host_config_input_float(const AeronConfigFile* config, const char* key, int required,
+								   double min_value, double max_value, float* out, char* error,
+								   size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	double value;
+
+	if (!node) {
+		return host_config_input_missing(required, key, error, error_size);
+	}
+	value = AeronConfigNode_Float(node, NAN);
+	if (!isfinite(value) || value < min_value || value > max_value) {
+		return host_config_error(error, error_size, "invalid input setting '%s'", key);
+	}
+	*out = (float)value;
+	return 1;
+}
+
+static int host_config_input_string(const AeronConfigFile* config, const char* key, int required, char* out,
+									size_t capacity, char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	const char* value;
+
+	if (!node) {
+		return host_config_input_missing(required, key, error, error_size);
+	}
+	value = AeronConfigNode_String(node, NULL);
+	if (!value || strlen(value) >= capacity) {
+		return host_config_error(error, error_size, "invalid input setting '%s'", key);
+	}
+	snprintf(out, capacity, "%s", value);
+	return 1;
+}
+
+static int host_config_gamepad_axis_source(const AeronConfigFile* config, const char* key, int required,
+										   int* out, char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	const char* value;
+	AeronGamepadAxis axis;
+
+	if (!node) {
+		return host_config_input_missing(required, key, error, error_size);
+	}
+	value = AeronConfigNode_String(node, NULL);
+	if (value && strcmp(value, "none") == 0) {
+		*out = -1;
+		return 1;
+	}
+	axis = Aeron_GamepadAxisFromName(value);
+	if (axis >= AERON_GAMEPAD_AXIS_COUNT) {
+		return host_config_error(error, error_size, "invalid input setting '%s'", key);
+	}
+	*out = (int)axis;
+	return 1;
+}
+
+static int host_config_gamepad_button_source(const AeronConfigFile* config, const char* key, int required,
+											 int* out, char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	const char* value;
+	AeronGamepadButton button;
+
+	if (!node) {
+		return host_config_input_missing(required, key, error, error_size);
+	}
+	value = AeronConfigNode_String(node, NULL);
+	if (value && strcmp(value, "none") == 0) {
+		*out = -1;
+		return 1;
+	}
+	button = Aeron_GamepadButtonFromName(value);
+	if (button >= AERON_GAMEPAD_BUTTON_COUNT) {
+		return host_config_error(error, error_size, "invalid input setting '%s'", key);
+	}
+	*out = (int)button;
+	return 1;
+}
+
+static int host_config_raw_source(const AeronConfigFile* config, const char* key, int required, int maximum,
+								  int* out, char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	const char* text;
+	int64_t value;
+
+	if (!node) {
+		return host_config_input_missing(required, key, error, error_size);
+	}
+	text = AeronConfigNode_String(node, NULL);
+	if (text && strcmp(text, "none") == 0) {
+		*out = -1;
+		return 1;
+	}
+	value = AeronConfigNode_Int(node, -1);
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || value < 0 || value >= maximum) {
+		return host_config_error(error, error_size, "invalid input setting '%s'", key);
+	}
+	*out = (int)value;
+	return 1;
+}
+
+static int host_config_controller_axes(const AeronConfigFile* config, int required,
+									   XwaControllerOptions* controller, char* error, size_t error_size) {
+	static const char* const axis_names[XWA_CONTROLLER_LOGICAL_AXIS_COUNT] = { "yaw", "pitch", "throttle",
+																			   "roll" };
+	char key[128];
+	int i;
+
+	for (i = 0; i < XWA_CONTROLLER_LOGICAL_AXIS_COUNT; ++i) {
+		snprintf(key, sizeof(key), "input.controller.gamepad.axes.%s.source", axis_names[i]);
+		if (!host_config_gamepad_axis_source(config, key, required, &controller->gamepad.axes[i].source,
+											 error, error_size)) {
+			return 0;
+		}
+		snprintf(key, sizeof(key), "input.controller.gamepad.axes.%s.invert", axis_names[i]);
+		if (!host_config_input_bool(config, key, required, &controller->gamepad.axes[i].invert, error,
+									error_size)) {
+			return 0;
+		}
+		snprintf(key, sizeof(key), "input.controller.gamepad.axes.%s.deadzone", axis_names[i]);
+		if (!host_config_input_float(config, key, required, 0.0, 1.0, &controller->gamepad.axes[i].deadzone,
+									 error, error_size)) {
+			return 0;
+		}
+		snprintf(key, sizeof(key), "input.controller.joystick.axes.%s.source", axis_names[i]);
+		if (!host_config_raw_source(config, key, required, AERON_CONTROLLER_AXIS_MAX,
+									&controller->joystick.axes[i].source, error, error_size)) {
+			return 0;
+		}
+		snprintf(key, sizeof(key), "input.controller.joystick.axes.%s.invert", axis_names[i]);
+		if (!host_config_input_bool(config, key, required, &controller->joystick.axes[i].invert, error,
+									error_size)) {
+			return 0;
+		}
+		snprintf(key, sizeof(key), "input.controller.joystick.axes.%s.deadzone", axis_names[i]);
+		if (!host_config_input_float(config, key, required, 0.0, 1.0, &controller->joystick.axes[i].deadzone,
+									 error, error_size)) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static int host_config_controller_buttons(const AeronConfigFile* config, int required,
+										  XwaControllerOptions* controller, char* error, size_t error_size) {
+	char key[128];
+	int i;
+
+	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
+		snprintf(key, sizeof(key), "input.controller.gamepad.buttons.%d", i + 1);
+		if (!host_config_gamepad_button_source(config, key, required, &controller->gamepad.buttons[i], error,
+											   error_size)) {
+			return 0;
+		}
+		snprintf(key, sizeof(key), "input.controller.joystick.buttons.%d", i + 1);
+		if (!host_config_raw_source(config, key, required, AERON_CONTROLLER_BUTTON_MAX,
+									&controller->joystick.buttons[i], error, error_size)) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static int host_config_controller_pov(const AeronConfigFile* config, int required,
+									  XwaControllerOptions* controller, char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, "input.controller.gamepad.pov");
+	const char* value;
+
+	if (!node) {
+		if (!host_config_input_missing(required, "input.controller.gamepad.pov", error, error_size)) {
+			return 0;
+		}
+	} else {
+		value = AeronConfigNode_String(node, NULL);
+		if (value && strcmp(value, "dpad") == 0) {
+			controller->gamepad.pov_source = 1;
+		} else if (value && strcmp(value, "none") == 0) {
+			controller->gamepad.pov_source = 0;
+		} else {
+			return host_config_error(error, error_size, "invalid input setting '%s'",
+									 "input.controller.gamepad.pov");
+		}
+	}
+	return host_config_raw_source(config, "input.controller.joystick.pov_hat", required,
+								  AERON_CONTROLLER_HAT_MAX, &controller->joystick.pov_source, error,
+								  error_size);
+}
+
+static int host_config_controller_actions(const AeronConfigFile* config, int required,
+										  const char* profile_name, XwaControllerProfile* profile,
+										  char* error, size_t error_size) {
+	char key[96];
+	const AeronConfigNode* node;
+	size_t count;
+	int i;
+
+	snprintf(key, sizeof(key), "input.controller.%s.actions", profile_name);
+	node = AeronConfigFile_GetNode(config, key);
+	if (!node) {
+		return host_config_input_missing(required, key, error, error_size);
+	}
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_SEQUENCE) {
+		return host_config_error(error, error_size, "invalid input setting '%s'", key);
+	}
+	count = AeronConfigNode_SequenceCount(node);
+	if (count != XWA_CONTROLLER_ACTION_COUNT) {
+		return host_config_error(error, error_size, "invalid input setting '%s'", key);
+	}
+	for (i = 0; i < XWA_CONTROLLER_ACTION_COUNT; ++i) {
+		const AeronConfigNode* item = AeronConfigNode_SequenceGet(node, (size_t)i);
+		int64_t value = AeronConfigNode_Int(item, -1);
+		if (AeronConfigNode_Type(item) != AERON_CONFIG_INT || value < 0 || value > UINT16_MAX) {
+			return host_config_error(error, error_size, "invalid input setting '%s'", key);
+		}
+		profile->actions[i] = (uint16_t)value;
+	}
+	return 1;
+}
+
+static int host_config_controller_options(const AeronConfigFile* config, int required,
+										  XwaControllerOptions* controller, char* error, size_t error_size) {
+	if (!host_config_input_string(config, "input.controller.device.guid", required, controller->device.guid,
+								  sizeof(controller->device.guid), error, error_size) ||
+		!host_config_input_string(config, "input.controller.device.path", required, controller->device.path,
+								  sizeof(controller->device.path), error, error_size) ||
+		!host_config_input_int(config, "input.controller.device.ordinal", required, 0,
+							   XWA_CONTROLLER_DEVICE_ORDINAL_MAX, &controller->device.ordinal, error,
+							   error_size)) {
+		return 0;
+	}
+	return host_config_input_bool(config, "input.controller.roll_enabled", required,
+								  &controller->roll_enabled, error, error_size) &&
+		   host_config_input_bool(config, "input.controller.rumble_enabled", required,
+								  &controller->rumble_enabled, error, error_size) &&
+		   host_config_input_int(config, "input.controller.rumble_strength", required,
+								 XWA_CONTROLLER_RUMBLE_STRENGTH_MIN, XWA_CONTROLLER_RUMBLE_STRENGTH_MAX,
+								 &controller->rumble_strength, error, error_size) &&
+		   host_config_controller_axes(config, required, controller, error, error_size) &&
+		   host_config_controller_buttons(config, required, controller, error, error_size) &&
+		   host_config_controller_pov(config, required, controller, error, error_size) &&
+		   host_config_controller_actions(config, required, "gamepad", &controller->gamepad, error,
+										  error_size) &&
+		   host_config_controller_actions(config, required, "joystick", &controller->joystick, error,
+										  error_size);
+}
+
 static int host_config_input_options(const AeronConfigFile* config, int required, XwaModernInputOptions* out,
 									 char* error, size_t error_size) {
 	const AeronConfigNode* node;
 
-	node = AeronConfigFile_GetNode(config, "input.mouse_flight");
-	if (!node) {
-		if (required) {
-			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
-									 "input.mouse_flight");
-		}
-	} else {
-		if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
-			return host_config_error(error, error_size, "invalid input setting '%s'", "input.mouse_flight");
-		}
-		out->mouse_flight_enabled = AeronConfigNode_Bool(node, 0);
+	if (!host_config_input_bool(config, "input.mouse_flight", required, &out->mouse_flight_enabled, error,
+								error_size) ||
+		!host_config_input_int(config, "input.mouse_sensitivity", required, XWA_MODERN_MOUSE_SENSITIVITY_MIN,
+							   XWA_MODERN_MOUSE_SENSITIVITY_MAX, &out->mouse_sensitivity, error,
+							   error_size) ||
+		!host_config_input_bool(config, "input.mouse_invert_y", required, &out->mouse_invert_y, error,
+								error_size) ||
+		!host_config_controller_options(config, required, &out->controller, error, error_size)) {
+		return 0;
 	}
 
 	node = AeronConfigFile_GetNode(config, "input.mouse_mode");
 	if (!node) {
-		if (required) {
-			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
-									 "input.mouse_mode");
+		if (!host_config_input_missing(required, "input.mouse_mode", error, error_size)) {
+			return 0;
 		}
 	} else {
 		const char* value = AeronConfigNode_String(node, NULL);
@@ -422,35 +701,39 @@ static int host_config_input_options(const AeronConfigFile* config, int required
 									 "'position' or 'rate'");
 		}
 	}
-
-	node = AeronConfigFile_GetNode(config, "input.mouse_sensitivity");
-	if (!node) {
-		if (required) {
-			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
-									 "input.mouse_sensitivity");
-		}
-	} else {
-		const int64_t value = AeronConfigNode_Int(node, 0);
-		if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || value < XWA_MODERN_MOUSE_SENSITIVITY_MIN ||
-			value > XWA_MODERN_MOUSE_SENSITIVITY_MAX) {
-			return host_config_error(error, error_size,
-									 "invalid 'input.mouse_sensitivity': expected integer %s",
-									 "from 1 through 9");
-		}
-		out->mouse_sensitivity = (int)value;
+	if (!XwaModernInputOptions_Validate(out)) {
+		return host_config_error(error, error_size, "invalid input configuration in %s",
+								 required ? "remaster/config.yaml" : "config.yaml");
 	}
+	return 1;
+}
 
-	node = AeronConfigFile_GetNode(config, "input.mouse_invert_y");
-	if (!node) {
-		if (required) {
-			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
-									 "input.mouse_invert_y");
+static int host_config_validate_input_maps(const AeronConfigFile* config, char* error, size_t error_size) {
+	static const char* const map_paths[] = {
+		"input.controller",
+		"input.controller.device",
+		"input.controller.gamepad",
+		"input.controller.gamepad.axes",
+		"input.controller.gamepad.axes.yaw",
+		"input.controller.gamepad.axes.pitch",
+		"input.controller.gamepad.axes.throttle",
+		"input.controller.gamepad.axes.roll",
+		"input.controller.gamepad.buttons",
+		"input.controller.joystick",
+		"input.controller.joystick.axes",
+		"input.controller.joystick.axes.yaw",
+		"input.controller.joystick.axes.pitch",
+		"input.controller.joystick.axes.throttle",
+		"input.controller.joystick.axes.roll",
+		"input.controller.joystick.buttons",
+	};
+	size_t i;
+
+	for (i = 0; i < sizeof(map_paths) / sizeof(map_paths[0]); ++i) {
+		const AeronConfigNode* node = AeronConfigFile_GetNode(config, map_paths[i]);
+		if (node && AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+			return host_config_error(error, error_size, "'%s' must be a mapping", map_paths[i]);
 		}
-	} else {
-		if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
-			return host_config_error(error, error_size, "invalid input setting '%s'", "input.mouse_invert_y");
-		}
-		out->mouse_invert_y = AeronConfigNode_Bool(node, 0);
 	}
 	return 1;
 }
@@ -520,6 +803,7 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		host_config_remaster_options(config, 0, out, error, error_size) &&
 		host_config_video_options(config, &out->video_options, &out->video_options_override_mask, error,
 								  error_size) &&
+		host_config_validate_input_maps(config, error, error_size) &&
 		host_config_input_options(config, 0, &out->input_options, error, error_size);
 	AeronConfigFile_Destroy(config);
 	return valid;
@@ -795,22 +1079,164 @@ int XwaHostConfig_SaveGameDataPath(AeronVfs* vfs, const char* game_data_path, ch
 	return host_yaml_save_document(vfs, &document, error, error_size);
 }
 
+static int host_yaml_set_sequence_node(yaml_document_t* document, int mapping_id, const char* key,
+									   int sequence_id) {
+	size_t pair_index = 0;
+	const int existing_value_id = host_yaml_mapping_value(document, mapping_id, key, &pair_index);
+
+	if (!sequence_id) {
+		return 0;
+	}
+	if (existing_value_id) {
+		yaml_node_t* mapping = yaml_document_get_node(document, mapping_id);
+		mapping->data.mapping.pairs.start[pair_index].value = sequence_id;
+		return 1;
+	}
+	{
+		const int key_id = host_yaml_add_scalar(document, key, YAML_PLAIN_SCALAR_STYLE);
+		return key_id && yaml_document_append_mapping_pair(document, mapping_id, key_id, sequence_id);
+	}
+}
+
+static int host_yaml_set_controller_axis(yaml_document_t* document, int axes_id, const char* name,
+										 const XwaControllerAxisBinding* binding, int gamepad) {
+	int axis_id = host_yaml_get_or_add_mapping(document, axes_id, name);
+	char source_text[16];
+	char deadzone_text[32];
+	const char* source_name;
+
+	if (!axis_id) {
+		return 0;
+	}
+	if (binding->source < 0) {
+		source_name = "none";
+	} else if (gamepad) {
+		source_name = Aeron_GamepadAxisName((AeronGamepadAxis)binding->source);
+		if (!source_name) {
+			return 0;
+		}
+	} else {
+		snprintf(source_text, sizeof(source_text), "%d", binding->source);
+		source_name = source_text;
+	}
+	snprintf(deadzone_text, sizeof(deadzone_text), "%.6g", (double)binding->deadzone);
+	return host_yaml_set_scalar(document, axis_id, "source", source_name,
+								gamepad || binding->source < 0 ? YAML_SINGLE_QUOTED_SCALAR_STYLE
+															   : YAML_PLAIN_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, axis_id, "invert", binding->invert ? "true" : "false",
+								YAML_PLAIN_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, axis_id, "deadzone", deadzone_text, YAML_PLAIN_SCALAR_STYLE);
+}
+
+static int host_yaml_set_controller_actions(yaml_document_t* document, int profile_id,
+											const uint16_t actions[XWA_CONTROLLER_ACTION_COUNT]);
+
+static int host_yaml_set_controller_profile(yaml_document_t* document, int controller_id,
+											const char* profile_name, const XwaControllerProfile* profile,
+											int gamepad) {
+	static const char* const axis_names[XWA_CONTROLLER_LOGICAL_AXIS_COUNT] = { "yaw", "pitch", "throttle",
+																			   "roll" };
+	int profile_id;
+	int axes_id;
+	int buttons_id;
+	int pov_ok;
+	int i;
+
+	profile_id = host_yaml_get_or_add_mapping(document, controller_id, profile_name);
+	axes_id = profile_id ? host_yaml_get_or_add_mapping(document, profile_id, "axes") : 0;
+	buttons_id = profile_id ? host_yaml_get_or_add_mapping(document, profile_id, "buttons") : 0;
+	if (!axes_id || !buttons_id) {
+		return 0;
+	}
+	for (i = 0; i < XWA_CONTROLLER_LOGICAL_AXIS_COUNT; ++i) {
+		if (!host_yaml_set_controller_axis(document, axes_id, axis_names[i], &profile->axes[i], gamepad)) {
+			return 0;
+		}
+	}
+	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
+		char key[8];
+		char value[16];
+		const char* source_name;
+		yaml_scalar_style_t style;
+
+		snprintf(key, sizeof(key), "%d", i + 1);
+		if (profile->buttons[i] < 0) {
+			source_name = "none";
+			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+		} else if (gamepad) {
+			source_name = Aeron_GamepadButtonName((AeronGamepadButton)profile->buttons[i]);
+			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+			if (!source_name) {
+				return 0;
+			}
+		} else {
+			snprintf(value, sizeof(value), "%d", profile->buttons[i]);
+			source_name = value;
+			style = YAML_PLAIN_SCALAR_STYLE;
+		}
+		if (!host_yaml_set_scalar(document, buttons_id, key, source_name, style)) {
+			return 0;
+		}
+	}
+	if (gamepad) {
+		pov_ok = host_yaml_set_scalar(document, profile_id, "pov", profile->pov_source ? "dpad" : "none",
+									  YAML_SINGLE_QUOTED_SCALAR_STYLE);
+	} else {
+		char value[16];
+		const char* text = "none";
+		yaml_scalar_style_t style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+		if (profile->pov_source >= 0) {
+			snprintf(value, sizeof(value), "%d", profile->pov_source);
+			text = value;
+			style = YAML_PLAIN_SCALAR_STYLE;
+		}
+		pov_ok = host_yaml_set_scalar(document, profile_id, "pov_hat", text, style);
+	}
+	return pov_ok && host_yaml_set_controller_actions(document, profile_id, profile->actions);
+}
+
+static int host_yaml_set_controller_actions(yaml_document_t* document, int profile_id,
+											const uint16_t actions[XWA_CONTROLLER_ACTION_COUNT]) {
+	int sequence_id;
+	int i;
+
+	sequence_id = yaml_document_add_sequence(document, (yaml_char_t*)YAML_SEQ_TAG, YAML_BLOCK_SEQUENCE_STYLE);
+	if (!sequence_id) {
+		return 0;
+	}
+	for (i = 0; i < XWA_CONTROLLER_ACTION_COUNT; ++i) {
+		char value[16];
+		int value_id;
+
+		snprintf(value, sizeof(value), "%u", (unsigned int)actions[i]);
+		value_id = host_yaml_add_scalar(document, value, YAML_PLAIN_SCALAR_STYLE);
+		if (!value_id || !yaml_document_append_sequence_item(document, sequence_id, value_id)) {
+			return 0;
+		}
+	}
+	return host_yaml_set_sequence_node(document, profile_id, "actions", sequence_id);
+}
+
 static int host_yaml_set_input_options(yaml_document_t* document, const XwaModernInputOptions* options) {
 	static const char* const mode_names[] = { "position", "rate" };
 	yaml_node_t* root = yaml_document_get_root_node(document);
 	char sensitivity_text[16];
+	char ordinal_text[16];
+	char rumble_strength_text[16];
 	int input_id;
+	int controller_id;
+	int device_id;
 
-	if (!root || root->type != YAML_MAPPING_NODE || !options ||
-		options->mouse_sensitivity < XWA_MODERN_MOUSE_SENSITIVITY_MIN ||
-		options->mouse_sensitivity > XWA_MODERN_MOUSE_SENSITIVITY_MAX ||
-		options->mouse_mode < XWA_MODERN_MOUSE_MODE_POSITION ||
-		options->mouse_mode > XWA_MODERN_MOUSE_MODE_RATE) {
+	if (!root || root->type != YAML_MAPPING_NODE || !XwaModernInputOptions_Validate(options)) {
 		return 0;
 	}
 	snprintf(sensitivity_text, sizeof sensitivity_text, "%d", options->mouse_sensitivity);
 	input_id = host_yaml_get_or_add_mapping(document, 1, "input");
-	return input_id &&
+	controller_id = input_id ? host_yaml_get_or_add_mapping(document, input_id, "controller") : 0;
+	device_id = controller_id ? host_yaml_get_or_add_mapping(document, controller_id, "device") : 0;
+	snprintf(ordinal_text, sizeof(ordinal_text), "%d", options->controller.device.ordinal);
+	snprintf(rumble_strength_text, sizeof(rumble_strength_text), "%d", options->controller.rumble_strength);
+	return input_id && controller_id && device_id &&
 		   host_yaml_set_scalar(document, input_id, "mouse_flight",
 								options->mouse_flight_enabled ? "true" : "false", YAML_PLAIN_SCALAR_STYLE) &&
 		   host_yaml_set_scalar(document, input_id, "mouse_mode", mode_names[options->mouse_mode],
@@ -818,7 +1244,24 @@ static int host_yaml_set_input_options(yaml_document_t* document, const XwaModer
 		   host_yaml_set_scalar(document, input_id, "mouse_sensitivity", sensitivity_text,
 								YAML_PLAIN_SCALAR_STYLE) &&
 		   host_yaml_set_scalar(document, input_id, "mouse_invert_y",
-								options->mouse_invert_y ? "true" : "false", YAML_PLAIN_SCALAR_STYLE);
+								options->mouse_invert_y ? "true" : "false", YAML_PLAIN_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, device_id, "guid", options->controller.device.guid,
+								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, device_id, "path", options->controller.device.path,
+								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, device_id, "ordinal", ordinal_text, YAML_PLAIN_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, controller_id, "roll_enabled",
+								options->controller.roll_enabled ? "true" : "false",
+								YAML_PLAIN_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, controller_id, "rumble_enabled",
+								options->controller.rumble_enabled ? "true" : "false",
+								YAML_PLAIN_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, controller_id, "rumble_strength", rumble_strength_text,
+								YAML_PLAIN_SCALAR_STYLE) &&
+		   host_yaml_set_controller_profile(document, controller_id, "gamepad", &options->controller.gamepad,
+											1) &&
+		   host_yaml_set_controller_profile(document, controller_id, "joystick",
+											&options->controller.joystick, 0);
 }
 
 int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* options, char* error,

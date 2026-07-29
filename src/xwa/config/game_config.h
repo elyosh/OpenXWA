@@ -177,6 +177,11 @@ int Config_GetDisplayDriverIndex(int profileIdx);
 int Config_Load(void);
 int Config_Write(void);
 
+#ifdef XWA_MODERN
+struct XwaModernInputOptions;
+void Config_ApplyModernInputOptions(const struct XwaModernInputOptions* options);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

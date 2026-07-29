@@ -331,6 +331,18 @@ int Joystick_InitDevices(void) {
 	return initializedCount != 0;
 }
 
+void Joystick_ReinitializeDevices(void) {
+	WinmmJoystick_ResetTrace();
+	memset(&g_joystickState, 0, sizeof(g_joystickState));
+	memset(g_joyCalibrated, 0, sizeof(g_joyCalibrated));
+	memset(g_joyDeviceId, 0, sizeof(g_joyDeviceId));
+	g_joystickDetectionCached = 0;
+	g_joystickDetectionProbeInProgress = 0;
+	g_joystickActive = 0;
+	g_joyDeviceIndex = 0;
+	Joystick_InitDevices();
+}
+
 // FUNCTION: XWA 0x541050
 void Joystick_UpdateState(int joySlot) {
 	JOYINFOEX pji;

@@ -1,14 +1,13 @@
 #ifndef XWA_RUNTIME_COMPAT_WINMM_JOYSTICK_H
 #define XWA_RUNTIME_COMPAT_WINMM_JOYSTICK_H
 
-/* WinMM joystick API compatibility shim, backed by Aeron gamepads.
+/* WinMM joystick API compatibility shim, backed by Aeron controllers.
  *
  * The recovered joystick code (Joystick_InitDevices / UpdateState / PollRawAxes) uses
  * the Windows Multimedia joystick API -- joyGetNumDevs / joyGetDevCapsA / joyGetPosEx
  * -- exactly as the original did. This header declares that API plus the JOYCAPS /
- * JOYINFOEX layouts; the shim (winmm/joystick_compat.c) fills them from
- * Aeron_InputSnapshot()->gamepads[], applying the YAML device-layout config (axis
- * slot assignment, inversion, deadzone override). */
+ * JOYINFOEX layouts. The shim fills them from the controller selected and mapped
+ * by the modern YAML input options. */
 
 #include <stdint.h>
 
@@ -31,27 +30,27 @@ typedef uint32_t MMRESULT;
 #define XWA_WINMMIMPORT
 #endif
 
-#define JOYERR_NOERROR   0u
-#define JOYERR_PARMS     165u
+#define JOYERR_NOERROR 0u
+#define JOYERR_PARMS 165u
 #define JOYERR_UNPLUGGED 167u
 
 /* JOYCAPS.wCaps bits used by the recovered code. */
-#define JOYCAPS_HASZ   0x0001u
-#define JOYCAPS_HASR   0x0002u
-#define JOYCAPS_HASU   0x0004u
-#define JOYCAPS_HASV   0x0008u
+#define JOYCAPS_HASZ 0x0001u
+#define JOYCAPS_HASR 0x0002u
+#define JOYCAPS_HASU 0x0004u
+#define JOYCAPS_HASV 0x0008u
 #define JOYCAPS_HASPOV 0x0010u
 
 /* JOYINFOEX.dwFlags bits (which fields joyGetPosEx returns). The shim fills every
  * axis regardless, so these are accepted and not required. */
-#define JOY_RETURNX        0x00000001u
-#define JOY_RETURNY        0x00000002u
-#define JOY_RETURNZ        0x00000004u
-#define JOY_RETURNR        0x00000008u
-#define JOY_RETURNPOV      0x00000040u
-#define JOY_RETURNBUTTONS  0x00000080u
+#define JOY_RETURNX 0x00000001u
+#define JOY_RETURNY 0x00000002u
+#define JOY_RETURNZ 0x00000004u
+#define JOY_RETURNR 0x00000008u
+#define JOY_RETURNPOV 0x00000040u
+#define JOY_RETURNBUTTONS 0x00000080u
 #define JOY_RETURNCENTERED 0x00000400u
-#define JOY_RETURNALL      0x000000FFu
+#define JOY_RETURNALL 0x000000FFu
 
 /* Centered POV value. */
 #define JOY_POVCENTERED 0xFFFFu
@@ -61,7 +60,7 @@ typedef uint32_t MMRESULT;
 typedef struct tagJOYCAPSA {
 	uint16_t wMid;
 	uint16_t wPid;
-	char     szPname[32];
+	char szPname[32];
 	uint32_t wXmin;
 	uint32_t wXmax;
 	uint32_t wYmin;
@@ -81,8 +80,8 @@ typedef struct tagJOYCAPSA {
 	uint32_t wMaxAxes;
 	uint32_t wNumAxes;
 	uint32_t wMaxButtons;
-	char     szRegKey[32];
-	char     szOEMVxD[260];
+	char szRegKey[32];
+	char szOEMVxD[260];
 } JOYCAPSA;
 
 /* joyGetPosEx extended position structure. */
@@ -105,12 +104,12 @@ typedef struct joyinfoex_tag {
 /* Latest successful Aeron-to-WinMM axis conversion, for modern diagnostics. */
 typedef struct WinmmJoystickTraceSample {
 	uint32_t deviceId;
-	int8_t   sourceAxisX;
-	int8_t   sourceAxisY;
-	int8_t   sourceAxisR;
-	int16_t  sourceValueX;
-	int16_t  sourceValueY;
-	int16_t  sourceValueR;
+	int8_t sourceAxisX;
+	int8_t sourceAxisY;
+	int8_t sourceAxisR;
+	int16_t sourceValueX;
+	int16_t sourceValueY;
+	int16_t sourceValueR;
 	uint32_t winmmX;
 	uint32_t winmmY;
 	uint32_t winmmR;
@@ -122,11 +121,13 @@ XWA_WINMMIMPORT uint32_t XWA_WINMMAPI joyGetNumDevs(void);
 /* Fills caps for device uJoyID; JOYERR_NOERROR if present, else an error. */
 XWA_WINMMIMPORT MMRESULT XWA_WINMMAPI joyGetDevCapsA(uint32_t uJoyID, JOYCAPSA* pjc, uint32_t cbjc);
 
-/* Fills the extended position for device uJoyID from the mapped Aeron gamepad. */
+/* Fills the extended position for device uJoyID from the mapped Aeron controller. */
 XWA_WINMMIMPORT MMRESULT XWA_WINMMAPI joyGetPosEx(uint32_t uJoyID, JOYINFOEX* pji);
 
 /* Copies the most recent successful joyGetPosEx axis conversion. */
 int WinmmJoystick_GetLastTraceSample(WinmmJoystickTraceSample* sample);
+/* Clears the diagnostic sample after controller selection or mapping changes. */
+void WinmmJoystick_ResetTrace(void);
 
 #ifdef __cplusplus
 }
