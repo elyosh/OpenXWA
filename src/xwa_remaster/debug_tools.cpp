@@ -4,7 +4,7 @@
  * set for the shared machinery:
  *
  *   PBR — Global : XwaShipPbrTuning + mesh texture filtering
- *   SSAO         : XwaFlightSsaoParams (live; render.yaml persists)
+ *   SSAO         : XwaFlightSsaoParams (live; remaster/config.yaml persists)
  *   HDR & Display: output mode + AeronScenePresent_* tonemap knobs
  *
  * All state mutations go through the public accessors — no renderer
@@ -82,7 +82,7 @@ static void xwa_tool_pbr(int* open, void* user) {
 		ImGui::EndDisabled();
 	}
 	ImGui::TextDisabled("Applies to base-color, normal, material and emissive atlases.\n"
-						"Edits are not persisted; copy them into render.yaml.");
+						"Edits are not persisted; copy them into remaster/config.yaml.");
 	if (ImGui::Button("Reset texture filtering")) {
 		XwaRemasterFlight_GetTextureFilteringDefault(&filtering);
 		filtering_changed = true;
@@ -183,7 +183,7 @@ static void xwa_tool_ssao(int* open, void* user) {
 		changed = true;
 	}
 	ImGui::TextDisabled("Edits apply on the next frame and are NOT persisted —\n"
-						"copy values into resources/remaster/flight/render.yaml.");
+						"copy values into resources/remaster/config.yaml.");
 	if (changed) {
 		XwaRemasterFlight_SetSsao(&p);
 	}
@@ -325,7 +325,7 @@ static void xwa_tool_shadows(int* open, void* user) {
 		changed = true;
 	}
 	ImGui::TextDisabled("Edits apply on the next frame and are NOT persisted —\n"
-						"copy values into resources/remaster/flight/render.yaml.");
+						"copy values into resources/remaster/config.yaml.");
 	ImGui::TextDisabled("GPU group 'Directional shadows' is atlas rendering.\n"
 						"With SSAO, opaque sampling is evaluated at half resolution in the SSAO group;\n"
 						"transparent and receiver-local sampling remains in the main PBR color pass.");
@@ -383,7 +383,7 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 		changed = true;
 	}
 	ImGui::TextDisabled("The hangar backdrop receives shadows but does not cast them.\n"
-						"Edits are not persisted; copy them into render.yaml.");
+						"Edits are not persisted; copy them into remaster/config.yaml.");
 	if (changed) {
 		XwaRemasterFlight_SetHangarLighting(&p);
 	}
@@ -439,7 +439,7 @@ static void xwa_tool_point_lights(int* open, void* user) {
 		changed = true;
 	}
 	ImGui::TextDisabled("Edits apply on the next frame and are NOT persisted —\n"
-						"copy values into resources/remaster/flight/render.yaml\n"
+						"copy values into resources/remaster/config.yaml\n"
 						"under point_lights: {scale, range_scale, min_distance,\n"
 						"spec_weight, enabled}.");
 	if (changed) {
@@ -583,7 +583,7 @@ static void xwa_tool_fsr(int* open, void* user) {
 		ImGui::TextDisabled("Unavailable while FSR is inactive");
 	}
 
-	ImGui::TextDisabled("Runtime edits are not persisted to render.yaml.");
+	ImGui::TextDisabled("Runtime edits are not persisted to remaster/config.yaml.");
 	ImGui::End();
 	*open = b ? 1 : 0;
 }

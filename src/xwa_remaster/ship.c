@@ -437,7 +437,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 		env.ssao_rt_h = ao->rt_h;
 		env.ssao_direct = ao->direct;
 	}
-	/* Remaining shading knobs come from the required render.yaml profile
+	/* Remaining shading knobs come from the required remaster/config.yaml profile
 	 * through the process-wide tuning state. */
 	env.global_spec_mul = g_pbr_tuning.global_spec_mul;
 	env.light_wrap = g_pbr_tuning.light_wrap;

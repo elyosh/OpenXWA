@@ -66,7 +66,8 @@ static int host_config_model_smoothing(const AeronConfigFile* config, int requir
 	double value;
 	if (!node) {
 		if (required) {
-			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 key);
 		}
 		return 1;
 	}
@@ -87,7 +88,8 @@ static int host_config_opt_emissive_strength(const AeronConfigFile* config, int 
 	double value;
 	if (!node) {
 		if (required) {
-			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 key);
 		}
 		return 1;
 	}
@@ -108,7 +110,8 @@ static int host_config_opt_projectile_emissive_strength(const AeronConfigFile* c
 	double value;
 	if (!node) {
 		if (required) {
-			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 key);
 		}
 		return 1;
 	}
@@ -129,7 +132,8 @@ static int host_config_engine_emissive_strength(const AeronConfigFile* config, i
 	double value;
 	if (!node) {
 		if (required) {
-			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 key);
 		}
 		return 1;
 	}
@@ -149,7 +153,8 @@ static int host_config_force_opt(const AeronConfigFile* config, int required, in
 	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
 	if (!node) {
 		if (required) {
-			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 key);
 		}
 		return 1;
 	}
@@ -166,7 +171,8 @@ static int host_config_prefer_original_2d(const AeronConfigFile* config, int req
 	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
 	if (!node) {
 		if (required) {
-			return host_config_error(error, error_size, "missing required remaster setting '%s'", key);
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 key);
 		}
 		return 1;
 	}
@@ -192,22 +198,25 @@ static int host_config_remaster_options(const AeronConfigFile* config, int requi
 		   host_config_prefer_original_2d(config, required, &out->prefer_original_2d, error, error_size);
 }
 
-static int host_config_load_remaster_profile(AeronVfs* vfs, XwaHostConfig* out, char* error,
-											 size_t error_size) {
-	static const char* path = "remaster/flight/render.yaml";
+static int host_config_input_options(const AeronConfigFile* config, int required, XwaModernInputOptions* out,
+									 char* error, size_t error_size);
+
+static int host_config_load_shipped_config(AeronVfs* vfs, XwaHostConfig* out, char* error,
+										   size_t error_size) {
+	static const char* path = "remaster/config.yaml";
 	AeronConfigFile* config = NULL;
 	int valid;
 
 	if (!AeronConfigFile_LoadYaml(vfs, AERON_VFS_ROOT_RESOURCE, path, &config)) {
-		return host_config_error(error, error_size, "required remaster profile unavailable or invalid: %s",
-								 path);
+		return host_config_error(error, error_size,
+								 "required shipped configuration unavailable or invalid: %s", path);
 	}
 	if (AeronConfigNode_Type(AeronConfigFile_Root(config)) != AERON_CONFIG_MAP) {
 		AeronConfigFile_Destroy(config);
-		return host_config_error(error, error_size, "required remaster profile root must be a mapping: %s",
-								 path);
+		return host_config_error(error, error_size, "shipped configuration root must be a mapping: %s", path);
 	}
-	valid = host_config_remaster_options(config, 1, out, error, error_size);
+	valid = host_config_remaster_options(config, 1, out, error, error_size) &&
+			host_config_input_options(config, 1, &out->input_options, error, error_size);
 	AeronConfigFile_Destroy(config);
 	return valid;
 }
@@ -379,6 +388,73 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 	return 1;
 }
 
+static int host_config_input_options(const AeronConfigFile* config, int required, XwaModernInputOptions* out,
+									 char* error, size_t error_size) {
+	const AeronConfigNode* node;
+
+	node = AeronConfigFile_GetNode(config, "input.mouse_flight");
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 "input.mouse_flight");
+		}
+	} else {
+		if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+			return host_config_error(error, error_size, "invalid input setting '%s'", "input.mouse_flight");
+		}
+		out->mouse_flight_enabled = AeronConfigNode_Bool(node, 0);
+	}
+
+	node = AeronConfigFile_GetNode(config, "input.mouse_mode");
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 "input.mouse_mode");
+		}
+	} else {
+		const char* value = AeronConfigNode_String(node, NULL);
+		if (value && strcmp(value, "position") == 0) {
+			out->mouse_mode = XWA_MODERN_MOUSE_MODE_POSITION;
+		} else if (value && strcmp(value, "rate") == 0) {
+			out->mouse_mode = XWA_MODERN_MOUSE_MODE_RATE;
+		} else {
+			return host_config_error(error, error_size, "invalid 'input.mouse_mode': expected %s",
+									 "'position' or 'rate'");
+		}
+	}
+
+	node = AeronConfigFile_GetNode(config, "input.mouse_sensitivity");
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 "input.mouse_sensitivity");
+		}
+	} else {
+		const int64_t value = AeronConfigNode_Int(node, 0);
+		if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || value < XWA_MODERN_MOUSE_SENSITIVITY_MIN ||
+			value > XWA_MODERN_MOUSE_SENSITIVITY_MAX) {
+			return host_config_error(error, error_size,
+									 "invalid 'input.mouse_sensitivity': expected integer %s",
+									 "from 1 through 9");
+		}
+		out->mouse_sensitivity = (int)value;
+	}
+
+	node = AeronConfigFile_GetNode(config, "input.mouse_invert_y");
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 "input.mouse_invert_y");
+		}
+	} else {
+		if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+			return host_config_error(error, error_size, "invalid input setting '%s'", "input.mouse_invert_y");
+		}
+		out->mouse_invert_y = AeronConfigNode_Bool(node, 0);
+	}
+	return 1;
+}
+
 int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size) {
 	static const char* path = "config.yaml";
 	AeronConfigFile* config = NULL;
@@ -387,7 +463,7 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 	}
 	memset(out, 0, sizeof *out);
 	out->flight_simulation_step_ticks = 1;
-	if (!host_config_load_remaster_profile(vfs, out, error, error_size)) {
+	if (!host_config_load_shipped_config(vfs, out, error, error_size)) {
 		return 0;
 	}
 	if (!AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, path)) {
@@ -406,6 +482,7 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		const AeronConfigNode* models = AeronConfigFile_GetNode(config, "models");
 		const AeronConfigNode* assets = AeronConfigFile_GetNode(config, "assets");
 		const AeronConfigNode* video = AeronConfigFile_GetNode(config, "video");
+		const AeronConfigNode* input = AeronConfigFile_GetNode(config, "input");
 		if (version &&
 			(AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1)) {
 			AeronConfigFile_Destroy(config);
@@ -427,6 +504,10 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 			AeronConfigFile_Destroy(config);
 			return host_config_error(error, error_size, "'video' must be a mapping in %s", path);
 		}
+		if (input && AeronConfigNode_Type(input) != AERON_CONFIG_MAP) {
+			AeronConfigFile_Destroy(config);
+			return host_config_error(error, error_size, "'input' must be a mapping in %s", path);
+		}
 	}
 	if (AeronConfigFile_GetNode(config, "paths.resources")) {
 		Aeron_LogWarn("xwa.config",
@@ -438,7 +519,8 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		host_config_simulation_step(config, &out->flight_simulation_step_ticks, error, error_size) &&
 		host_config_remaster_options(config, 0, out, error, error_size) &&
 		host_config_video_options(config, &out->video_options, &out->video_options_override_mask, error,
-								  error_size);
+								  error_size) &&
+		host_config_input_options(config, 0, &out->input_options, error, error_size);
 	AeronConfigFile_Destroy(config);
 	return valid;
 }
@@ -707,6 +789,50 @@ int XwaHostConfig_SaveGameDataPath(AeronVfs* vfs, const char* game_data_path, ch
 		return 0;
 	}
 	if (!host_yaml_set_game_data(&document, game_data_path)) {
+		yaml_document_delete(&document);
+		return host_config_error(error, error_size, "could not update user configuration: %s", "config.yaml");
+	}
+	return host_yaml_save_document(vfs, &document, error, error_size);
+}
+
+static int host_yaml_set_input_options(yaml_document_t* document, const XwaModernInputOptions* options) {
+	static const char* const mode_names[] = { "position", "rate" };
+	yaml_node_t* root = yaml_document_get_root_node(document);
+	char sensitivity_text[16];
+	int input_id;
+
+	if (!root || root->type != YAML_MAPPING_NODE || !options ||
+		options->mouse_sensitivity < XWA_MODERN_MOUSE_SENSITIVITY_MIN ||
+		options->mouse_sensitivity > XWA_MODERN_MOUSE_SENSITIVITY_MAX ||
+		options->mouse_mode < XWA_MODERN_MOUSE_MODE_POSITION ||
+		options->mouse_mode > XWA_MODERN_MOUSE_MODE_RATE) {
+		return 0;
+	}
+	snprintf(sensitivity_text, sizeof sensitivity_text, "%d", options->mouse_sensitivity);
+	input_id = host_yaml_get_or_add_mapping(document, 1, "input");
+	return input_id &&
+		   host_yaml_set_scalar(document, input_id, "mouse_flight",
+								options->mouse_flight_enabled ? "true" : "false", YAML_PLAIN_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, input_id, "mouse_mode", mode_names[options->mouse_mode],
+								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, input_id, "mouse_sensitivity", sensitivity_text,
+								YAML_PLAIN_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, input_id, "mouse_invert_y",
+								options->mouse_invert_y ? "true" : "false", YAML_PLAIN_SCALAR_STYLE);
+}
+
+int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* options, char* error,
+								   size_t error_size) {
+	yaml_document_t document;
+
+	if (!vfs || !options) {
+		return host_config_error(error, error_size, "cannot save invalid input settings to %s",
+								 "config.yaml");
+	}
+	if (!host_yaml_prepare_user_document(vfs, &document, error, error_size)) {
+		return 0;
+	}
+	if (!host_yaml_set_input_options(&document, options)) {
 		yaml_document_delete(&document);
 		return host_config_error(error, error_size, "could not update user configuration: %s", "config.yaml");
 	}

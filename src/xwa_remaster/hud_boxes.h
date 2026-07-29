@@ -25,7 +25,12 @@ typedef struct XwaHudPreparedBoxState {
 	uint16_t target_w, target_h;
 	uint16_t box_count, dropped_boxes;
 	uint8_t profile, valid;
-	uint16_t reserved;
+	uint8_t stick_marker_valid;
+	uint8_t reserved;
+	/* Mouse flight virtual-stick marker: center and box size in target px. */
+	float stick_marker_x_px, stick_marker_y_px;
+	float stick_marker_size_px, stick_marker_edge_px;
+	uint32_t stick_marker_argb;
 	AeronRectI camera_viewport;
 	XwaHudPreparedBox boxes[XWA_HUD_MAX_PREPARED_BOXES];
 } XwaHudPreparedBoxState;

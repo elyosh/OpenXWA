@@ -3,6 +3,7 @@
 #include "aeron/scene/draw_list2d.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/flight.h"
+#include "xwa_remaster/hud_fixed.h"
 #include "xwa_remaster/hud_layout.h"
 
 #include <math.h>
@@ -166,6 +167,36 @@ void XwaRemasterHudBoxes_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 					  center_x < viewport.x + viewport.width && center_y > viewport.y &&
 					  center_y < viewport.y + viewport.height);
 	}
+	/* Mouse flight virtual-stick marker, anchored to the reticle center. The
+	 * fixed-HUD build runs before this one, so the reticle reference position
+	 * is valid whenever the reticle is drawn this frame. */
+	{
+		float reticle_x_ref, reticle_y_ref;
+		XwaRemasterHudVisibility visibility;
+
+		XwaRemasterHud_BuildVisibility(&snapshot->hud, &visibility);
+		if (snapshot->hud.reticle.stick_marker && visibility.reticle && snapshot->hud.reticle.visible &&
+			XwaRemasterHudFixed_ReticleCenter(&reticle_x_ref, &reticle_y_ref)) {
+			const float range_px = (float)viewport.height / 6.0f;
+			const float center_x = reticle_x_ref * output_scale + (float)out_x;
+			const float center_y = reticle_y_ref * output_scale + (float)out_y;
+
+			box_prepared.stick_marker_valid = 1;
+			box_prepared.stick_marker_x_px =
+				center_x + (float)snapshot->hud.reticle.stick_marker_x * range_px / 127.0f;
+			/* Y flipped: the marker points where the nose is commanded toward
+			 * (positive stick = pull back = pitch up = up on screen). */
+			box_prepared.stick_marker_y_px =
+				center_y - (float)snapshot->hud.reticle.stick_marker_y * range_px / 127.0f;
+			box_prepared.stick_marker_size_px = 4.0f * classic_pixel_px;
+			box_prepared.stick_marker_edge_px = classic_pixel_px;
+			/* Configured HUD color (the reticle tint); component-marker
+			 * palette entry if the capture carried no usable color. */
+			box_prepared.stick_marker_argb = (snapshot->hud.hud_colors[0] >> 24) != 0
+												 ? snapshot->hud.hud_colors[0]
+												 : XwaSnapshotExport_FlightPaletteColor(63);
+		}
+	}
 	box_prepared.valid = 1;
 }
 
@@ -185,11 +216,11 @@ static void box_prepare_layer(AeronCommandBuffer* cmd, int target_w, int target_
 		(void)AeronDrawList_Prepare(box_list, cmd);
 		return;
 	}
-	int has_layer = 0;
-	for (uint16_t i = 0; i < box_prepared.box_count; i++) {
+	const int has_stick_marker = layer == XWA_HUD_TARGET_BOX_AFTER_FIXED && box_prepared.stick_marker_valid;
+	int has_layer = has_stick_marker;
+	for (uint16_t i = 0; !has_layer && i < box_prepared.box_count; i++) {
 		if (box_prepared.boxes[i].layer == (uint8_t)layer) {
 			has_layer = 1;
-			break;
 		}
 	}
 	if (!has_layer) {
@@ -197,6 +228,21 @@ static void box_prepare_layer(AeronCommandBuffer* cmd, int target_w, int target_
 		return;
 	}
 	const AeronRectI scissor = box_prepared.camera_viewport;
+	if (has_stick_marker) {
+		const uint32_t argb = box_prepared.stick_marker_argb;
+		const float a = ((argb >> 24) & 255) / 255.0f;
+		const float rgba[4] = {
+			XwaRemaster_SrgbToLinear(((argb >> 16) & 255) / 255.0f) * a,
+			XwaRemaster_SrgbToLinear(((argb >> 8) & 255) / 255.0f) * a,
+			XwaRemaster_SrgbToLinear((argb & 255) / 255.0f) * a,
+			a,
+		};
+		const float size = box_prepared.stick_marker_size_px;
+
+		AeronDrawList_AddFrame(box_list, box_prepared.stick_marker_x_px - size * 0.5f,
+							   box_prepared.stick_marker_y_px - size * 0.5f, size, size,
+							   box_prepared.stick_marker_edge_px, rgba, AERON_BLIT2D_BLEND_PMA, &scissor);
+	}
 	for (uint16_t i = 0; i < box_prepared.box_count; i++) {
 		const XwaHudPreparedBox* box = &box_prepared.boxes[i];
 		if (box->layer != (uint8_t)layer)

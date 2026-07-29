@@ -141,7 +141,7 @@ static struct {
 	AeronSampler* mesh_sampler;
 	int mesh_sampler_configured;
 
-	/* SSAO knobs loaded from the mandatory render.yaml resource, then
+	/* SSAO knobs loaded from the mandatory remaster/config.yaml resource, then
 	 * live-mutated by the debug
 	 * inspector via the XwaRemasterFlight_GetSsao/SetSsao accessors. */
 	XwaFlightSsaoParams ssao;
@@ -541,16 +541,16 @@ static int fl_pbr_config_valid(const XwaShipPbrTuning* p) {
 		   p->ambient[2] >= 0.0f;
 }
 
-/* Load the mandatory renderer configuration once. */
+/* Load the renderer's settings from the mandatory shipped configuration once. */
 int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	if (s.config_loaded) {
 		return 1;
 	}
 
-	static const char* path = "remaster/flight/render.yaml";
+	static const char* path = "remaster/config.yaml";
 	AeronConfigFile* cf = NULL;
 	if (!vfs || !AeronConfigFile_LoadYaml(vfs, AERON_VFS_ROOT_RESOURCE, path, &cf)) {
-		Aeron_LogError("xwa.remaster", "required render configuration unavailable or invalid: %s", path);
+		Aeron_LogError("xwa.remaster", "required shipped configuration unavailable or invalid: %s", path);
 		return 0;
 	}
 	const char* error_path = NULL;

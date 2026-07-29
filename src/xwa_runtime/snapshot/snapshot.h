@@ -800,6 +800,11 @@ typedef struct XwaHudReticle {
 	int16_t look_yaw, look_pitch;
 	uint8_t seat;
 	uint8_t turret_auto_fire;
+	/* Mouse flight virtual-stick marker (position mode): held deflection in
+	 * [-127, 127], drawn by the HD HUD relative to the reticle center. */
+	uint8_t stick_marker;
+	int8_t stick_marker_x;
+	int8_t stick_marker_y;
 } XwaHudReticle;
 
 typedef struct XwaHudThreats {

@@ -1,5 +1,11 @@
-# XWA remaster shipped profile.
-# This file is mandatory; config.yaml may override documented user settings.
+# OpenXWA shipped default configuration.
+# This file is mandatory; the user config.yaml may override documented user
+# settings.
+input:
+  mouse_flight: false
+  mouse_mode: 'position'
+  mouse_sensitivity: 5
+  mouse_invert_y: true
 models:
   smooth_angle_degrees: 90
   force_opt: true

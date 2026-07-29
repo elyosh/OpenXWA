@@ -289,7 +289,7 @@ main() {
     stage_licenses
 
     test -x "${application}/Contents/MacOS/OpenXWA"
-    test -f "${application}/Contents/Resources/resources/remaster/flight/render.yaml"
+    test -f "${application}/Contents/Resources/resources/remaster/config.yaml"
     test -f "${application}/Contents/Resources/shaders/hyperspace_streak.vert.msl"
     plutil -lint "${application}/Contents/Info.plist"
     if [[ "${build_type}" == Debug ]]; then

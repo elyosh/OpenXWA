@@ -32,7 +32,7 @@
 extern "C" {
 #endif
 
-/* SSAO knobs loaded from mandatory render.yaml, then mutated live by
+/* SSAO knobs loaded from mandatory remaster/config.yaml, then mutated live by
  * the debug inspector or user menu (applied on the next rendered
  * frame). The user menu persists only the quality selection.
  * radius/bias are view-space units (XWA world unit ~= 1/40.96 m). */
@@ -68,7 +68,7 @@ enum {
 	XWA_FLIGHT_SHADOWS_PCF = 1,
 };
 
-/* Global directional-shadow settings (`shadows:` in render.yaml). */
+/* Global directional-shadow settings (`shadows:` in remaster/config.yaml). */
 typedef struct XwaFlightShadowParams {
 	int mode;
 	int atlas_size;
@@ -121,7 +121,7 @@ void XwaRemasterFlight_GetHangarLighting(XwaFlightHangarLightingParams* out);
 void XwaRemasterFlight_SetHangarLighting(const XwaFlightHangarLightingParams* in);
 void XwaRemasterFlight_GetHangarLightingDefault(XwaFlightHangarLightingParams* out);
 
-/* Point-light knobs (render.yaml `point_lights:` mapping + the debug
+/* Point-light knobs (remaster/config.yaml `point_lights:` mapping + the debug
  * inspector). The classic SOURCE laws fix each light's color, classic
  * intensity and effective reach; the shader evaluates the CLASSIC
  * attenuation curve (intensity * 0.5 / d, windowed where the classic
@@ -142,7 +142,7 @@ void XwaRemasterFlight_SetPointLights(const XwaFlightPointLightParams* in);
 void XwaRemasterFlight_GetPointLightsDefault(XwaFlightPointLightParams* out);
 
 /* Mesh-texture filtering shared by the base-color, normal,
- * metallic-roughness and emissive atlases. Loaded from render.yaml's
+ * metallic-roughness and emissive atlases. Loaded from remaster/config.yaml's
  * `texture_filtering:` mapping and live-editable in the debug UI. */
 typedef struct XwaFlightTextureFilteringParams {
 	int anisotropic;
@@ -153,7 +153,7 @@ void XwaRemasterFlight_GetTextureFiltering(XwaFlightTextureFilteringParams* out)
 void XwaRemasterFlight_SetTextureFiltering(const XwaFlightTextureFilteringParams* in);
 void XwaRemasterFlight_GetTextureFilteringDefault(XwaFlightTextureFilteringParams* out);
 
-/* Motion-blur knobs (render.yaml `motion_blur:` mapping + the debug
+/* Motion-blur knobs (remaster/config.yaml `motion_blur:` mapping + the debug
  * inspector) — the TIE set. Velocity derives from the prev/curr
  * snapshot pair and is normalized to XWA's original 32 ms logical
  * flight frame; the scene owns the velocity prepass + reconstruct. */

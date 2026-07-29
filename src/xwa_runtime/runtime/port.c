@@ -18,8 +18,10 @@
 #include "xwa/xwa_options.h"
 #include "xwa_runtime/compat/directx/ddraw.h"
 #include "xwa_runtime/compat/directx/dinput.h"
+#include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/input/input_bridge.h"
+#include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/frontend_task.h"
 #include "xwa_runtime/runtime/movie_task.h"
@@ -191,6 +193,9 @@ static void XwaPort_TickBody(int32_t delta_us) {
 		/* Capture this host frame's keyboard/mouse edges into the DirectInput shim so
 		 * buffered key events are not lost on frames the fixed-step flight loop skips. */
 		DInputShim_Pump();
+		/* Same for mouse flight: fold this host frame's mouse deltas into its
+		 * accumulator so motion on unsampled frames is not lost. */
+		XwaMouseFlight_Pump();
 		if (FlightDisplay_IsFrontendModalActive()) {
 			Aeron_SetRelativeMouseMode(0);
 			/* The modal draws the frontend software cursor; keep the OS one hidden
@@ -312,6 +317,7 @@ void XwaPort_Shutdown(void) {
 	Aeron_SetRelativeMouseMode(0);
 	XwaPort_SetHostCursorVisible(1);
 	XwaModernVideoOptions_Flush();
+	XwaModernInputOptions_Flush();
 	/* TODO: Run recovered shutdown paths in original-compatible order. */
 	if (XwaFlightTask_IsActive()) {
 		XwaFlightTask_Shutdown();

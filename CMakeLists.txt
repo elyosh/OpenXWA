@@ -193,10 +193,13 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/compat/directx/dinput_compat.c
     src/xwa_runtime/compat/directx/dsound_compat.c
     src/xwa_runtime/compat/winmm/joystick_compat.c
+    src/xwa_runtime/config/modern_input_options.c
+    src/xwa_runtime/config/modern_input_options_screen.c
     src/xwa_runtime/config/modern_video_options.c
     src/xwa_runtime/config/modern_video_options_screen.c
     src/xwa_runtime/hooks/orientation_hook.c
     src/xwa_runtime/input/input_bridge.c
+    src/xwa_runtime/input/mouse_flight.c
     src/xwa_runtime/runtime/flight_task.c
     src/xwa_runtime/runtime/frontend_task.c
     src/xwa_runtime/runtime/movie_task.c
@@ -442,6 +445,8 @@ if(XWA_BUILD_TOOLS)
 endif()
 
 set(XWA_FORMAT_HEADERS
+    src/xwa_runtime/config/modern_input_options.h
+    src/xwa_runtime/config/modern_input_options_screen.h
     src/xwa_runtime/config/modern_video_options.h
     src/xwa_runtime/config/modern_video_options_screen.h
     src/xwa/audio/cd_audio.h
@@ -527,6 +532,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/runtime/frontend_task.h
     src/xwa_runtime/timing/host_clock.h
     src/xwa_runtime/input/input_bridge.h
+    src/xwa_runtime/input/mouse_flight.h
     src/xwa_runtime/timing/modern_flight_timing.h
     src/xwa_runtime/runtime/movie_task.h
     src/xwa_runtime/hooks/orientation_hook.h

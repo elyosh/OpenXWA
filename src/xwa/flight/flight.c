@@ -55,6 +55,7 @@
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -136,7 +137,7 @@ void FlightDebug_SetJoystickTraceEnabled(int enabled) {
 	g_modernJoystickTraceEnabled = enabled;
 	memset(g_modernJoystickInputSamples, 0, sizeof(g_modernJoystickInputSamples));
 	g_modernJoystickInputSampleCursor = 0;
-	Aeron_LogTrace("xwa.input.trace", "JOYTRACE state=%s", enabled ? "on" : "off");
+	Aeron_LogInfo("xwa.input.trace", "JOYTRACE state=%s", enabled ? "on" : "off");
 }
 
 static void FlightDebug_CaptureJoystickInputSample(int timestamp) {
@@ -195,20 +196,20 @@ static void FlightDebug_LogJoystickIntegration(const ModernJoystickIntegrationTr
 		sample = &fallback;
 	}
 
-	Aeron_LogTrace("xwa.input.trace",
-			  "JOYTRACE ts=%d dt=%u joy=%d sdl=%d:%d,%d:%d,%d:%d wm=%u,%u,%u xwa=%d,%d,%d "
-			  "pk=%d,%d,%d sc_ypr=%d,%d,%d tgt_ypr=%d,%d,%d sm_ypr=%d,%d,%d step_ypr=%d,%d,%d "
-			  "ang_pyr=%u,%u,%u>%u,%u,%u",
-			  trace->timestamp, (unsigned int)trace->elapsedTicks, sample->joystickValid,
-			  sample->bridge.sourceAxisX, sample->bridge.sourceValueX, sample->bridge.sourceAxisY,
-			  sample->bridge.sourceValueY, sample->bridge.sourceAxisR, sample->bridge.sourceValueR,
-			  sample->bridge.winmmX, sample->bridge.winmmY, sample->bridge.winmmR, sample->prePackX,
-			  sample->prePackY, sample->prePackR, sample->packedX, sample->packedY, sample->packedR,
-			  trace->scaledYaw, trace->scaledPitch, trace->scaledRoll, trace->targetYaw, trace->targetPitch,
-			  trace->targetRoll, trace->smoothedYaw, trace->smoothedPitch, trace->smoothedRoll,
-			  trace->stepYaw, trace->stepPitch, trace->stepRoll, (unsigned int)trace->oldPitch,
-			  (unsigned int)trace->oldYaw, (unsigned int)trace->oldRoll, (unsigned int)trace->newPitch,
-			  (unsigned int)trace->newYaw, (unsigned int)trace->newRoll);
+	Aeron_LogInfo("xwa.input.trace",
+				  "JOYTRACE ts=%d dt=%u joy=%d sdl=%d:%d,%d:%d,%d:%d wm=%u,%u,%u xwa=%d,%d,%d "
+				  "pk=%d,%d,%d sc_ypr=%d,%d,%d tgt_ypr=%d,%d,%d sm_ypr=%d,%d,%d step_ypr=%d,%d,%d "
+				  "ang_pyr=%u,%u,%u>%u,%u,%u",
+				  trace->timestamp, (unsigned int)trace->elapsedTicks, sample->joystickValid,
+				  sample->bridge.sourceAxisX, sample->bridge.sourceValueX, sample->bridge.sourceAxisY,
+				  sample->bridge.sourceValueY, sample->bridge.sourceAxisR, sample->bridge.sourceValueR,
+				  sample->bridge.winmmX, sample->bridge.winmmY, sample->bridge.winmmR, sample->prePackX,
+				  sample->prePackY, sample->prePackR, sample->packedX, sample->packedY, sample->packedR,
+				  trace->scaledYaw, trace->scaledPitch, trace->scaledRoll, trace->targetYaw,
+				  trace->targetPitch, trace->targetRoll, trace->smoothedYaw, trace->smoothedPitch,
+				  trace->smoothedRoll, trace->stepYaw, trace->stepPitch, trace->stepRoll,
+				  (unsigned int)trace->oldPitch, (unsigned int)trace->oldYaw, (unsigned int)trace->oldRoll,
+				  (unsigned int)trace->newPitch, (unsigned int)trace->newYaw, (unsigned int)trace->newRoll);
 }
 
 void Flight_ModernResetHighRateIntegration(void) {
@@ -2448,6 +2449,32 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 			joystickButtons = Joystick_PollRawAxesIfEnabled(&axisX, &axisY, &throttleRaw, &axisR, 0);
 		}
 
+#ifdef XWA_MODERN
+		/* Modern mouse flight control, injected before the input frame is
+		 * packed so films, replays, and net lockstep stay source-agnostic.
+		 * The mouse overrides any axis it deflects; the joystick keeps the
+		 * rest. Cockpit mouse look owns the pointer while enabled. */
+		if (g_padlockMouseLookEnabled) {
+			XwaMouseFlight_Suspend();
+		} else if (XwaMouseFlight_Sample()) {
+			int mouseAxisX;
+			int mouseAxisY;
+			int mouseAxisR;
+
+			XwaMouseFlight_GetAxes(&mouseAxisX, &mouseAxisY, &mouseAxisR);
+			if (mouseAxisX != 0) {
+				axisX = mouseAxisX;
+			}
+			if (mouseAxisY != 0) {
+				axisY = mouseAxisY;
+			}
+			if (mouseAxisR != 0) {
+				axisR = mouseAxisR;
+			}
+			joystickButtons |= XwaMouseFlight_ButtonsMask();
+		}
+#endif
+
 		key = 0;
 		if (g_injectedKeyCount != 0) {
 			key = g_injectedKeyStack[g_injectedKeyCount - 1];
@@ -2461,6 +2488,16 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 				key = Console_ApplyKeyMacro(key, g_localPlayer);
 			}
 		}
+
+#ifdef XWA_MODERN
+		/* A short right-button tap emits the target-in-sight action, like the
+		 * original joystick button 2 tap. Taps made while typing a message are
+		 * consumed and discarded — KEY_ALT_1 would insert a taunt there. */
+		if (key == 0 && !g_padlockMouseLookEnabled && XwaMouseFlight_TakeTargetTap() &&
+			g_players[g_localPlayer].msgTypeId == 0) {
+			key = KEY_ALT_1;
+		}
+#endif
 
 		{
 			int buttonBit;

@@ -9,6 +9,7 @@
 #include "xwa/flight/object/object.h"
 #include "xwa/flight/player/player.h"
 #include "xwa/render/renderer.h"
+#include "xwa_runtime/input/mouse_flight.h"
 
 #include <string.h>
 
@@ -428,6 +429,17 @@ static void hud_capture_direct_state(XwaHudState* out) {
 	out->reticle.look_yaw = player->lookYawOffset;
 	out->reticle.look_pitch = player->lookPitchOffset;
 	out->reticle.seat = (uint8_t)player->currentSeatIdx;
+	out->reticle.stick_marker = 0;
+	if (!g_padlockMouseLookEnabled) {
+		int stick_marker_x;
+		int stick_marker_y;
+
+		if (XwaMouseFlight_GetHudMarker(&stick_marker_x, &stick_marker_y)) {
+			out->reticle.stick_marker = 1;
+			out->reticle.stick_marker_x = (int8_t)stick_marker_x;
+			out->reticle.stick_marker_y = (int8_t)stick_marker_y;
+		}
+	}
 	out->reticle.turret_auto_fire = (uint8_t)(player->turretAutoFireState != 0);
 	out->reticle.laser_hardpoint_count =
 		(uint8_t)(g_reticleLaserHardpointCount < 0

@@ -34,6 +34,8 @@
 #include "xwa/util/time.h"
 
 #ifdef XWA_MODERN
+#include "xwa_runtime/config/modern_input_options.h"
+#include "xwa_runtime/config/modern_input_options_screen.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/config/modern_video_options_screen.h"
 #endif
@@ -883,13 +885,21 @@ int Config_ControllerOptionsScreen(void) {
 		Keyboard_FlushCharBuffer();
 		keyState = 0;
 		if (--g_menuCursorRow < 0) {
+#ifdef XWA_MODERN
+			g_menuCursorRow = 9;
+#else
 			g_menuCursorRow = 8;
+#endif
 		}
 	} else if (keyState == CONFIG_KEY_VK_DOWN) {
 		FrontendSound_PlayUISound("configsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
 		Keyboard_FlushCharBuffer();
 		keyState = 0;
+#ifdef XWA_MODERN
+		if (++g_menuCursorRow >= 10) {
+#else
 		if (++g_menuCursorRow >= 9) {
+#endif
 			g_menuCursorRow = 0;
 		}
 	}
@@ -914,6 +924,27 @@ int Config_ControllerOptionsScreen(void) {
 							&keyState, 24);
 	Config_DrawOptionCycle(&g_gameConfig.flipY, STR_CONFIG_FLIP_Y_AXIS, STR_CONFIG_NO, 2, &y, &rowIndex,
 						   &keyState, 25);
+
+#ifdef XWA_MODERN
+	text = "OpenXWA Input Options";
+	textX = g_configMenuCenterX - (int)((unsigned int)FrontendText_MeasureWidth(text, 15) >> 1);
+	buttonPressed = FrontendButton_DrawMenuButton(textX, y, text, 15, g_colorPaleBlue, 51, 0, "settingsound");
+	if (g_menuCursorRow == rowIndex) {
+		FrontendText_Draw(15, text, textX, y, g_colorGreen);
+		if (keyState == CONFIG_KEY_ENTER) {
+			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+			Keyboard_FlushCharBuffer();
+			keyState = 0;
+			buttonPressed |= 1;
+		}
+	}
+	if (buttonPressed) {
+		g_pendingMenuScreen = 19;
+		g_menuCursorRow = 0;
+	}
+	y += 20;
+	++rowIndex;
+#endif
 
 	text = FrontendString_Get(STR_CONFIG_REMAP_JOYSTICK_BUTTONS);
 	textX = g_configMenuCenterX - (int)((unsigned int)FrontendText_MeasureWidth(text, 15) >> 1);
@@ -2090,6 +2121,13 @@ int Config_OptionsDatapadUpdate(int frameState) {
 			}
 			done = 0;
 			break;
+		case 19:
+			if (XwaModernInputOptionsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
+				g_pendingMenuScreen = 4;
+				g_menuCursorRow = 6;
+			}
+			done = 0;
+			break;
 #endif
 		default:
 			done = 0;
@@ -2110,6 +2148,7 @@ int Config_OptionsDatapadUpdate(int frameState) {
 		FrontendMouse_ClearClicks();
 #ifdef XWA_MODERN
 		XwaModernVideoOptions_Flush();
+		XwaModernInputOptions_Flush();
 		if (Movie_Play("dpclose", 1)) {
 			g_configOptionsDatapadClosingMovie = 1;
 			return 0;

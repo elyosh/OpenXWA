@@ -85,7 +85,7 @@ int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaC
 
 /* Process-wide PBR tuning globals consumed by every lit
  * XwaRemasterShip_SetPbrEnv submit (stored in the combined PbrLightFS
- * environment block). The required render.yaml profile defines the HD
+ * environment block). The required remaster/config.yaml profile defines the HD
  * relight baseline. Mutated by the debug inspector; not persisted. */
 typedef struct XwaShipPbrTuning {
 	float light_intensity;    /* directional sun weight */
@@ -98,7 +98,7 @@ typedef struct XwaShipPbrTuning {
 
 void XwaRemasterShip_GetPbrTuning(XwaShipPbrTuning* out);
 void XwaRemasterShip_SetPbrTuning(const XwaShipPbrTuning* in);
-/* Installs the required render.yaml profile and makes it the debug reset target. */
+/* Installs the required remaster/config.yaml profile and makes it the debug reset target. */
 void XwaRemasterShip_ConfigurePbrTuning(const XwaShipPbrTuning* in);
 void XwaRemasterShip_GetPbrTuningDefault(XwaShipPbrTuning* out);
 
