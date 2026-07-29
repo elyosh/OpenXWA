@@ -193,7 +193,7 @@ int Net_MarkPlayerReadyNoLock(int playerId);
 int Net_SetPlayerReady(int playerId);
 int Net_UpdateKeepaliveSequences(void);
 int Net_SendSequenceKeepalives(void);
-int Net_ShutdownDirectPlaySession(void);
+void Net_ShutdownDirectPlaySession(void);
 void Net_ShutdownDirectPlaySessionForQuit(void);
 int Net_IsHost(void);
 int Net_HasQueuedPacketTypeOrBacklog(int packetType);

@@ -910,10 +910,17 @@ int Net_UpdateKeepaliveSequences(void) {
 // FUNCTION: XWA 0x52F740
 int Net_SendSequenceKeepalives(void) { return Net_UpdateKeepaliveSequences(); }
 
+#ifndef XWA_MODERN
+void Net_ShutdownDirectPlaySessionEx(int suppressRestart, int allowJoinAbortExit);
+#endif
+
 // FUNCTION: XWA 0x52BBE0
-int Net_ShutdownDirectPlaySession(void) {
-	/* TODO: Reimplement Net_ShutdownDirectPlaySession @ 0x52BBE0. */
-	return 0;
+void Net_ShutdownDirectPlaySession(void) {
+#ifdef XWA_MODERN
+	NetSession_Shutdown();
+#else
+	Net_ShutdownDirectPlaySessionEx(0, 1);
+#endif
 }
 
 // FUNCTION: XWA 0x52BBD0
