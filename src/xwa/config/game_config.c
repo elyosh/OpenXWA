@@ -1493,7 +1493,230 @@ int Config_SinglePlayerVideoOptionsScreen(void) {
 
 // FUNCTION: XWA 0x520730
 int Config_MultiplayerVideoOptionsScreen(void) {
-	/* TODO: Reimplement Config_MultiplayerVideoOptionsScreen @ 0x520730. */
+	unsigned int driverIndex;
+	char keyState;
+	const char* text;
+	int y;
+	int rowIndex;
+	int action;
+	int dialogResult;
+	int textX;
+	int buttonPressed;
+	unsigned int titleWidth;
+	unsigned int driverCount;
+	DisplayDriverEntry* drivers;
+	FrontendRect rect;
+
+	driverIndex = 0;
+	rowIndex = 0;
+	action = 0;
+	y = 50;
+	keyState = (char)Config_GetMenuNavKey();
+	if (keyState == CONFIG_KEY_VK_UP) {
+		FrontendSound_PlayUISound("configsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+		Keyboard_FlushCharBuffer();
+		keyState = 0;
+		if (--g_menuCursorRow < 0) {
+			g_menuCursorRow = 16;
+		}
+	} else if (keyState == CONFIG_KEY_VK_DOWN) {
+		FrontendSound_PlayUISound("configsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+		Keyboard_FlushCharBuffer();
+		keyState = 0;
+		if (++g_menuCursorRow >= 17) {
+			g_menuCursorRow = 0;
+		}
+	}
+
+	FrontendDraw_RectAssign(&rect, 0, y, 639, y + 15);
+	FrontendText_DrawCentered(15, FrontendString_Get(STR_CONFIG_VIDEO_MULTIPLAYER_OPTIONS), &rect,
+							  g_colorLightBlue);
+	titleWidth = FrontendText_MeasureWidth(FrontendString_Get(STR_CONFIG_VIDEO_MULTIPLAYER_OPTIONS), 20);
+	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+	FrontendDraw_Line(textX, y + 17, textX + (int)titleWidth, y + 17, g_colorLightBlue);
+	y += 20;
+
+	Config_DrawVideoOptionRows(1, &y, &rowIndex, &keyState);
+
+	if (g_gameConfig.use3dHardware[1]) {
+		text = FrontendString_Get(STR_CONFIG_MP_HARDWARE_VIDEO_OPTIONS);
+	} else {
+		text = FrontendString_Get(STR_CONFIG_MP_SOFTWARE_VIDEO_OPTIONS);
+	}
+	titleWidth = FrontendText_MeasureWidth(text, 15);
+	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+	buttonPressed = FrontendButton_DrawMenuButton(textX, y, text, 15, g_colorPaleBlue, 20, 0, "settingsound");
+	if (g_menuCursorRow == rowIndex) {
+		FrontendText_Draw(15, text, textX, y, g_colorGreen);
+		if (keyState == CONFIG_KEY_ENTER) {
+			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+			Keyboard_FlushCharBuffer();
+			keyState = 0;
+			buttonPressed |= 1;
+		}
+	}
+	if (buttonPressed) {
+		g_menuCursorRow = 0;
+		g_pendingMenuScreen = g_gameConfig.use3dHardware[1] ? 11 : 12;
+	}
+
+	y += 20;
+	++rowIndex;
+	if (g_configRestrictedOptionsModalActive) {
+		text = FrontendString_Get(STR_CONFIG_SAME_AS_SINGLE_PLAYER);
+		titleWidth = FrontendText_MeasureWidth(text, 15);
+		textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+		if (g_menuCursorRow == rowIndex) {
+			FrontendText_Draw(15, text, textX, y, 0xffff);
+		} else {
+			FrontendText_Draw(15, text, textX, y, g_colorGray);
+		}
+	} else {
+		text = FrontendString_Get(STR_CONFIG_SAME_AS_SINGLE_PLAYER);
+		titleWidth = FrontendText_MeasureWidth(text, 15);
+		textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+		buttonPressed =
+			FrontendButton_DrawMenuButton(textX, y, text, 15, g_colorPaleBlue, 21, 0, "settingsound");
+		if (g_menuCursorRow == rowIndex) {
+			FrontendText_Draw(15, text, textX, y, g_colorGreen);
+			if (keyState == CONFIG_KEY_ENTER) {
+				FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+				Keyboard_FlushCharBuffer();
+				keyState = 0;
+				buttonPressed |= 1;
+			}
+		}
+		if (buttonPressed) {
+			action = 1;
+		}
+	}
+
+	y += 20;
+	++rowIndex;
+	if (g_configRestrictedOptionsModalActive) {
+		text = FrontendString_Get(STR_CONFIG_RESTORE_DEFAULTS);
+		titleWidth = FrontendText_MeasureWidth(text, 15);
+		FrontendText_Draw(15, text, g_configMenuCenterX - (int)(titleWidth >> 1), y, g_colorGray);
+	} else {
+		text = FrontendString_Get(STR_CONFIG_RESTORE_DEFAULTS);
+		titleWidth = FrontendText_MeasureWidth(text, 15);
+		textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+		buttonPressed =
+			FrontendButton_DrawMenuButton(textX, y, text, 15, g_colorPaleBlue, 22, 0, "settingsound");
+		if (g_menuCursorRow == rowIndex) {
+			FrontendText_Draw(15, text, textX, y, g_colorGreen);
+			if (keyState == CONFIG_KEY_ENTER) {
+				FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+				Keyboard_FlushCharBuffer();
+				keyState = 0;
+				buttonPressed |= 1;
+			}
+		}
+		if (buttonPressed) {
+			action = 2;
+		}
+	}
+
+	y += 20;
+	++rowIndex;
+	text = FrontendString_Get(STR_BACK);
+	titleWidth = FrontendText_MeasureWidth(text, 15);
+	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+	buttonPressed = FrontendButton_DrawMenuButton(textX, y, text, 15, g_colorPaleBlue, 23, 0, "settingsound");
+	if (g_menuCursorRow == rowIndex) {
+		FrontendText_Draw(15, text, textX, y, g_colorGreen);
+		if (keyState == CONFIG_KEY_ENTER) {
+			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+			Keyboard_FlushCharBuffer();
+			keyState = 0;
+			buttonPressed |= 1;
+		}
+	}
+	if (keyState == CONFIG_KEY_ESCAPE) {
+		Keyboard_FlushCharBuffer();
+		keyState = 0;
+		buttonPressed = 1;
+	}
+	if (buttonPressed) {
+		g_pendingMenuScreen = 2;
+		g_menuCursorRow = 1;
+	}
+
+	if (action == 1) {
+		dialogResult = FrontendDialog_ShowConfirmDialog(
+			FrontendString_Get(STR_CONFIG_OVERWRITE1), FrontendString_Get(STR_CONFIG_OVERWRITE2),
+			FrontendString_Get(STR_CONFIG_OVERWRITE3), FrontendString_Get(STR_OKAY),
+			FrontendString_Get(STR_CANCEL));
+		if (dialogResult != 0) {
+			g_gameConfig.threedDevice[1] = g_gameConfig.threedDevice[0];
+			g_gameConfig.use3dHardware[1] = g_gameConfig.use3dHardware[0];
+			g_gameConfig.screenRes[1] = g_gameConfig.screenRes[0];
+			g_gameConfig.brightness[1] = g_gameConfig.brightness[0];
+			g_gameConfig.debris[1] = g_gameConfig.debris[0];
+			g_gameConfig.debrisDensity[1] = g_gameConfig.debrisDensity[0];
+			g_gameConfig.backdrop[1] = g_gameConfig.backdrop[0];
+			g_gameConfig.starDensity[1] = g_gameConfig.starDensity[0];
+			g_gameConfig.lod[1] = g_gameConfig.lod[0];
+			g_gameConfig.yardLod[1] = g_gameConfig.yardLod[0];
+			g_gameConfig.textureRes[1] = g_gameConfig.textureRes[0];
+			g_gameConfig.localLights[1] = g_gameConfig.localLights[0];
+			g_gameConfig.diffuse[1] = g_gameConfig.diffuse[0];
+			g_gameConfig.explosionRes[1] = g_gameConfig.explosionRes[0];
+			return 0;
+		}
+	} else if (action == 2) {
+		dialogResult = FrontendDialog_ShowConfirmDialog(
+			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL1),
+			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL2),
+			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL3), FrontendString_Get(STR_OKAY),
+			FrontendString_Get(STR_CANCEL));
+		if (dialogResult != 0) {
+			drivers = FrontendDisplay_GetDriverTable(&driverCount);
+			g_gameConfig.threedDevice[1] = 0;
+			g_gameConfig.use3dHardware[1] = 0;
+			for (driverIndex = 0; driverIndex < driverCount; ++driverIndex) {
+				unsigned int charIndex;
+
+				for (charIndex = 0; charIndex < strlen(drivers[driverIndex].name); ++charIndex) {
+					g_frontendScratchBuffer[charIndex] =
+						(char)tolower((unsigned char)drivers[driverIndex].name[charIndex]);
+				}
+				g_frontendScratchBuffer[charIndex] = '\0';
+				if (strstr(g_frontendScratchBuffer, "voodoo") || strstr(g_frontendScratchBuffer, "3dfx")) {
+					g_gameConfig.threedDevice[1] = (uint8_t)driverIndex;
+					g_gameConfig.use3dHardware[1] = 1;
+					break;
+				}
+			}
+
+			g_gameConfig.screenRes[1] = 0;
+			g_gameConfig.brightness[1] = 2;
+			g_gameConfig.debris[1] = 1;
+			g_gameConfig.debrisDensity[1] = 4;
+			g_gameConfig.backdrop[1] = 1;
+			g_gameConfig.starDensity[1] = 2;
+			g_gameConfig.lod[1] = 10;
+			g_gameConfig.yardLod[1] = 10;
+			g_gameConfig.textureRes[1] = 1;
+			g_gameConfig.localLights[1] = 2;
+			g_gameConfig.diffuse[1] = 1;
+			g_gameConfig.explosionRes[1] = 1;
+			switch (g_gameConfig.performance) {
+				case 0:
+					Config_SetDetailDefaultsLow(8);
+					break;
+				case 1:
+					Config_SetDetailDefaultsMedium(8);
+					return 0;
+				case 2:
+					Config_SetDetailDefaultsHigh(8);
+					return 0;
+				default:
+					break;
+			}
+		}
+	}
+
 	return 0;
 }
 
