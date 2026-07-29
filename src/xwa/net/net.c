@@ -21,6 +21,13 @@
 
 typedef struct XwaDirectPlay4 XwaDirectPlay4;
 
+typedef struct XwaDirectPlayName {
+	uint32_t size;
+	uint32_t flags;
+	const char* shortName;
+	const char* longName;
+} XwaDirectPlayName;
+
 typedef struct XwaDirectPlay4Vtbl {
 	void* reserved0[2];
 	uint32_t(XWA_DXAPI* Release)(XwaDirectPlay4* self);
@@ -35,6 +42,9 @@ typedef struct XwaDirectPlay4Vtbl {
 	void* reserved15[11];
 	HRESULT(XWA_DXAPI* Send)(XwaDirectPlay4* self, int32_t fromPlayerId, int32_t toPlayerId, uint32_t flags,
 							 void* data, uint32_t dataSize);
+	void* reservedAfterSend[3];
+	HRESULT(XWA_DXAPI* SetPlayerName)(XwaDirectPlay4* self, uint32_t playerId, XwaDirectPlayName* name,
+									 uint32_t flags);
 } XwaDirectPlay4Vtbl;
 
 struct XwaDirectPlay4 {
@@ -2864,12 +2874,29 @@ void FlightNet_MarkPilotNetworkPlayerLeft(int playerIdx) {
 
 // FUNCTION: XWA 0x52FB50
 int Net_SetPlayerNameWithLockGuard(int playerId, const char* longName, const char* shortName) {
-	(void)playerId;
-	(void)longName;
-	(void)shortName;
+	XwaDirectPlay4* dplay;
+	XwaDirectPlayName name;
+	int wasBackBufferLocked;
+	HRESULT result;
 
-	/* TODO: Reimplement Net_SetPlayerNameWithLockGuard @ 0x52FB50. */
-	return 1;
+	wasBackBufferLocked = g_backBufferLocked.word & 0xff;
+	FrontendDisplay_UnlockBackBuffer();
+	dplay = (XwaDirectPlay4*)g_netDirectPlayInterface;
+	if (dplay == NULL) {
+		return 0;
+	}
+
+	memset(&name, 0, sizeof(name));
+	name.longName = longName;
+	name.size = sizeof(name);
+	name.shortName = shortName;
+	result = dplay->lpVtbl->SetPlayerName(dplay, (uint32_t)playerId, &name, 0);
+
+	if (wasBackBufferLocked) {
+		g_drawSurfacePtr = FrontendDisplay_LockBackBuffer();
+	}
+
+	return result == 0;
 }
 
 // FUNCTION: XWA 0x52FBD0
