@@ -157,6 +157,7 @@ extern int recvHistoryCount;
 extern int recvQueueHighWater;
 extern int g_netLastDeliveredRecvSequence;
 extern NetReliablePeerSlot g_netRuntimeReliablePeerSlots[40];
+extern unsigned short g_networkPort;
 extern uint32_t g_netSequenceCount;
 extern int dpid;
 extern int g_playerAbortFlags[8];

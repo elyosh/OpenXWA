@@ -122,6 +122,8 @@ int recvQueueHighWater;
 int g_netLastDeliveredRecvSequence;
 // GLOBAL: XWA 0xAB6819
 NetReliablePeerSlot g_netRuntimeReliablePeerSlots[40];
+// GLOBAL: XWA 0xABC71F
+unsigned short g_networkPort;
 // GLOBAL: XWA 0xABC311
 uint32_t g_netSequenceCount;
 // GLOBAL: XWA 0x631860
@@ -243,9 +245,7 @@ int Net_PumpIncomingPackets(void) {
 
 // FUNCTION: XWA 0x531670
 int Net_SetNetworkPort(const unsigned short* port) {
-	(void)port;
-
-	/* TODO: Reimplement Net_SetNetworkPort @ 0x531670. */
+	g_networkPort = *port;
 	return 1;
 }
 
