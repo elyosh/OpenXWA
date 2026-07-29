@@ -804,10 +804,34 @@ int Net_MarkPlayerReadyNoLock(int playerId) {
 
 // FUNCTION: XWA 0x52F0F0
 int Net_SetPlayerReady(int playerId) {
-	(void)playerId;
+	int wasBackBufferLocked;
+	int playerIndex;
 
-	/* TODO: Reimplement Net_SetPlayerReady @ 0x52F0F0. */
-	return 0;
+	if (g_netDirectPlayInterface == NULL) {
+		return 0;
+	}
+
+	wasBackBufferLocked = g_backBufferLocked.word & 0xff;
+	FrontendDisplay_UnlockBackBuffer();
+
+	for (playerIndex = 0; playerIndex < g_netPlayerCount; ++playerIndex) {
+		if (g_netPlayers[playerIndex].playerId == playerId) {
+			break;
+		}
+	}
+
+	if (playerIndex == g_netPlayerCount) {
+		if (wasBackBufferLocked) {
+			g_drawSurfacePtr = FrontendDisplay_LockBackBuffer();
+		}
+		return 0;
+	}
+
+	g_netPlayers[playerIndex].readyFlag = 1;
+	if (wasBackBufferLocked) {
+		g_drawSurfacePtr = FrontendDisplay_LockBackBuffer();
+	}
+	return 1;
 }
 
 static uint8_t Net_IncrementSeq7(int* sequence) {
