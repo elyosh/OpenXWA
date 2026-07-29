@@ -2,8 +2,11 @@
 
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/linez.h"
+#include "xwa/config/game_config.h"
 #include "xwa/frontend/frontend_display.h"
+#include "xwa/frontend/frontend_image.h"
 #include "xwa/frontend/frontend_scratch.h"
+#include "xwa/frontend/frontend_sound.h"
 #include "xwa/frontend/frontend_text.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/runtime/movie_task.h"
@@ -13,6 +16,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifndef XWA_MODERN
+typedef int(__cdecl* MovieSmushFrameCallback)(void);
+typedef int(__cdecl* MovieSmushSetVolumeProc)(int volume);
+typedef int(__cdecl* MovieSmushStartupProc)(int flags, void* directSound);
+typedef int(__cdecl* MovieSmushPlayProc)(const char* path, int frameRate, int x, int y, int flags,
+										int width, int height, int frameLimit, int userData,
+										MovieSmushFrameCallback callback, int enableSound,
+										int audioBufferSize, int videoBufferSize);
+typedef void(__cdecl* MovieSmushShutdownProc)(void);
+
+// GLOBAL: XWA 0x5A92F0
+MovieSmushSetVolumeProc SmushSetVolume;
+// GLOBAL: XWA 0x5A92E8
+MovieSmushStartupProc SmushStartup;
+// GLOBAL: XWA 0x5A92EC
+MovieSmushPlayProc SmushPlay;
+// GLOBAL: XWA 0x5A92E4
+MovieSmushShutdownProc SmushShutdown;
+
+int Movie_SmushFrameCallback(void);
+int FrontendDisplay_ClearFrontSurface(void);
+int FrontendDisplay_PresentFrontSurface(void);
+int FrontendDisplay_GetMovieDrawSurfacePitch(void);
+#endif
 
 // GLOBAL: XWA 0x9F4B38
 int g_movieSubtitleCount = 0;
@@ -24,18 +52,108 @@ int g_movieSkipRequested = 0;
 int g_movieSubtitleCurrentIndex = 0;
 // GLOBAL: XWA 0x78387C
 int g_movieFrameNumber = 0;
+// GLOBAL: XWA 0x783868
+int g_movieSavedDrawSurfacePitch = 0;
+// GLOBAL: XWA 0x78386C
+int g_movieFadeEnabled = 0;
+// GLOBAL: XWA 0x783874
+int g_moviePlaybackFinished = 0;
+// GLOBAL: XWA 0x783878
+unsigned short* g_movieRgb555Lookup = NULL;
 
 // FUNCTION: XWA 0x55BC20
 int Movie_Play(const char* name, int noFade) {
 #ifdef XWA_MODERN
 	return XwaMovieTask_Begin(name, noFade);
 #else
-	(void)name;
-	(void)noFade;
+	char moviePath[256];
+	FILE* stream;
+	int result;
+	int color;
 
 	g_movieSkipRequested = 0;
-	/* TODO: Reimplement Movie_Play @ 0x55BC20. */
-	return 0;
+	sprintf(moviePath, "movies\\%s.snm", name);
+	stream = fopen(moviePath, "rb");
+	if (stream == NULL) {
+		sprintf(moviePath, "d:\\movies\\%s.snm", name);
+		moviePath[0] = File_GetCdDriveLetter();
+		if (moviePath[0] == '\0') {
+			return 0;
+		}
+
+		stream = fopen(moviePath, "rb");
+		if (stream == NULL) {
+			return 0;
+		}
+	}
+
+	fclose(stream);
+	Movie_LoadSubtitles(moviePath);
+	FrontendDisplay_DisableOffscreenRestore();
+	FrontendDisplay_UnlockBackBuffer();
+
+	if (noFade == 0) {
+		g_movieFadeEnabled = 1;
+		FrontendDisplay_ClearFrontSurface();
+		FrontendDisplay_PresentFrontSurface();
+		FrontendDisplay_ClearFrontSurface();
+	} else {
+		g_movieFadeEnabled = 0;
+	}
+
+	FrontendText_ResetGlyphScratch();
+	g_movieFrameNumber = 0;
+	g_moviePlaybackFinished = 0;
+
+	if (g_movieRgb555Lookup != NULL) {
+		Mem_Free(g_movieRgb555Lookup);
+		g_movieRgb555Lookup = NULL;
+	}
+
+	if (FrontendDisplay_GetPixelFormat555()) {
+		g_movieRgb555Lookup = (unsigned short*)Mem_Alloc(0x20000);
+		for (color = 0; color < 0x10000; ++color) {
+			g_movieRgb555Lookup[color] =
+				(unsigned short)((color & 0x1f) + (((unsigned int)color >> 1) & 0x7fe0));
+		}
+	} else {
+		g_movieRgb555Lookup = NULL;
+	}
+
+	g_movieSavedDrawSurfacePitch = g_drawSurfacePitch;
+	g_drawSurfacePitch = FrontendDisplay_GetMovieDrawSurfacePitch();
+
+	SmushSetVolume(127 * g_gameConfig.sfxDatapadVolume / 10);
+	result = SmushStartup(0, FrontendSound_GetDirectSound());
+	if (result != 0) {
+		result = SmushPlay(moviePath, 15, 0, 0, 0, 640, 480, -1, 0,
+						   Movie_SmushFrameCallback, 1, 1000000, 1000000);
+		g_moviePlaybackFinished = 1;
+		SmushShutdown();
+	}
+
+	g_drawSurfacePitch = g_movieSavedDrawSurfacePitch;
+	if (g_movieRgb555Lookup != NULL) {
+		Mem_Free(g_movieRgb555Lookup);
+		g_movieRgb555Lookup = NULL;
+	}
+
+	if (noFade == 0) {
+		FrontendDisplay_ClearBackBuffer();
+		FrontendDisplay_ClearOffscreenSurface();
+		FrontendDisplay_PresentFrame();
+		FrontendDisplay_ClearBackBuffer();
+	}
+
+	if (g_movieSubtitles != NULL) {
+		Mem_Free(g_movieSubtitles);
+		g_movieSubtitles = NULL;
+		g_movieSubtitleCount = 0;
+	}
+
+	g_drawSurfacePtr = FrontendDisplay_LockBackBuffer();
+	FrontendDisplay_EnableOffscreenRestore();
+	return result;
 #endif
 }
 
