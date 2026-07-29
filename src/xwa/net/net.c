@@ -41,6 +41,10 @@ struct XwaDirectPlay4 {
 	const XwaDirectPlay4Vtbl* lpVtbl;
 };
 
+#ifndef XWA_MODERN
+void Net_ShutdownDirectPlaySessionEx(int suppressRestart, int allowJoinAbortExit);
+#endif
+
 // GLOBAL: XWA 0xA21449
 void* g_netDirectPlayInterface;
 #ifndef XWA_MODERN
@@ -913,7 +917,13 @@ int Net_ShutdownDirectPlaySession(void) {
 }
 
 // FUNCTION: XWA 0x52BBD0
-void Net_ShutdownDirectPlaySessionForQuit(void) { Net_ShutdownDirectPlaySession(); }
+void Net_ShutdownDirectPlaySessionForQuit(void) {
+#ifdef XWA_MODERN
+	Net_ShutdownDirectPlaySession();
+#else
+	Net_ShutdownDirectPlaySessionEx(1, 1);
+#endif
+}
 
 // FUNCTION: XWA 0x52DD80
 int Net_IsHost(void) { return g_netIsHost; }
