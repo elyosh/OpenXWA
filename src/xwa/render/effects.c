@@ -1252,9 +1252,44 @@ void Particle_InitEffectType12(ParticleEffect* effect) {
 
 // FUNCTION: XWA 0x4C8140
 void Particle_SpawnTransientObjectFromRecord(ParticleRecord* particle) {
-	(void)particle;
+	unsigned int objectIdx;
+	int velX;
+	int velY;
+	int velZ;
+	int maxVelocity;
 
-	/* TODO: Reimplement Particle_SpawnTransientObjectFromRecord @ 0x4C8140. */
+	objectIdx = Object_AllocLocalTransientSlot();
+	if (objectIdx == 0xffffu) {
+		return;
+	}
+
+	g_objectTable[objectIdx].objectType = OBJ_SparkTextureGroup3000;
+	velX = (int)particle->vel.x;
+	g_objectTable[objectIdx].world_x = (int)particle->world.x;
+	g_objectTable[objectIdx].world_y = (int)particle->world.y;
+	g_objectTable[objectIdx].world_z = (int)particle->world.z;
+	velY = (int)particle->vel.y;
+	g_objectTable[objectIdx].genusId = GENUS_Explosion;
+	g_objectTable[objectIdx].mobj->state = 5;
+	g_objectTable[objectIdx].typeSpecificByte[0] = 1;
+	velZ = (int)particle->vel.z;
+	g_objectTable[objectIdx].mobj->framesAlive = 0;
+	g_objectTable[objectIdx].mobj->lifetimeTimer = 0;
+	g_objectTable[objectIdx].mobj->sourceObjIdx = -1;
+	g_objectTable[objectIdx].mobj->instanceExtent =
+		g_modelTypeTable[(uint16_t)g_objectTable[objectIdx].objectType].maxBoundsExtent >> 2;
+
+	maxVelocity = (velX > velY ? velX : velY) > velZ ? (velX > velY ? velX : velY) : velZ;
+	g_objectTable[objectIdx].mobj->speed =
+		(uint16_t)((uint8_t)(236 * maxVelocity / g_elapsedTicks) << 8);
+
+	trig2_ctop(velX, velY, velZ);
+	g_objectTable[objectIdx].pitch = targetPitch;
+	g_objectTable[objectIdx].yaw = trig2_xyangle;
+	g_objectTable[objectIdx].roll = (Q16Angle)GameRand2();
+	g_objectTable[objectIdx].angleD = 0;
+	g_objectTable[objectIdx].mobj->orientMatrixDirty = 1;
+	g_objectTable[objectIdx].mobj->moveVectorDirty = 1;
 }
 
 // FUNCTION: XWA 0x4C8300
