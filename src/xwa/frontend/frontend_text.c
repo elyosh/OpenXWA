@@ -291,11 +291,7 @@ int FrontendText_LoadFontAtlasFile(const char* fileName, int slotIndex) {
 	void* glyphBits;
 
 	font = &g_fontSlots[slotIndex];
-#ifdef XWA_MODERN
-	stream = File_OpenAsset(AERON_VFS_ROOT_ASSET, fileName, "rb");
-#else
 	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
-#endif
 	if (stream == NULL) {
 #ifdef XWA_MODERN
 		Aeron_LogError("xwa.assets", "Failed to open frontend font '%s'", fileName);
@@ -425,11 +421,7 @@ int FrontendText_LoadFont(int pointSize) {
 	}
 
 	sprintf(fileName, "times%u.abp", (unsigned int)pointSize);
-#ifdef XWA_MODERN
-	stream = File_OpenAsset(AERON_VFS_ROOT_ASSET, fileName, "rb");
-#else
 	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
-#endif
 	if (stream != NULL) {
 		File_Close(stream);
 		if (FrontendText_LoadFontAtlasFile(fileName, slotIndex)) {

@@ -213,17 +213,17 @@ int Movie_LoadSubtitles(const char* moviePath) {
 		memcpy(subtitlePath, moviePath, stemLength);
 		memcpy(subtitlePath + stemLength, ".sub", sizeof(".sub"));
 	}
-	stream = File_OpenAsset(AERON_VFS_ROOT_ASSET, subtitlePath, "r");
+	stream = File_Open(AERON_VFS_ROOT_ASSET, subtitlePath, "r");
 #else
 	strcpy(g_frontendScratchBuffer, moviePath);
 	g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - MOVIE_EXTENSION_LENGTH] = '\0';
 	strcat(g_frontendScratchBuffer, ".sub");
 
 	if (g_frontendScratchBuffer[MOVIE_SUBTITLE_DRIVE_SEPARATOR] == ':') {
-		stream = File_OpenAsset(AERON_VFS_ROOT_ASSET,
-								&g_frontendScratchBuffer[MOVIE_SUBTITLE_DRIVE_PATH_START], "r");
+		stream = File_Open(AERON_VFS_ROOT_ASSET,
+						   &g_frontendScratchBuffer[MOVIE_SUBTITLE_DRIVE_PATH_START], "r");
 	} else {
-		stream = File_OpenAsset(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "r");
+		stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "r");
 	}
 #endif
 

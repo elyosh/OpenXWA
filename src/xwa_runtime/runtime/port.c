@@ -95,8 +95,8 @@ void XwaPort_SetCommandLine(const char* commandLine) {
 int XwaPort_Init(void) {
 	XwaTime_Reset();
 	File_SetVfs(Aeron_GetVfs());
-	if (SpriteResource_LoadCatalog("ALLIANCE/RESDATA.TXT") != 0) {
-		Aeron_LogError("xwa.assets", "Failed to load required sprite catalog 'ALLIANCE/RESDATA.TXT'");
+	if (SpriteResource_LoadCatalog("Resdata.txt") != 0) {
+		Aeron_LogError("xwa.assets", "Failed to load required sprite catalog 'Resdata.txt'");
 	}
 	Linez_LoadDict("xwa.tab");
 	/* Original _WinMain@16 gives the string loader a valid initial handle. Large
@@ -108,7 +108,7 @@ int XwaPort_Init(void) {
 		return 0;
 	}
 	if (StringTable_LoadGameStrings() != 0) {
-		Aeron_LogError("xwa.assets", "Failed to load game string table 'ALLIANCE/STRINGS.TXT'");
+		Aeron_LogError("xwa.assets", "Failed to load game string table 'strings.txt'");
 		XwaPort_FreeStartupAssets();
 		return 0;
 	}

@@ -49,7 +49,7 @@ int BakeSource_InitDatCatalog(AeronVfs* vfs, BakeDatCatalog* catalog, char* erro
 	catalog->groups = (uint16_t*)malloc(0x10000u * sizeof *catalog->groups);
 	uint8_t* bytes = NULL;
 	size_t size = 0;
-	if (!catalog->groups || !read_asset(vfs, "ALLIANCE/RESDATA.TXT", &bytes, &size))
+	if (!catalog->groups || !read_asset(vfs, "RESDATA.TXT", &bytes, &size))
 		goto failed;
 	size_t cursor = 0;
 	while (cursor < size && catalog->file_count < 64) {

@@ -95,10 +95,13 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 }
 
 static int setup_check_required_files(AeronVfs* vfs, const char** missing) {
-	/* Include runtime content unique to each CD so a one-disc tree cannot pass validation. */
+	/* Canonical install layout: the CD ALLIANCE directory contents merged into the
+	   root, as the original installer laid them out. RESDATA.TXT marks the merged
+	   ALLIANCE content; the movie/wave entries are unique to CD1 and CD2 so a
+	   one-disc tree cannot pass validation. */
 	static const char* required[] = {
-		"ALLIANCE/RESDATA.TXT", "FLIGHTMODELS/SPACECRAFT0.LST", "MISSIONS/MISSION.LST",
-		"MOVIES/PROLOGUE.SNM",  "MOVIES/BATTLE1.SNM",           "WAVE/FRONTEND/B1M1/N010101.WAV",
+		"RESDATA.TXT",         "FLIGHTMODELS/SPACECRAFT0.LST", "MISSIONS/MISSION.LST",
+		"MOVIES/PROLOGUE.SNM", "MOVIES/BATTLE1.SNM",           "WAVE/FRONTEND/B1M1/N010101.WAV",
 	};
 	size_t i;
 
@@ -126,6 +129,15 @@ int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normal
 	if (setup_check_required_files(vfs, &missing)) {
 		snprintf(normalized, normalized_capacity, "%s", candidate);
 		return 1;
+	}
+
+	/* A raw CD copy keeps the install files under ALLIANCE; the game expects them
+	   merged into the root. Detect it so the failure explains the fix. */
+	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_ASSET, "ALLIANCE/RESDATA.TXT")) {
+		return setup_error(error, error_size,
+						   "this looks like an unmerged CD copy: copy the contents of its ALLIANCE "
+						   "directory into the selected folder (missing '%s')",
+						   missing);
 	}
 
 	return setup_error(error, error_size, "selected directory is missing '%s'", missing);

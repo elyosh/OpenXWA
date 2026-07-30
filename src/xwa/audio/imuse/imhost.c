@@ -127,7 +127,7 @@ int ImHost_GetTime(void) { return g_gameTime; }
 // FUNCTION: XWA 0x49A880
 XwaFile* ImHost_OpenFile(const char* path, const char* mode) {
 #ifdef XWA_MODERN
-	XwaFile* stream = File_OpenAsset(ImHost_FileRootForMode(mode), path, mode);
+	XwaFile* stream = File_Open(ImHost_FileRootForMode(mode), path, mode);
 	Aeron_LogVerbose("xwa.music", "iMUSE open '%s' (%s) -> %s", path, mode, stream ? "ok" : "FAIL");
 	return stream;
 #else
@@ -209,7 +209,7 @@ int ImHost_GetFileSize(const char* path) {
 	int size;
 
 #ifdef XWA_MODERN
-	stream = File_OpenAsset(AERON_VFS_ROOT_ASSET, path, "r");
+	stream = File_Open(AERON_VFS_ROOT_ASSET, path, "r");
 #else
 	stream = fopen(path, "r");
 #endif

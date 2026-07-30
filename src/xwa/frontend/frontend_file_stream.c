@@ -441,9 +441,9 @@ int FrontendFileStream_OpenQueuedFile(int slot, FrontendFileStreamRequest* reque
 		File_Close(g_frontendFileStreamFiles[slot]);
 	}
 
-	/* Resolve install-relative ("wave\\...") paths the same way the rest of the
-	   sound subsystem does (ALLIANCE install subtree, then the CD-image tree). */
-	g_frontendFileStreamFiles[slot] = FrontendSound_OpenAsset(request->path, "rb");
+	/* The original built '<drive>:\<path>' from the per-slot drive letter; the
+	   port resolves install-relative ("wave\\...") paths through the asset VFS. */
+	g_frontendFileStreamFiles[slot] = File_Open(AERON_VFS_ROOT_ASSET, request->path, "rb");
 	return g_frontendFileStreamFiles[slot] != NULL;
 }
 

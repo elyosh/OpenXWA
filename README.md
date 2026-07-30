@@ -2,13 +2,14 @@
 
 ![Screenshot of the Azzameen hangar in OpenXWA](assets/openxwa_hangar.jpg)
 
-OpenXWA is an in-progress decompilation and port of the 1999 game *Star Wars:
-X-Wing Alliance*, based on its original version 2.02 Windows executable. It
+OpenXWA is an in-progress open-source faithful re-implementation of the 1999 game *Star Wars:
+X-Wing Alliance* with optional enhancements.  
+It
 runs the original game data on Windows, macOS, and Linux.
 
 > [!IMPORTANT]
-> OpenXWA does not include the original missions, models, textures, audio, or
-> movies. A complete copy of *X-Wing Alliance* is required.
+> OpenXWA does not include any content from the original game. A complete copy of *X-Wing Alliance* is required.
+> The game can be bought on [GOG](https://www.gog.com/en/game/star_wars_xwing_alliance) or [Steam](https://store.steampowered.com/app/361670/STAR_WARS__XWing_Alliance/)
 
 ## Supported platforms
 
@@ -21,10 +22,8 @@ runs the original game data on Windows, macOS, and Linux.
 ## Current state
 
 Every original function not dedicated to multiplayer has been reimplemented.
-More than half of these functions compile to machine code that is byte-for-byte
-identical to the corresponding code in the original 2.02 executable.
 
-The original digital iMUSE audio engine has been fully reimplemented.
+The digital iMUSE audio engine has been fully reimplemented.
 
 OpenXWA remains under active development. Bugs and differences from the
 original game are still likely despite this level of coverage. Multiplayer is
@@ -66,9 +65,9 @@ Gamepads are supported, with force-feedback effects translated to rumble.
 
 ## Original game data
 
-On first launch, OpenXWA asks for the directory containing the original game
-data and remembers the selection. This directory must contain the contents of
-both original CDs under a single root.
+On first launch, OpenXWA asks for the directory containing the original game data and remembers the selection.
+This directory must use the installed game layout (as in a GOG or Steam install).
+For a raw CD copy, first merge the contents of the ALLIANCE directory into the root.
 
 For unattended or development launches, pass the directory on the command
 line:

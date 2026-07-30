@@ -127,7 +127,7 @@ static uint8_t* read_whole_file(const char* path, size_t* out_size) {
 static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_size,
 						 const uint8_t* ttf, size_t ttf_size) {
 	char source_path[64];
-	snprintf(source_path, sizeof source_path, "ALLIANCE/TIMES%d.ABP", point_size);
+	snprintf(source_path, sizeof source_path, "TIMES%d.ABP", point_size);
 	uint8_t* source_bytes = NULL;
 	size_t source_size = 0;
 	Xwa2dFontAtlas source = { 0 };
@@ -266,7 +266,7 @@ int BakeFonts_Run(const BakeFontsOptions* opt, AeronVfs* vfs) {
 	}
 
 	FontDiscovery disc = { 0 };
-	AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, "ALLIANCE", "TIMES*.ABP",
+	AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, ".", "TIMES*.ABP",
 				  AERON_VFS_GLOB_FILES | AERON_VFS_GLOB_CASE_INSENSITIVE, glob_collect_abp,
 				  &disc);
 	printf("bake: %d frontend fonts discovered\n", disc.count);

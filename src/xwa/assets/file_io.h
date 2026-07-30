@@ -49,7 +49,6 @@ XwaFile* File_Open(const char* fileName, const char* mode);
 #define File_Open(root, fileName, mode) File_Open(fileName, mode)
 #endif
 #endif
-XwaFile* File_OpenAsset(AeronVfsRoot root, const char* fileName, const char* mode);
 int File_Close(XwaFile* stream);
 int File_Seek(XwaFile* stream, int offset, int16_t origin);
 int File_Tell(XwaFile* stream);

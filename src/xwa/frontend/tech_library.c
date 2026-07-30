@@ -331,7 +331,7 @@ char* GetCraftTypeModelLongName(int craftType) {
 // FUNCTION: XWA 0x577140
 int TechLibrary_LoadSpecTextTable(void) {
 #ifdef XWA_MODERN
-	const char* path = "ALLIANCE/SPECDESC.TXT";
+	const char* path = "specdesc.txt";
 	XwaFile* stream;
 	char line[1024];
 	int entryIndex;

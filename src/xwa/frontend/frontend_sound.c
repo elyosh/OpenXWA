@@ -51,11 +51,6 @@ int g_frontendSoundPlaySerial;
 // GLOBAL: XWA 0x9F7F1B
 FrontendSoundVoice* g_frontendSoundVoices;
 
-/* Opens a sound asset with the shared install-then-CD resolution (File_OpenAsset). */
-XwaFile* FrontendSound_OpenAsset(const char* fileName, const char* mode) {
-	return File_OpenAsset(AERON_VFS_ROOT_ASSET, fileName, mode);
-}
-
 // FUNCTION: XWA 0x55D9B0
 int FrontendSound_LoadList(char* fileName) {
 	XwaFile* stream;
@@ -63,7 +58,7 @@ int FrontendSound_LoadList(char* fileName) {
 	char soundName[256];
 
 #ifdef XWA_MODERN
-	stream = FrontendSound_OpenAsset(fileName, "r");
+	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "r");
 #else
 	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "r");
 #endif
@@ -120,7 +115,7 @@ int FrontendSound_UnloadList(char* fileName) {
 	char soundName[256];
 
 #ifdef XWA_MODERN
-	stream = FrontendSound_OpenAsset(fileName, "r");
+	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "r");
 #else
 	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "r");
 #endif
@@ -374,7 +369,7 @@ static int DirectSound_LoadFileAndFindAudioData(int unused, char* fileName, DSWa
 #endif
 
 #ifdef XWA_MODERN
-	stream = FrontendSound_OpenAsset(fileName, "rb");
+	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
 #else
 	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
 #endif

@@ -18,8 +18,10 @@ typedef struct XwaLaunchOptions {
 
 int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* error, size_t error_size);
 
-/* Applies a candidate asset root and validates the staged original-data
- * layout. Selecting its ALLIANCE install child is normalized to the parent. */
+/* Applies a candidate asset root and validates the canonical install layout:
+ * an installed game directory with the CD ALLIANCE contents merged into the
+ * root, plus the CD data directories (FLIGHTMODELS, MISSIONS, MOVIES, RESDATA,
+ * WAVE). An unmerged CD copy is rejected with an explanatory error. */
 int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normalized,
 							  size_t normalized_capacity, char* error, size_t error_size);
 

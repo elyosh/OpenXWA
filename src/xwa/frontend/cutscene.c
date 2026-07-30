@@ -44,11 +44,7 @@ int Cutscene_LoadTable(char* fileName) {
 
 	g_cutsceneCount = 0;
 
-#ifdef XWA_MODERN
-	stream = File_OpenAsset(AERON_VFS_ROOT_ASSET, fileName, "r");
-#else
 	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "r");
-#endif
 	if (stream == NULL) {
 		return 0;
 	}

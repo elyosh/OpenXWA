@@ -108,7 +108,7 @@ int Frontend_LoadResources(void) {
 	g_cursorBitmap = (unsigned char*)Mem_Alloc((size_t)(2 * (rect.bottom + 1) * (rect.right + 1)));
 	FrontendCursor_SetImageResourceForCurrentTheme("cursor", g_cursorBitmap);
 	memset(&g_pilotData, 0, sizeof(g_pilotData));
-	FrontendString_LoadTable("ALLIANCE/fronttxt.txt");
+	FrontendString_LoadTable("fronttxt.txt");
 	ShipList_Load();
 	FrontendMedals_LoadTable();
 	Cutscene_LoadTable("frontres\\cutscene\\cutscene.txt");

@@ -61,7 +61,6 @@ int FrontendSound_BinarySearchBufferByName(FrontendSoundBufferRecord* records, i
 void FrontendSound_InsertSortedBuffer(FrontendSoundBufferRecord* record);
 void FrontendSound_RemoveBufferRecord(int bufferIndex);
 IDirectSoundBuffer* DirectSound_LoadWaveBuffer(void* directSound, char* fileName, int create3DFlags);
-XwaFile* FrontendSound_OpenAsset(const char* fileName, const char* mode);
 IDirectSoundBuffer* DirectSound_LoadWaveBufferIntoPtr(IDirectSoundBuffer** outBuffer, char* fileName,
 													  int create3DFlags);
 void DirectSound_PlayBuffer(IDirectSoundBuffer* buffer, uint32_t position, int loop, int volume0To127);

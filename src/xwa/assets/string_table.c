@@ -459,8 +459,9 @@ int StringTable_LoadGameStrings(void) {
 	g_stringLoadFailed = 0;
 	memset(g_craftGender, 0, sizeof(g_craftGender));
 
-	/* Original opens strings.txt from the game directory; asset-root mode makes that explicit. */
-	stream = File_Open(AERON_VFS_ROOT_ASSET, "ALLIANCE/STRINGS.TXT", "r");
+	/* Original: File_OpenGlobalStream("strings.txt", "r", promptOnFail=1, locationMode=0);
+	   the port opens directly without the retry prompt. */
+	stream = File_Open(AERON_VFS_ROOT_ASSET, "strings.txt", "r");
 	if (stream == NULL) {
 		return 2;
 	}

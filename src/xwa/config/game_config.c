@@ -1899,11 +1899,7 @@ int Config_CreditsScreen(void) {
 		}
 
 		loaded = 1;
-#ifdef XWA_MODERN
-		stream = File_OpenAsset(AERON_VFS_ROOT_ASSET, "credits.txt", "r");
-#else
 		stream = File_Open(AERON_VFS_ROOT_ASSET, "credits.txt", "r");
-#endif
 		if (stream == NULL) {
 			loaded = 0;
 		} else {
@@ -4397,7 +4393,7 @@ int Config_LoadJoystickActionDictionary(void) {
 	int tokenIndex;
 	int entryIndex;
 
-	stream = File_Open(AERON_VFS_ROOT_ASSET, "ALLIANCE/JOYSTICK.TXT", "r");
+	stream = File_Open(AERON_VFS_ROOT_ASSET, "joystick.txt", "r");
 	if (stream == NULL) {
 		return 0;
 	}

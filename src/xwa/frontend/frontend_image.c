@@ -166,51 +166,17 @@ static void FrontImage_CopyUppercasePath(char* dest, size_t destSize, const char
 	dest[i] = '\0';
 }
 
-static int FrontImage_PathStartsWithAlliance(const char* path) {
-	char normalized[9];
-	size_t i;
-
-	if (path == NULL) {
-		return 0;
-	}
-
-	for (i = 0; i < sizeof(normalized) - 1 && path[i] != '\0'; ++i) {
-		normalized[i] = path[i] == '\\' ? '/' : (char)toupper((unsigned char)path[i]);
-	}
-
-	normalized[i] = '\0';
-	return strncmp(normalized, "ALLIANCE", 8) == 0 && (path[8] == '/' || path[8] == '\\');
-}
-
 static XwaFile* FrontImage_OpenRead(AeronVfsRoot root, const char* path) {
-	char candidate[FRONT_IMAGE_PATH_SIZE];
 	char uppercase[FRONT_IMAGE_PATH_SIZE];
 	XwaFile* stream;
 
-	snprintf(candidate, sizeof(candidate), "%s", path);
-	stream = File_Open(root, candidate, "rb");
+	stream = File_Open(root, path, "rb");
 	if (stream != NULL) {
 		return stream;
 	}
 
-	FrontImage_CopyUppercasePath(uppercase, sizeof(uppercase), candidate);
-	stream = File_Open(root, uppercase, "rb");
-	if (stream != NULL) {
-		return stream;
-	}
-
-	if (!FrontImage_PathStartsWithAlliance(path)) {
-		snprintf(candidate, sizeof(candidate), "ALLIANCE/%s", path);
-		stream = File_Open(root, candidate, "rb");
-		if (stream != NULL) {
-			return stream;
-		}
-
-		FrontImage_CopyUppercasePath(uppercase, sizeof(uppercase), candidate);
-		stream = File_Open(root, uppercase, "rb");
-	}
-
-	return stream;
+	FrontImage_CopyUppercasePath(uppercase, sizeof(uppercase), path);
+	return File_Open(root, uppercase, "rb");
 }
 
 static void FrontImage_MakeCbmPath(const char* srcFile, char* outPath, size_t outPathSize) {

@@ -561,7 +561,7 @@ static void XwaFlightTask_InitProjectionAndPalette(void) {
 	DebugPrintf("");
 	FlightDisplay_Flip();
 	FlightRender_InstallCallbacks(3u);
-	FeDiskIo_ReadAllBytesOrFatal("ALLIANCE/NEWPAL.ACT", palette);
+	FeDiskIo_ReadAllBytesOrFatal("newpal.act", palette);
 	for (int colorIdx = 0; colorIdx < 128; ++colorIdx) {
 		RgbTriplet low;
 		RgbTriplet high;
@@ -1400,7 +1400,7 @@ void XwaFlightTask_Tick(void) {
 				if (!g_flightConfNoPilot) {
 					Mission_SyncPilotNetworkPlayersToSessionSlots();
 				}
-				pai_loadplans("ALLIANCE/PAIPLAN");
+				pai_loadplans("paiplan");
 				pai_cacheBuiltinPlanIds();
 				XwaFlightTask_InitProjectionAndPalette();
 				g_messageLogWriteIndex = 0xffffu;

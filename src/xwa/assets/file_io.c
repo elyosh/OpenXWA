@@ -96,38 +96,6 @@ static int File_SplitWildcard(const char* wildcard, char* directory, size_t dire
 
 void File_SetVfs(AeronVfs* vfs) { g_fileVfs = vfs; }
 
-/* Opens a game asset that may be addressed install-relative. The original
-   File_Open @ 0x52AD30 searched the working directory (the ALLIANCE install
-   folder) and then the CD root; the port's asset root is the parent of both, so
-   for ASSET reads try the "ALLIANCE/" install subtree first, then the path as
-   given (the CD-image tree). Non-asset roots resolve directly. Shared by the
-   sound, wave-stream, and iMUSE music loaders. */
-XwaFile* File_OpenAsset(AeronVfsRoot root, const char* fileName, const char* mode) {
-	if (fileName == NULL) {
-		return NULL;
-	}
-	if (root == AERON_VFS_ROOT_ASSET) {
-		char resolved[512];
-		XwaFile* stream;
-
-		snprintf(resolved, sizeof(resolved), "ALLIANCE/%s", fileName);
-#ifdef XWA_MODERN
-		stream = File_Open(AERON_VFS_ROOT_ASSET, resolved, mode);
-#else
-		stream = File_Open(resolved, mode);
-#endif
-		if (stream != NULL) {
-			return stream;
-		}
-	}
-#ifdef XWA_MODERN
-	return File_Open(root, fileName, mode);
-#else
-	(void)root;
-	return File_Open(fileName, mode);
-#endif
-}
-
 // FUNCTION: XWA 0x52AD30
 #ifdef XWA_MODERN
 XwaFile* File_Open(AeronVfsRoot root, const char* fileName, const char* mode) {

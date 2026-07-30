@@ -170,8 +170,8 @@ CraftTechStats* g_cachedCraftTechStats;
 // GLOBAL: XWA 0x9EAA14
 int g_cachedCraftTechStatsCount;
 // GLOBAL: XWA 0x603168
-const char* g_campaignDirNames[6] = { "missions",           "melee",    "combat",
-									  "ALLIANCE\\SKIRMISH", "missions", "missions" };
+const char* g_campaignDirNames[6] = { "missions", "melee",    "combat",
+									  "skirmish", "missions", "missions" };
 
 static void MissionSetup_TrimTrailingLineBreak(char* text) {
 	size_t length;
@@ -1015,11 +1015,7 @@ void MissionSetup_LoadMissionList(MissionDirectoryId missionDirectoryId) {
 	if (missionDirectoryId != MISSION_DIRECTORY_SKIRMISH) {
 		sprintf(g_frontendScratchBuffer, "%s\\mission.lst", g_campaignDirNames[missionDirectoryId]);
 		while (1) {
-#ifdef XWA_MODERN
-			stream = File_OpenAsset(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "r");
-#else
 			stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "r");
-#endif
 			if (stream != NULL) {
 				break;
 			}

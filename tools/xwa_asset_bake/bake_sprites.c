@@ -237,7 +237,7 @@ static void emit_frames(const BakeSpriteOptions* opt, const char* bundle_dir, co
 static void bake_one_file(const BakeSpriteOptions* opt, AeronVfs* vfs, const char* dir_name,
 						  const char* file_name, BakeStats* stats) {
 	char src[512];
-	snprintf(src, sizeof src, "ALLIANCE/FRONTRES/%s/%s", dir_name, file_name);
+	snprintf(src, sizeof src, "FRONTRES/%s/%s", dir_name, file_name);
 
 	char base[128];
 	snprintf(base, sizeof base, "%s", file_name);
@@ -479,7 +479,7 @@ int BakeSprites_Run(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeStats* stat
 		return 0;
 	}
 	if (!opt->dat_only) {
-		AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, "ALLIANCE/FRONTRES", "*",
+		AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, "FRONTRES", "*",
 					  AERON_VFS_GLOB_DIRECTORIES | AERON_VFS_GLOB_CASE_INSENSITIVE,
 					  glob_collect_dir, disc);
 		printf("bake: %d frontres directories discovered\n", disc->dir_count);
@@ -493,7 +493,7 @@ int BakeSprites_Run(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeStats* stat
 
 	for (int i = 0; i < disc->dir_count; i++) {
 		char sub[560];
-		snprintf(sub, sizeof sub, "ALLIANCE/FRONTRES/%s", disc->dirs[i]);
+		snprintf(sub, sizeof sub, "FRONTRES/%s", disc->dirs[i]);
 		disc->file_count = 0;
 		AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, sub, "*",
 					  AERON_VFS_GLOB_FILES | AERON_VFS_GLOB_CASE_INSENSITIVE, glob_collect_image,

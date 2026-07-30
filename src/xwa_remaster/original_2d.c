@@ -50,29 +50,13 @@ static XwaRemasterOriginal2dLoadStatus
 original_read_asset(XwaRemasterOriginal2d* reader, AeronVfsRoot root, const char* path,
 					uint8_t** out_bytes, size_t* out_size) {
 	char normalized[ORIGINAL_2D_PATH_MAX];
-	char candidate[ORIGINAL_2D_PATH_MAX];
 	XwaRemasterOriginal2dLoadStatus status;
 	original_normalize_path(path, normalized, sizeof normalized, 0);
 	status = original_read_candidate(reader, root, normalized, out_bytes, out_size);
 	if (status != XWA_REMASTER_ORIGINAL_2D_LOAD_MISSING)
 		return status;
-	if (strncmp(normalized, "ALLIANCE/", 9) != 0) {
-		snprintf(candidate, sizeof candidate, "ALLIANCE/%s", normalized);
-		status = original_read_candidate(reader, root, candidate, out_bytes, out_size);
-		if (status != XWA_REMASTER_ORIGINAL_2D_LOAD_MISSING)
-			return status;
-	}
 	original_normalize_path(path, normalized, sizeof normalized, 1);
-	status = original_read_candidate(reader, root, normalized, out_bytes, out_size);
-	if (status != XWA_REMASTER_ORIGINAL_2D_LOAD_MISSING)
-		return status;
-	if (strncmp(normalized, "ALLIANCE/", 9) != 0) {
-		snprintf(candidate, sizeof candidate, "ALLIANCE/%s", normalized);
-		status = original_read_candidate(reader, root, candidate, out_bytes, out_size);
-		if (status != XWA_REMASTER_ORIGINAL_2D_LOAD_MISSING)
-			return status;
-	}
-	return XWA_REMASTER_ORIGINAL_2D_LOAD_MISSING;
+	return original_read_candidate(reader, root, normalized, out_bytes, out_size);
 }
 
 static void original_cbm_path(const char* source, char out[ORIGINAL_2D_PATH_MAX]) {
@@ -159,10 +143,10 @@ original_load_dat_paths(XwaRemasterOriginal2d* reader, char* error, size_t error
 	uint8_t* bytes = NULL;
 	size_t size = 0;
 	XwaRemasterOriginal2dLoadStatus status =
-		original_read_asset(reader, AERON_VFS_ROOT_ASSET, "ALLIANCE/RESDATA.TXT", &bytes, &size);
+		original_read_asset(reader, AERON_VFS_ROOT_ASSET, "RESDATA.TXT", &bytes, &size);
 	if (status != XWA_REMASTER_ORIGINAL_2D_LOAD_SUCCESS) {
 		if (error && error_size)
-			snprintf(error, error_size, "ALLIANCE/RESDATA.TXT %s",
+			snprintf(error, error_size, "RESDATA.TXT %s",
 					 status == XWA_REMASTER_ORIGINAL_2D_LOAD_MISSING ? "not found" : "read failed");
 		return status;
 	}
@@ -206,12 +190,12 @@ original_load_dat_paths(XwaRemasterOriginal2d* reader, char* error, size_t error
 	free(bytes);
 	if (!reader->dat_file_count) {
 		if (error && error_size)
-			snprintf(error, error_size, "ALLIANCE/RESDATA.TXT contains no DAT files");
+			snprintf(error, error_size, "RESDATA.TXT contains no DAT files");
 		return XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
 	}
 	if (cursor < size) {
 		if (error && error_size)
-			snprintf(error, error_size, "ALLIANCE/RESDATA.TXT exceeds DAT file capacity");
+			snprintf(error, error_size, "RESDATA.TXT exceeds DAT file capacity");
 		return XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
 	}
 	reader->dat_paths_loaded = 1;
@@ -269,7 +253,7 @@ XwaRemasterOriginal2d_LoadFrontendFont(XwaRemasterOriginal2d* reader, int point_
 	if (!reader || !out || point_size <= 0 || point_size > 255)
 		return XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
 	char path[64];
-	snprintf(path, sizeof path, "ALLIANCE/TIMES%d.ABP", point_size);
+	snprintf(path, sizeof path, "TIMES%d.ABP", point_size);
 	uint8_t* bytes = NULL;
 	size_t size = 0;
 	XwaRemasterOriginal2dLoadStatus status =

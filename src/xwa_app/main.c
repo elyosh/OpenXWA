@@ -55,9 +55,9 @@ static int show_first_launch_prompt(int* cancelled, char* error, size_t error_si
 		.kind = AERON_MESSAGE_BOX_INFORMATION,
 		.title = "Set up OpenXWA",
 		.message = "OpenXWA requires data files from an original X-Wing Alliance installation.\n\n"
-				   "Select a folder containing the merged contents of CD1 and CD2:\n\n"
-				   "    ALLIANCE\n"
+				   "Select an installed game folder (for example a GOG or Steam install) containing:\n\n"
 				   "    FLIGHTMODELS\n"
+				   "    FRONTRES\n"
 				   "    MISSIONS\n"
 				   "    MOVIES\n"
 				   "    RESDATA\n"
@@ -151,7 +151,7 @@ static int select_game_data(AeronVfs* vfs, char* selected, size_t selected_capac
 					 "The selected folder is not a complete X-Wing Alliance data directory.\n\n"
 					 "Selected:\n%s\n\n"
 					 "%s\n\n"
-					 "Select the folder containing ALLIANCE, FLIGHTMODELS, and MISSIONS.",
+					 "Select an installed game folder containing FLIGHTMODELS, MISSIONS, and RESDATA.TXT.",
 					 candidate, validation_error);
 			if (!Aeron_ShowMessageBox(&message_options, &selected_button)) {
 				snprintf(error, error_size, "Could not show the game-data validation result.");

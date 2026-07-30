@@ -112,26 +112,15 @@ static int XwaMovieTask_ResolveManifestEntry(const char* name, char* path, size_
 static int XwaMovieTask_ResolveAsset(const char* name, char* path, size_t path_size, char* original_path,
 									 size_t original_path_size, char* subtitle_path,
 									 size_t subtitle_path_size) {
-	static const char* const original_formats[] = {
-		"MOVIES/%s.SNM",
-		"ALLIANCE/MOVIES/%s.SNM",
-	};
-	size_t i;
 	int original_found;
 
-	original_path[0] = '\0';
 	subtitle_path[0] = '\0';
-	original_found = 0;
-	for (i = 0; i < sizeof(original_formats) / sizeof(original_formats[0]); ++i) {
-		if (snprintf(original_path, original_path_size, original_formats[i], name) >=
-			(int)original_path_size) {
-			return 0;
-		}
-		if (AeronVfs_Exists(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, original_path)) {
-			original_found = 1;
-			break;
-		}
+	if (snprintf(original_path, original_path_size, "MOVIES/%s.SNM", name) >=
+		(int)original_path_size) {
+		original_path[0] = '\0';
+		return 0;
 	}
+	original_found = AeronVfs_Exists(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, original_path);
 	if (XwaMovieTask_ResolveManifestEntry(name, path, path_size, subtitle_path, subtitle_path_size)) {
 		return 1;
 	}

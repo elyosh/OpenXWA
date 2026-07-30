@@ -201,7 +201,7 @@ int FrontendWaveStream_PlayWaveFile(char* fileName, int loopMode, char driveSele
 #ifdef XWA_MODERN
 		/* The port resolves install-relative paths through the asset VFS. */
 		(void)driveSelect;
-		stream = FrontendSound_OpenAsset(fileName, "rb");
+		stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
 		if (stream == NULL) {
 			Aeron_LogError("xwa.audio", "wave stream file not found: %s", fileName);
 		}

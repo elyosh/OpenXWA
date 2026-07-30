@@ -33,14 +33,10 @@ int ShipList_Load(void) {
 		return 0;
 	}
 
-#ifdef XWA_MODERN
-	stream = File_Open(AERON_VFS_ROOT_ASSET, "ALLIANCE/SHIPLIST.TXT", "r");
-#else
 	stream = File_Open(AERON_VFS_ROOT_ASSET, "shiplist.txt", "r");
-#endif
 	if (stream == NULL) {
 #ifdef XWA_MODERN
-		Aeron_LogError("xwa.assets", "Failed to open ship list 'ALLIANCE/SHIPLIST.TXT'");
+		Aeron_LogError("xwa.assets", "Failed to open ship list 'shiplist.txt'");
 #endif
 		return 0;
 	}
