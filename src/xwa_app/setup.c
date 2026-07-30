@@ -123,7 +123,7 @@ int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normal
 	}
 	if (!AeronVfs_SetRoot(vfs, AERON_VFS_ROOT_ASSET, candidate) ||
 		!AeronVfs_SetRootOptions(vfs, AERON_VFS_ROOT_ASSET,
-								 AERON_VFS_ROOT_OPTION_CASE_INSENSITIVE_READ_LOOKUP)) {
+								 AERON_VFS_ROOT_OPTION_CASE_INSENSITIVE_LOOKUP)) {
 		return setup_error(error, error_size, "could not use game-data directory: %s", candidate);
 	}
 	if (setup_check_required_files(vfs, &missing)) {

@@ -132,7 +132,7 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 	if (!AeronVfs_SetRootOptions(vfs, AERON_VFS_ROOT_ASSET,
-								 AERON_VFS_ROOT_OPTION_CASE_INSENSITIVE_READ_LOOKUP)) {
+								 AERON_VFS_ROOT_OPTION_CASE_INSENSITIVE_LOOKUP)) {
 		fprintf(stderr, "xwa_asset_bake: VFS asset lookup configuration failed\n");
 		AeronVfs_Destroy(vfs);
 		return 1;
