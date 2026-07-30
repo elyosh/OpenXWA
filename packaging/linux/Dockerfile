@@ -210,12 +210,6 @@ RUN mkdir -p /build/package/openxwa-linux-x86_64/licenses \
         /build/package/openxwa-linux-x86_64/licenses/zstd.txt \
     && cp /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt \
         /build/package/openxwa-linux-x86_64/licenses/FFmpeg-LGPL-2.1.txt \
-    && cp -L /usr/share/doc/libgcc-s1/copyright \
-        /build/package/openxwa-linux-x86_64/licenses/libgcc-s1.txt \
-    && cp -L /usr/share/doc/libstdc++6/copyright \
-        /build/package/openxwa-linux-x86_64/licenses/libstdc++6.txt \
-    && cp /usr/share/common-licenses/GPL-3 \
-        /build/package/openxwa-linux-x86_64/licenses/GPL-3.txt \
     && cp -L /opt/xwa-linux/lib/libSDL3.so.0 \
         /build/package/openxwa-linux-x86_64/lib/ \
     && cp -L /opt/xwa-linux/lib/libavcodec.so.62 \
@@ -230,10 +224,6 @@ RUN mkdir -p /build/package/openxwa-linux-x86_64/licenses \
         /build/package/openxwa-linux-x86_64/lib/ \
     && cp -L /opt/xwa-linux/lib/libzstd.so.1 \
         /build/package/openxwa-linux-x86_64/lib/ \
-    && cp -L "$(g++ -print-file-name=libgcc_s.so.1)" \
-        /build/package/openxwa-linux-x86_64/lib/ \
-    && cp -L "$(g++ -print-file-name=libstdc++.so.6)" \
-        /build/package/openxwa-linux-x86_64/lib/ \
     && patchelf --set-rpath '$ORIGIN/lib' \
         /build/package/openxwa-linux-x86_64/OpenXWA \
     && for library in /build/package/openxwa-linux-x86_64/lib/*.so*; do \
@@ -247,6 +237,33 @@ RUN test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.vert.s
     && env -u LD_LIBRARY_PATH ldd /build/package/openxwa-linux-x86_64/OpenXWA \
     && ! env -u LD_LIBRARY_PATH \
         ldd /build/package/openxwa-linux-x86_64/OpenXWA | grep -q "not found" \
+    # The GCC runtime must resolve from the host, never from the package: the
+    # host's Mesa Vulkan ICDs dlopen into the process and bind whichever
+    # libstdc++ is already loaded, so a bundled (older) copy breaks Vulkan
+    # device enumeration on newer distros.
+    && ! env -u LD_LIBRARY_PATH \
+        ldd /build/package/openxwa-linux-x86_64/OpenXWA \
+        | grep -E 'libstdc[+][+]|libgcc_s' | grep -q '/build/package' \
+    # Host baseline contract: glibc 2.35 and the GCC 12 runtime (Ubuntu 22.04
+    # era). Fail packaging if any shipped object requires newer symbol
+    # versions, or the glibc-2.36-only DT_RELR ABI, so a toolchain or
+    # dependency bump cannot silently raise the floor.
+    && for object in /build/package/openxwa-linux-x86_64/OpenXWA \
+        /build/package/openxwa-linux-x86_64/lib/*.so*; do \
+        if readelf -V "$object" | grep -q 'GLIBC_ABI_'; then \
+            echo "$object requires a GLIBC_ABI_* version (DT_RELR needs glibc 2.36+)" >&2; \
+            exit 1; \
+        fi; \
+        for bound in GLIBC_2.35 GLIBCXX_3.4.30 CXXABI_1.3.13; do \
+            required=$(readelf -V "$object" \
+                | grep -oE "${bound%_*}_[0-9][0-9.]*" | sort -uV | tail -n 1); \
+            if [ -n "$required" ] && \
+                [ "$(printf '%s\n%s\n' "$required" "$bound" | sort -V | tail -n 1)" != "$bound" ]; then \
+                echo "$object requires $required, above the $bound host baseline" >&2; \
+                exit 1; \
+            fi; \
+        done; \
+    done \
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
         readelf --sections /build/package/openxwa-linux-x86_64/OpenXWA \
             | grep -q '\.debug_info'; \

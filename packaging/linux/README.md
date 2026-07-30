@@ -5,8 +5,10 @@ executable, application resources, private shared libraries, and Vulkan SPIR-V
 shaders. SDL3, zstd, FFmpeg, and SDL_shadercross are downloaded and built
 inside Docker; they are not required on the host.
 
-The package targets Debian 12's glibc baseline. It still uses the Linux host's
-Vulkan driver, window system, input devices, and audio services.
+The package requires glibc 2.35 and the GCC 12 runtime or newer on the host
+(Ubuntu 22.04 era). It uses the Linux host's Vulkan driver, window system,
+input devices, and audio services. The GCC runtime is intentionally not
+bundled; see the Dockerfile for the rationale.
 
 The build requires the Docker Buildx plugin.
 
