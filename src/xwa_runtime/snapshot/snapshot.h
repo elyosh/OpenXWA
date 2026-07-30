@@ -422,10 +422,10 @@ typedef struct XwaFlightCamera {
 	uint16_t vp_w, vp_h;   /* g_flightVpWidth/Height */
 	int16_t vp_center_x;   /* g_flightVpCenterX */
 	int16_t vp_center_y;   /* g_flightVpCenterY */
-	int16_t proj_offset_y; /* g_projOffsetY (letterbox shift) */
-	/* Flight display mode (g_screenWidth/Height) — the logical frame
-	 * the classic presents at (matches Aeron's logical size in
-	 * flight); the driver's overlay rect uses it. */
+	int16_t proj_offset_y; /* g_projOffsetY (per-craft gunsight Y offset) */
+	/* Flight display mode (g_screenWidth/Height) — the classic 4:3
+	 * frame size the classic renderer presents at; the driver's
+	 * overlay rect uses it. */
 	uint16_t screen_w, screen_h;
 	/* g_flightBrightnessScaleQ8 — the classic display-brightness scale
 	 * the default explosion point-light case derives from. */

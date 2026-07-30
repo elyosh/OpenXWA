@@ -728,6 +728,11 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		}
 		g.scene_tex = next_scene_tex;
 		g.scene_kind = snap->scene_kind;
+		if (next_scene_is_direct != g.scene_is_direct && snap->scene_kind == XWA_SCENE_FLIGHT) {
+			Aeron_LogInfo("xwa.remaster", "flight presentation: %s (%dx%d)",
+						  next_scene_is_direct ? "direct to swapchain" : "composed",
+						  g.render_pixel_width, g.render_pixel_height);
+		}
 		g.scene_is_direct     = next_scene_is_direct;
 		g.scene_is_tonemapped = next_scene_is_tonemapped;
 		g.last_tick = snap->tick_index;

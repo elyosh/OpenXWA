@@ -1003,10 +1003,11 @@ static HRESULT XWA_DXAPI DDDevice_SetDisplayMode(IDirectDraw* self, uint32_t w, 
 	d->mode_bpp = (int)bpp;
 	d->mode_format = DDShim_FormatForBpp((int)bpp);
 	/* The DirectDraw mode describes classic surface allocation only. Aeron's
-	 * application-logical presentation size is permanently 1920x1080 and is
-	 * mapped to/from these surfaces at the composition/input boundary. Changing
-	 * it here would reinterpret the centered 4:3 safe-frame rectangle as
-	 * 640x480 coordinates and zoom/crop every submitted layer. */
+	 * application-logical presentation size is owned by the presentation frame
+	 * (fixed height, width tracking the window aspect) and is mapped to/from
+	 * these surfaces at the composition/input boundary. Changing it here would
+	 * reinterpret the centered 4:3 safe-frame rectangle as 640x480 coordinates
+	 * and zoom/crop every submitted layer. */
 	return DX_DD_OK;
 }
 

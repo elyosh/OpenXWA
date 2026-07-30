@@ -206,6 +206,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/runtime/frontend_task.c
     src/xwa_runtime/runtime/movie_task.c
     src/xwa_runtime/runtime/port.c
+    src/xwa_runtime/runtime/presentation.c
     src/xwa_runtime/snapshot/snapshot.c
     src/xwa_runtime/snapshot/snapshot_export.c
     src/xwa_runtime/snapshot/snapshot_hud.c

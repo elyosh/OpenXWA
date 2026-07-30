@@ -33,6 +33,38 @@ static int persist_modern_video_options(const XwaModernVideoOptions* options, ch
 	return XwaHostConfig_SaveVideoOptions(Aeron_GetVfs(), options, error, error_size);
 }
 
+/* Platform-conventional fullscreen toggle chord: Cmd+Ctrl+F on macOS,
+ * Alt+Enter on Windows, Alt+Enter or F11 elsewhere. */
+static int fullscreen_hotkey_pressed(const AeronInputSnapshot* in) {
+	if (!in) {
+		return 0;
+	}
+#if defined(__APPLE__)
+	return (in->key_down[AERON_KEY_LGUI] || in->key_down[AERON_KEY_RGUI]) &&
+		   (in->key_down[AERON_KEY_LCTRL] || in->key_down[AERON_KEY_RCTRL]) &&
+		   in->key_pressed[AERON_KEY_A + ('f' - 'a')];
+#else
+	const int alt = in->key_down[AERON_KEY_LALT] || in->key_down[AERON_KEY_RALT];
+	const int enter = in->key_pressed[AERON_KEY_RETURN] || in->key_pressed[AERON_KEY_KP_ENTER];
+#if defined(_WIN32)
+	return alt && enter;
+#else
+	return (alt && enter) || in->key_pressed[AERON_KEY_F11];
+#endif
+#endif
+}
+
+/* Window-mode changes route through the video options module so the apply
+ * callback, the options screen, and config persistence stay in agreement. */
+static void set_window_mode_option(XwaModernWindowMode mode) {
+	XwaModernVideoOptions options;
+	XwaModernVideoOptions_Get(&options);
+	if (options.window_mode != mode) {
+		options.window_mode = mode;
+		XwaModernVideoOptions_Set(&options);
+	}
+}
+
 static void apply_modern_input_options(const XwaModernInputOptions* options) {
 	XwaMouseFlight_SetOptions(options);
 	if (options) {
@@ -250,8 +282,9 @@ int main(int argc, char** argv) {
 	config.window_title = "OpenXWA";
 	config.window_icon_bmp = xwa_window_icon_bmp;
 	config.window_icon_bmp_size = sizeof(xwa_window_icon_bmp);
-	config.window_width = 1920;
-	config.window_height = 1080;
+	/* Windowed size auto-fits the primary display. The logical frame starts
+	 * at the 16:9 default and tracks the window aspect once the main loop
+	 * runs (XwaPresentation_SyncToWindow). */
 	config.logical_width = XWA_PRESENTATION_WIDTH;
 	config.logical_height = XWA_PRESENTATION_HEIGHT;
 	config.presentation_mode = AERON_PRESENTATION_ASPECT_FIT;
@@ -363,10 +396,30 @@ int main(int argc, char** argv) {
 	 * input path (edges pump inside the tick). */
 	{
 		int paused = 0;
+		int last_fullscreen = Aeron_Fullscreen();
 		while (!Aeron_QuitRequested() && !XwaPort_ShouldQuit()) {
 			const int32_t delta_us = Aeron_BeginFrame();
 			const AeronInputSnapshot* in = Aeron_InputSnapshot();
 			int toggled = 0;
+			if (in) {
+				XwaPresentation_SyncToWindow(in->window_width, in->window_height);
+			}
+			/* Reconcile OS-initiated fullscreen transitions (e.g. the macOS
+			 * green button) into the stored option. Edge-triggered on the
+			 * observed state so an in-flight transition is never fought. */
+			const int fullscreen = Aeron_Fullscreen();
+			if (fullscreen != last_fullscreen) {
+				last_fullscreen = fullscreen;
+				set_window_mode_option(fullscreen ? XWA_MODERN_WINDOW_MODE_FULLSCREEN
+												  : XWA_MODERN_WINDOW_MODE_WINDOWED);
+			}
+			/* The toggle frame skips the game tick like the other host
+			 * chords so the Enter/F/F11 edge never reaches classic input. */
+			if (fullscreen_hotkey_pressed(in)) {
+				set_window_mode_option(fullscreen ? XWA_MODERN_WINDOW_MODE_WINDOWED
+												  : XWA_MODERN_WINDOW_MODE_FULLSCREEN);
+				toggled = 1;
+			}
 			const int gui_mod = in && (in->key_down[AERON_KEY_LGUI] || in->key_down[AERON_KEY_RGUI]);
 			if (gui_mod && in->key_pressed[AERON_KEY_A + ('p' - 'a')]) {
 				paused = !paused;

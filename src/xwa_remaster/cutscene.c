@@ -3,6 +3,7 @@
 #include "aeron/aeron.h"
 #include "aeron/scene/draw_list2d.h"
 #include "xwa_remaster/text.h"
+#include "xwa_runtime/runtime/presentation.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -13,17 +14,6 @@ static struct {
 	int width;
 	int height;
 } g_cutscene;
-
-static void cutscene_safe_frame_size(int presentation_width, int presentation_height, int* width,
-									 int* height) {
-	if ((int64_t)presentation_width * XWA_CLASSIC_HEIGHT > (int64_t)presentation_height * XWA_CLASSIC_WIDTH) {
-		*height = presentation_height;
-		*width = (int)((int64_t)presentation_height * XWA_CLASSIC_WIDTH / XWA_CLASSIC_HEIGHT);
-	} else {
-		*width = presentation_width;
-		*height = (int)((int64_t)presentation_width * XWA_CLASSIC_HEIGHT / XWA_CLASSIC_WIDTH);
-	}
-}
 
 static int cutscene_ensure(int width, int height) {
 	if (g_cutscene.target && g_cutscene.width == width && g_cutscene.height == height) {
@@ -70,7 +60,11 @@ AeronTexture* XwaRemasterCutscene_Render(AeronCommandBuffer* cmd, const XwaSnaps
 		return NULL;
 	}
 
-	cutscene_safe_frame_size(presentation_width, presentation_height, &width, &height);
+	const XwaPresentationRect safe = XwaPresentation_AspectFit(
+		XWA_CLASSIC_WIDTH, XWA_CLASSIC_HEIGHT,
+		(XwaPresentationRect) { 0, 0, presentation_width, presentation_height });
+	width = safe.width;
+	height = safe.height;
 	if (width <= 0 || height <= 0 || !cutscene_ensure(width, height)) {
 		return NULL;
 	}
