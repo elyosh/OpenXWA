@@ -13,7 +13,7 @@
 #include "xwa/frontend/frontend_sound.h"
 #include "xwa/frontend/frontend_text.h"
 #include "xwa/frontend/mission_setup.h"
-#include "xwa/net/net.h"
+#include "xwa/frontend/net_transport.h"
 
 #include <stdio.h>
 #include <string.h>

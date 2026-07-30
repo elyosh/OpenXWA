@@ -13,7 +13,7 @@
 #include "xwa/frontend/frontend_screen.h"
 #include "xwa/frontend/frontend_sound.h"
 #include "xwa/frontend/frontend_text.h"
-#include "xwa/net/net.h"
+#include "xwa/frontend/net_transport.h"
 #include "xwa/util/memory.h"
 #include "xwa/xwa_options.h"
 

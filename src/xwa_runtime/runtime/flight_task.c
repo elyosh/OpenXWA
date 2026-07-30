@@ -34,7 +34,9 @@
 #include "xwa/flight/mission/mission.h"
 #include "xwa/flight/yard.h"
 #include "xwa/flight/film.h"
-#include "xwa/net/net.h"
+#include "xwa/flight/flight_net.h"
+#include "xwa/flight/flight_sync.h"
+#include "xwa/flight/net_session.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/flight/player/player.h"
 #include "xwa/render/effects.h"
@@ -680,7 +682,7 @@ static void XwaFlightTask_RenderFrameAndAudio(const XwaFlightTaskLoopTiming* tim
 	g_inputTimestamp += (int)Time_GetFrameDelta();
 	XwaFlightTask_UpdateNetworkIndicators();
 	renderStartTimestamp = g_inputTimestamp;
-	FlightNet_ApplyRemotePlayerRenderSmoothing();
+	FlightSync_ApplyRemotePlayerRenderSmoothing();
 	if (g_flightPlayerCount > 1) {
 		g_flightSfxSideEffectGate = 1;
 	}
@@ -695,7 +697,7 @@ static void XwaFlightTask_RenderFrameAndAudio(const XwaFlightTaskLoopTiming* tim
 		g_xwaFlightTaskLastSoundUpdateTimestamp = g_inputTimestamp;
 		Sound_Update3DListenerAndSources();
 	}
-	FlightNet_CaptureRemotePlayerRenderSamples();
+	FlightSync_CaptureRemotePlayerRenderSamples();
 	g_inputTimestamp += (int)Time_GetFrameDelta();
 	renderTicks = g_inputTimestamp - renderStartTimestamp;
 	loopTicks = g_inputTimestamp - timing->frameStartTimestamp;
@@ -1168,7 +1170,7 @@ static int XwaFlightTask_RunMultiplayerFrame(void) {
 	g_inputTimestamp = targetTimestamp;
 	g_xwaFlightTaskPredictedFrameDelta = targetTimestamp - g_xwaFlightTaskLastStepTargetTimestamp;
 	FlightNet_SampleAndSendInput();
-	FlightNet_QueuePredictedRemoteInputFrames(g_xwaFlightTaskPredictedFrameDelta);
+	FlightSync_QueuePredictedRemoteInputFrames(g_xwaFlightTaskPredictedFrameDelta);
 	g_flightSimSideEffectsSuppressed = 1;
 	Flight_StepSimToTime(g_inputTimestamp);
 	XwaFlightTask_EnterRequestedHangarReady(XWA_FLIGHT_TASK_HANGAR_CONTINUE_FLIGHT);
@@ -1351,7 +1353,7 @@ void XwaFlightTask_Tick(void) {
 				g_sw3dSkipOddScanlines = 0;
 				g_flightNetHostAbortReceived = 0;
 				fsfx_ClearSfxNameTable();
-				FlightNet_ResetRemotePlayerRenderSmoothing();
+				FlightSync_ResetRemotePlayerRenderSmoothing();
 				Time_ResetFrameDeltaClocks();
 				g_flightDisplaySurfacesActive = 1;
 				g_flightSimSideEffectsSuppressed = 0;
@@ -1615,10 +1617,10 @@ void XwaFlightTask_Tick(void) {
 					}
 				}
 				if (g_flightPlayerCount <= 1) {
-					FlightNet_ResetWorldMessageBufferCursor();
+					FlightSync_ResetWorldMessageBufferCursor();
 				} else {
 					Flight_AllocWorldStateBuffers();
-					FlightNet_ResetWorldMessageBufferCursor();
+					FlightSync_ResetWorldMessageBufferCursor();
 					Flight_SaveWorldState();
 				}
 				ForceFeedback_EnableEffects();
@@ -1711,7 +1713,7 @@ void XwaFlightTask_Tick(void) {
 
 					g_flightDisplaySurfacesActive = 1;
 					memset(g_playerAbortFlags, 0, sizeof(g_playerAbortFlags));
-					FlightNet_ResetRemotePlayerRenderSmoothing();
+					FlightSync_ResetRemotePlayerRenderSmoothing();
 					Time_ResetFrameDeltaClocks();
 					g_localPlayer = NetSession_FindPlayerSlotByDpid(NetSession_GetLocalDplayId());
 					playerCount = NetSession_GetPlayerCount();

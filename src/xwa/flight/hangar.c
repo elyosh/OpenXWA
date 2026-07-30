@@ -42,7 +42,6 @@
 #include "xwa/flight/mission/mission.h"
 #include "xwa/flight/yard.h"
 #include "xwa/flight/film.h"
-#include "xwa/net/net.h"
 #include "xwa/flight/object/laser.h"
 #include "xwa/flight/player/player.h"
 #ifdef XWA_MODERN

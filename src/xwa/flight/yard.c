@@ -21,7 +21,7 @@
 #include "xwa/math/scalar.h"
 #include "xwa/math/trig2.h"
 #include "xwa/flight/mission/mission.h"
-#include "xwa/net/net.h"
+#include "xwa/flight/net_session.h"
 #include "xwa/flight/object/laser.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/flight/player/player.h"

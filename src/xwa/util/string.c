@@ -2,6 +2,9 @@
 
 #include <ctype.h>
 
+// GLOBAL: XWA 0x631860
+char g_emptyString[1];
+
 int Xwa_Stricmp(const char* left, const char* right) {
 	unsigned char leftCh;
 	unsigned char rightCh;

@@ -6,7 +6,7 @@
 #include "xwa/frontend/frontend_resources.h"
 #include "xwa/frontend/frontend_scrollbar.h"
 #include "xwa/frontend/mission_setup.h"
-#include "xwa/net/net.h"
+#include "xwa/frontend/net_transport.h"
 
 // GLOBAL: XWA 0x9EAC40
 MpRosterEntry g_mpRoster[8];

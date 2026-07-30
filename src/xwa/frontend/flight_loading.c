@@ -20,7 +20,9 @@
 #include "xwa/frontend/frontend_text.h"
 #include "xwa/frontend/mission_briefing.h"
 #include "xwa/frontend/mission_setup.h"
-#include "xwa/net/net.h"
+#include "xwa/flight/flight_net.h"
+#include "xwa/flight/net_session.h"
+#include "xwa/frontend/net_transport.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/time.h"
 

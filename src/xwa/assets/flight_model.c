@@ -14,7 +14,6 @@
 #include "xwa/frontend/frontend_display.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/flight/mission/mission.h"
-#include "xwa/net/net.h"
 #include "xwa/flight/player/player.h"
 #include "xwa/render/renderer.h"
 #include "xwa/render/renderer_internal.h"

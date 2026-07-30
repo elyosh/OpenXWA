@@ -30,8 +30,9 @@
 #include "xwa/frontend/frontend_text.h"
 #include "xwa/frontend/frontend_wave_stream.h"
 #include "xwa/frontend/mission_setup.h"
-#include "xwa/net/net.h"
+#include "xwa/flight/net_session.h"
 #include "xwa/util/memory.h"
+#include "xwa/util/string.h"
 #include "xwa/xwa_options.h"
 #include "xwa_runtime/timing/host_clock.h"
 

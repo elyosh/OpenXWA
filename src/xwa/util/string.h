@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+extern char g_emptyString[1];
+
 int Xwa_Stricmp(const char* left, const char* right);
 int StrCmpI(const char* lhs, const char* rhs);
 

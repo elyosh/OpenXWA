@@ -10,6 +10,9 @@ int FlightDebug_JoystickTraceEnabled(void);
 void FlightDebug_SetJoystickTraceEnabled(int enabled);
 int FlightDebug_GimbalLockFixEnabled(void);
 void FlightDebug_SetGimbalLockFixEnabled(int enabled);
+#ifdef XWA_MODERN
+void FlightDebug_CaptureJoystickInputSample(int timestamp);
+#endif
 
 #ifdef __cplusplus
 }

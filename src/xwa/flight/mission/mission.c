@@ -24,13 +24,14 @@
 #include "xwa/math/trig2.h"
 #include "xwa/flight/yard.h"
 #include "xwa/flight/film.h"
-#include "xwa/net/net.h"
+#include "xwa/flight/net_session.h"
 #include "xwa/flight/object/laser.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/flight/player/player.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/random.h"
+#include "xwa/util/string.h"
 #include "xwa/util/time.h"
 
 #include <locale.h>

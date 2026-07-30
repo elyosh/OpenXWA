@@ -1,4 +1,5 @@
 #include "xwa/flight/fediskio.h"
+#include "xwa/flight/net_session.h"
 #include "xwa/render/effects.h"
 #include "xwa/render/renderer_internal.h"
 

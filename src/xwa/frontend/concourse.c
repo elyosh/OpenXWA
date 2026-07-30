@@ -37,7 +37,7 @@
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/frontend/skirmish.h"
 #include "xwa/frontend/tech_library.h"
-#include "xwa/net/net.h"
+#include "xwa/frontend/net_transport.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"
 #include "xwa/xwa_options.h"

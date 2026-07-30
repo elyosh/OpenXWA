@@ -9,7 +9,7 @@
 #include "xwa/frontend/frontend_mission_session.h"
 #include "xwa/frontend/frontend_net.h"
 #include "xwa/frontend/frontend_screen.h"
-#include "xwa/net/net.h"
+#include "xwa/frontend/net_transport.h"
 #include "xwa/util/debug.h"
 
 static int g_frontendEscapeConfigModalActive;

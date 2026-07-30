@@ -36,7 +36,7 @@
 #include "xwa/frontend/frontend_wave_stream.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/movie/movie.h"
-#include "xwa/net/net.h"
+#include "xwa/frontend/net_transport.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"
 

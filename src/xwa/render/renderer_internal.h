@@ -17,7 +17,6 @@
 #include "xwa/math/fixed.h"
 #include "xwa/math/scalar.h"
 #include "xwa/math/trig2.h"
-#include "xwa/net/net.h"
 #include "xwa/flight/player/player.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"

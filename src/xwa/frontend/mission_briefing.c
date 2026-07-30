@@ -39,7 +39,8 @@
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/frontend/model_preview.h"
 #include "xwa/frontend/tech_library.h"
-#include "xwa/net/net.h"
+#include "xwa/flight/net_session.h"
+#include "xwa/frontend/net_transport.h"
 #include "xwa/util/memory.h"
 #include "xwa/util/time.h"
 

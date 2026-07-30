@@ -113,6 +113,7 @@ set(XWA_RECOVERED_SOURCES
     src/xwa/frontend/frontend_mission_list.c
     src/xwa/frontend/frontend_mission_session.c
     src/xwa/frontend/frontend_net.c
+    src/xwa/frontend/net_transport.c
     src/xwa/frontend/frontend_resources.c
     src/xwa/frontend/frontend_scratch.c
     src/xwa/frontend/frontend_screen.c
@@ -137,6 +138,8 @@ set(XWA_RECOVERED_SOURCES
     src/xwa/flight/fediskio.c
     src/xwa/flight/film.c
     src/xwa/flight/flight.c
+    src/xwa/flight/flight_net.c
+    src/xwa/flight/flight_sync.c
     src/xwa/flight/flight_display.c
     src/xwa/flight/flight_light.c
     src/xwa/flight/flight_map.c
@@ -145,6 +148,7 @@ set(XWA_RECOVERED_SOURCES
     src/xwa/flight/hangar.c
     src/xwa/flight/hud/hud.c
     src/xwa/flight/mission/mission.c
+    src/xwa/flight/net_session.c
     src/xwa/flight/object/collision.c
     src/xwa/flight/object/damage.c
     src/xwa/flight/object/debris.c
@@ -161,7 +165,6 @@ set(XWA_RECOVERED_SOURCES
     src/xwa/math/scalar.c
     src/xwa/math/trig2.c
     src/xwa/movie/movie.c
-    src/xwa/net/net.c
     src/xwa/render/effects.c
     src/xwa/render/engine_glow.c
     src/xwa/render/lens_flare.c
@@ -518,6 +521,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa/flight/flight.h
     src/xwa/flight/flight_debug.h
     src/xwa/flight/flight_map.h
+    src/xwa/flight/flight_sync.h
     src/xwa/flight/object/collision.h
     src/xwa/flight/object/damage.h
     src/xwa/flight/flight_light.h
@@ -527,7 +531,6 @@ set(XWA_FORMAT_HEADERS
     src/xwa/frontend/skirmish.h
     src/xwa/frontend/tech_library.h
     src/xwa/movie/movie.h
-    src/xwa/net/net.h
     src/xwa/flight/player/player.h
     src/xwa/render/renderer.h
     src/xwa/xwa.h

@@ -7,7 +7,6 @@
 #include "xwa/assets/sprite_resource.h"
 #include "xwa/assets/sprite_texture.h"
 #include "xwa/frontend/frontend_display.h"
-#include "xwa/net/net.h"
 #include "xwa/render/renderer.h"
 #include "xwa/render/std3d_device.h"
 #include "xwa/util/byte_order.h"

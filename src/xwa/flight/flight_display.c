@@ -12,7 +12,7 @@
 #include "xwa/frontend/frontend_image.h"
 #include "xwa/frontend/frontend_screen.h"
 #include "xwa/input/dinput.h"
-#include "xwa/net/net.h"
+#include "xwa/flight/net_session.h"
 #include "xwa/render/renderer.h"
 #include "xwa/render/renderer_internal.h"
 #include "xwa/util/debug.h"

@@ -16,7 +16,7 @@
 #include "xwa/frontend/mission_briefing.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/frontend/skirmish.h"
-#include "xwa/net/net.h"
+#include "xwa/frontend/net_transport.h"
 #include "xwa/util/memory.h"
 
 #include <stdint.h>

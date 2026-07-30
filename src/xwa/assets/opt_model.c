@@ -9,7 +9,7 @@
 #include "xwa/assets/model_texture.h"
 #include "xwa/config/game_config.h"
 #include "xwa/frontend/frontend_display.h"
-#include "xwa/net/net.h"
+#include "xwa/flight/net_session.h"
 #include "xwa/render/renderer.h"
 #include "xwa/render/std3d_device.h"
 #include "xwa/util/byte_order.h"

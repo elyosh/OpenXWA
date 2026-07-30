@@ -31,7 +31,8 @@
 #include "xwa/math/trig2.h"
 #include "xwa/flight/mission/mission.h"
 #include "xwa/flight/yard.h"
-#include "xwa/net/net.h"
+#include "xwa/flight/flight_net.h"
+#include "xwa/flight/net_session.h"
 #include "xwa/flight/player/player.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/snapshot/snapshot_hud.h"
@@ -39,6 +40,7 @@
 #include "xwa/render/effects.h"
 #include "xwa/render/renderer_internal.h"
 #include "xwa/util/debug.h"
+#include "xwa/util/string.h"
 #include "xwa/util/time.h"
 #include "xwa_runtime/timing/host_clock.h"
 
