@@ -322,6 +322,9 @@ void XwaPort_Tick(int32_t delta_us) {
 
 void XwaPort_PausedFrame(void) {
 	XwaPort_ApplyClassicFlightRenderingPolicy();
+	if (XwaFlightTask_IsActive()) {
+		DInputShim_PumpSuppressed();
+	}
 	XwaMovieTask_ReapFinished();
 	if (XwaMovieTask_IsActive()) {
 		XwaMovieTask_PausedFrame();

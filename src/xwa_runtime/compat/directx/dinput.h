@@ -138,9 +138,11 @@ extern const DIDATAFORMAT c_dfDIJoystick;
 HRESULT XWA_DXAPI DirectInputCreateA(void* hinst, uint32_t version, IDirectInputA** out, void* outer);
 
 /* Captures the current Aeron input frame into the keyboard/mouse devices. The host
- * shell calls this once per frame so buffered key edges accumulate independently of
- * the game's fixed-step polling. No-op until DirectInput devices are created. */
+ * shell calls this once per normal frame so buffered key edges accumulate independently
+ * of the game's fixed-step polling. No-op until DirectInput devices are created. */
 void DInputShim_Pump(void);
+/* Captures keyboard state on a host-suppressed frame without forwarding key presses. */
+void DInputShim_PumpSuppressed(void);
 
 /* --- Force feedback (IDirectInputDevice2 / IDirectInputEffect) ------------- *
  * The recovered force-feedback code (forcefeedback.c) drives DirectInput 5 effect

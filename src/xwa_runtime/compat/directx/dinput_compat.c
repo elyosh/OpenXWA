@@ -3,8 +3,8 @@
  * COM methods (CreateDevice / SetDataFormat / SetProperty / Acquire / GetDeviceState
  * / GetDeviceData); this file services them from Aeron_InputSnapshot().
  *
- * Capture model: DInputShim_Pump samples the Aeron snapshot into the devices once
- * per host frame (the shim's analog of DirectInput's asynchronous capture),
+ * Capture model: host pumps sample the Aeron snapshot into the devices once per
+ * host frame (the shim's analog of DirectInput's asynchronous capture),
  * translating key_down into the immediate DIK state and key_pressed/key_released
  * into buffered make/break events. Device reads (GetDeviceState/GetDeviceData) are
  * pure reads of that captured state, so no buffered key edge is missed on frames the
@@ -200,10 +200,10 @@ typedef struct DInputShim {
 	int refcount;
 } DInputShim;
 
-/* The single keyboard/mouse device instances, tracked so DInputShim_Pump can capture
- * input edges every host frame -- the recovered flight loop polls at a fixed step
- * slower than the host frame rate, so on-read sampling alone would miss the one-frame
- * key_pressed/key_released edges on frames the game does not poll. */
+/* The single keyboard/mouse device instances, tracked so the host input pumps can
+ * capture input edges every host frame -- the recovered flight loop polls at a fixed
+ * step slower than the host frame rate, so on-read sampling alone would miss the
+ * one-frame key_pressed/key_released edges on frames the game does not poll. */
 static DInputDeviceShim* g_shimKeyboardDevice;
 static DInputDeviceShim* g_shimMouseDevice;
 
@@ -225,7 +225,7 @@ static uint32_t DInputShim_RingCount(const DInputDeviceShim* d) {
 }
 
 /* Sample the current Aeron snapshot into this device once per frame. */
-static void DInputShim_Sample(DInputDeviceShim* d) {
+static void DInputShim_Sample(DInputDeviceShim* d, int suppress_keyboard_presses) {
 	const AeronInputSnapshot* in = Aeron_InputSnapshot();
 	int k;
 	int focus;
@@ -248,7 +248,7 @@ static void DInputShim_Sample(DInputDeviceShim* d) {
 			}
 			/* Buffered make/break edges. A make is suppressed without focus; a break
 			 * is always delivered so held keys release when focus is lost. */
-			if (focus && in->key_pressed[k]) {
+			if (focus && in->key_pressed[k] && !suppress_keyboard_presses) {
 				DInputShim_RingPush(d, dik, 0x80);
 			}
 			if (in->key_released[k]) {
@@ -1034,7 +1034,7 @@ static HRESULT XWA_DXAPI DInput_CreateDevice(IDirectInputA* self, const DxGuid* 
 	/* Capture the current frame immediately so the device reports valid state on the
 	 * first read (DInput_Init reads modifier state right after creation, before the
 	 * next per-frame pump). Subsequent frames are captured by DInputShim_Pump. */
-	DInputShim_Sample(d);
+	DInputShim_Sample(d, 0);
 	*out = (IDirectInputDeviceA*)d;
 	return DI_OK;
 }
@@ -1044,10 +1044,16 @@ static HRESULT XWA_DXAPI DInput_CreateDevice(IDirectInputA* self, const DxGuid* 
  * cadence; the per-frame frame_id guard makes it idempotent with on-read sampling. */
 void DInputShim_Pump(void) {
 	if (g_shimKeyboardDevice) {
-		DInputShim_Sample(g_shimKeyboardDevice);
+		DInputShim_Sample(g_shimKeyboardDevice, 0);
 	}
 	if (g_shimMouseDevice) {
-		DInputShim_Sample(g_shimMouseDevice);
+		DInputShim_Sample(g_shimMouseDevice, 0);
+	}
+}
+
+void DInputShim_PumpSuppressed(void) {
+	if (g_shimKeyboardDevice) {
+		DInputShim_Sample(g_shimKeyboardDevice, 1);
 	}
 }
 
