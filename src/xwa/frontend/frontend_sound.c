@@ -57,11 +57,7 @@ int FrontendSound_LoadList(char* fileName) {
 	char soundFileName[256];
 	char soundName[256];
 
-#ifdef XWA_MODERN
 	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "r");
-#else
-	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "r");
-#endif
 	if (stream == NULL) {
 		return 0;
 	}
@@ -114,11 +110,7 @@ int FrontendSound_UnloadList(char* fileName) {
 	char soundFileName[256];
 	char soundName[256];
 
-#ifdef XWA_MODERN
 	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "r");
-#else
-	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "r");
-#endif
 	if (stream == NULL) {
 		return 0;
 	}

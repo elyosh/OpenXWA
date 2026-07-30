@@ -34,11 +34,7 @@ int SceneBillboard_ComputeProjectedSize(int depthZ, uint16_t modelMaxExtent, int
 		scaledDepth = modelMaxExtent / scaledDepth;
 	}
 	{
-#ifdef XWA_MODERN
 		int result = (baseScreenSize & 0xffff) * scaledDepth;
-#else
-		int result = (baseScreenSize & 0xffff) * scaledDepth;
-#endif
 
 		scaledDepth = clampTo1024;
 		result >>= 8;
