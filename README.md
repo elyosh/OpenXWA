@@ -1,4 +1,5 @@
 # OpenXWA
+![GitHub Release](https://img.shields.io/github/v/release/elyosh/OpenXWA)
 
 ![Screenshot of the Azzameen hangar in OpenXWA](assets/openxwa_hangar.jpg)
 
