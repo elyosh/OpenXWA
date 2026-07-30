@@ -481,25 +481,81 @@ static int host_config_gamepad_axis_source(const AeronConfigFile* config, const 
 	return 1;
 }
 
-static int host_config_gamepad_button_source(const AeronConfigFile* config, const char* key, int required,
-											 int* out, char* error, size_t error_size) {
+static int host_config_controller_digital_binding(const AeronConfigFile* config, const char* key,
+												  int required, int gamepad, XwaControllerDigitalBinding* out,
+												  char* error, size_t error_size) {
 	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	const AeronConfigNode* axis_node;
+	const AeronConfigNode* direction_node;
+	const AeronConfigNode* threshold_node;
 	const char* value;
-	AeronGamepadButton button;
+	int source;
 
 	if (!node) {
 		return host_config_input_missing(required, key, error, error_size);
 	}
-	value = AeronConfigNode_String(node, NULL);
-	if (value && strcmp(value, "none") == 0) {
-		*out = -1;
+	out->threshold = XWA_CONTROLLER_DIGITAL_THRESHOLD_DEFAULT;
+	if (AeronConfigNode_Type(node) == AERON_CONFIG_MAP) {
+		axis_node = AeronConfigNode_MapGet(node, "axis");
+		direction_node = AeronConfigNode_MapGet(node, "direction");
+		threshold_node = AeronConfigNode_MapGet(node, "threshold");
+		if (!axis_node) {
+			return host_config_error(error, error_size, "invalid input setting '%s'", key);
+		}
+		if (gamepad) {
+			AeronGamepadAxis axis = Aeron_GamepadAxisFromName(AeronConfigNode_String(axis_node, NULL));
+			if (axis >= AERON_GAMEPAD_AXIS_COUNT) {
+				return host_config_error(error, error_size, "invalid input setting '%s'", key);
+			}
+			source = (int)axis;
+		} else {
+			const int64_t axis = AeronConfigNode_Int(axis_node, -1);
+			if (AeronConfigNode_Type(axis_node) != AERON_CONFIG_INT || axis < 0 ||
+				axis >= AERON_CONTROLLER_AXIS_MAX) {
+				return host_config_error(error, error_size, "invalid input setting '%s'", key);
+			}
+			source = (int)axis;
+		}
+		value = direction_node ? AeronConfigNode_String(direction_node, NULL) : "positive";
+		if (value && strcmp(value, "positive") == 0) {
+			out->kind = XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE;
+		} else if (value && strcmp(value, "negative") == 0) {
+			out->kind = XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE;
+		} else {
+			return host_config_error(error, error_size, "invalid input setting '%s'", key);
+		}
+		if (threshold_node) {
+			const double threshold = AeronConfigNode_Float(threshold_node, NAN);
+			if (!isfinite(threshold) || threshold <= 0.0 || threshold > 1.0) {
+				return host_config_error(error, error_size, "invalid input setting '%s'", key);
+			}
+			out->threshold = (float)threshold;
+		}
+		out->source = source;
 		return 1;
 	}
-	button = Aeron_GamepadButtonFromName(value);
-	if (button >= AERON_GAMEPAD_BUTTON_COUNT) {
-		return host_config_error(error, error_size, "invalid input setting '%s'", key);
+	value = AeronConfigNode_String(node, NULL);
+	if (value && strcmp(value, "none") == 0) {
+		out->kind = XWA_CONTROLLER_DIGITAL_NONE;
+		out->source = -1;
+		return 1;
 	}
-	*out = (int)button;
+	if (gamepad) {
+		const AeronGamepadButton button = Aeron_GamepadButtonFromName(value);
+		if (button >= AERON_GAMEPAD_BUTTON_COUNT) {
+			return host_config_error(error, error_size, "invalid input setting '%s'", key);
+		}
+		source = (int)button;
+	} else {
+		const int64_t button = AeronConfigNode_Int(node, -1);
+		if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || button < 0 ||
+			button >= AERON_CONTROLLER_BUTTON_MAX) {
+			return host_config_error(error, error_size, "invalid input setting '%s'", key);
+		}
+		source = (int)button;
+	}
+	out->kind = XWA_CONTROLLER_DIGITAL_BUTTON;
+	out->source = source;
 	return 1;
 }
 
@@ -574,13 +630,13 @@ static int host_config_controller_buttons(const AeronConfigFile* config, int req
 
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
 		snprintf(key, sizeof(key), "input.controller.gamepad.buttons.%d", i + 1);
-		if (!host_config_gamepad_button_source(config, key, required, &controller->gamepad.buttons[i], error,
-											   error_size)) {
+		if (!host_config_controller_digital_binding(config, key, required, 1, &controller->gamepad.buttons[i],
+													error, error_size)) {
 			return 0;
 		}
 		snprintf(key, sizeof(key), "input.controller.joystick.buttons.%d", i + 1);
-		if (!host_config_raw_source(config, key, required, AERON_CONTROLLER_BUTTON_MAX,
-									&controller->joystick.buttons[i], error, error_size)) {
+		if (!host_config_controller_digital_binding(config, key, required, 0,
+													&controller->joystick.buttons[i], error, error_size)) {
 			return 0;
 		}
 	}
@@ -1098,6 +1154,25 @@ static int host_yaml_set_sequence_node(yaml_document_t* document, int mapping_id
 	}
 }
 
+static int host_yaml_set_mapping_node(yaml_document_t* document, int parent_id, const char* key,
+									  int mapping_id) {
+	size_t pair_index = 0;
+	const int existing_value_id = host_yaml_mapping_value(document, parent_id, key, &pair_index);
+
+	if (!mapping_id) {
+		return 0;
+	}
+	if (existing_value_id) {
+		yaml_node_t* parent = yaml_document_get_node(document, parent_id);
+		parent->data.mapping.pairs.start[pair_index].value = mapping_id;
+		return 1;
+	}
+	{
+		const int key_id = host_yaml_add_scalar(document, key, YAML_PLAIN_SCALAR_STYLE);
+		return key_id && yaml_document_append_mapping_pair(document, parent_id, key_id, mapping_id);
+	}
+}
+
 static int host_yaml_set_controller_axis(yaml_document_t* document, int axes_id, const char* name,
 										 const XwaControllerAxisBinding* binding, int gamepad) {
 	int axis_id = host_yaml_get_or_add_mapping(document, axes_id, name);
@@ -1128,6 +1203,63 @@ static int host_yaml_set_controller_axis(yaml_document_t* document, int axes_id,
 		   host_yaml_set_scalar(document, axis_id, "deadzone", deadzone_text, YAML_PLAIN_SCALAR_STYLE);
 }
 
+static int host_yaml_set_controller_button(yaml_document_t* document, int buttons_id, const char* key,
+										   const XwaControllerDigitalBinding* binding, int gamepad) {
+	char source_text[16];
+	const char* source_name;
+	yaml_scalar_style_t source_style;
+
+	if (binding->kind == XWA_CONTROLLER_DIGITAL_NONE) {
+		return host_yaml_set_scalar(document, buttons_id, key, "none", YAML_SINGLE_QUOTED_SCALAR_STYLE);
+	}
+	if (binding->kind == XWA_CONTROLLER_DIGITAL_BUTTON) {
+		if (gamepad) {
+			source_name = Aeron_GamepadButtonName((AeronGamepadButton)binding->source);
+			source_style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+			if (!source_name) {
+				return 0;
+			}
+		} else {
+			snprintf(source_text, sizeof(source_text), "%d", binding->source);
+			source_name = source_text;
+			source_style = YAML_PLAIN_SCALAR_STYLE;
+		}
+		return host_yaml_set_scalar(document, buttons_id, key, source_name, source_style);
+	}
+	if (binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE ||
+		binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
+		char threshold_text[32];
+		int mapping_id =
+			yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_FLOW_MAPPING_STYLE);
+		if (!mapping_id) {
+			return 0;
+		}
+		if (gamepad) {
+			source_name = Aeron_GamepadAxisName((AeronGamepadAxis)binding->source);
+			source_style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+			if (!source_name) {
+				return 0;
+			}
+		} else {
+			snprintf(source_text, sizeof(source_text), "%d", binding->source);
+			source_name = source_text;
+			source_style = YAML_PLAIN_SCALAR_STYLE;
+		}
+		snprintf(threshold_text, sizeof(threshold_text), "%.6g", (double)binding->threshold);
+		if (!host_yaml_set_scalar(document, mapping_id, "axis", source_name, source_style) ||
+			!host_yaml_set_scalar(document, mapping_id, "direction",
+								  binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE ? "positive"
+																						: "negative",
+								  YAML_SINGLE_QUOTED_SCALAR_STYLE) ||
+			!host_yaml_set_scalar(document, mapping_id, "threshold", threshold_text,
+								  YAML_PLAIN_SCALAR_STYLE)) {
+			return 0;
+		}
+		return host_yaml_set_mapping_node(document, buttons_id, key, mapping_id);
+	}
+	return 0;
+}
+
 static int host_yaml_set_controller_actions(yaml_document_t* document, int profile_id,
 											const uint16_t actions[XWA_CONTROLLER_ACTION_COUNT]);
 
@@ -1155,26 +1287,9 @@ static int host_yaml_set_controller_profile(yaml_document_t* document, int contr
 	}
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
 		char key[8];
-		char value[16];
-		const char* source_name;
-		yaml_scalar_style_t style;
 
 		snprintf(key, sizeof(key), "%d", i + 1);
-		if (profile->buttons[i] < 0) {
-			source_name = "none";
-			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-		} else if (gamepad) {
-			source_name = Aeron_GamepadButtonName((AeronGamepadButton)profile->buttons[i]);
-			style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-			if (!source_name) {
-				return 0;
-			}
-		} else {
-			snprintf(value, sizeof(value), "%d", profile->buttons[i]);
-			source_name = value;
-			style = YAML_PLAIN_SCALAR_STYLE;
-		}
-		if (!host_yaml_set_scalar(document, buttons_id, key, source_name, style)) {
+		if (!host_yaml_set_controller_button(document, buttons_id, key, &profile->buttons[i], gamepad)) {
 			return 0;
 		}
 	}

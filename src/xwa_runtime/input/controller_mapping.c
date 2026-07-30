@@ -13,6 +13,7 @@ typedef struct XwaControllerMappingState {
 	XwaControllerOptions options;
 	int configured;
 	uint32_t previous_instance_id;
+	uint32_t digital_axis_buttons;
 } XwaControllerMappingState;
 
 static XwaControllerMappingState g_controllerMapping;
@@ -30,7 +31,9 @@ static int ControllerMapping_ProfileEqual(const XwaControllerProfile* lhs, const
 		}
 	}
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
-		if (lhs->buttons[i] != rhs->buttons[i]) {
+		if (lhs->buttons[i].kind != rhs->buttons[i].kind ||
+			lhs->buttons[i].source != rhs->buttons[i].source ||
+			lhs->buttons[i].threshold != rhs->buttons[i].threshold) {
 			return 0;
 		}
 	}
@@ -127,7 +130,7 @@ static uint32_t ControllerMapping_TriggerAxis(int16_t value, int invert, float d
 	return (uint32_t)(normalized * CONTROLLER_AXIS_RANGE);
 }
 
-static int ControllerMapping_ButtonDown(const AeronControllerSnapshot* controller, int source) {
+static int ControllerMapping_PhysicalButtonDown(const AeronControllerSnapshot* controller, int source) {
 	if (source < 0) {
 		return 0;
 	}
@@ -136,6 +139,42 @@ static int ControllerMapping_ButtonDown(const AeronControllerSnapshot* controlle
 	}
 	return source < controller->button_count && source < AERON_CONTROLLER_BUTTON_MAX &&
 		   (controller->raw_buttons & (UINT64_C(1) << source)) != 0;
+}
+
+static double ControllerMapping_DigitalAxisMagnitude(const AeronControllerSnapshot* controller,
+													 const XwaControllerDigitalBinding* binding) {
+	const int16_t value = ControllerMapping_AxisValue(controller, binding->source);
+
+	if (binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE) {
+		return value > 0 ? (double)value / 32767.0 : 0.0;
+	}
+	if (binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
+		return value < 0 ? (double)-value / 32768.0 : 0.0;
+	}
+	return 0.0;
+}
+
+static int ControllerMapping_DigitalDown(const AeronControllerSnapshot* controller,
+										 const XwaControllerDigitalBinding* binding, int was_down) {
+	double release_threshold;
+	double magnitude;
+
+	if (binding->kind == XWA_CONTROLLER_DIGITAL_BUTTON) {
+		return ControllerMapping_PhysicalButtonDown(controller, binding->source);
+	}
+	if (binding->kind != XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE &&
+		binding->kind != XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
+		return 0;
+	}
+	magnitude = ControllerMapping_DigitalAxisMagnitude(controller, binding);
+	if (!was_down) {
+		return magnitude >= binding->threshold;
+	}
+	release_threshold = binding->threshold - 0.1;
+	if (release_threshold < 0.0) {
+		release_threshold = 0.0;
+	}
+	return magnitude > release_threshold;
 }
 
 static uint8_t ControllerMapping_Hat(const AeronControllerSnapshot* controller,
@@ -207,7 +246,13 @@ static void ControllerMapping_LogUnavailableSources(const AeronControllerSnapsho
 		unavailable_axes += profile->axes[i].source >= controller->axis_count;
 	}
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
-		unavailable_buttons += profile->buttons[i] >= controller->button_count;
+		const XwaControllerDigitalBinding* binding = &profile->buttons[i];
+		if (binding->kind == XWA_CONTROLLER_DIGITAL_BUTTON) {
+			unavailable_buttons += binding->source >= controller->button_count;
+		} else if (binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE ||
+				   binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
+			unavailable_axes += binding->source >= controller->axis_count;
+		}
 	}
 	unavailable_pov = profile->pov_source >= controller->hat_count;
 	if (unavailable_axes || unavailable_buttons || unavailable_pov) {
@@ -219,12 +264,16 @@ static void ControllerMapping_LogUnavailableSources(const AeronControllerSnapsho
 	}
 }
 
-void XwaControllerMapping_MapSnapshot(const XwaControllerOptions* options,
-									  const AeronControllerSnapshot* controller, int has_focus,
-									  XwaControllerLogicalState* state) {
+static void ControllerMapping_MapSnapshot(const XwaControllerOptions* options,
+										  const AeronControllerSnapshot* controller, int has_focus,
+										  uint32_t previous_axis_buttons, uint32_t* axis_buttons,
+										  XwaControllerLogicalState* state) {
 	const XwaControllerProfile* profile;
 	int logical;
 
+	if (axis_buttons) {
+		*axis_buttons = 0;
+	}
 	if (!state) {
 		return;
 	}
@@ -256,11 +305,22 @@ void XwaControllerMapping_MapSnapshot(const XwaControllerOptions* options,
 		return;
 	}
 	for (logical = 0; logical < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++logical) {
-		if (ControllerMapping_ButtonDown(controller, profile->buttons[logical])) {
+		const XwaControllerDigitalBinding* binding = &profile->buttons[logical];
+		const uint32_t bit = 1u << logical;
+		if (ControllerMapping_DigitalDown(controller, binding, (previous_axis_buttons & bit) != 0)) {
 			state->buttons |= 1u << logical;
+			if (axis_buttons && binding->kind != XWA_CONTROLLER_DIGITAL_BUTTON) {
+				*axis_buttons |= bit;
+			}
 		}
 	}
 	state->pov_direction = ControllerMapping_PovDirection(ControllerMapping_Hat(controller, profile));
+}
+
+void XwaControllerMapping_MapSnapshot(const XwaControllerOptions* options,
+									  const AeronControllerSnapshot* controller, int has_focus,
+									  XwaControllerLogicalState* state) {
+	ControllerMapping_MapSnapshot(options, controller, has_focus, 0, NULL, state);
 }
 
 void XwaControllerMapping_SetOptions(const XwaControllerOptions* options) {
@@ -328,6 +388,7 @@ int XwaControllerMapping_ConsumeSelectionChange(void) {
 	Aeron_LogInfo("xwa.input", "Active controller changed from %u to %u",
 				  g_controllerMapping.previous_instance_id, instance_id);
 	g_controllerMapping.previous_instance_id = instance_id;
+	g_controllerMapping.digital_axis_buttons = 0;
 	ControllerMapping_LogUnavailableSources(XwaControllerMapping_SelectedController());
 	return 1;
 }
@@ -336,8 +397,9 @@ int XwaControllerMapping_GetState(XwaControllerLogicalState* state) {
 	const AeronInputSnapshot* input = Aeron_InputSnapshot();
 	const AeronControllerSnapshot* controller = XwaControllerMapping_SelectedController();
 
-	XwaControllerMapping_MapSnapshot(&g_controllerMapping.options, controller, input && input->has_focus,
-									 state);
+	ControllerMapping_MapSnapshot(&g_controllerMapping.options, controller, input && input->has_focus,
+								  g_controllerMapping.digital_axis_buttons,
+								  &g_controllerMapping.digital_axis_buttons, state);
 	return controller != NULL;
 }
 

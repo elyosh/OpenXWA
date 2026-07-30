@@ -6,6 +6,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define XWA_CONTROLLER_DIGITAL_THRESHOLD_DEFAULT 0.5f
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -44,6 +46,21 @@ typedef struct XwaControllerAxisBinding {
 	float deadzone;
 } XwaControllerAxisBinding;
 
+typedef enum XwaControllerDigitalSourceKind {
+	XWA_CONTROLLER_DIGITAL_NONE = 0,
+	XWA_CONTROLLER_DIGITAL_BUTTON,
+	XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE,
+	XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE,
+} XwaControllerDigitalSourceKind;
+
+typedef struct XwaControllerDigitalBinding {
+	XwaControllerDigitalSourceKind kind;
+	/* Standardized gamepad control or raw joystick control index. */
+	int source;
+	/* Axis activation threshold in the normalized 0..1 range. */
+	float threshold;
+} XwaControllerDigitalBinding;
+
 typedef struct XwaControllerDeviceSelector {
 	char guid[33];
 	char path[AERON_CONTROLLER_PATH_CAPACITY];
@@ -52,10 +69,8 @@ typedef struct XwaControllerDeviceSelector {
 
 typedef struct XwaControllerProfile {
 	XwaControllerAxisBinding axes[XWA_CONTROLLER_LOGICAL_AXIS_COUNT];
-	/* Physical source for logical buttons 1..16. Standardized
-	 * AeronGamepadButton values in the gamepad profile, raw zero-based indices
-	 * in the joystick profile. */
-	int buttons[XWA_CONTROLLER_LOGICAL_BUTTON_COUNT];
+	/* Physical digital sources for logical WinMM buttons 1..16. */
+	XwaControllerDigitalBinding buttons[XWA_CONTROLLER_LOGICAL_BUTTON_COUNT];
 	/* Gamepad profile: boolean D-pad-to-POV. Joystick profile: raw hat index,
 	 * or -1 for no POV. */
 	int pov_source;
