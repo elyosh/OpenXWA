@@ -538,6 +538,13 @@ int FrontendDisplay_ClearBackBuffer(void) {
 	FrontendRect rc;
 	DDBLTFX fx;
 
+#ifdef XWA_MODERN
+	/* Remaster: back-buffer colorfill (the shim's COLORFILL clears only
+	 * classic CPU pixels). */
+	XwaSnapshot_EmitSurfaceEventAux(XWA_SURFACE_EVENT_BACKBUFFER_CLEAR, 0, 0, 639, 479,
+									(int)(uint16_t)g_surfaceClearColor, 0);
+#endif
+
 	result = (int)(intptr_t)g_directDraw;
 	if (g_directDraw) {
 		result = (int)(intptr_t)g_backBufferSurface;
@@ -585,6 +592,12 @@ void FrontendDisplay_ClearOffscreenSurface(void) {
 	int wasLocked;
 	FrontendRect rc;
 	DDBLTFX fx;
+
+#ifdef XWA_MODERN
+	/* Remaster: offscreen-surface colorfill. */
+	XwaSnapshot_EmitSurfaceEventAux(XWA_SURFACE_EVENT_OFFSCREEN_CLEAR, 0, 0, 639, 479,
+									(int)(uint16_t)g_surfaceClearColor, 0);
+#endif
 
 	if (g_directDraw) {
 		if (g_offscreenSurface) {

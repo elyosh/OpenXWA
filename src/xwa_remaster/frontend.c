@@ -346,6 +346,18 @@ static void rm_blit_rt(AeronCommandBuffer* cmd, AeronRenderTarget* dst, AeronRen
 	AeronDrawList_Render(g.list, cmd);
 }
 
+/* Full-surface engine colorfill. AddFill, not a pass clear value: the
+ * fill shader applies the sRGB->linear conversion a clear would skip. */
+static void rm_surface_clear(AeronCommandBuffer* cmd, AeronRenderTarget* rt, uint32_t engine_color) {
+	float rgba[4];
+	rm_color_linear(engine_color, rgba);
+	rgba[3] = 1.0f;
+	AeronDrawList_Begin(g.list, rt, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_AddFill(g.list, 0.0f, 0.0f, (float)RM_RT_W, (float)RM_RT_H, rgba, AERON_BLIT2D_BLEND_NONE,
+						  NULL);
+	AeronDrawList_Render(g.list, cmd);
+}
+
 /* EXTERNAL_COMPOSITE_REVEAL: copy the external RT's texels (PMA — only
  * drawn content shows, mirroring the classic color-keyed scratch copy)
  * over the main surface in the L-shaped remainder OUTSIDE the reveal
@@ -615,6 +627,23 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 					 * rect: a right band (cols >= reveal w) and a bottom
 					 * band (rows >= reveal h, within the revealed cols). */
 					rm_external_composite(cmd, e, restore_on);
+					break;
+				case XWA_SURFACE_EVENT_BACKBUFFER_CLEAR:
+					/* Post-present clears clean the NEXT frame's buffer —
+					 * the tick-start rebuild models that. Restore off:
+					 * the back buffer is the persistent surface, so the
+					 * clear persists (MAIN record rule). */
+					if (!present_seen) {
+						rm_surface_clear(cmd, g.output_rt, (uint32_t)(uint16_t)e->aux0);
+					}
+					if (!restore_on) {
+						rm_surface_clear(cmd, g.screen_rt, (uint32_t)(uint16_t)e->aux0);
+					}
+					break;
+				case XWA_SURFACE_EVENT_OFFSCREEN_CLEAR:
+					/* Persistent surface only — the visible frame changes
+					 * at the next restore, like the engine. */
+					rm_surface_clear(cmd, g.screen_rt, (uint32_t)(uint16_t)e->aux0);
 					break;
 			}
 			continue;

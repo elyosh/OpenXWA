@@ -74,6 +74,10 @@ typedef enum XwaSurfaceEventKind {
 	 * from its top-left (the briefing wireframe-over-model effect). */
 	XWA_SURFACE_EVENT_EXTERNAL_CLEAR = 5,
 	XWA_SURFACE_EVENT_EXTERNAL_COMPOSITE_REVEAL = 6,
+	/* Full-surface colorfill clears (FrontendDisplay_Clear*); aux0 is
+	 * the engine 16bpp fill color. */
+	XWA_SURFACE_EVENT_BACKBUFFER_CLEAR = 7,
+	XWA_SURFACE_EVENT_OFFSCREEN_CLEAR = 8,
 } XwaSurfaceEventKind;
 
 typedef struct XwaSurfaceEvent {
