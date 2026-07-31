@@ -38,6 +38,7 @@
 #include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_input_options_screen.h"
+#include "xwa_runtime/config/modern_pilot_profiles_screen.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/config/modern_video_options_screen.h"
 #include "xwa_runtime/input/controller_mapping.h"
@@ -172,7 +173,11 @@ int Config_MainMenuScreen(void) {
 	}
 #endif
 
+#ifdef XWA_MODERN
+	rowCount = g_configRestrictedOptionsModalActive ? 8 : 11;
+#else
 	rowCount = g_configRestrictedOptionsModalActive ? 7 : 10;
+#endif
 	y = 215 - ((25 * rowCount) >> 1);
 	keyState = (char)Config_GetMenuNavKey();
 	if (keyState == CONFIG_KEY_VK_UP) {
@@ -374,6 +379,28 @@ int Config_MainMenuScreen(void) {
 		y += 25;
 		++rowIndex;
 	}
+
+#ifdef XWA_MODERN
+	text = "Pilot Profiles";
+	titleWidth = FrontendText_MeasureWidth(text, 20);
+	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+	buttonPressed = FrontendButton_DrawMenuButton(textX, y, text, 20, g_colorPaleBlue, 30, 0, "settingsound");
+	if (g_menuCursorRow == rowIndex) {
+		FrontendText_Draw(20, text, textX, y, g_colorGreen);
+		if (keyState == CONFIG_KEY_ENTER) {
+			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+			Keyboard_FlushCharBuffer();
+			keyState = 0;
+			buttonPressed = 1;
+		}
+	}
+	if (buttonPressed) {
+		g_pendingMenuScreen = 19;
+		g_menuCursorRow = 0;
+	}
+	y += 25;
+	++rowIndex;
+#endif
 
 	text = FrontendString_Get(STR_CONFIG_RETURN_TO_GAME);
 	titleWidth = FrontendText_MeasureWidth(text, 20);
@@ -2354,6 +2381,7 @@ static void Config_FinishOptionsDatapadOpen(void) {
 }
 
 static void Config_FinishOptionsDatapadClose(void) {
+	XwaModernPilotProfilesScreen_Leave();
 	g_activeTextFieldId = 0;
 	FrontendDraw_ForceFullScreenPresent();
 	Keyboard_FlushCharBuffer();
@@ -2488,6 +2516,13 @@ int Config_OptionsDatapadUpdate(int frameState) {
 			if (XwaModernVideoOptionsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
 				g_pendingMenuScreen = 2;
 				g_menuCursorRow = 0;
+			}
+			done = 0;
+			break;
+		case 19:
+			if (XwaModernPilotProfilesScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
+				g_pendingMenuScreen = 0;
+				g_menuCursorRow = g_configRestrictedOptionsModalActive ? 5 : 8;
 			}
 			done = 0;
 			break;

@@ -2,6 +2,10 @@
 
 #include "xwa/config/game_config.h"
 #include "xwa/config/pilot.h"
+#ifdef XWA_MODERN
+#include "xwa/frontend/concourse.h"
+#include "xwa_runtime/config/modern_pilot_profiles_screen.h"
+#endif
 #include "xwa/frontend/frontend_button.h"
 #include "xwa/frontend/frontend_cursor.h"
 #include "xwa/frontend/frontend_draw.h"
@@ -27,6 +31,9 @@ int Frontend_HandleEscapeQuit(int sessionContext) {
 	int mouseX;
 	int mouseY;
 	int exitConfirmed;
+#ifdef XWA_MODERN
+	int activePilotChanged;
+#endif
 	FrontendRect rc;
 
 	FrontendCursor_GetPos(&mouseX, &mouseY);
@@ -34,11 +41,17 @@ int Frontend_HandleEscapeQuit(int sessionContext) {
 	(void)mouseY;
 
 	exitConfirmed = 0;
+#ifdef XWA_MODERN
+	activePilotChanged = 0;
+#endif
 	if (g_frontendEscapeConfigModalActive) {
 		if (FrontendScreen_GetModalStatus() == FRONTEND_SCREEN_MODAL_INACTIVE ||
 			FrontendScreen_GetModalStatus() == FRONTEND_SCREEN_MODAL_DONE) {
 			g_frontendEscapeConfigModalActive = 0;
 			exitConfirmed = g_configDatapadQuitConfirmed;
+#ifdef XWA_MODERN
+			activePilotChanged = XwaModernPilotProfilesScreen_TakeActiveChanged();
+#endif
 		}
 	} else if (Keyboard_BufferContains(27)) {
 		Keyboard_FlushCharBuffer();
@@ -49,6 +62,12 @@ int Frontend_HandleEscapeQuit(int sessionContext) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (activePilotChanged && !exitConfirmed) {
+		FrontendScreen_SetCallbacks(Concourse_Update, Concourse_Exit);
+		return 0;
+	}
+#endif
 	if (!exitConfirmed) {
 		return 0;
 	}

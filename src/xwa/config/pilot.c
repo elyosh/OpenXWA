@@ -42,6 +42,13 @@ int Pilot_CreateNew(const char* pilotName) {
 	int i;
 	XwaFile* stream;
 	char fileName[32];
+#ifdef XWA_MODERN
+	PilotData previousPilotData;
+	FrontendMissionSessionMode previousSessionMode;
+
+	memcpy(&previousPilotData, &g_pilotData, sizeof(previousPilotData));
+	previousSessionMode = g_frontendMissionSessionMode;
+#endif
 
 	for (i = 0;; ++i) {
 		sprintf(fileName, "%s%d.plt", pilotName, i);
@@ -117,7 +124,17 @@ int Pilot_CreateNew(const char* pilotName) {
 	}
 
 	g_frontendMissionSessionMode = FRONTEND_MISSION_SESSION_NONE;
+#ifdef XWA_MODERN
+	if (!File_WriteCount(stream, &g_pilotData, sizeof(g_pilotData))) {
+		File_Close(stream);
+		File_Remove(AERON_VFS_ROOT_USER, fileName);
+		memcpy(&g_pilotData, &previousPilotData, sizeof(g_pilotData));
+		g_frontendMissionSessionMode = previousSessionMode;
+		return 0;
+	}
+#else
 	File_WriteCount(stream, &g_pilotData, sizeof(g_pilotData));
+#endif
 	if (g_shipCount > 0) {
 		for (i = 0; i < g_shipCount; ++i) {
 			if (g_shipList[i].known) {
@@ -126,8 +143,17 @@ int Pilot_CreateNew(const char* pilotName) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (File_Close(stream) != 0 || !Pilot_Save(0)) {
+		File_Remove(AERON_VFS_ROOT_USER, fileName);
+		memcpy(&g_pilotData, &previousPilotData, sizeof(g_pilotData));
+		g_frontendMissionSessionMode = previousSessionMode;
+		return 0;
+	}
+#else
 	File_Close(stream);
 	Pilot_Save(0);
+#endif
 	return 1;
 }
 
@@ -327,7 +353,15 @@ int Pilot_Save(int toTempFile) {
 		return 0;
 	}
 
+#ifdef XWA_MODERN
+	if (!File_WriteCount(stream, &g_pilotData, sizeof(g_pilotData))) {
+		File_Close(stream);
+		return 0;
+	}
+	return File_Close(stream) == 0;
+#else
 	File_WriteCount(stream, &g_pilotData, sizeof(g_pilotData));
 	File_Close(stream);
 	return 1;
+#endif
 }

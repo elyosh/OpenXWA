@@ -41,6 +41,7 @@ int g_dialogResult;
 
 #ifdef XWA_MODERN
 static int g_frontDialogPromptActive;
+static int g_frontDialogPromptResultReady;
 static int g_frontDialogPromptOverlayTextWasEnabled;
 static int g_frontDialogConfirmActive;
 static int g_frontDialogConfirmResultReady;
@@ -240,6 +241,11 @@ int FrontendDialog_CreatePilotNameCallback(int frameState) {
 		accepted = 1;
 	} else if (Keyboard_PeekChar() == 27) {
 		Keyboard_DiscardChar();
+#ifdef XWA_MODERN
+		g_frontDialogText0[0] = '\0';
+		FrontImage_FreeResourceByName("backname");
+		return 1;
+#endif
 	}
 
 	if (!accepted || !g_frontDialogText0[0]) {
@@ -251,6 +257,8 @@ int FrontendDialog_CreatePilotNameCallback(int frameState) {
 }
 
 #ifdef XWA_MODERN
+static void FrontendDialog_FinishPilotNamePrompt(void) { g_frontDialogPromptResultReady = 1; }
+
 static void FrontendDialog_FinishConfirmDialog(void) {
 	if (!g_frontDialogConfirmActive) {
 		return;
@@ -417,7 +425,6 @@ int FrontendDialog_ShowConfirmDialog(const char* line1, const char* line2, const
 // FUNCTION: XWA 0x559A90
 int FrontendDialog_PromptForPilotName(char* outName) {
 #ifdef XWA_MODERN
-	FrontendScreenModalStatus modalStatus;
 	FrontendRect rect;
 
 	if (!g_frontDialogPromptActive) {
@@ -427,7 +434,9 @@ int FrontendDialog_PromptForPilotName(char* outName) {
 		FrontendDraw_RectAssign(&rect, 0, 0, 640, 480);
 		FrontendCursor_GetPos(&g_frontDialogSavedMouseX, &g_frontDialogSavedMouseY);
 		memset(g_frontDialogText0, 0, sizeof(g_frontDialogText0));
-		if (!FrontendScreen_BeginModal(FrontendDialog_CreatePilotNameCallback, &rect)) {
+		g_frontDialogPromptResultReady = 0;
+		if (!FrontendScreen_BeginModalWithCleanup(FrontendDialog_CreatePilotNameCallback, &rect,
+												  FrontendDialog_FinishPilotNamePrompt)) {
 			if (g_frontDialogPromptOverlayTextWasEnabled) {
 				FrontendButton_EnableOverlayText();
 			}
@@ -441,13 +450,13 @@ int FrontendDialog_PromptForPilotName(char* outName) {
 		g_frontDialogPromptActive = 1;
 	}
 
-	modalStatus = FrontendScreen_GetModalStatus();
-	if (modalStatus != FRONTEND_SCREEN_MODAL_INACTIVE && modalStatus != FRONTEND_SCREEN_MODAL_DONE) {
+	if (!g_frontDialogPromptResultReady) {
 		if (outName != 0) {
 			outName[0] = '\0';
 		}
 		return 0;
 	}
+	g_frontDialogPromptResultReady = 0;
 
 	FrontendText_ResetGlyphScratch();
 	if (g_frontDialogPromptOverlayTextWasEnabled) {
