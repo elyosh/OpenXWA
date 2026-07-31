@@ -4,25 +4,18 @@
 #include "aeron/input.h"
 #include "xwa/assets/string_table.h"
 #include "xwa/config/game_config.h"
-#include "xwa/frontend/frontend_button.h"
 #include "xwa/frontend/frontend_color.h"
-#include "xwa/frontend/frontend_draw.h"
 #include "xwa/frontend/frontend_input.h"
 #include "xwa/frontend/frontend_sound.h"
 #include "xwa/frontend/frontend_text.h"
 #include "xwa_runtime/config/modern_input_options.h"
+#include "xwa_runtime/config/modern_options_menu.h"
 #include "xwa_runtime/input/controller_mapping.h"
 
 #include <stdio.h>
 #include <string.h>
 
 enum {
-	CONTROLLER_KEY_ENTER = '\r',
-	CONTROLLER_KEY_ESCAPE = 0x1b,
-	CONTROLLER_KEY_LEFT = 0x25,
-	CONTROLLER_KEY_UP = 0x26,
-	CONTROLLER_KEY_RIGHT = 0x27,
-	CONTROLLER_KEY_DOWN = 0x28,
 	CONTROLLER_KEY_DELETE = 0x2e,
 	CONTROLLER_CAPTURE_THRESHOLD = 8192,
 	CONTROLLER_PAGE_SIZE = 8,
@@ -59,100 +52,6 @@ static ControllerBindingEditState g_controllerBindingEdit;
 static int g_controllerButtonPage;
 static char g_controllerBindingMessage[96];
 static int g_controllerBindingMessageTtl;
-
-static void ControllerScreen_PlayMove(void) {
-	FrontendSound_PlayUISound("configsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
-}
-
-static void ControllerScreen_PlaySelect(void) {
-	FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
-}
-
-static char ControllerScreen_Navigate(int* cursor_row, int row_count) {
-	char key = (char)Config_GetMenuNavKey();
-
-	if (key == CONTROLLER_KEY_UP) {
-		ControllerScreen_PlayMove();
-		Keyboard_FlushCharBuffer();
-		key = 0;
-		if (--*cursor_row < 0) {
-			*cursor_row = row_count - 1;
-		}
-	} else if (key == CONTROLLER_KEY_DOWN) {
-		ControllerScreen_PlayMove();
-		Keyboard_FlushCharBuffer();
-		key = 0;
-		if (++*cursor_row >= row_count) {
-			*cursor_row = 0;
-		}
-	}
-	return key;
-}
-
-static void ControllerScreen_DrawTitle(const char* title, int y, int menu_center_x) {
-	FrontendRect rect;
-	unsigned int width;
-
-	FrontendDraw_RectAssign(&rect, 0, y, 639, y + 15);
-	FrontendText_DrawCentered(15, title, &rect, g_colorLightBlue);
-	width = FrontendText_MeasureWidth(title, 20);
-	FrontendDraw_Line(menu_center_x - (int)(width >> 1), y + 17, menu_center_x + (int)(width >> 1), y + 17,
-					  g_colorLightBlue);
-}
-
-static int ControllerScreen_DrawButton(const char* text, int menu_center_x, int* y, int* row, int cursor_row,
-									   char* key, int id, int disabled) {
-	int x = menu_center_x - (int)(FrontendText_MeasureWidth(text, 15) >> 1);
-	int pressed = 0;
-
-	if (disabled) {
-		FrontendText_Draw(15, text, x, *y, cursor_row == *row ? 0xffff : g_colorGray);
-	} else {
-		pressed = FrontendButton_DrawMenuButton(x, *y, text, 15, g_colorPaleBlue, id, 0, "settingsound");
-		if (cursor_row == *row) {
-			FrontendText_Draw(15, text, x, *y, g_colorGreen);
-			if (*key == CONTROLLER_KEY_ENTER) {
-				ControllerScreen_PlaySelect();
-				Keyboard_FlushCharBuffer();
-				*key = 0;
-				pressed = 1;
-			}
-		}
-	}
-	*y += 20;
-	++*row;
-	return pressed;
-}
-
-/* Returns -1/1 for a left/right change, 1 for a click, or zero. */
-static int ControllerScreen_DrawValue(const char* label, const char* value, int menu_center_x, int* y,
-									  int* row, int cursor_row, char* key, int id, int disabled) {
-	int label_x = menu_center_x - FrontendText_MeasureWidth(label, 15) - 10;
-	int result = 0;
-
-	if (disabled) {
-		FrontendText_Draw(15, label, label_x, *y, cursor_row == *row ? 0xffff : g_colorGray);
-		FrontendText_Draw(15, value, menu_center_x + 10, *y, g_colorGray);
-	} else {
-		FrontendText_Draw(15, label, label_x, *y, cursor_row == *row ? g_colorGreen : g_colorLightBlue);
-		result = FrontendButton_DrawMenuButton(menu_center_x + 10, *y, value, 15, g_colorPaleBlue, id, 0,
-											   "settingsound");
-		if (cursor_row == *row && (*key == CONTROLLER_KEY_LEFT || *key == CONTROLLER_KEY_RIGHT)) {
-			result = *key == CONTROLLER_KEY_LEFT ? -1 : 1;
-			ControllerScreen_PlaySelect();
-			Keyboard_FlushCharBuffer();
-			*key = 0;
-		} else if (cursor_row == *row && *key == CONTROLLER_KEY_ENTER) {
-			result = 1;
-			ControllerScreen_PlaySelect();
-			Keyboard_FlushCharBuffer();
-			*key = 0;
-		}
-	}
-	*y += 20;
-	++*row;
-	return result;
-}
 
 static int ControllerScreen_DeviceMatches(const AeronControllerSnapshot* controller,
 										  const XwaControllerDeviceSelector* selector, int ordinal) {
@@ -530,12 +429,10 @@ void XwaModernControllerOptionsScreen_Leave(void) {
 XwaModernControllerScreenResult XwaModernControllerOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	static const char* const toggle_text[] = { "Off", "On" };
 	XwaModernInputOptions options;
+	XwaModernOptionsMenu menu;
 	const AeronControllerSnapshot* selected;
 	char device_text[96];
 	char value[32];
-	char key;
-	int y = 110;
-	int row = 0;
 	int changed;
 	int pressed;
 
@@ -544,34 +441,30 @@ XwaModernControllerScreenResult XwaModernControllerOptionsScreen_Update(int menu
 	}
 	XwaModernInputOptions_Get(&options);
 	ControllerScreen_DeviceText(&options.controller.device, device_text, sizeof(device_text), &selected);
-	key = ControllerScreen_Navigate(cursor_row, 9);
-	ControllerScreen_DrawTitle("Controller Setup", y, menu_center_x);
-	y += 20;
+	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 110, cursor_row, 9);
+	XwaModernOptionsMenu_DrawTitle(&menu, "Controller Setup");
 
-	changed = ControllerScreen_DrawValue("Active Device", device_text, menu_center_x, &y, &row, *cursor_row,
-										 &key, 100, 0);
+	changed = XwaModernOptionsMenu_DrawValue(&menu, "Active Device", device_text, 100, 0);
 	if (changed) {
 		ControllerScreen_SelectDevice(&options.controller.device, changed);
 		XwaModernInputOptions_Set(&options);
 		XwaModernInputOptions_Get(&options);
 		ControllerScreen_DeviceText(&options.controller.device, device_text, sizeof(device_text), &selected);
 	}
-	changed = ControllerScreen_DrawValue("Roll Enabled", toggle_text[options.controller.roll_enabled != 0],
-										 menu_center_x, &y, &row, *cursor_row, &key, 101, 0);
+	changed = XwaModernOptionsMenu_DrawValue(&menu, "Roll Enabled",
+											 toggle_text[options.controller.roll_enabled != 0], 101, 0);
 	if (changed) {
 		options.controller.roll_enabled = !options.controller.roll_enabled;
 		XwaModernInputOptions_Set(&options);
 	}
-	changed =
-		ControllerScreen_DrawValue("Rumble Enabled", toggle_text[options.controller.rumble_enabled != 0],
-								   menu_center_x, &y, &row, *cursor_row, &key, 102, 0);
+	changed = XwaModernOptionsMenu_DrawValue(&menu, "Rumble Enabled",
+											 toggle_text[options.controller.rumble_enabled != 0], 102, 0);
 	if (changed) {
 		options.controller.rumble_enabled = !options.controller.rumble_enabled;
 		XwaModernInputOptions_Set(&options);
 	}
 	snprintf(value, sizeof(value), "%d", options.controller.rumble_strength);
-	changed = ControllerScreen_DrawValue("Rumble Strength", value, menu_center_x, &y, &row, *cursor_row, &key,
-										 103, 0);
+	changed = XwaModernOptionsMenu_DrawValue(&menu, "Rumble Strength", value, 103, 0);
 	if (changed) {
 		options.controller.rumble_strength += changed;
 		if (options.controller.rumble_strength < XWA_CONTROLLER_RUMBLE_STRENGTH_MIN) {
@@ -581,33 +474,26 @@ XwaModernControllerScreenResult XwaModernControllerOptionsScreen_Update(int menu
 		}
 		XwaModernInputOptions_Set(&options);
 	}
-	pressed =
-		ControllerScreen_DrawButton("Test Rumble", menu_center_x, &y, &row, *cursor_row, &key, 104,
-									!selected || !selected->has_rumble || !options.controller.rumble_enabled);
+	pressed = XwaModernOptionsMenu_DrawAction(
+		&menu, "Test Rumble", 104, !selected || !selected->has_rumble || !options.controller.rumble_enabled);
 	if (pressed) {
 		const uint16_t magnitude =
 			(uint16_t)(options.controller.rumble_strength * 65535u / XWA_CONTROLLER_RUMBLE_STRENGTH_MAX);
 		XwaControllerMapping_Rumble(magnitude, magnitude, 300);
 	}
-	if (ControllerScreen_DrawButton("Configure Axes", menu_center_x, &y, &row, *cursor_row, &key, 105, 0)) {
+	if (XwaModernOptionsMenu_DrawAction(&menu, "Configure Axes", 105, 0)) {
 		XwaControllerMapping_Rumble(0, 0, 0);
 		return XWA_MODERN_CONTROLLER_SCREEN_AXES;
 	}
-	if (ControllerScreen_DrawButton("Configure Button Bindings", menu_center_x, &y, &row, *cursor_row, &key,
-									106, 0)) {
+	if (XwaModernOptionsMenu_DrawAction(&menu, "Configure Button Bindings", 106, 0)) {
 		XwaControllerMapping_Rumble(0, 0, 0);
 		return XWA_MODERN_CONTROLLER_SCREEN_BUTTONS;
 	}
-	if (ControllerScreen_DrawButton("Restore Controller Defaults", menu_center_x, &y, &row, *cursor_row, &key,
-									107, 0)) {
+	if (XwaModernOptionsMenu_DrawAction(&menu, "Restore Controller Defaults", 107, 0)) {
 		XwaModernInputOptions_RestoreControllerDefaults();
 	}
-	pressed = ControllerScreen_DrawButton(FrontendString_Get(STR_BACK), menu_center_x, &y, &row, *cursor_row,
-										  &key, 108, 0);
-	if (key == CONTROLLER_KEY_ESCAPE) {
-		Keyboard_FlushCharBuffer();
-		pressed = 1;
-	}
+	pressed = XwaModernOptionsMenu_DrawAction(&menu, FrontendString_Get(STR_BACK), 108, 0);
+	pressed |= XwaModernOptionsMenu_TakeEscape(&menu);
 	if (pressed) {
 		XwaModernControllerOptionsScreen_Leave();
 		XwaModernInputOptions_Flush();
@@ -620,53 +506,51 @@ int XwaModernControllerAxesScreen_Update(int menu_center_x, int* cursor_row) {
 	static const char* const logical_names[] = { "Yaw", "Pitch", "Throttle", "Roll" };
 	static const char* const toggle_text[] = { "No", "Yes" };
 	XwaModernInputOptions options;
+	XwaModernOptionsMenu menu;
 	const AeronControllerSnapshot* selected;
 	XwaControllerProfile* profile;
-	char key;
 	char value[96];
-	int y = 60;
-	int row = 0;
 	int axis;
 	int changed;
 	int back;
 
+	if (!cursor_row) {
+		return 0;
+	}
 	XwaModernInputOptions_Get(&options);
 	selected = ControllerScreen_Selected(&options.controller.device, NULL);
 	profile = ControllerScreen_Profile(&options, selected);
-	key = ControllerScreen_Navigate(cursor_row, 13);
-	if (g_controllerCapture.axis >= 0 && key == CONTROLLER_KEY_ESCAPE) {
+	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 60, cursor_row, 13);
+	if (g_controllerCapture.axis >= 0 && menu.key == XWA_MODERN_MENU_KEY_ESCAPE) {
 		g_controllerCapture.axis = -1;
-		Keyboard_FlushCharBuffer();
-		key = 0;
+		XwaModernOptionsMenu_TakeEscape(&menu);
 	}
 	ControllerScreen_UpdateAxisCapture(&options, selected);
-	ControllerScreen_DrawTitle("Controller Axis Mapping", y, menu_center_x);
-	y += 20;
+	XwaModernOptionsMenu_DrawTitle(&menu, "Controller Axis Mapping");
 	for (axis = 0; axis < XWA_CONTROLLER_LOGICAL_AXIS_COUNT; ++axis) {
 		char source_name[48];
 		const int16_t live = ControllerScreen_Axis(selected, profile->axes[axis].source);
 		ControllerScreen_AxisName(selected, profile->axes[axis].source, source_name, sizeof(source_name));
 		snprintf(value, sizeof(value), "%s (%+.2f)", source_name, live < 0 ? live / 32768.0 : live / 32767.0);
-		changed = ControllerScreen_DrawValue(logical_names[axis], value, menu_center_x, &y, &row, *cursor_row,
-											 &key, 120 + axis * 3, !selected);
+		changed =
+			XwaModernOptionsMenu_DrawValue(&menu, logical_names[axis], value, 120 + axis * 3, !selected);
 		if (changed) {
 			ControllerScreen_BeginAxisCapture(selected, axis);
 		}
-		if (selected && *cursor_row == row - 1 && Keyboard_IsKeyDown(CONTROLLER_KEY_DELETE)) {
+		if (selected && XwaModernOptionsMenu_LastRowSelected(&menu) &&
+			Keyboard_IsKeyDown(CONTROLLER_KEY_DELETE)) {
 			profile->axes[axis].source = -1;
 			g_controllerCapture.axis = -1;
 			XwaModernInputOptions_Set(&options);
 		}
-		changed =
-			ControllerScreen_DrawValue("  Invert", toggle_text[profile->axes[axis].invert != 0],
-									   menu_center_x, &y, &row, *cursor_row, &key, 121 + axis * 3, !selected);
+		changed = XwaModernOptionsMenu_DrawValue(
+			&menu, "  Invert", toggle_text[profile->axes[axis].invert != 0], 121 + axis * 3, !selected);
 		if (changed) {
 			profile->axes[axis].invert = !profile->axes[axis].invert;
 			XwaModernInputOptions_Set(&options);
 		}
 		snprintf(value, sizeof(value), "%d%%", (int)(profile->axes[axis].deadzone * 100.0f + 0.5f));
-		changed = ControllerScreen_DrawValue("  Deadzone", value, menu_center_x, &y, &row, *cursor_row, &key,
-											 122 + axis * 3, !selected);
+		changed = XwaModernOptionsMenu_DrawValue(&menu, "  Deadzone", value, 122 + axis * 3, !selected);
 		if (changed) {
 			int percent = (int)(profile->axes[axis].deadzone * 100.0f + 0.5f) + changed;
 			if (percent < 0) {
@@ -678,25 +562,21 @@ int XwaModernControllerAxesScreen_Update(int menu_center_x, int* cursor_row) {
 			XwaModernInputOptions_Set(&options);
 		}
 		if (axis + 1 < XWA_CONTROLLER_LOGICAL_AXIS_COUNT) {
-			y += 20;
+			menu.y += 20;
 		}
 	}
 	if (g_controllerCapture.axis >= 0) {
 		snprintf(value, sizeof(value), "Move an axis for %s (Esc cancels)",
 				 logical_names[g_controllerCapture.axis]);
-		FrontendText_DrawCentered(12, value, &(FrontendRect) { 0, y, 639, y + 15 }, g_colorGreen);
-		y += 20;
+		FrontendText_DrawCentered(12, value, &(FrontendRect) { 0, menu.y, 639, menu.y + 15 }, g_colorGreen);
+		menu.y += 20;
 	} else {
 		FrontendText_DrawCentered(12, "Enter remaps the selected axis; Delete unbinds it",
-								  &(FrontendRect) { 0, y, 639, y + 15 }, g_colorGreen);
-		y += 20;
+								  &(FrontendRect) { 0, menu.y, 639, menu.y + 15 }, g_colorGreen);
+		menu.y += 20;
 	}
-	back = ControllerScreen_DrawButton(FrontendString_Get(STR_BACK), menu_center_x, &y, &row, *cursor_row,
-									   &key, 132, 0);
-	if (key == CONTROLLER_KEY_ESCAPE) {
-		Keyboard_FlushCharBuffer();
-		back = 1;
-	}
+	back = XwaModernOptionsMenu_DrawAction(&menu, FrontendString_Get(STR_BACK), 132, 0);
+	back |= XwaModernOptionsMenu_TakeEscape(&menu);
 	if (back) {
 		g_controllerCapture.axis = -1;
 		return 1;
@@ -1043,13 +923,11 @@ int XwaModernControllerButtonsScreen_Update(int menu_center_x, int* cursor_row) 
 	ControllerBindingRow bindings[AERON_CONTROLLER_BUTTON_MAX + AERON_CONTROLLER_AXIS_MAX * 2 + 5];
 	ControllerBindingRow captured_binding;
 	XwaModernInputOptions options;
+	XwaModernOptionsMenu menu;
 	const AeronControllerSnapshot* selected;
 	XwaControllerProfile* profile;
-	char key;
 	char label[64];
 	char value[64];
-	int y = 110;
-	int row = 0;
 	int binding_count;
 	int page_count;
 	int start;
@@ -1093,20 +971,19 @@ int XwaModernControllerButtonsScreen_Update(int menu_center_x, int* cursor_row) 
 	if (*cursor_row >= row_count) {
 		*cursor_row = row_count - 1;
 	}
-	key = ControllerScreen_Navigate(cursor_row, row_count);
-	if (g_controllerCapture.button >= 0 && key == CONTROLLER_KEY_ESCAPE) {
-		g_controllerCapture.button = -1;
-		Keyboard_FlushCharBuffer();
-		key = 0;
+	if (!XwaModernOptionsMenu_Begin(&menu, menu_center_x, 110, cursor_row, row_count)) {
+		return 0;
 	}
-	if (g_controllerCapture.digital_axis >= 0 && key == CONTROLLER_KEY_ESCAPE) {
+	if (g_controllerCapture.button >= 0 && menu.key == XWA_MODERN_MENU_KEY_ESCAPE) {
+		g_controllerCapture.button = -1;
+		XwaModernOptionsMenu_TakeEscape(&menu);
+	}
+	if (g_controllerCapture.digital_axis >= 0 && menu.key == XWA_MODERN_MENU_KEY_ESCAPE) {
 		g_controllerCapture.digital_axis = -1;
-		Keyboard_FlushCharBuffer();
-		key = 0;
+		XwaModernOptionsMenu_TakeEscape(&menu);
 	}
 	ControllerScreen_UpdatePovCapture(&options, selected);
-	ControllerScreen_DrawTitle("Controller Button Bindings", y, menu_center_x);
-	y += 20;
+	XwaModernOptionsMenu_DrawTitle(&menu, "Controller Button Bindings");
 
 	if (selected && selected->kind == AERON_CONTROLLER_KIND_GAMEPAD) {
 		snprintf(value, sizeof(value), "%s", profile->pov_source ? "D-pad" : "Not mapped");
@@ -1115,15 +992,15 @@ int XwaModernControllerButtonsScreen_Update(int menu_center_x, int* cursor_row) 
 	} else {
 		snprintf(value, sizeof(value), "%s", "Not mapped");
 	}
-	changed = ControllerScreen_DrawValue("POV Source", value, menu_center_x, &y, &row, *cursor_row, &key, 139,
-										 !selected);
+	changed = XwaModernOptionsMenu_DrawValue(&menu, "POV Source", value, 139, !selected);
 	if (changed) {
 		g_controllerCapture.axis = -1;
 		g_controllerCapture.digital_axis = -1;
 		g_controllerCapture.button = XWA_CONTROLLER_LOGICAL_BUTTON_COUNT;
 		g_controllerCapture.wait_for_release = 1;
 	}
-	if (selected && *cursor_row == row - 1 && Keyboard_IsKeyDown(CONTROLLER_KEY_DELETE)) {
+	if (selected && XwaModernOptionsMenu_LastRowSelected(&menu) &&
+		Keyboard_IsKeyDown(CONTROLLER_KEY_DELETE)) {
 		profile->pov_source = selected->kind == AERON_CONTROLLER_KIND_GAMEPAD ? 0 : -1;
 		g_controllerCapture.button = -1;
 		XwaModernInputOptions_Set(&options);
@@ -1136,7 +1013,7 @@ int XwaModernControllerButtonsScreen_Update(int menu_center_x, int* cursor_row) 
 						  : binding->logical_button >= 0 ? profile->actions[binding->logical_button]
 														 : 0;
 		ControllerScreen_BindingLabel(selected, profile, binding, label, sizeof(label));
-		if (Config_DrawJoystickBindingRow(&action, label, &y, &row, &key, 140 + index)) {
+		if (Config_DrawJoystickBindingRow(&action, label, &menu.y, &menu.row, &menu.key, 140 + index)) {
 			if (binding->capture_axis) {
 				ControllerScreen_BeginDigitalAxisCapture(selected);
 				return 0;
@@ -1145,22 +1022,23 @@ int XwaModernControllerButtonsScreen_Update(int menu_center_x, int* cursor_row) 
 			return 0;
 		}
 		if (binding->logical_button >= 0 && ControllerScreen_IsAxisDigitalKind(binding->kind) &&
-			*cursor_row == row - 1 && (key == CONTROLLER_KEY_LEFT || key == CONTROLLER_KEY_RIGHT)) {
+			XwaModernOptionsMenu_LastRowSelected(&menu) &&
+			(menu.key == XWA_MODERN_MENU_KEY_LEFT || menu.key == XWA_MODERN_MENU_KEY_RIGHT)) {
 			XwaControllerDigitalBinding* digital = &profile->buttons[binding->logical_button];
 			int percent = (int)(digital->threshold * 100.0f + 0.5f);
-			percent += key == CONTROLLER_KEY_LEFT ? -5 : 5;
+			percent += menu.key == XWA_MODERN_MENU_KEY_LEFT ? -5 : 5;
 			if (percent < 5) {
 				percent = 5;
 			} else if (percent > 100) {
 				percent = 100;
 			}
 			digital->threshold = percent / 100.0f;
-			ControllerScreen_PlaySelect();
+			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
 			Keyboard_FlushCharBuffer();
-			key = 0;
+			menu.key = 0;
 			XwaModernInputOptions_Set(&options);
 		}
-		if (*cursor_row == row - 1 && Keyboard_IsKeyDown(CONTROLLER_KEY_DELETE)) {
+		if (XwaModernOptionsMenu_LastRowSelected(&menu) && Keyboard_IsKeyDown(CONTROLLER_KEY_DELETE)) {
 			if (binding->pov_direction >= 0) {
 				profile->actions[XWA_CONTROLLER_LOGICAL_BUTTON_COUNT + binding->pov_direction] = 0;
 			} else if (binding->logical_button >= 0) {
@@ -1175,8 +1053,7 @@ int XwaModernControllerButtonsScreen_Update(int menu_center_x, int* cursor_row) 
 	}
 	if (page_count > 1) {
 		snprintf(value, sizeof(value), "Page %d of %d", g_controllerButtonPage + 1, page_count);
-		changed =
-			ControllerScreen_DrawValue("Bindings", value, menu_center_x, &y, &row, *cursor_row, &key, 149, 0);
+		changed = XwaModernOptionsMenu_DrawValue(&menu, "Bindings", value, 149, 0);
 		if (changed) {
 			g_controllerButtonPage += changed;
 			if (g_controllerButtonPage < 0) {
@@ -1191,30 +1068,26 @@ int XwaModernControllerButtonsScreen_Update(int menu_center_x, int* cursor_row) 
 	}
 	if (g_controllerCapture.digital_axis >= 0) {
 		FrontendText_DrawCentered(12, "Move an axis direction (Esc cancels)",
-								  &(FrontendRect) { 0, y, 639, y + 15 }, g_colorGreen);
-		y += 20;
+								  &(FrontendRect) { 0, menu.y, 639, menu.y + 15 }, g_colorGreen);
+		menu.y += 20;
 	} else if (g_controllerCapture.button >= 0) {
 		FrontendText_DrawCentered(12, "Press a D-pad or hat direction (Esc cancels)",
-								  &(FrontendRect) { 0, y, 639, y + 15 }, g_colorGreen);
-		y += 20;
+								  &(FrontendRect) { 0, menu.y, 639, menu.y + 15 }, g_colorGreen);
+		menu.y += 20;
 	} else if (g_controllerBindingMessageTtl > 0) {
-		FrontendText_DrawCentered(12, g_controllerBindingMessage, &(FrontendRect) { 0, y, 639, y + 15 },
-								  g_colorGreen);
+		FrontendText_DrawCentered(12, g_controllerBindingMessage,
+								  &(FrontendRect) { 0, menu.y, 639, menu.y + 15 }, g_colorGreen);
 		--g_controllerBindingMessageTtl;
-		y += 20;
+		menu.y += 20;
 	}
 	FrontendText_DrawCentered(12, "Press a control to find it; Enter or click assigns; Delete unbinds",
-							  &(FrontendRect) { 0, y, 639, y + 15 }, g_colorGreen);
-	y += 20;
+							  &(FrontendRect) { 0, menu.y, 639, menu.y + 15 }, g_colorGreen);
+	menu.y += 20;
 	FrontendText_DrawCentered(12, "Left/Right adjusts an axis binding threshold",
-							  &(FrontendRect) { 0, y, 639, y + 15 }, g_colorGreen);
-	y += 20;
-	back = ControllerScreen_DrawButton(FrontendString_Get(STR_BACK), menu_center_x, &y, &row, *cursor_row,
-									   &key, 150, 0);
-	if (key == CONTROLLER_KEY_ESCAPE) {
-		Keyboard_FlushCharBuffer();
-		back = 1;
-	}
+							  &(FrontendRect) { 0, menu.y, 639, menu.y + 15 }, g_colorGreen);
+	menu.y += 20;
+	back = XwaModernOptionsMenu_DrawAction(&menu, FrontendString_Get(STR_BACK), 150, 0);
+	back |= XwaModernOptionsMenu_TakeEscape(&menu);
 	if (back) {
 		g_controllerCapture.button = -1;
 		g_controllerCapture.digital_axis = -1;

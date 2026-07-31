@@ -199,6 +199,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/config/modern_input_options.c
     src/xwa_runtime/config/modern_controller_options_screen.c
     src/xwa_runtime/config/modern_input_options_screen.c
+    src/xwa_runtime/config/modern_options_menu.c
     src/xwa_runtime/config/modern_video_options.c
     src/xwa_runtime/config/modern_video_options_screen.c
     src/xwa_runtime/hooks/orientation_hook.c
@@ -454,6 +455,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/config/modern_input_options.h
     src/xwa_runtime/config/modern_controller_options_screen.h
     src/xwa_runtime/config/modern_input_options_screen.h
+    src/xwa_runtime/config/modern_options_menu.h
     src/xwa_runtime/config/modern_video_options.h
     src/xwa_runtime/config/modern_video_options_screen.h
     src/xwa/audio/cd_audio.h
