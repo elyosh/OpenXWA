@@ -2,6 +2,7 @@
 
 #include "aeron/config_file.h"
 #include "aeron/log.h"
+#include "aeron/numeric.h"
 
 #include <float.h>
 #include <math.h>
@@ -436,6 +437,25 @@ static int host_config_input_float(const AeronConfigFile* config, const char* ke
 		return host_config_input_missing(required, key, error, error_size);
 	}
 	value = AeronConfigNode_Float(node, NAN);
+	/* Affected builds wrote optional user values with the active locale's
+	 * decimal comma. Keep canonical YAML strict while accepting that output. */
+	if (!isfinite(value) && !required) {
+		const char* text = AeronConfigNode_String(node, NULL);
+		char normalized[64];
+		char* comma;
+		size_t length;
+
+		if (text) {
+			length = strlen(text);
+			comma = strchr(text, ',');
+			if (length > 0 && length < sizeof(normalized) && comma && comma != text && comma[1] != '\0' &&
+				!strchr(text, '.') && !strchr(comma + 1, ',')) {
+				memcpy(normalized, text, length + 1);
+				normalized[comma - text] = '.';
+				(void)Aeron_ParseAsciiDouble(normalized, length, &value);
+			}
+		}
+	}
 	if (!isfinite(value) || value < min_value || value > max_value) {
 		return host_config_error(error, error_size, "invalid input setting '%s'", key);
 	}
@@ -1194,7 +1214,9 @@ static int host_yaml_set_controller_axis(yaml_document_t* document, int axes_id,
 		snprintf(source_text, sizeof(source_text), "%d", binding->source);
 		source_name = source_text;
 	}
-	snprintf(deadzone_text, sizeof(deadzone_text), "%.6g", (double)binding->deadzone);
+	if (!Aeron_FormatAsciiDouble(deadzone_text, sizeof(deadzone_text), (double)binding->deadzone, 6)) {
+		return 0;
+	}
 	return host_yaml_set_scalar(document, axis_id, "source", source_name,
 								gamepad || binding->source < 0 ? YAML_SINGLE_QUOTED_SCALAR_STYLE
 															   : YAML_PLAIN_SCALAR_STYLE) &&
@@ -1245,7 +1267,9 @@ static int host_yaml_set_controller_button(yaml_document_t* document, int button
 			source_name = source_text;
 			source_style = YAML_PLAIN_SCALAR_STYLE;
 		}
-		snprintf(threshold_text, sizeof(threshold_text), "%.6g", (double)binding->threshold);
+		if (!Aeron_FormatAsciiDouble(threshold_text, sizeof(threshold_text), (double)binding->threshold, 6)) {
+			return 0;
+		}
 		if (!host_yaml_set_scalar(document, mapping_id, "axis", source_name, source_style) ||
 			!host_yaml_set_scalar(document, mapping_id, "direction",
 								  binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE ? "positive"
