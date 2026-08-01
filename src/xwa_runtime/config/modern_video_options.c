@@ -2,6 +2,7 @@
 
 #include "aeron/log.h"
 
+#include <math.h>
 #include <string.h>
 
 static struct {
@@ -22,7 +23,9 @@ static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 		   (options->fsr_upscaling == XWA_MODERN_FSR_OFF || options->msaa == XWA_MODERN_MSAA_OFF) &&
 		   options->motion_blur_quality >= XWA_MODERN_MOTION_BLUR_OFF &&
 		   options->motion_blur_quality <= XWA_MODERN_MOTION_BLUR_HIGH &&
-		   options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 && options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB &&
+		   isfinite(options->motion_blur_amount) && options->motion_blur_amount >= 0.0f &&
+		   options->motion_blur_amount <= 1.0f && options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 &&
+		   options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB &&
 		   options->paper_white >= XWA_MODERN_PAPER_WHITE_AUTO &&
 		   options->paper_white <= XWA_MODERN_PAPER_WHITE_400;
 }
@@ -31,7 +34,8 @@ static int XwaModernVideoOptions_AreEqual(const XwaModernVideoOptions* lhs,
 										  const XwaModernVideoOptions* rhs) {
 	return lhs->window_mode == rhs->window_mode && lhs->ssao_quality == rhs->ssao_quality &&
 		   lhs->fsr_upscaling == rhs->fsr_upscaling && lhs->msaa == rhs->msaa &&
-		   lhs->motion_blur_quality == rhs->motion_blur_quality && lhs->hdr_output == rhs->hdr_output &&
+		   lhs->motion_blur_quality == rhs->motion_blur_quality &&
+		   lhs->motion_blur_amount == rhs->motion_blur_amount && lhs->hdr_output == rhs->hdr_output &&
 		   lhs->sdr_gamma == rhs->sdr_gamma && lhs->paper_white == rhs->paper_white;
 }
 

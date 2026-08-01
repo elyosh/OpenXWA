@@ -221,7 +221,9 @@ static int XwaRemaster_VideoOptionsValid(const XwaModernVideoOptions* options) {
 		   (options->fsr_upscaling == XWA_MODERN_FSR_OFF || options->msaa == XWA_MODERN_MSAA_OFF) &&
 		   options->motion_blur_quality >= XWA_MODERN_MOTION_BLUR_OFF &&
 		   options->motion_blur_quality <= XWA_MODERN_MOTION_BLUR_HIGH &&
-		   options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 && options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB &&
+		   isfinite(options->motion_blur_amount) && options->motion_blur_amount >= 0.0f &&
+		   options->motion_blur_amount <= 1.0f && options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 &&
+		   options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB &&
 		   options->paper_white >= XWA_MODERN_PAPER_WHITE_AUTO &&
 		   options->paper_white <= XWA_MODERN_PAPER_WHITE_400;
 }
@@ -244,6 +246,7 @@ void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
 	out->fsr_upscaling = XwaRemaster_FromTemporalMode(temporal.mode);
 	out->msaa = XwaRemaster_FromSampleCount(XwaRemaster_MsaaSampleCount());
 	out->motion_blur_quality = (XwaModernMotionBlurQuality)motion_blur.quality;
+	out->motion_blur_amount = motion_blur.shutter;
 	out->hdr_output = XwaRemaster_GetHdrDesired();
 	out->sdr_gamma = XwaRemaster_SdrGammaFromDecode(Aeron_OutputSdrContentGamma());
 	out->paper_white = XwaRemaster_PaperWhiteFromNits(Aeron_OutputPaperWhiteNits());
@@ -263,6 +266,7 @@ void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
 
 	XwaRemasterFlight_GetMotionBlur(&motion_blur);
 	motion_blur.quality = options->motion_blur_quality;
+	motion_blur.shutter = options->motion_blur_amount;
 	XwaRemasterFlight_SetMotionBlur(&motion_blur);
 
 	g.msaa_samples = XwaRemaster_ToSampleCount(options->msaa);
@@ -327,6 +331,9 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	}
 	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_MOTION_BLUR) {
 		video_options.motion_blur_quality = options->video_options.motion_blur_quality;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_MOTION_BLUR_AMOUNT) {
+		video_options.motion_blur_amount = options->video_options.motion_blur_amount;
 	}
 	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_HDR) {
 		video_options.hdr_output = options->video_options.hdr_output;

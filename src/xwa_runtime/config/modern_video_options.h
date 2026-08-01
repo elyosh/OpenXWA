@@ -67,6 +67,7 @@ typedef struct XwaModernVideoOptions {
 	XwaModernFsrUpscaling fsr_upscaling;
 	XwaModernMsaa msaa;
 	XwaModernMotionBlurQuality motion_blur_quality;
+	float motion_blur_amount; /* normalized shutter: 0.5 = 180 degrees */
 	int hdr_output;
 	XwaModernSdrGamma sdr_gamma;
 	XwaModernPaperWhite paper_white;
@@ -81,6 +82,7 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_MSAA = 1u << 5,
 	XWA_MODERN_VIDEO_OVERRIDE_SDR_GAMMA = 1u << 6,
 	XWA_MODERN_VIDEO_OVERRIDE_PAPER_WHITE = 1u << 7,
+	XWA_MODERN_VIDEO_OVERRIDE_MOTION_BLUR_AMOUNT = 1u << 8,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

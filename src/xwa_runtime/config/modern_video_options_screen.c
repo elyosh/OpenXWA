@@ -5,11 +5,13 @@
 #include "xwa_runtime/config/modern_options_menu.h"
 #include "xwa_runtime/config/modern_video_options.h"
 
+#include <math.h>
 #include <stdint.h>
 
 int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	static const char* const window_mode_texts[] = { "Windowed", "Fullscreen" };
 	static const char* const quality_texts[] = { "Off", "Low", "High" };
+	static const char* const motion_blur_texts[] = { "Off", "Low Quality", "High Quality" };
 	static const char* const fsr_texts[] = { "Off", "Performance", "Balanced", "Quality", "Native AA" };
 	static const char* const msaa_texts[] = { "Off", "2x", "4x", "8x" };
 	static const char* const toggle_texts[] = { "Off", "On" };
@@ -27,11 +29,13 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	uint8_t msaa;
 	uint8_t original_fsr;
 	uint8_t original_msaa;
-	uint8_t motion_blur;
+	uint8_t motion_blur_quality;
+	uint8_t motion_blur_amount;
 	uint8_t hdr;
 	uint8_t sdr_gamma;
 	uint8_t paper_white;
 	int hdr_rows_disabled;
+	int motion_blur_amount_changed;
 	int changed;
 	int back;
 
@@ -46,12 +50,13 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	msaa = (uint8_t)options.msaa;
 	original_fsr = fsr;
 	original_msaa = msaa;
-	motion_blur = (uint8_t)options.motion_blur_quality;
+	motion_blur_quality = (uint8_t)options.motion_blur_quality;
+	motion_blur_amount = (uint8_t)lroundf(options.motion_blur_amount * 10.0f);
 	hdr = (uint8_t)(options.hdr_output != 0);
 	sdr_gamma = (uint8_t)options.sdr_gamma;
 	paper_white = (uint8_t)options.paper_white;
 	changed = 0;
-	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 140, cursor_row, 9);
+	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 140, cursor_row, 10);
 	XwaModernOptionsMenu_DrawTitle(&menu, "OpenXWA Video Options");
 
 	changed |=
@@ -59,7 +64,12 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &ssao, "SSAO", quality_texts, 3, 61, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &fsr, "FSR Upscaling", fsr_texts, 5, 62, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &msaa, "MSAA", msaa_texts, 4, 63, 0);
-	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &motion_blur, "Motion Blur", quality_texts, 3, 64, 0);
+	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &motion_blur_quality, "Motion Blur", motion_blur_texts,
+												3, 64, 0);
+	motion_blur_amount_changed =
+		XwaModernOptionsMenu_DrawSliderU8(&menu, &motion_blur_amount, "Motion Blur Amount", "0%", "100%", 10,
+										  motion_blur_quality == XWA_MODERN_MOTION_BLUR_OFF);
+	changed |= motion_blur_amount_changed;
 	/* Greyed while the display cannot present HDR (OS HDR disabled or the
 	 * display is not HDR-capable — the backend cannot distinguish the two). */
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &hdr, "HDR Output", toggle_texts, 2, 65,
@@ -90,7 +100,10 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		options.ssao_quality = (XwaModernSsaoQuality)ssao;
 		options.fsr_upscaling = (XwaModernFsrUpscaling)fsr;
 		options.msaa = (XwaModernMsaa)msaa;
-		options.motion_blur_quality = (XwaModernMotionBlurQuality)motion_blur;
+		options.motion_blur_quality = (XwaModernMotionBlurQuality)motion_blur_quality;
+		if (motion_blur_amount_changed) {
+			options.motion_blur_amount = (float)motion_blur_amount / 10.0f;
+		}
 		options.hdr_output = hdr != 0;
 		options.sdr_gamma = (XwaModernSdrGamma)sdr_gamma;
 		options.paper_white = (XwaModernPaperWhite)paper_white;

@@ -308,6 +308,20 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 		return 0;
 	}
 	out->motion_blur_quality = (XwaModernMotionBlurQuality)value;
+	{
+		const char* amount_key = "video.motion_blur_amount";
+		const AeronConfigNode* amount_node = AeronConfigFile_GetNode(config, amount_key);
+		if (amount_node) {
+			const double amount = AeronConfigNode_Float(amount_node, NAN);
+			if (!isfinite(amount) || amount < 0.0 || amount > 1.0) {
+				return host_config_error(error, error_size,
+										 "invalid 'video.motion_blur_amount': expected numeric value %s",
+										 "from 0 through 1");
+			}
+			out->motion_blur_amount = (float)amount;
+			*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_MOTION_BLUR_AMOUNT;
+		}
+	}
 
 	hdr_node = AeronConfigFile_GetNode(config, hdr_key);
 	if (hdr_node) {
@@ -973,6 +987,7 @@ static int host_yaml_set_video_options(yaml_document_t* document, const XwaModer
 	static const char* const sdr_gamma_names[] = { "2.2", "2.4", "srgb" };
 	static const char* const paper_white_names[] = { "auto", "100", "150", "200", "250", "300", "400" };
 	yaml_node_t* root = yaml_document_get_root_node(document);
+	char motion_blur_amount[32];
 	int video_id;
 
 	if (!root || root->type != YAML_MAPPING_NODE || !options ||
@@ -984,9 +999,15 @@ static int host_yaml_set_video_options(yaml_document_t* document, const XwaModer
 		(options->fsr_upscaling != XWA_MODERN_FSR_OFF && options->msaa != XWA_MODERN_MSAA_OFF) ||
 		options->motion_blur_quality < XWA_MODERN_MOTION_BLUR_OFF ||
 		options->motion_blur_quality > XWA_MODERN_MOTION_BLUR_HIGH ||
-		options->sdr_gamma < XWA_MODERN_SDR_GAMMA_2_2 || options->sdr_gamma > XWA_MODERN_SDR_GAMMA_SRGB ||
+		!isfinite(options->motion_blur_amount) || options->motion_blur_amount < 0.0f ||
+		options->motion_blur_amount > 1.0f || options->sdr_gamma < XWA_MODERN_SDR_GAMMA_2_2 ||
+		options->sdr_gamma > XWA_MODERN_SDR_GAMMA_SRGB ||
 		options->paper_white < XWA_MODERN_PAPER_WHITE_AUTO ||
 		options->paper_white > XWA_MODERN_PAPER_WHITE_400) {
+		return 0;
+	}
+	if (!Aeron_FormatAsciiDouble(motion_blur_amount, sizeof motion_blur_amount,
+								 (double)options->motion_blur_amount, 6)) {
 		return 0;
 	}
 	video_id = host_yaml_get_or_add_mapping(document, 1, "video");
@@ -1002,6 +1023,8 @@ static int host_yaml_set_video_options(yaml_document_t* document, const XwaModer
 		   host_yaml_set_scalar(document, video_id, "motion_blur_quality",
 								quality_names[options->motion_blur_quality],
 								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, video_id, "motion_blur_amount", motion_blur_amount,
+								YAML_PLAIN_SCALAR_STYLE) &&
 		   host_yaml_set_scalar(document, video_id, "hdr_output", options->hdr_output ? "true" : "false",
 								YAML_PLAIN_SCALAR_STYLE) &&
 		   host_yaml_set_scalar(document, video_id, "sdr_content_gamma", sdr_gamma_names[options->sdr_gamma],

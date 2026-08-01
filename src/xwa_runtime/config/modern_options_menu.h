@@ -34,6 +34,9 @@ int XwaModernOptionsMenu_DrawValue(XwaModernOptionsMenu* menu, const char* label
 int XwaModernOptionsMenu_DrawCycleU8(XwaModernOptionsMenu* menu, uint8_t* value, const char* label,
 									 const char* const* value_texts, int option_count, int button_id,
 									 int disabled);
+int XwaModernOptionsMenu_DrawSliderU8(XwaModernOptionsMenu* menu, uint8_t* value, const char* label,
+									  const char* min_label, const char* max_label, int notch_count,
+									  int disabled);
 int XwaModernOptionsMenu_TakeEscape(XwaModernOptionsMenu* menu);
 int XwaModernOptionsMenu_LastRowSelected(const XwaModernOptionsMenu* menu);
 
