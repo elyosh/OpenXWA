@@ -110,6 +110,8 @@ int          Hangar_BeginEnterCraft(uint16_t fromObjIdx);
 #ifdef XWA_MODERN
 /* Consume a request to resume the original ready loop from the host task. */
 int          Hangar_TakeReadyLoopRequest(void);
+/* Complete a pending nonblocking options modal before hangar timing resumes. */
+int          Hangar_ContinueOptionsModal(void);
 #endif
 int          Hangar_EnterCraft(uint16_t fromObjIdx);
 void         Hangar_HandleInput(void);

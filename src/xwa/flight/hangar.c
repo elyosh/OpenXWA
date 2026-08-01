@@ -3638,6 +3638,15 @@ static int Hangar_RunOptionsModal(void) {
 	}
 	return 0;
 }
+
+int Hangar_ContinueOptionsModal(void) {
+	if (!g_hangarOptionsModalPending) {
+		return 0;
+	}
+
+	(void)Hangar_RunOptionsModal();
+	return 1;
+}
 #endif
 
 // FUNCTION: XWA 0x45C680

@@ -1319,6 +1319,11 @@ void XwaFlightTask_Tick(void) {
 		}
 		return;
 	}
+	/* Modal continuations discard their elapsed host time; do not simulate on the completion frame. */
+	if (Flight_ContinueOptionsModal() || Hangar_ContinueOptionsModal()) {
+		g_xwaFlightTaskNextWakeUs = Aeron_NowUs() + XWA_FLIGHT_FRAME_US;
+		return;
+	}
 
 	if (Aeron_NowUs() < g_xwaFlightTaskNextWakeUs) {
 		if (g_xwaFlightTaskTickLogCount < 8u) {

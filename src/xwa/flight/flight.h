@@ -445,6 +445,8 @@ void Flight_AdvanceOneStep(int targetTimestamp);
 void Flight_StepSimToTime(int targetTimestamp);
 #ifdef XWA_MODERN
 void Flight_ModernResetHighRateIntegration(void);
+/* Complete a pending nonblocking options modal before flight timing resumes. */
+int Flight_ContinueOptionsModal(void);
 #endif
 int Flight_PumpWindowMessages(void);
 int Pause_ProcessInput(void);

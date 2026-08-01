@@ -10350,6 +10350,15 @@ static __inline int Flight_UpdateEntity_OpenOptions(unsigned int playerIdx) {
 	return 0;
 }
 
+int Flight_ContinueOptionsModal(void) {
+	if (!g_flightOptionsModalPending) {
+		return 0;
+	}
+
+	(void)Flight_UpdateEntity_OpenOptions(g_flightOptionsModalPlayerIdx);
+	return 1;
+}
+
 static __inline void Flight_UpdateEntity_PauseUntilKey(unsigned int playerIdx) {
 	int16_t nextKey;
 
