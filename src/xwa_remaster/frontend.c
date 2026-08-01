@@ -159,6 +159,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	s.texture = ref.texture;
 	s.filter = AERON_BLIT2D_FILTER_LINEAR;
 	s.blend = (d->kind == XWA_DRAW2D_SPRITE_OPAQUE) ? AERON_BLIT2D_BLEND_NONE : AERON_BLIT2D_BLEND_PMA;
+	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
 	if (d->kind == XWA_DRAW2D_SPRITE_OPAQUE) {
 		/* The engine's opaque blit copies EVERY pixel (no color key);
 		 * keyed-out texels in the baked asset are PMA black with
@@ -337,6 +338,7 @@ static void rm_blit_rt(AeronCommandBuffer* cmd, AeronRenderTarget* dst, AeronRen
 	s.texture = Aeron_RenderTargetGetTexture(src);
 	s.filter = AERON_BLIT2D_FILTER_NEAREST;
 	s.blend = AERON_BLIT2D_BLEND_NONE;
+	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
 	s.src_u1 = 1.0f;
 	s.src_v1 = 1.0f;
 	s.dst_w = (float)RM_RT_W;
@@ -441,6 +443,7 @@ static void rm_push_save(AeronCommandBuffer* cmd, const XwaSurfaceEvent* e, int 
 	s.texture = Aeron_RenderTargetGetTexture(src);
 	s.filter = AERON_BLIT2D_FILTER_NEAREST;
 	s.blend = AERON_BLIT2D_BLEND_NONE;
+	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
 	s.src_u0 = (float)rm_edge(e->left) / (float)RM_RT_W;
 	s.src_v0 = (float)rm_edge(e->top) / (float)RM_RT_H;
 	s.src_u1 = (float)rm_edge(e->right + 1) / (float)RM_RT_W;
@@ -465,6 +468,7 @@ static void rm_pop_restore(AeronCommandBuffer* cmd, const XwaSurfaceEvent* e) {
 	s.texture = Aeron_RenderTargetGetTexture(slot->rt);
 	s.filter = AERON_BLIT2D_FILTER_NEAREST;
 	s.blend = AERON_BLIT2D_BLEND_NONE;
+	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
 	s.src_u1 = 1.0f;
 	s.src_v1 = 1.0f;
 	s.dst_x = (float)rm_edge(e->left);
