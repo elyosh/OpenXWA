@@ -48,11 +48,7 @@ DeathStarObjectPointTable g_deathStarObjectPointTables[53];
 // GLOBAL: XWA 0x631B98
 DeathStarFollowChainSlot g_deathStarFollowChainSlots[10];
 // GLOBAL: XWA 0x631880
-int g_deathStarPathSampleWriteIdx;
-// GLOBAL: XWA 0x631884
-int g_deathStarPathSampleLastTime;
-// GLOBAL: XWA 0x631888
-DeathStarPathSample g_deathStarPathSamples[30];
+DeathStarPathHistory g_deathStarPathHistory;
 // GLOBAL: XWA 0x631B60
 int g_deathStarFollowRefreshPending;
 // GLOBAL: XWA 0x631C60
@@ -957,19 +953,20 @@ void DeathStarTunnel_Update(void) {
 	}
 
 	{
-		int prevIdx = g_deathStarPathSampleWriteIdx - 1;
+		int prevIdx = g_deathStarPathHistory.sampleWriteIdx - 1;
 		ObjectRecord* leader;
 		unsigned int dist;
 		if (prevIdx < 0)
 			prevIdx += 0x1E;
 		leader = &g_objectTable[g_deathStarFollowLeaderObjIdx];
-		dist = collide_roughdistance3d(leader->world_x - g_deathStarPathSamples[prevIdx].worldX,
-									   leader->world_y - g_deathStarPathSamples[prevIdx].worldY,
-									   leader->world_z - g_deathStarPathSamples[prevIdx].worldZ);
+		dist = collide_roughdistance3d(leader->world_x - g_deathStarPathHistory.samples[prevIdx].worldX,
+									   leader->world_y - g_deathStarPathHistory.samples[prevIdx].worldY,
+									   leader->world_z - g_deathStarPathHistory.samples[prevIdx].worldZ);
 		if (dist >= 0x1F4) {
-			int dt = g_deathStarTunnelTimer - g_deathStarPathSampleLastTime;
+			int dt = g_deathStarTunnelTimer - g_deathStarPathHistory.sampleLastTime;
 			if ((unsigned int)dt > 0x32) {
-				DeathStarPathSample* s = &g_deathStarPathSamples[g_deathStarPathSampleWriteIdx];
+				DeathStarPathSample* s =
+					&g_deathStarPathHistory.samples[g_deathStarPathHistory.sampleWriteIdx];
 				s->worldX = leader->world_x;
 				s->worldY = leader->world_y;
 				s->worldZ = leader->world_z;
@@ -978,10 +975,10 @@ void DeathStarTunnel_Update(void) {
 				s->roll = leader->roll;
 				s->tacticalIndex = leader->mobj->speed;
 				s->elapsedTicksSincePrev = dt;
-				g_deathStarPathSampleLastTime = g_deathStarTunnelTimer;
-				++g_deathStarPathSampleWriteIdx;
-				if (g_deathStarPathSampleWriteIdx == 30)
-					g_deathStarPathSampleWriteIdx = 0;
+				g_deathStarPathHistory.sampleLastTime = g_deathStarTunnelTimer;
+				++g_deathStarPathHistory.sampleWriteIdx;
+				if (g_deathStarPathHistory.sampleWriteIdx == 30)
+					g_deathStarPathHistory.sampleWriteIdx = 0;
 			}
 		}
 	}
@@ -1299,26 +1296,26 @@ void DeathStar_UpdateFollowOverrideCraft(int objectIdx) {
 			slot->pathDistance += elapsed;
 		}
 
-		accumTime = g_deathStarTunnelTimer - g_deathStarPathSampleLastTime;
-		sampleIdx = g_deathStarPathSampleWriteIdx - 1;
+		accumTime = g_deathStarTunnelTimer - g_deathStarPathHistory.sampleLastTime;
+		sampleIdx = g_deathStarPathHistory.sampleWriteIdx - 1;
 		if (sampleIdx < 0) {
 			sampleIdx += 30;
 		}
 
 		sampleIdxA = sampleIdx;
 		sampleIdxB = sampleIdx;
-		if (sampleIdx != g_deathStarPathSampleWriteIdx) {
+		if (sampleIdx != g_deathStarPathHistory.sampleWriteIdx) {
 			do {
 				sampleIdxA = sampleIdxB - 1;
 				if (sampleIdxA < 0) {
 					sampleIdxA += 30;
 				}
-				accumTime += g_deathStarPathSamples[sampleIdxB].elapsedTicksSincePrev;
+				accumTime += g_deathStarPathHistory.samples[sampleIdxB].elapsedTicksSincePrev;
 				if (accumTime > slot->pathDistance) {
 					break;
 				}
 				sampleIdxB = sampleIdxA;
-			} while (sampleIdxA != g_deathStarPathSampleWriteIdx);
+			} while (sampleIdxA != g_deathStarPathHistory.sampleWriteIdx);
 		}
 
 		{
@@ -1341,7 +1338,7 @@ void DeathStar_UpdateFollowOverrideCraft(int objectIdx) {
 				g_paiContext.aiController->hasLiveTarget = 0;
 				paifight_fightershootorder();
 				g_paiContext.aiController->aiPlanState =
-					20 * g_deathStarPathSamples[sampleIdxA].tacticalIndex;
+					20 * g_deathStarPathHistory.samples[sampleIdxA].tacticalIndex;
 			}
 		}
 
@@ -1388,7 +1385,7 @@ void DeathStar_UpdateFollowOverrideCraft(int objectIdx) {
 		int deltaZ;
 
 		object = &g_objectTable[objectIdx];
-		targetSample = &g_deathStarPathSamples[g_deathStarPathSampleWriteIdx];
+		targetSample = &g_deathStarPathHistory.samples[g_deathStarPathHistory.sampleWriteIdx];
 		deltaX = targetSample->worldX - object->world_x;
 		deltaY = targetSample->worldY - object->world_y;
 		deltaZ = targetSample->worldZ - object->world_z;
@@ -1606,9 +1603,7 @@ void DeathStar_WriteFilmStateBlock(void) {
 	DEATH_STAR_WRITE_FIELD(g_deathStarReactorAssaultFgIdx);
 	DEATH_STAR_WRITE_FIELD(g_deathStarRandomChildObjectLimit);
 	DEATH_STAR_WRITE_FIELD(g_deathStarSegmentChildInitialHitCount);
-	DEATH_STAR_WRITE_FIELD(g_deathStarPathSampleWriteIdx);
-	DEATH_STAR_WRITE_FIELD(g_deathStarPathSampleLastTime);
-	DEATH_STAR_WRITE_ARRAY(g_deathStarPathSamples);
+	DEATH_STAR_WRITE_FIELD(g_deathStarPathHistory);
 	DEATH_STAR_WRITE_FIELD(g_deathStarFollowLeaderExtentX4);
 	DEATH_STAR_WRITE_ARRAY(g_deathStarFollowChainSlots);
 	DEATH_STAR_WRITE_FIELD(g_deathStarFollowRefreshPending);
@@ -1705,9 +1700,7 @@ void DeathStar_ReadFilmStateBlock(void) {
 	DEATH_STAR_READ_FIELD(g_deathStarReactorAssaultFgIdx);
 	DEATH_STAR_READ_FIELD(g_deathStarRandomChildObjectLimit);
 	DEATH_STAR_READ_FIELD(g_deathStarSegmentChildInitialHitCount);
-	DEATH_STAR_READ_FIELD(g_deathStarPathSampleWriteIdx);
-	DEATH_STAR_READ_FIELD(g_deathStarPathSampleLastTime);
-	DEATH_STAR_READ_ARRAY(g_deathStarPathSamples);
+	DEATH_STAR_READ_FIELD(g_deathStarPathHistory);
 	DEATH_STAR_READ_FIELD(g_deathStarFollowLeaderExtentX4);
 	DEATH_STAR_READ_ARRAY(g_deathStarFollowChainSlots);
 	DEATH_STAR_READ_FIELD(g_deathStarFollowRefreshPending);
@@ -1777,13 +1770,11 @@ void DeathStar_InitFollowOverrideState(void) {
 	uint16_t slotIdx;
 	uint32_t objectIdx;
 
-	memset(&g_deathStarPathSampleWriteIdx, 0,
-		   sizeof(g_deathStarPathSampleWriteIdx) + sizeof(g_deathStarPathSampleLastTime) +
-			   sizeof(g_deathStarPathSamples));
+	memset(&g_deathStarPathHistory, 0, sizeof(g_deathStarPathHistory));
 
-	g_deathStarPathSampleLastTime = g_deathStarTunnelTimer;
+	g_deathStarPathHistory.sampleLastTime = g_deathStarTunnelTimer;
 	g_deathStarFollowChainLastValidateTime = g_deathStarTunnelTimer;
-	g_deathStarPathSampleWriteIdx = 0;
+	g_deathStarPathHistory.sampleWriteIdx = 0;
 	g_deathStarFollowLeaderObjIdx = g_deathStarPlayerObjIdx;
 	sampleWorldY = 0;
 	g_deathStarFollowLeaderObjectType = g_objectTable[g_deathStarPlayerObjIdx].objectType;
@@ -1794,7 +1785,7 @@ void DeathStar_InitFollowOverrideState(void) {
 		DeathStarPathSample* sample;
 
 		sampleWorldY -= 500;
-		sample = &g_deathStarPathSamples[sampleIdx];
+		sample = &g_deathStarPathHistory.samples[sampleIdx];
 		sample->elapsedTicksSincePrev = 50;
 		sample->worldX = 0;
 		sample->worldY = sampleWorldY;
@@ -2943,8 +2934,8 @@ char DeathStar_InterpolateFollowCraftOnPath(int objectIdx, int sampleIdxA, int s
 	double fraction;
 
 	object = &g_objectTable[objectIdx];
-	sampleA = &g_deathStarPathSamples[sampleIdxA];
-	sampleB = &g_deathStarPathSamples[sampleIdxB];
+	sampleA = &g_deathStarPathHistory.samples[sampleIdxA];
+	sampleB = &g_deathStarPathHistory.samples[sampleIdxB];
 
 	object->world_x = sampleA->worldX;
 	object->world_y = sampleA->worldY;
@@ -3015,11 +3006,11 @@ void DeathStar_AddFollowChainSlot(int objectIdx) {
 		if (slot->objectIdx == 0xffff) {
 			slot->objectIdx = objectIdx;
 			slot->objectSignature = g_objectTable[objectIdx].objectSignature;
-			pathDistance = g_deathStarTunnelTimer - g_deathStarPathSampleLastTime;
+			pathDistance = g_deathStarTunnelTimer - g_deathStarPathHistory.sampleLastTime;
 
 			for (sampleIdx = 0; sampleIdx < 30; ++sampleIdx) {
-				if (sampleIdx != g_deathStarPathSampleWriteIdx) {
-					pathDistance += g_deathStarPathSamples[sampleIdx].elapsedTicksSincePrev;
+				if (sampleIdx != g_deathStarPathHistory.sampleWriteIdx) {
+					pathDistance += g_deathStarPathHistory.samples[sampleIdx].elapsedTicksSincePrev;
 				}
 			}
 

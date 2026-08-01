@@ -103,14 +103,18 @@ typedef struct DeathStarPathSample {
 	uint16_t tacticalIndex;
 	int      elapsedTicksSincePrev;
 } DeathStarPathSample;
+
+typedef struct DeathStarPathHistory {
+	int                 sampleWriteIdx;
+	int                 sampleLastTime;
+	DeathStarPathSample samples[30];
+} DeathStarPathHistory;
 #pragma pack(pop)
 
 extern DeathStarSegmentSet g_deathStarSegmentSets[8];
 extern DeathStarObjectPointTable g_deathStarObjectPointTables[53];
 extern DeathStarFollowChainSlot g_deathStarFollowChainSlots[10];
-extern int g_deathStarPathSampleWriteIdx;
-extern int g_deathStarPathSampleLastTime;
-extern DeathStarPathSample g_deathStarPathSamples[30];
+extern DeathStarPathHistory g_deathStarPathHistory;
 extern int g_deathStarFollowRefreshPending;
 extern int g_deathStarFollowLeaderExtentX4;
 extern int g_deathStarFollowLeaderObjectType;
