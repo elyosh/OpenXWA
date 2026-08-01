@@ -413,8 +413,6 @@ int XwaRemasterFlightMap_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scene, c
 		MapPreparedObject* prepared = &map_state.objects[i];
 		const int object_above = prepared->object->world_pos[2] >= MAP_PLANE_Z;
 		prepared->annotation_pass = (uint8_t)(object_above != camera_above ? 0 : 1);
-		if (!XwaRemasterFlight_ProjectView(view, prepared->eye, &prepared->screen_x, &prepared->screen_y))
-			continue;
 		const int icon_eligible = prepared->map->render_kind == XWA_FLIGHT_MAP_RENDER_CRAFT ||
 								  prepared->object->genus == XWA_SNAP_GENUS_MINE;
 		const int use_icon = icon_eligible && prepared->eye[2] > 0.0f &&
@@ -422,6 +420,8 @@ int XwaRemasterFlightMap_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scene, c
 		if (!use_icon &&
 			!submit_object(prepared->map, prepared->object, prepared->snapshot_index, submit_user))
 			return 0;
+		if (!XwaRemasterFlight_ProjectView(view, prepared->eye, &prepared->screen_x, &prepared->screen_y))
+			continue;
 		map_add_object_annotations(snapshot, assets, view, prepared, use_icon);
 		const char* label = prepared->map->label_offset < snapshot->flight_map.label_bytes
 								? &snapshot->flight_map.labels[prepared->map->label_offset]
