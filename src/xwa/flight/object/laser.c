@@ -2861,7 +2861,11 @@ uint16_t laser_createprojectilefromstatic(uint16_t staticObjIdx, uint16_t shoote
 			ObjectRecord* scanObj;
 
 			scanObj = &g_objectTable[projectileObjIdx];
+#ifdef XWA_MODERN
+			if (laser_GetProjectileWarheadClass(scanObj->objectType) == 0 &&
+#else
 			if (g_projectileWarheadClassByType[scanObj->objectType - OBJ_LaserRebel] == 0 &&
+#endif
 				scanObj->mobj->team == g_missionFlightGroups[flightGroupIdx].fg.team) {
 				break;
 			}
@@ -3097,7 +3101,11 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 					continue;
 				}
 				if (g_objectTable[scanObjIdx].mobj->state == 1 &&
+#ifdef XWA_MODERN
+					laser_GetProjectileWarheadClass((ObjectTypeId)scanType) > 0 &&
+#else
 					g_projectileWarheadClassByType[scanType - OBJ_LaserRebel] != 0 &&
+#endif
 					(unsigned int)g_objectTable[scanObjIdx].mobj->pWarheadGuidance->targetObjIdx ==
 						ownerObjIdx) {
 					uint32_t flareObjIdx;

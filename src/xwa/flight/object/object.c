@@ -1573,9 +1573,9 @@ void Object_UpdateLifetimeAndMovement(void) {
 					case GENUS_NpcProjectile: {
 						uint16_t projType = obj->objectType;
 #ifdef XWA_MODERN
-						if (g_projectileWarheadClassByType[projType - OBJ_LaserRebel]) {
+						if (laser_GetProjectileWarheadClass((ObjectTypeId)projType) > 0) {
 #else
-						if (((const uint8_t*)&g_projectileDamageByType[14])[projType]) {
+						if (g_projectileWarheadClassByType[projType - OBJ_LaserRebel]) {
 #endif
 							if (projType == OBJ_WarheadSpaceBomb || projType == OBJ_WarheadRocket) {
 								collide_ApplyDefaultProximityDamage(

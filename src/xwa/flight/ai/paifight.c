@@ -716,7 +716,7 @@ int16_t paifight_FindNearestAttackerOfMatchingTarget(uint16_t target1Type, uint1
 							projectileType >= OBJ_LaserRebel && projectileType <= OBJ_LaserImperialDS &&
 							g_projectileWarheadClassByType[projectileType - OBJ_LaserRebel] != 0 &&
 #else
-							((const uint8_t*)&g_projectileDamageByType[14])[projectileType] != 0 &&
+							g_projectileWarheadClassByType[projectileType - OBJ_LaserRebel] != 0 &&
 #endif
 							projectileObject->mobj->pWarheadGuidance->targetObjIdx == targetObjIdx) {
 							uint32_t rangeScore;
@@ -2370,9 +2370,9 @@ static __inline uint32_t paifight_ApplyTurretTargetRangePenalty(uint16_t targetO
 
 static __inline int paifight_IsWarheadClassProjectile(ObjectTypeId objectType) {
 #ifdef XWA_MODERN
-	return g_projectileWarheadClassByType[(uint16_t)objectType - OBJ_LaserRebel] != 0;
+	return laser_GetProjectileWarheadClass(objectType) > 0;
 #else
-	return ((const uint8_t*)&g_projectileDamageByType[14])[(uint16_t)objectType] != 0;
+	return g_projectileWarheadClassByType[(uint16_t)objectType - OBJ_LaserRebel] != 0;
 #endif
 }
 
@@ -2873,8 +2873,12 @@ char paifight_fightershootorder(void) {
 
 		projectileObj = &g_objectTable[projectileObjIdx];
 		if (projectileObj->objectType != OBJ_None &&
+#ifdef XWA_MODERN
+			(laser_GetProjectileWarheadClass(projectileObj->objectType) == desiredWarheadClass ||
+#else
 			(g_projectileWarheadClassByType[(uint16_t)projectileObj->objectType - OBJ_LaserRebel] ==
 				 desiredWarheadClass ||
+#endif
 			 (g_missionFormatVersion >= 14 && projectileObj->objectType == OBJ_WarheadMagPulse &&
 			  desiredWarheadClass == 2))) {
 			WarheadGuidanceState* guidance;

@@ -17,6 +17,19 @@ extern const uint16_t g_projectileSpeedByType[OBJ_LaserImperialDS - OBJ_LaserReb
 extern const int      g_projectileDamageByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
 extern const uint8_t  g_projectileWarheadClassByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
 
+#ifdef XWA_MODERN
+/* Returns -1 when objectType cannot index the compact projectile tables. */
+static inline int laser_GetProjectileWarheadClass(ObjectTypeId objectType) {
+	uint16_t type = (uint16_t)objectType;
+
+	if (type < OBJ_LaserRebel || type > OBJ_LaserImperialDS) {
+		return -1;
+	}
+
+	return g_projectileWarheadClassByType[type - OBJ_LaserRebel];
+}
+#endif
+
 /* Mission-score point value lost when a player-owned warhead is destroyed, indexed by warhead
    object type. Original is a biased-base table; only the warhead object-type window is populated. */
 extern const uint16_t g_warheadProjectilePointValueByObjectType[OBJ_LaserImperialDS + 1];

@@ -3455,7 +3455,11 @@ int collide_GetSweptHitRadius(unsigned int attackerObjIdx, unsigned int targetOb
 
 	if (!g_asyncFlag || objects[targetObjIdx].playerOwnerIdx == -1 ||
 		objects[attackerObjIdx].genusId != GENUS_PlayerProjectile ||
-		((const uint8_t*)&g_projectileDamageByType[14])[(uint16_t)objects[attackerObjIdx].objectType] != 0) {
+#ifdef XWA_MODERN
+		laser_GetProjectileWarheadClass(objects[attackerObjIdx].objectType) != 0) {
+#else
+		g_projectileWarheadClassByType[(uint16_t)objects[attackerObjIdx].objectType - OBJ_LaserRebel] != 0) {
+#endif
 		return radius;
 	}
 
@@ -5180,12 +5184,12 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 						if (warnCount < 5) {
 							warnCount +=
 #ifdef XWA_MODERN
+								(laser_GetProjectileWarheadClass(
+									 g_objectTable[projectileObjIdx].objectType) > 0)
+#else
 								(g_projectileWarheadClassByType[(uint16_t)g_objectTable[projectileObjIdx]
 																	.objectType -
 																OBJ_LaserRebel] != 0)
-#else
-								(((const uint8_t*)&g_projectileDamageByType[14])
-									 [(uint16_t)g_objectTable[projectileObjIdx].objectType] != 0)
 #endif
 									? 4
 									: 0;
@@ -5269,11 +5273,10 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 			if (g_craftImpactBounceEnabled) {
 				if (targetCraft->objectKind == 0) {
 #ifdef XWA_MODERN
+					if (laser_GetProjectileWarheadClass(g_objectTable[projectileObjIdx].objectType) > 0)
+#else
 					if (g_projectileWarheadClassByType[(uint16_t)g_objectTable[projectileObjIdx].objectType -
 													   OBJ_LaserRebel] != 0)
-#else
-					if (((const uint8_t*)&g_projectileDamageByType[14])
-							[(uint16_t)g_objectTable[projectileObjIdx].objectType] != 0)
 #endif
 					{
 						collide_applyCraftImpactBounce(targetObjIdx, projectileObjIdx);
@@ -5287,9 +5290,9 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 
 				if (targetCraft->cmTypeId == 1 && targetCraft->chaffActiveTimer != 0 &&
 #ifdef XWA_MODERN
-					g_projectileWarheadClassByType[(uint16_t)projType - OBJ_LaserRebel] != 0 &&
+					laser_GetProjectileWarheadClass(projType) > 0 &&
 #else
-					((const uint8_t*)&g_projectileDamageByType[14])[(uint16_t)projType] != 0 &&
+					g_projectileWarheadClassByType[(uint16_t)projType - OBJ_LaserRebel] != 0 &&
 #endif
 					forwardPositive) {
 					chaffHandled = 1;
@@ -5369,9 +5372,9 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 		unsigned int effectSlot;
 
 #ifdef XWA_MODERN
-		if (g_projectileWarheadClassByType[(uint16_t)projType - OBJ_LaserRebel] == 0) {
+		if (laser_GetProjectileWarheadClass(projType) <= 0) {
 #else
-		if (((const uint8_t*)&g_projectileDamageByType[14])[(uint16_t)projType] == 0) {
+		if (g_projectileWarheadClassByType[(uint16_t)projType - OBJ_LaserRebel] == 0) {
 #endif
 			effectClass = 1;
 			if (projType == OBJ_LaserIon || projType == OBJ_LaserIonTurbo || projType == OBJ_WarheadIon ||
@@ -5817,9 +5820,9 @@ void static_laserhitstatic(unsigned int sourceObjIdx, unsigned int staticObjIdx,
 	}
 
 #ifdef XWA_MODERN
-	if (g_projectileWarheadClassByType[(uint16_t)g_objectTable[sourceObjIdx].objectType - OBJ_LaserRebel]) {
+	if (laser_GetProjectileWarheadClass(g_objectTable[sourceObjIdx].objectType) > 0) {
 #else
-	if (((const uint8_t*)&g_projectileDamageByType[14])[(uint16_t)g_objectTable[sourceObjIdx].objectType]) {
+	if (g_projectileWarheadClassByType[(uint16_t)g_objectTable[sourceObjIdx].objectType - OBJ_LaserRebel]) {
 #endif
 		effectType = OBJ_ExplosionTextureGroup2002;
 		collide_ApplyDefaultProximityDamage(sourceObjIdx, g_objectTable[sourceObjIdx].mobj->damageAmount,
@@ -6754,9 +6757,9 @@ static __inline int collide_HitMeshIsEngineGlow(ObjectTypeId targetType, uint16_
 
 static __inline uint8_t collide_GetProjectileWarheadClass(ObjectTypeId projectileType) {
 #ifdef XWA_MODERN
-	return g_projectileWarheadClassByType[(uint16_t)projectileType - OBJ_LaserRebel];
+	return laser_GetProjectileWarheadClass(projectileType) > 0;
 #else
-	return ((const uint8_t*)&g_projectileDamageByType[14])[(uint16_t)projectileType];
+	return g_projectileWarheadClassByType[(uint16_t)projectileType - OBJ_LaserRebel];
 #endif
 }
 

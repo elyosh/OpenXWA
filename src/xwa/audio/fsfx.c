@@ -1643,7 +1643,11 @@ void fsfx_UpdateMissileThreatWarning(void) {
 
 		genusId = g_objectTable[objIdx].genusId;
 		if ((genusId == GENUS_PlayerProjectile || genusId == GENUS_NpcProjectile) &&
+#ifdef XWA_MODERN
+			laser_GetProjectileWarheadClass(g_objectTable[objIdx].objectType) > 0) {
+#else
 			g_projectileWarheadClassByType[g_objectTable[objIdx].objectType - OBJ_LaserRebel] != 0) {
+#endif
 			WarheadGuidanceState* guidance;
 
 			guidance = g_objectTable[objIdx].mobj->pWarheadGuidance;

@@ -1030,8 +1030,17 @@ int DeathStar_HandlePowerNodeHit(unsigned int sourceObjIdx, unsigned int powerNo
 		result = OBJ_SparkTextureGroup3000;
 		if (g_objectTable[sourceObjIdx].genusId == GENUS_PlayerProjectile ||
 			g_objectTable[sourceObjIdx].genusId == GENUS_NpcProjectile) {
-			if (((const uint8_t*)&g_projectileDamageByType[14])[(uint16_t)g_objectTable[sourceObjIdx]
-																	.objectType] == 0) {
+#ifdef XWA_MODERN
+			int warheadClass = laser_GetProjectileWarheadClass(g_objectTable[sourceObjIdx].objectType);
+
+			if (warheadClass < 0) {
+				return result;
+			}
+			if (warheadClass == 0) {
+#else
+			if (g_projectileWarheadClassByType[(uint16_t)g_objectTable[sourceObjIdx].objectType -
+											 OBJ_LaserRebel] == 0) {
+#endif
 				--g_objectTable[powerNodeObjIdx].typeSpecificWord;
 			} else if (g_objectTable[powerNodeObjIdx].typeSpecificWord > 50u) {
 				g_objectTable[powerNodeObjIdx].typeSpecificWord =
@@ -1064,8 +1073,17 @@ int DeathStar_HandlePowerNodeHit(unsigned int sourceObjIdx, unsigned int powerNo
 
 	if (g_objectTable[sourceObjIdx].genusId == GENUS_PlayerProjectile ||
 		g_objectTable[sourceObjIdx].genusId == GENUS_NpcProjectile) {
-		if (((const uint8_t*)&g_projectileDamageByType[14])[(uint16_t)g_objectTable[sourceObjIdx]
-																.objectType] == 0) {
+#ifdef XWA_MODERN
+		int warheadClass = laser_GetProjectileWarheadClass(g_objectTable[sourceObjIdx].objectType);
+
+		if (warheadClass < 0) {
+			return result;
+		}
+		if (warheadClass == 0) {
+#else
+		if (g_projectileWarheadClassByType[(uint16_t)g_objectTable[sourceObjIdx].objectType -
+										 OBJ_LaserRebel] == 0) {
+#endif
 			--g_objectTable[powerNodeObjIdx].typeSpecificWord;
 		} else {
 			g_objectTable[powerNodeObjIdx].typeSpecificWord = 0;
@@ -5179,8 +5197,12 @@ void DeathStar_FireLaserAtTarget(void) {
 		laserObjIdx = g_playerProjectileSlotsTotal + g_sharedPlayerProjectileSlotsPerRegion +
 					  g_projectileObjectSlotStart;
 		while (laserObjIdx < g_projectileObjectSlotEnd) {
-			if (((const uint8_t*)&g_projectileDamageByType[14])[(uint16_t)g_objectTable[laserObjIdx]
-																	.objectType] == 0 &&
+#ifdef XWA_MODERN
+			if (laser_GetProjectileWarheadClass(g_objectTable[laserObjIdx].objectType) == 0 &&
+#else
+			if (g_projectileWarheadClassByType[(uint16_t)g_objectTable[laserObjIdx].objectType -
+											 OBJ_LaserRebel] == 0 &&
+#endif
 				g_objectTable[laserObjIdx].mobj->team == 1) {
 				break;
 			}
