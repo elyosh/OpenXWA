@@ -285,7 +285,8 @@ typedef struct XwaDirLight {
 #define XWA_SNAP_SLOT_MAIN 1      /* [g_regionMainObjectSlotStart, End) */
 #define XWA_SNAP_SLOT_TRANSIENT 2 /* [g_localTransientSlotStart, End) */
 
-/* Object-type values in the billboard laws (mirrors ObjectTypeId). */
+/* Object-type values the drivers dispatch on (mirrors ObjectTypeId). */
+#define XWA_SNAP_TYPE_BWING 4               /* OBJ_BWing (model-wide bridge compensation) */
 #define XWA_SNAP_TYPE_FALCON2 59            /* OBJ_MilleniumFalcon2 (DS hangar light gate) */
 #define XWA_SNAP_TYPE_SSD 140               /* OBJ_SuperStarDestroyer */
 #define XWA_SNAP_TYPE_DS_REACTOR 324        /* OBJ_DSReactorCylinder (point-light gate) */
@@ -511,6 +512,7 @@ typedef struct XwaHyperspaceState {
 /* OPT mesh-type values the drivers dispatch on (mirrors MeshType —
  * carried per glb mesh slot as AeronMeshRot.mesh_type). */
 #define XWA_SNAP_MESH_FUSELAGE 3
+#define XWA_SNAP_MESH_BRIDGE 7
 #define XWA_SNAP_MESH_ROTARY_GUN_TURRET 21
 #define XWA_SNAP_MESH_ROTARY_LAUNCHER 22
 #define XWA_SNAP_MESH_ROTARY_BEAM 24

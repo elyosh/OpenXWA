@@ -590,21 +590,57 @@ static void ship_mat3x4_mul(float out[3][4], const float lhs[3][4], const float 
 	memcpy(out, result, sizeof result);
 }
 
+static int ship_bwing_bridge_slot(const AeronSceneMesh* mesh, uint32_t slots) {
+	if (!mesh) {
+		return -1;
+	}
+	for (uint32_t mi = 0; mi < slots; mi++) {
+		if (mesh->mesh_rot[mi].mesh_type == XWA_SNAP_MESH_BRIDGE) {
+			return (int)mi;
+		}
+	}
+	return -1;
+}
+
+static int ship_bwing_compensation(const AeronSceneMesh* mesh, const XwaFlightObject* f, uint32_t slots,
+								   float out[3][4]) {
+	if (f->object_type != XWA_SNAP_TYPE_BWING) {
+		return 0;
+	}
+	const int bridge_slot = ship_bwing_bridge_slot(mesh, slots);
+	if (bridge_slot < 0 || f->mesh_rotation[bridge_slot] == 0) {
+		return 0;
+	}
+	/* The classic B-Wing walker rotates every mesh root by the Bridge
+	 * rotation around model -Y before applying that root's local rotation. */
+	static const float axis[3] = { 0.0f, -1.0f, 0.0f };
+	static const float pivot[3] = { 0.0f, 0.0f, 0.0f };
+	const float angle = (float)f->mesh_rotation[bridge_slot] * (-2.0f * 3.14159265358979323846f / 256.0f);
+	ship_mat3x4_rotation_about_pivot(out, axis, pivot, angle);
+	return 1;
+}
+
 int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,
 								   AeronSceneMeshTable* out) {
 	if (!mesh || !f || !out || !f->has_craft) {
 		return 0;
 	}
+	const uint32_t slots =
+		AERON_MAX_MESH_SLOTS < XWA_SNAP_MAX_MESH_SLOTS ? AERON_MAX_MESH_SLOTS : XWA_SNAP_MAX_MESH_SLOTS;
+	float bwing_compensation[3][4];
+	const int has_bwing_compensation = ship_bwing_compensation(mesh, f, slots, bwing_compensation);
 	for (uint32_t mi = 0; mi < AERON_MAX_MESH_SLOTS; mi++) {
-		ship_mat3x4_identity(out->rows[mi]);
+		if (has_bwing_compensation) {
+			memcpy(out->rows[mi], bwing_compensation, sizeof out->rows[mi]);
+		} else {
+			ship_mat3x4_identity(out->rows[mi]);
+		}
 		out->visibility_packed[mi >> 2][mi & 3] = 1.0f;
 		out->highlight_packed[mi >> 2][mi & 3] = 0.0f;
 		out->markings_packed[mi >> 2][mi & 3] = 0.0f;
 		out->emissive_packed[mi >> 2][mi & 3] = 1.0f;
 	}
-	int any = 0;
-	const uint32_t slots =
-		AERON_MAX_MESH_SLOTS < XWA_SNAP_MAX_MESH_SLOTS ? AERON_MAX_MESH_SLOTS : XWA_SNAP_MAX_MESH_SLOTS;
+	int any = has_bwing_compensation;
 	for (uint32_t mi = 0; mi < slots; mi++) {
 		/* Classic blown-off gate: the node walk SKIPS a mesh when
 		 * componentState[ordinal-1] != 0 (render_scene_core). */
@@ -627,7 +663,13 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 		 * explicit -meshRotation corroborates. Our table is consumed
 		 * straight (v' = R v), so negate here. */
 		const float angle = (float)f->mesh_rotation[mi] * (-2.0f * 3.14159265358979323846f / 256.0f);
-		ship_mat3x4_rotation_about_pivot(out->rows[mi], r->axis, r->pivot, angle);
+		float local_rotation[3][4];
+		ship_mat3x4_rotation_about_pivot(local_rotation, r->axis, r->pivot, angle);
+		if (has_bwing_compensation) {
+			ship_mat3x4_mul(out->rows[mi], bwing_compensation, local_rotation);
+		} else {
+			memcpy(out->rows[mi], local_rotation, sizeof out->rows[mi]);
+		}
 		any = 1;
 	}
 	return any;
@@ -636,11 +678,23 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 int XwaRemasterShip_BuildPreviousMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* current,
 										   const XwaFlightObject* previous, AeronSceneMeshTable* out) {
 	if (!mesh || !current || !previous || !out || !current->has_craft || !previous->has_craft ||
-		current->object_type != previous->object_type || !mesh->has_any_rotation) {
+		current->object_type != previous->object_type) {
+		return 0;
+	}
+	if (current->object_type != XWA_SNAP_TYPE_BWING && !mesh->has_any_rotation) {
 		return 0;
 	}
 	const uint32_t slots =
 		AERON_MAX_MESH_SLOTS < XWA_SNAP_MAX_MESH_SLOTS ? AERON_MAX_MESH_SLOTS : XWA_SNAP_MAX_MESH_SLOTS;
+	if (current->object_type == XWA_SNAP_TYPE_BWING) {
+		const int bridge_slot = ship_bwing_bridge_slot(mesh, slots);
+		/* Bridge rotation drives every root, independently of whether the
+		 * Bridge mesh itself has a usable local rotation node. */
+		if (bridge_slot >= 0 && current->mesh_rotation[bridge_slot] != previous->mesh_rotation[bridge_slot]) {
+			XwaRemasterShip_BuildMeshTable(mesh, previous, out);
+			return 1;
+		}
+	}
 	for (uint32_t mi = 0; mi < slots; ++mi) {
 		if (mesh->mesh_rot[mi].has_rotation && current->mesh_rotation[mi] != previous->mesh_rotation[mi]) {
 			/* BuildMeshTable always initializes out. Its zero return is expected

@@ -53,7 +53,9 @@ void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissiv
  * from the captured craft state: rotary meshes rotate about their
  * cooked OPT pivot/axis by the classic angle meshRotation[slot] *
  * 2pi/256 (RenderScene_DrawObjectModelHardware); blown-off components
- * (componentState[slot] != 0 — the classic node-walk skip) hide.
+ * (componentState[slot] != 0 — the classic node-walk skip) hide. B-Wings
+ * additionally rotate every mesh root by the Bridge slot rotation before
+ * applying the root-local transform.
  * Returns 1 when any slot rotates or hides (callers skip the table
  * bind otherwise). */
 int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,
