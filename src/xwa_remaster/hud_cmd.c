@@ -563,7 +563,7 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 							   int target_h) {
 	memset(&s_cmd.prepared, 0, sizeof s_cmd.prepared);
 	s_cmd.output = NULL;
-	if (!cmd || !snapshot || !assets || !snapshot->hud.valid || !snapshot->hud.crt.visible)
+	if (!cmd || !snapshot || !assets || !snapshot->hud.crt.visible)
 		return;
 	const XwaHudLayoutProfile* profile = cmd_profile(profile_id);
 	if (!profile || !profile->valid)

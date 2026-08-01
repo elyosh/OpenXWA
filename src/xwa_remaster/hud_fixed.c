@@ -993,7 +993,9 @@ void XwaRemasterHudFixed_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 	const XwaHudState* hud = snapshot ? &snapshot->hud : NULL;
 	const XwaHudLayout* layout = XwaRemasterHud_Layout();
 	const XwaHudLayoutProfile* selected = fixed_profile(profile);
-	if (!hud || !hud->valid || !layout || !selected || !selected->valid) {
+	const uint32_t special_modes = XWA_HUD_MODE_HANGAR_READY | XWA_HUD_MODE_MAP;
+	if (!hud || (!hud->valid && !(hud->mode_flags & special_modes)) || !layout || !selected ||
+		!selected->valid) {
 		fixed_snapshot = NULL;
 		fixed_flight_view = NULL;
 		fixed_target_w = fixed_target_h = 0;

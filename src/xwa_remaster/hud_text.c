@@ -5,6 +5,7 @@
 #include "xwa_remaster/hud_boxes.h"
 #include "xwa_remaster/hud_fixed.h"
 #include "xwa_remaster/hud_layout.h"
+#include "xwa_remaster/text.h"
 
 #include <math.h>
 #include <string.h>
@@ -185,19 +186,6 @@ static void text_append_arrow_glyph(uint8_t ch, float x, float y, float size, ui
 	text_prepared.arrow_glyphs[i].argb = argb;
 }
 
-static float text_measure_arrow_string(const XwaFlightFontRef* font, const char* str, float size_ref) {
-	float width = 0.0f;
-	for (const uint8_t* p = (const uint8_t*)str; *p; p++) {
-		if (*p == 0xfeu && p[1]) {
-			p++;
-			continue;
-		}
-		if (*p >= 0x20u)
-			width += text_arrow_advance(font, *p, size_ref);
-	}
-	return width;
-}
-
 static void text_build_arrow_string(const XwaFlightFontRef* font, const char* str, float x, float y,
 									float size_ref, uint32_t initial_argb) {
 	uint32_t argb = initial_argb;
@@ -270,7 +258,7 @@ static void text_build_target_arrow(const XwaSnapshot* snapshot, XwaHudProfileIn
 	text_prepared.arrow_tier = (uint8_t)tier;
 	const float size_ref = font_scale * px_y;
 	const float line_h = (font_scale - (font_scale >> 2)) * px_y;
-	const float name_w = text_measure_arrow_string(font, snapshot->hud.target.name, size_ref);
+	const float name_w = XwaRemasterText_MeasureFlightString(font, snapshot->hud.target.name, size_ref);
 	const float local_x = arrow.center_x_ref - bounds->x;
 	const float local_y = arrow.center_y_ref - bounds->y;
 	const float pad_x = 6.0f * px_x;
@@ -356,7 +344,7 @@ static void text_build_target_box_readouts(const XwaSnapshot* snapshot) {
 		const float line_h = (font_scale - (font_scale >> 2)) * px;
 		const float center_x = box->x_ref + box->w_ref * 0.5f;
 		const float bottom_y = box->y_ref + box->h_ref;
-		float width = text_measure_arrow_string(font, snapshot->hud.target.name, size_ref);
+		float width = XwaRemasterText_MeasureFlightString(font, snapshot->hud.target.name, size_ref);
 		text_build_arrow_string(font, snapshot->hud.target.name, center_x - width * 0.5f, box->y_ref - line_h,
 								size_ref, name_argb);
 
@@ -364,13 +352,13 @@ static void text_build_target_box_readouts(const XwaSnapshot* snapshot) {
 		const float upper_y = box->y_ref - 2.0f * px;
 		const float lower_y = bottom_y - line_h + 2.0f * px;
 		text_format_decimal(snapshot->hud.target.hull_pct, 3, 1, digits);
-		width = text_measure_arrow_string(font, "100", size_ref);
+		width = XwaRemasterText_MeasureFlightString(font, "100", size_ref);
 		text_build_arrow_string(font, digits, box->x_ref - width, lower_y, size_ref, value_argb);
 		text_format_decimal(snapshot->hud.target.system_pct, 3, 1, digits);
 		text_build_arrow_string(font, digits, box->x_ref + box->w_ref + 3.0f * px, upper_y, size_ref,
 								value_argb);
 		text_format_decimal(snapshot->hud.target.shield_pct, 3, 1, digits);
-		width = text_measure_arrow_string(font, "200", size_ref);
+		width = XwaRemasterText_MeasureFlightString(font, "200", size_ref);
 		text_build_arrow_string(font, digits, box->x_ref - width, upper_y, size_ref, value_argb);
 		text_format_decimal(snapshot->hud.target.distance_whole, 2, 1, digits);
 		const float distance_x = box->x_ref + box->w_ref;
@@ -378,7 +366,7 @@ static void text_build_target_box_readouts(const XwaSnapshot* snapshot) {
 		text_build_arrow_string(font, ".", distance_x + 10.0f * px, lower_y, size_ref, value_argb);
 		text_format_decimal(snapshot->hud.target.distance_frac, 2, 2, digits);
 		text_build_arrow_string(font, digits, distance_x + 13.0f * px, lower_y, size_ref, value_argb);
-		width = text_measure_arrow_string(font, snapshot->hud.target.status, size_ref);
+		width = XwaRemasterText_MeasureFlightString(font, snapshot->hud.target.status, size_ref);
 		text_build_arrow_string(font, snapshot->hud.target.status, center_x - width * 0.5f, bottom_y,
 								size_ref, value_argb);
 	}
@@ -401,7 +389,9 @@ void XwaRemasterHudText_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex pr
 							  uint32_t bundle_generation) {
 	memset(&text_prepared, 0, sizeof text_prepared);
 	const XwaHudLayout* layout = XwaRemasterHud_Layout();
-	if (!snapshot || !layout || !snapshot->hud.valid || !XwaRemasterHudLayout_Profile(layout, profile))
+	const uint32_t special_modes = XWA_HUD_MODE_HANGAR_READY | XWA_HUD_MODE_MAP;
+	if (!snapshot || !layout || (!snapshot->hud.valid && !(snapshot->hud.mode_flags & special_modes)) ||
+		!XwaRemasterHudLayout_Profile(layout, profile))
 		return;
 	text_prepared.layout_generation = layout->generation;
 	text_prepared.bundle_generation = bundle_generation;

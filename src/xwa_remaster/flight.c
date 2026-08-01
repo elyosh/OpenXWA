@@ -11,6 +11,7 @@
 #include "aeron/scene/scene3d.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/effects.h"
+#include "xwa_remaster/flight_map.h"
 #include "xwa_remaster/glow_marks.h"
 #include "xwa_remaster/hud.h"
 #include "xwa_remaster/hyperspace.h"
@@ -82,7 +83,7 @@ typedef struct FlBillboard {
 	float prev_corners[4][3];
 	uint8_t has_prev;
 } FlBillboard;
-#define FL_MAX_BILLBOARDS 1024
+#define FL_MAX_BILLBOARDS 2048
 
 /* One lens-flare source (classic LensFlare_QueueSource): the anchored
  * screen position the 7-quad train derives from at submit. */
@@ -263,6 +264,7 @@ static struct {
 	 * tables. */
 	AeronSceneMeshTable tables[XWA_SNAP_MAX_FLIGHT_OBJECTS * 2 + 2];
 	uint32_t table_count;
+	int map_present;
 } s;
 
 static void fl_draw_before_opaque(AeronCommandBuffer* command_buffer, AeronRenderPass* render_pass, int rt_w,
@@ -1576,6 +1578,37 @@ static void fl_object_local(const XwaFlightObject* object, float out[3]) {
 	XwaRemasterWorld_LocalI32(s.origin_world, object->world_pos, out);
 }
 
+static int fl_object_is_projectile(const XwaFlightObject* object) {
+	return object->genus == XWA_SNAP_GENUS_PLAYER_PROJECTILE ||
+		   object->genus == XWA_SNAP_GENUS_NPC_PROJECTILE;
+}
+
+/* Shared pose law for ordinary flight and the map. Projectile roll alignment
+ * is view-dependent; every other object uses the captured orientation as-is. */
+static void fl_object_pose(const XwaFlightObject* object, const int32_t camera_world[3], int roll_align,
+						   float basis[9], float local[3], float model[16]) {
+	float cur[3][3];
+	if (object->has_mobj && !object->orient_dirty)
+		fl_curmat_from_cached(object->rows, cur);
+	else
+		fl_curmat_from_euler(object, cur);
+	if (roll_align) {
+		float camera_delta[3];
+		XwaRemasterWorld_DeltaI32(camera_world, object->world_pos, camera_delta);
+		const float side_dot =
+			camera_delta[0] * cur[0][0] + camera_delta[1] * cur[0][1] + camera_delta[2] * cur[0][2];
+		const float up_dot =
+			camera_delta[0] * cur[1][0] + camera_delta[1] * cur[1][1] + camera_delta[2] * cur[1][2];
+		if (side_dot != 0.0f || up_dot != 0.0f) {
+			const int dq16 = (int)lrintf(atan2f(up_dot, side_dot) / FL_Q16_TO_RAD) - 0x4000;
+			fl_transformaxes(cur, cur[2], dq16);
+		}
+	}
+	fl_object_world(cur, basis);
+	fl_object_local(object, local);
+	fl_model_matrix(basis, local, model);
+}
+
 int XwaRemasterFlight_ObjectModelMatrixForCameraDelta(const XwaFlightObject* object,
 													  const float camera_minus_object[3], int roll_align,
 													  float out[16]) {
@@ -2754,6 +2787,112 @@ static void fl_submit_billboards(void) {
 	}
 }
 
+typedef struct FlMapSubmitContext {
+	AeronCommandBuffer* cmd;
+	XwaRemasterAssets* assets;
+} FlMapSubmitContext;
+
+typedef struct FlPreparedMesh {
+	AeronSceneMesh* mesh;
+	AeronSceneMeshTable* table;
+	int runtime_opt;
+} FlPreparedMesh;
+
+/* Resolve the model and its current articulation once for both flight views.
+ * Callers retain ownership of motion, lighting, shadows and effect submission. */
+static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* model_name_override,
+								  FlPreparedMesh* out) {
+	if (!object || !out) {
+		return 0;
+	}
+	memset(out, 0, sizeof *out);
+	if (object->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK) {
+		out->mesh = XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(object->source_object_type));
+		if (!out->mesh || s.table_count >= XWA_SNAP_MAX_FLIGHT_OBJECTS * 2 + 2) {
+			return 0;
+		}
+		out->table = &s.tables[s.table_count];
+		if (!XwaRemasterShip_BuildDebrisMeshTable(object, out->table)) {
+			out->table = NULL;
+			return 0;
+		}
+		s.table_count++;
+		return 1;
+	}
+
+	const char* model_name = model_name_override ? model_name_override
+												 : XwaSnapshotExport_ModelName(object->object_type);
+	out->mesh = XwaRemasterShip_MeshForNameWithSource(model_name, &out->runtime_opt);
+	if (!out->mesh) {
+		return 0;
+	}
+	if (s.table_count < XWA_SNAP_MAX_FLIGHT_OBJECTS * 2 + 2) {
+		AeronSceneMeshTable* candidate = &s.tables[s.table_count];
+		if (XwaRemasterShip_BuildMeshTable(out->mesh, object, candidate)) {
+			out->table = candidate;
+			s.table_count++;
+		}
+	}
+	return 1;
+}
+
+/* The map owns eligibility and icon substitution. This helper owns only the
+ * already-selected modern primitive, using the same pose, articulation and
+ * sprite laws as ordinary flight. */
+static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaFlightObject* f,
+								uint32_t snapshot_index, void* user) {
+	FlMapSubmitContext* context = (FlMapSubmitContext*)user;
+	if (!context || !context->cmd || !context->assets || !map_object || !f)
+		return 0;
+
+	if (map_object->render_kind == XWA_FLIGHT_MAP_RENDER_SCENE_OBJECT) {
+		const uint32_t old_count = s.bb_count;
+		fl_derive_object_billboard(f, snapshot_index, context->assets, NULL, NULL);
+		if (s.bb_count != old_count)
+			return 1;
+	}
+
+	const int is_bolt = fl_object_is_projectile(f);
+	float bw[9], object_local[3], model_matrix[16];
+	fl_object_pose(f, s.snap->flight_camera.world_pos, is_bolt, bw, object_local, model_matrix);
+
+	FlPreparedMesh prepared;
+	if (!fl_prepare_object_mesh(f, NULL, &prepared)) {
+		return 1;
+	}
+
+	AeronSceneMeshInstance instance;
+	memset(&instance, 0, sizeof instance);
+	instance.mesh = prepared.mesh;
+	memcpy(instance.transform, model_matrix, sizeof model_matrix);
+	memcpy(instance.prev_transform, model_matrix, sizeof model_matrix);
+	instance.variant = f->node_switch;
+	instance.mesh_table = prepared.table;
+	instance.prev_mesh_table = prepared.table;
+	instance.zero_velocity = 1;
+	instance.no_local_lights = 1;
+	instance.cull_mode = is_bolt ? AERON_CULL_NONE : AERON_CULL_BACK;
+	if (is_bolt) {
+		instance.shadow_flags = AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_NO_RECEIVE_SHADOW;
+		instance.velocity_stamp = 1;
+		if (prepared.runtime_opt)
+			instance.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
+	}
+	AeronScene_AddMeshInstance(s.scene, &instance);
+	if (!is_bolt && f->object_type != XWA_SNAP_TYPE_DEBRIS_CHUNK) {
+		XwaRemasterGlowMarks_SubmitObject(s.scene, context->cmd, context->assets, s.snap, f, prepared.mesh,
+										  model_matrix, prepared.table);
+		if (map_object->render_kind == XWA_FLIGHT_MAP_RENDER_CRAFT)
+			fl_derive_wreck_flames(f, snapshot_index, context->assets, NULL, NULL);
+		if (s.glow_ok) {
+			XwaRemasterShip_SubmitEngineGlows(s.scene, prepared.mesh, model_matrix, 1.0f, prepared.table,
+											  f->eg_knockout_mask, XwaRemasterShip_EngineGlowScale(f), s.crows,
+											  s.camera_local, &s.glow_ref);
+		}
+	}
+	return 1;
+}
+
 /* Locate the two poses the hyperspace special path still consumes. It
  * deliberately does not submit any world object: the classic path draws only
  * the effect field and (optionally) the player cockpit. */
@@ -2908,18 +3047,28 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	Aeron_SetScissor(pass, &full_target);
 	static const float present_tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	AeronScenePresentChain_Draw(chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
-								AeronSceneBloom_Intensity(), s.rt_w, s.rt_h,
+								s.map_present ? 0.0f : AeronSceneBloom_Intensity(), s.rt_w, s.rt_h,
 								/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0);
-	Aeron_GpuDebugMarker(cmd, "HUD target boxes before fixed");
-	XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h, XWA_HUD_TARGET_BOX_BEFORE_FIXED);
+	if (!s.map_present) {
+		Aeron_GpuDebugMarker(cmd, "HUD target boxes before fixed");
+		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
+										 XWA_HUD_TARGET_BOX_BEFORE_FIXED);
+	}
 	Aeron_GpuDebugMarker(cmd, "HUD fixed");
 	XwaRemasterHud_RenderFixed(cmd, pass, target, target_w, target_h);
-	Aeron_GpuDebugMarker(cmd, "HUD target boxes after fixed");
-	XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h, XWA_HUD_TARGET_BOX_AFTER_FIXED);
+	if (!s.map_present) {
+		Aeron_GpuDebugMarker(cmd, "HUD target boxes after fixed");
+		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
+										 XWA_HUD_TARGET_BOX_AFTER_FIXED);
+	}
 	Aeron_GpuDebugMarker(cmd, "HUD CMD");
 	XwaRemasterHud_RenderCmd(cmd, pass, target, target_w, target_h);
 	Aeron_GpuDebugMarker(cmd, "HUD text");
 	XwaRemasterHud_RenderText(cmd, pass, target, target_w, target_h);
+	if (s.map_present) {
+		Aeron_GpuDebugMarker(cmd, "Flight map deferred text");
+		XwaRemasterFlightMap_RenderDeferredText(cmd, pass, target);
+	}
 }
 
 AeronTexture* XwaRemasterFlight_ResolvePresentation(AeronCommandBuffer* cmd, int direct_present) {
@@ -2995,7 +3144,7 @@ static AeronTexture* fl_present(AeronCommandBuffer* cmd, int direct_present) {
 		s.direct_ready = 0;
 		return NULL;
 	}
-	if (s.bloom && AeronSceneBloom_Intensity() > 0.0f) {
+	if (!s.map_present && s.bloom && AeronSceneBloom_Intensity() > 0.0f) {
 		if (!AeronSceneBloom_Apply(s.bloom, cmd, s.present_scene_tex, s.rt_w, s.rt_h, s.rt_h)) {
 			Aeron_CommandBufferSetFailure(cmd, "Flight bloom recording failed");
 			return NULL;
@@ -3194,6 +3343,52 @@ static float fl_mb_logical_frame_shutter(void) {
 	return (float)((double)s.mb_shutter * (double)FL_MB_REFERENCE_FRAME_US / (double)s.mb_velocity_span_us);
 }
 
+static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
+								   XwaRemasterAssets* assets, const XwaRemasterFlightView* view,
+								   uint64_t host_time_us, int direct_present) {
+	if (!snap->flight_map.active)
+		return NULL;
+	s.snap = snap;
+	s.map_present = 1;
+	s.mb_enabled = 0;
+	s.table_count = 0;
+	s.bb_count = 0;
+	s.glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &s.glow_ref);
+	fl_set_temporal(host_time_us, 0);
+
+	XwaRemasterEffectView effect_view;
+	XwaRemasterEffectView_Main(&effect_view, view, s.crows);
+	XwaRemasterParticles_Prepare(s.particles, cmd, snap, NULL, assets, &effect_view, NULL);
+	XwaRemasterTrails_Prepare(s.trails, cmd, snap, assets, &effect_view);
+
+	if (!AeronScene_Begin(s.scene, &view->camera)) {
+		s.snap = NULL;
+		return NULL;
+	}
+	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
+	AeronScene_SetPost(s.scene, NULL);
+	AeronScene_SetMotionContext(s.scene, NULL, 1);
+	AeronScene_SetDirectionalShadow(s.scene, NULL);
+
+	FlMapSubmitContext submit_context = { .cmd = cmd, .assets = assets };
+	if (!XwaRemasterFlightMap_Prepare(cmd, s.scene, snap, assets, view, s.crows, fl_map_submit_object,
+									  &submit_context)) {
+		s.snap = NULL;
+		return NULL;
+	}
+	XwaRemasterParticles_SubmitRegion(s.particles, s.scene, snap, snap->flight_camera.region);
+	XwaRemasterTrails_SubmitRegion(s.trails, s.scene, snap->flight_camera.region);
+	fl_submit_billboards();
+	XwaRemasterShip_SetPbrEnv(s.scene, snap->dir_lights, snap->dir_light_count, NULL, s.camera_local, NULL,
+							  NULL, NULL);
+	if (!AeronScene_Render(s.scene, cmd)) {
+		s.snap = NULL;
+		return NULL;
+	}
+	s.snap = NULL;
+	return fl_present(cmd, direct_present);
+}
+
 AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
 									   XwaRemasterAssets* assets, int target_w, int target_h,
 									   int direct_present) {
@@ -3201,9 +3396,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		return NULL;
 	}
 	const XwaFlightCamera* cam = &snap->flight_camera;
-	if (cam->map_mode) {
-		return NULL; /* map reconstruction remains classic */
-	}
 	if (!fl_ensure(target_w, target_h)) {
 		return NULL;
 	}
@@ -3213,9 +3405,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	}
 	memcpy(s.origin_world, flight_view.origin_world, sizeof s.origin_world);
 	memcpy(s.camera_local, flight_view.camera.pos, sizeof s.camera_local);
-	XwaRemasterHud_Prewarm(cmd, snap, assets, &flight_view, s.rt_w, s.rt_h);
+	XwaRemasterHud_PrepareFrame(cmd, snap, assets, &flight_view, s.rt_w, s.rt_h);
 	fl_quat_to_mat3(flight_view.camera.ori, s.crows);
 	const uint64_t host_time_us = XwaTime_GetElapsedUs();
+	if (cam->map_mode)
+		return fl_render_map(cmd, snap, assets, &flight_view, host_time_us, direct_present);
+	s.map_present = 0;
 	if (cam->hyperspace_phase) {
 		return fl_render_hyperspace(cmd, snap, assets, &flight_view, host_time_us, direct_present);
 	}
@@ -3559,12 +3754,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		}
 		/* Transforms derive for every in-region object — the cockpit
 		 * anchors to one even when its own model is suppressed. */
-		float cur[3][3];
-		if (f->has_mobj && !f->orient_dirty) {
-			fl_curmat_from_cached(f->rows, cur);
-		} else {
-			fl_curmat_from_euler(f, cur);
-		}
 		/* Projectiles: classic roll alignment
 		 * (RenderBillboard_DrawRollAlignedObjectModel @0x40FA80): spin
 		 * the flat ribbon about its flight axis so the broad face
@@ -3576,22 +3765,11 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		 * the classic draws the model as-is (sub-pixel bolts flicker
 		 * in the original too, and at 4.5x the classic resolution
 		 * anything classic-visible covers >= 4.5 px here). */
-		const int is_bolt =
-			f->genus == XWA_SNAP_GENUS_PLAYER_PROJECTILE || f->genus == XWA_SNAP_GENUS_NPC_PROJECTILE;
-		if (is_bolt) {
-			float d[3];
-			XwaRemasterWorld_DeltaI32(cam->world_pos, f->world_pos, d);
-			const float side_dot = d[0] * cur[0][0] + d[1] * cur[0][1] + d[2] * cur[0][2];
-			const float up_dot = d[0] * cur[1][0] + d[1] * cur[1][1] + d[2] * cur[1][2];
-			if (side_dot != 0.0f || up_dot != 0.0f) {
-				const int dq16 = (int)lrintf(atan2f(up_dot, side_dot) / FL_Q16_TO_RAD) - 0x4000;
-				fl_transformaxes(cur, cur[2], dq16);
-			}
-		}
+		const int is_bolt = fl_object_is_projectile(f);
 		float bw[9];
 		float object_local[3];
-		fl_object_world(cur, bw);
-		fl_object_local(f, object_local);
+		float model_matrix[16];
+		fl_object_pose(f, cam->world_pos, is_bolt, bw, object_local, model_matrix);
 		if ((int32_t)f->slot == cam->player_obj_idx) {
 			player_f = f; /* cockpit glow scale/knockouts key to the player */
 			memcpy(player_bw, bw, sizeof player_bw);
@@ -3608,21 +3786,16 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			if (cam->external && f->slot_class == XWA_SNAP_SLOT_TRANSIENT) {
 				continue;
 			}
-			AeronSceneMesh* chunk_mesh =
-				XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(f->source_object_type));
-			AeronSceneMeshTable* tb = &s.tables[s.table_count];
-			if (!chunk_mesh || !XwaRemasterShip_BuildDebrisMeshTable(f, tb)) {
+			FlPreparedMesh prepared;
+			if (!fl_prepare_object_mesh(f, NULL, &prepared)) {
 				continue; /* never fall through to a whole-model draw */
 			}
-			s.table_count++;
 			AeronSceneMeshInstance inst;
 			memset(&inst, 0, sizeof inst);
-			inst.mesh = chunk_mesh;
-			float m[16];
-			fl_model_matrix(bw, object_local, m);
-			memcpy(inst.transform, m, sizeof m);
+			inst.mesh = prepared.mesh;
+			memcpy(inst.transform, model_matrix, sizeof model_matrix);
 			inst.variant = f->node_switch; /* markings survive the detach copy */
-			inst.mesh_table = tb;
+			inst.mesh_table = prepared.table;
 			inst.no_local_lights = 1;
 			inst.cull_mode = AERON_CULL_BACK;
 			fl_instance_motion(&inst, i, /*is_bolt=*/0);
@@ -3639,25 +3812,20 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		/* Classic external view swaps the PLAYER object's model to the
 		 * "<name>Exterior.opt" variant (the flyable OPT has no cockpit
 		 * detail); flight and hangar loops both apply it. */
-		AeronSceneMesh* mesh;
-		int runtime_opt = 0;
+		const char* model_name_override = NULL;
 		if (cam->external && (int32_t)f->slot == cam->player_obj_idx &&
 			snap->cockpit.exterior_name[0] != '\0') {
-			mesh = XwaRemasterShip_MeshForNameWithSource(snap->cockpit.exterior_name, &runtime_opt);
-		} else {
-			mesh = XwaRemasterShip_MeshForNameWithSource(XwaSnapshotExport_ModelName(f->object_type),
-														 &runtime_opt);
+			model_name_override = snap->cockpit.exterior_name;
 		}
-		if (!mesh) {
+		FlPreparedMesh prepared;
+		if (!fl_prepare_object_mesh(f, model_name_override, &prepared)) {
 			continue;
 		}
 
 		AeronSceneMeshInstance inst;
 		memset(&inst, 0, sizeof inst);
-		inst.mesh = mesh;
-		float m[16];
-		fl_model_matrix(bw, object_local, m);
-		memcpy(inst.transform, m, sizeof m);
+		inst.mesh = prepared.mesh;
+		memcpy(inst.transform, model_matrix, sizeof model_matrix);
 		inst.variant = f->node_switch;
 		inst.no_local_lights = 1; /* frame-global punctual lights instead */
 		if (scene_lighting.hangar_override && (int32_t)f->slot == cam->hangar_launch_ref_obj_idx) {
@@ -3668,7 +3836,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		if (is_bolt) {
 			inst.shadow_flags |= AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_NO_RECEIVE_SHADOW;
 		}
-		if (is_bolt && runtime_opt) {
+		if (is_bolt && prepared.runtime_opt) {
 			/* The original renderer makes both projectile genera fully
 			 * bright independently of the OPT palette. Runtime conversion
 			 * has no such semantic, so render its base texture as HDR
@@ -3680,13 +3848,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		/* Rotary-mesh articulation (cranes, radar dishes, droid arms)
 		 * from the captured craft state — tables borrow pool slots for
 		 * the frame (the scene keeps the pointer until Render). */
-		AeronSceneMeshTable* tb = &s.tables[s.table_count];
-		if (XwaRemasterShip_BuildMeshTable(mesh, f, tb)) {
-			inst.mesh_table = tb;
-			s.table_count++;
-		}
+		inst.mesh_table = prepared.table;
 		AeronSceneMeshTable* prev_tb = &s.tables[s.table_count];
-		if (XwaRemasterShip_BuildPreviousMeshTable(mesh, f, previous_f, prev_tb)) {
+		if (XwaRemasterShip_BuildPreviousMeshTable(prepared.mesh, f, previous_f, prev_tb)) {
 			inst.prev_mesh_table = prev_tb;
 			s.table_count++;
 		}
@@ -3709,11 +3873,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			s.bolts[s.bolt_count++] = inst;
 		} else {
 			AeronScene_AddMeshInstance(s.scene, &inst);
-			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, mesh, m, inst.mesh_table);
+			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, prepared.mesh, model_matrix,
+											  inst.mesh_table);
 			/* State-derived engine glows for this craft (classic scale
 			 * gates — no craft / dead subsystems — return 0 and skip). */
 			if (s.glow_ok) {
-				XwaRemasterShip_SubmitEngineGlows(s.scene, mesh, m, 1.0f, inst.mesh_table,
+				XwaRemasterShip_SubmitEngineGlows(s.scene, prepared.mesh, model_matrix, 1.0f, inst.mesh_table,
 												  f->eg_knockout_mask, XwaRemasterShip_EngineGlowScale(f),
 												  s.crows, s.camera_local, &s.glow_ref);
 			}
@@ -3721,7 +3886,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * modelIndex branch: raw dims over 2000 only). */
 			if (s.plight.enabled && f->has_craft && s.pl_cand_count < FL_MAX_PL_CANDIDATES) {
 				s.pl_cand_count += XwaRemasterShip_CollectEngineGlowPointLights(
-					mesh, m, inst.mesh_table, f, &s.pl_cand[s.pl_cand_count],
+					prepared.mesh, model_matrix, inst.mesh_table, f, &s.pl_cand[s.pl_cand_count],
 					FL_MAX_PL_CANDIDATES - s.pl_cand_count);
 			}
 		}
@@ -3838,6 +4003,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 }
 
 void XwaRemasterFlight_Shutdown(void) {
+	XwaRemasterFlightMap_Shutdown();
 	XwaRemasterHyperspace_Destroy(s.hyperspace);
 	s.hyperspace = NULL;
 	XwaRemasterSkyStars_Destroy(s.sky_stars);

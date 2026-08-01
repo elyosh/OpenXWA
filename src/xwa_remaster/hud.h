@@ -200,8 +200,11 @@ uint32_t XwaRemasterHud_BuildAssetRequests(const XwaHudState* hud, uint8_t* out_
 int XwaRemasterHud_Init(AeronVfs* vfs);
 const XwaHudLayout* XwaRemasterHud_Layout(void);
 void XwaRemasterHud_Shutdown(void);
-void XwaRemasterHud_Prewarm(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot, XwaRemasterAssets* assets,
-							const XwaRemasterFlightView* flight_view, int target_w, int target_h);
+/* Resolves lightweight references from the mission-resident asset set, then
+ * builds transient HUD draw data. It performs no I/O, upload, or residency work. */
+void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
+								 XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
+								 int target_w, int target_h);
 const XwaRemasterHudPreparedAssets* XwaRemasterHud_PreparedAssets(void);
 void XwaRemasterHud_BeginRenderPhase(void);
 void XwaRemasterHud_EndRenderPhase(void);

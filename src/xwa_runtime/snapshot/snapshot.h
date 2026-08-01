@@ -389,6 +389,51 @@ typedef struct XwaFlightObject {
 	uint32_t eg_knockout_mask;
 } XwaFlightObject;
 
+#define XWA_SNAP_MAX_FLIGHT_OBJECTS 1664
+#define XWA_SNAP_MAX_FLIGHT_MAP_OBJECTS XWA_SNAP_MAX_FLIGHT_OBJECTS
+#define XWA_SNAP_FLIGHT_MAP_LABEL_BYTES 65535
+
+typedef enum XwaFlightMapRenderKind {
+	XWA_FLIGHT_MAP_RENDER_CRAFT = 0,
+	XWA_FLIGHT_MAP_RENDER_PROJECTILE = 1,
+	XWA_FLIGHT_MAP_RENDER_SCENE_OBJECT = 2,
+} XwaFlightMapRenderKind;
+
+typedef enum XwaFlightMapCullKind {
+	XWA_FLIGHT_MAP_CULL_BOUNDS = 0,
+	XWA_FLIGHT_MAP_CULL_SPHERE = 1,
+} XwaFlightMapCullKind;
+
+typedef struct XwaFlightMapObject {
+	uint16_t flight_object_index;
+	uint16_t label_offset;
+	int32_t max_bounds_extent;
+	int32_t box_extent;
+	int16_t move_x;
+	int16_t move_y;
+	uint16_t icon_id;
+	uint16_t range_value;
+	uint8_t effective_iff;
+	uint8_t render_kind;
+	uint8_t cull_kind;
+	uint8_t label_visible;
+	uint8_t movement_visible;
+	uint8_t box_visible;
+	uint8_t box_color_index;
+} XwaFlightMapObject;
+
+typedef struct XwaFlightMapState {
+	uint8_t active;
+	uint8_t has_order_endpoint;
+	uint16_t object_count;
+	uint16_t current_target_slot;
+	uint16_t current_target_signature;
+	uint16_t label_bytes;
+	int32_t order_endpoint_world[3];
+	XwaFlightMapObject objects[XWA_SNAP_MAX_FLIGHT_MAP_OBJECTS];
+	char labels[XWA_SNAP_FLIGHT_MAP_LABEL_BYTES];
+} XwaFlightMapState;
+
 /* Flight camera, captured with the objects. `rows` are the active modern
  * render camera's world->eye basis rows in R0, R1, R2 storage order. */
 typedef struct XwaFlightCamera {
@@ -934,7 +979,6 @@ typedef struct XwaHudState {
 #define XWA_SNAP_MAX_PAINT_CMDS 24576
 #define XWA_SNAP_MAX_GLYPHS 8192
 #define XWA_SNAP_MAX_MODEL_PREVIEWS 4
-#define XWA_SNAP_MAX_FLIGHT_OBJECTS 512
 #define XWA_SNAP_MAX_SURFACE_EVENTS 64
 #define XWA_SNAP_MAX_BACKDROPS 32  /* engine: 32 records per region */
 #define XWA_SNAP_MAX_GLOW_MARKS 56 /* exact: 24 animated + 32 blast */
@@ -1025,6 +1069,7 @@ typedef struct XwaSnapshot {
 
 	XwaFlightObject flight_objects[XWA_SNAP_MAX_FLIGHT_OBJECTS];
 	uint32_t flight_object_count;
+	XwaFlightMapState flight_map;
 	XwaFlightCamera flight_camera;
 	uint8_t flight_camera_valid;
 	XwaHyperspaceState hyperspace;

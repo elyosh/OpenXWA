@@ -25,6 +25,7 @@ extern uint32_t trig2_divisorhilo;
 extern uint16_t trig2_theta;
 extern uint16_t trig2_angleplane;
 extern uint16_t targetPitch;
+extern const uint16_t g_squarerootable[258];
 
 void trig2_ctop(int dx, int dy, int dz);
 void trig2_ctop2dim(int dx, int dy);

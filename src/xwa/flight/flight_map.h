@@ -15,6 +15,9 @@ int FlightMap_PickObjectNearestScreenCenter(int playerIdx);
 void FlightMap_DrawObjectPass(int pass);
 void FlightMap_DrawObjectIconAtViewPos(int objectIdx, int viewX, int viewY, int viewZ);
 
+/* Original object-type-to-map-icon data used by FlightMap_DrawObjectIconAtViewPos. */
+extern const uint16_t g_flightMapIconByObjectType[];
+
 void RenderList_Reset(void);
 void RenderList_QueueObject(int objectIdx, int sortDepth, int viewX, int viewY, int viewZ, int cullFlags,
 							int projectedRadius);

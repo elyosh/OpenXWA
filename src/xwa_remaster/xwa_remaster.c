@@ -679,8 +679,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 					Aeron_GpuDebugPop(cmd);
 					break;
 				case XWA_SCENE_FLIGHT:
-					render_output_required =
-						snap->flight_camera_valid && !snap->flight_camera.map_mode;
+					render_output_required = snap->flight_camera_valid;
 					Aeron_GpuDebugPush(cmd, "OpenXWA flight renderer");
 					next_scene_tex =
 						snap->flight_camera_valid

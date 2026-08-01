@@ -8,7 +8,6 @@
 #include "aeron/aeron.h"
 #include "xwa/assets/object_type.h"
 
-#include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -147,7 +146,7 @@ int XwaRemasterHud_ValidateWidgetRegistry(char* error, uint32_t error_size) {
 		}
 		if (w->asset != XWA_HUD_ASSET_NONE && w->asset != XWA_HUD_ASSET_TARGET_ARROW &&
 			!hud_asset_frames[w->asset].count) {
-			return hud_registry_error(error, error_size, "asset has no prewarm manifest for widget %u",
+			return hud_registry_error(error, error_size, "asset has no flight-cache manifest for widget %u",
 									  w->id);
 		}
 		if (w->stable_order <= previous_order) {
@@ -292,7 +291,7 @@ static HudCachedFrame* hud_find_frame(int object_type, int frame) {
 	return NULL;
 }
 
-static int hud_prewarm_frame(XwaRemasterAssets* assets, int object_type, int frame) {
+static int hud_cache_frame(XwaRemasterAssets* assets, int object_type, int frame) {
 	HudCachedFrame* cached = hud_find_frame(object_type, frame);
 	if (cached)
 		return cached->state == 1;
@@ -306,23 +305,24 @@ static int hud_prewarm_frame(XwaRemasterAssets* assets, int object_type, int fra
 	return cached->state == 1;
 }
 
-static int hud_prewarm_asset(XwaRemasterAssets* assets, XwaHudAssetId asset, const XwaHudState* hud) {
+static int hud_cache_asset(XwaRemasterAssets* assets, XwaHudAssetId asset, const XwaHudState* hud) {
 	if (asset == XWA_HUD_ASSET_NONE)
 		return 1;
 	if (asset == XWA_HUD_ASSET_TARGET_ARROW)
-		return hud_prewarm_frame(assets, OBJ_HudTextureGroup13000_Sprite000, 1);
+		return hud_cache_frame(assets, OBJ_HudTextureGroup13000_Sprite000, 1);
 	const HudAssetFrameList* list = &hud_asset_frames[asset];
 	int ok = list->count != 0;
 	for (uint8_t i = 0; i < list->count; i++)
-		ok &= hud_prewarm_frame(assets, OBJ_HudTextureGroup12000, list->frames[i]);
+		ok &= hud_cache_frame(assets, OBJ_HudTextureGroup12000, list->frames[i]);
 	if (asset == XWA_HUD_ASSET_SHIELD_HULL && hud && hud->instruments.shield_silhouette_sprite)
-		ok &= hud_prewarm_frame(assets, OBJ_HullIconTextureGroup26000,
+		ok &= hud_cache_frame(assets, OBJ_HullIconTextureGroup26000,
 								hud->instruments.shield_silhouette_sprite / 100);
 	return ok;
 }
 
-void XwaRemasterHud_Prewarm(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot, XwaRemasterAssets* assets,
-							const XwaRemasterFlightView* flight_view, int target_w, int target_h) {
+void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
+								 XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
+								 int target_w, int target_h) {
 	const XwaHudState* hud = snapshot ? &snapshot->hud : NULL;
 	if (!cmd || !assets || !hud_initialized)
 		return;
@@ -330,38 +330,36 @@ void XwaRemasterHud_Prewarm(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot
 		return;
 	const uint32_t layout_generation = hud_layout.generation;
 	const uint32_t bundle_generation = XwaRemasterAssets_Generation(assets);
-	if (hud_assets.prepared.layout_generation != layout_generation ||
-		hud_assets.prepared.bundle_generation != bundle_generation) {
+	if (hud_assets.prepared.bundle_generation != bundle_generation) {
 		memset(&hud_assets, 0, sizeof hud_assets);
-		hud_assets.prepared.layout_generation = layout_generation;
 		hud_assets.prepared.bundle_generation = bundle_generation;
 	}
+	hud_assets.prepared.layout_generation = layout_generation;
 	uint8_t requested_fonts = 0;
 	const uint32_t requested = XwaRemasterHud_BuildAssetRequests(hud, &requested_fonts);
+	hud_assets.prepared.requested_asset_mask = requested;
+	hud_assets.prepared.requested_font_mask = requested_fonts;
 	for (int asset = 1; asset < XWA_HUD_ASSET_COUNT; asset++) {
 		const uint32_t bit = 1u << asset;
 		if (!(requested & bit))
 			continue;
-		if (hud_prewarm_asset(assets, (XwaHudAssetId)asset, hud))
+		if (hud_cache_asset(assets, (XwaHudAssetId)asset, hud)) {
 			hud_assets.prepared.resolved_asset_mask |= bit;
-		else
+			hud_assets.prepared.missing_asset_mask &= ~bit;
+		} else {
 			hud_assets.prepared.missing_asset_mask |= bit;
+		}
 	}
-	hud_assets.prepared.requested_asset_mask |= requested;
-	if (requested_fonts) {
-		for (int tier = 0; tier < 3; tier++) {
-			const uint8_t bit = (uint8_t)(1u << tier);
-			if (!(requested_fonts & bit))
-				continue;
-			hud_assets.prepared.requested_font_mask |= bit;
-			if (!(hud_assets.prepared.resolved_font_mask & bit) &&
-				!(hud_assets.prepared.missing_font_mask & bit)) {
-				hud_assets.fonts[tier] = XwaRemasterAssets_FlightFont(assets, tier);
-				if (hud_assets.fonts[tier])
-					hud_assets.prepared.resolved_font_mask |= bit;
-				else
-					hud_assets.prepared.missing_font_mask |= bit;
-			}
+	for (int tier = 0; tier < 3; tier++) {
+		const uint8_t bit = (uint8_t)(1u << tier);
+		if (!(requested_fonts & bit) || (hud_assets.prepared.resolved_font_mask & bit))
+			continue;
+		hud_assets.fonts[tier] = XwaRemasterAssets_FlightFont(assets, tier);
+		if (hud_assets.fonts[tier]) {
+			hud_assets.prepared.resolved_font_mask |= bit;
+			hud_assets.prepared.missing_font_mask &= (uint8_t)~bit;
+		} else {
+			hud_assets.prepared.missing_font_mask |= bit;
 		}
 	}
 	hud_assets.prepared.cache_entries = hud_assets.frame_count;
@@ -382,23 +380,23 @@ void XwaRemasterHud_BeginRenderPhase(void) { hud_assets.render_phase = 1; }
 
 void XwaRemasterHud_EndRenderPhase(void) { hud_assets.render_phase = 0; }
 
-static void hud_unwarmed_asset(void) {
-	hud_assets.prepared.render_phase_violations++;
-	assert(!hud_assets.render_phase && "HUD render attempted an asset lookup that was not prewarmed");
+static void hud_uncached_asset(void) {
+	if (hud_assets.render_phase)
+		hud_assets.prepared.render_phase_violations++;
 }
 
 const XwaAssetRef* XwaRemasterHud_AssetFrame(int object_type, int classic_frame_1based) {
 	HudCachedFrame* cached = hud_find_frame(object_type, classic_frame_1based);
 	if (!cached) {
-		hud_unwarmed_asset();
+		hud_uncached_asset();
 		return NULL;
 	}
 	return cached->state == 1 ? &cached->ref : NULL;
 }
 
 const XwaFlightFontRef* XwaRemasterHud_FlightFont(int tier) {
-	if (tier < 0 || tier >= 3 || !(hud_assets.prepared.requested_font_mask & (1u << tier))) {
-		hud_unwarmed_asset();
+	if (tier < 0 || tier >= 3 || !(hud_assets.prepared.resolved_font_mask & (1u << tier))) {
+		hud_uncached_asset();
 		return NULL;
 	}
 	return hud_assets.fonts[tier];
@@ -415,7 +413,7 @@ void XwaRemasterHud_BuildVisibility(const XwaHudState* h, XwaRemasterHudVisibili
 	const int region = (modes & XWA_HUD_MODE_REGION_SESSION) != 0;
 	const int mission_end = (modes & XWA_HUD_MODE_MISSION_END) != 0;
 	memset(out, 0, sizeof *out);
-	if (!h || !h->valid) {
+	if (!h) {
 		return;
 	}
 
@@ -437,6 +435,9 @@ void XwaRemasterHud_BuildVisibility(const XwaHudState* h, XwaRemasterHudVisibili
 		out->cmd = 1;
 		out->mfd_frames = 1;
 		out->cmd_pip = 1;
+		return;
+	}
+	if (!h->valid) {
 		return;
 	}
 

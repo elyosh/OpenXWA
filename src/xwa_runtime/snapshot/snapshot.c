@@ -8,6 +8,7 @@
  */
 
 #include "xwa_runtime/snapshot/snapshot.h"
+#include "xwa_runtime/snapshot/snapshot_flight_map.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 
 #include "aeron/aeron.h"
@@ -98,6 +99,7 @@ void XwaSnapshot_BeginTick(void) {
 	s->hyperspace_streak_count = 0;
 	s->cockpit_valid = 0;
 	s->flight_object_count = 0;
+	memset(&s->flight_map, 0, sizeof s->flight_map);
 	s->flight_camera_valid = 0;
 	memset(&s->hyperspace, 0, sizeof s->hyperspace);
 	memset(&s->hud, 0, sizeof s->hud);
@@ -1192,6 +1194,20 @@ void XwaSnapshot_CaptureFlight(void) {
 		}
 	}
 
+	XwaSnapshotFlightMap_Begin(s);
+	uint32_t flight_index = 0;
+	for (uint32_t slot = g_regionMainObjectSlotStart; s->flight_map.active &&
+		 slot < g_regionStaticObjectSlotEnd && slot < g_objectTableSlotCount; slot++) {
+		while (flight_index < s->flight_object_count && s->flight_objects[flight_index].slot < slot) {
+			flight_index++;
+		}
+		const uint16_t index = flight_index < s->flight_object_count &&
+							   s->flight_objects[flight_index].slot == slot
+							   ? (uint16_t)flight_index
+							   : UINT16_MAX;
+		XwaSnapshotFlightMap_CaptureObject(s, slot, index);
+	}
+	XwaSnapshotFlightMap_End(s);
 	/* Object trails are persistent renderer STATE. ObjectTrail_Update has
 	 * already advanced these lists during the classic effects pass; capture
 	 * the linked state here without invoking it again and without trusting

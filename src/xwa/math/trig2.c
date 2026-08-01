@@ -65,7 +65,7 @@ static const uint16_t g_arctantable[258] = {
 };
 
 // GLOBAL: XWA 0x5FF1E0
-static const uint16_t g_squarerootable[258] = {
+const uint16_t g_squarerootable[258] = {
 	0,     0,     2,     4,     8,     12,    18,    24,    32,    40,    50,    60,    72,    84,    98,
 	112,   128,   144,   162,   180,   200,   220,   242,   264,   287,   312,   337,   363,   391,   419,
 	448,   479,   510,   542,   575,   610,   645,   681,   718,   756,   795,   835,   876,   918,   961,
