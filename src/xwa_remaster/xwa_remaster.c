@@ -468,6 +468,11 @@ static void XwaRemaster_UpdateRenderSize(void) {
 		 * before this host frame selects a presentation path. */
 		g.force_scene_render = 1;
 		g.scene_tex = NULL;
+	} else if (snap && (snap->scene_kind == XWA_SCENE_FRONTEND || snap->scene_kind == XWA_SCENE_LOADING ||
+						snap->scene_kind == XWA_SCENE_FRONTEND_MODAL)) {
+		/* Frontend retained surfaces migrate when the replacement frame is
+		 * rendered. Keep the old texture visible until that succeeds. */
+		g.force_scene_render = 1;
 	}
 	Aeron_LogInfo("xwa.remaster", "physical render size: %dx%d", width, height);
 }
@@ -670,14 +675,24 @@ void XwaRemaster_Frame(int32_t delta_us) {
 			switch (snap->scene_kind) {
 				case XWA_SCENE_FRONTEND:
 				case XWA_SCENE_LOADING:
-				case XWA_SCENE_FRONTEND_MODAL:
+				case XWA_SCENE_FRONTEND_MODAL: {
+					const XwaPresentationRect frame = XwaPresentation_Frame();
+					const XwaPresentationRect safe = XwaPresentation_ClassicSafeFrame();
+					/* Match Aeron_ProjectLogicalRect exactly so the frontend texture
+					 * reaches the swapchain without a whole-frame size conversion. */
+					const int frontend_width =
+						(int)((long long)safe.width * g.render_pixel_width / frame.width);
+					const int frontend_height =
+						(int)((long long)safe.height * g.render_pixel_height / frame.height);
 					render_output_required = 1;
 					Aeron_GpuDebugPush(cmd, "OpenXWA frontend reconstruction");
-					next_scene_tex = XwaRemasterFrontend_Render(cmd, snap, g.assets);
+					next_scene_tex =
+						XwaRemasterFrontend_Render(cmd, snap, g.assets, frontend_width, frontend_height);
 					next_scene_is_direct     = 0;
 					next_scene_is_tonemapped = 0;
 					Aeron_GpuDebugPop(cmd);
 					break;
+				}
 				case XWA_SCENE_FLIGHT:
 					render_output_required = snap->flight_camera_valid;
 					Aeron_GpuDebugPush(cmd, "OpenXWA flight renderer");

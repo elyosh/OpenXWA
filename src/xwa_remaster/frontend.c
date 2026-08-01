@@ -39,20 +39,15 @@
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/preview.h"
 #include "xwa_remaster/text.h"
+#include "xwa_runtime/runtime/presentation.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/* 4.5x the classic 640x480 frame = 2880x2160: the scale at which the
- * 4:3 frontend exactly fills a 4K-UHD display's height, and the scale
- * the sprite bake is authored at (atlas_svga_to_4k) — assets land 1:1.
- * Fractional, so integer rects must go through rm_edge(). */
-#define RM_SCALE 4.5f
-#define RM_RT_W 2880
-#define RM_RT_H 2160
 #define RM_SAVE_STACK_CAP 8
+#define RM_RETIRED_TARGET_CAP (3 + RM_SAVE_STACK_CAP)
 
 typedef struct RmSaveSlot {
 	AeronRenderTarget* rt;
@@ -60,7 +55,6 @@ typedef struct RmSaveSlot {
 } RmSaveSlot;
 
 typedef struct RmState {
-	int initialized;
 	AeronRenderTarget* screen_rt;
 	AeronRenderTarget* output_rt;
 	/* External (scratch-surface) mirror: EXTERNAL-tagged records draw
@@ -68,10 +62,16 @@ typedef struct RmState {
 	 * hologram). Persistent across ticks like the classic scratch. */
 	AeronRenderTarget* external_rt;
 	AeronDrawList2D* list;
+	int rt_width;
+	int rt_height;
 	XwaSceneKind last_scene;
 	int screen_needs_clear;
 	RmSaveSlot save_stack[RM_SAVE_STACK_CAP];
 	int save_depth;
+	/* Targets sampled during the last resize migration. They remain alive
+	 * until the next render call, after their command buffer was submitted. */
+	AeronRenderTarget* retired_targets[RM_RETIRED_TARGET_CAP];
+	int retired_target_count;
 	XwaRemasterAssets* assets; /* borrowed per Render call */
 	/* Per-tick PiP results (rendered in rm_prepare_model_previews,
 	 * composited by the z-merge; NULL = no cooked model, classic covers it). */
@@ -105,11 +105,21 @@ static void rm_color_linear(uint32_t engine_color, float out_rgb[3]) {
 	out_rgb[2] = XwaRemaster_SrgbToLinear((float)rgba[2] / 255.0f);
 }
 
+static float rm_scale_x(void) { return (float)g.rt_width / (float)XWA_CLASSIC_WIDTH; }
+
+static float rm_scale_y(void) { return (float)g.rt_height / (float)XWA_CLASSIC_HEIGHT; }
+
 /* Classic-pixel EDGE -> RT-pixel edge. All integer rects (scissors,
- * reveal bands, save regions) round edges through this one function so
+ * reveal bands, save regions) round edges through these functions so
  * adjacent regions computed from the same classic edge share the same
- * RT pixel column — no seams or overlaps at the fractional scale. */
-static int rm_edge(int c) { return (int)lroundf((float)c * RM_SCALE); }
+ * RT pixel row or column — no seams or overlaps at fractional scales. */
+static int rm_edge_for(int c, int target_extent, int classic_extent) {
+	return (int)lroundf((float)c * (float)target_extent / (float)classic_extent);
+}
+
+static int rm_x_edge(int c) { return rm_edge_for(c, g.rt_width, XWA_CLASSIC_WIDTH); }
+
+static int rm_y_edge(int c) { return rm_edge_for(c, g.rt_height, XWA_CLASSIC_HEIGHT); }
 
 /* Inclusive 640x480 clip rect -> RT-pixel scissor; full-screen -> none. */
 static AeronRectI rm_scissor(int16_t l, int16_t t, int16_t r, int16_t b) {
@@ -117,10 +127,10 @@ static AeronRectI rm_scissor(int16_t l, int16_t t, int16_t r, int16_t b) {
 	if (l <= 0 && t <= 0 && r >= 639 && b >= 479) {
 		return rect; /* zero size = no scissor */
 	}
-	rect.x = rm_edge(l);
-	rect.y = rm_edge(t);
-	rect.width = rm_edge(r + 1) - rm_edge(l);
-	rect.height = rm_edge(b + 1) - rm_edge(t);
+	rect.x = rm_x_edge(l);
+	rect.y = rm_y_edge(t);
+	rect.width = rm_x_edge(r + 1) - rm_x_edge(l);
+	rect.height = rm_y_edge(b + 1) - rm_y_edge(t);
 	return rect;
 }
 
@@ -163,7 +173,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	s.scissor = rm_scissor(d->clip_left, d->clip_top, d->clip_right, d->clip_bottom);
 
 	/* Geometry authority is the record's CLASSIC dims: dst extents in
-	 * classic px x RM_SCALE, src rect mapped proportionally inside the
+	 * classic px scaled to the live target, src rect mapped proportionally inside the
 	 * resolved frame's UV rect. Asset resolution never enters — a
 	 * hand-authored replacement of any size maps identically. */
 	float su0 = ref.u0, sv0 = ref.v0, su1 = ref.u1, sv1 = ref.v1;
@@ -203,10 +213,12 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 			q.tint[0] = q.tint[1] = q.tint[2] = 1.0f;
 		}
 		q.tint[3] = 1.0f;
-		const float x0 = (float)d->dst_x * RM_SCALE;
-		const float y0 = (float)d->dst_y * RM_SCALE;
-		const float x1 = x0 + (float)dst_ch * RM_SCALE; /* transposed dst */
-		const float y1 = y0 + (float)dst_cw * RM_SCALE;
+		const float scale_x = rm_scale_x();
+		const float scale_y = rm_scale_y();
+		const float x0 = (float)d->dst_x * scale_x;
+		const float y0 = (float)d->dst_y * scale_y;
+		const float x1 = x0 + (float)dst_ch * scale_x; /* transposed dst */
+		const float y1 = y0 + (float)dst_cw * scale_y;
 		/* corners[] = TL, TR, BL, BR {x, y, u, v} */
 		q.corners[0][0] = x0;
 		q.corners[0][1] = y0;
@@ -249,10 +261,10 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	s.src_u1 = su1;
 	s.src_v1 = sv1;
 
-	s.dst_x = (float)(d->dst_x * RM_SCALE);
-	s.dst_y = (float)(d->dst_y * RM_SCALE);
-	s.dst_w = (float)(dst_cw * RM_SCALE);
-	s.dst_h = (float)(dst_ch * RM_SCALE);
+	s.dst_x = (float)d->dst_x * rm_scale_x();
+	s.dst_y = (float)d->dst_y * rm_scale_y();
+	s.dst_w = (float)dst_cw * rm_scale_x();
+	s.dst_h = (float)dst_ch * rm_scale_y();
 
 	if (d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED || d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_BLEND) {
 		rm_color_linear(d->tint_color, s.tint);
@@ -282,15 +294,17 @@ static void rm_add_paint(AeronDrawList2D* list, const XwaPaintCmd* p) {
 	rgba[3] = 1.0f;
 	AeronRectI sc = rm_scissor(p->clip_left, p->clip_top, p->clip_right, p->clip_bottom);
 	const AeronRectI* scp = sc.width > 0 ? &sc : NULL;
-	const float s = (float)RM_SCALE;
+	const float sx = rm_scale_x();
+	const float sy = rm_scale_y();
+	const float line_thickness = fminf(sx, sy);
 
 	switch ((XwaPaintKind)p->kind) {
 		case XWA_PAINT_HLINE:
-			AeronDrawList_AddFill(list, p->x0 * s, p->y0 * s, (p->x1 - p->x0 + 1) * s, s, rgba,
+			AeronDrawList_AddFill(list, p->x0 * sx, p->y0 * sy, (p->x1 - p->x0 + 1) * sx, sy, rgba,
 								  AERON_BLIT2D_BLEND_NONE, scp);
 			break;
 		case XWA_PAINT_VLINE:
-			AeronDrawList_AddFill(list, p->x0 * s, p->y0 * s, s, (p->y1 - p->y0 + 1) * s, rgba,
+			AeronDrawList_AddFill(list, p->x0 * sx, p->y0 * sy, sx, (p->y1 - p->y0 + 1) * sy, rgba,
 								  AERON_BLIT2D_BLEND_NONE, scp);
 			break;
 		case XWA_PAINT_LINE:
@@ -298,58 +312,67 @@ static void rm_add_paint(AeronDrawList2D* list, const XwaPaintCmd* p) {
 			/* One record per segment (rotated quad; the briefing hologram
 			 * draws 20k+ per tick). Endpoints at classic texel centers,
 			 * classic-px stroke. */
-			AeronDrawList_AddLine(list, p->x0 * s + s * 0.5f, p->y0 * s + s * 0.5f, p->x1 * s + s * 0.5f,
-								  p->y1 * s + s * 0.5f, s, rgba, AERON_BLIT2D_BLEND_NONE, scp);
+			AeronDrawList_AddLine(list, p->x0 * sx + sx * 0.5f, p->y0 * sy + sy * 0.5f,
+								  p->x1 * sx + sx * 0.5f, p->y1 * sy + sy * 0.5f, line_thickness, rgba,
+								  AERON_BLIT2D_BLEND_NONE, scp);
 			break;
 		case XWA_PAINT_FILL_TRANSLUCENT: {
 			float half[4] = { rgba[0] * 0.5f, rgba[1] * 0.5f, rgba[2] * 0.5f, 0.5f };
-			AeronDrawList_AddFill(list, (p->x0 + p->dx) * s, (p->y0 + p->dy) * s, (p->x1 - p->x0 + 1) * s,
-								  (p->y1 - p->y0 + 1) * s, half, AERON_BLIT2D_BLEND_PMA, scp);
+			AeronDrawList_AddFill(list, (p->x0 + p->dx) * sx, (p->y0 + p->dy) * sy, (p->x1 - p->x0 + 1) * sx,
+								  (p->y1 - p->y0 + 1) * sy, half, AERON_BLIT2D_BLEND_PMA, scp);
 			break;
 		}
 		case XWA_PAINT_PIXEL:
-			AeronDrawList_AddFill(list, p->x0 * s, p->y0 * s, s, s, rgba, AERON_BLIT2D_BLEND_NONE, scp);
+			AeronDrawList_AddFill(list, p->x0 * sx, p->y0 * sy, sx, sy, rgba, AERON_BLIT2D_BLEND_NONE, scp);
 			break;
 		case XWA_PAINT_FILL_RECT: {
-			AeronDrawList_AddFill(list, (p->x0 + p->dx) * s, (p->y0 + p->dy) * s, (p->x1 - p->x0 + 1) * s,
-								  (p->y1 - p->y0 + 1) * s, rgba, AERON_BLIT2D_BLEND_NONE, scp);
+			AeronDrawList_AddFill(list, (p->x0 + p->dx) * sx, (p->y0 + p->dy) * sy, (p->x1 - p->x0 + 1) * sx,
+								  (p->y1 - p->y0 + 1) * sy, rgba, AERON_BLIT2D_BLEND_NONE, scp);
 			break;
 		}
 		case XWA_PAINT_RECT_OUTLINE: {
-			const float x = (p->x0 + p->dx) * s;
-			const float y = (p->y0 + p->dy) * s;
-			const float w = (p->x1 - p->x0 + 1) * s;
-			const float h = (p->y1 - p->y0 + 1) * s;
-			AeronDrawList_AddFill(list, x, y, w, s, rgba, AERON_BLIT2D_BLEND_NONE, scp);         /* top */
-			AeronDrawList_AddFill(list, x, y + h - s, w, s, rgba, AERON_BLIT2D_BLEND_NONE, scp); /* bottom */
-			AeronDrawList_AddFill(list, x, y, s, h, rgba, AERON_BLIT2D_BLEND_NONE, scp);         /* left */
-			AeronDrawList_AddFill(list, x + w - s, y, s, h, rgba, AERON_BLIT2D_BLEND_NONE, scp); /* right */
+			const float x = (p->x0 + p->dx) * sx;
+			const float y = (p->y0 + p->dy) * sy;
+			const float w = (p->x1 - p->x0 + 1) * sx;
+			const float h = (p->y1 - p->y0 + 1) * sy;
+			AeronDrawList_AddFill(list, x, y, w, sy, rgba, AERON_BLIT2D_BLEND_NONE, scp); /* top */
+			AeronDrawList_AddFill(list, x, y + h - sy, w, sy, rgba, AERON_BLIT2D_BLEND_NONE,
+								  scp);                                                   /* bottom */
+			AeronDrawList_AddFill(list, x, y, sx, h, rgba, AERON_BLIT2D_BLEND_NONE, scp); /* left */
+			AeronDrawList_AddFill(list, x + w - sx, y, sx, h, rgba, AERON_BLIT2D_BLEND_NONE, scp); /* right */
 			break;
 		}
 	}
 }
 
 static void rm_add_glyph(AeronDrawList2D* list, const XwaGlyph2D* gl) {
-	(void)XwaRemasterText_AddFrontendGlyph(list, g.assets, gl, RM_RT_W, RM_RT_H);
+	(void)XwaRemasterText_AddFrontendGlyph(list, g.assets, gl, g.rt_width, g.rt_height);
 }
 
 /* ---- reconstruction core --------------------------------------------- */
 
 /* Copy src RT into dst RT — one opaque full-surface sprite draw,
  * executed immediately on `cmd`. */
-static void rm_blit_rt(AeronCommandBuffer* cmd, AeronRenderTarget* dst, AeronRenderTarget* src) {
+static void rm_blit_scaled(AeronCommandBuffer* cmd, AeronRenderTarget* dst, int dst_width, int dst_height,
+						   AeronRenderTarget* src, AeronBlit2DFilter filter,
+						   AeronDrawList2DClearMode clear_mode) {
 	AeronDrawList2DSprite s = { 0 };
 	s.texture = Aeron_RenderTargetGetTexture(src);
-	s.filter = AERON_BLIT2D_FILTER_NEAREST;
+	s.filter = filter;
 	s.blend = AERON_BLIT2D_BLEND_NONE;
 	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
 	s.src_u1 = 1.0f;
 	s.src_v1 = 1.0f;
-	s.dst_w = (float)RM_RT_W;
-	s.dst_h = (float)RM_RT_H;
-	AeronDrawList_Begin(g.list, dst, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_LOAD, NULL);
+	s.dst_w = (float)dst_width;
+	s.dst_h = (float)dst_height;
+	AeronDrawList_Begin(g.list, dst, dst_width, dst_height, clear_mode, NULL);
 	AeronDrawList_AddSprite(g.list, &s);
 	AeronDrawList_Render(g.list, cmd);
+}
+
+static void rm_blit_rt(AeronCommandBuffer* cmd, AeronRenderTarget* dst, AeronRenderTarget* src) {
+	rm_blit_scaled(cmd, dst, g.rt_width, g.rt_height, src, AERON_BLIT2D_FILTER_NEAREST,
+				   AERON_DRAWLIST2D_LOAD);
 }
 
 /* Full-surface engine colorfill. AddFill, not a pass clear value: the
@@ -358,9 +381,9 @@ static void rm_surface_clear(AeronCommandBuffer* cmd, AeronRenderTarget* rt, uin
 	float rgba[4];
 	rm_color_linear(engine_color, rgba);
 	rgba[3] = 1.0f;
-	AeronDrawList_Begin(g.list, rt, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_LOAD, NULL);
-	AeronDrawList_AddFill(g.list, 0.0f, 0.0f, (float)RM_RT_W, (float)RM_RT_H, rgba, AERON_BLIT2D_BLEND_NONE,
-						  NULL);
+	AeronDrawList_Begin(g.list, rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_AddFill(g.list, 0.0f, 0.0f, (float)g.rt_width, (float)g.rt_height, rgba,
+						  AERON_BLIT2D_BLEND_NONE, NULL);
 	AeronDrawList_Render(g.list, cmd);
 }
 
@@ -378,13 +401,13 @@ static void rm_external_composite(AeronCommandBuffer* cmd, const XwaSurfaceEvent
 	int band_count = 0;
 	if (l + reveal_w <= r) { /* right band, full height */
 		bands[band_count++] =
-			(AeronRectI) { rm_edge(l + reveal_w), rm_edge(t), rm_edge(r + 1) - rm_edge(l + reveal_w),
-						   rm_edge(b + 1) - rm_edge(t) };
+			(AeronRectI) { rm_x_edge(l + reveal_w), rm_y_edge(t), rm_x_edge(r + 1) - rm_x_edge(l + reveal_w),
+						   rm_y_edge(b + 1) - rm_y_edge(t) };
 	}
 	if (t + reveal_h <= b && reveal_w > 0) { /* bottom band under the revealed cols */
 		bands[band_count++] =
-			(AeronRectI) { rm_edge(l), rm_edge(t + reveal_h), rm_edge(l + reveal_w) - rm_edge(l),
-						   rm_edge(b + 1) - rm_edge(t + reveal_h) };
+			(AeronRectI) { rm_x_edge(l), rm_y_edge(t + reveal_h), rm_x_edge(l + reveal_w) - rm_x_edge(l),
+						   rm_y_edge(b + 1) - rm_y_edge(t + reveal_h) };
 	}
 	if (!band_count) {
 		return;
@@ -396,8 +419,8 @@ static void rm_external_composite(AeronCommandBuffer* cmd, const XwaSurfaceEvent
 	s.blend = AERON_BLIT2D_BLEND_PMA;
 	s.src_u1 = 1.0f;
 	s.src_v1 = 1.0f;
-	s.dst_w = (float)RM_RT_W;
-	s.dst_h = (float)RM_RT_H;
+	s.dst_w = (float)g.rt_width;
+	s.dst_h = (float)g.rt_height;
 	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
 
 	AeronRenderTarget* targets[2] = { g.output_rt, restore_enabled ? NULL : g.screen_rt };
@@ -405,7 +428,7 @@ static void rm_external_composite(AeronCommandBuffer* cmd, const XwaSurfaceEvent
 		if (!targets[ti]) {
 			continue;
 		}
-		AeronDrawList_Begin(g.list, targets[ti], RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_LOAD, NULL);
+		AeronDrawList_Begin(g.list, targets[ti], g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD, NULL);
 		for (int i = 0; i < band_count; i++) {
 			s.scissor = bands[i];
 			AeronDrawList_AddSprite(g.list, &s);
@@ -422,8 +445,8 @@ static void rm_push_save(AeronCommandBuffer* cmd, const XwaSurfaceEvent* e, int 
 		}
 		return;
 	}
-	const int w = rm_edge(e->right + 1) - rm_edge(e->left);
-	const int h = rm_edge(e->bottom + 1) - rm_edge(e->top);
+	const int w = rm_x_edge(e->right + 1) - rm_x_edge(e->left);
+	const int h = rm_y_edge(e->bottom + 1) - rm_y_edge(e->top);
 	if (w <= 0 || h <= 0) {
 		return;
 	}
@@ -448,10 +471,10 @@ static void rm_push_save(AeronCommandBuffer* cmd, const XwaSurfaceEvent* e, int 
 	s.filter = AERON_BLIT2D_FILTER_NEAREST;
 	s.blend = AERON_BLIT2D_BLEND_NONE;
 	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
-	s.src_u0 = (float)rm_edge(e->left) / (float)RM_RT_W;
-	s.src_v0 = (float)rm_edge(e->top) / (float)RM_RT_H;
-	s.src_u1 = (float)rm_edge(e->right + 1) / (float)RM_RT_W;
-	s.src_v1 = (float)rm_edge(e->bottom + 1) / (float)RM_RT_H;
+	s.src_u0 = (float)rm_x_edge(e->left) / (float)g.rt_width;
+	s.src_v0 = (float)rm_y_edge(e->top) / (float)g.rt_height;
+	s.src_u1 = (float)rm_x_edge(e->right + 1) / (float)g.rt_width;
+	s.src_v1 = (float)rm_y_edge(e->bottom + 1) / (float)g.rt_height;
 	s.dst_w = (float)w;
 	s.dst_h = (float)h;
 	AeronDrawList_Begin(g.list, slot->rt, w, h, AERON_DRAWLIST2D_CLEAR, NULL);
@@ -475,16 +498,16 @@ static void rm_pop_restore(AeronCommandBuffer* cmd, const XwaSurfaceEvent* e) {
 	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
 	s.src_u1 = 1.0f;
 	s.src_v1 = 1.0f;
-	s.dst_x = (float)rm_edge(e->left);
-	s.dst_y = (float)rm_edge(e->top);
-	s.dst_w = (float)(rm_edge(e->right + 1) - rm_edge(e->left));
-	s.dst_h = (float)(rm_edge(e->bottom + 1) - rm_edge(e->top));
+	s.dst_x = (float)rm_x_edge(e->left);
+	s.dst_y = (float)rm_y_edge(e->top);
+	s.dst_w = (float)(rm_x_edge(e->right + 1) - rm_x_edge(e->left));
+	s.dst_h = (float)(rm_y_edge(e->bottom + 1) - rm_y_edge(e->top));
 	/* Visible now AND persistent (the engine restores into the
 	 * offscreen surface when restore mode is on). */
-	AeronDrawList_Begin(g.list, g.screen_rt, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_Begin(g.list, g.screen_rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD, NULL);
 	AeronDrawList_AddSprite(g.list, &s);
 	AeronDrawList_Render(g.list, cmd);
-	AeronDrawList_Begin(g.list, g.output_rt, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_Begin(g.list, g.output_rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD, NULL);
 	AeronDrawList_AddSprite(g.list, &s);
 	AeronDrawList_Render(g.list, cmd);
 	Aeron_DestroyRenderTarget(slot->rt);
@@ -522,7 +545,7 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 		 * coverage as a ghostly classic cursor/background mix). */
 		static const float rm_black[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
 		g.screen_needs_clear = 0;
-		AeronDrawList_Begin(g.list, g.screen_rt, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_CLEAR, rm_black);
+		AeronDrawList_Begin(g.list, g.screen_rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_CLEAR, rm_black);
 		AeronDrawList_Render(g.list, cmd);
 		while (g.save_depth > 0) {
 			RmSaveSlot* slot = &g.save_stack[--g.save_depth];
@@ -572,7 +595,8 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 				if (seg_open) {
 					AeronDrawList_Render(g.list, cmd);
 				}
-				AeronDrawList_Begin(g.list, g.output_rt, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_LOAD, NULL);
+				AeronDrawList_Begin(g.list, g.output_rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD,
+									NULL);
 				seg_open = 1;
 			}
 			AeronDrawList2DSprite ps = { 0 };
@@ -581,16 +605,17 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 			ps.blend = AERON_BLIT2D_BLEND_PMA;
 			ps.src_u1 = 1.0f;
 			ps.src_v1 = 1.0f;
-			ps.dst_x = (float)(p->dst_x * RM_SCALE);
-			ps.dst_y = (float)(p->dst_y * RM_SCALE);
-			ps.dst_w = (float)(p->dst_w * RM_SCALE);
-			ps.dst_h = (float)(p->dst_h * RM_SCALE);
+			ps.dst_x = (float)p->dst_x * rm_scale_x();
+			ps.dst_y = (float)p->dst_y * rm_scale_y();
+			ps.dst_w = (float)p->dst_w * rm_scale_x();
+			ps.dst_h = (float)p->dst_h * rm_scale_y();
 			ps.tint[0] = ps.tint[1] = ps.tint[2] = ps.tint[3] = 1.0f;
 			AeronDrawList_AddSprite(g.list, &ps);
 			const int pv_to_screen = (p->target == XWA_EMIT_TARGET_OFFSCREEN) || !restore_on;
 			if (pv_to_screen) {
 				AeronDrawList_Render(g.list, cmd);
-				AeronDrawList_Begin(g.list, g.screen_rt, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_LOAD, NULL);
+				AeronDrawList_Begin(g.list, g.screen_rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD,
+									NULL);
 				AeronDrawList_AddSprite(g.list, &ps);
 				AeronDrawList_Render(g.list, cmd);
 				seg_open = 0;
@@ -625,8 +650,8 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 					break;
 				case XWA_SURFACE_EVENT_EXTERNAL_CLEAR:
 					/* Classic scratch wipe before the wireframe render. */
-					AeronDrawList_Begin(g.list, g.external_rt, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_CLEAR,
-										NULL);
+					AeronDrawList_Begin(g.list, g.external_rt, g.rt_width, g.rt_height,
+										AERON_DRAWLIST2D_CLEAR, NULL);
 					AeronDrawList_Render(g.list, cmd);
 					break;
 				case XWA_SURFACE_EVENT_EXTERNAL_COMPOSITE_REVEAL:
@@ -674,7 +699,8 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 				if (seg_open) {
 					AeronDrawList_Render(g.list, cmd);
 				}
-				AeronDrawList_Begin(g.list, g.external_rt, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_LOAD, NULL);
+				AeronDrawList_Begin(g.list, g.external_rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD,
+									NULL);
 				seg_open = 2;
 			}
 			if (dz <= pz && dz <= gz) {
@@ -697,7 +723,7 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 			if (seg_open) {
 				AeronDrawList_Render(g.list, cmd);
 			}
-			AeronDrawList_Begin(g.list, g.output_rt, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_LOAD, NULL);
+			AeronDrawList_Begin(g.list, g.output_rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD, NULL);
 			seg_open = 1;
 		}
 		const uint32_t rec_d = di, rec_p = pi, rec_g = gi;
@@ -713,7 +739,7 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 			/* Same record into the persistent RT (separate pass; order
 			 * within screen_rt matches record order). */
 			AeronDrawList_Render(g.list, cmd);
-			AeronDrawList_Begin(g.list, g.screen_rt, RM_RT_W, RM_RT_H, AERON_DRAWLIST2D_LOAD, NULL);
+			AeronDrawList_Begin(g.list, g.screen_rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD, NULL);
 			if (dz <= pz && dz <= gz) {
 				rm_add_draw(g.list, &snap->draws_2d[rec_d]);
 			} else if (pz <= gz) {
@@ -740,36 +766,126 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 
 /* ---- per-frame -------------------------------------------------------- */
 
-static int rm_ensure(void) {
-	if (g.initialized) {
-		return g.screen_rt != NULL && g.output_rt != NULL && g.list != NULL;
+static AeronRenderTarget* rm_create_target(int width, int height, const char* debug_name) {
+	return Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = width,
+															   .height = height,
+															   .format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
+															   .debug_name = debug_name });
+}
+
+static void rm_release_retired_targets(void) {
+	for (int i = 0; i < g.retired_target_count; i++) {
+		Aeron_DestroyRenderTarget(g.retired_targets[i]);
+		g.retired_targets[i] = NULL;
 	}
-	g.initialized = 1;
-	/* sRGB RTs keep the compose domain linear in-shader (hardware
-	 * encode on write / decode on sample) — see XwaRemaster_SrgbToLinear. */
-	g.screen_rt =
-		Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = RM_RT_W,
-															.height = RM_RT_H,
-															.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
-															.debug_name = "xwa.frontend.screen" });
-	g.output_rt =
-		Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = RM_RT_W,
-															.height = RM_RT_H,
-															.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
-															.debug_name = "xwa.frontend.output" });
-	g.external_rt =
-		Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = RM_RT_W,
-															.height = RM_RT_H,
-															.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
-															.debug_name = "xwa.frontend.external" });
+	g.retired_target_count = 0;
+}
+
+static void rm_retire_target(AeronRenderTarget* target) {
+	if (!target) {
+		return;
+	}
+	if (g.retired_target_count < RM_RETIRED_TARGET_CAP) {
+		g.retired_targets[g.retired_target_count++] = target;
+		return;
+	}
+	/* The fixed-capacity set holds every target a single resize can replace. */
+	Aeron_DestroyRenderTarget(target);
+}
+
+static int rm_resize_targets(AeronCommandBuffer* cmd, int width, int height) {
+	AeronRenderTarget* new_screen;
+	AeronRenderTarget* new_output;
+	AeronRenderTarget* new_external;
+	AeronRenderTarget* new_saves[RM_SAVE_STACK_CAP] = { 0 };
+	const int had_targets = g.screen_rt != NULL;
+
+	new_screen = rm_create_target(width, height, "xwa.frontend.screen");
+	new_output = rm_create_target(width, height, "xwa.frontend.output");
+	new_external = rm_create_target(width, height, "xwa.frontend.external");
+	for (int i = 0; i < g.save_depth; i++) {
+		const RmSaveSlot* slot = &g.save_stack[i];
+		const int save_width = rm_edge_for(slot->right + 1, width, XWA_CLASSIC_WIDTH) -
+							   rm_edge_for(slot->left, width, XWA_CLASSIC_WIDTH);
+		const int save_height = rm_edge_for(slot->bottom + 1, height, XWA_CLASSIC_HEIGHT) -
+								rm_edge_for(slot->top, height, XWA_CLASSIC_HEIGHT);
+		if (slot->rt && save_width > 0 && save_height > 0) {
+			new_saves[i] = rm_create_target(save_width, save_height, "xwa.frontend.saved_region");
+		}
+	}
+
+	int complete = new_screen != NULL && new_output != NULL && new_external != NULL;
+	for (int i = 0; complete && i < g.save_depth; i++) {
+		if (g.save_stack[i].rt && !new_saves[i]) {
+			complete = 0;
+		}
+	}
+	if (!complete) {
+		Aeron_DestroyRenderTarget(new_screen);
+		Aeron_DestroyRenderTarget(new_output);
+		Aeron_DestroyRenderTarget(new_external);
+		for (int i = 0; i < g.save_depth; i++) {
+			Aeron_DestroyRenderTarget(new_saves[i]);
+		}
+		Aeron_LogError("xwa.remaster", "frontend target resize failed at %dx%d", width, height);
+		return 0;
+	}
+
+	if (had_targets) {
+		/* The snapshot contains only this tick's incremental operations. Preserve
+		 * the authoritative persistent pixels before replaying those operations. */
+		rm_blit_scaled(cmd, new_screen, width, height, g.screen_rt, AERON_BLIT2D_FILTER_LINEAR,
+					   AERON_DRAWLIST2D_CLEAR);
+		rm_blit_scaled(cmd, new_external, width, height, g.external_rt, AERON_BLIT2D_FILTER_LINEAR,
+					   AERON_DRAWLIST2D_CLEAR);
+		for (int i = 0; i < g.save_depth; i++) {
+			if (g.save_stack[i].rt) {
+				const int save_width = Aeron_TextureGetWidth(Aeron_RenderTargetGetTexture(new_saves[i]));
+				const int save_height = Aeron_TextureGetHeight(Aeron_RenderTargetGetTexture(new_saves[i]));
+				rm_blit_scaled(cmd, new_saves[i], save_width, save_height, g.save_stack[i].rt,
+							   AERON_BLIT2D_FILTER_LINEAR, AERON_DRAWLIST2D_CLEAR);
+			}
+		}
+	}
+
+	rm_retire_target(g.screen_rt);
+	rm_retire_target(g.output_rt);
+	rm_retire_target(g.external_rt);
+	g.screen_rt = new_screen;
+	g.output_rt = new_output;
+	g.external_rt = new_external;
+	for (int i = 0; i < g.save_depth; i++) {
+		rm_retire_target(g.save_stack[i].rt);
+		g.save_stack[i].rt = new_saves[i];
+	}
+	g.rt_width = width;
+	g.rt_height = height;
+	if (!had_targets) {
+		g.screen_needs_clear = 1;
+	}
+	Aeron_LogInfo("xwa.remaster", "frontend render size: %dx%d", width, height);
+	return 1;
+}
+
+static int rm_ensure(AeronCommandBuffer* cmd, int width, int height) {
+	if (!cmd || width <= 0 || height <= 0) {
+		return 0;
+	}
 	/* Sized for the briefing ship-inspect hologram: one quad record per
 	 * classic wireframe line, 20k+ per tick for large exteriors. */
-	g.list = AeronDrawList_Create(32768);
-	g.screen_needs_clear = 1;
-	if (!g.screen_rt || !g.output_rt || !g.list) {
-		Aeron_LogError("xwa.remaster", "frontend overlay init failed");
+	if (!g.list) {
+		g.list = AeronDrawList_Create(32768);
+		if (!g.list) {
+			Aeron_LogError("xwa.remaster", "frontend draw-list initialization failed");
+			return 0;
+		}
 	}
-	return g.screen_rt != NULL && g.output_rt != NULL && g.list != NULL;
+	rm_release_retired_targets();
+	if ((!g.screen_rt || !g.output_rt || !g.external_rt || g.rt_width != width || g.rt_height != height) &&
+		!rm_resize_targets(cmd, width, height)) {
+		return 0;
+	}
+	return 1;
 }
 
 void XwaRemasterFrontend_Shutdown(void) {
@@ -791,13 +907,14 @@ void XwaRemasterFrontend_Shutdown(void) {
 	if (g.external_rt) {
 		Aeron_DestroyRenderTarget(g.external_rt);
 	}
+	rm_release_retired_targets();
 	XwaRemasterPreview_Shutdown();
 	memset(&g, 0, sizeof g);
 }
 
 AeronTexture* XwaRemasterFrontend_Render(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
-										 XwaRemasterAssets* assets) {
-	if (!cmd || !snap || !rm_ensure()) {
+										 XwaRemasterAssets* assets, int target_width, int target_height) {
+	if (!cmd || !snap || !rm_ensure(cmd, target_width, target_height)) {
 		return NULL;
 	}
 	g.assets = assets; /* borrowed for the call (rm_* helpers read it) */

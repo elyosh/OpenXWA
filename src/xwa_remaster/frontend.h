@@ -21,7 +21,7 @@ extern "C" {
  * failure. `cmd` must have no open pass; `assets` is borrowed for the
  * call. */
 AeronTexture* XwaRemasterFrontend_Render(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
-										 XwaRemasterAssets* assets);
+										 XwaRemasterAssets* assets, int target_width, int target_height);
 
 void XwaRemasterFrontend_Shutdown(void);
 
