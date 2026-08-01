@@ -2423,6 +2423,13 @@ void FlightSw_DrawLine(int x1, int y1, int x2, int y2, uint8_t colorIdx) {
 			y2 = g_flightClipTop;
 		}
 
+#ifdef XWA_MODERN
+		// Sequential integer clipping can invert a steep span after rounding.
+		if (y2 > y1) {
+			return;
+		}
+#endif
+
 		pixel = (uint8_t*)g_flightSwFramebufferBase;
 		pixel += y1 * FlightSw_GetLinePitch();
 		pixel += x1 * g_flight16bppBytesPerPixel;
