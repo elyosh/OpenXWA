@@ -149,10 +149,11 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 		const XwaDraw2D* d = &s->draws_2d[i];
 		fprintf(fp,
 				"draw z%u k%u t%u '%s' f%d g%d i%d src %d,%d,%d,%d dst %d,%d tint %08x "
-				"blend %d clip %d,%d,%d,%d\n",
+				"opaque_fill %08x blend %d clip %d,%d,%d,%d\n",
 				d->z_order, d->kind, d->target, d->name, d->frame, d->atlas_group, d->atlas_index,
 				d->src_left, d->src_top, d->src_right, d->src_bottom, d->dst_x, d->dst_y, d->tint_color,
-				d->blend_mode, d->clip_left, d->clip_top, d->clip_right, d->clip_bottom);
+				d->opaque_fill_color, d->blend_mode, d->clip_left, d->clip_top, d->clip_right,
+				d->clip_bottom);
 	}
 	for (uint32_t i = 0; i < s->paint_cmd_count; i++) {
 		const XwaPaintCmd* c = &s->paint_cmds[i];
@@ -731,7 +732,7 @@ void XwaSnapshot_EmitSurfaceEvent(XwaSurfaceEventKind kind, int left, int top, i
 
 void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, const int16_t src_ltrb[4],
 							int dst_x, int dst_y, int img_w, int img_h, uint32_t tint_color,
-							int32_t blend_mode) {
+							uint32_t opaque_fill_color, int32_t blend_mode) {
 	XwaSnapshot* s = wr();
 	if (s->draw_2d_count >= XWA_SNAP_MAX_DRAWS_2D) {
 		s->dropped_records++;
@@ -770,6 +771,7 @@ void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, con
 	d->dst_x = (int16_t)dst_x;
 	d->dst_y = (int16_t)dst_y;
 	d->tint_color = tint_color;
+	d->opaque_fill_color = opaque_fill_color;
 	d->blend_mode = blend_mode;
 	stamp_clip(&d->clip_left, &d->clip_top, &d->clip_right, &d->clip_bottom);
 }

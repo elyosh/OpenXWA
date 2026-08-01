@@ -134,8 +134,9 @@ typedef struct XwaDraw2D {
 	int16_t src_left, src_top, src_right, src_bottom;
 	/* Destination in frontend coords (640x480 frame). */
 	int16_t dst_x, dst_y;
-	uint32_t tint_color; /* raw engine color arg (tinted kinds) */
-	int32_t blend_mode;  /* raw engine blend arg (blend kinds) */
+	uint32_t tint_color;        /* raw engine color arg (tinted kinds) */
+	uint32_t opaque_fill_color; /* palette entry 0 for FrontImage_DrawSpriteOpaque */
+	int32_t blend_mode;         /* raw engine blend arg (blend kinds) */
 	/* Active screen clip rect (inclusive, frontend coords) at emit
 	 * time — FrontendDisplay_Get/SetScreenClipRect640x480 state. */
 	int16_t clip_left, clip_top, clip_right, clip_bottom;
@@ -1122,10 +1123,11 @@ void XwaSnapshot_SetEmitTarget(XwaEmitTarget target);
 
 /* Sprite family. `src` may be NULL (whole image); `frame` is the
  * resource's currentFrame at draw time (animation cel); img_w/img_h
- * are the classic image dims of that frame. */
+ * are the classic image dims of that frame. `opaque_fill_color` is
+ * palette entry 0 for the color-key-blind opaque blit, otherwise 0. */
 void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, const int16_t src_ltrb[4],
 							int dst_x, int dst_y, int img_w, int img_h, uint32_t tint_color,
-							int32_t blend_mode);
+							uint32_t opaque_fill_color, int32_t blend_mode);
 /* DAT atlas sprite. x/y is the FINAL anchored blit position (the
  * caller adds the payload anchor first — aeron atlas convention:
  * origins are baked into the draw position at emit time). */

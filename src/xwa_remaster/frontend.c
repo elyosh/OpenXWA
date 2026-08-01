@@ -158,15 +158,8 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	AeronDrawList2DSprite s = { 0 };
 	s.texture = ref.texture;
 	s.filter = AERON_BLIT2D_FILTER_LINEAR;
-	s.blend = (d->kind == XWA_DRAW2D_SPRITE_OPAQUE) ? AERON_BLIT2D_BLEND_NONE : AERON_BLIT2D_BLEND_PMA;
+	s.blend = AERON_BLIT2D_BLEND_PMA;
 	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
-	if (d->kind == XWA_DRAW2D_SPRITE_OPAQUE) {
-		/* The engine's opaque blit copies EVERY pixel (no color key);
-		 * keyed-out texels in the baked asset are PMA black with
-		 * alpha 0 — force alpha 1 (shader bias.a) so the classic layer
-		 * cannot bleed through opaque-blitted content. */
-		s.bias[3] = 1.0f;
-	}
 	s.scissor = rm_scissor(d->clip_left, d->clip_top, d->clip_right, d->clip_bottom);
 
 	/* Geometry authority is the record's CLASSIC dims: dst extents in
@@ -269,6 +262,17 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 0.5f;
 	}
 
+	if (d->kind == XWA_DRAW2D_SPRITE_OPAQUE) {
+		/* The classic opaque blit writes palette entry 0 where the keyed
+		 * texture is transparent. Rebuild that lost color beneath the PMA
+		 * sprite; this also gives filtered HD edges the correct coverage. */
+		float fill[4];
+		rm_color_linear(d->opaque_fill_color, fill);
+		fill[3] = 1.0f;
+		const AeronRectI* scissor = s.scissor.width > 0 && s.scissor.height > 0 ? &s.scissor : NULL;
+		AeronDrawList_AddFill(list, s.dst_x, s.dst_y, s.dst_w, s.dst_h, fill, AERON_BLIT2D_BLEND_NONE,
+							  scissor);
+	}
 	AeronDrawList_AddSprite(list, &s);
 }
 

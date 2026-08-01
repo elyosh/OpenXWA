@@ -2288,7 +2288,7 @@ int FrontImage_DrawSprite(const char* name, int x, int y) {
 	/* Remaster snapshot observer (non-atlas path; the atlas branch
 	 * above emits inside FrontImage_DrawAtlasSprite). */
 	XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE, name, currentFrame, 0, x, y, desc->image[currentFrame].width,
-						   desc->image[currentFrame].height, 0, 0);
+						   desc->image[currentFrame].height, 0, 0, 0);
 #endif
 	return FrontImage_BlitClipped(&desc->image[currentFrame], x, y);
 }
@@ -2828,9 +2828,10 @@ int FrontImage_DrawSpriteOpaque(const char* name, int x, int y) {
 	{
 		/* Remaster snapshot observer (opaque). */
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
+		const ImageResource* snapImage = &snapDesc->image[snapDesc->currentFrame];
 		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_OPAQUE, name, snapDesc->currentFrame, 0, x, y,
-							   snapDesc->image[snapDesc->currentFrame].width,
-							   snapDesc->image[snapDesc->currentFrame].height, 0, 0);
+							   snapImage->width, snapImage->height, 0,
+							   (uint32_t)(uint16_t)snapImage->colorLUT[0], 0);
 	}
 #endif
 
@@ -3249,7 +3250,7 @@ int FrontImage_DrawSpriteTranslucent(const char* name, int x, int y) {
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
 		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_TRANSLUCENT, name, snapDesc->currentFrame, 0, x, y,
 							   snapDesc->image[snapDesc->currentFrame].width,
-							   snapDesc->image[snapDesc->currentFrame].height, 0, 0);
+							   snapDesc->image[snapDesc->currentFrame].height, 0, 0, 0);
 	}
 #endif
 
@@ -3349,7 +3350,7 @@ int FrontImage_DrawSpriteRectTransparent(const char* name, FrontendRect* srcRect
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
 		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_RECT, name, snapDesc->currentFrame, snapSrc, dstX, dstY,
 							   snapDesc->image[snapDesc->currentFrame].width,
-							   snapDesc->image[snapDesc->currentFrame].height, 0, 0);
+							   snapDesc->image[snapDesc->currentFrame].height, 0, 0, 0);
 	}
 #endif
 
@@ -3497,7 +3498,7 @@ int FrontImage_DrawSpriteRectTinted(const char* name, FrontendRect* srcRect, int
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
 		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_RECT_TINTED, name, snapDesc->currentFrame, snapSrc, dstX,
 							   dstY, snapDesc->image[snapDesc->currentFrame].width,
-							   snapDesc->image[snapDesc->currentFrame].height, tintColor, 0);
+							   snapDesc->image[snapDesc->currentFrame].height, tintColor, 0, 0);
 	}
 #endif
 
@@ -3868,7 +3869,7 @@ int FrontImage_DrawSpriteRectBlendMode(const char* name, FrontendRect* srcRect, 
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
 		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_RECT_BLEND, name, snapDesc->currentFrame, snapSrc, dstX,
 							   dstY, snapDesc->image[snapDesc->currentFrame].width,
-							   snapDesc->image[snapDesc->currentFrame].height, 0, blendMode);
+							   snapDesc->image[snapDesc->currentFrame].height, 0, 0, blendMode);
 	}
 #endif
 
@@ -4429,7 +4430,7 @@ int FrontImage_DrawSpriteRectTintedBlendMode(const char* name, FrontendRect* src
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
 		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_RECT_TINTED_BLEND, name, snapDesc->currentFrame, snapSrc,
 							   dstX, dstY, snapDesc->image[snapDesc->currentFrame].width,
-							   snapDesc->image[snapDesc->currentFrame].height, tintColor, blendMode);
+							   snapDesc->image[snapDesc->currentFrame].height, tintColor, 0, blendMode);
 	}
 #endif
 
