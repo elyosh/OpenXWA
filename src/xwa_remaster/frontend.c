@@ -190,24 +190,22 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		dst_cw = d->src_right - d->src_left + 1;
 		dst_ch = d->src_bottom - d->src_top + 1;
 	}
-	/* The classic *BlendMode blits' `blendMode` is an ORIENTATION
-	 * switch, not a blend (FrontImage_BlitRectBlendMode and its tinted
-	 * twin share the walks): 1 / 3 are the two 90-degree rotated blits
-	 * (briefing-map ship icons face along their heading), 2 is a
-	 * vertical flip, anything else the upright blit. Rotations need
-	 * per-corner UVs — a Quad4 with the dst extents transposed,
+	/* The classic oriented blits use modes 1 / 3 for the two 90-degree
+	 * rotations, 2 for a vertical flip, and 4 for a horizontal flip.
+	 * Briefing-map ship icons use these modes to face along their heading.
+	 * Rotations need per-corner UVs — a Quad4 with the dst extents transposed,
 	 * corners mapped per the classic source walks (mode 1:
 	 * dst(c,r) <- src(row top+c, col right-r); mode 3:
 	 * dst(c,r) <- src(row bottom-c, col left+r)). */
 	const int oriented =
-		d->kind == XWA_DRAW2D_SPRITE_RECT_BLEND || d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_BLEND;
-	if (oriented && (d->blend_mode == 1 || d->blend_mode == 3)) {
+		d->kind == XWA_DRAW2D_SPRITE_RECT_ORIENTED || d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED;
+	if (oriented && (d->orientation_mode == 1 || d->orientation_mode == 3)) {
 		AeronDrawList2DQuad4 q = { 0 };
 		q.texture = ref.texture;
 		q.filter = AERON_BLIT2D_FILTER_LINEAR;
 		q.blend = AERON_BLIT2D_BLEND_PMA;
 		q.scissor = s.scissor;
-		if (d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_BLEND) {
+		if (d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED) {
 			rm_color_linear(d->tint_color, q.tint);
 		} else {
 			q.tint[0] = q.tint[1] = q.tint[2] = 1.0f;
@@ -228,7 +226,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		q.corners[2][1] = y1;
 		q.corners[3][0] = x1;
 		q.corners[3][1] = y1;
-		if (d->blend_mode == 1) {
+		if (d->orientation_mode == 1) {
 			q.corners[0][2] = su1;
 			q.corners[0][3] = sv0;
 			q.corners[1][2] = su1;
@@ -250,10 +248,14 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		AeronDrawList_AddQuad4(list, &q);
 		return;
 	}
-	if (oriented && d->blend_mode == 2) {
+	if (oriented && d->orientation_mode == 2) {
 		const float t = sv0; /* vertical flip */
 		sv0 = sv1;
 		sv1 = t;
+	} else if (oriented && d->orientation_mode == 4) {
+		const float t = su0; /* horizontal flip */
+		su0 = su1;
+		su1 = t;
 	}
 
 	s.src_u0 = su0;
@@ -266,7 +268,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	s.dst_w = (float)dst_cw * rm_scale_x();
 	s.dst_h = (float)dst_ch * rm_scale_y();
 
-	if (d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED || d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_BLEND) {
+	if (d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED || d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED) {
 		rm_color_linear(d->tint_color, s.tint);
 		s.tint[3] = 1.0f;
 	} else if (d->kind == XWA_DRAW2D_SPRITE_TRANSLUCENT) {
@@ -924,12 +926,12 @@ AeronTexture* XwaRemasterFrontend_Render(AeronCommandBuffer* cmd, const XwaSnaps
 	}
 	/* Resolver coverage heartbeat (~ every 10 s at 30 Hz). */
 	if (++g.stat_ticks >= 300) {
-		Aeron_LogDebug("xwa.remaster", "sprite resolve: %u hit, %u miss (last %u ticks; e.g. %s | %s | %s | %s)",
-				  g.stat_hits, g.stat_misses, g.stat_ticks,
-				  g.stat_miss_key_count > 0 ? g.stat_miss_keys[0] : "-",
-				  g.stat_miss_key_count > 1 ? g.stat_miss_keys[1] : "-",
-				  g.stat_miss_key_count > 2 ? g.stat_miss_keys[2] : "-",
-				  g.stat_miss_key_count > 3 ? g.stat_miss_keys[3] : "-");
+		Aeron_LogDebug("xwa.remaster",
+					   "sprite resolve: %u hit, %u miss (last %u ticks; e.g. %s | %s | %s | %s)", g.stat_hits,
+					   g.stat_misses, g.stat_ticks, g.stat_miss_key_count > 0 ? g.stat_miss_keys[0] : "-",
+					   g.stat_miss_key_count > 1 ? g.stat_miss_keys[1] : "-",
+					   g.stat_miss_key_count > 2 ? g.stat_miss_keys[2] : "-",
+					   g.stat_miss_key_count > 3 ? g.stat_miss_keys[3] : "-");
 		g.stat_ticks = g.stat_hits = g.stat_misses = 0;
 		g.stat_miss_key_count = 0;
 	}

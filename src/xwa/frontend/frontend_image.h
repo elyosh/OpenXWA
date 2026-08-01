@@ -132,14 +132,14 @@ int FrontImage_DrawSpriteRectTinted(const char* name, FrontendRect* srcRect, int
 									unsigned int tintColor);
 int FrontImage_BlitRectTinted(ImageResource* image, FrontendRect* srcRect, int dstX, int dstY,
 							  unsigned int tintColor);
-int FrontImage_DrawSpriteRectBlendMode(const char* name, FrontendRect* srcRect, int dstX, int dstY,
-									   int blendMode);
-int FrontImage_BlitRectBlendMode(ImageResource* image, FrontendRect* srcRect, int dstX, int dstY,
-								 int blendMode);
-int FrontImage_DrawSpriteRectTintedBlendMode(const char* name, FrontendRect* srcRect, int dstX, int dstY,
-											 unsigned int tintColor, int blendMode);
-int FrontImage_BlitRectTintedBlendMode(ImageResource* image, FrontendRect* srcRect, int dstX, int dstY,
-									   unsigned int tintColor, int blendMode);
+int FrontImage_DrawSpriteRectOriented(const char* name, FrontendRect* srcRect, int dstX, int dstY,
+									  int orientationMode);
+int FrontImage_BlitRectOriented(ImageResource* image, FrontendRect* srcRect, int dstX, int dstY,
+								int orientationMode);
+int FrontImage_DrawSpriteRectTintedOriented(const char* name, FrontendRect* srcRect, int dstX, int dstY,
+											unsigned int tintColor, int orientationMode);
+int FrontImage_BlitRectTintedOriented(ImageResource* image, FrontendRect* srcRect, int dstX, int dstY,
+									  unsigned int tintColor, int orientationMode);
 int FrontImage_DrawGlyph(intptr_t* glyph, int x, int y, unsigned int color, int allowColorRemap);
 void FrontImage_BlitGlyphRLE_8bpp(intptr_t* glyph, int destX, int destY, int clipLeftSkip, int clipTopSkip,
 								  int visibleWidth, int visibleRows, unsigned char color);

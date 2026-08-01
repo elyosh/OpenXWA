@@ -46,7 +46,7 @@ typedef struct FrontendBriefingMapIconState {
 	uint8_t iconClass;
 	int16_t mapX;
 	int16_t mapY;
-	int16_t drawFlags;
+	int16_t orientationMode;
 	uint8_t gap08[16];
 } FrontendBriefingMapIconState;
 

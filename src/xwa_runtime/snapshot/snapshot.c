@@ -12,7 +12,6 @@
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 
 #include "aeron/aeron.h"
-#include "xwa/frontend/frontend_image.h"
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_type.h"
 #include "xwa/assets/object_type.h"
@@ -21,15 +20,16 @@
 #include "xwa/flight/flight.h"
 #include "xwa/flight/flight_light.h"
 #include "xwa/flight/hangar.h"
+#include "xwa/flight/mission/mission.h"
+#include "xwa/flight/object/object.h"
+#include "xwa/flight/player/player.h"
 #include "xwa/flight/starfield.h"
 #include "xwa/frontend/frontend_cursor.h"
 #include "xwa/frontend/frontend_display.h"
 #include "xwa/frontend/frontend_draw.h"
+#include "xwa/frontend/frontend_image.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/frontend/frontend_text.h"
-#include "xwa/flight/mission/mission.h"
-#include "xwa/flight/object/object.h"
-#include "xwa/flight/player/player.h"
 #include "xwa/render/effects.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/time.h"
@@ -149,10 +149,10 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 		const XwaDraw2D* d = &s->draws_2d[i];
 		fprintf(fp,
 				"draw z%u k%u t%u '%s' f%d g%d i%d src %d,%d,%d,%d dst %d,%d tint %08x "
-				"opaque_fill %08x blend %d clip %d,%d,%d,%d\n",
+				"opaque_fill %08x orientation %d clip %d,%d,%d,%d\n",
 				d->z_order, d->kind, d->target, d->name, d->frame, d->atlas_group, d->atlas_index,
 				d->src_left, d->src_top, d->src_right, d->src_bottom, d->dst_x, d->dst_y, d->tint_color,
-				d->opaque_fill_color, d->blend_mode, d->clip_left, d->clip_top, d->clip_right,
+				d->opaque_fill_color, d->orientation_mode, d->clip_left, d->clip_top, d->clip_right,
 				d->clip_bottom);
 	}
 	for (uint32_t i = 0; i < s->paint_cmd_count; i++) {
@@ -410,14 +410,14 @@ void XwaSnapshot_Commit(void) {
 			paint_kinds[s->paint_cmds[i].kind & 7]++;
 		}
 		Aeron_LogWarn("xwa.snapshot",
-				  "tick %llu: %u 2D records dropped (caps %d/%d); kept draws "
-				  "spr=%u opq=%u trl=%u rect=%u rtint=%u rblend=%u rtb=%u atlas=%u | paints "
-				  "hl=%u vl=%u ln=%u aa=%u ftr=%u fill=%u out=%u px=%u | glyphs=%u",
-				  (unsigned long long)s->tick_index, s->dropped_records, XWA_SNAP_MAX_DRAWS_2D,
-				  XWA_SNAP_MAX_PAINT_CMDS, draw_kinds[0], draw_kinds[1], draw_kinds[2], draw_kinds[3],
-				  draw_kinds[4], draw_kinds[5], draw_kinds[6], draw_kinds[7], paint_kinds[0], paint_kinds[1],
-				  paint_kinds[2], paint_kinds[3], paint_kinds[4], paint_kinds[5], paint_kinds[6],
-				  paint_kinds[7], s->glyph_count);
+					  "tick %llu: %u 2D records dropped (caps %d/%d); kept draws "
+					  "spr=%u opq=%u trl=%u rect=%u rtint=%u rblend=%u rtb=%u atlas=%u | paints "
+					  "hl=%u vl=%u ln=%u aa=%u ftr=%u fill=%u out=%u px=%u | glyphs=%u",
+					  (unsigned long long)s->tick_index, s->dropped_records, XWA_SNAP_MAX_DRAWS_2D,
+					  XWA_SNAP_MAX_PAINT_CMDS, draw_kinds[0], draw_kinds[1], draw_kinds[2], draw_kinds[3],
+					  draw_kinds[4], draw_kinds[5], draw_kinds[6], draw_kinds[7], paint_kinds[0],
+					  paint_kinds[1], paint_kinds[2], paint_kinds[3], paint_kinds[4], paint_kinds[5],
+					  paint_kinds[6], paint_kinds[7], s->glyph_count);
 	}
 	snapshot_maybe_dump(s);
 	g_previous_slot = g_current_slot;
@@ -732,7 +732,7 @@ void XwaSnapshot_EmitSurfaceEvent(XwaSurfaceEventKind kind, int left, int top, i
 
 void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, const int16_t src_ltrb[4],
 							int dst_x, int dst_y, int img_w, int img_h, uint32_t tint_color,
-							uint32_t opaque_fill_color, int32_t blend_mode) {
+							uint32_t opaque_fill_color, int32_t orientation_mode) {
 	XwaSnapshot* s = wr();
 	if (s->draw_2d_count >= XWA_SNAP_MAX_DRAWS_2D) {
 		s->dropped_records++;
@@ -772,7 +772,7 @@ void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, con
 	d->dst_y = (int16_t)dst_y;
 	d->tint_color = tint_color;
 	d->opaque_fill_color = opaque_fill_color;
-	d->blend_mode = blend_mode;
+	d->orientation_mode = orientation_mode;
 	stamp_clip(&d->clip_left, &d->clip_top, &d->clip_right, &d->clip_bottom);
 }
 
@@ -1198,15 +1198,16 @@ void XwaSnapshot_CaptureFlight(void) {
 
 	XwaSnapshotFlightMap_Begin(s);
 	uint32_t flight_index = 0;
-	for (uint32_t slot = g_regionMainObjectSlotStart; s->flight_map.active &&
-		 slot < g_regionStaticObjectSlotEnd && slot < g_objectTableSlotCount; slot++) {
+	for (uint32_t slot = g_regionMainObjectSlotStart;
+		 s->flight_map.active && slot < g_regionStaticObjectSlotEnd && slot < g_objectTableSlotCount;
+		 slot++) {
 		while (flight_index < s->flight_object_count && s->flight_objects[flight_index].slot < slot) {
 			flight_index++;
 		}
-		const uint16_t index = flight_index < s->flight_object_count &&
-							   s->flight_objects[flight_index].slot == slot
-							   ? (uint16_t)flight_index
-							   : UINT16_MAX;
+		const uint16_t index =
+			flight_index < s->flight_object_count && s->flight_objects[flight_index].slot == slot
+				? (uint16_t)flight_index
+				: UINT16_MAX;
 		XwaSnapshotFlightMap_CaptureObject(s, slot, index);
 	}
 	XwaSnapshotFlightMap_End(s);

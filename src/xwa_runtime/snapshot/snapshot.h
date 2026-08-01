@@ -25,10 +25,10 @@ extern "C" {
 
 typedef enum XwaSceneKind {
 	XWA_SCENE_NONE = 0,
-	XWA_SCENE_FRONTEND, /* concourse / menus / briefing / film room */
-	XWA_SCENE_FLIGHT,   /* in-mission simulation (incl. hangar / DS) */
-	XWA_SCENE_CUTSCENE, /* SMUSH playback */
-	XWA_SCENE_LOADING,  /* flight mission loading UI on attached frontend surfaces */
+	XWA_SCENE_FRONTEND,       /* concourse / menus / briefing / film room */
+	XWA_SCENE_FLIGHT,         /* in-mission simulation (incl. hangar / DS) */
+	XWA_SCENE_CUTSCENE,       /* SMUSH playback */
+	XWA_SCENE_LOADING,        /* flight mission loading UI on attached frontend surfaces */
 	XWA_SCENE_FRONTEND_MODAL, /* frontend UI temporarily attached to an active flight */
 } XwaSceneKind;
 
@@ -88,14 +88,14 @@ typedef struct XwaSurfaceEvent {
 } XwaSurfaceEvent;
 
 typedef enum XwaDraw2DKind {
-	XWA_DRAW2D_SPRITE = 0,               /* FrontImage_DrawSprite (transparent) */
-	XWA_DRAW2D_SPRITE_OPAQUE,            /* FrontImage_DrawSpriteOpaque */
-	XWA_DRAW2D_SPRITE_TRANSLUCENT,       /* FrontImage_DrawSpriteTranslucent */
-	XWA_DRAW2D_SPRITE_RECT,              /* FrontImage_DrawSpriteRectTransparent */
-	XWA_DRAW2D_SPRITE_RECT_TINTED,       /* FrontImage_DrawSpriteRectTinted */
-	XWA_DRAW2D_SPRITE_RECT_BLEND,        /* FrontImage_DrawSpriteRectBlendMode */
-	XWA_DRAW2D_SPRITE_RECT_TINTED_BLEND, /* ...RectTintedBlendMode */
-	XWA_DRAW2D_ATLAS_SPRITE,             /* FrontImage_DrawAtlasSprite */
+	XWA_DRAW2D_SPRITE = 0,                  /* FrontImage_DrawSprite (transparent) */
+	XWA_DRAW2D_SPRITE_OPAQUE,               /* FrontImage_DrawSpriteOpaque */
+	XWA_DRAW2D_SPRITE_TRANSLUCENT,          /* FrontImage_DrawSpriteTranslucent */
+	XWA_DRAW2D_SPRITE_RECT,                 /* FrontImage_DrawSpriteRectTransparent */
+	XWA_DRAW2D_SPRITE_RECT_TINTED,          /* FrontImage_DrawSpriteRectTinted */
+	XWA_DRAW2D_SPRITE_RECT_ORIENTED,        /* FrontImage_DrawSpriteRectOriented */
+	XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED, /* ...RectTintedOriented */
+	XWA_DRAW2D_ATLAS_SPRITE,                /* FrontImage_DrawAtlasSprite */
 } XwaDraw2DKind;
 
 #define XWA_SNAP_SPRITE_NAME_MAX 24
@@ -136,7 +136,7 @@ typedef struct XwaDraw2D {
 	int16_t dst_x, dst_y;
 	uint32_t tint_color;        /* raw engine color arg (tinted kinds) */
 	uint32_t opaque_fill_color; /* palette entry 0 for FrontImage_DrawSpriteOpaque */
-	int32_t blend_mode;         /* raw engine blend arg (blend kinds) */
+	int32_t orientation_mode;   /* raw orientation arg (oriented kinds) */
 	/* Active screen clip rect (inclusive, frontend coords) at emit
 	 * time — FrontendDisplay_Get/SetScreenClipRect640x480 state. */
 	int16_t clip_left, clip_top, clip_right, clip_bottom;
@@ -1126,10 +1126,11 @@ void XwaSnapshot_SetEmitTarget(XwaEmitTarget target);
 /* Sprite family. `src` may be NULL (whole image); `frame` is the
  * resource's currentFrame at draw time (animation cel); img_w/img_h
  * are the classic image dims of that frame. `opaque_fill_color` is
- * palette entry 0 for the color-key-blind opaque blit, otherwise 0. */
+ * palette entry 0 for the color-key-blind opaque blit, otherwise 0.
+ * `orientation_mode` is the raw selector for the oriented kinds. */
 void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, const int16_t src_ltrb[4],
 							int dst_x, int dst_y, int img_w, int img_h, uint32_t tint_color,
-							uint32_t opaque_fill_color, int32_t blend_mode);
+							uint32_t opaque_fill_color, int32_t orientation_mode);
 /* DAT atlas sprite. x/y is the FINAL anchored blit position (the
  * caller adds the payload anchor first — aeron atlas convention:
  * origins are baked into the draw position at emit time). */

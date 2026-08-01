@@ -6,13 +6,13 @@
 
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/flight_model.h"
-#include "xwa/frontend/frontend_image.h"
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/ship_list.h"
 #include "xwa/assets/string_table.h"
 #include "xwa/assets/ui_string.h"
 #include "xwa/audio/music.h"
 #include "xwa/config/game_config.h"
+#include "xwa/flight/net_session.h"
 #include "xwa/frontend/briefing_script.h"
 #include "xwa/frontend/concourse.h"
 #include "xwa/frontend/family_transport_room.h"
@@ -24,6 +24,7 @@
 #include "xwa/frontend/frontend_display.h"
 #include "xwa/frontend/frontend_draw.h"
 #include "xwa/frontend/frontend_escape.h"
+#include "xwa/frontend/frontend_image.h"
 #include "xwa/frontend/frontend_input.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/frontend/frontend_mission_list.h"
@@ -38,9 +39,8 @@
 #include "xwa/frontend/frontend_wave_stream.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/frontend/model_preview.h"
-#include "xwa/frontend/tech_library.h"
-#include "xwa/flight/net_session.h"
 #include "xwa/frontend/net_transport.h"
+#include "xwa/frontend/tech_library.h"
 #include "xwa/util/memory.h"
 #include "xwa/util/time.h"
 
@@ -593,7 +593,8 @@ void BriefingMap_DrawCraftIconHighlight(FrontendRect* viewportRect, int unused, 
 	shipListIndex = g_shipTypeToShipListIndex[objectType];
 	iconWidth = g_shipList[shipListIndex].iconRect.right - g_shipList[shipListIndex].iconRect.left + 1;
 	iconHeight = g_shipList[shipListIndex].iconRect.bottom - g_shipList[shipListIndex].iconRect.top + 1;
-	if ((g_briefingMapCurrentRegionIcons[iconIndex].drawFlags & 1) == 0) {
+	/* The two 90-degree orientation modes are the odd values 1 and 3. */
+	if ((g_briefingMapCurrentRegionIcons[iconIndex].orientationMode & 1) == 0) {
 		screenX = (int16_t)(screenX - (iconWidth >> 1));
 		screenY = (int16_t)(screenY - (iconHeight >> 1));
 		FrontendDraw_RectAssign(&rect, screenX, screenY, iconWidth + screenX - 1, iconHeight + screenY - 1);
@@ -640,22 +641,22 @@ void BriefingMap_DrawCraftIconHighlight(FrontendRect* viewportRect, int unused, 
 				int* tintColor;
 
 				tintColor = &g_textShadeRamps[0][(uint16_t)shadeIndex];
-				FrontImage_DrawSpriteRectTintedBlendMode(
+				FrontImage_DrawSpriteRectTintedOriented(
 					"lgreyicon", &g_shipList[shipListIndex].iconRect, screenX - (int16_t)offset,
 					screenY - (int16_t)offset, *tintColor,
-					g_briefingMapCurrentRegionIcons[iconIndex].drawFlags);
-				FrontImage_DrawSpriteRectTintedBlendMode(
+					g_briefingMapCurrentRegionIcons[iconIndex].orientationMode);
+				FrontImage_DrawSpriteRectTintedOriented(
 					"lgreyicon", &g_shipList[shipListIndex].iconRect, screenX + (int16_t)offset,
 					screenY - (int16_t)offset, *tintColor,
-					g_briefingMapCurrentRegionIcons[iconIndex].drawFlags);
-				FrontImage_DrawSpriteRectTintedBlendMode(
+					g_briefingMapCurrentRegionIcons[iconIndex].orientationMode);
+				FrontImage_DrawSpriteRectTintedOriented(
 					"lgreyicon", &g_shipList[shipListIndex].iconRect, screenX - (int16_t)offset,
 					screenY + (int16_t)offset, *tintColor,
-					g_briefingMapCurrentRegionIcons[iconIndex].drawFlags);
-				FrontImage_DrawSpriteRectTintedBlendMode(
+					g_briefingMapCurrentRegionIcons[iconIndex].orientationMode);
+				FrontImage_DrawSpriteRectTintedOriented(
 					"lgreyicon", &g_shipList[shipListIndex].iconRect, screenX + (int16_t)offset,
 					screenY + (int16_t)offset, *tintColor,
-					g_briefingMapCurrentRegionIcons[iconIndex].drawFlags);
+					g_briefingMapCurrentRegionIcons[iconIndex].orientationMode);
 				shadeIndex += 2;
 				offset -= 2;
 			} while (--repeatCount != 0);
@@ -791,7 +792,8 @@ void BriefingMap_DrawOverlays(FrontendRect* viewportRect, int unused) {
 				iconHeight =
 					g_shipList[shipListIndex].iconRect.bottom - g_shipList[shipListIndex].iconRect.top + 1;
 				BriefingMap_ProjectPointToViewport(&dst, mapX, mapY, &outX, &outY);
-				if ((g_briefingMapCurrentRegionIcons[iconIndex].drawFlags & 1) == 0) {
+				/* Modes 1 and 3 transpose the icon dimensions. */
+				if ((g_briefingMapCurrentRegionIcons[iconIndex].orientationMode & 1) == 0) {
 					outX = (int16_t)(outX - (iconWidth >> 1));
 					outY = (int16_t)(outY - (iconHeight >> 1));
 				} else {
@@ -799,9 +801,9 @@ void BriefingMap_DrawOverlays(FrontendRect* viewportRect, int unused) {
 					outY = (int16_t)(outY - (iconWidth >> 1));
 				}
 				sprintf(g_frontendScratchBuffer, "lmapicon%d", (int16_t)mapIconResourceIndex);
-				FrontImage_DrawSpriteRectBlendMode(g_frontendScratchBuffer,
-												   &g_shipList[shipListIndex].iconRect, outX, outY,
-												   g_briefingMapCurrentRegionIcons[iconIndex].drawFlags);
+				FrontImage_DrawSpriteRectOriented(g_frontendScratchBuffer,
+												  &g_shipList[shipListIndex].iconRect, outX, outY,
+												  g_briefingMapCurrentRegionIcons[iconIndex].orientationMode);
 			}
 			++i;
 		} while (--remaining);

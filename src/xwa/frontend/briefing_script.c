@@ -23,7 +23,7 @@ enum {
 	BRIEFING_SCRIPT_OPCODE_ICON_TYPE_CLASS = 26,
 	BRIEFING_SCRIPT_OPCODE_PRIMARY_HIGHLIGHT = 27,
 	BRIEFING_SCRIPT_OPCODE_ICON_POSITION = 28,
-	BRIEFING_SCRIPT_OPCODE_ICON_FLAGS = 29,
+	BRIEFING_SCRIPT_OPCODE_ICON_ORIENTATION = 29,
 	BRIEFING_SCRIPT_OPCODE_SET_REGION = 30,
 	BRIEFING_SCRIPT_OPCODE_CRAFT_STATS_REVEAL = 31,
 	BRIEFING_SCRIPT_INITIAL_AGE = 0x50,
@@ -282,11 +282,11 @@ void BriefingScript_AdvanceFrame(int16_t initializeState) {
 						break;
 					}
 
-					case BRIEFING_SCRIPT_OPCODE_ICON_FLAGS: {
+					case BRIEFING_SCRIPT_OPCODE_ICON_ORIENTATION: {
 						int16_t iconIndex;
 
 						iconIndex = args[0];
-						g_briefingMapCurrentRegionIcons[iconIndex].drawFlags = args[1];
+						g_briefingMapCurrentRegionIcons[iconIndex].orientationMode = args[1];
 						break;
 					}
 

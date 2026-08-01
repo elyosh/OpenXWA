@@ -915,8 +915,9 @@ static int FrontImage_LoadResourceListImpl(char* fileName, int unload) {
 				FrontImage_FreeResourceByName(name);
 			} else {
 				if (!FrontImage_RegisterResource(buffer, name, 0, id)) {
-					Aeron_LogError("xwa.assets", "Failed to register frontend resource '%s' from '%s' (id %d)",
-							  name, buffer, id);
+					Aeron_LogError("xwa.assets",
+								   "Failed to register frontend resource '%s' from '%s' (id %d)", name,
+								   buffer, id);
 				}
 				Music_Update();
 			}
@@ -3516,8 +3517,8 @@ int FrontImage_DrawSpriteRectTinted(const char* name, FrontendRect* srcRect, int
 }
 
 // FUNCTION: XWA 0x532D00
-int FrontImage_BlitRectBlendMode(ImageResource* image, FrontendRect* srcRect, int dstX, int dstY,
-								 int blendMode) {
+int FrontImage_BlitRectOriented(ImageResource* image, FrontendRect* srcRect, int dstX, int dstY,
+								int orientationMode) {
 	FrontendRect dstRect;
 	FrontendRect savedRect;
 	int clipX;
@@ -3531,7 +3532,7 @@ int FrontImage_BlitRectBlendMode(ImageResource* image, FrontendRect* srcRect, in
 		return 0;
 	}
 
-	switch (blendMode) {
+	switch (orientationMode) {
 		case 1:
 			FrontendDraw_RectCopy(&dstRect, srcRect);
 			FrontendDraw_RectOffsetXY(&dstRect, -srcRect->left, -srcRect->top);
@@ -3542,13 +3543,13 @@ int FrontImage_BlitRectBlendMode(ImageResource* image, FrontendRect* srcRect, in
 			dstRect.bottom = dstRect.top + visibleWidth - 1;
 			FrontendDraw_RectOffsetXY(&dstRect, dstX, dstY);
 			FrontendDraw_RectCopy(&savedRect, &dstRect);
-			blendMode = FrontendDraw_RectClipToBounds(&dstRect);
+			orientationMode = FrontendDraw_RectClipToBounds(&dstRect);
 
 			if (dstRect.right < dstRect.left) {
-				return blendMode;
+				return orientationMode;
 			}
 			if (dstRect.bottom < dstRect.top) {
-				return blendMode;
+				return orientationMode;
 			}
 
 			clipX = dstRect.left - savedRect.left;
@@ -3605,10 +3606,10 @@ int FrontImage_BlitRectBlendMode(ImageResource* image, FrontendRect* srcRect, in
 			FrontendDraw_RectCopy(&dstRect, srcRect);
 			FrontendDraw_RectOffsetXY(&dstRect, dstX - srcRect->left, dstY - srcRect->top);
 			FrontendDraw_RectCopy(&savedRect, &dstRect);
-			blendMode = FrontendDraw_RectClipToBounds(&dstRect);
+			orientationMode = FrontendDraw_RectClipToBounds(&dstRect);
 
 			if (dstRect.right < dstRect.left || dstRect.bottom < dstRect.top) {
-				return blendMode;
+				return orientationMode;
 			}
 
 			clipX = dstRect.left - savedRect.left;
@@ -3670,13 +3671,13 @@ int FrontImage_BlitRectBlendMode(ImageResource* image, FrontendRect* srcRect, in
 			dstRect.bottom = dstRect.top + visibleWidth - 1;
 			FrontendDraw_RectOffsetXY(&dstRect, dstX, dstY);
 			FrontendDraw_RectCopy(&savedRect, &dstRect);
-			blendMode = FrontendDraw_RectClipToBounds(&dstRect);
+			orientationMode = FrontendDraw_RectClipToBounds(&dstRect);
 
 			if (dstRect.right < dstRect.left) {
-				return blendMode;
+				return orientationMode;
 			}
 			if (dstRect.bottom < dstRect.top) {
-				return blendMode;
+				return orientationMode;
 			}
 
 			clipX = dstRect.left - savedRect.left;
@@ -3733,10 +3734,10 @@ int FrontImage_BlitRectBlendMode(ImageResource* image, FrontendRect* srcRect, in
 			FrontendDraw_RectCopy(&dstRect, srcRect);
 			FrontendDraw_RectOffsetXY(&dstRect, dstX - srcRect->left, dstY - srcRect->top);
 			FrontendDraw_RectCopy(&savedRect, &dstRect);
-			blendMode = FrontendDraw_RectClipToBounds(&dstRect);
+			orientationMode = FrontendDraw_RectClipToBounds(&dstRect);
 
 			if (dstRect.right < dstRect.left || dstRect.bottom < dstRect.top) {
-				return blendMode;
+				return orientationMode;
 			}
 
 			clipX = dstRect.left - savedRect.left;
@@ -3792,10 +3793,10 @@ int FrontImage_BlitRectBlendMode(ImageResource* image, FrontendRect* srcRect, in
 			FrontendDraw_RectCopy(&dstRect, srcRect);
 			FrontendDraw_RectOffsetXY(&dstRect, dstX - srcRect->left, dstY - srcRect->top);
 			FrontendDraw_RectCopy(&savedRect, &dstRect);
-			blendMode = FrontendDraw_RectClipToBounds(&dstRect);
+			orientationMode = FrontendDraw_RectClipToBounds(&dstRect);
 
 			if (dstRect.right < dstRect.left || dstRect.bottom < dstRect.top) {
-				return blendMode;
+				return orientationMode;
 			}
 
 			clipX = dstRect.left - savedRect.left;
@@ -3847,13 +3848,13 @@ int FrontImage_BlitRectBlendMode(ImageResource* image, FrontendRect* srcRect, in
 			break;
 	}
 
-	return blendMode;
+	return orientationMode;
 }
 
 // FLAGS: /O2 /G6
 // FUNCTION: XWA 0x532C90
-int FrontImage_DrawSpriteRectBlendMode(const char* name, FrontendRect* srcRect, int dstX, int dstY,
-									   int blendMode) {
+int FrontImage_DrawSpriteRectOriented(const char* name, FrontendRect* srcRect, int dstX, int dstY,
+									  int orientationMode) {
 	int index;
 	ResourceDescriptor* desc;
 
@@ -3867,9 +3868,9 @@ int FrontImage_DrawSpriteRectBlendMode(const char* name, FrontendRect* srcRect, 
 		int16_t snapSrc[4] = { (int16_t)srcRect->left, (int16_t)srcRect->top, (int16_t)srcRect->right,
 							   (int16_t)srcRect->bottom };
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
-		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_RECT_BLEND, name, snapDesc->currentFrame, snapSrc, dstX,
+		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_RECT_ORIENTED, name, snapDesc->currentFrame, snapSrc, dstX,
 							   dstY, snapDesc->image[snapDesc->currentFrame].width,
-							   snapDesc->image[snapDesc->currentFrame].height, 0, 0, blendMode);
+							   snapDesc->image[snapDesc->currentFrame].height, 0, 0, orientationMode);
 	}
 #endif
 
@@ -3882,13 +3883,13 @@ int FrontImage_DrawSpriteRectBlendMode(const char* name, FrontendRect* srcRect, 
 		return 0;
 	}
 
-	return FrontImage_BlitRectBlendMode(&g_resourceTable[index].desc->image[desc->currentFrame], srcRect,
-										dstX, dstY, blendMode);
+	return FrontImage_BlitRectOriented(&g_resourceTable[index].desc->image[desc->currentFrame], srcRect, dstX,
+									   dstY, orientationMode);
 }
 
 // FUNCTION: XWA 0x533C70
-int FrontImage_BlitRectTintedBlendMode(ImageResource* image, FrontendRect* srcRect, int dstX, int dstY,
-									   unsigned int tintColor, int blendMode) {
+int FrontImage_BlitRectTintedOriented(ImageResource* image, FrontendRect* srcRect, int dstX, int dstY,
+									  unsigned int tintColor, int orientationMode) {
 	int clipResult;
 	int clipX;
 	int clipY;
@@ -3901,7 +3902,7 @@ int FrontImage_BlitRectTintedBlendMode(ImageResource* image, FrontendRect* srcRe
 		return 0;
 	}
 
-	switch (blendMode) {
+	switch (orientationMode) {
 		case 1: {
 			int srcWidth;
 			int srcHeight;
@@ -4413,8 +4414,8 @@ int FrontImage_BlitRectTintedBlendMode(ImageResource* image, FrontendRect* srcRe
 }
 
 // FUNCTION: XWA 0x533BF0
-int FrontImage_DrawSpriteRectTintedBlendMode(const char* name, FrontendRect* srcRect, int dstX, int dstY,
-											 unsigned int tintColor, int blendMode) {
+int FrontImage_DrawSpriteRectTintedOriented(const char* name, FrontendRect* srcRect, int dstX, int dstY,
+											unsigned int tintColor, int orientationMode) {
 	int index;
 	ResourceDescriptor* desc;
 
@@ -4428,9 +4429,9 @@ int FrontImage_DrawSpriteRectTintedBlendMode(const char* name, FrontendRect* src
 		int16_t snapSrc[4] = { (int16_t)srcRect->left, (int16_t)srcRect->top, (int16_t)srcRect->right,
 							   (int16_t)srcRect->bottom };
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
-		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_RECT_TINTED_BLEND, name, snapDesc->currentFrame, snapSrc,
+		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED, name, snapDesc->currentFrame, snapSrc,
 							   dstX, dstY, snapDesc->image[snapDesc->currentFrame].width,
-							   snapDesc->image[snapDesc->currentFrame].height, tintColor, 0, blendMode);
+							   snapDesc->image[snapDesc->currentFrame].height, tintColor, 0, orientationMode);
 	}
 #endif
 
@@ -4443,8 +4444,8 @@ int FrontImage_DrawSpriteRectTintedBlendMode(const char* name, FrontendRect* src
 		return 0;
 	}
 
-	return FrontImage_BlitRectTintedBlendMode(&desc->image[desc->currentFrame], srcRect, dstX, dstY,
-											  tintColor, blendMode);
+	return FrontImage_BlitRectTintedOriented(&desc->image[desc->currentFrame], srcRect, dstX, dstY, tintColor,
+											 orientationMode);
 }
 
 // FUNCTION: XWA 0x564C50
@@ -4568,7 +4569,8 @@ int FrontImage_RegisterResource(const char* fileName, const char* name, int flag
 		int result = FrontImage_RegisterFlicResource((char*)fileName, (char*)name, flags, id);
 #ifdef XWA_MODERN
 		if (!result) {
-			Aeron_LogError("xwa.assets", "Failed to load FLIC frontend resource '%s' as '%s'", fileName, name);
+			Aeron_LogError("xwa.assets", "Failed to load FLIC frontend resource '%s' as '%s'", fileName,
+						   name);
 		}
 		if (result) {
 			FrontImage_NoteSnapshotResourceBinding(fileName, name);
@@ -4623,8 +4625,8 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 
 	if (*fileName == '\0') {
 #ifdef XWA_MODERN
-		Aeron_LogError("xwa.assets", "Failed to register default frontend resource with empty file name as '%s'",
-				  name);
+		Aeron_LogError("xwa.assets",
+					   "Failed to register default frontend resource with empty file name as '%s'", name);
 #endif
 		return 0;
 	}
@@ -4632,23 +4634,23 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 	if (*name == '\0') {
 #ifdef XWA_MODERN
 		Aeron_LogError("xwa.assets", "Failed to register default frontend resource '%s' with empty name",
-				  fileName);
+					   fileName);
 #endif
 		return 0;
 	}
 
 	if (g_resourceCount >= FRONT_IMAGE_MAX_RESOURCES) {
 #ifdef XWA_MODERN
-		Aeron_LogWarn("xwa.assets", "No free frontend resource slots for default resource '%s' as '%s'", fileName,
-				  name);
+		Aeron_LogWarn("xwa.assets", "No free frontend resource slots for default resource '%s' as '%s'",
+					  fileName, name);
 #endif
 		return 0;
 	}
 
 	if (FrontImage_FindResourceByName(name) != -1) {
 #ifdef XWA_MODERN
-		Aeron_LogWarn("xwa.assets", "Default frontend resource name '%s' is already registered from '%s'", name,
-				  fileName);
+		Aeron_LogWarn("xwa.assets", "Default frontend resource name '%s' is already registered from '%s'",
+					  name, fileName);
 #endif
 		return 0;
 	}
@@ -4670,8 +4672,8 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 		int result = FrontImage_RegisterFlicResource((char*)fileName, (char*)name, 1, 1);
 #ifdef XWA_MODERN
 		if (!result) {
-			Aeron_LogError("xwa.assets", "Failed to load default FLIC frontend resource '%s' as '%s'", fileName,
-					  name);
+			Aeron_LogError("xwa.assets", "Failed to load default FLIC frontend resource '%s' as '%s'",
+						   fileName, name);
 		}
 		if (result) {
 			FrontImage_NoteSnapshotResourceBinding(fileName, name);
@@ -4683,8 +4685,8 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 	image = (ImageResource*)Mem_Alloc(sizeof(*image));
 	if (image == NULL) {
 #ifdef XWA_MODERN
-		Aeron_LogError("xwa.assets", "Failed to allocate default frontend resource image '%s' as '%s'", fileName,
-				  name);
+		Aeron_LogError("xwa.assets", "Failed to allocate default frontend resource image '%s' as '%s'",
+					   fileName, name);
 #endif
 		return 0;
 	}
@@ -4692,7 +4694,8 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 	memset(image, 0, sizeof(*image));
 	if (!FrontImage_LoadBmpFile((char*)fileName, image, 1, 1)) {
 #ifdef XWA_MODERN
-		Aeron_LogError("xwa.assets", "Failed to load default BMP frontend resource '%s' as '%s'", fileName, name);
+		Aeron_LogError("xwa.assets", "Failed to load default BMP frontend resource '%s' as '%s'", fileName,
+					   name);
 #endif
 		Mem_Free(image);
 		return 0;
@@ -4702,7 +4705,7 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 	if (desc == NULL) {
 #ifdef XWA_MODERN
 		Aeron_LogError("xwa.assets", "Failed to allocate default frontend resource descriptor '%s' as '%s'",
-				  fileName, name);
+					   fileName, name);
 #endif
 		Mem_Free(image->pixels);
 		Mem_Free(image);
