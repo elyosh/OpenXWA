@@ -315,6 +315,9 @@ typedef struct RenderObjectListEntry {
 	int projectedRadius;
 } RenderObjectListEntry;
 
+/* Capacity of the per-frame visible-object render list (VISIBLEOBJECTS). */
+#define RENDER_OBJECT_LIST_CAPACITY 1664
+
 typedef struct FlightTexQuad {
 	int screenX;
 	int screenY;
@@ -914,6 +917,8 @@ extern uint8_t g_bBackdropMeshMode;
 extern int g_curLayerId;
 extern int g_faceIdCounter;
 extern void* g_curTextureDesc;
+/* XWA_MODERN: runtime palette pointer tracked alongside g_curTextureDesc. */
+extern void* g_curTexturePalette;
 extern intptr_t g_curMeshFlags;
 extern intptr_t g_curVertNormals;
 extern uint16_t g_curTextureId;

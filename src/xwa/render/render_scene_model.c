@@ -33,7 +33,7 @@ static inline void RenderScene_AppendVisibleFace(SceneFace** outFace, SceneMesh*
 	face->faceIndex = faceIndex;
 	face->pMesh = mesh;
 	phongSlotIndex = g_phongSlotIndex;
-	face->pPhongData = g_scenePhongData + 12 * g_phongSlotStride * phongSlotIndex;
+	face->pPhongData = g_scenePhongData + sizeof(SoftwareLightSample) * g_phongSlotStride * phongSlotIndex;
 	if (g_phongSlotIndex < 199) {
 		++g_phongSlotIndex;
 	}
@@ -162,7 +162,8 @@ int RenderScene_AppendMeshFacesNoCull(SceneMesh* mesh) {
 	while (faceIndex < mesh->faceCount) {
 		outFace->faceIndex = faceIndex;
 		outFace->pMesh = mesh;
-		outFace->pPhongData = g_scenePhongData + 12 * g_phongSlotStride * g_phongSlotIndex;
+		outFace->pPhongData =
+			g_scenePhongData + sizeof(SoftwareLightSample) * g_phongSlotStride * g_phongSlotIndex;
 		if (g_phongSlotIndex < 199) {
 			++g_phongSlotIndex;
 		}
@@ -1165,7 +1166,11 @@ void RenderScene_DrawModelNode(OptimizedPolyObject* model, OptNode* node, SceneM
 				if (mesh->pMaterial == NULL) {
 					mesh->pMaterial = (OptTextureData*)g_curTextureDesc;
 					mesh->pTexels = (uint8_t*)g_curTextureDesc + sizeof(OptTextureData);
+#ifdef XWA_MODERN
+					mesh->pPalette = g_curTexturePalette;
+#else
 					mesh->pPalette = (void*)(uintptr_t)((OptTextureData*)g_curTextureDesc)->paletteAddress;
+#endif
 					mesh->alphaFlag = g_curMeshFlags;
 				}
 				if (mesh->pVertNormals == NULL) {
@@ -1186,7 +1191,13 @@ void RenderScene_DrawModelNode(OptimizedPolyObject* model, OptNode* node, SceneM
 										  .textureNode->param2;
 					g_curTextureDesc = mesh->pMaterial;
 					mesh->pTexels = (uint8_t*)mesh->pMaterial + sizeof(OptTextureData);
+#ifdef XWA_MODERN
+					g_curTexturePalette = OptModel_ResolveTexturePalette(
+						g_modelTextureOverrideSlots[(uint16_t)g_curTextureId].textureNode);
+					mesh->pPalette = g_curTexturePalette;
+#else
 					mesh->pPalette = (void*)(uintptr_t)((OptTextureData*)g_curTextureDesc)->paletteAddress;
+#endif
 					mesh->alphaFlag = 0;
 					g_curMeshFlags = 0;
 				} else {
@@ -1194,7 +1205,12 @@ void RenderScene_DrawModelNode(OptimizedPolyObject* model, OptNode* node, SceneM
 					mesh->pMaterial = (OptTextureData*)curNode->param2;
 					g_curTextureDesc = mesh->pMaterial;
 					mesh->pTexels = (uint8_t*)mesh->pMaterial + sizeof(OptTextureData);
+#ifdef XWA_MODERN
+					g_curTexturePalette = OptModel_ResolveTexturePalette(curNode);
+					mesh->pPalette = g_curTexturePalette;
+#else
 					mesh->pPalette = (void*)(uintptr_t)((OptTextureData*)g_curTextureDesc)->paletteAddress;
+#endif
 					if (curNode->childCount != 0) {
 						OptNode* textureChild;
 
@@ -1260,7 +1276,12 @@ void RenderScene_DrawModelNode(OptimizedPolyObject* model, OptNode* node, SceneM
 				mesh->pMaterial = (OptTextureData*)curNode->param2;
 				g_curTextureDesc = (OptTextureData*)curNode->param2;
 				mesh->pTexels = (uint8_t*)mesh->pMaterial + sizeof(OptTextureData);
+#ifdef XWA_MODERN
+				g_curTexturePalette = OptModel_ResolveTexturePalette(curNode);
+				mesh->pPalette = g_curTexturePalette;
+#else
 				mesh->pPalette = (void*)(uintptr_t)((OptTextureData*)g_curTextureDesc)->paletteAddress;
+#endif
 				if (curNode->childCount != 0) {
 					OptNode* textureChild;
 

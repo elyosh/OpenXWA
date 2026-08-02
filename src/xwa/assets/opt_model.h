@@ -95,6 +95,7 @@ void OptModel_AdjustOptimizedPolyObjectPointers(OptimizedPolyObject* model);
 void OptModel_ScaleTexturePaletteBrightness16Bpp(float brightnessScale, const uint16_t* srcPalette,
 												 uint16_t* dstPalette, int entryCount, int isRgb555);
 void OptModel_PrepareTexturePalette(uint16_t* palette);
+void* OptModel_ResolveTexturePalette(const OptNode* textureNode);
 int OptModel_PrepareTextures(OptNode* node, OptimizedPolyObject* model, int modelSize);
 int OptModel_ReplaceTextureNodesWithRefsRecursive(OptNode* node, OptimizedPolyObject* model,
 												  const intptr_t* textureIds, int textureRefIndex,

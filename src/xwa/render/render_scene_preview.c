@@ -256,7 +256,11 @@ void RenderScene_WalkPreviewOptNodeForProjection(OptimizedPolyObject* model, Opt
 					mesh->pMaterial = (OptTextureData*)g_curTextureDesc;
 					mesh->pTexels = (uint8_t*)g_curTextureDesc;
 					mesh->pTexels = (uint8_t*)g_curTextureDesc + sizeof(OptTextureData);
+#ifdef XWA_MODERN
+					mesh->pPalette = g_curTexturePalette;
+#else
 					mesh->pPalette = (void*)(uintptr_t)((OptTextureData*)g_curTextureDesc)->paletteAddress;
+#endif
 				}
 
 				if (mesh->pVertNormals == NULL) {
@@ -307,7 +311,12 @@ void RenderScene_WalkPreviewOptNodeForProjection(OptimizedPolyObject* model, Opt
 				mesh->pMaterial = (OptTextureData*)curNode->param2;
 				g_curTextureDesc = mesh->pMaterial;
 				mesh->pTexels = (uint8_t*)mesh->pMaterial + sizeof(OptTextureData);
+#ifdef XWA_MODERN
+				g_curTexturePalette = OptModel_ResolveTexturePalette(curNode);
+				mesh->pPalette = g_curTexturePalette;
+#else
 				mesh->pPalette = (void*)(uintptr_t)((OptTextureData*)g_curTextureDesc)->paletteAddress;
+#endif
 				break;
 			}
 			default:
@@ -329,7 +338,12 @@ void RenderScene_WalkPreviewOptNodeForProjection(OptimizedPolyObject* model, Opt
 				mesh->pMaterial = (OptTextureData*)curNode->param2;
 				g_curTextureDesc = mesh->pMaterial;
 				mesh->pTexels = (uint8_t*)mesh->pMaterial + sizeof(OptTextureData);
+#ifdef XWA_MODERN
+				g_curTexturePalette = OptModel_ResolveTexturePalette(curNode);
+				mesh->pPalette = g_curTexturePalette;
+#else
 				mesh->pPalette = (void*)(uintptr_t)((OptTextureData*)g_curTextureDesc)->paletteAddress;
+#endif
 				break;
 			}
 			case OPT_NODESWITCH:
@@ -450,6 +464,9 @@ int RenderScene_ProjectPreviewWireframeModel(ObjectRecord* obj) {
 
 	g_modelNodeWalkUnusedScratch0 = 0;
 	g_curTextureDesc = ModelTexture_GetDefaultWhiteTexture();
+#ifdef XWA_MODERN
+	g_curTexturePalette = ModelTexture_GetDefaultWhiteTexture()->data.shadeTable;
+#endif
 	g_modelNodeWalkUnusedScratch1 = 0;
 	g_curVertNormals = 0;
 	g_modelNodeWalkUnusedScratch2 = 0;

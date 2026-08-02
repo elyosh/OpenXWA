@@ -5,13 +5,11 @@
 
 enum {
 	SCENE_SPAN_DATA_COUNT = 40000,
-	SCENE_SPAN_DATA_BYTES = 0xEA600,
 	SCENE_SPAN_PTR_COUNT = 40000,
-	SCENE_SPAN_PTR_BYTES = 0x27100,
 	SCENE_FACE_COUNT = 10000,
-	SCENE_SCALED_EDGE_BYTES = 0x12C0,
-	SCENE_SCANLINE_SPAN_BYTES = 0x12C0,
-	SCENE_PHONG_ROW_BYTES = 2400,
+	/* One list head per scanline at the tallest flight resolution (1600x1200). */
+	SCENE_SCANLINE_COUNT = 1200,
+	SCENE_PHONG_SLOT_COUNT = 200,
 	SCENE_PHONG_BASE_BYTES = 2412,
 	SCENE_PHONG_WIDTH_SAMPLES = 0x640,
 	SCENE_COMPOSITE_MESH_COUNT = 1000,
@@ -29,14 +27,16 @@ void* sw3d_AllocSceneBuffers(void) {
 	}
 
 	g_sceneSpanDataMax = SCENE_SPAN_DATA_COUNT;
-	g_sceneSpanDataHandle = Memory_AllocHandle("SCENESPANDATA", SCENE_SPAN_DATA_BYTES);
+	g_sceneSpanDataHandle =
+		Memory_AllocHandle("SCENESPANDATA", (size_t)SCENE_SPAN_DATA_COUNT * sizeof(SceneSpan));
 	if (g_sceneSpanDataHandle == 0) {
 		FeDiskIo_FatalError(0);
 	}
 	g_sceneSpanData = (uint8_t*)Memory_LockHandle(g_sceneSpanDataHandle);
 
 	g_sceneSpanPtrMax = SCENE_SPAN_PTR_COUNT;
-	g_sceneSpanPtrListHandle = Memory_AllocHandle("SCENESPANPTRLIST", SCENE_SPAN_PTR_BYTES);
+	g_sceneSpanPtrListHandle =
+		Memory_AllocHandle("SCENESPANPTRLIST", (size_t)SCENE_SPAN_PTR_COUNT * sizeof(SceneSpan*));
 	if (g_sceneSpanPtrListHandle == 0) {
 		FeDiskIo_FatalError(0);
 	}
@@ -49,19 +49,21 @@ void* sw3d_AllocSceneBuffers(void) {
 	}
 	g_visFaceList = (SceneFace*)Memory_LockHandle(g_visFaceListHandle);
 
-	g_sceneSclEdgeListHandle = Memory_AllocHandle("SCENESCLEDGELIST", SCENE_SCALED_EDGE_BYTES);
+	g_sceneSclEdgeListHandle =
+		Memory_AllocHandle("SCENESCLEDGELIST", (size_t)SCENE_SCANLINE_COUNT * sizeof(SceneEdge*));
 	if (g_sceneSclEdgeListHandle == 0) {
 		FeDiskIo_FatalError(0);
 	}
 	g_sceneSclEdgeList = (uint8_t*)Memory_LockHandle(g_sceneSclEdgeListHandle);
 
-	g_scanlineSpanHeadsHandle = Memory_AllocHandle("SCENESPANLIST", SCENE_SCANLINE_SPAN_BYTES);
+	g_scanlineSpanHeadsHandle =
+		Memory_AllocHandle("SCENESPANLIST", (size_t)SCENE_SCANLINE_COUNT * sizeof(SceneSpan*));
 	if (g_scanlineSpanHeadsHandle == 0) {
 		FeDiskIo_FatalError(0);
 	}
 	g_scanlineSpanHeads = (uint8_t*)Memory_LockHandle(g_scanlineSpanHeadsHandle);
 
-	scenePhongSize = (size_t)SCENE_PHONG_ROW_BYTES *
+	scenePhongSize = (size_t)SCENE_PHONG_SLOT_COUNT * sizeof(SoftwareLightSample) *
 						 (SCENE_PHONG_WIDTH_SAMPLES / (unsigned int)g_sw3dLightSampleBlockSize) +
 					 SCENE_PHONG_BASE_BYTES;
 	g_scenePhongDataHandle = Memory_AllocHandle("SCENEPHONGDATA", scenePhongSize);
@@ -94,7 +96,8 @@ void sw3d_AllocSceneModelLists(void) {
 			Memory_UnlockHandle(g_projVertListHandle);
 			Memory_FreeHandle("SCENEVERTLIST", g_projVertListHandle);
 		}
-		g_projVertListHandle = Memory_AllocHandle("SCENEVERTLIST", (size_t)(688 * g_modelVertCapacity));
+		g_projVertListHandle =
+			Memory_AllocHandle("SCENEVERTLIST", (size_t)(4 * g_modelVertCapacity) * sizeof(ProjVertex));
 		if (g_projVertListHandle == 0) {
 			FeDiskIo_FatalError(0);
 		}
@@ -107,7 +110,8 @@ void sw3d_AllocSceneModelLists(void) {
 			Memory_UnlockHandle(g_sceneEdgeListHandle);
 			Memory_FreeHandle("SCENEEDGELIST", g_sceneEdgeListHandle);
 		}
-		g_sceneEdgeListHandle = Memory_AllocHandle("SCENEEDGELIST", (size_t)(112 * g_modelEdgeCapacity));
+		g_sceneEdgeListHandle =
+			Memory_AllocHandle("SCENEEDGELIST", (size_t)(4 * g_modelEdgeCapacity) * sizeof(SceneEdge));
 		if (g_sceneEdgeListHandle == 0) {
 			FeDiskIo_FatalError(0);
 		}
@@ -120,7 +124,8 @@ void sw3d_AllocSceneModelLists(void) {
 			Memory_UnlockHandle(g_vertexRemapHandle);
 			Memory_FreeHandle("SCENEVERTFLAGS", g_vertexRemapHandle);
 		}
-		g_vertexRemapHandle = Memory_AllocHandle("SCENEVERTFLAGS", (size_t)(4 * g_modelVertCapacity));
+		g_vertexRemapHandle =
+			Memory_AllocHandle("SCENEVERTFLAGS", (size_t)g_modelVertCapacity * sizeof(int));
 		if (g_vertexRemapHandle == 0) {
 			FeDiskIo_FatalError(0);
 		}
@@ -133,7 +138,8 @@ void sw3d_AllocSceneModelLists(void) {
 			Memory_UnlockHandle(g_sceneEdgeFlagsHandle);
 			Memory_FreeHandle("SCENEEDGEFLAGS", g_sceneEdgeFlagsHandle);
 		}
-		g_sceneEdgeFlagsHandle = Memory_AllocHandle("SCENEEDGEFLAGS", (size_t)(4 * g_modelEdgeCapacity));
+		g_sceneEdgeFlagsHandle =
+			Memory_AllocHandle("SCENEEDGEFLAGS", (size_t)g_modelEdgeCapacity * sizeof(int));
 		if (g_sceneEdgeFlagsHandle == 0) {
 			FeDiskIo_FatalError(0);
 		}

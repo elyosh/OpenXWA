@@ -45,6 +45,13 @@ static void FeDiskIo_OutputDebugString(const char* outputString) { DebugPrintf("
 #define g_OutputDebugStringA FeDiskIo_OutputDebugString
 #endif
 
+/* Map-room icon buffer: a pointer table (one slot per icon) followed by the icon
+ * byte payload. */
+enum {
+	MAP_ROOM_ICON_TABLE_ENTRIES = 5570,
+	MAP_ROOM_ICON_DATA_BYTES = 0xd05c - 0x5708,
+};
+
 /*
  * fediskio-owned resource handles + craft-load state (XWA 0x63CF38..0x63CF68),
  * allocated/freed by FeDiskIo_Init/FreeGlobalBuffers and set during craft load;
@@ -1398,7 +1405,8 @@ void FeDiskIo_InitGlobalBuffers(void) {
 		}
 	}
 
-	g_mapRoomIconsHandle = Memory_AllocHandle("MAPROOMICONS", 0xd05cu);
+	g_mapRoomIconsHandle = Memory_AllocHandle(
+		"MAPROOMICONS", MAP_ROOM_ICON_TABLE_ENTRIES * sizeof(uint8_t*) + MAP_ROOM_ICON_DATA_BYTES);
 	if (g_mapRoomIconsHandle == 0) {
 		allocFailed = 1;
 	} else {
@@ -1412,11 +1420,13 @@ void FeDiskIo_InitGlobalBuffers(void) {
 		if (stream != NULL) {
 			uint8_t** iconTable;
 			uint8_t* iconData;
+			uint8_t* iconDataEnd;
 			int iconCount;
 			int done;
 
 			iconTable = (uint8_t**)g_mapRoomIconsBuffer;
-			iconData = g_mapRoomIconsBuffer + 0x5708;
+			iconData = g_mapRoomIconsBuffer + MAP_ROOM_ICON_TABLE_ENTRIES * sizeof(uint8_t*);
+			iconDataEnd = iconData + MAP_ROOM_ICON_DATA_BYTES;
 			iconCount = 0;
 			done = 0;
 			do {
@@ -1424,7 +1434,8 @@ void FeDiskIo_InitGlobalBuffers(void) {
 
 				iconTable[iconCount] = iconData;
 				while (File_ReadByte(stream, &ch)) {
-					if (ch == 0xffu) {
+					/* Leave room for the 0xff terminator written below. */
+					if (ch == 0xffu || iconData + 1 >= iconDataEnd) {
 						break;
 					}
 					*iconData++ = ch;
@@ -1434,7 +1445,7 @@ void FeDiskIo_InitGlobalBuffers(void) {
 				}
 				*iconData++ = 0xffu;
 				++iconCount;
-			} while (!done);
+			} while (!done && iconCount < MAP_ROOM_ICON_TABLE_ENTRIES && iconData + 1 < iconDataEnd);
 
 			File_Close(stream);
 			g_stream = NULL;
@@ -1487,7 +1498,8 @@ void FeDiskIo_InitGlobalBuffers(void) {
 	if (g_messageLogHandle == 0) {
 		allocFailed = 1;
 	}
-	g_visibleObjectsHandle = Memory_AllocHandle("VISIBLEOBJECTS", 0xd000u);
+	g_visibleObjectsHandle = Memory_AllocHandle(
+		"VISIBLEOBJECTS", (size_t)RENDER_OBJECT_LIST_CAPACITY * sizeof(RenderObjectListEntry));
 	if (g_visibleObjectsHandle == 0) {
 		allocFailed = 1;
 	} else {
@@ -3453,7 +3465,9 @@ void FeDiskIo_LoadResources(void) {
 								size_t allocSize;
 								int rootNodeIdx;
 								MemoryHandle handle;
-								int* rootMap;
+								/* One slot per root node, read back as a pointer table by
+								 * FeDiskIo_GetMeshVertexComponentMap. */
+								uint8_t** rootMap;
 
 								model = (OptimizedPolyObject*)Memory_LockHandle(
 									g_loadedModels.byObjectType[loadedModelType]);
@@ -3486,9 +3500,9 @@ void FeDiskIo_LoadResources(void) {
 									FeDiskIo_FatalError(0);
 								}
 								g_modelFloatHardpointDataHandles[loadedModelType] = handle;
-								rootMap = (int*)Memory_LockHandle(handle);
+								rootMap = (uint8_t**)Memory_LockHandle(handle);
 								for (rootNodeIdx = 0; rootNodeIdx < model->rootNodeCount; ++rootNodeIdx) {
-									rootMap[rootNodeIdx] = 0;
+									rootMap[rootNodeIdx] = NULL;
 								}
 								Memory_UnlockHandle(handle);
 								Memory_UnlockHandle(g_loadedModels.byObjectType[loadedModelType]);

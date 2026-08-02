@@ -617,6 +617,8 @@ int g_curLayerId;
 int g_faceIdCounter;
 // GLOBAL: XWA 0x68CA60
 void* g_curTextureDesc;
+/* XWA_MODERN companion to g_curTextureDesc; no original counterpart. */
+void* g_curTexturePalette;
 // GLOBAL: XWA 0x68CA30
 intptr_t g_curMeshFlags;
 // GLOBAL: XWA 0x68CA70
@@ -828,7 +830,7 @@ OptTexCoord g_mfdFrameQuadTexCoords[4] = {
 OptTexCoord g_backdropStripTexCoords[4];
 // GLOBAL: XWA 0x9CF73C
 OptTexCoord* g_currentQuadTexCoords = g_defaultQuadTexCoords;
-static RenderObjectListEntry g_renderObjectListEntryStorage[1664];
+static RenderObjectListEntry g_renderObjectListEntryStorage[RENDER_OBJECT_LIST_CAPACITY];
 // GLOBAL: XWA 0x8C1638
 RenderObjectListEntry* g_renderObjectListEntries = g_renderObjectListEntryStorage;
 // GLOBAL: XWA 0x7D4B74

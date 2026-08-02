@@ -60,7 +60,7 @@ void RenderList_Reset(void) {
 // FUNCTION: XWA 0x49F460
 void RenderList_QueueObject(int objectIdx, int sortDepth, int viewX, int viewY, int viewZ, int cullFlags,
 							int projectedRadius) {
-	if (g_renderObjectListCount >= 1664) {
+	if (g_renderObjectListCount >= RENDER_OBJECT_LIST_CAPACITY) {
 		return;
 	}
 
@@ -1558,7 +1558,7 @@ int FlightMap_PickObjectNearestScreenCenter(int playerIdx) {
 static __inline void FlightMap_QueueDynamicRenderObject(int objectIdx, int sortDepth, int viewPosX,
 														int viewPosY, int viewPosZ, int cullFlags,
 														int projectedRadius) {
-	if (g_renderObjectListCount >= 1664) {
+	if (g_renderObjectListCount >= RENDER_OBJECT_LIST_CAPACITY) {
 		return;
 	}
 

@@ -35,24 +35,9 @@ static const uint8_t g_defaultWhiteTextureRgb24[192] = {
 static uint8_t g_defaultWhiteTextureBuildScratch[64 + 8192];
 #endif
 // GLOBAL: XWA 0x68CA78
-static ModelTextureDefaultTextureDesc g_defaultWhiteTextureDesc;
-
-#ifndef XWA_MODERN
-#pragma pack(push, 1)
-#endif
-typedef struct ModelTextureDefaultTextureData {
-	uint8_t baseTexels[64];
-	uint8_t mipTexels[21];
-	uint16_t shadeTable[4096];
-} ModelTextureDefaultTextureData;
-#ifndef XWA_MODERN
-#pragma pack(pop)
-#endif
-
-// GLOBAL: XWA 0x68CA90
-static ModelTextureDefaultTextureData g_defaultWhiteTextureData;
+static ModelTextureDefaultTexture g_defaultWhiteTexture;
 // GLOBAL: XWA 0x68EAF8
-static ModelTextureDefaultTextureDesc* g_defaultWhiteTextureDescPtr;
+static ModelTextureDefaultTexture* g_defaultWhiteTextureDescPtr;
 // FUNCTION: XWA 0x44A5A0
 void ModelTexture_CacheHyperspaceTunnelFrames(void) {
 	uint16_t frame;
@@ -252,41 +237,50 @@ void ModelTexture_BuildPalettedShadeTable(uint8_t* dst, const uint8_t* rgb24, in
 #pragma function(memcpy)
 #endif
 // FUNCTION: XWA 0x480460
-ModelTextureDefaultTextureDesc* ModelTexture_GetDefaultWhiteTexture(void) {
+ModelTextureDefaultTexture* ModelTexture_GetDefaultWhiteTexture(void) {
 	if (g_defaultWhiteTextureDescPtr != NULL) {
 		return g_defaultWhiteTextureDescPtr;
 	}
 
-	g_defaultWhiteTextureDesc.field04 = 0;
-	g_defaultWhiteTextureDescPtr = &g_defaultWhiteTextureDesc;
-	g_defaultWhiteTextureDesc.shadeTable = g_defaultWhiteTextureData.shadeTable;
-	g_defaultWhiteTextureDesc.baseTexelCount = 64;
-	g_defaultWhiteTextureDesc.mipTexelCount = 85;
-	g_defaultWhiteTextureDesc.width = 8;
-	g_defaultWhiteTextureDesc.height = 8;
-
 #ifdef XWA_MODERN
+	g_defaultWhiteTexture.desc.paletteAddress = 0;
+	g_defaultWhiteTexture.desc.paletteType = 0;
+	g_defaultWhiteTextureDescPtr = &g_defaultWhiteTexture;
+	g_defaultWhiteTexture.desc.textureSize = 64;
+	g_defaultWhiteTexture.desc.dataSize = 85;
+	g_defaultWhiteTexture.desc.width = 8;
+	g_defaultWhiteTexture.desc.height = 8;
+
+	/* Built in scratch: the in-place build below relies on the packed layout. */
 	ModelTexture_BuildPalettedShadeTable(g_defaultWhiteTextureBuildScratch, g_defaultWhiteTextureRgb24, 8, 8);
-	memcpy(g_defaultWhiteTextureData.baseTexels, g_defaultWhiteTextureBuildScratch,
-		   sizeof(g_defaultWhiteTextureData.baseTexels));
-	memcpy(g_defaultWhiteTextureData.shadeTable, g_defaultWhiteTextureBuildScratch + 64,
-		   sizeof(g_defaultWhiteTextureData.shadeTable));
+	memcpy(g_defaultWhiteTexture.data.baseTexels, g_defaultWhiteTextureBuildScratch,
+		   sizeof(g_defaultWhiteTexture.data.baseTexels));
+	memcpy(g_defaultWhiteTexture.data.shadeTable, g_defaultWhiteTextureBuildScratch + 64,
+		   sizeof(g_defaultWhiteTexture.data.shadeTable));
 #else
-	ModelTexture_BuildPalettedShadeTable(g_defaultWhiteTextureData.baseTexels, g_defaultWhiteTextureRgb24, 8,
-										 8);
-	memcpy(g_defaultWhiteTextureData.shadeTable, g_defaultWhiteTextureData.mipTexels,
-		   sizeof(g_defaultWhiteTextureData.shadeTable));
+	g_defaultWhiteTexture.field04 = 0;
+	g_defaultWhiteTextureDescPtr = &g_defaultWhiteTexture;
+	g_defaultWhiteTexture.shadeTable = g_defaultWhiteTexture.data.shadeTable;
+	g_defaultWhiteTexture.baseTexelCount = 64;
+	g_defaultWhiteTexture.mipTexelCount = 85;
+	g_defaultWhiteTexture.width = 8;
+	g_defaultWhiteTexture.height = 8;
+
+	ModelTexture_BuildPalettedShadeTable(g_defaultWhiteTexture.data.baseTexels, g_defaultWhiteTextureRgb24,
+										 8, 8);
+	memcpy(g_defaultWhiteTexture.data.shadeTable, g_defaultWhiteTexture.data.mipTexels,
+		   sizeof(g_defaultWhiteTexture.data.shadeTable));
 #endif
 
-	memset(g_defaultWhiteTextureData.mipTexels, g_defaultWhiteTextureData.baseTexels[0],
-		   sizeof(g_defaultWhiteTextureData.mipTexels));
+	memset(g_defaultWhiteTexture.data.mipTexels, g_defaultWhiteTexture.data.baseTexels[0],
+		   sizeof(g_defaultWhiteTexture.data.mipTexels));
 
 	if ((g_useHardware3D ? ModelTexture_IsHardwareFormat555() : g_pixelFormatCode == 555) != 0) {
 		int remaining;
 		uint16_t* shade;
 
 		remaining = 4096;
-		shade = g_defaultWhiteTextureData.shadeTable;
+		shade = g_defaultWhiteTexture.data.shadeTable;
 		do {
 			uint16_t color;
 			int blue;

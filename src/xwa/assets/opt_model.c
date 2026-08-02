@@ -121,6 +121,23 @@ static void* OptModel_AddressToPtr(const NativeOptimizedPolyObject* native, uint
 	return native->serializedData + offset;
 }
 
+/* Resolve a texture node's serialized palette address to a runtime pointer. Anchored
+ * on the node's translated param2 so override nodes from other models resolve against
+ * their own serialized image. */
+void* OptModel_ResolveTexturePalette(const OptNode* textureNode) {
+	const NativeOptNode* nativeNode;
+	const OptTextureData* textureData;
+
+	nativeNode = (const NativeOptNode*)textureNode;
+	textureData = (const OptTextureData*)textureNode->param2;
+	if (textureData == NULL || textureData->paletteAddress == 0) {
+		return NULL;
+	}
+
+	return (uint8_t*)textureNode->param2 +
+		   (int32_t)(textureData->paletteAddress - nativeNode->param2Address);
+}
+
 static uint32_t OptModel_PtrToAddress(const NativeOptimizedPolyObject* native, const void* ptr) {
 	const uint8_t* bytes;
 

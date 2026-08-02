@@ -1137,12 +1137,14 @@ char RenderScene_DrawVisibleFaces(void) {
 		scanlineByteOffset =
 			g_flight16bppBytesPerPixel * g_flightVpX + g_surfacePitch * (g_sw3dCurrentScanY + g_flightVpY);
 		g_sw3dScanlineByteOffset = scanlineByteOffset;
+		scanY = (uint32_t)g_sw3dCurrentScanY;
 
 		if (scanY < (uint32_t)face->yBot) {
 			spanOffset = 0;
 			do {
 				SceneSpan* span;
 
+				/* spanOffset walks pSpans (one SceneSpan* per scanline) in bytes. */
 				span = *(SceneSpan**)((uint8_t*)face->pSpans + spanOffset);
 				if (span == NULL) {
 					scanlineViewZBase += face->gradients[7];
@@ -1239,7 +1241,7 @@ char RenderScene_DrawVisibleFaces(void) {
 				}
 
 				g_sw3dCurrentScanY = (int)++scanY;
-				spanOffset += 4;
+				spanOffset += (int)sizeof(SceneSpan*);
 			} while (scanY < (uint32_t)face->yBot);
 		}
 

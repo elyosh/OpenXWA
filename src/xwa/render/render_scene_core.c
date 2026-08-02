@@ -151,9 +151,10 @@ void RenderScene_InitHardwareFrame(void) {
 	g_d3dVertexAlphaStateResetSlot = zero;
 	g_capVertexAlpha = 1;
 	g_flightVpOriginY = (float)(int64_t)viewportOrigin;
-	spanBytes = (uint32_t)(24 * g_sceneSpanDataMax);
+	/* The hardware path reuses the SceneSpan pool as vertex/triangle scratch. */
+	spanBytes = (uint32_t)(sizeof(SceneSpan) * g_sceneSpanDataMax);
 	maxVertexCount = spanBytes >> 7;
-	maxTriCount = (int)((spanBytes >> 2) / 20u);
+	maxTriCount = (int)((spanBytes >> 2) / (uint32_t)sizeof(Std3DRenderTri));
 	g_maxBatchVerts = maxVertexCount;
 	g_maxBatchTris = maxTriCount;
 	if (maxVertexCount > g_pStd3DCurDevice->caps.maxVertexCount) {
@@ -173,7 +174,7 @@ void RenderScene_InitHardwareFrame(void) {
 		g_maxBatchTris = (int)triangleCapacity;
 	}
 	g_flightVertexBuffer = (D3DTLVERTEX*)g_sceneSpanData;
-	g_triBuffer = (Std3DRenderTri*)(g_sceneSpanData + 24 * (g_sceneSpanDataMax / 2));
+	g_triBuffer = (Std3DRenderTri*)(g_sceneSpanData + sizeof(SceneSpan) * (g_sceneSpanDataMax / 2));
 }
 
 // FUNCTION: XWA 0x489310
@@ -484,6 +485,9 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 		g_modelNodeWalkUnusedScratch0 = 0;
 		g_curTextureId = (uint16_t)(-2 - obj->objectSignature);
 		g_curTextureDesc = ModelTexture_GetDefaultWhiteTexture();
+#ifdef XWA_MODERN
+		g_curTexturePalette = ModelTexture_GetDefaultWhiteTexture()->data.shadeTable;
+#endif
 		g_modelNodeWalkUnusedScratch1 = 0;
 		g_curVertNormals = 0;
 		g_modelNodeWalkUnusedScratch2 = 0;
@@ -794,6 +798,9 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 	g_curTextureId = (uint16_t)(-2 - obj->objectSignature);
 	g_curMeshFlags = 0;
 	g_curTextureDesc = ModelTexture_GetDefaultWhiteTexture();
+#ifdef XWA_MODERN
+	g_curTexturePalette = ModelTexture_GetDefaultWhiteTexture()->data.shadeTable;
+#endif
 	g_modelNodeWalkUnusedScratch1 = 0;
 	g_curVertNormals = 0;
 	g_modelNodeWalkUnusedScratch2 = 0;
@@ -999,6 +1006,9 @@ void RenderScene_DrawNoAssetSourceModel(ObjectRecord* obj, int nodeSwitchIndex) 
 
 	g_modelNodeWalkUnusedScratch0 = 0;
 	g_curTextureDesc = ModelTexture_GetDefaultWhiteTexture();
+#ifdef XWA_MODERN
+	g_curTexturePalette = ModelTexture_GetDefaultWhiteTexture()->data.shadeTable;
+#endif
 	g_modelNodeWalkUnusedScratch1 = 0;
 	g_curVertNormals = 0;
 	g_modelNodeWalkUnusedScratch2 = 0;
