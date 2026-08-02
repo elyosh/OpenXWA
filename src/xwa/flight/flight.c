@@ -8564,12 +8564,11 @@ static __inline void FlightAction_ConfirmPendingAction(unsigned int playerIdx, C
 								g_missionHeader.body.goalsUnimportant &&
 								g_pilotData.numHumanPlayersLastMission == 1) {
 								g_missionFlightRuntimeState.teamScores[TEAM_SCORE_MISSION][team] -= 2000;
-								player->pendingActionId = 0;
-								return;
 							}
-						} else {
-							g_flightExitRequest = 1;
+							player->pendingActionId = 0;
+							return;
 						}
+						g_flightExitRequest = 1;
 					}
 					connectedCount = 0;
 					for (scanPlayerIdx = 0; scanPlayerIdx < 8; ++scanPlayerIdx) {
