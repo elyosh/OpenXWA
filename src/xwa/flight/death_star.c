@@ -5231,7 +5231,11 @@ void DeathStar_FireLaserAtTarget(void) {
 	g_objectTable[laserObjIdx].mobj->orientMatrixDirty = 1;
 	g_objectTable[laserObjIdx].mobj->speed = g_projectileSpeedByType[DEATH_STAR_LASER_PROJECTILE_IDX];
 	g_objectTable[laserObjIdx].mobj->damageAmount = g_projectileDamageByType[DEATH_STAR_LASER_PROJECTILE_IDX];
+#ifndef XWA_MODERN
 	moveX = 236 * *(const int*)&g_projectileLifetimeSecondsByType[DEATH_STAR_LASER_PROJECTILE_IDX];
+#else
+	moveX = 236 * g_projectileLifetimeSecondsByType[DEATH_STAR_LASER_PROJECTILE_IDX];
+#endif
 	moveY = g_projectileLifetimeFracQ16ByType[DEATH_STAR_LASER_PROJECTILE_IDX];
 	moveX += MATH2_fraction((uint16_t)moveY, 0x00ecu);
 	g_objectTable[laserObjIdx].mobj->lifetimeTimer = (uint16_t)moveX;
