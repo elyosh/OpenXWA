@@ -584,10 +584,10 @@ typedef struct XwaLightPulse {
 } XwaLightPulse;
 #define XWA_SNAP_MAX_LIGHT_PULSES 6
 
-/* Coordinate-strip cap: the engine clamps stripSegmentCount to 16,
- * then rounds it up to a multiple of the frame count (24, or
- * 4 * frames) — bounded by 4 * 8-frame groups = 32 segments. */
-#define XWA_SNAP_MAX_STRIP_COORDS 33
+/* Snapshot capacity for coordinate strips after the engine aligns the
+ * segment count to the texture frame count. The original 32-frame
+ * WrapBack group builds 128 segments and therefore needs 129 coords. */
+#define XWA_SNAP_MAX_STRIP_COORDS 256
 
 /* One region backdrop (suns, planets, nebula sheets): a directional
  * sprite at infinity. Sampled at CaptureFlight from the region's
