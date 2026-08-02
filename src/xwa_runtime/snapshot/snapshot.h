@@ -299,6 +299,7 @@ typedef struct XwaDirLight {
 #define XWA_SNAP_TYPE_EXPLOSION_2000 264    /* OBJ_ExplosionTextureGroup2000 */
 #define XWA_SNAP_TYPE_EXPLOSION_2006 270    /* OBJ_ExplosionTextureGroup2006 (capital-ship blast) */
 #define XWA_SNAP_TYPE_FLAME_2008 279        /* OBJ_AnimationTextureGroup2008 (wreck fire) */
+#define XWA_SNAP_TYPE_LASER_IMPERIAL_DS 306 /* OBJ_LaserImperialDS */
 /* Backdrop sun sprite range (lens-flare sources; mirrors
  * OBJ_BackdropTextureGroup9001..9010). */
 #define XWA_SNAP_TYPE_BACKDROP_SUN_FIRST 521
@@ -482,6 +483,14 @@ typedef struct XwaFlightCamera {
 	 * the default explosion point-light case derives from. */
 	uint16_t brightness_q8;
 } XwaFlightCamera;
+
+/* Traveling backdrop superlaser's classic model transform. */
+typedef struct XwaDeathStarBeam {
+	uint16_t object_slot;
+	uint16_t object_signature;
+	float length_scale;
+	uint8_t active;
+} XwaDeathStarBeam;
 
 /* Persistent hyperspace-effect STATE. The engine stores streak seeds in
  * camera-local XWA coordinates and rebuilds their quad corners every draw.
@@ -1075,6 +1084,7 @@ typedef struct XwaSnapshot {
 	XwaFlightMapState flight_map;
 	XwaFlightCamera flight_camera;
 	uint8_t flight_camera_valid;
+	XwaDeathStarBeam death_star_beam;
 	XwaHyperspaceState hyperspace;
 	XwaHyperspaceStreak hyperspace_streaks[XWA_SNAP_MAX_HYPERSPACE_STREAKS];
 	uint32_t hyperspace_streak_count;

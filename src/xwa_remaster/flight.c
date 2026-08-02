@@ -28,6 +28,7 @@
 #include <string.h>
 
 #define FL_MB_REFERENCE_FRAME_US 32000u
+#define FL_DS_LASER_TRANSVERSE_SCALE 100.0f
 
 /* Reversed-Z near plane in engine view units. Cockpit geometry sits
  * within a few units of the eye, so this must stay small; D32F
@@ -1583,6 +1584,22 @@ static void fl_model_matrix(const float basis[9], const float delta[3], float m[
 	m[13] = 0.0f;
 	m[14] = 0.0f;
 	m[15] = 1.0f;
+}
+
+static int fl_is_death_star_beam(const XwaSnapshot* snap, const XwaFlightObject* object) {
+	const XwaDeathStarBeam* beam = &snap->death_star_beam;
+	return beam->active && object->object_type == XWA_SNAP_TYPE_LASER_IMPERIAL_DS &&
+		   object->slot == beam->object_slot && object->signature == beam->object_signature;
+}
+
+static void fl_apply_death_star_beam_scale(const XwaSnapshot* snap, float model[16]) {
+	const float scale[3] = { FL_DS_LASER_TRANSVERSE_SCALE, snap->death_star_beam.length_scale,
+						   FL_DS_LASER_TRANSVERSE_SCALE };
+	for (int row = 0; row < 3; row++) {
+		for (int axis = 0; axis < 3; axis++) {
+			model[row * 4 + axis] *= scale[axis];
+		}
+	}
 }
 
 static void fl_object_local(const XwaFlightObject* object, float out[3]) {
@@ -3795,6 +3812,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		float object_local[3];
 		float model_matrix[16];
 		fl_object_pose(f, cam->world_pos, is_bolt, bw, object_local, model_matrix);
+		if (fl_is_death_star_beam(snap, f)) {
+			fl_apply_death_star_beam_scale(snap, model_matrix);
+		}
 		if ((int32_t)f->slot == cam->player_obj_idx) {
 			player_f = f; /* cockpit glow scale/knockouts key to the player */
 			memcpy(player_bw, bw, sizeof player_bw);
@@ -3870,6 +3890,16 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		}
 		inst.cull_mode = AERON_CULL_BACK;
 		const XwaFlightObject* previous_f = fl_instance_motion(&inst, f, i, is_bolt);
+		if (fl_is_death_star_beam(snap, f) && s.mb_enabled) {
+			if (previous_f && fl_is_death_star_beam(s.mb_prev_snap, previous_f)) {
+				float previous_local[3];
+				XwaRemasterWorld_LocalI32(s.origin_world, previous_f->world_pos, previous_local);
+				fl_model_matrix(bw, previous_local, inst.prev_transform);
+				fl_apply_death_star_beam_scale(s.mb_prev_snap, inst.prev_transform);
+			} else {
+				inst.zero_velocity = 1;
+			}
+		}
 		/* Rotary-mesh articulation (cranes, radar dishes, droid arms)
 		 * from the captured craft state — tables borrow pool slots for
 		 * the frame (the scene keeps the pointer until Render). */

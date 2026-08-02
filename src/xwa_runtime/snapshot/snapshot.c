@@ -101,6 +101,7 @@ void XwaSnapshot_BeginTick(void) {
 	s->flight_object_count = 0;
 	memset(&s->flight_map, 0, sizeof s->flight_map);
 	s->flight_camera_valid = 0;
+	memset(&s->death_star_beam, 0, sizeof s->death_star_beam);
 	memset(&s->hyperspace, 0, sizeof s->hyperspace);
 	memset(&s->hud, 0, sizeof s->hud);
 	s->dropped_records = 0;
@@ -1342,6 +1343,20 @@ void XwaSnapshot_CaptureFlight(void) {
 		c->ds_beam_world_pos[0] = g_deathStarTunnelLaserRegions[regionIdx].pointLightX;
 		c->ds_beam_world_pos[1] = g_deathStarTunnelLaserRegions[regionIdx].pointLightY;
 		c->ds_beam_world_pos[2] = g_deathStarTunnelLaserRegions[regionIdx].pointLightZ;
+
+		const int object_idx = g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx;
+		const int model_extent = g_modelTypeTable[OBJ_LaserImperialDS].maxBoundsExtent;
+		if (object_idx >= 0 && (uint32_t)object_idx < g_objectTableSlotCount && model_extent > 0) {
+			const ObjectRecord* object = &g_objectTable[object_idx];
+			if (object->objectType == OBJ_LaserImperialDS) {
+				XwaDeathStarBeam* beam = &s->death_star_beam;
+				beam->active = 1;
+				beam->object_slot = (uint16_t)object_idx;
+				beam->object_signature = object->objectSignature;
+				beam->length_scale =
+					-g_deathStarTunnelLaserRegions[regionIdx].remainingDistance / (float)model_extent;
+			}
+		}
 	}
 	c->proj_scale = g_projScale;
 	c->vp_w = g_flightVpWidth;
