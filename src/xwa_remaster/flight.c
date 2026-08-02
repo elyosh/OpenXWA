@@ -1662,17 +1662,20 @@ int XwaRemasterFlight_ObjectModelMatrixAtOrigin(const XwaFlightObject* object, c
 	return 1;
 }
 
-/* Prev-frame transform for the motion-blur velocity prepass. Matched
- * objects re-derive the PREV snapshot record's basis through the same
- * cached/Euler law as the current one; projectiles keep the CURRENT
- * roll-aligned rotation and take only the prev position (the alignment
- * is view-dependent — the TIE rule). Unmatched objects (spawn frames)
- * stamp zero velocity: camera-consistent "static" treatment would
- * smear a bogus streak. Returns the matched record so rigid and articulated
- * motion use the same history identity. */
-static const XwaFlightObject* fl_instance_motion(AeronSceneMeshInstance* inst, uint32_t walk_index,
+/* Prev-frame transform for the motion-blur velocity prepass. */
+static const XwaFlightObject* fl_instance_motion(AeronSceneMeshInstance* inst,
+												 const XwaFlightObject* current, uint32_t walk_index,
 												 int is_bolt) {
-	if (!s.mb_enabled || s.mb_prev_index[walk_index] < 0) {
+	if (!s.mb_enabled) {
+		inst->zero_velocity = 1;
+		return NULL;
+	}
+	/* Tunnel slots are static-world proxies recycled as the active window advances. */
+	if (current->genus == XWA_SNAP_GENUS_DS_TUNNEL) {
+		memcpy(inst->prev_transform, inst->transform, sizeof inst->prev_transform);
+		return current;
+	}
+	if (s.mb_prev_index[walk_index] < 0) {
 		inst->zero_velocity = 1;
 		return NULL;
 	}
@@ -3820,7 +3823,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			inst.mesh_table = prepared.table;
 			inst.no_local_lights = 1;
 			inst.cull_mode = AERON_CULL_BACK;
-			fl_instance_motion(&inst, i, /*is_bolt=*/0);
+			fl_instance_motion(&inst, f, i, /*is_bolt=*/0);
 			AeronScene_AddMeshInstance(s.scene, &inst);
 			continue;
 		}
@@ -3866,7 +3869,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			inst.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
 		}
 		inst.cull_mode = AERON_CULL_BACK;
-		const XwaFlightObject* previous_f = fl_instance_motion(&inst, i, is_bolt);
+		const XwaFlightObject* previous_f = fl_instance_motion(&inst, f, i, is_bolt);
 		/* Rotary-mesh articulation (cranes, radar dishes, droid arms)
 		 * from the captured craft state — tables borrow pool slots for
 		 * the frame (the scene keeps the pointer until Render). */
