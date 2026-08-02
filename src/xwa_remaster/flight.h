@@ -130,7 +130,6 @@ void XwaRemasterFlight_GetHangarLightingDefault(XwaFlightHangarLightingParams* o
 typedef struct XwaFlightPointLightParams {
 	int enabled;
 	int clustered;
-	int cluster_tile_size;
 	int cluster_depth_slices;
 	int cluster_debug;
 	float scale;        /* classic-intensity multiplier (1 = classic) */

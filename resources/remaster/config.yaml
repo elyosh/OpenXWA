@@ -212,8 +212,7 @@ skybox:
                          # DrawBrightStarFlare ±1px plus/L pattern
 point_lights:
   enabled: true
-  clustered: true
-  cluster_tile_size: 32
+  clustered: true            # automatically uses brute force for small light counts
   cluster_depth_slices: 24
   cluster_debug: false
   scale: 1.0

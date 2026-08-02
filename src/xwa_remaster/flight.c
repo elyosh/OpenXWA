@@ -371,8 +371,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 	static const char* ints[] = {
 		"presentation.vsync_divisor", "presentation.msaa_samples", "ssao.quality",
 		"motion_blur.quality",        "shadows.atlas_size",         "shadows.cascade_count",
-		"shadows.filter_quality",     "point_lights.cluster_tile_size",
-		"point_lights.cluster_depth_slices",
+		"shadows.filter_quality",     "point_lights.cluster_depth_slices",
 	};
 	static const char* floats[] = {
 		"ssao.intensity",
@@ -527,8 +526,8 @@ static int fl_hangar_lighting_config_valid(const XwaFlightHangarLightingParams* 
 }
 
 static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
-	return p->cluster_tile_size >= 8 && p->cluster_tile_size <= 128 && p->cluster_depth_slices >= 4 &&
-		   p->cluster_depth_slices <= 64 && isfinite(p->scale) && p->scale >= 0.0f &&
+	return p->cluster_depth_slices >= 4 && p->cluster_depth_slices <= 64 && isfinite(p->scale) &&
+		   p->scale >= 0.0f &&
 		   isfinite(p->range_scale) && p->range_scale > 0.0f &&
 		   isfinite(p->min_distance) && p->min_distance > 0.0f && isfinite(p->spec_weight) &&
 		   p->spec_weight >= 0.0f && isfinite(p->diffuse_wrap) && p->diffuse_wrap >= 0.0f &&
@@ -710,7 +709,6 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	}
 	s.plight.enabled = AeronConfigFile_GetBool(cf, "point_lights.enabled", 0);
 	s.plight.clustered = AeronConfigFile_GetBool(cf, "point_lights.clustered", 0);
-	s.plight.cluster_tile_size = (int)AeronConfigFile_GetInt(cf, "point_lights.cluster_tile_size", 0);
 	s.plight.cluster_depth_slices =
 		(int)AeronConfigFile_GetInt(cf, "point_lights.cluster_depth_slices", 0);
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
@@ -2814,7 +2812,6 @@ static uint32_t fl_submit_point_lights(uint32_t count) {
 static int fl_configure_clustered_lights(AeronScene3D* scene) {
 	return AeronScene_SetClusteredLights(scene, &(AeronSceneClusteredLightDesc) {
 		.enabled = s.plight.clustered,
-		.tile_size = (uint32_t)s.plight.cluster_tile_size,
 		.depth_slices = (uint32_t)s.plight.cluster_depth_slices,
 		.min_distance = s.plight.min_distance,
 		.contribution_cap = s.plight.contrib_cap,

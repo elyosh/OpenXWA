@@ -414,7 +414,7 @@ static void xwa_tool_point_lights(int* open, void* user) {
 		changed = true;
 	}
 	bool clustered = p.clustered != 0;
-	if (ImGui::Checkbox("Clustered", &clustered)) {
+	if (ImGui::Checkbox("Clustered (auto)", &clustered)) {
 		p.clustered = clustered ? 1 : 0;
 		changed = true;
 	}
@@ -423,7 +423,6 @@ static void xwa_tool_point_lights(int* open, void* user) {
 		p.cluster_debug = cluster_debug ? 1 : 0;
 		changed = true;
 	}
-	changed |= ImGui::SliderInt("Cluster tile", &p.cluster_tile_size, 8, 128);
 	changed |= ImGui::SliderInt("Depth slices", &p.cluster_depth_slices, 4, 64);
 	XwaFlightPointLightStats stats;
 	XwaRemasterFlight_GetPointLightStats(&stats);
@@ -431,7 +430,9 @@ static void xwa_tool_point_lights(int* open, void* user) {
 				stats.invalid_count, stats.candidate_overflow_count);
 	ImGui::Text("Scene %u accepted, %u dropped; %u global", stats.scene.submitted_light_count,
 				stats.scene.dropped_light_count, stats.scene.global_light_count);
-	ImGui::Text("Grid %ux%ux%u (%.1f MiB)", stats.scene.grid_x, stats.scene.grid_y, stats.scene.grid_z,
+	ImGui::Text("%s, tile %u, grid %ux%ux%u (%.1f MiB)",
+				stats.scene.clustered_active ? "Clustered" : "Brute force", stats.scene.effective_tile_size,
+				stats.scene.grid_x, stats.scene.grid_y, stats.scene.grid_z,
 				(double)stats.scene.allocated_buffer_bytes / (1024.0 * 1024.0));
 	changed |=
 		ImGui::SliderFloat("Intensity scale", &p.scale, 0.05f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);

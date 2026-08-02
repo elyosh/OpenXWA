@@ -480,15 +480,14 @@ static void cmd_submit_point_lights(uint32_t count) {
 static int cmd_configure_clustered_lights(void) {
 	XwaFlightPointLightParams config;
 	XwaRemasterFlight_GetPointLights(&config);
-	return AeronScene_SetClusteredLights(s_cmd.scene,
-										 &(AeronSceneClusteredLightDesc) {
-											 .enabled = config.clustered,
-											 .tile_size = (uint32_t)config.cluster_tile_size,
-											 .depth_slices = (uint32_t)config.cluster_depth_slices,
-											 .min_distance = config.min_distance,
-											 .contribution_cap = config.contrib_cap,
-											 .debug_view = config.cluster_debug,
-										 });
+	const AeronSceneClusteredLightDesc desc = {
+		.enabled = config.clustered,
+		.depth_slices = (uint32_t)config.cluster_depth_slices,
+		.min_distance = config.min_distance,
+		.contribution_cap = config.contrib_cap,
+		.debug_view = config.cluster_debug,
+	};
+	return AeronScene_SetClusteredLights(s_cmd.scene, &desc);
 }
 
 static void cmd_destroy_targets(void) {
