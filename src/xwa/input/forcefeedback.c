@@ -888,15 +888,25 @@ uint8_t ForceFeedback_SetStrength(unsigned int strength) {
 	}
 
 	if (g_forceFeedbackEffectsEnabled) {
+#ifdef XWA_MODERN
+		for (i = 0; i < 10; ++i) {
+			slot = &g_forceFeedbackEffects[i];
+			effectPtr = &slot->effect;
+#else
 		i = 0;
 		effectPtr = &g_forceFeedbackEffects[0].effect;
 		while ((intptr_t)effectPtr <
 			   (intptr_t)&g_forceFeedbackEffects[0].effect + (intptr_t)sizeof(g_forceFeedbackEffects)) {
 			slot = (ForceFeedbackEffectSlot*)((char*)effectPtr - offsetof(ForceFeedbackEffectSlot, effect));
+#endif
 			if (slot->isPlaying && g_forceFeedbackDevice && g_forceFeedbackEffectsEnabled) {
+#ifdef XWA_MODERN
+				if ((unsigned int)i >= 10) {
+#else
 				if ((intptr_t)effectPtr >= (intptr_t)&g_forceFeedbackEffects[0].effect +
 											   (intptr_t)sizeof(g_forceFeedbackEffects) ||
 					(intptr_t)effectPtr < (intptr_t)&g_forceFeedbackEffects[0].effect) {
+#endif
 					debugFuncPtr(2, "EffectNum out of range in StopEffect");
 				} else if (*effectPtr) {
 					hr = (*effectPtr)->lpVtbl->Stop(*effectPtr);
@@ -908,8 +918,10 @@ uint8_t ForceFeedback_SetStrength(unsigned int strength) {
 					slot->remainingTicks = 0;
 				}
 			}
+#ifndef XWA_MODERN
 			effectPtr = (IDirectInputEffect**)((char*)effectPtr + sizeof(ForceFeedbackEffectSlot));
 			++i;
+#endif
 		}
 		g_forceFeedbackEffectsEnabled = 0;
 	}
