@@ -429,8 +429,9 @@ static void xwa_tool_point_lights(int* open, void* user) {
 	XwaRemasterFlight_GetPointLightStats(&stats);
 	ImGui::Text("Candidates %u, valid %u, invalid %u, overflow %u", stats.generated_count, stats.valid_count,
 				stats.invalid_count, stats.candidate_overflow_count);
-	ImGui::Text("Scene %u accepted, %u dropped; grid %ux%ux%u (%.1f MiB)", stats.scene.submitted_light_count,
-				stats.scene.dropped_light_count, stats.scene.grid_x, stats.scene.grid_y, stats.scene.grid_z,
+	ImGui::Text("Scene %u accepted, %u dropped; %u global", stats.scene.submitted_light_count,
+				stats.scene.dropped_light_count, stats.scene.global_light_count);
+	ImGui::Text("Grid %ux%ux%u (%.1f MiB)", stats.scene.grid_x, stats.scene.grid_y, stats.scene.grid_z,
 				(double)stats.scene.allocated_buffer_bytes / (1024.0 * 1024.0));
 	changed |=
 		ImGui::SliderFloat("Intensity scale", &p.scale, 0.05f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);

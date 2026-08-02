@@ -1100,16 +1100,12 @@ uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh
 						transform[r * 4 + 2] * p[2] + transform[r * 4 + 3];
 		}
 		/* Visibility-law window (classic 0.5/d has no shading cutoff):
-		 * ~1% floor at 50 * intensity, never below the classic cull
-		 * radius, capped for the GPU early-out. */
+		 * ~1% floor at 50 * intensity, never below the classic cull radius. */
 		{
 			const float cull = engine_scale * 16384.0f;
 			float rng = 50.0f * intensity;
 			if (rng < cull) {
 				rng = cull;
-			}
-			if (rng > 32768.0f) {
-				rng = 32768.0f;
 			}
 			l->range = rng;
 		}

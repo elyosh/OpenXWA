@@ -380,8 +380,6 @@ static float cmd_point_range(float intensity, float cull_radius) {
 	float range = 50.0f * intensity;
 	if (range < cull_radius)
 		range = cull_radius;
-	if (range > 32768.0f)
-		range = 32768.0f;
 	return range;
 }
 

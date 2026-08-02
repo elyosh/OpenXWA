@@ -2636,14 +2636,11 @@ static void fl_pl_push(const float pos[3], float range, const float color_x_inte
  * contribution has no shading cutoff (its cull radius only gates
  * per-object selection), so the window sits where the contribution
  * falls under ~1% (d = 50 * intensity), never below the classic cull
- * radius, capped for the GPU early-out. */
+ * radius. */
 static float fl_pl_range(float classic_intensity, float cull_radius) {
 	float r = 50.0f * classic_intensity;
 	if (r < cull_radius) {
 		r = cull_radius;
-	}
-	if (r > 32768.0f) {
-		r = 32768.0f;
 	}
 	return r;
 }
