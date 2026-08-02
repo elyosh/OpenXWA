@@ -21,7 +21,7 @@
 
 #define CMD_NEAR_Z 64.0f
 #define CMD_MAX_BILLBOARDS (XWA_SNAP_MAX_FLIGHT_OBJECTS + XWA_SNAP_MAX_MESH_SLOTS * 2)
-#define CMD_MAX_POINT_CANDIDATES 192
+#define CMD_MAX_POINT_CANDIDATES 256
 
 typedef struct CmdBillboard {
 	float center[3];
@@ -49,7 +49,7 @@ static struct {
 	uint32_t table_count;
 	XwaShipPointLight point_candidates[CMD_MAX_POINT_CANDIDATES];
 	uint32_t point_candidate_count;
-	XwaShipPointLight point_final[XWA_SHIP_MAX_POINT_LIGHTS];
+	uint32_t point_candidate_dropped;
 	uint32_t particle_light_ids[XWA_SNAP_MAX_PARTICLE_EFFECTS];
 	uint32_t particle_light_id_count;
 } s_cmd;
@@ -240,11 +240,13 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 				s_cmd.scene, mesh, transform, 1.0f, instance.mesh_table, object->eg_knockout_mask,
 				cmd_engine_glow_scale(object, snapshot->tick_index), NULL, NULL, glow_ref);
 		}
-		if (object->has_craft && s_cmd.point_candidate_count < CMD_MAX_POINT_CANDIDATES) {
+		if (object->has_craft) {
+			const uint32_t remaining = CMD_MAX_POINT_CANDIDATES - s_cmd.point_candidate_count;
+			uint32_t dropped = 0;
 			s_cmd.point_candidate_count += XwaRemasterShip_CollectEngineGlowPointLights(
 				mesh, transform, instance.mesh_table, object,
-				&s_cmd.point_candidates[s_cmd.point_candidate_count],
-				CMD_MAX_POINT_CANDIDATES - s_cmd.point_candidate_count);
+				remaining ? &s_cmd.point_candidates[s_cmd.point_candidate_count] : NULL, remaining, &dropped);
+			s_cmd.point_candidate_dropped += dropped;
 		}
 	}
 	return 1;
@@ -385,8 +387,10 @@ static float cmd_point_range(float intensity, float cull_radius) {
 
 static void cmd_add_point_light(const XwaSnapshot* snapshot, const XwaFlightObject* object,
 								const float eye[3]) {
-	if (s_cmd.point_candidate_count >= CMD_MAX_POINT_CANDIDATES)
+	if (s_cmd.point_candidate_count >= CMD_MAX_POINT_CANDIDATES) {
+		s_cmd.point_candidate_dropped++;
 		return;
+	}
 	float color[3], intensity;
 	int cull;
 	if (!XwaSnapshotExport_PointLightForObject(
@@ -416,8 +420,12 @@ static void cmd_add_particle_lights(const XwaSnapshot* snapshot, const float row
 				break;
 			}
 		}
-		if (seen || s_cmd.point_candidate_count >= CMD_MAX_POINT_CANDIDATES)
+		if (seen)
 			continue;
+		if (s_cmd.point_candidate_count >= CMD_MAX_POINT_CANDIDATES) {
+			s_cmd.point_candidate_dropped++;
+			continue;
+		}
 		if (s_cmd.particle_light_id_count < XWA_SNAP_MAX_PARTICLE_EFFECTS)
 			s_cmd.particle_light_ids[s_cmd.particle_light_id_count++] = effect->stable_id;
 		float delta[3];
@@ -439,48 +447,50 @@ static uint32_t cmd_finalize_point_lights(XwaShipPointLightTuning* tuning) {
 	XwaRemasterFlight_GetPointLights(&config);
 	if (!config.enabled || !s_cmd.point_candidate_count)
 		return 0;
-	float scores[CMD_MAX_POINT_CANDIDATES];
+	uint32_t count = 0;
 	for (uint32_t i = 0; i < s_cmd.point_candidate_count; i++) {
-		XwaShipPointLight* light = &s_cmd.point_candidates[i];
+		XwaShipPointLight light = s_cmd.point_candidates[i];
 		for (int c = 0; c < 3; c++)
-			light->color[c] *= config.scale;
-		light->range *= config.range_scale;
-		const float distance2 =
-			light->pos[0] * light->pos[0] + light->pos[1] * light->pos[1] + light->pos[2] * light->pos[2];
+			light.color[c] *= config.scale;
+		light.range *= config.range_scale;
 		const float luminance =
-			0.2126f * light->color[0] + 0.7152f * light->color[1] + 0.0722f * light->color[2];
-		scores[i] = luminance / (distance2 + light->range * light->range);
-	}
-	const uint32_t count = s_cmd.point_candidate_count < XWA_SHIP_MAX_POINT_LIGHTS
-							   ? s_cmd.point_candidate_count
-							   : XWA_SHIP_MAX_POINT_LIGHTS;
-	uint8_t used[CMD_MAX_POINT_CANDIDATES] = { 0 };
-	for (uint32_t output = 0; output < count; output++) {
-		int best = -1;
-		for (uint32_t i = 0; i < s_cmd.point_candidate_count; i++)
-			if (!used[i] && (best < 0 || scores[i] > scores[best]))
-				best = (int)i;
-		if (best < 0)
-			break;
-		used[best] = 1;
-		s_cmd.point_final[output] = s_cmd.point_candidates[best];
+			0.2126f * light.color[0] + 0.7152f * light.color[1] + 0.0722f * light.color[2];
+		if (!(light.range > 0.0f) || !(luminance > 0.0f) || !isfinite(light.range) || !isfinite(luminance) ||
+			!isfinite(light.pos[0]) || !isfinite(light.pos[1]) || !isfinite(light.pos[2]) ||
+			!isfinite(light.color[0]) || !isfinite(light.color[1]) || !isfinite(light.color[2]))
+			continue;
+		s_cmd.point_candidates[count++] = light;
 	}
 	tuning->min_distance = config.min_distance;
 	tuning->spec_weight = config.spec_weight;
 	tuning->diffuse_wrap = config.diffuse_wrap;
 	tuning->contrib_cap = config.contrib_cap;
-	tuning->light_count = count;
+	s_cmd.point_candidate_count = count;
 	return count;
 }
 
 static void cmd_submit_point_lights(uint32_t count) {
 	for (uint32_t i = 0; i < count; ++i) {
 		AeronSceneLight light = { 0 };
-		memcpy(light.pos, s_cmd.point_final[i].pos, sizeof light.pos);
-		light.radius = s_cmd.point_final[i].range;
-		memcpy(light.color, s_cmd.point_final[i].color, sizeof light.color);
+		memcpy(light.pos, s_cmd.point_candidates[i].pos, sizeof light.pos);
+		light.radius = s_cmd.point_candidates[i].range;
+		memcpy(light.color, s_cmd.point_candidates[i].color, sizeof light.color);
 		AeronScene_AddLight(s_cmd.scene, &light);
 	}
+}
+
+static int cmd_configure_clustered_lights(void) {
+	XwaFlightPointLightParams config;
+	XwaRemasterFlight_GetPointLights(&config);
+	return AeronScene_SetClusteredLights(s_cmd.scene,
+										 &(AeronSceneClusteredLightDesc) {
+											 .enabled = config.clustered,
+											 .tile_size = (uint32_t)config.cluster_tile_size,
+											 .depth_slices = (uint32_t)config.cluster_depth_slices,
+											 .min_distance = config.min_distance,
+											 .contribution_cap = config.contrib_cap,
+											 .debug_view = config.cluster_debug,
+										 });
 }
 
 static void cmd_destroy_targets(void) {
@@ -624,6 +634,7 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	s_cmd.billboard_count = 0;
 	s_cmd.table_count = 0;
 	s_cmd.point_candidate_count = 0;
+	s_cmd.point_candidate_dropped = 0;
 	s_cmd.particle_light_id_count = 0;
 	XwaAssetRef glow_ref;
 	const int glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &glow_ref);
@@ -696,6 +707,10 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	XwaShipPointLightTuning point_tuning;
 	const uint32_t point_count = cmd_finalize_point_lights(&point_tuning);
 	cmd_submit_point_lights(point_count);
+	if (!cmd_configure_clustered_lights()) {
+		Aeron_CommandBufferSetFailure(cmd, "HUD CMD clustered-light configuration failed");
+		return;
+	}
 	XwaRemasterShip_SetPbrEnv(s_cmd.scene, snapshot->dir_lights, snapshot->dir_light_count, rows, NULL, NULL,
 							  point_count ? &point_tuning : NULL, /*ambient_cube=*/NULL);
 	if (!AeronScene_Render(s_cmd.scene, cmd)) {

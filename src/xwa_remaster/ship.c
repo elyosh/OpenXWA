@@ -352,10 +352,8 @@ typedef struct PbrLightFS {
 	float extra_col[3][4];
 	/* Point-light evaluation: min distance, spec weight, diffuse wrap, cap. */
 	float point_params[4];
-	uint32_t point_light_count;
-	uint32_t _pad_point_light_count[3];
 } PbrLightFS;
-typedef char PbrLightFSSizeCheck[sizeof(PbrLightFS) == 320 ? 1 : -1];
+typedef char PbrLightFSSizeCheck[sizeof(PbrLightFS) == 304 ? 1 : -1];
 
 void XwaRemasterShip_GetPbrTuning(XwaShipPbrTuning* out) {
 	if (out) {
@@ -540,7 +538,6 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 		env.point_params[1] = point_tuning->spec_weight;
 		env.point_params[2] = point_tuning->diffuse_wrap;
 		env.point_params[3] = point_tuning->contrib_cap;
-		env.point_light_count = point_tuning->light_count;
 	}
 	AeronScene_SetFrameUniformData(scene, AERON_SHADER_STAGE_FRAGMENT, 1, &env, sizeof env);
 }
@@ -1049,8 +1046,11 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh, const float transform[16],
 													  const AeronSceneMeshTable* table,
 													  const XwaFlightObject* f, XwaShipPointLight* out,
-													  uint32_t max) {
-	if (!mesh || !mesh->engine_glow_count || !transform || !f || !out || !max) {
+													  uint32_t max, uint32_t* dropped) {
+	if (dropped) {
+		*dropped = 0;
+	}
+	if (!mesh || !mesh->engine_glow_count || !transform || !f || (!out && max > 0)) {
 		return 0;
 	}
 	/* Classic engineScale for the LIGHT law
@@ -1064,7 +1064,7 @@ uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh
 	}
 
 	uint32_t n = 0;
-	for (uint32_t gi = 0; gi < mesh->engine_glow_count && n < max; gi++) {
+	for (uint32_t gi = 0; gi < mesh->engine_glow_count; gi++) {
 		const AeronGltfEngineGlow* g = &mesh->engine_glows[gi];
 		/* Classic gates: disabled emitters and small glows skip (raw
 		 * OPT dims; only LARGE engines — capitals — light their hull).
@@ -1074,6 +1074,12 @@ uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh
 		}
 		const float intensity = g->dimensions[2] * engine_scale * 300.0f;
 		if (intensity <= 0.0f) {
+			continue;
+		}
+		if (n >= max) {
+			if (dropped) {
+				(*dropped)++;
+			}
 			continue;
 		}
 

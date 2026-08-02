@@ -25,8 +25,8 @@
 #include "aeron/render.h"
 #include "aeron/vfs.h"
 #include "aeron/scene/scene3d.h"
-#include "xwa_runtime/snapshot/snapshot.h"
 #include "xwa_remaster/assets.h"
+#include "xwa_runtime/snapshot/snapshot.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -129,6 +129,10 @@ void XwaRemasterFlight_GetHangarLightingDefault(XwaFlightHangarLightingParams* o
  * is therefore dimensionless (1 = classic lit-color magnitudes). */
 typedef struct XwaFlightPointLightParams {
 	int enabled;
+	int clustered;
+	int cluster_tile_size;
+	int cluster_depth_slices;
+	int cluster_debug;
 	float scale;        /* classic-intensity multiplier (1 = classic) */
 	float range_scale;  /* multiplies the derived visibility range */
 	float min_distance; /* near clamp on 0.5/d, world units */
@@ -137,9 +141,18 @@ typedef struct XwaFlightPointLightParams {
 	float contrib_cap;  /* per-light lit-color cap (classic saturates at 1) */
 } XwaFlightPointLightParams;
 
+typedef struct XwaFlightPointLightStats {
+	uint32_t generated_count;
+	uint32_t valid_count;
+	uint32_t invalid_count;
+	uint32_t candidate_overflow_count;
+	AeronSceneClusteredLightStats scene;
+} XwaFlightPointLightStats;
+
 void XwaRemasterFlight_GetPointLights(XwaFlightPointLightParams* out);
 void XwaRemasterFlight_SetPointLights(const XwaFlightPointLightParams* in);
 void XwaRemasterFlight_GetPointLightsDefault(XwaFlightPointLightParams* out);
+void XwaRemasterFlight_GetPointLightStats(XwaFlightPointLightStats* out);
 
 /* Mesh-texture filtering shared by the base-color, normal,
  * metallic-roughness and emissive atlases. Loaded from remaster/config.yaml's

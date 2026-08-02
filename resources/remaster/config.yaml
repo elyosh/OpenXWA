@@ -212,6 +212,10 @@ skybox:
                          # DrawBrightStarFlare ±1px plus/L pattern
 point_lights:
   enabled: true
+  clustered: true
+  cluster_tile_size: 32
+  cluster_depth_slices: 24
+  cluster_debug: false
   scale: 1.0
   range_scale: 1.0
   min_distance: 64.0

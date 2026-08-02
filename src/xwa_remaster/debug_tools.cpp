@@ -396,7 +396,7 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 
 static void xwa_tool_point_lights(int* open, void* user) {
 	(void)user;
-	ImGui::SetNextWindowSize(ImVec2(440, 280), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(440, 520), ImGuiCond_FirstUseEver);
 	bool b = *open != 0;
 	if (!ImGui::Begin("Point Lights", &b)) {
 		ImGui::End();
@@ -413,6 +413,25 @@ static void xwa_tool_point_lights(int* open, void* user) {
 		p.enabled = enabled ? 1 : 0;
 		changed = true;
 	}
+	bool clustered = p.clustered != 0;
+	if (ImGui::Checkbox("Clustered", &clustered)) {
+		p.clustered = clustered ? 1 : 0;
+		changed = true;
+	}
+	bool cluster_debug = p.cluster_debug != 0;
+	if (ImGui::Checkbox("Cluster occupancy", &cluster_debug)) {
+		p.cluster_debug = cluster_debug ? 1 : 0;
+		changed = true;
+	}
+	changed |= ImGui::SliderInt("Cluster tile", &p.cluster_tile_size, 8, 128);
+	changed |= ImGui::SliderInt("Depth slices", &p.cluster_depth_slices, 4, 64);
+	XwaFlightPointLightStats stats;
+	XwaRemasterFlight_GetPointLightStats(&stats);
+	ImGui::Text("Candidates %u, valid %u, invalid %u, overflow %u", stats.generated_count, stats.valid_count,
+				stats.invalid_count, stats.candidate_overflow_count);
+	ImGui::Text("Scene %u accepted, %u dropped; grid %ux%ux%u (%.1f MiB)", stats.scene.submitted_light_count,
+				stats.scene.dropped_light_count, stats.scene.grid_x, stats.scene.grid_y, stats.scene.grid_z,
+				(double)stats.scene.allocated_buffer_bytes / (1024.0 * 1024.0));
 	changed |=
 		ImGui::SliderFloat("Intensity scale", &p.scale, 0.05f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
 	ImGui::TextDisabled("Multiplier on the classic intensities. The shader runs the\n"
@@ -440,8 +459,7 @@ static void xwa_tool_point_lights(int* open, void* user) {
 	}
 	ImGui::TextDisabled("Edits apply on the next frame and are NOT persisted —\n"
 						"copy values into resources/remaster/config.yaml\n"
-						"under point_lights: {scale, range_scale, min_distance,\n"
-						"spec_weight, enabled}.");
+						"under point_lights.");
 	if (changed) {
 		XwaRemasterFlight_SetPointLights(&p);
 	}

@@ -114,7 +114,7 @@ typedef struct XwaShipAoParams {
 	float direct;     /* AO weight on direct diffuse (0 = ambient-only) */
 } XwaShipAoParams;
 
-/* One frame-global punctual light for the PBR env (world space, HDR
+/* One punctual-light candidate for the PBR env (world space, HDR
  * color with the source intensity premultiplied, range = attenuation
  * window in world units). Evaluated per fragment by the scene PBR FS
  * (windowed inverse-square, Lambert + Cook-Torrance spec). */
@@ -123,10 +123,7 @@ typedef struct XwaShipPointLight {
 	float range;
 	float color[3]; /* linear HDR */
 } XwaShipPointLight;
-#define XWA_SHIP_MAX_POINT_LIGHTS 16
-
 typedef struct XwaShipPointLightTuning {
-	uint32_t light_count;
 	float min_distance; /* near clamp on the 0.5/d law, world units */
 	float spec_weight;  /* 0 disables the spec lobe */
 	float diffuse_wrap; /* 0 = Lambert, 1 = half-Lambert */
@@ -155,7 +152,7 @@ typedef struct XwaShipAmbientCube {
 uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh, const float transform[16],
 													  const AeronSceneMeshTable* table,
 													  const XwaFlightObject* f, XwaShipPointLight* out,
-													  uint32_t max);
+													  uint32_t max, uint32_t* dropped);
 
 /* Select the semantic key directional: the brightest active sun
  * backdrop when present, otherwise the greatest linear luminance. */
