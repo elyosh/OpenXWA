@@ -74,6 +74,7 @@ typedef struct FlBillboard {
 	float half_w, half_h; /* view units at that depth */
 	float rot;            /* roll about the view axis, radians */
 	float depth_bias;     /* view units toward the camera (test only) */
+	float emissive_strength; /* linear-RGB multiplier; alpha is unchanged */
 	XwaAssetRef ref;
 	uint32_t argb;
 	/* Motion blur: complete PREV-frame geometry in the current frame's
@@ -155,6 +156,7 @@ static struct {
 	/* Point-light calibration knobs (same lifecycle as ssao). */
 	XwaFlightPointLightParams plight;
 	XwaFlightPointLightParams plight_default;
+	float explosion_genus_emissive_strength;
 	XwaFlightTextureFilteringParams texture_filtering;
 	XwaFlightTextureFilteringParams texture_filtering_default;
 
@@ -428,6 +430,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"lighting.ambient_g",
 		"lighting.ambient_b",
 		"bloom.intensity",
+		"effects.explosion_genus_emissive_strength",
 		"motion_blur.shutter",
 		"temporal_upscaling.sharpness",
 		"texture_filtering.max_anisotropy",
@@ -780,6 +783,14 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	AeronSceneBloom_SetIntensity(bloom_intensity);
+	s.explosion_genus_emissive_strength =
+		(float)AeronConfigFile_GetFloat(cf, "effects.explosion_genus_emissive_strength", 0.0);
+	if (!isfinite(s.explosion_genus_emissive_strength) || s.explosion_genus_emissive_strength < 1.0f) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: effects.explosion_genus_emissive_strength must be finite and at least 1", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
 
 	s.mb_quality = (int)AeronConfigFile_GetInt(cf, "motion_blur.quality", 0);
 	if (s.mb_quality < 0 || s.mb_quality > 2) {
@@ -1825,7 +1836,7 @@ static const float fl_default_uvs[4][2] = { { 1, 1 }, { 0, 1 }, { 0, 0 }, { 1, 0
 static void fl_submit_view_quad_ex(AeronSceneBillboardStage stage, const float corners[4][3],
 								   const float uvs[4][2], const XwaAssetRef* ref, uint32_t argb,
 								   const float* anchor_local, float depth_bias,
-								   const float (*prev_corners)[3]) {
+								   const float (*prev_corners)[3], float emissive_strength) {
 	AeronSceneBillboardDesc d;
 	memset(&d, 0, sizeof d);
 	d.texture = ref->texture;
@@ -1843,9 +1854,11 @@ static void fl_submit_view_quad_ex(AeronSceneBillboardStage stage, const float c
 	tint[3] = (float)((argb >> 24) & 0xffu) / 255.0f;
 	/* PMA modulate: the tint's alpha scales the premultiplied RGB too
 	 * (equivalent to the classic straight-alpha vertex modulate). */
-	tint[0] = XwaRemaster_SrgbToLinear((float)((argb >> 16) & 0xffu) / 255.0f) * tint[3];
-	tint[1] = XwaRemaster_SrgbToLinear((float)((argb >> 8) & 0xffu) / 255.0f) * tint[3];
-	tint[2] = XwaRemaster_SrgbToLinear((float)(argb & 0xffu) / 255.0f) * tint[3];
+	tint[0] =
+		XwaRemaster_SrgbToLinear((float)((argb >> 16) & 0xffu) / 255.0f) * tint[3] * emissive_strength;
+	tint[1] =
+		XwaRemaster_SrgbToLinear((float)((argb >> 8) & 0xffu) / 255.0f) * tint[3] * emissive_strength;
+	tint[2] = XwaRemaster_SrgbToLinear((float)(argb & 0xffu) / 255.0f) * tint[3] * emissive_strength;
 	const float du = ref->u1 - ref->u0;
 	const float dv = ref->v1 - ref->v0;
 	for (int v = 0; v < 4; v++) {
@@ -1866,7 +1879,7 @@ static void fl_submit_view_quad_ex(AeronSceneBillboardStage stage, const float c
 static void fl_submit_view_quad(AeronSceneBillboardStage stage, const float corners[4][3],
 								const float uvs[4][2], const XwaAssetRef* ref, uint32_t argb,
 								const float* anchor_local) {
-	fl_submit_view_quad_ex(stage, corners, uvs, ref, argb, anchor_local, 0.0f, NULL);
+	fl_submit_view_quad_ex(stage, corners, uvs, ref, argb, anchor_local, 0.0f, NULL, 1.0f);
 }
 
 /* Resolve a model-type-bound DAT frame from the baked resdata group
@@ -2092,7 +2105,7 @@ static void fl_bb_geometry_corners_local(const FlBillboardGeometry* g, const Xwa
 }
 
 static void fl_bb_push(const FlBillboardGeometry* g, const XwaAssetRef* ref, uint32_t argb,
-					   const float (*prev_corners)[3]) {
+					   const float (*prev_corners)[3], float emissive_strength) {
 	if (s.bb_count >= FL_MAX_BILLBOARDS) {
 		return;
 	}
@@ -2102,6 +2115,7 @@ static void fl_bb_push(const FlBillboardGeometry* g, const XwaAssetRef* ref, uin
 	b->half_h = g->half_h;
 	b->rot = g->rot;
 	b->depth_bias = g->depth_bias;
+	b->emissive_strength = emissive_strength;
 	b->ref = *ref;
 	b->argb = argb;
 	b->has_prev = prev_corners != NULL;
@@ -2120,6 +2134,13 @@ static int fl_object_billboard_candidate(const XwaFlightObject* f, const XwaFlig
 		return f->genus != XWA_SNAP_GENUS_DEBRIS || !cam->external;
 	return f->slot_class == XWA_SNAP_SLOT_MAIN &&
 		   (f->genus == XWA_SNAP_GENUS_EXPLOSION || f->genus == XWA_SNAP_GENUS_DEBRIS);
+}
+
+static float fl_object_billboard_emissive_strength(const XwaFlightObject* f) {
+	/* The map has no bloom pass, so retain its established LDR appearance. */
+	if (!s.map_present && f->genus == XWA_SNAP_GENUS_EXPLOSION)
+		return s.explosion_genus_emissive_strength;
+	return 1.0f;
 }
 
 static int fl_object_billboard_geometry(const XwaFlightObject* f, const XwaFlightCamera* cam,
@@ -2200,7 +2221,7 @@ static void fl_derive_object_billboard(const XwaFlightObject* f, uint32_t snap_i
 	}
 	/* Classic billboards draw with color arg -1 = opaque white (the
 	 * texture as authored; the level argbColor is draw scratch). */
-	fl_bb_push(&geometry, &ref, 0xffffffffu, previous_corners_ptr);
+	fl_bb_push(&geometry, &ref, 0xffffffffu, previous_corners_ptr, fl_object_billboard_emissive_strength(f));
 }
 
 static int fl_wreck_flame_base_geometry(const XwaFlightObject* f, const XwaFlightCamera* cam,
@@ -2290,7 +2311,7 @@ static void fl_derive_wreck_flames(const XwaFlightObject* f, uint32_t snap_index
 										 previous_corners);
 			previous_corners_ptr = previous_corners;
 		}
-		fl_bb_push(&geometry, &ref, 0xffffffffu, previous_corners_ptr);
+		fl_bb_push(&geometry, &ref, 0xffffffffu, previous_corners_ptr, 1.0f);
 	}
 }
 
@@ -2783,7 +2804,8 @@ static void fl_submit_billboards(void) {
 			corners[c][2] = b->center[2];
 		}
 		fl_submit_view_quad_ex(AERON_SCENE_BILLBOARD_STAGE_OVERLAY, corners, fl_default_uvs, &b->ref, b->argb,
-							   NULL, b->depth_bias, b->has_prev ? b->prev_corners : NULL);
+							   NULL, b->depth_bias, b->has_prev ? b->prev_corners : NULL,
+							   b->emissive_strength);
 	}
 }
 
