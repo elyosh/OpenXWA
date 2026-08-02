@@ -985,20 +985,15 @@ void DeathStarTunnel_Update(void) {
 
 	if ((unsigned int)(g_deathStarTunnelTimer - g_deathStarFollowChainLastValidateTime) > 0x3E8) {
 		int i;
-		DeathStarFollowChainSlot* slot;
 		g_deathStarFollowChainLastValidateTime = g_deathStarTunnelTimer;
-		i = 0;
-		slot = g_deathStarFollowChainSlots;
-		do {
-			int objIdx = slot->objectIdx;
-			if (objIdx != 0xFFFF) {
-				if (g_objectTable[objIdx].objectType == OBJ_None ||
-					g_objectTable[objIdx].objectSignature != slot->objectSignature)
+		for (i = 0; i < 10; ++i) {
+			if (g_deathStarFollowChainSlots[i].objectIdx != 0xFFFF) {
+				if (g_objectTable[g_deathStarFollowChainSlots[i].objectIdx].objectType == OBJ_None ||
+					g_objectTable[g_deathStarFollowChainSlots[i].objectIdx].objectSignature !=
+						g_deathStarFollowChainSlots[i].objectSignature)
 					DeathStar_RemoveFollowChainSlot(i);
 			}
-			++slot;
-			++i;
-		} while ((intptr_t)slot < (intptr_t)&g_deathStarFollowLeaderExtentX4);
+		}
 	}
 
 	{
