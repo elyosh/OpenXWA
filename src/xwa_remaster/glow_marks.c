@@ -194,7 +194,8 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* command_buffer,
 									   XwaRemasterAssets* assets, const XwaSnapshot* snapshot,
 									   const XwaFlightObject* object, const AeronSceneMesh* mesh,
-									   const float transform[16], const AeronSceneMeshTable* mesh_table) {
+									   const float transform[16], const AeronSceneMeshTable* mesh_table,
+									   float emissive_strength) {
 	if (!scene || !command_buffer || !assets || !snapshot || !object || !mesh || !transform) {
 		return;
 	}
@@ -231,7 +232,9 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 		overlay.uv_rect[1]  = texture_frame.v0;
 		overlay.uv_rect[2]  = texture_frame.u1;
 		overlay.uv_rect[3]  = texture_frame.v1;
-		overlay.color[0] = overlay.color[1] = overlay.color[2] = overlay.color[3] = 1.0f;
+		const float mark_emissive_strength = mark->pool_kind == 0 ? emissive_strength : 1.0f;
+		overlay.color[0] = overlay.color[1] = overlay.color[2] = mark_emissive_strength;
+		overlay.color[3] = 1.0f;
 		/* The classic extra-texture pass reuses the hull's transformed
 		 * vertices exactly. Aeron's compact overlay uses a separate vertex
 		 * shader, so pull only its test depth slightly toward the camera to

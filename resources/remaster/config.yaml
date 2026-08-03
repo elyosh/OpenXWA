@@ -115,6 +115,7 @@ models:
   engine_emissive_strength: 2.5
 effects:
   explosion_genus_emissive_strength: 2.5
+  glow_mark_emissive_strength: 3.0
 assets:
   prefer_original_2d: false
 presentation:

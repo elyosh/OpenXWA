@@ -9,7 +9,8 @@
 void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* command_buffer,
 									   XwaRemasterAssets* assets, const XwaSnapshot* snapshot,
 									   const XwaFlightObject* object, const AeronSceneMesh* mesh,
-									   const float transform[16], const AeronSceneMeshTable* mesh_table);
+									   const float transform[16], const AeronSceneMeshTable* mesh_table,
+									   float emissive_strength);
 void XwaRemasterGlowMarks_InvalidateMesh(const AeronSceneMesh* mesh);
 void XwaRemasterGlowMarks_Shutdown(void);
 

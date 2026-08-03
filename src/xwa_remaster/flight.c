@@ -157,6 +157,7 @@ static struct {
 	XwaFlightPointLightParams plight;
 	XwaFlightPointLightParams plight_default;
 	float explosion_genus_emissive_strength;
+	float glow_mark_emissive_strength;
 	XwaFlightTextureFilteringParams texture_filtering;
 	XwaFlightTextureFilteringParams texture_filtering_default;
 
@@ -431,6 +432,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"lighting.ambient_b",
 		"bloom.intensity",
 		"effects.explosion_genus_emissive_strength",
+		"effects.glow_mark_emissive_strength",
 		"motion_blur.shutter",
 		"temporal_upscaling.sharpness",
 		"texture_filtering.max_anisotropy",
@@ -796,6 +798,14 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	if (!isfinite(s.explosion_genus_emissive_strength) || s.explosion_genus_emissive_strength < 1.0f) {
 		Aeron_LogError("xwa.remaster",
 					   "%s: effects.explosion_genus_emissive_strength must be finite and at least 1", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	s.glow_mark_emissive_strength =
+		(float)AeronConfigFile_GetFloat(cf, "effects.glow_mark_emissive_strength", 0.0);
+	if (!isfinite(s.glow_mark_emissive_strength) || s.glow_mark_emissive_strength < 1.0f) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: effects.glow_mark_emissive_strength must be finite and at least 1", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -2937,7 +2947,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	AeronScene_AddMeshInstance(s.scene, &instance);
 	if (!is_bolt && f->object_type != XWA_SNAP_TYPE_DEBRIS_CHUNK) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, context->cmd, context->assets, s.snap, f, prepared.mesh,
-										  model_matrix, prepared.table);
+										  model_matrix, prepared.table, 1.0f);
 		if (map_object->render_kind == XWA_FLIGHT_MAP_RENDER_CRAFT)
 			fl_derive_wreck_flames(f, snapshot_index, context->assets, NULL, NULL);
 		if (s.glow_ok) {
@@ -3057,7 +3067,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	AeronScene_AddMeshInstance(s.scene, &inst);
 	if (player_f) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
-										  inst.mesh_table);
+										  inst.mesh_table, s.glow_mark_emissive_strength);
 	}
 	if (s.glow_ok && player_f) {
 		XwaRemasterShip_SubmitEngineGlows(
@@ -3949,7 +3959,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		} else {
 			AeronScene_AddMeshInstance(s.scene, &inst);
 			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, prepared.mesh, model_matrix,
-											  inst.mesh_table);
+											  inst.mesh_table, s.glow_mark_emissive_strength);
 			/* State-derived engine glows for this craft (classic scale
 			 * gates — no craft / dead subsystems — return 0 and skip). */
 			if (s.glow_ok) {
@@ -4047,7 +4057,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			AeronScene_AddMeshInstance(s.scene, &inst);
 			if (player_f) {
 				XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
-												  inst.mesh_table);
+												  inst.mesh_table, s.glow_mark_emissive_strength);
 			}
 			/* Cockpit-model engine glows (classic: the cockpit glow set
 			 * when internal + cockpit visible), scale/knockouts from
