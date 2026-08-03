@@ -3043,6 +3043,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	AeronSceneMeshInstance inst;
 	memset(&inst, 0, sizeof inst);
 	inst.mesh = cockpit_mesh;
+	inst.variant = player_f ? player_f->node_switch : 0;
 	memcpy(inst.transform, m, sizeof m);
 	memcpy(inst.prev_transform, m, sizeof m);
 	inst.no_local_lights = 1;
@@ -4013,6 +4014,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			AeronSceneMeshInstance inst;
 			memset(&inst, 0, sizeof inst);
 			inst.mesh = cockpit_mesh;
+			inst.variant = cockpit_anchor->node_switch;
 			memcpy(inst.transform, m, sizeof m);
 			memcpy(inst.prev_transform, m, sizeof m);
 			inst.no_local_lights = 1;
