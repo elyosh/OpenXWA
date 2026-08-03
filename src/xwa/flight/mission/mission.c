@@ -6852,11 +6852,14 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			pai_ApplyPendingPlanTargetAndManeuver(objIdx);
 		}
 
-		// Player craft re-applies throttle/speed after AI context setup.
+		// Player craft re-applies throttle/speed after AI context setup. The
+		// !objectTypeOverride conjunct is constant-false: the zero-throttle branch
+		// is dead here and kept only for original codegen shape (0x41D083).
 		if ((uint8_t)objectTypeOverride) {
 			uint16_t throttle2;
-			if (!strcmp(plan->name, "nullpln") || !strcmp(plan->name, "stationaryldrpln") ||
-				!strcmp(plan->name, "stationaryflwpln"))
+			if ((!strcmp(plan->name, "nullpln") || !strcmp(plan->name, "stationaryldrpln") ||
+				 !strcmp(plan->name, "stationaryflwpln")) &&
+				!(uint8_t)objectTypeOverride)
 				throttle2 = 0;
 			else if (!strcmp(plan->name, "escortldr1pln"))
 				throttle2 = 0x8000;
