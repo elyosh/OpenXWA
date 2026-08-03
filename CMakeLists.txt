@@ -361,13 +361,25 @@ if(APPLE)
     set_source_files_properties("${XWA_MACOS_ICON}" PROPERTIES
         MACOSX_PACKAGE_LOCATION Resources)
 
+    set(XWA_MACOS_RESOURCE_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/remaster/config.yaml")
+    target_sources(xwa PRIVATE ${XWA_MACOS_RESOURCE_FILES})
+    set_source_files_properties(${XWA_MACOS_RESOURCE_FILES} PROPERTIES
+        HEADER_FILE_ONLY TRUE
+        MACOSX_PACKAGE_LOCATION Resources/resources/remaster)
+
+    set(XWA_MACOS_SHADER_OUTPUTS ${AERON_SHADER_OUTPUTS} ${XWA_SHADER_OUTPUTS})
+    target_sources(xwa PRIVATE ${XWA_MACOS_SHADER_OUTPUTS})
+    set_source_files_properties(${XWA_MACOS_SHADER_OUTPUTS} PROPERTIES
+        GENERATED TRUE
+        MACOSX_PACKAGE_LOCATION Resources/shaders)
+
     add_custom_command(TARGET xwa POST_BUILD
         COMMAND ${CMAKE_COMMAND}
             "-DXWA_BUNDLE_CONTENT_DIR=$<TARGET_BUNDLE_CONTENT_DIR:xwa>"
-            "-DXWA_RESOURCE_SOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/resources"
             "-DXWA_SHADER_SOURCE_DIR=${CMAKE_BINARY_DIR}/shaders"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/StageBundle.cmake"
-        COMMENT "Staging OpenXWA macOS bundle resources"
+        COMMENT "Staging OpenXWA macOS shaders"
         VERBATIM
     )
 
