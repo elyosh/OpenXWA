@@ -1439,15 +1439,12 @@ void XwaSnapshot_CaptureFlight(void) {
 		}
 	}
 
-	/* Region backdrops: mission-static STATE (world direction, strip
-	 * geometry built once at load) from the region's WorldRectRecord
-	 * table — the same records Backdrop_RenderCurrentRegion draws. The
-	 * scene-level gate and the per-record skips mirror that function:
-	 * the Death Star hangar draws no backdrops; a record hides when
-	 * backdrops are disabled with drawFlags set, or when it is the
-	 * region's tunnel-laser beam sprite while no shot is active. */
+	/* Capture the backdrop records drawn by Backdrop_RenderCurrentRegion.
+	 * Hangar backdrops come from the saved mission region while hangar
+	 * objects and the camera remain in the synthetic hangar region. */
 	{
-		const int region = g_players[g_localPlayer].regionIndex;
+		const int region =
+			g_inHangarReady ? g_hangarSavedMissionRegionIdx : g_players[g_localPlayer].regionIndex;
 		uint32_t n = 0;
 		if (region >= 0 && region < XWA_BACKDROP_REGION_COUNT &&
 			g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR) {

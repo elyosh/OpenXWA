@@ -3697,8 +3697,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 
 	/* Star skybox — replaces the classic CPU pixel starfield
 	 * (FlightStarfield_Render). Drawn scene-side under the SKY
-	 * backdrops and all meshes. The classic gates the starfield off in
-	 * the Death Star hangar scene (ds_hangar).
+	 * backdrops and all meshes. Disabled in Death Star tunnel/interior mode.
 	 * World→cube basis: XWA world XY is the horizontal plane, +Z up
 	 * (starfield elevation bins measure from XY toward ±Z; backdrop
 	 * strips extend along Z) — world X→cube X, world Z→cube +Y (up),

@@ -459,8 +459,8 @@ typedef struct XwaFlightCamera {
 	uint8_t map_mode;         /* player.mapCameraState */
 	uint8_t film_overlay;     /* film playback with overlay camera */
 	uint8_t in_hangar;        /* g_inHangarReady (hangar scene phase) */
-	/* Mission hangar kind == Death Star: type-2006 explosion billboards
-	 * skip the 1024 projected-size clamp there (classic flush rule). */
+	/* Death Star tunnel/interior mode. Type-2006 explosion billboards
+	 * skip the 1024 projected-size clamp. */
 	uint8_t ds_hangar;
 	/* Death Star tunnel turbolaser beam light (the region's
 	 * g_deathStarTunnelLaserRegions state while a beam is active —
