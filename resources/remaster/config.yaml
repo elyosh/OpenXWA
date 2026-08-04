@@ -167,7 +167,8 @@ shadows:
   light_angular_radius_degrees: 0.6
   max_filter_radius: 8.0
   pcss_min_filter_radius: 0.75
-  normal_bias: 4.0
+  # Receiver offset as a multiplier of the cascade's filtered texel footprint.
+  normal_bias: 0.5
   normal_bias_face_normal: true
   depth_bias_texels: 1.0
   slope_bias: 1.0

@@ -261,7 +261,7 @@ static void xwa_tool_shadows(int* open, void* user) {
 	if (!contact_hardening) {
 		ImGui::EndDisabled();
 	}
-	changed |= ImGui::SliderFloat("Normal bias", &p.normal_bias, 0.0f, 32.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Normal bias", &p.normal_bias, 0.0f, 4.0f, "%.2f x filter radius");
 	bool face_normal_bias = p.normal_bias_face_normal != 0;
 	if (ImGui::Checkbox("Bias along face normal", &face_normal_bias)) {
 		p.normal_bias_face_normal = face_normal_bias ? 1 : 0;
