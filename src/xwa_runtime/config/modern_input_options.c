@@ -30,13 +30,13 @@ static int XwaControllerProfile_HasUniqueSources(const XwaControllerProfile* pro
 		}
 	}
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
-		const XwaControllerDigitalBinding* lhs = &profile->buttons[i];
-		if (lhs->kind == XWA_CONTROLLER_DIGITAL_NONE) {
+		const AeronControllerDigitalSource* lhs = &profile->buttons[i];
+		if (lhs->kind == AERON_CONTROLLER_DIGITAL_NONE) {
 			continue;
 		}
 		for (j = i + 1; j < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++j) {
-			const XwaControllerDigitalBinding* rhs = &profile->buttons[j];
-			if (lhs->kind == rhs->kind && lhs->source == rhs->source) {
+			const AeronControllerDigitalSource* rhs = &profile->buttons[j];
+			if (lhs->kind == rhs->kind && lhs->index == rhs->index) {
 				return 0;
 			}
 		}
@@ -59,21 +59,21 @@ static int XwaControllerProfile_IsValid(const XwaControllerProfile* profile, int
 		}
 	}
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
-		const XwaControllerDigitalBinding* binding = &profile->buttons[i];
+		const AeronControllerDigitalSource* binding = &profile->buttons[i];
 		switch (binding->kind) {
-			case XWA_CONTROLLER_DIGITAL_NONE:
-				if (binding->source != -1) {
+			case AERON_CONTROLLER_DIGITAL_NONE:
+				if (binding->index != 0) {
 					return 0;
 				}
 				break;
-			case XWA_CONTROLLER_DIGITAL_BUTTON:
-				if (binding->source < 0 || binding->source >= button_limit) {
+			case AERON_CONTROLLER_DIGITAL_BUTTON:
+				if (binding->index >= button_limit) {
 					return 0;
 				}
 				break;
-			case XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE:
-			case XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE:
-				if (binding->source < 0 || binding->source >= axis_limit || !isfinite(binding->threshold) ||
+			case AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE:
+			case AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE:
+				if (binding->index >= axis_limit || !isfinite(binding->threshold) ||
 					binding->threshold <= 0.0f || binding->threshold > 1.0f) {
 					return 0;
 				}
@@ -92,10 +92,10 @@ static int XwaControllerGamepadPovIsUnambiguous(const XwaControllerProfile* prof
 		return 1;
 	}
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
-		const XwaControllerDigitalBinding* binding = &profile->buttons[i];
-		if (binding->kind == XWA_CONTROLLER_DIGITAL_BUTTON &&
-			binding->source >= AERON_GAMEPAD_BUTTON_DPAD_UP &&
-			binding->source <= AERON_GAMEPAD_BUTTON_DPAD_RIGHT) {
+		const AeronControllerDigitalSource* binding = &profile->buttons[i];
+		if (binding->kind == AERON_CONTROLLER_DIGITAL_BUTTON &&
+			binding->index >= AERON_GAMEPAD_BUTTON_DPAD_UP &&
+			binding->index <= AERON_GAMEPAD_BUTTON_DPAD_RIGHT) {
 			return 0;
 		}
 	}
@@ -151,19 +151,20 @@ static void XwaModernInputOptions_Normalize(XwaModernInputOptions* options) {
 		options->controller.joystick.axes[i].invert = options->controller.joystick.axes[i].invert != 0;
 	}
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
-		XwaControllerDigitalBinding* gamepad = &options->controller.gamepad.buttons[i];
-		XwaControllerDigitalBinding* joystick = &options->controller.joystick.buttons[i];
-		if (gamepad->kind == XWA_CONTROLLER_DIGITAL_NONE) {
-			gamepad->source = -1;
+		AeronControllerDigitalSource* gamepad = &options->controller.gamepad.buttons[i];
+		AeronControllerDigitalSource* joystick = &options->controller.joystick.buttons[i];
+		if (gamepad->kind == AERON_CONTROLLER_DIGITAL_NONE) {
+			gamepad->index = 0;
 		}
-		if (joystick->kind == XWA_CONTROLLER_DIGITAL_NONE) {
-			joystick->source = -1;
+		if (joystick->kind == AERON_CONTROLLER_DIGITAL_NONE) {
+			joystick->index = 0;
 		}
-		if (gamepad->kind == XWA_CONTROLLER_DIGITAL_NONE || gamepad->kind == XWA_CONTROLLER_DIGITAL_BUTTON) {
+		if (gamepad->kind == AERON_CONTROLLER_DIGITAL_NONE ||
+			gamepad->kind == AERON_CONTROLLER_DIGITAL_BUTTON) {
 			gamepad->threshold = XWA_CONTROLLER_DIGITAL_THRESHOLD_DEFAULT;
 		}
-		if (joystick->kind == XWA_CONTROLLER_DIGITAL_NONE ||
-			joystick->kind == XWA_CONTROLLER_DIGITAL_BUTTON) {
+		if (joystick->kind == AERON_CONTROLLER_DIGITAL_NONE ||
+			joystick->kind == AERON_CONTROLLER_DIGITAL_BUTTON) {
 			joystick->threshold = XWA_CONTROLLER_DIGITAL_THRESHOLD_DEFAULT;
 		}
 	}
@@ -182,8 +183,7 @@ static int XwaControllerProfile_AreEqual(const XwaControllerProfile* lhs, const 
 		}
 	}
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
-		if (lhs->buttons[i].kind != rhs->buttons[i].kind ||
-			lhs->buttons[i].source != rhs->buttons[i].source ||
+		if (lhs->buttons[i].kind != rhs->buttons[i].kind || lhs->buttons[i].index != rhs->buttons[i].index ||
 			lhs->buttons[i].threshold != rhs->buttons[i].threshold) {
 			return 0;
 		}

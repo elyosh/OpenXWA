@@ -3,13 +3,11 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "aeron/numeric.h"
-
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <yaml.h>
 
 static int host_config_error(char* error, size_t error_size, const char* message, const char* detail) {
 	if (error && error_size) {
@@ -526,8 +524,9 @@ static int host_config_gamepad_axis_source(const AeronConfigFile* config, const 
 }
 
 static int host_config_controller_digital_binding(const AeronConfigFile* config, const char* key,
-												  int required, int gamepad, XwaControllerDigitalBinding* out,
-												  char* error, size_t error_size) {
+												  int required, int gamepad,
+												  AeronControllerDigitalSource* out, char* error,
+												  size_t error_size) {
 	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
 	const AeronConfigNode* axis_node;
 	const AeronConfigNode* direction_node;
@@ -562,9 +561,9 @@ static int host_config_controller_digital_binding(const AeronConfigFile* config,
 		}
 		value = direction_node ? AeronConfigNode_String(direction_node, NULL) : "positive";
 		if (value && strcmp(value, "positive") == 0) {
-			out->kind = XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE;
+			out->kind = AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE;
 		} else if (value && strcmp(value, "negative") == 0) {
-			out->kind = XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE;
+			out->kind = AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE;
 		} else {
 			return host_config_error(error, error_size, "invalid input setting '%s'", key);
 		}
@@ -575,13 +574,13 @@ static int host_config_controller_digital_binding(const AeronConfigFile* config,
 			}
 			out->threshold = (float)threshold;
 		}
-		out->source = source;
+		out->index = (uint8_t)source;
 		return 1;
 	}
 	value = AeronConfigNode_String(node, NULL);
 	if (value && strcmp(value, "none") == 0) {
-		out->kind = XWA_CONTROLLER_DIGITAL_NONE;
-		out->source = -1;
+		out->kind = AERON_CONTROLLER_DIGITAL_NONE;
+		out->index = 0;
 		return 1;
 	}
 	if (gamepad) {
@@ -598,8 +597,8 @@ static int host_config_controller_digital_binding(const AeronConfigFile* config,
 		}
 		source = (int)button;
 	}
-	out->kind = XWA_CONTROLLER_DIGITAL_BUTTON;
-	out->source = source;
+	out->kind = AERON_CONTROLLER_DIGITAL_BUTTON;
+	out->index = (uint8_t)source;
 	return 1;
 }
 
@@ -909,87 +908,42 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 	return valid;
 }
 
-static int host_yaml_scalar_equals(const yaml_node_t* node, const char* value) {
-	const size_t length = strlen(value);
-	return node && node->type == YAML_SCALAR_NODE && node->data.scalar.length == length &&
-		   memcmp(node->data.scalar.value, value, length) == 0;
-}
+static int host_config_prepare_user_document(AeronVfs* vfs, AeronConfigFile** document, char* error,
+											 size_t error_size) {
+	AeronConfigError config_error = { 0 };
 
-static int host_yaml_mapping_value(const yaml_document_t* document, int mapping_id, const char* key,
-								   size_t* pair_index) {
-	yaml_node_t* mapping = yaml_document_get_node((yaml_document_t*)document, mapping_id);
-	yaml_node_pair_t* pair;
-
-	if (!mapping || mapping->type != YAML_MAPPING_NODE) {
-		return 0;
-	}
-	for (pair = mapping->data.mapping.pairs.start; pair < mapping->data.mapping.pairs.top; ++pair) {
-		if (host_yaml_scalar_equals(yaml_document_get_node((yaml_document_t*)document, pair->key), key)) {
-			if (pair_index) {
-				*pair_index = (size_t)(pair - mapping->data.mapping.pairs.start);
-			}
-			return pair->value;
+	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, "config.yaml")) {
+		if (AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_USER, "config.yaml", document, &config_error)) {
+			return 1;
 		}
+		return host_config_error(error, error_size, "could not update user configuration: %s",
+								 config_error.message);
 	}
-	return 0;
+	if (!AeronConfigFile_CreateMap(AERON_VFS_ROOT_USER, "config.yaml", document, &config_error) ||
+		!AeronConfigFile_SetInt(*document, "version", 1, &config_error)) {
+		AeronConfigFile_Destroy(*document);
+		*document = NULL;
+		return host_config_error(error, error_size, "could not create user configuration: %s",
+								 config_error.message);
+	}
+	return 1;
 }
 
-static int host_yaml_add_scalar(yaml_document_t* document, const char* value, yaml_scalar_style_t style) {
-	return yaml_document_add_scalar(document, (yaml_char_t*)YAML_STR_TAG, (const yaml_char_t*)value,
-									(int)strlen(value), style);
+static int host_config_save_user_document(AeronVfs* vfs, AeronConfigFile* document, char* error,
+										  size_t error_size) {
+	AeronConfigError config_error = { 0 };
+	int saved = AeronConfigFile_SaveYaml(vfs, document, &config_error);
+
+	AeronConfigFile_Destroy(document);
+	if (!saved) {
+		return host_config_error(error, error_size, "could not save user configuration: %s",
+								 config_error.message);
+	}
+	return 1;
 }
 
-static int host_yaml_get_or_add_mapping(yaml_document_t* document, int parent_id, const char* key) {
-	int mapping_id;
-
-	mapping_id = host_yaml_mapping_value(document, parent_id, key, NULL);
-	if (mapping_id) {
-		yaml_node_t* mapping = yaml_document_get_node(document, mapping_id);
-		return mapping && mapping->type == YAML_MAPPING_NODE ? mapping_id : 0;
-	}
-	mapping_id = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_BLOCK_MAPPING_STYLE);
-	if (mapping_id) {
-		const int key_id = host_yaml_add_scalar(document, key, YAML_PLAIN_SCALAR_STYLE);
-		if (key_id && yaml_document_append_mapping_pair(document, parent_id, key_id, mapping_id)) {
-			return mapping_id;
-		}
-	}
-	return 0;
-}
-
-static int host_yaml_set_scalar(yaml_document_t* document, int mapping_id, const char* key, const char* value,
-								yaml_scalar_style_t style) {
-	size_t pair_index = 0;
-	const int existing_value_id = host_yaml_mapping_value(document, mapping_id, key, &pair_index);
-	const int value_id = host_yaml_add_scalar(document, value, style);
-
-	if (!value_id) {
-		return 0;
-	}
-	if (existing_value_id) {
-		yaml_node_t* mapping = yaml_document_get_node(document, mapping_id);
-		mapping->data.mapping.pairs.start[pair_index].value = value_id;
-		return 1;
-	}
-	{
-		const int key_id = host_yaml_add_scalar(document, key, YAML_PLAIN_SCALAR_STYLE);
-		return key_id && yaml_document_append_mapping_pair(document, mapping_id, key_id, value_id);
-	}
-}
-
-static int host_yaml_set_game_data(yaml_document_t* document, const char* path) {
-	yaml_node_t* root = yaml_document_get_root_node(document);
-	int paths_id;
-
-	if (!root || root->type != YAML_MAPPING_NODE) {
-		return 0;
-	}
-	paths_id = host_yaml_get_or_add_mapping(document, 1, "paths");
-	return paths_id &&
-		   host_yaml_set_scalar(document, paths_id, "game_data", path, YAML_SINGLE_QUOTED_SCALAR_STYLE);
-}
-
-static int host_yaml_set_video_options(yaml_document_t* document, const XwaModernVideoOptions* options) {
+static int host_config_set_video_options(AeronConfigFile* document, const XwaModernVideoOptions* options,
+										 AeronConfigError* error) {
 	static const char* const window_mode_names[] = { "windowed", "fullscreen" };
 	static const char* const quality_names[] = { "off", "low", "high" };
 	static const char* const shadow_quality_names[] = { "standard", "high" };
@@ -997,12 +951,8 @@ static int host_yaml_set_video_options(yaml_document_t* document, const XwaModer
 	static const char* const msaa_names[] = { "off", "2x", "4x", "8x" };
 	static const char* const sdr_gamma_names[] = { "2.2", "2.4", "srgb" };
 	static const char* const paper_white_names[] = { "auto", "100", "150", "200", "250", "300", "400" };
-	yaml_node_t* root = yaml_document_get_root_node(document);
-	char motion_blur_amount[32];
-	int video_id;
 
-	if (!root || root->type != YAML_MAPPING_NODE || !options ||
-		options->window_mode < XWA_MODERN_WINDOW_MODE_WINDOWED ||
+	if (!options || options->window_mode < XWA_MODERN_WINDOW_MODE_WINDOWED ||
 		options->window_mode > XWA_MODERN_WINDOW_MODE_FULLSCREEN ||
 		options->ssao_quality < XWA_MODERN_SSAO_OFF || options->ssao_quality > XWA_MODERN_SSAO_HIGH ||
 		options->shadow_quality < XWA_MODERN_SHADOW_STANDARD ||
@@ -1019,229 +969,52 @@ static int host_yaml_set_video_options(yaml_document_t* document, const XwaModer
 		options->paper_white > XWA_MODERN_PAPER_WHITE_400) {
 		return 0;
 	}
-	if (!Aeron_FormatAsciiDouble(motion_blur_amount, sizeof motion_blur_amount,
-								 (double)options->motion_blur_amount, 6)) {
-		return 0;
-	}
-	video_id = host_yaml_get_or_add_mapping(document, 1, "video");
-	return video_id &&
-		   host_yaml_set_scalar(document, video_id, "window_mode", window_mode_names[options->window_mode],
-								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, video_id, "ssao_quality", quality_names[options->ssao_quality],
-								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, video_id, "shadow_quality",
-								shadow_quality_names[options->shadow_quality],
-								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, video_id, "fsr_upscaling", fsr_names[options->fsr_upscaling],
-								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, video_id, "msaa", msaa_names[options->msaa],
-								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, video_id, "motion_blur_quality",
-								quality_names[options->motion_blur_quality],
-								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, video_id, "motion_blur_amount", motion_blur_amount,
-								YAML_PLAIN_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, video_id, "hdr_output", options->hdr_output ? "true" : "false",
-								YAML_PLAIN_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, video_id, "sdr_content_gamma", sdr_gamma_names[options->sdr_gamma],
-								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, video_id, "paper_white_nits",
-								paper_white_names[options->paper_white], YAML_SINGLE_QUOTED_SCALAR_STYLE);
-}
-
-static int host_yaml_create_document(yaml_document_t* document) {
-	int root_id;
-	int version_key_id;
-	int version_value_id;
-
-	if (!yaml_document_initialize(document, NULL, NULL, NULL, 1, 1)) {
-		return 0;
-	}
-	root_id = yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_BLOCK_MAPPING_STYLE);
-	version_key_id = host_yaml_add_scalar(document, "version", YAML_PLAIN_SCALAR_STYLE);
-	version_value_id = host_yaml_add_scalar(document, "1", YAML_PLAIN_SCALAR_STYLE);
-	if (!root_id || !version_key_id || !version_value_id ||
-		!yaml_document_append_mapping_pair(document, root_id, version_key_id, version_value_id)) {
-		yaml_document_delete(document);
-		return 0;
-	}
-	return 1;
-}
-
-static int host_yaml_load_document(AeronVfs* vfs, yaml_document_t* document) {
-	uint8_t* data = NULL;
-	size_t data_size = 0;
-	yaml_parser_t parser;
-	yaml_document_t extra_document;
-	int document_loaded = 0;
-	int loaded = 0;
-
-	memset(document, 0, sizeof *document);
-	memset(&extra_document, 0, sizeof extra_document);
-	if (!AeronVfs_ReadAll(vfs, AERON_VFS_ROOT_USER, "config.yaml", 1024 * 1024, &data, &data_size) ||
-		!yaml_parser_initialize(&parser)) {
-		free(data);
-		return 0;
-	}
-	yaml_parser_set_input_string(&parser, data, data_size);
-	if (yaml_parser_load(&parser, document)) {
-		document_loaded = 1;
-	}
-	if (document_loaded && yaml_parser_load(&parser, &extra_document)) {
-		yaml_node_t* root = yaml_document_get_root_node(document);
-		if (root && root->type == YAML_MAPPING_NODE && !yaml_document_get_root_node(&extra_document)) {
-			loaded = 1;
-		}
-	}
-	if (document_loaded && !loaded) {
-		yaml_document_delete(document);
-	}
-	yaml_document_delete(&extra_document);
-	yaml_parser_delete(&parser);
-	free(data);
-	return loaded;
-}
-
-static int host_yaml_write(void* data, unsigned char* buffer, size_t size) {
-	AeronFile* file = (AeronFile*)data;
-	return AeronVfs_Write(file, buffer, size, NULL);
-}
-
-static int host_yaml_save_document(AeronVfs* vfs, yaml_document_t* document, char* error, size_t error_size) {
-	static const char* path = "config.yaml";
-	static const char* temporary_path = "config.yaml.tmp";
-	yaml_emitter_t emitter;
-	AeronFile* file = NULL;
-	int emitter_initialized = 0;
-	int document_owned = 1;
-	int ok = 0;
-
-	if (!AeronVfs_Open(vfs, AERON_VFS_ROOT_USER, temporary_path, AERON_VFS_WRITE, &file) ||
-		!yaml_emitter_initialize(&emitter)) {
-		goto cleanup;
-	}
-	emitter_initialized = 1;
-	yaml_emitter_set_output(&emitter, host_yaml_write, file);
-	yaml_emitter_set_indent(&emitter, 2);
-	yaml_emitter_set_unicode(&emitter, 1);
-	if (!yaml_emitter_open(&emitter)) {
-		goto cleanup;
-	}
-	document_owned = 0;
-	if (!yaml_emitter_dump(&emitter, document) || !yaml_emitter_close(&emitter) || !AeronVfs_Flush(file)) {
-		goto cleanup;
-	}
-	{
-		const int close_ok = AeronVfs_Close(file);
-		file = NULL;
-		if (!close_ok) {
-			goto cleanup;
-		}
-	}
-	if (!AeronVfs_Rename(vfs, AERON_VFS_ROOT_USER, temporary_path, path)) {
-		goto cleanup;
-	}
-	ok = 1;
-
-cleanup:
-	if (file) {
-		AeronVfs_Close(file);
-	}
-	if (emitter_initialized) {
-		yaml_emitter_delete(&emitter);
-	}
-	if (document_owned) {
-		yaml_document_delete(document);
-	}
-	if (!ok) {
-		AeronVfs_Remove(vfs, AERON_VFS_ROOT_USER, temporary_path);
-		host_config_error(error, error_size, "could not save user configuration: %s", path);
-	}
-	return ok;
-}
-
-static int host_yaml_prepare_user_document(AeronVfs* vfs, yaml_document_t* document, char* error,
-										   size_t error_size) {
-	static const char* path = "config.yaml";
-
-	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, path)) {
-		if (host_yaml_load_document(vfs, document)) {
-			return 1;
-		}
-		return host_config_error(error, error_size, "could not update user configuration: %s", path);
-	}
-	if (host_yaml_create_document(document)) {
-		return 1;
-	}
-	return host_config_error(error, error_size, "could not create user configuration: %s", path);
+	return AeronConfigFile_SetString(document, "video.window_mode", window_mode_names[options->window_mode],
+									 error) &&
+		   AeronConfigFile_SetString(document, "video.ssao_quality", quality_names[options->ssao_quality],
+									 error) &&
+		   AeronConfigFile_SetString(document, "video.shadow_quality",
+									 shadow_quality_names[options->shadow_quality], error) &&
+		   AeronConfigFile_SetString(document, "video.fsr_upscaling", fsr_names[options->fsr_upscaling],
+									 error) &&
+		   AeronConfigFile_SetString(document, "video.msaa", msaa_names[options->msaa], error) &&
+		   AeronConfigFile_SetString(document, "video.motion_blur_quality",
+									 quality_names[options->motion_blur_quality], error) &&
+		   AeronConfigFile_SetFloat(document, "video.motion_blur_amount", options->motion_blur_amount,
+									error) &&
+		   AeronConfigFile_SetBool(document, "video.hdr_output", options->hdr_output, error) &&
+		   AeronConfigFile_SetString(document, "video.sdr_content_gamma", sdr_gamma_names[options->sdr_gamma],
+									 error) &&
+		   AeronConfigFile_SetString(document, "video.paper_white_nits",
+									 paper_white_names[options->paper_white], error);
 }
 
 int XwaHostConfig_SaveGameDataPath(AeronVfs* vfs, const char* game_data_path, char* error,
 								   size_t error_size) {
-	yaml_document_t document;
+	AeronConfigFile* document = NULL;
+	AeronConfigError config_error = { 0 };
 
 	if (!vfs || !game_data_path || !game_data_path[0] ||
 		strlen(game_data_path) >= XWA_HOST_CONFIG_PATH_CAPACITY) {
 		return host_config_error(error, error_size, "cannot save invalid path to %s", "config.yaml");
 	}
-	if (!host_yaml_prepare_user_document(vfs, &document, error, error_size)) {
+	if (!host_config_prepare_user_document(vfs, &document, error, error_size)) {
 		return 0;
 	}
-	if (!host_yaml_set_game_data(&document, game_data_path)) {
-		yaml_document_delete(&document);
-		return host_config_error(error, error_size, "could not update user configuration: %s", "config.yaml");
+	if (!AeronConfigFile_SetString(document, "paths.game_data", game_data_path, &config_error)) {
+		AeronConfigFile_Destroy(document);
+		return host_config_error(error, error_size, "could not update user configuration: %s",
+								 config_error.message);
 	}
-	return host_yaml_save_document(vfs, &document, error, error_size);
+	return host_config_save_user_document(vfs, document, error, error_size);
 }
 
-static int host_yaml_set_sequence_node(yaml_document_t* document, int mapping_id, const char* key,
-									   int sequence_id) {
-	size_t pair_index = 0;
-	const int existing_value_id = host_yaml_mapping_value(document, mapping_id, key, &pair_index);
-
-	if (!sequence_id) {
-		return 0;
-	}
-	if (existing_value_id) {
-		yaml_node_t* mapping = yaml_document_get_node(document, mapping_id);
-		mapping->data.mapping.pairs.start[pair_index].value = sequence_id;
-		return 1;
-	}
-	{
-		const int key_id = host_yaml_add_scalar(document, key, YAML_PLAIN_SCALAR_STYLE);
-		return key_id && yaml_document_append_mapping_pair(document, mapping_id, key_id, sequence_id);
-	}
-}
-
-static int host_yaml_set_mapping_node(yaml_document_t* document, int parent_id, const char* key,
-									  int mapping_id) {
-	size_t pair_index = 0;
-	const int existing_value_id = host_yaml_mapping_value(document, parent_id, key, &pair_index);
-
-	if (!mapping_id) {
-		return 0;
-	}
-	if (existing_value_id) {
-		yaml_node_t* parent = yaml_document_get_node(document, parent_id);
-		parent->data.mapping.pairs.start[pair_index].value = mapping_id;
-		return 1;
-	}
-	{
-		const int key_id = host_yaml_add_scalar(document, key, YAML_PLAIN_SCALAR_STYLE);
-		return key_id && yaml_document_append_mapping_pair(document, parent_id, key_id, mapping_id);
-	}
-}
-
-static int host_yaml_set_controller_axis(yaml_document_t* document, int axes_id, const char* name,
-										 const XwaControllerAxisBinding* binding, int gamepad) {
-	int axis_id = host_yaml_get_or_add_mapping(document, axes_id, name);
-	char source_text[16];
-	char deadzone_text[32];
+static int host_config_set_controller_axis(AeronConfigFile* document, const char* profile_name,
+										   const char* name, const XwaControllerAxisBinding* binding,
+										   int gamepad, AeronConfigError* error) {
+	char path[128];
 	const char* source_name;
 
-	if (!axis_id) {
-		return 0;
-	}
 	if (binding->source < 0) {
 		source_name = "none";
 	} else if (gamepad) {
@@ -1249,102 +1022,106 @@ static int host_yaml_set_controller_axis(yaml_document_t* document, int axes_id,
 		if (!source_name) {
 			return 0;
 		}
-	} else {
-		snprintf(source_text, sizeof(source_text), "%d", binding->source);
-		source_name = source_text;
 	}
-	if (!Aeron_FormatAsciiDouble(deadzone_text, sizeof(deadzone_text), (double)binding->deadzone, 6)) {
+	snprintf(path, sizeof path, "input.controller.%s.axes.%s.source", profile_name, name);
+	if (gamepad || binding->source < 0) {
+		if (!AeronConfigFile_SetString(document, path, source_name, error)) {
+			return 0;
+		}
+	} else if (!AeronConfigFile_SetInt(document, path, binding->source, error)) {
 		return 0;
 	}
-	return host_yaml_set_scalar(document, axis_id, "source", source_name,
-								gamepad || binding->source < 0 ? YAML_SINGLE_QUOTED_SCALAR_STYLE
-															   : YAML_PLAIN_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, axis_id, "invert", binding->invert ? "true" : "false",
-								YAML_PLAIN_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, axis_id, "deadzone", deadzone_text, YAML_PLAIN_SCALAR_STYLE);
+	snprintf(path, sizeof path, "input.controller.%s.axes.%s.invert", profile_name, name);
+	if (!AeronConfigFile_SetBool(document, path, binding->invert, error)) {
+		return 0;
+	}
+	snprintf(path, sizeof path, "input.controller.%s.axes.%s.deadzone", profile_name, name);
+	return AeronConfigFile_SetFloat(document, path, binding->deadzone, error);
 }
 
-static int host_yaml_set_controller_button(yaml_document_t* document, int buttons_id, const char* key,
-										   const XwaControllerDigitalBinding* binding, int gamepad) {
-	char source_text[16];
+static int host_config_set_controller_button(AeronConfigFile* document, const char* profile_name,
+											 const char* key, const AeronControllerDigitalSource* binding,
+											 int gamepad, AeronConfigError* error) {
+	char path[128];
 	const char* source_name;
-	yaml_scalar_style_t source_style;
 
-	if (binding->kind == XWA_CONTROLLER_DIGITAL_NONE) {
-		return host_yaml_set_scalar(document, buttons_id, key, "none", YAML_SINGLE_QUOTED_SCALAR_STYLE);
+	snprintf(path, sizeof path, "input.controller.%s.buttons.%s", profile_name, key);
+
+	if (binding->kind == AERON_CONTROLLER_DIGITAL_NONE) {
+		return AeronConfigFile_SetString(document, path, "none", error);
 	}
-	if (binding->kind == XWA_CONTROLLER_DIGITAL_BUTTON) {
+	if (binding->kind == AERON_CONTROLLER_DIGITAL_BUTTON) {
 		if (gamepad) {
-			source_name = Aeron_GamepadButtonName((AeronGamepadButton)binding->source);
-			source_style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+			source_name = Aeron_GamepadButtonName((AeronGamepadButton)binding->index);
 			if (!source_name) {
 				return 0;
 			}
+			return AeronConfigFile_SetString(document, path, source_name, error);
 		} else {
-			snprintf(source_text, sizeof(source_text), "%d", binding->source);
-			source_name = source_text;
-			source_style = YAML_PLAIN_SCALAR_STYLE;
+			return AeronConfigFile_SetInt(document, path, binding->index, error);
 		}
-		return host_yaml_set_scalar(document, buttons_id, key, source_name, source_style);
 	}
-	if (binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE ||
-		binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
-		char threshold_text[32];
-		int mapping_id =
-			yaml_document_add_mapping(document, (yaml_char_t*)YAML_MAP_TAG, YAML_FLOW_MAPPING_STYLE);
-		if (!mapping_id) {
-			return 0;
-		}
+	if (binding->kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE ||
+		binding->kind == AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
+		AeronConfigValue axis;
+		AeronConfigValue direction = { .type = AERON_CONFIG_STRING };
+		AeronConfigValue threshold = { .type = AERON_CONFIG_FLOAT };
+		AeronConfigMapValue entries[3];
+		AeronConfigValue value = { .type = AERON_CONFIG_MAP };
+
 		if (gamepad) {
-			source_name = Aeron_GamepadAxisName((AeronGamepadAxis)binding->source);
-			source_style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
+			source_name = Aeron_GamepadAxisName((AeronGamepadAxis)binding->index);
 			if (!source_name) {
 				return 0;
 			}
+			axis.type = AERON_CONFIG_STRING;
+			axis.value.string_value = source_name;
 		} else {
-			snprintf(source_text, sizeof(source_text), "%d", binding->source);
-			source_name = source_text;
-			source_style = YAML_PLAIN_SCALAR_STYLE;
+			axis.type = AERON_CONFIG_INT;
+			axis.value.int_value = binding->index;
 		}
-		if (!Aeron_FormatAsciiDouble(threshold_text, sizeof(threshold_text), (double)binding->threshold, 6)) {
-			return 0;
-		}
-		if (!host_yaml_set_scalar(document, mapping_id, "axis", source_name, source_style) ||
-			!host_yaml_set_scalar(document, mapping_id, "direction",
-								  binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE ? "positive"
-																						: "negative",
-								  YAML_SINGLE_QUOTED_SCALAR_STYLE) ||
-			!host_yaml_set_scalar(document, mapping_id, "threshold", threshold_text,
-								  YAML_PLAIN_SCALAR_STYLE)) {
-			return 0;
-		}
-		return host_yaml_set_mapping_node(document, buttons_id, key, mapping_id);
+		direction.value.string_value =
+			binding->kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE ? "positive" : "negative";
+		threshold.value.float_value = binding->threshold;
+		entries[0] = (AeronConfigMapValue) { "axis", &axis };
+		entries[1] = (AeronConfigMapValue) { "direction", &direction };
+		entries[2] = (AeronConfigMapValue) { "threshold", &threshold };
+		value.value.map.entries = entries;
+		value.value.map.count = 3;
+		return AeronConfigFile_SetValue(document, path, &value, error);
 	}
 	return 0;
 }
 
-static int host_yaml_set_controller_actions(yaml_document_t* document, int profile_id,
-											const uint16_t actions[XWA_CONTROLLER_ACTION_COUNT]);
-
-static int host_yaml_set_controller_profile(yaml_document_t* document, int controller_id,
-											const char* profile_name, const XwaControllerProfile* profile,
-											int gamepad) {
-	static const char* const axis_names[XWA_CONTROLLER_LOGICAL_AXIS_COUNT] = { "yaw", "pitch", "throttle",
-																			   "roll" };
-	int profile_id;
-	int axes_id;
-	int buttons_id;
-	int pov_ok;
+static int host_config_set_controller_actions(AeronConfigFile* document, const char* profile_name,
+											  const uint16_t actions[XWA_CONTROLLER_ACTION_COUNT],
+											  AeronConfigError* error) {
+	AeronConfigValue items[XWA_CONTROLLER_ACTION_COUNT];
+	AeronConfigValue sequence = { .type = AERON_CONFIG_SEQUENCE };
+	char path[96];
 	int i;
 
-	profile_id = host_yaml_get_or_add_mapping(document, controller_id, profile_name);
-	axes_id = profile_id ? host_yaml_get_or_add_mapping(document, profile_id, "axes") : 0;
-	buttons_id = profile_id ? host_yaml_get_or_add_mapping(document, profile_id, "buttons") : 0;
-	if (!axes_id || !buttons_id) {
-		return 0;
+	for (i = 0; i < XWA_CONTROLLER_ACTION_COUNT; ++i) {
+		items[i].type = AERON_CONFIG_INT;
+		items[i].value.int_value = actions[i];
 	}
+	sequence.value.sequence.values = items;
+	sequence.value.sequence.count = XWA_CONTROLLER_ACTION_COUNT;
+	snprintf(path, sizeof path, "input.controller.%s.actions", profile_name);
+	return AeronConfigFile_SetValue(document, path, &sequence, error);
+}
+
+static int host_config_set_controller_profile(AeronConfigFile* document, const char* profile_name,
+											  const XwaControllerProfile* profile, int gamepad,
+											  AeronConfigError* error) {
+	static const char* const axis_names[XWA_CONTROLLER_LOGICAL_AXIS_COUNT] = { "yaw", "pitch", "throttle",
+																			   "roll" };
+	char path[96];
+	int i;
+
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_AXIS_COUNT; ++i) {
-		if (!host_yaml_set_controller_axis(document, axes_id, axis_names[i], &profile->axes[i], gamepad)) {
+		if (!host_config_set_controller_axis(document, profile_name, axis_names[i], &profile->axes[i],
+											 gamepad, error)) {
 			return 0;
 		}
 	}
@@ -1352,128 +1129,92 @@ static int host_yaml_set_controller_profile(yaml_document_t* document, int contr
 		char key[8];
 
 		snprintf(key, sizeof(key), "%d", i + 1);
-		if (!host_yaml_set_controller_button(document, buttons_id, key, &profile->buttons[i], gamepad)) {
+		if (!host_config_set_controller_button(document, profile_name, key, &profile->buttons[i], gamepad,
+											   error)) {
 			return 0;
 		}
 	}
 	if (gamepad) {
-		pov_ok = host_yaml_set_scalar(document, profile_id, "pov", profile->pov_source ? "dpad" : "none",
-									  YAML_SINGLE_QUOTED_SCALAR_STYLE);
-	} else {
-		char value[16];
-		const char* text = "none";
-		yaml_scalar_style_t style = YAML_SINGLE_QUOTED_SCALAR_STYLE;
-		if (profile->pov_source >= 0) {
-			snprintf(value, sizeof(value), "%d", profile->pov_source);
-			text = value;
-			style = YAML_PLAIN_SCALAR_STYLE;
+		snprintf(path, sizeof path, "input.controller.%s.pov", profile_name);
+		if (!AeronConfigFile_SetString(document, path, profile->pov_source ? "dpad" : "none", error)) {
+			return 0;
 		}
-		pov_ok = host_yaml_set_scalar(document, profile_id, "pov_hat", text, style);
-	}
-	return pov_ok && host_yaml_set_controller_actions(document, profile_id, profile->actions);
-}
-
-static int host_yaml_set_controller_actions(yaml_document_t* document, int profile_id,
-											const uint16_t actions[XWA_CONTROLLER_ACTION_COUNT]) {
-	int sequence_id;
-	int i;
-
-	sequence_id = yaml_document_add_sequence(document, (yaml_char_t*)YAML_SEQ_TAG, YAML_BLOCK_SEQUENCE_STYLE);
-	if (!sequence_id) {
-		return 0;
-	}
-	for (i = 0; i < XWA_CONTROLLER_ACTION_COUNT; ++i) {
-		char value[16];
-		int value_id;
-
-		snprintf(value, sizeof(value), "%u", (unsigned int)actions[i]);
-		value_id = host_yaml_add_scalar(document, value, YAML_PLAIN_SCALAR_STYLE);
-		if (!value_id || !yaml_document_append_sequence_item(document, sequence_id, value_id)) {
+	} else {
+		snprintf(path, sizeof path, "input.controller.%s.pov_hat", profile_name);
+		if (profile->pov_source >= 0) {
+			if (!AeronConfigFile_SetInt(document, path, profile->pov_source, error)) {
+				return 0;
+			}
+		} else if (!AeronConfigFile_SetString(document, path, "none", error)) {
 			return 0;
 		}
 	}
-	return host_yaml_set_sequence_node(document, profile_id, "actions", sequence_id);
+	return host_config_set_controller_actions(document, profile_name, profile->actions, error);
 }
 
-static int host_yaml_set_input_options(yaml_document_t* document, const XwaModernInputOptions* options) {
+static int host_config_set_input_options(AeronConfigFile* document, const XwaModernInputOptions* options,
+										 AeronConfigError* error) {
 	static const char* const mode_names[] = { "position", "rate" };
-	yaml_node_t* root = yaml_document_get_root_node(document);
-	char sensitivity_text[16];
-	char ordinal_text[16];
-	char rumble_strength_text[16];
-	int input_id;
-	int controller_id;
-	int device_id;
 
-	if (!root || root->type != YAML_MAPPING_NODE || !XwaModernInputOptions_Validate(options)) {
+	if (!XwaModernInputOptions_Validate(options)) {
 		return 0;
 	}
-	snprintf(sensitivity_text, sizeof sensitivity_text, "%d", options->mouse_sensitivity);
-	input_id = host_yaml_get_or_add_mapping(document, 1, "input");
-	controller_id = input_id ? host_yaml_get_or_add_mapping(document, input_id, "controller") : 0;
-	device_id = controller_id ? host_yaml_get_or_add_mapping(document, controller_id, "device") : 0;
-	snprintf(ordinal_text, sizeof(ordinal_text), "%d", options->controller.device.ordinal);
-	snprintf(rumble_strength_text, sizeof(rumble_strength_text), "%d", options->controller.rumble_strength);
-	return input_id && controller_id && device_id &&
-		   host_yaml_set_scalar(document, input_id, "mouse_flight",
-								options->mouse_flight_enabled ? "true" : "false", YAML_PLAIN_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, input_id, "mouse_mode", mode_names[options->mouse_mode],
-								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, input_id, "mouse_sensitivity", sensitivity_text,
-								YAML_PLAIN_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, input_id, "mouse_invert_y",
-								options->mouse_invert_y ? "true" : "false", YAML_PLAIN_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, device_id, "guid", options->controller.device.guid,
-								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, device_id, "path", options->controller.device.path,
-								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, device_id, "ordinal", ordinal_text, YAML_PLAIN_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, controller_id, "roll_enabled",
-								options->controller.roll_enabled ? "true" : "false",
-								YAML_PLAIN_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, controller_id, "rumble_enabled",
-								options->controller.rumble_enabled ? "true" : "false",
-								YAML_PLAIN_SCALAR_STYLE) &&
-		   host_yaml_set_scalar(document, controller_id, "rumble_strength", rumble_strength_text,
-								YAML_PLAIN_SCALAR_STYLE) &&
-		   host_yaml_set_controller_profile(document, controller_id, "gamepad", &options->controller.gamepad,
-											1) &&
-		   host_yaml_set_controller_profile(document, controller_id, "joystick",
-											&options->controller.joystick, 0);
+	return AeronConfigFile_SetBool(document, "input.mouse_flight", options->mouse_flight_enabled, error) &&
+		   AeronConfigFile_SetString(document, "input.mouse_mode", mode_names[options->mouse_mode], error) &&
+		   AeronConfigFile_SetInt(document, "input.mouse_sensitivity", options->mouse_sensitivity, error) &&
+		   AeronConfigFile_SetBool(document, "input.mouse_invert_y", options->mouse_invert_y, error) &&
+		   AeronConfigFile_SetString(document, "input.controller.device.guid",
+									 options->controller.device.guid, error) &&
+		   AeronConfigFile_SetString(document, "input.controller.device.path",
+									 options->controller.device.path, error) &&
+		   AeronConfigFile_SetInt(document, "input.controller.device.ordinal",
+								  options->controller.device.ordinal, error) &&
+		   AeronConfigFile_SetBool(document, "input.controller.roll_enabled",
+								   options->controller.roll_enabled, error) &&
+		   AeronConfigFile_SetBool(document, "input.controller.rumble_enabled",
+								   options->controller.rumble_enabled, error) &&
+		   AeronConfigFile_SetInt(document, "input.controller.rumble_strength",
+								  options->controller.rumble_strength, error) &&
+		   host_config_set_controller_profile(document, "gamepad", &options->controller.gamepad, 1, error) &&
+		   host_config_set_controller_profile(document, "joystick", &options->controller.joystick, 0, error);
 }
 
 int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* options, char* error,
 								   size_t error_size) {
-	yaml_document_t document;
+	AeronConfigFile* document = NULL;
+	AeronConfigError config_error = { 0 };
 
 	if (!vfs || !options) {
 		return host_config_error(error, error_size, "cannot save invalid input settings to %s",
 								 "config.yaml");
 	}
-	if (!host_yaml_prepare_user_document(vfs, &document, error, error_size)) {
+	if (!host_config_prepare_user_document(vfs, &document, error, error_size)) {
 		return 0;
 	}
-	if (!host_yaml_set_input_options(&document, options)) {
-		yaml_document_delete(&document);
-		return host_config_error(error, error_size, "could not update user configuration: %s", "config.yaml");
+	if (!host_config_set_input_options(document, options, &config_error)) {
+		AeronConfigFile_Destroy(document);
+		return host_config_error(error, error_size, "could not update user configuration: %s",
+								 config_error.message[0] ? config_error.message : "invalid input settings");
 	}
-	return host_yaml_save_document(vfs, &document, error, error_size);
+	return host_config_save_user_document(vfs, document, error, error_size);
 }
 
 int XwaHostConfig_SaveVideoOptions(AeronVfs* vfs, const XwaModernVideoOptions* options, char* error,
 								   size_t error_size) {
-	yaml_document_t document;
+	AeronConfigFile* document = NULL;
+	AeronConfigError config_error = { 0 };
 
 	if (!vfs || !options) {
 		return host_config_error(error, error_size, "cannot save invalid video settings to %s",
 								 "config.yaml");
 	}
-	if (!host_yaml_prepare_user_document(vfs, &document, error, error_size)) {
+	if (!host_config_prepare_user_document(vfs, &document, error, error_size)) {
 		return 0;
 	}
-	if (!host_yaml_set_video_options(&document, options)) {
-		yaml_document_delete(&document);
-		return host_config_error(error, error_size, "could not update user configuration: %s", "config.yaml");
+	if (!host_config_set_video_options(document, options, &config_error)) {
+		AeronConfigFile_Destroy(document);
+		return host_config_error(error, error_size, "could not update user configuration: %s",
+								 config_error.message[0] ? config_error.message : "invalid video settings");
 	}
-	return host_yaml_save_document(vfs, &document, error, error_size);
+	return host_config_save_user_document(vfs, document, error, error_size);
 }

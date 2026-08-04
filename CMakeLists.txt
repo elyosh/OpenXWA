@@ -330,9 +330,7 @@ target_link_libraries(xwa
         xwa_remaster
 )
 target_include_directories(xwa PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/xwa_app
-    ${CMAKE_CURRENT_SOURCE_DIR}/aeron/third_party/libyaml/include)
-target_compile_definitions(xwa PRIVATE YAML_DECLARE_STATIC)
+	${CMAKE_CURRENT_SOURCE_DIR}/src/xwa_app)
 
 set(XWA_VERSION "0.0.0-dev" CACHE STRING "OpenXWA application version")
 

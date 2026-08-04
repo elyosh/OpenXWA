@@ -26,9 +26,9 @@
 #include "xwa/frontend/frontend_wave_stream.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/frontend/model_preview.h"
+#include "xwa/frontend/net_transport.h"
 #include "xwa/input/forcefeedback.h"
 #include "xwa/movie/movie.h"
-#include "xwa/frontend/net_transport.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"
 #include "xwa/util/string.h"
@@ -1205,11 +1205,11 @@ int Config_JoystickRemapScreen(void) {
 	}
 
 	if (restoreDefaults == 1) {
-		dialogResult = FrontendDialog_ShowConfirmDialog(
-			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL1),
-			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL2),
-			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL3), FrontendString_Get(STR_OKAY),
-			FrontendString_Get(STR_CANCEL));
+		dialogResult =
+			FrontendDialog_ShowConfirmDialog(FrontendString_Get(STR_RESTORING_DEFAULTS_WILL1),
+											 FrontendString_Get(STR_RESTORING_DEFAULTS_WILL2),
+											 FrontendString_Get(STR_RESTORING_DEFAULTS_WILL3),
+											 FrontendString_Get(STR_OKAY), FrontendString_Get(STR_CANCEL));
 		if (dialogResult != 0) {
 			memset(g_gameConfig.joyButtons, 0, sizeof(g_gameConfig.joyButtons));
 			for (defaultIndex = 0; defaultIndex < 16; ++defaultIndex) {
@@ -1688,11 +1688,11 @@ int Config_MultiplayerVideoOptionsScreen(void) {
 			return 0;
 		}
 	} else if (action == 2) {
-		dialogResult = FrontendDialog_ShowConfirmDialog(
-			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL1),
-			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL2),
-			FrontendString_Get(STR_RESTORING_DEFAULTS_WILL3), FrontendString_Get(STR_OKAY),
-			FrontendString_Get(STR_CANCEL));
+		dialogResult =
+			FrontendDialog_ShowConfirmDialog(FrontendString_Get(STR_RESTORING_DEFAULTS_WILL1),
+											 FrontendString_Get(STR_RESTORING_DEFAULTS_WILL2),
+											 FrontendString_Get(STR_RESTORING_DEFAULTS_WILL3),
+											 FrontendString_Get(STR_OKAY), FrontendString_Get(STR_CANCEL));
 		if (dialogResult != 0) {
 			drivers = FrontendDisplay_GetDriverTable(&driverCount);
 			g_gameConfig.threedDevice[1] = 0;
@@ -3804,7 +3804,6 @@ int Config_DrawVideoOptionRows(int profileIdx, int* y, int* rowIndex, char* keyS
 // FUNCTION: XWA 0x51E660
 int Config_VideoOptionsMenu(void) {
 	char keyState;
-	const char* title;
 	const char* text;
 	int textX;
 	int titleX;
@@ -5284,7 +5283,7 @@ static void Config_SetInitialJoystickDefaults(void) {
 }
 #else
 void Config_ApplyModernInputOptions(const XwaModernInputOptions* options) {
-	static XwaControllerDeviceSelector previousDevice;
+	static AeronControllerSelector previousDevice;
 	static int previousRumbleEnabled;
 	static int previousRumbleStrength;
 	static int configured;

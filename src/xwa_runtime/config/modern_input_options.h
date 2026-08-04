@@ -46,31 +46,10 @@ typedef struct XwaControllerAxisBinding {
 	float deadzone;
 } XwaControllerAxisBinding;
 
-typedef enum XwaControllerDigitalSourceKind {
-	XWA_CONTROLLER_DIGITAL_NONE = 0,
-	XWA_CONTROLLER_DIGITAL_BUTTON,
-	XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE,
-	XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE,
-} XwaControllerDigitalSourceKind;
-
-typedef struct XwaControllerDigitalBinding {
-	XwaControllerDigitalSourceKind kind;
-	/* Standardized gamepad control or raw joystick control index. */
-	int source;
-	/* Axis activation threshold in the normalized 0..1 range. */
-	float threshold;
-} XwaControllerDigitalBinding;
-
-typedef struct XwaControllerDeviceSelector {
-	char guid[33];
-	char path[AERON_CONTROLLER_PATH_CAPACITY];
-	int ordinal;
-} XwaControllerDeviceSelector;
-
 typedef struct XwaControllerProfile {
 	XwaControllerAxisBinding axes[XWA_CONTROLLER_LOGICAL_AXIS_COUNT];
 	/* Physical digital sources for logical WinMM buttons 1..16. */
-	XwaControllerDigitalBinding buttons[XWA_CONTROLLER_LOGICAL_BUTTON_COUNT];
+	AeronControllerDigitalSource buttons[XWA_CONTROLLER_LOGICAL_BUTTON_COUNT];
 	/* Gamepad profile: boolean D-pad-to-POV. Joystick profile: raw hat index,
 	 * or -1 for no POV. */
 	int pov_source;
@@ -80,7 +59,7 @@ typedef struct XwaControllerProfile {
 } XwaControllerProfile;
 
 typedef struct XwaControllerOptions {
-	XwaControllerDeviceSelector device;
+	AeronControllerSelector device;
 	int roll_enabled;
 	int rumble_enabled;
 	int rumble_strength;

@@ -30,7 +30,7 @@ typedef struct ControllerCaptureState {
 } ControllerCaptureState;
 
 typedef struct ControllerBindingRow {
-	XwaControllerDigitalSourceKind kind;
+	AeronControllerDigitalSourceKind kind;
 	int source;
 	int logical_button;
 	int pov_direction;
@@ -40,7 +40,7 @@ typedef struct ControllerBindingRow {
 typedef struct ControllerBindingEditState {
 	int active;
 	AeronControllerKind controller_kind;
-	XwaControllerDigitalSourceKind kind;
+	AeronControllerDigitalSourceKind kind;
 	int source;
 	int pov_direction;
 	uint16_t action;
@@ -52,13 +52,6 @@ static ControllerBindingEditState g_controllerBindingEdit;
 static int g_controllerButtonPage;
 static char g_controllerBindingMessage[96];
 static int g_controllerBindingMessageTtl;
-
-static int ControllerScreen_DeviceMatches(const AeronControllerSnapshot* controller,
-										  const XwaControllerDeviceSelector* selector, int ordinal) {
-	return controller->connected && (!selector->guid[0] || strcmp(controller->guid, selector->guid) == 0) &&
-		   (!selector->path[0] || strcmp(controller->path, selector->path) == 0) &&
-		   ordinal == selector->ordinal;
-}
 
 static int ControllerScreen_DeviceOrdinal(const AeronInputSnapshot* input, int slot) {
 	int ordinal = 0;
@@ -95,10 +88,10 @@ static int ControllerScreen_NameOrdinal(const AeronInputSnapshot* input, int slo
 	return ordinal;
 }
 
-static const AeronControllerSnapshot* ControllerScreen_Selected(const XwaControllerDeviceSelector* selector,
+static const AeronControllerSnapshot* ControllerScreen_Selected(const AeronControllerSelector* selector,
 																int* selected_slot) {
 	const AeronInputSnapshot* input = Aeron_InputSnapshot();
-	int slot;
+	const AeronControllerSnapshot* controller;
 
 	if (selected_slot) {
 		*selected_slot = -1;
@@ -106,20 +99,16 @@ static const AeronControllerSnapshot* ControllerScreen_Selected(const XwaControl
 	if (!input) {
 		return NULL;
 	}
-	for (slot = 0; slot < AERON_CONTROLLER_MAX; ++slot) {
-		if (ControllerScreen_DeviceMatches(&input->controllers[slot], selector,
-										   ControllerScreen_DeviceOrdinal(input, slot))) {
-			if (selected_slot) {
-				*selected_slot = slot;
-			}
-			return &input->controllers[slot];
-		}
+	controller = Aeron_SelectController(input, selector);
+	if (controller && selected_slot) {
+		*selected_slot = (int)(controller - input->controllers);
 	}
-	return NULL;
+	return controller;
 }
 
-static void ControllerScreen_SelectDevice(XwaControllerDeviceSelector* selector, int direction) {
+static void ControllerScreen_SelectDevice(AeronControllerSelector* selector, int direction) {
 	const AeronInputSnapshot* input = Aeron_InputSnapshot();
+	const AeronControllerSnapshot* selected;
 	int connected_slots[AERON_CONTROLLER_MAX];
 	int count = 0;
 	int current = 0;
@@ -130,11 +119,11 @@ static void ControllerScreen_SelectDevice(XwaControllerDeviceSelector* selector,
 		memset(selector, 0, sizeof(*selector));
 		return;
 	}
+	selected = Aeron_SelectController(input, selector);
 	for (slot = 0; slot < AERON_CONTROLLER_MAX; ++slot) {
 		if (input->controllers[slot].connected) {
 			connected_slots[count++] = slot;
-			if (ControllerScreen_DeviceMatches(&input->controllers[slot], selector,
-											   ControllerScreen_DeviceOrdinal(input, slot))) {
+			if (&input->controllers[slot] == selected) {
 				current = count;
 			}
 		}
@@ -158,8 +147,8 @@ static void ControllerScreen_SelectDevice(XwaControllerDeviceSelector* selector,
 	selector->ordinal = ControllerScreen_DeviceOrdinal(input, i);
 }
 
-static void ControllerScreen_DeviceText(const XwaControllerDeviceSelector* selector, char* text,
-										size_t capacity, const AeronControllerSnapshot** selected) {
+static void ControllerScreen_DeviceText(const AeronControllerSelector* selector, char* text, size_t capacity,
+										const AeronControllerSnapshot** selected) {
 	int slot = -1;
 	const AeronControllerSnapshot* controller = ControllerScreen_Selected(selector, &slot);
 
@@ -312,7 +301,7 @@ static int ControllerScreen_UpdateDigitalAxisCapture(const AeronControllerSnapsh
 	}
 	memset(binding, 0, sizeof(*binding));
 	binding->kind =
-		best_delta > 0 ? XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE : XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE;
+		best_delta > 0 ? AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE : AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE;
 	binding->source = best_source;
 	binding->logical_button = -1;
 	binding->pov_direction = -1;
@@ -399,12 +388,12 @@ static int ControllerScreen_UpdatePovCapture(XwaModernInputOptions* options,
 	profile->pov_source = source;
 	if (controller->kind == AERON_CONTROLLER_KIND_GAMEPAD) {
 		for (logical_button = 0; logical_button < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++logical_button) {
-			XwaControllerDigitalBinding* binding = &profile->buttons[logical_button];
-			if (binding->kind == XWA_CONTROLLER_DIGITAL_BUTTON &&
-				binding->source >= AERON_GAMEPAD_BUTTON_DPAD_UP &&
-				binding->source <= AERON_GAMEPAD_BUTTON_DPAD_RIGHT) {
-				binding->kind = XWA_CONTROLLER_DIGITAL_NONE;
-				binding->source = -1;
+			AeronControllerDigitalSource* binding = &profile->buttons[logical_button];
+			if (binding->kind == AERON_CONTROLLER_DIGITAL_BUTTON &&
+				binding->index >= AERON_GAMEPAD_BUTTON_DPAD_UP &&
+				binding->index <= AERON_GAMEPAD_BUTTON_DPAD_RIGHT) {
+				binding->kind = AERON_CONTROLLER_DIGITAL_NONE;
+				binding->index = 0;
 				binding->threshold = XWA_CONTROLLER_DIGITAL_THRESHOLD_DEFAULT;
 				profile->actions[logical_button] = 0;
 			}
@@ -584,26 +573,26 @@ int XwaModernControllerAxesScreen_Update(int menu_center_x, int* cursor_row) {
 	return 0;
 }
 
-static int ControllerScreen_IsAxisDigitalKind(XwaControllerDigitalSourceKind kind) {
-	return kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE || kind == XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE;
+static int ControllerScreen_IsAxisDigitalKind(AeronControllerDigitalSourceKind kind) {
+	return kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE || kind == AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE;
 }
 
 static void ControllerScreen_DigitalSourceName(const AeronControllerSnapshot* controller,
-											   XwaControllerDigitalSourceKind kind, int source, char* text,
+											   AeronControllerDigitalSourceKind kind, int source, char* text,
 											   size_t capacity) {
-	if (kind == XWA_CONTROLLER_DIGITAL_NONE || source < 0) {
+	if (kind == AERON_CONTROLLER_DIGITAL_NONE || source < 0) {
 		snprintf(text, capacity, "%s", "Not mapped");
-	} else if (kind == XWA_CONTROLLER_DIGITAL_BUTTON && controller &&
+	} else if (kind == AERON_CONTROLLER_DIGITAL_BUTTON && controller &&
 			   controller->kind == AERON_CONTROLLER_KIND_GAMEPAD) {
 		snprintf(text, capacity, "%s", Aeron_GamepadButtonName((AeronGamepadButton)source));
-	} else if (kind == XWA_CONTROLLER_DIGITAL_BUTTON) {
+	} else if (kind == AERON_CONTROLLER_DIGITAL_BUTTON) {
 		snprintf(text, capacity, "Button %d", source);
 	} else if (controller && controller->kind == AERON_CONTROLLER_KIND_GAMEPAD) {
 		snprintf(text, capacity, "%s %c", Aeron_GamepadAxisName((AeronGamepadAxis)source),
-				 kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE ? '+' : '-');
+				 kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE ? '+' : '-');
 	} else {
 		snprintf(text, capacity, "Axis %d %c", source,
-				 kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE ? '+' : '-');
+				 kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE ? '+' : '-');
 	}
 }
 
@@ -614,11 +603,11 @@ static XwaControllerProfile* ControllerScreen_ProfileForKind(XwaModernInputOptio
 }
 
 static int ControllerScreen_FindButton(const XwaControllerProfile* profile,
-									   XwaControllerDigitalSourceKind kind, int source) {
+									   AeronControllerDigitalSourceKind kind, int source) {
 	int logical;
 
 	for (logical = 0; logical < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++logical) {
-		if (profile->buttons[logical].kind == kind && profile->buttons[logical].source == source) {
+		if (profile->buttons[logical].kind == kind && profile->buttons[logical].index == source) {
 			return logical;
 		}
 	}
@@ -629,7 +618,7 @@ static int ControllerScreen_FindFreeButton(const XwaControllerProfile* profile) 
 	int logical;
 
 	for (logical = 0; logical < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++logical) {
-		if (profile->buttons[logical].kind == XWA_CONTROLLER_DIGITAL_NONE) {
+		if (profile->buttons[logical].kind == AERON_CONTROLLER_DIGITAL_NONE) {
 			return logical;
 		}
 	}
@@ -676,14 +665,14 @@ static int ControllerScreen_BuildBindingRows(const AeronControllerSnapshot* cont
 	if (controller->kind == AERON_CONTROLLER_KIND_GAMEPAD) {
 		for (source = 0; source < AERON_GAMEPAD_BUTTON_COUNT && count < capacity; ++source) {
 			const int logical_button =
-				ControllerScreen_FindButton(profile, XWA_CONTROLLER_DIGITAL_BUTTON, source);
+				ControllerScreen_FindButton(profile, AERON_CONTROLLER_DIGITAL_BUTTON, source);
 			if (profile->pov_source && ControllerScreen_IsGamepadDpadButton(source)) {
 				continue;
 			}
 			if (!(controller->gamepad_available_buttons & (1u << source)) && logical_button < 0) {
 				continue;
 			}
-			rows[count].kind = XWA_CONTROLLER_DIGITAL_BUTTON;
+			rows[count].kind = AERON_CONTROLLER_DIGITAL_BUTTON;
 			rows[count].source = source;
 			rows[count].logical_button = logical_button;
 			rows[count].pov_direction = -1;
@@ -693,11 +682,11 @@ static int ControllerScreen_BuildBindingRows(const AeronControllerSnapshot* cont
 		for (source = AERON_GAMEPAD_AXIS_LEFT_TRIGGER;
 			 source <= AERON_GAMEPAD_AXIS_RIGHT_TRIGGER && count < capacity; ++source) {
 			const int logical_button =
-				ControllerScreen_FindButton(profile, XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE, source);
+				ControllerScreen_FindButton(profile, AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE, source);
 			if (!(controller->gamepad_available_axes & (1u << source)) && logical_button < 0) {
 				continue;
 			}
-			rows[count].kind = XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE;
+			rows[count].kind = AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE;
 			rows[count].source = source;
 			rows[count].logical_button = logical_button;
 			rows[count].pov_direction = -1;
@@ -707,10 +696,10 @@ static int ControllerScreen_BuildBindingRows(const AeronControllerSnapshot* cont
 		has_pov = profile->pov_source != 0;
 	} else {
 		for (source = 0; source < controller->button_count && count < capacity; ++source) {
-			rows[count].kind = XWA_CONTROLLER_DIGITAL_BUTTON;
+			rows[count].kind = AERON_CONTROLLER_DIGITAL_BUTTON;
 			rows[count].source = source;
 			rows[count].logical_button =
-				ControllerScreen_FindButton(profile, XWA_CONTROLLER_DIGITAL_BUTTON, source);
+				ControllerScreen_FindButton(profile, AERON_CONTROLLER_DIGITAL_BUTTON, source);
 			rows[count].pov_direction = -1;
 			rows[count].capture_axis = 0;
 			++count;
@@ -718,18 +707,18 @@ static int ControllerScreen_BuildBindingRows(const AeronControllerSnapshot* cont
 		has_pov = profile->pov_source >= 0 && profile->pov_source < controller->hat_count;
 	}
 	for (logical = 0; logical < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT && count < capacity; ++logical) {
-		const XwaControllerDigitalBinding* binding = &profile->buttons[logical];
+		const AeronControllerDigitalSource* binding = &profile->buttons[logical];
 		if (!ControllerScreen_IsAxisDigitalKind(binding->kind)) {
 			continue;
 		}
 		if (controller->kind == AERON_CONTROLLER_KIND_GAMEPAD &&
-			binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE &&
-			binding->source >= AERON_GAMEPAD_AXIS_LEFT_TRIGGER &&
-			binding->source <= AERON_GAMEPAD_AXIS_RIGHT_TRIGGER) {
+			binding->kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE &&
+			binding->index >= AERON_GAMEPAD_AXIS_LEFT_TRIGGER &&
+			binding->index <= AERON_GAMEPAD_AXIS_RIGHT_TRIGGER) {
 			continue;
 		}
 		rows[count].kind = binding->kind;
-		rows[count].source = binding->source;
+		rows[count].source = binding->index;
 		rows[count].logical_button = logical;
 		rows[count].pov_direction = -1;
 		rows[count].capture_axis = 0;
@@ -737,7 +726,7 @@ static int ControllerScreen_BuildBindingRows(const AeronControllerSnapshot* cont
 	}
 	if (has_pov) {
 		for (direction = 0; direction < 4 && count < capacity; ++direction) {
-			rows[count].kind = XWA_CONTROLLER_DIGITAL_NONE;
+			rows[count].kind = AERON_CONTROLLER_DIGITAL_NONE;
 			rows[count].source = -1;
 			rows[count].logical_button = -1;
 			rows[count].pov_direction = direction;
@@ -746,7 +735,7 @@ static int ControllerScreen_BuildBindingRows(const AeronControllerSnapshot* cont
 		}
 	}
 	if (count < capacity) {
-		rows[count].kind = XWA_CONTROLLER_DIGITAL_NONE;
+		rows[count].kind = AERON_CONTROLLER_DIGITAL_NONE;
 		rows[count].source = -1;
 		rows[count].logical_button = -1;
 		rows[count].pov_direction = -1;
@@ -833,13 +822,13 @@ static int ControllerScreen_UpdateBindingEdit(void) {
 		}
 		if (logical >= 0) {
 			if (g_controllerBindingEdit.action == 0) {
-				profile->buttons[logical].kind = XWA_CONTROLLER_DIGITAL_NONE;
-				profile->buttons[logical].source = -1;
+				profile->buttons[logical].kind = AERON_CONTROLLER_DIGITAL_NONE;
+				profile->buttons[logical].index = 0;
 				profile->buttons[logical].threshold = XWA_CONTROLLER_DIGITAL_THRESHOLD_DEFAULT;
 				profile->actions[logical] = 0;
 			} else {
 				profile->buttons[logical].kind = g_controllerBindingEdit.kind;
-				profile->buttons[logical].source = g_controllerBindingEdit.source;
+				profile->buttons[logical].index = (uint8_t)g_controllerBindingEdit.source;
 				if (!ControllerScreen_IsAxisDigitalKind(g_controllerBindingEdit.kind)) {
 					profile->buttons[logical].threshold = XWA_CONTROLLER_DIGITAL_THRESHOLD_DEFAULT;
 				}
@@ -898,13 +887,13 @@ static void ControllerScreen_SelectPressedBinding(const AeronControllerSnapshot*
 	for (index = 0; index < binding_count; ++index) {
 		const ControllerBindingRow* row = &bindings[index];
 		int active = direction >= 0 && row->pov_direction == direction;
-		if (!active && direction < 0 && source >= 0 && row->kind == XWA_CONTROLLER_DIGITAL_BUTTON &&
+		if (!active && direction < 0 && source >= 0 && row->kind == AERON_CONTROLLER_DIGITAL_BUTTON &&
 			row->source == source) {
 			active = 1;
 		}
 		if (!active && direction < 0 && ControllerScreen_IsAxisDigitalKind(row->kind)) {
 			const int16_t value = ControllerScreen_Axis(controller, row->source);
-			const double magnitude = row->kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE
+			const double magnitude = row->kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE
 										 ? (value > 0 ? (double)value / 32767.0 : 0.0)
 										 : (value < 0 ? (double)-value / 32768.0 : 0.0);
 			const float threshold = row->logical_button >= 0 ? profile->buttons[row->logical_button].threshold
@@ -1024,7 +1013,7 @@ int XwaModernControllerButtonsScreen_Update(int menu_center_x, int* cursor_row) 
 		if (binding->logical_button >= 0 && ControllerScreen_IsAxisDigitalKind(binding->kind) &&
 			XwaModernOptionsMenu_LastRowSelected(&menu) &&
 			(menu.key == XWA_MODERN_MENU_KEY_LEFT || menu.key == XWA_MODERN_MENU_KEY_RIGHT)) {
-			XwaControllerDigitalBinding* digital = &profile->buttons[binding->logical_button];
+			AeronControllerDigitalSource* digital = &profile->buttons[binding->logical_button];
 			int percent = (int)(digital->threshold * 100.0f + 0.5f);
 			percent += menu.key == XWA_MODERN_MENU_KEY_LEFT ? -5 : 5;
 			if (percent < 5) {
@@ -1042,8 +1031,8 @@ int XwaModernControllerButtonsScreen_Update(int menu_center_x, int* cursor_row) 
 			if (binding->pov_direction >= 0) {
 				profile->actions[XWA_CONTROLLER_LOGICAL_BUTTON_COUNT + binding->pov_direction] = 0;
 			} else if (binding->logical_button >= 0) {
-				profile->buttons[binding->logical_button].kind = XWA_CONTROLLER_DIGITAL_NONE;
-				profile->buttons[binding->logical_button].source = -1;
+				profile->buttons[binding->logical_button].kind = AERON_CONTROLLER_DIGITAL_NONE;
+				profile->buttons[binding->logical_button].index = 0;
 				profile->buttons[binding->logical_button].threshold =
 					XWA_CONTROLLER_DIGITAL_THRESHOLD_DEFAULT;
 				profile->actions[binding->logical_button] = 0;

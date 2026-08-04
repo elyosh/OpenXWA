@@ -31,8 +31,7 @@ static int ControllerMapping_ProfileEqual(const XwaControllerProfile* lhs, const
 		}
 	}
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
-		if (lhs->buttons[i].kind != rhs->buttons[i].kind ||
-			lhs->buttons[i].source != rhs->buttons[i].source ||
+		if (lhs->buttons[i].kind != rhs->buttons[i].kind || lhs->buttons[i].index != rhs->buttons[i].index ||
 			lhs->buttons[i].threshold != rhs->buttons[i].threshold) {
 			return 0;
 		}
@@ -48,32 +47,13 @@ static int ControllerMapping_OptionsEqual(const XwaControllerOptions* lhs, const
 		   ControllerMapping_ProfileEqual(&lhs->joystick, &rhs->joystick);
 }
 
-static int ControllerMapping_DeviceMatches(const AeronControllerSnapshot* controller,
-										   const XwaControllerDeviceSelector* selector) {
-	return controller->connected && (!selector->guid[0] || strcmp(controller->guid, selector->guid) == 0) &&
-		   (!selector->path[0] || strcmp(controller->path, selector->path) == 0);
-}
-
 const AeronControllerSnapshot* XwaControllerMapping_SelectedController(void) {
 	const AeronInputSnapshot* input = Aeron_InputSnapshot();
-	const XwaControllerDeviceSelector* selector;
-	int ordinal = 0;
-	int slot;
 
 	if (!input || !g_controllerMapping.configured) {
 		return NULL;
 	}
-	selector = &g_controllerMapping.options.device;
-	for (slot = 0; slot < AERON_CONTROLLER_MAX; ++slot) {
-		const AeronControllerSnapshot* controller = &input->controllers[slot];
-		if (!ControllerMapping_DeviceMatches(controller, selector)) {
-			continue;
-		}
-		if (ordinal++ == selector->ordinal) {
-			return controller;
-		}
-	}
-	return NULL;
+	return Aeron_SelectController(input, &g_controllerMapping.options.device);
 }
 
 static const XwaControllerProfile* ControllerMapping_Profile(const XwaControllerOptions* options,
@@ -128,53 +108,6 @@ static uint32_t ControllerMapping_TriggerAxis(int16_t value, int invert, float d
 		normalized = 1.0 - normalized;
 	}
 	return (uint32_t)(normalized * CONTROLLER_AXIS_RANGE);
-}
-
-static int ControllerMapping_PhysicalButtonDown(const AeronControllerSnapshot* controller, int source) {
-	if (source < 0) {
-		return 0;
-	}
-	if (controller->kind == AERON_CONTROLLER_KIND_GAMEPAD) {
-		return source < AERON_GAMEPAD_BUTTON_COUNT && (controller->gamepad_buttons & (1u << source)) != 0;
-	}
-	return source < controller->button_count && source < AERON_CONTROLLER_BUTTON_MAX &&
-		   (controller->raw_buttons & (UINT64_C(1) << source)) != 0;
-}
-
-static double ControllerMapping_DigitalAxisMagnitude(const AeronControllerSnapshot* controller,
-													 const XwaControllerDigitalBinding* binding) {
-	const int16_t value = ControllerMapping_AxisValue(controller, binding->source);
-
-	if (binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE) {
-		return value > 0 ? (double)value / 32767.0 : 0.0;
-	}
-	if (binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
-		return value < 0 ? (double)-value / 32768.0 : 0.0;
-	}
-	return 0.0;
-}
-
-static int ControllerMapping_DigitalDown(const AeronControllerSnapshot* controller,
-										 const XwaControllerDigitalBinding* binding, int was_down) {
-	double release_threshold;
-	double magnitude;
-
-	if (binding->kind == XWA_CONTROLLER_DIGITAL_BUTTON) {
-		return ControllerMapping_PhysicalButtonDown(controller, binding->source);
-	}
-	if (binding->kind != XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE &&
-		binding->kind != XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
-		return 0;
-	}
-	magnitude = ControllerMapping_DigitalAxisMagnitude(controller, binding);
-	if (!was_down) {
-		return magnitude >= binding->threshold;
-	}
-	release_threshold = binding->threshold - 0.1;
-	if (release_threshold < 0.0) {
-		release_threshold = 0.0;
-	}
-	return magnitude > release_threshold;
 }
 
 static uint8_t ControllerMapping_Hat(const AeronControllerSnapshot* controller,
@@ -246,12 +179,12 @@ static void ControllerMapping_LogUnavailableSources(const AeronControllerSnapsho
 		unavailable_axes += profile->axes[i].source >= controller->axis_count;
 	}
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
-		const XwaControllerDigitalBinding* binding = &profile->buttons[i];
-		if (binding->kind == XWA_CONTROLLER_DIGITAL_BUTTON) {
-			unavailable_buttons += binding->source >= controller->button_count;
-		} else if (binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_POSITIVE ||
-				   binding->kind == XWA_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
-			unavailable_axes += binding->source >= controller->axis_count;
+		const AeronControllerDigitalSource* binding = &profile->buttons[i];
+		if (binding->kind == AERON_CONTROLLER_DIGITAL_BUTTON) {
+			unavailable_buttons += binding->index >= controller->button_count;
+		} else if (binding->kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE ||
+				   binding->kind == AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
+			unavailable_axes += binding->index >= controller->axis_count;
 		}
 	}
 	unavailable_pov = profile->pov_source >= controller->hat_count;
@@ -305,11 +238,11 @@ static void ControllerMapping_MapSnapshot(const XwaControllerOptions* options,
 		return;
 	}
 	for (logical = 0; logical < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++logical) {
-		const XwaControllerDigitalBinding* binding = &profile->buttons[logical];
+		const AeronControllerDigitalSource* binding = &profile->buttons[logical];
 		const uint32_t bit = 1u << logical;
-		if (ControllerMapping_DigitalDown(controller, binding, (previous_axis_buttons & bit) != 0)) {
+		if (Aeron_ControllerDigitalSourceDown(controller, binding, (previous_axis_buttons & bit) != 0)) {
 			state->buttons |= 1u << logical;
-			if (axis_buttons && binding->kind != XWA_CONTROLLER_DIGITAL_BUTTON) {
+			if (axis_buttons && binding->kind != AERON_CONTROLLER_DIGITAL_BUTTON) {
 				*axis_buttons |= bit;
 			}
 		}
