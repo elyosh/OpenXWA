@@ -261,17 +261,8 @@ static void xwa_tool_shadows(int* open, void* user) {
 	if (!contact_hardening) {
 		ImGui::EndDisabled();
 	}
-	changed |= ImGui::SliderFloat("Normal bias", &p.normal_bias, 0.0f, 4.0f, "%.2f x filter radius");
-	bool face_normal_bias = p.normal_bias_face_normal != 0;
-	if (ImGui::Checkbox("Bias along face normal", &face_normal_bias)) {
-		p.normal_bias_face_normal = face_normal_bias ? 1 : 0;
-		changed = true;
-	}
-	changed |= ImGui::SliderFloat("Depth bias", &p.depth_bias_texels, 0.0f, 8.0f, "%.2f texels");
-	changed |= ImGui::SliderFloat("Slope bias", &p.slope_bias, 0.0f, 8.0f, "%.2f");
-	changed |= ImGui::SliderFloat("Receiver-plane bias", &p.receiver_plane_bias, 0.0f, 2.0f, "%.2f");
-	changed |= ImGui::SliderFloat("Caster constant bias", &p.caster_constant_bias, 0.0f, 8.0f, "%.2f");
-	changed |= ImGui::SliderFloat("Caster slope bias", &p.caster_slope_bias, 0.0f, 8.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Normal bias", &p.normal_bias_texels, 0.0f, 4.0f, "%.2f texels");
+	changed |= ImGui::SliderFloat("Depth bias", &p.depth_bias_texels, 0.0f, 4.0f, "%.2f texels");
 	changed |= ImGui::SliderFloat("Cascade transition", &p.transition_fraction, 0.0f, 0.5f, "%.2f");
 	changed |= ImGui::SliderFloat("Distance fade", &p.distance_fade_fraction, 0.0f, 0.5f, "%.2f");
 	bool debug_cascades = p.debug_cascades != 0;

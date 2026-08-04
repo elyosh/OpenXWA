@@ -85,13 +85,8 @@ typedef struct XwaFlightShadowParams {
 	float light_angular_radius_degrees; /* source half-angle */
 	float max_filter_radius;            /* atlas texels */
 	float pcss_min_filter_radius;       /* atlas texels */
-	float normal_bias;
-	int normal_bias_face_normal;
-	float depth_bias_texels;
-	float slope_bias;
-	float receiver_plane_bias;
-	float caster_constant_bias;
-	float caster_slope_bias;
+	float normal_bias_texels; /* lateral receiver offset at grazing incidence */
+	float depth_bias_texels;  /* receiver comparison offset along the light */
 	float transition_fraction;
 	float distance_fade_fraction;
 	int debug_cascades;

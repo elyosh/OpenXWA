@@ -392,12 +392,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"shadows.light_angular_radius_degrees",
 		"shadows.max_filter_radius",
 		"shadows.pcss_min_filter_radius",
-		"shadows.normal_bias",
+		"shadows.normal_bias_texels",
 		"shadows.depth_bias_texels",
-		"shadows.slope_bias",
-		"shadows.receiver_plane_bias",
-		"shadows.caster_constant_bias",
-		"shadows.caster_slope_bias",
 		"shadows.transition_fraction",
 		"shadows.distance_fade_fraction",
 		"hangar_lighting.direction_x",
@@ -449,7 +445,6 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"motion_blur.velocity_viz",
 		"motion_blur.fsr_direct_motion",
 		"texture_filtering.anisotropic",
-		"shadows.normal_bias_face_normal",
 		"shadows.explicit_splits",
 		"shadows.contact_hardening",
 		"shadows.debug_cascades",
@@ -510,10 +505,8 @@ static int fl_shadows_config_valid(const XwaFlightShadowParams* p) {
 		   p->light_angular_radius_degrees >= 0.0f && p->light_angular_radius_degrees <= 5.0f &&
 		   p->max_filter_radius >= p->filter_radius && p->max_filter_radius <= 16.0f &&
 		   p->pcss_min_filter_radius >= 0.5f && p->pcss_min_filter_radius <= p->filter_radius &&
-		   p->normal_bias >= 0.0f && p->depth_bias_texels >= 0.0f && p->slope_bias >= 0.0f &&
-		   p->receiver_plane_bias >= 0.0f && p->receiver_plane_bias <= 2.0f &&
-		   p->caster_constant_bias >= 0.0f && p->caster_constant_bias <= 16.0f &&
-		   p->caster_slope_bias >= 0.0f && p->caster_slope_bias <= 16.0f &&
+		   p->normal_bias_texels >= 0.0f && p->normal_bias_texels <= 4.0f &&
+		   p->depth_bias_texels >= 0.0f && p->depth_bias_texels <= 4.0f &&
 		   p->transition_fraction >= 0.0f && p->transition_fraction <= 0.5f &&
 		   p->distance_fade_fraction >= 0.0f && p->distance_fade_fraction <= 0.5f;
 }
@@ -653,16 +646,9 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.shadows.max_filter_radius = (float)AeronConfigFile_GetFloat(cf, "shadows.max_filter_radius", 0.0);
 	s.shadows.pcss_min_filter_radius =
 		(float)AeronConfigFile_GetFloat(cf, "shadows.pcss_min_filter_radius", 0.0);
-	s.shadows.normal_bias = (float)AeronConfigFile_GetFloat(cf, "shadows.normal_bias", 0.0);
-	s.shadows.normal_bias_face_normal = AeronConfigFile_GetBool(cf, "shadows.normal_bias_face_normal", 0);
+	s.shadows.normal_bias_texels =
+		(float)AeronConfigFile_GetFloat(cf, "shadows.normal_bias_texels", 0.0);
 	s.shadows.depth_bias_texels = (float)AeronConfigFile_GetFloat(cf, "shadows.depth_bias_texels", 0.0);
-	s.shadows.slope_bias = (float)AeronConfigFile_GetFloat(cf, "shadows.slope_bias", 0.0);
-	s.shadows.receiver_plane_bias =
-		(float)AeronConfigFile_GetFloat(cf, "shadows.receiver_plane_bias", 0.0);
-	s.shadows.caster_constant_bias =
-		(float)AeronConfigFile_GetFloat(cf, "shadows.caster_constant_bias", 0.0);
-	s.shadows.caster_slope_bias =
-		(float)AeronConfigFile_GetFloat(cf, "shadows.caster_slope_bias", 0.0);
 	s.shadows.transition_fraction =
 		(float)AeronConfigFile_GetFloat(cf, "shadows.transition_fraction", 0.0);
 	s.shadows.distance_fade_fraction =
@@ -991,13 +977,8 @@ void XwaRemasterFlight_SetShadows(const XwaFlightShadowParams* in) {
 	s.shadows.max_filter_radius = fminf(fmaxf(s.shadows.max_filter_radius, s.shadows.filter_radius), 16.0f);
 	s.shadows.pcss_min_filter_radius =
 		fminf(fmaxf(s.shadows.pcss_min_filter_radius, 0.5f), s.shadows.filter_radius);
-	s.shadows.normal_bias = fmaxf(s.shadows.normal_bias, 0.0f);
-	s.shadows.normal_bias_face_normal = in->normal_bias_face_normal ? 1 : 0;
-	s.shadows.depth_bias_texels = fmaxf(s.shadows.depth_bias_texels, 0.0f);
-	s.shadows.slope_bias = fmaxf(s.shadows.slope_bias, 0.0f);
-	s.shadows.receiver_plane_bias = fminf(fmaxf(s.shadows.receiver_plane_bias, 0.0f), 2.0f);
-	s.shadows.caster_constant_bias = fminf(fmaxf(s.shadows.caster_constant_bias, 0.0f), 16.0f);
-	s.shadows.caster_slope_bias = fminf(fmaxf(s.shadows.caster_slope_bias, 0.0f), 16.0f);
+	s.shadows.normal_bias_texels = fminf(fmaxf(s.shadows.normal_bias_texels, 0.0f), 4.0f);
+	s.shadows.depth_bias_texels = fminf(fmaxf(s.shadows.depth_bias_texels, 0.0f), 4.0f);
 	s.shadows.transition_fraction = fminf(fmaxf(s.shadows.transition_fraction, 0.0f), 0.5f);
 	s.shadows.distance_fade_fraction = fminf(fmaxf(s.shadows.distance_fade_fraction, 0.0f), 0.5f);
 	s.shadows.debug_cascades = in->debug_cascades ? 1 : 0;
@@ -3690,13 +3671,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			.light_angular_radius_degrees = s.shadows.light_angular_radius_degrees,
 			.max_filter_radius = s.shadows.max_filter_radius,
 			.pcss_min_filter_radius = s.shadows.pcss_min_filter_radius,
-			.normal_bias = s.shadows.normal_bias,
-			.normal_bias_face_normal = s.shadows.normal_bias_face_normal,
+			.normal_bias_texels = s.shadows.normal_bias_texels,
 			.depth_bias_texels = s.shadows.depth_bias_texels,
-			.slope_bias = s.shadows.slope_bias,
-			.receiver_plane_bias = s.shadows.receiver_plane_bias,
-			.caster_constant_bias = s.shadows.caster_constant_bias,
-			.caster_slope_bias = s.shadows.caster_slope_bias,
 			.transition_fraction = s.shadows.transition_fraction,
 			.distance_fade_fraction = s.shadows.distance_fade_fraction,
 			.debug_cascades = s.shadows.debug_cascades,
