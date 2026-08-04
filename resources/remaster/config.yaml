@@ -167,7 +167,7 @@ shadows:
   light_angular_radius_degrees: 0.6
   max_filter_radius: 8.0
   pcss_min_filter_radius: 0.75
-  normal_bias_texels: 1.0
+  normal_bias_texels: 2.0
   depth_bias_texels: 1.0
   transition_fraction: 0.10
   distance_fade_fraction: 0.10
