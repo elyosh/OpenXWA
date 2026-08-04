@@ -17,6 +17,8 @@ static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 	return options && options->window_mode >= XWA_MODERN_WINDOW_MODE_WINDOWED &&
 		   options->window_mode <= XWA_MODERN_WINDOW_MODE_FULLSCREEN &&
 		   options->ssao_quality >= XWA_MODERN_SSAO_OFF && options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
+		   options->shadow_quality >= XWA_MODERN_SHADOW_STANDARD &&
+		   options->shadow_quality <= XWA_MODERN_SHADOW_HIGH &&
 		   options->fsr_upscaling >= XWA_MODERN_FSR_OFF &&
 		   options->fsr_upscaling <= XWA_MODERN_FSR_NATIVE_AA && options->msaa >= XWA_MODERN_MSAA_OFF &&
 		   options->msaa <= XWA_MODERN_MSAA_8X &&
@@ -33,6 +35,7 @@ static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 static int XwaModernVideoOptions_AreEqual(const XwaModernVideoOptions* lhs,
 										  const XwaModernVideoOptions* rhs) {
 	return lhs->window_mode == rhs->window_mode && lhs->ssao_quality == rhs->ssao_quality &&
+		   lhs->shadow_quality == rhs->shadow_quality &&
 		   lhs->fsr_upscaling == rhs->fsr_upscaling && lhs->msaa == rhs->msaa &&
 		   lhs->motion_blur_quality == rhs->motion_blur_quality &&
 		   lhs->motion_blur_amount == rhs->motion_blur_amount && lhs->hdr_output == rhs->hdr_output &&

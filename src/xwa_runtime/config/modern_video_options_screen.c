@@ -11,6 +11,7 @@
 int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	static const char* const window_mode_texts[] = { "Windowed", "Fullscreen" };
 	static const char* const quality_texts[] = { "Off", "Low", "High" };
+	static const char* const shadow_quality_texts[] = { "Standard", "High" };
 	static const char* const motion_blur_texts[] = { "Off", "Low Quality", "High Quality" };
 	static const char* const fsr_texts[] = { "Off", "Performance", "Balanced", "Quality", "Native AA" };
 	static const char* const msaa_texts[] = { "Off", "2x", "4x", "8x" };
@@ -25,6 +26,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	XwaModernOptionsMenu menu;
 	uint8_t window_mode;
 	uint8_t ssao;
+	uint8_t shadow_quality;
 	uint8_t fsr;
 	uint8_t msaa;
 	uint8_t original_fsr;
@@ -46,6 +48,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	XwaModernVideoOptions_Get(&options);
 	window_mode = (uint8_t)options.window_mode;
 	ssao = (uint8_t)options.ssao_quality;
+	shadow_quality = (uint8_t)options.shadow_quality;
 	fsr = (uint8_t)options.fsr_upscaling;
 	msaa = (uint8_t)options.msaa;
 	original_fsr = fsr;
@@ -56,23 +59,25 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	sdr_gamma = (uint8_t)options.sdr_gamma;
 	paper_white = (uint8_t)options.paper_white;
 	changed = 0;
-	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 140, cursor_row, 10);
+	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 140, cursor_row, 11);
 	XwaModernOptionsMenu_DrawTitle(&menu, "OpenXWA Video Options");
 
 	changed |=
 		XwaModernOptionsMenu_DrawCycleU8(&menu, &window_mode, "Window Mode", window_mode_texts, 2, 60, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &ssao, "SSAO", quality_texts, 3, 61, 0);
-	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &fsr, "FSR Upscaling", fsr_texts, 5, 62, 0);
-	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &msaa, "MSAA", msaa_texts, 4, 63, 0);
+	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &shadow_quality, "Shadow Quality",
+											 shadow_quality_texts, 2, 62, 0);
+	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &fsr, "FSR Upscaling", fsr_texts, 5, 63, 0);
+	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &msaa, "MSAA", msaa_texts, 4, 64, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &motion_blur_quality, "Motion Blur", motion_blur_texts,
-												3, 64, 0);
+												3, 65, 0);
 	motion_blur_amount_changed =
 		XwaModernOptionsMenu_DrawSliderU8(&menu, &motion_blur_amount, "Motion Blur Amount", "0%", "100%", 10,
 										  motion_blur_quality == XWA_MODERN_MOTION_BLUR_OFF);
 	changed |= motion_blur_amount_changed;
 	/* Greyed while the display cannot present HDR (OS HDR disabled or the
 	 * display is not HDR-capable — the backend cannot distinguish the two). */
-	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &hdr, "HDR Output", toggle_texts, 2, 65,
+	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &hdr, "HDR Output", toggle_texts, 2, 66,
 												!Aeron_OutputSupportsHdr());
 #if defined(__APPLE__)
 	/* Fixed platform behavior (piecewise sRGB, EDR white following system
@@ -86,9 +91,9 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	hdr_rows_disabled = !Aeron_OutputHdrEnabled();
 #endif
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &sdr_gamma, "SDR Content Gamma", sdr_gamma_texts, 2,
-												66, hdr_rows_disabled);
-	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &paper_white, "HDR Paper White", paper_white_texts, 7,
 												67, hdr_rows_disabled);
+	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &paper_white, "HDR Paper White", paper_white_texts, 7,
+												68, hdr_rows_disabled);
 
 	if (changed) {
 		if (msaa != original_msaa && msaa != XWA_MODERN_MSAA_OFF) {
@@ -98,6 +103,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		}
 		options.window_mode = (XwaModernWindowMode)window_mode;
 		options.ssao_quality = (XwaModernSsaoQuality)ssao;
+		options.shadow_quality = (XwaModernShadowQuality)shadow_quality;
 		options.fsr_upscaling = (XwaModernFsrUpscaling)fsr;
 		options.msaa = (XwaModernMsaa)msaa;
 		options.motion_blur_quality = (XwaModernMotionBlurQuality)motion_blur_quality;
@@ -110,7 +116,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		XwaModernVideoOptions_Set(&options);
 	}
 
-	back = XwaModernOptionsMenu_DrawAction(&menu, FrontendString_Get(STR_BACK), 68, 0);
+	back = XwaModernOptionsMenu_DrawAction(&menu, FrontendString_Get(STR_BACK), 69, 0);
 	back |= XwaModernOptionsMenu_TakeEscape(&menu);
 	if (!back) {
 		return 0;

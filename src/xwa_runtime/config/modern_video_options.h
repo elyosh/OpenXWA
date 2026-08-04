@@ -13,6 +13,11 @@ typedef enum XwaModernSsaoQuality {
 	XWA_MODERN_SSAO_HIGH,
 } XwaModernSsaoQuality;
 
+typedef enum XwaModernShadowQuality {
+	XWA_MODERN_SHADOW_STANDARD = 0, /* 4096 directional-shadow atlas */
+	XWA_MODERN_SHADOW_HIGH,         /* 8192 directional-shadow atlas */
+} XwaModernShadowQuality;
+
 typedef enum XwaModernFsrUpscaling {
 	XWA_MODERN_FSR_OFF = 0,
 	XWA_MODERN_FSR_PERFORMANCE,
@@ -64,6 +69,7 @@ typedef enum XwaModernPaperWhite {
 typedef struct XwaModernVideoOptions {
 	XwaModernWindowMode window_mode;
 	XwaModernSsaoQuality ssao_quality;
+	XwaModernShadowQuality shadow_quality;
 	XwaModernFsrUpscaling fsr_upscaling;
 	XwaModernMsaa msaa;
 	XwaModernMotionBlurQuality motion_blur_quality;
@@ -83,6 +89,7 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_SDR_GAMMA = 1u << 6,
 	XWA_MODERN_VIDEO_OVERRIDE_PAPER_WHITE = 1u << 7,
 	XWA_MODERN_VIDEO_OVERRIDE_MOTION_BLUR_AMOUNT = 1u << 8,
+	XWA_MODERN_VIDEO_OVERRIDE_SHADOW_QUALITY = 1u << 9,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

@@ -259,6 +259,7 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 									 unsigned int* override_mask, char* error, size_t error_size) {
 	static const char* const window_mode_names[] = { "windowed", "fullscreen" };
 	static const char* const quality_names[] = { "off", "low", "high" };
+	static const char* const shadow_quality_names[] = { "standard", "high" };
 	static const char* const fsr_names[] = { "off", "performance", "balanced", "quality", "native_aa" };
 	static const char* const msaa_names[] = { "off", "2x", "4x", "8x" };
 	const char* hdr_key = "video.hdr_output";
@@ -281,6 +282,15 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 		return 0;
 	}
 	out->ssao_quality = (XwaModernSsaoQuality)value;
+
+	value = 0;
+	if (!host_config_named_value(config, "video.shadow_quality", shadow_quality_names,
+								 sizeof shadow_quality_names / sizeof shadow_quality_names[0], &value,
+								 XWA_MODERN_VIDEO_OVERRIDE_SHADOW_QUALITY, override_mask, error,
+								 error_size)) {
+		return 0;
+	}
+	out->shadow_quality = (XwaModernShadowQuality)value;
 
 	value = 0;
 	if (!host_config_named_value(config, "video.fsr_upscaling", fsr_names,
@@ -982,6 +992,7 @@ static int host_yaml_set_game_data(yaml_document_t* document, const char* path) 
 static int host_yaml_set_video_options(yaml_document_t* document, const XwaModernVideoOptions* options) {
 	static const char* const window_mode_names[] = { "windowed", "fullscreen" };
 	static const char* const quality_names[] = { "off", "low", "high" };
+	static const char* const shadow_quality_names[] = { "standard", "high" };
 	static const char* const fsr_names[] = { "off", "performance", "balanced", "quality", "native_aa" };
 	static const char* const msaa_names[] = { "off", "2x", "4x", "8x" };
 	static const char* const sdr_gamma_names[] = { "2.2", "2.4", "srgb" };
@@ -994,6 +1005,8 @@ static int host_yaml_set_video_options(yaml_document_t* document, const XwaModer
 		options->window_mode < XWA_MODERN_WINDOW_MODE_WINDOWED ||
 		options->window_mode > XWA_MODERN_WINDOW_MODE_FULLSCREEN ||
 		options->ssao_quality < XWA_MODERN_SSAO_OFF || options->ssao_quality > XWA_MODERN_SSAO_HIGH ||
+		options->shadow_quality < XWA_MODERN_SHADOW_STANDARD ||
+		options->shadow_quality > XWA_MODERN_SHADOW_HIGH ||
 		options->fsr_upscaling < XWA_MODERN_FSR_OFF || options->fsr_upscaling > XWA_MODERN_FSR_NATIVE_AA ||
 		options->msaa < XWA_MODERN_MSAA_OFF || options->msaa > XWA_MODERN_MSAA_8X ||
 		(options->fsr_upscaling != XWA_MODERN_FSR_OFF && options->msaa != XWA_MODERN_MSAA_OFF) ||
@@ -1015,6 +1028,9 @@ static int host_yaml_set_video_options(yaml_document_t* document, const XwaModer
 		   host_yaml_set_scalar(document, video_id, "window_mode", window_mode_names[options->window_mode],
 								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
 		   host_yaml_set_scalar(document, video_id, "ssao_quality", quality_names[options->ssao_quality],
+								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
+		   host_yaml_set_scalar(document, video_id, "shadow_quality",
+								shadow_quality_names[options->shadow_quality],
 								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
 		   host_yaml_set_scalar(document, video_id, "fsr_upscaling", fsr_names[options->fsr_upscaling],
 								YAML_SINGLE_QUOTED_SCALAR_STYLE) &&
