@@ -151,7 +151,7 @@ extern int16_t               g_flightClipLeft;
 extern int16_t               g_flightClipBottom;
 extern int16_t               g_flightClipRight;
 extern uint8_t               g_flightColorEscapeBypassChar;
-extern const uint8_t         g_flightCharToColorLut[96];
+extern const uint8_t         g_flightCharToColorLut[32];
 
 void RenderScene_EnsureMeshBatches(void);
 int  RenderScene_AppendMeshFacesNoCull(SceneMesh* mesh);

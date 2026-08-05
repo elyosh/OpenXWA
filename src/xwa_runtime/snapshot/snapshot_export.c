@@ -58,8 +58,8 @@ uint32_t XwaSnapshotExport_FlightPaletteColor(uint16_t color_index) {
 
 uint8_t XwaSnapshotExport_FlightColorCodePaletteIndex(uint8_t color_code) {
 	return color_code >= 0x40u && color_code < 96u && color_code != g_flightColorEscapeBypassChar
-			   ? g_flightCharToColorLut[color_code]
-			   : color_code;
+				   ? g_flightCharToColorLut[color_code - 0x40u]
+				   : color_code;
 }
 
 int XwaSnapshotExport_ComponentTargetGeometry(int object_type, int component, float out_local[3],

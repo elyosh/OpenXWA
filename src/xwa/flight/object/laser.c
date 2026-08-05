@@ -131,15 +131,16 @@ const uint8_t g_projectileHomingProfileBaseByObjectType[OBJ_LaserImperialDS + 1]
 };
 
 // GLOBAL: XWA 0x5B6790 (7-entry rows: row base 0/7/14/21/28/35 + homing tier)
-const uint16_t g_projectileHomingTurnRateByProfile[44] = {
+const uint16_t g_projectileHomingTurnRateByProfile[42] = {
 	0,    1024, 2048, 3072,  5120,  7168,  9216, 0,    512,   1024,  2048,  3072,  4608, 6144, 0,
 	2048, 4096, 5120, 10240, 14336, 18432, 0,    32,   64,    80,    96,    112,   128,  0,    512,
-	1024, 1280, 1536, 1792,  2048,  0,     4096, 8192, 12288, 16384, 20480, 24576, 0,    0,
+	1024, 1280, 1536, 1792,  2048,  0,     4096, 8192, 12288, 16384, 20480, 24576,
 };
 
-// GLOBAL: XWA 0x5B67E8 (rows at base 0 and base 7)
-const uint16_t g_projectileHomingSpeedAdjustRateByProfile[12] = {
-	0, 50, 100, 200, 300, 400, 500, 0, 25, 50, 100, 150,
+// GLOBAL: XWA 0x5B67E8 (7-entry rows: row base 0/7/14/21/28/35 + homing tier)
+const uint16_t g_projectileHomingSpeedAdjustRateByProfile[42] = {
+	0, 50, 100, 200, 300, 400, 500, 0, 25, 50, 100, 150, 200, 250, 0, 100, 200, 400, 600, 800, 1000,
+	0, 0,  0,   0,   0,   0,   0,   0, 10, 20,  30,  40,  50,  60, 0, 100, 200, 400, 600, 800, 1000,
 };
 
 // GLOBAL: XWA 0x5B65D0

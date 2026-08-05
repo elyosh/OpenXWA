@@ -38,9 +38,9 @@ extern const uint16_t g_warheadProjectilePointValue[11];
    tier to select a profile row in the homing turn-rate / speed-adjust tables. */
 extern const uint8_t  g_projectileHomingProfileBaseByObjectType[OBJ_LaserImperialDS + 1];
 /* Homing turn rate (Q16 angle/step scale) per resolved homing profile row. */
-extern const uint16_t g_projectileHomingTurnRateByProfile[44];
+extern const uint16_t g_projectileHomingTurnRateByProfile[42];
 /* Homing speed adjustment rate per resolved homing profile row. */
-extern const uint16_t g_projectileHomingSpeedAdjustRateByProfile[12];
+extern const uint16_t g_projectileHomingSpeedAdjustRateByProfile[42];
 
 uint16_t laser_GetProjectileLifetimeTicks(ObjectTypeId projectileObjectType);
 void     laser_weaponsfire(void);

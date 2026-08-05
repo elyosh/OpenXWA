@@ -117,12 +117,8 @@ FlightTextQueueEntry g_flightTextQueue[FLIGHT_TEXT_QUEUE_CAPACITY];
 // GLOBAL: XWA 0x5B3390
 const uint16_t g_flightTextDecimalDivisors[6] = { 1, 1, 10, 100, 1000, 10000 };
 
-// GLOBAL: XWA 0x5B6800
-const uint8_t g_flightCharToColorLut[96] = {
-	0xc8, 0x00, 0xfa, 0x00, 0x00, 0x00, 0x64, 0x00, 0xc8, 0x00, 0x90, 0x01, 0x58, 0x02, 0x20, 0x03,
-	0xe8, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x0a, 0x00, 0x14, 0x00, 0x1e, 0x00, 0x28, 0x00, 0x32, 0x00, 0x3c, 0x00, 0x00, 0x00,
-	0x64, 0x00, 0xc8, 0x00, 0x90, 0x01, 0x58, 0x02, 0x20, 0x03, 0xe8, 0x03, 0x00, 0x00, 0x00, 0x00,
+// GLOBAL: XWA 0x5B6840
+const uint8_t g_flightCharToColorLut[32] = {
 	0x2c, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b,
 	0x3c, 0x3d, 0x3e, 0x3f, 0xd5, 0xd5, 0xd4, 0xd3, 0x2c, 0x2d, 0x2e, 0x2f, 0x2c, 0x2d, 0x2e, 0x2f,
 };
@@ -1296,7 +1292,7 @@ void FlightText_DrawDecimalNumber(uint16_t value, unsigned int width, unsigned i
 		if ((uint8_t)'@' == g_flightColorEscapeBypassChar) {
 			zeroColorIndex = '@';
 		} else {
-			zeroColorIndex = g_flightCharToColorLut['@'];
+			zeroColorIndex = g_flightCharToColorLut[0];
 		}
 		g_flightTextColorIndex = zeroColorIndex;
 
@@ -1372,7 +1368,7 @@ void FlightText_DrawString(const char* str) {
 			code = (uint8_t)*str;
 		set_color:
 			g_flightTextColorIndex = (code >= 0x40u && code != g_flightColorEscapeBypassChar)
-										 ? g_flightCharToColorLut[code]
+										 ? g_flightCharToColorLut[code - 0x40u]
 										 : (uint8_t)code;
 			if (g_useHardware3D) {
 				/* inlined FlightText_PaletteIndexToHardwareArgb(g_flightTextColorIndex) */
@@ -1640,7 +1636,7 @@ void FlightText_SetBackgroundColor(uint32_t charOrIndex) {
 	if (charOrIndex < 0x40u || charOrIndex == g_flightColorEscapeBypassChar) {
 		g_flightTextBgColor = (uint8_t)charOrIndex;
 	} else {
-		g_flightTextBgColor = g_flightCharToColorLut[charOrIndex];
+		g_flightTextBgColor = g_flightCharToColorLut[charOrIndex - 0x40u];
 	}
 }
 
@@ -1650,7 +1646,7 @@ void FlightText_SetColor(unsigned int charOrIndex) {
 	uint32_t hwArgb;
 
 	if (charOrIndex >= 0x40u && charOrIndex != g_flightColorEscapeBypassChar) {
-		g_flightTextColorIndex = g_flightCharToColorLut[charOrIndex];
+		g_flightTextColorIndex = g_flightCharToColorLut[charOrIndex - 0x40u];
 	} else {
 		g_flightTextColorIndex = (uint8_t)charOrIndex;
 	}
@@ -1675,7 +1671,7 @@ void FlightText_SetShadowColor(unsigned int charOrIndex) {
 	if (charOrIndex < 0x40u || charOrIndex == g_flightColorEscapeBypassChar) {
 		g_flightTextShadowColor = (uint8_t)charOrIndex;
 	} else {
-		g_flightTextShadowColor = g_flightCharToColorLut[charOrIndex];
+		g_flightTextShadowColor = g_flightCharToColorLut[charOrIndex - 0x40u];
 	}
 	if (g_useHardware3D) {
 		rgb16 = g_flightTextPalette[g_flightTextShadowColor];
