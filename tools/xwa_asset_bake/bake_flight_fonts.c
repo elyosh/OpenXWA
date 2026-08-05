@@ -38,7 +38,26 @@ static void wr_u32(FILE* f, uint32_t value) {
 	fwrite(b, 1, sizeof b, f);
 }
 
+static int scaled_u16_fits(int value, int scale) {
+	return value >= 0 && scale > 0 && value <= UINT16_MAX / scale;
+}
+
 static int write_fnt(const char* path, const Xwa2dFontAtlas* font, int scale) {
+	if (!font || !scaled_u16_fits(font->width, scale) ||
+		!scaled_u16_fits(font->height, scale) ||
+		!scaled_u16_fits(font->cell_width, scale) ||
+		!scaled_u16_fits(font->cell_height, scale) ||
+		!scaled_u16_fits(font->baseline, scale))
+		return 0;
+	for (uint16_t glyph = 0; glyph < font->glyph_count; glyph++) {
+		const Xwa2dGlyph* metric = &font->glyphs[glyph];
+		if (!scaled_u16_fits(metric->x, scale) ||
+			!scaled_u16_fits(metric->y, scale) ||
+			!scaled_u16_fits(metric->width, scale) ||
+			!scaled_u16_fits(metric->height, scale) ||
+			!scaled_u16_fits(metric->advance, scale))
+			return 0;
+	}
 	FILE* f = fopen(path, "wb");
 	if (!f)
 		return 0;
@@ -48,9 +67,9 @@ static int write_fnt(const char* path, const Xwa2dFontAtlas* font, int scale) {
 	wr_u16(f, font->glyph_count);
 	wr_u16(f, (uint16_t)(font->width * scale));
 	wr_u16(f, (uint16_t)(font->height * scale));
-	wr_u16(f, (uint16_t)font->cell_width);
-	wr_u16(f, (uint16_t)font->cell_height);
-	wr_u16(f, (uint16_t)font->baseline);
+	wr_u16(f, (uint16_t)(font->cell_width * scale));
+	wr_u16(f, (uint16_t)(font->cell_height * scale));
+	wr_u16(f, (uint16_t)(font->baseline * scale));
 	wr_u32(f, 0);
 	for (uint16_t glyph = 0; glyph < font->glyph_count; glyph++) {
 		const Xwa2dGlyph* metric = &font->glyphs[glyph];
@@ -58,7 +77,7 @@ static int write_fnt(const char* path, const Xwa2dFontAtlas* font, int scale) {
 		wr_u16(f, (uint16_t)(metric->y * scale));
 		wr_u16(f, (uint16_t)(metric->width * scale));
 		wr_u16(f, (uint16_t)(metric->height * scale));
-		wr_u16(f, metric->advance);
+		wr_u16(f, (uint16_t)(metric->advance * scale));
 	}
 	const int ok = !ferror(f) && fclose(f) == 0;
 	return ok;

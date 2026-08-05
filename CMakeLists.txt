@@ -259,7 +259,6 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/ship.c
     src/xwa_remaster/opt_mesh.c
     src/xwa_remaster/original_2d.c
-    src/xwa_remaster/runtime_atlas.c
     src/xwa_remaster/sky_stars.c
     src/xwa_remaster/assets.c
     src/xwa_remaster/text.c
@@ -277,8 +276,7 @@ target_link_libraries(xwa_remaster
     PUBLIC
         aeron
         aeron_scene
-        opt2gltf_lib
-        aeron_gltf_cook_lib
+        aeron_asset
         xwa_2d_formats
 )
 

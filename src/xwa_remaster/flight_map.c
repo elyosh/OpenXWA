@@ -288,7 +288,7 @@ static void map_add_object_annotations(const XwaSnapshot* snapshot, XwaRemasterA
 }
 
 static void map_add_object_text(const XwaFlightMapObject* map, const XwaFlightObject* object,
-								const XwaRemasterFlightView* view, const XwaFlightFontRef* font,
+								const XwaRemasterFlightView* view, const AeronFontAtlas* font,
 								const char* label, float screen_x, float screen_y, float depth,
 								float classic_width_px, float font_size, float line_height, int show_range) {
 	if (!map->label_visible || !font || depth <= 0.0f)
@@ -404,7 +404,7 @@ int XwaRemasterFlightMap_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scene, c
 	if (font_scale < 1)
 		font_scale = 10;
 	const int font_tier = font_scale < 12 ? 2 : (font_scale < 15 ? 1 : 0);
-	const XwaFlightFontRef* font = XwaRemasterAssets_FlightFont(assets, font_tier);
+	const AeronFontAtlas* font = XwaRemasterAssets_FlightFont(assets, font_tier, NULL);
 	const float font_size = (float)font_scale * view->classic_pixel_scale;
 	const float line_height = (float)(font_scale - (font_scale >> 2)) * view->classic_pixel_scale;
 	const float source_w = snapshot->flight_camera.screen_w ? snapshot->flight_camera.screen_w : 640.0f;

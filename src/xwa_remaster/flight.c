@@ -885,7 +885,7 @@ int XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterA
 	}
 	int loaded_font_tiers = 0;
 	for (int tier = 0; tier < 3; tier++) {
-		loaded_font_tiers += XwaRemasterAssets_FlightFont(assets, tier) != NULL;
+		loaded_font_tiers += XwaRemasterAssets_FlightFont(assets, tier, NULL) != NULL;
 	}
 	Aeron_LogInfo("xwa.remaster", "flight HUD fonts: %d/3 tiers loaded", loaded_font_tiers);
 	if (loaded_font_tiers != 3) {

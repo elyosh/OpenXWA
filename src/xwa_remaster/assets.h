@@ -57,14 +57,6 @@ typedef struct XwaAssetRef {
 	int classic_w, classic_h;
 } XwaAssetRef;
 
-typedef struct XwaFlightFontRef {
-	AeronTexture* texture;
-	int atlas_w, atlas_h;
-	uint16_t first_char, num_chars;
-	uint16_t cell_w, cell_h, baseline;
-	AeronFontGlyph* glyphs;
-} XwaFlightFontRef;
-
 /* `root` is the configured bake output root. `prefer_original_2d` changes
  * source order; the alternate source is selected only when the first is absent. */
 XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d);
@@ -100,9 +92,11 @@ int XwaRemasterAssets_FlightModelFrame(XwaRemasterAssets* a, int object_type, in
 									   XwaAssetRef* out);
 
 /* Flight HUD font tiers are process-resident. Prepare performs all three
- * loads once; FlightFont is lookup-only afterward. */
+ * loads once; FlightFont is lookup-only afterward. Atlas metrics use the
+ * returned pixel scale relative to classic coordinates. */
 int XwaRemasterAssets_PrepareFlightFonts(XwaRemasterAssets* a, AeronCommandBuffer* cmd);
-const XwaFlightFontRef* XwaRemasterAssets_FlightFont(XwaRemasterAssets* a, int tier);
+const AeronFontAtlas* XwaRemasterAssets_FlightFont(XwaRemasterAssets* a,
+		int tier, float* out_atlas_scale);
 
 uint32_t XwaRemasterAssets_Generation(const XwaRemasterAssets* a);
 

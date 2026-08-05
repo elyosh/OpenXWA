@@ -4,7 +4,7 @@
 
 #include <math.h>
 
-static float text_flight_advance(const XwaFlightFontRef* font, uint8_t ch, float size_px) {
+static float text_flight_advance(const AeronFontAtlas* font, uint8_t ch, float size_px) {
 	if (!font || !font->glyphs || font->cell_h == 0 || ch < font->first_char ||
 		ch >= font->first_char + font->num_chars) {
 		return size_px * 0.6f;
@@ -13,7 +13,7 @@ static float text_flight_advance(const XwaFlightFontRef* font, uint8_t ch, float
 	return glyph->advance ? (float)glyph->advance * size_px / font->cell_h : size_px * 0.5f;
 }
 
-float XwaRemasterText_MeasureFlightString(const XwaFlightFontRef* font, const char* text,
+float XwaRemasterText_MeasureFlightString(const AeronFontAtlas* font, const char* text,
 										 float size_px) {
 	float width = 0.0f;
 	if (!text || size_px <= 0.0f)
@@ -29,7 +29,7 @@ float XwaRemasterText_MeasureFlightString(const XwaFlightFontRef* font, const ch
 	return width;
 }
 
-int XwaRemasterText_AddFlightString(AeronDrawList2D* list, const XwaFlightFontRef* font,
+int XwaRemasterText_AddFlightString(AeronDrawList2D* list, const AeronFontAtlas* font,
 									const char* text, float x_px, float y_px, float size_px,
 									XwaRemasterTextAlign align, uint32_t initial_argb,
 									const AeronRectI* scissor) {

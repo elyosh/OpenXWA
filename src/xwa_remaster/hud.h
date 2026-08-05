@@ -209,7 +209,8 @@ const XwaRemasterHudPreparedAssets* XwaRemasterHud_PreparedAssets(void);
 void XwaRemasterHud_BeginRenderPhase(void);
 void XwaRemasterHud_EndRenderPhase(void);
 const XwaAssetRef* XwaRemasterHud_AssetFrame(int object_type, int classic_frame_1based);
-const XwaFlightFontRef* XwaRemasterHud_FlightFont(int tier);
+const AeronFontAtlas* XwaRemasterHud_FlightFont(int tier,
+		float* out_atlas_scale);
 const XwaHudPreparedDrawState* XwaRemasterHud_PreparedDrawState(void);
 void XwaRemasterHud_RenderTargetBoxes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 									  AeronRenderTarget* target, int target_w, int target_h,

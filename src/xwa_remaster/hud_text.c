@@ -168,7 +168,7 @@ static const XwaHudPane* text_find_pane(uint16_t pane_id) {
 	return NULL;
 }
 
-static float text_arrow_advance(const XwaFlightFontRef* font, uint8_t ch, float size_ref) {
+static float text_arrow_advance(const AeronFontAtlas* font, uint8_t ch, float size_ref) {
 	if (!font || ch < font->first_char || ch >= font->first_char + font->num_chars || font->cell_h == 0)
 		return size_ref * 0.6f;
 	const AeronFontGlyph* glyph = &font->glyphs[ch - font->first_char];
@@ -186,7 +186,7 @@ static void text_append_arrow_glyph(uint8_t ch, float x, float y, float size, ui
 	text_prepared.arrow_glyphs[i].argb = argb;
 }
 
-static void text_build_arrow_string(const XwaFlightFontRef* font, const char* str, float x, float y,
+static void text_build_arrow_string(const AeronFontAtlas* font, const char* str, float x, float y,
 									float size_ref, uint32_t initial_argb) {
 	uint32_t argb = initial_argb;
 	for (const uint8_t* p = (const uint8_t*)str; *p; p++) {
@@ -254,7 +254,7 @@ static void text_build_target_arrow(const XwaSnapshot* snapshot, XwaHudProfileIn
 	if (font_scale < 1)
 		font_scale = 1;
 	const int tier = font_scale < 12 ? 2 : (font_scale < 15 ? 1 : 0);
-	const XwaFlightFontRef* font = XwaRemasterHud_FlightFont(tier);
+	const AeronFontAtlas* font = XwaRemasterHud_FlightFont(tier, NULL);
 	text_prepared.arrow_tier = (uint8_t)tier;
 	const float size_ref = font_scale * px_y;
 	const float line_h = (font_scale - (font_scale >> 2)) * px_y;
@@ -329,7 +329,7 @@ static void text_build_target_box_readouts(const XwaSnapshot* snapshot) {
 	if (font_scale < 1)
 		font_scale = 1;
 	const int tier = font_scale < 12 ? 2 : (font_scale < 15 ? 1 : 0);
-	const XwaFlightFontRef* font = XwaRemasterHud_FlightFont(tier);
+	const AeronFontAtlas* font = XwaRemasterHud_FlightFont(tier, NULL);
 	text_prepared.arrow_tier = (uint8_t)tier;
 	const uint32_t name_argb =
 		XwaSnapshotExport_FlightPaletteColor(XwaSnapshotExport_FlightColorCodePaletteIndex(0x43u));
@@ -451,7 +451,8 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, i
 	}
 	XwaRemasterHud_BeginRenderPhase();
 	if (text_prepared.arrow_glyph_count) {
-		const XwaFlightFontRef* font = XwaRemasterHud_FlightFont(text_prepared.arrow_tier);
+		const AeronFontAtlas* font = XwaRemasterHud_FlightFont(
+				text_prepared.arrow_tier, NULL);
 		if (font && font->texture) {
 			for (uint16_t i = 0; i < text_prepared.arrow_glyph_count; i++) {
 				const uint8_t ch = text_prepared.arrow_glyphs[i].ch;
@@ -491,7 +492,8 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, i
 										 text_prepared.screen_w, text_prepared.screen_h, &mapped) ||
 			!text_mapped_glyph_visible(layout, glyph, (XwaHudProfileIndex)text_prepared.profile, &mapped))
 			continue;
-		const XwaFlightFontRef* font = XwaRemasterHud_FlightFont(glyph->font_tier);
+		const AeronFontAtlas* font = XwaRemasterHud_FlightFont(
+				glyph->font_tier, NULL);
 		if (!font || !font->texture || glyph->ch < font->first_char ||
 			glyph->ch >= font->first_char + font->num_chars)
 			continue;

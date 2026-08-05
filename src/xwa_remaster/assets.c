@@ -11,10 +11,10 @@
 #include "aeron/log.h"
 #include "aeron/time.h"
 #include "aeron/scene/image_cache.h"
+#include "aeron/scene/runtime_atlas.h"
 #include "aeron/scene/sprite_atlas.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #include "xwa_remaster/original_2d.h"
-#include "xwa_remaster/runtime_atlas.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -37,9 +37,9 @@ typedef struct FontSlot {
 
 typedef struct FlightFontSlot {
 	uint8_t tried;
-	uint8_t loaded;
 	uint8_t source; /* AssetSource */
-	XwaFlightFontRef ref;
+	float atlas_scale;
+	AeronFontAtlas atlas;
 } FlightFontSlot;
 
 /* Classified layout form of one source-file key. Probed once (fopen),
@@ -73,7 +73,7 @@ typedef struct FileSlot {
 	uint16_t frontend_part_count;
 	uint64_t frontend_seen_generation;
 	AeronSpriteAtlas atlas; /* FILE_ATLAS only */
-	XwaRuntimeAtlas original_atlas;
+	AeronRuntimeAtlas original_atlas;
 } FileSlot;
 
 typedef struct GroupSlot {
@@ -86,8 +86,8 @@ typedef struct GroupSlot {
 	uint64_t frontend_seen_generation;
 	uint64_t flight_seen_generation;
 	AeronSpriteAtlas atlas;
-	XwaRuntimeAtlas frontend_original_atlas;
-	XwaRuntimeAtlas flight_original_atlas;
+	AeronRuntimeAtlas frontend_original_atlas;
+	AeronRuntimeAtlas flight_original_atlas;
 } GroupSlot;
 
 struct XwaRemasterAssets {
@@ -147,23 +147,20 @@ void XwaRemasterAssets_Destroy(XwaRemasterAssets* a) {
 		}
 	}
 	for (int i = 0; i < a->file_count; i++) {
-		XwaRuntimeAtlas_Free(&a->files[i].original_atlas);
+		Aeron_RuntimeAtlasRelease(&a->files[i].original_atlas);
 		if (a->files[i].kind == FILE_ATLAS) {
 			Aeron_SpriteAtlasFree(&a->files[i].atlas);
 		}
 	}
 	for (int i = 0; i < a->group_count; i++) {
-		XwaRuntimeAtlas_Free(&a->groups[i].frontend_original_atlas);
-		XwaRuntimeAtlas_Free(&a->groups[i].flight_original_atlas);
+		Aeron_RuntimeAtlasRelease(&a->groups[i].frontend_original_atlas);
+		Aeron_RuntimeAtlasRelease(&a->groups[i].flight_original_atlas);
 		if (a->groups[i].remastered_status == ASSET_LOAD_SUCCESS) {
 			Aeron_SpriteAtlasFree(&a->groups[i].atlas);
 		}
 	}
 	for (int i = 0; i < 3; i++) {
-		if (a->flight_fonts[i].source == ASSET_SOURCE_ORIGINAL) {
-			Aeron_DestroyTexture(a->flight_fonts[i].ref.texture);
-		}
-		free(a->flight_fonts[i].ref.glyphs);
+		AeronFontAtlas_Release(&a->flight_fonts[i].atlas);
 	}
 	if (a->frontend_images) {
 		Aeron_ImageCacheDestroy(a->frontend_images);
@@ -266,13 +263,13 @@ static int apply_atlas_frame(const AeronSpriteAtlas* atlas, int frame, XwaAssetR
 	return 1;
 }
 
-static int assets_runtime_frame(const XwaRuntimeAtlas* atlas, int frame, XwaAssetRef* out) {
+static int assets_runtime_frame(const AeronRuntimeAtlas* atlas, int frame, XwaAssetRef* out) {
 	if (!atlas || !out || frame < 0 || frame >= atlas->layout.frame_count)
 		return 0;
 	const int page_index = atlas->layout.pages ? atlas->layout.pages[frame] : 0;
 	if (page_index < 0 || page_index >= atlas->layout.page_count)
 		return 0;
-	const XwaRuntimeAtlasPage* page = &atlas->pages[page_index];
+	const AeronRuntimeAtlasPage* page = &atlas->pages[page_index];
 	if (!page->texture || page->width <= 0 || page->height <= 0)
 		return 0;
 	out->texture = page->texture;
@@ -281,6 +278,39 @@ static int assets_runtime_frame(const XwaRuntimeAtlas* atlas, int frame, XwaAsse
 	out->w = page->width;
 	out->h = page->height;
 	return apply_atlas_frame(&atlas->layout, frame, out);
+}
+
+static int assets_build_runtime_atlas(AeronRuntimeAtlas* atlas,
+		AeronCommandBuffer* cmd, const Xwa2dFrameSet* source,
+		int generate_mips, const char* debug_name) {
+	if (!atlas || !cmd || !source || !source->frames || source->count <= 0)
+		return 0;
+	AeronRuntimeAtlasFrame* frames =
+		(AeronRuntimeAtlasFrame*)calloc((size_t)source->count, sizeof *frames);
+	if (!frames)
+		return 0;
+	for (int index = 0; index < source->count; ++index) {
+		const Xwa2dFrame* source_frame = &source->frames[index];
+		frames[index] = (AeronRuntimeAtlasFrame) {
+			.rgba = source_frame->rgba,
+			.width = source_frame->width,
+			.height = source_frame->height,
+			.id = source_frame->sprite_id,
+			.anchor_x = source_frame->anchor_x,
+			.anchor_y = source_frame->anchor_y,
+		};
+	}
+	const AeronRuntimeAtlasOptions options = {
+		.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
+		.color_space = AERON_COLOR_SPACE_SRGB,
+		.alpha_mode = AERON_IMAGE_ALPHA_STRAIGHT,
+		.generate_mips = generate_mips != 0,
+		.debug_name = debug_name,
+	};
+	const int built = Aeron_RuntimeAtlasBuild(atlas, cmd, frames,
+			source->count, &options) ? 1 : 0;
+	free(frames);
+	return built;
 }
 
 static FileSlot* file_classify(XwaRemasterAssets* a, const char* key) {
@@ -446,8 +476,9 @@ static AssetLoadStatus assets_load_original_group(XwaRemasterAssets* a, AeronCom
 			Aeron_LogWarn("xwa.remaster", "2D group %d: original load failed: %s", slot->group, error);
 		return status;
 	}
-	XwaRuntimeAtlas* atlas = flight ? &slot->flight_original_atlas : &slot->frontend_original_atlas;
-	const int loaded = XwaRuntimeAtlas_Build(atlas, cmd, &frames, flight, "XWA original DAT group");
+	AeronRuntimeAtlas* atlas = flight ? &slot->flight_original_atlas : &slot->frontend_original_atlas;
+	const int loaded = assets_build_runtime_atlas(atlas, cmd, &frames, flight,
+			"XWA original DAT group");
 	Xwa2dFrameSet_Free(&frames);
 	if (loaded) {
 		Aeron_LogInfo("xwa.remaster", "2D group %d: source=original pages=%d time_us=%llu", slot->group,
@@ -492,7 +523,8 @@ static void assets_release_group(XwaRemasterAssets* a, GroupSlot* slot, int flig
 			Aeron_ImageCacheInvalidate(images, path);
 		}
 	} else if (*source == ASSET_SOURCE_ORIGINAL) {
-		XwaRuntimeAtlas_Free(flight ? &slot->flight_original_atlas : &slot->frontend_original_atlas);
+		Aeron_RuntimeAtlasRelease(flight ? &slot->flight_original_atlas :
+				&slot->frontend_original_atlas);
 	}
 	if (flight)
 		slot->flight_resident = 0;
@@ -540,7 +572,8 @@ static AssetLoadStatus assets_load_original_file(XwaRemasterAssets* a, AeronComm
 			Aeron_LogWarn("xwa.remaster", "2D file '%s': original load failed: %s", slot->key, error);
 		return status;
 	}
-	const int loaded = XwaRuntimeAtlas_Build(&slot->original_atlas, cmd, &frames, 0, slot->source_file);
+	const int loaded = assets_build_runtime_atlas(&slot->original_atlas, cmd,
+			&frames, 0, slot->source_file);
 	Xwa2dFrameSet_Free(&frames);
 	if (loaded) {
 		Aeron_LogInfo("xwa.remaster", "2D file '%s': source=original pages=%d time_us=%llu", slot->key,
@@ -612,7 +645,7 @@ int XwaRemasterAssets_SyncFrontendAssets(XwaRemasterAssets* a, AeronCommandBuffe
 		slot->frontend_seen_generation = snapshot->frontend_asset_generation;
 		if (strcmp(slot->source_file, asset->source_file) != 0) {
 			assets_sync_frontend_file(a, cmd, slot, 0);
-			XwaRuntimeAtlas_Free(&slot->original_atlas);
+			Aeron_RuntimeAtlasRelease(&slot->original_atlas);
 			slot->resident_source = ASSET_SOURCE_MISSING;
 			snprintf(slot->source_file, sizeof slot->source_file, "%s", asset->source_file);
 		}
@@ -658,7 +691,7 @@ int XwaRemasterAssets_SyncFrontendAssets(XwaRemasterAssets* a, AeronCommandBuffe
 		if (slot->resident_source != ASSET_SOURCE_MISSING &&
 			slot->frontend_seen_generation != snapshot->frontend_asset_generation) {
 			(void)assets_sync_frontend_file(a, cmd, slot, 0);
-			XwaRuntimeAtlas_Free(&slot->original_atlas);
+			Aeron_RuntimeAtlasRelease(&slot->original_atlas);
 			slot->resident_source = ASSET_SOURCE_MISSING;
 		}
 		texture_count += slot->resident_source == ASSET_SOURCE_ORIGINAL
@@ -850,49 +883,6 @@ int XwaRemasterAssets_FlightModelFrame(XwaRemasterAssets* a, int object_type, in
 	return assets_flight_group_frame(a, slot, frame, out);
 }
 
-static uint16_t assets_rd_u16(const uint8_t* p) { return (uint16_t)(p[0] | (p[1] << 8)); }
-
-static uint32_t assets_rd_u32(const uint8_t* p) {
-	return (uint32_t)p[0] | ((uint32_t)p[1] << 8) | ((uint32_t)p[2] << 16) | ((uint32_t)p[3] << 24);
-}
-
-static uint8_t* assets_read_file(const char* path, size_t* out_size, AssetLoadStatus* status) {
-	FILE* f = fopen(path, "rb");
-	if (!f) {
-		*status = errno == ENOENT || errno == ENOTDIR ? ASSET_LOAD_MISSING
-													  : ASSET_LOAD_FAILED;
-		return NULL;
-	}
-	if (fseek(f, 0, SEEK_END) != 0) {
-		*status = ASSET_LOAD_FAILED;
-		fclose(f);
-		return NULL;
-	}
-	const long length = ftell(f);
-	if (length < 0) {
-		*status = ASSET_LOAD_FAILED;
-		fclose(f);
-		return NULL;
-	}
-	rewind(f);
-	uint8_t* data = (uint8_t*)malloc(length > 0 ? (size_t)length : 1u);
-	if (!data) {
-		*status = ASSET_LOAD_FAILED;
-		fclose(f);
-		return NULL;
-	}
-	if (fread(data, 1, (size_t)length, f) != (size_t)length) {
-		*status = ASSET_LOAD_FAILED;
-		free(data);
-		fclose(f);
-		return NULL;
-	}
-	fclose(f);
-	*out_size = (size_t)length;
-	*status = ASSET_LOAD_SUCCESS;
-	return data;
-}
-
 static AeronFontGlyph* assets_copy_font_glyphs(const Xwa2dFontAtlas* source, int atlas_scale) {
 	if (!source || !source->glyphs || !source->glyph_count || atlas_scale <= 0)
 		return NULL;
@@ -903,7 +893,8 @@ static AeronFontGlyph* assets_copy_font_glyphs(const Xwa2dFontAtlas* source, int
 		if (source->glyphs[i].x > UINT16_MAX / atlas_scale ||
 			source->glyphs[i].y > UINT16_MAX / atlas_scale ||
 			source->glyphs[i].width > UINT16_MAX / atlas_scale ||
-			source->glyphs[i].height > UINT16_MAX / atlas_scale) {
+			source->glyphs[i].height > UINT16_MAX / atlas_scale ||
+			source->glyphs[i].advance > UINT16_MAX / atlas_scale) {
 			free(glyphs);
 			return NULL;
 		}
@@ -911,35 +902,47 @@ static AeronFontGlyph* assets_copy_font_glyphs(const Xwa2dFontAtlas* source, int
 		glyphs[i].atlas_y = (uint16_t)(source->glyphs[i].y * atlas_scale);
 		glyphs[i].atlas_w = (uint16_t)(source->glyphs[i].width * atlas_scale);
 		glyphs[i].atlas_h = (uint16_t)(source->glyphs[i].height * atlas_scale);
-		glyphs[i].advance = source->glyphs[i].advance;
+		glyphs[i].advance = (uint16_t)(source->glyphs[i].advance * atlas_scale);
 	}
 	return glyphs;
 }
 
-static int assets_upload_original_font(AeronCommandBuffer* cmd, const Xwa2dFontAtlas* font, int atlas_scale,
-									   int generate_mips, const char* debug_name, AeronTexture** out_texture,
-									   AeronFontGlyph** out_glyphs, int* out_width, int* out_height) {
-	if (!cmd || !font || !out_texture || !out_glyphs || !out_width || !out_height)
+static int assets_init_original_font(AeronCommandBuffer* cmd,
+		const Xwa2dFontAtlas* font, int atlas_scale, int generate_mips,
+		const char* debug_name, AeronFontAtlas* out) {
+	if (!cmd || !font || !out || atlas_scale <= 0 || font->cell_width <= 0 ||
+		font->cell_height <= 0 || font->baseline < 0 ||
+		font->cell_width > UINT16_MAX / atlas_scale ||
+		font->cell_height > UINT16_MAX / atlas_scale ||
+		font->baseline > UINT16_MAX / atlas_scale)
 		return 0;
 	AeronFontGlyph* glyphs = assets_copy_font_glyphs(font, atlas_scale);
 	int atlas_width = 0, atlas_height = 0;
 	uint8_t* atlas_rgba = glyphs ? Aeron_ImageUpscaleNearestRgba8(font->rgba, font->width, font->height,
-																  atlas_scale, &atlas_width, &atlas_height)
+														  atlas_scale, &atlas_width, &atlas_height)
 								 : NULL;
-	AeronTexture* texture = atlas_rgba
-								? XwaRuntimeTexture_UploadLinearRgba(cmd, atlas_rgba, atlas_width,
-																	 atlas_height, generate_mips, debug_name)
-								: NULL;
+	const int initialized = atlas_rgba && AeronFontAtlas_InitRgba8(
+			out, cmd,
+			&(AeronFontAtlasRgba8Desc) {
+				.pixels = atlas_rgba,
+				.width = atlas_width,
+				.height = atlas_height,
+				.pitch = (size_t)atlas_width * 4,
+				.first_char = font->first_char,
+				.cell_w = (uint16_t)(font->cell_width * atlas_scale),
+				.cell_h = (uint16_t)(font->cell_height * atlas_scale),
+				.baseline = (uint16_t)(font->baseline * atlas_scale),
+				.glyphs = glyphs,
+				.glyph_count = font->glyph_count,
+				.format = AERON_TEXTURE_FORMAT_RGBA8_UNORM,
+				.color_space = AERON_COLOR_SPACE_LINEAR_SRGB,
+				.alpha_mode = AERON_IMAGE_ALPHA_STRAIGHT,
+				.generate_mips = generate_mips != 0,
+				.debug_name = debug_name,
+			});
 	free(atlas_rgba);
-	if (!texture) {
-		free(glyphs);
-		return 0;
-	}
-	*out_texture = texture;
-	*out_glyphs = glyphs;
-	*out_width = atlas_width;
-	*out_height = atlas_height;
-	return 1;
+	free(glyphs);
+	return initialized;
 }
 
 static AssetLoadStatus assets_load_original_flight_font(XwaRemasterAssets* a, AeronCommandBuffer* cmd,
@@ -962,23 +965,12 @@ static AssetLoadStatus assets_load_original_flight_font(XwaRemasterAssets* a, Ae
 		return ASSET_LOAD_FAILED;
 	}
 	Xwa2dFrameSet_Free(&group);
-	AeronFontGlyph* glyphs = NULL;
-	AeronTexture* texture = NULL;
-	int atlas_width = 0, atlas_height = 0;
-	if (!assets_upload_original_font(cmd, &font, XWA_ORIGINAL_FONT_SCALE, 1, "XWA original flight font",
-									 &texture, &glyphs, &atlas_width, &atlas_height)) {
+	if (!assets_init_original_font(cmd, &font, XWA_ORIGINAL_FONT_SCALE, 1,
+			"XWA original flight font", &slot->atlas)) {
 		Xwa2dFontAtlas_Free(&font);
 		return ASSET_LOAD_FAILED;
 	}
-	slot->ref.texture = texture;
-	slot->ref.atlas_w = atlas_width;
-	slot->ref.atlas_h = atlas_height;
-	slot->ref.cell_w = (uint16_t)font.cell_width;
-	slot->ref.cell_h = (uint16_t)font.cell_height;
-	slot->ref.baseline = (uint16_t)font.baseline;
-	slot->ref.first_char = font.first_char;
-	slot->ref.num_chars = font.glyph_count;
-	slot->ref.glyphs = glyphs;
+	slot->atlas_scale = (float)XWA_ORIGINAL_FONT_SCALE;
 	Xwa2dFontAtlas_Free(&font);
 	return ASSET_LOAD_SUCCESS;
 }
@@ -991,62 +983,21 @@ static AssetLoadStatus assets_load_remastered_flight_font(XwaRemasterAssets* a,
 	if (!cmd)
 		return ASSET_LOAD_FAILED;
 	char base[768], path[800];
-	snprintf(base, sizeof base, "%s/flight/fonts/font_tier_%d", a->root, tier);
-	snprintf(path, sizeof path, "%s.fnt", base);
-	size_t size = 0;
-	AssetLoadStatus status;
-	uint8_t* fnt = assets_read_file(path, &size, &status);
-	if (!fnt)
+	if (snprintf(base, sizeof base, "%s/flight/fonts/font_tier_%d",
+			a->root, tier) >= (int)sizeof base ||
+		snprintf(path, sizeof path, "%s.fnt", base) >= (int)sizeof path)
+		return ASSET_LOAD_FAILED;
+	AssetLoadStatus status = assets_probe_file(path);
+	if (status != ASSET_LOAD_SUCCESS)
 		return status;
-	if (size < 24 || assets_rd_u32(fnt) != 0x544e4654u || assets_rd_u16(fnt + 4) != 2) {
-		free(fnt);
+	if (snprintf(path, sizeof path, "%s.ktx2", base) >= (int)sizeof path)
 		return ASSET_LOAD_FAILED;
-	}
-	const uint16_t count = assets_rd_u16(fnt + 8);
-	if (!count || size != 24u + (size_t)count * 10u) {
-		free(fnt);
+	status = assets_probe_file(path);
+	if (status != ASSET_LOAD_SUCCESS)
+		return status;
+	if (!AeronFontAtlas_LoadKtx2(&slot->atlas, cmd, base))
 		return ASSET_LOAD_FAILED;
-	}
-	AeronFontGlyph* glyphs = (AeronFontGlyph*)calloc(count, sizeof *glyphs);
-	if (!glyphs) {
-		free(fnt);
-		return ASSET_LOAD_FAILED;
-	}
-	for (uint16_t i = 0; i < count; i++) {
-		const uint8_t* r = fnt + 24 + (size_t)i * 10;
-		glyphs[i].atlas_x = assets_rd_u16(r);
-		glyphs[i].atlas_y = assets_rd_u16(r + 2);
-		glyphs[i].atlas_w = assets_rd_u16(r + 4);
-		glyphs[i].atlas_h = assets_rd_u16(r + 6);
-		glyphs[i].advance = assets_rd_u16(r + 8);
-	}
-	slot->ref.atlas_w = assets_rd_u16(fnt + 10);
-	slot->ref.atlas_h = assets_rd_u16(fnt + 12);
-	slot->ref.cell_w = assets_rd_u16(fnt + 14);
-	slot->ref.cell_h = assets_rd_u16(fnt + 16);
-	slot->ref.baseline = assets_rd_u16(fnt + 18);
-	slot->ref.first_char = assets_rd_u16(fnt + 6);
-	slot->ref.num_chars = count;
-	for (uint16_t i = 0; i < count; i++) {
-		if ((uint32_t)glyphs[i].atlas_x + glyphs[i].atlas_w > (uint32_t)slot->ref.atlas_w ||
-			(uint32_t)glyphs[i].atlas_y + glyphs[i].atlas_h > (uint32_t)slot->ref.atlas_h) {
-			free(glyphs);
-			free(fnt);
-			memset(&slot->ref, 0, sizeof slot->ref);
-			return ASSET_LOAD_FAILED;
-		}
-	}
-	free(fnt);
-	snprintf(path, sizeof path, "%s.ktx2", base);
-	const AeronImageCacheEntry* image = Aeron_ImageCacheLoad(a->flight_images, cmd, path);
-	if (!image || !image->tex || image->w != slot->ref.atlas_w || image->h != slot->ref.atlas_h) {
-		free(glyphs);
-		memset(&slot->ref, 0, sizeof slot->ref);
-		return ASSET_LOAD_FAILED;
-	}
-	slot->ref.texture = image->tex;
-	slot->ref.glyphs = glyphs;
-	slot->loaded = 1;
+	slot->atlas_scale = (float)XWA_ORIGINAL_FONT_SCALE;
 	return ASSET_LOAD_SUCCESS;
 }
 
@@ -1056,7 +1007,7 @@ static AssetLoadStatus assets_load_flight_font(XwaRemasterAssets* a, AeronComman
 		return ASSET_LOAD_FAILED;
 	FlightFontSlot* slot = &a->flight_fonts[tier];
 	if (slot->tried)
-		return slot->loaded ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
+		return slot->atlas.loaded ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
 	slot->tried = 1;
 	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_REMASTERED;
 	for (int attempt = 0; attempt < 2; attempt++) {
@@ -1068,7 +1019,6 @@ static AssetLoadStatus assets_load_flight_font(XwaRemasterAssets* a, AeronComman
 											: assets_load_remastered_flight_font(a, cmd, tier);
 		if (status == ASSET_LOAD_SUCCESS) {
 			slot->source = (uint8_t)source;
-			slot->loaded = 1;
 			Aeron_LogInfo("xwa.remaster", "flight font tier %d: source=%s", tier, assets_source_name(source));
 			return ASSET_LOAD_SUCCESS;
 		}
@@ -1092,12 +1042,15 @@ int XwaRemasterAssets_PrepareFlightFonts(XwaRemasterAssets* a, AeronCommandBuffe
 	return 1;
 }
 
-const XwaFlightFontRef* XwaRemasterAssets_FlightFont(XwaRemasterAssets* a, int tier) {
+const AeronFontAtlas* XwaRemasterAssets_FlightFont(XwaRemasterAssets* a,
+		int tier, float* out_atlas_scale) {
 	if (!a || tier < 0 || tier >= 3) {
 		return NULL;
 	}
 	const FlightFontSlot* slot = &a->flight_fonts[tier];
-	return slot->loaded ? &slot->ref : NULL;
+	if (out_atlas_scale)
+		*out_atlas_scale = slot->atlas_scale;
+	return slot->atlas.loaded ? &slot->atlas : NULL;
 }
 
 uint32_t XwaRemasterAssets_Generation(const XwaRemasterAssets* a) { return a ? a->generation : 0; }
@@ -1115,24 +1068,11 @@ static AssetLoadStatus assets_load_original_frontend_font(XwaRemasterAssets* a,
 			Aeron_LogWarn("xwa.remaster", "frontend font %d: original load failed: %s", font_size, error);
 		return status;
 	}
-	AeronFontGlyph* glyphs = NULL;
-	AeronTexture* texture = NULL;
-	int atlas_width = 0, atlas_height = 0;
-	if (!assets_upload_original_font(cmd, &font, XWA_ORIGINAL_FONT_SCALE, 0, "XWA original frontend font",
-									 &texture, &glyphs, &atlas_width, &atlas_height)) {
+	if (!assets_init_original_font(cmd, &font, XWA_ORIGINAL_FONT_SCALE, 0,
+			"XWA original frontend font", &slot->atlas)) {
 		Xwa2dFontAtlas_Free(&font);
 		return ASSET_LOAD_FAILED;
 	}
-	slot->atlas.texture = texture;
-	slot->atlas.atlas_w = atlas_width;
-	slot->atlas.atlas_h = atlas_height;
-	slot->atlas.first_char = font.first_char;
-	slot->atlas.num_chars = font.glyph_count;
-	slot->atlas.cell_w = (uint16_t)(font.cell_width * XWA_ORIGINAL_FONT_SCALE);
-	slot->atlas.cell_h = (uint16_t)(font.cell_height * XWA_ORIGINAL_FONT_SCALE);
-	slot->atlas.baseline = (uint16_t)(font.baseline * XWA_ORIGINAL_FONT_SCALE);
-	slot->atlas.glyphs = glyphs;
-	slot->atlas.loaded = 1;
 	Xwa2dFontAtlas_Free(&font);
 	return ASSET_LOAD_SUCCESS;
 }
