@@ -457,6 +457,10 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"lighting.ambient_r",
 		"lighting.ambient_g",
 		"lighting.ambient_b",
+		"tonemap.agx_eotf_exponent",
+		"tonemap.agx_punchy_power",
+		"tonemap.agx_punchy_saturation",
+		"tonemap.aces_pre_exposure",
 		"bloom.intensity",
 		"effects.explosion_genus_emissive_strength",
 		"effects.glow_mark_emissive_strength",
@@ -475,7 +479,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"hangar_lighting.enabled",       "lighting.spec_geom_adapt",
 	};
 	static const char* strings[] = {
-		"shadows.mode", "shadows.fit_mode", "skybox.path", "skybox.mode", "temporal_upscaling.mode",
+		"shadows.mode", "shadows.fit_mode", "skybox.path", "skybox.mode", "tonemap.operator",
+		"tonemap.agx_look", "temporal_upscaling.mode",
 	};
 	for (size_t i = 0; i < sizeof ints / sizeof ints[0]; i++) {
 		if (!fl_cfg_has_type(config, ints[i], AERON_CONFIG_INT)) {
@@ -631,6 +636,67 @@ static int fl_pbr_config_valid(const XwaShipPbrTuning* p) {
 		   p->light_wrap <= 1.0f && isfinite(p->ambient[0]) && p->ambient[0] >= 0.0f &&
 		   isfinite(p->ambient[1]) && p->ambient[1] >= 0.0f && isfinite(p->ambient[2]) &&
 		   p->ambient[2] >= 0.0f;
+}
+
+static int fl_load_tonemap_config(const AeronConfigFile* config, const char* config_path) {
+	const char* operator_name = AeronConfigFile_GetString(config, "tonemap.operator", NULL);
+	int operator_id;
+	if (strcmp(operator_name, "agx") == 0) {
+		operator_id = AERON_SCENE_TONEMAP_AGX_PARAMETRIC;
+	} else if (strcmp(operator_name, "aces") == 0) {
+		operator_id = AERON_SCENE_TONEMAP_ACES;
+	} else {
+		Aeron_LogError("xwa.remaster", "%s: tonemap.operator must be 'agx' or 'aces'", config_path);
+		return 0;
+	}
+
+	const char* look_name = AeronConfigFile_GetString(config, "tonemap.agx_look", NULL);
+	int look_id;
+	if (strcmp(look_name, "base") == 0) {
+		look_id = AERON_SCENE_AGX_LOOK_BASE;
+	} else if (strcmp(look_name, "punchy") == 0) {
+		look_id = AERON_SCENE_AGX_LOOK_PUNCHY;
+	} else {
+		Aeron_LogError("xwa.remaster", "%s: tonemap.agx_look must be 'base' or 'punchy'", config_path);
+		return 0;
+	}
+
+	const float eotf_exponent =
+		(float)AeronConfigFile_GetFloat(config, "tonemap.agx_eotf_exponent", 0.0);
+	const float punchy_power =
+		(float)AeronConfigFile_GetFloat(config, "tonemap.agx_punchy_power", 0.0);
+	const float punchy_saturation =
+		(float)AeronConfigFile_GetFloat(config, "tonemap.agx_punchy_saturation", 0.0);
+	const float aces_pre_exposure =
+		(float)AeronConfigFile_GetFloat(config, "tonemap.aces_pre_exposure", 0.0);
+	if (!isfinite(eotf_exponent) || eotf_exponent < 1.8f || eotf_exponent > 2.6f) {
+		Aeron_LogError("xwa.remaster", "%s: tonemap.agx_eotf_exponent must be between 1.8 and 2.6",
+					   config_path);
+		return 0;
+	}
+	if (!isfinite(punchy_power) || punchy_power < 0.5f || punchy_power > 2.0f) {
+		Aeron_LogError("xwa.remaster", "%s: tonemap.agx_punchy_power must be between 0.5 and 2",
+					   config_path);
+		return 0;
+	}
+	if (!isfinite(punchy_saturation) || punchy_saturation < 0.0f || punchy_saturation > 2.0f) {
+		Aeron_LogError("xwa.remaster", "%s: tonemap.agx_punchy_saturation must be between 0 and 2",
+					   config_path);
+		return 0;
+	}
+	if (!isfinite(aces_pre_exposure) || aces_pre_exposure < 1.0f || aces_pre_exposure > 3.0f) {
+		Aeron_LogError("xwa.remaster", "%s: tonemap.aces_pre_exposure must be between 1 and 3",
+					   config_path);
+		return 0;
+	}
+
+	AeronScenePresent_SetTonemapOp(operator_id);
+	AeronScenePresent_SetAgxLook(look_id);
+	AeronScenePresent_SetEotfExponent(eotf_exponent);
+	AeronScenePresent_SetAgxPunchyPower(punchy_power);
+	AeronScenePresent_SetAgxPunchySaturation(punchy_saturation);
+	AeronScenePresent_SetAcesExposure(aces_pre_exposure);
+	return 1;
 }
 
 /* Load the renderer's settings from the mandatory shipped configuration once. */
@@ -851,6 +917,11 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	XwaRemasterShip_ConfigurePbrTuning(&pbr);
+
+	if (!fl_load_tonemap_config(cf, path)) {
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
 
 	/* Bloom contribution weight (process-wide present knob; 0 = off,
 	 * chain skipped). */

@@ -212,22 +212,22 @@ hyperspace_tunnel:
   rotation_speed: -2.3   # radians per second around the tunnel axis
   noise_scale: 1.0       # multiplier for all simplex octave frequencies
   brightness: 1.0        # final linear emission before bloom and tonemapping
-  highlight_strength: 2.0 # cyan-white noise highlights and cap light; independent of the blue body
+  highlight_strength: 3.0 # cyan-white noise highlights and cap light; independent of the blue body
   focal_length: 1.15     # tunnel perspective; larger values narrow the apparent opening
   twist: 0.1989437       # reference angular shear: 1.25 / (2 * pi)
   cap_radius: 0.001       # normalized-screen radius of the full-strength white core
-  cap_falloff: 15.0        # exponential falloff outside the core
+  cap_falloff: 30.0        # exponential falloff outside the core
   dark_color_r: 0.0      # reference tunnel reaches black between noise structures
   dark_color_g: 0.0
   dark_color_b: 0.0
   body_color_r: 0.0   # reference 1.25 * (0.15, 0.4, 0.9)
-  body_color_g: 0.08824
+  body_color_g: 0.06
   body_color_b: 1
-  highlight_color_r: 0.0 # reference additive white noise highlights
-  highlight_color_g: 0.2039
-  highlight_color_b: 0.9902
-  cap_color_r: 0.0       # linear HDR color of the distant additive light
-  cap_color_g: 0.2059
+  highlight_color_r: 0.05 # reference additive white noise highlights
+  highlight_color_g: 0.24
+  highlight_color_b: 0.99
+  cap_color_r: 0.09       # linear HDR color of the distant additive light
+  cap_color_g: 0.28
   cap_color_b: 1.0
 point_lights:
   enabled: true
@@ -248,6 +248,16 @@ lighting:
   ambient_r: 0.08
   ambient_g: 0.08
   ambient_b: 0.08
+tonemap:
+  # Operator: agx or aces.
+  operator: "agx"
+  # AgX appearance: base or punchy. The Punchy parameters operate after
+  # the sigmoid in normalized, display-encoded AgX space.
+  agx_look: "punchy"
+  agx_eotf_exponent: 2.2
+  agx_punchy_power: 1.2
+  agx_punchy_saturation: 1.3
+  aces_pre_exposure: 1.6
 bloom:
   intensity: 0.5
 temporal_upscaling:

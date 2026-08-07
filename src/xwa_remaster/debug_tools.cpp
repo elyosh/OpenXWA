@@ -704,7 +704,7 @@ static void xwa_tool_fsr(int* open, void* user) {
 
 static void xwa_tool_hdr(int* open, void* user) {
 	(void)user;
-	ImGui::SetNextWindowSize(ImVec2(420, 360), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(420, 440), ImGuiCond_FirstUseEver);
 	bool b = *open != 0;
 	if (!ImGui::Begin("HDR & Display", &b)) {
 		ImGui::End();
@@ -783,6 +783,26 @@ static void xwa_tool_hdr(int* open, void* user) {
 	ImGui::RadioButton("AGX (parametric)", &new_op, AERON_SCENE_TONEMAP_AGX_PARAMETRIC);
 	if (new_op != op) {
 		AeronScenePresent_SetTonemapOp(new_op);
+	}
+	int agx_look = AeronScenePresent_AgxLook();
+	int new_agx_look = agx_look;
+	ImGui::TextUnformatted("AgX look");
+	ImGui::RadioButton("Base", &new_agx_look, AERON_SCENE_AGX_LOOK_BASE);
+	ImGui::SameLine();
+	ImGui::RadioButton("Punchy", &new_agx_look, AERON_SCENE_AGX_LOOK_PUNCHY);
+	if (new_agx_look != agx_look) {
+		AeronScenePresent_SetAgxLook(new_agx_look);
+	}
+	if (new_agx_look == AERON_SCENE_AGX_LOOK_PUNCHY) {
+		float punchy_power = AeronScenePresent_AgxPunchyPower();
+		if (ImGui::SliderFloat("Punchy power", &punchy_power, 0.5f, 2.0f, "%.2f")) {
+			AeronScenePresent_SetAgxPunchyPower(punchy_power);
+		}
+		float punchy_saturation = AeronScenePresent_AgxPunchySaturation();
+		if (ImGui::SliderFloat("Punchy saturation", &punchy_saturation, 0.0f, 2.0f,
+						   "%.2f")) {
+			AeronScenePresent_SetAgxPunchySaturation(punchy_saturation);
+		}
 	}
 
 	ImGui::TextUnformatted("ACES pre-exposure");
