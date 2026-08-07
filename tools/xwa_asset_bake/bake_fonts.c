@@ -166,8 +166,7 @@ static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_s
 		output->atlas_y = (uint16_t)(input->y * scale);
 		output->atlas_w = (uint16_t)(input->width * scale);
 		output->atlas_h = (uint16_t)(input->height * scale);
-		const int advance = input->advance * scale - FONT_ATLAS_SPACE_BETWEEN_PX;
-		output->advance = (uint16_t)(advance > 0 ? advance : 0);
+		output->advance = (uint16_t)(input->advance * scale);
 	}
 
 	int cap_h_classic = 0;
