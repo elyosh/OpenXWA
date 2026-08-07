@@ -17,7 +17,7 @@
 typedef struct PreparedTrailQuad {
 	uint16_t owner_slot;
 	uint16_t owner_signature;
-	uint8_t region;
+	uint8_t render_region;
 	AeronTexture* texture;
 	float corners[4][3];
 	float uv[4][2];
@@ -42,7 +42,7 @@ typedef struct PreparedParticleQuad {
 	uint16_t owner_slot;
 	uint16_t owner_signature;
 	uint8_t source_kind;
-	uint8_t region;
+	uint8_t render_region;
 	uint8_t hide_owner_external;
 	uint8_t hide_owner_film;
 	AeronTexture* texture;
@@ -344,7 +344,7 @@ void XwaRemasterParticles_Prepare(XwaRemasterParticles* particles, AeronCommandB
 			q->owner_slot = effect->owner_slot;
 			q->owner_signature = effect->owner_signature;
 			q->source_kind = effect->source_kind;
-			q->region = effect->region;
+			q->render_region = effect->render_region;
 			q->hide_owner_external = effect->hide_owner_external;
 			q->hide_owner_film = effect->hide_owner_film;
 			q->texture = ref.texture;
@@ -396,8 +396,7 @@ void XwaRemasterParticles_SubmitRegion(const XwaRemasterParticles* particles, Ae
 		return;
 	for (uint32_t i = 0; i < particles->count; i++) {
 		const PreparedParticleQuad* q = &particles->quads[i];
-		if ((q->source_kind == XWA_PARTICLE_SOURCE_WORLD || q->region == region) &&
-			!particle_hidden_for_view(q, snapshot))
+		if (q->render_region == region && !particle_hidden_for_view(q, snapshot))
 			particle_submit(scene, q);
 	}
 }
@@ -484,7 +483,7 @@ static float trail_local_v(float value, int end_of_forward_period) {
 }
 
 static void trails_append_quad(XwaRemasterTrails* trails, const XwaRemasterEffectView* view,
-							   const XwaTrailEmitter* emitter, uint8_t region, const XwaAssetRef* ref,
+							   const XwaTrailEmitter* emitter, uint8_t render_region, const XwaAssetRef* ref,
 							   const TrailEndpoint* a, const TrailEndpoint* b, float plus_ax, float plus_ay,
 							   float plus_bx, float plus_by, float va, float vb) {
 	if (!trails_reserve(trails))
@@ -493,7 +492,7 @@ static void trails_append_quad(XwaRemasterTrails* trails, const XwaRemasterEffec
 	memset(q, 0, sizeof *q);
 	q->owner_slot = emitter->owner_slot;
 	q->owner_signature = emitter->owner_signature;
-	q->region = region;
+	q->render_region = render_region;
 	q->texture = ref->texture;
 
 	float eye[4][3] = {
@@ -642,7 +641,7 @@ void XwaRemasterTrails_Prepare(XwaRemasterTrails* trails, AeronCommandBuffer* cm
 		if (!XwaRemasterAssets_FlightModelFrame(assets, emitter->texture_model_type, emitter->texture_frame,
 												&ref))
 			continue;
-		trails_build_emitter(trails, view, emitter, owner->region,
+		trails_build_emitter(trails, view, emitter, owner->render_region,
 							 &snapshot->trail_points[emitter->first_point], &ref);
 	}
 	if (trails->dropped)
@@ -669,7 +668,7 @@ void XwaRemasterTrails_SubmitRegion(const XwaRemasterTrails* trails, AeronScene3
 	if (!trails || !scene)
 		return;
 	for (uint32_t i = 0; i < trails->count; i++)
-		if (trails->quads[i].region == region)
+		if (trails->quads[i].render_region == region)
 			trails_submit_quad(scene, &trails->quads[i]);
 }
 

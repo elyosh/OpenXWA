@@ -656,7 +656,7 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	}
 	for (uint32_t i = 0; i < snapshot->flight_object_count; i++) {
 		const XwaFlightObject* object = &snapshot->flight_objects[i];
-		if (object->region != target->region)
+		if (object->render_region != target->render_region)
 			continue;
 		if (cmd_projectile(object) && object->slot_class == XWA_SNAP_SLOT_MAIN) {
 			if (object->slot == crt->projectile_exclude_slots[0] ||

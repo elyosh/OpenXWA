@@ -1847,6 +1847,10 @@ static int fl_object_is_projectile(const XwaFlightObject* object) {
 		   object->genus == XWA_SNAP_GENUS_NPC_PROJECTILE;
 }
 
+static int fl_object_in_render_region(const XwaFlightObject* object, uint8_t region) {
+	return object->render_region == region && object->slot_class != XWA_SNAP_SLOT_OTHER;
+}
+
 /* Shared pose law for ordinary flight and the map. Projectile roll alignment
  * is view-dependent; every other object uses the captured orientation as-is. */
 static void fl_object_pose(const XwaFlightObject* object, const int32_t camera_world[3], int roll_align,
@@ -1973,8 +1977,10 @@ static const XwaFlightObject* fl_cockpit_anchor(const XwaSnapshot* snap, const X
 	}
 	const int32_t slot = cam->in_hangar ? cam->player_obj_idx : cam->focus_obj_idx;
 	const XwaFlightObject* anchor = fl_object_by_slot(snap, slot);
-	return anchor && anchor->region == cam->region && anchor->genus != XWA_SNAP_GENUS_EXPLOSION ? anchor
-																								: NULL;
+	return anchor && fl_object_in_render_region(anchor, cam->region) &&
+				   anchor->genus != XWA_SNAP_GENUS_EXPLOSION
+			   ? anchor
+			   : NULL;
 }
 
 static int fl_cockpit_drawn(const XwaSnapshot* snap, const XwaFlightCamera* cam) {
@@ -2383,6 +2389,8 @@ static const XwaFlightObject* fl_bb_previous_object(uint32_t snap_index) {
 }
 
 static int fl_object_billboard_candidate(const XwaFlightObject* f, const XwaFlightCamera* cam) {
+	if (!fl_object_in_render_region(f, cam->region))
+		return 0;
 	if (f->slot_class == XWA_SNAP_SLOT_TRANSIENT)
 		return f->genus != XWA_SNAP_GENUS_DEBRIS || !cam->external;
 	return f->slot_class == XWA_SNAP_SLOT_MAIN &&
@@ -2578,11 +2586,13 @@ static void fl_derive_billboards(const XwaSnapshot* snap, XwaRemasterAssets* ass
 								 const XwaFlightCamera* history_cam, const float history_world_to_view[9]) {
 	s.bb_count = 0;
 	const XwaFlightCamera* cam = &snap->flight_camera;
-	/* slot_class was captured from the active main + local transient
-	 * ranges that the classic walks.  Do not add a region-byte gate:
-	 * several dynamic effect spawners leave ObjectRecord.regionIdx stale. */
+	/* Slot topology is authoritative: several dynamic effect spawners
+	 * leave ObjectRecord.regionIdx stale. */
 	for (uint32_t i = 0; i < snap->flight_object_count; i++) {
 		const XwaFlightObject* f = &snap->flight_objects[i];
+		if (!fl_object_in_render_region(f, cam->region)) {
+			continue;
+		}
 		if (f->slot_class == XWA_SNAP_SLOT_TRANSIENT) {
 			if (f->genus == XWA_SNAP_GENUS_DEBRIS && cam->external) {
 				continue; /* classic hides transient debris externally */
@@ -2675,12 +2685,12 @@ static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* as
 		fl_lens_add_source(flight_view, anchor, 0xffffffffu);
 	}
 
-	/* Explosion flashes: the render walk's case-13 window (active MAIN
-	 * slots only — transient sparks never queue flares).  MAIN already
-	 * encodes the current region; ObjectRecord.regionIdx is not a gate. */
+	/* Explosion flashes: the render walk's case-13 window (current-region
+	 * MAIN slots only — transient sparks never queue flares). */
 	for (uint32_t i = 0; i < snap->flight_object_count && s.lens_src_count < FL_MAX_LENS_SOURCES; i++) {
 		const XwaFlightObject* f = &snap->flight_objects[i];
-		if (f->slot_class != XWA_SNAP_SLOT_MAIN || f->genus != XWA_SNAP_GENUS_EXPLOSION) {
+		if (!fl_object_in_render_region(f, cam->region) || f->slot_class != XWA_SNAP_SLOT_MAIN ||
+			f->genus != XWA_SNAP_GENUS_EXPLOSION) {
 			continue;
 		}
 		if (f->object_type <= XWA_SNAP_TYPE_EXPLOSION_2000 || f->object_type > XWA_SNAP_TYPE_EXPLOSION_2006) {
@@ -2878,9 +2888,9 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 	}
 	for (uint32_t i = 0; i < snap->flight_object_count; i++) {
 		const XwaFlightObject* f = &snap->flight_objects[i];
-		/* Mirrors FlightView's active-main and local-effect slot walks;
-		 * their dynamically spawned records may carry a stale region byte. */
-		if (f->slot_class == XWA_SNAP_SLOT_OTHER) {
+		/* Mirrors FlightView's active-main and local-effect slot walks. */
+		if (!fl_object_in_render_region(f, cam->region) ||
+			(f->slot_class != XWA_SNAP_SLOT_MAIN && f->slot_class != XWA_SNAP_SLOT_TRANSIENT)) {
 			continue;
 		}
 		/* Classic append gate (genus/type list; the engine-glow branch
@@ -2918,7 +2928,7 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 	for (uint32_t i = 0; i < snap->particle_effect_count; i++) {
 		const XwaParticleEffect* effect = &snap->particle_effects[i];
 		if (!effect->point_light || effect->source_kind != XWA_PARTICLE_SOURCE_OBJECT ||
-			effect->region != cam->region) {
+			effect->render_region != cam->region) {
 			continue;
 		}
 		const float intensity = 125.0f;
@@ -4092,7 +4102,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	int player_found = 0;
 	for (uint32_t i = 0; i < snap->flight_object_count; i++) {
 		const XwaFlightObject* f = &snap->flight_objects[i];
-		if (f->region != cam->region || f->genus == XWA_SNAP_GENUS_EXPLOSION) {
+		if (!fl_object_in_render_region(f, cam->region) || f->genus == XWA_SNAP_GENUS_EXPLOSION) {
 			continue; /* other regions; explosions are billboards */
 		}
 		/* Transforms derive for every in-region object — the cockpit

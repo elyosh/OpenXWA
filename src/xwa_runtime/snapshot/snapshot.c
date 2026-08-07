@@ -175,10 +175,11 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 	for (uint32_t i = 0; i < s->flight_object_count; i++) {
 		const XwaFlightObject* f = &s->flight_objects[i];
 		fprintf(fp,
-				"fobj sig %u slot %u type %u genus %u fg %u iff %d pos %d,%d,%d "
-				"ypr %u,%u,%u spd %u\n",
-				f->signature, f->slot, f->object_type, f->genus, f->fg_idx, f->iff, f->world_pos[0],
-				f->world_pos[1], f->world_pos[2], f->yaw, f->pitch, f->roll, f->speed);
+				"fobj sig %u slot %u type %u genus %u fg %u region %u render_region %u class %u iff %d "
+				"pos %d,%d,%d ypr %u,%u,%u spd %u\n",
+				f->signature, f->slot, f->object_type, f->genus, f->fg_idx, f->region, f->render_region,
+				f->slot_class, f->iff, f->world_pos[0], f->world_pos[1], f->world_pos[2], f->yaw, f->pitch,
+				f->roll, f->speed);
 	}
 	for (uint32_t i = 0; i < s->trail_emitter_count; i++) {
 		const XwaTrailEmitter* e = &s->trail_emitters[i];
@@ -198,11 +199,11 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 	for (uint32_t i = 0; i < s->particle_effect_count; i++) {
 		const XwaParticleEffect* e = &s->particle_effects[i];
 		fprintf(fp,
-				"peffect id %u owner %u:%u src %u region %u type %u mode %u tex %u "
+				"peffect id %u owner %u:%u src %u render_region %u type %u mode %u tex %u "
 				"particles %u+%u light %u emitter %.3f,%.3f,%.3f flags %08x\n",
-				e->stable_id, e->owner_slot, e->owner_signature, e->source_kind, e->region, e->effect_type,
-				e->billboard_mode, e->texture_model_type, e->first_particle, e->particle_count,
-				e->point_light, snapshot_precise_coord(&e->emitter_world_pos, 0),
+				e->stable_id, e->owner_slot, e->owner_signature, e->source_kind, e->render_region,
+				e->effect_type, e->billboard_mode, e->texture_model_type, e->first_particle,
+				e->particle_count, e->point_light, snapshot_precise_coord(&e->emitter_world_pos, 0),
 				snapshot_precise_coord(&e->emitter_world_pos, 1),
 				snapshot_precise_coord(&e->emitter_world_pos, 2), e->render_flags);
 		for (uint32_t j = 0; j < e->particle_count; j++) {
@@ -825,6 +826,32 @@ typedef struct SnapshotParticleTransform {
 	Vec3f emitter_offset;
 } SnapshotParticleTransform;
 
+static void snapshot_classify_object_slot(uint32_t slot, uint8_t local_region, uint8_t* render_region,
+										  uint8_t* slot_class) {
+	*render_region = XWA_SNAP_RENDER_REGION_NONE;
+	*slot_class = XWA_SNAP_SLOT_OTHER;
+
+	if (slot >= g_localTransientSlotStart && slot < g_localTransientSlotEnd) {
+		if (g_missionRegionCount > 0 && (uint32_t)local_region < (uint32_t)g_missionRegionCount) {
+			*render_region = local_region;
+			*slot_class = XWA_SNAP_SLOT_TRANSIENT;
+		}
+		return;
+	}
+	if (slot >= g_regionObjectSlotEnd || g_missionRegionCount <= 0 || g_objectSlotsPerRegion == 0 ||
+		g_mainObjectSlotsPerRegion > g_objectSlotsPerRegion) {
+		return;
+	}
+
+	const uint32_t region = slot / g_objectSlotsPerRegion;
+	if (region >= (uint32_t)g_missionRegionCount || region >= XWA_SNAP_RENDER_REGION_NONE) {
+		return;
+	}
+	*render_region = (uint8_t)region;
+	*slot_class = slot % g_objectSlotsPerRegion < g_mainObjectSlotsPerRegion ? XWA_SNAP_SLOT_MAIN
+																			 : XWA_SNAP_SLOT_STATIC;
+}
+
 static void snapshot_particle_point_set(XwaPreciseWorldPoint* out, const int32_t base[3],
 										const float offset[3]) {
 	memcpy(out->base, base, sizeof out->base);
@@ -919,7 +946,13 @@ static int snapshot_particle_capture_effect(XwaSnapshot* s, const ParticleEffect
 	dst->owner_slot = object_source ? owner_slot : 0xffffu;
 	dst->owner_signature = object_source ? owner->objectSignature : 0;
 	dst->source_kind = object_source ? XWA_PARTICLE_SOURCE_OBJECT : XWA_PARTICLE_SOURCE_WORLD;
-	dst->region = object_source ? owner->regionIdx : (uint8_t)g_players[g_localPlayer].regionIndex;
+	if (object_source) {
+		uint8_t owner_slot_class;
+		snapshot_classify_object_slot(owner_slot, (uint8_t)g_players[g_localPlayer].regionIndex,
+									  &dst->render_region, &owner_slot_class);
+	} else {
+		dst->render_region = (uint8_t)g_players[g_localPlayer].regionIndex;
+	}
 	dst->effect_type = (uint8_t)effect->effectType;
 	dst->billboard_mode = effect->stretchedBillboard
 							  ? (effect->useAttachedTransform ? XWA_PARTICLE_BILLBOARD_STRETCHED
@@ -1101,6 +1134,8 @@ void XwaSnapshot_CaptureFlight(void) {
 		f->genus = o->genusId;
 		f->fg_idx = o->flightGroupIdx;
 		f->region = o->regionIdx;
+		snapshot_classify_object_slot(i, (uint8_t)g_players[g_localPlayer].regionIndex, &f->render_region,
+									  &f->slot_class);
 		f->world_pos[0] = o->world_x;
 		f->world_pos[1] = o->world_y;
 		f->world_pos[2] = o->world_z;
@@ -1117,13 +1152,6 @@ void XwaSnapshot_CaptureFlight(void) {
 		 * render walk's slot-range dispatch class. */
 		f->type_specific_0 = o->typeSpecificByte[0];
 		f->type_specific_w = o->typeSpecificWord;
-		if (i >= g_regionMainObjectSlotStart && i < g_regionMainObjectSlotEnd) {
-			f->slot_class = XWA_SNAP_SLOT_MAIN;
-		} else if (i >= g_localTransientSlotStart && i < g_localTransientSlotEnd) {
-			f->slot_class = XWA_SNAP_SLOT_TRANSIENT;
-		} else {
-			f->slot_class = XWA_SNAP_SLOT_OTHER;
-		}
 		const MobileObject* m = o->mobj;
 		if (m) {
 			f->has_mobj = 1;

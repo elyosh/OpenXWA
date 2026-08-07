@@ -280,10 +280,12 @@ typedef struct XwaDirLight {
 #define XWA_SNAP_GENUS_RUBBLE 20
 #define XWA_SNAP_GENUS_SALVAGE_JUNK 21
 
-/* Object-table slot classes (XwaFlightObject.slot_class). */
-#define XWA_SNAP_SLOT_OTHER 0     /* static/region ranges outside main+transient */
-#define XWA_SNAP_SLOT_MAIN 1      /* [g_regionMainObjectSlotStart, End) */
-#define XWA_SNAP_SLOT_TRANSIENT 2 /* [g_localTransientSlotStart, End) */
+/* Intrinsic object-table slot classes (XwaFlightObject.slot_class). */
+#define XWA_SNAP_SLOT_OTHER 0
+#define XWA_SNAP_SLOT_MAIN 1
+#define XWA_SNAP_SLOT_TRANSIENT 2
+#define XWA_SNAP_SLOT_STATIC 3
+#define XWA_SNAP_RENDER_REGION_NONE 0xffu
 
 /* Object-type values the drivers dispatch on (mirrors ObjectTypeId). */
 #define XWA_SNAP_TYPE_BWING 4               /* OBJ_BWing (model-wide bridge compensation) */
@@ -310,7 +312,8 @@ typedef struct XwaFlightObject {
 	uint16_t object_type; /* ObjectTypeId (model index) */
 	uint8_t genus;        /* ModelGenusId */
 	uint8_t fg_idx;       /* flight-group index */
-	uint8_t region;
+	uint8_t region;        /* raw ObjectRecord.regionIdx; not a render-visibility gate */
+	uint8_t render_region; /* slot-derived region used by renderer visibility */
 	int8_t iff; /* from MobileObject (0 when no mobj) */
 	uint8_t team;
 	uint8_t state; /* MobileObject.state */
@@ -326,8 +329,8 @@ typedef struct XwaFlightObject {
 	/* ---- billboard-law state (SceneBillboard_QueueObjectTextured
 	 * inputs; the HD driver derives explosion/debris/spark sprites from
 	 * these). */
-	uint8_t slot_class;          /* XWA_SNAP_SLOT_* — the render walk's slot-
-								  * range dispatch (flight_view.c): MAIN slots
+	uint8_t slot_class;          /* XWA_SNAP_SLOT_* — the render walk's intrinsic
+								  * slot-range dispatch (flight_view.c): MAIN slots
 								  * take the genus switch; TRANSIENT slots
 								  * queue as billboards for any genus (angleD
 								  * forced 0, GENUS_Debris hidden in external
@@ -716,7 +719,7 @@ typedef struct XwaParticleEffect {
 	uint16_t owner_slot;      /* 0xffff for world-list effects */
 	uint16_t owner_signature; /* 0 for world-list effects */
 	uint8_t source_kind;      /* XwaParticleSourceKind */
-	uint8_t region;
+	uint8_t render_region; /* slot-derived for object effects; local for world effects */
 	uint8_t effect_type;
 	uint8_t billboard_mode; /* XwaParticleBillboardMode */
 	/* The classic dispatcher suppresses only the top-level object-local
