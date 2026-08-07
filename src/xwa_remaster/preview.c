@@ -187,6 +187,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 		AeronSceneMeshInstance inst;
 		memset(&inst, 0, sizeof inst);
 		inst.mesh = mesh;
+		inst.variant = (uint8_t)p->node_switch_index;
 		const float k = p->model_scale > 0.0f ? p->model_scale : 1.0f;
 		float* m = inst.transform;
 		m[0] = k * p->obj_basis[0];
