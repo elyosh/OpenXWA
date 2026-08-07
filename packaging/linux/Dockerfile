@@ -232,6 +232,8 @@ RUN mkdir -p /build/package/openxwa-linux-x86_64/licenses \
 
 RUN test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.vert.spv \
     && test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.frag.spv \
+    && test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_tunnel.vert.spv \
+    && test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_tunnel.frag.spv \
     && test -f /build/package/openxwa-linux-x86_64/resources/remaster/config.yaml \
     && file /build/package/openxwa-linux-x86_64/OpenXWA \
     && env -u LD_LIBRARY_PATH ldd /build/package/openxwa-linux-x86_64/OpenXWA \

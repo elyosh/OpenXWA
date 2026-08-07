@@ -228,8 +228,8 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 				c->map_mode, c->film_overlay, c->in_hangar, c->hangar_floor_z, c->hangar_launch_ref_obj_idx,
 				s->game_time_ms);
 	}
-	fprintf(fp, "hyperspace phase %u ticks %u tunnel_q16 %08x streaks %u\n", s->hyperspace.phase,
-			s->hyperspace.phase_elapsed_ticks, s->hyperspace.tunnel_frame_q16, s->hyperspace_streak_count);
+	fprintf(fp, "hyperspace phase %u ticks %u streaks %u\n", s->hyperspace.phase,
+			s->hyperspace.phase_elapsed_ticks, s->hyperspace_streak_count);
 	for (uint32_t i = 0; i < s->hyperspace_streak_count; i++) {
 		const XwaHyperspaceStreak* h = &s->hyperspace_streaks[i];
 		fprintf(fp, "hyperstreak %u off %d,%d,%d half %d roll %u\n", i, h->offset[0], h->offset[1],
@@ -1053,7 +1053,6 @@ void XwaSnapshot_CaptureFlight(void) {
 			(uint32_t)(g_hyperspaceStarStreakCount < 0 ? 0 : g_hyperspaceStarStreakCount);
 		h->phase = player->hyperspacePhase;
 		h->phase_elapsed_ticks = player->hyperspaceRuntime.phaseElapsedTicks;
-		h->tunnel_frame_q16 = (uint32_t)g_hyperspaceTunnelFrameQ16;
 		if (h->phase == PLAYER_HYPERSPACE_OUTBOUND || h->phase == PLAYER_HYPERSPACE_INBOUND) {
 			uint32_t count =
 				g_hyperspace_visible_streak_valid ? g_hyperspace_visible_streak_count : live_count;

@@ -273,6 +273,10 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
     && test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.frag.dxil \
     && test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert.spv \
     && test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.frag.spv \
+    && test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_tunnel.vert.dxil \
+    && test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_tunnel.frag.dxil \
+    && test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_tunnel.vert.spv \
+    && test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_tunnel.frag.spv \
     && test -f /build/package/openxwa-windows-x86_64/resources/remaster/config.yaml \
     && x86_64-w64-mingw32-objdump -p \
         /build/package/openxwa-windows-x86_64/OpenXWA.exe \

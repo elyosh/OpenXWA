@@ -71,10 +71,10 @@ typedef struct FlBackdropQuad {
  * sprite, wreck flame), resolved before AeronScene_Begin (atlas
  * uploads precede the passes) and submitted back-to-front. */
 typedef struct FlBillboard {
-	float center[3];      /* view space; [2] is the adjusted depth */
-	float half_w, half_h; /* view units at that depth */
-	float rot;            /* roll about the view axis, radians */
-	float depth_bias;     /* view units toward the camera (test only) */
+	float center[3];         /* view space; [2] is the adjusted depth */
+	float half_w, half_h;    /* view units at that depth */
+	float rot;               /* roll about the view axis, radians */
+	float depth_bias;        /* view units toward the camera (test only) */
 	float emissive_strength; /* linear-RGB multiplier; alpha is unchanged */
 	XwaAssetRef ref;
 	uint32_t argb;
@@ -219,6 +219,10 @@ static struct {
 	float star_core_px;
 	float star_feather;
 	float star_flare;
+	XwaFlightHyperspaceTunnelParams hyperspace_params;
+	XwaFlightHyperspaceTunnelParams hyperspace_params_default;
+	int hyperspace_preview;
+	uint64_t hyperspace_preview_epoch_us;
 
 	const XwaSnapshot* snap;
 	/* Camera world->eye rows re-derived from the quaternion the scene
@@ -268,6 +272,7 @@ static struct {
 	AeronSceneMeshTable tables[XWA_SNAP_MAX_FLIGHT_OBJECTS * 2 + 2];
 	uint32_t table_count;
 	int map_present;
+	int suppress_hud;
 } s;
 
 static void fl_draw_before_opaque(AeronCommandBuffer* command_buffer, AeronRenderPass* render_pass, int rt_w,
@@ -338,7 +343,7 @@ static void fl_report_fsr_reset(int reset_requested) {
 	if (!reset_requested) {
 		if (s.fsr_consecutive_reset_frames > 1) {
 			Aeron_LogDebug("xwa.remaster", "FSR history reset condition cleared after %u consecutive frames",
-					  s.fsr_consecutive_reset_frames);
+						   s.fsr_consecutive_reset_frames);
 		}
 		s.fsr_last_reset_reasons = 0;
 		s.fsr_consecutive_reset_frames = 0;
@@ -360,7 +365,7 @@ static void fl_report_fsr_reset(int reset_requested) {
 	fl_format_fsr_reset_reasons(reasons, text, sizeof text);
 
 	Aeron_LogDebug("xwa.remaster", "FSR history reset frame %u: %s", s.fsr_consecutive_reset_frames,
-			  text[0] ? text : "unknown reason");
+				   text[0] ? text : "unknown reason");
 }
 
 static int fl_cfg_has_type(const AeronConfigFile* config, const char* path, AeronConfigNodeType type) {
@@ -370,9 +375,14 @@ static int fl_cfg_has_type(const AeronConfigFile* config, const char* path, Aero
 
 static int fl_cfg_validate(const AeronConfigFile* config, const char** error_path) {
 	static const char* ints[] = {
-		"presentation.vsync_divisor", "presentation.msaa_samples", "ssao.quality",
-		"motion_blur.quality",        "shadows.atlas_size",         "shadows.cascade_count",
-		"shadows.filter_quality",     "point_lights.cluster_depth_slices",
+		"presentation.vsync_divisor",
+		"presentation.msaa_samples",
+		"ssao.quality",
+		"motion_blur.quality",
+		"shadows.atlas_size",
+		"shadows.cascade_count",
+		"shadows.filter_quality",
+		"point_lights.cluster_depth_slices",
 	};
 	static const char* floats[] = {
 		"ssao.intensity",
@@ -420,6 +430,27 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"skybox.star_core_px",
 		"skybox.star_feather",
 		"skybox.star_flare",
+		"hyperspace_tunnel.travel_speed",
+		"hyperspace_tunnel.rotation_speed",
+		"hyperspace_tunnel.noise_scale",
+		"hyperspace_tunnel.brightness",
+		"hyperspace_tunnel.highlight_strength",
+		"hyperspace_tunnel.focal_length",
+		"hyperspace_tunnel.twist",
+		"hyperspace_tunnel.cap_radius",
+		"hyperspace_tunnel.cap_falloff",
+		"hyperspace_tunnel.dark_color_r",
+		"hyperspace_tunnel.dark_color_g",
+		"hyperspace_tunnel.dark_color_b",
+		"hyperspace_tunnel.body_color_r",
+		"hyperspace_tunnel.body_color_g",
+		"hyperspace_tunnel.body_color_b",
+		"hyperspace_tunnel.highlight_color_r",
+		"hyperspace_tunnel.highlight_color_g",
+		"hyperspace_tunnel.highlight_color_b",
+		"hyperspace_tunnel.cap_color_r",
+		"hyperspace_tunnel.cap_color_g",
+		"hyperspace_tunnel.cap_color_b",
 		"lighting.intensity",
 		"lighting.spec_mul",
 		"lighting.wrap",
@@ -434,29 +465,17 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"texture_filtering.max_anisotropy",
 	};
 	static const char* bools[] = {
-		"presentation.hdr_output",
-		"ssao.debug_viz",
-		"point_lights.enabled",
-		"point_lights.clustered",
-		"point_lights.cluster_debug",
-		"skybox.enabled",
-		"motion_blur.camera_blur",
-		"motion_blur.pause_keep_blur",
-		"motion_blur.velocity_viz",
-		"motion_blur.fsr_direct_motion",
-		"texture_filtering.anisotropic",
-		"shadows.explicit_splits",
-		"shadows.contact_hardening",
-		"shadows.debug_cascades",
-		"hangar_lighting.enabled",
-		"lighting.spec_geom_adapt",
+		"presentation.hdr_output",       "ssao.debug_viz",
+		"point_lights.enabled",          "point_lights.clustered",
+		"point_lights.cluster_debug",    "skybox.enabled",
+		"motion_blur.camera_blur",       "motion_blur.pause_keep_blur",
+		"motion_blur.velocity_viz",      "motion_blur.fsr_direct_motion",
+		"texture_filtering.anisotropic", "shadows.explicit_splits",
+		"shadows.contact_hardening",     "shadows.debug_cascades",
+		"hangar_lighting.enabled",       "lighting.spec_geom_adapt",
 	};
 	static const char* strings[] = {
-		"shadows.mode",
-		"shadows.fit_mode",
-		"skybox.path",
-		"skybox.mode",
-		"temporal_upscaling.mode",
+		"shadows.mode", "shadows.fit_mode", "skybox.path", "skybox.mode", "temporal_upscaling.mode",
 	};
 	for (size_t i = 0; i < sizeof ints / sizeof ints[0]; i++) {
 		if (!fl_cfg_has_type(config, ints[i], AERON_CONFIG_INT)) {
@@ -495,35 +514,32 @@ static int fl_ssao_config_valid(const XwaFlightSsaoParams* p) {
 }
 
 static int fl_shadows_config_valid(const XwaFlightShadowParams* p) {
-	return p->atlas_size >= 1024 && p->atlas_size <= 8192 &&
-		   (p->atlas_size & (p->atlas_size - 1)) == 0 && p->cascade_count >= 1 &&
-		   p->cascade_count <= AERON_SCENE_SHADOW_MAX_CASCADES && p->filter_quality >= 0 &&
-		   p->filter_quality <= 3 && p->max_distance > FL_NEAR_Z && p->split_lambda >= 0.0f &&
-		   p->split_lambda <= 1.0f && p->split_positions[0] > 0.0f &&
+	return p->atlas_size >= 1024 && p->atlas_size <= 8192 && (p->atlas_size & (p->atlas_size - 1)) == 0 &&
+		   p->cascade_count >= 1 && p->cascade_count <= AERON_SCENE_SHADOW_MAX_CASCADES &&
+		   p->filter_quality >= 0 && p->filter_quality <= 3 && p->max_distance > FL_NEAR_Z &&
+		   p->split_lambda >= 0.0f && p->split_lambda <= 1.0f && p->split_positions[0] > 0.0f &&
 		   p->split_positions[0] < p->split_positions[1] && p->split_positions[1] < p->split_positions[2] &&
 		   p->split_positions[2] < 1.0f && p->filter_radius >= 0.5f && p->filter_radius <= 3.0f &&
 		   p->light_angular_radius_degrees >= 0.0f && p->light_angular_radius_degrees <= 5.0f &&
 		   p->max_filter_radius >= p->filter_radius && p->max_filter_radius <= 16.0f &&
 		   p->pcss_min_filter_radius >= 0.5f && p->pcss_min_filter_radius <= p->filter_radius &&
-		   p->normal_bias_texels >= 0.0f && p->normal_bias_texels <= 4.0f &&
-		   p->depth_bias_texels >= 0.0f && p->depth_bias_texels <= 4.0f &&
-		   p->transition_fraction >= 0.0f && p->transition_fraction <= 0.5f &&
+		   p->normal_bias_texels >= 0.0f && p->normal_bias_texels <= 4.0f && p->depth_bias_texels >= 0.0f &&
+		   p->depth_bias_texels <= 4.0f && p->transition_fraction >= 0.0f && p->transition_fraction <= 0.5f &&
 		   p->distance_fade_fraction >= 0.0f && p->distance_fade_fraction <= 0.5f;
 }
 
 static int fl_hangar_lighting_config_valid(const XwaFlightHangarLightingParams* p, float direction_length) {
 	return direction_length > 0.0001f && isfinite(direction_length) && p->intensity >= 0.0f &&
 		   p->intensity <= 4.0f && p->color[0] >= 0.0f && p->color[0] <= 4.0f && p->color[1] >= 0.0f &&
-		   p->color[1] <= 4.0f && p->color[2] >= 0.0f && p->color[2] <= 4.0f &&
-		   p->ambient_ceiling >= 0.0f && p->ambient_ceiling <= 4.0f && p->ambient_sides >= 0.0f &&
-		   p->ambient_sides <= 4.0f && p->ambient_floor >= 0.0f && p->ambient_floor <= 4.0f &&
-		   p->shadow_filter_radius >= 0.5f && p->shadow_filter_radius <= 3.0f;
+		   p->color[1] <= 4.0f && p->color[2] >= 0.0f && p->color[2] <= 4.0f && p->ambient_ceiling >= 0.0f &&
+		   p->ambient_ceiling <= 4.0f && p->ambient_sides >= 0.0f && p->ambient_sides <= 4.0f &&
+		   p->ambient_floor >= 0.0f && p->ambient_floor <= 4.0f && p->shadow_filter_radius >= 0.5f &&
+		   p->shadow_filter_radius <= 3.0f;
 }
 
 static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
 	return p->cluster_depth_slices >= 4 && p->cluster_depth_slices <= 64 && isfinite(p->scale) &&
-		   p->scale >= 0.0f &&
-		   isfinite(p->range_scale) && p->range_scale > 0.0f &&
+		   p->scale >= 0.0f && isfinite(p->range_scale) && p->range_scale > 0.0f &&
 		   isfinite(p->min_distance) && p->min_distance > 0.0f && isfinite(p->spec_weight) &&
 		   p->spec_weight >= 0.0f && isfinite(p->diffuse_wrap) && p->diffuse_wrap >= 0.0f &&
 		   p->diffuse_wrap <= 1.0f && isfinite(p->contrib_cap) && p->contrib_cap >= 0.0f;
@@ -535,6 +551,78 @@ static int fl_sky_config_valid(void) {
 		   s.star_density <= 1.0f && isfinite(s.star_grid) && s.star_grid >= 1.0f && s.star_grid <= 256.0f &&
 		   isfinite(s.star_core_px) && s.star_core_px >= 0.0f && isfinite(s.star_feather) &&
 		   s.star_feather >= 0.0f && isfinite(s.star_flare) && s.star_flare >= 0.0f;
+}
+
+static int fl_hyperspace_config_valid(const XwaFlightHyperspaceTunnelParams* p) {
+	if (!(isfinite(p->travel_speed) && p->travel_speed > 0.0f && p->travel_speed <= 64.0f &&
+		  isfinite(p->rotation_speed) && p->rotation_speed >= -8.0f && p->rotation_speed <= 8.0f &&
+		  isfinite(p->noise_scale) && p->noise_scale >= 0.125f && p->noise_scale <= 8.0f &&
+		  isfinite(p->brightness) && p->brightness >= 0.0f && p->brightness <= 16.0f &&
+		  isfinite(p->highlight_strength) && p->highlight_strength >= 0.0f &&
+		  p->highlight_strength <= 16.0f && isfinite(p->focal_length) && p->focal_length >= 0.25f &&
+		  p->focal_length <= 4.0f && isfinite(p->twist) && p->twist >= -2.0f && p->twist <= 2.0f &&
+		  isfinite(p->cap_radius) && p->cap_radius >= 0.001f && p->cap_radius <= 1.0f &&
+		  isfinite(p->cap_falloff) && p->cap_falloff >= 0.1f && p->cap_falloff <= 64.0f)) {
+		return 0;
+	}
+	for (int channel = 0; channel < 3; channel++) {
+		if (!isfinite(p->dark_color[channel]) || p->dark_color[channel] < 0.0f ||
+			p->dark_color[channel] > 16.0f || !isfinite(p->body_color[channel]) ||
+			p->body_color[channel] < 0.0f || p->body_color[channel] > 16.0f ||
+			!isfinite(p->highlight_color[channel]) || p->highlight_color[channel] < 0.0f ||
+			p->highlight_color[channel] > 16.0f || !isfinite(p->cap_color[channel]) ||
+			p->cap_color[channel] < 0.0f || p->cap_color[channel] > 16.0f) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static int fl_load_hyperspace_config(const AeronConfigFile* config, const char* config_path) {
+	s.hyperspace_params.travel_speed =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_tunnel.travel_speed", 0.0);
+	s.hyperspace_params.rotation_speed =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_tunnel.rotation_speed", 0.0);
+	s.hyperspace_params.noise_scale =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_tunnel.noise_scale", 0.0);
+	s.hyperspace_params.brightness =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_tunnel.brightness", 0.0);
+	s.hyperspace_params.highlight_strength =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_tunnel.highlight_strength", 0.0);
+	s.hyperspace_params.focal_length =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_tunnel.focal_length", 0.0);
+	s.hyperspace_params.twist = (float)AeronConfigFile_GetFloat(config, "hyperspace_tunnel.twist", 0.0);
+	s.hyperspace_params.cap_radius =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_tunnel.cap_radius", 0.0);
+	s.hyperspace_params.cap_falloff =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_tunnel.cap_falloff", 0.0);
+	static const char* dark_color_paths[3] = { "hyperspace_tunnel.dark_color_r",
+											   "hyperspace_tunnel.dark_color_g",
+											   "hyperspace_tunnel.dark_color_b" };
+	static const char* body_color_paths[3] = { "hyperspace_tunnel.body_color_r",
+											   "hyperspace_tunnel.body_color_g",
+											   "hyperspace_tunnel.body_color_b" };
+	static const char* highlight_color_paths[3] = { "hyperspace_tunnel.highlight_color_r",
+													"hyperspace_tunnel.highlight_color_g",
+													"hyperspace_tunnel.highlight_color_b" };
+	static const char* cap_color_paths[3] = { "hyperspace_tunnel.cap_color_r",
+											  "hyperspace_tunnel.cap_color_g",
+											  "hyperspace_tunnel.cap_color_b" };
+	for (int channel = 0; channel < 3; channel++) {
+		s.hyperspace_params.dark_color[channel] =
+			(float)AeronConfigFile_GetFloat(config, dark_color_paths[channel], 0.0);
+		s.hyperspace_params.body_color[channel] =
+			(float)AeronConfigFile_GetFloat(config, body_color_paths[channel], 0.0);
+		s.hyperspace_params.highlight_color[channel] =
+			(float)AeronConfigFile_GetFloat(config, highlight_color_paths[channel], 0.0);
+		s.hyperspace_params.cap_color[channel] =
+			(float)AeronConfigFile_GetFloat(config, cap_color_paths[channel], 0.0);
+	}
+	if (!fl_hyperspace_config_valid(&s.hyperspace_params)) {
+		Aeron_LogError("xwa.remaster", "%s: invalid hyperspace_tunnel settings", config_path);
+		return 0;
+	}
+	return 1;
 }
 
 static int fl_pbr_config_valid(const XwaShipPbrTuning* p) {
@@ -627,8 +715,8 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	} else if (strcmp(shadow_fit_mode, "scene_dependent") == 0) {
 		s.shadows.fit_mode = AERON_SCENE_SHADOW_FIT_SCENE_DEPENDENT;
 	} else {
-		Aeron_LogError("xwa.remaster", "%s: shadows.fit_mode must be 'stable', 'frustum', or 'scene_dependent'",
-				  path);
+		Aeron_LogError("xwa.remaster",
+					   "%s: shadows.fit_mode must be 'stable', 'frustum', or 'scene_dependent'", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -641,16 +729,14 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.shadows.filter_quality = (int)AeronConfigFile_GetInt(cf, "shadows.filter_quality", 0);
 	s.shadows.filter_radius = (float)AeronConfigFile_GetFloat(cf, "shadows.filter_radius", 0.0);
 	s.shadows.contact_hardening = AeronConfigFile_GetBool(cf, "shadows.contact_hardening", 0);
-	s.shadows.light_angular_radius_degrees = (float)AeronConfigFile_GetFloat(
-		cf, "shadows.light_angular_radius_degrees", 0.0);
+	s.shadows.light_angular_radius_degrees =
+		(float)AeronConfigFile_GetFloat(cf, "shadows.light_angular_radius_degrees", 0.0);
 	s.shadows.max_filter_radius = (float)AeronConfigFile_GetFloat(cf, "shadows.max_filter_radius", 0.0);
 	s.shadows.pcss_min_filter_radius =
 		(float)AeronConfigFile_GetFloat(cf, "shadows.pcss_min_filter_radius", 0.0);
-	s.shadows.normal_bias_texels =
-		(float)AeronConfigFile_GetFloat(cf, "shadows.normal_bias_texels", 0.0);
+	s.shadows.normal_bias_texels = (float)AeronConfigFile_GetFloat(cf, "shadows.normal_bias_texels", 0.0);
 	s.shadows.depth_bias_texels = (float)AeronConfigFile_GetFloat(cf, "shadows.depth_bias_texels", 0.0);
-	s.shadows.transition_fraction =
-		(float)AeronConfigFile_GetFloat(cf, "shadows.transition_fraction", 0.0);
+	s.shadows.transition_fraction = (float)AeronConfigFile_GetFloat(cf, "shadows.transition_fraction", 0.0);
 	s.shadows.distance_fade_fraction =
 		(float)AeronConfigFile_GetFloat(cf, "shadows.distance_fade_fraction", 0.0);
 	s.shadows.debug_cascades = AeronConfigFile_GetBool(cf, "shadows.debug_cascades", 0);
@@ -661,28 +747,21 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	s.hangar_lighting.enabled = AeronConfigFile_GetBool(cf, "hangar_lighting.enabled", 0);
-	s.hangar_lighting.direction[0] =
-		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.direction_x", 0.0);
-	s.hangar_lighting.direction[1] =
-		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.direction_y", 0.0);
-	s.hangar_lighting.direction[2] =
-		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.direction_z", 0.0);
-	s.hangar_lighting.intensity =
-		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.intensity", 0.0);
-	s.hangar_lighting.color[0] =
-		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.color_r", 0.0);
-	s.hangar_lighting.color[1] =
-		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.color_g", 0.0);
-	s.hangar_lighting.color[2] =
-		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.color_b", 0.0);
+	s.hangar_lighting.direction[0] = (float)AeronConfigFile_GetFloat(cf, "hangar_lighting.direction_x", 0.0);
+	s.hangar_lighting.direction[1] = (float)AeronConfigFile_GetFloat(cf, "hangar_lighting.direction_y", 0.0);
+	s.hangar_lighting.direction[2] = (float)AeronConfigFile_GetFloat(cf, "hangar_lighting.direction_z", 0.0);
+	s.hangar_lighting.intensity = (float)AeronConfigFile_GetFloat(cf, "hangar_lighting.intensity", 0.0);
+	s.hangar_lighting.color[0] = (float)AeronConfigFile_GetFloat(cf, "hangar_lighting.color_r", 0.0);
+	s.hangar_lighting.color[1] = (float)AeronConfigFile_GetFloat(cf, "hangar_lighting.color_g", 0.0);
+	s.hangar_lighting.color[2] = (float)AeronConfigFile_GetFloat(cf, "hangar_lighting.color_b", 0.0);
 	s.hangar_lighting.ambient_ceiling =
 		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.ambient_ceiling", 0.0);
 	s.hangar_lighting.ambient_sides =
 		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.ambient_sides", 0.0);
 	s.hangar_lighting.ambient_floor =
 		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.ambient_floor", 0.0);
-	s.hangar_lighting.shadow_filter_radius = (float)AeronConfigFile_GetFloat(
-		cf, "hangar_lighting.shadow_filter_radius", 0.0);
+	s.hangar_lighting.shadow_filter_radius =
+		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.shadow_filter_radius", 0.0);
 	const float hangar_direction_length =
 		sqrtf(s.hangar_lighting.direction[0] * s.hangar_lighting.direction[0] +
 			  s.hangar_lighting.direction[1] * s.hangar_lighting.direction[1] +
@@ -697,8 +776,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	}
 	s.plight.enabled = AeronConfigFile_GetBool(cf, "point_lights.enabled", 0);
 	s.plight.clustered = AeronConfigFile_GetBool(cf, "point_lights.clustered", 0);
-	s.plight.cluster_depth_slices =
-		(int)AeronConfigFile_GetInt(cf, "point_lights.cluster_depth_slices", 0);
+	s.plight.cluster_depth_slices = (int)AeronConfigFile_GetInt(cf, "point_lights.cluster_depth_slices", 0);
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
 	s.plight.scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.scale", 0.0);
 	s.plight.range_scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.range_scale", 0.0);
@@ -724,7 +802,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	const char* sky_path = AeronConfigFile_GetString(cf, "skybox.path", NULL);
 	if (!sky_path[0] || strlen(sky_path) >= sizeof s.sky_path) {
 		Aeron_LogError("xwa.remaster", "%s: skybox.path must be non-empty and shorter than %zu bytes", path,
-				  sizeof s.sky_path);
+					   sizeof s.sky_path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -750,6 +828,10 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.star_flare = (float)AeronConfigFile_GetFloat(cf, "skybox.star_flare", 0.0);
 	if (!fl_sky_config_valid()) {
 		Aeron_LogError("xwa.remaster", "%s: invalid skybox settings", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	if (!fl_load_hyperspace_config(cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -821,14 +903,15 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	}
 	if (s.fsr_mode != AERON_TEMPORAL_OFF && s.configured_msaa_samples != AERON_SAMPLE_COUNT_1) {
 		Aeron_LogError("xwa.remaster",
-				  "%s: temporal_upscaling.mode and presentation.msaa_samples cannot both be enabled", path);
+					   "%s: temporal_upscaling.mode and presentation.msaa_samples cannot both be enabled",
+					   path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
 	s.fsr_sharpness = (float)AeronConfigFile_GetFloat(cf, "temporal_upscaling.sharpness", 0.0);
 	if (s.fsr_sharpness < 0.0f || s.fsr_sharpness > 1.0f) {
 		Aeron_LogError("xwa.remaster", "%s: temporal_upscaling.sharpness %.3f must be between 0 and 1", path,
-				  (double)s.fsr_sharpness);
+					   (double)s.fsr_sharpness);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -837,24 +920,25 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.hangar_lighting_default = s.hangar_lighting;
 	s.plight_default = s.plight;
 	s.texture_filtering_default = s.texture_filtering;
+	s.hyperspace_params_default = s.hyperspace_params;
 	fl_request_fsr_reset(FL_FSR_RESET_INITIAL);
 	AeronConfigFile_Destroy(cf);
 	s.config_loaded = 1;
 	Aeron_LogInfo("xwa.remaster",
-			  "flight ssao: quality %d intensity %.2f power %.2f radius %.1f bias %.2f "
-			  "direct %.2f%s",
-			  s.ssao.quality, (double)s.ssao.intensity, (double)s.ssao.power, (double)s.ssao.radius_view,
-			  (double)s.ssao.bias_view, (double)s.ssao.direct, s.ssao.debug_viz ? " (debug viz)" : "");
+				  "flight ssao: quality %d intensity %.2f power %.2f radius %.1f bias %.2f "
+				  "direct %.2f%s",
+				  s.ssao.quality, (double)s.ssao.intensity, (double)s.ssao.power, (double)s.ssao.radius_view,
+				  (double)s.ssao.bias_view, (double)s.ssao.direct, s.ssao.debug_viz ? " (debug viz)" : "");
 	if (s.texture_filtering.anisotropic) {
 		Aeron_LogInfo("xwa.remaster", "flight mesh filtering: trilinear + %.0fx anisotropic",
-				  (double)s.texture_filtering.max_anisotropy);
+					  (double)s.texture_filtering.max_anisotropy);
 	} else {
 		Aeron_LogInfo("xwa.remaster", "flight mesh filtering: trilinear");
 	}
 	Aeron_LogInfo("xwa.remaster", "flight FSR 3.1.4 mode: %s%s", AeronTemporal_ModeName(s.fsr_mode),
-			  s.fsr_sharpness > 0.0f ? " with RCAS" : "");
+				  s.fsr_sharpness > 0.0f ? " with RCAS" : "");
 	Aeron_LogInfo("xwa.remaster", "presentation: %.2f Hz display, VSync divisor %d, %.2f fps target",
-			  Aeron_DisplayRefreshRate(), Aeron_PresentationVsyncDivisor(), Aeron_PresentationRate());
+				  Aeron_DisplayRefreshRate(), Aeron_PresentationVsyncDivisor(), Aeron_PresentationRate());
 	return 1;
 }
 
@@ -872,9 +956,7 @@ void XwaRemasterFlight_GetPresentationDefaults(AeronSampleCount* msaa_samples, i
 	}
 }
 
-int XwaRemasterFlight_ProcessAssetsNeedPrepare(void) {
-	return !s.process_assets_prepared;
-}
+int XwaRemasterFlight_ProcessAssetsNeedPrepare(void) { return !s.process_assets_prepared; }
 
 int XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterAssets* assets) {
 	if (!cmd || !assets || s.process_assets_prepared || !fl_cfg_ensure()) {
@@ -898,7 +980,8 @@ int XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterA
 		char sky_path[600];
 		snprintf(sky_path, sizeof sky_path, "%s/%s", XwaRemasterAssets_Root(assets), s.sky_path);
 		s.sky_cube = Aeron_ImageLoadCubemapKtx2(cmd, sky_path);
-		Aeron_LogWarn("xwa.remaster", "flight skybox %s: %s", s.sky_cube ? "loaded" : "load failed", sky_path);
+		Aeron_LogWarn("xwa.remaster", "flight skybox %s: %s", s.sky_cube ? "loaded" : "load failed",
+					  sky_path);
 		if (!s.sky_cube) {
 			return 0;
 		}
@@ -1076,10 +1159,10 @@ void XwaRemasterFlight_GetPointLightStats(XwaFlightPointLightStats* out) {
 		return;
 	}
 	memset(out, 0, sizeof *out);
-	out->valid_count              = s.pl_cand_count;
-	out->invalid_count            = s.pl_invalid_count;
+	out->valid_count = s.pl_cand_count;
+	out->invalid_count = s.pl_invalid_count;
 	out->candidate_overflow_count = s.pl_cand_dropped;
-	out->generated_count          = s.pl_cand_count + s.pl_invalid_count + s.pl_cand_dropped;
+	out->generated_count = s.pl_cand_count + s.pl_invalid_count + s.pl_cand_dropped;
 	AeronScene_GetClusteredLightStats(s.scene, &out->scene);
 }
 
@@ -1099,7 +1182,7 @@ static int fl_apply_texture_filtering(const XwaFlightTextureFilteringParams* in)
 		});
 		if (!sampler) {
 			Aeron_LogWarn("xwa.remaster",
-					  "flight: anisotropic mesh sampler creation failed; keeping previous filtering");
+						  "flight: anisotropic mesh sampler creation failed; keeping previous filtering");
 			return 0;
 		}
 	}
@@ -1169,6 +1252,78 @@ void XwaRemasterFlight_SetMotionBlur(const XwaFlightMotionBlurParams* in) {
 		s.mb_velocity_viz = in->velocity_viz;
 	}
 }
+
+void XwaRemasterFlight_GetHyperspaceTunnel(XwaFlightHyperspaceTunnelParams* out) {
+	if (out && fl_cfg_ensure()) {
+		*out = s.hyperspace_params;
+	}
+}
+
+void XwaRemasterFlight_SetHyperspaceTunnel(const XwaFlightHyperspaceTunnelParams* in) {
+	if (!in || !fl_cfg_ensure()) {
+		return;
+	}
+	XwaFlightHyperspaceTunnelParams p = *in;
+	if (!isfinite(p.travel_speed))
+		p.travel_speed = s.hyperspace_params_default.travel_speed;
+	if (!isfinite(p.rotation_speed))
+		p.rotation_speed = s.hyperspace_params_default.rotation_speed;
+	if (!isfinite(p.noise_scale))
+		p.noise_scale = s.hyperspace_params_default.noise_scale;
+	if (!isfinite(p.brightness))
+		p.brightness = s.hyperspace_params_default.brightness;
+	if (!isfinite(p.highlight_strength))
+		p.highlight_strength = s.hyperspace_params_default.highlight_strength;
+	if (!isfinite(p.focal_length))
+		p.focal_length = s.hyperspace_params_default.focal_length;
+	if (!isfinite(p.twist))
+		p.twist = s.hyperspace_params_default.twist;
+	if (!isfinite(p.cap_radius))
+		p.cap_radius = s.hyperspace_params_default.cap_radius;
+	if (!isfinite(p.cap_falloff))
+		p.cap_falloff = s.hyperspace_params_default.cap_falloff;
+	p.travel_speed = fminf(fmaxf(p.travel_speed, 0.01f), 64.0f);
+	p.rotation_speed = fminf(fmaxf(p.rotation_speed, -8.0f), 8.0f);
+	p.noise_scale = fminf(fmaxf(p.noise_scale, 0.125f), 8.0f);
+	p.brightness = fminf(fmaxf(p.brightness, 0.0f), 16.0f);
+	p.highlight_strength = fminf(fmaxf(p.highlight_strength, 0.0f), 16.0f);
+	p.focal_length = fminf(fmaxf(p.focal_length, 0.25f), 4.0f);
+	p.twist = fminf(fmaxf(p.twist, -2.0f), 2.0f);
+	p.cap_radius = fminf(fmaxf(p.cap_radius, 0.001f), 1.0f);
+	p.cap_falloff = fminf(fmaxf(p.cap_falloff, 0.1f), 64.0f);
+	for (int channel = 0; channel < 3; channel++) {
+		if (!isfinite(p.dark_color[channel]))
+			p.dark_color[channel] = s.hyperspace_params_default.dark_color[channel];
+		if (!isfinite(p.body_color[channel]))
+			p.body_color[channel] = s.hyperspace_params_default.body_color[channel];
+		if (!isfinite(p.highlight_color[channel]))
+			p.highlight_color[channel] = s.hyperspace_params_default.highlight_color[channel];
+		if (!isfinite(p.cap_color[channel]))
+			p.cap_color[channel] = s.hyperspace_params_default.cap_color[channel];
+		p.dark_color[channel] = fminf(fmaxf(p.dark_color[channel], 0.0f), 16.0f);
+		p.body_color[channel] = fminf(fmaxf(p.body_color[channel], 0.0f), 16.0f);
+		p.highlight_color[channel] = fminf(fmaxf(p.highlight_color[channel], 0.0f), 16.0f);
+		p.cap_color[channel] = fminf(fmaxf(p.cap_color[channel], 0.0f), 16.0f);
+	}
+	s.hyperspace_params = p;
+	XwaRemasterHyperspace_SetParams(s.hyperspace, &p);
+}
+
+void XwaRemasterFlight_GetHyperspaceTunnelDefault(XwaFlightHyperspaceTunnelParams* out) {
+	if (out && fl_cfg_ensure()) {
+		*out = s.hyperspace_params_default;
+	}
+}
+
+void XwaRemasterFlight_SetHyperspaceTunnelPreview(int enabled) {
+	const int next = enabled ? 1 : 0;
+	if (next && !s.hyperspace_preview) {
+		s.hyperspace_preview_epoch_us = XwaTime_GetElapsedUs();
+	}
+	s.hyperspace_preview = next;
+}
+
+int XwaRemasterFlight_HyperspaceTunnelPreviewEnabled(void) { return s.hyperspace_preview; }
 
 void XwaRemasterFlight_GetTemporal(XwaFlightTemporalParams* out) {
 	if (!out) {
@@ -1270,7 +1425,7 @@ static int fl_ensure(int target_w, int target_h) {
 		}
 	}
 	if (!s.hyperspace) {
-		s.hyperspace = XwaRemasterHyperspace_Create();
+		s.hyperspace = XwaRemasterHyperspace_Create(&s.hyperspace_params);
 		if (!s.hyperspace) {
 			Aeron_LogError("xwa.remaster", "flight: hyperspace renderer create failed");
 			return 0;
@@ -1604,7 +1759,7 @@ static int fl_is_death_star_beam(const XwaSnapshot* snap, const XwaFlightObject*
 
 static void fl_apply_death_star_beam_scale(const XwaSnapshot* snap, float model[16]) {
 	const float scale[3] = { FL_DS_LASER_TRANSVERSE_SCALE, snap->death_star_beam.length_scale,
-						   FL_DS_LASER_TRANSVERSE_SCALE };
+							 FL_DS_LASER_TRANSVERSE_SCALE };
 	for (int row = 0; row < 3; row++) {
 		for (int axis = 0; axis < 3; axis++) {
 			model[row * 4 + axis] *= scale[axis];
@@ -1690,9 +1845,8 @@ int XwaRemasterFlight_ObjectModelMatrixAtOrigin(const XwaFlightObject* object, c
 }
 
 /* Prev-frame transform for the motion-blur velocity prepass. */
-static const XwaFlightObject* fl_instance_motion(AeronSceneMeshInstance* inst,
-												 const XwaFlightObject* current, uint32_t walk_index,
-												 int is_bolt) {
+static const XwaFlightObject* fl_instance_motion(AeronSceneMeshInstance* inst, const XwaFlightObject* current,
+												 uint32_t walk_index, int is_bolt) {
 	if (!s.mb_enabled) {
 		inst->zero_velocity = 1;
 		return NULL;
@@ -1884,10 +2038,8 @@ static void fl_submit_view_quad_ex(AeronSceneBillboardStage stage, const float c
 	tint[3] = (float)((argb >> 24) & 0xffu) / 255.0f;
 	/* PMA modulate: the tint's alpha scales the premultiplied RGB too
 	 * (equivalent to the classic straight-alpha vertex modulate). */
-	tint[0] =
-		XwaRemaster_SrgbToLinear((float)((argb >> 16) & 0xffu) / 255.0f) * tint[3] * emissive_strength;
-	tint[1] =
-		XwaRemaster_SrgbToLinear((float)((argb >> 8) & 0xffu) / 255.0f) * tint[3] * emissive_strength;
+	tint[0] = XwaRemaster_SrgbToLinear((float)((argb >> 16) & 0xffu) / 255.0f) * tint[3] * emissive_strength;
+	tint[1] = XwaRemaster_SrgbToLinear((float)((argb >> 8) & 0xffu) / 255.0f) * tint[3] * emissive_strength;
 	tint[2] = XwaRemaster_SrgbToLinear((float)(argb & 0xffu) / 255.0f) * tint[3] * emissive_strength;
 	const float du = ref->u1 - ref->u0;
 	const float dv = ref->v1 - ref->v0;
@@ -2636,7 +2788,7 @@ static float fl_pl_range(float classic_intensity, float cull_radius) {
 
 /* Accessor-law sources (everything except engine glows + pulses). */
 static void fl_derive_point_lights(const XwaSnapshot* snap) {
-	s.pl_cand_count   = 0;
+	s.pl_cand_count = 0;
 	s.pl_cand_dropped = 0;
 	s.pl_invalid_count = 0;
 	if (!s.plight.enabled) {
@@ -2771,10 +2923,9 @@ static uint32_t fl_finalize_point_lights(XwaShipPointLightTuning* tuning) {
 		light.range *= s.plight.range_scale;
 		const float luminance =
 			0.2126f * light.color[0] + 0.7152f * light.color[1] + 0.0722f * light.color[2];
-		if (!(light.range > 0.0f) || !(luminance > 0.0f) || !isfinite(light.range) ||
-			!isfinite(luminance) || !isfinite(light.pos[0]) || !isfinite(light.pos[1]) ||
-			!isfinite(light.pos[2]) || !isfinite(light.color[0]) || !isfinite(light.color[1]) ||
-			!isfinite(light.color[2])) {
+		if (!(light.range > 0.0f) || !(luminance > 0.0f) || !isfinite(light.range) || !isfinite(luminance) ||
+			!isfinite(light.pos[0]) || !isfinite(light.pos[1]) || !isfinite(light.pos[2]) ||
+			!isfinite(light.color[0]) || !isfinite(light.color[1]) || !isfinite(light.color[2])) {
 			s.pl_invalid_count++;
 			continue;
 		}
@@ -2802,12 +2953,12 @@ static uint32_t fl_submit_point_lights(uint32_t count) {
 
 static int fl_configure_clustered_lights(AeronScene3D* scene) {
 	return AeronScene_SetClusteredLights(scene, &(AeronSceneClusteredLightDesc) {
-		.enabled = s.plight.clustered,
-		.depth_slices = (uint32_t)s.plight.cluster_depth_slices,
-		.min_distance = s.plight.min_distance,
-		.contribution_cap = s.plight.contrib_cap,
-		.debug_view = s.plight.cluster_debug,
-	});
+													.enabled = s.plight.clustered,
+													.depth_slices = (uint32_t)s.plight.cluster_depth_slices,
+													.min_distance = s.plight.min_distance,
+													.contribution_cap = s.plight.contrib_cap,
+													.debug_view = s.plight.cluster_debug,
+												});
 }
 
 /* Submit the derived set as OVERLAY billboards (corner build shared
@@ -2867,8 +3018,8 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 		return 1;
 	}
 
-	const char* model_name = model_name_override ? model_name_override
-												 : XwaSnapshotExport_ModelName(object->object_type);
+	const char* model_name =
+		model_name_override ? model_name_override : XwaSnapshotExport_ModelName(object->object_type);
 	out->mesh = XwaRemasterShip_MeshForNameWithSource(model_name, &out->runtime_opt);
 	if (!out->mesh) {
 		return 0;
@@ -2933,8 +3084,8 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 			fl_derive_wreck_flames(f, snapshot_index, context->assets, NULL, NULL);
 		if (s.glow_ok) {
 			XwaRemasterShip_SubmitEngineGlows(s.scene, prepared.mesh, model_matrix, 1.0f, prepared.table,
-											  f->eg_knockout_mask, XwaRemasterShip_EngineGlowScale(f), s.crows,
-											  s.camera_local, &s.glow_ref);
+											  f->eg_knockout_mask, XwaRemasterShip_EngineGlowScale(f),
+											  s.crows, s.camera_local, &s.glow_ref);
 		}
 	}
 	return 1;
@@ -2975,6 +3126,61 @@ static void fl_hyper_find_poses(const XwaSnapshot* snap, const XwaFlightCamera* 
 			*player_found = 1;
 		}
 	}
+}
+
+static int fl_hyper_normalize_axis(float axis[3]) {
+	const float length = sqrtf(axis[0] * axis[0] + axis[1] * axis[1] + axis[2] * axis[2]);
+	if (!isfinite(length) || length <= 0.0001f) {
+		return 0;
+	}
+	axis[0] /= length;
+	axis[1] /= length;
+	axis[2] /= length;
+	return 1;
+}
+
+static void fl_hyper_build_tunnel_view(const AeronSceneCamera* camera, const float player_bw[9],
+									   int player_found, XwaRemasterHyperspaceTunnelView* out) {
+	memset(out, 0, sizeof *out);
+	out->right[0] = 1.0f;
+	out->up[1] = -1.0f;
+	out->forward[2] = 1.0f;
+	out->tan_half_fov_x = fmaxf(tanf(camera->h_half_rad), 0.0001f);
+	out->tan_half_fov_y = fmaxf(tanf(camera->v_half_rad), 0.0001f);
+	out->proj_offset_x = camera->proj_x_offset;
+	out->proj_offset_y = camera->proj_y_offset;
+	if (!player_found) {
+		return;
+	}
+
+	/* player_bw uses the recovered (R0, R2, R1) row order: right,
+	 * ship-backward, and up. Negate its longitudinal row so signed tunnel
+	 * motion follows the craft's travel direction. */
+	float right[3], up[3], forward[3];
+	fl_world_to_view(s.crows, player_bw[0], player_bw[1], player_bw[2], right);
+	fl_world_to_view(s.crows, player_bw[6], player_bw[7], player_bw[8], up);
+	fl_world_to_view(s.crows, -player_bw[3], -player_bw[4], -player_bw[5], forward);
+	if (!fl_hyper_normalize_axis(forward)) {
+		return;
+	}
+	const float right_forward = right[0] * forward[0] + right[1] * forward[1] + right[2] * forward[2];
+	for (int axis = 0; axis < 3; axis++) {
+		right[axis] -= forward[axis] * right_forward;
+	}
+	if (!fl_hyper_normalize_axis(right)) {
+		return;
+	}
+	const float up_forward = up[0] * forward[0] + up[1] * forward[1] + up[2] * forward[2];
+	const float up_right = up[0] * right[0] + up[1] * right[1] + up[2] * right[2];
+	for (int axis = 0; axis < 3; axis++) {
+		up[axis] -= forward[axis] * up_forward + right[axis] * up_right;
+	}
+	if (!fl_hyper_normalize_axis(up)) {
+		return;
+	}
+	memcpy(out->right, right, sizeof out->right);
+	memcpy(out->up, up, sizeof out->up);
+	memcpy(out->forward, forward, sizeof out->forward);
 }
 
 /* Hyperspace uses the same state-derived cockpit transform and articulation
@@ -3097,6 +3303,9 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	AeronScenePresentChain_Draw(chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
 								s.map_present ? 0.0f : AeronSceneBloom_Intensity(), s.rt_w, s.rt_h,
 								/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0);
+	if (s.suppress_hud) {
+		return;
+	}
 	if (!s.map_present) {
 		Aeron_GpuDebugMarker(cmd, "HUD target boxes before fixed");
 		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
@@ -3237,16 +3446,30 @@ static void fl_set_temporal(uint64_t host_time_us, int scene_supported) {
 
 static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
 										  XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
-										  uint64_t host_time_us, int direct_present) {
-	if (!s.hyperspace || !XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, snap, assets,
-														flight_view->view_proj, s.crows, s.rt_w, s.rt_h)) {
+										  uint64_t host_time_us, int direct_present, int preview) {
+	float anchor_bw[9], player_bw[9], player_local[3];
+	int anchor_found, player_found;
+	const XwaFlightObject* player_f;
+	fl_hyper_find_poses(snap, &snap->flight_camera, anchor_bw, &anchor_found, &player_f, player_bw,
+						player_local, &player_found);
+	XwaRemasterHyperspaceTunnelView tunnel_view;
+	fl_hyper_build_tunnel_view(&flight_view->camera, player_bw, player_found, &tunnel_view);
+
+	float preview_time = 0.0f;
+	if (preview && host_time_us >= s.hyperspace_preview_epoch_us) {
+		const double elapsed_seconds = (double)(host_time_us - s.hyperspace_preview_epoch_us) / 1000000.0;
+		preview_time = (float)fmod(elapsed_seconds, 4096.0);
+	}
+	if (!s.hyperspace ||
+		!XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, snap, flight_view->view_proj, s.crows,
+									   s.rt_w, s.rt_h, preview, preview_time, &tunnel_view)) {
 		return NULL;
 	}
 	/* Cockpit glow texture is the only ordinary-flight atlas dependency
 	 * retained by the special scene. */
 	s.glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &s.glow_ref);
 	s.table_count = 0;
-	s.pl_cand_count   = 0;
+	s.pl_cand_count = 0;
 	s.pl_cand_dropped = 0;
 	s.pl_invalid_count = 0;
 	s.snap = snap;
@@ -3264,7 +3487,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, fl_draw_before_opaque, NULL);
 	/* SSAO remains active for the 3D cockpit. Motion blur is deliberately
 	 * disabled: the tunnel/streak hook has no velocity attachment, and the
-	 * classic effect already encodes its own motion in geometry/animation. */
+	 * hyperspace effects encode their own motion in geometry and shader animation. */
 	AeronScene_SetPost(s.scene, &(AeronScenePostDesc) {
 									.ssao_quality = s.ssao.quality,
 									.ssao_intensity = s.ssao.intensity,
@@ -3281,11 +3504,6 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 								});
 	AeronScene_SetMotionContext(s.scene, NULL, 1);
 
-	float anchor_bw[9], player_bw[9], player_local[3];
-	int anchor_found, player_found;
-	const XwaFlightObject* player_f;
-	fl_hyper_find_poses(snap, &snap->flight_camera, anchor_bw, &anchor_found, &player_f, player_bw,
-						player_local, &player_found);
 	if (player_found && player_f) {
 		fl_derive_pulse_lights(snap, player_bw, player_local);
 	}
@@ -3462,12 +3680,18 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	XwaRemasterHud_PrepareFrame(cmd, snap, assets, &flight_view, s.rt_w, s.rt_h);
 	fl_quat_to_mat3(flight_view.camera.ori, s.crows);
 	const uint64_t host_time_us = XwaTime_GetElapsedUs();
-	if (cam->map_mode)
+	if (cam->map_mode) {
+		s.suppress_hud = 0;
 		return fl_render_map(cmd, snap, assets, &flight_view, host_time_us, direct_present);
-	s.map_present = 0;
-	if (cam->hyperspace_phase) {
-		return fl_render_hyperspace(cmd, snap, assets, &flight_view, host_time_us, direct_present);
 	}
+	s.map_present = 0;
+	const int hyperspace_preview = s.hyperspace_preview && !cam->hyperspace_phase;
+	s.suppress_hud = hyperspace_preview;
+	if (cam->hyperspace_phase || hyperspace_preview) {
+		return fl_render_hyperspace(cmd, snap, assets, &flight_view, host_time_us, direct_present,
+									hyperspace_preview);
+	}
+	s.suppress_hud = 0;
 	s.snap = snap;
 	/* The hook persists on the scene object; explicitly clear it when
 	 * returning to the ordinary world path. */
@@ -3980,8 +4204,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		return NULL;
 	}
 	XwaRemasterShip_SetPbrEnv(s.scene, scene_lighting.lights, scene_lighting.light_count, NULL,
-							  s.camera_local, ao_on ? &ao : NULL,
-							  s.plight.enabled ? &point_tuning : NULL,
+							  s.camera_local, ao_on ? &ao : NULL, s.plight.enabled ? &point_tuning : NULL,
 							  scene_lighting.ambient);
 
 	/* Player cockpit (lit; classic runs the normal light setup). Gates

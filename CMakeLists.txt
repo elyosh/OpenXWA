@@ -284,10 +284,10 @@ target_link_libraries(xwa_remaster
 # land beside the shared runtime shaders so Aeron_CreateShader can resolve
 # them by name on every backend.
 aeron_compile_hlsl(XWA_SHADER_OUTPUTS ${CMAKE_BINARY_DIR}/shaders
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_streak.vert.hlsl
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_streak.frag.hlsl
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_texture.vert.hlsl
-    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_texture.frag.hlsl
+	${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_streak.vert.hlsl
+	${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_streak.frag.hlsl
+	${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_tunnel.vert.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_tunnel.frag.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/d3d_projected_triangle.vert.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/d3d_projected_triangle.frag.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/sky_stars.vert.hlsl

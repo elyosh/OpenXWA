@@ -295,7 +295,6 @@ typedef struct XwaDirLight {
 #define XWA_SNAP_TYPE_DEBRIS_SPRITE_0 233   /* OBJ_DebrisTextureGroup4000 */
 #define XWA_SNAP_TYPE_DEBRIS_SPRITE_3 236   /* OBJ_DebrisTextureGroup4003 */
 #define XWA_SNAP_TYPE_LIGHTING_1000 237     /* OBJ_LightingEffectTextureGroup1000 (glow / flare sprites) */
-#define XWA_SNAP_TYPE_HYPER_TUNNEL 238      /* OBJ_AnimationTextureGroup3051 */
 #define XWA_SNAP_TYPE_EXPLOSION_2000 264    /* OBJ_ExplosionTextureGroup2000 */
 #define XWA_SNAP_TYPE_EXPLOSION_2006 270    /* OBJ_ExplosionTextureGroup2006 (capital-ship blast) */
 #define XWA_SNAP_TYPE_FLAME_2008 279        /* OBJ_AnimationTextureGroup2008 (wreck fire) */
@@ -515,7 +514,6 @@ typedef enum XwaHyperspacePhase {
 typedef struct XwaHyperspaceState {
 	uint8_t phase; /* XwaHyperspacePhase */
 	uint32_t phase_elapsed_ticks;
-	uint32_t tunnel_frame_q16;
 } XwaHyperspaceState;
 
 /* OPT mesh-type values the drivers dispatch on (mirrors MeshType —

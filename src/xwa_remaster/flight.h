@@ -23,8 +23,8 @@
  */
 
 #include "aeron/render.h"
-#include "aeron/vfs.h"
 #include "aeron/scene/scene3d.h"
+#include "aeron/vfs.h"
 #include "xwa_remaster/assets.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
@@ -85,8 +85,8 @@ typedef struct XwaFlightShadowParams {
 	float light_angular_radius_degrees; /* source half-angle */
 	float max_filter_radius;            /* atlas texels */
 	float pcss_min_filter_radius;       /* atlas texels */
-	float normal_bias_texels; /* lateral receiver offset at grazing incidence */
-	float depth_bias_texels;  /* receiver comparison offset along the light */
+	float normal_bias_texels;           /* lateral receiver offset at grazing incidence */
+	float depth_bias_texels;            /* receiver comparison offset along the light */
 	float transition_fraction;
 	float distance_fade_fraction;
 	int debug_cascades;
@@ -175,6 +175,31 @@ typedef struct XwaFlightMotionBlurParams {
 void XwaRemasterFlight_GetMotionBlur(XwaFlightMotionBlurParams* out);
 void XwaRemasterFlight_SetMotionBlur(const XwaFlightMotionBlurParams* in);
 
+/* Procedural hyperspace-tunnel settings loaded from remaster/config.yaml and
+ * live-editable through the debug inspector. The preview override affects
+ * rendering only; it never changes the captured flight simulation state. */
+typedef struct XwaFlightHyperspaceTunnelParams {
+	float travel_speed;
+	float rotation_speed;
+	float noise_scale;
+	float brightness;
+	float highlight_strength;
+	float focal_length;
+	float twist;
+	float cap_radius;
+	float cap_falloff;
+	float dark_color[3];
+	float body_color[3];
+	float highlight_color[3];
+	float cap_color[3];
+} XwaFlightHyperspaceTunnelParams;
+
+void XwaRemasterFlight_GetHyperspaceTunnel(XwaFlightHyperspaceTunnelParams* out);
+void XwaRemasterFlight_SetHyperspaceTunnel(const XwaFlightHyperspaceTunnelParams* in);
+void XwaRemasterFlight_GetHyperspaceTunnelDefault(XwaFlightHyperspaceTunnelParams* out);
+void XwaRemasterFlight_SetHyperspaceTunnelPreview(int enabled);
+int XwaRemasterFlight_HyperspaceTunnelPreviewEnabled(void);
+
 /* FSR controls exposed by the debug inspector. The user menu persists only
  * the mode; sharpness and debug visualization remain session-only. */
 typedef struct XwaFlightTemporalParams {
@@ -236,7 +261,7 @@ int XwaRemasterFlight_ObjectModelMatrixForCameraDelta(const XwaFlightObject* obj
 /* One-shot process assets prepared by the first flight loading snapshot.
  * PrepareProcessAssets requires no open GPU render pass. */
 int XwaRemasterFlight_ProcessAssetsNeedPrepare(void);
-int  XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterAssets* assets);
+int XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterAssets* assets);
 void XwaRemasterFlight_CommitProcessAssets(void);
 
 /* Returns whether the current full-frame output can use Aeron's direct

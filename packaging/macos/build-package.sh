@@ -291,6 +291,8 @@ main() {
     test -x "${application}/Contents/MacOS/OpenXWA"
     test -f "${application}/Contents/Resources/resources/remaster/config.yaml"
     test -f "${application}/Contents/Resources/shaders/hyperspace_streak.vert.msl"
+    test -f "${application}/Contents/Resources/shaders/hyperspace_tunnel.vert.msl"
+    test -f "${application}/Contents/Resources/shaders/hyperspace_tunnel.frag.msl"
     plutil -lint "${application}/Contents/Info.plist"
     if [[ "${build_type}" == Debug ]]; then
         application_uuid="$(dwarfdump --uuid \

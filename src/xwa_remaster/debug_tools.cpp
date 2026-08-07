@@ -525,6 +525,109 @@ static void xwa_tool_motion_blur(int* open, void* user) {
 	*open = b ? 1 : 0;
 }
 
+/* ---- Hyperspace tunnel ---------------------------------------------- */
+
+static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
+	(void)user;
+	ImGui::SetNextWindowSize(ImVec2(460, 520), ImGuiCond_FirstUseEver);
+	bool b = *open != 0;
+	if (!ImGui::Begin("Hyperspace Tunnel", &b)) {
+		ImGui::End();
+		if (!b) {
+			XwaRemasterFlight_SetHyperspaceTunnelPreview(0);
+		}
+		*open = b ? 1 : 0;
+		return;
+	}
+
+	bool preview = XwaRemasterFlight_HyperspaceTunnelPreviewEnabled() != 0;
+	if (ImGui::Checkbox("Preview in flight", &preview)) {
+		XwaRemasterFlight_SetHyperspaceTunnelPreview(preview ? 1 : 0);
+	}
+	ImGui::TextDisabled("Replaces the normal 3D flight scene without changing simulation state.\n"
+						"Map mode and real hyperspace retain precedence; the cockpit remains visible.");
+
+	ImGui::Separator();
+	XwaFlightHyperspaceTunnelParams p;
+	XwaRemasterFlight_GetHyperspaceTunnel(&p);
+	bool changed = false;
+	changed |= ImGui::SliderFloat("Travel speed", &p.travel_speed, 0.01f, 64.0f, "%.2f",
+								  ImGuiSliderFlags_Logarithmic);
+	changed |= ImGui::SliderFloat("Rotation speed", &p.rotation_speed, -8.0f, 8.0f, "%.3f");
+	changed |=
+		ImGui::SliderFloat("Noise scale", &p.noise_scale, 0.125f, 8.0f, "%.3f", ImGuiSliderFlags_Logarithmic);
+	changed |= ImGui::SliderFloat("Brightness", &p.brightness, 0.0f, 8.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Highlight strength", &p.highlight_strength, 0.0f, 8.0f, "%.2f");
+	ImGui::TextDisabled("Scales cyan-white HDR highlights, the cap light, and their bloom.");
+	changed |= ImGui::SliderFloat("Focal length", &p.focal_length, 0.25f, 4.0f, "%.3f");
+	ImGui::TextDisabled("Larger focal lengths narrow the apparent opening.");
+	changed |= ImGui::SliderFloat("Axial twist", &p.twist, -2.0f, 2.0f, "%.3f");
+	changed |=
+		ImGui::SliderFloat("Cap radius", &p.cap_radius, 0.001f, 1.0f, "%.4f", ImGuiSliderFlags_Logarithmic);
+	changed |=
+		ImGui::SliderFloat("Cap falloff", &p.cap_falloff, 0.1f, 64.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+	ImGui::TextDisabled("Controls the full-strength core radius and exponential halo falloff.");
+	changed |=
+		ImGui::ColorEdit3("Dark color", p.dark_color, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+	changed |=
+		ImGui::ColorEdit3("Body color", p.body_color, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+	changed |= ImGui::ColorEdit3("Highlight color", p.highlight_color,
+								 ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+	changed |=
+		ImGui::ColorEdit3("Cap color", p.cap_color, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+
+	ImGui::Separator();
+	if (ImGui::Button("Reset to YAML defaults")) {
+		XwaRemasterFlight_GetHyperspaceTunnelDefault(&p);
+		changed = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Copy YAML")) {
+		char yaml[1024];
+		std::snprintf(yaml, sizeof yaml,
+					  "hyperspace_tunnel:\n"
+					  "  travel_speed: %.4g\n"
+					  "  rotation_speed: %.4g\n"
+					  "  noise_scale: %.4g\n"
+					  "  brightness: %.4g\n"
+					  "  highlight_strength: %.4g\n"
+					  "  focal_length: %.4g\n"
+					  "  twist: %.4g\n"
+					  "  cap_radius: %.4g\n"
+					  "  cap_falloff: %.4g\n"
+					  "  dark_color_r: %.4g\n"
+					  "  dark_color_g: %.4g\n"
+					  "  dark_color_b: %.4g\n"
+					  "  body_color_r: %.4g\n"
+					  "  body_color_g: %.4g\n"
+					  "  body_color_b: %.4g\n"
+					  "  highlight_color_r: %.4g\n"
+					  "  highlight_color_g: %.4g\n"
+					  "  highlight_color_b: %.4g\n"
+					  "  cap_color_r: %.4g\n"
+					  "  cap_color_g: %.4g\n"
+					  "  cap_color_b: %.4g\n",
+					  (double)p.travel_speed, (double)p.rotation_speed, (double)p.noise_scale, (double)p.brightness,
+					  (double)p.highlight_strength, (double)p.focal_length, (double)p.twist,
+					  (double)p.cap_radius, (double)p.cap_falloff, (double)p.dark_color[0],
+					  (double)p.dark_color[1], (double)p.dark_color[2], (double)p.body_color[0],
+					  (double)p.body_color[1], (double)p.body_color[2], (double)p.highlight_color[0],
+					  (double)p.highlight_color[1], (double)p.highlight_color[2], (double)p.cap_color[0],
+					  (double)p.cap_color[1], (double)p.cap_color[2]);
+		ImGui::SetClipboardText(yaml);
+	}
+	ImGui::TextDisabled("Edits apply immediately and are not persisted.");
+	if (changed) {
+		XwaRemasterFlight_SetHyperspaceTunnel(&p);
+	}
+
+	ImGui::End();
+	if (!b) {
+		XwaRemasterFlight_SetHyperspaceTunnelPreview(0);
+	}
+	*open = b ? 1 : 0;
+}
+
 /* ---- FSR 3.1.4 ------------------------------------------------------ */
 
 static void xwa_tool_fsr(int* open, void* user) {
@@ -872,6 +975,7 @@ extern "C" void XwaRemasterDebugTools_Register(void) {
 	Aeron_DebugRegisterTool("Hangar Lighting", xwa_tool_hangar_lighting, nullptr);
 	Aeron_DebugRegisterTool("Point Lights", xwa_tool_point_lights, nullptr);
 	Aeron_DebugRegisterTool("Motion Blur", xwa_tool_motion_blur, nullptr);
+	Aeron_DebugRegisterTool("Hyperspace Tunnel", xwa_tool_hyperspace_tunnel, nullptr);
 	Aeron_DebugRegisterTool("FSR 3.1.4", xwa_tool_fsr, nullptr);
 	Aeron_DebugRegisterTool("HDR & Display", xwa_tool_hdr, nullptr);
 	Aeron_DebugRegisterTool("HUD Snapshot", xwa_tool_hud_snapshot, nullptr);

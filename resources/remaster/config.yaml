@@ -206,6 +206,29 @@ skybox:
   star_feather: 0.25     # dot antialias edge (classic px)
   star_flare: 1.0        # bright-star flare brightness (0 = off); exact
                          # DrawBrightStarFlare ±1px plus/L pattern
+hyperspace_tunnel:
+  # Ship-relative 3D simplex tunnel used by the remaster renderer.
+  travel_speed: 8.0      # forward rate; 8 matches the reference shader
+  rotation_speed: -2.3   # radians per second around the tunnel axis
+  noise_scale: 1.0       # multiplier for all simplex octave frequencies
+  brightness: 1.0        # final linear emission before bloom and tonemapping
+  highlight_strength: 2.0 # cyan-white noise highlights and cap light; independent of the blue body
+  focal_length: 1.15     # tunnel perspective; larger values narrow the apparent opening
+  twist: 0.1989437       # reference angular shear: 1.25 / (2 * pi)
+  cap_radius: 0.001       # normalized-screen radius of the full-strength white core
+  cap_falloff: 15.0        # exponential falloff outside the core
+  dark_color_r: 0.0      # reference tunnel reaches black between noise structures
+  dark_color_g: 0.0
+  dark_color_b: 0.0
+  body_color_r: 0.0   # reference 1.25 * (0.15, 0.4, 0.9)
+  body_color_g: 0.08824
+  body_color_b: 1
+  highlight_color_r: 0.0 # reference additive white noise highlights
+  highlight_color_g: 0.2039
+  highlight_color_b: 0.9902
+  cap_color_r: 0.0       # linear HDR color of the distant additive light
+  cap_color_g: 0.2059
+  cap_color_b: 1.0
 point_lights:
   enabled: true
   clustered: true            # automatically uses brute force for small light counts

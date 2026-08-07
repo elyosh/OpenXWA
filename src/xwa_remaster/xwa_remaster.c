@@ -82,6 +82,7 @@ static struct {
 	uint64_t observed_size_since_us;
 	int force_scene_render;
 	int flight_render_suspended;
+	int hyperspace_preview_last;
 	AeronSampleCount msaa_samples;
 } g;
 
@@ -104,9 +105,7 @@ void XwaRemaster_SetHdrDesired(int want) {
 
 int XwaRemaster_GetHdrDesired(void) { return g.hdr_desired; }
 
-AeronSampleCount XwaRemaster_MsaaSampleCount(void) {
-	return g.msaa_samples;
-}
+AeronSampleCount XwaRemaster_MsaaSampleCount(void) { return g.msaa_samples; }
 
 static AeronSampleCount XwaRemaster_ToSampleCount(XwaModernMsaa msaa) {
 	switch (msaa) {
@@ -375,7 +374,7 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 		return 0;
 	}
 	Aeron_LogInfo("xwa.remaster", "HDR output: desired %s, %s (headroom %.2f)", g.hdr_desired ? "on" : "off",
-			  Aeron_OutputHdrStatusName(Aeron_OutputHdrStatus()), (double)Aeron_OutputHdrHeadroom());
+				  Aeron_OutputHdrStatusName(Aeron_OutputHdrStatus()), (double)Aeron_OutputHdrHeadroom());
 	char remaster_root[1024];
 	snprintf(remaster_root, sizeof remaster_root, "%s/remaster", Aeron_AssetRoot());
 	g.assets = XwaRemasterAssets_Create(remaster_root, options->prefer_original_2d);
@@ -409,7 +408,7 @@ static void XwaRemaster_SetViewMode(RmViewMode mode, int fade) {
 	}
 	g.mode = mode;
 	Aeron_LogInfo("xwa.remaster", "view mode: %s",
-			  g.mode == RM_VIEW_HD ? "HD" : (g.mode == RM_VIEW_SPLIT ? "SPLIT" : "CLASSIC"));
+				  g.mode == RM_VIEW_HD ? "HD" : (g.mode == RM_VIEW_SPLIT ? "SPLIT" : "CLASSIC"));
 }
 
 static void XwaRemaster_RequestViewMode(RmViewMode mode, int fade) {
@@ -467,9 +466,7 @@ static int XwaRemaster_CanPresentFlightDirect(const XwaSnapshot* snap) {
 		   XwaRemasterFlight_CanDirectPresent(g.render_pixel_width, g.render_pixel_height);
 }
 
-static void XwaRemaster_FatalGpu(const char* operation) {
-	Aeron_RequestFatalRendererError(operation);
-}
+static void XwaRemaster_FatalGpu(const char* operation) { Aeron_RequestFatalRendererError(operation); }
 
 static void XwaRemaster_UpdateRenderSize(void) {
 	int width;
@@ -548,6 +545,17 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	if (!snap) {
 		return;
 	}
+	const int hyperspace_preview = XwaRemasterFlight_HyperspaceTunnelPreviewEnabled();
+	const int hyperspace_preview_visible = hyperspace_preview && snap->scene_kind == XWA_SCENE_FLIGHT &&
+										   snap->flight_camera_valid && !snap->flight_camera.map_mode &&
+										   !snap->flight_camera.hyperspace_phase;
+	if (snap->scene_kind == XWA_SCENE_FLIGHT && snap->flight_camera_valid &&
+		(hyperspace_preview_visible || hyperspace_preview != g.hyperspace_preview_last)) {
+		/* Preview animation is host-clock driven, so render it on every host
+		 * frame and also force one ordinary frame when the override is disabled. */
+		g.force_scene_render = 1;
+	}
+	g.hyperspace_preview_last = hyperspace_preview;
 	if (g.force_scene_render && snap->scene_kind != XWA_SCENE_FLIGHT &&
 		snap->scene_kind != XWA_SCENE_CUTSCENE) {
 		g.force_scene_render = 0;
@@ -560,8 +568,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		g.last_kind = snap->scene_kind;
 		/* Cutscenes supply their opaque video independently of scene_tex; their
 		 * optional subtitle texture is not a valid transition background. */
-		if (snap->scene_kind == XWA_SCENE_CUTSCENE ||
-			(g.scene_tex && g.scene_kind == XWA_SCENE_CUTSCENE)) {
+		if (snap->scene_kind == XWA_SCENE_CUTSCENE || (g.scene_tex && g.scene_kind == XWA_SCENE_CUTSCENE)) {
 			g.scene_tex = NULL;
 			g.scene_is_direct = 0;
 		}
@@ -584,16 +591,15 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		g.flight_render_suspended = 0;
 	}
 	const int direct_present = XwaRemaster_CanPresentFlightDirect(snap);
-	const int presentation_change =
-		snap->scene_kind == XWA_SCENE_FLIGHT && g.scene_tex && g.scene_kind == XWA_SCENE_FLIGHT &&
-		direct_present != g.scene_is_direct;
+	const int presentation_change = snap->scene_kind == XWA_SCENE_FLIGHT && g.scene_tex &&
+									g.scene_kind == XWA_SCENE_FLIGHT && direct_present != g.scene_is_direct;
 	/* Flight shutdown commits once after the task has released its camera and
 	 * before the frontend callback draws its first frame. Preserve and, when
 	 * necessary, resolve the last complete flight image before its assets are
 	 * eligible for reconciliation. */
-	const int retain_invalid_flight_frame =
-		snap->scene_kind == XWA_SCENE_FLIGHT && !snap->flight_camera_valid && g.scene_tex &&
-		g.scene_kind == XWA_SCENE_FLIGHT;
+	const int retain_invalid_flight_frame = snap->scene_kind == XWA_SCENE_FLIGHT &&
+											!snap->flight_camera_valid && g.scene_tex &&
+											g.scene_kind == XWA_SCENE_FLIGHT;
 
 	/* Classic OPT and texture-model lifetimes drive HD residency. While a
 	 * settled CLASSIC flight suspends HD work, generation changes remain dirty
@@ -606,12 +612,12 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	const int process_assets_need_prepare = flight_render_needed && snap->scene_kind == XWA_SCENE_LOADING &&
 											XwaRemasterFlight_ProcessAssetsNeedPrepare();
 	const int assets_need_sync =
-		!retain_invalid_flight_frame &&
-		(frontend_assets_need_sync || ship_assets_need_sync || texture_assets_need_sync ||
-		 process_assets_need_prepare);
+		!retain_invalid_flight_frame && (frontend_assets_need_sync || ship_assets_need_sync ||
+										 texture_assets_need_sync || process_assets_need_prepare);
 	const int render_snapshot = snap->tick_index != g.last_tick || g.force_scene_render;
 	const int retain_scene_frame =
-		!render_snapshot || (snap->scene_kind == XWA_SCENE_LOADING && !XwaRemaster_SnapshotHasPresent(snap)) ||
+		!render_snapshot ||
+		(snap->scene_kind == XWA_SCENE_LOADING && !XwaRemaster_SnapshotHasPresent(snap)) ||
 		retain_invalid_flight_frame;
 	int assets_pending = 0;
 
@@ -630,9 +636,8 @@ void XwaRemaster_Frame(int32_t delta_us) {
 			ship_sync = XWA_REMASTER_SHIP_SYNC_FAILED;
 		}
 		if (ship_sync == XWA_REMASTER_SHIP_SYNC_COMPLETE && ship_assets_need_sync) {
-			ship_sync = XwaRemasterShip_SyncAssets(upload_cmd, snap,
-												  RM_ASSET_UPLOAD_BYTE_BUDGET,
-												  RM_ASSET_UPLOAD_COPY_BUDGET);
+			ship_sync = XwaRemasterShip_SyncAssets(upload_cmd, snap, RM_ASSET_UPLOAD_BYTE_BUDGET,
+												   RM_ASSET_UPLOAD_COPY_BUDGET);
 		}
 		if (ship_sync == XWA_REMASTER_SHIP_SYNC_COMPLETE) {
 			if (!XwaRemasterAssets_SyncFlightTextures(g.assets, upload_cmd, snap)) {
@@ -641,8 +646,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 				texture_assets_prepared = texture_assets_need_sync;
 			}
 			if (ship_sync == XWA_REMASTER_SHIP_SYNC_COMPLETE && process_assets_need_prepare) {
-				process_assets_prepared =
-					XwaRemasterFlight_PrepareProcessAssets(upload_cmd, g.assets);
+				process_assets_prepared = XwaRemasterFlight_PrepareProcessAssets(upload_cmd, g.assets);
 				if (!process_assets_prepared) {
 					ship_sync = XWA_REMASTER_SHIP_SYNC_FAILED;
 				}
@@ -672,12 +676,12 @@ void XwaRemaster_Frame(int32_t delta_us) {
 			XwaRemasterFlight_CommitProcessAssets();
 		}
 		if (upload_usage.staged_bytes >= 16u * 1024u * 1024u || upload_usage.copy_count >= 64u) {
-			Aeron_LogDebug("xwa.remaster",
-					  "asset upload batch: staged=%llu reserved=%llu chunks=%u copies=%u passes=%u largest=%u",
-					  (unsigned long long)upload_usage.staged_bytes,
-					  (unsigned long long)upload_usage.reserved_bytes, upload_usage.chunk_count,
-					  upload_usage.copy_count, upload_usage.copy_pass_count,
-					  upload_usage.largest_upload_bytes);
+			Aeron_LogDebug(
+				"xwa.remaster",
+				"asset upload batch: staged=%llu reserved=%llu chunks=%u copies=%u passes=%u largest=%u",
+				(unsigned long long)upload_usage.staged_bytes,
+				(unsigned long long)upload_usage.reserved_bytes, upload_usage.chunk_count,
+				upload_usage.copy_count, upload_usage.copy_pass_count, upload_usage.largest_upload_bytes);
 		}
 		if (ship_sync == XWA_REMASTER_SHIP_SYNC_MORE) {
 			assets_pending = 1;
@@ -690,7 +694,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	if (!assets_pending && flight_render_needed && (render_snapshot || presentation_change) &&
 		(!retain_scene_frame || presentation_change)) {
 		AeronTexture* next_scene_tex = g.scene_tex;
-		int next_scene_is_direct     = g.scene_is_direct;
+		int next_scene_is_direct = g.scene_is_direct;
 		int next_scene_is_tonemapped = g.scene_is_tonemapped;
 		int render_output_required = retain_scene_frame;
 		AeronCommandBuffer* cmd = Aeron_AcquireCommandBuffer();
@@ -716,7 +720,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 					Aeron_GpuDebugPush(cmd, "OpenXWA frontend reconstruction");
 					next_scene_tex =
 						XwaRemasterFrontend_Render(cmd, snap, g.assets, frontend_width, frontend_height);
-					next_scene_is_direct     = 0;
+					next_scene_is_direct = 0;
 					next_scene_is_tonemapped = 0;
 					Aeron_GpuDebugPop(cmd);
 					break;
@@ -724,27 +728,25 @@ void XwaRemaster_Frame(int32_t delta_us) {
 				case XWA_SCENE_FLIGHT:
 					render_output_required = snap->flight_camera_valid;
 					Aeron_GpuDebugPush(cmd, "OpenXWA flight renderer");
-					next_scene_tex =
-						snap->flight_camera_valid
-							? XwaRemasterFlight_Render(cmd, snap, g.assets, g.render_pixel_width,
-													   g.render_pixel_height, direct_present)
-							: NULL;
-					next_scene_is_direct =
-						next_scene_tex && XwaRemasterFlight_DirectPresentationReady();
+					next_scene_tex = snap->flight_camera_valid
+										 ? XwaRemasterFlight_Render(cmd, snap, g.assets, g.render_pixel_width,
+																	g.render_pixel_height, direct_present)
+										 : NULL;
+					next_scene_is_direct = next_scene_tex && XwaRemasterFlight_DirectPresentationReady();
 					next_scene_is_tonemapped = next_scene_tex != NULL;
 					Aeron_GpuDebugPop(cmd);
 					break;
 				case XWA_SCENE_CUTSCENE:
 					Aeron_GpuDebugPush(cmd, "OpenXWA cutscene subtitles");
-					next_scene_tex = XwaRemasterCutscene_Render(
-						cmd, snap, g.assets, g.render_pixel_width, g.render_pixel_height);
-					next_scene_is_direct     = 0;
+					next_scene_tex = XwaRemasterCutscene_Render(cmd, snap, g.assets, g.render_pixel_width,
+																g.render_pixel_height);
+					next_scene_is_direct = 0;
 					next_scene_is_tonemapped = 0;
 					Aeron_GpuDebugPop(cmd);
 					break;
 				default:
-					next_scene_tex           = NULL;
-					next_scene_is_direct     = 0;
+					next_scene_tex = NULL;
+					next_scene_is_direct = 0;
 					next_scene_is_tonemapped = 0;
 					break;
 			}
@@ -752,8 +754,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 			render_output_required = 1;
 			Aeron_GpuDebugPush(cmd, "OpenXWA flight presentation transition");
 			next_scene_tex = XwaRemasterFlight_ResolvePresentation(cmd, direct_present);
-			next_scene_is_direct =
-				next_scene_tex && XwaRemasterFlight_DirectPresentationReady();
+			next_scene_is_direct = next_scene_tex && XwaRemasterFlight_DirectPresentationReady();
 			/* Retained/transition frames are flight output: tonemapped. */
 			next_scene_is_tonemapped = next_scene_tex != NULL;
 			Aeron_GpuDebugPop(cmd);
@@ -772,10 +773,10 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		g.scene_kind = snap->scene_kind;
 		if (next_scene_is_direct != g.scene_is_direct && snap->scene_kind == XWA_SCENE_FLIGHT) {
 			Aeron_LogInfo("xwa.remaster", "flight presentation: %s (%dx%d)",
-						  next_scene_is_direct ? "direct to swapchain" : "composed",
-						  g.render_pixel_width, g.render_pixel_height);
+						  next_scene_is_direct ? "direct to swapchain" : "composed", g.render_pixel_width,
+						  g.render_pixel_height);
 		}
-		g.scene_is_direct     = next_scene_is_direct;
+		g.scene_is_direct = next_scene_is_direct;
 		g.scene_is_tonemapped = next_scene_is_tonemapped;
 		g.last_tick = snap->tick_index;
 		g.force_scene_render = 0;
@@ -834,8 +835,8 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		 * and make the texture path diverge from direct presentation
 		 * (visible when SPLIT view forces this path under HDR). The
 		 * remap is only for decoded sRGB art. */
-		.color_space = g.scene_is_tonemapped ? AERON_COLOR_SPACE_LINEAR_SRGB
-											 : AERON_COLOR_SPACE_LINEAR_DISPLAY,
+		.color_space =
+			g.scene_is_tonemapped ? AERON_COLOR_SPACE_LINEAR_SRGB : AERON_COLOR_SPACE_LINEAR_DISPLAY,
 		.tint_enabled = 1,
 		.tint_rgba = { g.ramp.alpha, g.ramp.alpha, g.ramp.alpha, g.ramp.alpha },
 	};
