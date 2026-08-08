@@ -3920,8 +3920,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	FlSceneLighting scene_lighting;
 	fl_build_scene_lighting(snap, cam, &scene_lighting);
 	float shadow_light_dir[3];
+	/* Preserve the classic directional fill inside the sealed Death Star,
+	 * but do not let its backdrop light cast exterior shadows in the tunnel. */
 	const int shadows_active =
-		s.shadows.mode == XWA_FLIGHT_SHADOWS_PCF &&
+		!cam->death_star_mode && s.shadows.mode == XWA_FLIGHT_SHADOWS_PCF &&
 		fl_key_directional_light(scene_lighting.lights, scene_lighting.light_count, shadow_light_dir);
 	if (!s.mb_enabled) {
 		uint32_t motion_reset_reasons = 0;
