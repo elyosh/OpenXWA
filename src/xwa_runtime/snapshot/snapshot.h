@@ -463,7 +463,7 @@ typedef struct XwaFlightCamera {
 	uint8_t in_hangar;        /* g_inHangarReady (hangar scene phase) */
 	/* Death Star tunnel/interior mode. Type-2006 explosion billboards
 	 * skip the 1024 projected-size clamp. */
-	uint8_t ds_hangar;
+	uint8_t death_star_mode;
 	/* Death Star tunnel turbolaser beam light (the region's
 	 * g_deathStarTunnelLaserRegions state while a beam is active —
 	 * classic: green, intensity 100000, cull 0x4000). */

@@ -3134,7 +3134,8 @@ void Player_EndFlightParticipation(int playerIdx) {
 
 		playerIff = (uint16_t)g_players[playerIdx].playerIff;
 		if (g_missionFlightRuntimeState.teamGoalStatus[playerIff][TEAM_GOAL_PRIMARY] == 1) {
-			if (!g_flightExitRequest && g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (!g_flightExitRequest &&
+				g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				g_missionFlightRuntimeState.teamGoalStatus[playerIff][TEAM_GOAL_PRIMARY] = 2;
 			}
 			if (Mission_ShouldApplyEndMissionPenalty((unsigned int)playerIdx)) {
@@ -3448,7 +3449,7 @@ void Player_UpdateParticipationState(void) {
 						if (g_objectTable[objectIndex].objectType == OBJ_None ||
 							pl->boundObjectSignature != g_objectTable[objectIndex].objectSignature) {
 							Mission_ProcessFlightGroupWaveCompletion(pl->boundFlightGroupIdx);
-							if ((g_missionHeader.body.hangar != XWA_HANGAR_SKIRMISH &&
+							if ((g_missionHeader.body.missionType != XWA_MISSION_TYPE_SKIRMISH &&
 								 !g_provingGroundsModeActive) ||
 								Player_BindToAvailableCraft(p, 0xFFFFu, 0, 0)) {
 								Player_EndFlightParticipation(p);
@@ -3795,8 +3796,8 @@ int Player_AppendKillMessageActorName(unsigned int msgSlot, char* nameBuffer, in
 						   : (team = g_missionFlightGroups[obj->flightGroupIdx].fg.team),
 		 team != playerIff) &&
 		g_missionTeams[playerIff].allies[team] == 0) {
-		if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-			g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) {
+		if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+			g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 			Hud_AppendObjectDisplayName(objIdx, 1);
 		} else {
 			Hud_AppendObjectDisplayName(objIdx, 3);

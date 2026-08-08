@@ -348,7 +348,7 @@ int MissionDebrief_Update(int frameCounter) {
 		g_frontendRightBarAnimState = 0;
 		if (g_pilotData.campaignMode) {
 			if (g_pilotData.skipMissionsRemaining &&
-				g_frontendMission->header.hangar != XWA_HANGAR_FAMILYTRANSPORT &&
+				g_frontendMission->header.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN &&
 				!g_pilotData.teamsStatistics[g_pilotData.team].isMissionCompleted &&
 				((unsigned int)g_currentMissionId < 0x31 || (unsigned int)g_currentMissionId > 0x34)) {
 				g_frontendRightBarPanelIndex = 3;
@@ -531,7 +531,7 @@ int MissionDebrief_Update(int frameCounter) {
 				g_frontendSidebarButtonRects[8].top +
 					((g_frontendSidebarButtonRects[8].bottom - g_frontendSidebarButtonRects[8].top) >> 1));
 		} else {
-			if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				musicState = MUSIC_STATE_FRONTEND_1270;
 				if (g_gameConfig.datapadMusicEnabled) {
 					Music_SetState(MUSIC_STATE_FRONTEND_1270);
@@ -562,7 +562,7 @@ int MissionDebrief_Update(int frameCounter) {
 				break;
 			case 1:
 				if (g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_SINGLEPLAYER &&
-					g_frontendMission->header.hangar == XWA_HANGAR_JUNKYARD) {
+					g_frontendMission->header.missionType == XWA_MISSION_TYPE_JUNKYARD) {
 					g_briefingTab = 1;
 				} else {
 					g_briefingTab = 0;
@@ -610,7 +610,7 @@ int MissionDebrief_Update(int frameCounter) {
 		}
 
 		if (g_pilotData.campaignMode) {
-			if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				FrontImage_RegisterResourceDefault("frontres\\family\\markoholo.bmp", "background");
 			} else {
 				FrontImage_RegisterResourceDefault("frontres\\combat\\solo.bmp", "background");
@@ -629,8 +629,8 @@ int MissionDebrief_Update(int frameCounter) {
 		if (!g_pendingAward) {
 			FrontendText_ResetGlyphScratchBuffer(20);
 			FrontendSound_PlayUISound("panelarm", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
-			if (g_frontendMission->header.hangar != XWA_HANGAR_QUICKSTART &&
-				g_frontendMission->header.hangar != XWA_HANGAR_SKIRMISH) {
+			if (g_frontendMission->header.missionType != XWA_MISSION_TYPE_QUICK_START &&
+				g_frontendMission->header.missionType != XWA_MISSION_TYPE_SKIRMISH) {
 				char parsedSep;
 				int battleNum;
 				int missionNum;
@@ -996,11 +996,11 @@ int MissionDebrief_Update(int frameCounter) {
 							g_colorLightBlue, 8, "buttonsound");
 					}
 				} else {
-					char hangar;
+					char missionType;
 
 					if (g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_SINGLEPLAYER) {
-						hangar = g_frontendMission->header.hangar;
-						if (hangar == XWA_HANGAR_JUNKYARD) {
+						missionType = g_frontendMission->header.missionType;
+						if (missionType == XWA_MISSION_TYPE_JUNKYARD) {
 							result = FrontendButton_DrawSpriteWithHoverText(
 								&scratch.rect, "back", "back",
 								(void*)FrontendString_Get(STR_BACK_TO_CONCOURSE), g_colorPaleBlue,
@@ -1029,7 +1029,7 @@ int MissionDebrief_Update(int frameCounter) {
 							g_debriefAction = 1;
 						} else {
 							g_debriefAction =
-								(g_frontendMission->header.hangar != XWA_HANGAR_JUNKYARD) ? 5 : 1;
+								(g_frontendMission->header.missionType != XWA_MISSION_TYPE_JUNKYARD) ? 5 : 1;
 						}
 						FrontendSound_PlayUISound("panelarm", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume,
 												  63);
@@ -1162,12 +1162,12 @@ int MissionDebrief_DrawMissionOverviewPage(int frameCounter) {
 	FrontendDisplay_SetScreenClipRect640x480(&rect);
 	g_debriefMissionOverviewRowCount = 0;
 	y = 111 - 15 * g_debriefMissionOverviewScrollOffset;
-	if (!g_frontendMission->header.hangar) {
+	if (!g_frontendMission->header.missionType) {
 		FrontendText_Draw(12, FrontendString_Get(STR_TIME_CAPS), 300, y, g_colorLightBlue);
 	} else {
 		FrontendText_Draw(12, FrontendString_Get(STR_SCORE_CAPS), 300, y, g_colorLightBlue);
 	}
-	if (g_frontendMission->header.hangar) {
+	if (g_frontendMission->header.missionType) {
 		FrontendText_Draw(12, FrontendString_Get(STR_KILLS_CAPS), 400, y, g_colorLightBlue);
 	}
 	FrontendText_Draw(12, FrontendString_Get(STR_DEATHS), 465, y, g_colorLightBlue);
@@ -1175,7 +1175,7 @@ int MissionDebrief_DrawMissionOverviewPage(int frameCounter) {
 	y += 15;
 
 	place = 0;
-	if (!g_frontendMission->header.hangar) {
+	if (!g_frontendMission->header.missionType) {
 		prevStat = g_pilotData.teamsStatistics[g_debriefSortedTeamIds[0]].missionTime;
 	} else {
 		prevStat = g_pilotData.teamsStatistics[g_debriefSortedTeamIds[0]].missionScore;
@@ -1186,7 +1186,7 @@ int MissionDebrief_DrawMissionOverviewPage(int frameCounter) {
 			break;
 		}
 		if (g_debriefTeamHasPlayer[g_debriefSortedTeamIds[teamLoopIndex]]) {
-			if (!g_frontendMission->header.hangar) {
+			if (!g_frontendMission->header.missionType) {
 				if (prevStat !=
 					g_pilotData.teamsStatistics[g_debriefSortedTeamIds[teamLoopIndex]].missionTime) {
 					place = teamLoopIndex;
@@ -1208,15 +1208,15 @@ int MissionDebrief_DrawMissionOverviewPage(int frameCounter) {
 				colorCode = 1;
 			}
 			if (!g_debriefRankByPilot) {
-				if (g_frontendMission->header.hangar == XWA_HANGAR_QUICKSTART ||
-					g_frontendMission->header.hangar == XWA_HANGAR_SKIRMISH) {
+				if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_QUICK_START ||
+					g_frontendMission->header.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 					sprintf(g_frontendScratchBuffer, "%c%d. %c%s", colorCode, place + 1, 1,
 							g_frontendMission->teams[g_debriefSortedTeamIds[teamLoopIndex]].name);
 					FrontendText_Draw(12, g_frontendScratchBuffer, 88, y, g_colorLightBlue);
 					sprintf(g_frontendScratchBuffer, "%d",
 							g_pilotData.teamsStatistics[g_debriefSortedTeamIds[teamLoopIndex]].missionScore);
 					FrontendText_Draw(12, g_frontendScratchBuffer, 300, y, 0xFFFF);
-					if (g_frontendMission->header.hangar) {
+					if (g_frontendMission->header.missionType) {
 						sprintf(
 							g_frontendScratchBuffer, "%d (%d)",
 							g_pilotData.teamsStatistics[g_debriefSortedTeamIds[teamLoopIndex]].kills,
@@ -1238,7 +1238,7 @@ int MissionDebrief_DrawMissionOverviewPage(int frameCounter) {
 					sprintf(g_frontendScratchBuffer, "%d",
 							g_pilotData.teamsStatistics[g_debriefSortedTeamIds[teamLoopIndex]].missionScore);
 					FrontendText_Draw(12, g_frontendScratchBuffer, 300, y, 0xFFFF);
-					if (g_frontendMission->header.hangar) {
+					if (g_frontendMission->header.missionType) {
 						sprintf(
 							g_frontendScratchBuffer, "%d (%d)",
 							g_pilotData.teamsStatistics[g_debriefSortedTeamIds[teamLoopIndex]].kills,
@@ -1271,7 +1271,7 @@ int MissionDebrief_DrawMissionOverviewPage(int frameCounter) {
 									FrontendString_Get((UIString)(g_pilotData.flightGroupRating[i] + 54)), 1,
 									g_frontendMission->flightGroups[i].name);
 							FrontendText_Draw(12, g_frontendScratchBuffer, x, y, g_colorLightBlue);
-							if (!g_frontendMission->header.hangar) {
+							if (!g_frontendMission->header.missionType) {
 								Frontend_FormatSecondsToClockString(
 									g_pilotData.teamsStatistics[g_debriefSortedTeamIds[teamLoopIndex]]
 										.missionTime);
@@ -1281,7 +1281,7 @@ int MissionDebrief_DrawMissionOverviewPage(int frameCounter) {
 											.missionScore);
 							}
 							FrontendText_Draw(12, g_frontendScratchBuffer, 300, y, 0xFFFF);
-							if (g_frontendMission->header.hangar) {
+							if (g_frontendMission->header.missionType) {
 								sprintf(
 									g_frontendScratchBuffer, "%d (%d)",
 									g_pilotData.teamsStatistics[g_debriefSortedTeamIds[teamLoopIndex]].kills,
@@ -1353,8 +1353,8 @@ int MissionDebrief_DrawMissionOverviewPage(int frameCounter) {
 						}
 						FrontendText_Draw(12, g_frontendScratchBuffer, x, y, color);
 						FrontendDisplay_SetScreenClipRect640x480(&src);
-						if (g_frontendMission->header.hangar == XWA_HANGAR_QUICKSTART ||
-							g_frontendMission->header.hangar == XWA_HANGAR_SKIRMISH) {
+						if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_QUICK_START ||
+							g_frontendMission->header.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 							if (g_debriefRankByPilot) {
 								sprintf(g_frontendScratchBuffer, "%d",
 										g_pilotData.teamsStatistics[g_debriefSortedTeamIds[teamLoopIndex]]
@@ -1363,7 +1363,7 @@ int MissionDebrief_DrawMissionOverviewPage(int frameCounter) {
 								sprintf(g_frontendScratchBuffer, "%d",
 										g_pilotData.networkPlayers[playerId].totalScore);
 							}
-						} else if (g_frontendMission->header.hangar == XWA_HANGAR_JUNKYARD) {
+						} else if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_JUNKYARD) {
 							if (g_pilotData
 									.teamsStatistics[g_frontendMission
 														 ->flightGroups[g_pilotData.networkPlayers[playerId]
@@ -1387,7 +1387,7 @@ int MissionDebrief_DrawMissionOverviewPage(int frameCounter) {
 						}
 						FrontendText_Draw(12, g_frontendScratchBuffer, 300, y, 0xFFFF);
 						if (g_debriefRankByPilot) {
-							if (g_frontendMission->header.hangar) {
+							if (g_frontendMission->header.missionType) {
 								sprintf(
 									g_frontendScratchBuffer, "%d (%d)",
 									g_pilotData.teamsStatistics[g_debriefSortedTeamIds[teamLoopIndex]].kills,
@@ -1410,7 +1410,7 @@ int MissionDebrief_DrawMissionOverviewPage(int frameCounter) {
 									g_pilotData.teamsStatistics[g_debriefSortedTeamIds[teamLoopIndex]]
 										.killsAssist);
 						} else {
-							if (g_frontendMission->header.hangar) {
+							if (g_frontendMission->header.missionType) {
 								sprintf(g_frontendScratchBuffer, "%d (%d)",
 										g_pilotData.networkPlayers[playerId].kills,
 										g_pilotData.networkPlayers[playerId].killsShared);
@@ -1588,7 +1588,7 @@ int MissionDebrief_DrawPlayerStatisticsPage(void) {
 	int sharedKills;
 	int localTeam;
 	int missionScore;
-	uint8_t hangarType;
+	uint8_t headerMissionType;
 
 	FrontendDraw_RectAssign(&rect, 65, 90, 575, 106);
 	FrontendText_DrawCentered(12, FrontendString_Get(STR_PLAYER_STATISTICS), &rect, g_colorLightBlue);
@@ -1613,20 +1613,21 @@ int MissionDebrief_DrawPlayerStatisticsPage(void) {
 		g_debriefStatsPageNeedsRebuild = 0;
 		totalRows = (g_pilotData.missionDirectoryId == 3) ? 10 : 4;
 		g_debriefStatsTotalRows = totalRows;
-		if (g_frontendMission->header.hangar) {
+		if (g_frontendMission->header.missionType) {
 			g_debriefStatsTotalRows = ++totalRows;
 		}
 		if (!g_frontendMission->header.goalsUnimportant &&
-			g_frontendMission->header.hangar != XWA_HANGAR_QUICKSTART) {
+			g_frontendMission->header.missionType != XWA_MISSION_TYPE_QUICK_START) {
 			g_debriefStatsTotalRows = ++totalRows;
 		}
 		if (sessionMode != FRONTEND_MISSION_SESSION_SINGLEPLAYER) {
 			totalRows += 5;
 			g_debriefStatsTotalRows = totalRows;
 		}
-		hangarType = g_frontendMission->header.hangar;
-		if (hangarType == XWA_HANGAR_QUICKSTART || hangarType == XWA_HANGAR_JUNKYARD ||
-			(hangarType == XWA_HANGAR_SKIRMISH && g_gameConfig.goalType == 1)) {
+		headerMissionType = g_frontendMission->header.missionType;
+		if (headerMissionType == XWA_MISSION_TYPE_QUICK_START ||
+			headerMissionType == XWA_MISSION_TYPE_JUNKYARD ||
+			(headerMissionType == XWA_MISSION_TYPE_SKIRMISH && g_gameConfig.goalType == 1)) {
 			g_debriefStatsTotalRows = ++totalRows;
 		}
 		if (g_pilotData.newPromotion) {
@@ -1747,10 +1748,10 @@ int MissionDebrief_DrawPlayerStatisticsPage(void) {
 
 	row = 0;
 	y = 111;
-	hangarType = g_frontendMission->header.hangar;
+	headerMissionType = g_frontendMission->header.missionType;
 
-	if (hangarType == XWA_HANGAR_QUICKSTART || hangarType == XWA_HANGAR_JUNKYARD ||
-		(hangarType == XWA_HANGAR_SKIRMISH && g_gameConfig.goalType == 1)) {
+	if (headerMissionType == XWA_MISSION_TYPE_QUICK_START || headerMissionType == XWA_MISSION_TYPE_JUNKYARD ||
+		(headerMissionType == XWA_MISSION_TYPE_SKIRMISH && g_gameConfig.goalType == 1)) {
 		if (row >= g_debriefStatsScrollOffset && row - g_debriefStatsScrollOffset < 21) {
 			if (g_debriefRankByPilot) {
 				sprintf(g_frontendScratchBuffer, "%c%s %c%s %c%s %c%d %c%s", 2, FrontendString_Get(STR_PLACE),
@@ -1770,7 +1771,7 @@ int MissionDebrief_DrawPlayerStatisticsPage(void) {
 	}
 
 	if (!g_frontendMission->header.goalsUnimportant &&
-		g_frontendMission->header.hangar != XWA_HANGAR_QUICKSTART) {
+		g_frontendMission->header.missionType != XWA_MISSION_TYPE_QUICK_START) {
 		if (row >= g_debriefStatsScrollOffset && row - g_debriefStatsScrollOffset < 21) {
 			if (g_missionOutcome == 2) {
 				sprintf(g_frontendScratchBuffer, "%c%s %c%s", 2, FrontendString_Get(STR_RESULT), 1,
@@ -1793,9 +1794,9 @@ int MissionDebrief_DrawPlayerStatisticsPage(void) {
 		++row;
 	}
 
-	if (g_frontendMission->header.hangar) {
+	if (g_frontendMission->header.missionType) {
 		if (row >= g_debriefStatsScrollOffset && row - g_debriefStatsScrollOffset < 21) {
-			if (g_frontendMission->header.hangar == XWA_HANGAR_SKIRMISH) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 				if (g_gameConfig.goalType == 1) {
 					missionScore = g_pilotData.missionScore;
 				} else {
@@ -2101,7 +2102,7 @@ int MissionDebrief_DrawPlayerStatisticsPage(void) {
 // FUNCTION: XWA 0x5827A0
 // Draws the debrief screen's animated left/right side panels (rightbar%d /
 // leftbar%d sprites) and, once the left bar is fully extended, the stack of tab
-// buttons. Which tabs appear depends on session mode, hangar type and the
+// buttons. Which tabs appear depends on session mode, mission type and the
 // mission outcome: Mission Overview (0), Player Statistics (1), Mission
 // Debriefing (2) and Mission Hints (3). Clicking a tab switches g_briefingTab.
 // Returns 1 once the tab buttons are drawn, 0 while the bars are still sliding.
@@ -2122,15 +2123,15 @@ int MissionDebrief_DrawTabBar(void) {
 	rightBarName[8] = (char)(g_frontendRightBarPanelIndex + '0');
 
 	if (g_frontendMissionSessionMode != FRONTEND_MISSION_SESSION_SINGLEPLAYER ||
-		g_frontendMission->header.hangar == XWA_HANGAR_QUICKSTART ||
-		g_frontendMission->header.hangar == XWA_HANGAR_SKIRMISH) {
+		g_frontendMission->header.missionType == XWA_MISSION_TYPE_QUICK_START ||
+		g_frontendMission->header.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 		showOverview = 1;
 		tabCount = 1;
 	} else {
 		showOverview = 0;
 	}
 
-	if (g_frontendMission->header.hangar != XWA_HANGAR_QUICKSTART) {
+	if (g_frontendMission->header.missionType != XWA_MISSION_TYPE_QUICK_START) {
 		showPlayerStats = 1;
 		++tabCount;
 	} else {
@@ -2490,8 +2491,8 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 			}
 
 			if (!FrontendWaveStream_IsPlaying() && g_awardCeremonyFrameCounter > 240) {
-				if (g_frontendMission->header.hangar != XWA_HANGAR_QUICKSTART &&
-					g_frontendMission->header.hangar != XWA_HANGAR_SKIRMISH) {
+				if (g_frontendMission->header.missionType != XWA_MISSION_TYPE_QUICK_START &&
+					g_frontendMission->header.missionType != XWA_MISSION_TYPE_SKIRMISH) {
 					sscanf(g_missionList[g_selectedMissionListIndex].fileName, "%d%c%d%c%d", &parsedFirst,
 						   &separator, &battleNumber, &separator, &missionNumber);
 					if (battleNumber >= 0 && battleNumber <= 99 && missionNumber >= 0 &&
@@ -2622,8 +2623,8 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 
 	if (FrontendMouse_GetLeftClick() || FrontendMouse_GetRightClick() || Keyboard_BufferContains(27) ||
 		Keyboard_BufferContains(32) || Keyboard_BufferContains(13) || Keyboard_BufferContains(8)) {
-		if (g_frontendMission->header.hangar != XWA_HANGAR_QUICKSTART &&
-			g_frontendMission->header.hangar != XWA_HANGAR_SKIRMISH) {
+		if (g_frontendMission->header.missionType != XWA_MISSION_TYPE_QUICK_START &&
+			g_frontendMission->header.missionType != XWA_MISSION_TYPE_SKIRMISH) {
 			sscanf(g_missionList[g_selectedMissionListIndex].fileName, "%d%c%d%c%d", &parsedFirst, &separator,
 				   &battleNumber, &separator, &missionNumber);
 			if (battleNumber >= 0 && battleNumber <= 99 && missionNumber >= 0 && missionNumber <= 99) {
@@ -2693,7 +2694,7 @@ int MissionDebrief_Prepare(void) {
 	g_missionOutcome = 1;
 
 	// Flag each team that fields at least one human player.
-	if (g_frontendMission->header.hangar == XWA_HANGAR_SKIRMISH) {
+	if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 		for (; i < g_frontendMission->flightGroupCount; ++i) {
 			if (g_frontendMission->flightGroups[i].playerNumber) {
 				if (!g_debriefTeamHasPlayer[g_frontendMission->flightGroups[i].team]) {
@@ -2721,7 +2722,7 @@ int MissionDebrief_Prepare(void) {
 	memset(g_debriefSortedPlayerIds, 0xFF, sizeof(g_debriefSortedPlayerIds));
 
 	// Junkyard time-trial: give active teams that never finished a sentinel time.
-	if (g_frontendMission->header.hangar == XWA_HANGAR_JUNKYARD) {
+	if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_JUNKYARD) {
 		for (i = 0; i < 10; ++i) {
 			if (g_debriefTeamHasPlayer[i] && g_pilotData.teamsStatistics[i].missionTime == 0) {
 				g_pilotData.teamsStatistics[i].missionTime = 215999;
@@ -2741,13 +2742,13 @@ int MissionDebrief_Prepare(void) {
 				g_debriefSortedTeamIds[sortIndex] = candidate;
 				break;
 			}
-			if (g_frontendMission->header.hangar == XWA_HANGAR_QUICKSTART) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_QUICK_START) {
 				if (g_pilotData.teamsStatistics[candidate].missionScore >
 					g_pilotData.teamsStatistics[existing].missionScore) {
 					g_debriefSortedTeamIds[sortIndex] = candidate;
 					candidate = existing;
 				}
-			} else if (g_frontendMission->header.hangar == XWA_HANGAR_JUNKYARD) {
+			} else if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_JUNKYARD) {
 				if (g_pilotData.teamsStatistics[existing].isMissionCompleted) {
 					if (g_pilotData.teamsStatistics[candidate].missionTime <
 						g_pilotData.teamsStatistics[existing].missionTime) {
@@ -2770,7 +2771,7 @@ int MissionDebrief_Prepare(void) {
 						candidate = existing;
 					}
 				}
-			} else if (g_frontendMission->header.hangar == XWA_HANGAR_SKIRMISH) {
+			} else if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 				if (g_gameConfig.goalType) {
 					if (g_pilotData.teamsStatistics[candidate].missionScore >
 						g_pilotData.teamsStatistics[existing].missionScore) {
@@ -2869,7 +2870,7 @@ int MissionDebrief_Prepare(void) {
 										->flightGroups[g_pilotData.networkPlayers[existing].flightGroupId]
 										.team]
 							   .isMissionCompleted != 1) {
-				if (!g_frontendMission->header.hangar) {
+				if (!g_frontendMission->header.missionType) {
 					if (g_pilotData
 							.teamsStatistics
 								[g_frontendMission
@@ -2918,7 +2919,7 @@ int MissionDebrief_Prepare(void) {
 	// Quick-start: fold AI flight groups (rank id = fg + 8) into the kills-on
 	// ranking, comparing full kills then shared kills. Player ranks use the
 	// per-player arrays; flight-group ranks use the contiguous per-fg arrays.
-	if (g_frontendMission->header.hangar == XWA_HANGAR_QUICKSTART) {
+	if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_QUICK_START) {
 		for (i = 0; i < g_frontendMission->flightGroupCount; ++i) {
 			candidate = i + 8;
 			if (!g_frontendMission->flightGroups[i].playerNumber) {
@@ -2986,7 +2987,7 @@ int MissionDebrief_Prepare(void) {
 	}
 
 	// Quick-start: fold AI flight groups into the kills-from ranking likewise.
-	if (g_frontendMission->header.hangar == XWA_HANGAR_QUICKSTART) {
+	if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_QUICK_START) {
 		for (i = 0; i < g_frontendMission->flightGroupCount; ++i) {
 			candidate = i + 8;
 			if (!g_frontendMission->flightGroups[i].playerNumber) {
@@ -3037,7 +3038,7 @@ int MissionDebrief_Prepare(void) {
 	// Rank by individual pilot when every team is a single flight group, and
 	// always for the junkyard.
 	g_debriefRankByPilot = 0;
-	if (g_frontendMission->header.hangar == XWA_HANGAR_QUICKSTART) {
+	if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_QUICK_START) {
 		for (i = 0; i < g_teamCount; ++i) {
 			if (g_teamFgCountScratch[i] > 1) {
 				break;
@@ -3046,13 +3047,13 @@ int MissionDebrief_Prepare(void) {
 		if (i == g_teamCount) {
 			g_debriefRankByPilot = 1;
 		}
-	} else if (g_frontendMission->header.hangar == XWA_HANGAR_JUNKYARD) {
+	} else if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_JUNKYARD) {
 		g_debriefRankByPilot = 1;
 	}
 
 	// Compute the mission outcome (unless goals are unimportant or quick-start).
 	if (!g_frontendMission->header.goalsUnimportant &&
-		g_frontendMission->header.hangar != XWA_HANGAR_QUICKSTART) {
+		g_frontendMission->header.missionType != XWA_MISSION_TYPE_QUICK_START) {
 		completedTeamCount = 0;
 		for (i = 0; i < 10; ++i) {
 			if (g_pilotData.teamsStatistics[i].isMissionCompleted == 1) {
@@ -3063,7 +3064,7 @@ int MissionDebrief_Prepare(void) {
 			outcome = g_pilotData.teamsStatistics[g_pilotData.team].isMissionCompleted != 0;
 		} else {
 			if (Net_GetPlayerCount() > 1) {
-				if (!g_frontendMission->header.hangar) {
+				if (!g_frontendMission->header.missionType) {
 					outcome = g_pilotData.teamsStatistics[g_pilotData.team].missionTime ==
 								  g_pilotData.teamsStatistics[g_debriefSortedTeamIds[0]].missionTime &&
 							  g_pilotData.teamsStatistics[g_pilotData.team].isMissionCompleted == 1;
@@ -3077,7 +3078,7 @@ int MissionDebrief_Prepare(void) {
 		g_missionOutcome = outcome;
 	}
 
-	if (g_missionOutcome == 1 && g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+	if (g_missionOutcome == 1 && g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		g_pilotData.emkayAnnounceNewAward = 1;
 	}
 	return 1;
@@ -3159,7 +3160,8 @@ void MissionDebrief_BuildText(char* outResults, char* outHints, int useWinText) 
 	sscanf(g_missionList[missionIndex].fileName, "%c%c%d%c%d", &fileBuffer[0], &fileBuffer[1], &firstNumber,
 		   &fileBuffer[2], &secondNumber);
 
-	if (g_pilotData.missionDirectoryId != 2 && g_frontendMission->header.hangar != XWA_HANGAR_SKIRMISH) {
+	if (g_pilotData.missionDirectoryId != 2 &&
+		g_frontendMission->header.missionType != XWA_MISSION_TYPE_SKIRMISH) {
 		File_ReadWord(stream, &fileMarker);
 		if (fileMarker == 18) {
 			if (useWinText) {
@@ -3308,7 +3310,7 @@ int MissionDebrief_DrawMissionResultsPage(void) {
 	// Suppressed for quick-start launches and missions whose goals are flagged
 	// unimportant; in that case only the shared reveal counter advances.
 	if (!g_frontendMission->header.goalsUnimportant &&
-		g_frontendMission->header.hangar != XWA_HANGAR_QUICKSTART) {
+		g_frontendMission->header.missionType != XWA_MISSION_TYPE_QUICK_START) {
 		// 'Mission Results' only for a clean single-player win (outcome 1); a loss
 		// (0) or multiplayer-other result (2) shows 'Mission Consequences'.
 		if (g_missionOutcome != 2 && g_missionOutcome == 1) {
@@ -3361,7 +3363,7 @@ int MissionDebrief_DrawMissionHintsPage(void) {
 	// Suppressed for quick-start launches and missions whose goals are flagged
 	// unimportant; in that case only the shared reveal counter advances.
 	if (!g_frontendMission->header.goalsUnimportant &&
-		g_frontendMission->header.hangar != XWA_HANGAR_QUICKSTART) {
+		g_frontendMission->header.missionType != XWA_MISSION_TYPE_QUICK_START) {
 		FrontendText_DrawCenteredReveal(12, FrontendString_Get(STR_MISSION_HINTS), &rect, g_colorLightBlue,
 										g_debriefTextRevealFrame);
 

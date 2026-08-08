@@ -101,7 +101,7 @@ char FeDiskIo_LoadFlightSfxBanks(void) {
 			strcat(fileName, "SfxBlastNew.lst");
 			fsfx_LoadSfxList(fileName, 4, waveDir);
 
-			if (g_flightPlayerCount == 1 && g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR) {
+			if (g_flightPlayerCount == 1 && g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR) {
 				strcpy(fileName, baseWaveDir);
 				strcat(fileName, "HangarSFX.lst");
 				fsfx_LoadSfxList(fileName, 139, waveDir);
@@ -120,7 +120,7 @@ char FeDiskIo_LoadFlightSfxBanks(void) {
 				result = (char)fsfx_LoadSfxList(fileName, 172, waveDir);
 			}
 
-			if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 				strcpy(fileName, baseWaveDir);
 				strcat(fileName, "DSSfx.lst");
 				return (char)fsfx_LoadSfxList(fileName, 161, waveDir);
@@ -1567,7 +1567,7 @@ void FeDiskIo_FreeGlobalBuffers(void) {
 void FeDiskIo_FreeModelResources(void) {
 	int modelType;
 	uint16_t textureModelType;
-	uint8_t hangar;
+	uint8_t missionType;
 
 	Mission_FreeObjectStorageHandles();
 	fsfx_UnloadAllEffects_Thunk();
@@ -1606,7 +1606,7 @@ void FeDiskIo_FreeModelResources(void) {
 		}
 	}
 
-	hangar = g_missionHeader.body.hangar;
+	missionType = g_missionHeader.body.missionType;
 	for (textureModelType = 0; textureModelType < OBJ_Count; ++textureModelType) {
 		uint8_t assetFlags;
 
@@ -1618,13 +1618,15 @@ void FeDiskIo_FreeModelResources(void) {
 		if ((assetFlags & MODEL_TYPE_ASSET_TEXTURE_UNLOAD_CLASS_MASK) != 0 &&
 			((assetFlags & MODEL_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 || g_provingGroundsModeActive) &&
 			(assetFlags & MODEL_TYPE_ASSET_TEXTURE_READY) != 0 &&
-			((assetFlags & MODEL_TYPE_ASSET_DEATH_STAR_ONLY) == 0 || hangar == XWA_HANGAR_DEATHSTAR) &&
-			((assetFlags & MODEL_TYPE_ASSET_NOT_DEATH_STAR) == 0 || hangar != XWA_HANGAR_DEATHSTAR) &&
+			((assetFlags & MODEL_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
+			 missionType == XWA_MISSION_TYPE_DEATH_STAR) &&
+			((assetFlags & MODEL_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
+			 missionType != XWA_MISSION_TYPE_DEATH_STAR) &&
 			(g_useHardware3D ||
 			 (g_modelTypeTable[textureModelType].flags & MODEL_TYPE_FLAG_HARDWARE_ONLY) == 0) &&
 			(assetFlags & MODEL_TYPE_ASSET_TEXTURE_DRAW) != 0) {
 			FeDiskIo_FreeTexturesForType(textureModelType);
-			hangar = g_missionHeader.body.hangar;
+			missionType = g_missionHeader.body.missionType;
 		}
 	}
 
@@ -1842,7 +1844,7 @@ static __inline void PilotData_UpdatePromotion(unsigned int missionCategory) {
 
 	if (missionCategory == 3 || missionCategory == 0 || missionCategory == 1) {
 		pilotRating = g_pilotData.pilotRating;
-		if (pilotRating < (g_missionHeader.body.hangar == XWA_HANGAR_SIMULATOR2 ? 24 : 7)) {
+		if (pilotRating < (g_missionHeader.body.missionType == XWA_MISSION_TYPE_SIMULATOR_2 ? 24 : 7)) {
 			currentPromo = g_pilotData.currentRatingPromoPoints +
 						   g_players[g_localPlayer].missionStats.ratingPromoPoints;
 			threshold = g_pilotRatingPromotionPointThresholds[pilotRating];
@@ -2056,7 +2058,7 @@ int16_t FeDiskIo_CommitFlightResults(void) {
 	int placement;
 	int margin;
 	uint8_t status1;
-	uint8_t hangar;
+	uint8_t missionType;
 	unsigned idx;
 	int i;
 
@@ -2086,23 +2088,24 @@ int16_t FeDiskIo_CommitFlightResults(void) {
 
 	campaignMode = g_pilotData.campaignMode;
 	campaignModeZero = campaignMode == 0;
-	hangar = g_missionHeader.body.hangar;
-	if (hangar == XWA_HANGAR_SIMULATOR1) {
+	missionType = g_missionHeader.body.missionType;
+	if (missionType == XWA_MISSION_TYPE_SIMULATOR_1) {
 		return 0;
 	}
-	if (hangar == XWA_HANGAR_JUNKYARD || hangar == XWA_HANGAR_SIMULATOR2) {
+	if (missionType == XWA_MISSION_TYPE_JUNKYARD || missionType == XWA_MISSION_TYPE_SIMULATOR_2) {
 		missionCategory = 3;
 		statType = 2;
-	} else if (hangar == XWA_HANGAR_MONCALCRUISER || hangar == XWA_HANGAR_DEATHSTAR) {
+	} else if (missionType == XWA_MISSION_TYPE_ALLIANCE_CAMPAIGN ||
+			   missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 		missionCategory = 0;
 		statType = campaignMode != 0 ? 0 : 2;
-	} else if (hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+	} else if (missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		missionCategory = 1;
 		statType = campaignMode != 0 ? 1 : 2;
-	} else if (hangar == XWA_HANGAR_QUICKSTART) {
+	} else if (missionType == XWA_MISSION_TYPE_QUICK_START) {
 		missionCategory = 4;
 		statType = 2;
-	} else if (hangar == XWA_HANGAR_SKIRMISH) {
+	} else if (missionType == XWA_MISSION_TYPE_SKIRMISH) {
 		missionCategory = 6;
 		statType = 2;
 	} else {
@@ -2196,8 +2199,8 @@ int16_t FeDiskIo_CommitFlightResults(void) {
 				g_players[g_localPlayer].perMissionKills.killsFullFromFlightGroup[fgIdx];
 			g_pilotData.killsSharedFromFlightGroup[fgIdx] =
 				g_players[g_localPlayer].perMissionKills.killsSharedFromFlightGroup[fgIdx];
-			if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-				g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+				g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 				int groupAI;
 				int rating;
 
@@ -3372,9 +3375,9 @@ void FeDiskIo_LoadResources(void) {
 					(assetFlags & MODEL_TYPE_ASSET_TEXTURE_UNLOAD_CLASS_MASK) != 0 &&
 					((assetFlags & MODEL_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 || g_provingGroundsModeActive) &&
 					((assetFlags & MODEL_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
-					 g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) &&
+					 g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) &&
 					((assetFlags & MODEL_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
-					 g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR)) {
+					 g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR)) {
 					matched = 1;
 					matchedAssetFlags = (uint8_t)assetFlags;
 					break;
@@ -3429,9 +3432,9 @@ void FeDiskIo_LoadResources(void) {
 						((assetFlags & MODEL_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 ||
 						 g_provingGroundsModeActive) &&
 						((assetFlags & MODEL_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
-						 g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) &&
+						 g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) &&
 						((assetFlags & MODEL_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
-						 g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR)) {
+						 g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR)) {
 						g_modelTypeTable[loadedModelType].curTexLevel = texLevel;
 						modelIndex = (uint16_t)g_modelTypeTable[loadedModelType].modelIndex;
 						g_loadedModels.byObjectType[loadedModelType] = modelHandle;
@@ -3535,11 +3538,11 @@ void FeDiskIo_LoadResources(void) {
 #endif
 
 	{
-		uint8_t hangar;
+		uint8_t missionType;
 		int modelType;
 		ModelTypeInfo* info;
 
-		hangar = g_missionHeader.body.hangar;
+		missionType = g_missionHeader.body.missionType;
 		info = g_modelTypeTable;
 		for (modelType = 0; (uint16_t)modelType < XWA_LOADED_MODEL_COUNT; ++modelType, ++info) {
 			if ((info->recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) != 0) {
@@ -3550,13 +3553,14 @@ void FeDiskIo_LoadResources(void) {
 					((assetFlags & MODEL_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 || g_provingGroundsModeActive) &&
 					(assetFlags & MODEL_TYPE_ASSET_TEXTURE_READY) != 0 &&
 					((assetFlags & MODEL_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
-					 hangar == XWA_HANGAR_DEATHSTAR) &&
-					((assetFlags & MODEL_TYPE_ASSET_NOT_DEATH_STAR) == 0 || hangar != XWA_HANGAR_DEATHSTAR) &&
+					 missionType == XWA_MISSION_TYPE_DEATH_STAR) &&
+					((assetFlags & MODEL_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
+					 missionType != XWA_MISSION_TYPE_DEATH_STAR) &&
 					(g_useHardware3D || (info->flags & MODEL_TYPE_FLAG_HARDWARE_ONLY) == 0) &&
 					(assetFlags & MODEL_TYPE_ASSET_TEXTURE_DRAW) != 0) {
 					FeDiskIo_LoadTexturesForType(modelType);
 					DebugPrintf((const char*)(uintptr_t)modelType);
-					hangar = g_missionHeader.body.hangar;
+					missionType = g_missionHeader.body.missionType;
 				}
 			}
 		}

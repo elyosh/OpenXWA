@@ -631,7 +631,7 @@ void laser_weaponsfire(void) {
 			shieldRechargeRate = 20;
 			for (scanObjIdx = g_activeRegionObjectSlotStart;
 				 (uint16_t)scanObjIdx < g_activeRegionCraftObjectSlotEnd; ++scanObjIdx) {
-				if (g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR) {
+				if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR) {
 					if (g_objectTable[(uint16_t)scanObjIdx].objectType != OBJ_None &&
 						(g_objectTable[(uint16_t)scanObjIdx].genusId == GENUS_Starship ||
 						 g_objectTable[(uint16_t)scanObjIdx].genusId == GENUS_Platform) &&

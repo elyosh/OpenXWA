@@ -779,7 +779,7 @@ int FrontendFamily_PlayEmkayVoiceLine(int allowMissionOrIdleLine) {
 	}
 
 	if (g_frontendMissionLoaded) {
-		if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+		if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 			int missionListIndex;
 			int battleNumber;
 			int missionNumber;
@@ -986,7 +986,8 @@ int FamilyTransportRoom_DrawPilotStatsPage(int statCategory) {
 
 	y = 81;
 	visibleRows = 13;
-	if (g_frontendMissionLoaded && g_frontendMission->header.hangar != XWA_HANGAR_FAMILYTRANSPORT) {
+	if (g_frontendMissionLoaded &&
+		g_frontendMission->header.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		sprintf(g_frontendScratchBuffer, "%c%s: %c%s", 2, FrontendString_Get(STR_FAMILY_ASSIGNED_TO), 1,
 				FrontendString_Get((UIString)(g_frontendMission->header.briefingLogo + 727)));
 		FrontendText_Draw(12, g_frontendScratchBuffer, 65, 81, 0xffff);
@@ -1165,7 +1166,8 @@ int FamilyTransportRoom_DrawCombatSimulatorRecordPage(int statCategory) {
 		g_combatRecordScrollOffset = 0;
 		g_frontendFamilyPageResetPending = 0;
 		g_statsPageRowCount = 18;
-		if (g_frontendMissionLoaded && g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT &&
+		if (g_frontendMissionLoaded &&
+			g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN &&
 			(unsigned int)g_currentMissionId < 7u) {
 			g_statsPageRowCount = 17;
 		}
@@ -1294,7 +1296,7 @@ int FamilyTransportRoom_DrawCombatSimulatorRecordPage(int statCategory) {
 		const char* assignment;
 
 		if (g_frontendMissionLoaded) {
-			if (g_frontendMission->header.hangar != XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				assignment = FrontendString_Get((UIString)(g_frontendMission->header.briefingLogo + 727));
 			} else if ((unsigned int)g_currentMissionId < 7u) {
 				goto draw_total_score;
@@ -1903,7 +1905,8 @@ int FamilyTransportRoom_Update(int frameCounter) {
 		}
 
 		g_frontendFamilyDetailMode = 0;
-		if (g_frontendMissionLoaded && g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+		if (g_frontendMissionLoaded &&
+			g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 			FrontendCursor_SetPos(172, 357);
 		}
 
@@ -2052,7 +2055,8 @@ int FamilyTransportRoom_Update(int frameCounter) {
 				FrontendCursor_SetImageResourceForCurrentTheme("cursor", g_cursorBitmap);
 			}
 
-			if (g_frontendMissionLoaded && g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMissionLoaded &&
+				g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				FrontendDraw_RectAssign(&rect, 103, 288, 234, 416);
 				if (FrontendDraw_PointInRect(&rect, outX, frameCounter)) {
 					FamilyTransportRoom_DrawHoverLabel(&rect, STR_FAMILY_PLAY_MISSION);

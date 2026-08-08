@@ -1795,7 +1795,7 @@ char FlightView_Render(void) {
 					int sortDepth;
 
 					sortDepth = viewZ;
-					if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+					if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 						sortDepth = 0x7fffffff;
 					}
 					RenderList_QueueObject(objectIdx, sortDepth, viewX, viewY, viewZ, cullFlags,

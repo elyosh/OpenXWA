@@ -251,9 +251,9 @@ static const char* g_builtinPlanNames[] = {
 	"followtarget3pln",
 };
 
-static const char* g_hangarNames[] = {
-	"Junkyard", "Simulator1", "Quickstart",    "Simulator2",
-	"Skirmish", "DeathStar",  "MonCalCruiser", "FamilyTransport",
+static const char* g_missionTypeNames[] = {
+	"Junkyard", "Simulator1", "QuickStart",       "Simulator2",
+	"Skirmish", "DeathStar",  "AllianceCampaign", "FamilyCampaign",
 };
 
 static const char* name_or_unknown(const char* const* names, size_t count, unsigned int value) {
@@ -319,8 +319,9 @@ static const char* plan_meaning(const char* planName) {
 	return "";
 }
 
-static const char* hangar_name(unsigned int value) {
-	return name_or_unknown(g_hangarNames, sizeof(g_hangarNames) / sizeof(g_hangarNames[0]), value);
+static const char* mission_type_name(unsigned int value) {
+	return name_or_unknown(g_missionTypeNames, sizeof(g_missionTypeNames) / sizeof(g_missionTypeNames[0]),
+						   value);
 }
 
 static const char* target_pair_op_name(unsigned int value) { return value == 1 ? "OR" : "AND"; }
@@ -749,12 +750,13 @@ static void dump_header(const MissionFile* mission) {
 	printf("Mission\n");
 	printf("  formatVersion=%d flightGroups=%u messages=%u\n", mission->formatVersion,
 		   (unsigned)mission->header.numFlightGroups, (unsigned)mission->header.numMessages);
-	printf("  hangar=%u(%s) goalsUnimportant=%u timeLimitMin=%u endWhenComplete=%u briefingOfficer=%u "
+	printf("  missionType=%u(%s) goalsUnimportant=%u timeLimitMin=%u endWhenComplete=%u briefingOfficer=%u "
 		   "briefingLogo=%u briefingOfficerEntryLine=%u secondaryVersion=%u\n",
-		   (unsigned)body->hangar, hangar_name(body->hangar), (unsigned)body->goalsUnimportant,
-		   (unsigned)body->timeLimitMin, (unsigned)body->endMissionWhenComplete,
-		   (unsigned)body->briefingOfficer, (unsigned)body->briefingLogo,
-		   (unsigned)body->briefingOfficerEntryLine, (unsigned)body->secondaryVersion);
+		   (unsigned)body->missionType, mission_type_name(body->missionType),
+		   (unsigned)body->goalsUnimportant, (unsigned)body->timeLimitMin,
+		   (unsigned)body->endMissionWhenComplete, (unsigned)body->briefingOfficer,
+		   (unsigned)body->briefingLogo, (unsigned)body->briefingOfficerEntryLine,
+		   (unsigned)body->secondaryVersion);
 	printf("  legacy: time=%u:%u winType=%u backdrop=%u rescue=%u allWayShown=%u\n",
 		   (unsigned)body->legacyTimeLimitMin, (unsigned)body->legacyTimeLimitSec,
 		   (unsigned)body->legacyWinType, (unsigned)body->legacyBackdrop, (unsigned)body->legacyRescue,

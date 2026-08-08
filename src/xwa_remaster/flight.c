@@ -2437,7 +2437,7 @@ static int fl_object_billboard_geometry(const XwaFlightObject* f, const XwaFligh
 			return 0;
 	}
 	float proj = (float)maxb * (float)base / z;
-	if (!(cam->ds_hangar && type == XWA_SNAP_TYPE_EXPLOSION_2006) && proj > 1024.0f)
+	if (!(cam->death_star_mode && type == XWA_SNAP_TYPE_EXPLOSION_2006) && proj > 1024.0f)
 		proj = 1024.0f;
 	const float ps = cam->proj_scale > 0.0f ? cam->proj_scale : 512.0f;
 	const float px2vw = z / ps;
@@ -2899,7 +2899,7 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 			f->genus == XWA_SNAP_GENUS_EXPLOSION || f->genus == XWA_SNAP_GENUS_PLAYER_PROJECTILE ||
 			f->genus == XWA_SNAP_GENUS_NPC_PROJECTILE || f->genus == XWA_SNAP_GENUS_DS_TUNNEL ||
 			f->object_type == XWA_SNAP_TYPE_DS_REACTOR ||
-			(f->object_type == XWA_SNAP_TYPE_FALCON2 && cam->ds_hangar && snap->dir_light_count == 0);
+			(f->object_type == XWA_SNAP_TYPE_FALCON2 && cam->death_star_mode && snap->dir_light_count == 0);
 		if (!gate) {
 			continue;
 		}
@@ -4002,7 +4002,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	static const float fl_world_to_cube[9] = {
 		1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f,
 	};
-	if (!cam->ds_hangar) {
+	if (!cam->death_star_mode) {
 		if (s.sky_mode == 1) {
 			/* Classic stars are one flight-viewport pixel; the HD scene
 			 * renders the same FOV at rt_h. Scaling the classic-pixel dot

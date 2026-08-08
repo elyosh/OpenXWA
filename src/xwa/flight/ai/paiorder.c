@@ -2456,7 +2456,7 @@ char paiorder_waitgootherorder(void) {
 				strcmp(planName, "caprespondldr1pln") == 0 || strcmp(planName, "disableldr1pln") == 0 ||
 				strcmp(planName, "inspectldr1pln") == 0 || strcmp(planName, "escortldr1pln") == 0 ||
 				strcmp(planName, "followtarget1pln") == 0 ||
-				(g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH &&
+				(g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH &&
 				 (strcmp(planName, "capfreeldr1pln") == 0 || strcmp(planName, "hyperspacepln") == 0))) {
 				paiorder_selectorderslot(orderSlot);
 				return 1;

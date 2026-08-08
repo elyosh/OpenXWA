@@ -923,7 +923,7 @@ uint16_t collide_lasercraftcollide(unsigned int attackerObjIdx, unsigned int tar
 	}
 
 simple_box_collision:
-	if (g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR ||
+	if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR ||
 		g_objectTable[attackerObjIdx].objectType == OBJ_DSContainer ||
 		g_objectTable[targetObjIdx].objectType == OBJ_DSContainer) {
 		MobileObject* attackerMobj;
@@ -1415,7 +1415,7 @@ void collide_applyCraftImpactBounce(unsigned int sourceObjIdx, unsigned int impa
 		(int16_t)impactSpeed > 50) {
 		impactSpeed = 50;
 	}
-	if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR && (int16_t)impactSpeed > 50) {
+	if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR && (int16_t)impactSpeed > 50) {
 		impactSpeed = 50;
 	}
 
@@ -1486,7 +1486,7 @@ void collide_applyCraftImpactBounce(unsigned int sourceObjIdx, unsigned int impa
 		impactObjIdx < g_activeRegionCraftObjectSlotEnd) {
 		g_objectTable[impactObjIdx].pitch = trig2_w_arcsin((int16_t)sourceMoveX);
 		impulse = 100 * impactSpeed;
-		if (g_provingGroundsModeActive || g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+		if (g_provingGroundsModeActive || g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 			impulse = 50 * impactSpeed;
 		}
 		if ((uint16_t)impulse >= 0x8000u) {
@@ -1543,7 +1543,7 @@ void collide_applyCraftImpactBounce(unsigned int sourceObjIdx, unsigned int impa
 	}
 
 	impulse = 100 * impactSpeed;
-	if (g_provingGroundsModeActive || g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+	if (g_provingGroundsModeActive || g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 		impulse = 50 * impactSpeed;
 	}
 	if ((uint16_t)impulse >= 0x8000u) {
@@ -3891,11 +3891,11 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 			Object_IsHostileToTeam((uint16_t)targetObjIdx, (uint16_t)g_players[g_localPlayer].playerIff)) {
 			if (ModelMesh_HasFuselage(g_objectTable[targetObjIdx].objectType) ||
 				g_objectTable[targetObjIdx].genusId == GENUS_Fighter) {
-				if (g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT)
+				if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN)
 					Music_TriggerSequence(2125, g_objectTable[targetObjIdx].regionIdx, 0);
 				else
 					Music_TriggerSequence(2105, g_objectTable[targetObjIdx].regionIdx, 0);
-			} else if (g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			} else if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				Music_TriggerSequence(2120, g_objectTable[targetObjIdx].regionIdx, 0);
 			} else {
 				Music_TriggerSequence(2100, g_objectTable[targetObjIdx].regionIdx, 0);
@@ -4046,11 +4046,11 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 		g_objectTable[targetObjIdx].playerOwnerIdx != g_localPlayer) {
 		if (ModelMesh_HasFuselage((uint16_t)g_objectTable[targetObjIdx].objectType) ||
 			!g_objectTable[targetObjIdx].genusId) {
-			if (g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT)
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN)
 				Music_TriggerSequence(2135, g_objectTable[targetObjIdx].regionIdx, 0);
 			else
 				Music_TriggerSequence(2115, g_objectTable[targetObjIdx].regionIdx, 0);
-		} else if (g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+		} else if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 			Music_TriggerSequence(2130, g_objectTable[targetObjIdx].regionIdx, 0);
 		} else {
 			Music_TriggerSequence(2110, g_objectTable[targetObjIdx].regionIdx, 0);
@@ -6367,8 +6367,8 @@ static __inline void collide_HandleTargetInspection(int playerIdx, unsigned int 
 		msg_emitCraftMessage(targetIdx, tcraft, 150);
 		fsfx_PlaySound(69, g_players[g_localPlayer].objectIndex, g_localPlayer);
 		if (goalScore && g_flightPlayerCount > 1 &&
-			(g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-			 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH)) {
+			(g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+			 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH)) {
 			g_msgArgTable[0] = (uint16_t)(maxLevel + 385);
 			msg_emitInFlightMessage(MSG_INSPECT_PLACE, g_localPlayer);
 		}
@@ -6595,7 +6595,7 @@ static __inline void collide_ApplyCraftCraftBump(unsigned int srcObjIdx, unsigne
 
 	srcSpeed = (int16_t)g_objectTable[srcObjIdx].mobj->speed;
 	candSpeed = (int16_t)g_objectTable[candObjIdx].mobj->speed;
-	if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+	if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 		srcSpeed >>= 2;
 		candSpeed >>= 2;
 	}
@@ -6649,7 +6649,7 @@ static __inline void collide_ApplyCraftCraftBump(unsigned int srcObjIdx, unsigne
 
 	candRoll = 100 * relSpeed;
 	srcRollMagnitude = 100 * relSpeed;
-	if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+	if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 		candRoll = 5 * relSpeed;
 	}
 	if ((uint16_t)candRoll >= 0x8000) {
@@ -7211,7 +7211,7 @@ void collide_collisions(void) {
 								uint16_t savedElapsed = am->velocityOverrideElapsed;
 								collide_applySurfaceRicochet(attacker, hitTarget);
 								if (!g_provingGroundsModeActive) {
-									if (g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR) {
+									if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR) {
 										collide_damagecraft(hitTarget, (unsigned int)hitComponent, attacker,
 															0, 0);
 									}

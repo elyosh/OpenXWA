@@ -939,7 +939,7 @@ int FrontendMission_LoadCurrent(void) {
 		int result;
 
 		Skirmish_InitMissionDefaults();
-		g_frontendMission->header.hangar = XWA_HANGAR_SKIRMISH;
+		g_frontendMission->header.missionType = XWA_MISSION_TYPE_SKIRMISH;
 		g_frontendMission->formatVersion = FRONTEND_MISSION_FORMAT_V18;
 		g_frontendMission->header.secondaryVersion = 98;
 		g_frontendMission->flightGroupCount = 16;
@@ -1084,7 +1084,7 @@ int FrontendMission_InitPlayerState(void) {
 		g_pilotData.regionsCount += 2;
 	}
 
-	if (!g_frontendMission->header.hangar) {
+	if (!g_frontendMission->header.missionType) {
 		if (g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_SINGLEPLAYER) {
 			g_pilotData.meleeMissionIndex = -1;
 		} else {
@@ -1095,7 +1095,7 @@ int FrontendMission_InitPlayerState(void) {
 		g_pilotData.meleeMissionIndex = 0;
 	}
 
-	if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+	if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		if ((unsigned int)g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] < 7u) {
 			g_pilotData.hangarType = 1;
 		} else {
@@ -1106,7 +1106,7 @@ int FrontendMission_InitPlayerState(void) {
 	}
 
 	if (g_pilotData.campaignMode) {
-		if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+		if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 			g_pilotData.currentFactionId = 3;
 		} else {
 			g_pilotData.currentFactionId = 0;
@@ -1127,7 +1127,7 @@ int FrontendMission_InitPlayerState(void) {
 		return NetSession_CompactReliablePeerSlotsForRoster();
 	}
 
-	if (g_frontendMission->header.hangar) {
+	if (g_frontendMission->header.missionType) {
 		g_pilotData.factionStatistics[0].team = g_pilotData.team;
 		g_pilotData.factionStatistics[0].missionDirectoryId = g_pilotData.missionDirectoryId;
 		g_pilotData.factionStatistics[0].missionDescriptionIds[g_pilotData.missionDirectoryId] =

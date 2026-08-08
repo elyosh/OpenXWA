@@ -277,7 +277,7 @@ typedef struct XWA_LEGACY_PACKED LegacyMissionHeader {
 	uint8_t allWaypointsShown;
 	uint8_t variables[8];
 	char iffNames[4][20];
-	uint8_t hangar;
+	uint8_t missionType;
 	uint8_t goalsUnimportant;
 	uint8_t missionTimeLimit;
 	uint8_t reserved[61];
@@ -528,7 +528,7 @@ int Mission_LoadFile(char* fileName) {
 					++i;
 				} while (--iffCount != 0);
 			}
-			g_missionHeader.body.hangar = legacyHeader.hangar;
+			g_missionHeader.body.missionType = legacyHeader.missionType;
 			g_missionHeader.body.goalsUnimportant = legacyHeader.goalsUnimportant;
 			g_missionHeader.body.timeLimitMin = legacyHeader.missionTimeLimit;
 		}
@@ -3228,15 +3228,15 @@ static __inline void Mission_HandlePrimaryGoalStatusChanged(int teamIdx, uint8_t
 				g_players[playerIdx].missionStats.field18 = completedTeamCount;
 				g_msgSenderIff = (uint16_t)g_players[playerIdx].iff;
 				emitComplete = 1;
-				if (g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) {
+				if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 					emitComplete =
 						g_missionFlightRuntimeState.teamGoalStatus[teamIdx][TEAM_GOAL_SECONDARY] != 1;
 				}
 
 				if (emitComplete) {
 					msg_emitInFlightMessage(MSG_MISSION_COMPLETE, playerIdx);
-					if ((g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-						 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) &&
+					if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+						 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) &&
 						g_flightPlayerCount > 1) {
 						g_msgArgTable[0] = (uint16_t)(completedTeamCount + 386);
 						msg_emitInFlightMessage(MSG_GENERAL_WIN, playerIdx);
@@ -3268,9 +3268,9 @@ static __inline void Mission_HandlePrimaryGoalStatusChanged(int teamIdx, uint8_t
 				}
 			} else {
 				g_msgArgTable[1] = (uint16_t)(completedTeamCount + 386);
-				if ((g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-					 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH ||
-					 g_missionHeader.body.hangar == XWA_HANGAR_SIMULATOR1) &&
+				if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+					 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH ||
+					 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SIMULATOR_1) &&
 					lastWinningPlayer != -1) {
 					msg_addMessagePtr(0, NetSession_GetPlayerName(lastWinningPlayer));
 					msg_emitInFlightMessage(MSG_OTHER_PLAYER_WIN, playerIdx);
@@ -3326,7 +3326,7 @@ static __inline void Mission_HandleSecondaryGoalComplete(int teamIdx) {
 			int emitLoss;
 
 			emitLoss = 1;
-			if (g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 				emitLoss = g_missionFlightRuntimeState.teamGoalStatus[teamIdx][TEAM_GOAL_PRIMARY] != 1;
 			}
 			if (emitLoss) {
@@ -3691,14 +3691,15 @@ void Mission_UpdateLogic(void) {
 						g_missionFlightRuntimeState.teamGoalStatus[teamIdx][TEAM_GOAL_SECONDARY] == 1) {
 						aggregateState = 0;
 					}
-					if (g_flightPlayerCount == 1 && g_missionHeader.body.hangar != XWA_HANGAR_SKIRMISH &&
+					if (g_flightPlayerCount == 1 &&
+						g_missionHeader.body.missionType != XWA_MISSION_TYPE_SKIRMISH &&
 						goalKind == g_flightPlayerCount && aggregateState == g_flightPlayerCount &&
 						g_missionFlightRuntimeState.teamGoalStatus[teamIdx][TEAM_GOAL_PRIMARY] == 1) {
 						g_missionFlightRuntimeState.teamGoalStatus[teamIdx][TEAM_GOAL_PRIMARY] = 2;
 					}
 					if (goalKind == 0 &&
-						(g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-						 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) &&
+						(g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+						 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) &&
 						g_missionHeader.body.goalsUnimportant) {
 						aggregateState = 0;
 					}
@@ -4541,8 +4542,8 @@ static __inline void Mission_SpawnCurrentFlightGroupAtMissionStart(void) {
 			g_missionFlightGroups[g_currentFlightGroupIdx].fg.numberOfWaves;
 		Mission_SpawnFlightGroupWaveCraft(0xFFFFu);
 	} else {
-		if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-			g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH)
+		if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+			g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH)
 			g_missionFgStats[g_currentFlightGroupIdx].wavesRemaining =
 				g_missionFlightGroups[g_currentFlightGroupIdx].fg.numberOfWaves;
 		else
@@ -5355,8 +5356,8 @@ void Mission_UpdateFlightGroupArrivals(void) {
 							g_missionFlightGroups[g_currentFlightGroupIdx].fg.numberOfWaves;
 						Mission_SpawnFlightGroupWaveCraft(0xFFFFu);
 					} else {
-						if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-							g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH)
+						if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+							g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH)
 							g_missionFgStats[g_currentFlightGroupIdx].wavesRemaining =
 								g_missionFlightGroups[g_currentFlightGroupIdx].fg.numberOfWaves;
 						else
@@ -5398,8 +5399,8 @@ short Mission_StartFlightGroupArrival(uint16_t instanceFilter) {
 		Mission_SpawnFlightGroupWaveCraft(instanceFilter);
 		return 1;
 	}
-	if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-		g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH)
+	if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+		g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH)
 		g_missionFgStats[g_currentFlightGroupIdx].wavesRemaining =
 			g_missionFlightGroups[g_currentFlightGroupIdx].fg.numberOfWaves;
 	else
@@ -5442,8 +5443,8 @@ short Mission_SpawnFlightGroupWaveCraft(uint16_t instanceFilter) {
 		g_spawnWorldZ = worldlocz;
 
 		if (missionRunning) {
-			if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-				g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+				g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 				uint8_t playerNumber = g_missionFlightGroups[g_currentFlightGroupIdx].fg.playerNumber;
 				if (playerNumber) {
 					uint8_t i;
@@ -6570,8 +6571,8 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			g_curCraft->shieldRear = 0;
 			g_curCraft->shieldDistribMode = 0;
 		}
-		if (g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH && !g_missionHeader.body.goalsUnimportant &&
-			g_spawnGenusId == GENUS_Fighter) {
+		if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH &&
+			!g_missionHeader.body.goalsUnimportant && g_spawnGenusId == GENUS_Fighter) {
 			g_curCraft->shieldFront *= 2;
 			g_curCraft->shieldRear *= 2;
 		} else if (g_spawnStatus1 == 3 || g_spawnStatus2 == 3) {
@@ -7569,14 +7570,14 @@ uint16_t Mission_Init(char* fileName) {
 				++teamIdx;
 			}
 		}
-		if ((g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-			 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) &&
+		if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+			 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) &&
 			teamIdx == 1) {
 			g_aiOpponentsEnabled = 1;
 		}
 
 		if ((g_gameConfig.craftSelection == 2 || g_gameConfig.craftSelection == 1) &&
-			g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART &&
+			g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START &&
 			g_pilotData.numHumanPlayersLastMission == 1) {
 			uint16_t sourceFgIdx;
 
@@ -7605,7 +7606,8 @@ uint16_t Mission_Init(char* fileName) {
 						g_missionFlightGroups[sourceFgIdx].fg.countermeasures;
 				}
 			}
-		} else if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART && g_gameConfig.craftSelection == 1) {
+		} else if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START &&
+				   g_gameConfig.craftSelection == 1) {
 			int ownedTeamCount;
 
 			memset(teamOwnedFg, 0, sizeof(teamOwnedFg));
@@ -7771,7 +7773,7 @@ uint16_t Mission_Init(char* fileName) {
 		}
 	}
 
-	if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART) {
+	if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START) {
 		int teamsWithoutOwnedPlayers;
 		int chosenOrdinal;
 		int chosenTeam;
@@ -7838,8 +7840,8 @@ uint16_t Mission_Init(char* fileName) {
 		}
 		if (g_missionFlightGroups[fgIdx].fg.playerNumber != 0 &&
 			(g_missionFlightGroups[fgIdx].playerOwnerIdx != -1 ||
-			 g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-			 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH)) {
+			 g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+			 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH)) {
 			if (g_playerFlightGroupWaveMode == 0) {
 				g_missionFlightGroups[fgIdx].fg.numberOfWaves = 0;
 			} else if (g_playerFlightGroupWaveMode == 2) {
@@ -7889,8 +7891,8 @@ uint16_t Mission_Init(char* fileName) {
 		}
 
 		g_missionFgStats[fgIdx].currentMissionPointRef = MISSION_MODERN_STRING_TAIL;
-		if ((g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-			 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) &&
+		if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+			 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) &&
 			g_missionFlightGroups[fgIdx].fg.playerNumber != 0) {
 			if (objectType == OBJ_TIEFighter || objectType == OBJ_TIEInterceptor ||
 				objectType == OBJ_TIEBomber || objectType == OBJ_TIEAdvanced ||
@@ -8370,8 +8372,8 @@ static __inline int Mission_ComputeKillCreditPointValue(unsigned int victimObjId
 		pointValue = 10;
 	}
 
-	if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-		g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) {
+	if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+		g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 		pointValue *= 3;
 	}
 
@@ -8699,8 +8701,8 @@ void Mission_CreditPlayerKillContribution(uint16_t victimObjIdx, int specialCarg
 				pointValue = 10;
 			}
 
-			if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-				g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+				g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 				pointValue *= 3;
 			}
 		}
@@ -8768,8 +8770,8 @@ void Mission_CreditPlayerKillContribution(uint16_t victimObjIdx, int specialCarg
 				pointValue = 10;
 			}
 
-			if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-				g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+				g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 				pointValue *= 3;
 			}
 		}
@@ -8881,8 +8883,8 @@ int Mission_CreditTeamKillContribution(uint16_t victimObjIdx, int specialCargoFl
 				killPointValue = 10;
 			}
 
-			if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-				g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+				g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 				killPointValue *= 3;
 			}
 		}

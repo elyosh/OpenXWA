@@ -226,7 +226,7 @@ int BriefingRoom_DrawMissionBriefingTextReveal(int revealRadius) {
 	int lineCount;
 
 	FrontendDraw_RectAssign(&rect, 65, 165, 575, 186);
-	if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+	if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		FrontendText_DrawCenteredReveal(12, FrontendString_Get(STR_FAMILY_MISSION_OVERVIEW), &rect,
 										g_colorLightBlue, revealRadius);
 	} else {
@@ -261,11 +261,11 @@ int BriefingRoom_DrawOrderOfBattle(FrontendRect* rect, int revealCount) {
 	int savedRevealPhase;
 	int entryIndex;
 	FrontendRect textRect;
-	uint8_t hangar;
+	uint8_t missionType;
 
 	FrontendDraw_RectCopy(&textRect, rect);
-	hangar = g_frontendMission->header.hangar;
-	if (hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+	missionType = g_frontendMission->header.missionType;
+	if (missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		strcpy(g_frontendScratchBuffer, FrontendString_Get(STR_MISSION_CRAFT));
 	} else {
 		strcpy(g_frontendScratchBuffer, FrontendString_Get(STR_ORDER_OF_BATTLE));
@@ -579,7 +579,7 @@ int BriefingRoom_Update(int frameCounter) {
 		g_frontendFirstVisibleLine = 0;
 		FrontendText_SetGlyphGradientBg(g_colorNearBlack);
 
-		if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+		if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 			FrontImage_RegisterResourceDefault("frontres\\family\\markostart.bmp", "briefstart");
 			g_briefingRoomState = BRIEFING_ROOM_PLAY_ROOM_MOVIE;
 #ifdef XWA_MODERN
@@ -666,7 +666,7 @@ int BriefingRoom_Update(int frameCounter) {
 			FrontendDisplay_DisableOffscreenRestore();
 			FrontendDisplay_UnlockBackBuffer();
 #ifdef XWA_MODERN
-			if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				if (Movie_Play("marko", 1)) {
 					g_briefingRoomState = BRIEFING_ROOM_WAIT_ROOM_MOVIE;
 					break;
@@ -683,7 +683,7 @@ int BriefingRoom_Update(int frameCounter) {
 
 		case BRIEFING_ROOM_WAIT_ROOM_MOVIE:
 #else
-			if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				Movie_Play("marko", 1);
 			} else {
 				Movie_Play("briefroom", 1);
@@ -693,7 +693,7 @@ int BriefingRoom_Update(int frameCounter) {
 			g_briefingRoomStateFrameCounter = 0;
 			g_briefingRoomRevealCount = 0;
 			FrontendDisplay_EnableOffscreenRestore();
-			if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				FrontImage_RegisterResourceDefault("frontres\\family\\markoholo.bmp", "background");
 			} else {
 				FrontImage_RegisterResourceDefault("frontres\\combat\\solo.bmp", "background");
@@ -770,7 +770,7 @@ int BriefingRoom_Update(int frameCounter) {
 						int x;
 
 						x = rand() % lineSpan + rect.left + 5;
-						if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+						if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 							FrontendDraw_LineAntialiased(x, closeBottom, 616, 338,
 														 g_textShadeRamps[3][rand() % 6]);
 						} else {
@@ -788,7 +788,7 @@ int BriefingRoom_Update(int frameCounter) {
 				FrontendDisplay_SetScreenClipRect640x480(&rect);
 			}
 
-			if (g_frontendMission->header.hangar != XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				int logoCenterX;
 				int oobLeft;
 				int titleX;

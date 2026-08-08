@@ -161,7 +161,7 @@ static __inline void BriefingMap_DrawDatapadBeams(FrontendRect* rect, int y, int
 	for (i = 0; i < count; ++i) {
 		x = (int16_t)(rand() % width + rect->left + 5);
 		if (g_pilotData.campaignMode) {
-			if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				FrontendDraw_LineAntialiased(x, (int16_t)y, 616, 338, g_textShadeRamps[3][rand() % 6]);
 			} else {
 				FrontendDraw_LineAntialiased(x, (int16_t)y, 320, 450, g_textShadeRamps[3][rand() % 6]);
@@ -185,7 +185,7 @@ static __inline void BriefingMap_DrawDatapadBeamsFromX(FrontendRect* rect, int x
 	for (i = 0; i < count; ++i) {
 		y = (int16_t)(rand() % height + rect->top + 5);
 		if (g_pilotData.campaignMode) {
-			if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				FrontendDraw_LineAntialiased((int16_t)x, y, 616, 338, g_textShadeRamps[3][rand() % 6]);
 			} else {
 				FrontendDraw_LineAntialiased((int16_t)x, y, 320, 450, g_textShadeRamps[3][rand() % 6]);
@@ -868,7 +868,7 @@ int MissionBriefing_DrawTextPage(void) {
 	FrontendRect rect;
 
 	FrontendDraw_RectAssign(&rect, 65, 90, 575, 106);
-	if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+	if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		FrontendText_DrawCenteredReveal(12, FrontendString_Get(STR_FAMILY_MISSION_OVERVIEW), &rect,
 										g_colorLightBlue, clipBottomAdjust);
 	} else {
@@ -1892,7 +1892,7 @@ int MissionBriefing_DrawPlaybackControls(void) {
 			FrontendDraw_RectOffsetXY(&dst, 64, 81);
 			dst.top = dst.bottom - 41;
 			if (g_pilotData.campaignMode) {
-				if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+				if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 					FrontImage_DrawSprite("briefbarfam", 60, 372);
 				} else {
 					FrontImage_DrawSprite("briefbartour", 60, 372);
@@ -1982,7 +1982,7 @@ int MissionBriefing_DrawPlaybackControls(void) {
 		return 0;
 	}
 
-	if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+	if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		result = FrontendButton_DrawSpriteWithHoverText(
 			&dst, "azrecord", "azrecord", (void*)FrontendString_Get(STR_FAMILY_MISSION_OVERVIEW),
 			(unsigned int)g_colorPaleBlue, (unsigned int)g_colorLightBlue, 17, "jewelsound");
@@ -2110,7 +2110,7 @@ int MissionBriefing_Update(int frameCounter) {
 		}
 
 		if (g_pilotData.campaignMode) {
-			if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				musicState = MUSIC_STATE_FRONTEND_1210;
 				if (g_gameConfig.datapadMusicEnabled) {
 					Music_SetState(MUSIC_STATE_FRONTEND_1210);
@@ -2210,7 +2210,7 @@ int MissionBriefing_Update(int frameCounter) {
 		g_skipFrontendEntryMovie = 1;
 		if (g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_SINGLEPLAYER &&
 			g_pilotData.campaignMode) {
-			if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				FrontImage_RegisterResourceDefault("frontres\\family\\markoholo.bmp", "background");
 			} else {
 				FrontImage_RegisterResourceDefault("frontres\\combat\\solo.bmp", "background");
@@ -2227,7 +2227,7 @@ int MissionBriefing_Update(int frameCounter) {
 			FrontendDraw_RectOffsetXY(&rect, 64, 81);
 			rect.top = rect.bottom - 41;
 			if (g_pilotData.campaignMode) {
-				if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+				if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 					FrontImage_DrawSprite("briefbarfam", 60, 372);
 				} else {
 					FrontImage_DrawSprite("briefbartour", 60, 372);
@@ -2666,7 +2666,7 @@ int MissionBriefing_Update(int frameCounter) {
 		FrontendDraw_RectOffsetXY(&rect, 64, 81);
 		rect.top = rect.bottom - 41;
 		if (g_pilotData.campaignMode) {
-			if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				FrontImage_DrawSprite("briefbarfam", 60, 372);
 			} else {
 				FrontImage_DrawSprite("briefbartour", 60, 372);

@@ -226,7 +226,7 @@ int Music_TriggerOutOfHyperspaceSequenceForObject(int objectIdx) {
 	ObjectRecord* obj;
 	uint16_t objectType;
 	int genusId;
-	uint8_t hangar;
+	uint8_t missionType;
 	int regionIdx;
 	uint8_t flightGroupIdx;
 	uint8_t iff;
@@ -245,9 +245,9 @@ int Music_TriggerOutOfHyperspaceSequenceForObject(int objectIdx) {
 		return Music_TriggerSequence(2140, regionIdx, 0);
 	}
 
-	hangar = g_missionHeader.body.hangar;
+	missionType = g_missionHeader.body.missionType;
 	if (iff == 0) {
-		if (hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+		if (missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 			if (ModelMesh_HasFuselage(objectType) || genusId == GENUS_Fighter) {
 				return Music_TriggerSequence(2175, regionIdx, 0);
 			}
@@ -260,7 +260,7 @@ int Music_TriggerOutOfHyperspaceSequenceForObject(int objectIdx) {
 		return Music_TriggerSequence(2150, regionIdx, 0);
 	}
 
-	if (hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+	if (missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		if (ModelMesh_HasFuselage(objectType) || genusId == GENUS_Fighter) {
 			return Music_TriggerSequence(2185, regionIdx, 0);
 		}

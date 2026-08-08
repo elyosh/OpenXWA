@@ -2594,7 +2594,7 @@ char paifight_fightershootorder(void) {
 	}
 
 	laserLinkModeHi = 0;
-	aimThreshold = g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR ? 0x0800u : 0x3000u;
+	aimThreshold = g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR ? 0x0800u : 0x3000u;
 	if (yawDelta >= aimThreshold || pitchDelta >= aimThreshold ||
 		(uint32_t)trig2_polardistance >= maxLaserRange) {
 		laserLinkMode = 0;
@@ -2697,7 +2697,7 @@ char paifight_fightershootorder(void) {
 						if (g_paiContext.aiController->hasLiveTarget != 1) {
 							goto set_laser_link_mode;
 						}
-					} else if (g_missionHeader.body.hangar != XWA_HANGAR_SKIRMISH) {
+					} else if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_SKIRMISH) {
 						goto set_laser_link_mode;
 					}
 				}
@@ -2963,7 +2963,7 @@ char paifight_fightershootorder(void) {
 						 (uint32_t)firingCraft->hullDamage >=
 							 (uint32_t)firingCraft->systemDamageHullThreshold &&
 						 !isDisablePlan) ||
-						g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+						g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 						firingCraft->warheadLauncherFlags[launcherIdx] = 3;
 					} else {
 						firstSlot =

@@ -2261,7 +2261,7 @@ void Backdrop_DrawCoordinateStrip(WorldRectRecord* worldRect) {
 
 // FUNCTION: XWA 0x405FE0
 void Backdrop_RenderCurrentRegion(void) {
-	uint8_t hangar;
+	uint8_t missionType;
 	int regionIndex;
 	unsigned int recordIdx;
 	int screenScale;
@@ -2282,8 +2282,8 @@ void Backdrop_RenderCurrentRegion(void) {
 	int* corner;
 	int cornerCount;
 
-	hangar = g_missionHeader.body.hangar;
-	if (hangar == XWA_HANGAR_DEATHSTAR) {
+	missionType = g_missionHeader.body.missionType;
+	if (missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 		return;
 	}
 
@@ -3452,7 +3452,7 @@ void SceneBillboard_RenderQueuedTextured(int drawTargetComponentMarkers) {
 				(uint16_t)entry->screenSize);
 		} else {
 			clampTo1024 = 1;
-			if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR &&
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR &&
 				objectType == OBJ_ExplosionTextureGroup2006) {
 				clampTo1024 = 0;
 			}

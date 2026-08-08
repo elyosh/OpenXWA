@@ -1361,7 +1361,7 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->map_mode = g_players[g_localPlayer].mapCameraState;
 	c->film_overlay = (uint8_t)(g_filmPlaybackMode && g_filmOverlayActive == 1);
 	c->in_hangar = (uint8_t)(g_inHangarReady != 0);
-	c->ds_hangar = (uint8_t)(g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR);
+	c->death_star_mode = (uint8_t)(g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR);
 	/* DS tunnel turbolaser beam light (FlightView_Render's direct
 	 * scene-light write; regionIdx is the tunnel-region global). */
 	c->ds_beam_active = (uint8_t)(g_deathStarTunnelLaserRegions[regionIdx].enabled &&
@@ -1474,7 +1474,7 @@ void XwaSnapshot_CaptureFlight(void) {
 			g_inHangarReady ? g_hangarSavedMissionRegionIdx : g_players[g_localPlayer].regionIndex;
 		uint32_t n = 0;
 		if (region >= 0 && region < XWA_BACKDROP_REGION_COUNT &&
-			g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR) {
+			g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR) {
 			uint32_t count = (uint32_t)g_backdropCountByRegion[region];
 			if (count > XWA_SNAP_MAX_BACKDROPS) {
 				count = XWA_SNAP_MAX_BACKDROPS;

@@ -2758,7 +2758,7 @@ int MissionSetup_LoadSkirmishFile(const char* fileName, int updateCurrentName) {
 		}
 
 		Skirmish_InitMissionDefaults();
-		g_frontendMission->header.hangar = XWA_HANGAR_SKIRMISH;
+		g_frontendMission->header.missionType = XWA_MISSION_TYPE_SKIRMISH;
 		g_frontendMission->formatVersion = 18;
 		g_frontendMission->header.secondaryVersion = 98;
 		g_frontendMission->flightGroupCount = 16;

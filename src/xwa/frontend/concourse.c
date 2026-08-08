@@ -264,7 +264,8 @@ int Concourse_PlayIdleVoice(int frameCounter) {
 	(void)frameCounter;
 
 	srand(GetTickCount());
-	if (g_frontendMissionLoaded && g_frontendMission->header.hangar != XWA_HANGAR_FAMILYTRANSPORT) {
+	if (g_frontendMissionLoaded &&
+		g_frontendMission->header.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		int missionListIndex;
 		int missionPart1;
 		int missionPart2;
@@ -381,7 +382,7 @@ int Concourse_LoadMarkoVoiceClip(void) {
 	FrontendSound_UnloadBufferByName("markovoice");
 	fileName[0] = '\0';
 	if (g_frontendMissionLoaded) {
-		if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+		if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 			int missionListIndex;
 			int missionPart1;
 			int missionPart2, missionPart3;
@@ -519,7 +520,7 @@ int Concourse_Update(int frameCounter) {
 		if (g_frontendMissionLoaded) {
 			if ((unsigned int)g_currentMissionId < 7u) {
 				FrontendCursor_SetPos(172, 357);
-			} else if (g_frontendMission->header.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			} else if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				FrontendCursor_SetPos(145, 363);
 			} else {
 				FrontendCursor_SetPos(320, 216);
@@ -735,7 +736,7 @@ int Concourse_Update(int frameCounter) {
 				if ((unsigned int)g_frontendEmailEntries[i].field00 <= (unsigned int)g_currentMissionId &&
 					!g_pilotData.emailsStatus[g_frontendEmailEntries[i].emailIndex]) {
 					g_frontendFamilyHasNewEmail = 1;
-					if (g_frontendMission->header.hangar != XWA_HANGAR_FAMILYTRANSPORT) {
+					if (g_frontendMission->header.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 						g_pilotData.emailsStatus[g_frontendEmailEntries[i].emailIndex] = 1;
 					}
 				}
@@ -878,7 +879,8 @@ int Concourse_Update(int frameCounter) {
 		FrontImage_RewindSpriteFrame("combatdoor", 0);
 	}
 
-	if (g_frontendMissionLoaded && g_frontendMission->header.hangar != XWA_HANGAR_FAMILYTRANSPORT) {
+	if (g_frontendMissionLoaded &&
+		g_frontendMission->header.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		FrontImage_GetResourceRect("tourdoor", &rect);
 		FrontendDraw_RectOffsetXY(&rect, 231, 174);
 		if (FrontendDraw_PointInRect(&rect, outX, outY)) {

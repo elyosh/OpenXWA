@@ -2440,12 +2440,12 @@ static __inline void* Hud_AllocSurface(const char* tag, uint32_t width, uint32_t
 
 static __inline void Hud_InitPlayerDisplayState(void) {
 	uint8_t goalsUnimportant;
-	uint8_t hangar;
+	uint8_t missionType;
 	PlayerData* player;
 	uint8_t* mfdEnabled;
 
 	goalsUnimportant = g_missionHeader.body.goalsUnimportant;
-	hangar = g_missionHeader.body.hangar;
+	missionType = g_missionHeader.body.missionType;
 
 	for (mfdEnabled = &g_players[0].mfd.enabled[1];
 		 mfdEnabled < &g_players[XWA_PLAYER_COUNT - 1].mfd.enabled[1] + sizeof(PlayerData);
@@ -2470,7 +2470,7 @@ static __inline void Hud_InitPlayerDisplayState(void) {
 		player->mfdCommandMenuItemCount[8] = 2;
 		player->cockpitVisible = 1;
 
-		if (hangar == XWA_HANGAR_SKIRMISH) {
+		if (missionType == XWA_MISSION_TYPE_SKIRMISH) {
 			player->mfd.page[1] = 4;
 			if (goalsUnimportant) {
 				player->mfd.page[2] = 0;
@@ -9002,8 +9002,8 @@ void Hud_UpdateTargetInfoCache(void) {
 	}
 
 	nameFlags = 3;
-	if ((g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-		 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) &&
+	if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+		 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) &&
 		g_flightPlayerCount > 1) {
 		MobileObject* targetMobj;
 
@@ -13448,8 +13448,8 @@ void Hud_DrawCmdTargetOrderLine(void) {
 	}
 
 	ai = pai_GetEffectiveAIController(craft);
-	if ((g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-		 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) &&
+	if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+		 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) &&
 		g_flightPlayerCount > 1) {
 		if (g_objectTable[(uint16_t)g_players[g_localPlayer].currentTargetObjectIdx].mobj != NULL) {
 			if (!g_flightLocatePlayersEnabled) {
@@ -14049,8 +14049,8 @@ char Hud_IsMfdPageAvailable(uint16_t playerIdx, uint8_t page) {
 	switch (page) {
 		case 0:
 			if (g_missionHeader.body.goalsUnimportant ||
-				g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-				g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH || g_provingGroundsModeActive) {
+				g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+				g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH || g_provingGroundsModeActive) {
 				result = 1;
 			} else {
 				result = 0;
@@ -16443,9 +16443,10 @@ void Mfd_DrawMessageLogPage(int mfdSide, void* mfdSurface) {
 
 	drawCount = g_messageLogTotalCount;
 	g_messageLogDrawTotalCount = drawCount;
-	if (g_missionHeader.body.hangar != XWA_HANGAR_SKIRMISH &&
-		g_missionHeader.body.hangar != XWA_HANGAR_QUICKSTART && g_missionHeader.body.hangar != 0 &&
-		drawCount != 0 && g_readyMessagePaneQueue[0].stateOrMessageId != 0xffffu) {
+	if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_SKIRMISH &&
+		g_missionHeader.body.missionType != XWA_MISSION_TYPE_QUICK_START &&
+		g_missionHeader.body.missionType != 0 && drawCount != 0 &&
+		g_readyMessagePaneQueue[0].stateOrMessageId != 0xffffu) {
 		uint8_t readyClockTick;
 		uint8_t readyClockMinute;
 		uint8_t readyClockHour;
@@ -16784,8 +16785,8 @@ void Mfd_DrawMissionScoreboardPage(int mfdSide, void* mfdSurface) {
 	paneWidth = (uint16_t)(maxNameWidth + FlightText_MeasureStringWidth(g_flightTextScratchBuffer));
 	activePlayerCount = g_activeFlightPlayerCount;
 
-	if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-		g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) {
+	if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+		g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 		int fgIdx;
 
 		memset(teamMarkers, 0, sizeof(teamMarkers));
@@ -16863,8 +16864,8 @@ void Mfd_DrawMissionScoreboardPage(int mfdSide, void* mfdSurface) {
 	}
 
 	FlightText_SetCursor(0, 0);
-	if ((g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-		 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) &&
+	if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+		 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) &&
 		playerFgCountByTeam[(uint16_t)g_players[g_localPlayer].playerIff] > 1) {
 		FlightText_DrawString(g_strOverlayStrings[10]);
 	} else {
@@ -16887,8 +16888,8 @@ void Mfd_DrawMissionScoreboardPage(int mfdSide, void* mfdSurface) {
 	lastVisibleExclusive = paneHeight / (uint16_t)lineStep + g_mfdMissionScoreboardFirstVisibleRow - 1;
 
 	rowY = bodyY;
-	if (g_missionHeader.body.hangar != XWA_HANGAR_QUICKSTART &&
-		g_missionHeader.body.hangar != XWA_HANGAR_SKIRMISH) {
+	if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_QUICK_START &&
+		g_missionHeader.body.missionType != XWA_MISSION_TYPE_SKIRMISH) {
 		int16_t connectedCount;
 
 		connectedCount = 0;
@@ -18901,7 +18902,8 @@ void Mfd_DrawFilmRightOptionsPage(void) {
 						FlightText_DrawString(g_strFilmOptions[0]);
 					}
 				} else {
-					if ((g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR || g_provingGroundsModeActive) &&
+					if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR ||
+						 g_provingGroundsModeActive) &&
 						g_filmOverlayViewState.cameraFocusObjIdx != 0xffff && optionIndex > 1 &&
 						optionIndex < 8) {
 						FlightText_SetColor(0x41u);
@@ -18922,7 +18924,8 @@ void Mfd_DrawFilmRightOptionsPage(void) {
 						FlightText_DrawString(g_strFilmOptions[1]);
 					}
 				} else {
-					if ((g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR || g_provingGroundsModeActive) &&
+					if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR ||
+						 g_provingGroundsModeActive) &&
 						g_filmOverlayViewState.cameraFocusObjIdx != 0xffff && optionIndex > 1 &&
 						optionIndex < 8) {
 						FlightText_SetColor(0x41u);
@@ -20281,8 +20284,8 @@ void Mfd_DrawCommandObjectOrderLine(unsigned int objectIdx, int unused, int16_t 
 	craft = g_objectTable[objectIdx].mobj->pCraft;
 	ai = pai_GetEffectiveAIController(craft);
 
-	if ((g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-		 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) &&
+	if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+		 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) &&
 		g_flightPlayerCount > 1) {
 		uint16_t currentTargetObjectIdx;
 

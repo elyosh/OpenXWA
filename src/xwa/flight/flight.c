@@ -1017,14 +1017,14 @@ void Flight_UpdateDynamicMusicState(void) {
 			selectedState = MUSIC_STATE_COMBAT_STEADY;
 		}
 	} else if (g_playerFlightTransientTimers[localPlayerIdx].missionLossMusicTimer) {
-		selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
+		selectedState = g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
 							? MUSIC_STATE_MISSION_LOSS_ALT
 							: MUSIC_STATE_1155;
 		if (g_currentMusicState != selectedState) {
 			DebugPrintfChannel(256, "Music state set to %d, Mission Loss.\n", selectedState);
 		}
 	} else if (g_playerFlightTransientTimers[localPlayerIdx].missionSuccessMusicTimer) {
-		selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
+		selectedState = g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
 							? MUSIC_STATE_MISSION_SUCCESS_ALT
 							: MUSIC_STATE_MISSION_SUCCESS;
 		if (g_currentMusicState != selectedState) {
@@ -1092,7 +1092,7 @@ void Flight_UpdateDynamicMusicState(void) {
 		localPlayerIff = (uint16_t)g_players[localPlayerIdx].playerIff;
 		if (nearestHostileObjIdx == 0xffff) {
 			if (g_missionFlightRuntimeState.teamGoalStatus[localPlayerIff][TEAM_GOAL_PRIMARY] == 1) {
-				selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
+				selectedState = g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
 									? MUSIC_STATE_NO_ENEMIES_CALM_ALT
 									: MUSIC_STATE_NO_ENEMIES_CALM;
 				if (g_currentMusicState != selectedState) {
@@ -1100,14 +1100,14 @@ void Flight_UpdateDynamicMusicState(void) {
 									   selectedState);
 				}
 			} else if (!g_musicCombatSeen) {
-				selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
+				selectedState = g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
 									? MUSIC_STATE_NO_ENEMIES_INTRO_ALT
 									: MUSIC_STATE_NO_ENEMIES_INTRO;
 				if (g_currentMusicState != selectedState) {
 					DebugPrintfChannel(256, "Music state set to %d, Intro, no enemies.\n", selectedState);
 				}
 			} else {
-				selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
+				selectedState = g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
 									? MUSIC_STATE_NO_ENEMIES_CALM_ALT
 									: MUSIC_STATE_NO_ENEMIES_CALM;
 				if (g_currentMusicState != selectedState) {
@@ -1118,7 +1118,7 @@ void Flight_UpdateDynamicMusicState(void) {
 			engagementRangeThreshold = g_musicCombatSeen ? 0x100000u : 0x80000u;
 			if (nearestHostileRangeScore > engagementRangeThreshold &&
 				nearestHeavyHostileRangeScore > engagementRangeThreshold) {
-				selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
+				selectedState = g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
 									? MUSIC_STATE_NO_ENEMIES_INTRO_ALT
 									: MUSIC_STATE_NO_ENEMIES_INTRO;
 				if (g_currentMusicState != selectedState) {
@@ -1139,7 +1139,7 @@ void Flight_UpdateDynamicMusicState(void) {
 				}
 
 				if (warheadObjIdx != g_projectileObjectSlotEnd) {
-					selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
+					selectedState = g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
 										? MUSIC_STATE_PANIC_ALT
 										: MUSIC_STATE_PANIC;
 					if (g_currentMusicState != selectedState) {
@@ -1213,17 +1213,19 @@ void Flight_UpdateDynamicMusicState(void) {
 						if (shieldTotal < 1000 &&
 							(uint32_t)playerCraft->hullDamage <
 								MATH2_longfraction((uint32_t)playerCraft->hullMax, 0x8000u)) {
-							selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
-												? MUSIC_STATE_PANIC_ALT
-												: MUSIC_STATE_PANIC;
+							selectedState =
+								g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
+									? MUSIC_STATE_PANIC_ALT
+									: MUSIC_STATE_PANIC;
 							if (g_currentMusicState != selectedState) {
 								DebugPrintfChannel(256, "Music state set to %d, Almost dead: panic!\n",
 												   selectedState);
 							}
 						} else if (nearestHeavyHostileRangeScore < 0x8000u) {
-							selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
-												? MUSIC_STATE_PANIC_ALT
-												: MUSIC_STATE_PANIC;
+							selectedState =
+								g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
+									? MUSIC_STATE_PANIC_ALT
+									: MUSIC_STATE_PANIC;
 							if (g_currentMusicState != selectedState) {
 								DebugPrintfChannel(256, "Music state set to %d, Starship: panic!\n",
 												   selectedState);
@@ -1235,17 +1237,19 @@ void Flight_UpdateDynamicMusicState(void) {
 										 .teamGoalStatus[localPlayerIff][TEAM_GOAL_PRIMARY] != 2) &&
 								g_missionFlightRuntimeState
 										.teamGoalStatus[localPlayerIff][TEAM_GOAL_SECONDARY] != 1) {
-								selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
-													? MUSIC_STATE_CLIMAX
-													: MUSIC_STATE_1145;
+								selectedState =
+									g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
+										? MUSIC_STATE_CLIMAX
+										: MUSIC_STATE_1145;
 								if (g_currentMusicState != selectedState) {
 									DebugPrintfChannel(256, "Music state set to %d, Climax.\n",
 													   selectedState);
 								}
 							} else if (sideStrength[0] >= sideStrength[1]) {
-								selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
-													? MUSIC_STATE_COMBAT_ACTIVE_ALT
-													: MUSIC_STATE_COMBAT_ACTIVE;
+								selectedState =
+									g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
+										? MUSIC_STATE_COMBAT_ACTIVE_ALT
+										: MUSIC_STATE_COMBAT_ACTIVE;
 								if (g_currentMusicState != selectedState) {
 									DebugPrintfChannel(256,
 													   "Music state set to %d, outnumbering, confident.\n",
@@ -1257,27 +1261,30 @@ void Flight_UpdateDynamicMusicState(void) {
 								friendlyHostileRatioQ16 =
 									(uint16_t)MATH2_divide(sideStrength[0], sideStrength[1]);
 								if (friendlyHostileRatioQ16 >= 0xe000u) {
-									selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
-														? MUSIC_STATE_COMBAT_ACTIVE_ALT
-														: MUSIC_STATE_COMBAT_ACTIVE;
+									selectedState =
+										g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
+											? MUSIC_STATE_COMBAT_ACTIVE_ALT
+											: MUSIC_STATE_COMBAT_ACTIVE;
 									if (g_currentMusicState != selectedState) {
 										DebugPrintfChannel(
 											256, "Music state set to %d, not good, but confident.\n",
 											selectedState);
 									}
 								} else if (friendlyHostileRatioQ16 >= 0x8000u) {
-									selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
-														? MUSIC_STATE_COMBAT_STEADY_ALT
-														: MUSIC_STATE_COMBAT_STEADY;
+									selectedState =
+										g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
+											? MUSIC_STATE_COMBAT_STEADY_ALT
+											: MUSIC_STATE_COMBAT_STEADY;
 									if (g_currentMusicState != selectedState) {
 										DebugPrintfChannel(
 											256, "Music state set to %d, outnumbered, challenged.\n",
 											selectedState);
 									}
 								} else {
-									selectedState = g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT
-														? MUSIC_STATE_PANIC_ALT
-														: MUSIC_STATE_PANIC;
+									selectedState =
+										g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN
+											? MUSIC_STATE_PANIC_ALT
+											: MUSIC_STATE_PANIC;
 									if (g_currentMusicState != selectedState) {
 										DebugPrintfChannel(
 											256, "Music state set to %d, way outnumbered.  Aaaaa!\n",
@@ -1303,7 +1310,7 @@ void Flight_UpdateDynamicMusicState(void) {
 			 g_currentMusicState == MUSIC_STATE_NO_ENEMIES_INTRO_ALT) &&
 			(g_selectedMusicState == MUSIC_STATE_CONFLICT || g_selectedMusicState == MUSIC_STATE_1115 ||
 			 g_selectedMusicState == MUSIC_STATE_1120)) {
-			if (g_missionHeader.body.hangar == XWA_HANGAR_FAMILYTRANSPORT) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				Music_TriggerSequence(2205, g_players[g_localPlayer].regionIndex, 2);
 			} else {
 				Music_TriggerSequence(2200, g_players[g_localPlayer].regionIndex, 2);
@@ -4413,7 +4420,7 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 				if (g_players[playerIdx].hyperspaceRuntime.targetRegionOrMode == 4) {
 					// targetRegionOrMode == 4: the craft departs the mission entirely.
 					Mission_RecordCraftOutcome(playerObjIdx, flightGroupIdx, 0x11u);
-					if (g_missionHeader.body.hangar != XWA_HANGAR_QUICKSTART &&
+					if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_QUICK_START &&
 						g_playerFlightGroupWaveMode == 1 &&
 						g_missionFlightGroups[flightGroupIdx].fg.numberOfWaves != 99 &&
 						(uint16_t)GetModelIndexFromType(g_objectTable[playerObjIdx].objectType) != 0xFFFF) {
@@ -4437,7 +4444,7 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					}
 					Mission_ProcessFlightGroupWaveCompletion(flightGroupIdx);
 
-					if (g_missionHeader.body.hangar != XWA_HANGAR_SKIRMISH ||
+					if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_SKIRMISH ||
 						Player_BindToAvailableCraft(playerIdx, 0xFFFFu, 0, 0) != 0) {
 						// Non-skirmish, or skirmish with no craft left.
 						Player_EndFlightParticipation(playerIdx);
@@ -5963,7 +5970,7 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 						g_worldStateDupBuffer = NULL;
 					}
 
-					if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+					if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 						DeathStar_WriteFilmStateBlock();
 					}
 					Hangar_FilmWriteSceneObjectState();
@@ -6085,7 +6092,7 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 				g_worldStateDupBuffer = NULL;
 			}
 
-			if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 				DeathStar_ReadFilmStateBlock();
 			}
 			Hangar_FilmReadSceneObjectState();
@@ -6546,8 +6553,9 @@ int Pause_ProcessInput(void) {
 				return 1;
 			}
 			Hud_MarkFilmOverlayElementsVisible();
-			if (g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR &&
-				g_missionHeader.body.hangar != XWA_HANGAR_SIMULATOR2 && g_missionHeader.body.hangar != 0) {
+			if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR &&
+				g_missionHeader.body.missionType != XWA_MISSION_TYPE_SIMULATOR_2 &&
+				g_missionHeader.body.missionType != 0) {
 				if (g_filmOverlayViewState.cameraFocusObjIdx == 0xffff) {
 					g_filmOverlayViewState.cameraFocusObjIdx = g_players[g_localPlayer].objectIndex;
 					if (g_filmOverlayViewState.cameraFocusObjIdx != 0xffff) {
@@ -6570,7 +6578,8 @@ int Pause_ProcessInput(void) {
 			if (g_filmOverlayActive != 1) {
 				return 1;
 			}
-			if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR || g_provingGroundsModeActive) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR ||
+				g_provingGroundsModeActive) {
 				break;
 			}
 			Hud_MarkFilmOverlayElementsVisible();
@@ -6605,7 +6614,8 @@ int Pause_ProcessInput(void) {
 			if (g_filmOverlayActive != 1) {
 				return 1;
 			}
-			if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR || g_provingGroundsModeActive) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR ||
+				g_provingGroundsModeActive) {
 				break;
 			}
 			Hud_MarkFilmOverlayElementsVisible();
@@ -6929,9 +6939,9 @@ int Flight_CheckMissionEndAndExitRequest(void) {
 			return (uint8_t)g_flightMissionEndPending;
 		}
 
-		if (g_missionHeader.body.hangar != XWA_HANGAR_QUICKSTART &&
-			g_missionHeader.body.hangar != XWA_HANGAR_SKIRMISH &&
-			g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR) {
+		if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_QUICK_START &&
+			g_missionHeader.body.missionType != XWA_MISSION_TYPE_SKIRMISH &&
+			g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR) {
 			{
 				unsigned missionDescriptionId = (unsigned)g_pilotData.missionDescriptionIds[4];
 				int campaignMode = g_pilotData.campaignMode;
@@ -6981,7 +6991,7 @@ int Flight_CheckMissionEndAndExitRequest(void) {
 			return (uint8_t)g_flightMissionEndPending;
 		}
 
-		if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR &&
+		if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR &&
 			g_missionFlightRuntimeState
 					.teamGoalStatus[(uint16_t)g_players[g_localPlayer].playerIff][TEAM_GOAL_PRIMARY] != 1) {
 			g_flightExitRequest = 2;
@@ -7068,7 +7078,7 @@ void Flight_UpdateTimers(void) {
 
 	if (g_missionElapsedClock.subsecondTicks <= 0) {
 		unsigned int localPlayerIdx;
-		uint8_t hangar;
+		uint8_t missionType;
 		int8_t countdownTick;
 		int completedChallengeOrSkirmishGoal;
 		int imposeTimeLimitMessage;
@@ -7087,7 +7097,7 @@ void Flight_UpdateTimers(void) {
 		}
 
 		localPlayerIdx = (unsigned int)g_localPlayer;
-		hangar = g_missionHeader.body.hangar;
+		missionType = g_missionHeader.body.missionType;
 
 		if (g_missionCountdownClock.minutes || g_missionCountdownClock.seconds) {
 			countdownTick = (int8_t)(g_missionCountdownClock.seconds - 1u);
@@ -7112,8 +7122,8 @@ void Flight_UpdateTimers(void) {
 				}
 
 				g_flightMissionEndPending = 1;
-				if (hangar != XWA_HANGAR_QUICKSTART && hangar != XWA_HANGAR_SKIRMISH &&
-					hangar != XWA_HANGAR_DEATHSTAR &&
+				if (missionType != XWA_MISSION_TYPE_QUICK_START && missionType != XWA_MISSION_TYPE_SKIRMISH &&
+					missionType != XWA_MISSION_TYPE_DEATH_STAR &&
 					g_missionFlightRuntimeState.teamGoalStatus[(uint16_t)g_players[localPlayerIdx].playerIff]
 															  [TEAM_GOAL_PRIMARY] != 1) {
 					g_missionFlightRuntimeState
@@ -7167,9 +7177,9 @@ void Flight_UpdateTimers(void) {
 			}
 		}
 
-		if (g_missionHeader.body.hangar != XWA_HANGAR_QUICKSTART &&
-			g_missionHeader.body.hangar != XWA_HANGAR_JUNKYARD &&
-			g_missionHeader.body.hangar != XWA_HANGAR_SKIRMISH &&
+		if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_QUICK_START &&
+			g_missionHeader.body.missionType != XWA_MISSION_TYPE_JUNKYARD &&
+			g_missionHeader.body.missionType != XWA_MISSION_TYPE_SKIRMISH &&
 			g_missionFlightRuntimeState.teamGoalStatus[0][TEAM_GOAL_PRIMARY] == 1 &&
 			g_missionFlightRuntimeState.teamGoalStatus[0][TEAM_GOAL_SECONDARY] == 0 &&
 			g_missionHeader.body.endMissionWhenComplete && !g_teamVictoryTimeLimitStarted) {
@@ -7206,7 +7216,7 @@ void Flight_UpdateTimers(void) {
 
 		imposeTimeLimitMessage = 0;
 		if (g_flightPlayerCount > 1 && g_teamVictoryTimeLimitMinutes && !g_teamVictoryTimeLimitStarted &&
-			(g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH || g_provingGroundsModeActive)) {
+			(g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH || g_provingGroundsModeActive)) {
 			if ((uint8_t)g_missionCountdownClock.minutes > g_teamVictoryTimeLimitMinutes ||
 				(g_missionCountdownClock.minutes == 0 && g_missionCountdownClock.seconds == 0)) {
 				uint8_t presentTeams[10];
@@ -7220,7 +7230,7 @@ void Flight_UpdateTimers(void) {
 					}
 				}
 
-				if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART) {
+				if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START) {
 					uint32_t objectIdx;
 
 					for (objectIdx = 0; objectIdx < g_objectTableSlotCount; ++objectIdx) {
@@ -7244,8 +7254,8 @@ void Flight_UpdateTimers(void) {
 				}
 
 				if (presentTeamCount == 1 &&
-					(g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-					 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) &&
+					(g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+					 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) &&
 					(g_missionFlightRuntimeState.teamGoalStatus[presentTeamIdx][TEAM_GOAL_PRIMARY] == 1 ||
 					 g_missionFlightRuntimeState.teamGoalStatus[presentTeamIdx][TEAM_GOAL_PRIMARY] == 2 ||
 					 g_missionFlightRuntimeState.teamGoalStatus[presentTeamIdx][TEAM_GOAL_SECONDARY] == 1)) {
@@ -8560,7 +8570,7 @@ static __inline void FlightAction_ConfirmPendingAction(unsigned int playerIdx, C
 						}
 						if (g_missionFlightRuntimeState.teamGoalStatus[team][TEAM_GOAL_PRIMARY] != 1) {
 							g_flightExitRequest = 1;
-							if (g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH &&
+							if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH &&
 								g_missionHeader.body.goalsUnimportant &&
 								g_pilotData.numHumanPlayersLastMission == 1) {
 								g_missionFlightRuntimeState.teamScores[TEAM_SCORE_MISSION][team] -= 2000;
@@ -8588,7 +8598,7 @@ static __inline void FlightAction_ConfirmPendingAction(unsigned int playerIdx, C
 						msg_addMessagePtr(0, NetSession_GetPlayerName((int)playerIdx));
 						msg_emitInFlightMessage(MSG_PLAYER_QUIT, g_localPlayer);
 					}
-					if (g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH &&
+					if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH &&
 						g_missionHeader.body.goalsUnimportant &&
 						g_pilotData.numHumanPlayersLastMission == 1) {
 						int team = (uint16_t)player->playerIff;
@@ -8942,8 +8952,8 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 				break;
 			case KEY_J:
 				if (!g_flightSimSideEffectsSuppressed &&
-					(g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-					 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH)) {
+					(g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+					 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH)) {
 					if (g_flightCraftJumpingEnabled) {
 						uint16_t oldObjIdx = objIdx;
 						if (Player_UnbindFromCurrentCraft((int)currentPlayerIdx, 1, 1)) {
@@ -9617,7 +9627,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			FlightAction_CycleTargetComponent(currentPlayerIdx, -1);
 			return;
 		case KEY_SHIFT_A:
-			if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 				return;
 			}
 			if (!FlightAction_HasCommandSystem(currentPlayerIdx, craft)) {
@@ -9635,7 +9645,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			}
 			return;
 		case KEY_SHIFT_E:
-			if (g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR) {
+			if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR) {
 				Player_HandleEvadeCommand((int)currentPlayerIdx, 0xffff);
 			}
 			return;
@@ -9643,7 +9653,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			FlightAction_ToggleFilmRecording(currentPlayerIdx);
 			return;
 		case KEY_SHIFT_G:
-			if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 				return;
 			}
 			if (!FlightAction_HasCommandSystem(currentPlayerIdx, craft)) {
@@ -9653,7 +9663,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			FlightAction_CommandTargetGo(currentPlayerIdx);
 			return;
 		case KEY_SHIFT_H:
-			if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 				return;
 			}
 			if (!FlightAction_HasCommandSystem(currentPlayerIdx, craft)) {
@@ -9687,7 +9697,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			}
 			return;
 		case KEY_SHIFT_I:
-			if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 				return;
 			}
 			if (!FlightAction_HasCommandSystem(currentPlayerIdx, craft)) {
@@ -9738,7 +9748,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			Player_HandleReportInCommand((int)currentPlayerIdx, 0xffff);
 			return;
 		case KEY_SHIFT_W:
-			if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+			if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 				return;
 			}
 			if (!FlightAction_HasCommandSystem(currentPlayerIdx, craft)) {
@@ -9772,7 +9782,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			return;
 		case KEY_M:
 			if (!g_flightSimSideEffectsSuppressed && !g_provingGroundsModeActive &&
-				g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR &&
+				g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR &&
 				!g_players[currentPlayerIdx].hasCheckpointFlag &&
 				g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 1 &&
 				!FlightAction_HasCheckpointPartner(currentPlayerIdx) &&
@@ -9862,7 +9872,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			return;
 		case KEY_Q:
 			if (g_players[currentPlayerIdx].connectedFlag == 1) {
-				if ((g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH &&
+				if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH &&
 					 g_missionHeader.body.goalsUnimportant && g_pilotData.numHumanPlayersLastMission == 1 &&
 					 g_missionFlightRuntimeState.teamGoalStatus[(uint16_t)g_players[currentPlayerIdx]
 																	.playerIff][TEAM_GOAL_PRIMARY] != 1) ||
@@ -10335,7 +10345,7 @@ static __inline int Flight_UpdateEntity_OpenOptions(unsigned int playerIdx) {
 			msg_addMessagePtr(0, NetSession_GetPlayerName((int)g_flightOptionsModalPlayerIdx));
 			msg_emitInFlightMessage(MSG_PLAYER_QUIT, g_localPlayer);
 		}
-		if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART &&
+		if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START &&
 			g_pilotData.numHumanPlayersLastMission == 1) {
 			int playerIff = (uint16_t)g_players[g_flightOptionsModalPlayerIdx].playerIff;
 			if (g_missionFlightRuntimeState.teamGoalStatus[playerIff][TEAM_GOAL_PRIMARY] != 1) {
@@ -10727,7 +10737,7 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 								msg_addMessagePtr(0, NetSession_GetPlayerName((int)playerIdx));
 								msg_emitInFlightMessage(MSG_PLAYER_QUIT, g_localPlayer);
 							}
-							if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART &&
+							if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START &&
 								g_pilotData.numHumanPlayersLastMission == 1) {
 								int playerIff = (uint16_t)g_players[playerIdx].playerIff;
 								if (g_missionFlightRuntimeState
@@ -11007,7 +11017,7 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 			int partner;
 
 			Mission_ProcessFlightGroupWaveCompletion(g_players[playerIdx].boundFlightGroupIdx);
-			if (g_missionHeader.body.hangar != XWA_HANGAR_SKIRMISH ||
+			if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_SKIRMISH ||
 				Player_BindToAvailableCraft(playerIdx, 0xffffu, 0, 0)) {
 				Player_EndFlightParticipation((int)playerIdx);
 				if (playerIdx != (unsigned int)g_localPlayer) {

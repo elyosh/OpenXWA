@@ -521,8 +521,8 @@ void FlightLight_AppendScenePointLightForObject(ObjectRecord* obj) {
 		(obj->genusId == GENUS_Explosion || obj->genusId == GENUS_PlayerProjectile ||
 		 obj->genusId == GENUS_NpcProjectile || obj->genusId == GENUS_DeathStarTunnelSegment ||
 		 objectType == OBJ_DSReactorCylinder ||
-		 (objectType == OBJ_MilleniumFalcon2 && g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR &&
-		  !g_dirLightCount) ||
+		 (objectType == OBJ_MilleniumFalcon2 &&
+		  g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR && !g_dirLightCount) ||
 		 (g_inHangarReady && (objectType == OBJ_HangarDroid || objectType == OBJ_HangarDroid2 ||
 							  objectType == OBJ_Shuttle || objectType == OBJ_HangarRoofCrane)))) {
 		int lightIdx;

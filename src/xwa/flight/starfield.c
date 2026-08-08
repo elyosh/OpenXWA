@@ -170,7 +170,7 @@ void FlightStarfield_Init(void) {
 	StarfieldPolarCoord polar;
 	int i;
 
-	if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+	if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 		return;
 	}
 
@@ -439,7 +439,7 @@ void FlightStarfield_Render(void) {
 	int camForwardY;
 	StarfieldScreenCoord screenXY;
 
-	if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+	if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 		return;
 	}
 

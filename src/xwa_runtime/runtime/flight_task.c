@@ -502,9 +502,10 @@ static int XwaFlightTask_ShouldSkipHangarReady(void) {
 		missionDesc = g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId];
 		return missionDesc == 50 || missionDesc == 51;
 	}
-	return !g_provingGroundsModeActive && g_missionHeader.body.hangar != XWA_HANGAR_MONCALCRUISER &&
-		   g_missionHeader.body.hangar != XWA_HANGAR_DEATHSTAR &&
-		   g_missionHeader.body.hangar != XWA_HANGAR_FAMILYTRANSPORT;
+	return !g_provingGroundsModeActive &&
+		   g_missionHeader.body.missionType != XWA_MISSION_TYPE_ALLIANCE_CAMPAIGN &&
+		   g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR &&
+		   g_missionHeader.body.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN;
 }
 
 static void XwaFlightTask_InitProjectionAndPalette(void) {
@@ -962,7 +963,7 @@ static int XwaFlightTask_RunSinglePlayerFrame(void) {
 				Yard_UpdateChallengeTick(dtMs);
 			}
 		}
-		if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+		if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 			DeathStarTunnel_Update();
 		}
 		g_flightStepRanThisFrame = 0;
@@ -1542,7 +1543,7 @@ void XwaFlightTask_Tick(void) {
 				}
 				XwaFlightTask_ResetLocalLightPulses();
 				Math_SetFpuSinglePrecisionMode();
-				if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+				if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 					skipHangarReady = 1;
 					g_debrisEnabled = 0;
 					DeathStar_Init();
@@ -1565,8 +1566,9 @@ void XwaFlightTask_Tick(void) {
 				g_inputTimestamp = 0;
 				g_hangarSceneRegionIdx = g_missionRegionCount - 1;
 				Time_GetFrameDelta();
-				if (g_flightPlayerCount != 1 || g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR ||
-					g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) {
+				if (g_flightPlayerCount != 1 ||
+					g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR ||
+					g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) {
 					Hangar_ClearSceneObjectCount();
 				} else {
 					Hangar_SetupReadyScene();
@@ -1700,7 +1702,7 @@ void XwaFlightTask_Tick(void) {
 					FeDiskIo_CommitFlightResults();
 				}
 				g_flightDisplaySurfacesActive = 0;
-				if (g_missionHeader.body.hangar == XWA_HANGAR_DEATHSTAR) {
+				if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 					DeathStar_Shutdown();
 				}
 				if (g_useHardware3D) {

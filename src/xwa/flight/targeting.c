@@ -428,15 +428,15 @@ void Targeting_DrawObjectBox(uint16_t objectIdx, uint16_t componentIdx, uint8_t 
 
 // FUNCTION: XWA 0x5036F0
 void Targeting_DrawSceneObjectBoxes(void) {
-	uint8_t hangar;
+	uint8_t missionType;
 	int leadingTeam;
 	int leadingScore;
 	uint32_t teamIdx;
 	uint32_t objectIdx;
 
-	hangar = g_missionHeader.body.hangar;
+	missionType = g_missionHeader.body.missionType;
 	leadingTeam = 10;
-	if ((hangar == XWA_HANGAR_QUICKSTART || hangar == XWA_HANGAR_SKIRMISH) &&
+	if ((missionType == XWA_MISSION_TYPE_QUICK_START || missionType == XWA_MISSION_TYPE_SKIRMISH) &&
 		g_missionHeader.body.goalsUnimportant) {
 		leadingScore = 0;
 		for (teamIdx = 0; teamIdx < 8; ++teamIdx) {
@@ -479,15 +479,15 @@ void Targeting_DrawSceneObjectBoxes(void) {
 		objTeam = (uint8_t)mobj->team;
 		objTeamScore = g_missionFlightRuntimeState.teamScores[TEAM_SCORE_MISSION][objTeam] +
 					   g_missionFlightRuntimeState.teamScores[TEAM_SCORE_BONUS_TENTHS][objTeam];
-		if ((g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART ||
-			 g_missionHeader.body.hangar == XWA_HANGAR_SKIRMISH) &&
+		if ((g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+			 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH) &&
 			objTeam == (uint16_t)g_players[g_localPlayer].playerIff && obj->genusId == 0) {
 			colorIndex = 47;
 		} else {
 			playerIff = (uint16_t)g_players[g_localPlayer].playerIff;
 			if (leadingTeam == 10 || objTeamScore != leadingScore) {
 				if (obj->playerOwnerIdx != -1 && obj->playerOwnerIdx != g_localPlayer) {
-					if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART) {
+					if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START) {
 						playerIff = (uint16_t)g_players[g_localPlayer].playerIff;
 						if (g_objectTable[(uint16_t)objectIdx].mobj != NULL) {
 							objTeam = g_objectTable[(uint16_t)objectIdx].mobj->team;

@@ -3615,7 +3615,7 @@ static int Hangar_RunOptionsModal(void) {
 		g_flightReturnToFrontendRequested = 1;
 		g_flightExitRequest = 1;
 		Player_EndFlightParticipation(g_localPlayer);
-		if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART &&
+		if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START &&
 			g_pilotData.numHumanPlayersLastMission == 1) {
 			int playerIff = (uint16_t)g_players[g_localPlayer].playerIff;
 			if (g_missionFlightRuntimeState.teamGoalStatus[playerIff][TEAM_GOAL_PRIMARY] != 1) {
@@ -3966,7 +3966,7 @@ after_key:
 					g_flightReturnToFrontendRequested = 1;
 					g_flightExitRequest = 1;
 					Player_EndFlightParticipation(g_localPlayer);
-					if (g_missionHeader.body.hangar == XWA_HANGAR_QUICKSTART &&
+					if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START &&
 						g_pilotData.numHumanPlayersLastMission == 1) {
 						int playerIff = (uint16_t)g_players[g_localPlayer].playerIff;
 						if (g_missionFlightRuntimeState.teamGoalStatus[playerIff][TEAM_GOAL_PRIMARY] != 1) {

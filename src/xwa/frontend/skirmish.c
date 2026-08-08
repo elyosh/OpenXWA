@@ -117,7 +117,7 @@ int Skirmish_InitMissionDefaults(void) {
 	g_frontendMission->flightGroupCount = 1;
 	g_frontendMission->header.legacyAllWayShown = 0;
 	g_frontendMission->header.legacyWinType = 1;
-	g_frontendMission->header.hangar = XWA_HANGAR_SKIRMISH;
+	g_frontendMission->header.missionType = XWA_MISSION_TYPE_SKIRMISH;
 
 	for (regionIndex = 0; regionIndex < MAX_REGION_COUNT; ++regionIndex) {
 		sprintf(g_frontendMission->header.regions[regionIndex].name, "Region %d", regionIndex + 1);

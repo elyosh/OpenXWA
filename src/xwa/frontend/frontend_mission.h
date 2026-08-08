@@ -13,16 +13,16 @@ extern "C" {
 typedef struct FrontendMission FrontendMission;
 struct FrontendBriefingContent;
 
-typedef enum XwaHangarType {
-	XWA_HANGAR_JUNKYARD = 0,
-	XWA_HANGAR_SIMULATOR1 = 1,
-	XWA_HANGAR_QUICKSTART = 2,
-	XWA_HANGAR_SIMULATOR2 = 3,
-	XWA_HANGAR_SKIRMISH = 4,
-	XWA_HANGAR_DEATHSTAR = 5,
-	XWA_HANGAR_MONCALCRUISER = 6,
-	XWA_HANGAR_FAMILYTRANSPORT = 7,
-} XwaHangarType;
+typedef enum XwaMissionType {
+	XWA_MISSION_TYPE_JUNKYARD = 0,
+	XWA_MISSION_TYPE_SIMULATOR_1 = 1,
+	XWA_MISSION_TYPE_QUICK_START = 2,
+	XWA_MISSION_TYPE_SIMULATOR_2 = 3,
+	XWA_MISSION_TYPE_SKIRMISH = 4,
+	XWA_MISSION_TYPE_DEATH_STAR = 5,
+	XWA_MISSION_TYPE_ALLIANCE_CAMPAIGN = 6,
+	XWA_MISSION_TYPE_FAMILY_CAMPAIGN = 7,
+} XwaMissionType;
 
 #if defined(_MSC_VER)
 #pragma pack(push, 1)
@@ -264,7 +264,7 @@ typedef struct XWA_MISSION_PACKED_STRUCT XwaMissionHeaderBody {
 	XwaGlobalCargo globalCargos[16];
 	XwaGlobalUnit globalGroups[32];
 	XwaGlobalUnit globalUnits[40];
-	uint8_t hangar;
+	uint8_t missionType;
 	uint8_t goalsUnimportant;
 	uint8_t timeLimitMin;
 	uint8_t endMissionWhenComplete;
@@ -351,7 +351,8 @@ XWA_MISSION_STATIC_ASSERT(xwa_flight_group_player_number_offset,
 XWA_MISSION_STATIC_ASSERT(xwa_flight_group_mission_point_regions_offset,
 						  offsetof(XwaFlightGroup, missionPointRegions) == 0xDAA);
 XWA_MISSION_STATIC_ASSERT(xwa_flight_group_backdrop_offset, offsetof(XwaFlightGroup, backdrop) == 0xE12);
-XWA_MISSION_STATIC_ASSERT(xwa_mission_header_hangar_offset, offsetof(XwaMissionHeaderBody, hangar) == 0x23A6);
+XWA_MISSION_STATIC_ASSERT(xwa_mission_header_mission_type_offset,
+						  offsetof(XwaMissionHeaderBody, missionType) == 0x23A6);
 XWA_MISSION_STATIC_ASSERT(xwa_frontend_mission_messages_offset,
 						  offsetof(FrontendMission, messages) == 0xAAE80);
 XWA_MISSION_STATIC_ASSERT(xwa_frontend_mission_global_goals_offset,
