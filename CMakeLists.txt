@@ -358,7 +358,8 @@ if(APPLE)
         MACOSX_PACKAGE_LOCATION Resources)
 
     set(XWA_MACOS_RESOURCE_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/resources/remaster/config.yaml")
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/remaster/config.yaml"
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/remaster/opt_alpha_overrides.yaml")
     target_sources(xwa PRIVATE ${XWA_MACOS_RESOURCE_FILES})
     set_source_files_properties(${XWA_MACOS_RESOURCE_FILES} PROPERTIES
         HEADER_FILE_ONLY TRUE

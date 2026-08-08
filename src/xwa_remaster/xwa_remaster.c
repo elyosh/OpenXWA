@@ -25,6 +25,7 @@
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/frontend.h"
 #include "xwa_remaster/hud.h"
+#include "xwa_remaster/opt_mesh.h"
 #include "xwa_remaster/ship.h"
 #include "xwa_runtime/runtime/movie_task.h"
 #include "xwa_runtime/runtime/port.h"
@@ -306,6 +307,7 @@ void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
 int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	XwaModernVideoOptions video_options;
 	unsigned int video_override_mask;
+	char opt_mesh_error[256];
 
 	if (g.initialized) {
 		return g.assets != NULL;
@@ -315,6 +317,10 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 		return 0;
 	}
 	g.initialized = 1;
+	if (!XwaRemasterOptMesh_Init(Aeron_GetVfs(), opt_mesh_error, sizeof opt_mesh_error)) {
+		Aeron_LogError("xwa.remaster", "OPT mesh initialization failed: %s", opt_mesh_error);
+		return 0;
+	}
 	XwaRemasterShip_Configure(options->opt_smooth_angle_degrees, options->opt_emissive_strength,
 							  options->opt_projectile_emissive_strength, options->engine_emissive_strength,
 							  options->force_opt_models);

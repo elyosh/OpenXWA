@@ -1,0 +1,5 @@
+# Compatibility metadata for legacy OPT alpha planes. The OPT format stores
+# alpha samples but no material mode; add entries only when the deterministic
+# content classifier cannot distinguish coverage from translucency.
+version: 1
+materials: []
