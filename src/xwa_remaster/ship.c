@@ -1155,16 +1155,6 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 		d.texture = tex->texture;
 		d.blend = AERON_SCENE_BILLBOARD_BLEND_PMA;
 		d.stage = AERON_SCENE_BILLBOARD_STAGE_OVERLAY;
-		float center_position[3];
-		if (crows && cam_pos) {
-			for (int r = 0; r < 3; r++) {
-				center_position[r] =
-					cam_pos[r] + crows[0 * 3 + r] * c[0] + crows[1 * 3 + r] * c[1] + crows[2 * 3 + r] * c[2];
-			}
-		} else {
-			memcpy(center_position, c, sizeof center_position);
-		}
-		d.center_position = center_position;
 		d.center_color = core;
 		for (int v = 0; v < 4; v++) {
 			/* View corners -> submission space (inverse of the camera
