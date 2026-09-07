@@ -1,7 +1,7 @@
 # OpenXWA
 
 [![GitHub Release](https://img.shields.io/github/v/release/elyosh/OpenXWA)](https://github.com/elyosh/OpenXWA/releases/latest)
-[![Visit our Discord server](https://img.shields.io/discord/1533001488391995442)](https://discord.gg/vfPVFxBA4)
+[![Visit our Discord server](https://img.shields.io/discord/1533001488391995442)](https://discord.gg/WBvYzczWfG)
 
 ![Screenshot of the Azzameen hangar in OpenXWA](assets/openxwa_hangar.jpg)
 
@@ -107,7 +107,7 @@ of *Star Wars: TIE Fighter* for Windows, macOS, and Linux.
 
 ## Community
 
-Join the [TotallyOpen Discord server](https://discord.gg/vfPVFxBA4) to discuss
+Join the [TotallyOpen Discord server](https://discord.gg/WBvYzczWfG) to discuss
 OpenXWA, OpenTIE, development, and the Totally Games flight simulators.
 
 ## System requirements
