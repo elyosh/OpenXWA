@@ -87,6 +87,7 @@ set(XWA_RECOVERED_SOURCES
     src/xwa/assets/object_type.c
     src/xwa/assets/model_source.c
     src/xwa/assets/opt_model.c
+    src/xwa/assets/opt_synth.c
     src/xwa/assets/ship_list.c
     src/xwa/assets/sprite_resource.c
     src/xwa/assets/sprite_texture.c
@@ -465,6 +466,13 @@ if(XWA_BUILD_TOOLS)
     add_executable(imc_decode tools/imc_decode.c)
     target_link_libraries(imc_decode PRIVATE xwa_core)
 
+endif()
+
+# Replacement-model simulation data must be bit-identical across compilers.
+if(MSVC)
+    set_source_files_properties(src/xwa/assets/opt_synth.c PROPERTIES COMPILE_OPTIONS "/fp:precise")
+else()
+    set_source_files_properties(src/xwa/assets/opt_synth.c PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 
 if(MSVC)
