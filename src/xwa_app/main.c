@@ -3,6 +3,7 @@
 #include "host_config.h"
 #include "setup.h"
 #include "window_icon.h"
+#include "xwa/assets/model_source.h"
 #include "xwa/config/game_config.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/input/controller_mapping.h"
@@ -388,6 +389,8 @@ int main(int argc, char** argv) {
 
 	XwaPort_SetCommandLine(launch.game_command_line);
 	XwaModernFlightTiming_Configure(host_config.flight_simulation_step_ticks);
+	/* XwaRemaster_Init succeeded above, so the HD renderer is available. */
+	XwaModelSource_Configure(!host_config.force_opt_models);
 	if (!XwaPort_Init()) {
 		XwaRemaster_Shutdown();
 		Aeron_Shutdown();

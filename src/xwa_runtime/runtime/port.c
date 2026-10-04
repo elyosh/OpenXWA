@@ -5,6 +5,7 @@
 #include "aeron/compat/host.h"
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/linez.h"
+#include "xwa/assets/model_source.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/assets/sprite_resource.h"
 #include "xwa/assets/string_table.h"
@@ -118,6 +119,7 @@ int XwaPort_Init(void) {
 	XwaRumble_RegisterProvider();
 	XwaTime_Reset();
 	File_SetVfs(Aeron_GetVfs());
+	XwaModelSource_Init();
 	if (SpriteResource_LoadCatalog("Resdata.txt") != 0) {
 		Aeron_LogError("xwa.assets", "Failed to load required sprite catalog 'Resdata.txt'");
 	}

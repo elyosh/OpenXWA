@@ -85,6 +85,7 @@ set(XWA_RECOVERED_SOURCES
     src/xwa/assets/model_texture.c
     src/xwa/assets/model_type.c
     src/xwa/assets/object_type.c
+    src/xwa/assets/model_source.c
     src/xwa/assets/opt_model.c
     src/xwa/assets/ship_list.c
     src/xwa/assets/sprite_resource.c
@@ -309,6 +310,8 @@ target_link_libraries(xwa_core
         aeron
         aeron_compat
         aeron_video
+        aeron_flight_model
+        aeron_collision
 )
 
 set(XWA_APP_SOURCES
