@@ -1,5 +1,5 @@
-#ifndef XWA_ASSETS_MODEL_SOURCE_H
-#define XWA_ASSETS_MODEL_SOURCE_H
+#ifndef XWA_RUNTIME_MODELS_MODEL_SOURCE_H
+#define XWA_RUNTIME_MODELS_MODEL_SOURCE_H
 
 /* Modern port: chooses where each flight model comes from. With replacements
  * enabled, a model whose key has a `remaster/models/<key>.glb` on the asset

@@ -85,9 +85,7 @@ set(XWA_RECOVERED_SOURCES
     src/xwa/assets/model_texture.c
     src/xwa/assets/model_type.c
     src/xwa/assets/object_type.c
-    src/xwa/assets/model_source.c
     src/xwa/assets/opt_model.c
-    src/xwa/assets/opt_synth.c
     src/xwa/assets/ship_list.c
     src/xwa/assets/sprite_resource.c
     src/xwa/assets/sprite_texture.c
@@ -207,6 +205,8 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/input/rumble_provider.c
     src/xwa_runtime/input/winmm_joystick_provider.c
     src/xwa_runtime/input/mouse_flight.c
+    src/xwa_runtime/models/model_source.c
+    src/xwa_runtime/models/opt_synth.c
     src/xwa_runtime/runtime/flight_pause_task.c
     src/xwa_runtime/runtime/flight_task.c
     src/xwa_runtime/runtime/frontend_task.c
@@ -470,9 +470,9 @@ endif()
 
 # Replacement-model simulation data must be bit-identical across compilers.
 if(MSVC)
-    set_source_files_properties(src/xwa/assets/opt_synth.c PROPERTIES COMPILE_OPTIONS "/fp:precise")
+    set_source_files_properties(src/xwa_runtime/models/opt_synth.c PROPERTIES COMPILE_OPTIONS "/fp:precise")
 else()
-    set_source_files_properties(src/xwa/assets/opt_synth.c PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+    set_source_files_properties(src/xwa_runtime/models/opt_synth.c PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 
 if(MSVC)

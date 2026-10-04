@@ -1,5 +1,5 @@
-#ifndef XWA_ASSETS_OPT_SYNTH_H
-#define XWA_ASSETS_OPT_SYNTH_H
+#ifndef XWA_RUNTIME_MODELS_OPT_SYNTH_H
+#define XWA_RUNTIME_MODELS_OPT_SYNTH_H
 
 /* Modern port: builds an OPT payload image for a GLB replacement model
  * (remaster/models/<key>.glb). The image is what OptModel_LoadHandle would

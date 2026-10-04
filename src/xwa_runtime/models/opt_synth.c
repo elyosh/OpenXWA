@@ -1,11 +1,11 @@
-#include "xwa/assets/opt_synth.h"
+#include "xwa_runtime/models/opt_synth.h"
 
 #include "aeron/aeron.h"
 #include "aeron/collision/hash.h"
 #include "aeron/log.h"
 #include "aeron/vfs.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_source.h"
+#include "xwa_runtime/models/model_source.h"
 
 #include <math.h>
 #include <stdio.h>

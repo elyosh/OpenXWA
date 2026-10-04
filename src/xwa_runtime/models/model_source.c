@@ -1,4 +1,4 @@
-#include "xwa/assets/model_source.h"
+#include "xwa_runtime/models/model_source.h"
 
 #include "aeron/log.h"
 #include "xwa/assets/file_io.h"
