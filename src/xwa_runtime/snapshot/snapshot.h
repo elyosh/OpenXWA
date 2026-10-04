@@ -1018,6 +1018,7 @@ typedef struct XwaHudState {
 typedef struct XwaOptAsset {
 	uint16_t public_handle;
 	char name[XWA_SNAP_OPT_NAME_MAX]; /* basename, no extension */
+	uint8_t source;                   /* XwaModelSource the simulation loaded */
 } XwaOptAsset;
 
 /* One sprite-textured model type whose classic TexLevel storage is live.
@@ -1220,7 +1221,7 @@ const char* XwaSnapshotExport_ModelName(int object_type);
 
 /* Engine-side OPT-loader observers. They update only snapshot-side state;
  * recovered simulation/render behavior never branches on the registry. */
-void XwaSnapshot_NoteOptLoad(uint16_t public_handle, const char* file_name);
+void XwaSnapshot_NoteOptLoad(uint16_t public_handle, const char* file_name, uint8_t source);
 void XwaSnapshot_NoteOptFree(uint16_t public_handle);
 
 /* Copy the authoritative live processed-OPT set into a snapshot slot. */

@@ -405,6 +405,7 @@ int XwaSnapshotExport_ModelMeshTypes(int object_type, uint8_t out_types[XWA_SNAP
 typedef struct XwaOptHandleState {
 	uint16_t public_handle;
 	char name[XWA_SNAP_OPT_NAME_MAX];
+	uint8_t source;
 	uint8_t active;
 } XwaOptHandleState;
 
@@ -413,7 +414,7 @@ static uint64_t g_optAssetGeneration;
 static uint8_t g_textureAssets[XWA_SNAP_MAX_TEXTURE_ASSETS];
 static uint64_t g_textureAssetGeneration;
 
-void XwaSnapshot_NoteOptLoad(uint16_t public_handle, const char* file_name) {
+void XwaSnapshot_NoteOptLoad(uint16_t public_handle, const char* file_name, uint8_t source) {
 	if (!public_handle || !file_name) {
 		return;
 	}
@@ -445,6 +446,7 @@ void XwaSnapshot_NoteOptLoad(uint16_t public_handle, const char* file_name) {
 	}
 	state->name[n] = '\0';
 	state->public_handle = public_handle;
+	state->source = source;
 	state->active = 1;
 	g_optAssetGeneration++;
 }
@@ -481,6 +483,7 @@ void XwaSnapshotExport_CaptureOptAssets(XwaSnapshot* snapshot) {
 		}
 		XwaOptAsset* asset = &snapshot->opt_assets[snapshot->opt_asset_count++];
 		asset->public_handle = g_optHandles[i].public_handle;
+		asset->source = g_optHandles[i].source;
 		snprintf(asset->name, sizeof asset->name, "%s", g_optHandles[i].name);
 	}
 }

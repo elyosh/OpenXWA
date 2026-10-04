@@ -104,6 +104,17 @@ void OptModel_ResolveTextureRefsRecursive(OptNode* node, OptimizedPolyObject* mo
 int OptModel_BuildHardwareData(OptimizedPolyObject* model, int modelSize);
 void OptModel_ReleaseD3DInfoRecursive(OptNode* node);
 
+#ifdef XWA_MODERN
+/* Modern port: GLB replacement models (see xwa_runtime/models/opt_synth.h). */
+struct XwaOptSynthData;
+struct XwaOptSynthMesh;
+int OptModel_IsSynthesized(const OptimizedPolyObject* model);
+const struct XwaOptSynthData* OptModel_GetSynthData(const OptimizedPolyObject* model);
+/* Side data for the stub FaceData node `faceDataNode`, or NULL. */
+const struct XwaOptSynthMesh* OptModel_FindSynthMesh(const OptimizedPolyObject* model,
+													 const OptNode* faceDataNode);
+#endif
+
 #ifdef __cplusplus
 }
 #endif
