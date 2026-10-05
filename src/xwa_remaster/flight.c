@@ -284,6 +284,12 @@ static struct {
 	int suppress_hud;
 } s;
 
+/* XWA world -> sky cube basis (see the star skybox comment in
+ * XwaRemasterFlight_Render). */
+static const float fl_world_to_cube[9] = {
+	1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f,
+};
+
 static void fl_draw_before_opaque(AeronCommandBuffer* command_buffer, AeronRenderPass* render_pass, int rt_w,
 								  int rt_h, void* user) {
 	(void)user;
@@ -1997,9 +2003,17 @@ static const float fl_default_uvs[4][2] = { { 1, 1 }, { 0, 1 }, { 0, 0 }, { 1, 0
  * reproduces the view positions exactly — crows is derived from the
  * same quaternion). `anchor_local` is the LENS-stage occlusion source
  * (NULL for the depth-tested stages). */
-static void fl_submit_view_quad_ex(AeronSceneBillboardStage stage, const float corners[4][3],
-								   const float uvs[4][2], const XwaAssetRef* ref, uint32_t argb,
-								   const float* anchor_local, float depth_bias,
+/* Scene and camera a view-space quad is submitted to: the flight frame's,
+ * or an environment capture's. */
+typedef struct FlQuadTarget {
+	AeronScene3D* scene;
+	const float* crows;
+	const float* camera_local;
+} FlQuadTarget;
+
+static void fl_submit_view_quad_to(const FlQuadTarget* target, AeronSceneBillboardStage stage,
+								   const float corners[4][3], const float uvs[4][2], const XwaAssetRef* ref,
+								   uint32_t argb, const float* anchor_local, float depth_bias,
 								   const float (*prev_corners)[3], float emissive_strength) {
 	AeronSceneBillboardDesc d;
 	memset(&d, 0, sizeof d);
@@ -2026,8 +2040,9 @@ static void fl_submit_view_quad_ex(AeronSceneBillboardStage stage, const float c
 	for (int v = 0; v < 4; v++) {
 		/* local = camera_local + crows^T * view */
 		for (int j = 0; j < 3; j++) {
-			d.corners[v][j] = s.camera_local[j] + s.crows[0 * 3 + j] * corners[v][0] +
-							  s.crows[1 * 3 + j] * corners[v][1] + s.crows[2 * 3 + j] * corners[v][2];
+			d.corners[v][j] = target->camera_local[j] + target->crows[0 * 3 + j] * corners[v][0] +
+							  target->crows[1 * 3 + j] * corners[v][1] +
+							  target->crows[2 * 3 + j] * corners[v][2];
 		}
 		d.uv[v][0] = ref->u0 + uvs[v][0] * du;
 		d.uv[v][1] = ref->v0 + uvs[v][1] * dv;
@@ -2035,7 +2050,16 @@ static void fl_submit_view_quad_ex(AeronSceneBillboardStage stage, const float c
 	}
 	if (prev_corners)
 		d.prev_corners = prev_corners; /* copied by AddBillboard */
-	AeronScene_AddBillboard(s.scene, &d);
+	AeronScene_AddBillboard(target->scene, &d);
+}
+
+static void fl_submit_view_quad_ex(AeronSceneBillboardStage stage, const float corners[4][3],
+								   const float uvs[4][2], const XwaAssetRef* ref, uint32_t argb,
+								   const float* anchor_local, float depth_bias,
+								   const float (*prev_corners)[3], float emissive_strength) {
+	const FlQuadTarget target = { s.scene, s.crows, s.camera_local };
+	fl_submit_view_quad_to(&target, stage, corners, uvs, ref, argb, anchor_local, depth_bias, prev_corners,
+						   emissive_strength);
 }
 
 static void fl_submit_view_quad(AeronSceneBillboardStage stage, const float corners[4][3],
@@ -2073,12 +2097,26 @@ static void fl_world_to_view(const float cam[9], float x, float y, float z, floa
 	}
 }
 
-static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9],
-									XwaRemasterAssets* assets) {
+static int fl_backdrop_is_sun(const XwaBackdrop* b) {
+	return b->model_type >= XWA_SNAP_TYPE_BACKDROP_SUN_FIRST &&
+		   b->model_type <= XWA_SNAP_TYPE_BACKDROP_SUN_LAST;
+}
+
+/* Backdrop selection for fl_derive_backdrops: every record, every record
+ * except backdrop suns, or one record index (>= 0). */
+enum { FL_BACKDROPS_ALL = -1, FL_BACKDROPS_NO_SUNS = XWA_FLIGHT_CAPTURE_BACKDROPS_NO_SUNS };
+
+/* `camera_independent` (environment capture) replaces the axis quads'
+ * camera-hemisphere gate with the record's own direction: a quad is kept
+ * when a camera looking at it would draw it. */
+static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9], XwaRemasterAssets* assets,
+									int filter, int camera_independent, FlBackdropQuad* out,
+									uint32_t capacity) {
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < snap->backdrop_count; i++) {
 		const XwaBackdrop* b = &snap->backdrops[i];
-		if (b->hidden) {
+		if (b->hidden || (filter >= 0 && (uint32_t)filter != i) ||
+			(filter == FL_BACKDROPS_NO_SUNS && fl_backdrop_is_sun(b))) {
 			continue;
 		}
 		int frame = (b->flags & 1u) ? b->frame : 1;
@@ -2098,7 +2136,7 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 			int32_t hh = b->strip_half_height;
 			int prev_h = ref.classic_h;
 			int seg_in_frame = 1;
-			for (int seg = 1; seg <= b->strip_segment_count && count < FL_MAX_BACKDROP_QUADS; seg++) {
+			for (int seg = 1; seg <= b->strip_segment_count && count < capacity; seg++) {
 				float u0;
 				if (seg > 1) {
 					seg_in_frame++;
@@ -2120,7 +2158,7 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 					u0 = 0.0f;
 				}
 				const float u1 = (float)seg_in_frame / (float)b->strip_segments_per_frame;
-				FlBackdropQuad* q = &s.bd_quads[count++];
+				FlBackdropQuad* q = &out[count++];
 				const float* c0 = b->strip_coords[seg - 1];
 				const float* c1 = b->strip_coords[seg];
 				fl_world_to_view(crows, c0[0], c0[1], c0[2] + (float)hh, q->corners[0]);
@@ -2143,13 +2181,12 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 			 * angular_scale * (classic_dim * 1.5) / 256 around the
 			 * direction / 512. Visibility gates on the camera forward
 			 * row's Z sign (side 4 faces one world pole, 5 the other). */
-			const float fwd_z = crows[8];
+			const float fwd_z = camera_independent ? b->world_dir[2] : crows[8];
 			if ((b->side == 4 && !(fwd_z > 0.0f)) || (b->side == 5 && !(fwd_z < 0.0f))) {
 				continue;
 			}
-			if (count >= FL_MAX_BACKDROP_QUADS ||
-				!fl_resolve_type_frame(assets, b->model_type, frame, &ref) || ref.classic_w <= 0 ||
-				ref.classic_h <= 0) {
+			if (count >= capacity || !fl_resolve_type_frame(assets, b->model_type, frame, &ref) ||
+				ref.classic_w <= 0 || ref.classic_h <= 0) {
 				continue;
 			}
 			const int ext_w = ((int)b->angular_scale * (ref.classic_w + (ref.classic_w >> 1))) >> 8;
@@ -2159,7 +2196,7 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 			for (int a = 0; a < 3; a++) {
 				v[a] = (float)((int)v[a] >> 9); /* classic >>9 on the int view dir */
 			}
-			FlBackdropQuad* q = &s.bd_quads[count++];
+			FlBackdropQuad* q = &out[count++];
 			for (int a = 0; a < 3; a++) {
 				const float h = crows[a * 3 + 0] * (float)ext_h; /* cam column X */
 				const float w = crows[a * 3 + 1] * (float)ext_w; /* cam column Y */
@@ -3627,6 +3664,7 @@ static int fl_is_default_hangar_lighting(const XwaSnapshot* snap) {
  * PBR path decodes it back without loss. Never a backdrop source. */
 static void fl_package_light_to_dir_light(const AeronEnvironmentLight* light, XwaDirLight* out) {
 	memset(out, 0, sizeof *out);
+	out->source_backdrop_index = -1;
 	memcpy(out->world_dir, light->direction_world, sizeof out->world_dir);
 	const float peak = fmaxf(light->color_linear[0], fmaxf(light->color_linear[1], light->color_linear[2]));
 	if (!(peak > 0.0f) || !isfinite(peak)) {
@@ -3704,6 +3742,7 @@ static void fl_build_hangar_lighting(const XwaSnapshot* snap, FlSceneLighting* o
 		memcpy(out->hangar_key.world_dir, s.hangar_lighting.direction, sizeof out->hangar_key.world_dir);
 		out->hangar_key.intensity = s.hangar_lighting.intensity;
 		memcpy(out->hangar_key.color, s.hangar_lighting.color, sizeof out->hangar_key.color);
+		out->hangar_key.source_backdrop_index = -1;
 		out->lights = &out->hangar_key;
 		out->light_count = 1;
 	}
@@ -3852,6 +3891,109 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	}
 	s.snap = NULL;
 	return fl_present(cmd, direct_present);
+}
+
+/* ---- environment capture support ------------------------------------- */
+
+void XwaRemasterFlight_CaptureSkyInfo(XwaFlightCaptureSky* out) {
+	if (!out) {
+		return;
+	}
+	memset(out, 0, sizeof *out);
+	out->mode = s.sky_mode == 1 ? XWA_FLIGHT_CAPTURE_SKY_STARS
+								: (s.sky_cube ? XWA_FLIGHT_CAPTURE_SKY_CUBE : XWA_FLIGHT_CAPTURE_SKY_NONE);
+	out->exposure = s.sky_exposure;
+	out->star_brightness = s.star_brightness;
+	out->star_density = s.star_density;
+	out->star_grid = s.star_grid;
+}
+
+int XwaRemasterFlight_CaptureCamera(const float right[3], const float down[3], const float forward[3],
+									float half_tan, int size, AeronSceneCamera* camera, float crows[9]) {
+	if (!right || !down || !forward || !camera || !crows || !(half_tan > 0.0f) || size <= 0) {
+		return 0;
+	}
+	const float rows[9] = { right[0], right[1],   right[2],   down[0],   down[1],
+							down[2],  forward[0], forward[1], forward[2] };
+	memset(camera, 0, sizeof *camera);
+	fl_rows_to_quat(rows, camera->ori);
+	const float length = sqrtf(camera->ori[0] * camera->ori[0] + camera->ori[1] * camera->ori[1] +
+							   camera->ori[2] * camera->ori[2] + camera->ori[3] * camera->ori[3]);
+	if (!(length > 0.5f) || !isfinite(length)) {
+		return 0;
+	}
+	for (int i = 0; i < 4; i++) {
+		camera->ori[i] /= length;
+	}
+	camera->h_half_rad = atanf(half_tan);
+	camera->v_half_rad = camera->h_half_rad;
+	camera->near_z = FL_NEAR_Z;
+	camera->viewport = (AeronRectI) { 0, 0, size, size };
+	/* Backdrop geometry and the scene projection agree when both come from
+	 * the same quaternion (see s.crows). */
+	fl_quat_to_mat3(camera->ori, crows);
+	return 1;
+}
+
+int XwaRemasterFlight_CaptureSetSky(AeronScene3D* scene, XwaRemasterSkyStars* stars, const XwaSnapshot* snap,
+									float star_upscale) {
+	if (!scene || !snap) {
+		return 0;
+	}
+	if (s.sky_mode == 1) {
+		const XwaRemasterSkyStarsParams params = {
+			.exposure = s.sky_exposure,
+			.brightness = s.star_brightness,
+			.density = s.star_density,
+			.grid_n = s.star_grid,
+			.core_radius_px = s.star_core_px * star_upscale,
+			.feather_px = s.star_feather * star_upscale,
+			.pixel_pitch_px = star_upscale,
+			.flare_strength = s.star_flare,
+			.game_time_ms = (uint32_t)snap->game_time_ms,
+		};
+		if (!stars || !XwaRemasterSkyStars_Prepare(stars, scene, fl_world_to_cube, &params)) {
+			return 0;
+		}
+		AeronScene_SetPassHook(scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, XwaRemasterSkyStars_Draw, stars);
+	} else if (s.sky_cube) {
+		AeronScene_SetSkyCube(scene, s.sky_cube, fl_world_to_cube, s.sky_exposure);
+	}
+	return 1;
+}
+
+uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float crows[9],
+											const XwaSnapshot* snap, XwaRemasterAssets* assets, int filter,
+											float* out_max_tan) {
+	static FlBackdropQuad quads[FL_MAX_BACKDROP_QUADS];
+	if (out_max_tan) {
+		*out_max_tan = 0.0f;
+	}
+	if (!crows || !snap || !assets) {
+		return 0;
+	}
+	const uint32_t count = fl_derive_backdrops(snap, crows, assets, filter, 1, quads, FL_MAX_BACKDROP_QUADS);
+	static const float origin[3] = { 0.0f, 0.0f, 0.0f };
+	const FlQuadTarget target = { scene, crows, origin };
+	float max_tan = 0.0f;
+	for (uint32_t i = 0; i < count; i++) {
+		for (int c = 0; c < 4; c++) {
+			const float* v = quads[i].corners[c];
+			if (!(v[2] > 0.0f)) {
+				max_tan = -1.0f;
+			} else if (max_tan >= 0.0f) {
+				max_tan = fmaxf(max_tan, fmaxf(fabsf(v[0]), fabsf(v[1])) / v[2]);
+			}
+		}
+		if (scene) {
+			fl_submit_view_quad_to(&target, AERON_SCENE_BILLBOARD_STAGE_SKY, quads[i].corners, quads[i].uvs,
+								   &quads[i].ref, 0xffffffffu, NULL, 0.0f, NULL, 1.0f);
+		}
+	}
+	if (out_max_tan) {
+		*out_max_tan = max_tan;
+	}
+	return count;
 }
 
 AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
@@ -4014,7 +4156,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.package : NULL;
 	fl_derive_lens_flares(snap, assets, &flight_view, authored);
 	fl_derive_point_lights(snap);
-	s.bd_count = authored ? 0 : fl_derive_backdrops(snap, s.crows, assets);
+	s.bd_count = authored ? 0
+						  : fl_derive_backdrops(snap, s.crows, assets, FL_BACKDROPS_ALL, 0, s.bd_quads,
+												FL_MAX_BACKDROP_QUADS);
 	XwaRemasterEffectView effect_view;
 	XwaRemasterEffectView_Main(&effect_view, &flight_view, s.crows);
 	XwaRemasterEffectView previous_effect_view;
@@ -4121,9 +4265,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * cube basis, so it orients consistently with authored cubes; its
 	 * twinkle advances off the sim clock (game_time_ms), not wall time,
 	 * so it is deterministic and pauses with the game. */
-	static const float fl_world_to_cube[9] = {
-		1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f,
-	};
 	if (authored) {
 		AeronScene_SetSkyCube(s.scene, authored->radiance, authored->world_to_cube,
 							  authored->settings.intensity);

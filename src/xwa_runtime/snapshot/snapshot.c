@@ -438,10 +438,15 @@ void XwaSnapshot_Commit(void) {
 			o->color[1] = dl->colorG;
 			o->color[2] = dl->colorB;
 			o->source_backdrop_model_type = 0;
+			o->source_backdrop_index = -1;
 			const int backdrop_idx = g_directionalLightBackdropIndices[i];
 			if (region >= 0 && region < XWA_BACKDROP_REGION_COUNT && backdrop_idx >= 0 &&
 				backdrop_idx < g_backdropCountByRegion[region]) {
 				o->source_backdrop_model_type = g_backdropRecordsByRegion[region][backdrop_idx].modelType;
+				/* backdrops[] holds at most XWA_SNAP_MAX_BACKDROPS records. */
+				if (backdrop_idx < XWA_SNAP_MAX_BACKDROPS) {
+					o->source_backdrop_index = (int16_t)backdrop_idx;
+				}
 			}
 		}
 		s->dir_light_count = n;

@@ -247,6 +247,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/cutscene.c
     src/xwa_remaster/frontend.c
     src/xwa_remaster/effects.c
+    src/xwa_remaster/env_capture.c
     src/xwa_remaster/environment.c
     src/xwa_remaster/flight.c
     src/xwa_remaster/flight_map.c

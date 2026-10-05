@@ -229,6 +229,57 @@ int XwaRemasterFlight_ProcessAssetsNeedPrepare(void);
 int XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterAssets* assets);
 void XwaRemasterFlight_CommitProcessAssets(void);
 
+/* ---- environment capture support (env_capture.c) ----------------------
+ * The capture renders the HD sky into its own scenes with the flight
+ * module's sky configuration and backdrop derivation. Capture cameras sit
+ * at the render-local origin; the sky is translation independent. */
+
+/* Backdrop selection for XwaRemasterFlight_CaptureBackdrops: every
+ * record except backdrop suns, or one record index (>= 0). */
+#define XWA_FLIGHT_CAPTURE_BACKDROPS_NO_SUNS (-2)
+
+struct XwaRemasterSkyStars;
+
+typedef enum XwaFlightCaptureSkyMode {
+	XWA_FLIGHT_CAPTURE_SKY_NONE,  /* cube mode without a loaded cube */
+	XWA_FLIGHT_CAPTURE_SKY_STARS, /* procedural starfield */
+	XWA_FLIGHT_CAPTURE_SKY_CUBE,  /* configured sky cube */
+} XwaFlightCaptureSkyMode;
+
+typedef struct XwaFlightCaptureSky {
+	XwaFlightCaptureSkyMode mode;
+	float exposure;
+	float star_brightness;
+	float star_density;
+	float star_grid;
+} XwaFlightCaptureSky;
+
+/* The configured sky source the flight frame draws outside authored mode. */
+void XwaRemasterFlight_CaptureSkyInfo(XwaFlightCaptureSky* out);
+
+/* A square perspective capture camera with half-angle tangent `half_tan`
+ * and world-space view axes (unit, right x down = forward), and the
+ * world->view rows re-derived from its quaternion, as the flight frame
+ * does. Returns 0 for an invalid basis. */
+int XwaRemasterFlight_CaptureCamera(const float right[3], const float down[3], const float forward[3],
+									float half_tan, int size, AeronSceneCamera* camera, float crows[9]);
+
+/* After AeronScene_Begin: draws the configured sky into `scene`. Stars use
+ * `stars` (the scene's BEFORE_OPAQUE hook) with the classic-pixel dot
+ * geometry scaled by `star_upscale`. Returns 0 on failure. */
+int XwaRemasterFlight_CaptureSetSky(AeronScene3D* scene, struct XwaRemasterSkyStars* stars,
+									const XwaSnapshot* snap, float star_upscale);
+
+/* Derives the region's backdrop quads for the capture camera rows `crows`
+ * and, when `scene` is not NULL, submits them as SKY billboards. Axis
+ * quads are kept by their own direction instead of the camera hemisphere.
+ * `out_max_tan` receives the largest |x| / z or |y| / z over the quad
+ * corners, or a negative value when a corner is not in front of the
+ * camera. Returns the quad count. */
+uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float crows[9],
+											const XwaSnapshot* snap, XwaRemasterAssets* assets, int filter,
+											float* out_max_tan);
+
 /* Returns whether the current full-frame output can use Aeron's direct
  * swapchain render layer at the requested dimensions. */
 int XwaRemasterFlight_CanDirectPresent(int target_w, int target_h);

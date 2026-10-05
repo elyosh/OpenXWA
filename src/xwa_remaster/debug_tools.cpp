@@ -12,6 +12,7 @@
  */
 
 #include "xwa_remaster/debug_tools.h"
+#include "xwa_remaster/env_capture.h"
 
 #include "xwa_remaster/environment.h"
 #include "xwa_remaster/flight.h"
@@ -1078,6 +1079,36 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 		if (selection.fallback != XWA_ENV_FALLBACK_NONE) {
 			ImGui::Text("Fallback: %s", XwaRemasterEnvironment_FallbackName(selection.fallback));
 		}
+	}
+
+	/* Capture the current region's HD sky for environment_bake --capture. */
+	ImGui::SeparatorText("Capture");
+	static const int face_sizes[] = { 1024, 2048, 4096 };
+	static int face_index = 1;
+	static float sun_radius = XWA_ENV_CAPTURE_DEFAULT_SUN_RADIUS;
+	ImGui::Combo("Face size", &face_index,
+				 "1024\0"
+				 "2048\0"
+				 "4096\0");
+	ImGui::SliderFloat("Sun angular radius", &sun_radius, 0.01f, 5.0f, "%.2f deg");
+	const char* reason = nullptr;
+	const bool available = XwaRemasterEnvCapture_Available(XwaSnapshot_Current(), &reason) != 0;
+	const bool pending = XwaRemasterEnvCapture_Pending() != 0;
+	ImGui::BeginDisabled(!available || pending);
+	if (ImGui::Button(pending ? "Capture pending" : "Capture region")) {
+		XwaRemasterEnvCapture_Request(face_sizes[face_index], sun_radius);
+	}
+	ImGui::EndDisabled();
+	if (!available && reason) {
+		ImGui::SameLine();
+		ImGui::TextDisabled("(%s)", reason);
+	}
+	if (pending) {
+		ImGui::TextDisabled("Runs on the next HD flight frame.");
+	}
+	const char* status = XwaRemasterEnvCapture_Status();
+	if (status[0]) {
+		ImGui::TextWrapped("Last capture: %s", status);
 	}
 }
 

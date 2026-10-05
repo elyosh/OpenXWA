@@ -238,6 +238,9 @@ typedef struct XwaDirLight {
 	/* ObjectTypeId of the source backdrop, or 0 for synthetic/studio
 	 * lights. Sun types 521..530 are also the lens-flare sources. */
 	uint16_t source_backdrop_model_type;
+	/* Index of that backdrop in the snapshot's backdrops[] (the current
+	 * region's records in record order), or -1. */
+	int16_t source_backdrop_index;
 } XwaDirLight;
 
 #define XWA_SNAP_MAX_DIR_LIGHTS 8

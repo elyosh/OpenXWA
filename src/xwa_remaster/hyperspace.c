@@ -456,6 +456,7 @@ static void hyper_build_tunnel_lighting(XwaRemasterHyperspace* h, const float ca
 			h->lighting.key.color[channel] = XwaRemaster_LinearToSrgb(linear_key[channel] / intensity);
 		}
 		h->lighting.key.source_backdrop_model_type = 0;
+		h->lighting.key.source_backdrop_index = -1;
 		h->lighting.key_count = 1;
 	}
 	h->lighting.active = 1;

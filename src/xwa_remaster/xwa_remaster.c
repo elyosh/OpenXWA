@@ -22,6 +22,7 @@
 #include "xwa_remaster/assets.h"
 #include "xwa_remaster/cutscene.h"
 #include "xwa_remaster/debug_tools.h"
+#include "xwa_remaster/env_capture.h"
 #include "xwa_remaster/environment.h"
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/frontend.h"
@@ -578,6 +579,11 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		snap->scene_kind != XWA_SCENE_CUTSCENE) {
 		g.force_scene_render = 0;
 	}
+	/* An environment capture runs from a flight frame, so a pending one
+	 * renders the next frame even while the game is paused. */
+	if (XwaRemasterEnvCapture_Pending() && snap->scene_kind == XWA_SCENE_FLIGHT) {
+		g.force_scene_render = 1;
+	}
 
 	/* Render on new sim ticks and reuse the persistent texture between them.
 	 * Keep the last complete render across a scene transition until the new
@@ -733,6 +739,12 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		int next_scene_is_direct = g.scene_is_direct;
 		int next_scene_is_tonemapped = g.scene_is_tonemapped;
 		int render_output_required = retain_scene_frame;
+		/* A pending environment capture renders and reads back its own scenes
+		 * before this frame's command buffer exists; the frame then renders
+		 * normally. */
+		if (!retain_scene_frame && snap->scene_kind == XWA_SCENE_FLIGHT && XwaRemasterEnvCapture_Pending()) {
+			XwaRemasterEnvCapture_Run(snap, g.assets);
+		}
 		AeronCommandBuffer* cmd = Aeron_AcquireCommandBuffer();
 		if (!cmd) {
 			XwaRemaster_FatalGpu("HD frame command-buffer acquisition");
