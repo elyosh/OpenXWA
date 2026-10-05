@@ -29,6 +29,7 @@ static const char* const s_hangarDroid2Keys[] = { "hangardroid2", NULL };
 static const char* const s_workDroid1Keys[] = { "workdroid1", NULL };
 static const char* const s_pilotKeys[] = { "rebelpilot", "imperialpilot", NULL };
 static const char* const s_accelRingKeys[] = { "accelring2", "accelring3", NULL };
+static const char* const s_compactorKeys[] = { "compactor", NULL };
 static const char* const s_platformKeys[] = { "platform1", "platform2", "platform3",
 											  "platform4", "platform5", NULL };
 
@@ -49,6 +50,10 @@ static const ModelRoleInfo s_roles[XWA_MODEL_ROLE_COUNT] = {
 	[XWA_ROLE_PILOT_LIMB_3] = { "pilot.limb.3", MODEL_ROLE_SINGLE, s_pilotKeys },
 	[XWA_ROLE_PILOT_LIMB_4] = { "pilot.limb.4", MODEL_ROLE_SINGLE, s_pilotKeys },
 	[XWA_ROLE_ACCELRING_CORE] = { "accelring.core", MODEL_ROLE_SINGLE, s_accelRingKeys },
+	[XWA_ROLE_COMPACTOR_DOOR_1] = { "compactor.door.1", MODEL_ROLE_SINGLE, s_compactorKeys },
+	[XWA_ROLE_COMPACTOR_DOOR_2] = { "compactor.door.2", MODEL_ROLE_SINGLE, s_compactorKeys },
+	[XWA_ROLE_COMPACTOR_DOOR_3] = { "compactor.door.3", MODEL_ROLE_SINGLE, s_compactorKeys },
+	[XWA_ROLE_COMPACTOR_DOOR_4] = { "compactor.door.4", MODEL_ROLE_SINGLE, s_compactorKeys },
 };
 
 static int ModelRole_AppliesTo(const ModelRoleInfo* info, const char* key) {

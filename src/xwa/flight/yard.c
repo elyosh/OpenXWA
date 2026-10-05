@@ -137,7 +137,10 @@ const float g_yardCentrifugeDamageScale = 0.5f;
 // GLOBAL: XWA 0x5AA0EC
 const float g_yardTurretLeadTimeScale = 4.0f;
 // GLOBAL: XWA 0x6005C0
-const uint8_t g_yardCompactorMeshOpenLimits[5] = { 0u, 0x20u, 0x40u, 0x20u, 0x20u };
+// Open limit per compactor component. The original table is five bytes followed
+// by three zero alignment bytes, which Yard_UpdateCompactorCycle reads for the
+// stock model's components 5 and 6 (they never open); they are explicit here.
+const uint8_t g_yardCompactorMeshOpenLimits[8] = { 0u, 0x20u, 0x40u, 0x20u, 0x20u, 0u, 0u, 0u };
 
 // FUNCTION: XWA 0x511E40
 void Yard_InitChallengeScene(void) {
@@ -1243,19 +1246,44 @@ void Yard_UpdateCompactorCycle(int deltaTicks) {
 			break;
 
 		case 1:
-			meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(compactorObj->objectType);
-			if (meshCount > 1u) {
-				for (meshIdx = 1; meshIdx < meshCount; ++meshIdx) {
-					if (compactorCraft->meshRotation[meshIdx] < g_yardCompactorMeshOpenLimits[meshIdx]) {
+#ifdef XWA_MODERN
+			/* Modern port: a GLB replacement names its four doors with roles;
+			 * door n opens to stock limit n. */
+			if (XwaModelRole_IsReplacement((uint16_t)compactorObj->objectType)) {
+				uint16_t door;
+
+				for (door = 1; door <= 4; ++door) {
+					meshIdx = (uint16_t)XwaModelRole_Resolve(
+						(uint16_t)compactorObj->objectType,
+						(XwaModelRole)(XWA_ROLE_COMPACTOR_DOOR_1 + door - 1), door);
+					if (compactorCraft->meshRotation[meshIdx] < g_yardCompactorMeshOpenLimits[door]) {
 						compactorCraft->meshRotation[meshIdx] += (uint8_t)stepCount;
-						if (compactorCraft->meshRotation[meshIdx] > g_yardCompactorMeshOpenLimits[meshIdx]) {
-							compactorCraft->meshRotation[meshIdx] = g_yardCompactorMeshOpenLimits[meshIdx];
+						if (compactorCraft->meshRotation[meshIdx] > g_yardCompactorMeshOpenLimits[door]) {
+							compactorCraft->meshRotation[meshIdx] = g_yardCompactorMeshOpenLimits[door];
+						}
+					}
+				}
+			} else
+#endif
+			{
+				meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(compactorObj->objectType);
+				if (meshCount > 1u) {
+					for (meshIdx = 1; meshIdx < meshCount; ++meshIdx) {
+						if (compactorCraft->meshRotation[meshIdx] < g_yardCompactorMeshOpenLimits[meshIdx]) {
+							compactorCraft->meshRotation[meshIdx] += (uint8_t)stepCount;
+							if (compactorCraft->meshRotation[meshIdx] >
+								g_yardCompactorMeshOpenLimits[meshIdx]) {
+								compactorCraft->meshRotation[meshIdx] =
+									g_yardCompactorMeshOpenLimits[meshIdx];
+							}
 						}
 					}
 				}
 			}
 
-			if (compactorCraft->meshRotation[2] == g_yardCompactorMeshOpenLimits[2]) {
+			if (compactorCraft
+					->meshRotation[XWA_MODEL_ROLE(compactorObj->objectType, XWA_ROLE_COMPACTOR_DOOR_2, 2)] ==
+				g_yardCompactorMeshOpenLimits[2]) {
 				g_yardContext.compactorCycleState = 2;
 				fsfx_PlaySound(182, sourceObjIdx, (unsigned int)g_localPlayer);
 			}
@@ -1278,15 +1306,37 @@ void Yard_UpdateCompactorCycle(int deltaTicks) {
 		}
 
 		case 3:
-			meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(compactorObj->objectType);
-			if (meshCount > 1u) {
-				for (meshIdx = 1; meshIdx < meshCount; ++meshIdx) {
+#ifdef XWA_MODERN
+			/* Modern port: close the replacement's door roles (see case 1). */
+			if (XwaModelRole_IsReplacement((uint16_t)compactorObj->objectType)) {
+				uint16_t door;
+
+				for (door = 1; door <= 4; ++door) {
+					meshIdx = (uint16_t)XwaModelRole_Resolve(
+						(uint16_t)compactorObj->objectType,
+						(XwaModelRole)(XWA_ROLE_COMPACTOR_DOOR_1 + door - 1), door);
 					meshRotation = compactorCraft->meshRotation[meshIdx];
 					if (meshRotation > 0u) {
 						meshRotation = (uint8_t)(meshRotation - stepCount);
 						compactorCraft->meshRotation[meshIdx] = meshRotation;
-						if (meshRotation > g_yardCompactorMeshOpenLimits[meshIdx]) {
+						if (meshRotation > g_yardCompactorMeshOpenLimits[door]) {
 							compactorCraft->meshRotation[meshIdx] = 0;
+						}
+					}
+				}
+			} else
+#endif
+			{
+				meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(compactorObj->objectType);
+				if (meshCount > 1u) {
+					for (meshIdx = 1; meshIdx < meshCount; ++meshIdx) {
+						meshRotation = compactorCraft->meshRotation[meshIdx];
+						if (meshRotation > 0u) {
+							meshRotation = (uint8_t)(meshRotation - stepCount);
+							compactorCraft->meshRotation[meshIdx] = meshRotation;
+							if (meshRotation > g_yardCompactorMeshOpenLimits[meshIdx]) {
+								compactorCraft->meshRotation[meshIdx] = 0;
+							}
 						}
 					}
 				}
@@ -1310,7 +1360,9 @@ void Yard_UpdateCompactorCycle(int deltaTicks) {
 				}
 			}
 
-			if (compactorCraft->meshRotation[2] == 0) {
+			if (compactorCraft
+					->meshRotation[XWA_MODEL_ROLE(compactorObj->objectType, XWA_ROLE_COMPACTOR_DOOR_2, 2)] ==
+				0) {
 				g_yardContext.compactorCycleState = 0;
 				(void)fsfx_PlaySound(182, sourceObjIdx, (unsigned int)g_localPlayer);
 				fsfx_PlaySound(185, sourceObjIdx, (unsigned int)g_localPlayer);

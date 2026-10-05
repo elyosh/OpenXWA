@@ -38,6 +38,12 @@ typedef enum XwaModelRole {
 	/* AccelRing2/3: the core the proving-grounds course has the player
 	   destroy (target box, hit filter, speed boost, reset). */
 	XWA_ROLE_ACCELRING_CORE,
+	/* Compactor: its four doors, in order; door 2 decides when it is fully
+	   open or closed, and door n keeps stock open limit n. */
+	XWA_ROLE_COMPACTOR_DOOR_1,
+	XWA_ROLE_COMPACTOR_DOOR_2,
+	XWA_ROLE_COMPACTOR_DOOR_3,
+	XWA_ROLE_COMPACTOR_DOOR_4,
 	XWA_MODEL_ROLE_COUNT
 } XwaModelRole;
 
