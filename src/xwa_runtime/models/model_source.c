@@ -35,6 +35,13 @@ static ModelSourceCraftKey* s_craftKeys;
 static int s_craftKeyCount;
 static ModelSourceCockpitKey* s_cockpitKeys;
 static int s_cockpitKeyCount;
+/* Equipment0.LST keys by row, like s_craftRows, and the replaceable ones:
+   every row except projectiles, whose HD rendering relies on runtime-OPT
+   emission. */
+static ModelSourceKeyText* s_equipmentRows;
+static int s_equipmentRowCount;
+static ModelSourceCockpitKey* s_equipmentKeys;
+static int s_equipmentKeyCount;
 
 static const char s_exteriorSuffix[] = "exterior";
 
@@ -196,8 +203,6 @@ static int ModelSource_AddCockpitKey(const char* key) {
    FeDiskIo_LoadCockpitModel tries, and the Equipment0.LST key of every
    turret-seat model type. */
 static int ModelSource_BuildCockpitKeys(void) {
-	ModelSourceKeyText* equipmentRows;
-	int equipmentRowCount;
 	int modelIndex;
 	int ok;
 
@@ -219,10 +224,6 @@ static int ModelSource_BuildCockpitKeys(void) {
 		return 0;
 	}
 
-	if (!ModelSource_ReadList("FlightModels\\Equipment0.LST", &equipmentRows, &equipmentRowCount)) {
-		Aeron_LogWarn("xwa.models", "cannot read FlightModels\\Equipment0.LST; turret seats keep their OPT");
-		return 1;
-	}
 	for (modelIndex = 0; ok && modelIndex < XWA_MODEL_DEF_COUNT; ++modelIndex) {
 		int seat;
 
@@ -235,19 +236,71 @@ static int ModelSource_BuildCockpitKeys(void) {
 			}
 			info = &g_modelTypeTable[objectType];
 			if ((info->recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) != 0 && info->textureGroup == 1 &&
-				(int)info->frameCount < equipmentRowCount) {
-				ok = ModelSource_AddCockpitKey(equipmentRows[info->frameCount]);
+				(int)info->frameCount < s_equipmentRowCount) {
+				ok = ModelSource_AddCockpitKey(s_equipmentRows[info->frameCount]);
 			}
 		}
 	}
-	free(equipmentRows);
 	return ok;
+}
+
+static int ModelSource_IsProjectileEquipmentRow(int row) {
+	int objectType;
+
+	for (objectType = 0; objectType < OBJ_Count; ++objectType) {
+		const ModelTypeInfo* info = &g_modelTypeTable[objectType];
+
+		if ((info->recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) != 0 && info->textureGroup == 1 &&
+			(int)info->frameCount == row &&
+			(info->genusId == GENUS_PlayerProjectile || info->genusId == GENUS_NpcProjectile)) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/* Every Equipment0.LST model except projectiles. Recovered code reaches the
+   components of some of them by number; those sites resolve component roles
+   (xwa_runtime/models/model_roles.h), so their layout is free too. */
+static int ModelSource_BuildEquipmentKeys(void) {
+	int row;
+
+	for (row = 0; row < s_equipmentRowCount; ++row) {
+		const char* key = s_equipmentRows[row];
+		ModelSourceCockpitKey* entry;
+		int known;
+		int i;
+
+		if (key[0] == '\0' || ModelSource_IsProjectileEquipmentRow(row)) {
+			continue;
+		}
+		known = 0;
+		for (i = 0; i < s_equipmentKeyCount && !known; ++i) {
+			known = strcmp(s_equipmentKeys[i].key, key) == 0;
+		}
+		if (known) {
+			continue;
+		}
+		if (!ModelSource_Grow((void**)&s_equipmentKeys, s_equipmentKeyCount, sizeof *s_equipmentKeys)) {
+			return 0;
+		}
+		entry = &s_equipmentKeys[s_equipmentKeyCount++];
+		memset(entry, 0, sizeof *entry);
+		strcpy(entry->key, key);
+	}
+	return 1;
 }
 
 static void ModelSource_Reset(void) {
 	free(s_craftRows);
 	free(s_craftKeys);
 	free(s_cockpitKeys);
+	free(s_equipmentRows);
+	free(s_equipmentKeys);
+	s_equipmentRows = NULL;
+	s_equipmentRowCount = 0;
+	s_equipmentKeys = NULL;
+	s_equipmentKeyCount = 0;
 	s_craftRows = NULL;
 	s_craftRowCount = 0;
 	s_craftKeys = NULL;
@@ -280,7 +333,11 @@ void XwaModelSource_Init(void) {
 			return;
 		}
 	}
-	if (!ModelSource_BuildCockpitKeys()) {
+	if (!ModelSource_ReadList("FlightModels\\Equipment0.LST", &s_equipmentRows, &s_equipmentRowCount)) {
+		Aeron_LogWarn("xwa.models",
+					  "cannot read FlightModels\\Equipment0.LST; equipment and turret seats keep their OPT");
+	}
+	if (!ModelSource_BuildCockpitKeys() || !ModelSource_BuildEquipmentKeys()) {
 		Aeron_LogError("xwa.models", "out of memory building the model replacement set");
 		ModelSource_Reset();
 		return;
@@ -313,9 +370,20 @@ void XwaModelSource_Init(void) {
 			++glbCount;
 		}
 	}
+	for (i = 0; i < s_equipmentKeyCount; ++i) {
+		ModelSourceCockpitKey* entry = &s_equipmentKeys[i];
+
+		entry->hasGlb =
+			(uint8_t)(ModelSource_FindCockpitKey(entry->key) == NULL && ModelSource_GlbExists(entry->key));
+		if (entry->hasGlb) {
+			Aeron_LogInfo("xwa.models", "replacement: %s", entry->key);
+			++glbCount;
+		}
+	}
 	s_initialized = 1;
-	Aeron_LogInfo("xwa.models", "model replacements: %d GLB (%d craft keys, %d cockpit-class keys)", glbCount,
-				  s_craftKeyCount, s_cockpitKeyCount);
+	Aeron_LogInfo("xwa.models",
+				  "model replacements: %d GLB (%d craft keys, %d cockpit-class keys, %d equipment keys)",
+				  glbCount, s_craftKeyCount, s_cockpitKeyCount, s_equipmentKeyCount);
 }
 
 XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_t glbPathSize) {
@@ -324,6 +392,7 @@ XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_
 	const ModelSourceCraftKey* craft;
 	const ModelSourceCockpitKey* cockpit;
 	size_t length;
+	int i;
 
 	if (!s_replacementsEnabled || !s_initialized || !XwaModelSource_NormalizeKey(fileName, key)) {
 		return XWA_MODEL_SOURCE_OPT;
@@ -351,6 +420,11 @@ XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_
 	if (glbKey == NULL) {
 		cockpit = ModelSource_FindCockpitKey(key);
 		if (cockpit != NULL && cockpit->hasGlb) {
+			glbKey = key;
+		}
+	}
+	for (i = 0; glbKey == NULL && i < s_equipmentKeyCount; ++i) {
+		if (s_equipmentKeys[i].hasGlb && strcmp(s_equipmentKeys[i].key, key) == 0) {
 			glbKey = key;
 		}
 	}
