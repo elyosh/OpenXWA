@@ -112,6 +112,9 @@ void XwaRemasterEnvironment_Resolve(const struct XwaSnapshot* snap, XwaEnvironme
  * before the first resolution. */
 int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mission, size_t mission_size);
 
+/* The normalized mission key whose packages are prepared; "" when none. */
+const char* XwaRemasterEnvironment_PreparedMissionKey(void);
+
 const char* XwaRemasterEnvironment_ModeName(XwaEnvironmentMode mode);
 const char* XwaRemasterEnvironment_FallbackName(XwaEnvironmentFallback fallback);
 

@@ -31,6 +31,7 @@
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <cstdio>
+#include <cstring>
 #include <imgui.h>
 
 /* ---- PBR — Global --------------------------------------------------- */
@@ -397,9 +398,19 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 	changed |= ImGui::ColorEdit3("Light color", p.color, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 	ImGui::Separator();
 	ImGui::TextUnformatted("Ambient cube (linear)");
+	/* An authored hangar package's fill and diffuse cube replace this cube. */
+	XwaEnvironmentSelection selection;
+	const bool authored_hangar = XwaRemasterEnvironment_LastSelection(&selection, NULL, 0) &&
+								 selection.mode == XWA_ENV_MODE_HANGAR && selection.package;
+	if (authored_hangar) {
+		ImGui::TextDisabled("Replaced by the authored hangar package '%s' (Environment tool).",
+							selection.reference ? selection.reference->package : "?");
+	}
+	ImGui::BeginDisabled(authored_hangar);
 	changed |= ImGui::SliderFloat("Ceiling fill (+Z)", &p.ambient_ceiling, 0.0f, 1.0f, "%.3f");
 	changed |= ImGui::SliderFloat("Wall bounce", &p.ambient_sides, 0.0f, 1.0f, "%.3f");
 	changed |= ImGui::SliderFloat("Floor bounce (-Z)", &p.ambient_floor, 0.0f, 1.0f, "%.3f");
+	ImGui::EndDisabled();
 	ImGui::Separator();
 	changed |= ImGui::SliderFloat("Shadow filter radius", &p.shadow_filter_radius, 0.5f, 3.0f, "%.2f texels");
 	if (!enabled) {
@@ -1049,6 +1060,18 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 	char mission[128];
 	if (XwaRemasterEnvironment_LastSelection(&selection, mission, sizeof mission)) {
 		ImGui::Text("Mission: %s, region %u", mission[0] ? mission : "(none)", (unsigned)selection.region);
+		/* The normalized key is what the manifest's xwa.missions entry needs. */
+		char key[XWA_ENV_MISSION_KEY_MAX];
+		if (mission[0] && XwaRemasterEnvironment_NormalizeMissionKey(mission, key, sizeof key)) {
+			ImGui::Text("Manifest key: %s", key);
+			if (ImGui::SmallButton("Copy key")) {
+				ImGui::SetClipboardText(key);
+			}
+			const char* prepared = XwaRemasterEnvironment_PreparedMissionKey();
+			if (strcmp(prepared, key) != 0) {
+				ImGui::Text("Prepared key: %s", prepared[0] ? prepared : "(none)");
+			}
+		}
 		ImGui::Text("Selection: %s%s%s", XwaRemasterEnvironment_ModeName(selection.mode),
 					selection.reference ? ", package " : "",
 					selection.reference ? selection.reference->package : "");

@@ -579,6 +579,8 @@ int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mis
 	return 1;
 }
 
+const char* XwaRemasterEnvironment_PreparedMissionKey(void) { return s_env.prepared_key; }
+
 const char* XwaRemasterEnvironment_ModeName(XwaEnvironmentMode mode) {
 	switch (mode) {
 		case XWA_ENV_MODE_DISABLED:

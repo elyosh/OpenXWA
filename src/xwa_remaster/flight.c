@@ -3660,10 +3660,26 @@ static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronEnvir
 	for (uint32_t i = 0; i < package->light_count && count < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
 		fl_package_light_to_dir_light(&package->lights[i], &out->authored_lights[count++]);
 	}
+	uint32_t kept = 0;
 	for (uint32_t i = 0; i < snap->dir_light_count && count < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
 		if (snap->dir_lights[i].source_backdrop_model_type == 0) {
 			out->authored_lights[count++] = snap->dir_lights[i];
+			kept++;
 		}
+	}
+	/* In flight every recovered directional comes from a backdrop, so a kept
+	 * untagged light is unexpected (a special scene, or a backdrop the
+	 * snapshot could not trace) and may double-light the region. Logged
+	 * once per package and region. */
+	static const AeronEnvironmentPackage* warned_package;
+	static uint8_t warned_region;
+	if (kept > 0 && (warned_package != package || warned_region != snap->flight_camera.region)) {
+		warned_package = package;
+		warned_region = snap->flight_camera.region;
+		Aeron_LogWarn("xwa.remaster",
+					  "environment: authored region %u keeps %u recovered directional(s) without a backdrop "
+					  "source; check for double lighting",
+					  (unsigned)snap->flight_camera.region, kept);
 	}
 	out->lights = out->authored_lights;
 	out->light_count = count;
