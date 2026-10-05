@@ -41,6 +41,12 @@ typedef struct XwaOptSynthData {
 	XwaOptSynthMesh* meshes;     /* in component order, ascending stub offsets */
 	AeronOptSimModel simulation; /* owns faces and BVHs */
 	AeronFlightTag* tagStorage;  /* owns every mesh's tags */
+	/* The GLB is parsed once: after the simulation data is built, the parsed
+	   model keeps what the HD renderer needs until it has built its mesh
+	   (xwa_runtime/models/render_model.h). */
+	int hasRenderModel;
+	AeronFlightModel renderModel;
+	struct XwaOptSynthData* nextLive; /* loaded replacements, for XwaRenderModel_Find */
 } XwaOptSynthData;
 
 void OptSynth_Free(XwaOptSynthData* synth);

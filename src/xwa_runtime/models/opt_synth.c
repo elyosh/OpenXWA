@@ -9,6 +9,7 @@
 #include "xwa/util/memory.h"
 #include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/models/render_model.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -315,25 +316,27 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 		return OptSynth_Fail(key, "cannot read the GLB");
 	}
 	glbHash = Aeron_Xxh64(glb, glbSize, 0);
-	if (!Aeron_FlightModelBuildSemanticsMemory(glb, glbSize, path, &model)) {
+	/* The full build: the HD renderer takes the render half from this parse
+	   (XwaRenderModel_Find) instead of reading the GLB again. */
+	if (!Aeron_FlightModelBuildMemory(glb, glbSize, path, &model)) {
 		free(glb);
 		return OptSynth_Fail(key, "invalid GLB or AERON_flight_model data");
 	}
 	free(glb);
 	if (!OptSynth_ValidateModel(key, &model)) {
-		Aeron_FlightModelFreeSemantics(&model);
+		Aeron_FlightModelFree(&model);
 		return 0;
 	}
 
 	simOptions.vertex_sample_count = OPT_SYNTH_VERTEX_SAMPLE_COUNT;
 	simOptions.trailing_box = AERON_OPT_TRAILING_BOX_DESCRIPTOR;
 	if (!Aeron_OptSimModelBuild(&model, &simOptions, &simulation, error, sizeof error)) {
-		Aeron_FlightModelFreeSemantics(&model);
+		Aeron_FlightModelFree(&model);
 		return OptSynth_Fail(key, error);
 	}
 	if (!OptSynth_ValidateSimulation(key, &simulation)) {
 		Aeron_OptSimModelFree(&simulation);
-		Aeron_FlightModelFreeSemantics(&model);
+		Aeron_FlightModelFree(&model);
 		return 0;
 	}
 
@@ -346,7 +349,7 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 															&payloadSize, stubOffsets, error, sizeof error)) {
 		free(stubOffsets);
 		Aeron_OptSimModelFree(&simulation);
-		Aeron_FlightModelFreeSemantics(&model);
+		Aeron_FlightModelFree(&model);
 		return OptSynth_Fail(key, stubOffsets == NULL ? "out of memory" : error);
 	}
 
@@ -369,12 +372,15 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 	Aeron_OptSimModelTrimToFaces(&simulation);
 	synth = OptSynth_CreateData(key, glbHash, &model, &simulation, stubOffsets);
 	free(stubOffsets);
-	Aeron_FlightModelFreeSemantics(&model);
 	if (synth == NULL) {
+		Aeron_FlightModelFree(&model);
 		Aeron_OptSimModelFree(&simulation);
 		free(payload);
 		return OptSynth_Fail(key, "out of memory");
 	}
+	Aeron_FlightModelReleaseSimulationData(&model);
+	synth->renderModel = model;
+	synth->hasRenderModel = 1;
 
 	Aeron_LogInfo("xwa.models",
 				  "replacement '%s': hash=%016llx components=%u vertices=%u faces=%u image=%d bytes "
@@ -387,10 +393,55 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 	return 1;
 }
 
+/* Loaded replacements, most recent first; linked once a handle owns them. */
+static XwaOptSynthData* s_liveSynths;
+
+static void OptSynth_Unlink(XwaOptSynthData* synth) {
+	XwaOptSynthData** link;
+
+	for (link = &s_liveSynths; *link != NULL; link = &(*link)->nextLive) {
+		if (*link == synth) {
+			*link = synth->nextLive;
+			synth->nextLive = NULL;
+			return;
+		}
+	}
+}
+
+static void OptSynth_DropRenderModel(XwaOptSynthData* synth) {
+	if (synth->hasRenderModel) {
+		Aeron_FlightModelFree(&synth->renderModel);
+		synth->hasRenderModel = 0;
+	}
+}
+
+const AeronFlightModel* XwaRenderModel_Find(const char* key) {
+	const XwaOptSynthData* synth;
+
+	for (synth = s_liveSynths; synth != NULL && key != NULL; synth = synth->nextLive) {
+		if (synth->hasRenderModel && strcmp(synth->key, key) == 0) {
+			return &synth->renderModel;
+		}
+	}
+	return NULL;
+}
+
+void XwaRenderModel_Release(const char* key) {
+	XwaOptSynthData* synth;
+
+	for (synth = s_liveSynths; synth != NULL && key != NULL; synth = synth->nextLive) {
+		if (strcmp(synth->key, key) == 0) {
+			OptSynth_DropRenderModel(synth);
+		}
+	}
+}
+
 void OptSynth_Free(XwaOptSynthData* synth) {
 	if (synth == NULL) {
 		return;
 	}
+	OptSynth_Unlink(synth);
+	OptSynth_DropRenderModel(synth);
 	Aeron_OptSimModelFree(&synth->simulation);
 	free(synth->meshes);
 	free(synth->tagStorage);
@@ -495,6 +546,8 @@ uint16_t OptSynth_LoadToHandle(const char* fileName, int* outVersion) {
 		return 0;
 	}
 	native->synth = synth;
+	synth->nextLive = s_liveSynths;
+	s_liveSynths = synth;
 
 	Memory_UnlockHandle(handle);
 	if (outVersion != NULL) {

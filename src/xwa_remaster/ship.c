@@ -10,6 +10,7 @@
 #include "xwa_remaster/glow_marks.h"
 #include "xwa_remaster/opt_mesh.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/models/render_model.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -86,28 +87,41 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 	char path[512];
 	AeronFlightModel model;
 	if (source == XWA_MODEL_SOURCE_GLB) {
-		uint8_t* bytes = NULL;
-		size_t size = 0;
 		if (!XwaModelSource_GlbPath(key, path, sizeof path)) {
 			Aeron_LogError("xwa.remaster", "mesh: GLB path too long for '%s'", key);
 			ship_set_failure(cmd, "Ship model '%s': GLB path too long", key);
 			return NULL;
 		}
-		if (!AeronVfs_ReadAll(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, path, 0, &bytes, &size)) {
-			Aeron_LogError("xwa.remaster", "mesh: cannot read GLB '%s'", path);
-			ship_set_failure(cmd, "Ship model '%s': cannot read '%s'", key, path);
-			return NULL;
-		}
-		const int built = Aeron_FlightModelBuildMemory(bytes, size, path, &model);
-		free(bytes);
-		if (!built) {
-			Aeron_LogError("xwa.remaster", "mesh: GLB content invalid '%s'", path);
-			ship_set_failure(cmd, "Ship model '%s': invalid GLB '%s'", key, path);
-			return NULL;
+		/* The simulation parsed this GLB when it loaded the model; build from
+		 * that parse. Only a rebuild after the parsed model was released (a
+		 * renderer restart) reads the file again. */
+		const AeronFlightModel* parsed = XwaRenderModel_Find(key);
+		if (!parsed) {
+			uint8_t* bytes = NULL;
+			size_t size = 0;
+			Aeron_LogInfo("xwa.remaster", "mesh: '%s' has no parsed model; reading '%s'", key, path);
+			if (!AeronVfs_ReadAll(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, path, 0, &bytes, &size)) {
+				Aeron_LogError("xwa.remaster", "mesh: cannot read GLB '%s'", path);
+				ship_set_failure(cmd, "Ship model '%s': cannot read '%s'", key, path);
+				return NULL;
+			}
+			const int built = Aeron_FlightModelBuildMemory(bytes, size, path, &model);
+			free(bytes);
+			if (!built) {
+				Aeron_LogError("xwa.remaster", "mesh: GLB content invalid '%s'", path);
+				ship_set_failure(cmd, "Ship model '%s': invalid GLB '%s'", key, path);
+				return NULL;
+			}
 		}
 		AeronSceneMeshCreateStatus create_status;
-		AeronSceneMesh* mesh = AeronScene_MeshCreate(cmd, &model, key, &create_status);
-		Aeron_FlightModelFree(&model);
+		AeronSceneMesh* mesh = AeronScene_MeshCreate(cmd, parsed ? parsed : &model, key, &create_status);
+		if (parsed) {
+			if (mesh) {
+				XwaRenderModel_Release(key);
+			}
+		} else {
+			Aeron_FlightModelFree(&model);
+		}
 		if (!mesh) {
 			Aeron_LogError("xwa.remaster", "mesh: GLB resource creation failed '%s' status=%d", path,
 						   (int)create_status);
@@ -152,6 +166,14 @@ static void ship_mesh_asset_destroy(ShipMeshAsset* asset) {
 	}
 	if (asset) {
 		memset(asset, 0, sizeof *asset);
+	}
+}
+
+/* A reloaded GLB model whose mesh the registry already holds: the parse the
+ * simulation kept for this renderer is not needed. */
+static void ship_release_parsed_model(const ShipDesiredAsset* desired) {
+	if (desired->source == XWA_MODEL_SOURCE_GLB) {
+		XwaRenderModel_Release(desired->key);
 	}
 }
 
@@ -220,6 +242,7 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 			}
 		}
 		if (found < s_pending_mesh_count) {
+			ship_release_parsed_model(&desired[i]);
 			continue;
 		}
 		if (s_pending_mesh_count >= XWA_SNAP_MAX_OPT_ASSETS) {
@@ -233,6 +256,7 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 				*asset = s_meshes[j];
 				asset->pending_new = 0;
 				s_pending_mesh_count++;
+				ship_release_parsed_model(&desired[i]);
 				break;
 			}
 		}
