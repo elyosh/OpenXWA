@@ -27,6 +27,7 @@ static const char* const s_hangarCraneKeys[] = { "hangarcrane", NULL };
 static const char* const s_hangarDroidKeys[] = { "hangardroid", NULL };
 static const char* const s_hangarDroid2Keys[] = { "hangardroid2", NULL };
 static const char* const s_workDroid1Keys[] = { "workdroid1", NULL };
+static const char* const s_pilotKeys[] = { "rebelpilot", "imperialpilot", NULL };
 static const char* const s_platformKeys[] = { "platform1", "platform2", "platform3",
 											  "platform4", "platform5", NULL };
 
@@ -42,6 +43,10 @@ static const ModelRoleInfo s_roles[XWA_MODEL_ROLE_COUNT] = {
 	[XWA_ROLE_WORKDROID1_TURN] = { "workdroid1.turn", MODEL_ROLE_SINGLE, s_workDroid1Keys },
 	[XWA_ROLE_WORKDROID1_NOD_1] = { "workdroid1.nod.1", MODEL_ROLE_SINGLE, s_workDroid1Keys },
 	[XWA_ROLE_WORKDROID1_NOD_2] = { "workdroid1.nod.2", MODEL_ROLE_SINGLE, s_workDroid1Keys },
+	[XWA_ROLE_PILOT_LIMB_1] = { "pilot.limb.1", MODEL_ROLE_SINGLE, s_pilotKeys },
+	[XWA_ROLE_PILOT_LIMB_2] = { "pilot.limb.2", MODEL_ROLE_SINGLE, s_pilotKeys },
+	[XWA_ROLE_PILOT_LIMB_3] = { "pilot.limb.3", MODEL_ROLE_SINGLE, s_pilotKeys },
+	[XWA_ROLE_PILOT_LIMB_4] = { "pilot.limb.4", MODEL_ROLE_SINGLE, s_pilotKeys },
 };
 
 static int ModelRole_AppliesTo(const ModelRoleInfo* info, const char* key) {

@@ -56,6 +56,7 @@
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
 #include "xwa_runtime/input/winmm_joystick_provider.h"
+#include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/opt_synth.h"
@@ -1574,7 +1575,8 @@ void FlightObject_AnimateCrewMeshRotations(int objectIndex, int resetToNeutral) 
 		g_objectTable[objectIndex].objectType == OBJ_ImperialPilot) {
 		int count;
 
-		rotation = &craft->meshRotation[2];
+		rotation = &craft->meshRotation[XWA_MODEL_ROLE(g_objectTable[objectIndex].objectType,
+													   XWA_ROLE_PILOT_LIMB_1, 2)];
 		count = 4;
 		do {
 			if (resetToNeutral) {
@@ -1601,7 +1603,17 @@ void FlightObject_AnimateCrewMeshRotations(int objectIndex, int resetToNeutral) 
 					}
 				}
 			}
+#ifdef XWA_MODERN
+			/* Modern port: limbs are components 2-5 on the stock model, in
+			 * order; a replacement names each one with a pilot.limb role. */
+			if (count > 1) {
+				rotation = &craft->meshRotation[XWA_MODEL_ROLE(
+					g_objectTable[objectIndex].objectType, (XwaModelRole)(XWA_ROLE_PILOT_LIMB_1 + 5 - count),
+					7 - count)];
+			}
+#else
 			++rotation;
+#endif
 			--count;
 		} while (count != 0);
 	}

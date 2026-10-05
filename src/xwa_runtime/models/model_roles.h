@@ -29,6 +29,12 @@ typedef enum XwaModelRole {
 	XWA_ROLE_WORKDROID1_TURN,
 	XWA_ROLE_WORKDROID1_NOD_1,
 	XWA_ROLE_WORKDROID1_NOD_2,
+	/* RebelPilot and ImperialPilot: the four limbs of the crew animation, in
+	   order (the head uses the optional crew.forward tag). */
+	XWA_ROLE_PILOT_LIMB_1,
+	XWA_ROLE_PILOT_LIMB_2,
+	XWA_ROLE_PILOT_LIMB_3,
+	XWA_ROLE_PILOT_LIMB_4,
 	XWA_MODEL_ROLE_COUNT
 } XwaModelRole;
 
