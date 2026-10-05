@@ -45,6 +45,9 @@
 #include "xwa/util/time.h"
 
 #include "xwa/util/debug.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/model_source.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -1632,7 +1635,12 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 							strcpy(g_frontendScratchBuffer, craftModelName);
 							g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 							strcat(g_frontendScratchBuffer, "Exterior.opt");
+#ifdef XWA_MODERN
+							/* Modern port: GLB replacements decide whether the model exists. */
+							stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
+#else
 							stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
+#endif
 							if (stream == NULL) {
 								ModelPreview_LoadModel(craftModelName, BriefingMap_GetSelectedObjectType());
 							} else {
@@ -2265,7 +2273,12 @@ int MissionBriefing_Update(int frameCounter) {
 				strcpy(g_frontendScratchBuffer, craftModelName);
 				g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 				strcat(g_frontendScratchBuffer, "Exterior.opt");
+#ifdef XWA_MODERN
+				/* Modern port: GLB replacements decide whether the model exists. */
+				stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
+#else
 				stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
+#endif
 				if (stream == NULL) {
 					ModelPreview_LoadModel(craftModelName, BriefingMap_GetSelectedObjectType());
 				} else {
@@ -2689,7 +2702,12 @@ int MissionBriefing_Update(int frameCounter) {
 				strcpy(g_frontendScratchBuffer, craftModelName);
 				g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 				strcat(g_frontendScratchBuffer, "Exterior.opt");
+#ifdef XWA_MODERN
+				/* Modern port: GLB replacements decide whether the model exists. */
+				stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
+#else
 				stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
+#endif
 				if (stream == NULL) {
 					ModelPreview_LoadModel(craftModelName, BriefingMap_GetSelectedObjectType());
 				} else {

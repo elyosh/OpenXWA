@@ -363,24 +363,18 @@ XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_
 	return XWA_MODEL_SOURCE_GLB;
 }
 
-int XwaModelSource_ModelFileExists(const char* fileName) {
-	XwaFile* stream;
+XwaFile* XwaModelSource_OpenModelFile(const char* fileName) {
+	char glbPath[XWA_MODEL_SOURCE_KEY_MAX + 32];
 
-	switch (XwaModelSource_Resolve(fileName, NULL, 0)) {
+	switch (XwaModelSource_Resolve(fileName, glbPath, sizeof glbPath)) {
 		case XWA_MODEL_SOURCE_GLB:
-			return 1;
+			return File_Open(AERON_VFS_ROOT_ASSET, glbPath, "rb");
 		case XWA_MODEL_SOURCE_SUPPRESSED:
-			return 0;
+			return NULL;
 		case XWA_MODEL_SOURCE_OPT:
 		default:
-			break;
+			return File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
 	}
-	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
-	if (stream == NULL) {
-		return 0;
-	}
-	File_Close(stream);
-	return 1;
 }
 
 int XwaModelSource_ReplacementsEnabled(void) { return s_replacementsEnabled && s_initialized; }

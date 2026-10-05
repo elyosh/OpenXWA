@@ -8,6 +8,8 @@
  * model file's basename without extension, lower-cased
  * ("FlightModels\\XWing.opt" -> "xwing"). */
 
+#include "xwa/assets/file_io.h"
+
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -31,9 +33,11 @@ void XwaModelSource_Init(void);
 /* `glbPath` (optional) receives the asset-root path of the GLB when the
    result is XWA_MODEL_SOURCE_GLB. */
 XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_t glbPathSize);
-/* Replacement-aware form of the frontend's "does this model file exist"
-   probe: true for GLB, false for SUPPRESSED, the File_Open result for OPT. */
-int XwaModelSource_ModelFileExists(const char* fileName);
+/* Replacement-aware form of the frontend's model-existence probes
+   (File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb")): the same File_Open for
+   OPT, NULL for SUPPRESSED, and an open stream on the GLB for GLB. Callers
+   keep their original close (or leak) of the returned stream. */
+XwaFile* XwaModelSource_OpenModelFile(const char* fileName);
 int XwaModelSource_ReplacementsEnabled(void);
 /* Writes `fileName`'s key (basename without extension, lower-cased) to `key`
    (XWA_MODEL_SOURCE_KEY_MAX bytes). Returns 0 for an empty or overlong name. */

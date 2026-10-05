@@ -19,6 +19,9 @@
 #include "xwa/frontend/frontend_draw.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/memory.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/model_source.h"
+#endif
 
 #include <math.h>
 #include <stdint.h>
@@ -371,7 +374,7 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 	strcpy(fileName, baseName);
 	strcat(fileName, ".opt");
 #ifdef XWA_MODERN
-	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
+	stream = XwaModelSource_OpenModelFile(fileName);
 #else
 	File_OpenGlobalStream(fileName, "rb", 0, 0);
 	stream = g_stream;

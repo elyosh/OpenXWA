@@ -31,6 +31,9 @@
 #include "xwa/movie/movie.h"
 #include "xwa/util/memory.h"
 #include "xwa/xwa_options.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/model_source.h"
+#endif
 
 #include <stdint.h>
 #include <stdio.h>
@@ -1291,7 +1294,12 @@ int TechLibrary_Update(int frameCounter) {
 			strcpy(g_frontendScratchBuffer, craftModelName);
 			g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 			strcat(g_frontendScratchBuffer, "Exterior.opt");
+#ifdef XWA_MODERN
+			/* Modern port: GLB replacements decide whether the model exists. */
+			stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
+#else
 			stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
+#endif
 			if (stream == NULL) {
 				ModelPreview_LoadModel(craftModelName, g_shipList[g_techLibrarySelectedShipListIdx].typeId);
 			} else {
@@ -1398,7 +1406,12 @@ int TechLibrary_Update(int frameCounter) {
 				strcpy(g_frontendScratchBuffer, craftModelName);
 				g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 				strcat(g_frontendScratchBuffer, "Exterior.opt");
+#ifdef XWA_MODERN
+				/* Modern port: GLB replacements decide whether the model exists. */
+				stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
+#else
 				stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
+#endif
 				if (stream == NULL) {
 					ModelPreview_LoadModel(craftModelName,
 										   g_shipList[g_techLibrarySelectedShipListIdx].typeId);
@@ -1521,7 +1534,12 @@ int TechLibrary_Update(int frameCounter) {
 					strcpy(g_frontendScratchBuffer, craftModelName);
 					g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 					strcat(g_frontendScratchBuffer, "Exterior.opt");
+#ifdef XWA_MODERN
+					/* Modern port: GLB replacements decide whether the model exists. */
+					stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
+#else
 					stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
+#endif
 					if (stream == NULL) {
 						ModelPreview_LoadModel(craftModelName,
 											   g_shipList[g_techLibrarySelectedShipListIdx].typeId);
