@@ -30,6 +30,7 @@ static const char* const s_workDroid1Keys[] = { "workdroid1", NULL };
 static const char* const s_pilotKeys[] = { "rebelpilot", "imperialpilot", NULL };
 static const char* const s_accelRingKeys[] = { "accelring2", "accelring3", NULL };
 static const char* const s_compactorKeys[] = { "compactor", NULL };
+static const char* const s_centrifugeKeys[] = { "centrifuge", NULL };
 static const char* const s_platformKeys[] = { "platform1", "platform2", "platform3",
 											  "platform4", "platform5", NULL };
 
@@ -54,6 +55,12 @@ static const ModelRoleInfo s_roles[XWA_MODEL_ROLE_COUNT] = {
 	[XWA_ROLE_COMPACTOR_DOOR_2] = { "compactor.door.2", MODEL_ROLE_SINGLE, s_compactorKeys },
 	[XWA_ROLE_COMPACTOR_DOOR_3] = { "compactor.door.3", MODEL_ROLE_SINGLE, s_compactorKeys },
 	[XWA_ROLE_COMPACTOR_DOOR_4] = { "compactor.door.4", MODEL_ROLE_SINGLE, s_compactorKeys },
+	[XWA_ROLE_CENTRIFUGE_SPIN_1] = { "centrifuge.spin.1", MODEL_ROLE_SINGLE, s_centrifugeKeys },
+	[XWA_ROLE_CENTRIFUGE_SPIN_2] = { "centrifuge.spin.2", MODEL_ROLE_SINGLE, s_centrifugeKeys },
+	[XWA_ROLE_CENTRIFUGE_SPIN_3] = { "centrifuge.spin.3", MODEL_ROLE_SINGLE, s_centrifugeKeys },
+	[XWA_ROLE_CENTRIFUGE_DOOR_1] = { "centrifuge.door.1", MODEL_ROLE_SINGLE, s_centrifugeKeys },
+	[XWA_ROLE_CENTRIFUGE_DOOR_2] = { "centrifuge.door.2", MODEL_ROLE_SINGLE, s_centrifugeKeys },
+	[XWA_ROLE_CENTRIFUGE_DOOR_3] = { "centrifuge.door.3", MODEL_ROLE_SINGLE, s_centrifugeKeys },
 };
 
 static int ModelRole_AppliesTo(const ModelRoleInfo* info, const char* key) {

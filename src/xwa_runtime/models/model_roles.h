@@ -44,6 +44,14 @@ typedef enum XwaModelRole {
 	XWA_ROLE_COMPACTOR_DOOR_2,
 	XWA_ROLE_COMPACTOR_DOOR_3,
 	XWA_ROLE_COMPACTOR_DOOR_4,
+	/* Centrifuge: the spinning part and the door of each of its three
+	   mechanisms, numbered by mechanism. */
+	XWA_ROLE_CENTRIFUGE_SPIN_1,
+	XWA_ROLE_CENTRIFUGE_SPIN_2,
+	XWA_ROLE_CENTRIFUGE_SPIN_3,
+	XWA_ROLE_CENTRIFUGE_DOOR_1,
+	XWA_ROLE_CENTRIFUGE_DOOR_2,
+	XWA_ROLE_CENTRIFUGE_DOOR_3,
 	XWA_MODEL_ROLE_COUNT
 } XwaModelRole;
 

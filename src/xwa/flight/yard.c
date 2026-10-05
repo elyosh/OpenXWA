@@ -2141,26 +2141,26 @@ int Yard_HandleChallengeObjectCollision(unsigned int sourceObjIdx, unsigned int 
 static __inline uint16_t Yard_CentrifugeSpinMeshIndex(int mechanismIdx) {
 	switch (mechanismIdx) {
 		case 0:
-			return 3;
+			return (uint16_t)XWA_MODEL_ROLE(OBJ_Centrifuge, XWA_ROLE_CENTRIFUGE_SPIN_1, 3);
 		case 1:
-			return 4;
+			return (uint16_t)XWA_MODEL_ROLE(OBJ_Centrifuge, XWA_ROLE_CENTRIFUGE_SPIN_2, 4);
 		case 2:
-			return 12;
+			return (uint16_t)XWA_MODEL_ROLE(OBJ_Centrifuge, XWA_ROLE_CENTRIFUGE_SPIN_3, 12);
 		default:
-			return 12;
+			return (uint16_t)XWA_MODEL_ROLE(OBJ_Centrifuge, XWA_ROLE_CENTRIFUGE_SPIN_3, 12);
 	}
 }
 
 static __inline uint16_t Yard_CentrifugeDoorMeshIndex(int mechanismIdx) {
 	switch (mechanismIdx) {
 		case 0:
-			return 8;
+			return (uint16_t)XWA_MODEL_ROLE(OBJ_Centrifuge, XWA_ROLE_CENTRIFUGE_DOOR_1, 8);
 		case 1:
-			return 7;
+			return (uint16_t)XWA_MODEL_ROLE(OBJ_Centrifuge, XWA_ROLE_CENTRIFUGE_DOOR_2, 7);
 		case 2:
-			return 6;
+			return (uint16_t)XWA_MODEL_ROLE(OBJ_Centrifuge, XWA_ROLE_CENTRIFUGE_DOOR_3, 6);
 		default:
-			return 6;
+			return (uint16_t)XWA_MODEL_ROLE(OBJ_Centrifuge, XWA_ROLE_CENTRIFUGE_DOOR_3, 6);
 	}
 }
 
@@ -3678,7 +3678,8 @@ int Yard_BuildAdvancedChallengeCourse(void) {
 	g_yardContext.centrifugeMechanisms[1].angularVelocity = 4.0f;
 	g_yardContext.centrifugeMechanisms[1].delayTicks = 2;
 	g_yardContext.centrifugeMechanisms[1].meshRotationAccum = 8192.0f;
-	g_objectTable[g_yardCentrifugeObjIdx].mobj->pCraft->meshRotation[4] = 32;
+	g_objectTable[g_yardCentrifugeObjIdx]
+		.mobj->pCraft->meshRotation[XWA_MODEL_ROLE(OBJ_Centrifuge, XWA_ROLE_CENTRIFUGE_SPIN_2, 4)] = 32;
 	g_yardContext.centrifugeMechanisms[2].state = 2;
 	g_yardContext.centrifugeMechanisms[2].cycleParity = 0;
 	g_yardContext.centrifugeMechanisms[2].angularAccel = 0.0f;
