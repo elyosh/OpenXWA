@@ -1096,6 +1096,9 @@ typedef struct XwaSnapshot {
 	XwaFlightMapState flight_map;
 	XwaFlightCamera flight_camera;
 	uint8_t flight_camera_valid;
+	/* g_currentMissionFile during a loaded flight (object storage live);
+	 * empty otherwise. Read-only transport for HD environment selection. */
+	char mission_path[128];
 	XwaDeathStarBeam death_star_beam;
 	XwaHyperspaceState hyperspace;
 	XwaHyperspaceStreak hyperspace_streaks[XWA_SNAP_MAX_HYPERSPACE_STREAKS];

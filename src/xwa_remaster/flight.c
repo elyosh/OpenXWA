@@ -14,6 +14,7 @@
 #include "aeron/scene/world.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/effects.h"
+#include "xwa_remaster/environment.h"
 #include "xwa_remaster/flight_map.h"
 #include "xwa_remaster/glow_marks.h"
 #include "xwa_remaster/hud.h"
@@ -215,6 +216,8 @@ static struct {
 	/* Sky source: 0 = authored cube map (sky_path), 1 = XWA-owned GPU
 	 * reproduction of FlightStarfield_Render. Selected by skybox.mode. */
 	int sky_mode;
+	/* Environment selection resolved at the start of each flight frame. */
+	XwaEnvironmentSelection environment;
 	float star_brightness;
 	float star_density;
 	float star_grid;
@@ -455,9 +458,11 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"motion_blur.velocity_viz",      "motion_blur.fsr_direct_motion",
 		"texture_filtering.anisotropic",
 		"hangar_lighting.enabled",       "lighting.spec_geom_adapt",
+		"environment_maps.enabled",
 	};
 	static const char* strings[] = {
 		"skybox.path", "skybox.mode", "temporal_upscaling.mode",
+		"environment_maps.manifest",
 	};
 	for (size_t i = 0; i < sizeof ints / sizeof ints[0]; i++) {
 		if (!fl_cfg_has_type(config, ints[i], AERON_CONFIG_INT)) {
@@ -762,6 +767,10 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	if (!fl_load_hyperspace_config(cf, path)) {
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	if (!XwaRemasterEnvironment_Init(vfs, cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -3734,6 +3743,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		return fl_render_map(cmd, snap, assets, &flight_view, host_time_us, direct_present);
 	}
 	s.map_present = 0;
+	/* One environment selection per frame, before any sky, backdrop,
+	 * directional or lens-flare decision. */
+	XwaRemasterEnvironment_Resolve(snap, &s.environment);
 	const int hyperspace_preview = s.hyperspace_preview && !cam->hyperspace_phase;
 	s.suppress_hud = hyperspace_preview;
 	if (cam->hyperspace_phase || hyperspace_preview) {
@@ -4349,6 +4361,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 
 void XwaRemasterFlight_Shutdown(void) {
 	XwaRemasterFlightMap_Shutdown();
+	XwaRemasterEnvironment_Shutdown();
 	XwaRemasterHyperspace_Destroy(s.hyperspace);
 	s.hyperspace = NULL;
 	XwaRemasterSkyStars_Destroy(s.sky_stars);

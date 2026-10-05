@@ -161,6 +161,7 @@ void XwaSnapshot_BeginTick(void) {
 	s->flight_object_count = 0;
 	memset(&s->flight_map, 0, sizeof s->flight_map);
 	s->flight_camera_valid = 0;
+	s->mission_path[0] = '\0';
 	memset(&s->death_star_beam, 0, sizeof s->death_star_beam);
 	memset(&s->hyperspace, 0, sizeof s->hyperspace);
 	memset(&s->hud, 0, sizeof s->hud);
@@ -1172,6 +1173,8 @@ void XwaSnapshot_CaptureFlight(void) {
 	if (!g_objectTable || g_objectTableHandle == 0) {
 		return;
 	}
+	memcpy(s->mission_path, g_currentMissionFile, sizeof s->mission_path);
+	s->mission_path[sizeof s->mission_path - 1] = '\0';
 	{
 		const PlayerData* player = &g_players[g_localPlayer];
 		XwaHyperspaceState* h = &s->hyperspace;

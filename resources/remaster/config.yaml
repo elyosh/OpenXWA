@@ -145,6 +145,13 @@ hangar_lighting:
   ambient_sides: 0.10
   ambient_floor: 0.06
   shadow_filter_radius: 2.0
+# Authored per-region HDR environments (sky, diffuse and specular lighting,
+# suns). The manifest, under the remaster bake root, holds the `packages:`
+# map and the `xwa:` hangar and (mission, region) mapping; it is required
+# when enabled. Regions without an entry keep the classic HD sky.
+environment_maps:
+  enabled: false
+  manifest: "flight/environments/environments.yaml"
 skybox:
   enabled: true
   exposure: 1.0
