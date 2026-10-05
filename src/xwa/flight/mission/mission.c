@@ -33,6 +33,10 @@
 #include "xwa/util/random.h"
 #include "xwa/util/string.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/model_roles.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/opt_synth.h"
+#endif
 
 #include <locale.h>
 #include <stdarg.h>
@@ -6680,7 +6684,34 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 	if (g_spawnGenusId == GENUS_Platform && (uint16_t)g_spawnObjectType >= OBJ_Platform1 &&
 		(uint16_t)g_spawnObjectType <= OBJ_Platform5) {
 		uint8_t beam = g_missionFlightGroups[g_currentFlightGroupIdx].fg.beam;
-		if (beam) {
+#ifdef XWA_MODERN
+		/* Modern port: a GLB replacement names these components with role
+		 * tags instead of the per-platform table, which assumes the stock
+		 * layout. Any beam hides platform.hidden_by_beam; jamming and decoy
+		 * beams (all but tractor, 1) also hide platform.hidden_by_jamming_decoy. */
+		if (beam && XwaModelRole_IsReplacement((uint16_t)g_spawnObjectType)) {
+			int components[XWA_OPT_SYNTH_MAX_COMPONENTS];
+			int count;
+			int index;
+
+			count = XwaModelRole_Collect((uint16_t)g_spawnObjectType, XWA_ROLE_PLATFORM_HIDDEN_BY_BEAM,
+										 components, XWA_OPT_SYNTH_MAX_COMPONENTS);
+			for (index = 0; index < count; ++index) {
+				g_curCraft->componentHp[components[index]] = 0;
+				g_curCraft->componentState[components[index]] = 4;
+			}
+			if (beam != 1) {
+				count = XwaModelRole_Collect((uint16_t)g_spawnObjectType,
+											 XWA_ROLE_PLATFORM_HIDDEN_BY_JAMMING_DECOY, components,
+											 XWA_OPT_SYNTH_MAX_COMPONENTS);
+				for (index = 0; index < count; ++index) {
+					g_curCraft->componentHp[components[index]] = 0;
+					g_curCraft->componentState[components[index]] = 4;
+				}
+			}
+		} else
+#endif
+			if (beam) {
 			uint16_t tableIdx = (uint16_t)(12 * (uint16_t)g_spawnObjectType - 12 * OBJ_Platform1);
 			int count = (beam != 1) ? 12 : 6;
 			int end = tableIdx + count;

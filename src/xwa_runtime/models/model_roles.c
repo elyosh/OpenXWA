@@ -1,0 +1,150 @@
+#include "xwa_runtime/models/model_roles.h"
+
+#include "aeron/asset/flight_model.h"
+#include "aeron/log.h"
+#include "xwa/assets/object_type.h"
+#include "xwa/assets/opt_model.h"
+#include "xwa/util/memory.h"
+#include "xwa_runtime/models/opt_synth.h"
+
+#include <stdio.h>
+#include <string.h>
+
+/* Modern port module; no original counterpart. */
+
+typedef enum ModelRoleKind {
+	MODEL_ROLE_SINGLE, /* exactly one component; required */
+	MODEL_ROLE_SET,    /* any number of components; optional */
+} ModelRoleKind;
+
+typedef struct ModelRoleInfo {
+	const char* tag;
+	ModelRoleKind kind;
+	const char* const* keys; /* models that carry the role, NULL-terminated */
+} ModelRoleInfo;
+
+static const char* const s_platformKeys[] = { "platform1", "platform2", "platform3",
+											  "platform4", "platform5", NULL };
+
+static const ModelRoleInfo s_roles[XWA_MODEL_ROLE_COUNT] = {
+	[XWA_ROLE_PLATFORM_HIDDEN_BY_BEAM] = { "platform.hidden_by_beam", MODEL_ROLE_SET, s_platformKeys },
+	[XWA_ROLE_PLATFORM_HIDDEN_BY_JAMMING_DECOY] = { "platform.hidden_by_jamming_decoy", MODEL_ROLE_SET,
+													s_platformKeys },
+};
+
+static int ModelRole_AppliesTo(const ModelRoleInfo* info, const char* key) {
+	const char* const* cursor;
+
+	for (cursor = info->keys; *cursor != NULL; ++cursor) {
+		if (strcmp(*cursor, key) == 0) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int XwaModelRole_Validate(const char* key, const struct AeronFlightModel* model, char* reason,
+						  unsigned int reasonSize) {
+	int role;
+
+	for (role = 0; role < XWA_MODEL_ROLE_COUNT; ++role) {
+		const ModelRoleInfo* info = &s_roles[role];
+		uint32_t carriers;
+		uint32_t component;
+
+		if (info->kind != MODEL_ROLE_SINGLE || !ModelRole_AppliesTo(info, key)) {
+			continue;
+		}
+		carriers = 0;
+		for (component = 0; component < model->component_count; ++component) {
+			const AeronFlightComponent* item = &model->components[component];
+			uint32_t tag;
+
+			for (tag = 0; tag < item->tag_count; ++tag) {
+				carriers += strcmp(item->tags[tag].name, info->tag) == 0;
+			}
+		}
+		if (carriers != 1) {
+			snprintf(reason, reasonSize, "needs exactly one component tagged '%s' (found %u)", info->tag,
+					 carriers);
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/* Locks `objectType`'s loaded model; NULL when none is loaded. */
+static const OptimizedPolyObject* ModelRole_LockModel(unsigned short objectType, MemoryHandle* handle) {
+	*handle = objectType < OBJ_Count ? g_loadedModels.byObjectType[objectType] : 0;
+	return *handle != 0 ? (const OptimizedPolyObject*)Memory_LockHandle(*handle) : NULL;
+}
+
+int XwaModelRole_IsReplacement(unsigned short objectType) {
+	MemoryHandle handle;
+	const OptimizedPolyObject* model = ModelRole_LockModel(objectType, &handle);
+	const int replacement = OptSynth_IsSynthesized(model);
+
+	if (model != NULL) {
+		Memory_UnlockHandle(handle);
+	}
+	return replacement;
+}
+
+int XwaModelRole_Resolve(unsigned short objectType, XwaModelRole role, int stockComponent) {
+	MemoryHandle handle;
+	const OptimizedPolyObject* model;
+	int component;
+
+	if ((unsigned int)role >= XWA_MODEL_ROLE_COUNT) {
+		return stockComponent;
+	}
+	model = ModelRole_LockModel(objectType, &handle);
+	if (model == NULL) {
+		return stockComponent;
+	}
+	component = stockComponent;
+	if (OptSynth_IsSynthesized(model)) {
+		component = OptSynth_FindModelComponentByTag(model, s_roles[role].tag);
+		if (component < 0) {
+			/* Validation makes required roles present; keep memory safe. */
+			Aeron_LogError("xwa.models", "replacement for object type %u lacks role '%s'",
+						   (unsigned)objectType, s_roles[role].tag);
+			component = stockComponent;
+		}
+	}
+	Memory_UnlockHandle(handle);
+	return component;
+}
+
+int XwaModelRole_Collect(unsigned short objectType, XwaModelRole role, int* components, int capacity) {
+	MemoryHandle handle;
+	const OptimizedPolyObject* model;
+	const XwaOptSynthData* synth;
+	int count;
+	uint32_t mesh;
+
+	if ((unsigned int)role >= XWA_MODEL_ROLE_COUNT) {
+		return 0;
+	}
+	model = ModelRole_LockModel(objectType, &handle);
+	if (model == NULL) {
+		return 0;
+	}
+	synth = OptSynth_GetModelData(model);
+	count = 0;
+	for (mesh = 0; synth != NULL && mesh < synth->meshCount; ++mesh) {
+		uint32_t tag;
+
+		for (tag = 0; tag < synth->meshes[mesh].tagCount; ++tag) {
+			if (strcmp(synth->meshes[mesh].tags[tag].name, s_roles[role].tag) == 0) {
+				if (count < capacity) {
+					components[count] = (int)mesh;
+				}
+				++count;
+				break;
+			}
+		}
+	}
+	Memory_UnlockHandle(handle);
+	return count < capacity ? count : capacity;
+}

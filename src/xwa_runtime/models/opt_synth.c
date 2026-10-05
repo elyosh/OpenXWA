@@ -7,6 +7,7 @@
 #include "xwa/assets/model_mesh.h"
 #include "xwa/assets/opt_model_native.h"
 #include "xwa/util/memory.h"
+#include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/models/model_source.h"
 
 #include <math.h>
@@ -92,6 +93,10 @@ static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model
 	if (gunnerCount > OPT_SYNTH_MAX_GUNNER_HARDPOINTS) {
 		snprintf(reason, sizeof reason, "%u Gunner/AccEnd hardpoints (at most %d)", gunnerCount,
 				 OPT_SYNTH_MAX_GUNNER_HARDPOINTS);
+		return OptSynth_Fail(key, reason);
+	}
+
+	if (!XwaModelRole_Validate(key, model, reason, sizeof reason)) {
 		return OptSynth_Fail(key, reason);
 	}
 
