@@ -354,12 +354,16 @@ int main(int argc, char** argv) {
 	Aeron_LogInfo("xwa.config", "force OPT models: %s", host_config.force_opt_models ? "yes" : "no");
 	Aeron_LogInfo("xwa.config", "prefer original 2D assets: %s",
 				  host_config.prefer_original_2d ? "yes" : "no");
+	Aeron_LogInfo("xwa.config", "environment maps: %s (manifest %s)",
+				  host_config.environment_maps_enabled ? "yes" : "no", host_config.environment_maps_manifest);
 	const XwaRemasterInitOptions remaster_options = {
 		.opt_smooth_angle_degrees = host_config.model_smooth_angle_degrees,
 		.opt_emissive_strength = host_config.model_opt_emissive_strength,
 		.opt_projectile_emissive_strength = host_config.model_opt_projectile_emissive_strength,
 		.engine_emissive_strength = host_config.model_engine_emissive_strength,
 		.prefer_original_2d = host_config.prefer_original_2d,
+		.environment_maps_enabled = host_config.environment_maps_enabled,
+		.environment_maps_manifest = host_config.environment_maps_manifest,
 		.video_options = host_config.video_options,
 		.video_options_override_mask = host_config.video_options_override_mask,
 	};

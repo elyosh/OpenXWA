@@ -12,6 +12,7 @@ extern "C" {
 #endif
 
 #define XWA_HOST_CONFIG_PATH_CAPACITY 1024
+#define XWA_HOST_CONFIG_MANIFEST_CAPACITY 256
 
 typedef struct XwaHostConfig {
 	char game_data_path[XWA_HOST_CONFIG_PATH_CAPACITY];
@@ -22,6 +23,9 @@ typedef struct XwaHostConfig {
 	float model_engine_emissive_strength;
 	int force_opt_models;
 	int prefer_original_2d;
+	int environment_maps_enabled;
+	/* Relative to the remaster bake root. */
+	char environment_maps_manifest[XWA_HOST_CONFIG_MANIFEST_CAPACITY];
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
 	XwaModernInputOptions input_defaults;

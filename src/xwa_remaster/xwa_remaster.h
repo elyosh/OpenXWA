@@ -29,6 +29,8 @@ typedef struct XwaRemasterInitOptions {
 	float opt_projectile_emissive_strength;
 	float engine_emissive_strength;
 	int prefer_original_2d;
+	int environment_maps_enabled;
+	const char* environment_maps_manifest; /* relative to the remaster bake root */
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
 } XwaRemasterInitOptions;

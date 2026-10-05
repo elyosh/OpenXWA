@@ -4,7 +4,8 @@
 /*
  * HD authored environments: XWA mapping and per-frame selection.
  *
- * The manifest (environment_maps.manifest, under the remaster bake root)
+ * The manifest (host option environment_maps.manifest, under the remaster
+ * bake root)
  * holds Aeron's shared `packages:` map and an `xwa:` section that maps the
  * hangar and each (mission path, region) to a package reference. A mission
  * or region without an entry keeps the classic HD path.
@@ -17,8 +18,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "aeron/config_file.h"
 #include "aeron/scene/environment.h"
+#include "aeron/vfs.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,10 +55,14 @@ typedef struct XwaEnvironmentSelection {
 
 #define XWA_ENV_MISSION_KEY_MAX 128
 
-/* Reads environment_maps.* from the remaster configuration and, when
- * enabled, parses the required manifest. Returns 0 on any error, logged
- * with the source path and YAML line. */
-int XwaRemasterEnvironment_Init(AeronVfs* vfs, const AeronConfigFile* config, const char* config_path);
+/* Sets the host options environment_maps.enabled and .manifest (shipped
+ * configuration, optionally overridden by the user configuration). The
+ * manifest path is copied. Call before XwaRemasterEnvironment_Init. */
+void XwaRemasterEnvironment_Configure(int enabled, const char* manifest);
+
+/* When enabled, parses the required manifest. Returns 0 on any error,
+ * logged with the source path and YAML line. */
+int XwaRemasterEnvironment_Init(AeronVfs* vfs);
 void XwaRemasterEnvironment_Shutdown(void);
 
 int XwaRemasterEnvironment_Enabled(void);

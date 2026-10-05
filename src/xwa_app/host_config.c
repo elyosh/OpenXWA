@@ -183,6 +183,39 @@ static int host_config_prefer_original_2d(const AeronConfigFile* config, int req
 	return 1;
 }
 
+static int host_config_environment_maps(const AeronConfigFile* config, int required, XwaHostConfig* out,
+										char* error, size_t error_size) {
+	const char* enabled_key = "environment_maps.enabled";
+	const char* manifest_key = "environment_maps.manifest";
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, enabled_key);
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 enabled_key);
+		}
+	} else if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+		return host_config_error(error, error_size, "invalid 'environment_maps.enabled': expected %s",
+								 "boolean");
+	} else {
+		out->environment_maps_enabled = AeronConfigNode_Bool(node, 0);
+	}
+	node = AeronConfigFile_GetNode(config, manifest_key);
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 manifest_key);
+		}
+		return 1;
+	}
+	const char* manifest = AeronConfigNode_String(node, NULL);
+	if (!manifest || !manifest[0] || strlen(manifest) >= sizeof out->environment_maps_manifest) {
+		return host_config_error(error, error_size, "invalid 'environment_maps.manifest': expected %s",
+								 "a non-empty path shorter than 256 bytes");
+	}
+	snprintf(out->environment_maps_manifest, sizeof out->environment_maps_manifest, "%s", manifest);
+	return 1;
+}
+
 static int host_config_remaster_options(const AeronConfigFile* config, int required, XwaHostConfig* out,
 										char* error, size_t error_size) {
 	return host_config_model_smoothing(config, required, &out->model_smooth_angle_degrees, error,
@@ -194,7 +227,8 @@ static int host_config_remaster_options(const AeronConfigFile* config, int requi
 		   host_config_engine_emissive_strength(config, required, &out->model_engine_emissive_strength, error,
 												error_size) &&
 		   host_config_force_opt(config, required, &out->force_opt_models, error, error_size) &&
-		   host_config_prefer_original_2d(config, required, &out->prefer_original_2d, error, error_size);
+		   host_config_prefer_original_2d(config, required, &out->prefer_original_2d, error, error_size) &&
+		   host_config_environment_maps(config, required, out, error, error_size);
 }
 
 static int host_config_input_options(const AeronConfigFile* config, int required, XwaModernInputOptions* out,
@@ -863,6 +897,7 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		const AeronConfigNode* paths = AeronConfigFile_GetNode(config, "paths");
 		const AeronConfigNode* models = AeronConfigFile_GetNode(config, "models");
 		const AeronConfigNode* assets = AeronConfigFile_GetNode(config, "assets");
+		const AeronConfigNode* environment_maps = AeronConfigFile_GetNode(config, "environment_maps");
 		const AeronConfigNode* video = AeronConfigFile_GetNode(config, "video");
 		const AeronConfigNode* input = AeronConfigFile_GetNode(config, "input");
 		if (version &&
@@ -881,6 +916,10 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		if (assets && AeronConfigNode_Type(assets) != AERON_CONFIG_MAP) {
 			AeronConfigFile_Destroy(config);
 			return host_config_error(error, error_size, "'assets' must be a mapping in %s", path);
+		}
+		if (environment_maps && AeronConfigNode_Type(environment_maps) != AERON_CONFIG_MAP) {
+			AeronConfigFile_Destroy(config);
+			return host_config_error(error, error_size, "'environment_maps' must be a mapping in %s", path);
 		}
 		if (video && AeronConfigNode_Type(video) != AERON_CONFIG_MAP) {
 			AeronConfigFile_Destroy(config);

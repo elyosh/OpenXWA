@@ -22,6 +22,7 @@
 #include "xwa_remaster/assets.h"
 #include "xwa_remaster/cutscene.h"
 #include "xwa_remaster/debug_tools.h"
+#include "xwa_remaster/environment.h"
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/frontend.h"
 #include "xwa_remaster/hud.h"
@@ -324,6 +325,7 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	}
 	XwaRemasterShip_Configure(options->opt_smooth_angle_degrees, options->opt_emissive_strength,
 							  options->opt_projectile_emissive_strength, options->engine_emissive_strength);
+	XwaRemasterEnvironment_Configure(options->environment_maps_enabled, options->environment_maps_manifest);
 	if (!XwaRemasterFlight_InitConfig(Aeron_GetVfs())) {
 		return 0;
 	}

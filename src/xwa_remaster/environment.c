@@ -1,5 +1,6 @@
 #include "xwa_remaster/environment.h"
 
+#include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
@@ -33,6 +34,17 @@ static struct {
 	XwaEnvironmentSelection last;
 	char last_mission[sizeof(((XwaSnapshot*)0)->mission_path)];
 } s_env;
+
+/* Host options; survive Shutdown, which clears s_env. */
+static struct {
+	int enabled;
+	char manifest[sizeof s_env.manifest_path];
+} s_env_options;
+
+void XwaRemasterEnvironment_Configure(int enabled, const char* manifest) {
+	s_env_options.enabled = enabled != 0;
+	snprintf(s_env_options.manifest, sizeof s_env_options.manifest, "%s", manifest ? manifest : "");
+}
 
 static int env_node_error(const AeronConfigNode* node, const char* format, ...) {
 	char message[512];
@@ -282,20 +294,19 @@ static int env_load_manifest(AeronVfs* vfs) {
 	return ok;
 }
 
-int XwaRemasterEnvironment_Init(AeronVfs* vfs, const AeronConfigFile* config, const char* config_path) {
+int XwaRemasterEnvironment_Init(AeronVfs* vfs) {
 	XwaRemasterEnvironment_Shutdown();
-	s_env.enabled = AeronConfigFile_GetBool(config, "environment_maps.enabled", 0);
-	const char* manifest = AeronConfigFile_GetString(config, "environment_maps.manifest", "");
-	if (!manifest[0] || strlen(manifest) >= sizeof s_env.manifest_path) {
-		Aeron_LogError("xwa.remaster",
-					   "%s: environment_maps.manifest must be non-empty and shorter than %zu bytes",
-					   config_path, sizeof s_env.manifest_path);
-		return 0;
-	}
-	snprintf(s_env.manifest_path, sizeof s_env.manifest_path, "%s", manifest);
+	s_env.enabled = s_env_options.enabled;
+	memcpy(s_env.manifest_path, s_env_options.manifest, sizeof s_env.manifest_path);
 	if (!s_env.enabled) {
 		Aeron_LogInfo("xwa.remaster", "environment maps: disabled");
 		return 1;
+	}
+	if (!s_env.manifest_path[0]) {
+		Aeron_LogError("xwa.remaster",
+					   "environment_maps.manifest is required when environment maps are enabled");
+		XwaRemasterEnvironment_Shutdown();
+		return 0;
 	}
 	if (!env_load_manifest(vfs)) {
 		XwaRemasterEnvironment_Shutdown();

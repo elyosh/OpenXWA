@@ -458,11 +458,9 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"motion_blur.velocity_viz",      "motion_blur.fsr_direct_motion",
 		"texture_filtering.anisotropic",
 		"hangar_lighting.enabled",       "lighting.spec_geom_adapt",
-		"environment_maps.enabled",
 	};
 	static const char* strings[] = {
 		"skybox.path", "skybox.mode", "temporal_upscaling.mode",
-		"environment_maps.manifest",
 	};
 	for (size_t i = 0; i < sizeof ints / sizeof ints[0]; i++) {
 		if (!fl_cfg_has_type(config, ints[i], AERON_CONFIG_INT)) {
@@ -770,7 +768,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
-	if (!XwaRemasterEnvironment_Init(vfs, cf, path)) {
+	if (!XwaRemasterEnvironment_Init(vfs)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
