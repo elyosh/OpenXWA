@@ -4126,9 +4126,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	};
 	if (authored) {
 		AeronScene_SetSkyCube(s.scene, authored->radiance, authored->world_to_cube,
-							  authored->settings.sky_exposure);
+							  authored->settings.intensity);
 		for (uint32_t i = 0; i < authored->light_count; i++) {
-			AeronScene_AddSkySun(s.scene, &authored->lights[i], authored->settings.sky_exposure);
+			AeronScene_AddSkySun(s.scene, &authored->lights[i]);
 		}
 	} else if (!cam->death_star_mode) {
 		if (s.sky_mode == 1) {
