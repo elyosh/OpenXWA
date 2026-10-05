@@ -11,6 +11,7 @@
 #include "xwa/assets/model_bounds.h"
 #include "xwa/flight/flight.h"
 #include "xwa/flight/object/laser.h"
+#include "xwa_runtime/models/model_roles.h"
 
 #ifndef XWA_MODERN
 __declspec(dllimport) void __stdcall OutputDebugStringA(const char* outputString);
@@ -1648,7 +1649,8 @@ void GlowMark_QueueCraftDamageSurfaceEffects(uint16_t objectIndex) {
 		switch ((int)g_objectTable[objectIndex].objectType) {
 			case OBJ_AccelRing2:
 			case OBJ_AccelRing3:
-				if (g_objectTable[objectIndex].mobj->pCraft->componentHp[4] == 0 &&
+				if (g_objectTable[objectIndex].mobj->pCraft->componentHp[XWA_MODEL_ROLE(
+						g_objectTable[objectIndex].objectType, XWA_ROLE_ACCELRING_CORE, 4)] == 0 &&
 					(uint16_t)GameRand2() % 100 < 10) {
 					float scale;
 

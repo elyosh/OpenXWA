@@ -35,6 +35,9 @@ typedef enum XwaModelRole {
 	XWA_ROLE_PILOT_LIMB_2,
 	XWA_ROLE_PILOT_LIMB_3,
 	XWA_ROLE_PILOT_LIMB_4,
+	/* AccelRing2/3: the core the proving-grounds course has the player
+	   destroy (target box, hit filter, speed boost, reset). */
+	XWA_ROLE_ACCELRING_CORE,
 	XWA_MODEL_ROLE_COUNT
 } XwaModelRole;
 

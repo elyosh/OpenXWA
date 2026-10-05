@@ -34,6 +34,7 @@
 #include "xwa/util/debug.h"
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/collision_bvh.h"
 #include "xwa_runtime/models/opt_synth.h"
@@ -2580,8 +2581,11 @@ void collide_TestSweepAgainstModelMeshes(unsigned int sourceObjIdx, unsigned int
 				switch (targetObjectType) {
 					case OBJ_AccelRing2:
 					case OBJ_AccelRing3:
-						if (g_collisionStagedModelProbe && targetObj->mobj->pCraft->componentHp[4] != 0 &&
-							g_collideSweepCurrentMeshOrdinal - 1 != 4) {
+						if (g_collisionStagedModelProbe &&
+							targetObj->mobj->pCraft->componentHp[XWA_MODEL_ROLE(
+								targetObj->objectType, XWA_ROLE_ACCELRING_CORE, 4)] != 0 &&
+							g_collideSweepCurrentMeshOrdinal - 1 !=
+								XWA_MODEL_ROLE(targetObj->objectType, XWA_ROLE_ACCELRING_CORE, 4)) {
 							continue;
 						}
 						break;

@@ -5,6 +5,7 @@
 #include "xwa/flight/flight.h"
 #include "xwa/math/fixed.h"
 #include "xwa/util/memory.h"
+#include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #else
@@ -3483,7 +3484,8 @@ void SceneBillboard_RenderQueuedTextured(int drawTargetComponentMarkers) {
 			if (g_objectTable[currentTargetObjectIdx].objectType == OBJ_AccelRing2 ||
 				g_objectTable[currentTargetObjectIdx].objectType == OBJ_AccelRing3) {
 				Targeting_DrawObjectBox(currentTargetObjectIdx, 0xFFFFu, 0x3Bu);
-				if (g_objectTable[currentTargetObjectIdx].mobj->pCraft->componentHp[4]) {
+				if (g_objectTable[currentTargetObjectIdx].mobj->pCraft->componentHp[XWA_MODEL_ROLE(
+						g_objectTable[currentTargetObjectIdx].objectType, XWA_ROLE_ACCELRING_CORE, 4)]) {
 					Targeting_DrawObjectBox(currentTargetObjectIdx,
 											(uint16_t)g_players[g_localPlayer].selectedTargetComponent,
 											0x36u);

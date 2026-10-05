@@ -30,6 +30,7 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -3194,10 +3195,11 @@ void Yard_UpdateAccelRingLaunchers(int deltaTicks) {
 
 				craft = g_objectTable[launcherObjIdx].mobj->pCraft;
 				g_curCraft = craft;
-				if (craft->componentHp[4] == 0) {
+				if (craft->componentHp[XWA_MODEL_ROLE(objectType, XWA_ROLE_ACCELRING_CORE, 4)] == 0) {
 					if (g_flightPlayerCount > 1 && craft->aiController.aiPlanState == 0) {
-						craft->componentHp[4] = 2;
-						g_curCraft->componentState[4] = 0;
+						craft->componentHp[XWA_MODEL_ROLE(objectType, XWA_ROLE_ACCELRING_CORE, 4)] = 2;
+						g_curCraft->componentState[XWA_MODEL_ROLE(objectType, XWA_ROLE_ACCELRING_CORE, 4)] =
+							0;
 						for (playerIdx = 0; playerIdx < g_flightPlayerCount; ++playerIdx) {
 							g_curCraft->damageFromPlayer[playerIdx] = 0;
 						}
@@ -3212,10 +3214,11 @@ void Yard_UpdateAccelRingLaunchers(int deltaTicks) {
 
 				craft = g_objectTable[launcherObjIdx].mobj->pCraft;
 				g_curCraft = craft;
-				if (craft->componentHp[4] == 0) {
+				if (craft->componentHp[XWA_MODEL_ROLE(objectType, XWA_ROLE_ACCELRING_CORE, 4)] == 0) {
 					if (g_flightPlayerCount > 1 && craft->aiController.aiPlanState == 0) {
-						craft->componentHp[4] = 2;
-						g_curCraft->componentState[4] = 0;
+						craft->componentHp[XWA_MODEL_ROLE(objectType, XWA_ROLE_ACCELRING_CORE, 4)] = 2;
+						g_curCraft->componentState[XWA_MODEL_ROLE(objectType, XWA_ROLE_ACCELRING_CORE, 4)] =
+							0;
 						for (playerIdx = 0; playerIdx < g_flightPlayerCount; ++playerIdx) {
 							g_curCraft->damageFromPlayer[playerIdx] = 0;
 						}
@@ -3342,10 +3345,13 @@ void Yard_UpdateSecondaryAccelRingLaunchers(int deltaTicks) {
 		}
 
 		g_curCraft = g_objectTable[launcherObjIdx].mobj->pCraft;
-		if (g_curCraft->componentHp[4] == 0) {
+		if (g_curCraft->componentHp[XWA_MODEL_ROLE(g_objectTable[launcherObjIdx].objectType,
+												   XWA_ROLE_ACCELRING_CORE, 4)] == 0) {
 			if (g_flightPlayerCount > 1 && g_curCraft->aiController.aiPlanState == 0) {
-				g_curCraft->componentHp[4] = 2;
-				g_curCraft->componentState[4] = 0;
+				g_curCraft->componentHp[XWA_MODEL_ROLE(g_objectTable[launcherObjIdx].objectType,
+													   XWA_ROLE_ACCELRING_CORE, 4)] = 2;
+				g_curCraft->componentState[XWA_MODEL_ROLE(g_objectTable[launcherObjIdx].objectType,
+														  XWA_ROLE_ACCELRING_CORE, 4)] = 0;
 				for (playerIdx = 0; playerIdx < g_flightPlayerCount; ++playerIdx) {
 					g_curCraft->damageFromPlayer[playerIdx] = 0;
 				}
@@ -5026,7 +5032,9 @@ void Yard_UpdateChallengeProgressAndScoring(int deltaTicks) {
 						finalType = ringObj->objectType;
 						if (finalType == OBJ_AccelRing2 || finalType == OBJ_AccelRing3) {
 							CraftData* ringCraft = ringObj->mobj->pCraft;
-							if (!ringCraft->componentHp[4] && ringCraft->damageFromPlayer[playerIdx]) {
+							if (!ringCraft
+									 ->componentHp[XWA_MODEL_ROLE(finalType, XWA_ROLE_ACCELRING_CORE, 4)] &&
+								ringCraft->damageFromPlayer[playerIdx]) {
 								g_objectTable[g_players[playerIdx].objectIndex].mobj->speed += 60;
 							}
 						}

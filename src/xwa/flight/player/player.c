@@ -30,6 +30,7 @@
 #include "xwa/render/renderer_internal.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/model_roles.h"
 
 #include <stddef.h>
 #include <string.h>
@@ -2944,13 +2945,17 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 					targetObjectType = (uint16_t)g_objectTable[targetObjIdx].objectType;
 					switch (targetObjectType) {
 						case OBJ_AccelRing2:
-							if (g_objectTable[targetObjIdx].mobj->pCraft->componentHp[4] != 0) {
-								g_players[playerIdx].selectedTargetComponent = 4;
+							if (g_objectTable[targetObjIdx].mobj->pCraft->componentHp[XWA_MODEL_ROLE(
+									targetObjectType, XWA_ROLE_ACCELRING_CORE, 4)] != 0) {
+								g_players[playerIdx].selectedTargetComponent =
+									(int16_t)XWA_MODEL_ROLE(targetObjectType, XWA_ROLE_ACCELRING_CORE, 4);
 							}
 							break;
 						case OBJ_AccelRing3:
-							if (g_objectTable[targetObjIdx].mobj->pCraft->componentHp[4] != 0) {
-								g_players[playerIdx].selectedTargetComponent = 4;
+							if (g_objectTable[targetObjIdx].mobj->pCraft->componentHp[XWA_MODEL_ROLE(
+									targetObjectType, XWA_ROLE_ACCELRING_CORE, 4)] != 0) {
+								g_players[playerIdx].selectedTargetComponent =
+									(int16_t)XWA_MODEL_ROLE(targetObjectType, XWA_ROLE_ACCELRING_CORE, 4);
 							}
 							break;
 					}
