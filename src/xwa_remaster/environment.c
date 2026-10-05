@@ -43,14 +43,13 @@ static struct {
 	char last_mission[sizeof(((XwaSnapshot*)0)->mission_path)];
 } s_env;
 
-/* Host options and the development switch; survive Shutdown, which clears
- * s_env. */
+/* Host options and the debug switch; survive Shutdown, which clears s_env. */
 static struct {
 	int authored;
 	int enabled;
 	float sun_max_radiance; /* 0 = Aeron's default */
 	char manifest[sizeof s_env.manifest_path];
-} s_env_options;
+} s_env_options = { .authored = 1 };
 
 void XwaRemasterEnvironment_Configure(int enabled, const char* manifest, float sun_max_radiance) {
 	s_env_options.enabled = enabled != 0;

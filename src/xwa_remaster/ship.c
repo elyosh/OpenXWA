@@ -516,6 +516,8 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	env.light_wrap = g_pbr_tuning.light_wrap;
 	env.spec_geom_adapt = g_pbr_tuning.spec_geom_adapt;
 	AeronScene_SetPbrDebugViews(scene, env.debug_isolate_term != 0.0f || env.spec_geom_adapt == 0.0f);
+	AeronScene_SetPbrDebugMaterial(scene, g_pbr_tuning.debug_material_override != 0.0f,
+								   g_pbr_tuning.debug_metallic, g_pbr_tuning.debug_roughness);
 
 	/* HD relight: authored ambient fill (tuning.ambient, linear) plus
 	 * sun = decode(classic light color) x intensity. The game state

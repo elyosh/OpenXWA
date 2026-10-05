@@ -51,7 +51,7 @@ typedef enum XwaEnvironmentFallback {
 	XWA_ENV_FALLBACK_NO_REGION_ENTRY,  /* region not in the mission's mapping */
 	XWA_ENV_FALLBACK_NO_HANGAR_ENTRY,  /* no hangar package in the mapping */
 	XWA_ENV_FALLBACK_NOT_READY,        /* mapped package not prepared or unavailable */
-	XWA_ENV_FALLBACK_AUTHORED_OFF,     /* authored environments are behind the development switch */
+	XWA_ENV_FALLBACK_AUTHORED_OFF,     /* authored environments switched off in the debug tool */
 } XwaEnvironmentFallback;
 
 typedef struct XwaEnvironmentSelection {
@@ -80,10 +80,10 @@ void XwaRemasterEnvironment_Shutdown(void);
 
 int XwaRemasterEnvironment_Enabled(void);
 
-/* Development switch for authored environments (off by default): until the
- * feature is complete, the hangar and flight regions keep their current
- * lighting and sky. Packages are still prepared, so toggling it loads
- * nothing. */
+/* Debug switch for authored environments (on by default): off, the hangar
+ * and flight regions use the classic path, for visual comparison and for
+ * profiling the environments' cost. Packages stay prepared, so toggling it
+ * loads nothing. */
 void XwaRemasterEnvironment_SetAuthoredEnvironments(int enabled);
 int XwaRemasterEnvironment_AuthoredEnvironments(void);
 

@@ -100,6 +100,11 @@ typedef struct XwaShipPbrTuning {
 	float spec_geom_adapt;    /* 0/1: blend spec normal toward the face */
 	float debug_isolate_term; /* PbrIsolateMode (0 = off) */
 	float ambient[3];         /* ambient cube fill (linear RGB) */
+	/* Debug material override (debug inspector only): every PBR material
+	 * shaded with this metallic and perceptual roughness. */
+	float debug_material_override; /* 0/1 */
+	float debug_metallic;
+	float debug_roughness;
 } XwaShipPbrTuning;
 
 void XwaRemasterShip_GetPbrTuning(XwaShipPbrTuning* out);

@@ -94,8 +94,18 @@ static void xwa_tool_pbr(int* open, void* user) {
 
 	ImGui::Separator();
 	static const char* isolate_names[] = {
-		"None", "Base diffuse", "Specular",    "Geometry term (G)", "N.V",
-		"N.L",  "Normal",       "View vector", "N.V signed",        "Local lights",
+		"None",
+		"Base diffuse",
+		"Specular",
+		"Geometry term (G)",
+		"N.V",
+		"N.L",
+		"Normal",
+		"View vector",
+		"N.V signed",
+		"Local lights",
+		"Environment diffuse",
+		"Environment specular",
 	};
 	int iso = (int)t.debug_isolate_term;
 	if (ImGui::Combo("Isolate term", &iso, isolate_names,
@@ -103,6 +113,19 @@ static void xwa_tool_pbr(int* open, void* user) {
 		t.debug_isolate_term = (float)iso;
 		changed = true;
 	}
+
+	ImGui::Separator();
+	bool material_override = t.debug_material_override != 0.0f;
+	if (ImGui::Checkbox("Override materials", &material_override)) {
+		t.debug_material_override = material_override ? 1.0f : 0.0f;
+		changed = true;
+	}
+	ImGui::BeginDisabled(!material_override);
+	changed |= ImGui::SliderFloat("Metallic", &t.debug_metallic, 0.0f, 1.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Roughness", &t.debug_roughness, 0.0f, 1.0f, "%.2f");
+	ImGui::EndDisabled();
+	ImGui::TextDisabled("Shades every PBR material with these values, e.g. metallic 1 and roughness 0.1\n"
+						"to check environment reflections without authored PBR assets.");
 
 	ImGui::Separator();
 	if (ImGui::Button("Reset to defaults")) {
@@ -1017,10 +1040,11 @@ static void xwa_tool_flight_input(int* open, void* user) {
 extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 	(void)user;
 	bool authored = XwaRemasterEnvironment_AuthoredEnvironments() != 0;
-	if (ImGui::Checkbox("Authored environments (development switch)", &authored)) {
+	if (ImGui::Checkbox("Authored environments", &authored)) {
 		XwaRemasterEnvironment_SetAuthoredEnvironments(authored ? 1 : 0);
 	}
-	ImGui::TextDisabled("Off: the hangar and flight regions keep their current lighting and sky.");
+	ImGui::TextDisabled(
+		"Off: the hangar and flight regions use the classic path (for comparison and profiling).");
 	XwaEnvironmentSelection selection;
 	char mission[128];
 	if (XwaRemasterEnvironment_LastSelection(&selection, mission, sizeof mission)) {
