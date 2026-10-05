@@ -73,8 +73,8 @@ int XwaModelSource_NormalizeKey(const char* fileName, char* key) {
 	return 1;
 }
 
-static int ModelSource_FormatGlbPath(const char* key, char* path, size_t pathSize) {
-	int written = snprintf(path, pathSize, "remaster\\models\\%s.glb", key);
+int XwaModelSource_GlbPath(const char* key, char* path, size_t pathSize) {
+	int written = snprintf(path, pathSize, "remaster/models/%s.glb", key);
 	return written > 0 && (size_t)written < pathSize;
 }
 
@@ -82,7 +82,7 @@ static int ModelSource_GlbExists(const char* key) {
 	char path[XWA_MODEL_SOURCE_KEY_MAX + 32];
 	XwaFile* stream;
 
-	if (!ModelSource_FormatGlbPath(key, path, sizeof path)) {
+	if (!XwaModelSource_GlbPath(key, path, sizeof path)) {
 		return 0;
 	}
 	stream = File_Open(AERON_VFS_ROOT_ASSET, path, "rb");
@@ -415,7 +415,7 @@ XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_
 	if (glbKey == NULL) {
 		return XWA_MODEL_SOURCE_OPT;
 	}
-	if (glbPath != NULL && glbPathSize != 0 && !ModelSource_FormatGlbPath(glbKey, glbPath, glbPathSize)) {
+	if (glbPath != NULL && glbPathSize != 0 && !XwaModelSource_GlbPath(glbKey, glbPath, glbPathSize)) {
 		glbPath[0] = '\0';
 	}
 	return XWA_MODEL_SOURCE_GLB;

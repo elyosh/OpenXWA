@@ -21,6 +21,7 @@
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/sky_stars.h"
 #include "xwa_remaster/xwa_remaster.h"
+#include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/presentation.h"
 #include "xwa_runtime/timing/host_clock.h"
 
@@ -2972,7 +2973,7 @@ typedef struct FlMapSubmitContext {
 typedef struct FlPreparedMesh {
 	AeronSceneMesh* mesh;
 	AeronSceneMeshTable* table;
-	int runtime_opt;
+	uint8_t source; /* XwaModelSource */
 } FlPreparedMesh;
 
 /* Resolve the model and its current articulation once for both flight views.
@@ -2999,7 +3000,7 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 
 	const char* model_name =
 		model_name_override ? model_name_override : XwaSnapshotExport_ModelName(object->object_type);
-	out->mesh = XwaRemasterShip_MeshForNameWithSource(model_name, &out->runtime_opt);
+	out->mesh = XwaRemasterShip_MeshForNameWithSource(model_name, &out->source);
 	if (!out->mesh) {
 		return 0;
 	}
@@ -3052,7 +3053,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	if (is_bolt) {
 		instance.shadow_flags = AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_NO_RECEIVE_SHADOW;
 		instance.velocity_stamp = 1;
-		if (prepared.runtime_opt)
+		if (prepared.source == XWA_MODEL_SOURCE_OPT)
 			instance.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
 	}
 	AeronScene_AddMeshInstance(s.scene, &instance);
@@ -4161,7 +4162,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		if (is_bolt) {
 			inst.shadow_flags |= AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_NO_RECEIVE_SHADOW;
 		}
-		if (is_bolt && prepared.runtime_opt) {
+		if (is_bolt && prepared.source == XWA_MODEL_SOURCE_OPT) {
 			/* The original renderer makes both projectile genera fully
 			 * bright independently of the OPT palette. Runtime conversion
 			 * has no such semantic, so render its base texture as HDR

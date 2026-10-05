@@ -30,6 +30,9 @@ typedef enum XwaModelSource {
 void XwaModelSource_Configure(int replacementsEnabled);
 /* Builds the replacement set once the VFS is ready. */
 void XwaModelSource_Init(void);
+/* Writes the asset-root path of `key`'s replacement GLB
+   ("remaster/models/<key>.glb"). Returns 0 when it does not fit. */
+int XwaModelSource_GlbPath(const char* key, char* path, size_t pathSize);
 /* `glbPath` (optional) receives the asset-root path of the GLB when the
    result is XWA_MODEL_SOURCE_GLB. */
 XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_t glbPathSize);

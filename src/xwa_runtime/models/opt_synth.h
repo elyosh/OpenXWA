@@ -43,18 +43,7 @@ typedef struct XwaOptSynthData {
 	AeronFlightTag* tagStorage;  /* owns every mesh's tags */
 } XwaOptSynthData;
 
-/* Builds the payload (the OPT bytes after the -version/size header) for
-   `key`. On success the caller owns *outPayload (free()) and *outSynth
-   (OptSynth_Free). Returns 0 and logs the reason on failure. */
-int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* outPayloadSize,
-						  XwaOptSynthData** outSynth);
 void OptSynth_Free(XwaOptSynthData* synth);
-
-/* Mesh whose stub FaceData sits at `stubFaceDataOffset`, or NULL. */
-const XwaOptSynthMesh* OptSynth_FindMeshByStubOffset(const XwaOptSynthData* synth,
-													 uint32_t stubFaceDataOffset);
-/* First component carrying `tag`, or -1. */
-int OptSynth_FindComponentByTag(const XwaOptSynthData* synth, const char* tag);
 
 /* OptModel_LoadFileToHandle for a GLB replacement: builds the payload for
    `fileName`'s key and loads it into a temporary native handle, setting the

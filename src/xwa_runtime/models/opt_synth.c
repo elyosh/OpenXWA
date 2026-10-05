@@ -60,16 +60,8 @@ static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model
 		return OptSynth_Fail(key, reason);
 	}
 	for (tag = 0; tag < sizeof s_uniqueTags / sizeof s_uniqueTags[0]; ++tag) {
-		uint32_t carriers = 0;
+		const uint32_t carriers = Aeron_FlightModelCountTag(model, s_uniqueTags[tag]);
 
-		for (component = 0; component < model->component_count; ++component) {
-			const AeronFlightComponent* item = &model->components[component];
-			uint32_t index;
-
-			for (index = 0; index < item->tag_count; ++index) {
-				carriers += strcmp(item->tags[index].name, s_uniqueTags[tag]) == 0;
-			}
-		}
 		if (carriers > 1) {
 			snprintf(reason, sizeof reason, "tag '%s' is on %u components", s_uniqueTags[tag], carriers);
 			return OptSynth_Fail(key, reason);
@@ -286,8 +278,11 @@ static XwaOptSynthData* OptSynth_CreateData(const char* key, uint64_t glbHash, c
 	return synth;
 }
 
-int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* outPayloadSize,
-						  XwaOptSynthData** outSynth) {
+/* Builds the payload (the OPT bytes after the -version/size header) for
+   `key`. On success the caller owns *outPayload (free()) and *outSynth
+   (OptSynth_Free). Returns 0 and logs the reason on failure. */
+static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* outPayloadSize,
+								 XwaOptSynthData** outSynth) {
 	char path[XWA_MODEL_SOURCE_KEY_MAX + 32];
 	char error[256];
 	uint8_t* glb;
@@ -311,7 +306,9 @@ int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* outPayload
 	*outPayloadSize = 0;
 	*outSynth = NULL;
 
-	snprintf(path, sizeof path, "remaster/models/%s.glb", key);
+	if (!XwaModelSource_GlbPath(key, path, sizeof path)) {
+		return OptSynth_Fail(key, "GLB path too long");
+	}
 	glb = NULL;
 	glbSize = 0;
 	if (!AeronVfs_ReadAll(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, path, 0, &glb, &glbSize)) {
@@ -400,8 +397,9 @@ void OptSynth_Free(XwaOptSynthData* synth) {
 	free(synth);
 }
 
-const XwaOptSynthMesh* OptSynth_FindMeshByStubOffset(const XwaOptSynthData* synth,
-													 uint32_t stubFaceDataOffset) {
+/* Mesh whose stub FaceData sits at `stubFaceDataOffset`, or NULL. */
+static const XwaOptSynthMesh* OptSynth_FindMeshByStubOffset(const XwaOptSynthData* synth,
+															uint32_t stubFaceDataOffset) {
 	uint32_t low;
 	uint32_t high;
 
@@ -424,7 +422,8 @@ const XwaOptSynthMesh* OptSynth_FindMeshByStubOffset(const XwaOptSynthData* synt
 			   : NULL;
 }
 
-int OptSynth_FindComponentByTag(const XwaOptSynthData* synth, const char* tag) {
+/* First component carrying `tag`, or -1. */
+static int OptSynth_FindComponentByTag(const XwaOptSynthData* synth, const char* tag) {
 	uint32_t mesh;
 
 	if (synth == NULL || tag == NULL) {

@@ -36,9 +36,10 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
  * the next host frame. */
 void XwaRemasterShip_CommitSyncBatch(void);
 AeronSceneMesh* XwaRemasterShip_MeshForName(const char* name);
-/* Same lookup with source metadata; out_runtime_opt is 1 only for an
- * in-memory OPT conversion, never for an authored GLB. */
-AeronSceneMesh* XwaRemasterShip_MeshForNameWithSource(const char* name, int* out_runtime_opt);
+/* Same lookup, also giving the XwaModelSource the mesh was built from:
+ * XWA_MODEL_SOURCE_OPT for an in-memory OPT conversion, XWA_MODEL_SOURCE_GLB
+ * for a replacement GLB. */
+AeronSceneMesh* XwaRemasterShip_MeshForNameWithSource(const char* name, uint8_t* out_source);
 float XwaRemasterShip_OptProjectileEmissiveStrength(void);
 void XwaRemasterShip_Shutdown(void);
 void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissive_strength,

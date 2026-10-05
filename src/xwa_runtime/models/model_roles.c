@@ -95,20 +95,11 @@ int XwaModelRole_Validate(const char* key, const struct AeronFlightModel* model,
 	for (role = 0; role < XWA_MODEL_ROLE_COUNT; ++role) {
 		const ModelRoleInfo* info = &s_roles[role];
 		uint32_t carriers;
-		uint32_t component;
 
 		if (info->kind != MODEL_ROLE_SINGLE || !ModelRole_AppliesTo(info, key)) {
 			continue;
 		}
-		carriers = 0;
-		for (component = 0; component < model->component_count; ++component) {
-			const AeronFlightComponent* item = &model->components[component];
-			uint32_t tag;
-
-			for (tag = 0; tag < item->tag_count; ++tag) {
-				carriers += strcmp(item->tags[tag].name, info->tag) == 0;
-			}
-		}
+		carriers = Aeron_FlightModelCountTag(model, info->tag);
 		if (carriers != 1) {
 			snprintf(reason, reasonSize, "needs exactly one component tagged '%s' (found %u)", info->tag,
 					 carriers);

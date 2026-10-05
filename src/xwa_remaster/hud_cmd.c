@@ -15,6 +15,7 @@
 #include "aeron/asset/opt_model.h"
 #include "aeron/scene/world.h"
 #include "xwa_remaster/xwa_remaster.h"
+#include "xwa_runtime/models/model_source.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -165,9 +166,9 @@ static int cmd_projectile(const XwaFlightObject* object) {
 		   object->genus == XWA_SNAP_GENUS_NPC_PROJECTILE;
 }
 
-static AeronSceneMesh* cmd_mesh(const XwaFlightObject* object, int* out_runtime_opt) {
+static AeronSceneMesh* cmd_mesh(const XwaFlightObject* object, uint8_t* out_source) {
 	const char* name = XwaSnapshotExport_ModelName(object->object_type);
-	return name ? XwaRemasterShip_MeshForNameWithSource(name, out_runtime_opt) : NULL;
+	return name ? XwaRemasterShip_MeshForNameWithSource(name, out_source) : NULL;
 }
 
 static float cmd_engine_glow_scale(const XwaFlightObject* object, uint64_t tick_index) {
@@ -200,11 +201,11 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 		return 0;
 	if (out_transform)
 		memcpy(out_transform, transform, sizeof transform);
-	int runtime_opt = 0;
+	uint8_t source = XWA_MODEL_SOURCE_OPT;
 	AeronSceneMesh* mesh =
 		object->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK
 			? XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(object->source_object_type))
-			: cmd_mesh(object, &runtime_opt);
+			: cmd_mesh(object, &source);
 	if (!mesh)
 		return 0;
 	AeronSceneMeshInstance instance;
@@ -213,7 +214,7 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 	instance.variant = object->node_switch;
 	instance.no_local_lights = 1;
 	instance.zero_velocity = 1;
-	if (cmd_projectile(object) && runtime_opt) {
+	if (cmd_projectile(object) && source == XWA_MODEL_SOURCE_OPT) {
 		instance.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
 	}
 	instance.cull_mode = roll_align ? AERON_CULL_NONE : AERON_CULL_BACK;
