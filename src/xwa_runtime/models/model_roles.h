@@ -65,6 +65,11 @@ typedef enum XwaModelRole {
 	XWA_ROLE_SMELTINGROOM_POWER_1,
 	XWA_ROLE_SMELTINGROOM_POWER_2,
 	XWA_ROLE_SMELTINGROOM_TARGET,
+	/* DSReactorCore: the power regenerator, which must be destroyed before
+	   the reactor can be damaged, and the reactor, whose destruction starts
+	   the Death Star destruction sequence. */
+	XWA_ROLE_DSREACTORCORE_REGENERATOR,
+	XWA_ROLE_DSREACTORCORE_REACTOR,
 	XWA_MODEL_ROLE_COUNT
 } XwaModelRole;
 

@@ -28,6 +28,7 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -1132,11 +1133,33 @@ void DeathStar_HandleReactorHit(unsigned int projectileObjIdx, unsigned int reac
 					savedCurCraft = g_curCraft;
 					reactorCraft = g_objectTable[reactorObjIdx].mobj->pCraft;
 					g_curCraft = reactorCraft;
+#ifdef XWA_MODERN
+					/* Modern port: a GLB replacement names the regenerator and
+					 * reactor with roles; map a hit on either to its stock
+					 * component so the cases below apply. */
+					if (XwaModelRole_IsReplacement(OBJ_DSReactorCore)) {
+						if (hitComponentId == (unsigned int)XWA_MODEL_ROLE(
+												  OBJ_DSReactorCore, XWA_ROLE_DSREACTORCORE_REGENERATOR, 1)) {
+							hitComponentId = 1;
+						} else if (hitComponentId ==
+								   (unsigned int)XWA_MODEL_ROLE(OBJ_DSReactorCore,
+																XWA_ROLE_DSREACTORCORE_REACTOR, 2)) {
+							hitComponentId = 2;
+						} else {
+							hitComponentId = 0;
+						}
+					}
+#endif
 					switch ((uint16_t)hitComponentId) {
 						case 1:
-							Craft_DamageComponent(g_deathStarReactorCoreObjIdx, hitComponentId + 1, 0x100u,
-												  g_objectTable[projectileObjIdx].mobj->sourceObjIdx);
-							if (!reactorCraft->componentHp[1]) {
+							Craft_DamageComponent(g_deathStarReactorCoreObjIdx,
+												  XWA_MODEL_ROLE(OBJ_DSReactorCore,
+																 XWA_ROLE_DSREACTORCORE_REGENERATOR,
+																 hitComponentId) +
+													  1,
+												  0x100u, g_objectTable[projectileObjIdx].mobj->sourceObjIdx);
+							if (!reactorCraft->componentHp[XWA_MODEL_ROLE(
+									OBJ_DSReactorCore, XWA_ROLE_DSREACTORCORE_REGENERATOR, 1)]) {
 								collide_damagecraft(g_deathStarReactorCoreObjIdx, 0xFFFFu, 0xFFFFFFFDu, 0x20u,
 													0);
 								fsfx_PlaySound(169, g_deathStarReactorCoreObjIdx, g_localPlayer);
@@ -1144,17 +1167,22 @@ void DeathStar_HandleReactorHit(unsigned int projectileObjIdx, unsigned int reac
 							effect = 270;
 							break;
 						case 2:
-							if (!reactorCraft->componentHp[1]) {
-								Craft_DamageComponent(g_deathStarReactorCoreObjIdx, hitComponentId + 1,
-													  0x100u,
-													  g_objectTable[projectileObjIdx].mobj->sourceObjIdx);
+							if (!reactorCraft->componentHp[XWA_MODEL_ROLE(
+									OBJ_DSReactorCore, XWA_ROLE_DSREACTORCORE_REGENERATOR, 1)]) {
+								Craft_DamageComponent(
+									g_deathStarReactorCoreObjIdx,
+									XWA_MODEL_ROLE(OBJ_DSReactorCore, XWA_ROLE_DSREACTORCORE_REACTOR,
+												   hitComponentId) +
+										1,
+									0x100u, g_objectTable[projectileObjIdx].mobj->sourceObjIdx);
 							}
 							break;
 					}
 					g_curCraft = savedCurCraft;
 					g_missionFlightGroups[(uint8_t)g_deathStarReactorCoreFgIdx].fg.status2 = 20;
 					g_missionFlightGroups[(uint8_t)g_deathStarReactorCoreFgIdx].fg.status1 = 20;
-					if (!reactorCraft->componentHp[2]) {
+					if (!reactorCraft->componentHp[XWA_MODEL_ROLE(OBJ_DSReactorCore,
+																  XWA_ROLE_DSREACTORCORE_REACTOR, 2)]) {
 						CraftData* coreCraft;
 						unsigned int destructionTime;
 						fsfx_PlaySound(170, g_deathStarReactorCoreObjIdx, g_localPlayer);
@@ -1182,8 +1210,10 @@ void DeathStar_HandleReactorHit(unsigned int projectileObjIdx, unsigned int reac
 		}
 		case OBJ_DSReactorCylinder:
 			if (g_deathStarReactorCoreObjIdx)
-				result =
-					g_objectTable[g_deathStarReactorCoreObjIdx].mobj->pCraft->componentHp[1] != 0 ? 0x110 : 0;
+				result = g_objectTable[g_deathStarReactorCoreObjIdx].mobj->pCraft->componentHp[XWA_MODEL_ROLE(
+							 OBJ_DSReactorCore, XWA_ROLE_DSREACTORCORE_REGENERATOR, 1)] != 0
+							 ? 0x110
+							 : 0;
 			break;
 		case OBJ_DSFocusLens:
 			if (objectType == OBJ_DSLaserInternal) {

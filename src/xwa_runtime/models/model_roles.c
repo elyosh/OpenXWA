@@ -32,6 +32,7 @@ static const char* const s_accelRingKeys[] = { "accelring2", "accelring3", NULL 
 static const char* const s_compactorKeys[] = { "compactor", NULL };
 static const char* const s_centrifugeKeys[] = { "centrifuge", NULL };
 static const char* const s_smeltingRoomKeys[] = { "smeltingroom", NULL };
+static const char* const s_dsReactorCoreKeys[] = { "dsreactorcore", NULL };
 static const char* const s_platformKeys[] = { "platform1", "platform2", "platform3",
 											  "platform4", "platform5", NULL };
 
@@ -71,6 +72,9 @@ static const ModelRoleInfo s_roles[XWA_MODEL_ROLE_COUNT] = {
 	[XWA_ROLE_SMELTINGROOM_POWER_1] = { "smeltingroom.power.1", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
 	[XWA_ROLE_SMELTINGROOM_POWER_2] = { "smeltingroom.power.2", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
 	[XWA_ROLE_SMELTINGROOM_TARGET] = { "smeltingroom.target", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
+	[XWA_ROLE_DSREACTORCORE_REGENERATOR] = { "dsreactorcore.regenerator", MODEL_ROLE_SINGLE,
+											 s_dsReactorCoreKeys },
+	[XWA_ROLE_DSREACTORCORE_REACTOR] = { "dsreactorcore.reactor", MODEL_ROLE_SINGLE, s_dsReactorCoreKeys },
 };
 
 static int ModelRole_AppliesTo(const ModelRoleInfo* info, const char* key) {
