@@ -52,6 +52,19 @@ typedef enum XwaModelRole {
 	XWA_ROLE_CENTRIFUGE_DOOR_1,
 	XWA_ROLE_CENTRIFUGE_DOOR_2,
 	XWA_ROLE_CENTRIFUGE_DOOR_3,
+	/* SmeltingRoom: six turrets in firing order (turret n fires from weapon
+	   hardpoint n), the two power components that silence turrets 1-3 and
+	   4-6 when destroyed, and the only component the proving-grounds
+	   turbolaser can hit. */
+	XWA_ROLE_SMELTINGROOM_TURRET_1,
+	XWA_ROLE_SMELTINGROOM_TURRET_2,
+	XWA_ROLE_SMELTINGROOM_TURRET_3,
+	XWA_ROLE_SMELTINGROOM_TURRET_4,
+	XWA_ROLE_SMELTINGROOM_TURRET_5,
+	XWA_ROLE_SMELTINGROOM_TURRET_6,
+	XWA_ROLE_SMELTINGROOM_POWER_1,
+	XWA_ROLE_SMELTINGROOM_POWER_2,
+	XWA_ROLE_SMELTINGROOM_TARGET,
 	XWA_MODEL_ROLE_COUNT
 } XwaModelRole;
 

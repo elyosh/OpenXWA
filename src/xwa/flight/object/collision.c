@@ -2570,7 +2570,9 @@ void collide_TestSweepAgainstModelMeshes(unsigned int sourceObjIdx, unsigned int
 
 		if (g_provingGroundsModeActive) {
 			if (g_objectTable[sourceObjIdx].objectType == OBJ_LaserRebelTurbo_301 &&
-				targetObj->objectType == OBJ_SmeltingRoom && g_collideSweepCurrentMeshOrdinal - 1 != 9) {
+				targetObj->objectType == OBJ_SmeltingRoom &&
+				g_collideSweepCurrentMeshOrdinal - 1 !=
+					XWA_MODEL_ROLE(OBJ_SmeltingRoom, XWA_ROLE_SMELTINGROOM_TARGET, 9)) {
 				continue;
 			}
 

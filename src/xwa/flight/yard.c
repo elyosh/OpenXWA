@@ -136,6 +136,12 @@ uint8_t g_yardSpawnFlightGroupIdx;
 const float g_yardCentrifugeDamageScale = 0.5f;
 // GLOBAL: XWA 0x5AA0EC
 const float g_yardTurretLeadTimeScale = 4.0f;
+/* SmeltingRoom turret role for a stock turret component (3-8); XWA_MODEL_ROLE
+ * is the stock component outside XWA_MODERN. */
+#define SMELTINGROOM_TURRET(stockMesh)                                                                       \
+	XWA_MODEL_ROLE(OBJ_SmeltingRoom, (XwaModelRole)(XWA_ROLE_SMELTINGROOM_TURRET_1 + (stockMesh) - 3),       \
+				   (stockMesh))
+
 // GLOBAL: XWA 0x6005C0
 // Open limit per compactor component. The original table is five bytes followed
 // by three zero alignment bytes, which Yard_UpdateCompactorCycle reads for the
@@ -3032,8 +3038,9 @@ void Yard_UpdateSmeltingRoomTurrets(int deltaTicks) {
 
 			(void)ModelMesh_GetObjectTypeMeshCount(g_objectTable[smeltingObjIdx].objectType);
 			for (mesh = 3; mesh <= 8; ++mesh) {
-				smeltingCraft->meshRotation[mesh] =
-					(uint8_t)(smeltingCraft->meshRotation[mesh] + stepCount * (10 - mesh));
+				smeltingCraft->meshRotation[SMELTINGROOM_TURRET(mesh)] =
+					(uint8_t)(smeltingCraft->meshRotation[SMELTINGROOM_TURRET(mesh)] +
+							  stepCount * (10 - mesh));
 			}
 			break;
 		}
@@ -3043,8 +3050,8 @@ void Yard_UpdateSmeltingRoomTurrets(int deltaTicks) {
 
 			(void)ModelMesh_GetObjectTypeMeshCount(g_objectTable[smeltingObjIdx].objectType);
 			for (mesh = 0; mesh < 6; ++mesh) {
-				smeltingCraft->meshRotation[mesh + 3] =
-					(uint8_t)(smeltingCraft->meshRotation[mesh + 3] + stepCount);
+				smeltingCraft->meshRotation[SMELTINGROOM_TURRET(mesh + 3)] =
+					(uint8_t)(smeltingCraft->meshRotation[SMELTINGROOM_TURRET(mesh + 3)] + stepCount);
 			}
 			break;
 		}
@@ -3069,10 +3076,13 @@ void Yard_UpdateSmeltingRoomTurrets(int deltaTicks) {
 
 			turretCraft = g_objectTable[smeltingObjIdx].mobj->pCraft;
 			if (result <= 5) {
-				if (turretCraft->componentHp[2] == 0) {
+				if (turretCraft
+						->componentHp[XWA_MODEL_ROLE(OBJ_SmeltingRoom, XWA_ROLE_SMELTINGROOM_POWER_1, 2)] ==
+					0) {
 					continue;
 				}
-			} else if (turretCraft->componentHp[10] == 0) {
+			} else if (turretCraft->componentHp[XWA_MODEL_ROLE(OBJ_SmeltingRoom,
+															   XWA_ROLE_SMELTINGROOM_POWER_2, 10)] == 0) {
 				continue;
 			}
 
@@ -3089,8 +3099,10 @@ void Yard_UpdateSmeltingRoomTurrets(int deltaTicks) {
 				smeltingModelIdx = GetModelIndexFromType(OBJ_SmeltingRoom);
 
 				ModelMesh_ApplyAnimatedMeshRotationToPoint(
-					smeltingCraft->meshRotation[g_yardContext.smeltingRoomTurretMeshIdx] << 8,
-					OBJ_SmeltingRoom, (unsigned int)g_yardContext.smeltingRoomTurretMeshIdx,
+					smeltingCraft->meshRotation[SMELTINGROOM_TURRET(g_yardContext.smeltingRoomTurretMeshIdx)]
+						<< 8,
+					OBJ_SmeltingRoom,
+					(unsigned int)SMELTINGROOM_TURRET(g_yardContext.smeltingRoomTurretMeshIdx),
 					g_modelDefs[smeltingModelIdx].weaponHardpoints[hardpointSlot].x,
 					g_modelDefs[smeltingModelIdx].weaponHardpoints[hardpointSlot].y,
 					g_modelDefs[smeltingModelIdx].weaponHardpoints[hardpointSlot].z);
@@ -3218,7 +3230,7 @@ void Yard_UpdateSmeltingRoomTurrets(int deltaTicks) {
 				guidance->sourcePlayerIdx = -1;
 
 				smeltingCraft->warheadData[hardpointSlot].lastFireMeshIdx =
-					(uint8_t)g_yardContext.smeltingRoomTurretMeshIdx;
+					(uint8_t)SMELTINGROOM_TURRET(g_yardContext.smeltingRoomTurretMeshIdx);
 				smeltingCraft->warheadData[hardpointSlot].lastFireHardpointIdx =
 					g_modelDefs[smeltingModelIdx].weaponHardpoints[hardpointSlot].alternateMeshHardpointIdx;
 				fsfx_triggerweaponsfx((unsigned int)projectileObjIdx, (unsigned int)g_localPlayer);

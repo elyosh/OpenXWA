@@ -31,6 +31,7 @@ static const char* const s_pilotKeys[] = { "rebelpilot", "imperialpilot", NULL }
 static const char* const s_accelRingKeys[] = { "accelring2", "accelring3", NULL };
 static const char* const s_compactorKeys[] = { "compactor", NULL };
 static const char* const s_centrifugeKeys[] = { "centrifuge", NULL };
+static const char* const s_smeltingRoomKeys[] = { "smeltingroom", NULL };
 static const char* const s_platformKeys[] = { "platform1", "platform2", "platform3",
 											  "platform4", "platform5", NULL };
 
@@ -61,6 +62,15 @@ static const ModelRoleInfo s_roles[XWA_MODEL_ROLE_COUNT] = {
 	[XWA_ROLE_CENTRIFUGE_DOOR_1] = { "centrifuge.door.1", MODEL_ROLE_SINGLE, s_centrifugeKeys },
 	[XWA_ROLE_CENTRIFUGE_DOOR_2] = { "centrifuge.door.2", MODEL_ROLE_SINGLE, s_centrifugeKeys },
 	[XWA_ROLE_CENTRIFUGE_DOOR_3] = { "centrifuge.door.3", MODEL_ROLE_SINGLE, s_centrifugeKeys },
+	[XWA_ROLE_SMELTINGROOM_TURRET_1] = { "smeltingroom.turret.1", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
+	[XWA_ROLE_SMELTINGROOM_TURRET_2] = { "smeltingroom.turret.2", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
+	[XWA_ROLE_SMELTINGROOM_TURRET_3] = { "smeltingroom.turret.3", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
+	[XWA_ROLE_SMELTINGROOM_TURRET_4] = { "smeltingroom.turret.4", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
+	[XWA_ROLE_SMELTINGROOM_TURRET_5] = { "smeltingroom.turret.5", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
+	[XWA_ROLE_SMELTINGROOM_TURRET_6] = { "smeltingroom.turret.6", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
+	[XWA_ROLE_SMELTINGROOM_POWER_1] = { "smeltingroom.power.1", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
+	[XWA_ROLE_SMELTINGROOM_POWER_2] = { "smeltingroom.power.2", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
+	[XWA_ROLE_SMELTINGROOM_TARGET] = { "smeltingroom.target", MODEL_ROLE_SINGLE, s_smeltingRoomKeys },
 };
 
 static int ModelRole_AppliesTo(const ModelRoleInfo* info, const char* key) {
