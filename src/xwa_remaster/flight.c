@@ -3,10 +3,11 @@
 #include "xwa_remaster/flight.h"
 
 #include "aeron/aeron.h"
-#include "aeron/config_file.h"
 #include "aeron/asset/opt_model.h"
+#include "aeron/config_file.h"
 #include "aeron/scene/billboard.h"
 #include "aeron/scene/bloom.h"
+#include "aeron/scene/environment.h"
 #include "aeron/scene/image_cache.h"
 #include "aeron/scene/present.h"
 #include "aeron/scene/scene3d.h"
@@ -3542,10 +3543,10 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 		directional_lights = lighting_ready ? &hyperspace_lighting.key : NULL;
 		directional_light_count = lighting_ready ? hyperspace_lighting.key_count : 0;
 	}
-	XwaRemasterShip_SetPbrEnv(s.scene, directional_lights, directional_light_count, NULL, s.camera_local,
-							  ao_on ? &ao : NULL, s.plight.enabled ? &point_tuning : NULL, &ambient,
-							  phase == XWA_HYPERSPACE_TUNNEL && lighting_ready
-								  ? &hyperspace_lighting.environment : NULL);
+	XwaRemasterShip_SetPbrEnv(
+		s.scene, directional_lights, directional_light_count, -1, NULL, s.camera_local, ao_on ? &ao : NULL,
+		s.plight.enabled ? &point_tuning : NULL, &ambient,
+		phase == XWA_HYPERSPACE_TUNNEL && lighting_ready ? &hyperspace_lighting.environment : NULL);
 	fl_submit_hyperspace_cockpit(cmd, assets, snap, &snap->flight_camera, anchor_bw, anchor_found, player_f);
 
 	if (!AeronScene_Render(s.scene, cmd)) {
@@ -3567,6 +3568,14 @@ typedef struct FlSceneLighting {
 	XwaShipAmbientCube ambient_cube;
 	const XwaShipAmbientCube* ambient;
 	int hangar_override;
+	/* Authored environment: the package to bind, the combined light list
+	 * (package lights, then kept recovered lights), the explicit key and
+	 * the shadow policy. key_index -1 keeps the recovered key selection. */
+	const AeronEnvironmentPackage* package;
+	XwaDirLight authored_lights[XWA_SNAP_MAX_DIR_LIGHTS];
+	int32_t key_index;
+	int shadow_allowed;
+	float shadow_angular_radius_degrees;
 } FlSceneLighting;
 
 static int fl_is_default_hangar_lighting(const XwaSnapshot* snap) {
@@ -3582,12 +3591,62 @@ static int fl_is_default_hangar_lighting(const XwaSnapshot* snap) {
 		   fabsf(light->color[2] - 1.0f) <= epsilon;
 }
 
-static void fl_build_scene_lighting(const XwaSnapshot* snap, const XwaFlightCamera* cam,
-									FlSceneLighting* out) {
+/* A package light as a runtime directional: the largest linear channel is
+ * the scalar intensity, and the normalized colour is sRGB-encoded so the
+ * PBR path decodes it back without loss. Never a backdrop source. */
+static void fl_package_light_to_dir_light(const AeronEnvironmentLight* light, XwaDirLight* out) {
 	memset(out, 0, sizeof *out);
-	out->lights = snap->dir_lights;
-	out->light_count = snap->dir_light_count;
-	if (!cam->in_hangar || !s.hangar_lighting.enabled) {
+	memcpy(out->world_dir, light->direction_world, sizeof out->world_dir);
+	const float peak = fmaxf(light->color_linear[0], fmaxf(light->color_linear[1], light->color_linear[2]));
+	if (!(peak > 0.0f) || !isfinite(peak)) {
+		return;
+	}
+	out->intensity = peak;
+	for (int channel = 0; channel < 3; channel++) {
+		out->color[channel] = XwaRemaster_LinearToSrgb(light->color_linear[channel] / peak);
+	}
+}
+
+/* While a package is bound it owns the ambient: its authored fill replaces
+ * the game's ambient cube in every direction (the diffuse cube adds the
+ * directional part). */
+static void fl_set_package_ambient(FlSceneLighting* out, const AeronEnvironmentPackage* package) {
+	float* const lobes[6] = { out->ambient_cube.pos_x, out->ambient_cube.neg_x, out->ambient_cube.pos_y,
+							  out->ambient_cube.neg_y, out->ambient_cube.pos_z, out->ambient_cube.neg_z };
+	for (int lobe = 0; lobe < 6; lobe++) {
+		memcpy(lobes[lobe], package->settings.ambient_fill, 3 * sizeof(float));
+	}
+	out->ambient = &out->ambient_cube;
+}
+
+/* Authored flight: package lights replace backdrop-derived directionals;
+ * recovered lights without a backdrop source are kept, since they are not
+ * known to belong to the sky. The declared primary is the key and the only
+ * shadow caster. */
+static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronEnvironmentPackage* package,
+									   FlSceneLighting* out) {
+	uint32_t count = 0;
+	for (uint32_t i = 0; i < package->light_count && count < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
+		fl_package_light_to_dir_light(&package->lights[i], &out->authored_lights[count++]);
+	}
+	for (uint32_t i = 0; i < snap->dir_light_count && count < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
+		if (snap->dir_lights[i].source_backdrop_model_type == 0) {
+			out->authored_lights[count++] = snap->dir_lights[i];
+		}
+	}
+	out->lights = out->authored_lights;
+	out->light_count = count;
+	out->key_index = package->primary_light_index;
+	const AeronEnvironmentLight* primary =
+		package->primary_light_index >= 0 ? &package->lights[package->primary_light_index] : NULL;
+	out->shadow_allowed = primary && primary->casts_shadows;
+	out->shadow_angular_radius_degrees = primary ? primary->angular_radius_degrees : 0.0f;
+	out->package = package;
+	fl_set_package_ambient(out, package);
+}
+
+static void fl_build_hangar_lighting(const XwaSnapshot* snap, FlSceneLighting* out) {
+	if (!s.hangar_lighting.enabled) {
 		return;
 	}
 
@@ -3632,11 +3691,41 @@ static void fl_build_scene_lighting(const XwaSnapshot* snap, const XwaFlightCame
 	out->ambient = &out->ambient_cube;
 }
 
-static int fl_key_directional_light(const XwaDirLight* lights, uint32_t light_count, float out_direction[3]) {
+static void fl_build_scene_lighting(const XwaSnapshot* snap, const XwaFlightCamera* cam,
+									FlSceneLighting* out) {
+	memset(out, 0, sizeof *out);
+	out->lights = snap->dir_lights;
+	out->light_count = snap->dir_light_count;
+	out->key_index = -1;
+	out->shadow_allowed = 1;
+	out->shadow_angular_radius_degrees = s.shadows.light_angular_radius_degrees;
+	if (s.environment.mode == XWA_ENV_MODE_AUTHORED && s.environment.package) {
+		fl_apply_authored_lighting(snap, s.environment.package, out);
+		return;
+	}
+	if (!cam->in_hangar) {
+		return;
+	}
+	fl_build_hangar_lighting(snap, out);
+	/* The hangar package's fill and diffuse cube replace the ceiling, side
+	 * and floor ambient; the artificial ceiling light stays. Without a
+	 * package the hangar keeps its current ambient. */
+	if (s.environment.mode == XWA_ENV_MODE_HANGAR && s.environment.package) {
+		out->package = s.environment.package;
+		fl_set_package_ambient(out, s.environment.package);
+	}
+}
+
+/* The shadow-casting key: lights[key_index] when in range (an authored
+ * primary), otherwise the recovered key selection. */
+static int fl_key_directional_light(const XwaDirLight* lights, uint32_t light_count, int32_t key_index,
+									float out_direction[3]) {
 	if (!lights || !out_direction || light_count == 0) {
 		return 0;
 	}
-	const XwaDirLight* key = XwaRemasterShip_SelectKeyDirectionalLight(lights, light_count);
+	const XwaDirLight* key = key_index >= 0 && (uint32_t)key_index < light_count
+								 ? &lights[key_index]
+								 : XwaRemasterShip_SelectKeyDirectionalLight(lights, light_count);
 	if (!key) {
 		return 0;
 	}
@@ -3708,8 +3797,8 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	XwaRemasterParticles_SubmitRegion(s.particles, s.scene, snap, snap->flight_camera.region);
 	XwaRemasterTrails_SubmitRegion(s.trails, s.scene, snap->flight_camera.region);
 	fl_submit_billboards();
-	XwaRemasterShip_SetPbrEnv(s.scene, snap->dir_lights, snap->dir_light_count, NULL, s.camera_local, NULL,
-							  NULL, NULL, NULL);
+	XwaRemasterShip_SetPbrEnv(s.scene, snap->dir_lights, snap->dir_light_count, -1, NULL, s.camera_local,
+							  NULL, NULL, NULL, NULL);
 	if (!AeronScene_Render(s.scene, cmd)) {
 		s.snap = NULL;
 		return NULL;
@@ -3901,9 +3990,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	float shadow_light_dir[3];
 	/* Preserve the classic directional fill inside the sealed Death Star,
 	 * but do not let its backdrop light cast exterior shadows in the tunnel. */
-	const int shadows_active =
-		!cam->death_star_mode && s.shadows.enabled &&
-		fl_key_directional_light(scene_lighting.lights, scene_lighting.light_count, shadow_light_dir);
+	const int shadows_active = !cam->death_star_mode && s.shadows.enabled && scene_lighting.shadow_allowed &&
+							   fl_key_directional_light(scene_lighting.lights, scene_lighting.light_count,
+														scene_lighting.key_index, shadow_light_dir);
 	if (!s.mb_enabled) {
 		uint32_t motion_reset_reasons = 0;
 		if (!prev) {
@@ -3954,7 +4043,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			.filter_radius = scene_lighting.hangar_override ? s.hangar_lighting.shadow_filter_radius
 															: s.shadows.filter_radius,
 			.contact_hardening = s.shadows.contact_hardening,
-			.light_angular_radius_degrees = s.shadows.light_angular_radius_degrees,
+			.light_angular_radius_degrees = scene_lighting.shadow_angular_radius_degrees,
 			.max_filter_radius = s.shadows.max_filter_radius,
 			.pcss_min_filter_radius = s.shadows.pcss_min_filter_radius,
 			.normal_bias_texels = s.shadows.normal_bias_texels,
@@ -4266,9 +4355,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		s.snap = NULL;
 		return NULL;
 	}
-	XwaRemasterShip_SetPbrEnv(s.scene, scene_lighting.lights, scene_lighting.light_count, NULL,
-							  s.camera_local, ao_on ? &ao : NULL, s.plight.enabled ? &point_tuning : NULL,
-							  scene_lighting.ambient, NULL);
+	XwaRemasterShip_SetPbrEnv(s.scene, scene_lighting.lights, scene_lighting.light_count,
+							  scene_lighting.key_index, NULL, s.camera_local, ao_on ? &ao : NULL,
+							  s.plight.enabled ? &point_tuning : NULL, scene_lighting.ambient, NULL);
+	if (scene_lighting.package) {
+		AeronScene_SetPbrEnvironmentPackage(s.scene, scene_lighting.package);
+	}
 
 	/* Player cockpit (lit; classic runs the normal light setup). Gates
 	 * mirror the classic draw sites: the hangar draws it whenever the

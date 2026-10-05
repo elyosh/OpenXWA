@@ -51,6 +51,7 @@ typedef enum XwaEnvironmentFallback {
 	XWA_ENV_FALLBACK_NO_REGION_ENTRY,  /* region not in the mission's mapping */
 	XWA_ENV_FALLBACK_NO_HANGAR_ENTRY,  /* no hangar package in the mapping */
 	XWA_ENV_FALLBACK_NOT_READY,        /* mapped package not prepared or unavailable */
+	XWA_ENV_FALLBACK_AUTHORED_OFF,     /* authored environments are behind the development switch */
 } XwaEnvironmentFallback;
 
 typedef struct XwaEnvironmentSelection {
@@ -78,6 +79,13 @@ void XwaRemasterEnvironment_Shutdown(void);
 
 int XwaRemasterEnvironment_Enabled(void);
 
+/* Development switch for authored environments (off by default): until the
+ * feature is complete, the hangar and flight regions keep their current
+ * lighting and sky. Packages are still prepared, so toggling it loads
+ * nothing. */
+void XwaRemasterEnvironment_SetAuthoredEnvironments(int enabled);
+int XwaRemasterEnvironment_AuthoredEnvironments(void);
+
 /* Creates the package library and prepares the hangar package. Failures are
  * logged and leave the classic path; returns 0 only on invalid arguments. */
 int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd);
@@ -98,6 +106,10 @@ int XwaRemasterEnvironment_NormalizeMissionKey(const char* path, char* out, size
 /* Resolves the environment selection for one flight frame. Never loads or
  * allocates; logs when the selection changes. */
 void XwaRemasterEnvironment_Resolve(const struct XwaSnapshot* snap, XwaEnvironmentSelection* out);
+
+/* The most recently resolved selection and its mission path; returns 0
+ * before the first resolution. */
+int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mission, size_t mission_size);
 
 const char* XwaRemasterEnvironment_ModeName(XwaEnvironmentMode mode);
 const char* XwaRemasterEnvironment_FallbackName(XwaEnvironmentFallback fallback);

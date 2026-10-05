@@ -411,11 +411,9 @@ typedef struct PbrLightFS {
 	float extra_col[3][4];
 	/* Point-light evaluation: min distance, spec weight, diffuse wrap, cap. */
 	float point_params[4];
-	/* Detailed diffuse environment intensity and world-to-local basis. */
-	float environment_params[4];
-	float environment_right[4];
-	float environment_up[4];
-	float environment_forward[4];
+	/* Reserved: the environment moved to Aeron's scene lighting block
+	 * (AeronScene_SetPbrEnvironment). Left zero. */
+	float reserved_environment[4][4];
 } PbrLightFS;
 typedef char PbrLightFSSizeCheck[sizeof(PbrLightFS) == 368 ? 1 : -1];
 
@@ -494,8 +492,8 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
 }
 
 void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, uint32_t light_count,
-							   const float cam_rows[9], const float cam_pos[3], const XwaShipAoParams* ao,
-							   const XwaShipPointLightTuning* point_tuning,
+							   int32_t key_index, const float cam_rows[9], const float cam_pos[3],
+							   const XwaShipAoParams* ao, const XwaShipPointLightTuning* point_tuning,
 							   const XwaShipAmbientCube* ambient_cube,
 							   const XwaShipEnvironmentMap* environment_map) {
 	if (!scene) {
@@ -549,38 +547,44 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	}
 	if (environment_map && environment_map->texture && environment_map->sampler &&
 		isfinite(environment_map->strength) && environment_map->strength > 0.0f) {
+		/* Basis vectors become the rows of the world-to-local matrix, in
+		 * the space the instances were submitted in. */
 		const float* const source_basis[3] = {
 			environment_map->right, environment_map->up, environment_map->forward
 		};
-		float* const destination_basis[3] = {
-			env.environment_right, env.environment_up, env.environment_forward
-		};
+		AeronScenePbrEnvironment environment;
+		memset(&environment, 0, sizeof environment);
+		environment.diffuse = environment_map->texture;
+		environment.sampler = environment_map->sampler;
+		environment.diffuse_strength = environment_map->strength;
 		for (int basis = 0; basis < 3; basis++) {
+			float* row_out = &environment.world_to_local[basis * 3];
 			if (cam_rows) {
 				for (int row = 0; row < 3; row++) {
-					destination_basis[basis][row] =
-						cam_rows[row * 3 + 0] * source_basis[basis][0] +
-						cam_rows[row * 3 + 1] * source_basis[basis][1] +
-						cam_rows[row * 3 + 2] * source_basis[basis][2];
+					row_out[row] = cam_rows[row * 3 + 0] * source_basis[basis][0] +
+								   cam_rows[row * 3 + 1] * source_basis[basis][1] +
+								   cam_rows[row * 3 + 2] * source_basis[basis][2];
 				}
 			} else {
-				memcpy(destination_basis[basis], source_basis[basis], 3 * sizeof(float));
+				memcpy(row_out, source_basis[basis], 3 * sizeof(float));
 			}
 		}
-		env.environment_params[0] = environment_map->strength;
-		AeronScene_SetPbrEnvironmentMap(scene, environment_map->texture, environment_map->sampler);
+		AeronScene_SetPbrEnvironment(scene, &environment);
 	}
 
 	/* A backdrop sun is the key even when a planet has slightly greater
-	 * intensity. The classic sums plain Lambert per ADDITIONAL light, so
-	 * the three brightest remaining lights feed diffuse-only extra slots.
-	 * Each light's color is decoded to linear and scaled by its
-	 * intensity. */
+	 * intensity, unless the caller names the key (authored packages
+	 * declare their primary). The classic sums plain Lambert per
+	 * ADDITIONAL light, so the three brightest remaining lights feed
+	 * diffuse-only extra slots. Each light's color is decoded to linear
+	 * and scaled by its intensity. */
 	const XwaDirLight* sorted[XWA_SNAP_MAX_DIR_LIGHTS];
 	float sorted_luminance[XWA_SNAP_MAX_DIR_LIGHTS];
 	const uint32_t n =
 		!lights ? 0 : (light_count > XWA_SNAP_MAX_DIR_LIGHTS ? XWA_SNAP_MAX_DIR_LIGHTS : light_count);
-	const XwaDirLight* key = XwaRemasterShip_SelectKeyDirectionalLight(lights, n);
+	const XwaDirLight* key = key_index >= 0 && (uint32_t)key_index < n
+								 ? &lights[key_index]
+								 : XwaRemasterShip_SelectKeyDirectionalLight(lights, n);
 	for (uint32_t i = 0; i < n; i++) {
 		sorted[i] = &lights[i];
 		sorted_luminance[i] = ship_directional_light_luminance(sorted[i]);

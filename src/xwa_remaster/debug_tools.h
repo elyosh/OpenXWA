@@ -18,6 +18,10 @@ extern "C" {
  * state). No-op when the overlay is unavailable at runtime. */
 void XwaRemasterDebugTools_Register(void);
 
+/* XWA rows of Aeron's Environment debug tool (selection and the authored
+ * flight development switch). */
+void XwaRemasterDebugTools_EnvironmentRows(void* user);
+
 #ifdef __cplusplus
 }
 #endif

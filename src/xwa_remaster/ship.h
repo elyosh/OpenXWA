@@ -148,8 +148,9 @@ typedef struct XwaShipAmbientCube {
 /* Fill every lobe with the current process-wide linear ambient tuning. */
 void XwaRemasterShip_GetAmbientCube(XwaShipAmbientCube* out);
 
-/* Optional detailed diffuse environment. The cubemap is linear HDR and
- * indexed in the supplied world-space orthonormal basis. */
+/* Optional detailed diffuse environment (Lambert irradiance / pi, linear
+ * HDR) indexed in the supplied world-space orthonormal basis; bound with
+ * AeronScene_SetPbrEnvironment. */
 typedef struct XwaShipEnvironmentMap {
 	AeronTexture* texture;
 	AeronSampler* sampler;
@@ -188,15 +189,17 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
  *     space), cam_pos = NULL (camera at the origin).
  * `ao` carries the per-frame SSAO inputs the FS folds into the
  * ambient (and optionally direct-diffuse) term; NULL = AO off.
- * The key light follows SelectKeyDirectionalLight. Directional light
+ * The key light is lights[key_index] when key_index is in range, otherwise
+ * SelectKeyDirectionalLight's choice. Directional light
  * colors are decoded to linear and scaled by their intensity. Punctual
  * records are submitted separately through AeronScene_AddLight;
  * `point_tuning` controls their evaluation. `ambient_cube` optionally
- * replaces the uniform ambient fill; `environment_map` adds detailed
- * diffuse radiance in a scene-specific world-space basis. */
+ * replaces the uniform ambient fill; `environment_map`, when given,
+ * selects the scene's diffuse environment (otherwise the scene's selection,
+ * such as an authored package, is left as is). */
 void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, uint32_t light_count,
-							   const float cam_rows[9], const float cam_pos[3], const XwaShipAoParams* ao,
-							   const XwaShipPointLightTuning* point_tuning,
+							   int32_t key_index, const float cam_rows[9], const float cam_pos[3],
+							   const XwaShipAoParams* ao, const XwaShipPointLightTuning* point_tuning,
 							   const XwaShipAmbientCube* ambient_cube,
 							   const XwaShipEnvironmentMap* environment_map);
 

@@ -3,6 +3,7 @@
 #include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
+#include "xwa_remaster/debug_tools.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <math.h>
@@ -42,8 +43,10 @@ static struct {
 	char last_mission[sizeof(((XwaSnapshot*)0)->mission_path)];
 } s_env;
 
-/* Host options; survive Shutdown, which clears s_env. */
+/* Host options and the development switch; survive Shutdown, which clears
+ * s_env. */
 static struct {
+	int authored;
 	int enabled;
 	char manifest[sizeof s_env.manifest_path];
 } s_env_options;
@@ -341,6 +344,10 @@ void XwaRemasterEnvironment_Shutdown(void) {
 
 int XwaRemasterEnvironment_Enabled(void) { return s_env.enabled; }
 
+void XwaRemasterEnvironment_SetAuthoredEnvironments(int enabled) { s_env_options.authored = enabled != 0; }
+
+int XwaRemasterEnvironment_AuthoredEnvironments(void) { return s_env_options.authored; }
+
 /* XWA world X/Y horizontal, +Z up: cube +X = world +X, cube +Y = world +Z,
  * cube +Z = world -Y (the flight sky's existing rotation). */
 static const float env_base_world_to_cube[9] = {
@@ -367,7 +374,11 @@ int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd) {
 					   "environment maps: package library creation failed; classic path only");
 		return 1;
 	}
+#ifdef AERON_DEBUG_UI
+	AeronEnvironmentLibrary_RegisterDebugTool(s_env.library, XwaRemasterDebugTools_EnvironmentRows, NULL);
+#else
 	AeronEnvironmentLibrary_RegisterDebugTool(s_env.library, NULL, NULL);
+#endif
 	env_clear_prepared();
 	if (s_env.hangar_reference >= 0 &&
 		AeronEnvironmentLibrary_Prepare(s_env.library, cmd, &s_env.references[s_env.hangar_reference], 1)) {
@@ -475,8 +486,15 @@ static void env_resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 			return;
 		}
 		const AeronEnvironmentPackage* package = env_package(s_env.prepared_hangar);
-		env_select(out, XWA_ENV_MODE_HANGAR, package ? XWA_ENV_FALLBACK_NONE : XWA_ENV_FALLBACK_NOT_READY,
-				   s_env.hangar_reference);
+		if (!package) {
+			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NOT_READY, s_env.hangar_reference);
+			return;
+		}
+		if (!s_env_options.authored) {
+			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_AUTHORED_OFF, s_env.hangar_reference);
+			return;
+		}
+		env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NONE, s_env.hangar_reference);
 		out->package = package;
 		return;
 	}
@@ -503,6 +521,10 @@ static void env_resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 		strcmp(key, s_env.prepared_key) == 0 ? env_package(s_env.prepared_region[cam->region]) : NULL;
 	if (!package) {
 		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_NOT_READY, reference);
+		return;
+	}
+	if (!s_env_options.authored) {
+		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_AUTHORED_OFF, reference);
 		return;
 	}
 	env_select(out, XWA_ENV_MODE_AUTHORED, XWA_ENV_FALLBACK_NONE, reference);
@@ -542,6 +564,19 @@ void XwaRemasterEnvironment_Resolve(const XwaSnapshot* snap, XwaEnvironmentSelec
 														 : "");
 }
 
+int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mission, size_t mission_size) {
+	if (!s_env.logged) {
+		return 0;
+	}
+	if (out) {
+		*out = s_env.last;
+	}
+	if (mission && mission_size) {
+		snprintf(mission, mission_size, "%s", s_env.last_mission);
+	}
+	return 1;
+}
+
 const char* XwaRemasterEnvironment_ModeName(XwaEnvironmentMode mode) {
 	switch (mode) {
 		case XWA_ENV_MODE_DISABLED:
@@ -576,6 +611,8 @@ const char* XwaRemasterEnvironment_FallbackName(XwaEnvironmentFallback fallback)
 			return "no hangar package";
 		case XWA_ENV_FALLBACK_NOT_READY:
 			return "package not ready";
+		case XWA_ENV_FALLBACK_AUTHORED_OFF:
+			return "authored environments switch off";
 	}
 	return "unknown";
 }

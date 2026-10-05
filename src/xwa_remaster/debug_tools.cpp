@@ -13,6 +13,7 @@
 
 #include "xwa_remaster/debug_tools.h"
 
+#include "xwa_remaster/environment.h"
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/hud.h"
 #include "xwa_remaster/hud_boxes.h"
@@ -1011,6 +1012,26 @@ static void xwa_tool_flight_input(int* open, void* user) {
 
 	ImGui::End();
 	*open = b ? 1 : 0;
+}
+
+extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
+	(void)user;
+	bool authored = XwaRemasterEnvironment_AuthoredEnvironments() != 0;
+	if (ImGui::Checkbox("Authored environments (development switch)", &authored)) {
+		XwaRemasterEnvironment_SetAuthoredEnvironments(authored ? 1 : 0);
+	}
+	ImGui::TextDisabled("Off: the hangar and flight regions keep their current lighting and sky.");
+	XwaEnvironmentSelection selection;
+	char mission[128];
+	if (XwaRemasterEnvironment_LastSelection(&selection, mission, sizeof mission)) {
+		ImGui::Text("Mission: %s, region %u", mission[0] ? mission : "(none)", (unsigned)selection.region);
+		ImGui::Text("Selection: %s%s%s", XwaRemasterEnvironment_ModeName(selection.mode),
+					selection.reference ? ", package " : "",
+					selection.reference ? selection.reference->package : "");
+		if (selection.fallback != XWA_ENV_FALLBACK_NONE) {
+			ImGui::Text("Fallback: %s", XwaRemasterEnvironment_FallbackName(selection.fallback));
+		}
+	}
 }
 
 extern "C" void XwaRemasterDebugTools_Register(void) {
