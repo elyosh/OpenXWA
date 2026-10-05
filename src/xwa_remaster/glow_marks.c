@@ -60,10 +60,12 @@ static float dot3(const float a[3], const float b[3]) { return a[0] * b[0] + a[1
 static uint32_t build_candidate_slabs(const XwaGlowMark* mark, AeronFaceBvhSlab slabs[3]) {
 	float limit;
 	if (mark->world_segment_mode) {
-		if (!(mark->layer_uv_scale > 0.0f)) {
+		/* The geometry is cached for the mark's lifetime while its scale
+		 * animates, so use the largest visible square it will reach. */
+		if (!(mark->layer_uv_scale_min > 0.0f)) {
 			return 0;
 		}
-		limit = 0.5f / mark->layer_uv_scale;
+		limit = 0.5f / mark->layer_uv_scale_min;
 	} else {
 		limit = 0.5f;
 	}
@@ -240,9 +242,11 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 		}
 		/* A world-segment triangle entirely past one edge of the visible
 		 * square |uv| <= 0.5 / layer_uv_scale draws nothing: the overlay
-		 * shader discards outside it and UVs interpolate convexly. */
-		if (mark->world_segment_mode && mark->layer_uv_scale > 0.0f) {
-			const float visible_limit = 0.5f / mark->layer_uv_scale;
+		 * shader discards outside it and UVs interpolate convexly. The
+		 * geometry is cached while layer_uv_scale animates, so cull against
+		 * the largest square the mark will reach. */
+		if (mark->world_segment_mode && mark->layer_uv_scale_min > 0.0f) {
+			const float visible_limit = 0.5f / mark->layer_uv_scale_min;
 			uint8_t     visible_clip_mask = 15;
 			for (int triangle_vertex_index = 0; triangle_vertex_index < 3; triangle_vertex_index++) {
 				visible_clip_mask &= projected_uv_outcode_within(projected_u[triangle_vertex_index],

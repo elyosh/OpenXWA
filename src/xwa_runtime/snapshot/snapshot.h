@@ -653,7 +653,11 @@ typedef struct XwaGlowMark {
 	float inv_scale_u;
 	float inv_scale_v;
 	float layer_uv_scale; /* classic per-frame dimension compensation */
-	uint64_t mesh_mask;   /* engine/OPT mesh ordinals traversed at creation */
+	/* Smallest layer_uv_scale from this frame to the end of the mark's
+	 * animation (its largest visible square); 0 when some frame has no
+	 * scale, which leaves the overlay unclipped. */
+	float layer_uv_scale_min;
+	uint64_t mesh_mask; /* engine/OPT mesh ordinals traversed at creation */
 } XwaGlowMark;
 
 /* ---- object trails -------------------------------------------------

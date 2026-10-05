@@ -72,6 +72,61 @@ static GlowMarkCaptureMeta g_glow_mark_meta[24];
 static GlowMarkCaptureMeta g_blast_mark_meta[32];
 static uint32_t g_glow_mark_generation;
 
+/* Frame-scale table GlowMark_UpdateActivePatches selects for an animated mark. */
+static const uint8_t* snapshot_glow_mark_frame_scales(uint16_t model_type) {
+	switch (model_type) {
+		case OBJ_AnimationTextureGroup3055:
+			return g_tractorBeamFrameScales;
+		case OBJ_AnimationTextureGroup3005:
+			return g_hullLightFrameScales;
+		case OBJ_AnimationTextureGroup2007:
+			return g_magElectFrameScales;
+		case OBJ_AnimationTextureGroup2008:
+			return g_ionElectFrameScales;
+		default:
+			return g_shieldGlowFrameScales;
+	}
+}
+
+/* The mark's current uvScale. GlowMark_UpdateActivePatches rewrites it each
+ * animation frame, but only in the face patches GlowMark_CollectModelFaces
+ * created. A GLB replacement model collects none (its faces live in the HD
+ * renderer), so its face patch 0 keeps the allocation value; derive the
+ * value the update would have written instead. Blast marks never change it. */
+static float snapshot_glow_mark_uv_scale(const ObjectMeshTextureLayerBlock* p, int pool_kind) {
+	const float stored = p->facePatches[0].passes[0].uvScale;
+	if (pool_kind != 0 || p->facePatchCount > 0 || p->currentFrame <= 1 || p->modelType >= OBJ_Count ||
+		p->currentFrame > (int)g_modelTypeTable[p->modelType].frameCount) {
+		return stored;
+	}
+	const uint8_t* frame_scales = snapshot_glow_mark_frame_scales(p->modelType);
+	return frame_scales ? (float)(unsigned int)frame_scales[p->currentFrame - 1] * p->baseScale : stored;
+}
+
+/* Smallest uvScale `p` will use from now until its animation ends: animated
+ * marks advance one frame per GlowMark_UpdateActivePatches call through the
+ * same table, up to the model type's frameCount; baseScale is fixed at
+ * allocation. */
+static float snapshot_glow_mark_min_uv_scale(const ObjectMeshTextureLayerBlock* p, int pool_kind,
+											 float current_scale) {
+	float min_scale = current_scale;
+	if (pool_kind != 0 || p->modelType >= OBJ_Count) {
+		return min_scale > 0.0f ? min_scale : 0.0f;
+	}
+	const uint8_t* frame_scales = snapshot_glow_mark_frame_scales(p->modelType);
+	if (!frame_scales) {
+		return 0.0f;
+	}
+	const int frame_count = (int)g_modelTypeTable[p->modelType].frameCount;
+	for (int frame = p->currentFrame + 1; frame <= frame_count; frame++) {
+		const float scale = (float)(unsigned int)frame_scales[frame - 1] * p->baseScale;
+		if (scale < min_scale) {
+			min_scale = scale;
+		}
+	}
+	return min_scale > 0.0f ? min_scale : 0.0f;
+}
+
 static XwaSnapshot* wr(void) { return &g_slots[g_write_slot]; }
 
 /* Active frontend clip rect, stamped into every 2D record so the
@@ -1373,7 +1428,8 @@ void XwaSnapshot_CaptureFlight(void) {
 			memcpy(m->v_axis, &p->vAxis, sizeof m->v_axis);
 			m->inv_scale_u = meta[i].inv_scale_u;
 			m->inv_scale_v = meta[i].inv_scale_v;
-			m->layer_uv_scale = p->facePatches[0].passes[0].uvScale;
+			m->layer_uv_scale = snapshot_glow_mark_uv_scale(p, pool_kind);
+			m->layer_uv_scale_min = snapshot_glow_mark_min_uv_scale(p, pool_kind, m->layer_uv_scale);
 			m->mesh_mask = meta[i].mesh_mask;
 		}
 	}
