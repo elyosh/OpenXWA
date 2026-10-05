@@ -31,6 +31,7 @@ typedef struct XwaRemasterInitOptions {
 	int prefer_original_2d;
 	int environment_maps_enabled;
 	const char* environment_maps_manifest; /* relative to the remaster bake root */
+	float environment_maps_sun_max_radiance;
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
 } XwaRemasterInitOptions;

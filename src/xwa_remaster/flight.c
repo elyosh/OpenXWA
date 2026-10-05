@@ -2561,16 +2561,47 @@ static void fl_lens_add_source(const XwaRemasterFlightView* flight_view, const f
 	src->argb = argb;
 }
 
+/* Authored package lights that request a flare are direction sources at
+ * infinity like backdrop suns. Their unit directions are scaled to the
+ * backdrop Q20 magnitude so the anchor's depth reference also lands at the
+ * far plane. */
+static void fl_derive_authored_lens_sources(const AeronEnvironmentPackage* package,
+											const XwaRemasterFlightView* flight_view) {
+	for (uint32_t i = 0; i < package->light_count && s.lens_src_count < FL_MAX_LENS_SOURCES; i++) {
+		const AeronEnvironmentLight* light = &package->lights[i];
+		if (!light->lens_flare) {
+			continue;
+		}
+		float v[3];
+		fl_world_to_view(s.crows, light->direction_world[0], light->direction_world[1],
+						 light->direction_world[2], v);
+		if (v[2] <= 0.0f) {
+			continue;
+		}
+		const float far_scale = 1048576.0f;
+		const float anchor[3] = { s.camera_local[0] + light->direction_world[0] * far_scale,
+								  s.camera_local[1] + light->direction_world[1] * far_scale,
+								  s.camera_local[2] + light->direction_world[2] * far_scale };
+		fl_lens_add_source(flight_view, anchor, 0xffffffffu);
+	}
+}
+
 static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* assets,
-								  const XwaRemasterFlightView* flight_view) {
+								  const XwaRemasterFlightView* flight_view,
+								  const AeronEnvironmentPackage* authored) {
 	s.lens_src_count = 0;
 	s.lens_ok = 0;
 	const XwaFlightCamera* cam = &snap->flight_camera;
 
+	if (authored) {
+		fl_derive_authored_lens_sources(authored, flight_view);
+	}
 	/* Backdrop suns: direction sources at infinity (raw Q20 world
 	 * dirs; projection is magnitude-independent, the anchor's large
-	 * magnitude lands the depth reference at the far plane). */
-	for (uint32_t i = 0; i < snap->backdrop_count && s.lens_src_count < FL_MAX_LENS_SOURCES; i++) {
+	 * magnitude lands the depth reference at the far plane). An authored
+	 * package replaces them. */
+	for (uint32_t i = 0; !authored && i < snap->backdrop_count && s.lens_src_count < FL_MAX_LENS_SOURCES;
+		 i++) {
 		const XwaBackdrop* b = &snap->backdrops[i];
 		if (b->model_type < XWA_SNAP_TYPE_BACKDROP_SUN_FIRST ||
 			b->model_type > XWA_SNAP_TYPE_BACKDROP_SUN_LAST) {
@@ -3960,9 +3991,14 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * open); point-light candidates start with the accessor-law
 	 * sources (glow lights + pulses append during/after the walk). */
 	fl_derive_billboards(snap, assets, billboard_history_cam, billboard_history_crows);
-	fl_derive_lens_flares(snap, assets, &flight_view);
+	/* Authored mode is atomic: the package's sky, suns, lights and flares
+	 * replace the configured sky, the recovered backdrop sprites, the
+	 * backdrop-derived directionals and the backdrop-sun flares together. */
+	const AeronEnvironmentPackage* authored =
+		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.package : NULL;
+	fl_derive_lens_flares(snap, assets, &flight_view, authored);
 	fl_derive_point_lights(snap);
-	s.bd_count = fl_derive_backdrops(snap, s.crows, assets);
+	s.bd_count = authored ? 0 : fl_derive_backdrops(snap, s.crows, assets);
 	XwaRemasterEffectView effect_view;
 	XwaRemasterEffectView_Main(&effect_view, &flight_view, s.crows);
 	XwaRemasterEffectView previous_effect_view;
@@ -4072,7 +4108,13 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	static const float fl_world_to_cube[9] = {
 		1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f,
 	};
-	if (!cam->death_star_mode) {
+	if (authored) {
+		AeronScene_SetSkyCube(s.scene, authored->radiance, authored->world_to_cube,
+							  authored->settings.sky_exposure);
+		for (uint32_t i = 0; i < authored->light_count; i++) {
+			AeronScene_AddSkySun(s.scene, &authored->lights[i], authored->settings.sky_exposure);
+		}
+	} else if (!cam->death_star_mode) {
 		if (s.sky_mode == 1) {
 			/* Classic stars are one flight-viewport pixel; the HD scene
 			 * renders the same FOV at rt_h. Scaling the classic-pixel dot

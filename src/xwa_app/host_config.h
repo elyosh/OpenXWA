@@ -26,6 +26,8 @@ typedef struct XwaHostConfig {
 	int environment_maps_enabled;
 	/* Relative to the remaster bake root. */
 	char environment_maps_manifest[XWA_HOST_CONFIG_MANIFEST_CAPACITY];
+	/* Largest radiance a sun disc is drawn with. */
+	float environment_maps_sun_max_radiance;
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
 	XwaModernInputOptions input_defaults;

@@ -152,6 +152,10 @@ hangar_lighting:
 environment_maps:
   enabled: false
   manifest: "flight/environments/environments.yaml"
+  # Largest radiance a sun disc is drawn with (its lighting is not capped).
+  # A physical disc is far brighter than screen-space bloom resolves
+  # cleanly; 1 to 60000.
+  sun_max_radiance: 100.0
 skybox:
   enabled: true
   exposure: 1.0

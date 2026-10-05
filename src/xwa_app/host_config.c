@@ -216,6 +216,28 @@ static int host_config_environment_maps(const AeronConfigFile* config, int requi
 	return 1;
 }
 
+static int host_config_sun_max_radiance(const AeronConfigFile* config, int required, float* out, char* error,
+										size_t error_size) {
+	const char* key = "environment_maps.sun_max_radiance";
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	double value;
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 key);
+		}
+		return 1;
+	}
+	value = AeronConfigNode_Float(node, NAN);
+	if (!isfinite(value) || value < 1.0 || value > 60000.0) {
+		return host_config_error(error, error_size,
+								 "invalid 'environment_maps.sun_max_radiance': expected numeric value %s",
+								 "from 1 to 60000");
+	}
+	*out = (float)value;
+	return 1;
+}
+
 static int host_config_remaster_options(const AeronConfigFile* config, int required, XwaHostConfig* out,
 										char* error, size_t error_size) {
 	return host_config_model_smoothing(config, required, &out->model_smooth_angle_degrees, error,
@@ -228,7 +250,9 @@ static int host_config_remaster_options(const AeronConfigFile* config, int requi
 												error_size) &&
 		   host_config_force_opt(config, required, &out->force_opt_models, error, error_size) &&
 		   host_config_prefer_original_2d(config, required, &out->prefer_original_2d, error, error_size) &&
-		   host_config_environment_maps(config, required, out, error, error_size);
+		   host_config_environment_maps(config, required, out, error, error_size) &&
+		   host_config_sun_max_radiance(config, required, &out->environment_maps_sun_max_radiance, error,
+										error_size);
 }
 
 static int host_config_input_options(const AeronConfigFile* config, int required, XwaModernInputOptions* out,

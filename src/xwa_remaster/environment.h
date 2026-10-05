@@ -67,10 +67,11 @@ typedef struct XwaEnvironmentSelection {
 
 #define XWA_ENV_MISSION_KEY_MAX 128
 
-/* Sets the host options environment_maps.enabled and .manifest (shipped
- * configuration, optionally overridden by the user configuration). The
- * manifest path is copied. Call before XwaRemasterEnvironment_Init. */
-void XwaRemasterEnvironment_Configure(int enabled, const char* manifest);
+/* Sets the host options environment_maps.enabled, .manifest and
+ * .sun_max_radiance (shipped configuration, optionally overridden by the
+ * user configuration). The manifest path is copied. Call before
+ * XwaRemasterEnvironment_Init. */
+void XwaRemasterEnvironment_Configure(int enabled, const char* manifest, float sun_max_radiance);
 
 /* When enabled, parses the required manifest. Returns 0 on any error,
  * logged with the source path and YAML line. */

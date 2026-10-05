@@ -48,11 +48,13 @@ static struct {
 static struct {
 	int authored;
 	int enabled;
+	float sun_max_radiance; /* 0 = Aeron's default */
 	char manifest[sizeof s_env.manifest_path];
 } s_env_options;
 
-void XwaRemasterEnvironment_Configure(int enabled, const char* manifest) {
+void XwaRemasterEnvironment_Configure(int enabled, const char* manifest, float sun_max_radiance) {
 	s_env_options.enabled = enabled != 0;
+	s_env_options.sun_max_radiance = sun_max_radiance;
 	snprintf(s_env_options.manifest, sizeof s_env_options.manifest, "%s", manifest ? manifest : "");
 }
 
@@ -367,6 +369,7 @@ int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd) {
 	desc.vfs = Aeron_GetVfs();
 	desc.root = AERON_VFS_ROOT_ASSET;
 	desc.path_prefix = "remaster/";
+	desc.sun_max_radiance = s_env_options.sun_max_radiance;
 	memcpy(desc.base_world_to_cube, env_base_world_to_cube, sizeof desc.base_world_to_cube);
 	s_env.library = AeronEnvironmentLibrary_Create(&desc);
 	if (!s_env.library) {
