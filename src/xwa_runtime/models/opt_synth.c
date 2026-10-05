@@ -26,9 +26,14 @@ enum {
 	OPT_SYNTH_VERTEX_SAMPLE_COUNT = 256,
 };
 
-/* Mean edge length below which a cockpit-class component's loose hit test
-   loses its meaning (50 OPT units, about 1.2 m). */
-#define OPT_SYNTH_COCKPIT_DENSE_EDGE 50.0
+/* Cockpit-class models are hit-tested by the loose FaceData walk: up to nine
+   linear sweeps over every face per player hit, accepting near misses within
+   about 50 / edge length OPT units of a face edge. Stock cockpits (the twelve
+   *Cockpit.opt plus CorellianTransportGunner.opt) have at most 629 faces and
+   a smallest per-component mean edge of 1.1 OPT units, so warn only beyond
+   what the game shipped with. */
+#define OPT_SYNTH_COCKPIT_MAX_FACES 5000u
+#define OPT_SYNTH_COCKPIT_MIN_MEAN_EDGE 1.0
 
 /* Tags that OpenXWA reads as a single component. */
 static const char* const s_uniqueTags[] = { "crew.side", "crew.forward" };
@@ -165,20 +170,29 @@ static int OptSynth_ValidateSimulation(const char* key, const AeronOptSimModel* 
 	return 1;
 }
 
-/* Warns about cockpit-class components whose dense geometry makes the loose
-   hit-spark sweeps slow and their tolerance large. */
+/* Warns once when a cockpit-class model is denser than any stock cockpit:
+   more faces makes the loose hit-spark sweeps slower, and shorter edges widen
+   their near-miss tolerance. A collision mesh replaces the edge concern for
+   its component. */
 static void OptSynth_WarnDenseCockpit(const char* key, const AeronFlightModel* model) {
 	uint32_t component;
+	uint32_t faceTotal;
+	double smallestMeanEdge;
+	int smallestComponent;
 
 	if (!XwaModelSource_IsCockpitClassKey(key)) {
 		return;
 	}
+	faceTotal = 0;
+	smallestMeanEdge = 0.0;
+	smallestComponent = -1;
 	for (component = 0; component < model->component_count; ++component) {
 		const AeronFlightComponent* item = &model->components[component];
 		const AeronFlightTopology* topology = &item->topology;
 		double total;
 		uint32_t face;
 
+		faceTotal += topology->face_count;
 		if (item->has_collision || topology->face_count == 0) {
 			continue;
 		}
@@ -198,12 +212,24 @@ static void OptSynth_WarnDenseCockpit(const char* key, const AeronFlightModel* m
 			}
 		}
 		total = total / (3.0 * topology->face_count) * AERON_OPT_SIM_UNITS_PER_METER;
-		if (total < OPT_SYNTH_COCKPIT_DENSE_EDGE) {
-			Aeron_LogWarn("xwa.models",
-						  "replacement '%s': cockpit component %u has a mean edge of %.1f OPT units and no "
-						  "collision mesh; hit sparks will be slow and loose",
-						  key, component, total);
+		if (smallestComponent < 0 || total < smallestMeanEdge) {
+			smallestMeanEdge = total;
+			smallestComponent = (int)component;
 		}
+	}
+	if (faceTotal > OPT_SYNTH_COCKPIT_MAX_FACES) {
+		Aeron_LogWarn(
+			"xwa.models",
+			"replacement '%s': cockpit has %u faces (stock cockpits have at most 629); each player hit "
+			"sweeps all of them up to nine times",
+			key, faceTotal);
+	}
+	if (smallestComponent >= 0 && smallestMeanEdge < OPT_SYNTH_COCKPIT_MIN_MEAN_EDGE) {
+		Aeron_LogWarn(
+			"xwa.models",
+			"replacement '%s': cockpit component %d has a mean edge of %.2f OPT units (stock cockpits "
+			"stay above 1.1) and no collision mesh; hit sparks accept wide near misses",
+			key, smallestComponent, smallestMeanEdge);
 	}
 }
 
