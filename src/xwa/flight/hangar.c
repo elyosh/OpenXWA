@@ -176,12 +176,14 @@ int g_hangarTipDelayMs;
 // GLOBAL: XWA 0x68BBAC
 int g_hangarNextAmbientSoundTime;
 // GLOBAL: XWA 0x68BBB0
-int g_unusedHangarPrimaryDroidObjIdxMirror;
+int g_unusedHangarWorkStandObjIdxMirror;
 // GLOBAL: XWA 0x68BBB4
-int g_unusedHangarPrimaryDroidObjIdx;
+// Hangar workstand object (OBJ_HangarWorkStand); spawned but otherwise unused.
+int g_unusedHangarWorkStandObjIdx;
 // GLOBAL: XWA 0x68BBB8
 int g_launchAnimDone;
 // GLOBAL: XWA 0x68BBBC
+// Hangar generator object (OBJ_HangarGenerator), used as a droid route target.
 int g_hangarDroidRouteTargetObjIdx;
 // GLOBAL: XWA 0x68BBC0
 int g_hangarMenuLevel;
@@ -212,6 +214,7 @@ int g_hangarMenuCursor[HANGAR_MENU_LEVEL_COUNT];
 // GLOBAL: XWA 0x68BC30
 int g_hangarSavedPlayerYaw;
 // GLOBAL: XWA 0x68BC34
+// Hangar monitor object (OBJ_HangarMonitor), used as a droid route target.
 int g_hangarDroidTargetObjIdx;
 // GLOBAL: XWA 0x68BC38
 int g_launchBaseZ;
@@ -220,7 +223,8 @@ char g_hangarMenuColTitle[2][HANGAR_MENU_TEXT_LENGTH];
 // GLOBAL: XWA 0x68BCA4
 float g_hangarLaunchMoveSpeed;
 // GLOBAL: XWA 0x68BCA8
-int g_hangarAnimatedDroidObjIdx;
+// Hangar crane object (OBJ_HangarCrane); meshRotation[0] is the crane arm swing.
+int g_hangarCraneObjIdx;
 // GLOBAL: XWA 0x68BCAC
 int g_hangarReadyElapsedMs;
 // GLOBAL: XWA 0x68BCB0
@@ -4465,7 +4469,7 @@ static void Hangar_ModernResetCadenceSensitiveState(void) {
 
 	g_modernHangarLegacyCadenceTicks = 0;
 	g_modernHangarLegacyCadenceDue = 0;
-	craft = g_objectTable[g_hangarAnimatedDroidObjIdx].mobj->pCraft;
+	craft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
 	g_modernHangarCraneRotationActive = (craft->meshRotation[0] & 1u) != 0;
 	g_modernHangarCraneScaledStateActive = 0;
 
@@ -4502,7 +4506,7 @@ static void Hangar_ModernUpdateCraneRotation(int dtTicks, uint16_t stopThreshold
 	CraftData* craft;
 	uint8_t rotation;
 
-	craft = g_objectTable[g_hangarAnimatedDroidObjIdx].mobj->pCraft;
+	craft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
 	g_curCraft = craft;
 	rotation = craft->meshRotation[0];
 	if (g_modernHangarCraneRotationActive) {
@@ -4535,7 +4539,7 @@ static void Hangar_ModernPrepareOriginalCraneRotation(void) {
 	if (!g_modernHangarCraneScaledStateActive) {
 		return;
 	}
-	craft = g_objectTable[g_hangarAnimatedDroidObjIdx].mobj->pCraft;
+	craft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
 	rotation = craft->meshRotation[0];
 	if (((rotation & 1u) != 0) != g_modernHangarCraneRotationActive) {
 		craft->meshRotation[0] = rotation ^ 1u;
@@ -5001,13 +5005,13 @@ lbl58:
 	if (g_hangarBackdropModelType == OBJ_Hangar) {
 		g_hangarDroidTargetObjIdx =
 			(uint16_t)Hangar_SpawnObjectRelativeToLaunchRef(0x13a, -1059, 1313, 0x7fffffff, 38600, 0);
-		g_hangarAnimatedDroidObjIdx =
+		g_hangarCraneObjIdx =
 			(uint16_t)Hangar_SpawnObjectRelativeToLaunchRef(0x135, 725, -416, 0x7fffffff, 23500, 0);
 		g_hangarDroidRouteTargetObjIdx =
 			(uint16_t)Hangar_SpawnObjectRelativeToLaunchRef(0x139, -1352, 1440, 0x7fffffff, 536, 0);
-		g_unusedHangarPrimaryDroidObjIdx =
+		g_unusedHangarWorkStandObjIdx =
 			(uint16_t)Hangar_SpawnObjectRelativeToLaunchRef(0x13b, -1065, -56, 0x7fffffff, 47736, 0);
-		g_unusedHangarPrimaryDroidObjIdxMirror = g_unusedHangarPrimaryDroidObjIdx;
+		g_unusedHangarWorkStandObjIdxMirror = g_unusedHangarWorkStandObjIdx;
 		if (g_gameConfig.lod[g_flightPlayerCount > 1] > 5u) {
 			if (g_gameConfig.lod[g_flightPlayerCount > 1] > 6u) {
 				Hangar_SpawnObjectRelativeToLaunchRef(0x13b, 2079, 733, 0x7fffffff, 6400, 0);
@@ -5072,12 +5076,12 @@ lbl58:
 		}
 		g_hangarRoofCraneState.targetObjIdx = 0;
 	} else {
-		g_unusedHangarPrimaryDroidObjIdx =
+		g_unusedHangarWorkStandObjIdx =
 			(uint16_t)Hangar_SpawnObjectRelativeToLaunchRef(0x13b, 821, -6618, 0x7fffffff, 30600, 0);
-		g_unusedHangarPrimaryDroidObjIdxMirror = g_unusedHangarPrimaryDroidObjIdx;
+		g_unusedHangarWorkStandObjIdxMirror = g_unusedHangarWorkStandObjIdx;
 		g_hangarDroidTargetObjIdx =
 			(uint16_t)Hangar_SpawnObjectRelativeToLaunchRef(0x13a, 2431, -5447, 0x7fffffff, 61536, 0);
-		g_hangarAnimatedDroidObjIdx =
+		g_hangarCraneObjIdx =
 			(uint16_t)Hangar_SpawnObjectRelativeToLaunchRef(0x135, 626, -6397, 0x7fffffff, 736, 0);
 		g_hangarDroidRouteTargetObjIdx =
 			(uint16_t)Hangar_SpawnObjectRelativeToLaunchRef(0x139, 1577, -6663, 0x7fffffff, 500, 0);
@@ -5709,7 +5713,7 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 	} else {
 		Hangar_ModernPrepareOriginalCraneRotation();
 #endif
-		g_curCraft = g_objectTable[g_hangarAnimatedDroidObjIdx].mobj->pCraft;
+		g_curCraft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
 		if ((g_curCraft->meshRotation[0] & 1u) != 0) {
 			if ((g_hangarSceneObjects[0].routeNodeIdx & 1) != 0) {
 				g_curCraft->meshRotation[0] = (uint8_t)(g_curCraft->meshRotation[0] - 2u);
@@ -6026,7 +6030,7 @@ void Hangar_UpdateFamilyBaseDroidTraffic(int dtTicks) {
 	} else {
 		Hangar_ModernPrepareOriginalCraneRotation();
 #endif
-		g_curCraft = g_objectTable[g_hangarAnimatedDroidObjIdx].mobj->pCraft;
+		g_curCraft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
 		if ((g_curCraft->meshRotation[0] & 1u) != 0) {
 			if ((g_hangarSceneObjects[0].routeNodeIdx & 1) != 0) {
 				g_curCraft->meshRotation[0] = (uint8_t)(g_curCraft->meshRotation[0] - 2u);
