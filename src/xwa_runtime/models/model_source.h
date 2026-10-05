@@ -35,6 +35,9 @@ XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_
    probe: true for GLB, false for SUPPRESSED, the File_Open result for OPT. */
 int XwaModelSource_ModelFileExists(const char* fileName);
 int XwaModelSource_ReplacementsEnabled(void);
+/* Writes `fileName`'s key (basename without extension, lower-cased) to `key`
+   (XWA_MODEL_SOURCE_KEY_MAX bytes). Returns 0 for an empty or overlong name. */
+int XwaModelSource_NormalizeKey(const char* fileName, char* key);
 /* `key` may also be a file name; it is normalized first. */
 int XwaModelSource_IsCockpitClassKey(const char* key);
 /* True when a Spacecraft0.LST row with this key is bound to a model type

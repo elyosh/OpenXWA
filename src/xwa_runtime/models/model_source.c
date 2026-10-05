@@ -38,9 +38,7 @@ static int s_cockpitKeyCount;
 
 static const char s_exteriorSuffix[] = "exterior";
 
-/* Basename without extension, lower-cased. Returns 0 for an empty or
-   overlong name. */
-static int ModelSource_NormalizeKey(const char* fileName, char* key) {
+int XwaModelSource_NormalizeKey(const char* fileName, char* key) {
 	const char* base;
 	const char* end;
 	const char* cursor;
@@ -133,7 +131,7 @@ static int ModelSource_ReadList(const char* path, ModelSourceKeyText** rows, int
 			*rowCount = 0;
 			return 0;
 		}
-		if (!ModelSource_NormalizeKey(line, (*rows)[*rowCount])) {
+		if (!XwaModelSource_NormalizeKey(line, (*rows)[*rowCount])) {
 			(*rows)[*rowCount][0] = '\0';
 		}
 		++*rowCount;
@@ -213,7 +211,7 @@ static int ModelSource_BuildCockpitKeys(void) {
 			continue;
 		}
 		written = snprintf(fileName, sizeof fileName, "%sCockpit", g_modelDefs[modelIndex].name);
-		if (written > 0 && (size_t)written < sizeof fileName && ModelSource_NormalizeKey(fileName, key)) {
+		if (written > 0 && (size_t)written < sizeof fileName && XwaModelSource_NormalizeKey(fileName, key)) {
 			ok = ModelSource_AddCockpitKey(key);
 		}
 	}
@@ -327,7 +325,7 @@ XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_
 	const ModelSourceCockpitKey* cockpit;
 	size_t length;
 
-	if (!s_replacementsEnabled || !s_initialized || !ModelSource_NormalizeKey(fileName, key)) {
+	if (!s_replacementsEnabled || !s_initialized || !XwaModelSource_NormalizeKey(fileName, key)) {
 		return XWA_MODEL_SOURCE_OPT;
 	}
 
@@ -390,14 +388,14 @@ int XwaModelSource_ReplacementsEnabled(void) { return s_replacementsEnabled && s
 int XwaModelSource_IsCockpitClassKey(const char* key) {
 	ModelSourceKeyText normalized;
 
-	return ModelSource_NormalizeKey(key, normalized) && ModelSource_FindCockpitKey(normalized) != NULL;
+	return XwaModelSource_NormalizeKey(key, normalized) && ModelSource_FindCockpitKey(normalized) != NULL;
 }
 
 int XwaModelSource_KeyRequiresFloatHardpoints(const char* key) {
 	ModelSourceKeyText normalized;
 	int row;
 
-	if (!ModelSource_NormalizeKey(key, normalized)) {
+	if (!XwaModelSource_NormalizeKey(key, normalized)) {
 		return 0;
 	}
 	for (row = 0; row < s_craftRowCount; ++row) {

@@ -5,6 +5,8 @@
 #include "aeron/log.h"
 #include "aeron/vfs.h"
 #include "xwa/assets/model_mesh.h"
+#include "xwa/assets/opt_model_native.h"
+#include "xwa/util/memory.h"
 #include "xwa_runtime/models/model_source.h"
 
 #include <math.h>
@@ -405,4 +407,150 @@ int OptSynth_FindComponentByTag(const XwaOptSynthData* synth, const char* tag) {
 		}
 	}
 	return -1;
+}
+
+/* ===== Native model integration ===== */
+
+uint16_t OptSynth_LoadToHandle(const char* fileName, int* outVersion) {
+	char key[XWA_MODEL_SOURCE_KEY_MAX];
+	uint8_t* payload;
+	int payloadSize;
+	XwaOptSynthData* synth;
+	uint16_t handle;
+	NativeOptimizedPolyObject* native;
+
+	if (outVersion != NULL) {
+		*outVersion = 0;
+	}
+
+	if (!XwaModelSource_NormalizeKey(fileName, key)) {
+		Aeron_LogError("xwa.models", "invalid replacement model name '%s'", fileName);
+		return 0;
+	}
+	if (!OptSynth_BuildPayload(key, &payload, &payloadSize, &synth)) {
+		return 0;
+	}
+
+	if (g_loadOptBufHandle != 0) {
+		OptModel_FreeHandle(g_loadOptBufHandle);
+	}
+
+	handle = Memory_AllocHandle(0, sizeof(NativeOptimizedPolyObject));
+	if (handle == 0) {
+		Aeron_LogError("xwa.assets", "Failed to allocate native OPT handle for '%s'", fileName);
+		OptSynth_Free(synth);
+		free(payload);
+		return 0;
+	}
+
+	native = (NativeOptimizedPolyObject*)Memory_LockHandle(handle);
+	if (native == NULL) {
+		Aeron_LogError("xwa.assets", "Failed to lock native OPT handle %u for '%s'", (unsigned)handle,
+					   fileName);
+		Memory_FreeHandle(0, handle);
+		OptSynth_Free(synth);
+		free(payload);
+		return 0;
+	}
+
+	if (!OptModel_InitNativeModelFromBytes(native, payload, payloadSize)) {
+		Aeron_LogError("xwa.assets", "Failed to parse synthesized OPT '%s' payload size %d", fileName,
+					   payloadSize);
+		OptModel_DestroyNativeModel(native);
+		Memory_UnlockHandle(handle);
+		Memory_FreeHandle(0, handle);
+		OptSynth_Free(synth);
+		return 0;
+	}
+	native->synth = synth;
+
+	Memory_UnlockHandle(handle);
+	if (outVersion != NULL) {
+		*outVersion = 5;
+	}
+	g_loadOptBufHandle = handle;
+	g_loadOptBufSize = payloadSize;
+	return handle;
+}
+
+static int OptSynth_IsFaceDataNode(const OptNode* node) {
+	return node->nodeType == OPT_FACEDATA || node->nodeType == OPT_FACEDATA_15 ||
+		   node->nodeType == OPT_FACEDATA_16 || node->nodeType == OPT_FACEDATA_17;
+}
+
+static int OptSynth_FindStubFaceData(const OptNode* node, const OptNode** found) {
+	int childIndex;
+
+	if (node == NULL) {
+		return 1;
+	}
+	if (OptSynth_IsFaceDataNode(node)) {
+		if (*found != NULL && *found != node) {
+			return 0;
+		}
+		*found = node;
+	}
+	for (childIndex = 0; childIndex < node->childCount; ++childIndex) {
+		if (!OptSynth_FindStubFaceData(node->pChildren[childIndex], found)) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+int OptSynth_RekeyStubs(NativeOptimizedPolyObject* native) {
+	XwaOptSynthData* synth;
+	uint32_t meshIndex;
+	int rootIndex;
+
+	synth = native->synth;
+	meshIndex = 0;
+	for (rootIndex = 0; rootIndex < native->model.rootNodeCount; ++rootIndex) {
+		const OptNode* root;
+		const OptNode* stub;
+		uint32_t offset;
+
+		root = native->model.rootNodes[rootIndex];
+		if (root->nodeType == OPT_TEXTURE || root->nodeType == OPT_TEXTURE_REF) {
+			continue;
+		}
+		stub = NULL;
+		if (meshIndex >= synth->meshCount || !OptSynth_FindStubFaceData(root, &stub) || stub == NULL ||
+			(uint8_t*)stub->param2 < native->serializedData ||
+			(uint8_t*)stub->param2 >= native->serializedData + native->serializedSize) {
+			return 0;
+		}
+		offset = (uint32_t)((uint8_t*)stub->param2 - native->serializedData);
+		if (meshIndex != 0 && offset <= synth->meshes[meshIndex - 1].stubFaceDataOffset) {
+			return 0;
+		}
+		synth->meshes[meshIndex++].stubFaceDataOffset = offset;
+	}
+	return meshIndex == synth->meshCount;
+}
+
+int OptSynth_IsSynthesized(const OptimizedPolyObject* model) {
+	return model != NULL && ((const NativeOptimizedPolyObject*)model)->synth != NULL;
+}
+
+const XwaOptSynthData* OptSynth_GetModelData(const OptimizedPolyObject* model) {
+	return model != NULL ? ((const NativeOptimizedPolyObject*)model)->synth : NULL;
+}
+
+const XwaOptSynthMesh* OptSynth_FindMeshForNode(const OptimizedPolyObject* model,
+												const OptNode* faceDataNode) {
+	const NativeOptimizedPolyObject* native;
+
+	native = (const NativeOptimizedPolyObject*)model;
+	if (native == NULL || native->synth == NULL || faceDataNode == NULL ||
+		(const uint8_t*)faceDataNode->param2 < native->serializedData ||
+		(const uint8_t*)faceDataNode->param2 >= native->serializedData + native->serializedSize) {
+		return NULL;
+	}
+	return OptSynth_FindMeshByStubOffset(
+		native->synth, (uint32_t)((const uint8_t*)faceDataNode->param2 - native->serializedData));
+}
+
+int OptSynth_FindModelComponentByTag(const OptimizedPolyObject* model, const char* tag) {
+	return OptSynth_FindComponentByTag(OptSynth_GetModelData(model), tag);
 }

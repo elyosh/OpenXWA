@@ -11,12 +11,15 @@
 #include "aeron/asset/opt_payload.h"
 #include "aeron/asset/opt_sim_model.h"
 #include "aeron/collision/face_bvh.h"
+#include "xwa/assets/opt_model.h"
 
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct NativeOptimizedPolyObject;
 
 /* CraftData.componentState[49] holds the animated-texture frame and wreck
    flame state, so a model may use components 0..48 only. */
@@ -52,6 +55,26 @@ const XwaOptSynthMesh* OptSynth_FindMeshByStubOffset(const XwaOptSynthData* synt
 													 uint32_t stubFaceDataOffset);
 /* First component carrying `tag`, or -1. */
 int OptSynth_FindComponentByTag(const XwaOptSynthData* synth, const char* tag);
+
+/* OptModel_LoadFileToHandle for a GLB replacement: builds the payload for
+   `fileName`'s key and loads it into a temporary native handle, setting the
+   load-buffer globals as the file path does. `*outVersion` is 5. */
+uint16_t OptSynth_LoadToHandle(const char* fileName, int* outVersion);
+/* Texture processing deletes byte ranges ahead of the stubs, so the offsets
+   the synthesizer recorded are stale once OptModel_LoadHandle has processed
+   the model. Records each mesh's final stub payload offset (nothing moves
+   bytes afterwards). Returns 0 if the processed layout no longer has one
+   FaceData stub per mesh in ascending order. */
+int OptSynth_RekeyStubs(struct NativeOptimizedPolyObject* native);
+
+/* Per-model queries; all are safe on stock models. */
+int OptSynth_IsSynthesized(const OptimizedPolyObject* model);
+const XwaOptSynthData* OptSynth_GetModelData(const OptimizedPolyObject* model);
+/* Side data for the stub FaceData node `faceDataNode`, or NULL. */
+const XwaOptSynthMesh* OptSynth_FindMeshForNode(const OptimizedPolyObject* model,
+												const OptNode* faceDataNode);
+/* First component (mesh ordinal - 1) carrying `tag`, or -1. */
+int OptSynth_FindModelComponentByTag(const OptimizedPolyObject* model, const char* tag);
 
 #ifdef __cplusplus
 }

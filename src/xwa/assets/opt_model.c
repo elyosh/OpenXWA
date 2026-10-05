@@ -1,4 +1,5 @@
 #include "xwa/assets/opt_model.h"
+#include "xwa/assets/opt_model_native.h"
 
 #include "aeron/log.h"
 
@@ -26,26 +27,6 @@
 #ifndef XWA_MODERN
 extern void(__stdcall* g_OutputDebugStringA)(const char* outputString);
 #endif
-
-typedef struct NativeOptNode {
-	OptNode node;
-	uint32_t serializedAddress;
-	uint32_t param2Address;
-} NativeOptNode;
-
-typedef struct NativeOptimizedPolyObject {
-	OptimizedPolyObject model;
-	uint8_t* serializedData;
-	int serializedSize;
-	uint32_t serializedBase;
-	uint32_t rootNodesAddress;
-	NativeOptNode** nodes;
-	int nodeCount;
-	int nodeCapacity;
-#ifdef XWA_MODERN
-	XwaOptSynthData* synth; /* non-NULL only for GLB-sourced models */
-#endif
-} NativeOptimizedPolyObject;
 
 typedef struct OptPatchVisitedList {
 	uint32_t* items;
@@ -77,9 +58,9 @@ const float g_optModelBrightnessRangeScale = 1.75f;
 const float g_optModelBrightnessOffset = -1.0f;
 
 // GLOBAL: XWA 0x74C26C
-static uint16_t g_loadOptBufHandle;
+uint16_t g_loadOptBufHandle;
 // GLOBAL: XWA 0x74C270
-static int g_loadOptBufSize;
+int g_loadOptBufSize;
 
 static uint16_t OptModel_NormalizeHandle(int modelHandle) {
 	return (uint16_t)((uint16_t)modelHandle & 0x7fff);
@@ -238,7 +219,7 @@ static void OptModel_FreeNativeGraph(NativeOptimizedPolyObject* native) {
 	native->nodeCapacity = 0;
 }
 
-static void OptModel_DestroyNativeModel(NativeOptimizedPolyObject* native) {
+void OptModel_DestroyNativeModel(NativeOptimizedPolyObject* native) {
 	if (native == NULL) {
 		return;
 	}
@@ -437,7 +418,7 @@ static int OptModel_BuildNativeGraph(NativeOptimizedPolyObject* native) {
 	return 1;
 }
 
-static int OptModel_InitNativeModelFromBytes(NativeOptimizedPolyObject* native, uint8_t* data, int size) {
+int OptModel_InitNativeModelFromBytes(NativeOptimizedPolyObject* native, uint8_t* data, int size) {
 	uint32_t selfMarker;
 
 	if (native == NULL || data == NULL || size < 14) {
@@ -1016,148 +997,6 @@ uint16_t OptModel_LoadFileToHandle(const char* fileName, int* outVersion) {
 	g_loadOptBufSize = payloadSize;
 	return handle;
 }
-
-#ifdef XWA_MODERN
-/* Modern port: OptModel_LoadFileToHandle for a GLB replacement. The payload
- * comes from the synthesizer instead of the file; the handle, globals and
- * version follow the file path (the image is version 5). */
-static uint16_t OptSynth_LoadToHandle(const char* fileName, const char* key, int* outVersion) {
-	uint8_t* payload;
-	int payloadSize;
-	XwaOptSynthData* synth;
-	uint16_t handle;
-	NativeOptimizedPolyObject* native;
-
-	if (outVersion != NULL) {
-		*outVersion = 0;
-	}
-
-	if (!OptSynth_BuildPayload(key, &payload, &payloadSize, &synth)) {
-		return 0;
-	}
-
-	if (g_loadOptBufHandle != 0) {
-		OptModel_FreeHandle(g_loadOptBufHandle);
-	}
-
-	handle = Memory_AllocHandle(0, sizeof(NativeOptimizedPolyObject));
-	if (handle == 0) {
-		Aeron_LogError("xwa.assets", "Failed to allocate native OPT handle for '%s'", fileName);
-		OptSynth_Free(synth);
-		free(payload);
-		return 0;
-	}
-
-	native = (NativeOptimizedPolyObject*)Memory_LockHandle(handle);
-	if (native == NULL) {
-		Aeron_LogError("xwa.assets", "Failed to lock native OPT handle %u for '%s'", (unsigned)handle,
-					   fileName);
-		Memory_FreeHandle(0, handle);
-		OptSynth_Free(synth);
-		free(payload);
-		return 0;
-	}
-
-	if (!OptModel_InitNativeModelFromBytes(native, payload, payloadSize)) {
-		Aeron_LogError("xwa.assets", "Failed to parse synthesized OPT '%s' payload size %d", fileName,
-					   payloadSize);
-		OptModel_DestroyNativeModel(native);
-		Memory_UnlockHandle(handle);
-		Memory_FreeHandle(0, handle);
-		OptSynth_Free(synth);
-		return 0;
-	}
-	native->synth = synth;
-
-	Memory_UnlockHandle(handle);
-	if (outVersion != NULL) {
-		*outVersion = 5;
-	}
-	g_loadOptBufHandle = handle;
-	g_loadOptBufSize = payloadSize;
-	return handle;
-}
-
-static int OptModel_IsFaceDataNode(const OptNode* node) {
-	return node->nodeType == OPT_FACEDATA || node->nodeType == OPT_FACEDATA_15 ||
-		   node->nodeType == OPT_FACEDATA_16 || node->nodeType == OPT_FACEDATA_17;
-}
-
-static int OptModel_FindStubFaceData(const OptNode* node, const OptNode** found) {
-	int childIndex;
-
-	if (node == NULL) {
-		return 1;
-	}
-	if (OptModel_IsFaceDataNode(node)) {
-		if (*found != NULL && *found != node) {
-			return 0;
-		}
-		*found = node;
-	}
-	for (childIndex = 0; childIndex < node->childCount; ++childIndex) {
-		if (!OptModel_FindStubFaceData(node->pChildren[childIndex], found)) {
-			return 0;
-		}
-	}
-	return 1;
-}
-
-/* Texture processing deletes byte ranges ahead of the stubs, so the offsets
- * recorded by the synthesizer are stale once loading has finished. Records
- * each mesh's final stub payload offset; nothing moves bytes afterwards. */
-static int OptModel_RekeySynthStubs(NativeOptimizedPolyObject* native) {
-	XwaOptSynthData* synth;
-	uint32_t meshIndex;
-	int rootIndex;
-
-	synth = native->synth;
-	meshIndex = 0;
-	for (rootIndex = 0; rootIndex < native->model.rootNodeCount; ++rootIndex) {
-		const OptNode* root;
-		const OptNode* stub;
-		uint32_t offset;
-
-		root = native->model.rootNodes[rootIndex];
-		if (root->nodeType == OPT_TEXTURE || root->nodeType == OPT_TEXTURE_REF) {
-			continue;
-		}
-		stub = NULL;
-		if (meshIndex >= synth->meshCount || !OptModel_FindStubFaceData(root, &stub) || stub == NULL ||
-			(uint8_t*)stub->param2 < native->serializedData ||
-			(uint8_t*)stub->param2 >= native->serializedData + native->serializedSize) {
-			return 0;
-		}
-		offset = (uint32_t)((uint8_t*)stub->param2 - native->serializedData);
-		if (meshIndex != 0 && offset <= synth->meshes[meshIndex - 1].stubFaceDataOffset) {
-			return 0;
-		}
-		synth->meshes[meshIndex++].stubFaceDataOffset = offset;
-	}
-	return meshIndex == synth->meshCount;
-}
-
-int OptModel_IsSynthesized(const OptimizedPolyObject* model) {
-	return model != NULL && ((const NativeOptimizedPolyObject*)model)->synth != NULL;
-}
-
-const XwaOptSynthData* OptModel_GetSynthData(const OptimizedPolyObject* model) {
-	return model != NULL ? ((const NativeOptimizedPolyObject*)model)->synth : NULL;
-}
-
-const XwaOptSynthMesh* OptModel_FindSynthMesh(const OptimizedPolyObject* model, const OptNode* faceDataNode) {
-	const NativeOptimizedPolyObject* native;
-
-	native = (const NativeOptimizedPolyObject*)model;
-	if (native == NULL || native->synth == NULL || faceDataNode == NULL ||
-		(const uint8_t*)faceDataNode->param2 < native->serializedData ||
-		(const uint8_t*)faceDataNode->param2 >= native->serializedData + native->serializedSize) {
-		return NULL;
-	}
-	return OptSynth_FindMeshByStubOffset(
-		native->synth, (uint32_t)((const uint8_t*)faceDataNode->param2 - native->serializedData));
-}
-#endif
 
 // FUNCTION: XWA 0x4850F0
 void OptModel_DeleteBytes(OptimizedPolyObject* model, int modelSize, void* cutPoint, int cutSize) {
@@ -2177,7 +2016,6 @@ uint16_t OptModel_LoadHandle(const char* fileName) {
 	int meshCount;
 #ifdef XWA_MODERN
 	XwaModelSource source;
-	char key[XWA_MODEL_SOURCE_KEY_MAX];
 	int savedVertCapacity;
 	int savedEdgeCapacity;
 	int savedCurVertexCount;
@@ -2190,23 +2028,7 @@ uint16_t OptModel_LoadHandle(const char* fileName) {
 		return 0;
 	}
 	if (source == XWA_MODEL_SOURCE_GLB) {
-		const char* base;
-		const char* cursor;
-		size_t length;
-
-		/* XwaModelSource key: basename without extension, lower-cased. */
-		base = fileName;
-		for (cursor = fileName; *cursor != '\0'; ++cursor) {
-			if (*cursor == '\\' || *cursor == '/') {
-				base = cursor + 1;
-			}
-		}
-		for (length = 0; base[length] != '\0' && base[length] != '.' && length + 1 < sizeof key; ++length) {
-			key[length] = (base[length] >= 'A' && base[length] <= 'Z') ? (char)(base[length] + ('a' - 'A'))
-																	   : base[length];
-		}
-		key[length] = '\0';
-		tempHandle = OptSynth_LoadToHandle(fileName, key, &version);
+		tempHandle = OptSynth_LoadToHandle(fileName, &version);
 	} else {
 		tempHandle = OptModel_LoadFileToHandle(fileName, &version);
 	}
@@ -2270,7 +2092,7 @@ uint16_t OptModel_LoadHandle(const char* fileName) {
 	OptModel_AdjustOptimizedPolyObjectPointers(&modelNative->model);
 	OptModel_RetainD3DInfoRefs(&modelNative->model);
 #ifdef XWA_MODERN
-	if (modelNative->synth != NULL && !OptModel_RekeySynthStubs(modelNative)) {
+	if (modelNative->synth != NULL && !OptSynth_RekeyStubs(modelNative)) {
 		Aeron_LogError("xwa.assets", "Synthesized OPT '%s' lost its mesh layout during processing", fileName);
 		Memory_UnlockHandle(modelHandle);
 		OptModel_FreeHandle(modelHandle);

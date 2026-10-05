@@ -7,10 +7,18 @@
  * FaceData loop, in ascending face order, so results match a linear scan. */
 
 #include "xwa/assets/opt_model.h"
+#include "xwa/flight/object/collision.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* One FaceData face of the exact and loose walks, moved verbatim from the
+   loops of collide_TestSweepAgainstOptNode and
+   collide_TestSweepAgainstOptNodeLoose. Stock FaceData loops and the
+   replacement-model paths below both call them. */
+void collide_TestSweepFace(const int* faceIndices, const Vec3f* faceNormal, const float* vertexBase);
+void collide_TestSweepFaceLoose(const int* faceIndices, const float* faceNormal, const float* vertexBase);
 
 /* Exact walk (collide_TestSweepAgainstOptNode): tests the faces whose BVH
    leaves the current walker segment can reach. */
