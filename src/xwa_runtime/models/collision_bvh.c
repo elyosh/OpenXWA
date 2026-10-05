@@ -269,7 +269,8 @@ void CollisionBvh_TestFaceData(OptimizedPolyObject* model, OptNode* faceDataNode
 	uint32_t index;
 
 	mesh = CollisionBvh_FindMesh(model, faceDataNode);
-	if (mesh == NULL) {
+	/* A component without faces has no BVH and nothing to hit. */
+	if (mesh == NULL || mesh->faceCount == 0) {
 		return;
 	}
 	vertexBase = (const float*)g_collideCurrentMeshVertsNode->param2;

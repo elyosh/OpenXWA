@@ -363,7 +363,9 @@ int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* outPayload
 		vertexTotal += mesh->vertex_count;
 		faceTotal += mesh->face_count;
 		nodeTotal += mesh->bvh != NULL ? mesh->bvh->node_count : 0;
-		cooked &= mesh->bvh_cooked;
+		if (mesh->face_count != 0) {
+			cooked &= mesh->bvh_cooked;
+		}
 	}
 	OptSynth_WarnDenseCockpit(key, &model);
 

@@ -29,7 +29,7 @@ typedef struct XwaOptSynthMesh {
 	uint32_t stubFaceDataOffset; /* payload offset of the stub FaceData node */
 	uint32_t faceCount;
 	const AeronOptFace* faces; /* OPT frame and units */
-	const AeronFaceBvh* bvh;   /* OPT units */
+	const AeronFaceBvh* bvh;   /* OPT units; NULL without faces */
 	uint32_t tagCount;
 	const AeronFlightTag* tags;
 } XwaOptSynthMesh;

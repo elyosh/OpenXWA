@@ -35,9 +35,8 @@ static ModelSourceCraftKey* s_craftKeys;
 static int s_craftKeyCount;
 static ModelSourceCockpitKey* s_cockpitKeys;
 static int s_cockpitKeyCount;
-/* Equipment0.LST keys by row, like s_craftRows, and the replaceable ones:
-   every row except projectiles, whose HD rendering relies on runtime-OPT
-   emission. */
+/* Equipment0.LST keys by row, like s_craftRows, and the replaceable ones
+   (every row). */
 static ModelSourceKeyText* s_equipmentRows;
 static int s_equipmentRowCount;
 static ModelSourceCockpitKey* s_equipmentKeys;
@@ -244,23 +243,8 @@ static int ModelSource_BuildCockpitKeys(void) {
 	return ok;
 }
 
-static int ModelSource_IsProjectileEquipmentRow(int row) {
-	int objectType;
-
-	for (objectType = 0; objectType < OBJ_Count; ++objectType) {
-		const ModelTypeInfo* info = &g_modelTypeTable[objectType];
-
-		if ((info->recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) != 0 && info->textureGroup == 1 &&
-			(int)info->frameCount == row &&
-			(info->genusId == GENUS_PlayerProjectile || info->genusId == GENUS_NpcProjectile)) {
-			return 1;
-		}
-	}
-	return 0;
-}
-
-/* Every Equipment0.LST model except projectiles. Recovered code reaches the
-   components of some of them by number; those sites resolve component roles
+/* Every Equipment0.LST model. Recovered code reaches the components of some
+   of them by number; those sites resolve component roles
    (xwa_runtime/models/model_roles.h), so their layout is free too. */
 static int ModelSource_BuildEquipmentKeys(void) {
 	int row;
@@ -271,7 +255,7 @@ static int ModelSource_BuildEquipmentKeys(void) {
 		int known;
 		int i;
 
-		if (key[0] == '\0' || ModelSource_IsProjectileEquipmentRow(row)) {
+		if (key[0] == '\0') {
 			continue;
 		}
 		known = 0;
