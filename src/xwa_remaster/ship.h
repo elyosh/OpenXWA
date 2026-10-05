@@ -213,7 +213,7 @@ float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f);
 
 /* Derive + queue one model instance's engine glows as batched OVERLAY
  * scene billboards — the float mirror of EngineGlow_BuildProjectedQuad
- * over the cooked glb's engine-glow extras (position/axes/dims/colors
+ * over the HD mesh's flight-model engine glows (position/axes/dims/colors
  * per emitter): the rect / view-aligned-round corner build, the
  * look-axis depth extrusion, the viewZ / projected-size culls, and
  * the classic fan colors (center = core, rim = outer, sampling `tex`

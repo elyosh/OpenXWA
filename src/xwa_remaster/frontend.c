@@ -82,7 +82,8 @@ typedef struct RmState {
 	int retired_target_count;
 	XwaRemasterAssets* assets; /* borrowed per Render call */
 	/* Per-tick PiP results (rendered in rm_prepare_model_previews,
-	 * composited by the z-merge; NULL = no cooked model, classic covers it). */
+	 * composited by the z-merge; NULL = not rendered: no HD mesh, or the
+	 * render failed). */
 	AeronTexture* preview_tex[XWA_SNAP_MAX_MODEL_PREVIEWS];
 	int warned_save_stack;
 	/* Resolver coverage telemetry (throttled log). */
@@ -715,7 +716,7 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 			AeronTexture* tex = g.preview_tex[vi];
 			vi++;
 			if (!tex || p->target == XWA_EMIT_TARGET_EXTERNAL) {
-				continue; /* no cooked model / brief-map scratch: classic covers it */
+				continue; /* not rendered, or brief-map scratch (classic draws it) */
 			}
 			if (seg_open != 1) {
 				if (seg_open) {

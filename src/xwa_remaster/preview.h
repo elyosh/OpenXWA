@@ -21,11 +21,11 @@ extern "C" {
 /* Render preview `p` into the internal RT for `slot` (one per
  * model_previews[] index). `lights`/`light_count` are the snapshot's
  * shared dir_lights channel (the engine's own preview light). Engine
- * glows are STATE-DERIVED from the cooked mesh's own glb extras at the
+ * glows are STATE-DERIVED from the HD mesh's own engine glows at the
  * classic preview base scale; `glow_tex` is the resolved
  * LightingEffects frame (NULL = no glows drawn). Returns the slot's
  * tonemapped texture (borrowed; valid until the next render into the
- * same slot); a missing cooked mesh renders an empty transparent PiP.
+ * same slot); a missing HD mesh renders an empty transparent PiP.
  * `cmd` must have no open pass. */
 AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelPreview* p,
 										int slot, const XwaDirLight* lights,

@@ -2209,7 +2209,7 @@ void EngineGlow_RenderForObject(unsigned int objIdx) {
 					}
 					if (texLevel != NULL && texLevel->image != NULL) {
 						/* Remaster: no draw-time capture — HD glows are
-						 * state-derived (glb extras + eg_* craft state). */
+						 * state-derived (HD mesh glows + eg_* craft state). */
 						RenderQuad_DrawGlow(viewQuad, minDepth, (Std3DTextureSurface*)texLevel->image,
 											(int)glow->outerColor, (int)glow->coreColor);
 					}
@@ -2281,7 +2281,7 @@ void EngineGlow_RenderSceneGlows(void) {
 				}
 				if (texLevel != NULL && texLevel->image != NULL) {
 					/* Remaster: no draw-time capture — the preview PiP
-					 * derives glows from the glb extras + preview scale. */
+					 * derives glows from the HD mesh + preview scale. */
 					RenderQuad_DrawGlow(viewQuad, minDepth, (Std3DTextureSurface*)texLevel->image,
 										(int)glow->outerColor, (int)glow->coreColor);
 				}

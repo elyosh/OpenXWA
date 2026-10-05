@@ -2730,7 +2730,7 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
  *   - explosion-genus sprites / projectiles / DS fixtures via the
  *     XwaSnapshotExport_PointLightForObject accessor (the classic
  *     type switch + intensity tables), with the classic append gates;
- *   - capital engine glows via the cooked glb extras (collected in
+ *   - capital engine glows via the HD mesh's engine glows (collected in
  *     the instance walk where mesh + articulation exist);
  *   - the local player's semantic pulses, including weapon fire and
  *     hyperspace effects (classic cycle/fade envelope replayed from

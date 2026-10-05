@@ -243,8 +243,8 @@ typedef struct XwaDirLight {
 #define XWA_SNAP_MAX_DIR_LIGHTS 8
 
 /* Engine glows are STATE-DERIVED: the HD driver rebuilds the classic
- * EngineGlow_BuildProjectedQuad geometry from the cooked glb's
- * engine-glow extras (position/axes/dims/colors per emitter) + the
+ * EngineGlow_BuildProjectedQuad geometry from the HD mesh's flight-model
+ * engine glows (position/axes/dims/colors per emitter) + the
  * per-object eg_* craft state below; no draw-time capture exists. */
 
 /* ---- flight channel ------------------------------------------------
@@ -324,8 +324,8 @@ typedef struct XwaFlightObject {
 	uint8_t state; /* MobileObject.state */
 	uint8_t motion_flags;
 	/* MobileObject.nodeSwitchIndex — the OPT variant selector (mission
-	 * sets it from the flight group's `markings`); maps to the cooked
-	 * glb's KHR material variant. */
+	 * sets it from the flight group's `markings`); maps to the HD mesh's
+	 * KHR material variant. */
 	uint8_t node_switch;
 	uint8_t has_mobj;     /* mobj-derived fields valid */
 	uint8_t orient_dirty; /* MobileObject.orientMatrixDirty */
@@ -381,8 +381,8 @@ typedef struct XwaFlightObject {
 	uint8_t mesh_rotation[XWA_SNAP_MAX_MESH_SLOTS];
 	uint8_t component_hp[XWA_SNAP_MAX_MESH_SLOTS];
 	/* ---- engine-glow state (EngineGlow_RenderObjectGlows inputs; the
-	 * HD driver derives the glow fans from these + the cooked glb's
-	 * engine-glow extras). objectKind 5/6 use the speed-boost scale
+	 * HD driver derives the glow fans from these + the HD mesh's
+	 * flight-model engine glows). objectKind 5/6 use the speed-boost scale
 	 * formula (speed vs eg_max_speed); everything else the power-
 	 * margin formula (16 - redirects, engineOutputScale, throttle). */
 	uint8_t object_kind;        /* CraftData.objectKind */
@@ -394,7 +394,8 @@ typedef struct XwaFlightObject {
 	uint16_t eg_output_scale;   /* CraftData.engineOutputScale */
 	uint16_t eg_max_speed;      /* CraftData.aiFlight.maxSpeedCache */
 	/* Damage knockouts: bit N = emitter N destroyed (classic per-model
-	 * emitter order == the cooked glb's glow list order; emitters past
+	 * emitter order == the HD mesh's glow order, as both come from the
+	 * model the simulation loaded; emitters past
 	 * 32 keep drawing). */
 	uint32_t eg_knockout_mask;
 } XwaFlightObject;
@@ -1017,8 +1018,8 @@ typedef struct XwaHudState {
 
 /* One processed OPT handle currently owned by the classic engine. The
  * remaster mirrors this authoritative live set after each committed tick;
- * public_handle identifies the original allocation while name selects the
- * GLB / runtime-OPT HD counterpart. */
+ * public_handle identifies the original allocation, name gives the HD mesh
+ * key, and source selects the GLB or a runtime OPT conversion. */
 typedef struct XwaOptAsset {
 	uint16_t public_handle;
 	char name[XWA_SNAP_OPT_NAME_MAX]; /* basename, no extension */
@@ -1219,8 +1220,8 @@ int XwaSnapshotExport_ComponentTargetGeometry(int object_type, int component, fl
  * OPT basename of the model the engine LOADED for that type
  * (g_loadedModels handle -> load-time name registry; covers hangar
  * props and every non-craft loadable), falling back to the g_modelDefs
- * craft name. NULL when the type has no model. The driver keys cooked
- * .glb assets with it. */
+ * craft name. NULL when the type has no model. The driver keys its HD
+ * meshes with it. */
 const char* XwaSnapshotExport_ModelName(int object_type);
 
 /* Engine-side OPT-loader observers. They update only snapshot-side state;
@@ -1288,7 +1289,7 @@ int XwaSnapshotExport_ModelFrameCount(int object_type);
  * blast — including the x4 multiplier and the brightness-based
  * default) and the projectile/special table (lasers, ions, warheads,
  * DS fixtures, the Falcon hangar light). Engine-glow lights are NOT
- * covered — the driver derives those from the cooked glb extras. The
+ * covered — the driver derives those from the HD mesh's engine glows. The
  * caller applies the classic append GATES (genus/type list, hangar /
  * dir-light context) itself. Returns 0 when the type contributes no
  * light. */

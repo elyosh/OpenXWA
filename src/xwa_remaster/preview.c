@@ -218,12 +218,12 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 		/* The classic renderer never rasterizes back-facing OPT polygons
 		 * (CPU facing test in RenderScene_BuildMeshVisibleFaces); without
 		 * culling, near-coincident interior faces z-fight the hull.
-		 * Cooked glbs are CCW-front; BACK keeps the hull solid under
+		 * HD meshes are CCW-front; BACK keeps the hull solid under
 		 * this projection (verified empirically). */
 		inst.cull_mode = AERON_CULL_BACK;
 		AeronScene_AddMeshInstance(s.scene, &inst);
 
-		/* State-derived engine glows from the mesh's own glb extras —
+		/* State-derived engine glows from the mesh's own engine glows —
 		 * the classic preview renders every emitter at a fixed base
 		 * scale 0.6 with the ~6% flicker (identity camera: the
 		 * instance transform IS the eye placement). */

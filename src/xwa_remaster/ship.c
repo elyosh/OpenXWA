@@ -1157,8 +1157,8 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 			}
 		}
 
-		/* Colors: glb extras are sRGB 0..1 (decoded from the OPT's
-		 * 0xAARRGGBB) — linearize like every other classic color. The
+		/* Colors: flight-model glow colors are sRGB 0..1 (an OPT's
+		 * 0xAARRGGBB, decoded) — linearize like every other classic color. The
 		 * glow atlas is PREMULTIPLIED (imgbake KTX2 convention), so the
 		 * PMA blend + tint RGB pre-scaled by tint alpha keep the
 		 * classic straight-alpha modulate (straight blending crushed
