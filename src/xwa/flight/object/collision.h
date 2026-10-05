@@ -120,6 +120,12 @@ void collide_TransformHitIntoObjectLocalFrame(unsigned int objIdx, int* outDirX,
 void collide_TransformSweepToModelLocal(ObjectRecord* targetObj, int* worldEnd, int* worldStart);
 int collide_TestSweepAgainstOptNode(OptimizedPolyObject* model, OptNode* node);
 int collide_TestSweepAgainstOptNodeLoose(OptimizedPolyObject* model, OptNode* node);
+#ifdef XWA_MODERN
+/* Modern port: one FaceData face of the exact and loose walks; see
+   xwa_runtime/models/collision_bvh.h. */
+void collide_TestSweepFace(const int* faceIndices, const Vec3f* faceNormal, const float* vertexBase);
+void collide_TestSweepFaceLoose(const int* faceIndices, const float* faceNormal, const float* vertexBase);
+#endif
 void collide_TestSweepAgainstModelMeshes(unsigned int sourceObjIdx, unsigned int targetObjIdx,
 										 OptimizedPolyObject* model);
 int collide_CheckLocalSweepAgainstObjectModel(unsigned int sourceObjIdx, unsigned int targetObjIdx,
