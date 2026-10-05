@@ -302,7 +302,9 @@ static void XwaPort_TickBody(int32_t delta_us) {
 			   partially initialized flight state to the HD flight renderer. */
 			XwaSnapshot_SetSceneKind(XWA_SCENE_LOADING);
 			FrontendDisplay_ClearPresentFrameReady();
+			XwaSnapshot_CaptureMission();
 		} else {
+			XwaSnapshot_CaptureMission();
 			XwaSnapshot_CaptureFlight();
 		}
 		XwaSnapshot_Commit();

@@ -1096,8 +1096,9 @@ typedef struct XwaSnapshot {
 	XwaFlightMapState flight_map;
 	XwaFlightCamera flight_camera;
 	uint8_t flight_camera_valid;
-	/* g_currentMissionFile during a loaded flight (object storage live);
-	 * empty otherwise. Read-only transport for HD environment selection. */
+	/* g_currentMissionFile during a flight session, from its first loading
+	 * tick; empty otherwise. Read-only transport for HD environment
+	 * preparation and selection. */
 	char mission_path[128];
 	XwaDeathStarBeam death_star_beam;
 	XwaHyperspaceState hyperspace;
@@ -1193,6 +1194,11 @@ void XwaSnapshot_EmitModelPreview(const XwaModelPreview* preview);
  * channel. Called from the port loop after XwaFlightTask_Tick (not an
  * in-engine hook); no-op outside flight scenes. */
 void XwaSnapshot_CaptureFlight(void);
+
+/* Copy g_currentMissionFile into the snapshot. Called from the port loop on
+ * flight-session ticks (loading screen and flight), so the HD renderer can
+ * prepare mission assets during loading. */
+void XwaSnapshot_CaptureMission(void);
 
 /* Hyperspace's classic renderer appends the NEXT 45 random seeds after
  * latching the count it draws this frame. This scalar capture slot preserves

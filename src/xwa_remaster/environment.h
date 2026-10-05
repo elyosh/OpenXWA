@@ -10,6 +10,12 @@
  * hangar and each (mission path, region) to a package reference. A mission
  * or region without an entry keeps the classic HD path.
  *
+ * Packages are prepared through Aeron's environment library: the hangar
+ * package during process asset preparation, and the hangar plus every
+ * region of a mission when the snapshot's normalized mission key changes,
+ * at the HD asset synchronization point. A region becomes authored only once
+ * its package is prepared and available.
+ *
  * The selection is resolved from snapshot state alone, once per flight
  * frame, before any sky, backdrop, directional or lens-flare decision. It
  * never loads files or allocates.
@@ -18,6 +24,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "aeron/render.h"
 #include "aeron/scene/environment.h"
 #include "aeron/vfs.h"
 
@@ -43,6 +50,7 @@ typedef enum XwaEnvironmentFallback {
 	XWA_ENV_FALLBACK_NO_MISSION_ENTRY, /* mission not in the mapping */
 	XWA_ENV_FALLBACK_NO_REGION_ENTRY,  /* region not in the mission's mapping */
 	XWA_ENV_FALLBACK_NO_HANGAR_ENTRY,  /* no hangar package in the mapping */
+	XWA_ENV_FALLBACK_NOT_READY,        /* mapped package not prepared or unavailable */
 } XwaEnvironmentFallback;
 
 typedef struct XwaEnvironmentSelection {
@@ -50,6 +58,9 @@ typedef struct XwaEnvironmentSelection {
 	XwaEnvironmentFallback fallback;
 	/* Hangar or region reference; NULL when the mode uses no package. */
 	const AeronEnvironmentReference* reference;
+	/* Prepared package for the reference; NULL unless the mode uses one and
+	 * it is available. */
+	const AeronEnvironmentPackage* package;
 	uint8_t region;
 } XwaEnvironmentSelection;
 
@@ -66,6 +77,17 @@ int XwaRemasterEnvironment_Init(AeronVfs* vfs);
 void XwaRemasterEnvironment_Shutdown(void);
 
 int XwaRemasterEnvironment_Enabled(void);
+
+/* Creates the package library and prepares the hangar package. Failures are
+ * logged and leave the classic path; returns 0 only on invalid arguments. */
+int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd);
+
+/* Nonzero when the snapshot's mission key differs from the prepared one, or
+ * a debug reload is pending. */
+int XwaRemasterEnvironment_NeedsPrepare(const struct XwaSnapshot* snap);
+/* Prepares the hangar and the mission's regions (or services a reload) with
+ * `cmd`. Failures are logged; the affected regions stay classic. */
+void XwaRemasterEnvironment_Prepare(AeronCommandBuffer* cmd, const struct XwaSnapshot* snap);
 
 /* Normalizes a mission path into a lookup key: forward slashes, lower-case
  * ASCII, empty and "." components dropped, ".." rejected, relative

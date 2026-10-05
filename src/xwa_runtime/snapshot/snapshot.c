@@ -1160,6 +1160,12 @@ static void snapshot_capture_particles(XwaSnapshot* s, uint32_t render_state_slo
 	}
 }
 
+void XwaSnapshot_CaptureMission(void) {
+	XwaSnapshot* s = wr();
+	memcpy(s->mission_path, g_currentMissionFile, sizeof s->mission_path);
+	s->mission_path[sizeof s->mission_path - 1] = '\0';
+}
+
 void XwaSnapshot_CaptureFlight(void) {
 	XwaSnapshot* s = wr();
 	s->flight_object_count = 0;
@@ -1173,8 +1179,6 @@ void XwaSnapshot_CaptureFlight(void) {
 	if (!g_objectTable || g_objectTableHandle == 0) {
 		return;
 	}
-	memcpy(s->mission_path, g_currentMissionFile, sizeof s->mission_path);
-	s->mission_path[sizeof s->mission_path - 1] = '\0';
 	{
 		const PlayerData* player = &g_players[g_localPlayer];
 		XwaHyperspaceState* h = &s->hyperspace;

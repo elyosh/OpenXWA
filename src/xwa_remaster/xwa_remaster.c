@@ -628,9 +628,13 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		flight_render_needed && XwaRemasterAssets_FlightTexturesNeedSync(g.assets, snap);
 	const int process_assets_need_prepare = flight_render_needed && snap->scene_kind == XWA_SCENE_LOADING &&
 											XwaRemasterFlight_ProcessAssetsNeedPrepare();
+	/* Authored environment packages are prepared when the mission key changes
+	 * (or a debug reload is pending), never from the flight render. */
+	const int environment_needs_prepare = flight_render_needed && XwaRemasterEnvironment_NeedsPrepare(snap);
 	const int assets_need_sync =
 		!retain_invalid_flight_frame && (frontend_assets_need_sync || ship_assets_need_sync ||
-										 texture_assets_need_sync || process_assets_need_prepare);
+										 texture_assets_need_sync || process_assets_need_prepare ||
+										 environment_needs_prepare);
 	const int render_snapshot = snap->tick_index != g.last_tick || g.force_scene_render;
 	const int frontend_scene = snap->scene_kind == XWA_SCENE_FRONTEND ||
 							   snap->scene_kind == XWA_SCENE_FRONTEND_MODAL ||
@@ -678,6 +682,9 @@ void XwaRemaster_Frame(int32_t delta_us) {
 					Aeron_CommandBufferSetFailure(upload_cmd, "Flight process asset preparation failed");
 					ship_sync = XWA_REMASTER_SHIP_SYNC_FAILED;
 				}
+			}
+			if (ship_sync == XWA_REMASTER_SHIP_SYNC_COMPLETE && environment_needs_prepare) {
+				XwaRemasterEnvironment_Prepare(upload_cmd, snap);
 			}
 		}
 		Aeron_GpuDebugPop(upload_cmd);

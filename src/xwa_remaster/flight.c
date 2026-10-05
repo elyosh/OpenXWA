@@ -928,7 +928,8 @@ int XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterA
 	} else {
 		Aeron_LogInfo("xwa.remaster", "flight sky: procedural starfield (cube map not loaded)");
 	}
-	return 1;
+	/* Authored environments are optional: failures leave the classic path. */
+	return XwaRemasterEnvironment_PrepareProcess(cmd);
 }
 
 void XwaRemasterFlight_CommitProcessAssets(void) { s.process_assets_prepared = 1; }
