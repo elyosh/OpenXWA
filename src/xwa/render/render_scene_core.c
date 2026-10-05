@@ -6,6 +6,7 @@
 
 #ifdef XWA_MODERN
 #include "xwa/frontend/frontend_display.h" /* g_flightRenderToFrontend */
+#include "xwa_runtime/models/opt_synth.h"
 #endif
 
 #ifndef XWA_MODERN
@@ -702,6 +703,13 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 			}
 
 			g_meshRenderFlags = g_renderFlags;
+#ifdef XWA_MODERN
+			/* Modern port: a GLB replacement model has no classic geometry;
+			 * the HD renderer draws it. */
+			if (OptSynth_IsSynthesized(model)) {
+				drawMesh = 0;
+			}
+#endif
 			if (drawMesh) {
 				RenderScene_DrawModelNode(model, node, &mesh);
 			}
@@ -914,7 +922,14 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 		}
 
 		++g_curLayerId;
+#ifdef XWA_MODERN
+		/* Modern port: GLB replacement models are drawn by the HD renderer. */
+		if (!OptSynth_IsSynthesized(model)) {
+			RenderScene_DrawModelNodeHardware(model, node, &mesh);
+		}
+#else
 		RenderScene_DrawModelNodeHardware(model, node, &mesh);
+#endif
 		if (saveMeshForBwing) {
 			saveMeshForBwing = 0;
 			memcpy(&mesh, &savedMesh, sizeof(mesh));
@@ -1055,11 +1070,24 @@ void RenderScene_DrawNoAssetSourceModel(ObjectRecord* obj, int nodeSwitchIndex) 
 		nodeType = node->nodeType;
 		if (nodeType == OPT_TEXTURE || nodeType == OPT_TEXTURE_REF) {
 			++g_curLayerId;
+#ifdef XWA_MODERN
+			/* Modern port: GLB replacement models are drawn by the HD renderer. */
+			if (!OptSynth_IsSynthesized(model)) {
+				RenderScene_DrawModelNode(model, node, &mesh);
+			}
+#else
 			RenderScene_DrawModelNode(model, node, &mesh);
+#endif
 			++nodeSwitchIndex;
 		} else if (rootIndex == nodeSwitchIndex) {
 			++g_curLayerId;
+#ifdef XWA_MODERN
+			if (!OptSynth_IsSynthesized(model)) {
+				RenderScene_DrawModelNode(model, node, &mesh);
+			}
+#else
 			RenderScene_DrawModelNode(model, node, &mesh);
+#endif
 		}
 	}
 

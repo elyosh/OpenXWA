@@ -1,5 +1,8 @@
 #include "xwa/render/renderer_internal.h"
 #include "xwa/util/string.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/opt_synth.h"
+#endif
 
 // FUNCTION: XWA 0x482D60
 void RenderScene_WalkPreviewOptNodeForProjection(OptimizedPolyObject* model, OptNode* node, SceneMesh* mesh) {
@@ -521,7 +524,15 @@ int RenderScene_ProjectPreviewWireframeModel(ObjectRecord* obj) {
 		}
 
 		++g_curLayerId;
+#ifdef XWA_MODERN
+		/* Modern port: GLB replacement models have no classic faces to
+		 * project; the HD renderer draws the preview. */
+		if (!OptSynth_IsSynthesized(model)) {
+			RenderScene_WalkPreviewOptNodeForProjection(model, node, &mesh);
+		}
+#else
 		RenderScene_WalkPreviewOptNodeForProjection(model, node, &mesh);
+#endif
 		if (saveMeshForBwing) {
 			memcpy(&mesh, &savedMesh, sizeof(mesh));
 			saveMeshForBwing = 0;

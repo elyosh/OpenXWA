@@ -58,6 +58,7 @@
 #include "xwa_runtime/input/winmm_joystick_provider.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/input/mouse_flight.h"
+#include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -1494,6 +1495,29 @@ void FlightObject_AnimateCrewMeshRotations(int objectIndex, int resetToNeutral) 
 		default:
 			return;
 	}
+
+#ifdef XWA_MODERN
+	/* Modern port: a GLB replacement's component layout is authored freely,
+	 * so its animated components come from the crew tags, never from the
+	 * stock ordinals above. Untagged replacements animate nothing. */
+	{
+		MemoryHandle modelHandle;
+		const OptimizedPolyObject* model;
+
+		modelHandle = g_loadedModels.byObjectType[(uint16_t)g_objectTable[objectIndex].objectType];
+		if (objectIndex == (uint16_t)g_players[g_localPlayer].objectIndex && g_exteriorModelLoaded) {
+			modelHandle = g_exteriorModel;
+		}
+		model = modelHandle != 0 ? (const OptimizedPolyObject*)Memory_LockHandle(modelHandle) : NULL;
+		if (OptSynth_IsSynthesized(model)) {
+			sideMeshIdx = (short)OptSynth_FindModelComponentByTag(model, "crew.side");
+			forwardMeshIdx = (short)OptSynth_FindModelComponentByTag(model, "crew.forward");
+		}
+		if (model != NULL) {
+			Memory_UnlockHandle(modelHandle);
+		}
+	}
+#endif
 
 	craft = g_objectTable[objectIndex].mobj->pCraft;
 	if (sideMeshIdx >= 0) {

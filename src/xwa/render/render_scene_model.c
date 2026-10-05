@@ -3,6 +3,7 @@
 #include "xwa/util/string.h"
 
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -544,7 +545,15 @@ void GlowMark_ProcessPendingRequests(uint16_t objectIndex) {
 												XwaSnapshot_NoteGlowMarkMesh(
 													glowMarkTail, (unsigned int)(g_glowMarkMeshOrdinal - 1));
 #endif
+#ifdef XWA_MODERN
+												/* Modern port: the HD renderer projects marks onto
+												 * a GLB replacement's own vertices. */
+												if (!OptSynth_IsSynthesized(model)) {
+													GlowMark_CollectModelFaces(glowMarkTail, model, node);
+												}
+#else
 												GlowMark_CollectModelFaces(glowMarkTail, model, node);
+#endif
 												DebugPrintf((const char*)(uintptr_t)(uint16_t)obj->objectType,
 															g_glowMarkMeshOrdinal - 1);
 											}

@@ -27,6 +27,7 @@
 #include "xwa_remaster/hud.h"
 #include "xwa_remaster/opt_mesh.h"
 #include "xwa_remaster/ship.h"
+#include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/movie_task.h"
 #include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/runtime/presentation.h"
@@ -441,13 +442,21 @@ static void XwaRemaster_RequestViewMode(RmViewMode mode, int fade) {
 	XwaRemaster_SetViewMode(mode, fade);
 }
 
+/* GLB replacement models have no classic geometry, so the classic and split
+ * views stay off while replacements are enabled; the HD view is the only one. */
 static void XwaRemaster_ToggleSplitView(void) {
+	if (XwaModelSource_ReplacementsEnabled()) {
+		return;
+	}
 	const RmViewMode selected_mode = g.pending_mode_valid ? g.pending_mode : g.mode;
 	const RmViewMode target = selected_mode == RM_VIEW_SPLIT ? g.primary_mode : RM_VIEW_SPLIT;
 	XwaRemaster_RequestViewMode(target, 0);
 }
 
 static void XwaRemaster_TogglePrimaryView(void) {
+	if (XwaModelSource_ReplacementsEnabled()) {
+		return;
+	}
 	const RmViewMode selected_mode = g.pending_mode_valid ? g.pending_mode : g.mode;
 	const RmViewMode old_primary = g.primary_mode;
 	const RmViewMode target = old_primary == RM_VIEW_HD ? RM_VIEW_CLASSIC : RM_VIEW_HD;
