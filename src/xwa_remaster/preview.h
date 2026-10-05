@@ -3,9 +3,9 @@
 
 /*
  * Frontend model-preview PiP: renders one XwaModelPreview record as a
- * true AeronScene3D PBR draw of the cooked ship mesh
- * (<configured asset root>/remaster/models/<opt>.glb — the OPT -> opt2gltf ->
- * aeron_gltf_cook pipeline) into an internal HDR render target. The caller
+ * true AeronScene3D PBR draw of the ship mesh registered for the preview's
+ * model (its GLB replacement when the simulation loaded one, otherwise the
+ * converted OPT) into an internal HDR render target. The caller
  * composites the returned texture into the 2D reconstruction at the
  * record's z position. No classic renderer involvement.
  */

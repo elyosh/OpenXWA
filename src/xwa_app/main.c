@@ -359,7 +359,6 @@ int main(int argc, char** argv) {
 		.opt_emissive_strength = host_config.model_opt_emissive_strength,
 		.opt_projectile_emissive_strength = host_config.model_opt_projectile_emissive_strength,
 		.engine_emissive_strength = host_config.model_engine_emissive_strength,
-		.force_opt_models = host_config.force_opt_models,
 		.prefer_original_2d = host_config.prefer_original_2d,
 		.video_options = host_config.video_options,
 		.video_options_override_mask = host_config.video_options_override_mask,

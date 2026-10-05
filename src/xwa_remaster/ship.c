@@ -9,17 +9,20 @@
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/glow_marks.h"
 #include "xwa_remaster/opt_mesh.h"
+#include "xwa_runtime/models/model_source.h"
 
 #include <math.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* ---- classic-lifetime HD assets ------------------------------------ */
 
 typedef struct ShipMeshAsset {
 	char key[XWA_SNAP_OPT_NAME_MAX];
+	uint8_t source; /* XwaModelSource the simulation loaded */
 	AeronSceneMesh* mesh;
 	int runtime_opt;
 	int pending_new;
@@ -27,6 +30,7 @@ typedef struct ShipMeshAsset {
 
 typedef struct ShipDesiredAsset {
 	char key[XWA_SNAP_OPT_NAME_MAX];
+	uint8_t source;
 } ShipDesiredAsset;
 
 static ShipMeshAsset s_meshes[XWA_SNAP_MAX_OPT_ASSETS];
@@ -42,7 +46,6 @@ static float s_opt_smooth_angle_degrees;
 static float s_opt_emissive_strength;
 static float s_opt_projectile_emissive_strength;
 static float s_engine_emissive_strength;
-static int s_force_opt_models;
 static XwaShipPbrTuning g_pbr_tuning_default;
 static XwaShipPbrTuning g_pbr_tuning;
 
@@ -56,13 +59,11 @@ static void ship_set_failure(AeronCommandBuffer* cmd, const char* format, ...) {
 }
 
 void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissive_strength,
-							   float opt_projectile_emissive_strength, float engine_emissive_strength,
-							   int force_opt_models) {
+							   float opt_projectile_emissive_strength, float engine_emissive_strength) {
 	s_opt_smooth_angle_degrees = opt_smooth_angle_degrees;
 	s_opt_emissive_strength = opt_emissive_strength;
 	s_opt_projectile_emissive_strength = opt_projectile_emissive_strength;
 	s_engine_emissive_strength = engine_emissive_strength;
-	s_force_opt_models = force_opt_models != 0;
 }
 
 static void ship_mesh_key(const char* name, char key[XWA_SNAP_OPT_NAME_MAX]) {
@@ -79,29 +80,44 @@ static void ship_mesh_key(const char* name, char key[XWA_SNAP_OPT_NAME_MAX]) {
 	key[n] = '\0';
 }
 
-static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, int* out_runtime_opt) {
+/* The simulation's source decides the mesh: a GLB the simulation loaded is
+ * the only valid render source for that key, and an OPT key never tries a
+ * GLB. */
+static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, uint8_t source,
+									  int* out_runtime_opt) {
 	char path[512];
 	AeronFlightModel model;
 	if (out_runtime_opt) {
 		*out_runtime_opt = 0;
 	}
-	if (!s_force_opt_models) {
-		snprintf(path, sizeof path, "%s/remaster/models/%s.glb", Aeron_AssetRoot(), key);
-		if (Aeron_FlightModelBuild(path, &model)) {
-			AeronSceneMeshCreateStatus create_status;
-			AeronSceneMesh* mesh = AeronScene_MeshCreate(cmd, &model, key, &create_status);
-			Aeron_FlightModelFree(&model);
-			if (mesh) {
-				Aeron_LogVerbose("xwa.remaster", "mesh: '%s' source=GLB", key);
-				return mesh;
-			}
-			if (create_status != AERON_SCENE_MESH_CREATE_INVALID_SOURCE) {
-				Aeron_LogWarn("xwa.remaster", "mesh: GLB resource creation failed '%s'", path);
-				ship_set_failure(cmd, "Ship model '%s': GLB resource creation failed for '%s'", key, path);
-				return NULL;
-			}
-			Aeron_LogWarn("xwa.remaster", "mesh: GLB content invalid '%s'; trying OPT", path);
+	if (source == XWA_MODEL_SOURCE_GLB) {
+		uint8_t* bytes = NULL;
+		size_t size = 0;
+		snprintf(path, sizeof path, "remaster/models/%s.glb", key);
+		if (!AeronVfs_ReadAll(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, path, 0, &bytes, &size)) {
+			Aeron_LogError("xwa.remaster", "mesh: cannot read GLB '%s'", path);
+			ship_set_failure(cmd, "Ship model '%s': cannot read '%s'", key, path);
+			return NULL;
 		}
+		const int built = Aeron_FlightModelBuildMemory(bytes, size, path, &model);
+		free(bytes);
+		if (!built) {
+			Aeron_LogError("xwa.remaster", "mesh: GLB content invalid '%s'", path);
+			ship_set_failure(cmd, "Ship model '%s': invalid GLB '%s'", key, path);
+			return NULL;
+		}
+		AeronSceneMeshCreateStatus create_status;
+		AeronSceneMesh* mesh = AeronScene_MeshCreate(cmd, &model, key, &create_status);
+		Aeron_FlightModelFree(&model);
+		if (!mesh) {
+			Aeron_LogError("xwa.remaster", "mesh: GLB resource creation failed '%s' status=%d", path,
+						   (int)create_status);
+			ship_set_failure(cmd, "Ship model '%s': GLB resource creation failed for '%s' (status %d)", key,
+							 path, (int)create_status);
+			return NULL;
+		}
+		Aeron_LogVerbose("xwa.remaster", "mesh: '%s' source=GLB", key);
+		return mesh;
 	}
 
 	char opt_error[256];
@@ -173,9 +189,10 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 		if (!key[0]) {
 			continue;
 		}
+		const uint8_t source = snapshot->opt_assets[i].source;
 		uint32_t found = desired_count;
 		for (uint32_t j = 0; j < desired_count; j++) {
-			if (strcmp(desired[j].key, key) == 0) {
+			if (strcmp(desired[j].key, key) == 0 && desired[j].source == source) {
 				found = j;
 				break;
 			}
@@ -184,6 +201,7 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 			continue;
 		}
 		snprintf(desired[desired_count].key, sizeof desired[desired_count].key, "%s", key);
+		desired[desired_count].source = source;
 		desired_count++;
 	}
 
@@ -199,7 +217,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 	for (uint32_t i = 0; i < desired_count; i++) {
 		uint32_t found = s_pending_mesh_count;
 		for (uint32_t j = 0; j < s_pending_mesh_count; j++) {
-			if (strcmp(s_pending_meshes[j].key, desired[i].key) == 0) {
+			if (strcmp(s_pending_meshes[j].key, desired[i].key) == 0 &&
+				s_pending_meshes[j].source == desired[i].source) {
 				found = j;
 				break;
 			}
@@ -214,7 +233,7 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 		}
 		ShipMeshAsset* asset = &s_pending_meshes[s_pending_mesh_count];
 		for (uint32_t j = 0; j < s_mesh_count; j++) {
-			if (strcmp(s_meshes[j].key, desired[i].key) == 0) {
+			if (strcmp(s_meshes[j].key, desired[i].key) == 0 && s_meshes[j].source == desired[i].source) {
 				*asset = s_meshes[j];
 				asset->pending_new = 0;
 				s_pending_mesh_count++;
@@ -225,7 +244,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 			continue;
 		}
 		snprintf(asset->key, sizeof asset->key, "%s", desired[i].key);
-		asset->mesh = ship_mesh_load(cmd, asset->key, &asset->runtime_opt);
+		asset->source = desired[i].source;
+		asset->mesh = ship_mesh_load(cmd, asset->key, asset->source, &asset->runtime_opt);
 		if (!asset->mesh) {
 			memset(asset, 0, sizeof *asset);
 			return XWA_REMASTER_SHIP_SYNC_FAILED;
@@ -243,7 +263,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 			for (uint32_t j = i + 1; j < desired_count; j++) {
 				uint32_t pending = s_pending_mesh_count;
 				for (uint32_t k = 0; k < s_pending_mesh_count; k++) {
-					if (strcmp(s_pending_meshes[k].key, desired[j].key) == 0) {
+					if (strcmp(s_pending_meshes[k].key, desired[j].key) == 0 &&
+						s_pending_meshes[k].source == desired[j].source) {
 						pending = k;
 						break;
 					}

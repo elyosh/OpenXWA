@@ -28,7 +28,6 @@ typedef struct XwaRemasterInitOptions {
 	float opt_emissive_strength;
 	float opt_projectile_emissive_strength;
 	float engine_emissive_strength;
-	int force_opt_models;
 	int prefer_original_2d;
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;

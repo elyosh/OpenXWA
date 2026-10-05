@@ -42,8 +42,7 @@ AeronSceneMesh* XwaRemasterShip_MeshForNameWithSource(const char* name, int* out
 float XwaRemasterShip_OptProjectileEmissiveStrength(void);
 void XwaRemasterShip_Shutdown(void);
 void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissive_strength,
-							   float opt_projectile_emissive_strength, float engine_emissive_strength,
-							   int force_opt_models);
+							   float opt_projectile_emissive_strength, float engine_emissive_strength);
 
 /* Projectiles render as ordinary scene instances (roll-aligned by the
  * flight driver). Runtime-converted OPTs receive a genus-driven

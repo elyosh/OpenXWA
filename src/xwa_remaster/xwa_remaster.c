@@ -323,8 +323,7 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 		return 0;
 	}
 	XwaRemasterShip_Configure(options->opt_smooth_angle_degrees, options->opt_emissive_strength,
-							  options->opt_projectile_emissive_strength, options->engine_emissive_strength,
-							  options->force_opt_models);
+							  options->opt_projectile_emissive_strength, options->engine_emissive_strength);
 	if (!XwaRemasterFlight_InitConfig(Aeron_GetVfs())) {
 		return 0;
 	}
