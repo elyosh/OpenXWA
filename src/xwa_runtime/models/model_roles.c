@@ -23,6 +23,10 @@ typedef struct ModelRoleInfo {
 	const char* const* keys; /* models that carry the role, NULL-terminated */
 } ModelRoleInfo;
 
+static const char* const s_hangarCraneKeys[] = { "hangarcrane", NULL };
+static const char* const s_hangarDroidKeys[] = { "hangardroid", NULL };
+static const char* const s_hangarDroid2Keys[] = { "hangardroid2", NULL };
+static const char* const s_workDroid1Keys[] = { "workdroid1", NULL };
 static const char* const s_platformKeys[] = { "platform1", "platform2", "platform3",
 											  "platform4", "platform5", NULL };
 
@@ -30,6 +34,14 @@ static const ModelRoleInfo s_roles[XWA_MODEL_ROLE_COUNT] = {
 	[XWA_ROLE_PLATFORM_HIDDEN_BY_BEAM] = { "platform.hidden_by_beam", MODEL_ROLE_SET, s_platformKeys },
 	[XWA_ROLE_PLATFORM_HIDDEN_BY_JAMMING_DECOY] = { "platform.hidden_by_jamming_decoy", MODEL_ROLE_SET,
 													s_platformKeys },
+	[XWA_ROLE_HANGARCRANE_ARM] = { "hangarcrane.arm", MODEL_ROLE_SINGLE, s_hangarCraneKeys },
+	[XWA_ROLE_HANGARDROID_NOD] = { "hangardroid.nod", MODEL_ROLE_SINGLE, s_hangarDroidKeys },
+	[XWA_ROLE_HANGARDROID2_SWING] = { "hangardroid2.swing", MODEL_ROLE_SINGLE, s_hangarDroid2Keys },
+	[XWA_ROLE_HANGARDROID2_SPIN] = { "hangardroid2.spin", MODEL_ROLE_SINGLE, s_hangarDroid2Keys },
+	[XWA_ROLE_WORKDROID1_SPIN] = { "workdroid1.spin", MODEL_ROLE_SINGLE, s_workDroid1Keys },
+	[XWA_ROLE_WORKDROID1_TURN] = { "workdroid1.turn", MODEL_ROLE_SINGLE, s_workDroid1Keys },
+	[XWA_ROLE_WORKDROID1_NOD_1] = { "workdroid1.nod.1", MODEL_ROLE_SINGLE, s_workDroid1Keys },
+	[XWA_ROLE_WORKDROID1_NOD_2] = { "workdroid1.nod.2", MODEL_ROLE_SINGLE, s_workDroid1Keys },
 };
 
 static int ModelRole_AppliesTo(const ModelRoleInfo* info, const char* key) {

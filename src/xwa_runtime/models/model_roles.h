@@ -20,6 +20,15 @@ typedef enum XwaModelRole {
 	   Sets; a platform may tag any number of components, including none. */
 	XWA_ROLE_PLATFORM_HIDDEN_BY_BEAM,
 	XWA_ROLE_PLATFORM_HIDDEN_BY_JAMMING_DECOY,
+	/* Hangar props animated by the hangar and family-base scenes. */
+	XWA_ROLE_HANGARCRANE_ARM,
+	XWA_ROLE_HANGARDROID_NOD,
+	XWA_ROLE_HANGARDROID2_SWING,
+	XWA_ROLE_HANGARDROID2_SPIN,
+	XWA_ROLE_WORKDROID1_SPIN,
+	XWA_ROLE_WORKDROID1_TURN,
+	XWA_ROLE_WORKDROID1_NOD_1,
+	XWA_ROLE_WORKDROID1_NOD_2,
 	XWA_MODEL_ROLE_COUNT
 } XwaModelRole;
 

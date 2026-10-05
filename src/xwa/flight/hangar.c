@@ -55,11 +55,32 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/model_roles.h"
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* Component roles of the animated hangar props. XWA_MODEL_ROLE is the stock
+ * component outside XWA_MODERN; a GLB replacement names its component with a
+ * role tag instead (see xwa_runtime/models/model_roles.h). */
+#define HANGARCRANE_ARM                                                                                      \
+	XWA_MODEL_ROLE(g_objectTable[g_hangarCraneObjIdx].objectType, XWA_ROLE_HANGARCRANE_ARM, 0)
+#define HANGARDROID_NOD(objectIdx)                                                                           \
+	XWA_MODEL_ROLE(g_objectTable[objectIdx].objectType, XWA_ROLE_HANGARDROID_NOD, 3)
+#define HANGARDROID2_SWING(objectIdx)                                                                        \
+	XWA_MODEL_ROLE(g_objectTable[objectIdx].objectType, XWA_ROLE_HANGARDROID2_SWING, 1)
+#define HANGARDROID2_SPIN(objectIdx)                                                                         \
+	XWA_MODEL_ROLE(g_objectTable[objectIdx].objectType, XWA_ROLE_HANGARDROID2_SPIN, 2)
+#define WORKDROID1_SPIN(objectIdx)                                                                           \
+	XWA_MODEL_ROLE(g_objectTable[objectIdx].objectType, XWA_ROLE_WORKDROID1_SPIN, 0)
+#define WORKDROID1_TURN(objectIdx)                                                                           \
+	XWA_MODEL_ROLE(g_objectTable[objectIdx].objectType, XWA_ROLE_WORKDROID1_TURN, 3)
+#define WORKDROID1_NOD_1(objectIdx)                                                                          \
+	XWA_MODEL_ROLE(g_objectTable[objectIdx].objectType, XWA_ROLE_WORKDROID1_NOD_1, 4)
+#define WORKDROID1_NOD_2(objectIdx)                                                                          \
+	XWA_MODEL_ROLE(g_objectTable[objectIdx].objectType, XWA_ROLE_WORKDROID1_NOD_2, 6)
 
 #ifdef XWA_MODERN
 #define HANGAR_HUD_PANE_PUSH(id_, x_, y_, w_, h_) XwaSnapshotHud_PushPane((id_), (x_), (y_), (w_), (h_))
@@ -4470,19 +4491,29 @@ static void Hangar_ModernResetCadenceSensitiveState(void) {
 	g_modernHangarLegacyCadenceTicks = 0;
 	g_modernHangarLegacyCadenceDue = 0;
 	craft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
-	g_modernHangarCraneRotationActive = (craft->meshRotation[0] & 1u) != 0;
+	g_modernHangarCraneRotationActive = (craft->meshRotation[HANGARCRANE_ARM] & 1u) != 0;
 	g_modernHangarCraneScaledStateActive = 0;
 
 	g_modernHangarPrimaryDroidRotation.decreasing = 0;
 	g_modernHangarPrimaryDroidRotation.scaledStateActive = 0;
 	memset(g_modernFamilyDroidRotations, 0, sizeof(g_modernFamilyDroidRotations));
 	for (sceneIdx = 0; sceneIdx < g_hangarSceneObjectCount && sceneIdx < 10; ++sceneIdx) {
-		craft = g_objectTable[g_hangarSceneObjects[sceneIdx].objectIdx].mobj->pCraft;
-		if (sceneIdx == 0) {
-			g_modernHangarPrimaryDroidRotation.decreasing = (craft->meshRotation[3] & 1u) != 0;
+		const int objectIdx = g_hangarSceneObjects[sceneIdx].objectIdx;
+		const uint16_t objectType = (uint16_t)g_objectTable[objectIdx].objectType;
+
+		/* Each flag is read only for its own droid type, so read each role
+		 * only on the type that carries it. */
+		craft = g_objectTable[objectIdx].mobj->pCraft;
+		if (sceneIdx == 0 && objectType == OBJ_HangarDroid) {
+			g_modernHangarPrimaryDroidRotation.decreasing =
+				(craft->meshRotation[HANGARDROID_NOD(objectIdx)] & 1u) != 0;
 		}
-		g_modernFamilyDroidRotations[sceneIdx][0].decreasing = (craft->meshRotation[4] & 1u) != 0;
-		g_modernFamilyDroidRotations[sceneIdx][1].decreasing = (craft->meshRotation[6] & 1u) != 0;
+		if (objectType == OBJ_WorkDroid1) {
+			g_modernFamilyDroidRotations[sceneIdx][0].decreasing =
+				(craft->meshRotation[WORKDROID1_NOD_1(objectIdx)] & 1u) != 0;
+			g_modernFamilyDroidRotations[sceneIdx][1].decreasing =
+				(craft->meshRotation[WORKDROID1_NOD_2(objectIdx)] & 1u) != 0;
+		}
 	}
 }
 
@@ -4508,7 +4539,7 @@ static void Hangar_ModernUpdateCraneRotation(int dtTicks, uint16_t stopThreshold
 
 	craft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
 	g_curCraft = craft;
-	rotation = craft->meshRotation[0];
+	rotation = craft->meshRotation[HANGARCRANE_ARM];
 	if (g_modernHangarCraneRotationActive) {
 		if ((g_hangarSceneObjects[0].routeNodeIdx & 1) != 0) {
 			rotation = (uint8_t)(rotation - dtTicks);
@@ -4528,7 +4559,7 @@ static void Hangar_ModernUpdateCraneRotation(int dtTicks, uint16_t stopThreshold
 			g_modernHangarCraneRotationActive = 1;
 		}
 	}
-	craft->meshRotation[0] = rotation;
+	craft->meshRotation[HANGARCRANE_ARM] = rotation;
 	g_modernHangarCraneScaledStateActive = 1;
 }
 
@@ -4540,9 +4571,9 @@ static void Hangar_ModernPrepareOriginalCraneRotation(void) {
 		return;
 	}
 	craft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
-	rotation = craft->meshRotation[0];
+	rotation = craft->meshRotation[HANGARCRANE_ARM];
 	if (((rotation & 1u) != 0) != g_modernHangarCraneRotationActive) {
-		craft->meshRotation[0] = rotation ^ 1u;
+		craft->meshRotation[HANGARCRANE_ARM] = rotation ^ 1u;
 	}
 	g_modernHangarCraneScaledStateActive = 0;
 }
@@ -4600,17 +4631,20 @@ static void Hangar_ModernUpdateHangarDroidMesh(int sceneIdx, int objectIdx, int 
 		} else {
 			meshDir = g_hangarSceneObjects[1].meshRotationDir;
 		}
-		g_curCraft->meshRotation[1] = (uint8_t)(g_curCraft->meshRotation[1] + 2 * dtTicks * meshDir);
+		g_curCraft->meshRotation[HANGARDROID2_SWING(objectIdx)] =
+			(uint8_t)(g_curCraft->meshRotation[HANGARDROID2_SWING(objectIdx)] + 2 * dtTicks * meshDir);
 		if (g_hangarSceneObjects[1].moveState == 0) {
 			if (g_modernHangarLegacyCadenceDue) {
-				++g_curCraft->meshRotation[2];
+				++g_curCraft->meshRotation[HANGARDROID2_SPIN(objectIdx)];
 			}
 		} else {
-			g_curCraft->meshRotation[2] = (uint8_t)(g_curCraft->meshRotation[2] + 2 * dtTicks);
+			g_curCraft->meshRotation[HANGARDROID2_SPIN(objectIdx)] =
+				(uint8_t)(g_curCraft->meshRotation[HANGARDROID2_SPIN(objectIdx)] + 2 * dtTicks);
 		}
 	} else if (sceneIdx == 0) {
 		g_curCraft = g_objectTable[objectIdx].mobj->pCraft;
-		Hangar_ModernUpdatePackedRotation(g_curCraft, 3, dtTicks, 0x200, &g_modernHangarPrimaryDroidRotation);
+		Hangar_ModernUpdatePackedRotation(g_curCraft, HANGARDROID_NOD(objectIdx), dtTicks, 0x200,
+										  &g_modernHangarPrimaryDroidRotation);
 	}
 }
 
@@ -4621,21 +4655,22 @@ static void Hangar_ModernUpdateFamilyDroidMesh(int sceneIdx, int objectIdx, int 
 	if (g_modernHangarLegacyCadenceDue && (GameRand() & 0xffff) % 100 < 4) {
 		g_hangarSceneObjects[sceneIdx].meshRotationDir = abs(abs(GameRand() & 0xffff) & 1) - 1;
 	}
-	g_curCraft->meshRotation[3] =
-		(uint8_t)(g_curCraft->meshRotation[3] +
+	g_curCraft->meshRotation[WORKDROID1_TURN(objectIdx)] =
+		(uint8_t)(g_curCraft->meshRotation[WORKDROID1_TURN(objectIdx)] +
 				  2 * dtTicks * (int8_t)g_hangarSceneObjects[sceneIdx].meshRotationDir);
 	if (g_hangarSceneObjects[sceneIdx].moveState == 0) {
 		if (g_modernHangarLegacyCadenceDue) {
-			++g_curCraft->meshRotation[0];
+			++g_curCraft->meshRotation[WORKDROID1_SPIN(objectIdx)];
 		}
 	} else {
-		g_curCraft->meshRotation[0] = (uint8_t)(g_curCraft->meshRotation[0] + 2 * dtTicks);
+		g_curCraft->meshRotation[WORKDROID1_SPIN(objectIdx)] =
+			(uint8_t)(g_curCraft->meshRotation[WORKDROID1_SPIN(objectIdx)] + 2 * dtTicks);
 	}
 
 	threshold = g_hangarSceneObjects[sceneIdx].moveState != 0 ? 0x200 : 0xa000;
-	Hangar_ModernUpdatePackedRotation(g_curCraft, 4, dtTicks, threshold,
+	Hangar_ModernUpdatePackedRotation(g_curCraft, WORKDROID1_NOD_1(objectIdx), dtTicks, threshold,
 									  &g_modernFamilyDroidRotations[sceneIdx][0]);
-	Hangar_ModernUpdatePackedRotation(g_curCraft, 6, dtTicks, threshold,
+	Hangar_ModernUpdatePackedRotation(g_curCraft, WORKDROID1_NOD_2(objectIdx), dtTicks, threshold,
 									  &g_modernFamilyDroidRotations[sceneIdx][1]);
 }
 #endif
@@ -5655,7 +5690,7 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 		} else {
 			if (sceneIdx == 0) {
 				g_curCraft = g_objectTable[objectIdx].mobj->pCraft;
-				Hangar_ModernPrepareOriginalPackedRotation(g_curCraft, 3,
+				Hangar_ModernPrepareOriginalPackedRotation(g_curCraft, HANGARDROID_NOD(objectIdx),
 														   &g_modernHangarPrimaryDroidRotation);
 			}
 #endif
@@ -5671,31 +5706,39 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 					} else {
 						meshDir = g_hangarSceneObjects[1].meshRotationDir;
 					}
-					g_curCraft->meshRotation[1] = (uint8_t)(g_curCraft->meshRotation[1] + 4 * meshDir);
+					g_curCraft->meshRotation[HANGARDROID2_SWING(objectIdx)] =
+						(uint8_t)(g_curCraft->meshRotation[HANGARDROID2_SWING(objectIdx)] + 4 * meshDir);
 					if (g_hangarSceneObjects[1].moveState == 0) {
-						++g_curCraft->meshRotation[2];
+						++g_curCraft->meshRotation[HANGARDROID2_SPIN(objectIdx)];
 					} else {
-						g_curCraft->meshRotation[2] = (uint8_t)(g_curCraft->meshRotation[2] + 4u);
+						g_curCraft->meshRotation[HANGARDROID2_SPIN(objectIdx)] =
+							(uint8_t)(g_curCraft->meshRotation[HANGARDROID2_SPIN(objectIdx)] + 4u);
 					}
 					break;
 				}
 				case 0:
 					g_curCraft = g_objectTable[objectIdx].mobj->pCraft;
-					if ((g_curCraft->meshRotation[3] & 1u) != 0) {
-						g_curCraft->meshRotation[3] = (uint8_t)(g_curCraft->meshRotation[3] - 2u);
-						if (g_curCraft->meshRotation[3] == 0xf7u && (uint16_t)GameRand() > 0x200u) {
-							g_curCraft->meshRotation[3] = (uint8_t)(g_curCraft->meshRotation[3] + 2u);
+					if ((g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] & 1u) != 0) {
+						g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] =
+							(uint8_t)(g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] - 2u);
+						if (g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] == 0xf7u &&
+							(uint16_t)GameRand() > 0x200u) {
+							g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] =
+								(uint8_t)(g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] + 2u);
 						}
-						if (g_curCraft->meshRotation[3] == 0xe1u) {
-							g_curCraft->meshRotation[3] = (uint8_t)-32;
+						if (g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] == 0xe1u) {
+							g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] = (uint8_t)-32;
 						}
 					} else {
-						g_curCraft->meshRotation[3] = (uint8_t)(g_curCraft->meshRotation[3] + 2u);
-						if (g_curCraft->meshRotation[3] == 4u && (uint16_t)GameRand() > 0x200u) {
-							g_curCraft->meshRotation[3] = (uint8_t)(g_curCraft->meshRotation[3] - 2u);
+						g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] =
+							(uint8_t)(g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] + 2u);
+						if (g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] == 4u &&
+							(uint16_t)GameRand() > 0x200u) {
+							g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] =
+								(uint8_t)(g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] - 2u);
 						}
-						if (g_curCraft->meshRotation[3] == 32u) {
-							g_curCraft->meshRotation[3] = 33u;
+						if (g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] == 32u) {
+							g_curCraft->meshRotation[HANGARDROID_NOD(objectIdx)] = 33u;
 						}
 					}
 					break;
@@ -5714,17 +5757,19 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 		Hangar_ModernPrepareOriginalCraneRotation();
 #endif
 		g_curCraft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
-		if ((g_curCraft->meshRotation[0] & 1u) != 0) {
+		if ((g_curCraft->meshRotation[HANGARCRANE_ARM] & 1u) != 0) {
 			if ((g_hangarSceneObjects[0].routeNodeIdx & 1) != 0) {
-				g_curCraft->meshRotation[0] = (uint8_t)(g_curCraft->meshRotation[0] - 2u);
+				g_curCraft->meshRotation[HANGARCRANE_ARM] =
+					(uint8_t)(g_curCraft->meshRotation[HANGARCRANE_ARM] - 2u);
 			} else {
-				g_curCraft->meshRotation[0] = (uint8_t)(g_curCraft->meshRotation[0] + 2u);
+				g_curCraft->meshRotation[HANGARCRANE_ARM] =
+					(uint8_t)(g_curCraft->meshRotation[HANGARCRANE_ARM] + 2u);
 			}
 			if ((uint16_t)GameRand() < 0x300u) {
-				g_curCraft->meshRotation[0] ^= 1u;
+				g_curCraft->meshRotation[HANGARCRANE_ARM] ^= 1u;
 			}
 		} else if ((uint16_t)GameRand() < 0x200u) {
-			g_curCraft->meshRotation[0] ^= 1u;
+			g_curCraft->meshRotation[HANGARCRANE_ARM] ^= 1u;
 		}
 #ifdef XWA_MODERN
 	}
@@ -5931,75 +5976,80 @@ void Hangar_UpdateFamilyBaseDroidTraffic(int dtTicks) {
 		} else {
 
 			g_curCraft = g_objectTable[objectIdx].mobj->pCraft;
-			Hangar_ModernPrepareOriginalPackedRotation(g_curCraft, 4,
+			Hangar_ModernPrepareOriginalPackedRotation(g_curCraft, WORKDROID1_NOD_1(objectIdx),
 													   &g_modernFamilyDroidRotations[sceneIdx][0]);
-			Hangar_ModernPrepareOriginalPackedRotation(g_curCraft, 6,
+			Hangar_ModernPrepareOriginalPackedRotation(g_curCraft, WORKDROID1_NOD_2(objectIdx),
 													   &g_modernFamilyDroidRotations[sceneIdx][1]);
 #endif
 			g_curCraft = g_objectTable[objectIdx].mobj->pCraft;
 			if ((GameRand() & 0xffff) % 100 < 4) {
 				g_hangarSceneObjects[sceneIdx].meshRotationDir = abs(abs(GameRand() & 0xffff) & 1) - 1;
 			}
-			g_curCraft->meshRotation[3] =
-				(uint8_t)(g_curCraft->meshRotation[3] +
+			g_curCraft->meshRotation[WORKDROID1_TURN(objectIdx)] =
+				(uint8_t)(g_curCraft->meshRotation[WORKDROID1_TURN(objectIdx)] +
 						  4 * (int8_t)g_hangarSceneObjects[sceneIdx].meshRotationDir);
 			if (g_hangarSceneObjects[sceneIdx].moveState == 0) {
-				++g_curCraft->meshRotation[0];
+				++g_curCraft->meshRotation[WORKDROID1_SPIN(objectIdx)];
 			} else {
-				g_curCraft->meshRotation[0] = (uint8_t)(g_curCraft->meshRotation[0] + 4u);
+				g_curCraft->meshRotation[WORKDROID1_SPIN(objectIdx)] =
+					(uint8_t)(g_curCraft->meshRotation[WORKDROID1_SPIN(objectIdx)] + 4u);
 			}
 			{
 				int threshold;
 				uint8_t meshRotation;
 
 				threshold = g_hangarSceneObjects[sceneIdx].moveState != 0 ? 0x200 : 0xa000;
-				meshRotation = g_curCraft->meshRotation[4];
+				meshRotation = g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)];
 				if ((meshRotation & 1u) != 0) {
 					meshRotation -= 2;
-					g_curCraft->meshRotation[4] = meshRotation;
-					if (g_curCraft->meshRotation[4] == 0xf7u) {
+					g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] = meshRotation;
+					if (g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] == 0xf7u) {
 						if ((GameRand() & 0xffff) > threshold) {
-							g_curCraft->meshRotation[4] = (uint8_t)(g_curCraft->meshRotation[4] + 2u);
+							g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] =
+								(uint8_t)(g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] + 2u);
 						}
 					}
-					if (g_curCraft->meshRotation[4] == 0xe1u) {
-						g_curCraft->meshRotation[4] = (uint8_t)-32;
+					if (g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] == 0xe1u) {
+						g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] = (uint8_t)-32;
 					}
 				} else {
 					meshRotation += 2;
-					g_curCraft->meshRotation[4] = meshRotation;
-					if (g_curCraft->meshRotation[4] == 4u) {
+					g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] = meshRotation;
+					if (g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] == 4u) {
 						if ((GameRand() & 0xffff) > threshold) {
-							g_curCraft->meshRotation[4] = (uint8_t)(g_curCraft->meshRotation[4] - 2u);
+							g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] =
+								(uint8_t)(g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] - 2u);
 						}
 					}
-					if (g_curCraft->meshRotation[4] == 32u) {
-						g_curCraft->meshRotation[4] = 33u;
+					if (g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] == 32u) {
+						g_curCraft->meshRotation[WORKDROID1_NOD_1(objectIdx)] = 33u;
 					}
 				}
 
-				meshRotation = g_curCraft->meshRotation[6];
+				meshRotation = g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)];
 				if ((meshRotation & 1u) != 0) {
 					meshRotation -= 2;
-					g_curCraft->meshRotation[6] = meshRotation;
-					if (g_curCraft->meshRotation[6] == 0xf7u) {
+					g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] = meshRotation;
+					if (g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] == 0xf7u) {
 						if ((GameRand() & 0xffff) > threshold) {
-							g_curCraft->meshRotation[6] = (uint8_t)(g_curCraft->meshRotation[6] + 2u);
+							g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] =
+								(uint8_t)(g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] + 2u);
 						}
 					}
-					if (g_curCraft->meshRotation[6] == 0xe1u) {
-						g_curCraft->meshRotation[6] = (uint8_t)-32;
+					if (g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] == 0xe1u) {
+						g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] = (uint8_t)-32;
 					}
 				} else {
 					meshRotation += 2;
-					g_curCraft->meshRotation[6] = meshRotation;
-					if (g_curCraft->meshRotation[6] == 4u) {
+					g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] = meshRotation;
+					if (g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] == 4u) {
 						if ((GameRand() & 0xffff) > threshold) {
-							g_curCraft->meshRotation[6] = (uint8_t)(g_curCraft->meshRotation[6] - 2u);
+							g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] =
+								(uint8_t)(g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] - 2u);
 						}
 					}
-					if (g_curCraft->meshRotation[6] == 32u) {
-						g_curCraft->meshRotation[6] = 33u;
+					if (g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] == 32u) {
+						g_curCraft->meshRotation[WORKDROID1_NOD_2(objectIdx)] = 33u;
 					}
 				}
 			}
@@ -6031,18 +6081,20 @@ void Hangar_UpdateFamilyBaseDroidTraffic(int dtTicks) {
 		Hangar_ModernPrepareOriginalCraneRotation();
 #endif
 		g_curCraft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
-		if ((g_curCraft->meshRotation[0] & 1u) != 0) {
+		if ((g_curCraft->meshRotation[HANGARCRANE_ARM] & 1u) != 0) {
 			if ((g_hangarSceneObjects[0].routeNodeIdx & 1) != 0) {
-				g_curCraft->meshRotation[0] = (uint8_t)(g_curCraft->meshRotation[0] - 2u);
+				g_curCraft->meshRotation[HANGARCRANE_ARM] =
+					(uint8_t)(g_curCraft->meshRotation[HANGARCRANE_ARM] - 2u);
 			} else {
-				g_curCraft->meshRotation[0] = (uint8_t)(g_curCraft->meshRotation[0] + 2u);
+				g_curCraft->meshRotation[HANGARCRANE_ARM] =
+					(uint8_t)(g_curCraft->meshRotation[HANGARCRANE_ARM] + 2u);
 			}
 			if ((uint16_t)GameRand() < 0x390u) {
-				g_curCraft->meshRotation[0] ^= 1u;
+				g_curCraft->meshRotation[HANGARCRANE_ARM] ^= 1u;
 			}
 		} else {
 			if ((uint16_t)GameRand() < 0x200u) {
-				g_curCraft->meshRotation[0] ^= 1u;
+				g_curCraft->meshRotation[HANGARCRANE_ARM] ^= 1u;
 			}
 		}
 #ifdef XWA_MODERN
