@@ -255,6 +255,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/glow_marks.c
     src/xwa_remaster/hyperspace.c
     src/xwa_remaster/hud.c
+    src/xwa_remaster/dynamic_cockpit.c
     src/xwa_remaster/hud_boxes.c
     src/xwa_remaster/hud_cmd.c
     src/xwa_remaster/hud_cmd_math.c

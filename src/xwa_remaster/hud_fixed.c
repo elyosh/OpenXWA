@@ -1034,6 +1034,32 @@ void XwaRemasterHudFixed_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 	fixed_target_w = fixed_target_h = 0;
 }
 
+/* The quad a record's sprite covers in the target: x, y, w, h. */
+static void fixed_record_quad(const XwaHudDrawRecord* r, const XwaAssetRef* asset, int out_x, int out_y,
+							  float scale, float quad[4]) {
+	const float size_scale = (float)r->screen_size / 256.0f * r->scale_ref * scale;
+	quad[2] = asset->classic_w * size_scale;
+	quad[3] = asset->classic_h * size_scale;
+	quad[0] = out_x + r->center_x_ref * scale - quad[2] * 0.5f;
+	quad[1] = out_y + r->center_y_ref * scale - quad[3] * 0.5f;
+}
+
+int XwaRemasterHudFixed_RecordQuad(const XwaHudDrawRecord* r, int target_w, int target_h, float quad[4]) {
+	if (!r || !fixed_draws.valid || target_w <= 0 || target_h <= 0)
+		return 0;
+	const XwaHudLayoutProfile* profile = fixed_profile((XwaHudProfileIndex)fixed_draws.profile);
+	const XwaAssetRef* asset = XwaRemasterHud_AssetFrame(r->object_type, r->frame);
+	if (!profile || !asset || asset->classic_w <= 0 || asset->classic_h <= 0)
+		return 0;
+	int out_x, out_y;
+	float scale;
+	XwaRemasterHudLayout_OutputTransform(profile, target_w, target_h, &out_x, &out_y, &scale);
+	if (scale <= 0.0f)
+		return 0;
+	fixed_record_quad(r, asset, out_x, out_y, scale, quad);
+	return 1;
+}
+
 void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, int target_h) {
 	if (!cmd || !fixed_list || target_w <= 0 || target_h <= 0)
 		return;
@@ -1060,9 +1086,10 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 		const XwaAssetRef* asset = XwaRemasterHud_AssetFrame(r->object_type, r->frame);
 		if (!asset || asset->classic_w <= 0 || asset->classic_h <= 0)
 			continue;
-		const float size_scale = (float)r->screen_size / 256.0f * r->scale_ref * scale;
-		const float w = asset->classic_w * size_scale;
-		const float h = asset->classic_h * size_scale;
+		float quad[4];
+		fixed_record_quad(r, asset, out_x, out_y, scale, quad);
+		const float w = quad[2];
+		const float h = quad[3];
 		const float a = ((r->argb >> 24) & 255) / 255.0f;
 		AeronDrawList2DSprite sprite = { 0 };
 		sprite.texture = asset->texture;
@@ -1070,8 +1097,8 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 		sprite.src_u1 = r->mirror_x ? asset->u0 : asset->u1;
 		sprite.src_v0 = asset->v0;
 		sprite.src_v1 = asset->v1;
-		sprite.dst_x = out_x + r->center_x_ref * scale - w * 0.5f;
-		sprite.dst_y = out_y + r->center_y_ref * scale - h * 0.5f;
+		sprite.dst_x = quad[0];
+		sprite.dst_y = quad[1];
 		sprite.dst_w = w;
 		sprite.dst_h = h;
 		sprite.tint[0] = XwaRemaster_SrgbToLinear(((r->argb >> 16) & 255) / 255.0f) * a;

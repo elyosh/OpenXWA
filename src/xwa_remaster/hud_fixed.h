@@ -25,6 +25,10 @@ int XwaRemasterHudFixed_ProjectTargetArrow(const XwaSnapshot* snapshot, XwaHudPr
 										   int target_h, XwaHudProjectedArrow* out);
 const XwaHudProjectedArrow* XwaRemasterHudFixed_TargetArrow(void);
 int XwaRemasterHudFixed_ReticleCenter(float* out_x_ref, float* out_y_ref);
+/* The quad (x, y, w, h in target pixels) a record of
+ * XwaRemasterHud_PreparedDrawState draws, as its sprite is placed; 0 when
+ * the record draws nothing. */
+int XwaRemasterHudFixed_RecordQuad(const XwaHudDrawRecord* record, int target_w, int target_h, float quad[4]);
 void XwaRemasterHudFixed_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 								AeronRenderTarget* target, int target_w, int target_h);
 

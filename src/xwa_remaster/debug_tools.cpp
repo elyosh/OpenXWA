@@ -12,6 +12,7 @@
  */
 
 #include "xwa_remaster/debug_tools.h"
+#include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/env_capture.h"
 
 #include "xwa_remaster/environment.h"
@@ -1115,6 +1116,63 @@ static void xwa_tool_cockpit_eye(int* open, void* user) {
 	*open = b ? 1 : 0;
 }
 
+/* ---- Dynamic cockpit ----------------------------------------------- */
+
+static void xwa_tool_dynamic_cockpit(int* open, void* user) {
+	(void)user;
+	ImGui::SetNextWindowSize(ImVec2(520, 520), ImGuiCond_FirstUseEver);
+	bool b = *open != 0;
+	if (!ImGui::Begin("Dynamic Cockpit", &b)) {
+		ImGui::End();
+		*open = b ? 1 : 0;
+		return;
+	}
+	static int highlight = -1;
+	bool boxes = XwaRemasterDc_DebugBoxes() != 0;
+	if (ImGui::Checkbox("Show boxes", &boxes)) {
+		XwaRemasterDc_SetDebugBoxes(boxes ? 1 : 0, highlight);
+	}
+	ImGui::TextDisabled("Sources green (selected yellow), erasable HUD regions red, in render pixels.");
+	if (ImGui::BeginTable("dc_sources", 3,
+						  ImGuiTableFlags_RowBg | ImGuiTableFlags_ScrollY | ImGuiTableFlags_BordersInnerV,
+						  ImVec2(0, 300))) {
+		ImGui::TableSetupColumn("#", ImGuiTableColumnFlags_WidthFixed, 24);
+		ImGui::TableSetupColumn("Source");
+		ImGui::TableSetupColumn("Box (x0, y0, x1, y1)");
+		ImGui::TableHeadersRow();
+		for (unsigned i = 0; i < XWA_DC_SOURCE_COUNT; ++i) {
+			float box[4];
+			const bool placed = XwaRemasterDc_SourceBox(i, box) != 0;
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::Text("%u", i);
+			ImGui::TableNextColumn();
+			if (ImGui::Selectable(XwaRemasterDc_SourceName(i), highlight == (int)i,
+								  ImGuiSelectableFlags_SpanAllColumns)) {
+				highlight = highlight == (int)i ? -1 : (int)i;
+				XwaRemasterDc_SetDebugBoxes(XwaRemasterDc_DebugBoxes(), highlight);
+			}
+			ImGui::TableNextColumn();
+			if (placed)
+				ImGui::Text("%.1f, %.1f, %.1f, %.1f", box[0], box[1], box[2], box[3]);
+			else
+				ImGui::TextDisabled("-");
+		}
+		ImGui::EndTable();
+	}
+	ImGui::SeparatorText("Regions");
+	for (unsigned i = 0; i < XWA_DC_REGION_COUNT; ++i) {
+		float box[4];
+		if (XwaRemasterDc_RegionBox(i, box))
+			ImGui::Text("%2u %-26s %.1f, %.1f, %.1f, %.1f", i, XwaRemasterDc_RegionName(i), box[0], box[1],
+						box[2], box[3]);
+		else
+			ImGui::TextDisabled("%2u %-26s -", i, XwaRemasterDc_RegionName(i));
+	}
+	ImGui::End();
+	*open = b ? 1 : 0;
+}
+
 extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 	(void)user;
 	bool authored = XwaRemasterEnvironment_AuthoredEnvironments() != 0;
@@ -1194,4 +1252,5 @@ extern "C" void XwaRemasterDebugTools_Register(void) {
 	Aeron_DebugRegisterTool("HUD Snapshot", xwa_tool_hud_snapshot, nullptr);
 	Aeron_DebugRegisterTool("Flight Input", xwa_tool_flight_input, nullptr);
 	Aeron_DebugRegisterTool("Cockpit Eye", xwa_tool_cockpit_eye, nullptr);
+	Aeron_DebugRegisterTool("Dynamic Cockpit", xwa_tool_dynamic_cockpit, nullptr);
 }

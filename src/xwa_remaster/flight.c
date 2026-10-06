@@ -1,6 +1,7 @@
 /* Flight-scene HD driver — see xwa_remaster/flight.h. */
 
 #include "xwa_remaster/flight.h"
+#include "xwa_remaster/dynamic_cockpit.h"
 
 #include "aeron/aeron.h"
 #include "aeron/asset/opt_model.h"
@@ -3381,6 +3382,7 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	XwaRemasterHud_RenderCmd(cmd, pass, target, target_w, target_h);
 	Aeron_GpuDebugMarker(cmd, "HUD text");
 	XwaRemasterHud_RenderText(cmd, pass, target, target_w, target_h);
+	XwaRemasterDc_RenderDebugOverlay(cmd, pass, target);
 	if (s.map_present) {
 		Aeron_GpuDebugMarker(cmd, "Flight map deferred text");
 		XwaRemasterFlightMap_RenderDeferredText(cmd, pass, target);
@@ -4013,6 +4015,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	memcpy(s.origin_world, flight_view.origin_world, sizeof s.origin_world);
 	memcpy(s.camera_local, flight_view.camera.pos, sizeof s.camera_local);
 	XwaRemasterHud_PrepareFrame(cmd, snap, assets, &flight_view, s.rt_w, s.rt_h);
+	XwaRemasterDc_Prepare(snap, s.rt_w, s.rt_h);
+	XwaRemasterDc_PrepareDebugOverlay(cmd, s.rt_w, s.rt_h);
 	fl_quat_to_mat3(flight_view.camera.ori, s.crows);
 	const uint64_t host_time_us = XwaTime_GetElapsedUs();
 	if (cam->map_mode) {

@@ -1,4 +1,5 @@
 #include "xwa_remaster/hud.h"
+#include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/hud_boxes.h"
 #include "xwa_remaster/hud_cmd.h"
 #include "xwa_remaster/hud_fixed.h"
@@ -193,6 +194,14 @@ int XwaRemasterHud_Init(AeronVfs* vfs) {
 		Aeron_LogError("xwa.hud", "pane-glyph draw list initialization failed");
 		return 0;
 	}
+	if (!XwaRemasterDc_Init()) {
+		XwaRemasterHudText_Shutdown();
+		XwaRemasterHudCmd_Shutdown();
+		XwaRemasterHudBoxes_Shutdown();
+		XwaRemasterHudFixed_Shutdown();
+		Aeron_LogError("xwa.hud", "dynamic cockpit initialization failed");
+		return 0;
+	}
 	hud_initialized = 1;
 	return 1;
 }
@@ -200,6 +209,7 @@ int XwaRemasterHud_Init(AeronVfs* vfs) {
 const XwaHudLayout* XwaRemasterHud_Layout(void) { return hud_initialized ? &hud_layout : NULL; }
 
 void XwaRemasterHud_Shutdown(void) {
+	XwaRemasterDc_Shutdown();
 	XwaRemasterHudText_Shutdown();
 	XwaRemasterHudCmd_Shutdown();
 	XwaRemasterHudBoxes_Shutdown();
