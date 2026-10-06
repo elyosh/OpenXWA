@@ -6,7 +6,15 @@
  * root is built from that GLB for simulation and rendering instead of its
  * OPT. The replacement set is fixed by XwaModelSource_Init. A key is the
  * model file's basename without extension, lower-cased
- * ("FlightModels\\XWing.opt" -> "xwing"). */
+ * ("FlightModels\\XWing.opt" -> "xwing").
+ *
+ * remaster/models/model_map.yaml (optional) names a different GLB for a key,
+ * for model sets that rename stock models:
+ *   version: 1
+ *   models:
+ *     tunaboat2: mediumtransport
+ * Craft, exterior, cockpit and equipment keys are all mapped explicitly; a key
+ * keeps its identity everywhere else (roles, simulation, render registry). */
 
 #include "xwa/assets/file_io.h"
 
@@ -31,7 +39,9 @@ void XwaModelSource_Configure(int replacementsEnabled);
 /* Builds the replacement set once the VFS is ready. */
 void XwaModelSource_Init(void);
 /* Writes the asset-root path of `key`'s replacement GLB
-   ("remaster/models/<key>.glb"). Returns 0 when it does not fit. */
+   ("remaster/models/<glb key>.glb"), where the GLB key is the key's entry in
+   remaster/models/model_map.yaml, or the key itself. Returns 0 when it does
+   not fit. */
 int XwaModelSource_GlbPath(const char* key, char* path, size_t pathSize);
 /* `glbPath` (optional) receives the asset-root path of the GLB when the
    result is XWA_MODEL_SOURCE_GLB. */
