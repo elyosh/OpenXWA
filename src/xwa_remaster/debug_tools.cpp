@@ -1058,6 +1058,48 @@ static void xwa_tool_flight_input(int* open, void* user) {
 	*open = b ? 1 : 0;
 }
 
+/* ---- Cockpit eye ---------------------------------------------------- */
+
+static void xwa_tool_cockpit_eye(int* open, void* user) {
+	(void)user;
+	ImGui::SetNextWindowSize(ImVec2(430, 190), ImGuiCond_FirstUseEver);
+	bool b = *open != 0;
+	if (!ImGui::Begin("Cockpit Eye", &b)) {
+		ImGui::End();
+		*open = b ? 1 : 0;
+		return;
+	}
+
+	static int edit[3];
+	static int edit_model = -1;
+	int model = -1;
+	int eye[3];
+	if (FlightDebug_GetPlayerCockpitEye(&model, eye)) {
+		if (model != edit_model) {
+			edit_model = model;
+			memcpy(edit, eye, sizeof edit);
+		}
+		ImGui::Text("Player model %d: X=%d Y=%d Z=%d", model, eye[0], eye[1], eye[2]);
+		ImGui::InputInt3("X, Y, Z", edit);
+		if (ImGui::Button("Apply")) {
+			FlightDebug_SetPlayerCockpitEye(edit);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Restore")) {
+			FlightDebug_RestorePlayerCockpitEye();
+			FlightDebug_GetPlayerCockpitEye(&model, edit);
+		}
+	} else {
+		edit_model = -1;
+		ImGui::TextDisabled("No player craft.");
+	}
+	ImGui::TextDisabled("Craft-table cockpit eye (+0x238), the values XWAU's CockpitPovX/Y/Z\n"
+						"set. Edits last until the model is reloaded.");
+
+	ImGui::End();
+	*open = b ? 1 : 0;
+}
+
 extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 	(void)user;
 	bool authored = XwaRemasterEnvironment_AuthoredEnvironments() != 0;
@@ -1136,4 +1178,5 @@ extern "C" void XwaRemasterDebugTools_Register(void) {
 	Aeron_DebugRegisterTool("HDR & Display", xwa_tool_hdr, nullptr);
 	Aeron_DebugRegisterTool("HUD Snapshot", xwa_tool_hud_snapshot, nullptr);
 	Aeron_DebugRegisterTool("Flight Input", xwa_tool_flight_input, nullptr);
+	Aeron_DebugRegisterTool("Cockpit Eye", xwa_tool_cockpit_eye, nullptr);
 }

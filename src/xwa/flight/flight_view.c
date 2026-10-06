@@ -2644,6 +2644,68 @@ void FlightDebug_SetGimbalLockFixEnabled(int enabled) {
 	g_gimbalLockFixEnabled = enabled;
 	Aeron_LogInfo("xwa.input.orientation", "ORIENTFIX state=%s", enabled ? "on" : "off");
 }
+
+/* Debug cockpit-eye override: the original values of the one model edited. */
+static int g_cockpitEyeSavedModel = -1;
+static int16_t g_cockpitEyeSaved[3];
+
+static int FlightDebug_PlayerModelIndex(void) {
+	int objectIdx;
+	ModelIndex modelIndex;
+
+	if (g_localPlayer < 0 || (uint16_t)g_players[g_localPlayer].objectIndex == 0xffffu) {
+		return -1;
+	}
+	objectIdx = (uint16_t)g_players[g_localPlayer].objectIndex;
+	modelIndex = GetModelIndexFromType(g_objectTable[objectIdx].objectType);
+	return modelIndex == 0xffffu ? -1 : (int)modelIndex;
+}
+
+int FlightDebug_GetPlayerCockpitEye(int* modelIndex, int eye[3]) {
+	const int index = FlightDebug_PlayerModelIndex();
+
+	if (index < 0) {
+		return 0;
+	}
+	if (modelIndex) {
+		*modelIndex = index;
+	}
+	eye[0] = g_modelDefs[index].primaryHardpointX;
+	eye[1] = g_modelDefs[index].primaryHardpointY;
+	eye[2] = g_modelDefs[index].primaryHardpointZ;
+	return 1;
+}
+
+int FlightDebug_SetPlayerCockpitEye(const int eye[3]) {
+	const int index = FlightDebug_PlayerModelIndex();
+
+	if (index < 0) {
+		return 0;
+	}
+	if (g_cockpitEyeSavedModel != index) {
+		FlightDebug_RestorePlayerCockpitEye();
+		g_cockpitEyeSavedModel = index;
+		g_cockpitEyeSaved[0] = g_modelDefs[index].primaryHardpointX;
+		g_cockpitEyeSaved[1] = g_modelDefs[index].primaryHardpointY;
+		g_cockpitEyeSaved[2] = g_modelDefs[index].primaryHardpointZ;
+	}
+	g_modelDefs[index].primaryHardpointX = (int16_t)eye[0];
+	g_modelDefs[index].primaryHardpointY = (int16_t)eye[1];
+	g_modelDefs[index].primaryHardpointZ = (int16_t)eye[2];
+	Aeron_LogInfo("xwa.debug", "cockpit eye model=%d X=%d Y=%d Z=%d", index, eye[0], eye[1], eye[2]);
+	return 1;
+}
+
+int FlightDebug_RestorePlayerCockpitEye(void) {
+	if (g_cockpitEyeSavedModel < 0) {
+		return 0;
+	}
+	g_modelDefs[g_cockpitEyeSavedModel].primaryHardpointX = g_cockpitEyeSaved[0];
+	g_modelDefs[g_cockpitEyeSavedModel].primaryHardpointY = g_cockpitEyeSaved[1];
+	g_modelDefs[g_cockpitEyeSavedModel].primaryHardpointZ = g_cockpitEyeSaved[2];
+	g_cockpitEyeSavedModel = -1;
+	return 1;
+}
 #endif
 
 // FUNCTION: XWA 0x5042F0
