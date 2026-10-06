@@ -1127,6 +1127,27 @@ static void xwa_tool_dynamic_cockpit(int* open, void* user) {
 		*open = b ? 1 : 0;
 		return;
 	}
+	XwaRemasterDcSettings settings;
+	XwaRemasterDc_GetSettings(&settings);
+	bool enabled = settings.enabled != 0, classic = settings.classic_hud != 0,
+		 holograms = settings.holograms != 0;
+	bool changed = ImGui::Checkbox("Enabled", &enabled);
+	ImGui::SameLine();
+	changed |= ImGui::Checkbox("Classic HUD", &classic);
+	ImGui::SameLine();
+	changed |= ImGui::Checkbox("Holograms", &holograms);
+	changed |=
+		ImGui::SliderFloat("Display strength", &settings.display_emissive_strength, 0.0f, 8.0f, "%.2f");
+	changed |=
+		ImGui::SliderFloat("Hologram strength", &settings.hologram_emissive_strength, 0.0f, 8.0f, "%.2f");
+	if (changed) {
+		settings.enabled = enabled ? 1 : 0;
+		settings.classic_hud = classic ? 1 : 0;
+		settings.holograms = holograms ? 1 : 0;
+		XwaRemasterDc_SetSettings(&settings);
+	}
+	ImGui::Text("Active: %s", XwaRemasterDc_Active() ? "yes (cockpit with screens)" : "no");
+	ImGui::Separator();
 	static int highlight = -1;
 	bool boxes = XwaRemasterDc_DebugBoxes() != 0;
 	if (ImGui::Checkbox("Show boxes", &boxes)) {

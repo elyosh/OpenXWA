@@ -2,6 +2,7 @@
 
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/dynamic_cockpit.h"
+#include "xwa_remaster/hud_fixed.h"
 
 #include "aeron/aeron.h"
 #include "aeron/asset/opt_model.h"
@@ -1343,6 +1344,7 @@ void XwaRemasterFlight_GetTemporalStats(XwaFlightTemporalStats* out) {
 }
 
 static void fl_destroy_sized_resources(void) {
+	XwaRemasterDc_ReleaseTargets();
 	s.direct_ready = 0;
 	s.present_scene_tex = NULL;
 	s.present_bloom_tex = NULL;
@@ -3366,6 +3368,21 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	if (s.suppress_hud) {
 		return;
 	}
+	if (!s.map_present && XwaRemasterDc_Active()) {
+		/* Dynamic Cockpit (dynamic_cockpit.md D9, D10): panels drawn
+		 * directly, the captured foreground and text minus the regions the
+		 * cockpit's screens show. */
+		Aeron_GpuDebugMarker(cmd, "HUD dynamic cockpit");
+		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
+										 XWA_HUD_TARGET_BOX_BEFORE_FIXED);
+		XwaRemasterHudFixed_RenderPanels(cmd, pass, target);
+		XwaRemasterDc_RenderComposite(cmd, pass, target, 0);
+		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
+										 XWA_HUD_TARGET_BOX_AFTER_FIXED);
+		XwaRemasterDc_RenderComposite(cmd, pass, target, 1);
+		XwaRemasterDc_RenderDebugOverlay(cmd, pass, target);
+		return;
+	}
 	if (!s.map_present) {
 		Aeron_GpuDebugMarker(cmd, "HUD target boxes before fixed");
 		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
@@ -3559,6 +3576,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 		s.snap = NULL;
 		return NULL;
 	}
+	XwaRemasterDc_ApplyToScene(s.scene);
 	s.before_opaque_mode = FL_BEFORE_OPAQUE_HYPERSPACE;
 	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, fl_draw_before_opaque, NULL);
 	/* SSAO remains active for the 3D cockpit. Motion blur is deliberately
@@ -4014,9 +4032,15 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	}
 	memcpy(s.origin_world, flight_view.origin_world, sizeof s.origin_world);
 	memcpy(s.camera_local, flight_view.camera.pos, sizeof s.camera_local);
+	/* Dynamic Cockpit: decided before the HUD prepares its lists (the
+	 * panel split), captured after. */
+	XwaRemasterDc_BeginFrame(snap,
+							 !cam->map_mode && fl_cockpit_drawn(snap, cam)
+								 ? XwaRemasterShip_MeshForName(snap->cockpit.model_name)
+								 : NULL,
+							 s.rt_w, s.rt_h);
 	XwaRemasterHud_PrepareFrame(cmd, snap, assets, &flight_view, s.rt_w, s.rt_h);
-	XwaRemasterDc_Prepare(snap, s.rt_w, s.rt_h);
-	XwaRemasterDc_PrepareDebugOverlay(cmd, s.rt_w, s.rt_h);
+	XwaRemasterDc_Prepare(cmd, snap, s.rt_w, s.rt_h);
 	fl_quat_to_mat3(flight_view.camera.ori, s.crows);
 	const uint64_t host_time_us = XwaTime_GetElapsedUs();
 	if (cam->map_mode) {
@@ -4225,6 +4249,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		s.snap = NULL;
 		return NULL;
 	}
+	XwaRemasterDc_ApplyToScene(s.scene);
 	if (shadows_active) {
 		const AeronSceneDirectionalShadowDesc shadow = {
 			.enabled = 1,

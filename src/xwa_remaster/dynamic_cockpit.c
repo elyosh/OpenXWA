@@ -1,10 +1,14 @@
 #include "xwa_remaster/dynamic_cockpit.h"
 
+#include "aeron/log.h"
 #include "aeron/scene/draw_list2d.h"
+#include "xwa/assets/object_type.h"
+#include "xwa_remaster/color.h"
 #include "xwa_remaster/hud.h"
 #include "xwa_remaster/hud_fixed.h"
 #include "xwa_remaster/hud_layout.h"
 
+#include <math.h>
 #include <string.h>
 
 /* Modern port module; no original counterpart (dynamic_cockpit.h). */
@@ -149,20 +153,89 @@ static struct {
 	int overlay_enabled;
 	int overlay_highlight;
 	int overlay_prepared;
+	/* Settings (XwaRemasterDcSettings). */
+	XwaRemasterDcSettings settings;
+	/* Frame state: active this frame, the cockpit's hide mask and the
+	 * regions erased from the 2D HUD. */
+	int active;
+	uint32_t hide_mask;
+	uint32_t erased;
+	/* Capture targets (G graphics, T text) at the HUD's target size. */
+	AeronRenderTarget* graphics_rt;
+	AeronRenderTarget* text_rt;
+	int rt_w, rt_h;
+	int warm_pending;
+	/* Display inputs and the 2D HUD composite (G, T) of this frame. */
+	AeronSceneScreenFrame frame;
+	AeronDrawList2D* composite[2];
+	int composite_prepared;
+	/* Hologram animation, advanced by game time. */
+	float holo_time, holo_fade;
+	int32_t last_game_ms;
+	int have_game_ms;
 } dc;
+
+/* dynamic_cockpit.md D19, D28, D34: display text starts at the OPT
+ * cockpit lights' strength. */
+static const XwaRemasterDcSettings dc_default_settings = {
+	.enabled = 1,
+	.classic_hud = 0,
+	.holograms = 1,
+	.display_emissive_strength = 1.5f,
+	.hologram_emissive_strength = 1.5f,
+};
 
 int XwaRemasterDc_Init(void) {
 	if (!dc.overlay)
 		dc.overlay = AeronDrawList_Create(0);
+	for (int i = 0; i < 2; ++i)
+		if (!dc.composite[i])
+			dc.composite[i] = AeronDrawList_Create(1024);
 	dc.overlay_highlight = -1;
-	return dc.overlay != NULL;
+	if (!dc.settings.display_emissive_strength)
+		dc.settings = dc_default_settings;
+	dc.holo_fade = dc.settings.holograms ? 1.0f : 0.0f;
+	return dc.overlay != NULL && dc.composite[0] != NULL && dc.composite[1] != NULL;
+}
+
+void XwaRemasterDc_ReleaseTargets(void) {
+	if (dc.graphics_rt)
+		Aeron_DestroyRenderTarget(dc.graphics_rt);
+	if (dc.text_rt)
+		Aeron_DestroyRenderTarget(dc.text_rt);
+	dc.graphics_rt = dc.text_rt = NULL;
+	dc.rt_w = dc.rt_h = 0;
+	dc.active = 0;
 }
 
 void XwaRemasterDc_Shutdown(void) {
+	XwaRemasterDc_ReleaseTargets();
 	if (dc.overlay)
 		AeronDrawList_Destroy(dc.overlay);
+	for (int i = 0; i < 2; ++i)
+		if (dc.composite[i])
+			AeronDrawList_Destroy(dc.composite[i]);
+	const XwaRemasterDcSettings settings = dc.settings;
 	memset(&dc, 0, sizeof dc);
+	dc.settings = settings;
 }
+
+void XwaRemasterDc_GetSettings(XwaRemasterDcSettings* out) {
+	if (out)
+		*out = dc.settings.display_emissive_strength ? dc.settings : dc_default_settings;
+}
+
+void XwaRemasterDc_SetSettings(const XwaRemasterDcSettings* settings) {
+	if (settings)
+		dc.settings = *settings;
+}
+
+void XwaRemasterDc_ToggleHolograms(void) {
+	dc.settings.holograms = !dc.settings.holograms;
+	Aeron_LogInfo("xwa.remaster", "dynamic cockpit holograms %s", dc.settings.holograms ? "on" : "off");
+}
+
+int XwaRemasterDc_Active(void) { return dc.active; }
 
 /* The quad (x0, y0, x1, y1) each image anchor's record covers this frame. */
 static void dc_image_anchors(int target_w, int target_h, float quads[DC_ANCHOR_IMAGE_COUNT][4],
@@ -242,8 +315,70 @@ static int dc_place(const DcRect* rect, const float quads[DC_ANCHOR_IMAGE_COUNT]
 	}
 }
 
-void XwaRemasterDc_Prepare(const XwaSnapshot* snapshot, int target_w, int target_h) {
-	(void)snapshot;
+/* ---- Frame -------------------------------------------------------- */
+
+static int dc_ensure_targets(int target_w, int target_h) {
+	if (dc.graphics_rt && dc.rt_w == target_w && dc.rt_h == target_h)
+		return 1;
+	XwaRemasterDc_ReleaseTargets();
+	dc.graphics_rt =
+		Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = target_w,
+															.height = target_h,
+															.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
+															.debug_name = "xwa.dc.graphics" });
+	dc.text_rt =
+		Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = target_w,
+															.height = target_h,
+															.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
+															.debug_name = "xwa.dc.text" });
+	if (!dc.graphics_rt || !dc.text_rt) {
+		Aeron_LogError("xwa.remaster", "dynamic cockpit capture targets failed at %dx%d", target_w, target_h);
+		XwaRemasterDc_ReleaseTargets();
+		return 0;
+	}
+	dc.rt_w = target_w;
+	dc.rt_h = target_h;
+	/* Capture once now so the draw-list pipelines for this format are made
+	 * with the other flight pipelines, not when the cockpit first shows. */
+	dc.warm_pending = 1;
+	return 1;
+}
+
+void XwaRemasterDc_BeginFrame(const XwaSnapshot* snapshot, const AeronSceneMesh* cockpit_mesh, int target_w,
+							  int target_h) {
+	dc.active = 0;
+	dc.erased = 0;
+	dc.hide_mask = 0;
+	if (!dc.settings.enabled || target_w <= 0 || target_h <= 0) {
+		XwaRemasterDc_ReleaseTargets();
+	} else if (dc_ensure_targets(target_w, target_h) && cockpit_mesh &&
+			   (cockpit_mesh->screen_rect_count > 0 || cockpit_mesh->screen_hide_mask != 0)) {
+		dc.active = 1;
+		dc.hide_mask = cockpit_mesh->screen_hide_mask;
+		dc.erased = dc.settings.classic_hud ? 0u : dc.hide_mask & ((1u << XWA_DC_REGION_COUNT) - 1u);
+	}
+	XwaRemasterHudFixed_SetPanelSplit(dc.active, dc.erased);
+
+	/* Hologram time and fade follow game time, so they hold while paused
+	 * (dynamic_cockpit.md D30: XWAU's 0.04 per frame at 60 fps). */
+	float dt = 0.0f;
+	if (snapshot) {
+		if (dc.have_game_ms && snapshot->game_time_ms >= dc.last_game_ms)
+			dt = (float)(snapshot->game_time_ms - dc.last_game_ms) * 0.001f;
+		dc.last_game_ms = snapshot->game_time_ms;
+		dc.have_game_ms = 1;
+	}
+	if (dt > 0.25f)
+		dt = 0.25f;
+	dc.holo_time += dt;
+	const float target_fade = dc.settings.holograms ? 1.0f : 0.0f;
+	if (dc.holo_fade < target_fade)
+		dc.holo_fade = fminf(target_fade, dc.holo_fade + 2.4f * dt);
+	else if (dc.holo_fade > target_fade)
+		dc.holo_fade = fmaxf(target_fade, dc.holo_fade - 2.4f * dt);
+}
+
+static void dc_place_boxes(int target_w, int target_h) {
 	dc.source_valid = 0;
 	dc.region_valid = 0;
 	if (target_w <= 0 || target_h <= 0)
@@ -257,6 +392,180 @@ void XwaRemasterDc_Prepare(const XwaSnapshot* snapshot, int target_w, int target
 	for (unsigned i = 0; i < XWA_DC_REGION_COUNT; ++i)
 		if (dc_place(&dc_regions[i], quads, quads_valid, dc.region_box[i]))
 			dc.region_valid |= 1u << i;
+}
+
+/* The display inputs (AeronSceneScreenFrame) of this frame. */
+static void dc_build_frame(const XwaSnapshot* snapshot, int target_w, int target_h) {
+	AeronSceneScreenFrame* f = &dc.frame;
+	memset(f, 0, sizeof *f);
+	for (unsigned i = 0; i < XWA_DC_SOURCE_COUNT; ++i) {
+		if (!(dc.source_valid & ((uint64_t)1 << i)))
+			continue;
+		f->valid[i >> 5] |= 1u << (i & 31u);
+		f->source[i][0] = dc.source_box[i][0] / (float)target_w;
+		f->source[i][1] = dc.source_box[i][1] / (float)target_h;
+		f->source[i][2] = dc.source_box[i][2] / (float)target_w;
+		f->source[i][3] = dc.source_box[i][3] / (float)target_h;
+	}
+	const XwaHudState* hud = snapshot ? &snapshot->hud : NULL;
+	/* D17: the backgrounds the reticle frames follow in hud_fixed.c. */
+	if (hud && hud->target.valid && hud->reticle.missile_lock_state == 3)
+		f->color_state = 2u;
+	else if (hud && hud->reticle.in_range)
+		f->color_state = 1u;
+	f->flags = dc.settings.classic_hud ? AERON_SCENE_SCREEN_HIDE_TRANSPARENT : AERON_SCENE_SCREEN_BAR_VISIBLE;
+	f->display_strength = dc.settings.display_emissive_strength;
+	/* CraftData.throttleSpeed (0xF0), XWAU's EngineThrottleInput. */
+	f->bar_level = hud ? (float)hud->instruments.throttle_speed / 65535.0f : 0.0f;
+	f->holo_time = dc.holo_time;
+	f->holo_fade = dc.holo_fade;
+	const uint32_t hud_color = hud ? hud->hud_colors[0] : 0xff00ff00u;
+	f->holo_color[0] = XwaRemaster_SrgbToLinear(((hud_color >> 16) & 255u) / 255.0f);
+	f->holo_color[1] = XwaRemaster_SrgbToLinear(((hud_color >> 8) & 255u) / 255.0f);
+	f->holo_color[2] = XwaRemaster_SrgbToLinear((hud_color & 255u) / 255.0f);
+	f->holo_color[3] = dc.settings.hologram_emissive_strength;
+}
+
+/* The 2D HUD composite: G and T drawn over the target minus the erased
+ * regions, as sprites over the cells of the grid the region edges make. */
+static void dc_prepare_composite(AeronCommandBuffer* cmd, int target_w, int target_h) {
+	dc.composite_prepared = 0;
+	float xs[2 + 2 * XWA_DC_REGION_COUNT], ys[2 + 2 * XWA_DC_REGION_COUNT];
+	float erase[XWA_DC_REGION_COUNT][4];
+	int nx = 0, ny = 0, ne = 0;
+	xs[nx++] = 0.0f;
+	xs[nx++] = (float)target_w;
+	ys[ny++] = 0.0f;
+	ys[ny++] = (float)target_h;
+	for (unsigned i = 0; i < XWA_DC_REGION_COUNT; ++i) {
+		if (!(dc.erased & dc.region_valid & (1u << i)))
+			continue;
+		float* e = erase[ne++];
+		e[0] = fmaxf(0.0f, fminf((float)target_w, fminf(dc.region_box[i][0], dc.region_box[i][2])));
+		e[2] = fmaxf(0.0f, fminf((float)target_w, fmaxf(dc.region_box[i][0], dc.region_box[i][2])));
+		e[1] = fmaxf(0.0f, fminf((float)target_h, fminf(dc.region_box[i][1], dc.region_box[i][3])));
+		e[3] = fmaxf(0.0f, fminf((float)target_h, fmaxf(dc.region_box[i][1], dc.region_box[i][3])));
+		xs[nx++] = e[0];
+		xs[nx++] = e[2];
+		ys[ny++] = e[1];
+		ys[ny++] = e[3];
+	}
+	/* Sort and dedupe the edges (at most 24 each). */
+	for (int i = 1; i < nx; ++i)
+		for (int j = i; j > 0 && xs[j] < xs[j - 1]; --j) {
+			const float v = xs[j];
+			xs[j] = xs[j - 1];
+			xs[j - 1] = v;
+		}
+	for (int i = 1; i < ny; ++i)
+		for (int j = i; j > 0 && ys[j] < ys[j - 1]; --j) {
+			const float v = ys[j];
+			ys[j] = ys[j - 1];
+			ys[j - 1] = v;
+		}
+	AeronTexture* textures[2] = { Aeron_RenderTargetGetTexture(dc.graphics_rt),
+								  Aeron_RenderTargetGetTexture(dc.text_rt) };
+	if (!textures[0] || !textures[1])
+		return;
+	for (int layer = 0; layer < 2; ++layer)
+		AeronDrawList_Begin(dc.composite[layer], NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	for (int row = 0; row + 1 < ny; ++row) {
+		const float y0 = ys[row], y1 = ys[row + 1];
+		if (y1 <= y0)
+			continue;
+		int run_start = -1;
+		for (int col = 0; col + 1 <= nx; ++col) {
+			int keep = 0;
+			if (col + 1 < nx && xs[col + 1] > xs[col]) {
+				const float cx = 0.5f * (xs[col] + xs[col + 1]), cy = 0.5f * (y0 + y1);
+				keep = 1;
+				for (int e = 0; e < ne && keep; ++e)
+					keep = !(cx > erase[e][0] && cx < erase[e][2] && cy > erase[e][1] && cy < erase[e][3]);
+			} else if (col + 1 < nx) {
+				keep = run_start >= 0; /* zero-width cell: continue the run */
+			}
+			if (keep && run_start < 0)
+				run_start = col;
+			if (!keep && run_start >= 0) {
+				const float x0 = xs[run_start], x1 = xs[col];
+				for (int layer = 0; layer < 2; ++layer) {
+					AeronDrawList2DSprite sprite = { 0 };
+					sprite.texture = textures[layer];
+					sprite.src_u0 = x0 / (float)target_w;
+					sprite.src_u1 = x1 / (float)target_w;
+					sprite.src_v0 = y0 / (float)target_h;
+					sprite.src_v1 = y1 / (float)target_h;
+					sprite.dst_x = x0;
+					sprite.dst_y = y0;
+					sprite.dst_w = x1 - x0;
+					sprite.dst_h = y1 - y0;
+					sprite.tint[0] = sprite.tint[1] = sprite.tint[2] = sprite.tint[3] = 1.0f;
+					sprite.blend = AERON_BLIT2D_BLEND_PMA;
+					sprite.filter = AERON_BLIT2D_FILTER_NEAREST;
+					AeronDrawList_AddSprite(dc.composite[layer], &sprite);
+				}
+				run_start = -1;
+			}
+		}
+	}
+	dc.composite_prepared =
+		AeronDrawList_Prepare(dc.composite[0], cmd) && AeronDrawList_Prepare(dc.composite[1], cmd);
+}
+
+/* Draws the HUD's foreground and text into G and T. */
+static void dc_capture(AeronCommandBuffer* cmd, int target_w, int target_h) {
+	AeronRenderPass* pass =
+		Aeron_BeginRenderPass(&(AeronRenderPassDesc) { .color_target = dc.graphics_rt,
+													   .clear_color = 1,
+													   .clear_color_rgba = { 0, 0, 0, 0 },
+													   .command_buffer = cmd,
+													   .debug_label = "OpenXWA DC graphics" });
+	if (pass) {
+		XwaRemasterHud_RenderFixed(cmd, pass, dc.graphics_rt, target_w, target_h);
+		XwaRemasterHud_RenderCmd(cmd, pass, dc.graphics_rt, target_w, target_h);
+		Aeron_EndRenderPass(pass);
+	}
+	pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) { .color_target = dc.text_rt,
+														  .clear_color = 1,
+														  .clear_color_rgba = { 0, 0, 0, 0 },
+														  .command_buffer = cmd,
+														  .debug_label = "OpenXWA DC text" });
+	if (pass) {
+		XwaRemasterHud_RenderText(cmd, pass, dc.text_rt, target_w, target_h);
+		Aeron_EndRenderPass(pass);
+	}
+}
+
+void XwaRemasterDc_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot, int target_w, int target_h) {
+	dc.source_valid = 0;
+	dc.region_valid = 0;
+	dc.composite_prepared = 0;
+	if (target_w <= 0 || target_h <= 0)
+		return;
+	dc_place_boxes(target_w, target_h);
+	if (cmd && dc.graphics_rt && (dc.active || dc.warm_pending)) {
+		dc_capture(cmd, target_w, target_h);
+		dc.warm_pending = 0;
+	}
+	if (cmd && dc.active) {
+		dc_build_frame(snapshot, target_w, target_h);
+		dc_prepare_composite(cmd, target_w, target_h);
+	}
+	XwaRemasterDc_PrepareDebugOverlay(cmd, target_w, target_h);
+}
+
+void XwaRemasterDc_ApplyToScene(AeronScene3D* scene) {
+	if (dc.active && dc.graphics_rt && dc.text_rt)
+		AeronScene_SetScreenSources(scene, Aeron_RenderTargetGetTexture(dc.graphics_rt),
+									Aeron_RenderTargetGetTexture(dc.text_rt), &dc.frame);
+	else
+		AeronScene_SetScreenSources(scene, NULL, NULL, NULL);
+}
+
+void XwaRemasterDc_RenderComposite(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+								   int layer) {
+	if (dc.active && dc.composite_prepared && layer >= 0 && layer < 2 && cmd && pass && target)
+		AeronDrawList_RenderIntoPass(dc.composite[layer], cmd, pass, target);
 }
 
 int XwaRemasterDc_SourceBox(unsigned source, float box[4]) {

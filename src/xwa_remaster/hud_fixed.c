@@ -14,6 +14,11 @@
 #include <string.h>
 
 static AeronDrawList2D* fixed_list;
+/* Panel split (XwaRemasterHudFixed_SetPanelSplit): panel records go to
+ * fixed_panel_list, or nowhere when their region is erased. */
+static AeronDrawList2D* fixed_panel_list;
+static int fixed_split;
+static uint32_t fixed_split_erased;
 static XwaHudPreparedDrawState fixed_draws;
 static const XwaSnapshot* fixed_snapshot;
 static float fixed_hud_unit_scale = 1.0f;
@@ -962,12 +967,18 @@ static void fixed_build_reticle_threats(const XwaHudState* h, const XwaRemasterH
 int XwaRemasterHudFixed_Init(void) {
 	if (!fixed_list)
 		fixed_list = AeronDrawList_Create(XWA_HUD_MAX_FIXED_DRAWS);
-	return fixed_list != NULL;
+	if (!fixed_panel_list)
+		fixed_panel_list = AeronDrawList_Create(64);
+	return fixed_list != NULL && fixed_panel_list != NULL;
 }
 
 void XwaRemasterHudFixed_Shutdown(void) {
 	AeronDrawList_Destroy(fixed_list);
 	fixed_list = NULL;
+	AeronDrawList_Destroy(fixed_panel_list);
+	fixed_panel_list = NULL;
+	fixed_split = 0;
+	fixed_split_erased = 0;
 	fixed_snapshot = NULL;
 	fixed_hud_unit_scale = 1.0f;
 	fixed_classic_pixel_scale = 1.0f;
@@ -1060,24 +1071,68 @@ int XwaRemasterHudFixed_RecordQuad(const XwaHudDrawRecord* r, int target_w, int 
 	return 1;
 }
 
+void XwaRemasterHudFixed_SetPanelSplit(int enabled, uint32_t erased_regions) {
+	fixed_split = enabled != 0;
+	fixed_split_erased = enabled ? erased_regions : 0u;
+}
+
+/* The XWAU Dynamic Cockpit region (dynamic_cockpit.c) whose panel image a
+ * record draws, or -1: the HUD.dat images xwa_ddraw_d3d11 renders to its
+ * background layer (is_DC_HUDRegionSrc). */
+static int fixed_panel_region(const XwaHudDrawRecord* r) {
+	if (r->object_type != OBJ_HudTextureGroup12000)
+		return -1;
+	switch ((XwaHudWidgetId)r->widget) {
+		case XWA_HUD_WIDGET_FORE_RADAR_SCOPE:
+			return r->frame == 45 ? 0 : -1; /* 4500 */
+		case XWA_HUD_WIDGET_AFT_RADAR_SCOPE:
+			return r->frame == 46 || r->frame == 4 ? 1 : -1; /* 4600, 400 */
+		case XWA_HUD_WIDGET_SHIELD_HULL:
+			return r->frame == 43 ? 2 : -1; /* 4300 */
+		case XWA_HUD_WIDGET_BEAM:
+			return r->frame == 44 ? 3 : -1; /* 4400 */
+		case XWA_HUD_WIDGET_CMD_FRAME:
+			return r->frame == 11 ? 4 : -1; /* 1100 */
+		case XWA_HUD_WIDGET_LASER_CHARGE:
+		case XWA_HUD_WIDGET_ION_CHARGE:
+			return r->frame == 23 || r->frame == 25 ? 4 : -1; /* 2300, 2500 boxes */
+		case XWA_HUD_WIDGET_MFD_LEFT_FRAME:
+			return r->frame == 1 || r->frame == 2 ? 5 : -1; /* 100, 200 */
+		case XWA_HUD_WIDGET_MFD_RIGHT_FRAME:
+			return r->frame == 1 || r->frame == 2 ? 6 : -1;
+		case XWA_HUD_WIDGET_FORE_RADAR_FRAME:
+			return r->frame == 27 ? 7 : -1; /* 2700 */
+		case XWA_HUD_WIDGET_AFT_RADAR_FRAME:
+			return r->frame == 28 ? 8 : -1; /* 2800 */
+		default:
+			return -1;
+	}
+}
+
+static void fixed_prepare_lists(AeronCommandBuffer* cmd) {
+	(void)AeronDrawList_Prepare(fixed_list, cmd);
+	(void)AeronDrawList_Prepare(fixed_panel_list, cmd);
+}
+
 void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, int target_h) {
-	if (!cmd || !fixed_list || target_w <= 0 || target_h <= 0)
+	if (!cmd || !fixed_list || !fixed_panel_list || target_w <= 0 || target_h <= 0)
 		return;
 	AeronDrawList_Begin(fixed_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_Begin(fixed_panel_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	if (!fixed_draws.valid) {
-		(void)AeronDrawList_Prepare(fixed_list, cmd);
+		fixed_prepare_lists(cmd);
 		return;
 	}
 	const XwaHudLayoutProfile* profile = fixed_profile((XwaHudProfileIndex)fixed_draws.profile);
 	if (!profile) {
-		(void)AeronDrawList_Prepare(fixed_list, cmd);
+		fixed_prepare_lists(cmd);
 		return;
 	}
 	int out_x, out_y;
 	float scale;
 	XwaRemasterHudLayout_OutputTransform(profile, target_w, target_h, &out_x, &out_y, &scale);
 	if (scale <= 0.0f) {
-		(void)AeronDrawList_Prepare(fixed_list, cmd);
+		fixed_prepare_lists(cmd);
 		return;
 	}
 	XwaRemasterHud_BeginRenderPhase();
@@ -1086,6 +1141,13 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 		const XwaAssetRef* asset = XwaRemasterHud_AssetFrame(r->object_type, r->frame);
 		if (!asset || asset->classic_w <= 0 || asset->classic_h <= 0)
 			continue;
+		AeronDrawList2D* list = fixed_list;
+		const int region = fixed_split ? fixed_panel_region(r) : -1;
+		if (region >= 0) {
+			if (fixed_split_erased & (1u << region))
+				continue;
+			list = fixed_panel_list;
+		}
 		float quad[4];
 		fixed_record_quad(r, asset, out_x, out_y, scale, quad);
 		const float w = quad[2];
@@ -1134,13 +1196,13 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 			quad.texture = sprite.texture;
 			quad.blend = sprite.blend;
 			quad.filter = sprite.filter;
-			AeronDrawList_AddQuad4(fixed_list, &quad);
+			AeronDrawList_AddQuad4(list, &quad);
 		} else {
-			AeronDrawList_AddSprite(fixed_list, &sprite);
+			AeronDrawList_AddSprite(list, &sprite);
 		}
 	}
 	XwaRemasterHud_EndRenderPhase();
-	(void)AeronDrawList_Prepare(fixed_list, cmd);
+	fixed_prepare_lists(cmd);
 }
 
 void XwaRemasterHudFixed_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
@@ -1149,6 +1211,13 @@ void XwaRemasterHudFixed_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, 
 		target_h <= 0)
 		return;
 	AeronDrawList_RenderIntoPass(fixed_list, cmd, pass, target);
+}
+
+void XwaRemasterHudFixed_RenderPanels(AeronCommandBuffer* cmd, AeronRenderPass* pass,
+									  AeronRenderTarget* target) {
+	if (!cmd || !pass || !target || !fixed_panel_list || !fixed_draws.valid || !fixed_split)
+		return;
+	AeronDrawList_RenderIntoPass(fixed_panel_list, cmd, pass, target);
 }
 
 const XwaHudPreparedDrawState* XwaRemasterHud_PreparedDrawState(void) { return &fixed_draws; }
