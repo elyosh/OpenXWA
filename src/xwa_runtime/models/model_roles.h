@@ -4,8 +4,8 @@
 /* Component roles: recovered code that reaches a model's component by a fixed
  * number names it through XWA_MODEL_ROLE instead. A stock model keeps the
  * stock number; a GLB replacement supplies the component through a
- * `<model>.<part>` tag, so its layout is free. The synthesizer rejects a
- * replacement that lacks a required role.
+ * `<model>.<part>` tag, so its layout is free. The synthesizer warns about a
+ * replacement that lacks a role, which then resolves to the stock number.
  *
  * Recovered sources include this header in every build. Outside XWA_MODERN
  * the macro is the stock number, so the original code is unchanged. */
@@ -86,8 +86,9 @@ int XwaModelRole_Collect(unsigned short objectType, XwaModelRole role, int* comp
 	XwaModelRole_Resolve((unsigned short)(objectType), (role), (stockComponent))
 
 struct AeronFlightModel;
-/* Checks that replacement `key` carries every role required of it: each
-   single role on exactly one component. Writes the reason on failure. */
+/* Warns when replacement `key` does not carry each of its single roles on
+   exactly one component. Never rejects the model: a missing role resolves to
+   the stock component number. `reason` is unused. */
 int XwaModelRole_Validate(const char* key, const struct AeronFlightModel* model, char* reason,
 						  unsigned int reasonSize);
 #else

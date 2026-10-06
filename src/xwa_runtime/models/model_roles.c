@@ -13,7 +13,7 @@
 /* Modern port module; no original counterpart. */
 
 typedef enum ModelRoleKind {
-	MODEL_ROLE_SINGLE, /* exactly one component; required */
+	MODEL_ROLE_SINGLE, /* one component; warned about when missing or repeated */
 	MODEL_ROLE_SET,    /* any number of components; optional */
 } ModelRoleKind;
 
@@ -99,13 +99,21 @@ int XwaModelRole_Validate(const char* key, const struct AeronFlightModel* model,
 		if (info->kind != MODEL_ROLE_SINGLE || !ModelRole_AppliesTo(info, key)) {
 			continue;
 		}
+		/* The model still loads: a missing role falls back to the stock
+		   component number, a repeated one resolves to its first carrier. Stock
+		   numbers index the craft's per-component arrays, which every model
+		   has, so the fallback is memory safe; it only animates or targets
+		   whatever component sits at that number. */
 		carriers = Aeron_FlightModelCountTag(model, info->tag);
 		if (carriers != 1) {
-			snprintf(reason, reasonSize, "needs exactly one component tagged '%s' (found %u)", info->tag,
-					 carriers);
-			return 0;
+			Aeron_LogWarn("xwa.models",
+						  "replacement '%s' should tag exactly one component '%s' (found %u); %s", key,
+						  info->tag, carriers,
+						  carriers ? "the first one is used" : "the stock component number is used");
 		}
 	}
+	(void)reason;
+	(void)reasonSize;
 	return 1;
 }
 
@@ -142,9 +150,7 @@ int XwaModelRole_Resolve(unsigned short objectType, XwaModelRole role, int stock
 	if (OptSynth_IsSynthesized(model)) {
 		component = OptSynth_FindModelComponentByTag(model, s_roles[role].tag);
 		if (component < 0) {
-			/* Validation makes required roles present; keep memory safe. */
-			Aeron_LogError("xwa.models", "replacement for object type %u lacks role '%s'",
-						   (unsigned)objectType, s_roles[role].tag);
+			/* Validation warned once at load; this runs per frame. */
 			component = stockComponent;
 		}
 	}
