@@ -260,9 +260,11 @@ typedef struct CraftData {
 	uint8_t               systemDisplaySlotBySystem[11];
 	uint16_t              systemHealth[11];
 	uint16_t              systemTimer[11];
-	uint8_t               componentState[50];
-	uint8_t               meshRotation[50];
-	uint8_t               componentHp[50];
+	/* Grown in place by the modern build (XWA_CRAFT_*_COUNT); the original
+	 * sizes are 50, 50, 50, 16 and 16. */
+	uint8_t componentState[XWA_CRAFT_MESH_SLOT_COUNT];
+	uint8_t meshRotation[XWA_CRAFT_MESH_SLOT_COUNT];
+	uint8_t componentHp[XWA_CRAFT_MESH_SLOT_COUNT];
 	int16_t               playerCommandAvoidTargetObjIdx;
 	uint8_t               followPlayerMode;
 	uint8_t               followPlayerIdx;
@@ -271,14 +273,26 @@ typedef struct CraftData {
 	uint8_t               savedCurrentPlan;
 	uint8_t               savedPendingPlan;
 	uint16_t              followTimer;
-	uint8_t               engineEmitterHealth[16];
-	WarheadInventoryEntry warheadData[16];
+	uint8_t engineEmitterHealth[XWA_CRAFT_ENGINE_EMITTER_COUNT];
+	WarheadInventoryEntry warheadData[XWA_CRAFT_WEAPON_SLOT_COUNT];
 	TurretAimState        turretAim;
 	char                  specialCargoName[20];
 	uint8_t               reserved3ED[8];
+#ifdef XWA_MODERN
+	/* The original keeps the animated-texture frame / wreck-flame byte in
+	 * componentState[49], which a model with 50+ meshes uses as a mesh. */
+	uint8_t animatedTextureFrame;
+#endif
 	ObjectRecord*         effectiveAiObjectLink;
 } CraftData;
 #pragma pack(pop)
+
+/* Animated-texture frame / wreck-flame byte (Craft +0x25F). */
+#ifdef XWA_MODERN
+#define XWA_CRAFT_ANIM_FRAME(craft) ((craft)->animatedTextureFrame)
+#else
+#define XWA_CRAFT_ANIM_FRAME(craft) ((craft)->componentState[49])
+#endif
 
 typedef char craft_data_ai_heading_state_offset
 	[(offsetof(CraftData, aiFlight) + offsetof(AiFlightState, headingState) == 0xCE) ? 1 : -1];
@@ -300,8 +314,10 @@ typedef char craft_data_warhead_launcher_cooldown_offset
 	[(offsetof(CraftData, warheadLauncherCooldownTicks) == 0x1D8) ? 1 : -1];
 typedef char craft_data_warhead_lock_ticks_offset[(offsetof(CraftData, warheadLockTicks) == 0x1DC) ? 1 : -1];
 typedef char craft_data_component_state_offset[(offsetof(CraftData, componentState) == 0x22E) ? 1 : -1];
+#ifndef XWA_MODERN
 typedef char craft_data_mesh_rotation_offset[(offsetof(CraftData, meshRotation) == 0x260) ? 1 : -1];
 typedef char craft_data_component_hp_offset[(offsetof(CraftData, componentHp) == 0x292) ? 1 : -1];
+#endif
 
 typedef struct MobileObject {
 	uint8_t                   state;

@@ -10,6 +10,8 @@
  * Recovered sources include this header in every build. Outside XWA_MODERN
  * the macro is the stock number, so the original code is unchanged. */
 
+#include "xwa/assets/object_type.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -91,8 +93,15 @@ struct AeronFlightModel;
    the stock component number. `reason` is unused. */
 int XwaModelRole_Validate(const char* key, const struct AeronFlightModel* model, char* reason,
 						  unsigned int reasonSize);
+/* Weapon slots a model def keeps: the X-Wing Alliance Upgrade cutoff of 120
+   for GLB replacements, the original 16 for stock OPTs (17 of which have more
+   weapon hardpoints and rely on the cut). */
+#define XWA_MODEL_WEAPON_SLOT_LIMIT(objectType)                                                              \
+	(XwaModelRole_IsReplacement((unsigned short)(objectType)) ? XWA_CRAFT_WEAPON_SLOT_COUNT                  \
+															  : XWA_STOCK_WEAPON_SLOT_COUNT)
 #else
 #define XWA_MODEL_ROLE(objectType, role, stockComponent) (stockComponent)
+#define XWA_MODEL_WEAPON_SLOT_LIMIT(objectType) 16
 #endif
 
 #ifdef __cplusplus

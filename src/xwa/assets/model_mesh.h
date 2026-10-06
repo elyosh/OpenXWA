@@ -1,6 +1,7 @@
 #ifndef XWA_ASSETS_MODEL_MESH_H
 #define XWA_ASSETS_MODEL_MESH_H
 
+#include "xwa/assets/object_type.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/render/renderer.h"
 
@@ -119,8 +120,8 @@ typedef struct OptHardpoint {
 
 typedef struct ObjectTypeMeshCache {
 	int meshCount;
-	MeshType meshTypes[50];
-	MeshDescriptor* meshDescriptors[50];
+	MeshType meshTypes[XWA_CRAFT_MESH_SLOT_COUNT];
+	MeshDescriptor* meshDescriptors[XWA_CRAFT_MESH_SLOT_COUNT];
 } ObjectTypeMeshCache;
 
 typedef struct OptRotationScale {

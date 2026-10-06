@@ -1005,12 +1005,15 @@ int Yard_SpawnObjectAtWorldPos(ObjectTypeId objectType, int worldX, int worldY, 
 			g_curCraft->aiController.maneuverPhase = 0;
 			g_curCraft->aiController.maneuverTimer = 0;
 
-			for (componentIdx = 0, remainingCount = 50; remainingCount != 0;
+			for (componentIdx = 0, remainingCount = XWA_CRAFT_MESH_SLOT_COUNT; remainingCount != 0;
 				 ++componentIdx, --remainingCount) {
 				g_curCraft->componentState[componentIdx] = 0;
 				g_curCraft->meshRotation[componentIdx] = 0;
 				g_curCraft->componentHp[componentIdx] = 0xffu;
 			}
+#ifdef XWA_MODERN
+			g_curCraft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
+#endif
 
 			meshCount = ModelMesh_GetObjectTypeMeshCount((ObjectTypeId)objectTypeId);
 			for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {

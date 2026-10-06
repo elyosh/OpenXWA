@@ -4971,11 +4971,14 @@ lbl58:
 	for (i = 0; i < 2; ++i) {
 		g_objectTable[launchRefIdx].typeSpecificByte[i] = 0;
 	}
-	for (i = 0; i < 50; ++i) {
+	for (i = 0; i < XWA_CRAFT_MESH_SLOT_COUNT; ++i) {
 		g_curCraft->componentState[i] = 0;
 		g_curCraft->meshRotation[i] = 0;
 		g_curCraft->componentHp[i] = 0xff;
 	}
+#ifdef XWA_MODERN
+	g_curCraft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
+#endif
 	g_curCraft->hullMax = 0x7fff;
 	g_curCraft->systemDamageHullThreshold = 0x7fff;
 	g_curCraft->hullDamage = 0;
@@ -5289,11 +5292,14 @@ int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t modelType, int relX, int 
 
 	g_curCraft = g_objectTable[objIdx].mobj->pCraft;
 	if (g_curCraft != NULL) {
-		for (componentIdx = 0; componentIdx < 50; ++componentIdx) {
+		for (componentIdx = 0; componentIdx < XWA_CRAFT_MESH_SLOT_COUNT; ++componentIdx) {
 			g_curCraft->componentState[componentIdx] = 0;
 			g_curCraft->meshRotation[componentIdx] = 0;
 			g_curCraft->componentHp[componentIdx] = 0xffu;
 		}
+#ifdef XWA_MODERN
+		g_curCraft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
+#endif
 
 		if (modelType == OBJ_Shuttle) {
 			g_curCraft->engineOutputScale = 0xffffu;
@@ -7130,13 +7136,16 @@ ObjectIndex Hangar_SwitchPlayerCraft(int newModelType) {
 	}
 
 	componentIdx = 0;
-	componentsLeft = 50;
+	componentsLeft = XWA_CRAFT_MESH_SLOT_COUNT;
 	do {
 		++componentIdx;
 		--componentsLeft;
 		g_curCraft->componentState[componentIdx - 1] = 0;
 		g_curCraft->meshRotation[componentIdx - 1] = 0;
 	} while (componentsLeft != 0);
+#ifdef XWA_MODERN
+	g_curCraft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
+#endif
 
 	FlightObject_AnimateCrewMeshRotations(g_hangarPlayerObjIdx, 1);
 

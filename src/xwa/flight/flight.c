@@ -2230,8 +2230,9 @@ void FlightObject_UpdateSpecialBehavior(void) {
 				if (meshType == 3) {
 					// Animated-texture mesh: advance the frame stored in componentState[49],
 					// temporarily reusing OBJ_AnimationTextureGroup2008's model info.
+					// Modern port: XWA_CRAFT_ANIM_FRAME keeps that byte in its own field.
 					ObjectTypeId savedType = g_objectTable[(uint16_t)objIdx].objectType;
-					uint16_t frame = g_curCraft->componentState[49];
+					uint16_t frame = XWA_CRAFT_ANIM_FRAME(g_curCraft);
 
 					g_flightObjectAnimFrameScratch = frame;
 					g_objectTable[(uint16_t)objIdx].objectType = OBJ_AnimationTextureGroup2008;
@@ -2256,7 +2257,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 						}
 					}
 					g_objectTable[(uint16_t)objIdx].objectType = savedType;
-					g_curCraft->componentState[49] = (uint8_t)g_flightObjectAnimFrameScratch;
+					XWA_CRAFT_ANIM_FRAME(g_curCraft) = (uint8_t)g_flightObjectAnimFrameScratch;
 				}
 
 				// Cosmetic hull breakup effects on a dying craft.
@@ -2954,12 +2955,56 @@ static void FlightWorldState_SerializeMobileObject(FlightSerializedMobileObject*
 	dst->pCharData = FlightWorldState_EncodeOffset(src->pCharData, g_mobileObjectCharDataPool);
 }
 
+/* The 1017-byte CraftData record keeps the original layout. The modern
+ * CraftData grows its per-mesh, engine-emitter and rack arrays in place and
+ * moves the componentState[49] byte to its own field, so each stock range is
+ * copied to its original offset; the grown ranges travel in the world-state
+ * extension block (FlightWorldState_WriteExtension). */
+typedef struct FlightCraftWireRange {
+	uint16_t wireOffset;
+	uint16_t fieldOffset;
+	uint16_t size;
+} FlightCraftWireRange;
+
+static const FlightCraftWireRange g_flightCraftWireRanges[] = {
+	{ 0x000, 0, 0x22E },                                /* prefix */
+	{ 0x22E, offsetof(CraftData, componentState), 49 }, /* 0x25F: anim frame */
+	{ 0x260, offsetof(CraftData, meshRotation), XWA_STOCK_MESH_SLOT_COUNT },
+	{ 0x292, offsetof(CraftData, componentHp), XWA_STOCK_MESH_SLOT_COUNT },
+	{ 0x2C4, offsetof(CraftData, playerCommandAvoidTargetObjIdx), 0x2CF - 0x2C4 },
+	{ 0x2CF, offsetof(CraftData, engineEmitterHealth), XWA_STOCK_ENGINE_EMITTER_COUNT },
+	{ 0x2DF, offsetof(CraftData, warheadData), XWA_STOCK_WEAPON_SLOT_COUNT * sizeof(WarheadInventoryEntry) },
+	{ 0x3BF, offsetof(CraftData, turretAim), 0x3F5 - 0x3BF },
+};
+
+typedef char xwa_flight_craft_wire_component_state[(offsetof(CraftData, componentState) == 0x22E) ? 1 : -1];
+typedef char xwa_flight_craft_wire_between[(offsetof(CraftData, engineEmitterHealth) -
+												offsetof(CraftData, playerCommandAvoidTargetObjIdx) ==
+											0x2CF - 0x2C4)
+											   ? 1
+											   : -1];
+typedef char
+	xwa_flight_craft_wire_tail[(offsetof(CraftData, reserved3ED) + sizeof(((CraftData*)0)->reserved3ED) -
+									offsetof(CraftData, turretAim) ==
+								0x3F5 - 0x3BF)
+								   ? 1
+								   : -1];
+
+enum {
+	FLIGHT_SERIALIZED_CRAFT_ANIM_FRAME_OFFSET = 0x25F,
+	FLIGHT_SERIALIZED_CRAFT_EFFECTIVE_LINK_OFFSET = 0x3F5
+};
+
 static void FlightWorldState_SerializeCraftData(FlightSerializedCraftData* dst, const CraftData* src) {
 	uint32_t encodedLink;
-	enum { FLIGHT_SERIALIZED_CRAFT_EFFECTIVE_LINK_OFFSET = 0x3F5 };
+	size_t range;
 
 	memset(dst, 0, sizeof(*dst));
-	memcpy(dst->bytes, src, offsetof(CraftData, effectiveAiObjectLink));
+	for (range = 0; range < sizeof g_flightCraftWireRanges / sizeof g_flightCraftWireRanges[0]; ++range) {
+		const FlightCraftWireRange* wire = &g_flightCraftWireRanges[range];
+		memcpy(&dst->bytes[wire->wireOffset], (const uint8_t*)src + wire->fieldOffset, wire->size);
+	}
+	dst->bytes[FLIGHT_SERIALIZED_CRAFT_ANIM_FRAME_OFFSET] = XWA_CRAFT_ANIM_FRAME(src);
 	encodedLink = FlightWorldState_EncodeOffset(src->effectiveAiObjectLink, g_objectTable);
 	FlightWorldState_WriteU32(&dst->bytes[FLIGHT_SERIALIZED_CRAFT_EFFECTIVE_LINK_OFFSET], encodedLink);
 }
@@ -3111,12 +3156,151 @@ static uint32_t FlightWorldState_ReadU32(const uint8_t* src) {
 
 static void FlightWorldState_RestoreCraftData(CraftData* dst, const FlightSerializedCraftData* src) {
 	uint32_t encodedLink;
-	enum { FLIGHT_SERIALIZED_CRAFT_EFFECTIVE_LINK_OFFSET = 0x3F5 };
+	size_t range;
 
-	memcpy(dst, src->bytes, offsetof(CraftData, effectiveAiObjectLink));
+	for (range = 0; range < sizeof g_flightCraftWireRanges / sizeof g_flightCraftWireRanges[0]; ++range) {
+		const FlightCraftWireRange* wire = &g_flightCraftWireRanges[range];
+		memcpy((uint8_t*)dst + wire->fieldOffset, &src->bytes[wire->wireOffset], wire->size);
+	}
+	XWA_CRAFT_ANIM_FRAME(dst) = src->bytes[FLIGHT_SERIALIZED_CRAFT_ANIM_FRAME_OFFSET];
 	encodedLink = FlightWorldState_ReadU32(&src->bytes[FLIGHT_SERIALIZED_CRAFT_EFFECTIVE_LINK_OFFSET]);
 	dst->effectiveAiObjectLink = (ObjectRecord*)FlightWorldState_DecodeOffset(encodedLink, g_objectTable);
 }
+
+#ifdef XWA_MODERN
+/* World-state extension block (modern port; no original counterpart). It
+ * carries the CraftData ranges past the original sizes, for craft whose model
+ * is a GLB replacement, after the last original item (g_players):
+ *   u8 magic[4] 'XWEX', u8 version 1, u16 record count, then per record:
+ *   u16 object slot, componentState[49..254], meshRotation[50..254],
+ *   componentHp[50..254], engineEmitterHealth[16..254], warheadData[16..119].
+ * Without such craft no block is written, so the state matches the original's
+ * byte for byte. */
+static const uint8_t g_flightWorldExtensionMagic[4] = { 'X', 'W', 'E', 'X' };
+enum {
+	FLIGHT_WORLD_EXTENSION_VERSION = 1,
+	FLIGHT_WORLD_EXTENSION_HEADER_SIZE = 7,
+	FLIGHT_WORLD_EXTENSION_RECORD_SIZE =
+		2 + (XWA_CRAFT_MESH_SLOT_COUNT - 49) + 2 * (XWA_CRAFT_MESH_SLOT_COUNT - XWA_STOCK_MESH_SLOT_COUNT) +
+		(XWA_CRAFT_ENGINE_EMITTER_COUNT - XWA_STOCK_ENGINE_EMITTER_COUNT) +
+		(XWA_CRAFT_WEAPON_SLOT_COUNT - XWA_STOCK_WEAPON_SLOT_COUNT) * (int)sizeof(WarheadInventoryEntry),
+};
+typedef char xwa_flight_world_extension_record_size[(FLIGHT_WORLD_EXTENSION_RECORD_SIZE == 2313) ? 1 : -1];
+
+typedef struct FlightWorldExtensionRange {
+	uint16_t fieldOffset;
+	uint16_t size;
+} FlightWorldExtensionRange;
+
+static const FlightWorldExtensionRange g_flightWorldExtensionRanges[] = {
+	{ offsetof(CraftData, componentState) + 49, XWA_CRAFT_MESH_SLOT_COUNT - 49 },
+	{ offsetof(CraftData, meshRotation) + XWA_STOCK_MESH_SLOT_COUNT,
+	  XWA_CRAFT_MESH_SLOT_COUNT - XWA_STOCK_MESH_SLOT_COUNT },
+	{ offsetof(CraftData, componentHp) + XWA_STOCK_MESH_SLOT_COUNT,
+	  XWA_CRAFT_MESH_SLOT_COUNT - XWA_STOCK_MESH_SLOT_COUNT },
+	{ offsetof(CraftData, engineEmitterHealth) + XWA_STOCK_ENGINE_EMITTER_COUNT,
+	  XWA_CRAFT_ENGINE_EMITTER_COUNT - XWA_STOCK_ENGINE_EMITTER_COUNT },
+	{ offsetof(CraftData, warheadData) + XWA_STOCK_WEAPON_SLOT_COUNT * sizeof(WarheadInventoryEntry),
+	  (XWA_CRAFT_WEAPON_SLOT_COUNT - XWA_STOCK_WEAPON_SLOT_COUNT) * sizeof(WarheadInventoryEntry) },
+};
+
+/* The craft of a slot whose CraftData the world state serializes, or NULL. */
+static CraftData* FlightWorldState_SerializedCraft(uint32_t slot) {
+	const ObjectRecord* obj = &g_objectTable[slot];
+
+	if (obj->objectType == OBJ_None || obj->mobj == NULL || obj->mobj->pCraft == NULL ||
+		(g_modelTypeTable[(uint16_t)obj->objectType].recordFlags & 4u) != 0) {
+		return NULL;
+	}
+	return obj->mobj->pCraft;
+}
+
+static void FlightWorldState_WriteExtension(uint8_t** cursor) {
+	uint32_t slot;
+	uint16_t count = 0;
+
+	for (slot = 0; slot < g_regionObjectSlotEnd; ++slot) {
+		if (FlightWorldState_SerializedCraft(slot) != NULL &&
+			XwaModelRole_IsReplacement((unsigned short)g_objectTable[slot].objectType)) {
+			++count;
+		}
+	}
+	if (count == 0) {
+		return;
+	}
+	FlightWorldState_WriteBlock(cursor, g_flightWorldExtensionMagic, sizeof g_flightWorldExtensionMagic);
+	**cursor = FLIGHT_WORLD_EXTENSION_VERSION;
+	++*cursor;
+	FlightWorldState_WriteBlock(cursor, &count, sizeof count);
+	for (slot = 0; slot < g_regionObjectSlotEnd; ++slot) {
+		const CraftData* craft = FlightWorldState_SerializedCraft(slot);
+		const uint16_t objectSlot = (uint16_t)slot;
+		size_t range;
+
+		if (craft == NULL || !XwaModelRole_IsReplacement((unsigned short)g_objectTable[slot].objectType)) {
+			continue;
+		}
+		FlightWorldState_WriteBlock(cursor, &objectSlot, sizeof objectSlot);
+		for (range = 0; range < sizeof g_flightWorldExtensionRanges / sizeof g_flightWorldExtensionRanges[0];
+			 ++range) {
+			FlightWorldState_WriteBlock(
+				cursor, (const uint8_t*)craft + g_flightWorldExtensionRanges[range].fieldOffset,
+				g_flightWorldExtensionRanges[range].size);
+		}
+	}
+}
+
+/* Resets the extension ranges of every serialized craft to their spawn
+ * defaults, then applies the block at `cursor` when g_worldStateSize holds
+ * one. */
+static void FlightWorldState_RestoreExtension(const uint8_t* cursor) {
+	const uint8_t* end = g_worldStateBuffer + g_worldStateSize;
+	uint32_t slot;
+	uint16_t count;
+	uint16_t record;
+
+	for (slot = 0; slot < g_regionObjectSlotEnd; ++slot) {
+		CraftData* craft = FlightWorldState_SerializedCraft(slot);
+
+		if (craft == NULL) {
+			continue;
+		}
+		memset(&craft->componentState[49], 0, XWA_CRAFT_MESH_SLOT_COUNT - 49);
+		memset(&craft->meshRotation[XWA_STOCK_MESH_SLOT_COUNT], 0,
+			   XWA_CRAFT_MESH_SLOT_COUNT - XWA_STOCK_MESH_SLOT_COUNT);
+		memset(&craft->componentHp[XWA_STOCK_MESH_SLOT_COUNT], 0xFF,
+			   XWA_CRAFT_MESH_SLOT_COUNT - XWA_STOCK_MESH_SLOT_COUNT);
+		memset(&craft->engineEmitterHealth[XWA_STOCK_ENGINE_EMITTER_COUNT], 0,
+			   XWA_CRAFT_ENGINE_EMITTER_COUNT - XWA_STOCK_ENGINE_EMITTER_COUNT);
+		memset(&craft->warheadData[XWA_STOCK_WEAPON_SLOT_COUNT], 0,
+			   (XWA_CRAFT_WEAPON_SLOT_COUNT - XWA_STOCK_WEAPON_SLOT_COUNT) * sizeof(WarheadInventoryEntry));
+	}
+	if (cursor < g_worldStateBuffer || end - cursor < FLIGHT_WORLD_EXTENSION_HEADER_SIZE ||
+		memcmp(cursor, g_flightWorldExtensionMagic, sizeof g_flightWorldExtensionMagic) != 0 ||
+		cursor[4] != FLIGHT_WORLD_EXTENSION_VERSION) {
+		return;
+	}
+	memcpy(&count, cursor + 5, sizeof count);
+	cursor += FLIGHT_WORLD_EXTENSION_HEADER_SIZE;
+	for (record = 0; record < count && end - cursor >= FLIGHT_WORLD_EXTENSION_RECORD_SIZE; ++record) {
+		uint16_t objectSlot;
+		CraftData* craft;
+		size_t range;
+
+		memcpy(&objectSlot, cursor, sizeof objectSlot);
+		craft = objectSlot < g_regionObjectSlotEnd ? FlightWorldState_SerializedCraft(objectSlot) : NULL;
+		cursor += sizeof objectSlot;
+		for (range = 0; range < sizeof g_flightWorldExtensionRanges / sizeof g_flightWorldExtensionRanges[0];
+			 ++range) {
+			if (craft != NULL) {
+				memcpy((uint8_t*)craft + g_flightWorldExtensionRanges[range].fieldOffset, cursor,
+					   g_flightWorldExtensionRanges[range].size);
+			}
+			cursor += g_flightWorldExtensionRanges[range].size;
+		}
+	}
+}
+#endif
 
 static void FlightWorldState_RestoreWarheadGuidance(WarheadGuidanceState* dst,
 													const FlightSerializedWarheadGuidanceState* src) {
@@ -3191,6 +3375,10 @@ void Flight_AllocWorldStateBuffers(void) {
 	}
 	GameRand_GetPrimarySeed();
 	bufferSize += 3023u * (uint32_t)g_flightPlayerCount + 22086u;
+#ifdef XWA_MODERN
+	bufferSize +=
+		FLIGHT_WORLD_EXTENSION_HEADER_SIZE + FLIGHT_WORLD_EXTENSION_RECORD_SIZE * g_craftObjectSlotsTotal;
+#endif
 
 	g_worldStateHandle = Memory_AllocHandle("WORLDSTATEDATA", bufferSize);
 	if (g_worldStateHandle == 0) {
@@ -3793,6 +3981,7 @@ int Flight_SaveWorldState(void) {
 	randSeed = GameRand_GetPrimarySeed();
 	FlightWorldState_WriteBlock(&cursor, &randSeed, sizeof(randSeed));
 	FlightWorldState_WriteBlock(&cursor, g_players, 3023u * (uint32_t)g_flightPlayerCount);
+	FlightWorldState_WriteExtension(&cursor);
 
 	g_worldStateSize = (int)(cursor - g_worldStateBuffer);
 	worldStateSize = g_worldStateSize;
@@ -4055,6 +4244,15 @@ int Flight_ChecksumWorldState(int expectedChecksum, int serverTicks) {
 			sectionChecksum += *cursor++;
 		} while (--byteCount != 0);
 	}
+#ifdef XWA_MODERN
+	/* Modern port: the world-state extension block follows the players. */
+	if (g_worldStateBuffer + g_worldStateSize > cursor) {
+		byteCount = (uint32_t)(g_worldStateBuffer + g_worldStateSize - cursor);
+		do {
+			sectionChecksum += *cursor++;
+		} while (--byteCount != 0);
+	}
+#endif
 
 	DebugPrintfChannel(0x20000, "randomSeed set to %d.\n", randSeed);
 
@@ -4323,6 +4521,8 @@ void Flight_RestoreWorldState(void) {
 	cursor += sizeof(randSeed);
 	Math_SeedRandom(randSeed);
 	memcpy(g_players, cursor, 3023u * (uint32_t)g_flightPlayerCount);
+	cursor += 3023u * (uint32_t)g_flightPlayerCount;
+	FlightWorldState_RestoreExtension(cursor);
 #endif
 }
 
@@ -5974,6 +6174,10 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 						}
 						GameRand_GetPrimarySeed();
 						bufferSize += 3023u * (uint32_t)g_flightPlayerCount + 22086u;
+#ifdef XWA_MODERN
+						bufferSize += FLIGHT_WORLD_EXTENSION_HEADER_SIZE +
+									  FLIGHT_WORLD_EXTENSION_RECORD_SIZE * g_craftObjectSlotsTotal;
+#endif
 
 						g_worldStateHandle = Memory_AllocHandle("WORLDSTATEDATA", bufferSize);
 						if (g_worldStateHandle == 0) {
@@ -6097,6 +6301,10 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 				}
 				GameRand_GetPrimarySeed();
 				bufferSize += 3023u * (uint32_t)g_flightPlayerCount + 22086u;
+#ifdef XWA_MODERN
+				bufferSize += FLIGHT_WORLD_EXTENSION_HEADER_SIZE +
+							  FLIGHT_WORLD_EXTENSION_RECORD_SIZE * g_craftObjectSlotsTotal;
+#endif
 
 				g_worldStateHandle = Memory_AllocHandle("WORLDSTATEDATA", bufferSize);
 				if (g_worldStateHandle == 0) {
@@ -6112,6 +6320,10 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 
 			Film_ReadBytes(&loopIdx, sizeof(loopIdx));
 			Film_ReadBytes(g_worldStateBuffer, loopIdx);
+#ifdef XWA_MODERN
+			/* Modern port: the restore reads the extension block up to this size. */
+			g_worldStateSize = (int)loopIdx;
+#endif
 			Flight_RestoreWorldState();
 			if (allocatedWorldState) {
 				Memory_FreeHandle("WORLDSTATEDATA", g_worldStateHandle);

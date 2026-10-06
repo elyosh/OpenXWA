@@ -494,13 +494,16 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 		int remainingComponents;
 
 		componentIndex = 0;
-		remainingComponents = 50;
+		remainingComponents = XWA_CRAFT_MESH_SLOT_COUNT;
 		do {
 			craft->componentState[componentIndex] = 0;
 			craft->meshRotation[componentIndex] = 0;
 			craft->componentHp[componentIndex] = 0xffu;
 			++componentIndex;
 		} while (--remainingComponents != 0);
+#ifdef XWA_MODERN
+		craft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
+#endif
 	}
 	{
 		uint16_t meshIndex;
@@ -1120,6 +1123,15 @@ void Object_ClearSlotState(uint32_t objIdx) {
 		memset(g_objectTable[objIdx].mobj->pCraft, 0,
 			   offsetof(CraftData, warheadData[14].count) +
 				   sizeof(g_objectTable[objIdx].mobj->pCraft->warheadData[14].count));
+#ifdef XWA_MODERN
+		/* Modern port: the prefix cleared above held the animated-texture
+		 * byte as componentState[49], and no rack past 15. Clear the byte and
+		 * the racks only a GLB replacement has; rack 15 keeps its original
+		 * behaviour. */
+		g_objectTable[objIdx].mobj->pCraft->animatedTextureFrame = 0;
+		memset(&g_objectTable[objIdx].mobj->pCraft->warheadData[XWA_STOCK_WEAPON_SLOT_COUNT], 0,
+			   (XWA_CRAFT_WEAPON_SLOT_COUNT - XWA_STOCK_WEAPON_SLOT_COUNT) * sizeof(WarheadInventoryEntry));
+#endif
 		g_objectTable[objIdx].mobj->iff = -1;
 	}
 

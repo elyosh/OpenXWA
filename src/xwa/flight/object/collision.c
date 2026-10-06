@@ -4262,15 +4262,16 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 				direction.x = 0.0f;
 				direction.y = 1.0f;
 				direction.z = 0.0f;
+				/* Modern port: XWA_CRAFT_ANIM_FRAME is componentState[49]'s own field. */
 				if ((uint16_t)GameRand2() <= 0x6000) {
-					targetCraft->componentState[49] = 1;
+					XWA_CRAFT_ANIM_FRAME(targetCraft) = 1;
 				} else {
 					Particle_AttachEffectToObject(1, (uint16_t)targetObjIdx, NULL, &direction);
 					if (g_flightPlayerCount > 1 || g_filmRecording == 2 || g_filmPlaybackMode == 2)
-						targetCraft->componentState[49] = 1;
+						XWA_CRAFT_ANIM_FRAME(targetCraft) = 1;
 				}
 			} else {
-				targetCraft->componentState[49] = 1;
+				XWA_CRAFT_ANIM_FRAME(targetCraft) = 1;
 			}
 			{
 				uint16_t meshCount =

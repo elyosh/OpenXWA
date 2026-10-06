@@ -911,7 +911,7 @@ static void fixed_build_reticle_threats(const XwaHudState* h, const XwaRemasterH
 	if (v->reticle && r->visible) {
 		if (r->weapon_mode == 0) {
 			if (r->seat == 0) {
-				for (int i = 0; i < r->laser_hardpoint_count && i < 16; i++) {
+				for (int i = 0; i < r->laser_hardpoint_count && i < XWA_SNAP_MAX_WEAPON_SLOTS; i++) {
 					if (r->laser_hardpoint_index[i] == -1)
 						continue;
 					fixed_emit_reticle_group(XWA_HUD_WIDGET_READINESS, 10, r->aim_offset[i][0],

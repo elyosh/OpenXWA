@@ -2428,13 +2428,13 @@ static void fl_derive_object_billboard(const XwaFlightObject* f, uint32_t snap_i
 static int fl_wreck_flame_base_geometry(const XwaFlightObject* f, const XwaFlightCamera* cam,
 										const float world_to_view[9], FlBillboardGeometry* out,
 										uint8_t mesh_types[XWA_SNAP_MAX_MESH_SLOTS], int* mesh_count) {
-	if (!f->has_craft || f->component_state[49] == 0)
+	if (!f->has_craft || f->anim_frame == 0)
 		return 0;
 	*mesh_count = XwaSnapshotExport_ModelMeshTypes(f->object_type, mesh_types);
 	if (*mesh_count == 0)
 		return 0;
 	int w = 0, h = 0, maxb = 0;
-	if (!XwaSnapshotExport_ModelTexFrame(XWA_SNAP_TYPE_FLAME_2008, f->component_state[49], &w, &h, &maxb) ||
+	if (!XwaSnapshotExport_ModelTexFrame(XWA_SNAP_TYPE_FLAME_2008, f->anim_frame, &w, &h, &maxb) ||
 		maxb <= 0) {
 		return 0;
 	}
@@ -2458,7 +2458,7 @@ static int fl_wreck_flame_base_geometry(const XwaFlightObject* f, const XwaFligh
 /* Wreck flames (Damage_QueueCraftBillboards mirror): one type-2008
  * sprite per destroyed MESH_Fuselage slot, all at the object center,
  * the object's roll accumulating onto the billboard angle per flame,
- * frame from componentState[49], base size 256. */
+ * frame from the anim_frame byte (componentState[49] originally), base size 256. */
 static void fl_derive_wreck_flames(const XwaFlightObject* f, uint32_t snap_index, XwaRemasterAssets* assets,
 								   const XwaFlightCamera* history_cam, const float history_world_to_view[9]) {
 	const XwaFlightCamera* cam = &s.snap->flight_camera;
@@ -2468,7 +2468,7 @@ static void fl_derive_wreck_flames(const XwaFlightObject* f, uint32_t snap_index
 	if (!fl_wreck_flame_base_geometry(f, cam, s.crows, &base_geometry, mesh_types, &mesh_count))
 		return;
 	XwaAssetRef ref;
-	if (!fl_resolve_type_frame(assets, XWA_SNAP_TYPE_FLAME_2008, f->component_state[49], &ref))
+	if (!fl_resolve_type_frame(assets, XWA_SNAP_TYPE_FLAME_2008, f->anim_frame, &ref))
 		return;
 
 	FlBillboardGeometry previous_base;

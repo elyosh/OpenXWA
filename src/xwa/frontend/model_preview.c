@@ -501,8 +501,8 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 			--rootNodeCount;
 		}
 		Memory_UnlockHandle(g_loadedModels.byObjectType[0]);
-		if (rootNodeCount > 50) {
-			rootNodeCount = 50;
+		if (rootNodeCount > XWA_CRAFT_MESH_SLOT_COUNT) {
+			rootNodeCount = XWA_CRAFT_MESH_SLOT_COUNT;
 		}
 		for (i = 0; i < rootNodeCount; ++i) {
 			int glowIndex;

@@ -578,6 +578,27 @@ enum {
 #define XWA_CRAFT_TYPE_REVERSE_SEARCH_COUNT OBJ_Count
 #endif
 
+/* Per-craft model limits. The modern build raises them to what the X-Wing
+ * Alliance Upgrade hooks configure, for GLB replacement models: 255 meshes,
+ * 255 engine glows and 120 weapon slots. Stock models keep the stock limits
+ * (at most 47 meshes and 13 glows; weapon slots are cut at 16 per model). */
+#ifdef XWA_MODERN
+enum {
+	XWA_CRAFT_MESH_SLOT_COUNT = 255,
+	XWA_CRAFT_ENGINE_EMITTER_COUNT = 255,
+	XWA_CRAFT_WEAPON_SLOT_COUNT = 120
+};
+#else
+enum {
+	XWA_CRAFT_MESH_SLOT_COUNT = 50,
+	XWA_CRAFT_ENGINE_EMITTER_COUNT = 16,
+	XWA_CRAFT_WEAPON_SLOT_COUNT = 16
+};
+#endif
+#define XWA_STOCK_MESH_SLOT_COUNT 50
+#define XWA_STOCK_ENGINE_EMITTER_COUNT 16
+#define XWA_STOCK_WEAPON_SLOT_COUNT 16
+
 #pragma pack(push, 1)
 typedef struct ObjectTypeBackdropDescriptor {
 	uint16_t modelType;

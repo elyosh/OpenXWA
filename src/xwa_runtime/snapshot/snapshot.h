@@ -261,8 +261,11 @@ typedef struct XwaDirLight {
  * uses the (R0, R2, R1) row arrangement (FVIEW_ComputeObjectViewMatrix)
  * — that hazard lives in the driver's math, not in this data. */
 
-/* CraftData carries 50 per-mesh slots. */
-#define XWA_SNAP_MAX_MESH_SLOTS 50
+/* CraftData per-mesh slots and weapon slots in the modern build
+ * (XWA_CRAFT_MESH_SLOT_COUNT, XWA_CRAFT_WEAPON_SLOT_COUNT); the original has
+ * 50 and 16. */
+#define XWA_SNAP_MAX_MESH_SLOTS 255
+#define XWA_SNAP_MAX_WEAPON_SLOTS 120
 
 /* Genus values the driver dispatches on (mirrors ModelGenusId — part
  * of the captured records' vocabulary, so drivers need no engine
@@ -383,6 +386,9 @@ typedef struct XwaFlightObject {
 	uint8_t component_state[XWA_SNAP_MAX_MESH_SLOTS];
 	uint8_t mesh_rotation[XWA_SNAP_MAX_MESH_SLOTS];
 	uint8_t component_hp[XWA_SNAP_MAX_MESH_SLOTS];
+	/* Animated-texture frame / wreck-flame byte (XWA_CRAFT_ANIM_FRAME; the
+	 * original's componentState[49]). */
+	uint8_t anim_frame;
 	/* ---- engine-glow state (EngineGlow_RenderObjectGlows inputs; the
 	 * HD driver derives the glow fans from these + the HD mesh's
 	 * flight-model engine glows). objectKind 5/6 use the speed-boost scale
@@ -396,11 +402,10 @@ typedef struct XwaFlightObject {
 	uint16_t eg_throttle;       /* CraftData.throttleSpeed */
 	uint16_t eg_output_scale;   /* CraftData.engineOutputScale */
 	uint16_t eg_max_speed;      /* CraftData.aiFlight.maxSpeedCache */
-	/* Damage knockouts: bit N = emitter N destroyed (classic per-model
-	 * emitter order == the HD mesh's glow order, as both come from the
-	 * model the simulation loaded; emitters past
-	 * 32 keep drawing). */
-	uint32_t eg_knockout_mask;
+	/* Damage knockouts: bit N (word N >> 5, bit N & 31) = emitter N
+	 * destroyed (classic per-model emitter order == the HD mesh's glow
+	 * order, as both come from the model the simulation loaded). */
+	uint32_t eg_knockout_mask[8];
 } XwaFlightObject;
 
 #define XWA_SNAP_MAX_FLIGHT_OBJECTS 1664
@@ -838,9 +843,9 @@ typedef struct XwaHudInstruments {
 	uint8_t laser_link_mode[6];
 	uint8_t laser_link_next_slot[3];
 	uint16_t laser_projectile_type[3];
-	uint8_t weapon_type[16];
-	uint8_t laser_charge[16];
-	uint8_t warhead_count[16];
+	uint8_t weapon_type[XWA_SNAP_MAX_WEAPON_SLOTS];
+	uint8_t laser_charge[XWA_SNAP_MAX_WEAPON_SLOTS];
+	uint8_t warhead_count[XWA_SNAP_MAX_WEAPON_SLOTS];
 	uint16_t warhead_lock_ticks;
 	uint8_t system_display_slot[11];
 	uint16_t system_health[11];
@@ -866,12 +871,12 @@ typedef struct XwaHudReticle {
 	uint8_t in_range;
 	uint8_t laser_hardpoint_count;
 	uint8_t warhead_hardpoint_count;
-	uint8_t ready[16];
-	uint8_t hardpoint_kind[16];
-	int16_t laser_hardpoint_index[16];
-	int16_t warhead_hardpoint_index[16];
-	int16_t hardpoint_local[16][3];
-	int16_t aim_offset[16][2];
+	uint8_t ready[XWA_SNAP_MAX_WEAPON_SLOTS];
+	uint8_t hardpoint_kind[XWA_SNAP_MAX_WEAPON_SLOTS];
+	int16_t laser_hardpoint_index[XWA_SNAP_MAX_WEAPON_SLOTS];
+	int16_t warhead_hardpoint_index[XWA_SNAP_MAX_WEAPON_SLOTS];
+	int16_t hardpoint_local[XWA_SNAP_MAX_WEAPON_SLOTS][3];
+	int16_t aim_offset[XWA_SNAP_MAX_WEAPON_SLOTS][2];
 	int16_t look_yaw, look_pitch;
 	uint8_t seat;
 	uint8_t turret_auto_fire;
@@ -1014,7 +1019,7 @@ typedef struct XwaHudState {
 #define XWA_SNAP_MAX_PARTICLE_EFFECTS 36
 #define XWA_SNAP_MAX_PARTICLES 3600
 #define XWA_SNAP_MAX_OPT_ASSETS 1024
-#define XWA_SNAP_OPT_NAME_MAX 40
+#define XWA_SNAP_OPT_NAME_MAX 64 /* XWA_MODEL_SOURCE_KEY_MAX */
 #define XWA_SNAP_MAX_TEXTURE_ASSETS 600
 #define XWA_SNAP_MAX_FRONTEND_FILES 1024
 #define XWA_SNAP_MAX_SPRITE_GROUPS 200

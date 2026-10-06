@@ -69,8 +69,8 @@ __inline int ModelMesh_GetCount(int modelSlot) {
 	}
 
 	Memory_UnlockHandle(g_loadedModels.byObjectType[modelSlot]);
-	if (meshCount > 50) {
-		meshCount = 50;
+	if (meshCount > XWA_CRAFT_MESH_SLOT_COUNT) {
+		meshCount = XWA_CRAFT_MESH_SLOT_COUNT;
 	}
 
 	return meshCount;
@@ -158,8 +158,8 @@ void ModelMesh_BuildObjectTypeMeshCache(void) {
 			}
 
 			Memory_UnlockHandle(modelHandle);
-			if (meshCount > 50) {
-				meshCount = 50;
+			if (meshCount > XWA_CRAFT_MESH_SLOT_COUNT) {
+				meshCount = XWA_CRAFT_MESH_SLOT_COUNT;
 			}
 		}
 

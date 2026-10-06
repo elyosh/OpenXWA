@@ -1303,6 +1303,7 @@ void XwaSnapshot_CaptureFlight(void) {
 				memcpy(f->component_state, cd->componentState, sizeof f->component_state);
 				memcpy(f->mesh_rotation, cd->meshRotation, sizeof f->mesh_rotation);
 				memcpy(f->component_hp, cd->componentHp, sizeof f->component_hp);
+				f->anim_frame = XWA_CRAFT_ANIM_FRAME(cd);
 				/* Engine-glow scale inputs (EngineGlow_RenderObjectGlows). */
 				f->object_kind = cd->objectKind;
 				f->eg_working = (uint8_t)(cd->workingSubsystems != 0);
@@ -1313,16 +1314,13 @@ void XwaSnapshot_CaptureFlight(void) {
 				f->eg_output_scale = cd->engineOutputScale;
 				f->eg_max_speed = (uint16_t)cd->aiFlight.maxSpeedCache;
 				/* Per-emitter damage knockouts -> bitmask (read-only walk
-				 * of the render-state list; emitters >= 32 keep drawing).
-				 * g_objRenderState is allocated with the flight scene —
-				 * NULL during mission loading. */
-				f->eg_knockout_mask = 0;
+				 * of the render-state list). g_objRenderState is allocated
+				 * with the flight scene — NULL during mission loading. */
+				memset(f->eg_knockout_mask, 0, sizeof f->eg_knockout_mask);
 				if (i < render_state_slot_count) {
 					for (const EngineGlowKnockoutMark* k = g_objRenderState[i].engineGlowKnockouts; k != NULL;
 						 k = k->next) {
-						if (k->emitterIndex < 32) {
-							f->eg_knockout_mask |= 1u << k->emitterIndex;
-						}
+						f->eg_knockout_mask[k->emitterIndex >> 5] |= 1u << (k->emitterIndex & 31);
 					}
 				}
 			}

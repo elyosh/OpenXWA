@@ -6373,7 +6373,8 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 				for (g = 0; g < 3; ++g) {
 					uint8_t remaining = g_modelDefs[modelIndex].laserGroupSlotCount[g];
 					if (g_modelDefs[modelIndex].laserGroupMountType[g] >= 4 && remaining) {
-						for (slot = 0; slot < 16; ++slot) {
+						/* Modern port: a GLB replacement has up to 120 slots. */
+						for (slot = 0; slot < XWA_MODEL_WEAPON_SLOT_LIMIT(g_spawnObjectType); ++slot) {
 							if (!g_curCraft->warheadData[slot].weaponType) {
 								g_curCraft->warheadData[slot].projectileTypeId =
 									g_modelDefs[modelIndex].laserGroupWeaponType[g]
@@ -6648,11 +6649,14 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 	g_objectTable[objIdx].typeSpecificByte[1] = 0;
 	{
 		int i;
-		for (i = 0; i < 50; ++i) {
+		for (i = 0; i < XWA_CRAFT_MESH_SLOT_COUNT; ++i) {
 			g_curCraft->componentState[i] = 0;
 			g_curCraft->meshRotation[i] = 0;
 			g_curCraft->componentHp[i] = 0xFF;
 		}
+#ifdef XWA_MODERN
+		g_curCraft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
+#endif
 	}
 
 	// Component hit points per mesh, plus status-driven turret/HP overrides.

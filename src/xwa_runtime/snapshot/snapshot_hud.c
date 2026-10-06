@@ -34,7 +34,7 @@ static XwaHudTargetBoxLayer g_hud_target_box_layer = XWA_HUD_TARGET_BOX_AFTER_FI
 
 static void hud_initialize_reticle_indices(XwaHudReticle* reticle) {
 	int i;
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < XWA_SNAP_MAX_WEAPON_SLOTS; i++) {
 		reticle->laser_hardpoint_index[i] = -1;
 		reticle->warhead_hardpoint_index[i] = -1;
 	}
@@ -183,7 +183,7 @@ void XwaSnapshotHud_EmitFlightGlyph(uint8_t ch, uint8_t font_tier, int x, int y,
 }
 
 void XwaSnapshotHud_NoteReticleReady(int slot, int ready) {
-	if (g_hud_capture.building_active && slot >= 0 && slot < 16)
+	if (g_hud_capture.building_active && slot >= 0 && slot < XWA_SNAP_MAX_WEAPON_SLOTS)
 		g_hud_capture.building.reticle.ready[slot] = (uint8_t)(ready != 0);
 }
 
@@ -418,7 +418,7 @@ static void hud_capture_instruments(XwaHudState* out, const ObjectRecord* object
 		   sizeof instruments->laser_link_next_slot);
 	memcpy(instruments->laser_projectile_type, craft->laserProjectileTypeId,
 		   sizeof instruments->laser_projectile_type);
-	for (i = 0; i < 16; i++) {
+	for (i = 0; i < XWA_SNAP_MAX_WEAPON_SLOTS; i++) {
 		instruments->weapon_type[i] = craft->warheadData[i].weaponType;
 		instruments->laser_charge[i] = craft->warheadData[i].laserCharge;
 		instruments->warhead_count[i] = craft->warheadData[i].count;
@@ -468,14 +468,17 @@ static void hud_capture_direct_state(XwaHudState* out) {
 	}
 	out->reticle.turret_auto_fire = (uint8_t)(player->turretAutoFireState != 0);
 	out->reticle.laser_hardpoint_count =
-		(uint8_t)(g_reticleLaserHardpointCount < 0
-					  ? 0
-					  : (g_reticleLaserHardpointCount > 16 ? 16 : g_reticleLaserHardpointCount));
+		(uint8_t)(g_reticleLaserHardpointCount < 0 ? 0
+												   : (g_reticleLaserHardpointCount > XWA_SNAP_MAX_WEAPON_SLOTS
+														  ? XWA_SNAP_MAX_WEAPON_SLOTS
+														  : g_reticleLaserHardpointCount));
 	out->reticle.warhead_hardpoint_count =
 		(uint8_t)(g_reticleWarheadHardpointCount < 0
 					  ? 0
-					  : (g_reticleWarheadHardpointCount > 16 ? 16 : g_reticleWarheadHardpointCount));
-	for (int i = 0; i < 16; i++) {
+					  : (g_reticleWarheadHardpointCount > XWA_SNAP_MAX_WEAPON_SLOTS
+							 ? XWA_SNAP_MAX_WEAPON_SLOTS
+							 : g_reticleWarheadHardpointCount));
+	for (int i = 0; i < XWA_SNAP_MAX_WEAPON_SLOTS; i++) {
 		out->reticle.laser_hardpoint_index[i] = (int16_t)g_reticleLaserHardpointIndices[i];
 		out->reticle.warhead_hardpoint_index[i] = (int16_t)g_reticleWarheadHardpointIndices[i];
 		out->reticle.aim_offset[i][0] = (int16_t)(g_reticleLaserAimPoints[i].x - g_reticleCenterX);

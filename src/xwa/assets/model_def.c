@@ -12,9 +12,9 @@
 // GLOBAL: XWA 0x9E9080
 MemoryHandle g_modelFloatHardpointDataHandles[XWA_LOADED_MODEL_COUNT];
 // GLOBAL: XWA 0x7FFB80
-OptEngineGlow* g_cockpitEngineGlows[16];
+OptEngineGlow* g_cockpitEngineGlows[XWA_CRAFT_ENGINE_EMITTER_COUNT];
 // GLOBAL: XWA 0x7FFBC0
-uint8_t g_cockpitEngineGlowMeshIdx[16];
+uint8_t g_cockpitEngineGlowMeshIdx[XWA_CRAFT_ENGINE_EMITTER_COUNT];
 // GLOBAL: XWA 0x7FFBD0
 uint8_t g_cockpitEngineGlowCount;
 // GLOBAL: XWA 0x7FFBD1
@@ -22,15 +22,15 @@ CockpitSparkHardpoint g_cockpitSparkHardpoints[16];
 // GLOBAL: XWA 0x7FFD61
 uint8_t g_cockpitSparkHardpointCount;
 // GLOBAL: XWA 0x910960
-OptEngineGlow* g_exteriorEngineGlows[16];
+OptEngineGlow* g_exteriorEngineGlows[XWA_CRAFT_ENGINE_EMITTER_COUNT];
 // GLOBAL: XWA 0x9109A0
-uint8_t g_exteriorEngineGlowMeshIdx[16];
+uint8_t g_exteriorEngineGlowMeshIdx[XWA_CRAFT_ENGINE_EMITTER_COUNT];
 // GLOBAL: XWA 0x9109B0
 uint8_t g_exteriorEngineGlowCount;
 // GLOBAL: XWA 0x8D5760
-OptEngineGlow* g_spaceBombEngineGlows[16];
+OptEngineGlow* g_spaceBombEngineGlows[XWA_CRAFT_ENGINE_EMITTER_COUNT];
 // GLOBAL: XWA 0x8D57A0
-uint8_t g_spaceBombEngineGlowMeshIdx[16];
+uint8_t g_spaceBombEngineGlowMeshIdx[XWA_CRAFT_ENGINE_EMITTER_COUNT];
 // GLOBAL: XWA 0x8D57B0
 uint8_t g_spaceBombEngineGlowCount;
 // GLOBAL: XWA 0x8D5941

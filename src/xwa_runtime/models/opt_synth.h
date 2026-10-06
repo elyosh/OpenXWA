@@ -11,6 +11,7 @@
 #include "aeron/asset/opt_payload.h"
 #include "aeron/asset/opt_sim_model.h"
 #include "aeron/collision/face_bvh.h"
+#include "xwa/assets/object_type.h"
 #include "xwa/assets/opt_model.h"
 
 #include <stdint.h>
@@ -21,9 +22,10 @@ extern "C" {
 
 struct NativeOptimizedPolyObject;
 
-/* CraftData.componentState[49] holds the animated-texture frame and wreck
-   flame state, so a model may use components 0..48 only. */
-enum { XWA_OPT_SYNTH_MAX_COMPONENTS = 49 };
+/* The modern CraftData carries XWA_CRAFT_MESH_SLOT_COUNT components and keeps
+   the animated-texture frame and wreck flame state in its own field (the
+   original's componentState[49]), so a model may use every component. */
+enum { XWA_OPT_SYNTH_MAX_COMPONENTS = XWA_CRAFT_MESH_SLOT_COUNT };
 
 typedef struct XwaOptSynthMesh {
 	uint32_t stubFaceDataOffset; /* payload offset of the stub FaceData node */

@@ -249,13 +249,13 @@ uint16_t g_shieldSilhouetteSpriteIdByObjectType[72] = {
 // GLOBAL: XWA 0x68C550
 int32_t g_reticleLaserHardpointCount;
 // GLOBAL: XWA 0x68BD68
-int g_reticleLaserHardpointIndices[16];
+int g_reticleLaserHardpointIndices[XWA_CRAFT_WEAPON_SLOT_COUNT];
 // GLOBAL: XWA 0x68C554
 int g_reticleWarheadHardpointCount;
 // GLOBAL: XWA 0x68BCE0
-int g_reticleWarheadHardpointIndices[16];
+int g_reticleWarheadHardpointIndices[XWA_CRAFT_WEAPON_SLOT_COUNT];
 // GLOBAL: XWA 0x68C140
-HudPoint g_reticleLaserAimPoints[16];
+HudPoint g_reticleLaserAimPoints[XWA_CRAFT_WEAPON_SLOT_COUNT];
 // GLOBAL: XWA 0x68C558
 int g_reticleCenterX;
 // GLOBAL: XWA 0x68C55C
@@ -271,9 +271,9 @@ uint8_t g_hudLaserChargeDisplayDrawn;
 // GLOBAL: XWA 0x5A96E4
 int g_reticleAimPointDistanceBias = 40;
 // GLOBAL: XWA 0x68BFE8
-FlightTexQuad g_hudLaserChargeQuads[16];
+FlightTexQuad g_hudLaserChargeQuads[XWA_CRAFT_WEAPON_SLOT_COUNT];
 // GLOBAL: XWA 0x68C420
-FlightTexQuad g_hudIonChargeQuads[16];
+FlightTexQuad g_hudIonChargeQuads[XWA_CRAFT_WEAPON_SLOT_COUNT];
 // GLOBAL: XWA 0x5A96A0
 int g_hudEnergyBankLaserSelector = 0;
 // GLOBAL: XWA 0x5A96A4
@@ -5727,17 +5727,18 @@ void Hud_DrawPowerSettings3D(void) {
 
 static __inline int Hud_U16Layout(int value) { return value & 0xffff; }
 
-static __inline void Hud_ResetChargeQuads(FlightTexQuad quads[16]) {
+static __inline void Hud_ResetChargeQuads(FlightTexQuad quads[XWA_CRAFT_WEAPON_SLOT_COUNT]) {
 	int i;
 
-	for (i = 0; i < 16; ++i) {
+	for (i = 0; i < XWA_CRAFT_WEAPON_SLOT_COUNT; ++i) {
 		memset(&quads[i], 0, sizeof(quads[i]));
 		quads[i].depthZ = 1;
 		quads[i].screenSize = 256;
 	}
 }
 
-static __inline void Hud_SetChargeQuad(FlightTexQuad quads[16], int slot, int x, int y) {
+static __inline void Hud_SetChargeQuad(FlightTexQuad quads[XWA_CRAFT_WEAPON_SLOT_COUNT], int slot, int x,
+									   int y) {
 	quads[slot].screenX = x;
 	quads[slot].screenY = y;
 }
@@ -6127,7 +6128,7 @@ void Hud_DrawEnergyBar3D(int isIonBank, int bankWeaponCount) {
 	};
 	void(XWA_HUD_STDCALL * debugOutput)(const char*);
 	FlightTexQuad quad;
-	FlightTexQuad chargeQuads[16];
+	FlightTexQuad chargeQuads[XWA_CRAFT_WEAPON_SLOT_COUNT];
 	CraftData* craft;
 	uint8_t* chargePtr;
 	int* anchorY;
@@ -6158,7 +6159,7 @@ void Hud_DrawEnergyBar3D(int isIonBank, int bankWeaponCount) {
 		FlightTexQuad* initQuad;
 
 		initQuad = chargeQuads;
-		i = 16;
+		i = XWA_CRAFT_WEAPON_SLOT_COUNT;
 		do {
 			memset(initQuad, 0, sizeof(*initQuad));
 			initQuad->screenSize = HUD_ENERGY_BAR_BASE_SIZE;
@@ -8082,7 +8083,7 @@ void Hud_DrawEnergyBar2D(int isIonBank, int bankWeaponCount) {
 		HUD_ENERGY_BAR_REQUIRED_FEATURES = 0x0006,
 		HUD_ENERGY_BAR_REQUIRED_SUBSYSTEM = 0x0010
 	};
-	FlightTexQuad chargeQuads[16];
+	FlightTexQuad chargeQuads[XWA_CRAFT_WEAPON_SLOT_COUNT];
 	CraftData* craft;
 	uint16_t startWeapon;
 	uint16_t endWeapon;
@@ -8100,7 +8101,7 @@ void Hud_DrawEnergyBar2D(int isIonBank, int bankWeaponCount) {
 		return;
 	}
 
-	for (i = 0; i < 16; ++i) {
+	for (i = 0; i < XWA_CRAFT_WEAPON_SLOT_COUNT; ++i) {
 		chargeQuads[i].screenX = 0;
 		chargeQuads[i].screenY = 0;
 		chargeQuads[i].depthZ = 1;

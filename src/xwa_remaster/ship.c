@@ -1032,8 +1032,9 @@ float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f) {
 
 void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh* mesh,
 									   const float transform[16], float model_scale,
-									   const AeronSceneMeshTable* table, uint32_t knockout_mask, float scale,
-									   const float crows[9], const float cam_pos[3], const XwaAssetRef* tex) {
+									   const AeronSceneMeshTable* table, const uint32_t* knockout_mask,
+									   float scale, const float crows[9], const float cam_pos[3],
+									   const XwaAssetRef* tex) {
 	if (!scene || !mesh || !mesh->engine_glow_count || !transform || scale <= 0.0f ||
 		s_engine_emissive_strength <= 0.0f || !tex || !tex->texture) {
 		return;
@@ -1052,7 +1053,7 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 
 	for (uint32_t gi = 0; gi < mesh->engine_glow_count; gi++) {
 		const AeronFlightEngineGlow* g = &mesh->engine_glows[gi];
-		if (!g->enabled || (gi < 32 && (knockout_mask & (1u << gi)))) {
+		if (!g->enabled || (knockout_mask && gi < 256 && (knockout_mask[gi >> 5] & (1u << (gi & 31))))) {
 			continue;
 		}
 

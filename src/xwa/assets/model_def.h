@@ -78,9 +78,9 @@ typedef struct ModelDef {
 	uint8_t warheadLauncherLastSlot[2];
 	uint8_t warheadLauncherSlotCount[2];
 	uint8_t warheadLauncherValue[2];
-	ModelWeaponHardpoint weaponHardpoints[16];
-	OptEngineGlow* engineGlows[16];
-	uint8_t engineGlowMeshIdx[16];
+	ModelWeaponHardpoint weaponHardpoints[XWA_CRAFT_WEAPON_SLOT_COUNT];
+	OptEngineGlow* engineGlows[XWA_CRAFT_ENGINE_EMITTER_COUNT];
+	uint8_t engineGlowMeshIdx[XWA_CRAFT_ENGINE_EMITTER_COUNT];
 	uint8_t engineGlowCount;
 	uint8_t countermeasureCount;
 	int gunsightOffsetY;
@@ -112,16 +112,16 @@ typedef struct ModelDef {
 
 extern ModelDef g_modelDefs[XWA_MODEL_DEF_COUNT];
 extern MemoryHandle g_modelFloatHardpointDataHandles[XWA_LOADED_MODEL_COUNT];
-extern OptEngineGlow* g_cockpitEngineGlows[16];
-extern uint8_t g_cockpitEngineGlowMeshIdx[16];
+extern OptEngineGlow* g_cockpitEngineGlows[XWA_CRAFT_ENGINE_EMITTER_COUNT];
+extern uint8_t g_cockpitEngineGlowMeshIdx[XWA_CRAFT_ENGINE_EMITTER_COUNT];
 extern uint8_t g_cockpitEngineGlowCount;
 extern CockpitSparkHardpoint g_cockpitSparkHardpoints[16];
 extern uint8_t g_cockpitSparkHardpointCount;
-extern OptEngineGlow* g_exteriorEngineGlows[16];
-extern uint8_t g_exteriorEngineGlowMeshIdx[16];
+extern OptEngineGlow* g_exteriorEngineGlows[XWA_CRAFT_ENGINE_EMITTER_COUNT];
+extern uint8_t g_exteriorEngineGlowMeshIdx[XWA_CRAFT_ENGINE_EMITTER_COUNT];
 extern uint8_t g_exteriorEngineGlowCount;
-extern OptEngineGlow* g_spaceBombEngineGlows[16];
-extern uint8_t g_spaceBombEngineGlowMeshIdx[16];
+extern OptEngineGlow* g_spaceBombEngineGlows[XWA_CRAFT_ENGINE_EMITTER_COUNT];
+extern uint8_t g_spaceBombEngineGlowMeshIdx[XWA_CRAFT_ENGINE_EMITTER_COUNT];
 extern uint8_t g_spaceBombEngineGlowCount;
 extern uint8_t g_unusedSpaceBombEngineGlowInitByte;
 

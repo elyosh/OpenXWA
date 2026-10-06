@@ -31,6 +31,7 @@
 #include "xwa/util/color.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"
+#include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <stdio.h>
@@ -551,6 +552,14 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 	if ((g_modelTypeTable[loadedModelSlot].flags & MODEL_TYPE_FLAG_EXPANDED_TARGET_PROBE) == 0) {
 		uint8_t weaponSlot;
 		int remainingGroups;
+#ifdef XWA_MODERN
+		/* Modern port: GLB replacements keep up to 120 weapon slots (the
+		 * original compares against 16 below). */
+		const int weaponSlotLimit = XWA_MODEL_WEAPON_SLOT_LIMIT(modelSlot);
+#define FEDISKIO_WEAPON_SLOT_LIMIT weaponSlotLimit
+#else
+#define FEDISKIO_WEAPON_SLOT_LIMIT 16
+#endif
 
 		weaponSlot = 0;
 		{
@@ -565,7 +574,7 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 				uint8_t startSlot;
 				uint16_t scanMesh;
 
-				if (weaponSlot == 16) {
+				if (weaponSlot == FEDISKIO_WEAPON_SLOT_LIMIT) {
 					*laserGroupWeaponType = 0;
 					laserGroupFirstSlot[9] = 0;
 				} else {
@@ -612,7 +621,7 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 											pairedSlot = weaponSlot;
 										}
 										++weaponSlot;
-										if (weaponSlot == 16) {
+										if (weaponSlot == FEDISKIO_WEAPON_SLOT_LIMIT) {
 											break;
 										}
 									} else {
@@ -624,7 +633,7 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 										pairedSlot = 255;
 									}
 								}
-								if (weaponSlot == 16) {
+								if (weaponSlot == FEDISKIO_WEAPON_SLOT_LIMIT) {
 									break;
 								}
 							}
@@ -655,7 +664,7 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 				uint8_t startSlot;
 				uint16_t scanMesh;
 
-				if (weaponSlot == 16) {
+				if (weaponSlot == FEDISKIO_WEAPON_SLOT_LIMIT) {
 					*warheadLauncherType = 0;
 				} else {
 					targetType = (uint16_t)(*warheadLauncherType - 279);
@@ -686,11 +695,11 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 									g_modelDefs[modelEntryIdx].weaponHardpoints[weaponSlot].meshIdx =
 										(uint8_t)scanMesh;
 									++weaponSlot;
-									if (weaponSlot == 16) {
+									if (weaponSlot == FEDISKIO_WEAPON_SLOT_LIMIT) {
 										break;
 									}
 								}
-								if (weaponSlot == 16) {
+								if (weaponSlot == FEDISKIO_WEAPON_SLOT_LIMIT) {
 									break;
 								}
 							}
@@ -741,6 +750,7 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 	g_modelDefs[modelEntryIdx].craftPointValue = (uint16_t)result;
 	return result;
 }
+#undef FEDISKIO_WEAPON_SLOT_LIMIT
 
 // FUNCTION: XWA 0x433760
 void FeDiskIo_LoadExteriorGlowEmitters(unsigned int modelSlot) {
