@@ -6,6 +6,7 @@
 #include "aeron/vfs.h"
 #include "xwa/assets/model_mesh.h"
 #include "xwa/assets/opt_model_native.h"
+#include "xwa/flight/fediskio.h"
 #include "xwa/util/memory.h"
 #include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/models/model_source.h"
@@ -106,11 +107,21 @@ static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model
 				hasLaser |= OptSynth_IsLaserHardpoint(item->hardpoints[index].type);
 			}
 		}
+		/* The laser hardpoints become the model def's float hardpoints. Without
+		   any, the warhead launch point falls back to MainHull vertices, which
+		   reads out of range when there is no MainHull. */
 		if (!hasLaser) {
 			return OptSynth_Fail(key, "its model type needs a laser hardpoint (type 0-6, 9-11 or 18)");
 		}
+		/* The original code, and XWAU, run without a MainHull: hardpoints go to
+		   the nearest weapon-system mesh (root 0 when there is none), and only
+		   MainHull-keyed effects are lost. */
 		if (!hasMainHull) {
-			return OptSynth_Fail(key, "its model type needs a MainHull component");
+			Aeron_LogWarn(
+				"xwa.models",
+				"replacement '%s' has no MainHull component: no hull debris or forced hull "
+				"explosions, and float hardpoints without a weapon-system mesh belong to component 0",
+				key);
 		}
 	}
 	return 1;
@@ -131,6 +142,7 @@ static int OptSynth_Finite(const float* values, size_t count) {
    overflowed. */
 static int OptSynth_ValidateSimulation(const char* key, const AeronOptSimModel* simulation) {
 	uint32_t meshIndex;
+	uint32_t floatHardpoints = 0;
 
 	for (meshIndex = 0; meshIndex < simulation->mesh_count; ++meshIndex) {
 		const AeronOptSimMesh* mesh = &simulation->meshes[meshIndex];
@@ -164,6 +176,28 @@ static int OptSynth_ValidateSimulation(const char* key, const AeronOptSimModel* 
 			snprintf(reason, sizeof reason, "component %u has a non-finite value", meshIndex);
 			return OptSynth_Fail(key, reason);
 		}
+		/* Float hardpoints as FeDiskIo_BuildModelDef collects them: type 0 and
+		   laser-group hardpoints, plus a mirrored copy of each at more than 256
+		   OPT units off the centre line, up to 256 entries. */
+		for (index = 0; index < mesh->hardpoint_count; ++index) {
+			const int32_t type = mesh->hardpoints[index].type;
+			const int x = (int)mesh->hardpoints[index].position[0];
+
+			if (type != 0 && (type < 0 || type >= 40 || g_optHardpointWeaponGroupKindByType[type] != 1)) {
+				continue;
+			}
+			if (floatHardpoints < 256) {
+				++floatHardpoints;
+			}
+			if (floatHardpoints < 256 && (x > 256 || x < -256)) {
+				++floatHardpoints;
+			}
+		}
+	}
+	/* The model def stores the count in a byte: 256 reads back as none, which
+	   sends the warhead launch point to the MainHull-vertex fallback. */
+	if (floatHardpoints >= 256 && XwaModelSource_KeyRequiresFloatHardpoints(key)) {
+		return OptSynth_Fail(key, "256 or more float hardpoints (the model def holds at most 255)");
 	}
 	return 1;
 }

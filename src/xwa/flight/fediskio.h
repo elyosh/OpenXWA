@@ -23,6 +23,10 @@ struct ModelFloatHardpoint;
  */
 
 /* Owned resource handles + craft-load state (XWA 0x63CF38..0x63CF68). */
+/* Weapon-group kind per OPT hardpoint type: 1 = laser group, 2 = warhead
+ * launcher. Flag-0x800 model defs collect type 0 and kind-1 hardpoints as
+ * float hardpoints. */
+extern const uint8_t g_optHardpointWeaponGroupKindByType[40];
 extern MemoryHandle g_visibleObjectsHandle;
 extern MemoryHandle g_flightLog1BufferHandle;
 extern MemoryHandle g_flightTinyFontHandle;
