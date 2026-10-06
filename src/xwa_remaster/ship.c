@@ -693,6 +693,17 @@ static void ship_mat3x4_mul(float out[3][4], const float lhs[3][4], const float 
 	memcpy(out, result, sizeof result);
 }
 
+/* Slots a mesh table fills: the model's components. Craft state covers the
+ * first XWA_SNAP_MAX_MESH_SLOTS of them. */
+static uint32_t ship_table_slots(const AeronSceneMesh* mesh) {
+	return mesh->slot_count ? mesh->slot_count : 1u;
+}
+
+static uint32_t ship_state_slots(const AeronSceneMesh* mesh) {
+	const uint32_t slots = ship_table_slots(mesh);
+	return slots < XWA_SNAP_MAX_MESH_SLOTS ? slots : XWA_SNAP_MAX_MESH_SLOTS;
+}
+
 static int ship_bwing_bridge_slot(const AeronSceneMesh* mesh, uint32_t slots) {
 	if (!mesh) {
 		return -1;
@@ -728,11 +739,11 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 	if (!mesh || !f || !out || !f->has_craft) {
 		return 0;
 	}
-	const uint32_t slots =
-		AERON_MAX_MESH_SLOTS < XWA_SNAP_MAX_MESH_SLOTS ? AERON_MAX_MESH_SLOTS : XWA_SNAP_MAX_MESH_SLOTS;
+	const uint32_t slots = ship_state_slots(mesh);
 	float bwing_compensation[3][4];
 	const int has_bwing_compensation = ship_bwing_compensation(mesh, f, slots, bwing_compensation);
-	for (uint32_t mi = 0; mi < AERON_MAX_MESH_SLOTS; mi++) {
+	out->slot_count = ship_table_slots(mesh);
+	for (uint32_t mi = 0; mi < out->slot_count; mi++) {
 		if (has_bwing_compensation) {
 			memcpy(out->rows[mi], bwing_compensation, sizeof out->rows[mi]);
 		} else {
@@ -787,8 +798,7 @@ int XwaRemasterShip_BuildPreviousMeshTable(const AeronSceneMesh* mesh, const Xwa
 	if (current->object_type != XWA_SNAP_TYPE_BWING && !mesh->has_any_rotation) {
 		return 0;
 	}
-	const uint32_t slots =
-		AERON_MAX_MESH_SLOTS < XWA_SNAP_MAX_MESH_SLOTS ? AERON_MAX_MESH_SLOTS : XWA_SNAP_MAX_MESH_SLOTS;
+	const uint32_t slots = ship_state_slots(mesh);
 	if (current->object_type == XWA_SNAP_TYPE_BWING) {
 		const int bridge_slot = ship_bwing_bridge_slot(mesh, slots);
 		/* Bridge rotation drives every root, independently of whether the
@@ -809,15 +819,19 @@ int XwaRemasterShip_BuildPreviousMeshTable(const AeronSceneMesh* mesh, const Xwa
 	return 0;
 }
 
-int XwaRemasterShip_BuildDebrisMeshTable(const XwaFlightObject* f, AeronSceneMeshTable* out) {
-	if (!f || !out) {
+int XwaRemasterShip_BuildDebrisMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,
+										 AeronSceneMeshTable* out) {
+	if (!mesh || !f || !out) {
 		return 0;
 	}
 	const uint32_t comp = (uint32_t)(f->type_specific_0 >> 1);
-	if (comp >= AERON_MAX_MESH_SLOTS) {
+	/* Every slot of the model is filled: the shader clamps a vertex's slot
+	 * into the table, so a shorter table would show other components. */
+	out->slot_count = ship_table_slots(mesh);
+	if (comp >= out->slot_count) {
 		return 0;
 	}
-	for (uint32_t mi = 0; mi < AERON_MAX_MESH_SLOTS; mi++) {
+	for (uint32_t mi = 0; mi < out->slot_count; mi++) {
 		ship_mat3x4_identity(out->rows[mi]);
 		out->visibility_packed[mi >> 2][mi & 3] = mi == comp ? 1.0f : 0.0f;
 		out->highlight_packed[mi >> 2][mi & 3] = 0.0f;
@@ -856,12 +870,12 @@ int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaC
 		return XwaRemasterShip_BuildMeshTable(mesh, anchor, out);
 	}
 
-	const uint32_t slots =
-		AERON_MAX_MESH_SLOTS < XWA_SNAP_MAX_MESH_SLOTS ? AERON_MAX_MESH_SLOTS : XWA_SNAP_MAX_MESH_SLOTS;
+	const uint32_t slots = ship_state_slots(mesh);
 	float bwing_compensation[3][4];
 	const int has_bwing_compensation =
 		ship_bwing_compensation(mesh, anchor, slots, bwing_compensation);
-	for (uint32_t mi = 0; mi < AERON_MAX_MESH_SLOTS; mi++) {
+	out->slot_count = ship_table_slots(mesh);
+	for (uint32_t mi = 0; mi < out->slot_count; mi++) {
 		if (has_bwing_compensation) {
 			memcpy(out->rows[mi], bwing_compensation, sizeof out->rows[mi]);
 		} else {
@@ -959,9 +973,7 @@ int XwaRemasterShip_BuildPreviousCockpitMeshTable(
 				  memcmp(current_anchor->component_state, previous_anchor->component_state,
 						 sizeof current_anchor->component_state) != 0;
 	if (!changed && current_anchor->object_type == XWA_SNAP_TYPE_BWING) {
-		const uint32_t slots = AERON_MAX_MESH_SLOTS < XWA_SNAP_MAX_MESH_SLOTS
-							   ? AERON_MAX_MESH_SLOTS
-							   : XWA_SNAP_MAX_MESH_SLOTS;
+		const uint32_t slots = ship_state_slots(mesh);
 		const int bridge_slot = ship_bwing_bridge_slot(mesh, slots);
 		changed = bridge_slot >= 0 &&
 				  current_anchor->mesh_rotation[bridge_slot] != previous_anchor->mesh_rotation[bridge_slot];
@@ -1051,7 +1063,7 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 		float ax_look[3] = { g->look.x, g->look.y, g->look.z };
 		float ax_right[3] = { g->right.x, g->right.y, g->right.z };
 		float ax_up[3] = { g->up.x, g->up.y, g->up.z };
-		if (table && g->component_index < AERON_MAX_MESH_SLOTS) {
+		if (table && g->component_index < ship_table_slots(mesh)) {
 			const float (*rw)[4] = table->rows[g->component_index];
 			float tp[3], tv[3];
 			for (int r = 0; r < 3; r++) {
@@ -1273,7 +1285,7 @@ uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh
 		/* Anchor: mesh-table articulation + instance transform (the
 		 * same chain the glow quads use). */
 		float p[3] = { g->position.x, g->position.y, g->position.z };
-		if (table && g->component_index < AERON_MAX_MESH_SLOTS) {
+		if (table && g->component_index < ship_table_slots(mesh)) {
 			const float (*rw)[4] = table->rows[g->component_index];
 			float tp[3];
 			for (int r = 0; r < 3; r++) {

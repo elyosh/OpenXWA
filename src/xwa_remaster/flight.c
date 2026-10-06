@@ -3067,7 +3067,7 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 			return 0;
 		}
 		out->table = &s.tables[s.table_count];
-		if (!XwaRemasterShip_BuildDebrisMeshTable(object, out->table)) {
+		if (!XwaRemasterShip_BuildDebrisMeshTable(out->mesh, object, out->table)) {
 			out->table = NULL;
 			return 0;
 		}

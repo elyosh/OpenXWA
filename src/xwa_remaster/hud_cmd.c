@@ -222,7 +222,7 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 	memcpy(instance.prev_transform, transform, sizeof transform);
 	if (object->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK && s_cmd.table_count < 2) {
 		AeronSceneMeshTable* table = &s_cmd.tables[s_cmd.table_count];
-		if (!XwaRemasterShip_BuildDebrisMeshTable(object, table))
+		if (!XwaRemasterShip_BuildDebrisMeshTable(mesh, object, table))
 			return 0;
 		instance.mesh_table = table;
 		s_cmd.table_count++;

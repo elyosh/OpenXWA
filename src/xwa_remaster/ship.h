@@ -76,7 +76,8 @@ int XwaRemasterShip_BuildPreviousMeshTable(const AeronSceneMesh* mesh, const Xwa
  * the component focus point (renderOffset). Returns 0 only on a bad
  * component index — callers must then skip the instance entirely
  * (never draw the whole source model). */
-int XwaRemasterShip_BuildDebrisMeshTable(const XwaFlightObject* f, AeronSceneMeshTable* out);
+int XwaRemasterShip_BuildDebrisMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,
+										 AeronSceneMeshTable* out);
 
 /* Mesh table for the cockpit model. Pilot cockpits inherit articulation
  * and component visibility from the anchor craft. Turret cockpits retain
