@@ -84,9 +84,12 @@ typedef struct ModelDef {
 	uint8_t engineGlowCount;
 	uint8_t countermeasureCount;
 	int gunsightOffsetY;
-	int16_t primaryHardpointY;
-	int16_t primaryHardpointZ;
-	int16_t primaryHardpointX;
+	/* Pilot eye in the craft model's frame (+0x238). ComputeHardpointWorldPos
+	   places it at (X, -Y, Z); a Cockpit hardpoint (type 31) on the craft
+	   model sets Y and Z (FeDiskIo_BuildModelDef). */
+	int16_t cockpitEyeY;
+	int16_t cockpitEyeZ;
+	int16_t cockpitEyeX;
 	int16_t turretSeatPosY[2];
 	int16_t turretSeatPosZ[2];
 	int16_t turretSeatPosX[2];

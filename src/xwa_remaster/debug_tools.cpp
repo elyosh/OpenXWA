@@ -29,6 +29,7 @@
 #include "aeron/scene/present.h"
 #include "aeron/time.h"
 #include "xwa/flight/flight_debug.h"
+#include "xwa_runtime/models/cockpit_eye.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <cstdio>
@@ -1074,7 +1075,7 @@ static void xwa_tool_cockpit_eye(int* open, void* user) {
 	static int edit_model = -1;
 	int model = -1;
 	int eye[3];
-	if (FlightDebug_GetPlayerCockpitEye(&model, eye)) {
+	if (XwaCockpitEye_GetPlayer(&model, eye)) {
 		if (model != edit_model) {
 			edit_model = model;
 			memcpy(edit, eye, sizeof edit);
@@ -1082,19 +1083,33 @@ static void xwa_tool_cockpit_eye(int* open, void* user) {
 		ImGui::Text("Player model %d: X=%d Y=%d Z=%d", model, eye[0], eye[1], eye[2]);
 		ImGui::InputInt3("X, Y, Z", edit);
 		if (ImGui::Button("Apply")) {
-			FlightDebug_SetPlayerCockpitEye(edit);
+			XwaCockpitEye_SetPlayer(edit);
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Restore")) {
-			FlightDebug_RestorePlayerCockpitEye();
-			FlightDebug_GetPlayerCockpitEye(&model, edit);
+			XwaCockpitEye_RestorePlayer();
+			XwaCockpitEye_GetPlayer(&model, edit);
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Copy as hardpoint")) {
+			/* A Cockpit (type 31) hardpoint at OPT (X, -Y, Z) gives this eye.
+			   In Blender (glTF imported Z-up, metres): (-x, y, z) * 1600/65536. */
+			const float metres = 1600.0f / 65536.0f;
+			char text[192];
+			snprintf(text, sizeof text,
+					 "Cockpit hardpoint (type 31): OPT %d %d %d; Blender %.4f %.4f %.4f m; "
+					 "opt2gltf --cockpit-eye %d,%d,%d",
+					 eye[0], -eye[1], eye[2], -eye[0] * metres, -eye[1] * metres, eye[2] * metres, eye[0],
+					 eye[1], eye[2]);
+			ImGui::SetClipboardText(text);
 		}
 	} else {
 		edit_model = -1;
 		ImGui::TextDisabled("No player craft.");
 	}
 	ImGui::TextDisabled("Craft-table cockpit eye (+0x238), the values XWAU's CockpitPovX/Y/Z\n"
-						"set. Edits last until the model is reloaded.");
+						"set. Edits last until the model is reloaded. A GLB sets it with one\n"
+						"Cockpit (type 31) hardpoint on the craft model.");
 
 	ImGui::End();
 	*open = b ? 1 : 0;

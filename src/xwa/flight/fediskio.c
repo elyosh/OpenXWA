@@ -31,6 +31,7 @@
 #include "xwa/util/color.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"
+#include "xwa_runtime/models/cockpit_eye.h"
 #include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
@@ -302,6 +303,10 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 	g_modelDefs[modelEntryIdx].childMountPoints[3] = 0;
 	g_modelDefs[modelEntryIdx].childMountPoints[5] = ModelBounds_GetMaxY(modelSlot);
 	g_modelDefs[modelEntryIdx].childMountPoints[4] = 0;
+#ifdef XWA_MODERN
+	/* Modern port: restore the pilot eye before the hardpoints set it. */
+	XwaCockpitEye_ResetModelDef(modelEntryIdx);
+#endif
 	g_modelDefs[modelEntryIdx].dockPointCount = 0;
 	g_modelDefs[modelEntryIdx].engineGlowCount = 0;
 	g_modelDefs[modelEntryIdx].auxHardpointCount = 0;
@@ -393,8 +398,13 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 							handled = 1;
 							break;
 						case 10:
-							g_modelDefs[modelEntryIdx].primaryHardpointZ = (int16_t)outZ;
-							g_modelDefs[modelEntryIdx].primaryHardpointY = (int16_t)outY;
+							g_modelDefs[modelEntryIdx].cockpitEyeZ = (int16_t)outZ;
+							g_modelDefs[modelEntryIdx].cockpitEyeY = (int16_t)outY;
+#ifdef XWA_MODERN
+							/* Modern port: a GLB replacement's Cockpit hardpoint
+							 * also sets X. */
+							XwaCockpitEye_ApplyHardpointX(modelEntryIdx, (unsigned short)modelSlot, outX);
+#endif
 							handled = 1;
 							break;
 						case 1:

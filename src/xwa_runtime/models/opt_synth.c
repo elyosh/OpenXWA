@@ -26,6 +26,7 @@ enum {
 	OPT_SYNTH_MAX_GUNNER_HARDPOINTS = 8,
 	OPT_SYNTH_HARDPOINT_GUNNER = 19,
 	OPT_SYNTH_HARDPOINT_ACC_END = 24,
+	OPT_SYNTH_HARDPOINT_COCKPIT = 31,
 	OPT_SYNTH_VERTEX_SAMPLE_COUNT = 256,
 };
 
@@ -53,6 +54,7 @@ static int OptSynth_IsLaserHardpoint(int32_t type) {
 static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model) {
 	char reason[160];
 	uint32_t gunnerCount;
+	uint32_t cockpitEyeCount;
 	uint32_t component;
 	size_t tag;
 
@@ -75,6 +77,7 @@ static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model
 		return OptSynth_Fail(key, reason);
 	}
 	gunnerCount = 0;
+	cockpitEyeCount = 0;
 	for (component = 0; component < model->component_count; ++component) {
 		const AeronFlightComponent* item = &model->components[component];
 		uint32_t index;
@@ -82,12 +85,25 @@ static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model
 		for (index = 0; index < item->hardpoint_count; ++index) {
 			gunnerCount += item->hardpoints[index].type == OPT_SYNTH_HARDPOINT_GUNNER ||
 						   item->hardpoints[index].type == OPT_SYNTH_HARDPOINT_ACC_END;
+			cockpitEyeCount += item->hardpoints[index].type == OPT_SYNTH_HARDPOINT_COCKPIT;
 		}
 	}
 	if (gunnerCount > OPT_SYNTH_MAX_GUNNER_HARDPOINTS) {
 		snprintf(reason, sizeof reason, "%u Gunner/AccEnd hardpoints (at most %d)", gunnerCount,
 				 OPT_SYNTH_MAX_GUNNER_HARDPOINTS);
 		return OptSynth_Fail(key, reason);
+	}
+	/* FeDiskIo_BuildModelDef takes the pilot eye from the craft model's Cockpit
+	   hardpoint; with several, the last one in component order would win. */
+	if (cockpitEyeCount > 1) {
+		snprintf(reason, sizeof reason, "%u Cockpit (type 31) hardpoints (at most 1)", cockpitEyeCount);
+		return OptSynth_Fail(key, reason);
+	}
+	if (cockpitEyeCount != 0 && XwaModelSource_IsCockpitClassKey(key)) {
+		Aeron_LogWarn("xwa.models",
+					  "replacement '%s': cockpit models ignore Cockpit (type 31) hardpoints; the pilot eye "
+					  "belongs on the craft model",
+					  key);
 	}
 
 	if (!XwaModelRole_Validate(key, model, reason, sizeof reason)) {
