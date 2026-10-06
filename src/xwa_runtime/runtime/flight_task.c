@@ -1858,6 +1858,12 @@ int XwaFlightTask_Shutdown(void) {
 		std3D_Close(0);
 		std3D_Shutdown();
 	}
+	/* A session that ends during loading (a fatal asset error) still lends
+	 * the flight surfaces to the frontend; take them back before releasing
+	 * them, or the frontend releases them again at shutdown. */
+	if (FlightLoading_AreFrontendSurfacesAttached()) {
+		FlightLoading_DetachFrontendSurfaces();
+	}
 	FlightDisplay_FreeSurfaces();
 
 	g_useHardware3D = 0;
