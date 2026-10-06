@@ -48,6 +48,8 @@ static float s_opt_projectile_emissive_strength;
 static float s_engine_emissive_strength;
 static XwaShipPbrTuning g_pbr_tuning_default;
 static XwaShipPbrTuning g_pbr_tuning;
+/* AeronScene_SetBackfaceFill; debug inspector toggle, not persisted. */
+static int g_backface_fill = 1;
 
 static void ship_set_failure(AeronCommandBuffer* cmd, const char* format, ...) {
 	char message[512];
@@ -433,6 +435,14 @@ void XwaRemasterShip_ConfigurePbrTuning(const XwaShipPbrTuning* in) {
 		g_pbr_tuning = *in;
 	}
 }
+int XwaRemasterShip_BackfaceFill(void) {
+	return g_backface_fill;
+}
+
+void XwaRemasterShip_SetBackfaceFill(int enabled) {
+	g_backface_fill = enabled != 0;
+}
+
 void XwaRemasterShip_GetPbrTuningDefault(XwaShipPbrTuning* out) {
 	if (out) {
 		*out = g_pbr_tuning_default;
@@ -518,6 +528,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	AeronScene_SetPbrDebugViews(scene, env.debug_isolate_term != 0.0f || env.spec_geom_adapt == 0.0f);
 	AeronScene_SetPbrDebugMaterial(scene, g_pbr_tuning.debug_material_override != 0.0f,
 								   g_pbr_tuning.debug_metallic, g_pbr_tuning.debug_roughness);
+	AeronScene_SetBackfaceFill(scene, g_backface_fill);
 
 	/* HD relight: authored ambient fill (tuning.ambient, linear) plus
 	 * sun = decode(classic light color) x intensity. The game state

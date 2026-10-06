@@ -114,6 +114,12 @@ void XwaRemasterShip_SetPbrTuning(const XwaShipPbrTuning* in);
 void XwaRemasterShip_ConfigurePbrTuning(const XwaShipPbrTuning* in);
 void XwaRemasterShip_GetPbrTuningDefault(XwaShipPbrTuning* out);
 
+/* Dark back-face fill behind hairline cracks (AeronScene_SetBackfaceFill).
+ * On by default; the debug inspector toggles it for comparison and
+ * profiling. */
+int  XwaRemasterShip_BackfaceFill(void);
+void XwaRemasterShip_SetBackfaceFill(int enabled);
+
 /* Per-frame SSAO inputs for XwaRemasterShip_SetPbrEnv (mirrors TIE's
  * FlightPbrAoParams). NULL disables AO (intensity 0): the FS leaves
  * the ambient term untouched and the bound AO texture reads as 1. */

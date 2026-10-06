@@ -130,8 +130,17 @@ static void xwa_tool_pbr(int* open, void* user) {
 						"to check environment reflections without authored PBR assets.");
 
 	ImGui::Separator();
+	bool backface_fill = XwaRemasterShip_BackfaceFill() != 0;
+	if (ImGui::Checkbox("Back-face fill", &backface_fill)) {
+		XwaRemasterShip_SetBackfaceFill(backface_fill ? 1 : 0);
+	}
+	ImGui::TextDisabled("Dark interior behind cracks between model surfaces, instead of the\n"
+						"background. Off for comparison and profiling.");
+
+	ImGui::Separator();
 	if (ImGui::Button("Reset to defaults")) {
 		XwaRemasterShip_GetPbrTuningDefault(&t);
+		XwaRemasterShip_SetBackfaceFill(1);
 		changed = true;
 	}
 	if (changed) {
