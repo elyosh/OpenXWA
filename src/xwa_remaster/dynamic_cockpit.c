@@ -809,13 +809,22 @@ static void dc_route(AeronDrawList2D* screen, XwaRemasterDcLayer layer, const fl
 		emit(screen, record, 0, 0, &clip);
 	}
 
+	/* The capture clip is the slot, cut by the record's own scissor, not
+	 * the record's box: records only draw inside their box, and a clip
+	 * shared by every record of the slot lets the draw list merge them
+	 * (one draw per slot and texture instead of one per glyph). */
 	for (int c = 0; c < dc.capture_count; ++c) {
 		const int* r = dc.capture[c];
 		if (!dc_overlap(box, r))
 			continue;
 		const int dx = dc.capture_slot[c][0] - r[0], dy = dc.capture_slot[c][1] - r[1];
-		const int x0 = box[0] > r[0] ? box[0] : r[0], y0 = box[1] > r[1] ? box[1] : r[1];
-		const int x1 = box[2] < r[2] ? box[2] : r[2], y1 = box[3] < r[3] ? box[3] : r[3];
+		int       x0 = r[0], y0 = r[1], x1 = r[2], y1 = r[3];
+		if (dc_scissor_set(scissor)) {
+			x0 = x0 > scissor->x ? x0 : scissor->x;
+			y0 = y0 > scissor->y ? y0 : scissor->y;
+			x1 = x1 < scissor->x + scissor->width ? x1 : scissor->x + scissor->width;
+			y1 = y1 < scissor->y + scissor->height ? y1 : scissor->y + scissor->height;
+		}
 		const AeronRectI clip = { x0 + dx, y0 + dy, x1 - x0, y1 - y0 };
 		emit(dc.capture_list[layer], record, dx, dy, &clip);
 	}
