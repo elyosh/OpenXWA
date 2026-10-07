@@ -102,6 +102,7 @@ fails the build if a patch no longer applies.
 | Patch | Applies to | Purpose |
 |-|-|-|
 | `shadercross-fsr3.patch` | SDL_shadercross (host) | FSR3 shader generation support |
+| `shadercross-msl-bindings.patch` | SDL_shadercross (host) | Stable MSL storage-buffer slots when a graphics shader leaves a texture unused |
 | `sdl-gpu-d3d12-hdr.patch` | SDL3 (Windows target) | Lets the D3D12 SDL_GPU backend report and enable HDR swapchain compositions |
 
 SDL_shadercross is a build-host tool. The Dockerfile builds it for Linux and

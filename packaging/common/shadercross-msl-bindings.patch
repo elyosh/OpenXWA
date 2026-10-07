@@ -1,0 +1,28 @@
+diff --git a/src/SDL_shadercross.c b/src/SDL_shadercross.c
+index 20eef87..8b49801 100644
+--- a/src/SDL_shadercross.c
++++ b/src/SDL_shadercross.c
+@@ -985,17 +985,13 @@ static SPIRVTranspileContext *SDL_ShaderCross_INTERNAL_TranspileFromSPIRV(
+         SDL_zeroa(textureBindings);
+         Uint32 numTextureBindings = 0;
+ 
+-        spvc_set active_variables;
+-        result = spvc_compiler_get_active_interface_variables(compiler, &active_variables);
+-        if (result < 0) {
+-            SPVC_ERROR(spvc_compiler_get_active_interface_variables);
+-            spvc_context_destroy(context);
+-            return NULL;
+-        }
+-
+-        result = spvc_compiler_create_shader_resources_for_active_variables(compiler, &resources, active_variables);
++        // All declared resources, not only the active ones: the slots below
++        // are derived from resource counts, and SDL binds against the
++        // declared layout. Counting only active textures would shift every
++        // storage buffer when a shader leaves a texture unused.
++        result = spvc_compiler_create_shader_resources(compiler, &resources);
+         if (result < 0) {
+-            SPVC_ERROR(spvc_compiler_create_shader_resources_for_active_variables);
++            SPVC_ERROR(spvc_compiler_create_shader_resources);
+             spvc_context_destroy(context);
+             return NULL;
+         }

@@ -42,6 +42,7 @@ RUN git clone --branch "release-${SDL_VERSION}" --depth 1 \
     && cmake --install /build/sdl-host
 
 COPY packaging/common/shadercross-fsr3.patch /tmp/shadercross-fsr3.patch
+COPY packaging/common/shadercross-msl-bindings.patch /tmp/shadercross-msl-bindings.patch
 
 # DXC 1.9 requires glibc 2.38; keep the Debian 12-compatible 1.8 release.
 ARG DXC_VERSION=1.8.2502
@@ -55,6 +56,7 @@ ADD --checksum=sha256:${DXC_LINUX_X64_SHA256} \
 RUN git clone https://github.com/libsdl-org/SDL_shadercross.git /deps/SDL_shadercross \
     && git -C /deps/SDL_shadercross checkout "${SHADERCROSS_COMMIT}" \
     && git -C /deps/SDL_shadercross apply /tmp/shadercross-fsr3.patch \
+    && git -C /deps/SDL_shadercross apply /tmp/shadercross-msl-bindings.patch \
     && git -C /deps/SDL_shadercross submodule update --init --depth 1 \
         external/SPIRV-Cross \
     && mkdir -p \

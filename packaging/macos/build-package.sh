@@ -65,7 +65,7 @@ clone_tag() {
 
 prepare_shadercross() {
     local destination="${source_root}/SDL_shadercross"
-    local patch="${repo_root}/packaging/common/shadercross-fsr3.patch"
+    local patch
     local checkout
 
     if [[ ! -d "${destination}/.git" ]]; then
@@ -83,12 +83,16 @@ prepare_shadercross() {
         exit 1
     fi
 
-    if git -C "${destination}" apply --check "${patch}" >/dev/null 2>&1; then
-        git -C "${destination}" apply "${patch}"
-    elif ! git -C "${destination}" apply --reverse --check "${patch}" >/dev/null 2>&1; then
-        echo "SDL_shadercross patch cannot be applied cleanly" >&2
-        exit 1
-    fi
+    # In order: each patch applies on top of the previous ones.
+    for patch in "${repo_root}/packaging/common/shadercross-fsr3.patch" \
+        "${repo_root}/packaging/common/shadercross-msl-bindings.patch"; do
+        if git -C "${destination}" apply --check "${patch}" >/dev/null 2>&1; then
+            git -C "${destination}" apply "${patch}"
+        elif ! git -C "${destination}" apply --reverse --check "${patch}" >/dev/null 2>&1; then
+            echo "SDL_shadercross patch cannot be applied cleanly: ${patch}" >&2
+            exit 1
+        fi
+    done
 
     git -C "${destination}" submodule update --init --recursive
 }
