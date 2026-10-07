@@ -523,6 +523,37 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, i
 	(void)AeronDrawList_Prepare(text_list, cmd);
 }
 
+void XwaRemasterHudText_ForEachGlyph(int target_w, int target_h, XwaHudGlyphVisitor visit, void* context) {
+	const XwaHudLayout* layout = XwaRemasterHud_Layout();
+	if (!visit || !text_prepared.valid || !layout || text_prepared.layout_generation != layout->generation)
+		return;
+	const XwaHudLayoutProfile* profile = text_profile(layout);
+	if (!profile)
+		return;
+	int out_x, out_y;
+	float output_scale;
+	XwaRemasterHudLayout_OutputTransform(profile, target_w, target_h, &out_x, &out_y, &output_scale);
+	if (output_scale <= 0.0f)
+		return;
+	for (uint16_t i = 0; i < text_prepared.glyph_count; i++) {
+		const XwaHudGlyph* glyph = &text_prepared.glyphs[i];
+		const XwaHudPane* pane = text_find_pane(glyph->pane);
+		XwaHudMappedGlyph mapped;
+		if (glyph->font_tier >= 3 || glyph->scale == 0 ||
+			!XwaRemasterHudText_MapGlyph(pane, glyph, (XwaHudProfileIndex)text_prepared.profile,
+										 text_prepared.screen_w, text_prepared.screen_h, &mapped) ||
+			!text_mapped_glyph_visible(layout, glyph, (XwaHudProfileIndex)text_prepared.profile, &mapped))
+			continue;
+		/* The glyph's cell, its advance wide (the classic character width). */
+		const float advance =
+			(glyph->classic_w ? glyph->classic_w : glyph->scale) * mapped.w_ref / glyph->scale;
+		const float rect[4] = { out_x + mapped.x_ref * output_scale, out_y + mapped.y_ref * output_scale,
+								out_x + (mapped.x_ref + advance) * output_scale,
+								out_y + (mapped.y_ref + mapped.h_ref) * output_scale };
+		visit(context, glyph->pane, glyph->ch, rect);
+	}
+}
+
 void XwaRemasterHudText_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							   int target_w, int target_h) {
 	if (!cmd || !pass || !target || !text_list || !text_prepared.valid || target_w <= 0 ||

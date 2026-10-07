@@ -118,6 +118,18 @@ models:
 effects:
   explosion_genus_emissive_strength: 2.5
   glow_mark_emissive_strength: 5.0
+dynamic_cockpit:
+  # Cockpit displays showing the HUD, from XWAU Dynamic Cockpit data in
+  # converted cockpit models (docs/dynamic_cockpit.md).
+  enabled: true
+  # Keep the whole 2D HUD on screen (XWAU's D key); transparent displays
+  # without always_visible are hidden and the throttle bar is not drawn.
+  classic_hud: false
+  # Hologram displays visible.
+  holograms: true
+  # Emissive multipliers of the display content and of holograms.
+  display_emissive_strength: 1.5
+  hologram_emissive_strength: 1.5
 assets:
   prefer_original_2d: false
 presentation:

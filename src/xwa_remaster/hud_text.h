@@ -15,6 +15,11 @@ void XwaRemasterHudText_Shutdown(void);
 void XwaRemasterHudText_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex profile,
 							  uint32_t bundle_generation);
 void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, int target_h);
+/* Visits the pane glyphs the prepared text draws, each with its pane, its
+ * character and its cell (x0, y0, x1, y1 in target pixels, the classic
+ * advance wide). */
+typedef void (*XwaHudGlyphVisitor)(void* context, uint16_t pane, uint8_t ch, const float rect[4]);
+void XwaRemasterHudText_ForEachGlyph(int target_w, int target_h, XwaHudGlyphVisitor visit, void* context);
 void XwaRemasterHudText_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 							   AeronRenderTarget* target, int target_w, int target_h);
 int XwaRemasterHudText_MapGlyph(const XwaHudPane* pane, const XwaHudGlyph* glyph, XwaHudProfileIndex profile,

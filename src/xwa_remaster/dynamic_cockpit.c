@@ -7,6 +7,7 @@
 #include "xwa_remaster/hud.h"
 #include "xwa_remaster/hud_fixed.h"
 #include "xwa_remaster/hud_layout.h"
+#include "xwa_remaster/hud_text.h"
 
 #include <math.h>
 #include <string.h>
@@ -169,6 +170,12 @@ static struct {
 	AeronSceneScreenFrame frame;
 	AeronDrawList2D* composite[2];
 	int composite_prepared;
+	/* Sources fitted to the top text (42-49): grow-only boxes since the
+	 * cockpit or the target size last changed (DCResetSubRegions). */
+	float auto_box[8][4];
+	uint32_t auto_valid;
+	const void* auto_owner;
+	int auto_w, auto_h;
 	/* Hologram animation, advanced by game time. */
 	float holo_time, holo_fade;
 	int32_t last_game_ms;
@@ -358,6 +365,13 @@ void XwaRemasterDc_BeginFrame(const XwaSnapshot* snapshot, const AeronSceneMesh*
 		dc.erased = dc.settings.classic_hud ? 0u : dc.hide_mask & ((1u << XWA_DC_REGION_COUNT) - 1u);
 	}
 	XwaRemasterHudFixed_SetPanelSplit(dc.active, dc.erased);
+	if ((cockpit_mesh && cockpit_mesh != dc.auto_owner) || target_w != dc.auto_w || target_h != dc.auto_h) {
+		dc.auto_valid = 0;
+		if (cockpit_mesh)
+			dc.auto_owner = cockpit_mesh;
+		dc.auto_w = target_w;
+		dc.auto_h = target_h;
+	}
 
 	/* Hologram time and fade follow game time, so they hold while paused
 	 * (dynamic_cockpit.md D30: XWAU's 0.04 per frame at 60 fps). */
@@ -392,6 +406,144 @@ static void dc_place_boxes(int target_w, int target_h) {
 	for (unsigned i = 0; i < XWA_DC_REGION_COUNT; ++i)
 		if (dc_place(&dc_regions[i], quads, quads_valid, dc.region_box[i]))
 			dc.region_valid |= 1u << i;
+}
+
+/* ---- Sources from the HUD text and laser charges ------------------ */
+
+enum {
+	DC_AUTO_MISSILES_L = 42,
+	DC_AUTO_MISSILES_R = 43,
+	DC_AUTO_SPEED = 44,
+	DC_AUTO_CHAFF = 45,
+	DC_AUTO_NAME = 46,
+	DC_AUTO_TIME = 47,
+	DC_AUTO_MISSILES_B = 48,
+	DC_AUTO_MISSILES_MIS = 49,
+	DC_ENERGY_DUAL_L = 50,
+	DC_ENERGY_DUAL_R = 51,
+	DC_ENERGY_QUAD_LU = 52,
+	DC_ENERGY_QUAD_LD = 53,
+	DC_ENERGY_QUAD_RU = 54,
+	DC_ENERGY_QUAD_RD = 55,
+	DC_ENERGY_ALL = 56,
+};
+
+static void dc_union(float box[4], const float r[4], int first) {
+	if (first) {
+		memcpy(box, r, 4 * sizeof *box);
+		return;
+	}
+	box[0] = fminf(box[0], r[0]);
+	box[1] = fminf(box[1], r[1]);
+	box[2] = fmaxf(box[2], r[2]);
+	box[3] = fmaxf(box[3], r[3]);
+}
+
+static void dc_grow_auto(unsigned source, const float r[4]) {
+	const unsigned slot = source - DC_AUTO_MISSILES_L;
+	dc_union(dc.auto_box[slot], r, !(dc.auto_valid & (1u << slot)));
+	dc.auto_valid |= 1u << slot;
+}
+
+/* PrimarySurface::ExtractDCText's per-region character rules, applied to
+ * the HUD panes holding the same text. `context` is the missile side: 0
+ * before the ':' of the warhead counts, 1 after. */
+static void dc_visit_glyph(void* context, uint16_t pane, uint8_t ch, const float rect[4]) {
+	int* missile_side = (int*)context;
+	const int digit = ch >= '0' && ch <= '9';
+	switch ((XwaHudPaneId)pane) {
+		case XWA_HUD_PANE_TOP_SPEED:
+			if (digit)
+				dc_grow_auto(DC_AUTO_SPEED, rect);
+			break;
+		case XWA_HUD_PANE_TOP_CLOCK:
+			if (digit || ch == ':')
+				dc_grow_auto(DC_AUTO_TIME, rect);
+			break;
+		case XWA_HUD_PANE_TOP_COUNTERMEASURE:
+			if (ch != ' ')
+				dc_grow_auto(DC_AUTO_CHAFF, rect);
+			break;
+		case XWA_HUD_PANE_TOP_CRAFT_NAME:
+			dc_grow_auto(DC_AUTO_NAME, rect);
+			break;
+		case XWA_HUD_PANE_TOP_WEAPONS:
+			dc_grow_auto(DC_AUTO_MISSILES_B, rect);
+			if (ch == ' ')
+				break;
+			dc_grow_auto(DC_AUTO_MISSILES_MIS, rect);
+			if (ch == ':')
+				*missile_side = 1;
+			else
+				dc_grow_auto(*missile_side ? DC_AUTO_MISSILES_R : DC_AUTO_MISSILES_L, rect);
+			break;
+		default:
+			break;
+	}
+}
+
+/* DcEnergyBarData::ReduceAndLabelBoxes: the laser-charge boxes (HUD.dat
+ * 2300, lasers and ion cannons alike) reduced to the strip through their
+ * centres, labelled by count, and their union. */
+static void dc_place_energy_bars(int target_w, int target_h) {
+	const XwaHudPreparedDrawState* draw = XwaRemasterHud_PreparedDrawState();
+	if (!draw || !draw->valid)
+		return;
+	float boxes[16][4];
+	int count = 0;
+	for (uint16_t i = 0; i < draw->record_count && count < 16; ++i) {
+		const XwaHudDrawRecord* r = &draw->records[i];
+		float quad[4];
+		if ((r->widget == XWA_HUD_WIDGET_LASER_CHARGE || r->widget == XWA_HUD_WIDGET_ION_CHARGE) &&
+			r->object_type == OBJ_HudTextureGroup12000 && r->frame == 23 &&
+			XwaRemasterHudFixed_RecordQuad(r, target_w, target_h, quad)) {
+			boxes[count][0] = quad[0];
+			boxes[count][1] = quad[1];
+			boxes[count][2] = quad[0] + quad[2];
+			boxes[count][3] = quad[1] + quad[3];
+			count++;
+		}
+	}
+	if (count == 0)
+		return;
+	float min_y = boxes[0][1], max_y = boxes[0][3];
+	for (int i = 1; i < count; ++i) {
+		min_y = fminf(min_y, boxes[i][1]);
+		max_y = fmaxf(max_y, boxes[i][3]);
+	}
+	const float mid_x = 0.5f * (float)target_w, mid_y = 0.5f * (min_y + max_y);
+	float all[4];
+	for (int i = 0; i < count; ++i) {
+		const float w = boxes[i][2] - boxes[i][0], h = boxes[i][3] - boxes[i][1];
+		const float x = 0.5f * (boxes[i][0] + boxes[i][2]), y = 0.5f * (boxes[i][1] + boxes[i][3]);
+		const float reduced[4] = { x - 28.5f / 64.0f * w, y - 0.5f / 64.0f * h, x + 28.5f / 64.0f * w,
+								   y + 0.5f / 64.0f * h };
+		dc_union(all, reduced, i == 0);
+		int source = -1;
+		if (count == 2)
+			source = x < mid_x ? DC_ENERGY_DUAL_L : DC_ENERGY_DUAL_R;
+		else if (count == 4)
+			source = y < mid_y ? (x < mid_x ? DC_ENERGY_QUAD_LU : DC_ENERGY_QUAD_RU)
+							   : (x < mid_x ? DC_ENERGY_QUAD_LD : DC_ENERGY_QUAD_RD);
+		if (source >= 0) {
+			memcpy(dc.source_box[source], reduced, sizeof reduced);
+			dc.source_valid |= (uint64_t)1 << source;
+		}
+	}
+	memcpy(dc.source_box[DC_ENERGY_ALL], all, sizeof all);
+	dc.source_valid |= (uint64_t)1 << DC_ENERGY_ALL;
+}
+
+static void dc_place_dynamic(int target_w, int target_h) {
+	int missile_side = 0;
+	XwaRemasterHudText_ForEachGlyph(target_w, target_h, dc_visit_glyph, &missile_side);
+	for (unsigned slot = 0; slot < 8; ++slot) {
+		if (!(dc.auto_valid & (1u << slot)))
+			continue;
+		memcpy(dc.source_box[DC_AUTO_MISSILES_L + slot], dc.auto_box[slot], sizeof dc.auto_box[slot]);
+		dc.source_valid |= (uint64_t)1 << (DC_AUTO_MISSILES_L + slot);
+	}
+	dc_place_energy_bars(target_w, target_h);
 }
 
 /* The display inputs (AeronSceneScreenFrame) of this frame. */
@@ -543,6 +695,7 @@ void XwaRemasterDc_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
 	if (target_w <= 0 || target_h <= 0)
 		return;
 	dc_place_boxes(target_w, target_h);
+	dc_place_dynamic(target_w, target_h);
 	if (cmd && dc.graphics_rt && (dc.active || dc.warm_pending)) {
 		dc_capture(cmd, target_w, target_h);
 		dc.warm_pending = 0;

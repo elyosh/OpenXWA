@@ -455,18 +455,28 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"bloom.intensity",
 		"effects.explosion_genus_emissive_strength",
 		"effects.glow_mark_emissive_strength",
+		"dynamic_cockpit.display_emissive_strength",
+		"dynamic_cockpit.hologram_emissive_strength",
 		"motion_blur.shutter",
 		"temporal_upscaling.sharpness",
 		"texture_filtering.max_anisotropy",
 	};
 	static const char* bools[] = {
 		"presentation.hdr_output",
-		"point_lights.enabled",          "point_lights.clustered",
-		"point_lights.cluster_debug",    "skybox.enabled",
-		"motion_blur.camera_blur",       "motion_blur.pause_keep_blur",
-		"motion_blur.velocity_viz",      "motion_blur.fsr_direct_motion",
+		"point_lights.enabled",
+		"point_lights.clustered",
+		"point_lights.cluster_debug",
+		"skybox.enabled",
+		"motion_blur.camera_blur",
+		"motion_blur.pause_keep_blur",
+		"motion_blur.velocity_viz",
+		"motion_blur.fsr_direct_motion",
 		"texture_filtering.anisotropic",
-		"hangar_lighting.enabled",       "lighting.spec_geom_adapt",
+		"hangar_lighting.enabled",
+		"lighting.spec_geom_adapt",
+		"dynamic_cockpit.enabled",
+		"dynamic_cockpit.classic_hud",
+		"dynamic_cockpit.holograms",
 	};
 	static const char* strings[] = {
 		"skybox.path", "skybox.mode", "temporal_upscaling.mode",
@@ -825,6 +835,25 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+
+	/* Dynamic Cockpit (dynamic_cockpit.md D21, D31, D34). */
+	const XwaRemasterDcSettings dc_settings = {
+		.enabled = AeronConfigFile_GetBool(cf, "dynamic_cockpit.enabled", 1),
+		.classic_hud = AeronConfigFile_GetBool(cf, "dynamic_cockpit.classic_hud", 0),
+		.holograms = AeronConfigFile_GetBool(cf, "dynamic_cockpit.holograms", 1),
+		.display_emissive_strength =
+			(float)AeronConfigFile_GetFloat(cf, "dynamic_cockpit.display_emissive_strength", 0.0),
+		.hologram_emissive_strength =
+			(float)AeronConfigFile_GetFloat(cf, "dynamic_cockpit.hologram_emissive_strength", 0.0),
+	};
+	if (!isfinite(dc_settings.display_emissive_strength) || dc_settings.display_emissive_strength <= 0.0f ||
+		!isfinite(dc_settings.hologram_emissive_strength) || dc_settings.hologram_emissive_strength <= 0.0f) {
+		Aeron_LogError("xwa.remaster", "%s: dynamic_cockpit emissive strengths must be finite and positive",
+					   path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	XwaRemasterDc_SetSettings(&dc_settings);
 
 	s.mb_quality = (int)AeronConfigFile_GetInt(cf, "motion_blur.quality", 0);
 	if (s.mb_quality < 0 || s.mb_quality > 2) {
