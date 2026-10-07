@@ -4638,6 +4638,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			inst.cull_mode = AERON_CULL_BACK;
 			inst.shadow_flags =
 				AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_USE_RECEIVER_LOCAL_SHADOW;
+			/* Holograms and transparent screens carry the cockpit's motion
+			 * vectors, so motion blur does not smear them with the view
+			 * behind. */
+			inst.velocity_stamp_screens = 1;
 			AeronSceneMeshTable* tb = &s.tables[s.table_count];
 			if (XwaRemasterShip_BuildCockpitMeshTable(cockpit_mesh, &snap->cockpit, cockpit_anchor, tb)) {
 				inst.mesh_table = tb;
