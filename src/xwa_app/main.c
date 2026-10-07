@@ -4,6 +4,7 @@
 #include "setup.h"
 #include "window_icon.h"
 #include "xwa/config/game_config.h"
+#include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
@@ -457,6 +458,16 @@ int main(int argc, char** argv) {
 				(in->key_down[AERON_KEY_LALT] || in->key_down[AERON_KEY_RALT]) &&
 				in->key_pressed[AERON_KEY_A + ('m' - 'a')]) {
 				XwaPort_ToggleMouseCapture();
+				toggled = 1;
+			}
+			/* Ctrl+H toggles the Dynamic Cockpit holograms (XWAU's binding)
+			 * while a cockpit with screens is shown, skipping the tick so the
+			 * chord (control code 0x08, KEY_BACKSPACE) never reaches classic
+			 * input. */
+			if (in && (in->key_down[AERON_KEY_LCTRL] || in->key_down[AERON_KEY_RCTRL]) &&
+				!(in->key_down[AERON_KEY_LALT] || in->key_down[AERON_KEY_RALT]) &&
+				in->key_pressed[AERON_KEY_A + ('h' - 'a')] && XwaRemasterDc_Active()) {
+				XwaRemasterDc_ToggleHolograms();
 				toggled = 1;
 			}
 			XwaRemaster_BeginFrame(in);

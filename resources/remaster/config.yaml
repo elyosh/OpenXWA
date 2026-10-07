@@ -125,7 +125,7 @@ dynamic_cockpit:
   # Keep the whole 2D HUD on screen (XWAU's D key); transparent displays
   # without always_visible are hidden and the throttle bar is not drawn.
   classic_hud: false
-  # Hologram displays visible.
+  # Hologram displays visible; Ctrl+H toggles them in flight.
   holograms: true
   # Emissive multipliers of the display content and of holograms.
   display_emissive_strength: 1.5
