@@ -380,6 +380,9 @@ void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* sna
 	XwaRemasterHudFixed_Build(snapshot, profile, bundle_generation, flight_view, target_w, target_h);
 	XwaRemasterHudBoxes_Build(snapshot, profile, bundle_generation, flight_view, target_w, target_h);
 	XwaRemasterHudText_Build(snapshot, profile, bundle_generation);
+	/* The Dynamic Cockpit's boxes come from the built HUD; its routing
+	 * (XwaRemasterDc_AddSprite) needs them as the lists are prepared. */
+	XwaRemasterDc_PlaceFrame(target_w, target_h);
 	XwaRemasterHudBoxes_PrepareDrawLists(cmd, target_w, target_h);
 	XwaRemasterHudFixed_PrepareDrawList(cmd, target_w, target_h);
 	XwaRemasterHudCmd_PrepareDrawList(cmd, target_w, target_h);

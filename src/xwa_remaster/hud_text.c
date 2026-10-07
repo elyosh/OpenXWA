@@ -2,6 +2,7 @@
 
 #include "aeron/scene/draw_list2d.h"
 #include "xwa_remaster/color.h"
+#include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/hud_boxes.h"
 #include "xwa_remaster/hud_fixed.h"
 #include "xwa_remaster/hud_layout.h"
@@ -375,7 +376,7 @@ static void text_build_target_box_readouts(const XwaSnapshot* snapshot) {
 int XwaRemasterHudText_Init(void) {
 	if (text_list)
 		return 1;
-	text_list = AeronDrawList_Create(XWA_SNAP_MAX_HUD_GLYPHS + 128);
+	text_list = AeronDrawList_Create(XWA_SNAP_MAX_HUD_GLYPHS + 512); /* + erase-clipped pieces */
 	return text_list != NULL;
 }
 
@@ -479,7 +480,7 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, i
 				sprite.tint[3] = a;
 				sprite.blend = AERON_BLIT2D_BLEND_PMA;
 				sprite.filter = AERON_BLIT2D_FILTER_LINEAR;
-				AeronDrawList_AddSprite(text_list, &sprite);
+				XwaRemasterDc_AddSprite(text_list, XWA_DC_LAYER_TEXT, &sprite);
 			}
 		}
 	}
@@ -517,7 +518,7 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, i
 		sprite.tint[3] = a;
 		sprite.blend = AERON_BLIT2D_BLEND_PMA;
 		sprite.filter = AERON_BLIT2D_FILTER_LINEAR;
-		AeronDrawList_AddSprite(text_list, &sprite);
+		XwaRemasterDc_AddSprite(text_list, XWA_DC_LAYER_TEXT, &sprite);
 	}
 	XwaRemasterHud_EndRenderPhase();
 	(void)AeronDrawList_Prepare(text_list, cmd);

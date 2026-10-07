@@ -6,6 +6,7 @@
 #include "aeron/scene/present.h"
 #include "aeron/scene/scene3d.h"
 #include "xwa_remaster/color.h"
+#include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/effects.h"
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/glow_marks.h"
@@ -545,7 +546,7 @@ static int cmd_ensure_targets(int width, int height) {
 
 int XwaRemasterHudCmd_Init(void) {
 	if (!s_cmd.draw_list)
-		s_cmd.draw_list = AeronDrawList_Create(8);
+		s_cmd.draw_list = AeronDrawList_Create(32); /* + erase-clipped pieces */
 	if (!s_cmd.trails)
 		s_cmd.trails = XwaRemasterTrails_Create();
 	if (!s_cmd.particles)
@@ -801,7 +802,7 @@ void XwaRemasterHudCmd_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, in
 						? AERON_BLIT2D_FILTER_LINEAR
 						: AERON_BLIT2D_FILTER_NEAREST;
 	sprite.scissor = scissor;
-	AeronDrawList_AddSprite(s_cmd.draw_list, &sprite);
+	XwaRemasterDc_AddSprite(s_cmd.draw_list, XWA_DC_LAYER_GRAPHICS, &sprite);
 	if (s_cmd.prepared.marker_visible) {
 		const uint32_t argb = XwaSnapshotExport_FlightPaletteColor(63);
 		const float a = ((argb >> 24) & 255) / 255.0f;
@@ -815,14 +816,16 @@ void XwaRemasterHudCmd_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, in
 		const float pixel_y = h / (float)s_cmd.prepared.classic_viewport_h;
 		const float mx = x + s_cmd.prepared.marker_x * w - 2.0f * pixel_x;
 		const float my = y + s_cmd.prepared.marker_y * h - 2.0f * pixel_y;
-		AeronDrawList_AddFill(s_cmd.draw_list, mx, my, 4.0f * pixel_x, pixel_y, color, AERON_BLIT2D_BLEND_PMA,
+		AeronDrawList2D* list = s_cmd.draw_list;
+		const XwaRemasterDcLayer layer = XWA_DC_LAYER_GRAPHICS;
+		XwaRemasterDc_AddFill(list, layer, mx, my, 4.0f * pixel_x, pixel_y, color, AERON_BLIT2D_BLEND_PMA,
 							  &scissor);
-		AeronDrawList_AddFill(s_cmd.draw_list, mx, my + 3.0f * pixel_y, 4.0f * pixel_x, pixel_y, color,
+		XwaRemasterDc_AddFill(list, layer, mx, my + 3.0f * pixel_y, 4.0f * pixel_x, pixel_y, color,
 							  AERON_BLIT2D_BLEND_PMA, &scissor);
-		AeronDrawList_AddFill(s_cmd.draw_list, mx, my + pixel_y, pixel_x, 2.0f * pixel_y, color,
+		XwaRemasterDc_AddFill(list, layer, mx, my + pixel_y, pixel_x, 2.0f * pixel_y, color,
 							  AERON_BLIT2D_BLEND_PMA, &scissor);
-		AeronDrawList_AddFill(s_cmd.draw_list, mx + 3.0f * pixel_x, my + pixel_y, pixel_x, 2.0f * pixel_y,
-							  color, AERON_BLIT2D_BLEND_PMA, &scissor);
+		XwaRemasterDc_AddFill(list, layer, mx + 3.0f * pixel_x, my + pixel_y, pixel_x, 2.0f * pixel_y, color,
+							  AERON_BLIT2D_BLEND_PMA, &scissor);
 	}
 	(void)AeronDrawList_Prepare(s_cmd.draw_list, cmd);
 }

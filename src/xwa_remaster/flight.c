@@ -3397,21 +3397,8 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	if (s.suppress_hud) {
 		return;
 	}
-	if (!s.map_present && XwaRemasterDc_Active()) {
-		/* Dynamic Cockpit (dynamic_cockpit.md D9, D10): panels drawn
-		 * directly, the captured foreground and text minus the regions the
-		 * cockpit's screens show. */
-		Aeron_GpuDebugMarker(cmd, "HUD dynamic cockpit");
-		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
-										 XWA_HUD_TARGET_BOX_BEFORE_FIXED);
-		XwaRemasterHudFixed_RenderPanels(cmd, pass, target);
-		XwaRemasterDc_RenderComposite(cmd, pass, target, 0);
-		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
-										 XWA_HUD_TARGET_BOX_AFTER_FIXED);
-		XwaRemasterDc_RenderComposite(cmd, pass, target, 1);
-		XwaRemasterDc_RenderDebugOverlay(cmd, pass, target);
-		return;
-	}
+	/* With the Dynamic Cockpit active the HUD's lists already leave out
+	 * what the cockpit's screens show (XwaRemasterDc_AddSprite). */
 	if (!s.map_present) {
 		Aeron_GpuDebugMarker(cmd, "HUD target boxes before fixed");
 		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
@@ -4061,8 +4048,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	}
 	memcpy(s.origin_world, flight_view.origin_world, sizeof s.origin_world);
 	memcpy(s.camera_local, flight_view.camera.pos, sizeof s.camera_local);
-	/* Dynamic Cockpit: decided before the HUD prepares its lists (the
-	 * panel split), captured after. */
+	/* Dynamic Cockpit: decided before the HUD prepares its lists (which
+	 * route through it), captured after. */
 	XwaRemasterDc_BeginFrame(snap,
 							 !cam->map_mode && fl_cockpit_drawn(snap, cam)
 								 ? XwaRemasterShip_MeshForName(snap->cockpit.model_name)

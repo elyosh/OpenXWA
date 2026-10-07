@@ -161,15 +161,29 @@ static struct {
 	int active;
 	uint32_t hide_mask;
 	uint32_t erased;
-	/* Capture targets (G graphics, T text) at the HUD's target size. */
-	AeronRenderTarget* graphics_rt;
-	AeronRenderTarget* text_rt;
-	int rt_w, rt_h;
+	/* The sources the cockpit's screens sample: the only ones captured. */
+	uint64_t source_mask;
+	/* Boxes placed this frame (PlaceFrame). */
+	int placed;
+	/* Erased regions in target pixels (x0, y0, x1, y1): routed records are
+	 * not drawn there on the 2D HUD. */
+	int erase[XWA_DC_REGION_COUNT][4];
+	int erase_count;
+	/* The capture: the sources padded and merged, in target pixels, their
+	 * slots in the atlas and each source's capture rectangle (-1: none). */
+	int capture[XWA_DC_SOURCE_COUNT][4];
+	int capture_slot[XWA_DC_SOURCE_COUNT][2];
+	int capture_count;
+	int8_t source_capture[XWA_DC_SOURCE_COUNT];
+	/* Capture atlases per XwaRemasterDcLayer, their lists (open between
+	 * PlaceFrame and Prepare) and their size. */
+	AeronRenderTarget* atlas[2];
+	AeronDrawList2D* capture_list[2];
+	int atlas_w, atlas_h;
+	int capture_open;
 	int warm_pending;
-	/* Display inputs and the 2D HUD composite (G, T) of this frame. */
+	/* Display inputs of this frame. */
 	AeronSceneScreenFrame frame;
-	AeronDrawList2D* composite[2];
-	int composite_prepared;
 	/* Sources fitted to the top text (42-49): grow-only boxes since the
 	 * cockpit or the target size last changed (DCResetSubRegions). */
 	float auto_box[8][4];
@@ -192,26 +206,36 @@ static const XwaRemasterDcSettings dc_default_settings = {
 	.hologram_emissive_strength = 1.5f,
 };
 
+/* Capture layout: the padding around each source (bilinear sampling at its
+ * edges reads the same texels as on the HUD), the atlas size steps and
+ * limit, and the most pieces an erase-clipped record splits into. */
+#define DC_CAPTURE_PAD 2
+#define DC_ATLAS_MIN_W 1024
+#define DC_ATLAS_STEP 256
+#define DC_ATLAS_MAX 8192
+#define DC_MAX_PIECES 32
+
 int XwaRemasterDc_Init(void) {
 	if (!dc.overlay)
 		dc.overlay = AeronDrawList_Create(0);
 	for (int i = 0; i < 2; ++i)
-		if (!dc.composite[i])
-			dc.composite[i] = AeronDrawList_Create(1024);
+		if (!dc.capture_list[i])
+			dc.capture_list[i] = AeronDrawList_Create(8192);
 	dc.overlay_highlight = -1;
 	if (!dc.settings.display_emissive_strength)
 		dc.settings = dc_default_settings;
 	dc.holo_fade = dc.settings.holograms ? 1.0f : 0.0f;
-	return dc.overlay != NULL && dc.composite[0] != NULL && dc.composite[1] != NULL;
+	return dc.overlay != NULL && dc.capture_list[0] != NULL && dc.capture_list[1] != NULL;
 }
 
 void XwaRemasterDc_ReleaseTargets(void) {
-	if (dc.graphics_rt)
-		Aeron_DestroyRenderTarget(dc.graphics_rt);
-	if (dc.text_rt)
-		Aeron_DestroyRenderTarget(dc.text_rt);
-	dc.graphics_rt = dc.text_rt = NULL;
-	dc.rt_w = dc.rt_h = 0;
+	for (int i = 0; i < 2; ++i) {
+		if (dc.atlas[i])
+			Aeron_DestroyRenderTarget(dc.atlas[i]);
+		dc.atlas[i] = NULL;
+	}
+	dc.atlas_w = dc.atlas_h = 0;
+	dc.capture_open = 0;
 	dc.active = 0;
 }
 
@@ -220,8 +244,8 @@ void XwaRemasterDc_Shutdown(void) {
 	if (dc.overlay)
 		AeronDrawList_Destroy(dc.overlay);
 	for (int i = 0; i < 2; ++i)
-		if (dc.composite[i])
-			AeronDrawList_Destroy(dc.composite[i]);
+		if (dc.capture_list[i])
+			AeronDrawList_Destroy(dc.capture_list[i]);
 	const XwaRemasterDcSettings settings = dc.settings;
 	memset(&dc, 0, sizeof dc);
 	dc.settings = settings;
@@ -324,27 +348,27 @@ static int dc_place(const DcRect* rect, const float quads[DC_ANCHOR_IMAGE_COUNT]
 
 /* ---- Frame -------------------------------------------------------- */
 
-static int dc_ensure_targets(int target_w, int target_h) {
-	if (dc.graphics_rt && dc.rt_w == target_w && dc.rt_h == target_h)
+/* Atlases of at least w x h, grown in DC_ATLAS_STEP steps (active is
+ * kept: the atlas only grows between frames' captures). */
+static int dc_ensure_atlas(int w, int h) {
+	if (dc.atlas[0] && dc.atlas[1] && dc.atlas_w >= w && dc.atlas_h >= h)
 		return 1;
-	XwaRemasterDc_ReleaseTargets();
-	dc.graphics_rt =
-		Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = target_w,
-															.height = target_h,
-															.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
-															.debug_name = "xwa.dc.graphics" });
-	dc.text_rt =
-		Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = target_w,
-															.height = target_h,
-															.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
-															.debug_name = "xwa.dc.text" });
-	if (!dc.graphics_rt || !dc.text_rt) {
-		Aeron_LogError("xwa.remaster", "dynamic cockpit capture targets failed at %dx%d", target_w, target_h);
+	w = ((w > dc.atlas_w ? w : dc.atlas_w) + DC_ATLAS_STEP - 1) / DC_ATLAS_STEP * DC_ATLAS_STEP;
+	h = ((h > dc.atlas_h ? h : dc.atlas_h) + DC_ATLAS_STEP - 1) / DC_ATLAS_STEP * DC_ATLAS_STEP;
+	static const char* const names[2] = { "xwa.dc.graphics", "xwa.dc.text" };
+	for (int i = 0; i < 2; ++i) {
+		if (dc.atlas[i])
+			Aeron_DestroyRenderTarget(dc.atlas[i]);
+		dc.atlas[i] = Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) {
+			.width = w, .height = h, .format = AERON_TEXTURE_FORMAT_RGBA8_SRGB, .debug_name = names[i] });
+	}
+	if (!dc.atlas[0] || !dc.atlas[1]) {
+		Aeron_LogError("xwa.remaster", "dynamic cockpit capture atlas failed at %dx%d", w, h);
 		XwaRemasterDc_ReleaseTargets();
 		return 0;
 	}
-	dc.rt_w = target_w;
-	dc.rt_h = target_h;
+	dc.atlas_w = w;
+	dc.atlas_h = h;
 	/* Capture once now so the draw-list pipelines for this format are made
 	 * with the other flight pipelines, not when the cockpit first shows. */
 	dc.warm_pending = 1;
@@ -356,15 +380,19 @@ void XwaRemasterDc_BeginFrame(const XwaSnapshot* snapshot, const AeronSceneMesh*
 	dc.active = 0;
 	dc.erased = 0;
 	dc.hide_mask = 0;
+	dc.source_mask = 0;
+	dc.placed = 0;
+	dc.capture_open = 0;
 	if (!dc.settings.enabled || target_w <= 0 || target_h <= 0) {
 		XwaRemasterDc_ReleaseTargets();
-	} else if (dc_ensure_targets(target_w, target_h) && cockpit_mesh &&
+	} else if (dc_ensure_atlas(DC_ATLAS_MIN_W, DC_ATLAS_STEP) && cockpit_mesh &&
 			   (cockpit_mesh->screen_rect_count > 0 || cockpit_mesh->screen_hide_mask != 0)) {
 		dc.active = 1;
 		dc.hide_mask = cockpit_mesh->screen_hide_mask;
+		dc.source_mask = cockpit_mesh->screen_source_mask;
 		dc.erased = dc.settings.classic_hud ? 0u : dc.hide_mask & ((1u << XWA_DC_REGION_COUNT) - 1u);
 	}
-	XwaRemasterHudFixed_SetPanelSplit(dc.active, dc.erased);
+	XwaRemasterHudFixed_SetDynamicCockpit(dc.active, dc.erased);
 	if ((cockpit_mesh && cockpit_mesh != dc.auto_owner) || target_w != dc.auto_w || target_h != dc.auto_h) {
 		dc.auto_valid = 0;
 		if (cockpit_mesh)
@@ -547,17 +575,21 @@ static void dc_place_dynamic(int target_w, int target_h) {
 }
 
 /* The display inputs (AeronSceneScreenFrame) of this frame. */
-static void dc_build_frame(const XwaSnapshot* snapshot, int target_w, int target_h) {
+static void dc_build_frame(const XwaSnapshot* snapshot) {
 	AeronSceneScreenFrame* f = &dc.frame;
 	memset(f, 0, sizeof *f);
+	/* Each source where its capture rectangle sits in the atlas. */
 	for (unsigned i = 0; i < XWA_DC_SOURCE_COUNT; ++i) {
-		if (!(dc.source_valid & ((uint64_t)1 << i)))
+		const int c = dc.source_capture[i];
+		if (!(dc.source_valid & ((uint64_t)1 << i)) || c < 0)
 			continue;
+		const float dx = (float)(dc.capture_slot[c][0] - dc.capture[c][0]);
+		const float dy = (float)(dc.capture_slot[c][1] - dc.capture[c][1]);
 		f->valid[i >> 5] |= 1u << (i & 31u);
-		f->source[i][0] = dc.source_box[i][0] / (float)target_w;
-		f->source[i][1] = dc.source_box[i][1] / (float)target_h;
-		f->source[i][2] = dc.source_box[i][2] / (float)target_w;
-		f->source[i][3] = dc.source_box[i][3] / (float)target_h;
+		f->source[i][0] = (dc.source_box[i][0] + dx) / (float)dc.atlas_w;
+		f->source[i][1] = (dc.source_box[i][1] + dy) / (float)dc.atlas_h;
+		f->source[i][2] = (dc.source_box[i][2] + dx) / (float)dc.atlas_w;
+		f->source[i][3] = (dc.source_box[i][3] + dy) / (float)dc.atlas_h;
 	}
 	const XwaHudState* hud = snapshot ? &snapshot->hud : NULL;
 	/* D17: the backgrounds the reticle frames follow in hud_fixed.c. */
@@ -578,147 +610,337 @@ static void dc_build_frame(const XwaSnapshot* snapshot, int target_w, int target
 	f->holo_color[3] = dc.settings.hologram_emissive_strength;
 }
 
-/* The 2D HUD composite: G and T drawn over the target minus the erased
- * regions, as sprites over the cells of the grid the region edges make. */
-static void dc_prepare_composite(AeronCommandBuffer* cmd, int target_w, int target_h) {
-	dc.composite_prepared = 0;
-	float xs[2 + 2 * XWA_DC_REGION_COUNT], ys[2 + 2 * XWA_DC_REGION_COUNT];
-	float erase[XWA_DC_REGION_COUNT][4];
-	int nx = 0, ny = 0, ne = 0;
-	xs[nx++] = 0.0f;
-	xs[nx++] = (float)target_w;
-	ys[ny++] = 0.0f;
-	ys[ny++] = (float)target_h;
+/* ---- Capture layout ----------------------------------------------- */
+
+static int dc_overlap(const int a[4], const int b[4]) {
+	return a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+}
+
+/* The erased regions, rounded to the pixels whose centres they cover. */
+static void dc_layout_erase(void) {
+	dc.erase_count = 0;
 	for (unsigned i = 0; i < XWA_DC_REGION_COUNT; ++i) {
 		if (!(dc.erased & dc.region_valid & (1u << i)))
 			continue;
-		float* e = erase[ne++];
-		e[0] = fmaxf(0.0f, fminf((float)target_w, fminf(dc.region_box[i][0], dc.region_box[i][2])));
-		e[2] = fmaxf(0.0f, fminf((float)target_w, fmaxf(dc.region_box[i][0], dc.region_box[i][2])));
-		e[1] = fmaxf(0.0f, fminf((float)target_h, fminf(dc.region_box[i][1], dc.region_box[i][3])));
-		e[3] = fmaxf(0.0f, fminf((float)target_h, fmaxf(dc.region_box[i][1], dc.region_box[i][3])));
-		xs[nx++] = e[0];
-		xs[nx++] = e[2];
-		ys[ny++] = e[1];
-		ys[ny++] = e[3];
+		const float* r = dc.region_box[i];
+		int* e = dc.erase[dc.erase_count];
+		e[0] = (int)lroundf(fminf(r[0], r[2]));
+		e[1] = (int)lroundf(fminf(r[1], r[3]));
+		e[2] = (int)lroundf(fmaxf(r[0], r[2]));
+		e[3] = (int)lroundf(fmaxf(r[1], r[3]));
+		if (e[2] > e[0] && e[3] > e[1])
+			dc.erase_count++;
 	}
-	/* Sort and dedupe the edges (at most 24 each). */
-	for (int i = 1; i < nx; ++i)
-		for (int j = i; j > 0 && xs[j] < xs[j - 1]; --j) {
-			const float v = xs[j];
-			xs[j] = xs[j - 1];
-			xs[j - 1] = v;
-		}
-	for (int i = 1; i < ny; ++i)
-		for (int j = i; j > 0 && ys[j] < ys[j - 1]; --j) {
-			const float v = ys[j];
-			ys[j] = ys[j - 1];
-			ys[j - 1] = v;
-		}
-	AeronTexture* textures[2] = { Aeron_RenderTargetGetTexture(dc.graphics_rt),
-								  Aeron_RenderTargetGetTexture(dc.text_rt) };
-	if (!textures[0] || !textures[1])
-		return;
-	for (int layer = 0; layer < 2; ++layer)
-		AeronDrawList_Begin(dc.composite[layer], NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
-	for (int row = 0; row + 1 < ny; ++row) {
-		const float y0 = ys[row], y1 = ys[row + 1];
-		if (y1 <= y0)
+}
+
+/* The capture rectangles: the valid sources the cockpit's screens sample,
+ * padded by DC_CAPTURE_PAD (outside the target too: the screens sample
+ * whole sources), merged where they overlap, shelf-packed tallest first
+ * into the atlas. */
+static void dc_layout_capture(void) {
+	dc.capture_count = 0;
+	memset(dc.source_capture, -1, sizeof dc.source_capture);
+	int padded[XWA_DC_SOURCE_COUNT][4];
+	const uint64_t captured = dc.source_valid & dc.source_mask;
+	for (unsigned i = 0; i < XWA_DC_SOURCE_COUNT; ++i) {
+		if (!(captured & ((uint64_t)1 << i)))
 			continue;
-		int run_start = -1;
-		for (int col = 0; col + 1 <= nx; ++col) {
-			int keep = 0;
-			if (col + 1 < nx && xs[col + 1] > xs[col]) {
-				const float cx = 0.5f * (xs[col] + xs[col + 1]), cy = 0.5f * (y0 + y1);
-				keep = 1;
-				for (int e = 0; e < ne && keep; ++e)
-					keep = !(cx > erase[e][0] && cx < erase[e][2] && cy > erase[e][1] && cy < erase[e][3]);
-			} else if (col + 1 < nx) {
-				keep = run_start >= 0; /* zero-width cell: continue the run */
+		const float* b = dc.source_box[i];
+		int* p = padded[i];
+		p[0] = (int)floorf(fminf(b[0], b[2])) - DC_CAPTURE_PAD;
+		p[1] = (int)floorf(fminf(b[1], b[3])) - DC_CAPTURE_PAD;
+		p[2] = (int)ceilf(fmaxf(b[0], b[2])) + DC_CAPTURE_PAD;
+		p[3] = (int)ceilf(fmaxf(b[1], b[3])) + DC_CAPTURE_PAD;
+		memcpy(dc.capture[dc.capture_count++], p, sizeof padded[i]);
+	}
+	for (int merged = 1; merged;) {
+		merged = 0;
+		for (int a = 0; a < dc.capture_count && !merged; ++a)
+			for (int b = a + 1; b < dc.capture_count && !merged; ++b) {
+				if (!dc_overlap(dc.capture[a], dc.capture[b]))
+					continue;
+				int* r = dc.capture[a];
+				const int* o = dc.capture[b];
+				r[0] = r[0] < o[0] ? r[0] : o[0];
+				r[1] = r[1] < o[1] ? r[1] : o[1];
+				r[2] = r[2] > o[2] ? r[2] : o[2];
+				r[3] = r[3] > o[3] ? r[3] : o[3];
+				memcpy(dc.capture[b], dc.capture[--dc.capture_count], sizeof dc.capture[b]);
+				merged = 1;
 			}
-			if (keep && run_start < 0)
-				run_start = col;
-			if (!keep && run_start >= 0) {
-				const float x0 = xs[run_start], x1 = xs[col];
-				for (int layer = 0; layer < 2; ++layer) {
-					AeronDrawList2DSprite sprite = { 0 };
-					sprite.texture = textures[layer];
-					sprite.src_u0 = x0 / (float)target_w;
-					sprite.src_u1 = x1 / (float)target_w;
-					sprite.src_v0 = y0 / (float)target_h;
-					sprite.src_v1 = y1 / (float)target_h;
-					sprite.dst_x = x0;
-					sprite.dst_y = y0;
-					sprite.dst_w = x1 - x0;
-					sprite.dst_h = y1 - y0;
-					sprite.tint[0] = sprite.tint[1] = sprite.tint[2] = sprite.tint[3] = 1.0f;
-					sprite.blend = AERON_BLIT2D_BLEND_PMA;
-					sprite.filter = AERON_BLIT2D_FILTER_NEAREST;
-					AeronDrawList_AddSprite(dc.composite[layer], &sprite);
-				}
-				run_start = -1;
-			}
+	}
+	for (unsigned i = 0; i < XWA_DC_SOURCE_COUNT; ++i) {
+		if (!(captured & ((uint64_t)1 << i)))
+			continue;
+		for (int c = 0; c < dc.capture_count && dc.source_capture[i] < 0; ++c)
+			if (dc.capture[c][0] <= padded[i][0] && dc.capture[c][1] <= padded[i][1] &&
+				dc.capture[c][2] >= padded[i][2] && dc.capture[c][3] >= padded[i][3])
+				dc.source_capture[i] = (int8_t)c;
+	}
+
+	int order[XWA_DC_SOURCE_COUNT];
+	int width = DC_ATLAS_MIN_W;
+	for (int c = 0; c < dc.capture_count; ++c) {
+		const int w = dc.capture[c][2] - dc.capture[c][0];
+		width = w > width ? w : width;
+		int j = c;
+		for (; j > 0; --j) {
+			const int* prev = dc.capture[order[j - 1]];
+			if (prev[3] - prev[1] >= dc.capture[c][3] - dc.capture[c][1])
+				break;
+			order[j] = order[j - 1];
 		}
+		order[j] = c;
 	}
-	dc.composite_prepared =
-		AeronDrawList_Prepare(dc.composite[0], cmd) && AeronDrawList_Prepare(dc.composite[1], cmd);
-}
-
-/* Draws the HUD's foreground and text into G and T. */
-static void dc_capture(AeronCommandBuffer* cmd, int target_w, int target_h) {
-	AeronRenderPass* pass =
-		Aeron_BeginRenderPass(&(AeronRenderPassDesc) { .color_target = dc.graphics_rt,
-													   .clear_color = 1,
-													   .clear_color_rgba = { 0, 0, 0, 0 },
-													   .command_buffer = cmd,
-													   .debug_label = "OpenXWA DC graphics" });
-	if (pass) {
-		XwaRemasterHud_RenderFixed(cmd, pass, dc.graphics_rt, target_w, target_h);
-		XwaRemasterHud_RenderCmd(cmd, pass, dc.graphics_rt, target_w, target_h);
-		Aeron_EndRenderPass(pass);
+	int x = 0, y = 0, shelf = 0;
+	for (int k = 0; k < dc.capture_count; ++k) {
+		const int* r = dc.capture[order[k]];
+		const int w = r[2] - r[0], h = r[3] - r[1];
+		if (x + w > width) {
+			x = 0;
+			y += shelf;
+			shelf = 0;
+		}
+		dc.capture_slot[order[k]][0] = x;
+		dc.capture_slot[order[k]][1] = y;
+		x += w;
+		shelf = h > shelf ? h : shelf;
 	}
-	pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) { .color_target = dc.text_rt,
-														  .clear_color = 1,
-														  .clear_color_rgba = { 0, 0, 0, 0 },
-														  .command_buffer = cmd,
-														  .debug_label = "OpenXWA DC text" });
-	if (pass) {
-		XwaRemasterHud_RenderText(cmd, pass, dc.text_rt, target_w, target_h);
-		Aeron_EndRenderPass(pass);
+	if (width > DC_ATLAS_MAX || y + shelf > DC_ATLAS_MAX || !dc_ensure_atlas(width, y + shelf)) {
+		dc.capture_count = 0;
+		memset(dc.source_capture, -1, sizeof dc.source_capture);
 	}
 }
 
-void XwaRemasterDc_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot, int target_w, int target_h) {
+void XwaRemasterDc_PlaceFrame(int target_w, int target_h) {
 	dc.source_valid = 0;
 	dc.region_valid = 0;
-	dc.composite_prepared = 0;
+	dc.erase_count = 0;
+	dc.capture_count = 0;
+	dc.capture_open = 0;
 	if (target_w <= 0 || target_h <= 0)
 		return;
 	dc_place_boxes(target_w, target_h);
 	dc_place_dynamic(target_w, target_h);
-	if (cmd && dc.graphics_rt && (dc.active || dc.warm_pending)) {
-		dc_capture(cmd, target_w, target_h);
+	dc.placed = 1;
+	if (dc.active) {
+		dc_layout_erase();
+		dc_layout_capture();
+	}
+	if (dc.atlas[0] && dc.atlas[1] && (dc.active || dc.warm_pending)) {
+		static const float clear_rgba[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+		for (int i = 0; i < 2; ++i) {
+			AeronDrawList_Begin(dc.capture_list[i], NULL, dc.atlas_w, dc.atlas_h, AERON_DRAWLIST2D_LOAD, NULL);
+			/* A transparent pixel makes the warm-up capture build the
+			 * HUD sprites' pipeline for the atlas format. */
+			if (!dc.active)
+				AeronDrawList_AddFill(dc.capture_list[i], 0.0f, 0.0f, 1.0f, 1.0f, clear_rgba,
+									  AERON_BLIT2D_BLEND_PMA, NULL);
+		}
+		dc.capture_open = 1;
+	}
+}
+
+/* ---- Record routing ----------------------------------------------- */
+
+/* Adds `record` to `list` moved by (dx, dy) and clipped to `scissor`
+ * (NULL or empty: unclipped). */
+typedef void (*DcEmitFn)(AeronDrawList2D* list, const void* record, int dx, int dy, const AeronRectI* scissor);
+
+static int dc_scissor_set(const AeronRectI* s) { return s && s->width > 0 && s->height > 0; }
+
+/* The parts of `box` outside the erased regions, or -1 when it meets none
+ * (or splits into more than DC_MAX_PIECES: drawn whole). */
+static int dc_visible_pieces(const int box[4], int pieces[DC_MAX_PIECES][4]) {
+	int n = 1, touched = 0;
+	memcpy(pieces[0], box, 4 * sizeof *box);
+	for (int e = 0; e < dc.erase_count; ++e) {
+		const int* r = dc.erase[e];
+		int next[DC_MAX_PIECES][4], m = 0;
+		for (int p = 0; p < n; ++p) {
+			const int* q = pieces[p];
+			if (!dc_overlap(q, r)) {
+				if (m == DC_MAX_PIECES)
+					return -1;
+				memcpy(next[m++], q, sizeof next[0]);
+				continue;
+			}
+			touched = 1;
+			const int y0 = q[1] > r[1] ? q[1] : r[1], y1 = q[3] < r[3] ? q[3] : r[3];
+			const int split[4][4] = { { q[0], q[1], q[2], r[1] },
+									  { q[0], r[3], q[2], q[3] },
+									  { q[0], y0, r[0], y1 },
+									  { r[2], y0, q[2], y1 } };
+			for (int k = 0; k < 4; ++k) {
+				if (split[k][2] <= split[k][0] || split[k][3] <= split[k][1])
+					continue;
+				if (m == DC_MAX_PIECES)
+					return -1;
+				memcpy(next[m++], split[k], sizeof next[0]);
+			}
+		}
+		memcpy(pieces, next, (size_t)m * sizeof next[0]);
+		n = m;
+	}
+	return touched ? n : -1;
+}
+
+/* `bounds` (x0, y0, x1, y1) covers what the record draws, `scissor` its
+ * own clip. */
+static void dc_route(AeronDrawList2D* screen, XwaRemasterDcLayer layer, const float bounds[4],
+					 const AeronRectI* scissor, DcEmitFn emit, const void* record) {
+	int box[4] = { (int)floorf(bounds[0]), (int)floorf(bounds[1]), (int)ceilf(bounds[2]), (int)ceilf(bounds[3]) };
+	if (dc_scissor_set(scissor)) {
+		box[0] = box[0] > scissor->x ? box[0] : scissor->x;
+		box[1] = box[1] > scissor->y ? box[1] : scissor->y;
+		box[2] = box[2] < scissor->x + scissor->width ? box[2] : scissor->x + scissor->width;
+		box[3] = box[3] < scissor->y + scissor->height ? box[3] : scissor->y + scissor->height;
+	}
+	if (box[2] <= box[0] || box[3] <= box[1])
+		return;
+
+	int pieces[DC_MAX_PIECES][4];
+	const int n = dc_visible_pieces(box, pieces);
+	if (n < 0)
+		emit(screen, record, 0, 0, scissor);
+	for (int p = 0; p < n; ++p) {
+		const AeronRectI clip = { pieces[p][0], pieces[p][1], pieces[p][2] - pieces[p][0],
+								  pieces[p][3] - pieces[p][1] };
+		emit(screen, record, 0, 0, &clip);
+	}
+
+	for (int c = 0; c < dc.capture_count; ++c) {
+		const int* r = dc.capture[c];
+		if (!dc_overlap(box, r))
+			continue;
+		const int dx = dc.capture_slot[c][0] - r[0], dy = dc.capture_slot[c][1] - r[1];
+		const int x0 = box[0] > r[0] ? box[0] : r[0], y0 = box[1] > r[1] ? box[1] : r[1];
+		const int x1 = box[2] < r[2] ? box[2] : r[2], y1 = box[3] < r[3] ? box[3] : r[3];
+		const AeronRectI clip = { x0 + dx, y0 + dy, x1 - x0, y1 - y0 };
+		emit(dc.capture_list[layer], record, dx, dy, &clip);
+	}
+}
+
+static int dc_routing(void) { return dc.active && dc.capture_open; }
+
+static void dc_emit_sprite(AeronDrawList2D* list, const void* record, int dx, int dy, const AeronRectI* scissor) {
+	AeronDrawList2DSprite sprite = *(const AeronDrawList2DSprite*)record;
+	sprite.dst_x += (float)dx;
+	sprite.dst_y += (float)dy;
+	sprite.scissor = dc_scissor_set(scissor) ? *scissor : (AeronRectI) { 0 };
+	AeronDrawList_AddSprite(list, &sprite);
+}
+
+void XwaRemasterDc_AddSprite(AeronDrawList2D* screen, XwaRemasterDcLayer layer,
+							 const AeronDrawList2DSprite* sprite) {
+	if (!screen || !sprite)
+		return;
+	if (!dc_routing()) {
+		AeronDrawList_AddSprite(screen, sprite);
+		return;
+	}
+	/* Trapezoid insets may widen the top edge. */
+	const float spread = fmaxf(fabsf(sprite->trap_top_dx_left_px), fabsf(sprite->trap_top_dx_right_px));
+	const float bounds[4] = { fminf(sprite->dst_x, sprite->dst_x + sprite->dst_w) - spread,
+							  fminf(sprite->dst_y, sprite->dst_y + sprite->dst_h),
+							  fmaxf(sprite->dst_x, sprite->dst_x + sprite->dst_w) + spread,
+							  fmaxf(sprite->dst_y, sprite->dst_y + sprite->dst_h) };
+	dc_route(screen, layer, bounds, &sprite->scissor, dc_emit_sprite, sprite);
+}
+
+static void dc_emit_quad4(AeronDrawList2D* list, const void* record, int dx, int dy, const AeronRectI* scissor) {
+	AeronDrawList2DQuad4 quad = *(const AeronDrawList2DQuad4*)record;
+	for (int c = 0; c < 4; ++c) {
+		quad.corners[c][0] += (float)dx;
+		quad.corners[c][1] += (float)dy;
+	}
+	quad.scissor = dc_scissor_set(scissor) ? *scissor : (AeronRectI) { 0 };
+	AeronDrawList_AddQuad4(list, &quad);
+}
+
+void XwaRemasterDc_AddQuad4(AeronDrawList2D* screen, XwaRemasterDcLayer layer, const AeronDrawList2DQuad4* quad) {
+	if (!screen || !quad)
+		return;
+	if (!dc_routing()) {
+		AeronDrawList_AddQuad4(screen, quad);
+		return;
+	}
+	float bounds[4] = { quad->corners[0][0], quad->corners[0][1], quad->corners[0][0], quad->corners[0][1] };
+	for (int c = 1; c < 4; ++c) {
+		bounds[0] = fminf(bounds[0], quad->corners[c][0]);
+		bounds[1] = fminf(bounds[1], quad->corners[c][1]);
+		bounds[2] = fmaxf(bounds[2], quad->corners[c][0]);
+		bounds[3] = fmaxf(bounds[3], quad->corners[c][1]);
+	}
+	dc_route(screen, layer, bounds, &quad->scissor, dc_emit_quad4, quad);
+}
+
+typedef struct DcFill {
+	float x, y, w, h;
+	const float* rgba;
+	AeronBlit2DBlend blend;
+} DcFill;
+
+static void dc_emit_fill(AeronDrawList2D* list, const void* record, int dx, int dy, const AeronRectI* scissor) {
+	const DcFill* f = (const DcFill*)record;
+	AeronDrawList_AddFill(list, f->x + (float)dx, f->y + (float)dy, f->w, f->h, f->rgba, f->blend,
+						  dc_scissor_set(scissor) ? scissor : NULL);
+}
+
+void XwaRemasterDc_AddFill(AeronDrawList2D* screen, XwaRemasterDcLayer layer, float x, float y, float w, float h,
+						   const float rgba[4], AeronBlit2DBlend blend, const AeronRectI* scissor) {
+	if (!screen || !rgba)
+		return;
+	if (!dc_routing()) {
+		AeronDrawList_AddFill(screen, x, y, w, h, rgba, blend, scissor);
+		return;
+	}
+	const DcFill fill = { x, y, w, h, rgba, blend };
+	const float bounds[4] = { x, y, x + w, y + h };
+	dc_route(screen, layer, bounds, scissor, dc_emit_fill, &fill);
+}
+
+/* ---- Frame end ----------------------------------------------------- */
+
+void XwaRemasterDc_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot, int target_w, int target_h) {
+	if (!dc.placed) {
+		/* The HUD was not built this frame: nothing is placed. */
+		dc.source_valid = 0;
+		dc.region_valid = 0;
+		dc.capture_count = 0;
+	}
+	if (cmd && dc.capture_open) {
+		static const char* const labels[2] = { "OpenXWA DC graphics", "OpenXWA DC text" };
+		for (int i = 0; i < 2; ++i) {
+			/* Cleared even when empty: the screens sample every source. */
+			const int prepared = AeronDrawList_Prepare(dc.capture_list[i], cmd);
+			AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
+				.color_target = dc.atlas[i],
+				.clear_color = 1,
+				.clear_color_rgba = { 0, 0, 0, 0 },
+				.command_buffer = cmd,
+				.debug_label = labels[i],
+			});
+			if (!pass)
+				continue;
+			if (prepared)
+				AeronDrawList_RenderIntoPass(dc.capture_list[i], cmd, pass, dc.atlas[i]);
+			Aeron_EndRenderPass(pass);
+		}
 		dc.warm_pending = 0;
 	}
-	if (cmd && dc.active) {
-		dc_build_frame(snapshot, target_w, target_h);
-		dc_prepare_composite(cmd, target_w, target_h);
-	}
+	dc.capture_open = 0;
+	if (cmd && dc.active)
+		dc_build_frame(snapshot);
 	XwaRemasterDc_PrepareDebugOverlay(cmd, target_w, target_h);
 }
 
 void XwaRemasterDc_ApplyToScene(AeronScene3D* scene) {
-	if (dc.active && dc.graphics_rt && dc.text_rt)
-		AeronScene_SetScreenSources(scene, Aeron_RenderTargetGetTexture(dc.graphics_rt),
-									Aeron_RenderTargetGetTexture(dc.text_rt), &dc.frame);
+	if (dc.active && dc.atlas[0] && dc.atlas[1])
+		AeronScene_SetScreenSources(scene, Aeron_RenderTargetGetTexture(dc.atlas[0]),
+									Aeron_RenderTargetGetTexture(dc.atlas[1]), &dc.frame);
 	else
 		AeronScene_SetScreenSources(scene, NULL, NULL, NULL);
-}
-
-void XwaRemasterDc_RenderComposite(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-								   int layer) {
-	if (dc.active && dc.composite_prepared && layer >= 0 && layer < 2 && cmd && pass && target)
-		AeronDrawList_RenderIntoPass(dc.composite[layer], cmd, pass, target);
 }
 
 int XwaRemasterDc_SourceBox(unsigned source, float box[4]) {

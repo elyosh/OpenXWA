@@ -13,19 +13,21 @@
  * sources onto the HUD layout's pane anchors. Sources follow XWAU's table
  * order, the `source` index of a screen rectangle.
  *
- * While a cockpit with screens is drawn, the HUD's foreground (the fixed
- * widgets without their panel images, and the CMD view) and its text are
- * captured into two textures for the screens, and the 2D HUD draws its
- * panels directly and the captures minus the erased regions
- * (dynamic_cockpit.md 2.6).
+ * While a cockpit with screens is drawn, the HUD modules emit their records
+ * through AddSprite / AddQuad4 / AddFill, which route each one: onto the
+ * 2D HUD except within the erased regions, and into a capture atlas (one
+ * per layer: graphics, the fixed widgets and the CMD view; text) where it
+ * overlaps a source. The atlas packs the sources, padded, and the screens
+ * sample them there (dynamic_cockpit.md 2.6). The panel images are not
+ * captured; erased ones are not drawn (XwaRemasterHudFixed_SetErasedPanels).
  *
- * Per frame: BeginFrame before XwaRemasterHud_PrepareFrame, Prepare after
- * it, ApplyToScene after AeronScene_Begin, and in the 2D HUD
- * XwaRemasterHudFixed_RenderPanels, RenderComposite(0) and
- * RenderComposite(1) in place of the fixed, CMD and text draws.
+ * Per frame: BeginFrame before XwaRemasterHud_PrepareFrame, which calls
+ * PlaceFrame between the modules' Build and PrepareDrawList; Prepare after
+ * it; ApplyToScene after AeronScene_Begin.
  */
 
 #include "aeron/render.h"
+#include "aeron/scene/draw_list2d.h"
 #include "aeron/scene/mesh.h"
 #include "aeron/scene/scene3d.h"
 #include "xwa_runtime/snapshot/snapshot.h"
@@ -49,28 +51,42 @@ typedef struct XwaRemasterDcSettings {
 
 int XwaRemasterDc_Init(void);
 void XwaRemasterDc_Shutdown(void);
-/* Releases the capture targets (with the flight's sized resources); the
- * next active frame recreates them. */
+/* Releases the capture atlas (with the flight's sized resources); the next
+ * frame recreates it. */
 void XwaRemasterDc_ReleaseTargets(void);
 void XwaRemasterDc_GetSettings(XwaRemasterDcSettings* out);
 void XwaRemasterDc_SetSettings(const XwaRemasterDcSettings* settings);
 void XwaRemasterDc_ToggleHolograms(void);
 
+/* Capture layers, the screens' graphics and text inputs. */
+typedef enum XwaRemasterDcLayer {
+	XWA_DC_LAYER_GRAPHICS = 0,
+	XWA_DC_LAYER_TEXT = 1,
+} XwaRemasterDcLayer;
+
 /* Decides whether this frame shows screens: the settings allow it and
  * `cockpit_mesh` (the cockpit drawn this frame, or NULL) has screens.
- * Configures the fixed HUD's panel split. */
+ * Tells the fixed HUD which panels are erased. */
 void XwaRemasterDc_BeginFrame(const XwaSnapshot* snapshot, const AeronSceneMesh* cockpit_mesh, int target_w,
 							  int target_h);
-/* Places the sources and regions on the HUD prepared for a
- * target_w x target_h target and, when active, captures it and prepares
- * the screen inputs and the 2D composite. */
+/* Places the sources and regions on the HUD built for a target_w x
+ * target_h target and lays out this frame's capture (hud.c, before the
+ * HUD's draw lists). */
+void XwaRemasterDc_PlaceFrame(int target_w, int target_h);
+/* A HUD record of `layer`, in place of AeronDrawList_AddSprite /
+ * AddQuad4 / AddFill on `screen`: while active, onto `screen` outside the
+ * erased regions and into the capture where it overlaps a source;
+ * otherwise added to `screen` unchanged. */
+void XwaRemasterDc_AddSprite(AeronDrawList2D* screen, XwaRemasterDcLayer layer,
+							 const AeronDrawList2DSprite* sprite);
+void XwaRemasterDc_AddQuad4(AeronDrawList2D* screen, XwaRemasterDcLayer layer, const AeronDrawList2DQuad4* quad);
+void XwaRemasterDc_AddFill(AeronDrawList2D* screen, XwaRemasterDcLayer layer, float x, float y, float w, float h,
+						   const float rgba[4], AeronBlit2DBlend blend, const AeronRectI* scissor);
+/* After XwaRemasterHud_PrepareFrame: renders the capture and prepares the
+ * screen inputs. */
 void XwaRemasterDc_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot, int target_w, int target_h);
 int XwaRemasterDc_Active(void);
 void XwaRemasterDc_ApplyToScene(AeronScene3D* scene);
-/* The captured foreground (layer 0) or text (layer 1) minus the erased
- * regions. */
-void XwaRemasterDc_RenderComposite(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-								   int layer);
 
 /* Source or region box in target pixels (x0, y0, x1, y1); 0 when the
  * frame's HUD does not place it. */

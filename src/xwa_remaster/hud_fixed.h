@@ -29,14 +29,12 @@ int XwaRemasterHudFixed_ReticleCenter(float* out_x_ref, float* out_y_ref);
  * XwaRemasterHud_PreparedDrawState draws, as its sprite is placed; 0 when
  * the record draws nothing. */
 int XwaRemasterHudFixed_RecordQuad(const XwaHudDrawRecord* record, int target_w, int target_h, float quad[4]);
-/* Dynamic Cockpit panel split, set before the list is prepared: when
- * enabled, the panel images (box borders the cockpit displays don't show)
- * go to their own list, drawn by RenderPanels, and the panels of the
- * `erased_regions` (dynamic_cockpit.c region bits) are not drawn. Render
- * then draws the other records only. */
-void XwaRemasterHudFixed_SetPanelSplit(int enabled, uint32_t erased_regions);
-void XwaRemasterHudFixed_RenderPanels(AeronCommandBuffer* cmd, AeronRenderPass* pass,
-									  AeronRenderTarget* target);
+/* Dynamic Cockpit state, set before the list is prepared: while active,
+ * the panel images (box borders the cockpit displays don't show) are drawn
+ * but not captured, those of the `erased_regions` (dynamic_cockpit.c
+ * region bits) not at all, and the other records go through
+ * XwaRemasterDc_AddSprite / AddQuad4. */
+void XwaRemasterHudFixed_SetDynamicCockpit(int active, uint32_t erased_regions);
 void XwaRemasterHudFixed_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 								AeronRenderTarget* target, int target_w, int target_h);
 
