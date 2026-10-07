@@ -452,7 +452,10 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"lighting.ambient_r",
 		"lighting.ambient_g",
 		"lighting.ambient_b",
+		"lighting.emissive_scale",
 		"bloom.intensity",
+		"bloom.threshold",
+		"bloom.knee",
 		"effects.explosion_genus_emissive_strength",
 		"effects.glow_mark_emissive_strength",
 		"dynamic_cockpit.display_emissive_strength",
@@ -807,6 +810,13 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	XwaRemasterShip_ConfigurePbrTuning(&pbr);
+	const float emissive_scale = (float)AeronConfigFile_GetFloat(cf, "lighting.emissive_scale", 0.0);
+	if (!isfinite(emissive_scale) || emissive_scale < 0.0f) {
+		Aeron_LogError("xwa.remaster", "%s: lighting.emissive_scale must be finite and non-negative", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	AeronScene_SetEmissiveScale(emissive_scale);
 
 	AeronScenePresent_ApplySettings(&tonemap);
 
@@ -819,6 +829,18 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	AeronSceneBloom_SetIntensity(bloom_intensity);
+	const float bloom_threshold = (float)AeronConfigFile_GetFloat(cf, "bloom.threshold", 0.0);
+	const float bloom_knee      = (float)AeronConfigFile_GetFloat(cf, "bloom.knee", 0.0);
+	if (!isfinite(bloom_threshold) || bloom_threshold < 0.0f || !isfinite(bloom_knee) ||
+		bloom_knee < AERON_SCENE_BLOOM_MIN_KNEE) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: bloom.threshold must be finite and non-negative, bloom.knee finite and >= %g", path,
+					   (double)AERON_SCENE_BLOOM_MIN_KNEE);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	AeronSceneBloom_SetThreshold(bloom_threshold);
+	AeronSceneBloom_SetKnee(bloom_knee);
 	s.explosion_genus_emissive_strength =
 		(float)AeronConfigFile_GetFloat(cf, "effects.explosion_genus_emissive_strength", 0.0);
 	if (!isfinite(s.explosion_genus_emissive_strength) || s.explosion_genus_emissive_strength < 1.0f) {
