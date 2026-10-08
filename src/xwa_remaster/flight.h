@@ -72,16 +72,14 @@ void XwaRemasterFlight_GetHangarLightingDefault(XwaFlightHangarLightingParams* o
 /* Point-light knobs (remaster/config.yaml `point_lights:` mapping + the debug
  * inspector). The classic SOURCE laws fix each light's color and classic
  * intensity; the scene evaluates them as physical sphere lights as bright
- * as the classic law at XWA_SHIP_POINT_LIGHT_MATCH_DISTANCE_M
- * (XwaRemasterShip_ScenePointLight), so scale 1 keeps that calibration. */
+ * as the classic law at match_distance_m (XwaRemasterShip_ScenePointLight). */
 typedef struct XwaFlightPointLightParams {
 	int enabled;
 	int clustered;
 	int cluster_depth_slices;
 	int cluster_debug;
-	float scale;        /* classic-source intensity multiplier */
-	float range_scale;  /* multiplies the derived falloff range */
-	float spec_weight;  /* 0..2 — punctual specular lobe weight */
+	float match_distance_m; /* metres at which a light is as bright as the classic law */
+	float range_scale;      /* multiplies the derived falloff range */
 	float model_light_intensity; /* intensity multiplier of lights authored in models */
 } XwaFlightPointLightParams;
 

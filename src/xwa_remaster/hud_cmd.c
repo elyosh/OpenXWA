@@ -438,19 +438,17 @@ static void cmd_add_particle_lights(const XwaSnapshot* snapshot, const float row
 
 /* Convert the candidates to scene lights as the flight scene does,
  * discarding invalid records without changing order. */
-static uint32_t cmd_finalize_point_lights(XwaShipPointLightTuning* tuning) {
-	memset(tuning, 0, sizeof *tuning);
+static uint32_t cmd_finalize_point_lights(void) {
 	XwaFlightPointLightParams config;
 	XwaRemasterFlight_GetPointLights(&config);
 	if (!config.enabled || !s_cmd.point_candidate_count)
 		return 0;
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < s_cmd.point_candidate_count; i++) {
-		if (XwaRemasterShip_ScenePointLight(&s_cmd.point_candidates[i], config.scale, config.range_scale,
+		if (XwaRemasterShip_ScenePointLight(&s_cmd.point_candidates[i], config.match_distance_m, config.range_scale,
 											&s_cmd.point_scene[count]))
 			count++;
 	}
-	tuning->spec_weight = config.spec_weight;
 	s_cmd.point_candidate_count = count;
 	return count;
 }
@@ -682,16 +680,13 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	XwaRemasterTrails_SubmitOwner(s_cmd.trails, s_cmd.scene, target->slot, target->signature);
 	cmd_add_particle_lights(snapshot, rows, target, target->slot, target->signature);
 	cmd_submit_billboards();
-	XwaShipPointLightTuning point_tuning;
-	const uint32_t point_count = cmd_finalize_point_lights(&point_tuning);
-	cmd_submit_point_lights(point_count);
+	cmd_submit_point_lights(cmd_finalize_point_lights());
 	if (!cmd_configure_clustered_lights()) {
 		Aeron_CommandBufferSetFailure(cmd, "HUD CMD clustered-light configuration failed");
 		return;
 	}
 	XwaRemasterShip_SetPbrEnv(s_cmd.scene, snapshot->dir_lights, snapshot->dir_light_count, -1, rows, NULL,
-							  NULL, point_count ? &point_tuning : NULL, /*ambient_cube=*/NULL,
-							  /*environment_map=*/NULL);
+							  NULL, /*ambient_cube=*/NULL, /*environment_map=*/NULL);
 	if (!AeronScene_Render(s_cmd.scene, cmd)) {
 		return;
 	}

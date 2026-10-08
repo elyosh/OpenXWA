@@ -172,8 +172,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	 * (world-space dir_lights channel) rotated by this view's captured
 	 * camera; camera at the origin. */
 	XwaRemasterShip_SetPbrEnv(s.scene, lights, light_count, -1, p->cam_rows, NULL, ao_on ? &ao : NULL,
-							  /*point_tuning=*/NULL, /*ambient_cube=*/NULL,
-							  /*environment_map=*/NULL);
+							  /*ambient_cube=*/NULL, /*environment_map=*/NULL);
 
 	/* Model->eye ("world") instance. The engine consumes the captured
 	 * basis through Math3D_RotateVec3, which is COLUMN-major (out.x =

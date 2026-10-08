@@ -53,12 +53,8 @@ static void xwa_tool_pbr(int* open, void* user) {
 	XwaRemasterShip_GetPbrTuning(&t);
 	bool changed = false;
 
-	changed |= ImGui::SliderFloat("Sun intensity", &t.light_intensity, 0.0f, 4.0f, "%.2f");
-	changed |= ImGui::SliderFloat("Global specular", &t.global_spec_mul, 0.0f, 4.0f, "%.2f");
-	ImGui::TextDisabled("Classic craft shading is pure diffuse (0). The period Gouraud\n"
-						"OPT normals break a modern spec lobe into per-face patches.");
-	changed |= ImGui::SliderFloat("Light wrap", &t.light_wrap, 0.0f, 1.0f, "%.2f");
-	ImGui::TextDisabled("0 = Lambert (classic hard terminator), 1 = Half-Lambert.");
+	changed |= ImGui::SliderFloat("Sun illuminance scale", &t.sun_illuminance_scale, 0.0f, 8.0f, "%.3f");
+	ImGui::TextDisabled("Illuminance per unit of sun intensity; pi = as bright as the classic.");
 	changed |=
 		ImGui::ColorEdit3("Ambient fill", t.ambient, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 	ImGui::TextDisabled("Linear ambient cube fill.");
@@ -466,16 +462,14 @@ static void xwa_tool_point_lights(int* open, void* user) {
 				stats.scene.clustered_active ? "Clustered" : "Brute force", stats.scene.effective_tile_size,
 				stats.scene.grid_x, stats.scene.grid_y, stats.scene.grid_z,
 				(double)stats.scene.allocated_buffer_bytes / (1024.0 * 1024.0));
-	changed |=
-		ImGui::SliderFloat("Intensity scale", &p.scale, 0.05f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
-	ImGui::TextDisabled("Multiplier on the game's lights (lasers, explosions, engines).\n"
-						"Inverse-square; 1.0 = as bright as the classic law %.0f m away.",
-						(double)XWA_SHIP_POINT_LIGHT_MATCH_DISTANCE_M);
+	changed |= ImGui::SliderFloat("Match distance (m)", &p.match_distance_m, 1.0f, 200.0f, "%.1f",
+								  ImGuiSliderFlags_Logarithmic);
+	ImGui::TextDisabled("The game's lights (lasers, explosions, engines) are inverse-square,\n"
+						"as bright as the classic law at this distance.");
 	changed |=
 		ImGui::SliderFloat("Range scale", &p.range_scale, 0.25f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
 	ImGui::TextDisabled("Multiplies the distance where a light falls under\n"
 						"1/250 of a unit of illuminance and ends.");
-	changed |= ImGui::SliderFloat("Specular weight", &p.spec_weight, 0.0f, 2.0f, "%.2f");
 	changed |= ImGui::SliderFloat("Model light intensity", &p.model_light_intensity, 0.0f, 16.0f, "%.2f",
 								  ImGuiSliderFlags_Logarithmic);
 	ImGui::TextDisabled("Intensity of lights authored in models (cockpit interior light).\n"

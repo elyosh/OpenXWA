@@ -161,7 +161,7 @@ hangar_lighting:
 # map and the `xwa:` hangar and (mission, region) mapping; it is required
 # when enabled. Regions without an entry keep the classic HD sky.
 environment_maps:
-  enabled: false
+  enabled: true
   manifest: "flight/environments/environments.yaml"
   # Largest radiance a sun disc is drawn with (its lighting is not capped).
   # A physical disc is far brighter than screen-space bloom resolves
@@ -217,21 +217,21 @@ point_lights:
   cluster_depth_slices: 24
   cluster_debug: false       # occupancy view; debug-UI builds only
   # The game's lights (lasers, explosions, engines) are physical
-  # inverse-square sphere lights from the classic intensities; scale 1 is
-  # as bright as the classic law 5 m away, so brighter closer and dimmer
-  # farther.
-  scale: 1.0
+  # inverse-square sphere lights from the classic intensities, as bright
+  # as the classic law this many metres away, so brighter closer and
+  # dimmer farther.
+  match_distance_m: 27.5
   # Multiplies the distance where a light falls under 1/250 of a unit of
   # illuminance and ends.
   range_scale: 1.0
-  spec_weight: 1.0
   # Intensity multiplier of point lights authored in models (such as the
   # converted cockpits' interior light); 0 disables them.
   model_light_intensity: 1.0
 lighting:
-  intensity: 0.8
-  spec_mul: 1.0
-  wrap: 0.0
+  # Illuminance per unit of the game's sun intensity (also the hangar and
+  # environment-package lights). Pi shades as brightly as the classic
+  # renderer; 0.8 x pi is the tuned look.
+  sun_illuminance_scale: 2.513
   spec_geom_adapt: true
   ambient_r: 0.08
   ambient_g: 0.08

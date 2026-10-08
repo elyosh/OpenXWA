@@ -386,10 +386,10 @@ static void ship_color(uint32_t argb, float out[4]) {
 
 /* FS b1 — mirrors cbuffer PbrLightFS (scene_pbr_lighting.hlsli). */
 typedef struct PbrLightFS {
-	float light_intensity;
-	float global_spec_mul;
+	float reserved_sun_gain; /* formerly the sun's diffuse gain */
+	float reserved_spec_mul; /* formerly the specular multiplier */
 	float debug_isolate_term;
-	float light_wrap;
+	float reserved_wrap; /* formerly the wrap-lighting amount */
 	float reserved_xvt; /* formerly the XvT flat-shading switch */
 	float ssao_intensity;
 	float ssao_power;
@@ -410,8 +410,8 @@ typedef struct PbrLightFS {
 	 * the classic sums plain Lambert per light). */
 	float extra_dir[3][4];
 	float extra_col[3][4];
-	/* Point-light evaluation: reserved, spec weight, reserved, reserved. */
-	float point_params[4];
+	/* Reserved: formerly the point-light knobs. */
+	float reserved_point[4];
 	/* Reserved: the environment moved to Aeron's scene lighting block
 	 * (AeronScene_SetPbrEnvironment). Left zero. */
 	float reserved_environment[4][4];
@@ -502,15 +502,13 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
 
 void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, uint32_t light_count,
 							   int32_t key_index, const float cam_rows[9], const float cam_pos[3],
-							   const XwaShipAoParams* ao, const XwaShipPointLightTuning* point_tuning,
-							   const XwaShipAmbientCube* ambient_cube,
+							   const XwaShipAoParams* ao, const XwaShipAmbientCube* ambient_cube,
 							   const XwaShipEnvironmentMap* environment_map) {
 	if (!scene) {
 		return;
 	}
 
 	PbrLightFS env = { 0 };
-	env.light_intensity = g_pbr_tuning.light_intensity;
 	env.debug_isolate_term = g_pbr_tuning.debug_isolate_term;
 	if (ao) {
 		env.ssao_intensity = ao->intensity;
@@ -519,8 +517,6 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	}
 	/* Remaining shading knobs come from the required remaster/config.yaml profile
 	 * through the process-wide tuning state. */
-	env.global_spec_mul = g_pbr_tuning.global_spec_mul;
-	env.light_wrap = g_pbr_tuning.light_wrap;
 	env.spec_geom_adapt = g_pbr_tuning.spec_geom_adapt;
 	AeronScene_SetPbrDebugViews(scene, env.debug_isolate_term != 0.0f || env.spec_geom_adapt == 0.0f);
 	AeronScene_SetPbrDebugMaterial(scene, g_pbr_tuning.debug_material_override != 0.0f,
@@ -528,7 +524,8 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	AeronScene_SetBackfaceFill(scene, g_backface_fill);
 
 	/* HD relight: authored ambient fill (tuning.ambient, linear) plus
-	 * sun = decode(classic light color) x intensity. The game state
+	 * sun illuminance = decode(classic light color) x intensity x
+	 * sun_illuminance_scale. The game state
 	 * contributes the art direction (light directions, colors, relative
 	 * intensities); the response curve belongs to the shading and
 	 * present chain. */
@@ -637,7 +634,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 		}
 		float col[3];
 		for (int c = 0; c < 3; c++) {
-			col[c] = XwaRemaster_SrgbToLinear(l->color[c]) * l->intensity;
+			col[c] = XwaRemaster_SrgbToLinear(l->color[c]) * l->intensity * g_pbr_tuning.sun_illuminance_scale;
 		}
 		if (li == 0) {
 			memcpy(env.directional_dir, d, sizeof d);
@@ -646,9 +643,6 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 			memcpy(env.extra_dir[li - 1], d, sizeof d);
 			memcpy(env.extra_col[li - 1], col, sizeof col);
 		}
-	}
-	if (point_tuning) {
-		env.point_params[1] = point_tuning->spec_weight;
 	}
 	AeronScene_SetFrameUniformData(scene, AERON_SHADER_STAGE_FRAGMENT, 1, &env, sizeof env);
 }
@@ -1251,13 +1245,15 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
  * changes no pixel by more than a few levels. */
 #define SHIP_POINT_LIGHT_CUTOFF 0.004f
 
-int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float intensity_scale, float range_scale,
+int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float match_distance_m, float range_scale,
 									AeronSceneLight* out) {
 	if (!light || !out) {
 		return 0;
 	}
-	/* I / D^2 == 0.5 * c / D at the match distance D (world units). */
-	const float scale = intensity_scale * 0.5f * XWA_SHIP_POINT_LIGHT_MATCH_DISTANCE_M * AERON_OPT_UNITS_PER_METER;
+	/* The classic law lights a texture by 0.5 * c / d, and the Lambert
+	 * BRDF by I / (pi * d^2): equal at the match distance D (world units)
+	 * when I = 0.5 * c * D * pi. */
+	const float scale = 0.5f * match_distance_m * AERON_OPT_UNITS_PER_METER * 3.14159265f;
 	float peak = 0.0f;
 	memset(out, 0, sizeof *out);
 	for (int c = 0; c < 3; c++) {

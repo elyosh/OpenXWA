@@ -410,9 +410,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"hangar_lighting.ambient_ceiling",
 		"hangar_lighting.ambient_sides",
 		"hangar_lighting.ambient_floor",
-		"point_lights.scale",
+		"point_lights.match_distance_m",
 		"point_lights.range_scale",
-		"point_lights.spec_weight",
 		"point_lights.model_light_intensity",
 		"skybox.exposure",
 		"skybox.star_brightness",
@@ -445,9 +444,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"hyperspace_tunnel.cap_color_r",
 		"hyperspace_tunnel.cap_color_g",
 		"hyperspace_tunnel.cap_color_b",
-		"lighting.intensity",
-		"lighting.spec_mul",
-		"lighting.wrap",
+		"lighting.sun_illuminance_scale",
 		"lighting.ambient_r",
 		"lighting.ambient_g",
 		"lighting.ambient_b",
@@ -517,9 +514,8 @@ static int fl_hangar_lighting_config_valid(const XwaFlightHangarLightingParams* 
 }
 
 static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
-	return p->cluster_depth_slices >= 4 && p->cluster_depth_slices <= 64 && isfinite(p->scale) &&
-		   p->scale >= 0.0f && isfinite(p->range_scale) && p->range_scale > 0.0f &&
-		   isfinite(p->spec_weight) && p->spec_weight >= 0.0f &&
+	return p->cluster_depth_slices >= 4 && p->cluster_depth_slices <= 64 && isfinite(p->match_distance_m) &&
+		   p->match_distance_m > 0.0f && isfinite(p->range_scale) && p->range_scale > 0.0f &&
 		   isfinite(p->model_light_intensity) && p->model_light_intensity >= 0.0f;
 }
 
@@ -615,9 +611,7 @@ static int fl_load_hyperspace_config(const AeronConfigFile* config, const char* 
 }
 
 static int fl_pbr_config_valid(const XwaShipPbrTuning* p) {
-	return isfinite(p->light_intensity) && p->light_intensity >= 0.0f && isfinite(p->global_spec_mul) &&
-		   p->global_spec_mul >= 0.0f && isfinite(p->light_wrap) && p->light_wrap >= 0.0f &&
-		   p->light_wrap <= 1.0f && isfinite(p->ambient[0]) && p->ambient[0] >= 0.0f &&
+	return isfinite(p->sun_illuminance_scale) && p->sun_illuminance_scale >= 0.0f && isfinite(p->ambient[0]) && p->ambient[0] >= 0.0f &&
 		   isfinite(p->ambient[1]) && p->ambient[1] >= 0.0f && isfinite(p->ambient[2]) &&
 		   p->ambient[2] >= 0.0f;
 }
@@ -726,9 +720,8 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.plight.clustered = AeronConfigFile_GetBool(cf, "point_lights.clustered", 0);
 	s.plight.cluster_depth_slices = (int)AeronConfigFile_GetInt(cf, "point_lights.cluster_depth_slices", 0);
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
-	s.plight.scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.scale", 0.0);
+	s.plight.match_distance_m = (float)AeronConfigFile_GetFloat(cf, "point_lights.match_distance_m", 0.0);
 	s.plight.range_scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.range_scale", 0.0);
-	s.plight.spec_weight = (float)AeronConfigFile_GetFloat(cf, "point_lights.spec_weight", 0.0);
 	s.plight.model_light_intensity = (float)AeronConfigFile_GetFloat(cf, "point_lights.model_light_intensity", 0.0);
 	if (!fl_point_lights_config_valid(&s.plight)) {
 		Aeron_LogError("xwa.remaster", "%s: invalid point_lights settings", path);
@@ -788,9 +781,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 
 	XwaShipPbrTuning pbr;
 	memset(&pbr, 0, sizeof pbr);
-	pbr.light_intensity = (float)AeronConfigFile_GetFloat(cf, "lighting.intensity", 0.0);
-	pbr.global_spec_mul = (float)AeronConfigFile_GetFloat(cf, "lighting.spec_mul", 0.0);
-	pbr.light_wrap = (float)AeronConfigFile_GetFloat(cf, "lighting.wrap", 0.0);
+	pbr.sun_illuminance_scale = (float)AeronConfigFile_GetFloat(cf, "lighting.sun_illuminance_scale", 0.0);
 	pbr.spec_geom_adapt = AeronConfigFile_GetBool(cf, "lighting.spec_geom_adapt", 0) ? 1.0f : 0.0f;
 	pbr.ambient[0] = (float)AeronConfigFile_GetFloat(cf, "lighting.ambient_r", 0.0);
 	pbr.ambient[1] = (float)AeronConfigFile_GetFloat(cf, "lighting.ambient_g", 0.0);
@@ -3027,21 +3018,19 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
 
 /* Convert the candidates to scene lights with the calibration, discarding
  * invalid records without changing order. */
-static uint32_t fl_finalize_point_lights(XwaShipPointLightTuning* tuning) {
-	memset(tuning, 0, sizeof *tuning);
+static uint32_t fl_finalize_point_lights(void) {
 	if (!s.plight.enabled || s.pl_cand_count == 0) {
 		return 0;
 	}
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < s.pl_cand_count; i++) {
-		if (!XwaRemasterShip_ScenePointLight(&s.pl_cand[i], s.plight.scale, s.plight.range_scale,
+		if (!XwaRemasterShip_ScenePointLight(&s.pl_cand[i], s.plight.match_distance_m, s.plight.range_scale,
 											 &s.pl_scene[count])) {
 			s.pl_invalid_count++;
 			continue;
 		}
 		s.pl_cand[count++] = s.pl_cand[i];
 	}
-	tuning->spec_weight = s.plight.spec_weight;
 	s.pl_cand_count = count;
 	return count;
 }
@@ -3055,8 +3044,8 @@ static uint32_t fl_submit_point_lights(uint32_t count) {
 }
 
 /* Lights authored in a model (AeronFlightLight), placed by its instance.
- * Their intensity is authored physically, so point_lights.scale does not
- * apply; point_lights.model_light_intensity does. */
+ * Their intensity is authored physically, so point_lights.match_distance_m
+ * does not apply; point_lights.model_light_intensity does. */
 static void fl_submit_model_lights(const AeronSceneMesh* mesh, const float transform[16],
 								   const AeronSceneMeshTable* table) {
 	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f)) {
@@ -3646,8 +3635,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 		enum { FL_HYPERSPACE_PULSE_MASK = (1u << 3) | (1u << 4) | (1u << 5) };
 		fl_derive_pulse_lights(snap, player_bw, player_local, FL_HYPERSPACE_PULSE_MASK);
 	}
-	XwaShipPointLightTuning point_tuning;
-	fl_submit_point_lights(fl_finalize_point_lights(&point_tuning));
+	fl_submit_point_lights(fl_finalize_point_lights());
 	if (!fl_configure_clustered_lights(s.scene)) {
 		Aeron_CommandBufferSetFailure(cmd, "Hyperspace clustered-light configuration failed");
 		s.snap = NULL;
@@ -3673,7 +3661,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	}
 	XwaRemasterShip_SetPbrEnv(
 		s.scene, directional_lights, directional_light_count, -1, NULL, s.camera_local, ao_on ? &ao : NULL,
-		s.plight.enabled ? &point_tuning : NULL, &ambient,
+		&ambient,
 		phase == XWA_HYPERSPACE_TUNNEL && lighting_ready ? &hyperspace_lighting.environment : NULL);
 	fl_submit_hyperspace_cockpit(cmd, assets, snap, &snap->flight_camera, anchor_bw, anchor_found, player_f);
 
@@ -3944,7 +3932,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	XwaRemasterTrails_SubmitRegion(s.trails, s.scene, snap->flight_camera.region);
 	fl_submit_billboards();
 	XwaRemasterShip_SetPbrEnv(s.scene, snap->dir_lights, snap->dir_light_count, -1, NULL, s.camera_local,
-							  NULL, NULL, NULL, NULL);
+							  NULL, NULL, NULL);
 	if (!AeronScene_Render(s.scene, cmd)) {
 		s.snap = NULL;
 		return NULL;
@@ -4608,8 +4596,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	if (player_found && player_f) {
 		fl_derive_pulse_lights(snap, player_bw, player_local, 0);
 	}
-	XwaShipPointLightTuning point_tuning;
-	fl_submit_point_lights(fl_finalize_point_lights(&point_tuning));
+	fl_submit_point_lights(fl_finalize_point_lights());
 	if (!fl_configure_clustered_lights(s.scene)) {
 		Aeron_CommandBufferSetFailure(cmd, "Flight clustered-light configuration failed");
 		s.snap = NULL;
@@ -4617,7 +4604,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	}
 	XwaRemasterShip_SetPbrEnv(s.scene, scene_lighting.lights, scene_lighting.light_count,
 							  scene_lighting.key_index, NULL, s.camera_local, ao_on ? &ao : NULL,
-							  s.plight.enabled ? &point_tuning : NULL, scene_lighting.ambient, NULL);
+							  scene_lighting.ambient, NULL);
 	if (scene_lighting.package) {
 		AeronScene_SetPbrEnvironmentPackage(s.scene, scene_lighting.package);
 	}
