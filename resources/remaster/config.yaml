@@ -111,7 +111,7 @@ models:
   smooth_angle_degrees: 90
   # true: original OPT models for simulation and rendering.
   # false: remaster/models/<key>.glb replacements, where present, for both.
-  force_opt: true
+  force_opt: false
   opt_emissive_strength: 1.5
   opt_projectile_emissive_strength: 5.0
   engine_emissive_strength: 2.5
@@ -239,10 +239,11 @@ lighting:
   # Scale of all emitted light (illumination, screens, holograms, lasers,
   # glows, explosions). Emitters far brighter than lit surfaces are what
   # visibly glow through bloom.
-  emissive_scale: 1.0
+  emissive_scale: 2.0
 bloom:
-  # Fraction of the scene's light the bloom scatters (no threshold).
-  intensity: 0.1
+  # Fraction of the scene's light the bloom scatters (no threshold), 0 to 1.
+  # The scattered light leaves its source, so lit surfaces do not brighten.
+  intensity: 0.2
 temporal_upscaling:
   # off, native_aa, quality, balanced, or performance.
   mode: "off"

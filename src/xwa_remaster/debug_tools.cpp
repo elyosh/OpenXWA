@@ -878,10 +878,10 @@ static void xwa_tool_hdr(int* open, void* user) {
 		AeronScenePresent_SetBloomKernel(new_bk);
 	}
 	float bloom_i = AeronSceneBloom_Intensity();
-	if (ImGui::SliderFloat("Bloom intensity", &bloom_i, 0.0f, 2.0f, "%.2f")) {
+	if (ImGui::SliderFloat("Bloom intensity", &bloom_i, 0.0f, 0.25f, "%.3f")) {
 		AeronSceneBloom_SetIntensity(bloom_i);
 	}
-	ImGui::TextDisabled("0 disables bloom (chain is skipped entirely).");
+	ImGui::TextDisabled("Fraction of the light scattered; 0 disables bloom (chain is skipped entirely).");
 	float emissive_scale = AeronScene_EmissiveScale();
 	if (ImGui::SliderFloat("Emissive scale", &emissive_scale, 0.25f, 32.0f, "%.2f", ImGuiSliderFlags_Logarithmic)) {
 		AeronScene_SetEmissiveScale(emissive_scale);

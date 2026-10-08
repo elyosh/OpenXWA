@@ -811,11 +811,11 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 
 	AeronScenePresent_ApplySettings(&tonemap);
 
-	/* Bloom contribution weight (process-wide present knob; 0 = off,
-	 * chain skipped). */
+	/* Fraction of the light the bloom scatters (process-wide present knob;
+	 * 0 = off, chain skipped). */
 	const float bloom_intensity = (float)AeronConfigFile_GetFloat(cf, "bloom.intensity", 0.0);
-	if (!isfinite(bloom_intensity) || bloom_intensity < 0.0f) {
-		Aeron_LogError("xwa.remaster", "%s: bloom.intensity must be finite and non-negative", path);
+	if (!isfinite(bloom_intensity) || bloom_intensity < 0.0f || bloom_intensity > 1.0f) {
+		Aeron_LogError("xwa.remaster", "%s: bloom.intensity must be between 0 and 1", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
