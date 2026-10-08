@@ -393,8 +393,7 @@ typedef struct PbrLightFS {
 	float reserved_xvt; /* formerly the XvT flat-shading switch */
 	float ssao_intensity;
 	float ssao_power;
-	float ssao_rt_w;
-	float ssao_rt_h;
+	float reserved_ssao_rt[2]; /* formerly the AO target size, which Aeron provides */
 	float ssao_direct;
 	float spec_geom_adapt;
 	float _pad_tuning;
@@ -516,8 +515,6 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	if (ao) {
 		env.ssao_intensity = ao->intensity;
 		env.ssao_power = ao->power;
-		env.ssao_rt_w = ao->rt_w;
-		env.ssao_rt_h = ao->rt_h;
 		env.ssao_direct = ao->direct;
 	}
 	/* Remaining shading knobs come from the required remaster/config.yaml profile

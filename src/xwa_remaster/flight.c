@@ -3653,13 +3653,9 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 		s.snap = NULL;
 		return NULL;
 	}
-	int render_w, render_h;
-	AeronScene_RenderDims(s.scene, &render_w, &render_h);
 	const XwaShipAoParams ao = {
 		.intensity = s.ssao.ssao_intensity,
 		.power = s.ssao.ssao_power,
-		.rt_w = (float)render_w,
-		.rt_h = (float)render_h,
 		.direct = s.ssao.ssao_direct,
 	};
 	const int ao_on = s.ssao.ssao_quality > 0 && s.ssao.ssao_intensity > 0.0f;
@@ -4414,13 +4410,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	/* The lit PBR env is submitted AFTER the instance walk (frame
 	 * uniforms are copied at submit and bound inside Render) so the
 	 * walk can contribute the engine-glow point lights. */
-	int render_w, render_h;
-	AeronScene_RenderDims(s.scene, &render_w, &render_h);
 	const XwaShipAoParams ao = {
 		.intensity = s.ssao.ssao_intensity,
 		.power = s.ssao.ssao_power,
-		.rt_w = (float)render_w,
-		.rt_h = (float)render_h,
 		.direct = s.ssao.ssao_direct,
 	};
 	const int ao_on = s.ssao.ssao_quality > 0 && s.ssao.ssao_intensity > 0.0f;

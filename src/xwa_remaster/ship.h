@@ -122,11 +122,10 @@ void XwaRemasterShip_SetBackfaceFill(int enabled);
 
 /* Per-frame SSAO inputs for XwaRemasterShip_SetPbrEnv (mirrors TIE's
  * FlightPbrAoParams). NULL disables AO (intensity 0): the FS leaves
- * the ambient term untouched and the bound AO texture reads as 1. */
+ * the ambient term untouched. */
 typedef struct XwaShipAoParams {
 	float intensity;  /* 0 = off; else ambient-occlusion lerp weight */
 	float power;      /* pow(ao, power) contrast — 1 = linear */
-	float rt_w, rt_h; /* scene RT dimensions (screen-UV denominator) */
 	float direct;     /* AO weight on direct diffuse (0 = ambient-only) */
 } XwaShipAoParams;
 

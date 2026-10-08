@@ -161,14 +161,9 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 									.ssao_max_screen_frac = ssao.ssao_max_screen_frac,
 									.ssao_sample_jitter = ssao.ssao_sample_jitter,
 								});
-	int render_w;
-	int render_h;
-	AeronScene_RenderDims(s.scene, &render_w, &render_h);
 	const XwaShipAoParams ao = {
 		.intensity = ssao.ssao_intensity,
 		.power = ssao.ssao_power,
-		.rt_w = (float)render_w,
-		.rt_h = (float)render_h,
 		.direct = ssao.ssao_direct,
 	};
 	const int ao_on = ssao.ssao_quality > 0 && ssao.ssao_intensity > 0.0f;
