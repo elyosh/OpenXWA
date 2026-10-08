@@ -411,8 +411,7 @@ typedef struct PbrLightFS {
 	 * the classic sums plain Lambert per light). */
 	float extra_dir[3][4];
 	float extra_col[3][4];
-	/* Point-light evaluation: classic-law min distance (unused: the lights
-	 * are physical), spec weight, classic wrap and cap (unused). */
+	/* Point-light evaluation: reserved, spec weight, reserved, reserved. */
 	float point_params[4];
 	/* Reserved: the environment moved to Aeron's scene lighting block
 	 * (AeronScene_SetPbrEnvironment). Left zero. */
@@ -1270,8 +1269,7 @@ int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float intens
 		}
 	}
 	out->radius = sqrtf(peak / SHIP_POINT_LIGHT_CUTOFF) * range_scale;
-	out->falloff = AERON_SCENE_LIGHT_FALLOFF_INVERSE_SQUARE;
-	out->min_distance = XWA_SHIP_POINT_LIGHT_RADIUS_M * AERON_OPT_UNITS_PER_METER;
+	out->source_radius = XWA_SHIP_POINT_LIGHT_RADIUS_M * AERON_OPT_UNITS_PER_METER;
 	return peak > 0.0f && isfinite(peak) && out->radius > 0.0f && isfinite(out->radius) &&
 		   isfinite(out->pos[0]) && isfinite(out->pos[1]) && isfinite(out->pos[2]);
 }
