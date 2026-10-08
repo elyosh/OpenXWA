@@ -1253,7 +1253,8 @@ int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float match_
 	/* The classic law lights a texture by 0.5 * c / d, and the Lambert
 	 * BRDF by I / (pi * d^2): equal at the match distance D (world units)
 	 * when I = 0.5 * c * D * pi. */
-	const float scale = 0.5f * match_distance_m * AERON_OPT_UNITS_PER_METER * 3.14159265f;
+	const float distance_m = light->match_distance_m > 0.0f ? light->match_distance_m : match_distance_m;
+	const float scale = 0.5f * distance_m * AERON_OPT_UNITS_PER_METER * 3.14159265f;
 	float peak = 0.0f;
 	memset(out, 0, sizeof *out);
 	for (int c = 0; c < 3; c++) {

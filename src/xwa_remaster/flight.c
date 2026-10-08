@@ -2850,11 +2850,12 @@ static XwaShipPointLight* fl_pl_push(const float pos[3], const float color_x_int
 }
 
 /* A projectile's light is its streak: the bolt model's long bound axis,
- * placed as the bolt is drawn. Its origin is the bolt's tip, outside the
- * streak (a fighter laser trails 5.5 to 22.5 m behind it), where the
- * classic law's point sat. Returns zero when the model is unavailable. */
-static int fl_projectile_streak(const XwaFlightObject* f, const int32_t camera_world[3], float center[3],
-								float half_axis[3]) {
+ * placed as the bolt is drawn (the superlaser with its beam scale). Its
+ * origin is the bolt's tip, outside the streak (a fighter laser trails 5.5
+ * to 22.5 m behind it), where the classic law's point sat. Returns zero
+ * when the model is unavailable. */
+static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* f, const int32_t camera_world[3],
+								float center[3], float half_axis[3]) {
 	const AeronSceneMesh* mesh =
 		XwaRemasterShip_MeshForNameWithSource(XwaSnapshotExport_ModelName(f->object_type), NULL);
 	if (!mesh) {
@@ -2862,11 +2863,18 @@ static int fl_projectile_streak(const XwaFlightObject* f, const int32_t camera_w
 	}
 	float basis[9], local[3], model[16];
 	fl_object_pose(f, camera_world, 1, basis, local, model);
+	if (fl_is_death_star_beam(snap, f)) {
+		fl_apply_death_star_beam_scale(snap, model);
+	}
 	int long_axis = 0;
-	for (int axis = 1; axis < 3; axis++) {
-		if (mesh->bound_max[axis] - mesh->bound_min[axis] >
-			mesh->bound_max[long_axis] - mesh->bound_min[long_axis]) {
+	float long_length = 0.0f;
+	for (int axis = 0; axis < 3; axis++) {
+		const float scale = sqrtf(model[0 * 4 + axis] * model[0 * 4 + axis] + model[1 * 4 + axis] * model[1 * 4 + axis] +
+								  model[2 * 4 + axis] * model[2 * 4 + axis]);
+		const float length = (mesh->bound_max[axis] - mesh->bound_min[axis]) * scale;
+		if (length > long_length) {
 			long_axis = axis;
+			long_length = length;
 		}
 	}
 	float mid[3], half[3] = { 0.0f, 0.0f, 0.0f };
@@ -2891,15 +2899,17 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 		return;
 	}
 	const XwaFlightCamera* cam = &snap->flight_camera;
-	/* DS tunnel turbolaser beam (FlightView_Render's direct scene-
-	 * light write: green, intensity 100000, cull 0x4000 — appended
-	 * FIRST like the classic). */
-	if (cam->ds_beam_active) {
-		const float i = 100000.0f;
-		const float cx[3] = { 0.0f, XwaRemaster_SrgbToLinear(1.0f) * i, XwaRemaster_SrgbToLinear(0.2f) * i };
+	/* Superlaser beam light (FlightView_Render's direct scene-light write:
+	 * green, intensity 100000, cull 0x4000 — appended FIRST like the
+	 * classic). With the beam's object available it lights along the
+	 * drawn beam instead, in the object walk below. */
+	const float ds_beam_intensity = 100000.0f;
+	const float ds_beam_color[3] = { 0.0f, XwaRemaster_SrgbToLinear(1.0f) * ds_beam_intensity,
+									 XwaRemaster_SrgbToLinear(0.2f) * ds_beam_intensity };
+	if (cam->ds_beam_active && !snap->death_star_beam.active) {
 		float local[3];
 		AeronWorld_LocalI32(s.origin_world, cam->ds_beam_world_pos, local);
-		fl_pl_push(local, cx);
+		fl_pl_push(local, ds_beam_color);
 	}
 	for (uint32_t i = 0; i < snap->flight_object_count; i++) {
 		const XwaFlightObject* f = &snap->flight_objects[i];
@@ -2933,7 +2943,21 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 		}
 		float local[3];
 		float half_axis[3];
-		if (fl_object_is_projectile(f) && fl_projectile_streak(f, cam->world_pos, local, half_axis)) {
+		if (fl_is_death_star_beam(snap, f)) {
+			/* The beam's light (the classic's point near the target, and
+			 * the beam object's own) becomes one line source along the
+			 * drawn beam: its diffuse falls as 1/d out to kilometres, as
+			 * the classic law did, and fades as the beam shortens. */
+			if (fl_projectile_streak(snap, f, cam->world_pos, local, half_axis)) {
+				XwaShipPointLight* light = fl_pl_push(local, ds_beam_color);
+				if (light) {
+					memcpy(light->half_axis, half_axis, sizeof half_axis);
+					light->match_distance_m = sqrtf(half_axis[0] * half_axis[0] + half_axis[1] * half_axis[1] +
+													half_axis[2] * half_axis[2]) *
+											  AERON_OPT_METERS_PER_UNIT;
+				}
+			}
+		} else if (fl_object_is_projectile(f) && fl_projectile_streak(snap, f, cam->world_pos, local, half_axis)) {
 			XwaShipPointLight* light = fl_pl_push(local, cxi);
 			if (light) {
 				memcpy(light->half_axis, half_axis, sizeof half_axis);

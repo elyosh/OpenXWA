@@ -139,12 +139,18 @@ typedef struct XwaShipPointLight {
 	float pos[3];
 	float color[3]; /* linear colour x classic intensity */
 	float half_axis[3];
+	/* When positive, replaces the configured match distance (metres). A
+	 * tube much longer than the distances it lights is a line source,
+	 * whose diffuse falls as 1/d like the classic law: matched at half
+	 * its length, it equals that law all along it. */
+	float match_distance_m;
 } XwaShipPointLight;
 
 /* A classic-intensity source as a physical scene light: an inverse-square
  * sphere (or tube) of XWA_SHIP_POINT_LIGHT_RADIUS_M whose Lambert diffuse
  * is as bright as the classic law (0.5 * intensity / d) at
- * `match_distance_m`, so brighter closer and dimmer farther.
+ * `match_distance_m` (or the light's own), so brighter closer and dimmer
+ * farther.
  * `range_scale` multiplies the distance where it falls under 1/250 of a
  * unit of illuminance. Returns zero for a light that emits nothing. */
 #define XWA_SHIP_POINT_LIGHT_RADIUS_M 0.25f
