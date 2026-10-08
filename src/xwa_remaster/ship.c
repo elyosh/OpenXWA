@@ -411,7 +411,8 @@ typedef struct PbrLightFS {
 	 * the classic sums plain Lambert per light). */
 	float extra_dir[3][4];
 	float extra_col[3][4];
-	/* Point-light evaluation: min distance, spec weight, diffuse wrap, cap. */
+	/* Point-light evaluation: classic-law min distance (unused: the lights
+	 * are physical), spec weight, classic wrap and cap (unused). */
 	float point_params[4];
 	/* Reserved: the environment moved to Aeron's scene lighting block
 	 * (AeronScene_SetPbrEnvironment). Left zero. */
@@ -651,10 +652,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 		}
 	}
 	if (point_tuning) {
-		env.point_params[0] = point_tuning->min_distance;
 		env.point_params[1] = point_tuning->spec_weight;
-		env.point_params[2] = point_tuning->diffuse_wrap;
-		env.point_params[3] = point_tuning->contrib_cap;
 	}
 	AeronScene_SetFrameUniformData(scene, AERON_SHADER_STAGE_FRAGMENT, 1, &env, sizeof env);
 }
@@ -1251,6 +1249,32 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 	}
 }
 
+/* Point lights end under this illuminance, as Aeron's model lights do. */
+#define SHIP_POINT_LIGHT_CUTOFF 0.001f
+
+int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float intensity_scale, float range_scale,
+									AeronSceneLight* out) {
+	if (!light || !out) {
+		return 0;
+	}
+	/* I / D^2 == 0.5 * c / D at the match distance D (world units). */
+	const float scale = intensity_scale * 0.5f * XWA_SHIP_POINT_LIGHT_MATCH_DISTANCE_M * AERON_OPT_UNITS_PER_METER;
+	float peak = 0.0f;
+	memset(out, 0, sizeof *out);
+	for (int c = 0; c < 3; c++) {
+		out->pos[c] = light->pos[c];
+		out->color[c] = light->color[c] * scale;
+		if (out->color[c] > peak) {
+			peak = out->color[c];
+		}
+	}
+	out->radius = sqrtf(peak / SHIP_POINT_LIGHT_CUTOFF) * range_scale;
+	out->falloff = AERON_SCENE_LIGHT_FALLOFF_INVERSE_SQUARE;
+	out->min_distance = XWA_SHIP_POINT_LIGHT_RADIUS_M * AERON_OPT_UNITS_PER_METER;
+	return peak > 0.0f && isfinite(peak) && out->radius > 0.0f && isfinite(out->radius) &&
+		   isfinite(out->pos[0]) && isfinite(out->pos[1]) && isfinite(out->pos[2]);
+}
+
 uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh, const float transform[16],
 													  const AeronSceneMeshTable* table,
 													  const XwaFlightObject* f, XwaShipPointLight* out,
@@ -1309,16 +1333,6 @@ uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh
 		for (int r = 0; r < 3; r++) {
 			l->pos[r] = transform[r * 4 + 0] * p[0] + transform[r * 4 + 1] * p[1] +
 						transform[r * 4 + 2] * p[2] + transform[r * 4 + 3];
-		}
-		/* Visibility-law window (classic 0.5/d has no shading cutoff):
-		 * ~1% floor at 50 * intensity, never below the classic cull radius. */
-		{
-			const float cull = engine_scale * 16384.0f;
-			float rng = 50.0f * intensity;
-			if (rng < cull) {
-				rng = cull;
-			}
-			l->range = rng;
 		}
 		for (int c = 0; c < 3; c++) {
 			l->color[c] = XwaRemaster_SrgbToLinear(g->core_rgba[c]) * intensity;

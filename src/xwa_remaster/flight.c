@@ -263,6 +263,8 @@ static struct {
 	/* Point-light candidates (classic source laws, classic-unit color
 	 * x intensity premultiplied; knobs applied at finalize). */
 	XwaShipPointLight pl_cand[FL_MAX_PL_CANDIDATES];
+	/* The valid candidates as scene lights (fl_finalize_point_lights). */
+	AeronSceneLight pl_scene[FL_MAX_PL_CANDIDATES];
 	uint32_t pl_cand_count;
 	uint32_t pl_cand_dropped;
 	uint32_t pl_invalid_count;
@@ -411,10 +413,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"hangar_lighting.shadow_filter_radius",
 		"point_lights.scale",
 		"point_lights.range_scale",
-		"point_lights.min_distance",
 		"point_lights.spec_weight",
-		"point_lights.diffuse_wrap",
-		"point_lights.contrib_cap",
 		"point_lights.model_light_intensity",
 		"skybox.exposure",
 		"skybox.star_brightness",
@@ -522,9 +521,7 @@ static int fl_hangar_lighting_config_valid(const XwaFlightHangarLightingParams* 
 static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
 	return p->cluster_depth_slices >= 4 && p->cluster_depth_slices <= 64 && isfinite(p->scale) &&
 		   p->scale >= 0.0f && isfinite(p->range_scale) && p->range_scale > 0.0f &&
-		   isfinite(p->min_distance) && p->min_distance > 0.0f && isfinite(p->spec_weight) &&
-		   p->spec_weight >= 0.0f && isfinite(p->diffuse_wrap) && p->diffuse_wrap >= 0.0f &&
-		   p->diffuse_wrap <= 1.0f && isfinite(p->contrib_cap) && p->contrib_cap >= 0.0f &&
+		   isfinite(p->spec_weight) && p->spec_weight >= 0.0f &&
 		   isfinite(p->model_light_intensity) && p->model_light_intensity >= 0.0f;
 }
 
@@ -735,10 +732,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
 	s.plight.scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.scale", 0.0);
 	s.plight.range_scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.range_scale", 0.0);
-	s.plight.min_distance = (float)AeronConfigFile_GetFloat(cf, "point_lights.min_distance", 0.0);
 	s.plight.spec_weight = (float)AeronConfigFile_GetFloat(cf, "point_lights.spec_weight", 0.0);
-	s.plight.diffuse_wrap = (float)AeronConfigFile_GetFloat(cf, "point_lights.diffuse_wrap", 0.0);
-	s.plight.contrib_cap = (float)AeronConfigFile_GetFloat(cf, "point_lights.contrib_cap", 0.0);
 	s.plight.model_light_intensity = (float)AeronConfigFile_GetFloat(cf, "point_lights.model_light_intensity", 0.0);
 	if (!fl_point_lights_config_valid(&s.plight)) {
 		Aeron_LogError("xwa.remaster", "%s: invalid point_lights settings", path);
@@ -2844,11 +2838,11 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
 }
 
 /* ---- point lights (state-derived) -------------------------------------
- * Classic SOURCE laws (positions, colors, classic intensities, cull
- * radii) from FlightLight_AppendScenePointLightForObject, evaluated as
- * modern PBR punctual lights (clustered, windowed inverse-square,
- * per-pixel Lambert + spec — the sanctioned look-better deviation from
- * the classic per-object 8-light 1/d vertex law). Sources:
+ * Classic SOURCE laws (positions, colors, classic intensities) from
+ * FlightLight_AppendScenePointLightForObject, evaluated as physical
+ * sphere lights (clustered, inverse-square, per-pixel Lambert + spec —
+ * the sanctioned look-better deviation from the classic per-object
+ * 8-light 1/d vertex law; XwaRemasterShip_ScenePointLight). Sources:
  *   - explosion-genus sprites / projectiles / DS fixtures via the
  *     XwaSnapshotExport_PointLightForObject accessor (the classic
  *     type switch + intensity tables), with the classic append gates;
@@ -2857,31 +2851,18 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
  *   - the local player's semantic pulses, including weapon fire and
  *     hyperspace effects (classic cycle/fade envelope replayed from
  *     game_time_ms at the hardpoint).
- * The classic Local Lights config level is NOT honored (period option).
- * Aeron assigns the submitted sources to spatial light clusters. */
+ * The classic cull radii only selected lights per object and are not
+ * used. The classic Local Lights config level is NOT honored (period
+ * option). Aeron assigns the submitted sources to spatial light clusters. */
 
-static void fl_pl_push(const float pos[3], float range, const float color_x_intensity[3]) {
+static void fl_pl_push(const float pos[3], const float color_x_intensity[3]) {
 	if (s.pl_cand_count >= FL_MAX_PL_CANDIDATES) {
 		s.pl_cand_dropped++;
 		return;
 	}
 	XwaShipPointLight* l = &s.pl_cand[s.pl_cand_count++];
 	memcpy(l->pos, pos, 3 * sizeof(float));
-	l->range = range;
 	memcpy(l->color, color_x_intensity, 3 * sizeof(float));
-}
-
-/* Window range from the classic VISIBILITY law: the classic 0.5/d
- * contribution has no shading cutoff (its cull radius only gates
- * per-object selection), so the window sits where the contribution
- * falls under ~1% (d = 50 * intensity), never below the classic cull
- * radius. */
-static float fl_pl_range(float classic_intensity, float cull_radius) {
-	float r = 50.0f * classic_intensity;
-	if (r < cull_radius) {
-		r = cull_radius;
-	}
-	return r;
 }
 
 /* Accessor-law sources (everything except engine glows + pulses). */
@@ -2901,7 +2882,7 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 		const float cx[3] = { 0.0f, XwaRemaster_SrgbToLinear(1.0f) * i, XwaRemaster_SrgbToLinear(0.2f) * i };
 		float local[3];
 		AeronWorld_LocalI32(s.origin_world, cam->ds_beam_world_pos, local);
-		fl_pl_push(local, fl_pl_range(i, 16384.0f), cx);
+		fl_pl_push(local, cx);
 	}
 	for (uint32_t i = 0; i < snap->flight_object_count; i++) {
 		const XwaFlightObject* f = &snap->flight_objects[i];
@@ -2935,7 +2916,7 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 		}
 		float local[3];
 		fl_object_local(f, local);
-		fl_pl_push(local, fl_pl_range(intensity, (float)cull), cxi);
+		fl_pl_push(local, cxi);
 	}
 	/* Particle_AppendObjectEffectPointLights contributes one warm light at
 	 * each eligible object-attached emitter (effect type 1 is excluded).
@@ -2953,7 +2934,7 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 		float local[3];
 		AeronWorld_LocalPointI32F32(s.origin_world, effect->emitter_world_pos.base,
 									effect->emitter_world_pos.offset, local);
-		fl_pl_push(local, fl_pl_range(intensity, 0.0f), cxi);
+		fl_pl_push(local, cxi);
 	}
 }
 
@@ -3006,11 +2987,12 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
 		for (int c = 0; c < 3; c++) {
 			cxi[c] = XwaRemaster_SrgbToLinear(pl->color[c]) * pl->intensity * fade;
 		}
-		fl_pl_push(world, fl_pl_range(pl->intensity * fade, pl->cull_radius * fade), cxi);
+		fl_pl_push(world, cxi);
 	}
 }
 
-/* Apply calibration and discard invalid records without changing order. */
+/* Convert the candidates to scene lights with the calibration, discarding
+ * invalid records without changing order. */
 static uint32_t fl_finalize_point_lights(XwaShipPointLightTuning* tuning) {
 	memset(tuning, 0, sizeof *tuning);
 	if (!s.plight.enabled || s.pl_cand_count == 0) {
@@ -3018,25 +3000,14 @@ static uint32_t fl_finalize_point_lights(XwaShipPointLightTuning* tuning) {
 	}
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < s.pl_cand_count; i++) {
-		XwaShipPointLight light = s.pl_cand[i];
-		for (int c = 0; c < 3; c++) {
-			light.color[c] *= s.plight.scale;
-		}
-		light.range *= s.plight.range_scale;
-		const float luminance =
-			0.2126f * light.color[0] + 0.7152f * light.color[1] + 0.0722f * light.color[2];
-		if (!(light.range > 0.0f) || !(luminance > 0.0f) || !isfinite(light.range) || !isfinite(luminance) ||
-			!isfinite(light.pos[0]) || !isfinite(light.pos[1]) || !isfinite(light.pos[2]) ||
-			!isfinite(light.color[0]) || !isfinite(light.color[1]) || !isfinite(light.color[2])) {
+		if (!XwaRemasterShip_ScenePointLight(&s.pl_cand[i], s.plight.scale, s.plight.range_scale,
+											 &s.pl_scene[count])) {
 			s.pl_invalid_count++;
 			continue;
 		}
-		s.pl_cand[count++] = light;
+		s.pl_cand[count++] = s.pl_cand[i];
 	}
-	tuning->min_distance = s.plight.min_distance;
 	tuning->spec_weight = s.plight.spec_weight;
-	tuning->diffuse_wrap = s.plight.diffuse_wrap;
-	tuning->contrib_cap = s.plight.contrib_cap;
 	s.pl_cand_count = count;
 	return count;
 }
@@ -3044,18 +3015,14 @@ static uint32_t fl_finalize_point_lights(XwaShipPointLightTuning* tuning) {
 static uint32_t fl_submit_point_lights(uint32_t count) {
 	uint32_t accepted = 0;
 	for (uint32_t i = 0; i < count; ++i) {
-		AeronSceneLight light = { 0 };
-		memcpy(light.pos, s.pl_cand[i].pos, sizeof light.pos);
-		light.radius = s.pl_cand[i].range;
-		memcpy(light.color, s.pl_cand[i].color, sizeof light.color);
-		accepted += (uint32_t)AeronScene_AddLight(s.scene, &light);
+		accepted += (uint32_t)AeronScene_AddLight(s.scene, &s.pl_scene[i]);
 	}
 	return accepted;
 }
 
 /* Lights authored in a model (AeronFlightLight), placed by its instance.
- * They are physical (inverse-square) rather than classic, so the classic
- * calibration knobs do not apply; point_lights.model_light_intensity does. */
+ * Their intensity is authored physically, so point_lights.scale does not
+ * apply; point_lights.model_light_intensity does. */
 static void fl_submit_model_lights(const AeronSceneMesh* mesh, const float transform[16],
 								   const AeronSceneMeshTable* table) {
 	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f)) {
@@ -3074,8 +3041,6 @@ static int fl_configure_clustered_lights(AeronScene3D* scene) {
 	return AeronScene_SetClusteredLights(scene, &(AeronSceneClusteredLightDesc) {
 													.enabled = s.plight.clustered,
 													.depth_slices = (uint32_t)s.plight.cluster_depth_slices,
-													.min_distance = s.plight.min_distance,
-													.contribution_cap = s.plight.contrib_cap,
 													.debug_view = s.plight.cluster_debug,
 												});
 }

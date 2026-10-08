@@ -217,15 +217,17 @@ point_lights:
   clustered: true            # automatically uses brute force for small light counts
   cluster_depth_slices: 24
   cluster_debug: false
+  # The game's lights (lasers, explosions, engines) are physical
+  # inverse-square sphere lights from the classic intensities; scale 1 is
+  # as bright as the classic law 5 m away, so brighter closer and dimmer
+  # farther.
   scale: 1.0
+  # Multiplies the distance where a light falls under 1/1000 of a unit of
+  # illuminance and ends.
   range_scale: 1.0
-  min_distance: 64.0
   spec_weight: 1.0
-  diffuse_wrap: 1.0
-  contrib_cap: 1.0
   # Intensity multiplier of point lights authored in models (such as the
-  # converted cockpits' interior light); physical inverse-square falloff,
-  # unaffected by the classic knobs above. 0 disables them.
+  # converted cockpits' interior light); 0 disables them.
   model_light_intensity: 1.0
 lighting:
   intensity: 0.8

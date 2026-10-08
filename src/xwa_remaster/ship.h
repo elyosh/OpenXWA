@@ -130,21 +130,27 @@ typedef struct XwaShipAoParams {
 	float direct;     /* AO weight on direct diffuse (0 = ambient-only) */
 } XwaShipAoParams;
 
-/* One punctual-light candidate for the PBR env (world space, HDR
- * color with the source intensity premultiplied, range = attenuation
- * window in world units). Evaluated per fragment by the scene PBR FS
- * (windowed inverse-square, Lambert + Cook-Torrance spec). */
+/* One punctual-light source in the classic SOURCE law's terms (world
+ * space; linear colour with the classic intensity premultiplied). The
+ * scene evaluates it as a physical light (XwaRemasterShip_ScenePointLight). */
 typedef struct XwaShipPointLight {
 	float pos[3];
-	float range;
-	float color[3]; /* linear HDR */
+	float color[3]; /* linear colour x classic intensity */
 } XwaShipPointLight;
 typedef struct XwaShipPointLightTuning {
-	float min_distance; /* near clamp on the 0.5/d law, world units */
-	float spec_weight;  /* 0 disables the spec lobe */
-	float diffuse_wrap; /* 0 = Lambert, 1 = half-Lambert */
-	float contrib_cap;  /* per-light lit-color cap (classic saturation) */
+	float spec_weight; /* 0 disables the spec lobe */
 } XwaShipPointLightTuning;
+
+/* A classic-intensity source as a physical scene light: an inverse-square
+ * sphere of XWA_SHIP_POINT_LIGHT_RADIUS_M, as bright as the classic law
+ * (0.5 * intensity / d) at XWA_SHIP_POINT_LIGHT_MATCH_DISTANCE_M, so
+ * brighter closer and dimmer farther. `intensity_scale` multiplies it;
+ * `range_scale` multiplies the distance where it falls under 1/1000 of
+ * a unit of illuminance. Returns zero for a light that emits nothing. */
+#define XWA_SHIP_POINT_LIGHT_MATCH_DISTANCE_M 5.0f
+#define XWA_SHIP_POINT_LIGHT_RADIUS_M 0.25f
+int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float intensity_scale, float range_scale,
+									AeronSceneLight* out);
 
 /* Optional per-frame linear ambient cube. NULL selects the process-wide
  * uniform ambient value from XwaShipPbrTuning. */
@@ -175,8 +181,8 @@ typedef struct XwaShipEnvironmentMap {
 /* Classic engine-glow POINT LIGHTS (the modelIndex branch of
  * FlightLight_AppendScenePointLightForObject): every glow with raw
  * dims.x/y over 2000 emits a light at its (articulated) anchor —
- * intensity dim.z x engineScale x 300, range engineScale x 16384,
- * color = core color; engineScale is the power margin x output scale
+ * intensity dim.z x engineScale x 300, color = core color (the classic
+ * range, engineScale x 16384, only selected lights); engineScale is the power margin x output scale
  * (no throttle/flicker — those belong to the glow SIZE law). Color
  * carries the classic intensity premultiplied (linear HDR); the
  * caller applies its global scale knobs. Returns lights appended. */

@@ -489,23 +489,14 @@ static void xwa_tool_point_lights(int* open, void* user) {
 				(double)stats.scene.allocated_buffer_bytes / (1024.0 * 1024.0));
 	changed |=
 		ImGui::SliderFloat("Intensity scale", &p.scale, 0.05f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
-	ImGui::TextDisabled("Multiplier on the classic intensities. The shader runs the\n"
-						"classic curve (intensity*0.5/d), so 1.0 = classic magnitudes.");
+	ImGui::TextDisabled("Multiplier on the game's lights (lasers, explosions, engines).\n"
+						"Inverse-square; 1.0 = as bright as the classic law %.0f m away.",
+						(double)XWA_SHIP_POINT_LIGHT_MATCH_DISTANCE_M);
 	changed |=
 		ImGui::SliderFloat("Range scale", &p.range_scale, 0.25f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
-	ImGui::TextDisabled("Multiplies the derived visibility window (~the classic 1%%\n"
-						"contribution floor; the classic curve has no hard cutoff).");
-	changed |= ImGui::SliderFloat("Min distance", &p.min_distance, 4.0f, 1024.0f, "%.0f",
-								  ImGuiSliderFlags_Logarithmic);
-	ImGui::TextDisabled("Near clamp on 0.5/d in view units (~2.4 cm each) — stops the\n"
-						"blowup when a bolt skims a hull.");
+	ImGui::TextDisabled("Multiplies the distance where a light falls under\n"
+						"1/1000 of a unit of illuminance and ends.");
 	changed |= ImGui::SliderFloat("Specular weight", &p.spec_weight, 0.0f, 2.0f, "%.2f");
-	changed |= ImGui::SliderFloat("Diffuse wrap", &p.diffuse_wrap, 0.0f, 1.0f, "%.2f");
-	ImGui::TextDisabled("0 = Lambert (hard shaping), 1 = half-Lambert — grazing hulls\n"
-						"under a passing bolt stay lit like the classic (no N.L there).");
-	changed |= ImGui::SliderFloat("Contribution cap", &p.contrib_cap, 0.0f, 4.0f, "%.2f");
-	ImGui::TextDisabled("Per-light lit-color cap, hue-preserving; the classic saturates\n"
-						"at 1.0 (engine-glow sources exceed it by design). 0 = uncapped.");
 	changed |= ImGui::SliderFloat("Model light intensity", &p.model_light_intensity, 0.0f, 16.0f, "%.2f",
 								  ImGuiSliderFlags_Logarithmic);
 	ImGui::TextDisabled("Intensity of lights authored in models (cockpit interior light).\n"
