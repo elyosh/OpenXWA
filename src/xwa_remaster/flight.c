@@ -1055,6 +1055,8 @@ void XwaRemasterFlight_SetShadows(const XwaFlightShadowParams* in) {
 	s.shadows.transition_fraction = fminf(fmaxf(s.shadows.transition_fraction, 0.0f), 0.5f);
 	s.shadows.distance_fade_fraction = fminf(fmaxf(s.shadows.distance_fade_fraction, 0.0f), 0.5f);
 	s.shadows.debug_cascades = in->debug_cascades ? 1 : 0;
+	s.shadows.receiver_local_near_distance_m =
+		fminf(fmaxf(s.shadows.receiver_local_near_distance_m, 0.0f), 10.0f);
 }
 
 void XwaRemasterFlight_GetShadowsDefault(XwaFlightShadowParams* out) {
@@ -4321,6 +4323,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			.transition_fraction = s.shadows.transition_fraction,
 			.distance_fade_fraction = s.shadows.distance_fade_fraction,
 			.debug_cascades = s.shadows.debug_cascades,
+			.receiver_local_near_distance =
+				s.shadows.receiver_local_near_distance_m * AERON_OPT_UNITS_PER_METER,
 			.debug_atlas = s.shadow_debug_atlas,
 			.debug_atlas_cascade = s.shadow_debug_atlas_cascade,
 		};

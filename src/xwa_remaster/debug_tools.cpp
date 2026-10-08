@@ -314,6 +314,8 @@ static void xwa_tool_shadows(int* open, void* user) {
 	changed |= ImGui::SliderFloat("Depth bias", &p.depth_bias_texels, 0.0f, 4.0f, "%.2f texels");
 	changed |= ImGui::SliderFloat("Cascade transition", &p.transition_fraction, 0.0f, 0.5f, "%.2f");
 	changed |= ImGui::SliderFloat("Distance fade", &p.distance_fade_fraction, 0.0f, 0.5f, "%.2f");
+	changed |= ImGui::SliderFloat("Cockpit near tile", &p.receiver_local_near_distance_m, 0.0f, 4.0f, "%.2f m");
+	ImGui::TextDisabled("Camera distance the cockpit's finer shadow tile covers; 0 = off.");
 	bool debug_cascades = p.debug_cascades != 0;
 	if (ImGui::Checkbox("Visualize cascades", &debug_cascades)) {
 		p.debug_cascades = debug_cascades ? 1 : 0;
