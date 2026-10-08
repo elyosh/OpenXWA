@@ -4665,8 +4665,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				inst.zero_velocity = 1;
 			}
 			inst.cull_mode = AERON_CULL_BACK;
-			inst.shadow_flags =
-				AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_USE_RECEIVER_LOCAL_SHADOW;
+			/* The cockpit shadows itself in its own map (the hidden exterior
+			 * already casts on the rest of the scene), with both faces: its
+			 * walls are single-sided, facing in. */
+			inst.shadow_flags = AERON_SCENE_INSTANCE_USE_RECEIVER_LOCAL_SHADOW |
+								AERON_SCENE_INSTANCE_CAST_RECEIVER_LOCAL_ONLY |
+								AERON_SCENE_INSTANCE_SHADOW_DOUBLE_SIDED;
 			/* Holograms and transparent screens carry the cockpit's motion
 			 * vectors, so motion blur does not smear them with the view
 			 * behind. */
