@@ -73,21 +73,18 @@ static const XwaFlightObject* cmd_find_object(const XwaSnapshot* snapshot, uint1
 	return NULL;
 }
 
+/* The CMD camera rows as captured. Hud_PointCamera's shortcut for a target
+ * the player carries (or its AI targets) aims along the target's own axes,
+ * negated: a mirrored basis. Kept as is, the view shows what the classic
+ * draws, and cmd_rows_mirrored reverses the culled faces to match. */
 static void cmd_rows(const XwaHudCrt* crt, float rows[9]) {
 	XwaRemasterHudCmdMath_OrthonormalRows(crt->camera_rows_q15, rows);
-	const float determinant = rows[0] * (rows[4] * rows[8] - rows[5] * rows[7]) -
-							  rows[1] * (rows[3] * rows[8] - rows[5] * rows[6]) +
-							  rows[2] * (rows[3] * rows[7] - rows[4] * rows[6]);
-	if (determinant < 0.0f) {
-		/* Hud_PointCamera's docked/carried-target shortcut is expressed in
-		 * the classic renderer's reflected object/view convention. The glTF
-		 * eye-local boundary has already absorbed the classic model-axis
-		 * mapping, so reverse its up and forward rows as a pair. One reversal
-		 * would change handedness; the pair keeps the target presentation
-		 * rotation fixed while selecting the carrier-facing (top) side. */
-		for (int i = 3; i < 9; i++)
-			rows[i] = -rows[i];
-	}
+}
+
+static int cmd_rows_mirrored(const float rows[9]) {
+	return rows[0] * (rows[4] * rows[8] - rows[5] * rows[7]) - rows[1] * (rows[3] * rows[8] - rows[5] * rows[6]) +
+			   rows[2] * (rows[3] * rows[7] - rows[4] * rows[6]) <
+		   0.0f;
 }
 
 static float cmd_camera_distance(const XwaHudCrt* crt) {
@@ -218,7 +215,8 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 	if (cmd_projectile(object) && source == XWA_MODEL_SOURCE_OPT) {
 		instance.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
 	}
-	instance.cull_mode = roll_align ? AERON_CULL_NONE : AERON_CULL_BACK;
+	/* A mirrored view reverses the winding of every face it shows. */
+	instance.cull_mode = roll_align ? AERON_CULL_NONE : cmd_rows_mirrored(rows) ? AERON_CULL_FRONT : AERON_CULL_BACK;
 	memcpy(instance.transform, transform, sizeof transform);
 	memcpy(instance.prev_transform, transform, sizeof transform);
 	if (object->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK && s_cmd.table_count < 2) {
