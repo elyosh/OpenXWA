@@ -410,7 +410,6 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"hangar_lighting.ambient_ceiling",
 		"hangar_lighting.ambient_sides",
 		"hangar_lighting.ambient_floor",
-		"hangar_lighting.shadow_filter_radius",
 		"point_lights.scale",
 		"point_lights.range_scale",
 		"point_lights.spec_weight",
@@ -514,8 +513,7 @@ static int fl_hangar_lighting_config_valid(const XwaFlightHangarLightingParams* 
 		   p->intensity <= 4.0f && p->color[0] >= 0.0f && p->color[0] <= 4.0f && p->color[1] >= 0.0f &&
 		   p->color[1] <= 4.0f && p->color[2] >= 0.0f && p->color[2] <= 4.0f && p->ambient_ceiling >= 0.0f &&
 		   p->ambient_ceiling <= 4.0f && p->ambient_sides >= 0.0f && p->ambient_sides <= 4.0f &&
-		   p->ambient_floor >= 0.0f && p->ambient_floor <= 4.0f && p->shadow_filter_radius >= 0.5f &&
-		   p->shadow_filter_radius <= 3.0f;
+		   p->ambient_floor >= 0.0f && p->ambient_floor <= 4.0f;
 }
 
 static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
@@ -712,8 +710,6 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.ambient_sides", 0.0);
 	s.hangar_lighting.ambient_floor =
 		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.ambient_floor", 0.0);
-	s.hangar_lighting.shadow_filter_radius =
-		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.shadow_filter_radius", 0.0);
 	const float hangar_direction_length =
 		sqrtf(s.hangar_lighting.direction[0] * s.hangar_lighting.direction[0] +
 			  s.hangar_lighting.direction[1] * s.hangar_lighting.direction[1] +
@@ -1036,14 +1032,10 @@ void XwaRemasterFlight_SetShadows(const XwaFlightShadowParams* in) {
 	s.shadows.split_lambda = fminf(fmaxf(s.shadows.split_lambda, 0.0f), 1.0f);
 	s.shadows.explicit_splits = in->explicit_splits ? 1 : 0;
 	fl_sanitize_shadow_split_positions(s.shadows.split_positions);
-	s.shadows.filter_quality =
-		s.shadows.filter_quality < 0 ? 0 : (s.shadows.filter_quality > 3 ? 3 : s.shadows.filter_quality);
-	s.shadows.filter_radius = fminf(fmaxf(s.shadows.filter_radius, 0.5f), 3.0f);
-	s.shadows.contact_hardening = in->contact_hardening ? 1 : 0;
 	s.shadows.light_angular_radius_degrees = fminf(fmaxf(s.shadows.light_angular_radius_degrees, 0.0f), 5.0f);
-	s.shadows.max_filter_radius = fminf(fmaxf(s.shadows.max_filter_radius, s.shadows.filter_radius), 16.0f);
+	s.shadows.max_filter_radius = fminf(fmaxf(s.shadows.max_filter_radius, 1.0f), 16.0f);
 	s.shadows.pcss_min_filter_radius =
-		fminf(fmaxf(s.shadows.pcss_min_filter_radius, 0.5f), s.shadows.filter_radius);
+		fminf(fmaxf(s.shadows.pcss_min_filter_radius, 0.5f), s.shadows.max_filter_radius);
 	s.shadows.normal_bias_texels = fminf(fmaxf(s.shadows.normal_bias_texels, 0.0f), 4.0f);
 	s.shadows.depth_bias_texels = fminf(fmaxf(s.shadows.depth_bias_texels, 0.0f), 4.0f);
 	s.shadows.transition_fraction = fminf(fmaxf(s.shadows.transition_fraction, 0.0f), 0.5f);
@@ -1103,7 +1095,6 @@ static void fl_sanitize_hangar_lighting(XwaFlightHangarLightingParams* params) {
 	params->ambient_ceiling = fminf(fmaxf(params->ambient_ceiling, 0.0f), 4.0f);
 	params->ambient_sides = fminf(fmaxf(params->ambient_sides, 0.0f), 4.0f);
 	params->ambient_floor = fminf(fmaxf(params->ambient_floor, 0.0f), 4.0f);
-	params->shadow_filter_radius = fminf(fmaxf(params->shadow_filter_radius, 0.5f), 3.0f);
 }
 
 void XwaRemasterFlight_GetHangarLighting(XwaFlightHangarLightingParams* out) {
@@ -4317,10 +4308,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			.explicit_splits = s.shadows.explicit_splits,
 			.split_positions = { s.shadows.split_positions[0], s.shadows.split_positions[1],
 								 s.shadows.split_positions[2] },
-			.filter_quality = (uint32_t)s.shadows.filter_quality,
-			.filter_radius = scene_lighting.hangar_override ? s.hangar_lighting.shadow_filter_radius
-															: s.shadows.filter_radius,
-			.contact_hardening = s.shadows.contact_hardening,
 			.light_angular_radius_degrees = scene_lighting.shadow_angular_radius_degrees,
 			.max_filter_radius = s.shadows.max_filter_radius,
 			.pcss_min_filter_radius = s.shadows.pcss_min_filter_radius,

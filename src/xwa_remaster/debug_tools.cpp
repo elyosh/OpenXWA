@@ -284,31 +284,13 @@ static void xwa_tool_shadows(int* open, void* user) {
 	} else {
 		changed |= ImGui::SliderFloat("Split lambda", &p.split_lambda, 0.0f, 1.0f, "%.2f");
 	}
-	static const char* filter_names[] = { "Hard", "Low (3x3 PCF / 8-tap PCSS)",
-										  "Medium (5x5 PCF / 16-tap PCSS)", "High (7x7 PCF / 24-tap PCSS)" };
-	int filter_quality = (int)p.filter_quality;
-	if (ImGui::Combo("Filter", &filter_quality, filter_names, 4)) {
-		p.filter_quality = (uint32_t)filter_quality;
-		changed = true;
-	}
-	changed |= ImGui::SliderFloat("Filter radius", &p.filter_radius, 0.5f, 3.0f, "%.2f texels");
-	bool contact_hardening = p.contact_hardening != 0;
-	if (ImGui::Checkbox("Contact-hardening PCSS", &contact_hardening)) {
-		p.contact_hardening = contact_hardening ? 1 : 0;
-		changed = true;
-	}
-	if (!contact_hardening) {
-		ImGui::BeginDisabled();
-	}
+	ImGui::TextDisabled("Contact-hardening PCSS: 16-tap blocker search, 16 filter taps.");
 	changed |=
 		ImGui::SliderFloat("Light angular radius", &p.light_angular_radius_degrees, 0.0f, 5.0f, "%.3f deg");
-	changed |= ImGui::SliderFloat("Maximum filter radius", &p.max_filter_radius, p.filter_radius, 16.0f,
+	changed |= ImGui::SliderFloat("Maximum filter radius", &p.max_filter_radius, p.pcss_min_filter_radius,
+								  16.0f, "%.2f texels");
+	changed |= ImGui::SliderFloat("Minimum PCSS radius", &p.pcss_min_filter_radius, 0.5f, p.max_filter_radius,
 								  "%.2f texels");
-	changed |= ImGui::SliderFloat("Minimum PCSS radius", &p.pcss_min_filter_radius, 0.5f, p.filter_radius,
-								  "%.2f texels");
-	if (!contact_hardening) {
-		ImGui::EndDisabled();
-	}
 	changed |= ImGui::SliderFloat("Normal bias", &p.normal_bias_texels, 0.0f, 4.0f, "%.2f texels");
 	changed |= ImGui::SliderFloat("Depth bias", &p.depth_bias_texels, 0.0f, 4.0f, "%.2f texels");
 	changed |= ImGui::SliderFloat("Cascade transition", &p.transition_fraction, 0.0f, 0.5f, "%.2f");
@@ -424,8 +406,6 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 	changed |= ImGui::SliderFloat("Wall bounce", &p.ambient_sides, 0.0f, 1.0f, "%.3f");
 	changed |= ImGui::SliderFloat("Floor bounce (-Z)", &p.ambient_floor, 0.0f, 1.0f, "%.3f");
 	ImGui::EndDisabled();
-	ImGui::Separator();
-	changed |= ImGui::SliderFloat("Shadow filter radius", &p.shadow_filter_radius, 0.5f, 3.0f, "%.2f texels");
 	if (!enabled) {
 		ImGui::EndDisabled();
 	}

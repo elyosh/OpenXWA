@@ -156,7 +156,6 @@ hangar_lighting:
   ambient_ceiling: 0.16
   ambient_sides: 0.10
   ambient_floor: 0.06
-  shadow_filter_radius: 2.0
 # Authored per-region HDR environments (sky, diffuse and specular lighting,
 # suns). The manifest, under the remaster bake root, holds the `packages:`
 # map and the `xwa:` hangar and (mission, region) mapping; it is required
@@ -216,7 +215,7 @@ point_lights:
   enabled: true
   clustered: true            # automatically uses brute force for small light counts
   cluster_depth_slices: 24
-  cluster_debug: false
+  cluster_debug: false       # occupancy view; debug-UI builds only
   # The game's lights (lasers, explosions, engines) are physical
   # inverse-square sphere lights from the classic intensities; scale 1 is
   # as bright as the classic law 5 m away, so brighter closer and dimmer

@@ -390,7 +390,7 @@ typedef struct PbrLightFS {
 	float global_spec_mul;
 	float debug_isolate_term;
 	float light_wrap;
-	float xvt_flat;
+	float reserved_xvt; /* formerly the XvT flat-shading switch */
 	float ssao_intensity;
 	float ssao_power;
 	float ssao_rt_w;

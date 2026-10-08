@@ -63,7 +63,6 @@ typedef struct XwaFlightHangarLightingParams {
 	float ambient_ceiling;
 	float ambient_sides;
 	float ambient_floor;
-	float shadow_filter_radius;
 } XwaFlightHangarLightingParams;
 
 void XwaRemasterFlight_GetHangarLighting(XwaFlightHangarLightingParams* out);
