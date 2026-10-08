@@ -132,17 +132,20 @@ typedef struct XwaShipAoParams {
 
 /* One punctual-light source in the classic SOURCE law's terms (world
  * space; linear colour with the classic intensity premultiplied). The
- * scene evaluates it as a physical light (XwaRemasterShip_ScenePointLight). */
+ * scene evaluates it as a physical light (XwaRemasterShip_ScenePointLight):
+ * a sphere, or with a non-zero half axis a tube along pos +- half_axis
+ * (a laser streak) with the same total intensity. */
 typedef struct XwaShipPointLight {
 	float pos[3];
 	float color[3]; /* linear colour x classic intensity */
+	float half_axis[3];
 } XwaShipPointLight;
 typedef struct XwaShipPointLightTuning {
 	float spec_weight; /* 0 disables the spec lobe */
 } XwaShipPointLightTuning;
 
 /* A classic-intensity source as a physical scene light: an inverse-square
- * sphere of XWA_SHIP_POINT_LIGHT_RADIUS_M, as bright as the classic law
+ * sphere (or tube) of XWA_SHIP_POINT_LIGHT_RADIUS_M, as bright as the classic law
  * (0.5 * intensity / d) at XWA_SHIP_POINT_LIGHT_MATCH_DISTANCE_M, so
  * brighter closer and dimmer farther. `intensity_scale` multiplies it;
  * `range_scale` multiplies the distance where it falls under 1/1000 of

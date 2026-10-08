@@ -2855,14 +2855,49 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
  * used. The classic Local Lights config level is NOT honored (period
  * option). Aeron assigns the submitted sources to spatial light clusters. */
 
-static void fl_pl_push(const float pos[3], const float color_x_intensity[3]) {
+static XwaShipPointLight* fl_pl_push(const float pos[3], const float color_x_intensity[3]) {
 	if (s.pl_cand_count >= FL_MAX_PL_CANDIDATES) {
 		s.pl_cand_dropped++;
-		return;
+		return NULL;
 	}
 	XwaShipPointLight* l = &s.pl_cand[s.pl_cand_count++];
+	memset(l, 0, sizeof *l);
 	memcpy(l->pos, pos, 3 * sizeof(float));
 	memcpy(l->color, color_x_intensity, 3 * sizeof(float));
+	return l;
+}
+
+/* A projectile's light is its streak: the bolt model's long bound axis,
+ * placed as the bolt is drawn. Its origin is the bolt's tip, outside the
+ * streak (a fighter laser trails 5.5 to 22.5 m behind it), where the
+ * classic law's point sat. Returns zero when the model is unavailable. */
+static int fl_projectile_streak(const XwaFlightObject* f, const int32_t camera_world[3], float center[3],
+								float half_axis[3]) {
+	const AeronSceneMesh* mesh =
+		XwaRemasterShip_MeshForNameWithSource(XwaSnapshotExport_ModelName(f->object_type), NULL);
+	if (!mesh) {
+		return 0;
+	}
+	float basis[9], local[3], model[16];
+	fl_object_pose(f, camera_world, 1, basis, local, model);
+	int long_axis = 0;
+	for (int axis = 1; axis < 3; axis++) {
+		if (mesh->bound_max[axis] - mesh->bound_min[axis] >
+			mesh->bound_max[long_axis] - mesh->bound_min[long_axis]) {
+			long_axis = axis;
+		}
+	}
+	float mid[3], half[3] = { 0.0f, 0.0f, 0.0f };
+	for (int axis = 0; axis < 3; axis++) {
+		mid[axis] = 0.5f * (mesh->bound_min[axis] + mesh->bound_max[axis]);
+	}
+	half[long_axis] = 0.5f * (mesh->bound_max[long_axis] - mesh->bound_min[long_axis]);
+	for (int r = 0; r < 3; r++) {
+		center[r] = model[r * 4 + 0] * mid[0] + model[r * 4 + 1] * mid[1] + model[r * 4 + 2] * mid[2] +
+					model[r * 4 + 3];
+		half_axis[r] = model[r * 4 + 0] * half[0] + model[r * 4 + 1] * half[1] + model[r * 4 + 2] * half[2];
+	}
+	return 1;
 }
 
 /* Accessor-law sources (everything except engine glows + pulses). */
@@ -2915,8 +2950,16 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 			cxi[c] = XwaRemaster_SrgbToLinear(color[c]) * intensity;
 		}
 		float local[3];
-		fl_object_local(f, local);
-		fl_pl_push(local, cxi);
+		float half_axis[3];
+		if (fl_object_is_projectile(f) && fl_projectile_streak(f, cam->world_pos, local, half_axis)) {
+			XwaShipPointLight* light = fl_pl_push(local, cxi);
+			if (light) {
+				memcpy(light->half_axis, half_axis, sizeof half_axis);
+			}
+		} else {
+			fl_object_local(f, local);
+			fl_pl_push(local, cxi);
+		}
 	}
 	/* Particle_AppendObjectEffectPointLights contributes one warm light at
 	 * each eligible object-attached emitter (effect type 1 is excluded).

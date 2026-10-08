@@ -395,6 +395,7 @@ static void cmd_add_point_light(const XwaSnapshot* snapshot, const XwaFlightObje
 		intensity <= 0.0f)
 		return;
 	XwaShipPointLight* light = &s_cmd.point_candidates[s_cmd.point_candidate_count++];
+	memset(light, 0, sizeof *light);
 	memcpy(light->pos, eye, sizeof light->pos);
 	for (int i = 0; i < 3; i++)
 		light->color[i] = XwaRemaster_SrgbToLinear(color[i]) * intensity;
@@ -427,6 +428,7 @@ static void cmd_add_particle_lights(const XwaSnapshot* snapshot, const float row
 		AeronWorld_LocalPointI32F32(target->world_pos, effect->emitter_world_pos.base,
 									effect->emitter_world_pos.offset, delta);
 		XwaShipPointLight* light = &s_cmd.point_candidates[s_cmd.point_candidate_count++];
+		memset(light, 0, sizeof *light);
 		for (int r = 0; r < 3; r++)
 			light->pos[r] = rows[r * 3] * delta[0] + rows[r * 3 + 1] * delta[1] + rows[r * 3 + 2] * delta[2];
 		light->pos[2] += cmd_camera_distance(&snapshot->hud.crt);

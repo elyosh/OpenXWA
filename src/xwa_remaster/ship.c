@@ -1263,6 +1263,7 @@ int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float intens
 	memset(out, 0, sizeof *out);
 	for (int c = 0; c < 3; c++) {
 		out->pos[c] = light->pos[c];
+		out->half_axis[c] = light->half_axis[c];
 		out->color[c] = light->color[c] * scale;
 		if (out->color[c] > peak) {
 			peak = out->color[c];
@@ -1330,6 +1331,7 @@ uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh
 			memcpy(p, tp, sizeof tp);
 		}
 		XwaShipPointLight* l = &out[n++];
+		memset(l, 0, sizeof *l);
 		for (int r = 0; r < 3; r++) {
 			l->pos[r] = transform[r * 4 + 0] * p[0] + transform[r * 4 + 1] * p[1] +
 						transform[r * 4 + 2] * p[2] + transform[r * 4 + 3];
