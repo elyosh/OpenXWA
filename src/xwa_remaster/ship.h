@@ -147,8 +147,8 @@ typedef struct XwaShipPointLightTuning {
  * sphere (or tube) of XWA_SHIP_POINT_LIGHT_RADIUS_M, as bright as the classic law
  * (0.5 * intensity / d) at XWA_SHIP_POINT_LIGHT_MATCH_DISTANCE_M, so
  * brighter closer and dimmer farther. `intensity_scale` multiplies it;
- * `range_scale` multiplies the distance where it falls under 1/1000 of
- * a unit of illuminance. Returns zero for a light that emits nothing. */
+ * `range_scale` multiplies the distance where it falls under 1/250 of a
+ * unit of illuminance. Returns zero for a light that emits nothing. */
 #define XWA_SHIP_POINT_LIGHT_MATCH_DISTANCE_M 5.0f
 #define XWA_SHIP_POINT_LIGHT_RADIUS_M 0.25f
 int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float intensity_scale, float range_scale,

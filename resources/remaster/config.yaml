@@ -221,7 +221,7 @@ point_lights:
   # as bright as the classic law 5 m away, so brighter closer and dimmer
   # farther.
   scale: 1.0
-  # Multiplies the distance where a light falls under 1/1000 of a unit of
+  # Multiplies the distance where a light falls under 1/250 of a unit of
   # illuminance and ends.
   range_scale: 1.0
   spec_weight: 1.0

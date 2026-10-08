@@ -1245,8 +1245,11 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 	}
 }
 
-/* Point lights end under this illuminance, as Aeron's model lights do. */
-#define SHIP_POINT_LIGHT_CUTOFF 0.001f
+/* Point lights end under this illuminance. The window has already faded
+ * the light to almost nothing there, and a shorter range keeps fewer
+ * lights per cluster; even in a dark region, 1/250 instead of 1/1000
+ * changes no pixel by more than a few levels. */
+#define SHIP_POINT_LIGHT_CUTOFF 0.004f
 
 int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float intensity_scale, float range_scale,
 									AeronSceneLight* out) {

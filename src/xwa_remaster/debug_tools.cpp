@@ -474,7 +474,7 @@ static void xwa_tool_point_lights(int* open, void* user) {
 	changed |=
 		ImGui::SliderFloat("Range scale", &p.range_scale, 0.25f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
 	ImGui::TextDisabled("Multiplies the distance where a light falls under\n"
-						"1/1000 of a unit of illuminance and ends.");
+						"1/250 of a unit of illuminance and ends.");
 	changed |= ImGui::SliderFloat("Specular weight", &p.spec_weight, 0.0f, 2.0f, "%.2f");
 	changed |= ImGui::SliderFloat("Model light intensity", &p.model_light_intensity, 0.0f, 16.0f, "%.2f",
 								  ImGuiSliderFlags_Logarithmic);
