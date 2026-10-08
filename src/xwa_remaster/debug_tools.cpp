@@ -504,6 +504,10 @@ static void xwa_tool_point_lights(int* open, void* user) {
 	changed |= ImGui::SliderFloat("Contribution cap", &p.contrib_cap, 0.0f, 4.0f, "%.2f");
 	ImGui::TextDisabled("Per-light lit-color cap, hue-preserving; the classic saturates\n"
 						"at 1.0 (engine-glow sources exceed it by design). 0 = uncapped.");
+	changed |= ImGui::SliderFloat("Model light intensity", &p.model_light_intensity, 0.0f, 16.0f, "%.2f",
+								  ImGuiSliderFlags_Logarithmic);
+	ImGui::TextDisabled("Intensity of lights authored in models (cockpit interior light).\n"
+						"Physical inverse-square falloff; 0 = off.");
 
 	ImGui::Separator();
 	if (ImGui::Button("Reset to defaults")) {

@@ -87,6 +87,7 @@ typedef struct XwaFlightPointLightParams {
 	float spec_weight;  /* 0..2 — punctual specular lobe weight */
 	float diffuse_wrap; /* 0 = Lambert, 1 = half-Lambert (classic pool) */
 	float contrib_cap;  /* per-light lit-color cap (classic saturates at 1) */
+	float model_light_intensity; /* intensity multiplier of lights authored in models */
 } XwaFlightPointLightParams;
 
 typedef struct XwaFlightPointLightStats {

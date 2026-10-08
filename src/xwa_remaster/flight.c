@@ -415,6 +415,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"point_lights.spec_weight",
 		"point_lights.diffuse_wrap",
 		"point_lights.contrib_cap",
+		"point_lights.model_light_intensity",
 		"skybox.exposure",
 		"skybox.star_brightness",
 		"skybox.star_density",
@@ -523,7 +524,8 @@ static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
 		   p->scale >= 0.0f && isfinite(p->range_scale) && p->range_scale > 0.0f &&
 		   isfinite(p->min_distance) && p->min_distance > 0.0f && isfinite(p->spec_weight) &&
 		   p->spec_weight >= 0.0f && isfinite(p->diffuse_wrap) && p->diffuse_wrap >= 0.0f &&
-		   p->diffuse_wrap <= 1.0f && isfinite(p->contrib_cap) && p->contrib_cap >= 0.0f;
+		   p->diffuse_wrap <= 1.0f && isfinite(p->contrib_cap) && p->contrib_cap >= 0.0f &&
+		   isfinite(p->model_light_intensity) && p->model_light_intensity >= 0.0f;
 }
 
 static int fl_sky_config_valid(void) {
@@ -737,6 +739,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.plight.spec_weight = (float)AeronConfigFile_GetFloat(cf, "point_lights.spec_weight", 0.0);
 	s.plight.diffuse_wrap = (float)AeronConfigFile_GetFloat(cf, "point_lights.diffuse_wrap", 0.0);
 	s.plight.contrib_cap = (float)AeronConfigFile_GetFloat(cf, "point_lights.contrib_cap", 0.0);
+	s.plight.model_light_intensity = (float)AeronConfigFile_GetFloat(cf, "point_lights.model_light_intensity", 0.0);
 	if (!fl_point_lights_config_valid(&s.plight)) {
 		Aeron_LogError("xwa.remaster", "%s: invalid point_lights settings", path);
 		AeronConfigFile_Destroy(cf);
@@ -3048,6 +3051,23 @@ static uint32_t fl_submit_point_lights(uint32_t count) {
 	return accepted;
 }
 
+/* Lights authored in a model (AeronFlightLight), placed by its instance.
+ * They are physical (inverse-square) rather than classic, so the classic
+ * calibration knobs do not apply; point_lights.model_light_intensity does. */
+static void fl_submit_model_lights(const AeronSceneMesh* mesh, const float transform[16],
+								   const AeronSceneMeshTable* table) {
+	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f)) {
+		return;
+	}
+	for (uint32_t i = 0; i < mesh->light_count; ++i) {
+		AeronSceneLight light;
+		if (AeronScene_MeshLight(mesh, i, transform, AERON_OPT_UNITS_PER_METER, table, s.plight.model_light_intensity,
+								 &light)) {
+			AeronScene_AddLight(s.scene, &light);
+		}
+	}
+}
+
 static int fl_configure_clustered_lights(AeronScene3D* scene) {
 	return AeronScene_SetClusteredLights(scene, &(AeronSceneClusteredLightDesc) {
 													.enabled = s.plight.clustered,
@@ -3350,6 +3370,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 		s.table_count++;
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
+	fl_submit_model_lights(cockpit_mesh, m, inst.mesh_table);
 	if (player_f) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 										  inst.mesh_table, s.glow_mark_emissive_strength);
@@ -4665,6 +4686,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				}
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
+			fl_submit_model_lights(cockpit_mesh, m, inst.mesh_table);
 			if (player_f) {
 				XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 												  inst.mesh_table, s.glow_mark_emissive_strength);

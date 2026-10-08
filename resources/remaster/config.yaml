@@ -223,6 +223,10 @@ point_lights:
   spec_weight: 1.0
   diffuse_wrap: 1.0
   contrib_cap: 1.0
+  # Intensity multiplier of point lights authored in models (such as the
+  # converted cockpits' interior light); physical inverse-square falloff,
+  # unaffected by the classic knobs above. 0 disables them.
+  model_light_intensity: 1.0
 lighting:
   intensity: 0.8
   spec_mul: 1.0
