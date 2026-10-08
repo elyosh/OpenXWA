@@ -232,15 +232,12 @@ lighting:
   ambient_g: 0.08
   ambient_b: 0.08
   # Scale of all emitted light (illumination, screens, holograms, lasers,
-  # glows, explosions). With a low bloom threshold, emitters well above lit
-  # surfaces glow through bloom as a lens scatters light.
+  # glows, explosions). Emitters far brighter than lit surfaces are what
+  # visibly glow through bloom.
   emissive_scale: 1.0
 bloom:
-  intensity: 0.5
-  # Bright-pass gate in linear HDR: a pixel blooms with weight
-  # smoothstep(threshold, threshold + knee, brightest channel).
-  threshold: 1.0
-  knee: 0.3
+  # Fraction of the scene's light the bloom scatters (no threshold).
+  intensity: 0.1
 temporal_upscaling:
   # off, native_aa, quality, balanced, or performance.
   mode: "off"

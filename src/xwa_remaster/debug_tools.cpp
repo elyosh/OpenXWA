@@ -906,15 +906,6 @@ static void xwa_tool_hdr(int* open, void* user) {
 		AeronSceneBloom_SetIntensity(bloom_i);
 	}
 	ImGui::TextDisabled("0 disables bloom (chain is skipped entirely).");
-	float bloom_threshold = AeronSceneBloom_Threshold();
-	if (ImGui::SliderFloat("Bloom threshold", &bloom_threshold, 0.0f, 3.0f, "%.2f")) {
-		AeronSceneBloom_SetThreshold(bloom_threshold);
-	}
-	float bloom_knee = AeronSceneBloom_Knee();
-	if (ImGui::SliderFloat("Bloom knee", &bloom_knee, 0.05f, 3.0f, "%.2f")) {
-		AeronSceneBloom_SetKnee(bloom_knee);
-	}
-	ImGui::TextDisabled("Pixels bloom from the threshold, fully at threshold + knee (linear HDR).");
 	float emissive_scale = AeronScene_EmissiveScale();
 	if (ImGui::SliderFloat("Emissive scale", &emissive_scale, 0.25f, 32.0f, "%.2f", ImGuiSliderFlags_Logarithmic)) {
 		AeronScene_SetEmissiveScale(emissive_scale);
