@@ -107,7 +107,6 @@ static void xwa_tool_pbr(int* open, void* user) {
 		"Normal",
 		"View vector",
 		"N.V signed",
-		"Local lights",
 		"Environment diffuse",
 		"Environment specular",
 	};

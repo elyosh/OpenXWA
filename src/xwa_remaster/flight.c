@@ -3195,7 +3195,6 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	instance.mesh_table = prepared.table;
 	instance.prev_mesh_table = prepared.table;
 	instance.zero_velocity = 1;
-	instance.no_local_lights = 1;
 	instance.cull_mode = is_bolt ? AERON_CULL_NONE : AERON_CULL_BACK;
 	if (is_bolt) {
 		instance.shadow_flags = AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_NO_RECEIVE_SHADOW;
@@ -3371,7 +3370,6 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	inst.variant = player_f ? player_f->node_switch : 0;
 	memcpy(inst.transform, m, sizeof m);
 	memcpy(inst.prev_transform, m, sizeof m);
-	inst.no_local_lights = 1;
 	inst.zero_velocity = 1;
 	inst.cull_mode = AERON_CULL_BACK;
 	AeronSceneMeshTable* tb = &s.tables[s.table_count];
@@ -4507,7 +4505,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			memcpy(inst.transform, model_matrix, sizeof model_matrix);
 			inst.variant = f->node_switch; /* markings survive the detach copy */
 			inst.mesh_table = prepared.table;
-			inst.no_local_lights = 1;
 			inst.cull_mode = AERON_CULL_BACK;
 			fl_instance_motion(&inst, f, i, /*is_bolt=*/0);
 			AeronScene_AddMeshInstance(s.scene, &inst);
@@ -4538,7 +4535,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		inst.mesh = prepared.mesh;
 		memcpy(inst.transform, model_matrix, sizeof model_matrix);
 		inst.variant = f->node_switch;
-		inst.no_local_lights = 1; /* frame-global punctual lights instead */
 		if (scene_lighting.hangar_override && (int32_t)f->slot == cam->hangar_launch_ref_obj_idx) {
 			/* The enclosed backdrop contains the implied ceiling emitter.
 			 * It receives object shadows but must not occlude that light. */
@@ -4666,7 +4662,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			inst.variant = cockpit_anchor->node_switch;
 			memcpy(inst.transform, m, sizeof m);
 			memcpy(inst.prev_transform, m, sizeof m);
-			inst.no_local_lights = 1;
 			if (cockpit_history_valid &&
 				fl_cockpit_model_matrix(&prev->cockpit, previous_cockpit_anchor, previous_crows,
 										previous_flight_view.camera.pos, inst.prev_transform)) {

@@ -213,7 +213,6 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 		m[14] = 0.0f;
 		m[15] = 1.0f;
 		memcpy(inst.prev_transform, inst.transform, sizeof inst.transform);
-		inst.no_local_lights = 1; /* studio sun + ambient only */
 		inst.zero_velocity = 1;
 		/* The classic renderer never rasterizes back-facing OPT polygons
 		 * (CPU facing test in RenderScene_BuildMeshVisibleFaces); without

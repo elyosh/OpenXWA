@@ -214,7 +214,6 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 	memset(&instance, 0, sizeof instance);
 	instance.mesh = mesh;
 	instance.variant = object->node_switch;
-	instance.no_local_lights = 1;
 	instance.zero_velocity = 1;
 	if (cmd_projectile(object) && source == XWA_MODEL_SOURCE_OPT) {
 		instance.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
