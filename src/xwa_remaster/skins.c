@@ -110,6 +110,12 @@ uint32_t XwaRemasterSkins_MarkingsVariants(const XwaRemasterSkinModel* skin, con
 			highest = use->markings > highest ? use->markings : highest;
 		}
 	}
+	/* A model no flight group or preview uses (hangar craft, for example)
+	   shows markings 0, which objects start with. */
+	if (highest < 0) {
+		used[0] = 1;
+		highest = 0;
+	}
 	for (int m = 0; m <= highest; m++) {
 		const uint32_t assets = skin->asset_variant_count;
 		variants[m] = (uint32_t)m < assets ? (uint32_t)m : assets - 1u;

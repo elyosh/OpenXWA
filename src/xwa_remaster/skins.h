@@ -9,7 +9,9 @@
  *     GLB, else the GLB's default for it (aeronSkinMarkings); a selected
  *     name the GLB doesn't have falls back to the default, logged once;
  *   - a markings value without a skin, and any unused one, shows the asset
- *     paint state min(m, aeronAssetVariants - 1).
+ *     paint state min(m, aeronAssetVariants - 1);
+ *   - a model no object is known to use (hangar craft, for example) uses
+ *     markings 0, which objects start with.
  * Only models with variant groups get markings variants; the others keep
  * their asset variants (AeronScene_MeshCreate). */
 
@@ -33,8 +35,8 @@ XwaRemasterSkinModel* XwaRemasterSkins_Capture(const AeronGltfModel* model, cons
 void XwaRemasterSkins_Free(XwaRemasterSkinModel* skin);
 
 /* The variant each markings value shows, for `snapshot`'s selections and
-   uses, up to the highest markings value used; returns their count, 0 when no
-   object uses the model (it then keeps its asset variants). */
+   uses, up to the highest markings value used (0 when none is); returns
+   their count. */
 uint32_t XwaRemasterSkins_MarkingsVariants(const XwaRemasterSkinModel* skin, const XwaSnapshot* snapshot,
 										   uint32_t variants[XWA_REMASTER_MAX_MARKINGS]);
 /* A hash of `count` markings variants, to tell when a mesh's change. */

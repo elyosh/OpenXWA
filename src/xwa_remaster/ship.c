@@ -149,7 +149,9 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 								 &create_status)
 						   : AeronScene_MeshCreate(cmd, built, key, &create_status);
 		if (mesh && skin) {
-			XwaRemasterSkins_NoteMesh(mesh, key, markings_count);
+			if (markings_count) {
+				XwaRemasterSkins_NoteMesh(mesh, key, markings_count);
+			}
 			*out_skin = skin;
 		} else {
 			XwaRemasterSkins_Free(skin);
