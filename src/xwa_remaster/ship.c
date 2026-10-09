@@ -58,6 +58,7 @@ static XwaShipPbrTuning g_pbr_tuning_default;
 static XwaShipPbrTuning g_pbr_tuning;
 /* AeronScene_SetBackfaceFill; debug inspector toggle, not persisted. */
 static int g_backface_fill = 1;
+static AeronEffectAtlas* s_effect_atlas;
 
 static void ship_set_failure(AeronCommandBuffer* cmd, const char* format, ...) {
 	char message[512];
@@ -142,12 +143,14 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 		const uint32_t markings_count =
 			ship_markings_variants(skin, snapshot, variants, out_markings_variants_hash);
 		AeronSceneMeshCreateStatus create_status;
-		AeronSceneMesh* mesh =
-			markings_count ? AeronScene_MeshCreateWithVariants(
-								 cmd, built, key,
-								 &(AeronSceneMeshVariants) { .variants = variants, .count = markings_count },
-								 &create_status)
-						   : AeronScene_MeshCreate(cmd, built, key, &create_status);
+		const AeronSceneMeshVariants markings_set = { .variants = variants, .count = markings_count };
+		AeronSceneMesh* mesh = AeronScene_MeshCreateEx(
+			cmd,
+			&(AeronSceneMeshCreateInfo) { .model = built,
+										  .debug_name = key,
+										  .variants = markings_count ? &markings_set : NULL,
+										  .effect_atlas = XwaRemasterShip_EffectAtlas() },
+			&create_status);
 		if (mesh && skin) {
 			if (markings_count) {
 				XwaRemasterSkins_NoteMesh(mesh, key, markings_count);
@@ -364,6 +367,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 }
 
 void XwaRemasterShip_CommitSyncBatch(void) {
+	/* The batch's atlas growth copies are submitted. */
+	AeronEffectAtlas_Commit(s_effect_atlas);
 	if (!s_batch_active) {
 		return;
 	}
@@ -422,6 +427,13 @@ AeronSceneMesh* XwaRemasterShip_MeshForName(const char* name) {
 
 float XwaRemasterShip_OptProjectileEmissiveStrength(void) { return s_opt_projectile_emissive_strength; }
 
+AeronEffectAtlas* XwaRemasterShip_EffectAtlas(void) {
+	if (!s_effect_atlas) {
+		s_effect_atlas = AeronEffectAtlas_Create(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, "remaster/effects");
+	}
+	return s_effect_atlas;
+}
+
 void XwaRemasterShip_Shutdown(void) {
 	ship_pending_discard();
 	for (uint32_t i = 0; i < s_mesh_count; i++) {
@@ -429,6 +441,8 @@ void XwaRemasterShip_Shutdown(void) {
 	}
 	memset(s_meshes, 0, sizeof s_meshes);
 	s_mesh_count = 0;
+	AeronEffectAtlas_Destroy(s_effect_atlas);
+	s_effect_atlas = NULL;
 	s_opt_asset_generation = UINT64_MAX;
 	s_skin_generation = UINT64_MAX;
 	s_batch_active = 0;

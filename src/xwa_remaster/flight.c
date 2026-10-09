@@ -1471,6 +1471,7 @@ static int fl_ensure(int target_w, int target_h) {
 		Aeron_LogError("xwa.remaster", "flight: scene mesh sampler configuration failed");
 		return 0;
 	}
+	AeronScene_SetEffectAtlas(s.scene, XwaRemasterShip_EffectAtlas());
 
 	s.bloom = AeronSceneBloom_Create(target_w, target_h);
 	s.present_rt =
@@ -3631,6 +3632,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	 * temporal reconstruction for this special scene and reset history
 	 * before returning to ordinary flight. */
 	fl_set_temporal(host_time_us, 0);
+	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ms / 1000.0);
 	if (!AeronScene_Begin(s.scene, &flight_view->camera)) {
 		Aeron_CommandBufferSetFailure(cmd, "Hyperspace scene initialization failed");
 		s.snap = NULL;
@@ -3940,6 +3942,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	XwaRemasterParticles_Prepare(s.particles, cmd, snap, NULL, assets, &effect_view, NULL);
 	XwaRemasterTrails_Prepare(s.trails, cmd, snap, assets, &effect_view);
 
+	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ms / 1000.0);
 	if (!AeronScene_Begin(s.scene, &view->camera)) {
 		s.snap = NULL;
 		return NULL;
@@ -4299,6 +4302,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 												  : FL_FSR_RESET_MOTION_CONTEXT_UNKNOWN);
 	}
 	fl_set_temporal(host_time_us, 1);
+	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ms / 1000.0);
 	if (!AeronScene_Begin(s.scene, &flight_view.camera)) {
 		Aeron_CommandBufferSetFailure(cmd, "Flight scene initialization failed");
 		s.snap = NULL;
