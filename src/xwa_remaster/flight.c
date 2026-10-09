@@ -124,6 +124,22 @@ typedef struct FlEnergyState {
 	float start;
 } FlEnergyState;
 
+/* Material states (bit per AERON_ANIM_STATE_*) and when each last fired,
+ * in animation seconds. */
+typedef struct FlStateOnsets {
+	uint32_t mask;
+	float onset[32];
+} FlStateOnsets;
+
+/* The player's target event, one at a time (XWAU's TargetEvent). */
+enum {
+	FL_TARGET_NONE,
+	FL_TARGET_SELECTED,
+	FL_TARGET_LASER_LOCK,
+	FL_TARGET_WARHEAD_LOCKING,
+	FL_TARGET_WARHEAD_LOCKED,
+};
+
 /* The scene owns the pass topology (prepass / SSAO / forward color /
  * motion-blur resolve — AeronScene_Render); this driver submits mesh
  * instances and draws the non-mesh geometry through the scene's pass
@@ -300,6 +316,15 @@ static struct {
 	/* Energy effect per object slot. */
 	FlEnergyState energy_states[XWA_SNAP_MAX_FLIGHT_OBJECTS];
 	XwaFlightMaterialAnimOverride anim_override;
+	/* Player states and the debug override's, with the animation time they
+	 * were last updated at; the target event and the threat indicators as
+	 * the classic HUD last drew them. */
+	FlStateOnsets player_states;
+	FlStateOnsets override_states;
+	float states_time;
+	uint8_t target_event;
+	uint8_t states_in_hangar;
+	XwaHudThreats threats;
 	int map_present;
 	int suppress_hud;
 } s;
@@ -3145,14 +3170,19 @@ typedef struct FlPreparedMesh {
 	uint8_t source; /* XwaModelSource */
 } FlPreparedMesh;
 
-/* The hull-damage stage of an object: 1 at or below 75 % hull, 2 at or
- * below 50 %, 3 at or below 25 %, else 0. */
-static uint32_t fl_damage_stage(const XwaFlightObject* object) {
-	if (!object->has_craft || object->hull_max <= 0) {
+/* The hull-damage stage for a hull damage and maximum: 1 at or below 75 %
+ * hull, 2 at or below 50 %, 3 at or below 25 %, else 0. */
+static uint32_t fl_hull_stage(int32_t damage, int32_t max) {
+	if (max <= 0) {
 		return 0;
 	}
-	const double hull = 100.0 * (1.0 - (double)object->hull_damage / (double)object->hull_max);
+	const double hull = 100.0 * (1.0 - (double)damage / (double)max);
 	return hull <= 25.0 ? 3u : hull <= 50.0 ? 2u : hull <= 75.0 ? 1u : 0u;
+}
+
+/* The hull-damage stage of an object. */
+static uint32_t fl_damage_stage(const XwaFlightObject* object) {
+	return object->has_craft ? fl_hull_stage(object->hull_damage, object->hull_max) : 0u;
 }
 
 /* The energy effect an object shows (XWAU's shield/beam instance event):
@@ -3191,7 +3221,176 @@ static float fl_energy_start(const XwaFlightObject* object, uint32_t energy) {
 	return state->start;
 }
 
-/* An object's material animation state for this frame, from the pool. */
+/* The cannon-state bits (cannon.1 .. cannon.8) of hardpoints first to last. */
+static uint32_t fl_cannon_range(int first, int last) {
+	uint32_t bits = 0;
+	for (int i = first < 0 ? 0 : first; i <= last && i < 8; i++) {
+		bits |= 1u << i;
+	}
+	return bits;
+}
+
+/* The cannons that fire next, bit i for hardpoint i (XWAU's cannon-ready
+ * events). Per cannon set, link mode 1 marks the next hardpoint, 2 every
+ * second one from it to the end of the set, 3 the set and 4 every
+ * hardpoint; set 0 is the lasers and set 1 the ions, counted by weapon
+ * type. None is ready with warheads armed; otherwise the set not selected
+ * is not, unless a mode is 4; nor is a cannon without energy. */
+static uint32_t fl_cannons_ready(const XwaHudState* hud) {
+	const XwaHudInstruments* in = &hud->instruments;
+	const int count =
+		in->laser_slot_count < XWA_SNAP_MAX_WEAPON_SLOTS ? in->laser_slot_count : XWA_SNAP_MAX_WEAPON_SLOTS;
+	int lasers = 0;
+	int ions = 0;
+	for (int i = 0; i < count; i++) {
+		lasers += in->weapon_type[i] == 1;
+		ions += in->weapon_type[i] == 2;
+	}
+	uint32_t ready = 0;
+	int all = 0;
+	for (int j = 0; j < in->cannon_count && j < 3; j++) {
+		const int first = j == 0 ? 0 : j == 1 ? lasers : lasers + ions;
+		const int last = j == 0 ? lasers - 1 : j == 1 ? lasers + ions - 1 : count - 1;
+		switch (in->laser_link_mode[j]) {
+			case 1:
+				ready |= fl_cannon_range(in->laser_link_next_slot[j], in->laser_link_next_slot[j]);
+				break;
+			case 2:
+				for (int i = in->laser_link_next_slot[j]; i <= last; i += 2) {
+					ready |= fl_cannon_range(i, i);
+				}
+				break;
+			case 3:
+				ready |= fl_cannon_range(first, last);
+				break;
+			case 4:
+				all = 1;
+				ready |= fl_cannon_range(0, count - 1);
+				break;
+			default:
+				break;
+		}
+	}
+	if (hud->reticle.weapon_mode) {
+		ready &= ~fl_cannon_range(0, count - 1);
+	} else if (!all) {
+		ready &= ~(hud->reticle.selected_warhead == 0 ? fl_cannon_range(lasers, lasers + ions - 1)
+													  : fl_cannon_range(0, lasers - 1));
+	}
+	for (int i = 0; i < count; i++) {
+		if (in->laser_charge[i] == 0) {
+			ready &= ~fl_cannon_range(i, i);
+		}
+	}
+	return ready;
+}
+
+/* The broken-instrument states from the craft's instrument masks, at the
+ * start and now: CMD 0x1, lasers/ions 0xE (all three), beam 0x10, shields
+ * 0x20, throttle 0x40, sensors 0x180 (both), laser recharge 0x200, engine
+ * 0x400, shield recharge 0x800, beam recharge 0x1000. The beam, shields and
+ * their recharges count only on a craft that started with them. */
+static uint32_t fl_broken_states(uint16_t initial, uint16_t current) {
+	uint32_t m = 0;
+	m |= (current & 0x1) == 0 ? 1u << AERON_ANIM_STATE_BROKEN_CMD : 0u;
+	m |= (current & 0xE) != 0xE ? 1u << AERON_ANIM_STATE_BROKEN_LASER_ION : 0u;
+	m |= (initial & ~current & 0x10) != 0 ? 1u << AERON_ANIM_STATE_BROKEN_BEAM_WEAPON : 0u;
+	m |= (initial & ~current & 0x20) != 0 ? 1u << AERON_ANIM_STATE_BROKEN_SHIELDS : 0u;
+	m |= (current & 0x40) == 0 ? 1u << AERON_ANIM_STATE_BROKEN_THROTTLE : 0u;
+	m |= (current & 0x180) != 0x180 ? 1u << AERON_ANIM_STATE_BROKEN_SENSORS : 0u;
+	m |= (current & 0x200) == 0 ? 1u << AERON_ANIM_STATE_BROKEN_LASER_RECHARGE : 0u;
+	m |= (current & 0x400) == 0 ? 1u << AERON_ANIM_STATE_BROKEN_ENGINE_POWER : 0u;
+	m |= (initial & ~current & 0x800) != 0 ? 1u << AERON_ANIM_STATE_BROKEN_SHIELD_RECHARGE : 0u;
+	m |= (initial & ~current & 0x1000) != 0 ? 1u << AERON_ANIM_STATE_BROKEN_BEAM_RECHARGE : 0u;
+	return m;
+}
+
+/* Sets the states to `mask`, moving the onsets of the `fired` ones to now. */
+static void fl_state_onsets_update(FlStateOnsets* states, uint32_t mask, uint32_t fired, float now) {
+	for (int i = 0; i < 32; i++) {
+		if (fired >> i & 1u) {
+			states->onset[i] = now;
+		}
+	}
+	states->mask = mask;
+}
+
+/* This frame's player states, on the player's craft and cockpit (XWAU's
+ * game events): the threat indicators as the classic HUD last drew them
+ * (cleared on hangar entry), the cannons ready, the broken instruments, the
+ * hull stage, the target event (warhead lock over laser lock over a
+ * selected target, with `target` set for any of them) and the hangar. A state
+ * fires when it becomes set; `target` when the target event becomes
+ * "selected". The debug override's states fire the same way. All of it
+ * starts over when the clock goes back. Repeating the update for a snapshot
+ * changes nothing. */
+static void fl_update_material_states(const XwaSnapshot* snap, float now) {
+	if (now < s.states_time) {
+		memset(&s.player_states, 0, sizeof s.player_states);
+		memset(&s.override_states, 0, sizeof s.override_states);
+		memset(&s.threats, 0, sizeof s.threats);
+		s.target_event = FL_TARGET_NONE;
+	}
+	s.states_time = now;
+	const XwaHudState* hud = &snap->hud;
+	const uint8_t in_hangar = snap->flight_camera.in_hangar != 0;
+	if (in_hangar && !s.states_in_hangar) {
+		memset(&s.threats, 0, sizeof s.threats);
+	}
+	s.states_in_hangar = in_hangar;
+	if (hud->threats.valid) {
+		s.threats = hud->threats;
+	}
+	uint32_t mask = in_hangar ? 1u << AERON_ANIM_STATE_HANGAR : 0u;
+	uint8_t target = FL_TARGET_NONE;
+	if (hud->valid) {
+		mask |= s.threats.laser ? 1u << AERON_ANIM_STATE_THREAT_LASER : 0u;
+		mask |= s.threats.turret ? 1u << AERON_ANIM_STATE_THREAT_TURRET : 0u;
+		mask |= s.threats.beam ? 1u << AERON_ANIM_STATE_THREAT_BEAM : 0u;
+		mask |= s.threats.missile == 1 ? 1u << AERON_ANIM_STATE_THREAT_MISSILE_LOCKING : 0u;
+		mask |= s.threats.missile == 2 ? 1u << AERON_ANIM_STATE_THREAT_MISSILE_LOCKED : 0u;
+		mask |= fl_cannons_ready(hud) << AERON_ANIM_STATE_CANNON_1;
+		mask |= fl_broken_states(hud->instruments.installed_features, hud->instruments.active_features);
+		const uint32_t hull = fl_hull_stage(hud->instruments.hull_damage, hud->instruments.hull_max);
+		mask |= hull == 1   ? 1u << AERON_ANIM_STATE_HULL_75
+				: hull == 2 ? 1u << AERON_ANIM_STATE_HULL_50
+				: hull == 3 ? 1u << AERON_ANIM_STATE_HULL_25
+							: 0u;
+		target = hud->target.valid ? FL_TARGET_SELECTED : FL_TARGET_NONE;
+		if (hud->reticle.in_range) {
+			target = FL_TARGET_LASER_LOCK;
+		}
+		if (hud->reticle.weapon_mode && hud->reticle.missile_lock_state == 2) {
+			target = FL_TARGET_WARHEAD_LOCKING;
+		} else if (hud->reticle.weapon_mode && hud->reticle.missile_lock_state == 3) {
+			target = FL_TARGET_WARHEAD_LOCKED;
+		}
+		mask |= target == FL_TARGET_LASER_LOCK        ? 1u << AERON_ANIM_STATE_LASER_LOCK
+				: target == FL_TARGET_WARHEAD_LOCKING ? 1u << AERON_ANIM_STATE_WARHEAD_LOCKING
+				: target == FL_TARGET_WARHEAD_LOCKED  ? 1u << AERON_ANIM_STATE_WARHEAD_LOCKED
+													  : 0u;
+		mask |= target != FL_TARGET_NONE ? 1u << AERON_ANIM_STATE_TARGET : 0u;
+	}
+	uint32_t fired = mask & ~s.player_states.mask & ~(1u << AERON_ANIM_STATE_TARGET);
+	if (target == FL_TARGET_SELECTED && s.target_event != FL_TARGET_SELECTED) {
+		fired |= 1u << AERON_ANIM_STATE_TARGET;
+	}
+	s.target_event = target;
+	fl_state_onsets_update(&s.player_states, mask, fired, now);
+	const uint32_t forced = s.anim_override.enabled ? s.anim_override.state_mask : 0u;
+	fl_state_onsets_update(&s.override_states, forced, forced & ~s.override_states.mask, now);
+}
+
+/* Sets the scene's animation clock from the snapshot and updates the
+ * material states at that time. */
+static void fl_set_animation_time(const XwaSnapshot* snap) {
+	const double now = (double)snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS;
+	AeronScene_SetAnimationTime(s.scene, now);
+	fl_update_material_states(snap, (float)now);
+}
+
+/* An object's material animation state for this frame, from the pool. The
+ * player's craft carries the player states. */
 static const AeronSceneMaterialAnim* fl_object_anim(const XwaFlightObject* object) {
 	if (s.anim_count >= sizeof s.anims / sizeof s.anims[0]) {
 		return NULL;
@@ -3201,6 +3400,10 @@ static const AeronSceneMaterialAnim* fl_object_anim(const XwaFlightObject* objec
 	anim->seed = (uint32_t)object->slot << 16 | object->signature;
 	anim->damage_stage = fl_damage_stage(object);
 	anim->energy = fl_energy(object);
+	if (s.snap && (int32_t)object->slot == s.snap->flight_camera.player_obj_idx) {
+		anim->state_mask = s.player_states.mask;
+		memcpy(anim->onset, s.player_states.onset, sizeof anim->onset);
+	}
 	const XwaFlightMaterialAnimOverride* o = &s.anim_override;
 	const XwaHudTarget* target = s.snap ? &s.snap->hud.target : NULL;
 	if (o->enabled && (o->all_objects || (target && target->valid && target->slot == object->slot &&
@@ -3208,6 +3411,7 @@ static const AeronSceneMaterialAnim* fl_object_anim(const XwaFlightObject* objec
 		anim->damage_stage = o->damage_stage;
 		anim->energy = o->energy;
 		anim->state_mask = o->state_mask;
+		memcpy(anim->onset, s.override_states.onset, sizeof anim->onset);
 	}
 	anim->energy_start = fl_energy_start(object, anim->energy);
 	return anim;
@@ -3224,6 +3428,8 @@ void XwaRemasterFlight_SetMaterialAnimOverride(const XwaFlightMaterialAnimOverri
 		s.anim_override = *in;
 	}
 }
+
+uint32_t XwaRemasterFlight_GetPlayerMaterialStates(void) { return s.player_states.mask; }
 
 /* Resolve the model and its current articulation once for both flight views.
  * Callers retain ownership of motion, lighting, shadows and effect submission. */
@@ -3478,6 +3684,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	memcpy(inst.prev_transform, m, sizeof m);
 	inst.zero_velocity = 1;
 	inst.cull_mode = AERON_CULL_BACK;
+	inst.anim = player_f ? fl_object_anim(player_f) : NULL;
 	AeronSceneMeshTable* tb = &s.tables[s.table_count];
 	if (XwaRemasterShip_BuildCockpitMeshTable(cockpit_mesh, &snap->cockpit, player_f, tb)) {
 		inst.mesh_table = tb;
@@ -3731,7 +3938,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	 * temporal reconstruction for this special scene and reset history
 	 * before returning to ordinary flight. */
 	fl_set_temporal(host_time_us, 0);
-	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS);
+	fl_set_animation_time(snap);
 	if (!AeronScene_Begin(s.scene, &flight_view->camera)) {
 		Aeron_CommandBufferSetFailure(cmd, "Hyperspace scene initialization failed");
 		s.snap = NULL;
@@ -4042,7 +4249,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	XwaRemasterParticles_Prepare(s.particles, cmd, snap, NULL, assets, &effect_view, NULL);
 	XwaRemasterTrails_Prepare(s.trails, cmd, snap, assets, &effect_view);
 
-	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS);
+	fl_set_animation_time(snap);
 	if (!AeronScene_Begin(s.scene, &view->camera)) {
 		s.snap = NULL;
 		return NULL;
@@ -4402,7 +4609,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 												  : FL_FSR_RESET_MOTION_CONTEXT_UNKNOWN);
 	}
 	fl_set_temporal(host_time_us, 1);
-	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS);
+	fl_set_animation_time(snap);
 	if (!AeronScene_Begin(s.scene, &flight_view.camera)) {
 		Aeron_CommandBufferSetFailure(cmd, "Flight scene initialization failed");
 		s.snap = NULL;
@@ -4785,6 +4992,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * vectors, so motion blur does not smear them with the view
 			 * behind. */
 			inst.velocity_stamp_screens = 1;
+			inst.anim = player_f ? fl_object_anim(player_f) : NULL;
 			AeronSceneMeshTable* tb = &s.tables[s.table_count];
 			if (XwaRemasterShip_BuildCockpitMeshTable(cockpit_mesh, &snap->cockpit, cockpit_anchor, tb)) {
 				inst.mesh_table = tb;

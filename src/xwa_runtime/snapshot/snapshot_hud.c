@@ -198,6 +198,7 @@ void XwaSnapshotHud_NoteThreat(int slot, int state) {
 	if (!g_hud_capture.building_active)
 		return;
 	XwaHudThreats* threats = &g_hud_capture.building.threats;
+	threats->valid = 1;
 	switch (slot) {
 		case 0:
 			threats->laser = (uint8_t)state;

@@ -907,6 +907,7 @@ typedef struct XwaHudThreats {
 	uint8_t beam;
 	uint8_t missile;
 	uint8_t flash_frame;
+	uint8_t valid; /* the classic HUD drew the indicators this frame */
 } XwaHudThreats;
 
 typedef struct XwaHudRadarBlip {

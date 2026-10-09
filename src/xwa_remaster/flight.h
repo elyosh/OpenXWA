@@ -57,6 +57,8 @@ typedef struct XwaFlightMaterialAnimOverride {
 } XwaFlightMaterialAnimOverride;
 void XwaRemasterFlight_GetMaterialAnimOverride(XwaFlightMaterialAnimOverride* out);
 void XwaRemasterFlight_SetMaterialAnimOverride(const XwaFlightMaterialAnimOverride* in);
+/* The player's material states this frame, bit per AERON_ANIM_STATE_*. */
+uint32_t XwaRemasterFlight_GetPlayerMaterialStates(void);
 
 void XwaRemasterFlight_GetShadows(XwaFlightShadowParams* out);
 void XwaRemasterFlight_SetShadows(const XwaFlightShadowParams* in);

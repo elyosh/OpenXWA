@@ -927,6 +927,46 @@ static void xwa_tool_material_animation(int* open, void* user) {
 	o.energy = (uint32_t)energy;
 	o.state_mask = mask & 0x7FFFFFFFu;
 	XwaRemasterFlight_SetMaterialAnimOverride(&o);
+	/* The state names of the converted models, by bit. */
+	static const char* const states[31] = { "threat.laser",
+											"threat.turret",
+											"threat.beam",
+											"threat.missile_locking",
+											"threat.missile_locked",
+											"cannon.1",
+											"cannon.2",
+											"cannon.3",
+											"cannon.4",
+											"cannon.5",
+											"cannon.6",
+											"cannon.7",
+											"cannon.8",
+											"broken.cmd",
+											"broken.laser_ion",
+											"broken.beam_weapon",
+											"broken.shields",
+											"broken.throttle",
+											"broken.sensors",
+											"broken.laser_recharge",
+											"broken.engine_power",
+											"broken.shield_recharge",
+											"broken.beam_recharge",
+											"hull.25",
+											"hull.50",
+											"hull.75",
+											"laser_lock",
+											"warhead.locking",
+											"warhead.locked",
+											"hangar",
+											"target" };
+	const uint32_t player = XwaRemasterFlight_GetPlayerMaterialStates();
+	ImGui::Separator();
+	ImGui::Text("Player states: %08X", player);
+	for (int i = 0; i < 31; i++) {
+		if (player >> i & 1u) {
+			ImGui::BulletText("%s", states[i]);
+		}
+	}
 	ImGui::End();
 	*open = b ? 1 : 0;
 }
