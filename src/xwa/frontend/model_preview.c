@@ -21,8 +21,6 @@
 #include "xwa/util/memory.h"
 #ifdef XWA_MODERN
 #include "xwa/frontend/briefing_script.h"
-#include "xwa/frontend/frontend_screen.h"
-#include "xwa/frontend/tech_library.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/object_profiles.h"
 #endif
@@ -472,11 +470,9 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 #ifdef XWA_MODERN
 	/* Modern port: hide the components of the selected object profile, as
 	 * destroyed: the ship-info flight group's while a briefing plays, none
-	 * otherwise. The tech library has no mission, so it uses the
-	 * mission-independent selections. */
+	 * otherwise (the tech library has no mission). */
 	XwaObjectProfiles_Apply((uint16_t)g_modelPreviewModelType,
 							g_briefingPlaybackActive ? (int)(uint16_t)g_briefingMapPrimaryHighlightIconIndex : 0xFFFF, 0,
-							0, g_screenStates[g_screenStackTop].updateFn == TechLibrary_Update,
 							&g_modelPreviewCraftData);
 #endif
 	g_modelPreviewAngleD = 0;

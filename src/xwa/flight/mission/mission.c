@@ -6735,7 +6735,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 	/* Modern port: hide the components of the object profile selected for
 	 * this flight group, as destroyed. Only GLB replacements carry profiles. */
 	XwaObjectProfiles_Apply((uint16_t)g_spawnObjectType, g_currentFlightGroupIdx,
-							g_objectTable[objIdx].mobj->nodeSwitchIndex, 0, 0, g_curCraft);
+							g_objectTable[objIdx].mobj->nodeSwitchIndex, g_curCraft);
 #endif
 
 	// AI plan assignment from the spawn-region order.
@@ -7548,7 +7548,8 @@ uint16_t Mission_Init(char* fileName) {
 #ifdef XWA_MODERN
 	/* Modern port: read the mission's object profile selections, before any
 	   flight-group object is created. */
-	XwaObjectProfiles_LoadMission(fileName);
+	XwaObjectProfiles_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
+								  (int16_t)g_missionHeader.numFlightGroups);
 #endif
 
 	if (g_pilotData.campaignMode) {

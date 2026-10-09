@@ -30,7 +30,6 @@
 #include "xwa_runtime/input/rumble_provider.h"
 #include "xwa_runtime/input/winmm_joystick_provider.h"
 #include "xwa_runtime/models/model_source.h"
-#include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/frontend_task.h"
@@ -121,7 +120,6 @@ int XwaPort_Init(void) {
 	XwaTime_Reset();
 	File_SetVfs(Aeron_GetVfs());
 	XwaModelSource_Init();
-	XwaObjectProfiles_Init();
 	if (SpriteResource_LoadCatalog("Resdata.txt") != 0) {
 		Aeron_LogError("xwa.assets", "Failed to load required sprite catalog 'Resdata.txt'");
 	}

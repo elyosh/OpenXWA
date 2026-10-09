@@ -5353,11 +5353,10 @@ int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t modelType, int relX, int 
 	g_objectTable[objIdx].mobj->prevWorldZ = g_objectTable[objIdx].world_z;
 	FlightObject_InitMeshAnimationDefaults(objIdx);
 #ifdef XWA_MODERN
-	/* Modern port: hide the components of the hangar object profile selected
-	 * for this prop, as destroyed, using the flight group it inherits from the
-	 * launch reference above. */
-	XwaObjectProfiles_Apply(modelType, g_objectTable[objIdx].flightGroupIdx,
-							g_objectTable[objIdx].mobj->nodeSwitchIndex, 1, 0, g_curCraft);
+	/* Modern port: hide the components of this prop's default object profile,
+	 * as destroyed. The flight group it inherits from the launch reference is
+	 * the player's, whose selection is for a craft, so it selects none. */
+	XwaObjectProfiles_Apply(modelType, 0xFFFF, g_objectTable[objIdx].mobj->nodeSwitchIndex, g_curCraft);
 #endif
 	FVIEW_calcrotatemove(g_objectTable[objIdx].pitch, g_objectTable[objIdx].yaw, &g_objectTable[objIdx]);
 	FVIEW_calcrotateorient(g_objectTable[objIdx].roll, g_objectTable[objIdx].angleD, &g_objectTable[objIdx]);

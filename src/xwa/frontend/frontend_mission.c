@@ -213,7 +213,9 @@ int FrontendMission_LoadForBriefing(void) {
 
 		snprintf(missionPath, sizeof missionPath, "%s\\%s", g_campaignDirNames[g_pilotData.missionDirectoryId],
 				 g_missionList[g_selectedMissionListIndex].fileName);
-		XwaObjectProfiles_LoadMission(missionPath);
+		XwaObjectProfiles_LoadMission(missionPath, g_frontendMission != NULL ? g_frontendMission->flightGroups : NULL,
+									  sizeof g_frontendMission->flightGroups[0],
+									  g_frontendMission != NULL ? g_frontendMission->flightGroupCount : 0);
 	}
 #endif
 	BriefingScript_ResetState();
