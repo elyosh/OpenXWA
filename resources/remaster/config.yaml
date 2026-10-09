@@ -257,3 +257,5 @@ motion_blur:
   velocity_viz: false
   # Consume FSR's retained render-resolution motion without a full-size copy.
   fsr_direct_motion: true
+shadows:
+  receiver_local_near_distance_m: 3.0
