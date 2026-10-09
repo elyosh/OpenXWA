@@ -18,6 +18,9 @@
 #include "xwa/frontend/net_transport.h"
 #include "xwa/frontend/skirmish.h"
 #include "xwa/util/memory.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/object_profiles.h"
+#endif
 
 #include <stdint.h>
 #include <stdio.h>
@@ -201,6 +204,18 @@ void FrontendMission_Reset(void) {
 int FrontendMission_LoadForBriefing(void) {
 	FrontendMission_Reset();
 	FrontendMission_LoadCurrentMissionData();
+#ifdef XWA_MODERN
+	/* Modern port: read the briefing mission's object profile selections, for
+	   the ship-info preview. The path is the one
+	   FrontendMission_LoadCurrentMissionData opens. */
+	if (g_missionList != NULL) {
+		char missionPath[256];
+
+		snprintf(missionPath, sizeof missionPath, "%s\\%s", g_campaignDirNames[g_pilotData.missionDirectoryId],
+				 g_missionList[g_selectedMissionListIndex].fileName);
+		XwaObjectProfiles_LoadMission(missionPath);
+	}
+#endif
 	BriefingScript_ResetState();
 	return 1;
 }

@@ -84,6 +84,9 @@ int XwaModelRole_IsReplacement(unsigned short objectType);
 /* For a replacement, writes the components carrying a set role to
    `components` (at most `capacity`) and returns how many there are. */
 int XwaModelRole_Collect(unsigned short objectType, XwaModelRole role, int* components, int capacity);
+/* For a replacement, writes the components carrying tag `tagName` to
+   `components` (at most `capacity`) and returns how many there are. */
+int XwaModelRole_CollectTag(unsigned short objectType, const char* tagName, int* components, int capacity);
 #define XWA_MODEL_ROLE(objectType, role, stockComponent)                                                     \
 	XwaModelRole_Resolve((unsigned short)(objectType), (role), (stockComponent))
 

@@ -45,6 +45,7 @@
 #include "xwa/math/scalar.h"
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -5351,6 +5352,13 @@ int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t modelType, int relX, int 
 	g_objectTable[objIdx].mobj->prevWorldY = g_objectTable[objIdx].world_y;
 	g_objectTable[objIdx].mobj->prevWorldZ = g_objectTable[objIdx].world_z;
 	FlightObject_InitMeshAnimationDefaults(objIdx);
+#ifdef XWA_MODERN
+	/* Modern port: hide the components of the hangar object profile selected
+	 * for this prop, as destroyed, using the flight group it inherits from the
+	 * launch reference above. */
+	XwaObjectProfiles_Apply(modelType, g_objectTable[objIdx].flightGroupIdx,
+							g_objectTable[objIdx].mobj->nodeSwitchIndex, 1, 0, g_curCraft);
+#endif
 	FVIEW_calcrotatemove(g_objectTable[objIdx].pitch, g_objectTable[objIdx].yaw, &g_objectTable[objIdx]);
 	FVIEW_calcrotateorient(g_objectTable[objIdx].roll, g_objectTable[objIdx].angleD, &g_objectTable[objIdx]);
 	return (int16_t)objIdx;

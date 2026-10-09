@@ -35,6 +35,7 @@
 #include "xwa/util/time.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
 #endif
 
@@ -6730,6 +6731,13 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		}
 	}
 
+#ifdef XWA_MODERN
+	/* Modern port: hide the components of the object profile selected for
+	 * this flight group, as destroyed. Only GLB replacements carry profiles. */
+	XwaObjectProfiles_Apply((uint16_t)g_spawnObjectType, g_currentFlightGroupIdx,
+							g_objectTable[objIdx].mobj->nodeSwitchIndex, 0, 0, g_curCraft);
+#endif
+
 	// AI plan assignment from the spawn-region order.
 	{
 		PlanRecord* plan;
@@ -7537,6 +7545,11 @@ uint16_t Mission_Init(char* fileName) {
 	if (!Mission_LoadFile(fileName)) {
 		return 0;
 	}
+#ifdef XWA_MODERN
+	/* Modern port: read the mission's object profile selections, before any
+	   flight-group object is created. */
+	XwaObjectProfiles_LoadMission(fileName);
+#endif
 
 	if (g_pilotData.campaignMode) {
 		for (fgIdx = 0; fgIdx < (int16_t)g_missionHeader.numFlightGroups; ++fgIdx) {

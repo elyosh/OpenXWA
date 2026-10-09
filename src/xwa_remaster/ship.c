@@ -733,18 +733,13 @@ static int ship_bwing_compensation(const AeronSceneMesh* mesh, const XwaFlightOb
 	return 1;
 }
 
-int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,
-								   AeronSceneMeshTable* out) {
-	if (!mesh || !f || !out || !f->has_craft) {
-		return 0;
-	}
-	const uint32_t slots = ship_state_slots(mesh);
-	float bwing_compensation[3][4];
-	const int has_bwing_compensation = ship_bwing_compensation(mesh, f, slots, bwing_compensation);
+/* Every slot visible, unhighlighted, at full emissive, with `rows` (or the
+ * identity when NULL) as its transform. */
+static void ship_mesh_table_init(const AeronSceneMesh* mesh, const float (*rows)[4], AeronSceneMeshTable* out) {
 	out->slot_count = ship_table_slots(mesh);
 	for (uint32_t mi = 0; mi < out->slot_count; mi++) {
-		if (has_bwing_compensation) {
-			memcpy(out->rows[mi], bwing_compensation, sizeof out->rows[mi]);
+		if (rows) {
+			memcpy(out->rows[mi], rows, sizeof out->rows[mi]);
 		} else {
 			ship_mat3x4_identity(out->rows[mi]);
 		}
@@ -753,6 +748,17 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 		out->markings_packed[mi >> 2][mi & 3] = 0.0f;
 		out->emissive_packed[mi >> 2][mi & 3] = 1.0f;
 	}
+}
+
+int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,
+								   AeronSceneMeshTable* out) {
+	if (!mesh || !f || !out || !f->has_craft) {
+		return 0;
+	}
+	const uint32_t slots = ship_state_slots(mesh);
+	float bwing_compensation[3][4];
+	const int has_bwing_compensation = ship_bwing_compensation(mesh, f, slots, bwing_compensation);
+	ship_mesh_table_init(mesh, has_bwing_compensation ? (const float (*)[4])bwing_compensation : NULL, out);
 	int any = has_bwing_compensation;
 	for (uint32_t mi = 0; mi < slots; mi++) {
 		/* Classic blown-off gate: the node walk SKIPS a mesh when
@@ -784,6 +790,24 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 			memcpy(out->rows[mi], local_rotation, sizeof out->rows[mi]);
 		}
 		any = 1;
+	}
+	return any;
+}
+
+int XwaRemasterShip_BuildHiddenMeshTable(const AeronSceneMesh* mesh,
+										 const uint8_t component_state[XWA_SNAP_MAX_MESH_SLOTS],
+										 AeronSceneMeshTable* out) {
+	if (!mesh || !component_state || !out) {
+		return 0;
+	}
+	const uint32_t slots = ship_state_slots(mesh);
+	int any = 0;
+	ship_mesh_table_init(mesh, NULL, out);
+	for (uint32_t mi = 0; mi < slots; mi++) {
+		if (component_state[mi] != 0) {
+			out->visibility_packed[mi >> 2][mi & 3] = 0.0f;
+			any = 1;
+		}
 	}
 	return any;
 }
@@ -1055,6 +1079,12 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 		if (!g->enabled || (knockout_mask && gi < 256 && (knockout_mask[gi >> 5] & (1u << (gi & 31))))) {
 			continue;
 		}
+		/* A glow is not drawn without its component (destroyed, or hidden
+		 * by an object profile). */
+		if (table && g->component_index < ship_table_slots(mesh) &&
+			table->visibility_packed[g->component_index >> 2][g->component_index & 3] == 0.0f) {
+			continue;
+		}
 
 		/* Emitter anchor + axes in model space, articulated by the
 		 * instance's mesh table (the same affine the mesh's vertices
@@ -1301,6 +1331,11 @@ uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh
 		const float dim_y = g->dimensions.y * AERON_OPT_UNITS_PER_METER;
 		const float dim_z = g->dimensions.z * AERON_OPT_UNITS_PER_METER;
 		if (!g->enabled || (dim_x <= 2000.0f && dim_y <= 2000.0f)) {
+			continue;
+		}
+		/* Nor without its component (destroyed, or hidden by an object
+		 * profile). */
+		if (g->component_index < XWA_SNAP_MAX_MESH_SLOTS && f->component_state[g->component_index] != 0) {
 			continue;
 		}
 		const float intensity = dim_z * engine_scale * 300.0f;

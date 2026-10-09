@@ -2826,6 +2826,17 @@ int8_t Player_CanRadioCommandCraft(unsigned int targetObjIdx, int playerIdx) {
 	return radio == (uint16_t)g_players[playerIdx].playerIff + 1u;
 }
 
+#ifdef XWA_MODERN
+/* Modern port: nonzero when component `meshIdx` of object `objIdx` is not
+   drawn (destroyed, or hidden by an object profile), so it cannot be a new
+   target's aim point. */
+static int Player_IsTargetComponentHidden(unsigned int objIdx, unsigned int meshIdx) {
+	const MobileObject* mobj = g_objectTable[objIdx].mobj;
+
+	return mobj != NULL && mobj->pCraft != NULL && mobj->pCraft->componentState[meshIdx] != 0;
+}
+#endif
+
 // FUNCTION: XWA 0x503E10
 void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 	unsigned int targetObjIdx;
@@ -2879,7 +2890,12 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 					meshType = ModelMesh_GetObjectTypeMeshType(
 						g_objectTable[(uint16_t)g_players[playerIdx].currentTargetObjectIdx].objectType,
 						meshIdx);
-					if (meshType == MESH_MainHull || meshType == MESH_Fuselage) {
+					if ((meshType == MESH_MainHull || meshType == MESH_Fuselage)
+#ifdef XWA_MODERN
+						&& !Player_IsTargetComponentHidden(
+							(uint16_t)g_players[playerIdx].currentTargetObjectIdx, meshIdx)
+#endif
+					) {
 						g_players[playerIdx].selectedTargetComponent = (int16_t)(uint16_t)meshIdx;
 						break;
 					}
@@ -2906,7 +2922,11 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 
 						meshType =
 							ModelMesh_GetObjectTypeMeshType(g_objectTable[targetObjIdx].objectType, meshIdx);
-						if (meshType == MESH_MainHull || meshType == MESH_Fuselage) {
+						if ((meshType == MESH_MainHull || meshType == MESH_Fuselage)
+#ifdef XWA_MODERN
+							&& !Player_IsTargetComponentHidden(targetObjIdx, meshIdx)
+#endif
+						) {
 							unsigned int distance;
 
 							distance = Object_DirectionAndDistanceToMeshCenter(
@@ -2931,7 +2951,11 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 						}
 						meshType = ModelMesh_GetObjectTypeMeshType(g_objectTable[targetObjIdx].objectType,
 																   selectedMeshIdx);
-						if (meshType == MESH_MainHull || meshType == MESH_Fuselage) {
+						if ((meshType == MESH_MainHull || meshType == MESH_Fuselage)
+#ifdef XWA_MODERN
+							&& !Player_IsTargetComponentHidden(targetObjIdx, selectedMeshIdx)
+#endif
+						) {
 							break;
 						}
 						++selectedMeshIdx;

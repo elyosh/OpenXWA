@@ -214,6 +214,12 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 		 * HD meshes are CCW-front; BACK keeps the hull solid under
 		 * this projection (verified empirically). */
 		inst.cull_mode = AERON_CULL_BACK;
+		/* Components hidden by the selected object profile. The scene
+		 * reads the table until AeronScene_Render below. */
+		static AeronSceneMeshTable hidden;
+		const AeronSceneMeshTable* table =
+			XwaRemasterShip_BuildHiddenMeshTable(mesh, p->component_state, &hidden) ? &hidden : NULL;
+		inst.mesh_table = table;
 		AeronScene_AddMeshInstance(s.scene, &inst);
 
 		/* State-derived engine glows from the mesh's own engine glows —
@@ -226,8 +232,8 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 			flick ^= flick >> 17;
 			flick ^= flick << 5;
 			const float scale = (float)(0.60000002 - (double)(flick & 0xf) * 0.0024999999);
-			XwaRemasterShip_SubmitEngineGlows(s.scene, mesh, inst.transform, k,
-											  /*table=*/NULL, /*knockout_mask=*/NULL, scale,
+			XwaRemasterShip_SubmitEngineGlows(s.scene, mesh, inst.transform, k, table,
+											  /*knockout_mask=*/NULL, scale,
 											  /*crows=*/NULL, /*cam_pos=*/NULL, glow_tex);
 		}
 	}

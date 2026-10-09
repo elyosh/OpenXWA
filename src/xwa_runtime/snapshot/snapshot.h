@@ -186,6 +186,12 @@ typedef struct XwaGlyph2D {
 	int16_t clip_left, clip_top, clip_right, clip_bottom;
 } XwaGlyph2D;
 
+/* CraftData per-mesh slots and weapon slots in the modern build
+ * (XWA_CRAFT_MESH_SLOT_COUNT, XWA_CRAFT_WEAPON_SLOT_COUNT); the original has
+ * 50 and 16. */
+#define XWA_SNAP_MAX_MESH_SLOTS 255
+#define XWA_SNAP_MAX_WEAPON_SLOTS 120
+
 /* One frontend 3D model preview (tech library / mission briefing).
  * The remaster driver renders it as a scene PiP over the drawlist.
  * Pose follows the engine's Q16 angle convention (full circle =
@@ -221,6 +227,9 @@ typedef struct XwaModelPreview {
 	 * flight_camera.rows); the driver rotates the WORLD-space dir_lights
 	 * channel into eye space with it. */
 	float cam_rows[9];
+	/* g_modelPreviewCraftData.componentState: nonzero components are not
+	 * drawn (hidden by the selected object profile). */
+	uint8_t component_state[XWA_SNAP_MAX_MESH_SLOTS];
 } XwaModelPreview;
 
 /* ---- directional lights (shared 3D lighting state) ------------------
@@ -260,12 +269,6 @@ typedef struct XwaDirLight {
  * remaster driver can pick per state. NOTE the engine's view compose
  * uses the (R0, R2, R1) row arrangement (FVIEW_ComputeObjectViewMatrix)
  * — that hazard lives in the driver's math, not in this data. */
-
-/* CraftData per-mesh slots and weapon slots in the modern build
- * (XWA_CRAFT_MESH_SLOT_COUNT, XWA_CRAFT_WEAPON_SLOT_COUNT); the original has
- * 50 and 16. */
-#define XWA_SNAP_MAX_MESH_SLOTS 255
-#define XWA_SNAP_MAX_WEAPON_SLOTS 120
 
 /* Genus values the driver dispatches on (mirrors ModelGenusId — part
  * of the captured records' vocabulary, so drivers need no engine

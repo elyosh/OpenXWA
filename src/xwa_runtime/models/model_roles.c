@@ -159,15 +159,19 @@ int XwaModelRole_Resolve(unsigned short objectType, XwaModelRole role, int stock
 }
 
 int XwaModelRole_Collect(unsigned short objectType, XwaModelRole role, int* components, int capacity) {
+	if ((unsigned int)role >= XWA_MODEL_ROLE_COUNT) {
+		return 0;
+	}
+	return XwaModelRole_CollectTag(objectType, s_roles[role].tag, components, capacity);
+}
+
+int XwaModelRole_CollectTag(unsigned short objectType, const char* tagName, int* components, int capacity) {
 	MemoryHandle handle;
 	const OptimizedPolyObject* model;
 	const XwaOptSynthData* synth;
 	int count;
 	uint32_t mesh;
 
-	if ((unsigned int)role >= XWA_MODEL_ROLE_COUNT) {
-		return 0;
-	}
 	model = ModelRole_LockModel(objectType, &handle);
 	if (model == NULL) {
 		return 0;
@@ -178,7 +182,7 @@ int XwaModelRole_Collect(unsigned short objectType, XwaModelRole role, int* comp
 		uint32_t tag;
 
 		for (tag = 0; tag < synth->meshes[mesh].tagCount; ++tag) {
-			if (strcmp(synth->meshes[mesh].tags[tag].name, s_roles[role].tag) == 0) {
+			if (strcmp(synth->meshes[mesh].tags[tag].name, tagName) == 0) {
 				if (count < capacity) {
 					components[count] = (int)mesh;
 				}

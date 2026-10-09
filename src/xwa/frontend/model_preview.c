@@ -20,7 +20,11 @@
 #include "xwa/render/renderer.h"
 #include "xwa/util/memory.h"
 #ifdef XWA_MODERN
+#include "xwa/frontend/briefing_script.h"
+#include "xwa/frontend/frontend_screen.h"
+#include "xwa/frontend/tech_library.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/models/object_profiles.h"
 #endif
 
 #include <math.h>
@@ -465,6 +469,16 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 	g_modelPreviewObject.pitch = 0;
 	g_modelPreviewObject.yaw = 0;
 	g_modelPreviewObject.roll = 0;
+#ifdef XWA_MODERN
+	/* Modern port: hide the components of the selected object profile, as
+	 * destroyed: the ship-info flight group's while a briefing plays, none
+	 * otherwise. The tech library has no mission, so it uses the
+	 * mission-independent selections. */
+	XwaObjectProfiles_Apply((uint16_t)g_modelPreviewModelType,
+							g_briefingPlaybackActive ? (int)(uint16_t)g_briefingMapPrimaryHighlightIconIndex : 0xFFFF, 0,
+							0, g_screenStates[g_screenStackTop].updateFn == TechLibrary_Update,
+							&g_modelPreviewCraftData);
+#endif
 	g_modelPreviewAngleD = 0;
 
 	g_projOffsetY = 0;
@@ -686,6 +700,8 @@ int ModelPreview_RenderViewport(int x, int y, int width, int height, void* softw
 		snapPreview.world_y = g_modelPreviewObject.world_y;
 		snapPreview.world_z = g_modelPreviewObject.world_z;
 		snapPreview.node_switch_index = g_nodeSwitchIndex;
+		memcpy(snapPreview.component_state, g_modelPreviewCraftData.componentState,
+			   sizeof snapPreview.component_state);
 		snapPreview.dst_x = (int16_t)x;
 		snapPreview.dst_y = (int16_t)y;
 		snapPreview.dst_w = (int16_t)width;
@@ -827,6 +843,8 @@ int ModelPreview_RenderWireframeViewport(int x, int y, int width, int height, in
 		snapPreview.world_y = g_modelPreviewObject.world_y;
 		snapPreview.world_z = g_modelPreviewObject.world_z;
 		snapPreview.node_switch_index = g_nodeSwitchIndex;
+		memcpy(snapPreview.component_state, g_modelPreviewCraftData.componentState,
+			   sizeof snapPreview.component_state);
 		snapPreview.dst_x = (int16_t)x;
 		snapPreview.dst_y = (int16_t)y;
 		snapPreview.dst_w = (int16_t)width;
