@@ -33,6 +33,7 @@
 #include "aeron/scene/scene3d.h"
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/ship.h"
+#include "xwa_remaster/skins.h"
 #include "xwa_remaster/xwa_remaster.h"
 
 #include <math.h>
@@ -187,6 +188,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 		memset(&inst, 0, sizeof inst);
 		inst.mesh = mesh;
 		inst.variant = (uint8_t)p->node_switch_index;
+		XwaRemasterSkins_CheckMarkings(inst.mesh, inst.variant);
 		const float preview_scale = p->model_scale > 0.0f ? p->model_scale : 1.0f;
 		const float k = preview_scale * AERON_OPT_UNITS_PER_METER;
 		float* m = inst.transform;

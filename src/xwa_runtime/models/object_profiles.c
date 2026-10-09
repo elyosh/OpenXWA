@@ -1,11 +1,11 @@
 #include "xwa_runtime/models/object_profiles.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/frontend/frontend_resources.h"
+#include "xwa_runtime/models/mission_file.h"
 #include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/models/opt_synth.h"
 
@@ -44,31 +44,6 @@ static char ObjectProfiles_Lower(char c) {
 	return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c;
 }
 
-/* remaster/missions/<mission path without its extension>.yaml, lower case,
-   with '/' separators. */
-static void ObjectProfiles_SelectionPath(const char* missionPath, char* path, size_t pathSize) {
-	const char* dot = strrchr(missionPath, '.');
-	const char* separator = strrchr(missionPath, '\\');
-	const char* slash = strrchr(missionPath, '/');
-	size_t length;
-	size_t index;
-	size_t offset;
-
-	if (slash != NULL && (separator == NULL || slash > separator)) {
-		separator = slash;
-	}
-	length = dot != NULL && (separator == NULL || dot > separator) ? (size_t)(dot - missionPath)
-																	: strlen(missionPath);
-	offset = (size_t)snprintf(path, pathSize, "remaster/missions/");
-	for (index = 0; index < length && offset + 1 < pathSize; ++index) {
-		const char c = missionPath[index];
-
-		path[offset++] = c == '\\' ? '/' : ObjectProfiles_Lower(c);
-	}
-	path[offset] = '\0';
-	snprintf(path + offset, pathSize - offset, ".yaml");
-}
-
 /* Nonzero when the entry's optional `name` and `craft` checks match
    flight group `fg`; logs the mismatch otherwise. */
 static int ObjectProfiles_EntryMatches(const char* path, const char* key, const AeronConfigNode* entry,
@@ -102,33 +77,24 @@ void XwaObjectProfiles_LoadMission(const char* missionPath, const struct XwaFlig
 								   size_t stride, int count) {
 	char path[300];
 	AeronConfigFile* config = NULL;
-	AeronConfigError error;
-	const AeronConfigNode* root;
+	const AeronConfigNode* section;
 	const AeronConfigNode* selections;
 	size_t index;
 	int loaded;
 
 	ObjectProfiles_Clear();
-	if (missionPath == NULL) {
+	if (missionPath == NULL || XwaMissionFile_Load(missionPath, &config, path, sizeof path) <= 0) {
 		return;
 	}
-	ObjectProfiles_SelectionPath(missionPath, path, sizeof path);
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, path, &config, &error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.models", "%s:%d: %s; no object profile selected", path, error.line,
-						   error.message);
-		}
+	/* The section is optional: the file may hold other selections only. */
+	section = AeronConfigNode_MapGet(AeronConfigFile_Root(config), "object_profiles");
+	selections = AeronConfigNode_MapGet(section, "flight_groups");
+	if (section == NULL) {
+		AeronConfigFile_Destroy(config);
 		return;
 	}
-	root = AeronConfigFile_Root(config);
-	selections = AeronConfigNode_MapGet(AeronConfigNode_MapGet(root, "object_profiles"), "flight_groups");
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Type(AeronConfigNode_MapGet(root, "version")) != AERON_CONFIG_INT ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1 ||
-		AeronConfigNode_Type(selections) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.models", "%s: expected 'version: 1' and an 'object_profiles.flight_groups' map",
-					   path);
+	if (AeronConfigNode_Type(selections) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.models", "%s: expected an 'object_profiles.flight_groups' map", path);
 		AeronConfigFile_Destroy(config);
 		return;
 	}

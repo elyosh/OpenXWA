@@ -1,10 +1,12 @@
 #include "xwa_remaster/hud_cmd.h"
 
 #include "aeron/aeron.h"
+#include "aeron/asset/opt_model.h"
 #include "aeron/scene/billboard.h"
 #include "aeron/scene/draw_list2d.h"
 #include "aeron/scene/present.h"
 #include "aeron/scene/scene3d.h"
+#include "aeron/scene/world.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/effects.h"
@@ -13,8 +15,7 @@
 #include "xwa_remaster/hud_cmd_math.h"
 #include "xwa_remaster/hud_layout.h"
 #include "xwa_remaster/ship.h"
-#include "aeron/asset/opt_model.h"
-#include "aeron/scene/world.h"
+#include "xwa_remaster/skins.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/models/model_source.h"
 
@@ -211,6 +212,7 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 	memset(&instance, 0, sizeof instance);
 	instance.mesh = mesh;
 	instance.variant = object->node_switch;
+	XwaRemasterSkins_CheckMarkings(instance.mesh, instance.variant);
 	instance.zero_velocity = 1;
 	if (cmd_projectile(object) && source == XWA_MODEL_SOURCE_OPT) {
 		instance.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();

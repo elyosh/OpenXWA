@@ -37,6 +37,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
+#include "xwa_runtime/models/skins.h"
 #endif
 
 #include <locale.h>
@@ -7550,6 +7551,7 @@ uint16_t Mission_Init(char* fileName) {
 	   flight-group object is created. */
 	XwaObjectProfiles_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 								  (int16_t)g_missionHeader.numFlightGroups);
+	XwaSkins_LoadMission(fileName);
 #endif
 
 	if (g_pilotData.campaignMode) {
@@ -7974,6 +7976,13 @@ uint16_t Mission_Init(char* fileName) {
 			}
 		}
 	}
+
+#ifdef XWA_MODERN
+	/* Modern port: the skins the renderer loads follow the flight groups'
+	   markings, final once the loop above has set the player groups'. */
+	XwaSkins_SetFlightGroups(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
+							 (int16_t)g_missionHeader.numFlightGroups);
+#endif
 
 	GameRand_SavePrimarySeed();
 	Math_SeedRandom((uint16_t)(g_missionHeader.body.legacyBackdrop - 16657));

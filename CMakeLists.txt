@@ -208,8 +208,10 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/cockpit_eye.c
     src/xwa_runtime/models/collision_bvh.c
     src/xwa_runtime/models/model_roles.c
+    src/xwa_runtime/models/mission_file.c
     src/xwa_runtime/models/model_source.c
     src/xwa_runtime/models/object_profiles.c
+    src/xwa_runtime/models/skins.c
     src/xwa_runtime/models/opt_synth.c
     src/xwa_runtime/runtime/flight_pause_task.c
     src/xwa_runtime/runtime/flight_task.c
@@ -265,6 +267,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/hud_text.c
     src/xwa_remaster/preview.c
     src/xwa_remaster/ship.c
+    src/xwa_remaster/skins.c
     src/xwa_remaster/opt_mesh.c
     src/xwa_remaster/original_2d.c
     src/xwa_remaster/sky_stars.c

@@ -9,6 +9,7 @@
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/glow_marks.h"
 #include "xwa_remaster/opt_mesh.h"
+#include "xwa_remaster/skins.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/render_model.h"
 
@@ -26,6 +27,10 @@ typedef struct ShipMeshAsset {
 	uint8_t source; /* XwaModelSource the simulation loaded */
 	AeronSceneMesh* mesh;
 	int pending_new;
+	/* A GLB with XWAU skin variants (xwa_remaster/skins.h) and the hash of
+	   the markings variants its mesh was created with; NULL otherwise. */
+	XwaRemasterSkinModel* skin;
+	uint64_t markings_variants_hash;
 } ShipMeshAsset;
 
 typedef struct ShipDesiredAsset {
@@ -39,6 +44,9 @@ static ShipMeshAsset s_pending_meshes[XWA_SNAP_MAX_OPT_ASSETS];
 static uint32_t s_pending_mesh_count;
 static uint64_t s_pending_generation = UINT64_MAX;
 static uint64_t s_opt_asset_generation = UINT64_MAX;
+static uint64_t s_skin_generation = UINT64_MAX;
+static uint64_t s_pending_skin_generation = UINT64_MAX;
+static uint64_t s_batch_skin_generation;
 static uint64_t s_batch_generation;
 static int s_batch_active;
 static int s_batch_completes_generation;
@@ -85,9 +93,21 @@ static void ship_mesh_key(const char* name, char key[XWA_SNAP_OPT_NAME_MAX]) {
 /* The simulation's source decides the mesh: a GLB the simulation loaded is
  * the only valid render source for that key, and an OPT key never tries a
  * GLB. */
-static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, uint8_t source) {
+/* The markings variants of `skin`'s mesh for `snapshot`, and their hash. */
+static uint32_t ship_markings_variants(const XwaRemasterSkinModel* skin, const XwaSnapshot* snapshot,
+									   uint32_t variants[XWA_REMASTER_MAX_MARKINGS], uint64_t* hash) {
+	const uint32_t count = skin ? XwaRemasterSkins_MarkingsVariants(skin, snapshot, variants) : 0u;
+	*hash = XwaRemasterSkins_MarkingsVariantsHash(variants, count);
+	return count;
+}
+
+static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, uint8_t source,
+									  const XwaSnapshot* snapshot, XwaRemasterSkinModel** out_skin,
+									  uint64_t* out_markings_variants_hash) {
 	char path[512];
 	AeronFlightModel model;
+	*out_skin = NULL;
+	*out_markings_variants_hash = 0;
 	if (source == XWA_MODEL_SOURCE_GLB) {
 		if (!XwaModelSource_GlbPath(key, path, sizeof path)) {
 			Aeron_LogError("xwa.remaster", "mesh: GLB path too long for '%s'", key);
@@ -115,8 +135,25 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 				return NULL;
 			}
 		}
+		/* A GLB with skin variants shows, per markings value, what its objects use. */
+		const AeronFlightModel* built = parsed ? parsed : &model;
+		XwaRemasterSkinModel* skin = XwaRemasterSkins_Capture(&built->render, key);
+		uint32_t variants[XWA_REMASTER_MAX_MARKINGS];
+		const uint32_t markings_count =
+			ship_markings_variants(skin, snapshot, variants, out_markings_variants_hash);
 		AeronSceneMeshCreateStatus create_status;
-		AeronSceneMesh* mesh = AeronScene_MeshCreate(cmd, parsed ? parsed : &model, key, &create_status);
+		AeronSceneMesh* mesh =
+			markings_count ? AeronScene_MeshCreateWithVariants(
+								 cmd, built, key,
+								 &(AeronSceneMeshVariants) { .variants = variants, .count = markings_count },
+								 &create_status)
+						   : AeronScene_MeshCreate(cmd, built, key, &create_status);
+		if (mesh && skin) {
+			XwaRemasterSkins_NoteMesh(mesh, key, markings_count);
+			*out_skin = skin;
+		} else {
+			XwaRemasterSkins_Free(skin);
+		}
 		if (parsed) {
 			if (mesh) {
 				XwaRenderModel_Release(key);
@@ -158,13 +195,18 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 }
 
 int XwaRemasterShip_AssetsNeedSync(const XwaSnapshot* snapshot) {
-	return snapshot && snapshot->opt_asset_generation != s_opt_asset_generation;
+	return snapshot && (snapshot->opt_asset_generation != s_opt_asset_generation ||
+						snapshot->skin_generation != s_skin_generation);
 }
 
 static void ship_mesh_asset_destroy(ShipMeshAsset* asset) {
 	if (asset && asset->mesh) {
 		XwaRemasterGlowMarks_InvalidateMesh(asset->mesh);
+		XwaRemasterSkins_ForgetMesh(asset->mesh);
 		AeronScene_MeshDestroy(asset->mesh);
+	}
+	if (asset) {
+		XwaRemasterSkins_Free(asset->skin);
 	}
 	if (asset) {
 		memset(asset, 0, sizeof *asset);
@@ -188,6 +230,7 @@ static void ship_pending_discard(void) {
 	memset(s_pending_meshes, 0, sizeof s_pending_meshes);
 	s_pending_mesh_count = 0;
 	s_pending_generation = UINT64_MAX;
+	s_pending_skin_generation = UINT64_MAX;
 }
 
 XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
@@ -225,12 +268,15 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 		desired_count++;
 	}
 
-	if (s_pending_generation != snapshot->opt_asset_generation) {
+	if (s_pending_generation != snapshot->opt_asset_generation ||
+		s_pending_skin_generation != snapshot->skin_generation) {
 		ship_pending_discard();
 		s_pending_generation = snapshot->opt_asset_generation;
+		s_pending_skin_generation = snapshot->skin_generation;
 	}
 
 	s_batch_generation = snapshot->opt_asset_generation;
+	s_batch_skin_generation = snapshot->skin_generation;
 	s_batch_active = 1;
 	s_batch_completes_generation = 1;
 
@@ -255,6 +301,15 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 		ShipMeshAsset* asset = &s_pending_meshes[s_pending_mesh_count];
 		for (uint32_t j = 0; j < s_mesh_count; j++) {
 			if (strcmp(s_meshes[j].key, desired[i].key) == 0 && s_meshes[j].source == desired[i].source) {
+				/* A skinned mesh whose markings variants changed is created again. */
+				if (s_meshes[j].skin) {
+					uint32_t variants[XWA_REMASTER_MAX_MARKINGS];
+					uint64_t hash;
+					ship_markings_variants(s_meshes[j].skin, snapshot, variants, &hash);
+					if (hash != s_meshes[j].markings_variants_hash) {
+						break;
+					}
+				}
 				*asset = s_meshes[j];
 				asset->pending_new = 0;
 				s_pending_mesh_count++;
@@ -267,7 +322,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 		}
 		snprintf(asset->key, sizeof asset->key, "%s", desired[i].key);
 		asset->source = desired[i].source;
-		asset->mesh = ship_mesh_load(cmd, asset->key, asset->source);
+		asset->mesh = ship_mesh_load(cmd, asset->key, asset->source, snapshot, &asset->skin,
+									 &asset->markings_variants_hash);
 		if (!asset->mesh) {
 			memset(asset, 0, sizeof *asset);
 			return XWA_REMASTER_SHIP_SYNC_FAILED;
@@ -331,7 +387,9 @@ void XwaRemasterShip_CommitSyncBatch(void) {
 		memset(s_pending_meshes, 0, sizeof s_pending_meshes);
 		s_pending_mesh_count = 0;
 		s_pending_generation = UINT64_MAX;
+		s_pending_skin_generation = UINT64_MAX;
 		s_opt_asset_generation = s_batch_generation;
+		s_skin_generation = s_batch_skin_generation;
 		Aeron_LogDebug("xwa.remaster", "mesh assets: generation=%llu unique=%u",
 					   (unsigned long long)s_opt_asset_generation, s_mesh_count);
 	}
@@ -370,6 +428,7 @@ void XwaRemasterShip_Shutdown(void) {
 	memset(s_meshes, 0, sizeof s_meshes);
 	s_mesh_count = 0;
 	s_opt_asset_generation = UINT64_MAX;
+	s_skin_generation = UINT64_MAX;
 	s_batch_active = 0;
 	s_batch_completes_generation = 0;
 	memset(&g_pbr_tuning, 0, sizeof g_pbr_tuning);

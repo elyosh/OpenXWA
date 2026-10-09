@@ -23,6 +23,7 @@
 #include "xwa_remaster/hud.h"
 #include "xwa_remaster/hyperspace.h"
 #include "xwa_remaster/ship.h"
+#include "xwa_remaster/skins.h"
 #include "xwa_remaster/sky_stars.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/models/model_source.h"
@@ -3196,6 +3197,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	memcpy(instance.transform, model_matrix, sizeof model_matrix);
 	memcpy(instance.prev_transform, model_matrix, sizeof model_matrix);
 	instance.variant = f->node_switch;
+	XwaRemasterSkins_CheckMarkings(instance.mesh, instance.variant);
 	instance.mesh_table = prepared.table;
 	instance.prev_mesh_table = prepared.table;
 	instance.zero_velocity = 1;
@@ -3372,6 +3374,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	memset(&inst, 0, sizeof inst);
 	inst.mesh = cockpit_mesh;
 	inst.variant = player_f ? player_f->node_switch : 0;
+	XwaRemasterSkins_CheckMarkings(inst.mesh, inst.variant);
 	memcpy(inst.transform, m, sizeof m);
 	memcpy(inst.prev_transform, m, sizeof m);
 	inst.zero_velocity = 1;
@@ -4495,6 +4498,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			inst.mesh = prepared.mesh;
 			memcpy(inst.transform, model_matrix, sizeof model_matrix);
 			inst.variant = f->node_switch; /* markings survive the detach copy */
+			XwaRemasterSkins_CheckMarkings(inst.mesh, inst.variant);
 			inst.mesh_table = prepared.table;
 			inst.cull_mode = AERON_CULL_BACK;
 			fl_instance_motion(&inst, f, i, /*is_bolt=*/0);
@@ -4526,6 +4530,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		inst.mesh = prepared.mesh;
 		memcpy(inst.transform, model_matrix, sizeof model_matrix);
 		inst.variant = f->node_switch;
+		XwaRemasterSkins_CheckMarkings(inst.mesh, inst.variant);
 		if (scene_lighting.hangar_override && (int32_t)f->slot == cam->hangar_launch_ref_obj_idx) {
 			/* The enclosed backdrop contains the implied ceiling emitter.
 			 * It receives object shadows but must not occlude that light. */
@@ -4650,6 +4655,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			memset(&inst, 0, sizeof inst);
 			inst.mesh = cockpit_mesh;
 			inst.variant = cockpit_anchor->node_switch;
+			XwaRemasterSkins_CheckMarkings(inst.mesh, inst.variant);
 			memcpy(inst.transform, m, sizeof m);
 			memcpy(inst.prev_transform, m, sizeof m);
 			if (cockpit_history_valid &&

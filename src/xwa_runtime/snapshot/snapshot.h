@@ -1037,6 +1037,24 @@ typedef struct XwaOptAsset {
 	uint8_t source;                   /* XwaModelSource the simulation loaded */
 } XwaOptAsset;
 
+/* A mission's skin selection: model `model` (its GLB name) shows variant
+ * `variant` for markings value `markings`. */
+#define XWA_SNAP_MAX_SKIN_SELECTIONS 256
+#define XWA_SNAP_SKIN_NAME_MAX 64
+typedef struct XwaSkinSelection {
+	char model[XWA_SNAP_SKIN_NAME_MAX];
+	char variant[XWA_SNAP_SKIN_NAME_MAX];
+	uint8_t markings;
+} XwaSkinSelection;
+
+/* Objects of the model loaded as `key` (an XwaOptAsset name, lower case)
+ * use markings value `markings`. */
+#define XWA_SNAP_MAX_SKIN_USES 256
+typedef struct XwaSkinUse {
+	char key[XWA_SNAP_OPT_NAME_MAX];
+	uint8_t markings;
+} XwaSkinUse;
+
 /* One sprite-textured model type whose classic TexLevel storage is live.
  * The remaster mirrors the corresponding baked atlas pages while this type
  * remains in the authoritative set. */
@@ -1101,6 +1119,14 @@ typedef struct XwaSnapshot {
 	uint64_t texture_asset_generation;
 	XwaTextureAsset texture_assets[XWA_SNAP_MAX_TEXTURE_ASSETS];
 	uint32_t texture_asset_count;
+	/* XWAU skins (xwa_runtime/models/skins.h): the mission's selections and
+	 * the markings values each model's objects use; skin_generation changes
+	 * when either does. */
+	uint64_t skin_generation;
+	XwaSkinSelection skin_selections[XWA_SNAP_MAX_SKIN_SELECTIONS];
+	uint32_t skin_selection_count;
+	XwaSkinUse skin_uses[XWA_SNAP_MAX_SKIN_USES];
+	uint32_t skin_use_count;
 
 	XwaFlightObject flight_objects[XWA_SNAP_MAX_FLIGHT_OBJECTS];
 	uint32_t flight_object_count;

@@ -20,6 +20,7 @@
 #include "xwa/util/memory.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/object_profiles.h"
+#include "xwa_runtime/models/skins.h"
 #endif
 
 #include <stdint.h>
@@ -216,6 +217,7 @@ int FrontendMission_LoadForBriefing(void) {
 		XwaObjectProfiles_LoadMission(missionPath, g_frontendMission != NULL ? g_frontendMission->flightGroups : NULL,
 									  sizeof g_frontendMission->flightGroups[0],
 									  g_frontendMission != NULL ? g_frontendMission->flightGroupCount : 0);
+		XwaSkins_LoadMission(missionPath);
 	}
 #endif
 	BriefingScript_ResetState();

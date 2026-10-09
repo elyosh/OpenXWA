@@ -8,6 +8,7 @@
  */
 
 #include "xwa_runtime/snapshot/snapshot.h"
+#include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 
@@ -418,6 +419,7 @@ void XwaSnapshot_Commit(void) {
 	snapshot_capture_frontend_assets(s);
 	XwaSnapshotExport_CaptureOptAssets(s);
 	XwaSnapshotExport_CaptureTextureAssets(s);
+	XwaSkins_Capture(s);
 	/* Shared 3D lighting state: the FlightLight directional table
 	 * (world space), read-only sample once per tick. Lights every 3D
 	 * view — flight scenes and the frontend model preview alike. */
