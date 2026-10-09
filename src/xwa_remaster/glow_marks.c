@@ -74,7 +74,8 @@ static int blast_mark_frame(const XwaGlowMark* mark, const XwaSnapshot* snapshot
 	AeronEffectImage image;
 	AeronEffectAtlas* atlas = XwaRemasterShip_EffectAtlas();
 	const float page = (float)AeronEffectAtlas_PageSize(atlas);
-	if (!AeronEffectData_ImageFrame(s_effect_data, index, (double)snapshot->game_time_ms / 1000.0 + phase,
+	if (!AeronEffectData_ImageFrame(s_effect_data, index,
+									(double)snapshot->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS + phase,
 									&image) ||
 		!(page > 0.0f)) {
 		return 0;

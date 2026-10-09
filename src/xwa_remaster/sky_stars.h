@@ -20,7 +20,7 @@ typedef struct XwaRemasterSkyStarsParams {
 	float feather_px;
 	float pixel_pitch_px;
 	float flare_strength;
-	uint32_t game_time_ms;
+	uint32_t game_time_ticks;
 } XwaRemasterSkyStarsParams;
 
 XwaRemasterSkyStars* XwaRemasterSkyStars_Create(void);

@@ -285,6 +285,10 @@ static struct {
 	 * tables. */
 	AeronSceneMeshTable tables[XWA_SNAP_MAX_FLIGHT_OBJECTS * 2 + 2];
 	uint32_t table_count;
+	/* Material animation states, borrowed by instances like the tables. */
+	AeronSceneMaterialAnim anims[XWA_SNAP_MAX_FLIGHT_OBJECTS + 2];
+	uint32_t anim_count;
+	XwaFlightMaterialAnimOverride anim_override;
 	int map_present;
 	int suppress_hud;
 } s;
@@ -2841,7 +2845,7 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
  *     the instance walk where mesh + articulation exist);
  *   - the local player's semantic pulses, including weapon fire and
  *     hyperspace effects (classic cycle/fade envelope replayed from
- *     game_time_ms at the hardpoint).
+ *     game_time_ticks at the hardpoint).
  * The classic cull radii only selected lights per object and are not
  * used. The classic Local Lights config level is NOT honored (period
  * option). Aeron assigns the submitted sources to spatial light clusters. */
@@ -3021,7 +3025,7 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
 		if (!pl->enabled) {
 			continue;
 		}
-		const double elapsed = (double)(snap->game_time_ms - pl->start_time);
+		const double elapsed = (double)(snap->game_time_ticks - pl->start_time);
 		const double phase_t =
 			elapsed - (double)(int)(elapsed * pl->inv_cycle_ticks) * (double)pl->cycle_ticks;
 		const float phase = (float)(phase_t * pl->inv_cycle_ticks);
@@ -3133,8 +3137,51 @@ typedef struct FlMapSubmitContext {
 typedef struct FlPreparedMesh {
 	AeronSceneMesh* mesh;
 	AeronSceneMeshTable* table;
+	const AeronSceneMaterialAnim* anim;
 	uint8_t source; /* XwaModelSource */
 } FlPreparedMesh;
+
+/* The hull-damage stage of an object: 1 at or below 75 % hull, 2 at or
+ * below 50 %, 3 at or below 25 %, else 0. */
+static uint32_t fl_damage_stage(const XwaFlightObject* object) {
+	if (!object->has_craft || object->hull_max <= 0) {
+		return 0;
+	}
+	const double hull = 100.0 * (1.0 - (double)object->hull_damage / (double)object->hull_max);
+	return hull <= 25.0 ? 3u : hull <= 50.0 ? 2u : hull <= 75.0 ? 1u : 0u;
+}
+
+/* An object's material animation state for this frame, from the pool. */
+static const AeronSceneMaterialAnim* fl_object_anim(const XwaFlightObject* object) {
+	if (s.anim_count >= sizeof s.anims / sizeof s.anims[0]) {
+		return NULL;
+	}
+	AeronSceneMaterialAnim* anim = &s.anims[s.anim_count++];
+	memset(anim, 0, sizeof *anim);
+	anim->seed = (uint32_t)object->slot << 16 | object->signature;
+	anim->damage_stage = fl_damage_stage(object);
+	const XwaFlightMaterialAnimOverride* o = &s.anim_override;
+	const XwaHudTarget* target = s.snap ? &s.snap->hud.target : NULL;
+	if (o->enabled && (o->all_objects || (target && target->valid && target->slot == object->slot &&
+										  target->signature == object->signature))) {
+		anim->damage_stage = o->damage_stage;
+		anim->energy = o->energy;
+		anim->state_mask = o->state_mask;
+	}
+	return anim;
+}
+
+void XwaRemasterFlight_GetMaterialAnimOverride(XwaFlightMaterialAnimOverride* out) {
+	if (out) {
+		*out = s.anim_override;
+	}
+}
+
+void XwaRemasterFlight_SetMaterialAnimOverride(const XwaFlightMaterialAnimOverride* in) {
+	if (in) {
+		s.anim_override = *in;
+	}
+}
 
 /* Resolve the model and its current articulation once for both flight views.
  * Callers retain ownership of motion, lighting, shadows and effect submission. */
@@ -3171,6 +3218,7 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 			s.table_count++;
 		}
 	}
+	out->anim = fl_object_anim(object);
 	return 1;
 }
 
@@ -3208,6 +3256,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	XwaRemasterSkins_CheckMarkings(instance.mesh, instance.variant);
 	instance.mesh_table = prepared.table;
 	instance.prev_mesh_table = prepared.table;
+	instance.anim = prepared.anim;
 	instance.zero_velocity = 1;
 	instance.cull_mode = is_bolt ? AERON_CULL_NONE : AERON_CULL_BACK;
 	if (is_bolt) {
@@ -3630,6 +3679,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	 * retained by the special scene. */
 	s.glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &s.glow_ref);
 	s.table_count = 0;
+	s.anim_count = 0;
 	s.pl_cand_count = 0;
 	s.pl_cand_dropped = 0;
 	s.pl_invalid_count = 0;
@@ -3639,7 +3689,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	 * temporal reconstruction for this special scene and reset history
 	 * before returning to ordinary flight. */
 	fl_set_temporal(host_time_us, 0);
-	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ms / 1000.0);
+	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS);
 	if (!AeronScene_Begin(s.scene, &flight_view->camera)) {
 		Aeron_CommandBufferSetFailure(cmd, "Hyperspace scene initialization failed");
 		s.snap = NULL;
@@ -3940,6 +3990,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	s.map_present = 1;
 	s.mb_enabled = 0;
 	s.table_count = 0;
+	s.anim_count = 0;
 	s.bb_count = 0;
 	s.glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &s.glow_ref);
 	fl_set_temporal(host_time_us, 0);
@@ -3949,7 +4000,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	XwaRemasterParticles_Prepare(s.particles, cmd, snap, NULL, assets, &effect_view, NULL);
 	XwaRemasterTrails_Prepare(s.trails, cmd, snap, assets, &effect_view);
 
-	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ms / 1000.0);
+	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS);
 	if (!AeronScene_Begin(s.scene, &view->camera)) {
 		s.snap = NULL;
 		return NULL;
@@ -4035,7 +4086,7 @@ int XwaRemasterFlight_CaptureSetSky(AeronScene3D* scene, XwaRemasterSkyStars* st
 			.feather_px = s.star_feather * star_upscale,
 			.pixel_pitch_px = star_upscale,
 			.flare_strength = s.star_flare,
-			.game_time_ms = (uint32_t)snap->game_time_ms,
+			.game_time_ticks = (uint32_t)snap->game_time_ticks,
 		};
 		if (!stars || !XwaRemasterSkyStars_Prepare(stars, scene, fl_world_to_cube, &params)) {
 			return 0;
@@ -4147,14 +4198,14 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		const XwaFlightCamera* pc = &prev->flight_camera;
 		if (pc->region == cam->region && !pc->hyperspace_phase && !pc->map_mode &&
 			pc->in_hangar == cam->in_hangar && pc->external == cam->external &&
-			pc->film_overlay == cam->film_overlay && snap->game_time_ms >= prev->game_time_ms) {
+			pc->film_overlay == cam->film_overlay && snap->game_time_ticks >= prev->game_time_ticks) {
 			fl_build_view_at_origin(pc, s.origin_world, s.rt_w, s.rt_h, &previous_flight_view);
 			memcpy(s.mb_prev_vp, previous_flight_view.view_proj, sizeof s.mb_prev_vp);
 			s.mb_enabled = 1;
 			/* Hold velocity while a paused snapshot is truly unchanged. Camera
 			 * panning and cockpit articulation can still change with frozen sim
 			 * time, and must regenerate velocity for both temporal consumers. */
-			paused = snap->game_time_ms == prev->game_time_ms;
+			paused = snap->game_time_ticks == prev->game_time_ticks;
 			mb_regen = !paused || fl_temporal_pose_changed(snap, prev);
 			/* Prev lookup by stable identity: objectSignature is unique
 			 * per spawn (slot reuse bumps it), so signature + slot pins
@@ -4302,14 +4353,14 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				motion_reset_reasons |= FL_FSR_RESET_EXTERNAL_VIEW_CHANGE;
 			if (pc->film_overlay != cam->film_overlay)
 				motion_reset_reasons |= FL_FSR_RESET_FILM_OVERLAY_CHANGE;
-			if (snap->game_time_ms < prev->game_time_ms)
+			if (snap->game_time_ticks < prev->game_time_ticks)
 				motion_reset_reasons |= FL_FSR_RESET_GAME_TIME_ROLLBACK;
 		}
 		fl_request_fsr_reset(motion_reset_reasons ? motion_reset_reasons
 												  : FL_FSR_RESET_MOTION_CONTEXT_UNKNOWN);
 	}
 	fl_set_temporal(host_time_us, 1);
-	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ms / 1000.0);
+	AeronScene_SetAnimationTime(s.scene, (double)snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS);
 	if (!AeronScene_Begin(s.scene, &flight_view.camera)) {
 		Aeron_CommandBufferSetFailure(cmd, "Flight scene initialization failed");
 		s.snap = NULL;
@@ -4356,7 +4407,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * shared authored cubes orient identically in both games. The
 	 * procedural starfield (skybox.mode: stars) hashes stars in this same
 	 * cube basis, so it orients consistently with authored cubes; its
-	 * twinkle advances off the sim clock (game_time_ms), not wall time,
+	 * twinkle advances off the sim clock (game_time_ticks), not wall time,
 	 * so it is deterministic and pauses with the game. */
 	if (authored) {
 		AeronScene_SetSkyCube(s.scene, authored->radiance, authored->world_to_cube,
@@ -4382,7 +4433,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				.feather_px = s.star_feather * upscale,
 				.pixel_pitch_px = upscale,
 				.flare_strength = s.star_flare,
-				.game_time_ms = (uint32_t)snap->game_time_ms,
+				.game_time_ticks = (uint32_t)snap->game_time_ticks,
 			};
 			if (!XwaRemasterSkyStars_Prepare(s.sky_stars, s.scene, fl_world_to_cube, &stars)) {
 				Aeron_CommandBufferSetFailure(cmd, "Procedural starfield preparation failed");
@@ -4445,6 +4496,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 
 	s.bolt_count = 0;
 	s.table_count = 0;
+	s.anim_count = 0;
 
 	/* Derive every object transform from the STATE channel: cached rows
 	 * when the mobile object's cache is fresh, the Euler compose
@@ -4511,6 +4563,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			inst.variant = f->node_switch; /* markings survive the detach copy */
 			XwaRemasterSkins_CheckMarkings(inst.mesh, inst.variant);
 			inst.mesh_table = prepared.table;
+			inst.anim = prepared.anim;
 			inst.cull_mode = AERON_CULL_BACK;
 			fl_instance_motion(&inst, f, i, /*is_bolt=*/0);
 			AeronScene_AddMeshInstance(s.scene, &inst);
@@ -4573,6 +4626,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		 * from the captured craft state — tables borrow pool slots for
 		 * the frame (the scene keeps the pointer until Render). */
 		inst.mesh_table = prepared.table;
+		inst.anim = prepared.anim;
 		AeronSceneMeshTable* prev_tb = &s.tables[s.table_count];
 		if (XwaRemasterShip_BuildPreviousMeshTable(prepared.mesh, f, previous_f, prev_tb)) {
 			inst.prev_mesh_table = prev_tb;

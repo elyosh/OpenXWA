@@ -141,7 +141,7 @@ int XwaRemasterSkyStars_Prepare(XwaRemasterSkyStars* stars, const AeronScene3D* 
 	stars->vertex_uniform.view[3] = params->density;
 	stars->vertex_uniform.geom[0] = params->core_radius_px * pixel_scale;
 	stars->vertex_uniform.geom[1] = params->pixel_pitch_px * pixel_scale;
-	stars->vertex_uniform.geom[2] = (float)params->game_time_ms;
+	stars->vertex_uniform.geom[2] = (float)params->game_time_ticks;
 	stars->vertex_uniform.geom[3] = params->flare_strength;
 	stars->vertex_uniform.tone[0] = exposure * params->brightness;
 	stars->vertex_uniform.tone[1] = 1.0f;

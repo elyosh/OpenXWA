@@ -192,8 +192,8 @@ static struct {
 	int auto_w, auto_h;
 	/* Hologram animation, advanced by game time. */
 	float holo_time, holo_fade;
-	int32_t last_game_ms;
-	int have_game_ms;
+	int32_t last_game_ticks;
+	int have_game_ticks;
 } dc;
 
 /* dynamic_cockpit.md D19, D28, D34: display text starts at the OPT
@@ -405,10 +405,11 @@ void XwaRemasterDc_BeginFrame(const XwaSnapshot* snapshot, const AeronSceneMesh*
 	 * (dynamic_cockpit.md D30: XWAU's 0.04 per frame at 60 fps). */
 	float dt = 0.0f;
 	if (snapshot) {
-		if (dc.have_game_ms && snapshot->game_time_ms >= dc.last_game_ms)
-			dt = (float)(snapshot->game_time_ms - dc.last_game_ms) * 0.001f;
-		dc.last_game_ms = snapshot->game_time_ms;
-		dc.have_game_ms = 1;
+		if (dc.have_game_ticks && snapshot->game_time_ticks >= dc.last_game_ticks)
+			dt = (float)((double)(snapshot->game_time_ticks - dc.last_game_ticks) *
+						 XWA_SNAP_GAME_TICK_SECONDS);
+		dc.last_game_ticks = snapshot->game_time_ticks;
+		dc.have_game_ticks = 1;
 	}
 	if (dt > 0.25f)
 		dt = 0.25f;

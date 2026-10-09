@@ -409,6 +409,10 @@ typedef struct XwaFlightObject {
 	 * destroyed (classic per-model emitter order == the HD mesh's glow
 	 * order, as both come from the model the simulation loaded). */
 	uint32_t eg_knockout_mask[8];
+	/* Hull: CraftData.hullDamage (damage taken) and hullMax; the hull is
+	 * 100 * (1 - hull_damage / hull_max) percent. */
+	int32_t hull_damage;
+	int32_t hull_max;
 } XwaFlightObject;
 
 #define XWA_SNAP_MAX_FLIGHT_OBJECTS 1664
@@ -589,7 +593,7 @@ typedef struct XwaCockpit {
 /* Local-player weapon-fire light pulses (g_localPlayerLightPulses):
  * time-animated point lights at the weapon hardpoint, toggled by the
  * firing code. The driver replays the classic cycle/fade envelope
- * from game_time_ms (deterministic). */
+ * from game_time_ticks (deterministic). */
 typedef struct XwaLightPulse {
 	uint8_t enabled;
 	int32_t start_time; /* g_gameTime base */
@@ -1078,14 +1082,19 @@ typedef struct XwaFrontendGroupAsset {
 
 /* ---- snapshot ------------------------------------------------------ */
 
+/* Seconds per game tick (XwaSnapshot.game_time_ticks). */
+#define XWA_SNAP_GAME_TICK_SECONDS 0.004
+
 typedef struct XwaSnapshot {
 	uint64_t tick_index; /* monotonic host tick counter */
-	/* g_gameTime at commit — the SIM clock in ms (freezes on pause,
-	 * scales with time compression, follows film replay). Drives all
-	 * driver-side animation pacing and the lerp-vs-snap decision
+	/* g_gameTime at commit — the SIM clock in game ticks of 4 ms
+	 * (XWA_SNAP_GAME_TICK_SECONDS; Time_GetFrameDelta counts
+	 * timeGetTime() >> 2). It freezes on pause, scales with time
+	 * compression and follows film replay.
+	 * Drives driver-side animation pacing and the lerp-vs-snap decision
 	 * (equal across the pair = paused; non-monotonic = seek). The
 	 * tick's sim delta is the difference across the held pair. */
-	int32_t game_time_ms;
+	int32_t game_time_ticks;
 	XwaSceneKind scene_kind;
 
 	XwaDraw2D draws_2d[XWA_SNAP_MAX_DRAWS_2D];

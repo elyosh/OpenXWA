@@ -896,6 +896,41 @@ static void xwa_tool_hdr(int* open, void* user) {
 	*open = b ? 1 : 0;
 }
 
+/* ---- material animation ---------------------------------------------- */
+
+static void xwa_tool_material_animation(int* open, void* user) {
+	(void)user;
+	ImGui::SetNextWindowSize(ImVec2(360, 220), ImGuiCond_FirstUseEver);
+	bool b = *open != 0;
+	if (!ImGui::Begin("Material Animation", &b)) {
+		ImGui::End();
+		*open = b ? 1 : 0;
+		return;
+	}
+	XwaFlightMaterialAnimOverride o;
+	XwaRemasterFlight_GetMaterialAnimOverride(&o);
+	bool enabled = o.enabled != 0, all = o.all_objects != 0;
+	ImGui::Checkbox("Override", &enabled);
+	ImGui::SameLine();
+	ImGui::Checkbox("All objects (else the target)", &all);
+	static const char* const stages[] = { "None", "75 %", "50 %", "25 %" };
+	static const char* const energies[] = { "None", "Shields down", "Tractor beam", "Jamming beam" };
+	int stage = (int)o.damage_stage, energy = (int)o.energy;
+	ImGui::Combo("Hull damage", &stage, stages, 4);
+	ImGui::Combo("Energy effect", &energy, energies, 4);
+	unsigned int mask = o.state_mask;
+	ImGui::InputScalar("State mask", ImGuiDataType_U32, &mask, nullptr, nullptr, "%08X",
+					   ImGuiInputTextFlags_CharsHexadecimal);
+	o.enabled = enabled ? 1 : 0;
+	o.all_objects = all ? 1 : 0;
+	o.damage_stage = (uint32_t)stage;
+	o.energy = (uint32_t)energy;
+	o.state_mask = mask & 0x7FFFFFFFu;
+	XwaRemasterFlight_SetMaterialAnimOverride(&o);
+	ImGui::End();
+	*open = b ? 1 : 0;
+}
+
 /* ---- registration ---------------------------------------------------- */
 
 static void xwa_tool_hud_snapshot(int* open, void* user) {
@@ -1249,4 +1284,5 @@ extern "C" void XwaRemasterDebugTools_Register(void) {
 	Aeron_DebugRegisterTool("Flight Input", xwa_tool_flight_input, nullptr);
 	Aeron_DebugRegisterTool("Cockpit Eye", xwa_tool_cockpit_eye, nullptr);
 	Aeron_DebugRegisterTool("Dynamic Cockpit", xwa_tool_dynamic_cockpit, nullptr);
+	Aeron_DebugRegisterTool("Material Animation", xwa_tool_material_animation, nullptr);
 }

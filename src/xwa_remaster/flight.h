@@ -46,6 +46,18 @@ void XwaRemasterFlight_GetSsaoDefault(XwaFlightSsaoParams* out);
 
 typedef AeronSceneShadowSettings XwaFlightShadowParams;
 
+/* Debug override of objects' material animation state (debug tools): when
+ * enabled, the player's target (or every object) shows these values. */
+typedef struct XwaFlightMaterialAnimOverride {
+	int enabled;
+	int all_objects;
+	uint32_t damage_stage; /* 0-3 */
+	uint32_t energy;       /* 0-3 */
+	uint32_t state_mask;
+} XwaFlightMaterialAnimOverride;
+void XwaRemasterFlight_GetMaterialAnimOverride(XwaFlightMaterialAnimOverride* out);
+void XwaRemasterFlight_SetMaterialAnimOverride(const XwaFlightMaterialAnimOverride* in);
+
 void XwaRemasterFlight_GetShadows(XwaFlightShadowParams* out);
 void XwaRemasterFlight_SetShadows(const XwaFlightShadowParams* in);
 void XwaRemasterFlight_GetShadowsDefault(XwaFlightShadowParams* out);

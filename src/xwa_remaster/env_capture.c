@@ -408,10 +408,10 @@ static int env_capture_write_description(const char* path, const char* package, 
 					   "  star_brightness: %.9g\n"
 					   "  star_density: %.9g\n"
 					   "  star_grid: %.9g\n"
-					   "  game_time_ms: %lld\n"
+					   "  game_time_ticks: %lld\n"
 					   "  proj_scale: %.9g\n",
 					   sky_modes[sky.mode], (double)sky.exposure, (double)sky.star_brightness,
-					   (double)sky.star_density, (double)sky.star_grid, (long long)snap->game_time_ms,
+					   (double)sky.star_density, (double)sky.star_grid, (long long)snap->game_time_ticks,
 					   (double)snap->flight_camera.proj_scale);
 	return t.ok && AeronVfs_WriteAllAtomic(Aeron_GetVfs(), AERON_VFS_ROOT_USER, path, t.data, t.size);
 }

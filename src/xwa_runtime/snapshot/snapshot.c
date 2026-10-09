@@ -290,7 +290,7 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 				c->world_pos[0], c->world_pos[1], c->world_pos[2], c->focus_obj_idx, c->view_pitch,
 				c->view_yaw, c->view_roll, c->external, c->cockpit_visible, c->hyperspace_phase, c->region,
 				c->map_mode, c->film_overlay, c->in_hangar, c->hangar_floor_z, c->hangar_launch_ref_obj_idx,
-				s->game_time_ms);
+				s->game_time_ticks);
 	}
 	fprintf(fp, "hyperspace phase %u ticks %u streaks %u\n", s->hyperspace.phase,
 			s->hyperspace.phase_elapsed_ticks, s->hyperspace_streak_count);
@@ -414,7 +414,7 @@ static void snapshot_maybe_dump(const XwaSnapshot* s) {
 void XwaSnapshot_Commit(void) {
 	XwaSnapshot* s = wr();
 	s->scene_kind = g_scene_kind;
-	s->game_time_ms = g_gameTime; /* sim clock; see header */
+	s->game_time_ticks = g_gameTime; /* sim clock; see header */
 	s->offscreen_restore_enabled = g_offscreenRestoreEnabled;
 	snapshot_capture_frontend_assets(s);
 	XwaSnapshotExport_CaptureOptAssets(s);
@@ -1302,6 +1302,8 @@ void XwaSnapshot_CaptureFlight(void) {
 				}
 				f->system_flags = cd->systemFlags;
 				f->subsystem_damage = cd->subsystemDamage;
+				f->hull_damage = cd->hullDamage;
+				f->hull_max = cd->hullMax;
 				memcpy(f->component_state, cd->componentState, sizeof f->component_state);
 				memcpy(f->mesh_rotation, cd->meshRotation, sizeof f->mesh_rotation);
 				memcpy(f->component_hp, cd->componentHp, sizeof f->component_hp);

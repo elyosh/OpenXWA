@@ -603,7 +603,7 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	/* CMD has no motion-blur pass, so particle history is intentionally absent. */
 	XwaRemasterParticles_Prepare(s_cmd.particles, cmd, snapshot, NULL, assets, &effect_view, NULL);
 	XwaRemasterTrails_Prepare(s_cmd.trails, cmd, snapshot, assets, &effect_view);
-	AeronScene_SetAnimationTime(s_cmd.scene, (double)snapshot->game_time_ms / 1000.0);
+	AeronScene_SetAnimationTime(s_cmd.scene, (double)snapshot->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS);
 	if (!AeronScene_Begin(s_cmd.scene, &camera)) {
 		Aeron_CommandBufferSetFailure(cmd, "HUD CMD scene initialization failed");
 		return;
