@@ -38,7 +38,6 @@ typedef struct XwaOptSynthMesh {
 
 typedef struct XwaOptSynthData {
 	char key[64];
-	uint64_t glbHash; /* XXH64 (seed 0) of the GLB bytes */
 	uint32_t meshCount;
 	XwaOptSynthMesh* meshes;     /* in component order, ascending stub offsets */
 	AeronOptSimModel simulation; /* owns faces and BVHs */

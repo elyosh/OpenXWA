@@ -1,7 +1,6 @@
 #include "xwa_runtime/models/opt_synth.h"
 
 #include "aeron/aeron.h"
-#include "aeron/collision/hash.h"
 #include "aeron/log.h"
 #include "aeron/vfs.h"
 #include "xwa/assets/model_mesh.h"
@@ -281,7 +280,7 @@ static void OptSynth_WarnDenseCockpit(const char* key, const AeronFlightModel* m
 	}
 }
 
-static XwaOptSynthData* OptSynth_CreateData(const char* key, uint64_t glbHash, const AeronFlightModel* model,
+static XwaOptSynthData* OptSynth_CreateData(const char* key, const AeronFlightModel* model,
 											AeronOptSimModel* simulation, const uint32_t* stubOffsets) {
 	XwaOptSynthData* synth;
 	uint32_t tagTotal;
@@ -304,7 +303,6 @@ static XwaOptSynthData* OptSynth_CreateData(const char* key, uint64_t glbHash, c
 		return NULL;
 	}
 	snprintf(synth->key, sizeof synth->key, "%s", key);
-	synth->glbHash = glbHash;
 	synth->meshCount = simulation->mesh_count;
 	synth->simulation = *simulation;
 	memset(simulation, 0, sizeof *simulation);
@@ -338,7 +336,6 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 	char error[256];
 	uint8_t* glb;
 	size_t glbSize;
-	uint64_t glbHash;
 	AeronFlightModel model;
 	AeronOptSimModel simulation;
 	AeronOptSimOptions simOptions;
@@ -365,7 +362,6 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 	if (!AeronVfs_ReadAll(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, path, 0, &glb, &glbSize)) {
 		return OptSynth_Fail(key, "cannot read the GLB");
 	}
-	glbHash = Aeron_Xxh64(glb, glbSize, 0);
 	/* The full build: the HD renderer takes the render half from this parse
 	   (XwaRenderModel_Find) instead of reading the GLB again. */
 	if (!Aeron_FlightModelBuildMemory(glb, glbSize, path, &model)) {
@@ -420,7 +416,7 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 	OptSynth_WarnDenseCockpit(key, &model);
 
 	Aeron_OptSimModelTrimToFaces(&simulation);
-	synth = OptSynth_CreateData(key, glbHash, &model, &simulation, stubOffsets);
+	synth = OptSynth_CreateData(key, &model, &simulation, stubOffsets);
 	free(stubOffsets);
 	if (synth == NULL) {
 		Aeron_FlightModelFree(&model);
@@ -433,10 +429,10 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 	synth->hasRenderModel = 1;
 
 	Aeron_LogInfo("xwa.models",
-				  "replacement '%s': hash=%016llx components=%u vertices=%u faces=%u image=%d bytes "
+				  "replacement '%s': components=%u vertices=%u faces=%u image=%d bytes "
 				  "bvh_nodes=%u simulation=%s",
-				  key, (unsigned long long)glbHash, synth->meshCount, vertexTotal, faceTotal, payloadSize,
-				  nodeTotal, cooked ? "cooked" : "built at load");
+				  key, synth->meshCount, vertexTotal, faceTotal, payloadSize, nodeTotal,
+				  cooked ? "cooked" : "built at load");
 	*outPayload = payload;
 	*outPayloadSize = payloadSize;
 	*outSynth = synth;
