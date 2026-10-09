@@ -413,6 +413,13 @@ typedef struct XwaFlightObject {
 	 * 100 * (1 - hull_damage / hull_max) percent. */
 	int32_t hull_damage;
 	int32_t hull_max;
+	/* Shields (CraftData.shieldFront, shieldRear) and whether a tractor or
+	 * jamming beam holds the craft (CraftData.beamEffectAccum[1], [2] != 0;
+	 * XWAU's IsUnderBeamEffect). */
+	int32_t shield_front;
+	int32_t shield_rear;
+	uint8_t beam_tractor;
+	uint8_t beam_jamming;
 } XwaFlightObject;
 
 #define XWA_SNAP_MAX_FLIGHT_OBJECTS 1664

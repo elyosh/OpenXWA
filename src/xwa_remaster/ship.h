@@ -45,6 +45,10 @@ float XwaRemasterShip_OptProjectileEmissiveStrength(void);
  * their animated materials in; scenes drawing them use it
  * (AeronScene_SetEffectAtlas). Created on first use; NULL when it cannot be. */
 AeronEffectAtlas* XwaRemasterShip_EffectAtlas(void);
+/* The game's effect data (effects.yaml: energy effects, animated blast
+ * marks) in that atlas, loaded with the first ship mesh; NULL before or
+ * without it. */
+const AeronEffectData* XwaRemasterShip_EffectData(void);
 void XwaRemasterShip_Shutdown(void);
 void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissive_strength,
 							   float opt_projectile_emissive_strength, float engine_emissive_strength);

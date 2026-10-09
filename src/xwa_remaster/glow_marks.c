@@ -25,16 +25,6 @@ typedef struct GlowGeometryCache {
 static GlowGeometryCache   s_cache[XWA_SNAP_MAX_GLOW_MARKS];
 static uint32_t            s_next_cache_replacement;
 static AeronFaceBvhScratch s_candidate_scratch;
-/* effects.yaml: the animated blast marks (docs: xwau_animated_materials.md,
- * "Blast marks"); NULL without it. */
-static AeronEffectData* s_effect_data;
-
-int XwaRemasterGlowMarks_PrepareProcess(AeronCommandBuffer* command_buffer) {
-	if (!s_effect_data) {
-		s_effect_data = AeronEffectData_Load(XwaRemasterShip_EffectAtlas(), command_buffer);
-	}
-	return 1;
-}
 
 /* Integer hash (lowbias32) of a mark's pool slot and generation. */
 static uint32_t mark_hash(uint32_t pool_index, uint32_t generation) {
@@ -57,24 +47,25 @@ static uint32_t mark_hash(uint32_t pool_index, uint32_t generation) {
  * classic square. */
 static int blast_mark_frame(const XwaGlowMark* mark, const XwaSnapshot* snapshot, AeronTexture** texture,
 							uint32_t* layer, uint32_t* max_lod, float rect[4], float crop[4]) {
+	const AeronEffectData* effect_data = XwaRemasterShip_EffectData();
 	int group = 0, frames_mode = 0, sprite_id = 0;
-	if (!s_effect_data || mark->pool_kind != 1 ||
+	if (!effect_data || mark->pool_kind != 1 ||
 		!XwaSnapshotExport_ModelTextureBinding(mark->texture_model_type, &group, &frames_mode, &sprite_id) ||
 		!frames_mode) {
 		return 0;
 	}
 	char key[32];
 	snprintf(key, sizeof key, "%d-%d", group, mark->texture_frame - 1);
-	const int index = AeronEffectData_FindImage(s_effect_data, key);
+	const int index = AeronEffectData_FindImage(effect_data, key);
 	if (index < 0) {
 		return 0;
 	}
 	const double phase = (double)mark_hash(mark->pool_index, mark->generation) / 4294967296.0 *
-						 AeronEffectData_ImageDuration(s_effect_data, index);
+						 AeronEffectData_ImageDuration(effect_data, index);
 	AeronEffectImage image;
 	AeronEffectAtlas* atlas = XwaRemasterShip_EffectAtlas();
 	const float page = (float)AeronEffectAtlas_PageSize(atlas);
-	if (!AeronEffectData_ImageFrame(s_effect_data, index,
+	if (!AeronEffectData_ImageFrame(effect_data, index,
 									(double)snapshot->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS + phase,
 									&image) ||
 		!(page > 0.0f)) {
@@ -464,6 +455,4 @@ void XwaRemasterGlowMarks_Shutdown(void) {
 	memset(s_cache, 0, sizeof s_cache);
 	s_next_cache_replacement = 0;
 	AeronFaceBvhScratch_Free(&s_candidate_scratch);
-	AeronEffectData_Destroy(s_effect_data);
-	s_effect_data = NULL;
 }

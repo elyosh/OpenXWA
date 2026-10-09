@@ -1304,6 +1304,10 @@ void XwaSnapshot_CaptureFlight(void) {
 				f->subsystem_damage = cd->subsystemDamage;
 				f->hull_damage = cd->hullDamage;
 				f->hull_max = cd->hullMax;
+				f->shield_front = cd->shieldFront;
+				f->shield_rear = cd->shieldRear;
+				f->beam_tractor = (uint8_t)(cd->beamEffectAccum[1] != 0);
+				f->beam_jamming = (uint8_t)(cd->beamEffectAccum[2] != 0);
 				memcpy(f->component_state, cd->componentState, sizeof f->component_state);
 				memcpy(f->mesh_rotation, cd->meshRotation, sizeof f->mesh_rotation);
 				memcpy(f->component_hp, cd->componentHp, sizeof f->component_hp);

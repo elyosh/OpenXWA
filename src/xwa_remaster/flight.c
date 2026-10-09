@@ -115,6 +115,15 @@ typedef enum FlBeforeOpaqueMode {
 	FL_BEFORE_OPAQUE_SKY_STARS,
 } FlBeforeOpaqueMode;
 
+/* The energy effect an object slot last showed: the object (signature),
+ * the effect, and when it started (animation seconds). */
+typedef struct FlEnergyState {
+	uint16_t signature;
+	uint8_t energy;
+	uint8_t valid;
+	float start;
+} FlEnergyState;
+
 /* The scene owns the pass topology (prepass / SSAO / forward color /
  * motion-blur resolve — AeronScene_Render); this driver submits mesh
  * instances and draws the non-mesh geometry through the scene's pass
@@ -288,6 +297,8 @@ static struct {
 	/* Material animation states, borrowed by instances like the tables. */
 	AeronSceneMaterialAnim anims[XWA_SNAP_MAX_FLIGHT_OBJECTS + 2];
 	uint32_t anim_count;
+	/* Energy effect per object slot. */
+	FlEnergyState energy_states[XWA_SNAP_MAX_FLIGHT_OBJECTS];
 	XwaFlightMaterialAnimOverride anim_override;
 	int map_present;
 	int suppress_hud;
@@ -963,18 +974,11 @@ int XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterA
 	} else {
 		Aeron_LogInfo("xwa.remaster", "flight sky: procedural starfield (cube map not loaded)");
 	}
-	if (!XwaRemasterGlowMarks_PrepareProcess(cmd)) {
-		return 0;
-	}
 	/* Authored environments are optional: failures leave the classic path. */
 	return XwaRemasterEnvironment_PrepareProcess(cmd);
 }
 
-void XwaRemasterFlight_CommitProcessAssets(void) {
-	/* The preparation's effect atlas growth copies are submitted. */
-	AeronEffectAtlas_Commit(XwaRemasterShip_EffectAtlas());
-	s.process_assets_prepared = 1;
-}
+void XwaRemasterFlight_CommitProcessAssets(void) { s.process_assets_prepared = 1; }
 
 void XwaRemasterFlight_GetSsao(XwaFlightSsaoParams* out) {
 	if (out) {
@@ -3151,6 +3155,42 @@ static uint32_t fl_damage_stage(const XwaFlightObject* object) {
 	return hull <= 25.0 ? 3u : hull <= 50.0 ? 2u : hull <= 75.0 ? 1u : 0u;
 }
 
+/* The energy effect an object shows (XWAU's shield/beam instance event):
+ * 3 under a jamming beam, else 2 under a tractor beam, else 1 when its
+ * shields are down (or it has none), else 0. */
+static uint32_t fl_energy(const XwaFlightObject* object) {
+	if (!object->has_craft) {
+		return 0;
+	}
+	if (object->beam_jamming) {
+		return 3;
+	}
+	if (object->beam_tractor) {
+		return 2;
+	}
+	return object->shield_front + object->shield_rear == 0 ? 1u : 0u;
+}
+
+/* When the object's current energy effect started, in animation seconds:
+ * now when it changed, counting an object not seen before as showing none
+ * (XWAU fires the event then, so a craft without shields flashes once when
+ * it appears), or when the clock went back. */
+static float fl_energy_start(const XwaFlightObject* object, uint32_t energy) {
+	const float now = s.snap ? (float)((double)s.snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS) : 0.0f;
+	if (object->slot >= XWA_SNAP_MAX_FLIGHT_OBJECTS) {
+		return now;
+	}
+	FlEnergyState* state = &s.energy_states[object->slot];
+	const uint32_t previous = state->valid && state->signature == object->signature ? state->energy : 0u;
+	if (energy != previous || !state->valid || state->signature != object->signature || now < state->start) {
+		state->start = now;
+	}
+	state->signature = object->signature;
+	state->energy = (uint8_t)energy;
+	state->valid = 1;
+	return state->start;
+}
+
 /* An object's material animation state for this frame, from the pool. */
 static const AeronSceneMaterialAnim* fl_object_anim(const XwaFlightObject* object) {
 	if (s.anim_count >= sizeof s.anims / sizeof s.anims[0]) {
@@ -3160,6 +3200,7 @@ static const AeronSceneMaterialAnim* fl_object_anim(const XwaFlightObject* objec
 	memset(anim, 0, sizeof *anim);
 	anim->seed = (uint32_t)object->slot << 16 | object->signature;
 	anim->damage_stage = fl_damage_stage(object);
+	anim->energy = fl_energy(object);
 	const XwaFlightMaterialAnimOverride* o = &s.anim_override;
 	const XwaHudTarget* target = s.snap ? &s.snap->hud.target : NULL;
 	if (o->enabled && (o->all_objects || (target && target->valid && target->slot == object->slot &&
@@ -3168,6 +3209,7 @@ static const AeronSceneMaterialAnim* fl_object_anim(const XwaFlightObject* objec
 		anim->energy = o->energy;
 		anim->state_mask = o->state_mask;
 	}
+	anim->energy_start = fl_energy_start(object, anim->energy);
 	return anim;
 }
 

@@ -59,6 +59,18 @@ static XwaShipPbrTuning g_pbr_tuning;
 /* AeronScene_SetBackfaceFill; debug inspector toggle, not persisted. */
 static int g_backface_fill = 1;
 static AeronEffectAtlas* s_effect_atlas;
+/* effects.yaml in the atlas (energy effects, animated blast marks), loaded
+ * with the first mesh; NULL without it. */
+static AeronEffectData* s_effect_data;
+static int s_effect_data_tried;
+
+static const AeronEffectData* ship_effect_data(AeronCommandBuffer* cmd) {
+	if (!s_effect_data_tried && XwaRemasterShip_EffectAtlas()) {
+		s_effect_data_tried = 1;
+		s_effect_data = AeronEffectData_Load(s_effect_atlas, cmd);
+	}
+	return s_effect_data;
+}
 
 static void ship_set_failure(AeronCommandBuffer* cmd, const char* format, ...) {
 	char message[512];
@@ -149,7 +161,8 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 			&(AeronSceneMeshCreateInfo) { .model = built,
 										  .debug_name = key,
 										  .variants = markings_count ? &markings_set : NULL,
-										  .effect_atlas = XwaRemasterShip_EffectAtlas() },
+										  .effect_atlas = XwaRemasterShip_EffectAtlas(),
+										  .effect_data = ship_effect_data(cmd) },
 			&create_status);
 		if (mesh && skin) {
 			if (markings_count) {
@@ -434,6 +447,8 @@ AeronEffectAtlas* XwaRemasterShip_EffectAtlas(void) {
 	return s_effect_atlas;
 }
 
+const AeronEffectData* XwaRemasterShip_EffectData(void) { return s_effect_data; }
+
 void XwaRemasterShip_Shutdown(void) {
 	ship_pending_discard();
 	for (uint32_t i = 0; i < s_mesh_count; i++) {
@@ -441,6 +456,9 @@ void XwaRemasterShip_Shutdown(void) {
 	}
 	memset(s_meshes, 0, sizeof s_meshes);
 	s_mesh_count = 0;
+	AeronEffectData_Destroy(s_effect_data);
+	s_effect_data = NULL;
+	s_effect_data_tried = 0;
 	AeronEffectAtlas_Destroy(s_effect_atlas);
 	s_effect_atlas = NULL;
 	s_opt_asset_generation = UINT64_MAX;
