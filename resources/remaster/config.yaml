@@ -226,7 +226,7 @@ point_lights:
   range_scale: 1.0
   # Intensity multiplier of point lights authored in models (such as the
   # converted cockpits' interior light); 0 disables them.
-  model_light_intensity: 1.0
+  model_light_intensity: 2.0
 lighting:
   # Illuminance per unit of the game's sun intensity (also the hangar and
   # environment-package lights). Pi shades as brightly as the classic
@@ -239,7 +239,7 @@ lighting:
   # Scale of all emitted light (illumination, screens, holograms, lasers,
   # glows, explosions). Emitters far brighter than lit surfaces are what
   # visibly glow through bloom.
-  emissive_scale: 2.0
+  emissive_scale: 3.0
 bloom:
   # Fraction of the scene's light the bloom scatters (no threshold), 0 to 1.
   # The scattered light leaves its source, so lit surfaces do not brighten.
