@@ -796,13 +796,22 @@ static void dc_route(AeronDrawList2D* screen, XwaRemasterDcLayer layer, const fl
 		box[2] = box[2] < scissor->x + scissor->width ? box[2] : scissor->x + scissor->width;
 		box[3] = box[3] < scissor->y + scissor->height ? box[3] : scissor->y + scissor->height;
 	}
+	/* Only the on-screen part draws, and the pieces cut from it become
+	 * scissors, which must lie within the screen. */
+	box[0] = box[0] > 0 ? box[0] : 0;
+	box[1] = box[1] > 0 ? box[1] : 0;
+	box[2] = box[2] < dc.auto_w ? box[2] : dc.auto_w;
+	box[3] = box[3] < dc.auto_h ? box[3] : dc.auto_h;
 	if (box[2] <= box[0] || box[3] <= box[1])
 		return;
 
 	int pieces[DC_MAX_PIECES][4];
 	const int n = dc_visible_pieces(box, pieces);
-	if (n < 0)
-		emit(screen, record, 0, 0, scissor);
+	if (n < 0) {
+		/* The record's own scissor cut to the screen, or none. */
+		const AeronRectI clip = { box[0], box[1], box[2] - box[0], box[3] - box[1] };
+		emit(screen, record, 0, 0, dc_scissor_set(scissor) ? &clip : NULL);
+	}
 	for (int p = 0; p < n; ++p) {
 		const AeronRectI clip = { pieces[p][0], pieces[p][1], pieces[p][2] - pieces[p][0],
 								  pieces[p][3] - pieces[p][1] };
