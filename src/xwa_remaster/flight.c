@@ -959,11 +959,18 @@ int XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterA
 	} else {
 		Aeron_LogInfo("xwa.remaster", "flight sky: procedural starfield (cube map not loaded)");
 	}
+	if (!XwaRemasterGlowMarks_PrepareProcess(cmd)) {
+		return 0;
+	}
 	/* Authored environments are optional: failures leave the classic path. */
 	return XwaRemasterEnvironment_PrepareProcess(cmd);
 }
 
-void XwaRemasterFlight_CommitProcessAssets(void) { s.process_assets_prepared = 1; }
+void XwaRemasterFlight_CommitProcessAssets(void) {
+	/* The preparation's effect atlas growth copies are submitted. */
+	AeronEffectAtlas_Commit(XwaRemasterShip_EffectAtlas());
+	s.process_assets_prepared = 1;
+}
 
 void XwaRemasterFlight_GetSsao(XwaFlightSsaoParams* out) {
 	if (out) {

@@ -12,6 +12,9 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 									   const float transform[16], const AeronSceneMeshTable* mesh_table,
 									   float emissive_strength);
 void XwaRemasterGlowMarks_InvalidateMesh(const AeronSceneMesh* mesh);
+/* Loads effects.yaml (animated blast marks) into the process effect atlas
+ * through `command_buffer`; its absence leaves the classic marks. */
+int XwaRemasterGlowMarks_PrepareProcess(AeronCommandBuffer* command_buffer);
 void XwaRemasterGlowMarks_Shutdown(void);
 
 #endif

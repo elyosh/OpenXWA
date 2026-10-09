@@ -5,8 +5,10 @@
 #include "aeron/asset/opt_model.h"
 #include "aeron/collision/face_bvh.h"
 #include "aeron/scene/mesh_overlay.h"
+#include "xwa_remaster/ship.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,6 +25,71 @@ typedef struct GlowGeometryCache {
 static GlowGeometryCache   s_cache[XWA_SNAP_MAX_GLOW_MARKS];
 static uint32_t            s_next_cache_replacement;
 static AeronFaceBvhScratch s_candidate_scratch;
+/* effects.yaml: the animated blast marks (docs: xwau_animated_materials.md,
+ * "Blast marks"); NULL without it. */
+static AeronEffectData* s_effect_data;
+
+int XwaRemasterGlowMarks_PrepareProcess(AeronCommandBuffer* command_buffer) {
+	if (!s_effect_data) {
+		s_effect_data = AeronEffectData_Load(XwaRemasterShip_EffectAtlas(), command_buffer);
+	}
+	return 1;
+}
+
+/* Integer hash (lowbias32) of a mark's pool slot and generation. */
+static uint32_t mark_hash(uint32_t pool_index, uint32_t generation) {
+	uint32_t x = pool_index * 0x9E3779B9u ^ generation;
+	x ^= x >> 16;
+	x *= 0x7FEB352Du;
+	x ^= x >> 15;
+	x *= 0x846CA68Bu;
+	x ^= x >> 16;
+	return x;
+}
+
+/* A blast-pool mark whose DAT image has an effects.yaml flipbook: its frame
+ * at the flight clock, offset by a phase per mark, as an array-texture
+ * overlay source. XWAU samples the image at tex * 0.35 + 0.3 (its crop),
+ * tex being the classic frame's UV, over every face the classic pass
+ * draws, with the game's CLAMP addressing: the classic square shows the
+ * crop and the rest of the image spreads around it. `rect` is the whole
+ * image in atlas UV, inset half a texel, `crop` the image UV range of the
+ * classic square. */
+static int blast_mark_frame(const XwaGlowMark* mark, const XwaSnapshot* snapshot, AeronTexture** texture,
+							uint32_t* layer, uint32_t* max_lod, float rect[4], float crop[4]) {
+	int group = 0, frames_mode = 0, sprite_id = 0;
+	if (!s_effect_data || mark->pool_kind != 1 ||
+		!XwaSnapshotExport_ModelTextureBinding(mark->texture_model_type, &group, &frames_mode, &sprite_id) ||
+		!frames_mode) {
+		return 0;
+	}
+	char key[32];
+	snprintf(key, sizeof key, "%d-%d", group, mark->texture_frame - 1);
+	const int index = AeronEffectData_FindImage(s_effect_data, key);
+	if (index < 0) {
+		return 0;
+	}
+	const double phase = (double)mark_hash(mark->pool_index, mark->generation) / 4294967296.0 *
+						 AeronEffectData_ImageDuration(s_effect_data, index);
+	AeronEffectImage image;
+	AeronEffectAtlas* atlas = XwaRemasterShip_EffectAtlas();
+	const float page = (float)AeronEffectAtlas_PageSize(atlas);
+	if (!AeronEffectData_ImageFrame(s_effect_data, index, (double)snapshot->game_time_ms / 1000.0 + phase,
+									&image) ||
+		!(page > 0.0f)) {
+		return 0;
+	}
+	*texture = AeronEffectAtlas_Texture(atlas, AERON_EFFECT_LAYER);
+	*layer = image.layer[AERON_EFFECT_LAYER];
+	*max_lod = image.lod[AERON_EFFECT_LAYER];
+	const uint32_t* r = image.rect[AERON_EFFECT_LAYER];
+	rect[0] = ((float)r[0] + 0.5f) / page;
+	rect[1] = ((float)r[1] + 0.5f) / page;
+	rect[2] = ((float)(r[0] + r[2]) - 0.5f) / page;
+	rect[3] = ((float)(r[1] + r[3]) - 0.5f) / page;
+	memcpy(crop, image.crop, sizeof image.crop);
+	return *texture != NULL;
+}
 
 static int resolve_texture_frame(XwaRemasterAssets* assets, int texture_model_type, int texture_frame,
 								 XwaAssetRef* resolved_frame) {
@@ -318,9 +385,22 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 			mark->texture_frame == 0 || mark->inv_scale_u == 0.0f || mark->inv_scale_v == 0.0f) {
 			continue;
 		}
+		AeronTexture* blast_texture = NULL;
+		uint32_t blast_layer = 0, blast_max_lod = 0;
+		float blast_rect[4], blast_crop[4];
+		const int blast = blast_mark_frame(mark, snapshot, &blast_texture, &blast_layer, &blast_max_lod,
+										   blast_rect, blast_crop);
 		XwaAssetRef texture_frame;
-		if (!resolve_texture_frame(assets, mark->texture_model_type, mark->texture_frame,
-								   &texture_frame)) {
+		if (blast) {
+			/* The classic square: the crop of the image. */
+			const float width = blast_rect[2] - blast_rect[0], height = blast_rect[3] - blast_rect[1];
+			memset(&texture_frame, 0, sizeof texture_frame);
+			texture_frame.u0 = blast_rect[0] + blast_crop[0] * width;
+			texture_frame.v0 = blast_rect[1] + blast_crop[1] * height;
+			texture_frame.u1 = blast_rect[0] + blast_crop[2] * width;
+			texture_frame.v1 = blast_rect[1] + blast_crop[3] * height;
+		} else if (!resolve_texture_frame(assets, mark->texture_model_type, mark->texture_frame,
+										  &texture_frame)) {
 			continue;
 		}
 		GlowGeometryCache* cached_geometry = find_or_allocate_geometry_cache(mark, mesh);
@@ -335,16 +415,20 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 		overlay.vertices     = cached_geometry->vertices;
 		overlay.vertex_count = cached_geometry->vertex_count;
 		overlay.texture      = texture_frame.texture;
+		overlay.texture_array = blast_texture;
+		overlay.texture_layer = blast_layer;
+		overlay.texture_max_lod = blast_max_lod;
 		memcpy(overlay.transform, transform, sizeof overlay.transform);
 		overlay.mesh_table  = mesh_table;
 		overlay.uv_xform[0] = texture_frame.u0 + 0.5f * atlas_frame_width;
 		overlay.uv_xform[1] = texture_frame.v0 + 0.5f * atlas_frame_height;
 		overlay.uv_xform[2] = mark->layer_uv_scale * atlas_frame_width;
 		overlay.uv_xform[3] = mark->layer_uv_scale * atlas_frame_height;
-		overlay.uv_rect[0]  = texture_frame.u0;
-		overlay.uv_rect[1]  = texture_frame.v0;
-		overlay.uv_rect[2]  = texture_frame.u1;
-		overlay.uv_rect[3]  = texture_frame.v1;
+		overlay.uv_rect[0] = blast ? blast_rect[0] : texture_frame.u0;
+		overlay.uv_rect[1] = blast ? blast_rect[1] : texture_frame.v0;
+		overlay.uv_rect[2] = blast ? blast_rect[2] : texture_frame.u1;
+		overlay.uv_rect[3] = blast ? blast_rect[3] : texture_frame.v1;
+		overlay.texture_clamp = (uint8_t)blast;
 		const float mark_emissive_strength = mark->pool_kind == 0 ? emissive_strength : 1.0f;
 		overlay.color[0] = overlay.color[1] = overlay.color[2] = mark_emissive_strength;
 		overlay.color[3] = 1.0f;
@@ -379,4 +463,6 @@ void XwaRemasterGlowMarks_Shutdown(void) {
 	memset(s_cache, 0, sizeof s_cache);
 	s_next_cache_replacement = 0;
 	AeronFaceBvhScratch_Free(&s_candidate_scratch);
+	AeronEffectData_Destroy(s_effect_data);
+	s_effect_data = NULL;
 }
