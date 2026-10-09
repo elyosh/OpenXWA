@@ -537,7 +537,7 @@ typedef struct XwaHyperspaceState {
 } XwaHyperspaceState;
 
 /* OPT mesh-type values the drivers dispatch on (mirrors MeshType —
- * carried per glb mesh slot as AeronMeshRot.mesh_type). */
+ * carried per glb component as AeronSceneMesh.component_rot[].mesh_type). */
 #define XWA_SNAP_MESH_FUSELAGE 3
 #define XWA_SNAP_MESH_BRIDGE 7
 #define XWA_SNAP_MESH_ROTARY_GUN_TURRET 21

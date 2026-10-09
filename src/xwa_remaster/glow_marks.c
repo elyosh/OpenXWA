@@ -163,7 +163,7 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 			&mesh->cpu_vertices[mesh->cpu_indices[triangle_index_offset + 1]],
 			&mesh->cpu_vertices[mesh->cpu_indices[triangle_index_offset + 2]],
 		};
-		const int mesh_index = (int)floorf(triangle_vertices[0]->mesh_index + 0.5f);
+		const int mesh_index = (int)floorf(triangle_vertices[0]->component + 0.5f);
 		if (mesh_index < 0 || mesh_index >= 64 ||
 			(mark->mesh_mask && !(mark->mesh_mask & ((uint64_t)1 << mesh_index)))) {
 			continue;
@@ -291,7 +291,7 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 				   sizeof overlay_vertex->pos);
 			overlay_vertex->uv[0]      = projected_u[triangle_vertex_index];
 			overlay_vertex->uv[1]      = projected_v[triangle_vertex_index];
-			overlay_vertex->mesh_index = triangle_vertices[triangle_vertex_index]->mesh_index;
+			overlay_vertex->component = triangle_vertices[triangle_vertex_index]->component;
 		}
 	}
 	/* Shrink to the output; keep at least one vertex so an empty result
