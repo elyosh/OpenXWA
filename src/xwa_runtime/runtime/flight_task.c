@@ -47,6 +47,7 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/timing/host_clock.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 
@@ -834,9 +835,13 @@ static void XwaFlightTask_RunHangarReadyFrame(void) {
 		}
 		if (fire) {
 			g_flightGlobalCountdownTimers[2] = 15;
-			if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive) {
+			/* Models with crew.update_all animate their crew in the hangar too,
+			   for every object and in any view (XWAU's patch at 0x458C9E). */
+			if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive &&
+				!XwaArticulation_CrewUpdatesAll(g_players[g_localPlayer].objectIndex)) {
 				FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex, 0);
 			}
+			XwaArticulation_StepHangarCrew();
 		}
 	}
 

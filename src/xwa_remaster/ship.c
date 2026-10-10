@@ -810,7 +810,7 @@ static int ship_bwing_bridge_component(const AeronSceneMesh* mesh, uint32_t comp
 
 static int ship_bwing_compensation(const AeronSceneMesh* mesh, const XwaFlightObject* f, uint32_t components,
 								   float out[3][4]) {
-	if (f->object_type != XWA_SNAP_TYPE_BWING) {
+	if (!f->bridge_aligned) {
 		return 0;
 	}
 	const int bridge_component = ship_bwing_bridge_component(mesh, components);
@@ -912,11 +912,11 @@ int XwaRemasterShip_BuildPreviousMeshTable(const AeronSceneMesh* mesh, const Xwa
 		current->object_type != previous->object_type) {
 		return 0;
 	}
-	if (current->object_type != XWA_SNAP_TYPE_BWING && !mesh->has_any_rotation) {
+	if (!current->bridge_aligned && !mesh->has_any_rotation) {
 		return 0;
 	}
 	const uint32_t components = ship_state_components(mesh);
-	if (current->object_type == XWA_SNAP_TYPE_BWING) {
+	if (current->bridge_aligned) {
 		const int bridge_component = ship_bwing_bridge_component(mesh, components);
 		/* Bridge rotation drives every root, independently of whether the
 		 * Bridge mesh itself has a usable local rotation node. */
@@ -1090,7 +1090,7 @@ int XwaRemasterShip_BuildPreviousCockpitMeshTable(
 				  current_cockpit->aim_angle_b != previous_cockpit->aim_angle_b ||
 				  memcmp(current_anchor->component_state, previous_anchor->component_state,
 						 sizeof current_anchor->component_state) != 0;
-	if (!changed && current_anchor->object_type == XWA_SNAP_TYPE_BWING) {
+	if (!changed && current_anchor->bridge_aligned) {
 		const uint32_t components = ship_state_components(mesh);
 		const int bridge_component = ship_bwing_bridge_component(mesh, components);
 		changed = bridge_component >= 0 && current_anchor->mesh_rotation[bridge_component] !=

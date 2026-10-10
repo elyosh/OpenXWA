@@ -6,6 +6,7 @@
 
 #ifdef XWA_MODERN
 #include "xwa/frontend/frontend_display.h" /* g_flightRenderToFrontend */
+#include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/opt_synth.h"
 #endif
 
@@ -546,6 +547,21 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 						continue;
 					}
 
+#ifdef XWA_MODERN
+					/* Modern port: articulated models are aligned on their bridge too,
+					   each looked up in its own model (XWAU drops the type test and the
+					   B-wing cache). */
+					if (XwaArticulation_AlignsBridge(obj)) {
+						int bridgeIndex;
+
+						bridgeIndex = obj->objectType == OBJ_BWing ? g_bwingBridgeMeshIndexCache : -1;
+						if (bridgeIndex == -1) {
+							bridgeIndex = ModelMesh_FindBridgeIndex(model);
+							if (obj->objectType == OBJ_BWing) {
+								g_bwingBridgeMeshIndexCache = bridgeIndex;
+							}
+						}
+#else
 					if (obj->objectType == OBJ_BWing) {
 						int bridgeIndex;
 
@@ -554,6 +570,7 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 							bridgeIndex = ModelMesh_FindBridgeIndex(model);
 							g_bwingBridgeMeshIndexCache = bridgeIndex;
 						}
+#endif
 						if (bridgeIndex != -1) {
 							mobj = obj->mobj;
 							if (mobj->pCraft->meshRotation[bridgeIndex]) {
@@ -863,6 +880,21 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 					continue;
 				}
 
+#ifdef XWA_MODERN
+				/* Modern port: articulated models are aligned on their bridge too,
+				   each looked up in its own model (XWAU drops the type test and the
+				   B-wing cache). */
+				if (XwaArticulation_AlignsBridge(obj)) {
+					int bridgeIndex;
+
+					bridgeIndex = obj->objectType == OBJ_BWing ? g_bwingBridgeMeshIndexCache : -1;
+					if (bridgeIndex == -1) {
+						bridgeIndex = ModelMesh_FindBridgeIndex(model);
+						if (obj->objectType == OBJ_BWing) {
+							g_bwingBridgeMeshIndexCache = bridgeIndex;
+						}
+					}
+#else
 				if (obj->objectType == OBJ_BWing) {
 					int bridgeIndex;
 
@@ -871,6 +903,7 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 						bridgeIndex = ModelMesh_FindBridgeIndex(model);
 						g_bwingBridgeMeshIndexCache = bridgeIndex;
 					}
+#endif
 					if (bridgeIndex != -1) {
 						mobj = obj->mobj;
 						if (mobj->pCraft->meshRotation[bridgeIndex]) {

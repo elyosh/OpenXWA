@@ -35,6 +35,7 @@
 #include "xwa/util/time.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/skins.h"
@@ -6658,6 +6659,10 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		}
 #ifdef XWA_MODERN
 		g_curCraft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
+		memset(g_curCraft->articulationTicks, 0, sizeof g_curCraft->articulationTicks);
+		g_curCraft->articulationMotion = 0;
+		/* Modern port: the mission's start poses for articulated models. */
+		XwaArticulation_InitMissionStart(objIdx);
 #endif
 	}
 
@@ -7547,10 +7552,12 @@ uint16_t Mission_Init(char* fileName) {
 		return 0;
 	}
 #ifdef XWA_MODERN
-	/* Modern port: read the mission's object profile selections, before any
-	   flight-group object is created. */
+	/* Modern port: read the mission's object profile selections and
+	   articulation overrides, before any flight-group object is created. */
 	XwaObjectProfiles_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 								  (int16_t)g_missionHeader.numFlightGroups);
+	XwaArticulation_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
+								(int16_t)g_missionHeader.numFlightGroups);
 	XwaSkins_LoadMission(fileName);
 #endif
 

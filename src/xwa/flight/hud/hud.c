@@ -15206,6 +15206,10 @@ void msg_writeMessageLogFile(void) {
 #endif
 }
 
+#ifdef XWA_MODERN
+typedef char hud_modern_message_count[(MSG_MODERN_END == XWA_IN_FLIGHT_MESSAGE_COUNT) ? 1 : -1];
+#endif
+
 // FUNCTION: XWA 0x497D40
 void msg_emitInFlightMessage(int messageId, int playerIdx) {
 	HudInFlightMessageRecord record;

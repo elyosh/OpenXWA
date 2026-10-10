@@ -38,8 +38,27 @@ enum {
 #define OPT_SYNTH_COCKPIT_MAX_FACES 5000u
 #define OPT_SYNTH_COCKPIT_MIN_MEAN_EDGE 1.0
 
-/* Tags that OpenXWA reads as a single component. */
-static const char* const s_uniqueTags[] = { "crew.side", "crew.forward" };
+/* Articulation names OpenXWA reads. A
+   `cargo_clamps.` group may end with any carried model's encoded name, and
+   `variant.<name>.` may prefix any group but `crew`. */
+static const char* const s_articulationGroups[] = { "sfoils",  "landing_gear", "hangar_doors", "hatches",
+													"warheads_bay", "cargo_clamps.open", "cargo_clamps.close",
+													"crew" };
+static const char* const s_articulationBehaviors[] = { "swing", "random", "random_pause" };
+static const char* const s_articulationSettings[] = { "step_ticks",           "sfoils.close_in_hyperspace",
+													  "sfoils.allow_fire_closed", "sfoils.park_closed",
+													  "hangar_doors.distance", "crew.update_all" };
+
+static int OptSynth_IsKnownName(const char* name, const char* const* names, size_t count) {
+	size_t index;
+
+	for (index = 0; index < count; ++index) {
+		if (strcmp(name, names[index]) == 0) {
+			return 1;
+		}
+	}
+	return 0;
+}
 
 static int OptSynth_Fail(const char* key, const char* reason) {
 	Aeron_LogError("xwa.models", "replacement '%s' rejected: %s", key, reason);
@@ -55,20 +74,11 @@ static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model
 	uint32_t gunnerCount;
 	uint32_t cockpitEyeCount;
 	uint32_t component;
-	size_t tag;
 
 	if (model->component_count == 0 || model->component_count > XWA_OPT_SYNTH_MAX_COMPONENTS) {
 		snprintf(reason, sizeof reason, "%u components (1..%d allowed)", model->component_count,
 				 XWA_OPT_SYNTH_MAX_COMPONENTS);
 		return OptSynth_Fail(key, reason);
-	}
-	for (tag = 0; tag < sizeof s_uniqueTags / sizeof s_uniqueTags[0]; ++tag) {
-		const uint32_t carriers = Aeron_FlightModelCountTag(model, s_uniqueTags[tag]);
-
-		if (carriers > 1) {
-			snprintf(reason, sizeof reason, "tag '%s' is on %u components", s_uniqueTags[tag], carriers);
-			return OptSynth_Fail(key, reason);
-		}
 	}
 	if (model->engine_glow_count > OPT_SYNTH_MAX_ENGINE_GLOWS) {
 		snprintf(reason, sizeof reason, "%u engine glows (at most %d)", model->engine_glow_count,
@@ -280,11 +290,50 @@ static void OptSynth_WarnDenseCockpit(const char* key, const AeronFlightModel* m
 	}
 }
 
+/* Warns once per load about articulation names OpenXWA does not read; they
+   are ignored. */
+static void OptSynth_WarnUnknownArticulations(const char* key, const AeronFlightModel* model) {
+	uint32_t index;
+
+	for (index = 0; index < model->articulation_count; ++index) {
+		const AeronFlightArticulation* articulation = &model->articulations[index];
+		const char* group = articulation->group;
+
+		if (strncmp(group, "variant.", 8) == 0) {
+			const char* end = strchr(group + 8, '.');
+
+			group = end != NULL && end > group + 8 && strcmp(end + 1, "crew") != 0 ? end + 1 : "";
+		}
+		if (!OptSynth_IsKnownName(group, s_articulationGroups,
+								  sizeof s_articulationGroups / sizeof s_articulationGroups[0]) &&
+			strncmp(group, "cargo_clamps.", 13) != 0) {
+			Aeron_LogWarn("xwa.models", "replacement '%s': component %u has unknown articulation group '%s'", key,
+						  articulation->component, articulation->group);
+		}
+		if (articulation->behavior[0] != '\0' &&
+			!OptSynth_IsKnownName(articulation->behavior, s_articulationBehaviors,
+								  sizeof s_articulationBehaviors / sizeof s_articulationBehaviors[0])) {
+			Aeron_LogWarn("xwa.models", "replacement '%s': component %u has unknown articulation behavior '%s'",
+						  key, articulation->component, articulation->behavior);
+		}
+	}
+	for (index = 0; index < model->articulation_setting_count; ++index) {
+		if (!OptSynth_IsKnownName(model->articulation_settings[index].name, s_articulationSettings,
+								  sizeof s_articulationSettings / sizeof s_articulationSettings[0])) {
+			Aeron_LogWarn("xwa.models", "replacement '%s': unknown articulation setting '%s'", key,
+						  model->articulation_settings[index].name);
+		}
+	}
+}
+
 static XwaOptSynthData* OptSynth_CreateData(const char* key, const AeronFlightModel* model,
 											AeronOptSimModel* simulation, const uint32_t* stubOffsets) {
 	XwaOptSynthData* synth;
 	uint32_t tagTotal;
 	uint32_t component;
+	const uint32_t articulationCount = model->articulation_count;
+	const uint32_t settingCount = model->articulation_setting_count;
+	const uint32_t setCount = model->component_set_count;
 
 	synth = (XwaOptSynthData*)calloc(1, sizeof *synth);
 	if (synth == NULL) {
@@ -296,12 +345,41 @@ static XwaOptSynthData* OptSynth_CreateData(const char* key, const AeronFlightMo
 	}
 	synth->meshes = (XwaOptSynthMesh*)calloc(simulation->mesh_count, sizeof *synth->meshes);
 	synth->tagStorage = tagTotal != 0 ? (AeronFlightTag*)calloc(tagTotal, sizeof *synth->tagStorage) : NULL;
-	if (synth->meshes == NULL || (tagTotal != 0 && synth->tagStorage == NULL)) {
+	synth->articulations =
+		articulationCount != 0
+			? (AeronFlightArticulation*)calloc(articulationCount, sizeof *synth->articulations)
+			: NULL;
+	synth->articulationSettings =
+		settingCount != 0
+			? (AeronFlightArticulationSetting*)calloc(settingCount, sizeof *synth->articulationSettings)
+			: NULL;
+	synth->componentSets =
+		setCount != 0 ? (AeronFlightComponentSet*)calloc(setCount, sizeof *synth->componentSets) : NULL;
+	if (synth->meshes == NULL || (tagTotal != 0 && synth->tagStorage == NULL) ||
+		(articulationCount != 0 && synth->articulations == NULL) ||
+		(settingCount != 0 && synth->articulationSettings == NULL) ||
+		(setCount != 0 && synth->componentSets == NULL)) {
 		free(synth->meshes);
 		free(synth->tagStorage);
+		free(synth->articulations);
+		free(synth->articulationSettings);
+		free(synth->componentSets);
 		free(synth);
 		return NULL;
 	}
+	if (setCount != 0) {
+		memcpy(synth->componentSets, model->component_sets, setCount * sizeof *synth->componentSets);
+	}
+	synth->componentSetCount = setCount;
+	if (articulationCount != 0) {
+		memcpy(synth->articulations, model->articulations, articulationCount * sizeof *synth->articulations);
+	}
+	synth->articulationCount = articulationCount;
+	if (settingCount != 0) {
+		memcpy(synth->articulationSettings, model->articulation_settings,
+			   settingCount * sizeof *synth->articulationSettings);
+	}
+	synth->articulationSettingCount = settingCount;
 	snprintf(synth->key, sizeof synth->key, "%s", key);
 	synth->meshCount = simulation->mesh_count;
 	synth->simulation = *simulation;
@@ -414,6 +492,7 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 		}
 	}
 	OptSynth_WarnDenseCockpit(key, &model);
+	OptSynth_WarnUnknownArticulations(key, &model);
 
 	Aeron_OptSimModelTrimToFaces(&simulation);
 	synth = OptSynth_CreateData(key, &model, &simulation, stubOffsets);
@@ -491,6 +570,9 @@ void OptSynth_Free(XwaOptSynthData* synth) {
 	Aeron_OptSimModelFree(&synth->simulation);
 	free(synth->meshes);
 	free(synth->tagStorage);
+	free(synth->articulations);
+	free(synth->articulationSettings);
+	free(synth->componentSets);
 	free(synth);
 }
 
@@ -684,4 +766,31 @@ const XwaOptSynthMesh* OptSynth_FindMeshForNode(const OptimizedPolyObject* model
 
 int OptSynth_FindModelComponentByTag(const OptimizedPolyObject* model, const char* tag) {
 	return OptSynth_FindComponentByTag(OptSynth_GetModelData(model), tag);
+}
+
+const AeronFlightComponentSet* OptSynth_FindComponentSet(const OptimizedPolyObject* model, const char* name) {
+	const XwaOptSynthData* synth = OptSynth_GetModelData(model);
+	uint32_t index;
+
+	for (index = 0; synth != NULL && name != NULL && index < synth->componentSetCount; ++index) {
+		if (strcmp(synth->componentSets[index].name, name) == 0) {
+			return &synth->componentSets[index];
+		}
+	}
+	return NULL;
+}
+
+int32_t OptSynth_GetArticulationSetting(const OptimizedPolyObject* model, const char* name, int32_t fallback) {
+	const XwaOptSynthData* synth = OptSynth_GetModelData(model);
+	uint32_t index;
+
+	if (synth == NULL || name == NULL) {
+		return fallback;
+	}
+	for (index = 0; index < synth->articulationSettingCount; ++index) {
+		if (strcmp(synth->articulationSettings[index].name, name) == 0) {
+			return synth->articulationSettings[index].value;
+		}
+	}
+	return fallback;
 }

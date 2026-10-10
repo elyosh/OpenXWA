@@ -61,7 +61,26 @@ char* g_strShipGenus[17];
 // GLOBAL: XWA 0x9AFE80
 char* g_strMapStrings[17];
 // GLOBAL: XWA 0x9B6400
+#ifdef XWA_MODERN
+char* g_strInFlightMessages[XWA_IN_FLIGHT_MESSAGE_COUNT];
+
+/* Modern port: the messages after the stock table, in hud.h id order. They
+   are XWAU hook_sfoils' English texts; the first byte is the pane type. */
+static const char* const s_modernInFlightMessages[XWA_IN_FLIGHT_MESSAGE_COUNT - 538] = {
+	"\003Landing Gears opening",
+	"\003Landing Gears closing",
+	"\003Landing Gears have reached [open] position",
+	"\003Landing Gears have reached [closed] position",
+	"\003Your craft is not equipped with [Landing Gears]",
+	"\003[Landing Gears] are already opening or closing",
+	"\003Close [Landing Gear] before engaging [S-Foils]",
+	"\003[S-Foils] are already opening or closing",
+	"\003Close [S-Foils] before engaging [Landing Gears]",
+	"\003Cannons cannot fire with S-Foils closed or Landing Gears opened",
+};
+#else
 char* g_strInFlightMessages[538];
+#endif
 // GLOBAL: XWA 0x91B2A0
 char* g_strPanelStrings[PANEL_STRING_COUNT];
 // GLOBAL: XWA 0x91AF60
@@ -284,6 +303,11 @@ static int StringTable_StoreInFlightMessages(XwaFile* stream) {
 
 		g_strInFlightMessages[i] = stored;
 	}
+#ifdef XWA_MODERN
+	for (i = 538; i < XWA_IN_FLIGHT_MESSAGE_COUNT; ++i) {
+		g_strInFlightMessages[i] = (char*)s_modernInFlightMessages[i - 538];
+	}
+#endif
 
 	return 1;
 }

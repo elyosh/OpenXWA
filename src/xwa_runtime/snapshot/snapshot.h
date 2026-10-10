@@ -302,7 +302,6 @@ typedef struct XwaDirLight {
 #define XWA_SNAP_RENDER_REGION_NONE 0xffu
 
 /* Object-type values the drivers dispatch on (mirrors ObjectTypeId). */
-#define XWA_SNAP_TYPE_BWING 4               /* OBJ_BWing (model-wide bridge compensation) */
 #define XWA_SNAP_TYPE_FALCON2 59            /* OBJ_MilleniumFalcon2 (DS hangar light gate) */
 #define XWA_SNAP_TYPE_SSD 140               /* OBJ_SuperStarDestroyer */
 #define XWA_SNAP_TYPE_DS_REACTOR 324        /* OBJ_DSReactorCylinder (point-light gate) */
@@ -382,6 +381,9 @@ typedef struct XwaFlightObject {
 	 * open/close animation. */
 	uint8_t has_craft;
 	uint8_t sfoil_state;
+	/* The whole model turns with its Bridge component's rotation: the
+	 * B-wing, and articulated models (XwaArticulation_AlignsBridge). */
+	uint8_t bridge_aligned;
 	uint16_t carried_object_slot;      /* CraftData.carriedObjectIndex */
 	uint16_t carried_object_signature; /* stable identity, 0 when absent */
 	uint16_t system_flags;             /* CraftData.systemFlags */

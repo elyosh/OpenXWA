@@ -26,6 +26,7 @@
 #include "xwa/render/renderer_internal.h"
 #include "xwa/util/random.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -2121,9 +2122,20 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 	g_curCraft = g_objectTable[shooterObjIdx].mobj->pCraft;
 	effectiveAi = pai_GetEffectiveAIController(g_curCraft);
 	modelIndex = g_curCraft->modelIndex;
+#ifdef XWA_MODERN
+	/* Modern port: articulated models use XWAU's gate (hook_sfoils
+	   NoFireMessageHook): moving S-foils, closed S-foils unless
+	   sfoils.allow_fire_closed, or lowered landing gear. */
+	if (XwaArticulation_FireBlocked(shooterObjIdx, g_curCraft->sFoilState != 0)) {
+#else
 	if (g_curCraft->sFoilState != 0) {
+#endif
 		if (playerIdx == g_localPlayer) {
+#ifdef XWA_MODERN
+			msg_emitInFlightMessage(XwaArticulation_Message(shooterObjIdx, MSG_SFOILS_NO_FIRE), g_localPlayer);
+#else
 			msg_emitInFlightMessage(MSG_SFOILS_NO_FIRE, g_localPlayer);
+#endif
 		}
 		return;
 	}

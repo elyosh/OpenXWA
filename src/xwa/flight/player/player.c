@@ -31,6 +31,9 @@
 #include "xwa/util/debug.h"
 #include "xwa/util/time.h"
 #include "xwa_runtime/models/model_roles.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/articulation.h"
+#endif
 
 #include <stddef.h>
 #include <string.h>
@@ -1122,7 +1125,15 @@ void Player_HandleHyperspaceCommand(CraftData* craft, unsigned int playerIdx, ch
 			int16_t objectType;
 
 			objectType = g_objectTable[g_players[playerIdx].objectIndex].objectType;
+#ifdef XWA_MODERN
+			/* Modern port: articulated models close their S-foils only with
+			   sfoils.close_in_hyperspace (XWAU hook_sfoils SFoilsFilterHook). */
+			if (XwaArticulation_TriggerPasses(g_players[playerIdx].objectIndex, XWA_ARTICULATION_HYPERSPACE_DEPARTURE,
+											  objectType == OBJ_XWing || objectType == OBJ_BWing) &&
+				(craft->sFoilState & 2u) == 0) {
+#else
 			if ((objectType == OBJ_XWing || objectType == OBJ_BWing) && (craft->sFoilState & 2u) == 0) {
+#endif
 				craft->sFoilState = (uint8_t)(craft->sFoilState | 3u);
 				if ((int)playerIdx == g_localPlayer) {
 					fsfx_PlaySound(120, 0xffffu, playerIdx);

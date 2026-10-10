@@ -8,6 +8,7 @@
  */
 
 #include "xwa_runtime/snapshot/snapshot.h"
+#include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
@@ -1295,6 +1296,7 @@ void XwaSnapshot_CaptureFlight(void) {
 			if (cd) {
 				f->has_craft = 1;
 				f->sfoil_state = cd->sFoilState;
+				f->bridge_aligned = (uint8_t)(XwaArticulation_AlignsBridge(o) != 0);
 				f->carried_object_slot = cd->carriedObjectIndex;
 				if (cd->carriedObjectIndex != 0xffffu && cd->carriedObjectIndex < g_objectTableSlotCount &&
 					g_objectTable[cd->carriedObjectIndex].objectType != OBJ_None) {

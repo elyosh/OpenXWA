@@ -2,12 +2,14 @@
 
 #include "aeron/config_file.h"
 #include "aeron/log.h"
+#include "xwa/assets/opt_model.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/frontend/frontend_resources.h"
 #include "xwa_runtime/models/mission_file.h"
 #include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/models/opt_synth.h"
+#include "xwa/util/memory.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,18 +17,17 @@
 
 /* Modern port module; no original counterpart. It selects each object's
    profile from the mission's YAML selections; the profiles themselves are
-   component tags written by the model converter. */
+   component sets written by the model converter. */
 
 /* The skirmish test reads header.missionType, at its original offset. */
 typedef char object_profiles_mission_type_offset
 	[(offsetof(FrontendMission, header.missionType) == 0xB1B82) ? 1 : -1];
 
-#define OBJECT_PROFILE_TAG_PREFIX "hidden_by_profile."
+#define OBJECT_PROFILE_SET_PREFIX "hidden_by_profile."
 /* AERON_FLIGHT_TAG_MAX minus its terminator. */
-#define OBJECT_PROFILE_TAG_LENGTH_MAX 63
+#define OBJECT_PROFILE_SET_LENGTH_MAX 63
 /* g_missionFlightGroups and FrontendMission.flightGroups hold 192. */
 #define OBJECT_PROFILE_FLIGHT_GROUPS 192
-#define OBJECT_PROFILE_FLIGHT_GROUP_NAME 20
 
 /* The current mission's profile per flight group; NULL selects nothing. */
 static char* s_profiles[OBJECT_PROFILE_FLIGHT_GROUPS];
@@ -42,35 +43,6 @@ static void ObjectProfiles_Clear(void) {
 
 static char ObjectProfiles_Lower(char c) {
 	return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c;
-}
-
-/* Nonzero when the entry's optional `name` and `craft` checks match
-   flight group `fg`; logs the mismatch otherwise. */
-static int ObjectProfiles_EntryMatches(const char* path, const char* key, const AeronConfigNode* entry,
-									   const struct XwaFlightGroup* fg) {
-	const AeronConfigNode* name = AeronConfigNode_MapGet(entry, "name");
-	const AeronConfigNode* craft = AeronConfigNode_MapGet(entry, "craft");
-
-	if (name != NULL) {
-		const char* expected = AeronConfigNode_String(name, NULL);
-		size_t length = 0;
-
-		while (length < OBJECT_PROFILE_FLIGHT_GROUP_NAME && fg->name[length] != '\0') {
-			++length;
-		}
-		if (expected == NULL || strlen(expected) != length || memcmp(expected, fg->name, length) != 0) {
-			Aeron_LogWarn("xwa.models", "%s: flight group %s is '%.*s', not '%s'; selection ignored", path, key,
-						  (int)length, fg->name, expected != NULL ? expected : "");
-			return 0;
-		}
-	}
-	if (craft != NULL && (AeronConfigNode_Type(craft) != AERON_CONFIG_INT ||
-						  AeronConfigNode_Int(craft, -1) != (int64_t)fg->craftType)) {
-		Aeron_LogWarn("xwa.models", "%s: flight group %s has craft type %u, not %lld; selection ignored", path,
-					  key, (unsigned int)fg->craftType, (long long)AeronConfigNode_Int(craft, -1));
-		return 0;
-	}
-	return 1;
 }
 
 void XwaObjectProfiles_LoadMission(const char* missionPath, const struct XwaFlightGroup* flightGroups,
@@ -104,22 +76,13 @@ void XwaObjectProfiles_LoadMission(const char* missionPath, const struct XwaFlig
 		const char* key = AeronConfigNode_MapKeyAt(selections, index);
 		const AeronConfigNode* entry = AeronConfigNode_MapValueAt(selections, index);
 		const char* profile = AeronConfigNode_String(AeronConfigNode_MapGet(entry, "profile"), NULL);
-		char* end = NULL;
-		long fgIdx = key != NULL ? strtol(key, &end, 10) : -1;
+		const int fgIdx = XwaMissionFile_FlightGroup(path, key, entry, flightGroups, stride, count);
 
-		if (key == NULL || end == key || *end != '\0' || fgIdx < 0 || fgIdx >= OBJECT_PROFILE_FLIGHT_GROUPS ||
-			AeronConfigNode_Type(entry) != AERON_CONFIG_MAP || profile == NULL || profile[0] == '\0') {
-			Aeron_LogWarn("xwa.models", "%s: '%s' is not a flight-group index with a 'profile'; ignored", path,
-						  key != NULL ? key : "");
+		if (fgIdx < 0) {
 			continue;
 		}
-		if (fgIdx >= count) {
-			Aeron_LogWarn("xwa.models", "%s: the mission has no flight group %s; selection ignored", path, key);
-			continue;
-		}
-		if (!ObjectProfiles_EntryMatches(
-				path, key, entry,
-				(const struct XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)fgIdx * stride))) {
+		if (profile == NULL || profile[0] == '\0') {
+			Aeron_LogWarn("xwa.models", "%s: flight group %s has no 'profile'; ignored", path, key);
 			continue;
 		}
 		free(s_profiles[fgIdx]);
@@ -133,34 +96,55 @@ void XwaObjectProfiles_LoadMission(const char* missionPath, const struct XwaFlig
 	Aeron_LogInfo("xwa.models", "%s: %d object profile selections", path, loaded);
 }
 
-/* The components carrying profile `profile`'s tag: the lower-case name, with
-   every byte outside [a-z0-9_] written as '.' and two hex digits, as the
-   model converter writes it. */
+/* The components of profile `profile`'s set, `hidden_by_profile.` and the
+   lower-case name with every byte outside [a-z0-9_] written as '.' and two
+   hex digits, as the model converter writes it. A member may be past the
+   model's components: it hides a component of the exterior or cockpit model
+   drawn with the craft's state. */
 static int ObjectProfiles_Collect(uint16_t objectType, const char* profile, int* components, int capacity) {
-	char tag[OBJECT_PROFILE_TAG_LENGTH_MAX + 1];
+	char name[OBJECT_PROFILE_SET_LENGTH_MAX + 1];
 	size_t length;
 	const unsigned char* cursor;
+	MemoryHandle handle;
+	const OptimizedPolyObject* model;
+	const AeronFlightComponentSet* set;
+	int component;
+	int count;
 
-	length = strlen(OBJECT_PROFILE_TAG_PREFIX);
-	memcpy(tag, OBJECT_PROFILE_TAG_PREFIX, length);
+	length = strlen(OBJECT_PROFILE_SET_PREFIX);
+	memcpy(name, OBJECT_PROFILE_SET_PREFIX, length);
 	for (cursor = (const unsigned char*)profile; *cursor != '\0'; ++cursor) {
 		const unsigned char c = (unsigned char)ObjectProfiles_Lower((char)*cursor);
 
 		if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_') {
-			if (length + 1 > OBJECT_PROFILE_TAG_LENGTH_MAX) {
+			if (length + 1 > OBJECT_PROFILE_SET_LENGTH_MAX) {
 				return 0;
 			}
-			tag[length++] = (char)c;
+			name[length++] = (char)c;
 		} else {
-			if (length + 3 > OBJECT_PROFILE_TAG_LENGTH_MAX) {
+			if (length + 3 > OBJECT_PROFILE_SET_LENGTH_MAX) {
 				return 0;
 			}
-			snprintf(tag + length, 4, ".%02x", c);
+			snprintf(name + length, 4, ".%02x", c);
 			length += 3;
 		}
 	}
-	tag[length] = '\0';
-	return XwaModelRole_CollectTag(objectType, tag, components, capacity);
+	name[length] = '\0';
+
+	handle = objectType < OBJ_Count ? g_loadedModels.byObjectType[objectType] : 0;
+	model = handle != 0 ? (const OptimizedPolyObject*)Memory_LockHandle(handle) : NULL;
+	if (model == NULL) {
+		return 0;
+	}
+	set = OptSynth_FindComponentSet(model, name);
+	count = 0;
+	for (component = 0; set != NULL && component < XWA_CRAFT_MESH_SLOT_COUNT && count < capacity; ++component) {
+		if ((set->members[component / 32] & (1u << (component % 32))) != 0) {
+			components[count++] = component;
+		}
+	}
+	Memory_UnlockHandle(handle);
+	return count;
 }
 
 void XwaObjectProfiles_Apply(uint16_t objectType, int flightGroupIdx, uint8_t markings,

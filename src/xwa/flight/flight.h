@@ -183,6 +183,11 @@ typedef enum GameActionKey {
 	KEY_HUD_TOGGLE = 0x12c,
 	KEY_CONSOLE_TOGGLE = 0x111,
 	KEY_NEXT_PLAYER_CRAFT = 0x11e,
+#ifdef XWA_MODERN
+	/* Modern port: Ctrl+L (DInput Ctrl table), the landing-gear key of
+	 * articulated models; the original ignores it. */
+	KEY_CTRL_L = 0x11a,
+#endif
 } GameActionKey;
 
 #pragma pack(push, 1)

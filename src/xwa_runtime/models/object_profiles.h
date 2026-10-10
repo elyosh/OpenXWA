@@ -3,8 +3,9 @@
 
 /* Object profiles: model variants that hide some of a model's components.
  *
- * A GLB replacement carries a `hidden_by_profile.<name>` tag on each
- * component profile <name> hides. A mission selects a profile per flight
+ * A GLB replacement lists the components profile <name> hides in its
+ * `hidden_by_profile.<name>` component set, which may name exterior or
+ * cockpit components past its own. A mission selects a profile per flight
  * group in remaster/missions/<mission path>.yaml; Apply hides the selected
  * profile's components by marking them destroyed at spawn. The selections
  * are read at mission load, never when an object spawns. */

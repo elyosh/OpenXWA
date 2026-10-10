@@ -59,6 +59,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/input/mouse_flight.h"
+#include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
@@ -1455,6 +1456,15 @@ void FlightObject_AnimateCrewMeshRotations(int objectIndex, int resetToNeutral) 
 		return;
 	}
 
+#ifdef XWA_MODERN
+	/* Modern port: a GLB replacement's component layout is authored freely,
+	 * so it animates its own crew articulations, never the stock ordinals
+	 * below (XWAU hook_pilot PilotHook). A replacement without them animates
+	 * nothing. */
+	if (XwaArticulation_AnimateCrew((unsigned int)objectIndex, resetToNeutral)) {
+		return;
+	}
+#endif
 	switch (g_objectTable[objectIndex].objectType) {
 		case OBJ_XWing:
 			sideMeshIdx = 6;
@@ -1496,29 +1506,6 @@ void FlightObject_AnimateCrewMeshRotations(int objectIndex, int resetToNeutral) 
 		default:
 			return;
 	}
-
-#ifdef XWA_MODERN
-	/* Modern port: a GLB replacement's component layout is authored freely,
-	 * so its animated components come from the crew tags, never from the
-	 * stock ordinals above. Untagged replacements animate nothing. */
-	{
-		MemoryHandle modelHandle;
-		const OptimizedPolyObject* model;
-
-		modelHandle = g_loadedModels.byObjectType[(uint16_t)g_objectTable[objectIndex].objectType];
-		if (objectIndex == (uint16_t)g_players[g_localPlayer].objectIndex && g_exteriorModelLoaded) {
-			modelHandle = g_exteriorModel;
-		}
-		model = modelHandle != 0 ? (const OptimizedPolyObject*)Memory_LockHandle(modelHandle) : NULL;
-		if (OptSynth_IsSynthesized(model)) {
-			sideMeshIdx = (short)OptSynth_FindModelComponentByTag(model, "crew.side");
-			forwardMeshIdx = (short)OptSynth_FindModelComponentByTag(model, "crew.forward");
-		}
-		if (model != NULL) {
-			Memory_UnlockHandle(modelHandle);
-		}
-	}
-#endif
 
 	craft = g_objectTable[objectIndex].mobj->pCraft;
 	if (sideMeshIdx >= 0) {
@@ -1575,8 +1562,7 @@ void FlightObject_AnimateCrewMeshRotations(int objectIndex, int resetToNeutral) 
 		g_objectTable[objectIndex].objectType == OBJ_ImperialPilot) {
 		int count;
 
-		rotation = &craft->meshRotation[XWA_MODEL_ROLE(g_objectTable[objectIndex].objectType,
-													   XWA_ROLE_PILOT_LIMB_1, 2)];
+		rotation = &craft->meshRotation[2];
 		count = 4;
 		do {
 			if (resetToNeutral) {
@@ -1603,17 +1589,7 @@ void FlightObject_AnimateCrewMeshRotations(int objectIndex, int resetToNeutral) 
 					}
 				}
 			}
-#ifdef XWA_MODERN
-			/* Modern port: limbs are components 2-5 on the stock model, in
-			 * order; a replacement names each one with a pilot.limb role. */
-			if (count > 1) {
-				rotation = &craft->meshRotation[XWA_MODEL_ROLE(
-					g_objectTable[objectIndex].objectType, (XwaModelRole)(XWA_ROLE_PILOT_LIMB_1 + 5 - count),
-					7 - count)];
-			}
-#else
 			++rotation;
-#endif
 			--count;
 		} while (count != 0);
 	}
@@ -1640,6 +1616,13 @@ void FlightObject_InitMeshAnimationDefaults(int objIdx) {
 	pCraft = mobj->pCraft;
 	g_curCraft = pCraft;
 
+#ifdef XWA_MODERN
+	/* Modern port: a model listing S-foils or landing gear sets them from its
+	   articulations instead (XWAU hook_sfoils SFoilsHook1). */
+	if (XwaArticulation_InitLeavingHangar((unsigned int)objIdx)) {
+		return;
+	}
+#endif
 	switch (obj->objectType) {
 		case OBJ_XWing:
 		case OBJ_BWing:
@@ -1871,6 +1854,14 @@ void FlightObject_UpdateSpecialBehavior(void) {
 	int16_t objectType;
 	int modelType;
 
+#ifdef XWA_MODERN
+	/* Modern port: S-foils and landing gear of articulated models step on
+	   every sim step, with their own tick accumulator; phase 1 skips them. */
+	for (objIdx = g_activeRegionObjectSlotStart; (uint16_t)objIdx < g_activeRegionCraftObjectSlotEnd; ++objIdx) {
+		XwaArticulation_StepSFoils(objIdx);
+	}
+#endif
+
 	// ---- Phase 1: S-foil / folding mesh rotation ----
 	if (g_flightGlobalCountdownTimers[11] == 0) {
 		if (regionIdx == g_activeMissionRegionCount - 1) {
@@ -1887,6 +1878,11 @@ void FlightObject_UpdateSpecialBehavior(void) {
 						g_curCraft = mobj->pCraft;
 						modelType = (uint16_t)objectType;
 
+#ifdef XWA_MODERN
+						if (XwaArticulation_HasSFoilsOrLandingGear(objIdx)) {
+							/* Stepped above, every sim step. */
+						} else
+#endif
 						switch ((uint16_t)objectType) {
 							case 1:
 							case 4:
@@ -2315,8 +2311,18 @@ void FlightObject_UpdateSpecialBehavior(void) {
 				}
 			}
 
+#ifdef XWA_MODERN
+			/* Modern port: a model with crew.update_all animates its crew for
+			   every object, in any view (XWAU's patch at 0x4024EB). Pilots keep
+			   their own call below. */
+			if ((g_objectTable[(uint16_t)objIdx].playerOwnerIdx != -1 && g_flightPlayerCount == 1 &&
+				 g_players[g_localPlayer].viewState.externalCameraActive) ||
+				(objectType != OBJ_RebelPilot && objectType != OBJ_ImperialPilot &&
+				 XwaArticulation_CrewUpdatesAll(objIdx))) {
+#else
 			if (g_objectTable[(uint16_t)objIdx].playerOwnerIdx != -1 && g_flightPlayerCount == 1 &&
 				g_players[g_localPlayer].viewState.externalCameraActive) {
+#endif
 				FlightObject_AnimateCrewMeshRotations((uint16_t)objIdx, 0);
 			}
 			if (objectType == OBJ_RebelPilot || objectType == OBJ_ImperialPilot) {
@@ -4963,7 +4969,15 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					// X-/B-wing s-foils reopen on arrival.
 					po = &g_objectTable[g_players[playerIdx].objectIndex];
 					arrivedType = (ObjectTypeId)po->objectType;
+#ifdef XWA_MODERN
+					/* Modern port: articulated models decide from their S-foils
+					   (XWAU hook_sfoils SFoilsFilterHook). */
+					if (XwaArticulation_TriggerPasses(g_players[playerIdx].objectIndex,
+													  XWA_ARTICULATION_HYPERSPACE_ARRIVAL,
+													  arrivedType == OBJ_XWing || arrivedType == OBJ_BWing)) {
+#else
 					if (arrivedType == OBJ_XWing || arrivedType == OBJ_BWing) {
+#endif
 						po->mobj->pCraft->sFoilState ^= 2u;
 						g_objectTable[g_players[playerIdx].objectIndex].mobj->pCraft->sFoilState |= 1u;
 						if (playerIdx == (unsigned int)g_localPlayer) {
@@ -5983,6 +5997,11 @@ void Flight_StepSimToTime(int targetTimestamp) {
 
 				Flight_UpdateCraftSteeringAndSpeed();
 				collide_collisions();
+#ifdef XWA_MODERN
+				/* Modern port: warheads bay, cargo clamps and hangar doors of
+				   articulated models (XWAU hook_sfoils HangarDoorsHook). */
+				XwaArticulation_StepWorld();
+#endif
 				if (!g_flightSimSideEffectsSuppressed && g_flightMissionEndPending == 1) {
 					break;
 				}
@@ -9262,7 +9281,47 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					}
 				}
 				break;
+#ifdef XWA_MODERN
+			case KEY_CTRL_L:
+#endif
 			case KEY_V:
+#ifdef XWA_MODERN
+				/* Modern port: articulated models toggle their S-foils (V) or
+				   landing gear (Ctrl+L), as XWAU's hook_sfoils does. The
+				   original ignores Ctrl+L. */
+				if (objIdx != 0xffff) {
+					uint16_t refusal = 0;
+					const XwaArticulationTriggerResult articulation = XwaArticulation_Trigger(
+						(uint16_t)objIdx,
+						g_currentActionKey == KEY_CTRL_L ? XWA_ARTICULATION_KEY_LANDING_GEAR
+														 : XWA_ARTICULATION_KEY_SFOILS,
+						&refusal);
+
+					if (articulation == XWA_ARTICULATION_STOCK && g_currentActionKey == KEY_CTRL_L) {
+						break;
+					}
+					if (articulation == XWA_ARTICULATION_REFUSED || articulation == XWA_ARTICULATION_NOT_EQUIPPED) {
+						msg_emitInFlightMessage(refusal, (int)currentPlayerIdx);
+						break;
+					}
+					if (articulation == XWA_ARTICULATION_PASS) {
+						if ((craft->sFoilState & 1) == 0) {
+							craft->sFoilState ^= 2u;
+							craft->sFoilState |= 1u;
+							if (currentPlayerIdx == (unsigned int)g_localPlayer) {
+								fsfx_PlaySound(120, 0xffffu, currentPlayerIdx);
+							}
+							msg_emitInFlightMessage(
+								XwaArticulation_Message((uint16_t)objIdx, (craft->sFoilState & 2) ? MSG_SFOILS_CLOSING
+																								   : MSG_SFOILS_OPENING),
+								(int)currentPlayerIdx);
+						}
+						break;
+					}
+				} else if (g_currentActionKey == KEY_CTRL_L) {
+					break;
+				}
+#endif
 				if (objIdx != 0xffff && (g_objectTable[(uint16_t)objIdx].objectType == OBJ_XWing ||
 										 g_objectTable[(uint16_t)objIdx].objectType == OBJ_BWing)) {
 					if ((craft->sFoilState & 1) == 0) {

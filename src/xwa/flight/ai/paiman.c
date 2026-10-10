@@ -5,6 +5,9 @@
 #include "xwa/input/forcefeedback.h"
 #include "xwa/math/fixed.h"
 #include "xwa/util/time.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/articulation.h"
+#endif
 
 // GLOBAL: XWA 0x9AF178
 PaiManeuverFunc g_aiCourseOrderManeuverMode;
@@ -577,6 +580,10 @@ void paiman_initparkmaneuver(void) {
 	uint8_t elapsedMinutes;
 	uint8_t elapsedSeconds;
 
+#ifdef XWA_MODERN
+	/* Modern port: XWAU hook_sfoils AIParkManrHook. */
+	XwaArticulation_AiParkStart(g_paiContext.aiObjIdx);
+#endif
 	elapsedHours = g_missionElapsedClock.hours;
 	elapsedMinutes = g_missionElapsedClock.minutes;
 	elapsedSeconds = g_missionElapsedClock.seconds;
@@ -2040,7 +2047,17 @@ int paiman_initoutofhyperspacemaneuver(void) {
 	g_paiContext.aiController->maneuverTimer = 2596;
 	g_curCraft->aiFlight.objSignatures[0] = (uint16_t)g_paiContext.aiController->thinkInterval;
 	g_paiContext.aiController->thinkInterval = 29;
+#ifdef XWA_MODERN
+	{
+		/* Modern port: XWAU hook_sfoils SFoilsAIOutOfHyperspace1Hook. */
+		const int result = Music_TriggerOutOfHyperspaceSequenceForObject(g_paiContext.aiObjIdx);
+
+		XwaArticulation_AiOutOfHyperspaceInit(g_paiContext.aiObjIdx);
+		return result;
+	}
+#else
 	return Music_TriggerOutOfHyperspaceSequenceForObject(g_paiContext.aiObjIdx);
+#endif
 }
 
 // FUNCTION: XWA 0x4B2730
@@ -2076,6 +2093,10 @@ void paiman_initintohyperspacemaneuver(void) {
 
 	g_paiContext.aiController->maneuverPhase = 0;
 	pai_CalcAnglesToAimPoint();
+#ifdef XWA_MODERN
+	/* Modern port: XWAU hook_sfoils SFoilsAIIntoHyperspace1Hook. */
+	XwaArticulation_AiIntoHyperspace(g_paiContext.aiObjIdx);
+#endif
 	if (trig2_polardistance == 0) {
 		return;
 	}
@@ -5606,6 +5627,10 @@ static char paiman_outofhyperspacemaneuver(void) {
 	uint8_t planId;
 	PlanRecord* plan;
 
+#ifdef XWA_MODERN
+	/* Modern port: XWAU hook_sfoils SFoilsAIOutOfHyperspace2Hook. */
+	XwaArticulation_AiOutOfHyperspaceStep(g_paiContext.aiObjIdx, g_paiContext.aiController->maneuverTimer);
+#endif
 	pai_GetEffectiveAIController(g_paiContext.aiTargetCraft);
 	aiController = g_paiContext.aiController;
 	if (g_paiContext.aiController->aiPlanState == 0) {
@@ -6275,8 +6300,13 @@ static char paiman_parkmaneuver(void) {
 			g_paiContext.aiController->maneuverTimer = 1180;
 			return 0;
 		case 4:
-			if (g_paiContext.aiController->maneuverTimer == 0)
+			if (g_paiContext.aiController->maneuverTimer == 0) {
 				++g_paiContext.aiController->maneuverPhase;
+#ifdef XWA_MODERN
+				/* Modern port: XWAU hook_sfoils AIParkManrFunctionHook. */
+				XwaArticulation_AiParkEnd(g_paiContext.aiObjIdx);
+#endif
+			}
 			break;
 	}
 

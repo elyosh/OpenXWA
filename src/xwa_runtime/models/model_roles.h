@@ -31,12 +31,6 @@ typedef enum XwaModelRole {
 	XWA_ROLE_WORKDROID1_TURN,
 	XWA_ROLE_WORKDROID1_NOD_1,
 	XWA_ROLE_WORKDROID1_NOD_2,
-	/* RebelPilot and ImperialPilot: the four limbs of the crew animation, in
-	   order (the head uses the optional crew.forward tag). */
-	XWA_ROLE_PILOT_LIMB_1,
-	XWA_ROLE_PILOT_LIMB_2,
-	XWA_ROLE_PILOT_LIMB_3,
-	XWA_ROLE_PILOT_LIMB_4,
 	/* AccelRing2/3: the core the proving-grounds course has the player
 	   destroy (target box, hit filter, speed boost, reset). */
 	XWA_ROLE_ACCELRING_CORE,

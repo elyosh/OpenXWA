@@ -45,6 +45,7 @@
 #include "xwa/math/scalar.h"
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
@@ -1018,10 +1019,22 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 				}
 				if (crewTimer == 0) {
 					g_flightGlobalCountdownTimers[2] = 15;
+#ifdef XWA_MODERN
+					/* Modern port: models with crew.update_all animate their crew in
+					   the hangar too, for every object and in any view (XWAU's
+					   patch at 0x458C9E). */
+					if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive &&
+						!XwaArticulation_CrewUpdatesAll(g_players[g_localPlayer].objectIndex)) {
+						FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex,
+															  0);
+					}
+					XwaArticulation_StepHangarCrew();
+#else
 					if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive) {
 						FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex,
 															  0);
 					}
+#endif
 				}
 			}
 
@@ -1547,10 +1560,22 @@ int Hangar_EnterCraft(uint16_t fromObjIdx) {
 				}
 				if (crewTimer == 0) {
 					g_flightGlobalCountdownTimers[2] = 15;
+#ifdef XWA_MODERN
+					/* Modern port: models with crew.update_all animate their crew in
+					   the hangar too, for every object and in any view (XWAU's
+					   patch at 0x458C9E). */
+					if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive &&
+						!XwaArticulation_CrewUpdatesAll(g_players[g_localPlayer].objectIndex)) {
+						FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex,
+															  0);
+					}
+					XwaArticulation_StepHangarCrew();
+#else
 					if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive) {
 						FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex,
 															  0);
 					}
+#endif
 				}
 			}
 
@@ -1932,6 +1957,10 @@ int Hangar_UpdateLaunch(int dtMs) {
 	}
 
 	// ---- launch-animation phase machine ----
+#ifdef XWA_MODERN
+	/* Modern port: XWAU hook_sfoils PlayerCraftHatchHook. */
+	XwaArticulation_StepLaunchHatches(g_hangarPlayerObjIdx);
+#endif
 	playerObjIdx = g_hangarPlayerObjIdx;
 	dtMsa = clampedDtMs >> 2;
 	if (dtMsa > 236) {
@@ -2554,8 +2583,17 @@ void Hangar_LaunchPlayerCraft(void) {
 	}
 
 	g_objectTable[newObjIdx].mobj->framesAlive = 0;
+#ifdef XWA_MODERN
+	XwaArticulation_CloseHatches(newObjIdx);
+	/* Modern port: articulated models open their S-foils and raise their
+	   landing gear (XWAU hook_sfoils SFoilsFilterHook). */
+	if (XwaArticulation_TriggerPasses(newObjIdx, XWA_ARTICULATION_LAUNCH,
+									  g_objectTable[newObjIdx].objectType == OBJ_XWing ||
+										  g_objectTable[newObjIdx].objectType == OBJ_BWing)) {
+#else
 	if (g_objectTable[newObjIdx].objectType == OBJ_XWing ||
 		g_objectTable[newObjIdx].objectType == OBJ_BWing) {
+#endif
 		craft->sFoilState = (uint8_t)((craft->sFoilState ^ 2u) | 1u);
 		fsfx_PlaySound(120, 0xffffu, (unsigned int)g_localPlayer);
 		msg_emitInFlightMessage(MSG_SFOILS_OPENING, g_localPlayer);
@@ -3185,6 +3223,10 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 
 	objectIdx = g_hangarShuttleState.objectIdx;
 	sourceObjIdx = objectIdx;
+#ifdef XWA_MODERN
+	/* Modern port: XWAU hook_sfoils ShuttleHatchHook. */
+	XwaArticulation_StepShuttleHatches((unsigned int)objectIdx);
+#endif
 	decisionTime = 4u * (unsigned int)g_gameTime;
 	craft = g_objectTable[objectIdx].mobj->pCraft;
 
@@ -3245,20 +3287,26 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			g_objectTable[objectIdx].yaw = (uint16_t)(g_objectTable[objectIdx].yaw + 50 * dtTicks);
 			g_objectTable[objectIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objectIdx].mobj->moveVectorDirty = 1;
-			meshCount = ModelMesh_GetObjectTypeMeshCount(g_objectTable[objectIdx].objectType);
-			for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
-				MeshType meshType;
-				uint8_t meshRotation;
+#ifdef XWA_MODERN
+			/* Modern port: XWAU hook_sfoils SFoilsHangarShuttleHook. */
+			if (!XwaArticulation_StepShuttleBlock((unsigned int)objectIdx, XWA_ARTICULATION_SHUTTLE_HATCHES, dtTicks))
+#endif
+			{
+				meshCount = ModelMesh_GetObjectTypeMeshCount(g_objectTable[objectIdx].objectType);
+				for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
+					MeshType meshType;
+					uint8_t meshRotation;
 
-				meshType =
-					ModelMesh_GetObjectTypeMeshType((uint16_t)g_objectTable[objectIdx].objectType, meshIdx);
-				if (meshType == MESH_Hatch || meshType == MESH_Custom) {
-					meshRotation = craft->meshRotation[meshIdx];
-					if (meshRotation > 0) {
-						meshRotation = (uint8_t)(meshRotation - dtTicks);
-						craft->meshRotation[meshIdx] = meshRotation;
-						if (meshRotation > 0x60u) {
-							craft->meshRotation[meshIdx] = 0;
+					meshType =
+						ModelMesh_GetObjectTypeMeshType((uint16_t)g_objectTable[objectIdx].objectType, meshIdx);
+					if (meshType == MESH_Hatch || meshType == MESH_Custom) {
+						meshRotation = craft->meshRotation[meshIdx];
+						if (meshRotation > 0) {
+							meshRotation = (uint8_t)(meshRotation - dtTicks);
+							craft->meshRotation[meshIdx] = meshRotation;
+							if (meshRotation > 0x60u) {
+								craft->meshRotation[meshIdx] = 0;
+							}
 						}
 					}
 				}
@@ -3325,18 +3373,24 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			g_objectTable[objectIdx].world_x +=
 				dtTicks * (int)(sin(angleRadians) * g_hangarShuttleState.moveSpeed);
 			craft->throttleSpeed = (uint16_t)(4096 - (int)(g_hangarShuttleState.moveSpeed * -256.0f));
-			meshCount = ModelMesh_GetObjectTypeMeshCount(g_objectTable[objectIdx].objectType);
-			for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
-				uint8_t meshRotation;
+#ifdef XWA_MODERN
+			/* Modern port: XWAU hook_sfoils SFoilsHangarShuttleHook. */
+			if (!XwaArticulation_StepShuttleBlock((unsigned int)objectIdx, XWA_ARTICULATION_SHUTTLE_OPEN, dtTicks))
+#endif
+			{
+				meshCount = ModelMesh_GetObjectTypeMeshCount(g_objectTable[objectIdx].objectType);
+				for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
+					uint8_t meshRotation;
 
-				if (ModelMesh_GetObjectTypeMeshType((uint16_t)g_objectTable[objectIdx].objectType, meshIdx) ==
-					MESH_RotaryWing) {
-					meshRotation = craft->meshRotation[meshIdx];
-					if (meshRotation > 0) {
-						meshRotation = (uint8_t)(meshRotation - dtTicks);
-						craft->meshRotation[meshIdx] = meshRotation;
-						if (meshRotation > 0x60u) {
-							craft->meshRotation[meshIdx] = 0;
+					if (ModelMesh_GetObjectTypeMeshType((uint16_t)g_objectTable[objectIdx].objectType, meshIdx) ==
+						MESH_RotaryWing) {
+						meshRotation = craft->meshRotation[meshIdx];
+						if (meshRotation > 0) {
+							meshRotation = (uint8_t)(meshRotation - dtTicks);
+							craft->meshRotation[meshIdx] = meshRotation;
+							if (meshRotation > 0x60u) {
+								craft->meshRotation[meshIdx] = 0;
+							}
 						}
 					}
 				}
@@ -3380,18 +3434,24 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 					}
 				}
 				{
-					meshCount = ModelMesh_GetObjectTypeMeshCount(g_objectTable[objectIdx].objectType);
-					for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
-						uint8_t meshRotation;
+#ifdef XWA_MODERN
+					/* Modern port: XWAU hook_sfoils SFoilsHangarShuttleHook. */
+					if (!XwaArticulation_StepShuttleBlock((unsigned int)objectIdx, XWA_ARTICULATION_SHUTTLE_CLOSE, dtTicks))
+#endif
+					{
+						meshCount = ModelMesh_GetObjectTypeMeshCount(g_objectTable[objectIdx].objectType);
+						for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
+							uint8_t meshRotation;
 
-						if (ModelMesh_GetObjectTypeMeshType((uint16_t)g_objectTable[objectIdx].objectType,
-															meshIdx) == MESH_RotaryWing) {
-							meshRotation = craft->meshRotation[meshIdx];
-							if (meshRotation < 0x60u) {
-								meshRotation = (uint8_t)(meshRotation + dtLow);
-								craft->meshRotation[meshIdx] = meshRotation;
-								if (meshRotation > 0x60u) {
-									craft->meshRotation[meshIdx] = 0x60u;
+							if (ModelMesh_GetObjectTypeMeshType((uint16_t)g_objectTable[objectIdx].objectType,
+																meshIdx) == MESH_RotaryWing) {
+								meshRotation = craft->meshRotation[meshIdx];
+								if (meshRotation < 0x60u) {
+									meshRotation = (uint8_t)(meshRotation + dtLow);
+									craft->meshRotation[meshIdx] = meshRotation;
+									if (meshRotation > 0x60u) {
+										craft->meshRotation[meshIdx] = 0x60u;
+									}
 								}
 							}
 						}
@@ -3470,20 +3530,26 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			g_objectTable[objectIdx].yaw = (uint16_t)(g_objectTable[objectIdx].yaw + 50 * dtTicks);
 			g_objectTable[objectIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objectIdx].mobj->moveVectorDirty = 1;
-			meshCount = ModelMesh_GetObjectTypeMeshCount(g_objectTable[objectIdx].objectType);
-			for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
-				MeshType meshType;
-				uint8_t meshRotation;
+#ifdef XWA_MODERN
+			/* Modern port: XWAU hook_sfoils SFoilsHangarShuttleHook. */
+			if (!XwaArticulation_StepShuttleBlock((unsigned int)objectIdx, XWA_ARTICULATION_SHUTTLE_HATCHES, dtTicks))
+#endif
+			{
+				meshCount = ModelMesh_GetObjectTypeMeshCount(g_objectTable[objectIdx].objectType);
+				for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
+					MeshType meshType;
+					uint8_t meshRotation;
 
-				meshType =
-					ModelMesh_GetObjectTypeMeshType((uint16_t)g_objectTable[objectIdx].objectType, meshIdx);
-				if (meshType == MESH_Hatch || meshType == MESH_Custom) {
-					meshRotation = craft->meshRotation[meshIdx];
-					if (meshRotation < 0x60u) {
-						meshRotation = (uint8_t)(meshRotation + dtTicks);
-						craft->meshRotation[meshIdx] = meshRotation;
-						if (meshRotation > 0x60u) {
-							craft->meshRotation[meshIdx] = 0x60u;
+					meshType =
+						ModelMesh_GetObjectTypeMeshType((uint16_t)g_objectTable[objectIdx].objectType, meshIdx);
+					if (meshType == MESH_Hatch || meshType == MESH_Custom) {
+						meshRotation = craft->meshRotation[meshIdx];
+						if (meshRotation < 0x60u) {
+							meshRotation = (uint8_t)(meshRotation + dtTicks);
+							craft->meshRotation[meshIdx] = meshRotation;
+							if (meshRotation > 0x60u) {
+								craft->meshRotation[meshIdx] = 0x60u;
+							}
 						}
 					}
 				}
@@ -3554,18 +3620,24 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			if (Sound_CountPlayingInstances(g_sfxIds[147]) == 0) {
 				fsfx_PlaySound(147, sourceObjIdx, (unsigned int)g_localPlayer);
 			}
-			meshCount = ModelMesh_GetObjectTypeMeshCount(g_objectTable[objectIdx].objectType);
-			for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
-				uint8_t meshRotation;
+#ifdef XWA_MODERN
+			/* Modern port: XWAU hook_sfoils SFoilsHangarShuttleHook. */
+			if (!XwaArticulation_StepShuttleBlock((unsigned int)objectIdx, XWA_ARTICULATION_SHUTTLE_CLOSE, dtTicks))
+#endif
+			{
+				meshCount = ModelMesh_GetObjectTypeMeshCount(g_objectTable[objectIdx].objectType);
+				for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
+					uint8_t meshRotation;
 
-				if (ModelMesh_GetObjectTypeMeshType((uint16_t)g_objectTable[objectIdx].objectType, meshIdx) ==
-					MESH_RotaryWing) {
-					meshRotation = craft->meshRotation[meshIdx];
-					if (meshRotation < 0x60u) {
-						meshRotation = (uint8_t)(meshRotation + dtTicks);
-						craft->meshRotation[meshIdx] = meshRotation;
-						if (meshRotation > 0x60u) {
-							craft->meshRotation[meshIdx] = 0x60u;
+					if (ModelMesh_GetObjectTypeMeshType((uint16_t)g_objectTable[objectIdx].objectType, meshIdx) ==
+						MESH_RotaryWing) {
+						meshRotation = craft->meshRotation[meshIdx];
+						if (meshRotation < 0x60u) {
+							meshRotation = (uint8_t)(meshRotation + dtTicks);
+							craft->meshRotation[meshIdx] = meshRotation;
+							if (meshRotation > 0x60u) {
+								craft->meshRotation[meshIdx] = 0x60u;
+							}
 						}
 					}
 				}
@@ -5698,7 +5770,10 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 		}
 
 #ifdef XWA_MODERN
-		if (XwaModernFlightTiming_IsHighRate()) {
+		/* Modern port: a droid model with crew.update_all moves through the
+		   crew update instead (XWAU's droid hooks skip this motion). */
+		if (XwaArticulation_CrewUpdatesAll(objectIdx)) {
+		} else if (XwaModernFlightTiming_IsHighRate()) {
 			Hangar_ModernUpdateHangarDroidMesh(sceneIdx, objectIdx, dtTicks);
 		} else {
 			if (sceneIdx == 0) {

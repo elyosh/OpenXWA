@@ -1,4 +1,7 @@
 #include "xwa/flight/ai/ai_internal.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/articulation.h"
+#endif
 
 // GLOBAL: XWA 0x5B7670
 const unsigned int g_aiStillAttackLastAttackerRangeBySkill[4] = { 0x8000, 0xc000, 0xe000, 0 };
@@ -539,6 +542,10 @@ char paiorder_enterhangarorder(void) {
 	unsigned int objIdx;
 	unsigned int distance;
 
+#ifdef XWA_MODERN
+	/* Modern port: XWAU hook_sfoils AIEnterHangarOrderHook. */
+	XwaArticulation_AiEnterHangarOrder(g_paiContext.aiObjIdx);
+#endif
 	g_curCraft->aiFlight.separation = 1;
 	g_paiContext.aiController->thinkInterval = 29;
 
@@ -1840,6 +1847,10 @@ char paiorder_lookforparkorder(void) {
 				worldlocy + g_modelDefs[targetModelIndex].dockPoints[selectedDockPoint].y;
 			g_paiContext.aiController->aimPointZ =
 				worldlocz + g_modelDefs[targetModelIndex].dockPoints[selectedDockPoint].z;
+#ifdef XWA_MODERN
+			/* Modern port: XWAU hook_sfoils AILookForParkOrderHook. */
+			XwaArticulation_AiParkOrder(g_paiContext.aiObjIdx);
+#endif
 			return 1;
 		}
 	}
@@ -2893,6 +2904,11 @@ char paiorder_hyperspaceorder(void) {
 		g_paiContext.aiController->aiPlanState = 944;
 		g_paiContext.aiController->maneuverTimer = 2360;
 		paiman_setpower((int)g_paiContext.aiObjIdx, 0xffffu);
+#ifdef XWA_MODERN
+		/* Modern port: XWAU hook_sfoils SFoilsAIHyperspaceOrderHook, keeping
+		   the paiman_setpower call that hook loses. */
+		XwaArticulation_AiIntoHyperspace(g_paiContext.aiObjIdx);
+#endif
 	}
 	return 0;
 }
