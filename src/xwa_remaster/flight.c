@@ -1,6 +1,7 @@
 /* Flight-scene HD driver — see xwa_remaster/flight.h. */
 
 #include "xwa_remaster/flight.h"
+#include "xwa/assets/object_type.h"
 
 #include "aeron/aeron.h"
 #include "aeron/config_file.h"
@@ -1913,6 +1914,34 @@ static int fl_temporal_pose_changed(const XwaSnapshot* current, const XwaSnapsho
 		   memcmp(cockpit->camera_pan, prev_cockpit->camera_pan, sizeof cockpit->camera_pan) != 0;
 }
 
+/* The F5 renderer rotates a ventral turret cockpit about the native
+ * gunner hardpoint in MODEL coordinates. Modern rendering must use that
+ * fixed model-local half-turn, not a camera-dependent rotation. */
+static int fl_classic_ventral_pivot(int seat, uint16_t object_type) {
+	return seat == 2 && (object_type == OBJ_FamilyTransport ||
+						 object_type == OBJ_MilleniumFalcon2);
+}
+
+static void fl_apply_classic_ventral_pivot(float basis[9],
+									 const XwaCockpit* cockpit, const float camera_local[3],
+									 float position[3]) {
+	/* fl_model_matrix transposes these rows: negate local Y/Z for a
+	 * 180-degree rotation around the native model-local X axis. */
+	for (int axis = 0; axis < 3; ++axis) {
+		basis[3 + axis] = -basis[3 + axis];
+		basis[6 + axis] = -basis[6 + axis];
+	}
+	for (int axis = 0; axis < 3; ++axis) {
+		const float rotated_pivot =
+			basis[axis] * cockpit->hardpoint_local[0] +
+			basis[3 + axis] * cockpit->hardpoint_local[1] +
+			basis[6 + axis] * cockpit->hardpoint_local[2];
+		const float craft_origin = camera_local[axis] -
+			cockpit->hardpoint_world[axis] - cockpit->camera_pan[axis] * 0.0625f;
+		position[axis] = craft_origin + cockpit->hardpoint_world[axis] - rotated_pivot;
+	}
+}
+
 static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const XwaFlightObject* anchor,
 								   const float camera_rows[9], const float camera_local[3], float out[16]) {
 	if (!cockpit || !anchor || !camera_rows || !camera_local || !out) {
@@ -1926,6 +1955,13 @@ static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const XwaFlightObj
 	}
 	float basis[9];
 	fl_object_world(cur, basis);
+
+	if (fl_classic_ventral_pivot(cockpit->seat, anchor->object_type)) {
+		float position[3];
+		fl_apply_classic_ventral_pivot(basis, cockpit, camera_local, position);
+		fl_model_matrix(basis, position, out);
+		return 1;
+	}
 
 	float eye_offset[3];
 	for (int axis = 0; axis < 3; ++axis) {
@@ -3214,6 +3250,12 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	for (int j = 0; j < 3; j++) {
 		pw[j] = s.camera_local[j] + s.crows[0 * 3 + j] * delta[0] + s.crows[1 * 3 + j] * delta[1] +
 				s.crows[2 * 3 + j] * delta[2];
+	}
+	/* F5/classic pivots the two affected lower cockpits around the native
+	 * gunner hardpoint. Keep every other ship's original path unchanged. */
+	if (player_f && fl_classic_ventral_pivot(snap->cockpit.seat, player_f->object_type)) {
+		memcpy(bw, anchor_bw, sizeof bw);
+		fl_apply_classic_ventral_pivot(bw, &snap->cockpit, s.camera_local, pw);
 	}
 	float m[16];
 	fl_model_matrix(bw, pw, m);
