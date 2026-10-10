@@ -36,6 +36,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	uint8_t hdr;
 	uint8_t sdr_gamma;
 	uint8_t paper_white;
+	uint8_t smooth_menu_fonts;
 	int hdr_rows_disabled;
 	int motion_blur_amount_changed;
 	int changed;
@@ -58,8 +59,9 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	hdr = (uint8_t)(options.hdr_output != 0);
 	sdr_gamma = (uint8_t)options.sdr_gamma;
 	paper_white = (uint8_t)options.paper_white;
+	smooth_menu_fonts = (uint8_t)(options.smooth_menu_fonts != 0);
 	changed = 0;
-	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 140, cursor_row, 11);
+	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 140, cursor_row, 12);
 	XwaModernOptionsMenu_DrawTitle(&menu, "OpenXWA Video Options");
 
 	changed |=
@@ -69,6 +71,9 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 												shadow_quality_texts, 2, 62, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &fsr, "FSR Upscaling", fsr_texts, 5, 63, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &msaa, "MSAA", msaa_texts, 4, 64, 0);
+	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &smooth_menu_fonts, "Smooth Menu Fonts",
+											 toggle_texts, 2, 70, 0);
+
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &motion_blur_quality, "Motion Blur", motion_blur_texts,
 												3, 65, 0);
 	motion_blur_amount_changed =
@@ -113,6 +118,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		options.hdr_output = hdr != 0;
 		options.sdr_gamma = (XwaModernSdrGamma)sdr_gamma;
 		options.paper_white = (XwaModernPaperWhite)paper_white;
+		options.smooth_menu_fonts = smooth_menu_fonts;
 		XwaModernVideoOptions_Set(&options);
 	}
 

@@ -85,6 +85,7 @@ static struct {
 	int flight_render_suspended;
 	int hyperspace_preview_last;
 	AeronSampleCount msaa_samples;
+	int smooth_menu_fonts;
 } g;
 
 static int XwaRemaster_SnapshotHasPresent(const XwaSnapshot* snap) {
@@ -230,7 +231,8 @@ static int XwaRemaster_VideoOptionsValid(const XwaModernVideoOptions* options) {
 		   options->motion_blur_amount <= 1.0f && options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 &&
 		   options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB &&
 		   options->paper_white >= XWA_MODERN_PAPER_WHITE_AUTO &&
-		   options->paper_white <= XWA_MODERN_PAPER_WHITE_400;
+		   options->paper_white <= XWA_MODERN_PAPER_WHITE_400 &&
+		   (options->smooth_menu_fonts == 0 || options->smooth_menu_fonts == 1);
 }
 
 void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
@@ -260,6 +262,7 @@ void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
 	out->hdr_output = XwaRemaster_GetHdrDesired();
 	out->sdr_gamma = XwaRemaster_SdrGammaFromDecode(Aeron_OutputSdrContentGamma());
 	out->paper_white = XwaRemaster_PaperWhiteFromNits(Aeron_OutputPaperWhiteNits());
+	out->smooth_menu_fonts = g.smooth_menu_fonts;
 }
 
 void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
@@ -302,6 +305,10 @@ void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
 #endif
 
 	XwaRemaster_SetHdrDesired(options->hdr_output);
+	/* Both original frontend font atlases are preloaded. Draws from the
+	 * next menu update use the chosen atlas; no restart or GPU reload. */
+	g.smooth_menu_fonts = options->smooth_menu_fonts;
+	XwaRemasterAssets_SetSmoothMenuFonts(g.assets, g.smooth_menu_fonts);
 }
 
 int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
@@ -370,6 +377,9 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_PAPER_WHITE) {
 		video_options.paper_white = options->video_options.paper_white;
 	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_SMOOTH_MENU_FONTS) {
+		video_options.smooth_menu_fonts = options->video_options.smooth_menu_fonts;
+	}
 	XwaRemaster_SetVideoOptions(&video_options);
 	g.hdr_apply_pending = 0;
 	/* Aeron downgrades to SDR by itself when HDR is unavailable and re-applies
@@ -383,7 +393,7 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 				  Aeron_OutputHdrStatusName(Aeron_OutputHdrStatus()), (double)Aeron_OutputHdrHeadroom());
 	char remaster_root[1024];
 	snprintf(remaster_root, sizeof remaster_root, "%s/remaster", Aeron_AssetRoot());
-	g.assets = XwaRemasterAssets_Create(remaster_root, options->prefer_original_2d);
+	g.assets = XwaRemasterAssets_Create(remaster_root, options->prefer_original_2d, g.smooth_menu_fonts);
 	Aeron_BlendRampInit(&g.ramp);
 	g.last_tick = UINT64_MAX; /* Snapshot zero has not been rendered yet. */
 	g.mode = RM_VIEW_HD;

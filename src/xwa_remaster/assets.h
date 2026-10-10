@@ -59,8 +59,10 @@ typedef struct XwaAssetRef {
 
 /* `root` is the configured bake output root. `prefer_original_2d` changes
  * source order; the alternate source is selected only when the first is absent. */
-XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d);
+XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d, int smooth_menu_fonts);
 void XwaRemasterAssets_Destroy(XwaRemasterAssets* a);
+/* Both original font textures are resident: selection is immediate, with no GPU reload. */
+void XwaRemasterAssets_SetSmoothMenuFonts(XwaRemasterAssets* a, int enabled);
 
 /* The bake output root passed at create.
  * Borrowed; consumers with their own asset keying (flight sky cube)
@@ -101,7 +103,8 @@ const AeronFontAtlas* XwaRemasterAssets_FlightFont(XwaRemasterAssets* a,
 uint32_t XwaRemasterAssets_Generation(const XwaRemasterAssets* a);
 
 /* Font atlas for a classic point size, or NULL when neither source loaded.
- * Both authored and runtime-original atlases use a 4x pixel scale.
+ * Authored atlases use 4x; original atlases have both 4x and native
+ * versions for immediate selection without reloading textures.
  * Borrowed; owned by the resolver. */
 const AeronFontAtlas* XwaRemasterAssets_FrontendFont(XwaRemasterAssets* a, int font_size,
 													 float* out_atlas_scale);

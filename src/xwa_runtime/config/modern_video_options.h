@@ -77,6 +77,7 @@ typedef struct XwaModernVideoOptions {
 	int hdr_output;
 	XwaModernSdrGamma sdr_gamma;
 	XwaModernPaperWhite paper_white;
+	int smooth_menu_fonts; /* original frontend fonts only; applies immediately */
 } XwaModernVideoOptions;
 
 enum {
@@ -90,6 +91,7 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_PAPER_WHITE = 1u << 7,
 	XWA_MODERN_VIDEO_OVERRIDE_MOTION_BLUR_AMOUNT = 1u << 8,
 	XWA_MODERN_VIDEO_OVERRIDE_SHADOW_QUALITY = 1u << 9,
+	XWA_MODERN_VIDEO_OVERRIDE_SMOOTH_MENU_FONTS = 1u << 10,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

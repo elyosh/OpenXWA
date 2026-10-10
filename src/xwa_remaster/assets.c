@@ -32,7 +32,9 @@ static uint32_t assets_next_generation;
 typedef struct FontSlot {
 	int font_size;
 	uint8_t source;       /* AssetSource */
-	AeronFontAtlas atlas; /* loaded == 0 when the load failed */
+	float atlas_scale;
+	AeronFontAtlas atlas; /* existing 4x / remastered font, always available */
+	AeronFontAtlas smooth_atlas; /* native original pixels, loaded alongside 4x */
 } FontSlot;
 
 typedef struct FlightFontSlot {
@@ -93,6 +95,7 @@ typedef struct GroupSlot {
 struct XwaRemasterAssets {
 	char root[512];
 	int prefer_original_2d;
+	int smooth_menu_fonts;
 	XwaRemasterOriginal2d* original_reader;
 	AeronImageCache* frontend_images;
 	AeronImageCache* flight_images;
@@ -109,13 +112,14 @@ struct XwaRemasterAssets {
 	uint32_t generation;
 };
 
-XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d) {
+XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d, int smooth_menu_fonts) {
 	XwaRemasterAssets* a = (XwaRemasterAssets*)calloc(1, sizeof *a);
 	if (!a) {
 		return NULL;
 	}
 	snprintf(a->root, sizeof a->root, "%s", root ? root : "");
 	a->prefer_original_2d = prefer_original_2d != 0;
+	a->smooth_menu_fonts = smooth_menu_fonts != 0;
 	a->original_reader = XwaRemasterOriginal2d_Create(Aeron_GetVfs());
 	a->frontend_images = Aeron_ImageCacheCreate();
 	a->flight_images = Aeron_ImageCacheCreate();
@@ -145,6 +149,9 @@ void XwaRemasterAssets_Destroy(XwaRemasterAssets* a) {
 		if (a->fonts[i].atlas.loaded) {
 			AeronFontAtlas_Release(&a->fonts[i].atlas);
 		}
+		if (a->fonts[i].smooth_atlas.loaded) {
+			AeronFontAtlas_Release(&a->fonts[i].smooth_atlas);
+		}
 	}
 	for (int i = 0; i < a->file_count; i++) {
 		Aeron_RuntimeAtlasRelease(&a->files[i].original_atlas);
@@ -173,6 +180,12 @@ void XwaRemasterAssets_Destroy(XwaRemasterAssets* a) {
 }
 
 const char* XwaRemasterAssets_Root(const XwaRemasterAssets* a) { return a ? a->root : ""; }
+
+void XwaRemasterAssets_SetSmoothMenuFonts(XwaRemasterAssets* a, int enabled) {
+	if (a) {
+		a->smooth_menu_fonts = enabled != 0;
+	}
+}
 
 static AssetLoadStatus assets_probe_file(const char* path) {
 	FILE* f = fopen(path, "rb");
@@ -1068,12 +1081,21 @@ static AssetLoadStatus assets_load_original_frontend_font(XwaRemasterAssets* a,
 			Aeron_LogWarn("xwa.remaster", "frontend font %d: original load failed: %s", font_size, error);
 		return status;
 	}
-	if (!assets_init_original_font(cmd, &font, XWA_ORIGINAL_FONT_SCALE, 0,
-			"XWA original frontend font", &slot->atlas)) {
-		Xwa2dFontAtlas_Free(&font);
+	/* Keep both atlases resident: 4x nearest-neighbor reproduces the
+	 * original look; the native 1x pixels use existing linear sampling.
+	 * Switching the menu option only changes which texture is drawn. */
+	const int pixelated = assets_init_original_font(cmd, &font, XWA_ORIGINAL_FONT_SCALE, 0,
+			"XWA original frontend font", &slot->atlas);
+	const int smooth = pixelated && assets_init_original_font(cmd, &font, 1, 0,
+			"XWA smooth frontend font", &slot->smooth_atlas);
+	Xwa2dFontAtlas_Free(&font);
+	if (!smooth) {
+		AeronFontAtlas_Release(&slot->atlas);
+		AeronFontAtlas_Release(&slot->smooth_atlas);
+		memset(&slot->atlas, 0, sizeof slot->atlas);
+		memset(&slot->smooth_atlas, 0, sizeof slot->smooth_atlas);
 		return ASSET_LOAD_FAILED;
 	}
-	Xwa2dFontAtlas_Free(&font);
 	return ASSET_LOAD_SUCCESS;
 }
 
@@ -1114,6 +1136,7 @@ static AssetLoadStatus assets_load_frontend_font(XwaRemasterAssets* a, AeronComm
 		}
 		if (status == ASSET_LOAD_SUCCESS) {
 			slot->source = (uint8_t)source;
+			slot->atlas_scale = (float)XWA_ORIGINAL_FONT_SCALE;
 			Aeron_LogInfo("xwa.remaster", "frontend font %d: source=%s", font_size, assets_source_name(source));
 			*out = &slot->atlas;
 			return ASSET_LOAD_SUCCESS;
@@ -1154,10 +1177,17 @@ const AeronFontAtlas* XwaRemasterAssets_FrontendFont(XwaRemasterAssets* a, int f
 		return NULL;
 	}
 	for (int i = 0; i < a->font_count; i++) {
-		if (a->fonts[i].font_size == font_size) {
+		const FontSlot* slot = &a->fonts[i];
+		if (slot->font_size == font_size) {
+			if (a->smooth_menu_fonts && slot->source == ASSET_SOURCE_ORIGINAL &&
+				slot->smooth_atlas.loaded) {
+				if (out_atlas_scale)
+					*out_atlas_scale = 1.0f;
+				return &slot->smooth_atlas;
+			}
 			if (out_atlas_scale)
-				*out_atlas_scale = 4.0f;
-			return a->fonts[i].atlas.loaded ? &a->fonts[i].atlas : NULL;
+				*out_atlas_scale = slot->atlas_scale;
+			return slot->atlas.loaded ? &slot->atlas : NULL;
 		}
 	}
 	return NULL;
