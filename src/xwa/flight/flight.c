@@ -11614,25 +11614,23 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 				double accumA;
 				double accumB;
 				double integrationScale;
+				double response;
 				ModernTurretAngleRemainder* angleRemainder;
 
-				if (XwaModernFlightTiming_IsHighRate()) {
-					integrationScale = (double)(uint16_t)g_elapsedTicks / 8.0;
-					accumA = craft->turretAim.aimAccumA[seatIdx] +
-							 ((double)g_players[playerIdx].smoothedInputPitch * 0.1 -
-							  craft->turretAim.aimAccumA[seatIdx] * 0.25) *
-								 integrationScale;
-					accumB = craft->turretAim.aimAccumB[seatIdx] +
-							 ((double)g_players[playerIdx].smoothedInputYaw * 0.1 -
-							  craft->turretAim.aimAccumB[seatIdx] * 0.25) *
-								 integrationScale;
-				} else {
-					integrationScale = 1.0;
-					accumA = (double)g_players[playerIdx].smoothedInputPitch * 0.1 -
-							 craft->turretAim.aimAccumA[seatIdx] * 0.25 + craft->turretAim.aimAccumA[seatIdx];
-					accumB = (double)g_players[playerIdx].smoothedInputYaw * 0.1 -
-							 craft->turretAim.aimAccumB[seatIdx] * 0.25 + craft->turretAim.aimAccumB[seatIdx];
-				}
+				/* Apply the same response to mouse/joystick and both gunner seats.
+				 * Original rate: 0.1 / 0.25 = 0.4 times smoothed input;
+				 * new rate: 2.4 times input (6x faster), with quicker damping. */
+				integrationScale = XwaModernFlightTiming_IsHighRate()
+					? (double)(uint16_t)g_elapsedTicks / 8.0 : 1.0;
+				response = 0.5 * integrationScale;
+				if (response < 0.0) response = 0.0;
+				if (response > 1.0) response = 1.0;
+				accumA = craft->turretAim.aimAccumA[seatIdx] +
+					(g_players[playerIdx].smoothedInputPitch * 2.4 -
+					 craft->turretAim.aimAccumA[seatIdx]) * response;
+				accumB = craft->turretAim.aimAccumB[seatIdx] +
+					(g_players[playerIdx].smoothedInputYaw * 2.4 -
+					 craft->turretAim.aimAccumB[seatIdx]) * response;
 				angleRemainder = &g_modernTurretAngleRemainders[playerIdx][seatIdx];
 				if (!angleRemainder->initialized ||
 					angleRemainder->objectIdx != g_players[playerIdx].objectIndex ||
