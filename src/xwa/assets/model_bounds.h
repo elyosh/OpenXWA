@@ -7,6 +7,9 @@
 extern "C" {
 #endif
 
+/* Nonzero once a model type's bounds are computed, per model type. */
+extern int g_modelBoundsCached[];
+
 void ModelBounds_EnsureCached(int modelType);
 int ModelBounds_GetMaxExtent(int modelType);
 int ModelBounds_GetMinY(int modelType);

@@ -58,6 +58,11 @@ static const char s_modelMapPath[] = "remaster/models/model_map.yaml";
 static ModelSourceMapEntry* s_mapEntries;
 static int s_mapEntryCount;
 
+/* GLB keys no model list names, added by the settings that load them
+   (XwaModelSource_AddKey); they map to themselves. */
+static ModelSourceKeyText* s_addedKeys;
+static int s_addedKeyCount;
+
 int XwaModelSource_NormalizeKey(const char* fileName, char* key) {
 	const char* base;
 	const char* end;
@@ -310,6 +315,9 @@ static void ModelSource_Reset(void) {
 	free(s_mapEntries);
 	s_mapEntries = NULL;
 	s_mapEntryCount = 0;
+	free(s_addedKeys);
+	s_addedKeys = NULL;
+	s_addedKeyCount = 0;
 	s_equipmentRows = NULL;
 	s_equipmentRowCount = 0;
 	s_equipmentKeys = NULL;
@@ -574,6 +582,11 @@ XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_
 			glbKey = key;
 		}
 	}
+	for (i = 0; glbKey == NULL && i < s_addedKeyCount; ++i) {
+		if (strcmp(s_addedKeys[i], key) == 0) {
+			glbKey = key;
+		}
+	}
 	if (glbKey == NULL) {
 		return XWA_MODEL_SOURCE_OPT;
 	}
@@ -598,6 +611,54 @@ XwaFile* XwaModelSource_OpenModelFile(const char* fileName) {
 }
 
 int XwaModelSource_ReplacementsEnabled(void) { return s_replacementsEnabled && s_initialized; }
+
+int XwaModelSource_AddKey(const char* key) {
+	ModelSourceKeyText normalized;
+	int i;
+
+	if (!s_replacementsEnabled || !s_initialized || !ModelSource_IsValidKeyText(key)) {
+		return 0;
+	}
+	strcpy(normalized, key);
+	if (ModelSource_IsKnownKey(normalized)) {
+		return XwaModelSource_Resolve(normalized, NULL, 0) == XWA_MODEL_SOURCE_GLB;
+	}
+	for (i = 0; i < s_addedKeyCount; ++i) {
+		if (strcmp(s_addedKeys[i], normalized) == 0) {
+			return 1;
+		}
+	}
+	if (!ModelSource_GlbExists(normalized) ||
+		!ModelSource_Grow((void**)&s_addedKeys, s_addedKeyCount, sizeof *s_addedKeys)) {
+		return 0;
+	}
+	strcpy(s_addedKeys[s_addedKeyCount++], normalized);
+	Aeron_LogInfo("xwa.models", "replacement: %s (%s.glb, added)", normalized, normalized);
+	return 1;
+}
+
+int XwaModelSource_TypeKey(unsigned int objectType, char* key) {
+	const ModelTypeInfo* info;
+	const char* rowKey = NULL;
+
+	if (!s_replacementsEnabled || !s_initialized || objectType >= OBJ_Count) {
+		return 0;
+	}
+	info = &g_modelTypeTable[objectType];
+	if ((info->recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) == 0) {
+		return 0;
+	}
+	if (info->textureGroup == 0 && (int)info->frameCount < s_craftRowCount) {
+		rowKey = s_craftRows[info->frameCount];
+	} else if (info->textureGroup == 1 && (int)info->frameCount < s_equipmentRowCount) {
+		rowKey = s_equipmentRows[info->frameCount];
+	}
+	if (rowKey == NULL || rowKey[0] == '\0') {
+		return 0;
+	}
+	strcpy(key, ModelSource_GlbKeyFor(rowKey));
+	return 1;
+}
 
 int XwaModelSource_IsCockpitClassKey(const char* key) {
 	ModelSourceKeyText normalized;

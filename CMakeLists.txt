@@ -209,6 +209,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/collision_bvh.c
     src/xwa_runtime/models/articulation.c
     src/xwa_runtime/models/model_roles.c
+    src/xwa_runtime/models/hangars.c
     src/xwa_runtime/models/mission_file.c
     src/xwa_runtime/models/model_source.c
     src/xwa_runtime/models/object_profiles.c

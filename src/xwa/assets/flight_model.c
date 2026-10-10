@@ -19,6 +19,9 @@
 #include "xwa/render/renderer_internal.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/hangars.h"
+#endif
 
 #include <stdint.h>
 #include <string.h>
@@ -57,6 +60,12 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 	g_loadingModel = 1;
 	modelType = (uint16_t)objectType;
 
+#ifdef XWA_MODERN
+	/* Modern port (XWAU hook_hangars HangarOptLoadHook): the hangar settings
+	   may load another model for this type, the command ship's own hangar or a
+	   swapped hangar object. */
+	if (!XwaHangars_ModelFileName(modelType, modelName, sizeof modelName))
+#endif
 	switch (modelType) {
 		case OBJ_AWing:
 			strcpy(modelName, "Awing.opt");
@@ -247,6 +256,9 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 		return 0;
 	}
 	g_loadedModels.byObjectType[modelType] = modelHandle;
+#ifdef XWA_MODERN
+	XwaHangars_ModelLoaded(modelType, modelHandle);
+#endif
 	g_modelTypeTable[modelType].curTexLevel = texLevel;
 	FeDiskIo_BuildModelDef((uint16_t)g_modelTypeTable[modelType].modelIndex, modelType);
 

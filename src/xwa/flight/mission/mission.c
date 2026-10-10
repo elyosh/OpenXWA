@@ -36,6 +36,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/skins.h"
@@ -7552,13 +7553,15 @@ uint16_t Mission_Init(char* fileName) {
 		return 0;
 	}
 #ifdef XWA_MODERN
-	/* Modern port: read the mission's object profile selections and
-	   articulation overrides, before any flight-group object is created. */
+	/* Modern port: read the mission's object profile selections, articulation
+	   overrides and hangar settings, before any flight-group object is
+	   created. */
 	XwaObjectProfiles_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 								  (int16_t)g_missionHeader.numFlightGroups);
 	XwaArticulation_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 								(int16_t)g_missionHeader.numFlightGroups);
 	XwaSkins_LoadMission(fileName);
+	XwaHangars_LoadMission(fileName);
 #endif
 
 	if (g_pilotData.campaignMode) {

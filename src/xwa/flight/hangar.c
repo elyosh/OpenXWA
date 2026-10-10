@@ -46,6 +46,7 @@
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
@@ -5005,6 +5006,12 @@ lbl58:
 
 	// Carrier hangar (308) for the default hangar type, family base model (179) otherwise.
 	g_hangarBackdropModelType = g_pilotData.hangarType ? 179 : OBJ_Hangar;
+#ifdef XWA_MODERN
+	/* Modern port (XWAU hook_hangars HangarOptReloadHook): the command ship's
+	   hangar settings, and its own hangar model in place of a loaded one. */
+	XwaHangars_Resolve();
+	XwaHangars_ReleaseStaleModel((uint16_t)g_hangarBackdropModelType);
+#endif
 	if (!g_loadedModels.byObjectType[(uint16_t)g_hangarBackdropModelType]) {
 		Hangar_LoadCraftModelByType((ObjectTypeId)g_hangarBackdropModelType);
 		Math_SetFpuSinglePrecisionMode();
@@ -5037,6 +5044,15 @@ lbl58:
 		mobj->iff = 0;
 	}
 	g_objectTable[launchRefIdx].mobj->team = g_objectTable[g_hangarPlayerObjIdx].mobj->team;
+#ifdef XWA_MODERN
+	/* Modern port (XWAU hook_hangars HangarReloadHook): the hangar model shows
+	   the HangarIff markings, by default the command ship's. */
+	if (XwaHangars_IsActive()) {
+		const uint8_t hangarIff = XwaHangars_Objects()->hangarIff;
+
+		mobj->nodeSwitchIndex = hangarIff != 0xFF ? hangarIff : XwaHangars_CommandShipMarkings();
+	}
+#endif
 	g_curCraft = g_objectTable[launchRefIdx].mobj->pCraft;
 
 	for (i = 0; i < 2; ++i) {
