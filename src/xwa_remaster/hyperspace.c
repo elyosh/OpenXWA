@@ -491,6 +491,15 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 	memcpy(h->view_proj, view_proj, sizeof h->view_proj);
 	const uint8_t phase = force_tunnel ? XWA_HYPERSPACE_TUNNEL : snap->hyperspace.phase;
 	const uint32_t ticks = force_tunnel ? 0u : snap->hyperspace.phase_elapsed_ticks;
+	/* The entry/exit flash must share the tunnel's ship axis and eye rays,
+	 * including off-center projection and head-tracked camera movement. */
+	if (tunnel_view) {
+		h->tunnel_uniform.projection[0] = tunnel_view->tan_half_fov_x;
+		h->tunnel_uniform.projection[1] = tunnel_view->tan_half_fov_y;
+		h->tunnel_uniform.projection[2] = tunnel_view->proj_offset_x;
+		h->tunnel_uniform.projection[3] = tunnel_view->proj_offset_y;
+		memcpy(h->tunnel_uniform.tunnel_forward, tunnel_view->forward, 3 * sizeof(float));
+	}
 	if (phase == XWA_HYPERSPACE_TUNNEL) {
 		if (tunnel_view) {
 			h->tunnel_uniform.projection[0] = tunnel_view->tan_half_fov_x;
