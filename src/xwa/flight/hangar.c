@@ -4320,7 +4320,6 @@ void Hangar_SetCameraShot(int shotIndex) {
 	int worldZ;
 	int noObject;
 	ObjectRecord* playerObj;
-	ObjectRecord* launchRef;
 
 	noObject = 0xffff;
 	g_hangarAutoCam = 1;
@@ -4400,11 +4399,10 @@ void Hangar_SetCameraShot(int shotIndex) {
 							worldY = g_objectTable[g_launchRefObjIdx].world_y - 135;
 							worldZ = g_objectTable[g_launchRefObjIdx].world_z - 741;
 						} else {
-							launchRef = &g_objectTable[g_launchRefObjIdx];
 							worldX = playerObj->world_x - 90;
-							worldY = ModelBounds_GetSizeY(playerObjectType) / 2 + launchRef->world_y + 45;
+							worldY = ModelBounds_GetSizeY(playerObjectType) / 2 + playerObj->world_y + 45;
 							worldZ =
-								ModelBounds_GetSizeZ(launchRef->objectType) / 2 + playerObj->world_z + 80;
+								ModelBounds_GetSizeZ(playerObj->objectType) / 2 + playerObj->world_z + 80;
 						}
 						break;
 				}
