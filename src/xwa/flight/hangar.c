@@ -717,6 +717,13 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 				}
 			}
 			Hud_ResetFlightMessagePanes(1);
+#ifdef XWA_MODERN
+			/* Modern port: a hangar without its shuttle (LoadShuttle 0) spawns
+			   it for the player; the hook leaves object 0 here. */
+			if (XwaHangars_IsActive()) {
+				XwaHangarScene_EnsureShuttle();
+			}
+#endif
 			shuttleIdx = g_hangarShuttleState.objectIdx;
 			g_launchSeqPhase = 9;
 			g_players[g_localPlayer].regionSessionId = 0;
@@ -755,6 +762,12 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 			g_objectTable[g_hangarPlayerObjIdx].world_x = g_objectTable[g_launchRefObjIdx].world_x + 1127;
 			g_objectTable[g_hangarPlayerObjIdx].world_y = g_objectTable[g_launchRefObjIdx].world_y + 9000;
 			g_objectTable[g_hangarPlayerObjIdx].world_z = g_launchBaseZ + 353;
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars HangarShuttleReenterPositionHook). */
+			if (XwaHangars_IsActive()) {
+				XwaHangarScene_PlaceShuttleReentry(g_hangarPlayerObjIdx);
+			}
+#endif
 			g_objectTable[g_hangarPlayerObjIdx].yaw = 0x8000;
 			g_objectTable[g_hangarPlayerObjIdx].pitch = 0x4000;
 			g_objectTable[g_hangarPlayerObjIdx].roll = 0;
@@ -904,6 +917,13 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 						g_objectTable[g_launchRefObjIdx].world_y - 400;
 				}
 				g_objectTable[g_hangarPlayerObjIdx].world_z = g_launchBaseZ + 547;
+#ifdef XWA_MODERN
+				/* Modern port (XWAU hook_hangars): with the player's offset and
+				   PlayerAnimationStraightLine farther out, at its re-entry height. */
+				if (XwaHangars_IsActive()) {
+					XwaHangarScene_PlaceReentryStart(g_hangarPlayerObjIdx);
+				}
+#endif
 				g_objectTable[g_hangarPlayerObjIdx].yaw = 0x8000;
 				g_objectTable[g_hangarPlayerObjIdx].pitch = 14336;
 				g_objectTable[g_hangarPlayerObjIdx].roll = 0;
@@ -2041,7 +2061,17 @@ int Hangar_UpdateLaunch(int dtMs) {
 			int steps = dtMsa;
 			double rate;
 
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): the climb leaves the player's floor
+			   side, up to its heights. */
+			if (XwaHangars_IsActive()) {
+				XwaHangarScene_PlayerRise(g_hangarPlayerObjIdx, dtMsa);
+			} else {
+				g_objectTable[g_hangarPlayerObjIdx].world_z += dtMsa;
+			}
+#else
 			g_objectTable[g_hangarPlayerObjIdx].world_z += dtMsa;
+#endif
 			g_objectTable[objIdx].roll += (Q16Angle)((int)g_hangarLaunchRollRate * dtMsa);
 			rate = (0x8000 - g_objectTable[objIdx].roll <= 0) ? (g_hangarLaunchRollRate + fdt)
 															  : (g_hangarLaunchRollRate - fdt);
@@ -2059,7 +2089,13 @@ int Hangar_UpdateLaunch(int dtMs) {
 			}
 			g_objectTable[objIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objIdx].mobj->moveVectorDirty = 1;
+#ifdef XWA_MODERN
+			if (XwaHangars_IsActive()
+					? XwaHangarScene_PlayerAbove(objIdx, XwaHangarScene_PlayerAnimationElevation(objIdx, 247))
+					: g_objectTable[objIdx].world_z > g_launchBaseZ + 247) {
+#else
 			if (g_objectTable[objIdx].world_z > g_launchBaseZ + 247) {
+#endif
 				g_launchSeqPhase = 2;
 				g_objectTable[objIdx].roll = 0;
 				g_hangarLaunchRollRate = 0.0f;
@@ -2096,8 +2132,15 @@ int Hangar_UpdateLaunch(int dtMs) {
 			}
 			g_objectTable[objIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objIdx].mobj->moveVectorDirty = 1;
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): PlayerAnimationStraightLine farther. */
+			if (g_objectTable[objIdx].world_y >
+				(g_hangarBackdropModelType != 308 ? -900 : 2500) + g_objectTable[g_launchRefObjIdx].world_y +
+					(XwaHangars_IsActive() ? XwaHangars_Objects()->playerAnimationStraightLine : 0)) {
+#else
 			if (g_objectTable[objIdx].world_y >
 				(g_hangarBackdropModelType != 308 ? -900 : 2500) + g_objectTable[g_launchRefObjIdx].world_y) {
+#endif
 				g_launchAnimDone = 1;
 				g_launchSeqPhase = 4;
 			}
@@ -2118,21 +2161,47 @@ int Hangar_UpdateLaunch(int dtMs) {
 			if (g_hangarLaunchMoveSpeed < 3.0f) {
 				g_hangarLaunchMoveSpeed = 3.0f;
 			}
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): no deceleration nor descent on the
+			   PlayerAnimationStraightLine, then the player's heights, floor side
+			   and offset. */
+			if (XwaHangars_IsActive() && XwaHangarScene_ReentryStraight(objIdx)) {
+				g_hangarLaunchMoveSpeed += (float)dtMsa * decel;
+			} else if (XwaHangars_IsActive()
+						   ? XwaHangarScene_PlayerAbove(objIdx,
+														XwaHangarScene_PlayerAnimationElevation(objIdx, 147))
+						   : g_objectTable[objIdx].world_z > g_launchBaseZ + 147) {
+#else
 			if (g_objectTable[objIdx].world_z > g_launchBaseZ + 147) {
+#endif
 				int objectType = g_objectTable[g_hangarPlayerObjIdx].objectType;
 				if (objectType != OBJ_BWing) {
 					railZ = ModelBounds_GetSizeZ((uint16_t)objectType) / 2;
 				} else {
 					railZ = 50;
 				}
+#ifdef XWA_MODERN
+				if (XwaHangars_IsActive()
+						? XwaHangarScene_PlayerAbove(objIdx, XwaHangarScene_PlayerRestElevation(objIdx))
+						: g_objectTable[objIdx].world_z > g_launchBaseZ + railZ) {
+#else
 				if (g_objectTable[objIdx].world_z > g_launchBaseZ + railZ) {
+#endif
 					int step;
 					if (g_hangarLaunchMoveSpeed > 2.0f) {
 						step = 2 * dtMsa;
 					} else {
 						step = (int)((double)dtMsa * g_hangarLaunchMoveSpeed);
 					}
+#ifdef XWA_MODERN
+					if (XwaHangars_IsActive()) {
+						XwaHangarScene_PlayerRise(objIdx, -step);
+					} else {
+						g_objectTable[objIdx].world_z -= step;
+					}
+#else
 					g_objectTable[objIdx].world_z -= step;
+#endif
 				}
 			}
 			craft = g_objectTable[objIdx].mobj->pCraft;
@@ -2147,8 +2216,14 @@ int Hangar_UpdateLaunch(int dtMs) {
 			}
 			g_objectTable[objIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objIdx].mobj->moveVectorDirty = 1;
+#ifdef XWA_MODERN
+			if (g_objectTable[objIdx].world_y <=
+				(g_hangarBackdropModelType != 308 ? -6800 : -800) + g_objectTable[g_launchRefObjIdx].world_y +
+					(XwaHangars_IsActive() ? XwaHangarScene_PlayerOffset(objIdx, 1) : 0)) {
+#else
 			if (g_objectTable[objIdx].world_y <= (g_hangarBackdropModelType != 308 ? -6800 : -800) +
 													 g_objectTable[g_launchRefObjIdx].world_y) {
+#endif
 				g_launchSeqPhase = 6;
 				g_hangarLaunchYawRate = 0.0f;
 				craft->throttleSpeed = 12288;
@@ -2191,9 +2266,19 @@ int Hangar_UpdateLaunch(int dtMs) {
 					railZ = 50;
 				}
 			}
+#ifdef XWA_MODERN
+			if (XwaHangars_IsActive()) {
+				if (XwaHangarScene_PlayerAbove(objIdx, XwaHangarScene_PlayerRestElevation(objIdx))) {
+					XwaHangarScene_PlayerRise(objIdx, -dtMsa);
+				}
+			} else if (g_objectTable[objIdx].world_z > g_launchBaseZ + railZ) {
+				g_objectTable[objIdx].world_z -= dtMsa;
+			}
+#else
 			if (g_objectTable[objIdx].world_z > g_launchBaseZ + railZ) {
 				g_objectTable[objIdx].world_z -= dtMsa;
 			}
+#endif
 			if (g_objectTable[objIdx].pitch < 0x4000u) {
 				g_objectTable[objIdx].pitch += (Q16Angle)(int64_t)(g_hangarLaunchPitchRate * fdt);
 				g_hangarLaunchPitchRate = g_hangarLaunchPitchRate - (float)(fdt * -0.5f);
@@ -2215,7 +2300,15 @@ int Hangar_UpdateLaunch(int dtMs) {
 			int objIdx = g_hangarPlayerObjIdx;
 			int railZ;
 
+#ifdef XWA_MODERN
+			if (XwaHangars_IsActive()) {
+				XwaHangarScene_PlayerRise(g_hangarPlayerObjIdx, -dtMsa);
+			} else {
+				g_objectTable[g_hangarPlayerObjIdx].world_z -= dtMsa;
+			}
+#else
 			g_objectTable[g_hangarPlayerObjIdx].world_z -= dtMsa;
+#endif
 			g_objectTable[playerObjIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[playerObjIdx].mobj->moveVectorDirty = 1;
 			{
@@ -2226,7 +2319,13 @@ int Hangar_UpdateLaunch(int dtMs) {
 					railZ = 50;
 				}
 			}
+#ifdef XWA_MODERN
+			if (XwaHangars_IsActive()
+					? !XwaHangarScene_PlayerAbove(objIdx, XwaHangarScene_PlayerRestElevation(objIdx))
+					: g_objectTable[objIdx].world_z <= g_launchBaseZ + railZ) {
+#else
 			if (g_objectTable[objIdx].world_z <= g_launchBaseZ + railZ) {
+#endif
 				if (g_hangarBackdropModelType == 308) {
 					g_objectTable[objIdx].world_x = g_objectTable[g_launchRefObjIdx].world_x;
 					g_objectTable[objIdx].world_y = g_objectTable[g_launchRefObjIdx].world_y - 800;
@@ -2237,6 +2336,13 @@ int Hangar_UpdateLaunch(int dtMs) {
 				g_objectTable[objIdx].world_z =
 					g_launchBaseZ +
 					Hangar_GetLaunchModelZOffset(g_objectTable[g_hangarPlayerObjIdx].objectType);
+#ifdef XWA_MODERN
+				/* Modern port (XWAU hook_hangars): parked with the player's
+				   elevation, floor side and offset. */
+				if (XwaHangars_IsActive()) {
+					XwaHangarScene_PlaceOnLaunchRail(objIdx);
+				}
+#endif
 				g_objectTable[objIdx].yaw = 0;
 				g_objectTable[objIdx].pitch = 0x4000;
 				g_launchSeqPhase = 8;
@@ -2275,7 +2381,14 @@ int Hangar_UpdateLaunch(int dtMs) {
 
 	if (g_hangarBackdropModelType == 308) {
 		Hangar_UpdateHangarDroidTraffic(dtMsa);
+#ifdef XWA_MODERN
+		/* Modern port (XWAU hook_hangars HangarShuttleUpdateHook): no shuttle, no traffic. */
+		if (!XwaHangars_IsActive() || XwaHangarScene_ShuttleLoaded()) {
+			Hangar_UpdateShuttleTrafficCycle(dtMsa);
+		}
+#else
 		Hangar_UpdateShuttleTrafficCycle(dtMsa);
+#endif
 		Hangar_UpdateRoofCraneMotion(dtMsa);
 	} else if (g_hangarBackdropModelType == 179) {
 		Hangar_UpdateFamilyBaseDroidTraffic(dtMsa);
@@ -3272,7 +3385,16 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			int distance;
 
 			pan = 64;
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): away from its floor side. */
+			if (XwaHangars_IsActive()) {
+				XwaHangarScene_ShuttleRise(2 * dtTicks);
+			} else {
+				g_objectTable[objectIdx].world_z += 2 * dtTicks;
+			}
+#else
 			g_objectTable[objectIdx].world_z += 2 * dtTicks;
+#endif
 			g_objectTable[objectIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objectIdx].mobj->moveVectorDirty = 1;
 			baseVolume = (uint16_t)fsfx_ComputeSourceVolume(sourceObjIdx, 150u, &outPriority);
@@ -3299,7 +3421,13 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				Sound_SetLatestInstancePan(g_sfxIds[150], pan);
 				Sound_SetLatestInstanceVolume(g_sfxIds[150], volume);
 			}
+#ifdef XWA_MODERN
+			if (XwaHangars_IsActive()
+					? XwaHangarScene_ShuttleAbove(XwaHangarScene_ShuttleAnimationElevation(353))
+					: g_objectTable[objectIdx].world_z > g_launchBaseZ + 353) {
+#else
 			if (g_objectTable[objectIdx].world_z > g_launchBaseZ + 353) {
+#endif
 				g_hangarShuttleState.moveState = 2;
 				Sound_SetLatestInstanceVolume(g_sfxIds[150], baseVolume);
 			}
@@ -3307,7 +3435,18 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 		}
 
 		case 2: {
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): the short way to heading 0. */
+			int turned = 0;
+
+			if (XwaHangars_IsActive()) {
+				turned = XwaHangarScene_ShuttleTurnOut(dtTicks);
+			} else {
+				g_objectTable[objectIdx].yaw = (uint16_t)(g_objectTable[objectIdx].yaw + 50 * dtTicks);
+			}
+#else
 			g_objectTable[objectIdx].yaw = (uint16_t)(g_objectTable[objectIdx].yaw + 50 * dtTicks);
+#endif
 			g_objectTable[objectIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objectIdx].mobj->moveVectorDirty = 1;
 #ifdef XWA_MODERN
@@ -3334,7 +3473,11 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 					}
 				}
 			}
+#ifdef XWA_MODERN
+			if (XwaHangars_IsActive() ? turned : g_objectTable[objectIdx].yaw < 0x4e20u) {
+#else
 			if (g_objectTable[objectIdx].yaw < 0x4e20u) {
+#endif
 				g_objectTable[objectIdx].yaw = 0;
 				g_hangarShuttleState.moveState = 3;
 				fsfx_PlaySound(146, sourceObjIdx, (unsigned int)g_localPlayer);
@@ -3376,6 +3519,12 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				}
 			}
 			targetY = g_objectTable[g_launchRefObjIdx].world_y + 2400;
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): ShuttleAnimationStraightLine farther. */
+			if (XwaHangars_IsActive()) {
+				targetY += XwaHangars_Objects()->shuttleAnimationStraightLine;
+			}
+#endif
 			if (g_objectTable[objectIdx].world_y > targetY) {
 				g_objectTable[objectIdx].world_y = targetY;
 				g_hangarShuttleState.moveState = 4;
@@ -3393,8 +3542,19 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			angleRadians = (float)g_objectTable[objectIdx].yaw * 0.000095873722f;
 			g_objectTable[objectIdx].world_y +=
 				dtTicks * (int)(cos(angleRadians) * g_hangarShuttleState.moveSpeed);
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): along ShuttleAnimation. */
+			if (XwaHangars_IsActive()) {
+				XwaHangarScene_ShuttleSideStep(
+					dtTicks * (int)(sin(angleRadians) * g_hangarShuttleState.moveSpeed), dtTicks);
+			} else {
+				g_objectTable[objectIdx].world_x +=
+					dtTicks * (int)(sin(angleRadians) * g_hangarShuttleState.moveSpeed);
+			}
+#else
 			g_objectTable[objectIdx].world_x +=
 				dtTicks * (int)(sin(angleRadians) * g_hangarShuttleState.moveSpeed);
+#endif
 			craft->throttleSpeed = (uint16_t)(4096 - (int)(g_hangarShuttleState.moveSpeed * -256.0f));
 #ifdef XWA_MODERN
 			/* Modern port: XWAU hook_sfoils SFoilsHangarShuttleHook. */
@@ -3446,8 +3606,19 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			angleRadians = (float)g_objectTable[objectIdx].yaw * 0.000095873722f;
 			g_objectTable[objectIdx].world_y +=
 				dtTicks * (int)(cos(angleRadians) * g_hangarShuttleState.moveSpeed);
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): along ShuttleAnimation. */
+			if (XwaHangars_IsActive()) {
+				XwaHangarScene_ShuttleSideStep(
+					dtTicks * (int)(sin(angleRadians) * g_hangarShuttleState.moveSpeed), dtTicks);
+			} else {
+				g_objectTable[objectIdx].world_x +=
+					dtTicks * (int)(sin(angleRadians) * g_hangarShuttleState.moveSpeed);
+			}
+#else
 			g_objectTable[objectIdx].world_x +=
 				dtTicks * (int)(sin(angleRadians) * g_hangarShuttleState.moveSpeed);
+#endif
 			craft->throttleSpeed = (uint16_t)(4096 - (int)(g_hangarShuttleState.moveSpeed * -256.0f));
 			if (g_objectTable[objectIdx].yaw < 0xa05au && g_objectTable[objectIdx].yaw > 0x1000u) {
 				if (Sound_CountPlayingInstances(g_sfxIds[147]) == 0) {
@@ -3496,8 +3667,17 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			int targetX;
 
 			g_objectTable[objectIdx].world_y -= (int)g_hangarShuttleState.moveSpeed * dtTicks;
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): 0.1 deceleration and no nudge
+			   toward the stock X, for the configured landing place. */
+			g_hangarShuttleState.moveSpeed =
+				g_hangarShuttleState.moveSpeed - (float)dtTicks * (XwaHangars_IsActive() ? 0.1f : 0.13f);
+			targetX = XwaHangars_IsActive() ? g_objectTable[objectIdx].world_x
+											: g_objectTable[g_launchRefObjIdx].world_x + 1127;
+#else
 			g_hangarShuttleState.moveSpeed = g_hangarShuttleState.moveSpeed - (float)dtTicks * 0.13f;
 			targetX = g_objectTable[g_launchRefObjIdx].world_x + 1127;
+#endif
 #ifdef XWA_MODERN
 			if (!XwaModernFlightTiming_IsHighRate() || g_modernHangarLegacyCadenceDue) {
 #endif
@@ -3536,10 +3716,24 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				Sound_SetLatestInstancePan(g_sfxIds[150], pan);
 				Sound_SetLatestInstanceVolume(g_sfxIds[150], volume);
 			}
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): the landing place ShuttlePositionX/Y. */
+			if (g_hangarShuttleState.moveSpeed <= 0.0f ||
+				g_objectTable[objectIdx].world_y <=
+					g_objectTable[g_launchRefObjIdx].world_y +
+						(XwaHangars_IsActive() ? XwaHangars_Objects()->shuttlePosition[1] : 959)) {
+				g_objectTable[objectIdx].world_x =
+					g_objectTable[g_launchRefObjIdx].world_x +
+					(XwaHangars_IsActive() ? XwaHangars_Objects()->shuttlePosition[0] : 1127);
+				g_objectTable[objectIdx].world_y =
+					g_objectTable[g_launchRefObjIdx].world_y +
+					(XwaHangars_IsActive() ? XwaHangars_Objects()->shuttlePosition[1] : 959);
+#else
 			if (g_hangarShuttleState.moveSpeed <= 0.0f ||
 				g_objectTable[objectIdx].world_y <= g_objectTable[g_launchRefObjIdx].world_y + 959) {
 				g_objectTable[objectIdx].world_x = g_objectTable[g_launchRefObjIdx].world_x + 1127;
 				g_objectTable[objectIdx].world_y = g_objectTable[g_launchRefObjIdx].world_y + 959;
+#endif
 				g_objectTable[objectIdx].roll = 0;
 				g_hangarShuttleState.moveSpeed = 0.0f;
 				g_hangarShuttleState.moveState = 8;
@@ -3550,7 +3744,18 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 		}
 
 		case 8: {
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): to ShuttleOrientation. */
+			int turned = 0;
+
+			if (XwaHangars_IsActive()) {
+				turned = XwaHangarScene_ShuttleTurnIn(dtTicks);
+			} else {
+				g_objectTable[objectIdx].yaw = (uint16_t)(g_objectTable[objectIdx].yaw + 50 * dtTicks);
+			}
+#else
 			g_objectTable[objectIdx].yaw = (uint16_t)(g_objectTable[objectIdx].yaw + 50 * dtTicks);
+#endif
 			g_objectTable[objectIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objectIdx].mobj->moveVectorDirty = 1;
 #ifdef XWA_MODERN
@@ -3577,7 +3782,11 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 					}
 				}
 			}
+#ifdef XWA_MODERN
+			if (XwaHangars_IsActive() ? turned : g_objectTable[objectIdx].yaw >= 0xa880u) {
+#else
 			if (g_objectTable[objectIdx].yaw >= 0xa880u) {
+#endif
 				g_hangarShuttleState.moveState = 9;
 			}
 			break;
@@ -3587,7 +3796,16 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			int pan;
 			int distance;
 
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): back to its floor side. */
+			if (XwaHangars_IsActive()) {
+				XwaHangarScene_ShuttleRise(-2 * dtTicks);
+			} else {
+				g_objectTable[objectIdx].world_z -= 2 * dtTicks;
+			}
+#else
 			g_objectTable[objectIdx].world_z -= 2 * dtTicks;
+#endif
 			g_objectTable[objectIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objectIdx].mobj->moveVectorDirty = 1;
 			if (Sound_CountPlayingInstances(g_sfxIds[150]) != 0) {
@@ -3613,7 +3831,13 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 					Sound_SetLatestInstancePan(g_sfxIds[150], pan);
 				}
 			}
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): lands at its [Size] elevation. */
+			if (XwaHangars_IsActive() ? !XwaHangarScene_ShuttleAbove(XwaHangarScene_ShuttleRestElevation())
+									  : g_objectTable[objectIdx].world_z <= g_launchBaseZ + 138) {
+#else
 			if (g_objectTable[objectIdx].world_z <= g_launchBaseZ + 138) {
+#endif
 				g_hangarShuttleState.moveState = 0;
 				g_hangarShuttleState.nextDecisionTime =
 					(int)((uint16_t)GameRand() % 20000 + decisionTime + 25000);
@@ -3688,10 +3912,24 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				Sound_SetLatestInstancePan(g_sfxIds[150], pan);
 				Sound_SetLatestInstanceVolume(g_sfxIds[150], volume);
 			}
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): the landing place ShuttlePositionX/Y. */
+			if (g_hangarShuttleState.moveSpeed <= 0.0f ||
+				g_objectTable[objectIdx].world_y <=
+					g_objectTable[g_launchRefObjIdx].world_y +
+						(XwaHangars_IsActive() ? XwaHangars_Objects()->shuttlePosition[1] : 959)) {
+				g_objectTable[objectIdx].world_x =
+					g_objectTable[g_launchRefObjIdx].world_x +
+					(XwaHangars_IsActive() ? XwaHangars_Objects()->shuttlePosition[0] : 1127);
+				g_objectTable[objectIdx].world_y =
+					g_objectTable[g_launchRefObjIdx].world_y +
+					(XwaHangars_IsActive() ? XwaHangars_Objects()->shuttlePosition[1] : 959);
+#else
 			if (g_hangarShuttleState.moveSpeed <= 0.0f ||
 				g_objectTable[objectIdx].world_y <= g_objectTable[g_launchRefObjIdx].world_y + 959) {
 				g_objectTable[objectIdx].world_x = g_objectTable[g_launchRefObjIdx].world_x + 1127;
 				g_objectTable[objectIdx].world_y = g_objectTable[g_launchRefObjIdx].world_y + 959;
+#endif
 				g_objectTable[objectIdx].roll = 0;
 				g_hangarShuttleState.moveSpeed = 0.0f;
 				g_hangarShuttleState.moveState = 8;
@@ -4025,6 +4263,12 @@ after_key:
 			else
 				sizeZ = ModelBounds_GetSizeZ((uint16_t)g_objectTable[g_hangarPlayerObjIdx].objectType) / 2;
 			g_objectTable[placementObjIdx].world_z = g_launchBaseZ + sizeZ;
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars): the new craft's elevation, floor side and offset. */
+			if (XwaHangars_IsActive()) {
+				XwaHangarScene_PlacePlayerAtRest(placementObjIdx);
+			}
+#endif
 			g_yardFinishPlacementResultCode = 0;
 			if (GameRand2() & 1)
 				fsfx_PlaySound(2627, 0xFFFFu, g_localPlayer);
@@ -5113,6 +5357,13 @@ lbl58:
 		halfSizeZ = 50;
 	}
 	g_launchBaseZ = g_objectTable[g_hangarPlayerObjIdx].world_z - halfSizeZ;
+#ifdef XWA_MODERN
+	/* Modern port (XWAU hook_hangars): the player's [Size] elevation, floor
+	   side and offset. */
+	if (XwaHangars_IsActive()) {
+		g_launchBaseZ = XwaHangarScene_FloorZ(g_hangarPlayerObjIdx);
+	}
+#endif
 
 	if (g_hangarBackdropModelType == OBJ_Hangar) {
 		g_objectTable[launchRefIdx].world_x = g_objectTable[g_hangarPlayerObjIdx].world_x;
@@ -5121,6 +5372,11 @@ lbl58:
 		g_objectTable[launchRefIdx].world_x = g_objectTable[g_hangarPlayerObjIdx].world_x - 142;
 		g_objectTable[launchRefIdx].world_y = g_objectTable[g_hangarPlayerObjIdx].world_y + 6800;
 	}
+#ifdef XWA_MODERN
+	if (XwaHangars_IsActive()) {
+		XwaHangarScene_OffsetLaunchRef(launchRefIdx, g_hangarPlayerObjIdx);
+	}
+#endif
 	g_objectTable[launchRefIdx].world_z =
 		g_launchBaseZ - g_modelDefs[(uint16_t)GetModelIndexFromType((ObjectTypeId)g_hangarBackdropModelType)]
 							.meshAttachData[6];
@@ -5474,6 +5730,12 @@ int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t modelType, int relX, int 
 			zOffset = 50;
 		}
 		g_objectTable[objIdx].world_z = zOffset + g_launchBaseZ;
+#ifdef XWA_MODERN
+		/* Modern port (XWAU hook_hangars): the [Size] elevation, on the floor side. */
+		if (XwaHangars_IsActive()) {
+			g_objectTable[objIdx].world_z = XwaHangarScene_ObjectFloorZ(modelType);
+		}
+#endif
 	}
 
 	g_objectTable[objIdx].mobj->prevWorldX = g_objectTable[objIdx].world_x;
@@ -5505,6 +5767,13 @@ void Hangar_UpdateRoofCraneMotion(int dtTicks) {
 			int distance;
 
 			worldX = &g_objectTable[objectIdx].world_x;
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars HangarRoofCraneUpdateHook): along
+			   HangarRoofCraneAxis; targetWorldX holds the target on it. */
+			if (XwaHangars_IsActive()) {
+				worldX = XwaHangarScene_CraneCoordinate();
+			}
+#endif
 			distance = abs(*worldX - g_hangarRoofCraneState.targetWorldX);
 
 			if (distance <= 100) {
@@ -5554,6 +5823,15 @@ void Hangar_UpdateRoofCraneMotion(int dtTicks) {
 					offset = -offset;
 				}
 
+#ifdef XWA_MODERN
+				/* Modern port (XWAU hook_hangars HangarRoofCraneInitHook): within
+				   HangarRoofCraneLow/HighOffset of the crane's place. */
+				if (XwaHangars_IsActive()) {
+					g_hangarRoofCraneState.targetWorldX = XwaHangarScene_CraneTarget(offset);
+					g_hangarRoofCraneState.moveState = 1;
+					break;
+				}
+#endif
 				launchRefObjIdx = g_launchRefObjIdx;
 				currentWorldX = g_objectTable[objectIdx].world_x;
 				targetWorldX = offset + currentWorldX;
@@ -5583,6 +5861,13 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 		int playerObjIdx;
 		unsigned int objectIdx;
 
+#ifdef XWA_MODERN
+		/* Modern port (XWAU hook_hangars HangarDroidsUpdateHook): Droid1/2Update. */
+		if (XwaHangars_IsActive() && !XwaHangarScene_DroidUpdates(sceneIdx)) {
+			++sceneIdx;
+			continue;
+		}
+#endif
 		launchSeqPhase = g_launchSeqPhase;
 		objectTable = g_objectTable;
 		playerObjIdx = g_hangarPlayerObjIdx;

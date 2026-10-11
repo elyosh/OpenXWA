@@ -5,7 +5,7 @@
  *
  * remaster/hangars.yaml holds the settings layers (written by the model
  * conversion from XWAU's FlightModels files): a default layer, one per ship
- * model with variants per IFF, and the player crafts' hangar cameras and
+ * model with variants per IFF, and the crafts' hangar cameras and
  * elevations. A mission adds its own layer (`hangar` in its mission file).
  * For the hangar's command ship, the layers mission > ship IFF > ship >
  * default give each object setting from the first layer that sets it, and
@@ -116,6 +116,15 @@ const XwaHangarMapEntry* XwaHangars_Map(int family, int* count);
 const XwaHangarCamera* XwaHangars_Camera(int family);
 /* The command ship's markings (FG markings, 0 without a command ship). */
 uint8_t XwaHangars_CommandShipMarkings(void);
+/* How high `objectType` stands off the hangar floor (GetCraftElevation): the
+   [Size] ClosedSFoilsElevation, or ClosedSFoilsElevationInverted below an
+   inverted floor, of the model it loads (`crafts` in hangars.yaml); without
+   one, 50 for the B-wing, 138 for the shuttle, else half its height. */
+int XwaHangars_CraftElevation(uint16_t objectType, int inverted);
+/* Whether the player craft `objectType` hangs from the inverted floor, and
+   its offset from the stock place (GetPlayerCraft). */
+int XwaHangars_PlayerFloorInverted(uint16_t objectType);
+void XwaHangars_PlayerOffset(uint16_t objectType, int offset[3]);
 
 /* The model file Hangar_LoadCraftModelByType loads for `objectType` instead
    of its stock one ("<key>.opt", resolved by the model source), or 0: the

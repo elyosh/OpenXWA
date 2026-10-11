@@ -777,3 +777,56 @@ void XwaHangars_LeaveHangar(void) {
 	s_inHangar = 0;
 	Hangars_ReloadUsedTypes(0);
 }
+
+/* ---- placement ---------------------------------------------------------- */
+
+int XwaHangars_CraftElevation(uint16_t objectType, int inverted) {
+	const AeronConfigNode* elevation = NULL;
+	HangarsKey key;
+
+	Hangars_DesiredKey(objectType, key);
+	if (s_settings != NULL && (key[0] != '\0' || XwaModelSource_TypeKey(objectType, 1, key))) {
+		const AeronConfigNode* crafts = AeronConfigNode_MapGet(AeronConfigFile_Root(s_settings), "crafts");
+
+		elevation = AeronConfigNode_MapGet(AeronConfigNode_MapGet(crafts, key), "elevation");
+	}
+	if (AeronConfigNode_SequenceCount(elevation) == 2) {
+		return (int)AeronConfigNode_Int(AeronConfigNode_SequenceGet(elevation, inverted != 0), 0);
+	}
+	switch (objectType) {
+		case OBJ_BWing:
+			return 50;
+		case OBJ_Shuttle:
+			return 138;
+		default:
+			return ModelBounds_GetSizeZ(objectType) / 2;
+	}
+}
+
+int XwaHangars_PlayerFloorInverted(uint16_t objectType) {
+	int index;
+
+	if (s_objects.isPlayerFloorInverted) {
+		return 1;
+	}
+	for (index = 0; index < s_objects.playerFloorInvertedTypeCount; ++index) {
+		if (s_objects.playerFloorInvertedTypes[index] == objectType) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+void XwaHangars_PlayerOffset(uint16_t objectType, int offset[3]) {
+	const int* source =
+		XwaHangars_PlayerFloorInverted(objectType) ? s_objects.playerInvertedOffset : s_objects.playerOffset;
+	int index;
+
+	for (index = 0; index < s_objects.playerCraftCount; ++index) {
+		if (s_objects.playerCrafts[index].objectType == objectType) {
+			source = s_objects.playerCrafts[index].offset;
+			break;
+		}
+	}
+	memcpy(offset, source, 3 * sizeof *offset);
+}
