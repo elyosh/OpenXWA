@@ -1463,6 +1463,11 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 	}
 
 	memset(g_objectTable[projectileObjIdx].mobj, 0, offsetof(MobileObject, pWarheadGuidance));
+#ifdef XWA_MODERN
+	g_objectTable[projectileObjIdx].mobj->projectileMoveFractionX = 0;
+	g_objectTable[projectileObjIdx].mobj->projectileMoveFractionY = 0;
+	g_objectTable[projectileObjIdx].mobj->projectileMoveFractionZ = 0;
+#endif
 	g_objectTable[projectileObjIdx].mobj->state = 1;
 	g_objectTable[projectileObjIdx].mobj->iff = ownerObj->mobj->iff;
 	g_objectTable[projectileObjIdx].mobj->framesAlive = 1;
@@ -1704,6 +1709,12 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 	if (projectileObjIdx != 0xffffu) {
 
 		memset(g_objectTable[projectileObjIdx].mobj, 0, offsetof(MobileObject, pWarheadGuidance));
+#ifdef XWA_MODERN
+		/* Player projectile slots bypass Object_AllocSlotForGenus. */
+		g_objectTable[projectileObjIdx].mobj->projectileMoveFractionX = 0;
+		g_objectTable[projectileObjIdx].mobj->projectileMoveFractionY = 0;
+		g_objectTable[projectileObjIdx].mobj->projectileMoveFractionZ = 0;
+#endif
 		g_objectTable[projectileObjIdx].mobj->sourceObjIdx = -1;
 		g_objectTable[projectileObjIdx].mobj->instanceExtent = 0;
 

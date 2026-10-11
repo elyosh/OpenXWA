@@ -169,6 +169,14 @@ uint16_t Object_AllocSlotForGenus(uint16_t genusId) {
 			g_objectTable[candidateObjIdx].objectSignature = 1;
 		}
 
+#ifdef XWA_MODERN
+		if (genusId == GENUS_NpcProjectile || genusId == GENUS_PlayerProjectile) {
+			MobileObject* projectile = g_objectTable[candidateObjIdx].mobj;
+			projectile->projectileMoveFractionX = 0;
+			projectile->projectileMoveFractionY = 0;
+			projectile->projectileMoveFractionZ = 0;
+		}
+#endif
 		collide_ResetObjectProximityForSlot(candidateObjIdx);
 		return candidateObjIdx;
 	}
@@ -1340,6 +1348,36 @@ static __inline void Object_DecayVelocityOverride(MobileObject* mobj) {
 
 // Applies the movement scratch delta directly in the update loop, where the original code inlined
 // the world-bound clamp rather than calling Object_AddTrigMoveDeltaAndClampWorldPosition.
+/* Preserve the fractional portion of a projectile's per-axis Q15 displacement.
+ * The legacy integer-only step drops it every frame; slow weapons consequently
+ * drift when modern flight simulation uses short steps. */
+#ifdef XWA_MODERN
+static int Object_ProjectileStepQ15(int16_t direction, uint16_t scalar, uint16_t* fraction) {
+	int64_t scaled = (int64_t)direction * scalar + *fraction;
+	int64_t whole = scaled / 32768;
+	int64_t remainder = scaled % 32768;
+	/* Define floor division explicitly for negative movement components. */
+	if (remainder < 0) {
+		--whole;
+		remainder += 32768;
+	}
+	*fraction = (uint16_t)remainder;
+	return (int)whole;
+}
+#endif
+
+static void Object_ComputeProjectileForwardMove(MobileObject* projectile, uint16_t scalar) {
+#ifdef XWA_MODERN
+	trig2_xmovedist = Object_ProjectileStepQ15(projectile->moveX, scalar, &projectile->projectileMoveFractionX);
+	trig2_ymovedist = Object_ProjectileStepQ15(projectile->moveY, scalar, &projectile->projectileMoveFractionY);
+	trig2_zmovedist = Object_ProjectileStepQ15(projectile->moveZ, scalar, &projectile->projectileMoveFractionZ);
+#else
+	trig2_xmovedist = Xwa_Q15Mul((int16_t)projectile->moveX, scalar);
+	trig2_ymovedist = Xwa_Q15Mul((int16_t)projectile->moveY, scalar);
+	trig2_zmovedist = Xwa_Q15Mul((int16_t)projectile->moveZ, scalar);
+#endif
+}
+
 static __inline void Object_ApplyTrigMoveDeltaAndClampWorldPosition(ObjectRecord* obj) {
 	obj->world_x += trig2_xmovedist;
 	if (obj->world_x < -0x01000000) {
@@ -2057,9 +2095,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 						// (no speed ramp during launch).
 						Object_ComputeVelocityOverrideMove(obj);
 						Object_ApplyTrigMoveDeltaAndClampWorldPosition(obj);
-						trig2_xmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveX, (uint16_t)fwdScalar);
-						trig2_ymovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveY, (uint16_t)fwdScalar);
-						trig2_zmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveZ, (uint16_t)fwdScalar);
+						Object_ComputeProjectileForwardMove(obj->mobj, (uint16_t)fwdScalar);
 						Object_ApplyTrigMoveDeltaAndClampWorldPosition(obj);
 						goto advance;
 					}
@@ -2077,9 +2113,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 								fm->velocityOverrideActive = 0;
 							}
 						}
-						trig2_xmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveX, (uint16_t)fwdScalar);
-						trig2_ymovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveY, (uint16_t)fwdScalar);
-						trig2_zmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveZ, (uint16_t)fwdScalar);
+						Object_ComputeProjectileForwardMove(obj->mobj, (uint16_t)fwdScalar);
 						Object_ApplyTrigMoveDeltaAndClampWorldPosition(obj);
 						goto advance;
 					}
@@ -2228,9 +2262,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 				if (obj->mobj->moveVectorDirty) {
 					FVIEW_calcrotatemove(obj->pitch, obj->yaw, obj);
 				}
-				trig2_xmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveX, (uint16_t)fwdScalar);
-				trig2_ymovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveY, (uint16_t)fwdScalar);
-				trig2_zmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveZ, (uint16_t)fwdScalar);
+				Object_ComputeProjectileForwardMove(obj->mobj, (uint16_t)fwdScalar);
 				Object_ApplyTrigMoveDeltaAndClampWorldPosition(obj);
 				goto advance;
 
