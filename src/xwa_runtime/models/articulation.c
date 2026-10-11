@@ -50,8 +50,9 @@ enum {
 /* AI maneuvers that drive the cargo clamps (g_maneuverInitTable). */
 #define ARTICULATION_BOARD_MANEUVER 18
 #define ARTICULATION_RELEASE_MANEUVER 35
-/* The hangar shuttle's S-foils step on this legacy cadence, in ticks. */
-#define ARTICULATION_SHUTTLE_CADENCE 8
+/* The hangar shuttle's S-foils step on this legacy cadence, in the shuttle
+   traffic's dt units (4 ticks): the original's 8-tick frames. */
+#define ARTICULATION_SHUTTLE_CADENCE 2
 #define ARTICULATION_HANGAR_DOORS_DISTANCE 0x4000
 /* XWAU's AI out-of-hyperspace maneuver opens the S-foils from this timer. */
 #define ARTICULATION_OUT_OF_HYPERSPACE_OPEN_TIMER 0x2ac
@@ -956,8 +957,8 @@ int XwaArticulation_StepShuttleBlock(unsigned int objIdx, XwaArticulationShuttle
 		return 0;
 	}
 	/* hook_sfoils SFoilsHangarShuttleHook steps by (speed * dt + 1) / 2, which
-	   rounds differently at each dt; it runs here on the original's 8-tick
-	   frames. */
+	   rounds differently at each dt; it runs here on the original's frames
+	   (dt 2). */
 	ticks = (uint32_t)craft->articulationTicks[ARTICULATION_CLOCK_SHUTTLE] + (uint32_t)(dtTicks > 0 ? dtTicks : 0);
 	for (; ticks >= ARTICULATION_SHUTTLE_CADENCE; ticks -= ARTICULATION_SHUTTLE_CADENCE) {
 		uint32_t index;

@@ -754,6 +754,8 @@ static int XwaFlightTask_EnterRequestedHangarReady(XwaFlightTaskHangarContinuati
 static int XwaFlightTask_UpdateHangarFromFlightFrame(int elapsedTicks) {
 	int stepTicks;
 	int advanceTicks;
+	uint16_t savedElapsedTicks;
+	int result;
 
 	if (!g_inHangarReady) {
 		g_xwaFlightTaskPendingHangarTicks = 0;
@@ -770,7 +772,14 @@ static int XwaFlightTask_UpdateHangarFromFlightFrame(int elapsedTicks) {
 
 	advanceTicks = g_xwaFlightTaskPendingHangarTicks - g_xwaFlightTaskPendingHangarTicks % stepTicks;
 	g_xwaFlightTaskPendingHangarTicks -= advanceTicks;
-	return Hangar_UpdateLaunch(advanceTicks);
+	/* The hangar step sees the ticks it covers as g_elapsedTicks, as in the
+	   hangar-ready loop and the original, where both were one frame; the last
+	   flight step's may be shorter. */
+	savedElapsedTicks = g_elapsedTicks;
+	g_elapsedTicks = (uint16_t)advanceTicks;
+	result = Hangar_UpdateLaunch(advanceTicks);
+	g_elapsedTicks = savedElapsedTicks;
+	return result;
 }
 
 static void XwaFlightTask_RunHangarReadyFrame(void) {
