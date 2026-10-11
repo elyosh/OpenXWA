@@ -106,8 +106,21 @@ typedef struct FlLensSource {
 #define FL_MAX_LENS_SOURCES 4 /* classic queue capacity */
 #define FL_LENS_RINGS 7
 
-/* Bounded source pool submitted to Aeron's spatial light allocator. */
-#define FL_MAX_PL_CANDIDATES 256
+/* Bounded source pools: the game's light candidates, and the scene lights
+ * (those and the models' lights) ranked into Aeron's capacity. */
+#define FL_MAX_PL_CANDIDATES 1024
+#define FL_MAX_PL_POOL 1024
+/* A kept light whose score is under this many times the best dropped
+ * light's fades toward it, so ranks swapping at the cut do not pop. */
+#define FL_PL_FADE_BAND 2.0f
+
+/* A scene light in the pool, with its rank score (the illuminance it can
+ * give the camera's nearest point; INFINITY always keeps it). */
+typedef struct FlPoolLight {
+	AeronSceneLight light;
+	float score;
+	int model; /* authored in a model */
+} FlPoolLight;
 
 typedef enum FlBeforeOpaqueMode {
 	FL_BEFORE_OPAQUE_NONE = 0,
@@ -289,11 +302,18 @@ static struct {
 	/* Point-light candidates (classic source laws, classic-unit color
 	 * x intensity premultiplied; knobs applied at finalize). */
 	XwaShipPointLight pl_cand[FL_MAX_PL_CANDIDATES];
-	/* The valid candidates as scene lights (fl_finalize_point_lights). */
-	AeronSceneLight pl_scene[FL_MAX_PL_CANDIDATES];
 	uint32_t pl_cand_count;
 	uint32_t pl_cand_dropped;
 	uint32_t pl_invalid_count;
+	/* The valid candidates and the models' lights as scene lights, culled
+	 * by the view (frustum planes, camera position), ranked at submit. */
+	FlPoolLight pl_pool[FL_MAX_PL_POOL];
+	uint32_t pl_pool_count;
+	float pl_frustum[5][4];
+	float pl_eye[3];
+	uint32_t pl_model_count;
+	uint32_t pl_culled[2]; /* [model] */
+	uint32_t pl_dropped[2];
 
 	/* Projectile instances, collected during the walk and submitted
 	 * AFTER every ship (instances draw in submission order): their
@@ -1177,10 +1197,15 @@ void XwaRemasterFlight_GetPointLightStats(XwaFlightPointLightStats* out) {
 		return;
 	}
 	memset(out, 0, sizeof *out);
-	out->valid_count = s.pl_cand_count;
+	out->valid_count = s.pl_cand_count - s.pl_invalid_count;
 	out->invalid_count = s.pl_invalid_count;
 	out->candidate_overflow_count = s.pl_cand_dropped;
-	out->generated_count = s.pl_cand_count + s.pl_invalid_count + s.pl_cand_dropped;
+	out->generated_count = s.pl_cand_count + s.pl_cand_dropped;
+	out->model_count = s.pl_model_count;
+	out->culled_count = s.pl_culled[0];
+	out->model_culled_count = s.pl_culled[1];
+	out->dropped_count = s.pl_dropped[0];
+	out->model_dropped_count = s.pl_dropped[1];
 	AeronScene_GetClusteredLightStats(s.scene, &out->scene);
 }
 
@@ -2877,7 +2902,90 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
  *     game_time_ticks at the hardpoint).
  * The classic cull radii only selected lights per object and are not
  * used. The classic Local Lights config level is NOT honored (period
- * option). Aeron assigns the submitted sources to spatial light clusters. */
+ * option). Aeron assigns the submitted sources to spatial light clusters.
+ * They and the models' lights share one pool, ranked into the scene's
+ * capacity (fl_submit_point_lights). */
+
+/* Start the frame's light pool for `view`: its frustum planes (as the
+ * scene's culling, without the far plane; dot(xyz, p) + w is the signed
+ * distance, positive inside) and camera position. */
+static void fl_begin_point_lights(const XwaRemasterFlightView* view) {
+	s.pl_cand_count = 0;
+	s.pl_cand_dropped = 0;
+	s.pl_invalid_count = 0;
+	s.pl_pool_count = 0;
+	s.pl_model_count = 0;
+	memset(s.pl_culled, 0, sizeof s.pl_culled);
+	memset(s.pl_dropped, 0, sizeof s.pl_dropped);
+	const float* m = view->view_proj;
+	for (int k = 0; k < 4; k++) {
+		const float w = m[12 + k];
+		s.pl_frustum[0][k] = w + m[0 + k]; /* x >= -w */
+		s.pl_frustum[1][k] = w - m[0 + k]; /* x <= w */
+		s.pl_frustum[2][k] = w + m[4 + k]; /* y >= -w */
+		s.pl_frustum[3][k] = w - m[4 + k]; /* y <= w */
+		s.pl_frustum[4][k] = w - m[8 + k]; /* near (reverse Z): z <= w */
+	}
+	for (int p = 0; p < 5; p++) {
+		const float length = sqrtf(s.pl_frustum[p][0] * s.pl_frustum[p][0] + s.pl_frustum[p][1] * s.pl_frustum[p][1] +
+								   s.pl_frustum[p][2] * s.pl_frustum[p][2]);
+		const float inverse = length > 0.0f ? 1.0f / length : 0.0f;
+		for (int k = 0; k < 4; k++) {
+			s.pl_frustum[p][k] *= inverse;
+		}
+	}
+	memcpy(s.pl_eye, view->camera.pos, sizeof s.pl_eye);
+}
+
+/* Add a scene light to the pool unless its reach (range plus half length)
+ * misses the view. Its score is its peak intensity over the squared
+ * distance from the camera to its nearest point (at least its source
+ * radius away); `keep` scores it INFINITY. A full pool replaces its
+ * lowest score. */
+static void fl_pool_add(const AeronSceneLight* light, int model, int keep) {
+	const float half_length = sqrtf(light->half_axis[0] * light->half_axis[0] +
+									light->half_axis[1] * light->half_axis[1] +
+									light->half_axis[2] * light->half_axis[2]);
+	const float reach = light->radius + half_length;
+	for (int p = 0; p < 5; p++) {
+		const float* plane = s.pl_frustum[p];
+		if (plane[0] * light->pos[0] + plane[1] * light->pos[1] + plane[2] * light->pos[2] + plane[3] < -reach) {
+			s.pl_culled[model]++;
+			return;
+		}
+	}
+	float score = INFINITY;
+	if (!keep) {
+		const float d[3] = { light->pos[0] - s.pl_eye[0], light->pos[1] - s.pl_eye[1], light->pos[2] - s.pl_eye[2] };
+		const float source_radius = fabsf(light->source_radius);
+		float distance = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) - half_length - source_radius;
+		if (distance < source_radius) {
+			distance = source_radius;
+		}
+		float peak = light->color[0] > light->color[1] ? light->color[0] : light->color[1];
+		peak = light->color[2] > peak ? light->color[2] : peak;
+		score = peak / (distance * distance);
+	}
+	FlPoolLight* slot;
+	if (s.pl_pool_count < FL_MAX_PL_POOL) {
+		slot = &s.pl_pool[s.pl_pool_count++];
+	} else {
+		slot = &s.pl_pool[0];
+		for (uint32_t i = 1; i < FL_MAX_PL_POOL; i++) {
+			if (s.pl_pool[i].score < slot->score) {
+				slot = &s.pl_pool[i];
+			}
+		}
+		if (!(score > slot->score)) {
+			s.pl_dropped[model]++;
+			return;
+		}
+		s.pl_dropped[slot->model]++;
+	}
+	slot->light = *light;
+	slot->score = score;
+	slot->model = model;
+}
 
 static XwaShipPointLight* fl_pl_push(const float pos[3], const float color_x_intensity[3]) {
 	if (s.pl_cand_count >= FL_MAX_PL_CANDIDATES) {
@@ -2934,9 +3042,6 @@ static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* 
 
 /* Accessor-law sources (everything except engine glows + pulses). */
 static void fl_derive_point_lights(const XwaSnapshot* snap) {
-	s.pl_cand_count = 0;
-	s.pl_cand_dropped = 0;
-	s.pl_invalid_count = 0;
 	if (!s.plight.enabled) {
 		return;
 	}
@@ -3082,39 +3187,29 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
 	}
 }
 
-/* Convert the candidates to scene lights with the calibration, discarding
- * invalid records without changing order. */
-static uint32_t fl_finalize_point_lights(void) {
-	if (!s.plight.enabled || s.pl_cand_count == 0) {
-		return 0;
+/* Convert the candidates to scene lights with the calibration into the
+ * pool, discarding invalid records. */
+static void fl_finalize_point_lights(void) {
+	if (!s.plight.enabled) {
+		return;
 	}
-	uint32_t count = 0;
 	for (uint32_t i = 0; i < s.pl_cand_count; i++) {
+		AeronSceneLight light;
 		if (!XwaRemasterShip_ScenePointLight(&s.pl_cand[i], s.plight.match_distance_m, s.plight.range_scale,
-											 &s.pl_scene[count])) {
+											 &light)) {
 			s.pl_invalid_count++;
 			continue;
 		}
-		s.pl_cand[count++] = s.pl_cand[i];
+		fl_pool_add(&light, 0, 0);
 	}
-	s.pl_cand_count = count;
-	return count;
 }
 
-static uint32_t fl_submit_point_lights(uint32_t count) {
-	uint32_t accepted = 0;
-	for (uint32_t i = 0; i < count; ++i) {
-		accepted += (uint32_t)AeronScene_AddLight(s.scene, &s.pl_scene[i]);
-	}
-	return accepted;
-}
-
-/* Lights authored in a model (AeronFlightLight), placed by its instance.
- * Their intensity is authored in candela, so point_lights.match_distance_m
- * does not apply; point_lights.model_light_intensity converts it to the
- * scene's units. */
-static void fl_submit_model_lights(const AeronSceneMesh* mesh, const float transform[16],
-								   const AeronSceneMeshTable* table) {
+/* Lights authored in a model (AeronFlightLight), placed by its instance,
+ * into the pool; `keep` always keeps them (the cockpit's). Their intensity
+ * is authored in candela, so point_lights.match_distance_m does not apply;
+ * point_lights.model_light_intensity converts it to the scene's units. */
+static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transform[16],
+								const AeronSceneMeshTable* table, int keep) {
 	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f)) {
 		return;
 	}
@@ -3122,8 +3217,43 @@ static void fl_submit_model_lights(const AeronSceneMesh* mesh, const float trans
 		AeronSceneLight light;
 		if (AeronScene_MeshLight(mesh, i, transform, AERON_OPT_UNITS_PER_METER, table, s.plight.model_light_intensity,
 								 &light)) {
-			AeronScene_AddLight(s.scene, &light);
+			s.pl_model_count++;
+			fl_pool_add(&light, 1, keep);
 		}
+	}
+}
+
+static int fl_pool_compare(const void* a, const void* b) {
+	const float sa = ((const FlPoolLight*)a)->score;
+	const float sb = ((const FlPoolLight*)b)->score;
+	return sa > sb ? -1 : (sa < sb ? 1 : 0);
+}
+
+/* Submit the pool's best lights within the scene's capacity. When some
+ * are dropped, a kept light under FL_PL_FADE_BAND times the best dropped
+ * one's score fades toward zero at it: scores change continuously as the
+ * camera moves, so a light crossing the cut is already dark. */
+static void fl_submit_point_lights(void) {
+	uint32_t count = s.pl_pool_count;
+	if (count > AERON_SCENE_POINT_LIGHT_CAPACITY) {
+		qsort(s.pl_pool, count, sizeof s.pl_pool[0], fl_pool_compare);
+		count = AERON_SCENE_POINT_LIGHT_CAPACITY;
+		for (uint32_t i = count; i < s.pl_pool_count; i++) {
+			s.pl_dropped[s.pl_pool[i].model]++;
+		}
+		const float cut = s.pl_pool[count].score;
+		for (uint32_t i = 0; i < count && isfinite(cut); i++) {
+			FlPoolLight* l = &s.pl_pool[i];
+			if (l->score < cut * FL_PL_FADE_BAND) {
+				const float fade = (l->score / cut - 1.0f) / (FL_PL_FADE_BAND - 1.0f);
+				for (int c = 0; c < 3; c++) {
+					l->light.color[c] *= fade;
+				}
+			}
+		}
+	}
+	for (uint32_t i = 0; i < count; ++i) {
+		AeronScene_AddLight(s.scene, &s.pl_pool[i].light);
 	}
 }
 
@@ -3692,7 +3822,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 		s.table_count++;
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
-	fl_submit_model_lights(cockpit_mesh, m, inst.mesh_table);
+	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, 1);
 	if (player_f) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 										  inst.mesh_table, s.glow_mark_emissive_strength);
@@ -3930,9 +4060,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	s.glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &s.glow_ref);
 	s.table_count = 0;
 	s.anim_count = 0;
-	s.pl_cand_count = 0;
-	s.pl_cand_dropped = 0;
-	s.pl_invalid_count = 0;
+	fl_begin_point_lights(flight_view);
 	s.snap = snap;
 
 	/* The tunnel is drawn by a game hook without motion vectors. Disable
@@ -3971,7 +4099,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 		enum { FL_HYPERSPACE_PULSE_MASK = (1u << 3) | (1u << 4) | (1u << 5) };
 		fl_derive_pulse_lights(snap, player_bw, player_local, FL_HYPERSPACE_PULSE_MASK);
 	}
-	fl_submit_point_lights(fl_finalize_point_lights());
+	fl_finalize_point_lights();
 	if (!fl_configure_clustered_lights(s.scene)) {
 		Aeron_CommandBufferSetFailure(cmd, "Hyperspace clustered-light configuration failed");
 		s.snap = NULL;
@@ -4000,6 +4128,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 		&ambient,
 		phase == XWA_HYPERSPACE_TUNNEL && lighting_ready ? &hyperspace_lighting.environment : NULL);
 	fl_submit_hyperspace_cockpit(cmd, assets, snap, &snap->flight_camera, anchor_bw, anchor_found, player_f);
+	fl_submit_point_lights();
 
 	if (!AeronScene_Render(s.scene, cmd)) {
 		AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
@@ -4549,6 +4678,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const AeronEnvironmentPackage* authored =
 		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.package : NULL;
 	fl_derive_lens_flares(snap, assets, &flight_view, authored);
+	fl_begin_point_lights(&flight_view);
 	fl_derive_point_lights(snap);
 	s.bd_count = authored ? 0
 						  : fl_derive_backdrops(snap, s.crows, assets, FL_BACKDROPS_ALL, 0, s.bd_quads,
@@ -4901,6 +5031,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			s.bolts[s.bolt_count++] = inst;
 		} else {
 			AeronScene_AddMeshInstance(s.scene, &inst);
+			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, 0);
 			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, prepared.mesh, model_matrix,
 											  inst.mesh_table, s.glow_mark_emissive_strength);
 			/* State-derived engine glows for this craft (classic scale
@@ -4936,11 +5067,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	}
 
 	/* Local-player pulse lights (player basis known after the walk),
-	 * then the finalized punctual set + the lit PBR env. */
+	 * then the finalized candidates into the light pool (submitted with
+	 * the cockpit's lights) + the lit PBR env. */
 	if (player_found && player_f) {
 		fl_derive_pulse_lights(snap, player_bw, player_local, 0);
 	}
-	fl_submit_point_lights(fl_finalize_point_lights());
+	fl_finalize_point_lights();
 	if (!fl_configure_clustered_lights(s.scene)) {
 		Aeron_CommandBufferSetFailure(cmd, "Flight clustered-light configuration failed");
 		s.snap = NULL;
@@ -5009,7 +5141,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				}
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
-			fl_submit_model_lights(cockpit_mesh, m, inst.mesh_table);
+			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, 1);
 			if (player_f) {
 				XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 												  inst.mesh_table, s.glow_mark_emissive_strength);
@@ -5025,6 +5157,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			}
 		}
 	}
+	/* Every light is in the pool once the cockpit's are. */
+	fl_submit_point_lights();
 
 	/* Classic effects order: particles, persistent warhead trails, then
 	 * queued scene billboards. */

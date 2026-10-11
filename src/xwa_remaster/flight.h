@@ -97,11 +97,17 @@ typedef struct XwaFlightPointLightParams {
 	float model_light_intensity; /* scene illuminance per lux of lights authored in models (candela) */
 } XwaFlightPointLightParams;
 
+/* The game's light candidates, the models' lights, and those of both whose
+ * reach misses the view (culled) or that rank below the scene's capacity
+ * (dropped); the rest are submitted. */
 typedef struct XwaFlightPointLightStats {
 	uint32_t generated_count;
 	uint32_t valid_count;
 	uint32_t invalid_count;
 	uint32_t candidate_overflow_count;
+	uint32_t model_count;
+	uint32_t culled_count, model_culled_count;
+	uint32_t dropped_count, model_dropped_count;
 	AeronSceneClusteredLightStats scene;
 } XwaFlightPointLightStats;
 

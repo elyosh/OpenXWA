@@ -456,6 +456,9 @@ static void xwa_tool_point_lights(int* open, void* user) {
 	XwaRemasterFlight_GetPointLightStats(&stats);
 	ImGui::Text("Candidates %u, valid %u, invalid %u, overflow %u", stats.generated_count, stats.valid_count,
 				stats.invalid_count, stats.candidate_overflow_count);
+	ImGui::Text("Game: %u culled, %u dropped", stats.culled_count, stats.dropped_count);
+	ImGui::Text("Model: %u, %u culled, %u dropped", stats.model_count, stats.model_culled_count,
+				stats.model_dropped_count);
 	ImGui::Text("Scene %u accepted, %u dropped; %u global", stats.scene.submitted_light_count,
 				stats.scene.dropped_light_count, stats.scene.global_light_count);
 	ImGui::Text("%s, tile %u, grid %ux%ux%u (%.1f MiB)",
@@ -473,7 +476,7 @@ static void xwa_tool_point_lights(int* open, void* user) {
 	changed |= ImGui::SliderFloat("Model light intensity", &p.model_light_intensity, 0.0f, 0.1f, "%.6f",
 								  ImGuiSliderFlags_Logarithmic);
 	ImGui::TextDisabled("Scene illuminance per lux of lights authored in models\n"
-						"(candela; cockpit interior light). 1/683 = 0.001464; 0 = off.");
+						"(candela). 1/683 = 0.001464; 0 = off.");
 
 	ImGui::Separator();
 	if (ImGui::Button("Reset to defaults")) {
