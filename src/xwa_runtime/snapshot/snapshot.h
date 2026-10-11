@@ -376,7 +376,7 @@ typedef struct XwaFlightObject {
 	int32_t player_owner;
 	/* ---- v2: craft component pools (CraftData; valid when has_craft).
 	 * componentState drives damage-texture selection per mesh,
-	 * mesh_rotation the articulated meshes (turrets, rotaries),
+	 * mesh_angle the articulated meshes (turrets, rotaries),
 	 * component_hp the blown-off threshold; sfoil_state the s-foil
 	 * open/close animation. */
 	uint8_t has_craft;
@@ -389,7 +389,10 @@ typedef struct XwaFlightObject {
 	uint16_t system_flags;             /* CraftData.systemFlags */
 	uint16_t subsystem_damage;         /* CraftData.subsystemDamage */
 	uint8_t component_state[XWA_SNAP_MAX_MESH_SLOTS];
-	uint8_t mesh_rotation[XWA_SNAP_MAX_MESH_SLOTS];
+	/* CraftData.meshRotation in 1/256 units (a full turn is 65536), with the
+	 * articulated meshes drawn between their steps
+	 * (XwaArticulation_DrawnAngles). */
+	uint16_t mesh_angle[XWA_SNAP_MAX_MESH_SLOTS];
 	uint8_t component_hp[XWA_SNAP_MAX_MESH_SLOTS];
 	/* Animated-texture frame / wreck-flame byte (XWA_CRAFT_ANIM_FRAME; the
 	 * original's componentState[49]). */

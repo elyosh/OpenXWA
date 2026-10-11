@@ -1855,10 +1855,14 @@ void FlightObject_UpdateSpecialBehavior(void) {
 	int modelType;
 
 #ifdef XWA_MODERN
-	/* Modern port: S-foils and landing gear of articulated models step on
-	   every sim step, with their own tick accumulator; phase 1 skips them. */
+	/* Modern port: S-foils and landing gear of articulated models, and the
+	   stock S-foils in the high-rate mode, move on every sim step; phase 1
+	   skips them. The crew meshes' drawn angles follow phase 2's crew steps. */
 	for (objIdx = g_activeRegionObjectSlotStart; (uint16_t)objIdx < g_activeRegionCraftObjectSlotEnd; ++objIdx) {
 		XwaArticulation_StepSFoils(objIdx);
+	}
+	for (objIdx = g_activeRegionObjectSlotStart; (uint16_t)objIdx < g_regionStaticObjectSlotEnd; ++objIdx) {
+		XwaArticulation_StepCrewAngles(objIdx);
 	}
 #endif
 
@@ -1879,7 +1883,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 						modelType = (uint16_t)objectType;
 
 #ifdef XWA_MODERN
-						if (XwaArticulation_HasSFoilsOrLandingGear(objIdx)) {
+						if (XwaArticulation_StepsSFoils(objIdx)) {
 							/* Stepped above, every sim step. */
 						} else
 #endif

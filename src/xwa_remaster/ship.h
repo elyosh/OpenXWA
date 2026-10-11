@@ -60,7 +60,8 @@ void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissiv
 /* Build the per-instance mesh table (articulation + visibility lanes)
  * from the captured craft state: rotary meshes rotate about their
  * cooked OPT pivot/axis by the classic angle meshRotation[slot] *
- * 2pi/256 (RenderScene_DrawObjectModelHardware); blown-off components
+ * 2pi/256 (RenderScene_DrawObjectModelHardware), carried with the
+ * articulations' in-between angles as mesh_angle; blown-off components
  * (componentState[slot] != 0 — the classic node-walk skip) hide. B-Wings
  * additionally rotate every mesh root by the Bridge slot rotation before
  * applying the root-local transform.

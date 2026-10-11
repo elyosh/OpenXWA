@@ -6662,6 +6662,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		g_curCraft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
 		memset(g_curCraft->articulationTicks, 0, sizeof g_curCraft->articulationTicks);
 		g_curCraft->articulationMotion = 0;
+		memset(g_curCraft->articulationAngles, 0, sizeof g_curCraft->articulationAngles);
 		/* Modern port: the mission's start poses for articulated models. */
 		XwaArticulation_InitMissionStart(objIdx);
 #endif

@@ -5,7 +5,9 @@
  * replacement lists on its model root. They
  * reproduce XWAU's hook_sfoils and hook_pilot on the stock state: each
  * articulation turns CraftData.meshRotation[component], and S-foils and
- * landing gear share CraftData.sFoilState.
+ * landing gear share CraftData.sFoilState. Unlike XWAU, which steps them
+ * once per period, they move on every sim step by a fine angle
+ * (CraftData.articulationAngles) at the same speeds.
  *
  * Each entry point applies only to a craft whose model lists the group it
  * drives; for every other craft the caller keeps the original code. All
@@ -45,8 +47,14 @@ int XwaArticulation_HasSFoilsOrLandingGear(unsigned int objIdx);
 int XwaArticulation_InitLeavingHangar(unsigned int objIdx);
 
 /* Every sim step: steps the S-foils and landing gear by sFoilState and
-   settles it, with the original completion messages. */
+   settles it, with the original completion messages. In the high-rate mode,
+   it also moves the stock S-foils of an original OPT (the X-wing, B-wing,
+   Missile Boat, Skipray and shuttle), at the speeds of
+   FlightObject_UpdateSpecialBehavior's phase 1. */
 void XwaArticulation_StepSFoils(unsigned int objIdx);
+/* Whether XwaArticulation_StepSFoils moves the object's S-foils, so phase 1
+   skips it. */
+int XwaArticulation_StepsSFoils(unsigned int objIdx);
 
 /* Replaces the original X-wing/B-wing test at a trigger. For the keys, a
    pass also sets sFoilState so the original toggle moves the group the
@@ -95,6 +103,12 @@ int XwaArticulation_CrewUpdatesAll(unsigned int objIdx);
    (XWAU calls the special-behavior pass from the hangar). */
 void XwaArticulation_StepHangarCrew(void);
 
+/* Every sim step: the crew meshes' drawn angles follow the crew animation's
+   own steps (stock or XWAU, on the crew timer) at their speed. For one
+   object, and in the hangar for every object. */
+void XwaArticulation_StepCrewAngles(unsigned int objIdx);
+void XwaArticulation_StepHangarCrewAngles(void);
+
 /* Hatches, hangar doors, warheads bay and cargo clamps (XWAU hook_sfoils).
    Hatches are off in multiplayer, as XWAU's. */
 
@@ -137,6 +151,11 @@ void XwaArticulation_InitMissionStart(unsigned int objIdx);
    B-wing, and any object-table craft whose model has articulations (XWAU
    drops the type test). */
 int XwaArticulation_AlignsBridge(const struct ObjectRecord* object);
+
+/* The renderer's angles of the object's first `count` meshes, in 1/256 of a
+   meshRotation unit (a full turn is 65536): an articulated mesh's fine angle,
+   a crew mesh's followed angle, else meshRotation. */
+void XwaArticulation_DrawnAngles(const struct ObjectRecord* object, uint16_t* angles, size_t count);
 
 #ifdef __cplusplus
 }

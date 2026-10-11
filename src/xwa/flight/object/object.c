@@ -505,6 +505,7 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 		craft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
 		memset(craft->articulationTicks, 0, sizeof craft->articulationTicks);
 		craft->articulationMotion = 0;
+		memset(craft->articulationAngles, 0, sizeof craft->articulationAngles);
 #endif
 	}
 	{
@@ -1134,6 +1135,8 @@ void Object_ClearSlotState(uint32_t objIdx) {
 		memset(g_objectTable[objIdx].mobj->pCraft->articulationTicks, 0,
 			   sizeof g_objectTable[objIdx].mobj->pCraft->articulationTicks);
 		g_objectTable[objIdx].mobj->pCraft->articulationMotion = 0;
+		memset(g_objectTable[objIdx].mobj->pCraft->articulationAngles, 0,
+			   sizeof g_objectTable[objIdx].mobj->pCraft->articulationAngles);
 		memset(&g_objectTable[objIdx].mobj->pCraft->warheadData[XWA_STOCK_WEAPON_SLOT_COUNT], 0,
 			   (XWA_CRAFT_WEAPON_SLOT_COUNT - XWA_STOCK_WEAPON_SLOT_COUNT) * sizeof(WarheadInventoryEntry));
 #endif

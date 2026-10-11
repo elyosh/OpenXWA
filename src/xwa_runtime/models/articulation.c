@@ -3,6 +3,7 @@
 #include "aeron/asset/flight_model.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
+#include "xwa/assets/model_mesh.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/flight/flight.h"
@@ -15,6 +16,7 @@
 #include "xwa_runtime/models/mission_file.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/snapshot/snapshot.h"
+#include "xwa_runtime/timing/modern_flight_timing.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,9 +52,14 @@ enum {
 /* AI maneuvers that drive the cargo clamps (g_maneuverInitTable). */
 #define ARTICULATION_BOARD_MANEUVER 18
 #define ARTICULATION_RELEASE_MANEUVER 35
-/* The hangar shuttle's S-foils step on this legacy cadence, in the shuttle
-   traffic's dt units (4 ticks): the original's 8-tick frames. */
+/* The hangar shuttle's S-foil speeds are units per this many shuttle traffic
+   dt units (4 ticks): the original's 8-tick frames. */
 #define ARTICULATION_SHUTTLE_CADENCE 2
+/* Stock S-foil and crew speeds are units per these many ticks (the phase-1
+   and crew timers of FlightObject_UpdateSpecialBehavior). */
+#define ARTICULATION_STOCK_STEP_TICKS 14
+#define ARTICULATION_CREW_TICKS 15
+#define ARTICULATION_STOCK_SFOILS_MAX 32
 #define ARTICULATION_HANGAR_DOORS_DISTANCE 0x4000
 /* XWAU's AI out-of-hyperspace maneuver opens the S-foils from this timer. */
 #define ARTICULATION_OUT_OF_HYPERSPACE_OPEN_TIMER 0x2ac
@@ -250,6 +257,25 @@ static const ArticulationModel* Articulation_Model(unsigned int objIdx, Articula
 	return view;
 }
 
+/* Whether the object's loaded model is an original OPT, without replacement
+   data; such a model has no articulations. */
+static int Articulation_IsOriginalOpt(unsigned int objIdx) {
+	MemoryHandle handle;
+	const OptimizedPolyObject* optModel;
+	int original;
+	const uint16_t objectType =
+		Articulation_Craft(objIdx) != NULL ? (uint16_t)g_objectTable[objIdx].objectType : 0;
+
+	handle = objectType != 0 && objectType < OBJ_Count ? g_loadedModels.byObjectType[objectType] : 0;
+	optModel = handle != 0 ? (const OptimizedPolyObject*)Memory_LockHandle(handle) : NULL;
+	if (optModel == NULL) {
+		return 0;
+	}
+	original = OptSynth_GetModelData(optModel) == NULL;
+	Memory_UnlockHandle(handle);
+	return original;
+}
+
 static int Articulation_InLists(const AeronFlightArticulation* articulation, int lists) {
 	return ((lists & ARTICULATION_SFOILS) != 0 && strcmp(articulation->group, "sfoils") == 0) ||
 		   ((lists & ARTICULATION_LANDING_GEAR) != 0 && strcmp(articulation->group, "landing_gear") == 0);
@@ -296,6 +322,44 @@ static int Articulation_AtRest(const ArticulationModel* model, const CraftData* 
 	return 1;
 }
 
+/* Each articulated mesh moves by its fine angle, CraftData.articulationAngles,
+   in 1/256 meshRotation units on every step; meshRotation follows it in whole
+   units. Code that sets meshRotation itself restarts the fine angle there. A
+   mesh with a negative angle moves on the signed side of 0. */
+static int32_t Articulation_FineAngle(CraftData* craft, int component, int signedSide) {
+	uint16_t* fine = &craft->articulationAngles[component];
+
+	if ((uint8_t)(*fine >> 8) != craft->meshRotation[component]) {
+		*fine = (uint16_t)(craft->meshRotation[component] << 8);
+	}
+	return signedSide ? (int32_t)(int16_t)*fine : (int32_t)*fine;
+}
+
+static void Articulation_SetAngle(CraftData* craft, int component, int angle) {
+	craft->articulationAngles[component] = (uint16_t)(angle * 256);
+	craft->meshRotation[component] = (uint8_t)angle;
+}
+
+/* Moves `component` toward `angle` (meshRotation units) by `stepUp` or
+   `stepDown` 1/256 units. Returns whether it was away from it. */
+static int Articulation_MoveToward(CraftData* craft, int component, int angle, int32_t stepUp,
+								   int32_t stepDown, int signedSide) {
+	const int32_t target = angle * 256;
+	int32_t position = Articulation_FineAngle(craft, component, signedSide);
+
+	if (position == target) {
+		return 0;
+	}
+	if (position < target) {
+		position = position + stepUp < target ? position + stepUp : target;
+	} else {
+		position = position - stepDown > target ? position - stepDown : target;
+	}
+	craft->articulationAngles[component] = (uint16_t)position;
+	craft->meshRotation[component] = (uint8_t)(craft->articulationAngles[component] >> 8);
+	return 1;
+}
+
 /* Sets the meshes of `lists` to their angle (the byte wraps, as XWAU's). */
 static void Articulation_SetToAngle(const ArticulationModel* model, CraftData* craft, int lists) {
 	uint32_t index;
@@ -304,7 +368,7 @@ static void Articulation_SetToAngle(const ArticulationModel* model, CraftData* c
 		const AeronFlightArticulation* articulation = &model->articulations[index];
 
 		if (Articulation_InLists(articulation, lists)) {
-			craft->meshRotation[articulation->component] = (uint8_t)articulation->angle;
+			Articulation_SetAngle(craft, articulation->component, articulation->angle);
 		}
 	}
 }
@@ -324,33 +388,26 @@ static int Articulation_HasGroup(const ArticulationModel* model, const char* gro
 	return 0;
 }
 
-/* hook_sfoils' common step: toward each entry's angle, or back to 0, by its
-   speeds times `timeSpeed`. */
-static void Articulation_StepGroup(const ArticulationModel* model, CraftData* craft, const char* group, int toAngle,
-								   int timeSpeed) {
+/* One entry toward its angle by its speed, or back to 0 by its speed back,
+   `unit` 1/256 units per unit of speed. Returns whether it was away. */
+static int Articulation_StepEntry(CraftData* craft, const AeronFlightArticulation* articulation, int toAngle,
+								  int32_t unit) {
+	const int32_t step = (toAngle ? articulation->speed : articulation->speed_back) * unit;
+
+	return Articulation_MoveToward(craft, articulation->component, toAngle ? articulation->angle : 0, step,
+								   step, articulation->angle < 0);
+}
+
+/* hook_sfoils' common step over a group. */
+static void Articulation_StepGroup(const ArticulationModel* model, CraftData* craft, const char* group,
+								   int toAngle, int32_t unit) {
 	uint32_t index;
 
 	for (index = 0; index < model->articulationCount; ++index) {
 		const AeronFlightArticulation* articulation = &model->articulations[index];
-		uint8_t* rotation = &craft->meshRotation[articulation->component];
-		const int speed = articulation->speed * timeSpeed;
-		const int speedBack = articulation->speed_back * timeSpeed;
 
-		if (!Articulation_InGroup(articulation, group)) {
-			continue;
-		}
-		if (toAngle) {
-			if (*rotation < articulation->angle) {
-				*rotation = (uint8_t)(*rotation + speed);
-				if (*rotation > articulation->angle) {
-					*rotation = (uint8_t)articulation->angle;
-				}
-			}
-		} else if (*rotation >= speedBack) {
-			*rotation = (uint8_t)(*rotation - speedBack);
-			if (*rotation < speedBack) {
-				*rotation = 0;
-			}
+		if (Articulation_InGroup(articulation, group)) {
+			Articulation_StepEntry(craft, articulation, toAngle, unit);
 		}
 	}
 }
@@ -358,23 +415,16 @@ static void Articulation_StepGroup(const ArticulationModel* model, CraftData* cr
 /* hook_sfoils SetCraftMeshRotationAngles: toward `angle` (each entry's own
    when `angle` is -1), from either side. */
 static void Articulation_StepGroupToward(const ArticulationModel* model, CraftData* craft, const char* group,
-										 int angle, int timeSpeed) {
+										 int angle, int32_t unit) {
 	uint32_t index;
 
 	for (index = 0; index < model->articulationCount; ++index) {
 		const AeronFlightArticulation* articulation = &model->articulations[index];
-		uint8_t* rotation = &craft->meshRotation[articulation->component];
-		const int target = angle == -1 ? articulation->angle : angle;
-		const int speed = articulation->speed * timeSpeed;
-		const int speedBack = articulation->speed_back * timeSpeed;
 
-		if (!Articulation_InGroup(articulation, group) || *rotation == target) {
-			continue;
-		}
-		if (*rotation < target) {
-			*rotation = *rotation < target - speed ? (uint8_t)(*rotation + speed) : (uint8_t)target;
-		} else {
-			*rotation = *rotation >= target + speedBack ? (uint8_t)(*rotation - speedBack) : (uint8_t)target;
+		if (Articulation_InGroup(articulation, group)) {
+			Articulation_MoveToward(craft, articulation->component, angle == -1 ? articulation->angle : angle,
+									articulation->speed * unit, articulation->speed_back * unit,
+									articulation->angle < 0);
 		}
 	}
 }
@@ -384,8 +434,8 @@ static void Articulation_SetGroup(const ArticulationModel* model, CraftData* cra
 
 	for (index = 0; index < model->articulationCount; ++index) {
 		if (Articulation_InGroup(&model->articulations[index], group)) {
-			craft->meshRotation[model->articulations[index].component] =
-				toAngle ? (uint8_t)model->articulations[index].angle : 0;
+			Articulation_SetAngle(craft, model->articulations[index].component,
+								  toAngle ? model->articulations[index].angle : 0);
 		}
 	}
 }
@@ -419,22 +469,130 @@ int XwaArticulation_InitLeavingHangar(unsigned int objIdx) {
 	return 1;
 }
 
-/* hook_sfoils ObjectIndexTime::RetrieveTimeSpeed: 1 once per step period of
-   accumulated ticks, else 0. XWAU keeps one accumulator per feature; so does
-   CraftData.articulationTicks, by `clock`. */
-static int Articulation_TimeSpeed(const ArticulationModel* model, CraftData* craft, int clock) {
-	int32_t period = Articulation_Setting(model, "step_ticks", ARTICULATION_STEP_TICKS);
-	uint32_t time = (uint32_t)craft->articulationTicks[clock] + g_elapsedTicks;
+/* How far a unit of speed moves over `elapsed` time units, in 1/256 units: a
+   speed is in units per `period`. XWAU steps once per period
+   (ObjectIndexTime::RetrieveTimeSpeed); here the motion is spread over it.
+   The remainder stays in CraftData.articulationTicks, one per `clock` as
+   XWAU keeps one accumulator per feature. */
+static int32_t Articulation_Advance(CraftData* craft, int clock, int elapsed, int32_t period) {
+	uint32_t total;
 
 	if (period < 1) {
 		period = 1;
 	}
-	if (time < (uint32_t)period) {
-		craft->articulationTicks[clock] = (uint16_t)time;
+	total = (uint32_t)craft->articulationTicks[clock] + (uint32_t)(elapsed > 0 ? elapsed : 0) * 256u;
+	craft->articulationTicks[clock] = (uint16_t)(total % (uint32_t)period);
+	return (int32_t)(total / (uint32_t)period);
+}
+
+/* Over this sim step, at the model's step_ticks period (15 x XWAU's
+   SFoilsAnimationSpeed). */
+static int32_t Articulation_StepUnit(const ArticulationModel* model, CraftData* craft, int clock) {
+	return Articulation_Advance(craft, clock, g_elapsedTicks,
+								Articulation_Setting(model, "step_ticks", ARTICULATION_STEP_TICKS));
+}
+
+/* Original OPTs: the stock S-foils of FlightObject_UpdateSpecialBehavior
+   (phase 1) move the same way in the high-rate mode, where phase 1 leaves
+   them to this; the compatibility mode keeps phase 1. Its per-type numbers,
+   a speed being units per ARTICULATION_STOCK_STEP_TICKS: */
+typedef struct ArticulationStockSFoil {
+	int component;
+	int angle;
+	int speed;
+	int counted; /* its motion holds the completion (not the B-wing's bridge) */
+} ArticulationStockSFoil;
+
+static int Articulation_StockSFoils(uint16_t objectType, ArticulationStockSFoil* entries, int capacity) {
+	int count = 0;
+	int meshCount;
+	int mesh;
+
+	if (objectType != OBJ_XWing && objectType != OBJ_BWing && objectType != OBJ_MissileBoat &&
+		objectType != OBJ_SkiprayBlastBoat && objectType != OBJ_Shuttle) {
 		return 0;
 	}
-	craft->articulationTicks[clock] = (uint16_t)(time % (uint32_t)period);
-	return 1;
+	meshCount = ModelMesh_GetObjectTypeMeshCount(objectType);
+	for (mesh = 0; mesh < meshCount && count < capacity; ++mesh) {
+		const MeshType meshType = ModelMesh_GetObjectTypeMeshType(objectType, mesh);
+		ArticulationStockSFoil* entry = &entries[count];
+
+		entry->component = mesh;
+		entry->counted = 1;
+		entry->speed = 2;
+		if (meshType == MESH_RotaryWing) {
+			if (objectType == OBJ_XWing) {
+				entry->angle = ModelMesh_GetCenterZ(OBJ_XWing, mesh) < 0 ? 12 : 8;
+				entry->speed = 1;
+			} else if (objectType == OBJ_MissileBoat) {
+				entry->angle = 0x42;
+			} else if (objectType == OBJ_Shuttle) {
+				entry->angle = 0x60;
+			} else {
+				entry->angle = 0x40;
+			}
+		} else if (meshType == MESH_Bridge && objectType == OBJ_BWing) {
+			entry->angle = 0x40;
+			entry->counted = 0;
+		} else if (meshType == MESH_Launcher && objectType == OBJ_MissileBoat) {
+			entry->angle = 0x20;
+			entry->speed = 1;
+		} else {
+			continue;
+		}
+		++count;
+	}
+	return count;
+}
+
+static int Articulation_StockSFoilsActive(unsigned int objIdx) {
+	ArticulationStockSFoil entries[ARTICULATION_STOCK_SFOILS_MAX];
+
+	return XwaModernFlightTiming_IsHighRate() && Articulation_IsOriginalOpt(objIdx) &&
+		   Articulation_StockSFoils((uint16_t)g_objectTable[objIdx].objectType, entries,
+									ARTICULATION_STOCK_SFOILS_MAX) != 0;
+}
+
+static void Articulation_StepStockSFoils(unsigned int objIdx, CraftData* craft) {
+	ArticulationStockSFoil entries[ARTICULATION_STOCK_SFOILS_MAX];
+	const ObjectRecord* object = &g_objectTable[objIdx];
+	int32_t unit;
+	int count;
+	int moved = 0;
+	int index;
+
+	count = Articulation_StockSFoils((uint16_t)object->objectType, entries, ARTICULATION_STOCK_SFOILS_MAX);
+	if (count == 0) {
+		return;
+	}
+	unit =
+		Articulation_Advance(craft, ARTICULATION_CLOCK_SFOILS, g_elapsedTicks, ARTICULATION_STOCK_STEP_TICKS);
+	if ((craft->sFoilState & 1) == 0) {
+		return;
+	}
+	for (index = 0; index < count; ++index) {
+		const int32_t step = entries[index].speed * unit;
+
+		if (Articulation_MoveToward(craft, entries[index].component,
+									(craft->sFoilState & 2) != 0 ? entries[index].angle : 0, step, step, 0) &&
+			entries[index].counted) {
+			moved = 1;
+		}
+	}
+	/* Phase 1's completion. */
+	if (!moved) {
+		if ((craft->sFoilState & 2) != 0) {
+			craft->sFoilState = 2;
+			msg_emitInFlightMessage(MSG_SFOILS_CLOSED, object->playerOwnerIdx);
+		} else {
+			craft->sFoilState = 0;
+			msg_emitInFlightMessage(MSG_SFOILS_OPEN, object->playerOwnerIdx);
+		}
+	}
+}
+
+int XwaArticulation_StepsSFoils(unsigned int objIdx) {
+	return XwaArticulation_HasSFoilsOrLandingGear(objIdx) || Articulation_StockSFoilsActive(objIdx);
 }
 
 void XwaArticulation_StepSFoils(unsigned int objIdx) {
@@ -443,11 +601,17 @@ void XwaArticulation_StepSFoils(unsigned int objIdx) {
 	CraftData* craft = Articulation_Craft(objIdx);
 	const ObjectRecord* object;
 	int lists;
-	int timeSpeed;
+	int32_t unit;
 	int moved;
 	uint32_t index;
 
-	if (craft == NULL || !Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR)) {
+	if (craft == NULL) {
+		return;
+	}
+	if (!Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR)) {
+		if (XwaModernFlightTiming_IsHighRate() && Articulation_IsOriginalOpt(objIdx)) {
+			Articulation_StepStockSFoils(objIdx, craft);
+		}
 		return;
 	}
 	object = &g_objectTable[objIdx];
@@ -471,30 +635,13 @@ void XwaArticulation_StepSFoils(unsigned int objIdx) {
 		return;
 	}
 
-	timeSpeed = Articulation_TimeSpeed(model, craft, ARTICULATION_CLOCK_SFOILS);
+	unit = Articulation_StepUnit(model, craft, ARTICULATION_CLOCK_SFOILS);
 	moved = 0;
 	for (index = 0; index < model->articulationCount; ++index) {
 		const AeronFlightArticulation* articulation = &model->articulations[index];
-		uint8_t* rotation = &craft->meshRotation[articulation->component];
-		const int speed = articulation->speed * timeSpeed;
-		const int speedBack = articulation->speed_back * timeSpeed;
 
-		if (!Articulation_InLists(articulation, lists) || (craft->sFoilState & 1) == 0) {
-			continue;
-		}
-		if ((craft->sFoilState & 2) != 0) {
-			if (*rotation < articulation->angle) {
-				*rotation = (uint8_t)(*rotation + speed);
-				if (*rotation > articulation->angle) {
-					*rotation = (uint8_t)articulation->angle;
-				}
-				moved = 1;
-			}
-		} else if (*rotation >= speedBack) {
-			*rotation = (uint8_t)(*rotation - speedBack);
-			if (*rotation < speedBack) {
-				*rotation = 0;
-			}
+		if (Articulation_InLists(articulation, lists) && (craft->sFoilState & 1) != 0 &&
+			Articulation_StepEntry(craft, articulation, (craft->sFoilState & 2) != 0, unit)) {
 			moved = 1;
 		}
 	}
@@ -885,6 +1032,121 @@ void XwaArticulation_StepHangarCrew(void) {
 	}
 }
 
+/* The crew meshes the crew animation moves, with their speed in units per
+   ARTICULATION_CREW_TICKS: a replacement's crew articulations, or for an
+   original OPT the stock ordinals of FlightObject_AnimateCrewMeshRotations
+   (speed 2). */
+typedef struct ArticulationCrewMesh {
+	int component;
+	int speed;
+} ArticulationCrewMesh;
+
+#define ARTICULATION_CREW_MAX 16
+
+static int Articulation_CrewMeshes(unsigned int objIdx, const ArticulationModel* model,
+								   ArticulationCrewMesh* meshes) {
+	static const int8_t stockMeshes[][5] = {
+		{ 6, 9, -1, -1, -1 },   /* OBJ_XWing */
+		{ 4, -1, -1, -1, -1 },  /* OBJ_AWing */
+		{ 8, 13, -1, -1, -1 },  /* OBJ_YWing */
+		{ 19, 17, -1, -1, -1 }, /* OBJ_CorellianTransport2 */
+		{ 13, 9, -1, -1, -1 },  /* OBJ_FamilyTransport */
+		{ 21, 19, -1, -1, -1 }, /* OBJ_MilleniumFalcon2 */
+		{ 1, 2, 3, 4, 5 },      /* OBJ_RebelPilot, OBJ_ImperialPilot */
+	};
+	int count = 0;
+	int row;
+	int index;
+
+	if (model != NULL) {
+		uint32_t entry;
+
+		for (entry = 0; entry < model->articulationCount && count < ARTICULATION_CREW_MAX; ++entry) {
+			if (Articulation_IsCrew(&model->articulations[entry])) {
+				meshes[count].component = model->articulations[entry].component;
+				meshes[count].speed = model->articulations[entry].speed;
+				++count;
+			}
+		}
+		return count;
+	}
+	switch (g_objectTable[objIdx].objectType) {
+		case OBJ_XWing:
+			row = 0;
+			break;
+		case OBJ_AWing:
+			row = 1;
+			break;
+		case OBJ_YWing:
+			row = 2;
+			break;
+		case OBJ_CorellianTransport2:
+			row = 3;
+			break;
+		case OBJ_FamilyTransport:
+			row = 4;
+			break;
+		case OBJ_MilleniumFalcon2:
+			row = 5;
+			break;
+		case OBJ_RebelPilot:
+		case OBJ_ImperialPilot:
+			row = 6;
+			break;
+		default:
+			return 0;
+	}
+	if (!Articulation_IsOriginalOpt(objIdx)) {
+		return 0;
+	}
+	for (index = 0; index < 5 && stockMeshes[row][index] >= 0; ++index) {
+		meshes[count].component = stockMeshes[row][index];
+		meshes[count].speed = 2;
+		++count;
+	}
+	return count;
+}
+
+/* The crew logic keeps its stock and XWAU steps, with the direction in the
+   angle's low bit and its random choices on the crew timer; the crew meshes'
+   fine angles follow those signed angles at their speed on every step, and
+   only the drawing reads them. */
+void XwaArticulation_StepCrewAngles(unsigned int objIdx) {
+	ArticulationModel view;
+	ArticulationCrewMesh meshes[ARTICULATION_CREW_MAX];
+	CraftData* craft = Articulation_Craft(objIdx);
+	int count;
+	int index;
+
+	if (craft == NULL) {
+		return;
+	}
+	count = Articulation_CrewMeshes(objIdx, Articulation_Model(objIdx, &view), meshes);
+	for (index = 0; index < count; ++index) {
+		uint16_t* fine = &craft->articulationAngles[meshes[index].component];
+		const int32_t target = (int8_t)craft->meshRotation[meshes[index].component] * 256;
+		const int32_t step =
+			(meshes[index].speed * 256 * (int32_t)g_elapsedTicks + ARTICULATION_CREW_TICKS - 1) /
+			ARTICULATION_CREW_TICKS;
+		int32_t position = (int16_t)*fine;
+
+		if (position < target) {
+			position = position + step < target ? position + step : target;
+		} else {
+			position = position - step > target ? position - step : target;
+		}
+		*fine = (uint16_t)position;
+	}
+}
+
+void XwaArticulation_StepHangarCrewAngles(void) {
+	uint32_t objIdx;
+
+	for (objIdx = 0; g_objectTable != NULL && objIdx < g_objectTableSlotCount; ++objIdx) {
+		XwaArticulation_StepCrewAngles(objIdx);
+	}
+}
+
 void XwaArticulation_CloseHatches(unsigned int objIdx) {
 	ArticulationModel view;
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
@@ -900,21 +1162,21 @@ void XwaArticulation_StepLaunchHatches(unsigned int objIdx) {
 	ArticulationModel view;
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
-	int timeSpeed;
+	int32_t unit;
 
 	/* hook_sfoils PlayerCraftHatchHook: phases 1-4 close the hatches (and
 	   raise the landing gear from phase 2), 7-8 open them. */
 	if (craft == NULL || !Articulation_HasGroup(model, "hatches") || !Articulation_HatchesActive()) {
 		return;
 	}
-	timeSpeed = Articulation_TimeSpeed(model, craft, ARTICULATION_CLOCK_HATCHES);
+	unit = Articulation_StepUnit(model, craft, ARTICULATION_CLOCK_HATCHES);
 	if (g_launchSeqPhase >= 1 && g_launchSeqPhase <= 4) {
-		Articulation_StepGroup(model, craft, "hatches", 0, timeSpeed);
+		Articulation_StepGroup(model, craft, "hatches", 0, unit);
 		if (g_launchSeqPhase >= 2) {
-			Articulation_StepGroup(model, craft, "landing_gear", 0, timeSpeed);
+			Articulation_StepGroup(model, craft, "landing_gear", 0, unit);
 		}
 	} else if (g_launchSeqPhase == 7 || g_launchSeqPhase == 8) {
-		Articulation_StepGroup(model, craft, "hatches", 1, timeSpeed);
+		Articulation_StepGroup(model, craft, "hatches", 1, unit);
 	}
 }
 
@@ -922,20 +1184,20 @@ void XwaArticulation_StepShuttleHatches(unsigned int objIdx) {
 	ArticulationModel view;
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
-	int timeSpeed;
+	int32_t unit;
 
 	/* hook_sfoils ShuttleHatchHook: open while parked (0), closing while
 	   leaving (1-7), opening while landing (9). */
 	if (craft == NULL || !Articulation_HasGroup(model, "hatches") || !Articulation_HatchesActive()) {
 		return;
 	}
-	timeSpeed = Articulation_TimeSpeed(model, craft, ARTICULATION_CLOCK_HATCHES);
+	unit = Articulation_StepUnit(model, craft, ARTICULATION_CLOCK_HATCHES);
 	if (g_hangarShuttleState.moveState == 0) {
 		Articulation_SetGroup(model, craft, "hatches", 1);
 	} else if (g_hangarShuttleState.moveState >= 1 && g_hangarShuttleState.moveState <= 7) {
-		Articulation_StepGroup(model, craft, "hatches", 0, timeSpeed);
+		Articulation_StepGroup(model, craft, "hatches", 0, unit);
 	} else if (g_hangarShuttleState.moveState == 9) {
-		Articulation_StepGroup(model, craft, "hatches", 1, timeSpeed);
+		Articulation_StepGroup(model, craft, "hatches", 1, unit);
 	}
 }
 
@@ -943,7 +1205,8 @@ int XwaArticulation_StepShuttleBlock(unsigned int objIdx, XwaArticulationShuttle
 	ArticulationModel view;
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
-	uint32_t ticks;
+	int32_t unit;
+	uint32_t index;
 
 	if (craft == NULL || model == NULL) {
 		return 0;
@@ -956,42 +1219,16 @@ int XwaArticulation_StepShuttleBlock(unsigned int objIdx, XwaArticulationShuttle
 	if (!Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR)) {
 		return 0;
 	}
-	/* hook_sfoils SFoilsHangarShuttleHook steps by (speed * dt + 1) / 2, which
-	   rounds differently at each dt; it runs here on the original's frames
-	   (dt 2). */
-	ticks = (uint32_t)craft->articulationTicks[ARTICULATION_CLOCK_SHUTTLE] + (uint32_t)(dtTicks > 0 ? dtTicks : 0);
-	for (; ticks >= ARTICULATION_SHUTTLE_CADENCE; ticks -= ARTICULATION_SHUTTLE_CADENCE) {
-		uint32_t index;
+	/* hook_sfoils SFoilsHangarShuttleHook moves (speed * dt + 1) / 2 per call:
+	   at the original's frames (dt 2), a speed is units per frame. */
+	unit = Articulation_Advance(craft, ARTICULATION_CLOCK_SHUTTLE, dtTicks, ARTICULATION_SHUTTLE_CADENCE);
+	for (index = 0; index < model->articulationCount; ++index) {
+		const AeronFlightArticulation* articulation = &model->articulations[index];
 
-		for (index = 0; index < model->articulationCount; ++index) {
-			const AeronFlightArticulation* articulation = &model->articulations[index];
-			uint8_t* rotation = &craft->meshRotation[articulation->component];
-
-			if (!Articulation_InLists(articulation, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR)) {
-				continue;
-			}
-			if (step == XWA_ARTICULATION_SHUTTLE_CLOSE) {
-				const int speed = (articulation->speed * ARTICULATION_SHUTTLE_CADENCE + 1) / 2;
-
-				if (*rotation < articulation->angle) {
-					*rotation = (uint8_t)(*rotation + speed);
-					if (*rotation > articulation->angle) {
-						*rotation = (uint8_t)articulation->angle;
-					}
-				}
-			} else {
-				const int speed = (articulation->speed_back * ARTICULATION_SHUTTLE_CADENCE + 1) / 2;
-
-				if (*rotation >= speed) {
-					*rotation = (uint8_t)(*rotation - speed);
-					if (*rotation < speed) {
-						*rotation = 0;
-					}
-				}
-			}
+		if (Articulation_InLists(articulation, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR)) {
+			Articulation_StepEntry(craft, articulation, step == XWA_ARTICULATION_SHUTTLE_CLOSE, unit);
 		}
 	}
-	craft->articulationTicks[ARTICULATION_CLOCK_SHUTTLE] = (uint16_t)ticks;
 	return 1;
 }
 
@@ -1011,7 +1248,7 @@ static void Articulation_StepWarheadsBay(void) {
 		return;
 	}
 	Articulation_StepGroup(model, craft, "warheads_bay", g_players[g_localPlayer].selectedWeaponMode == 1,
-						   Articulation_TimeSpeed(model, craft, ARTICULATION_CLOCK_WARHEADS_BAY));
+						   Articulation_StepUnit(model, craft, ARTICULATION_CLOCK_WARHEADS_BAY));
 }
 
 /* The cargo-clamp group for carrying object `carriedObjIdx`:
@@ -1076,7 +1313,7 @@ static void Articulation_StepCargoClamps(unsigned int objIdx) {
 	}
 	if (Articulation_HasGroup(model, group)) {
 		Articulation_StepGroupToward(model, craft, group, angle,
-									 Articulation_TimeSpeed(model, craft, ARTICULATION_CLOCK_CARGO_CLAMPS));
+									 Articulation_StepUnit(model, craft, ARTICULATION_CLOCK_CARGO_CLAMPS));
 	}
 }
 
@@ -1136,8 +1373,9 @@ static void Articulation_StepHangarDoors(unsigned int objIdx) {
 		}
 	}
 	doorsDistance = Articulation_Setting(model, "hangar_doors.distance", ARTICULATION_HANGAR_DOORS_DISTANCE);
-	Articulation_StepGroup(model, craft, "hangar_doors", sameTeam < doorsDistance && otherTeams >= doorsDistance,
-						   Articulation_TimeSpeed(model, craft, ARTICULATION_CLOCK_HANGAR_DOORS));
+	Articulation_StepGroup(model, craft, "hangar_doors",
+						   sameTeam < doorsDistance && otherTeams >= doorsDistance,
+						   Articulation_StepUnit(model, craft, ARTICULATION_CLOCK_HANGAR_DOORS));
 }
 
 void XwaArticulation_StepWorld(void) {
@@ -1171,6 +1409,41 @@ int XwaArticulation_AlignsBridge(const ObjectRecord* object) {
 	}
 	model = Articulation_Model((unsigned int)(object - g_objectTable), &view);
 	return model != NULL && model->articulationCount != 0;
+}
+
+void XwaArticulation_DrawnAngles(const ObjectRecord* object, uint16_t* angles, size_t count) {
+	const CraftData* craft;
+	size_t component;
+
+	if (object == NULL || object->mobj == NULL || object->mobj->pCraft == NULL) {
+		return;
+	}
+	craft = object->mobj->pCraft;
+	if (count > XWA_CRAFT_MESH_SLOT_COUNT) {
+		count = XWA_CRAFT_MESH_SLOT_COUNT;
+	}
+	/* A fine angle holds while meshRotation is its whole part; other code
+	   that set meshRotation draws as it is. */
+	for (component = 0; component < count; ++component) {
+		const uint16_t fine = craft->articulationAngles[component];
+
+		angles[component] = (uint8_t)(fine >> 8) == craft->meshRotation[component]
+								? fine
+								: (uint16_t)(craft->meshRotation[component] << 8);
+	}
+	if (g_objectTable != NULL && object >= g_objectTable && object < g_objectTable + g_objectTableSlotCount) {
+		const unsigned int objIdx = (unsigned int)(object - g_objectTable);
+		ArticulationModel view;
+		ArticulationCrewMesh meshes[ARTICULATION_CREW_MAX];
+		const int crewCount = Articulation_CrewMeshes(objIdx, Articulation_Model(objIdx, &view), meshes);
+		int index;
+
+		for (index = 0; index < crewCount; ++index) {
+			if ((size_t)meshes[index].component < count) {
+				angles[meshes[index].component] = craft->articulationAngles[meshes[index].component];
+			}
+		}
+	}
 }
 
 static void Articulation_ClearMission(void) {

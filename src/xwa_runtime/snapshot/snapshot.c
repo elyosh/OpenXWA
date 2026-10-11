@@ -1311,7 +1311,7 @@ void XwaSnapshot_CaptureFlight(void) {
 				f->beam_tractor = (uint8_t)(cd->beamEffectAccum[1] != 0);
 				f->beam_jamming = (uint8_t)(cd->beamEffectAccum[2] != 0);
 				memcpy(f->component_state, cd->componentState, sizeof f->component_state);
-				memcpy(f->mesh_rotation, cd->meshRotation, sizeof f->mesh_rotation);
+				XwaArticulation_DrawnAngles(o, f->mesh_angle, XWA_SNAP_MAX_MESH_SLOTS);
 				memcpy(f->component_hp, cd->componentHp, sizeof f->component_hp);
 				f->anim_frame = XWA_CRAFT_ANIM_FRAME(cd);
 				/* Engine-glow scale inputs (EngineGlow_RenderObjectGlows). */

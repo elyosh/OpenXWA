@@ -854,6 +854,7 @@ static void XwaFlightTask_RunHangarReadyFrame(void) {
 			XwaArticulation_StepHangarCrew();
 		}
 	}
+	XwaArticulation_StepHangarCrewAngles();
 
 	Hud_UpdateFlightMessagePanes();
 	Flight_UpdateDynamicMusicState();
