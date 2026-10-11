@@ -470,10 +470,10 @@ static void xwa_tool_point_lights(int* open, void* user) {
 		ImGui::SliderFloat("Range scale", &p.range_scale, 0.25f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
 	ImGui::TextDisabled("Multiplies the distance where a light falls under\n"
 						"1/250 of a unit of illuminance and ends.");
-	changed |= ImGui::SliderFloat("Model light intensity", &p.model_light_intensity, 0.0f, 16.0f, "%.2f",
+	changed |= ImGui::SliderFloat("Model light intensity", &p.model_light_intensity, 0.0f, 0.1f, "%.6f",
 								  ImGuiSliderFlags_Logarithmic);
-	ImGui::TextDisabled("Intensity of lights authored in models (cockpit interior light).\n"
-						"Physical inverse-square falloff; 0 = off.");
+	ImGui::TextDisabled("Scene illuminance per lux of lights authored in models\n"
+						"(candela; cockpit interior light). 1/683 = 0.001464; 0 = off.");
 
 	ImGui::Separator();
 	if (ImGui::Button("Reset to defaults")) {

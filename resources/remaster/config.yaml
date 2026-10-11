@@ -224,9 +224,11 @@ point_lights:
   # Multiplies the distance where a light falls under 1/250 of a unit of
   # illuminance and ends.
   range_scale: 1.0
-  # Intensity multiplier of point lights authored in models (such as the
-  # converted cockpits' interior light); 0 disables them.
-  model_light_intensity: 2.0
+  # Lights authored in models (such as the converted cockpits' interior
+  # light) are in candela: this is the scene illuminance per lux they give.
+  # 1/683 makes the scene's units Blender's W/m^2 (683 lm/W), so the white
+  # sun (about 2.5) matches a Blender sun of that strength. 0 disables them.
+  model_light_intensity: 0.0014641288
 lighting:
   # Illuminance per unit of the game's sun intensity (also the hangar and
   # environment-package lights). Pi shades as brightly as the classic

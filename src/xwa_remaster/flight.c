@@ -3110,8 +3110,9 @@ static uint32_t fl_submit_point_lights(uint32_t count) {
 }
 
 /* Lights authored in a model (AeronFlightLight), placed by its instance.
- * Their intensity is authored physically, so point_lights.match_distance_m
- * does not apply; point_lights.model_light_intensity does. */
+ * Their intensity is authored in candela, so point_lights.match_distance_m
+ * does not apply; point_lights.model_light_intensity converts it to the
+ * scene's units. */
 static void fl_submit_model_lights(const AeronSceneMesh* mesh, const float transform[16],
 								   const AeronSceneMeshTable* table) {
 	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f)) {
