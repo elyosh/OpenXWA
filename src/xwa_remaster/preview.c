@@ -31,6 +31,7 @@
 #include "aeron/scene/bloom.h"
 #include "aeron/scene/present.h"
 #include "aeron/scene/scene3d.h"
+#include "aeron/time.h"
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/skins.h"
@@ -78,6 +79,9 @@ static int preview_ensure(void) {
 	/* Transparent background — the src-coverage tonemap keeps it for
 	 * the frontend z-merge PMA-over composite. */
 	AeronScene_SetClearColor(s.scene, (const float[4]) { 0.0f, 0.0f, 0.0f, 0.0f });
+	/* Materials animate as in flight: an always-playing flipbook draws its
+	 * frames over the material's plain colour. */
+	AeronScene_SetEffectAtlas(s.scene, XwaRemasterShip_EffectAtlas());
 	if (!s.chain) {
 		s.chain = AeronScenePresentChain_Create(AERON_TEXTURE_FORMAT_RGBA16_FLOAT);
 	}
@@ -143,6 +147,8 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	cam.h_half_rad = atanf((float)p->dst_w / 1024.0f);
 	cam.v_half_rad = atanf((float)p->dst_h / 1024.0f);
 	cam.near_z = PREVIEW_NEAR_Z;
+	/* The frontend has no game clock: animations follow the host's. */
+	AeronScene_SetAnimationTime(s.scene, (double)Aeron_NowUs() * 1.0e-6);
 	if (!AeronScene_Begin(s.scene, &cam)) {
 		Aeron_CommandBufferSetFailure(cmd, "Model-preview scene initialization failed");
 		return NULL;

@@ -23,7 +23,7 @@
 /* Modern port module; no original counterpart. It reproduces the settings
    lookup of XWAU's hook_hangars (hangar.cpp: GetCommandShipModelIndex,
    GetCustomFileLines, CustomFileLinesHangarObjects) over the layers the
-   model conversion imports (docs: xwau_hangars.md). */
+   model conversion imports. */
 
 #define HANGARS_LAYERS 4
 #define HANGARS_LIST_MAX 64

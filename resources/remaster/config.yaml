@@ -120,7 +120,7 @@ effects:
   glow_mark_emissive_strength: 5.0
 dynamic_cockpit:
   # Cockpit displays showing the HUD, from XWAU Dynamic Cockpit data in
-  # converted cockpit models (docs/dynamic_cockpit.md).
+  # converted cockpit models.
   enabled: true
   # Keep the whole 2D HUD on screen (XWAU's D key); transparent displays
   # without always_visible are hidden and the throttle bar is not drawn.

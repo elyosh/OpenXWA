@@ -247,9 +247,8 @@ static struct {
 
 	/* Star skybox — an authored cube map replaces the classic CPU
 	 * pixel starfield (procedural + random per launch, so the cube
-	 * has no per-mission fidelity constraint; deviation register in
-	 * docs/xwa_snapshot.md). Loaded once per process, latched on
-	 * failure. sky_path is relative to the bake root. */
+	 * has no per-mission fidelity constraint). Loaded once per process,
+	 * latched on failure. sky_path is relative to the bake root. */
 	AeronTexture* sky_cube;
 	int process_assets_prepared;
 	int sky_enabled;
@@ -889,7 +888,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 
-	/* Dynamic Cockpit (dynamic_cockpit.md D21, D31, D34). */
+	/* Dynamic Cockpit. */
 	const XwaRemasterDcSettings dc_settings = {
 		.enabled = AeronConfigFile_GetBool(cf, "dynamic_cockpit.enabled", 1),
 		.classic_hud = AeronConfigFile_GetBool(cf, "dynamic_cockpit.classic_hud", 0),

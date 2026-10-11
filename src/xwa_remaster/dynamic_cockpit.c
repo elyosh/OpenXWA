@@ -196,7 +196,7 @@ static struct {
 	int have_game_ticks;
 } dc;
 
-/* dynamic_cockpit.md D19, D28, D34: display text starts at the OPT
+/* Display text starts at the OPT
  * cockpit lights' strength. */
 static const XwaRemasterDcSettings dc_default_settings = {
 	.enabled = 1,
@@ -402,7 +402,7 @@ void XwaRemasterDc_BeginFrame(const XwaSnapshot* snapshot, const AeronSceneMesh*
 	}
 
 	/* Hologram time and fade follow game time, so they hold while paused
-	 * (dynamic_cockpit.md D30: XWAU's 0.04 per frame at 60 fps). */
+	 * (XWAU's 0.04 per frame at 60 fps). */
 	float dt = 0.0f;
 	if (snapshot) {
 		if (dc.have_game_ticks && snapshot->game_time_ticks >= dc.last_game_ticks)

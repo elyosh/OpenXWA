@@ -4,7 +4,7 @@
 /*
  * Dynamic Cockpit: the HD HUD shown on cockpit displays (screen materials,
  * aeron gltf_mesh.h) as the X-Wing Alliance Upgrade's ddraw wrapper does
- * (docs: dynamic_cockpit.md). Modern port module; no original counterpart.
+ * Modern port module; no original counterpart.
  *
  * Every frame, after XwaRemasterHud_PrepareFrame, the module places XWAU's
  * source rectangles and erasable HUD regions on the frame's HUD: a
@@ -18,7 +18,7 @@
  * 2D HUD except within the erased regions, and into a capture atlas (one
  * per layer: graphics, the fixed widgets and the CMD view; text) where it
  * overlaps a source. The atlas packs the sources, padded, and the screens
- * sample them there (dynamic_cockpit.md 2.6). The panel images are not
+ * sample them there. The panel images are not
  * captured; erased ones are not drawn (XwaRemasterHudFixed_SetErasedPanels).
  *
  * Per frame: BeginFrame before XwaRemasterHud_PrepareFrame, which calls
@@ -36,11 +36,11 @@
 extern "C" {
 #endif
 
-/* Sources and HUD regions of XWAU's tables (dynamic_cockpit.md, 1.4). */
+/* Sources and HUD regions of XWAU's tables. */
 #define XWA_DC_SOURCE_COUNT 57
 #define XWA_DC_REGION_COUNT 11
 
-/* dynamic_cockpit.md D19, D21, D28, D31, D34. */
+/* Dynamic Cockpit settings (remaster/config.yaml `dynamic_cockpit:`). */
 typedef struct XwaRemasterDcSettings {
 	int enabled;     /* capture and screens; off draws the HUD as before */
 	int classic_hud; /* nothing erased; transparent screens without always_visible hidden */

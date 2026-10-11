@@ -6,7 +6,7 @@
  * HD sky into six cube faces, renders each backdrop sun on its own as a
  * sprite, and writes them with the light list to
  *   <user root>/captures/environments/<mission>/region_<n>/
- * for `environment_bake --capture`. See docs/hd_environment_capture.md.
+ * for `environment_bake --capture`.
  *
  * The debug action records a request; the remaster frame code runs it at
  * the start of the next HD flight frame, before that frame's command buffer
