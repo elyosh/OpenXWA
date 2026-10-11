@@ -637,7 +637,7 @@ int XwaModelSource_AddKey(const char* key) {
 	return 1;
 }
 
-int XwaModelSource_TypeKey(unsigned int objectType, char* key) {
+int XwaModelSource_TypeKey(unsigned int objectType, int mapped, char* key) {
 	const ModelTypeInfo* info;
 	const char* rowKey = NULL;
 
@@ -656,7 +656,7 @@ int XwaModelSource_TypeKey(unsigned int objectType, char* key) {
 	if (rowKey == NULL || rowKey[0] == '\0') {
 		return 0;
 	}
-	strcpy(key, ModelSource_GlbKeyFor(rowKey));
+	strcpy(key, mapped ? ModelSource_GlbKeyFor(rowKey) : rowKey);
 	return 1;
 }
 

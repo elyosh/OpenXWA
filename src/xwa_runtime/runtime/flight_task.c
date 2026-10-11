@@ -48,6 +48,7 @@
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/timing/host_clock.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 
@@ -858,6 +859,9 @@ static void XwaFlightTask_RunHangarReadyFrame(void) {
 		Sound_Update3DListenerAndSources();
 	}
 	if (g_launchAnimDone || g_flightExitRequest || !g_inHangarReady) {
+		/* Leaving the hangar (XWAU hook_hangars HangarExitHook): the other
+		   objects get their own models back from the hangar's swaps. */
+		XwaHangars_LeaveHangar();
 		if (g_xwaFlightTaskHangarContinuation == XWA_FLIGHT_TASK_HANGAR_CONTINUE_MISSION_START) {
 			g_xwaFlightTaskPhase = XWA_FLIGHT_TASK_PHASE_MISSION_START;
 		} else if (g_flightExitRequest) {
@@ -1588,6 +1592,9 @@ void XwaFlightTask_Tick(void) {
 					Hangar_SetupReadyScene();
 				}
 				if (skipHangarReady || g_filmPlaybackMode) {
+					/* The mission starts in flight: its objects get their own
+					   models, not the hangar's swaps. */
+					XwaHangars_LeaveHangar();
 					if (g_provingGroundsModeActive) {
 						Yard_InitChallengeScene();
 					}

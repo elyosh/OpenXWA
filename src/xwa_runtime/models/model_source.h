@@ -56,10 +56,11 @@ int XwaModelSource_ReplacementsEnabled(void);
    no list has (a mothership's hangar, a hangar object swap). Returns 1 when
    the key now resolves to a GLB. */
 int XwaModelSource_AddKey(const char* key);
-/* Writes the GLB key `objectType`'s model list row resolves to (the row's
-   key through the model map) to `key` (XWA_MODEL_SOURCE_KEY_MAX bytes).
-   Returns 0 when replacements are off or the type has no row. */
-int XwaModelSource_TypeKey(unsigned int objectType, char* key);
+/* Writes the key of `objectType`'s model list row to `key`
+   (XWA_MODEL_SOURCE_KEY_MAX bytes); `mapped` gives the GLB key it resolves
+   to (through the model map). Returns 0 when replacements are off or the
+   type has no row. */
+int XwaModelSource_TypeKey(unsigned int objectType, int mapped, char* key);
 /* Writes `fileName`'s key (basename without extension, lower-cased) to `key`
    (XWA_MODEL_SOURCE_KEY_MAX bytes). Returns 0 for an empty or overlong name. */
 int XwaModelSource_NormalizeKey(const char* fileName, char* key);

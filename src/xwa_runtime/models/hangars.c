@@ -12,6 +12,7 @@
 #include "xwa/flight/mission/mission.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/flight/player/player.h"
+#include "xwa/math/scalar.h"
 #include "xwa_runtime/models/mission_file.h"
 #include "xwa_runtime/models/model_source.h"
 
@@ -48,6 +49,8 @@ static const AeronConfigNode* s_mission;
 
 /* The resolved state. */
 static int s_resolved;
+/* From a resolution to leaving the hangar: HangarObjects swaps apply. */
+static int s_inHangar;
 static int s_provingGround;
 static HangarsKey s_shipKey;
 static int s_shipIff;
@@ -144,6 +147,7 @@ void XwaHangars_LoadMission(const char* missionPath) {
 	}
 	s_mission = NULL;
 	s_resolved = 0;
+	s_inHangar = 0;
 	if (s_settings == NULL || missionPath == NULL ||
 		XwaMissionFile_Load(missionPath, &s_missionFile, path, sizeof path) <= 0) {
 		return;
@@ -396,6 +400,48 @@ static const AeronConfigNode* Hangars_Section(const char* name) {
 	return NULL;
 }
 
+/* hook_hangars' layouts without a map section (HangarMapHook,
+   FamHangarMapHook): the stock layouts at the highest detail level. */
+typedef struct HangarsDefaultLine {
+	uint16_t objectType;
+	int x;
+	int y;
+	int z;
+	uint16_t headingXY;
+	uint16_t headingZ;
+} HangarsDefaultLine;
+
+#define HANGARS_FLOOR 0x7FFFFFFF
+
+static const HangarsDefaultLine s_defaultMap[] = {
+	{ 314, -1059, 1313, HANGARS_FLOOR, 38600, 0 },	   { 309, 725, -416, HANGARS_FLOOR, 23500, 0 },
+	{ 313, -1352, 1440, HANGARS_FLOOR, 536, 0 },	   { 315, -1065, -56, HANGARS_FLOOR, 47736, 0 },
+	{ 315, 2079, 733, HANGARS_FLOOR, 6400, 0 },		   { 315, -2488, 1215, HANGARS_FLOOR, 11864, 0 },
+	{ 310, 794, -750, -848, 6800, 12500 },			   { 310, -803, -1464, HANGARS_FLOOR, 49200, 0 },
+	{ 310, -1563, 944, HANGARS_FLOOR, 51436, 0 },	   { 83, -506, -2136, -722, 32836, 16480 },
+	{ 83, -841, -1628, HANGARS_FLOOR, 53100, 0 },	   { 83, 1240, -2098, -722, 272, 16480 },
+	{ 84, -834, -2034, HANGARS_FLOOR, 32336, 0 },	   { 80, -3474, -275, HANGARS_FLOOR, 29436, 0 },
+	{ 2, -1038, -798, HANGARS_FLOOR, 7700, 0 },		   { 50, 1146, -1288, -741, 50536, 0 },
+	{ 315, 820, -665, HANGARS_FLOOR, 49136, 0 },	   { 310, -873, -1456, -849, 60472, 20400 },
+	{ 310, -3095, -592, HANGARS_FLOOR, 51436, 0 },	   { 83, -1751, -1996, HANGARS_FLOOR, 31172, 0 },
+	{ 83, 979, -2103, HANGARS_FLOOR, 37036, 0 },	   { 84, -1374, -2068, HANGARS_FLOOR, 40536, 0 },
+	{ 80, 2806, 1357, HANGARS_FLOOR, 20536, 0 },	   { 80, -195, -1910, HANGARS_FLOOR, 54372, 0 },
+	{ 3, 2178, 506, -830, 40036, 1500 },			   { 2, 1100, -503, HANGARS_FLOOR, 49036, 0 },
+	{ 1, -1003, 280, -825, 16600, 0 },
+};
+
+static const HangarsDefaultLine s_defaultFamilyMap[] = {
+	{ 315, 821, -6618, HANGARS_FLOOR, 30600, 0 },	   { 314, 2431, -5447, HANGARS_FLOOR, 61536, 0 },
+	{ 309, 626, -6397, HANGARS_FLOOR, 736, 0 },		   { 313, 1577, -6663, HANGARS_FLOOR, 500, 0 },
+	{ 80, -1954, -7445, HANGARS_FLOOR, 31236, 0 },	   { 80, -1938, -7445, -4997, 31236, 0 },
+	{ 83, -1231, -8544, -5003, 32736, 0x4000 },		   { 83, -1481, -8444, -5003, 45736, 0x4000 },
+	{ 83, -1821, -8464, -5003, 32736, 0x4000 },		   { 84, -1834, -6154, HANGARS_FLOOR, 42736, 0 },
+	{ 84, 1939, -8013, HANGARS_FLOOR, 31800, 0 },	   { 80, -1954, -7445, -4888, 31236, 0 },
+	{ 80, -1978, -7386, -4781, 31736, 0 },			   { 310, 1484, -8339, -5133, 29700, 20400 },
+	{ 310, 1384, -8339, HANGARS_FLOOR, 32036, 0 },	   { 83, -2061, -8344, -5003, 32736, 0x4000 },
+	{ 83, -1511, -6734, HANGARS_FLOOR, 27736, 0x8000 },
+};
+
 static void Hangars_ResolveMap(int family) {
 	const AeronConfigNode* section = Hangars_Section(family ? "fam_map" : "map");
 	size_t count = AeronConfigNode_SequenceCount(section);
@@ -404,13 +450,35 @@ static void Hangars_ResolveMap(int family) {
 	free(s_maps[family]);
 	s_maps[family] = NULL;
 	s_mapCounts[family] = 0;
-	s_mapPresent[family] = section != NULL;
+	s_mapPresent[family] = 1;
+	if (section == NULL) {
+		const HangarsDefaultLine* lines = family ? s_defaultFamilyMap : s_defaultMap;
+
+		count = family ? sizeof s_defaultFamilyMap / sizeof *lines : sizeof s_defaultMap / sizeof *lines;
+		s_maps[family] = (XwaHangarMapEntry*)calloc(count, sizeof *s_maps[family]);
+		if (s_maps[family] == NULL) {
+			return;
+		}
+		for (index = 0; index < count; ++index) {
+			XwaHangarMapEntry* entry = &s_maps[family][index];
+
+			entry->objectType = lines[index].objectType;
+			entry->position[0] = lines[index].x;
+			entry->position[1] = lines[index].y;
+			entry->position[2] = lines[index].z;
+			entry->headingXY = lines[index].headingXY;
+			entry->headingZ = lines[index].headingZ;
+			strcpy(entry->objectProfile, "Default");
+			entry->isFloorInverted = -1;
+		}
+		s_mapCounts[family] = (int)count;
+		return;
+	}
 	if (count == 0) {
 		return;
 	}
 	s_maps[family] = (XwaHangarMapEntry*)calloc(count, sizeof *s_maps[family]);
 	if (s_maps[family] == NULL) {
-		s_mapPresent[family] = 0;
 		return;
 	}
 	for (index = 0; index < count; ++index) {
@@ -503,7 +571,7 @@ int XwaHangars_Resolve(void) {
 	root = AeronConfigFile_Root(s_settings);
 	key[0] = '\0';
 	hasShip = !g_provingGroundsModeActive && Hangars_CommandShip(&objectType, &iff, &markings) &&
-			  XwaModelSource_TypeKey(objectType, key);
+			  XwaModelSource_TypeKey(objectType, 1, key);
 	if (!hasShip) {
 		key[0] = '\0';
 		iff = 0;
@@ -522,6 +590,7 @@ int XwaHangars_Resolve(void) {
 	changed = !s_resolved || s_provingGround != g_provingGroundsModeActive || strcmp(s_shipKey, key) != 0 ||
 			  s_shipIff != (hasShip ? iff : -1);
 	s_resolved = 1;
+	s_inHangar = 1;
 	s_provingGround = g_provingGroundsModeActive;
 	strcpy(s_shipKey, key);
 	s_shipIff = hasShip ? iff : -1;
@@ -598,7 +667,7 @@ static void Hangars_DesiredKey(uint16_t objectType, char* key) {
 		strcpy(key, s_hangarModel);
 		return;
 	}
-	if (!XwaModelSource_TypeKey(objectType, typeKey)) {
+	if (!s_inHangar || !XwaModelSource_TypeKey(objectType, 1, typeKey)) {
 		return;
 	}
 	for (swap = 0; swap < s_swapCount; ++swap) {
@@ -615,6 +684,17 @@ int XwaHangars_ModelFileName(uint16_t objectType, char* fileName, unsigned int f
 
 	Hangars_DesiredKey(objectType, key);
 	if (key[0] == '\0') {
+		return 0;
+	}
+	written = snprintf(fileName, fileNameSize, "%s.opt", key);
+	return written > 0 && (unsigned int)written < fileNameSize;
+}
+
+int XwaHangars_TypeFileName(uint16_t objectType, char* fileName, unsigned int fileNameSize) {
+	HangarsKey key;
+	int written;
+
+	if (s_settings == NULL || !XwaModelSource_TypeKey(objectType, 0, key)) {
 		return 0;
 	}
 	written = snprintf(fileName, fileNameSize, "%s.opt", key);
@@ -650,4 +730,50 @@ void XwaHangars_ReleaseStaleModel(uint16_t objectType) {
 	g_modelTypeTable[objectType].curTexLevel = NULL;
 	g_modelBoundsCached[objectType] = 0;
 	s_loaded[objectType].handle = 0;
+}
+
+/* Gives every type the objects of the hangar (`hangar`) or of the rest of
+   the mission use the model the settings want for them now. */
+static void Hangars_ReloadUsedTypes(int hangar) {
+	static uint8_t used[XWA_LOADED_MODEL_COUNT];
+	uint8_t hangarFlightGroup;
+	uint32_t objIdx;
+	unsigned int objectType;
+
+	if (s_settings == NULL || g_launchRefObjIdx < 0 || (uint32_t)g_launchRefObjIdx >= g_objectTableSlotCount) {
+		return;
+	}
+	hangarFlightGroup = g_objectTable[g_launchRefObjIdx].flightGroupIdx;
+	memset(used, 0, sizeof used);
+	for (objIdx = 0; objIdx < g_objectTableSlotCount; ++objIdx) {
+		const ObjectRecord* object = &g_objectTable[objIdx];
+
+		if (object->objectType == 0 || object->objectType >= XWA_LOADED_MODEL_COUNT ||
+			object->objectType == OBJ_Hangar || object->objectType == OBJ_FamilyBase) {
+			continue;
+		}
+		if ((object->flightGroupIdx == hangarFlightGroup) == (hangar != 0)) {
+			used[object->objectType] = 1;
+		}
+	}
+	for (objectType = 0; objectType < XWA_LOADED_MODEL_COUNT; ++objectType) {
+		if (!used[objectType] || g_loadedModels.byObjectType[objectType] == 0) {
+			continue;
+		}
+		XwaHangars_ReleaseStaleModel((uint16_t)objectType);
+		if (g_loadedModels.byObjectType[objectType] == 0) {
+			Hangar_LoadCraftModelByType((uint16_t)objectType);
+			Math_SetFpuSinglePrecisionMode();
+		}
+	}
+}
+
+void XwaHangars_ReapplyHangarModels(void) { Hangars_ReloadUsedTypes(1); }
+
+void XwaHangars_LeaveHangar(void) {
+	if (!s_inHangar) {
+		return;
+	}
+	s_inHangar = 0;
+	Hangars_ReloadUsedTypes(0);
 }

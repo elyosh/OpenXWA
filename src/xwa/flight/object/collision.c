@@ -37,6 +37,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/collision_bvh.h"
+#include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/opt_synth.h"
 #endif
 
@@ -6512,7 +6513,15 @@ static __inline void collide_HandleDepartureDockPrompt(int playerIdx, unsigned i
 			}
 
 			ot = cand->objectType;
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars SelectHangarInsideAnimation): with
+			   hangar settings, every mothership but the family base also offers
+			   the mirrored dock point, as the Calamari cruisers do. */
+			if (ot == OBJ_CalamariCruiserNew || ot == OBJ_CalamariWinged ||
+				(XwaHangars_IsActive() && ot != OBJ_FamilyBase)) {
+#else
 			if (ot == OBJ_CalamariCruiserNew || ot == OBJ_CalamariWinged) {
+#endif
 				// Evaluate the mirrored (-X) docking offset first.
 				pai_RotateLocalVectorToWorldScratch(cand, -g_modelDefs[ccraft->modelIndex].meshAttachData[5],
 													g_modelDefs[ccraft->modelIndex].meshAttachData[6],

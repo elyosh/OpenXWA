@@ -184,3 +184,22 @@ void XwaObjectProfiles_Apply(uint16_t objectType, int flightGroupIdx, uint8_t ma
 		craft->componentState[components[index]] = 4;
 	}
 }
+
+void XwaObjectProfiles_ApplyNamed(uint16_t objectType, const char* profile, struct CraftData* craft) {
+	int components[XWA_OPT_SYNTH_MAX_COMPONENTS];
+	int count;
+	int index;
+
+	if (craft == NULL || profile == NULL || !XwaModelRole_IsReplacement(objectType)) {
+		return;
+	}
+	for (index = 0; index < XWA_CRAFT_MESH_SLOT_COUNT; ++index) {
+		craft->componentHp[index] = 0xFF;
+		craft->componentState[index] = 0;
+	}
+	count = ObjectProfiles_Collect(objectType, profile, components, XWA_OPT_SYNTH_MAX_COMPONENTS);
+	for (index = 0; index < count; ++index) {
+		craft->componentHp[components[index]] = 0;
+		craft->componentState[components[index]] = 4;
+	}
+}

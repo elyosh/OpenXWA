@@ -236,6 +236,14 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 			strcpy(modelName, "MoltenBlock.opt");
 			break;
 		default:
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars removes this filter): with hangar
+			   settings, any type with a model list row loads, as hangar maps
+			   place any of them. */
+			if (XwaHangars_TypeFileName(modelType, modelName, sizeof modelName)) {
+				break;
+			}
+#endif
 			return 0;
 	}
 

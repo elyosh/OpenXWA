@@ -110,7 +110,8 @@ int XwaHangars_Resolve(void);
 int XwaHangars_IsActive(void);
 
 const XwaHangarObjects* XwaHangars_Objects(void);
-/* The map section (`family`: the family base's); NULL when no layer has one. */
+/* The map section (`family`: the family base's). Without one in any layer,
+   hook_hangars' default layout: the stock one at the highest detail level. */
 const XwaHangarMapEntry* XwaHangars_Map(int family, int* count);
 const XwaHangarCamera* XwaHangars_Camera(int family);
 /* The command ship's markings (FG markings, 0 without a command ship). */
@@ -120,11 +121,21 @@ uint8_t XwaHangars_CommandShipMarkings(void);
    of its stock one ("<key>.opt", resolved by the model source), or 0: the
    command ship's hangar model for the hangar, a HangarObjects swap. */
 int XwaHangars_ModelFileName(uint16_t objectType, char* fileName, unsigned int fileNameSize);
+/* The stock model file of any type with a model list row, for the types
+   Hangar_LoadCraftModelByType has no name for (hook_hangars removes its
+   type filter); 0 without settings. */
+int XwaHangars_TypeFileName(uint16_t objectType, char* fileName, unsigned int fileNameSize);
 /* Records the handle Hangar_LoadCraftModelByType loaded for `objectType`. */
 void XwaHangars_ModelLoaded(uint16_t objectType, uint16_t handle);
 /* Frees `objectType`'s loaded model when the settings want another one, so
    the next Hangar_LoadCraftModelByType loads it. */
 void XwaHangars_ReleaseStaleModel(uint16_t objectType);
+/* HangarObjects swaps apply from a resolution until the player leaves the
+   hangar. Back in the hangar without a new resolution, the hangar objects get
+   their swapped models again; on leaving, the other objects get theirs
+   back. */
+void XwaHangars_ReapplyHangarModels(void);
+void XwaHangars_LeaveHangar(void);
 
 #ifdef __cplusplus
 }
