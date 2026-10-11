@@ -593,7 +593,18 @@ static void Hangar_UpdateReadyAutoCamera(PlayerData* player) {
 		trig2_ctop(playerObj->world_x - focusObj->world_x, playerObj->world_y - focusObj->world_y,
 				   playerObj->world_z - focusObj->world_z);
 		if (g_hangarCamFocusObj == g_hangarRoofCraneState.objectIdx) {
+#ifdef XWA_MODERN
+			/* Modern port (XWAU hook_hangars HangarRoofCraneCameraHook): above
+			   the crane on any axis. */
+			if (XwaHangars_IsActive()) {
+				XwaHangarScene_FollowCrane(&player->viewState.savedTargetX, &player->viewState.savedTargetY,
+										   &player->viewState.savedTargetZ);
+			} else {
+				player->viewState.savedTargetX = focusObj->world_x;
+			}
+#else
 			player->viewState.savedTargetX = focusObj->world_x;
+#endif
 		} else {
 			double angleRadians;
 
@@ -4592,6 +4603,13 @@ void Hangar_SetCameraShot(int shotIndex) {
 	g_hangarAutoCam = 1;
 	g_hangarCamFocusObj = noObject;
 
+#ifdef XWA_MODERN
+	/* Modern port (XWAU hook_hangars HangarCameraPositionHook): the shots
+	   from the camera sections. */
+	if (XwaHangars_IsActive() && XwaHangarScene_CameraShot(shotIndex, &worldX, &worldY, &worldZ)) {
+		goto shot_placed;
+	}
+#endif
 	if (g_hangarBackdropModelType == 308) {
 		switch ((uint16_t)shotIndex) {
 			case 0:
@@ -4784,6 +4802,9 @@ void Hangar_SetCameraShot(int shotIndex) {
 		}
 	}
 
+#ifdef XWA_MODERN
+shot_placed:
+#endif
 	FlightView_UpdatePlayerCamera(g_localPlayer);
 	g_players[g_localPlayer].viewState.savedTargetX = worldX;
 	g_players[g_localPlayer].viewState.savedTargetY = worldY;

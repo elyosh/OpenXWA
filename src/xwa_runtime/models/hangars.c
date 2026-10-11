@@ -830,3 +830,25 @@ void XwaHangars_PlayerOffset(uint16_t objectType, int offset[3]) {
 	}
 	memcpy(offset, source, 3 * sizeof *offset);
 }
+
+int XwaHangars_CraftCamera(uint16_t objectType, int family, int inverted, int offset[3]) {
+	const AeronConfigNode* camera = NULL;
+	const AeronConfigNode* triple;
+	HangarsKey key;
+	int axis;
+
+	/* The hook reads the [Camera] of the type's own model, never a swap. */
+	if (s_settings != NULL && XwaModelSource_TypeKey(objectType, 1, key)) {
+		const AeronConfigNode* crafts = AeronConfigNode_MapGet(AeronConfigFile_Root(s_settings), "crafts");
+
+		camera = AeronConfigNode_MapGet(AeronConfigNode_MapGet(crafts, key), "camera");
+	}
+	triple = AeronConfigNode_SequenceGet(camera, (size_t)((family != 0) * 2 + (inverted != 0)));
+	if (AeronConfigNode_SequenceCount(camera) != 4 || AeronConfigNode_SequenceCount(triple) != 3) {
+		return 0;
+	}
+	for (axis = 0; axis < 3; ++axis) {
+		offset[axis] = (int)AeronConfigNode_Int(AeronConfigNode_SequenceGet(triple, (size_t)axis), 0);
+	}
+	return 1;
+}

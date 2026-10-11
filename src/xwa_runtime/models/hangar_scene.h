@@ -76,6 +76,14 @@ int XwaHangarScene_DroidUpdates(int sceneIdx);
 int* XwaHangarScene_CraneCoordinate(void);
 int XwaHangarScene_CraneTarget(int offset);
 
+/* Hangar_SetCameraShot's position for shot `shotIndex` from the camera
+   sections ([HangarCamera], [FamHangarCamera], the player craft's [Camera])
+   and the droids' and crane's places; 0 for a shot the stock code places
+   (the cockpit, the family work droid, a player craft without [Camera]). */
+int XwaHangarScene_CameraShot(int shotIndex, int* x, int* y, int* z);
+/* The crane shot's camera, above the crane on any axis. */
+void XwaHangarScene_FollowCrane(int* x, int* y, int* z);
+
 #ifdef __cplusplus
 }
 #endif

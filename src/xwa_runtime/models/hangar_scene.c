@@ -512,3 +512,127 @@ int XwaHangarScene_CraneTarget(int offset) {
 	}
 	return current + step;
 }
+
+/* ---- cameras (hook_hangars HangarCameraPositionHook,
+   HangarRoofCraneCameraHook) ------------------------------------------- */
+
+/* The stock offsets from the launch reference of the fixed shots. */
+static const int s_stockShots[2][10][3] = {
+	{ { 0 },
+	  { 1130, -2320, -300 },
+	  { 1240, -330, -700 },
+	  { -1120, 1360, -790 },
+	  { 0 },
+	  { 0 },
+	  { -1200, -1530, -850 },
+	  { 0 },
+	  { 0 },
+	  { 1070, 4640, -130 } },
+	{ { 0 },
+	  { 780, -6471, -4977 },
+	  { -1970, -8810, -4707 },
+	  { 2510, -5391, -5067 },
+	  { 0 },
+	  { 0 },
+	  { 1740, -8461, -5047 },
+	  { 3180, 2629, -3777 },
+	  { 8242, 6600, 10 },
+	  { -13360, 35019, -6537 } },
+};
+
+/* A fixed shot: the camera section's key (a missing key is 0), else stock. */
+static void HangarScene_FixedShot(int family, int shot, int* x, int* y, int* z) {
+	const XwaHangarCamera* camera = XwaHangars_Camera(family);
+	const int* offset = camera->present ? camera->offsets[shot] : s_stockShots[family][shot];
+	const ObjectRecord* launchRef = &g_objectTable[g_launchRefObjIdx];
+
+	*x = launchRef->world_x + offset[0];
+	*y = launchRef->world_y + offset[1];
+	*z = launchRef->world_z + offset[2];
+}
+
+/* The player craft's own camera; 0 without one (the stock per-type shot). */
+static int HangarScene_PlayerShot(int family, int* x, int* y, int* z) {
+	const ObjectRecord* player = &g_objectTable[g_hangarPlayerObjIdx];
+	int offset[3];
+
+	if (!XwaHangars_CraftCamera(player->objectType, family,
+								XwaHangars_PlayerFloorInverted(player->objectType), offset)) {
+		return 0;
+	}
+	*x = player->world_x + offset[0];
+	*y = player->world_y + offset[1];
+	*z = player->world_z + offset[2];
+	return 1;
+}
+
+int XwaHangarScene_CameraShot(int shotIndex, int* x, int* y, int* z) {
+	const int family = g_hangarBackdropModelType != OBJ_Hangar;
+	const int shot = (uint16_t)shotIndex;
+
+	if (!family) {
+		switch (shot) {
+			case 1:
+			case 2:
+			case 3:
+			case 6:
+			case 9:
+				HangarScene_FixedShot(0, shot, x, y, z);
+				return 1;
+			case 4:
+			case 5:
+				/* A droid not loaded gives key 3. */
+				if (!XwaHangars_Objects()->droids[shot - 4].load) {
+					HangarScene_FixedShot(0, 3, x, y, z);
+					return 1;
+				}
+				g_hangarCamFocusObj = g_hangarSceneObjects[shot - 4].objectIdx;
+				*x = g_objectTable[g_hangarCamFocusObj].world_x;
+				*y = g_objectTable[g_hangarCamFocusObj].world_y;
+				*z = g_objectTable[g_hangarCamFocusObj].world_z + 30;
+				return 1;
+			case 7:
+				if (g_hangarPlayerObjIdx == 0xffff || g_launchSeqPhase) {
+					HangarScene_FixedShot(0, 3, x, y, z);
+					return 1;
+				}
+				return HangarScene_PlayerShot(0, x, y, z);
+			case 8:
+				/* Above the crane, wherever it travels. */
+				g_hangarCamFocusObj = g_hangarRoofCraneState.objectIdx;
+				*x = g_objectTable[g_hangarCamFocusObj].world_x;
+				*y = g_objectTable[g_hangarCamFocusObj].world_y + 654;
+				*z = g_objectTable[g_hangarCamFocusObj].world_z - 8;
+				return 1;
+			default:
+				return 0;
+		}
+	}
+	switch (shot) {
+		case 1:
+		case 2:
+		case 3:
+		case 6:
+		case 7:
+		case 8:
+		case 9:
+			HangarScene_FixedShot(1, shot, x, y, z);
+			return 1;
+		case 5:
+			if (g_hangarPlayerObjIdx == 0xffff) {
+				HangarScene_FixedShot(1, 3, x, y, z);
+				return 1;
+			}
+			return HangarScene_PlayerShot(1, x, y, z);
+		default:
+			return 0;
+	}
+}
+
+void XwaHangarScene_FollowCrane(int* x, int* y, int* z) {
+	const ObjectRecord* crane = &g_objectTable[g_hangarRoofCraneState.objectIdx];
+
+	*x = crane->world_x;
+	*y = crane->world_y + 654;
+	*z = crane->world_z - 8;
+}

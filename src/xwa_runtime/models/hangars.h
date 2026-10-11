@@ -124,6 +124,10 @@ int XwaHangars_CraftElevation(uint16_t objectType, int inverted);
 /* Whether the player craft `objectType` hangs from the inverted floor, and
    its offset from the stock place (GetPlayerCraft). */
 int XwaHangars_PlayerFloorInverted(uint16_t objectType);
+/* The player craft camera offset of `objectType` from the player ([Camera]
+   of its model, `crafts` in hangars.yaml) for the hangar or the family base,
+   on the normal or inverted floor; 0 without one. */
+int XwaHangars_CraftCamera(uint16_t objectType, int family, int inverted, int offset[3]);
 void XwaHangars_PlayerOffset(uint16_t objectType, int offset[3]);
 
 /* The model file Hangar_LoadCraftModelByType loads for `objectType` instead
