@@ -50,6 +50,28 @@ jobs:
           path: build/artifacts/*.tar.xz
           if-no-files-found: error
 
+      # The Blender add-on's cooker, from the same dependency stages.
+      - name: Build add-on cooker
+        if: matrix.build-type == 'Release'
+        uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: .
+          file: packaging/linux/Dockerfile
+          platforms: linux/amd64
+          target: cooker-artifact
+          outputs: type=local,dest=build/cooker
+          cache-from: type=gha,scope=linux
+
+      - name: Upload add-on cooker
+        if: matrix.build-type == 'Release'
+        uses: actions/upload-artifact@v7
+        with:
+          name: aeron-gltf-cook-linux-x64
+          path: build/cooker/
+          if-no-files-found: error
+
   windows:
     name: Windows ${{ matrix.build-type }}
     runs-on: ubuntu-latest
@@ -92,6 +114,28 @@ jobs:
           path: build/artifacts/*.zip
           if-no-files-found: error
 
+      # The Blender add-on's cooker, from the same dependency stages.
+      - name: Build add-on cooker
+        if: matrix.build-type == 'Release'
+        uses: docker/build-push-action@v7
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
+        with:
+          context: .
+          file: packaging/windows/Dockerfile
+          platforms: linux/amd64
+          target: cooker-artifact
+          outputs: type=local,dest=build/cooker
+          cache-from: type=gha,scope=windows
+
+      - name: Upload add-on cooker
+        if: matrix.build-type == 'Release'
+        uses: actions/upload-artifact@v7
+        with:
+          name: aeron-gltf-cook-windows-x64
+          path: build/cooker/
+          if-no-files-found: error
+
   macos:
     name: macOS ${{ matrix.build-type }}
     runs-on: macos-15
@@ -123,12 +167,16 @@ jobs:
             build/cache/macos-arm64/build/zstd
             build/cache/macos-arm64/build/ffmpeg
             build/cache/macos-arm64/build/shadercross
+            build/cache/macos-arm64/cooker-dependencies
+            build/cache/macos-arm64/build/cooker-sdl
+            build/cache/macos-arm64/build/cooker-zstd
           key: macos-arm64-${{ steps.runner-image.outputs.version }}-deps-${{ hashFiles('packaging/macos/build-package.sh', 'packaging/common/shadercross-fsr3.patch') }}
 
       - name: Build package
         env:
           XWA_BUILD_TYPE: ${{ matrix.build-type }}
           XWA_MACOS_BUILD_VERSION: ${{ github.run_number }}
+          XWA_MACOS_BUILD_COOKER: ${{ matrix.build-type == 'Release' && '1' || '0' }}
         run: |
           XWA_VERSION="${GITHUB_REF_NAME#v}" ./packaging/macos/build-package.sh
 
@@ -139,16 +187,65 @@ jobs:
           path: build/artifacts/*.dmg
           if-no-files-found: error
 
+      - name: Upload add-on cooker
+        if: matrix.build-type == 'Release'
+        uses: actions/upload-artifact@v7
+        with:
+          name: aeron-gltf-cook-macos
+          path: build/artifacts/aeron_gltf_cook-macos/
+          if-no-files-found: error
+
+  addon:
+    name: Blender add-on packages
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out sources
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Download cookers
+        uses: actions/download-artifact@v8
+        with:
+          pattern: aeron-gltf-cook-*
+          path: cookers
+
+      # One package per platform, each with its cooker and zstd's license.
+      - name: Build packages
+        run: |
+          for platform in linux-x64 windows-x64 macos; do
+            dir="cookers/aeron-gltf-cook-${platform}"
+            cooker="${dir}/aeron_gltf_cook"
+            [ "${platform}" != windows-x64 ] || cooker="${cooker}.exe"
+            python3 aeron/tools/gltf_cook/package_addon.py --platform "${platform}" \
+                --cooker "${cooker}" --license "zstd=${dir}/zstd.txt" --out build/addon
+          done
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: aeron-flight-model-addon
+          path: build/addon/*.zip
+          if-no-files-found: error
+
   publish:
     name: Publish GitHub release
-    needs: [linux, windows, macos]
+    needs: [linux, windows, macos, addon]
     runs-on: ubuntu-latest
     steps:
       - name: Download packages
         uses: actions/download-artifact@v8
         with:
+          pattern: openxwa-*
           path: artifacts
           merge-multiple: true
+
+      - name: Download add-on packages
+        uses: actions/download-artifact@v8
+        with:
+          name: aeron-flight-model-addon
+          path: artifacts
 
       - name: Create draft release
         env:

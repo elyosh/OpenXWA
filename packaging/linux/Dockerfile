@@ -75,7 +75,7 @@ RUN git clone --branch "v${ZSTD_VERSION}" --depth 1 \
         -DCMAKE_INSTALL_PREFIX=/opt/xwa-linux \
         -DZSTD_BUILD_PROGRAMS=OFF \
         -DZSTD_BUILD_SHARED=ON \
-        -DZSTD_BUILD_STATIC=OFF \
+        -DZSTD_BUILD_STATIC=ON \
         -DZSTD_BUILD_TESTS=OFF \
     && cmake --build /build/zstd --parallel \
     && cmake --install /build/zstd
@@ -292,6 +292,57 @@ RUN test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.vert.s
         -cJf "/build/artifacts/${package_name}.tar.xz" \
         "${package_name}" \
     && tar -tJf "/build/artifacts/${package_name}.tar.xz"
+
+# aeron_gltf_cook for the Blender add-on's Linux package: zstd linked
+# statically, no SDL (aeron/tools/gltf_cook/CMakeLists.txt).
+# The game's own zstd links the shared library; the static one is the
+# cooker's.
+FROM build-base AS cooker-build
+
+COPY --from=sdl-build /opt/xwa-linux /opt/xwa-linux
+COPY --from=zstd-build /opt/xwa-linux /opt/xwa-linux
+COPY --from=zstd-build /deps/zstd/LICENSE /build/artifacts/zstd.txt
+COPY --from=shader-tools /opt/xwa-tools /opt/xwa-tools
+COPY aeron /src/aeron
+
+ENV LD_LIBRARY_PATH=/opt/xwa-tools/lib:/opt/xwa-linux/lib
+
+RUN cmake -S /src/aeron -B /build/cooker -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_PREFIX_PATH=/opt/xwa-linux \
+        -DAERON_SHADERCROSS_EXECUTABLE=/opt/xwa-tools/bin/shadercross \
+        -DAERON_BUILD_TOOLS=ON \
+        -DAERON_ENABLE_VIDEO=OFF \
+        -DAERON_GLTF_COOK_STANDALONE=ON \
+    && cmake --build /build/cooker --target aeron_gltf_cook --parallel \
+    && cp /build/cooker/aeron_gltf_cook /build/artifacts/
+
+# Only system libraries (no SDL or zstd), within the game's host baseline
+# (glibc 2.35 without DT_RELR, the GCC 12 runtime). Then a library and a
+# model build.
+RUN env -u LD_LIBRARY_PATH ldd /build/artifacts/aeron_gltf_cook \
+    && ! env -u LD_LIBRARY_PATH ldd /build/artifacts/aeron_gltf_cook \
+        | grep -E 'not found|SDL|zstd' \
+    && ! readelf -V /build/artifacts/aeron_gltf_cook | grep -q 'GLIBC_ABI_' \
+    && for bound in GLIBC_2.35 GLIBCXX_3.4.30 CXXABI_1.3.13; do \
+        required=$(readelf -V /build/artifacts/aeron_gltf_cook \
+            | grep -oE "${bound%_*}_[0-9][0-9.]*" | sort -uV | tail -n 1); \
+        if [ -n "$required" ] && \
+            [ "$(printf '%s\n%s\n' "$required" "$bound" | sort -V | tail -n 1)" != "$bound" ]; then \
+            echo "aeron_gltf_cook requires $required, above the $bound host baseline" >&2; \
+            exit 1; \
+        fi; \
+    done \
+    && example=/src/aeron/tools/effect_pack/example \
+    && mkdir -p /tmp/cooker-check \
+    && env -u LD_LIBRARY_PATH /build/artifacts/aeron_gltf_cook \
+        --library "$example/examplepanel.yaml" --out /tmp/cooker-check \
+    && env -u LD_LIBRARY_PATH /build/artifacts/aeron_gltf_cook "$example/panel.gltf" \
+        --out /tmp/cooker-check/panel.glb --animations "$example/panel.anim.yaml" \
+        --effects-dir /tmp/cooker-check
+
+FROM scratch AS cooker-artifact
+COPY --from=cooker-build /build/artifacts/ /
 
 FROM scratch AS artifact
 COPY --from=xwa-build /build/artifacts/ /

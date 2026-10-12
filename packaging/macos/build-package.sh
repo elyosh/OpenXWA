@@ -14,6 +14,7 @@ architecture="${XWA_MACOS_ARCHITECTURE:-$(uname -m)}"
 application_version="${XWA_VERSION:-0.0.0-dev}"
 build_version="${XWA_MACOS_BUILD_VERSION:-1}"
 build_type="${XWA_BUILD_TYPE:-Release}"
+cooker_enabled="${XWA_MACOS_BUILD_COOKER:-0}"
 bundle_identifier="${XWA_MACOS_BUNDLE_IDENTIFIER:-org.openxwa.openxwa}"
 sign_identity="${XWA_MACOS_SIGN_IDENTITY:--}"
 notary_profile="${XWA_MACOS_NOTARY_PROFILE:-}"
@@ -43,6 +44,8 @@ dmg="${artifact_dir}/openxwa-${application_version}-macos-${architecture}-${buil
 dmg_volume_name="OpenXWA"
 dmg_extras="${script_dir}/dmg"
 dsym_bundle=""
+cooker_prefix="${work_root}/cooker-dependencies"
+cooker_dir="${artifact_dir}/aeron_gltf_cook-macos"
 
 jobs=""
 
@@ -224,6 +227,72 @@ build_application() {
     fi
 }
 
+# aeron_gltf_cook for the Blender add-on's macOS package (with
+# XWA_MACOS_BUILD_COOKER=1, as the release does): one universal binary, with
+# zstd linked statically and no SDL (aeron/tools/gltf_cook/CMakeLists.txt).
+# Configuring Aeron needs SDL for both architectures, so the cooker has its
+# own universal dependencies.
+build_cooker() {
+    local universal=(
+        -G Ninja
+        -DCMAKE_BUILD_TYPE=Release
+        "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
+        "-DCMAKE_OSX_DEPLOYMENT_TARGET=${deployment_target}"
+        "-DCMAKE_INSTALL_PREFIX=${cooker_prefix}"
+    )
+    local arch
+
+    cmake -S "${source_root}/SDL-${sdl_version}" \
+        -B "${build_root}/cooker-sdl" \
+        "${universal[@]}" \
+        -DSDL_HIDAPI_LIBUSB=OFF \
+        -DSDL_INSTALL_DOCS=OFF \
+        -DSDL_SHARED=ON \
+        -DSDL_STATIC=OFF \
+        -DSDL_TESTS=OFF
+    cmake --build "${build_root}/cooker-sdl" --parallel "${jobs}"
+    cmake --install "${build_root}/cooker-sdl"
+
+    cmake -S "${source_root}/zstd-${zstd_version}/build/cmake" \
+        -B "${build_root}/cooker-zstd" \
+        "${universal[@]}" \
+        -DZSTD_BUILD_PROGRAMS=OFF \
+        -DZSTD_BUILD_SHARED=OFF \
+        -DZSTD_BUILD_STATIC=ON \
+        -DZSTD_BUILD_TESTS=OFF
+    cmake --build "${build_root}/cooker-zstd" --parallel "${jobs}"
+    cmake --install "${build_root}/cooker-zstd"
+
+    cmake -S "${repo_root}/aeron" \
+        -B "${build_root}/cooker" \
+        "${universal[@]}" \
+        "-DCMAKE_PREFIX_PATH=${cooker_prefix}" \
+        "-DAERON_SHADERCROSS_EXECUTABLE=${build_root}/shadercross/shadercross" \
+        -DAERON_BUILD_TOOLS=ON \
+        -DAERON_ENABLE_VIDEO=OFF \
+        -DAERON_GLTF_COOK_STANDALONE=ON
+    cmake --build "${build_root}/cooker" --target aeron_gltf_cook --parallel "${jobs}"
+
+    cmake -E remove_directory "${cooker_dir}"
+    mkdir -p "${cooker_dir}"
+    cp "${build_root}/cooker/aeron_gltf_cook" "${cooker_dir}/"
+    cp "${source_root}/zstd-${zstd_version}/LICENSE" "${cooker_dir}/zstd.txt"
+
+    for arch in arm64 x86_64; do
+        lipo "${cooker_dir}/aeron_gltf_cook" -verify_arch "${arch}"
+    done
+    # Per architecture, a "<file> (architecture <arch>):" line, then its
+    # libraries.
+    if otool -L "${cooker_dir}/aeron_gltf_cook" | grep -v -E ':$|^[[:space:]]+/usr/lib/'; then
+        echo "aeron_gltf_cook links libraries outside the system's" >&2
+        exit 1
+    fi
+    mkdir -p "${build_root}/cooker-check"
+    "${cooker_dir}/aeron_gltf_cook" \
+        --library "${repo_root}/aeron/tools/effect_pack/example/examplepanel.yaml" \
+        --out "${build_root}/cooker-check"
+}
+
 stage_licenses() {
     local license_dir="${application}/Contents/Resources/licenses"
 
@@ -269,6 +338,9 @@ main() {
             otool pkg-config plutil sysctl xcrun; do
         require_command "${command}"
     done
+    if [[ "${cooker_enabled}" == 1 ]]; then
+        require_command lipo
+    fi
     if [[ "${build_type}" == Debug ]]; then
         require_command dsymutil
         require_command dwarfdump
@@ -290,6 +362,9 @@ main() {
     build_dependencies
     build_shadercross
     build_application
+    if [[ "${cooker_enabled}" == 1 ]]; then
+        build_cooker
+    fi
     stage_licenses
 
     test -x "${application}/Contents/MacOS/OpenXWA"
@@ -324,6 +399,9 @@ main() {
 
     echo "Created ${dmg}"
     echo "Application bundle: ${application}"
+    if [[ "${cooker_enabled}" == 1 ]]; then
+        echo "Add-on cooker: ${cooker_dir}/aeron_gltf_cook"
+    fi
 }
 
 main "$@"

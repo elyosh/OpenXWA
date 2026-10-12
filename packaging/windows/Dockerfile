@@ -130,7 +130,7 @@ RUN git clone --branch "v${ZSTD_VERSION}" --depth 1 \
         -DCMAKE_TOOLCHAIN_FILE=/opt/xwa-toolchain.cmake \
         -DZSTD_BUILD_PROGRAMS=OFF \
         -DZSTD_BUILD_SHARED=ON \
-        -DZSTD_BUILD_STATIC=OFF \
+        -DZSTD_BUILD_STATIC=ON \
         -DZSTD_BUILD_TESTS=OFF \
     && cmake --build /build/zstd-windows --parallel \
     && cmake --install /build/zstd-windows
@@ -306,6 +306,40 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
     && TZ=UTC zip -X -9 -q "/build/artifacts/${package_name}.zip" \
         -@ < /tmp/openxwa-windows-files \
     && unzip -tq "/build/artifacts/${package_name}.zip"
+
+# aeron_gltf_cook for the Blender add-on's Windows package: zstd and the
+# MinGW runtime linked statically, no SDL (aeron/tools/gltf_cook/
+# CMakeLists.txt). The game's own zstd links the DLL; the static library is
+# the cooker's.
+FROM build-base AS cooker-build
+
+COPY --from=xwa-host-tools /opt/xwa-host /opt/xwa-host
+COPY --from=sdl-windows /opt/xwa-windows /opt/xwa-windows
+COPY --from=zstd-windows /opt/xwa-windows /opt/xwa-windows
+COPY --from=zstd-windows /deps/zstd/LICENSE /build/artifacts/zstd.txt
+COPY cmake/toolchains/mingw-w64-x86_64.cmake /opt/xwa-toolchain.cmake
+COPY aeron /src/aeron
+
+ENV LD_LIBRARY_PATH=/opt/xwa-host/lib
+
+RUN cmake -S /src/aeron -B /build/cooker -G Ninja \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_TOOLCHAIN_FILE=/opt/xwa-toolchain.cmake \
+        -DAERON_FSR3_SHADERGEN_EXECUTABLE=/opt/xwa-host/bin/aeron_fsr3_shadergen \
+        -DAERON_SHADERCROSS_EXECUTABLE=/opt/xwa-host/bin/shadercross \
+        -DAERON_BUILD_TOOLS=ON \
+        -DAERON_ENABLE_VIDEO=OFF \
+        -DAERON_GLTF_COOK_STANDALONE=ON \
+    && cmake --build /build/cooker --target aeron_gltf_cook --parallel \
+    && cp /build/cooker/aeron_gltf_cook.exe /build/artifacts/
+
+# Only Windows' own DLLs: no SDL, zstd or MinGW runtime.
+RUN x86_64-w64-mingw32-objdump -p /build/artifacts/aeron_gltf_cook.exe | grep 'DLL Name' \
+    && ! x86_64-w64-mingw32-objdump -p /build/artifacts/aeron_gltf_cook.exe \
+        | grep -iE 'DLL Name: (SDL|libzstd|libstdc|libgcc|libwinpthread)'
+
+FROM scratch AS cooker-artifact
+COPY --from=cooker-build /build/artifacts/ /
 
 FROM scratch AS artifact
 COPY --from=xwa-build /build/artifacts/ /
