@@ -289,7 +289,7 @@ build_cooker() {
     fi
     mkdir -p "${build_root}/cooker-check"
     "${cooker_dir}/aeron_gltf_cook" \
-        --library "${repo_root}/aeron/tools/effect_pack/example/examplepanel.yaml" \
+        --library "${repo_root}/aeron/tools/gltf_cook/example/examplepanel.yaml" \
         --out "${build_root}/cooker-check"
 }
 

@@ -333,7 +333,7 @@ RUN env -u LD_LIBRARY_PATH ldd /build/artifacts/aeron_gltf_cook \
             exit 1; \
         fi; \
     done \
-    && example=/src/aeron/tools/effect_pack/example \
+    && example=/src/aeron/tools/gltf_cook/example \
     && mkdir -p /tmp/cooker-check \
     && env -u LD_LIBRARY_PATH /build/artifacts/aeron_gltf_cook \
         --library "$example/examplepanel.yaml" --out /tmp/cooker-check \
