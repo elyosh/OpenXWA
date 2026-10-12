@@ -32,6 +32,7 @@
 #include "xwa/util/time.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -912,6 +913,11 @@ int Yard_SpawnObjectAtWorldPos(ObjectTypeId objectType, int worldX, int worldY, 
 	if ((uint16_t)objIdx == 0xffffu) {
 		return 0xffff;
 	}
+#ifdef XWA_MODERN
+	/* Modern port: the challenges change their objects' markings during play
+	   (rings, rooms, tubes, containers), so every value's look is loaded. */
+	XwaSkins_UseAllMarkings(objectTypeId);
+#endif
 
 	g_objectTable[objIdx].regionIdx = g_players[g_localPlayer].regionIndex;
 	g_objectTable[objIdx].objectType = objectType;

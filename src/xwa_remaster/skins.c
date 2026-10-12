@@ -13,10 +13,8 @@ struct XwaRemasterSkinModel {
 	char key[XWA_SNAP_OPT_NAME_MAX];
 	char glb[XWA_SNAP_SKIN_NAME_MAX]; /* GLB name the mission selections use */
 	uint32_t variant_count;
-	uint32_t asset_variant_count;
 	char** variant_names;
-	uint32_t skin_markings_count;
-	uint32_t* skin_markings;
+	AeronGltfModel markings; /* the markings list only (Aeron_GltfMarkingsVariant) */
 };
 
 /* Skinned meshes, for the miss log. */
@@ -46,12 +44,12 @@ void XwaRemasterSkins_Free(XwaRemasterSkinModel* skin) {
 		free(skin->variant_names[v]);
 	}
 	free(skin->variant_names);
-	free(skin->skin_markings);
+	free(skin->markings.markings);
 	free(skin);
 }
 
 XwaRemasterSkinModel* XwaRemasterSkins_Capture(const AeronGltfModel* model, const char* key) {
-	if (!model || model->group_count == 0 || model->variant_count == 0) {
+	if (!model || model->variant_count == 0) {
 		return NULL;
 	}
 	XwaRemasterSkinModel* skin = (XwaRemasterSkinModel*)calloc(1, sizeof *skin);
@@ -70,12 +68,11 @@ XwaRemasterSkinModel* XwaRemasterSkins_Capture(const AeronGltfModel* model, cons
 		}
 	}
 	skin->variant_count = model->variant_count;
-	skin->asset_variant_count = model->asset_variant_count;
 	skin->variant_names = (char**)calloc(model->variant_count, sizeof *skin->variant_names);
-	skin->skin_markings_count = model->skin_markings_count;
-	skin->skin_markings = (uint32_t*)calloc(model->skin_markings_count ? model->skin_markings_count : 1,
-											sizeof *skin->skin_markings);
-	if (!skin->variant_names || !skin->skin_markings) {
+	skin->markings.markings_count = model->markings_count;
+	skin->markings.markings = (uint32_t*)calloc(model->markings_count ? model->markings_count : 1,
+												sizeof *skin->markings.markings);
+	if (!skin->variant_names || !skin->markings.markings) {
 		XwaRemasterSkins_Free(skin);
 		return NULL;
 	}
@@ -85,8 +82,7 @@ XwaRemasterSkinModel* XwaRemasterSkins_Capture(const AeronGltfModel* model, cons
 			return NULL;
 		}
 	}
-	memcpy(skin->skin_markings, model->skin_markings,
-		   model->skin_markings_count * sizeof *skin->skin_markings);
+	memcpy(skin->markings.markings, model->markings, model->markings_count * sizeof *model->markings);
 	return skin;
 }
 
@@ -105,33 +101,39 @@ uint32_t XwaRemasterSkins_MarkingsVariants(const XwaRemasterSkinModel* skin, con
 	int highest = -1;
 	for (uint32_t i = 0; i < snapshot->skin_use_count; i++) {
 		const XwaSkinUse* use = &snapshot->skin_uses[i];
-		if (strcmp(use->key, skin->key) == 0) {
-			used[use->markings] = 1;
-			highest = use->markings > highest ? use->markings : highest;
+		if (strcmp(use->key, skin->key) != 0) {
+			continue;
 		}
+		/* Every value: the list's entries, the last repeating past them. */
+		const int last = use->all_markings
+							 ? (skin->markings.markings_count ? (int)skin->markings.markings_count - 1 : 0)
+							 : use->markings;
+		for (int m = use->all_markings ? 0 : last; m <= last; m++) {
+			used[m] = 1;
+		}
+		highest = last > highest ? last : highest;
 	}
-	/* A model no flight group or preview uses (hangar craft, for example)
-	   shows markings 0, which objects start with. */
+	/* A model no object is known to use shows markings 0, which objects
+	   start with. */
 	if (highest < 0) {
 		used[0] = 1;
 		highest = 0;
 	}
 	for (int m = 0; m <= highest; m++) {
-		const uint32_t assets = skin->asset_variant_count;
-		variants[m] = (uint32_t)m < assets ? (uint32_t)m : assets - 1u;
+		variants[m] = AERON_GLTF_NO_VARIANT;
 		if (!used[m]) {
 			continue;
 		}
-		const uint32_t fallback =
-			(uint32_t)m < skin->skin_markings_count ? skin->skin_markings[m] : AERON_GLTF_NO_VARIANT;
+		const uint32_t fallback = Aeron_GltfMarkingsVariant(&skin->markings, (uint32_t)m);
 		uint32_t variant = fallback;
 		for (uint32_t i = 0; i < snapshot->skin_selection_count; i++) {
 			const XwaSkinSelection* selection = &snapshot->skin_selections[i];
 			if (selection->markings != m || strcmp(selection->model, skin->glb) != 0) {
 				continue;
 			}
-			variant = skins_variant(skin, selection->variant);
-			if (variant == AERON_GLTF_NO_VARIANT) {
+			/* An empty selection: the own materials. */
+			variant = selection->variant[0] ? skins_variant(skin, selection->variant) : AERON_GLTF_NO_VARIANT;
+			if (selection->variant[0] && variant == AERON_GLTF_NO_VARIANT) {
 				Aeron_LogWarn("xwa.remaster",
 							  "skins: '%s' has no variant '%s' (markings %d); using its default", skin->glb,
 							  selection->variant, m);
@@ -139,9 +141,7 @@ uint32_t XwaRemasterSkins_MarkingsVariants(const XwaRemasterSkinModel* skin, con
 			}
 			break;
 		}
-		if (variant != AERON_GLTF_NO_VARIANT) {
-			variants[m] = variant;
-		}
+		variants[m] = variant;
 	}
 	return (uint32_t)(highest + 1);
 }

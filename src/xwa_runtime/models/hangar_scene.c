@@ -14,6 +14,7 @@
 #include "xwa/util/random.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/object_profiles.h"
+#include "xwa_runtime/models/skins.h"
 
 /* Modern port module; no original counterpart. It builds the hangar scene as
    XWAU's hook_hangars does (hangar.cpp: HangarMapHook, FamHangarMapHook,
@@ -52,6 +53,7 @@ static void HangarScene_SpawnMap(int family) {
 		s_spawnFloorInverted = -1;
 		if (objIdx != 0xffffu && objIdx != 0) {
 			g_objectTable[objIdx].mobj->nodeSwitchIndex = (uint8_t)entry->markings;
+			XwaSkins_UseMarkings(entry->objectType, g_objectTable[objIdx].mobj->nodeSwitchIndex);
 			XwaObjectProfiles_ApplyNamed(entry->objectType, entry->objectProfile,
 										 g_objectTable[objIdx].mobj->pCraft);
 		}
@@ -110,6 +112,7 @@ static uint16_t HangarScene_SpawnOnFloor(uint16_t objectType, int x, int y, int 
 static void HangarScene_Dress(uint16_t objIdx, uint16_t objectType, int markings, const char* profile) {
 	if (objIdx != 0xffffu && objIdx != 0) {
 		g_objectTable[objIdx].mobj->nodeSwitchIndex = (uint8_t)markings;
+		XwaSkins_UseMarkings(objectType, g_objectTable[objIdx].mobj->nodeSwitchIndex);
 		XwaObjectProfiles_ApplyNamed(objectType, profile, g_objectTable[objIdx].mobj->pCraft);
 	}
 }
@@ -210,6 +213,8 @@ void XwaHangarScene_SetHangarMarkings(void) {
 
 	g_objectTable[g_launchRefObjIdx].mobj->nodeSwitchIndex =
 		hangarIff != 0xFF ? hangarIff : XwaHangars_CommandShipMarkings();
+	XwaSkins_UseMarkings(g_objectTable[g_launchRefObjIdx].objectType,
+						 g_objectTable[g_launchRefObjIdx].mobj->nodeSwitchIndex);
 }
 
 /* HangarReloadHook: the hangar of another command ship. The hangar model

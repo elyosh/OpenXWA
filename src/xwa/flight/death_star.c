@@ -30,6 +30,7 @@
 #include "xwa/util/time.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -1870,6 +1871,11 @@ void DeathStar_SpawnScriptedObjects(void) {
 		}
 
 		def->spawnedObjIdx = (uint16_t)objIdx;
+#ifdef XWA_MODERN
+		/* Modern port: the scripted objects' markings change during play (the
+		   reactor and its cylinder), so every value's look is loaded. */
+		XwaSkins_UseAllMarkings(def->objectType);
+#endif
 		obj = &g_objectTable[objIdx];
 		obj->flightGroupIdx = g_deathStarDefaultScriptedObjectFgIdx;
 		obj->regionIdx = 0;

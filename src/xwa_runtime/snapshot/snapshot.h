@@ -1055,7 +1055,8 @@ typedef struct XwaOptAsset {
 } XwaOptAsset;
 
 /* A mission's skin selection: model `model` (its GLB name) shows variant
- * `variant` for markings value `markings`. */
+ * `variant` for markings value `markings`; an empty `variant` shows the
+ * model's own materials. */
 #define XWA_SNAP_MAX_SKIN_SELECTIONS 256
 #define XWA_SNAP_SKIN_NAME_MAX 64
 typedef struct XwaSkinSelection {
@@ -1065,11 +1066,13 @@ typedef struct XwaSkinSelection {
 } XwaSkinSelection;
 
 /* Objects of the model loaded as `key` (an XwaOptAsset name, lower case)
- * use markings value `markings`. */
+ * use markings value `markings`, or, with `all_markings`, every value of
+ * the model's markings list (game code changes them during play). */
 #define XWA_SNAP_MAX_SKIN_USES 256
 typedef struct XwaSkinUse {
 	char key[XWA_SNAP_OPT_NAME_MAX];
 	uint8_t markings;
+	uint8_t all_markings;
 } XwaSkinUse;
 
 /* One sprite-textured model type whose classic TexLevel storage is live.
