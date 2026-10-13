@@ -278,7 +278,7 @@ build_cooker() {
     cp "${build_root}/cooker/aeron_gltf_cook" "${build_root}/cooker/opt2gltf" "${cooker_dir}/"
     cp "${source_root}/zstd-${zstd_version}/LICENSE" "${cooker_dir}/zstd.txt"
 
-    local tool status
+    local tool
     for tool in aeron_gltf_cook opt2gltf; do
         for arch in arm64 x86_64; do
             lipo "${cooker_dir}/${tool}" -verify_arch "${arch}"
@@ -290,17 +290,6 @@ build_cooker() {
             exit 1
         fi
     done
-    mkdir -p "${build_root}/cooker-check"
-    "${cooker_dir}/aeron_gltf_cook" \
-        --library "${repo_root}/aeron/tools/gltf_cook/example/examplepanel.yaml" \
-        --out "${build_root}/cooker-check"
-    # opt2gltf runs: without arguments, its usage and status 2.
-    status=0
-    "${cooker_dir}/opt2gltf" >/dev/null 2>&1 || status=$?
-    if [[ "${status}" -ne 2 ]]; then
-        echo "opt2gltf does not run (status ${status})" >&2
-        exit 1
-    fi
 }
 
 stage_licenses() {

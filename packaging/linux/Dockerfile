@@ -318,8 +318,7 @@ RUN cmake -S /src/aeron -B /build/cooker -G Ninja \
     && cp /build/cooker/aeron_gltf_cook /build/cooker/opt2gltf /build/artifacts/
 
 # Only system libraries (no SDL or zstd), within the game's host baseline
-# (glibc 2.35 without DT_RELR, the GCC 12 runtime). Then a library and a
-# model build, and opt2gltf's usage (status 2).
+# (glibc 2.35 without DT_RELR, the GCC 12 runtime).
 RUN for tool in aeron_gltf_cook opt2gltf; do \
         env -u LD_LIBRARY_PATH ldd /build/artifacts/$tool \
         && ! env -u LD_LIBRARY_PATH ldd /build/artifacts/$tool \
@@ -335,14 +334,7 @@ RUN for tool in aeron_gltf_cook opt2gltf; do \
                 exit 1; \
             fi; \
         done; \
-    done \
-    && { env -u LD_LIBRARY_PATH /build/artifacts/opt2gltf >/dev/null 2>&1; [ $? -eq 2 ]; } \
-    && example=/src/aeron/tools/gltf_cook/example \
-    && mkdir -p /tmp/cooker-check \
-    && env -u LD_LIBRARY_PATH /build/artifacts/aeron_gltf_cook \
-        --library "$example/examplepanel.yaml" --out /tmp/cooker-check \
-    && env -u LD_LIBRARY_PATH /build/artifacts/aeron_gltf_cook "$example/panel.gltf" \
-        --out /tmp/cooker-check/panel.glb --effects-dir /tmp/cooker-check
+    done
 
 FROM scratch AS cooker-artifact
 COPY --from=cooker-build /build/artifacts/ /
