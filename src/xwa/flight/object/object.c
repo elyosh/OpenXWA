@@ -1,4 +1,5 @@
 #include "xwa/flight/object/object.h"
+#include "xwa/flight/object/motion_math.h"
 
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/model_def.h"
@@ -1846,11 +1847,10 @@ void Object_UpdateLifetimeAndMovement(void) {
 
 		// Forward-move scalar for this step (LABEL_137).
 		fm = obj->mobj;
-		if (fm->speed) {
-			fwdScalar = (uint16_t)g_elapsedTicks * ((4660 * fm->speed + 128) >> 8) / 236;
-		} else {
-			fwdScalar = 0;
-		}
+		/* Preserve the fractional distance between 236Hz simulation steps.
+		 * Truncating every frame previously erased slow docking approach
+		 * movement, especially at high update rates. */
+		fwdScalar = XwaObject_ScaledForwardMove(g_gameTime, (uint16_t)g_elapsedTicks, fm->speed);
 		if (obj->playerOwnerIdx != -1) {
 			uint8_t inputDisabledFlag = g_players[obj->playerOwnerIdx].inputDisabledFlag;
 			if (inputDisabledFlag && inputDisabledFlag != 5) {
@@ -1891,9 +1891,19 @@ void Object_UpdateLifetimeAndMovement(void) {
 					}
 					nm = obj->mobj;
 					if (!nm->velocityOverrideActive || nm->velocityOverrideDuration) {
+#ifdef XWA_MODERN
+						/* Forward displacement must round signed components symmetrically.
+						 * The legacy arithmetic shift produces -1 unit per low-speed
+						 * tick for a tiny negative vertical component, but 0 for a tiny
+						 * positive one: the reported slow-flight downward drift. */
+						trig2_xmovedist += XwaObject_ForwardAxisStep((int16_t)nm->moveX, (uint16_t)fwdScalar);
+						trig2_ymovedist += XwaObject_ForwardAxisStep((int16_t)nm->moveY, (uint16_t)fwdScalar);
+						trig2_zmovedist += XwaObject_ForwardAxisStep((int16_t)nm->moveZ, (uint16_t)fwdScalar);
+#else
 						trig2_xmovedist += Xwa_Q15Mul((int16_t)nm->moveX, (uint16_t)fwdScalar);
 						trig2_ymovedist += Xwa_Q15Mul((int16_t)obj->mobj->moveY, (uint16_t)fwdScalar);
 						trig2_zmovedist += Xwa_Q15Mul((int16_t)obj->mobj->moveZ, (uint16_t)fwdScalar);
+#endif
 					}
 
 					if (mc->workingSubsystems) {
@@ -1933,7 +1943,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 							}
 							step = (uint16_t)g_elapsedTicks * (int16_t)clamp / 236;
 							if (!step) {
-								step = ((int16_t)clamp <= 0) ? -1 : 1;
+								step = XwaObject_MinimumSignedPush(pax, step);
 							}
 							mc->pushAccumX = pax - step;
 							trig2_xmovedist += step;
@@ -1949,7 +1959,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 							}
 							step = (uint16_t)g_elapsedTicks * (int16_t)clamp / 236;
 							if (!step) {
-								step = ((int16_t)clamp <= 0) ? -1 : 1;
+								step = XwaObject_MinimumSignedPush(pay, step);
 							}
 							mc->pushAccumY = pay - step;
 							trig2_ymovedist += step;
@@ -1967,7 +1977,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 							}
 							step = (uint16_t)g_elapsedTicks * (int16_t)clamp / 236;
 							if (!step) {
-								step = ((int16_t)clamp <= 0) ? -1 : 1;
+								step = XwaObject_MinimumSignedPush(paz, step);
 							}
 							if (aiCtrl->maneuverMode != 34) {
 								mc->pushAccumZ = paz - step;
