@@ -1150,11 +1150,8 @@ static void xwa_tool_cockpit_eye(int* open, void* user) {
 			   In Blender (glTF imported Z-up, metres): (-x, y, z) * 1600/65536. */
 			const float metres = 1600.0f / 65536.0f;
 			char text[192];
-			snprintf(text, sizeof text,
-					 "Cockpit hardpoint (type 31): OPT %d %d %d; Blender %.4f %.4f %.4f m; "
-					 "opt2gltf --cockpit-eye %d,%d,%d",
-					 eye[0], -eye[1], eye[2], -eye[0] * metres, -eye[1] * metres, eye[2] * metres, eye[0],
-					 eye[1], eye[2]);
+			snprintf(text, sizeof text, "Cockpit hardpoint (type 31): OPT %d %d %d; Blender %.4f %.4f %.4f m",
+					 eye[0], -eye[1], eye[2], -eye[0] * metres, -eye[1] * metres, eye[2] * metres);
 			ImGui::SetClipboardText(text);
 		}
 	} else {
