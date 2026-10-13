@@ -63,6 +63,10 @@ typedef struct XwaEnvironmentSelection {
 	 * it is available. */
 	const AeronEnvironmentPackage* package;
 	uint8_t region;
+	/* In the hangar: the package is the loaded hangar model's own
+	 * (`xwa.hangars`), baked with the model's lights, so the game does not
+	 * add them. */
+	uint8_t replaces_hangar_lights;
 } XwaEnvironmentSelection;
 
 #define XWA_ENV_MISSION_KEY_MAX 128

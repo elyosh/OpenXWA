@@ -5030,7 +5030,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			s.bolts[s.bolt_count++] = inst;
 		} else {
 			AeronScene_AddMeshInstance(s.scene, &inst);
-			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, 0);
+			/* A hangar package baked from this hangar model holds its lights. */
+			if (!(s.environment.replaces_hangar_lights && (int32_t)f->slot == cam->hangar_launch_ref_obj_idx)) {
+				fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, 0);
+			}
 			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, prepared.mesh, model_matrix,
 											  inst.mesh_table, s.glow_mark_emissive_strength);
 			/* State-derived engine glows for this craft (classic scale

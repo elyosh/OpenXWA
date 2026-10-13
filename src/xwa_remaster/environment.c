@@ -14,7 +14,14 @@
 /* XWA keeps four regions per mission. */
 #define ENV_MAX_REGIONS 4
 #define ENV_MAX_MISSIONS 128
-#define ENV_MAX_REFERENCES (1 + ENV_MAX_MISSIONS * ENV_MAX_REGIONS)
+#define ENV_MAX_HANGARS 64
+#define ENV_MAX_REFERENCES (1 + ENV_MAX_HANGARS + ENV_MAX_MISSIONS * ENV_MAX_REGIONS)
+
+/* A hangar model with its own package (`xwa.hangars`). */
+typedef struct EnvHangar {
+	char key[XWA_SNAP_OPT_NAME_MAX]; /* model key, lower case */
+	int32_t reference;
+} EnvHangar;
 
 typedef struct EnvMission {
 	char key[XWA_ENV_MISSION_KEY_MAX];
@@ -28,7 +35,9 @@ static struct {
 	AeronEnvironmentDefinitionSet* packages;
 	AeronEnvironmentReference references[ENV_MAX_REFERENCES];
 	uint32_t reference_count;
-	int32_t hangar_reference; /* -1 = none */
+	int32_t hangar_reference; /* xwa.hangar, -1 = none */
+	EnvHangar hangars[ENV_MAX_HANGARS];
+	uint32_t hangar_count;
 	EnvMission missions[ENV_MAX_MISSIONS];
 	uint32_t mission_count;
 	/* Package library and the prepared reference set: indices as passed to
@@ -36,6 +45,7 @@ static struct {
 	AeronEnvironmentLibrary* library;
 	char prepared_key[XWA_ENV_MISSION_KEY_MAX]; /* "" = no mission prepared */
 	int32_t prepared_hangar;
+	int32_t prepared_hangar_reference; /* the reference prepared_hangar holds, -1 = none */
 	int32_t prepared_region[ENV_MAX_REGIONS];
 	/* Last logged selection, to log changes only. */
 	int logged;
@@ -233,8 +243,46 @@ static int env_parse_mission(const char* source, const AeronConfigNode* node) {
 	return 1;
 }
 
+static void env_lower(char* out, size_t size, const char* text) {
+	size_t i = 0;
+	for (; text[i] && i + 1 < size; i++) {
+		out[i] = (char)(text[i] >= 'A' && text[i] <= 'Z' ? text[i] - 'A' + 'a' : text[i]);
+	}
+	out[i] = '\0';
+}
+
+static int env_parse_hangars(const AeronConfigNode* hangars) {
+	if (AeronConfigNode_Type(hangars) != AERON_CONFIG_MAP) {
+		return env_node_error(hangars, "xwa: 'hangars' must be a map");
+	}
+	for (size_t i = 0; i < AeronConfigNode_MapCount(hangars); i++) {
+		const char* key = AeronConfigNode_MapKeyAt(hangars, i);
+		const AeronConfigNode* value = AeronConfigNode_MapValueAt(hangars, i);
+		if (s_env.hangar_count >= ENV_MAX_HANGARS) {
+			return env_node_error(value, "xwa.hangars: at most %d hangar models are allowed", ENV_MAX_HANGARS);
+		}
+		EnvHangar* hangar = &s_env.hangars[s_env.hangar_count];
+		if (!key[0] || strlen(key) >= sizeof hangar->key) {
+			return env_node_error(value, "xwa.hangars: invalid model key '%s'", key);
+		}
+		env_lower(hangar->key, sizeof hangar->key, key);
+		for (uint32_t h = 0; h < s_env.hangar_count; h++) {
+			if (strcmp(s_env.hangars[h].key, hangar->key) == 0) {
+				return env_node_error(value, "xwa.hangars: duplicate model '%s'", key);
+			}
+		}
+		char what[96];
+		snprintf(what, sizeof what, "xwa.hangars '%s'", key);
+		if (!env_add_reference(value, what, AERON_ENV_KIND_LIGHTING, &hangar->reference)) {
+			return 0;
+		}
+		s_env.hangar_count++;
+	}
+	return 1;
+}
+
 static int env_parse_xwa(const AeronConfigNode* xwa) {
-	static const char* const fields[] = { "hangar", "missions" };
+	static const char* const fields[] = { "hangar", "hangars", "missions" };
 	if (!xwa || AeronConfigNode_Type(xwa) != AERON_CONFIG_MAP) {
 		return env_node_error(xwa, "manifest: 'xwa' must be a map");
 	}
@@ -244,6 +292,10 @@ static int env_parse_xwa(const AeronConfigNode* xwa) {
 	const AeronConfigNode* hangar = AeronConfigNode_MapGet(xwa, "hangar");
 	if (hangar &&
 		!env_add_reference(hangar, "xwa.hangar", AERON_ENV_KIND_LIGHTING, &s_env.hangar_reference)) {
+		return 0;
+	}
+	const AeronConfigNode* hangars = AeronConfigNode_MapGet(xwa, "hangars");
+	if (hangars && !env_parse_hangars(hangars)) {
 		return 0;
 	}
 	const AeronConfigNode* missions = AeronConfigNode_MapGet(xwa, "missions");
@@ -297,8 +349,9 @@ static int env_load_manifest(AeronVfs* vfs) {
 	}
 	AeronConfigFile_Destroy(manifest);
 	if (ok) {
-		Aeron_LogInfo("xwa.remaster", "environment manifest %s: %u packages, %u missions, hangar %s",
+		Aeron_LogInfo("xwa.remaster", "environment manifest %s: %u packages, %u missions, %u hangar models, hangar %s",
 					  vfs_path, AeronEnvironmentDefinitionSet_Count(s_env.packages), s_env.mission_count,
+					  s_env.hangar_count,
 					  s_env.hangar_reference >= 0 ? s_env.references[s_env.hangar_reference].package
 												  : "(none)");
 	}
@@ -329,6 +382,7 @@ int XwaRemasterEnvironment_Init(AeronVfs* vfs) {
 static void env_clear_prepared(void) {
 	s_env.prepared_key[0] = '\0';
 	s_env.prepared_hangar = -1;
+	s_env.prepared_hangar_reference = -1;
 	for (int r = 0; r < ENV_MAX_REGIONS; r++) {
 		s_env.prepared_region[r] = -1;
 	}
@@ -385,8 +439,46 @@ int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd) {
 	if (s_env.hangar_reference >= 0 &&
 		AeronEnvironmentLibrary_Prepare(s_env.library, cmd, &s_env.references[s_env.hangar_reference], 1)) {
 		s_env.prepared_hangar = 0;
+		s_env.prepared_hangar_reference = s_env.hangar_reference;
 	}
 	return 1;
+}
+
+/* The `xwa.hangars` reference of the loaded hangar model, or -1. The hangar
+ * model is the launch reference object's. */
+static int32_t env_model_hangar_reference(const XwaSnapshot* snap) {
+	if (!snap->flight_camera.in_hangar || s_env.hangar_count == 0) {
+		return -1;
+	}
+	for (uint32_t i = 0; i < snap->flight_object_count; i++) {
+		const XwaFlightObject* object = &snap->flight_objects[i];
+		if ((int32_t)object->slot != snap->flight_camera.hangar_launch_ref_obj_idx) {
+			continue;
+		}
+		const char* name = XwaSnapshotExport_ModelName(object->object_type);
+		char key[XWA_SNAP_OPT_NAME_MAX];
+		env_lower(key, sizeof key, name ? name : "");
+		for (uint32_t h = 0; h < s_env.hangar_count; h++) {
+			if (strcmp(s_env.hangars[h].key, key) == 0) {
+				return s_env.hangars[h].reference;
+			}
+		}
+		return -1;
+	}
+	return -1;
+}
+
+/* The hangar reference to prepare and use: the loaded hangar model's own,
+ * else xwa.hangar. Outside the hangar, the one already prepared. */
+static int32_t env_hangar_reference(const XwaSnapshot* snap) {
+	const int32_t model = env_model_hangar_reference(snap);
+	if (model >= 0) {
+		return model;
+	}
+	if (!snap->flight_camera.in_hangar && s_env.prepared_hangar_reference >= 0) {
+		return s_env.prepared_hangar_reference;
+	}
+	return s_env.hangar_reference;
 }
 
 static int env_snapshot_key(const XwaSnapshot* snap, char* key, size_t size) {
@@ -404,17 +496,27 @@ int XwaRemasterEnvironment_NeedsPrepare(const XwaSnapshot* snap) {
 		return 1;
 	}
 	char key[XWA_ENV_MISSION_KEY_MAX];
-	return env_snapshot_key(snap, key, sizeof key) && strcmp(key, s_env.prepared_key) != 0;
+	return (env_snapshot_key(snap, key, sizeof key) && strcmp(key, s_env.prepared_key) != 0) ||
+		   (snap && env_hangar_reference(snap) != s_env.prepared_hangar_reference);
 }
 
 void XwaRemasterEnvironment_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 	if (!s_env.library || !cmd) {
 		return;
 	}
+	if (!snap) {
+		return;
+	}
 	char key[XWA_ENV_MISSION_KEY_MAX];
-	if (!env_snapshot_key(snap, key, sizeof key) || strcmp(key, s_env.prepared_key) == 0) {
+	const int has_key = env_snapshot_key(snap, key, sizeof key);
+	const int32_t hangar_reference = env_hangar_reference(snap);
+	if ((!has_key || strcmp(key, s_env.prepared_key) == 0) && hangar_reference == s_env.prepared_hangar_reference) {
 		AeronEnvironmentLibrary_ServiceReload(s_env.library, cmd);
 		return;
+	}
+	if (!has_key) {
+		/* Only the hangar changed: keep the prepared mission's regions. */
+		snprintf(key, sizeof key, "%s", s_env.prepared_key);
 	}
 	/* The hangar plus every mapped region, so a hyperspace region change
 	 * never loads anything. Textures shared by path are uploaded once. */
@@ -422,9 +524,9 @@ void XwaRemasterEnvironment_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* 
 	uint32_t count = 0;
 	int32_t hangar = -1;
 	int32_t regions[ENV_MAX_REGIONS] = { -1, -1, -1, -1 };
-	if (s_env.hangar_reference >= 0) {
+	if (hangar_reference >= 0) {
 		hangar = (int32_t)count;
-		references[count++] = s_env.references[s_env.hangar_reference];
+		references[count++] = s_env.references[hangar_reference];
 	}
 	const EnvMission* mission = env_find_mission(key);
 	for (int r = 0; mission && r < ENV_MAX_REGIONS; r++) {
@@ -436,6 +538,7 @@ void XwaRemasterEnvironment_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* 
 	/* Record the key even on failure: retrying every frame would not help. */
 	env_clear_prepared();
 	snprintf(s_env.prepared_key, sizeof s_env.prepared_key, "%s", key);
+	s_env.prepared_hangar_reference = hangar_reference;
 	if (!AeronEnvironmentLibrary_Prepare(s_env.library, cmd, references, count)) {
 		Aeron_LogError("xwa.remaster", "environment maps: preparation failed for mission '%s'", key);
 		return;
@@ -460,6 +563,7 @@ static void env_select(XwaEnvironmentSelection* out, XwaEnvironmentMode mode, Xw
 	out->fallback = fallback;
 	out->reference = reference >= 0 ? &s_env.references[reference] : NULL;
 	out->package = NULL;
+	out->replaces_hangar_lights = 0;
 }
 
 /* The prepared package at library index `prepared`, or NULL. */
@@ -483,21 +587,24 @@ static void env_resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 		return;
 	}
 	if (cam->in_hangar) {
-		if (s_env.hangar_reference < 0) {
+		const int32_t reference = env_hangar_reference(snap);
+		if (reference < 0) {
 			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NO_HANGAR_ENTRY, -1);
 			return;
 		}
-		const AeronEnvironmentPackage* package = env_package(s_env.prepared_hangar);
+		const AeronEnvironmentPackage* package =
+			reference == s_env.prepared_hangar_reference ? env_package(s_env.prepared_hangar) : NULL;
 		if (!package) {
-			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NOT_READY, s_env.hangar_reference);
+			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NOT_READY, reference);
 			return;
 		}
 		if (!s_env_options.authored) {
-			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_AUTHORED_OFF, s_env.hangar_reference);
+			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_AUTHORED_OFF, reference);
 			return;
 		}
-		env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NONE, s_env.hangar_reference);
+		env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NONE, reference);
 		out->package = package;
+		out->replaces_hangar_lights = reference != s_env.hangar_reference;
 		return;
 	}
 	if (!snap->mission_path[0]) {
