@@ -307,10 +307,10 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
         -@ < /tmp/openxwa-windows-files \
     && unzip -tq "/build/artifacts/${package_name}.zip"
 
-# aeron_gltf_cook for the Blender add-on's Windows package: zstd and the
-# MinGW runtime linked statically, no SDL (aeron/tools/gltf_cook/
-# CMakeLists.txt). The game's own zstd links the DLL; the static library is
-# the cooker's.
+# aeron_gltf_cook and opt2gltf for the Blender add-on's Windows package:
+# zstd and the MinGW runtime linked statically, no SDL (aeron/tools/
+# gltf_cook/CMakeLists.txt). The game's own zstd links the DLL; the static
+# library is the tools'.
 FROM build-base AS cooker-build
 
 COPY --from=xwa-host-tools /opt/xwa-host /opt/xwa-host
@@ -330,13 +330,16 @@ RUN cmake -S /src/aeron -B /build/cooker -G Ninja \
         -DAERON_BUILD_TOOLS=ON \
         -DAERON_ENABLE_VIDEO=OFF \
         -DAERON_GLTF_COOK_STANDALONE=ON \
-    && cmake --build /build/cooker --target aeron_gltf_cook --parallel \
-    && cp /build/cooker/aeron_gltf_cook.exe /build/artifacts/
+    && cmake --build /build/cooker --target aeron_gltf_cook opt2gltf --parallel \
+    && cp /build/cooker/aeron_gltf_cook.exe /build/cooker/opt2gltf.exe /build/artifacts/
 
 # Only Windows' own DLLs: no SDL, zstd or MinGW runtime.
-RUN x86_64-w64-mingw32-objdump -p /build/artifacts/aeron_gltf_cook.exe | grep 'DLL Name' \
-    && ! x86_64-w64-mingw32-objdump -p /build/artifacts/aeron_gltf_cook.exe \
-        | grep -iE 'DLL Name: (SDL|libzstd|libstdc|libgcc|libwinpthread)'
+RUN for tool in aeron_gltf_cook opt2gltf; do \
+        x86_64-w64-mingw32-objdump -p /build/artifacts/$tool.exe | grep 'DLL Name' \
+        && ! x86_64-w64-mingw32-objdump -p /build/artifacts/$tool.exe \
+            | grep -iE 'DLL Name: (SDL|libzstd|libstdc|libgcc|libwinpthread)' \
+        || exit 1; \
+    done
 
 FROM scratch AS cooker-artifact
 COPY --from=cooker-build /build/artifacts/ /

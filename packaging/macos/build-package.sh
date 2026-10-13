@@ -227,10 +227,10 @@ build_application() {
     fi
 }
 
-# aeron_gltf_cook for the Blender add-on's macOS package (with
-# XWA_MACOS_BUILD_COOKER=1, as the release does): one universal binary, with
+# aeron_gltf_cook and opt2gltf for the Blender add-on's macOS package (with
+# XWA_MACOS_BUILD_COOKER=1, as the release does): universal binaries, with
 # zstd linked statically and no SDL (aeron/tools/gltf_cook/CMakeLists.txt).
-# Configuring Aeron needs SDL for both architectures, so the cooker has its
+# Configuring Aeron needs SDL for both architectures, so the tools have their
 # own universal dependencies.
 build_cooker() {
     local universal=(
@@ -271,26 +271,36 @@ build_cooker() {
         -DAERON_BUILD_TOOLS=ON \
         -DAERON_ENABLE_VIDEO=OFF \
         -DAERON_GLTF_COOK_STANDALONE=ON
-    cmake --build "${build_root}/cooker" --target aeron_gltf_cook --parallel "${jobs}"
+    cmake --build "${build_root}/cooker" --target aeron_gltf_cook opt2gltf --parallel "${jobs}"
 
     cmake -E remove_directory "${cooker_dir}"
     mkdir -p "${cooker_dir}"
-    cp "${build_root}/cooker/aeron_gltf_cook" "${cooker_dir}/"
+    cp "${build_root}/cooker/aeron_gltf_cook" "${build_root}/cooker/opt2gltf" "${cooker_dir}/"
     cp "${source_root}/zstd-${zstd_version}/LICENSE" "${cooker_dir}/zstd.txt"
 
-    for arch in arm64 x86_64; do
-        lipo "${cooker_dir}/aeron_gltf_cook" -verify_arch "${arch}"
+    local tool status
+    for tool in aeron_gltf_cook opt2gltf; do
+        for arch in arm64 x86_64; do
+            lipo "${cooker_dir}/${tool}" -verify_arch "${arch}"
+        done
+        # Per architecture, a "<file> (architecture <arch>):" line, then its
+        # libraries.
+        if otool -L "${cooker_dir}/${tool}" | grep -v -E ':$|^[[:space:]]+/usr/lib/'; then
+            echo "${tool} links libraries outside the system's" >&2
+            exit 1
+        fi
     done
-    # Per architecture, a "<file> (architecture <arch>):" line, then its
-    # libraries.
-    if otool -L "${cooker_dir}/aeron_gltf_cook" | grep -v -E ':$|^[[:space:]]+/usr/lib/'; then
-        echo "aeron_gltf_cook links libraries outside the system's" >&2
-        exit 1
-    fi
     mkdir -p "${build_root}/cooker-check"
     "${cooker_dir}/aeron_gltf_cook" \
         --library "${repo_root}/aeron/tools/gltf_cook/example/examplepanel.yaml" \
         --out "${build_root}/cooker-check"
+    # opt2gltf runs: without arguments, its usage and status 2.
+    status=0
+    "${cooker_dir}/opt2gltf" >/dev/null 2>&1 || status=$?
+    if [[ "${status}" -ne 2 ]]; then
+        echo "opt2gltf does not run (status ${status})" >&2
+        exit 1
+    fi
 }
 
 stage_licenses() {
@@ -400,7 +410,7 @@ main() {
     echo "Created ${dmg}"
     echo "Application bundle: ${application}"
     if [[ "${cooker_enabled}" == 1 ]]; then
-        echo "Add-on cooker: ${cooker_dir}/aeron_gltf_cook"
+        echo "Add-on tools: ${cooker_dir}"
     fi
 }
 

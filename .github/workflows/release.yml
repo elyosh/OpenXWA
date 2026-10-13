@@ -50,8 +50,8 @@ jobs:
           path: build/artifacts/*.tar.xz
           if-no-files-found: error
 
-      # The Blender add-on's cooker, from the same dependency stages.
-      - name: Build add-on cooker
+      # The Blender add-on's tools, from the same dependency stages.
+      - name: Build add-on tools
         if: matrix.build-type == 'Release'
         uses: docker/build-push-action@v7
         env:
@@ -64,7 +64,7 @@ jobs:
           outputs: type=local,dest=build/cooker
           cache-from: type=gha,scope=linux
 
-      - name: Upload add-on cooker
+      - name: Upload add-on tools
         if: matrix.build-type == 'Release'
         uses: actions/upload-artifact@v7
         with:
@@ -114,8 +114,8 @@ jobs:
           path: build/artifacts/*.zip
           if-no-files-found: error
 
-      # The Blender add-on's cooker, from the same dependency stages.
-      - name: Build add-on cooker
+      # The Blender add-on's tools, from the same dependency stages.
+      - name: Build add-on tools
         if: matrix.build-type == 'Release'
         uses: docker/build-push-action@v7
         env:
@@ -128,7 +128,7 @@ jobs:
           outputs: type=local,dest=build/cooker
           cache-from: type=gha,scope=windows
 
-      - name: Upload add-on cooker
+      - name: Upload add-on tools
         if: matrix.build-type == 'Release'
         uses: actions/upload-artifact@v7
         with:
@@ -187,7 +187,7 @@ jobs:
           path: build/artifacts/*.dmg
           if-no-files-found: error
 
-      - name: Upload add-on cooker
+      - name: Upload add-on tools
         if: matrix.build-type == 'Release'
         uses: actions/upload-artifact@v7
         with:
@@ -211,15 +211,17 @@ jobs:
           pattern: aeron-gltf-cook-*
           path: cookers
 
-      # One package per platform, each with its cooker and zstd's license.
+      # One package per platform, each with its cooker and opt2gltf, and
+      # zstd's license.
       - name: Build packages
         run: |
           for platform in linux-x64 windows-x64 macos; do
             dir="cookers/aeron-gltf-cook-${platform}"
-            cooker="${dir}/aeron_gltf_cook"
-            [ "${platform}" != windows-x64 ] || cooker="${cooker}.exe"
+            exe=""
+            [ "${platform}" != windows-x64 ] || exe=".exe"
             python3 aeron/tools/gltf_cook/package_addon.py --platform "${platform}" \
-                --cooker "${cooker}" --license "zstd=${dir}/zstd.txt" --out build/addon
+                --cooker "${dir}/aeron_gltf_cook${exe}" --opt2gltf "${dir}/opt2gltf${exe}" \
+                --license "zstd=${dir}/zstd.txt" --out build/addon
           done
 
       - name: Upload packages

@@ -293,10 +293,10 @@ RUN test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.vert.s
         "${package_name}" \
     && tar -tJf "/build/artifacts/${package_name}.tar.xz"
 
-# aeron_gltf_cook for the Blender add-on's Linux package: zstd linked
-# statically, no SDL (aeron/tools/gltf_cook/CMakeLists.txt).
+# aeron_gltf_cook and opt2gltf for the Blender add-on's Linux package: zstd
+# linked statically, no SDL (aeron/tools/gltf_cook/CMakeLists.txt).
 # The game's own zstd links the shared library; the static one is the
-# cooker's.
+# tools'.
 FROM build-base AS cooker-build
 
 COPY --from=sdl-build /opt/xwa-linux /opt/xwa-linux
@@ -314,25 +314,29 @@ RUN cmake -S /src/aeron -B /build/cooker -G Ninja \
         -DAERON_BUILD_TOOLS=ON \
         -DAERON_ENABLE_VIDEO=OFF \
         -DAERON_GLTF_COOK_STANDALONE=ON \
-    && cmake --build /build/cooker --target aeron_gltf_cook --parallel \
-    && cp /build/cooker/aeron_gltf_cook /build/artifacts/
+    && cmake --build /build/cooker --target aeron_gltf_cook opt2gltf --parallel \
+    && cp /build/cooker/aeron_gltf_cook /build/cooker/opt2gltf /build/artifacts/
 
 # Only system libraries (no SDL or zstd), within the game's host baseline
 # (glibc 2.35 without DT_RELR, the GCC 12 runtime). Then a library and a
-# model build.
-RUN env -u LD_LIBRARY_PATH ldd /build/artifacts/aeron_gltf_cook \
-    && ! env -u LD_LIBRARY_PATH ldd /build/artifacts/aeron_gltf_cook \
-        | grep -E 'not found|SDL|zstd' \
-    && ! readelf -V /build/artifacts/aeron_gltf_cook | grep -q 'GLIBC_ABI_' \
-    && for bound in GLIBC_2.35 GLIBCXX_3.4.30 CXXABI_1.3.13; do \
-        required=$(readelf -V /build/artifacts/aeron_gltf_cook \
-            | grep -oE "${bound%_*}_[0-9][0-9.]*" | sort -uV | tail -n 1); \
-        if [ -n "$required" ] && \
-            [ "$(printf '%s\n%s\n' "$required" "$bound" | sort -V | tail -n 1)" != "$bound" ]; then \
-            echo "aeron_gltf_cook requires $required, above the $bound host baseline" >&2; \
-            exit 1; \
-        fi; \
+# model build, and opt2gltf's usage (status 2).
+RUN for tool in aeron_gltf_cook opt2gltf; do \
+        env -u LD_LIBRARY_PATH ldd /build/artifacts/$tool \
+        && ! env -u LD_LIBRARY_PATH ldd /build/artifacts/$tool \
+            | grep -E 'not found|SDL|zstd' \
+        && ! readelf -V /build/artifacts/$tool | grep -q 'GLIBC_ABI_' \
+        || exit 1; \
+        for bound in GLIBC_2.35 GLIBCXX_3.4.30 CXXABI_1.3.13; do \
+            required=$(readelf -V /build/artifacts/$tool \
+                | grep -oE "${bound%_*}_[0-9][0-9.]*" | sort -uV | tail -n 1); \
+            if [ -n "$required" ] && \
+                [ "$(printf '%s\n%s\n' "$required" "$bound" | sort -V | tail -n 1)" != "$bound" ]; then \
+                echo "$tool requires $required, above the $bound host baseline" >&2; \
+                exit 1; \
+            fi; \
+        done; \
     done \
+    && { env -u LD_LIBRARY_PATH /build/artifacts/opt2gltf >/dev/null 2>&1; [ $? -eq 2 ]; } \
     && example=/src/aeron/tools/gltf_cook/example \
     && mkdir -p /tmp/cooker-check \
     && env -u LD_LIBRARY_PATH /build/artifacts/aeron_gltf_cook \
