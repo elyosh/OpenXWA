@@ -338,8 +338,7 @@ RUN env -u LD_LIBRARY_PATH ldd /build/artifacts/aeron_gltf_cook \
     && env -u LD_LIBRARY_PATH /build/artifacts/aeron_gltf_cook \
         --library "$example/examplepanel.yaml" --out /tmp/cooker-check \
     && env -u LD_LIBRARY_PATH /build/artifacts/aeron_gltf_cook "$example/panel.gltf" \
-        --out /tmp/cooker-check/panel.glb --animations "$example/panel.anim.yaml" \
-        --effects-dir /tmp/cooker-check
+        --out /tmp/cooker-check/panel.glb --effects-dir /tmp/cooker-check
 
 FROM scratch AS cooker-artifact
 COPY --from=cooker-build /build/artifacts/ /
