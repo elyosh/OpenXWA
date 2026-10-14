@@ -32,7 +32,7 @@ typedef struct EnvMission {
 	int32_t region_reference[ENV_MAX_REGIONS]; /* index into references, -1 = classic */
 } EnvMission;
 
-static struct {
+typedef struct EnvState {
 	int enabled;
 	char manifest_path[256];
 	AeronEnvironmentDefinitionSet* packages;
@@ -63,7 +63,8 @@ static struct {
 	int logged;
 	XwaEnvironmentSelection last;
 	char last_mission[sizeof(((XwaSnapshot*)0)->mission_path)];
-} s_env;
+} EnvState;
+static EnvState s_env;
 
 /* Host options and the debug switch; survive Shutdown, which clears s_env. */
 static struct {
@@ -605,20 +606,15 @@ int XwaRemasterEnvironment_NeedsPrepare(const XwaSnapshot* snap) {
 					 env_probes_mask(snap) != s_env.prepared_probes_mask));
 }
 
-void XwaRemasterEnvironment_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
-	if (!s_env.library || !cmd) {
-		return;
-	}
-	if (!snap) {
-		return;
-	}
+/* Prepares the hangar, the mission's regions and the loaded models' probes
+ * when they changed, or always with `force`. */
+static void env_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap, int force) {
 	char key[XWA_ENV_MISSION_KEY_MAX];
 	const int has_key = env_snapshot_key(snap, key, sizeof key);
 	const int32_t hangar_reference = env_hangar_reference(snap);
 	const uint64_t probes_mask = env_probes_mask(snap);
-	if ((!has_key || strcmp(key, s_env.prepared_key) == 0) &&
+	if (!force && (!has_key || strcmp(key, s_env.prepared_key) == 0) &&
 		hangar_reference == s_env.prepared_hangar_reference && probes_mask == s_env.prepared_probes_mask) {
-		AeronEnvironmentLibrary_ServiceReload(s_env.library, cmd);
 		return;
 	}
 	if (!has_key) {
@@ -664,6 +660,51 @@ void XwaRemasterEnvironment_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* 
 	memcpy(s_env.prepared_region, regions, sizeof regions);
 	memcpy(s_env.prepared_probes, probes, sizeof probes);
 	Aeron_LogInfo("xwa.remaster", "environment maps: prepared mission '%s' (%u references)", key, count);
+}
+
+/* Reads the manifest and the model packages again into fresh state. Keeps
+ * the loaded state, and returns 0, when the manifest has errors. */
+static int env_reload_manifest(void) {
+	static EnvState loaded;
+	loaded = s_env;
+	s_env.packages = NULL;
+	s_env.reference_count = 0;
+	s_env.hangar_reference = -1;
+	s_env.hangar_count = 0;
+	s_env.probe_count = 0;
+	s_env.mission_count = 0;
+	if (env_load_manifest(Aeron_GetVfs())) {
+		return 1;
+	}
+	AeronEnvironmentDefinitionSet_Destroy(s_env.packages);
+	s_env = loaded;
+	Aeron_LogError("xwa.remaster", "environment reload: the manifest has errors; keeping the loaded one");
+	return 0;
+}
+
+void XwaRemasterEnvironment_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
+	if (!s_env.library || !cmd || !snap) {
+		return;
+	}
+	if (!AeronEnvironmentLibrary_ReloadRequested(s_env.library)) {
+		env_prepare(cmd, snap, 0);
+		return;
+	}
+	/* Reload: read the definitions again too, so a new bake with another
+	 * grid or other probes loads without a restart. The textures of the
+	 * current references are read again, then everything is prepared from
+	 * the new definitions, which can map other packages. */
+	AeronEnvironmentDefinitionSet* previous = s_env.packages;
+	const int reread = env_reload_manifest();
+	if (reread) {
+		AeronEnvironmentLibrary_SetDefinitions(s_env.library, s_env.packages);
+	}
+	AeronEnvironmentLibrary_ServiceReload(s_env.library, cmd);
+	env_prepare(cmd, snap, reread);
+	if (reread) {
+		/* The published packages now point into the new set. */
+		AeronEnvironmentDefinitionSet_Destroy(previous);
+	}
 }
 
 static const EnvMission* env_find_mission(const char* key) {
