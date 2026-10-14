@@ -387,12 +387,6 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 	changed |= ImGui::SliderFloat3("Direction (surface to light)", p.direction, -1.0f, 1.0f, "%.3f");
 	changed |= ImGui::SliderFloat("Intensity", &p.intensity, 0.0f, 4.0f, "%.2f");
 	changed |= ImGui::ColorEdit3("Light color", p.color, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
-	changed |= ImGui::SliderFloat("Probe shadow", &p.probe_shadow, 0.0f, 1.0f, "%.2f");
-	if (ImGui::IsItemHovered()) {
-		ImGui::SetTooltip(
-			"When the hangar has probes, their bake already holds this light: it then only casts\n"
-			"shadows, which remove this share of the probe light.");
-	}
 	ImGui::Separator();
 	ImGui::TextUnformatted("Ambient cube (linear)");
 	/* An authored hangar package's fill and diffuse cube replace this cube. */
