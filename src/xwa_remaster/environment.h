@@ -14,7 +14,9 @@
  * package during process asset preparation, and the hangar plus every
  * region of a mission when the snapshot's normalized mission key changes,
  * at the HD asset synchronization point. A region becomes authored only once
- * its package is prepared and available.
+ * its package is prepared and available. `xwa.probes` maps model keys to
+ * `probes` packages, prepared with the mission for its loaded models; the
+ * flight renderer places them on the objects of those models.
  *
  * The selection is resolved from snapshot state alone, once per flight
  * frame, before any sky, backdrop, directional or lens-flare decision. It
@@ -26,6 +28,7 @@
 
 #include "aeron/render.h"
 #include "aeron/scene/environment.h"
+#include "aeron/scene/scene3d.h"
 #include "aeron/vfs.h"
 
 #ifdef __cplusplus
@@ -63,11 +66,14 @@ typedef struct XwaEnvironmentSelection {
 	 * it is available. */
 	const AeronEnvironmentPackage* package;
 	uint8_t region;
-	/* In the hangar: the package is the loaded hangar model's own
-	 * (`xwa.hangars`), baked with the model's lights, so the game does not
-	 * add them. */
-	uint8_t replaces_hangar_lights;
 } XwaEnvironmentSelection;
+
+/* A probe set placed this frame, for the debug rows. */
+typedef struct XwaEnvironmentProbeSet {
+	char model[64];
+	char package[AERON_ENV_NAME_MAX];
+	uint16_t slot; /* the owner object's slot */
+} XwaEnvironmentProbeSet;
 
 #define XWA_ENV_MISSION_KEY_MAX 128
 
@@ -90,6 +96,10 @@ int XwaRemasterEnvironment_Enabled(void);
  * loads nothing. */
 void XwaRemasterEnvironment_SetAuthoredEnvironments(int enabled);
 int XwaRemasterEnvironment_AuthoredEnvironments(void);
+
+/* Debug switch (off by default): outlines of the frame's probe sets. */
+void XwaRemasterEnvironment_SetShowProbes(int show);
+int XwaRemasterEnvironment_ShowProbes(void);
 
 /* Creates the package library and prepares the hangar package. Failures are
  * logged and leave the classic path; returns 0 only on invalid arguments. */
@@ -118,6 +128,16 @@ int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mis
 
 /* The normalized mission key whose packages are prepared; "" when none. */
 const char* XwaRemasterEnvironment_PreparedMissionKey(void);
+
+/* The prepared `probes` package of a model (`xwa.probes`, by name, any
+ * case), or NULL: none, not prepared, or authored environments off. */
+const AeronEnvironmentPackage* XwaRemasterEnvironment_ModelProbes(const char* model_name);
+
+/* Records a probe set placed this frame (Resolve clears them), for the
+ * debug rows. */
+void XwaRemasterEnvironment_NoteProbeSet(const char* model_name, const AeronEnvironmentPackage* package,
+										 uint16_t slot);
+uint32_t XwaRemasterEnvironment_FrameProbeSets(const XwaEnvironmentProbeSet** out);
 
 const char* XwaRemasterEnvironment_ModeName(XwaEnvironmentMode mode);
 const char* XwaRemasterEnvironment_FallbackName(XwaEnvironmentFallback fallback);

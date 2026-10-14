@@ -22,6 +22,7 @@
 #include "xwa_remaster/glow_marks.h"
 #include "xwa_remaster/hud.h"
 #include "xwa_remaster/hyperspace.h"
+#include "xwa_remaster/probe_outlines.h"
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/skins.h"
 #include "xwa_remaster/sky_stars.h"
@@ -259,6 +260,10 @@ static struct {
 	int sky_mode;
 	/* Environment selection resolved at the start of each flight frame. */
 	XwaEnvironmentSelection environment;
+	/* The frame's probe sets: their owners' walk indices, as placed. */
+	uint32_t probe_set_object[AERON_SCENE_MAX_PROBE_SETS];
+	XwaProbeOutlineSet probe_sets[AERON_SCENE_MAX_PROBE_SETS];
+	uint32_t probe_set_count;
 	float star_brightness;
 	float star_density;
 	float star_grid;
@@ -1693,6 +1698,22 @@ int XwaRemasterFlight_ProjectView(const XwaRemasterFlightView* view, const float
 	*out_x = view->viewport.x + (ndc_x + 1.0f) * 0.5f * view->viewport.width;
 	*out_y = view->viewport.y + (1.0f - ndc_y) * 0.5f * view->viewport.height;
 	return 1;
+}
+
+int XwaRemasterFlight_ClipProjectLine(const XwaRemasterFlightView* view, float a[3], float b[3], float* ax,
+									  float* ay, float* bx, float* by) {
+	const float near_z = view->camera.near_z;
+	if (a[2] < near_z && b[2] < near_z)
+		return 0;
+	if (a[2] < near_z || b[2] < near_z) {
+		float* behind = a[2] < near_z ? a : b;
+		const float* front = a[2] < near_z ? b : a;
+		const float t = (near_z - behind[2]) / (front[2] - behind[2]);
+		behind[0] += (front[0] - behind[0]) * t;
+		behind[1] += (front[1] - behind[1]) * t;
+		behind[2] = near_z;
+	}
+	return XwaRemasterFlight_ProjectView(view, a, ax, ay) && XwaRemasterFlight_ProjectView(view, b, bx, by);
 }
 
 /* ---- state-derived object transforms (TIE-style) --------------------
@@ -3203,17 +3224,91 @@ static void fl_finalize_point_lights(void) {
 	}
 }
 
+/* Places the probe sets of the drawn objects whose model has prepared probes
+ * (`xwa.probes`), closest to the camera first, up to the scene's limit. Each
+ * owner's instance takes its own set; the other instances take the first
+ * set their bounds overlap, so the closest set wins where sets meet. */
+static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
+								const XwaRemasterFlightView* view) {
+	const XwaFlightCamera* cam = &snap->flight_camera;
+	const AeronEnvironmentPackage* packages[AERON_SCENE_MAX_PROBE_SETS];
+	float distances[AERON_SCENE_MAX_PROBE_SETS];
+	uint32_t count = 0;
+	s.probe_set_count = 0;
+	for (uint32_t i = 0; i < snap->flight_object_count; i++) {
+		const XwaFlightObject* f = &snap->flight_objects[i];
+		if (!fl_object_in_render_region(f, cam->region) || f->genus == XWA_SNAP_GENUS_EXPLOSION ||
+			fl_object_is_projectile(f) || f->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK) {
+			continue;
+		}
+		const AeronEnvironmentPackage* package =
+			XwaRemasterEnvironment_ModelProbes(XwaSnapshotExport_ModelName(f->object_type));
+		if (!package) {
+			continue;
+		}
+		float delta[3];
+		AeronWorld_DeltaI32(cam->world_pos, f->world_pos, delta);
+		const float distance = delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2];
+		/* Insert by distance; the farthest drops past the limit. */
+		uint32_t k = count < AERON_SCENE_MAX_PROBE_SETS ? count++ : AERON_SCENE_MAX_PROBE_SETS;
+		for (; k > 0 && distances[k - 1] > distance; k--) {
+			if (k < AERON_SCENE_MAX_PROBE_SETS) {
+				distances[k] = distances[k - 1];
+				packages[k] = packages[k - 1];
+				s.probe_set_object[k] = s.probe_set_object[k - 1];
+			}
+		}
+		if (k < AERON_SCENE_MAX_PROBE_SETS) {
+			distances[k] = distance;
+			packages[k] = package;
+			s.probe_set_object[k] = i;
+		}
+	}
+	for (uint32_t k = 0; k < count; k++) {
+		const XwaFlightObject* f = &snap->flight_objects[s.probe_set_object[k]];
+		XwaProbeOutlineSet* set = &s.probe_sets[s.probe_set_count];
+		float basis[9], local[3];
+		/* The pose the object walk gives its instance. */
+		fl_object_pose(f, cam->world_pos, 0, basis, local, set->model);
+		if (AeronScene_AddProbeSet(s.scene, packages[k], set->model) < 0) {
+			continue;
+		}
+		set->package = packages[k];
+		s.probe_set_object[s.probe_set_count++] = s.probe_set_object[k];
+		XwaRemasterEnvironment_NoteProbeSet(XwaSnapshotExport_ModelName(f->object_type), packages[k],
+											f->slot);
+	}
+	if (s.probe_set_count && XwaRemasterEnvironment_ShowProbes()) {
+		XwaRemasterProbeOutlines_Prepare(cmd, s.scene, view, s.crows, s.probe_sets, s.probe_set_count);
+	}
+}
+
+/* The probe set owned by the object at walk index `i`, as index + 1; 0 = none. */
+static uint8_t fl_probe_set_owner(uint32_t i) {
+	for (uint32_t k = 0; k < s.probe_set_count; k++) {
+		if (s.probe_set_object[k] == i) {
+			return (uint8_t)(k + 1);
+		}
+	}
+	return 0;
+}
+
 /* Lights authored in a model (AeronFlightLight), placed by its instance,
  * into the pool; `keep` always keeps them (the cockpit's). Their intensity
  * is authored in candela, so point_lights.match_distance_m does not apply;
- * point_lights.model_light_intensity converts it to the scene's units. */
+ * point_lights.model_light_intensity converts it to the scene's units.
+ * `skip_baked` leaves out the lights baked into the model's probes, while
+ * its probe set is placed. */
 static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transform[16],
-								const AeronSceneMeshTable* table, int keep) {
+								const AeronSceneMeshTable* table, int keep, int skip_baked) {
 	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f)) {
 		return;
 	}
 	for (uint32_t i = 0; i < mesh->light_count; ++i) {
 		AeronSceneLight light;
+		if (skip_baked && mesh->lights[i].baked) {
+			continue;
+		}
 		if (AeronScene_MeshLight(mesh, i, transform, AERON_OPT_UNITS_PER_METER, table, s.plight.model_light_intensity,
 								 &light)) {
 			s.pl_model_count++;
@@ -3821,7 +3916,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 		s.table_count++;
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
-	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, 1);
+	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, 1, 0);
 	if (player_f) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 										  inst.mesh_table, s.glow_mark_emissive_strength);
@@ -4876,6 +4971,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	s.bolt_count = 0;
 	s.table_count = 0;
 	s.anim_count = 0;
+	fl_place_probe_sets(cmd, snap, &flight_view);
 
 	/* Derive every object transform from the STATE channel: cached rows
 	 * when the mobile object's cache is fresh, the Euler compose
@@ -4973,6 +5069,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		inst.mesh = prepared.mesh;
 		memcpy(inst.transform, model_matrix, sizeof model_matrix);
 		inst.variant = f->node_switch;
+		inst.probe_set_owner = fl_probe_set_owner(i);
 		XwaRemasterSkins_CheckMarkings(inst.mesh, inst.variant);
 		if (scene_lighting.hangar_override && (int32_t)f->slot == cam->hangar_launch_ref_obj_idx) {
 			/* The enclosed backdrop contains the implied ceiling emitter.
@@ -5030,10 +5127,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			s.bolts[s.bolt_count++] = inst;
 		} else {
 			AeronScene_AddMeshInstance(s.scene, &inst);
-			/* A hangar package baked from this hangar model holds its lights. */
-			if (!(s.environment.replaces_hangar_lights && (int32_t)f->slot == cam->hangar_launch_ref_obj_idx)) {
-				fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, 0);
-			}
+			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, 0, inst.probe_set_owner != 0);
 			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, prepared.mesh, model_matrix,
 											  inst.mesh_table, s.glow_mark_emissive_strength);
 			/* State-derived engine glows for this craft (classic scale
@@ -5143,7 +5237,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				}
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
-			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, 1);
+			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, 1, 0);
 			if (player_f) {
 				XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 												  inst.mesh_table, s.glow_mark_emissive_strength);
@@ -5189,6 +5283,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 
 void XwaRemasterFlight_Shutdown(void) {
 	XwaRemasterFlightMap_Shutdown();
+	XwaRemasterProbeOutlines_Shutdown();
 	XwaRemasterEnvironment_Shutdown();
 	XwaRemasterHyperspace_Destroy(s.hyperspace);
 	s.hyperspace = NULL;

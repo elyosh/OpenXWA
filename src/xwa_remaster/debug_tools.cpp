@@ -1275,6 +1275,18 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 			ImGui::Text("Fallback: %s", XwaRemasterEnvironment_FallbackName(selection.fallback));
 		}
 	}
+	const XwaEnvironmentProbeSet* sets = nullptr;
+	const uint32_t set_count = XwaRemasterEnvironment_FrameProbeSets(&sets);
+	ImGui::Text("Probe sets: %u", set_count);
+	for (uint32_t i = 0; i < set_count; ++i) {
+		ImGui::BulletText("%s, object %u: %s", sets[i].model, (unsigned)sets[i].slot, sets[i].package);
+	}
+	bool show_probes = XwaRemasterEnvironment_ShowProbes() != 0;
+	if (ImGui::Checkbox("Show probes", &show_probes)) {
+		XwaRemasterEnvironment_SetShowProbes(show_probes ? 1 : 0);
+	}
+	ImGui::SetItemTooltip("Outlines of each probe's influence (dimmer: where it applies fully), its parallax "
+						  "volume (grey), the light grid's box (white) and its points within 50 m.");
 
 	/* Capture the current region's HD sky for environment_bake --capture. */
 	ImGui::SeparatorText("Capture");

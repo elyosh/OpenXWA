@@ -214,6 +214,10 @@ int XwaRemasterFlight_ProjectWorldI32(const XwaRemasterFlightView* view, const i
 									  float* out_y, float* out_depth);
 int XwaRemasterFlight_ProjectView(const XwaRemasterFlightView* view, const float eye[3], float* out_x,
 								  float* out_y);
+/* Clips an eye-space segment to the near plane (moving the endpoint behind
+ * it) and projects both ends; returns 0 when it lies wholly behind. */
+int XwaRemasterFlight_ClipProjectLine(const XwaRemasterFlightView* view, float a[3], float b[3], float* ax,
+									  float* ay, float* bx, float* by);
 
 /* Reproduce SceneBillboard_QueueObjectTextured's base-size arithmetic,
  * including its late int16_t queue-store / uint16_t reload.  The source

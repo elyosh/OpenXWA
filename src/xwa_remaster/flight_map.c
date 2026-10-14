@@ -93,29 +93,13 @@ static void map_world_to_eye(const XwaFlightCamera* camera, const float world_to
 	}
 }
 
-static int map_clip_project_line(const XwaRemasterFlightView* view, float a[3], float b[3], float* ax,
-								 float* ay, float* bx, float* by) {
-	const float near_z = view->camera.near_z;
-	if (a[2] < near_z && b[2] < near_z)
-		return 0;
-	if (a[2] < near_z || b[2] < near_z) {
-		float* behind = a[2] < near_z ? a : b;
-		const float* front = a[2] < near_z ? b : a;
-		const float t = (near_z - behind[2]) / (front[2] - behind[2]);
-		behind[0] += (front[0] - behind[0]) * t;
-		behind[1] += (front[1] - behind[1]) * t;
-		behind[2] = near_z;
-	}
-	return XwaRemasterFlight_ProjectView(view, a, ax, ay) && XwaRemasterFlight_ProjectView(view, b, bx, by);
-}
-
 static void map_add_world_line(AeronDrawList2D* list, const XwaFlightCamera* camera,
 							   const XwaRemasterFlightView* view, const int32_t world_a[3],
 							   const int32_t world_b[3], uint8_t palette, float thickness, int depth_test) {
 	float a[3], b[3], ax, ay, bx, by, rgba[4];
 	map_world_to_eye(camera, map_state.world_to_eye, world_a, a);
 	map_world_to_eye(camera, map_state.world_to_eye, world_b, b);
-	if (!map_clip_project_line(view, a, b, &ax, &ay, &bx, &by))
+	if (!XwaRemasterFlight_ClipProjectLine(view, a, b, &ax, &ay, &bx, &by))
 		return;
 	map_argb_linear(map_color_argb(palette), rgba);
 	if (depth_test) {
