@@ -16,7 +16,9 @@
  * at the HD asset synchronization point. A region becomes authored only once
  * its package is prepared and available. `xwa.probes` maps model keys to
  * `probes` packages, prepared with the mission for its loaded models; the
- * flight renderer places them on the objects of those models.
+ * flight renderer places them on the objects of those models. A probes
+ * package is read from the model's own `models/<key>/package.yaml` beside
+ * the manifest, as the probes bake writes it, not from the manifest.
  *
  * The selection is resolved from snapshot state alone, once per flight
  * frame, before any sky, backdrop, directional or lens-flare decision. It

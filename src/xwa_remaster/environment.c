@@ -266,9 +266,60 @@ static void env_lower(char* out, size_t size, const char* text) {
 	out[i] = '\0';
 }
 
-/* `xwa.hangars` or `xwa.probes`: model keys to packages of `kind`. */
-static int env_parse_models(const AeronConfigNode* map, const char* field, AeronEnvironmentKind kind,
-							EnvModel* models, uint32_t* count, uint32_t max) {
+/* Adds the packages of a model's `package.yaml`, in `models/<key>/` beside
+ * the manifest, where the probes bake writes it: a new bake needs no edit
+ * of the manifest. Logs and returns 0 when the file is missing or invalid,
+ * or when the manifest defines one of its packages too. */
+static int env_load_model_packages(AeronVfs* vfs, const char* key) {
+	char directory[sizeof s_env.manifest_path];
+	snprintf(directory, sizeof directory, "%s", s_env.manifest_path);
+	char* slash = strrchr(directory, '/');
+	if (slash) {
+		slash[1] = '\0';
+	} else {
+		directory[0] = '\0';
+	}
+	char vfs_path[400];
+	snprintf(vfs_path, sizeof vfs_path, "remaster/%smodels/%s/package.yaml", directory, key);
+	AeronConfigFile* file = NULL;
+	AeronConfigError error;
+	memset(&error, 0, sizeof error);
+	if (!AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_ASSET, vfs_path, &file, &error)) {
+		Aeron_LogError("xwa.remaster", "environment: xwa.probes '%s': %s:%d: %s", key, vfs_path, error.line,
+					   error.message[0] ? error.message : "unavailable");
+		return 0;
+	}
+	static const char* const fields[] = { "packages" };
+	const AeronConfigNode* root = AeronConfigFile_Root(file);
+	const AeronConfigNode* packages = AeronConfigNode_MapGet(root, "packages");
+	int ok = AeronConfigNode_Type(root) == AERON_CONFIG_MAP
+				 ? env_check_fields(root, vfs_path, fields, sizeof fields / sizeof fields[0])
+				 : env_node_error(root, "%s must be a map", vfs_path);
+	for (size_t i = 0;
+		 ok && AeronConfigNode_Type(packages) == AERON_CONFIG_MAP && i < AeronConfigNode_MapCount(packages);
+		 i++) {
+		const char* name = AeronConfigNode_MapKeyAt(packages, i);
+		if (AeronEnvironmentDefinitionSet_Find(s_env.packages, name)) {
+			ok = env_node_error(AeronConfigNode_MapValueAt(packages, i),
+								"package '%s' is also in the manifest's packages: remove it there, the game "
+								"reads it from the model's folder",
+								name);
+		}
+	}
+	if (ok && !AeronEnvironment_AddPackages(packages, s_env.packages, &error)) {
+		Aeron_LogError("xwa.remaster", "%s:%d: %s", error.path[0] ? error.path : vfs_path, error.line,
+					   error.message);
+		ok = 0;
+	}
+	AeronConfigFile_Destroy(file);
+	return ok;
+}
+
+/* `xwa.hangars` or `xwa.probes`: model keys to packages of `kind`. A probes
+ * package comes from the model's own package.yaml; a model whose package
+ * cannot be loaded is left out, with an error logged. */
+static int env_parse_models(AeronVfs* vfs, const AeronConfigNode* map, const char* field,
+							AeronEnvironmentKind kind, EnvModel* models, uint32_t* count, uint32_t max) {
 	if (AeronConfigNode_Type(map) != AERON_CONFIG_MAP) {
 		return env_node_error(map, "xwa: '%s' must be a map", field);
 	}
@@ -290,7 +341,12 @@ static int env_parse_models(const AeronConfigNode* map, const char* field, Aeron
 		}
 		char what[96];
 		snprintf(what, sizeof what, "xwa.%s '%s'", field, key);
-		if (!env_add_reference(value, what, kind, &model->reference)) {
+		if (kind == AERON_ENV_KIND_PROBES) {
+			if (!env_load_model_packages(vfs, model->key) ||
+				!env_add_reference(value, what, kind, &model->reference)) {
+				continue;
+			}
+		} else if (!env_add_reference(value, what, kind, &model->reference)) {
 			return 0;
 		}
 		(*count)++;
@@ -298,7 +354,7 @@ static int env_parse_models(const AeronConfigNode* map, const char* field, Aeron
 	return 1;
 }
 
-static int env_parse_xwa(const AeronConfigNode* xwa) {
+static int env_parse_xwa(AeronVfs* vfs, const AeronConfigNode* xwa) {
 	static const char* const fields[] = { "hangar", "hangars", "probes", "missions" };
 	if (!xwa || AeronConfigNode_Type(xwa) != AERON_CONFIG_MAP) {
 		return env_node_error(xwa, "manifest: 'xwa' must be a map");
@@ -312,13 +368,13 @@ static int env_parse_xwa(const AeronConfigNode* xwa) {
 		return 0;
 	}
 	const AeronConfigNode* hangars = AeronConfigNode_MapGet(xwa, "hangars");
-	if (hangars && !env_parse_models(hangars, "hangars", AERON_ENV_KIND_LIGHTING, s_env.hangars,
+	if (hangars && !env_parse_models(vfs, hangars, "hangars", AERON_ENV_KIND_LIGHTING, s_env.hangars,
 									 &s_env.hangar_count, ENV_MAX_HANGARS)) {
 		return 0;
 	}
 	const AeronConfigNode* probes = AeronConfigNode_MapGet(xwa, "probes");
-	if (probes && !env_parse_models(probes, "probes", AERON_ENV_KIND_PROBES, s_env.probes, &s_env.probe_count,
-									ENV_MAX_PROBES)) {
+	if (probes && !env_parse_models(vfs, probes, "probes", AERON_ENV_KIND_PROBES, s_env.probes,
+									&s_env.probe_count, ENV_MAX_PROBES)) {
 		return 0;
 	}
 	const AeronConfigNode* missions = AeronConfigNode_MapGet(xwa, "missions");
@@ -368,7 +424,7 @@ static int env_load_manifest(AeronVfs* vfs) {
 		ok = 0;
 	}
 	if (ok) {
-		ok = env_parse_xwa(AeronConfigNode_MapGet(root, "xwa"));
+		ok = env_parse_xwa(vfs, AeronConfigNode_MapGet(root, "xwa"));
 	}
 	AeronConfigFile_Destroy(manifest);
 	if (ok) {
