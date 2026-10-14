@@ -235,11 +235,14 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
  * separately through AeronScene_AddLight. `ambient_cube` optionally
  * replaces the uniform ambient fill; `environment_map`, when given,
  * selects the scene's diffuse environment (otherwise the scene's selection,
- * such as an authored package, is left as is). */
+ * such as an authored package, is left as is). `key_probe_shadow` >= 0 says
+ * the key light is in the probe sets' bake (the hangar's ceiling light):
+ * inside a probe grid it then only casts shadows, which remove that share
+ * of the probe light; < 0 for a normal key light. */
 void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, uint32_t light_count,
 							   int32_t key_index, const float cam_rows[9], const float cam_pos[3],
 							   const XwaShipAoParams* ao, const XwaShipAmbientCube* ambient_cube,
-							   const XwaShipEnvironmentMap* environment_map);
+							   const XwaShipEnvironmentMap* environment_map, float key_probe_shadow);
 
 /* Classic per-object engine-glow intensity scale — the float mirror
  * of EngineGlow_RenderObjectGlows' scale derivation from the captured

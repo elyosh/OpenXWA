@@ -77,6 +77,10 @@ typedef struct XwaFlightHangarLightingParams {
 	float ambient_ceiling;
 	float ambient_sides;
 	float ambient_floor;
+	/* When the hangar's probes are in use, the light is in their bake: inside
+	 * their grid it only casts shadows, which remove this share (0-1) of the
+	 * probe light. Optional in config.yaml (`probe_shadow`), default 0.7. */
+	float probe_shadow;
 } XwaFlightHangarLightingParams;
 
 void XwaRemasterFlight_GetHangarLighting(XwaFlightHangarLightingParams* out);

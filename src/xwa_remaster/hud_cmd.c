@@ -688,7 +688,8 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 		return;
 	}
 	XwaRemasterShip_SetPbrEnv(s_cmd.scene, snapshot->dir_lights, snapshot->dir_light_count, -1, rows, NULL,
-							  NULL, /*ambient_cube=*/NULL, /*environment_map=*/NULL);
+							  NULL, /*ambient_cube=*/NULL, /*environment_map=*/NULL,
+							  /*key_probe_shadow=*/-1.0f);
 	if (!AeronScene_Render(s_cmd.scene, cmd)) {
 		return;
 	}

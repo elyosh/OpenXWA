@@ -575,7 +575,8 @@ static int fl_hangar_lighting_config_valid(const XwaFlightHangarLightingParams* 
 		   p->intensity <= 4.0f && p->color[0] >= 0.0f && p->color[0] <= 4.0f && p->color[1] >= 0.0f &&
 		   p->color[1] <= 4.0f && p->color[2] >= 0.0f && p->color[2] <= 4.0f && p->ambient_ceiling >= 0.0f &&
 		   p->ambient_ceiling <= 4.0f && p->ambient_sides >= 0.0f && p->ambient_sides <= 4.0f &&
-		   p->ambient_floor >= 0.0f && p->ambient_floor <= 4.0f;
+		   p->ambient_floor >= 0.0f && p->ambient_floor <= 4.0f && p->probe_shadow >= 0.0f &&
+		   p->probe_shadow <= 1.0f;
 }
 
 static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
@@ -769,6 +770,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.ambient_sides", 0.0);
 	s.hangar_lighting.ambient_floor =
 		(float)AeronConfigFile_GetFloat(cf, "hangar_lighting.ambient_floor", 0.0);
+	s.hangar_lighting.probe_shadow = (float)AeronConfigFile_GetFloat(cf, "hangar_lighting.probe_shadow", 0.7);
 	const float hangar_direction_length =
 		sqrtf(s.hangar_lighting.direction[0] * s.hangar_lighting.direction[0] +
 			  s.hangar_lighting.direction[1] * s.hangar_lighting.direction[1] +
@@ -1151,6 +1153,7 @@ static void fl_sanitize_hangar_lighting(XwaFlightHangarLightingParams* params) {
 	params->ambient_ceiling = fminf(fmaxf(params->ambient_ceiling, 0.0f), 4.0f);
 	params->ambient_sides = fminf(fmaxf(params->ambient_sides, 0.0f), 4.0f);
 	params->ambient_floor = fminf(fmaxf(params->ambient_floor, 0.0f), 4.0f);
+	params->probe_shadow = fminf(fmaxf(params->probe_shadow, 0.0f), 1.0f);
 }
 
 void XwaRemasterFlight_GetHangarLighting(XwaFlightHangarLightingParams* out) {
@@ -3283,6 +3286,17 @@ static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap
 	}
 }
 
+/* Whether the hangar model (the launch reference) placed its probe set. */
+static int fl_hangar_probe_set(const XwaSnapshot* snap) {
+	for (uint32_t k = 0; k < s.probe_set_count; k++) {
+		if ((int32_t)snap->flight_objects[s.probe_set_object[k]].slot ==
+			snap->flight_camera.hangar_launch_ref_obj_idx) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 /* The probe set owned by the object at walk index `i`, as index + 1; 0 = none. */
 static uint8_t fl_probe_set_owner(uint32_t i) {
 	for (uint32_t k = 0; k < s.probe_set_count; k++) {
@@ -4219,8 +4233,8 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	}
 	XwaRemasterShip_SetPbrEnv(
 		s.scene, directional_lights, directional_light_count, -1, NULL, s.camera_local, ao_on ? &ao : NULL,
-		&ambient,
-		phase == XWA_HYPERSPACE_TUNNEL && lighting_ready ? &hyperspace_lighting.environment : NULL);
+		&ambient, phase == XWA_HYPERSPACE_TUNNEL && lighting_ready ? &hyperspace_lighting.environment : NULL,
+		-1.0f);
 	fl_submit_hyperspace_cockpit(cmd, assets, snap, &snap->flight_camera, anchor_bw, anchor_found, player_f);
 	fl_submit_point_lights();
 
@@ -4493,7 +4507,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	XwaRemasterTrails_SubmitRegion(s.trails, s.scene, snap->flight_camera.region);
 	fl_submit_billboards();
 	XwaRemasterShip_SetPbrEnv(s.scene, snap->dir_lights, snap->dir_light_count, -1, NULL, s.camera_local,
-							  NULL, NULL, NULL);
+							  NULL, NULL, NULL, -1.0f);
 	if (!AeronScene_Render(s.scene, cmd)) {
 		s.snap = NULL;
 		return NULL;
@@ -5174,9 +5188,14 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		s.snap = NULL;
 		return NULL;
 	}
+	/* The configured ceiling light is in the hangar's probes: it only casts
+	 * shadows where they apply. */
+	const int key_in_probes =
+		cam->in_hangar && scene_lighting.lights == &scene_lighting.hangar_key && fl_hangar_probe_set(snap);
 	XwaRemasterShip_SetPbrEnv(s.scene, scene_lighting.lights, scene_lighting.light_count,
 							  scene_lighting.key_index, NULL, s.camera_local, ao_on ? &ao : NULL,
-							  scene_lighting.ambient, NULL);
+							  scene_lighting.ambient, NULL,
+							  key_in_probes ? s.hangar_lighting.probe_shadow : -1.0f);
 	if (scene_lighting.package) {
 		AeronScene_SetPbrEnvironmentPackage(s.scene, scene_lighting.package);
 	}

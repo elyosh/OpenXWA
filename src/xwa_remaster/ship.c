@@ -479,8 +479,8 @@ static void ship_color(uint32_t argb, float out[4]) {
 
 /* FS b1 — mirrors cbuffer PbrLightFS (scene_pbr_lighting.hlsli). */
 typedef struct PbrLightFS {
-	float reserved_sun_gain; /* formerly the sun's diffuse gain */
-	float reserved_spec_mul; /* formerly the specular multiplier */
+	float key_in_probes;    /* the key light is in the probe sets' bake */
+	float key_probe_shadow; /* the share of probe light its shadow removes */
 	float debug_isolate_term;
 	float reserved_wrap; /* formerly the wrap-lighting amount */
 	float reserved_xvt; /* formerly the XvT flat-shading switch */
@@ -596,12 +596,14 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
 void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, uint32_t light_count,
 							   int32_t key_index, const float cam_rows[9], const float cam_pos[3],
 							   const XwaShipAoParams* ao, const XwaShipAmbientCube* ambient_cube,
-							   const XwaShipEnvironmentMap* environment_map) {
+							   const XwaShipEnvironmentMap* environment_map, float key_probe_shadow) {
 	if (!scene) {
 		return;
 	}
 
 	PbrLightFS env = { 0 };
+	env.key_in_probes = key_probe_shadow >= 0.0f ? 1.0f : 0.0f;
+	env.key_probe_shadow = fmaxf(key_probe_shadow, 0.0f);
 	env.debug_isolate_term = g_pbr_tuning.debug_isolate_term;
 	if (ao) {
 		env.ssao_intensity = ao->intensity;
