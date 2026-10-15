@@ -58,6 +58,9 @@ static XwaShipPbrTuning g_pbr_tuning_default;
 static XwaShipPbrTuning g_pbr_tuning;
 /* AeronScene_SetBackfaceFill; debug inspector toggle, not persisted. */
 static int g_backface_fill = 1;
+/* The key light's shadow on the probe light from its side whichever way
+ * surfaces face; debug inspector toggle, not persisted. */
+static int g_key_shadow_all_sides = 1;
 static AeronEffectAtlas* s_effect_atlas;
 /* effects.yaml in the atlas (energy effects, animated blast marks), loaded
  * with the first mesh; NULL without it. */
@@ -482,7 +485,7 @@ typedef struct PbrLightFS {
 	float key_in_probes;    /* the key light is in the probe sets' bake */
 	float key_probe_shadow; /* the share of probe light its shadow removes */
 	float debug_isolate_term;
-	float reserved_wrap; /* formerly the wrap-lighting amount */
+	float key_shadow_facing; /* nonzero: the key shadow only as surfaces face the light */
 	float reserved_xvt; /* formerly the XvT flat-shading switch */
 	float ssao_intensity;
 	float ssao_power;
@@ -533,6 +536,14 @@ int XwaRemasterShip_BackfaceFill(void) {
 
 void XwaRemasterShip_SetBackfaceFill(int enabled) {
 	g_backface_fill = enabled != 0;
+}
+
+int XwaRemasterShip_KeyShadowAllSides(void) {
+	return g_key_shadow_all_sides;
+}
+
+void XwaRemasterShip_SetKeyShadowAllSides(int enabled) {
+	g_key_shadow_all_sides = enabled != 0;
 }
 
 void XwaRemasterShip_GetPbrTuningDefault(XwaShipPbrTuning* out) {
@@ -604,6 +615,8 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	PbrLightFS env = { 0 };
 	env.key_in_probes = key_probe_shadow >= 0.0f ? 1.0f : 0.0f;
 	env.key_probe_shadow = fmaxf(key_probe_shadow, 0.0f);
+	env.key_shadow_facing = g_key_shadow_all_sides ? 0.0f : 1.0f;
+	AeronScene_SetProbeKeyShadow(scene, key_probe_shadow >= 0.0f && g_key_shadow_all_sides);
 	env.debug_isolate_term = g_pbr_tuning.debug_isolate_term;
 	if (ao) {
 		env.ssao_intensity = ao->intensity;

@@ -137,6 +137,13 @@ void XwaRemasterShip_GetPbrTuningDefault(XwaShipPbrTuning* out);
 int  XwaRemasterShip_BackfaceFill(void);
 void XwaRemasterShip_SetBackfaceFill(int enabled);
 
+/* When the key light is in the probes (a hangar's ceiling light), its
+ * shadow takes the probe light from its side whichever way surfaces face.
+ * On by default; off, only as surfaces face the light (N.L), which the
+ * debug inspector toggles for comparison. */
+int  XwaRemasterShip_KeyShadowAllSides(void);
+void XwaRemasterShip_SetKeyShadowAllSides(int enabled);
+
 /* Per-frame SSAO inputs for XwaRemasterShip_SetPbrEnv (mirrors TIE's
  * FlightPbrAoParams). NULL disables AO (intensity 0): the FS leaves
  * the ambient term untouched. */
