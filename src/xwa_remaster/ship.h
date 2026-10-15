@@ -152,6 +152,12 @@ void XwaRemasterShip_SetKeyShadowAllSides(int enabled);
 int  XwaRemasterShip_ShipOcclusion(void);
 void XwaRemasterShip_SetShipOcclusion(int enabled);
 
+/* With the hangar's probes, when their package has a reflection plane, the
+ * hangar's floor reflects the ships on it. On by default; the debug
+ * inspector toggles it for comparison. */
+int  XwaRemasterShip_FloorReflection(void);
+void XwaRemasterShip_SetFloorReflection(int enabled);
+
 /* Per-frame SSAO inputs for XwaRemasterShip_SetPbrEnv (mirrors TIE's
  * FlightPbrAoParams). NULL disables AO (intensity 0): the FS leaves
  * the ambient term untouched. */

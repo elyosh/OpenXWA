@@ -65,6 +65,10 @@ static int g_key_shadow_all_sides = 1;
  * cover (AeronScene_SetProbeOcclusion), in place of the key light shadow's
  * cut; debug inspector toggle, not persisted. */
 static int g_ship_occlusion = 1;
+/* The hangar's floor reflects the ships on it when its probes package has
+ * a reflection plane (AeronScene_SetPlanarReflection); debug inspector
+ * toggle, not persisted. */
+static int g_floor_reflection = 1;
 static AeronEffectAtlas* s_effect_atlas;
 /* effects.yaml in the atlas (energy effects, animated blast marks), loaded
  * with the first mesh; NULL without it. */
@@ -558,6 +562,14 @@ void XwaRemasterShip_SetShipOcclusion(int enabled) {
 	g_ship_occlusion = enabled != 0;
 }
 
+int XwaRemasterShip_FloorReflection(void) {
+	return g_floor_reflection;
+}
+
+void XwaRemasterShip_SetFloorReflection(int enabled) {
+	g_floor_reflection = enabled != 0;
+}
+
 void XwaRemasterShip_GetPbrTuningDefault(XwaShipPbrTuning* out) {
 	if (out) {
 		*out = g_pbr_tuning_default;
@@ -630,6 +642,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	env.key_shadow_facing = g_key_shadow_all_sides ? 0.0f : 1.0f;
 	AeronScene_SetProbeKeyShadow(scene, key_probe_shadow >= 0.0f && g_key_shadow_all_sides);
 	AeronScene_SetProbeOcclusion(scene, key_probe_shadow >= 0.0f && g_ship_occlusion);
+	AeronScene_SetPlanarReflection(scene, key_probe_shadow >= 0.0f && g_floor_reflection);
 	env.debug_isolate_term = g_pbr_tuning.debug_isolate_term;
 	if (ao) {
 		env.ssao_intensity = ao->intensity;

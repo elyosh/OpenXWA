@@ -397,6 +397,15 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 			"under and around them, their landing gear, the ceiling's reflections).\n"
 			"Replaces \"Shadow from all sides\".");
 	}
+	bool floor_reflection = XwaRemasterShip_FloorReflection() != 0;
+	if (ImGui::Checkbox("Floor reflection", &floor_reflection)) {
+		XwaRemasterShip_SetFloorReflection(floor_reflection ? 1 : 0);
+	}
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltip(
+			"With the hangar's probes, when their package has a reflection plane: the floor reflects\n"
+			"the ships standing on it.");
+	}
 	/* The key light shadow's cut, which ship occlusion replaces. */
 	ImGui::BeginDisabled(ship_occlusion);
 	bool all_sides = XwaRemasterShip_KeyShadowAllSides() != 0;
