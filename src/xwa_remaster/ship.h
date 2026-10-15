@@ -144,6 +144,14 @@ void XwaRemasterShip_SetBackfaceFill(int enabled);
 int  XwaRemasterShip_KeyShadowAllSides(void);
 void XwaRemasterShip_SetKeyShadowAllSides(int enabled);
 
+/* With the hangar's probes, the ships inside their grid take the probe
+ * light from what they cover: the floor under and around them, their
+ * landing gear and the reflections of the bright ceiling darken. It replaces
+ * the key light shadow's cut. On by default; the debug inspector toggles it
+ * for comparison. */
+int  XwaRemasterShip_ShipOcclusion(void);
+void XwaRemasterShip_SetShipOcclusion(int enabled);
+
 /* Per-frame SSAO inputs for XwaRemasterShip_SetPbrEnv (mirrors TIE's
  * FlightPbrAoParams). NULL disables AO (intensity 0): the FS leaves
  * the ambient term untouched. */

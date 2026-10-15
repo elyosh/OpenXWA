@@ -61,6 +61,10 @@ static int g_backface_fill = 1;
 /* The key light's shadow on the probe light from its side whichever way
  * surfaces face; debug inspector toggle, not persisted. */
 static int g_key_shadow_all_sides = 1;
+/* The ships inside the hangar's probe grid take its light from what they
+ * cover (AeronScene_SetProbeOcclusion), in place of the key light shadow's
+ * cut; debug inspector toggle, not persisted. */
+static int g_ship_occlusion = 1;
 static AeronEffectAtlas* s_effect_atlas;
 /* effects.yaml in the atlas (energy effects, animated blast marks), loaded
  * with the first mesh; NULL without it. */
@@ -546,6 +550,14 @@ void XwaRemasterShip_SetKeyShadowAllSides(int enabled) {
 	g_key_shadow_all_sides = enabled != 0;
 }
 
+int XwaRemasterShip_ShipOcclusion(void) {
+	return g_ship_occlusion;
+}
+
+void XwaRemasterShip_SetShipOcclusion(int enabled) {
+	g_ship_occlusion = enabled != 0;
+}
+
 void XwaRemasterShip_GetPbrTuningDefault(XwaShipPbrTuning* out) {
 	if (out) {
 		*out = g_pbr_tuning_default;
@@ -617,6 +629,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	env.key_probe_shadow = fmaxf(key_probe_shadow, 0.0f);
 	env.key_shadow_facing = g_key_shadow_all_sides ? 0.0f : 1.0f;
 	AeronScene_SetProbeKeyShadow(scene, key_probe_shadow >= 0.0f && g_key_shadow_all_sides);
+	AeronScene_SetProbeOcclusion(scene, key_probe_shadow >= 0.0f && g_ship_occlusion);
 	env.debug_isolate_term = g_pbr_tuning.debug_isolate_term;
 	if (ao) {
 		env.ssao_intensity = ao->intensity;

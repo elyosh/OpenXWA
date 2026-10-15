@@ -387,15 +387,29 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 	changed |= ImGui::SliderFloat3("Direction (surface to light)", p.direction, -1.0f, 1.0f, "%.3f");
 	changed |= ImGui::SliderFloat("Intensity", &p.intensity, 0.0f, 4.0f, "%.2f");
 	changed |= ImGui::ColorEdit3("Light color", p.color, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+	bool ship_occlusion = XwaRemasterShip_ShipOcclusion() != 0;
+	if (ImGui::Checkbox("Ship occlusion", &ship_occlusion)) {
+		XwaRemasterShip_SetShipOcclusion(ship_occlusion ? 1 : 0);
+	}
+	if (ImGui::IsItemHovered()) {
+		ImGui::SetTooltip(
+			"With the hangar's probes: ships take the probe light from what they cover (the floor\n"
+			"under and around them, their landing gear, the ceiling's reflections).\n"
+			"Replaces \"Shadow from all sides\".");
+	}
+	/* The key light shadow's cut, which ship occlusion replaces. */
+	ImGui::BeginDisabled(ship_occlusion);
 	bool all_sides = XwaRemasterShip_KeyShadowAllSides() != 0;
 	if (ImGui::Checkbox("Shadow from all sides", &all_sides)) {
 		XwaRemasterShip_SetKeyShadowAllSides(all_sides ? 1 : 0);
 	}
-	if (ImGui::IsItemHovered()) {
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
 		ImGui::SetTooltip(
-			"With the hangar's probes: in the light's shadow (under a ship), surfaces lose the probe light\n"
-			"from the ceiling whichever way they face. Off: only as they face the light, as before.");
+			"With the hangar's probes and without ship occlusion: in the light's shadow (under a ship),\n"
+			"surfaces lose the probe light from the ceiling whichever way they face. Off: only as they face\n"
+			"the light.");
 	}
+	ImGui::EndDisabled();
 	ImGui::Separator();
 	ImGui::TextUnformatted("Ambient cube (linear)");
 	/* An authored hangar package's fill and diffuse cube replace this cube. */
