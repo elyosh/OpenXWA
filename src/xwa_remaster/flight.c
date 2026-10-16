@@ -4256,14 +4256,17 @@ typedef struct FlSceneLighting {
 	XwaShipAmbientCube ambient_cube;
 	const XwaShipAmbientCube* ambient;
 	int hangar_override;
-	/* Authored environment: the package to bind, the combined light list
+	/* Region package: the package to bind, the combined light list
 	 * (package lights, then kept recovered lights), the explicit key and
-	 * the shadow policy. key_index -1 keeps the recovered key selection. */
+	 * the shadow policy. key_index -1 keeps the recovered key selection.
+	 * package_lights is set when the package's lights replace the
+	 * recovered ones. */
 	const AeronEnvironmentPackage* package;
 	XwaDirLight authored_lights[XWA_SNAP_MAX_DIR_LIGHTS];
 	int32_t key_index;
 	int shadow_allowed;
 	float shadow_angular_radius_degrees;
+	int package_lights;
 } FlSceneLighting;
 
 static int fl_is_default_hangar_lighting(const XwaSnapshot* snap) {
@@ -4308,12 +4311,19 @@ static void fl_set_package_ambient(FlSceneLighting* out, const AeronEnvironmentP
 	out->ambient = &out->ambient_cube;
 }
 
-/* Authored flight: package lights replace backdrop-derived directionals;
- * recovered lights without a backdrop source are kept, since they are not
- * known to belong to the sky. The declared primary is the key and the only
- * shadow caster. */
+/* Region package (full or lighting): its fill replaces the ambient. When
+ * it gives directional lights (always for full), they replace the
+ * backdrop-derived directionals; recovered lights without a backdrop source
+ * are kept, since they are not known to belong to the sky. The declared
+ * primary is then the key and the only shadow caster. A lighting package
+ * without lights keeps the recovered lights and key selection. */
 static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronEnvironmentPackage* package,
 									   FlSceneLighting* out) {
+	out->package = package;
+	fl_set_package_ambient(out, package);
+	if (!package->definition->has_directional_lights) {
+		return;
+	}
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < package->light_count && count < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
 		fl_package_light_to_dir_light(&package->lights[i], &out->authored_lights[count++]);
@@ -4346,8 +4356,7 @@ static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronEnvir
 		package->primary_light_index >= 0 ? &package->lights[package->primary_light_index] : NULL;
 	out->shadow_allowed = primary && primary->casts_shadows;
 	out->shadow_angular_radius_degrees = primary ? primary->angular_radius_degrees : 0.0f;
-	out->package = package;
-	fl_set_package_ambient(out, package);
+	out->package_lights = 1;
 }
 
 static void fl_build_hangar_lighting(const XwaSnapshot* snap, FlSceneLighting* out) {
@@ -4405,7 +4414,8 @@ static void fl_build_scene_lighting(const XwaSnapshot* snap, const XwaFlightCame
 	out->key_index = -1;
 	out->shadow_allowed = 1;
 	out->shadow_angular_radius_degrees = s.shadows.light_angular_radius_degrees;
-	if (s.environment.mode == XWA_ENV_MODE_AUTHORED && s.environment.package) {
+	if ((s.environment.mode == XWA_ENV_MODE_AUTHORED || s.environment.mode == XWA_ENV_MODE_LIGHTING) &&
+		s.environment.package) {
 		fl_apply_authored_lighting(snap, s.environment.package, out);
 		return;
 	}
@@ -4781,7 +4791,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	fl_derive_billboards(snap, assets, billboard_history_cam, billboard_history_crows);
 	/* Authored mode is atomic: the package's sky, suns, lights and flares
 	 * replace the configured sky, the recovered backdrop sprites, the
-	 * backdrop-derived directionals and the backdrop-sun flares together. */
+	 * backdrop-derived directionals and the backdrop-sun flares together.
+	 * A lighting package keeps the sky, the sprites and the flares. */
 	const AeronEnvironmentPackage* authored =
 		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.package : NULL;
 	fl_derive_lens_flares(snap, assets, &flight_view, authored);
@@ -4816,8 +4827,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	fl_build_scene_lighting(snap, cam, &scene_lighting);
 	float shadow_light_dir[3];
 	/* Preserve the classic directional fill inside the sealed Death Star,
-	 * but do not let its backdrop light cast exterior shadows in the tunnel. */
-	const int shadows_active = !cam->death_star_mode && s.shadows.enabled && scene_lighting.shadow_allowed &&
+	 * but do not let its backdrop light cast exterior shadows in the tunnel.
+	 * Lights from a region package follow the package's shadow policy. */
+	const int shadows_active = (!cam->death_star_mode || scene_lighting.package_lights) &&
+							   s.shadows.enabled && scene_lighting.shadow_allowed &&
 							   fl_key_directional_light(scene_lighting.lights, scene_lighting.light_count,
 														scene_lighting.key_index, shadow_light_dir);
 	if (!s.mb_enabled) {

@@ -162,10 +162,17 @@ static int env_read_rotation(const AeronConfigNode* node, const char* what, floa
 	return 1;
 }
 
-/* Adds a reference to a package of the required kind. A reference is either
- * a package name or a map with `package` and an optional `rotation_degrees`. */
-static int env_add_reference(const AeronConfigNode* node, const char* what, AeronEnvironmentKind kind,
-							 int32_t* out_index) {
+/* What a reference is for, which sets the package kinds it accepts. */
+typedef enum EnvUse {
+	ENV_USE_REGION, /* full or lighting */
+	ENV_USE_HANGAR, /* lighting without directional_lights: the hangar keeps its own key light */
+	ENV_USE_PROBES, /* probes */
+} EnvUse;
+
+/* Adds a reference to a package of a kind `use` accepts. A reference is
+ * either a package name or a map with `package` and an optional
+ * `rotation_degrees`. */
+static int env_add_reference(const AeronConfigNode* node, const char* what, EnvUse use, int32_t* out_index) {
 	static const char* const fields[] = { "package", "rotation_degrees" };
 	const AeronConfigNode* package_node = node;
 	const AeronConfigNode* rotation_node = NULL;
@@ -187,11 +194,31 @@ static int env_add_reference(const AeronConfigNode* node, const char* what, Aero
 	if (!definition) {
 		return env_node_error(package_node, "%s: unknown package '%s'", what, name);
 	}
-	if (definition->kind != kind) {
-		return env_node_error(package_node, "%s: package '%s' must be of kind '%s'", what, name,
-							  kind == AERON_ENV_KIND_FULL       ? "full"
-							  : kind == AERON_ENV_KIND_LIGHTING ? "lighting"
-																: "probes");
+	switch (use) {
+		case ENV_USE_REGION:
+			if (definition->kind != AERON_ENV_KIND_FULL && definition->kind != AERON_ENV_KIND_LIGHTING) {
+				return env_node_error(package_node, "%s: package '%s' must be of kind 'full' or 'lighting'",
+									  what, name);
+			}
+			break;
+		case ENV_USE_HANGAR:
+			if (definition->kind != AERON_ENV_KIND_LIGHTING) {
+				return env_node_error(package_node, "%s: package '%s' must be of kind 'lighting'", what,
+									  name);
+			}
+			if (definition->has_directional_lights) {
+				return env_node_error(
+					package_node,
+					"%s: package '%s' sets 'directional_lights', which a hangar does not use: "
+					"the hangar keeps its own key light",
+					what, name);
+			}
+			break;
+		case ENV_USE_PROBES:
+			if (definition->kind != AERON_ENV_KIND_PROBES) {
+				return env_node_error(package_node, "%s: package '%s' must be of kind 'probes'", what, name);
+			}
+			break;
 	}
 	AeronEnvironmentReference* reference = &s_env.references[s_env.reference_count];
 	memset(reference, 0, sizeof *reference);
@@ -251,7 +278,7 @@ static int env_parse_mission(const char* source, const AeronConfigNode* node) {
 		}
 		char region_what[224];
 		snprintf(region_what, sizeof region_what, "%s region %d", what, region);
-		if (!env_add_reference(value, region_what, AERON_ENV_KIND_FULL, &mission->region_reference[region])) {
+		if (!env_add_reference(value, region_what, ENV_USE_REGION, &mission->region_reference[region])) {
 			return 0;
 		}
 	}
@@ -316,11 +343,11 @@ static int env_load_model_packages(AeronVfs* vfs, const char* key) {
 	return ok;
 }
 
-/* `xwa.hangars` or `xwa.probes`: model keys to packages of `kind`. A probes
+/* `xwa.hangars` or `xwa.probes`: model keys to packages for `use`. A probes
  * package comes from the model's own package.yaml; a model whose package
  * cannot be loaded is left out, with an error logged. */
-static int env_parse_models(AeronVfs* vfs, const AeronConfigNode* map, const char* field,
-							AeronEnvironmentKind kind, EnvModel* models, uint32_t* count, uint32_t max) {
+static int env_parse_models(AeronVfs* vfs, const AeronConfigNode* map, const char* field, EnvUse use,
+							EnvModel* models, uint32_t* count, uint32_t max) {
 	if (AeronConfigNode_Type(map) != AERON_CONFIG_MAP) {
 		return env_node_error(map, "xwa: '%s' must be a map", field);
 	}
@@ -342,12 +369,12 @@ static int env_parse_models(AeronVfs* vfs, const AeronConfigNode* map, const cha
 		}
 		char what[96];
 		snprintf(what, sizeof what, "xwa.%s '%s'", field, key);
-		if (kind == AERON_ENV_KIND_PROBES) {
+		if (use == ENV_USE_PROBES) {
 			if (!env_load_model_packages(vfs, model->key) ||
-				!env_add_reference(value, what, kind, &model->reference)) {
+				!env_add_reference(value, what, use, &model->reference)) {
 				continue;
 			}
-		} else if (!env_add_reference(value, what, kind, &model->reference)) {
+		} else if (!env_add_reference(value, what, use, &model->reference)) {
 			return 0;
 		}
 		(*count)++;
@@ -364,18 +391,17 @@ static int env_parse_xwa(AeronVfs* vfs, const AeronConfigNode* xwa) {
 		return 0;
 	}
 	const AeronConfigNode* hangar = AeronConfigNode_MapGet(xwa, "hangar");
-	if (hangar &&
-		!env_add_reference(hangar, "xwa.hangar", AERON_ENV_KIND_LIGHTING, &s_env.hangar_reference)) {
+	if (hangar && !env_add_reference(hangar, "xwa.hangar", ENV_USE_HANGAR, &s_env.hangar_reference)) {
 		return 0;
 	}
 	const AeronConfigNode* hangars = AeronConfigNode_MapGet(xwa, "hangars");
-	if (hangars && !env_parse_models(vfs, hangars, "hangars", AERON_ENV_KIND_LIGHTING, s_env.hangars,
+	if (hangars && !env_parse_models(vfs, hangars, "hangars", ENV_USE_HANGAR, s_env.hangars,
 									 &s_env.hangar_count, ENV_MAX_HANGARS)) {
 		return 0;
 	}
 	const AeronConfigNode* probes = AeronConfigNode_MapGet(xwa, "probes");
-	if (probes && !env_parse_models(vfs, probes, "probes", AERON_ENV_KIND_PROBES, s_env.probes,
-									&s_env.probe_count, ENV_MAX_PROBES)) {
+	if (probes && !env_parse_models(vfs, probes, "probes", ENV_USE_PROBES, s_env.probes, &s_env.probe_count,
+									ENV_MAX_PROBES)) {
 		return 0;
 	}
 	const AeronConfigNode* missions = AeronConfigNode_MapGet(xwa, "missions");
@@ -729,41 +755,10 @@ static const AeronEnvironmentPackage* env_package(int32_t prepared) {
 	return prepared >= 0 ? AeronEnvironmentLibrary_Find(s_env.library, (uint32_t)prepared) : NULL;
 }
 
-static void env_resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
+/* The mission region's package: authored (full) or lighting, or classic
+ * with the reason. */
+static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 	const XwaFlightCamera* cam = &snap->flight_camera;
-	out->region = cam->region;
-	if (cam->hyperspace_phase) {
-		env_select(out, XWA_ENV_MODE_HYPERSPACE, XWA_ENV_FALLBACK_NONE, -1);
-		return;
-	}
-	if (!s_env.enabled) {
-		env_select(out, XWA_ENV_MODE_DISABLED, XWA_ENV_FALLBACK_NONE, -1);
-		return;
-	}
-	if (cam->death_star_mode) {
-		env_select(out, XWA_ENV_MODE_DEATH_STAR, XWA_ENV_FALLBACK_NONE, -1);
-		return;
-	}
-	if (cam->in_hangar) {
-		const int32_t reference = env_hangar_reference(snap);
-		if (reference < 0) {
-			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NO_HANGAR_ENTRY, -1);
-			return;
-		}
-		const AeronEnvironmentPackage* package =
-			reference == s_env.prepared_hangar_reference ? env_package(s_env.prepared_hangar) : NULL;
-		if (!package) {
-			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NOT_READY, reference);
-			return;
-		}
-		if (!s_env_options.authored) {
-			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_AUTHORED_OFF, reference);
-			return;
-		}
-		env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NONE, reference);
-		out->package = package;
-		return;
-	}
 	if (!snap->mission_path[0]) {
 		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_NO_MISSION, -1);
 		return;
@@ -793,8 +788,54 @@ static void env_resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_AUTHORED_OFF, reference);
 		return;
 	}
-	env_select(out, XWA_ENV_MODE_AUTHORED, XWA_ENV_FALLBACK_NONE, reference);
+	env_select(out,
+			   package->definition->kind == AERON_ENV_KIND_LIGHTING ? XWA_ENV_MODE_LIGHTING
+																	: XWA_ENV_MODE_AUTHORED,
+			   XWA_ENV_FALLBACK_NONE, reference);
 	out->package = package;
+}
+
+static void env_resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
+	const XwaFlightCamera* cam = &snap->flight_camera;
+	out->region = cam->region;
+	if (cam->hyperspace_phase) {
+		env_select(out, XWA_ENV_MODE_HYPERSPACE, XWA_ENV_FALLBACK_NONE, -1);
+		return;
+	}
+	if (!s_env.enabled) {
+		env_select(out, XWA_ENV_MODE_DISABLED, XWA_ENV_FALLBACK_NONE, -1);
+		return;
+	}
+	/* A Death Star region takes its mapped package like any other; without
+	 * one it keeps the Death Star behaviour, with the reason. */
+	if (cam->death_star_mode) {
+		env_resolve_region(snap, out);
+		if (out->mode == XWA_ENV_MODE_CLASSIC) {
+			out->mode = XWA_ENV_MODE_DEATH_STAR;
+		}
+		return;
+	}
+	if (cam->in_hangar) {
+		const int32_t reference = env_hangar_reference(snap);
+		if (reference < 0) {
+			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NO_HANGAR_ENTRY, -1);
+			return;
+		}
+		const AeronEnvironmentPackage* package =
+			reference == s_env.prepared_hangar_reference ? env_package(s_env.prepared_hangar) : NULL;
+		if (!package) {
+			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NOT_READY, reference);
+			return;
+		}
+		if (!s_env_options.authored) {
+			env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_AUTHORED_OFF, reference);
+			return;
+		}
+		env_select(out, XWA_ENV_MODE_HANGAR, XWA_ENV_FALLBACK_NONE, reference);
+		out->package = package;
+		return;
+	}
+	env_resolve_region(snap, out);
 }
 
 void XwaRemasterEnvironment_Resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
@@ -890,6 +931,8 @@ const char* XwaRemasterEnvironment_ModeName(XwaEnvironmentMode mode) {
 			return "hangar";
 		case XWA_ENV_MODE_AUTHORED:
 			return "authored";
+		case XWA_ENV_MODE_LIGHTING:
+			return "lighting";
 		case XWA_ENV_MODE_CLASSIC:
 			return "classic";
 	}
