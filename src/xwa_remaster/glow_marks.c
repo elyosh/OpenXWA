@@ -214,6 +214,10 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 			candidate_count = count;
 		}
 	}
+	int mesh_filtered = 0;
+	for (uint32_t word = 0; word < XWA_SNAP_GLOW_MARK_MESH_WORDS; word++) {
+		mesh_filtered |= mark->mesh_mask[word] != 0;
+	}
 	uint32_t output_vertex_count = 0;
 	for (uint32_t candidate_index = 0; candidate_index < candidate_count; candidate_index++) {
 		const uint32_t triangle_index_offset = 3 * (candidates ? candidates[candidate_index] : candidate_index);
@@ -223,8 +227,8 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 			&mesh->cpu_vertices[mesh->cpu_indices[triangle_index_offset + 2]],
 		};
 		const int mesh_index = (int)floorf(triangle_vertices[0]->component + 0.5f);
-		if (mesh_index < 0 || mesh_index >= 64 ||
-			(mark->mesh_mask && !(mark->mesh_mask & ((uint64_t)1 << mesh_index)))) {
+		if (mesh_index < 0 || mesh_index >= XWA_SNAP_MAX_MESH_SLOTS ||
+			(mesh_filtered && !(mark->mesh_mask[mesh_index / 64] & ((uint64_t)1 << (mesh_index % 64))))) {
 			continue;
 		}
 		float edge_from_vertex_0_to_1[3];

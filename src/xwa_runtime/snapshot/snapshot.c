@@ -68,7 +68,7 @@ typedef struct GlowMarkCaptureMeta {
 	uint8_t world_segment_mode;
 	float inv_scale_u;
 	float inv_scale_v;
-	uint64_t mesh_mask;
+	uint64_t mesh_mask[XWA_SNAP_GLOW_MARK_MESH_WORDS];
 } GlowMarkCaptureMeta;
 static GlowMarkCaptureMeta g_glow_mark_meta[24];
 static GlowMarkCaptureMeta g_blast_mark_meta[32];
@@ -1450,7 +1450,7 @@ void XwaSnapshot_CaptureFlight(void) {
 			m->inv_scale_v = meta[i].inv_scale_v;
 			m->layer_uv_scale = snapshot_glow_mark_uv_scale(p, pool_kind);
 			m->layer_uv_scale_min = snapshot_glow_mark_min_uv_scale(p, pool_kind, m->layer_uv_scale);
-			m->mesh_mask = meta[i].mesh_mask;
+			memcpy(m->mesh_mask, meta[i].mesh_mask, sizeof m->mesh_mask);
 		}
 	}
 
@@ -1670,13 +1670,13 @@ void XwaSnapshot_NoteGlowMarkProjector(const void* patch, float inv_scale_u, flo
 	m->inv_scale_u = inv_scale_u;
 	m->inv_scale_v = inv_scale_v;
 	m->world_segment_mode = (uint8_t)(world_segment_mode != 0);
-	m->mesh_mask = 0;
+	memset(m->mesh_mask, 0, sizeof m->mesh_mask);
 }
 
 void XwaSnapshot_NoteGlowMarkMesh(const void* patch, unsigned int mesh_index) {
 	GlowMarkCaptureMeta* m = glow_mark_meta_for_patch(patch);
-	if (m && mesh_index < 64) {
-		m->mesh_mask |= (uint64_t)1 << mesh_index;
+	if (m && mesh_index < XWA_SNAP_MAX_MESH_SLOTS) {
+		m->mesh_mask[mesh_index / 64] |= (uint64_t)1 << (mesh_index % 64);
 	}
 }
 

@@ -191,6 +191,8 @@ typedef struct XwaGlyph2D {
  * 50 and 16. */
 #define XWA_SNAP_MAX_MESH_SLOTS 255
 #define XWA_SNAP_MAX_WEAPON_SLOTS 120
+/* 64-bit words of a glow-mark mesh mask, one bit per mesh slot. */
+#define XWA_SNAP_GLOW_MARK_MESH_WORDS ((XWA_SNAP_MAX_MESH_SLOTS + 63) / 64)
 
 /* One frontend 3D model preview (tech library / mission briefing).
  * The remaster driver renders it as a scene PiP over the drawlist.
@@ -685,7 +687,9 @@ typedef struct XwaGlowMark {
 	 * animation (its largest visible square); 0 when some frame has no
 	 * scale, which leaves the overlay unclipped. */
 	float layer_uv_scale_min;
-	uint64_t mesh_mask; /* engine/OPT mesh ordinals traversed at creation */
+	/* Engine/OPT mesh ordinals traversed at creation: bit n % 64 of word
+	 * n / 64 is mesh n. All zero leaves the overlay unfiltered. */
+	uint64_t mesh_mask[XWA_SNAP_GLOW_MARK_MESH_WORDS];
 } XwaGlowMark;
 
 /* ---- object trails -------------------------------------------------
