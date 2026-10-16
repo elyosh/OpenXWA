@@ -597,15 +597,44 @@ static void binding_normalize_file(const char* fileName, char* out, size_t outsz
 	snprintf(out, outsz, "%s", src);
 }
 
+/* Writes the same bytes as snprintf(dst, size, "%s", src): at most size - 1
+ * characters, then a zero. */
+static void snapshot_copy_string(char* dst, size_t size, const char* src) {
+	size_t n = 0;
+	while (n + 1 < size && src[n]) {
+		dst[n] = src[n];
+		n++;
+	}
+	dst[n] = '\0';
+}
+
+/* Finds the files already in the list being built. It holds index + 1 per
+ * slot (0 for an empty slot), uses linear probing, and is cleared at the
+ * start of each capture. Entries with the same name are met in the order
+ * they were added, as a scan of the list would meet them. */
+#define FRONTEND_FILE_TABLE_SIZE (2 * XWA_SNAP_MAX_FRONTEND_FILES)
+static uint16_t g_frontend_file_table[FRONTEND_FILE_TABLE_SIZE];
+
+static uint32_t frontend_file_slot(const char* file) {
+	uint32_t hash = 2166136261u;
+	for (size_t i = 0; i + 1 < XWA_SNAP_FRONTEND_FILE_MAX && file[i]; i++) {
+		hash = (hash ^ (uint8_t)file[i]) * 16777619u;
+	}
+	return hash & (FRONTEND_FILE_TABLE_SIZE - 1);
+}
+
 static void frontend_file_add(XwaFrontendFileAsset* files, uint32_t* count, const char* file,
 							  const char* source_file, uint16_t frame_count) {
-	for (uint32_t i = 0; i < *count; i++) {
-		if (strncmp(files[i].file, file, sizeof files[i].file) == 0) {
-			if (!files[i].source_file[0] && source_file) {
-				snprintf(files[i].source_file, sizeof files[i].source_file, "%s", source_file);
+	uint32_t slot = frontend_file_slot(file);
+	for (; g_frontend_file_table[slot]; slot = (slot + 1) & (FRONTEND_FILE_TABLE_SIZE - 1)) {
+		XwaFrontendFileAsset* asset = &files[g_frontend_file_table[slot] - 1];
+		if (strncmp(asset->file, file, sizeof asset->file) == 0) {
+			/* Copying an empty name over an empty name changes nothing. */
+			if (!asset->source_file[0] && source_file && source_file[0]) {
+				snapshot_copy_string(asset->source_file, sizeof asset->source_file, source_file);
 			}
-			if (files[i].frame_count < frame_count) {
-				files[i].frame_count = frame_count;
+			if (asset->frame_count < frame_count) {
+				asset->frame_count = frame_count;
 			}
 			return;
 		}
@@ -614,10 +643,43 @@ static void frontend_file_add(XwaFrontendFileAsset* files, uint32_t* count, cons
 		return;
 	}
 	XwaFrontendFileAsset* asset = &files[(*count)++];
+	g_frontend_file_table[slot] = (uint16_t)*count;
 	memset(asset, 0, sizeof *asset);
-	snprintf(asset->file, sizeof asset->file, "%s", file);
-	snprintf(asset->source_file, sizeof asset->source_file, "%s", source_file ? source_file : "");
+	snapshot_copy_string(asset->file, sizeof asset->file, file);
+	snapshot_copy_string(asset->source_file, sizeof asset->source_file, source_file ? source_file : "");
 	asset->frame_count = frame_count;
+}
+
+/* Orders frontend files by name, and by position for equal names, which is
+ * the order a stable sort gives. */
+static const XwaFrontendFileAsset* g_frontend_sort_files;
+
+static int frontend_file_compare(const void* lhs, const void* rhs) {
+	const uint16_t a = *(const uint16_t*)lhs;
+	const uint16_t b = *(const uint16_t*)rhs;
+	const int order = strcmp(g_frontend_sort_files[a].file, g_frontend_sort_files[b].file);
+	if (order != 0) {
+		return order;
+	}
+	return (a > b) - (a < b);
+}
+
+static void frontend_files_sort(XwaFrontendFileAsset* files, uint32_t count) {
+	static uint16_t order[XWA_SNAP_MAX_FRONTEND_FILES];
+	static XwaFrontendFileAsset sorted[XWA_SNAP_MAX_FRONTEND_FILES];
+
+	if (count < 2) {
+		return;
+	}
+	for (uint32_t i = 0; i < count; i++) {
+		order[i] = (uint16_t)i;
+	}
+	g_frontend_sort_files = files;
+	qsort(order, count, sizeof order[0], frontend_file_compare);
+	for (uint32_t i = 0; i < count; i++) {
+		sorted[i] = files[order[i]];
+	}
+	memcpy(files, sorted, count * sizeof files[0]);
 }
 
 static int frontend_group_find(const int16_t* groups, uint32_t count, int16_t group) {
@@ -747,6 +809,7 @@ static int frontend_asset_sets_match(const XwaSnapshot* lhs, const XwaSnapshot* 
 
 static void snapshot_capture_frontend_assets(XwaSnapshot* snapshot) {
 	snapshot->frontend_file_count = 0;
+	memset(g_frontend_file_table, 0, sizeof g_frontend_file_table);
 	for (int i = 0; i < g_binding_count; i++) {
 		if (g_bindings[i].active) {
 			frontend_file_add(snapshot->frontend_files, &snapshot->frontend_file_count, g_bindings[i].file,
@@ -760,15 +823,7 @@ static void snapshot_capture_frontend_assets(XwaSnapshot* snapshot) {
 							  draw->source_file, draw->resource_frame_count ? draw->resource_frame_count : 1);
 		}
 	}
-	for (uint32_t i = 1; i < snapshot->frontend_file_count; i++) {
-		XwaFrontendFileAsset value = snapshot->frontend_files[i];
-		uint32_t j = i;
-		while (j > 0 && strcmp(snapshot->frontend_files[j - 1].file, value.file) > 0) {
-			snapshot->frontend_files[j] = snapshot->frontend_files[j - 1];
-			j--;
-		}
-		snapshot->frontend_files[j] = value;
-	}
+	frontend_files_sort(snapshot->frontend_files, snapshot->frontend_file_count);
 
 	snapshot->frontend_group_count = 0;
 	for (uint32_t i = 0; i < g_frontend_active_group_count; i++) {

@@ -410,6 +410,9 @@ typedef struct XwaOptHandleState {
 } XwaOptHandleState;
 
 static XwaOptHandleState g_optHandles[XWA_SNAP_MAX_OPT_ASSETS];
+/* g_optHandles slot + 1 of each active public handle, 0 for none. A handle
+ * is active in at most one slot. */
+static uint16_t g_optHandleSlots[UINT16_MAX + 1];
 static uint64_t g_optAssetGeneration;
 static uint8_t g_textureAssets[XWA_SNAP_MAX_TEXTURE_ASSETS];
 static uint64_t g_textureAssetGeneration;
@@ -448,6 +451,7 @@ void XwaSnapshot_NoteOptLoad(uint16_t public_handle, const char* file_name, uint
 	state->public_handle = public_handle;
 	state->source = source;
 	state->active = 1;
+	g_optHandleSlots[public_handle] = (uint16_t)(state - g_optHandles + 1);
 	g_optAssetGeneration++;
 }
 
@@ -457,18 +461,18 @@ void XwaSnapshot_NoteOptFree(uint16_t public_handle) {
 			continue;
 		}
 		memset(&g_optHandles[i], 0, sizeof g_optHandles[i]);
+		g_optHandleSlots[public_handle] = 0;
 		g_optAssetGeneration++;
 		return;
 	}
 }
 
 const char* XwaSnapshotExport_OptHandleName(uint16_t public_handle) {
-	for (uint32_t i = 0; i < XWA_SNAP_MAX_OPT_ASSETS; i++) {
-		if (g_optHandles[i].active && g_optHandles[i].public_handle == public_handle) {
-			return g_optHandles[i].name[0] ? g_optHandles[i].name : NULL;
-		}
+	const uint16_t slot = g_optHandleSlots[public_handle];
+	if (!slot) {
+		return NULL;
 	}
-	return NULL;
+	return g_optHandles[slot - 1].name[0] ? g_optHandles[slot - 1].name : NULL;
 }
 
 void XwaSnapshotExport_CaptureOptAssets(XwaSnapshot* snapshot) {
@@ -484,7 +488,8 @@ void XwaSnapshotExport_CaptureOptAssets(XwaSnapshot* snapshot) {
 		XwaOptAsset* asset = &snapshot->opt_assets[snapshot->opt_asset_count++];
 		asset->public_handle = g_optHandles[i].public_handle;
 		asset->source = g_optHandles[i].source;
-		snprintf(asset->name, sizeof asset->name, "%s", g_optHandles[i].name);
+		/* The same bytes as snprintf "%s": the name and its zero. */
+		memcpy(asset->name, g_optHandles[i].name, strlen(g_optHandles[i].name) + 1);
 	}
 }
 

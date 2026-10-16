@@ -40,7 +40,12 @@ static SkinsUse s_uses[XWA_SNAP_MAX_SKIN_USES];
 static int s_useCount;
 static int s_usesFullLogged;
 static uint64_t s_generation;
-static uint64_t s_hash;
+/* What the last capture held, to tell when it changes. */
+static XwaSkinSelection s_capturedSelections[XWA_SNAP_MAX_SKIN_SELECTIONS];
+static uint32_t s_capturedSelectionCount;
+static XwaSkinUse s_capturedUses[XWA_SNAP_MAX_SKIN_USES];
+static uint32_t s_capturedUseCount;
+static int s_captured;
 
 void XwaSkins_LoadMission(const char* missionPath) {
 	char path[300];
@@ -93,7 +98,7 @@ void XwaSkins_LoadMission(const char* missionPath) {
 							  XWA_SNAP_MAX_SKIN_SELECTIONS);
 				break;
 			}
-			/* Zeroed, as the snapshot's change hash reads every byte. */
+			/* Zeroed, as the change check compares every byte. */
 			selection = &s_selections[s_selectionCount++];
 			memset(selection, 0, sizeof *selection);
 			snprintf(selection->model, sizeof selection->model, "%s", name);
@@ -229,25 +234,35 @@ static void Skins_AddUse(XwaSnapshot* snapshot, const char* name, int markings, 
 	if (snapshot->skin_use_count == XWA_SNAP_MAX_SKIN_USES) {
 		return;
 	}
-	/* Zeroed, as the change hash reads every byte. */
+	/* Zeroed, as the change check compares every byte. */
 	memset(&snapshot->skin_uses[snapshot->skin_use_count], 0, sizeof snapshot->skin_uses[0]);
 	snprintf(snapshot->skin_uses[snapshot->skin_use_count].key, sizeof snapshot->skin_uses[0].key, "%s", key);
 	snapshot->skin_uses[snapshot->skin_use_count].all_markings = (uint8_t)(all != 0);
 	snapshot->skin_uses[snapshot->skin_use_count++].markings = (uint8_t)markings;
 }
 
-static uint64_t Skins_Hash(uint64_t hash, const void* data, size_t size) {
-	const unsigned char* bytes = (const unsigned char*)data;
-	size_t index;
+/* Whether the selections and uses differ from the last capture, byte for
+   byte, and if so keeps a copy of them. The first capture always counts as
+   a change. */
+static int Skins_CaptureChanged(const XwaSnapshot* snapshot) {
+	const size_t selections = snapshot->skin_selection_count * sizeof snapshot->skin_selections[0];
+	const size_t uses = snapshot->skin_use_count * sizeof snapshot->skin_uses[0];
 
-	for (index = 0; index < size; ++index) {
-		hash = (hash ^ bytes[index]) * 1099511628211ull;
+	if (s_captured && snapshot->skin_selection_count == s_capturedSelectionCount &&
+		snapshot->skin_use_count == s_capturedUseCount &&
+		memcmp(snapshot->skin_selections, s_capturedSelections, selections) == 0 &&
+		memcmp(snapshot->skin_uses, s_capturedUses, uses) == 0) {
+		return 0;
 	}
-	return hash;
+	memcpy(s_capturedSelections, snapshot->skin_selections, selections);
+	memcpy(s_capturedUses, snapshot->skin_uses, uses);
+	s_capturedSelectionCount = snapshot->skin_selection_count;
+	s_capturedUseCount = snapshot->skin_use_count;
+	s_captured = 1;
+	return 1;
 }
 
 void XwaSkins_Capture(XwaSnapshot* snapshot) {
-	uint64_t hash;
 	int index;
 	uint32_t preview;
 
@@ -274,11 +289,7 @@ void XwaSkins_Capture(XwaSnapshot* snapshot) {
 					 snapshot->model_previews[preview].node_switch_index, 0);
 	}
 
-	hash = Skins_Hash(14695981039346656037ull, snapshot->skin_selections,
-					  snapshot->skin_selection_count * sizeof snapshot->skin_selections[0]);
-	hash = Skins_Hash(hash, snapshot->skin_uses, snapshot->skin_use_count * sizeof snapshot->skin_uses[0]);
-	if (hash != s_hash) {
-		s_hash = hash;
+	if (Skins_CaptureChanged(snapshot)) {
 		++s_generation;
 	}
 	snapshot->skin_generation = s_generation;

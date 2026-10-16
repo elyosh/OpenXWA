@@ -3698,7 +3698,8 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 	}
 	if (s.table_count < XWA_SNAP_MAX_FLIGHT_OBJECTS * 2 + 2) {
 		AeronSceneMeshTable* candidate = &s.tables[s.table_count];
-		if (XwaRemasterShip_BuildMeshTable(out->mesh, object, candidate)) {
+		if (XwaRemasterShip_NeedsMeshTable(out->mesh, object) &&
+			XwaRemasterShip_BuildMeshTable(out->mesh, object, candidate)) {
 			out->table = candidate;
 			s.table_count++;
 		}

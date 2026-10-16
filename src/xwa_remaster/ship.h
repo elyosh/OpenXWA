@@ -69,6 +69,9 @@ void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissiv
  * bind otherwise). */
 int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,
 								   AeronSceneMeshTable* out);
+/* Whether XwaRemasterShip_BuildMeshTable would return 1, without filling a
+ * table. Checking first saves the table fill for most craft each frame. */
+int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f);
 
 /* Build a static mesh table that hides the slots whose component_state is
  * nonzero (a craft's componentState). Returns 1 when any slot hides

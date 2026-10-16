@@ -985,9 +985,26 @@ int XwaArticulation_AnimateCrew(unsigned int objIdx, int resetToNeutral) {
 		return 1;
 	}
 	/* Pass 0 steps the `random` (side) entries, pass 1 the others; the stock
-	   function steps side, forward, then the limbs, whatever their numbers. */
+	   function steps side, forward, then the limbs, whatever their numbers.
+	   Within a pass, entries step by component, then by index: GameRand
+	   makes the order matter. Only the components that some entry uses are
+	   visited, in ascending order; the others step nothing. */
 	for (pass = 0; pass < 2; ++pass) {
-		for (component = 0; component < XWA_CRAFT_MESH_SLOT_COUNT; ++component) {
+		component = -1;
+		for (;;) {
+			int next = XWA_CRAFT_MESH_SLOT_COUNT;
+
+			for (index = 0; index < model->articulationCount; ++index) {
+				const int used = model->articulations[index].component;
+
+				if (used > component && used < next) {
+					next = used;
+				}
+			}
+			if (next == XWA_CRAFT_MESH_SLOT_COUNT) {
+				break;
+			}
+			component = next;
 			for (index = 0; index < model->articulationCount; ++index) {
 				const AeronFlightArticulation* articulation = &model->articulations[index];
 

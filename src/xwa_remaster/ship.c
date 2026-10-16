@@ -40,6 +40,30 @@ typedef struct ShipDesiredAsset {
 
 static ShipMeshAsset s_meshes[XWA_SNAP_MAX_OPT_ASSETS];
 static uint32_t s_mesh_count;
+/* s_meshes index + 1 for each key (0 for an empty slot), with linear
+ * probing. It is rebuilt whenever s_meshes changes. Entries with the same
+ * key are met in s_meshes order, as a scan of s_meshes would meet them. */
+#define SHIP_MESH_LOOKUP_SIZE (2 * XWA_SNAP_MAX_OPT_ASSETS)
+static uint16_t s_mesh_lookup[SHIP_MESH_LOOKUP_SIZE];
+
+static uint32_t ship_mesh_lookup_slot(const char* key) {
+	uint32_t hash = 2166136261u;
+	for (size_t i = 0; key[i]; i++) {
+		hash = (hash ^ (uint8_t)key[i]) * 16777619u;
+	}
+	return hash & (SHIP_MESH_LOOKUP_SIZE - 1);
+}
+
+static void ship_mesh_lookup_rebuild(void) {
+	memset(s_mesh_lookup, 0, sizeof s_mesh_lookup);
+	for (uint32_t i = 0; i < s_mesh_count; i++) {
+		uint32_t slot = ship_mesh_lookup_slot(s_meshes[i].key);
+		while (s_mesh_lookup[slot]) {
+			slot = (slot + 1) & (SHIP_MESH_LOOKUP_SIZE - 1);
+		}
+		s_mesh_lookup[slot] = (uint16_t)(i + 1);
+	}
+}
 static ShipMeshAsset s_pending_meshes[XWA_SNAP_MAX_OPT_ASSETS];
 static uint32_t s_pending_mesh_count;
 static uint64_t s_pending_generation = UINT64_MAX;
@@ -415,6 +439,7 @@ void XwaRemasterShip_CommitSyncBatch(void) {
 			s_meshes[i] = s_pending_meshes[i];
 			s_meshes[i].pending_new = 0;
 		}
+		ship_mesh_lookup_rebuild();
 		memset(s_pending_meshes, 0, sizeof s_pending_meshes);
 		s_pending_mesh_count = 0;
 		s_pending_generation = UINT64_MAX;
@@ -434,12 +459,14 @@ AeronSceneMesh* XwaRemasterShip_MeshForNameWithSource(const char* name, uint8_t*
 		*out_source = XWA_MODEL_SOURCE_OPT;
 	}
 	ship_mesh_key(name, key);
-	for (uint32_t i = 0; i < s_mesh_count; i++) {
-		if (strcmp(s_meshes[i].key, key) == 0) {
+	for (uint32_t slot = ship_mesh_lookup_slot(key); s_mesh_lookup[slot];
+		 slot = (slot + 1) & (SHIP_MESH_LOOKUP_SIZE - 1)) {
+		const ShipMeshAsset* asset = &s_meshes[s_mesh_lookup[slot] - 1];
+		if (strcmp(asset->key, key) == 0) {
 			if (out_source) {
-				*out_source = s_meshes[i].source;
+				*out_source = asset->source;
 			}
-			return s_meshes[i].mesh;
+			return asset->mesh;
 		}
 	}
 	return NULL;
@@ -467,6 +494,7 @@ void XwaRemasterShip_Shutdown(void) {
 	}
 	memset(s_meshes, 0, sizeof s_meshes);
 	s_mesh_count = 0;
+	ship_mesh_lookup_rebuild();
 	AeronEffectData_Destroy(s_effect_data);
 	s_effect_data = NULL;
 	s_effect_data_tried = 0;
@@ -882,6 +910,25 @@ static void ship_mesh_table_init(const AeronSceneMesh* mesh, const float (*rows)
 		out->markings_packed[mi >> 2][mi & 3] = 0.0f;
 		out->emissive_packed[mi >> 2][mi & 3] = 1.0f;
 	}
+}
+
+int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f) {
+	if (!mesh || !f || !f->has_craft) {
+		return 0;
+	}
+	const uint32_t components = ship_state_components(mesh);
+	if (f->bridge_aligned) {
+		const int bridge_component = ship_bwing_bridge_component(mesh, components);
+		if (bridge_component >= 0 && f->mesh_angle[bridge_component] != 0) {
+			return 1;
+		}
+	}
+	for (uint32_t mi = 0; mi < components; mi++) {
+		if (f->component_state[mi] != 0 || (mesh->component_rot[mi].has_rotation && f->mesh_angle[mi] != 0)) {
+			return 1;
+		}
+	}
+	return 0;
 }
 
 int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,

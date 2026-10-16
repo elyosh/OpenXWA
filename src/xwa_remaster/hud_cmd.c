@@ -229,7 +229,7 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 		s_cmd.table_count++;
 	} else if (s_cmd.table_count < 2) {
 		AeronSceneMeshTable* table = &s_cmd.tables[s_cmd.table_count];
-		if (XwaRemasterShip_BuildMeshTable(mesh, object, table)) {
+		if (XwaRemasterShip_NeedsMeshTable(mesh, object) && XwaRemasterShip_BuildMeshTable(mesh, object, table)) {
 			instance.mesh_table = table;
 			s_cmd.table_count++;
 		}
