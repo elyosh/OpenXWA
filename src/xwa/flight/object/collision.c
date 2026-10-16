@@ -779,7 +779,7 @@ uint16_t collide_lasercraftcollide(unsigned int attackerObjIdx, unsigned int tar
 	int sweepSpanZ;
 	int hitRadius;
 	unsigned int sweepEnvelope;
-	int allowSimpleBoxHit;
+	int allowModelSweep;
 	int probeWorldX;
 	int probeWorldY;
 	int probeWorldZ;
@@ -864,7 +864,7 @@ uint16_t collide_lasercraftcollide(unsigned int attackerObjIdx, unsigned int tar
 	probeStartAbsZ += sweepSpanZ;
 	sweepSpanZ = probeStartAbsZ;
 
-	hitRadius = collide_GetSweptHitRadius(attackerObjIdx, targetObjIdx, &allowSimpleBoxHit);
+	hitRadius = collide_GetSweptHitRadius(attackerObjIdx, targetObjIdx, &allowModelSweep);
 	sweepSpanX += hitRadius;
 	sweepSpanY += hitRadius;
 	sweepSpanZ += hitRadius;
@@ -884,7 +884,7 @@ uint16_t collide_lasercraftcollide(unsigned int attackerObjIdx, unsigned int tar
 		return 0;
 	}
 
-	if ((!allowSimpleBoxHit || hitRadius < 1095) &&
+	if ((!allowModelSweep || hitRadius < 1095) &&
 		g_objectTable[targetObjIdx].objectType != OBJ_ContainerGem) {
 		ModelGenusId targetGenus;
 
@@ -3458,13 +3458,16 @@ void collide_ResetNeighborProximityLists(uint16_t objIdx) {
 }
 
 // FUNCTION: XWA 0x40CCA0
+// *allowModelSweep is cleared when the radius is inflated past the target's
+// size (space bombs, flares, multiplayer player-vs-player shots), so callers
+// keep those hits on the box test instead of the per-face model sweep.
 int collide_GetSweptHitRadius(unsigned int attackerObjIdx, unsigned int targetObjIdx,
-							  int* allowSimpleBoxHit) {
+							  int* allowModelSweep) {
 	uint16_t targetType;
 	int radius;
 	ObjectRecord* objects;
 
-	*allowSimpleBoxHit = 1;
+	*allowModelSweep = 1;
 
 	objects = g_objectTable;
 	targetType = objects[targetObjIdx].objectType;
@@ -3474,11 +3477,11 @@ int collide_GetSweptHitRadius(unsigned int attackerObjIdx, unsigned int targetOb
 		objects[targetObjIdx].genusId == GENUS_PlayerProjectile) {
 		if (targetType == OBJ_WarheadSpaceBomb) {
 			radius <<= 4;
-			*allowSimpleBoxHit = 0;
+			*allowModelSweep = 0;
 		} else if (targetType != OBJ_WarheadFlare) {
 			radius >>= 1;
 		} else {
-			*allowSimpleBoxHit = 0;
+			*allowModelSweep = 0;
 		}
 		return radius;
 	}
@@ -3530,7 +3533,7 @@ int collide_GetSweptHitRadius(unsigned int attackerObjIdx, unsigned int targetOb
 			break;
 	}
 
-	*allowSimpleBoxHit = 0;
+	*allowModelSweep = 0;
 	return radius;
 }
 
@@ -6910,7 +6913,7 @@ void collide_collisions(void) {
 			MobileObject* cm;
 			int isRicochet;
 			int doRicochet;
-			int allowSimpleBoxHit;
+			int allowModelSweep;
 			int hitRadius;
 			ModelGenusId dg;
 			ModelGenusId cg;
@@ -7008,10 +7011,10 @@ void collide_collisions(void) {
 						doRicochet = Yard_HandleChallengeObjectCollision(sourceObjIdx, candIdx, hitComponent);
 						isRicochet = 1;
 					} else {
-						int allowSimpleBoxHit;
-						int hitRadius = collide_GetSweptHitRadius(sourceObjIdx, candIdx, &allowSimpleBoxHit);
+						int allowModelSweep;
+						int hitRadius = collide_GetSweptHitRadius(sourceObjIdx, candIdx, &allowModelSweep);
 						isRicochet = 1;
-						if ((!allowSimpleBoxHit || hitRadius < 1095) &&
+						if ((!allowModelSweep || hitRadius < 1095) &&
 							cand->objectType != OBJ_ContainerGem) {
 							ModelGenusId cg = cand->genusId;
 							if (cg != GENUS_DeathStarTunnelSegment &&
@@ -7050,9 +7053,9 @@ void collide_collisions(void) {
 					if ((uint16_t)hit == 0) {
 						goto finalize;
 					}
-					hitRadius = collide_GetSweptHitRadius(sourceObjIdx, candIdx, &allowSimpleBoxHit);
+					hitRadius = collide_GetSweptHitRadius(sourceObjIdx, candIdx, &allowModelSweep);
 					isRicochet = 1;
-					if ((!allowSimpleBoxHit || hitRadius < 1095) && cand->objectType != OBJ_ContainerGem) {
+					if ((!allowModelSweep || hitRadius < 1095) && cand->objectType != OBJ_ContainerGem) {
 						cg = cand->genusId;
 						if (cg != GENUS_DeathStarTunnelSegment &&
 							(cg != GENUS_PilotDroid || !g_provingGroundsModeActive) &&
@@ -7239,11 +7242,11 @@ void collide_collisions(void) {
 									Yard_HandleChallengeObjectCollision(attacker, hitTarget, hitComponent);
 								isRicochet = 1;
 							} else {
-								int allowSimpleBoxHit;
+								int allowModelSweep;
 								int hitRadius =
-									collide_GetSweptHitRadius(attacker, hitTarget, &allowSimpleBoxHit);
+									collide_GetSweptHitRadius(attacker, hitTarget, &allowModelSweep);
 								isRicochet = 1;
-								if ((!allowSimpleBoxHit || hitRadius < 1095) &&
+								if ((!allowModelSweep || hitRadius < 1095) &&
 									g_objectTable[hitTarget].objectType != OBJ_ContainerGem) {
 									ModelGenusId cg = g_objectTable[hitTarget].genusId;
 									if (cg != GENUS_DeathStarTunnelSegment &&

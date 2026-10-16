@@ -113,7 +113,7 @@ void collide_RefreshMobileObjectProximityCandidates(MobileObjectProximityList* l
 													unsigned int ownerObjIdx);
 void collide_ResetObjectProximityForSlot(uint16_t objIdx);
 void collide_ResetNeighborProximityLists(uint16_t objIdx);
-int collide_GetSweptHitRadius(unsigned int attackerObjIdx, unsigned int targetObjIdx, int* allowSimpleBoxHit);
+int collide_GetSweptHitRadius(unsigned int attackerObjIdx, unsigned int targetObjIdx, int* allowModelSweep);
 int collide_GetHyperRegionDesignationForPlayer(unsigned int playerObjIdx, unsigned int regionMarkerObjIdx,
 											   int designationSlot);
 void collide_TransformHitIntoObjectLocalFrame(unsigned int objIdx, int* outDirX, int* outDirY, int* outDirZ,
