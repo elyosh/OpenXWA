@@ -306,7 +306,11 @@ void CollisionBvh_TestFaceDataLoose(OptimizedPolyObject* model, OptNode* faceDat
 		return;
 	}
 	vertexBase = (const float*)g_collideCurrentMeshVertsNode->param2;
+	/* Authored order: a linear scan runs faster over it than over the leaf
+	   order, and ties resolve as they would in a stock FaceData loop. */
 	for (index = 0; index < mesh->faceCount; ++index) {
-		collide_TestSweepFaceLoose(mesh->faces[index].vertex_index, mesh->faces[index].normal, vertexBase);
+		const AeronOptFace* face = &mesh->faces[mesh->authoredOrder[index]];
+
+		collide_TestSweepFaceLoose(face->vertex_index, face->normal, vertexBase);
 	}
 }

@@ -395,6 +395,7 @@ static XwaOptSynthData* OptSynth_CreateData(const char* key, const AeronFlightMo
 		mesh->faceCount = source->face_count;
 		mesh->faces = source->faces;
 		mesh->bvh = source->bvh;
+		mesh->authoredOrder = source->authored_order;
 		mesh->tagCount = item->tag_count;
 		mesh->tags = item->tag_count != 0 ? &synth->tagStorage[tagTotal] : NULL;
 		if (item->tag_count != 0) {
@@ -462,6 +463,15 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 		Aeron_OptSimModelFree(&simulation);
 		Aeron_FlightModelFree(&model);
 		return 0;
+	}
+	/* Faces in BVH leaf order: collision queries return them ascending
+	   without sorting. Exact ties between faces of one component then go to
+	   the face earlier in leaf order. Failing the load on allocation failure
+	   keeps that order the same on every machine. */
+	if (!Aeron_OptSimModelReorderFacesToLeafOrder(&simulation)) {
+		Aeron_OptSimModelFree(&simulation);
+		Aeron_FlightModelFree(&model);
+		return OptSynth_Fail(key, "out of memory");
 	}
 
 	stubOffsets = (uint32_t*)calloc(simulation.mesh_count, sizeof *stubOffsets);

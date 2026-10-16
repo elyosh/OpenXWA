@@ -30,8 +30,10 @@ enum { XWA_OPT_SYNTH_MAX_COMPONENTS = XWA_CRAFT_MESH_SLOT_COUNT };
 typedef struct XwaOptSynthMesh {
 	uint32_t stubFaceDataOffset; /* payload offset of the stub FaceData node */
 	uint32_t faceCount;
-	const AeronOptFace* faces; /* OPT frame and units */
+	const AeronOptFace* faces; /* OPT frame and units, in the BVH's leaf order */
 	const AeronFaceBvh* bvh;   /* OPT units; NULL without faces */
+	/* Authored face a is faces[authoredOrder[a]]; NULL without faces. */
+	const uint32_t* authoredOrder;
 	uint32_t tagCount;
 	const AeronFlightTag* tags;
 } XwaOptSynthMesh;

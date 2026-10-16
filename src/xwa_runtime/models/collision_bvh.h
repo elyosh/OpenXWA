@@ -3,8 +3,9 @@
 
 /* Modern port: FaceData collision for GLB replacement models. Their FaceData
  * nodes are stubs; the faces and a BVH live in the model's synthesizer side
- * data. Each candidate face runs through the same per-face code as a stock
- * FaceData loop, in ascending face order, so results match a linear scan. */
+ * data, the faces stored in the BVH's leaf order. Each candidate face runs
+ * through the same per-face code as a stock FaceData loop, in ascending face
+ * order, so results match a linear scan over the stored faces. */
 
 #include "xwa/assets/opt_model.h"
 #include "xwa/flight/object/collision.h"
@@ -24,7 +25,8 @@ void collide_TestSweepFaceLoose(const int* faceIndices, const float* faceNormal,
    leaves the current walker segment can reach. */
 void CollisionBvh_TestFaceData(OptimizedPolyObject* model, OptNode* faceDataNode);
 /* Loose walk (collide_TestSweepAgainstOptNodeLoose): its edge-distance
-   acceptance has no bounding box, so every face is tested in order. */
+   acceptance has no bounding box, so every face is tested, in authored
+   order. */
 void CollisionBvh_TestFaceDataLoose(OptimizedPolyObject* model, OptNode* faceDataNode);
 
 #ifdef __cplusplus
