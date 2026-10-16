@@ -530,6 +530,11 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 			mesh.viewPos.z = mesh.viewPos.z - Math3D_RotateVec3Z(&pivot, (Matrix3x3*)mesh.viewOrient);
 		}
 
+#ifdef XWA_MODERN
+		/* Found on first use, once per draw (see the bridge alignment below). */
+		int alignsBridge = -1;
+		int modelBridgeIndex = -2;
+#endif
 		for (rootIndex = 0; rootIndex < model->rootNodeCount; ++rootIndex) {
 			OptNode* node;
 			OptNodeType nodeType;
@@ -550,13 +555,21 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 #ifdef XWA_MODERN
 					/* Modern port: articulated models are aligned on their bridge too,
 					   each looked up in its own model (XWAU drops the type test and the
-					   B-wing cache). */
-					if (XwaArticulation_AlignsBridge(obj)) {
+					   B-wing cache). Both answers depend only on the object and its
+					   model, so each is found once per draw instead of once per root:
+					   a bridge search walks every root. */
+					if (alignsBridge < 0) {
+						alignsBridge = XwaArticulation_AlignsBridge(obj) ? 1 : 0;
+					}
+					if (alignsBridge) {
 						int bridgeIndex;
 
 						bridgeIndex = obj->objectType == OBJ_BWing ? g_bwingBridgeMeshIndexCache : -1;
 						if (bridgeIndex == -1) {
-							bridgeIndex = ModelMesh_FindBridgeIndex(model);
+							if (modelBridgeIndex == -2) {
+								modelBridgeIndex = ModelMesh_FindBridgeIndex(model);
+							}
+							bridgeIndex = modelBridgeIndex;
 							if (obj->objectType == OBJ_BWing) {
 								g_bwingBridgeMeshIndexCache = bridgeIndex;
 							}
@@ -865,6 +878,11 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 		mesh.viewPos.z = mesh.viewPos.z - Math3D_RotateVec3Z(&pivot, (Matrix3x3*)mesh.viewOrient);
 	}
 
+#ifdef XWA_MODERN
+	/* Found on first use, once per draw (see the bridge alignment below). */
+	int alignsBridge = -1;
+	int modelBridgeIndex = -2;
+#endif
 	for (rootIndex = 0; rootIndex < model->rootNodeCount; ++rootIndex) {
 		OptNode* node;
 		OptNodeType nodeType;
@@ -883,13 +901,21 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 #ifdef XWA_MODERN
 				/* Modern port: articulated models are aligned on their bridge too,
 				   each looked up in its own model (XWAU drops the type test and the
-				   B-wing cache). */
-				if (XwaArticulation_AlignsBridge(obj)) {
+				   B-wing cache). Both answers depend only on the object and its
+				   model, so each is found once per draw instead of once per root:
+				   a bridge search walks every root. */
+				if (alignsBridge < 0) {
+					alignsBridge = XwaArticulation_AlignsBridge(obj) ? 1 : 0;
+				}
+				if (alignsBridge) {
 					int bridgeIndex;
 
 					bridgeIndex = obj->objectType == OBJ_BWing ? g_bwingBridgeMeshIndexCache : -1;
 					if (bridgeIndex == -1) {
-						bridgeIndex = ModelMesh_FindBridgeIndex(model);
+						if (modelBridgeIndex == -2) {
+							modelBridgeIndex = ModelMesh_FindBridgeIndex(model);
+						}
+						bridgeIndex = modelBridgeIndex;
 						if (obj->objectType == OBJ_BWing) {
 							g_bwingBridgeMeshIndexCache = bridgeIndex;
 						}
