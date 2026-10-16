@@ -650,7 +650,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 							  !snap->glyph_count && !snap->surface_event_count && !snap->model_preview_count;
 	/* Idle host ticks reuse the frontend output and its cursor textures. */
 	const int retain_scene_frame =
-		!render_snapshot || frontend_idle ||
+		!render_snapshot || frontend_idle || snap->retain_frame ||
 		(snap->scene_kind == XWA_SCENE_LOADING && !XwaRemaster_SnapshotHasPresent(snap)) ||
 		retain_invalid_flight_frame;
 	int assets_pending = 0;

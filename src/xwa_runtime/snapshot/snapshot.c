@@ -147,6 +147,7 @@ void XwaSnapshot_BeginTick(void) {
 	XwaSnapshot* s = wr();
 	s->tick_index = g_tick_index;
 	s->scene_kind = g_scene_kind;
+	s->retain_frame = 0;
 	s->draw_2d_count = 0;
 	s->paint_cmd_count = 0;
 	s->glyph_count = 0;
@@ -511,6 +512,8 @@ const XwaSnapshot* XwaSnapshot_Previous(void) { return g_previous_slot >= 0 ? &g
 /* ---- emitters ------------------------------------------------------ */
 
 void XwaSnapshot_SetSceneKind(XwaSceneKind kind) { g_scene_kind = kind; }
+
+void XwaSnapshot_RetainFrame(void) { wr()->retain_frame = 1; }
 
 void XwaSnapshot_SetEmitTarget(XwaEmitTarget target) { g_emit_target = target; }
 

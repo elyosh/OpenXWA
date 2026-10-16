@@ -1116,6 +1116,10 @@ typedef struct XwaSnapshot {
 	 * tick's sim delta is the difference across the held pair. */
 	int32_t game_time_ticks;
 	XwaSceneKind scene_kind;
+	/* Set when this tick's presents must not be shown, and the driver should
+	 * keep its last output. Used while the loading screen is held, because its
+	 * detach presents a black frame. */
+	uint8_t retain_frame;
 
 	XwaDraw2D draws_2d[XWA_SNAP_MAX_DRAWS_2D];
 	uint32_t draw_2d_count;
@@ -1211,6 +1215,8 @@ const XwaSnapshot* XwaSnapshot_Previous(void);
 /* ---- emitters (engine hooks; read-only observers) ------------------ */
 
 void XwaSnapshot_SetSceneKind(XwaSceneKind kind);
+/* Sets retain_frame for the current tick. */
+void XwaSnapshot_RetainFrame(void);
 
 /* FrontendDraw_Begin/EndExternalSurface routing tag. */
 void XwaSnapshot_SetEmitTarget(XwaEmitTarget target);

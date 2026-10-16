@@ -99,6 +99,7 @@ static int g_xwaFlightTaskFilmPathWasSet;
 static XwaFlightTaskPhase g_xwaFlightTaskPhase;
 static XwaFlightLoadingStage g_xwaFlightTaskLoadingStage;
 static uint32_t g_xwaFlightTaskLoadingStartTick;
+static int g_xwaFlightTaskLoadingHold;
 static uint64_t g_xwaFlightTaskNextWakeElapsedUs;
 static XwaFlightTaskPhase g_xwaFlightTaskLastLoggedPhase = XWA_FLIGHT_TASK_PHASE_INACTIVE;
 static uint32_t g_xwaFlightTaskTickLogCount;
@@ -189,6 +190,35 @@ static void XwaFlightTask_LogPhaseEntry(void) {
 static void XwaFlightTask_AdvanceLoadingStage(XwaFlightLoadingStage nextStage) {
 	g_xwaFlightTaskLoadingStage = nextStage;
 	g_xwaFlightTaskNextWakeElapsedUs = XwaTime_GetElapsedUs() + XWA_FLIGHT_FRAME_US;
+}
+
+/* Port deviation: the loading screen stays visible for at least
+ * XWA_FLIGHT_LOADING_MIN_VISIBLE_MS so the player can read the mission hints.
+ * The original removes it as soon as loading ends.
+ *
+ * The hold starts after the last loading stage and ends here, just before the
+ * first hangar or flight frame. The mission instance setup loads the cockpit,
+ * exterior and hangar models after the loading screen is detached, as in the
+ * original, so these loads also happen while the hints are shown. While the
+ * hold is active, XwaPort_TickBody and XwaPort_Tick keep the last loading
+ * image on screen.
+ *
+ * Returns 1 while holding. The tick that ends the hold does not run a frame
+ * either. It discards the frame time that passed during the hold, like the
+ * original does after the instance setup (0x510635), and gives classic
+ * presentation one tick to restart before the first frame is drawn. */
+static int XwaFlightTask_HoldLoadingScreen(uint64_t nowUs) {
+	if (!g_xwaFlightTaskLoadingHold) {
+		return 0;
+	}
+	g_xwaFlightTaskNextWakeElapsedUs = nowUs + XWA_FLIGHT_FRAME_US;
+	if (XwaTime_GetElapsedTicks() - g_xwaFlightTaskLoadingStartTick < XWA_FLIGHT_LOADING_MIN_VISIBLE_MS) {
+		return 1;
+	}
+	g_xwaFlightTaskLoadingHold = 0;
+	Time_GetFrameDelta();
+	XwaFlightTask_Log("loading-hold-done");
+	return 1;
 }
 
 static int XwaFlightTask_FileExists(AeronVfsRoot root, const char* path) {
@@ -1219,6 +1249,7 @@ int XwaFlightTask_Init(char* missionCmdLine, const char* filmFilePath) {
 	g_xwaFlightTaskPhase = XWA_FLIGHT_TASK_PHASE_INACTIVE;
 	g_xwaFlightTaskLoadingStage = XWA_FLIGHT_LOADING_STAGE_STEP0;
 	g_xwaFlightTaskLoadingStartTick = 0;
+	g_xwaFlightTaskLoadingHold = 0;
 	g_xwaFlightTaskLastLoggedPhase = XWA_FLIGHT_TASK_PHASE_INACTIVE;
 	g_xwaFlightTaskTickLogCount = 0;
 	g_xwaFlightTaskFilmPathWasSet = filmFilePath != 0 && filmFilePath[0] != '\0';
@@ -1516,16 +1547,14 @@ void XwaFlightTask_Tick(void) {
 						g_glowMarkScratchNormalVec = &g_glowMarkPlaneScratch.normal;
 						g_glowMarkScratchUAxisRefVec = &g_glowMarkPlaneScratch.uAxis;
 						FlightLoading_PulseAndDrawProgressScreen(8);
+						/* Start the hold one tick early, so the black flip of the detach
+						   tick is never shown. */
+						g_xwaFlightTaskLoadingHold = 1;
 						XwaFlightTask_AdvanceLoadingStage(XWA_FLIGHT_LOADING_STAGE_DETACH);
 						return;
 
 					case XWA_FLIGHT_LOADING_STAGE_DETACH:
 					default:
-						if (XwaTime_GetElapsedTicks() - g_xwaFlightTaskLoadingStartTick <
-							XWA_FLIGHT_LOADING_MIN_VISIBLE_MS) {
-							g_xwaFlightTaskNextWakeElapsedUs = nowUs + XWA_FLIGHT_FRAME_US;
-							return;
-						}
 						FlightLoading_DetachFrontendSurfaces();
 						XwaFlightTask_Log("loading-detached");
 						FlightSurface_ClearToBlack();
@@ -1627,10 +1656,16 @@ void XwaFlightTask_Tick(void) {
 			}
 
 			case XWA_FLIGHT_TASK_PHASE_HANGAR_READY:
+				if (XwaFlightTask_HoldLoadingScreen(nowUs)) {
+					return;
+				}
 				XwaFlightTask_RunHangarReadyFrame();
 				return;
 
 			case XWA_FLIGHT_TASK_PHASE_MISSION_START:
+				if (XwaFlightTask_HoldLoadingScreen(nowUs)) {
+					return;
+				}
 				if (g_inputTimestamp == 0) {
 					g_inputTimestamp += (int)Time_GetFrameDelta();
 					if (g_inputTimestamp == 0) {
@@ -1708,6 +1743,7 @@ void XwaFlightTask_Tick(void) {
 				int restartMission;
 				int directWorldCleanup;
 
+				g_xwaFlightTaskLoadingHold = 0;
 				XwaModernFlightTiming_EndSession();
 				directWorldCleanup = g_xwaFlightTaskDirectWorldCleanup;
 				g_xwaFlightTaskDirectWorldCleanup = 0;
@@ -1923,6 +1959,10 @@ int XwaFlightTask_Shutdown(void) {
 int XwaFlightTask_IsActive(void) { return g_xwaFlightTaskActive != 0; }
 
 int XwaFlightTask_IsComplete(void) { return g_xwaFlightTaskComplete != 0; }
+
+int XwaFlightTask_IsHoldingLoadingScreen(void) {
+	return g_xwaFlightTaskActive && !g_xwaFlightTaskComplete && g_xwaFlightTaskLoadingHold;
+}
 
 int XwaFlightTask_GetResult(void) { return g_xwaFlightTaskResult; }
 

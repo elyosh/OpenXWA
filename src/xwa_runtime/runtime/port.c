@@ -89,8 +89,12 @@ static void XwaPort_FreeStartupAssets(void) {
 }
 
 static void XwaPort_ApplyClassicFlightRenderingPolicy(void) {
-	const int suppress = XwaFlightTask_IsActive() && !FlightDisplay_IsFrontendModalActive() &&
-						 !g_xwaPortClassicFlightRenderingEnabled;
+	/* While the loading screen is held, keep its last classic image on screen.
+	 * This hides the black flip of the detach, and anything presented after it,
+	 * until the hold ends. */
+	const int suppress = (XwaFlightTask_IsActive() && !FlightDisplay_IsFrontendModalActive() &&
+						  !g_xwaPortClassicFlightRenderingEnabled) ||
+						 XwaFlightTask_IsHoldingLoadingScreen();
 	AeronDx5_SetClassicFlightRenderingSuppressed(suppress);
 }
 
@@ -305,6 +309,15 @@ static void XwaPort_TickBody(int32_t delta_us) {
 			XwaSnapshot_SetSceneKind(XWA_SCENE_LOADING);
 			FrontendDisplay_ClearPresentFrameReady();
 			XwaSnapshot_CaptureMission();
+		} else if (XwaFlightTask_IsHoldingLoadingScreen()) {
+			/* The loading screen is held (XwaFlightTask_IsHoldingLoadingScreen).
+			   Its surfaces are detached and the instance setup has run, but no
+			   frame has run yet. Keep showing the last loading image. The renderer
+			   still creates the models that the setup loaded. */
+			XwaSnapshot_SetSceneKind(XWA_SCENE_LOADING);
+			XwaSnapshot_RetainFrame();
+			FrontendDisplay_ClearPresentFrameReady();
+			XwaSnapshot_CaptureMission();
 		} else {
 			XwaSnapshot_CaptureMission();
 			XwaSnapshot_CaptureFlight();
@@ -348,8 +361,15 @@ void XwaPort_Tick(int32_t delta_us) {
 		return;
 	}
 	/* Complete the compatibility renderer's host frame after all recovered
-	 * presents have been coalesced and before remaster layers are submitted. */
-	AeronDx5_EndFrame();
+	 * presents have been coalesced and before remaster layers are submitted.
+	 * While the loading screen is held, classic presentation is suppressed
+	 * (see XwaPort_ApplyClassicFlightRenderingPolicy), so the last loading
+	 * image has to be submitted here. */
+	if (XwaFlightTask_IsHoldingLoadingScreen()) {
+		AeronDx5_ForceSubmitRetainedFrame();
+	} else {
+		AeronDx5_EndFrame();
+	}
 }
 
 void XwaPort_PausedFrame(void) {
