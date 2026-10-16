@@ -1,5 +1,6 @@
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
+#include "xwa_runtime/runtime/port.h"
 #include "xwa/flight/hangar.h"
 
 #include "aeron/aeron.h"
@@ -719,11 +720,15 @@ static void XwaFlightTask_RenderFrameAndAudio(const XwaFlightTaskLoopTiming* tim
 	if (g_flightPlayerCount > 1) {
 		g_flightSfxSideEffectGate = 1;
 	}
+	/* While classic rendering is suppressed, nothing shows this frame, so the
+	   back-buffer clear in it can wait (AeronDx5_SetClassicFlightFrameActive). */
+	XwaPort_SetClassicFlightFrameActive(1);
 	if (g_inHangarReady) {
 		Hangar_RenderReadyScreen();
 	} else {
 		FlightView_RenderFrame();
 	}
+	XwaPort_SetClassicFlightFrameActive(0);
 	g_flightSfxSideEffectGate = 0;
 	Sound_FlushQueuedEffects();
 	if (g_inputTimestamp - g_xwaFlightTaskLastSoundUpdateTimestamp > 29) {

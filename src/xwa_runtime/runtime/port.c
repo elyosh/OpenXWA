@@ -104,6 +104,8 @@ void XwaPort_SetClassicFlightRenderingEnabled(int enabled) {
 
 void XwaPort_SubmitRetainedClassicFrame(void) { AeronDx5_ForceSubmitRetainedFrame(); }
 
+void XwaPort_SetClassicFlightFrameActive(int active) { AeronDx5_SetClassicFlightFrameActive(active); }
+
 uint64_t XwaPort_GetClassicFlightFrameSerial(void) { return AeronDx5_GetClassicFlightFrameSerial(); }
 
 void XwaPort_SetCommandLine(const char* commandLine) {

@@ -17,6 +17,9 @@ void XwaPort_SetClassicFlightRenderingEnabled(int enabled);
 /* Forces the last complete classic frame into a presentation whose normal
  * classic output was suppressed earlier in the host frame. */
 void XwaPort_SubmitRetainedClassicFrame(void);
+/* Marks the recovered per-frame flight render (see
+ * AeronDx5_SetClassicFlightFrameActive). */
+void XwaPort_SetClassicFlightFrameActive(int active);
 uint64_t XwaPort_GetClassicFlightFrameSerial(void);
 /* Host-paused frame: the game tick is skipped (sim + snapshots
  * freeze); a required classic layer is re-submitted so CLASSIC/SPLIT
