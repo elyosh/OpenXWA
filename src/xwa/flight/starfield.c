@@ -17,6 +17,7 @@
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -457,6 +458,16 @@ void FlightStarfield_Render(void) {
 		}
 		g_starPaletteLastCycleTime = g_gameTime;
 	}
+
+#ifdef XWA_MODERN
+	/* Deviation: the stars below are drawn only into the classic back
+	   buffer. In a classic frame that is never shown (the HD renderer draws
+	   its own sky), they are skipped; the palette cycle above still advances.
+	   The trig2 scratch the scan leaves behind is not reproduced. */
+	if (XwaPort_IsClassicFlightFrameDiscarded()) {
+		return;
+	}
+#endif
 
 	densityStep = 0;
 	if (TRANSFM2_CamMatDotRow2(0, 0, 0x7fff) > 0) {

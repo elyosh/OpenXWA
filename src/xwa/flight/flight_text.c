@@ -4,6 +4,7 @@
 #include "xwa/flight/fediskio.h"
 #include "xwa/flight/flight.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #endif
 
@@ -1077,6 +1078,45 @@ void FlightText_FlushQueue(void) {
 	if (queueIdx == queueHead) {
 		return;
 	}
+
+#ifdef XWA_MODERN
+	/* Deviation: the glyph quads below go only to the classic back buffer,
+	   and the HD HUD captures each glyph when it is queued. In a classic
+	   frame that is never shown, the queue is emptied without drawing. The
+	   font state is left as the loop leaves it, set from the last glyph's
+	   scale. The texture cache and glyph tint updates of the draws are not
+	   reproduced. */
+	if (XwaPort_IsClassicFlightFrameDiscarded()) {
+		int lastIdx;
+
+		lastIdx = (queueHead == 0 ? FLIGHT_TEXT_QUEUE_CAPACITY : queueHead) - 1;
+		lastScale = g_flightTextQueue[lastIdx].scale;
+		if (lastScale < 12u) {
+			lastScale = 10;
+		}
+		if (lastScale < 12u) {
+			g_flightFontTier = 2;
+			g_flightFontLineHeight = 10;
+			g_flightFontHwScaleDivisor = 10;
+			g_flightFontGlyphWidthsHw = g_font2Widths;
+			g_flightActiveFontHwMetadata = g_font2BitmapHw;
+		} else if (lastScale < 15u) {
+			g_flightFontTier = 1;
+			g_flightFontLineHeight = 12;
+			g_flightFontHwScaleDivisor = 12;
+			g_flightFontGlyphWidthsHw = g_font0Widths;
+			g_flightActiveFontHwMetadata = g_font0BitmapHw;
+		} else {
+			g_flightFontTier = 0;
+			g_flightFontLineHeight = 16;
+			g_flightFontHwScaleDivisor = 16;
+			g_flightFontGlyphWidthsHw = g_font1Widths;
+			g_flightActiveFontHwMetadata = g_font1BitmapHw;
+		}
+		g_flightTextQueueTail = queueHead;
+		return;
+	}
+#endif
 
 	{
 		FlightTextGlyphBitmapHw* font0Bitmap;
