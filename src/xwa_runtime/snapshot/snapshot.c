@@ -664,11 +664,24 @@ static int frontend_file_compare(const void* lhs, const void* rhs) {
 	return (a > b) - (a < b);
 }
 
+/* The frontend files rarely change during a flight. The last list before
+ * sorting is kept with its sorted form: when the new list is the same, byte
+ * for byte, the sorted form is copied instead of sorting again. */
+static XwaFrontendFileAsset g_frontend_files_unsorted[XWA_SNAP_MAX_FRONTEND_FILES];
+static XwaFrontendFileAsset g_frontend_files_sorted[XWA_SNAP_MAX_FRONTEND_FILES];
+static uint32_t g_frontend_files_kept_count;
+static int g_frontend_files_kept;
+
 static void frontend_files_sort(XwaFrontendFileAsset* files, uint32_t count) {
 	static uint16_t order[XWA_SNAP_MAX_FRONTEND_FILES];
-	static XwaFrontendFileAsset sorted[XWA_SNAP_MAX_FRONTEND_FILES];
+	const size_t size = count * sizeof files[0];
 
 	if (count < 2) {
+		return;
+	}
+	if (g_frontend_files_kept && count == g_frontend_files_kept_count &&
+		memcmp(files, g_frontend_files_unsorted, size) == 0) {
+		memcpy(files, g_frontend_files_sorted, size);
 		return;
 	}
 	for (uint32_t i = 0; i < count; i++) {
@@ -677,9 +690,12 @@ static void frontend_files_sort(XwaFrontendFileAsset* files, uint32_t count) {
 	g_frontend_sort_files = files;
 	qsort(order, count, sizeof order[0], frontend_file_compare);
 	for (uint32_t i = 0; i < count; i++) {
-		sorted[i] = files[order[i]];
+		g_frontend_files_sorted[i] = files[order[i]];
 	}
-	memcpy(files, sorted, count * sizeof files[0]);
+	memcpy(g_frontend_files_unsorted, files, size);
+	g_frontend_files_kept_count = count;
+	g_frontend_files_kept = 1;
+	memcpy(files, g_frontend_files_sorted, size);
 }
 
 static int frontend_group_find(const int16_t* groups, uint32_t count, int16_t group) {
@@ -792,7 +808,11 @@ static int frontend_asset_sets_match(const XwaSnapshot* lhs, const XwaSnapshot* 
 		lhs->frontend_group_count != rhs->frontend_group_count) {
 		return 0;
 	}
-	for (uint32_t i = 0; i < lhs->frontend_file_count; i++) {
+	/* Usually nothing changed. Equal bytes mean equal entries; only when the
+	   bytes differ are the names compared. */
+	const int same_bytes = memcmp(lhs->frontend_files, rhs->frontend_files,
+								  lhs->frontend_file_count * sizeof lhs->frontend_files[0]) == 0;
+	for (uint32_t i = 0; !same_bytes && i < lhs->frontend_file_count; i++) {
 		if (lhs->frontend_files[i].frame_count != rhs->frontend_files[i].frame_count ||
 			strcmp(lhs->frontend_files[i].source_file, rhs->frontend_files[i].source_file) != 0 ||
 			strcmp(lhs->frontend_files[i].file, rhs->frontend_files[i].file) != 0) {

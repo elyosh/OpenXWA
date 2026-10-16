@@ -46,6 +46,17 @@ static uint32_t s_capturedSelectionCount;
 static XwaSkinUse s_capturedUses[XWA_SNAP_MAX_SKIN_USES];
 static uint32_t s_capturedUseCount;
 static int s_captured;
+/* The (object type, markings) pairs Skins_Registered accepts, as
+   objectType * 512 + markings, or objectType * 512 + 256 for a use of every
+   markings value. Each is stored + 1, with linear probing. The set is
+   rebuilt on the next lookup after the flight groups or uses change. */
+#define SKINS_REGISTERED_SIZE 1024
+static uint32_t s_registered[SKINS_REGISTERED_SIZE];
+static int s_registeredDirty = 1;
+/* The uses added to the snapshot being captured: skin_uses index + 1, with
+   linear probing, cleared at the start of each capture. */
+#define SKINS_USE_TABLE_SIZE (2 * XWA_SNAP_MAX_SKIN_USES)
+static uint16_t s_useTable[SKINS_USE_TABLE_SIZE];
 
 void XwaSkins_LoadMission(const char* missionPath) {
 	char path[300];
@@ -56,6 +67,7 @@ void XwaSkins_LoadMission(const char* missionPath) {
 	s_selectionCount = 0;
 	s_flightGroupCount = 0;
 	s_useCount = 0;
+	s_registeredDirty = 1;
 	s_usesFullLogged = 0;
 	if (missionPath == NULL || XwaMissionFile_Load(missionPath, &config, path, sizeof path) <= 0) {
 		return;
@@ -114,6 +126,7 @@ void XwaSkins_SetFlightGroups(const struct XwaFlightGroup* flightGroups, size_t 
 	int index;
 
 	s_flightGroupCount = 0;
+	s_registeredDirty = 1;
 	for (index = 0; index < count && index < SKINS_FLIGHT_GROUPS; ++index) {
 		const struct XwaFlightGroup* fg =
 			(const struct XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)index * stride);
@@ -127,20 +140,52 @@ void XwaSkins_SetFlightGroups(const struct XwaFlightGroup* flightGroups, size_t 
 
 /* Whether objects of `objectType` showing `markings` are registered: by a
    flight group or a use. */
-static int Skins_Registered(uint16_t objectType, int markings) {
-	int index;
+static uint32_t Skins_RegisteredSlot(uint32_t key) { return (key * 2654435761u) & (SKINS_REGISTERED_SIZE - 1); }
 
-	for (index = 0; index < s_flightGroupCount; ++index) {
-		if (s_flightGroups[index].objectType == objectType && s_flightGroups[index].markings == markings) {
-			return 1;
+static void Skins_RegisteredInsert(uint32_t key) {
+	uint32_t slot = Skins_RegisteredSlot(key);
+
+	while (s_registered[slot]) {
+		if (s_registered[slot] == key + 1) {
+			return;
 		}
+		slot = (slot + 1) & (SKINS_REGISTERED_SIZE - 1);
 	}
-	for (index = 0; index < s_useCount; ++index) {
-		if (s_uses[index].objectType == objectType && (s_uses[index].all || s_uses[index].markings == markings)) {
+	s_registered[slot] = key + 1;
+}
+
+static int Skins_RegisteredHas(uint32_t key) {
+	uint32_t slot = Skins_RegisteredSlot(key);
+
+	while (s_registered[slot]) {
+		if (s_registered[slot] == key + 1) {
 			return 1;
 		}
+		slot = (slot + 1) & (SKINS_REGISTERED_SIZE - 1);
 	}
 	return 0;
+}
+
+static int Skins_Registered(uint16_t objectType, int markings) {
+	const uint32_t base = (uint32_t)objectType * 512u;
+	int index;
+
+	if (s_registeredDirty) {
+		memset(s_registered, 0, sizeof s_registered);
+		for (index = 0; index < s_flightGroupCount; ++index) {
+			Skins_RegisteredInsert((uint32_t)s_flightGroups[index].objectType * 512u + s_flightGroups[index].markings);
+		}
+		for (index = 0; index < s_useCount; ++index) {
+			Skins_RegisteredInsert((uint32_t)s_uses[index].objectType * 512u +
+								   (s_uses[index].all ? 256u : s_uses[index].markings));
+		}
+		s_registeredDirty = 0;
+	}
+	/* Flight groups and single uses hold markings 0 to 255 only. */
+	if (markings >= 0 && markings <= 255 && Skins_RegisteredHas(base + (uint32_t)markings)) {
+		return 1;
+	}
+	return Skins_RegisteredHas(base + 256u);
 }
 
 static void Skins_Register(uint16_t objectType, int markings, int all) {
@@ -163,6 +208,7 @@ static void Skins_Register(uint16_t objectType, int markings, int all) {
 	s_uses[s_useCount].objectType = objectType;
 	s_uses[s_useCount].markings = (uint8_t)markings;
 	s_uses[s_useCount++].all = (uint8_t)(all != 0);
+	s_registeredDirty = 1;
 }
 
 void XwaSkins_UseMarkings(uint16_t objectType, int markings) {
@@ -220,20 +266,29 @@ static void Skins_RegisterShown(const XwaSnapshot* snapshot) {
    once. */
 static void Skins_AddUse(XwaSnapshot* snapshot, const char* name, int markings, int all) {
 	char key[XWA_MODEL_SOURCE_KEY_MAX];
-	uint32_t index;
+	uint32_t hash = 2166136261u;
+	uint32_t slot;
+	size_t index;
 
 	if (name == NULL || markings < 0 || markings > 255 || !XwaModelSource_NormalizeKey(name, key)) {
 		return;
 	}
-	for (index = 0; index < snapshot->skin_use_count; ++index) {
-		if (snapshot->skin_uses[index].markings == markings && snapshot->skin_uses[index].all_markings == all &&
-			strcmp(snapshot->skin_uses[index].key, key) == 0) {
+	for (index = 0; key[index]; ++index) {
+		hash = (hash ^ (uint8_t)key[index]) * 16777619u;
+	}
+	hash = (hash ^ (uint32_t)markings) * 16777619u;
+	hash = (hash ^ (uint32_t)all) * 16777619u;
+	for (slot = hash & (SKINS_USE_TABLE_SIZE - 1); s_useTable[slot]; slot = (slot + 1) & (SKINS_USE_TABLE_SIZE - 1)) {
+		const XwaSkinUse* use = &snapshot->skin_uses[s_useTable[slot] - 1];
+
+		if (use->markings == markings && use->all_markings == all && strcmp(use->key, key) == 0) {
 			return;
 		}
 	}
 	if (snapshot->skin_use_count == XWA_SNAP_MAX_SKIN_USES) {
 		return;
 	}
+	s_useTable[slot] = (uint16_t)(snapshot->skin_use_count + 1);
 	/* Zeroed, as the change check compares every byte. */
 	memset(&snapshot->skin_uses[snapshot->skin_use_count], 0, sizeof snapshot->skin_uses[0]);
 	snprintf(snapshot->skin_uses[snapshot->skin_use_count].key, sizeof snapshot->skin_uses[0].key, "%s", key);
@@ -269,6 +324,7 @@ void XwaSkins_Capture(XwaSnapshot* snapshot) {
 	memcpy(snapshot->skin_selections, s_selections, s_selectionCount * sizeof s_selections[0]);
 	snapshot->skin_selection_count = s_selectionCount;
 	snapshot->skin_use_count = 0;
+	memset(s_useTable, 0, sizeof s_useTable);
 	for (index = 0; index < s_flightGroupCount; ++index) {
 		const SkinsFlightGroup* group = &s_flightGroups[index];
 

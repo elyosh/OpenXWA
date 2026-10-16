@@ -895,21 +895,40 @@ static int ship_bwing_compensation(const AeronSceneMesh* mesh, const XwaFlightOb
 	return 1;
 }
 
+/* What ship_mesh_table_init writes for every component without `rows`,
+ * built once. Copying it is much faster than filling a large table value by
+ * value every frame. */
+static AeronSceneMeshTable s_default_mesh_table;
+static int s_default_mesh_table_ready;
+
 /* Every component visible, unhighlighted, at full emissive, with `rows` (or the
  * identity when NULL) as its transform. */
 static void ship_mesh_table_init(const AeronSceneMesh* mesh, const float (*rows)[4], AeronSceneMeshTable* out) {
-	out->component_count = ship_table_components(mesh);
-	for (uint32_t mi = 0; mi < out->component_count; mi++) {
-		if (rows) {
-			memcpy(out->rows[mi], rows, sizeof out->rows[mi]);
-		} else {
-			ship_mat3x4_identity(out->rows[mi]);
+	const AeronSceneMeshTable* d = &s_default_mesh_table;
+	if (!s_default_mesh_table_ready) {
+		for (uint32_t mi = 0; mi < AERON_MAX_MESH_COMPONENTS; mi++) {
+			ship_mat3x4_identity(s_default_mesh_table.rows[mi]);
+			s_default_mesh_table.visibility_packed[mi >> 2][mi & 3] = 1.0f;
+			s_default_mesh_table.highlight_packed[mi >> 2][mi & 3] = 0.0f;
+			s_default_mesh_table.markings_packed[mi >> 2][mi & 3] = 0.0f;
+			s_default_mesh_table.emissive_packed[mi >> 2][mi & 3] = 1.0f;
 		}
-		out->visibility_packed[mi >> 2][mi & 3] = 1.0f;
-		out->highlight_packed[mi >> 2][mi & 3] = 0.0f;
-		out->markings_packed[mi >> 2][mi & 3] = 0.0f;
-		out->emissive_packed[mi >> 2][mi & 3] = 1.0f;
+		s_default_mesh_table_ready = 1;
 	}
+	const uint32_t count = ship_table_components(mesh);
+	out->component_count = count;
+	if (rows) {
+		for (uint32_t mi = 0; mi < count; mi++) {
+			memcpy(out->rows[mi], rows, sizeof out->rows[mi]);
+		}
+	} else {
+		memcpy(out->rows, d->rows, count * sizeof out->rows[0]);
+	}
+	/* Component mi is lane value [mi >> 2][mi & 3], float mi of each array. */
+	memcpy(out->visibility_packed, d->visibility_packed, count * sizeof(float));
+	memcpy(out->highlight_packed, d->highlight_packed, count * sizeof(float));
+	memcpy(out->markings_packed, d->markings_packed, count * sizeof(float));
+	memcpy(out->emissive_packed, d->emissive_packed, count * sizeof(float));
 }
 
 int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f) {
