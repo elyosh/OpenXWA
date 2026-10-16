@@ -17,6 +17,7 @@
 #include "aeron/log.h"
 #include "xwa/flight/flight_debug.h"
 #include "xwa_runtime/hooks/orientation_hook.h"
+#include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #endif
 
@@ -1209,6 +1210,18 @@ char FlightView_IsLensFlareSourceVisible(int worldX, int worldY, int worldZ) {
 	RenderObjectListEntry* entry;
 	ObjectRecord* objectTable;
 	int visible;
+
+#ifdef XWA_MODERN
+	/* Deviation: in a classic frame that is never shown (the HD renderer
+	   draws instead), the classic flare queue this result feeds is never
+	   drawn, and the HD renderer tests flare visibility on the GPU. The
+	   sweeps are skipped. The original's sweeps also leave g_curCraft and
+	   the glow-mark scratch changed for later code in the frame; that is
+	   not reproduced. */
+	if (XwaPort_IsClassicFlightFrameDiscarded()) {
+		return 0;
+	}
+#endif
 
 	g_collisionScratchBackupSegmentStartWorldX = g_collisionSegmentStartWorldX;
 	g_collisionScratchBackupSegmentStartWorldY = g_collisionSegmentStartWorldY;

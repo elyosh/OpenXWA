@@ -20,6 +20,9 @@ void XwaPort_SubmitRetainedClassicFrame(void);
 /* Marks the recovered per-frame flight render (see
  * AeronDx5_SetClassicFlightFrameActive). */
 void XwaPort_SetClassicFlightFrameActive(int active);
+/* Whether the current classic flight frame will never be shown (see
+ * AeronDx5_IsClassicFlightFrameDiscarded). */
+int XwaPort_IsClassicFlightFrameDiscarded(void);
 uint64_t XwaPort_GetClassicFlightFrameSerial(void);
 /* Host-paused frame: the game tick is skipped (sim + snapshots
  * freeze); a required classic layer is re-submitted so CLASSIC/SPLIT
