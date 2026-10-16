@@ -9,10 +9,6 @@
 
 #include <stdint.h>
 
-/* Larger of the swept (+-10.0) and local-sweep (+-1e-4) plane epsilons of
-   collide_IntersectSegmentWithFacePlane, so one query covers both callers. */
-#define COLLISION_BVH_PLANE_TOLERANCE 10.0f
-
 /* Verbatim body of collide_TestSweepAgainstOptNode's FaceData loop. */
 void collide_TestSweepFace(const int* faceIndices, const Vec3f* faceNormal, const float* vertexBase) {
 	Vec3f point;
@@ -274,8 +270,13 @@ void CollisionBvh_TestFaceData(OptimizedPolyObject* model, OptNode* faceDataNode
 		return;
 	}
 	vertexBase = (const float*)g_collideCurrentMeshVertsNode->param2;
+	/* The query uses the plane epsilon of the current sweep: 10.0 for the
+	   swept test and 1e-4 for the local one. Both callers set it before they
+	   walk the model, and the negative epsilon always has the same size. With
+	   the larger value, the local sweep would get many faces that can't pass
+	   collide_IntersectSegmentWithFacePlane. */
 	count = AeronFaceBvh_Collect(mesh->bvh, &g_collideSweepWalkerStart.x, &g_collideSweepWalkerEnd.x,
-								 COLLISION_BVH_PLANE_TOLERANCE, &s_scratch);
+								 g_collidePlaneEpsilonPos, &s_scratch);
 	if (count == UINT32_MAX) {
 		/* Out of memory for candidates: every face, in order, gives the same
 		   result. */
