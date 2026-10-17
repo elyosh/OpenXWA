@@ -2179,11 +2179,54 @@ static int fl_backdrop_is_sun(const XwaBackdrop* b) {
  * except backdrop suns, or one record index (>= 0). */
 enum { FL_BACKDROPS_ALL = -1, FL_BACKDROPS_NO_SUNS = XWA_FLIGHT_CAPTURE_BACKDROPS_NO_SUNS };
 
+/* Whether `rule` hides the DAT image that `model_type` draws for `frame`. */
+static int fl_backdrop_hidden(XwaRemasterAssets* assets, const XwaEnvironmentBackdropRule* rule,
+							  int model_type, int frame) {
+	int group = 0;
+	int image = 0;
+	return rule && XwaRemasterAssets_FlightModelImageId(assets, model_type, frame, &group, &image) &&
+		   XwaRemasterEnvironment_BackdropHidden(rule, group, image);
+}
+
+/* Logs the DAT image of each backdrop of the region, and whether `rule`
+ * hides it, once per mission and region, so the manifest's hide and show
+ * lists can be checked against the mission. */
+static void fl_log_kept_backdrops(const XwaSnapshot* snap, XwaRemasterAssets* assets,
+								  const XwaEnvironmentBackdropRule* rule) {
+	static char logged_mission[sizeof snap->mission_path];
+	static int logged_region = -1;
+	const int region = snap->flight_camera.mission_region;
+	if (region == logged_region && strcmp(logged_mission, snap->mission_path) == 0) {
+		return;
+	}
+	logged_region = region;
+	snprintf(logged_mission, sizeof logged_mission, "%s", snap->mission_path);
+	char line[1024];
+	size_t length = 0;
+	line[0] = '\0';
+	for (uint32_t i = 0; i < snap->backdrop_count && length + 32 < sizeof line; i++) {
+		const XwaBackdrop* b = &snap->backdrops[i];
+		const int frame = (b->flags & 1u) ? b->frame : 1;
+		int group = 0;
+		int image = 0;
+		if (!XwaRemasterAssets_FlightModelImageId(assets, b->model_type, frame, &group, &image)) {
+			continue;
+		}
+		length +=
+			(size_t)snprintf(line + length, sizeof line - length, " %d-%d%s", group, image,
+							 XwaRemasterEnvironment_BackdropHidden(rule, group, image) ? " (hidden)" : "");
+	}
+	Aeron_LogInfo("xwa.remaster", "environment: region %d keeps its backdrops:%s", region,
+				  line[0] ? line : " none");
+}
+
 /* `camera_independent` (environment capture) replaces the axis quads'
  * camera-hemisphere gate with the record's own direction: a quad is kept
- * when a camera looking at it would draw it. */
+ * when a camera looking at it would draw it. `hide`, when set, leaves out
+ * the quads whose image it hides (a sky with `backdrops: keep`). */
 static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9], XwaRemasterAssets* assets,
-									int filter, int camera_independent, FlBackdropQuad* out,
+									int filter, int camera_independent,
+									const XwaEnvironmentBackdropRule* hide, FlBackdropQuad* out,
 									uint32_t capacity) {
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < snap->backdrop_count; i++) {
@@ -2231,6 +2274,9 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 					u0 = 0.0f;
 				}
 				const float u1 = (float)seg_in_frame / (float)b->strip_segments_per_frame;
+				if (fl_backdrop_hidden(assets, hide, b->model_type, frame)) {
+					continue;
+				}
 				FlBackdropQuad* q = &out[count++];
 				const float* c0 = b->strip_coords[seg - 1];
 				const float* c1 = b->strip_coords[seg];
@@ -2259,7 +2305,8 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 				continue;
 			}
 			if (count >= capacity || !fl_resolve_type_frame(assets, b->model_type, frame, &ref) ||
-				ref.classic_w <= 0 || ref.classic_h <= 0) {
+				ref.classic_w <= 0 || ref.classic_h <= 0 ||
+				fl_backdrop_hidden(assets, hide, b->model_type, frame)) {
 				continue;
 			}
 			const int ext_w = ((int)b->angular_scale * (ref.classic_w + (ref.classic_w >> 1))) >> 8;
@@ -4219,6 +4266,14 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	return fl_present(cmd, direct_present);
 }
 
+/* Whether the region's environment draws a sky with `backdrops: keep`: the
+ * mission's backdrops, their lights and their flares stay over the sky. */
+static int fl_environment_keeps_backdrops(void) {
+	return s.environment.mode == XWA_ENV_MODE_AUTHORED && s.environment.prepared &&
+		   s.environment.prepared->radiance && s.environment.backdrops &&
+		   s.environment.backdrops->mode == XWA_ENV_BACKDROPS_KEEP;
+}
+
 typedef struct FlSceneLighting {
 	const XwaDirLight* lights;
 	uint32_t light_count;
@@ -4283,7 +4338,9 @@ static void fl_set_environment_ambient(FlSceneLighting* out, const AeronPrepared
 
 /* Applies a region environment. Its fill replaces the ambient. If the
  * environment has directional lights (an environment with a sky always has
- * them), they replace the directional lights derived from backdrops.
+ * them), they replace the directional lights derived from backdrops, unless
+ * the environment keeps the backdrops: then the recovered lights and key
+ * selection stay.
  * Recovered lights without a backdrop source are kept, because they are not
  * known to belong to the sky. The environment's declared primary light then
  * becomes the key light and the only shadow caster. An environment without
@@ -4292,7 +4349,7 @@ static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronPrepa
 									   FlSceneLighting* out) {
 	out->environment = environment;
 	fl_set_environment_ambient(out, environment);
-	if (!environment->definition->has_directional_lights) {
+	if (!environment->definition->has_directional_lights || fl_environment_keeps_backdrops()) {
 		return;
 	}
 	uint32_t count = 0;
@@ -4566,7 +4623,8 @@ uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float cro
 	if (!crows || !snap || !assets) {
 		return 0;
 	}
-	const uint32_t count = fl_derive_backdrops(snap, crows, assets, filter, 1, quads, FL_MAX_BACKDROP_QUADS);
+	const uint32_t count =
+		fl_derive_backdrops(snap, crows, assets, filter, 1, NULL, quads, FL_MAX_BACKDROP_QUADS);
 	static const float origin[3] = { 0.0f, 0.0f, 0.0f };
 	const FlQuadTarget target = { scene, crows, origin };
 	float max_tan = 0.0f;
@@ -4754,18 +4812,26 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	/* An environment with a sky replaces all of these together: its sky,
 	 * suns, lights and flares replace the starfield, the recovered
 	 * backdrop sprites, the directional lights derived from backdrops and
-	 * the backdrop sun flares. An environment without a sky keeps the
-	 * starfield, the sprites and the flares. */
+	 * the backdrop sun flares. With `backdrops: keep`, only the starfield
+	 * is replaced: the backdrops are drawn over the sky, minus the hidden
+	 * images, and keep their lights and flares. An environment without a
+	 * sky keeps the starfield, the sprites and the flares. */
 	const AeronPreparedEnvironment* region_environment =
 		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.prepared : NULL;
 	const AeronPreparedEnvironment* sky_environment =
 		region_environment && region_environment->radiance ? region_environment : NULL;
-	fl_derive_lens_flares(snap, assets, &flight_view, sky_environment);
+	const int keep_backdrops = fl_environment_keeps_backdrops();
+	const AeronPreparedEnvironment* replacing_sky = keep_backdrops ? NULL : sky_environment;
+	if (keep_backdrops) {
+		fl_log_kept_backdrops(snap, assets, s.environment.backdrops);
+	}
+	fl_derive_lens_flares(snap, assets, &flight_view, replacing_sky);
 	fl_begin_point_lights(&flight_view);
 	fl_derive_point_lights(snap);
-	s.bd_count = sky_environment ? 0
-								 : fl_derive_backdrops(snap, s.crows, assets, FL_BACKDROPS_ALL, 0, s.bd_quads,
-													   FL_MAX_BACKDROP_QUADS);
+	s.bd_count = replacing_sky ? 0
+							   : fl_derive_backdrops(snap, s.crows, assets, FL_BACKDROPS_ALL, 0,
+													 keep_backdrops ? s.environment.backdrops : NULL,
+													 s.bd_quads, FL_MAX_BACKDROP_QUADS);
 	XwaRemasterEffectView effect_view;
 	XwaRemasterEffectView_Main(&effect_view, &flight_view, s.crows);
 	XwaRemasterEffectView previous_effect_view;
@@ -4873,7 +4939,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * is deterministic and pauses with the game. */
 	if (sky_environment) {
 		AeronScene_SetSkyEnvironment(s.scene, sky_environment);
-		for (uint32_t i = 0; i < sky_environment->light_count; i++) {
+		/* Kept backdrops bring their own suns. */
+		for (uint32_t i = 0; !keep_backdrops && i < sky_environment->light_count; i++) {
 			AeronScene_AddSkySun(s.scene, &sky_environment->lights[i]);
 		}
 	} else if (!cam->death_star_mode) {

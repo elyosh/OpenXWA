@@ -877,6 +877,33 @@ int XwaRemasterAssets_FlightModelFrame(XwaRemasterAssets* a, int object_type, in
 	return assets_flight_group_frame(a, slot, frame, out);
 }
 
+int XwaRemasterAssets_FlightModelImageId(XwaRemasterAssets* a, int object_type, int classic_frame_1based,
+										 int* out_group, int* out_image) {
+	int group = 0;
+	int frames_mode = 0;
+	int sprite_id = 0;
+	if (!a || !out_group || !out_image ||
+		!XwaSnapshotExport_ModelTextureBinding(object_type, &group, &frames_mode, &sprite_id)) {
+		return 0;
+	}
+	*out_group = group;
+	if (!frames_mode) {
+		*out_image = sprite_id;
+		return 1;
+	}
+	const int index = classic_frame_1based - 1;
+	if (index < 0) {
+		return 0;
+	}
+	const GroupSlot* slot = assets_group_find(a, group);
+	const AeronSpriteAtlas* atlas = !slot ? NULL
+									: slot->flight_source == ASSET_SOURCE_ORIGINAL
+										? &slot->flight_original_atlas.layout
+										: &slot->atlas;
+	*out_image = atlas && atlas->ids && index < atlas->frame_count ? atlas->ids[index] : index;
+	return 1;
+}
+
 static AeronFontGlyph* assets_copy_font_glyphs(const Xwa2dFontAtlas* source, int atlas_scale) {
 	if (!source || !source->glyphs || !source->glyph_count || atlas_scale <= 0)
 		return NULL;
