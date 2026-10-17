@@ -1,5 +1,5 @@
 /*
- * xwa_asset_bake — offline remaster-asset baker.
+ * xwa_asset_bake — offline baker of 2D assets for the mod folder.
  *
  * Reads source art through Aeron VFS, decodes it with the shared independent
  * XWA format library, and emits modern assets through imgbake.

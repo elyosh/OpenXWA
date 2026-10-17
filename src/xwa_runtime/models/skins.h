@@ -5,7 +5,7 @@
  *
  * A model's GLB names, in its markings list, the material variant each
  * markings value shows. A mission may select others in the `skins` section
- * of its remaster file (mission_file.h), keyed by GLB name and markings
+ * of its mission file (mission_file.h), keyed by GLB name and markings
  * value; null selects the model's own materials:
  *
  *   skins:

@@ -1,6 +1,6 @@
 /*
  * XWA remaster snapshot-resident asset resolver — see xwa_remaster/assets.h.
- * Resolves authored remaster assets or independently decoded original files.
+ * Resolves assets from the mod folder or independently decoded original files.
  * Recovered XWA resource state is used only for snapshot identities/lifetimes.
  */
 
@@ -55,7 +55,7 @@ typedef enum FileKind {
 
 typedef enum AssetSource {
 	ASSET_SOURCE_MISSING = 0,
-	ASSET_SOURCE_REMASTERED,
+	ASSET_SOURCE_MOD,
 	ASSET_SOURCE_ORIGINAL,
 } AssetSource;
 
@@ -78,7 +78,7 @@ typedef struct FileSlot {
 
 typedef struct GroupSlot {
 	int16_t group;
-	uint8_t remastered_status; /* AssetLoadStatus */
+	uint8_t mod_status; /* AssetLoadStatus */
 	uint8_t frontend_resident;
 	uint8_t flight_resident;
 	uint8_t frontend_source; /* AssetSource */
@@ -132,8 +132,7 @@ XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_origina
 	if (!a->generation)
 		a->generation = ++assets_next_generation;
 	Aeron_LogInfo("xwa.remaster", "2D asset policy: prefer=%s alternate=%s",
-			  a->prefer_original_2d ? "original" : "remastered",
-			  a->prefer_original_2d ? "remastered" : "original");
+				  a->prefer_original_2d ? "original" : "mod", a->prefer_original_2d ? "mod" : "original");
 	return a;
 }
 
@@ -155,7 +154,7 @@ void XwaRemasterAssets_Destroy(XwaRemasterAssets* a) {
 	for (int i = 0; i < a->group_count; i++) {
 		Aeron_RuntimeAtlasRelease(&a->groups[i].frontend_original_atlas);
 		Aeron_RuntimeAtlasRelease(&a->groups[i].flight_original_atlas);
-		if (a->groups[i].remastered_status == ASSET_LOAD_SUCCESS) {
+		if (a->groups[i].mod_status == ASSET_LOAD_SUCCESS) {
 			Aeron_SpriteAtlasFree(&a->groups[i].atlas);
 		}
 	}
@@ -210,9 +209,7 @@ static int assets_find_texture(AeronImageCache* images, const char* path, XwaAss
 }
 
 static const char* assets_source_name(int source) {
-	return source == ASSET_SOURCE_REMASTERED ? "remastered"
-		   : source == ASSET_SOURCE_ORIGINAL ? "original"
-											 : "missing";
+	return source == ASSET_SOURCE_MOD ? "mod" : source == ASSET_SOURCE_ORIGINAL ? "original" : "missing";
 }
 
 static AssetLoadStatus
@@ -403,10 +400,9 @@ static GroupSlot* assets_group_slot(XwaRemasterAssets* a, int group) {
 	snprintf(probe, sizeof probe, "%s/resdata/atlas/group_%d.yaml", a->root, group);
 	const AssetLoadStatus status = assets_probe_file(probe);
 	if (status == ASSET_LOAD_SUCCESS) {
-		s->remastered_status =
-			Aeron_SpriteAtlasLoad(&s->atlas, probe) ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
+		s->mod_status = Aeron_SpriteAtlasLoad(&s->atlas, probe) ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
 	} else {
-		s->remastered_status = (uint8_t)status;
+		s->mod_status = (uint8_t)status;
 	}
 	return s;
 }
@@ -442,10 +438,10 @@ static int assets_flight_group_frame(XwaRemasterAssets* a, GroupSlot* s, int fra
 	return assets_find_texture(a->flight_images, path, out) && apply_atlas_frame(&s->atlas, frame, out);
 }
 
-static AssetLoadStatus assets_load_remastered_group(XwaRemasterAssets* a, AeronImageCache* images,
-													 AeronCommandBuffer* cmd, GroupSlot* slot) {
-	if (slot->remastered_status != ASSET_LOAD_SUCCESS)
-		return (AssetLoadStatus)slot->remastered_status;
+static AssetLoadStatus assets_load_mod_group(XwaRemasterAssets* a, AeronImageCache* images,
+											 AeronCommandBuffer* cmd, GroupSlot* slot) {
+	if (slot->mod_status != ASSET_LOAD_SUCCESS)
+		return (AssetLoadStatus)slot->mod_status;
 	const int page_count = slot->atlas.page_count > 0 ? slot->atlas.page_count : 1;
 	for (int page = 0; page < page_count; page++) {
 		char path[768];
@@ -490,15 +486,15 @@ static AssetLoadStatus assets_load_original_group(XwaRemasterAssets* a, AeronCom
 static AssetLoadStatus assets_choose_group(XwaRemasterAssets* a, AeronCommandBuffer* cmd,
 										   GroupSlot* slot, int flight, uint8_t* out_source) {
 	*out_source = ASSET_SOURCE_MISSING;
-	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_REMASTERED;
+	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_MOD;
 	for (int attempt = 0; attempt < 2; attempt++) {
-		const int source =
-			attempt == 0 ? first
-						 : (first == ASSET_SOURCE_ORIGINAL ? ASSET_SOURCE_REMASTERED : ASSET_SOURCE_ORIGINAL);
+		const int source = attempt == 0
+							   ? first
+							   : (first == ASSET_SOURCE_ORIGINAL ? ASSET_SOURCE_MOD : ASSET_SOURCE_ORIGINAL);
 		const AssetLoadStatus status =
 			source == ASSET_SOURCE_ORIGINAL
 				? assets_load_original_group(a, cmd, slot, flight)
-				: assets_load_remastered_group(a, flight ? a->flight_images : a->frontend_images, cmd, slot);
+				: assets_load_mod_group(a, flight ? a->flight_images : a->frontend_images, cmd, slot);
 		if (status == ASSET_LOAD_SUCCESS) {
 			*out_source = (uint8_t)source;
 			return ASSET_LOAD_SUCCESS;
@@ -514,7 +510,7 @@ static void assets_release_group(XwaRemasterAssets* a, GroupSlot* slot, int flig
 	const int is_resident = flight ? slot->flight_resident : slot->frontend_resident;
 	if (!is_resident)
 		return;
-	if (*source == ASSET_SOURCE_REMASTERED) {
+	if (*source == ASSET_SOURCE_MOD) {
 		AeronImageCache* images = flight ? a->flight_images : a->frontend_images;
 		const int page_count = slot->atlas.page_count > 0 ? slot->atlas.page_count : 1;
 		for (int page = 0; page < page_count; page++) {
@@ -582,8 +578,8 @@ static AssetLoadStatus assets_load_original_file(XwaRemasterAssets* a, AeronComm
 	return loaded ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
 }
 
-static AssetLoadStatus assets_load_remastered_file(XwaRemasterAssets* a, AeronCommandBuffer* cmd,
-												   FileSlot* slot, uint16_t frame_count) {
+static AssetLoadStatus assets_load_mod_file(XwaRemasterAssets* a, AeronCommandBuffer* cmd, FileSlot* slot,
+											uint16_t frame_count) {
 	if (slot->kind == FILE_MISSING || slot->kind == FILE_UNPROBED)
 		return ASSET_LOAD_MISSING;
 	if (slot->kind == FILE_FAILED)
@@ -597,14 +593,14 @@ static AssetLoadStatus assets_choose_frontend_file(XwaRemasterAssets* a, AeronCo
 												   FileSlot* slot, uint16_t frame_count,
 												   uint8_t* out_source) {
 	*out_source = ASSET_SOURCE_MISSING;
-	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_REMASTERED;
+	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_MOD;
 	for (int attempt = 0; attempt < 2; attempt++) {
-		const int source =
-			attempt == 0 ? first
-						 : (first == ASSET_SOURCE_ORIGINAL ? ASSET_SOURCE_REMASTERED : ASSET_SOURCE_ORIGINAL);
-		const AssetLoadStatus status =
-			source == ASSET_SOURCE_ORIGINAL ? assets_load_original_file(a, cmd, slot)
-											: assets_load_remastered_file(a, cmd, slot, frame_count);
+		const int source = attempt == 0
+							   ? first
+							   : (first == ASSET_SOURCE_ORIGINAL ? ASSET_SOURCE_MOD : ASSET_SOURCE_ORIGINAL);
+		const AssetLoadStatus status = source == ASSET_SOURCE_ORIGINAL
+										   ? assets_load_original_file(a, cmd, slot)
+										   : assets_load_mod_file(a, cmd, slot, frame_count);
 		if (status == ASSET_LOAD_SUCCESS) {
 			*out_source = (uint8_t)source;
 			return ASSET_LOAD_SUCCESS;
@@ -707,7 +703,7 @@ int XwaRemasterAssets_SyncFrontendAssets(XwaRemasterAssets* a, AeronCommandBuffe
 		if (slot->frontend_resident) {
 			texture_count += slot->frontend_source == ASSET_SOURCE_ORIGINAL
 								 ? (uint32_t)slot->frontend_original_atlas.layout.page_count
-								 : (slot->frontend_source == ASSET_SOURCE_REMASTERED
+								 : (slot->frontend_source == ASSET_SOURCE_MOD
 										? (slot->atlas.page_count > 0 ? (uint32_t)slot->atlas.page_count : 1)
 										: 0);
 		}
@@ -809,7 +805,7 @@ int XwaRemasterAssets_SyncFlightTextures(XwaRemasterAssets* a, AeronCommandBuffe
 		}
 		if (slot->flight_source == ASSET_SOURCE_ORIGINAL) {
 			page_count += (uint32_t)slot->flight_original_atlas.layout.page_count;
-		} else if (slot->flight_source == ASSET_SOURCE_REMASTERED) {
+		} else if (slot->flight_source == ASSET_SOURCE_MOD) {
 			page_count += slot->atlas.page_count > 0 ? (uint32_t)slot->atlas.page_count : 1;
 		}
 	}
@@ -975,8 +971,7 @@ static AssetLoadStatus assets_load_original_flight_font(XwaRemasterAssets* a, Ae
 	return ASSET_LOAD_SUCCESS;
 }
 
-static AssetLoadStatus assets_load_remastered_flight_font(XwaRemasterAssets* a,
-														  AeronCommandBuffer* cmd, int tier) {
+static AssetLoadStatus assets_load_mod_flight_font(XwaRemasterAssets* a, AeronCommandBuffer* cmd, int tier) {
 	if (!a || tier < 0 || tier >= 3)
 		return ASSET_LOAD_FAILED;
 	FlightFontSlot* slot = &a->flight_fonts[tier];
@@ -1009,14 +1004,14 @@ static AssetLoadStatus assets_load_flight_font(XwaRemasterAssets* a, AeronComman
 	if (slot->tried)
 		return slot->atlas.loaded ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
 	slot->tried = 1;
-	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_REMASTERED;
+	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_MOD;
 	for (int attempt = 0; attempt < 2; attempt++) {
-		const int source =
-			attempt == 0 ? first
-						 : (first == ASSET_SOURCE_ORIGINAL ? ASSET_SOURCE_REMASTERED : ASSET_SOURCE_ORIGINAL);
-		const AssetLoadStatus status =
-			source == ASSET_SOURCE_ORIGINAL ? assets_load_original_flight_font(a, cmd, slot, tier)
-											: assets_load_remastered_flight_font(a, cmd, tier);
+		const int source = attempt == 0
+							   ? first
+							   : (first == ASSET_SOURCE_ORIGINAL ? ASSET_SOURCE_MOD : ASSET_SOURCE_ORIGINAL);
+		const AssetLoadStatus status = source == ASSET_SOURCE_ORIGINAL
+										   ? assets_load_original_flight_font(a, cmd, slot, tier)
+										   : assets_load_mod_flight_font(a, cmd, tier);
 		if (status == ASSET_LOAD_SUCCESS) {
 			slot->source = (uint8_t)source;
 			Aeron_LogInfo("xwa.remaster", "flight font tier %d: source=%s", tier, assets_source_name(source));
@@ -1095,11 +1090,11 @@ static AssetLoadStatus assets_load_frontend_font(XwaRemasterAssets* a, AeronComm
 	}
 	FontSlot* slot = &a->fonts[a->font_count++];
 	slot->font_size = font_size;
-	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_REMASTERED;
+	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_MOD;
 	for (int attempt = 0; attempt < 2; attempt++) {
-		const int source =
-			attempt == 0 ? first
-						 : (first == ASSET_SOURCE_ORIGINAL ? ASSET_SOURCE_REMASTERED : ASSET_SOURCE_ORIGINAL);
+		const int source = attempt == 0
+							   ? first
+							   : (first == ASSET_SOURCE_ORIGINAL ? ASSET_SOURCE_MOD : ASSET_SOURCE_ORIGINAL);
 		AssetLoadStatus status;
 		if (source == ASSET_SOURCE_ORIGINAL) {
 			status = assets_load_original_frontend_font(a, cmd, slot, font_size);

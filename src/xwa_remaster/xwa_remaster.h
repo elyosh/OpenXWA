@@ -9,7 +9,7 @@
  * controls coordinate ownership of classic presentation layers.
  *
  * Frontend records replay onto a persistent HD target. Asset identities
- * resolve to authored remaster files or independently decoded original files.
+ * resolve to files in the mod folder or independently decoded original files.
  */
 
 #include <stdint.h>
