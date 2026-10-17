@@ -85,11 +85,11 @@ static int g_backface_fill = 1;
 /* The key light's shadow on the probe light from its side whichever way
  * surfaces face; debug inspector toggle, not persisted. */
 static int g_key_shadow_all_sides = 1;
-/* The ships inside the hangar's probe grid take its light from what they
- * cover (AeronScene_SetProbeOcclusion), in place of the key light shadow's
- * cut. Off by default: it costs much and does not yet hold in every scene,
- * and the cut darkens the probe light under ships without it. Debug
- * inspector toggle, not persisted. */
+/* Ships inside the hangar's probe grid block the probe light on what they
+ * cover (AeronScene_SetProbeOcclusion), instead of the key light shadow
+ * removing it. Off by default, because it is expensive and does not yet
+ * work in every scene. When off, the key light shadow darkens the probe
+ * light under ships. Debug inspector toggle, not persisted. */
 static int g_ship_occlusion = 0;
 /* The hangar's floor reflects the ships on it when its probes package has
  * a reflection plane (AeronScene_SetPlanarReflection); debug inspector
@@ -520,8 +520,8 @@ static void ship_color(uint32_t argb, float out[4]) {
 
 /* FS b1 — mirrors cbuffer PbrLightFS (scene_pbr_lighting.hlsli). */
 typedef struct PbrLightFS {
-	float key_shadow_in_probes; /* the key light is in the probe sets' bake: its shadow cuts their light */
-	float key_probe_shadow;     /* the share of probe light its shadow removes */
+	float key_shadow_in_probes; /* nonzero: the key light is baked into the probes, so its shadow dims them */
+	float key_probe_shadow;     /* fraction of the probe light that the key shadow removes */
 	float debug_isolate_term;
 	float key_shadow_facing; /* nonzero: the key shadow only as surfaces face the light */
 	float reserved_xvt; /* formerly the XvT flat-shading switch */

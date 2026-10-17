@@ -67,15 +67,16 @@ void XwaRemasterFlight_GetShadowAtlasDebug(int* enabled, int* cascade);
 void XwaRemasterFlight_SetShadowAtlasDebug(int enabled, int cascade);
 void XwaRemasterFlight_GetShadowStats(AeronSceneDirectionalShadowStats* out);
 
-/* Debug switches: the models' probes (on by default; off, no probe set is
- * placed) and their outlines (off by default). */
+/* Debug switches. The Probes switch turns model probes on or off (on by
+ * default). When it is off, no probe set is placed. The ShowProbes switch
+ * draws the probe outlines (off by default). */
 void XwaRemasterFlight_SetProbes(int enabled);
 int XwaRemasterFlight_Probes(void);
 void XwaRemasterFlight_SetShowProbes(int show);
 int XwaRemasterFlight_ShowProbes(void);
 
-/* A probe set the last flight frame placed, for the debug rows. A copy: it
- * stays valid after its model's mesh goes. */
+/* A probe set placed by the last flight frame, for the debug rows. It is a
+ * copy, so it stays valid after the model's mesh is released. */
 typedef struct XwaFlightProbeSetInfo {
 	char model[64];
 	uint16_t slot; /* the owner object's slot */

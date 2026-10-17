@@ -1273,7 +1273,7 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 		XwaRemasterEnvironment_SetAuthoredEnvironments(authored ? 1 : 0);
 	}
 	ImGui::TextDisabled(
-		"Off: the regions use the classic path (for comparison and profiling).");
+		"When off, all regions use the classic path (for comparison and profiling).");
 	XwaEnvironmentSelection selection;
 	char mission[128];
 	if (XwaRemasterEnvironment_LastSelection(&selection, mission, sizeof mission)) {
@@ -1301,7 +1301,7 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 	if (ImGui::Checkbox("Probes", &probes)) {
 		XwaRemasterFlight_SetProbes(probes ? 1 : 0);
 	}
-	ImGui::SetItemTooltip("Off: no model's probes light the scene (for comparison and profiling).");
+	ImGui::SetItemTooltip("When off, model probes do not light the scene (for comparison and profiling).");
 	const XwaFlightProbeSetInfo* sets = nullptr;
 	const uint32_t set_count = XwaRemasterFlight_ProbeSets(&sets);
 	ImGui::Text("Probe sets: %u", set_count);

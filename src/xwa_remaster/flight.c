@@ -260,8 +260,8 @@ static struct {
 	int sky_mode;
 	/* Environment selection resolved at the start of each flight frame. */
 	XwaEnvironmentSelection environment;
-	/* The frame's probe sets: their owners' walk indices, as placed, and
-	 * the copies the debug rows read. */
+	/* Probe sets placed this frame: the walk index of each owner object,
+	 * the placed sets, and copies of their info for the debug rows. */
 	uint32_t probe_set_object[AERON_SCENE_MAX_PROBE_SETS];
 	XwaProbeOutlineSet probe_sets[AERON_SCENE_MAX_PROBE_SETS];
 	XwaFlightProbeSetInfo probe_set_info[AERON_SCENE_MAX_PROBE_SETS];
@@ -1116,7 +1116,7 @@ void XwaRemasterFlight_GetShadowAtlasDebug(int* enabled, int* cascade) {
 		*cascade = s.shadow_debug_atlas_cascade;
 }
 
-/* Debug switches; they survive flight sessions. */
+/* Debug switches. They keep their value across flight sessions. */
 static int s_probes_enabled = 1;
 static int s_show_probes;
 
@@ -3245,10 +3245,10 @@ static void fl_finalize_point_lights(void) {
 	}
 }
 
-/* Places the probe sets of the drawn objects whose model has probes (its
- * mesh's), closest to the camera first, up to the scene's limit. Each
- * owner's instance takes its own set; the other instances take the first
- * set their bounds overlap, so the closest set wins where sets meet. */
+/* Places a probe set on each drawn object whose model mesh has probes,
+ * closest to the camera first, up to the scene's limit. The instance of
+ * each owner object uses its own set. Other instances use the first set
+ * whose bounds they overlap, so the closest set wins where sets meet. */
 static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
 								const XwaRemasterFlightView* view) {
 	const XwaFlightCamera* cam = &snap->flight_camera;
@@ -3309,8 +3309,8 @@ static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap
 	}
 }
 
-/* The probe set of the hangar model (the launch reference) when it placed
- * it, else NULL. */
+/* Returns the probe set of the hangar model (the launch reference object)
+ * if this frame placed it, else NULL. */
 static const AeronProbeSet* fl_hangar_probe_set(const XwaSnapshot* snap) {
 	for (uint32_t k = 0; k < s.probe_set_count; k++) {
 		if ((int32_t)snap->flight_objects[s.probe_set_object[k]].slot ==
@@ -4337,11 +4337,12 @@ static void fl_set_package_ambient(FlSceneLighting* out, const AeronEnvironmentP
 	out->ambient = &out->ambient_cube;
 }
 
-/* Region package: its fill replaces the ambient. When it gives directional
- * lights (always with a sky), they replace the backdrop-derived
- * directionals; recovered lights without a backdrop source are kept, since
- * they are not known to belong to the sky. The declared primary is then the
- * key and the only shadow caster. A package without lights keeps the
+/* Applies a region package. Its fill replaces the ambient. If the package
+ * has directional lights (a package with a sky always has them), they
+ * replace the directional lights derived from backdrops. Recovered lights
+ * without a backdrop source are kept, because they are not known to belong
+ * to the sky. The package's declared primary light then becomes the key
+ * light and the only shadow caster. A package without lights keeps the
  * recovered lights and key selection. */
 static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronEnvironmentPackage* package,
 									   FlSceneLighting* out) {
@@ -4440,11 +4441,12 @@ static void fl_build_scene_lighting(const XwaSnapshot* snap, const XwaFlightCame
 	out->key_index = -1;
 	out->shadow_allowed = 1;
 	out->shadow_angular_radius_degrees = s.shadows.light_angular_radius_degrees;
-	/* The hangar is lit by its own rig and its model's probes. Its region's
-	 * package gives only its sky there: in a hangar without probes, its
-	 * fill, cubes and suns would light the interior through walls that cast
-	 * no shadow, and its suns would take the one shadow map from the rig
-	 * key, whose shadow cuts the probe light under parked ships. */
+	/* The hangar uses its own light rig and the probes of the hangar model.
+	 * The region's package only provides the sky in the hangar. In a hangar
+	 * without probes, the package's fill, cubes and suns would light the
+	 * interior through walls that cast no shadow. The package's suns would
+	 * also take the only shadow map from the rig's key light, whose shadow
+	 * removes probe light under parked ships. */
 	if (cam->in_hangar) {
 		fl_build_hangar_lighting(snap, out);
 		return;
@@ -4811,10 +4813,11 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * open); point-light candidates start with the accessor-law
 	 * sources (glow lights + pulses append during/after the walk). */
 	fl_derive_billboards(snap, assets, billboard_history_cam, billboard_history_crows);
-	/* A package's sky is atomic: its sky, suns, lights and flares replace
-	 * the configured sky, the recovered backdrop sprites, the
-	 * backdrop-derived directionals and the backdrop-sun flares together.
-	 * A package without a sky keeps the sky, the sprites and the flares. */
+	/* A package with a sky replaces all of these together: its sky, suns,
+	 * lights and flares replace the configured sky, the recovered backdrop
+	 * sprites, the directional lights derived from backdrops and the
+	 * backdrop sun flares. A package without a sky keeps the configured
+	 * sky, the sprites and the flares. */
 	const AeronEnvironmentPackage* region_package =
 		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.package : NULL;
 	const AeronEnvironmentPackage* sky_package =
@@ -5224,8 +5227,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		s.snap = NULL;
 		return NULL;
 	}
-	/* The configured ceiling light is in the hangar's probes: it only casts
-	 * shadows where they apply, as strong as the package says. */
+	/* The configured ceiling light is baked into the hangar's probes. Its
+	 * shadow applies only where the probes apply, with the strength that
+	 * the probe set gives. */
 	const AeronProbeSet* hangar_probes = NULL;
 	if (cam->in_hangar && scene_lighting.lights == &scene_lighting.hangar_key) {
 		hangar_probes = fl_hangar_probe_set(snap);

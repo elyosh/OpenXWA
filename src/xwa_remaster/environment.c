@@ -389,8 +389,9 @@ int XwaRemasterEnvironment_NeedsPrepare(const XwaSnapshot* snap) {
 	return env_snapshot_key(snap, key, sizeof key) && strcmp(key, s_env.prepared_key) != 0;
 }
 
-/* Prepares the mission's regions when the mission changed, or always with
- * `force` (keeping the prepared mission without a key). */
+/* Prepares the mission's regions when the mission key changed. With
+ * `force`, prepares them in any case, and a snapshot without a mission key
+ * prepares the last prepared mission again. */
 static void env_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap, int force) {
 	char key[XWA_ENV_MISSION_KEY_MAX];
 	const int has_key = env_snapshot_key(snap, key, sizeof key);
@@ -400,8 +401,8 @@ static void env_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap, int fo
 	if (!has_key) {
 		snprintf(key, sizeof key, "%s", s_env.prepared_key);
 	}
-	/* Every mapped region, so a hyperspace region change never loads
-	 * anything. Textures shared by path are uploaded once. */
+	/* Prepare all mapped regions, so a hyperspace jump to another region
+	 * loads nothing. Textures with the same path are uploaded once. */
 	AeronEnvironmentReference references[ENV_MAX_REGIONS];
 	uint32_t count = 0;
 	int32_t regions[ENV_MAX_REGIONS] = { -1, -1, -1, -1 };
@@ -423,8 +424,8 @@ static void env_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap, int fo
 	Aeron_LogInfo("xwa.remaster", "environment maps: prepared mission '%s' (%u references)", key, count);
 }
 
-/* Reads the manifest again into fresh state. Keeps the loaded state, and
- * returns 0, when the manifest has errors. */
+/* Reads the manifest again into a new state. If the manifest has errors,
+ * keeps the loaded state and returns 0. */
 static int env_reload_manifest(void) {
 	static EnvState loaded;
 	loaded = s_env;
@@ -448,10 +449,10 @@ void XwaRemasterEnvironment_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* 
 		env_prepare(cmd, snap, 0);
 		return;
 	}
-	/* Reload: read the definitions again too, so a new bake loads without a
-	 * restart. The textures of the current references are read again, then
-	 * everything is prepared from the new definitions, which can map other
-	 * packages. */
+	/* Reload: also read the package definitions again, so a new bake loads
+	 * without a restart. The textures of the current references are read
+	 * again, then everything is prepared from the new definitions, which
+	 * can map other packages. */
 	AeronEnvironmentDefinitionSet* previous = s_env.packages;
 	const int reread = env_reload_manifest();
 	if (reread) {
@@ -487,7 +488,8 @@ static const AeronEnvironmentPackage* env_package(int32_t prepared) {
 	return prepared >= 0 ? AeronEnvironmentLibrary_Find(s_env.library, (uint32_t)prepared) : NULL;
 }
 
-/* The mission region's package, or classic with the reason. */
+/* Selects the package of the mission region, or the classic path with the
+ * reason. */
 static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	if (!snap->mission_path[0]) {

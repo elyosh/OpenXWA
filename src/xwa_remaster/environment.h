@@ -7,20 +7,23 @@
  * The manifest (host option environment_maps.manifest, under the remaster
  * bake root)
  * holds Aeron's shared `packages:` map and an `xwa:` section that maps each
- * (mission path, region) to a package reference. A region's package
- * replaces the ambient with its fill and image-based lighting; with a sky
- * (`radiance`) it also replaces the classic sky, backdrops and backdrop
- * flares; with `directional_lights` it replaces the directional lights. A
- * mission or region without an entry keeps the classic HD path (the Death
- * Star behaviour in Death Star mode). A hangar resolves the region it was
- * entered from; the flight renderer takes only that package's sky there.
+ * (mission path, region) to a package reference.
  *
- * Packages are prepared through Aeron's environment library: every region
- * of a mission when the snapshot's normalized mission key changes, at the
- * HD asset synchronization point. A region becomes authored only once
- * its package is prepared and available. A model's probes come with its
- * GLB (AeronSceneMesh.probes); the flight renderer places them on the
- * objects of that model.
+ * A region's package replaces the ambient with its fill and image-based
+ * lighting. If the package has a sky (`radiance`), it also replaces the
+ * classic sky, backdrops and backdrop flares. If it has
+ * `directional_lights`, they replace the directional lights. A mission or
+ * region without an entry uses the classic HD path (the Death Star
+ * behaviour in Death Star mode). In a hangar, the selection uses the region
+ * the player entered the hangar from, and the flight renderer uses only
+ * the sky of that package.
+ *
+ * Packages are prepared through Aeron's environment library at the HD
+ * asset synchronization point. When the snapshot's normalized mission key
+ * changes, all regions of the mission are prepared. A region uses its
+ * package only after the package is prepared and available. A model's
+ * probes are stored in its GLB (AeronSceneMesh.probes), and the flight
+ * renderer places them on the objects that use that model.
  *
  * The selection is resolved from snapshot state alone, once per flight
  * frame, before any sky, backdrop, directional or lens-flare decision. It
@@ -85,22 +88,22 @@ void XwaRemasterEnvironment_Shutdown(void);
 
 int XwaRemasterEnvironment_Enabled(void);
 
-/* Debug switch for authored environments (on by default): off, the
- * regions use the classic path, for visual comparison and for
- * profiling the environments' cost. Packages stay prepared, so toggling it
+/* Debug switch for authored environments (on by default). When off, all
+ * regions use the classic path, for visual comparison and for profiling
+ * the cost of the environments. Packages stay prepared, so toggling it
  * loads nothing. */
 void XwaRemasterEnvironment_SetAuthoredEnvironments(int enabled);
 int XwaRemasterEnvironment_AuthoredEnvironments(void);
 
-/* Creates the package library. Failures are logged and leave the classic
- * path; returns 0 only on invalid arguments. */
+/* Creates the package library. Failures are logged, and the regions then
+ * use the classic path. Returns 0 only on invalid arguments. */
 int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd);
 
 /* Nonzero when the snapshot's mission key differs from the prepared one, or
  * a debug reload is pending. */
 int XwaRemasterEnvironment_NeedsPrepare(const struct XwaSnapshot* snap);
-/* Prepares the mission's regions (or services a reload) with
- * `cmd`. Failures are logged; the affected regions stay classic. */
+/* Prepares the mission's regions, or runs a pending reload, with `cmd`.
+ * Failures are logged, and the affected regions use the classic path. */
 void XwaRemasterEnvironment_Prepare(AeronCommandBuffer* cmd, const struct XwaSnapshot* snap);
 
 /* Normalizes a mission path into a lookup key: forward slashes, lower-case

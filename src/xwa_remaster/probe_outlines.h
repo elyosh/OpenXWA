@@ -16,8 +16,8 @@
 extern "C" {
 #endif
 
-/* A placed set: its probes and its owner's model matrix (model metres to
- * scene units, as passed to AeronScene_AddProbeSet). */
+/* A placed probe set and the model matrix of its owner object (model
+ * metres to scene units, as passed to AeronScene_AddProbeSet). */
 typedef struct XwaProbeOutlineSet {
 	const AeronProbeSet* probes;
 	float model[16];
