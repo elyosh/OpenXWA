@@ -25,12 +25,12 @@ typedef struct EnvMission {
 typedef struct EnvState {
 	int enabled;
 	char manifest_path[256];
-	AeronEnvironmentDefinitionSet* packages;
+	AeronEnvironmentDefinitionSet* definitions;
 	AeronEnvironmentReference references[ENV_MAX_REFERENCES];
 	uint32_t reference_count;
 	EnvMission missions[ENV_MAX_MISSIONS];
 	uint32_t mission_count;
-	/* Package library and the prepared reference set: indices as passed to
+	/* Environment library and the prepared reference set: indices as passed to
 	 * AeronEnvironmentLibrary_Prepare, -1 = not prepared. */
 	AeronEnvironmentLibrary* library;
 	char prepared_key[XWA_ENV_MISSION_KEY_MAX]; /* "" = no mission prepared */
@@ -137,33 +137,34 @@ static int env_read_rotation(const AeronConfigNode* node, const char* what, floa
 	return 1;
 }
 
-/* Adds a reference to a package. A reference is either a package name or
- * a map with `package` and an optional `rotation_degrees`. */
+/* Adds a reference to an environment. A reference is either an environment
+ * name or a map with `environment` and an optional `rotation_degrees`. */
 static int env_add_reference(const AeronConfigNode* node, const char* what, int32_t* out_index) {
-	static const char* const fields[] = { "package", "rotation_degrees" };
-	const AeronConfigNode* package_node = node;
+	static const char* const fields[] = { "environment", "rotation_degrees" };
+	const AeronConfigNode* name_node = node;
 	const AeronConfigNode* rotation_node = NULL;
 	if (AeronConfigNode_Type(node) == AERON_CONFIG_MAP) {
 		if (!env_check_fields(node, what, fields, sizeof fields / sizeof fields[0])) {
 			return 0;
 		}
-		package_node = AeronConfigNode_MapGet(node, "package");
-		if (!package_node) {
-			return env_node_error(node, "%s: missing required field 'package'", what);
+		name_node = AeronConfigNode_MapGet(node, "environment");
+		if (!name_node) {
+			return env_node_error(node, "%s: missing required field 'environment'", what);
 		}
 		rotation_node = AeronConfigNode_MapGet(node, "rotation_degrees");
 	}
-	if (AeronConfigNode_Type(package_node) != AERON_CONFIG_STRING) {
-		return env_node_error(package_node, "%s: must name a package", what);
+	if (AeronConfigNode_Type(name_node) != AERON_CONFIG_STRING) {
+		return env_node_error(name_node, "%s: must name an environment", what);
 	}
-	const char* name = AeronConfigNode_String(package_node, "");
-	const AeronEnvironmentDefinition* definition = AeronEnvironmentDefinitionSet_Find(s_env.packages, name);
+	const char* name = AeronConfigNode_String(name_node, "");
+	const AeronEnvironmentDefinition* definition =
+		AeronEnvironmentDefinitionSet_Find(s_env.definitions, name);
 	if (!definition) {
-		return env_node_error(package_node, "%s: unknown package '%s'", what, name);
+		return env_node_error(name_node, "%s: unknown environment '%s'", what, name);
 	}
 	AeronEnvironmentReference* reference = &s_env.references[s_env.reference_count];
 	memset(reference, 0, sizeof *reference);
-	snprintf(reference->package, sizeof reference->package, "%s", name);
+	snprintf(reference->environment, sizeof reference->environment, "%s", name);
 	if (rotation_node) {
 		if (!env_read_rotation(rotation_node, what, reference->rotation_degrees)) {
 			return 0;
@@ -252,7 +253,7 @@ static int env_parse_xwa(const AeronConfigNode* xwa) {
 }
 
 static int env_load_manifest(AeronVfs* vfs) {
-	static const char* const fields[] = { "version", "packages", "xwa" };
+	static const char* const fields[] = { "version", "environments", "xwa" };
 	char vfs_path[300];
 	snprintf(vfs_path, sizeof vfs_path, "remaster/%s", s_env.manifest_path);
 	AeronConfigFile* manifest = NULL;
@@ -275,8 +276,8 @@ static int env_load_manifest(AeronVfs* vfs) {
 			ok = env_node_error(version ? version : root, "manifest: 'version' must be 1");
 		}
 	}
-	if (ok &&
-		!AeronEnvironment_ParsePackages(AeronConfigNode_MapGet(root, "packages"), &s_env.packages, &error)) {
+	if (ok && !AeronEnvironment_ParseDefinitions(AeronConfigNode_MapGet(root, "environments"),
+												 &s_env.definitions, &error)) {
 		Aeron_LogError("xwa.remaster", "%s:%d: %s", error.path[0] ? error.path : vfs_path, error.line,
 					   error.message);
 		ok = 0;
@@ -286,8 +287,8 @@ static int env_load_manifest(AeronVfs* vfs) {
 	}
 	AeronConfigFile_Destroy(manifest);
 	if (ok) {
-		Aeron_LogInfo("xwa.remaster", "environment manifest %s: %u packages, %u missions", vfs_path,
-					  AeronEnvironmentDefinitionSet_Count(s_env.packages), s_env.mission_count);
+		Aeron_LogInfo("xwa.remaster", "environment manifest %s: %u environments, %u missions", vfs_path,
+					  AeronEnvironmentDefinitionSet_Count(s_env.definitions), s_env.mission_count);
 	}
 	return ok;
 }
@@ -323,7 +324,7 @@ static void env_clear_prepared(void) {
 void XwaRemasterEnvironment_Shutdown(void) {
 	/* The library borrows the definitions. */
 	AeronEnvironmentLibrary_Destroy(s_env.library);
-	AeronEnvironmentDefinitionSet_Destroy(s_env.packages);
+	AeronEnvironmentDefinitionSet_Destroy(s_env.definitions);
 	memset(&s_env, 0, sizeof s_env);
 	env_clear_prepared();
 }
@@ -350,7 +351,7 @@ int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd) {
 	}
 	AeronEnvironmentLibraryDesc desc;
 	memset(&desc, 0, sizeof desc);
-	desc.definitions = s_env.packages;
+	desc.definitions = s_env.definitions;
 	desc.vfs = Aeron_GetVfs();
 	desc.root = AERON_VFS_ROOT_ASSET;
 	desc.path_prefix = "remaster/";
@@ -359,7 +360,7 @@ int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd) {
 	s_env.library = AeronEnvironmentLibrary_Create(&desc);
 	if (!s_env.library) {
 		Aeron_LogError("xwa.remaster",
-					   "environment maps: package library creation failed; classic path only");
+					   "environment maps: environment library creation failed; classic path only");
 		return 1;
 	}
 #ifdef AERON_DEBUG_UI
@@ -429,13 +430,13 @@ static void env_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap, int fo
 static int env_reload_manifest(void) {
 	static EnvState loaded;
 	loaded = s_env;
-	s_env.packages = NULL;
+	s_env.definitions = NULL;
 	s_env.reference_count = 0;
 	s_env.mission_count = 0;
 	if (env_load_manifest(Aeron_GetVfs())) {
 		return 1;
 	}
-	AeronEnvironmentDefinitionSet_Destroy(s_env.packages);
+	AeronEnvironmentDefinitionSet_Destroy(s_env.definitions);
 	s_env = loaded;
 	Aeron_LogError("xwa.remaster", "environment reload: the manifest has errors; keeping the loaded one");
 	return 0;
@@ -449,19 +450,19 @@ void XwaRemasterEnvironment_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* 
 		env_prepare(cmd, snap, 0);
 		return;
 	}
-	/* Reload: also read the package definitions again, so a new bake loads
-	 * without a restart. The textures of the current references are read
-	 * again, then everything is prepared from the new definitions, which
-	 * can map other packages. */
-	AeronEnvironmentDefinitionSet* previous = s_env.packages;
+	/* Reload: also read the environment definitions again, so a new bake
+	 * loads without a restart. The textures of the current references are
+	 * read again, then everything is prepared from the new definitions,
+	 * which can map other environments. */
+	AeronEnvironmentDefinitionSet* previous = s_env.definitions;
 	const int reread = env_reload_manifest();
 	if (reread) {
-		AeronEnvironmentLibrary_SetDefinitions(s_env.library, s_env.packages);
+		AeronEnvironmentLibrary_SetDefinitions(s_env.library, s_env.definitions);
 	}
 	AeronEnvironmentLibrary_ServiceReload(s_env.library, cmd);
 	env_prepare(cmd, snap, reread);
 	if (reread) {
-		/* The published packages now point into the new set. */
+		/* The prepared environments now point into the new set. */
 		AeronEnvironmentDefinitionSet_Destroy(previous);
 	}
 }
@@ -480,16 +481,16 @@ static void env_select(XwaEnvironmentSelection* out, XwaEnvironmentMode mode, Xw
 	out->mode = mode;
 	out->fallback = fallback;
 	out->reference = reference >= 0 ? &s_env.references[reference] : NULL;
-	out->package = NULL;
+	out->prepared = NULL;
 }
 
-/* The prepared package at library index `prepared`, or NULL. */
-static const AeronEnvironmentPackage* env_package(int32_t prepared) {
+/* The prepared environment at library index `prepared`, or NULL. */
+static const AeronPreparedEnvironment* env_prepared(int32_t prepared) {
 	return prepared >= 0 ? AeronEnvironmentLibrary_Find(s_env.library, (uint32_t)prepared) : NULL;
 }
 
-/* Selects the package of the mission region, or the classic path with the
- * reason. */
+/* Selects the environment of the mission region, or the classic path with
+ * the reason. */
 static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	if (!snap->mission_path[0]) {
@@ -512,9 +513,9 @@ static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection*
 		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_NO_REGION_ENTRY, -1);
 		return;
 	}
-	const AeronEnvironmentPackage* package =
-		strcmp(key, s_env.prepared_key) == 0 ? env_package(s_env.prepared_region[region]) : NULL;
-	if (!package) {
+	const AeronPreparedEnvironment* prepared =
+		strcmp(key, s_env.prepared_key) == 0 ? env_prepared(s_env.prepared_region[region]) : NULL;
+	if (!prepared) {
 		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_NOT_READY, reference);
 		return;
 	}
@@ -523,7 +524,7 @@ static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection*
 		return;
 	}
 	env_select(out, XWA_ENV_MODE_AUTHORED, XWA_ENV_FALLBACK_NONE, reference);
-	out->package = package;
+	out->prepared = prepared;
 }
 
 static void env_resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
@@ -537,7 +538,7 @@ static void env_resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 		env_select(out, XWA_ENV_MODE_DISABLED, XWA_ENV_FALLBACK_NONE, -1);
 		return;
 	}
-	/* A Death Star region takes its mapped package like any other; without
+	/* A Death Star region uses its mapped environment like any other; without
 	 * one it keeps the Death Star behaviour, with the reason. */
 	if (cam->death_star_mode) {
 		env_resolve_region(snap, out);
@@ -556,8 +557,8 @@ void XwaRemasterEnvironment_Resolve(const XwaSnapshot* snap, XwaEnvironmentSelec
 	env_resolve(snap, out);
 	if (s_env.library) {
 		int32_t active = -1;
-		for (int r = 0; r < ENV_MAX_REGIONS && out->package && active < 0; r++) {
-			if (out->package == env_package(s_env.prepared_region[r])) {
+		for (int r = 0; r < ENV_MAX_REGIONS && out->prepared && active < 0; r++) {
+			if (out->prepared == env_prepared(s_env.prepared_region[r])) {
 				active = s_env.prepared_region[r];
 			}
 		}
@@ -573,7 +574,7 @@ void XwaRemasterEnvironment_Resolve(const XwaSnapshot* snap, XwaEnvironmentSelec
 	snprintf(s_env.last_mission, sizeof s_env.last_mission, "%s", snap->mission_path);
 	Aeron_LogInfo("xwa.remaster", "environment: mission '%s' region %u -> %s%s%s%s%s", snap->mission_path,
 				  (unsigned)out->region, XwaRemasterEnvironment_ModeName(out->mode),
-				  out->reference ? " package " : "", out->reference ? out->reference->package : "",
+				  out->reference ? " environment " : "", out->reference ? out->reference->environment : "",
 				  out->fallback != XWA_ENV_FALLBACK_NONE ? ", fallback: " : "",
 				  out->fallback != XWA_ENV_FALLBACK_NONE ? XwaRemasterEnvironment_FallbackName(out->fallback)
 														 : "");
@@ -623,7 +624,7 @@ const char* XwaRemasterEnvironment_FallbackName(XwaEnvironmentFallback fallback)
 		case XWA_ENV_FALLBACK_NO_REGION_ENTRY:
 			return "region not mapped";
 		case XWA_ENV_FALLBACK_NOT_READY:
-			return "package not ready";
+			return "environment not ready";
 		case XWA_ENV_FALLBACK_AUTHORED_OFF:
 			return "authored environments switch off";
 	}

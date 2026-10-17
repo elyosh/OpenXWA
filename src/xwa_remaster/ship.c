@@ -91,8 +91,8 @@ static int g_key_shadow_all_sides = 1;
  * work in every scene. When off, the key light shadow darkens the probe
  * light under ships. Debug inspector toggle, not persisted. */
 static int g_ship_occlusion = 0;
-/* The hangar's floor reflects the ships on it when its probes package has
- * a reflection plane (AeronScene_SetPlanarReflection); debug inspector
+/* The hangar's floor reflects the ships on it when its probes have a
+ * reflection plane (AeronScene_SetPlanarReflection); debug inspector
  * toggle, not persisted. */
 static int g_floor_reflection = 1;
 static AeronEffectAtlas* s_effect_atlas;
@@ -744,7 +744,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	}
 
 	/* A backdrop sun is the key even when a planet has slightly greater
-	 * intensity, unless the caller names the key (authored packages
+	 * intensity, unless the caller names the key (authored environments
 	 * declare their primary). The classic sums plain Lambert per
 	 * ADDITIONAL light, so the three brightest remaining lights feed
 	 * diffuse-only extra slots. Each light's color is decoded to linear

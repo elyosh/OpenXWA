@@ -2727,14 +2727,14 @@ static void fl_lens_add_source(const XwaRemasterFlightView* flight_view, const f
 	src->argb = argb;
 }
 
-/* Authored package lights that request a flare are direction sources at
+/* Authored environment lights that request a flare are direction sources at
  * infinity like backdrop suns. Their unit directions are scaled to the
  * backdrop Q20 magnitude so the anchor's depth reference also lands at the
  * far plane. */
-static void fl_derive_authored_lens_sources(const AeronEnvironmentPackage* package,
+static void fl_derive_authored_lens_sources(const AeronPreparedEnvironment* environment,
 											const XwaRemasterFlightView* flight_view) {
-	for (uint32_t i = 0; i < package->light_count && s.lens_src_count < FL_MAX_LENS_SOURCES; i++) {
-		const AeronEnvironmentLight* light = &package->lights[i];
+	for (uint32_t i = 0; i < environment->light_count && s.lens_src_count < FL_MAX_LENS_SOURCES; i++) {
+		const AeronEnvironmentLight* light = &environment->lights[i];
 		if (!light->lens_flare) {
 			continue;
 		}
@@ -2754,7 +2754,7 @@ static void fl_derive_authored_lens_sources(const AeronEnvironmentPackage* packa
 
 static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* assets,
 								  const XwaRemasterFlightView* flight_view,
-								  const AeronEnvironmentPackage* authored) {
+								  const AeronPreparedEnvironment* authored) {
 	s.lens_src_count = 0;
 	s.lens_ok = 0;
 	const XwaFlightCamera* cam = &snap->flight_camera;
@@ -2765,7 +2765,7 @@ static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* as
 	/* Backdrop suns: direction sources at infinity (raw Q20 world
 	 * dirs; projection is magnitude-independent, the anchor's large
 	 * magnitude lands the depth reference at the far plane). An authored
-	 * package replaces them. */
+	 * sky replaces them. */
 	for (uint32_t i = 0; !authored && i < snap->backdrop_count && s.lens_src_count < FL_MAX_LENS_SOURCES;
 		 i++) {
 		const XwaBackdrop* b = &snap->backdrops[i];
@@ -4282,17 +4282,17 @@ typedef struct FlSceneLighting {
 	XwaShipAmbientCube ambient_cube;
 	const XwaShipAmbientCube* ambient;
 	int hangar_override;
-	/* Region package: the package to bind, the combined light list
-	 * (package lights, then kept recovered lights), the explicit key and
-	 * the shadow policy. key_index -1 keeps the recovered key selection.
-	 * package_lights is set when the package's lights replace the
-	 * recovered ones. */
-	const AeronEnvironmentPackage* package;
+	/* Region environment: the prepared environment to bind, the combined
+	 * light list (environment lights, then kept recovered lights), the
+	 * explicit key and the shadow policy. key_index -1 keeps the recovered
+	 * key selection. environment_lights is set when the environment's lights
+	 * replace the recovered ones. */
+	const AeronPreparedEnvironment* environment;
 	XwaDirLight authored_lights[XWA_SNAP_MAX_DIR_LIGHTS];
 	int32_t key_index;
 	int shadow_allowed;
 	float shadow_angular_radius_degrees;
-	int package_lights;
+	int environment_lights;
 } FlSceneLighting;
 
 static int fl_is_default_hangar_lighting(const XwaSnapshot* snap) {
@@ -4308,10 +4308,10 @@ static int fl_is_default_hangar_lighting(const XwaSnapshot* snap) {
 		   fabsf(light->color[2] - 1.0f) <= epsilon;
 }
 
-/* A package light as a runtime directional: the largest linear channel is
- * the scalar intensity, and the normalized colour is sRGB-encoded so the
+/* An environment light as a runtime directional: the largest linear channel
+ * is the scalar intensity, and the normalized colour is sRGB-encoded so the
  * PBR path decodes it back without loss. Never a backdrop source. */
-static void fl_package_light_to_dir_light(const AeronEnvironmentLight* light, XwaDirLight* out) {
+static void fl_environment_light_to_dir_light(const AeronEnvironmentLight* light, XwaDirLight* out) {
 	memset(out, 0, sizeof *out);
 	out->source_backdrop_index = -1;
 	memcpy(out->world_dir, light->direction_world, sizeof out->world_dir);
@@ -4325,35 +4325,35 @@ static void fl_package_light_to_dir_light(const AeronEnvironmentLight* light, Xw
 	}
 }
 
-/* While a package is bound it owns the ambient: its authored fill replaces
- * the game's ambient cube in every direction (the diffuse cube adds the
- * directional part). */
-static void fl_set_package_ambient(FlSceneLighting* out, const AeronEnvironmentPackage* package) {
+/* While an environment is bound it owns the ambient: its authored fill
+ * replaces the game's ambient cube in every direction (the diffuse cube adds
+ * the directional part). */
+static void fl_set_environment_ambient(FlSceneLighting* out, const AeronPreparedEnvironment* environment) {
 	float* const lobes[6] = { out->ambient_cube.pos_x, out->ambient_cube.neg_x, out->ambient_cube.pos_y,
 							  out->ambient_cube.neg_y, out->ambient_cube.pos_z, out->ambient_cube.neg_z };
 	for (int lobe = 0; lobe < 6; lobe++) {
-		memcpy(lobes[lobe], package->settings.ambient_fill, 3 * sizeof(float));
+		memcpy(lobes[lobe], environment->settings.ambient_fill, 3 * sizeof(float));
 	}
 	out->ambient = &out->ambient_cube;
 }
 
-/* Applies a region package. Its fill replaces the ambient. If the package
- * has directional lights (a package with a sky always has them), they
- * replace the directional lights derived from backdrops. Recovered lights
- * without a backdrop source are kept, because they are not known to belong
- * to the sky. The package's declared primary light then becomes the key
- * light and the only shadow caster. A package without lights keeps the
- * recovered lights and key selection. */
-static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronEnvironmentPackage* package,
+/* Applies a region environment. Its fill replaces the ambient. If the
+ * environment has directional lights (an environment with a sky always has
+ * them), they replace the directional lights derived from backdrops.
+ * Recovered lights without a backdrop source are kept, because they are not
+ * known to belong to the sky. The environment's declared primary light then
+ * becomes the key light and the only shadow caster. An environment without
+ * lights keeps the recovered lights and key selection. */
+static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronPreparedEnvironment* environment,
 									   FlSceneLighting* out) {
-	out->package = package;
-	fl_set_package_ambient(out, package);
-	if (!package->definition->has_directional_lights) {
+	out->environment = environment;
+	fl_set_environment_ambient(out, environment);
+	if (!environment->definition->has_directional_lights) {
 		return;
 	}
 	uint32_t count = 0;
-	for (uint32_t i = 0; i < package->light_count && count < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
-		fl_package_light_to_dir_light(&package->lights[i], &out->authored_lights[count++]);
+	for (uint32_t i = 0; i < environment->light_count && count < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
+		fl_environment_light_to_dir_light(&environment->lights[i], &out->authored_lights[count++]);
 	}
 	uint32_t kept = 0;
 	for (uint32_t i = 0; i < snap->dir_light_count && count < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
@@ -4365,11 +4365,11 @@ static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronEnvir
 	/* In flight every recovered directional comes from a backdrop, so a kept
 	 * untagged light is unexpected (a special scene, or a backdrop the
 	 * snapshot could not trace) and may double-light the region. Logged
-	 * once per package and region. */
-	static const AeronEnvironmentPackage* warned_package;
+	 * once per environment and region. */
+	static const AeronPreparedEnvironment* warned_environment;
 	static uint8_t warned_region;
-	if (kept > 0 && (warned_package != package || warned_region != snap->flight_camera.region)) {
-		warned_package = package;
+	if (kept > 0 && (warned_environment != environment || warned_region != snap->flight_camera.region)) {
+		warned_environment = environment;
 		warned_region = snap->flight_camera.region;
 		Aeron_LogWarn("xwa.remaster",
 					  "environment: authored region %u keeps %u recovered directional(s) without a backdrop "
@@ -4378,12 +4378,12 @@ static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronEnvir
 	}
 	out->lights = out->authored_lights;
 	out->light_count = count;
-	out->key_index = package->primary_light_index;
+	out->key_index = environment->primary_light_index;
 	const AeronEnvironmentLight* primary =
-		package->primary_light_index >= 0 ? &package->lights[package->primary_light_index] : NULL;
+		environment->primary_light_index >= 0 ? &environment->lights[environment->primary_light_index] : NULL;
 	out->shadow_allowed = primary && primary->casts_shadows;
 	out->shadow_angular_radius_degrees = primary ? primary->angular_radius_degrees : 0.0f;
-	out->package_lights = 1;
+	out->environment_lights = 1;
 }
 
 static void fl_build_hangar_lighting(const XwaSnapshot* snap, FlSceneLighting* out) {
@@ -4442,17 +4442,17 @@ static void fl_build_scene_lighting(const XwaSnapshot* snap, const XwaFlightCame
 	out->shadow_allowed = 1;
 	out->shadow_angular_radius_degrees = s.shadows.light_angular_radius_degrees;
 	/* The hangar uses its own light rig and the probes of the hangar model.
-	 * The region's package only provides the sky in the hangar. In a hangar
-	 * without probes, the package's fill, cubes and suns would light the
-	 * interior through walls that cast no shadow. The package's suns would
+	 * The region's environment only provides the sky in the hangar. In a
+	 * hangar without probes, the environment's fill, cubes and suns would
+	 * light the interior through walls that cast no shadow. Its suns would
 	 * also take the only shadow map from the rig's key light, whose shadow
 	 * removes probe light under parked ships. */
 	if (cam->in_hangar) {
 		fl_build_hangar_lighting(snap, out);
 		return;
 	}
-	if (s.environment.mode == XWA_ENV_MODE_AUTHORED && s.environment.package) {
-		fl_apply_authored_lighting(snap, s.environment.package, out);
+	if (s.environment.mode == XWA_ENV_MODE_AUTHORED && s.environment.prepared) {
+		fl_apply_authored_lighting(snap, s.environment.prepared, out);
 	}
 }
 
@@ -4813,21 +4813,21 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * open); point-light candidates start with the accessor-law
 	 * sources (glow lights + pulses append during/after the walk). */
 	fl_derive_billboards(snap, assets, billboard_history_cam, billboard_history_crows);
-	/* A package with a sky replaces all of these together: its sky, suns,
-	 * lights and flares replace the configured sky, the recovered backdrop
-	 * sprites, the directional lights derived from backdrops and the
-	 * backdrop sun flares. A package without a sky keeps the configured
-	 * sky, the sprites and the flares. */
-	const AeronEnvironmentPackage* region_package =
-		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.package : NULL;
-	const AeronEnvironmentPackage* sky_package =
-		region_package && region_package->radiance ? region_package : NULL;
-	fl_derive_lens_flares(snap, assets, &flight_view, sky_package);
+	/* An environment with a sky replaces all of these together: its sky,
+	 * suns, lights and flares replace the configured sky, the recovered
+	 * backdrop sprites, the directional lights derived from backdrops and
+	 * the backdrop sun flares. An environment without a sky keeps the
+	 * configured sky, the sprites and the flares. */
+	const AeronPreparedEnvironment* region_environment =
+		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.prepared : NULL;
+	const AeronPreparedEnvironment* sky_environment =
+		region_environment && region_environment->radiance ? region_environment : NULL;
+	fl_derive_lens_flares(snap, assets, &flight_view, sky_environment);
 	fl_begin_point_lights(&flight_view);
 	fl_derive_point_lights(snap);
-	s.bd_count = sky_package ? 0
-						  : fl_derive_backdrops(snap, s.crows, assets, FL_BACKDROPS_ALL, 0, s.bd_quads,
-												FL_MAX_BACKDROP_QUADS);
+	s.bd_count = sky_environment ? 0
+								 : fl_derive_backdrops(snap, s.crows, assets, FL_BACKDROPS_ALL, 0, s.bd_quads,
+													   FL_MAX_BACKDROP_QUADS);
 	XwaRemasterEffectView effect_view;
 	XwaRemasterEffectView_Main(&effect_view, &flight_view, s.crows);
 	XwaRemasterEffectView previous_effect_view;
@@ -4855,8 +4855,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	float shadow_light_dir[3];
 	/* Preserve the classic directional fill inside the sealed Death Star,
 	 * but do not let its backdrop light cast exterior shadows in the tunnel.
-	 * Lights from a region package follow the package's shadow policy. */
-	const int shadows_active = (!cam->death_star_mode || scene_lighting.package_lights) &&
+	 * Lights from a region environment follow its shadow policy. */
+	const int shadows_active = (!cam->death_star_mode || scene_lighting.environment_lights) &&
 							   s.shadows.enabled && scene_lighting.shadow_allowed &&
 							   fl_key_directional_light(scene_lighting.lights, scene_lighting.light_count,
 														scene_lighting.key_index, shadow_light_dir);
@@ -4936,11 +4936,11 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * cube basis, so it orients consistently with authored cubes; its
 	 * twinkle advances off the sim clock (game_time_ticks), not wall time,
 	 * so it is deterministic and pauses with the game. */
-	if (sky_package) {
-		AeronScene_SetSkyCube(s.scene, sky_package->radiance, sky_package->world_to_cube,
-							  sky_package->settings.intensity);
-		for (uint32_t i = 0; i < sky_package->light_count; i++) {
-			AeronScene_AddSkySun(s.scene, &sky_package->lights[i]);
+	if (sky_environment) {
+		AeronScene_SetSkyCube(s.scene, sky_environment->radiance, sky_environment->world_to_cube,
+							  sky_environment->settings.intensity);
+		for (uint32_t i = 0; i < sky_environment->light_count; i++) {
+			AeronScene_AddSkySun(s.scene, &sky_environment->lights[i]);
 		}
 	} else if (!cam->death_star_mode) {
 		if (s.sky_mode == 1) {
@@ -5238,8 +5238,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 							  scene_lighting.key_index, NULL, s.camera_local, ao_on ? &ao : NULL,
 							  scene_lighting.ambient, NULL,
 							  hangar_probes ? hangar_probes->layout.key_light_shadow : -1.0f);
-	if (scene_lighting.package) {
-		AeronScene_SetPbrEnvironmentPackage(s.scene, scene_lighting.package);
+	if (scene_lighting.environment) {
+		AeronScene_SetPbrPreparedEnvironment(s.scene, scene_lighting.environment);
 	}
 
 	/* Player cockpit (lit; classic runs the normal light setup). Gates

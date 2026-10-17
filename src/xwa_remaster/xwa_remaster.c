@@ -635,7 +635,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		flight_render_needed && XwaRemasterAssets_FlightTexturesNeedSync(g.assets, snap);
 	const int process_assets_need_prepare = flight_render_needed && snap->scene_kind == XWA_SCENE_LOADING &&
 											XwaRemasterFlight_ProcessAssetsNeedPrepare();
-	/* Authored environment packages are prepared when the mission key changes
+	/* Authored environments are prepared when the mission key changes
 	 * (or a debug reload is pending), never from the flight render. */
 	const int environment_needs_prepare = flight_render_needed && XwaRemasterEnvironment_NeedsPrepare(snap);
 	const int assets_need_sync =

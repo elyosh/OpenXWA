@@ -5,23 +5,22 @@
  * HD authored environments: XWA mapping and per-frame selection.
  *
  * The manifest (host option environment_maps.manifest, under the remaster
- * bake root)
- * holds Aeron's shared `packages:` map and an `xwa:` section that maps each
- * (mission path, region) to a package reference.
+ * bake root) holds Aeron's shared `environments:` map and an `xwa:` section
+ * that maps each (mission path, region) to an environment reference.
  *
- * A region's package replaces the ambient with its fill and image-based
- * lighting. If the package has a sky (`radiance`), it also replaces the
+ * A region's environment replaces the ambient with its fill and image-based
+ * lighting. If the environment has a sky (`radiance`), it also replaces the
  * classic sky, backdrops and backdrop flares. If it has
  * `directional_lights`, they replace the directional lights. A mission or
  * region without an entry uses the classic HD path (the Death Star
  * behaviour in Death Star mode). In a hangar, the selection uses the region
  * the player entered the hangar from, and the flight renderer uses only
- * the sky of that package.
+ * the sky of that environment.
  *
- * Packages are prepared through Aeron's environment library at the HD
+ * Environments are prepared through Aeron's environment library at the HD
  * asset synchronization point. When the snapshot's normalized mission key
- * changes, all regions of the mission are prepared. A region uses its
- * package only after the package is prepared and available. A model's
+ * changes, the environments of all the mission's regions are prepared. A
+ * region uses its environment only after it is prepared and available. A model's
  * probes are stored in its GLB (AeronSceneMesh.probes), and the flight
  * renderer places them on the objects that use that model.
  *
@@ -47,8 +46,8 @@ struct XwaSnapshot;
 typedef enum XwaEnvironmentMode {
 	XWA_ENV_MODE_DISABLED,   /* feature disabled: current sky and ambient */
 	XWA_ENV_MODE_HYPERSPACE, /* dynamic hyperspace diffuse environment */
-	XWA_ENV_MODE_DEATH_STAR, /* Death Star region without a package: current behaviour */
-	XWA_ENV_MODE_AUTHORED,   /* the region's package: its lighting, and its sky when it has one */
+	XWA_ENV_MODE_DEATH_STAR, /* Death Star region without an environment: current behaviour */
+	XWA_ENV_MODE_AUTHORED,   /* the region's environment: its lighting, and its sky when it has one */
 	XWA_ENV_MODE_CLASSIC,    /* complete classic path */
 } XwaEnvironmentMode;
 
@@ -58,18 +57,18 @@ typedef enum XwaEnvironmentFallback {
 	XWA_ENV_FALLBACK_INVALID_MISSION,  /* mission path cannot be normalized */
 	XWA_ENV_FALLBACK_NO_MISSION_ENTRY, /* mission not in the mapping */
 	XWA_ENV_FALLBACK_NO_REGION_ENTRY,  /* region not in the mission's mapping */
-	XWA_ENV_FALLBACK_NOT_READY,        /* mapped package not prepared or unavailable */
+	XWA_ENV_FALLBACK_NOT_READY,        /* mapped environment not prepared or unavailable */
 	XWA_ENV_FALLBACK_AUTHORED_OFF,     /* authored environments switched off in the debug tool */
 } XwaEnvironmentFallback;
 
 typedef struct XwaEnvironmentSelection {
 	XwaEnvironmentMode mode;
 	XwaEnvironmentFallback fallback;
-	/* Region reference; NULL when the mode uses no package. */
+	/* Region reference; NULL when the mode uses no environment. */
 	const AeronEnvironmentReference* reference;
-	/* Prepared package for the reference; NULL unless the mode uses one and
-	 * it is available. */
-	const AeronEnvironmentPackage* package;
+	/* Prepared environment for the reference; NULL unless the mode uses one
+	 * and it is available. */
+	const AeronPreparedEnvironment* prepared;
 	uint8_t region; /* flight_camera.mission_region */
 } XwaEnvironmentSelection;
 
@@ -90,12 +89,12 @@ int XwaRemasterEnvironment_Enabled(void);
 
 /* Debug switch for authored environments (on by default). When off, all
  * regions use the classic path, for visual comparison and for profiling
- * the cost of the environments. Packages stay prepared, so toggling it
+ * the cost of the environments. Environments stay prepared, so toggling it
  * loads nothing. */
 void XwaRemasterEnvironment_SetAuthoredEnvironments(int enabled);
 int XwaRemasterEnvironment_AuthoredEnvironments(void);
 
-/* Creates the package library. Failures are logged, and the regions then
+/* Creates the environment library. Failures are logged, and the regions then
  * use the classic path. Returns 0 only on invalid arguments. */
 int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd);
 
@@ -120,7 +119,7 @@ void XwaRemasterEnvironment_Resolve(const struct XwaSnapshot* snap, XwaEnvironme
  * before the first resolution. */
 int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mission, size_t mission_size);
 
-/* The normalized mission key whose packages are prepared; "" when none. */
+/* The normalized mission key whose environments are prepared; "" when none. */
 const char* XwaRemasterEnvironment_PreparedMissionKey(void);
 
 const char* XwaRemasterEnvironment_ModeName(XwaEnvironmentMode mode);

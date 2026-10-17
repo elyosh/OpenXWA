@@ -359,7 +359,7 @@ static void env_capture_printf(EnvCaptureText* t, const char* format, ...) {
 	t->size += (size_t)n;
 }
 
-static int env_capture_write_description(const char* path, const char* package, const char* mission,
+static int env_capture_write_description(const char* path, const char* name, const char* mission,
 										 const XwaSnapshot* snap, int face_size, const EnvCaptureSun* suns,
 										 uint32_t sun_count) {
 	static char buffer[8192];
@@ -371,12 +371,12 @@ static int env_capture_write_description(const char* path, const char* package, 
 					   "# HD environment capture: environment_bake --capture <this directory> "
 					   "--bake-root <remaster bake root>\n"
 					   "version: 1\n"
-					   "package: \"%s\"\n"
+					   "environment: \"%s\"\n"
 					   "mission: \"%s\"\n"
 					   "region: %u\n"
 					   "face_size: %d\n"
 					   "sky_faces: \"sky\"\n",
-					   package, mission, (unsigned)snap->flight_camera.region, face_size);
+					   name, mission, (unsigned)snap->flight_camera.region, face_size);
 	env_capture_printf(&t, "directional_lights:%s\n", sun_count ? "" : " []");
 	for (uint32_t i = 0; i < sun_count; i++) {
 		const EnvCaptureSun* sun = &suns[i];
@@ -419,7 +419,7 @@ static int env_capture_write_description(const char* path, const char* package, 
 /* ---- capture --------------------------------------------------------------- */
 
 static int env_capture_run(const XwaSnapshot* snap, XwaRemasterAssets* assets, const char* directory,
-						   const char* package, const char* mission) {
+						   const char* name, const char* mission) {
 	const int face_size = g_capture.face_size;
 	EnvCaptureSun suns[XWA_SNAP_MAX_BACKDROPS];
 	uint32_t sun_count = env_capture_collect_suns(snap, suns);
@@ -495,7 +495,7 @@ static int env_capture_run(const XwaSnapshot* snap, XwaRemasterAssets* assets, c
 	}
 	if (ok) {
 		snprintf(path, sizeof path, "%s/capture.yaml", directory);
-		ok = env_capture_write_description(path, package, mission, snap, face_size, suns, exported);
+		ok = env_capture_write_description(path, name, mission, snap, face_size, suns, exported);
 		if (!ok) {
 			env_capture_status(1, "cannot write %s", path);
 		}
@@ -532,25 +532,25 @@ void XwaRemasterEnvCapture_Run(const XwaSnapshot* snap, XwaRemasterAssets* asset
 	XwaRemasterEnvironment_NormalizeMissionKey(snap->mission_path, key, sizeof key);
 	const unsigned region = snap->flight_camera.region;
 
-	/* Directory: the key with '/' as '_'. Package: the same, restricted to
-	 * the package-name alphabet, plus the region. */
+	/* Directory: the key with '/' as '_'. Environment name: the same,
+	 * restricted to the environment-name alphabet, plus the region. */
 	char mission_dir[XWA_ENV_MISSION_KEY_MAX];
-	char package[96];
+	char name[96];
 	snprintf(mission_dir, sizeof mission_dir, "%s", key);
 	for (char* p = mission_dir; *p; p++) {
 		if (*p == '/') {
 			*p = '_';
 		}
 	}
-	snprintf(package, sizeof package, "captured.%s.%u", mission_dir, region);
-	for (char* p = package; *p; p++) {
+	snprintf(name, sizeof name, "captured.%s.%u", mission_dir, region);
+	for (char* p = name; *p; p++) {
 		const int allowed = (*p >= 'a' && *p <= 'z') || (*p >= '0' && *p <= '9') || *p == '.' || *p == '_';
 		if (!allowed) {
 			*p = '_';
 		}
 	}
-	if (!AeronEnvironment_IsValidName(package)) {
-		env_capture_status(1, "package name '%s' is not valid (too long?)", package);
+	if (!AeronEnvironment_IsValidName(name)) {
+		env_capture_status(1, "environment name '%s' is not valid (too long?)", name);
 		return;
 	}
 	char directory[224];
@@ -561,5 +561,5 @@ void XwaRemasterEnvCapture_Run(const XwaSnapshot* snap, XwaRemasterAssets* asset
 	}
 	Aeron_LogInfo("xwa.remaster", "environment capture: %s region %u at %d px", key, region,
 				  g_capture.face_size);
-	env_capture_run(snap, assets, directory, package, key);
+	env_capture_run(snap, assets, directory, name, key);
 }

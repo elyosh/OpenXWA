@@ -115,7 +115,7 @@ int XwaRemasterShip_BuildPreviousCockpitMeshTable(
  * relight baseline. Mutated by the debug inspector; not persisted. */
 typedef struct XwaShipPbrTuning {
 	/* Illuminance per unit of directional-light value (the decoded
-	 * colour x intensity of suns, the hangar key and package lights); pi
+	 * colour x intensity of suns, the hangar key and environment lights); pi
 	 * shades as brightly as the classic renderer. */
 	float sun_illuminance_scale;
 	float spec_geom_adapt;    /* 0/1: blend spec normal toward the face */
@@ -155,8 +155,8 @@ void XwaRemasterShip_SetKeyShadowAllSides(int enabled);
 int  XwaRemasterShip_ShipOcclusion(void);
 void XwaRemasterShip_SetShipOcclusion(int enabled);
 
-/* With the hangar's probes, when their package has a reflection plane, the
- * hangar's floor reflects the ships on it. On by default; the debug
+/* When the hangar's probes have a reflection plane, the hangar's floor
+ * reflects the ships on it. On by default; the debug
  * inspector toggles it for comparison. */
 int  XwaRemasterShip_FloorReflection(void);
 void XwaRemasterShip_SetFloorReflection(int enabled);
@@ -259,7 +259,7 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
  * separately through AeronScene_AddLight. `ambient_cube` optionally
  * replaces the uniform ambient fill; `environment_map`, when given,
  * selects the scene's diffuse environment (otherwise the scene's selection,
- * such as an authored package, is left as is). `key_probe_shadow` >= 0 says
+ * such as an authored environment, is left as is). `key_probe_shadow` >= 0 says
  * the key light is in the probe sets' bake (the hangar's ceiling light):
  * inside a probe grid it then only casts shadows, which remove that share
  * of the probe light; < 0 for a normal key light. */

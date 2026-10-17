@@ -403,8 +403,8 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 	}
 	if (ImGui::IsItemHovered()) {
 		ImGui::SetTooltip(
-			"With the hangar's probes, when their package has a reflection plane: the floor reflects\n"
-			"the ships standing on it.");
+			"When the hangar's probes have a reflection plane, the floor reflects the ships standing\n"
+			"on it.");
 	}
 	/* The key light shadow's cut, which ship occlusion replaces. */
 	ImGui::BeginDisabled(ship_occlusion);
@@ -1291,8 +1291,8 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 			}
 		}
 		ImGui::Text("Selection: %s%s%s", XwaRemasterEnvironment_ModeName(selection.mode),
-					selection.reference ? ", package " : "",
-					selection.reference ? selection.reference->package : "");
+					selection.reference ? ", environment " : "",
+					selection.reference ? selection.reference->environment : "");
 		if (selection.fallback != XWA_ENV_FALLBACK_NONE) {
 			ImGui::Text("Fallback: %s", XwaRemasterEnvironment_FallbackName(selection.fallback));
 		}
