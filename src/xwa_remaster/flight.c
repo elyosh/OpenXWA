@@ -260,9 +260,11 @@ static struct {
 	int sky_mode;
 	/* Environment selection resolved at the start of each flight frame. */
 	XwaEnvironmentSelection environment;
-	/* The frame's probe sets: their owners' walk indices, as placed. */
+	/* The frame's probe sets: their owners' walk indices, as placed, and
+	 * the copies the debug rows read. */
 	uint32_t probe_set_object[AERON_SCENE_MAX_PROBE_SETS];
 	XwaProbeOutlineSet probe_sets[AERON_SCENE_MAX_PROBE_SETS];
+	XwaFlightProbeSetInfo probe_set_info[AERON_SCENE_MAX_PROBE_SETS];
 	uint32_t probe_set_count;
 	float star_brightness;
 	float star_density;
@@ -1112,6 +1114,25 @@ void XwaRemasterFlight_GetShadowAtlasDebug(int* enabled, int* cascade) {
 		*enabled = s.shadow_debug_atlas;
 	if (cascade)
 		*cascade = s.shadow_debug_atlas_cascade;
+}
+
+/* Debug switches; they survive flight sessions. */
+static int s_probes_enabled = 1;
+static int s_show_probes;
+
+void XwaRemasterFlight_SetProbes(int enabled) { s_probes_enabled = enabled != 0; }
+
+int XwaRemasterFlight_Probes(void) { return s_probes_enabled; }
+
+void XwaRemasterFlight_SetShowProbes(int show) { s_show_probes = show != 0; }
+
+int XwaRemasterFlight_ShowProbes(void) { return s_show_probes; }
+
+uint32_t XwaRemasterFlight_ProbeSets(const XwaFlightProbeSetInfo** out) {
+	if (out) {
+		*out = s.probe_set_info;
+	}
+	return s.probe_set_count;
 }
 
 void XwaRemasterFlight_SetShadowAtlasDebug(int enabled, int cascade) {
@@ -3235,7 +3256,7 @@ static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap
 	float distances[AERON_SCENE_MAX_PROBE_SETS];
 	uint32_t count = 0;
 	s.probe_set_count = 0;
-	for (uint32_t i = 0; XwaRemasterEnvironment_Probes() && i < snap->flight_object_count; i++) {
+	for (uint32_t i = 0; s_probes_enabled && i < snap->flight_object_count; i++) {
 		const XwaFlightObject* f = &snap->flight_objects[i];
 		if (!fl_object_in_render_region(f, cam->region) || f->genus == XWA_SNAP_GENUS_EXPLOSION ||
 			fl_object_is_projectile(f) || f->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK) {
@@ -3274,10 +3295,16 @@ static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap
 			continue;
 		}
 		set->probes = sets[k];
+		XwaFlightProbeSetInfo* info = &s.probe_set_info[s.probe_set_count];
+		const char* model = XwaSnapshotExport_ModelName(f->object_type);
+		snprintf(info->model, sizeof info->model, "%s", model ? model : "");
+		info->slot = f->slot;
+		info->probe_count = sets[k]->layout.probe_count;
+		memcpy(info->grid_resolution, sets[k]->layout.grid_resolution, sizeof info->grid_resolution);
+		info->bytes = sets[k]->bytes;
 		s.probe_set_object[s.probe_set_count++] = s.probe_set_object[k];
-		XwaRemasterEnvironment_NoteProbeSet(XwaSnapshotExport_ModelName(f->object_type), sets[k], f->slot);
 	}
-	if (s.probe_set_count && XwaRemasterEnvironment_ShowProbes()) {
+	if (s.probe_set_count && s_show_probes) {
 		XwaRemasterProbeOutlines_Prepare(cmd, s.scene, view, s.crows, s.probe_sets, s.probe_set_count);
 	}
 }
@@ -4790,12 +4817,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * A package without a sky keeps the sky, the sprites and the flares. */
 	const AeronEnvironmentPackage* region_package =
 		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.package : NULL;
-	const AeronEnvironmentPackage* authored =
+	const AeronEnvironmentPackage* sky_package =
 		region_package && region_package->radiance ? region_package : NULL;
-	fl_derive_lens_flares(snap, assets, &flight_view, authored);
+	fl_derive_lens_flares(snap, assets, &flight_view, sky_package);
 	fl_begin_point_lights(&flight_view);
 	fl_derive_point_lights(snap);
-	s.bd_count = authored ? 0
+	s.bd_count = sky_package ? 0
 						  : fl_derive_backdrops(snap, s.crows, assets, FL_BACKDROPS_ALL, 0, s.bd_quads,
 												FL_MAX_BACKDROP_QUADS);
 	XwaRemasterEffectView effect_view;
@@ -4906,11 +4933,11 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * cube basis, so it orients consistently with authored cubes; its
 	 * twinkle advances off the sim clock (game_time_ticks), not wall time,
 	 * so it is deterministic and pauses with the game. */
-	if (authored) {
-		AeronScene_SetSkyCube(s.scene, authored->radiance, authored->world_to_cube,
-							  authored->settings.intensity);
-		for (uint32_t i = 0; i < authored->light_count; i++) {
-			AeronScene_AddSkySun(s.scene, &authored->lights[i]);
+	if (sky_package) {
+		AeronScene_SetSkyCube(s.scene, sky_package->radiance, sky_package->world_to_cube,
+							  sky_package->settings.intensity);
+		for (uint32_t i = 0; i < sky_package->light_count; i++) {
+			AeronScene_AddSkySun(s.scene, &sky_package->lights[i]);
 		}
 	} else if (!cam->death_star_mode) {
 		if (s.sky_mode == 1) {
@@ -5206,7 +5233,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	XwaRemasterShip_SetPbrEnv(s.scene, scene_lighting.lights, scene_lighting.light_count,
 							  scene_lighting.key_index, NULL, s.camera_local, ao_on ? &ao : NULL,
 							  scene_lighting.ambient, NULL,
-							  hangar_probes ? hangar_probes->settings.key_light_shadow : -1.0f);
+							  hangar_probes ? hangar_probes->layout.key_light_shadow : -1.0f);
 	if (scene_lighting.package) {
 		AeronScene_SetPbrEnvironmentPackage(s.scene, scene_lighting.package);
 	}

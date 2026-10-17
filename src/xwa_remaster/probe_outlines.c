@@ -189,7 +189,7 @@ int XwaRemasterProbeOutlines_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scen
 	for (uint32_t i = 0; i < count; i++) {
 		if (sets[i].probes) {
 			outline.model = sets[i].model;
-			outline_set(&sets[i].probes->settings);
+			outline_set(&sets[i].probes->layout);
 		}
 	}
 	outline.view = NULL;

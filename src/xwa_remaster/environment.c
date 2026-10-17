@@ -35,9 +35,6 @@ typedef struct EnvState {
 	AeronEnvironmentLibrary* library;
 	char prepared_key[XWA_ENV_MISSION_KEY_MAX]; /* "" = no mission prepared */
 	int32_t prepared_region[ENV_MAX_REGIONS];
-	/* The probe sets placed this frame, for the debug rows. */
-	XwaEnvironmentProbeSet frame_sets[AERON_SCENE_MAX_PROBE_SETS];
-	uint32_t frame_set_count;
 	/* Last logged selection, to log changes only. */
 	int logged;
 	XwaEnvironmentSelection last;
@@ -48,12 +45,10 @@ static EnvState s_env;
 /* Host options and the debug switch; survive Shutdown, which clears s_env. */
 static struct {
 	int authored;
-	int probes;
-	int show_probes;
 	int enabled;
 	float sun_max_radiance; /* 0 = Aeron's default */
 	char manifest[sizeof s_env.manifest_path];
-} s_env_options = { .authored = 1, .probes = 1 };
+} s_env_options = { .authored = 1 };
 
 void XwaRemasterEnvironment_Configure(int enabled, const char* manifest, float sun_max_radiance) {
 	s_env_options.enabled = enabled != 0;
@@ -339,13 +334,6 @@ void XwaRemasterEnvironment_SetAuthoredEnvironments(int enabled) { s_env_options
 
 int XwaRemasterEnvironment_AuthoredEnvironments(void) { return s_env_options.authored; }
 
-void XwaRemasterEnvironment_SetProbes(int enabled) { s_env_options.probes = enabled != 0; }
-
-int XwaRemasterEnvironment_Probes(void) { return s_env_options.probes; }
-
-void XwaRemasterEnvironment_SetShowProbes(int show) { s_env_options.show_probes = show != 0; }
-
-int XwaRemasterEnvironment_ShowProbes(void) { return s_env_options.show_probes; }
 
 /* XWA world X/Y horizontal, +Z up: cube +X = world +X, cube +Y = world +Z,
  * cube +Z = world -Y (the flight sky's existing rotation). */
@@ -564,7 +552,6 @@ void XwaRemasterEnvironment_Resolve(const XwaSnapshot* snap, XwaEnvironmentSelec
 		return;
 	}
 	env_resolve(snap, out);
-	s_env.frame_set_count = 0;
 	if (s_env.library) {
 		int32_t active = -1;
 		for (int r = 0; r < ENV_MAX_REGIONS && out->package && active < 0; r++) {
@@ -604,23 +591,6 @@ int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mis
 }
 
 const char* XwaRemasterEnvironment_PreparedMissionKey(void) { return s_env.prepared_key; }
-
-void XwaRemasterEnvironment_NoteProbeSet(const char* model_name, AeronProbeSet* probes, uint16_t slot) {
-	if (s_env.frame_set_count >= AERON_SCENE_MAX_PROBE_SETS || !probes) {
-		return;
-	}
-	XwaEnvironmentProbeSet* set = &s_env.frame_sets[s_env.frame_set_count++];
-	snprintf(set->model, sizeof set->model, "%s", model_name ? model_name : "");
-	set->probes = probes;
-	set->slot = slot;
-}
-
-uint32_t XwaRemasterEnvironment_FrameProbeSets(const XwaEnvironmentProbeSet** out) {
-	if (out) {
-		*out = s_env.frame_sets;
-	}
-	return s_env.frame_set_count;
-}
 
 const char* XwaRemasterEnvironment_ModeName(XwaEnvironmentMode mode) {
 	switch (mode) {

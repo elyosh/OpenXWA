@@ -32,7 +32,6 @@
 
 #include "aeron/render.h"
 #include "aeron/scene/environment.h"
-#include "aeron/scene/probe_set.h"
 #include "aeron/scene/scene3d.h"
 #include "aeron/vfs.h"
 
@@ -71,14 +70,6 @@ typedef struct XwaEnvironmentSelection {
 	uint8_t region; /* flight_camera.mission_region */
 } XwaEnvironmentSelection;
 
-/* A probe set placed this frame, for the debug rows, which edit its
- * settings. */
-typedef struct XwaEnvironmentProbeSet {
-	char model[64];
-	AeronProbeSet* probes;
-	uint16_t slot; /* the owner object's slot */
-} XwaEnvironmentProbeSet;
-
 #define XWA_ENV_MISSION_KEY_MAX 128
 
 /* Sets the host options environment_maps.enabled, .manifest and
@@ -100,15 +91,6 @@ int XwaRemasterEnvironment_Enabled(void);
  * loads nothing. */
 void XwaRemasterEnvironment_SetAuthoredEnvironments(int enabled);
 int XwaRemasterEnvironment_AuthoredEnvironments(void);
-
-/* Debug switch for the models' probes (on by default): off, no probe set
- * is placed. */
-void XwaRemasterEnvironment_SetProbes(int enabled);
-int XwaRemasterEnvironment_Probes(void);
-
-/* Debug switch (off by default): outlines of the frame's probe sets. */
-void XwaRemasterEnvironment_SetShowProbes(int show);
-int XwaRemasterEnvironment_ShowProbes(void);
 
 /* Creates the package library. Failures are logged and leave the classic
  * path; returns 0 only on invalid arguments. */
@@ -137,11 +119,6 @@ int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mis
 
 /* The normalized mission key whose packages are prepared; "" when none. */
 const char* XwaRemasterEnvironment_PreparedMissionKey(void);
-
-/* Records a probe set placed this frame (Resolve clears them), for the
- * debug rows. */
-void XwaRemasterEnvironment_NoteProbeSet(const char* model_name, AeronProbeSet* probes, uint16_t slot);
-uint32_t XwaRemasterEnvironment_FrameProbeSets(const XwaEnvironmentProbeSet** out);
 
 const char* XwaRemasterEnvironment_ModeName(XwaEnvironmentMode mode);
 const char* XwaRemasterEnvironment_FallbackName(XwaEnvironmentFallback fallback);

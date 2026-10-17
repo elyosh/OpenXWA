@@ -67,6 +67,25 @@ void XwaRemasterFlight_GetShadowAtlasDebug(int* enabled, int* cascade);
 void XwaRemasterFlight_SetShadowAtlasDebug(int enabled, int cascade);
 void XwaRemasterFlight_GetShadowStats(AeronSceneDirectionalShadowStats* out);
 
+/* Debug switches: the models' probes (on by default; off, no probe set is
+ * placed) and their outlines (off by default). */
+void XwaRemasterFlight_SetProbes(int enabled);
+int XwaRemasterFlight_Probes(void);
+void XwaRemasterFlight_SetShowProbes(int show);
+int XwaRemasterFlight_ShowProbes(void);
+
+/* A probe set the last flight frame placed, for the debug rows. A copy: it
+ * stays valid after its model's mesh goes. */
+typedef struct XwaFlightProbeSetInfo {
+	char model[64];
+	uint16_t slot; /* the owner object's slot */
+	uint32_t probe_count;
+	uint32_t grid_resolution[3];
+	uint64_t bytes;
+} XwaFlightProbeSetInfo;
+
+uint32_t XwaRemasterFlight_ProbeSets(const XwaFlightProbeSetInfo** out);
+
 /* Artificial ceiling light used only during the enclosed hangar scene.
  * Direction follows XwaDirLight's surface-to-light world convention. */
 typedef struct XwaFlightHangarLightingParams {

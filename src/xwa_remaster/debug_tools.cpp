@@ -1297,39 +1297,23 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 			ImGui::Text("Fallback: %s", XwaRemasterEnvironment_FallbackName(selection.fallback));
 		}
 	}
-	bool probes = XwaRemasterEnvironment_Probes() != 0;
+	bool probes = XwaRemasterFlight_Probes() != 0;
 	if (ImGui::Checkbox("Probes", &probes)) {
-		XwaRemasterEnvironment_SetProbes(probes ? 1 : 0);
+		XwaRemasterFlight_SetProbes(probes ? 1 : 0);
 	}
 	ImGui::SetItemTooltip("Off: no model's probes light the scene (for comparison and profiling).");
-	const XwaEnvironmentProbeSet* sets = nullptr;
-	const uint32_t set_count = XwaRemasterEnvironment_FrameProbeSets(&sets);
+	const XwaFlightProbeSetInfo* sets = nullptr;
+	const uint32_t set_count = XwaRemasterFlight_ProbeSets(&sets);
 	ImGui::Text("Probe sets: %u", set_count);
 	for (uint32_t i = 0; i < set_count; ++i) {
-		AeronProbeSet* set = sets[i].probes;
-		AeronFlightProbeLayout* d = &set->settings;
-		if (!ImGui::TreeNode(set, "%s, object %u: %u probes, %ux%ux%u grid, %.1f MiB", sets[i].model,
-							 (unsigned)sets[i].slot, d->probe_count, d->grid_resolution[0],
-							 d->grid_resolution[1], d->grid_resolution[2],
-							 (double)set->bytes / (1024.0 * 1024.0))) {
-			continue;
-		}
-		/* Edits last until the model is loaded again. */
-		ImGui::SliderFloat("Intensity", &d->intensity, 0.0f, 16.0f, "%.3f");
-		ImGui::SliderFloat("Diffuse strength (relative)", &d->diffuse_strength, 0.0f, 4.0f, "%.3f");
-		ImGui::SliderFloat("Specular strength (relative)", &d->specular_strength, 0.0f, 4.0f, "%.3f");
-		ImGui::SliderFloat("Key light shadow", &d->key_light_shadow, 0.0f, 1.0f, "%.2f");
-		ImGui::SetItemTooltip(
-			"When the scene's key light is in the bake (a hangar's ceiling light): the part "
-			"of the probe light its shadow removes");
-		if (ImGui::Button("Reset")) {
-			*d = set->layout;
-		}
-		ImGui::TreePop();
+		ImGui::BulletText("%s, object %u: %u probes, %ux%ux%u grid, %.1f MiB", sets[i].model,
+						  (unsigned)sets[i].slot, sets[i].probe_count, sets[i].grid_resolution[0],
+						  sets[i].grid_resolution[1], sets[i].grid_resolution[2],
+						  (double)sets[i].bytes / (1024.0 * 1024.0));
 	}
-	bool show_probes = XwaRemasterEnvironment_ShowProbes() != 0;
+	bool show_probes = XwaRemasterFlight_ShowProbes() != 0;
 	if (ImGui::Checkbox("Show probes", &show_probes)) {
-		XwaRemasterEnvironment_SetShowProbes(show_probes ? 1 : 0);
+		XwaRemasterFlight_SetShowProbes(show_probes ? 1 : 0);
 	}
 	ImGui::SetItemTooltip("Outlines of each probe's influence (dimmer: where it applies fully), its parallax "
 						  "volume (grey), the light grid's box (white) and its points within 50 m.");
