@@ -2,7 +2,7 @@
 #define XWA_RUNTIME_MODELS_OPT_SYNTH_H
 
 /* Modern port: builds an OPT payload image for a GLB replacement model
- * (remaster/models/<key>.glb). The image is what OptModel_LoadHandle would
+ * (models/<key>.glb in the mod folder). The image is what OptModel_LoadHandle would
  * have read from an OPT file, except that each mesh's LOD 0 FaceData is a
  * stub with no faces; the faces, their BVH and the component tags stay in
  * XwaOptSynthData, keyed by the stub's payload offset. */

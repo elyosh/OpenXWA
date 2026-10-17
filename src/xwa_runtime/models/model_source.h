@@ -2,13 +2,13 @@
 #define XWA_RUNTIME_MODELS_MODEL_SOURCE_H
 
 /* Modern port: chooses where each flight model comes from. With replacements
- * enabled, a model whose key has a `remaster/models/<key>.glb` on the asset
- * root is built from that GLB for simulation and rendering instead of its
+ * enabled, a model whose key has a `models/<key>.glb` in the mod folder is
+ * built from that GLB for simulation and rendering instead of its
  * OPT. The replacement set is fixed by XwaModelSource_Init. A key is the
  * model file's basename without extension, lower-cased
  * ("FlightModels\\XWing.opt" -> "xwing").
  *
- * remaster/models/model_map.yaml (optional) names a different GLB for a key,
+ * models/model_map.yaml (optional) names a different GLB for a key,
  * for model sets that rename stock models:
  *   version: 1
  *   models:
@@ -38,12 +38,11 @@ typedef enum XwaModelSource {
 void XwaModelSource_Configure(int replacementsEnabled);
 /* Builds the replacement set once the VFS is ready. */
 void XwaModelSource_Init(void);
-/* Writes the asset-root path of `key`'s replacement GLB
-   ("remaster/models/<glb key>.glb"), where the GLB key is the key's entry in
-   remaster/models/model_map.yaml, or the key itself. Returns 0 when it does
-   not fit. */
+/* Writes the mod-root path of `key`'s replacement GLB
+   ("models/<glb key>.glb"), where the GLB key is the key's entry in
+   models/model_map.yaml, or the key itself. Returns 0 when it does not fit. */
 int XwaModelSource_GlbPath(const char* key, char* path, size_t pathSize);
-/* `glbPath` (optional) receives the asset-root path of the GLB when the
+/* `glbPath` (optional) receives the mod-root path of the GLB when the
    result is XWA_MODEL_SOURCE_GLB. */
 XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_t glbPathSize);
 /* Replacement-aware form of the frontend's model-existence probes

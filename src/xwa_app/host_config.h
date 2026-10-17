@@ -16,6 +16,8 @@ extern "C" {
 
 typedef struct XwaHostConfig {
 	char game_data_path[XWA_HOST_CONFIG_PATH_CAPACITY];
+	/* paths.mod. Empty when not set. */
+	char mod_path[XWA_HOST_CONFIG_PATH_CAPACITY];
 	int flight_simulation_step_ticks;
 	float model_smooth_angle_degrees;
 	float model_opt_emissive_strength;
@@ -24,7 +26,7 @@ typedef struct XwaHostConfig {
 	int force_opt_models;
 	int prefer_original_2d;
 	int environment_maps_enabled;
-	/* Relative to the remaster bake root. */
+	/* Relative to the mod folder. */
 	char environment_maps_manifest[XWA_HOST_CONFIG_MANIFEST_CAPACITY];
 	/* Largest radiance a sun disc is drawn with. */
 	float environment_maps_sun_max_radiance;

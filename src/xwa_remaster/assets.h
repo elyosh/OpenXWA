@@ -13,8 +13,8 @@
  *     records from the name->file bindings) + animation frame;
  *   - DAT atlas sprites: group id + sprite id.
  *
- * Layout consumed (exactly what tools/xwa_asset_bake emits under the
- * bundle root; hand-authored art substitutes by replacing the KTX2 at
+ * Layout consumed (exactly what tools/xwa_asset_bake emits in the mod
+ * folder; hand-authored art substitutes by replacing the KTX2 at
  * the same path, any resolution — draw geometry comes from the
  * record's classic dims, never from asset dims):
  *   frontres/<dir>/sprites/<base>.ktx2             single frame
@@ -57,12 +57,12 @@ typedef struct XwaAssetRef {
 	int classic_w, classic_h;
 } XwaAssetRef;
 
-/* `root` is the configured bake output root. `prefer_original_2d` changes
+/* `root` is the mod folder. `prefer_original_2d` changes
  * source order; the alternate source is selected only when the first is absent. */
 XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d);
 void XwaRemasterAssets_Destroy(XwaRemasterAssets* a);
 
-/* The bake output root passed at create.
+/* The mod folder passed at create.
  * Borrowed; consumers with their own asset keying (flight sky cube)
  * build paths under it. */
 const char* XwaRemasterAssets_Root(const XwaRemasterAssets* a);

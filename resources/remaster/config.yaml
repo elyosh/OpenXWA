@@ -110,7 +110,7 @@ input:
 models:
   smooth_angle_degrees: 90
   # true: original OPT models for simulation and rendering.
-  # false: remaster/models/<key>.glb replacements, where present, for both.
+  # false: models/<key>.glb replacements in the mod folder, where present, for both.
   force_opt: false
   opt_emissive_strength: 1.5
   opt_projectile_emissive_strength: 5.0
@@ -157,7 +157,7 @@ hangar_lighting:
   ambient_sides: 0.10
   ambient_floor: 0.06
 # Authored per-region HDR environments (sky, diffuse and specular lighting,
-# suns). The manifest is under the game data's remaster folder. It holds the
+# suns). The manifest path is relative to the mod folder. It holds the
 # `environments:` map and the `xwa:` hangar and (mission, region) mapping.
 # Without a manifest, environment maps are off. Regions without an entry keep
 # the classic HD sky.

@@ -273,6 +273,7 @@ int main(int argc, char** argv) {
 	XwaHostConfig host_config;
 	XwaLaunchOptions launch;
 	char selected_game_data[XWA_HOST_CONFIG_PATH_CAPACITY];
+	char selected_mod[XWA_HOST_CONFIG_PATH_CAPACITY];
 	char config_error[1024];
 	XwaModernWindowMode initial_window_mode;
 	int exit_code;
@@ -342,6 +343,19 @@ int main(int argc, char** argv) {
 	 * the game inside its unfocused pause. Ask for input focus back. */
 	Aeron_RaiseWindow();
 	Aeron_LogInfo("xwa.config", "game data: %s", selected_game_data);
+	if (!XwaSetup_SetModRoot(Aeron_GetVfs(), &launch, &host_config, selected_game_data, selected_mod,
+							 sizeof selected_mod, config_error, sizeof config_error)) {
+		Aeron_LogError("xwa.config", "%s", config_error);
+		Aeron_FatalError("OpenXWA", config_error);
+		Aeron_Shutdown();
+		return 1;
+	}
+	AeronFileInfo mod_info;
+	if (AeronVfs_Stat(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, ".", &mod_info) && mod_info.is_directory) {
+		Aeron_LogInfo("xwa.config", "mod: %s", selected_mod);
+	} else {
+		Aeron_LogInfo("xwa.config", "mod: %s (not found, original assets only)", selected_mod);
+	}
 	Aeron_LogInfo("xwa.config", "resources: %s", Aeron_ResourceRoot());
 	Aeron_LogInfo("xwa.config", "flight simulation step: %d ticks", host_config.flight_simulation_step_ticks);
 	Aeron_LogInfo("xwa.config", "OPT smoothing angle: %.3g degrees",

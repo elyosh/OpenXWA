@@ -13,7 +13,7 @@
 
 static char MissionFile_Lower(char c) { return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c; }
 
-/* remaster/missions/<mission path without its extension>.yaml, lower case,
+/* missions/<mission path without its extension>.yaml in the mod folder, lower case,
    with '/' separators. */
 static void MissionFile_Path(const char* missionPath, char* path, size_t pathSize) {
 	const char* dot = strrchr(missionPath, '.');
@@ -28,7 +28,7 @@ static void MissionFile_Path(const char* missionPath, char* path, size_t pathSiz
 	}
 	length = dot != NULL && (separator == NULL || dot > separator) ? (size_t)(dot - missionPath)
 																   : strlen(missionPath);
-	offset = (size_t)snprintf(path, pathSize, "remaster/missions/");
+	offset = (size_t)snprintf(path, pathSize, "missions/");
 	for (index = 0; index < length && offset + 1 < pathSize; ++index) {
 		const char c = missionPath[index];
 
@@ -45,7 +45,7 @@ int XwaMissionFile_Load(const char* missionPath, AeronConfigFile** out, char* pa
 	*out = NULL;
 	MissionFile_Path(missionPath, path, pathSize);
 	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, path, out, &error)) {
+	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, out, &error)) {
 		if (error.code == AERON_CONFIG_ERROR_NOT_FOUND) {
 			return 0;
 		}

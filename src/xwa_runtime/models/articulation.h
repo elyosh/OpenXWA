@@ -134,7 +134,7 @@ int XwaArticulation_StepShuttleBlock(unsigned int objIdx, XwaArticulationShuttle
 void XwaArticulation_StepWorld(void);
 
 /* Reads the selections of mission `missionPath` (the `articulations` map
-   of its remaster/missions file), replacing the previous mission's; the
+   of its mission file), replacing the previous mission's; the
    arguments are XwaObjectProfiles_LoadMission's. An object of a flight group
    that selects variant <name> uses its model's `variant.<name>.<group>`
    entries in place of the model's for the same group and component, and

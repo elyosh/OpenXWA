@@ -57,7 +57,7 @@ XwaRemasterSkinModel* XwaRemasterSkins_Capture(const AeronGltfModel* model, cons
 		return NULL;
 	}
 	snprintf(skin->key, sizeof skin->key, "%s", key);
-	/* The GLB name: remaster/models/<glb>.glb. */
+	/* The GLB name: models/<glb>.glb. */
 	char path[512];
 	if (XwaModelSource_GlbPath(key, path, sizeof path)) {
 		const char* base = strrchr(path, '/');

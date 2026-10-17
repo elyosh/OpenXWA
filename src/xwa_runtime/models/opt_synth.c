@@ -438,7 +438,7 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 	}
 	glb = NULL;
 	glbSize = 0;
-	if (!AeronVfs_ReadAll(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, path, 0, &glb, &glbSize)) {
+	if (!AeronVfs_ReadAll(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, 0, &glb, &glbSize)) {
 		return OptSynth_Fail(key, "cannot read the GLB");
 	}
 	/* The full build: the HD renderer takes the render half from this parse

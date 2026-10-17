@@ -172,7 +172,7 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 			uint8_t* bytes = NULL;
 			size_t size = 0;
 			Aeron_LogInfo("xwa.remaster", "mesh: '%s' has no parsed model; reading '%s'", key, path);
-			if (!AeronVfs_ReadAll(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, path, 0, &bytes, &size)) {
+			if (!AeronVfs_ReadAll(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, 0, &bytes, &size)) {
 				Aeron_LogError("xwa.remaster", "mesh: cannot read GLB '%s'", path);
 				ship_set_failure(cmd, "Ship model '%s': cannot read '%s'", key, path);
 				return NULL;
@@ -482,7 +482,7 @@ float XwaRemasterShip_OptProjectileEmissiveStrength(void) { return s_opt_project
 
 AeronEffectAtlas* XwaRemasterShip_EffectAtlas(void) {
 	if (!s_effect_atlas) {
-		s_effect_atlas = AeronEffectAtlas_Create(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, "remaster/effects");
+		s_effect_atlas = AeronEffectAtlas_Create(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, "effects");
 	}
 	return s_effect_atlas;
 }

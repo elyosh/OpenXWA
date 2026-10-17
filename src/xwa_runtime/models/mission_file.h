@@ -1,7 +1,7 @@
 #ifndef XWA_RUNTIME_MODELS_MISSION_FILE_H
 #define XWA_RUNTIME_MODELS_MISSION_FILE_H
 
-/* A mission's remaster file: remaster/missions/<mission path without its
+/* A mission's file in the mod folder: missions/<mission path without its
  * extension>.yaml, lower case, which holds the selections the game reads at
  * mission load (object profiles, skins, articulations):
  *

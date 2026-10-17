@@ -6,7 +6,8 @@
  * A GLB replacement lists the components profile <name> hides in its
  * `hidden_by_profile.<name>` component set, which may name exterior or
  * cockpit components past its own. A mission selects a profile per flight
- * group in remaster/missions/<mission path>.yaml; Apply hides the selected
+ * group in its mission file (missions/<mission path>.yaml in the mod
+ * folder); Apply hides the selected
  * profile's components by marking them destroyed at spawn. The selections
  * are read at mission load, never when an object spawns. */
 
@@ -21,7 +22,7 @@ struct CraftData;
 struct XwaFlightGroup;
 
 /* Reads the selections of mission `missionPath` (for example
-   "missions\1b1m5fg.tie") from remaster/missions/missions/1b1m5fg.yaml,
+   "missions\1b1m5fg.tie") from missions/missions/1b1m5fg.yaml in the mod folder,
    replacing the previous mission's. `flightGroups` is the loaded mission's
    first flight group, `stride` the distance between two of them and `count`
    their number: an entry whose flight group does not exist, or whose `name`

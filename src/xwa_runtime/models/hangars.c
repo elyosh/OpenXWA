@@ -42,7 +42,7 @@ typedef struct HangarsLoadedModel {
 	HangarsKey key; /* empty: the stock model */
 } HangarsLoadedModel;
 
-static const char s_settingsPath[] = "remaster/hangars.yaml";
+static const char s_settingsPath[] = "hangars.yaml";
 static AeronConfigFile* s_settings;
 static AeronConfigFile* s_missionFile;
 static const AeronConfigNode* s_mission;
@@ -101,7 +101,8 @@ void XwaHangars_Init(void) {
 		return;
 	}
 	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, s_settingsPath, &s_settings, &error)) {
+	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, s_settingsPath, &s_settings,
+									&error)) {
 		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
 			Aeron_LogError("xwa.models", "%s:%d: %s; the hangars keep their stock layout", s_settingsPath,
 						   error.line, error.message);

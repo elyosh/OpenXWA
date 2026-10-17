@@ -87,6 +87,19 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			}
 			continue;
 		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--mod");
+		if (!pass_through && (value || strcmp(argv[i], "--mod") == 0)) {
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, "%s requires a path", "--mod");
+				}
+				value = argv[i];
+			}
+			if (!setup_copy_path(out->mod_path, sizeof out->mod_path, value, "--mod", error, error_size)) {
+				return 0;
+			}
+			continue;
+		}
 		if (!setup_append_argument(out->game_command_line, sizeof out->game_command_line, argv[i])) {
 			return setup_error(error, error_size, "%s", "OpenXWA command line is too long");
 		}
@@ -140,4 +153,24 @@ int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normal
 	}
 
 	return setup_error(error, error_size, "selected directory is missing '%s'", missing);
+}
+
+int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaHostConfig* host_config,
+						const char* game_data, char* selected, size_t selected_capacity, char* error,
+						size_t error_size) {
+	int length;
+
+	if (launch->mod_path[0]) {
+		length = snprintf(selected, selected_capacity, "%s", launch->mod_path);
+	} else if (host_config->mod_path[0]) {
+		length = snprintf(selected, selected_capacity, "%s", host_config->mod_path);
+	} else {
+		length = snprintf(selected, selected_capacity, "%s/mod", game_data);
+	}
+	if (length < 0 || (size_t)length >= selected_capacity ||
+		!AeronVfs_SetRoot(vfs, AERON_VFS_ROOT_MOD, selected) ||
+		!AeronVfs_SetRootOptions(vfs, AERON_VFS_ROOT_MOD, AERON_VFS_ROOT_OPTION_CASE_INSENSITIVE_LOOKUP)) {
+		return setup_error(error, error_size, "could not use mod folder: %s", selected);
+	}
+	return 1;
 }

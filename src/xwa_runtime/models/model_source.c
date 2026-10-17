@@ -46,7 +46,7 @@ static int s_equipmentKeyCount;
 
 static const char s_exteriorSuffix[] = "exterior";
 
-/* remaster/models/model_map.yaml: stock key -> GLB key, for model sets whose
+/* models/model_map.yaml in the mod folder: stock key -> GLB key, for model sets whose
    file names differ from the stock ones. Without the file the mapping is the
    identity. */
 typedef struct ModelSourceMapEntry {
@@ -54,7 +54,7 @@ typedef struct ModelSourceMapEntry {
 	ModelSourceKeyText glbKey;
 } ModelSourceMapEntry;
 
-static const char s_modelMapPath[] = "remaster/models/model_map.yaml";
+static const char s_modelMapPath[] = "models/model_map.yaml";
 static ModelSourceMapEntry* s_mapEntries;
 static int s_mapEntryCount;
 
@@ -104,12 +104,12 @@ static const char* ModelSource_GlbKeyFor(const char* key) {
 }
 
 int XwaModelSource_GlbPath(const char* key, char* path, size_t pathSize) {
-	int written = snprintf(path, pathSize, "remaster/models/%s.glb", ModelSource_GlbKeyFor(key));
+	int written = snprintf(path, pathSize, "models/%s.glb", ModelSource_GlbKeyFor(key));
 	return written > 0 && (size_t)written < pathSize;
 }
 
 static int ModelSource_FileExists(const char* path) {
-	XwaFile* stream = File_Open(AERON_VFS_ROOT_ASSET, path, "rb");
+	XwaFile* stream = File_Open(AERON_VFS_ROOT_MOD, path, "rb");
 
 	if (stream == NULL) {
 		return 0;
@@ -386,7 +386,7 @@ static int ModelSource_LoadMap(char* message, size_t messageSize) {
 		return 1;
 	}
 	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, s_modelMapPath, &config, &error)) {
+	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, s_modelMapPath, &config, &error)) {
 		snprintf(message, messageSize, "%s:%d: %s", s_modelMapPath, error.line, error.message);
 		return 0;
 	}
@@ -434,7 +434,7 @@ static int ModelSource_LoadMap(char* message, size_t messageSize) {
 			AeronConfigFile_Destroy(config);
 			return 0;
 		}
-		snprintf(path, sizeof path, "remaster/models/%s.glb", value);
+		snprintf(path, sizeof path, "models/%s.glb", value);
 		if (!ModelSource_FileExists(path)) {
 			snprintf(message, messageSize, "%s: '%s' maps to missing '%s'", s_modelMapPath, key, path);
 			AeronConfigFile_Destroy(config);
@@ -601,7 +601,7 @@ XwaFile* XwaModelSource_OpenModelFile(const char* fileName) {
 
 	switch (XwaModelSource_Resolve(fileName, glbPath, sizeof glbPath)) {
 		case XWA_MODEL_SOURCE_GLB:
-			return File_Open(AERON_VFS_ROOT_ASSET, glbPath, "rb");
+			return File_Open(AERON_VFS_ROOT_MOD, glbPath, "rb");
 		case XWA_MODEL_SOURCE_SUPPRESSED:
 			return NULL;
 		case XWA_MODEL_SOURCE_OPT:

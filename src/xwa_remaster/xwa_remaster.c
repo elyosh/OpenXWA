@@ -385,9 +385,7 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	}
 	Aeron_LogInfo("xwa.remaster", "HDR output: desired %s, %s (headroom %.2f)", g.hdr_desired ? "on" : "off",
 				  Aeron_OutputHdrStatusName(Aeron_OutputHdrStatus()), (double)Aeron_OutputHdrHeadroom());
-	char remaster_root[1024];
-	snprintf(remaster_root, sizeof remaster_root, "%s/remaster", Aeron_AssetRoot());
-	g.assets = XwaRemasterAssets_Create(remaster_root, options->prefer_original_2d);
+	g.assets = XwaRemasterAssets_Create(Aeron_ModRoot(), options->prefer_original_2d);
 	Aeron_BlendRampInit(&g.ramp);
 	g.last_tick = UINT64_MAX; /* Snapshot zero has not been rendered yet. */
 	g.mode = RM_VIEW_HD;

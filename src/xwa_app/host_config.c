@@ -961,6 +961,8 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 	const int valid =
 		host_config_optional_path(config, "paths.game_data", out->game_data_path, sizeof out->game_data_path,
 								  error, error_size) &&
+		host_config_optional_path(config, "paths.mod", out->mod_path, sizeof out->mod_path, error,
+								  error_size) &&
 		host_config_simulation_step(config, &out->flight_simulation_step_ticks, error, error_size) &&
 		host_config_remaster_options(config, 0, out, error, error_size) &&
 		host_config_video_options(config, &out->video_options, &out->video_options_override_mask, error,

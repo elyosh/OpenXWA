@@ -369,7 +369,7 @@ static int env_capture_write_description(const char* path, const char* name, con
 	static const char* const sky_modes[] = { "none", "stars", "cube" };
 	env_capture_printf(&t,
 					   "# HD environment capture: environment_bake --capture <this directory> "
-					   "--bake-root <remaster bake root>\n"
+					   "--bake-root <mod folder>\n"
 					   "version: 1\n"
 					   "environment: \"%s\"\n"
 					   "mission: \"%s\"\n"

@@ -41,7 +41,7 @@ AeronSceneMesh* XwaRemasterShip_MeshForName(const char* name);
  * for a replacement GLB. */
 AeronSceneMesh* XwaRemasterShip_MeshForNameWithSource(const char* name, uint8_t* out_source);
 float XwaRemasterShip_OptProjectileEmissiveStrength(void);
-/* The process's effect atlas (remaster/effects), which ship meshes resolve
+/* The process's effect atlas (the mod folder's effects), which ship meshes resolve
  * their animated materials in; scenes drawing them use it
  * (AeronScene_SetEffectAtlas). Created on first use; NULL when it cannot be. */
 AeronEffectAtlas* XwaRemasterShip_EffectAtlas(void);

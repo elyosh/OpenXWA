@@ -255,14 +255,13 @@ static int env_parse_xwa(const AeronConfigNode* xwa) {
 /* Returns 1 when the manifest loads, -1 when it does not exist, 0 on error. */
 static int env_load_manifest(AeronVfs* vfs) {
 	static const char* const fields[] = { "version", "environments", "xwa" };
-	char vfs_path[300];
-	snprintf(vfs_path, sizeof vfs_path, "remaster/%s", s_env.manifest_path);
+	const char* vfs_path = s_env.manifest_path;
 	AeronConfigFile* manifest = NULL;
 	AeronConfigError error;
 	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_ASSET, vfs_path, &manifest, &error)) {
+	if (!AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_MOD, vfs_path, &manifest, &error)) {
 		if (error.code == AERON_CONFIG_ERROR_NOT_FOUND) {
-			/* Remastered assets are optional. */
+			/* The mod folder is optional. */
 			Aeron_LogInfo("xwa.remaster", "environment maps: no manifest at %s, classic sky only", vfs_path);
 			return -1;
 		}
@@ -360,8 +359,7 @@ int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd) {
 	memset(&desc, 0, sizeof desc);
 	desc.definitions = s_env.definitions;
 	desc.vfs = Aeron_GetVfs();
-	desc.root = AERON_VFS_ROOT_ASSET;
-	desc.path_prefix = "remaster/";
+	desc.root = AERON_VFS_ROOT_MOD;
 	desc.sun_max_radiance = s_env_options.sun_max_radiance;
 	memcpy(desc.base_world_to_cube, env_base_world_to_cube, sizeof desc.base_world_to_cube);
 	s_env.library = AeronEnvironmentLibrary_Create(&desc);
