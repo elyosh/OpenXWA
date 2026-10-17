@@ -3224,26 +3224,26 @@ static void fl_finalize_point_lights(void) {
 	}
 }
 
-/* Places the probe sets of the drawn objects whose model has prepared probes
- * (`xwa.probes`), closest to the camera first, up to the scene's limit. Each
+/* Places the probe sets of the drawn objects whose model has probes (its
+ * mesh's), closest to the camera first, up to the scene's limit. Each
  * owner's instance takes its own set; the other instances take the first
  * set their bounds overlap, so the closest set wins where sets meet. */
 static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
 								const XwaRemasterFlightView* view) {
 	const XwaFlightCamera* cam = &snap->flight_camera;
-	const AeronEnvironmentPackage* packages[AERON_SCENE_MAX_PROBE_SETS];
+	AeronProbeSet* sets[AERON_SCENE_MAX_PROBE_SETS];
 	float distances[AERON_SCENE_MAX_PROBE_SETS];
 	uint32_t count = 0;
 	s.probe_set_count = 0;
-	for (uint32_t i = 0; i < snap->flight_object_count; i++) {
+	for (uint32_t i = 0; XwaRemasterEnvironment_Probes() && i < snap->flight_object_count; i++) {
 		const XwaFlightObject* f = &snap->flight_objects[i];
 		if (!fl_object_in_render_region(f, cam->region) || f->genus == XWA_SNAP_GENUS_EXPLOSION ||
 			fl_object_is_projectile(f) || f->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK) {
 			continue;
 		}
-		const AeronEnvironmentPackage* package =
-			XwaRemasterEnvironment_ModelProbes(XwaSnapshotExport_ModelName(f->object_type));
-		if (!package) {
+		const AeronSceneMesh* mesh = XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(f->object_type));
+		AeronProbeSet* probes = mesh ? mesh->probes : NULL;
+		if (!probes) {
 			continue;
 		}
 		float delta[3];
@@ -3254,13 +3254,13 @@ static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap
 		for (; k > 0 && distances[k - 1] > distance; k--) {
 			if (k < AERON_SCENE_MAX_PROBE_SETS) {
 				distances[k] = distances[k - 1];
-				packages[k] = packages[k - 1];
+				sets[k] = sets[k - 1];
 				s.probe_set_object[k] = s.probe_set_object[k - 1];
 			}
 		}
 		if (k < AERON_SCENE_MAX_PROBE_SETS) {
 			distances[k] = distance;
-			packages[k] = package;
+			sets[k] = probes;
 			s.probe_set_object[k] = i;
 		}
 	}
@@ -3270,26 +3270,25 @@ static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap
 		float basis[9], local[3];
 		/* The pose the object walk gives its instance. */
 		fl_object_pose(f, cam->world_pos, 0, basis, local, set->model);
-		if (AeronScene_AddProbeSet(s.scene, packages[k], set->model) < 0) {
+		if (AeronScene_AddProbeSet(s.scene, sets[k], set->model) < 0) {
 			continue;
 		}
-		set->package = packages[k];
+		set->probes = sets[k];
 		s.probe_set_object[s.probe_set_count++] = s.probe_set_object[k];
-		XwaRemasterEnvironment_NoteProbeSet(XwaSnapshotExport_ModelName(f->object_type), packages[k],
-											f->slot);
+		XwaRemasterEnvironment_NoteProbeSet(XwaSnapshotExport_ModelName(f->object_type), sets[k], f->slot);
 	}
 	if (s.probe_set_count && XwaRemasterEnvironment_ShowProbes()) {
 		XwaRemasterProbeOutlines_Prepare(cmd, s.scene, view, s.crows, s.probe_sets, s.probe_set_count);
 	}
 }
 
-/* The probes package of the hangar model (the launch reference) when it
- * placed its probe set, else NULL. */
-static const AeronEnvironmentPackage* fl_hangar_probe_set(const XwaSnapshot* snap) {
+/* The probe set of the hangar model (the launch reference) when it placed
+ * it, else NULL. */
+static const AeronProbeSet* fl_hangar_probe_set(const XwaSnapshot* snap) {
 	for (uint32_t k = 0; k < s.probe_set_count; k++) {
 		if ((int32_t)snap->flight_objects[s.probe_set_object[k]].slot ==
 			snap->flight_camera.hangar_launch_ref_obj_idx) {
-			return s.probe_sets[k].package;
+			return s.probe_sets[k].probes;
 		}
 	}
 	return NULL;
@@ -5200,7 +5199,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	}
 	/* The configured ceiling light is in the hangar's probes: it only casts
 	 * shadows where they apply, as strong as the package says. */
-	const AeronEnvironmentPackage* hangar_probes = NULL;
+	const AeronProbeSet* hangar_probes = NULL;
 	if (cam->in_hangar && scene_lighting.lights == &scene_lighting.hangar_key) {
 		hangar_probes = fl_hangar_probe_set(snap);
 	}

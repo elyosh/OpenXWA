@@ -8,7 +8,7 @@
  * after the scene's meshes, tested against their depth.
  */
 
-#include "aeron/scene/environment.h"
+#include "aeron/scene/probe_set.h"
 #include "aeron/scene/scene3d.h"
 #include "xwa_remaster/flight.h"
 
@@ -16,10 +16,10 @@
 extern "C" {
 #endif
 
-/* A placed set: its package and its owner's model matrix (model metres to
+/* A placed set: its probes and its owner's model matrix (model metres to
  * scene units, as passed to AeronScene_AddProbeSet). */
 typedef struct XwaProbeOutlineSet {
-	const AeronEnvironmentPackage* package;
+	const AeronProbeSet* probes;
 	float model[16];
 } XwaProbeOutlineSet;
 

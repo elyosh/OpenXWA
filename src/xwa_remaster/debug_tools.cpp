@@ -1297,11 +1297,35 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 			ImGui::Text("Fallback: %s", XwaRemasterEnvironment_FallbackName(selection.fallback));
 		}
 	}
+	bool probes = XwaRemasterEnvironment_Probes() != 0;
+	if (ImGui::Checkbox("Probes", &probes)) {
+		XwaRemasterEnvironment_SetProbes(probes ? 1 : 0);
+	}
+	ImGui::SetItemTooltip("Off: no model's probes light the scene (for comparison and profiling).");
 	const XwaEnvironmentProbeSet* sets = nullptr;
 	const uint32_t set_count = XwaRemasterEnvironment_FrameProbeSets(&sets);
 	ImGui::Text("Probe sets: %u", set_count);
 	for (uint32_t i = 0; i < set_count; ++i) {
-		ImGui::BulletText("%s, object %u: %s", sets[i].model, (unsigned)sets[i].slot, sets[i].package);
+		AeronProbeSet* set = sets[i].probes;
+		AeronFlightProbeLayout* d = &set->settings;
+		if (!ImGui::TreeNode(set, "%s, object %u: %u probes, %ux%ux%u grid, %.1f MiB", sets[i].model,
+							 (unsigned)sets[i].slot, d->probe_count, d->grid_resolution[0],
+							 d->grid_resolution[1], d->grid_resolution[2],
+							 (double)set->bytes / (1024.0 * 1024.0))) {
+			continue;
+		}
+		/* Edits last until the model is loaded again. */
+		ImGui::SliderFloat("Intensity", &d->intensity, 0.0f, 16.0f, "%.3f");
+		ImGui::SliderFloat("Diffuse strength (relative)", &d->diffuse_strength, 0.0f, 4.0f, "%.3f");
+		ImGui::SliderFloat("Specular strength (relative)", &d->specular_strength, 0.0f, 4.0f, "%.3f");
+		ImGui::SliderFloat("Key light shadow", &d->key_light_shadow, 0.0f, 1.0f, "%.2f");
+		ImGui::SetItemTooltip(
+			"When the scene's key light is in the bake (a hangar's ceiling light): the part "
+			"of the probe light its shadow removes");
+		if (ImGui::Button("Reset")) {
+			*d = set->layout;
+		}
+		ImGui::TreePop();
 	}
 	bool show_probes = XwaRemasterEnvironment_ShowProbes() != 0;
 	if (ImGui::Checkbox("Show probes", &show_probes)) {

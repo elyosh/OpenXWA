@@ -14,7 +14,7 @@
 /* Per probe: influence, inner shape and parallax volume, each three circles
  * at most; per set, the grid box. */
 #define OUTLINE_RECORDS                                                                                      \
-	(AERON_SCENE_MAX_PROBE_SETS * (AERON_ENV_MAX_PROBES * 3 * 3 * OUTLINE_CIRCLE_SEGMENTS + 12) +            \
+	(AERON_SCENE_MAX_PROBE_SETS * (AERON_FLIGHT_MAX_PROBES * 3 * 3 * OUTLINE_CIRCLE_SEGMENTS + 12) +         \
 	 OUTLINE_MAX_POINTS * 3)
 
 static const float outline_colors[8][3] = {
@@ -102,18 +102,18 @@ static void outline_ellipsoid(const float center[3], const float size[3], const 
 	}
 }
 
-static void outline_shape(AeronEnvironmentProbeShape shape, const float center[3], const float size[3],
+static void outline_shape(AeronFlightProbeShape shape, const float center[3], const float size[3],
 						  const float rgba[4]) {
-	if (shape == AERON_ENV_PROBE_ELLIPSOID) {
+	if (shape == AERON_FLIGHT_PROBE_ELLIPSOID) {
 		outline_ellipsoid(center, size, rgba);
 	} else {
 		outline_box(center, size, rgba);
 	}
 }
 
-static void outline_set(const AeronEnvironmentDefinition* d) {
+static void outline_set(const AeronFlightProbeLayout* d) {
 	for (uint32_t k = 0; k < d->probe_count; k++) {
-		const AeronEnvironmentProbeDefinition* probe = &d->probes[k];
+		const AeronFlightProbe* probe = &d->probes[k];
 		const float* c = outline_colors[k % 8];
 		const float color[4] = { c[0], c[1], c[2], 1.0f };
 		const float dim[4] = { c[0] * 0.4f, c[1] * 0.4f, c[2] * 0.4f, 0.4f };
@@ -187,9 +187,9 @@ int XwaRemasterProbeOutlines_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scen
 	outline.thickness = fmaxf(1.0f, view->classic_pixel_scale);
 	outline.points = 0;
 	for (uint32_t i = 0; i < count; i++) {
-		if (sets[i].package) {
+		if (sets[i].probes) {
 			outline.model = sets[i].model;
-			outline_set(&sets[i].package->settings);
+			outline_set(&sets[i].probes->settings);
 		}
 	}
 	outline.view = NULL;

@@ -14,15 +14,7 @@
 /* XWA keeps four regions per mission. */
 #define ENV_MAX_REGIONS 4
 #define ENV_MAX_MISSIONS 128
-/* At most 64 models with probes: one bit each in a prepared set's mask. */
-#define ENV_MAX_PROBES 64
-#define ENV_MAX_REFERENCES (ENV_MAX_PROBES + ENV_MAX_MISSIONS * ENV_MAX_REGIONS)
-
-/* A model with its own package: its probes (`xwa.probes`). */
-typedef struct EnvModel {
-	char key[XWA_SNAP_OPT_NAME_MAX]; /* model key, lower case */
-	int32_t reference;
-} EnvModel;
+#define ENV_MAX_REFERENCES (ENV_MAX_MISSIONS * ENV_MAX_REGIONS)
 
 typedef struct EnvMission {
 	char key[XWA_ENV_MISSION_KEY_MAX];
@@ -36,8 +28,6 @@ typedef struct EnvState {
 	AeronEnvironmentDefinitionSet* packages;
 	AeronEnvironmentReference references[ENV_MAX_REFERENCES];
 	uint32_t reference_count;
-	EnvModel probes[ENV_MAX_PROBES];
-	uint32_t probe_count;
 	EnvMission missions[ENV_MAX_MISSIONS];
 	uint32_t mission_count;
 	/* Package library and the prepared reference set: indices as passed to
@@ -45,10 +35,6 @@ typedef struct EnvState {
 	AeronEnvironmentLibrary* library;
 	char prepared_key[XWA_ENV_MISSION_KEY_MAX]; /* "" = no mission prepared */
 	int32_t prepared_region[ENV_MAX_REGIONS];
-	/* The probes entries of the mission's models, by bit, and their library
-	 * indices (-1 = not prepared). */
-	uint64_t prepared_probes_mask;
-	int32_t prepared_probes[ENV_MAX_PROBES];
 	/* The probe sets placed this frame, for the debug rows. */
 	XwaEnvironmentProbeSet frame_sets[AERON_SCENE_MAX_PROBE_SETS];
 	uint32_t frame_set_count;
@@ -62,11 +48,12 @@ static EnvState s_env;
 /* Host options and the debug switch; survive Shutdown, which clears s_env. */
 static struct {
 	int authored;
+	int probes;
 	int show_probes;
 	int enabled;
 	float sun_max_radiance; /* 0 = Aeron's default */
 	char manifest[sizeof s_env.manifest_path];
-} s_env_options = { .authored = 1 };
+} s_env_options = { .authored = 1, .probes = 1 };
 
 void XwaRemasterEnvironment_Configure(int enabled, const char* manifest, float sun_max_radiance) {
 	s_env_options.enabled = enabled != 0;
@@ -155,16 +142,9 @@ static int env_read_rotation(const AeronConfigNode* node, const char* what, floa
 	return 1;
 }
 
-/* What a reference is for, which sets the packages it accepts. */
-typedef enum EnvUse {
-	ENV_USE_REGION, /* any but a probes package */
-	ENV_USE_PROBES, /* a probes package */
-} EnvUse;
-
-/* Adds a reference to a package `use` accepts. A reference is
- * either a package name or a map with `package` and an optional
- * `rotation_degrees`. */
-static int env_add_reference(const AeronConfigNode* node, const char* what, EnvUse use, int32_t* out_index) {
+/* Adds a reference to a package. A reference is either a package name or
+ * a map with `package` and an optional `rotation_degrees`. */
+static int env_add_reference(const AeronConfigNode* node, const char* what, int32_t* out_index) {
 	static const char* const fields[] = { "package", "rotation_degrees" };
 	const AeronConfigNode* package_node = node;
 	const AeronConfigNode* rotation_node = NULL;
@@ -185,18 +165,6 @@ static int env_add_reference(const AeronConfigNode* node, const char* what, EnvU
 	const AeronEnvironmentDefinition* definition = AeronEnvironmentDefinitionSet_Find(s_env.packages, name);
 	if (!definition) {
 		return env_node_error(package_node, "%s: unknown package '%s'", what, name);
-	}
-	switch (use) {
-		case ENV_USE_REGION:
-			if (AeronEnvironment_IsProbeSet(definition)) {
-				return env_node_error(package_node, "%s: package '%s' is a model's probes", what, name);
-			}
-			break;
-		case ENV_USE_PROBES:
-			if (!AeronEnvironment_IsProbeSet(definition)) {
-				return env_node_error(package_node, "%s: package '%s' is not a probes package", what, name);
-			}
-			break;
 	}
 	AeronEnvironmentReference* reference = &s_env.references[s_env.reference_count];
 	memset(reference, 0, sizeof *reference);
@@ -256,7 +224,7 @@ static int env_parse_mission(const char* source, const AeronConfigNode* node) {
 		}
 		char region_what[224];
 		snprintf(region_what, sizeof region_what, "%s region %d", what, region);
-		if (!env_add_reference(value, region_what, ENV_USE_REGION, &mission->region_reference[region])) {
+		if (!env_add_reference(value, region_what, &mission->region_reference[region])) {
 			return 0;
 		}
 	}
@@ -264,108 +232,12 @@ static int env_parse_mission(const char* source, const AeronConfigNode* node) {
 	return 1;
 }
 
-static void env_lower(char* out, size_t size, const char* text) {
-	size_t i = 0;
-	for (; text[i] && i + 1 < size; i++) {
-		out[i] = (char)(text[i] >= 'A' && text[i] <= 'Z' ? text[i] - 'A' + 'a' : text[i]);
-	}
-	out[i] = '\0';
-}
-
-/* Adds the packages of a model's `package.yaml`, in `models/<key>/` beside
- * the manifest, where the probes bake writes it: a new bake needs no edit
- * of the manifest. Logs and returns 0 when the file is missing or invalid,
- * or when the manifest defines one of its packages too. */
-static int env_load_model_packages(AeronVfs* vfs, const char* key) {
-	char directory[sizeof s_env.manifest_path];
-	snprintf(directory, sizeof directory, "%s", s_env.manifest_path);
-	char* slash = strrchr(directory, '/');
-	if (slash) {
-		slash[1] = '\0';
-	} else {
-		directory[0] = '\0';
-	}
-	char vfs_path[400];
-	snprintf(vfs_path, sizeof vfs_path, "remaster/%smodels/%s/package.yaml", directory, key);
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_ASSET, vfs_path, &file, &error)) {
-		Aeron_LogError("xwa.remaster", "environment: xwa.probes '%s': %s:%d: %s", key, vfs_path, error.line,
-					   error.message[0] ? error.message : "unavailable");
-		return 0;
-	}
-	static const char* const fields[] = { "packages" };
-	const AeronConfigNode* root = AeronConfigFile_Root(file);
-	const AeronConfigNode* packages = AeronConfigNode_MapGet(root, "packages");
-	int ok = AeronConfigNode_Type(root) == AERON_CONFIG_MAP
-				 ? env_check_fields(root, vfs_path, fields, sizeof fields / sizeof fields[0])
-				 : env_node_error(root, "%s must be a map", vfs_path);
-	for (size_t i = 0;
-		 ok && AeronConfigNode_Type(packages) == AERON_CONFIG_MAP && i < AeronConfigNode_MapCount(packages);
-		 i++) {
-		const char* name = AeronConfigNode_MapKeyAt(packages, i);
-		if (AeronEnvironmentDefinitionSet_Find(s_env.packages, name)) {
-			ok = env_node_error(AeronConfigNode_MapValueAt(packages, i),
-								"package '%s' is also in the manifest's packages: remove it there, the game "
-								"reads it from the model's folder",
-								name);
-		}
-	}
-	if (ok && !AeronEnvironment_AddPackages(packages, s_env.packages, &error)) {
-		Aeron_LogError("xwa.remaster", "%s:%d: %s", error.path[0] ? error.path : vfs_path, error.line,
-					   error.message);
-		ok = 0;
-	}
-	AeronConfigFile_Destroy(file);
-	return ok;
-}
-
-/* `xwa.probes`: model keys to probes packages, each from the model's own
- * package.yaml; a model whose package cannot be loaded is left out, with an
- * error logged. */
-static int env_parse_models(AeronVfs* vfs, const AeronConfigNode* map, const char* field, EnvModel* models,
-							uint32_t* count, uint32_t max) {
-	if (AeronConfigNode_Type(map) != AERON_CONFIG_MAP) {
-		return env_node_error(map, "xwa: '%s' must be a map", field);
-	}
-	for (size_t i = 0; i < AeronConfigNode_MapCount(map); i++) {
-		const char* key = AeronConfigNode_MapKeyAt(map, i);
-		const AeronConfigNode* value = AeronConfigNode_MapValueAt(map, i);
-		if (*count >= max) {
-			return env_node_error(value, "xwa.%s: at most %u models are allowed", field, max);
-		}
-		EnvModel* model = &models[*count];
-		if (!key[0] || strlen(key) >= sizeof model->key) {
-			return env_node_error(value, "xwa.%s: invalid model key '%s'", field, key);
-		}
-		env_lower(model->key, sizeof model->key, key);
-		for (uint32_t m = 0; m < *count; m++) {
-			if (strcmp(models[m].key, model->key) == 0) {
-				return env_node_error(value, "xwa.%s: duplicate model '%s'", field, key);
-			}
-		}
-		char what[96];
-		snprintf(what, sizeof what, "xwa.%s '%s'", field, key);
-		if (!env_load_model_packages(vfs, model->key) ||
-			!env_add_reference(value, what, ENV_USE_PROBES, &model->reference)) {
-			continue;
-		}
-		(*count)++;
-	}
-	return 1;
-}
-
-static int env_parse_xwa(AeronVfs* vfs, const AeronConfigNode* xwa) {
-	static const char* const fields[] = { "probes", "missions" };
+static int env_parse_xwa(const AeronConfigNode* xwa) {
+	static const char* const fields[] = { "missions" };
 	if (!xwa || AeronConfigNode_Type(xwa) != AERON_CONFIG_MAP) {
 		return env_node_error(xwa, "manifest: 'xwa' must be a map");
 	}
 	if (!env_check_fields(xwa, "xwa", fields, sizeof fields / sizeof fields[0])) {
-		return 0;
-	}
-	const AeronConfigNode* probes = AeronConfigNode_MapGet(xwa, "probes");
-	if (probes && !env_parse_models(vfs, probes, "probes", s_env.probes, &s_env.probe_count, ENV_MAX_PROBES)) {
 		return 0;
 	}
 	const AeronConfigNode* missions = AeronConfigNode_MapGet(xwa, "missions");
@@ -415,13 +287,12 @@ static int env_load_manifest(AeronVfs* vfs) {
 		ok = 0;
 	}
 	if (ok) {
-		ok = env_parse_xwa(vfs, AeronConfigNode_MapGet(root, "xwa"));
+		ok = env_parse_xwa(AeronConfigNode_MapGet(root, "xwa"));
 	}
 	AeronConfigFile_Destroy(manifest);
 	if (ok) {
-		Aeron_LogInfo("xwa.remaster", "environment manifest %s: %u packages, %u missions, %u models with probes",
-					  vfs_path, AeronEnvironmentDefinitionSet_Count(s_env.packages), s_env.mission_count,
-					  s_env.probe_count);
+		Aeron_LogInfo("xwa.remaster", "environment manifest %s: %u packages, %u missions", vfs_path,
+					  AeronEnvironmentDefinitionSet_Count(s_env.packages), s_env.mission_count);
 	}
 	return ok;
 }
@@ -452,10 +323,6 @@ static void env_clear_prepared(void) {
 	for (int r = 0; r < ENV_MAX_REGIONS; r++) {
 		s_env.prepared_region[r] = -1;
 	}
-	s_env.prepared_probes_mask = 0;
-	for (int p = 0; p < ENV_MAX_PROBES; p++) {
-		s_env.prepared_probes[p] = -1;
-	}
 }
 
 void XwaRemasterEnvironment_Shutdown(void) {
@@ -471,6 +338,10 @@ int XwaRemasterEnvironment_Enabled(void) { return s_env.enabled; }
 void XwaRemasterEnvironment_SetAuthoredEnvironments(int enabled) { s_env_options.authored = enabled != 0; }
 
 int XwaRemasterEnvironment_AuthoredEnvironments(void) { return s_env_options.authored; }
+
+void XwaRemasterEnvironment_SetProbes(int enabled) { s_env_options.probes = enabled != 0; }
+
+int XwaRemasterEnvironment_Probes(void) { return s_env_options.probes; }
 
 void XwaRemasterEnvironment_SetShowProbes(int show) { s_env_options.show_probes = show != 0; }
 
@@ -512,21 +383,6 @@ int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd) {
 	return 1;
 }
 
-/* The `xwa.probes` entries of the snapshot's loaded models, by bit. */
-static uint64_t env_probes_mask(const XwaSnapshot* snap) {
-	uint64_t mask = 0;
-	for (uint32_t i = 0; s_env.probe_count && i < snap->opt_asset_count && i < XWA_SNAP_MAX_OPT_ASSETS; i++) {
-		char key[XWA_SNAP_OPT_NAME_MAX];
-		env_lower(key, sizeof key, snap->opt_assets[i].name);
-		for (uint32_t p = 0; p < s_env.probe_count; p++) {
-			if (strcmp(s_env.probes[p].key, key) == 0) {
-				mask |= (uint64_t)1 << p;
-			}
-		}
-	}
-	return mask;
-}
-
 static int env_snapshot_key(const XwaSnapshot* snap, char* key, size_t size) {
 	return snap && snap->mission_path[0] &&
 		   XwaRemasterEnvironment_NormalizeMissionKey(snap->mission_path, key, size);
@@ -542,31 +398,25 @@ int XwaRemasterEnvironment_NeedsPrepare(const XwaSnapshot* snap) {
 		return 1;
 	}
 	char key[XWA_ENV_MISSION_KEY_MAX];
-	return (env_snapshot_key(snap, key, sizeof key) && strcmp(key, s_env.prepared_key) != 0) ||
-		   (snap && env_probes_mask(snap) != s_env.prepared_probes_mask);
+	return env_snapshot_key(snap, key, sizeof key) && strcmp(key, s_env.prepared_key) != 0;
 }
 
-/* Prepares the mission's regions and the loaded models' probes when they
- * changed, or always with `force`. */
+/* Prepares the mission's regions when the mission changed, or always with
+ * `force` (keeping the prepared mission without a key). */
 static void env_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap, int force) {
 	char key[XWA_ENV_MISSION_KEY_MAX];
 	const int has_key = env_snapshot_key(snap, key, sizeof key);
-	const uint64_t probes_mask = env_probes_mask(snap);
-	if (!force && (!has_key || strcmp(key, s_env.prepared_key) == 0) &&
-		probes_mask == s_env.prepared_probes_mask) {
+	if (!force && (!has_key || strcmp(key, s_env.prepared_key) == 0)) {
 		return;
 	}
 	if (!has_key) {
-		/* Only the models changed: keep the prepared mission's regions. */
 		snprintf(key, sizeof key, "%s", s_env.prepared_key);
 	}
 	/* Every mapped region, so a hyperspace region change never loads
-	 * anything, and the probes of the loaded models. Textures shared by path
-	 * are uploaded once. */
-	AeronEnvironmentReference references[ENV_MAX_REGIONS + ENV_MAX_PROBES];
+	 * anything. Textures shared by path are uploaded once. */
+	AeronEnvironmentReference references[ENV_MAX_REGIONS];
 	uint32_t count = 0;
 	int32_t regions[ENV_MAX_REGIONS] = { -1, -1, -1, -1 };
-	int32_t probes[ENV_MAX_PROBES];
 	const EnvMission* mission = env_find_mission(key);
 	for (int r = 0; mission && r < ENV_MAX_REGIONS; r++) {
 		if (mission->region_reference[r] >= 0) {
@@ -574,34 +424,24 @@ static void env_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap, int fo
 			references[count++] = s_env.references[mission->region_reference[r]];
 		}
 	}
-	for (uint32_t p = 0; p < ENV_MAX_PROBES; p++) {
-		probes[p] = -1;
-		if (probes_mask & ((uint64_t)1 << p)) {
-			probes[p] = (int32_t)count;
-			references[count++] = s_env.references[s_env.probes[p].reference];
-		}
-	}
 	/* Record the key even on failure: retrying every frame would not help. */
 	env_clear_prepared();
 	snprintf(s_env.prepared_key, sizeof s_env.prepared_key, "%s", key);
-	s_env.prepared_probes_mask = probes_mask;
 	if (!AeronEnvironmentLibrary_Prepare(s_env.library, cmd, references, count)) {
 		Aeron_LogError("xwa.remaster", "environment maps: preparation failed for mission '%s'", key);
 		return;
 	}
 	memcpy(s_env.prepared_region, regions, sizeof regions);
-	memcpy(s_env.prepared_probes, probes, sizeof probes);
 	Aeron_LogInfo("xwa.remaster", "environment maps: prepared mission '%s' (%u references)", key, count);
 }
 
-/* Reads the manifest and the model packages again into fresh state. Keeps
- * the loaded state, and returns 0, when the manifest has errors. */
+/* Reads the manifest again into fresh state. Keeps the loaded state, and
+ * returns 0, when the manifest has errors. */
 static int env_reload_manifest(void) {
 	static EnvState loaded;
 	loaded = s_env;
 	s_env.packages = NULL;
 	s_env.reference_count = 0;
-	s_env.probe_count = 0;
 	s_env.mission_count = 0;
 	if (env_load_manifest(Aeron_GetVfs())) {
 		return 1;
@@ -620,10 +460,10 @@ void XwaRemasterEnvironment_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* 
 		env_prepare(cmd, snap, 0);
 		return;
 	}
-	/* Reload: read the definitions again too, so a new bake with another
-	 * grid or other probes loads without a restart. The textures of the
-	 * current references are read again, then everything is prepared from
-	 * the new definitions, which can map other packages. */
+	/* Reload: read the definitions again too, so a new bake loads without a
+	 * restart. The textures of the current references are read again, then
+	 * everything is prepared from the new definitions, which can map other
+	 * packages. */
 	AeronEnvironmentDefinitionSet* previous = s_env.packages;
 	const int reread = env_reload_manifest();
 	if (reread) {
@@ -765,28 +605,13 @@ int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mis
 
 const char* XwaRemasterEnvironment_PreparedMissionKey(void) { return s_env.prepared_key; }
 
-const AeronEnvironmentPackage* XwaRemasterEnvironment_ModelProbes(const char* model_name) {
-	if (!s_env.library || !s_env.prepared_probes_mask || !s_env_options.authored || !model_name) {
-		return NULL;
-	}
-	char key[XWA_SNAP_OPT_NAME_MAX];
-	env_lower(key, sizeof key, model_name);
-	for (uint32_t p = 0; p < s_env.probe_count; p++) {
-		if (s_env.prepared_probes[p] >= 0 && strcmp(s_env.probes[p].key, key) == 0) {
-			return env_package(s_env.prepared_probes[p]);
-		}
-	}
-	return NULL;
-}
-
-void XwaRemasterEnvironment_NoteProbeSet(const char* model_name, const AeronEnvironmentPackage* package,
-										 uint16_t slot) {
-	if (s_env.frame_set_count >= AERON_SCENE_MAX_PROBE_SETS || !package) {
+void XwaRemasterEnvironment_NoteProbeSet(const char* model_name, AeronProbeSet* probes, uint16_t slot) {
+	if (s_env.frame_set_count >= AERON_SCENE_MAX_PROBE_SETS || !probes) {
 		return;
 	}
 	XwaEnvironmentProbeSet* set = &s_env.frame_sets[s_env.frame_set_count++];
 	snprintf(set->model, sizeof set->model, "%s", model_name ? model_name : "");
-	snprintf(set->package, sizeof set->package, "%s", package->definition ? package->definition->name : "");
+	set->probes = probes;
 	set->slot = slot;
 }
 
