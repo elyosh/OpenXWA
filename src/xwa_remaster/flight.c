@@ -4414,20 +4414,17 @@ static void fl_build_scene_lighting(const XwaSnapshot* snap, const XwaFlightCame
 	out->key_index = -1;
 	out->shadow_allowed = 1;
 	out->shadow_angular_radius_degrees = s.shadows.light_angular_radius_degrees;
+	/* The hangar is lit by its own rig and its model's probes. Its region's
+	 * package gives only its sky there: in a hangar without probes, its
+	 * fill, cubes and suns would light the interior through walls that cast
+	 * no shadow, and its suns would take the one shadow map from the rig
+	 * key, whose shadow cuts the probe light under parked ships. */
+	if (cam->in_hangar) {
+		fl_build_hangar_lighting(snap, out);
+		return;
+	}
 	if (s.environment.mode == XWA_ENV_MODE_AUTHORED && s.environment.package) {
 		fl_apply_authored_lighting(snap, s.environment.package, out);
-		return;
-	}
-	if (!cam->in_hangar) {
-		return;
-	}
-	fl_build_hangar_lighting(snap, out);
-	/* The hangar package's fill and diffuse cube replace the ceiling, side
-	 * and floor ambient; the artificial ceiling light stays. Without a
-	 * package the hangar keeps its current ambient. */
-	if (s.environment.mode == XWA_ENV_MODE_HANGAR && s.environment.package) {
-		out->package = s.environment.package;
-		fl_set_package_ambient(out, s.environment.package);
 	}
 }
 

@@ -421,19 +421,9 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 	ImGui::EndDisabled();
 	ImGui::Separator();
 	ImGui::TextUnformatted("Ambient cube (linear)");
-	/* An authored hangar package's fill and diffuse cube replace this cube. */
-	XwaEnvironmentSelection selection;
-	const bool authored_hangar = XwaRemasterEnvironment_LastSelection(&selection, NULL, 0) &&
-								 selection.mode == XWA_ENV_MODE_HANGAR && selection.package;
-	if (authored_hangar) {
-		ImGui::TextDisabled("Replaced by the authored hangar package '%s' (Environment tool).",
-							selection.reference ? selection.reference->package : "?");
-	}
-	ImGui::BeginDisabled(authored_hangar);
 	changed |= ImGui::SliderFloat("Ceiling fill (+Z)", &p.ambient_ceiling, 0.0f, 1.0f, "%.3f");
 	changed |= ImGui::SliderFloat("Wall bounce", &p.ambient_sides, 0.0f, 1.0f, "%.3f");
 	changed |= ImGui::SliderFloat("Floor bounce (-Z)", &p.ambient_floor, 0.0f, 1.0f, "%.3f");
-	ImGui::EndDisabled();
 	if (!enabled) {
 		ImGui::EndDisabled();
 	}
@@ -1283,7 +1273,7 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 		XwaRemasterEnvironment_SetAuthoredEnvironments(authored ? 1 : 0);
 	}
 	ImGui::TextDisabled(
-		"Off: the hangar and flight regions use the classic path (for comparison and profiling).");
+		"Off: the regions use the classic path (for comparison and profiling).");
 	XwaEnvironmentSelection selection;
 	char mission[128];
 	if (XwaRemasterEnvironment_LastSelection(&selection, mission, sizeof mission)) {

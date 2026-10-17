@@ -493,6 +493,10 @@ typedef struct XwaFlightCamera {
 	uint8_t cockpit_visible;  /* player cockpit shown (own record below) */
 	uint8_t hyperspace_phase; /* player.hyperspacePhase */
 	uint8_t region;           /* player region index */
+	/* The mission region the scene sits in: in the hangar, the region the
+	 * player entered it from (whose backdrops it draws), as the hangar
+	 * objects live in a synthetic region; else `region`. */
+	uint8_t mission_region;
 	uint8_t map_mode;         /* player.mapCameraState */
 	uint8_t film_overlay;     /* film playback with overlay camera */
 	uint8_t in_hangar;        /* g_inHangarReady (hangar scene phase) */

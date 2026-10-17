@@ -1550,6 +1550,8 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->cockpit_visible = g_players[g_localPlayer].cockpitVisible;
 	c->hyperspace_phase = (uint8_t)g_players[g_localPlayer].hyperspacePhase;
 	c->region = g_players[g_localPlayer].regionIndex;
+	c->mission_region =
+		(uint8_t)(g_inHangarReady ? g_hangarSavedMissionRegionIdx : g_players[g_localPlayer].regionIndex);
 	c->map_mode = g_players[g_localPlayer].mapCameraState;
 	c->film_overlay = (uint8_t)(g_filmPlaybackMode && g_filmOverlayActive == 1);
 	c->in_hangar = (uint8_t)(g_inHangarReady != 0);

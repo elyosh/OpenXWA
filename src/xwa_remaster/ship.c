@@ -87,8 +87,10 @@ static int g_backface_fill = 1;
 static int g_key_shadow_all_sides = 1;
 /* The ships inside the hangar's probe grid take its light from what they
  * cover (AeronScene_SetProbeOcclusion), in place of the key light shadow's
- * cut; debug inspector toggle, not persisted. */
-static int g_ship_occlusion = 1;
+ * cut. Off by default: it costs much and does not yet hold in every scene,
+ * and the cut darkens the probe light under ships without it. Debug
+ * inspector toggle, not persisted. */
+static int g_ship_occlusion = 0;
 /* The hangar's floor reflects the ships on it when its probes package has
  * a reflection plane (AeronScene_SetPlanarReflection); debug inspector
  * toggle, not persisted. */
@@ -518,8 +520,8 @@ static void ship_color(uint32_t argb, float out[4]) {
 
 /* FS b1 — mirrors cbuffer PbrLightFS (scene_pbr_lighting.hlsli). */
 typedef struct PbrLightFS {
-	float key_in_probes;    /* the key light is in the probe sets' bake */
-	float key_probe_shadow; /* the share of probe light its shadow removes */
+	float key_shadow_in_probes; /* the key light is in the probe sets' bake: its shadow cuts their light */
+	float key_probe_shadow;     /* the share of probe light its shadow removes */
 	float debug_isolate_term;
 	float key_shadow_facing; /* nonzero: the key shadow only as surfaces face the light */
 	float reserved_xvt; /* formerly the XvT flat-shading switch */
@@ -665,7 +667,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	}
 
 	PbrLightFS env = { 0 };
-	env.key_in_probes = key_probe_shadow >= 0.0f ? 1.0f : 0.0f;
+	env.key_shadow_in_probes = key_probe_shadow >= 0.0f ? 1.0f : 0.0f;
 	env.key_probe_shadow = fmaxf(key_probe_shadow, 0.0f);
 	env.key_shadow_facing = g_key_shadow_all_sides ? 0.0f : 1.0f;
 	AeronScene_SetProbeKeyShadow(scene, key_probe_shadow >= 0.0f && g_key_shadow_all_sides);
