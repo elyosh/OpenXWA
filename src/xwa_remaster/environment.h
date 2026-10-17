@@ -80,8 +80,9 @@ typedef struct XwaEnvironmentSelection {
  * XwaRemasterEnvironment_Init. */
 void XwaRemasterEnvironment_Configure(int enabled, const char* manifest, float sun_max_radiance);
 
-/* When enabled, parses the required manifest. Returns 0 on any error,
- * logged with the source path and YAML line. */
+/* When enabled, parses the manifest. A missing manifest turns environment
+ * maps off. Returns 0 when the manifest is invalid, and logs the source path
+ * and YAML line. */
 int XwaRemasterEnvironment_Init(AeronVfs* vfs);
 void XwaRemasterEnvironment_Shutdown(void);
 

@@ -252,6 +252,7 @@ static int env_parse_xwa(const AeronConfigNode* xwa) {
 	return 1;
 }
 
+/* Returns 1 when the manifest loads, -1 when it does not exist, 0 on error. */
 static int env_load_manifest(AeronVfs* vfs) {
 	static const char* const fields[] = { "version", "environments", "xwa" };
 	char vfs_path[300];
@@ -260,6 +261,11 @@ static int env_load_manifest(AeronVfs* vfs) {
 	AeronConfigError error;
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_ASSET, vfs_path, &manifest, &error)) {
+		if (error.code == AERON_CONFIG_ERROR_NOT_FOUND) {
+			/* Remastered assets are optional. */
+			Aeron_LogInfo("xwa.remaster", "environment maps: no manifest at %s, classic sky only", vfs_path);
+			return -1;
+		}
 		Aeron_LogError("xwa.remaster", "environment manifest %s:%d: %s", vfs_path, error.line,
 					   error.message[0] ? error.message : "unavailable");
 		return 0;
@@ -307,9 +313,10 @@ int XwaRemasterEnvironment_Init(AeronVfs* vfs) {
 		XwaRemasterEnvironment_Shutdown();
 		return 0;
 	}
-	if (!env_load_manifest(vfs)) {
+	const int loaded = env_load_manifest(vfs);
+	if (loaded <= 0) {
 		XwaRemasterEnvironment_Shutdown();
-		return 0;
+		return loaded < 0;
 	}
 	return 1;
 }
