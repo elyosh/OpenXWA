@@ -278,21 +278,14 @@ void XwaRemasterFlight_CommitProcessAssets(void);
 
 struct XwaRemasterSkyStars;
 
-typedef enum XwaFlightCaptureSkyMode {
-	XWA_FLIGHT_CAPTURE_SKY_NONE,  /* cube mode without a loaded cube */
-	XWA_FLIGHT_CAPTURE_SKY_STARS, /* procedural starfield */
-	XWA_FLIGHT_CAPTURE_SKY_CUBE,  /* configured sky cube */
-} XwaFlightCaptureSkyMode;
-
 typedef struct XwaFlightCaptureSky {
-	XwaFlightCaptureSkyMode mode;
 	float exposure;
 	float star_brightness;
 	float star_density;
 	float star_grid;
 } XwaFlightCaptureSky;
 
-/* The configured sky source the flight frame draws outside authored mode. */
+/* The starfield settings the flight frame draws with outside authored mode. */
 void XwaRemasterFlight_CaptureSkyInfo(XwaFlightCaptureSky* out);
 
 /* A square perspective capture camera with half-angle tangent `half_tan`
@@ -302,9 +295,9 @@ void XwaRemasterFlight_CaptureSkyInfo(XwaFlightCaptureSky* out);
 int XwaRemasterFlight_CaptureCamera(const float right[3], const float down[3], const float forward[3],
 									float half_tan, int size, AeronSceneCamera* camera, float crows[9]);
 
-/* After AeronScene_Begin: draws the configured sky into `scene`. Stars use
- * `stars` (the scene's BEFORE_OPAQUE hook) with the classic-pixel dot
- * geometry scaled by `star_upscale`. Returns 0 on failure. */
+/* After AeronScene_Begin: draws the starfield into `scene` with `stars`
+ * (the scene's BEFORE_OPAQUE hook), with the classic-pixel dot geometry
+ * scaled by `star_upscale`. Returns 0 on failure. */
 int XwaRemasterFlight_CaptureSetSky(AeronScene3D* scene, struct XwaRemasterSkyStars* stars,
 									const XwaSnapshot* snap, float star_upscale);
 

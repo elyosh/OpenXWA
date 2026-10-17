@@ -4,22 +4,26 @@
 /*
  * HD authored environments: XWA mapping and per-frame selection.
  *
- * The manifest (host option environment_maps.manifest, under the remaster
- * bake root) holds Aeron's shared `environments:` map and an `xwa:` section
- * that maps each (mission path, region) to an environment reference.
+ * The manifest (host option environment_maps.manifest, relative to the mod
+ * folder) holds Aeron's shared `environments:` map and an `xwa:` section.
+ * `xwa.missions` maps each (mission path, region) to an environment
+ * reference, and the optional `xwa.default` is the reference of every
+ * region without an entry.
  *
  * A region's environment replaces the ambient with its fill and image-based
  * lighting. If the environment has a sky (`radiance`), it also replaces the
  * classic sky, backdrops and backdrop flares. If it has
  * `directional_lights`, they replace the directional lights. A mission or
- * region without an entry uses the classic HD path (the Death Star
+ * region without an entry uses the default environment. Without a default,
+ * and in Death Star mode, it uses the classic HD path (the Death Star
  * behaviour in Death Star mode). In a hangar, the selection uses the region
  * the player entered the hangar from, and the flight renderer uses only
  * the sky of that environment.
  *
  * Environments are prepared through Aeron's environment library at the HD
  * asset synchronization point. When the snapshot's normalized mission key
- * changes, the environments of all the mission's regions are prepared. A
+ * changes, the environments of all the mission's regions, the default
+ * included, are prepared. A
  * region uses its environment only after it is prepared and available. A model's
  * probes are stored in its GLB (AeronSceneMesh.probes), and the flight
  * renderer places them on the objects that use that model.
@@ -29,6 +33,7 @@
  * never loads files or allocates.
  */
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -70,6 +75,8 @@ typedef struct XwaEnvironmentSelection {
 	 * and it is available. */
 	const AeronPreparedEnvironment* prepared;
 	uint8_t region; /* flight_camera.mission_region */
+	/* The reference is xwa.default: the region has no entry of its own. */
+	bool is_default;
 } XwaEnvironmentSelection;
 
 #define XWA_ENV_MISSION_KEY_MAX 128

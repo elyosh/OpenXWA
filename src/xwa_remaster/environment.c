@@ -14,7 +14,7 @@
 /* XWA keeps four regions per mission. */
 #define ENV_MAX_REGIONS 4
 #define ENV_MAX_MISSIONS 128
-#define ENV_MAX_REFERENCES (ENV_MAX_MISSIONS * ENV_MAX_REGIONS)
+#define ENV_MAX_REFERENCES (ENV_MAX_MISSIONS * ENV_MAX_REGIONS + 1) /* + xwa.default */
 
 typedef struct EnvMission {
 	char key[XWA_ENV_MISSION_KEY_MAX];
@@ -30,6 +30,8 @@ typedef struct EnvState {
 	uint32_t reference_count;
 	EnvMission missions[ENV_MAX_MISSIONS];
 	uint32_t mission_count;
+	/* xwa.default: index into references, -1 = none. */
+	int32_t default_reference;
 	/* Environment library and the prepared reference set: indices as passed to
 	 * AeronEnvironmentLibrary_Prepare, -1 = not prepared. */
 	AeronEnvironmentLibrary* library;
@@ -229,11 +231,15 @@ static int env_parse_mission(const char* source, const AeronConfigNode* node) {
 }
 
 static int env_parse_xwa(const AeronConfigNode* xwa) {
-	static const char* const fields[] = { "missions" };
+	static const char* const fields[] = { "missions", "default" };
 	if (!xwa || AeronConfigNode_Type(xwa) != AERON_CONFIG_MAP) {
 		return env_node_error(xwa, "manifest: 'xwa' must be a map");
 	}
 	if (!env_check_fields(xwa, "xwa", fields, sizeof fields / sizeof fields[0])) {
+		return 0;
+	}
+	const AeronConfigNode* default_node = AeronConfigNode_MapGet(xwa, "default");
+	if (default_node && !env_add_reference(default_node, "xwa.default", &s_env.default_reference)) {
 		return 0;
 	}
 	const AeronConfigNode* missions = AeronConfigNode_MapGet(xwa, "missions");
@@ -256,6 +262,7 @@ static int env_parse_xwa(const AeronConfigNode* xwa) {
 static int env_load_manifest(AeronVfs* vfs) {
 	static const char* const fields[] = { "version", "environments", "xwa" };
 	const char* vfs_path = s_env.manifest_path;
+	s_env.default_reference = -1;
 	AeronConfigFile* manifest = NULL;
 	AeronConfigError error;
 	memset(&error, 0, sizeof error);
@@ -407,16 +414,24 @@ static void env_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap, int fo
 	if (!has_key) {
 		snprintf(key, sizeof key, "%s", s_env.prepared_key);
 	}
-	/* Prepare all mapped regions, so a hyperspace jump to another region
-	 * loads nothing. Textures with the same path are uploaded once. */
+	/* Prepare all regions, so a hyperspace jump to another region loads
+	 * nothing. Regions without an entry share the default environment.
+	 * Textures with the same path are uploaded once. */
 	AeronEnvironmentReference references[ENV_MAX_REGIONS];
 	uint32_t count = 0;
 	int32_t regions[ENV_MAX_REGIONS] = { -1, -1, -1, -1 };
+	int32_t default_index = -1;
 	const EnvMission* mission = env_find_mission(key);
-	for (int r = 0; mission && r < ENV_MAX_REGIONS; r++) {
-		if (mission->region_reference[r] >= 0) {
+	for (int r = 0; r < ENV_MAX_REGIONS; r++) {
+		if (mission && mission->region_reference[r] >= 0) {
 			regions[r] = (int32_t)count;
 			references[count++] = s_env.references[mission->region_reference[r]];
+		} else if (s_env.default_reference >= 0) {
+			if (default_index < 0) {
+				default_index = (int32_t)count;
+				references[count++] = s_env.references[s_env.default_reference];
+			}
+			regions[r] = default_index;
 		}
 	}
 	/* Record the key even on failure: retrying every frame would not help. */
@@ -487,6 +502,7 @@ static void env_select(XwaEnvironmentSelection* out, XwaEnvironmentMode mode, Xw
 	out->fallback = fallback;
 	out->reference = reference >= 0 ? &s_env.references[reference] : NULL;
 	out->prepared = NULL;
+	out->is_default = reference >= 0 && reference == s_env.default_reference;
 }
 
 /* The prepared environment at library index `prepared`, or NULL. */
@@ -495,8 +511,9 @@ static const AeronPreparedEnvironment* env_prepared(int32_t prepared) {
 }
 
 /* Selects the environment of the mission region, or the classic path with
- * the reason. */
-static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
+ * the reason. A region without an entry uses the default environment when
+ * `use_default` is set and there is one. */
+static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection* out, int use_default) {
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	if (!snap->mission_path[0]) {
 		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_NO_MISSION, -1);
@@ -508,14 +525,18 @@ static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection*
 		return;
 	}
 	const EnvMission* mission = env_find_mission(key);
-	if (!mission) {
-		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_NO_MISSION_ENTRY, -1);
+	const uint8_t region = cam->mission_region;
+	if (region >= ENV_MAX_REGIONS) {
+		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_NO_REGION_ENTRY, -1);
 		return;
 	}
-	const uint8_t region = cam->mission_region;
-	const int32_t reference = region < ENV_MAX_REGIONS ? mission->region_reference[region] : -1;
+	int32_t reference = mission ? mission->region_reference[region] : -1;
+	if (reference < 0 && use_default) {
+		reference = s_env.default_reference;
+	}
 	if (reference < 0) {
-		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_NO_REGION_ENTRY, -1);
+		env_select(out, XWA_ENV_MODE_CLASSIC,
+				   mission ? XWA_ENV_FALLBACK_NO_REGION_ENTRY : XWA_ENV_FALLBACK_NO_MISSION_ENTRY, -1);
 		return;
 	}
 	const AeronPreparedEnvironment* prepared =
@@ -544,15 +565,16 @@ static void env_resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 		return;
 	}
 	/* A Death Star region uses its mapped environment like any other; without
-	 * one it keeps the Death Star behaviour, with the reason. */
+	 * one it keeps the Death Star behaviour, with the reason. The default
+	 * environment does not apply there. */
 	if (cam->death_star_mode) {
-		env_resolve_region(snap, out);
+		env_resolve_region(snap, out, 0);
 		if (out->mode == XWA_ENV_MODE_CLASSIC) {
 			out->mode = XWA_ENV_MODE_DEATH_STAR;
 		}
 		return;
 	}
-	env_resolve_region(snap, out);
+	env_resolve_region(snap, out, 1);
 }
 
 void XwaRemasterEnvironment_Resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
@@ -577,12 +599,12 @@ void XwaRemasterEnvironment_Resolve(const XwaSnapshot* snap, XwaEnvironmentSelec
 	s_env.logged = 1;
 	s_env.last = *out;
 	snprintf(s_env.last_mission, sizeof s_env.last_mission, "%s", snap->mission_path);
-	Aeron_LogInfo("xwa.remaster", "environment: mission '%s' region %u -> %s%s%s%s%s", snap->mission_path,
-				  (unsigned)out->region, XwaRemasterEnvironment_ModeName(out->mode),
-				  out->reference ? " environment " : "", out->reference ? out->reference->environment : "",
-				  out->fallback != XWA_ENV_FALLBACK_NONE ? ", fallback: " : "",
-				  out->fallback != XWA_ENV_FALLBACK_NONE ? XwaRemasterEnvironment_FallbackName(out->fallback)
-														 : "");
+	Aeron_LogInfo(
+		"xwa.remaster", "environment: mission '%s' region %u -> %s%s%s%s%s%s", snap->mission_path,
+		(unsigned)out->region, XwaRemasterEnvironment_ModeName(out->mode),
+		out->reference ? " environment " : "", out->reference ? out->reference->environment : "",
+		out->is_default ? " (default)" : "", out->fallback != XWA_ENV_FALLBACK_NONE ? ", fallback: " : "",
+		out->fallback != XWA_ENV_FALLBACK_NONE ? XwaRemasterEnvironment_FallbackName(out->fallback) : "");
 }
 
 int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mission, size_t mission_size) {

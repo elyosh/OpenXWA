@@ -366,7 +366,6 @@ static int env_capture_write_description(const char* path, const char* name, con
 	EnvCaptureText t = { buffer, 0, sizeof buffer, 1 };
 	XwaFlightCaptureSky sky;
 	XwaRemasterFlight_CaptureSkyInfo(&sky);
-	static const char* const sky_modes[] = { "none", "stars", "cube" };
 	env_capture_printf(&t,
 					   "# HD environment capture: environment_bake --capture <this directory> "
 					   "--bake-root <mod folder>\n"
@@ -403,15 +402,14 @@ static int env_capture_write_description(const char* path, const char* name, con
 	}
 	env_capture_printf(&t,
 					   "capture_settings:\n"
-					   "  skybox_mode: \"%s\"\n"
-					   "  skybox_exposure: %.9g\n"
+					   "  starfield_exposure: %.9g\n"
 					   "  star_brightness: %.9g\n"
 					   "  star_density: %.9g\n"
 					   "  star_grid: %.9g\n"
 					   "  game_time_ticks: %lld\n"
 					   "  proj_scale: %.9g\n",
-					   sky_modes[sky.mode], (double)sky.exposure, (double)sky.star_brightness,
-					   (double)sky.star_density, (double)sky.star_grid, (long long)snap->game_time_ticks,
+					   (double)sky.exposure, (double)sky.star_brightness, (double)sky.star_density,
+					   (double)sky.star_grid, (long long)snap->game_time_ticks,
 					   (double)snap->flight_camera.proj_scale);
 	return t.ok && AeronVfs_WriteAllAtomic(Aeron_GetVfs(), AERON_VFS_ROOT_USER, path, t.data, t.size);
 }
@@ -431,16 +429,12 @@ static int env_capture_run(const XwaSnapshot* snap, XwaRemasterAssets* assets, c
 					  dropped);
 	}
 
-	XwaFlightCaptureSky sky;
-	XwaRemasterFlight_CaptureSkyInfo(&sky);
 	AeronScene3D* face_scene = env_capture_scene(face_size);
 	AeronScene3D* sprite_scene = sun_count ? env_capture_scene(ENV_CAPTURE_SPRITE_SIZE) : NULL;
-	XwaRemasterSkyStars* stars =
-		sky.mode == XWA_FLIGHT_CAPTURE_SKY_STARS ? XwaRemasterSkyStars_Create() : NULL;
+	XwaRemasterSkyStars* stars = XwaRemasterSkyStars_Create();
 	uint16_t* pixels = (uint16_t*)malloc((size_t)face_size * face_size * 8u);
 	float* rgb = (float*)malloc((size_t)face_size * face_size * 3u * sizeof(float));
-	int ok = face_scene && (sun_count == 0 || sprite_scene) &&
-			 (sky.mode != XWA_FLIGHT_CAPTURE_SKY_STARS || stars) && pixels && rgb;
+	int ok = face_scene && (sun_count == 0 || sprite_scene) && stars && pixels && rgb;
 	if (!ok) {
 		env_capture_status(1, "cannot create the capture resources");
 	}

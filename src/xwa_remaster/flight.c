@@ -246,18 +246,9 @@ static struct {
 	uint64_t mb_velocity_span_us;
 	int mb_pose_host_valid;
 
-	/* Star skybox — an authored cube map replaces the classic CPU
-	 * pixel starfield (procedural + random per launch, so the cube
-	 * has no per-mission fidelity constraint). Loaded once per process,
-	 * latched on failure. sky_path is relative to the bake root. */
-	AeronTexture* sky_cube;
 	int process_assets_prepared;
-	int sky_enabled;
+	/* Starfield exposure (starfield.exposure). */
 	float sky_exposure;
-	char sky_path[256];
-	/* Sky source: 0 = authored cube map (sky_path), 1 = XWA-owned GPU
-	 * reproduction of FlightStarfield_Render. Selected by skybox.mode. */
-	int sky_mode;
 	/* Environment selection resolved at the start of each flight frame. */
 	XwaEnvironmentSelection environment;
 	/* Probe sets placed this frame: the walk index of each owner object,
@@ -355,8 +346,8 @@ static struct {
 	int suppress_hud;
 } s;
 
-/* XWA world -> sky cube basis (see the star skybox comment in
- * XwaRemasterFlight_Render). */
+/* XWA world -> cube basis of the procedural starfield (see the starfield
+ * comment in XwaRemasterFlight_Render). */
 static const float fl_world_to_cube[9] = {
 	1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, -1.0f, 0.0f,
 };
@@ -480,13 +471,13 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"point_lights.match_distance_m",
 		"point_lights.range_scale",
 		"point_lights.model_light_intensity",
-		"skybox.exposure",
-		"skybox.star_brightness",
-		"skybox.star_density",
-		"skybox.star_grid",
-		"skybox.star_core_px",
-		"skybox.star_feather",
-		"skybox.star_flare",
+		"starfield.exposure",
+		"starfield.brightness",
+		"starfield.density",
+		"starfield.grid",
+		"starfield.core_px",
+		"starfield.feather",
+		"starfield.flare",
 		"hyperspace_tunnel.travel_speed",
 		"hyperspace_tunnel.rotation_speed",
 		"hyperspace_tunnel.noise_scale",
@@ -526,24 +517,14 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"texture_filtering.max_anisotropy",
 	};
 	static const char* bools[] = {
-		"presentation.hdr_output",
-		"point_lights.enabled",
-		"point_lights.clustered",
-		"point_lights.cluster_debug",
-		"skybox.enabled",
-		"motion_blur.camera_blur",
-		"motion_blur.pause_keep_blur",
-		"motion_blur.velocity_viz",
-		"motion_blur.fsr_direct_motion",
-		"texture_filtering.anisotropic",
-		"hangar_lighting.enabled",
-		"lighting.spec_geom_adapt",
-		"dynamic_cockpit.enabled",
-		"dynamic_cockpit.classic_hud",
-		"dynamic_cockpit.holograms",
+		"presentation.hdr_output",     "point_lights.enabled",          "point_lights.clustered",
+		"point_lights.cluster_debug",  "motion_blur.camera_blur",       "motion_blur.pause_keep_blur",
+		"motion_blur.velocity_viz",    "motion_blur.fsr_direct_motion", "texture_filtering.anisotropic",
+		"hangar_lighting.enabled",     "lighting.spec_geom_adapt",      "dynamic_cockpit.enabled",
+		"dynamic_cockpit.classic_hud", "dynamic_cockpit.holograms",
 	};
 	static const char* strings[] = {
-		"skybox.path", "skybox.mode", "temporal_upscaling.mode",
+		"temporal_upscaling.mode",
 	};
 	for (size_t i = 0; i < sizeof ints / sizeof ints[0]; i++) {
 		if (!fl_cfg_has_type(config, ints[i], AERON_CONFIG_INT)) {
@@ -803,37 +784,15 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
-	s.sky_enabled = AeronConfigFile_GetBool(cf, "skybox.enabled", 0);
-	s.sky_exposure = (float)AeronConfigFile_GetFloat(cf, "skybox.exposure", 0.0);
-	const char* sky_path = AeronConfigFile_GetString(cf, "skybox.path", NULL);
-	if (!sky_path[0] || strlen(sky_path) >= sizeof s.sky_path) {
-		Aeron_LogError("xwa.remaster", "%s: skybox.path must be non-empty and shorter than %zu bytes", path,
-					   sizeof s.sky_path);
-		AeronConfigFile_Destroy(cf);
-		return 0;
-	}
-	snprintf(s.sky_path, sizeof s.sky_path, "%s", sky_path);
-
-	/* Sky source selection: "cube" uses the authored cube map;
-	 * "stars"/"procedural" uses the GPU twinkling starfield. */
-	const char* sky_mode = AeronConfigFile_GetString(cf, "skybox.mode", NULL);
-	if (strcmp(sky_mode, "cube") == 0) {
-		s.sky_mode = 0;
-	} else if (strcmp(sky_mode, "stars") == 0 || strcmp(sky_mode, "procedural") == 0) {
-		s.sky_mode = 1;
-	} else {
-		Aeron_LogError("xwa.remaster", "%s: skybox.mode must be 'cube', 'stars' or 'procedural'", path);
-		AeronConfigFile_Destroy(cf);
-		return 0;
-	}
-	s.star_brightness = (float)AeronConfigFile_GetFloat(cf, "skybox.star_brightness", 0.0);
-	s.star_density = (float)AeronConfigFile_GetFloat(cf, "skybox.star_density", 0.0);
-	s.star_grid = (float)AeronConfigFile_GetFloat(cf, "skybox.star_grid", 0.0);
-	s.star_core_px = (float)AeronConfigFile_GetFloat(cf, "skybox.star_core_px", 0.0);
-	s.star_feather = (float)AeronConfigFile_GetFloat(cf, "skybox.star_feather", 0.0);
-	s.star_flare = (float)AeronConfigFile_GetFloat(cf, "skybox.star_flare", 0.0);
+	s.sky_exposure = (float)AeronConfigFile_GetFloat(cf, "starfield.exposure", 0.0);
+	s.star_brightness = (float)AeronConfigFile_GetFloat(cf, "starfield.brightness", 0.0);
+	s.star_density = (float)AeronConfigFile_GetFloat(cf, "starfield.density", 0.0);
+	s.star_grid = (float)AeronConfigFile_GetFloat(cf, "starfield.grid", 0.0);
+	s.star_core_px = (float)AeronConfigFile_GetFloat(cf, "starfield.core_px", 0.0);
+	s.star_feather = (float)AeronConfigFile_GetFloat(cf, "starfield.feather", 0.0);
+	s.star_flare = (float)AeronConfigFile_GetFloat(cf, "starfield.flare", 0.0);
 	if (!fl_sky_config_valid()) {
-		Aeron_LogError("xwa.remaster", "%s: invalid skybox settings", path);
+		Aeron_LogError("xwa.remaster", "%s: invalid starfield settings", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -1009,21 +968,6 @@ int XwaRemasterFlight_PrepareProcessAssets(AeronCommandBuffer* cmd, XwaRemasterA
 	Aeron_LogInfo("xwa.remaster", "flight HUD fonts: %d/3 tiers loaded", loaded_font_tiers);
 	if (loaded_font_tiers != 3) {
 		return 0;
-	}
-	/* The authored cube map is only needed in cube mode; the procedural
-	 * starfield (sky_mode 1) never samples it, so skip the load + GPU
-	 * upload entirely. */
-	if (s.sky_mode == 0) {
-		char sky_path[600];
-		snprintf(sky_path, sizeof sky_path, "%s/%s", XwaRemasterAssets_Root(assets), s.sky_path);
-		s.sky_cube = Aeron_ImageLoadCubemapKtx2(cmd, sky_path);
-		Aeron_LogWarn("xwa.remaster", "flight skybox %s: %s", s.sky_cube ? "loaded" : "load failed",
-					  sky_path);
-		if (!s.sky_cube) {
-			return 0;
-		}
-	} else {
-		Aeron_LogInfo("xwa.remaster", "flight sky: procedural starfield (cube map not loaded)");
 	}
 	/* Authored environments are optional: failures leave the classic path. */
 	return XwaRemasterEnvironment_PrepareProcess(cmd);
@@ -1509,7 +1453,7 @@ static int fl_ensure(int target_w, int target_h) {
 			return 0;
 		}
 	}
-	if (s.sky_mode == 1 && !s.sky_stars) {
+	if (!s.sky_stars) {
 		s.sky_stars = XwaRemasterSkyStars_Create();
 		if (!s.sky_stars) {
 			Aeron_LogError("xwa.remaster", "flight: starfield renderer create failed");
@@ -4556,8 +4500,6 @@ void XwaRemasterFlight_CaptureSkyInfo(XwaFlightCaptureSky* out) {
 		return;
 	}
 	memset(out, 0, sizeof *out);
-	out->mode = s.sky_mode == 1 ? XWA_FLIGHT_CAPTURE_SKY_STARS
-								: (s.sky_cube ? XWA_FLIGHT_CAPTURE_SKY_CUBE : XWA_FLIGHT_CAPTURE_SKY_NONE);
 	out->exposure = s.sky_exposure;
 	out->star_brightness = s.star_brightness;
 	out->star_density = s.star_density;
@@ -4593,28 +4535,24 @@ int XwaRemasterFlight_CaptureCamera(const float right[3], const float down[3], c
 
 int XwaRemasterFlight_CaptureSetSky(AeronScene3D* scene, XwaRemasterSkyStars* stars, const XwaSnapshot* snap,
 									float star_upscale) {
-	if (!scene || !snap) {
+	if (!scene || !stars || !snap) {
 		return 0;
 	}
-	if (s.sky_mode == 1) {
-		const XwaRemasterSkyStarsParams params = {
-			.exposure = s.sky_exposure,
-			.brightness = s.star_brightness,
-			.density = s.star_density,
-			.grid_n = s.star_grid,
-			.core_radius_px = s.star_core_px * star_upscale,
-			.feather_px = s.star_feather * star_upscale,
-			.pixel_pitch_px = star_upscale,
-			.flare_strength = s.star_flare,
-			.game_time_ticks = (uint32_t)snap->game_time_ticks,
-		};
-		if (!stars || !XwaRemasterSkyStars_Prepare(stars, scene, fl_world_to_cube, &params)) {
-			return 0;
-		}
-		AeronScene_SetPassHook(scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, XwaRemasterSkyStars_Draw, stars);
-	} else if (s.sky_cube) {
-		AeronScene_SetSkyCube(scene, s.sky_cube, fl_world_to_cube, s.sky_exposure);
+	const XwaRemasterSkyStarsParams params = {
+		.exposure = s.sky_exposure,
+		.brightness = s.star_brightness,
+		.density = s.star_density,
+		.grid_n = s.star_grid,
+		.core_radius_px = s.star_core_px * star_upscale,
+		.feather_px = s.star_feather * star_upscale,
+		.pixel_pitch_px = star_upscale,
+		.flare_strength = s.star_flare,
+		.game_time_ticks = (uint32_t)snap->game_time_ticks,
+	};
+	if (!XwaRemasterSkyStars_Prepare(stars, scene, fl_world_to_cube, &params)) {
+		return 0;
 	}
+	AeronScene_SetPassHook(scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, XwaRemasterSkyStars_Draw, stars);
 	return 1;
 }
 
@@ -4814,10 +4752,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * sources (glow lights + pulses append during/after the walk). */
 	fl_derive_billboards(snap, assets, billboard_history_cam, billboard_history_crows);
 	/* An environment with a sky replaces all of these together: its sky,
-	 * suns, lights and flares replace the configured sky, the recovered
+	 * suns, lights and flares replace the starfield, the recovered
 	 * backdrop sprites, the directional lights derived from backdrops and
 	 * the backdrop sun flares. An environment without a sky keeps the
-	 * configured sky, the sprites and the flares. */
+	 * starfield, the sprites and the flares. */
 	const AeronPreparedEnvironment* region_environment =
 		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.prepared : NULL;
 	const AeronPreparedEnvironment* sky_environment =
@@ -4924,54 +4862,46 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		AeronScene_SetDirectionalShadow(s.scene, &shadow);
 	}
 
-	/* Star skybox — replaces the classic CPU pixel starfield
-	 * (FlightStarfield_Render). Drawn scene-side under the SKY
-	 * backdrops and all meshes. Disabled in Death Star tunnel/interior mode.
-	 * World→cube basis: XWA world XY is the horizontal plane, +Z up
-	 * (starfield elevation bins measure from XY toward ±Z; backdrop
-	 * strips extend along Z) — world X→cube X, world Z→cube +Y (up),
-	 * world Y→cube -Z (forward): the same proper rotation TIE uses, so
-	 * shared authored cubes orient identically in both games. The
-	 * procedural starfield (skybox.mode: stars) hashes stars in this same
-	 * cube basis, so it orients consistently with authored cubes; its
-	 * twinkle advances off the sim clock (game_time_ticks), not wall time,
-	 * so it is deterministic and pauses with the game. */
+	/* The sky: the region's environment, or the procedural starfield that
+	 * replaces the classic CPU pixel starfield (FlightStarfield_Render).
+	 * There is no starfield in Death Star mode. The sky is drawn under the
+	 * SKY backdrops and all meshes. World->cube basis: XWA world XY is the
+	 * horizontal plane, +Z up (starfield elevation bins measure from XY
+	 * toward +-Z; backdrop strips extend along Z): world X -> cube X, world
+	 * Z -> cube +Y (up), world Y -> cube -Z (forward). The starfield's
+	 * twinkle advances with the simulation clock (game_time_ticks), so it
+	 * is deterministic and pauses with the game. */
 	if (sky_environment) {
-		AeronScene_SetSkyCube(s.scene, sky_environment->radiance, sky_environment->world_to_cube,
-							  sky_environment->settings.intensity);
+		AeronScene_SetSkyEnvironment(s.scene, sky_environment);
 		for (uint32_t i = 0; i < sky_environment->light_count; i++) {
 			AeronScene_AddSkySun(s.scene, &sky_environment->lights[i]);
 		}
 	} else if (!cam->death_star_mode) {
-		if (s.sky_mode == 1) {
-			/* Classic stars are one flight-viewport pixel; the HD scene
-			 * renders the same FOV at rt_h. Scaling the classic-pixel dot
-			 * geometry by this upscale makes a star match the classic
-			 * footprint at any render resolution. */
-			const float classic_h =
-				cam->vp_h > 0 ? (float)cam->vp_h : (cam->screen_h > 0 ? (float)cam->screen_h : 480.0f);
-			const float upscale = (s.rt_h > 0 && classic_h > 0.0f) ? (float)s.rt_h / classic_h : 1.0f;
-			const XwaRemasterSkyStarsParams stars = {
-				.exposure = s.sky_exposure,
-				.brightness = s.star_brightness,
-				.density = s.star_density,
-				.grid_n = s.star_grid,
-				.core_radius_px = s.star_core_px * upscale,
-				.feather_px = s.star_feather * upscale,
-				.pixel_pitch_px = upscale,
-				.flare_strength = s.star_flare,
-				.game_time_ticks = (uint32_t)snap->game_time_ticks,
-			};
-			if (!XwaRemasterSkyStars_Prepare(s.sky_stars, s.scene, fl_world_to_cube, &stars)) {
-				Aeron_CommandBufferSetFailure(cmd, "Procedural starfield preparation failed");
-				s.snap = NULL;
-				return NULL;
-			}
-			s.before_opaque_mode = FL_BEFORE_OPAQUE_SKY_STARS;
-			AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, fl_draw_before_opaque, NULL);
-		} else if (s.sky_cube) {
-			AeronScene_SetSkyCube(s.scene, s.sky_cube, fl_world_to_cube, s.sky_exposure);
+		/* Classic stars are one flight-viewport pixel; the HD scene
+		 * renders the same FOV at rt_h. Scaling the classic-pixel dot
+		 * geometry by this upscale makes a star match the classic
+		 * footprint at any render resolution. */
+		const float classic_h =
+			cam->vp_h > 0 ? (float)cam->vp_h : (cam->screen_h > 0 ? (float)cam->screen_h : 480.0f);
+		const float upscale = (s.rt_h > 0 && classic_h > 0.0f) ? (float)s.rt_h / classic_h : 1.0f;
+		const XwaRemasterSkyStarsParams stars = {
+			.exposure = s.sky_exposure,
+			.brightness = s.star_brightness,
+			.density = s.star_density,
+			.grid_n = s.star_grid,
+			.core_radius_px = s.star_core_px * upscale,
+			.feather_px = s.star_feather * upscale,
+			.pixel_pitch_px = upscale,
+			.flare_strength = s.star_flare,
+			.game_time_ticks = (uint32_t)snap->game_time_ticks,
+		};
+		if (!XwaRemasterSkyStars_Prepare(s.sky_stars, s.scene, fl_world_to_cube, &stars)) {
+			Aeron_CommandBufferSetFailure(cmd, "Procedural starfield preparation failed");
+			s.snap = NULL;
+			return NULL;
 		}
+		s.before_opaque_mode = FL_BEFORE_OPAQUE_SKY_STARS;
+		AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, fl_draw_before_opaque, NULL);
 	}
 
 	/* Backdrops — classic draws them first with depth compare and write
@@ -5355,9 +5285,6 @@ void XwaRemasterFlight_Shutdown(void) {
 	XwaRemasterTrails_Destroy(s.trails);
 	s.trails = NULL;
 	XwaRemasterGlowMarks_Shutdown();
-	if (s.sky_cube) {
-		Aeron_DestroyTexture(s.sky_cube);
-	}
 	if (s.present_sampler) {
 		Aeron_DestroySampler(s.present_sampler);
 	}

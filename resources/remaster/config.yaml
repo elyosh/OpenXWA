@@ -158,9 +158,10 @@ hangar_lighting:
   ambient_floor: 0.06
 # Authored per-region HDR environments (sky, diffuse and specular lighting,
 # suns). The manifest path is relative to the mod folder. It holds the
-# `environments:` map and the `xwa:` hangar and (mission, region) mapping.
-# Without a manifest, environment maps are off. Regions without an entry keep
-# the classic HD sky.
+# `environments:` map and, under `xwa:`, the (mission, region) mapping and
+# the default environment. Without a manifest, environment maps are off.
+# Regions without an entry use the default environment, or the classic HD
+# sky when there is none.
 environment_maps:
   enabled: true
   manifest: "flight/environments/environments.yaml"
@@ -168,24 +169,20 @@ environment_maps:
   # A physical disc is far brighter than screen-space bloom resolves
   # cleanly; 1 to 60000.
   sun_max_radiance: 100.0
-skybox:
-  enabled: true
+# The twinkling starfield drawn in regions without an environment sky. It
+# reproduces the classic FlightStarfield_Render on the GPU.
+starfield:
   exposure: 1.0
-  path: "flight/skyboxes/stars.ktx2"
-  # Sky source: "cube" uses the authored cube map at `path`; "stars"
-  # (alias "procedural") uses the GPU twinkling starfield reproducing the
-  # classic CPU FlightStarfield_Render. The star_* knobs apply to "stars".
-  mode: "stars"
-  star_brightness: 1.0   # peak star brightness (tuned for the tonemap)
-  star_density: 0.4      # grid-cell occupancy; star count ~= 6*grid^2*density
-  star_grid: 32          # cells per cube-face edge (angular spacing)
-  # Dot geometry in CLASSIC VIEWPORT PIXELS, scaled by the viewport->render
+  brightness: 1.0   # peak star brightness (tuned for the tonemap)
+  density: 0.4      # grid-cell occupancy; star count ~= 6*grid^2*density
+  grid: 32          # cells per cube-face edge (angular spacing)
+  # Dot geometry in classic viewport pixels, scaled by the viewport->render
   # upscale at draw time so a star matches the classic single-pixel look at
-  # any resolution. 0.5 half-extent = one classic pixel.
-  star_core_px: 0.5      # star dot half-extent (classic px); 0.5 = 1 pixel
-  star_feather: 0.25     # dot antialias edge (classic px)
-  star_flare: 1.0        # bright-star flare brightness (0 = off); exact
-                         # DrawBrightStarFlare ±1px plus/L pattern
+  # any resolution.
+  core_px: 0.5      # star dot half-extent (classic px); 0.5 = 1 pixel
+  feather: 0.25     # dot antialias edge (classic px)
+  flare: 1.0        # bright-star flare brightness (0 = off); exact
+                    # DrawBrightStarFlare +-1px plus/L pattern
 hyperspace_tunnel:
   # Ship-relative 3D simplex tunnel used by the remaster renderer.
   travel_speed: 13.0      # forward rate; 8 matches the reference shader

@@ -63,11 +63,6 @@ typedef struct XwaAssetRef {
 XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d);
 void XwaRemasterAssets_Destroy(XwaRemasterAssets* a);
 
-/* The mod folder passed at create.
- * Borrowed; consumers with their own asset keying (flight sky cube)
- * build paths under it. */
-const char* XwaRemasterAssets_Root(const XwaRemasterAssets* a);
-
 /* Frontend residency mirrors the classic named-resource and DAT-group sets.
  * Sync performs all I/O/upload before reconstruction; sprite and font entry
  * points are lookup-only. */

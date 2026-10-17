@@ -171,8 +171,6 @@ void XwaRemasterAssets_Destroy(XwaRemasterAssets* a) {
 	free(a);
 }
 
-const char* XwaRemasterAssets_Root(const XwaRemasterAssets* a) { return a ? a->root : ""; }
-
 static AssetLoadStatus assets_probe_file(const char* path) {
 	FILE* f = fopen(path, "rb");
 	if (!f) {
