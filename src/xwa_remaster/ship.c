@@ -817,17 +817,13 @@ static void ship_mat3x4_identity(float out[3][4]) {
 	out[0][0] = out[1][1] = out[2][2] = 1.0f;
 }
 
+/* Math3D_BuildAxisAngleMatrix's matrix, about `pivot`. Like the original,
+ * it does not normalize the axis: an axis of length s turns the mesh by
+ * about s times the angle. Some models rely on this, such as the landing
+ * gear of CorellianTransport2. */
 static void ship_mat3x4_rotation_about_pivot(float out[3][4], const float axis[3], const float pivot[3],
 											 float angle) {
-	float ax = axis[0], ay = axis[1], az = axis[2];
-	const float len = sqrtf(ax * ax + ay * ay + az * az);
-	if (len < 1e-4f) {
-		ship_mat3x4_identity(out);
-		return;
-	}
-	ax /= len;
-	ay /= len;
-	az /= len;
+	const float ax = axis[0], ay = axis[1], az = axis[2];
 	const float c = cosf(angle), s = sinf(angle), omc = 1.0f - c;
 	out[0][0] = c + ax * ax * omc;
 	out[0][1] = ax * ay * omc - az * s;
