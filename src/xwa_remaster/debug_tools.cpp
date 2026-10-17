@@ -1296,6 +1296,16 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 		if (selection.fallback != XWA_ENV_FALLBACK_NONE) {
 			ImGui::Text("Fallback: %s", XwaRemasterEnvironment_FallbackName(selection.fallback));
 		}
+		const XwaEnvironmentBackdropRule* backdrops = selection.backdrops;
+		if (backdrops && backdrops->mode == XWA_ENV_BACKDROPS_KEEP) {
+			ImGui::Text("Backdrops: kept; hidden: %s, shown: %s",
+						backdrops->hide_all     ? "all"
+						: backdrops->hide_count ? "a list"
+												: "none",
+						backdrops->show_all     ? "all"
+						: backdrops->show_count ? "a list"
+												: "none");
+		}
 	}
 	bool probes = XwaRemasterFlight_Probes() != 0;
 	if (ImGui::Checkbox("Probes", &probes)) {

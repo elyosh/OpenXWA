@@ -8,12 +8,16 @@
  * folder) holds Aeron's shared `environments:` map and an `xwa:` section.
  * `xwa.missions` maps each (mission path, region) to an environment
  * reference, and the optional `xwa.default` is the reference of every
- * region without an entry.
+ * region without an entry. A region whose value is `none` has no
+ * environment, even when there is a default.
  *
  * A region's environment replaces the ambient with its fill and image-based
  * lighting. If the environment has a sky (`radiance`), it also replaces the
  * classic sky, backdrops and backdrop flares. If it has
- * `directional_lights`, they replace the directional lights. A mission or
+ * `directional_lights`, they replace the directional lights. A reference
+ * with `backdrops: keep` draws the mission's backdrops over the sky instead,
+ * except the hidden ones (XwaRemasterEnvironment_BackdropHidden), and keeps
+ * the backdrop lights and flares. A mission or
  * region without an entry uses the default environment. Without a default,
  * and in Death Star mode, it uses the classic HD path (the Death Star
  * behaviour in Death Star mode). In a hangar, the selection uses the region
@@ -64,7 +68,28 @@ typedef enum XwaEnvironmentFallback {
 	XWA_ENV_FALLBACK_NO_REGION_ENTRY,  /* region not in the mission's mapping */
 	XWA_ENV_FALLBACK_NOT_READY,        /* mapped environment not prepared or unavailable */
 	XWA_ENV_FALLBACK_AUTHORED_OFF,     /* authored environments switched off in the debug tool */
+	XWA_ENV_FALLBACK_REGION_NONE,      /* the region's value is `none` */
 } XwaEnvironmentFallback;
+
+/* What a sky does with the mission's backdrops (the reference's `backdrops`). */
+typedef enum XwaEnvironmentBackdrops {
+	XWA_ENV_BACKDROPS_REPLACE, /* the sky replaces the backdrops, their lights and their flares */
+	XWA_ENV_BACKDROPS_KEEP,    /* the backdrops are drawn over the sky, except the hidden ones */
+} XwaEnvironmentBackdrops;
+
+#define XWA_ENV_BACKDROP_LIST_MAX 64
+
+/* The backdrop settings of a reference. Images are `group << 16 | image id`
+ * (DAT group and image). */
+typedef struct XwaEnvironmentBackdropRule {
+	XwaEnvironmentBackdrops mode;
+	bool hide_all; /* hide_backdrops: all */
+	bool show_all; /* show_backdrops: all */
+	uint8_t hide_count;
+	uint8_t show_count;
+	uint32_t hide[XWA_ENV_BACKDROP_LIST_MAX];
+	uint32_t show[XWA_ENV_BACKDROP_LIST_MAX];
+} XwaEnvironmentBackdropRule;
 
 typedef struct XwaEnvironmentSelection {
 	XwaEnvironmentMode mode;
@@ -77,6 +102,8 @@ typedef struct XwaEnvironmentSelection {
 	uint8_t region; /* flight_camera.mission_region */
 	/* The reference is xwa.default: the region has no entry of its own. */
 	bool is_default;
+	/* The reference's backdrop settings; NULL without a reference. */
+	const XwaEnvironmentBackdropRule* backdrops;
 } XwaEnvironmentSelection;
 
 #define XWA_ENV_MISSION_KEY_MAX 128
@@ -129,6 +156,11 @@ int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mis
 
 /* The normalized mission key whose environments are prepared; "" when none. */
 const char* XwaRemasterEnvironment_PreparedMissionKey(void);
+
+/* Whether backdrop image (`group`, `image`) is hidden under `rule` in
+ * `keep` mode. An image is hidden when it is in `hide` or `hide_all` is
+ * set, unless it is in `show` or `show_all` is set. */
+bool XwaRemasterEnvironment_BackdropHidden(const XwaEnvironmentBackdropRule* rule, int group, int image);
 
 const char* XwaRemasterEnvironment_ModeName(XwaEnvironmentMode mode);
 const char* XwaRemasterEnvironment_FallbackName(XwaEnvironmentFallback fallback);

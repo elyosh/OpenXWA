@@ -9,17 +9,20 @@
 #include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* XWA keeps four regions per mission. */
 #define ENV_MAX_REGIONS 4
 #define ENV_MAX_MISSIONS 128
 #define ENV_MAX_REFERENCES (ENV_MAX_MISSIONS * ENV_MAX_REGIONS + 1) /* + xwa.default */
+/* A region whose value is `none`. */
+#define ENV_REFERENCE_NONE (-2)
 
 typedef struct EnvMission {
 	char key[XWA_ENV_MISSION_KEY_MAX];
 	char source[XWA_ENV_MISSION_KEY_MAX];      /* manifest spelling, for diagnostics */
-	int32_t region_reference[ENV_MAX_REGIONS]; /* index into references, -1 = classic */
+	int32_t region_reference[ENV_MAX_REGIONS]; /* index into references, -1 = no entry, ENV_REFERENCE_NONE */
 } EnvMission;
 
 typedef struct EnvState {
@@ -27,6 +30,7 @@ typedef struct EnvState {
 	char manifest_path[256];
 	AeronEnvironmentDefinitionSet* definitions;
 	AeronEnvironmentReference references[ENV_MAX_REFERENCES];
+	XwaEnvironmentBackdropRule backdrops[ENV_MAX_REFERENCES]; /* per reference */
 	uint32_t reference_count;
 	EnvMission missions[ENV_MAX_MISSIONS];
 	uint32_t mission_count;
@@ -139,12 +143,112 @@ static int env_read_rotation(const AeronConfigNode* node, const char* what, floa
 	return 1;
 }
 
+static int env_list_has(const uint32_t* list, size_t count, uint32_t image) {
+	for (size_t i = 0; i < count; i++) {
+		if (list[i] == image) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+bool XwaRemasterEnvironment_BackdropHidden(const XwaEnvironmentBackdropRule* rule, int group, int image) {
+	if (!rule || rule->mode != XWA_ENV_BACKDROPS_KEEP || group < 0 || group > 0xFFFF || image < 0 ||
+		image > 0xFFFF || rule->show_all) {
+		return false;
+	}
+	const uint32_t key = (uint32_t)group << 16 | (uint32_t)image;
+	if (env_list_has(rule->show, rule->show_count, key)) {
+		return false;
+	}
+	return rule->hide_all || env_list_has(rule->hide, rule->hide_count, key);
+}
+
+/* Parses a "G-I" image: DAT group and image id, 0 to 65535 each. */
+static int env_parse_image(const char* text, uint32_t* out) {
+	char* end = NULL;
+	if (text[0] < '0' || text[0] > '9') {
+		return 0;
+	}
+	const long group = strtol(text, &end, 10);
+	if (*end != '-' || end[1] < '0' || end[1] > '9') {
+		return 0;
+	}
+	const long image = strtol(end + 1, &end, 10);
+	if (*end || group > 0xFFFF || image > 0xFFFF) {
+		return 0;
+	}
+	*out = (uint32_t)group << 16 | (uint32_t)image;
+	return 1;
+}
+
+/* Reads `hide_backdrops` or `show_backdrops`: `all` or a sequence of "G-I"
+ * images. */
+static int env_read_backdrop_list(const AeronConfigNode* node, const char* what, const char* field,
+								  bool* out_all, uint32_t* list, uint8_t* count) {
+	if (AeronConfigNode_Type(node) == AERON_CONFIG_STRING &&
+		strcmp(AeronConfigNode_String(node, ""), "all") == 0) {
+		*out_all = true;
+		return 1;
+	}
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_SEQUENCE) {
+		return env_node_error(node, "%s: '%s' must be 'all' or a list of \"group-image\" images", what,
+							  field);
+	}
+	const size_t n = AeronConfigNode_SequenceCount(node);
+	if (n > XWA_ENV_BACKDROP_LIST_MAX) {
+		return env_node_error(node, "%s: '%s' lists more than %d images", what, field,
+							  XWA_ENV_BACKDROP_LIST_MAX);
+	}
+	for (size_t i = 0; i < n; i++) {
+		const AeronConfigNode* item = AeronConfigNode_SequenceGet(node, i);
+		const char* text =
+			AeronConfigNode_Type(item) == AERON_CONFIG_STRING ? AeronConfigNode_String(item, "") : NULL;
+		if (!text || !env_parse_image(text, &list[i])) {
+			return env_node_error(
+				item, "%s: '%s' has an image that is not \"group-image\" (for example \"6104-0\")", what,
+				field);
+		}
+	}
+	*count = (uint8_t)n;
+	return 1;
+}
+
+/* Reads the backdrop fields of a reference map. */
+static int env_read_backdrops(const AeronConfigNode* node, const char* what,
+							  XwaEnvironmentBackdropRule* out) {
+	const AeronConfigNode* mode = AeronConfigNode_MapGet(node, "backdrops");
+	const AeronConfigNode* hide = AeronConfigNode_MapGet(node, "hide_backdrops");
+	const AeronConfigNode* show = AeronConfigNode_MapGet(node, "show_backdrops");
+	if (mode) {
+		const char* value =
+			AeronConfigNode_Type(mode) == AERON_CONFIG_STRING ? AeronConfigNode_String(mode, "") : "";
+		if (strcmp(value, "keep") == 0) {
+			out->mode = XWA_ENV_BACKDROPS_KEEP;
+		} else if (strcmp(value, "replace") != 0) {
+			return env_node_error(mode, "%s: 'backdrops' must be 'replace' or 'keep'", what);
+		}
+	}
+	if ((hide || show) && out->mode != XWA_ENV_BACKDROPS_KEEP) {
+		return env_node_error(hide ? hide : show, "%s: '%s' needs 'backdrops: keep'", what,
+							  hide ? "hide_backdrops" : "show_backdrops");
+	}
+	return (!hide || env_read_backdrop_list(hide, what, "hide_backdrops", &out->hide_all, out->hide,
+											&out->hide_count)) &&
+		   (!show || env_read_backdrop_list(show, what, "show_backdrops", &out->show_all, out->show,
+											&out->show_count));
+}
+
 /* Adds a reference to an environment. A reference is either an environment
- * name or a map with `environment` and an optional `rotation_degrees`. */
+ * name or a map with `environment`, an optional `rotation_degrees` and the
+ * optional backdrop fields. */
 static int env_add_reference(const AeronConfigNode* node, const char* what, int32_t* out_index) {
-	static const char* const fields[] = { "environment", "rotation_degrees" };
+	static const char* const fields[] = { "environment", "rotation_degrees", "backdrops", "hide_backdrops",
+										  "show_backdrops" };
 	const AeronConfigNode* name_node = node;
 	const AeronConfigNode* rotation_node = NULL;
+	XwaEnvironmentBackdropRule backdrops;
+	memset(&backdrops, 0, sizeof backdrops);
 	if (AeronConfigNode_Type(node) == AERON_CONFIG_MAP) {
 		if (!env_check_fields(node, what, fields, sizeof fields / sizeof fields[0])) {
 			return 0;
@@ -154,6 +258,9 @@ static int env_add_reference(const AeronConfigNode* node, const char* what, int3
 			return env_node_error(node, "%s: missing required field 'environment'", what);
 		}
 		rotation_node = AeronConfigNode_MapGet(node, "rotation_degrees");
+		if (!env_read_backdrops(node, what, &backdrops)) {
+			return 0;
+		}
 	}
 	if (AeronConfigNode_Type(name_node) != AERON_CONFIG_STRING) {
 		return env_node_error(name_node, "%s: must name an environment", what);
@@ -173,6 +280,7 @@ static int env_add_reference(const AeronConfigNode* node, const char* what, int3
 		}
 		reference->has_rotation = true;
 	}
+	s_env.backdrops[s_env.reference_count] = backdrops;
 	*out_index = (int32_t)s_env.reference_count++;
 	return 1;
 }
@@ -222,6 +330,12 @@ static int env_parse_mission(const char* source, const AeronConfigNode* node) {
 		}
 		char region_what[224];
 		snprintf(region_what, sizeof region_what, "%s region %d", what, region);
+		/* `none` alone; { environment: none } names an environment. */
+		if (AeronConfigNode_Type(value) == AERON_CONFIG_STRING &&
+			strcmp(AeronConfigNode_String(value, ""), "none") == 0) {
+			mission->region_reference[region] = ENV_REFERENCE_NONE;
+			continue;
+		}
 		if (!env_add_reference(value, region_what, &mission->region_reference[region])) {
 			return 0;
 		}
@@ -239,6 +353,11 @@ static int env_parse_xwa(const AeronConfigNode* xwa) {
 		return 0;
 	}
 	const AeronConfigNode* default_node = AeronConfigNode_MapGet(xwa, "default");
+	if (default_node && AeronConfigNode_Type(default_node) == AERON_CONFIG_STRING &&
+		strcmp(AeronConfigNode_String(default_node, ""), "none") == 0) {
+		return env_node_error(default_node,
+							  "xwa.default: 'none' is for regions; leave the default out instead");
+	}
 	if (default_node && !env_add_reference(default_node, "xwa.default", &s_env.default_reference)) {
 		return 0;
 	}
@@ -423,6 +542,9 @@ static void env_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap, int fo
 	int32_t default_index = -1;
 	const EnvMission* mission = env_find_mission(key);
 	for (int r = 0; r < ENV_MAX_REGIONS; r++) {
+		if (mission && mission->region_reference[r] == ENV_REFERENCE_NONE) {
+			continue;
+		}
 		if (mission && mission->region_reference[r] >= 0) {
 			regions[r] = (int32_t)count;
 			references[count++] = s_env.references[mission->region_reference[r]];
@@ -503,6 +625,7 @@ static void env_select(XwaEnvironmentSelection* out, XwaEnvironmentMode mode, Xw
 	out->reference = reference >= 0 ? &s_env.references[reference] : NULL;
 	out->prepared = NULL;
 	out->is_default = reference >= 0 && reference == s_env.default_reference;
+	out->backdrops = reference >= 0 ? &s_env.backdrops[reference] : NULL;
 }
 
 /* The prepared environment at library index `prepared`, or NULL. */
@@ -531,6 +654,10 @@ static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection*
 		return;
 	}
 	int32_t reference = mission ? mission->region_reference[region] : -1;
+	if (reference == ENV_REFERENCE_NONE) {
+		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_REGION_NONE, -1);
+		return;
+	}
 	if (reference < 0 && use_default) {
 		reference = s_env.default_reference;
 	}
@@ -599,12 +726,14 @@ void XwaRemasterEnvironment_Resolve(const XwaSnapshot* snap, XwaEnvironmentSelec
 	s_env.logged = 1;
 	s_env.last = *out;
 	snprintf(s_env.last_mission, sizeof s_env.last_mission, "%s", snap->mission_path);
-	Aeron_LogInfo(
-		"xwa.remaster", "environment: mission '%s' region %u -> %s%s%s%s%s%s", snap->mission_path,
-		(unsigned)out->region, XwaRemasterEnvironment_ModeName(out->mode),
-		out->reference ? " environment " : "", out->reference ? out->reference->environment : "",
-		out->is_default ? " (default)" : "", out->fallback != XWA_ENV_FALLBACK_NONE ? ", fallback: " : "",
-		out->fallback != XWA_ENV_FALLBACK_NONE ? XwaRemasterEnvironment_FallbackName(out->fallback) : "");
+	Aeron_LogInfo("xwa.remaster", "environment: mission '%s' region %u -> %s%s%s%s%s%s%s", snap->mission_path,
+				  (unsigned)out->region, XwaRemasterEnvironment_ModeName(out->mode),
+				  out->reference ? " environment " : "", out->reference ? out->reference->environment : "",
+				  out->is_default ? " (default)" : "",
+				  out->backdrops && out->backdrops->mode == XWA_ENV_BACKDROPS_KEEP ? ", backdrops kept" : "",
+				  out->fallback != XWA_ENV_FALLBACK_NONE ? ", fallback: " : "",
+				  out->fallback != XWA_ENV_FALLBACK_NONE ? XwaRemasterEnvironment_FallbackName(out->fallback)
+														 : "");
 }
 
 int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mission, size_t mission_size) {
@@ -654,6 +783,8 @@ const char* XwaRemasterEnvironment_FallbackName(XwaEnvironmentFallback fallback)
 			return "environment not ready";
 		case XWA_ENV_FALLBACK_AUTHORED_OFF:
 			return "authored environments switch off";
+		case XWA_ENV_FALLBACK_REGION_NONE:
+			return "region set to none";
 	}
 	return "unknown";
 }
