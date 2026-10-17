@@ -111,7 +111,7 @@ models:
   smooth_angle_degrees: 90
   # true: original OPT models for simulation and rendering.
   # false: flight/models/<key>.glb replacements in the mod folder, where present, for both.
-  force_opt: true
+  force_opt: false
   opt_emissive_strength: 6.0
   opt_projectile_emissive_strength: 20.0
   engine_emissive_strength: 10.0
