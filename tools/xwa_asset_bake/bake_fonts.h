@@ -8,14 +8,14 @@
 #include "aeron/vfs.h"
 
 typedef struct BakeFontsOptions {
-	const char* out_root; /* bake output root (fonts/ appended) */
+	const char* out_root; /* bake output root (frontend/fonts/ appended) */
 	int         scale;    /* integer NN upscale factor (RM_SCALE; 1 = classic) */
-	/* Optional TTF: when set, fonts/font<size> is built by
+	/* Optional TTF: when set, frontend/fonts/font<size> is built by
 	 * rasterizing this face at HD cell metrics matched to the classic
 	 * font (the classic ABPs are cached GDI "Times New Roman"
 	 * renders, so a Times-family TTF is the faithful source). The
 	 * NN-upscaled classic atlas is then emitted as
-	 * fonts/reference/font<size> for font_tune comparison. */
+	 * frontend/fonts/reference/font<size> for font_tune comparison. */
 	const char* ttf_path;
 } BakeFontsOptions;
 

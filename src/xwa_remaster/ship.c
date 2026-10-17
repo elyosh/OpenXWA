@@ -482,7 +482,7 @@ float XwaRemasterShip_OptProjectileEmissiveStrength(void) { return s_opt_project
 
 AeronEffectAtlas* XwaRemasterShip_EffectAtlas(void) {
 	if (!s_effect_atlas) {
-		s_effect_atlas = AeronEffectAtlas_Create(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, "effects");
+		s_effect_atlas = AeronEffectAtlas_Create(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, "flight/effects");
 	}
 	return s_effect_atlas;
 }

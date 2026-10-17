@@ -3,7 +3,7 @@
  *
  * Loads each classic frontend bitmap font through the shared XWA 2D decoder
  * and emits an HD atlas pair
- * `fonts/font<size>.{png,fnt}` (TFNT v2, via imgbake font_atlas_write)
+ * `frontend/fonts/font<size>.{png,fnt}` (TFNT v2, via imgbake font_atlas_write)
  * under the bake root:
  *
  *   - the PNG holds white PMA glyphs on a 16-column grid, NN-upscaled
@@ -13,7 +13,7 @@
  *     so only the rects matter at render time).
  *
  * Hand-tuning: TIE's font_tune GUI reads/writes this exact pair —
- *   font_tune --reference <root>/fonts/font15 --ttf Some.ttf
+ *   font_tune --reference <root>/frontend/fonts/font15 --ttf Some.ttf
  * and saving over the same basename substitutes the TTF atlas.
  *
  * Glyph decode mirrors FrontImage_BlitGlyphRLE_16bpp exactly: per row
@@ -206,9 +206,9 @@ static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_s
 	 * without one it IS the runtime atlas (blocky classic look). */
 	char dir[1024];
 	if (ttf) {
-		snprintf(dir, sizeof dir, "%s/fonts/reference", opt->out_root);
+		snprintf(dir, sizeof dir, "%s/frontend/fonts/reference", opt->out_root);
 	} else {
-		snprintf(dir, sizeof dir, "%s/fonts", opt->out_root);
+		snprintf(dir, sizeof dir, "%s/frontend/fonts", opt->out_root);
 	}
 	mkdir_p2(dir);
 	char basename[1100];
@@ -226,7 +226,7 @@ static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_s
 
 	if (ok && ttf) {
 		char main_base[1100];
-		snprintf(dir, sizeof dir, "%s/fonts", opt->out_root);
+		snprintf(dir, sizeof dir, "%s/frontend/fonts", opt->out_root);
 		mkdir_p2(dir);
 		snprintf(main_base, sizeof main_base, "%s/font%d", dir, point_size);
 		ok = bake_ttf_font(opt, point_size, source.cell_height, cap_h_classic, baseline, ttf, ttf_size,

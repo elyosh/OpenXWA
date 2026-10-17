@@ -42,7 +42,7 @@ typedef struct HangarsLoadedModel {
 	HangarsKey key; /* empty: the stock model */
 } HangarsLoadedModel;
 
-static const char s_settingsPath[] = "hangars.yaml";
+static const char s_settingsPath[] = "flight/hangars.yaml";
 static AeronConfigFile* s_settings;
 static AeronConfigFile* s_missionFile;
 static const AeronConfigNode* s_mission;

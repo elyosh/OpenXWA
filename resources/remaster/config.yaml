@@ -110,7 +110,7 @@ input:
 models:
   smooth_angle_degrees: 90
   # true: original OPT models for simulation and rendering.
-  # false: models/<key>.glb replacements in the mod folder, where present, for both.
+  # false: flight/models/<key>.glb replacements in the mod folder, where present, for both.
   force_opt: true
   opt_emissive_strength: 6.0
   opt_projectile_emissive_strength: 20.0

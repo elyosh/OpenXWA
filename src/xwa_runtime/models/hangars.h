@@ -3,7 +3,7 @@
 
 /* Modern port: per-mothership hangar settings (XWAU hook_hangars).
  *
- * hangars.yaml in the mod folder holds the settings layers (written by the model
+ * flight/hangars.yaml in the mod folder holds the settings layers (written by the model
  * conversion from XWAU's FlightModels files): a default layer, one per ship
  * model with variants per IFF, and the crafts' hangar cameras and
  * elevations. A mission adds its own layer (`hangar` in its mission file).
@@ -97,7 +97,7 @@ typedef struct XwaHangarCamera {
 	int offsets[XWA_HANGAR_CAMERA_KEYS][3];
 } XwaHangarCamera;
 
-/* Loads the mod folder's hangars.yaml once model replacements are set up, and makes
+/* Loads the mod folder's flight/hangars.yaml once model replacements are set up, and makes
    the models it names loadable. */
 void XwaHangars_Init(void);
 /* Reads the mission's `hangar` layer (its mission file); NULL clears it. */

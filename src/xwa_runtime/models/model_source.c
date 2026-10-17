@@ -46,7 +46,7 @@ static int s_equipmentKeyCount;
 
 static const char s_exteriorSuffix[] = "exterior";
 
-/* models/model_map.yaml in the mod folder: stock key -> GLB key, for model sets whose
+/* flight/models/model_map.yaml in the mod folder: stock key -> GLB key, for model sets whose
    file names differ from the stock ones. Without the file the mapping is the
    identity. */
 typedef struct ModelSourceMapEntry {
@@ -54,7 +54,7 @@ typedef struct ModelSourceMapEntry {
 	ModelSourceKeyText glbKey;
 } ModelSourceMapEntry;
 
-static const char s_modelMapPath[] = "models/model_map.yaml";
+static const char s_modelMapPath[] = "flight/models/model_map.yaml";
 static ModelSourceMapEntry* s_mapEntries;
 static int s_mapEntryCount;
 
@@ -104,7 +104,7 @@ static const char* ModelSource_GlbKeyFor(const char* key) {
 }
 
 int XwaModelSource_GlbPath(const char* key, char* path, size_t pathSize) {
-	int written = snprintf(path, pathSize, "models/%s.glb", ModelSource_GlbKeyFor(key));
+	int written = snprintf(path, pathSize, "flight/models/%s.glb", ModelSource_GlbKeyFor(key));
 	return written > 0 && (size_t)written < pathSize;
 }
 
@@ -434,7 +434,7 @@ static int ModelSource_LoadMap(char* message, size_t messageSize) {
 			AeronConfigFile_Destroy(config);
 			return 0;
 		}
-		snprintf(path, sizeof path, "models/%s.glb", value);
+		snprintf(path, sizeof path, "flight/models/%s.glb", value);
 		if (!ModelSource_FileExists(path)) {
 			snprintf(message, messageSize, "%s: '%s' maps to missing '%s'", s_modelMapPath, key, path);
 			AeronConfigFile_Destroy(config);

@@ -13,7 +13,7 @@
 
 static char MissionFile_Lower(char c) { return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c; }
 
-/* missions/<mission path without its extension>.yaml in the mod folder, lower case,
+/* flight/missions/<mission path without its extension>.yaml in the mod folder, lower case,
    with '/' separators. */
 static void MissionFile_Path(const char* missionPath, char* path, size_t pathSize) {
 	const char* dot = strrchr(missionPath, '.');
@@ -28,7 +28,7 @@ static void MissionFile_Path(const char* missionPath, char* path, size_t pathSiz
 	}
 	length = dot != NULL && (separator == NULL || dot > separator) ? (size_t)(dot - missionPath)
 																   : strlen(missionPath);
-	offset = (size_t)snprintf(path, pathSize, "missions/");
+	offset = (size_t)snprintf(path, pathSize, "flight/missions/");
 	for (index = 0; index < length && offset + 1 < pathSize; ++index) {
 		const char c = missionPath[index];
 

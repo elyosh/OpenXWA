@@ -17,11 +17,12 @@
  * folder; hand-authored art substitutes by replacing the KTX2 at
  * the same path, any resolution — draw geometry comes from the
  * record's classic dims, never from asset dims):
- *   frontres/<dir>/sprites/<base>.ktx2             single frame
- *   frontres/<dir>/atlas/<base>.{ktx2,yaml}        packed animation
- *   frontres/<dir>/atlas/<base>/frame_NN.ktx2      oversized frames
- *   resdata/atlas/group_<g>.{ktx2,yaml}            DAT sprite group
- *   fonts/font<size>.{png,fnt}                     HD font atlas
+ *   frontend/frontres/<dir>/sprites/<base>.ktx2         single frame
+ *   frontend/frontres/<dir>/atlas/<base>.{ktx2,yaml}    packed animation
+ *   frontend/frontres/<dir>/atlas/<base>/frame_NN.ktx2  oversized frames
+ *   frontend/fonts/font<size>.{png,fnt}                 HD font atlas
+ *   flight/fonts/font_tier_<n>.{ktx2,fnt}               HD flight font atlas
+ *   resdata/atlas/group_<g>.{ktx2,yaml}                 DAT sprite group
  *
  * Substrate reused from aeron_scene: AeronImageCache,
  * AeronSpriteAtlas (layout YAML), AeronFontAtlas. Frontend and flight images

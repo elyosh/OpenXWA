@@ -48,9 +48,9 @@ typedef enum FileKind {
 	FILE_UNPROBED = 0,
 	FILE_MISSING,
 	FILE_FAILED,
-	FILE_SINGLE,   /* frontres/<dir>/sprites/<base>.ktx2 */
-	FILE_ATLAS,    /* frontres/<dir>/atlas/<base>.{ktx2,yaml} */
-	FILE_FRAMEDIR, /* frontres/<dir>/atlas/<base>/frame_NN.ktx2 */
+	FILE_SINGLE,   /* frontend/frontres/<dir>/sprites/<base>.ktx2 */
+	FILE_ATLAS,    /* frontend/frontres/<dir>/atlas/<base>.{ktx2,yaml} */
+	FILE_FRAMEDIR, /* frontend/frontres/<dir>/atlas/<base>/frame_NN.ktx2 */
 } FileKind;
 
 typedef enum AssetSource {
@@ -325,7 +325,7 @@ static FileSlot* file_classify(XwaRemasterAssets* a, const char* key) {
 
 	/* Split "<dir>/<base>" for path building. */
 	char path[768];
-	snprintf(path, sizeof path, "%s/frontres/", a->root);
+	snprintf(path, sizeof path, "%s/frontend/frontres/", a->root);
 	size_t pfx = strlen(path);
 	const char* slash = strchr(key, '/');
 	const char* base = slash ? slash + 1 : key;
@@ -375,12 +375,12 @@ static void assets_file_texture_path(const XwaRemasterAssets* a, const FileSlot*
 	const char* base = slash ? slash + 1 : slot->key;
 	const int dlen = slash ? (int)(slash - slot->key) : 0;
 	if (slot->kind == FILE_SINGLE) {
-		snprintf(path, 768, "%s/frontres/%.*s/sprites/%s.ktx2", a->root, dlen, slot->key, base);
+		snprintf(path, 768, "%s/frontend/frontres/%.*s/sprites/%s.ktx2", a->root, dlen, slot->key, base);
 	} else if (slot->kind == FILE_ATLAS) {
-		snprintf(path, 768, "%s/frontres/%.*s/atlas/%s.ktx2", a->root, dlen, slot->key, base);
+		snprintf(path, 768, "%s/frontend/frontres/%.*s/atlas/%s.ktx2", a->root, dlen, slot->key, base);
 	} else {
-		snprintf(path, 768, "%s/frontres/%.*s/atlas/%s/frame_%02d.ktx2", a->root, dlen, slot->key, base,
-				 part);
+		snprintf(path, 768, "%s/frontend/frontres/%.*s/atlas/%s/frame_%02d.ktx2", a->root, dlen, slot->key,
+				 base, part);
 	}
 }
 
@@ -1100,7 +1100,7 @@ static AssetLoadStatus assets_load_frontend_font(XwaRemasterAssets* a, AeronComm
 			status = assets_load_original_frontend_font(a, cmd, slot, font_size);
 		} else {
 			char basename[640], path[672];
-			snprintf(basename, sizeof basename, "%s/fonts/font%d", a->root, font_size);
+			snprintf(basename, sizeof basename, "%s/frontend/fonts/font%d", a->root, font_size);
 			snprintf(path, sizeof path, "%s.fnt", basename);
 			status = assets_probe_file(path);
 			if (status == ASSET_LOAD_SUCCESS &&

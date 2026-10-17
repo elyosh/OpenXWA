@@ -9,12 +9,12 @@
  * backend.
  *
  * Output layout (per user: PNG for artists, KTX2 for the game):
- *   <out>/frontres/<dir>/sprites/<base>.{png,ktx2}        single frame
- *   <out>/frontres/<dir>/atlas/<base>.{png,ktx2,yaml}     packed frames
- *   <out>/frontres/<dir>/atlas/<base>/frame_NN.{png,ktx2} frames too
- *                                                    big to pack (FLIC)
- *   <out>/resdata/atlas/group_<g>.{png,ktx2,yaml}         DAT group
- *   <out>/resdata/atlas/group_<g>/frame_NN.{png,ktx2}     oversized
+ *   <out>/frontend/frontres/<dir>/sprites/<base>.{png,ktx2}        single frame
+ *   <out>/frontend/frontres/<dir>/atlas/<base>.{png,ktx2,yaml}     packed frames
+ *   <out>/frontend/frontres/<dir>/atlas/<base>/frame_NN.{png,ktx2} frames too
+ *                                                                  big to pack (FLIC)
+ *   <out>/resdata/atlas/group_<g>.{png,ktx2,yaml}                  DAT group
+ *   <out>/resdata/atlas/group_<g>/frame_NN.{png,ktx2}              oversized
  *
  * Atlas layout YAML matches AeronSpriteAtlas: atlas{w,h,classic_w,
  * classic_h} + frames[{x,y,w,h,origin_x,origin_y}] (frame index is
@@ -262,7 +262,7 @@ static void bake_one_file(const BakeSpriteOptions* opt, AeronVfs* vfs, const cha
 	snprintf(dir_lower, sizeof dir_lower, "%s", dir_name);
 	lower_str(dir_lower);
 	char bundle_dir[1024];
-	snprintf(bundle_dir, sizeof bundle_dir, "%s/frontres/%s", opt->out_root, dir_lower);
+	snprintf(bundle_dir, sizeof bundle_dir, "%s/frontend/frontres/%s", opt->out_root, dir_lower);
 
 	BakeFrame* frames = (BakeFrame*)calloc((size_t)decoded.count, sizeof *frames);
 	int        n      = 0;
