@@ -162,14 +162,14 @@ static int env_read_rotation(const AeronConfigNode* node, const char* what, floa
 	return 1;
 }
 
-/* What a reference is for, which sets the package kinds it accepts. */
+/* What a reference is for, which sets the packages it accepts. */
 typedef enum EnvUse {
-	ENV_USE_REGION, /* full or lighting */
-	ENV_USE_HANGAR, /* lighting without directional_lights: the hangar keeps its own key light */
-	ENV_USE_PROBES, /* probes */
+	ENV_USE_REGION, /* any but a probes package */
+	ENV_USE_HANGAR, /* no sky and no directional_lights: the hangar keeps its own sky and key light */
+	ENV_USE_PROBES, /* a probes package */
 } EnvUse;
 
-/* Adds a reference to a package of a kind `use` accepts. A reference is
+/* Adds a reference to a package `use` accepts. A reference is
  * either a package name or a map with `package` and an optional
  * `rotation_degrees`. */
 static int env_add_reference(const AeronConfigNode* node, const char* what, EnvUse use, int32_t* out_index) {
@@ -196,15 +196,19 @@ static int env_add_reference(const AeronConfigNode* node, const char* what, EnvU
 	}
 	switch (use) {
 		case ENV_USE_REGION:
-			if (definition->kind != AERON_ENV_KIND_FULL && definition->kind != AERON_ENV_KIND_LIGHTING) {
-				return env_node_error(package_node, "%s: package '%s' must be of kind 'full' or 'lighting'",
-									  what, name);
+			if (AeronEnvironment_IsProbeSet(definition)) {
+				return env_node_error(package_node, "%s: package '%s' is a model's probes", what, name);
 			}
 			break;
 		case ENV_USE_HANGAR:
-			if (definition->kind != AERON_ENV_KIND_LIGHTING) {
-				return env_node_error(package_node, "%s: package '%s' must be of kind 'lighting'", what,
-									  name);
+			if (AeronEnvironment_IsProbeSet(definition)) {
+				return env_node_error(package_node, "%s: package '%s' is a model's probes", what, name);
+			}
+			if (definition->radiance_path[0]) {
+				return env_node_error(package_node,
+									  "%s: package '%s' sets 'radiance', which a hangar does not use: "
+									  "the hangar keeps its own sky",
+									  what, name);
 			}
 			if (definition->has_directional_lights) {
 				return env_node_error(
@@ -215,8 +219,8 @@ static int env_add_reference(const AeronConfigNode* node, const char* what, EnvU
 			}
 			break;
 		case ENV_USE_PROBES:
-			if (definition->kind != AERON_ENV_KIND_PROBES) {
-				return env_node_error(package_node, "%s: package '%s' must be of kind 'probes'", what, name);
+			if (!AeronEnvironment_IsProbeSet(definition)) {
+				return env_node_error(package_node, "%s: package '%s' is not a probes package", what, name);
 			}
 			break;
 	}
@@ -755,8 +759,7 @@ static const AeronEnvironmentPackage* env_package(int32_t prepared) {
 	return prepared >= 0 ? AeronEnvironmentLibrary_Find(s_env.library, (uint32_t)prepared) : NULL;
 }
 
-/* The mission region's package: authored (full) or lighting, or classic
- * with the reason. */
+/* The mission region's package, or classic with the reason. */
 static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	if (!snap->mission_path[0]) {
@@ -788,10 +791,7 @@ static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection*
 		env_select(out, XWA_ENV_MODE_CLASSIC, XWA_ENV_FALLBACK_AUTHORED_OFF, reference);
 		return;
 	}
-	env_select(out,
-			   package->definition->kind == AERON_ENV_KIND_LIGHTING ? XWA_ENV_MODE_LIGHTING
-																	: XWA_ENV_MODE_AUTHORED,
-			   XWA_ENV_FALLBACK_NONE, reference);
+	env_select(out, XWA_ENV_MODE_AUTHORED, XWA_ENV_FALLBACK_NONE, reference);
 	out->package = package;
 }
 
@@ -931,8 +931,6 @@ const char* XwaRemasterEnvironment_ModeName(XwaEnvironmentMode mode) {
 			return "hangar";
 		case XWA_ENV_MODE_AUTHORED:
 			return "authored";
-		case XWA_ENV_MODE_LIGHTING:
-			return "lighting";
 		case XWA_ENV_MODE_CLASSIC:
 			return "classic";
 	}

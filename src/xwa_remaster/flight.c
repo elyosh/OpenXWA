@@ -4311,12 +4311,12 @@ static void fl_set_package_ambient(FlSceneLighting* out, const AeronEnvironmentP
 	out->ambient = &out->ambient_cube;
 }
 
-/* Region package (full or lighting): its fill replaces the ambient. When
- * it gives directional lights (always for full), they replace the
- * backdrop-derived directionals; recovered lights without a backdrop source
- * are kept, since they are not known to belong to the sky. The declared
- * primary is then the key and the only shadow caster. A lighting package
- * without lights keeps the recovered lights and key selection. */
+/* Region package: its fill replaces the ambient. When it gives directional
+ * lights (always with a sky), they replace the backdrop-derived
+ * directionals; recovered lights without a backdrop source are kept, since
+ * they are not known to belong to the sky. The declared primary is then the
+ * key and the only shadow caster. A package without lights keeps the
+ * recovered lights and key selection. */
 static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronEnvironmentPackage* package,
 									   FlSceneLighting* out) {
 	out->package = package;
@@ -4414,8 +4414,7 @@ static void fl_build_scene_lighting(const XwaSnapshot* snap, const XwaFlightCame
 	out->key_index = -1;
 	out->shadow_allowed = 1;
 	out->shadow_angular_radius_degrees = s.shadows.light_angular_radius_degrees;
-	if ((s.environment.mode == XWA_ENV_MODE_AUTHORED || s.environment.mode == XWA_ENV_MODE_LIGHTING) &&
-		s.environment.package) {
+	if (s.environment.mode == XWA_ENV_MODE_AUTHORED && s.environment.package) {
 		fl_apply_authored_lighting(snap, s.environment.package, out);
 		return;
 	}
@@ -4789,12 +4788,14 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * open); point-light candidates start with the accessor-law
 	 * sources (glow lights + pulses append during/after the walk). */
 	fl_derive_billboards(snap, assets, billboard_history_cam, billboard_history_crows);
-	/* Authored mode is atomic: the package's sky, suns, lights and flares
-	 * replace the configured sky, the recovered backdrop sprites, the
+	/* A package's sky is atomic: its sky, suns, lights and flares replace
+	 * the configured sky, the recovered backdrop sprites, the
 	 * backdrop-derived directionals and the backdrop-sun flares together.
-	 * A lighting package keeps the sky, the sprites and the flares. */
-	const AeronEnvironmentPackage* authored =
+	 * A package without a sky keeps the sky, the sprites and the flares. */
+	const AeronEnvironmentPackage* region_package =
 		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.package : NULL;
+	const AeronEnvironmentPackage* authored =
+		region_package && region_package->radiance ? region_package : NULL;
 	fl_derive_lens_flares(snap, assets, &flight_view, authored);
 	fl_begin_point_lights(&flight_view);
 	fl_derive_point_lights(snap);

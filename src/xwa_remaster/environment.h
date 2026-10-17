@@ -7,12 +7,12 @@
  * The manifest (host option environment_maps.manifest, under the remaster
  * bake root)
  * holds Aeron's shared `packages:` map and an `xwa:` section that maps the
- * hangar and each (mission path, region) to a package reference. A region
- * takes a `full` package, which replaces the sky and the lighting, or a
- * `lighting` package, which keeps the classic sky and replaces the ambient
- * and, when it gives them, the directional lights. A mission or region
- * without an entry keeps the classic HD path (the Death Star behaviour in
- * Death Star mode).
+ * hangar and each (mission path, region) to a package reference. A region's
+ * package replaces the ambient with its fill and image-based lighting; with
+ * a sky (`radiance`) it also replaces the classic sky, backdrops and
+ * backdrop flares; with `directional_lights` it replaces the directional
+ * lights. A mission or region without an entry keeps the classic HD path
+ * (the Death Star behaviour in Death Star mode).
  *
  * Packages are prepared through Aeron's environment library: the hangar
  * package during process asset preparation, and the hangar plus every
@@ -48,8 +48,7 @@ typedef enum XwaEnvironmentMode {
 	XWA_ENV_MODE_HYPERSPACE, /* dynamic hyperspace diffuse environment */
 	XWA_ENV_MODE_DEATH_STAR, /* Death Star region without a package: current behaviour */
 	XWA_ENV_MODE_HANGAR,     /* hangar lighting package, or current ambient without one */
-	XWA_ENV_MODE_AUTHORED,   /* complete authored (full) package for the region */
-	XWA_ENV_MODE_LIGHTING,   /* lighting package for the region: classic sky, package lighting */
+	XWA_ENV_MODE_AUTHORED,   /* the region's package: its lighting, and its sky when it has one */
 	XWA_ENV_MODE_CLASSIC,    /* complete classic path */
 } XwaEnvironmentMode;
 
