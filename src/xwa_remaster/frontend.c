@@ -38,6 +38,7 @@
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/preview.h"
 #include "xwa_remaster/text.h"
+#include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/runtime/presentation.h"
 
 #include <math.h>
@@ -288,7 +289,10 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 0.5f;
 	}
 
-	if (d->kind == XWA_DRAW2D_SPRITE_OPAQUE) {
+	/* An image whose geometry comes from an atlas has no palette, and its
+	 * art expects what is behind it to show where it is transparent. So it
+	 * gets no fill. */
+	if (d->kind == XWA_DRAW2D_SPRITE_OPAQUE && !XwaFrontendGeometry_FindFile(d->source_file)) {
 		/* The classic opaque blit writes palette entry 0 where the keyed
 		 * texture is transparent. Rebuild that lost color beneath the PMA
 		 * sprite; this also gives filtered HD edges the correct coverage. */

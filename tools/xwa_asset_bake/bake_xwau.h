@@ -3,7 +3,7 @@
 
 /* xwa_asset_bake xwau-frontend: converts XWAU's frontend art into atlases
  * that also give the game its frame counts, sizes and offsets. See
- * bake_xwau.c and docs/xwau_hd_concourse_plan.md (4.0-4.4, 4.12). */
+ * bake_xwau.c. */
 
 #include "bake_sprites.h"
 

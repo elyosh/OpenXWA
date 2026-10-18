@@ -1,0 +1,540 @@
+#include "xwa_runtime/frontend/frontend_geometry.h"
+
+#include "aeron/aeron.h"
+#include "aeron/config_file.h"
+#include "aeron/image.h"
+#include "aeron/log.h"
+#include "xwa/util/memory.h"
+
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define XWA_GEOMETRY_DESIGN_PATH "frontend/frontend.yaml"
+#define XWA_GEOMETRY_STARFIELD_MASK_PATH "frontend/concourse/starfield_mask.png"
+#define XWA_GEOMETRY_KEY_SIZE 64
+
+/* The rows the concourse starfield picks from (concourse.c, Concourse_InitStarfield). */
+#define XWA_GEOMETRY_STARFIELD_TOP 25
+#define XWA_GEOMETRY_STARFIELD_ROWS 100
+
+typedef struct XwaGeometryEntry {
+	char key[XWA_GEOMETRY_KEY_SIZE]; /* "<dir>/<base>", or "group_<g>" */
+	XwaGeometryAtlas* atlas;         /* NULL when there is none */
+} XwaGeometryEntry;
+
+static XwaGeometryEntry* g_geometryEntries;
+static int g_geometryEntryCount;
+static int g_geometryEntryCapacity;
+
+static int g_geometryDesignLoaded;
+static float g_geometryDesignW = 640.0f;
+static float g_geometryDesignH = 480.0f;
+
+static const ResourceDescriptor** g_geometryDescriptors;
+static int g_geometryDescriptorCount;
+static int g_geometryDescriptorCapacity;
+
+static int g_geometryMaskState; /* 0 not read yet, 1 usable, -1 missing or unusable */
+static uint8_t* g_geometryMask;
+static int g_geometryMaskW;
+static int g_geometryMaskH;
+
+/* Reads `count` numbers from a sequence such as `[704, 357]`. */
+static int geometry_read_numbers(const AeronConfigNode* node, float* out, size_t count) {
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_SEQUENCE || AeronConfigNode_SequenceCount(node) != count) {
+		return 0;
+	}
+	for (size_t i = 0; i < count; ++i) {
+		const AeronConfigNode* value = AeronConfigNode_SequenceGet(node, i);
+		const AeronConfigNodeType type = AeronConfigNode_Type(value);
+		if (type != AERON_CONFIG_INT && type != AERON_CONFIG_FLOAT) {
+			return 0;
+		}
+		out[i] = (float)AeronConfigNode_Float(value, 0.0);
+	}
+	return 1;
+}
+
+static void geometry_load_design(void) {
+	AeronConfigFile* file = NULL;
+	AeronConfigError error;
+	const AeronConfigNode* design;
+	float size[2];
+
+	if (g_geometryDesignLoaded) {
+		return;
+	}
+	g_geometryDesignLoaded = 1;
+	memset(&error, 0, sizeof(error));
+	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, XWA_GEOMETRY_DESIGN_PATH, &file, &error)) {
+		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
+			Aeron_LogError("xwa.frontend", "%s:%d: %s; the design screen is 640x480", XWA_GEOMETRY_DESIGN_PATH,
+						   error.line, error.message[0] ? error.message : "unavailable");
+		}
+		return;
+	}
+	design = AeronConfigNode_MapGet(AeronConfigFile_Root(file), "design");
+	if (design != NULL) {
+		if (geometry_read_numbers(design, size, 2) && size[0] >= 1.0f && size[1] >= 1.0f) {
+			g_geometryDesignW = size[0];
+			g_geometryDesignH = size[1];
+		} else {
+			Aeron_LogError("xwa.frontend", "%s:%d: design must be [width, height] in pixels; it is 640x480",
+						   XWA_GEOMETRY_DESIGN_PATH, AeronConfigNode_Line(design));
+		}
+	}
+	AeronConfigFile_Destroy(file);
+}
+
+static void geometry_free_atlas(XwaGeometryAtlas* atlas) {
+	if (atlas != NULL) {
+		free(atlas->frames);
+		free(atlas->regions);
+		free(atlas);
+	}
+}
+
+/* Reads one frame. Unknown keys, such as the texture rectangle and the
+ * renderer's keys, are left to the renderer. */
+static int geometry_read_frame(const char* path, const AeronConfigNode* node, float scale, int needs_id,
+							   XwaGeometryFrame* frame) {
+	const AeronConfigNode* value;
+	const char* text;
+	float pixels[2];
+	const int line = AeronConfigNode_Line(node);
+
+	memset(frame, 0, sizeof(*frame));
+	frame->id = -1;
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.frontend", "%s:%d: a frame must be a map", path, line);
+		return 0;
+	}
+	value = AeronConfigNode_MapGet(node, "id");
+	if (value != NULL) {
+		if (AeronConfigNode_Type(value) != AERON_CONFIG_INT) {
+			Aeron_LogError("xwa.frontend", "%s:%d: id must be a number", path, AeronConfigNode_Line(value));
+			return 0;
+		}
+		frame->id = (int)AeronConfigNode_Int(value, -1);
+	} else if (needs_id) {
+		Aeron_LogError("xwa.frontend", "%s:%d: a frame of a DAT group needs an id", path, line);
+		return 0;
+	}
+	value = AeronConfigNode_MapGet(node, "size");
+	if (value != NULL) {
+		if (!geometry_read_numbers(value, frame->size, 2) || frame->size[0] <= 0.0f || frame->size[1] <= 0.0f) {
+			Aeron_LogError("xwa.frontend", "%s:%d: size must be [width, height]", path,
+						   AeronConfigNode_Line(value));
+			return 0;
+		}
+	} else {
+		pixels[0] = (float)AeronConfigNode_Float(AeronConfigNode_MapGet(node, "w"), 0.0);
+		pixels[1] = (float)AeronConfigNode_Float(AeronConfigNode_MapGet(node, "h"), 0.0);
+		if (pixels[0] <= 0.0f || pixels[1] <= 0.0f) {
+			Aeron_LogError("xwa.frontend", "%s:%d: a frame needs w and h, or a size", path, line);
+			return 0;
+		}
+		frame->size[0] = pixels[0] / scale;
+		frame->size[1] = pixels[1] / scale;
+	}
+	value = AeronConfigNode_MapGet(node, "offset");
+	if (value != NULL && !geometry_read_numbers(value, frame->offset, 2)) {
+		Aeron_LogError("xwa.frontend", "%s:%d: offset must be [x, y]", path, AeronConfigNode_Line(value));
+		return 0;
+	}
+	value = AeronConfigNode_MapGet(node, "bounds");
+	if (value != NULL) {
+		if (!geometry_read_numbers(value, frame->bounds, 4)) {
+			Aeron_LogError("xwa.frontend", "%s:%d: bounds must be [left, top, right, bottom]", path,
+						   AeronConfigNode_Line(value));
+			return 0;
+		}
+		frame->has_bounds = 1;
+	}
+	value = AeronConfigNode_MapGet(node, "keep_aspect");
+	if (value != NULL) {
+		text = AeronConfigNode_String(value, "");
+		if (strcmp(text, "height") == 0) {
+			frame->keep_aspect = XWA_GEOMETRY_KEEP_ASPECT_HEIGHT;
+		} else if (strcmp(text, "width") == 0) {
+			frame->keep_aspect = XWA_GEOMETRY_KEEP_ASPECT_WIDTH;
+		} else {
+			Aeron_LogError("xwa.frontend", "%s:%d: keep_aspect must be height or width", path,
+						   AeronConfigNode_Line(value));
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/* Reads an atlas. Returns NULL when the file is missing, has no
+ * `game_geometry: true`, or has an error, which is logged. */
+static XwaGeometryAtlas* geometry_read_atlas(const char* path, int needs_id) {
+	AeronConfigFile* file = NULL;
+	AeronConfigError error;
+	const AeronConfigNode* root;
+	const AeronConfigNode* frames;
+	const AeronConfigNode* value;
+	XwaGeometryAtlas* atlas;
+	float scale = 1.0f;
+	int ok = 1;
+
+	memset(&error, 0, sizeof(error));
+	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, &file, &error)) {
+		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
+			Aeron_LogError("xwa.frontend", "%s:%d: %s", path, error.line,
+						   error.message[0] ? error.message : "unavailable");
+		}
+		return NULL;
+	}
+	root = AeronConfigFile_Root(file);
+	if (!AeronConfigNode_Bool(AeronConfigNode_MapGet(root, "game_geometry"), 0)) {
+		AeronConfigFile_Destroy(file);
+		return NULL;
+	}
+	frames = AeronConfigNode_MapGet(root, "frames");
+	atlas = (XwaGeometryAtlas*)calloc(1, sizeof(*atlas));
+	if (atlas == NULL || AeronConfigNode_Type(frames) != AERON_CONFIG_SEQUENCE ||
+		AeronConfigNode_SequenceCount(frames) == 0) {
+		Aeron_LogError("xwa.frontend", "%s: an atlas with game geometry needs frames", path);
+		AeronConfigFile_Destroy(file);
+		free(atlas);
+		return NULL;
+	}
+	value = AeronConfigNode_MapGet(root, "scale");
+	if (value != NULL) {
+		scale = (float)AeronConfigNode_Float(value, 0.0);
+		if (scale <= 0.0f) {
+			Aeron_LogError("xwa.frontend", "%s:%d: scale must be a positive number", path,
+						   AeronConfigNode_Line(value));
+			ok = 0;
+		}
+	}
+	atlas->frame_count = (int)AeronConfigNode_SequenceCount(frames);
+	atlas->frames = (XwaGeometryFrame*)calloc((size_t)atlas->frame_count, sizeof(*atlas->frames));
+	ok = ok && atlas->frames != NULL;
+	for (int i = 0; ok && i < atlas->frame_count; ++i) {
+		ok = geometry_read_frame(path, AeronConfigNode_SequenceGet(frames, (size_t)i), scale, needs_id,
+								 &atlas->frames[i]);
+	}
+	atlas->classic_frames = atlas->frame_count;
+	value = AeronConfigNode_MapGet(root, "classic_frames");
+	if (ok && value != NULL) {
+		atlas->classic_frames = (int)AeronConfigNode_Int(value, 0);
+		if (AeronConfigNode_Type(value) != AERON_CONFIG_INT || atlas->classic_frames < 1 ||
+			atlas->classic_frames > atlas->frame_count) {
+			Aeron_LogError("xwa.frontend", "%s:%d: classic_frames must be between 1 and the frame count", path,
+						   AeronConfigNode_Line(value));
+			ok = 0;
+		}
+	}
+	value = AeronConfigNode_MapGet(root, "bounds");
+	if (ok && value != NULL) {
+		atlas->has_bounds = geometry_read_numbers(value, atlas->bounds, 4);
+		if (!atlas->has_bounds) {
+			Aeron_LogError("xwa.frontend", "%s:%d: bounds must be [left, top, right, bottom]", path,
+						   AeronConfigNode_Line(value));
+			ok = 0;
+		}
+	}
+	value = AeronConfigNode_MapGet(root, "regions");
+	if (ok && value != NULL) {
+		atlas->region_count = (int)AeronConfigNode_SequenceCount(value);
+		atlas->regions = (XwaGeometryRegion*)calloc((size_t)atlas->region_count + 1, sizeof(*atlas->regions));
+		ok = atlas->regions != NULL;
+		for (int i = 0; ok && i < atlas->region_count; ++i) {
+			const AeronConfigNode* region = AeronConfigNode_SequenceGet(value, (size_t)i);
+			const AeronConfigNode* type = AeronConfigNode_MapGet(region, "type");
+			atlas->regions[i].type = (int)AeronConfigNode_Int(type, 0);
+			if (AeronConfigNode_Type(type) != AERON_CONFIG_INT ||
+				!geometry_read_numbers(AeronConfigNode_MapGet(region, "rect"), atlas->regions[i].rect, 4)) {
+				Aeron_LogError("xwa.frontend", "%s:%d: a region needs a type and a rect [left, top, right, bottom]",
+							   path, AeronConfigNode_Line(region));
+				ok = 0;
+			}
+		}
+	}
+	AeronConfigFile_Destroy(file);
+	if (!ok) {
+		Aeron_LogError("xwa.frontend", "%s is ignored", path);
+		geometry_free_atlas(atlas);
+		return NULL;
+	}
+	return atlas;
+}
+
+static const XwaGeometryAtlas* geometry_find(const char* key, const char* path, int needs_id) {
+	XwaGeometryEntry* entry;
+
+	for (int i = 0; i < g_geometryEntryCount; ++i) {
+		if (strcmp(g_geometryEntries[i].key, key) == 0) {
+			return g_geometryEntries[i].atlas;
+		}
+	}
+	if (g_geometryEntryCount == g_geometryEntryCapacity) {
+		const int capacity = g_geometryEntryCapacity ? g_geometryEntryCapacity * 2 : 256;
+		XwaGeometryEntry* grown =
+			(XwaGeometryEntry*)realloc(g_geometryEntries, (size_t)capacity * sizeof(*grown));
+		if (grown == NULL) {
+			return NULL;
+		}
+		g_geometryEntries = grown;
+		g_geometryEntryCapacity = capacity;
+	}
+	geometry_load_design();
+	entry = &g_geometryEntries[g_geometryEntryCount++];
+	snprintf(entry->key, sizeof(entry->key), "%s", key);
+	entry->atlas = geometry_read_atlas(path, needs_id);
+	if (entry->atlas != NULL) {
+		Aeron_LogInfo("xwa.frontend", "%s: game geometry, %d frames", path, entry->atlas->classic_frames);
+	}
+	return entry->atlas;
+}
+
+const XwaGeometryAtlas* XwaFrontendGeometry_FindFile(const char* fileName) {
+	char name[XWA_GEOMETRY_KEY_SIZE + 16];
+	char path[160];
+	const char* key;
+	const char* slash;
+	char* dot;
+	size_t length = 0;
+
+	if (fileName == NULL) {
+		return NULL;
+	}
+	/* The key the snapshot records too: lower case, forward slashes, no
+	   extension and no leading "frontres/". */
+	for (const char* c = fileName; *c != '\0' && length + 1 < sizeof(name); ++c) {
+		char ch = *c;
+		if (ch == '\\') {
+			ch = '/';
+		} else if (ch >= 'A' && ch <= 'Z') {
+			ch = (char)(ch + ('a' - 'A'));
+		}
+		name[length++] = ch;
+	}
+	name[length] = '\0';
+	dot = strrchr(name, '.');
+	if (dot != NULL && strchr(dot, '/') == NULL) {
+		*dot = '\0';
+	}
+	key = strncmp(name, "frontres/", 9) == 0 ? name + 9 : name;
+	slash = strchr(key, '/');
+	if (strlen(key) >= XWA_GEOMETRY_KEY_SIZE || slash == NULL || strchr(slash + 1, '/') != NULL) {
+		return NULL;
+	}
+	snprintf(path, sizeof(path), "frontend/frontres/%.*s/atlas/%s.yaml", (int)(slash - key), key, slash + 1);
+	return geometry_find(key, path, 0);
+}
+
+const XwaGeometryAtlas* XwaFrontendGeometry_FindGroup(int group) {
+	char key[XWA_GEOMETRY_KEY_SIZE];
+	char path[64];
+
+	snprintf(key, sizeof(key), "group_%d", group);
+	snprintf(path, sizeof(path), "resdata/atlas/group_%d.yaml", group);
+	return geometry_find(key, path, 1);
+}
+
+const XwaGeometryFrame* XwaFrontendGeometry_FindFrame(const XwaGeometryAtlas* atlas, int id) {
+	if (atlas == NULL) {
+		return NULL;
+	}
+	for (int i = 0; i < atlas->frame_count; ++i) {
+		if (atlas->frames[i].id == id) {
+			return &atlas->frames[i];
+		}
+	}
+	return NULL;
+}
+
+const XwaGeometryRegion* XwaFrontendGeometry_FindRegion(const XwaGeometryAtlas* atlas, int type) {
+	if (atlas == NULL) {
+		return NULL;
+	}
+	for (int i = 0; i < atlas->region_count; ++i) {
+		if (atlas->regions[i].type == type) {
+			return &atlas->regions[i];
+		}
+	}
+	return NULL;
+}
+
+int XwaFrontendGeometry_UnitX(float x) {
+	geometry_load_design();
+	return (int)floorf(x * 640.0f / g_geometryDesignW + 0.5f);
+}
+
+int XwaFrontendGeometry_UnitY(float y) {
+	geometry_load_design();
+	return (int)floorf(y * 480.0f / g_geometryDesignH + 0.5f);
+}
+
+static void geometry_unit_bounds(const float* bounds, int* left, int* top, int* right, int* bottom) {
+	*left = XwaFrontendGeometry_UnitX(bounds[0]);
+	*top = XwaFrontendGeometry_UnitY(bounds[1]);
+	*right = XwaFrontendGeometry_UnitX(bounds[2]);
+	*bottom = XwaFrontendGeometry_UnitY(bounds[3]);
+}
+
+ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* atlas) {
+	ResourceDescriptor* desc;
+
+	if (atlas == NULL) {
+		return NULL;
+	}
+	if (g_geometryDescriptorCount == g_geometryDescriptorCapacity) {
+		const int capacity = g_geometryDescriptorCapacity ? g_geometryDescriptorCapacity * 2 : 64;
+		const ResourceDescriptor** grown = (const ResourceDescriptor**)realloc(
+			(void*)g_geometryDescriptors, (size_t)capacity * sizeof(*grown));
+		if (grown == NULL) {
+			return NULL;
+		}
+		g_geometryDescriptors = grown;
+		g_geometryDescriptorCapacity = capacity;
+	}
+	desc = (ResourceDescriptor*)Mem_Alloc(sizeof(*desc));
+	if (desc == NULL) {
+		return NULL;
+	}
+	memset(desc, 0, sizeof(*desc));
+	desc->frameCount = atlas->classic_frames;
+	desc->image = (ImageResource*)Mem_Alloc(sizeof(*desc->image) * (size_t)desc->frameCount);
+	if (desc->image == NULL) {
+		Mem_Free(desc);
+		return NULL;
+	}
+	memset(desc->image, 0, sizeof(*desc->image) * (size_t)desc->frameCount);
+	desc->bounds.left = 0x7fffffff;
+	desc->bounds.top = 0x7fffffff;
+	for (int i = 0; i < desc->frameCount; ++i) {
+		const XwaGeometryFrame* frame = &atlas->frames[i];
+		ImageResource* image = &desc->image[i];
+		int width = XwaFrontendGeometry_UnitX(frame->size[0]);
+		int height = XwaFrontendGeometry_UnitY(frame->size[1]);
+
+		image->width = width > 0 ? width : 1;
+		image->height = height > 0 ? height : 1;
+		image->pixelCount = image->width * image->height;
+		/* Uncompressed index 0 everywhere: the classic draw code works
+		   unchanged, and code that reads the pixels sees an empty image. */
+		image->pixels = (unsigned char*)Mem_Alloc((size_t)image->pixelCount);
+		if (image->pixels == NULL) {
+			for (int j = 0; j < i; ++j) {
+				Mem_Free(desc->image[j].pixels);
+			}
+			Mem_Free(desc->image);
+			Mem_Free(desc);
+			return NULL;
+		}
+		memset(image->pixels, 0, (size_t)image->pixelCount);
+		/* Without bounds, a frame's bounds are its drawn rectangle, inclusive,
+		   as FrontImage_ComputeImageBounds finds them for a full image. */
+		if (frame->has_bounds) {
+			geometry_unit_bounds(frame->bounds, &image->boundsLeft, &image->boundsTop, &image->boundsRight,
+								 &image->boundsBottom);
+		} else {
+			image->boundsRight = image->width - 1;
+			image->boundsBottom = image->height - 1;
+		}
+		/* The union of the frames, as FrontImage_RegisterFlicResource builds it. */
+		if (desc->bounds.left > image->boundsLeft) {
+			desc->bounds.left = image->boundsLeft;
+		}
+		if (desc->bounds.top > image->boundsTop) {
+			desc->bounds.top = image->boundsTop;
+		}
+		if (desc->bounds.right < image->boundsRight) {
+			desc->bounds.right = image->boundsRight;
+		}
+		if (desc->bounds.bottom < image->boundsBottom) {
+			desc->bounds.bottom = image->boundsBottom;
+		}
+	}
+	if (atlas->has_bounds) {
+		geometry_unit_bounds(atlas->bounds, &desc->bounds.left, &desc->bounds.top, &desc->bounds.right,
+							 &desc->bounds.bottom);
+	}
+	g_geometryDescriptors[g_geometryDescriptorCount++] = desc;
+	return desc;
+}
+
+int XwaFrontendGeometry_IsBuiltDescriptor(const ResourceDescriptor* desc) {
+	for (int i = 0; desc != NULL && i < g_geometryDescriptorCount; ++i) {
+		if (g_geometryDescriptors[i] == desc) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
+void XwaFrontendGeometry_ForgetDescriptor(const ResourceDescriptor* desc) {
+	for (int i = 0; desc != NULL && i < g_geometryDescriptorCount; ++i) {
+		if (g_geometryDescriptors[i] == desc) {
+			g_geometryDescriptors[i] = g_geometryDescriptors[--g_geometryDescriptorCount];
+			return;
+		}
+	}
+}
+
+static int geometry_mask_open(int x, int y) {
+	const int mx = (2 * x + 1) * g_geometryMaskW / 1280;
+	const int my = (2 * y + 1) * g_geometryMaskH / 960;
+	return g_geometryMask[((size_t)my * (size_t)g_geometryMaskW + (size_t)mx) * 4] >= 128;
+}
+
+int XwaFrontendGeometry_StarfieldOpen(int x, int y) {
+	if (g_geometryMaskState == 0) {
+		int open = 0;
+
+		g_geometryMaskState = -1;
+		g_geometryMask = Aeron_ImageReadPngRgba8(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, XWA_GEOMETRY_STARFIELD_MASK_PATH,
+												 &g_geometryMaskW, &g_geometryMaskH);
+		if (g_geometryMask == NULL) {
+			Aeron_LogError("xwa.frontend", "%s: missing or unreadable; the stars show everywhere",
+						   XWA_GEOMETRY_STARFIELD_MASK_PATH);
+			return -1;
+		}
+		g_geometryMaskState = 1;
+		/* The starfield picks random points until 128 are open, so a mask with
+		   none in its rows would never let it finish. */
+		for (int row = XWA_GEOMETRY_STARFIELD_TOP; !open && row < XWA_GEOMETRY_STARFIELD_TOP + XWA_GEOMETRY_STARFIELD_ROWS;
+			 ++row) {
+			for (int column = 0; !open && column < 640; ++column) {
+				open = geometry_mask_open(column, row);
+			}
+		}
+		if (!open) {
+			Aeron_LogError("xwa.frontend", "%s: no white pixel in rows %d-%d; the stars show everywhere",
+						   XWA_GEOMETRY_STARFIELD_MASK_PATH, XWA_GEOMETRY_STARFIELD_TOP,
+						   XWA_GEOMETRY_STARFIELD_TOP + XWA_GEOMETRY_STARFIELD_ROWS - 1);
+			g_geometryMaskState = -1;
+		}
+	}
+	if (g_geometryMaskState < 0 || x < 0 || y < 0 || x >= 640 || y >= 480) {
+		return -1;
+	}
+	return geometry_mask_open(x, y);
+}
+
+void XwaFrontendGeometry_Shutdown(void) {
+	for (int i = 0; i < g_geometryEntryCount; ++i) {
+		geometry_free_atlas(g_geometryEntries[i].atlas);
+	}
+	free(g_geometryEntries);
+	g_geometryEntries = NULL;
+	g_geometryEntryCount = 0;
+	g_geometryEntryCapacity = 0;
+	free((void*)g_geometryDescriptors);
+	g_geometryDescriptors = NULL;
+	g_geometryDescriptorCount = 0;
+	g_geometryDescriptorCapacity = 0;
+	free(g_geometryMask);
+	g_geometryMask = NULL;
+	g_geometryMaskState = 0;
+	g_geometryDesignLoaded = 0;
+	g_geometryDesignW = 640.0f;
+	g_geometryDesignH = 480.0f;
+}

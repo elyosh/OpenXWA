@@ -13,6 +13,7 @@
 #include "aeron/scene/image_cache.h"
 #include "aeron/scene/runtime_atlas.h"
 #include "aeron/scene/sprite_atlas.h"
+#include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #include "xwa_remaster/original_2d.h"
 
@@ -374,6 +375,8 @@ static void assets_file_texture_path(const XwaRemasterAssets* a, const FileSlot*
 	const int dlen = slash ? (int)(slash - slot->key) : 0;
 	if (slot->kind == FILE_SINGLE) {
 		snprintf(path, 768, "%s/frontend/frontres/%.*s/sprites/%s.ktx2", a->root, dlen, slot->key, base);
+	} else if (slot->kind == FILE_ATLAS && part > 0) {
+		snprintf(path, 768, "%s/frontend/frontres/%.*s/atlas/%s_p%d.ktx2", a->root, dlen, slot->key, base, part);
 	} else if (slot->kind == FILE_ATLAS) {
 		snprintf(path, 768, "%s/frontend/frontres/%.*s/atlas/%s.ktx2", a->root, dlen, slot->key, base);
 	} else {
@@ -484,6 +487,17 @@ static AssetLoadStatus assets_load_original_group(XwaRemasterAssets* a, AeronCom
 static AssetLoadStatus assets_choose_group(XwaRemasterAssets* a, AeronCommandBuffer* cmd,
 										   GroupSlot* slot, int flight, uint8_t* out_source) {
 	*out_source = ASSET_SOURCE_MISSING;
+	/* As for files: a group whose atlas sets the game's geometry is drawn
+	   only from the mod folder. */
+	if (!flight && XwaFrontendGeometry_FindGroup(slot->group)) {
+		const AssetLoadStatus status = assets_load_mod_group(a, a->frontend_images, cmd, slot);
+		if (status == ASSET_LOAD_SUCCESS)
+			*out_source = ASSET_SOURCE_MOD;
+		else if (status == ASSET_LOAD_MISSING)
+			Aeron_LogError("xwa.remaster", "frontend group %d: its geometry comes from an atlas, but there is "
+					   "no texture for it; it isn't drawn", slot->group);
+		return status == ASSET_LOAD_MISSING ? ASSET_LOAD_SUCCESS : status;
+	}
 	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_MOD;
 	for (int attempt = 0; attempt < 2; attempt++) {
 		const int source = attempt == 0
@@ -582,7 +596,9 @@ static AssetLoadStatus assets_load_mod_file(XwaRemasterAssets* a, AeronCommandBu
 		return ASSET_LOAD_MISSING;
 	if (slot->kind == FILE_FAILED)
 		return ASSET_LOAD_FAILED;
-	const uint16_t parts = slot->kind == FILE_FRAMEDIR ? frame_count : 1;
+	const uint16_t parts = slot->kind == FILE_FRAMEDIR ? frame_count
+						   : slot->kind == FILE_ATLAS && slot->atlas.page_count > 1 ? (uint16_t)slot->atlas.page_count
+																				   : 1;
 	const AssetLoadStatus status = assets_sync_frontend_file(a, cmd, slot, parts);
 	return status == ASSET_LOAD_SUCCESS ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
 }
@@ -591,6 +607,17 @@ static AssetLoadStatus assets_choose_frontend_file(XwaRemasterAssets* a, AeronCo
 												   FileSlot* slot, uint16_t frame_count,
 												   uint8_t* out_source) {
 	*out_source = ASSET_SOURCE_MISSING;
+	/* An image whose atlas sets the game's geometry has no stock image that
+	   fits it, so it is drawn only from the mod folder. */
+	if (XwaFrontendGeometry_FindFile(slot->source_file)) {
+		const AssetLoadStatus status = assets_load_mod_file(a, cmd, slot, frame_count);
+		if (status == ASSET_LOAD_SUCCESS)
+			*out_source = ASSET_SOURCE_MOD;
+		else if (status == ASSET_LOAD_MISSING)
+			Aeron_LogError("xwa.remaster", "2D file '%s': its geometry comes from an atlas, but there is no "
+					   "texture for it; it isn't drawn", slot->key);
+		return status == ASSET_LOAD_MISSING ? ASSET_LOAD_SUCCESS : status;
+	}
 	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_MOD;
 	for (int attempt = 0; attempt < 2; attempt++) {
 		const int source = attempt == 0
@@ -727,7 +754,9 @@ int XwaRemasterAssets_FrontendSprite(XwaRemasterAssets* a, const char* file_key,
 	if (slot->resident_source == ASSET_SOURCE_ORIGINAL) {
 		return assets_runtime_frame(&slot->original_atlas, frame, out);
 	}
-	const int part = slot->kind == FILE_FRAMEDIR && frame >= 0 ? frame : 0;
+	int part = slot->kind == FILE_FRAMEDIR && frame >= 0 ? frame : 0;
+	if (slot->kind == FILE_ATLAS && slot->atlas.pages && frame >= 0 && frame < slot->atlas.frame_count)
+		part = slot->atlas.pages[frame];
 	char path[768];
 	assets_file_texture_path(a, slot, part, path);
 	if (!assets_find_texture(a->frontend_images, path, out)) {

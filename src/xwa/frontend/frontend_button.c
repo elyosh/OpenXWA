@@ -355,6 +355,16 @@ int FrontendButton_DrawSpriteWithHoverText(FrontendRect* buttonRect, char* upSpr
 
 	FrontendCursor_GetPos(&outX, &outY);
 	FrontendDraw_RectCopy(&clippedRect, buttonRect);
+#ifdef XWA_MODERN
+	/* XWA_MODERN: when the up image takes its geometry from an atlas, the hit
+	   rectangle is the button's top left corner plus the size of the up
+	   image. */
+	if (FrontImage_ResourceHasGameGeometry(upSpriteName)) {
+		FrontImage_GetResourceRect(upSpriteName, &sourceRect);
+		clippedRect.right = clippedRect.left + (sourceRect.right - sourceRect.left);
+		clippedRect.bottom = clippedRect.top + (sourceRect.bottom - sourceRect.top);
+	}
+#endif
 	FrontendDraw_RectClipToBounds(&clippedRect);
 	if (FrontendDraw_PointInRect(&clippedRect, outX, outY)) {
 		if (FrontendMouse_GetLeftClick() || FrontendMouse_GetRightClick()) {

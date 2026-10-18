@@ -1,6 +1,6 @@
 /*
  * xwa_asset_bake xwau-frontend: converts XWAU's frontend art for the mod
- * folder (docs/xwau_hd_concourse_plan.md, 4.0-4.4 and 4.12).
+ * folder.
  *
  * XWAU replaces standard frontend files to change the frontend's layout, and
  * draws HD images in the rectangles they give. Here, each replaced image gets
@@ -40,8 +40,9 @@
 #define DESIGN_X 4.0
 #define DESIGN_Y 3.0
 
-/* A standard image this large, with an HD image of another shape, is a room
- * background, and sets the room's layout (plan 4.4). TECHGLOBE is 575x464. */
+/* A standard image this large is a screen background: its HD image sets the
+ * layout of the screens that draw it (XWAU's IsBackgroundWide). TECHGLOBE is
+ * 575x464. */
 #define BACKGROUND_MIN_W 560
 #define BACKGROUND_MIN_H 440
 
@@ -57,7 +58,6 @@ typedef struct XwauFrame {
 	int has_bounds;
 	double bounds[4]; /* left, top, right, bottom, as the game stores them */
 	const char* keep_aspect;
-	const char* layout;
 } XwauFrame;
 
 typedef struct XwauRegion {
@@ -79,6 +79,13 @@ typedef struct XwauAtlas {
 	int region_count;
 } XwauAtlas;
 
+/* A background and the layout XWAU gives the screens that show it. Files
+ * that aren't here have no HD image, so XWAU shows them in 4:3. */
+typedef struct XwauBackground {
+	char key[300];      /* "<dir>/<base>" or "group/<g>/<id>", in lower case */
+	const char* layout; /* "wide", "fill" or "classic" */
+} XwauBackground;
+
 typedef struct XwauContext {
 	const BakeXwauOptions* opt;
 	BakeXwauStats* stats;
@@ -90,6 +97,8 @@ typedef struct XwauContext {
 	int region_count;
 	char** wide_keys; /* ConcourseBackgroundsWide.txt entries set to 0 */
 	int wide_key_count;
+	XwauBackground* backgrounds; /* the layout XWAU gives each background */
+	int background_count;
 } XwauContext;
 
 /* ---- host files ------------------------------------------------------- */
@@ -272,6 +281,34 @@ static int listed_not_wide(const XwauContext* ctx, const char* key) {
 	return 0;
 }
 
+/* Notes the layout XWAU gives a background: 4:3 when its HD image has the
+ * standard image's shape, else wide, unless ConcourseBackgroundsWide.txt
+ * sets it to 0 or it is DPMED or CONFIGB, which the hook always sets to 0
+ * (fill). */
+static void note_background(XwauContext* ctx, const char* key, const char* list_key, int same_shape) {
+	XwauBackground* grown = (XwauBackground*)realloc(ctx->backgrounds, (size_t)(ctx->background_count + 1) *
+																		   sizeof *grown);
+	if (!grown)
+		return;
+	ctx->backgrounds = grown;
+	XwauBackground* b = &ctx->backgrounds[ctx->background_count++];
+	snprintf(b->key, sizeof b->key, "%s", key);
+	if (same_shape)
+		b->layout = "classic";
+	else if (strcmp(key, "config/dpmed") == 0 || strcmp(key, "config/configb") == 0 ||
+			 listed_not_wide(ctx, list_key))
+		b->layout = "fill";
+	else
+		b->layout = "wide";
+}
+
+static const char* background_layout(const XwauContext* ctx, const char* key) {
+	for (int i = 0; i < ctx->background_count; ++i)
+		if (strcmp(ctx->backgrounds[i].key, key) == 0)
+			return ctx->backgrounds[i].layout;
+	return "classic";
+}
+
 /* XWAU's tools store tenths of a unit as 8000 + 10 * value. */
 static double xwau_value(int32_t v) { return v > 8000 ? (v - 8000) / 10.0 : (double)v; }
 
@@ -351,8 +388,6 @@ static int write_atlas_yaml(const char* path, const XwauAtlas* atlas, const Aero
 		}
 		if (f->keep_aspect)
 			fprintf(fp, ", keep_aspect: %s", f->keep_aspect);
-		if (f->layout)
-			fprintf(fp, ", layout: %s", f->layout);
 		fprintf(fp, "}\n");
 	}
 	return fclose(fp) == 0;
@@ -661,7 +696,7 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 	}
 
 	/* The family room monitors have more HD frames than standard ones, and
-	 * play them by time at familyroom_monitor_fps (plan 4.3). Elsewhere, HD
+	 * play them by time at familyroom_monitor_fps. Elsewhere, HD
 	 * frames beyond the standard count are never drawn. */
 	const int by_time = strcasecmp(dir_name, "family") == 0 &&
 						(strcasecmp(base, "lightmon") == 0 || strcasecmp(base, "emailmon") == 0) &&
@@ -697,14 +732,11 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 			new_image |= f->w != s->width || f->h != s->height;
 			if (icons && !same_aspect(s->width, s->height, f->w, f->h))
 				f->keep_aspect = "width";
-			if (i == 0 && !map_icons && s->width >= BACKGROUND_MIN_W && s->height >= BACKGROUND_MIN_H &&
-				!same_aspect(s->width, s->height, f->w, f->h)) {
-				char key[600];
-				snprintf(key, sizeof key, "frontres/%s/%s.cbm", dir_lower, base_lower);
-				f->layout = strcmp(base_lower, "dpmed") == 0 || strcmp(base_lower, "configb") == 0 ||
-									listed_not_wide(ctx, key)
-								? "fill"
-								: "wide";
+			if (i == 0 && !map_icons && s->width >= BACKGROUND_MIN_W && s->height >= BACKGROUND_MIN_H) {
+				char key[600], list_key[600];
+				snprintf(key, sizeof key, "%s/%s", dir_lower, base_lower);
+				snprintf(list_key, sizeof list_key, "frontres/%s/%s.cbm", dir_lower, base_lower);
+				note_background(ctx, key, list_key, same_aspect(s->width, s->height, f->w, f->h));
 			}
 			if (map_icons) {
 				for (size_t t = 0; t < (size_t)f->w * f->h; ++t) {
@@ -942,12 +974,13 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 			ctx->stats->hd_frames++;
 			if (!same_aspect((int)sd_info.width, (int)sd_info.height, f->w, f->h))
 				f->keep_aspect = "height";
-			if ((int)sd_info.width >= BACKGROUND_MIN_W && (int)sd_info.height >= BACKGROUND_MIN_H &&
-				!same_aspect((int)sd_info.width, (int)sd_info.height, f->w, f->h)) {
-				char key[300];
-				snprintf(key, sizeof key, "resdata/%s-%d-%d", file->name, group, id);
-				lower(key);
-				f->layout = listed_not_wide(ctx, key) ? "fill" : "wide";
+			if ((int)sd_info.width >= BACKGROUND_MIN_W && (int)sd_info.height >= BACKGROUND_MIN_H) {
+				char key[300], list_key[300];
+				snprintf(key, sizeof key, "group/%d/%d", group, id);
+				snprintf(list_key, sizeof list_key, "resdata/%s-%d-%d", file->name, group, id);
+				lower(list_key);
+				note_background(ctx, key, list_key,
+								same_aspect((int)sd_info.width, (int)sd_info.height, f->w, f->h));
 			}
 			if (group == 15001 && id == 3100)
 				write_starfield_mask(ctx, f->rgba, f->w, f->h);
@@ -1019,8 +1052,8 @@ static void bake_resdata(XwauContext* ctx) {
 			*--end = '\0';
 		const char* name = strrchr(line, '\\');
 		name = name ? name + 1 : line;
-		/* New battle images need new mission content and an exe patch
-		 * (plan section 8). */
+		/* New battle images need new mission content and an exe patch,
+		 * which aren't supported. */
 		if (!name[0] || strcasecmp(name, "FrontEnd2_Battles.dat") == 0)
 			continue;
 		char path[1200];
@@ -1078,6 +1111,118 @@ static void bake_resdata(XwauContext* ctx) {
 
 /* ---- entry ----------------------------------------------------------------- */
 
+/* The screens and views of the layout table, and the backgrounds each one
+ * shows, from the recovered code. The family room's memento and rank views
+ * show many backgrounds, all in medals/: a prefix selects them. */
+typedef struct XwauScreen {
+	const char* name;
+	const char* backgrounds[4];
+	const char* medal_prefix; /* "rankzoom", or "" for the memento views */
+} XwauScreen;
+
+static const XwauScreen k_screens[] = {
+	{ "concourse", { "group/15001/3100" }, NULL },
+	{ "combat_room", { "combat/combat" }, NULL },
+	{ "combat_room.family", { "combat/podopen" }, NULL },
+	{ "family_room", { "family/familyroom" }, NULL },
+	{ "family_room.monitor", { "family/monitor" }, NULL },
+	{ "family_room.detail", { NULL }, "" },
+	{ "family_room.medal_case", { "medals/medback" }, NULL },
+	{ "family_room.rank", { NULL }, "rankzoom" },
+	{ "film_room", { "combat/multiplayer" }, NULL },
+	{ "tech_room", { "techroom/techglobe" }, NULL },
+	{ "briefing_room", { "combat/solo", "family/markoholo" }, NULL },
+	{ "briefing_room.start", { "family/markostart", "combat/briefoff" }, NULL },
+	{ "mission_briefing", { "combat/solo", "family/markoholo", "combat/multiplayer" }, NULL },
+	{ "mission_setup", { "combat/multiplayer" }, NULL },
+	{ "debrief", { "combat/solo", "family/markoholo", "combat/multiplayer" }, NULL },
+	{ "datapad", { "config/configb" }, NULL },
+	{ "create_pilot", { "concourse/create" }, NULL },
+	{ "get_ready", { "config/configb" }, NULL },
+	{ "loading", { "config/dpmed" }, NULL },
+};
+
+#define SCREEN_COUNT (sizeof k_screens / sizeof k_screens[0])
+
+/* Whether `key` is one of the medal folder's memento (prefix "") or rank
+ * zoom backgrounds. The medal case's own images are neither. */
+static int is_medal_view(const char* key, const char* prefix) {
+	if (strncmp(key, "medals/", 7) != 0)
+		return 0;
+	const char* base = key + 7;
+	if (prefix[0])
+		return strncmp(base, prefix, strlen(prefix)) == 0;
+	return strcmp(base, "medback") != 0 && strcmp(base, "medalcase") != 0 && strncmp(base, "rankzoom", 8) != 0 &&
+		   strncmp(base, "lbattle", 7) != 0 && strncmp(base, "lkalidor", 8) != 0;
+}
+
+/* A screen's layout: the most common one among its backgrounds, with a note
+ * for each background that differs. NULL when it has none. */
+static const char* screen_layout(const XwauContext* ctx, const XwauScreen* screen, int* image_count) {
+	static const char* const names[] = { "wide", "fill", "classic" };
+	const char* keys[256];
+	const char* layouts[256];
+	int count = 0;
+	if (screen->medal_prefix) {
+		for (int i = 0; i < ctx->background_count && count < 256; ++i)
+			if (is_medal_view(ctx->backgrounds[i].key, screen->medal_prefix)) {
+				keys[count] = ctx->backgrounds[i].key;
+				layouts[count++] = ctx->backgrounds[i].layout;
+			}
+	} else {
+		for (int b = 0; b < 4 && screen->backgrounds[b]; ++b) {
+			keys[count] = screen->backgrounds[b];
+			layouts[count++] = background_layout(ctx, screen->backgrounds[b]);
+		}
+	}
+	*image_count = count;
+	if (count == 0)
+		return NULL;
+	int votes[3] = { 0 }, best = 0;
+	for (int i = 0; i < count; ++i)
+		for (int n = 0; n < 3; ++n)
+			votes[n] += strcmp(layouts[i], names[n]) == 0;
+	for (int n = 1; n < 3; ++n)
+		if (votes[n] > votes[best])
+			best = n;
+	for (int i = 0; i < count; ++i)
+		if (strcmp(layouts[i], names[best]) != 0)
+			fprintf(stderr, "  note: %s is %s, but its background %s is %s\n", screen->name, names[best], keys[i],
+					layouts[i]);
+	return names[best];
+}
+
+/* Writes the screens whose layout isn't the one they fall back to: a view
+ * falls back to its screen, and a screen to `default: wide`. */
+static void write_layouts(const XwauContext* ctx, FILE* fp) {
+	const char* layouts[SCREEN_COUNT];
+	int counts[SCREEN_COUNT];
+	for (size_t i = 0; i < SCREEN_COUNT; ++i)
+		layouts[i] = screen_layout(ctx, &k_screens[i], &counts[i]);
+	fprintf(fp, "# The layout of each screen: wide (the whole screen), fill (a background\n"
+				"# around the original screen's items), or classic (the original 4:3\n"
+				"# screen). Views such as family_room.rank fall back to their screen.\n"
+				"layouts:\n"
+				"  default: wide\n");
+	for (size_t i = 0; i < SCREEN_COUNT; ++i) {
+		const char* name = k_screens[i].name;
+		const char* dot = strchr(name, '.');
+		const char* fallback = "wide";
+		for (size_t j = 0; dot && j < SCREEN_COUNT; ++j)
+			if (strlen(k_screens[j].name) == (size_t)(dot - name) && strncmp(k_screens[j].name, name, (size_t)(dot - name)) == 0 &&
+				layouts[j])
+				fallback = layouts[j];
+		if (!layouts[i] || strcmp(layouts[i], fallback) == 0)
+			continue;
+		fprintf(fp, "  %s: %s  # ", name, layouts[i]);
+		if (k_screens[i].medal_prefix)
+			fprintf(fp, "%d images in medals/", counts[i]);
+		for (int b = 0; !k_screens[i].medal_prefix && b < counts[i]; ++b)
+			fprintf(fp, "%s%s", b ? ", " : "", k_screens[i].backgrounds[b]);
+		fprintf(fp, "\n");
+	}
+}
+
 static void write_frontend_yaml(XwauContext* ctx) {
 	char dir[1100], path[1200];
 	snprintf(dir, sizeof dir, "%s/frontend", ctx->opt->sprites->out_root);
@@ -1099,6 +1244,7 @@ static void write_frontend_yaml(XwauContext* ctx) {
 				"  fill_alpha: 0.7\n"
 				"  line_width: pixel\n"
 				"  grid_colours: [0xFF0000, 0xFF0000]\n");
+	write_layouts(ctx, fp);
 	if (fclose(fp) != 0)
 		ctx->stats->failures++;
 }
@@ -1127,13 +1273,14 @@ int BakeXwau_RunFrontend(const BakeXwauOptions* opt, BakeXwauStats* stats) {
 	read_ship_regions(&ctx, opt->xwau_root);
 	read_wide_list(&ctx, opt->xwau_root);
 
-	write_frontend_yaml(&ctx);
 	bake_frontres(&ctx);
 	bake_resdata(&ctx);
+	write_frontend_yaml(&ctx);
 
 	free(ctx.regions);
 	for (int i = 0; i < ctx.wide_key_count; ++i)
 		free(ctx.wide_keys[i]);
 	free(ctx.wide_keys);
+	free(ctx.backgrounds);
 	return stats->failures == 0;
 }

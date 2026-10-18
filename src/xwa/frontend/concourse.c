@@ -1,5 +1,6 @@
 #include "xwa/frontend/concourse.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -140,6 +141,12 @@ int Concourse_InitStarfield(void) {
 	int i;
 	int colorValue;
 	int starIndex;
+#ifdef XWA_MODERN
+	/* XWA_MODERN: when the background takes its geometry from an atlas, it
+	   draws nothing on the draw surface, so a mask from the mod folder says
+	   where the window is. */
+	const int useMask = FrontImage_ResourceHasGameGeometry("concourse");
+#endif
 
 	drawSurfacePitch = FrontendDisplay_GetDrawSurfacePitch();
 
@@ -167,7 +174,21 @@ int Concourse_InitStarfield(void) {
 
 		x = rand() % 640;
 		y = rand() % 100 + 25;
+#ifdef XWA_MODERN
+		{
+			int open = useMask ? XwaFrontendGeometry_StarfieldOpen(x, y) : -1;
+
+			if (open < 0) {
+				open = *(uint16_t*)&g_drawSurfacePtr[2 * x + drawSurfacePitch * y] == 0;
+			}
+			if (!open) {
+				continue;
+			}
+		}
+		{
+#else
 		if (*(uint16_t*)&g_drawSurfacePtr[2 * x + drawSurfacePitch * y] == 0) {
+#endif
 			g_concourseStarX[starIndex] = x;
 			g_concourseStarY[starIndex] = y;
 			colorIdx = rand() % 31;

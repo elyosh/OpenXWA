@@ -1,5 +1,6 @@
 #include "xwa/frontend/frontend_image.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -1021,6 +1022,7 @@ void FrontImage_FreeResourceByName(const char* name) {
 	}
 #ifdef XWA_MODERN
 	XwaSnapshot_NoteResourceFree(name);
+	XwaFrontendGeometry_ForgetDescriptor(g_resourceTable[index].desc);
 #endif
 
 	desc = g_resourceTable[index].desc;
@@ -2568,8 +2570,39 @@ int FrontImage_GetAtlasSpriteBounds(FrontendRect* out, int groupId, uint16_t ind
 	out->right = sprite->width - 1;
 	out->bottom = sprite->height - 1;
 	FrontendDraw_RectOffsetXY(out, (int)payload->anchorX, (int)payload->anchorY);
+#ifdef XWA_MODERN
+	{
+		/* XWA_MODERN: a frame of an atlas with game geometry can set bounds
+		   other than its rectangle, such as a tooltip area that is larger
+		   than the image. */
+		const XwaGeometryFrame* frame = XwaFrontendGeometry_FindFrame(XwaFrontendGeometry_FindGroup(groupId), index);
+
+		if (frame != NULL && frame->has_bounds) {
+			out->left = XwaFrontendGeometry_UnitX(frame->bounds[0]);
+			out->top = XwaFrontendGeometry_UnitY(frame->bounds[1]);
+			out->right = XwaFrontendGeometry_UnitX(frame->bounds[2]);
+			out->bottom = XwaFrontendGeometry_UnitY(frame->bounds[3]);
+		}
+	}
+#endif
 	return 1;
 }
+
+#ifdef XWA_MODERN
+int FrontImage_ResourceHasGameGeometry(const char* name) {
+	const int index = FrontImage_FindResourceByName(name);
+	const ResourceDescriptor* desc;
+
+	if (index == -1) {
+		return 0;
+	}
+	desc = g_resourceTable[index].desc;
+	if (desc->atlasBaseIndex != 0) {
+		return XwaFrontendGeometry_FindGroup(desc->atlasGroupId) != NULL;
+	}
+	return XwaFrontendGeometry_IsBuiltDescriptor(desc);
+}
+#endif
 
 #ifndef XWA_MODERN
 #pragma optimize("y", off)
@@ -4463,6 +4496,29 @@ int FrontImage_LoadCbmResource(const char* srcFile, const char* name) {
 	char fileName[FRONT_IMAGE_PATH_SIZE];
 	int i;
 
+#ifdef XWA_MODERN
+	/* XWA_MODERN: when the image's atlas in the mod folder has game geometry,
+	   the frame count, sizes and bounds come from the atlas, and the standard
+	   file isn't read. Both register functions call this function first, so
+	   the BMP and FLC decoders, FrontImage_ComputeImageBounds, the RLE
+	   compression and the CBM cache are skipped too. */
+	{
+		const XwaGeometryAtlas* atlas = XwaFrontendGeometry_FindFile(srcFile);
+
+		if (atlas != NULL) {
+			desc = XwaFrontendGeometry_BuildDescriptor(atlas);
+			if (desc == NULL) {
+				return 0;
+			}
+
+			memset(&entry, 0, sizeof(entry));
+			entry.desc = desc;
+			strncpy(entry.name, name, sizeof(entry.name));
+			FrontImage_InsertResourceSorted(&entry);
+			return 1;
+		}
+	}
+#endif
 	FrontImage_MakeCbmPath(srcFile, fileName, sizeof(fileName));
 	stream = FrontImage_OpenRead(AERON_VFS_ROOT_USER, fileName);
 	if (stream == NULL) {
