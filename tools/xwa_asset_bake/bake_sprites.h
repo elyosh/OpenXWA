@@ -4,10 +4,12 @@
 /* xwa_asset_bake — sprite bake pass (named .LST resources + DAT
  * atlas groups). See bake_sprites.c for the output layout. */
 
+#include "aeron/atlas_pack.h"
 #include "aeron/vfs.h"
 #include "ktx2_writer.h"
 
 #include <stdbool.h>
+#include <stdint.h>
 
 typedef struct BakeSpriteOptions {
 	const char*    out_root;     /* output directory root */
@@ -21,6 +23,13 @@ typedef struct BakeSpriteOptions {
 	bool           dat_only;     /* skip the frontres pass */
 } BakeSpriteOptions;
 
+typedef struct BakeFrame {
+	uint8_t* rgba; /* HD (or classic when !scale) straight-alpha */
+	int      w, h;
+	int      classic_w, classic_h;
+	int      origin_x, origin_y; /* classic units (DAT anchors) */
+} BakeFrame;
+
 typedef struct BakeStats {
 	int sprites;    /* single-frame outputs */
 	int atlases;    /* packed multi-frame atlases */
@@ -31,5 +40,15 @@ typedef struct BakeStats {
 
 /* Run both passes. Returns nonzero when no failure occurred. */
 int BakeSprites_Run(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeStats* stats);
+
+/* Helpers shared with the XWAU frontend import (bake_xwau.c). */
+int BakeSprites_MakeDirs(const char* path);
+/* Writes `base_path`.png and/or .ktx2 (BC7, sRGB, premultiplied) per `opt`. */
+int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba, int w,
+						  int h);
+/* Packs frames into pages of at most 8192 texels with an 8-texel gutter.
+ * `max_pages` 0 allows any number of pages. */
+int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
+						   AeronAtlasImage** out_images, AeronCpuAtlas* out);
 
 #endif /* XWA_BAKE_SPRITES_H */

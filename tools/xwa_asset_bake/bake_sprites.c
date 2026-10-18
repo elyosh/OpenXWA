@@ -45,7 +45,7 @@
 
 /* ---- small utilities ------------------------------------------------- */
 
-static int mkdir_p(const char* path) {
+int BakeSprites_MakeDirs(const char* path) {
 	char tmp[1024];
 	snprintf(tmp, sizeof tmp, "%s", path);
 	for (char* p = tmp + 1; *p; p++) {
@@ -68,13 +68,6 @@ static void lower_str(char* s) {
 	}
 }
 
-typedef struct BakeFrame {
-	uint8_t* rgba; /* HD (or classic when !scale) straight-alpha */
-	int      w, h;
-	int      classic_w, classic_h;
-	int      origin_x, origin_y; /* classic units (DAT anchors) */
-} BakeFrame;
-
 static void frames_free(BakeFrame* f, int n) {
 	for (int i = 0; i < n; i++) {
 		free(f[i].rgba);
@@ -83,7 +76,7 @@ static void frames_free(BakeFrame* f, int n) {
 }
 
 /* Write one RGBA image as PNG and/or KTX2 per options. */
-static int emit_image(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba,
+int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba,
 					  int w, int h) {
 	char path[1100];
 	char err[256];
@@ -106,7 +99,7 @@ static int emit_image(const BakeSpriteOptions* opt, const char* base_path, const
 	return ok;
 }
 
-static int build_atlas(const BakeFrame* frames, int count, int max_pages,
+int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
 					   AeronAtlasImage** out_images, AeronCpuAtlas* out) {
 	AeronAtlasImage* images = (AeronAtlasImage*)calloc((size_t)count, sizeof *images);
 	if (!images)
@@ -180,9 +173,9 @@ static void emit_frames(const BakeSpriteOptions* opt, const char* bundle_dir, co
 	if (n == 1 && !force_atlas) {
 		char dir[1040];
 		snprintf(dir, sizeof dir, "%s/sprites", bundle_dir);
-		mkdir_p(dir);
+		BakeSprites_MakeDirs(dir);
 		snprintf(base, sizeof base, "%s/%s", dir, name);
-		if (emit_image(opt, base, frames[0].rgba, frames[0].w, frames[0].h)) {
+		if (BakeSprites_EmitImage(opt, base, frames[0].rgba, frames[0].w, frames[0].h)) {
 			stats->sprites++;
 		} else {
 			stats->failures++;
@@ -192,12 +185,12 @@ static void emit_frames(const BakeSpriteOptions* opt, const char* bundle_dir, co
 
 	AeronCpuAtlas atlas = { 0 };
 	AeronAtlasImage* images = NULL;
-	if (build_atlas(frames, n, 1, &images, &atlas)) {
+	if (BakeSprites_BuildAtlas(frames, n, 1, &images, &atlas)) {
 		char dir[1040];
 		snprintf(dir, sizeof dir, "%s/atlas", bundle_dir);
-		mkdir_p(dir);
+		BakeSprites_MakeDirs(dir);
 		snprintf(base, sizeof base, "%s/%s", dir, name);
-		int ok = emit_image(opt, base, atlas.pages[0].rgba, atlas.pages[0].width, atlas.pages[0].height);
+		int ok = BakeSprites_EmitImage(opt, base, atlas.pages[0].rgba, atlas.pages[0].width, atlas.pages[0].height);
 		char yaml[1100];
 		snprintf(yaml, sizeof yaml, "%s.yaml", base);
 		const float inv_scale = opt->scale ? (1.0f / 4.5f) : 1.0f;
@@ -217,11 +210,11 @@ static void emit_frames(const BakeSpriteOptions* opt, const char* bundle_dir, co
 	/* Frames too large to pack (room FLICs) — one file per frame. */
 	char dir[1040];
 	snprintf(dir, sizeof dir, "%s/atlas/%s", bundle_dir, name);
-	mkdir_p(dir);
+	BakeSprites_MakeDirs(dir);
 	int ok = 1;
 	for (int i = 0; i < n; i++) {
 		snprintf(base, sizeof base, "%s/frame_%02d", dir, i);
-		ok &= emit_image(opt, base, frames[i].rgba, frames[i].w, frames[i].h);
+		ok &= BakeSprites_EmitImage(opt, base, frames[i].rgba, frames[i].w, frames[i].h);
 	}
 	if (ok) {
 		stats->frame_dirs++;
@@ -308,10 +301,10 @@ static void emit_group_atlas(const BakeSpriteOptions* opt, const char* resdata_d
 							 BakeStats* stats) {
 	char dir[1040];
 	snprintf(dir, sizeof dir, "%s/atlas", resdata_dir);
-	mkdir_p(dir);
+	BakeSprites_MakeDirs(dir);
 	AeronCpuAtlas atlas = { 0 };
 	AeronAtlasImage* images = NULL;
-	if (!build_atlas(frames, n, 0, &images, &atlas)) {
+	if (!BakeSprites_BuildAtlas(frames, n, 0, &images, &atlas)) {
 		fprintf(stderr, "bake: group %u could not be packed within the atlas cap\n", group);
 		stats->failures++;
 		return;
@@ -324,7 +317,7 @@ static void emit_group_atlas(const BakeSpriteOptions* opt, const char* resdata_d
 		} else {
 			snprintf(base, sizeof base, "%s/group_%u_p%d", dir, group, page);
 		}
-		ok &= emit_image(opt, base, atlas.pages[page].rgba, atlas.pages[page].width,
+		ok &= BakeSprites_EmitImage(opt, base, atlas.pages[page].rgba, atlas.pages[page].width,
 						 atlas.pages[page].height);
 	}
 	char yaml_path[1160];

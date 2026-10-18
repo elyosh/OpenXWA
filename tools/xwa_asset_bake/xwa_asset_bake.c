@@ -13,6 +13,7 @@
 #include "bake_fonts.h"
 #include "bake_flight_fonts.h"
 #include "bake_sprites.h"
+#include "bake_xwau.h"
 
 #include "aeron/vfs.h"
 
@@ -22,7 +23,7 @@
 
 static int usage(const char* argv0) {
 	fprintf(stderr,
-			"usage: %s [--assets <dir>] <sprites|fonts|flight-fonts> <out-root> [options]\n"
+			"usage: %s [--assets <dir>] <sprites|fonts|flight-fonts|xwau-frontend> <out-root> [options]\n"
 			"\n"
 			"  --assets <dir>   game data root (default: game_data)\n"
 			"\n"
@@ -47,7 +48,13 @@ static int usage(const char* argv0) {
 			"  --list <substr>  only bake frontres files whose dir/name\n"
 			"                   contains <substr>; skips the DAT pass\n"
 			"  --group <id>     only bake DAT sprite group <id>\n"
-			"  --dat-only       skip the frontres pass (resdata only)\n",
+			"  --dat-only       skip the frontres pass (resdata only)\n"
+			"\n"
+			"xwau-frontend: convert XWAU's frontend art into atlases that also give\n"
+			"  the game its frame counts, sizes and offsets, in design pixels of a\n"
+			"  2560x1440 screen. Files equal to the stock ones (--assets) are left to\n"
+			"  the sprites bake. Takes the sprites format and quality options.\n"
+			"  --xwau <dir>     the XWAU install (required)\n",
 			argv0);
 	return 2;
 }
@@ -64,6 +71,7 @@ int main(int argc, char** argv) {
 
 	const char* command      = NULL;
 	const char* ttf_path     = NULL;
+	const char* xwau_root    = NULL;
 	int         explicit_fmt = 0;
 
 	for (int i = 1; i < argc; i++) {
@@ -99,6 +107,8 @@ int main(int argc, char** argv) {
 			opt.dat_only = true;
 		} else if (strcmp(a, "--ttf") == 0 && i + 1 < argc) {
 			ttf_path = argv[++i];
+		} else if (strcmp(a, "--xwau") == 0 && i + 1 < argc) {
+			xwau_root = argv[++i];
 		} else if (a[0] == '-') {
 			fprintf(stderr, "unknown option: %s\n", a);
 			return usage(argv[0]);
@@ -113,12 +123,23 @@ int main(int argc, char** argv) {
 	const int cmd_sprites = command && strcmp(command, "sprites") == 0;
 	const int cmd_fonts   = command && strcmp(command, "fonts") == 0;
 	const int cmd_flight_fonts = command && strcmp(command, "flight-fonts") == 0;
-	if ((!cmd_sprites && !cmd_fonts && !cmd_flight_fonts) || !opt.out_root) {
+	const int cmd_xwau         = command && strcmp(command, "xwau-frontend") == 0;
+	if ((!cmd_sprites && !cmd_fonts && !cmd_flight_fonts && !cmd_xwau) || !opt.out_root ||
+		(cmd_xwau && !xwau_root)) {
 		return usage(argv[0]);
 	}
 	if (!explicit_fmt) {
 		opt.write_png  = true;
 		opt.write_ktx2 = true;
+	}
+	if (cmd_xwau) {
+		const BakeXwauOptions xopt = { .sprites = &opt, .xwau_root = xwau_root, .stock_root = asset_root };
+		BakeXwauStats         xstats;
+		const int             ok = BakeXwau_RunFrontend(&xopt, &xstats);
+		printf("bake done: %d atlases, %d HD frames, %d frames upscaled from standard images, "
+			   "%d files left to the stock bake, %d failures\n",
+			   xstats.atlases, xstats.hd_frames, xstats.sd_frames, xstats.unchanged, xstats.failures);
+		return ok ? 0 : 1;
 	}
 
 	AeronVfsConfig cfg;

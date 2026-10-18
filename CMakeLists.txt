@@ -475,8 +475,9 @@ if(XWA_BUILD_TOOLS)
         tools/xwa_asset_bake/bake_flight_fonts.c
         tools/xwa_asset_bake/bake_fonts.c
         tools/xwa_asset_bake/bake_sprites.c
+        tools/xwa_asset_bake/bake_xwau.c
     )
-    target_link_libraries(xwa_asset_bake PRIVATE xwa_2d_formats imgbake)
+    target_link_libraries(xwa_asset_bake PRIVATE xwa_2d_formats imgbake xwau_files)
 
     add_executable(imc_decode tools/imc_decode.c)
     target_link_libraries(imc_decode PRIVATE xwa_core)
