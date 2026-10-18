@@ -1,4 +1,7 @@
 #include "xwa/frontend/mission_debrief.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/concourse_layout.h"
+#endif
 
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/linez.h"
@@ -2432,7 +2435,16 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 				width = rect.right - rect.left + 1;
 				height = rect.bottom - rect.top + 1;
 				x = 152 - (width >> 1);
+#ifdef XWA_MODERN
+				/* XWA_MODERN: frontend/concourse/layout.yaml can move the award
+				   images by their centre, move their labels, or hide the labels
+				   (award_ceremony). The labels stay where the stock images put
+				   them, as in XWAU. */
+				XwaConcourseLayout_DrawSpriteCentered(g_frontendScratchBuffer, "award_ceremony.battle.images",
+													  1, 152, 360, width, height);
+#else
 				FrontImage_DrawSprite(g_frontendScratchBuffer, x, 360 - (height >> 1));
+#endif
 				FrontImage_AdvanceSpriteFrame(g_frontendScratchBuffer, 1);
 
 				strcpy(g_frontendScratchBuffer,
@@ -2442,15 +2454,28 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 				rect.top = 345;
 				rect.right = rect.left + textWidth + 30;
 				rect.bottom = 375;
+#ifdef XWA_MODERN
+				XwaConcourseLayout_MoveRect(&rect, "award_ceremony.battle.text_offsets", 1);
+				if (XwaConcourseLayout_Bool("award_ceremony.zoom_texts", 1)) {
+					FrontendDraw_FillRectTranslucent(&rect, 0, 0, g_awardCeremonyLabelFillColor);
+					FrontendText_DrawCentered(12, g_frontendScratchBuffer, &rect, g_colorLightBlue);
+				}
+#else
 				FrontendDraw_FillRectTranslucent(&rect, 0, 0, g_awardCeremonyLabelFillColor);
 				FrontendText_DrawCentered(12, g_frontendScratchBuffer, &rect, g_colorLightBlue);
+#endif
 
 				sprintf(g_frontendScratchBuffer, "lkalidorzoom%d", g_pilotData.kalidorCresent - 1);
 				FrontImage_GetResourceRect(g_frontendScratchBuffer, &rect);
 				width = rect.right - rect.left + 1;
 				height = rect.bottom - rect.top + 1;
 				x = 388 - (width >> 1);
+#ifdef XWA_MODERN
+				XwaConcourseLayout_DrawSpriteCentered(
+					g_frontendScratchBuffer, "award_ceremony.kalidor.images", 1, 388, 120, width, height);
+#else
 				FrontImage_DrawSprite(g_frontendScratchBuffer, x, 120 - (height >> 1));
+#endif
 				FrontImage_AdvanceSpriteFrame(g_frontendScratchBuffer, 1);
 
 				strcpy(g_frontendScratchBuffer,
@@ -2462,15 +2487,28 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 				rect.bottom = 135;
 				revealCount = g_awardCeremonyFrameCounter;
 				++g_awardCeremonyFrameCounter;
+#ifdef XWA_MODERN
+				XwaConcourseLayout_MoveRect(&rect, "award_ceremony.kalidor.text_offsets", 1);
+				if (XwaConcourseLayout_Bool("award_ceremony.zoom_texts", 1)) {
+					FrontendText_DrawCenteredReveal(12, g_frontendScratchBuffer, &rect, g_colorLightBlue,
+													revealCount);
+				}
+#else
 				FrontendText_DrawCenteredReveal(12, g_frontendScratchBuffer, &rect, g_colorLightBlue,
 												revealCount);
+#endif
 			} else {
 				if (awardId != 0) {
 					sprintf(g_frontendScratchBuffer, "lbattlezoom%d", awardId - 1);
 					FrontImage_GetResourceRect(g_frontendScratchBuffer, &rect);
 					width = rect.right - rect.left + 1;
 					height = rect.bottom - rect.top + 1;
+#ifdef XWA_MODERN
+					XwaConcourseLayout_DrawSpriteCentered(
+						g_frontendScratchBuffer, "award_ceremony.battle.images", 0, 320, 240, width, height);
+#else
 					FrontImage_DrawSprite(g_frontendScratchBuffer, 320 - (width >> 1), 240 - (height >> 1));
+#endif
 					FrontImage_AdvanceSpriteFrame(g_frontendScratchBuffer, 1);
 					awardNameString = (UIString)(STR_FAMILY_BATTLE_MEDAL1 + awardId - 1);
 				} else {
@@ -2478,7 +2516,12 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 					FrontImage_GetResourceRect(g_frontendScratchBuffer, &rect);
 					width = rect.right - rect.left + 1;
 					height = rect.bottom - rect.top + 1;
+#ifdef XWA_MODERN
+					XwaConcourseLayout_DrawSpriteCentered(
+						g_frontendScratchBuffer, "award_ceremony.kalidor.images", 0, 320, 240, width, height);
+#else
 					FrontImage_DrawSprite(g_frontendScratchBuffer, 320 - (width >> 1), 240 - (height >> 1));
+#endif
 					FrontImage_AdvanceSpriteFrame(g_frontendScratchBuffer, 1);
 					awardNameString = (UIString)(STR_FAMILY_KALIDOR1 + g_pilotData.kalidorCresent - 1);
 				}
@@ -2489,8 +2532,19 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 				rect.top = 400;
 				rect.right = rect.left + textWidth + 40;
 				rect.bottom = 440;
+#ifdef XWA_MODERN
+				XwaConcourseLayout_MoveRect(&rect,
+											awardId != 0 ? "award_ceremony.battle.text_offsets"
+														 : "award_ceremony.kalidor.text_offsets",
+											0);
+				if (XwaConcourseLayout_Bool("award_ceremony.zoom_texts", 1)) {
+					FrontendDraw_FillRectTranslucent(&rect, 0, 0, g_awardCeremonyLabelFillColor);
+					FrontendText_DrawCentered(15, g_frontendScratchBuffer, &rect, g_colorLightBlue);
+				}
+#else
 				FrontendDraw_FillRectTranslucent(&rect, 0, 0, g_awardCeremonyLabelFillColor);
 				FrontendText_DrawCentered(15, g_frontendScratchBuffer, &rect, g_colorLightBlue);
+#endif
 			}
 
 			if (!FrontendWaveStream_IsPlaying() && g_awardCeremonyFrameCounter > 240) {

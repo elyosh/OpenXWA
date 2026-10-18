@@ -1,4 +1,7 @@
 #include "xwa/frontend/frontend_dialog.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/concourse_layout.h"
+#endif
 
 #include "xwa/assets/string_table.h"
 #include "xwa/assets/ui_string.h"
@@ -229,7 +232,13 @@ int FrontendDialog_CreatePilotNameCallback(int frameState) {
 	string = FrontendString_Get(STR_CREATE_A_NEW_PILOT);
 	FrontendText_DrawCentered(15, string, &rect, 0xffff);
 
+#ifdef XWA_MODERN
+	/* XWA_MODERN: frontend/concourse/layout.yaml can move the name field
+	   (create_pilot.name_field, as [x, y, width, height]). */
+	XwaConcourseLayout_AssignRect(&rect, "create_pilot.name_field", 250, 245, 440, 265);
+#else
 	FrontendDraw_RectAssign(&rect, 250, 245, 440, 265);
+#endif
 	accepted = FrontendText_DrawEditableField(&rect, g_frontDialogText0, 13, 0, 12, "\\*$");
 
 	FrontendDraw_RectAssign(&rect, 250, 275, 440, 295);

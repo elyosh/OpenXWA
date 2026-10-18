@@ -190,6 +190,42 @@ static int read_key_int(const char* path, const char* key, int fallback) {
 	return value;
 }
 
+/* Reads `key = value` from the `[section]` of an ini file. */
+static int read_section_key_int(const char* path, const char* section, const char* key, int fallback) {
+	FILE* fp = fopen(path, "r");
+	if (!fp)
+		return fallback;
+	char line[512];
+	int value = fallback;
+	int inside = 0;
+	while (fgets(line, sizeof line, fp)) {
+		char* comment = strchr(line, ';');
+		if (comment)
+			*comment = '\0';
+		char* name = line;
+		while (isspace((unsigned char)*name))
+			++name;
+		if (*name == '[') {
+			char* close = strchr(name, ']');
+			if (close)
+				*close = '\0';
+			inside = strcasecmp(name + 1, section) == 0;
+			continue;
+		}
+		char* eq = strchr(name, '=');
+		if (!inside || !eq)
+			continue;
+		*eq = '\0';
+		char* end = name + strlen(name);
+		while (end > name && isspace((unsigned char)end[-1]))
+			*--end = '\0';
+		if (strcasecmp(name, key) == 0)
+			value = (int)strtol(eq + 1, NULL, 0);
+	}
+	fclose(fp);
+	return value;
+}
+
 /* The map icon rectangle of each craft type in SHIPLIST.TXT: the last four
  * numbers of a line. Lines are numbered and skipped as ShipList_Load does
  * (src/xwa/assets/ship_list.c): from 1, without `*` lines or lines whose
@@ -746,12 +782,22 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 				}
 			}
 			if (hd_dat && (icons || map_icons)) {
+				/* XWAU adds an icon's HD offset to its position on tinted draws
+				 * (NET/Main.cs FrontResDrawBlendColor). It moves the whole HD
+				 * image, which XWAU draws in place of the standard image's
+				 * bounds, back onto the button. Map icons are drawn without it. */
 				XwauDatImageInfo info;
 				if (XwauDat_GetImageInfo(hd_dat, h->anchor_x, h->sprite_id, &info) &&
-					(info.offset_x || info.offset_y))
-					printf("  note: frontres/%s/%s frame %d has HD offset %d, %d, which XWAU adds "
-						   "only on tinted draws\n",
-						   dir_lower, base_lower, i, info.offset_x, info.offset_y);
+					(info.offset_x || info.offset_y)) {
+					if (icons) {
+						f->offset[0] = info.offset_x * DESIGN_X;
+						f->offset[1] = info.offset_y * DESIGN_Y;
+					} else {
+						printf("  note: frontres/%s/%s frame %d has HD offset %d, %d, which XWAU doesn't "
+							   "add on map icon draws\n",
+							   dir_lower, base_lower, i, info.offset_x, info.offset_y);
+					}
+				}
 			}
 		} else {
 			f->rgba = sd.frames[i].rgba;
@@ -988,11 +1034,20 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 			}
 			if (group == 15001 && id == 3100)
 				write_starfield_mask(ctx, f->rgba, f->w, f->h);
-			if (group != 15900 &&
-				(hd_info.offset_x != sd_info.offset_x || hd_info.offset_y != sd_info.offset_y))
-				printf("  note: %d-%d: HD offset %g, %g, standard offset %d, %d; clicks follow the HD art\n",
-					   group, id, xwau_value(hd_info.offset_x), xwau_value(hd_info.offset_y),
-					   sd_info.offset_x, sd_info.offset_y);
+			/* XWAU draws an HD image at its HD offset, but the game keeps the
+			 * standard offset for the image's bounds, from which it places some
+			 * images (the side bars are right-aligned on them) and takes hit
+			 * areas. The bounds give the game the standard frame's rectangle,
+			 * as FrontImage_GetAtlasSpriteBounds builds it. In group 15900,
+			 * XWAU takes the areas from the HD images (NET/Main.cs:565-633). */
+			if (group != 15900 && !f->has_bounds &&
+				(hd_info.offset_x != sd_info.offset_x || hd_info.offset_y != sd_info.offset_y)) {
+				f->has_bounds = 1;
+				f->bounds[0] = sd_info.offset_x * DESIGN_X;
+				f->bounds[1] = sd_info.offset_y * DESIGN_Y;
+				f->bounds[2] = (sd_info.offset_x + (int)sd_info.width - 1) * DESIGN_X;
+				f->bounds[3] = (sd_info.offset_y + (int)sd_info.height - 1) * DESIGN_Y;
+			}
 		} else if (!upscale_standard(ctx, &f->rgba, &f->w, &f->h)) {
 			ok = 0;
 			break;
@@ -1114,6 +1169,199 @@ static void bake_resdata(XwauContext* ctx) {
 }
 
 /* ---- entry ----------------------------------------------------------------- */
+
+/* ---- room positions ------------------------------------------------------ */
+
+/* One ConcourseDoors.txt value as XWAU uses it: the file's value, else the
+ * hook's default (HC/concourse.cpp:1929-2030). A value above 8000 holds tenths
+ * of a unit. */
+static double door_value(const char* doors, const char* key, int fallback) {
+	const int v = doors[0] ? read_key_int(doors, key, fallback) : fallback;
+	return v > 8000 ? (v - 8000) / 10.0 : v;
+}
+
+static void write_design_point(FILE* fp, double x, double y) {
+	const double values[2] = { x * DESIGN_X, y * DESIGN_Y };
+	write_list(fp, values, 2);
+}
+
+static void write_design_rect(FILE* fp, double x, double y, double w, double h) {
+	const double values[4] = { x * DESIGN_X, y * DESIGN_Y, w * DESIGN_X, h * DESIGN_Y };
+	write_list(fp, values, 4);
+}
+
+/* frontend/concourse/layout.yaml: every position that XWAU moves, from
+ * ConcourseDoors.txt, MedalsPositions.txt, the [hook_concourse] settings and
+ * the squadron logo files, with XWAU's own value where a file doesn't set
+ * one. Keys equal to stock are written too: the game then does what XWAU
+ * does, such as starting Marko's hit box at his position. */
+static void write_layout_yaml(XwauContext* ctx) {
+	const char* root = ctx->opt->xwau_root;
+	char doors[1100] = "", hooks[1100] = "", medals[1100] = "";
+	if (!find_ci(root, "ConcourseDoors.txt", doors, sizeof doors))
+		doors[0] = '\0';
+	/* hook_concourse.cfg wins over Hooks.ini, as in XWAU. */
+	const char* hook_section = "hook_concourse";
+	if (find_ci(root, "hook_concourse.cfg", hooks, sizeof hooks))
+		hook_section = NULL;
+	else if (!find_ci(root, "Hooks.ini", hooks, sizeof hooks))
+		hooks[0] = '\0';
+#define HOOK_INT(key, fallback)                                                                              \
+	(!hooks[0]      ? (fallback)                                                                             \
+	 : hook_section ? read_section_key_int(hooks, hook_section, key, fallback)                               \
+					: read_key_int(hooks, key, fallback))
+#define DOOR(key, fallback) door_value(doors, key, fallback)
+
+	char dir[1100], path[1200];
+	snprintf(dir, sizeof dir, "%s/frontend/concourse", ctx->opt->sprites->out_root);
+	BakeSprites_MakeDirs(dir);
+	snprintf(path, sizeof path, "%s/layout.yaml", dir);
+	FILE* fp = fopen(path, "w");
+	if (!fp) {
+		ctx->stats->failures++;
+		return;
+	}
+	fprintf(fp, "# Made by xwa_asset_bake xwau-frontend from ConcourseDoors.txt, MedalsPositions.txt,\n"
+				"# the [hook_concourse] settings and the squadron logo files. Positions and sizes\n"
+				"# are in design pixels.\n"
+				"version: 1\n");
+	fprintf(fp, "starfield: %s\n", HOOK_INT("DrawStarfield", 1) ? "true" : "false");
+	fprintf(fp, "planet: {left: %.0f, right: %.0f, top: %.0f, bottom: %.0f}\n",
+			DOOR("planet_position_left", 0) * DESIGN_X, DOOR("planet_position_right", 640) * DESIGN_X,
+			DOOR("planet_position_top", 55) * DESIGN_Y, DOOR("planet_position_bottom", 125) * DESIGN_Y);
+	static const struct {
+		const char* yaml;
+		const char* x;
+		const char* y;
+		int dx, dy;
+	} k_doors[] = {
+		{ "tour", "tourdoor_posX", "tourdoor_posY", 231, 174 },
+		{ "marko", "mkanim_posX", "mkanim_posY", 110, 358 },
+		{ "training", "traindoor_posX", "traindoor_posY", 536, 174 },
+		{ "combat", "combatdoor_poxX", "combatdoor_poxY", 35, 174 },
+		{ "film", "filmdoor_posX", "filmdoor_posY", 536, 286 },
+		{ "tech", "techdoor_posX", "techdoor_posY", 426, 219 },
+	};
+	fprintf(fp, "doors:\n");
+	for (size_t i = 0; i < sizeof k_doors / sizeof k_doors[0]; ++i) {
+		fprintf(fp, "  %s: ", k_doors[i].yaml);
+		write_design_point(fp, DOOR(k_doors[i].x, k_doors[i].dx), DOOR(k_doors[i].y, k_doors[i].dy));
+		fprintf(fp, "\n");
+	}
+	fprintf(fp, "combat_room:\n  multiplayer: {door: ");
+	write_design_point(fp, DOOR("multidoor_posX", 24), DOOR("multidoor_posY", 140));
+	fprintf(fp, ", selection: ");
+	write_design_rect(fp, DOOR("multidoor_posSelectionX", 36), DOOR("multidoor_posSelectionY", 148),
+					  DOOR("multidoor_posSelectionWidth", 282), DOOR("multidoor_posSelectionHeight", 108));
+	fprintf(fp, "}\n  single_player: {door: ");
+	write_design_point(fp, DOOR("singledoor_posX", 373), DOOR("singledoor_posY", 313));
+	fprintf(fp, ", selection: ");
+	write_design_rect(fp, DOOR("singledoor_posSelectionX", 384), DOOR("singledoor_posSelectionY", 252),
+					  DOOR("singledoor_posSelectionWidth", 246), DOOR("singledoor_posSelectionHeight", 172));
+	fprintf(fp, "}\n  back_door: ");
+	write_design_point(fp, DOOR("combatbackdoor_posX", 299), DOOR("combatbackdoor_posY", 90));
+	fprintf(fp, "\nfamily_room:\n  back: ");
+	write_design_rect(
+		fp, DOOR("familyroom_backtoconcourse_posX", 0), DOOR("familyroom_backtoconcourse_posY", 150),
+		DOOR("familyroom_backtoconcourse_posWidth", 120), DOOR("familyroom_backtoconcourse_posHeight", 137));
+	fprintf(fp, "\n  statistics: ");
+	write_design_rect(fp, DOOR("familyroom_statistics_posX", 403), DOOR("familyroom_statistics_posY", 228),
+					  DOOR("familyroom_statistics_posWidth", 96),
+					  DOOR("familyroom_statistics_posHeight", 79));
+	fprintf(fp, "\n  play_mission: ");
+	write_design_rect(fp, DOOR("familyroom_playmission_posX", 103), DOOR("familyroom_playmission_posY", 288),
+					  DOOR("familyroom_playmission_posWidth", 131),
+					  DOOR("familyroom_playmission_posHeight", 128));
+	fprintf(fp, "\n  marko_eye: ");
+	write_design_point(fp, DOOR("familyroom_mkeye_posX", 160), DOOR("familyroom_mkeye_posY", 200));
+	fprintf(fp, "\n  monitor: ");
+	write_design_point(fp, DOOR("familyroom_monitor_posX", 426), DOOR("familyroom_monitor_posY", 243));
+	fprintf(fp, "\n  lady_blue_mission: %d\n  cologne_mission: %d\n",
+			doors[0] ? read_key_int(doors, "familyroom_ladyblue_mission", 23) : 23,
+			doors[0] ? read_key_int(doors, "familyroom_cologne_mission", 9) : 9);
+	/* XWAU always draws its own linear progress bar. */
+	fprintf(fp, "loading_screen:\n  item: {left: %.0f, right: %.0f, height: %.0f}\n  progress: linear\n",
+			DOOR("briefing_review_item_left", 64) * DESIGN_X,
+			DOOR("briefing_review_item_right", 573) * DESIGN_X,
+			DOOR("briefing_review_item_height", 41) * DESIGN_Y);
+	fprintf(fp, "mission_selection_x: %.0f\n", DOOR("mission_selection_screen_posX", 230) * DESIGN_X);
+
+	/* A squadron logo with a video and a position file (Resdata\Squad<N>.txt)
+	 * moves; its number in the mission is N + 3. */
+	int logos = 0;
+	for (int n = 1; n <= 99; ++n) {
+		char name[32], txt[1200], webm[1200];
+		snprintf(name, sizeof name, "Squad%d.txt", n);
+		if (!find_ci(ctx->resdata, name, txt, sizeof txt))
+			continue;
+		snprintf(name, sizeof name, "Squad%d.webm", n);
+		if (!find_ci(ctx->resdata, name, webm, sizeof webm) || read_key_int(txt, "Width", 0) == 0 ||
+			read_key_int(txt, "Height", 0) == 0)
+			continue;
+		fprintf(fp, logos++ ? ", " : "briefing:\n  squad_logos: {");
+		fprintf(fp, "%d: ", n + 3);
+		write_design_point(fp, read_key_int(txt, "PositionX", 0), read_key_int(txt, "PositionY", 0));
+	}
+	if (logos)
+		fprintf(fp, "}\n");
+
+	/* The fixed moves of XWAU's pilot creation and cutscene viewer hooks
+	 * (HC:5361-5395, 7958-7976). */
+	fprintf(fp, "create_pilot:\n  name_field: ");
+	write_design_rect(fp, 305, 260, 120, 20);
+	fprintf(fp, "\ncutscene_viewer:\n  scroll_bar_x: 0\n");
+
+	fprintf(fp, "medals:\n");
+	if (find_ci(root, "MedalsPositions.txt", medals, sizeof medals)) {
+		FILE* mp = fopen(medals, "r");
+		char line[256];
+		int count = 0;
+		fprintf(fp, "  positions: [");
+		while (mp && fgets(line, sizeof line, mp)) {
+			char* comma = strchr(line, ',');
+			if (!comma)
+				continue;
+			fprintf(fp, count++ ? ", " : "");
+			write_design_point(fp, (double)strtol(line, NULL, 0), (double)strtol(comma + 1, NULL, 0));
+		}
+		if (mp)
+			fclose(mp);
+		fprintf(fp, "]\n");
+	}
+	fprintf(fp, "  kalidor: ");
+	write_design_point(fp, HOOK_INT("KalidorCrescentPositionX", 224),
+					   HOOK_INT("KalidorCrescentPositionY", 168));
+	/* The award ceremony: images by their centre, texts as offsets from the
+	 * points where the stock game puts them. */
+	fprintf(fp, "\naward_ceremony:\n  zoom_texts: %s\n",
+			doors[0] && read_key_int(doors, "draw_medalzoom_texts", 1) == 0 ? "false" : "true");
+	fprintf(fp, "  battle: {images: [");
+	write_design_point(fp, DOOR("battlezoom_image1_posX", 320), DOOR("battlezoom_image1_posY", 240));
+	fprintf(fp, ", ");
+	write_design_point(fp, DOOR("battlezoom_image2_posX", 320), DOOR("battlezoom_image2_posY", 360));
+	fprintf(fp, "], text_offsets: [");
+	write_design_point(fp, DOOR("battlezoom_text1_posX", 300) - 300,
+					   DOOR("battlezoom_text1_posY", 340) - 400);
+	fprintf(fp, ", ");
+	write_design_point(fp, DOOR("battlezoom_text2_posX", 182) - 182,
+					   DOOR("battlezoom_text2_posY", 345) - 345);
+	fprintf(fp, "]}\n  kalidor: {images: [");
+	write_design_point(fp, DOOR("kalidorzoom_image1_posX", 320), DOOR("kalidorzoom_image1_posY", 240));
+	fprintf(fp, ", ");
+	write_design_point(fp, DOOR("kalidorzoom_image2_posX", 320), DOOR("kalidorzoom_image2_posY", 120));
+	fprintf(fp, "], text_offsets: [");
+	write_design_point(fp, DOOR("kalidorzoom_text1_posX", 300) - 300,
+					   DOOR("kalidorzoom_text1_posY", 340) - 400);
+	fprintf(fp, ", ");
+	/* XWAU moves this one from (72, 105) (HC: DrawKalidorZoomText2Hook). */
+	write_design_point(fp, DOOR("kalidorzoom_text2_posX", 182) - 72,
+					   DOOR("kalidorzoom_text2_posY", 105) - 105);
+	fprintf(fp, "]}\n");
+#undef HOOK_INT
+#undef DOOR
+	if (fclose(fp) != 0)
+		ctx->stats->failures++;
+}
 
 /* The screens and views of the layout table, and the backgrounds each one
  * shows, from the recovered code. The family room's memento and rank views
@@ -1280,6 +1528,7 @@ int BakeXwau_RunFrontend(const BakeXwauOptions* opt, BakeXwauStats* stats) {
 	bake_frontres(&ctx);
 	bake_resdata(&ctx);
 	write_frontend_yaml(&ctx);
+	write_layout_yaml(&ctx);
 
 	free(ctx.regions);
 	for (int i = 0; i < ctx.wide_key_count; ++i)

@@ -1,4 +1,7 @@
 #include "xwa/frontend/frontend_button.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/frontend_geometry.h"
+#endif
 
 #include "xwa/config/game_config.h"
 #include "xwa/frontend/frontend_cursor.h"
@@ -359,7 +362,7 @@ int FrontendButton_DrawSpriteWithHoverText(FrontendRect* buttonRect, char* upSpr
 	/* XWA_MODERN: when the up image takes its geometry from an atlas, the hit
 	   rectangle is the button's top left corner plus the size of the up
 	   image. */
-	if (FrontImage_ResourceHasGameGeometry(upSpriteName)) {
+	if (XwaFrontendGeometry_ResourceHasGeometry(upSpriteName)) {
 		FrontImage_GetResourceRect(upSpriteName, &sourceRect);
 		clippedRect.right = clippedRect.left + (sourceRect.right - sourceRect.left);
 		clippedRect.bottom = clippedRect.top + (sourceRect.bottom - sourceRect.top);

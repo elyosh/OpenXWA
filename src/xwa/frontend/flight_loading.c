@@ -1,4 +1,7 @@
 #include "xwa/frontend/flight_loading.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/concourse_layout.h"
+#endif
 
 #include "xwa/assets/string_table.h"
 #include "xwa/assets/ui_string.h"
@@ -50,6 +53,15 @@ int FlightLoading_DrawProgressScreen(int progressStep) {
 	int progressBarWidth;
 	FrontendRect rect;
 	int x;
+#ifdef XWA_MODERN
+	/* XWA_MODERN: frontend/concourse/layout.yaml can set the column of the
+	   briefing lines (loading_screen.item). The titles, the skirmish texts and
+	   the progress bar follow it, as XWAU places them. */
+	const int itemLeft = XwaConcourseLayout_Round(XwaConcourseLayout_X("loading_screen.item.left", 64.0f));
+	const int itemRight = XwaConcourseLayout_Round(XwaConcourseLayout_X("loading_screen.item.right", 573.0f));
+	const int itemHeight =
+		XwaConcourseLayout_Round(XwaConcourseLayout_Y("loading_screen.item.height", 41.0f));
+#endif
 
 	g_drawSurfacePtr = FrontendDisplay_LockBackBuffer();
 
@@ -89,7 +101,11 @@ int FlightLoading_DrawProgressScreen(int progressStep) {
 		int previousTextBlock;
 		int y;
 
+#ifdef XWA_MODERN
+		FrontendDraw_RectAssign(&rect, itemLeft + 1, 60, itemRight + 2, 75);
+#else
 		FrontendDraw_RectAssign(&rect, 65, 60, 575, 75);
+#endif
 		FrontendText_DrawCentered(15, FrontendString_Get(STR_LETS_GET_READY), &rect, g_colorPaleBlue);
 		BriefingScript_ResetState();
 		BriefingScript_AdvanceToNextVisibleLine();
@@ -98,7 +114,11 @@ int FlightLoading_DrawProgressScreen(int progressStep) {
 		for (y = 90; y < 426; y += 42) {
 			int textBlock;
 
+#ifdef XWA_MODERN
+			FrontendDraw_RectAssign(&rect, itemLeft, y, itemRight, y + itemHeight);
+#else
 			FrontendDraw_RectAssign(&rect, 64, y, 573, y + 41);
+#endif
 			FrontendText_Draw(10, "*", rect.left - 10, rect.top + 1, 0xffff);
 			FrontendText_DrawFormattedWrappedText(
 				&rect,
@@ -123,7 +143,11 @@ int FlightLoading_DrawProgressScreen(int progressStep) {
 	} else {
 		int textRowsUsed;
 
+#ifdef XWA_MODERN
+		FrontendDraw_RectAssign(&rect, itemLeft + 1, 60, itemRight + 2, 75);
+#else
 		FrontendDraw_RectAssign(&rect, 65, 60, 575, 75);
+#endif
 		if (g_combatSimSkirmishFileName[0]) {
 			FrontendText_DrawCentered(15, g_combatSimSkirmishFileName, &rect, g_colorPaleBlue);
 		} else {
@@ -146,7 +170,12 @@ int FlightLoading_DrawProgressScreen(int progressStep) {
 		if (g_gameConfig.goalType) {
 			sprintf(g_frontendScratchBuffer, "* %s - %s", FrontendString_Get(STR_GAME_ALL_TEAMS),
 					FrontendString_Get(STR_GAME_GOAL1));
+#ifdef XWA_MODERN
+			FrontendText_Draw(10, g_frontendScratchBuffer, itemLeft + 6, 14 * textRowsUsed + 130,
+							  g_colorLightBlue);
+#else
 			FrontendText_Draw(10, g_frontendScratchBuffer, 70, 14 * textRowsUsed + 130, g_colorLightBlue);
+#endif
 		} else {
 			int teamTextWidth;
 			int y;
@@ -157,15 +186,50 @@ int FlightLoading_DrawProgressScreen(int progressStep) {
 			y = 14 * textRowsUsed + 130;
 			for (teamIdx = 0; teamIdx < g_gameConfig.numberOfTeams; ++teamIdx) {
 				sprintf(g_frontendScratchBuffer, "*  %s %d  -  ", FrontendString_Get(STR_TEAM), teamIdx + 1);
+#ifdef XWA_MODERN
+				FrontendText_Draw(10, g_frontendScratchBuffer, itemLeft + 6, y, g_colorLightBlue);
+#else
 				FrontendText_Draw(10, g_frontendScratchBuffer, 70, y, g_colorLightBlue);
+#endif
+#ifdef XWA_MODERN
+				FrontendText_Draw(
+					10, FrontendString_Get((UIString)(g_gameConfig.teamGoals[teamIdx] + STR_GAME_GOAL1)),
+					teamTextWidth + itemLeft + 21, y, g_colorLightBlue);
+#else
 				FrontendText_Draw(
 					10, FrontendString_Get((UIString)(g_gameConfig.teamGoals[teamIdx] + STR_GAME_GOAL1)),
 					teamTextWidth + 85, y, g_colorLightBlue);
+#endif
 				y += 30;
 			}
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (XwaConcourseLayout_LinearProgress()) {
+		/* XWA_MODERN: `progress: linear` grows the bar evenly with the steps,
+		   across the item column, as XWAU draws it. */
+		const int barLength = (itemRight - itemLeft) * 8 / 10 - 14;
+
+		progressBarWidth = barLength * progressStep / 8;
+		for (x = 0; x < progressBarWidth; ++x) {
+			FrontImage_DrawSprite("sbarcenter", itemLeft + 6 + x, 75);
+		}
+		FrontImage_DrawSprite("sbarstart", itemLeft + 1, 75);
+		if (progressBarWidth > 0) {
+			FrontImage_DrawSprite("sbarspark", itemLeft + 6 + progressBarWidth, 75);
+		}
+	} else {
+		progressBarWidth = 495 / (9 - progressStep);
+		for (x = 0; x < progressBarWidth; ++x) {
+			FrontImage_DrawSprite("sbarcenter", x + 70, 75);
+		}
+		FrontImage_DrawSprite("sbarstart", 65, 75);
+		if (progressBarWidth > 0) {
+			FrontImage_DrawSprite("sbarspark", progressBarWidth + 70, 75);
+		}
+	}
+#else
 	progressBarWidth = 495 / (9 - progressStep);
 	for (x = 0; x < progressBarWidth; ++x) {
 		FrontImage_DrawSprite("sbarcenter", x + 70, 75);
@@ -174,6 +238,7 @@ int FlightLoading_DrawProgressScreen(int progressStep) {
 	if (progressBarWidth > 0) {
 		FrontImage_DrawSprite("sbarspark", progressBarWidth + 70, 75);
 	}
+#endif
 
 	FrontendDisplay_PresentFrame();
 	FrontendDisplay_UnlockBackBuffer();

@@ -4,9 +4,11 @@
 #include "aeron/config_file.h"
 #include "aeron/image.h"
 #include "aeron/log.h"
+#include "xwa/util/byte_order.h"
 #include "xwa/util/memory.h"
 
 #include <math.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -581,6 +583,109 @@ ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* 
 	}
 	g_geometryDescriptors[g_geometryDescriptorCount++] = desc;
 	return desc;
+}
+
+int XwaFrontendGeometry_ResourceHasGeometry(const char* name) {
+	const int index = FrontImage_FindResourceByName(name);
+	const ResourceDescriptor* desc;
+
+	if (index == -1) {
+		return 0;
+	}
+	desc = g_resourceTable[index].desc;
+	if (desc->atlasBaseIndex != 0) {
+		return XwaFrontendGeometry_FindGroup(desc->atlasGroupId) != NULL;
+	}
+	return XwaFrontendGeometry_IsBuiltDescriptor(desc);
+}
+
+/* The DAT group layout of sprite_resource.c: an index of 8-byte entries
+ * (a 16-bit id, then a 32-bit offset into the data), sorted by id, then the
+ * sprites, each an 18-byte header and its payload. */
+enum {
+	GEOMETRY_INDEX_ENTRY_SIZE = 8,
+	GEOMETRY_SPRITE_HEADER_SIZE = 18,
+	GEOMETRY_SPRITE_TYPE = 25,
+};
+
+static const XwaGeometryAtlas* g_geometrySortAtlas;
+
+static int geometry_compare_ids(const void* lhs, const void* rhs) {
+	const int a = g_geometrySortAtlas->frames[*(const int*)lhs].id;
+	const int b = g_geometrySortAtlas->frames[*(const int*)rhs].id;
+	return (a > b) - (a < b);
+}
+
+int XwaFrontendGeometry_BuildSpriteGroup(int16_t group_id, SpriteGroup* group,
+										 const XwaGeometryAtlas* atlas) {
+	int* order = (int*)malloc((size_t)atlas->frame_count * sizeof(*order));
+	int32_t data_size = 0;
+	uint32_t data_used = 0;
+	int count = 0;
+
+	if (order == NULL) {
+		return 0;
+	}
+	for (int i = 0; i < atlas->frame_count; ++i) {
+		const int height = XwaFrontendGeometry_UnitY(atlas->frames[i].size[1]);
+		order[i] = i;
+		data_size += GEOMETRY_SPRITE_HEADER_SIZE + (int32_t)sizeof(SpritePayload) + (height > 0 ? height : 1);
+	}
+	g_geometrySortAtlas = atlas;
+	qsort(order, (size_t)atlas->frame_count, sizeof(*order), geometry_compare_ids);
+
+	memset(group, 0, sizeof(*group));
+	group->indexSize = GEOMETRY_INDEX_ENTRY_SIZE * atlas->frame_count;
+	group->hGlobal = (unsigned char*)calloc(1, (size_t)group->indexSize + (size_t)data_size);
+	if (group->hGlobal == NULL) {
+		free(order);
+		group->groupId = -1;
+		Aeron_LogError("xwa.assets", "Failed to allocate sprite group %d (%d bytes)", group_id,
+					   group->indexSize + data_size);
+		return 0;
+	}
+	group->groupId = group_id;
+	group->dataSize = group->indexSize + data_size;
+	group->indexBase = group->hGlobal;
+	group->dataBase = group->hGlobal + group->indexSize;
+	for (int i = 0; i < atlas->frame_count; ++i) {
+		const XwaGeometryFrame* frame = &atlas->frames[order[i]];
+		const int width = XwaFrontendGeometry_UnitX(frame->size[0]);
+		const int height = XwaFrontendGeometry_UnitY(frame->size[1]);
+		const uint16_t rows = (uint16_t)(height > 0 ? height : 1);
+		const uint32_t payload_size = (uint32_t)sizeof(SpritePayload) + rows;
+		unsigned char* sprite = group->dataBase + data_used;
+		unsigned char* payload = sprite + GEOMETRY_SPRITE_HEADER_SIZE;
+		unsigned char* entry = group->indexBase + GEOMETRY_INDEX_ENTRY_SIZE * count;
+
+		if (count > 0 && frame->id == atlas->frames[order[i - 1]].id) {
+			continue; /* the first image of an id wins, as in the DATs */
+		}
+		ByteOrder_WriteU16Le(sprite, GEOMETRY_SPRITE_TYPE);
+		ByteOrder_WriteU16Le(sprite + 2, (uint16_t)(width > 0 ? width : 1));
+		ByteOrder_WriteU16Le(sprite + 4, rows);
+		ByteOrder_WriteU16Le(sprite + 10, (uint16_t)group_id);
+		ByteOrder_WriteU16Le(sprite + 12, (uint16_t)frame->id);
+		ByteOrder_WriteU32Le(sprite + 14, payload_size);
+		ByteOrder_WriteU32Le(payload + offsetof(SpritePayload, payloadSize), payload_size);
+		ByteOrder_WriteU32Le(payload + offsetof(SpritePayload, colorTable24Offset), sizeof(SpritePayload));
+		ByteOrder_WriteU32Le(payload + offsetof(SpritePayload, rowDataOffset), sizeof(SpritePayload));
+		ByteOrder_WriteU32Le(payload + offsetof(SpritePayload, palette16Offset), payload_size);
+		ByteOrder_WriteU32Le(payload + offsetof(SpritePayload, anchorX),
+							 (uint32_t)XwaFrontendGeometry_UnitX(frame->offset[0]));
+		ByteOrder_WriteU32Le(payload + offsetof(SpritePayload, anchorY),
+							 (uint32_t)XwaFrontendGeometry_UnitY(frame->offset[1]));
+		/* Each row after the payload header is a zero run count; calloc
+		   cleared them. */
+		ByteOrder_WriteU16Le(entry, (uint16_t)frame->id);
+		ByteOrder_WriteU32Le(entry + 2, data_used);
+		data_used += GEOMETRY_SPRITE_HEADER_SIZE + payload_size;
+		count++;
+	}
+	free(order);
+	group->spriteCount = (int16_t)count;
+	group->lockState = 2;
+	return 1;
 }
 
 int XwaFrontendGeometry_IsBuiltDescriptor(const ResourceDescriptor* desc) {

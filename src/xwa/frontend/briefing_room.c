@@ -1,4 +1,7 @@
 #include "xwa/frontend/briefing_room.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/concourse_layout.h"
+#endif
 
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/ship_list.h"
@@ -638,6 +641,20 @@ int BriefingRoom_Update(int frameCounter) {
 			}
 		}
 
+#ifdef XWA_MODERN
+		{
+			/* XWA_MODERN: frontend/concourse/layout.yaml can move a squadron
+			   logo, by the mission's logo number (briefing.squad_logos). The
+			   title and the order-of-battle list follow it, as in XWAU. */
+			float logoX;
+			float logoY;
+
+			if (XwaConcourseLayout_SquadLogo(g_frontendMission->header.briefingLogo, &logoX, &logoY)) {
+				g_briefingRoomSquadLogoX = XwaConcourseLayout_Round(logoX);
+				g_briefingRoomSquadLogoY = XwaConcourseLayout_Round(logoY);
+			}
+		}
+#endif
 		FrontImage_RegisterResourceDefault(g_frontendScratchBuffer, "squadlogo");
 		FrontImage_SetSpriteFrame("squadlogo", 0);
 		FrontendCursor_Hide();

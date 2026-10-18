@@ -1,5 +1,6 @@
 #include "xwa/frontend/concourse.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/frontend/concourse_layout.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
@@ -128,8 +129,26 @@ int Concourse_DrawPlanet(void) {
 
 	width = out.right - out.left + 1;
 	height = out.bottom - out.top + 1;
+#ifdef XWA_MODERN
+	{
+		/* XWA_MODERN: frontend/concourse/layout.yaml can set the range the
+		   planet's centre is picked from, in whole units, as XWAU uses it.
+		   When the range is empty, the planet sits at its left or top edge,
+		   and rand is still called, so the random sequence doesn't change. */
+		const int left = XwaConcourseLayout_Round(XwaConcourseLayout_X("planet.left", 0.0f));
+		const int right = XwaConcourseLayout_Round(XwaConcourseLayout_X("planet.right", 640.0f));
+		const int top = XwaConcourseLayout_Round(XwaConcourseLayout_Y("planet.top", 55.0f));
+		const int bottom = XwaConcourseLayout_Round(XwaConcourseLayout_Y("planet.bottom", 125.0f));
+
+		x = rand();
+		x = right > left ? left + x % (right - left) : left;
+		y = rand();
+		y = bottom > top ? top + y % (bottom - top) : top;
+	}
+#else
 	x = rand() % 640;
 	y = rand() % 70 + 55;
+#endif
 	FrontImage_DrawSprite("planet", x - (width >> 1), y - (height >> 1));
 	return 1;
 }
@@ -145,7 +164,7 @@ int Concourse_InitStarfield(void) {
 	/* XWA_MODERN: when the background takes its geometry from an atlas, it
 	   draws nothing on the draw surface, so a mask from the mod folder says
 	   where the window is. */
-	const int useMask = FrontImage_ResourceHasGameGeometry("concourse");
+	const int useMask = XwaFrontendGeometry_ResourceHasGeometry("concourse");
 #endif
 
 	drawSurfacePitch = FrontendDisplay_GetDrawSurfacePitch();
@@ -827,6 +846,21 @@ int Concourse_Update(int frameCounter) {
 		Concourse_PlayIdleVoice(frame);
 	}
 
+#ifdef XWA_MODERN
+	/* XWA_MODERN: frontend/concourse/layout.yaml can move the doors, which
+	   are then drawn at their exact position. `starfield: false` skips the
+	   draw; the stars are still set up above, so the random sequence doesn't
+	   change. */
+	if (XwaConcourseLayout_Bool("starfield", 1)) {
+		Concourse_DrawStarfield(frame);
+	}
+	XwaConcourseLayout_DrawSpriteOpaque("tourdoor", "doors.tour", 231, 174);
+	XwaConcourseLayout_DrawSprite("mkanim", "doors.marko", 110, 358);
+	XwaConcourseLayout_DrawSpriteOpaque("traindoor", "doors.training", 536, 174);
+	XwaConcourseLayout_DrawSpriteOpaque("combatdoor", "doors.combat", 35, 174);
+	XwaConcourseLayout_DrawSpriteOpaque("filmdoor", "doors.film", 536, 286);
+	XwaConcourseLayout_DrawSpriteOpaque("techdoor", "doors.tech", 426, 219);
+#else
 	Concourse_DrawStarfield(frame);
 	FrontImage_DrawSpriteOpaque("tourdoor", 231, 174);
 	FrontImage_DrawSprite("mkanim", 110, 358);
@@ -834,10 +868,15 @@ int Concourse_Update(int frameCounter) {
 	FrontImage_DrawSpriteOpaque("combatdoor", 35, 174);
 	FrontImage_DrawSpriteOpaque("filmdoor", 536, 286);
 	FrontImage_DrawSpriteOpaque("techdoor", 426, 219);
+#endif
 	FrontendCursor_GetPos(&outX, &outY);
 
 	FrontImage_GetResourceRect("traindoor", &rect);
+#ifdef XWA_MODERN
+	XwaConcourseLayout_OffsetRect(&rect, "doors.training", 536, 174);
+#else
 	FrontendDraw_RectOffsetXY(&rect, 536, 174);
+#endif
 	if (FrontendDraw_PointInRect(&rect, outX, outY)) {
 		if (!FrontImage_GetSpriteFrame("traindoor")) {
 			FrontendSound_PlayUISound("tourdooropen", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
@@ -870,7 +909,11 @@ int Concourse_Update(int frameCounter) {
 	}
 
 	FrontImage_GetResourceRect("combatdoor", &rect);
+#ifdef XWA_MODERN
+	XwaConcourseLayout_OffsetRect(&rect, "doors.combat", 35, 174);
+#else
 	FrontendDraw_RectOffsetXY(&rect, 35, 174);
+#endif
 	if (FrontendDraw_PointInRect(&rect, outX, outY)) {
 		if (!FrontImage_GetSpriteFrame("combatdoor")) {
 			FrontendSound_PlayUISound("tourdooropen", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
@@ -903,7 +946,11 @@ int Concourse_Update(int frameCounter) {
 	if (g_frontendMissionLoaded &&
 		g_frontendMission->header.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		FrontImage_GetResourceRect("tourdoor", &rect);
+#ifdef XWA_MODERN
+		XwaConcourseLayout_OffsetRect(&rect, "doors.tour", 231, 174);
+#else
 		FrontendDraw_RectOffsetXY(&rect, 231, 174);
+#endif
 		if (FrontendDraw_PointInRect(&rect, outX, outY)) {
 			if (!FrontImage_GetSpriteFrame("tourdoor")) {
 				FrontendSound_PlayUISound("tourdooropen", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
@@ -946,7 +993,22 @@ int Concourse_Update(int frameCounter) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	{
+		/* XWA_MODERN: with doors.marko in layout.yaml, Marko's hit box starts
+		   at his position, as XWAU has it. */
+		int markoX;
+		int markoY;
+
+		if (XwaConcourseLayout_HitPoint("doors.marko", &markoX, &markoY)) {
+			FrontendDraw_RectAssign(&rect, markoX, markoY, markoX + 110, markoY + 80);
+		} else {
+			FrontendDraw_RectAssign(&rect, 90, 328, 200, 408);
+		}
+	}
+#else
 	FrontendDraw_RectAssign(&rect, 90, 328, 200, 408);
+#endif
 	if (FrontendDraw_PointInRect(&rect, outX, outY)) {
 		if (!g_concourseMarkoHovered) {
 			if (!FrontendSound_GetPlayingCount("markovoice")) {
@@ -985,7 +1047,11 @@ int Concourse_Update(int frameCounter) {
 
 	if (g_filmFeatureEnabled) {
 		FrontImage_GetResourceRect("filmdoor", &rect);
+#ifdef XWA_MODERN
+		XwaConcourseLayout_OffsetRect(&rect, "doors.film", 536, 286);
+#else
 		FrontendDraw_RectOffsetXY(&rect, 536, 286);
+#endif
 		if (FrontendDraw_PointInRect(&rect, outX, outY)) {
 			if (!FrontImage_GetSpriteFrame("filmdoor")) {
 				FrontendSound_PlayUISound("tourdooropen", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
@@ -1021,7 +1087,11 @@ int Concourse_Update(int frameCounter) {
 	}
 
 	FrontImage_GetResourceRect("techdoor", &rect);
+#ifdef XWA_MODERN
+	XwaConcourseLayout_OffsetRect(&rect, "doors.tech", 426, 219);
+#else
 	FrontendDraw_RectOffsetXY(&rect, 426, 219);
+#endif
 	if (FrontendDraw_PointInRect(&rect, outX, outY)) {
 		if (FrontendMouse_GetLeftClick() || FrontendMouse_GetRightClick()) {
 			FrontendScreen_SetCallbacks(TechLibrary_Update, TechLibrary_Exit);

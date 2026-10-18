@@ -2588,22 +2588,6 @@ int FrontImage_GetAtlasSpriteBounds(FrontendRect* out, int groupId, uint16_t ind
 	return 1;
 }
 
-#ifdef XWA_MODERN
-int FrontImage_ResourceHasGameGeometry(const char* name) {
-	const int index = FrontImage_FindResourceByName(name);
-	const ResourceDescriptor* desc;
-
-	if (index == -1) {
-		return 0;
-	}
-	desc = g_resourceTable[index].desc;
-	if (desc->atlasBaseIndex != 0) {
-		return XwaFrontendGeometry_FindGroup(desc->atlasGroupId) != NULL;
-	}
-	return XwaFrontendGeometry_IsBuiltDescriptor(desc);
-}
-#endif
-
 #ifndef XWA_MODERN
 #pragma optimize("y", off)
 #endif

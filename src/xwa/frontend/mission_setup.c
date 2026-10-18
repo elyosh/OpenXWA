@@ -1,4 +1,7 @@
 #include "xwa/frontend/mission_setup.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/concourse_layout.h"
+#endif
 
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/linez.h"
@@ -2955,11 +2958,23 @@ int MissionSetup_DrawMissionDescriptionPanel(void) {
 	int lineCount;
 	FrontendRect rect;
 
+#ifdef XWA_MODERN
+	/* XWA_MODERN: frontend/concourse/layout.yaml can move the description
+	   panel of the Tour of Duty and melee missions (mission_selection_x). */
+	if (g_pilotData.missionDirectoryId == MISSION_DIRECTORY_TOUR) {
+		xOffset = XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection_x", 230.0f));
+	} else {
+		xOffset = g_pilotData.missionDirectoryId == MISSION_DIRECTORY_MELEE
+					  ? XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection_x", 230.0f))
+					  : 0;
+	}
+#else
 	if (g_pilotData.missionDirectoryId == MISSION_DIRECTORY_TOUR) {
 		xOffset = 230;
 	} else {
 		xOffset = g_pilotData.missionDirectoryId == MISSION_DIRECTORY_MELEE ? 230 : 0;
 	}
+#endif
 
 	FrontendDraw_RectAssign(&rect, xOffset + 70, 75, xOffset + 540, 348);
 	if (g_pilotData.missionDirectoryId != MISSION_DIRECTORY_MELEE) {

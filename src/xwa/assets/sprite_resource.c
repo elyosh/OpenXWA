@@ -648,80 +648,6 @@ void SpriteResource_FreeGroups(void) {
 #endif
 }
 
-#ifdef XWA_MODERN
-/* XWA_MODERN: builds a group from an atlas with game geometry. Each image
- * gets the id, size and offset of its atlas frame, and rows with no runs,
- * so it draws nothing in the classic layer. The DATs aren't read, so a mod
- * can also add a group that the game doesn't have. */
-static int16_t SpriteResource_LoadGeometryGroup(int16_t groupId, int freeIndex, const XwaGeometryAtlas* atlas) {
-	SpriteGroup* group = &g_spriteGroups[freeIndex];
-	int32_t indexSize = SPRITE_RESOURCE_INDEX_ENTRY_SIZE * atlas->frame_count;
-	int32_t dataSize = 0;
-	uint32_t dataUsed = 0;
-	int i;
-
-	for (i = 0; i < atlas->frame_count; ++i) {
-		const int height = XwaFrontendGeometry_UnitY(atlas->frames[i].size[1]);
-
-		dataSize += SPRITE_RESOURCE_SPRITE_HEADER_SIZE + (int32_t)sizeof(SpritePayload) + (height > 0 ? height : 1);
-	}
-
-	group->groupId = groupId;
-	group->spriteCount = 0;
-	group->indexSize = indexSize;
-	group->dataSize = indexSize + dataSize;
-	group->hGlobal = (unsigned char*)calloc(1, (size_t)indexSize + (size_t)dataSize);
-	if (group->hGlobal == NULL) {
-		SpriteResource_ResetGroup(group);
-		Aeron_LogError("xwa.assets", "Failed to allocate sprite group %d (%d bytes)", groupId,
-					   indexSize + dataSize);
-		return -1;
-	}
-
-	group->indexBase = group->hGlobal;
-	group->dataBase = group->hGlobal + indexSize;
-	for (i = 0; i < atlas->frame_count; ++i) {
-		const XwaGeometryFrame* frame = &atlas->frames[i];
-		const int width = XwaFrontendGeometry_UnitX(frame->size[0]);
-		const int height = XwaFrontendGeometry_UnitY(frame->size[1]);
-		const uint16_t rows = (uint16_t)(height > 0 ? height : 1);
-		const uint32_t payloadSize = (uint32_t)sizeof(SpritePayload) + rows;
-		unsigned char* sprite = group->dataBase + dataUsed;
-		unsigned char* payload = sprite + SPRITE_RESOURCE_SPRITE_HEADER_SIZE;
-		int duplicate;
-		int insertIndex;
-
-		insertIndex = SpriteResource_FindInsertIndex(group, (uint16_t)frame->id, &duplicate);
-		if (duplicate) {
-			continue;
-		}
-
-		ByteOrder_WriteU16Le(sprite + SPRITE_RESOURCE_SPRITE_TYPE_OFFSET, 25);
-		ByteOrder_WriteU16Le(sprite + SPRITE_RESOURCE_SPRITE_WIDTH_OFFSET, (uint16_t)(width > 0 ? width : 1));
-		ByteOrder_WriteU16Le(sprite + SPRITE_RESOURCE_SPRITE_HEIGHT_OFFSET, rows);
-		ByteOrder_WriteU16Le(sprite + SPRITE_RESOURCE_SPRITE_GROUP_ID_OFFSET, (uint16_t)groupId);
-		ByteOrder_WriteU16Le(sprite + SPRITE_RESOURCE_SPRITE_ID_OFFSET, (uint16_t)frame->id);
-		ByteOrder_WriteU32Le(sprite + SPRITE_RESOURCE_SPRITE_PIXEL_DATA_SIZE_OFFSET, payloadSize);
-		ByteOrder_WriteU32Le(payload, payloadSize);
-		ByteOrder_WriteU32Le(payload + SPRITE_RESOURCE_PAYLOAD_COLOR_TABLE_24_OFFSET_OFFSET, sizeof(SpritePayload));
-		ByteOrder_WriteU32Le(payload + SPRITE_RESOURCE_PAYLOAD_ROW_DATA_OFFSET_OFFSET, sizeof(SpritePayload));
-		ByteOrder_WriteU32Le(payload + SPRITE_RESOURCE_PAYLOAD_PALETTE16_OFFSET_OFFSET, payloadSize);
-		ByteOrder_WriteU32Le(payload + SPRITE_RESOURCE_PAYLOAD_ANCHOR_X_OFFSET,
-							 (uint32_t)XwaFrontendGeometry_UnitX(frame->offset[0]));
-		ByteOrder_WriteU32Le(payload + SPRITE_RESOURCE_PAYLOAD_ANCHOR_Y_OFFSET,
-							 (uint32_t)XwaFrontendGeometry_UnitY(frame->offset[1]));
-		/* The rows follow the payload header, each a zero run count; calloc
-		   already cleared them. */
-		SpriteResource_InsertIndexEntry(group, insertIndex, (uint16_t)frame->id, dataUsed);
-		dataUsed += SPRITE_RESOURCE_SPRITE_HEADER_SIZE + payloadSize;
-	}
-
-	group->lockState = 2;
-	XwaSnapshot_NoteSpriteGroupLoad(groupId);
-	return (int16_t)freeIndex;
-}
-#endif
-
 // FUNCTION: XWA 0x4CD6C0
 int16_t SpriteResource_LoadGroup(int16_t groupId) {
 #ifndef XWA_MODERN
@@ -1045,11 +971,17 @@ int16_t SpriteResource_LoadGroup(int16_t groupId) {
 	}
 
 	{
-		/* XWA_MODERN: a group with game geometry is built from its atlas. */
+		/* XWA_MODERN: a group whose atlas in the mod folder has game geometry
+		   is built from the atlas, and the DATs aren't read, so a mod can also
+		   add a group the game doesn't have. */
 		const XwaGeometryAtlas* atlas = XwaFrontendGeometry_FindGroup(groupId);
 
 		if (atlas != NULL) {
-			return SpriteResource_LoadGeometryGroup(groupId, freeIndex, atlas);
+			if (!XwaFrontendGeometry_BuildSpriteGroup(groupId, &g_spriteGroups[freeIndex], atlas)) {
+				return -1;
+			}
+			XwaSnapshot_NoteSpriteGroupLoad(groupId);
+			return (int16_t)freeIndex;
 		}
 	}
 

@@ -15,6 +15,7 @@
  * file). They are converted to the game's 640x480 units here, when the game
  * asks for them. Atlases are read once and kept, and so is a missing one. */
 
+#include "xwa/assets/sprite_resource.h"
 #include "xwa/frontend/frontend_image.h"
 
 #include <stdint.h>
@@ -103,6 +104,15 @@ void XwaFrontendGeometry_DesignSize(float* width, float* height);
  * whole image's bounds. Each frame's pixels are all index 0. Returns NULL
  * when memory runs out. */
 ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* atlas);
+/* Whether the loaded resource `name` takes its geometry from an atlas in the
+ * mod folder: a named image built from its atlas, or a DAT image whose group
+ * has one. */
+int XwaFrontendGeometry_ResourceHasGeometry(const char* name);
+/* Builds the DAT group `group_id` from its atlas in `group`, a free slot:
+ * each image gets the id, size and offset of its atlas frame, and rows with
+ * no runs, so it draws nothing in the classic layer. Returns 0 when memory
+ * runs out. */
+int XwaFrontendGeometry_BuildSpriteGroup(int16_t group_id, SpriteGroup* group, const XwaGeometryAtlas* atlas);
 /* Whether `desc` was built by XwaFrontendGeometry_BuildDescriptor and not
  * forgotten since. */
 int XwaFrontendGeometry_IsBuiltDescriptor(const ResourceDescriptor* desc);

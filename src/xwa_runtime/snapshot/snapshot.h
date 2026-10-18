@@ -146,6 +146,9 @@ typedef struct XwaDraw2D {
 	int16_t src_left, src_top, src_right, src_bottom;
 	/* Destination in frontend coords (640x480 frame). */
 	int16_t dst_x, dst_y;
+	/* The fraction of a unit the game's whole destination leaves out, in
+	 * 1/256 units, for items placed by frontend/concourse/layout.yaml. */
+	int16_t dst_frac_x, dst_frac_y;
 	uint32_t tint_color;        /* raw engine color arg (tinted kinds) */
 	uint32_t opaque_fill_color; /* palette entry 0 for FrontImage_DrawSpriteOpaque */
 	int32_t orientation_mode;   /* raw orientation arg (oriented kinds) */
@@ -1263,6 +1266,9 @@ void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, con
  * caller adds the payload anchor first — aeron atlas convention:
  * origins are baked into the draw position at emit time). */
 void XwaSnapshot_EmitAtlasSprite(int group_id, int index, int x, int y, int img_w, int img_h);
+/* The next sprite record is drawn `frac_x`, `frac_y` 1/256 units further,
+ * the part of an exact position that the game's whole units leave out. */
+void XwaSnapshot_SetNextSpriteFraction(int frac_x, int frac_y);
 
 /* Name -> source-file binding, recorded at resource registration
  * (FrontImage_RegisterResource* success). `fileName` is the engine's

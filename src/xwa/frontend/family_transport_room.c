@@ -1,4 +1,7 @@
 #include "xwa/frontend/family_transport_room.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/concourse_layout.h"
+#endif
 
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/linez.h"
@@ -262,7 +265,13 @@ static void FamilyTransportRoom_DrawNormalBackgroundLayer(void) {
 	unsigned int i;
 
 	FrontImage_DrawSpriteOpaque("background", 0, 0);
+#ifdef XWA_MODERN
+	/* XWA_MODERN: layout.yaml can choose the mission that unlocks the
+	   cologne and Lady Blue, and the award text they show. */
+	if (XwaConcourseLayout_Unlocked("family_room.cologne_mission", 9)) {
+#else
 	if (g_pilotData.tourOfDutyMissions[8].completedCount) {
+#endif
 		FrontImage_GetResourceRect("cologne", &rect);
 		FrontendButton_DrawSpriteAtOriginWithTooltip(&rect, "cologne", FrontendString_Get(STR_FAMILY_COLOGNE),
 													 12, g_colorLightBlue);
@@ -307,7 +316,11 @@ static void FamilyTransportRoom_DrawNormalBackgroundLayer(void) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (XwaConcourseLayout_Unlocked("family_room.lady_blue_mission", 23)) {
+#else
 	if (g_pilotData.tourOfDutyMissions[22].completedCount) {
+#endif
 		FrontImage_GetResourceRect("ladyblue", &rect);
 		FrontendButton_DrawSpriteAtOriginWithTooltip(
 			&rect, "ladyblue", FrontendString_Get(STR_FAMILY_LADY_BLUE), 12, g_colorLightBlue);
@@ -322,14 +335,30 @@ static void FamilyTransportRoom_DrawMedalCaseZoomLayer(void) {
 	for (i = 0; i < (unsigned int)g_medalCount; ++i) {
 		if (g_pilotData.tourOfDutyMissions[g_medalValues[i]].completedCount == 1) {
 			sprintf(buffer, "battlezoom%d", i);
+#ifdef XWA_MODERN
+			{
+				/* XWA_MODERN: layout.yaml can move the medals and the Kalidor
+				   crescent in the medal case. */
+				int x = g_familyMedalZoomOffsetX[i];
+				int y = g_familyMedalZoomOffsetY[i];
+
+				XwaConcourseLayout_MedalPosition(i, &x, &y);
+				FrontImage_DrawSprite(buffer, x, y);
+			}
+#else
 			FrontImage_DrawSprite(buffer, g_familyMedalZoomOffsetX[i], g_familyMedalZoomOffsetY[i]);
+#endif
 		}
 	}
 
 	for (i = 0; i < 6; ++i) {
 		if (g_pilotData.kalidorCresent > (int)i) {
 			sprintf(buffer, "kalidorzoom%d", i);
+#ifdef XWA_MODERN
+			XwaConcourseLayout_DrawSprite(buffer, "medals.kalidor", 224, 168);
+#else
 			FrontImage_DrawSprite(buffer, 224, 168);
+#endif
 		}
 	}
 }
@@ -640,7 +669,11 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 					g_colorLightBlue);
 			}
 
+#ifdef XWA_MODERN
+			if (XwaConcourseLayout_Unlocked("family_room.lady_blue_mission", 23)) {
+#else
 			if (g_pilotData.tourOfDutyMissions[22].completedCount) {
+#endif
 				FrontImage_GetResourceRect("ladyblue", &rect);
 				if (FrontendDraw_PointInRect(&rect, outX, outY)) {
 					hotspotActive = 1;
@@ -661,7 +694,12 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 					g_frontendFamilySelectedAwardTextIdx = 0;
 					for (awardTextIndex = 0; awardTextIndex < (unsigned int)g_frontendFamilyAwardTextCount;
 						 ++awardTextIndex) {
+#ifdef XWA_MODERN
+						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId ==
+							XwaConcourseLayout_UnlockMission("family_room.lady_blue_mission", 23)) {
+#else
 						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId == 23) {
+#endif
 							g_frontendFamilySelectedAwardTextIdx = (int)awardTextIndex;
 							break;
 						}
@@ -669,7 +707,11 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 				}
 			}
 
+#ifdef XWA_MODERN
+			if (XwaConcourseLayout_Unlocked("family_room.cologne_mission", 9)) {
+#else
 			if (g_pilotData.tourOfDutyMissions[8].completedCount) {
+#endif
 				FrontImage_GetResourceRect("cologne", &rect);
 				if (FrontendDraw_PointInRect(&rect, outX, outY)) {
 					hotspotActive = 1;
@@ -690,7 +732,12 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 					g_frontendFamilySelectedAwardTextIdx = 0;
 					for (awardTextIndex = 0; awardTextIndex < (unsigned int)g_frontendFamilyAwardTextCount;
 						 ++awardTextIndex) {
+#ifdef XWA_MODERN
+						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId ==
+							XwaConcourseLayout_UnlockMission("family_room.cologne_mission", 9)) {
+#else
 						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId == 9) {
+#endif
 							g_frontendFamilySelectedAwardTextIdx = (int)awardTextIndex;
 							break;
 						}
@@ -706,8 +753,18 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 					if (g_pilotData.tourOfDutyMissions[g_medalValues[medalIndex]].completedCount == 1) {
 						sprintf(buffer, "battlezoom%d", medalIndex);
 						FrontImage_GetResourceRect(buffer, &rect);
+#ifdef XWA_MODERN
+						{
+							int x = g_familyMedalZoomOffsetX[medalIndex];
+							int y = g_familyMedalZoomOffsetY[medalIndex];
+
+							XwaConcourseLayout_MedalPosition(medalIndex, &x, &y);
+							FrontendDraw_RectOffsetXY(&rect, x, y);
+						}
+#else
 						FrontendDraw_RectOffsetXY(&rect, g_familyMedalZoomOffsetX[medalIndex],
 												  g_familyMedalZoomOffsetY[medalIndex]);
+#endif
 						FrontendButton_DrawSpriteAtOriginWithTooltip(
 							&rect, g_emptyString,
 							FrontendString_Get((UIString)(medalIndex + STR_FAMILY_BATTLE_MEDAL1)), 12,
@@ -722,7 +779,11 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 				if ((unsigned int)g_pilotData.kalidorCresent > medalIndex) {
 					sprintf(buffer, "kalidorzoom%d", medalIndex);
 					FrontImage_GetResourceRect(buffer, &rect);
+#ifdef XWA_MODERN
+					XwaConcourseLayout_OffsetRect(&rect, "medals.kalidor", 224, 168);
+#else
 					FrontendDraw_RectOffsetXY(&rect, 224, 168);
+#endif
 					FrontendButton_DrawSpriteAtOriginWithTooltip(
 						&rect, g_emptyString,
 						FrontendString_Get((UIString)(g_pilotData.kalidorCresent + STR_FAMILY_KALIDOR1 - 1)),
@@ -879,10 +940,19 @@ int FrontendFamily_PlayEmkayVoiceLine(int allowMissionOrIdleLine) {
 int FrontendFamily_DrawEmailMonitor(int frameCounter) {
 	if (g_frontendFamilyHasNewEmail) {
 		FrontImage_SetSpriteFrame("emailmon", frameCounter % 20 / 4);
+#ifdef XWA_MODERN
+		/* XWA_MODERN: layout.yaml can move the monitor. */
+		XwaConcourseLayout_DrawSprite("emailmon", "family_room.monitor", 426, 243);
+#else
 		FrontImage_DrawSprite("emailmon", 426, 243);
+#endif
 	} else {
 		FrontImage_SetSpriteFrame("lightmon", frameCounter % 24 / 4);
+#ifdef XWA_MODERN
+		XwaConcourseLayout_DrawSprite("lightmon", "family_room.monitor", 426, 243);
+#else
 		FrontImage_DrawSprite("lightmon", 426, 243);
+#endif
 	}
 
 	return 1;
@@ -1999,7 +2069,13 @@ int FamilyTransportRoom_Update(int frameCounter) {
 		int isFamilyMission;
 
 		if (FrontendWaveStream_IsPlaying()) {
+#ifdef XWA_MODERN
+			/* XWA_MODERN: layout.yaml can move Marko's eye and the room's hit
+			   areas. */
+			XwaConcourseLayout_DrawSprite("mkeye", "family_room.marko_eye", 160, 200);
+#else
 			FrontImage_DrawSprite("mkeye", 160, 200);
+#endif
 			if (screenTick & 1) {
 				FrontImage_AdvanceSpriteFrame("mkeye", 1);
 			}
@@ -2020,7 +2096,11 @@ int FamilyTransportRoom_Update(int frameCounter) {
 
 		if (!trophyHotspotActive) {
 			if (isFamilyMission) {
+#ifdef XWA_MODERN
+				XwaConcourseLayout_AssignRect(&rect, "family_room.back", 0, 150, 120, 287);
+#else
 				FrontendDraw_RectAssign(&rect, 0, 150, 120, 287);
+#endif
 				if (FrontendDraw_PointInRect(&rect, outX, frameCounter)) {
 					FamilyTransportRoom_DrawHoverLabel(&rect, STR_CONCOURSE_COMBAT_SIMULATOR);
 					if (FrontendMouse_GetLeftClick() || FrontendMouse_GetRightClick()) {
@@ -2029,7 +2109,11 @@ int FamilyTransportRoom_Update(int frameCounter) {
 					}
 				}
 			} else {
+#ifdef XWA_MODERN
+				XwaConcourseLayout_AssignRect(&rect, "family_room.back", 0, 150, 120, 287);
+#else
 				FrontendDraw_RectAssign(&rect, 0, 150, 120, 287);
+#endif
 				if (FrontendDraw_PointInRect(&rect, outX, frameCounter)) {
 					FamilyTransportRoom_DrawHoverLabel(&rect, STR_FAMILY_BACK_TO_CALAMARI);
 					if (FrontendMouse_GetLeftClick() || FrontendMouse_GetRightClick()) {
@@ -2038,7 +2122,11 @@ int FamilyTransportRoom_Update(int frameCounter) {
 				}
 			}
 
+#ifdef XWA_MODERN
+			XwaConcourseLayout_AssignRect(&rect, "family_room.statistics", 403, 228, 499, 307);
+#else
 			FrontendDraw_RectAssign(&rect, 403, 228, 499, 307);
+#endif
 			if (FrontendDraw_PointInRect(&rect, outX, frameCounter)) {
 				FrontendCursor_SetImageResourceForCurrentTheme("cursor3", g_cursorBitmap);
 				FamilyTransportRoom_DrawHoverLabel(&rect, STR_STATISTICS);
@@ -2057,7 +2145,11 @@ int FamilyTransportRoom_Update(int frameCounter) {
 
 			if (g_frontendMissionLoaded &&
 				g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
+#ifdef XWA_MODERN
+				XwaConcourseLayout_AssignRect(&rect, "family_room.play_mission", 103, 288, 234, 416);
+#else
 				FrontendDraw_RectAssign(&rect, 103, 288, 234, 416);
+#endif
 				if (FrontendDraw_PointInRect(&rect, outX, frameCounter)) {
 					FamilyTransportRoom_DrawHoverLabel(&rect, STR_FAMILY_PLAY_MISSION);
 					if (FrontendMouse_GetLeftClick() || FrontendMouse_GetRightClick()) {

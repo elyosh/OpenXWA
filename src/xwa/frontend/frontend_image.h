@@ -106,11 +106,6 @@ int FrontImage_RegisterAtlasSprite(const char* name, uint16_t groupId, uint16_t 
 int FrontImage_CreateAtlasResource(const char* name, int groupId, int baseIndex, int frameCount,
 								   const FrontendRect* bounds);
 int FrontImage_GetAtlasSpriteBounds(FrontendRect* out, int groupId, uint16_t index);
-#ifdef XWA_MODERN
-/* Whether the resource `name` takes its geometry from an atlas in the mod
- * folder. */
-int FrontImage_ResourceHasGameGeometry(const char* name);
-#endif
 void FrontImage_BlitAtlasSprite(int16_t x, int16_t y);
 int FrontImage_UnloadAtlasSpriteGroups(void);
 int FrontImage_FreeAtlasResources(void);

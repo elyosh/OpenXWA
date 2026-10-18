@@ -34,6 +34,17 @@ XwaFrontendLayout XwaFrontendScreens_Layout(void);
  * screen, 1 elsewhere. */
 float XwaFrontendScreens_TextWidthScale(void);
 
+/* The text width scale in 1/256: 192 at 16:9 in a wide screen, else 256.
+ * On a wide screen a 640x480 unit is wider than it is tall, but text keeps
+ * its shape. So the text functions measure and advance text by the width it
+ * has on screen, and keep the fraction of a unit for the glyph records. Box
+ * sizes, centring and wrapping then fit the drawn text. With 256 the results
+ * are the original ones. */
+int XwaFrontendScreens_TextScale256(void);
+/* Advances a text position by `advance` units times `scale256` / 256.
+ * `*x_frac` keeps the fraction, in 1/256 units. */
+void XwaFrontendScreens_AdvanceText(int* x, int* x_frac, int advance, int scale256);
+
 void XwaFrontendScreens_Shutdown(void);
 
 #ifdef __cplusplus

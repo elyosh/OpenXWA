@@ -200,6 +200,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/config/modern_video_options.c
     src/xwa_runtime/config/modern_video_options_screen.c
     src/xwa_runtime/hooks/orientation_hook.c
+    src/xwa_runtime/frontend/concourse_layout.c
     src/xwa_runtime/frontend/frontend_geometry.c
     src/xwa_runtime/frontend/frontend_screens.c
     src/xwa_runtime/input/input_bridge.c
@@ -603,6 +604,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/runtime/flight_task.h
     src/xwa_runtime/runtime/frontend_task.h
     src/xwa_runtime/timing/host_clock.h
+    src/xwa_runtime/frontend/concourse_layout.h
     src/xwa_runtime/frontend/frontend_geometry.h
     src/xwa_runtime/frontend/frontend_screens.h
     src/xwa_runtime/input/input_bridge.h

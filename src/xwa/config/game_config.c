@@ -1,4 +1,7 @@
 #include "xwa/config/game_config.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/concourse_layout.h"
+#endif
 
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/linez.h"
@@ -2184,7 +2187,19 @@ int Config_CutsceneViewerScreen(void) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	{
+		/* XWA_MODERN: frontend/concourse/layout.yaml can move the cutscene
+		   viewer's scroll bar (cutscene_viewer.scroll_bar_x); it keeps its
+		   width. */
+		const int scrollLeft =
+			XwaConcourseLayout_Round(XwaConcourseLayout_X("cutscene_viewer.scroll_bar_x", 31.0f));
+
+		FrontendDraw_RectAssign(&rect, scrollLeft, 50, scrollLeft + 19, 430);
+	}
+#else
 	FrontendDraw_RectAssign(&rect, 31, 50, 50, 430);
+#endif
 	if ((unsigned int)g_cutsceneViewerPlayableRowCount > 5) {
 		g_cutsceneViewerScrollRow = FrontendScrollbar_Draw(
 			&rect, g_cutsceneViewerScrollRow, g_cutsceneViewerPlayableRowCount, 0, 5, g_colorNavy, 11);

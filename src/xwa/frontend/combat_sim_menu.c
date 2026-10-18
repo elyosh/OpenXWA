@@ -1,4 +1,7 @@
 #include "xwa/frontend/combat_sim_menu.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/concourse_layout.h"
+#endif
 
 #include "xwa/assets/string_table.h"
 #include "xwa/config/game_config.h"
@@ -101,7 +104,13 @@ int CombatSimMenu_Update(int frameCounter) {
 				} else {
 					FrontendScreen_SetCallbacks(MultiplayerSetup_Update, MultiplayerSetup_Exit);
 				}
+#ifdef XWA_MODERN
+				/* XWA_MODERN: frontend/concourse/layout.yaml can move the pod doors
+				   and their selection areas. */
+				XwaConcourseLayout_DrawSprite("multi", "combat_room.multiplayer.door", 24, 140);
+#else
 				FrontImage_DrawSprite("multi", 24, 140);
+#endif
 				return 0;
 
 			case COMBAT_SIM_MENU_PENDING_SINGLE_POD:
@@ -118,7 +127,11 @@ int CombatSimMenu_Update(int frameCounter) {
 				} else {
 					FrontendScreen_SetCallbacks(MissionSetup_Update, MissionSetup_Exit);
 				}
+#ifdef XWA_MODERN
+				XwaConcourseLayout_DrawSprite("single", "combat_room.single_player.door", 373, 313);
+#else
 				FrontImage_DrawSprite("single", 373, 313);
+#endif
 				return 0;
 
 			case COMBAT_SIM_MENU_PENDING_MULTIPLAYER:
@@ -160,7 +173,11 @@ int CombatSimMenu_Update(int frameCounter) {
 		}
 		FrontendText_DrawCentered(15, FrontendString_Get(STR_SINGLE_PLAYER), &rect, color);
 	} else {
+#ifdef XWA_MODERN
+		XwaConcourseLayout_AssignRect(&rect, "combat_room.single_player.selection", 384, 252, 630, 424);
+#else
 		FrontendDraw_RectAssign(&rect, 384, 252, 630, 424);
+#endif
 		if (FrontendDraw_PointInRect(&rect, mouseX, mouseY)) {
 			textWidth = FrontendText_MeasureWidth(FrontendString_Get(STR_SINGLE_PLAYER), 15);
 			rect.left = 300 - (textWidth >> 1);
@@ -202,7 +219,11 @@ int CombatSimMenu_Update(int frameCounter) {
 		}
 		FrontendText_DrawCentered(15, FrontendString_Get(STR_MULTIPLAYER), &rect, color);
 	} else {
+#ifdef XWA_MODERN
+		XwaConcourseLayout_AssignRect(&rect, "combat_room.multiplayer.selection", 36, 148, 318, 256);
+#else
 		FrontendDraw_RectAssign(&rect, 36, 148, 318, 256);
+#endif
 		if (FrontendDraw_PointInRect(&rect, mouseX, mouseY)) {
 			textWidth = FrontendText_MeasureWidth(FrontendString_Get(STR_MULTIPLAYER), 15);
 			rect.left = 300 - (textWidth >> 1);
@@ -263,7 +284,12 @@ int CombatSimMenu_Update(int frameCounter) {
 		}
 		FrontendText_DrawCentered(15, FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT), &rect, color);
 	} else {
+#ifdef XWA_MODERN
+		/* XWA_MODERN: the back door's hit area follows the door. */
+		XwaConcourseLayout_AssignMovedRect(&rect, "combat_room.back_door", 299, 90, 326, 22, 412, 148);
+#else
 		FrontendDraw_RectAssign(&rect, 326, 22, 412, 148);
+#endif
 		if (FrontendDraw_PointInRect(&rect, mouseX, mouseY)) {
 			if (FrontImage_GetSpriteFrame("doors") == 0) {
 				FrontendSound_PlayUISound("tourdooropen", 1, 0, 255, 8 * g_gameConfig.sfxDatapadVolume, 63);
@@ -281,7 +307,11 @@ int CombatSimMenu_Update(int frameCounter) {
 			rect.bottom = 440;
 
 			if (FrontImage_GetSpriteFrame("doors") != 0) {
+#ifdef XWA_MODERN
+				XwaConcourseLayout_DrawSprite("doors", "combat_room.back_door", 299, 90);
+#else
 				FrontImage_DrawSprite("doors", 299, 90);
+#endif
 			}
 			FrontendDraw_FillRectTranslucent(&rect, 0, 0, (unsigned int)g_combatSimMenuTranslucentFillColor);
 			FrontendText_DrawCentered(15, FrontendString_Get(STR_BACK_TO_CONCOURSE), &rect, 0xffff);
@@ -295,7 +325,11 @@ int CombatSimMenu_Update(int frameCounter) {
 			}
 			FrontImage_RewindSpriteFrame("doors", 0);
 			if (FrontImage_GetSpriteFrame("doors") != 0) {
+#ifdef XWA_MODERN
+				XwaConcourseLayout_DrawSprite("doors", "combat_room.back_door", 299, 90);
+#else
 				FrontImage_DrawSprite("doors", 299, 90);
+#endif
 			}
 		}
 	}

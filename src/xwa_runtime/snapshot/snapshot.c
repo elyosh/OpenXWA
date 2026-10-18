@@ -918,6 +918,22 @@ void XwaSnapshot_EmitSurfaceEvent(XwaSurfaceEventKind kind, int left, int top, i
 	XwaSnapshot_EmitSurfaceEventAux(kind, left, top, right, bottom, 0, 0);
 }
 
+static int16_t g_next_sprite_frac_x;
+static int16_t g_next_sprite_frac_y;
+
+void XwaSnapshot_SetNextSpriteFraction(int frac_x, int frac_y) {
+	g_next_sprite_frac_x = (int16_t)frac_x;
+	g_next_sprite_frac_y = (int16_t)frac_y;
+}
+
+/* Stamps the fraction set for this record, and clears it. */
+static void snapshot_take_sprite_fraction(XwaDraw2D* d) {
+	d->dst_frac_x = g_next_sprite_frac_x;
+	d->dst_frac_y = g_next_sprite_frac_y;
+	g_next_sprite_frac_x = 0;
+	g_next_sprite_frac_y = 0;
+}
+
 void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, const int16_t src_ltrb[4],
 							int dst_x, int dst_y, int img_w, int img_h, uint32_t tint_color,
 							uint32_t opaque_fill_color, int32_t orientation_mode) {
@@ -958,6 +974,7 @@ void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, con
 	d->frame = (int16_t)frame;
 	d->dst_x = (int16_t)dst_x;
 	d->dst_y = (int16_t)dst_y;
+	snapshot_take_sprite_fraction(d);
 	d->tint_color = tint_color;
 	d->opaque_fill_color = opaque_fill_color;
 	d->orientation_mode = orientation_mode;
@@ -981,6 +998,7 @@ void XwaSnapshot_EmitAtlasSprite(int group_id, int index, int x, int y, int img_
 	d->img_h = (int16_t)img_h;
 	d->dst_x = (int16_t)x;
 	d->dst_y = (int16_t)y;
+	snapshot_take_sprite_fraction(d);
 	stamp_clip(&d->clip_left, &d->clip_top, &d->clip_right, &d->clip_bottom);
 }
 

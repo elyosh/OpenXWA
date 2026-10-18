@@ -269,7 +269,8 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	 * game can: its offset and size in design pixels aren't rounded to
 	 * whole units. The game has already added the rounded offset of a DAT
 	 * image, so only the remainder is added to those. */
-	float dst_ux = (float)d->dst_x, dst_uy = (float)d->dst_y;
+	float dst_ux = (float)d->dst_x + (float)d->dst_frac_x / 256.0f;
+	float dst_uy = (float)d->dst_y + (float)d->dst_frac_y / 256.0f;
 	if (gframe) {
 		dst_ux += XwaFrontendGeometry_UnitsX(gframe->offset[0]);
 		dst_uy += XwaFrontendGeometry_UnitsY(gframe->offset[1]);
