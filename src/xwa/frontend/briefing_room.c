@@ -643,9 +643,9 @@ int BriefingRoom_Update(int frameCounter) {
 
 #ifdef XWA_MODERN
 		{
-			/* XWA_MODERN: frontend/concourse/layout.yaml can move a squadron
-			   logo, by the mission's logo number (briefing.squad_logos). The
-			   title and the order-of-battle list follow it, as in XWAU. */
+			/* XWA_MODERN: briefing.squad_logos in frontend/concourse/layout.yaml
+			   can move the squadron logo for each logo number. The title and the
+			   order-of-battle list move with it. */
 			float logoX;
 			float logoY;
 

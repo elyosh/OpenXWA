@@ -2436,10 +2436,10 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 				height = rect.bottom - rect.top + 1;
 				x = 152 - (width >> 1);
 #ifdef XWA_MODERN
-				/* XWA_MODERN: frontend/concourse/layout.yaml can move the award
-				   images by their centre, move their labels, or hide the labels
-				   (award_ceremony). The labels stay where the stock images put
-				   them, as in XWAU. */
+				/* XWA_MODERN: award_ceremony in frontend/concourse/layout.yaml can
+				   move the award images by their centre, move their labels and
+				   hide the labels. Moving an image doesn't move its label; labels
+				   only move by their own text offsets. */
 				XwaConcourseLayout_DrawSpriteCentered(g_frontendScratchBuffer, "award_ceremony.battle.images",
 													  1, 152, 360, width, height);
 #else

@@ -132,10 +132,10 @@ int Concourse_DrawPlanet(void) {
 	height = out.bottom - out.top + 1;
 #ifdef XWA_MODERN
 	{
-		/* XWA_MODERN: frontend/concourse/layout.yaml can set the range the
-		   planet's centre is picked from, in whole units, as XWAU uses it.
-		   When the range is empty, the planet sits at its left or top edge,
-		   and rand is still called, so the random sequence doesn't change. */
+		/* XWA_MODERN: frontend/concourse/layout.yaml can set the range for the
+		   planet's random centre, rounded to whole units. If a range is empty,
+		   the planet uses its left or top value. rand() is still called so the
+		   random sequence stays the same. */
 		const int left = XwaConcourseLayout_Round(XwaConcourseLayout_X("planet.left", 0.0f));
 		const int right = XwaConcourseLayout_Round(XwaConcourseLayout_X("planet.right", 640.0f));
 		const int top = XwaConcourseLayout_Round(XwaConcourseLayout_Y("planet.top", 55.0f));
@@ -162,9 +162,9 @@ int Concourse_InitStarfield(void) {
 	int colorValue;
 	int starIndex;
 #ifdef XWA_MODERN
-	/* XWA_MODERN: when the background takes its geometry from an atlas, it
-	   draws nothing on the draw surface, so a mask from the mod folder says
-	   where the window is. */
+	/* XWA_MODERN: a background with atlas geometry draws nothing on the draw
+	   surface, so its pixels can't show where the window is. A mask from the
+	   mod folder is used instead. */
 	const int useMask = XwaFrontendGeometry_ResourceHasGeometry("concourse");
 #endif
 
@@ -848,10 +848,9 @@ int Concourse_Update(int frameCounter) {
 	}
 
 #ifdef XWA_MODERN
-	/* XWA_MODERN: frontend/concourse/layout.yaml can move the doors, which
-	   are then drawn at their exact position. `starfield: false` skips the
-	   draw; the stars are still set up above, so the random sequence doesn't
-	   change. */
+	/* XWA_MODERN: frontend/concourse/layout.yaml can move the doors. Moved doors
+	   are drawn at their exact, unrounded position. `starfield: false` hides the
+	   stars. They are still set up, so the random sequence stays the same. */
 	if (XwaConcourseLayout_Bool("starfield", 1)) {
 		Concourse_DrawStarfield(frame);
 	}
@@ -861,8 +860,8 @@ int Concourse_Update(int frameCounter) {
 	XwaConcourseLayout_DrawSpriteOpaque("combatdoor", "doors.combat", 35, 174);
 	XwaConcourseLayout_DrawSpriteOpaque("filmdoor", "doors.film", 536, 286);
 	XwaConcourseLayout_DrawSpriteOpaque("techdoor", "doors.tech", 426, 219);
-	/* The animations of frontend/animations.yaml go over the doors and under
-	   the labels. */
+	/* Animations from frontend/animations.yaml are drawn over the doors and
+	   under the labels. */
 	XwaRoomAnims_Draw("concourse", frame);
 #else
 	Concourse_DrawStarfield(frame);
@@ -999,8 +998,8 @@ int Concourse_Update(int frameCounter) {
 
 #ifdef XWA_MODERN
 	{
-		/* XWA_MODERN: with doors.marko in layout.yaml, Marko's hit box starts
-		   at his position, as XWAU has it. */
+		/* XWA_MODERN: if layout.yaml sets doors.marko, Marko's hit box starts at
+		   his sprite position instead of 20 units left and 30 units above it. */
 		int markoX;
 		int markoY;
 
@@ -1124,7 +1123,7 @@ int Concourse_Exit(int frameCounter) {
 	(void)frameCounter;
 
 #ifdef XWA_MODERN
-	/* XWA_MODERN: stops the animations of frontend/animations.yaml. */
+	/* XWA_MODERN: stop the animations from frontend/animations.yaml. */
 	XwaRoomAnims_Leave("concourse");
 #endif
 	FrontendWaveStream_Shutdown();

@@ -384,8 +384,8 @@ void BriefingMap_DrawGrid(FrontendRect* viewportRect) {
 
 	FrontendDraw_RectCopy(&dst, viewportRect);
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer: the lines below are the grid, which a mod
-	   can draw in its own colours and thickness. */
+	/* Remaster snapshot observer: marks the lines below as the grid, so a mod
+	   can draw it with its own colours and line width. */
 	XwaSnapshot_BeginBriefingGrid((uint32_t)(uint16_t)g_briefingMapMajorGridColor);
 #endif
 

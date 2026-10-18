@@ -2572,9 +2572,8 @@ int FrontImage_GetAtlasSpriteBounds(FrontendRect* out, int groupId, uint16_t ind
 	FrontendDraw_RectOffsetXY(out, (int)payload->anchorX, (int)payload->anchorY);
 #ifdef XWA_MODERN
 	{
-		/* XWA_MODERN: a frame of an atlas with game geometry can set bounds
-		   other than its rectangle, such as a tooltip area that is larger
-		   than the image. */
+		/* XWA_MODERN: in an atlas with game geometry, a frame can set its own
+		   bounds, for example a tooltip area larger than the image. */
 		const XwaGeometryFrame* frame = XwaFrontendGeometry_FindFrame(XwaFrontendGeometry_FindGroup(groupId), index);
 
 		if (frame != NULL && frame->has_bounds) {
@@ -4481,11 +4480,11 @@ int FrontImage_LoadCbmResource(const char* srcFile, const char* name) {
 	int i;
 
 #ifdef XWA_MODERN
-	/* XWA_MODERN: when the image's atlas in the mod folder has game geometry,
-	   the frame count, sizes and bounds come from the atlas, and the standard
-	   file isn't read. Both register functions call this function first, so
-	   the BMP and FLC decoders, FrontImage_ComputeImageBounds, the RLE
-	   compression and the CBM cache are skipped too. */
+	/* XWA_MODERN: if the mod folder has an atlas with game geometry for this
+	   image, the frame count, sizes and bounds come from the atlas and the
+	   image file is not read. Both register functions call this function
+	   first, so the BMP and FLC decoders, FrontImage_ComputeImageBounds, the
+	   RLE compression and the CBM cache are skipped too. */
 	{
 		const XwaGeometryAtlas* atlas = XwaFrontendGeometry_FindFile(srcFile);
 

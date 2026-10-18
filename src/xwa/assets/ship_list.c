@@ -153,10 +153,10 @@ int ShipList_Load(void) {
 			g_shipList[g_shipCount].iconRect.bottom = atoi(token);
 #ifdef XWA_MODERN
 			{
-				/* XWA_MODERN: when the map icon sheets have game geometry, the
-				   rectangles come from the regions of their atlas, not from
-				   SHIPLIST.TXT. All sheets use the same rectangles, so they are
-				   read from the grey sheet. */
+				/* XWA_MODERN: if the map icon sheets have game geometry, the icon
+				   rectangles come from their atlas regions instead of SHIPLIST.TXT.
+				   All sheets share the same rectangles, so they are read from the
+				   grey sheet. */
 				const XwaGeometryRegion* region = XwaFrontendGeometry_FindRegion(
 					XwaFrontendGeometry_FindFile("frontres\\mapicons\\licons.bmp"), (int)i);
 

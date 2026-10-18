@@ -1,9 +1,9 @@
 #ifndef XWA_BAKE_XWAU_H
 #define XWA_BAKE_XWAU_H
 
-/* xwa_asset_bake xwau-frontend: converts XWAU's frontend art into atlases
- * that also give the game its frame counts, sizes and offsets. See
- * bake_xwau.c. */
+/* xwa_asset_bake xwau-frontend: converts XWAU's frontend art into atlases.
+ * The atlases also hold the frame counts, sizes and offsets that the game
+ * uses. See bake_xwau.c. */
 
 #include "bake_sprites.h"
 
@@ -17,7 +17,7 @@ typedef struct BakeXwauStats {
 	int atlases;   /* atlases written */
 	int hd_frames; /* frames taken from XWAU's HD images */
 	int sd_frames; /* frames upscaled from XWAU's standard images */
-	int unchanged; /* standard files equal to stock, without HD: left to the stock bake */
+	int unchanged; /* files that match stock and have no HD image; the stock bake handles them */
 	int failures;
 } BakeXwauStats;
 

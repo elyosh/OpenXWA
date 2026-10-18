@@ -2959,8 +2959,8 @@ int MissionSetup_DrawMissionDescriptionPanel(void) {
 	FrontendRect rect;
 
 #ifdef XWA_MODERN
-	/* XWA_MODERN: frontend/concourse/layout.yaml can move the description
-	   panel of the Tour of Duty and melee missions (mission_selection_x). */
+	/* XWA_MODERN: mission_selection_x in frontend/concourse/layout.yaml moves
+	   the description panel for Tour of Duty and melee missions. */
 	if (g_pilotData.missionDirectoryId == MISSION_DIRECTORY_TOUR) {
 		xOffset = XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection_x", 230.0f));
 	} else {

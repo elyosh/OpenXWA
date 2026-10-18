@@ -8,7 +8,9 @@
  */
 
 #include "xwa_runtime/snapshot/snapshot.h"
+#include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
+#include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
@@ -570,6 +572,9 @@ typedef struct XwaResourceBinding {
 	char source_file[XWA_SNAP_FRONTEND_SOURCE_MAX];
 	uint16_t frame_count;
 	uint8_t active;
+	/* The atlas whose video replaces the file, or NULL. The geometry module
+	   owns it until shutdown. */
+	const XwaGeometryAtlas* video;
 } XwaResourceBinding;
 
 static XwaResourceBinding g_bindings[XWA_SNAP_MAX_BINDINGS];
@@ -734,6 +739,11 @@ static void frontend_snapshot_group_add(XwaFrontendGroupAsset* groups, uint32_t*
 	groups[(*count)++].group = group;
 }
 
+static const XwaGeometryAtlas* binding_video(const char* fileName) {
+	const XwaGeometryAtlas* atlas = XwaFrontendGeometry_FindFile(fileName);
+	return atlas && atlas->video[0] ? atlas : NULL;
+}
+
 void XwaSnapshot_NoteResourceBinding(const char* fileName, const char* name, int frame_count) {
 	if (!fileName || !name || !fileName[0] || !name[0]) {
 		return;
@@ -750,6 +760,7 @@ void XwaSnapshot_NoteResourceBinding(const char* fileName, const char* name, int
 				snprintf(g_bindings[i].source_file, sizeof g_bindings[i].source_file, "%s", fileName);
 				g_bindings[i].frame_count = frames;
 				g_bindings[i].active = 1;
+				g_bindings[i].video = binding_video(fileName);
 			}
 			return;
 		}
@@ -769,6 +780,7 @@ void XwaSnapshot_NoteResourceBinding(const char* fileName, const char* name, int
 	snprintf(b->source_file, sizeof b->source_file, "%s", fileName);
 	b->frame_count = frames;
 	b->active = 1;
+	b->video = binding_video(fileName);
 }
 
 void XwaSnapshot_NoteResourceFree(const char* name) {
@@ -778,6 +790,9 @@ void XwaSnapshot_NoteResourceFree(const char* name) {
 	for (int i = 0; i < g_binding_count; i++) {
 		XwaResourceBinding* b = &g_bindings[i];
 		if (b->active && strncmp(b->name, name, sizeof b->name) == 0) {
+			if (b->video) {
+				XwaFrontendVideo_FreeImage(b->video->video);
+			}
 			b->active = 0;
 			return;
 		}
@@ -927,7 +942,7 @@ void XwaSnapshot_SetNextSpriteFraction(int frac_x, int frac_y) {
 	g_next_sprite_frac_y = (int16_t)frac_y;
 }
 
-/* Stamps the fraction set for this record, and clears it. */
+/* Copies the pending fraction into the record and clears it. */
 static void snapshot_take_sprite_fraction(XwaDraw2D* d) {
 	d->dst_frac_x = g_next_sprite_frac_x;
 	d->dst_frac_y = g_next_sprite_frac_y;
@@ -935,10 +950,29 @@ static void snapshot_take_sprite_fraction(XwaDraw2D* d) {
 	g_next_sprite_frac_y = 0;
 }
 
+/* Emits a video record in place of an image: at the image's position plus
+ * the video's offset, with the video's size. */
+static void snapshot_emit_image_video(const XwaGeometryAtlas* video, int dst_x, int dst_y) {
+	const XwaGeometryFrame* frame = &video->frames[0];
+	const float x =
+		(float)dst_x + (float)g_next_sprite_frac_x / 256.0f + XwaFrontendGeometry_UnitsX(frame->offset[0]);
+	const float y =
+		(float)dst_y + (float)g_next_sprite_frac_y / 256.0f + XwaFrontendGeometry_UnitsY(frame->offset[1]);
+	g_next_sprite_frac_x = 0;
+	g_next_sprite_frac_y = 0;
+	XwaFrontendVideo_DrawImage(video->video, video->fps, x, y, XwaFrontendGeometry_UnitsX(frame->size[0]),
+							   XwaFrontendGeometry_UnitsY(frame->size[1]));
+}
+
 void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, const int16_t src_ltrb[4],
 							int dst_x, int dst_y, int img_w, int img_h, uint32_t tint_color,
 							uint32_t opaque_fill_color, int32_t orientation_mode) {
 	XwaSnapshot* s = wr();
+	const XwaResourceBinding* binding = name ? binding_lookup(name) : NULL;
+	if (binding && binding->video) {
+		snapshot_emit_image_video(binding->video, dst_x, dst_y);
+		return;
+	}
 	if (s->draw_2d_count >= XWA_SNAP_MAX_DRAWS_2D) {
 		s->dropped_records++;
 		return;
@@ -956,7 +990,6 @@ void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, con
 		memcpy(d->name, name, n);
 		/* Stamp the name's CURRENT file binding — resolving at emit
 		 * time (not consume time) keeps same-tick rebinds correct. */
-		const XwaResourceBinding* binding = binding_lookup(name);
 		if (binding) {
 			memcpy(d->file, binding->file, sizeof d->file);
 			snprintf(d->source_file, sizeof d->source_file, "%s", binding->source_file);

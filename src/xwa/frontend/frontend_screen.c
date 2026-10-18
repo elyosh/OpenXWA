@@ -413,7 +413,8 @@ int FrontendScreen_RunFrame(void) {
 	exitFn = state->exitFn;
 	g_frontendScreenRunFrameActive = 1;
 #ifdef XWA_MODERN
-	/* The screen that runs sets the layout of this tick's frontend frame. */
+	/* XWA_MODERN: the screen that runs this tick sets the frontend frame's
+	   layout. */
 	XwaFrontendScreens_NoteRun();
 #endif
 	result = state->updateFn(g_frameCounter);

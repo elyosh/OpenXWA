@@ -50,10 +50,10 @@ static int usage(const char* argv0) {
 			"  --group <id>     only bake DAT sprite group <id>\n"
 			"  --dat-only       skip the frontres pass (resdata only)\n"
 			"\n"
-			"xwau-frontend: convert XWAU's frontend art into atlases that also give\n"
-			"  the game its frame counts, sizes and offsets, in design pixels of a\n"
-			"  2560x1440 screen. Files equal to the stock ones (--assets) are left to\n"
-			"  the sprites bake. Takes the sprites format and quality options.\n"
+			"xwau-frontend: convert XWAU's frontend art into atlases, with frame\n"
+			"  counts, sizes and offsets in design pixels of a 2560x1440 screen.\n"
+			"  Files that match the stock ones (--assets) are left to the sprites\n"
+			"  bake. Uses the same format and quality options as sprites.\n"
 			"  --xwau <dir>     the XWAU install (required)\n",
 			argv0);
 	return 2;

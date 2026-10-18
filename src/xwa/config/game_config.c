@@ -2189,9 +2189,8 @@ int Config_CutsceneViewerScreen(void) {
 
 #ifdef XWA_MODERN
 	{
-		/* XWA_MODERN: frontend/concourse/layout.yaml can move the cutscene
-		   viewer's scroll bar (cutscene_viewer.scroll_bar_x); it keeps its
-		   width. */
+		/* XWA_MODERN: cutscene_viewer.scroll_bar_x in frontend/concourse/layout.yaml
+		   moves the cutscene viewer's scroll bar. Its width stays the same. */
 		const int scrollLeft =
 			XwaConcourseLayout_Round(XwaConcourseLayout_X("cutscene_viewer.scroll_bar_x", 31.0f));
 

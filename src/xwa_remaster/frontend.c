@@ -53,9 +53,9 @@
 typedef struct RmSaveSlot {
 	AeronRenderTarget* rt;
 	int16_t left, top, right, bottom;
-	/* The saved pixels' place in the targets. The mapping can change before
-	 * the restore (a fill datapad over a wide room), so the restore puts the
-	 * pixels back where they were taken, not where the units map now. */
+	/* Where the saved pixels are in the targets. The mapping can change before
+	 * the restore (for example a fill datapad over a wide room), so the restore
+	 * puts the pixels back where they were saved, not where the units map now. */
 	int px_x, px_y, px_w, px_h;
 } RmSaveSlot;
 
@@ -79,9 +79,9 @@ typedef struct RmState {
 	int rt_width;
 	int rt_height;
 	/* How 640x480 units map to target pixels: x * map_sx + map_ox across and
-	 * y * map_sy down. The targets have the design screen's shape; a wide
-	 * screen spreads the units over all of it, the other layouts keep them
-	 * in its middle 4:3 area. */
+	 * y * map_sy down. The targets have the design screen's shape. A wide
+	 * screen spreads the units over the whole target; the other layouts keep
+	 * them in a centered 4:3 area. */
 	XwaFrontendLayout layout;
 	float map_sx, map_sy, map_ox;
 	XwaSceneKind last_scene;
@@ -94,7 +94,7 @@ typedef struct RmState {
 	AeronRenderTarget* retired_targets[RM_RETIRED_TARGET_CAP];
 	int retired_target_count;
 	XwaRemasterAssets* assets; /* borrowed per Render call */
-	double time_s;             /* the snapshot's host clock, for images shown by time */
+	double time_s;             /* the snapshot's host clock in seconds, for timed images */
 	/* Per-tick PiP results (rendered in rm_prepare_model_previews,
 	 * composited by the z-merge; NULL = not rendered: no HD mesh, or the
 	 * render failed). */
@@ -164,9 +164,8 @@ static int rm_x_edge(int c) { return (int)lroundf(rm_px((float)c)); }
 
 static int rm_y_edge(int c) { return (int)lroundf((float)c * g.map_sy); }
 
-/* Inclusive 640x480 clip rect -> RT-pixel scissor. A full-screen clip is no
- * scissor on a wide screen, and the 4:3 area on the others, as XWAU clips
- * them. */
+/* Inclusive 640x480 clip rect -> RT-pixel scissor. A full-screen clip gives
+ * no scissor on a wide screen, and the centered 4:3 area on other layouts. */
 static AeronRectI rm_scissor(int16_t l, int16_t t, int16_t r, int16_t b) {
 	AeronRectI rect = { 0, 0, 0, 0 };
 	if (l <= 0 && t <= 0 && r >= 639 && b >= 479) {
@@ -182,9 +181,9 @@ static AeronRectI rm_scissor(int16_t l, int16_t t, int16_t r, int16_t b) {
 	return rect;
 }
 
-/* The atlas with game geometry behind a record and the frame drawn, or
- * NULL. A named image whose atlas has an `fps` shows its frames by time,
- * whatever frame the game is on; `*frame_index` is then that frame. */
+/* Returns the atlas that sets a record's game geometry, or NULL, and the
+ * frame to draw. If a named image's atlas has an `fps`, the frame comes from
+ * the clock instead of the game, and `*frame_index` is set to it. */
 static const XwaGeometryAtlas* rm_record_geometry(const XwaDraw2D* d, const XwaGeometryFrame** frame,
 												  int* frame_index) {
 	const XwaGeometryAtlas* atlas;
@@ -205,10 +204,10 @@ static const XwaGeometryAtlas* rm_record_geometry(const XwaDraw2D* d, const XwaG
 	return atlas;
 }
 
-/* Whether an engine colour is one of the highlights that tinted icons keep
- * with `tint: highlights`: light blue, yellow and green (g_colorLightBlue,
- * g_colorYellow, g_colorGreen). The engine colour is 16-bit, so the test
- * allows its rounding. */
+/* Returns whether an engine colour is a highlight colour that tinted icons
+ * keep with `tint: highlights`: light blue, yellow or green (g_colorLightBlue,
+ * g_colorYellow, g_colorGreen). Engine colours are 16-bit, so the test allows
+ * for rounding. */
 static int rm_is_highlight_tint(uint32_t engine_color) {
 	static const uint8_t highlights[3][3] = { { 0x60, 0x80, 0xff }, { 0xff, 0xff, 0x00 }, { 0x00, 0xff, 0x00 } };
 	uint8_t rgba[4];
@@ -221,8 +220,8 @@ static int rm_is_highlight_tint(uint32_t engine_color) {
 	return 0;
 }
 
-/* A video record: the slot's current frame, stretched over the record's
- * rectangle. */
+/* Draws a video record: the slot's current frame, stretched over the
+ * record's rectangle. */
 static void rm_add_video(AeronDrawList2D* list, const XwaDraw2D* d) {
 	if (d->video_slot < 0 || d->video_slot >= XWA_FRONTEND_VIDEO_SLOTS || !g.video_tex[d->video_slot])
 		return;
@@ -292,10 +291,10 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	 * hand-authored replacement of any size maps identically. */
 	float su0 = ref.u0, sv0 = ref.v0, su1 = ref.u1, sv1 = ref.v1;
 	float dst_cw = (float)d->img_w, dst_ch = (float)d->img_h;
-	/* An atlas with game geometry places the image more exactly than the
-	 * game can: its offset and size in design pixels aren't rounded to
-	 * whole units. The game has already added the rounded offset of a DAT
-	 * image, so only the remainder is added to those. */
+	/* An atlas with game geometry gives the offset and size in design pixels,
+	 * so the image is placed more exactly than the game's whole units allow.
+	 * For a DAT image the game has already added the rounded offset, so only
+	 * the remainder is added. */
 	float dst_ux = (float)d->dst_x + (float)d->dst_frac_x / 256.0f;
 	float dst_uy = (float)d->dst_y + (float)d->dst_frac_y / 256.0f;
 	if (gframe) {
@@ -310,9 +309,9 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 			dst_ch = XwaFrontendGeometry_UnitsY(gframe->size[1]);
 		}
 	}
-	/* A tinted icon whose atlas keeps its aspect by width, as XWAU draws its
-	 * HD icons: the game's width, the height from the image's shape, one
-	 * unit higher, and the whole image. */
+	/* A tinted icon whose atlas keeps the aspect ratio by width is drawn
+	 * whole, at the game's width, with the height from the image's aspect
+	 * ratio, and one unit higher. */
 	const int icon_by_width = gframe && gframe->keep_aspect == XWA_GEOMETRY_KEEP_ASPECT_WIDTH &&
 							  d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED && ref.w > 0;
 	if (d->has_src_rect && !icon_by_width) {
@@ -414,26 +413,24 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		s.dst_w = (float)d->img_w * rm_scale_x();
 		s.dst_h = s.dst_w * (float)ref.h / (float)ref.w;
 	} else if (gframe && gframe->keep_aspect == XWA_GEOMETRY_KEEP_ASPECT_HEIGHT && !d->has_src_rect && ref.h > 0) {
-		/* The game's height, and the width from the image's shape. */
+		/* Keep the game's height; the width comes from the image's aspect ratio. */
 		s.dst_w = s.dst_h * (float)ref.w / (float)ref.h;
 	}
-	/* With `fit: screen_height`, the image ignores the position and size the
-	 * game draws it at. It is as tall as the screen, keeps its shape, and is
-	 * centred left to right. The record's position and size, which the game
-	 * uses, don't change. */
+	/* With `fit: screen_height`, the image is drawn as tall as the screen,
+	 * keeps its aspect ratio and is centred horizontally. This only changes
+	 * the drawing; the game still uses the record's position and size. */
 	if (gframe && gframe->fit == XWA_GEOMETRY_FIT_SCREEN_HEIGHT && !d->has_src_rect && ref.h > 0) {
 		s.dst_h = (float)g.rt_height;
 		s.dst_w = s.dst_h * (float)ref.w / (float)ref.h;
 		s.dst_x = ((float)g.rt_width - s.dst_w) * 0.5f;
 		s.dst_y = 0.0f;
-		/* On fill and classic screens, a clip of the whole 640x480 screen
-		   becomes the 4:3 area in the middle. That would cut this image, so
-		   it isn't clipped. */
+		/* On fill and classic screens, a full-screen clip becomes the
+		   centered 4:3 area, which would cut this image. Drop the scissor. */
 		s.scissor = rm_scissor(d->clip_left, d->clip_top, d->clip_right, d->clip_bottom);
 		if (s.scissor.x == rm_x_edge(0) && s.scissor.width == rm_x_edge(XWA_CLASSIC_WIDTH) - rm_x_edge(0))
 			s.scissor = (AeronRectI) { 0, 0, 0, 0 };
 	} else if (geo && geo->has_draw_adjust) {
-		/* Changes the drawing only; the game's geometry stays. */
+		/* Only the drawing moves; the game's geometry doesn't change. */
 		s.dst_x += XwaFrontendGeometry_UnitsX(geo->draw_adjust[0]) * rm_scale_x();
 		s.dst_y += XwaFrontendGeometry_UnitsY(geo->draw_adjust[1]) * rm_scale_y();
 		s.dst_w += XwaFrontendGeometry_UnitsX(geo->draw_adjust[2]) * rm_scale_x();
@@ -447,9 +444,9 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 							  geo->tint == XWA_GEOMETRY_TINT_ALL ||
 							  (geo->tint == XWA_GEOMETRY_TINT_HIGHLIGHTS && rm_is_highlight_tint(d->tint_color));
 		if (keep_tint) {
-			/* A tinted draw is a single colour, the tint at each pixel's
-			 * brightness, as FrontImage_BlitRectTinted draws it. A per-channel
-			 * multiply would mix the tint with coloured art. */
+			/* FrontImage_BlitRectTinted draws a single colour: the tint,
+			 * scaled by each pixel's brightness. A per-channel multiply would
+			 * mix the tint with coloured art. */
 			rm_color_linear(d->tint_color, s.tint);
 			s.monochrome = 1.0f;
 		}
@@ -460,8 +457,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	}
 
 	/* An image whose geometry comes from an atlas has no palette, and its
-	 * art expects what is behind it to show where it is transparent. So it
-	 * gets no fill. */
+	 * transparent areas should show what is behind it, so it gets no fill. */
 	if (d->kind == XWA_DRAW2D_SPRITE_OPAQUE && !geo) {
 		/* The classic opaque blit writes palette entry 0 where the keyed
 		 * texture is transparent. Rebuild that lost color beneath the PMA
@@ -484,8 +480,8 @@ static void rm_add_paint(AeronDrawList2D* list, const XwaPaintCmd* p) {
 	const AeronRectI* scp = sc.width > 0 ? &sc : NULL;
 	const float sx = rm_scale_x();
 	const float sy = rm_scale_y();
-	/* frontend.yaml's paint look: lines one screen pixel thick, the fill
-	 * alpha and the grid colours. Without it, the original look. */
+	/* frontend.yaml paint settings: one-pixel lines, the fill alpha and the
+	 * grid colours. The defaults match the original. */
 	const XwaFrontendPaint* paint = XwaFrontendGeometry_Paint();
 	const float line_thickness = paint->pixel_lines ? 1.0f : fminf(sx, sy);
 	const int grid = p->role == XWA_PAINT_ROLE_GRID_MAJOR || p->role == XWA_PAINT_ROLE_GRID_MINOR;
@@ -747,8 +743,8 @@ static void rm_prepare_model_previews(AeronCommandBuffer* cmd, const XwaSnapshot
 	}
 }
 
-/* Takes the current frame of each video the snapshot draws. The uploads must
- * come before the reconstruction's passes on this command buffer. */
+/* Gets the current frame of each video the snapshot draws. The uploads must
+ * happen before the reconstruction passes on this command buffer. */
 static void rm_prepare_videos(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 	memset(g.video_tex, 0, sizeof g.video_tex);
 	for (uint32_t i = 0; i < snap->draw_2d_count; i++) {
@@ -860,8 +856,8 @@ static void rm_present_cursor(AeronCommandBuffer* cmd, const XwaSnapshot* snap, 
 		g.cursor.visible = g.cursor_label.visible = 0;
 		return;
 	}
-	/* The cursor and its label keep their shape in every layout: their
-	 * layers are drawn at the vertical scale, from their own top left. */
+	/* The cursor and its label keep their aspect ratio in every layout: their
+	 * layers use the vertical scale on both axes, from their own top left. */
 	const float map_sx = g.map_sx, map_ox = g.map_ox;
 	const XwaFrontendLayout layout = g.layout;
 	g.map_sx = g.map_sy;
@@ -1310,8 +1306,8 @@ AeronTexture* XwaRemasterFrontend_Render(AeronCommandBuffer* cmd, const XwaSnaps
 	{
 		const XwaFrontendLayout previous = g.layout;
 		rm_set_mapping((XwaFrontendLayout)snap->frontend_layout);
-		/* A classic screen draws only in the 4:3 area, so the sides left by
-		 * a wider screen are cleared. */
+		/* A classic screen draws only in the 4:3 area, so clear the sides
+		 * left over from a wider layout. */
 		if (g.layout == XWA_FRONTEND_LAYOUT_CLASSIC && previous != XWA_FRONTEND_LAYOUT_CLASSIC)
 			g.bars_need_clear = 1;
 	}
@@ -1335,8 +1331,8 @@ AeronTexture* XwaRemasterFrontend_Render(AeronCommandBuffer* cmd, const XwaSnaps
 }
 
 /* Submits a cursor layer with its top left at (left, top) in presentation
- * coordinates. `unit` is the size of a 640x480 unit down the screen: the
- * layer keeps its shape at that scale. */
+ * coordinates. `unit` is the height of a 640x480 unit in presentation
+ * pixels; the layer is scaled by it on both axes. */
 static void rm_submit_cursor_layer(const RmCursorLayer* cursor, int left, int top, float unit, float opacity,
 								   int split_view) {
 	if (!cursor->visible || !cursor->rt)
@@ -1358,7 +1354,7 @@ static void rm_submit_cursor_layer(const RmCursorLayer* cursor, int left, int to
 		layer.scissor.x += frame.width / 2;
 		layer.scissor.width = frame.width / 2;
 	}
-	/* The game's clip rect, which is in 640x480 units like the screen. */
+	/* The game's clip rect is in 640x480 units, so map it through the content rect. */
 	const int clip_left = content.x + rm_edge_for(cursor->clip.x, content.width, XWA_CLASSIC_WIDTH);
 	const int clip_top = content.y + rm_edge_for(cursor->clip.y, content.height, XWA_CLASSIC_HEIGHT);
 	const int clip_right =
@@ -1392,8 +1388,8 @@ void XwaRemasterFrontend_PresentCursor(float opacity, int split_view) {
 	/* Keep the remaster and baked classic cursors aligned during the crossfade. */
 	if (opacity >= 1.0f)
 		XwaPresentation_ToClassic(input->mouse.x, input->mouse.y, &x, &y);
-	/* The hot spot follows the screen's mapping; the cursor and its label
-	 * are placed around it at their own shape. */
+	/* The hot spot uses the screen's mapping. The cursor and its label are
+	 * placed relative to it at the vertical scale, so they aren't stretched. */
 	const XwaPresentationRect content = XwaPresentation_ClassicContentRect();
 	const float unit = (float)content.height / (float)XWA_CLASSIC_HEIGHT;
 	const int hot_x = content.x + rm_edge_for(x, content.width, XWA_CLASSIC_WIDTH);
@@ -1406,7 +1402,8 @@ void XwaRemasterFrontend_PresentCursor(float opacity, int split_view) {
 		int label_x = hot_x + (int)lroundf((float)g.cursor_pose.width * unit);
 		int label_y = y + g.cursor_pose.height;
 		/* FrontendCursor_Draw's original edge placement: the label stays
-		 * inside the screen's right edge, and above row 462. */
+		 * inside the right edge of the screen, and moves up to row 462 near
+		 * the bottom. */
 		if (label_x + label_width > content.x + content.width)
 			label_x = content.x + content.width - label_width;
 		if (label_y + 17 >= 480)

@@ -364,8 +364,8 @@ static void XwaPort_TickBody(int32_t delta_us) {
 
 void XwaPort_Tick(int32_t delta_us) {
 	XwaMovieTask_ReapFinished();
-	/* The last tick's frame has been drawn, so the videos closed in it can go. */
-	XwaFrontendVideo_ReleaseClosed();
+	/* The last tick's frame has been drawn, so videos closed during it can be freed. */
+	XwaFrontendVideo_StartTick();
 	const int movieTick = XwaMovieTask_IsActive();
 	XwaPort_TickBody(delta_us);
 	if (movieTick || XwaMovieTask_IsActive()) {

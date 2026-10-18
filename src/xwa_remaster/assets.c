@@ -487,15 +487,17 @@ static AssetLoadStatus assets_load_original_group(XwaRemasterAssets* a, AeronCom
 static AssetLoadStatus assets_choose_group(XwaRemasterAssets* a, AeronCommandBuffer* cmd,
 										   GroupSlot* slot, int flight, uint8_t* out_source) {
 	*out_source = ASSET_SOURCE_MISSING;
-	/* As for files: a group whose atlas sets the game's geometry is drawn
-	   only from the mod folder. */
+	/* Same rule as for files: if an atlas sets a group's geometry, only the
+	   mod's texture is used. */
 	if (!flight && XwaFrontendGeometry_FindGroup(slot->group)) {
 		const AssetLoadStatus status = assets_load_mod_group(a, a->frontend_images, cmd, slot);
 		if (status == ASSET_LOAD_SUCCESS)
 			*out_source = ASSET_SOURCE_MOD;
 		else if (status == ASSET_LOAD_MISSING)
-			Aeron_LogError("xwa.remaster", "frontend group %d: its geometry comes from an atlas, but there is "
-					   "no texture for it; it isn't drawn", slot->group);
+			Aeron_LogError("xwa.remaster",
+						   "frontend group %d: the geometry comes from an atlas but the texture "
+						   "is missing, so the group isn't drawn",
+						   slot->group);
 		return status == ASSET_LOAD_MISSING ? ASSET_LOAD_SUCCESS : status;
 	}
 	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_MOD;
@@ -607,15 +609,21 @@ static AssetLoadStatus assets_choose_frontend_file(XwaRemasterAssets* a, AeronCo
 												   FileSlot* slot, uint16_t frame_count,
 												   uint8_t* out_source) {
 	*out_source = ASSET_SOURCE_MISSING;
-	/* An image whose atlas sets the game's geometry has no stock image that
-	   fits it, so it is drawn only from the mod folder. */
-	if (XwaFrontendGeometry_FindFile(slot->source_file)) {
+	/* If an atlas sets an image's geometry, the game's own image doesn't fit
+	   it, so only the mod's texture is used. An image replaced by a video has
+	   no texture; the snapshot draws the video instead. */
+	const XwaGeometryAtlas* atlas = XwaFrontendGeometry_FindFile(slot->source_file);
+	if (atlas && atlas->video[0])
+		return ASSET_LOAD_SUCCESS;
+	if (atlas) {
 		const AssetLoadStatus status = assets_load_mod_file(a, cmd, slot, frame_count);
 		if (status == ASSET_LOAD_SUCCESS)
 			*out_source = ASSET_SOURCE_MOD;
 		else if (status == ASSET_LOAD_MISSING)
-			Aeron_LogError("xwa.remaster", "2D file '%s': its geometry comes from an atlas, but there is no "
-					   "texture for it; it isn't drawn", slot->key);
+			Aeron_LogError("xwa.remaster",
+						   "2D file '%s': the geometry comes from an atlas but the texture is "
+						   "missing, so the file isn't drawn",
+						   slot->key);
 		return status == ASSET_LOAD_MISSING ? ASSET_LOAD_SUCCESS : status;
 	}
 	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_MOD;

@@ -32,7 +32,7 @@ typedef struct XwaRoomAnim {
 	int has_size;
 	float width, height; /* 640x480 units, with has_size */
 	float scale;         /* without has_size: video pixels per design pixel */
-	float fps;           /* the frames shown a second, or 0 for the file's rate */
+	float fps;           /* frames per second, or 0 for the file's rate */
 	XwaAnimMissions missions;
 	int first_mission, mission_count; /* in g_animMissionIds */
 } XwaRoomAnim;
@@ -239,8 +239,7 @@ static int anims_read_group(const AeronConfigNode* node) {
 		r++;
 	}
 	if (r == sizeof(k_animRooms) / sizeof(k_animRooms[0])) {
-		return anims_error(room ? room : node,
-						   "a group needs 'room', one of the rooms with animations: concourse");
+		return anims_error(room ? room : node, "a group needs 'room', one of: concourse");
 	}
 	group.room = k_animRooms[r];
 	if (repeat) {
@@ -328,7 +327,7 @@ static void anims_load(void) {
 		return;
 	}
 	g_animsLoaded = 1;
-	/* The animations use their own random numbers, so they don't change the
+	/* The animations use their own random generator, so they don't change the
 	   game's rand() sequence. */
 	if (!Aeron_RandomBytes(&g_animRandom, sizeof(g_animRandom)) || !g_animRandom) {
 		g_animRandom = 0x2545f491u;
@@ -337,7 +336,7 @@ static void anims_load(void) {
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, XWA_ANIMS_PATH, &file, &error)) {
 		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
 			Aeron_LogError("xwa.frontend", "%s:%d: %s", XWA_ANIMS_PATH, error.line,
-						   error.message[0] ? error.message : "unavailable");
+						   error.message[0] ? error.message : "cannot be read");
 			Aeron_LogError("xwa.frontend", "%s is ignored", XWA_ANIMS_PATH);
 		}
 		return;
@@ -403,13 +402,13 @@ static void group_stop(XwaRoomAnimGroup* group) {
 	group->waiting = 0;
 }
 
-/* Makes `anim` the group's next play, after the group's delay. */
+/* Sets up `anim` to play next, after the group's delay. */
 static void group_start(XwaRoomAnimGroup* group, int anim, int candidates, uint64_t now_us) {
 	const float delay = group->delay_min +
 						(group->delay_max - group->delay_min) * (float)(anims_random() % 10001u) / 10000.0f;
 	if (anim != group->current || !XwaFrontendVideo_Player(group->slot)) {
-		/* Without a delay, an animation that can only be followed by itself
-		   loops, so that its plays join without an empty frame. */
+		/* Without a delay, an animation that can only be followed by itself is
+		   opened looping, so there is no empty frame between plays. */
 		const int loop = group->delay_max <= 0.0f && (group->repeat_same || candidates == 1);
 		group_stop(group);
 		group->slot =

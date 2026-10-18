@@ -29,7 +29,7 @@ typedef enum XwaLayoutKind {
 	LAYOUT_PROGRESS,  /* linear or stock */
 } XwaLayoutKind;
 
-/* Every key the file can have. */
+/* The keys the file can have. */
 static const struct {
 	const char* key;
 	XwaLayoutKind kind;
@@ -207,7 +207,7 @@ static const AeronConfigNode* layout_node(const char* key) {
 										&error)) {
 			if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
 				Aeron_LogError("xwa.frontend", "%s:%d: %s", XWA_LAYOUT_PATH, error.line,
-							   error.message[0] ? error.message : "unavailable");
+							   error.message[0] ? error.message : "cannot be read");
 				Aeron_LogError("xwa.frontend", "%s is ignored", XWA_LAYOUT_PATH);
 			}
 			g_layoutFile = NULL;
@@ -217,7 +217,7 @@ static const AeronConfigNode* layout_node(const char* key) {
 			AeronConfigFile_Destroy(g_layoutFile);
 			g_layoutFile = NULL;
 		} else {
-			Aeron_LogInfo("xwa.frontend", "%s: room positions read", XWA_LAYOUT_PATH);
+			Aeron_LogInfo("xwa.frontend", "%s: loaded room positions", XWA_LAYOUT_PATH);
 		}
 	}
 	return g_layoutFile ? AeronConfigFile_GetNode(g_layoutFile, key) : NULL;
@@ -318,7 +318,7 @@ int XwaConcourseLayout_HitPoint(const char* key, int* x, int* y) {
 void XwaConcourseLayout_DrawSprite(const char* name, const char* key, int x, int y) {
 	XwaConcourseLayout_DrawPoint(key, &x, &y);
 	FrontImage_DrawSprite(name, x, y);
-	XwaSnapshot_SetNextSpriteFraction(0, 0); /* when nothing was drawn */
+	XwaSnapshot_SetNextSpriteFraction(0, 0); /* clear it in case nothing was drawn */
 }
 
 void XwaConcourseLayout_DrawSpriteOpaque(const char* name, const char* key, int x, int y) {

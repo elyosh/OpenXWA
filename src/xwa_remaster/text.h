@@ -16,7 +16,8 @@ int XwaRemasterText_AddFrontendGlyph(AeronDrawList2D* list, XwaRemasterAssets* a
 									 const XwaGlyph2D* glyph, int target_width, int target_height);
 
 /* How 640x480 units map to target pixels: x * scale_x + offset_x across and
- * y * scale_y down. Glyphs keep their shape at scale_y. */
+ * y * scale_y down. Glyphs are sized with scale_y on both axes, so they
+ * aren't stretched. */
 typedef struct XwaRemasterTextMapping {
 	float scale_x, scale_y;
 	float offset_x;

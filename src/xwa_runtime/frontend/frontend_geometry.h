@@ -1,19 +1,34 @@
 #ifndef XWA_RUNTIME_FRONTEND_FRONTEND_GEOMETRY_H
 #define XWA_RUNTIME_FRONTEND_FRONTEND_GEOMETRY_H
 
-/* Game geometry from the mod folder's frontend atlases, and the frontend's
- * paint look.
+/* Image geometry from frontend atlases in the mod folder, and the frontend's
+ * paint settings.
  *
- * An atlas with `game_geometry: true` gives the game the frame count, sizes,
- * offsets and bounds of the image it replaces, so the standard file isn't
- * read:
+ * An atlas with `game_geometry: true` replaces an image's geometry: the game
+ * takes the frame count, sizes, offsets and bounds from the atlas and doesn't
+ * read the original file:
  *   frontend/frontres/<dir>/atlas/<base>.yaml  a Frontres file
  *   resdata/atlas/group_<g>.yaml               a DAT group
  *
- * Values are in design pixels: pixels of the screen that
- * frontend/frontend.yaml declares with `design: [w, h]` (640x480 without the
- * file). They are converted to the game's 640x480 units here, when the game
- * asks for them. Atlases are read once and kept, and so is a missing one. */
+ * A video can also replace a Frontres file. It always sets the image's
+ * geometry, with the same values for every frame, and takes priority over an
+ * atlas:
+ *   frontend/frontres/<dir>/video/<base>.yaml
+ *
+ *   video: techdoor.webm   # next to this file
+ *   size: [388, 333]       # the drawn size
+ *   offset: [0, 0]         # optional: added to the game's draw position
+ *   classic_frames: 60     # optional: the game's frame count, 1 by default
+ *   fps: 24                # optional: frames per second; the file's rate by default
+ *
+ * The video loops for as long as the game draws the image, whichever frame
+ * the game asks for.
+ *
+ * Values are in design pixels: pixels of the screen size that
+ * frontend/frontend.yaml sets with `design: [w, h]` (640x480 by default).
+ * They are converted to the game's 640x480 units when the game asks for them.
+ * Each atlas is read once and kept. A missing atlas is remembered too, so it
+ * is only looked for once. */
 
 #include "xwa/assets/sprite_resource.h"
 #include "xwa/frontend/frontend_image.h"
@@ -24,7 +39,7 @@
 extern "C" {
 #endif
 
-/* Which tints of the game's tinted icon draws apply to an image. */
+/* Which tints apply when the game draws an image as a tinted icon. */
 typedef enum XwaGeometryTint {
 	XWA_GEOMETRY_TINT_ALL,
 	XWA_GEOMETRY_TINT_NONE,
@@ -37,21 +52,21 @@ typedef enum XwaGeometryKeepAspect {
 	XWA_GEOMETRY_KEEP_ASPECT_WIDTH,
 } XwaGeometryKeepAspect;
 
-/* Where an image is drawn, when not where the game draws it. */
+/* Where an image is drawn, if not at the game's position. */
 typedef enum XwaGeometryFit {
-	XWA_GEOMETRY_FIT_NONE,          /* where the game draws it, at the game's size */
+	XWA_GEOMETRY_FIT_NONE,          /* at the game's position and size */
 	XWA_GEOMETRY_FIT_SCREEN_HEIGHT, /* as tall as the screen, keeping its shape, centred left to right */
 } XwaGeometryFit;
 
 /* One frame, in design pixels. */
 typedef struct XwaGeometryFrame {
-	int id;           /* DAT image id; -1 in a Frontres atlas */
-	float size[2];    /* the drawn size */
-	float offset[2];  /* added to the game's draw position */
+	int id;          /* DAT image id; -1 in a Frontres atlas */
+	float size[2];   /* the drawn size */
+	float offset[2]; /* added to the game's draw position */
 	int has_bounds;
-	float bounds[4];  /* left, top, right, bottom, as the game stores them */
+	float bounds[4];     /* left, top, right, bottom, as the game stores them */
 	uint8_t keep_aspect; /* XwaGeometryKeepAspect */
-	uint8_t fit;         /* XwaGeometryFit; it changes only the drawing */
+	uint8_t fit;         /* XwaGeometryFit; changes the drawing only, not the geometry */
 } XwaGeometryFrame;
 
 /* A named rectangle of a sheet, such as a map icon. */
@@ -64,18 +79,22 @@ typedef struct XwaGeometryAtlas {
 	XwaGeometryFrame* frames;
 	int frame_count;
 	int classic_frames; /* the frame count the game uses: `classic_frames`, else frame_count */
-	float fps;          /* when above 0, the frames are shown by time, not by the game's frame */
-	uint8_t tint;       /* XwaGeometryTint */
+	/* Above 0, the frames change at this rate over time instead of following
+	   the game's frame. Videos always play over time, at the file's rate when
+	   `fps` is not set. */
+	float fps;
+	uint8_t tint; /* XwaGeometryTint */
 	int has_draw_adjust;
 	float draw_adjust[4]; /* x, y, width and height added to the drawn rectangle only */
 	int has_bounds;
 	float bounds[4]; /* the whole image's bounds */
 	XwaGeometryRegion* regions;
 	int region_count;
+	char video[160]; /* a video's path in the mod folder, or empty for an atlas */
 } XwaGeometryAtlas;
 
-/* The atlas with game geometry for a Frontres file, named as the game names
- * it ("frontres\\concourse\\tourdoor.cbm"), or NULL. */
+/* The atlas with game geometry for a Frontres file, or NULL. `fileName` is
+ * the name the game uses, such as "frontres\\concourse\\tourdoor.cbm". */
 const XwaGeometryAtlas* XwaFrontendGeometry_FindFile(const char* fileName);
 /* The atlas with game geometry for a DAT group, or NULL. */
 const XwaGeometryAtlas* XwaFrontendGeometry_FindGroup(int group);
@@ -91,12 +110,12 @@ int XwaFrontendGeometry_UnitY(float y);
 float XwaFrontendGeometry_UnitsX(float x);
 float XwaFrontendGeometry_UnitsY(float y);
 
-/* The `paint` section of frontend/frontend.yaml. Without it, the original
- * look. */
+/* The `paint` section of frontend/frontend.yaml. Missing keys keep the
+ * original look. */
 typedef struct XwaFrontendPaint {
-	float fill_alpha;     /* translucent fills; the original is 0.5 */
-	int pixel_lines;      /* lines, outlines and the briefing grid one screen pixel thick */
-	int has_grid_colours; /* the briefing grid's colours replace the game's */
+	float fill_alpha;     /* alpha of translucent fills; the original is 0.5 */
+	int pixel_lines;      /* draw lines, outlines and the briefing grid one screen pixel thick */
+	int has_grid_colours; /* use grid_major and grid_minor for the briefing grid */
 	uint32_t grid_major;  /* 0xRRGGBB */
 	uint32_t grid_minor;
 } XwaFrontendPaint;
@@ -106,28 +125,28 @@ const XwaFrontendPaint* XwaFrontendGeometry_Paint(void);
 /* The design screen's size in pixels: frontend.yaml `design`, else 640x480. */
 void XwaFrontendGeometry_DesignSize(float* width, float* height);
 
-/* Builds the descriptor that the recovered loaders would build from the
- * standard file: the frame count, each frame's size and bounds, and the
- * whole image's bounds. Each frame's pixels are all index 0. Returns NULL
- * when memory runs out. */
+/* Builds the descriptor that the game's loaders would build from the
+ * original file: the frame count, each frame's size and bounds, and the
+ * bounds of the whole image. Every pixel is index 0. Returns NULL when out of
+ * memory. */
 ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* atlas);
-/* Whether the loaded resource `name` takes its geometry from an atlas in the
- * mod folder: a named image built from its atlas, or a DAT image whose group
- * has one. */
+/* Whether the loaded resource `name` gets its geometry from an atlas in the
+ * mod folder. This is true for a named image built from an atlas, and for a
+ * DAT image whose group has an atlas. */
 int XwaFrontendGeometry_ResourceHasGeometry(const char* name);
-/* Builds the DAT group `group_id` from its atlas in `group`, a free slot:
- * each image gets the id, size and offset of its atlas frame, and rows with
- * no runs, so it draws nothing in the classic layer. Returns 0 when memory
- * runs out. */
+/* Builds the DAT group `group_id` from its atlas into `group`, a free slot.
+ * Each image gets the id, size and offset of its atlas frame, and rows with no
+ * pixel runs, so it draws nothing in the classic layer. Returns 0 when out of
+ * memory. */
 int XwaFrontendGeometry_BuildSpriteGroup(int16_t group_id, SpriteGroup* group, const XwaGeometryAtlas* atlas);
 /* Whether `desc` was built by XwaFrontendGeometry_BuildDescriptor and not
- * forgotten since. */
+ * yet passed to XwaFrontendGeometry_ForgetDescriptor. */
 int XwaFrontendGeometry_IsBuiltDescriptor(const ResourceDescriptor* desc);
 /* Called when a built descriptor is freed. */
 void XwaFrontendGeometry_ForgetDescriptor(const ResourceDescriptor* desc);
 
-/* Whether a concourse star can show at (x, y), in 640x480 units, according
- * to frontend/concourse/starfield_mask.png: white where the window is.
+/* Whether a concourse star can appear at (x, y), in 640x480 units. The mask
+ * frontend/concourse/starfield_mask.png is white where the window is.
  * Returns -1 when there is no usable mask. */
 int XwaFrontendGeometry_StarfieldOpen(int x, int y);
 

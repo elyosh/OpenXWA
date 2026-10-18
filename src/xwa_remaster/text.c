@@ -144,8 +144,9 @@ int XwaRemasterText_AddFrontendGlyphMapped(AeronDrawList2D* list, XwaRemasterAss
 	sprite.src_v0 = (float)metrics->atlas_y / (float)font->atlas_h;
 	sprite.src_u1 = (float)(metrics->atlas_x + metrics->atlas_w) / (float)font->atlas_w;
 	sprite.src_v1 = (float)(metrics->atlas_y + metrics->atlas_h) / (float)font->atlas_h;
-	/* The position follows the mapping, with the fraction of a unit the game
-	 * carries in wide screens; the glyph keeps its shape. */
+	/* The position uses the mapping, plus the sub-unit fraction the game keeps
+	 * on wide screens. The size uses scale_y on both axes, so the glyph isn't
+	 * stretched. */
 	sprite.dst_x = mapping->offset_x + ((float)glyph->x + (float)glyph->x_frac / 256.0f) * mapping->scale_x;
 	sprite.dst_y = (float)glyph->y * scale_y;
 	sprite.dst_w = (float)metrics->atlas_w * scale_y / atlas_scale;

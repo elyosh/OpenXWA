@@ -46,7 +46,7 @@ int BakeSprites_MakeDirs(const char* path);
 /* Writes `base_path`.png and/or .ktx2 (BC7, sRGB, premultiplied) per `opt`. */
 int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba, int w,
 						  int h);
-/* Packs frames into pages of at most 8192 texels with an 8-texel gutter.
+/* Packs frames into pages of at most 8192x8192 texels with an 8-texel gutter.
  * `max_pages` 0 allows any number of pages. */
 int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
 						   AeronAtlasImage** out_images, AeronCpuAtlas* out);

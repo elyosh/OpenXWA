@@ -81,7 +81,7 @@ static struct {
 	int pending_mode_fade;
 	uint64_t pending_classic_frame_serial;
 	int classic_suppressed_this_frame;
-	int frontend_wide; /* the layout of the frontend picture last rendered */
+	int frontend_wide; /* the last rendered frontend picture used the wide layout */
 	int render_pixel_width;
 	int render_pixel_height;
 	int observed_pixel_width;
@@ -93,9 +93,9 @@ static struct {
 	AeronSampleCount msaa_samples;
 } g;
 
-/* Tells the presentation code how the frontend is shown, for the picture and
- * for input: in the design screen's shape when the HD frontend is shown,
- * else as the classic 640x480 surface. */
+/* Tells the presentation code how the frontend is shown, so the picture and
+ * the mouse mapping agree: with the design screen's shape when the HD
+ * frontend is shown, else as the classic 640x480 surface. */
 static void XwaRemaster_SetFrontendShape(int hd_shown) {
 	float width = 0.0f, height = 0.0f;
 	if (hd_shown)
@@ -873,7 +873,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	g.ramp.target = target;
 	Aeron_BlendRampAdvance(&g.ramp, delta_us, target);
 	if (!g.scene_tex || g.ramp.alpha <= 0.001f) {
-		/* The classic surface is shown: input maps to it. */
+		/* The classic surface is shown, so map input to it. */
 		XwaRemaster_SetFrontendShape(0);
 		if (g.classic_suppressed_this_frame) {
 			XwaPort_SubmitRetainedClassicFrame();
@@ -888,8 +888,8 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		return;
 	}
 
-	/* The frontend reconstruction has the design screen's shape, fitted in
-	 * the frame. Modern flight owns the full presentation frame; HUD
+	/* The frontend reconstruction has the design screen's shape and is
+	 * fitted in the frame. Modern flight owns the full presentation frame; HUD
 	 * profiles change only the authored overlay layout. */
 	XwaRemaster_SetFrontendShape(g.scene_kind != XWA_SCENE_FLIGHT);
 	const XwaPresentationRect pr =

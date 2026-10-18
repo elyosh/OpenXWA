@@ -3,12 +3,12 @@
  * folder.
  *
  * XWAU replaces standard frontend files to change the frontend's layout, and
- * draws HD images in the rectangles they give. Here, each replaced image gets
- * an atlas with `game_geometry: true`: its pixels come from XWAU's HD image
- * (or from XWAU's standard image, upscaled, when there is none), and its frame
- * count, sizes, offsets and bounds come from XWAU's standard files. Values are
- * written in design pixels, for a 2560x1440 design screen: 640x480 units
- * times 4 across and 3 down.
+ * draws HD images in the rectangles they give. This tool gives each replaced
+ * image an atlas with `game_geometry: true`. Its pixels come from XWAU's HD
+ * image, or from XWAU's standard image, upscaled, when there is no HD image.
+ * Its frame count, sizes, offsets and bounds come from XWAU's standard files.
+ * Values are in design pixels of a 2560x1440 screen: one 640x480 unit is 4
+ * pixels across and 3 down.
  *
  * Output:
  *   <out>/frontend/frontend.yaml                    design screen and paint look
@@ -16,11 +16,14 @@
  *   <out>/resdata/atlas/group_<g>.yaml              with group_<g>.ktx2, group_<g>_p<N>.ktx2
  *   <out>/frontend/concourse/starfield_mask.png     where the concourse stars can show
  *   <out>/frontend/concourse/layout.yaml            room positions
- *   <out>/frontend/animations.yaml                  room animations; their videos are
- *                                                   copied by hand from XWAU's Resdata
+ *   <out>/frontend/animations.yaml                  room animations; copy their videos
+ *                                                   by hand from XWAU's Resdata
+ *   <out>/frontend/frontres/<dir>/video/<base>.yaml videos that replace images; copy
+ *                                                   these videos by hand too
  *
- * Standard files equal to stock that have no HD image are left to the stock
- * bake. The XWAU install is read with host file I/O; names match in any case.
+ * Standard files that match stock and have no HD image are left to the stock
+ * bake. The XWAU install is read with host file I/O, and file names are
+ * matched in any case.
  */
 
 #include "bake_xwau.h"
@@ -103,6 +106,8 @@ typedef struct XwauContext {
 	int wide_key_count;
 	XwauBackground* backgrounds; /* the layout XWAU gives each background */
 	int background_count;
+	struct XwauVideo* videos; /* the images that XWAU replaces with a video */
+	int video_count;
 } XwauContext;
 
 /* ---- host files ------------------------------------------------------- */
@@ -127,7 +132,7 @@ static uint8_t* read_host_file(const char* path, size_t* size) {
 	return bytes;
 }
 
-/* Finds `name` in `dir` in any case, and writes its path. */
+/* Finds `name` in `dir`, ignoring case, and writes its path to `out`. */
 static int find_ci(const char* dir, const char* name, char* out, size_t out_size) {
 	DIR* d = opendir(dir);
 	if (!d)
@@ -230,10 +235,10 @@ static int read_section_key_int(const char* path, const char* section, const cha
 	return value;
 }
 
-/* The map icon rectangle of each craft type in SHIPLIST.TXT: the last four
- * numbers of a line. Lines are numbered and skipped as ShipList_Load does
- * (src/xwa/assets/ship_list.c): from 1, without `*` lines or lines whose
- * category the game doesn't know. */
+/* Reads the map icon rectangle of each craft type from SHIPLIST.TXT: the last
+ * four numbers of a line. Lines are numbered from 1, as in ShipList_Load
+ * (src/xwa/assets/ship_list.c). Lines that start with `*` or have a category
+ * the game doesn't know are skipped, but still counted. */
 static void read_ship_regions(XwauContext* ctx, const char* xwau_root) {
 	static const char* const categories[] = { "Fighter",
 											  "Shuttle/Light Transport",
@@ -323,10 +328,10 @@ static int listed_not_wide(const XwauContext* ctx, const char* key) {
 
 static int is_screen_background(const char* key, int width, int height);
 
-/* Notes the layout XWAU gives a background: 4:3 when its HD image has the
- * standard image's shape, else wide, unless ConcourseBackgroundsWide.txt
- * sets it to 0 or it is DPMED or CONFIGB, which the hook always sets to 0
- * (fill). */
+/* Records the layout XWAU gives a background. It is classic (4:3) when the
+ * HD image has the same shape as the standard image. Otherwise it is fill
+ * when ConcourseBackgroundsWide.txt sets it to 0 or it is DPMED or CONFIGB
+ * (the hook always sets those to 0), and wide in every other case. */
 static void note_background(XwauContext* ctx, const char* key, const char* list_key, int same_shape) {
 	XwauBackground* grown = (XwauBackground*)realloc(ctx->backgrounds, (size_t)(ctx->background_count + 1) *
 																		   sizeof *grown);
@@ -488,7 +493,7 @@ static void free_atlas_frames(XwauAtlas* atlas) {
 	atlas->count = 0;
 }
 
-/* Upscales a standard image like the stock bake. Takes ownership of `rgba`. */
+/* Upscales a standard image the same way as the stock bake. Takes ownership of `rgba`. */
 static int upscale_standard(XwauContext* ctx, uint8_t** rgba, int* w, int* h) {
 	if (!atlas_svga_to_4k(rgba, w, h)) {
 		ctx->stats->failures++;
@@ -531,9 +536,9 @@ static int read_cbm_geometry(const uint8_t* bytes, size_t size, CbmGeometry* out
 	return 1;
 }
 
-/* The bounds that FrontImage_ComputeImageBounds (src/xwa/frontend/
- * frontend_image.c) gives a BMP or FLC frame, with the same scan and early
- * exits. Transparent texels are the game's palette index 0. */
+/* Computes the bounds of a BMP or FLC frame like FrontImage_ComputeImageBounds
+ * (src/xwa/frontend/frontend_image.c), with the same scan order and early
+ * exits. Texels with alpha 0 stand for the game's palette index 0. */
 static void compute_bounds_like_game(const uint8_t* rgba, int width, int height, int* out) {
 	int scan_y = height - 1, right = 0, bottom = 0;
 	if (scan_y > 0) {
@@ -573,8 +578,9 @@ static void compute_bounds_like_game(const uint8_t* rgba, int width, int height,
 	out[0] = left;
 }
 
-/* XWAU's HD images for a Frontres file: the images of <base>_hd.dat in group
- * and image order, or the frames of <base>_hd.cbm. */
+/* Loads XWAU's HD images for a Frontres file: the images of <base>_hd.dat,
+ * sorted by group and then by image id, or the frames of <base>_hd.cbm.
+ * Returns 1 when found, 0 when there are none, and -1 on error. */
 static int load_frontres_hd(const char* dir, const char* base, Xwa2dFrameSet* out, XwauDat** out_dat) {
 	char name[300], path[1400], error[256];
 	memset(out, 0, sizeof *out);
@@ -629,7 +635,7 @@ static int load_frontres_hd(const char* dir, const char* base, Xwa2dFrameSet* ou
 				f->width = (int)image.width;
 				f->height = (int)image.height;
 				f->sprite_id = sorted[i];
-				f->anchor_x = groups[g]; /* the group, to read the image's offset back */
+				f->anchor_x = groups[g]; /* the group, used later to look up the image's offset */
 			}
 			free(sorted);
 		}
@@ -640,8 +646,8 @@ static int load_frontres_hd(const char* dir, const char* base, Xwa2dFrameSet* ou
 	if (find_ci(dir, name, path, sizeof path)) {
 		size_t size = 0;
 		uint8_t* bytes = read_host_file(path, &size);
-		/* Palette index 0 is transparent, as XWAU makes it when its colour is
-		 * black (NET/ResItemImage.cs). XU's only _hd.cbm, EYE_HD, has it black. */
+		/* Palette index 0 is transparent. XWAU does this when that colour is
+		 * black (NET/ResItemImage.cs), and EYE_HD, XU's only _hd.cbm, has it black. */
 		const int ok = bytes && Xwa2d_DecodeCbm(bytes, size, out, error, sizeof error);
 		free(bytes);
 		if (!ok) {
@@ -651,6 +657,164 @@ static int load_frontres_hd(const char* dir, const char* base, Xwa2dFrameSet* ou
 		return 1;
 	}
 	return 0;
+}
+
+/* ---- videos in place of images -------------------------------------------- */
+
+/* An image that XWAU replaces with a video from Resdata (HC/concourse.cpp, the
+ * TechDoor, DSBrief and Squadlogo hooks). */
+typedef struct XwauVideo {
+	char dir[32], base[32]; /* the image, in lower case */
+	char webm[64];          /* the video's name in Resdata */
+	double size[2];         /* design pixels; 0 means the standard image's size */
+	double offset[2];
+} XwauVideo;
+
+static double door_value(const char* doors, const char* key, int fallback);
+
+static const XwauVideo* find_video(const XwauContext* ctx, const char* dir, const char* base) {
+	for (int i = 0; i < ctx->video_count; ++i) {
+		if (strcmp(ctx->videos[i].dir, dir) == 0 && strcmp(ctx->videos[i].base, base) == 0)
+			return &ctx->videos[i];
+	}
+	return NULL;
+}
+
+static void add_video(XwauContext* ctx, const char* dir, const char* base, const char* webm, double w,
+					  double h, double x, double y) {
+	XwauVideo* grown = (XwauVideo*)realloc(ctx->videos, (size_t)(ctx->video_count + 1) * sizeof *grown);
+	if (!grown)
+		return;
+	ctx->videos = grown;
+	XwauVideo* v = &ctx->videos[ctx->video_count++];
+	snprintf(v->dir, sizeof v->dir, "%s", dir);
+	snprintf(v->base, sizeof v->base, "%s", base);
+	snprintf(v->webm, sizeof v->webm, "%s", webm);
+	v->size[0] = w;
+	v->size[1] = h;
+	v->offset[0] = x;
+	v->offset[1] = y;
+}
+
+/* Lists the images XWAU replaces with videos, and the size and offset of each video. */
+static void find_videos(XwauContext* ctx) {
+	char path[1200], doors[1100] = "";
+	if (!find_ci(ctx->opt->xwau_root, "ConcourseDoors.txt", doors, sizeof doors))
+		doors[0] = '\0';
+	if (find_ci(ctx->resdata, "techdoor.webm", path, sizeof path)) {
+		/* Drawn at the door's position, at techdoor_posWidth x techdoor_posHeight. */
+		add_video(ctx, "concourse", "techdoor", strrchr(path, '/') + 1,
+				  door_value(doors, "techdoor_posWidth", 92) * DESIGN_X,
+				  door_value(doors, "techdoor_posHeight", 93) * DESIGN_Y, 0, 0);
+	}
+	if (find_ci(ctx->resdata, "dsbrief.webm", path, sizeof path)) {
+		/* 272x270 units, 5 units right and 3 down from the image's position.
+		   The campaign image and the other image use the same video. */
+		add_video(ctx, "dsbrief", "dsbrief", strrchr(path, '/') + 1, 272 * DESIGN_X, 270 * DESIGN_Y,
+				  5 * DESIGN_X, 3 * DESIGN_Y);
+		add_video(ctx, "dsbrief", "dsbriefc", strrchr(path, '/') + 1, 272 * DESIGN_X, 270 * DESIGN_Y,
+				  5 * DESIGN_X, 3 * DESIGN_Y);
+	}
+	for (int n = 1; n <= 99; ++n) {
+		char name[32], txt[1200], base[32];
+		snprintf(name, sizeof name, "Squad%d.webm", n);
+		if (!find_ci(ctx->resdata, name, path, sizeof path))
+			continue;
+		snprintf(base, sizeof base, "squad%d", n);
+		snprintf(name, sizeof name, "Squad%d.txt", n);
+		int w = 0, h = 0;
+		if (find_ci(ctx->resdata, name, txt, sizeof txt)) {
+			w = read_key_int(txt, "Width", 0);
+			h = read_key_int(txt, "Height", 0);
+		}
+		/* With Squad<N>.txt, XWAU draws the logo as a square on screen,
+		   Height units tall. Without it, the logo has the standard image's
+		   size. The position goes in layout.yaml. */
+		if (w && h)
+			add_video(ctx, "tour", base, strrchr(path, '/') + 1, h * DESIGN_Y, h * DESIGN_Y, 0, 0);
+		else
+			add_video(ctx, "tour", base, strrchr(path, '/') + 1, 0, 0, 0, 0);
+	}
+}
+
+/* Gets the frame count and first frame size of the file the game reads for
+ * an image: XWAU's file if there is one, else the stock one. Returns 0 when
+ * neither exists. */
+static int standard_image(const XwauContext* ctx, const char* dir, const char* base, int* count, int* w,
+						  int* h) {
+	static const char* const exts[] = { "cbm", "flc", "bmp" };
+	const char* roots[2] = { ctx->frontres, NULL };
+	char stock[1100];
+	if (find_ci(ctx->opt->stock_root, "FRONTRES", stock, sizeof stock))
+		roots[1] = stock;
+	for (int r = 0; r < 2; ++r) {
+		char folder[1200];
+		if (!roots[r] || !find_ci(roots[r], dir, folder, sizeof folder))
+			continue;
+		for (int e = 0; e < 3; ++e) {
+			char name[64], path[1400], error[256];
+			snprintf(name, sizeof name, "%s.%s", base, exts[e]);
+			if (!find_ci(folder, name, path, sizeof path))
+				continue;
+			size_t size = 0;
+			uint8_t* bytes = read_host_file(path, &size);
+			Xwa2dFrameSet set = { 0 };
+			const int ok = bytes && (e == 0   ? Xwa2d_DecodeCbm(bytes, size, &set, error, sizeof error)
+									 : e == 1 ? Xwa2d_DecodeFlc(bytes, size, &set, error, sizeof error)
+											  : Xwa2d_DecodeBmp(bytes, size, &set, error, sizeof error));
+			free(bytes);
+			if (ok && set.count > 0) {
+				*count = set.count;
+				*w = set.frames[0].width;
+				*h = set.frames[0].height;
+			}
+			Xwa2dFrameSet_Free(&set);
+			if (ok && *count > 0)
+				return 1;
+		}
+	}
+	return 0;
+}
+
+/* Writes frontend/frontres/<dir>/video/<base>.yaml for each image that XWAU
+ * replaces with a video. The game keeps the standard image's frame count.
+ * XWAU shows one video frame per frontend frame, at 24 frames a second. */
+static void write_video_yamls(XwauContext* ctx) {
+	for (int i = 0; i < ctx->video_count; ++i) {
+		const XwauVideo* v = &ctx->videos[i];
+		int count = 1, w = 0, h = 0;
+		const int has_image = standard_image(ctx, v->dir, v->base, &count, &w, &h);
+		double size[2] = { v->size[0], v->size[1] };
+		if (size[0] == 0 && !has_image) {
+			fprintf(stderr, "xwau: skipping %s: it has no size and %s/%s has no standard image\n",
+					v->webm, v->dir, v->base);
+			continue;
+		}
+		if (size[0] == 0) {
+			size[0] = w * DESIGN_X;
+			size[1] = h * DESIGN_Y;
+		}
+		char dir[1200], path[1300];
+		snprintf(dir, sizeof dir, "%s/frontend/frontres/%s/video", ctx->opt->sprites->out_root, v->dir);
+		BakeSprites_MakeDirs(dir);
+		snprintf(path, sizeof path, "%s/%s.yaml", dir, v->base);
+		FILE* fp = fopen(path, "w");
+		if (!fp) {
+			ctx->stats->failures++;
+			continue;
+		}
+		fprintf(fp,
+				"# Made by xwa_asset_bake xwau-frontend. Sizes are in design pixels. The video\n"
+				"# comes from XWAU's Resdata folder.\n"
+				"video: %s\nsize: ",
+				v->webm);
+		write_list(fp, size, 2);
+		fprintf(fp, "\noffset: ");
+		write_list(fp, v->offset, 2);
+		fprintf(fp, "\nclassic_frames: %d\nfps: 24\n", count);
+		if (fclose(fp) != 0)
+			ctx->stats->failures++;
+	}
 }
 
 static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const char* file_name) {
@@ -670,6 +834,8 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 	snprintf(base_lower, sizeof base_lower, "%s", base);
 	lower(dir_lower);
 	lower(base_lower);
+	if (find_video(ctx, dir_lower, base_lower))
+		return; /* write_video_yamls writes its file */
 
 	Xwa2dFrameSet hd = { 0 };
 	XwauDat* hd_dat = NULL;
@@ -704,9 +870,9 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 		ok = Xwa2d_DecodeBmp(bytes, size, &sd, error, sizeof error);
 	free(bytes);
 	if (!ok && bytes && !is_cbm && !has_hd) {
-		/* The game's BMP and FLC loaders read the stock formats only, so it
-		 * doesn't use this file (XU's 32-bit MAPICONS/LICON.BMP is source art). */
-		printf("  note: frontres/%s/%s is skipped: %s, which the game can't read either\n", dir_lower,
+		/* The game's BMP and FLC loaders only read the stock formats, so the game
+		 * can't use this file either. XU's 32-bit MAPICONS/LICON.BMP is source art. */
+		printf("  note: skipping frontres/%s/%s: %s. The game can't read it either\n", dir_lower,
 			   file_name, error);
 		Xwa2dFrameSet_Free(&sd);
 		return;
@@ -721,8 +887,8 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 		return;
 	}
 	if (!is_cbm) {
-		/* The game computes the bounds of a BMP or FLC from its pixels, and
-		 * the image's bounds are the union of its frames' bounds. */
+		/* The game computes the bounds of a BMP or FLC from its pixels. The
+		 * image's bounds are the union of its frames' bounds. */
 		cbm.count = sd.count;
 		cbm.bounds = (int*)calloc((size_t)sd.count * 4, sizeof *cbm.bounds);
 		for (int i = 0; i < sd.count && cbm.bounds; ++i) {
@@ -740,8 +906,8 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 	}
 
 	/* The family room monitors have more HD frames than standard ones, and
-	 * play them by time at familyroom_monitor_fps. Elsewhere, HD
-	 * frames beyond the standard count are never drawn. */
+	 * play them by time at familyroom_monitor_fps. Elsewhere, HD frames
+	 * beyond the standard count are never drawn. */
 	const int by_time = strcasecmp(dir_name, "family") == 0 &&
 						(strcasecmp(base, "lightmon") == 0 || strcasecmp(base, "emailmon") == 0) &&
 						hd.count > sd.count;
@@ -777,10 +943,9 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 			if (icons && !same_aspect(s->width, s->height, f->w, f->h))
 				f->keep_aspect = "width";
 			{
-				/* A background decides the layout of the screens that show it.
-				 * Large images count as backgrounds, and so do the images that
-				 * XWAU treats as backgrounds, whatever their size, such as
-				 * MEDBACK (481x474). */
+				/* A background sets the layout of the screens that show it.
+				 * Large images are backgrounds, and so are the images that XWAU
+				 * treats as backgrounds at any size, such as MEDBACK (481x474). */
 				char key[600], list_key[600];
 				snprintf(key, sizeof key, "%s/%s", dir_lower, base_lower);
 				snprintf(list_key, sizeof list_key, "frontres/%s/%s.cbm", dir_lower, base_lower);
@@ -791,9 +956,9 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 			}
 			{
 				/* XWAU draws some images as backgrounds: as tall as the screen
-				 * and centred, instead of where the game draws them. It does
-				 * this when the game loads the image under certain names, and
-				 * when the HD image doesn't have the standard image's shape
+				 * and centred, instead of where the game puts them. It does this
+				 * when the game loads the image under certain names and the HD
+				 * image has a different shape from the standard image
 				 * (NET/Main.cs DrawItem, IsBackgroundName). */
 				char key[600];
 				snprintf(key, sizeof key, "%s/%s", dir_lower, base_lower);
@@ -808,10 +973,10 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 				}
 			}
 			if (hd_dat && (icons || map_icons)) {
-				/* XWAU adds an icon's HD offset to its position on tinted draws
-				 * (NET/Main.cs FrontResDrawBlendColor). It moves the whole HD
-				 * image, which XWAU draws in place of the standard image's
-				 * bounds, back onto the button. Map icons are drawn without it. */
+				/* On tinted draws, XWAU adds an icon's HD offset to its position
+				 * (NET/Main.cs FrontResDrawBlendColor). XWAU draws the HD image
+				 * over the standard image's bounds, and the offset moves it back
+				 * onto the button. Map icons don't get the offset. */
 				XwauDatImageInfo info;
 				if (XwauDat_GetImageInfo(hd_dat, h->anchor_x, h->sprite_id, &info) &&
 					(info.offset_x || info.offset_y)) {
@@ -819,8 +984,8 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 						f->offset[0] = info.offset_x * DESIGN_X;
 						f->offset[1] = info.offset_y * DESIGN_Y;
 					} else {
-						printf("  note: frontres/%s/%s frame %d has HD offset %d, %d, which XWAU doesn't "
-							   "add on map icon draws\n",
+						printf("  note: frontres/%s/%s frame %d has HD offset %d, %d, which XWAU ignores "
+							   "for map icons\n",
 							   dir_lower, base_lower, i, info.offset_x, info.offset_y);
 					}
 				}
@@ -855,7 +1020,7 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 			atlas.area[2] = (cbm.area[2] > 180 ? cbm.area[2] : 180) * DESIGN_X;
 			atlas.area[3] = 180 * DESIGN_Y;
 		}
-		/* Drawing-only adjustments of XWAU's HD draw path (NET/Main.cs:835-849,
+		/* Draw-only adjustments from XWAU's HD draw path (NET/Main.cs:835-849,
 		 * 1033-1036), in design pixels. */
 		static const struct {
 			const char* dir;
@@ -911,7 +1076,7 @@ static void bake_frontres(XwauContext* ctx) {
 		snprintf(dir, sizeof dir, "%s/%s", ctx->frontres, d->d_name);
 		if (d->d_name[0] == '.' || !is_directory(dir))
 			continue;
-		/* One image per base name; the CBM, the game's cache, wins. */
+		/* Keep one image per base name. The CBM wins because it is the game's cache. */
 		char (*files)[256] = calloc(1024, sizeof *files);
 		int count = 0;
 		DIR* sub = opendir(dir);
@@ -949,8 +1114,9 @@ typedef struct XwauDatFile {
 static int is_frontend_group(int group) { return group >= 15000 && group <= 15999; }
 
 static void write_starfield_mask(XwauContext* ctx, const uint8_t* rgba, int w, int h) {
-	/* XWAU's HD starfield puts stars where the HD concourse background is
-	 * transparent, scaled down to 640x480 (HC/concourse.cpp:3413-3557). */
+	/* XWAU's HD starfield shows stars where the HD concourse background is
+	 * transparent (HC/concourse.cpp:3413-3557). A mask texel is white when all
+	 * the HD texels it covers are transparent. */
 	uint8_t* mask = (uint8_t*)calloc(640 * 480, 4);
 	if (!mask)
 		return;
@@ -980,8 +1146,8 @@ static void write_starfield_mask(XwauContext* ctx, const uint8_t* rgba, int w, i
 static int compare_ints(const void* a, const void* b) { return *(const int*)a - *(const int*)b; }
 
 static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_count, int group) {
-	/* Each image comes from the first DAT of RESDATA.TXT that has it, and its
-	 * HD image from that DAT's _hd.dat, as XWAU's .NET code finds them. */
+	/* Each image comes from the first DAT in RESDATA.TXT that has it, and its
+	 * HD image from that DAT's _hd.dat. XWAU's .NET code finds them the same way. */
 	int* ids = NULL;
 	int* owner = NULL;
 	int count = 0, any_hd = 0;
@@ -1030,7 +1196,7 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 		f->id = id;
 		f->size[0] = sd_info.width * DESIGN_X;
 		f->size[1] = sd_info.height * DESIGN_Y;
-		/* XWAU draws an HD image at its own offset, in place of the standard one. */
+		/* XWAU draws an HD image at the HD offset instead of the standard one. */
 		const XwauDatImageInfo* placed = has_hd ? &hd_info : &sd_info;
 		f->offset[0] = xwau_value(placed->offset_x) * DESIGN_X;
 		f->offset[1] = xwau_value(placed->offset_y) * DESIGN_Y;
@@ -1044,8 +1210,9 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 		f->h = (int)image.height;
 		if (has_hd) {
 			ctx->stats->hd_frames++;
-			/* XWAU keeps the shape of a DAT image of another aspect, but draws
-			 * backgrounds to fill the screen (NET/Main.cs:911-999, 1037-1041). */
+			/* When a DAT image's HD version has a different aspect ratio, XWAU
+			 * keeps the HD image's shape. Backgrounds still fill the screen
+			 * (NET/Main.cs:911-999, 1037-1041). */
 			const int background =
 				(int)sd_info.width >= BACKGROUND_MIN_W && (int)sd_info.height >= BACKGROUND_MIN_H;
 			if (!background && !same_aspect((int)sd_info.width, (int)sd_info.height, f->w, f->h))
@@ -1067,12 +1234,13 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 			}
 			if (group == 15001 && id == 3100)
 				write_starfield_mask(ctx, f->rgba, f->w, f->h);
-			/* XWAU draws an HD image at its HD offset, but the game keeps the
-			 * standard offset for the image's bounds, from which it places some
-			 * images (the side bars are right-aligned on them) and takes hit
-			 * areas. The bounds give the game the standard frame's rectangle,
-			 * as FrontImage_GetAtlasSpriteBounds builds it. In group 15900,
-			 * XWAU takes the areas from the HD images (NET/Main.cs:565-633). */
+			/* XWAU draws an HD image at its HD offset, but the game uses the
+			 * standard offset for the image's bounds. The game places some
+			 * images from these bounds (the side bars are right-aligned to
+			 * them) and uses them as hit areas. So the bounds hold the standard
+			 * frame's rectangle, built as in FrontImage_GetAtlasSpriteBounds.
+			 * In group 15900, XWAU takes the areas from the HD images
+			 * (NET/Main.cs:565-633). */
 			if (group != 15900 && !f->has_bounds &&
 				(hd_info.offset_x != sd_info.offset_x || hd_info.offset_y != sd_info.offset_y)) {
 				f->has_bounds = 1;
@@ -1085,9 +1253,9 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 			ok = 0;
 			break;
 		}
-		/* The rating tooltips' area: XWAU always widens it, or takes
-		 * familyroom_rating_* (HC/concourse.cpp:5642-5658). The ratings are
-		 * images 300 + 10 * n to 303 + 10 * n of group 15900. */
+		/* The area of the rating tooltips: XWAU widens it, or uses
+		 * familyroom_rating_* when they are set (HC/concourse.cpp:5642-5658).
+		 * The ratings are images 300 + 10 * n to 303 + 10 * n in group 15900. */
 		if (group == 15900 && id >= 300 && id < 370 && id % 10 < 4) {
 			const int left = (int)lround(f->offset[0] / DESIGN_X), top = (int)lround(f->offset[1] / DESIGN_Y);
 			int r[4] = { left, top, left + (int)sd_info.width - 1, top + (int)sd_info.height - 1 };
@@ -1145,7 +1313,7 @@ static void bake_resdata(XwauContext* ctx) {
 		const char* name = strrchr(line, '\\');
 		name = name ? name + 1 : line;
 		/* New battle images need new mission content and an exe patch,
-		 * which aren't supported. */
+		 * which OpenXWA doesn't support. */
 		if (!name[0] || strcasecmp(name, "FrontEnd2_Battles.dat") == 0)
 			continue;
 		char path[1200];
@@ -1201,13 +1369,11 @@ static void bake_resdata(XwauContext* ctx) {
 	}
 }
 
-/* ---- entry ----------------------------------------------------------------- */
-
 /* ---- room positions ------------------------------------------------------ */
 
-/* One ConcourseDoors.txt value as XWAU uses it: the file's value, else the
- * hook's default (HC/concourse.cpp:1929-2030). A value above 8000 holds tenths
- * of a unit. */
+/* Reads one ConcourseDoors.txt value the way XWAU does: the file's value,
+ * else the hook's default (HC/concourse.cpp:1929-2030). A value above 8000
+ * holds tenths of a unit. */
 static double door_value(const char* doors, const char* key, int fallback) {
 	const int v = doors[0] ? read_key_int(doors, key, fallback) : fallback;
 	return v > 8000 ? (v - 8000) / 10.0 : v;
@@ -1223,11 +1389,12 @@ static void write_design_rect(FILE* fp, double x, double y, double w, double h) 
 	write_list(fp, values, 4);
 }
 
-/* frontend/concourse/layout.yaml: every position that XWAU moves, from
- * ConcourseDoors.txt, MedalsPositions.txt, the [hook_concourse] settings and
- * the squadron logo files, with XWAU's own value where a file doesn't set
- * one. Keys equal to stock are written too: the game then does what XWAU
- * does, such as starting Marko's hit box at his position. */
+/* Writes frontend/concourse/layout.yaml with every position that XWAU moves.
+ * Values come from ConcourseDoors.txt, MedalsPositions.txt, the
+ * [hook_concourse] settings and the squadron logo files, or from XWAU's
+ * default when a file doesn't set one. Keys with stock values are written
+ * too, so the game behaves like XWAU, for example by starting Marko's hit box
+ * at his position. */
 static void write_layout_yaml(XwauContext* ctx) {
 	const char* root = ctx->opt->xwau_root;
 	char doors[1100] = "", hooks[1100] = "", medals[1100] = "";
@@ -1319,8 +1486,9 @@ static void write_layout_yaml(XwauContext* ctx) {
 			DOOR("briefing_review_item_height", 41) * DESIGN_Y);
 	fprintf(fp, "mission_selection_x: %.0f\n", DOOR("mission_selection_screen_posX", 230) * DESIGN_X);
 
-	/* A squadron logo with a video and a position file (Resdata\Squad<N>.txt)
-	 * moves; its number in the mission is N + 3. */
+	/* A squadron logo moves when it has a video and a position file
+	 * (Resdata\Squad<N>.txt) with a Width and Height. Its number in the
+	 * mission is N + 3. */
 	int logos = 0;
 	for (int n = 1; n <= 99; ++n) {
 		char name[32], txt[1200], webm[1200];
@@ -1338,7 +1506,7 @@ static void write_layout_yaml(XwauContext* ctx) {
 	if (logos)
 		fprintf(fp, "}\n");
 
-	/* The fixed moves of XWAU's pilot creation and cutscene viewer hooks
+	/* Fixed positions from XWAU's pilot creation and cutscene viewer hooks
 	 * (HC:5361-5395, 7958-7976). */
 	fprintf(fp, "create_pilot:\n  name_field: ");
 	write_design_rect(fp, 305, 260, 120, 20);
@@ -1364,8 +1532,8 @@ static void write_layout_yaml(XwauContext* ctx) {
 	fprintf(fp, "  kalidor: ");
 	write_design_point(fp, HOOK_INT("KalidorCrescentPositionX", 224),
 					   HOOK_INT("KalidorCrescentPositionY", 168));
-	/* The award ceremony: images by their centre, texts as offsets from the
-	 * points where the stock game puts them. */
+	/* Award ceremony: images are placed by their centre, and texts are
+	 * offsets from where the stock game puts them. */
 	fprintf(fp, "\naward_ceremony:\n  zoom_texts: %s\n",
 			doors[0] && read_key_int(doors, "draw_medalzoom_texts", 1) == 0 ? "false" : "true");
 	fprintf(fp, "  battle: {images: [");
@@ -1398,13 +1566,13 @@ static void write_layout_yaml(XwauContext* ctx) {
 
 /* ---- room animations ---------------------------------------------------- */
 
-/* XWAU counts its animation delays and plays its animations in concourse
- * frames, at 24 a second. */
+/* XWAU counts animation delays and plays animations in concourse frames, at
+ * 24 frames a second. */
 #define CONCOURSE_FPS 24.0
 
 typedef struct XwauAnimLine {
 	int line;       /* in ConcourseAnimations.txt */
-	int x, y, w, h; /* 640x480 units; w and h are 0 without a size */
+	int x, y, w, h; /* 640x480 units; w and h are 0 when the line has no size */
 	int id;
 	int delay_min, delay_max; /* concourse frames */
 	char group[64];
@@ -1421,9 +1589,8 @@ static char* trim(char* s) {
 	return s;
 }
 
-/* Splits `text` where it has `delimiters` and trims each piece, as XWAU
- * does: several delimiters in a row count as one. Returns the number of
- * pieces. */
+/* Splits `text` at any of `delimiters` and trims each piece, like XWAU.
+ * Several delimiters in a row count as one. Returns the number of pieces. */
 static int split(char* text, const char* delimiters, char** pieces, int max) {
 	int count = 0;
 	for (char* piece = strtok(text, delimiters); piece && count < max; piece = strtok(NULL, delimiters))
@@ -1431,9 +1598,9 @@ static int split(char* text, const char* delimiters, char** pieces, int max) {
 	return count;
 }
 
-/* The delay before each play in seconds. XWAU waits delayMin + rand() %
- * (delayMax - delayMin) frames, and doesn't wait when delayMax <= delayMin.
- * Returns 0 for no delay. */
+/* Gets the shortest and longest delay before each play, in seconds. XWAU
+ * waits delayMin + rand() % (delayMax - delayMin) frames, and doesn't wait
+ * when delayMax <= delayMin. Returns 0 for no delay. */
 static int anim_delay(const XwauAnimLine* a, double* shortest, double* longest) {
 	if (a->delay_max <= a->delay_min || a->delay_max <= 1)
 		return 0;
@@ -1448,8 +1615,9 @@ static int same_delay(const XwauAnimLine* a, const XwauAnimLine* b) {
 	return delayed == anim_delay(b, &b0, &b1) && a0 == b0 && a1 == b1;
 }
 
-/* XWAU's mission list: empty or with -1 for all missions, else the plain
- * numbers, else every mission but those after a ~. */
+/* Writes XWAU's mission list. An empty list, or one with -1, means all
+ * missions. Otherwise, if the list has plain numbers, only those count.
+ * If it only has ~ numbers, those are the missions to leave out. */
 static void write_missions(FILE* fp, const char* list) {
 	char text[512];
 	char* ids[128];
@@ -1472,9 +1640,9 @@ static void write_missions(FILE* fp, const char* list) {
 	fprintf(fp, plain ? "]" : "]}");
 }
 
-/* frontend/animations.yaml from ConcourseAnimations.txt. Each XWAU group
- * becomes a group; a name that starts with + repeats its animation. Lines
- * that OpenXWA can't play the same way are reported. */
+/* Writes frontend/animations.yaml from ConcourseAnimations.txt. Each XWAU
+ * group becomes a group. A group whose name starts with + repeats the same
+ * animation. Lines that OpenXWA can't play the same way are reported. */
 static void write_animations_yaml(XwauContext* ctx) {
 	char list[1100];
 	if (!find_ci(ctx->opt->xwau_root, "ConcourseAnimations.txt", list, sizeof list))
@@ -1498,7 +1666,7 @@ static void write_animations_yaml(XwauContext* ctx) {
 		const int n = split(t, ",;", v, 16);
 		if (n < 8)
 			continue;
-		/* 8 or 9 pieces (with a comment) have no size. */
+		/* Lines with 8 pieces, or 9 with a comment, have no size. */
 		const int k = n == 8 || n == 9 ? 0 : 2;
 		XwauAnimLine a;
 		memset(&a, 0, sizeof a);
@@ -1516,8 +1684,8 @@ static void write_animations_yaml(XwauContext* ctx) {
 		snprintf(a.missions, sizeof a.missions, "%s", v[7 + k]);
 		if (strcasecmp(v[0], "concourse") != 0) {
 			fprintf(stderr,
-					"xwau: ConcourseAnimations.txt:%d: XWAU draws only the concourse's animations, so this "
-					"%s line is left out\n",
+					"xwau: ConcourseAnimations.txt:%d: skipping this %s line: XWAU only draws concourse "
+					"animations\n",
 					number, v[0]);
 			continue;
 		}
@@ -1525,16 +1693,16 @@ static void write_animations_yaml(XwauContext* ctx) {
 		snprintf(name, sizeof name, "concourse_anim_%d.webm", a.id);
 		if (!find_ci(ctx->resdata, name, webm, sizeof webm)) {
 			fprintf(stderr,
-					"xwau: ConcourseAnimations.txt:%d: concourse_anim_%d has no webm file. It is a DAT "
-					"animation, which OpenXWA doesn't play, so the line is left out\n",
+					"xwau: ConcourseAnimations.txt:%d: skipping concourse_anim_%d: it has no webm file, "
+					"and OpenXWA doesn't play DAT animations\n",
 					number, a.id);
 			continue;
 		}
 		snprintf(a.video, sizeof a.video, "%s", strrchr(webm, '/') + 1);
 		if (a.w == 0 || a.h == 0)
 			fprintf(stderr,
-					"xwau: ConcourseAnimations.txt:%d: concourse_anim_%d has no size. XWAU draws it at its "
-					"pixel size in 640x480 units, OpenXWA at its pixel size in design pixels\n",
+					"xwau: ConcourseAnimations.txt:%d: concourse_anim_%d has no size. XWAU draws one video "
+					"pixel per 640x480 unit, OpenXWA one per design pixel\n",
 					number, a.id);
 		XwauAnimLine* grown = (XwauAnimLine*)realloc(lines, (size_t)(count + 1) * sizeof *lines);
 		if (!grown)
@@ -1554,13 +1722,13 @@ static void write_animations_yaml(XwauContext* ctx) {
 	}
 	fprintf(fp,
 			"# Made by xwa_asset_bake xwau-frontend from ConcourseAnimations.txt. Positions and\n"
-			"# sizes are in design pixels, delays in seconds. The videos go in\n"
-			"# frontend/animations/, copied from XWAU's Resdata folder.\n"
+			"# sizes are in design pixels, delays in seconds. Copy the videos from\n"
+			"# XWAU's Resdata folder to frontend/animations/.\n"
 			"version: 1\n"
 			"groups:%s\n",
 			count ? "" : " []");
-	/* The groups come in the order of their first line. Their names match in
-	   any case, as in XWAU. */
+	/* Groups are written in the order of their first line. Group names are
+	   compared ignoring case, like XWAU does. */
 	for (int first = 0; first < count; ++first) {
 		int seen = 0;
 		for (int i = 0; i < first && !seen; ++i)
@@ -1587,14 +1755,14 @@ static void write_animations_yaml(XwauContext* ctx) {
 			if (!same_delay(a, b))
 				fprintf(
 					stderr,
-					"xwau: ConcourseAnimations.txt:%d: this delay differs from the one on line %d. A group "
-					"has one delay in OpenXWA, so %s takes line %d's\n",
+					"xwau: ConcourseAnimations.txt:%d: this delay differs from the one on line %d. OpenXWA "
+					"has one delay per group, so %s uses the delay from line %d\n",
 					b->line, a->line, a->group, a->line);
 			if (apart == 1) {
 				fprintf(
 					stderr,
-					"xwau: ConcourseAnimations.txt:%d: the lines of %s are apart. OpenXWA draws the group "
-					"where its first line is, so other groups may be drawn over it in another order\n",
+					"xwau: ConcourseAnimations.txt:%d: the lines of %s are not together. OpenXWA draws the "
+					"whole group at its first line, so the order with other groups can differ\n",
 					b->line, a->group);
 				apart = 2;
 			}
@@ -1604,7 +1772,7 @@ static void write_animations_yaml(XwauContext* ctx) {
 				fprintf(fp, ", size: ");
 				write_design_point(fp, b->w, b->h);
 			}
-			/* XWAU shows a video frame each concourse frame, whatever the
+			/* XWAU shows one video frame per concourse frame, whatever the
 			   file's frame rate. */
 			fprintf(fp, ", fps: %.0f", CONCOURSE_FPS);
 			write_missions(fp, b->missions);
@@ -1617,8 +1785,8 @@ static void write_animations_yaml(XwauContext* ctx) {
 }
 
 /* The screens and views of the layout table, and the backgrounds each one
- * shows, from the recovered code. The family room's memento and rank views
- * show many backgrounds, all in medals/: a prefix selects them. */
+ * shows, taken from the recovered code. The family room's memento and rank
+ * views show many backgrounds in medals/, so they are selected by prefix. */
 typedef struct XwauScreen {
 	const char* name;
 	const char* backgrounds[4];
@@ -1649,8 +1817,8 @@ static const XwauScreen k_screens[] = {
 
 #define SCREEN_COUNT (sizeof k_screens / sizeof k_screens[0])
 
-/* Whether `key` is one of the medal folder's memento (prefix "") or rank
- * zoom backgrounds. The medal case's own images are neither. */
+/* Returns whether `key` is one of the memento (prefix "") or rank zoom
+ * backgrounds in medals/. The medal case's own images are neither. */
 static int is_medal_view(const char* key, const char* prefix) {
 	if (strncmp(key, "medals/", 7) != 0)
 		return 0;
@@ -1661,8 +1829,9 @@ static int is_medal_view(const char* key, const char* prefix) {
 		   strncmp(base, "lbattle", 7) != 0 && strncmp(base, "lkalidor", 8) != 0;
 }
 
-/* A screen's layout: the most common one among its backgrounds, with a note
- * for each background that differs. NULL when it has none. */
+/* Returns the most common layout among a screen's backgrounds, and prints a
+ * note for each background with another layout. Returns NULL when the screen
+ * has no backgrounds. */
 static const char* screen_layout(const XwauContext* ctx, const XwauScreen* screen, int* image_count) {
 	static const char* const names[] = { "wide", "fill", "classic" };
 	const char* keys[256];
@@ -1697,8 +1866,8 @@ static const char* screen_layout(const XwauContext* ctx, const XwauScreen* scree
 	return names[best];
 }
 
-/* Writes the screens whose layout isn't the one they fall back to: a view
- * falls back to its screen, and a screen to `default: wide`. */
+/* Writes only the screens whose layout differs from their fallback. A view
+ * falls back to its screen, and a screen falls back to `default: wide`. */
 static void write_layouts(const XwauContext* ctx, FILE* fp) {
 	const char* layouts[SCREEN_COUNT];
 	int counts[SCREEN_COUNT];
@@ -1728,15 +1897,16 @@ static void write_layouts(const XwauContext* ctx, FILE* fp) {
 	}
 }
 
-/* Whether XWAU treats the image `key` ("<dir>/<base>" or "group/<g>/<id>")
- * as a background. XWAU decides by the name the game loads the image under:
- * backname, backconfig, concourse, background, briefstart, globe, techroom
- * or cerecase (NET/Main.cs _backgroundNames). Those are the images in the
- * screen table, the family room's views, the ceremony's medal case and the
- * tech room. The family room's views are found by their folder, which also
- * holds the medal case's small medals, so a view's standard image
- * (`width` by `height`) must also be at least half the screen. The views
- * are 415x384 units or more, the medals 108x119 or less. */
+/* Returns whether XWAU treats the image `key` ("<dir>/<base>" or
+ * "group/<g>/<id>") as a background. XWAU decides from the name the game
+ * loads the image under: backname, backconfig, concourse, background,
+ * briefstart, globe, techroom or cerecase (NET/Main.cs _backgroundNames).
+ * These names cover the images in the screen table, the family room's views,
+ * the ceremony's medal case and the tech room. The family room's views are
+ * found by folder, but that folder also holds the medal case's small medals.
+ * So a view's standard image (`width` by `height`) must also be at least half
+ * the screen in each direction: the views are 415x384 units or more, and the
+ * medals 108x119 or less. */
 static int is_screen_background(const char* key, int width, int height) {
 	for (size_t i = 0; i < SCREEN_COUNT; ++i) {
 		if (k_screens[i].medal_prefix && is_medal_view(key, k_screens[i].medal_prefix) && width >= 320 &&
@@ -1798,17 +1968,20 @@ int BakeXwau_RunFrontend(const BakeXwauOptions* opt, BakeXwauStats* stats) {
 	}
 	read_ship_regions(&ctx, opt->xwau_root);
 	read_wide_list(&ctx, opt->xwau_root);
+	find_videos(&ctx);
 
 	bake_frontres(&ctx);
 	bake_resdata(&ctx);
 	write_frontend_yaml(&ctx);
 	write_layout_yaml(&ctx);
 	write_animations_yaml(&ctx);
+	write_video_yamls(&ctx);
 
 	free(ctx.regions);
 	for (int i = 0; i < ctx.wide_key_count; ++i)
 		free(ctx.wide_keys[i]);
 	free(ctx.wide_keys);
 	free(ctx.backgrounds);
+	free(ctx.videos);
 	return stats->failures == 0;
 }

@@ -25,7 +25,7 @@
 
 #define XWA_SCREENS_PATH "frontend/frontend.yaml"
 
-/* Screen and view names, in k_screens order. */
+/* Screen and view ids, in k_screens order. */
 typedef enum XwaScreenId {
 	SCREEN_NONE = -1,
 	SCREEN_CONCOURSE,
@@ -95,12 +95,13 @@ static const XwaScreen k_screens[SCREEN_COUNT] = {
 	{ "joystick_action", Config_JoystickActionPickerUpdate, SCREEN_NONE, 1 },
 };
 
-/* -1 where the table doesn't list a name. */
+/* -1 for names that the table doesn't list. */
 static int g_screenLayouts[SCREEN_COUNT];
 static int g_screenDefault = -1;
 static int g_screensLoaded;
 
 static int g_screenRunIndex = -1; /* the stack index that ran last */
+static unsigned g_screenFrames;   /* the frontend frames run so far */
 static XwaScreenId g_screenLogged = SCREEN_NONE;
 static int g_screenLoggedLayout = -1;
 
@@ -115,8 +116,8 @@ static int screens_parse_layout(const char* text) {
 	return -1;
 }
 
-/* Reads `layouts` once. A wrong name or value makes the whole table be
- * ignored, so that a typo can't leave a mod half wide. */
+/* Reads `layouts` once. If a name or value is wrong, the whole table is
+ * ignored, so a typo can't leave a mod half wide. */
 static void screens_load(void) {
 	AeronConfigFile* file = NULL;
 	AeronConfigError error;
@@ -172,7 +173,7 @@ static void screens_load(void) {
 	}
 	AeronConfigFile_Destroy(file);
 	if (!ok) {
-		Aeron_LogError("xwa.frontend", "%s: layouts is ignored; every screen is classic", XWA_SCREENS_PATH);
+		Aeron_LogError("xwa.frontend", "%s: ignoring layouts; every screen is classic", XWA_SCREENS_PATH);
 		return;
 	}
 	memcpy(g_screenLayouts, layouts, sizeof(layouts));
@@ -188,7 +189,7 @@ static XwaScreenId screens_find(FrontendScreenUpdateFn update) {
 	return SCREEN_NONE;
 }
 
-/* The view a screen shows now, from the state the game keeps for it. */
+/* The view a screen shows now, based on the screen's game state. */
 static XwaScreenId screens_view(XwaScreenId screen) {
 	switch (screen) {
 		case SCREEN_FAMILY_ROOM:
@@ -205,7 +206,7 @@ static XwaScreenId screens_view(XwaScreenId screen) {
 					return screen;
 			}
 		case SCREEN_COMBAT_ROOM:
-			/* The test CombatSimMenu_Update makes to show podopen. */
+			/* The same test CombatSimMenu_Update uses to show podopen. */
 			return g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u
 					   ? SCREEN_COMBAT_ROOM_FAMILY
 					   : screen;
@@ -226,7 +227,7 @@ static XwaScreenId screens_view(XwaScreenId screen) {
 	}
 }
 
-/* A view's layout, else its screen's, else `default`; -1 when none. */
+/* A view's layout, else its screen's layout; -1 when the table lists neither. */
 static int screens_listed_layout(XwaScreenId screen) {
 	if (g_screenLayouts[screen] >= 0) {
 		return g_screenLayouts[screen];
@@ -237,8 +238,9 @@ static int screens_listed_layout(XwaScreenId screen) {
 	return -1;
 }
 
-/* The layout of the screen at stack index `index`, and its name. Dialogs
- * that the table doesn't list take the layout of the screen below them. */
+/* The layout of the screen at stack index `index`. Sets *shown to the view
+ * it shows. Dialogs that the table doesn't list use the layout of the screen
+ * below them. */
 static int screens_stack_layout(int index, XwaScreenId* shown) {
 	for (; index >= 0; index--) {
 		const XwaScreenId screen = screens_find(g_screenStates[index].updateFn);
@@ -256,7 +258,12 @@ static int screens_stack_layout(int index, XwaScreenId* shown) {
 	return g_screenDefault;
 }
 
-void XwaFrontendScreens_NoteRun(void) { g_screenRunIndex = g_screenStackTop; }
+void XwaFrontendScreens_NoteRun(void) {
+	g_screenRunIndex = g_screenStackTop;
+	g_screenFrames++;
+}
+
+unsigned XwaFrontendScreens_FrameCount(void) { return g_screenFrames; }
 
 XwaFrontendLayout XwaFrontendScreens_Layout(void) {
 	XwaScreenId shown = SCREEN_NONE;

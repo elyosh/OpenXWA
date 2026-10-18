@@ -54,9 +54,9 @@ int FlightLoading_DrawProgressScreen(int progressStep) {
 	FrontendRect rect;
 	int x;
 #ifdef XWA_MODERN
-	/* XWA_MODERN: frontend/concourse/layout.yaml can set the column of the
-	   briefing lines (loading_screen.item). The titles, the skirmish texts and
-	   the progress bar follow it, as XWAU places them. */
+	/* XWA_MODERN: loading_screen.item in frontend/concourse/layout.yaml sets the
+	   left edge, right edge and height of the briefing lines. The titles and the
+	   skirmish texts move with them. */
 	const int itemLeft = XwaConcourseLayout_Round(XwaConcourseLayout_X("loading_screen.item.left", 64.0f));
 	const int itemRight = XwaConcourseLayout_Round(XwaConcourseLayout_X("loading_screen.item.right", 573.0f));
 	const int itemHeight =
@@ -207,8 +207,8 @@ int FlightLoading_DrawProgressScreen(int progressStep) {
 
 #ifdef XWA_MODERN
 	if (XwaConcourseLayout_LinearProgress()) {
-		/* XWA_MODERN: `progress: linear` grows the bar evenly with the steps,
-		   across the item column, as XWAU draws it. */
+		/* XWA_MODERN: with `progress: linear`, the bar grows by the same amount
+		   at each step and fits within the briefing lines. */
 		const int barLength = (itemRight - itemLeft) * 8 / 10 - 14;
 
 		progressBarWidth = barLength * progressStep / 8;

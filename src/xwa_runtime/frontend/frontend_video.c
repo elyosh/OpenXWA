@@ -2,12 +2,14 @@
 
 #include "aeron/aeron.h"
 #include "aeron/log.h"
+#include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
+#include <stdio.h>
 #include <string.h>
 
-/* The frontend draws at most a few videos at a time, so the players are
- * small: 3 decoded frames each, and 2 decoding threads. */
+/* The frontend shows only a few videos at once, so each player keeps 3
+ * decoded frames and uses 2 decoding threads. */
 #define XWA_FRONTEND_VIDEO_QUEUE_FRAMES 3
 #define XWA_FRONTEND_VIDEO_THREADS 2
 
@@ -19,6 +21,15 @@ typedef struct XwaFrontendVideoSlot {
 
 static XwaFrontendVideoSlot g_videoSlots[XWA_FRONTEND_VIDEO_SLOTS];
 
+/* A video that replaces an image, while the game draws it. */
+typedef struct XwaFrontendImageVideo {
+	char path[160]; /* empty when unused */
+	int slot;       /* -1 when the video can't be opened */
+	unsigned frame; /* the frontend frame that drew it last */
+} XwaFrontendImageVideo;
+
+static XwaFrontendImageVideo g_imageVideos[XWA_FRONTEND_VIDEO_SLOTS];
+
 int XwaFrontendVideo_Open(AeronVfsRoot root, const char* path, int loop, int play, float fps) {
 	AeronVideoOpenDesc desc;
 	int slot = 0;
@@ -27,7 +38,7 @@ int XwaFrontendVideo_Open(AeronVfsRoot root, const char* path, int loop, int pla
 		slot++;
 	}
 	if (slot == XWA_FRONTEND_VIDEO_SLOTS) {
-		Aeron_LogError("xwa.frontend", "%s: no free video slot; at most %d videos play at a time", path,
+		Aeron_LogError("xwa.frontend", "%s: no free video slot; at most %d videos can play at once", path,
 					   XWA_FRONTEND_VIDEO_SLOTS);
 		return -1;
 	}
@@ -44,7 +55,7 @@ int XwaFrontendVideo_Open(AeronVfsRoot root, const char* path, int loop, int pla
 	desc.frame_rate = fps;
 	g_videoSlots[slot].player = Aeron_VideoOpen(&desc);
 	if (!g_videoSlots[slot].player) {
-		Aeron_LogError("xwa.frontend", "%s: the video can't be opened", path);
+		Aeron_LogError("xwa.frontend", "%s: cannot open the video", path);
 		return -1;
 	}
 	g_videoSlots[slot].serial++;
@@ -82,7 +93,51 @@ AeronTexture* XwaFrontendVideo_Texture(int slot, unsigned serial, AeronCommandBu
 	return s && s->serial == (uint16_t)serial ? Aeron_VideoTexture(s->player, cmd) : NULL;
 }
 
-void XwaFrontendVideo_ReleaseClosed(void) {
+static void image_video_close(XwaFrontendImageVideo* video) {
+	XwaFrontendVideo_Close(video->slot);
+	video->path[0] = '\0';
+	video->slot = -1;
+}
+
+void XwaFrontendVideo_DrawImage(const char* path, float fps, float x, float y, float width, float height) {
+	XwaFrontendImageVideo* video = NULL;
+	AeronVideoPlayer* player;
+
+	for (int i = 0; i < XWA_FRONTEND_VIDEO_SLOTS && !video; i++) {
+		if (strcmp(g_imageVideos[i].path, path) == 0) {
+			video = &g_imageVideos[i];
+		}
+	}
+	for (int i = 0; i < XWA_FRONTEND_VIDEO_SLOTS && !video; i++) {
+		if (!g_imageVideos[i].path[0]) {
+			video = &g_imageVideos[i];
+			snprintf(video->path, sizeof(video->path), "%s", path);
+			/* A video that can't be opened keeps slot -1 until it stops being
+			   drawn, so the error is logged only once. */
+			video->slot = XwaFrontendVideo_Open(AERON_VFS_ROOT_MOD, path, 1, 1, fps);
+		}
+	}
+	if (!video) {
+		return;
+	}
+	video->frame = XwaFrontendScreens_FrameCount();
+	player = XwaFrontendVideo_Player(video->slot);
+	if (player) {
+		Aeron_VideoUpdate(player);
+		XwaFrontendVideo_Draw(video->slot, x, y, width, height);
+	}
+}
+
+void XwaFrontendVideo_FreeImage(const char* path) {
+	for (int i = 0; i < XWA_FRONTEND_VIDEO_SLOTS; i++) {
+		if (g_imageVideos[i].path[0] && strcmp(g_imageVideos[i].path, path) == 0) {
+			image_video_close(&g_imageVideos[i]);
+		}
+	}
+}
+
+void XwaFrontendVideo_StartTick(void) {
+	const unsigned frame = XwaFrontendScreens_FrameCount();
 	for (int i = 0; i < XWA_FRONTEND_VIDEO_SLOTS; i++) {
 		if (g_videoSlots[i].player && g_videoSlots[i].closed) {
 			Aeron_VideoClose(g_videoSlots[i].player);
@@ -90,9 +145,15 @@ void XwaFrontendVideo_ReleaseClosed(void) {
 			g_videoSlots[i].closed = 0;
 		}
 	}
+	for (int i = 0; i < XWA_FRONTEND_VIDEO_SLOTS; i++) {
+		if (g_imageVideos[i].path[0] && g_imageVideos[i].frame != frame) {
+			image_video_close(&g_imageVideos[i]);
+		}
+	}
 }
 
 void XwaFrontendVideo_Shutdown(void) {
+	memset(g_imageVideos, 0, sizeof(g_imageVideos));
 	for (int i = 0; i < XWA_FRONTEND_VIDEO_SLOTS; i++) {
 		Aeron_VideoClose(g_videoSlots[i].player);
 		g_videoSlots[i].player = NULL;

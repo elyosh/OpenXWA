@@ -38,18 +38,18 @@ XwaPresentationRect XwaPresentation_Frame(void);
 /* The centered 4:3 region classic content presents into. */
 XwaPresentationRect XwaPresentation_ClassicSafeFrame(void);
 
-/* Sets how the HD frontend is shown. With a design screen (frontend.yaml
- * `design`), the frontend picture has its shape, fitted in the frame; a
- * wide screen spreads the 640x480 units over all of it, other screens keep
- * them in a 4:3 area in its middle. A design size of 0 means the classic
- * 640x480 surface is shown, in the classic safe frame. */
+/* Sets how the HD frontend is shown. The frontend picture has the shape of
+ * the design screen (frontend.yaml `design`) and is fitted in the frame. A
+ * wide screen spreads the 640x480 units over the whole picture; other
+ * screens keep them in a centered 4:3 area. A design size of 0 means the
+ * classic 640x480 surface is shown in the classic safe frame. */
 void XwaPresentation_SetFrontendShape(int design_width, int design_height, int wide);
 
 /* Where the frontend picture is shown. */
 XwaPresentationRect XwaPresentation_FrontendFrame(void);
 
-/* Where the frontend's 640x480 units are shown: the frontend frame on a
- * wide screen, else its middle 4:3 area. */
+/* Where the frontend's 640x480 units are shown: the whole frontend frame on
+ * a wide screen, else its centered 4:3 area. */
 XwaPresentationRect XwaPresentation_ClassicContentRect(void);
 
 /* Maps an original pixel position to the center of its corresponding pixel

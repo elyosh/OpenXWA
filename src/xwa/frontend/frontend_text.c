@@ -694,9 +694,9 @@ int FrontendText_MeasureWidth(const char* str, int fontSize) {
 
 #ifdef XWA_MODERN
 	{
-		/* XWA_MODERN: on a wide screen, text is measured by the width it has
-		   on screen (XwaFrontendScreens_TextScale256), as the draw loops
-		   below advance it. */
+		/* XWA_MODERN: on a wide screen, the draw functions below scale each
+		   glyph's advance by XwaFrontendScreens_TextScale256, so the measured
+		   width is scaled the same way. */
 		const int scale256 = XwaFrontendScreens_TextScale256();
 		if (scale256 != 256) {
 			return ((width - font->charSpacing) * scale256 + 128) / 256;
