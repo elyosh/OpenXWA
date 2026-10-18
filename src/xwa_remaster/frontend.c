@@ -390,14 +390,18 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		/* The game's height, and the width from the image's shape. */
 		s.dst_w = s.dst_h * (float)ref.w / (float)ref.h;
 	}
-	/* On a fill screen, an image as large as the 640x480 screen is the
-	 * background, and fills the whole target. */
-	if (g.layout == XWA_FRONTEND_LAYOUT_FILL && !d->has_src_rect && d->dst_x <= 0 && d->dst_y <= 0 &&
-		d->dst_x + d->img_w >= XWA_CLASSIC_WIDTH && d->dst_y + d->img_h >= XWA_CLASSIC_HEIGHT) {
-		s.dst_x = 0.0f;
-		s.dst_y = 0.0f;
-		s.dst_w = (float)g.rt_width;
+	/* With `fit: screen_height`, the image ignores the position and size the
+	 * game draws it at. It is as tall as the screen, keeps its shape, and is
+	 * centred left to right. The record's position and size, which the game
+	 * uses, don't change. */
+	if (gframe && gframe->fit == XWA_GEOMETRY_FIT_SCREEN_HEIGHT && !d->has_src_rect && ref.h > 0) {
 		s.dst_h = (float)g.rt_height;
+		s.dst_w = s.dst_h * (float)ref.w / (float)ref.h;
+		s.dst_x = ((float)g.rt_width - s.dst_w) * 0.5f;
+		s.dst_y = 0.0f;
+		/* On fill and classic screens, a clip of the whole 640x480 screen
+		   becomes the 4:3 area in the middle. That would cut this image, so
+		   it isn't clipped. */
 		s.scissor = rm_scissor(d->clip_left, d->clip_top, d->clip_right, d->clip_bottom);
 		if (s.scissor.x == rm_x_edge(0) && s.scissor.width == rm_x_edge(XWA_CLASSIC_WIDTH) - rm_x_edge(0))
 			s.scissor = (AeronRectI) { 0, 0, 0, 0 };

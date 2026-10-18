@@ -37,6 +37,12 @@ typedef enum XwaGeometryKeepAspect {
 	XWA_GEOMETRY_KEEP_ASPECT_WIDTH,
 } XwaGeometryKeepAspect;
 
+/* Where an image is drawn, when not where the game draws it. */
+typedef enum XwaGeometryFit {
+	XWA_GEOMETRY_FIT_NONE,          /* where the game draws it, at the game's size */
+	XWA_GEOMETRY_FIT_SCREEN_HEIGHT, /* as tall as the screen, keeping its shape, centred left to right */
+} XwaGeometryFit;
+
 /* One frame, in design pixels. */
 typedef struct XwaGeometryFrame {
 	int id;           /* DAT image id; -1 in a Frontres atlas */
@@ -45,6 +51,7 @@ typedef struct XwaGeometryFrame {
 	int has_bounds;
 	float bounds[4];  /* left, top, right, bottom, as the game stores them */
 	uint8_t keep_aspect; /* XwaGeometryKeepAspect */
+	uint8_t fit;         /* XwaGeometryFit; it changes only the drawing */
 } XwaGeometryFrame;
 
 /* A named rectangle of a sheet, such as a map icon. */

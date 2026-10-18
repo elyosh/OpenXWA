@@ -202,6 +202,16 @@ static int geometry_read_frame(const char* path, const AeronConfigNode* node, fl
 		}
 		frame->has_bounds = 1;
 	}
+	value = AeronConfigNode_MapGet(node, "fit");
+	if (value != NULL) {
+		text = AeronConfigNode_String(value, "");
+		if (strcmp(text, "screen_height") == 0) {
+			frame->fit = XWA_GEOMETRY_FIT_SCREEN_HEIGHT;
+		} else {
+			Aeron_LogError("xwa.frontend", "%s:%d: fit must be screen_height", path, AeronConfigNode_Line(value));
+			return 0;
+		}
+	}
 	value = AeronConfigNode_MapGet(node, "keep_aspect");
 	if (value != NULL) {
 		text = AeronConfigNode_String(value, "");

@@ -58,6 +58,7 @@ typedef struct XwauFrame {
 	int has_bounds;
 	double bounds[4]; /* left, top, right, bottom, as the game stores them */
 	const char* keep_aspect;
+	const char* fit;
 } XwauFrame;
 
 typedef struct XwauRegion {
@@ -317,6 +318,8 @@ static int listed_not_wide(const XwauContext* ctx, const char* key) {
 	return 0;
 }
 
+static int is_screen_background(const char* key, int width, int height);
+
 /* Notes the layout XWAU gives a background: 4:3 when its HD image has the
  * standard image's shape, else wide, unless ConcourseBackgroundsWide.txt
  * sets it to 0 or it is DPMED or CONFIGB, which the hook always sets to 0
@@ -424,6 +427,8 @@ static int write_atlas_yaml(const char* path, const XwauAtlas* atlas, const Aero
 		}
 		if (f->keep_aspect)
 			fprintf(fp, ", keep_aspect: %s", f->keep_aspect);
+		if (f->fit)
+			fprintf(fp, ", fit: %s", f->fit);
 		fprintf(fp, "}\n");
 	}
 	return fclose(fp) == 0;
@@ -768,11 +773,29 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 			new_image |= f->w != s->width || f->h != s->height;
 			if (icons && !same_aspect(s->width, s->height, f->w, f->h))
 				f->keep_aspect = "width";
-			if (i == 0 && !map_icons && s->width >= BACKGROUND_MIN_W && s->height >= BACKGROUND_MIN_H) {
+			{
+				/* A background decides the layout of the screens that show it.
+				 * Large images count as backgrounds, and so do the images that
+				 * XWAU treats as backgrounds, whatever their size, such as
+				 * MEDBACK (481x474). */
 				char key[600], list_key[600];
 				snprintf(key, sizeof key, "%s/%s", dir_lower, base_lower);
 				snprintf(list_key, sizeof list_key, "frontres/%s/%s.cbm", dir_lower, base_lower);
-				note_background(ctx, key, list_key, same_aspect(s->width, s->height, f->w, f->h));
+				if (i == 0 && !map_icons &&
+					((s->width >= BACKGROUND_MIN_W && s->height >= BACKGROUND_MIN_H) ||
+					 is_screen_background(key, s->width, s->height)))
+					note_background(ctx, key, list_key, same_aspect(s->width, s->height, f->w, f->h));
+			}
+			{
+				/* XWAU draws some images as backgrounds: as tall as the screen
+				 * and centred, instead of where the game draws them. It does
+				 * this when the game loads the image under certain names, and
+				 * when the HD image doesn't have the standard image's shape
+				 * (NET/Main.cs DrawItem, IsBackgroundName). */
+				char key[600];
+				snprintf(key, sizeof key, "%s/%s", dir_lower, base_lower);
+				if (is_screen_background(key, s->width, s->height) && !same_aspect(s->width, s->height, f->w, f->h))
+					f->fit = "screen_height";
 			}
 			if (map_icons) {
 				for (size_t t = 0; t < (size_t)f->w * f->h; ++t) {
@@ -1024,6 +1047,13 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 				(int)sd_info.width >= BACKGROUND_MIN_W && (int)sd_info.height >= BACKGROUND_MIN_H;
 			if (!background && !same_aspect((int)sd_info.width, (int)sd_info.height, f->w, f->h))
 				f->keep_aspect = "height";
+			{
+				char key[64];
+				snprintf(key, sizeof key, "group/%d/%d", group, id);
+				if (is_screen_background(key, (int)sd_info.width, (int)sd_info.height) &&
+					!same_aspect((int)sd_info.width, (int)sd_info.height, f->w, f->h))
+					f->fit = "screen_height";
+			}
 			if (background) {
 				char key[300], list_key[300];
 				snprintf(key, sizeof key, "group/%d/%d", group, id);
@@ -1473,6 +1503,27 @@ static void write_layouts(const XwauContext* ctx, FILE* fp) {
 			fprintf(fp, "%s%s", b ? ", " : "", k_screens[i].backgrounds[b]);
 		fprintf(fp, "\n");
 	}
+}
+
+/* Whether XWAU treats the image `key` ("<dir>/<base>" or "group/<g>/<id>")
+ * as a background. XWAU decides by the name the game loads the image under:
+ * backname, backconfig, concourse, background, briefstart, globe, techroom
+ * or cerecase (NET/Main.cs _backgroundNames). Those are the images in the
+ * screen table, the family room's views, the ceremony's medal case and the
+ * tech room. The family room's views are found by their folder, which also
+ * holds the medal case's small medals, so a view's standard image
+ * (`width` by `height`) must also be at least half the screen. The views
+ * are 415x384 units or more, the medals 108x119 or less. */
+static int is_screen_background(const char* key, int width, int height) {
+	for (size_t i = 0; i < SCREEN_COUNT; ++i) {
+		if (k_screens[i].medal_prefix && is_medal_view(key, k_screens[i].medal_prefix) && width >= 320 &&
+			height >= 240)
+			return 1;
+		for (int b = 0; b < 4 && k_screens[i].backgrounds[b]; ++b)
+			if (strcmp(k_screens[i].backgrounds[b], key) == 0)
+				return 1;
+	}
+	return strcmp(key, "medals/medalcase") == 0 || strcmp(key, "group/15000/3000") == 0;
 }
 
 static void write_frontend_yaml(XwauContext* ctx) {
