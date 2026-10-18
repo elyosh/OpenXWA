@@ -32,7 +32,7 @@
 #include <string.h>
 
 // GLOBAL: XWA 0x5FFB90
-int g_filmFeatureEnabled;
+int g_filmFeatureEnabled = 1;
 // GLOBAL: XWA 0x783FE8
 int g_filmRoomListScrollOffset;
 // GLOBAL: XWA 0x783FEC
