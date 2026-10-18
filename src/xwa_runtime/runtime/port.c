@@ -27,6 +27,8 @@
 #include "xwa_runtime/frontend/concourse_layout.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
+#include "xwa_runtime/frontend/frontend_video.h"
+#include "xwa_runtime/frontend/room_anims.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/input_bridge.h"
 #include "xwa_runtime/input/mouse_flight.h"
@@ -362,6 +364,8 @@ static void XwaPort_TickBody(int32_t delta_us) {
 
 void XwaPort_Tick(int32_t delta_us) {
 	XwaMovieTask_ReapFinished();
+	/* The last tick's frame has been drawn, so the videos closed in it can go. */
+	XwaFrontendVideo_ReleaseClosed();
 	const int movieTick = XwaMovieTask_IsActive();
 	XwaPort_TickBody(delta_us);
 	if (movieTick || XwaMovieTask_IsActive()) {
@@ -407,6 +411,8 @@ void XwaPort_Shutdown(void) {
 	XwaFrontendGeometry_Shutdown();
 	XwaFrontendScreens_Shutdown();
 	XwaConcourseLayout_Shutdown();
+	XwaRoomAnims_Shutdown();
+	XwaFrontendVideo_Shutdown();
 	FlightDisplay_FreeSurfaces();
 	FrontendDisplay_FreeSurfaces();
 	AeronDx5_Shutdown();

@@ -2,6 +2,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/concourse_layout.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
+#include "xwa_runtime/frontend/room_anims.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -860,6 +861,9 @@ int Concourse_Update(int frameCounter) {
 	XwaConcourseLayout_DrawSpriteOpaque("combatdoor", "doors.combat", 35, 174);
 	XwaConcourseLayout_DrawSpriteOpaque("filmdoor", "doors.film", 536, 286);
 	XwaConcourseLayout_DrawSpriteOpaque("techdoor", "doors.tech", 426, 219);
+	/* The animations of frontend/animations.yaml go over the doors and under
+	   the labels. */
+	XwaRoomAnims_Draw("concourse", frame);
 #else
 	Concourse_DrawStarfield(frame);
 	FrontImage_DrawSpriteOpaque("tourdoor", 231, 174);
@@ -1119,6 +1123,10 @@ int Concourse_Update(int frameCounter) {
 int Concourse_Exit(int frameCounter) {
 	(void)frameCounter;
 
+#ifdef XWA_MODERN
+	/* XWA_MODERN: stops the animations of frontend/animations.yaml. */
+	XwaRoomAnims_Leave("concourse");
+#endif
 	FrontendWaveStream_Shutdown();
 	FrontImage_UnloadResourceList("frontres\\concourse\\concourse.lst");
 	Concourse_FreeBackground();

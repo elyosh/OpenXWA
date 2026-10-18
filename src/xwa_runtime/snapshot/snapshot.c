@@ -38,6 +38,7 @@
 #include "xwa/render/renderer.h"
 #include "xwa/util/time.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -478,23 +479,23 @@ void XwaSnapshot_Commit(void) {
 	if (s->dropped_records) {
 		/* Histogram of what filled the channels — identifies the
 		 * emitter flooding the caps. */
-		uint32_t draw_kinds[8] = { 0 };
+		uint32_t draw_kinds[16] = { 0 };
 		uint32_t paint_kinds[8] = { 0 };
 		for (uint32_t i = 0; i < s->draw_2d_count; i++) {
-			draw_kinds[s->draws_2d[i].kind & 7]++;
+			draw_kinds[s->draws_2d[i].kind & 15]++;
 		}
 		for (uint32_t i = 0; i < s->paint_cmd_count; i++) {
 			paint_kinds[s->paint_cmds[i].kind & 7]++;
 		}
 		Aeron_LogWarn("xwa.snapshot",
 					  "tick %llu: %u 2D records dropped (caps %d/%d); kept draws "
-					  "spr=%u opq=%u trl=%u rect=%u rtint=%u rblend=%u rtb=%u atlas=%u | paints "
+					  "spr=%u opq=%u trl=%u rect=%u rtint=%u rblend=%u rtb=%u atlas=%u video=%u | paints "
 					  "hl=%u vl=%u ln=%u aa=%u ftr=%u fill=%u out=%u px=%u | glyphs=%u",
 					  (unsigned long long)s->tick_index, s->dropped_records, XWA_SNAP_MAX_DRAWS_2D,
 					  XWA_SNAP_MAX_PAINT_CMDS, draw_kinds[0], draw_kinds[1], draw_kinds[2], draw_kinds[3],
-					  draw_kinds[4], draw_kinds[5], draw_kinds[6], draw_kinds[7], paint_kinds[0],
-					  paint_kinds[1], paint_kinds[2], paint_kinds[3], paint_kinds[4], paint_kinds[5],
-					  paint_kinds[6], paint_kinds[7], s->glyph_count);
+					  draw_kinds[4], draw_kinds[5], draw_kinds[6], draw_kinds[7], draw_kinds[8],
+					  paint_kinds[0], paint_kinds[1], paint_kinds[2], paint_kinds[3], paint_kinds[4],
+					  paint_kinds[5], paint_kinds[6], paint_kinds[7], s->glyph_count);
 	}
 	snapshot_maybe_dump(s);
 	g_previous_slot = g_current_slot;
@@ -999,6 +1000,28 @@ void XwaSnapshot_EmitAtlasSprite(int group_id, int index, int x, int y, int img_
 	d->dst_x = (int16_t)x;
 	d->dst_y = (int16_t)y;
 	snapshot_take_sprite_fraction(d);
+	stamp_clip(&d->clip_left, &d->clip_top, &d->clip_right, &d->clip_bottom);
+}
+
+void XwaSnapshot_EmitVideo(int slot, unsigned serial, float x, float y, float width, float height) {
+	XwaSnapshot* s = wr();
+	if (s->draw_2d_count >= XWA_SNAP_MAX_DRAWS_2D) {
+		s->dropped_records++;
+		return;
+	}
+	XwaDraw2D* d = &s->draws_2d[s->draw_2d_count++];
+	memset(d, 0, sizeof *d);
+	d->z_order = g_z_counter++;
+	d->kind = XWA_DRAW2D_VIDEO;
+	d->target = (uint8_t)snapshot_emit_target();
+	d->video_slot = (int16_t)slot;
+	d->video_serial = (uint16_t)serial;
+	d->dst_x = (int16_t)floorf(x);
+	d->dst_y = (int16_t)floorf(y);
+	d->dst_frac_x = (int16_t)lroundf((x - (float)d->dst_x) * 256.0f);
+	d->dst_frac_y = (int16_t)lroundf((y - (float)d->dst_y) * 256.0f);
+	d->video_w256 = (int32_t)lroundf(width * 256.0f);
+	d->video_h256 = (int32_t)lroundf(height * 256.0f);
 	stamp_clip(&d->clip_left, &d->clip_top, &d->clip_right, &d->clip_bottom);
 }
 

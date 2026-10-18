@@ -108,6 +108,7 @@ typedef enum XwaDraw2DKind {
 	XWA_DRAW2D_SPRITE_RECT_ORIENTED,        /* FrontImage_DrawSpriteRectOriented */
 	XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED, /* ...RectTintedOriented */
 	XWA_DRAW2D_ATLAS_SPRITE,                /* FrontImage_DrawAtlasSprite */
+	XWA_DRAW2D_VIDEO,                       /* a frontend video (xwa_runtime/frontend/frontend_video.h) */
 } XwaDraw2DKind;
 
 #define XWA_SNAP_SPRITE_NAME_MAX 24
@@ -155,6 +156,12 @@ typedef struct XwaDraw2D {
 	/* Active screen clip rect (inclusive, frontend coords) at emit
 	 * time — FrontendDisplay_Get/SetScreenClipRect640x480 state. */
 	int16_t clip_left, clip_top, clip_right, clip_bottom;
+	/* XWA_DRAW2D_VIDEO: the video slot, the serial of the player that was in
+	 * it, and the size in 1/256 units. The position is dst_x, dst_y and their
+	 * fractions. */
+	int16_t video_slot;
+	uint16_t video_serial;
+	int32_t video_w256, video_h256;
 } XwaDraw2D;
 
 typedef enum XwaPaintKind {
@@ -1266,6 +1273,9 @@ void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, con
  * caller adds the payload anchor first — aeron atlas convention:
  * origins are baked into the draw position at emit time). */
 void XwaSnapshot_EmitAtlasSprite(int group_id, int index, int x, int y, int img_w, int img_h);
+/* A frontend video record: the current frame of the player in `slot`,
+ * stretched over x, y, width, height in 640x480 units. */
+void XwaSnapshot_EmitVideo(int slot, unsigned serial, float x, float y, float width, float height);
 /* The next sprite record is drawn `frac_x`, `frac_y` 1/256 units further,
  * the part of an exact position that the game's whole units leave out. */
 void XwaSnapshot_SetNextSpriteFraction(int frac_x, int frac_y);

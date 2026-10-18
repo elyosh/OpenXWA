@@ -15,6 +15,9 @@
  *   <out>/frontend/frontres/<dir>/atlas/<base>.yaml with <base>.ktx2, <base>_p<N>.ktx2
  *   <out>/resdata/atlas/group_<g>.yaml              with group_<g>.ktx2, group_<g>_p<N>.ktx2
  *   <out>/frontend/concourse/starfield_mask.png     where the concourse stars can show
+ *   <out>/frontend/concourse/layout.yaml            room positions
+ *   <out>/frontend/animations.yaml                  room animations; their videos are
+ *                                                   copied by hand from XWAU's Resdata
  *
  * Standard files equal to stock that have no HD image are left to the stock
  * bake. The XWAU install is read with host file I/O; names match in any case.
@@ -1393,6 +1396,226 @@ static void write_layout_yaml(XwauContext* ctx) {
 		ctx->stats->failures++;
 }
 
+/* ---- room animations ---------------------------------------------------- */
+
+/* XWAU counts its animation delays and plays its animations in concourse
+ * frames, at 24 a second. */
+#define CONCOURSE_FPS 24.0
+
+typedef struct XwauAnimLine {
+	int line;       /* in ConcourseAnimations.txt */
+	int x, y, w, h; /* 640x480 units; w and h are 0 without a size */
+	int id;
+	int delay_min, delay_max; /* concourse frames */
+	char group[64];
+	char missions[512];
+	char video[256]; /* the webm file's name */
+} XwauAnimLine;
+
+static char* trim(char* s) {
+	while (isspace((unsigned char)*s))
+		s++;
+	char* end = s + strlen(s);
+	while (end > s && isspace((unsigned char)end[-1]))
+		*--end = '\0';
+	return s;
+}
+
+/* Splits `text` where it has `delimiters` and trims each piece, as XWAU
+ * does: several delimiters in a row count as one. Returns the number of
+ * pieces. */
+static int split(char* text, const char* delimiters, char** pieces, int max) {
+	int count = 0;
+	for (char* piece = strtok(text, delimiters); piece && count < max; piece = strtok(NULL, delimiters))
+		pieces[count++] = trim(piece);
+	return count;
+}
+
+/* The delay before each play in seconds. XWAU waits delayMin + rand() %
+ * (delayMax - delayMin) frames, and doesn't wait when delayMax <= delayMin.
+ * Returns 0 for no delay. */
+static int anim_delay(const XwauAnimLine* a, double* shortest, double* longest) {
+	if (a->delay_max <= a->delay_min || a->delay_max <= 1)
+		return 0;
+	*shortest = (a->delay_min > 0 ? a->delay_min : 0) / CONCOURSE_FPS;
+	*longest = (a->delay_max - 1) / CONCOURSE_FPS;
+	return 1;
+}
+
+static int same_delay(const XwauAnimLine* a, const XwauAnimLine* b) {
+	double a0 = 0, a1 = 0, b0 = 0, b1 = 0;
+	const int delayed = anim_delay(a, &a0, &a1);
+	return delayed == anim_delay(b, &b0, &b1) && a0 == b0 && a1 == b1;
+}
+
+/* XWAU's mission list: empty or with -1 for all missions, else the plain
+ * numbers, else every mission but those after a ~. */
+static void write_missions(FILE* fp, const char* list) {
+	char text[512];
+	char* ids[128];
+	snprintf(text, sizeof text, "%s", list);
+	const int count = split(text, " \t", ids, 128);
+	int plain = 0;
+	for (int i = 0; i < count; ++i) {
+		if (strcmp(ids[i], "-1") == 0)
+			return;
+		plain += ids[i][0] != '~';
+	}
+	if (count == 0)
+		return;
+	fprintf(fp, plain ? ", missions: [" : ", missions: {except: [");
+	int written = 0;
+	for (int i = 0; i < count; ++i) {
+		if ((ids[i][0] != '~') == (plain != 0))
+			fprintf(fp, "%s%ld", written++ ? ", " : "", strtol(ids[i] + (plain ? 0 : 1), NULL, 0));
+	}
+	fprintf(fp, plain ? "]" : "]}");
+}
+
+/* frontend/animations.yaml from ConcourseAnimations.txt. Each XWAU group
+ * becomes a group; a name that starts with + repeats its animation. Lines
+ * that OpenXWA can't play the same way are reported. */
+static void write_animations_yaml(XwauContext* ctx) {
+	char list[1100];
+	if (!find_ci(ctx->opt->xwau_root, "ConcourseAnimations.txt", list, sizeof list))
+		return;
+	FILE* in = fopen(list, "r");
+	if (!in) {
+		ctx->stats->failures++;
+		return;
+	}
+	XwauAnimLine* lines = NULL;
+	int count = 0;
+	char text[2048];
+	for (int number = 1; fgets(text, sizeof text, in); ++number) {
+		char* t = trim(text);
+		if (!t[0] || t[0] == '#' || t[0] == ';' || (t[0] == '/' && t[1] == '/'))
+			continue;
+		/* XWAU reads the lines before the first [section]. */
+		if (t[0] == '[' && t[strlen(t) - 1] == ']')
+			break;
+		char* v[16];
+		const int n = split(t, ",;", v, 16);
+		if (n < 8)
+			continue;
+		/* 8 or 9 pieces (with a comment) have no size. */
+		const int k = n == 8 || n == 9 ? 0 : 2;
+		XwauAnimLine a;
+		memset(&a, 0, sizeof a);
+		a.line = number;
+		a.x = (int)strtol(v[1], NULL, 0);
+		a.y = (int)strtol(v[2], NULL, 0);
+		if (k) {
+			a.w = (int)strtol(v[3], NULL, 0);
+			a.h = (int)strtol(v[4], NULL, 0);
+		}
+		a.id = (int)strtol(v[3 + k], NULL, 0);
+		a.delay_min = (int)strtol(v[4 + k], NULL, 0);
+		a.delay_max = (int)strtol(v[5 + k], NULL, 0);
+		snprintf(a.group, sizeof a.group, "%s", v[6 + k]);
+		snprintf(a.missions, sizeof a.missions, "%s", v[7 + k]);
+		if (strcasecmp(v[0], "concourse") != 0) {
+			fprintf(stderr,
+					"xwau: ConcourseAnimations.txt:%d: XWAU draws only the concourse's animations, so this "
+					"%s line is left out\n",
+					number, v[0]);
+			continue;
+		}
+		char name[64], webm[1200];
+		snprintf(name, sizeof name, "concourse_anim_%d.webm", a.id);
+		if (!find_ci(ctx->resdata, name, webm, sizeof webm)) {
+			fprintf(stderr,
+					"xwau: ConcourseAnimations.txt:%d: concourse_anim_%d has no webm file. It is a DAT "
+					"animation, which OpenXWA doesn't play, so the line is left out\n",
+					number, a.id);
+			continue;
+		}
+		snprintf(a.video, sizeof a.video, "%s", strrchr(webm, '/') + 1);
+		if (a.w == 0 || a.h == 0)
+			fprintf(stderr,
+					"xwau: ConcourseAnimations.txt:%d: concourse_anim_%d has no size. XWAU draws it at its "
+					"pixel size in 640x480 units, OpenXWA at its pixel size in design pixels\n",
+					number, a.id);
+		XwauAnimLine* grown = (XwauAnimLine*)realloc(lines, (size_t)(count + 1) * sizeof *lines);
+		if (!grown)
+			break;
+		lines = grown;
+		lines[count++] = a;
+	}
+	fclose(in);
+
+	char path[1200];
+	snprintf(path, sizeof path, "%s/frontend/animations.yaml", ctx->opt->sprites->out_root);
+	FILE* fp = fopen(path, "w");
+	if (!fp) {
+		free(lines);
+		ctx->stats->failures++;
+		return;
+	}
+	fprintf(fp,
+			"# Made by xwa_asset_bake xwau-frontend from ConcourseAnimations.txt. Positions and\n"
+			"# sizes are in design pixels, delays in seconds. The videos go in\n"
+			"# frontend/animations/, copied from XWAU's Resdata folder.\n"
+			"version: 1\n"
+			"groups:%s\n",
+			count ? "" : " []");
+	/* The groups come in the order of their first line. Their names match in
+	   any case, as in XWAU. */
+	for (int first = 0; first < count; ++first) {
+		int seen = 0;
+		for (int i = 0; i < first && !seen; ++i)
+			seen = strcasecmp(lines[i].group, lines[first].group) == 0;
+		if (seen)
+			continue;
+		const XwauAnimLine* a = &lines[first];
+		double shortest, longest;
+		fprintf(fp, "  - room: concourse\n    repeat: %s\n", a->group[0] == '+' ? "same" : "random");
+		if (anim_delay(a, &shortest, &longest)) {
+			const double delay[2] = { shortest, longest };
+			fprintf(fp, "    delay: ");
+			write_list(fp, delay, 2);
+			fprintf(fp, "\n");
+		}
+		fprintf(fp, "    animations:\n");
+		int apart = 0;
+		for (int i = first; i < count; ++i) {
+			const XwauAnimLine* b = &lines[i];
+			if (strcasecmp(b->group, a->group) != 0) {
+				apart = 1;
+				continue;
+			}
+			if (!same_delay(a, b))
+				fprintf(
+					stderr,
+					"xwau: ConcourseAnimations.txt:%d: this delay differs from the one on line %d. A group "
+					"has one delay in OpenXWA, so %s takes line %d's\n",
+					b->line, a->line, a->group, a->line);
+			if (apart == 1) {
+				fprintf(
+					stderr,
+					"xwau: ConcourseAnimations.txt:%d: the lines of %s are apart. OpenXWA draws the group "
+					"where its first line is, so other groups may be drawn over it in another order\n",
+					b->line, a->group);
+				apart = 2;
+			}
+			fprintf(fp, "      - {video: %s, at: ", b->video);
+			write_design_point(fp, b->x, b->y);
+			if (b->w && b->h) {
+				fprintf(fp, ", size: ");
+				write_design_point(fp, b->w, b->h);
+			}
+			/* XWAU shows a video frame each concourse frame, whatever the
+			   file's frame rate. */
+			fprintf(fp, ", fps: %.0f", CONCOURSE_FPS);
+			write_missions(fp, b->missions);
+			fprintf(fp, "}\n");
+		}
+	}
+	free(lines);
+	if (fclose(fp) != 0)
+		ctx->stats->failures++;
+}
+
 /* The screens and views of the layout table, and the backgrounds each one
  * shows, from the recovered code. The family room's memento and rank views
  * show many backgrounds, all in medals/: a prefix selects them. */
@@ -1580,6 +1803,7 @@ int BakeXwau_RunFrontend(const BakeXwauOptions* opt, BakeXwauStats* stats) {
 	bake_resdata(&ctx);
 	write_frontend_yaml(&ctx);
 	write_layout_yaml(&ctx);
+	write_animations_yaml(&ctx);
 
 	free(ctx.regions);
 	for (int i = 0; i < ctx.wide_key_count; ++i)

@@ -203,6 +203,8 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/frontend/concourse_layout.c
     src/xwa_runtime/frontend/frontend_geometry.c
     src/xwa_runtime/frontend/frontend_screens.c
+    src/xwa_runtime/frontend/frontend_video.c
+    src/xwa_runtime/frontend/room_anims.c
     src/xwa_runtime/input/input_bridge.c
     src/xwa_runtime/input/controller_mapping.c
     src/xwa_runtime/input/rumble_provider.c
@@ -607,6 +609,8 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/frontend/concourse_layout.h
     src/xwa_runtime/frontend/frontend_geometry.h
     src/xwa_runtime/frontend/frontend_screens.h
+    src/xwa_runtime/frontend/frontend_video.h
+    src/xwa_runtime/frontend/room_anims.h
     src/xwa_runtime/input/input_bridge.h
     src/xwa_runtime/input/rumble_provider.h
     src/xwa_runtime/input/winmm_joystick_provider.h

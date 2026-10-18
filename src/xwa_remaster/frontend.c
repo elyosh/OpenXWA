@@ -39,6 +39,7 @@
 #include "xwa_remaster/preview.h"
 #include "xwa_remaster/text.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
+#include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/runtime/presentation.h"
 
 #include <math.h>
@@ -98,6 +99,8 @@ typedef struct RmState {
 	 * composited by the z-merge; NULL = not rendered: no HD mesh, or the
 	 * render failed). */
 	AeronTexture* preview_tex[XWA_SNAP_MAX_MODEL_PREVIEWS];
+	/* This tick's frame of each video slot (rm_prepare_videos), or NULL. */
+	AeronTexture* video_tex[XWA_FRONTEND_VIDEO_SLOTS];
 	int warned_save_stack;
 	/* Resolver coverage telemetry (throttled log). */
 	uint32_t stat_hits;
@@ -218,7 +221,31 @@ static int rm_is_highlight_tint(uint32_t engine_color) {
 	return 0;
 }
 
+/* A video record: the slot's current frame, stretched over the record's
+ * rectangle. */
+static void rm_add_video(AeronDrawList2D* list, const XwaDraw2D* d) {
+	if (d->video_slot < 0 || d->video_slot >= XWA_FRONTEND_VIDEO_SLOTS || !g.video_tex[d->video_slot])
+		return;
+	AeronDrawList2DSprite s = { 0 };
+	s.texture = g.video_tex[d->video_slot];
+	s.filter = AERON_BLIT2D_FILTER_LINEAR;
+	s.blend = AERON_BLIT2D_BLEND_PMA;
+	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
+	s.src_u1 = 1.0f;
+	s.src_v1 = 1.0f;
+	s.dst_x = rm_px((float)d->dst_x + (float)d->dst_frac_x / 256.0f);
+	s.dst_y = ((float)d->dst_y + (float)d->dst_frac_y / 256.0f) * rm_scale_y();
+	s.dst_w = (float)d->video_w256 / 256.0f * rm_scale_x();
+	s.dst_h = (float)d->video_h256 / 256.0f * rm_scale_y();
+	s.scissor = rm_scissor(d->clip_left, d->clip_top, d->clip_right, d->clip_bottom);
+	AeronDrawList_AddSprite(list, &s);
+}
+
 static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
+	if (d->kind == XWA_DRAW2D_VIDEO) {
+		rm_add_video(list, d);
+		return;
+	}
 	XwaAssetRef ref;
 	int found;
 	const XwaGeometryFrame* gframe;
@@ -720,6 +747,18 @@ static void rm_prepare_model_previews(AeronCommandBuffer* cmd, const XwaSnapshot
 	}
 }
 
+/* Takes the current frame of each video the snapshot draws. The uploads must
+ * come before the reconstruction's passes on this command buffer. */
+static void rm_prepare_videos(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
+	memset(g.video_tex, 0, sizeof g.video_tex);
+	for (uint32_t i = 0; i < snap->draw_2d_count; i++) {
+		const XwaDraw2D* d = &snap->draws_2d[i];
+		if (d->kind == XWA_DRAW2D_VIDEO && d->video_slot >= 0 && d->video_slot < XWA_FRONTEND_VIDEO_SLOTS &&
+			!g.video_tex[d->video_slot])
+			g.video_tex[d->video_slot] = XwaFrontendVideo_Texture(d->video_slot, d->video_serial, cmd);
+	}
+}
+
 /* Cursor pixels belong to the held presentation, independently of source assets.
  * Reuse the ordinary translators in local coordinates; movement only submits layers. */
 static int rm_render_cursor_layer(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
@@ -845,6 +884,7 @@ static void rm_present_cursor(AeronCommandBuffer* cmd, const XwaSnapshot* snap, 
 
 static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 	rm_prepare_model_previews(cmd, snap);
+	rm_prepare_videos(cmd, snap);
 	if (g.screen_needs_clear) {
 		/* Opaque black, not transparent: an unreconstructed region must
 		 * read as a visible gap, not as the classic layer bleeding
