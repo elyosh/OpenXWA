@@ -383,6 +383,11 @@ void BriefingMap_DrawGrid(FrontendRect* viewportRect) {
 	int16_t drawMinorQuarterLines;
 
 	FrontendDraw_RectCopy(&dst, viewportRect);
+#ifdef XWA_MODERN
+	/* Remaster snapshot observer: the lines below are the grid, which a mod
+	   can draw in its own colours and thickness. */
+	XwaSnapshot_BeginBriefingGrid((uint32_t)(uint16_t)g_briefingMapMajorGridColor);
+#endif
 
 	{
 		int16_t centerX = g_briefingMapCenter.x;
@@ -465,6 +470,9 @@ void BriefingMap_DrawGrid(FrontendRect* viewportRect) {
 		y = (int16_t)(y + g_briefingMapScale.y);
 		++yCounter;
 	}
+#ifdef XWA_MODERN
+	XwaSnapshot_EndBriefingGrid();
+#endif
 }
 
 // FUNCTION: XWA 0x569F00

@@ -1,7 +1,8 @@
 #ifndef XWA_RUNTIME_FRONTEND_FRONTEND_GEOMETRY_H
 #define XWA_RUNTIME_FRONTEND_FRONTEND_GEOMETRY_H
 
-/* Game geometry from the mod folder's frontend atlases.
+/* Game geometry from the mod folder's frontend atlases, and the frontend's
+ * paint look.
  *
  * An atlas with `game_geometry: true` gives the game the frame count, sizes,
  * offsets and bounds of the image it replaces, so the standard file isn't
@@ -21,6 +22,13 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* Which tints of the game's tinted icon draws apply to an image. */
+typedef enum XwaGeometryTint {
+	XWA_GEOMETRY_TINT_ALL,
+	XWA_GEOMETRY_TINT_NONE,
+	XWA_GEOMETRY_TINT_HIGHLIGHTS, /* only light blue, yellow and green */
+} XwaGeometryTint;
 
 typedef enum XwaGeometryKeepAspect {
 	XWA_GEOMETRY_KEEP_ASPECT_NONE,
@@ -48,6 +56,10 @@ typedef struct XwaGeometryAtlas {
 	XwaGeometryFrame* frames;
 	int frame_count;
 	int classic_frames; /* the frame count the game uses: `classic_frames`, else frame_count */
+	float fps;          /* when above 0, the frames are shown by time, not by the game's frame */
+	uint8_t tint;       /* XwaGeometryTint */
+	int has_draw_adjust;
+	float draw_adjust[4]; /* x, y, width and height added to the drawn rectangle only */
 	int has_bounds;
 	float bounds[4]; /* the whole image's bounds */
 	XwaGeometryRegion* regions;
@@ -67,6 +79,21 @@ const XwaGeometryRegion* XwaFrontendGeometry_FindRegion(const XwaGeometryAtlas* 
 /* Design pixels to whole 640x480 units, rounded to the nearest. */
 int XwaFrontendGeometry_UnitX(float x);
 int XwaFrontendGeometry_UnitY(float y);
+/* Design pixels to 640x480 units, not rounded. */
+float XwaFrontendGeometry_UnitsX(float x);
+float XwaFrontendGeometry_UnitsY(float y);
+
+/* The `paint` section of frontend/frontend.yaml. Without it, the original
+ * look. */
+typedef struct XwaFrontendPaint {
+	float fill_alpha;     /* translucent fills; the original is 0.5 */
+	int pixel_lines;      /* lines, outlines and the briefing grid one screen pixel thick */
+	int has_grid_colours; /* the briefing grid's colours replace the game's */
+	uint32_t grid_major;  /* 0xRRGGBB */
+	uint32_t grid_minor;
+} XwaFrontendPaint;
+
+const XwaFrontendPaint* XwaFrontendGeometry_Paint(void);
 
 /* Builds the descriptor that the recovered loaders would build from the
  * standard file: the frame count, each frame's size and bounds, and the

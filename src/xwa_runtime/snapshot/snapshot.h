@@ -158,10 +158,18 @@ typedef enum XwaPaintKind {
 	XWA_PAINT_PIXEL,            /* single raw-color pixel (concourse stars) */
 } XwaPaintKind;
 
+/* What a paint record draws, when the renderer treats it differently. */
+typedef enum XwaPaintRole {
+	XWA_PAINT_ROLE_NONE = 0,
+	XWA_PAINT_ROLE_GRID_MAJOR, /* a major line of the briefing map grid */
+	XWA_PAINT_ROLE_GRID_MINOR, /* a minor line of the briefing map grid */
+} XwaPaintRole;
+
 typedef struct XwaPaintCmd {
 	uint32_t z_order;
 	uint8_t kind;   /* XwaPaintKind */
 	uint8_t target; /* XwaEmitTarget */
+	uint8_t role;   /* XwaPaintRole */
 	/* Lines: (x0,y0)-(x1,y1). HLINE: x0..x1 at y0. VLINE: y0..y1 at
 	 * x0. FILL_TRANSLUCENT: rect x0,y0..x1,y1 offset by (dx,dy). */
 	int16_t x0, y0, x1, y1;
@@ -1120,6 +1128,9 @@ typedef struct XwaSnapshot {
 	 * (equal across the pair = paused; non-monotonic = seek). The
 	 * tick's sim delta is the difference across the held pair. */
 	int32_t game_time_ticks;
+	/* The host clock at commit, in microseconds. It runs on during pauses
+	 * and drives frontend images shown by time (an atlas `fps`). */
+	uint64_t host_time_us;
 	XwaSceneKind scene_kind;
 	/* Set when this tick's presents must not be shown, and the driver should
 	 * keep its last output. Used while the loading screen is held, because its
@@ -1252,6 +1263,10 @@ void XwaSnapshot_NoteResourceBinding(const char* fileName, const char* name, int
 void XwaSnapshot_NoteResourceFree(const char* name);
 
 void XwaSnapshot_EmitPaint(XwaPaintKind kind, int x0, int y0, int x1, int y1, int dx, int dy, uint32_t color);
+/* Between these calls, horizontal and vertical lines are the briefing map
+ * grid: major when they have `major_color`, else minor. */
+void XwaSnapshot_BeginBriefingGrid(uint32_t major_color);
+void XwaSnapshot_EndBriefingGrid(void);
 
 /* One glyph from a FrontendText_Draw* string loop. */
 void XwaSnapshot_EmitGlyph(int font_size, unsigned char ch, int x, int y, uint32_t color);

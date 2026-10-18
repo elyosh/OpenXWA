@@ -31,6 +31,7 @@ static int g_geometryEntryCapacity;
 static int g_geometryDesignLoaded;
 static float g_geometryDesignW = 640.0f;
 static float g_geometryDesignH = 480.0f;
+static XwaFrontendPaint g_geometryPaint = { 0.5f, 0, 0, 0, 0 };
 
 static const ResourceDescriptor** g_geometryDescriptors;
 static int g_geometryDescriptorCount;
@@ -55,6 +56,51 @@ static int geometry_read_numbers(const AeronConfigNode* node, float* out, size_t
 		out[i] = (float)AeronConfigNode_Float(value, 0.0);
 	}
 	return 1;
+}
+
+/* Reads the `paint` section. A wrong value is logged, and that key keeps
+ * the original look. */
+static void geometry_read_paint(const AeronConfigNode* paint) {
+	const AeronConfigNode* value;
+	const char* text;
+
+	if (paint == NULL) {
+		return;
+	}
+	value = AeronConfigNode_MapGet(paint, "fill_alpha");
+	if (value != NULL) {
+		const float alpha = (float)AeronConfigNode_Float(value, -1.0);
+		if (alpha >= 0.0f && alpha <= 1.0f) {
+			g_geometryPaint.fill_alpha = alpha;
+		} else {
+			Aeron_LogError("xwa.frontend", "%s:%d: fill_alpha must be between 0 and 1", XWA_GEOMETRY_DESIGN_PATH,
+						   AeronConfigNode_Line(value));
+		}
+	}
+	value = AeronConfigNode_MapGet(paint, "line_width");
+	if (value != NULL) {
+		text = AeronConfigNode_String(value, "");
+		if (strcmp(text, "pixel") == 0 || strcmp(text, "unit") == 0) {
+			g_geometryPaint.pixel_lines = strcmp(text, "pixel") == 0;
+		} else {
+			Aeron_LogError("xwa.frontend", "%s:%d: line_width must be unit or pixel", XWA_GEOMETRY_DESIGN_PATH,
+						   AeronConfigNode_Line(value));
+		}
+	}
+	value = AeronConfigNode_MapGet(paint, "grid_colours");
+	if (value != NULL) {
+		const AeronConfigNode* major = AeronConfigNode_SequenceGet(value, 0);
+		const AeronConfigNode* minor = AeronConfigNode_SequenceGet(value, 1);
+		if (AeronConfigNode_SequenceCount(value) == 2 && AeronConfigNode_Type(major) == AERON_CONFIG_INT &&
+			AeronConfigNode_Type(minor) == AERON_CONFIG_INT) {
+			g_geometryPaint.has_grid_colours = 1;
+			g_geometryPaint.grid_major = (uint32_t)AeronConfigNode_Int(major, 0) & 0xffffffu;
+			g_geometryPaint.grid_minor = (uint32_t)AeronConfigNode_Int(minor, 0) & 0xffffffu;
+		} else {
+			Aeron_LogError("xwa.frontend", "%s:%d: grid_colours must be [major, minor], such as [0xFF0000, 0x800000]",
+						   XWA_GEOMETRY_DESIGN_PATH, AeronConfigNode_Line(value));
+		}
+	}
 }
 
 static void geometry_load_design(void) {
@@ -85,6 +131,7 @@ static void geometry_load_design(void) {
 						   XWA_GEOMETRY_DESIGN_PATH, AeronConfigNode_Line(design));
 		}
 	}
+	geometry_read_paint(AeronConfigNode_MapGet(AeronConfigFile_Root(file), "paint"));
 	AeronConfigFile_Destroy(file);
 }
 
@@ -230,6 +277,38 @@ static XwaGeometryAtlas* geometry_read_atlas(const char* path, int needs_id) {
 			ok = 0;
 		}
 	}
+	value = AeronConfigNode_MapGet(root, "fps");
+	if (ok && value != NULL) {
+		atlas->fps = (float)AeronConfigNode_Float(value, 0.0);
+		if (atlas->fps <= 0.0f) {
+			Aeron_LogError("xwa.frontend", "%s:%d: fps must be a positive number", path, AeronConfigNode_Line(value));
+			ok = 0;
+		}
+	}
+	value = AeronConfigNode_MapGet(root, "tint");
+	if (ok && value != NULL) {
+		const char* tint = AeronConfigNode_String(value, "");
+		if (strcmp(tint, "all") == 0) {
+			atlas->tint = XWA_GEOMETRY_TINT_ALL;
+		} else if (strcmp(tint, "none") == 0) {
+			atlas->tint = XWA_GEOMETRY_TINT_NONE;
+		} else if (strcmp(tint, "highlights") == 0) {
+			atlas->tint = XWA_GEOMETRY_TINT_HIGHLIGHTS;
+		} else {
+			Aeron_LogError("xwa.frontend", "%s:%d: tint must be all, none or highlights", path,
+						   AeronConfigNode_Line(value));
+			ok = 0;
+		}
+	}
+	value = AeronConfigNode_MapGet(root, "draw_adjust");
+	if (ok && value != NULL) {
+		atlas->has_draw_adjust = geometry_read_numbers(value, atlas->draw_adjust, 4);
+		if (!atlas->has_draw_adjust) {
+			Aeron_LogError("xwa.frontend", "%s:%d: draw_adjust must be [x, y, width, height]", path,
+						   AeronConfigNode_Line(value));
+			ok = 0;
+		}
+	}
 	value = AeronConfigNode_MapGet(root, "bounds");
 	if (ok && value != NULL) {
 		atlas->has_bounds = geometry_read_numbers(value, atlas->bounds, 4);
@@ -370,6 +449,21 @@ int XwaFrontendGeometry_UnitX(float x) {
 int XwaFrontendGeometry_UnitY(float y) {
 	geometry_load_design();
 	return (int)floorf(y * 480.0f / g_geometryDesignH + 0.5f);
+}
+
+float XwaFrontendGeometry_UnitsX(float x) {
+	geometry_load_design();
+	return x * 640.0f / g_geometryDesignW;
+}
+
+float XwaFrontendGeometry_UnitsY(float y) {
+	geometry_load_design();
+	return y * 480.0f / g_geometryDesignH;
+}
+
+const XwaFrontendPaint* XwaFrontendGeometry_Paint(void) {
+	geometry_load_design();
+	return &g_geometryPaint;
 }
 
 static void geometry_unit_bounds(const float* bounds, int* left, int* top, int* right, int* bottom) {
@@ -537,4 +631,7 @@ void XwaFrontendGeometry_Shutdown(void) {
 	g_geometryDesignLoaded = 0;
 	g_geometryDesignW = 640.0f;
 	g_geometryDesignH = 480.0f;
+	g_geometryPaint.fill_alpha = 0.5f;
+	g_geometryPaint.pixel_lines = 0;
+	g_geometryPaint.has_grid_colours = 0;
 }

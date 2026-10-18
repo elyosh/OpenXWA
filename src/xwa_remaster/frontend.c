@@ -82,6 +82,7 @@ typedef struct RmState {
 	AeronRenderTarget* retired_targets[RM_RETIRED_TARGET_CAP];
 	int retired_target_count;
 	XwaRemasterAssets* assets; /* borrowed per Render call */
+	double time_s;             /* the snapshot's host clock, for images shown by time */
 	/* Per-tick PiP results (rendered in rm_prepare_model_previews,
 	 * composited by the z-merge; NULL = not rendered: no HD mesh, or the
 	 * render failed). */
@@ -147,13 +148,55 @@ static AeronRectI rm_scissor(int16_t l, int16_t t, int16_t r, int16_t b) {
 	return rect;
 }
 
+/* The atlas with game geometry behind a record and the frame drawn, or
+ * NULL. A named image whose atlas has an `fps` shows its frames by time,
+ * whatever frame the game is on; `*frame_index` is then that frame. */
+static const XwaGeometryAtlas* rm_record_geometry(const XwaDraw2D* d, const XwaGeometryFrame** frame,
+												  int* frame_index) {
+	const XwaGeometryAtlas* atlas;
+	*frame = NULL;
+	*frame_index = d->frame;
+	if (d->kind == XWA_DRAW2D_ATLAS_SPRITE) {
+		atlas = XwaFrontendGeometry_FindGroup(d->atlas_group);
+		*frame = XwaFrontendGeometry_FindFrame(atlas, d->atlas_index);
+		return atlas;
+	}
+	atlas = XwaFrontendGeometry_FindFile(d->source_file);
+	if (!atlas)
+		return NULL;
+	if (atlas->fps > 0.0f)
+		*frame_index = (int)fmod(g.time_s * (double)atlas->fps, (double)atlas->frame_count);
+	if (*frame_index >= 0 && *frame_index < atlas->frame_count)
+		*frame = &atlas->frames[*frame_index];
+	return atlas;
+}
+
+/* Whether an engine colour is one of the highlights that tinted icons keep
+ * with `tint: highlights`: light blue, yellow and green (g_colorLightBlue,
+ * g_colorYellow, g_colorGreen). The engine colour is 16-bit, so the test
+ * allows its rounding. */
+static int rm_is_highlight_tint(uint32_t engine_color) {
+	static const uint8_t highlights[3][3] = { { 0x60, 0x80, 0xff }, { 0xff, 0xff, 0x00 }, { 0x00, 0xff, 0x00 } };
+	uint8_t rgba[4];
+	XwaSnapshotExport_ColorToRgba(engine_color, rgba);
+	for (int i = 0; i < 3; i++) {
+		if (abs(rgba[0] - highlights[i][0]) <= 8 && abs(rgba[1] - highlights[i][1]) <= 8 &&
+			abs(rgba[2] - highlights[i][2]) <= 8)
+			return 1;
+	}
+	return 0;
+}
+
 static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	XwaAssetRef ref;
 	int found;
+	const XwaGeometryFrame* gframe;
+	int frame;
+	const XwaGeometryAtlas* geo = rm_record_geometry(d, &gframe, &frame);
 	if (d->kind == XWA_DRAW2D_ATLAS_SPRITE) {
 		found = XwaRemasterAssets_FrontendAtlasSprite(g.assets, d->atlas_group, d->atlas_index, &ref);
 	} else {
-		found = XwaRemasterAssets_FrontendSprite(g.assets, d->file, d->frame, &ref);
+		found = XwaRemasterAssets_FrontendSprite(g.assets, d->file, frame, &ref);
 	}
 	if (!found || !ref.texture || d->img_w <= 0 || d->img_h <= 0) {
 		g.stat_misses++;
@@ -190,8 +233,30 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	 * resolved frame's UV rect. Asset resolution never enters — a
 	 * hand-authored replacement of any size maps identically. */
 	float su0 = ref.u0, sv0 = ref.v0, su1 = ref.u1, sv1 = ref.v1;
-	int dst_cw = d->img_w, dst_ch = d->img_h;
-	if (d->has_src_rect) {
+	float dst_cw = (float)d->img_w, dst_ch = (float)d->img_h;
+	/* An atlas with game geometry places the image more exactly than the
+	 * game can: its offset and size in design pixels aren't rounded to
+	 * whole units. The game has already added the rounded offset of a DAT
+	 * image, so only the remainder is added to those. */
+	float dst_ux = (float)d->dst_x, dst_uy = (float)d->dst_y;
+	if (gframe) {
+		dst_ux += XwaFrontendGeometry_UnitsX(gframe->offset[0]);
+		dst_uy += XwaFrontendGeometry_UnitsY(gframe->offset[1]);
+		if (d->kind == XWA_DRAW2D_ATLAS_SPRITE) {
+			dst_ux -= (float)XwaFrontendGeometry_UnitX(gframe->offset[0]);
+			dst_uy -= (float)XwaFrontendGeometry_UnitY(gframe->offset[1]);
+		}
+		if (!d->has_src_rect) {
+			dst_cw = XwaFrontendGeometry_UnitsX(gframe->size[0]);
+			dst_ch = XwaFrontendGeometry_UnitsY(gframe->size[1]);
+		}
+	}
+	/* A tinted icon whose atlas keeps its aspect by width, as XWAU draws its
+	 * HD icons: the game's width, the height from the image's shape, one
+	 * unit higher, and the whole image. */
+	const int icon_by_width = gframe && gframe->keep_aspect == XWA_GEOMETRY_KEEP_ASPECT_WIDTH &&
+							  d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED && ref.w > 0;
+	if (d->has_src_rect && !icon_by_width) {
 		const float iw = (float)d->img_w;
 		const float ih = (float)d->img_h;
 		const float du = ref.u1 - ref.u0;
@@ -200,8 +265,8 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		sv0 = ref.v0 + ((float)d->src_top / ih) * dv;
 		su1 = ref.u0 + ((float)(d->src_right + 1) / iw) * du;
 		sv1 = ref.v0 + ((float)(d->src_bottom + 1) / ih) * dv;
-		dst_cw = d->src_right - d->src_left + 1;
-		dst_ch = d->src_bottom - d->src_top + 1;
+		dst_cw = (float)(d->src_right - d->src_left + 1);
+		dst_ch = (float)(d->src_bottom - d->src_top + 1);
 	}
 	/* The classic oriented blits use modes 1 / 3 for the two 90-degree
 	 * rotations, 2 for a vertical flip, and 4 for a horizontal flip.
@@ -226,10 +291,10 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		q.tint[3] = 1.0f;
 		const float scale_x = rm_scale_x();
 		const float scale_y = rm_scale_y();
-		const float x0 = (float)d->dst_x * scale_x;
-		const float y0 = (float)d->dst_y * scale_y;
-		const float x1 = x0 + (float)dst_ch * scale_x; /* transposed dst */
-		const float y1 = y0 + (float)dst_cw * scale_y;
+		const float x0 = dst_ux * scale_x;
+		const float y0 = dst_uy * scale_y;
+		const float x1 = x0 + dst_ch * scale_x; /* transposed dst */
+		const float y1 = y0 + dst_cw * scale_y;
 		/* corners[] = TL, TR, BL, BR {x, y, u, v} */
 		q.corners[0][0] = x0;
 		q.corners[0][1] = y0;
@@ -276,13 +341,39 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	s.src_u1 = su1;
 	s.src_v1 = sv1;
 
-	s.dst_x = (float)d->dst_x * rm_scale_x();
-	s.dst_y = (float)d->dst_y * rm_scale_y();
-	s.dst_w = (float)dst_cw * rm_scale_x();
-	s.dst_h = (float)dst_ch * rm_scale_y();
+	s.dst_x = dst_ux * rm_scale_x();
+	s.dst_y = dst_uy * rm_scale_y();
+	s.dst_w = dst_cw * rm_scale_x();
+	s.dst_h = dst_ch * rm_scale_y();
+	if (icon_by_width) {
+		s.src_u0 = ref.u0;
+		s.src_v0 = ref.v0;
+		s.src_u1 = ref.u1;
+		s.src_v1 = ref.v1;
+		s.dst_y -= rm_scale_y();
+		s.dst_w = (float)d->img_w * rm_scale_x();
+		s.dst_h = s.dst_w * (float)ref.h / (float)ref.w;
+	} else if (gframe && gframe->keep_aspect == XWA_GEOMETRY_KEEP_ASPECT_HEIGHT && !d->has_src_rect && ref.h > 0) {
+		/* The game's height, and the width from the image's shape. */
+		s.dst_w = s.dst_h * (float)ref.w / (float)ref.h;
+	}
+	if (geo && geo->has_draw_adjust) {
+		/* Changes the drawing only; the game's geometry stays. */
+		s.dst_x += XwaFrontendGeometry_UnitsX(geo->draw_adjust[0]) * rm_scale_x();
+		s.dst_y += XwaFrontendGeometry_UnitsY(geo->draw_adjust[1]) * rm_scale_y();
+		s.dst_w += XwaFrontendGeometry_UnitsX(geo->draw_adjust[2]) * rm_scale_x();
+		s.dst_h += XwaFrontendGeometry_UnitsY(geo->draw_adjust[3]) * rm_scale_y();
+	}
 
 	if (d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED || d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED) {
-		rm_color_linear(d->tint_color, s.tint);
+		/* An atlas can drop the tint of the game's tinted icons, for art that
+		 * has its own colours. Map icons keep their tint. */
+		const int keep_tint = !geo || d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED ||
+							  geo->tint == XWA_GEOMETRY_TINT_ALL ||
+							  (geo->tint == XWA_GEOMETRY_TINT_HIGHLIGHTS && rm_is_highlight_tint(d->tint_color));
+		if (keep_tint) {
+			rm_color_linear(d->tint_color, s.tint);
+		}
 		s.tint[3] = 1.0f;
 	} else if (d->kind == XWA_DRAW2D_SPRITE_TRANSLUCENT) {
 		/* 50/50 blend factor, not a color — stays a raw multiplier. */
@@ -292,7 +383,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	/* An image whose geometry comes from an atlas has no palette, and its
 	 * art expects what is behind it to show where it is transparent. So it
 	 * gets no fill. */
-	if (d->kind == XWA_DRAW2D_SPRITE_OPAQUE && !XwaFrontendGeometry_FindFile(d->source_file)) {
+	if (d->kind == XWA_DRAW2D_SPRITE_OPAQUE && !geo) {
 		/* The classic opaque blit writes palette entry 0 where the keyed
 		 * texture is transparent. Rebuild that lost color beneath the PMA
 		 * sprite; this also gives filtered HD edges the correct coverage. */
@@ -314,16 +405,30 @@ static void rm_add_paint(AeronDrawList2D* list, const XwaPaintCmd* p) {
 	const AeronRectI* scp = sc.width > 0 ? &sc : NULL;
 	const float sx = rm_scale_x();
 	const float sy = rm_scale_y();
-	const float line_thickness = fminf(sx, sy);
+	/* frontend.yaml's paint look: lines one screen pixel thick, the fill
+	 * alpha and the grid colours. Without it, the original look. */
+	const XwaFrontendPaint* paint = XwaFrontendGeometry_Paint();
+	const float line_thickness = paint->pixel_lines ? 1.0f : fminf(sx, sy);
+	const int grid = p->role == XWA_PAINT_ROLE_GRID_MAJOR || p->role == XWA_PAINT_ROLE_GRID_MINOR;
+	if (grid && paint->has_grid_colours) {
+		const uint32_t rgb = p->role == XWA_PAINT_ROLE_GRID_MAJOR ? paint->grid_major : paint->grid_minor;
+		rgba[0] = XwaRemaster_SrgbToLinear((float)((rgb >> 16) & 0xffu) / 255.0f);
+		rgba[1] = XwaRemaster_SrgbToLinear((float)((rgb >> 8) & 0xffu) / 255.0f);
+		rgba[2] = XwaRemaster_SrgbToLinear((float)(rgb & 0xffu) / 255.0f);
+	}
+	/* A grid line one pixel thick is centred in its row or column of units. */
+	const int grid_pixel = grid && paint->pixel_lines;
 
 	switch ((XwaPaintKind)p->kind) {
 		case XWA_PAINT_HLINE:
-			AeronDrawList_AddFill(list, p->x0 * sx, p->y0 * sy, (p->x1 - p->x0 + 1) * sx, sy, rgba,
-								  AERON_BLIT2D_BLEND_NONE, scp);
+			AeronDrawList_AddFill(list, p->x0 * sx, grid_pixel ? p->y0 * sy + (sy - 1.0f) * 0.5f : p->y0 * sy,
+								  (p->x1 - p->x0 + 1) * sx, grid_pixel ? 1.0f : sy, rgba, AERON_BLIT2D_BLEND_NONE,
+								  scp);
 			break;
 		case XWA_PAINT_VLINE:
-			AeronDrawList_AddFill(list, p->x0 * sx, p->y0 * sy, sx, (p->y1 - p->y0 + 1) * sy, rgba,
-								  AERON_BLIT2D_BLEND_NONE, scp);
+			AeronDrawList_AddFill(list, grid_pixel ? p->x0 * sx + (sx - 1.0f) * 0.5f : p->x0 * sx, p->y0 * sy,
+								  grid_pixel ? 1.0f : sx, (p->y1 - p->y0 + 1) * sy, rgba, AERON_BLIT2D_BLEND_NONE,
+								  scp);
 			break;
 		case XWA_PAINT_LINE:
 		case XWA_PAINT_LINE_AA:
@@ -335,9 +440,10 @@ static void rm_add_paint(AeronDrawList2D* list, const XwaPaintCmd* p) {
 								  AERON_BLIT2D_BLEND_NONE, scp);
 			break;
 		case XWA_PAINT_FILL_TRANSLUCENT: {
-			float half[4] = { rgba[0] * 0.5f, rgba[1] * 0.5f, rgba[2] * 0.5f, 0.5f };
+			const float a = paint->fill_alpha;
+			float premultiplied[4] = { rgba[0] * a, rgba[1] * a, rgba[2] * a, a };
 			AeronDrawList_AddFill(list, (p->x0 + p->dx) * sx, (p->y0 + p->dy) * sy, (p->x1 - p->x0 + 1) * sx,
-								  (p->y1 - p->y0 + 1) * sy, half, AERON_BLIT2D_BLEND_PMA, scp);
+								  (p->y1 - p->y0 + 1) * sy, premultiplied, AERON_BLIT2D_BLEND_PMA, scp);
 			break;
 		}
 		case XWA_PAINT_PIXEL:
@@ -353,11 +459,13 @@ static void rm_add_paint(AeronDrawList2D* list, const XwaPaintCmd* p) {
 			const float y = (p->y0 + p->dy) * sy;
 			const float w = (p->x1 - p->x0 + 1) * sx;
 			const float h = (p->y1 - p->y0 + 1) * sy;
-			AeronDrawList_AddFill(list, x, y, w, sy, rgba, AERON_BLIT2D_BLEND_NONE, scp); /* top */
-			AeronDrawList_AddFill(list, x, y + h - sy, w, sy, rgba, AERON_BLIT2D_BLEND_NONE,
+			const float tx = paint->pixel_lines ? 1.0f : sx; /* stroke widths */
+			const float ty = paint->pixel_lines ? 1.0f : sy;
+			AeronDrawList_AddFill(list, x, y, w, ty, rgba, AERON_BLIT2D_BLEND_NONE, scp); /* top */
+			AeronDrawList_AddFill(list, x, y + h - ty, w, ty, rgba, AERON_BLIT2D_BLEND_NONE,
 								  scp);                                                   /* bottom */
-			AeronDrawList_AddFill(list, x, y, sx, h, rgba, AERON_BLIT2D_BLEND_NONE, scp); /* left */
-			AeronDrawList_AddFill(list, x + w - sx, y, sx, h, rgba, AERON_BLIT2D_BLEND_NONE, scp); /* right */
+			AeronDrawList_AddFill(list, x, y, tx, h, rgba, AERON_BLIT2D_BLEND_NONE, scp); /* left */
+			AeronDrawList_AddFill(list, x + w - tx, y, tx, h, rgba, AERON_BLIT2D_BLEND_NONE, scp); /* right */
 			break;
 		}
 	}
@@ -1066,6 +1174,7 @@ AeronTexture* XwaRemasterFrontend_Render(AeronCommandBuffer* cmd, const XwaSnaps
 		return NULL;
 	}
 	g.assets = assets; /* borrowed for the call (rm_* helpers read it) */
+	g.time_s = (double)snap->host_time_us / 1000000.0;
 	if (snap->scene_kind != g.last_scene) {
 		g.last_scene = snap->scene_kind;
 		g.screen_needs_clear = 1;

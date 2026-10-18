@@ -12,6 +12,7 @@
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
+#include "xwa_runtime/timing/host_clock.h"
 
 #include "aeron/aeron.h"
 #include "xwa/assets/model_def.h"
@@ -417,6 +418,7 @@ void XwaSnapshot_Commit(void) {
 	XwaSnapshot* s = wr();
 	s->scene_kind = g_scene_kind;
 	s->game_time_ticks = g_gameTime; /* sim clock; see header */
+	s->host_time_us = XwaTime_GetElapsedUs();
 	s->offscreen_restore_enabled = g_offscreenRestoreEnabled;
 	snapshot_capture_frontend_assets(s);
 	XwaSnapshotExport_CaptureOptAssets(s);
@@ -978,6 +980,16 @@ void XwaSnapshot_EmitAtlasSprite(int group_id, int index, int x, int y, int img_
 	stamp_clip(&d->clip_left, &d->clip_top, &d->clip_right, &d->clip_bottom);
 }
 
+static int g_briefing_grid_active;
+static uint32_t g_briefing_grid_major_color;
+
+void XwaSnapshot_BeginBriefingGrid(uint32_t major_color) {
+	g_briefing_grid_active = 1;
+	g_briefing_grid_major_color = major_color;
+}
+
+void XwaSnapshot_EndBriefingGrid(void) { g_briefing_grid_active = 0; }
+
 void XwaSnapshot_EmitPaint(XwaPaintKind kind, int x0, int y0, int x1, int y1, int dx, int dy,
 						   uint32_t color) {
 	XwaSnapshot* s = wr();
@@ -997,6 +1009,12 @@ void XwaSnapshot_EmitPaint(XwaPaintKind kind, int x0, int y0, int x1, int y1, in
 	p->dx = (int16_t)dx;
 	p->dy = (int16_t)dy;
 	p->color = color;
+	if (g_briefing_grid_active && (kind == XWA_PAINT_HLINE || kind == XWA_PAINT_VLINE)) {
+		/* Engine colours are 16-bit; the line functions get them sign-extended. */
+		p->role = (uint8_t)((color & 0xffffu) == (g_briefing_grid_major_color & 0xffffu)
+								? XWA_PAINT_ROLE_GRID_MAJOR
+								: XWA_PAINT_ROLE_GRID_MINOR);
+	}
 	stamp_clip(&p->clip_left, &p->clip_top, &p->clip_right, &p->clip_bottom);
 }
 

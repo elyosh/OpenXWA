@@ -972,9 +972,13 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 		f->h = (int)image.height;
 		if (has_hd) {
 			ctx->stats->hd_frames++;
-			if (!same_aspect((int)sd_info.width, (int)sd_info.height, f->w, f->h))
+			/* XWAU keeps the shape of a DAT image of another aspect, but draws
+			 * backgrounds to fill the screen (NET/Main.cs:911-999, 1037-1041). */
+			const int background =
+				(int)sd_info.width >= BACKGROUND_MIN_W && (int)sd_info.height >= BACKGROUND_MIN_H;
+			if (!background && !same_aspect((int)sd_info.width, (int)sd_info.height, f->w, f->h))
 				f->keep_aspect = "height";
-			if ((int)sd_info.width >= BACKGROUND_MIN_W && (int)sd_info.height >= BACKGROUND_MIN_H) {
+			if (background) {
 				char key[300], list_key[300];
 				snprintf(key, sizeof key, "group/%d/%d", group, id);
 				snprintf(list_key, sizeof list_key, "resdata/%s-%d-%d", file->name, group, id);
