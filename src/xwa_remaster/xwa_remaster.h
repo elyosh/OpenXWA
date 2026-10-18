@@ -15,6 +15,7 @@
 #include <stdint.h>
 
 #include "aeron/render.h"
+#include "xwa_remaster/captured_lighting.h"
 #include "xwa_runtime/config/modern_video_options.h"
 
 struct AeronInputSnapshot;
@@ -32,6 +33,7 @@ typedef struct XwaRemasterInitOptions {
 	int environment_maps_enabled;
 	const char* environment_maps_manifest; /* relative to the mod folder */
 	float environment_maps_sun_max_radiance;
+	XwaRemasterCapturedLightingOptions captured_lighting;
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
 } XwaRemasterInitOptions;

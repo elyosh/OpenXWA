@@ -159,7 +159,7 @@ hangar_lighting:
 # Authored per-region HDR environments (sky, diffuse and specular lighting,
 # suns). The manifest path is relative to the mod folder. It holds the
 # `environments:` map and, under `xwa:`, the (mission, region) mapping and
-# the default environment. Without a manifest, environment maps are off.
+# the default environment. Without a manifest, no region has an environment.
 # Regions without an entry use the default environment, or the classic HD
 # sky when there is none.
 environment_maps:
@@ -169,6 +169,17 @@ environment_maps:
   # A physical disc is far brighter than screen-space bloom resolves
   # cleanly; 1 to 60000.
   sun_max_radiance: 100.0
+  # Captured lighting builds lighting cubes in game from the region's sky
+  # and its backdrops other than suns. It applies to regions without an
+  # environment and to skies with `backdrops: keep`.
+  captured_lighting:
+    enabled: true
+    size: 512             # face size of the cubes: 64, 128, 256 or 512
+    specular_samples: 64  # samples per texel of the blurred reflections: 1 to 1024
+    # In regions without an environment:
+    diffuse_strength: 1.0
+    specular_strength: 1.0
+    # ambient_fill: [0.02, 0.02, 0.02]   # replaces the game's ambient when set
 # The twinkling starfield drawn in regions without an environment sky. It
 # reproduces the classic FlightStarfield_Render on the GPU.
 starfield:

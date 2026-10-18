@@ -86,10 +86,10 @@ void XwaRemasterAssets_CommitFlightTextures(XwaRemasterAssets* a, uint64_t gener
 int XwaRemasterAssets_FlightAtlasFrame(XwaRemasterAssets* a, int group, int frame_index0, XwaAssetRef* out);
 int XwaRemasterAssets_FlightModelFrame(XwaRemasterAssets* a, int object_type, int classic_frame_1based,
 									   XwaAssetRef* out);
-/* The DAT image that a flight model type draws for a frame: its group, and
- * the image id. That is the type's own image, or for a type drawn by frame,
- * the id of the frame-th image of the group (its index when the atlas has
- * no ids). Returns 0 when the type has no texture group. */
+/* Gets the DAT group and image id that a flight model type draws for a
+ * frame. A single-image type gives its own image. A type drawn by frame
+ * gives the id of the group's frame-th image, or the frame index when the
+ * atlas has no ids. Returns 0 when the type has no texture group. */
 int XwaRemasterAssets_FlightModelImageId(XwaRemasterAssets* a, int object_type, int classic_frame_1based,
 										 int* out_group, int* out_image);
 

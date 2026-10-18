@@ -15,6 +15,7 @@
 #include "aeron/scene/scene3d.h"
 #include "aeron/scene/settings.h"
 #include "aeron/scene/world.h"
+#include "xwa_remaster/captured_lighting.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/effects.h"
 #include "xwa_remaster/environment.h"
@@ -4266,13 +4267,8 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	return fl_present(cmd, direct_present);
 }
 
-/* Whether the region's environment draws a sky with `backdrops: keep`: the
- * mission's backdrops, their lights and their flares stay over the sky. */
-static int fl_environment_keeps_backdrops(void) {
-	return s.environment.mode == XWA_ENV_MODE_AUTHORED && s.environment.prepared &&
-		   s.environment.prepared->radiance && s.environment.backdrops &&
-		   s.environment.backdrops->mode == XWA_ENV_BACKDROPS_KEEP;
-}
+/* Whether the region's environment draws a sky with `backdrops: keep`. */
+static int fl_environment_keeps_backdrops(void) { return XwaRemasterEnvironment_KeepsBackdrops(&s.environment); }
 
 typedef struct FlSceneLighting {
 	const XwaDirLight* lights;
@@ -4292,6 +4288,10 @@ typedef struct FlSceneLighting {
 	int shadow_allowed;
 	float shadow_angular_radius_degrees;
 	int environment_lights;
+	/* When `captured` is set, these captured lighting cubes
+	 * (captured_lighting.h) are bound in place of the environment's cubes. */
+	AeronScenePbrEnvironment captured_environment;
+	int captured;
 } FlSceneLighting;
 
 static int fl_is_default_hangar_lighting(const XwaSnapshot* snap) {
@@ -4327,29 +4327,74 @@ static void fl_environment_light_to_dir_light(const AeronEnvironmentLight* light
 /* While an environment is bound it owns the ambient: its authored fill
  * replaces the game's ambient cube in every direction (the diffuse cube adds
  * the directional part). */
-static void fl_set_environment_ambient(FlSceneLighting* out, const AeronPreparedEnvironment* environment) {
+static void fl_set_ambient_fill(FlSceneLighting* out, const float fill[3]) {
 	float* const lobes[6] = { out->ambient_cube.pos_x, out->ambient_cube.neg_x, out->ambient_cube.pos_y,
 							  out->ambient_cube.neg_y, out->ambient_cube.pos_z, out->ambient_cube.neg_z };
 	for (int lobe = 0; lobe < 6; lobe++) {
-		memcpy(lobes[lobe], environment->settings.ambient_fill, 3 * sizeof(float));
+		memcpy(lobes[lobe], fill, 3 * sizeof(float));
 	}
 	out->ambient = &out->ambient_cube;
+}
+
+static void fl_set_environment_ambient(FlSceneLighting* out, const AeronPreparedEnvironment* environment) {
+	fl_set_ambient_fill(out, environment->settings.ambient_fill);
+}
+
+/* With `hidden_backdrop_lights: remove`, uses the recovered lights, except
+ * the lights of hidden backdrops that are not suns. The cube's lighting
+ * replaces them. Suns keep their light, because a sun painted in the sky is
+ * clipped at white and is too dim to light the ship. */
+static void fl_remove_hidden_backdrop_lights(const XwaSnapshot* snap, XwaRemasterAssets* assets,
+											 FlSceneLighting* out) {
+	uint32_t count = 0;
+	uint32_t dropped = 0;
+	for (uint32_t i = 0; i < snap->dir_light_count && i < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
+		const XwaDirLight* light = &snap->dir_lights[i];
+		const int16_t source = light->source_backdrop_index;
+		if (source >= 0 && (uint32_t)source < snap->backdrop_count) {
+			const XwaBackdrop* b = &snap->backdrops[source];
+			if (!fl_backdrop_is_sun(b) && fl_backdrop_hidden(assets, s.environment.backdrops, b->model_type,
+															 (b->flags & 1u) ? b->frame : 1)) {
+				dropped++;
+				continue;
+			}
+		}
+		out->authored_lights[count++] = *light;
+	}
+	out->lights = out->authored_lights;
+	out->light_count = count;
+	static char logged_mission[sizeof snap->mission_path];
+	static int logged_region = -1;
+	const int region = snap->flight_camera.mission_region;
+	if (dropped && (region != logged_region || strcmp(logged_mission, snap->mission_path) != 0)) {
+		logged_region = region;
+		snprintf(logged_mission, sizeof logged_mission, "%s", snap->mission_path);
+		Aeron_LogInfo("xwa.remaster", "environment: region %d leaves out the lights of %u hidden backdrop(s)",
+					  region, dropped);
+	}
 }
 
 /* Applies a region environment. Its fill replaces the ambient. If the
  * environment has directional lights (an environment with a sky always has
  * them), they replace the directional lights derived from backdrops, unless
- * the environment keeps the backdrops: then the recovered lights and key
- * selection stay.
+ * the environment keeps the backdrops: then the recovered lights stay, minus
+ * those fl_remove_hidden_backdrop_lights leaves out, and the key light is
+ * chosen from them as without an environment.
  * Recovered lights without a backdrop source are kept, because they are not
  * known to belong to the sky. The environment's declared primary light then
  * becomes the key light and the only shadow caster. An environment without
  * lights keeps the recovered lights and key selection. */
-static void fl_apply_authored_lighting(const XwaSnapshot* snap, const AeronPreparedEnvironment* environment,
-									   FlSceneLighting* out) {
+static void fl_apply_authored_lighting(const XwaSnapshot* snap, XwaRemasterAssets* assets,
+									   const AeronPreparedEnvironment* environment, FlSceneLighting* out) {
 	out->environment = environment;
 	fl_set_environment_ambient(out, environment);
-	if (!environment->definition->has_directional_lights || fl_environment_keeps_backdrops()) {
+	if (fl_environment_keeps_backdrops()) {
+		if (s.environment.backdrops->remove_hidden_lights) {
+			fl_remove_hidden_backdrop_lights(snap, assets, out);
+		}
+		return;
+	}
+	if (!environment->definition->has_directional_lights) {
 		return;
 	}
 	uint32_t count = 0;
@@ -4434,8 +4479,8 @@ static void fl_build_hangar_lighting(const XwaSnapshot* snap, FlSceneLighting* o
 	out->ambient = &out->ambient_cube;
 }
 
-static void fl_build_scene_lighting(const XwaSnapshot* snap, const XwaFlightCamera* cam,
-									FlSceneLighting* out) {
+static void fl_build_scene_lighting(const XwaSnapshot* snap, XwaRemasterAssets* assets,
+									const XwaFlightCamera* cam, FlSceneLighting* out) {
 	memset(out, 0, sizeof *out);
 	out->lights = snap->dir_lights;
 	out->light_count = snap->dir_light_count;
@@ -4453,7 +4498,16 @@ static void fl_build_scene_lighting(const XwaSnapshot* snap, const XwaFlightCame
 		return;
 	}
 	if (s.environment.mode == XWA_ENV_MODE_AUTHORED && s.environment.prepared) {
-		fl_apply_authored_lighting(snap, s.environment.prepared, out);
+		fl_apply_authored_lighting(snap, assets, s.environment.prepared, out);
+	}
+	/* The captured cubes replace the cubes of an environment whose sky keeps
+	 * the backdrops, or add cubes to a region without an environment. */
+	const float* fill = NULL;
+	if (XwaRemasterCapturedLighting_Environment(snap, &s.environment, &out->captured_environment, &fill)) {
+		out->captured = 1;
+		if (fill) {
+			fl_set_ambient_fill(out, fill);
+		}
 	}
 }
 
@@ -4591,9 +4645,16 @@ int XwaRemasterFlight_CaptureCamera(const float right[3], const float down[3], c
 }
 
 int XwaRemasterFlight_CaptureSetSky(AeronScene3D* scene, XwaRemasterSkyStars* stars, const XwaSnapshot* snap,
-									float star_upscale) {
-	if (!scene || !stars || !snap) {
+									const AeronPreparedEnvironment* sky, float star_upscale) {
+	if (!scene || !snap || (!sky && !stars)) {
 		return 0;
+	}
+	if (sky) {
+		/* The overlay is not part of the captured sky. */
+		AeronPreparedEnvironment without_overlay = *sky;
+		without_overlay.overlay = NULL;
+		AeronScene_SetSkyEnvironment(scene, &without_overlay);
+		return 1;
 	}
 	const XwaRemasterSkyStarsParams params = {
 		.exposure = s.sky_exposure,
@@ -4613,9 +4674,18 @@ int XwaRemasterFlight_CaptureSetSky(AeronScene3D* scene, XwaRemasterSkyStars* st
 	return 1;
 }
 
+int XwaRemasterFlight_CaptureBackdropHidden(const XwaSnapshot* snap, XwaRemasterAssets* assets,
+											uint32_t index, const XwaEnvironmentBackdropRule* hide) {
+	if (!snap || index >= snap->backdrop_count) {
+		return 1;
+	}
+	const XwaBackdrop* b = &snap->backdrops[index];
+	return b->hidden || fl_backdrop_hidden(assets, hide, b->model_type, (b->flags & 1u) ? b->frame : 1);
+}
+
 uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float crows[9],
 											const XwaSnapshot* snap, XwaRemasterAssets* assets, int filter,
-											float* out_max_tan) {
+											const XwaEnvironmentBackdropRule* hide, float* out_max_tan) {
 	static FlBackdropQuad quads[FL_MAX_BACKDROP_QUADS];
 	if (out_max_tan) {
 		*out_max_tan = 0.0f;
@@ -4624,7 +4694,7 @@ uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float cro
 		return 0;
 	}
 	const uint32_t count =
-		fl_derive_backdrops(snap, crows, assets, filter, 1, NULL, quads, FL_MAX_BACKDROP_QUADS);
+		fl_derive_backdrops(snap, crows, assets, filter, 1, hide, quads, FL_MAX_BACKDROP_QUADS);
 	static const float origin[3] = { 0.0f, 0.0f, 0.0f };
 	const FlQuadTarget target = { scene, crows, origin };
 	float max_tan = 0.0f;
@@ -4814,8 +4884,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * backdrop sprites, the directional lights derived from backdrops and
 	 * the backdrop sun flares. With `backdrops: keep`, only the starfield
 	 * is replaced: the backdrops are drawn over the sky, minus the hidden
-	 * images, and keep their lights and flares. An environment without a
-	 * sky keeps the starfield, the sprites and the flares. */
+	 * images, and keep their flares and lights, unless the region removes
+	 * the lights of hidden backdrops (fl_remove_hidden_backdrop_lights). An
+	 * environment without a sky keeps the starfield, the sprites and the
+	 * flares. */
 	const AeronPreparedEnvironment* region_environment =
 		s.environment.mode == XWA_ENV_MODE_AUTHORED ? s.environment.prepared : NULL;
 	const AeronPreparedEnvironment* sky_environment =
@@ -4854,8 +4926,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * baked atlas. */
 	s.glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &s.glow_ref);
 
+	XwaRemasterCapturedLighting_Update(cmd, snap, assets, &s.environment);
 	FlSceneLighting scene_lighting;
-	fl_build_scene_lighting(snap, cam, &scene_lighting);
+	fl_build_scene_lighting(snap, assets, cam, &scene_lighting);
 	float shadow_light_dir[3];
 	/* Preserve the classic directional fill inside the sealed Death Star,
 	 * but do not let its backdrop light cast exterior shadows in the tunnel.
@@ -5235,7 +5308,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 							  scene_lighting.key_index, NULL, s.camera_local, ao_on ? &ao : NULL,
 							  scene_lighting.ambient, NULL,
 							  hangar_probes ? hangar_probes->layout.key_light_shadow : -1.0f);
-	if (scene_lighting.environment) {
+	if (scene_lighting.captured) {
+		AeronScene_SetPbrEnvironment(s.scene, &scene_lighting.captured_environment);
+	} else if (scene_lighting.environment) {
 		AeronScene_SetPbrPreparedEnvironment(s.scene, scene_lighting.environment);
 	}
 

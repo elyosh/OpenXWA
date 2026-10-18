@@ -27,6 +27,7 @@
 #include "aeron/scene/settings.h"
 #include "aeron/vfs.h"
 #include "xwa_remaster/assets.h"
+#include "xwa_remaster/environment.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #ifdef __cplusplus
@@ -295,21 +296,30 @@ void XwaRemasterFlight_CaptureSkyInfo(XwaFlightCaptureSky* out);
 int XwaRemasterFlight_CaptureCamera(const float right[3], const float down[3], const float forward[3],
 									float half_tan, int size, AeronSceneCamera* camera, float crows[9]);
 
-/* After AeronScene_Begin: draws the starfield into `scene` with `stars`
- * (the scene's BEFORE_OPAQUE hook), with the classic-pixel dot geometry
- * scaled by `star_upscale`. Returns 0 on failure. */
+/* After AeronScene_Begin: draws the sky into `scene`. With `sky`, it is
+ * that environment's sky without its overlay, and `stars` may be NULL.
+ * Otherwise it is the starfield drawn with `stars` (the scene's
+ * BEFORE_OPAQUE hook), with the classic-pixel dot geometry scaled by
+ * `star_upscale`. Returns 0 on failure. */
 int XwaRemasterFlight_CaptureSetSky(AeronScene3D* scene, struct XwaRemasterSkyStars* stars,
-									const XwaSnapshot* snap, float star_upscale);
+									const XwaSnapshot* snap, const AeronPreparedEnvironment* sky,
+									float star_upscale);
+
+/* Whether backdrop record `index` is hidden: by the game, or by `hide`, the
+ * region's hide and show rules (NULL for none). */
+int XwaRemasterFlight_CaptureBackdropHidden(const XwaSnapshot* snap, XwaRemasterAssets* assets,
+											uint32_t index, const XwaEnvironmentBackdropRule* hide);
 
 /* Derives the region's backdrop quads for the capture camera rows `crows`
- * and, when `scene` is not NULL, submits them as SKY billboards. Axis
+ * and, when `scene` is not NULL, submits them as SKY billboards. Backdrops
+ * that `hide` hides (the region's rules; NULL for none) are left out. Axis
  * quads are kept by their own direction instead of the camera hemisphere.
  * `out_max_tan` receives the largest |x| / z or |y| / z over the quad
  * corners, or a negative value when a corner is not in front of the
  * camera. Returns the quad count. */
 uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float crows[9],
 											const XwaSnapshot* snap, XwaRemasterAssets* assets, int filter,
-											float* out_max_tan);
+											const XwaEnvironmentBackdropRule* hide, float* out_max_tan);
 
 /* Returns whether the current full-frame output can use Aeron's direct
  * swapchain render layer at the requested dimensions. */

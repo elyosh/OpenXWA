@@ -12,6 +12,7 @@
  */
 
 #include "xwa_remaster/debug_tools.h"
+#include "xwa_remaster/captured_lighting.h"
 #include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/env_capture.h"
 
@@ -1305,6 +1306,8 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 						backdrops->show_all     ? "all"
 						: backdrops->show_count ? "a list"
 												: "none");
+			ImGui::Text("Lights of hidden backdrops: %s",
+						backdrops->remove_hidden_lights ? "removed, except suns" : "kept");
 		}
 	}
 	bool probes = XwaRemasterFlight_Probes() != 0;
@@ -1327,6 +1330,26 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 	}
 	ImGui::SetItemTooltip("Outlines of each probe's influence (dimmer: where it applies fully), its parallax "
 						  "volume (grey), the light grid's box (white) and its points within 50 m.");
+
+	ImGui::SeparatorText("Captured lighting");
+	XwaRemasterCapturedLightingInfo captured;
+	XwaRemasterCapturedLighting_Info(&captured);
+	if (!captured.enabled) {
+		ImGui::TextDisabled("Off (environment_maps.captured_lighting.enabled).");
+	} else {
+		ImGui::Text("Cubes: %s, %d px",
+					captured.failed               ? "failed (see log)"
+					: captured.nothing_to_capture ? "not used (nothing to capture here)"
+					: !captured.ready             ? "none"
+					: captured.current            ? "current"
+					: captured.applies            ? "out of date"
+												  : "kept (does not apply here)",
+					captured.size);
+		if (captured.ready) {
+			ImGui::Text("Signature: %016llx", (unsigned long long)captured.signature);
+		}
+		ImGui::Text("Builds: %u", captured.build_count);
+	}
 
 	/* Capture the current region's HD sky for environment_bake --capture. */
 	ImGui::SeparatorText("Capture");

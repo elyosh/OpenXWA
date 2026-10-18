@@ -259,6 +259,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/flight.c
     src/xwa_remaster/flight_map.c
     src/xwa_remaster/probe_outlines.c
+    src/xwa_remaster/captured_lighting.c
     src/xwa_remaster/glow_marks.c
     src/xwa_remaster/hyperspace.c
     src/xwa_remaster/hud.c

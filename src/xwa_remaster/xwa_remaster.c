@@ -20,6 +20,7 @@
 #include "aeron/debug.h"
 #include "aeron/scene/blend_ramp.h"
 #include "xwa_remaster/assets.h"
+#include "xwa_remaster/captured_lighting.h"
 #include "xwa_remaster/cutscene.h"
 #include "xwa_remaster/debug_tools.h"
 #include "xwa_remaster/env_capture.h"
@@ -328,6 +329,7 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 							  options->opt_projectile_emissive_strength, options->engine_emissive_strength);
 	XwaRemasterEnvironment_Configure(options->environment_maps_enabled, options->environment_maps_manifest,
 									 options->environment_maps_sun_max_radiance);
+	XwaRemasterCapturedLighting_Configure(&options->captured_lighting);
 	if (!XwaRemasterFlight_InitConfig(Aeron_GetVfs())) {
 		return 0;
 	}
@@ -902,6 +904,7 @@ void XwaRemaster_Shutdown(void) {
 	XwaRemasterHud_Shutdown();
 	XwaRemasterCutscene_Shutdown();
 	XwaRemasterFrontend_Shutdown();
+	XwaRemasterCapturedLighting_Shutdown();
 	XwaRemasterFlight_Shutdown();
 	XwaRemasterShip_Shutdown();
 	if (g.assets) {

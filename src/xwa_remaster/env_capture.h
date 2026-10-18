@@ -6,13 +6,16 @@
  * HD sky into six cube faces, renders each backdrop sun on its own as a
  * sprite, and writes them with the light list to
  *   <user root>/captures/environments/<mission>/region_<n>/
- * for `environment_bake --capture`.
+ * for `environment_bake --capture`. In a region whose environment keeps the
+ * backdrops, the faces show that environment's sky instead of the starfield,
+ * without the backdrops it hides.
  *
  * The debug action records a request; the remaster frame code runs it at
  * the start of the next HD flight frame, before that frame's command buffer
  * is acquired. The capture uses its own scenes and blocks on GPU fences.
  */
 
+#include "aeron/scene/scene3d.h"
 #include "xwa_remaster/assets.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
@@ -36,6 +39,12 @@ int XwaRemasterEnvCapture_Pending(void);
 /* Runs a pending request against the snapshot, then clears it. The result
  * is logged and kept for XwaRemasterEnvCapture_Status. */
 void XwaRemasterEnvCapture_Run(const XwaSnapshot* snap, XwaRemasterAssets* assets);
+
+/* The 90-degree camera of cube face `face` (0 to 5: +X, -X, +Y, -Y, +Z, -Z),
+ * `size` pixels square, and its world->view rows. The rendered columns are
+ * mirrored: texel column x of the face is rendered column size - 1 - x.
+ * Returns 0 for an invalid face. */
+int XwaRemasterEnvCapture_FaceCamera(int face, int size, AeronSceneCamera* camera, float crows[9]);
 
 /* The last capture's outcome: the capture directory or the failure. Empty
  * before the first capture. */

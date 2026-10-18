@@ -238,6 +238,104 @@ static int host_config_sun_max_radiance(const AeronConfigFile* config, int requi
 	return 1;
 }
 
+/* Reads a strength from 0 to 100 at `key`. A missing key is an error only
+ * when `required`. */
+static int host_config_strength(const AeronConfigFile* config, int required, const char* key, float* out,
+								char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 key);
+		}
+		return 1;
+	}
+	const double value = AeronConfigNode_Float(node, NAN);
+	if (!isfinite(value) || value < 0.0 || value > 100.0) {
+		return host_config_error(error, error_size, "invalid '%s': expected a number from 0 to 100", key);
+	}
+	*out = (float)value;
+	return 1;
+}
+
+static int host_config_captured_lighting(const AeronConfigFile* config, int required, XwaHostConfig* out,
+										 char* error, size_t error_size) {
+	const char* enabled_key = "environment_maps.captured_lighting.enabled";
+	const char* size_key = "environment_maps.captured_lighting.size";
+	const char* samples_key = "environment_maps.captured_lighting.specular_samples";
+	const char* fill_key = "environment_maps.captured_lighting.ambient_fill";
+	const AeronConfigNode* section = AeronConfigFile_GetNode(config, "environment_maps.captured_lighting");
+	if (section && AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
+		return host_config_error(error, error_size, "'%s' must be a mapping",
+								 "environment_maps.captured_lighting");
+	}
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, enabled_key);
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 enabled_key);
+		}
+	} else if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+		return host_config_error(error, error_size, "invalid '%s': expected a boolean", enabled_key);
+	} else {
+		out->captured_lighting_enabled = AeronConfigNode_Bool(node, 0);
+	}
+	node = AeronConfigFile_GetNode(config, size_key);
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 size_key);
+		}
+	} else {
+		const int64_t size =
+			AeronConfigNode_Type(node) == AERON_CONFIG_INT ? AeronConfigNode_Int(node, 0) : 0;
+		if (size != 64 && size != 128 && size != 256 && size != 512) {
+			return host_config_error(error, error_size, "invalid '%s': expected 64, 128, 256 or 512",
+									 size_key);
+		}
+		out->captured_lighting_size = (int)size;
+	}
+	node = AeronConfigFile_GetNode(config, samples_key);
+	if (!node) {
+		if (required) {
+			return host_config_error(error, error_size, "missing required remaster/config.yaml setting '%s'",
+									 samples_key);
+		}
+	} else {
+		const int64_t samples =
+			AeronConfigNode_Type(node) == AERON_CONFIG_INT ? AeronConfigNode_Int(node, 0) : 0;
+		if (samples < 1 || samples > 1024) {
+			return host_config_error(error, error_size, "invalid '%s': expected an integer from 1 to 1024",
+									 samples_key);
+		}
+		out->captured_lighting_specular_samples = (int)samples;
+	}
+	if (!host_config_strength(config, required, "environment_maps.captured_lighting.diffuse_strength",
+							  &out->captured_lighting_diffuse_strength, error, error_size) ||
+		!host_config_strength(config, required, "environment_maps.captured_lighting.specular_strength",
+							  &out->captured_lighting_specular_strength, error, error_size)) {
+		return 0;
+	}
+	/* ambient_fill is optional, also in the shipped configuration. */
+	node = AeronConfigFile_GetNode(config, fill_key);
+	if (node) {
+		float fill[3];
+		int valid = AeronConfigNode_SequenceCount(node) == 3;
+		for (size_t i = 0; valid && i < 3; i++) {
+			const double value = AeronConfigNode_Float(AeronConfigNode_SequenceGet(node, i), NAN);
+			valid = isfinite(value) && value >= 0.0 && value <= 100.0;
+			fill[i] = (float)value;
+		}
+		if (!valid) {
+			return host_config_error(error, error_size, "invalid '%s': expected three numbers from 0 to 100",
+									 fill_key);
+		}
+		memcpy(out->captured_lighting_ambient_fill, fill, sizeof fill);
+		out->captured_lighting_has_ambient_fill = 1;
+	}
+	return 1;
+}
+
 static int host_config_remaster_options(const AeronConfigFile* config, int required, XwaHostConfig* out,
 										char* error, size_t error_size) {
 	return host_config_model_smoothing(config, required, &out->model_smooth_angle_degrees, error,
@@ -252,7 +350,8 @@ static int host_config_remaster_options(const AeronConfigFile* config, int requi
 		   host_config_prefer_original_2d(config, required, &out->prefer_original_2d, error, error_size) &&
 		   host_config_environment_maps(config, required, out, error, error_size) &&
 		   host_config_sun_max_radiance(config, required, &out->environment_maps_sun_max_radiance, error,
-										error_size);
+										error_size) &&
+		   host_config_captured_lighting(config, required, out, error, error_size);
 }
 
 static int host_config_input_options(const AeronConfigFile* config, int required, XwaModernInputOptions* out,

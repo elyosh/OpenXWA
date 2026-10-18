@@ -372,6 +372,9 @@ int main(int argc, char** argv) {
 	Aeron_LogInfo("xwa.config", "environment maps: %s (manifest %s, sun max radiance %.4g)",
 				  host_config.environment_maps_enabled ? "yes" : "no", host_config.environment_maps_manifest,
 				  (double)host_config.environment_maps_sun_max_radiance);
+	Aeron_LogInfo("xwa.config", "captured lighting: %s (%d px, %d specular samples)",
+				  host_config.captured_lighting_enabled ? "yes" : "no", host_config.captured_lighting_size,
+				  host_config.captured_lighting_specular_samples);
 	const XwaRemasterInitOptions remaster_options = {
 		.opt_smooth_angle_degrees = host_config.model_smooth_angle_degrees,
 		.opt_emissive_strength = host_config.model_opt_emissive_strength,
@@ -381,6 +384,18 @@ int main(int argc, char** argv) {
 		.environment_maps_enabled = host_config.environment_maps_enabled,
 		.environment_maps_manifest = host_config.environment_maps_manifest,
 		.environment_maps_sun_max_radiance = host_config.environment_maps_sun_max_radiance,
+		.captured_lighting =
+			{
+				.enabled = host_config.captured_lighting_enabled,
+				.size = host_config.captured_lighting_size,
+				.specular_samples = host_config.captured_lighting_specular_samples,
+				.diffuse_strength = host_config.captured_lighting_diffuse_strength,
+				.specular_strength = host_config.captured_lighting_specular_strength,
+				.has_ambient_fill = host_config.captured_lighting_has_ambient_fill,
+				.ambient_fill = { host_config.captured_lighting_ambient_fill[0],
+								  host_config.captured_lighting_ambient_fill[1],
+								  host_config.captured_lighting_ambient_fill[2] },
+			},
 		.video_options = host_config.video_options,
 		.video_options_override_mask = host_config.video_options_override_mask,
 	};

@@ -30,6 +30,14 @@ typedef struct XwaHostConfig {
 	char environment_maps_manifest[XWA_HOST_CONFIG_MANIFEST_CAPACITY];
 	/* Largest radiance a sun disc is drawn with. */
 	float environment_maps_sun_max_radiance;
+	/* environment_maps.captured_lighting */
+	int captured_lighting_enabled;
+	int captured_lighting_size;
+	int captured_lighting_specular_samples;
+	float captured_lighting_diffuse_strength;
+	float captured_lighting_specular_strength;
+	int captured_lighting_has_ambient_fill;
+	float captured_lighting_ambient_fill[3];
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
 	XwaModernInputOptions input_defaults;

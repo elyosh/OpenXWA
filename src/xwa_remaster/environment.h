@@ -16,8 +16,9 @@
  * classic sky, backdrops and backdrop flares. If it has
  * `directional_lights`, they replace the directional lights. A reference
  * with `backdrops: keep` draws the mission's backdrops over the sky instead,
- * except the hidden ones (XwaRemasterEnvironment_BackdropHidden), and keeps
- * the backdrop lights and flares. A mission or
+ * except the hidden ones (XwaRemasterEnvironment_BackdropHidden). It keeps
+ * the backdrop flares and lights. With `hidden_backdrop_lights: remove`, it
+ * leaves out the lights of hidden backdrops that are not suns. A mission or
  * region without an entry uses the default environment. Without a default,
  * and in Death Star mode, it uses the classic HD path (the Death Star
  * behaviour in Death Star mode). In a hangar, the selection uses the region
@@ -85,6 +86,9 @@ typedef struct XwaEnvironmentBackdropRule {
 	XwaEnvironmentBackdrops mode;
 	bool hide_all; /* hide_backdrops: all */
 	bool show_all; /* show_backdrops: all */
+	/* Set by hidden_backdrop_lights: remove. Hidden backdrops that are not
+	 * suns then make no light. */
+	bool remove_hidden_lights;
 	uint8_t hide_count;
 	uint8_t show_count;
 	uint32_t hide[XWA_ENV_BACKDROP_LIST_MAX];
@@ -114,9 +118,9 @@ typedef struct XwaEnvironmentSelection {
  * XwaRemasterEnvironment_Init. */
 void XwaRemasterEnvironment_Configure(int enabled, const char* manifest, float sun_max_radiance);
 
-/* When enabled, parses the manifest. A missing manifest turns environment
- * maps off. Returns 0 when the manifest is invalid, and logs the source path
- * and YAML line. */
+/* When enabled, parses the manifest. Without a manifest there are no
+ * authored environments, and every region uses the classic path. Returns 0
+ * when the manifest is invalid, and logs the source path and YAML line. */
 int XwaRemasterEnvironment_Init(AeronVfs* vfs);
 void XwaRemasterEnvironment_Shutdown(void);
 
@@ -156,6 +160,10 @@ int XwaRemasterEnvironment_LastSelection(XwaEnvironmentSelection* out, char* mis
 
 /* The normalized mission key whose environments are prepared; "" when none. */
 const char* XwaRemasterEnvironment_PreparedMissionKey(void);
+
+/* Whether the selection draws a sky with `backdrops: keep`, with the
+ * mission's backdrops drawn over it. */
+bool XwaRemasterEnvironment_KeepsBackdrops(const XwaEnvironmentSelection* selection);
 
 /* Whether backdrop image (`group`, `image`) is hidden under `rule` in
  * `keep` mode. An image is hidden when it is in `hide` or `hide_all` is

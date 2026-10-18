@@ -152,6 +152,12 @@ static int env_list_has(const uint32_t* list, size_t count, uint32_t image) {
 	return 0;
 }
 
+bool XwaRemasterEnvironment_KeepsBackdrops(const XwaEnvironmentSelection* selection) {
+	return selection && selection->mode == XWA_ENV_MODE_AUTHORED && selection->prepared &&
+		   selection->prepared->radiance && selection->backdrops &&
+		   selection->backdrops->mode == XWA_ENV_BACKDROPS_KEEP;
+}
+
 bool XwaRemasterEnvironment_BackdropHidden(const XwaEnvironmentBackdropRule* rule, int group, int image) {
 	if (!rule || rule->mode != XWA_ENV_BACKDROPS_KEEP || group < 0 || group > 0xFFFF || image < 0 ||
 		image > 0xFFFF || rule->show_all) {
@@ -220,6 +226,7 @@ static int env_read_backdrops(const AeronConfigNode* node, const char* what,
 	const AeronConfigNode* mode = AeronConfigNode_MapGet(node, "backdrops");
 	const AeronConfigNode* hide = AeronConfigNode_MapGet(node, "hide_backdrops");
 	const AeronConfigNode* show = AeronConfigNode_MapGet(node, "show_backdrops");
+	const AeronConfigNode* lights = AeronConfigNode_MapGet(node, "hidden_backdrop_lights");
 	if (mode) {
 		const char* value =
 			AeronConfigNode_Type(mode) == AERON_CONFIG_STRING ? AeronConfigNode_String(mode, "") : "";
@@ -229,9 +236,23 @@ static int env_read_backdrops(const AeronConfigNode* node, const char* what,
 			return env_node_error(mode, "%s: 'backdrops' must be 'replace' or 'keep'", what);
 		}
 	}
-	if ((hide || show) && out->mode != XWA_ENV_BACKDROPS_KEEP) {
-		return env_node_error(hide ? hide : show, "%s: '%s' needs 'backdrops: keep'", what,
-							  hide ? "hide_backdrops" : "show_backdrops");
+	if (out->mode != XWA_ENV_BACKDROPS_KEEP) {
+		static const char* const names[] = { "hide_backdrops", "show_backdrops", "hidden_backdrop_lights" };
+		const AeronConfigNode* const nodes[] = { hide, show, lights };
+		for (int i = 0; i < 3; i++) {
+			if (nodes[i]) {
+				return env_node_error(nodes[i], "%s: '%s' needs 'backdrops: keep'", what, names[i]);
+			}
+		}
+	}
+	if (lights) {
+		const char* value =
+			AeronConfigNode_Type(lights) == AERON_CONFIG_STRING ? AeronConfigNode_String(lights, "") : "";
+		if (strcmp(value, "remove") == 0) {
+			out->remove_hidden_lights = true;
+		} else if (strcmp(value, "keep") != 0) {
+			return env_node_error(lights, "%s: 'hidden_backdrop_lights' must be 'keep' or 'remove'", what);
+		}
 	}
 	return (!hide || env_read_backdrop_list(hide, what, "hide_backdrops", &out->hide_all, out->hide,
 											&out->hide_count)) &&
@@ -243,8 +264,8 @@ static int env_read_backdrops(const AeronConfigNode* node, const char* what,
  * name or a map with `environment`, an optional `rotation_degrees` and the
  * optional backdrop fields. */
 static int env_add_reference(const AeronConfigNode* node, const char* what, int32_t* out_index) {
-	static const char* const fields[] = { "environment", "rotation_degrees", "backdrops", "hide_backdrops",
-										  "show_backdrops" };
+	static const char* const fields[] = { "environment",    "rotation_degrees", "backdrops",
+										  "hide_backdrops", "show_backdrops",   "hidden_backdrop_lights" };
 	const AeronConfigNode* name_node = node;
 	const AeronConfigNode* rotation_node = NULL;
 	XwaEnvironmentBackdropRule backdrops;
@@ -330,7 +351,8 @@ static int env_parse_mission(const char* source, const AeronConfigNode* node) {
 		}
 		char region_what[224];
 		snprintf(region_what, sizeof region_what, "%s region %d", what, region);
-		/* `none` alone; { environment: none } names an environment. */
+		/* A bare `none` means no environment. { environment: none } names an
+		 * environment called `none`. */
 		if (AeronConfigNode_Type(value) == AERON_CONFIG_STRING &&
 			strcmp(AeronConfigNode_String(value, ""), "none") == 0) {
 			mission->region_reference[region] = ENV_REFERENCE_NONE;
@@ -377,7 +399,22 @@ static int env_parse_xwa(const AeronConfigNode* xwa) {
 	return 1;
 }
 
-/* Returns 1 when the manifest loads, -1 when it does not exist, 0 on error. */
+/* Creates an empty set of definitions, for a missing manifest. */
+static int env_empty_definitions(void) {
+	AeronConfigFile* empty = NULL;
+	AeronConfigError error;
+	memset(&error, 0, sizeof error);
+	const int ok = AeronConfigFile_CreateMap(AERON_VFS_ROOT_MOD, s_env.manifest_path, &empty, &error) &&
+				   AeronEnvironment_ParseDefinitions(AeronConfigFile_Root(empty), &s_env.definitions, &error);
+	AeronConfigFile_Destroy(empty);
+	if (!ok) {
+		Aeron_LogError("xwa.remaster", "environment maps: %s",
+					   error.message[0] ? error.message : "out of memory");
+	}
+	return ok;
+}
+
+/* Returns 1 when the manifest loads or does not exist, 0 on error. */
 static int env_load_manifest(AeronVfs* vfs) {
 	static const char* const fields[] = { "version", "environments", "xwa" };
 	const char* vfs_path = s_env.manifest_path;
@@ -387,9 +424,12 @@ static int env_load_manifest(AeronVfs* vfs) {
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_MOD, vfs_path, &manifest, &error)) {
 		if (error.code == AERON_CONFIG_ERROR_NOT_FOUND) {
-			/* The mod folder is optional. */
-			Aeron_LogInfo("xwa.remaster", "environment maps: no manifest at %s, classic sky only", vfs_path);
-			return -1;
+			/* The mod folder is optional. Without a manifest there are no
+			 * authored environments: every region uses the classic path,
+			 * and captured lighting still applies. */
+			Aeron_LogInfo("xwa.remaster", "environment maps: no manifest at %s, no authored environments",
+						  vfs_path);
+			return env_empty_definitions();
 		}
 		Aeron_LogError("xwa.remaster", "environment manifest %s:%d: %s", vfs_path, error.line,
 					   error.message[0] ? error.message : "unavailable");
@@ -438,10 +478,9 @@ int XwaRemasterEnvironment_Init(AeronVfs* vfs) {
 		XwaRemasterEnvironment_Shutdown();
 		return 0;
 	}
-	const int loaded = env_load_manifest(vfs);
-	if (loaded <= 0) {
+	if (!env_load_manifest(vfs)) {
 		XwaRemasterEnvironment_Shutdown();
-		return loaded < 0;
+		return 0;
 	}
 	return 1;
 }
@@ -466,7 +505,6 @@ int XwaRemasterEnvironment_Enabled(void) { return s_env.enabled; }
 void XwaRemasterEnvironment_SetAuthoredEnvironments(int enabled) { s_env_options.authored = enabled != 0; }
 
 int XwaRemasterEnvironment_AuthoredEnvironments(void) { return s_env_options.authored; }
-
 
 /* XWA world X/Y horizontal, +Z up: cube +X = world +X, cube +Y = world +Z,
  * cube +Z = world -Y (the flight sky's existing rotation). */

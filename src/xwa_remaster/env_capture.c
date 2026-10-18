@@ -241,15 +241,17 @@ static int env_capture_sun_order(const void* a, const void* b) {
 }
 
 /* Every visible backdrop sun of the region, with the directional linked to
- * it, ordered primary first, then by decreasing luminance. */
-static uint32_t env_capture_collect_suns(const XwaSnapshot* snap, EnvCaptureSun* suns) {
+ * it, ordered primary first, then by decreasing luminance. Suns that `hide`
+ * hides are left out. */
+static uint32_t env_capture_collect_suns(const XwaSnapshot* snap, XwaRemasterAssets* assets,
+										 const XwaEnvironmentBackdropRule* hide, EnvCaptureSun* suns) {
 	const XwaDirLight* key =
 		XwaRemasterShip_SelectKeyDirectionalLight(snap->dir_lights, snap->dir_light_count);
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < snap->backdrop_count; i++) {
 		const XwaBackdrop* b = &snap->backdrops[i];
-		if (b->hidden || b->model_type < XWA_SNAP_TYPE_BACKDROP_SUN_FIRST ||
-			b->model_type > XWA_SNAP_TYPE_BACKDROP_SUN_LAST) {
+		if (b->model_type < XWA_SNAP_TYPE_BACKDROP_SUN_FIRST || b->model_type > XWA_SNAP_TYPE_BACKDROP_SUN_LAST ||
+			XwaRemasterFlight_CaptureBackdropHidden(snap, assets, i, hide)) {
 			continue;
 		}
 		EnvCaptureSun* sun = &suns[count];
@@ -306,7 +308,7 @@ static int env_capture_sun_sprite(const XwaSnapshot* snap, XwaRemasterAssets* as
 	float max_tan = 0.0f;
 	if (!XwaRemasterFlight_CaptureCamera(right, down, forward, 1.0f, ENV_CAPTURE_SPRITE_SIZE, &camera,
 										 crows) ||
-		XwaRemasterFlight_CaptureBackdrops(NULL, crows, snap, assets, (int)sun->backdrop, &max_tan) == 0 ||
+		XwaRemasterFlight_CaptureBackdrops(NULL, crows, snap, assets, (int)sun->backdrop, NULL, &max_tan) == 0 ||
 		!(max_tan > 0.0f)) {
 		Aeron_LogWarn("xwa.remaster", "environment capture: sun backdrop %u has no quads in front of it",
 					  sun->backdrop);
@@ -324,7 +326,7 @@ static int env_capture_sun_sprite(const XwaSnapshot* snap, XwaRemasterAssets* as
 		!AeronScene_Begin(scene, &camera)) {
 		return 0;
 	}
-	XwaRemasterFlight_CaptureBackdrops(scene, crows, snap, assets, (int)sun->backdrop, NULL);
+	XwaRemasterFlight_CaptureBackdrops(scene, crows, snap, assets, (int)sun->backdrop, NULL, NULL);
 	if (!env_capture_render(scene, "Environment capture sun sprite", pixels, ENV_CAPTURE_SPRITE_SIZE)) {
 		return 0;
 	}
@@ -360,12 +362,12 @@ static void env_capture_printf(EnvCaptureText* t, const char* format, ...) {
 }
 
 static int env_capture_write_description(const char* path, const char* name, const char* mission,
-										 const XwaSnapshot* snap, int face_size, const EnvCaptureSun* suns,
-										 uint32_t sun_count) {
+										 const XwaSnapshot* snap, const AeronPreparedEnvironment* sky,
+										 int face_size, const EnvCaptureSun* suns, uint32_t sun_count) {
 	static char buffer[8192];
 	EnvCaptureText t = { buffer, 0, sizeof buffer, 1 };
-	XwaFlightCaptureSky sky;
-	XwaRemasterFlight_CaptureSkyInfo(&sky);
+	XwaFlightCaptureSky stars;
+	XwaRemasterFlight_CaptureSkyInfo(&stars);
 	env_capture_printf(&t,
 					   "# HD environment capture: environment_bake --capture <this directory> "
 					   "--bake-root <mod folder>\n"
@@ -408,19 +410,46 @@ static int env_capture_write_description(const char* path, const char* name, con
 					   "  star_grid: %.9g\n"
 					   "  game_time_ticks: %lld\n"
 					   "  proj_scale: %.9g\n",
-					   (double)sky.exposure, (double)sky.star_brightness, (double)sky.star_density,
-					   (double)sky.star_grid, (long long)snap->game_time_ticks,
+					   (double)stars.exposure, (double)stars.star_brightness, (double)stars.star_density,
+					   (double)stars.star_grid, (long long)snap->game_time_ticks,
 					   (double)snap->flight_camera.proj_scale);
+	/* With `backdrops: keep`, the region's sky replaces the starfield. */
+	if (sky && sky->definition) {
+		env_capture_printf(&t, "  sky_environment: \"%s\"\n", sky->definition->name);
+	}
 	return t.ok && AeronVfs_WriteAllAtomic(Aeron_GetVfs(), AERON_VFS_ROOT_USER, path, t.data, t.size);
 }
 
 /* ---- capture --------------------------------------------------------------- */
 
+int XwaRemasterEnvCapture_FaceCamera(int face, int size, AeronSceneCamera* camera, float crows[9]) {
+	if (face < 0 || face >= 6) {
+		return 0;
+	}
+	/* The face's texel axes are mirrored (sc x tc = -ma), so the camera looks
+	 * along ma with right = -sc, and the columns come out mirrored. */
+	float right[3], down[3], forward[3], neg_sc[3];
+	for (int i = 0; i < 3; i++) {
+		neg_sc[i] = -k_faces[face].sc[i];
+	}
+	env_capture_cube_to_world(neg_sc, right);
+	env_capture_cube_to_world(k_faces[face].tc, down);
+	env_capture_cube_to_world(k_faces[face].ma, forward);
+	return XwaRemasterFlight_CaptureCamera(right, down, forward, 1.0f, size, camera, crows);
+}
+
 static int env_capture_run(const XwaSnapshot* snap, XwaRemasterAssets* assets, const char* directory,
 						   const char* name, const char* mission) {
 	const int face_size = g_capture.face_size;
+	/* In a region with `backdrops: keep`, capture what the game shows: the
+	 * environment's sky, without the hidden backdrops. */
+	XwaEnvironmentSelection selection;
+	XwaRemasterEnvironment_Resolve(snap, &selection);
+	const int keep = XwaRemasterEnvironment_KeepsBackdrops(&selection);
+	const AeronPreparedEnvironment* sky = keep ? selection.prepared : NULL;
+	const XwaEnvironmentBackdropRule* hide = keep ? selection.backdrops : NULL;
 	EnvCaptureSun suns[XWA_SNAP_MAX_BACKDROPS];
-	uint32_t sun_count = env_capture_collect_suns(snap, suns);
+	uint32_t sun_count = env_capture_collect_suns(snap, assets, hide, suns);
 	uint32_t dropped = 0;
 	if (sun_count > AERON_ENV_MAX_LIGHTS) {
 		dropped = sun_count - AERON_ENV_MAX_LIGHTS;
@@ -445,29 +474,21 @@ static int env_capture_run(const XwaSnapshot* snap, XwaRemasterAssets* assets, c
 	const float star_upscale = (float)face_size / (2.0f * proj_scale);
 	char path[256];
 	for (int face = 0; ok && face < 6; face++) {
-		/* The face's texel axes are mirrored (sc x tc = -ma), so the camera
-		 * looks along ma with right = -sc and the columns are mirrored back. */
-		float right[3], down[3], forward[3], neg_sc[3];
-		for (int i = 0; i < 3; i++) {
-			neg_sc[i] = -k_faces[face].sc[i];
-		}
-		env_capture_cube_to_world(neg_sc, right);
-		env_capture_cube_to_world(k_faces[face].tc, down);
-		env_capture_cube_to_world(k_faces[face].ma, forward);
 		AeronSceneCamera camera;
 		float crows[9];
 		char label[64];
 		snprintf(label, sizeof label, "Environment capture face %s", k_faces[face].label);
 		snprintf(path, sizeof path, "%s/sky_%s.hdr", directory, k_faces[face].suffix);
-		ok = XwaRemasterFlight_CaptureCamera(right, down, forward, 1.0f, face_size, &camera, crows) &&
+		ok = XwaRemasterEnvCapture_FaceCamera(face, face_size, &camera, crows) &&
 			 AeronScene_Begin(face_scene, &camera) &&
-			 XwaRemasterFlight_CaptureSetSky(face_scene, stars, snap, star_upscale);
+			 XwaRemasterFlight_CaptureSetSky(face_scene, stars, snap, sky, star_upscale);
 		if (ok) {
 			XwaRemasterFlight_CaptureBackdrops(face_scene, crows, snap, assets,
-											   XWA_FLIGHT_CAPTURE_BACKDROPS_NO_SUNS, NULL);
+											   XWA_FLIGHT_CAPTURE_BACKDROPS_NO_SUNS, hide, NULL);
 			ok = env_capture_render(face_scene, label, pixels, face_size);
 		}
 		if (ok) {
+			/* The columns are mirrored back (XwaRemasterEnvCapture_FaceCamera). */
 			env_capture_to_rgb(pixels, face_size, 1, 0, rgb);
 			ok = Aeron_ImageWriteHdr(Aeron_GetVfs(), AERON_VFS_ROOT_USER, path, face_size, face_size, rgb);
 		}
@@ -489,7 +510,7 @@ static int env_capture_run(const XwaSnapshot* snap, XwaRemasterAssets* assets, c
 	}
 	if (ok) {
 		snprintf(path, sizeof path, "%s/capture.yaml", directory);
-		ok = env_capture_write_description(path, name, mission, snap, face_size, suns, exported);
+		ok = env_capture_write_description(path, name, mission, snap, sky, face_size, suns, exported);
 		if (!ok) {
 			env_capture_status(1, "cannot write %s", path);
 		}
