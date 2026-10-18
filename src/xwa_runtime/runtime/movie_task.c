@@ -1,6 +1,7 @@
 #include "xwa_runtime/runtime/movie_task.h"
 
 #include "aeron/aeron.h"
+#include "aeron/config_file.h"
 #include "aeron/video.h"
 #include "xwa/config/game_config.h"
 #include "xwa/frontend/frontend_dialog.h"
@@ -9,6 +10,7 @@
 #include "xwa/frontend/frontend_file_stream.h"
 #include "xwa/frontend/frontend_input.h"
 #include "xwa/frontend/frontend_text.h"
+#include "xwa/frontend/mission_setup.h"
 #include "xwa/movie/movie.h"
 #include "xwa/util/memory.h"
 #include "xwa_runtime/runtime/frontend_task.h"
@@ -24,7 +26,11 @@ enum {
 	XWA_MOVIE_OVERLAY_PITCH = XWA_MOVIE_OVERLAY_WIDTH * 2,
 	XWA_MOVIE_SKIP_GATE_FRAME = 5,
 	XWA_MOVIE_SUBTITLE_FPS = 15,
+	XWA_MOVIE_ROOM_NAME_SIZE = 64,
 };
+
+#define XWA_MOVIE_ROOMS_PATH "frontend/movies/movies.yaml"
+#define XWA_MOVIE_ROOM_DEFAULT "pod"
 
 typedef struct XwaMovieTaskState {
 	AeronVideoPlayer* player;
@@ -44,14 +50,24 @@ typedef struct XwaMovieTaskState {
 static XwaMovieTaskState g_xwaMovieTask;
 static int g_xwaMoviePreferOriginal;
 
+/* movies.yaml keys, in XwaMovieRoom order. */
+static const char* const g_xwaMovieRoomKeys[XWA_MOVIE_ROOM_COUNT] = {
+	"film_room",
+	"single_player_pod",
+	"multiplayer_pod",
+};
+static char g_xwaMovieRoomNames[XWA_MOVIE_ROOM_COUNT][XWA_MOVIE_ROOM_NAME_SIZE];
+static int g_xwaMovieRoomsLoaded;
+
 void XwaMovieTask_Configure(int preferOriginalMovies) {
 	g_xwaMoviePreferOriginal = preferOriginalMovies != 0;
 }
 
 /* Finds the movie `name`: a replacement in the mod folder,
  * frontend/movies/<name>.mp4, or the original MOVIES/<name>.SNM. The
- * replacement comes first unless assets.prefer_original_movies is set. */
-static int XwaMovieTask_ResolveAsset(const char* name) {
+ * replacement comes first unless assets.prefer_original_movies is set.
+ * `path` holds 512 characters. */
+static int XwaMovieTask_FindMovie(const char* name, char* path, AeronVfsRoot* root, int* isReplacement) {
 	char original[512];
 	char replacement[512];
 	int has_original;
@@ -64,18 +80,144 @@ static int XwaMovieTask_ResolveAsset(const char* name) {
 	}
 	has_original = AeronVfs_Exists(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, original);
 	has_replacement = AeronVfs_Exists(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, replacement);
-	g_xwaMovieTask.is_replacement = has_replacement && (!g_xwaMoviePreferOriginal || !has_original);
-	if (g_xwaMovieTask.is_replacement) {
-		g_xwaMovieTask.root = AERON_VFS_ROOT_MOD;
-		memcpy(g_xwaMovieTask.path, replacement, sizeof(replacement));
+	*isReplacement = has_replacement && (!g_xwaMoviePreferOriginal || !has_original);
+	if (*isReplacement) {
+		*root = AERON_VFS_ROOT_MOD;
+		memcpy(path, replacement, sizeof(replacement));
 		return 1;
 	}
 	if (!has_original) {
 		return 0;
 	}
-	g_xwaMovieTask.root = AERON_VFS_ROOT_ASSET;
-	memcpy(g_xwaMovieTask.path, original, sizeof(original));
+	*root = AERON_VFS_ROOT_ASSET;
+	memcpy(path, original, sizeof(original));
 	return 1;
+}
+
+static int XwaMovieTask_ResolveAsset(const char* name) {
+	return XwaMovieTask_FindMovie(name, g_xwaMovieTask.path, &g_xwaMovieTask.root,
+								  &g_xwaMovieTask.is_replacement);
+}
+
+/* Writes `<mission>_<name>` for the selected entry of the mission list, with
+ * the mission file name stripped of its folder and extension
+ * ("1B1M7G_ceremony"). Returns 0 when no mission is selected. */
+static int XwaMovieTask_MissionMovieName(const char* name, char* out, size_t size) {
+	const char* fileName;
+	const char* stem;
+	const char* extension;
+	size_t stemLength;
+
+	if (g_missionList == NULL || g_selectedMissionListIndex < 0 ||
+		g_selectedMissionListIndex >= g_missionCount) {
+		return 0;
+	}
+	fileName = g_missionList[g_selectedMissionListIndex].fileName;
+	stem = fileName;
+	for (const char* c = fileName; *c != '\0'; ++c) {
+		if (*c == '\\' || *c == '/') {
+			stem = c + 1;
+		}
+	}
+	extension = strrchr(stem, '.');
+	stemLength = extension != NULL ? (size_t)(extension - stem) : strlen(stem);
+	return stemLength != 0 && snprintf(out, size, "%.*s_%s", (int)stemLength, stem, name) < (int)size;
+}
+
+/* Reads frontend/movies/movies.yaml from the mod folder once. A file with an
+ * error is ignored as a whole, and every room plays its default movie. */
+static void XwaMovieTask_LoadRooms(void) {
+	char names[XWA_MOVIE_ROOM_COUNT][XWA_MOVIE_ROOM_NAME_SIZE];
+	AeronConfigFile* file = NULL;
+	AeronConfigError error;
+	const AeronConfigNode* root;
+	int ok = 1;
+
+	if (g_xwaMovieRoomsLoaded) {
+		return;
+	}
+	g_xwaMovieRoomsLoaded = 1;
+	memset(&error, 0, sizeof(error));
+	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, XWA_MOVIE_ROOMS_PATH, &file,
+									&error)) {
+		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
+			Aeron_LogError("xwa.movie", "%s:%d: %s", XWA_MOVIE_ROOMS_PATH, error.line,
+						   error.message[0] ? error.message : "unavailable");
+			Aeron_LogError("xwa.movie", "%s is ignored", XWA_MOVIE_ROOMS_PATH);
+		}
+		return;
+	}
+	memset(names, 0, sizeof(names));
+	root = AeronConfigFile_Root(file);
+	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.movie", "%s:%d: must be a map of rooms to movie names", XWA_MOVIE_ROOMS_PATH,
+					   AeronConfigNode_Line(root));
+		ok = 0;
+	}
+	for (size_t i = 0; ok && i < AeronConfigNode_MapCount(root); ++i) {
+		const char* key = AeronConfigNode_MapKeyAt(root, i);
+		const AeronConfigNode* value = AeronConfigNode_MapValueAt(root, i);
+		const char* name = AeronConfigNode_String(value, NULL);
+		int room = 0;
+
+		while (room < XWA_MOVIE_ROOM_COUNT && strcmp(key, g_xwaMovieRoomKeys[room]) != 0) {
+			++room;
+		}
+		if (room == XWA_MOVIE_ROOM_COUNT) {
+			Aeron_LogError("xwa.movie", "%s:%d: unknown room '%s'", XWA_MOVIE_ROOMS_PATH,
+						   AeronConfigNode_Line(value), key);
+			ok = 0;
+		} else if (name == NULL || name[0] == '\0' ||
+				   snprintf(names[room], sizeof(names[room]), "%s", name) >= (int)sizeof(names[room])) {
+			Aeron_LogError("xwa.movie", "%s:%d: '%s' must be a movie name of at most %d characters",
+						   XWA_MOVIE_ROOMS_PATH, AeronConfigNode_Line(value), key,
+						   XWA_MOVIE_ROOM_NAME_SIZE - 1);
+			ok = 0;
+		}
+	}
+	AeronConfigFile_Destroy(file);
+	if (!ok) {
+		Aeron_LogError("xwa.movie", "%s is ignored", XWA_MOVIE_ROOMS_PATH);
+		return;
+	}
+	memcpy(g_xwaMovieRoomNames, names, sizeof(names));
+}
+
+const char* XwaMovieTask_RoomMovie(XwaMovieRoom room) {
+	char path[512];
+	AeronVfsRoot root;
+	int isReplacement;
+	const char* name;
+
+	XwaMovieTask_LoadRooms();
+	if ((unsigned int)room >= XWA_MOVIE_ROOM_COUNT || g_xwaMovieRoomNames[room][0] == '\0') {
+		return XWA_MOVIE_ROOM_DEFAULT;
+	}
+	name = g_xwaMovieRoomNames[room];
+	if (!XwaMovieTask_FindMovie(name, path, &root, &isReplacement)) {
+		Aeron_LogWarn("xwa.movie", "%s: %s movie '%s' was not found; playing '%s'", XWA_MOVIE_ROOMS_PATH,
+					  g_xwaMovieRoomKeys[room], name, XWA_MOVIE_ROOM_DEFAULT);
+		return XWA_MOVIE_ROOM_DEFAULT;
+	}
+	/* With prefer_original_movies, a room movie from the mod folder would
+	   still replace the original one. */
+	return g_xwaMoviePreferOriginal && isReplacement ? XWA_MOVIE_ROOM_DEFAULT : name;
+}
+
+int XwaMovieTask_BeginForMission(const char* name, int noFade) {
+	char missionName[128];
+	char path[512];
+	AeronVfsRoot root;
+	int isReplacement;
+
+	/* With prefer_original_movies, a mission movie from the mod folder would
+	   still replace the original `name`, so it is not used. */
+	if (XwaMovieTask_MissionMovieName(name, missionName, sizeof(missionName)) &&
+		XwaMovieTask_FindMovie(missionName, path, &root, &isReplacement) &&
+		(!g_xwaMoviePreferOriginal || !isReplacement)) {
+		return XwaMovieTask_Begin(missionName, noFade);
+	}
+	return XwaMovieTask_Begin(name, noFade);
 }
 
 static void XwaMovieTask_RestoreFrontend(void) {
@@ -359,4 +501,6 @@ void XwaMovieTask_Shutdown(void) {
 		g_xwaMovieTask.subtitle_overlay = NULL;
 	}
 	memset(&g_xwaMovieTask, 0, sizeof(g_xwaMovieTask));
+	memset(g_xwaMovieRoomNames, 0, sizeof(g_xwaMovieRoomNames));
+	g_xwaMovieRoomsLoaded = 0;
 }

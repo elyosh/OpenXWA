@@ -37,6 +37,9 @@
 #include "xwa/frontend/net_transport.h"
 #include "xwa/frontend/skirmish.h"
 #include "xwa/movie/movie.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/runtime/movie_task.h"
+#endif
 #include "xwa/util/byte_order.h"
 #include "xwa/util/memory.h"
 #include "xwa/util/time.h"
@@ -7494,8 +7497,11 @@ int MissionSetup_Update(int frameCounter) {
 		}
 		g_missionSetupTourButtonEnabled = 1;
 #ifdef XWA_MODERN
+		/* Modern port: a mod can choose the pod's movie in
+		   frontend/movies/movies.yaml; it is "pod" otherwise. */
 		if (!entryMoviePending && !g_skipFrontendEntryMovie &&
-			g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_SINGLEPLAYER && Movie_Play("pod", 1)) {
+			g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_SINGLEPLAYER &&
+			Movie_Play(XwaMovieTask_RoomMovie(XWA_MOVIE_ROOM_SINGLE_PLAYER_POD), 1)) {
 			entryMoviePending = 1;
 			return 0;
 		}

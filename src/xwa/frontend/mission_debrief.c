@@ -37,6 +37,9 @@
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/frontend/net_transport.h"
 #include "xwa/movie/movie.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/runtime/movie_task.h"
+#endif
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"
 
@@ -2597,7 +2600,10 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 			sprintf(g_frontendScratchBuffer, "wave\\frontend\\MEDALANDPROMOTION\\%s", waveName);
 			parsedFirst = FrontendWaveStream_PlayWaveFile(g_frontendScratchBuffer, 0, 0);
 #ifdef XWA_MODERN
-			if (Movie_Play("ceremony", 1)) {
+			/* Modern port: a mission can have its own award ceremony movie,
+			   <mission>_ceremony, which plays instead of the original one when
+			   it exists. */
+			if (XwaMovieTask_BeginForMission("ceremony", 1)) {
 				g_awardCeremonyState = 3;
 				break;
 			}

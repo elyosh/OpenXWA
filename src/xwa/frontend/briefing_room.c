@@ -33,6 +33,9 @@
 #include "xwa/movie/movie.h"
 #include "xwa/util/memory.h"
 #include "xwa/util/time.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/runtime/movie_task.h"
+#endif
 #include "xwa_runtime/timing/host_clock.h"
 
 #include <stdio.h>
@@ -666,13 +669,16 @@ int BriefingRoom_Update(int frameCounter) {
 			FrontendDisplay_DisableOffscreenRestore();
 			FrontendDisplay_UnlockBackBuffer();
 #ifdef XWA_MODERN
+			/* Modern port: a mission can have its own room movie,
+			   <mission>_marko or <mission>_briefroom, which plays instead of
+			   the original one when it exists. */
 			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
-				if (Movie_Play("marko", 1)) {
+				if (XwaMovieTask_BeginForMission("marko", 1)) {
 					g_briefingRoomState = BRIEFING_ROOM_WAIT_ROOM_MOVIE;
 					break;
 				}
 			} else {
-				if (Movie_Play("briefroom", 1)) {
+				if (XwaMovieTask_BeginForMission("briefroom", 1)) {
 					g_briefingRoomState = BRIEFING_ROOM_WAIT_ROOM_MOVIE;
 					break;
 				}

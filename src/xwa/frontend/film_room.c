@@ -26,6 +26,9 @@
 #include "xwa/frontend/frontend_text.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/movie/movie.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/runtime/movie_task.h"
+#endif
 
 #include <stdint.h>
 #include <stdio.h>
@@ -271,7 +274,9 @@ int FilmRoom_Update(int frameCounter) {
 
 	if (frameCounter == 0 || entryMoviePending) {
 		if (!entryMoviePending && !g_skipFrontendEntryMovie) {
-			if (Movie_Play("pod", 1)) {
+			/* Modern port: a mod can choose the film room's movie in
+			   frontend/movies/movies.yaml; it is "pod" otherwise. */
+			if (Movie_Play(XwaMovieTask_RoomMovie(XWA_MOVIE_ROOM_FILM), 1)) {
 				entryMoviePending = 1;
 				return 0;
 			}
