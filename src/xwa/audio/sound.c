@@ -403,7 +403,12 @@ uint8_t Sound_LoadEffectEx(const char* fileName, const char* name, int create3DF
 	def.fileName[0] = '\0';
 	DebugPrintfChannel(1, "Loading sfx \"%s\" (%s), 3Ds %s.\n", fileName, name,
 					   g_sound3DEnabled ? "On" : "Off");
+#ifdef XWA_MODERN
+	def.buffer =
+		DirectSound_LoadWaveBuffer(g_directSound, AERON_VFS_ROOT_ASSET, (char*)fileName, create3DFlags);
+#else
 	def.buffer = DirectSound_LoadWaveBuffer(g_directSound, (char*)fileName, create3DFlags);
+#endif
 	if (!def.buffer) {
 		return 0;
 	}

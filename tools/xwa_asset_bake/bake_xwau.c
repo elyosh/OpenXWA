@@ -1578,6 +1578,7 @@ typedef struct XwauAnimLine {
 	char group[64];
 	char missions[512];
 	char video[256]; /* the webm file's name */
+	char sound[256]; /* the WAV file's name, or empty */
 } XwauAnimLine;
 
 static char* trim(char* s) {
@@ -1640,6 +1641,44 @@ static void write_missions(FILE* fp, const char* list) {
 	fprintf(fp, plain ? "]" : "]}");
 }
 
+/* Finds the WAV file that Sfx\Sfx.lst lists as `concourse_anim_<id>`. XWAU
+ * plays it at the start of each play of that animation. Writes the file's
+ * name to `out`, or returns 0 when there is none. */
+static int find_anim_sound(const XwauContext* ctx, int id, char* out, size_t out_size) {
+	char dir[1100], list[1200], name[64], line[600], file[256], sound[256];
+	snprintf(name, sizeof name, "concourse_anim_%d", id);
+	if (!find_ci(ctx->opt->xwau_root, "Sfx", dir, sizeof dir) || !find_ci(dir, "Sfx.lst", list, sizeof list))
+		return 0;
+	FILE* fp = fopen(list, "r");
+	if (!fp)
+		return 0;
+	int found = 0;
+	/* The game skips the first line. */
+	if (fgets(line, sizeof line, fp)) {
+		while (!found && fgets(line, sizeof line, fp)) {
+			if (sscanf(line, "%255s %255s", file, sound) == 2 && strcasecmp(sound, name) == 0)
+				found = 1;
+		}
+	}
+	fclose(fp);
+	if (!found)
+		return 0;
+	/* The path is relative to the install, with backslashes. */
+	char path[1400], listed[256];
+	snprintf(path, sizeof path, "%s", ctx->opt->xwau_root);
+	snprintf(listed, sizeof listed, "%s", file);
+	for (char* part = strtok(file, "\\/"); part; part = strtok(NULL, "\\/")) {
+		char next[1400];
+		if (!find_ci(path, part, next, sizeof next)) {
+			fprintf(stderr, "xwau: Sfx.lst lists %s for %s, but the file is missing\n", listed, name);
+			return 0;
+		}
+		snprintf(path, sizeof path, "%s", next);
+	}
+	snprintf(out, out_size, "%s", strrchr(path, '/') + 1);
+	return 1;
+}
+
 /* Writes frontend/animations.yaml from ConcourseAnimations.txt. Each XWAU
  * group becomes a group. A group whose name starts with + repeats the same
  * animation. Lines that OpenXWA can't play the same way are reported. */
@@ -1699,6 +1738,8 @@ static void write_animations_yaml(XwauContext* ctx) {
 			continue;
 		}
 		snprintf(a.video, sizeof a.video, "%s", strrchr(webm, '/') + 1);
+		if (!find_anim_sound(ctx, a.id, a.sound, sizeof a.sound))
+			a.sound[0] = '\0';
 		if (a.w == 0 || a.h == 0)
 			fprintf(stderr,
 					"xwau: ConcourseAnimations.txt:%d: concourse_anim_%d has no size. XWAU draws one video "
@@ -1723,7 +1764,8 @@ static void write_animations_yaml(XwauContext* ctx) {
 	fprintf(fp,
 			"# Made by xwa_asset_bake xwau-frontend from ConcourseAnimations.txt. Positions and\n"
 			"# sizes are in design pixels, delays in seconds. Copy the videos from\n"
-			"# XWAU's Resdata folder to frontend/animations/.\n"
+			"# XWAU's Resdata folder, and the sounds from its Sfx folder, to\n"
+			"# frontend/animations/.\n"
 			"version: 1\n"
 			"groups:%s\n",
 			count ? "" : " []");
@@ -1775,6 +1817,8 @@ static void write_animations_yaml(XwauContext* ctx) {
 			/* XWAU shows one video frame per concourse frame, whatever the
 			   file's frame rate. */
 			fprintf(fp, ", fps: %.0f", CONCOURSE_FPS);
+			if (b->sound[0])
+				fprintf(fp, ", sound: %s", b->sound);
 			write_missions(fp, b->missions);
 			fprintf(fp, "}\n");
 		}

@@ -527,7 +527,11 @@ int Concourse_LoadMarkoVoiceClip(void) {
 		strcpy(fileName, "wave\\frontend\\T01MC01.wav");
 	}
 
+#ifdef XWA_MODERN
+	FrontendSound_LoadSound(AERON_VFS_ROOT_ASSET, fileName, "markovoice");
+#else
 	FrontendSound_LoadSound(fileName, "markovoice");
+#endif
 	return 1;
 }
 

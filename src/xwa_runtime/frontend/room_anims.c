@@ -4,7 +4,9 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "aeron/random.h"
+#include "xwa/config/game_config.h"
 #include "xwa/frontend/frontend_resources.h"
+#include "xwa/frontend/frontend_sound.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/timing/host_clock.h"
@@ -33,6 +35,10 @@ typedef struct XwaRoomAnim {
 	float width, height; /* 640x480 units, with has_size */
 	float scale;         /* without has_size: video pixels per design pixel */
 	float fps;           /* frames per second, or 0 for the file's rate */
+	/* The sound's path in the mod folder, or empty. It is also the sound's
+	   name in the frontend sound table, which holds 63 characters. */
+	char sound[64];
+	int sound_state; /* 0 not loaded, 1 loaded, -1 can't be loaded */
 	XwaAnimMissions missions;
 	int first_mission, mission_count; /* in g_animMissionIds */
 } XwaRoomAnim;
@@ -48,6 +54,7 @@ typedef struct XwaRoomAnimGroup {
 	int slot;    /* its video slot, or -1 */
 	int waiting; /* the play starts at start_us, on the host clock */
 	uint64_t start_us;
+	int64_t position_us; /* the video's position at the last draw, to see a loop restart */
 } XwaRoomAnimGroup;
 
 static XwaRoomAnim* g_anims;
@@ -159,11 +166,12 @@ static int anims_read_missions(const AeronConfigNode* node, XwaRoomAnim* anim) {
 }
 
 static int anims_read_animation(const AeronConfigNode* node) {
-	static const char* const keys[] = { "video", "at", "size", "scale", "fps", "missions", NULL };
+	static const char* const keys[] = { "video", "at", "size", "scale", "fps", "sound", "missions", NULL };
 	const AeronConfigNode* video = AeronConfigNode_MapGet(node, "video");
 	const AeronConfigNode* size = AeronConfigNode_MapGet(node, "size");
 	const AeronConfigNode* scale = AeronConfigNode_MapGet(node, "scale");
 	const AeronConfigNode* fps = AeronConfigNode_MapGet(node, "fps");
+	const AeronConfigNode* sound = AeronConfigNode_MapGet(node, "sound");
 	XwaRoomAnim anim;
 	XwaRoomAnim* grown;
 	float x, y;
@@ -204,6 +212,15 @@ static int anims_read_animation(const AeronConfigNode* node) {
 			return anims_error(fps, "'fps' must be a number larger than 0");
 		}
 		anim.fps = anims_number(fps);
+	}
+	if (sound) {
+		const char* name = AeronConfigNode_String(sound, "");
+		if (AeronConfigNode_Type(sound) != AERON_CONFIG_STRING || !name[0] ||
+			strlen(XWA_ANIMS_DIR) + 1 + strlen(name) >= sizeof(anim.sound)) {
+			return anims_error(sound, "'sound' must be a WAV file name of at most %d characters",
+							   (int)(sizeof(anim.sound) - strlen(XWA_ANIMS_DIR) - 2));
+		}
+		snprintf(anim.sound, sizeof(anim.sound), "%s/%s", XWA_ANIMS_DIR, name);
 	}
 	if (!anims_read_missions(AeronConfigNode_MapGet(node, "missions"), &anim)) {
 		return 0;
@@ -461,6 +478,20 @@ static void anim_draw(const XwaRoomAnim* anim, int slot, AeronVideoPlayer* playe
 	XwaFrontendVideo_Draw(slot, anim->x, anim->y, width, height);
 }
 
+/* Plays the animation's sound, at the volume of the game's datapad sounds. */
+static void anim_play_sound(XwaRoomAnim* anim) {
+	if (!anim->sound[0] || anim->sound_state < 0) {
+		return;
+	}
+	if (anim->sound_state == 0) {
+		/* The loader logs a missing or bad file. */
+		anim->sound_state = FrontendSound_LoadSound(AERON_VFS_ROOT_MOD, anim->sound, anim->sound) ? 1 : -1;
+	}
+	if (anim->sound_state > 0) {
+		FrontendSound_PlayUISound(anim->sound, 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+	}
+}
+
 void XwaRoomAnims_Draw(const char* room, int frame) {
 	const uint64_t now_us = XwaTime_GetElapsedUs();
 	anims_load();
@@ -485,6 +516,8 @@ void XwaRoomAnims_Draw(const char* room, int frame) {
 			}
 			Aeron_VideoPlay(player);
 			group->waiting = 0;
+			group->position_us = 0;
+			anim_play_sound(&g_anims[group->current]);
 		}
 		Aeron_VideoUpdate(player);
 		state = Aeron_VideoGetState(player);
@@ -492,6 +525,12 @@ void XwaRoomAnims_Draw(const char* room, int frame) {
 			group_stop(group); /* Aeron has logged the error */
 			continue;
 		}
+		/* A looping video starts each pass at 0, and each pass plays the
+		   sound again. */
+		if (Aeron_VideoGetPositionUs(player) < group->position_us) {
+			anim_play_sound(&g_anims[group->current]);
+		}
+		group->position_us = Aeron_VideoGetPositionUs(player);
 		anim_draw(&g_anims[group->current], group->slot, player);
 		if (state == AERON_VIDEO_ENDED) {
 			group_next(group, now_us);
@@ -501,9 +540,18 @@ void XwaRoomAnims_Draw(const char* room, int frame) {
 
 void XwaRoomAnims_Leave(const char* room) {
 	for (int i = 0; i < g_animGroupCount; i++) {
-		if (strcmp(g_animGroups[i].room, room) == 0) {
-			group_stop(&g_animGroups[i]);
-			g_animGroups[i].active = 0;
+		XwaRoomAnimGroup* group = &g_animGroups[i];
+		if (strcmp(group->room, room) != 0) {
+			continue;
+		}
+		group_stop(group);
+		group->active = 0;
+		/* Unloading a sound also stops it. */
+		for (int a = group->first; a < group->first + group->count; a++) {
+			if (g_anims[a].sound_state > 0) {
+				FrontendSound_UnloadBufferByName(g_anims[a].sound);
+			}
+			g_anims[a].sound_state = 0;
 		}
 	}
 }

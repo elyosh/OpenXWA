@@ -49,8 +49,14 @@ void DirectSound_UnlockBuffer(IDirectSoundBuffer* buffer, void* audioPtr1, uint3
 uint32_t DirectSound_GetPlayCursor(IDirectSoundBuffer* buffer);
 int FrontendSound_ReleaseForFlight(void);
 int FrontendSound_RecreateAfterFlight(void* hwnd);
+#ifdef XWA_MODERN
+/* Modern port: `root` is the VFS root that holds `fileName`. */
+int FrontendSound_LoadSound(AeronVfsRoot root, char* fileName, char* soundName);
+int FrontendSound_LoadSoundFile(AeronVfsRoot root, char* fileName, char* soundName, int create3DFlags);
+#else
 int FrontendSound_LoadSound(char* fileName, char* soundName);
 int FrontendSound_LoadSoundFile(char* fileName, char* soundName, int create3DFlags);
+#endif
 int FrontendSound_UnloadBufferByName(char* soundName);
 int FrontendSound_GetPlayingCount(char* name);
 int FrontendSound_PlayUISound(char* soundName, int allowRestartExisting, int loop, int priority,
@@ -60,7 +66,12 @@ int FrontendSound_FindBufferByName(char* name);
 int FrontendSound_BinarySearchBufferByName(FrontendSoundBufferRecord* records, int lastIndex, char* name);
 void FrontendSound_InsertSortedBuffer(FrontendSoundBufferRecord* record);
 void FrontendSound_RemoveBufferRecord(int bufferIndex);
+#ifdef XWA_MODERN
+IDirectSoundBuffer* DirectSound_LoadWaveBuffer(void* directSound, AeronVfsRoot root, char* fileName,
+											   int create3DFlags);
+#else
 IDirectSoundBuffer* DirectSound_LoadWaveBuffer(void* directSound, char* fileName, int create3DFlags);
+#endif
 IDirectSoundBuffer* DirectSound_LoadWaveBufferIntoPtr(IDirectSoundBuffer** outBuffer, char* fileName,
 													  int create3DFlags);
 void DirectSound_PlayBuffer(IDirectSoundBuffer* buffer, uint32_t position, int loop, int volume0To127);

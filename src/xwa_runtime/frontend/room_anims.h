@@ -16,6 +16,7 @@
  *           at: [0, 0]          # design pixels
  *           size: [2560, 300]   # optional
  *           fps: 24             # optional: frames per second; the file's rate by default
+ *           sound: window.wav   # optional: in frontend/animations/, played at the start of each play
  *           missions: [7, 8]    # optional: all, a list, or {except: [...]}
  *
  * Each group plays one animation at a time. When the room is entered, each

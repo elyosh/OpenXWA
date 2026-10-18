@@ -66,7 +66,7 @@ int FrontendSound_LoadList(char* fileName) {
 					File_Close(stream);
 					return 0;
 				}
-				FrontendSound_LoadSound(soundFileName, soundName);
+				FrontendSound_LoadSound(AERON_VFS_ROOT_ASSET, soundFileName, soundName);
 			}
 		}
 	}
@@ -220,12 +220,22 @@ int FrontendSound_RecreateAfterFlight(void* hwnd) {
 }
 
 // FUNCTION: XWA 0x538630
+#ifdef XWA_MODERN
+int FrontendSound_LoadSound(AeronVfsRoot root, char* fileName, char* soundName) {
+	return FrontendSound_LoadSoundFile(root, fileName, soundName, 0);
+}
+#else
 int FrontendSound_LoadSound(char* fileName, char* soundName) {
 	return FrontendSound_LoadSoundFile(fileName, soundName, 0);
 }
+#endif
 
 // FUNCTION: XWA 0x538650
+#ifdef XWA_MODERN
+int FrontendSound_LoadSoundFile(AeronVfsRoot root, char* fileName, char* soundName, int create3DFlags) {
+#else
 int FrontendSound_LoadSoundFile(char* fileName, char* soundName, int create3DFlags) {
+#endif
 	FrontendSoundBufferRecord record;
 	IDirectSoundBuffer* buffer;
 	int wasBackBufferLocked;
@@ -241,7 +251,11 @@ int FrontendSound_LoadSoundFile(char* fileName, char* soundName, int create3DFla
 
 	wasBackBufferLocked = g_backBufferLocked.word & 0xff;
 	FrontendDisplay_UnlockBackBuffer();
+#ifdef XWA_MODERN
+	buffer = DirectSound_LoadWaveBuffer(g_frontendDirectSound, root, fileName, create3DFlags);
+#else
 	buffer = DirectSound_LoadWaveBuffer(g_frontendDirectSound, fileName, create3DFlags);
+#endif
 	record.buffer = buffer;
 	if (buffer == 0) {
 		if (wasBackBufferLocked) {
@@ -338,8 +352,14 @@ static int DirectSound_FindFormatAndDataChunks(void* riffData, DSWaveFormat** ou
 }
 
 // FUNCTION: XWA 0x539190
+#ifdef XWA_MODERN
+static int DirectSound_LoadFileAndFindAudioData(int unused, AeronVfsRoot root, char* fileName,
+												DSWaveFormat** outFormat, void** outSamples,
+												unsigned int* outSampleBytes) {
+#else
 static int DirectSound_LoadFileAndFindAudioData(int unused, char* fileName, DSWaveFormat** outFormat,
 												void** outSamples, unsigned int* outSampleBytes) {
+#endif
 	XwaFile* stream;
 	void* fileData;
 	size_t size;
@@ -349,7 +369,7 @@ static int DirectSound_LoadFileAndFindAudioData(int unused, char* fileName, DSWa
 #endif
 
 #ifdef XWA_MODERN
-	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
+	stream = File_Open(root, fileName, "rb");
 #else
 	stream = File_Open(AERON_VFS_ROOT_ASSET, fileName, "rb");
 #endif
@@ -407,7 +427,12 @@ static int DirectSound_CopyWaveDataToBuffer(IDirectSoundBuffer* buffer, const vo
 }
 
 // FUNCTION: XWA 0x539000
+#ifdef XWA_MODERN
+IDirectSoundBuffer* DirectSound_LoadWaveBuffer(void* directSound, AeronVfsRoot root, char* fileName,
+											   int create3DFlags) {
+#else
 IDirectSoundBuffer* DirectSound_LoadWaveBuffer(void* directSound, char* fileName, int create3DFlags) {
+#endif
 	IDirectSound* device = (IDirectSound*)directSound;
 	DSBufferDesc desc;
 	DSWaveFormat* format = NULL;
@@ -420,7 +445,11 @@ IDirectSoundBuffer* DirectSound_LoadWaveBuffer(void* directSound, char* fileName
 		g_waveFileTempBuffer = NULL;
 	}
 
+#ifdef XWA_MODERN
+	if (DirectSound_LoadFileAndFindAudioData(0, root, fileName, &format, &sampleData, &sampleBytes)) {
+#else
 	if (DirectSound_LoadFileAndFindAudioData(0, fileName, &format, &sampleData, &sampleBytes)) {
+#endif
 		memset(&desc, 0, sizeof(desc));
 		desc.dwSize = 20;
 		if (g_sound3DEnabled) {
@@ -451,7 +480,12 @@ done:
 // FUNCTION: XWA 0x539740
 IDirectSoundBuffer* DirectSound_LoadWaveBufferIntoPtr(IDirectSoundBuffer** outBuffer, char* fileName,
 													  int create3DFlags) {
+#ifdef XWA_MODERN
+	IDirectSoundBuffer* buffer =
+		DirectSound_LoadWaveBuffer(g_frontendDirectSound, AERON_VFS_ROOT_ASSET, fileName, create3DFlags);
+#else
 	IDirectSoundBuffer* buffer = DirectSound_LoadWaveBuffer(g_frontendDirectSound, fileName, create3DFlags);
+#endif
 	*outBuffer = buffer;
 	return buffer;
 }
