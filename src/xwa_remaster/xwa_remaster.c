@@ -30,6 +30,7 @@
 #include "xwa_remaster/hud.h"
 #include "xwa_remaster/opt_mesh.h"
 #include "xwa_remaster/ship.h"
+#include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/movie_task.h"
 #include "xwa_runtime/runtime/port.h"
@@ -80,6 +81,7 @@ static struct {
 	int pending_mode_fade;
 	uint64_t pending_classic_frame_serial;
 	int classic_suppressed_this_frame;
+	int frontend_wide; /* the layout of the frontend picture last rendered */
 	int render_pixel_width;
 	int render_pixel_height;
 	int observed_pixel_width;
@@ -90,6 +92,16 @@ static struct {
 	int hyperspace_preview_last;
 	AeronSampleCount msaa_samples;
 } g;
+
+/* Tells the presentation code how the frontend is shown, for the picture and
+ * for input: in the design screen's shape when the HD frontend is shown,
+ * else as the classic 640x480 surface. */
+static void XwaRemaster_SetFrontendShape(int hd_shown) {
+	float width = 0.0f, height = 0.0f;
+	if (hd_shown)
+		XwaFrontendGeometry_DesignSize(&width, &height);
+	XwaPresentation_SetFrontendShape((int)width, (int)height, hd_shown && g.frontend_wide);
+}
 
 static int XwaRemaster_SnapshotHasPresent(const XwaSnapshot* snap) {
 	for (uint32_t i = 0; i < snap->surface_event_count; i++) {
@@ -756,8 +768,12 @@ void XwaRemaster_Frame(int32_t delta_us) {
 				case XWA_SCENE_FRONTEND:
 				case XWA_SCENE_LOADING:
 				case XWA_SCENE_FRONTEND_MODAL: {
+					/* The frontend picture has the design screen's shape in every
+					   layout; only the mapping of its 640x480 units changes. */
+					g.frontend_wide = snap->frontend_layout == XWA_FRONTEND_LAYOUT_WIDE;
+					XwaRemaster_SetFrontendShape(1);
 					const XwaPresentationRect frame = XwaPresentation_Frame();
-					const XwaPresentationRect safe = XwaPresentation_ClassicSafeFrame();
+					const XwaPresentationRect safe = XwaPresentation_FrontendFrame();
 					/* Match Aeron_ProjectLogicalRect exactly so the frontend texture
 					 * reaches the swapchain without a whole-frame size conversion. */
 					const int frontend_width =
@@ -857,6 +873,8 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	g.ramp.target = target;
 	Aeron_BlendRampAdvance(&g.ramp, delta_us, target);
 	if (!g.scene_tex || g.ramp.alpha <= 0.001f) {
+		/* The classic surface is shown: input maps to it. */
+		XwaRemaster_SetFrontendShape(0);
 		if (g.classic_suppressed_this_frame) {
 			XwaPort_SubmitRetainedClassicFrame();
 		}
@@ -870,11 +888,12 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		return;
 	}
 
-	/* Frontend reconstruction remains a 4:3 texture inside the classic
-	 * safe frame. Modern flight owns the full presentation frame; HUD
+	/* The frontend reconstruction has the design screen's shape, fitted in
+	 * the frame. Modern flight owns the full presentation frame; HUD
 	 * profiles change only the authored overlay layout. */
+	XwaRemaster_SetFrontendShape(g.scene_kind != XWA_SCENE_FLIGHT);
 	const XwaPresentationRect pr =
-		g.scene_kind == XWA_SCENE_FLIGHT ? XwaPresentation_Frame() : XwaPresentation_ClassicSafeFrame();
+		g.scene_kind == XWA_SCENE_FLIGHT ? XwaPresentation_Frame() : XwaPresentation_FrontendFrame();
 	AeronTextureLayerDesc layer = {
 		.texture = g.scene_tex,
 		.logical_rect = { pr.x, pr.y, pr.width, pr.height },

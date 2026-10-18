@@ -13,6 +13,8 @@ int FrontendDialog_BeginConfirmDialog(const char* line1, const char* line2, cons
 int FrontendDialog_TakeConfirmDialogResult(int* result);
 #endif
 int FrontendDialog_ConfirmUpdateCallback(int frameState);
+int FrontendDialog_CreatePilotNameCallback(int frameState);
+int FrontendDialog_DeathStarTourOutcomeCallback(int frameState);
 int FrontendDialog_HasNetworkDismissPacket(void);
 int FrontendDialog_PromptForPilotName(char* outName);
 int FrontendDialog_EditText(char* text, unsigned int maxChars, const char* promptText);

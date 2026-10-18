@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 int CombatSimMenu_Update(int frameCounter);
+int MultiplayerSetup_Update(int frameCounter);
 int CombatSimMenu_Exit(int frameCounter);
 
 #ifdef __cplusplus

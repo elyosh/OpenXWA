@@ -25,6 +25,7 @@
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
+#include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/input_bridge.h"
 #include "xwa_runtime/input/mouse_flight.h"
@@ -403,6 +404,7 @@ void XwaPort_Shutdown(void) {
 	Pilot_Save(0);
 	XwaFrontendTask_Shutdown();
 	XwaFrontendGeometry_Shutdown();
+	XwaFrontendScreens_Shutdown();
 	FlightDisplay_FreeSurfaces();
 	FrontendDisplay_FreeSurfaces();
 	AeronDx5_Shutdown();

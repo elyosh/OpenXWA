@@ -119,7 +119,7 @@ static AeronSceneMesh* preview_mesh(const char* opt_name) {
 
 AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelPreview* p, int slot,
 										const XwaDirLight* lights, uint32_t light_count,
-										const XwaAssetRef* glow_tex) {
+										const XwaAssetRef* glow_tex, float width_scale) {
 	if (!cmd || !p || slot < 0 || slot >= PREVIEW_SLOTS || p->dst_w <= 0 || p->dst_h <= 0) {
 		return NULL;
 	}
@@ -144,7 +144,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	AeronSceneCamera cam;
 	memset(&cam, 0, sizeof cam);
 	cam.ori[0] = 1.0f; /* identity (w, x, y, z) */
-	cam.h_half_rad = atanf((float)p->dst_w / 1024.0f);
+	cam.h_half_rad = atanf((float)p->dst_w * width_scale / 1024.0f);
 	cam.v_half_rad = atanf((float)p->dst_h / 1024.0f);
 	cam.near_z = PREVIEW_NEAR_Z;
 	/* The frontend has no game clock: animations follow the host's. */

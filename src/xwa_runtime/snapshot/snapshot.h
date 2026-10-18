@@ -92,6 +92,13 @@ typedef struct XwaSurfaceEvent {
 	int16_t left, top, right, bottom; /* inclusive; push/pop rects */
 } XwaSurfaceEvent;
 
+/* How the frontend's 640x480 screen is shown (frontend.yaml `layouts`). */
+typedef enum XwaFrontendLayout {
+	XWA_FRONTEND_LAYOUT_CLASSIC = 0, /* the 640x480 screen in a 4:3 area in the middle */
+	XWA_FRONTEND_LAYOUT_WIDE,        /* the 640x480 screen spread over the design screen */
+	XWA_FRONTEND_LAYOUT_FILL,        /* like classic, but a full-screen image fills the design screen */
+} XwaFrontendLayout;
+
 typedef enum XwaDraw2DKind {
 	XWA_DRAW2D_SPRITE = 0,                  /* FrontImage_DrawSprite (transparent) */
 	XWA_DRAW2D_SPRITE_OPAQUE,               /* FrontImage_DrawSpriteOpaque */
@@ -190,6 +197,7 @@ typedef struct XwaGlyph2D {
 	uint8_t ch;
 	int16_t font_size; /* point-size key of g_fontBySize */
 	int16_t x, y;      /* frontend coords (640x480 frame) */
+	int16_t x_frac;    /* x's fraction in 1/256 units, when text is measured for a wide screen */
 	uint32_t color;    /* raw engine color arg */
 	int16_t clip_left, clip_top, clip_right, clip_bottom;
 } XwaGlyph2D;
@@ -1132,6 +1140,7 @@ typedef struct XwaSnapshot {
 	 * and drives frontend images shown by time (an atlas `fps`). */
 	uint64_t host_time_us;
 	XwaSceneKind scene_kind;
+	uint8_t frontend_layout; /* XwaFrontendLayout of the screen that ran this tick */
 	/* Set when this tick's presents must not be shown, and the driver should
 	 * keep its last output. Used while the loading screen is held, because its
 	 * detach presents a black frame. */
@@ -1231,6 +1240,7 @@ const XwaSnapshot* XwaSnapshot_Previous(void);
 /* ---- emitters (engine hooks; read-only observers) ------------------ */
 
 void XwaSnapshot_SetSceneKind(XwaSceneKind kind);
+XwaSceneKind XwaSnapshot_SceneKind(void);
 /* Sets retain_frame for the current tick. */
 void XwaSnapshot_RetainFrame(void);
 
@@ -1270,6 +1280,8 @@ void XwaSnapshot_EndBriefingGrid(void);
 
 /* One glyph from a FrontendText_Draw* string loop. */
 void XwaSnapshot_EmitGlyph(int font_size, unsigned char ch, int x, int y, uint32_t color);
+/* The same, with x's fraction in 1/256 units. */
+void XwaSnapshot_EmitGlyphFrac(int font_size, unsigned char ch, int x, int x_frac, int y, uint32_t color);
 
 /* Surface-structure event (see XwaSurfaceEventKind). rect ignored for
  * the full-surface kinds. */

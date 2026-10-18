@@ -52,6 +52,10 @@
 typedef struct RmSaveSlot {
 	AeronRenderTarget* rt;
 	int16_t left, top, right, bottom;
+	/* The saved pixels' place in the targets. The mapping can change before
+	 * the restore (a fill datapad over a wide room), so the restore puts the
+	 * pixels back where they were taken, not where the units map now. */
+	int px_x, px_y, px_w, px_h;
 } RmSaveSlot;
 
 typedef struct RmCursorLayer {
@@ -73,8 +77,15 @@ typedef struct RmState {
 	AeronDrawList2D* list;
 	int rt_width;
 	int rt_height;
+	/* How 640x480 units map to target pixels: x * map_sx + map_ox across and
+	 * y * map_sy down. The targets have the design screen's shape; a wide
+	 * screen spreads the units over all of it, the other layouts keep them
+	 * in its middle 4:3 area. */
+	XwaFrontendLayout layout;
+	float map_sx, map_sy, map_ox;
 	XwaSceneKind last_scene;
 	int screen_needs_clear;
+	int bars_need_clear;
 	RmSaveSlot save_stack[RM_SAVE_STACK_CAP];
 	int save_depth;
 	/* Targets sampled during the last resize migration. They remain alive
@@ -119,9 +130,24 @@ static void rm_color_linear(uint32_t engine_color, float out_rgb[3]) {
 	out_rgb[2] = XwaRemaster_SrgbToLinear((float)rgba[2] / 255.0f);
 }
 
-static float rm_scale_x(void) { return (float)g.rt_width / (float)XWA_CLASSIC_WIDTH; }
+static float rm_scale_x(void) { return g.map_sx; }
 
-static float rm_scale_y(void) { return (float)g.rt_height / (float)XWA_CLASSIC_HEIGHT; }
+static float rm_scale_y(void) { return g.map_sy; }
+
+/* A 640x480 x position in target pixels. */
+static float rm_px(float x) { return g.map_ox + x * g.map_sx; }
+
+static void rm_set_mapping(XwaFrontendLayout layout) {
+	g.layout = layout;
+	g.map_sy = (float)g.rt_height / (float)XWA_CLASSIC_HEIGHT;
+	if (layout == XWA_FRONTEND_LAYOUT_WIDE) {
+		g.map_sx = (float)g.rt_width / (float)XWA_CLASSIC_WIDTH;
+		g.map_ox = 0.0f;
+	} else {
+		g.map_sx = g.map_sy;
+		g.map_ox = ((float)g.rt_width - (float)XWA_CLASSIC_WIDTH * g.map_sx) * 0.5f;
+	}
+}
 
 /* Classic-pixel EDGE -> RT-pixel edge. All integer rects (scissors,
  * reveal bands, save regions) round edges through these functions so
@@ -131,14 +157,19 @@ static int rm_edge_for(int c, int target_extent, int classic_extent) {
 	return (int)lroundf((float)c * (float)target_extent / (float)classic_extent);
 }
 
-static int rm_x_edge(int c) { return rm_edge_for(c, g.rt_width, XWA_CLASSIC_WIDTH); }
+static int rm_x_edge(int c) { return (int)lroundf(rm_px((float)c)); }
 
-static int rm_y_edge(int c) { return rm_edge_for(c, g.rt_height, XWA_CLASSIC_HEIGHT); }
+static int rm_y_edge(int c) { return (int)lroundf((float)c * g.map_sy); }
 
-/* Inclusive 640x480 clip rect -> RT-pixel scissor; full-screen -> none. */
+/* Inclusive 640x480 clip rect -> RT-pixel scissor. A full-screen clip is no
+ * scissor on a wide screen, and the 4:3 area on the others, as XWAU clips
+ * them. */
 static AeronRectI rm_scissor(int16_t l, int16_t t, int16_t r, int16_t b) {
 	AeronRectI rect = { 0, 0, 0, 0 };
 	if (l <= 0 && t <= 0 && r >= 639 && b >= 479) {
+		if (g.layout != XWA_FRONTEND_LAYOUT_WIDE) {
+			rect = (AeronRectI) { rm_x_edge(0), 0, rm_x_edge(XWA_CLASSIC_WIDTH) - rm_x_edge(0), g.rt_height };
+		}
 		return rect; /* zero size = no scissor */
 	}
 	rect.x = rm_x_edge(l);
@@ -291,7 +322,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		q.tint[3] = 1.0f;
 		const float scale_x = rm_scale_x();
 		const float scale_y = rm_scale_y();
-		const float x0 = dst_ux * scale_x;
+		const float x0 = rm_px(dst_ux);
 		const float y0 = dst_uy * scale_y;
 		const float x1 = x0 + dst_ch * scale_x; /* transposed dst */
 		const float y1 = y0 + dst_cw * scale_y;
@@ -341,7 +372,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	s.src_u1 = su1;
 	s.src_v1 = sv1;
 
-	s.dst_x = dst_ux * rm_scale_x();
+	s.dst_x = rm_px(dst_ux);
 	s.dst_y = dst_uy * rm_scale_y();
 	s.dst_w = dst_cw * rm_scale_x();
 	s.dst_h = dst_ch * rm_scale_y();
@@ -357,7 +388,18 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		/* The game's height, and the width from the image's shape. */
 		s.dst_w = s.dst_h * (float)ref.w / (float)ref.h;
 	}
-	if (geo && geo->has_draw_adjust) {
+	/* On a fill screen, an image as large as the 640x480 screen is the
+	 * background, and fills the whole target. */
+	if (g.layout == XWA_FRONTEND_LAYOUT_FILL && !d->has_src_rect && d->dst_x <= 0 && d->dst_y <= 0 &&
+		d->dst_x + d->img_w >= XWA_CLASSIC_WIDTH && d->dst_y + d->img_h >= XWA_CLASSIC_HEIGHT) {
+		s.dst_x = 0.0f;
+		s.dst_y = 0.0f;
+		s.dst_w = (float)g.rt_width;
+		s.dst_h = (float)g.rt_height;
+		s.scissor = rm_scissor(d->clip_left, d->clip_top, d->clip_right, d->clip_bottom);
+		if (s.scissor.x == rm_x_edge(0) && s.scissor.width == rm_x_edge(XWA_CLASSIC_WIDTH) - rm_x_edge(0))
+			s.scissor = (AeronRectI) { 0, 0, 0, 0 };
+	} else if (geo && geo->has_draw_adjust) {
 		/* Changes the drawing only; the game's geometry stays. */
 		s.dst_x += XwaFrontendGeometry_UnitsX(geo->draw_adjust[0]) * rm_scale_x();
 		s.dst_y += XwaFrontendGeometry_UnitsY(geo->draw_adjust[1]) * rm_scale_y();
@@ -421,41 +463,41 @@ static void rm_add_paint(AeronDrawList2D* list, const XwaPaintCmd* p) {
 
 	switch ((XwaPaintKind)p->kind) {
 		case XWA_PAINT_HLINE:
-			AeronDrawList_AddFill(list, p->x0 * sx, grid_pixel ? p->y0 * sy + (sy - 1.0f) * 0.5f : p->y0 * sy,
-								  (p->x1 - p->x0 + 1) * sx, grid_pixel ? 1.0f : sy, rgba, AERON_BLIT2D_BLEND_NONE,
-								  scp);
+			AeronDrawList_AddFill(
+				list, rm_px(p->x0), grid_pixel ? p->y0 * sy + (sy - 1.0f) * 0.5f : p->y0 * sy,
+				(p->x1 - p->x0 + 1) * sx, grid_pixel ? 1.0f : sy, rgba, AERON_BLIT2D_BLEND_NONE, scp);
 			break;
 		case XWA_PAINT_VLINE:
-			AeronDrawList_AddFill(list, grid_pixel ? p->x0 * sx + (sx - 1.0f) * 0.5f : p->x0 * sx, p->y0 * sy,
-								  grid_pixel ? 1.0f : sx, (p->y1 - p->y0 + 1) * sy, rgba, AERON_BLIT2D_BLEND_NONE,
-								  scp);
+			AeronDrawList_AddFill(list, grid_pixel ? rm_px(p->x0) + (sx - 1.0f) * 0.5f : rm_px(p->x0),
+								  p->y0 * sy, grid_pixel ? 1.0f : sx, (p->y1 - p->y0 + 1) * sy, rgba,
+								  AERON_BLIT2D_BLEND_NONE, scp);
 			break;
 		case XWA_PAINT_LINE:
 		case XWA_PAINT_LINE_AA:
 			/* One record per segment (rotated quad; the briefing hologram
 			 * draws 20k+ per tick). Endpoints at classic texel centers,
 			 * classic-px stroke. */
-			AeronDrawList_AddLine(list, p->x0 * sx + sx * 0.5f, p->y0 * sy + sy * 0.5f,
-								  p->x1 * sx + sx * 0.5f, p->y1 * sy + sy * 0.5f, line_thickness, rgba,
+			AeronDrawList_AddLine(list, rm_px(p->x0) + sx * 0.5f, p->y0 * sy + sy * 0.5f,
+								  rm_px(p->x1) + sx * 0.5f, p->y1 * sy + sy * 0.5f, line_thickness, rgba,
 								  AERON_BLIT2D_BLEND_NONE, scp);
 			break;
 		case XWA_PAINT_FILL_TRANSLUCENT: {
 			const float a = paint->fill_alpha;
 			float premultiplied[4] = { rgba[0] * a, rgba[1] * a, rgba[2] * a, a };
-			AeronDrawList_AddFill(list, (p->x0 + p->dx) * sx, (p->y0 + p->dy) * sy, (p->x1 - p->x0 + 1) * sx,
+			AeronDrawList_AddFill(list, rm_px(p->x0 + p->dx), (p->y0 + p->dy) * sy, (p->x1 - p->x0 + 1) * sx,
 								  (p->y1 - p->y0 + 1) * sy, premultiplied, AERON_BLIT2D_BLEND_PMA, scp);
 			break;
 		}
 		case XWA_PAINT_PIXEL:
-			AeronDrawList_AddFill(list, p->x0 * sx, p->y0 * sy, sx, sy, rgba, AERON_BLIT2D_BLEND_NONE, scp);
+			AeronDrawList_AddFill(list, rm_px(p->x0), p->y0 * sy, sx, sy, rgba, AERON_BLIT2D_BLEND_NONE, scp);
 			break;
 		case XWA_PAINT_FILL_RECT: {
-			AeronDrawList_AddFill(list, (p->x0 + p->dx) * sx, (p->y0 + p->dy) * sy, (p->x1 - p->x0 + 1) * sx,
+			AeronDrawList_AddFill(list, rm_px(p->x0 + p->dx), (p->y0 + p->dy) * sy, (p->x1 - p->x0 + 1) * sx,
 								  (p->y1 - p->y0 + 1) * sy, rgba, AERON_BLIT2D_BLEND_NONE, scp);
 			break;
 		}
 		case XWA_PAINT_RECT_OUTLINE: {
-			const float x = (p->x0 + p->dx) * sx;
+			const float x = rm_px(p->x0 + p->dx);
 			const float y = (p->y0 + p->dy) * sy;
 			const float w = (p->x1 - p->x0 + 1) * sx;
 			const float h = (p->y1 - p->y0 + 1) * sy;
@@ -472,7 +514,8 @@ static void rm_add_paint(AeronDrawList2D* list, const XwaPaintCmd* p) {
 }
 
 static void rm_add_glyph(AeronDrawList2D* list, const XwaGlyph2D* gl) {
-	(void)XwaRemasterText_AddFrontendGlyph(list, g.assets, gl, g.rt_width, g.rt_height);
+	const XwaRemasterTextMapping mapping = { g.map_sx, g.map_sy, g.map_ox };
+	(void)XwaRemasterText_AddFrontendGlyphMapped(list, g.assets, gl, &mapping);
 }
 
 /* ---- reconstruction core --------------------------------------------- */
@@ -586,6 +629,10 @@ static void rm_push_save(AeronCommandBuffer* cmd, const XwaSurfaceEvent* e, int 
 	slot->top = e->top;
 	slot->right = e->right;
 	slot->bottom = e->bottom;
+	slot->px_x = rm_x_edge(e->left);
+	slot->px_y = rm_y_edge(e->top);
+	slot->px_w = w;
+	slot->px_h = h;
 	if (!slot->rt) {
 		return;
 	}
@@ -597,10 +644,10 @@ static void rm_push_save(AeronCommandBuffer* cmd, const XwaSurfaceEvent* e, int 
 	s.filter = AERON_BLIT2D_FILTER_NEAREST;
 	s.blend = AERON_BLIT2D_BLEND_NONE;
 	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
-	s.src_u0 = (float)rm_x_edge(e->left) / (float)g.rt_width;
-	s.src_v0 = (float)rm_y_edge(e->top) / (float)g.rt_height;
-	s.src_u1 = (float)rm_x_edge(e->right + 1) / (float)g.rt_width;
-	s.src_v1 = (float)rm_y_edge(e->bottom + 1) / (float)g.rt_height;
+	s.src_u0 = (float)slot->px_x / (float)g.rt_width;
+	s.src_v0 = (float)slot->px_y / (float)g.rt_height;
+	s.src_u1 = (float)(slot->px_x + w) / (float)g.rt_width;
+	s.src_v1 = (float)(slot->px_y + h) / (float)g.rt_height;
 	s.dst_w = (float)w;
 	s.dst_h = (float)h;
 	AeronDrawList_Begin(g.list, slot->rt, w, h, AERON_DRAWLIST2D_CLEAR, NULL);
@@ -624,10 +671,11 @@ static void rm_pop_restore(AeronCommandBuffer* cmd, const XwaSurfaceEvent* e) {
 	s.tint[0] = s.tint[1] = s.tint[2] = s.tint[3] = 1.0f;
 	s.src_u1 = 1.0f;
 	s.src_v1 = 1.0f;
-	s.dst_x = (float)rm_x_edge(e->left);
-	s.dst_y = (float)rm_y_edge(e->top);
-	s.dst_w = (float)(rm_x_edge(e->right + 1) - rm_x_edge(e->left));
-	s.dst_h = (float)(rm_y_edge(e->bottom + 1) - rm_y_edge(e->top));
+	(void)e;
+	s.dst_x = (float)slot->px_x;
+	s.dst_y = (float)slot->px_y;
+	s.dst_w = (float)slot->px_w;
+	s.dst_h = (float)slot->px_h;
 	/* Visible now AND persistent (the engine restores into the
 	 * offscreen surface when restore mode is on). */
 	AeronDrawList_Begin(g.list, g.screen_rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD, NULL);
@@ -656,8 +704,8 @@ static void rm_prepare_model_previews(AeronCommandBuffer* cmd, const XwaSnapshot
 			if (XwaRemasterAssets_FlightAtlasFrame(g.assets, 1000, 0, &glow_ref)) {
 				glow_tex = &glow_ref;
 			}
-			g.preview_tex[i] =
-				XwaRemasterPreview_Render(cmd, p, (int)i, snap->dir_lights, snap->dir_light_count, glow_tex);
+			g.preview_tex[i] = XwaRemasterPreview_Render(
+				cmd, p, (int)i, snap->dir_lights, snap->dir_light_count, glow_tex, g.map_sx / g.map_sy);
 		}
 	}
 }
@@ -763,8 +811,20 @@ static void rm_present_cursor(AeronCommandBuffer* cmd, const XwaSnapshot* snap, 
 		g.cursor.visible = g.cursor_label.visible = 0;
 		return;
 	}
-	if (!rm_render_cursor_layer(cmd, snap, cursor, end, XWA_EMIT_TARGET_CURSOR, &g.cursor) ||
-		!rm_render_cursor_layer(cmd, snap, label, end, XWA_EMIT_TARGET_CURSOR_LABEL, &g.cursor_label)) {
+	/* The cursor and its label keep their shape in every layout: their
+	 * layers are drawn at the vertical scale, from their own top left. */
+	const float map_sx = g.map_sx, map_ox = g.map_ox;
+	const XwaFrontendLayout layout = g.layout;
+	g.map_sx = g.map_sy;
+	g.map_ox = 0.0f;
+	g.layout = XWA_FRONTEND_LAYOUT_WIDE; /* no 4:3 scissor in the layers */
+	const int rendered =
+		rm_render_cursor_layer(cmd, snap, cursor, end, XWA_EMIT_TARGET_CURSOR, &g.cursor) &&
+		rm_render_cursor_layer(cmd, snap, label, end, XWA_EMIT_TARGET_CURSOR_LABEL, &g.cursor_label);
+	g.map_sx = map_sx;
+	g.map_ox = map_ox;
+	g.layout = layout;
+	if (!rendered) {
 		Aeron_CommandBufferSetFailure(cmd, "Frontend cursor target creation failed");
 		return;
 	}
@@ -791,6 +851,19 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 				slot->rt = NULL;
 			}
 		}
+	}
+
+	if (g.bars_need_clear) {
+		static const float rm_bar_black[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+		const float left = (float)rm_x_edge(0);
+		const float right = (float)rm_x_edge(XWA_CLASSIC_WIDTH);
+		g.bars_need_clear = 0;
+		AeronDrawList_Begin(g.list, g.screen_rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD, NULL);
+		AeronDrawList_AddFill(g.list, 0.0f, 0.0f, left, (float)g.rt_height, rm_bar_black,
+							  AERON_BLIT2D_BLEND_NONE, NULL);
+		AeronDrawList_AddFill(g.list, right, 0.0f, (float)g.rt_width - right, (float)g.rt_height,
+							  rm_bar_black, AERON_BLIT2D_BLEND_NONE, NULL);
+		AeronDrawList_Render(g.list, cmd);
 	}
 
 	/* Only frontend updates reach reconstruction; idle host ticks retain output. */
@@ -844,7 +917,7 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 			ps.blend = AERON_BLIT2D_BLEND_PMA;
 			ps.src_u1 = 1.0f;
 			ps.src_v1 = 1.0f;
-			ps.dst_x = (float)p->dst_x * rm_scale_x();
+			ps.dst_x = rm_px((float)p->dst_x);
 			ps.dst_y = (float)p->dst_y * rm_scale_y();
 			ps.dst_w = (float)p->dst_w * rm_scale_x();
 			ps.dst_h = (float)p->dst_h * rm_scale_y();
@@ -1056,10 +1129,10 @@ static int rm_resize_targets(AeronCommandBuffer* cmd, int width, int height) {
 	new_external = rm_create_target(width, height, "xwa.frontend.external");
 	for (int i = 0; i < g.save_depth; i++) {
 		const RmSaveSlot* slot = &g.save_stack[i];
-		const int save_width = rm_edge_for(slot->right + 1, width, XWA_CLASSIC_WIDTH) -
-							   rm_edge_for(slot->left, width, XWA_CLASSIC_WIDTH);
-		const int save_height = rm_edge_for(slot->bottom + 1, height, XWA_CLASSIC_HEIGHT) -
-								rm_edge_for(slot->top, height, XWA_CLASSIC_HEIGHT);
+		const int save_width = rm_edge_for(slot->px_x + slot->px_w, width, g.rt_width) -
+							   rm_edge_for(slot->px_x, width, g.rt_width);
+		const int save_height = rm_edge_for(slot->px_y + slot->px_h, height, g.rt_height) -
+								rm_edge_for(slot->px_y, height, g.rt_height);
 		if (slot->rt && save_width > 0 && save_height > 0) {
 			new_saves[i] = rm_create_target(save_width, save_height, "xwa.frontend.saved_region");
 		}
@@ -1106,8 +1179,17 @@ static int rm_resize_targets(AeronCommandBuffer* cmd, int width, int height) {
 	g.output_rt = new_output;
 	g.external_rt = new_external;
 	for (int i = 0; i < g.save_depth; i++) {
-		rm_retire_target(g.save_stack[i].rt);
-		g.save_stack[i].rt = new_saves[i];
+		RmSaveSlot* slot = &g.save_stack[i];
+		rm_retire_target(slot->rt);
+		slot->rt = new_saves[i];
+		if (slot->rt && g.rt_width > 0 && g.rt_height > 0) {
+			const int x = rm_edge_for(slot->px_x, width, g.rt_width);
+			const int y = rm_edge_for(slot->px_y, height, g.rt_height);
+			slot->px_w = rm_edge_for(slot->px_x + slot->px_w, width, g.rt_width) - x;
+			slot->px_h = rm_edge_for(slot->px_y + slot->px_h, height, g.rt_height) - y;
+			slot->px_x = x;
+			slot->px_y = y;
+		}
 	}
 	g.rt_width = width;
 	g.rt_height = height;
@@ -1175,6 +1257,14 @@ AeronTexture* XwaRemasterFrontend_Render(AeronCommandBuffer* cmd, const XwaSnaps
 	}
 	g.assets = assets; /* borrowed for the call (rm_* helpers read it) */
 	g.time_s = (double)snap->host_time_us / 1000000.0;
+	{
+		const XwaFrontendLayout previous = g.layout;
+		rm_set_mapping((XwaFrontendLayout)snap->frontend_layout);
+		/* A classic screen draws only in the 4:3 area, so the sides left by
+		 * a wider screen are cleared. */
+		if (g.layout == XWA_FRONTEND_LAYOUT_CLASSIC && previous != XWA_FRONTEND_LAYOUT_CLASSIC)
+			g.bars_need_clear = 1;
+	}
 	if (snap->scene_kind != g.last_scene) {
 		g.last_scene = snap->scene_kind;
 		g.screen_needs_clear = 1;
@@ -1194,33 +1284,37 @@ AeronTexture* XwaRemasterFrontend_Render(AeronCommandBuffer* cmd, const XwaSnaps
 	return Aeron_RenderTargetGetTexture(g.output_rt);
 }
 
-static void rm_submit_cursor_layer(const RmCursorLayer* cursor, int x, int y, float opacity, int split_view) {
+/* Submits a cursor layer with its top left at (left, top) in presentation
+ * coordinates. `unit` is the size of a 640x480 unit down the screen: the
+ * layer keeps its shape at that scale. */
+static void rm_submit_cursor_layer(const RmCursorLayer* cursor, int left, int top, float unit, float opacity,
+								   int split_view) {
 	if (!cursor->visible || !cursor->rt)
 		return;
-	const XwaPresentationRect safe = XwaPresentation_ClassicSafeFrame();
-	const int left = safe.x + rm_edge_for(x, safe.width, XWA_CLASSIC_WIDTH);
-	const int top = safe.y + rm_edge_for(y, safe.height, XWA_CLASSIC_HEIGHT);
+	const XwaPresentationRect content = XwaPresentation_ClassicContentRect();
+	const XwaPresentationRect frame = XwaPresentation_FrontendFrame();
 	/* Keep the cached artwork's size independent of position rounding. */
 	AeronTextureLayerDesc layer = {
 		.texture = Aeron_RenderTargetGetTexture(cursor->rt),
-		.logical_rect = { left, top, rm_edge_for(cursor->bounds.width, safe.width, XWA_CLASSIC_WIDTH),
-						  rm_edge_for(cursor->bounds.height, safe.height, XWA_CLASSIC_HEIGHT) },
+		.logical_rect = { left, top, (int)lroundf((float)cursor->bounds.width * unit),
+						  (int)lroundf((float)cursor->bounds.height * unit) },
 		.blend_mode = AERON_LAYER_BLEND_PREMULTIPLIED,
 		.color_space = AERON_COLOR_SPACE_LINEAR_DISPLAY,
 		.tint_enabled = 1,
 		.tint_rgba = { opacity, opacity, opacity, opacity },
-		.scissor = { safe.x, safe.y, safe.width, safe.height },
+		.scissor = { frame.x, frame.y, frame.width, frame.height },
 	};
 	if (split_view) {
-		layer.scissor.x += safe.width / 2;
-		layer.scissor.width = safe.width / 2;
+		layer.scissor.x += frame.width / 2;
+		layer.scissor.width = frame.width / 2;
 	}
-	const int clip_left = safe.x + rm_edge_for(cursor->clip.x, safe.width, XWA_CLASSIC_WIDTH);
-	const int clip_top = safe.y + rm_edge_for(cursor->clip.y, safe.height, XWA_CLASSIC_HEIGHT);
+	/* The game's clip rect, which is in 640x480 units like the screen. */
+	const int clip_left = content.x + rm_edge_for(cursor->clip.x, content.width, XWA_CLASSIC_WIDTH);
+	const int clip_top = content.y + rm_edge_for(cursor->clip.y, content.height, XWA_CLASSIC_HEIGHT);
 	const int clip_right =
-		safe.x + rm_edge_for(cursor->clip.x + cursor->clip.width, safe.width, XWA_CLASSIC_WIDTH);
+		content.x + rm_edge_for(cursor->clip.x + cursor->clip.width, content.width, XWA_CLASSIC_WIDTH);
 	const int clip_bottom =
-		safe.y + rm_edge_for(cursor->clip.y + cursor->clip.height, safe.height, XWA_CLASSIC_HEIGHT);
+		content.y + rm_edge_for(cursor->clip.y + cursor->clip.height, content.height, XWA_CLASSIC_HEIGHT);
 	const int right = clip_right < layer.scissor.x + layer.scissor.width
 						  ? clip_right
 						  : layer.scissor.x + layer.scissor.width;
@@ -1248,16 +1342,27 @@ void XwaRemasterFrontend_PresentCursor(float opacity, int split_view) {
 	/* Keep the remaster and baked classic cursors aligned during the crossfade. */
 	if (opacity >= 1.0f)
 		XwaPresentation_ToClassic(input->mouse.x, input->mouse.y, &x, &y);
-	rm_submit_cursor_layer(&g.cursor, x + g.cursor.bounds.x - g.cursor_pose.x,
-						   y + g.cursor.bounds.y - g.cursor_pose.y, opacity, split_view);
+	/* The hot spot follows the screen's mapping; the cursor and its label
+	 * are placed around it at their own shape. */
+	const XwaPresentationRect content = XwaPresentation_ClassicContentRect();
+	const float unit = (float)content.height / (float)XWA_CLASSIC_HEIGHT;
+	const int hot_x = content.x + rm_edge_for(x, content.width, XWA_CLASSIC_WIDTH);
+	const int hot_y = content.y + rm_edge_for(y, content.height, XWA_CLASSIC_HEIGHT);
+	rm_submit_cursor_layer(
+		&g.cursor, hot_x + (int)lroundf((float)(g.cursor.bounds.x - g.cursor_pose.x) * unit),
+		hot_y + (int)lroundf((float)(g.cursor.bounds.y - g.cursor_pose.y) * unit), unit, opacity, split_view);
 	if (g.cursor_label.visible) {
-		int label_x = x + g.cursor_pose.width;
+		const int label_width = (int)lroundf((float)g.cursor_label.bounds.width * unit);
+		int label_x = hot_x + (int)lroundf((float)g.cursor_pose.width * unit);
 		int label_y = y + g.cursor_pose.height;
-		/* FrontendCursor_Draw's original inclusive box and edge placement. */
-		if (label_x + g.cursor_label.bounds.width - 1 >= 640)
-			label_x = 640 - g.cursor_label.bounds.width;
+		/* FrontendCursor_Draw's original edge placement: the label stays
+		 * inside the screen's right edge, and above row 462. */
+		if (label_x + label_width > content.x + content.width)
+			label_x = content.x + content.width - label_width;
 		if (label_y + 17 >= 480)
 			label_y = 462;
-		rm_submit_cursor_layer(&g.cursor_label, label_x, label_y, opacity, split_view);
+		rm_submit_cursor_layer(&g.cursor_label, label_x,
+							   content.y + rm_edge_for(label_y, content.height, XWA_CLASSIC_HEIGHT), unit,
+							   opacity, split_view);
 	}
 }

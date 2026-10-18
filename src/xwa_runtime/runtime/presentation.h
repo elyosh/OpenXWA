@@ -38,14 +38,29 @@ XwaPresentationRect XwaPresentation_Frame(void);
 /* The centered 4:3 region classic content presents into. */
 XwaPresentationRect XwaPresentation_ClassicSafeFrame(void);
 
+/* Sets how the HD frontend is shown. With a design screen (frontend.yaml
+ * `design`), the frontend picture has its shape, fitted in the frame; a
+ * wide screen spreads the 640x480 units over all of it, other screens keep
+ * them in a 4:3 area in its middle. A design size of 0 means the classic
+ * 640x480 surface is shown, in the classic safe frame. */
+void XwaPresentation_SetFrontendShape(int design_width, int design_height, int wide);
+
+/* Where the frontend picture is shown. */
+XwaPresentationRect XwaPresentation_FrontendFrame(void);
+
+/* Where the frontend's 640x480 units are shown: the frontend frame on a
+ * wide screen, else its middle 4:3 area. */
+XwaPresentationRect XwaPresentation_ClassicContentRect(void);
+
 /* Maps an original pixel position to the center of its corresponding pixel
- * footprint in the presentation safe frame. Pixel-center mapping makes the
- * integer forward/inverse transforms exact for all 640x480 input positions. */
+ * footprint in the classic content rectangle. Pixel-center mapping makes
+ * the integer forward/inverse transforms exact for all 640x480 input
+ * positions. */
 void XwaPresentation_FromClassic(int classic_x, int classic_y, int* presentation_x, int* presentation_y);
 
 /* Maps application-logical mouse coordinates into the original 640x480
  * domain. The returned coordinates are clipped; the return value reports
- * whether the unclipped point was inside the classic safe frame. */
+ * whether the unclipped point was inside the classic content rectangle. */
 int XwaPresentation_ToClassic(int x, int y, int* classic_x, int* classic_y);
 
 #endif

@@ -8,6 +8,7 @@
  */
 
 #include "xwa_runtime/snapshot/snapshot.h"
+#include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
@@ -419,6 +420,7 @@ void XwaSnapshot_Commit(void) {
 	s->scene_kind = g_scene_kind;
 	s->game_time_ticks = g_gameTime; /* sim clock; see header */
 	s->host_time_us = XwaTime_GetElapsedUs();
+	s->frontend_layout = (uint8_t)XwaFrontendScreens_Layout();
 	s->offscreen_restore_enabled = g_offscreenRestoreEnabled;
 	snapshot_capture_frontend_assets(s);
 	XwaSnapshotExport_CaptureOptAssets(s);
@@ -514,6 +516,8 @@ const XwaSnapshot* XwaSnapshot_Previous(void) { return g_previous_slot >= 0 ? &g
 /* ---- emitters ------------------------------------------------------ */
 
 void XwaSnapshot_SetSceneKind(XwaSceneKind kind) { g_scene_kind = kind; }
+
+XwaSceneKind XwaSnapshot_SceneKind(void) { return g_scene_kind; }
 
 void XwaSnapshot_RetainFrame(void) { wr()->retain_frame = 1; }
 
@@ -1794,6 +1798,10 @@ void XwaSnapshot_EmitModelPreview(const XwaModelPreview* preview) {
 }
 
 void XwaSnapshot_EmitGlyph(int font_size, unsigned char ch, int x, int y, uint32_t color) {
+	XwaSnapshot_EmitGlyphFrac(font_size, ch, x, 0, y, color);
+}
+
+void XwaSnapshot_EmitGlyphFrac(int font_size, unsigned char ch, int x, int x_frac, int y, uint32_t color) {
 	XwaSnapshot* s = wr();
 	/* Record the color the glyph is actually drawn with: the engine's
 	 * blitter fades it while the text fade-in timer runs (every
@@ -1811,6 +1819,7 @@ void XwaSnapshot_EmitGlyph(int font_size, unsigned char ch, int x, int y, uint32
 	g->ch = ch;
 	g->font_size = (int16_t)font_size;
 	g->x = (int16_t)x;
+	g->x_frac = (int16_t)x_frac;
 	g->y = (int16_t)y;
 	g->color = color;
 	stamp_clip(&g->clip_left, &g->clip_top, &g->clip_right, &g->clip_bottom);

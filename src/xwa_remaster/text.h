@@ -15,6 +15,16 @@ extern "C" {
 int XwaRemasterText_AddFrontendGlyph(AeronDrawList2D* list, XwaRemasterAssets* assets,
 									 const XwaGlyph2D* glyph, int target_width, int target_height);
 
+/* How 640x480 units map to target pixels: x * scale_x + offset_x across and
+ * y * scale_y down. Glyphs keep their shape at scale_y. */
+typedef struct XwaRemasterTextMapping {
+	float scale_x, scale_y;
+	float offset_x;
+} XwaRemasterTextMapping;
+
+int XwaRemasterText_AddFrontendGlyphMapped(AeronDrawList2D* list, XwaRemasterAssets* assets,
+										   const XwaGlyph2D* glyph, const XwaRemasterTextMapping* mapping);
+
 /* Flight-font byte strings use the recovered 0xfe,color escape convention.
  * size_px is the rendered font cell height in target pixels. */
 float XwaRemasterText_MeasureFlightString(const AeronFontAtlas* font, const char* text,

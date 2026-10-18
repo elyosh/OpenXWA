@@ -27,9 +27,11 @@ extern "C" {
  * tonemapped texture (borrowed; valid until the next render into the
  * same slot); a missing HD mesh renders an empty transparent PiP.
  * `cmd` must have no open pass. */
-AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelPreview* p,
-										int slot, const XwaDirLight* lights,
-										uint32_t light_count, const XwaAssetRef* glow_tex);
+/* `width_scale` widens the view when the preview's rectangle is shown wider
+ * than its 640x480 size (a wide screen), so the model keeps its shape. */
+AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelPreview* p, int slot,
+										const XwaDirLight* lights, uint32_t light_count,
+										const XwaAssetRef* glow_tex, float width_scale);
 
 void XwaRemasterPreview_Shutdown(void);
 

@@ -461,6 +461,12 @@ float XwaFrontendGeometry_UnitsY(float y) {
 	return y * 480.0f / g_geometryDesignH;
 }
 
+void XwaFrontendGeometry_DesignSize(float* width, float* height) {
+	geometry_load_design();
+	*width = g_geometryDesignW;
+	*height = g_geometryDesignH;
+}
+
 const XwaFrontendPaint* XwaFrontendGeometry_Paint(void) {
 	geometry_load_design();
 	return &g_geometryPaint;
@@ -475,6 +481,8 @@ static void geometry_unit_bounds(const float* bounds, int* left, int* top, int* 
 
 ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* atlas) {
 	ResourceDescriptor* desc;
+	int atlasRight = 0;
+	int atlasBottom = 0;
 
 	if (atlas == NULL) {
 		return NULL;
@@ -503,6 +511,10 @@ ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* 
 	memset(desc->image, 0, sizeof(*desc->image) * (size_t)desc->frameCount);
 	desc->bounds.left = 0x7fffffff;
 	desc->bounds.top = 0x7fffffff;
+	if (atlas->has_bounds) {
+		atlasRight = XwaFrontendGeometry_UnitX(atlas->bounds[2]);
+		atlasBottom = XwaFrontendGeometry_UnitY(atlas->bounds[3]);
+	}
 	for (int i = 0; i < desc->frameCount; ++i) {
 		const XwaGeometryFrame* frame = &atlas->frames[i];
 		ImageResource* image = &desc->image[i];
@@ -511,19 +523,6 @@ ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* 
 
 		image->width = width > 0 ? width : 1;
 		image->height = height > 0 ? height : 1;
-		image->pixelCount = image->width * image->height;
-		/* Uncompressed index 0 everywhere: the classic draw code works
-		   unchanged, and code that reads the pixels sees an empty image. */
-		image->pixels = (unsigned char*)Mem_Alloc((size_t)image->pixelCount);
-		if (image->pixels == NULL) {
-			for (int j = 0; j < i; ++j) {
-				Mem_Free(desc->image[j].pixels);
-			}
-			Mem_Free(desc->image);
-			Mem_Free(desc);
-			return NULL;
-		}
-		memset(image->pixels, 0, (size_t)image->pixelCount);
 		/* Without bounds, a frame's bounds are its drawn rectangle, inclusive,
 		   as FrontImage_ComputeImageBounds finds them for a full image. */
 		if (frame->has_bounds) {
@@ -532,6 +531,35 @@ ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* 
 		} else {
 			image->boundsRight = image->width - 1;
 			image->boundsBottom = image->height - 1;
+		}
+		image->pixelCount = image->width * image->height;
+		{
+			/* Rectangle draws read the pixels inside the bounds the game gets,
+			   with the width as the row stride. XWAU's bounds include their right
+			   and bottom edges (24x24 for a 24x24 icon), which reads past the
+			   last row, so the buffer covers the frame's and the image's
+			   bounds. */
+			int lastColumn = image->width - 1;
+			int lastRow = image->height - 1;
+			size_t size;
+
+			lastColumn = image->boundsRight > lastColumn ? image->boundsRight : lastColumn;
+			lastRow = image->boundsBottom > lastRow ? image->boundsBottom : lastRow;
+			lastColumn = atlasRight > lastColumn ? atlasRight : lastColumn;
+			lastRow = atlasBottom > lastRow ? atlasBottom : lastRow;
+			size = (size_t)image->width * (size_t)lastRow + (size_t)lastColumn + 1;
+			/* Uncompressed index 0 everywhere: the classic draw code works
+			   unchanged, and code that reads the pixels sees an empty image. */
+			image->pixels = (unsigned char*)Mem_Alloc(size);
+			if (image->pixels == NULL) {
+				for (int j = 0; j < i; ++j) {
+					Mem_Free(desc->image[j].pixels);
+				}
+				Mem_Free(desc->image);
+				Mem_Free(desc);
+				return NULL;
+			}
+			memset(image->pixels, 0, size);
 		}
 		/* The union of the frames, as FrontImage_RegisterFlicResource builds it. */
 		if (desc->bounds.left > image->boundsLeft) {

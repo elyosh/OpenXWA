@@ -95,6 +95,9 @@ typedef struct XwaFrontendPaint {
 
 const XwaFrontendPaint* XwaFrontendGeometry_Paint(void);
 
+/* The design screen's size in pixels: frontend.yaml `design`, else 640x480. */
+void XwaFrontendGeometry_DesignSize(float* width, float* height);
+
 /* Builds the descriptor that the recovered loaders would build from the
  * standard file: the frame count, each frame's size and bounds, and the
  * whole image's bounds. Each frame's pixels are all index 0. Returns NULL

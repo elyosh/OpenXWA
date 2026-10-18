@@ -1,5 +1,6 @@
 #include "xwa/frontend/frontend_screen.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -411,6 +412,10 @@ int FrontendScreen_RunFrame(void) {
 
 	exitFn = state->exitFn;
 	g_frontendScreenRunFrameActive = 1;
+#ifdef XWA_MODERN
+	/* The screen that runs sets the layout of this tick's frontend frame. */
+	XwaFrontendScreens_NoteRun();
+#endif
 	result = state->updateFn(g_frameCounter);
 	if (g_screenCallbacksDirty == 1 || result == 1) {
 		g_screenCallbacksDirty = 0;
