@@ -317,6 +317,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		q.scissor = s.scissor;
 		if (d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED) {
 			rm_color_linear(d->tint_color, q.tint);
+			q.monochrome = 1.0f; /* see the tinted sprites below */
 		} else {
 			q.tint[0] = q.tint[1] = q.tint[2] = 1.0f;
 		}
@@ -415,7 +416,11 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 							  geo->tint == XWA_GEOMETRY_TINT_ALL ||
 							  (geo->tint == XWA_GEOMETRY_TINT_HIGHLIGHTS && rm_is_highlight_tint(d->tint_color));
 		if (keep_tint) {
+			/* A tinted draw is a single colour, the tint at each pixel's
+			 * brightness, as FrontImage_BlitRectTinted draws it. A per-channel
+			 * multiply would mix the tint with coloured art. */
 			rm_color_linear(d->tint_color, s.tint);
+			s.monochrome = 1.0f;
 		}
 		s.tint[3] = 1.0f;
 	} else if (d->kind == XWA_DRAW2D_SPRITE_TRANSLUCENT) {
