@@ -156,14 +156,18 @@ build_dependencies() {
             --disable-network \
             --disable-programs \
             --disable-static \
+            --enable-bsf=vp9_superframe_split \
             --enable-decoder=aac \
             --enable-decoder=adpcm_vima \
             --enable-decoder=h264 \
             --enable-decoder=sanm \
+            --enable-decoder=vp9 \
+            --enable-demuxer=matroska \
             --enable-demuxer=mov \
             --enable-demuxer=smush \
             --enable-parser=aac \
             --enable-parser=h264 \
+            --enable-parser=vp9 \
             --enable-pic \
             --enable-pthreads \
             --enable-shared \
