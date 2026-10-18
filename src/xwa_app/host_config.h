@@ -25,6 +25,7 @@ typedef struct XwaHostConfig {
 	float model_engine_emissive_strength;
 	int force_opt_models;
 	int prefer_original_2d;
+	int prefer_original_movies;
 	int environment_maps_enabled;
 	/* Relative to the mod folder. */
 	char environment_maps_manifest[XWA_HOST_CONFIG_MANIFEST_CAPACITY];

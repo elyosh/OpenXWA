@@ -1,7 +1,6 @@
 #include "xwa_runtime/runtime/movie_task.h"
 
 #include "aeron/aeron.h"
-#include "aeron/config_file.h"
 #include "aeron/video.h"
 #include "xwa/config/game_config.h"
 #include "xwa/frontend/frontend_dialog.h"
@@ -16,7 +15,6 @@
 #include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/runtime/presentation.h"
 
-#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -25,13 +23,14 @@ enum {
 	XWA_MOVIE_OVERLAY_HEIGHT = 480,
 	XWA_MOVIE_OVERLAY_PITCH = XWA_MOVIE_OVERLAY_WIDTH * 2,
 	XWA_MOVIE_SKIP_GATE_FRAME = 5,
+	XWA_MOVIE_SUBTITLE_FPS = 15,
 };
 
 typedef struct XwaMovieTaskState {
 	AeronVideoPlayer* player;
 	char path[512];
-	char original_path[512];
-	char subtitle_path[512];
+	AeronVfsRoot root;
+	int is_replacement;
 	uint16_t* subtitle_overlay;
 	uint64_t subtitle_generation;
 	AeronRenderSubmission subtitle_submission;
@@ -43,91 +42,40 @@ typedef struct XwaMovieTaskState {
 } XwaMovieTaskState;
 
 static XwaMovieTaskState g_xwaMovieTask;
-static AeronConfigFile* g_xwaMovieManifest;
-static int g_xwaMovieManifestLoaded;
+static int g_xwaMoviePreferOriginal;
 
-static void XwaMovieTask_LoadManifest(void) {
-	if (g_xwaMovieManifestLoaded) {
-		return;
-	}
-	g_xwaMovieManifestLoaded = 1;
-	if (AeronVfs_Exists(Aeron_GetVfs(), AERON_VFS_ROOT_RESOURCE, "remaster/videos.yaml")) {
-		(void)AeronConfigFile_LoadYaml(Aeron_GetVfs(), AERON_VFS_ROOT_RESOURCE, "remaster/videos.yaml",
-									   &g_xwaMovieManifest);
-	}
+void XwaMovieTask_Configure(int preferOriginalMovies) {
+	g_xwaMoviePreferOriginal = preferOriginalMovies != 0;
 }
 
-static int XwaMovieTask_ResolveManifestAssetPath(const AeronConfigNode* entry, const char* field,
-												 const char* name, char* path, size_t path_size) {
-	const AeronConfigNode* node;
-	const char* configured_path;
+/* Finds the movie `name`: a replacement in the mod folder,
+ * frontend/movies/<name>.mp4, or the original MOVIES/<name>.SNM. The
+ * replacement comes first unless assets.prefer_original_movies is set. */
+static int XwaMovieTask_ResolveAsset(const char* name) {
+	char original[512];
+	char replacement[512];
+	int has_original;
+	int has_replacement;
 
-	path[0] = '\0';
-	node = AeronConfigNode_MapGet(entry, field);
-	if (node == NULL) {
+	if (snprintf(original, sizeof(original), "MOVIES/%s.SNM", name) >= (int)sizeof(original) ||
+		snprintf(replacement, sizeof(replacement), "frontend/movies/%s.mp4", name) >=
+			(int)sizeof(replacement)) {
 		return 0;
 	}
-	configured_path = AeronConfigNode_String(node, NULL);
-	if (configured_path == NULL || configured_path[0] == '\0' ||
-		snprintf(path, path_size, "%s", configured_path) >= (int)path_size) {
-		path[0] = '\0';
-		Aeron_LogWarn("xwa.movie", "Ignoring invalid %s for '%s'", field, name);
-		return 0;
-	}
-	if (!AeronVfs_Exists(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, path)) {
-		Aeron_LogWarn("xwa.movie", "Configured %s '%s' for '%s' is unavailable", field, path, name);
-		path[0] = '\0';
-		return 0;
-	}
-	return 1;
-}
-
-static int XwaMovieTask_ResolveManifestEntry(const char* name, char* path, size_t path_size,
-											 char* subtitle_path, size_t subtitle_path_size) {
-	char key[128];
-	size_t i;
-	const AeronConfigNode* videos;
-	const AeronConfigNode* entry;
-
-	subtitle_path[0] = '\0';
-	XwaMovieTask_LoadManifest();
-	if (g_xwaMovieManifest == NULL) {
-		return 0;
-	}
-	for (i = 0; name[i] != '\0' && i + 1 < sizeof(key); ++i) {
-		key[i] = (char)tolower((unsigned char)name[i]);
-	}
-	key[i] = '\0';
-
-	videos = AeronConfigNode_MapGet(AeronConfigFile_Root(g_xwaMovieManifest), "videos");
-	entry = AeronConfigNode_MapGet(videos, key);
-	if (AeronConfigNode_Type(entry) != AERON_CONFIG_MAP) {
-		return 0;
-	}
-	(void)XwaMovieTask_ResolveManifestAssetPath(entry, "subtitle_path", name, subtitle_path,
-												subtitle_path_size);
-	return XwaMovieTask_ResolveManifestAssetPath(entry, "path", name, path, path_size);
-}
-
-static int XwaMovieTask_ResolveAsset(const char* name, char* path, size_t path_size, char* original_path,
-									 size_t original_path_size, char* subtitle_path,
-									 size_t subtitle_path_size) {
-	int original_found;
-
-	subtitle_path[0] = '\0';
-	if (snprintf(original_path, original_path_size, "MOVIES/%s.SNM", name) >= (int)original_path_size) {
-		original_path[0] = '\0';
-		return 0;
-	}
-	original_found = AeronVfs_Exists(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, original_path);
-	if (XwaMovieTask_ResolveManifestEntry(name, path, path_size, subtitle_path, subtitle_path_size)) {
+	has_original = AeronVfs_Exists(Aeron_GetVfs(), AERON_VFS_ROOT_ASSET, original);
+	has_replacement = AeronVfs_Exists(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, replacement);
+	g_xwaMovieTask.is_replacement = has_replacement && (!g_xwaMoviePreferOriginal || !has_original);
+	if (g_xwaMovieTask.is_replacement) {
+		g_xwaMovieTask.root = AERON_VFS_ROOT_MOD;
+		memcpy(g_xwaMovieTask.path, replacement, sizeof(replacement));
 		return 1;
 	}
-	if (!original_found) {
-		original_path[0] = '\0';
+	if (!has_original) {
 		return 0;
 	}
-	return snprintf(path, path_size, "%s", original_path) < (int)path_size;
+	g_xwaMovieTask.root = AERON_VFS_ROOT_ASSET;
+	memcpy(g_xwaMovieTask.path, original, sizeof(original));
+	return 1;
 }
 
 static void XwaMovieTask_RestoreFrontend(void) {
@@ -153,23 +101,12 @@ static void XwaMovieTask_Finish(int result, int preserve_submission) {
 	g_xwaMovieTask.complete = 1;
 }
 
+/* The subtitles next to the movie that plays: MOVIES/<name>.sub for an
+ * original, frontend/movies/<name>.sub in the mod folder for a replacement.
+ * A replacement never takes the original's subtitles, which are timed for the
+ * original and may repeat text that the replacement shows in its picture. */
 static int XwaMovieTask_LoadSubtitleTrack(void) {
-	if (g_xwaMovieTask.subtitle_path[0] != '\0') {
-		if (Movie_LoadSubtitles(g_xwaMovieTask.subtitle_path)) {
-			return 1;
-		}
-		Aeron_LogWarn("xwa.movie", "Could not load configured subtitles '%s'; trying automatic lookup",
-					  g_xwaMovieTask.subtitle_path);
-	}
-	if (Movie_LoadSubtitles(g_xwaMovieTask.path)) {
-		return 1;
-	}
-	if (strcmp(g_xwaMovieTask.path, g_xwaMovieTask.original_path) != 0) {
-		if (g_xwaMovieTask.original_path[0] != '\0') {
-			return Movie_LoadSubtitles(g_xwaMovieTask.original_path);
-		}
-	}
-	return 0;
+	return Movie_LoadSubtitles(g_xwaMovieTask.root, g_xwaMovieTask.path);
 }
 
 int XwaMovieTask_Begin(const char* name, int noFade) {
@@ -184,9 +121,7 @@ int XwaMovieTask_Begin(const char* name, int noFade) {
 	g_xwaMovieTask.complete = 0;
 	g_xwaMovieTask.result = 0;
 	g_xwaMovieTask.playback_paused = 0;
-	if (!XwaMovieTask_ResolveAsset(name, g_xwaMovieTask.path, sizeof(g_xwaMovieTask.path),
-								   g_xwaMovieTask.original_path, sizeof(g_xwaMovieTask.original_path),
-								   g_xwaMovieTask.subtitle_path, sizeof(g_xwaMovieTask.subtitle_path))) {
+	if (!XwaMovieTask_ResolveAsset(name)) {
 		Aeron_LogError("xwa.movie", "Movie asset '%s' was not found", name);
 		return 0;
 	}
@@ -213,7 +148,7 @@ int XwaMovieTask_Begin(const char* name, int noFade) {
 
 	memset(&desc, 0, sizeof(desc));
 	desc.vfs = Aeron_GetVfs();
-	desc.root = AERON_VFS_ROOT_ASSET;
+	desc.root = g_xwaMovieTask.root;
 	desc.path = g_xwaMovieTask.path;
 	desc.autoplay = 1;
 	desc.gain = (float)g_gameConfig.sfxDatapadVolume / 10.0f;
@@ -223,7 +158,8 @@ int XwaMovieTask_Begin(const char* name, int noFade) {
 		return 0;
 	}
 	g_xwaMovieTask.active = 1;
-	Aeron_LogInfo("xwa.movie", "Playing '%s' from %s", name, g_xwaMovieTask.path);
+	Aeron_LogInfo("xwa.movie", "Playing '%s' from %s (%s)", name, g_xwaMovieTask.path,
+				  g_xwaMovieTask.is_replacement ? "mod" : "original");
 	return 1;
 }
 
@@ -232,6 +168,20 @@ void XwaMovieTask_ReapFinished(void) {
 		Aeron_VideoClose(g_xwaMovieTask.player);
 		g_xwaMovieTask.player = NULL;
 	}
+}
+
+/* The frame number that subtitles and the skip guard count in. SUB files
+ * count frames at the original movies' 15 fps. An original counts its own
+ * frames; a replacement, whose frame rate may differ, counts its playback
+ * position at 15 fps. */
+static int XwaMovieTask_CurrentFrameNumber(void) {
+	int64_t position_us;
+
+	if (!g_xwaMovieTask.is_replacement) {
+		return (int)Aeron_VideoGetPresentedFrameIndex(g_xwaMovieTask.player);
+	}
+	position_us = Aeron_VideoGetPositionUs(g_xwaMovieTask.player);
+	return position_us > 0 ? (int)(position_us * XWA_MOVIE_SUBTITLE_FPS / 1000000) : 0;
 }
 
 static int XwaMovieTask_LocalSkipRequested(void) {
@@ -337,7 +287,7 @@ void XwaMovieTask_Tick(void) {
 	}
 
 	Aeron_VideoUpdate(g_xwaMovieTask.player);
-	g_movieFrameNumber = (int)Aeron_VideoGetPresentedFrameIndex(g_xwaMovieTask.player);
+	g_movieFrameNumber = XwaMovieTask_CurrentFrameNumber();
 
 	if (FrontendDialog_HasNetworkDismissPacket() || XwaMovieTask_LocalSkipRequested()) {
 		XwaMovieTask_Stop(1);
@@ -408,10 +358,5 @@ void XwaMovieTask_Shutdown(void) {
 		Mem_Free(g_xwaMovieTask.subtitle_overlay);
 		g_xwaMovieTask.subtitle_overlay = NULL;
 	}
-	if (g_xwaMovieManifest != NULL) {
-		AeronConfigFile_Destroy(g_xwaMovieManifest);
-		g_xwaMovieManifest = NULL;
-	}
 	memset(&g_xwaMovieTask, 0, sizeof(g_xwaMovieTask));
-	g_xwaMovieManifestLoaded = 0;
 }

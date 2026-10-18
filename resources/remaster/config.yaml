@@ -132,6 +132,9 @@ dynamic_cockpit:
   hologram_emissive_strength: 1.5
 assets:
   prefer_original_2d: false
+  # Play the original movies even when the mod folder has replacements
+  # (frontend/movies/<name>.mp4).
+  prefer_original_movies: false
 presentation:
   # 1 renders at the display refresh rate; 2 renders at half refresh.
   vsync_divisor: 1

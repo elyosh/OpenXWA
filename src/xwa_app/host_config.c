@@ -164,9 +164,9 @@ static int host_config_force_opt(const AeronConfigFile* config, int required, in
 	return 1;
 }
 
-static int host_config_prefer_original_2d(const AeronConfigFile* config, int required, int* out, char* error,
-										  size_t error_size) {
-	const char* key = "assets.prefer_original_2d";
+/* assets.prefer_original_2d and assets.prefer_original_movies. */
+static int host_config_prefer_original(const AeronConfigFile* config, int required, const char* key, int* out,
+									   char* error, size_t error_size) {
 	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
 	if (!node) {
 		if (required) {
@@ -176,8 +176,7 @@ static int host_config_prefer_original_2d(const AeronConfigFile* config, int req
 		return 1;
 	}
 	if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
-		return host_config_error(error, error_size, "invalid 'assets.prefer_original_2d': expected %s",
-								 "boolean");
+		return host_config_error(error, error_size, "invalid '%s': expected boolean", key);
 	}
 	*out = AeronConfigNode_Bool(node, 0);
 	return 1;
@@ -347,7 +346,10 @@ static int host_config_remaster_options(const AeronConfigFile* config, int requi
 		   host_config_engine_emissive_strength(config, required, &out->model_engine_emissive_strength, error,
 												error_size) &&
 		   host_config_force_opt(config, required, &out->force_opt_models, error, error_size) &&
-		   host_config_prefer_original_2d(config, required, &out->prefer_original_2d, error, error_size) &&
+		   host_config_prefer_original(config, required, "assets.prefer_original_2d",
+									   &out->prefer_original_2d, error, error_size) &&
+		   host_config_prefer_original(config, required, "assets.prefer_original_movies",
+									   &out->prefer_original_movies, error, error_size) &&
 		   host_config_environment_maps(config, required, out, error, error_size) &&
 		   host_config_sun_max_radiance(config, required, &out->environment_maps_sun_max_radiance, error,
 										error_size) &&

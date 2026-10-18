@@ -156,9 +156,14 @@ build_dependencies() {
             --disable-network \
             --disable-programs \
             --disable-static \
+            --enable-decoder=aac \
             --enable-decoder=adpcm_vima \
+            --enable-decoder=h264 \
             --enable-decoder=sanm \
+            --enable-demuxer=mov \
             --enable-demuxer=smush \
+            --enable-parser=aac \
+            --enable-parser=h264 \
             --enable-pic \
             --enable-pthreads \
             --enable-shared \

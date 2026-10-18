@@ -7,6 +7,9 @@
 extern "C" {
 #endif
 
+/* Called before XwaPort_Init. A nonzero value plays the original movies even
+   when the mod folder has replacements. */
+void XwaMovieTask_Configure(int preferOriginalMovies);
 int XwaMovieTask_Begin(const char* name, int noFade);
 void XwaMovieTask_ReapFinished(void);
 void XwaMovieTask_Tick(void);

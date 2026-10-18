@@ -9,6 +9,7 @@
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/runtime/movie_task.h"
 #include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/runtime/presentation.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
@@ -369,6 +370,8 @@ int main(int argc, char** argv) {
 	Aeron_LogInfo("xwa.config", "force OPT models: %s", host_config.force_opt_models ? "yes" : "no");
 	Aeron_LogInfo("xwa.config", "prefer original 2D assets: %s",
 				  host_config.prefer_original_2d ? "yes" : "no");
+	Aeron_LogInfo("xwa.config", "prefer original movies: %s",
+				  host_config.prefer_original_movies ? "yes" : "no");
 	Aeron_LogInfo("xwa.config", "environment maps: %s (manifest %s, sun max radiance %.4g)",
 				  host_config.environment_maps_enabled ? "yes" : "no", host_config.environment_maps_manifest,
 				  (double)host_config.environment_maps_sun_max_radiance);
@@ -426,6 +429,7 @@ int main(int argc, char** argv) {
 	XwaModernFlightTiming_Configure(host_config.flight_simulation_step_ticks);
 	/* XwaRemaster_Init succeeded above, so the HD renderer is available. */
 	XwaModelSource_Configure(!host_config.force_opt_models);
+	XwaMovieTask_Configure(host_config.prefer_original_movies);
 	if (!XwaPort_Init()) {
 		XwaRemaster_Shutdown();
 		Aeron_Shutdown();

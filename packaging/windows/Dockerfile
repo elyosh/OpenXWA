@@ -155,9 +155,14 @@ RUN git clone --branch "n${FFMPEG_VERSION}" --depth 1 \
         --disable-programs \
         --disable-static \
         --enable-shared \
+        --enable-decoder=aac \
         --enable-decoder=adpcm_vima \
+        --enable-decoder=h264 \
         --enable-decoder=sanm \
+        --enable-demuxer=mov \
         --enable-demuxer=smush \
+        --enable-parser=aac \
+        --enable-parser=h264 \
         --enable-w32threads \
     && make -j"$(nproc)" \
     && make install

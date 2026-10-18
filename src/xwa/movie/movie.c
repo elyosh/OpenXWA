@@ -169,7 +169,11 @@ void Movie_FreeSubtitles(void) {
 #endif
 
 // FUNCTION: XWA 0x55C120
+#ifdef XWA_MODERN
+int Movie_LoadSubtitles(AeronVfsRoot root, const char* moviePath) {
+#else
 int Movie_LoadSubtitles(const char* moviePath) {
+#endif
 	enum {
 		MOVIE_EXTENSION_LENGTH = 4,
 		MOVIE_SUBTITLE_LINE_READ_SIZE = 256,
@@ -213,7 +217,7 @@ int Movie_LoadSubtitles(const char* moviePath) {
 		memcpy(subtitlePath, moviePath, stemLength);
 		memcpy(subtitlePath + stemLength, ".sub", sizeof(".sub"));
 	}
-	stream = File_Open(AERON_VFS_ROOT_ASSET, subtitlePath, "r");
+	stream = File_Open(root, subtitlePath, "r");
 #else
 	strcpy(g_frontendScratchBuffer, moviePath);
 	g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - MOVIE_EXTENSION_LENGTH] = '\0';

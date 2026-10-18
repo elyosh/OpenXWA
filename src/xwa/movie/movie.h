@@ -1,6 +1,8 @@
 #ifndef XWA_MOVIE_MOVIE_H
 #define XWA_MOVIE_MOVIE_H
 
+#include "aeron/vfs.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -27,7 +29,12 @@ extern int g_movieSubtitleCurrentIndex;
 extern int g_movieFrameNumber;
 
 int Movie_Play(const char* name, int noFade);
+#ifdef XWA_MODERN
+/* Modern port: `root` is the VFS root that holds `moviePath`. */
+int Movie_LoadSubtitles(AeronVfsRoot root, const char* moviePath);
+#else
 int Movie_LoadSubtitles(const char* moviePath);
+#endif
 #ifdef XWA_MODERN
 void Movie_FreeSubtitles(void);
 #endif
