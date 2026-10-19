@@ -5200,6 +5200,12 @@ void DeathStar_FireLaserAtTarget(void) {
 		return;
 	}
 
+#ifdef XWA_MODERN
+	/* This path can recycle an occupied laser slot directly. */
+	g_objectTable[laserObjIdx].mobj->projectileMoveFractionX = 0;
+	g_objectTable[laserObjIdx].mobj->projectileMoveFractionY = 0;
+	g_objectTable[laserObjIdx].mobj->projectileMoveFractionZ = 0;
+#endif
 	g_deathStarTunnelLaserRegions[regionIdx].beamLightActive = 1;
 	g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx = (int)laserObjIdx;
 	g_objectTable[laserObjIdx].mobj->state = 1;

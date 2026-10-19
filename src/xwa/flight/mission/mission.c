@@ -7421,6 +7421,11 @@ uint16_t Mission_Init(char* fileName) {
 		g_mobileObjectPoolBase[slot].pCraft = NULL;
 		g_mobileObjectPoolBase[slot].pWarheadGuidance = NULL;
 		g_mobileObjectPoolBase[slot].pCharData = NULL;
+#ifdef XWA_MODERN
+		g_mobileObjectPoolBase[slot].projectileMoveFractionX = 0;
+		g_mobileObjectPoolBase[slot].projectileMoveFractionY = 0;
+		g_mobileObjectPoolBase[slot].projectileMoveFractionZ = 0;
+#endif
 	}
 
 	mobileObjectCount = 0;
