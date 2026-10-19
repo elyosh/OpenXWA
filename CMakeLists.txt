@@ -483,6 +483,7 @@ if(XWA_BUILD_TOOLS)
         tools/xwa_asset_bake/bake_fonts.c
         tools/xwa_asset_bake/bake_sprites.c
         tools/xwa_asset_bake/bake_xwau.c
+        tools/xwa_asset_bake/bake_xwau_flight.c
     )
     target_link_libraries(xwa_asset_bake PRIVATE xwa_2d_formats imgbake xwau_files)
 

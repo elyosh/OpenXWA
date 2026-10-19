@@ -125,13 +125,15 @@ int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
 }
 
 /* AeronSpriteAtlas-compatible layout YAML. */
-static int emit_atlas_yaml(const char* path, const AeronAtlasImage* images, const BakeFrame* frames,
-						   const uint16_t* ids, int count, const AeronCpuAtlas* atlas,
-						   int classic_atlas_w, int classic_atlas_h) {
+int BakeSprites_WriteAtlasYaml(const char* path, const AeronAtlasImage* images, const BakeFrame* frames,
+							   const uint16_t* ids, int count, const AeronCpuAtlas* atlas, int classic_atlas_w,
+							   int classic_atlas_h, const char* header) {
 	FILE* fp = fopen(path, "w");
 	if (!fp) {
 		return 0;
 	}
+	if (header)
+		fputs(header, fp);
 	fprintf(fp, "atlas: {w: %d, h: %d, classic_w: %d, classic_h: %d}\n", atlas->pages[0].width,
 			atlas->pages[0].height, classic_atlas_w, classic_atlas_h);
 	fprintf(fp, "frames:\n");
@@ -145,9 +147,12 @@ static int emit_atlas_yaml(const char* path, const AeronAtlasImage* images, cons
 			fprintf(fp, "page: %d, ", placement->page);
 		fprintf(fp,
 				"x: %d, y: %d, w: %d, h: %d, origin_x: %d, origin_y: %d, "
-				"classic_w: %d, classic_h: %d}\n",
+				"classic_w: %d, classic_h: %d",
 				placement->x, placement->y, frame->w, frame->h, frame->origin_x, frame->origin_y,
 				frame->classic_w, frame->classic_h);
+		if (frame->has_light)
+			fprintf(fp, ", light: [%g, %g, %g]", frame->light[0], frame->light[1], frame->light[2]);
+		fprintf(fp, "}\n");
 	}
 	fclose(fp);
 	return 1;
@@ -194,9 +199,9 @@ static void emit_frames(const BakeSpriteOptions* opt, const char* bundle_dir, co
 		char yaml[1100];
 		snprintf(yaml, sizeof yaml, "%s.yaml", base);
 		const float inv_scale = opt->scale ? (1.0f / 4.5f) : 1.0f;
-		ok &= emit_atlas_yaml(yaml, images, frames, NULL, n, &atlas,
-							  (int)(atlas.pages[0].width * inv_scale + 0.5f),
-							  (int)(atlas.pages[0].height * inv_scale + 0.5f));
+		ok &= BakeSprites_WriteAtlasYaml(yaml, images, frames, NULL, n, &atlas,
+										 (int)(atlas.pages[0].width * inv_scale + 0.5f),
+										 (int)(atlas.pages[0].height * inv_scale + 0.5f), NULL);
 		free(images);
 		Aeron_AtlasBuildFree(&atlas);
 		if (ok) {
@@ -323,9 +328,9 @@ static void emit_group_atlas(const BakeSpriteOptions* opt, const char* resdata_d
 	char yaml_path[1160];
 	snprintf(yaml_path, sizeof yaml_path, "%s/group_%u.yaml", dir, group);
 	const float inv_scale = opt->scale ? (1.0f / 4.5f) : 1.0f;
-	ok &= emit_atlas_yaml(yaml_path, images, frames, ids, n, &atlas,
-						  (int)(atlas.pages[0].width * inv_scale + 0.5f),
-						  (int)(atlas.pages[0].height * inv_scale + 0.5f));
+	ok &= BakeSprites_WriteAtlasYaml(yaml_path, images, frames, ids, n, &atlas,
+									 (int)(atlas.pages[0].width * inv_scale + 0.5f),
+									 (int)(atlas.pages[0].height * inv_scale + 0.5f), NULL);
 	const int page_count = atlas.page_count;
 	free(images);
 	Aeron_AtlasBuildFree(&atlas);

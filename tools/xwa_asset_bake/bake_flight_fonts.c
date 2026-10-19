@@ -105,12 +105,29 @@ static int bake_tier(const BakeFlightFontsOptions* opt, int tier, const Xwa2dFon
 	return ok;
 }
 
-int BakeFlightFonts_Run(const BakeFlightFontsOptions* opt, AeronVfs* vfs) {
-	if (!opt || !opt->out_root)
+int BakeFlightFonts_WriteTiers(const BakeFlightFontsOptions* opt, const Xwa2dFrameSet* group) {
+	if (!opt || !opt->out_root || !group)
 		return 0;
 	char dir[1024];
 	snprintf(dir, sizeof dir, "%s/flight/fonts", opt->out_root);
 	if (!mkdir_p(dir))
+		return 0;
+	int baked = 0;
+	for (int tier = 0; tier < 3; tier++) {
+		Xwa2dFontAtlas font = { 0 };
+		char error[256] = { 0 };
+		if (!Xwa2d_BuildFlightFontTier(group, tier, &font, error, sizeof error)) {
+			fprintf(stderr, "bake: flight font tier %d failed: %s\n", tier, error);
+			continue;
+		}
+		baked += bake_tier(opt, tier, &font);
+		Xwa2dFontAtlas_Free(&font);
+	}
+	return baked;
+}
+
+int BakeFlightFonts_Run(const BakeFlightFontsOptions* opt, AeronVfs* vfs) {
+	if (!opt || !opt->out_root)
 		return 0;
 	BakeDatCatalog catalog;
 	Xwa2dFrameSet source_group = { 0 };
@@ -124,17 +141,7 @@ int BakeFlightFonts_Run(const BakeFlightFontsOptions* opt, AeronVfs* vfs) {
 		return 0;
 	}
 	BakeSource_FreeDatCatalog(&catalog);
-	int baked = 0;
-	for (int tier = 0; tier < 3; tier++) {
-		Xwa2dFontAtlas font = { 0 };
-		error[0] = '\0';
-		if (!Xwa2d_BuildFlightFontTier(&source_group, tier, &font, error, sizeof error)) {
-			fprintf(stderr, "bake: flight font tier %d failed: %s\n", tier, error);
-			continue;
-		}
-		baked += bake_tier(opt, tier, &font);
-		Xwa2dFontAtlas_Free(&font);
-	}
+	const int baked = BakeFlightFonts_WriteTiers(opt, &source_group);
 	Xwa2dFrameSet_Free(&source_group);
 	return baked;
 }

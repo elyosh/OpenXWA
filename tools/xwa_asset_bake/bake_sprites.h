@@ -28,6 +28,8 @@ typedef struct BakeFrame {
 	int      w, h;
 	int      classic_w, classic_h;
 	int      origin_x, origin_y; /* classic units (DAT anchors) */
+	int      has_light;          /* write `light: [r, g, b]` */
+	float    light[3];
 } BakeFrame;
 
 typedef struct BakeStats {
@@ -50,5 +52,12 @@ int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, c
  * `max_pages` 0 allows any number of pages. */
 int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
 						   AeronAtlasImage** out_images, AeronCpuAtlas* out);
+/* Writes the layout YAML of an atlas that BakeSprites_BuildAtlas packed:
+ * each frame's id (when `ids` isn't NULL), page, rectangle, anchor and classic
+ * size, and `light` for a frame with `has_light`. `header`, when not NULL, is
+ * written first, as is. */
+int BakeSprites_WriteAtlasYaml(const char* path, const AeronAtlasImage* images, const BakeFrame* frames,
+							   const uint16_t* ids, int count, const AeronCpuAtlas* atlas, int classic_atlas_w,
+							   int classic_atlas_h, const char* header);
 
 #endif /* XWA_BAKE_SPRITES_H */
