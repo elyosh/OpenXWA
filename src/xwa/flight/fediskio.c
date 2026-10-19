@@ -900,8 +900,8 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 	int format;
 	int baseShift;
 #ifdef XWA_MODERN
-	/* A group built from an atlas with game geometry has images without
-	   pixels, which XwaGeometryTextures_* turn into texture levels. */
+	/* When an atlas with game geometry defines this group, its images have
+	   no pixels. XwaGeometryTextures_* make the texture levels for them. */
 	const int geometryGroup = XwaFrontendGeometry_FindGroup(g_modelTypeTable[modelType].textureGroup) != NULL;
 #endif
 

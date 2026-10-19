@@ -36,8 +36,8 @@ static CraftHudType s_types[OBJ_Count];
 static CraftHudList s_hullIcons;
 static CraftHudList s_mapIcons;
 
-/* Loads a mod file that must have "version: 1". Returns NULL when the file is
-   missing, and logs other errors. */
+/* Loads a file from the mod folder and checks that it has "version: 1".
+   Returns NULL when the file is missing. Other errors are logged. */
 static AeronConfigFile* CraftHud_LoadFile(const char* path) {
 	AeronConfigError error;
 	AeronConfigFile* file = NULL;
@@ -46,14 +46,14 @@ static AeronConfigFile* CraftHud_LoadFile(const char* path) {
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, &file, &error)) {
 		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.hud", "%s:%d: %s; the file is ignored", path, error.line, error.message);
+			Aeron_LogError("xwa.hud", "%s:%d: %s. The file is ignored", path, error.line, error.message);
 		}
 		return NULL;
 	}
 	root = AeronConfigFile_Root(file);
 	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP ||
 		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1) {
-		Aeron_LogError("xwa.hud", "%s: expected 'version: 1'; the file is ignored", path);
+		Aeron_LogError("xwa.hud", "%s: the file needs 'version: 1'. It is ignored", path);
 		AeronConfigFile_Destroy(file);
 		return NULL;
 	}
@@ -68,7 +68,7 @@ static void CraftHud_ReadList(const AeronConfigNode* root, const char* key, Craf
 		return;
 	}
 	if (AeronConfigNode_Type(node) != AERON_CONFIG_SEQUENCE) {
-		Aeron_LogError("xwa.hud", "%s: '%s' isn't a list; the game keeps its own table", s_iconsPath, key);
+		Aeron_LogError("xwa.hud", "%s: '%s' isn't a list. The game uses its own table", s_iconsPath, key);
 		return;
 	}
 	list->count = AeronConfigNode_SequenceCount(node);
@@ -81,8 +81,8 @@ static void CraftHud_ReadList(const AeronConfigNode* root, const char* key, Craf
 		const int64_t value = AeronConfigNode_Int(AeronConfigNode_SequenceGet(node, index), -1);
 
 		if (value < 0 || value > UINT16_MAX) {
-			Aeron_LogWarn("xwa.hud", "%s: '%s' entry %zu isn't an image id; it is 0", s_iconsPath, key,
-						  index);
+			Aeron_LogWarn("xwa.hud", "%s: entry %zu of '%s' isn't an image id. It is set to 0", s_iconsPath,
+						  index, key);
 			continue;
 		}
 		list->values[index] = (uint16_t)value;
@@ -114,7 +114,7 @@ static int CraftHud_ReadColor(const char* path, const AeronConfigNode* colors, c
 		return 0;
 	}
 	if (value < 0 || value > UINT32_MAX) {
-		Aeron_LogWarn("xwa.hud", "%s: colors.%s isn't an ARGB colour; it is ignored", path, key);
+		Aeron_LogWarn("xwa.hud", "%s: colors.%s isn't an ARGB colour. It is ignored", path, key);
 		return 0;
 	}
 	*out = (uint32_t)value;
@@ -141,8 +141,10 @@ static void CraftHud_ReadCraft(const char* path, CraftHudType* type) {
 
 		if (*key == '\0' || *end != '\0' || slot < 0 || slot >= XWA_CRAFT_HUD_RETICLE_SLOTS || value <= 0 ||
 			value > UINT16_MAX) {
-			Aeron_LogWarn("xwa.hud", "%s: reticle.%s isn't a slot and an image position; it is ignored", path,
-						  key);
+			Aeron_LogWarn(
+				"xwa.hud",
+				"%s: reticle.%s needs a slot from 0 to 22 and an image position above 0. It is ignored", path,
+				key);
 			continue;
 		}
 		type->reticle[slot] = (uint16_t)value;
@@ -208,7 +210,8 @@ void XwaCraftHud_LoadMission(const struct XwaFlightGroup* flightGroups, size_t s
 		}
 	}
 	if (craftCount != 0) {
-		Aeron_LogInfo("xwa.hud", "flight/craft: HUD settings for %d craft types of the mission", craftCount);
+		Aeron_LogInfo("xwa.hud", "flight/craft: HUD settings for %d of the mission's craft types",
+					  craftCount);
 	}
 }
 

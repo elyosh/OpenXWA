@@ -325,8 +325,9 @@ static int hud_cache_asset(XwaRemasterAssets* assets, XwaHudAssetId asset, const
 	int ok = list->count != 0;
 	for (uint8_t i = 0; i < list->count; i++)
 		ok &= hud_cache_frame(assets, OBJ_HudTextureGroup12000, list->frames[i]);
-	/* The frames the player's craft draws in its reticle slots. A slot whose
-	   frame is missing draws its own frame, so the asset doesn't need them. */
+	/* Also load the frames that the player's craft draws in its reticle
+	   slots. If one is missing, its slot draws its own frame, so the asset
+	   isn't missing. */
 	for (uint8_t i = 0; hud && i < list->count; i++) {
 		const uint8_t slot = list->frames[i];
 		if ((asset == XWA_HUD_ASSET_RETICLE || asset == XWA_HUD_ASSET_THREATS) &&

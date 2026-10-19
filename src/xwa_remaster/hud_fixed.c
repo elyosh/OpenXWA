@@ -894,10 +894,11 @@ const XwaHudProjectedArrow* XwaRemasterHudFixed_TargetArrow(void) {
 	return fixed_target_arrow.visible ? &fixed_target_arrow : NULL;
 }
 
-/* The frame that reticle slot `slot` draws for the player's craft. A frame
- * the craft changes is drawn as wide as the slot's own frame, as in XWAU's
- * reticle hook: `screen_size` is 256 x the slot frame's classic width / the
- * new frame's classic width. A frame that isn't loaded keeps the slot's own. */
+/* Returns the frame that reticle slot `slot` draws for the player's craft.
+ * When the craft replaces the slot's frame, the new frame is drawn as wide as
+ * the slot's own frame: `screen_size` is set to 256 x the classic width of
+ * the slot's frame / the classic width of the new frame. If the new frame
+ * isn't loaded, the slot draws its own frame. */
 static int fixed_reticle_slot_frame(int slot, int* screen_size) {
 	if (!fixed_snapshot || slot < 0 || slot >= XWA_SNAP_RETICLE_SLOTS)
 		return slot;

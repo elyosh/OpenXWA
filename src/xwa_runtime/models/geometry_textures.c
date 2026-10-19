@@ -8,21 +8,21 @@
 
 enum {
 	GEOMETRY_TEXTURES_SPRITE_HEADER_SIZE = 18,
-	/* sprite_resource.c's group index: 8-byte entries, a 16-bit id, then a
-	   32-bit offset into the data. */
+	/* The group index in sprite_resource.c has 8-byte entries: a 16-bit id,
+	   then a 32-bit offset into the data. */
 	GEOMETRY_TEXTURES_INDEX_ENTRY_SIZE = 8,
 	GEOMETRY_TEXTURES_INDEX_OFFSET = 2,
 	GEOMETRY_TEXTURES_PLACEHOLDER_SIZE = 8,
 	GEOMETRY_TEXTURES_PLACEHOLDER_ROW_BYTES =
 		2 * GEOMETRY_TEXTURES_PLACEHOLDER_SIZE * GEOMETRY_TEXTURES_PLACEHOLDER_SIZE,
-	/* The payload header, one 24-bit colour, then 2 bytes (index, alpha) for
-	   each pixel, as in a type-24 DAT image. */
+	/* Like a type-24 DAT image, the placeholder holds the payload header, one
+	   24-bit colour, then 2 bytes (index, alpha) for each pixel. */
 	GEOMETRY_TEXTURES_PLACEHOLDER_PAYLOAD_SIZE =
 		(int)sizeof(SpritePayload) + 3 + GEOMETRY_TEXTURES_PLACEHOLDER_ROW_BYTES,
 };
 
-/* An 8x8 type-24 image with one black colour, whose pixels all have alpha 0:
- * the source of every placeholder. */
+/* Every placeholder is made from this image: an 8x8 type-24 image with one
+ * black colour, where every pixel has alpha 0. */
 static uint8_t g_geometryTexturesPlaceholderSource[GEOMETRY_TEXTURES_SPRITE_HEADER_SIZE +
 												   GEOMETRY_TEXTURES_PLACEHOLDER_PAYLOAD_SIZE];
 static int g_geometryTexturesPlaceholderReady;
@@ -53,9 +53,9 @@ static void geometry_textures_convert_sprite(const Sprite* sprite, int format, T
 	TexLevel* levelCursor = texLevels;
 
 	memset(texLevels, 0, sizeof(*texLevels) * levelCount);
-	/* The level sizes of SpriteTexture_ConvertSprite: each level halves the
-	   size, and a level under 8 pixels ends the list, except the first, which
-	   then keeps the full size. */
+	/* Work out the level sizes as SpriteTexture_ConvertSprite does. Each level
+	   halves the size. A level under 8 pixels ends the list, except the first
+	   level, which then keeps the full size. */
 	for (level = 0; level < levelCount; ++level, ++levelCursor) {
 		uint8_t shift = (uint8_t)(baseShift + level);
 		uint16_t width = (uint16_t)(sprite->width >> shift);
@@ -109,7 +109,7 @@ void XwaGeometryTextures_ConvertByIndex(int16_t groupId, uint16_t spriteIndex, i
 	const SpriteGroup* group = NULL;
 	int16_t groupIndex;
 
-	/* The group lookup of SpriteTexture_ConvertByIndex. */
+	/* Find the group as SpriteTexture_ConvertByIndex does. */
 	for (int i = 0; i < SPRITE_RESOURCE_MAX_GROUPS && group == NULL; ++i) {
 		if (g_spriteGroups[i].groupId == groupId) {
 			group = &g_spriteGroups[i];

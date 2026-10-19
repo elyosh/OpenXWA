@@ -7990,9 +7990,10 @@ uint16_t Mission_Init(char* fileName) {
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: the skins the renderer loads follow the flight groups'
-	   markings, final once the loop above has set the player groups'. The
-	   craft HUD settings follow their craft types. */
+	/* Modern port: the skins that the renderer loads depend on the flight
+	   groups' markings, and the craft HUD settings depend on their craft
+	   types. Both are final once the loop above has set up the player
+	   groups. */
 	XwaSkins_SetFlightGroups(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 							 (int16_t)g_missionHeader.numFlightGroups);
 	XwaCraftHud_LoadMission(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],

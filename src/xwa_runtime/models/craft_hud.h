@@ -1,7 +1,7 @@
 #ifndef XWA_RUNTIME_MODELS_CRAFT_HUD_H
 #define XWA_RUNTIME_MODELS_CRAFT_HUD_H
 
-/* HUD settings for each craft, and the hull and map icon lists, read from the
+/* Reads each craft's HUD settings and the hull and map icon lists from the
  * mod folder.
  *
  * flight/hud.yaml replaces the game's icon tables. Each list gives the image
@@ -20,14 +20,15 @@
  *     reticle: {5: 135, 6: 136}
  *     colors: {inner: 0xff00ff00, border: 0xff008000}
  *
- * `reticle` gives, for a reticle slot, the image of group 12000 that it
- * draws, as a 1-based position in the group. `colors` gives the HUD's inner
- * and border colours as ARGB.
+ * `reticle` maps a reticle slot to the image of group 12000 that it draws,
+ * given as a 1-based position in the group. `colors` sets the HUD's inner and
+ * border colours, as ARGB.
  *
- * hud.yaml is read once at startup. The craft files are read when a mission
- * loads, for the craft types of its flight groups. They are only used with
- * model replacements, because the model keys come from them. Without the
- * files, the game uses its own tables and colours. */
+ * The game reads hud.yaml once at startup. It reads the craft files when a
+ * mission loads, for the craft types that the mission's flight groups use.
+ * The craft files only work with model replacements on, because the model
+ * keys come from the replacement list. Without the files, the game uses its
+ * own tables and colours. */
 
 #include <stddef.h>
 #include <stdint.h>
@@ -42,23 +43,27 @@ enum { XWA_CRAFT_HUD_RETICLE_SLOTS = 23 };
 
 /* Reads flight/hud.yaml. */
 void XwaCraftHud_Init(void);
-/* Reads the craft files of the craft types that the mission's flight groups
-   use, replacing the previous mission's. `flightGroups` is the first flight
-   group, `stride` the distance between two and `count` their number. Call
-   it once the flight groups' craft types are final. */
+/* Reads the craft files for the craft types that the mission's flight
+   groups use, and drops the previous mission's settings. `flightGroups`
+   points to the first flight group, `stride` is the distance between two
+   flight groups, and `count` is their number. Call it after the flight
+   groups' craft types are final. */
 void XwaCraftHud_LoadMission(const struct XwaFlightGroup* flightGroups, size_t stride, int count);
 
-/* The hull icon image id of `objectType`. With a `hull_icons` list, this is
-   the list's value, or 0 for a type past its end. Without one, it is
-   `stockId`. */
+/* Returns the image id of the hull icon for `objectType`. With a
+   `hull_icons` list, it returns the list's value, or 0 for a type past the
+   end of the list. Without a list, it returns `stockId`. */
 uint16_t XwaCraftHud_HullIcon(unsigned int objectType, uint16_t stockId);
-/* The same for the map icons and the `map_icons` list. */
+/* Works like XwaCraftHud_HullIcon, for the map icons and the `map_icons`
+   list. */
 uint16_t XwaCraftHud_MapIcon(unsigned int objectType, uint16_t stockId);
 /* Replaces colors[0] (inner) and colors[1] (border) with the colours that
-   `objectType`'s craft file sets. The colours it doesn't set don't change. */
+   the craft file of `objectType` sets. A colour that the file doesn't set
+   stays the same. */
 void XwaCraftHud_Colors(unsigned int objectType, uint32_t colors[2]);
-/* The 1-based position in group 12000 that reticle slot `slot` draws for
-   `objectType`, or 0 when the craft doesn't change that slot. */
+/* Returns the image that reticle slot `slot` draws for `objectType`, as a
+   1-based position in group 12000. Returns 0 when the craft doesn't change
+   that slot. */
 int XwaCraftHud_Reticle(unsigned int objectType, int slot);
 
 #ifdef __cplusplus

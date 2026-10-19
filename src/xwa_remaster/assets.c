@@ -503,9 +503,9 @@ static AssetLoadStatus assets_load_original_group(XwaRemasterAssets* a, AeronCom
 static AssetLoadStatus assets_choose_group(XwaRemasterAssets* a, AeronCommandBuffer* cmd,
 										   GroupSlot* slot, int flight, uint8_t* out_source) {
 	*out_source = ASSET_SOURCE_MISSING;
-	/* Same rule as for files: if an atlas sets a group's geometry, only the
-	   mod's texture is used, in the frontend and in flight. The stock DAT
-	   would have other frame counts and sizes than the ones the game uses. */
+	/* As for files: if an atlas sets a group's geometry, only the mod's
+	   texture is used, in the frontend and in flight. The stock DAT can have
+	   other frame counts and sizes than the ones the game uses. */
 	if (XwaFrontendGeometry_FindGroup(slot->group)) {
 		const AssetLoadStatus status =
 			assets_load_mod_group(a, flight ? a->flight_images : a->frontend_images, cmd, slot);

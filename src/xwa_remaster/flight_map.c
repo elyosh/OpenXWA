@@ -166,7 +166,7 @@ static void map_add_icon(AeronDrawList2D* list, XwaRemasterAssets* assets, const
 	const XwaAssetRef* ref = map_resolve_icon(assets, map->icon_id);
 	if (!ref)
 		return;
-	/* The icon's classic size, which is 16 px for the stock icons. */
+	/* Draw the icon at its classic size. The stock icons are 16 px. */
 	const float width = (ref->classic_w > 0 ? ref->classic_w : 16) * view->classic_pixel_scale;
 	const float height = (ref->classic_h > 0 ? ref->classic_h : 16) * view->classic_pixel_scale;
 	const float x = center_x - width * 0.5f;

@@ -219,7 +219,8 @@ typedef struct XwaGlyph2D {
  * 50 and 16. */
 #define XWA_SNAP_MAX_MESH_SLOTS 255
 #define XWA_SNAP_MAX_WEAPON_SLOTS 120
-/* The reticle slots: frames 0 to 22 of group 12000 (XWA_CRAFT_HUD_RETICLE_SLOTS). */
+/* The number of reticle slots, one for each of frames 0 to 22 of group 12000
+   (XWA_CRAFT_HUD_RETICLE_SLOTS). */
 #define XWA_SNAP_RETICLE_SLOTS 23
 /* 64-bit words of a glow-mark mesh mask, one bit per mesh slot. */
 #define XWA_SNAP_GLOW_MARK_MESH_WORDS ((XWA_SNAP_MAX_MESH_SLOTS + 63) / 64)
@@ -943,8 +944,8 @@ typedef struct XwaHudReticle {
 	uint8_t stick_marker;
 	int8_t stick_marker_x;
 	int8_t stick_marker_y;
-	/* The frame of group 12000 that each reticle slot draws for the player's
-	 * craft (craft_hud.h), or 0 for the slot's own frame. */
+	/* For each reticle slot, the frame of group 12000 that the player's craft
+	 * draws there (craft_hud.h). 0 means that the slot draws its own frame. */
 	uint16_t slot_frame[XWA_SNAP_RETICLE_SLOTS];
 } XwaHudReticle;
 

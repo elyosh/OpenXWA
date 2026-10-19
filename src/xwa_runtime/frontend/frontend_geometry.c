@@ -150,10 +150,10 @@ static void geometry_free_atlas(XwaGeometryAtlas* atlas) {
 	}
 }
 
-/* Reads a frame's size and anchor in game units: `classic_w` and
- * `classic_h`, which are needed, and `origin_x` and `origin_y`, 0 when
- * missing. The design-pixel keys are refused, so that a value is never read
- * in the wrong units. */
+/* Reads a frame's size and anchor in game units. The size comes from
+ * `classic_w` and `classic_h`, which are required. The anchor comes from
+ * `origin_x` and `origin_y`, which are 0 when missing. The keys in design
+ * pixels are an error here, so that no value is read in the wrong units. */
 static int geometry_read_game_frame(const char* path, const AeronConfigNode* node, XwaGeometryFrame* frame) {
 	static const char* const design_keys[] = { "size", "offset", "bounds" };
 	const AeronConfigNode* width = AeronConfigNode_MapGet(node, "classic_w");
@@ -165,14 +165,15 @@ static int geometry_read_game_frame(const char* path, const AeronConfigNode* nod
 	for (size_t i = 0; i < sizeof(design_keys) / sizeof(design_keys[0]); ++i) {
 		const AeronConfigNode* value = AeronConfigNode_MapGet(node, design_keys[i]);
 		if (value != NULL) {
-			Aeron_LogError("xwa.frontend", "%s:%d: %s is in design pixels, and this atlas uses game units", path,
-						   AeronConfigNode_Line(value), design_keys[i]);
+			Aeron_LogError("xwa.frontend", "%s:%d: %s is in design pixels, but this atlas uses game units",
+						   path, AeronConfigNode_Line(value), design_keys[i]);
 			return 0;
 		}
 	}
 	if (AeronConfigNode_Type(width) != AERON_CONFIG_INT || AeronConfigNode_Type(height) != AERON_CONFIG_INT ||
 		AeronConfigNode_Int(width, 0) <= 0 || AeronConfigNode_Int(height, 0) <= 0) {
-		Aeron_LogError("xwa.frontend", "%s:%d: a frame needs classic_w and classic_h, larger than 0", path, line);
+		Aeron_LogError("xwa.frontend", "%s:%d: a frame needs classic_w and classic_h, both above 0", path,
+					   line);
 		return 0;
 	}
 	frame->size[0] = (float)AeronConfigNode_Int(width, 0);
@@ -328,8 +329,9 @@ static XwaGeometryAtlas* geometry_read_atlas(const char* path, int needs_id) {
 	if (value != NULL) {
 		scale = (float)AeronConfigNode_Float(value, 0.0);
 		if (atlas->units == XWA_GEOMETRY_UNITS_GAME) {
-			Aeron_LogError("xwa.frontend", "%s:%d: scale converts design pixels, and this atlas uses game units",
-						   path, AeronConfigNode_Line(value));
+			Aeron_LogError("xwa.frontend",
+						   "%s:%d: scale only applies to design pixels, but this atlas uses game units", path,
+						   AeronConfigNode_Line(value));
 			ok = 0;
 		} else if (scale <= 0.0f) {
 			Aeron_LogError("xwa.frontend", "%s:%d: scale must be a positive number", path,
@@ -613,8 +615,9 @@ const XwaGeometryAtlas* XwaFrontendGeometry_FindGroup(int group) {
 	   font group keeps its DAT images. The HD fonts come from flight/fonts. */
 	if (atlas != NULL && group == g_modelTypeTable[MODEL_TEXTURE_FONT_MODEL_TYPE].textureGroup) {
 		if (!fontReported) {
-			Aeron_LogError("xwa.frontend", "%s: the flight font group can't take its geometry from an atlas; "
-										   "the DAT images are used",
+			Aeron_LogError("xwa.frontend",
+						   "%s: the flight font group can't use an atlas, so the game "
+						   "uses its DAT images",
 						   path);
 			fontReported = 1;
 		}
@@ -816,7 +819,7 @@ enum {
 
 static const XwaGeometryAtlas* g_geometrySortAtlas;
 
-/* An atlas value in whole game units, rounded to the nearest. */
+/* Converts an atlas value to whole game units, rounded to the nearest unit. */
 static int geometry_atlas_unit_x(const XwaGeometryAtlas* atlas, float x) {
 	return atlas->units == XWA_GEOMETRY_UNITS_GAME ? (int)floorf(x + 0.5f) : XwaFrontendGeometry_UnitX(x);
 }
