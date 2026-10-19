@@ -36,6 +36,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
@@ -7990,9 +7991,12 @@ uint16_t Mission_Init(char* fileName) {
 
 #ifdef XWA_MODERN
 	/* Modern port: the skins the renderer loads follow the flight groups'
-	   markings, final once the loop above has set the player groups'. */
+	   markings, final once the loop above has set the player groups'. The
+	   craft HUD settings follow their craft types. */
 	XwaSkins_SetFlightGroups(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 							 (int16_t)g_missionHeader.numFlightGroups);
+	XwaCraftHud_LoadMission(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
+							(int16_t)g_missionHeader.numFlightGroups);
 #endif
 
 	GameRand_SavePrimarySeed();

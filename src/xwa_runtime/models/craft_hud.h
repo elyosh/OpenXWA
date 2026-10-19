@@ -24,20 +24,29 @@
  * draws, as a 1-based position in the group. `colors` gives the HUD's inner
  * and border colours as ARGB.
  *
- * All files are read once at startup. The craft files are only used with
+ * hud.yaml is read once at startup. The craft files are read when a mission
+ * loads, for the craft types of its flight groups. They are only used with
  * model replacements, because the model keys come from them. Without the
  * files, the game uses its own tables and colours. */
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+struct XwaFlightGroup;
+
 enum { XWA_CRAFT_HUD_RETICLE_SLOTS = 23 };
 
-/* Reads the files. Call it after XwaModelSource_Init. */
+/* Reads flight/hud.yaml. */
 void XwaCraftHud_Init(void);
+/* Reads the craft files of the craft types that the mission's flight groups
+   use, replacing the previous mission's. `flightGroups` is the first flight
+   group, `stride` the distance between two and `count` their number. Call
+   it once the flight groups' craft types are final. */
+void XwaCraftHud_LoadMission(const struct XwaFlightGroup* flightGroups, size_t stride, int count);
 
 /* The hull icon image id of `objectType`. With a `hull_icons` list, this is
    the list's value, or 0 for a type past its end. Without one, it is

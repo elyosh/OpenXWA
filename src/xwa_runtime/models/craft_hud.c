@@ -4,6 +4,7 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/frontend/frontend_mission.h"
 #include "xwa_runtime/models/model_source.h"
 
 #include <stdio.h>
@@ -168,20 +169,35 @@ static int CraftHud_HasReticle(const CraftHudType* type) {
 }
 
 void XwaCraftHud_Init(void) {
-	unsigned int objectType;
-	int craftCount = 0;
-
 	free(s_hullIcons.values);
 	free(s_mapIcons.values);
 	memset(&s_hullIcons, 0, sizeof s_hullIcons);
 	memset(&s_mapIcons, 0, sizeof s_mapIcons);
-	memset(s_types, 0, sizeof s_types);
 	CraftHud_ReadIcons();
-	for (objectType = 0; objectType < OBJ_Count; ++objectType) {
+}
+
+void XwaCraftHud_LoadMission(const struct XwaFlightGroup* flightGroups, size_t stride, int count) {
+	static uint8_t read[OBJ_Count];
+	int index;
+	int craftCount = 0;
+
+	memset(s_types, 0, sizeof s_types);
+	memset(read, 0, sizeof read);
+	for (index = 0; index < count; ++index) {
+		const struct XwaFlightGroup* fg =
+			(const struct XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)index * stride);
+		const unsigned int objectType = fg->craftType < XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT
+											? g_objectTypeTables.craftTypeToObjectType[fg->craftType]
+											: OBJ_None;
 		char key[XWA_MODEL_SOURCE_KEY_MAX];
 		char path[XWA_MODEL_SOURCE_KEY_MAX + 32];
-		CraftHudType* type = &s_types[objectType];
+		CraftHudType* type;
 
+		if (objectType >= OBJ_Count || read[objectType]) {
+			continue;
+		}
+		read[objectType] = 1;
+		type = &s_types[objectType];
 		if (!XwaModelSource_TypeKey(objectType, 1, key)) {
 			continue;
 		}
@@ -192,7 +208,7 @@ void XwaCraftHud_Init(void) {
 		}
 	}
 	if (craftCount != 0) {
-		Aeron_LogInfo("xwa.hud", "flight/craft: HUD settings for %d craft types", craftCount);
+		Aeron_LogInfo("xwa.hud", "flight/craft: HUD settings for %d craft types of the mission", craftCount);
 	}
 }
 
