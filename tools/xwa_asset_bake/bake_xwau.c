@@ -1709,8 +1709,7 @@ static void write_fonts_yaml(XwauContext* ctx) {
 		ctx->stats->failures++;
 		return;
 	}
-	fprintf(fp, "# Made by xwa_asset_bake xwau-frontend from HDConcourseTextFont. Copy consolab.ttf\n"
-				"# from Windows' Fonts folder to this folder.\n"
+	fprintf(fp, "# Made by xwa_asset_bake xwau-frontend from HDConcourseTextFont.\n"
 				"version: 1\n"
 				"default: {file: consolab.ttf, metrics: font}\n");
 	fclose(fp);
