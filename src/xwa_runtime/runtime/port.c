@@ -35,6 +35,7 @@
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/input/rumble_provider.h"
 #include "xwa_runtime/input/winmm_joystick_provider.h"
+#include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
@@ -136,6 +137,7 @@ int XwaPort_Init(void) {
 	File_SetVfs(Aeron_GetVfs());
 	XwaModelSource_Init();
 	XwaHangars_Init();
+	XwaCraftHud_Init();
 	if (SpriteResource_LoadCatalog("Resdata.txt") != 0) {
 		Aeron_LogError("xwa.assets", "Failed to load required sprite catalog 'Resdata.txt'");
 	}

@@ -10,6 +10,7 @@
 #include "xwa/flight/player/player.h"
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/input/mouse_flight.h"
+#include "xwa_runtime/models/craft_hud.h"
 
 #include <string.h>
 
@@ -411,9 +412,10 @@ static void hud_capture_instruments(XwaHudState* out, const ObjectRecord* object
 		   sizeof instruments->warhead_last_slot);
 	memcpy(instruments->warhead_slot_count, model->warheadLauncherSlotCount,
 		   sizeof instruments->warhead_slot_count);
-	instruments->shield_silhouette_sprite = object->objectType <= OBJ_ContainerBrick
-												? g_shieldSilhouetteSpriteIdByObjectType[object->objectType]
-												: 0;
+	const uint16_t stock_hull_icon = object->objectType <= OBJ_ContainerBrick
+										 ? g_shieldSilhouetteSpriteIdByObjectType[object->objectType]
+										 : 0;
+	instruments->shield_silhouette_sprite = XwaCraftHud_HullIcon(object->objectType, stock_hull_icon);
 	memcpy(instruments->laser_link_mode, craft->laserLinkMode, sizeof instruments->laser_link_mode);
 	memcpy(instruments->laser_link_next_slot, craft->laserLinkNextSlot,
 		   sizeof instruments->laser_link_next_slot);
@@ -499,6 +501,7 @@ static void hud_capture_direct_state(XwaHudState* out) {
 	}
 	out->player_slot = (uint16_t)player_slot;
 	out->player_signature = object->objectSignature;
+	XwaCraftHud_Colors(object->objectType, out->hud_colors);
 	mobile = object->mobj;
 	if (mobile == NULL || mobile->pCraft == NULL) {
 		return;

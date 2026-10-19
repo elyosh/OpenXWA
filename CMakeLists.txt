@@ -214,6 +214,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/cockpit_eye.c
     src/xwa_runtime/models/collision_bvh.c
     src/xwa_runtime/models/geometry_textures.c
+    src/xwa_runtime/models/craft_hud.c
     src/xwa_runtime/models/articulation.c
     src/xwa_runtime/models/model_roles.c
     src/xwa_runtime/models/hangar_scene.c

@@ -166,11 +166,14 @@ static void map_add_icon(AeronDrawList2D* list, XwaRemasterAssets* assets, const
 	const XwaAssetRef* ref = map_resolve_icon(assets, map->icon_id);
 	if (!ref)
 		return;
-	const float size = 16.0f * view->classic_pixel_scale;
-	const float x = center_x - size * 0.5f;
-	const float y = center_y - size * 0.5f;
-	if (x < view->viewport.x || y < view->viewport.y || x + size >= view->viewport.x + view->viewport.width ||
-		y + size >= view->viewport.y + view->viewport.height)
+	/* The icon's classic size, which is 16 px for the stock icons. */
+	const float width = (ref->classic_w > 0 ? ref->classic_w : 16) * view->classic_pixel_scale;
+	const float height = (ref->classic_h > 0 ? ref->classic_h : 16) * view->classic_pixel_scale;
+	const float x = center_x - width * 0.5f;
+	const float y = center_y - height * 0.5f;
+	if (x < view->viewport.x || y < view->viewport.y ||
+		x + width >= view->viewport.x + view->viewport.width ||
+		y + height >= view->viewport.y + view->viewport.height)
 		return;
 	AeronDrawList2DSprite sprite = { 0 };
 	sprite.texture = ref->texture;
@@ -180,8 +183,8 @@ static void map_add_icon(AeronDrawList2D* list, XwaRemasterAssets* assets, const
 	sprite.src_v1 = ref->v1;
 	sprite.dst_x = x;
 	sprite.dst_y = y;
-	sprite.dst_w = size;
-	sprite.dst_h = size;
+	sprite.dst_w = width;
+	sprite.dst_h = height;
 	map_argb_linear(map_icon_argb(map->effective_iff), sprite.tint);
 	sprite.blend = AERON_BLIT2D_BLEND_PMA;
 	sprite.filter = AERON_BLIT2D_FILTER_LINEAR;

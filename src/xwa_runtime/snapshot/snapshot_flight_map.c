@@ -11,6 +11,7 @@
 #include "xwa/flight/player/player.h"
 #include "xwa/math/trig2.h"
 #include "xwa/render/renderer_internal.h"
+#include "xwa_runtime/models/craft_hud.h"
 
 #include <string.h>
 
@@ -313,8 +314,9 @@ void XwaSnapshotFlightMap_CaptureObject(XwaSnapshot* snapshot, uint32_t slot, ui
 	map->box_extent = Targeting_GetObjectBoxExtent((int)slot);
 	map->render_kind = render_kind;
 	map->cull_kind = cull_kind;
-	map->icon_id =
+	const uint16_t stock_icon =
 		object->objectType <= OBJ_NoAsset_222 ? g_flightMapIconByObjectType[(uint16_t)object->objectType] : 0;
+	map->icon_id = XwaCraftHud_MapIcon(object->objectType, stock_icon);
 	map->effective_iff =
 		object->mobj ? (uint8_t)object->mobj->iff : g_missionFlightGroups[object->flightGroupIdx].fg.iff;
 	if (object->mobj) {
