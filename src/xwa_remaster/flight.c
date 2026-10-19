@@ -220,7 +220,6 @@ static struct {
 	int mb_camera_blur;
 	int mb_pause_keep_blur;
 	int mb_velocity_viz;
-	int mb_fsr_direct_motion;
 
 	/* FSR 3.1.4 is owned by AeronScene. The game only supplies
 	 * configuration, frame timing, and history-reset boundaries. */
@@ -518,11 +517,10 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"texture_filtering.max_anisotropy",
 	};
 	static const char* bools[] = {
-		"presentation.hdr_output",       "point_lights.enabled",          "point_lights.cluster_debug",
-		"motion_blur.camera_blur",       "motion_blur.pause_keep_blur",   "motion_blur.velocity_viz",
-		"motion_blur.fsr_direct_motion", "texture_filtering.anisotropic", "hangar_lighting.enabled",
-		"lighting.spec_geom_adapt",      "dynamic_cockpit.enabled",       "dynamic_cockpit.classic_hud",
-		"dynamic_cockpit.holograms",
+		"presentation.hdr_output",       "point_lights.enabled",        "point_lights.cluster_debug",
+		"motion_blur.camera_blur",       "motion_blur.pause_keep_blur", "motion_blur.velocity_viz",
+		"texture_filtering.anisotropic", "hangar_lighting.enabled",     "lighting.spec_geom_adapt",
+		"dynamic_cockpit.enabled",       "dynamic_cockpit.classic_hud", "dynamic_cockpit.holograms",
 	};
 	static const char* strings[] = {
 		"temporal_upscaling.mode",
@@ -888,7 +886,6 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.mb_camera_blur = AeronConfigFile_GetBool(cf, "motion_blur.camera_blur", 0);
 	s.mb_pause_keep_blur = AeronConfigFile_GetBool(cf, "motion_blur.pause_keep_blur", 0);
 	s.mb_velocity_viz = AeronConfigFile_GetBool(cf, "motion_blur.velocity_viz", 0);
-	s.mb_fsr_direct_motion = AeronConfigFile_GetBool(cf, "motion_blur.fsr_direct_motion", 0);
 
 	const char* fsr_mode = AeronConfigFile_GetString(cf, "temporal_upscaling.mode", NULL);
 	if (!AeronTemporal_ParseMode(fsr_mode, &s.fsr_mode)) {
@@ -4214,7 +4211,6 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 									.ssao_max_screen_frac = s.ssao.ssao_max_screen_frac,
 									.ssao_sample_jitter = s.ssao.ssao_sample_jitter,
 									.mb_quality = 0,
-									.mb_fsr_direct_motion = s.mb_fsr_direct_motion,
 								});
 	AeronScene_SetMotionContext(s.scene, NULL, 1);
 
@@ -5075,7 +5071,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 									.mb_shutter = mb_shutter,
 									.mb_camera_blur = s.mb_camera_blur,
 									.mb_velocity_viz = s.mb_velocity_viz,
-									.mb_fsr_direct_motion = s.mb_fsr_direct_motion,
 								});
 	AeronScene_SetMotionContext(s.scene, s.mb_enabled ? s.mb_prev_vp : NULL, mb_regen);
 
