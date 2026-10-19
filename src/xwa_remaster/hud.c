@@ -325,6 +325,14 @@ static int hud_cache_asset(XwaRemasterAssets* assets, XwaHudAssetId asset, const
 	int ok = list->count != 0;
 	for (uint8_t i = 0; i < list->count; i++)
 		ok &= hud_cache_frame(assets, OBJ_HudTextureGroup12000, list->frames[i]);
+	/* The frames the player's craft draws in its reticle slots. A slot whose
+	   frame is missing draws its own frame, so the asset doesn't need them. */
+	for (uint8_t i = 0; hud && i < list->count; i++) {
+		const uint8_t slot = list->frames[i];
+		if ((asset == XWA_HUD_ASSET_RETICLE || asset == XWA_HUD_ASSET_THREATS) &&
+			slot < XWA_SNAP_RETICLE_SLOTS && hud->reticle.slot_frame[slot])
+			(void)hud_cache_frame(assets, OBJ_HudTextureGroup12000, hud->reticle.slot_frame[slot]);
+	}
 	if (asset == XWA_HUD_ASSET_SHIELD_HULL && hud && hud->instruments.shield_silhouette_sprite)
 		ok &= hud_cache_frame(assets, OBJ_HullIconTextureGroup26000,
 								hud->instruments.shield_silhouette_sprite / 100);

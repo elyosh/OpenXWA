@@ -894,6 +894,24 @@ const XwaHudProjectedArrow* XwaRemasterHudFixed_TargetArrow(void) {
 	return fixed_target_arrow.visible ? &fixed_target_arrow : NULL;
 }
 
+/* The frame that reticle slot `slot` draws for the player's craft. A frame
+ * the craft changes is drawn as wide as the slot's own frame, as in XWAU's
+ * reticle hook: `screen_size` is 256 x the slot frame's classic width / the
+ * new frame's classic width. A frame that isn't loaded keeps the slot's own. */
+static int fixed_reticle_slot_frame(int slot, int* screen_size) {
+	if (!fixed_snapshot || slot < 0 || slot >= XWA_SNAP_RETICLE_SLOTS)
+		return slot;
+	const int frame = fixed_snapshot->hud.reticle.slot_frame[slot];
+	if (frame == 0)
+		return slot;
+	const XwaAssetRef* own = XwaRemasterHud_AssetFrame(OBJ_HudTextureGroup12000, slot);
+	const XwaAssetRef* asset = XwaRemasterHud_AssetFrame(OBJ_HudTextureGroup12000, frame);
+	if (!own || !asset || own->classic_w <= 0 || asset->classic_w <= 0)
+		return slot;
+	*screen_size = 256 * own->classic_w / asset->classic_w;
+	return frame;
+}
+
 static void fixed_emit_reticle_group(XwaHudWidgetId widget_id, int frame, float dx, float dy,
 									 int density_scaled, uint32_t argb) {
 	const XwaHudLayoutProfile* profile = fixed_profile((XwaHudProfileIndex)fixed_draws.profile);
@@ -904,8 +922,10 @@ static void fixed_emit_reticle_group(XwaHudWidgetId widget_id, int frame, float 
 	const float offset_x = dx * offset_scale;
 	const float offset_y = dy * offset_scale;
 	const float size_scale = fixed_hud_unit_scale;
+	int screen_size = 256;
+	frame = fixed_reticle_slot_frame(frame, &screen_size);
 	fixed_emit_ref(widget_id, OBJ_HudTextureGroup12000, frame, fixed_reticle_x_ref + offset_x,
-				   fixed_reticle_y_ref + offset_y, size_scale, 256, argb, 0);
+				   fixed_reticle_y_ref + offset_y, size_scale, screen_size, argb, 0);
 }
 
 static void fixed_build_reticle_threats(const XwaHudState* h, const XwaRemasterHudVisibility* v) {

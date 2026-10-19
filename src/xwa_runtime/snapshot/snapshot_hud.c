@@ -488,6 +488,7 @@ static void hud_capture_direct_state(XwaHudState* out) {
 		out->reticle.aim_offset[i][1] = (int16_t)(g_reticleLaserAimPoints[i].y - g_reticleCenterY);
 	}
 
+	memset(out->reticle.slot_frame, 0, sizeof out->reticle.slot_frame);
 	player_slot = player->objectIndex;
 	out->player_slot = 0xffffu;
 	out->player_signature = 0;
@@ -502,6 +503,9 @@ static void hud_capture_direct_state(XwaHudState* out) {
 	out->player_slot = (uint16_t)player_slot;
 	out->player_signature = object->objectSignature;
 	XwaCraftHud_Colors(object->objectType, out->hud_colors);
+	for (int slot = 0; slot < XWA_SNAP_RETICLE_SLOTS; slot++) {
+		out->reticle.slot_frame[slot] = (uint16_t)XwaCraftHud_Reticle(object->objectType, slot);
+	}
 	mobile = object->mobj;
 	if (mobile == NULL || mobile->pCraft == NULL) {
 		return;
