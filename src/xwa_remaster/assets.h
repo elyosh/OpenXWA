@@ -94,6 +94,11 @@ int XwaRemasterAssets_FlightModelFrame(XwaRemasterAssets* a, int object_type, in
  * picks again among its own images and its sets. `snapshot` gives the
  * mission index for the sets' `missions`. */
 void XwaRemasterAssets_UpdateFrameSets(XwaRemasterAssets* a, const struct XwaSnapshot* snapshot);
+/* Gets the colour in the `light` key of the frame in the mod atlas, as opaque
+ * ARGB. Returns 0 when the frame has no such key, or when the group
+ * doesn't come from the mod folder. */
+int XwaRemasterAssets_FlightModelLight(XwaRemasterAssets* a, int object_type, int classic_frame_1based,
+									   uint32_t* out_argb);
 /* Gets the DAT group and image id that a flight model type draws for a
  * frame. A single-image type gives its own image. A type drawn by frame
  * gives the id of the group's frame-th image, or the frame index when the

@@ -2769,8 +2769,12 @@ static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* as
 		const float anchor[3] = { s.camera_local[0] + b->world_dir[0], s.camera_local[1] + b->world_dir[1],
 								  s.camera_local[2] + b->world_dir[2] };
 		/* Classic passes -1: DrawModelTexture stomps the level tint
-		 * with it -> opaque white (the sprite as authored). */
-		fl_lens_add_source(flight_view, anchor, 0xffffffffu);
+		 * with it -> opaque white (the sprite as authored). A sun image
+		 * with a `light` colour in its atlas gives its flare that colour. */
+		uint32_t argb = 0xffffffffu;
+		(void)XwaRemasterAssets_FlightModelLight(assets, b->model_type, (b->flags & 1u) ? b->frame : 1,
+												 &argb);
+		fl_lens_add_source(flight_view, anchor, argb);
 	}
 
 	/* Explosion flashes: the render walk's case-13 window (current-region

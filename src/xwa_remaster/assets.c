@@ -131,6 +131,9 @@ typedef struct GroupSlot {
 	AeronRuntimeAtlas frontend_original_atlas;
 	AeronRuntimeAtlas flight_original_atlas;
 	FrameSets* frame_sets; /* NULL when the mod atlas has no `frame_sets` */
+	/* The `light` key of each frame of the mod atlas, as 0xAARRGGBB with
+	   alpha 0 for a frame without one. NULL when no frame has the key. */
+	uint32_t* lights;
 } GroupSlot;
 
 struct XwaRemasterAssets {
@@ -214,6 +217,7 @@ void XwaRemasterAssets_Destroy(XwaRemasterAssets* a) {
 		if (a->groups[i].mod_status == ASSET_LOAD_SUCCESS) {
 			Aeron_SpriteAtlasFree(&a->groups[i].atlas);
 		}
+		free(a->groups[i].lights);
 		if (a->groups[i].frame_sets) {
 			for (int k = 0; k < a->groups[i].frame_sets->set_count; k++)
 				Aeron_SpriteAtlasFree(&a->groups[i].frame_sets->sets[k].atlas);
@@ -446,7 +450,7 @@ static void assets_file_texture_path(const XwaRemasterAssets* a, const FileSlot*
 	}
 }
 
-static FrameSets* assets_read_frame_sets(const XwaRemasterAssets* a, int group);
+static void assets_read_atlas_keys(const XwaRemasterAssets* a, GroupSlot* slot);
 
 static GroupSlot* assets_group_slot(XwaRemasterAssets* a, int group) {
 	for (int i = 0; i < a->group_count; i++) {
@@ -466,7 +470,7 @@ static GroupSlot* assets_group_slot(XwaRemasterAssets* a, int group) {
 	if (status == ASSET_LOAD_SUCCESS) {
 		s->mod_status = Aeron_SpriteAtlasLoad(&s->atlas, probe) ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
 		if (s->mod_status == ASSET_LOAD_SUCCESS)
-			s->frame_sets = assets_read_frame_sets(a, group);
+			assets_read_atlas_keys(a, s);
 	} else {
 		s->mod_status = (uint8_t)status;
 	}
@@ -543,16 +547,10 @@ static int assets_read_frame_set(const XwaRemasterAssets* a, const char* path, c
 	return 1;
 }
 
-/* Reads the `frame_sets` key of group `group`'s atlas. Returns NULL when the
-   atlas has no such key, or when the key has an error (logged). */
-static FrameSets* assets_read_frame_sets(const XwaRemasterAssets* a, int group) {
-	char path[64];
-	AeronConfigFile* file = NULL;
-	AeronConfigError error = { 0 };
-	snprintf(path, sizeof path, "resdata/atlas/group_%d.yaml", group);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, &file, &error))
-		return NULL; /* the atlas reader already reported it */
-	const AeronConfigNode* node = AeronConfigNode_MapGet(AeronConfigFile_Root(file), "frame_sets");
+/* Reads the `frame_sets` key of a group's atlas. Returns NULL when the atlas
+   has no such key, or when the key has an error (logged). */
+static FrameSets* assets_read_frame_sets(const XwaRemasterAssets* a, const char* path,
+										 const AeronConfigNode* node) {
 	const AeronConfigNode* shuffle = AeronConfigNode_MapGet(node, "shuffle");
 	const AeronConfigNode* reroll = AeronConfigNode_MapGet(node, "reroll_seconds");
 	const AeronConfigNode* sets = AeronConfigNode_MapGet(node, "sets");
@@ -561,10 +559,8 @@ static FrameSets* assets_read_frame_sets(const XwaRemasterAssets* a, int group) 
 	const double reroll_seconds = AeronConfigNode_Float(reroll, 0.0);
 	FrameSets* fs = NULL;
 	int ok = 1;
-	if (!node) {
-		AeronConfigFile_Destroy(file);
+	if (!node)
 		return NULL;
-	}
 	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP ||
 		AeronConfigNode_Type(sets) != AERON_CONFIG_SEQUENCE || set_count == 0 ||
 		set_count > XWA_ASSETS_MAX_FRAME_SETS)
@@ -594,8 +590,66 @@ static FrameSets* assets_read_frame_sets(const XwaRemasterAssets* a, int group) 
 		free(fs);
 		fs = NULL;
 	}
-	AeronConfigFile_Destroy(file);
 	return fs;
+}
+
+/* Reads the `light` key of each frame of a group's atlas. The key is the
+   colour of the image's light, as [r, g, b] with values from 0 to 1. A sun's
+   lens flare uses it. A key with an error is logged and ignored. */
+static uint32_t* assets_read_lights(const char* path, const AeronConfigNode* frames) {
+	const size_t count = AeronConfigNode_SequenceCount(frames);
+	uint32_t* lights = NULL;
+	for (size_t i = 0; i < count; i++) {
+		const AeronConfigNode* light =
+			AeronConfigNode_MapGet(AeronConfigNode_SequenceGet(frames, i), "light");
+		uint32_t argb = 0xff000000u;
+		if (!light)
+			continue;
+		if (AeronConfigNode_Type(light) != AERON_CONFIG_SEQUENCE ||
+			AeronConfigNode_SequenceCount(light) != 3) {
+			Aeron_LogError("xwa.remaster", "%s:%d: light must be [r, g, b]. It is ignored", path,
+						   AeronConfigNode_Line(light));
+			continue;
+		}
+		for (size_t c = 0; c < 3; c++) {
+			const AeronConfigNode* value = AeronConfigNode_SequenceGet(light, c);
+			const AeronConfigNodeType type = AeronConfigNode_Type(value);
+			double channel = AeronConfigNode_Float(value, -1.0);
+			if ((type != AERON_CONFIG_INT && type != AERON_CONFIG_FLOAT) || !(channel >= 0.0)) {
+				argb = 0;
+				break;
+			}
+			if (channel > 1.0)
+				channel = 1.0;
+			argb |= (uint32_t)lround(channel * 255.0) << (16 - 8 * (int)c);
+		}
+		if (argb == 0) {
+			Aeron_LogError("xwa.remaster", "%s:%d: light needs three numbers from 0 to 1. It is ignored",
+						   path, AeronConfigNode_Line(light));
+			continue;
+		}
+		if (!lights)
+			lights = (uint32_t*)calloc(count, sizeof *lights);
+		if (!lights)
+			return NULL;
+		lights[i] = argb;
+	}
+	return lights;
+}
+
+/* Reads the keys of a group's atlas that Aeron's atlas reader doesn't keep:
+   `frame_sets`, and the `light` of each frame. */
+static void assets_read_atlas_keys(const XwaRemasterAssets* a, GroupSlot* slot) {
+	char path[64];
+	AeronConfigFile* file = NULL;
+	AeronConfigError error = { 0 };
+	snprintf(path, sizeof path, "resdata/atlas/group_%d.yaml", slot->group);
+	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, &file, &error))
+		return; /* the atlas reader already reported it */
+	const AeronConfigNode* root = AeronConfigFile_Root(file);
+	slot->frame_sets = assets_read_frame_sets(a, path, AeronConfigNode_MapGet(root, "frame_sets"));
+	slot->lights = assets_read_lights(path, AeronConfigNode_MapGet(root, "frames"));
+	AeronConfigFile_Destroy(file);
 }
 
 static void assets_set_page_path(const XwaRemasterAssets* a, const FrameSet* set, int page, char path[768]) {
@@ -1249,6 +1303,28 @@ int XwaRemasterAssets_FlightModelFrame(XwaRemasterAssets* a, int object_type, in
 	if (slot->frame_sets)
 		return assets_frame_set_frame(a, slot, frame, out);
 	return assets_flight_group_frame(a, slot, frame, out);
+}
+
+int XwaRemasterAssets_FlightModelLight(XwaRemasterAssets* a, int object_type, int classic_frame_1based,
+									   uint32_t* out_argb) {
+	int group = 0;
+	int frames_mode = 0;
+	int sprite_id = 0;
+	if (!a || !out_argb ||
+		!XwaSnapshotExport_ModelTextureBinding(object_type, &group, &frames_mode, &sprite_id)) {
+		return 0;
+	}
+	const GroupSlot* slot = assets_group_find(a, group);
+	if (!slot || !slot->lights || !slot->flight_resident || slot->flight_source != ASSET_SOURCE_MOD) {
+		return 0;
+	}
+	const int frame =
+		frames_mode ? classic_frame_1based - 1 : Aeron_SpriteAtlasFindById(&slot->atlas, sprite_id);
+	if (frame < 0 || frame >= slot->atlas.frame_count || slot->lights[frame] == 0) {
+		return 0;
+	}
+	*out_argb = slot->lights[frame];
+	return 1;
 }
 
 int XwaRemasterAssets_FlightModelImageId(XwaRemasterAssets* a, int object_type, int classic_frame_1based,
