@@ -464,11 +464,6 @@ static void xwa_tool_point_lights(int* open, void* user) {
 		p.enabled = enabled ? 1 : 0;
 		changed = true;
 	}
-	bool clustered = p.clustered != 0;
-	if (ImGui::Checkbox("Clustered (auto)", &clustered)) {
-		p.clustered = clustered ? 1 : 0;
-		changed = true;
-	}
 	bool cluster_debug = p.cluster_debug != 0;
 	if (ImGui::Checkbox("Cluster occupancy", &cluster_debug)) {
 		p.cluster_debug = cluster_debug ? 1 : 0;
@@ -482,10 +477,10 @@ static void xwa_tool_point_lights(int* open, void* user) {
 	ImGui::Text("Game: %u culled, %u dropped", stats.culled_count, stats.dropped_count);
 	ImGui::Text("Model: %u, %u culled, %u dropped", stats.model_count, stats.model_culled_count,
 				stats.model_dropped_count);
-	ImGui::Text("Scene %u accepted, %u dropped; %u global", stats.scene.submitted_light_count,
-				stats.scene.dropped_light_count, stats.scene.global_light_count);
+	ImGui::Text("Scene %u accepted, %u dropped", stats.scene.submitted_light_count,
+				stats.scene.dropped_light_count);
 	ImGui::Text("%s, tile %u, grid %ux%ux%u (%.1f MiB)",
-				stats.scene.clustered_active ? "Clustered" : "Brute force", stats.scene.effective_tile_size,
+				stats.scene.clustered_active ? "Clustered" : "No lights", stats.scene.effective_tile_size,
 				stats.scene.grid_x, stats.scene.grid_y, stats.scene.grid_z,
 				(double)stats.scene.allocated_buffer_bytes / (1024.0 * 1024.0));
 	changed |= ImGui::SliderFloat("Match distance (m)", &p.match_distance_m, 1.0f, 200.0f, "%.1f",

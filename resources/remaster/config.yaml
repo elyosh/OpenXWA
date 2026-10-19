@@ -225,7 +225,6 @@ hyperspace_tunnel:
   cap_color_b: 1.0
 point_lights:
   enabled: true
-  clustered: true            # automatically uses brute force for small light counts
   cluster_depth_slices: 24
   cluster_debug: false       # occupancy view; debug-UI builds only
   # The game's lights (lasers, explosions, engines) are physical

@@ -110,7 +110,6 @@ void XwaRemasterFlight_GetHangarLightingDefault(XwaFlightHangarLightingParams* o
  * as the classic law at match_distance_m (XwaRemasterShip_ScenePointLight). */
 typedef struct XwaFlightPointLightParams {
 	int enabled;
-	int clustered;
 	int cluster_depth_slices;
 	int cluster_debug;
 	float match_distance_m; /* metres at which a light is as bright as the classic law */

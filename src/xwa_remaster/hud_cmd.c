@@ -462,7 +462,6 @@ static int cmd_configure_clustered_lights(void) {
 	XwaFlightPointLightParams config;
 	XwaRemasterFlight_GetPointLights(&config);
 	const AeronSceneClusteredLightDesc desc = {
-		.enabled = config.clustered,
 		.depth_slices = (uint32_t)config.cluster_depth_slices,
 		.debug_view = config.cluster_debug,
 	};

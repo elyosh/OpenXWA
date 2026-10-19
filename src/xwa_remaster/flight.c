@@ -518,11 +518,11 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"texture_filtering.max_anisotropy",
 	};
 	static const char* bools[] = {
-		"presentation.hdr_output",     "point_lights.enabled",          "point_lights.clustered",
-		"point_lights.cluster_debug",  "motion_blur.camera_blur",       "motion_blur.pause_keep_blur",
-		"motion_blur.velocity_viz",    "motion_blur.fsr_direct_motion", "texture_filtering.anisotropic",
-		"hangar_lighting.enabled",     "lighting.spec_geom_adapt",      "dynamic_cockpit.enabled",
-		"dynamic_cockpit.classic_hud", "dynamic_cockpit.holograms",
+		"presentation.hdr_output",       "point_lights.enabled",          "point_lights.cluster_debug",
+		"motion_blur.camera_blur",       "motion_blur.pause_keep_blur",   "motion_blur.velocity_viz",
+		"motion_blur.fsr_direct_motion", "texture_filtering.anisotropic", "hangar_lighting.enabled",
+		"lighting.spec_geom_adapt",      "dynamic_cockpit.enabled",       "dynamic_cockpit.classic_hud",
+		"dynamic_cockpit.holograms",
 	};
 	static const char* strings[] = {
 		"temporal_upscaling.mode",
@@ -766,7 +766,6 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		s.hangar_lighting.direction[axis] /= hangar_direction_length;
 	}
 	s.plight.enabled = AeronConfigFile_GetBool(cf, "point_lights.enabled", 0);
-	s.plight.clustered = AeronConfigFile_GetBool(cf, "point_lights.clustered", 0);
 	s.plight.cluster_depth_slices = (int)AeronConfigFile_GetInt(cf, "point_lights.cluster_depth_slices", 0);
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
 	s.plight.match_distance_m = (float)AeronConfigFile_GetFloat(cf, "point_lights.match_distance_m", 0.0);
@@ -3383,7 +3382,6 @@ static void fl_submit_point_lights(void) {
 
 static int fl_configure_clustered_lights(AeronScene3D* scene) {
 	return AeronScene_SetClusteredLights(scene, &(AeronSceneClusteredLightDesc) {
-													.enabled = s.plight.clustered,
 													.depth_slices = (uint32_t)s.plight.cluster_depth_slices,
 													.debug_view = s.plight.cluster_debug,
 												});
