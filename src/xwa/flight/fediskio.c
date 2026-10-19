@@ -33,6 +33,10 @@
 #include "xwa/util/memory.h"
 #include "xwa_runtime/models/cockpit_eye.h"
 #include "xwa_runtime/models/model_roles.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/frontend_geometry.h"
+#include "xwa_runtime/models/geometry_textures.h"
+#endif
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <stdio.h>
@@ -895,6 +899,11 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 	uint16_t flags;
 	int format;
 	int baseShift;
+#ifdef XWA_MODERN
+	/* A group built from an atlas with game geometry has images without
+	   pixels, which XwaGeometryTextures_* turn into texture levels. */
+	const int geometryGroup = XwaFrontendGeometry_FindGroup(g_modelTypeTable[modelType].textureGroup) != NULL;
+#endif
 
 	FlightNet_BroadcastStillLoadingPulse();
 
@@ -951,6 +960,12 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 			}
 
 			for (; (uint16_t)spriteIndex < spriteCount; ++spriteIndex) {
+#ifdef XWA_MODERN
+				if (geometryGroup) {
+					XwaGeometryTextures_ConvertByIndex((int16_t)g_modelTypeTable[modelType].textureGroup,
+													   spriteIndex, format, texLevel, (char)baseShift, levelCount);
+				} else
+#endif
 				SpriteTexture_ConvertByIndex((int16_t)g_modelTypeTable[modelType].textureGroup, spriteIndex,
 											 format, texLevel, (char)baseShift, levelCount);
 				if (g_useHardware3D) {
@@ -997,6 +1012,13 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 
 		texLevel =
 			(TexLevel*)Memory_CallocTagged(MODEL_TEXTURE_SPECIESTMINFO_TAG, levelCount, sizeof(TexLevel));
+#ifdef XWA_MODERN
+		if (geometryGroup) {
+			XwaGeometryTextures_ConvertById(g_modelTypeTable[modelType].textureGroup,
+											g_modelTypeTable[modelType].frameCount, format, texLevel,
+											(char)baseShift, levelCount);
+		} else
+#endif
 		SpriteTexture_ConvertById(g_modelTypeTable[modelType].textureGroup,
 								  g_modelTypeTable[modelType].frameCount, format, texLevel, (char)baseShift,
 								  levelCount);
@@ -1217,9 +1239,22 @@ void FeDiskIo_UploadTexLevelToStd3D(TexLevel* level) {
 			vb.raster.redPosShiftRight = (-vb.raster.redBPP) & 7u;
 			vb.pixels = (uint8_t*)image + 18; /* item+18: pixels follow the header */
 			width = level->width;
+#ifdef XWA_MODERN
+			/* A converted image has its level's size, except the 8x8 placeholder
+			   of a group built from an atlas (geometry_textures.h), which is
+			   uploaded at its own size. */
+			if (image->width < width) {
+				width = image->width;
+			}
+#endif
 			vb.raster.rowPitch = width * (vb.raster.bitsPerPixel >> 3);
 			vb.raster.greenPosShiftRight = (-vb.raster.greenBPP) & 7u;
 			height = level->height;
+#ifdef XWA_MODERN
+			if (image->height < height) {
+				height = image->height;
+			}
+#endif
 			vb.raster.width = width;
 			vb.raster.height = height;
 			vb.raster.alphaPosShiftRight = (-vb.raster.alphaBPP) & 7u;

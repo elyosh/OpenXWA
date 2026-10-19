@@ -1,14 +1,20 @@
 #ifndef XWA_RUNTIME_FRONTEND_FRONTEND_GEOMETRY_H
 #define XWA_RUNTIME_FRONTEND_FRONTEND_GEOMETRY_H
 
-/* Image geometry from frontend atlases in the mod folder, and the frontend's
- * paint settings.
+/* Image geometry from atlases in the mod folder, and the frontend's paint
+ * settings.
  *
  * An atlas with `game_geometry: true` replaces an image's geometry: the game
  * takes the frame count, sizes, offsets and bounds from the atlas and doesn't
  * read the original file:
  *   frontend/frontres/<dir>/atlas/<base>.yaml  a Frontres file
- *   resdata/atlas/group_<g>.yaml               a DAT group
+ *   resdata/atlas/group_<g>.yaml               a DAT group, for the frontend
+ *                                              and for flight
+ *
+ * For a DAT group, the whole game uses the atlas: in flight, the frame counts
+ * reach the simulation (an animated object ends after its type's last frame),
+ * and the sizes reach the drawing code. The flight font group can't use an
+ * atlas, because the game copies its glyph pixels (flight_text.c).
  *
  * A video can also replace a Frontres file. It always sets the image's
  * geometry, with the same values for every frame, and takes priority over an
@@ -24,9 +30,17 @@
  * The video loops for as long as the game draws the image, whichever frame
  * the game asks for.
  *
- * Values are in design pixels: pixels of the screen size that
- * frontend/frontend.yaml sets with `design: [w, h]` (640x480 by default).
- * They are converted to the game's 640x480 units when the game asks for them.
+ * An atlas gives its values in one of two units, set by `units`:
+ *   design  the default: pixels of the screen size that frontend/frontend.yaml
+ *           sets with `design: [w, h]` (640x480 by default). They are
+ *           converted to the game's 640x480 units when the game asks for
+ *           them. The frontend's atlases use these, with `size`, `offset` and
+ *           `bounds` for each frame.
+ *   game    the game's own pixels, with no conversion. Flight atlases use
+ *           these: the YAML that xwa_asset_bake writes, where each frame's
+ *           `classic_w` and `classic_h` give its size and `origin_x` and
+ *           `origin_y` its anchor.
+ *
  * Each atlas is read once and kept. A missing atlas is remembered too, so it
  * is only looked for once. */
 
@@ -58,7 +72,13 @@ typedef enum XwaGeometryFit {
 	XWA_GEOMETRY_FIT_SCREEN_HEIGHT, /* as tall as the screen, keeping its shape, centred left to right */
 } XwaGeometryFit;
 
-/* One frame, in design pixels. */
+/* The units of an atlas's values. */
+typedef enum XwaGeometryUnits {
+	XWA_GEOMETRY_UNITS_DESIGN, /* design pixels */
+	XWA_GEOMETRY_UNITS_GAME,   /* the game's own pixels */
+} XwaGeometryUnits;
+
+/* One frame, in the atlas's units. */
 typedef struct XwaGeometryFrame {
 	int id;          /* DAT image id; -1 in a Frontres atlas */
 	float size[2];   /* the drawn size */
@@ -91,12 +111,14 @@ typedef struct XwaGeometryAtlas {
 	XwaGeometryRegion* regions;
 	int region_count;
 	char video[160]; /* a video's path in the mod folder, or empty for an atlas */
+	uint8_t units;   /* XwaGeometryUnits */
 } XwaGeometryAtlas;
 
 /* The atlas with game geometry for a Frontres file, or NULL. `fileName` is
  * the name the game uses, such as "frontres\\concourse\\tourdoor.cbm". */
 const XwaGeometryAtlas* XwaFrontendGeometry_FindFile(const char* fileName);
-/* The atlas with game geometry for a DAT group, or NULL. */
+/* The atlas with game geometry for a DAT group, or NULL. Always NULL for the
+ * flight font group: an atlas for it is logged and ignored. */
 const XwaGeometryAtlas* XwaFrontendGeometry_FindGroup(int group);
 /* The frame with DAT image id `id`, or NULL. */
 const XwaGeometryFrame* XwaFrontendGeometry_FindFrame(const XwaGeometryAtlas* atlas, int id);
@@ -135,9 +157,12 @@ ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* 
  * DAT image whose group has an atlas. */
 int XwaFrontendGeometry_ResourceHasGeometry(const char* name);
 /* Builds the DAT group `group_id` from its atlas into `group`, a free slot.
- * Each image gets the id, size and offset of its atlas frame, and rows with no
- * pixel runs, so it draws nothing in the classic layer. Returns 0 when out of
- * memory. */
+ * Each image gets the id, size and offset of its atlas frame, in the game's
+ * units, and rows with no pixel runs, so it draws nothing in the classic
+ * layer. The images aren't real pixels: flight turns them into textures with
+ * XwaGeometryTextures_ConvertByIndex and XwaGeometryTextures_ConvertById
+ * (geometry_textures.h), not with the original converters. Returns 0 when out
+ * of memory. */
 int XwaFrontendGeometry_BuildSpriteGroup(int16_t group_id, SpriteGroup* group, const XwaGeometryAtlas* atlas);
 /* Whether `desc` was built by XwaFrontendGeometry_BuildDescriptor and not
  * yet passed to XwaFrontendGeometry_ForgetDescriptor. */

@@ -504,16 +504,18 @@ static AssetLoadStatus assets_choose_group(XwaRemasterAssets* a, AeronCommandBuf
 										   GroupSlot* slot, int flight, uint8_t* out_source) {
 	*out_source = ASSET_SOURCE_MISSING;
 	/* Same rule as for files: if an atlas sets a group's geometry, only the
-	   mod's texture is used. */
-	if (!flight && XwaFrontendGeometry_FindGroup(slot->group)) {
-		const AssetLoadStatus status = assets_load_mod_group(a, a->frontend_images, cmd, slot);
+	   mod's texture is used, in the frontend and in flight. The stock DAT
+	   would have other frame counts and sizes than the ones the game uses. */
+	if (XwaFrontendGeometry_FindGroup(slot->group)) {
+		const AssetLoadStatus status =
+			assets_load_mod_group(a, flight ? a->flight_images : a->frontend_images, cmd, slot);
 		if (status == ASSET_LOAD_SUCCESS)
 			*out_source = ASSET_SOURCE_MOD;
 		else if (status == ASSET_LOAD_MISSING)
 			Aeron_LogError("xwa.remaster",
-						   "frontend group %d: the geometry comes from an atlas but the texture "
+						   "%s group %d: the geometry comes from an atlas but the texture "
 						   "is missing, so the group isn't drawn",
-						   slot->group);
+						   flight ? "flight" : "frontend", slot->group);
 		return status == ASSET_LOAD_MISSING ? ASSET_LOAD_SUCCESS : status;
 	}
 	const int first = a->prefer_original_2d ? ASSET_SOURCE_ORIGINAL : ASSET_SOURCE_MOD;
