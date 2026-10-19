@@ -791,6 +791,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 				}
 				case XWA_SCENE_FLIGHT:
 					render_output_required = snap->flight_camera_valid;
+					XwaRemasterAssets_UpdateFrameSets(g.assets, snap);
 					Aeron_GpuDebugPush(cmd, "OpenXWA flight renderer");
 					next_scene_tex = snap->flight_camera_valid
 										 ? XwaRemasterFlight_Render(cmd, snap, g.assets, g.render_pixel_width,

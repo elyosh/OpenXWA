@@ -7,8 +7,10 @@
 #include "xwa_remaster/assets.h"
 
 #include "aeron/aeron.h"
+#include "aeron/config_file.h"
 #include "aeron/image.h"
 #include "aeron/log.h"
+#include "aeron/random.h"
 #include "aeron/time.h"
 #include "aeron/scene/image_cache.h"
 #include "aeron/scene/runtime_atlas.h"
@@ -30,6 +32,10 @@
 #define XWA_ASSETS_MAX_FILES 1024 /* == engine resource cap */
 #define XWA_ASSETS_MAX_GROUPS XWA_SNAP_MAX_TEXTURE_ASSETS
 #define XWA_ASSETS_KEY_MAX 40
+#define XWA_ASSETS_MAX_FRAME_SETS 8
+#define XWA_ASSETS_MAX_SET_MISSIONS 8
+#define XWA_ASSETS_SET_NAME_MAX 64
+#define XWA_ASSETS_SHUFFLE_NAME_MAX 32
 
 static uint32_t assets_next_generation;
 
@@ -88,6 +94,30 @@ typedef struct FileSlot {
 	AeronRuntimeAtlas original_atlas;
 } FileSlot;
 
+/* An alternative frame set of a group. It is an atlas in resdata/atlas, and
+ * its images replace the group's images by position. */
+typedef struct FrameSet {
+	char name[XWA_ASSETS_SET_NAME_MAX];
+	AeronSpriteAtlas atlas;
+	uint8_t atlas_ok;
+	uint8_t loaded; /* its pages are in the flight image cache */
+	int32_t missions[XWA_ASSETS_MAX_SET_MISSIONS];
+	int mission_count;
+} FrameSet;
+
+/* Holds the `frame_sets` key of a group's atlas, and the group's current
+ * choice. */
+typedef struct FrameSets {
+	char shuffle[XWA_ASSETS_SHUFFLE_NAME_MAX]; /* empty when the group picks alone */
+	uint64_t reroll_us;
+	FrameSet sets[XWA_ASSETS_MAX_FRAME_SETS];
+	int set_count;
+	int choice;             /* -1 for the group's own images, else an index in sets */
+	uint8_t drawn;          /* an image of the group was looked up since the last update */
+	uint64_t next_check_us; /* 0 before the first update */
+	uint32_t update_stamp;
+} FrameSets;
+
 typedef struct GroupSlot {
 	int16_t group;
 	uint8_t mod_status; /* AssetLoadStatus */
@@ -100,6 +130,7 @@ typedef struct GroupSlot {
 	AeronSpriteAtlas atlas;
 	AeronRuntimeAtlas frontend_original_atlas;
 	AeronRuntimeAtlas flight_original_atlas;
+	FrameSets* frame_sets; /* NULL when the mod atlas has no `frame_sets` */
 } GroupSlot;
 
 struct XwaRemasterAssets {
@@ -121,6 +152,9 @@ struct XwaRemasterAssets {
 	FlightFontSlot flight_fonts[3];
 	uint64_t texture_asset_generation;
 	uint32_t generation;
+	int32_t mission_index;      /* from the snapshot, for the frame sets' `missions` */
+	uint32_t frame_set_random;  /* xorshift32 state */
+	uint32_t frame_set_updates; /* counts XwaRemasterAssets_UpdateFrameSets calls */
 };
 
 XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d) {
@@ -130,6 +164,12 @@ XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_origina
 	}
 	snprintf(a->root, sizeof a->root, "%s", root ? root : "");
 	a->prefer_original_2d = prefer_original_2d != 0;
+	a->mission_index = -1;
+	/* The frame sets use their own random numbers, so they don't change the
+	   game's rand() sequence. */
+	if (!Aeron_RandomBytes(&a->frame_set_random, sizeof a->frame_set_random) || !a->frame_set_random) {
+		a->frame_set_random = 0x2545f491u;
+	}
 	a->original_reader = XwaRemasterOriginal2d_Create(Aeron_GetVfs());
 	a->frontend_images = Aeron_ImageCacheCreate();
 	a->flight_images = Aeron_ImageCacheCreate();
@@ -173,6 +213,11 @@ void XwaRemasterAssets_Destroy(XwaRemasterAssets* a) {
 		Aeron_RuntimeAtlasRelease(&a->groups[i].flight_original_atlas);
 		if (a->groups[i].mod_status == ASSET_LOAD_SUCCESS) {
 			Aeron_SpriteAtlasFree(&a->groups[i].atlas);
+		}
+		if (a->groups[i].frame_sets) {
+			for (int k = 0; k < a->groups[i].frame_sets->set_count; k++)
+				Aeron_SpriteAtlasFree(&a->groups[i].frame_sets->sets[k].atlas);
+			free(a->groups[i].frame_sets);
 		}
 	}
 	for (int i = 0; i < 3; i++) {
@@ -401,6 +446,8 @@ static void assets_file_texture_path(const XwaRemasterAssets* a, const FileSlot*
 	}
 }
 
+static FrameSets* assets_read_frame_sets(const XwaRemasterAssets* a, int group);
+
 static GroupSlot* assets_group_slot(XwaRemasterAssets* a, int group) {
 	for (int i = 0; i < a->group_count; i++) {
 		if (a->groups[i].group == (int16_t)group) {
@@ -418,6 +465,8 @@ static GroupSlot* assets_group_slot(XwaRemasterAssets* a, int group) {
 	const AssetLoadStatus status = assets_probe_file(probe);
 	if (status == ASSET_LOAD_SUCCESS) {
 		s->mod_status = Aeron_SpriteAtlasLoad(&s->atlas, probe) ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
+		if (s->mod_status == ASSET_LOAD_SUCCESS)
+			s->frame_sets = assets_read_frame_sets(a, group);
 	} else {
 		s->mod_status = (uint8_t)status;
 	}
@@ -441,6 +490,251 @@ static void assets_group_page_path(const XwaRemasterAssets* a, int group, int pa
 	}
 }
 
+/* ---- alternative frame sets ---------------------------------------------- */
+
+static int assets_frame_sets_error(const char* path, const AeronConfigNode* node, const char* message) {
+	Aeron_LogError("xwa.remaster", "%s:%d: %s. The group draws only its own images", path,
+				   AeronConfigNode_Line(node), message);
+	return 0;
+}
+
+/* A set name is used as a file name, so it may only contain letters, digits,
+   '_' and '-'. */
+static int assets_valid_set_name(const char* name) {
+	if (!name || !name[0] || strlen(name) >= XWA_ASSETS_SET_NAME_MAX)
+		return 0;
+	for (const char* c = name; *c; c++) {
+		if (!((*c >= 'a' && *c <= 'z') || (*c >= 'A' && *c <= 'Z') || (*c >= '0' && *c <= '9') || *c == '_' ||
+			  *c == '-'))
+			return 0;
+	}
+	return 1;
+}
+
+static int assets_read_frame_set(const XwaRemasterAssets* a, const char* path, const AeronConfigNode* node,
+								 FrameSet* set) {
+	const AeronConfigNode* atlas = AeronConfigNode_MapGet(node, "atlas");
+	const AeronConfigNode* missions = AeronConfigNode_MapGet(node, "missions");
+	const char* name = AeronConfigNode_String(atlas, NULL);
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP ||
+		AeronConfigNode_Type(atlas) != AERON_CONFIG_STRING || !assets_valid_set_name(name))
+		return assets_frame_sets_error(path, node,
+									   "each set needs an atlas name, with only letters, digits, _ and -");
+	snprintf(set->name, sizeof set->name, "%s", name);
+	if (missions) {
+		const size_t count = AeronConfigNode_SequenceCount(missions);
+		if (AeronConfigNode_Type(missions) != AERON_CONFIG_SEQUENCE || count > XWA_ASSETS_MAX_SET_MISSIONS)
+			return assets_frame_sets_error(path, missions,
+										   "missions must be a list of up to 8 mission indexes");
+		for (size_t i = 0; i < count; i++) {
+			const AeronConfigNode* mission = AeronConfigNode_SequenceGet(missions, i);
+			const int64_t index = AeronConfigNode_Int(mission, -1);
+			if (AeronConfigNode_Type(mission) != AERON_CONFIG_INT || index < 0 || index > INT32_MAX)
+				return assets_frame_sets_error(path, mission,
+											   "a mission index must be a whole number, 0 or more");
+			set->missions[set->mission_count++] = (int32_t)index;
+		}
+	}
+	char atlas_path[768];
+	snprintf(atlas_path, sizeof atlas_path, "%s/resdata/atlas/%s.yaml", a->root, set->name);
+	set->atlas_ok = Aeron_SpriteAtlasLoad(&set->atlas, atlas_path);
+	if (!set->atlas_ok)
+		Aeron_LogError("xwa.remaster", "%s: the set %s can't be read. It isn't used", path, set->name);
+	return 1;
+}
+
+/* Reads the `frame_sets` key of group `group`'s atlas. Returns NULL when the
+   atlas has no such key, or when the key has an error (logged). */
+static FrameSets* assets_read_frame_sets(const XwaRemasterAssets* a, int group) {
+	char path[64];
+	AeronConfigFile* file = NULL;
+	AeronConfigError error = { 0 };
+	snprintf(path, sizeof path, "resdata/atlas/group_%d.yaml", group);
+	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, &file, &error))
+		return NULL; /* the atlas reader already reported it */
+	const AeronConfigNode* node = AeronConfigNode_MapGet(AeronConfigFile_Root(file), "frame_sets");
+	const AeronConfigNode* shuffle = AeronConfigNode_MapGet(node, "shuffle");
+	const AeronConfigNode* reroll = AeronConfigNode_MapGet(node, "reroll_seconds");
+	const AeronConfigNode* sets = AeronConfigNode_MapGet(node, "sets");
+	const size_t set_count = AeronConfigNode_SequenceCount(sets);
+	const AeronConfigNodeType reroll_type = AeronConfigNode_Type(reroll);
+	const double reroll_seconds = AeronConfigNode_Float(reroll, 0.0);
+	FrameSets* fs = NULL;
+	int ok = 1;
+	if (!node) {
+		AeronConfigFile_Destroy(file);
+		return NULL;
+	}
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP ||
+		AeronConfigNode_Type(sets) != AERON_CONFIG_SEQUENCE || set_count == 0 ||
+		set_count > XWA_ASSETS_MAX_FRAME_SETS)
+		ok = assets_frame_sets_error(path, node, "frame_sets needs a list of 1 to 8 sets");
+	else if ((reroll_type != AERON_CONFIG_INT && reroll_type != AERON_CONFIG_FLOAT) ||
+			 !(reroll_seconds > 0.0 && reroll_seconds <= 3600.0))
+		ok = assets_frame_sets_error(path, node, "frame_sets needs reroll_seconds, from above 0 to 3600");
+	else if (shuffle && (AeronConfigNode_Type(shuffle) != AERON_CONFIG_STRING ||
+						 strlen(AeronConfigNode_String(shuffle, "")) >= XWA_ASSETS_SHUFFLE_NAME_MAX))
+		ok = assets_frame_sets_error(path, shuffle, "shuffle must be a name of up to 31 characters");
+	if (ok) {
+		fs = (FrameSets*)calloc(1, sizeof *fs);
+		ok = fs != NULL;
+	}
+	if (ok) {
+		snprintf(fs->shuffle, sizeof fs->shuffle, "%s", AeronConfigNode_String(shuffle, ""));
+		fs->reroll_us = (uint64_t)(reroll_seconds * 1000000.0);
+		fs->choice = -1;
+		for (size_t i = 0; ok && i < set_count; i++) {
+			ok = assets_read_frame_set(a, path, AeronConfigNode_SequenceGet(sets, i), &fs->sets[i]);
+			fs->set_count = (int)i + 1;
+		}
+	}
+	if (!ok && fs) {
+		for (int k = 0; k < fs->set_count; k++)
+			Aeron_SpriteAtlasFree(&fs->sets[k].atlas);
+		free(fs);
+		fs = NULL;
+	}
+	AeronConfigFile_Destroy(file);
+	return fs;
+}
+
+static void assets_set_page_path(const XwaRemasterAssets* a, const FrameSet* set, int page, char path[768]) {
+	if (page == 0) {
+		snprintf(path, 768, "%s/resdata/atlas/%s.ktx2", a->root, set->name);
+	} else {
+		snprintf(path, 768, "%s/resdata/atlas/%s_p%d.ktx2", a->root, set->name, page);
+	}
+}
+
+/* Loads the pages of the group's sets into the flight image cache. A set
+   that can't be loaded isn't used. */
+static void assets_load_frame_sets(XwaRemasterAssets* a, AeronCommandBuffer* cmd, GroupSlot* slot) {
+	FrameSets* fs = slot->frame_sets;
+	for (int k = 0; fs && k < fs->set_count; k++) {
+		FrameSet* set = &fs->sets[k];
+		if (!set->atlas_ok || set->loaded)
+			continue;
+		const int page_count = set->atlas.page_count > 0 ? set->atlas.page_count : 1;
+		int page = 0;
+		for (; page < page_count; page++) {
+			char path[768];
+			XwaAssetRef ref;
+			assets_set_page_path(a, set, page, path);
+			if (assets_load_texture(a->flight_images, cmd, path, &ref) != ASSET_LOAD_SUCCESS)
+				break;
+		}
+		if (page == page_count) {
+			set->loaded = 1;
+			continue;
+		}
+		for (int loaded = 0; loaded < page; loaded++) {
+			char path[768];
+			assets_set_page_path(a, set, loaded, path);
+			Aeron_ImageCacheInvalidate(a->flight_images, path);
+		}
+		Aeron_LogError("xwa.remaster", "flight group %d: the set %s can't be loaded. It isn't used",
+					   slot->group, set->name);
+	}
+}
+
+static void assets_release_frame_sets(XwaRemasterAssets* a, GroupSlot* slot) {
+	FrameSets* fs = slot->frame_sets;
+	for (int k = 0; fs && k < fs->set_count; k++) {
+		FrameSet* set = &fs->sets[k];
+		if (!set->loaded)
+			continue;
+		const int page_count = set->atlas.page_count > 0 ? set->atlas.page_count : 1;
+		for (int page = 0; page < page_count; page++) {
+			char path[768];
+			assets_set_page_path(a, set, page, path);
+			Aeron_ImageCacheInvalidate(a->flight_images, path);
+		}
+		set->loaded = 0;
+	}
+}
+
+/* Returns the set that the group draws now, or NULL when it draws its own
+   images. In a mission that a set lists, that set is drawn instead of any
+   other set. The group's own images stay a choice. */
+static const FrameSet* assets_chosen_set(const XwaRemasterAssets* a, const FrameSets* fs) {
+	if (fs->choice < 0 || fs->choice >= fs->set_count)
+		return NULL;
+	for (int k = 0; k < fs->set_count; k++) {
+		for (int m = 0; fs->sets[k].loaded && m < fs->sets[k].mission_count; m++) {
+			if (fs->sets[k].missions[m] == a->mission_index)
+				return &fs->sets[k];
+		}
+	}
+	return fs->sets[fs->choice].loaded ? &fs->sets[fs->choice] : NULL;
+}
+
+static uint32_t assets_frame_set_random(XwaRemasterAssets* a) {
+	uint32_t x = a->frame_set_random; /* xorshift32 */
+	x ^= x << 13;
+	x ^= x >> 17;
+	x ^= x << 5;
+	a->frame_set_random = x;
+	return x;
+}
+
+/* Picks the group's own images or one of its loaded sets, each with the same
+   odds. */
+static void assets_pick_frame_set(XwaRemasterAssets* a, FrameSets* fs) {
+	int loaded[XWA_ASSETS_MAX_FRAME_SETS];
+	int count = 0;
+	for (int k = 0; k < fs->set_count; k++) {
+		if (fs->sets[k].loaded)
+			loaded[count++] = k;
+	}
+	const uint32_t pick = assets_frame_set_random(a) % (uint32_t)(count + 1);
+	fs->choice = pick == 0 ? -1 : loaded[pick - 1];
+}
+
+static int assets_same_shuffle(const FrameSets* lhs, const FrameSets* rhs) {
+	return lhs == rhs || (lhs->shuffle[0] && strcmp(lhs->shuffle, rhs->shuffle) == 0);
+}
+
+void XwaRemasterAssets_UpdateFrameSets(XwaRemasterAssets* a, const XwaSnapshot* snapshot) {
+	if (!a)
+		return;
+	a->mission_index = snapshot ? snapshot->mission_index : -1;
+	const uint32_t stamp = ++a->frame_set_updates;
+	const uint64_t now = Aeron_NowUs();
+	for (int i = 0; i < a->group_count; i++) {
+		FrameSets* first = a->groups[i].frame_sets;
+		if (!first || first->update_stamp == stamp)
+			continue;
+		/* The groups that share this group's shuffle name use its timer. */
+		int drawn = 0;
+		for (int j = i; j < a->group_count; j++) {
+			const FrameSets* fs = a->groups[j].frame_sets;
+			if (fs && assets_same_shuffle(first, fs))
+				drawn |= fs->drawn;
+		}
+		const int start = first->next_check_us == 0;
+		const int check = !start && now >= first->next_check_us;
+		for (int j = i; j < a->group_count; j++) {
+			FrameSets* fs = a->groups[j].frame_sets;
+			if (!fs || !assets_same_shuffle(first, fs))
+				continue;
+			/* Pick new sets only when none of the groups was drawn in the
+			   last frame, so that no animation changes while on screen. */
+			if (check && !drawn)
+				assets_pick_frame_set(a, fs);
+			if (start || check)
+				fs->next_check_us = now + first->reroll_us;
+			fs->drawn = 0;
+			fs->update_stamp = stamp;
+		}
+	}
+}
+
+/* Looks up frame `frame` of a group with frame sets. It returns image
+   `frame` of the chosen set, with the classic size of the group's own frame,
+   so the image is drawn on the group's quad. When the set has fewer images,
+   the extra frames return nothing. */
+static int assets_frame_set_frame(XwaRemasterAssets* a, GroupSlot* slot, int frame, XwaAssetRef* out);
+
 static int assets_frontend_group_frame(XwaRemasterAssets* a, GroupSlot* s, int frame, XwaAssetRef* out) {
 	const int page = s->atlas.pages ? s->atlas.pages[frame] : 0;
 	char path[768];
@@ -453,6 +747,25 @@ static int assets_flight_group_frame(XwaRemasterAssets* a, GroupSlot* s, int fra
 	char path[768];
 	assets_group_page_path(a, s->group, page, path);
 	return assets_find_texture(a->flight_images, path, out) && apply_atlas_frame(&s->atlas, frame, out);
+}
+
+static int assets_frame_set_frame(XwaRemasterAssets* a, GroupSlot* slot, int frame, XwaAssetRef* out) {
+	FrameSets* fs = slot->frame_sets;
+	fs->drawn = 1;
+	const FrameSet* set = assets_chosen_set(a, fs);
+	if (!set)
+		return assets_flight_group_frame(a, slot, frame, out);
+	XwaAssetRef own;
+	if (!assets_flight_group_frame(a, slot, frame, &own) || frame >= set->atlas.frame_count)
+		return 0;
+	const int page = set->atlas.pages ? set->atlas.pages[frame] : 0;
+	char path[768];
+	assets_set_page_path(a, set, page, path);
+	if (!assets_find_texture(a->flight_images, path, out) || !apply_atlas_frame(&set->atlas, frame, out))
+		return 0;
+	out->classic_w = own.classic_w;
+	out->classic_h = own.classic_h;
+	return 1;
 }
 
 static AssetLoadStatus assets_load_mod_group(XwaRemasterAssets* a, AeronImageCache* images,
@@ -544,6 +857,8 @@ static void assets_release_group(XwaRemasterAssets* a, GroupSlot* slot, int flig
 		return;
 	if (*source == ASSET_SOURCE_MOD) {
 		AeronImageCache* images = flight ? a->flight_images : a->frontend_images;
+		if (flight)
+			assets_release_frame_sets(a, slot);
 		const int page_count = slot->atlas.page_count > 0 ? slot->atlas.page_count : 1;
 		for (int page = 0; page < page_count; page++) {
 			char path[768];
@@ -845,6 +1160,8 @@ int XwaRemasterAssets_SyncFlightTextures(XwaRemasterAssets* a, AeronCommandBuffe
 				return 0;
 			}
 			slot->flight_resident = 1;
+			if (slot->flight_source == ASSET_SOURCE_MOD)
+				assets_load_frame_sets(a, cmd, slot);
 			Aeron_LogInfo("xwa.remaster", "flight group %d: source=%s", slot->group,
 					  assets_source_name(slot->flight_source));
 		}
@@ -929,6 +1246,8 @@ int XwaRemasterAssets_FlightModelFrame(XwaRemasterAssets* a, int object_type, in
 	if (frame < 0 || frame >= slot->atlas.frame_count) {
 		return 0;
 	}
+	if (slot->frame_sets)
+		return assets_frame_set_frame(a, slot, frame, out);
 	return assets_flight_group_frame(a, slot, frame, out);
 }
 

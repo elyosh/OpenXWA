@@ -84,8 +84,16 @@ int XwaRemasterAssets_SyncFlightTextures(XwaRemasterAssets* a, AeronCommandBuffe
 void XwaRemasterAssets_CommitFrontendAssets(XwaRemasterAssets* a, uint64_t generation);
 void XwaRemasterAssets_CommitFlightTextures(XwaRemasterAssets* a, uint64_t generation);
 int XwaRemasterAssets_FlightAtlasFrame(XwaRemasterAssets* a, int group, int frame_index0, XwaAssetRef* out);
+/* For a group whose mod atlas has `frame_sets`, this returns the image of
+ * the set that the group draws now (XwaRemasterAssets_UpdateFrameSets). */
 int XwaRemasterAssets_FlightModelFrame(XwaRemasterAssets* a, int object_type, int classic_frame_1based,
 									   XwaAssetRef* out);
+/* Updates the frame set choices. Call it once before each flight frame is
+ * drawn. Groups with the same `shuffle` name check together, every
+ * `reroll_seconds`. If none of them was drawn in the last frame, each group
+ * picks again among its own images and its sets. `snapshot` gives the
+ * mission index for the sets' `missions`. */
+void XwaRemasterAssets_UpdateFrameSets(XwaRemasterAssets* a, const struct XwaSnapshot* snapshot);
 /* Gets the DAT group and image id that a flight model type draws for a
  * frame. A single-image type gives its own image. A type drawn by frame
  * gives the id of the group's frame-th image, or the frame index when the

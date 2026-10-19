@@ -37,6 +37,7 @@
 #include "xwa/frontend/frontend_image.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/frontend/frontend_text.h"
+#include "xwa/frontend/mission_setup.h"
 #include "xwa/render/effects.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/time.h"
@@ -171,6 +172,7 @@ void XwaSnapshot_BeginTick(void) {
 	memset(&s->flight_map, 0, sizeof s->flight_map);
 	s->flight_camera_valid = 0;
 	s->mission_path[0] = '\0';
+	s->mission_index = -1;
 	memset(&s->death_star_beam, 0, sizeof s->death_star_beam);
 	memset(&s->hyperspace, 0, sizeof s->hyperspace);
 	memset(&s->hud, 0, sizeof s->hud);
@@ -1347,6 +1349,7 @@ void XwaSnapshot_CaptureMission(void) {
 	XwaSnapshot* s = wr();
 	memcpy(s->mission_path, g_currentMissionFile, sizeof s->mission_path);
 	s->mission_path[sizeof s->mission_path - 1] = '\0';
+	s->mission_index = g_selectedMissionListIndex;
 }
 
 void XwaSnapshot_CaptureFlight(void) {

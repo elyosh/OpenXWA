@@ -1213,6 +1213,9 @@ typedef struct XwaSnapshot {
 	 * tick; empty otherwise. Read-only transport for HD environment
 	 * preparation and selection. */
 	char mission_path[128];
+	/* g_selectedMissionListIndex during a flight session: the index of the
+	 * mission in the game's mission list. -1 otherwise. */
+	int32_t mission_index;
 	XwaDeathStarBeam death_star_beam;
 	XwaHyperspaceState hyperspace;
 	XwaHyperspaceStreak hyperspace_streaks[XWA_SNAP_MAX_HYPERSPACE_STREAKS];
