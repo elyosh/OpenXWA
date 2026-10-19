@@ -17,6 +17,8 @@
  *   <out>/resdata/atlas/group_<g>_alt<n>.yaml the alternative explosion sets of
  *   <out>/resdata/atlas/group_<g>_ds2.yaml    Materials/dat-<g>.mat, with their pages
  *   <out>/flight/fonts/font_tier_<n>.{ktx2,fnt}  XWAU's flight font
+ *   <out>/flight/fonts/fonts.yaml             the TrueType font that XWAU's ddraw
+ *                                             draws flight text with
  *
  * Left out: the frontend groups (15000-15999) and the craft pictures
  * (20001-20232), which xwau-frontend converts; the font group 16000, which
@@ -695,6 +697,100 @@ static void flight_bake_fonts(FlightContext* ctx) {
 	free(images);
 }
 
+/* The TrueType font files of the font families that XWAU's ddraw can name
+ * in TextFontFamily. The ddraw asks Windows for the family at the normal
+ * weight, so the file is the family's regular file. */
+static const struct {
+	const char* family;
+	const char* file;
+} g_flightFontFiles[] = {
+	{ "Verdana", "verdana.ttf" },
+};
+
+/* Reads the text settings of DDraw.cfg as XWAU's ddraw does (config.cpp):
+ * lines starting with '#', ';' or "//" are comments, the name is the text
+ * before the first '=' without its spaces, and the last line with a name
+ * wins. Settings that the file doesn't set keep the ddraw's defaults. */
+static void flight_read_ddraw_text(const FlightContext* ctx, int* enabled, char* family, size_t family_size,
+								   int* width_delta) {
+	char path[1100], line[512];
+	*enabled = 1;
+	snprintf(family, family_size, "Verdana");
+	*width_delta = 0;
+	FILE* f = Xwau_FindFile(ctx->opt->xwau_root, "DDraw.cfg", path, sizeof path) ? fopen(path, "r") : NULL;
+	while (f && fgets(line, sizeof line, f)) {
+		char name[128];
+		size_t length = 0;
+		const char* equals = strchr(line, '=');
+		if (line[0] == '#' || line[0] == ';' || (line[0] == '/' && line[1] == '/') || !equals)
+			continue;
+		for (const char* c = line; c < equals && length + 1 < sizeof name; ++c) {
+			if (!isspace((unsigned char)*c))
+				name[length++] = *c;
+		}
+		name[length] = '\0';
+		const char* value = equals + 1;
+		while (isspace((unsigned char)*value))
+			++value;
+		size_t value_length = strlen(value);
+		while (value_length > 0 && isspace((unsigned char)value[value_length - 1]))
+			--value_length;
+		if (!length || !value_length)
+			continue;
+		if (strcmp(name, "Text2DRendererEnabled") == 0)
+			*enabled = atoi(value) != 0;
+		else if (strcmp(name, "TextFontFamily") == 0)
+			snprintf(family, family_size, "%.*s", (int)value_length, value);
+		else if (strcmp(name, "TextWidthDelta") == 0)
+			*width_delta = atoi(value);
+	}
+	if (f)
+		fclose(f);
+}
+
+/* Writes flight/fonts/fonts.yaml for the TrueType font that XWAU's ddraw
+ * draws flight text with. The game lays out the text with the font's
+ * widths, as with XWAU's ddraw, so the file sets `metrics: font`. */
+static void flight_write_fonts_yaml(FlightContext* ctx) {
+	int enabled, width_delta;
+	char family[128], dir[1100], path[1200];
+	const char* file = NULL;
+	flight_read_ddraw_text(ctx, &enabled, family, sizeof family, &width_delta);
+	if (!enabled)
+		return;
+	for (size_t i = 0; i < sizeof g_flightFontFiles / sizeof g_flightFontFiles[0]; ++i) {
+		if (strcasecmp(family, g_flightFontFiles[i].family) == 0)
+			file = g_flightFontFiles[i].file;
+	}
+	if (!file) {
+		fprintf(stderr,
+				"xwau: TextFontFamily = %s: the font's file isn't known, so flight/fonts/fonts.yaml isn't "
+				"written\n",
+				family);
+		return;
+	}
+	if (width_delta != 0)
+		fprintf(stderr,
+				"xwau: TextWidthDelta = %d isn't converted. The flight text uses the font's own widths\n",
+				width_delta);
+	snprintf(dir, sizeof dir, "%s/flight/fonts", ctx->opt->sprites->out_root);
+	BakeSprites_MakeDirs(dir);
+	snprintf(path, sizeof path, "%s/fonts.yaml", dir);
+	FILE* f = fopen(path, "w");
+	if (!f) {
+		fprintf(stderr, "xwau: %s can't be written\n", path);
+		ctx->stats->failures++;
+		return;
+	}
+	fprintf(f,
+			"# Made by xwa_asset_bake xwau-flight from TextFontFamily in DDraw.cfg.\n"
+			"version: 1\n"
+			"default: {file: %s, metrics: font}\n",
+			file);
+	fclose(f);
+	printf("xwau: copy %s from Windows' Fonts folder to flight/fonts/\n", file);
+}
+
 static int flight_compare_ints(const void* lhs, const void* rhs) {
 	const int a = *(const int*)lhs;
 	const int b = *(const int*)rhs;
@@ -743,8 +839,10 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 		qsort(groups, (size_t)group_count, sizeof *groups, flight_compare_ints);
 	for (int g = 0; g < group_count; ++g)
 		flight_bake_group(&ctx, groups[g]);
-	if (opt->sprites->group_filter < 0 || opt->sprites->group_filter == FLIGHT_FONT_GROUP)
+	if (opt->sprites->group_filter < 0 || opt->sprites->group_filter == FLIGHT_FONT_GROUP) {
 		flight_bake_fonts(&ctx);
+		flight_write_fonts_yaml(&ctx);
+	}
 
 	free(groups);
 	for (int f = 0; f < ctx.dat_count; ++f)
