@@ -308,14 +308,6 @@ int XwaFrontendScreens_TextScale256(void) {
 	return (int)(XwaFrontendScreens_TextWidthScale() * 256.0f + 0.5f);
 }
 
-void XwaFrontendScreens_AdvanceText(int* x, int* x_frac, int advance, int scale256) {
-	const int total = *x_frac + advance * scale256;
-	const int whole = total >= 0 ? total / 256 : -((255 - total) / 256);
-
-	*x += whole;
-	*x_frac = total - whole * 256;
-}
-
 void XwaFrontendScreens_Shutdown(void) {
 	g_screensLoaded = 0;
 	g_screenDefault = -1;

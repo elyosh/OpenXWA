@@ -45,9 +45,6 @@ float XwaFrontendScreens_TextWidthScale(void);
  * centring and wrapping then fit the drawn text. At 256 the results match the
  * original game. */
 int XwaFrontendScreens_TextScale256(void);
-/* Advances a text position by `advance` units times `scale256` / 256.
- * `*x_frac` keeps the fraction, in 1/256 units. */
-void XwaFrontendScreens_AdvanceText(int* x, int* x_frac, int advance, int scale256);
 
 void XwaFrontendScreens_Shutdown(void);
 

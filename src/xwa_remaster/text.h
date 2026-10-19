@@ -26,6 +26,13 @@ typedef struct XwaRemasterTextMapping {
 int XwaRemasterText_AddFrontendGlyphMapped(AeronDrawList2D* list, XwaRemasterAssets* assets,
 										   const XwaGlyph2D* glyph, const XwaRemasterTextMapping* mapping);
 
+/* Builds the atlases of the fonts from frontend/fonts/fonts.yaml that the
+ * snapshot's glyphs use, for a mapping with `scale_y` target pixels per
+ * unit down. Call it outside any pass, before adding the glyphs. Glyphs
+ * without an atlas use the original font. */
+void XwaRemasterText_PrepareFrontendFonts(AeronCommandBuffer* cmd, XwaRemasterAssets* assets,
+										  const XwaSnapshot* snap, float scale_y);
+
 /* Flight-font byte strings use the recovered 0xfe,color escape convention.
  * size_px is the rendered font cell height in target pixels. */
 float XwaRemasterText_MeasureFlightString(const AeronFontAtlas* font, const char* text,

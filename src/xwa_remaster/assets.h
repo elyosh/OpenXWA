@@ -108,6 +108,15 @@ uint32_t XwaRemasterAssets_Generation(const XwaRemasterAssets* a);
 const AeronFontAtlas* XwaRemasterAssets_FrontendFont(XwaRemasterAssets* a, int font_size,
 													 float* out_atlas_scale);
 
+/* Builds the atlas of the font that frontend/fonts/fonts.yaml sets for
+ * `font_size`, with an em size of `em_pixels`, unless the original 2D art
+ * is preferred. The last 16 atlases are kept. Call it outside any pass. */
+void XwaRemasterAssets_PrepareFaceFont(XwaRemasterAssets* a, AeronCommandBuffer* cmd, int font_size,
+									   float em_pixels);
+/* The atlas that XwaRemasterAssets_PrepareFaceFont built for this size and
+ * em size, or NULL. */
+const AeronFontAtlas* XwaRemasterAssets_FaceFont(XwaRemasterAssets* a, int font_size, float em_pixels);
+
 #ifdef __cplusplus
 }
 #endif

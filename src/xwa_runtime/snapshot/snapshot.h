@@ -206,10 +206,11 @@ typedef struct XwaGlyph2D {
 	uint32_t z_order;
 	uint8_t target; /* XwaEmitTarget */
 	uint8_t ch;
-	int16_t font_size; /* point-size key of g_fontBySize */
-	int16_t x, y;      /* frontend coords (640x480 frame) */
-	int16_t x_frac;    /* sub-unit part of x in 1/256 units; set when text is measured for a wide screen */
-	uint32_t color;    /* raw engine color arg */
+	int16_t font_size;   /* point-size key of g_fontBySize */
+	int16_t x, y;        /* frontend coords (640x480 frame) */
+	int16_t x_frac;      /* sub-unit part of x in 1/256 units; set when text is measured for a wide screen */
+	uint16_t advance256; /* the advance the layout used, in 1/256 units */
+	uint32_t color;      /* raw engine color arg */
 	int16_t clip_left, clip_top, clip_right, clip_bottom;
 } XwaGlyph2D;
 
@@ -1295,10 +1296,11 @@ void XwaSnapshot_EmitPaint(XwaPaintKind kind, int x0, int y0, int x1, int y1, in
 void XwaSnapshot_BeginBriefingGrid(uint32_t major_color);
 void XwaSnapshot_EndBriefingGrid(void);
 
-/* One glyph from a FrontendText_Draw* string loop. */
-void XwaSnapshot_EmitGlyph(int font_size, unsigned char ch, int x, int y, uint32_t color);
-/* Same as XwaSnapshot_EmitGlyph, plus a sub-unit part of x in 1/256 units. */
-void XwaSnapshot_EmitGlyphFrac(int font_size, unsigned char ch, int x, int x_frac, int y, uint32_t color);
+/* One glyph from a FrontendText_Draw* string loop. `x_frac` is the sub-unit
+ * part of x in 1/256 units. `advance` is the original advance in units and
+ * `scale256` the text width scale, which give the record's advance256. */
+void XwaSnapshot_EmitGlyphFrac(int font_size, unsigned char ch, int x, int x_frac, int y, uint32_t color,
+							   int advance, int scale256);
 
 /* Surface-structure event (see XwaSurfaceEventKind). rect ignored for
  * the full-surface kinds. */

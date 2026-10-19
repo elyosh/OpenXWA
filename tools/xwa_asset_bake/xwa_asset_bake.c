@@ -29,11 +29,7 @@ static int usage(const char* argv0) {
 			"\n"
 			"fonts: bake TIMES<size>.ABP frontend fonts to HD atlas pairs\n"
 			"  <out-root>/frontend/fonts/font<size>.{png,fnt} (TFNT v2, RM_SCALE=4x).\n"
-			"  --ttf <file>   rasterize this face (classic = GDI Times New\n"
-			"                 Roman) at matched HD metrics as the runtime\n"
-			"                 atlas; the classic NN atlas then lands under\n"
-			"                 frontend/fonts/reference/ for font_tune comparison.\n"
-			"  Hand-tune / replace with TIE's font_tune GUI (same format).\n"
+			"  For HD text from a TrueType font, use frontend/fonts/fonts.yaml.\n"
 			"\n"
 			"flight-fonts: bake the classic hardware HUD font group to\n"
 			"  <out-root>/flight/fonts/font_tier_{0,1,2}.{ktx2,fnt}.\n"
@@ -70,7 +66,6 @@ int main(int argc, char** argv) {
 	opt.group_filter = -1;
 
 	const char* command      = NULL;
-	const char* ttf_path     = NULL;
 	const char* xwau_root    = NULL;
 	int         explicit_fmt = 0;
 
@@ -105,8 +100,6 @@ int main(int argc, char** argv) {
 			opt.group_filter = atoi(argv[++i]);
 		} else if (strcmp(a, "--dat-only") == 0) {
 			opt.dat_only = true;
-		} else if (strcmp(a, "--ttf") == 0 && i + 1 < argc) {
-			ttf_path = argv[++i];
 		} else if (strcmp(a, "--xwau") == 0 && i + 1 < argc) {
 			xwau_root = argv[++i];
 		} else if (a[0] == '-') {
@@ -159,8 +152,7 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 	if (cmd_fonts) {
-		BakeFontsOptions fopt = { .out_root = opt.out_root, .scale = opt.scale ? 4 : 1,
-								  .ttf_path = ttf_path };
+		BakeFontsOptions fopt = { .out_root = opt.out_root, .scale = opt.scale ? 4 : 1 };
 		const int        baked = BakeFonts_Run(&fopt, vfs);
 		printf("bake done: %d fonts\n", baked);
 		AeronVfs_Destroy(vfs);

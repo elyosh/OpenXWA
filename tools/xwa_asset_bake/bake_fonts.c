@@ -12,10 +12,6 @@
  *     (AeronFontAtlas; glyph positions come from the snapshot records,
  *     so only the rects matter at render time).
  *
- * Hand-tuning: TIE's font_tune GUI reads/writes this exact pair —
- *   font_tune --reference <root>/frontend/fonts/font15 --ttf Some.ttf
- * and saving over the same basename substitutes the TTF atlas.
- *
  * Glyph decode mirrors FrontImage_BlitGlyphRLE_16bpp exactly: per row
  * a u32 total-size prefix, then tokens — t == 0x80 row end; t & 0x80
  * literal run (len = t & 0x7F, one payload byte per texel); t & 0x40
@@ -56,76 +52,7 @@ static int mkdir_p2(const char* path) {
 	return mkdir(tmp, 0755) == 0 || errno == EEXIST;
 }
 
-/* Rasterize the substitute TTF at HD metrics matched to the classic
- * font GLOBALLY (cell height, cap height, baseline) — glyph shapes and
- * widths stay natural; per-glyph adjustments belong in font_tune. */
-static int bake_ttf_font(const BakeFontsOptions* opt, int point_size, int classic_cell_h,
-						 int cap_h_classic, int classic_baseline, const uint8_t* ttf,
-						 size_t ttf_size, const char* basename) {
-	const int scale = opt->scale > 0 ? opt->scale : 1;
-
-	FontAtlasParams params = { 0 };
-	params.first_char      = 32; /* the builder clamps 0 to 32 anyway */
-	params.num_chars       = 224; /* 32..255 — engine text is cp1252 */
-	params.cell_h          = classic_cell_h * scale;
-	/* Anchor the TTF baseline at the classic ink baseline so glyphs
-	 * drawn top-aligned at record positions sit at the same rows. */
-	params.baseline        = classic_baseline > 0 ? classic_baseline : -1;
-	params.cap_height      = cap_h_classic > 0 ? cap_h_classic * scale : 0;
-	memset(params.compression_glyph_lsb_atlas, -1,
-		   sizeof params.compression_glyph_lsb_atlas); /* -1 = natural LSBs */
-	/* Engine text is Windows-1252: bytes 0x80..0x9F are typographic
-	 * punctuation, not C1 controls — remap those slots to the Unicode
-	 * codepoints the TTF actually carries. */
-	static const int cp1252_high[32] = {
-		0x20AC, 0,      0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021,
-		0x02C6, 0x2030, 0x0160, 0x2039, 0x0152, 0,      0x017D, 0,
-		0,      0x2018, 0x2019, 0x201C, 0x201D, 0x2022, 0x2013, 0x2014,
-		0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0,      0x017E, 0x0178,
-	};
-	for (int i = 0; i < 32; i++) {
-		params.codepoint_remap[0x80 + i] = cp1252_high[i];
-	}
-
-	FontAtlasResult r = { 0 };
-	char            err[256];
-	if (!font_atlas_build(ttf, ttf_size, &params, &r, err, sizeof err)) {
-		fprintf(stderr, "bake: font %d TTF build failed: %s\n", point_size, err);
-		return 0;
-	}
-
-	int ok = font_atlas_write(&r, basename, err, sizeof err) ? 1 : 0;
-	if (!ok) {
-		fprintf(stderr, "bake: font %d write failed: %s\n", point_size, err);
-	} else {
-		printf("font %-3d -> %s.{png,fnt} (TTF, %dx%d, cell %dx%d, baseline %d)\n", point_size,
-			   basename, r.atlas_w, r.atlas_h, r.cell_w, r.cell_h, r.baseline);
-	}
-	font_atlas_free(&r);
-	return ok;
-}
-
-static uint8_t* read_whole_file(const char* path, size_t* out_size) {
-	FILE* f = fopen(path, "rb");
-	if (!f) {
-		return NULL;
-	}
-	fseek(f, 0, SEEK_END);
-	long sz = ftell(f);
-	rewind(f);
-	uint8_t* buf = sz > 0 ? (uint8_t*)malloc((size_t)sz) : NULL;
-	if (!buf || fread(buf, 1, (size_t)sz, f) != (size_t)sz) {
-		free(buf);
-		fclose(f);
-		return NULL;
-	}
-	fclose(f);
-	*out_size = (size_t)sz;
-	return buf;
-}
-
-static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_size,
-						 const uint8_t* ttf, size_t ttf_size) {
+static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_size) {
 	char source_path[64];
 	snprintf(source_path, sizeof source_path, "TIMES%d.ABP", point_size);
 	uint8_t* source_bytes = NULL;
@@ -169,26 +96,20 @@ static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_s
 		output->advance = (uint16_t)(input->advance * scale);
 	}
 
-	int cap_h_classic = 0;
+	/* The baseline is the bottom of the ink of 'A'. */
 	int baseline = source.cell_height * scale;
-	for (int ch = 'A'; ch <= 'H'; ch += 'H' - 'A') {
-		const Xwa2dGlyph* glyph = &source.glyphs[ch];
+	{
+		const Xwa2dGlyph* glyph = &source.glyphs['A'];
 		int ink_bottom = -1;
-		int ink_top = glyph->height;
 		for (int y = 0; y < glyph->height; y++) {
 			for (int x = 0; x < glyph->width; x++) {
-				const uint8_t alpha =
-					source.rgba[((size_t)(glyph->y + y) * source.width + glyph->x + x) * 4 + 3];
-				if (alpha > 127) {
-					if (y > ink_bottom) ink_bottom = y;
-					if (y < ink_top) ink_top = y;
-				}
+				if (source.rgba[((size_t)(glyph->y + y) * source.width + glyph->x + x) * 4 + 3] > 127 &&
+					y > ink_bottom)
+					ink_bottom = y;
 			}
 		}
-		if (ch == 'A' && ink_bottom >= 0)
+		if (ink_bottom >= 0)
 			baseline = (ink_bottom + 1) * scale;
-		if (ch == 'H' && ink_bottom >= ink_top)
-			cap_h_classic = ink_bottom - ink_top + 1;
 	}
 
 	FontAtlasResult r = { 0 };
@@ -202,14 +123,8 @@ static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_s
 	r.rgba            = rgba;
 	r.glyphs          = glyphs;
 
-	/* With a TTF the classic NN atlas becomes the font_tune reference;
-	 * without one it IS the runtime atlas (blocky classic look). */
 	char dir[1024];
-	if (ttf) {
-		snprintf(dir, sizeof dir, "%s/frontend/fonts/reference", opt->out_root);
-	} else {
-		snprintf(dir, sizeof dir, "%s/frontend/fonts", opt->out_root);
-	}
+	snprintf(dir, sizeof dir, "%s/frontend/fonts", opt->out_root);
 	mkdir_p2(dir);
 	char basename[1100];
 	snprintf(basename, sizeof basename, "%s/font%d", dir, point_size);
@@ -223,15 +138,6 @@ static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_s
 	}
 	free(rgba);
 	free(glyphs);
-
-	if (ok && ttf) {
-		char main_base[1100];
-		snprintf(dir, sizeof dir, "%s/frontend/fonts", opt->out_root);
-		mkdir_p2(dir);
-		snprintf(main_base, sizeof main_base, "%s/font%d", dir, point_size);
-		ok = bake_ttf_font(opt, point_size, source.cell_height, cap_h_classic, baseline, ttf, ttf_size,
-						   main_base);
-	}
 	Xwa2dFontAtlas_Free(&source);
 	return ok;
 }
@@ -254,16 +160,6 @@ static int glob_collect_abp(void* user, const AeronVfsEntry* e) {
 }
 
 int BakeFonts_Run(const BakeFontsOptions* opt, AeronVfs* vfs) {
-	uint8_t* ttf      = NULL;
-	size_t   ttf_size = 0;
-	if (opt->ttf_path) {
-		ttf = read_whole_file(opt->ttf_path, &ttf_size);
-		if (!ttf) {
-			fprintf(stderr, "bake: cannot read TTF '%s'\n", opt->ttf_path);
-			return 0;
-		}
-	}
-
 	FontDiscovery disc = { 0 };
 	AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, ".", "TIMES*.ABP",
 				  AERON_VFS_GLOB_FILES | AERON_VFS_GLOB_CASE_INSENSITIVE, glob_collect_abp,
@@ -271,8 +167,7 @@ int BakeFonts_Run(const BakeFontsOptions* opt, AeronVfs* vfs) {
 	printf("bake: %d frontend fonts discovered\n", disc.count);
 	int baked = 0;
 	for (int i = 0; i < disc.count; i++) {
-		baked += bake_one_font(opt, vfs, disc.sizes[i], ttf, ttf_size);
+		baked += bake_one_font(opt, vfs, disc.sizes[i]);
 	}
-	free(ttf);
 	return baked;
 }

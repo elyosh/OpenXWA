@@ -881,6 +881,7 @@ static void rm_present_cursor(AeronCommandBuffer* cmd, const XwaSnapshot* snap, 
 static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 	rm_prepare_model_previews(cmd, snap);
 	rm_prepare_videos(cmd, snap);
+	XwaRemasterText_PrepareFrontendFonts(cmd, g.assets, snap, g.map_sy);
 	if (g.screen_needs_clear) {
 		/* Opaque black, not transparent: an unreconstructed region must
 		 * read as a visible gap, not as the classic layer bleeding

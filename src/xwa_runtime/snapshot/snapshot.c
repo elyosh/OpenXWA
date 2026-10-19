@@ -8,6 +8,7 @@
  */
 
 #include "xwa_runtime/snapshot/snapshot.h"
+#include "xwa_runtime/frontend/frontend_fonts.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/frontend/frontend_video.h"
@@ -1871,12 +1872,11 @@ void XwaSnapshot_EmitModelPreview(const XwaModelPreview* preview) {
 	m->target = (uint8_t)snapshot_emit_target();
 }
 
-void XwaSnapshot_EmitGlyph(int font_size, unsigned char ch, int x, int y, uint32_t color) {
-	XwaSnapshot_EmitGlyphFrac(font_size, ch, x, 0, y, color);
-}
-
-void XwaSnapshot_EmitGlyphFrac(int font_size, unsigned char ch, int x, int x_frac, int y, uint32_t color) {
+void XwaSnapshot_EmitGlyphFrac(int font_size, unsigned char ch, int x, int x_frac, int y, uint32_t color,
+							   int advance, int scale256) {
 	XwaSnapshot* s = wr();
+	const int64_t advance256 =
+		((int64_t)XwaFrontendFonts_Advance256(font_size, ch, advance) * scale256 + 128) / 256;
 	/* Record the color the glyph is actually drawn with: the engine's
 	 * blitter fades it while the text fade-in timer runs (every
 	 * FrontendText_Draw* loop passes allowColorRemap=1). */
@@ -1894,6 +1894,7 @@ void XwaSnapshot_EmitGlyphFrac(int font_size, unsigned char ch, int x, int x_fra
 	g->font_size = (int16_t)font_size;
 	g->x = (int16_t)x;
 	g->x_frac = (int16_t)x_frac;
+	g->advance256 = (uint16_t)(advance256 < 0 ? 0 : advance256 > UINT16_MAX ? UINT16_MAX : advance256);
 	g->y = (int16_t)y;
 	g->color = color;
 	stamp_clip(&g->clip_left, &g->clip_top, &g->clip_right, &g->clip_bottom);

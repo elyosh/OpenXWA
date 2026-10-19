@@ -201,6 +201,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/config/modern_video_options_screen.c
     src/xwa_runtime/hooks/orientation_hook.c
     src/xwa_runtime/frontend/concourse_layout.c
+    src/xwa_runtime/frontend/frontend_fonts.c
     src/xwa_runtime/frontend/frontend_geometry.c
     src/xwa_runtime/frontend/frontend_screens.c
     src/xwa_runtime/frontend/frontend_video.c
@@ -609,6 +610,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/frontend/concourse_layout.h
     src/xwa_runtime/frontend/frontend_geometry.h
     src/xwa_runtime/frontend/frontend_screens.h
+    src/xwa_runtime/frontend/frontend_fonts.h
     src/xwa_runtime/frontend/frontend_video.h
     src/xwa_runtime/frontend/room_anims.h
     src/xwa_runtime/input/input_bridge.h

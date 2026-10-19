@@ -20,6 +20,8 @@
  *                                                   by hand from XWAU's Resdata
  *   <out>/frontend/frontres/<dir>/video/<base>.yaml videos that replace images; copy
  *                                                   these videos by hand too
+ *   <out>/frontend/fonts/fonts.yaml                 the text font; copy the font file
+ *                                                   by hand from Windows' Fonts folder
  *
  * Standard files that match stock and have no HD image are left to the stock
  * bake. The XWAU install is read with host file I/O, and file names are
@@ -171,42 +173,16 @@ static int same_files(const char* a, const char* b) {
 
 /* ---- XWAU text files ---------------------------------------------------- */
 
-/* Reads `key = value` from a hook text file; `;` starts a comment. */
-static int read_key_int(const char* path, const char* key, int fallback) {
+/* Reads `key = value` from a hook text file into `out`; `;` starts a
+ * comment. With a `section`, only the keys in its `[section]` count. The last
+ * value wins. Returns 0 when the key isn't set. */
+static int read_key_string(const char* path, const char* section, const char* key, char* out, size_t size) {
 	FILE* fp = fopen(path, "r");
 	if (!fp)
-		return fallback;
+		return 0;
 	char line[512];
-	int value = fallback;
-	while (fgets(line, sizeof line, fp)) {
-		char* comment = strchr(line, ';');
-		if (comment)
-			*comment = '\0';
-		char* eq = strchr(line, '=');
-		if (!eq)
-			continue;
-		*eq = '\0';
-		char* name = line;
-		while (isspace((unsigned char)*name))
-			++name;
-		char* end = name + strlen(name);
-		while (end > name && isspace((unsigned char)end[-1]))
-			*--end = '\0';
-		if (strcasecmp(name, key) == 0)
-			value = atoi(eq + 1);
-	}
-	fclose(fp);
-	return value;
-}
-
-/* Reads `key = value` from the `[section]` of an ini file. */
-static int read_section_key_int(const char* path, const char* section, const char* key, int fallback) {
-	FILE* fp = fopen(path, "r");
-	if (!fp)
-		return fallback;
-	char line[512];
-	int value = fallback;
-	int inside = 0;
+	int found = 0;
+	int inside = section == NULL;
 	while (fgets(line, sizeof line, fp)) {
 		char* comment = strchr(line, ';');
 		if (comment)
@@ -214,7 +190,7 @@ static int read_section_key_int(const char* path, const char* section, const cha
 		char* name = line;
 		while (isspace((unsigned char)*name))
 			++name;
-		if (*name == '[') {
+		if (section && *name == '[') {
 			char* close = strchr(name, ']');
 			if (close)
 				*close = '\0';
@@ -228,11 +204,44 @@ static int read_section_key_int(const char* path, const char* section, const cha
 		char* end = name + strlen(name);
 		while (end > name && isspace((unsigned char)end[-1]))
 			*--end = '\0';
-		if (strcasecmp(name, key) == 0)
-			value = (int)strtol(eq + 1, NULL, 0);
+		if (strcasecmp(name, key) != 0)
+			continue;
+		char* value = eq + 1;
+		while (isspace((unsigned char)*value))
+			++value;
+		end = value + strlen(value);
+		while (end > value && isspace((unsigned char)end[-1]))
+			*--end = '\0';
+		snprintf(out, size, "%s", value);
+		found = 1;
 	}
 	fclose(fp);
-	return value;
+	return found;
+}
+
+static int read_key_int(const char* path, const char* key, int fallback) {
+	char value[512];
+	return read_key_string(path, NULL, key, value, sizeof value) ? atoi(value) : fallback;
+}
+
+static int read_section_key_int(const char* path, const char* section, const char* key, int fallback) {
+	char value[512];
+	return read_key_string(path, section, key, value, sizeof value) ? (int)strtol(value, NULL, 0) : fallback;
+}
+
+/* Finds the hook_concourse settings: hook_concourse.cfg wins over the
+ * [hook_concourse] section of Hooks.ini, as in XWAU. Sets *section to NULL
+ * for hook_concourse.cfg. Returns 0, with an empty path, when there are
+ * none. */
+static int find_hook_settings(const char* root, char* path, size_t size, const char** section) {
+	*section = NULL;
+	if (find_ci(root, "hook_concourse.cfg", path, size))
+		return 1;
+	*section = "hook_concourse";
+	if (find_ci(root, "Hooks.ini", path, size))
+		return 1;
+	path[0] = '\0';
+	return 0;
 }
 
 /* Reads the map icon rectangle of each craft type from SHIPLIST.TXT: the last
@@ -1400,16 +1409,10 @@ static void write_layout_yaml(XwauContext* ctx) {
 	char doors[1100] = "", hooks[1100] = "", medals[1100] = "";
 	if (!find_ci(root, "ConcourseDoors.txt", doors, sizeof doors))
 		doors[0] = '\0';
-	/* hook_concourse.cfg wins over Hooks.ini, as in XWAU. */
-	const char* hook_section = "hook_concourse";
-	if (find_ci(root, "hook_concourse.cfg", hooks, sizeof hooks))
-		hook_section = NULL;
-	else if (!find_ci(root, "Hooks.ini", hooks, sizeof hooks))
-		hooks[0] = '\0';
+	const char* hook_section;
+	find_hook_settings(root, hooks, sizeof hooks, &hook_section);
 #define HOOK_INT(key, fallback)                                                                              \
-	(!hooks[0]      ? (fallback)                                                                             \
-	 : hook_section ? read_section_key_int(hooks, hook_section, key, fallback)                               \
-					: read_key_int(hooks, key, fallback))
+	(!hooks[0] ? (fallback) : read_section_key_int(hooks, hook_section, key, fallback))
 #define DOOR(key, fallback) door_value(doors, key, fallback)
 
 	char dir[1100], path[1200];
@@ -1682,6 +1685,38 @@ static int find_anim_sound(const XwauContext* ctx, int id, char* out, size_t out
 /* Writes frontend/animations.yaml from ConcourseAnimations.txt. Each XWAU
  * group becomes a group. A group whose name starts with + repeats the same
  * animation. Lines that OpenXWA can't play the same way are reported. */
+/* Writes frontend/fonts/fonts.yaml when XWAU draws the frontend text with a
+ * system font (HDConcourseTextFont). XWAU draws it in bold, so the file names
+ * the font's bold file, which must be copied by hand. */
+static void write_fonts_yaml(XwauContext* ctx) {
+	char hooks[1100], font[128] = "consolas";
+	const char* section;
+	if (!find_hook_settings(ctx->opt->xwau_root, hooks, sizeof hooks, &section) ||
+		read_section_key_int(hooks, section, "HDConcourseEnabled", 0) == 0)
+		return;
+	read_key_string(hooks, section, "HDConcourseTextFont", font, sizeof font);
+	if (strcasecmp(font, "consolas") != 0) {
+		fprintf(stderr, "xwau: HDConcourseTextFont = %s: the font's bold file isn't known, fonts.yaml isn't written\n",
+				font);
+		return;
+	}
+	char dir[1100], path[1200];
+	snprintf(dir, sizeof dir, "%s/frontend/fonts", ctx->opt->sprites->out_root);
+	BakeSprites_MakeDirs(dir);
+	snprintf(path, sizeof path, "%s/fonts.yaml", dir);
+	FILE* fp = fopen(path, "w");
+	if (!fp) {
+		ctx->stats->failures++;
+		return;
+	}
+	fprintf(fp, "# Made by xwa_asset_bake xwau-frontend from HDConcourseTextFont. Copy consolab.ttf\n"
+				"# from Windows' Fonts folder to this folder.\n"
+				"version: 1\n"
+				"default: {file: consolab.ttf, metrics: font}\n");
+	fclose(fp);
+	printf("xwau: copy consolab.ttf from Windows' Fonts folder to frontend/fonts/\n");
+}
+
 static void write_animations_yaml(XwauContext* ctx) {
 	char list[1100];
 	if (!find_ci(ctx->opt->xwau_root, "ConcourseAnimations.txt", list, sizeof list))
@@ -2020,6 +2055,7 @@ int BakeXwau_RunFrontend(const BakeXwauOptions* opt, BakeXwauStats* stats) {
 	write_layout_yaml(&ctx);
 	write_animations_yaml(&ctx);
 	write_video_yamls(&ctx);
+	write_fonts_yaml(&ctx);
 
 	free(ctx.regions);
 	for (int i = 0; i < ctx.wide_key_count; ++i)

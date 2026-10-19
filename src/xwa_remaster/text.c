@@ -1,6 +1,7 @@
 #include "xwa_remaster/text.h"
 
 #include "xwa_remaster/color.h"
+#include "xwa_runtime/frontend/frontend_fonts.h"
 
 #include <math.h>
 
@@ -103,6 +104,61 @@ static AeronRectI text_scissor(const XwaGlyph2D* glyph, const XwaRemasterTextMap
 	return rect;
 }
 
+void XwaRemasterText_PrepareFrontendFonts(AeronCommandBuffer* cmd, XwaRemasterAssets* assets,
+										  const XwaSnapshot* snap, float scale_y) {
+	uint8_t seen[256] = { 0 };
+	for (uint32_t i = 0; snap && i < snap->glyph_count; i++) {
+		const int font_size = snap->glyphs[i].font_size;
+		if (font_size < 0 || font_size > 255 || seen[font_size])
+			continue;
+		seen[font_size] = 1;
+		const XwaFrontendFont* font = XwaFrontendFonts_Get(font_size);
+		if (font)
+			XwaRemasterAssets_PrepareFaceFont(assets, cmd, font_size, font->em_units * scale_y);
+	}
+}
+
+/* A glyph of a font from frontend/fonts/fonts.yaml, drawn 1:1 at whole
+ * pixels. It is centred in the advance the layout used. */
+static int text_add_face_glyph(AeronDrawList2D* list, const AeronFontAtlas* atlas, const XwaFrontendFont* font,
+							   const XwaGlyph2D* glyph, const XwaRemasterTextMapping* mapping) {
+	AeronDrawList2DSprite sprite = { 0 };
+	uint8_t rgba[4];
+	float advance;
+
+	if (glyph->ch < atlas->first_char || glyph->ch >= atlas->first_char + atlas->num_chars ||
+		!AeronFontFace_Advance(font->face, font->codepoints[glyph->ch], &advance)) {
+		return 0;
+	}
+	const AeronFontGlyph* metrics = &atlas->glyphs[glyph->ch - atlas->first_char];
+	if (metrics->atlas_w == 0 || metrics->atlas_h == 0) {
+		return 0;
+	}
+	const float pen = mapping->offset_x + ((float)glyph->x + (float)glyph->x_frac / 256.0f) * mapping->scale_x;
+	const float layout_advance = (float)glyph->advance256 / 256.0f * mapping->scale_x;
+	advance *= font->em_units * mapping->scale_y;
+	sprite.texture = atlas->texture;
+	sprite.filter = AERON_BLIT2D_FILTER_NEAREST;
+	sprite.blend = AERON_BLIT2D_BLEND_PMA;
+	sprite.scissor = text_scissor(glyph, mapping);
+	sprite.src_u0 = (float)metrics->atlas_x / (float)atlas->atlas_w;
+	sprite.src_v0 = (float)metrics->atlas_y / (float)atlas->atlas_h;
+	sprite.src_u1 = (float)(metrics->atlas_x + metrics->atlas_w) / (float)atlas->atlas_w;
+	sprite.src_v1 = (float)(metrics->atlas_y + metrics->atlas_h) / (float)atlas->atlas_h;
+	sprite.dst_x = floorf(pen + (layout_advance - advance) * 0.5f + 0.5f) + (float)metrics->offset_x;
+	sprite.dst_y = floorf(((float)glyph->y + font->baseline_units) * mapping->scale_y + 0.5f) +
+				   (float)metrics->offset_y;
+	sprite.dst_w = (float)metrics->atlas_w;
+	sprite.dst_h = (float)metrics->atlas_h;
+	XwaSnapshotExport_ColorToRgba(glyph->color, rgba);
+	sprite.tint[0] = XwaRemaster_SrgbToLinear((float)rgba[0] / 255.0f);
+	sprite.tint[1] = XwaRemaster_SrgbToLinear((float)rgba[1] / 255.0f);
+	sprite.tint[2] = XwaRemaster_SrgbToLinear((float)rgba[2] / 255.0f);
+	sprite.tint[3] = 1.0f;
+	AeronDrawList_AddSprite(list, &sprite);
+	return 1;
+}
+
 int XwaRemasterText_AddFrontendGlyph(AeronDrawList2D* list, XwaRemasterAssets* assets,
 									 const XwaGlyph2D* glyph, int target_width, int target_height) {
 	if (target_width <= 0 || target_height <= 0) {
@@ -124,6 +180,15 @@ int XwaRemasterText_AddFrontendGlyphMapped(AeronDrawList2D* list, XwaRemasterAss
 
 	if (!list || !assets || !glyph || !mapping || mapping->scale_x <= 0.0f || mapping->scale_y <= 0.0f) {
 		return 0;
+	}
+	{
+		const XwaFrontendFont* face_font = XwaFrontendFonts_Get(glyph->font_size);
+		const AeronFontAtlas* atlas =
+			face_font ? XwaRemasterAssets_FaceFont(assets, glyph->font_size, face_font->em_units * mapping->scale_y)
+					  : NULL;
+		if (atlas) {
+			return text_add_face_glyph(list, atlas, face_font, glyph, mapping);
+		}
 	}
 	font = XwaRemasterAssets_FrontendFont(assets, glyph->font_size, &atlas_scale);
 	if (!font || !font->texture || font->atlas_w <= 0 || font->atlas_h <= 0 || atlas_scale <= 0.0f ||

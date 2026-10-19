@@ -27,6 +27,7 @@
 #include "xwa_runtime/frontend/concourse_layout.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
+#include "xwa_runtime/frontend/frontend_fonts.h"
 #include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/frontend/room_anims.h"
 #include "xwa_runtime/input/controller_mapping.h"
@@ -413,6 +414,7 @@ void XwaPort_Shutdown(void) {
 	XwaConcourseLayout_Shutdown();
 	XwaRoomAnims_Shutdown();
 	XwaFrontendVideo_Shutdown();
+	XwaFrontendFonts_Shutdown();
 	FlightDisplay_FreeSurfaces();
 	FrontendDisplay_FreeSurfaces();
 	AeronDx5_Shutdown();

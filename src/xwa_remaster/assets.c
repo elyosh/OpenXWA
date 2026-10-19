@@ -13,16 +13,19 @@
 #include "aeron/scene/image_cache.h"
 #include "aeron/scene/runtime_atlas.h"
 #include "aeron/scene/sprite_atlas.h"
+#include "xwa_runtime/frontend/frontend_fonts.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #include "xwa_remaster/original_2d.h"
 
 #include <errno.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define XWA_ASSETS_MAX_FONTS 16
+#define XWA_ASSETS_MAX_FACE_FONTS 16
 #define XWA_ORIGINAL_FONT_SCALE 4
 #define XWA_ASSETS_MAX_FILES 1024 /* == engine resource cap */
 #define XWA_ASSETS_MAX_GROUPS XWA_SNAP_MAX_TEXTURE_ASSETS
@@ -35,6 +38,14 @@ typedef struct FontSlot {
 	uint8_t source;       /* AssetSource */
 	AeronFontAtlas atlas; /* loaded == 0 when the load failed */
 } FontSlot;
+
+/* An atlas of a font from frontend/fonts/fonts.yaml at one pixel size. */
+typedef struct FaceFontSlot {
+	int font_size;
+	float em_pixels;
+	uint32_t used; /* face_font_clock at the last prepare */
+	AeronFontAtlas atlas;
+} FaceFontSlot;
 
 typedef struct FlightFontSlot {
 	uint8_t tried;
@@ -99,6 +110,8 @@ struct XwaRemasterAssets {
 	AeronImageCache* flight_images;
 	FontSlot fonts[XWA_ASSETS_MAX_FONTS];
 	int font_count;
+	FaceFontSlot face_fonts[XWA_ASSETS_MAX_FACE_FONTS];
+	uint32_t face_font_clock;
 	FileSlot files[XWA_ASSETS_MAX_FILES];
 	int file_count;
 	GroupSlot groups[XWA_ASSETS_MAX_GROUPS];
@@ -145,6 +158,9 @@ void XwaRemasterAssets_Destroy(XwaRemasterAssets* a) {
 		if (a->fonts[i].atlas.loaded) {
 			AeronFontAtlas_Release(&a->fonts[i].atlas);
 		}
+	}
+	for (int i = 0; i < XWA_ASSETS_MAX_FACE_FONTS; i++) {
+		AeronFontAtlas_Release(&a->face_fonts[i].atlas);
 	}
 	for (int i = 0; i < a->file_count; i++) {
 		Aeron_RuntimeAtlasRelease(&a->files[i].original_atlas);
@@ -1203,6 +1219,57 @@ static int assets_prepare_frontend_fonts(XwaRemasterAssets* a, AeronCommandBuffe
 	Aeron_LogInfo("xwa.remaster", "frontend fonts: %d/%u sizes loaded", loaded,
 			  (unsigned)(sizeof font_sizes / sizeof font_sizes[0]));
 	return 1;
+}
+
+static FaceFontSlot* assets_find_face_font(XwaRemasterAssets* a, int font_size, float em_pixels) {
+	for (int i = 0; i < XWA_ASSETS_MAX_FACE_FONTS; i++) {
+		FaceFontSlot* slot = &a->face_fonts[i];
+		if (slot->atlas.loaded && slot->font_size == font_size && fabsf(slot->em_pixels - em_pixels) < 0.01f)
+			return slot;
+	}
+	return NULL;
+}
+
+void XwaRemasterAssets_PrepareFaceFont(XwaRemasterAssets* a, AeronCommandBuffer* cmd, int font_size,
+									   float em_pixels) {
+	const XwaFrontendFont* font = XwaFrontendFonts_Get(font_size);
+	if (!a || !cmd || !font || a->prefer_original_2d || !(em_pixels > 0.0f))
+		return;
+	a->face_font_clock++;
+	FaceFontSlot* slot = assets_find_face_font(a, font_size, em_pixels);
+	if (slot) {
+		slot->used = a->face_font_clock;
+		return;
+	}
+	/* Replace the slot used longest ago. */
+	slot = &a->face_fonts[0];
+	for (int i = 1; i < XWA_ASSETS_MAX_FACE_FONTS && slot->atlas.loaded; i++) {
+		if (!a->face_fonts[i].atlas.loaded || a->face_fonts[i].used < slot->used)
+			slot = &a->face_fonts[i];
+	}
+	AeronFontAtlas_Release(&slot->atlas);
+	char name[64];
+	snprintf(name, sizeof name, "frontend font %d at %.2f px", font_size, em_pixels);
+	const AeronFontFaceAtlasDesc desc = {
+		.em_pixels = em_pixels,
+		.first_char = 32,
+		.char_count = 224,
+		.codepoints = font->codepoints + 32,
+		.debug_name = name,
+	};
+	if (!AeronFontFace_BuildAtlas(font->face, cmd, &desc, &slot->atlas)) {
+		Aeron_LogError("xwa.remaster", "%s: the atlas can't be built", name);
+		return;
+	}
+	slot->font_size = font_size;
+	slot->em_pixels = em_pixels;
+	slot->used = a->face_font_clock;
+	Aeron_LogInfo("xwa.remaster", "%s: %dx%d atlas", name, slot->atlas.atlas_w, slot->atlas.atlas_h);
+}
+
+const AeronFontAtlas* XwaRemasterAssets_FaceFont(XwaRemasterAssets* a, int font_size, float em_pixels) {
+	const FaceFontSlot* slot = a ? assets_find_face_font(a, font_size, em_pixels) : NULL;
+	return slot ? &slot->atlas : NULL;
 }
 
 const AeronFontAtlas* XwaRemasterAssets_FrontendFont(XwaRemasterAssets* a, int font_size,

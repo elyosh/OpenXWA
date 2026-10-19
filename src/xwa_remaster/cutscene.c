@@ -69,6 +69,7 @@ AeronTexture* XwaRemasterCutscene_Render(AeronCommandBuffer* cmd, const XwaSnaps
 		return NULL;
 	}
 
+	XwaRemasterText_PrepareFrontendFonts(cmd, assets, snapshot, (float)height / (float)XWA_CLASSIC_HEIGHT);
 	AeronDrawList_Begin(g_cutscene.draw_list, g_cutscene.target, width, height, AERON_DRAWLIST2D_CLEAR, NULL);
 	for (uint32_t i = 0; i < snapshot->glyph_count; ++i) {
 		const XwaGlyph2D* glyph = &snapshot->glyphs[i];

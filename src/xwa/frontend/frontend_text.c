@@ -1,5 +1,6 @@
 #include "xwa/frontend/frontend_text.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/frontend/frontend_fonts.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
@@ -654,7 +655,12 @@ int FrontendText_GetFontHeight(int fontSize) {
 	if (fontSize >= 0 && fontSize <= 255) {
 		font = g_fontBySize[fontSize];
 		if (font != NULL) {
+#ifdef XWA_MODERN
+			/* XWA_MODERN: frontend/fonts/fonts.yaml can set the height. */
+			return XwaFrontendFonts_Height(fontSize, font->glyphHeight[0]);
+#else
 			return font->glyphHeight[0];
+#endif
 		}
 	}
 
@@ -696,8 +702,20 @@ int FrontendText_MeasureWidth(const char* str, int fontSize) {
 	{
 		/* XWA_MODERN: on a wide screen, the draw functions below scale each
 		   glyph's advance by XwaFrontendScreens_TextScale256, so the measured
-		   width is scaled the same way. */
+		   width is scaled the same way. With metrics: font in
+		   frontend/fonts/fonts.yaml, the width is the sum of the font's
+		   advances. */
 		const int scale256 = XwaFrontendScreens_TextScale256();
+		if (XwaFrontendFonts_UsesFontMetrics(fontSize)) {
+			long long width256 = 0;
+			for (p = str; *p != '\0'; ++p) {
+				if ((unsigned char)*p > 6) {
+					width256 += XwaFrontendFonts_Advance256(
+						fontSize, (unsigned char)*p, font->glyphWidth[(unsigned char)*p] + font->charSpacing);
+				}
+			}
+			return (int)((width256 * scale256 / 256 + 128) / 256);
+		}
 		if (scale256 != 256) {
 			return ((width - font->charSpacing) * scale256 + 128) / 256;
 		}
@@ -759,11 +777,13 @@ int FrontendText_Draw(int fontSize, const char* str, int x, int y, int color) {
 				result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
 				/* Remaster snapshot observer. */
-				XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor);
+				XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor,
+										  font->charSpacing + glyphWidth[(unsigned char)*text], textScale256);
 #endif
 #ifdef XWA_MODERN
-				XwaFrontendScreens_AdvanceText(
-					&x, &xFrac, font->charSpacing + glyphWidth[(unsigned char)*text], textScale256);
+				XwaFrontendFonts_AdvanceText(&x, &xFrac, (int)fontSize, (unsigned char)*text,
+											 font->charSpacing + glyphWidth[(unsigned char)*text],
+											 textScale256);
 #else
 				x += font->charSpacing + glyphWidth[(unsigned char)*text];
 #endif
@@ -835,14 +855,15 @@ int FrontendText_DrawReveal(unsigned int fontSize, const char* str, int x, int y
 				}
 #ifdef XWA_MODERN
 				/* Remaster snapshot observer. */
-				XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)str[index], x, xFrac, y,
-										  index == revealCount ? (unsigned int)g_textColorCodes[4]
-															   : currentColor);
+				XwaSnapshot_EmitGlyphFrac(
+					(int)fontSize, (unsigned char)str[index], x, xFrac, y,
+					index == revealCount ? (unsigned int)g_textColorCodes[4] : currentColor,
+					font->charSpacing + font->glyphWidth[(unsigned char)str[index]], textScale256);
 #endif
 #ifdef XWA_MODERN
-				XwaFrontendScreens_AdvanceText(
-					&x, &xFrac, font->charSpacing + font->glyphWidth[(unsigned char)str[index]],
-					textScale256);
+				XwaFrontendFonts_AdvanceText(&x, &xFrac, (int)fontSize, (unsigned char)str[index],
+											 font->charSpacing + font->glyphWidth[(unsigned char)str[index]],
+											 textScale256);
 #else
 				x += font->charSpacing + font->glyphWidth[(unsigned char)str[index]];
 #endif
@@ -911,11 +932,14 @@ int FrontendText_DrawRightAligned(int fontSize, const char* str, int xRight, int
 			result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
 			/* Remaster snapshot observer. */
-			XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor);
+			XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor,
+									  font->charSpacing + font->glyphWidth[(unsigned char)*text],
+									  textScale256);
 #endif
 #ifdef XWA_MODERN
-			XwaFrontendScreens_AdvanceText(
-				&x, &xFrac, font->charSpacing + font->glyphWidth[(unsigned char)*text], textScale256);
+			XwaFrontendFonts_AdvanceText(&x, &xFrac, (int)fontSize, (unsigned char)*text,
+										 font->charSpacing + font->glyphWidth[(unsigned char)*text],
+										 textScale256);
 #else
 			x += font->charSpacing + font->glyphWidth[(unsigned char)*text];
 #endif
@@ -989,11 +1013,14 @@ int FrontendText_DrawCentered(int fontSize, const char* str, FrontendRect* rect,
 				result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
 				/* Remaster snapshot observer. */
-				XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor);
+				XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor,
+										  font->charSpacing + font->glyphWidth[(unsigned char)*text],
+										  textScale256);
 #endif
 #ifdef XWA_MODERN
-				XwaFrontendScreens_AdvanceText(
-					&x, &xFrac, font->charSpacing + font->glyphWidth[(unsigned char)*text], textScale256);
+				XwaFrontendFonts_AdvanceText(&x, &xFrac, (int)fontSize, (unsigned char)*text,
+											 font->charSpacing + font->glyphWidth[(unsigned char)*text],
+											 textScale256);
 #else
 				x += font->charSpacing + font->glyphWidth[(unsigned char)*text];
 #endif
@@ -1084,23 +1111,26 @@ int FrontendText_DrawCenteredReveal(int fontSize, const char* str, FrontendRect*
 						result |= FrontImage_DrawGlyph(glyph, x, y, (unsigned int)g_textColorCodes[4], 1);
 #ifdef XWA_MODERN
 						/* Remaster snapshot observer. */
-						XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)str[index], x, xFrac, y,
-												  (unsigned int)g_textColorCodes[4]);
+						XwaSnapshot_EmitGlyphFrac(
+							(int)fontSize, (unsigned char)str[index], x, xFrac, y,
+							(unsigned int)g_textColorCodes[4],
+							font->charSpacing + font->glyphWidth[(unsigned char)str[index]], textScale256);
 #endif
 					} else {
 						result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
 						/* Remaster snapshot observer. */
-						XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)str[index], x, xFrac, y,
-												  currentColor);
+						XwaSnapshot_EmitGlyphFrac(
+							(int)fontSize, (unsigned char)str[index], x, xFrac, y, currentColor,
+							font->charSpacing + font->glyphWidth[(unsigned char)str[index]], textScale256);
 #endif
 					}
 				}
 
 #ifdef XWA_MODERN
-				XwaFrontendScreens_AdvanceText(
-					&x, &xFrac, font->charSpacing + font->glyphWidth[(unsigned char)str[index]],
-					textScale256);
+				XwaFrontendFonts_AdvanceText(&x, &xFrac, (int)fontSize, (unsigned char)str[index],
+											 font->charSpacing + font->glyphWidth[(unsigned char)str[index]],
+											 textScale256);
 #else
 				x += font->charSpacing + font->glyphWidth[(unsigned char)str[index]];
 #endif
@@ -1188,11 +1218,14 @@ int FrontendText_DrawAlignedInRect(int fontSize, const char* str, FrontendRect* 
 					result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
 					/* Remaster snapshot observer. */
-					XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor);
+					XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor,
+											  font->charSpacing + glyphWidth[(unsigned char)*text],
+											  textScale256);
 #endif
 #ifdef XWA_MODERN
-					XwaFrontendScreens_AdvanceText(
-						&x, &xFrac, font->charSpacing + glyphWidth[(unsigned char)*text], textScale256);
+					XwaFrontendFonts_AdvanceText(&x, &xFrac, (int)fontSize, (unsigned char)*text,
+												 font->charSpacing + glyphWidth[(unsigned char)*text],
+												 textScale256);
 #else
 					x += font->charSpacing + glyphWidth[(unsigned char)*text];
 #endif
@@ -1331,9 +1364,9 @@ int FrontendText_DrawWrapped(int fontSize, const char* str, FrontendRect* rect, 
 
 				if (lineIndex < firstVisibleLine) {
 #ifdef XWA_MODERN
-					XwaFrontendScreens_AdvanceText(
-						&x, &xFrac, font->charSpacing + font->glyphWidth[(unsigned char)word[i]],
-						textScale256);
+					XwaFrontendFonts_AdvanceText(&x, &xFrac, (int)fontSize, (unsigned char)word[i],
+												 font->charSpacing + font->glyphWidth[(unsigned char)word[i]],
+												 textScale256);
 #else
 					x += font->charSpacing + font->glyphWidth[(unsigned char)word[i]];
 #endif
@@ -1356,11 +1389,12 @@ int FrontendText_DrawWrapped(int fontSize, const char* str, FrontendRect* rect, 
 					result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
 					/* Remaster snapshot observer. */
-					XwaSnapshot_EmitGlyphFrac((int)fontSize, ch, x, xFrac, y, currentColor);
+					XwaSnapshot_EmitGlyphFrac((int)fontSize, ch, x, xFrac, y, currentColor,
+											  font->glyphWidth[ch] + font->charSpacing, textScale256);
 #endif
 #ifdef XWA_MODERN
-					XwaFrontendScreens_AdvanceText(&x, &xFrac, font->glyphWidth[ch] + font->charSpacing,
-												   textScale256);
+					XwaFrontendFonts_AdvanceText(&x, &xFrac, (int)fontSize, ch,
+												 font->glyphWidth[ch] + font->charSpacing, textScale256);
 #else
 					x += font->glyphWidth[ch] + font->charSpacing;
 #endif
