@@ -48,6 +48,7 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/frontend/frontend_fonts.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/timing/host_clock.h"
@@ -1521,6 +1522,9 @@ void XwaFlightTask_Tick(void) {
 					case XWA_FLIGHT_LOADING_STAGE_RUNTIME_INIT: {
 						if (g_useHardware3D) {
 							FlightText_BuildWidthTables();
+							/* A flight font with metrics: font replaces the
+							   widths that the game measured. */
+							XwaFlightFonts_WriteWidthTables();
 							Math_SetFpuSinglePrecisionMode();
 						}
 						FlightLight_InitLocalPlayerPulses();

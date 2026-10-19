@@ -4,6 +4,7 @@
 #include "xwa_runtime/frontend/frontend_fonts.h"
 
 #include <math.h>
+#include <string.h>
 
 static float text_flight_advance(const AeronFontAtlas* font, uint8_t ch, float size_px) {
 	if (!font || !font->glyphs || font->cell_h == 0 || ch < font->first_char ||
@@ -14,8 +15,92 @@ static float text_flight_advance(const AeronFontAtlas* font, uint8_t ch, float s
 	return glyph->advance ? (float)glyph->advance * size_px / font->cell_h : size_px * 0.5f;
 }
 
-float XwaRemasterText_MeasureFlightString(const AeronFontAtlas* font, const char* text,
-										 float size_px) {
+/* Fills `sprite` with glyph `ch` of a TrueType font atlas, drawn 1:1 at whole
+ * pixels. The glyph is centred in `layout_advance`, the space that the layout
+ * gave it from `pen_x`, and sits on the baseline at `baseline_y`. Returns 0
+ * when the font has no glyph for `ch`. */
+static int text_face_sprite(const AeronFontAtlas* atlas, const XwaFrontendFont* font, uint8_t ch, float em_px,
+							float pen_x, float layout_advance, float baseline_y,
+							AeronDrawList2DSprite* sprite) {
+	float advance;
+
+	if (ch < atlas->first_char || ch >= atlas->first_char + atlas->num_chars ||
+		!AeronFontFace_Advance(font->face, font->codepoints[ch], &advance)) {
+		return 0;
+	}
+	const AeronFontGlyph* metrics = &atlas->glyphs[ch - atlas->first_char];
+	if (metrics->atlas_w == 0 || metrics->atlas_h == 0) {
+		return 0;
+	}
+	advance *= em_px;
+	sprite->texture = atlas->texture;
+	sprite->filter = AERON_BLIT2D_FILTER_NEAREST;
+	sprite->blend = AERON_BLIT2D_BLEND_PMA;
+	sprite->src_u0 = (float)metrics->atlas_x / (float)atlas->atlas_w;
+	sprite->src_v0 = (float)metrics->atlas_y / (float)atlas->atlas_h;
+	sprite->src_u1 = (float)(metrics->atlas_x + metrics->atlas_w) / (float)atlas->atlas_w;
+	sprite->src_v1 = (float)(metrics->atlas_y + metrics->atlas_h) / (float)atlas->atlas_h;
+	sprite->dst_x = floorf(pen_x + (layout_advance - advance) * 0.5f + 0.5f) + (float)metrics->offset_x;
+	sprite->dst_y = floorf(baseline_y + 0.5f) + (float)metrics->offset_y;
+	sprite->dst_w = (float)metrics->atlas_w;
+	sprite->dst_h = (float)metrics->atlas_h;
+	return 1;
+}
+
+/* ---- flight fonts ------------------------------------------------------ */
+
+int XwaRemasterText_FlightTierFontSize(int tier) { return tier == 0 ? 16 : (tier == 1 ? 12 : 10); }
+
+int XwaRemasterText_FlightFaceMetrics(int tier, XwaRemasterFlightFace* out) {
+	const int font_size = XwaRemasterText_FlightTierFontSize(tier);
+	const XwaFrontendFont* font = XwaFlightFonts_Get(font_size);
+	if (!out || !font)
+		return 0;
+	memset(out, 0, sizeof *out);
+	out->font = font;
+	out->font_size = font_size;
+	return 1;
+}
+
+void XwaRemasterText_PrepareFlightFace(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, int tier,
+									   float size_px) {
+	XwaRemasterFlightFace face;
+	if (size_px > 0.0f && XwaRemasterText_FlightFaceMetrics(tier, &face))
+		XwaRemasterAssets_PrepareFlightFaceFont(assets, cmd, face.font_size,
+												face.font->em_units * size_px / (float)face.font_size);
+}
+
+int XwaRemasterText_FlightFace(XwaRemasterAssets* assets, int tier, float size_px,
+							   XwaRemasterFlightFace* out) {
+	if (!(size_px > 0.0f) || !XwaRemasterText_FlightFaceMetrics(tier, out))
+		return 0;
+	out->unit_px = size_px / (float)out->font_size;
+	out->em_px = out->font->em_units * out->unit_px;
+	out->atlas = XwaRemasterAssets_FlightFaceFont(assets, out->font_size, out->em_px);
+	return out->atlas != NULL;
+}
+
+float XwaRemasterText_FlightAdvance(const AeronFontAtlas* bitmap, const XwaRemasterFlightFace* face,
+									uint8_t ch, float size_px) {
+	if (face && XwaFlightFonts_UsesFontMetrics(face->font_size)) {
+		/* The whole-pixel width that the game's width tables get. */
+		const float advance = floorf(XwaFlightFonts_Advance(face->font_size, ch));
+		if (advance > 0.0f)
+			return advance * size_px / (float)face->font_size;
+	}
+	return text_flight_advance(bitmap, ch, size_px);
+}
+
+int XwaRemasterText_FlightFaceSprite(const XwaRemasterFlightFace* face, uint8_t ch, float pen_x, float top_y,
+									 float layout_advance, AeronDrawList2DSprite* out) {
+	if (!face || !face->atlas || !out)
+		return 0;
+	return text_face_sprite(face->atlas, face->font, ch, face->em_px, pen_x, layout_advance,
+							top_y + face->font->baseline_units * face->unit_px, out);
+}
+
+float XwaRemasterText_MeasureFlightString(const AeronFontAtlas* font, const XwaRemasterFlightFace* face,
+										  const char* text, float size_px) {
 	float width = 0.0f;
 	if (!text || size_px <= 0.0f)
 		return 0.0f;
@@ -25,22 +110,23 @@ float XwaRemasterText_MeasureFlightString(const AeronFontAtlas* font, const char
 			continue;
 		}
 		if (*p >= 0x20u)
-			width += text_flight_advance(font, *p, size_px);
+			width += XwaRemasterText_FlightAdvance(font, face, *p, size_px);
 	}
 	return width;
 }
 
 int XwaRemasterText_AddFlightString(AeronDrawList2D* list, const AeronFontAtlas* font,
-									const char* text, float x_px, float y_px, float size_px,
-									XwaRemasterTextAlign align, uint32_t initial_argb,
-									const AeronRectI* scissor) {
-	if (!list || !font || !font->texture || !font->glyphs || !text || size_px <= 0.0f ||
-		font->atlas_w <= 0 || font->atlas_h <= 0)
+									const XwaRemasterFlightFace* face, const char* text, float x_px,
+									float y_px, float size_px, XwaRemasterTextAlign align,
+									uint32_t initial_argb, const AeronRectI* scissor) {
+	const int use_face = face && face->atlas;
+	if (!list || !text || size_px <= 0.0f ||
+		(!use_face && (!font || !font->texture || !font->glyphs || font->atlas_w <= 0 || font->atlas_h <= 0)))
 		return 0;
 	if (align == XWA_REMASTER_TEXT_ALIGN_CENTER)
-		x_px -= XwaRemasterText_MeasureFlightString(font, text, size_px) * 0.5f;
+		x_px -= XwaRemasterText_MeasureFlightString(font, face, text, size_px) * 0.5f;
 	else if (align == XWA_REMASTER_TEXT_ALIGN_RIGHT)
-		x_px -= XwaRemasterText_MeasureFlightString(font, text, size_px);
+		x_px -= XwaRemasterText_MeasureFlightString(font, face, text, size_px);
 	uint32_t argb = initial_argb;
 	int emitted = 0;
 	for (const uint8_t* p = (const uint8_t*)text; *p; p++) {
@@ -51,12 +137,14 @@ int XwaRemasterText_AddFlightString(AeronDrawList2D* list, const AeronFontAtlas*
 		}
 		if (*p < 0x20u)
 			continue;
-		const float advance = text_flight_advance(font, *p, size_px);
-		if (*p >= font->first_char && *p < font->first_char + font->num_chars) {
+		const float advance = XwaRemasterText_FlightAdvance(font, face, *p, size_px);
+		AeronDrawList2DSprite sprite = { 0 };
+		int drawn = 0;
+		if (use_face) {
+			drawn = XwaRemasterText_FlightFaceSprite(face, *p, x_px, y_px, advance, &sprite);
+		} else if (*p >= font->first_char && *p < font->first_char + font->num_chars) {
 			const AeronFontGlyph* glyph = &font->glyphs[*p - font->first_char];
 			if (glyph->atlas_w && glyph->atlas_h) {
-				const float a = (float)((argb >> 24) & 255u) / 255.0f;
-				AeronDrawList2DSprite sprite = { 0 };
 				sprite.texture = font->texture;
 				sprite.src_u0 = (float)glyph->atlas_x / font->atlas_w;
 				sprite.src_v0 = (float)glyph->atlas_y / font->atlas_h;
@@ -66,17 +154,21 @@ int XwaRemasterText_AddFlightString(AeronDrawList2D* list, const AeronFontAtlas*
 				sprite.dst_y = y_px;
 				sprite.dst_w = size_px;
 				sprite.dst_h = size_px;
-				sprite.tint[0] = XwaRemaster_SrgbToLinear((float)((argb >> 16) & 255u) / 255.0f) * a;
-				sprite.tint[1] = XwaRemaster_SrgbToLinear((float)((argb >> 8) & 255u) / 255.0f) * a;
-				sprite.tint[2] = XwaRemaster_SrgbToLinear((float)(argb & 255u) / 255.0f) * a;
-				sprite.tint[3] = a;
 				sprite.blend = AERON_BLIT2D_BLEND_PMA;
 				sprite.filter = AERON_BLIT2D_FILTER_LINEAR;
-				if (scissor)
-					sprite.scissor = *scissor;
-				AeronDrawList_AddSprite(list, &sprite);
-				emitted++;
+				drawn = 1;
 			}
+		}
+		if (drawn) {
+			const float a = (float)((argb >> 24) & 255u) / 255.0f;
+			sprite.tint[0] = XwaRemaster_SrgbToLinear((float)((argb >> 16) & 255u) / 255.0f) * a;
+			sprite.tint[1] = XwaRemaster_SrgbToLinear((float)((argb >> 8) & 255u) / 255.0f) * a;
+			sprite.tint[2] = XwaRemaster_SrgbToLinear((float)(argb & 255u) / 255.0f) * a;
+			sprite.tint[3] = a;
+			if (scissor)
+				sprite.scissor = *scissor;
+			AeronDrawList_AddSprite(list, &sprite);
+			emitted++;
 		}
 		x_px += advance;
 	}
@@ -124,32 +216,15 @@ static int text_add_face_glyph(AeronDrawList2D* list, const AeronFontAtlas* atla
 							   const XwaGlyph2D* glyph, const XwaRemasterTextMapping* mapping) {
 	AeronDrawList2DSprite sprite = { 0 };
 	uint8_t rgba[4];
-	float advance;
-
-	if (glyph->ch < atlas->first_char || glyph->ch >= atlas->first_char + atlas->num_chars ||
-		!AeronFontFace_Advance(font->face, font->codepoints[glyph->ch], &advance)) {
-		return 0;
-	}
-	const AeronFontGlyph* metrics = &atlas->glyphs[glyph->ch - atlas->first_char];
-	if (metrics->atlas_w == 0 || metrics->atlas_h == 0) {
-		return 0;
-	}
-	const float pen = mapping->offset_x + ((float)glyph->x + (float)glyph->x_frac / 256.0f) * mapping->scale_x;
+	const float pen =
+		mapping->offset_x + ((float)glyph->x + (float)glyph->x_frac / 256.0f) * mapping->scale_x;
 	const float layout_advance = (float)glyph->advance256 / 256.0f * mapping->scale_x;
-	advance *= font->em_units * mapping->scale_y;
-	sprite.texture = atlas->texture;
-	sprite.filter = AERON_BLIT2D_FILTER_NEAREST;
-	sprite.blend = AERON_BLIT2D_BLEND_PMA;
+
+	if (!text_face_sprite(atlas, font, glyph->ch, font->em_units * mapping->scale_y, pen, layout_advance,
+						  ((float)glyph->y + font->baseline_units) * mapping->scale_y, &sprite)) {
+		return 0;
+	}
 	sprite.scissor = text_scissor(glyph, mapping);
-	sprite.src_u0 = (float)metrics->atlas_x / (float)atlas->atlas_w;
-	sprite.src_v0 = (float)metrics->atlas_y / (float)atlas->atlas_h;
-	sprite.src_u1 = (float)(metrics->atlas_x + metrics->atlas_w) / (float)atlas->atlas_w;
-	sprite.src_v1 = (float)(metrics->atlas_y + metrics->atlas_h) / (float)atlas->atlas_h;
-	sprite.dst_x = floorf(pen + (layout_advance - advance) * 0.5f + 0.5f) + (float)metrics->offset_x;
-	sprite.dst_y = floorf(((float)glyph->y + font->baseline_units) * mapping->scale_y + 0.5f) +
-				   (float)metrics->offset_y;
-	sprite.dst_w = (float)metrics->atlas_w;
-	sprite.dst_h = (float)metrics->atlas_h;
 	XwaSnapshotExport_ColorToRgba(glyph->color, rgba);
 	sprite.tint[0] = XwaRemaster_SrgbToLinear((float)rgba[0] / 255.0f);
 	sprite.tint[1] = XwaRemaster_SrgbToLinear((float)rgba[1] / 255.0f);

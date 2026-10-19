@@ -14,7 +14,11 @@ int XwaRemasterHudText_Init(void);
 void XwaRemasterHudText_Shutdown(void);
 void XwaRemasterHudText_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex profile,
 							  uint32_t bundle_generation);
-void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, int target_h);
+/* Draws the glyphs with the flight font from flight/fonts/fonts.yaml when
+ * there is one, and builds its atlases through `assets`. Otherwise it uses
+ * the bitmap tiers. Call it outside any pass. */
+void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, int target_w,
+										int target_h);
 /* Visits the pane glyphs the prepared text draws, each with its pane, its
  * character and its cell (x0, y0, x1, y1 in target pixels, the classic
  * advance wide). */

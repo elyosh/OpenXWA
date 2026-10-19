@@ -395,7 +395,7 @@ void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* sna
 	XwaRemasterHudBoxes_PrepareDrawLists(cmd, target_w, target_h);
 	XwaRemasterHudFixed_PrepareDrawList(cmd, target_w, target_h);
 	XwaRemasterHudCmd_PrepareDrawList(cmd, target_w, target_h);
-	XwaRemasterHudText_PrepareDrawList(cmd, target_w, target_h);
+	XwaRemasterHudText_PrepareDrawList(cmd, assets, target_w, target_h);
 }
 
 const XwaRemasterHudPreparedAssets* XwaRemasterHud_PreparedAssets(void) { return &hud_assets.prepared; }

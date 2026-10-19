@@ -124,6 +124,10 @@ void XwaRemasterAssets_PrepareFaceFont(XwaRemasterAssets* a, AeronCommandBuffer*
 /* The atlas that XwaRemasterAssets_PrepareFaceFont built for this size and
  * em size, or NULL. */
 const AeronFontAtlas* XwaRemasterAssets_FaceFont(XwaRemasterAssets* a, int font_size, float em_pixels);
+/* Work like the two functions above, for the fonts of flight/fonts/fonts.yaml. */
+void XwaRemasterAssets_PrepareFlightFaceFont(XwaRemasterAssets* a, AeronCommandBuffer* cmd, int font_size,
+											 float em_pixels);
+const AeronFontAtlas* XwaRemasterAssets_FlightFaceFont(XwaRemasterAssets* a, int font_size, float em_pixels);
 
 #ifdef __cplusplus
 }

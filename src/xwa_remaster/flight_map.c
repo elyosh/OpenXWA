@@ -276,9 +276,10 @@ static void map_add_object_annotations(const XwaSnapshot* snapshot, XwaRemasterA
 
 static void map_add_object_text(const XwaFlightMapObject* map, const XwaFlightObject* object,
 								const XwaRemasterFlightView* view, const AeronFontAtlas* font,
-								const char* label, float screen_x, float screen_y, float depth,
-								float classic_width_px, float font_size, float line_height, int show_range) {
-	if (!map->label_visible || !font || depth <= 0.0f)
+								const XwaRemasterFlightFace* face, const char* label, float screen_x,
+								float screen_y, float depth, float classic_width_px, float font_size,
+								float line_height, int show_range) {
+	if (!map->label_visible || (!font && !face) || depth <= 0.0f)
 		return;
 	const float focal = (float)view->viewport.height * 0.5f / tanf(view->camera.v_half_rad);
 	float extent = focal * (float)(map->box_extent > 0 ? map->box_extent : 1) / depth;
@@ -289,7 +290,7 @@ static void map_add_object_text(const XwaFlightMapObject* map, const XwaFlightOb
 	const float box_size = extent + 4.0f * view->classic_pixel_scale;
 	const uint32_t argb = map_color_argb(map_palette_for_iff(map->effective_iff));
 	if (label && label[0]) {
-		XwaRemasterText_AddFlightString(map_state.text, font, label, screen_x,
+		XwaRemasterText_AddFlightString(map_state.text, font, face, label, screen_x,
 										screen_y - box_size * 0.5f - line_height - view->classic_pixel_scale,
 										font_size, XWA_REMASTER_TEXT_ALIGN_CENTER, argb, &view->viewport);
 	}
@@ -298,8 +299,8 @@ static void map_add_object_text(const XwaFlightMapObject* map, const XwaFlightOb
 		char range[16];
 		const unsigned int whole = map->range_value / 100u;
 		(void)snprintf(range, sizeof range, "%2u.%02u", whole, map->range_value - whole * 100u);
-		const float x = screen_x - XwaRemasterText_MeasureFlightString(font, "00", font_size);
-		XwaRemasterText_AddFlightString(map_state.text, font, range, x,
+		const float x = screen_x - XwaRemasterText_MeasureFlightString(font, face, "00", font_size);
+		XwaRemasterText_AddFlightString(map_state.text, font, face, range, x,
 										screen_y + box_size * 0.5f + view->classic_pixel_scale, font_size,
 										XWA_REMASTER_TEXT_ALIGN_LEFT, argb, &view->viewport);
 	}
@@ -393,6 +394,11 @@ int XwaRemasterFlightMap_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scene, c
 	const int font_tier = font_scale < 12 ? 2 : (font_scale < 15 ? 1 : 0);
 	const AeronFontAtlas* font = XwaRemasterAssets_FlightFont(assets, font_tier, NULL);
 	const float font_size = (float)font_scale * view->classic_pixel_scale;
+	/* The flight font from flight/fonts/fonts.yaml, when there is one. */
+	XwaRemasterFlightFace face_storage;
+	XwaRemasterText_PrepareFlightFace(cmd, assets, font_tier, font_size);
+	const XwaRemasterFlightFace* face =
+		XwaRemasterText_FlightFace(assets, font_tier, font_size, &face_storage) ? &face_storage : NULL;
 	const float line_height = (float)(font_scale - (font_scale >> 2)) * view->classic_pixel_scale;
 	const float source_w = snapshot->flight_camera.screen_w ? snapshot->flight_camera.screen_w : 640.0f;
 	const float classic_width_px = source_w * view->classic_pixel_scale;
@@ -413,7 +419,7 @@ int XwaRemasterFlightMap_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scene, c
 		const char* label = prepared->map->label_offset < snapshot->flight_map.label_bytes
 								? &snapshot->flight_map.labels[prepared->map->label_offset]
 								: NULL;
-		map_add_object_text(prepared->map, prepared->object, view, font, label, prepared->screen_x,
+		map_add_object_text(prepared->map, prepared->object, view, font, face, label, prepared->screen_x,
 							prepared->screen_y, prepared->eye[2], classic_width_px, font_size, line_height,
 							snapshot->flight_camera.focus_obj_idx != 0xffff);
 	}

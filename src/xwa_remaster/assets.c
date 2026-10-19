@@ -45,8 +45,10 @@ typedef struct FontSlot {
 	AeronFontAtlas atlas; /* loaded == 0 when the load failed */
 } FontSlot;
 
-/* An atlas of a font from frontend/fonts/fonts.yaml at one pixel size. */
+/* An atlas of a font from frontend/fonts/fonts.yaml or flight/fonts/fonts.yaml
+ * at one pixel size. */
 typedef struct FaceFontSlot {
+	uint8_t flight; /* the font comes from the flight file */
 	int font_size;
 	float em_pixels;
 	uint32_t used; /* face_font_clock at the last prepare */
@@ -1542,22 +1544,23 @@ static int assets_prepare_frontend_fonts(XwaRemasterAssets* a, AeronCommandBuffe
 	return 1;
 }
 
-static FaceFontSlot* assets_find_face_font(XwaRemasterAssets* a, int font_size, float em_pixels) {
+static FaceFontSlot* assets_find_face_font(XwaRemasterAssets* a, int flight, int font_size, float em_pixels) {
 	for (int i = 0; i < XWA_ASSETS_MAX_FACE_FONTS; i++) {
 		FaceFontSlot* slot = &a->face_fonts[i];
-		if (slot->atlas.loaded && slot->font_size == font_size && fabsf(slot->em_pixels - em_pixels) < 0.01f)
+		if (slot->atlas.loaded && slot->flight == flight && slot->font_size == font_size &&
+			fabsf(slot->em_pixels - em_pixels) < 0.01f)
 			return slot;
 	}
 	return NULL;
 }
 
-void XwaRemasterAssets_PrepareFaceFont(XwaRemasterAssets* a, AeronCommandBuffer* cmd, int font_size,
-									   float em_pixels) {
-	const XwaFrontendFont* font = XwaFrontendFonts_Get(font_size);
+static void assets_prepare_face_font(XwaRemasterAssets* a, AeronCommandBuffer* cmd, int flight, int font_size,
+									 float em_pixels) {
+	const XwaFrontendFont* font = flight ? XwaFlightFonts_Get(font_size) : XwaFrontendFonts_Get(font_size);
 	if (!a || !cmd || !font || a->prefer_original_2d || !(em_pixels > 0.0f))
 		return;
 	a->face_font_clock++;
-	FaceFontSlot* slot = assets_find_face_font(a, font_size, em_pixels);
+	FaceFontSlot* slot = assets_find_face_font(a, flight, font_size, em_pixels);
 	if (slot) {
 		slot->used = a->face_font_clock;
 		return;
@@ -1570,7 +1573,8 @@ void XwaRemasterAssets_PrepareFaceFont(XwaRemasterAssets* a, AeronCommandBuffer*
 	}
 	AeronFontAtlas_Release(&slot->atlas);
 	char name[64];
-	snprintf(name, sizeof name, "frontend font %d at %.2f px", font_size, em_pixels);
+	snprintf(name, sizeof name, "%s font %d at %.2f px", flight ? "flight" : "frontend", font_size,
+			 em_pixels);
 	const AeronFontFaceAtlasDesc desc = {
 		.em_pixels = em_pixels,
 		.first_char = 32,
@@ -1582,14 +1586,30 @@ void XwaRemasterAssets_PrepareFaceFont(XwaRemasterAssets* a, AeronCommandBuffer*
 		Aeron_LogError("xwa.remaster", "%s: the atlas can't be built", name);
 		return;
 	}
+	slot->flight = (uint8_t)(flight != 0);
 	slot->font_size = font_size;
 	slot->em_pixels = em_pixels;
 	slot->used = a->face_font_clock;
 	Aeron_LogInfo("xwa.remaster", "%s: %dx%d atlas", name, slot->atlas.atlas_w, slot->atlas.atlas_h);
 }
 
+void XwaRemasterAssets_PrepareFaceFont(XwaRemasterAssets* a, AeronCommandBuffer* cmd, int font_size,
+									   float em_pixels) {
+	assets_prepare_face_font(a, cmd, 0, font_size, em_pixels);
+}
+
 const AeronFontAtlas* XwaRemasterAssets_FaceFont(XwaRemasterAssets* a, int font_size, float em_pixels) {
-	const FaceFontSlot* slot = a ? assets_find_face_font(a, font_size, em_pixels) : NULL;
+	const FaceFontSlot* slot = a ? assets_find_face_font(a, 0, font_size, em_pixels) : NULL;
+	return slot ? &slot->atlas : NULL;
+}
+
+void XwaRemasterAssets_PrepareFlightFaceFont(XwaRemasterAssets* a, AeronCommandBuffer* cmd, int font_size,
+											 float em_pixels) {
+	assets_prepare_face_font(a, cmd, 1, font_size, em_pixels);
+}
+
+const AeronFontAtlas* XwaRemasterAssets_FlightFaceFont(XwaRemasterAssets* a, int font_size, float em_pixels) {
+	const FaceFontSlot* slot = a ? assets_find_face_font(a, 1, font_size, em_pixels) : NULL;
 	return slot ? &slot->atlas : NULL;
 }
 
