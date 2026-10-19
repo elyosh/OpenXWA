@@ -1,6 +1,7 @@
 #include "xwa_runtime/models/geometry_textures.h"
 
 #include "xwa/assets/sprite_resource.h"
+#include "xwa/flight/fediskio.h"
 #include "xwa/util/byte_order.h"
 
 #include <string.h>
@@ -79,6 +80,19 @@ static void geometry_textures_convert_sprite(const Sprite* sprite, int format, T
 		SpriteTexture_ConvertSprite(geometry_textures_placeholder_source(), format, &placeholder, 0, 1);
 		texLevels[level].image = placeholder.image;
 	}
+}
+
+void XwaGeometryTextures_UploadLevel(TexLevel* level) {
+	TexLevel placeholder;
+
+	if (level->image == NULL) {
+		return;
+	}
+	placeholder = *level;
+	placeholder.width = level->image->width;
+	placeholder.height = level->image->height;
+	FeDiskIo_UploadTexLevelToStd3D(&placeholder);
+	level->image = placeholder.image;
 }
 
 void XwaGeometryTextures_ConvertById(int16_t groupId, uint16_t spriteId, int format, TexLevel* texLevels,

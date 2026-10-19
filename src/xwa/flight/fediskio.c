@@ -974,6 +974,11 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 					if (levelCount > 0) {
 						for (levelIndex = 0; levelIndex < levelCount; ++levelIndex) {
 							if (modelType != MODEL_TEXTURE_FONT_MODEL_TYPE) {
+#ifdef XWA_MODERN
+								if (geometryGroup) {
+									XwaGeometryTextures_UploadLevel(texLevel++);
+								} else
+#endif
 								FeDiskIo_UploadTexLevelToStd3D(texLevel++);
 							} else {
 								++texLevel;
@@ -1029,6 +1034,11 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 
 				singleLevelsRemaining = levelCount;
 				do {
+#ifdef XWA_MODERN
+					if (geometryGroup) {
+						XwaGeometryTextures_UploadLevel(texLevel++);
+					} else
+#endif
 					FeDiskIo_UploadTexLevelToStd3D(texLevel++);
 					--singleLevelsRemaining;
 				} while (singleLevelsRemaining != 0);
@@ -1239,22 +1249,9 @@ void FeDiskIo_UploadTexLevelToStd3D(TexLevel* level) {
 			vb.raster.redPosShiftRight = (-vb.raster.redBPP) & 7u;
 			vb.pixels = (uint8_t*)image + 18; /* item+18: pixels follow the header */
 			width = level->width;
-#ifdef XWA_MODERN
-			/* A converted image has its level's size, except the 8x8 placeholder
-			   of a group built from an atlas (geometry_textures.h), which is
-			   uploaded at its own size. */
-			if (image->width < width) {
-				width = image->width;
-			}
-#endif
 			vb.raster.rowPitch = width * (vb.raster.bitsPerPixel >> 3);
 			vb.raster.greenPosShiftRight = (-vb.raster.greenBPP) & 7u;
 			height = level->height;
-#ifdef XWA_MODERN
-			if (image->height < height) {
-				height = image->height;
-			}
-#endif
 			vb.raster.width = width;
 			vb.raster.height = height;
 			vb.raster.alphaPosShiftRight = (-vb.raster.alphaBPP) & 7u;
