@@ -37,6 +37,7 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/craft_names.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/runtime/movie_task.h"
 #endif
@@ -288,6 +289,14 @@ static int BriefingRoom_ListedFlightGroup(int flightGroupIndex) {
 	return category >= 2 && category <= 7;
 }
 
+/* Modern port: the ship list name of a flight group's craft, or the name
+   that the mission gives it (craft_names.h). */
+static const char* BriefingRoom_ShipName(const XwaFlightGroup* flightGroup, const ShipListEntry* shipEntry) {
+	const char* name = XwaCraftNames_ShipListName(flightGroup->craftType);
+
+	return name != NULL ? name : shipEntry->name;
+}
+
 /* Modern port: the text lines that replace the order of battle, under its
    title, from the settings' top when they give one. */
 static void BriefingRoom_DrawOrderOfBattleLines(FrontendRect* rect, int revealCount) {
@@ -390,7 +399,8 @@ int BriefingRoom_DrawOrderOfBattle(FrontendRect* rect, int revealCount) {
 							strcpy(g_frontendScratchBuffer,
 								   XwaMissionSettings_OrderOfBattleName(flightGroupIndex));
 						} else {
-							sprintf(g_frontendScratchBuffer, "%s %s", shipEntry->name, flightGroup->name);
+							sprintf(g_frontendScratchBuffer, "%s %s",
+									BriefingRoom_ShipName(flightGroup, shipEntry), flightGroup->name);
 						}
 #else
 						sprintf(g_frontendScratchBuffer, "%s %s", shipEntry->name, flightGroup->name);
@@ -416,7 +426,12 @@ int BriefingRoom_DrawOrderOfBattle(FrontendRect* rect, int revealCount) {
 				} else if (category < 6 && category != 4 && category != 1 && shipEntry->flyable) {
 					if (entryIndex >= linesPerPage * pageIndex &&
 						entryIndex < linesPerPage * (pageIndex + 1)) {
+#ifdef XWA_MODERN
+						sprintf(g_frontendScratchBuffer, "%s %s",
+								BriefingRoom_ShipName(flightGroup, shipEntry), flightGroup->name);
+#else
 						sprintf(g_frontendScratchBuffer, "%s %s", shipEntry->name, flightGroup->name);
+#endif
 						if (g_oobEntryCount > linesPerPage) {
 							if (revealPhase >= 100) {
 								revealPhase = savedRevealPhase;

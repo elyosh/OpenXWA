@@ -1,6 +1,7 @@
 #include "xwa/frontend/mission_debrief.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/concourse_layout.h"
+#include "xwa_runtime/models/craft_names.h"
 #endif
 
 #include "xwa/assets/file_io.h"
@@ -1126,6 +1127,10 @@ int MissionDebrief_Exit(int frameCounter) {
 	Frontend_ResetScrollableControls();
 	Keyboard_FlushCharBuffer();
 	FrontendMouse_ClearInputGate();
+#ifdef XWA_MODERN
+	/* Modern port: the mission's craft names end with its debriefing. */
+	XwaCraftNames_Restore();
+#endif
 	return 0;
 }
 

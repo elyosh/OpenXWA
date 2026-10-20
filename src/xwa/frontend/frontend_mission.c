@@ -19,6 +19,7 @@
 #include "xwa/frontend/skirmish.h"
 #include "xwa/util/memory.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/craft_names.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/models/object_profiles.h"
@@ -995,9 +996,10 @@ int FrontendMission_LoadCurrent(void) {
 				missionList[missionListIndex].fileName);
 #ifdef XWA_MODERN
 		/* Modern port: the briefing room's order of battle reads the
-		   mission's settings, and the frontend's previews show the models
-		   that the mission swaps in. */
+		   mission's settings and craft names, and the frontend's previews
+		   show the models that the mission swaps in. */
 		XwaMissionSettings_LoadMission(buffer);
+		XwaCraftNames_LoadMission(buffer);
 		XwaModelSwaps_LoadMission(buffer);
 #endif
 		return FrontendMission_LoadFile(buffer);

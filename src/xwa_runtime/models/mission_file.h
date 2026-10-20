@@ -13,6 +13,8 @@
  *   skins: ...             (skins.h)
  *   articulations: ...     (articulation.h)
  *   hangar: ...            (hangars.h)
+ *   model_swaps: ...       (model_swaps.h)
+ *   craft_names: ...       (craft_names.h)
  */
 
 #include <stddef.h>
