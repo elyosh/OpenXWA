@@ -8044,10 +8044,11 @@ uint16_t Mission_Init(char* fileName) {
 #ifdef XWA_MODERN
 		/* Modern port: some mods' mission files use backdrop ids past the
 		   stock table, which the stock game reads past its end. These place
-		   no backdrop. */
-		if (backdropId >= XWA_MISSION_BACKDROP_DESCRIPTOR_COUNT) {
+		   no backdrop. The id is a 32-bit field, so a negative one is out of
+		   the table too. */
+		if (backdropId < 0 || backdropId >= XWA_MISSION_BACKDROP_DESCRIPTOR_COUNT) {
 			Aeron_LogWarn("xwa.mission",
-						  "flight group %d: backdrop id %d is past the stock table; it places nothing",
+						  "flight group %d: backdrop id %d is outside the stock table; it places nothing",
 						  (int)g_currentFlightGroupIdx, backdropId);
 			backdropId = 0;
 		}
