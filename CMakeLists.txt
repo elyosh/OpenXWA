@@ -228,6 +228,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/runtime/flight_pause_task.c
     src/xwa_runtime/runtime/flight_task.c
     src/xwa_runtime/runtime/frontend_task.c
+    src/xwa_runtime/runtime/game_files.c
     src/xwa_runtime/runtime/movie_task.c
     src/xwa_runtime/runtime/port.c
     src/xwa_runtime/runtime/presentation.c

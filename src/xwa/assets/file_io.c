@@ -6,6 +6,9 @@
 #include "xwa/flight/flight.h"
 #include "xwa/flight/flight_display.h"
 #include "xwa/render/renderer_internal.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/runtime/game_files.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -105,6 +108,9 @@ XwaFile* File_Open(const char* fileName, const char* mode) {
 #endif
 	AeronFile* file;
 	AeronVfsOpenMode openMode;
+#ifdef XWA_MODERN
+	char modPath[XWA_GAME_FILES_PATH_SIZE];
+#endif
 
 #ifndef XWA_MODERN
 	root = AERON_VFS_ROOT_ASSET;
@@ -115,6 +121,15 @@ XwaFile* File_Open(const char* fileName, const char* mode) {
 
 	openMode = File_OpenMode(mode);
 	file = NULL;
+#ifdef XWA_MODERN
+	/* Modern port: a mod can replace the mission files and the voices that
+	   come with them (xwa_runtime/runtime/game_files.h). */
+	if (root == AERON_VFS_ROOT_ASSET && openMode == AERON_VFS_READ &&
+		XwaGameFiles_Find(g_fileVfs, fileName, modPath, sizeof modPath)) {
+		root = AERON_VFS_ROOT_MOD;
+		fileName = modPath;
+	}
+#endif
 	g_lastOpenedFileRoot = root;
 	strncpy(FileName, fileName, sizeof(FileName) - 1);
 	FileName[sizeof(FileName) - 1] = '\0';
