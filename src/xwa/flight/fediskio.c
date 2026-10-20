@@ -512,12 +512,12 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 										g_modelTypeTable[loadedModelSlot].genusId == GENUS_Container ||
 										g_modelTypeTable[loadedModelSlot].genusId == GENUS_Platform ||
 										g_modelTypeTable[loadedModelSlot].genusId == GENUS_Starship) {
-										g_modelDefs[modelEntryIdx].laserGroupMountType[group] = 4;
+										g_modelDefs[modelEntryIdx].laserGroupWeaponKind[group] = 4;
 									} else if (outType == OPT_HARDPOINT_IonCannon ||
 											   outType == OPT_HARDPOINT_MagPulse) {
-										g_modelDefs[modelEntryIdx].laserGroupMountType[group] = 2;
+										g_modelDefs[modelEntryIdx].laserGroupWeaponKind[group] = 2;
 									} else {
-										g_modelDefs[modelEntryIdx].laserGroupMountType[group] = 1;
+										g_modelDefs[modelEntryIdx].laserGroupWeaponKind[group] = 1;
 									}
 								}
 							} else if (g_optHardpointWeaponGroupKindByType[outType] == 2) {

@@ -6331,8 +6331,8 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 						uint8_t firstSlot = g_modelDefs[modelIndex].laserGroupFirstSlot[g];
 						uint8_t lastSlot = g_modelDefs[modelIndex].laserGroupLastSlot[g];
 						laserSlotAccum += g_modelDefs[modelIndex].laserGroupSlotCount[g];
-						if (g_modelDefs[modelIndex].laserGroupMountType[g] == 1 ||
-							g_modelDefs[modelIndex].laserGroupMountType[g] == 2) {
+						if (g_modelDefs[modelIndex].laserGroupWeaponKind[g] == 1 ||
+							g_modelDefs[modelIndex].laserGroupWeaponKind[g] == 2) {
 							++g_curCraft->cannonClassCount;
 							g_curCraft->laserLinkNextSlot[g] = (char)firstSlot;
 						}
@@ -6341,9 +6341,9 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 								g_curCraft->warheadData[slot].projectileTypeId =
 									g_curCraft->laserProjectileTypeId[g];
 								g_curCraft->warheadData[slot].weaponType =
-									(g_modelDefs[modelIndex].laserGroupMountType[g] == 1 ||
-									 g_modelDefs[modelIndex].laserGroupMountType[g] == 2)
-										? g_modelDefs[modelIndex].laserGroupMountType[g]
+									(g_modelDefs[modelIndex].laserGroupWeaponKind[g] == 1 ||
+									 g_modelDefs[modelIndex].laserGroupWeaponKind[g] == 2)
+										? g_modelDefs[modelIndex].laserGroupWeaponKind[g]
 										: 4;
 								g_curCraft->warheadData[slot].weaponGroupIdx = (uint8_t)g;
 								g_curCraft->warheadData[slot].laserCharge = 127;
@@ -6378,7 +6378,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			if ((g_modelTypeTable[(uint16_t)g_spawnObjectType].flags & 0x800) != 0) {
 				for (g = 0; g < 3; ++g) {
 					uint8_t remaining = g_modelDefs[modelIndex].laserGroupSlotCount[g];
-					if (g_modelDefs[modelIndex].laserGroupMountType[g] >= 4 && remaining) {
+					if (g_modelDefs[modelIndex].laserGroupWeaponKind[g] >= 4 && remaining) {
 						/* Modern port: a GLB replacement has up to 120 slots. */
 						for (slot = 0; slot < XWA_MODEL_WEAPON_SLOT_LIMIT(g_spawnObjectType); ++slot) {
 							if (!g_curCraft->warheadData[slot].weaponType) {
@@ -6387,7 +6387,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 										? g_modelDefs[modelIndex].laserGroupWeaponType[g]
 										: 281;
 								g_curCraft->warheadData[slot].weaponType =
-									g_modelDefs[modelIndex].laserGroupMountType[g];
+									g_modelDefs[modelIndex].laserGroupWeaponKind[g];
 								g_curCraft->warheadData[slot].laserCharge = 127;
 								g_curCraft->warheadData[slot].count = 0;
 								g_curCraft->warheadData[slot].lastFireMeshIdx = 0xFF;

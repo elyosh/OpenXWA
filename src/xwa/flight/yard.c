@@ -1097,20 +1097,20 @@ int Yard_SpawnObjectAtWorldPos(ObjectTypeId objectType, int worldX, int worldY, 
 						laserSlotCount += g_modelDefs[modelIndex].laserGroupSlotCount[groupIdx];
 						firstSlot = g_modelDefs[modelIndex].laserGroupFirstSlot[groupIdx];
 						lastSlot = g_modelDefs[modelIndex].laserGroupLastSlot[groupIdx];
-						if (g_modelDefs[modelIndex].laserGroupMountType[groupIdx] == 1u ||
-							g_modelDefs[modelIndex].laserGroupMountType[groupIdx] == 2u) {
+						if (g_modelDefs[modelIndex].laserGroupWeaponKind[groupIdx] == 1u ||
+							g_modelDefs[modelIndex].laserGroupWeaponKind[groupIdx] == 2u) {
 							++g_curCraft->cannonClassCount;
 							g_curCraft->laserLinkNextSlot[groupIdx] = firstSlot;
 						}
 
 						if (firstSlot <= lastSlot) {
 							for (slotIdx = firstSlot; slotIdx <= lastSlot; ++slotIdx) {
-								if (g_modelDefs[modelIndex].laserGroupMountType[groupIdx] == 1u ||
-									g_modelDefs[modelIndex].laserGroupMountType[groupIdx] == 2u) {
+								if (g_modelDefs[modelIndex].laserGroupWeaponKind[groupIdx] == 1u ||
+									g_modelDefs[modelIndex].laserGroupWeaponKind[groupIdx] == 2u) {
 									g_curCraft->warheadData[slotIdx].projectileTypeId =
 										g_curCraft->laserProjectileTypeId[groupIdx];
 									g_curCraft->warheadData[slotIdx].weaponType =
-										g_modelDefs[modelIndex].laserGroupMountType[groupIdx];
+										g_modelDefs[modelIndex].laserGroupWeaponKind[groupIdx];
 								} else {
 									g_curCraft->warheadData[slotIdx].projectileTypeId =
 										g_curCraft->laserProjectileTypeId[groupIdx];

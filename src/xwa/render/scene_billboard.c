@@ -739,10 +739,10 @@ void RenderBillboard_DrawOriented(ParticleEffect* effect, unsigned int renderFla
 		float relZBase;
 
 		cameraPanDeltaZ = (float)g_players[g_localPlayer].viewState.cameraPanDeltaZ;
-		relYBase = -g_players[g_localPlayer].hardpointWorldY -
+		relYBase = -g_players[g_localPlayer].seatEyeWorldOffsetY -
 				   (float)g_players[g_localPlayer].viewState.cameraPanDeltaY * 0.0625f;
-		relZBase = -g_players[g_localPlayer].hardpointWorldZ;
-		centerRel.x = -g_players[g_localPlayer].hardpointWorldX -
+		relZBase = -g_players[g_localPlayer].seatEyeWorldOffsetZ;
+		centerRel.x = -g_players[g_localPlayer].seatEyeWorldOffsetX -
 					  (float)g_players[g_localPlayer].viewState.cameraPanDeltaX * 0.0625f + centerRel.x;
 		centerRel.y = relYBase + centerRel.y;
 		centerRel.z = relZBase - cameraPanDeltaZ * 0.0625f + centerRel.z;
@@ -1440,10 +1440,10 @@ void RenderBillboard_DrawOrientedStretched(ParticleEffect* effect, unsigned int 
 		float relZBase;
 
 		cameraPanDeltaZ = (float)g_players[g_localPlayer].viewState.cameraPanDeltaZ;
-		relYBase = -g_players[g_localPlayer].hardpointWorldY -
+		relYBase = -g_players[g_localPlayer].seatEyeWorldOffsetY -
 				   (float)g_players[g_localPlayer].viewState.cameraPanDeltaY * 0.0625f;
-		relZBase = -g_players[g_localPlayer].hardpointWorldZ;
-		centerRel.x = -g_players[g_localPlayer].hardpointWorldX -
+		relZBase = -g_players[g_localPlayer].seatEyeWorldOffsetZ;
+		centerRel.x = -g_players[g_localPlayer].seatEyeWorldOffsetX -
 					  (float)g_players[g_localPlayer].viewState.cameraPanDeltaX * 0.0625f + centerRel.x;
 		centerRel.y = relYBase + centerRel.y;
 		centerRel.z = relZBase - cameraPanDeltaZ * 0.0625f + centerRel.z;

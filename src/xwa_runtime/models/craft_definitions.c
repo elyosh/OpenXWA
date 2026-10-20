@@ -136,7 +136,7 @@ static const CraftField s_recordFields[] = {
 static const CraftField s_laserFields[] = {
 	{ "type", offsetof(ModelDef, laserGroupWeaponType), CRAFT_FIELD_U16 },
 	{ "count", offsetof(ModelDef, laserGroupSlotCount), CRAFT_FIELD_U8 },
-	{ "mount", offsetof(ModelDef, laserGroupMountType), CRAFT_FIELD_U8 },
+	{ "kind", offsetof(ModelDef, laserGroupWeaponKind), CRAFT_FIELD_U8 },
 	{ "range", offsetof(ModelDef, laserGroupFireRange), CRAFT_FIELD_I32 },
 	{ "cooldown", offsetof(ModelDef, laserGroupFireCooldownTicks), CRAFT_FIELD_U16 },
 };

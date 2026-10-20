@@ -407,11 +407,11 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 		mesh.viewPos.y = (float)(obj->world_y - g_players[g_localPlayer].viewState.savedTargetY);
 		mesh.viewPos.z = (float)(obj->world_z - g_players[g_localPlayer].viewState.savedTargetZ);
 		if (g_cockpitViewActive) {
-			mesh.viewPos.x = -g_players[g_localPlayer].hardpointWorldX -
+			mesh.viewPos.x = -g_players[g_localPlayer].seatEyeWorldOffsetX -
 							 g_players[g_localPlayer].viewState.cameraPanDeltaX * g_cockpitPanPositionScale;
-			mesh.viewPos.y = -g_players[g_localPlayer].hardpointWorldY -
+			mesh.viewPos.y = -g_players[g_localPlayer].seatEyeWorldOffsetY -
 							 g_players[g_localPlayer].viewState.cameraPanDeltaY * g_cockpitPanPositionScale;
-			mesh.viewPos.z = -g_players[g_localPlayer].hardpointWorldZ -
+			mesh.viewPos.z = -g_players[g_localPlayer].seatEyeWorldOffsetZ -
 							 g_players[g_localPlayer].viewState.cameraPanDeltaZ * g_cockpitPanPositionScale;
 		}
 
@@ -790,11 +790,11 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 	mesh.viewPos.y = (float)(obj->world_y - g_players[g_localPlayer].viewState.savedTargetY);
 	mesh.viewPos.z = (float)(obj->world_z - g_players[g_localPlayer].viewState.savedTargetZ);
 	if (g_cockpitViewActive) {
-		mesh.viewPos.x = -g_players[g_localPlayer].hardpointWorldX -
+		mesh.viewPos.x = -g_players[g_localPlayer].seatEyeWorldOffsetX -
 						 g_players[g_localPlayer].viewState.cameraPanDeltaX * g_cockpitPanPositionScale;
-		mesh.viewPos.y = -g_players[g_localPlayer].hardpointWorldY -
+		mesh.viewPos.y = -g_players[g_localPlayer].seatEyeWorldOffsetY -
 						 g_players[g_localPlayer].viewState.cameraPanDeltaY * g_cockpitPanPositionScale;
-		mesh.viewPos.z = -g_players[g_localPlayer].hardpointWorldZ -
+		mesh.viewPos.z = -g_players[g_localPlayer].seatEyeWorldOffsetZ -
 						 g_players[g_localPlayer].viewState.cameraPanDeltaZ * g_cockpitPanPositionScale;
 	}
 
@@ -1036,11 +1036,11 @@ void RenderScene_DrawNoAssetSourceModel(ObjectRecord* obj, int nodeSwitchIndex) 
 	mesh.viewPos.y = (float)(obj->world_y - g_players[g_localPlayer].viewState.savedTargetY);
 	mesh.viewPos.z = (float)(obj->world_z - g_players[g_localPlayer].viewState.savedTargetZ);
 	if (g_cockpitViewActive) {
-		mesh.viewPos.x = -g_players[g_localPlayer].hardpointWorldX -
+		mesh.viewPos.x = -g_players[g_localPlayer].seatEyeWorldOffsetX -
 						 (double)g_players[g_localPlayer].viewState.cameraPanDeltaX * 0.0625;
-		mesh.viewPos.y = -g_players[g_localPlayer].hardpointWorldY -
+		mesh.viewPos.y = -g_players[g_localPlayer].seatEyeWorldOffsetY -
 						 (double)g_players[g_localPlayer].viewState.cameraPanDeltaY * 0.0625;
-		mesh.viewPos.z = -g_players[g_localPlayer].hardpointWorldZ -
+		mesh.viewPos.z = -g_players[g_localPlayer].seatEyeWorldOffsetZ -
 						 (double)g_players[g_localPlayer].viewState.cameraPanDeltaZ * 0.0625;
 	}
 

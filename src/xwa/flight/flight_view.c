@@ -277,7 +277,7 @@ static void FVIEW_StoreCamShadow(const double m[9]) {
 #endif
 
 // FUNCTION: XWA 0x497610
-int ComputeHardpointWorldPos(int playerIdx) {
+int FlightView_ComputeSeatEyeOffset(int playerIdx) {
 	int objectIdx;
 	ModelIndex modelIndex;
 	Vec3f vec;
@@ -388,14 +388,14 @@ int ComputeHardpointWorldPos(int playerIdx) {
 	out.m[7] = (float)g_objectTable[objectIdx].mobj->cachedUpY * flt_5A9AC0;
 	out.m[8] = (float)g_objectTable[objectIdx].mobj->cachedUpZ * flt_5A9AC0;
 
-	g_players[playerIdx].hardpointLocalX = vec.x;
-	g_players[playerIdx].hardpointLocalY = vec.y;
-	g_players[playerIdx].hardpointLocalZ = vec.z;
+	g_players[playerIdx].seatEyeLocalX = vec.x;
+	g_players[playerIdx].seatEyeLocalY = vec.y;
+	g_players[playerIdx].seatEyeLocalZ = vec.z;
 
 	Math3D_RotateVec3(&vec, &out);
-	g_players[playerIdx].hardpointWorldX = vec.x;
-	g_players[playerIdx].hardpointWorldY = vec.y;
-	g_players[playerIdx].hardpointWorldZ = vec.z;
+	g_players[playerIdx].seatEyeWorldOffsetX = vec.x;
+	g_players[playerIdx].seatEyeWorldOffsetY = vec.y;
+	g_players[playerIdx].seatEyeWorldOffsetZ = vec.z;
 	return 0;
 }
 
@@ -415,7 +415,7 @@ void FlightView_RenderCockpitModel(void) {
 	g_curCraft = g_objectTable[playerObjectIdx].mobj->pCraft;
 
 	FVIEW_SetObjectTransform(0, 0x4000u, 0, 0, &g_objectTable[playerObjectIdx]);
-	ComputeHardpointWorldPos(g_localPlayer);
+	FlightView_ComputeSeatEyeOffset(g_localPlayer);
 	g_cockpitViewActive = 1;
 
 	objectType = (uint16_t)g_objectTable[playerObjectIdx].objectType;
@@ -1115,10 +1115,10 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 			g_players[playerIdx].viewState.savedTargetZ =
 				g_objectTable[g_players[playerIdx].viewState.cameraFocusObjIdx].world_z;
 			if (g_players[playerIdx].viewState.cameraFocusObjIdx == g_players[playerIdx].objectIndex) {
-				ComputeHardpointWorldPos(playerIdx);
-				g_players[playerIdx].viewState.savedTargetX += (int)g_players[playerIdx].hardpointWorldX;
-				g_players[playerIdx].viewState.savedTargetY += (int)g_players[playerIdx].hardpointWorldY;
-				g_players[playerIdx].viewState.savedTargetZ += (int)g_players[playerIdx].hardpointWorldZ;
+				FlightView_ComputeSeatEyeOffset(playerIdx);
+				g_players[playerIdx].viewState.savedTargetX += (int)g_players[playerIdx].seatEyeWorldOffsetX;
+				g_players[playerIdx].viewState.savedTargetY += (int)g_players[playerIdx].seatEyeWorldOffsetY;
+				g_players[playerIdx].viewState.savedTargetZ += (int)g_players[playerIdx].seatEyeWorldOffsetZ;
 			}
 			g_players[playerIdx].viewState.savedTargetX +=
 				g_players[playerIdx].viewState.cameraPanDeltaX >> 4;
@@ -1313,9 +1313,9 @@ char FlightView_IsLensFlareSourceVisible(int worldX, int worldY, int worldZ) {
 		}
 
 		g_loadedModels.byObjectType[objectType] = g_cockpitModel;
-		localSegmentEnd[0] = player->hardpointLocalX;
-		localSegmentEnd[1] = player->hardpointLocalY;
-		localSegmentEnd[2] = player->hardpointLocalZ;
+		localSegmentEnd[0] = player->seatEyeLocalX;
+		localSegmentEnd[1] = player->seatEyeLocalY;
+		localSegmentEnd[2] = player->seatEyeLocalZ;
 
 		mobj = playerObj->mobj;
 		worldX = worldX - playerObj->world_x;

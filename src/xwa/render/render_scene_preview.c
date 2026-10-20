@@ -424,11 +424,11 @@ int RenderScene_ProjectPreviewWireframeModel(ObjectRecord* obj) {
 	mesh.viewPos.y = (float)(obj->world_y - g_players[g_localPlayer].viewState.savedTargetY);
 	mesh.viewPos.z = (float)(obj->world_z - g_players[g_localPlayer].viewState.savedTargetZ);
 	if (g_cockpitViewActive) {
-		mesh.viewPos.x = -g_players[g_localPlayer].hardpointWorldX -
+		mesh.viewPos.x = -g_players[g_localPlayer].seatEyeWorldOffsetX -
 						 (double)g_players[g_localPlayer].viewState.cameraPanDeltaX * 0.0625;
-		mesh.viewPos.y = -g_players[g_localPlayer].hardpointWorldY -
+		mesh.viewPos.y = -g_players[g_localPlayer].seatEyeWorldOffsetY -
 						 (double)g_players[g_localPlayer].viewState.cameraPanDeltaY * 0.0625;
-		mesh.viewPos.z = -g_players[g_localPlayer].hardpointWorldZ -
+		mesh.viewPos.z = -g_players[g_localPlayer].seatEyeWorldOffsetZ -
 						 (double)g_players[g_localPlayer].viewState.cameraPanDeltaZ * 0.0625;
 	}
 

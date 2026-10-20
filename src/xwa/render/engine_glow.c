@@ -1292,9 +1292,9 @@ char GlowMark_SpawnLocalPlayerHitEffects(void) {
 	}
 
 	g_cockpitViewActive = 1;
-	localSegmentEnd[0] = g_players[g_localPlayer].hardpointLocalX;
-	localSegmentEnd[1] = g_players[g_localPlayer].hardpointLocalY;
-	localSegmentEnd[2] = g_players[g_localPlayer].hardpointLocalZ;
+	localSegmentEnd[0] = g_players[g_localPlayer].seatEyeLocalX;
+	localSegmentEnd[1] = g_players[g_localPlayer].seatEyeLocalY;
+	localSegmentEnd[2] = g_players[g_localPlayer].seatEyeLocalZ;
 
 	for (i = 0; i < spawnCount; ++i) {
 		float localSegmentStart[3];

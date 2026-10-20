@@ -312,11 +312,12 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 	if (s->cockpit_valid) {
 		const XwaCockpit* k = &s->cockpit;
 		fprintf(fp,
-				"cockpit '%s' ext '%s' seat %u look %u tog %u hp %.1f,%.1f,%.1f "
+				"cockpit '%s' ext '%s' seat %u look %u tog %u eye %.1f,%.1f,%.1f "
 				"pan %.0f,%.0f,%.0f\n",
 				k->model_name, k->exterior_name, k->seat, k->look_available, k->toggle_available,
-				(double)k->hardpoint_world[0], (double)k->hardpoint_world[1], (double)k->hardpoint_world[2],
-				(double)k->camera_pan[0], (double)k->camera_pan[1], (double)k->camera_pan[2]);
+				(double)k->seat_eye_world_offset[0], (double)k->seat_eye_world_offset[1],
+				(double)k->seat_eye_world_offset[2], (double)k->camera_pan[0], (double)k->camera_pan[1],
+				(double)k->camera_pan[2]);
 	}
 	fprintf(fp,
 			"hud valid %u enabled %u frame %u epoch %u scale %.3f mode %08x player %u:%u "
@@ -1737,12 +1738,12 @@ void XwaSnapshot_CaptureFlight(void) {
 			}
 			k->look_available = g_players[g_localPlayer].cockpitLookAvailable;
 			k->toggle_available = (uint8_t)g_players[g_localPlayer].cockpitToggleAvailable;
-			k->hardpoint_world[0] = g_players[g_localPlayer].hardpointWorldX;
-			k->hardpoint_world[1] = g_players[g_localPlayer].hardpointWorldY;
-			k->hardpoint_world[2] = g_players[g_localPlayer].hardpointWorldZ;
-			k->hardpoint_local[0] = g_players[g_localPlayer].hardpointLocalX;
-			k->hardpoint_local[1] = g_players[g_localPlayer].hardpointLocalY;
-			k->hardpoint_local[2] = g_players[g_localPlayer].hardpointLocalZ;
+			k->seat_eye_world_offset[0] = g_players[g_localPlayer].seatEyeWorldOffsetX;
+			k->seat_eye_world_offset[1] = g_players[g_localPlayer].seatEyeWorldOffsetY;
+			k->seat_eye_world_offset[2] = g_players[g_localPlayer].seatEyeWorldOffsetZ;
+			k->seat_eye_local[0] = g_players[g_localPlayer].seatEyeLocalX;
+			k->seat_eye_local[1] = g_players[g_localPlayer].seatEyeLocalY;
+			k->seat_eye_local[2] = g_players[g_localPlayer].seatEyeLocalZ;
 			k->camera_pan[0] = (float)vs->cameraPanDeltaX;
 			k->camera_pan[1] = (float)vs->cameraPanDeltaY;
 			k->camera_pan[2] = (float)vs->cameraPanDeltaZ;

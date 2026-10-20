@@ -469,12 +469,12 @@ void FlightLight_AppendLocalPlayerPulses(void) {
 			pointLight->colorG = g_localPlayerLightPulses[pulseIdx].colorG;
 			pointLight->colorB = g_localPlayerLightPulses[pulseIdx].colorB;
 
-			pointLight->fixed.x = (int)g_players[playerIdx].hardpointLocalX;
-			pointLight->fixed.y = (int)g_players[playerIdx].hardpointLocalY;
-			pointLight->fixed.z = (int)g_players[playerIdx].hardpointLocalZ;
-			pointLight->x = g_players[playerIdx].hardpointLocalX;
-			pointLight->y = g_players[playerIdx].hardpointLocalY;
-			pointLight->z = g_players[playerIdx].hardpointLocalZ;
+			pointLight->fixed.x = (int)g_players[playerIdx].seatEyeLocalX;
+			pointLight->fixed.y = (int)g_players[playerIdx].seatEyeLocalY;
+			pointLight->fixed.z = (int)g_players[playerIdx].seatEyeLocalZ;
+			pointLight->x = g_players[playerIdx].seatEyeLocalX;
+			pointLight->y = g_players[playerIdx].seatEyeLocalY;
+			pointLight->z = g_players[playerIdx].seatEyeLocalZ;
 			++outLightCount;
 		}
 	}

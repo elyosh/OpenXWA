@@ -1621,13 +1621,13 @@ static __inline void laser_GetTurretProjectileHardpoint(ModelIndex firerModelInd
 		if (turretSeatIdx == 1) {
 			Matrix3x3 mirror = { { 1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, -1.0f } };
 
-			vec.x -= g_players[playerIdx].hardpointLocalX;
-			vec.y -= g_players[playerIdx].hardpointLocalY;
-			vec.z -= g_players[playerIdx].hardpointLocalZ;
+			vec.x -= g_players[playerIdx].seatEyeLocalX;
+			vec.y -= g_players[playerIdx].seatEyeLocalY;
+			vec.z -= g_players[playerIdx].seatEyeLocalZ;
 			Math3D_RotateVec3(&vec, &mirror);
-			vec.x += g_players[playerIdx].hardpointLocalX;
-			vec.y += g_players[playerIdx].hardpointLocalY;
-			vec.z += g_players[playerIdx].hardpointLocalZ;
+			vec.x += g_players[playerIdx].seatEyeLocalX;
+			vec.y += g_players[playerIdx].seatEyeLocalY;
+			vec.z += g_players[playerIdx].seatEyeLocalZ;
 		}
 
 		*outSide = (int16_t)(int)vec.x;
@@ -2171,7 +2171,7 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 			remainingShots = 1;
 			slotStep = 1;
 			if (firingPlayerIdx != -1 &&
-				g_modelDefs[g_curCraft->modelIndex].laserGroupMountType[laserGroupIdx] == 4 &&
+				g_modelDefs[g_curCraft->modelIndex].laserGroupWeaponKind[laserGroupIdx] == 4 &&
 				g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[firstSlot].z < -64) {
 				if (g_curCraft->carriedObjectIndex != 0xffffu) {
 					return;
@@ -2492,46 +2492,46 @@ void laser_fireplayerweapon(int playerIdx) {
 					}
 				}
 			} else {
-				uint8_t* laserGroupMountType;
+				uint8_t* laserGroupWeaponKind;
 				int laserGroupIdx;
 				int remainingGroups;
 
-				laserGroupMountType =
+				laserGroupWeaponKind =
 					g_modelDefs[(uint16_t)GetModelIndexFromType(
 									g_objectTable[g_players[playerIdx].objectIndex].objectType)]
-						.laserGroupMountType;
+						.laserGroupWeaponKind;
 				laserGroupIdx = 0;
 				remainingGroups = 3;
 				do {
-					if (*laserGroupMountType == 4) {
+					if (*laserGroupWeaponKind == 4) {
 						laser_firelasersystem((unsigned int)g_players[playerIdx].objectIndex, laserGroupIdx,
 											  playerIdx, 1u);
 					}
 					++laserGroupIdx;
-					++laserGroupMountType;
+					++laserGroupWeaponKind;
 					--remainingGroups;
 				} while (remainingGroups != 0);
 			}
 			if (g_players[playerIdx].turretAutoFireState == 0) {
 				if (g_players[playerIdx].selectedWarhead == 0 ||
 					craft->laserLinkMode[g_players[playerIdx].selectedWarhead] == 4) {
-					uint8_t* laserGroupMountType;
+					uint8_t* laserGroupWeaponKind;
 					int laserGroupIdx;
 					int remainingGroups;
 
-					laserGroupMountType =
+					laserGroupWeaponKind =
 						g_modelDefs[(uint16_t)GetModelIndexFromType(
 										g_objectTable[g_players[playerIdx].objectIndex].objectType)]
-							.laserGroupMountType;
+							.laserGroupWeaponKind;
 					laserGroupIdx = 0;
 					remainingGroups = 3;
 					do {
-						if (*laserGroupMountType == 4) {
+						if (*laserGroupWeaponKind == 4) {
 							laser_firelasersystem((unsigned int)g_players[playerIdx].objectIndex,
 												  laserGroupIdx, playerIdx, 0);
 						}
 						++laserGroupIdx;
-						++laserGroupMountType;
+						++laserGroupWeaponKind;
 						--remainingGroups;
 					} while (remainingGroups != 0);
 				}

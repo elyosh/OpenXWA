@@ -4,7 +4,7 @@
 /* Modern port: the pilot eye of GLB replacement models.
  *
  * XWA places the pilot eye at the model def's cockpitEyeX/Y/Z (+0x238), which
- * ComputeHardpointWorldPos reads every frame. FeDiskIo_BuildModelDef sets Y
+ * FlightView_ComputeSeatEyeOffset reads every frame. FeDiskIo_BuildModelDef sets Y
  * and Z from a Cockpit (type 31) hardpoint on the craft model and never X;
  * no stock OPT has one. For a GLB replacement the hardpoint places the whole
  * eye, so converted XWAU models and authored models carry the eye that XWAU's

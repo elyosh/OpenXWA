@@ -604,13 +604,13 @@ typedef struct XwaHyperspaceState {
  * internal view, at that object's own orientation
  * (FVIEW_SetObjectTransform of its roll/pitch/yaw/angleD — the same
  * basis the driver derives for every flight object), positioned at
- * -(hardpoint_world + camera_pan/16) rotated into eye space. Anchor
+ * -(seat_eye_world_offset + camera_pan/16) rotated into eye space. Anchor
  * and gates mirror the classic draw sites: the hangar anchors to the
  * PLAYER object and draws whenever the view is internal
  * (hangar.c render loop); flight anchors to the camera FOCUS object
  * and requires cockpit_visible plus the seat's availability flag
  * (FlightView_Render queue conditions). Gunner seat 2 additionally
- * flips the model about the hardpoint (basis * diag(1,-1,-1)). */
+ * flips the model about the seat's eye point (basis * diag(1,-1,-1)). */
 typedef struct XwaCockpit {
 	/* Cockpit OPT basename from the loaded-handle registry: seat 0 =
 	 * g_cockpitModel (includes the classic Tie/CombatSim fallback
@@ -632,17 +632,20 @@ typedef struct XwaCockpit {
 	 * -aim_angle_b (Q16, about the mesh's own rotation node). */
 	int16_t aim_angle_a;
 	int16_t aim_angle_b;
-	float hardpoint_world[3]; /* seat eye hardpoint (player.hardpointWorld*) */
-	float camera_pan[3];      /* viewState.cameraPanDelta* (classic scales by 1/16) */
-	/* The eye point of the player's seat in the CRAFT's model space
-	 * (player.hardpointLocal*, flight_view.c:300-391): the cockpit eye, or
-	 * the turret seat's position. The classic anchors the weapon-fire
-	 * pulse point lights here. */
-	float hardpoint_local[3];
+	/* The eye point of the player's seat, as an offset from the craft in
+	 * world axes (player.seatEyeWorldOffset*). */
+	float seat_eye_world_offset[3];
+	float camera_pan[3]; /* viewState.cameraPanDelta* (classic scales by 1/16) */
+	/* The same eye point in the CRAFT's model space (player.seatEyeLocal*,
+	 * FlightView_ComputeSeatEyeOffset): the cockpit eye, or the turret
+	 * seat's position. The classic anchors the weapon-fire pulse point
+	 * lights here. */
+	float seat_eye_local[3];
 } XwaCockpit;
 
 /* Local-player weapon-fire light pulses (g_localPlayerLightPulses):
- * time-animated point lights at the weapon hardpoint, toggled by the
+ * time-animated point lights at the eye point of the player's seat
+ * (XwaCockpit.seat_eye_local), toggled by the
  * firing code. The driver replays the classic cycle/fade envelope
  * from game_time_ticks (deterministic). */
 typedef struct XwaLightPulse {

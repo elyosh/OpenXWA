@@ -148,7 +148,7 @@ int ComputeCraftCombatRating(ObjectTypeId objectType) {
 				}
 				score = ModelDef_GetProjectileDamage((ObjectTypeId)modelDef->laserGroupWeaponType[group]) *
 						modelDef->laserGroupSlotCount[group] * (fireRange / 0x10000) / 10;
-				if (modelDef->laserGroupMountType[group] == 4) {
+				if (modelDef->laserGroupWeaponKind[group] == 4) {
 					score *= 2;
 				}
 				weaponScore += score;

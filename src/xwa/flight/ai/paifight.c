@@ -1893,7 +1893,7 @@ char paifight_gunneroffenseorder(void) {
 	} state;
 	uint16_t hasTurretMount;
 	int groupIdx;
-	const uint8_t* laserGroupMountType;
+	const uint8_t* laserGroupWeaponKind;
 
 	craft = g_curCraft;
 	if (craft->objectKind == 3 || craft->workingSubsystems == 0 ||
@@ -1904,12 +1904,12 @@ char paifight_gunneroffenseorder(void) {
 
 	hasTurretMount = 0;
 	groupIdx = 3;
-	laserGroupMountType = g_modelDefs[craft->modelIndex].laserGroupMountType;
+	laserGroupWeaponKind = g_modelDefs[craft->modelIndex].laserGroupWeaponKind;
 	do {
-		if (*laserGroupMountType >= 4u) {
+		if (*laserGroupWeaponKind >= 4u) {
 			hasTurretMount = 1;
 		}
-		++laserGroupMountType;
+		++laserGroupWeaponKind;
 		--groupIdx;
 	} while (groupIdx != 0);
 	if (!hasTurretMount) {

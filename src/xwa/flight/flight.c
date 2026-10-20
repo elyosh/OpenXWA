@@ -1714,9 +1714,9 @@ void FlightObject_UpdateDebrisAndTransientAnimations(void) {
 
 			if ((!g_filmPlaybackMode || g_filmOverlayActive != 1) &&
 				!g_players[g_localPlayer].viewState.externalCameraActive) {
-				playerWorldX += (int)g_players[g_localPlayer].hardpointWorldX;
-				playerWorldY += (int)g_players[g_localPlayer].hardpointWorldY;
-				playerWorldZ += (int)g_players[g_localPlayer].hardpointWorldZ;
+				playerWorldX += (int)g_players[g_localPlayer].seatEyeWorldOffsetX;
+				playerWorldY += (int)g_players[g_localPlayer].seatEyeWorldOffsetY;
+				playerWorldZ += (int)g_players[g_localPlayer].seatEyeWorldOffsetZ;
 			}
 
 			debrisWorldX -= playerWorldX;
@@ -6714,7 +6714,7 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 			}
 			if (g_players[selectedPlayer].regionIndex != g_hangarSceneRegionIdx) {
 				Flight_UpdateEntity((unsigned int)selectedPlayer);
-				ComputeHardpointWorldPos(selectedPlayer);
+				FlightView_ComputeSeatEyeOffset(selectedPlayer);
 			}
 
 			g_gameTime = savedGameTime;

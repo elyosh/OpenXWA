@@ -1612,7 +1612,7 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 
 		modelIndex = (ModelIndex)GetModelIndexFromType(g_objectTable[selectedObjIdx].objectType);
 		if (selectedCraft->laserProjectileTypeId[groupIdx] != 0) {
-			mountType = g_modelDefs[(uint16_t)modelIndex].laserGroupMountType[groupIdx];
+			mountType = g_modelDefs[(uint16_t)modelIndex].laserGroupWeaponKind[groupIdx];
 			if (mountType == 1 || mountType == 2) {
 				selectedCraft->laserLinkNextSlot[groupIdx] =
 					g_modelDefs[(uint16_t)modelIndex].laserGroupFirstSlot[groupIdx];

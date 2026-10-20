@@ -1994,8 +1994,8 @@ static int fl_temporal_pose_changed(const XwaSnapshot* current, const XwaSnapsho
 	const XwaCockpit* prev_cockpit = &previous->cockpit;
 	return cockpit->seat != prev_cockpit->seat || cockpit->aim_angle_a != prev_cockpit->aim_angle_a ||
 		   cockpit->aim_angle_b != prev_cockpit->aim_angle_b ||
-		   memcmp(cockpit->hardpoint_world, prev_cockpit->hardpoint_world, sizeof cockpit->hardpoint_world) !=
-			   0 ||
+		   memcmp(cockpit->seat_eye_world_offset, prev_cockpit->seat_eye_world_offset,
+				  sizeof cockpit->seat_eye_world_offset) != 0 ||
 		   memcmp(cockpit->camera_pan, prev_cockpit->camera_pan, sizeof cockpit->camera_pan) != 0;
 }
 
@@ -2015,12 +2015,12 @@ static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const XwaFlightObj
 
 	float eye_offset[3];
 	for (int axis = 0; axis < 3; ++axis) {
-		eye_offset[axis] = -(cockpit->hardpoint_world[axis] + cockpit->camera_pan[axis] * 0.0625f);
+		eye_offset[axis] = -(cockpit->seat_eye_world_offset[axis] + cockpit->camera_pan[axis] * 0.0625f);
 	}
 	float delta[3];
 	fl_world_to_view(camera_rows, eye_offset[0], eye_offset[1], eye_offset[2], delta);
 	if (cockpit->seat == 2) {
-		/* Classic gunner rear-turret flip about the hardpoint. The flip acts
+		/* Classic gunner rear-turret flip about the seat's eye point. The flip acts
 		 * in eye space, so move the anchor basis there and back. */
 		float eye_basis[9];
 		for (int row = 0; row < 3; ++row) {
@@ -2928,7 +2928,7 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
  *     the instance walk where mesh + articulation exist);
  *   - the local player's semantic pulses, including weapon fire and
  *     hyperspace effects (classic cycle/fade envelope replayed from
- *     game_time_ticks at the hardpoint).
+ *     game_time_ticks at the seat's eye point).
  * The classic cull radii only selected lights per object and are not
  * used. The classic Local Lights config level is NOT honored (period
  * option). Aeron assigns the submitted sources to spatial light clusters.
@@ -3165,7 +3165,7 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 
 /* Local-player pulse lights: the classic cycle/fade envelope
  * (FlightLight_AppendLocalPlayerPulses) replayed from the sim clock;
- * position = the weapon hardpoint in the player craft's model space,
+ * position = the eye point of the player's seat in the craft's model space,
  * carried to world through the player basis. Callers may exclude semantic
  * slots whose visual role is replaced by a dedicated HD scene. */
 static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_bw[9],
@@ -3176,9 +3176,8 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
 	const XwaCockpit* k = &snap->cockpit;
 	float world[3];
 	for (int r = 0; r < 3; r++) {
-		world[r] = player_pos[r] + player_bw[0 * 3 + r] * k->hardpoint_local[0] +
-				   player_bw[1 * 3 + r] * k->hardpoint_local[1] +
-				   player_bw[2 * 3 + r] * k->hardpoint_local[2];
+		world[r] = player_pos[r] + player_bw[0 * 3 + r] * k->seat_eye_local[0] +
+				   player_bw[1 * 3 + r] * k->seat_eye_local[1] + player_bw[2 * 3 + r] * k->seat_eye_local[2];
 	}
 	for (int p = 0; p < XWA_SNAP_MAX_LIGHT_PULSES; p++) {
 		if (excluded_slots & (1u << (uint32_t)p)) {
@@ -3890,7 +3889,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	memcpy(bw, anchor_bw, sizeof bw);
 	float w[3], delta[3];
 	for (int a = 0; a < 3; a++) {
-		w[a] = -(snap->cockpit.hardpoint_world[a] + snap->cockpit.camera_pan[a] * 0.0625f);
+		w[a] = -(snap->cockpit.seat_eye_world_offset[a] + snap->cockpit.camera_pan[a] * 0.0625f);
 	}
 	fl_world_to_view(s.crows, w[0], w[1], w[2], delta);
 	if (snap->cockpit.seat == 2) {
@@ -5311,7 +5310,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * mirror the classic draw sites: the hangar draws it whenever the
 	 * view is internal; flight requires the cockpit toggle plus the
 	 * seat's availability flag. Transform derived from STATE: the
-	 * anchor object's basis, eye anchored at -(seat hardpoint + camera
+	 * anchor object's basis, eye anchored at -(seat eye offset + camera
 	 * pan / 16) rotated into eye space (rotation only — the classic
 	 * g_cockpitViewActive override). Turret seats rotate the cockpit's
 	 * rotary meshes by the captured aim. */

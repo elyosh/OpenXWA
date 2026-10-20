@@ -203,12 +203,14 @@ typedef struct XWA_PLAYER_PACKED_STRUCT PlayerData {
 	uint8_t padlockActive;
 	int16_t lookYawOffset;
 	int16_t lookPitchOffset;
-	float hardpointWorldX;
-	float hardpointWorldY;
-	float hardpointWorldZ;
-	float hardpointLocalX;
-	float hardpointLocalY;
-	float hardpointLocalZ;
+	/* The eye point of the player's seat (FlightView_ComputeSeatEyeOffset): as an
+	   offset from the craft in world axes, and in the craft's model space. */
+	float seatEyeWorldOffsetX;
+	float seatEyeWorldOffsetY;
+	float seatEyeWorldOffsetZ;
+	float seatEyeLocalX;
+	float seatEyeLocalY;
+	float seatEyeLocalZ;
 	int16_t currentSeatIdx;
 	int16_t turretAutoFireState;
 	uint8_t gunnerHardpointToggle;

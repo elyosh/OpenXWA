@@ -70,7 +70,9 @@ typedef struct ModelDef {
 	uint8_t laserGroupFirstSlot[3];
 	uint8_t laserGroupLastSlot[3];
 	uint8_t laserGroupSlotCount[3];
-	uint8_t laserGroupMountType[3];
+	/* The weaponType that the group's slots get (WarheadInventoryEntry): 1 laser
+	   cannon, 2 ion cannon, 4 turret, 5 turret with twice the firing range. */
+	uint8_t laserGroupWeaponKind[3];
 	int laserGroupFireRange[3];
 	uint16_t laserGroupFireCooldownTicks[3];
 	uint16_t warheadLauncherType[2];
@@ -84,7 +86,7 @@ typedef struct ModelDef {
 	uint8_t engineGlowCount;
 	uint8_t countermeasureCount;
 	int gunsightOffsetY;
-	/* Pilot eye in the craft model's frame (+0x238). ComputeHardpointWorldPos
+	/* Pilot eye in the craft model's frame (+0x238). FlightView_ComputeSeatEyeOffset
 	   places it at (X, -Y, Z); a Cockpit hardpoint (type 31) on the craft
 	   model sets Y and Z (FeDiskIo_BuildModelDef). */
 	int16_t cockpitEyeY;

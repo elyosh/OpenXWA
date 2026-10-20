@@ -1073,7 +1073,7 @@ void Renderer_InitD3DDevice(IDirectDraw* pDD, IDirectDrawSurface* renderSurface)
 void FVIEW_calcrotatemove(Q16Angle angleA, Q16Angle angleB, ObjectRecord* objRecord);
 void FVIEW_transformaxes(int axisX_Q15, int axisY_Q15, int axisZ_Q15, int16_t angleQ16);
 void FVIEW_calcrotateorient(Q16Angle angleC, Q16Angle angleD, ObjectRecord* objRecord);
-int ComputeHardpointWorldPos(int playerIdx);
+int FlightView_ComputeSeatEyeOffset(int playerIdx);
 void FlightView_RenderCockpitModel(void);
 char FlightView_Render(void);
 void FlightView_RenderFrame(void);
