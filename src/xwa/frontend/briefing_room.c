@@ -37,6 +37,7 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/runtime/movie_task.h"
 #endif
 #include "xwa_runtime/timing/host_clock.h"
@@ -117,7 +118,18 @@ int BriefingRoom_PrepareTourBriefing(void) {
 #endif
 	g_gameConfig.randomSeed = rand();
 	MissionSetup_BuildBriefingText(g_briefingText);
+#ifdef XWA_MODERN
+	/* Modern port: a mission's text lines replace its order of battle. */
+	if (XwaMissionSettings_OrderOfBattleLineCount() > 0) {
+		memset(g_oobCraftCounts, 0, sizeof g_oobCraftCounts);
+		g_oobEntryCount = 0;
+		g_oobMaxWidth = 0;
+	} else {
+		BriefingRoom_ComputeOrderOfBattle();
+	}
+#else
 	BriefingRoom_ComputeOrderOfBattle();
+#endif
 
 	for (missionListIndex = 0; missionListIndex < g_missionCount; ++missionListIndex) {
 		if (g_missionList[missionListIndex].missionIdx == g_currentMissionId) {
@@ -259,6 +271,49 @@ int BriefingRoom_DrawMissionBriefingTextReveal(int revealRadius) {
 	return 1;
 }
 
+#ifdef XWA_MODERN
+/* Modern port: with a list of flight groups in the mission's settings, the
+   order of battle shows the listed ones that aren't fighters, whatever
+   their team and arrival, each with its name when the settings give one.
+   Returns -1 without a list. */
+static int BriefingRoom_ListedFlightGroup(int flightGroupIndex) {
+	const XwaFlightGroup* flightGroup = &g_frontendMission->flightGroups[flightGroupIndex];
+	const int listed = XwaMissionSettings_OrderOfBattleListed(flightGroupIndex);
+	int category;
+
+	if (listed <= 0) {
+		return listed;
+	}
+	category = g_shipList[g_shipTypeToShipListIndex[flightGroup->craftType]].category;
+	return category >= 2 && category <= 7;
+}
+
+/* Modern port: the text lines that replace the order of battle, under its
+   title, from the settings' top when they give one. */
+static void BriefingRoom_DrawOrderOfBattleLines(FrontendRect* rect, int revealCount) {
+	FrontendRect textRect;
+	int line;
+
+	FrontendDraw_RectCopy(&textRect, rect);
+	if (XwaMissionSettings_OrderOfBattleLinesTop() >= 0) {
+		textRect.top = XwaMissionSettings_OrderOfBattleLinesTop();
+	}
+	if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
+		strcpy(g_frontendScratchBuffer, FrontendString_Get(STR_MISSION_CRAFT));
+	} else {
+		strcpy(g_frontendScratchBuffer, FrontendString_Get(STR_ORDER_OF_BATTLE));
+	}
+	FrontendText_DrawReveal(12, g_frontendScratchBuffer, textRect.left, textRect.top, g_colorLightBlue,
+							revealCount);
+	textRect.top += 20;
+	for (line = 0; line < XwaMissionSettings_OrderOfBattleLineCount(); ++line) {
+		FrontendText_DrawReveal(12, XwaMissionSettings_OrderOfBattleLine(line), textRect.left, textRect.top,
+								g_colorLightBlue, revealCount);
+		FrontendDraw_RectOffsetXY(&textRect, 0, 15);
+	}
+}
+#endif
+
 // FUNCTION: XWA 0x578A60
 int BriefingRoom_DrawOrderOfBattle(FrontendRect* rect, int revealCount) {
 	int linesPerPage;
@@ -301,18 +356,45 @@ int BriefingRoom_DrawOrderOfBattle(FrontendRect* rect, int revealCount) {
 			int category;
 
 			flightGroup = &g_frontendMission->flightGroups[flightGroupIndex];
+#ifdef XWA_MODERN
+			if (BriefingRoom_ListedFlightGroup(flightGroupIndex) >= 0
+					? BriefingRoom_ListedFlightGroup(flightGroupIndex)
+					: flightGroup->team == g_pilotData.team &&
+						  flightGroup->arrival[0].triggers[0].condition == 0 &&
+						  flightGroup->arrival[0].triggers[0].variableType == 1 &&
+						  flightGroup->arrival[0].triggers[0].variable == 0 &&
+						  flightGroup->arrival[0].triggers[1].condition == 0 &&
+						  flightGroup->arrival[0].triggers[1].variableType == 1 &&
+						  flightGroup->arrival[0].triggers[1].variable == 0 &&
+						  flightGroup->arrival[0].t1OrT2 == 0) {
+#else
 			if (flightGroup->team == g_pilotData.team && flightGroup->arrival[0].triggers[0].condition == 0 &&
 				flightGroup->arrival[0].triggers[0].variableType == 1 &&
 				flightGroup->arrival[0].triggers[0].variable == 0 &&
 				flightGroup->arrival[0].triggers[1].condition == 0 &&
 				flightGroup->arrival[0].triggers[1].variableType == 1 &&
 				flightGroup->arrival[0].triggers[1].variable == 0 && flightGroup->arrival[0].t1OrT2 == 0) {
+#endif
 				shipEntry = &g_shipList[g_shipTypeToShipListIndex[flightGroup->craftType]];
 				category = shipEntry->category;
+#ifdef XWA_MODERN
+				if (category == 6 || BriefingRoom_ListedFlightGroup(flightGroupIndex) > 0) {
+#else
 				if (category == 6) {
+#endif
 					if (entryIndex >= linesPerPage * pageIndex &&
 						entryIndex < linesPerPage * (pageIndex + 1)) {
+#ifdef XWA_MODERN
+						if (XwaMissionSettings_OrderOfBattleName(flightGroupIndex) != NULL &&
+							BriefingRoom_ListedFlightGroup(flightGroupIndex) > 0) {
+							strcpy(g_frontendScratchBuffer,
+								   XwaMissionSettings_OrderOfBattleName(flightGroupIndex));
+						} else {
+							sprintf(g_frontendScratchBuffer, "%s %s", shipEntry->name, flightGroup->name);
+						}
+#else
 						sprintf(g_frontendScratchBuffer, "%s %s", shipEntry->name, flightGroup->name);
+#endif
 						if (g_oobEntryCount > linesPerPage) {
 							if (revealPhase >= 100) {
 								revealPhase = savedRevealPhase;
@@ -423,6 +505,19 @@ int BriefingRoom_ComputeOrderOfBattle(void) {
 		int category;
 
 		flightGroup = &g_frontendMission->flightGroups[flightGroupIndex];
+#ifdef XWA_MODERN
+		/* Modern port: with a list of flight groups in the mission's
+		   settings, only its fighters are counted, whatever their team and
+		   arrival. */
+		if (XwaMissionSettings_OrderOfBattleListed(flightGroupIndex) >= 0) {
+			if (XwaMissionSettings_OrderOfBattleListed(flightGroupIndex) &&
+				g_shipList[g_shipTypeToShipListIndex[flightGroup->craftType]].category == 1) {
+				g_oobCraftCounts[flightGroup->craftType] +=
+					(flightGroup->numberOfWaves + 1) * flightGroup->numberOfCraft;
+			}
+			continue;
+		}
+#endif
 		if (flightGroup->team != g_pilotData.team || flightGroup->arrival[0].triggers[0].condition != 0 ||
 			flightGroup->arrival[0].triggers[0].variableType != 1 ||
 			flightGroup->arrival[0].triggers[0].variable != 0 ||
@@ -842,12 +937,28 @@ int BriefingRoom_Update(int frameCounter) {
 					oobTop = 15 * (((20 - g_oobEntryCount) >> 1) + 6);
 				}
 				FrontendDraw_RectAssign(&out, oobLeft, oobTop, 570, 420);
+#ifdef XWA_MODERN
+				if (XwaMissionSettings_OrderOfBattleLineCount() > 0) {
+					BriefingRoom_DrawOrderOfBattleLines(&out, g_briefingRoomRevealCount);
+				} else {
+					BriefingRoom_DrawOrderOfBattle(&out, g_briefingRoomRevealCount);
+				}
+#else
 				BriefingRoom_DrawOrderOfBattle(&out, g_briefingRoomRevealCount);
+#endif
 			} else {
 				FrontImage_GetResourceRect("squadlogo", &out);
 				FrontImage_DrawSprite("squadlogo", 254, 155);
 				FrontendDraw_RectAssign(&out, 70, 90, 570, 165);
+#ifdef XWA_MODERN
+				if (XwaMissionSettings_OrderOfBattleLineCount() > 0) {
+					BriefingRoom_DrawOrderOfBattleLines(&out, g_briefingRoomRevealCount);
+				} else {
+					BriefingRoom_DrawOrderOfBattle(&out, g_briefingRoomRevealCount);
+				}
+#else
 				BriefingRoom_DrawOrderOfBattle(&out, g_briefingRoomRevealCount);
+#endif
 				BriefingRoom_DrawMissionBriefingTextReveal(g_briefingRoomRevealCount);
 			}
 

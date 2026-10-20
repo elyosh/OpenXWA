@@ -35,6 +35,7 @@
 #include "xwa/math/scalar.h"
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #endif
 #include "xwa/render/effects.h"
@@ -3787,7 +3788,14 @@ void Hud_RenderHud(void) {
 				Hud_DrawRadarBlips();
 			}
 			Hud_DrawPowerSettings3D();
+#ifdef XWA_MODERN
+			/* Modern port: without lasers, no laser charge. */
+			if (!XwaMissionSettings_PlayerLasersDisabled()) {
+				Hud_DrawLaserCharge3D();
+			}
+#else
 			Hud_DrawLaserCharge3D();
+#endif
 			Hud_DrawShieldStrength3D();
 			Hud_DrawBeamStrength3D();
 			Hud_DrawReticle3D();
@@ -15722,11 +15730,25 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 	unsigned int missionDescriptionId;
 
 	missionDescriptionId = g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId];
+#ifdef XWA_MODERN
+	/* Modern port: a mission can choose the IFF whose arrival messages are
+	   skipped. */
+	if (XwaMissionSettings_SkipArrivalMessages(g_missionFlightGroups[flightGroupIdx].fg.iff) > 0) {
+		return;
+	}
+	if (XwaMissionSettings_SkipArrivalMessages(g_missionFlightGroups[flightGroupIdx].fg.iff) < 0 &&
+		missionDescriptionId >= 49 && missionDescriptionId <= 52) {
+		if (g_missionFlightGroups[flightGroupIdx].fg.iff == 1) {
+			return;
+		}
+	}
+#else
 	if (missionDescriptionId >= 49 && missionDescriptionId <= 52) {
 		if (g_missionFlightGroups[flightGroupIdx].fg.iff == 1) {
 			return;
 		}
 	}
+#endif
 
 	fg = &g_missionFlightGroups[flightGroupIdx].fg;
 	if (g_missionFlightGroups[flightGroupIdx].fg.arrivalMethod == 0) {
@@ -15812,6 +15834,13 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 			g_msgArgTable[2] = clicks;
 			g_msgPtrs[0] = g_modelDefs[speciesIdx].longName;
 			g_msgPtrs[1] = g_missionFlightGroups[flightGroupIdx].fg.name;
+#ifdef XWA_MODERN
+			/* Modern port: a mission that skips the hyperspace messages skips
+			   the "entering area" messages too. */
+			if (XwaMissionSettings_SkipHyperspacedMessages() > 0) {
+				return;
+			}
+#endif
 			msg_emitInFlightMessage(MSG_ENTERING_OBJ, playerIdx);
 			return;
 		}
@@ -15821,6 +15850,11 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 		g_msgArgTable[3] = clicks;
 		g_msgPtrs[1] = g_modelDefs[speciesIdx].longName;
 		g_msgPtrs[2] = g_missionFlightGroups[flightGroupIdx].fg.name;
+#ifdef XWA_MODERN
+		if (XwaMissionSettings_SkipHyperspacedMessages() > 0) {
+			return;
+		}
+#endif
 		msg_emitInFlightMessage(MSG_ENTERING_OBJS, playerIdx);
 	}
 }
@@ -15838,8 +15872,17 @@ void msg_emitCraftMessage(uint16_t objIdx, CraftData* craft, int16_t msgTemplate
 	unsigned int modelIndex;
 	int16_t craftNumber;
 
+#ifdef XWA_MODERN
+	/* Modern port: a mission can skip message 143, or keep it in mission
+	   49. */
+	if ((XwaMissionSettings_SkipHyperspacedMessages() >= 0
+			 ? !XwaMissionSettings_SkipHyperspacedMessages()
+			 : g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 49) ||
+		msgTemplateId != 143 || g_objectTable[objIdx].genusId != 0) {
+#else
 	if (g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 49 || msgTemplateId != 143 ||
 		g_objectTable[objIdx].genusId != 0) {
+#endif
 		if (g_objectTable[objIdx].regionIdx == g_players[g_localPlayer].regionIndex) {
 			flightGroupIdx = g_objectTable[objIdx].flightGroupIdx;
 			g_msgSenderIff = (uint8_t)g_objectTable[objIdx].mobj->iff;

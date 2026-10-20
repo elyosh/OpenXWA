@@ -60,6 +60,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
@@ -4749,7 +4750,15 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 				g_hyperspaceFxPhaseLatch = 3;
 				if (playerIdx == (unsigned int)g_localPlayer) {
 					int li;
+#ifdef XWA_MODERN
+					/* Modern port: a jump to a region that the mission lists as
+					   interdicted plays the abort sound. */
+					fsfx_PlaySound(
+						XwaMissionSettings_InterdictedRegion(g_players[playerIdx].regionIndex) ? 119 : 117,
+						0xFFFFu, g_localPlayer);
+#else
 					fsfx_PlaySound(117, 0xFFFFu, g_localPlayer);
+#endif
 					ForceFeedback_PlayHyperspaceInboundEffect();
 					FlightLight_ClearDirectionalLights();
 					FlightLight_AddCurrentRegionBackdropLights();
@@ -10086,7 +10095,15 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			if (!g_flightSimSideEffectsSuppressed && !g_provingGroundsModeActive &&
 				g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR &&
 				!g_players[currentPlayerIdx].hasCheckpointFlag &&
+#ifdef XWA_MODERN
+				/* Modern port: no map in a mission that forces the player into
+				   the turret. */
+				(XwaMissionSettings_ForcePlayerInTurret() >= 0
+					 ? !XwaMissionSettings_ForcePlayerInTurret()
+					 : g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 1) &&
+#else
 				g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 1 &&
+#endif
 				!FlightAction_HasCheckpointPartner(currentPlayerIdx) &&
 				g_players[currentPlayerIdx].hyperspacePhase == PLAYER_HYPERSPACE_PHASE_NONE) {
 				if (g_players[currentPlayerIdx].mapCameraState) {
@@ -10159,6 +10176,11 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 		case KEY_O:
 			if (g_provingGroundsModeActive) {
 				Yard_TargetCurrentObjective(currentPlayerIdx);
+#ifdef XWA_MODERN
+				/* Modern port: a mission can make the O key target craft of
+				   some flight groups. */
+			} else if (XwaMissionSettings_TargetKey((int)currentPlayerIdx)) {
+#endif
 			} else {
 				int target = Player_FindNearestObjective(0, (int)currentPlayerIdx);
 				if (target == 0xffff)
@@ -10933,9 +10955,21 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 	FlightInput_Read((int)playerIdx);
 	FlightInput_ScaleAxesForFlight();
 
+#ifdef XWA_MODERN
+	/* Modern port: a mission can put the player in the turret, at its own
+	   time. */
+	if ((XwaMissionSettings_ForcePlayerInTurret() >= 0
+			 ? XwaMissionSettings_ForcePlayerInTurretAt(
+				   g_missionElapsedClock.hours, g_missionElapsedClock.minutes, g_missionElapsedClock.seconds)
+			 : g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] == 1 &&
+				   !g_missionElapsedClock.hours && !g_missionElapsedClock.minutes &&
+				   g_missionElapsedClock.seconds == 8u) &&
+		!g_players[playerIdx].currentSeatIdx) {
+#else
 	if (g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] == 1 &&
 		!g_missionElapsedClock.hours && !g_missionElapsedClock.minutes &&
 		g_missionElapsedClock.seconds == 8u && !g_players[playerIdx].currentSeatIdx) {
+#endif
 		g_currentActionKey = KEY_G;
 	}
 

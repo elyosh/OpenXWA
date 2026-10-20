@@ -42,6 +42,7 @@
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_art.h"
 #include "xwa_runtime/models/mission_backdrops.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/mission_tie.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
@@ -2970,6 +2971,13 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 
 					object = &g_objectTable[objectIdx];
 					if (object->objectType == 0 ||
+#ifdef XWA_MODERN
+						/* Modern port: a mission can make the proximity
+						   triggers skip objects without craft data, such as
+						   projectiles. */
+						(XwaMissionSettings_SkipProjectilesProximityCheck() &&
+						 (object->mobj == NULL || object->mobj->pCraft == NULL)) ||
+#endif
 						!Mission_ObjectMatchesTriggerVariableEx((uint16_t)objectIdx,
 																(MissionTriggerVariableType)variableType,
 																variable, 0xffffu)) {
@@ -2984,6 +2992,11 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 								 g_regionMainObjectSlotsTotal / (uint32_t)g_missionRegionCount;
 					for (; scanObjIdx < scanObjEnd; ++scanObjIdx) {
 						if (g_objectTable[scanObjIdx].objectType == 0 ||
+#ifdef XWA_MODERN
+							(XwaMissionSettings_SkipProjectilesProximityCheck() &&
+							 (g_objectTable[scanObjIdx].mobj == NULL ||
+							  g_objectTable[scanObjIdx].mobj->pCraft == NULL)) ||
+#endif
 							g_objectTable[scanObjIdx].flightGroupIdx != targetFgIdx) {
 							continue;
 						}
@@ -7578,11 +7591,16 @@ uint16_t Mission_Init(char* fileName) {
 		return 0;
 	}
 #ifdef XWA_MODERN
-	/* Modern port: read the mission's flight-group values, object profile
-	   selections, articulation overrides, hangar settings and art of its own,
-	   before any flight-group object is created or texture loaded. The
-	   flight-group values come first, right after the .TIE is read, so the
-	   readers after them see them. */
+	/* Modern port: read the mission's settings, flight-group values, object
+	   profile selections, articulation overrides, hangar settings and art of
+	   its own, before any flight-group object is created or texture loaded.
+	   The flight-group values come right after the .TIE is read, so the
+	   readers after them see them. A mod can also make each mission load
+	   start without the combat music state of the previous mission. */
+	if (XwaMissionSettings_ResetCombatMusicAtMissionLoad()) {
+		g_musicCombatSeen = 0;
+	}
+	XwaMissionSettings_LoadMission(fileName);
 	XwaMissionTie_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 							  (int16_t)g_missionHeader.numFlightGroups);
 	XwaObjectProfiles_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],

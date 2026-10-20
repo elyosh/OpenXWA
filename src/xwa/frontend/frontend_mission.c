@@ -19,6 +19,7 @@
 #include "xwa/frontend/skirmish.h"
 #include "xwa/util/memory.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/skins.h"
 #endif
@@ -990,6 +991,11 @@ int FrontendMission_LoadCurrent(void) {
 
 		sprintf(buffer, "%s\\%s", g_campaignDirNames[missionDirectoryId],
 				missionList[missionListIndex].fileName);
+#ifdef XWA_MODERN
+		/* Modern port: the briefing room's order of battle reads the
+		   mission's settings. */
+		XwaMissionSettings_LoadMission(buffer);
+#endif
 		return FrontendMission_LoadFile(buffer);
 	}
 }

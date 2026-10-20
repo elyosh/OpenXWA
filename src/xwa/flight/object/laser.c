@@ -27,6 +27,7 @@
 #include "xwa/util/random.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -2429,12 +2430,25 @@ void laser_fireplayerweapon(int playerIdx) {
 	if (objectIndex == 0xffff) {
 		return;
 	}
+#ifdef XWA_MODERN
+	/* Modern port: a mission can take the player's lasers or warheads
+	   away. */
+	if (XwaMissionSettings_PlayerLasersDisabled() && XwaMissionSettings_PlayerWarheadsDisabled()) {
+		return;
+	}
+#endif
 
 	craft = g_objectTable[objectIndex].mobj->pCraft;
 	if (craft->beamEffectAccum[2] != 0 && (craft->cmTypeId != 1 || craft->chaffActiveTimer == 0)) {
 		msg_emitInFlightMessage(MSG_WEAPONS_JAMMED, playerIdx);
 		return;
 	}
+#ifdef XWA_MODERN
+	if (g_players[playerIdx].selectedWeaponMode == 0 ? XwaMissionSettings_PlayerLasersDisabled()
+													 : XwaMissionSettings_PlayerWarheadsDisabled()) {
+		return;
+	}
+#endif
 
 	if (g_players[playerIdx].selectedWeaponMode == 0) {
 		fireCooldown = (int16_t)craft->laserFireCooldownTicks[0];

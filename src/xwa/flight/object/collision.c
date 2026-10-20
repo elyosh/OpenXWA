@@ -38,6 +38,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/collision_bvh.h"
 #include "xwa_runtime/models/hangars.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
 #endif
 
@@ -4373,7 +4374,13 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 				damageAmount = srcMobj->damageAmount;
 			} else {
 				damageAmount = srcMobj->damageAmount;
+#ifdef XWA_MODERN
+				/* Modern port: a mission can turn warhead collision damage
+				   off. */
+				if (g_missionFormatVersion >= 14 && XwaMissionSettings_WarheadCollisionDamage()) {
+#else
 				if (g_missionFormatVersion >= 14) {
+#endif
 					ModelGenusId tgtGenus = g_objectTable[targetObjIdx].genusId;
 					if (tgtGenus == GENUS_Starship || tgtGenus == GENUS_Platform) {
 						int modelIdx = GetModelDefIndexFromType((ObjectTypeId)damageKind);
@@ -4624,7 +4631,13 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 	if (!missionStatus20DamageCap && (uint16_t)componentId != 0xFFFF) {
 		int shieldsUp = (targetCraft->shieldFront + targetCraft->shieldRear) != 0;
 		if (shieldsUp) {
+#ifdef XWA_MODERN
+			/* Modern port: a mission can let shots damage components through
+			   the shields on Hard too. */
+			if (g_flightDifficulty != 2 || XwaMissionSettings_DamageThroughShieldsOnHard()) {
+#else
 			if (g_flightDifficulty != 2) {
+#endif
 				ModelDefIndex modelIdx = GetModelDefIndexFromType(g_objectTable[targetObjIdx].objectType);
 				if (modelIdx != (ModelDefIndex)0xFFFF && g_modelDefs[modelIdx].engineGlowCount) {
 					savedCurCraft = g_curCraft;

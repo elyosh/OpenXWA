@@ -49,6 +49,7 @@
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/hangar_scene.h"
 #include "xwa_runtime/models/hangars.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
@@ -2439,6 +2440,15 @@ int Hangar_UpdateLaunch(int dtMs) {
 		for (i = start; i < end; ++i) {
 			if (g_objectTable[i].flightGroupIdx == departureMothership) {
 				ObjectTypeId t = g_objectTable[i].objectType;
+#ifdef XWA_MODERN
+				/* Modern port: a mod can give the red alert to a mothership
+				   of any type. */
+				if (XwaMissionSettings_HangarRedAlertAnyMothership() && t != OBJ_None &&
+					(uint16_t)t != 0xFFFF) {
+					refObjIdx = i;
+					break;
+				}
+#endif
 				if (t == OBJ_CalamariCruiserNew || t == OBJ_CalamariWinged || t == OBJ_FamilyBase) {
 					refObjIdx = i;
 					break;
@@ -2452,7 +2462,13 @@ int Hangar_UpdateLaunch(int dtMs) {
 		int descId = g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId];
 
 		if ((uint32_t)mship->hullDamage >= MATH2_longfraction((uint32_t)mship->hullMax, 0x8000u) ||
+#ifdef XWA_MODERN
+			/* Modern port: a mission can turn the red alert of mission 20 on
+			   or off. */
+			((XwaMissionSettings_RedAlert() >= 0 ? XwaMissionSettings_RedAlert() : descId == 20) &&
+#else
 			(descId == 20 &&
+#endif
 			 g_missionFlightRuntimeState
 					 .teamGoalStatus[(uint16_t)g_players[g_localPlayer].playerIff][TEAM_GOAL_PRIMARY] != 1)) {
 			float pulse = (float)(4 * g_gameTime % 1000) * 0.001f;

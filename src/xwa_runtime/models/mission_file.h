@@ -2,13 +2,17 @@
 #define XWA_RUNTIME_MODELS_MISSION_FILE_H
 
 /* A mission's file in the mod folder: flight/missions/<mission path without its
- * extension>.yaml, lower case, which holds the selections the game reads at
- * mission load (object profiles, skins, articulations):
+ * extension>.yaml, lower case, which holds what the game reads at mission
+ * load:
  *
  *   version: 1
- *   object_profiles: ...
- *   skins: ...
- *   articulations: ...
+ *   resdata: ...           (mission_art.h)
+ *   settings: ...          (mission_settings.h)
+ *   flight_groups: ...     (mission_tie.h)
+ *   object_profiles: ...   (object_profiles.h)
+ *   skins: ...             (skins.h)
+ *   articulations: ...     (articulation.h)
+ *   hangar: ...            (hangars.h)
  */
 
 #include <stddef.h>
