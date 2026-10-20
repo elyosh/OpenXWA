@@ -1,6 +1,7 @@
 #include "xwa/frontend/concourse.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/concourse_layout.h"
+#include "xwa_runtime/frontend/concourse_planet.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/room_anims.h"
 #include "xwa_runtime/snapshot/snapshot.h"
@@ -135,7 +136,8 @@ int Concourse_DrawPlanet(void) {
 		/* XWA_MODERN: frontend/concourse/layout.yaml can set the range for the
 		   planet's random centre, rounded to whole units. If a range is empty,
 		   the planet uses its left or top value. rand() is still called so the
-		   random sequence stays the same. */
+		   random sequence stays the same. Then the mission file can set each
+		   axis of the centre. */
 		const int left = XwaConcourseLayout_Round(XwaConcourseLayout_X("planet.left", 0.0f));
 		const int right = XwaConcourseLayout_Round(XwaConcourseLayout_X("planet.right", 640.0f));
 		const int top = XwaConcourseLayout_Round(XwaConcourseLayout_Y("planet.top", 55.0f));
@@ -145,6 +147,7 @@ int Concourse_DrawPlanet(void) {
 		x = right > left ? left + x % (right - left) : left;
 		y = rand();
 		y = bottom > top ? top + y % (bottom - top) : top;
+		XwaConcoursePlanet_Center(&x, &y);
 	}
 #else
 	x = rand() % 640;
@@ -812,7 +815,14 @@ int Concourse_Update(int frameCounter) {
 
 					backdrop = g_frontendMission->flightGroups[i].backdrop;
 					if ((unsigned int)backdrop < 0x3du && backdrop != 0 && backdrop != 55) {
+#ifdef XWA_MODERN
+						/* XWA_MODERN: the mission's own planet image replaces this one. */
+						if (XwaConcoursePlanet_Image() < 0) {
+							Concourse_LoadPlanetSprite(g_frontendMission->flightGroups[i].backdrop);
+						}
+#else
 						Concourse_LoadPlanetSprite(g_frontendMission->flightGroups[i].backdrop);
+#endif
 						break;
 					}
 				}
@@ -825,8 +835,21 @@ int Concourse_Update(int frameCounter) {
 			do {
 				planetRand = rand() % 60 + 1;
 			} while (planetRand == 55);
+#ifdef XWA_MODERN
+			if (XwaConcoursePlanet_Image() < 0) {
+				Concourse_LoadPlanetSprite(planetRand);
+			}
+#else
 			Concourse_LoadPlanetSprite(planetRand);
+#endif
 		}
+#ifdef XWA_MODERN
+		/* XWA_MODERN: the planet image that the mission file sets. The stock
+		   pick above still runs, so the random sequence stays the same. */
+		if (XwaConcoursePlanet_Image() >= 0) {
+			Concourse_LoadPlanetSprite(XwaConcoursePlanet_Image() - CONCOURSE_PLANET_GROUP_ID_BASE);
+		}
+#endif
 
 		FrontImage_LoadResourceList("frontres\\concourse\\concourse.lst");
 		Concourse_LoadBackground();

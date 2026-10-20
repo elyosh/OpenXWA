@@ -15,6 +15,7 @@
  *   hangar: ...            (hangars.h)
  *   model_swaps: ...       (model_swaps.h)
  *   craft_names: ...       (craft_names.h)
+ *   concourse: ...         (frontend/concourse_planet.h)
  */
 
 #include <stddef.h>
