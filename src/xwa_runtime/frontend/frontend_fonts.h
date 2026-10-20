@@ -42,13 +42,14 @@ int XwaFrontendFonts_UsesFontMetrics(int font_size);
 int XwaFrontendFonts_Height(int font_size, int classic);
 /* Advances a text position by the advance of `ch` times `scale256` / 256.
  * `*x_frac` keeps the fraction, in 1/256 units. */
-void XwaFrontendFonts_AdvanceText(int* x, int* x_frac, int font_size, unsigned char ch, int classic, int scale256);
+void XwaFrontendFonts_AdvanceText(int* x, int* x_frac, int font_size, unsigned char ch, int classic,
+								  int scale256);
 
 /* A font for the renderer. */
 typedef struct XwaFrontendFont {
 	const AeronFontFace* face;
-	float em_units; /* the em size in units: 640x480 units in the frontend, screen pixels in flight */
-	float baseline_units;       /* from the top of the text to the baseline, in units */
+	float em_units;       /* the em size in units: 640x480 units in the frontend, screen pixels in flight */
+	float baseline_units; /* from the top of the text to the baseline, in units */
 	const uint32_t* codepoints; /* the code point of each byte, 256 entries */
 } XwaFrontendFont;
 

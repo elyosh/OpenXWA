@@ -587,8 +587,7 @@ static int fl_hyperspace_config_valid(const XwaFlightHyperspaceTunnelParams* p) 
 		  isfinite(p->mesh_ambient_strength) && p->mesh_ambient_strength >= 0.0f &&
 		  p->mesh_ambient_strength <= 4.0f && isfinite(p->mesh_environment_roughness) &&
 		  p->mesh_environment_roughness >= 0.0f && p->mesh_environment_roughness <= 1.0f &&
-		  isfinite(p->mesh_key_strength) &&
-		  p->mesh_key_strength >= 0.0f && p->mesh_key_strength <= 4.0f)) {
+		  isfinite(p->mesh_key_strength) && p->mesh_key_strength >= 0.0f && p->mesh_key_strength <= 4.0f)) {
 		return 0;
 	}
 	for (int channel = 0; channel < 3; channel++) {
@@ -658,9 +657,9 @@ static int fl_load_hyperspace_config(const AeronConfigFile* config, const char* 
 }
 
 static int fl_pbr_config_valid(const XwaShipPbrTuning* p) {
-	return isfinite(p->sun_illuminance_scale) && p->sun_illuminance_scale >= 0.0f && isfinite(p->ambient[0]) && p->ambient[0] >= 0.0f &&
-		   isfinite(p->ambient[1]) && p->ambient[1] >= 0.0f && isfinite(p->ambient[2]) &&
-		   p->ambient[2] >= 0.0f;
+	return isfinite(p->sun_illuminance_scale) && p->sun_illuminance_scale >= 0.0f &&
+		   isfinite(p->ambient[0]) && p->ambient[0] >= 0.0f && isfinite(p->ambient[1]) &&
+		   p->ambient[1] >= 0.0f && isfinite(p->ambient[2]) && p->ambient[2] >= 0.0f;
 }
 
 /* Load the renderer's settings from the mandatory shipped configuration once. */
@@ -680,7 +679,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	if (!AeronSceneSettings_Load(AeronConfigFile_Root(scene_defaults), &s.ssao, &s.shadows, &tonemap,
-								&scene_error)) {
+								 &scene_error)) {
 		Aeron_LogError("xwa.remaster", "%s:%d:%d: %s", scene_defaults_path, scene_error.line,
 					   scene_error.column, scene_error.message);
 		AeronConfigFile_Destroy(scene_defaults);
@@ -700,8 +699,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
-	if (!AeronSceneSettings_Overlay(AeronConfigFile_Root(cf), &s.ssao, &s.shadows, &tonemap,
-								   &scene_error)) {
+	if (!AeronSceneSettings_Overlay(AeronConfigFile_Root(cf), &s.ssao, &s.shadows, &tonemap, &scene_error)) {
 		Aeron_LogError("xwa.remaster", "%s:%d:%d: %s", path, scene_error.line, scene_error.column,
 					   scene_error.message);
 		AeronConfigFile_Destroy(cf);
@@ -768,7 +766,8 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
 	s.plight.match_distance_m = (float)AeronConfigFile_GetFloat(cf, "point_lights.match_distance_m", 0.0);
 	s.plight.range_scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.range_scale", 0.0);
-	s.plight.model_light_intensity = (float)AeronConfigFile_GetFloat(cf, "point_lights.model_light_intensity", 0.0);
+	s.plight.model_light_intensity =
+		(float)AeronConfigFile_GetFloat(cf, "point_lights.model_light_intensity", 0.0);
 	if (!fl_point_lights_config_valid(&s.plight)) {
 		Aeron_LogError("xwa.remaster", "%s: invalid point_lights settings", path);
 		AeronConfigFile_Destroy(cf);
@@ -920,8 +919,8 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 				  "flight ssao: quality %d intensity %.2f power %.2f radius %.1f bias %.2f "
 				  "direct %.2f%s",
 				  s.ssao.ssao_quality, (double)s.ssao.ssao_intensity, (double)s.ssao.ssao_power,
-				  (double)s.ssao.ssao_radius_view, (double)s.ssao.ssao_bias_view,
-				  (double)s.ssao.ssao_direct, s.ssao.ssao_debug_viz ? " (debug viz)" : "");
+				  (double)s.ssao.ssao_radius_view, (double)s.ssao.ssao_bias_view, (double)s.ssao.ssao_direct,
+				  s.ssao.ssao_debug_viz ? " (debug viz)" : "");
 	if (s.texture_filtering.anisotropic) {
 		Aeron_LogInfo("xwa.remaster", "flight mesh filtering: trilinear + %.0fx anisotropic",
 					  (double)s.texture_filtering.max_anisotropy);
@@ -2956,8 +2955,9 @@ static void fl_begin_point_lights(const XwaRemasterFlightView* view) {
 		s.pl_frustum[4][k] = w - m[8 + k]; /* near (reverse Z): z <= w */
 	}
 	for (int p = 0; p < 5; p++) {
-		const float length = sqrtf(s.pl_frustum[p][0] * s.pl_frustum[p][0] + s.pl_frustum[p][1] * s.pl_frustum[p][1] +
-								   s.pl_frustum[p][2] * s.pl_frustum[p][2]);
+		const float length =
+			sqrtf(s.pl_frustum[p][0] * s.pl_frustum[p][0] + s.pl_frustum[p][1] * s.pl_frustum[p][1] +
+				  s.pl_frustum[p][2] * s.pl_frustum[p][2]);
 		const float inverse = length > 0.0f ? 1.0f / length : 0.0f;
 		for (int k = 0; k < 4; k++) {
 			s.pl_frustum[p][k] *= inverse;
@@ -2972,20 +2972,22 @@ static void fl_begin_point_lights(const XwaRemasterFlightView* view) {
  * radius away); `keep` scores it INFINITY. A full pool replaces its
  * lowest score. */
 static void fl_pool_add(const AeronSceneLight* light, int model, int keep) {
-	const float half_length = sqrtf(light->half_axis[0] * light->half_axis[0] +
-									light->half_axis[1] * light->half_axis[1] +
-									light->half_axis[2] * light->half_axis[2]);
+	const float half_length =
+		sqrtf(light->half_axis[0] * light->half_axis[0] + light->half_axis[1] * light->half_axis[1] +
+			  light->half_axis[2] * light->half_axis[2]);
 	const float reach = light->radius + half_length;
 	for (int p = 0; p < 5; p++) {
 		const float* plane = s.pl_frustum[p];
-		if (plane[0] * light->pos[0] + plane[1] * light->pos[1] + plane[2] * light->pos[2] + plane[3] < -reach) {
+		if (plane[0] * light->pos[0] + plane[1] * light->pos[1] + plane[2] * light->pos[2] + plane[3] <
+			-reach) {
 			s.pl_culled[model]++;
 			return;
 		}
 	}
 	float score = INFINITY;
 	if (!keep) {
-		const float d[3] = { light->pos[0] - s.pl_eye[0], light->pos[1] - s.pl_eye[1], light->pos[2] - s.pl_eye[2] };
+		const float d[3] = { light->pos[0] - s.pl_eye[0], light->pos[1] - s.pl_eye[1],
+							 light->pos[2] - s.pl_eye[2] };
 		const float source_radius = fabsf(light->source_radius);
 		float distance = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) - half_length - source_radius;
 		if (distance < source_radius) {
@@ -3033,8 +3035,8 @@ static XwaShipPointLight* fl_pl_push(const float pos[3], const float color_x_int
  * origin is the bolt's tip, outside the streak (a fighter laser trails 5.5
  * to 22.5 m behind it), where the classic law's point sat. Returns zero
  * when the model is unavailable. */
-static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* f, const int32_t camera_world[3],
-								float center[3], float half_axis[3]) {
+static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* f,
+								const int32_t camera_world[3], float center[3], float half_axis[3]) {
 	const AeronSceneMesh* mesh =
 		XwaRemasterShip_MeshForNameWithSource(XwaSnapshotExport_ModelName(f->object_type), NULL);
 	if (!mesh) {
@@ -3048,8 +3050,9 @@ static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* 
 	int long_axis = 0;
 	float long_length = 0.0f;
 	for (int axis = 0; axis < 3; axis++) {
-		const float scale = sqrtf(model[0 * 4 + axis] * model[0 * 4 + axis] + model[1 * 4 + axis] * model[1 * 4 + axis] +
-								  model[2 * 4 + axis] * model[2 * 4 + axis]);
+		const float scale =
+			sqrtf(model[0 * 4 + axis] * model[0 * 4 + axis] + model[1 * 4 + axis] * model[1 * 4 + axis] +
+				  model[2 * 4 + axis] * model[2 * 4 + axis]);
 		const float length = (mesh->bound_max[axis] - mesh->bound_min[axis]) * scale;
 		if (length > long_length) {
 			long_axis = axis;
@@ -3128,12 +3131,14 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 				XwaShipPointLight* light = fl_pl_push(local, ds_beam_color);
 				if (light) {
 					memcpy(light->half_axis, half_axis, sizeof half_axis);
-					light->match_distance_m = sqrtf(half_axis[0] * half_axis[0] + half_axis[1] * half_axis[1] +
-													half_axis[2] * half_axis[2]) *
-											  AERON_OPT_METERS_PER_UNIT;
+					light->match_distance_m =
+						sqrtf(half_axis[0] * half_axis[0] + half_axis[1] * half_axis[1] +
+							  half_axis[2] * half_axis[2]) *
+						AERON_OPT_METERS_PER_UNIT;
 				}
 			}
-		} else if (fl_object_is_projectile(f) && fl_projectile_streak(snap, f, cam->world_pos, local, half_axis)) {
+		} else if (fl_object_is_projectile(f) &&
+				   fl_projectile_streak(snap, f, cam->world_pos, local, half_axis)) {
 			XwaShipPointLight* light = fl_pl_push(local, cxi);
 			if (light) {
 				memcpy(light->half_axis, half_axis, sizeof half_axis);
@@ -3334,8 +3339,8 @@ static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transfor
 		if (skip_baked && mesh->lights[i].baked) {
 			continue;
 		}
-		if (AeronScene_MeshLight(mesh, i, transform, AERON_OPT_UNITS_PER_METER, table, s.plight.model_light_intensity,
-								 &light)) {
+		if (AeronScene_MeshLight(mesh, i, transform, AERON_OPT_UNITS_PER_METER, table,
+								 s.plight.model_light_intensity, &light)) {
 			s.pl_model_count++;
 			fl_pool_add(&light, 1, keep);
 		}
@@ -3770,10 +3775,10 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 		if (map_object->render_kind == XWA_FLIGHT_MAP_RENDER_CRAFT)
 			fl_derive_wreck_flames(f, snapshot_index, context->assets, NULL, NULL);
 		if (s.glow_ok) {
-			XwaRemasterShip_SubmitEngineGlows(s.scene, prepared.mesh, model_matrix,
-											  AERON_OPT_UNITS_PER_METER, prepared.table,
-											  f->eg_knockout_mask, XwaRemasterShip_EngineGlowScale(f),
-											  s.crows, s.camera_local, &s.glow_ref);
+			XwaRemasterShip_SubmitEngineGlows(s.scene, prepared.mesh, model_matrix, AERON_OPT_UNITS_PER_METER,
+											  prepared.table, f->eg_knockout_mask,
+											  XwaRemasterShip_EngineGlowScale(f), s.crows, s.camera_local,
+											  &s.glow_ref);
 		}
 	}
 	return 1;
@@ -3948,9 +3953,8 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	}
 	if (s.glow_ok && player_f) {
 		XwaRemasterShip_SubmitEngineGlows(
-			s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER, inst.mesh_table,
-			player_f->eg_knockout_mask, XwaRemasterShip_EngineGlowScale(player_f), s.crows,
-			s.camera_local, &s.glow_ref);
+			s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER, inst.mesh_table, player_f->eg_knockout_mask,
+			XwaRemasterShip_EngineGlowScale(player_f), s.crows, s.camera_local, &s.glow_ref);
 	}
 }
 
@@ -4168,8 +4172,8 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 		preview_time = (float)fmod(elapsed_seconds, 4096.0);
 	}
 	if (!s.hyperspace ||
-		!XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, snap, flight_view->view_proj, s.crows,
-									   s.rt_w, s.rt_h, preview, preview_time, &tunnel_view)) {
+		!XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, snap, flight_view->view_proj, s.crows, s.rt_w,
+									   s.rt_h, preview, preview_time, &tunnel_view)) {
 		return NULL;
 	}
 	XwaRemasterHyperspaceLighting hyperspace_lighting;
@@ -4261,7 +4265,9 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 }
 
 /* Whether the region's environment draws a sky with `backdrops: keep`. */
-static int fl_environment_keeps_backdrops(void) { return XwaRemasterEnvironment_KeepsBackdrops(&s.environment); }
+static int fl_environment_keeps_backdrops(void) {
+	return XwaRemasterEnvironment_KeepsBackdrops(&s.environment);
+}
 
 typedef struct FlSceneLighting {
 	const XwaDirLight* lights;
@@ -5249,7 +5255,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * gates — no craft / dead subsystems — return 0 and skip). */
 			if (s.glow_ok) {
 				XwaRemasterShip_SubmitEngineGlows(s.scene, prepared.mesh, model_matrix,
-											  AERON_OPT_UNITS_PER_METER, inst.mesh_table,
+												  AERON_OPT_UNITS_PER_METER, inst.mesh_table,
 												  f->eg_knockout_mask, XwaRemasterShip_EngineGlowScale(f),
 												  s.crows, s.camera_local, &s.glow_ref);
 			}
@@ -5354,9 +5360,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			}
 			if (cockpit_history_valid) {
 				AeronSceneMeshTable* prev_tb = &s.tables[s.table_count];
-				if (XwaRemasterShip_BuildPreviousCockpitMeshTable(
-						cockpit_mesh, &snap->cockpit, cockpit_anchor, &prev->cockpit,
-						previous_cockpit_anchor, prev_tb)) {
+				if (XwaRemasterShip_BuildPreviousCockpitMeshTable(cockpit_mesh, &snap->cockpit,
+																  cockpit_anchor, &prev->cockpit,
+																  previous_cockpit_anchor, prev_tb)) {
 					inst.prev_mesh_table = prev_tb;
 					s.table_count++;
 				}
@@ -5371,10 +5377,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * when internal + cockpit visible), scale/knockouts from
 			 * the PLAYER craft's state. */
 			if (s.glow_ok && player_f) {
-				XwaRemasterShip_SubmitEngineGlows(
-					s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER, inst.mesh_table,
-					player_f->eg_knockout_mask, XwaRemasterShip_EngineGlowScale(player_f), s.crows,
-					s.camera_local, &s.glow_ref);
+				XwaRemasterShip_SubmitEngineGlows(s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER,
+												  inst.mesh_table, player_f->eg_knockout_mask,
+												  XwaRemasterShip_EngineGlowScale(player_f), s.crows,
+												  s.camera_local, &s.glow_ref);
 			}
 		}
 	}

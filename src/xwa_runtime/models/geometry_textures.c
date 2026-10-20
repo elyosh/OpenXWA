@@ -104,8 +104,8 @@ void XwaGeometryTextures_ConvertById(int16_t groupId, uint16_t spriteId, int for
 	}
 }
 
-void XwaGeometryTextures_ConvertByIndex(int16_t groupId, uint16_t spriteIndex, int format, TexLevel* texLevels,
-										char baseShift, uint16_t levelCount) {
+void XwaGeometryTextures_ConvertByIndex(int16_t groupId, uint16_t spriteIndex, int format,
+										TexLevel* texLevels, char baseShift, uint16_t levelCount) {
 	const SpriteGroup* group = NULL;
 	int16_t groupIndex;
 
@@ -123,10 +123,11 @@ void XwaGeometryTextures_ConvertByIndex(int16_t groupId, uint16_t spriteIndex, i
 		group = &g_spriteGroups[groupIndex];
 	}
 	if (spriteIndex < (uint16_t)group->spriteCount) {
-		const uint32_t offset = ByteOrder_ReadU32Le(group->indexBase + GEOMETRY_TEXTURES_INDEX_ENTRY_SIZE * spriteIndex +
-													GEOMETRY_TEXTURES_INDEX_OFFSET);
+		const uint32_t offset =
+			ByteOrder_ReadU32Le(group->indexBase + GEOMETRY_TEXTURES_INDEX_ENTRY_SIZE * spriteIndex +
+								GEOMETRY_TEXTURES_INDEX_OFFSET);
 
-		geometry_textures_convert_sprite((const Sprite*)(group->dataBase + offset), format, texLevels, baseShift,
-										 levelCount);
+		geometry_textures_convert_sprite((const Sprite*)(group->dataBase + offset), format, texLevels,
+										 baseShift, levelCount);
 	}
 }

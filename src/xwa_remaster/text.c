@@ -131,8 +131,7 @@ int XwaRemasterText_AddFlightString(AeronDrawList2D* list, const AeronFontAtlas*
 	int emitted = 0;
 	for (const uint8_t* p = (const uint8_t*)text; *p; p++) {
 		if (*p == 0xfeu && p[1]) {
-			argb = XwaSnapshotExport_FlightPaletteColor(
-				XwaSnapshotExport_FlightColorCodePaletteIndex(*++p));
+			argb = XwaSnapshotExport_FlightPaletteColor(XwaSnapshotExport_FlightColorCodePaletteIndex(*++p));
 			continue;
 		}
 		if (*p < 0x20u)
@@ -212,8 +211,9 @@ void XwaRemasterText_PrepareFrontendFonts(AeronCommandBuffer* cmd, XwaRemasterAs
 
 /* A glyph of a font from frontend/fonts/fonts.yaml, drawn 1:1 at whole
  * pixels. It is centred in the advance the layout used. */
-static int text_add_face_glyph(AeronDrawList2D* list, const AeronFontAtlas* atlas, const XwaFrontendFont* font,
-							   const XwaGlyph2D* glyph, const XwaRemasterTextMapping* mapping) {
+static int text_add_face_glyph(AeronDrawList2D* list, const AeronFontAtlas* atlas,
+							   const XwaFrontendFont* font, const XwaGlyph2D* glyph,
+							   const XwaRemasterTextMapping* mapping) {
 	AeronDrawList2DSprite sprite = { 0 };
 	uint8_t rgba[4];
 	const float pen =
@@ -259,8 +259,9 @@ int XwaRemasterText_AddFrontendGlyphMapped(AeronDrawList2D* list, XwaRemasterAss
 	{
 		const XwaFrontendFont* face_font = XwaFrontendFonts_Get(glyph->font_size);
 		const AeronFontAtlas* atlas =
-			face_font ? XwaRemasterAssets_FaceFont(assets, glyph->font_size, face_font->em_units * mapping->scale_y)
-					  : NULL;
+			face_font
+				? XwaRemasterAssets_FaceFont(assets, glyph->font_size, face_font->em_units * mapping->scale_y)
+				: NULL;
 		if (atlas) {
 			return text_add_face_glyph(list, atlas, face_font, glyph, mapping);
 		}

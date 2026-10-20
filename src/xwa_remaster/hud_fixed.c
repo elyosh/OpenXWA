@@ -1,5 +1,6 @@
 #include "xwa_remaster/hud_fixed.h"
 
+#include "aeron/scene/world.h"
 #include "xwa/assets/object_type.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/dynamic_cockpit.h"
@@ -8,7 +9,6 @@
 #include "xwa_remaster/hud_cmd.h"
 #include "xwa_remaster/hud_layout.h"
 #include "xwa_remaster/hud_text.h"
-#include "aeron/scene/world.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -1221,8 +1221,7 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 
 void XwaRemasterHudFixed_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 								int target_w, int target_h) {
-	if (!cmd || !pass || !target || !fixed_list || !fixed_draws.valid || target_w <= 0 ||
-		target_h <= 0)
+	if (!cmd || !pass || !target || !fixed_list || !fixed_draws.valid || target_w <= 0 || target_h <= 0)
 		return;
 	AeronDrawList_RenderIntoPass(fixed_list, cmd, pass, target);
 }

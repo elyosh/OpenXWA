@@ -112,8 +112,8 @@ typedef struct XwaFlightPointLightParams {
 	int enabled;
 	int cluster_depth_slices;
 	int cluster_debug;
-	float match_distance_m; /* metres at which a light is as bright as the classic law */
-	float range_scale;      /* multiplies the derived falloff range */
+	float match_distance_m;      /* metres at which a light is as bright as the classic law */
+	float range_scale;           /* multiplies the derived falloff range */
 	float model_light_intensity; /* scene illuminance per lux of lights authored in models (candela) */
 } XwaFlightPointLightParams;
 

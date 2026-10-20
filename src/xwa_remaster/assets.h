@@ -105,8 +105,7 @@ int XwaRemasterAssets_FlightModelImageId(XwaRemasterAssets* a, int object_type, 
  * loads once; FlightFont is lookup-only afterward. Atlas metrics use the
  * returned pixel scale relative to classic coordinates. */
 int XwaRemasterAssets_PrepareFlightFonts(XwaRemasterAssets* a, AeronCommandBuffer* cmd);
-const AeronFontAtlas* XwaRemasterAssets_FlightFont(XwaRemasterAssets* a,
-		int tier, float* out_atlas_scale);
+const AeronFontAtlas* XwaRemasterAssets_FlightFont(XwaRemasterAssets* a, int tier, float* out_atlas_scale);
 
 uint32_t XwaRemasterAssets_Generation(const XwaRemasterAssets* a);
 

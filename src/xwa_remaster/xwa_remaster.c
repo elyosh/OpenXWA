@@ -651,9 +651,9 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	 * (or a debug reload is pending), never from the flight render. */
 	const int environment_needs_prepare = flight_render_needed && XwaRemasterEnvironment_NeedsPrepare(snap);
 	const int assets_need_sync =
-		!retain_invalid_flight_frame && (frontend_assets_need_sync || ship_assets_need_sync ||
-										 texture_assets_need_sync || process_assets_need_prepare ||
-										 environment_needs_prepare);
+		!retain_invalid_flight_frame &&
+		(frontend_assets_need_sync || ship_assets_need_sync || texture_assets_need_sync ||
+		 process_assets_need_prepare || environment_needs_prepare);
 	const int render_snapshot = snap->tick_index != g.last_tick || g.force_scene_render;
 	const int frontend_scene = snap->scene_kind == XWA_SCENE_FRONTEND ||
 							   snap->scene_kind == XWA_SCENE_FRONTEND_MODAL ||

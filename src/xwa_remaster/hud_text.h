@@ -24,8 +24,8 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
  * advance wide). */
 typedef void (*XwaHudGlyphVisitor)(void* context, uint16_t pane, uint8_t ch, const float rect[4]);
 void XwaRemasterHudText_ForEachGlyph(int target_w, int target_h, XwaHudGlyphVisitor visit, void* context);
-void XwaRemasterHudText_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass,
-							   AeronRenderTarget* target, int target_w, int target_h);
+void XwaRemasterHudText_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+							   int target_w, int target_h);
 int XwaRemasterHudText_MapGlyph(const XwaHudPane* pane, const XwaHudGlyph* glyph, XwaHudProfileIndex profile,
 								int screen_w, int screen_h, XwaHudMappedGlyph* out);
 int XwaRemasterHudText_GlyphVisible(const XwaHudPane* pane, const XwaHudGlyph* glyph,

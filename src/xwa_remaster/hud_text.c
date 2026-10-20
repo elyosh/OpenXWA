@@ -607,8 +607,7 @@ void XwaRemasterHudText_ForEachGlyph(int target_w, int target_h, XwaHudGlyphVisi
 
 void XwaRemasterHudText_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							   int target_w, int target_h) {
-	if (!cmd || !pass || !target || !text_list || !text_prepared.valid || target_w <= 0 ||
-		target_h <= 0)
+	if (!cmd || !pass || !target || !text_list || !text_prepared.valid || target_w <= 0 || target_h <= 0)
 		return;
 	AeronDrawList_RenderIntoPass(text_list, cmd, pass, target);
 }

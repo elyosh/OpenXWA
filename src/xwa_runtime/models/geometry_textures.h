@@ -29,8 +29,8 @@ extern "C" {
 void XwaGeometryTextures_ConvertById(int16_t groupId, uint16_t spriteId, int format, TexLevel* texLevels,
 									 char baseShift, uint16_t levelCount);
 /* Takes the same arguments as SpriteTexture_ConvertByIndex. */
-void XwaGeometryTextures_ConvertByIndex(int16_t groupId, uint16_t spriteIndex, int format, TexLevel* texLevels,
-										char baseShift, uint16_t levelCount);
+void XwaGeometryTextures_ConvertByIndex(int16_t groupId, uint16_t spriteIndex, int format,
+										TexLevel* texLevels, char baseShift, uint16_t levelCount);
 /* Uploads a level's placeholder image at its own size, 8x8. It works like
  * FeDiskIo_UploadTexLevelToStd3D, which uploads at the level's size. The
  * level keeps the size from the atlas. */

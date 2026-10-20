@@ -308,7 +308,8 @@ static int fonts_advance256(XwaFontSet* set, int font_size, unsigned char ch, in
 	if (*advance == INT32_MIN) {
 		float em;
 		if (AeronFontFace_Advance(set->faces[size->face], g_fontCodepoints[ch], &em)) {
-			*advance = (int32_t)lroundf((em + size->settings.spacing) * fonts_em_units(size, font_size) * 256.0f);
+			*advance =
+				(int32_t)lroundf((em + size->settings.spacing) * fonts_em_units(size, font_size) * 256.0f);
 			if (*advance < 0) {
 				*advance = 0;
 			}
@@ -379,7 +380,8 @@ int XwaFrontendFonts_Height(int font_size, int classic) {
 	return height > 0 ? (int)height : 1;
 }
 
-void XwaFrontendFonts_AdvanceText(int* x, int* x_frac, int font_size, unsigned char ch, int classic, int scale256) {
+void XwaFrontendFonts_AdvanceText(int* x, int* x_frac, int font_size, unsigned char ch, int classic,
+								  int scale256) {
 	/* Without the font's metrics this is the original advance times
 	   scale256, with no rounding. */
 	const int64_t total =

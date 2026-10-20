@@ -1,9 +1,9 @@
 #include "xwa_remaster/flight_map.h"
 
 #include "aeron/scene/draw_list2d.h"
+#include "aeron/scene/world.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/text.h"
-#include "aeron/scene/world.h"
 
 #include <math.h>
 #include <stdio.h>

@@ -136,7 +136,8 @@ void XwaHangars_Init(void) {
 			Hangars_AddLayerKeys(AeronConfigNode_MapValueAt(iffs, iff));
 		}
 	}
-	Aeron_LogInfo("xwa.models", "%s: %u ship hangars", s_settingsPath, (unsigned int)AeronConfigNode_MapCount(ships));
+	Aeron_LogInfo("xwa.models", "%s: %u ship hangars", s_settingsPath,
+				  (unsigned int)AeronConfigNode_MapCount(ships));
 }
 
 void XwaHangars_LoadMission(const char* missionPath) {
@@ -242,7 +243,8 @@ static const AeronConfigNode* Hangars_Value(const char* name) {
 	int layer;
 
 	for (layer = 0; layer < s_layerCount; ++layer) {
-		const AeronConfigNode* value = AeronConfigNode_MapGet(AeronConfigNode_MapGet(s_layers[layer], "objects"), name);
+		const AeronConfigNode* value =
+			AeronConfigNode_MapGet(AeronConfigNode_MapGet(s_layers[layer], "objects"), name);
 
 		if (value != NULL) {
 			return value;
@@ -340,7 +342,8 @@ static void Hangars_ResolveObjects(void) {
 		droid->positionZ = Hangars_Int(keys[index][1], droidsPositionZ);
 		droid->isFloorInverted = isDroidsFloorInverted || Hangars_Int(keys[index][2], 0) != 0;
 		droid->update = droid->load && Hangars_Int(keys[index][3], 1) != 0;
-		droid->modelType = (uint16_t)Hangars_Int(keys[index][4], index == 0 ? OBJ_HangarDroid : OBJ_HangarDroid2);
+		droid->modelType =
+			(uint16_t)Hangars_Int(keys[index][4], index == 0 ? OBJ_HangarDroid : OBJ_HangarDroid2);
 		droid->markings = Hangars_Int(keys[index][5], 0);
 		Hangars_Profile(keys[index][6], droid->objectProfile);
 	}
@@ -356,7 +359,8 @@ static void Hangars_ResolveObjects(void) {
 	o->hangarIff = (uint8_t)Hangars_Int("HangarIff", -1);
 	o->drawShadows = Hangars_Int("DrawShadows", o->isHangarFloorInverted ? 0 : 1) != 0;
 	o->playerAnimationElevation = Hangars_Int("PlayerAnimationElevation", 0);
-	o->playerAnimationInvertedElevation = Hangars_Int("PlayerAnimationInvertedElevation", o->playerAnimationElevation);
+	o->playerAnimationInvertedElevation =
+		Hangars_Int("PlayerAnimationInvertedElevation", o->playerAnimationElevation);
 	o->playerAnimationStraightLine = Hangars_Int("PlayerAnimationStraightLine", 0);
 	o->playerOffset[0] = Hangars_Int("PlayerOffsetX", 0);
 	o->playerOffset[1] = Hangars_Int("PlayerOffsetY", 0);
@@ -367,7 +371,8 @@ static void Hangars_ResolveObjects(void) {
 
 	/* The per-type offsets apply only when the four lists match. */
 	count = Hangars_List("PlayerModelIndices", types);
-	if (Hangars_List("PlayerOffsetsX", offsets[0]) == count && Hangars_List("PlayerOffsetsY", offsets[1]) == count &&
+	if (Hangars_List("PlayerOffsetsX", offsets[0]) == count &&
+		Hangars_List("PlayerOffsetsY", offsets[1]) == count &&
 		Hangars_List("PlayerOffsetsZ", offsets[2]) == count) {
 		for (index = 0; index < count; ++index) {
 			s_playerCrafts[index].objectType = (uint16_t)types[index];
@@ -415,31 +420,52 @@ typedef struct HangarsDefaultLine {
 #define HANGARS_FLOOR 0x7FFFFFFF
 
 static const HangarsDefaultLine s_defaultMap[] = {
-	{ 314, -1059, 1313, HANGARS_FLOOR, 38600, 0 },	   { 309, 725, -416, HANGARS_FLOOR, 23500, 0 },
-	{ 313, -1352, 1440, HANGARS_FLOOR, 536, 0 },	   { 315, -1065, -56, HANGARS_FLOOR, 47736, 0 },
-	{ 315, 2079, 733, HANGARS_FLOOR, 6400, 0 },		   { 315, -2488, 1215, HANGARS_FLOOR, 11864, 0 },
-	{ 310, 794, -750, -848, 6800, 12500 },			   { 310, -803, -1464, HANGARS_FLOOR, 49200, 0 },
-	{ 310, -1563, 944, HANGARS_FLOOR, 51436, 0 },	   { 83, -506, -2136, -722, 32836, 16480 },
-	{ 83, -841, -1628, HANGARS_FLOOR, 53100, 0 },	   { 83, 1240, -2098, -722, 272, 16480 },
-	{ 84, -834, -2034, HANGARS_FLOOR, 32336, 0 },	   { 80, -3474, -275, HANGARS_FLOOR, 29436, 0 },
-	{ 2, -1038, -798, HANGARS_FLOOR, 7700, 0 },		   { 50, 1146, -1288, -741, 50536, 0 },
-	{ 315, 820, -665, HANGARS_FLOOR, 49136, 0 },	   { 310, -873, -1456, -849, 60472, 20400 },
-	{ 310, -3095, -592, HANGARS_FLOOR, 51436, 0 },	   { 83, -1751, -1996, HANGARS_FLOOR, 31172, 0 },
-	{ 83, 979, -2103, HANGARS_FLOOR, 37036, 0 },	   { 84, -1374, -2068, HANGARS_FLOOR, 40536, 0 },
-	{ 80, 2806, 1357, HANGARS_FLOOR, 20536, 0 },	   { 80, -195, -1910, HANGARS_FLOOR, 54372, 0 },
-	{ 3, 2178, 506, -830, 40036, 1500 },			   { 2, 1100, -503, HANGARS_FLOOR, 49036, 0 },
+	{ 314, -1059, 1313, HANGARS_FLOOR, 38600, 0 },
+	{ 309, 725, -416, HANGARS_FLOOR, 23500, 0 },
+	{ 313, -1352, 1440, HANGARS_FLOOR, 536, 0 },
+	{ 315, -1065, -56, HANGARS_FLOOR, 47736, 0 },
+	{ 315, 2079, 733, HANGARS_FLOOR, 6400, 0 },
+	{ 315, -2488, 1215, HANGARS_FLOOR, 11864, 0 },
+	{ 310, 794, -750, -848, 6800, 12500 },
+	{ 310, -803, -1464, HANGARS_FLOOR, 49200, 0 },
+	{ 310, -1563, 944, HANGARS_FLOOR, 51436, 0 },
+	{ 83, -506, -2136, -722, 32836, 16480 },
+	{ 83, -841, -1628, HANGARS_FLOOR, 53100, 0 },
+	{ 83, 1240, -2098, -722, 272, 16480 },
+	{ 84, -834, -2034, HANGARS_FLOOR, 32336, 0 },
+	{ 80, -3474, -275, HANGARS_FLOOR, 29436, 0 },
+	{ 2, -1038, -798, HANGARS_FLOOR, 7700, 0 },
+	{ 50, 1146, -1288, -741, 50536, 0 },
+	{ 315, 820, -665, HANGARS_FLOOR, 49136, 0 },
+	{ 310, -873, -1456, -849, 60472, 20400 },
+	{ 310, -3095, -592, HANGARS_FLOOR, 51436, 0 },
+	{ 83, -1751, -1996, HANGARS_FLOOR, 31172, 0 },
+	{ 83, 979, -2103, HANGARS_FLOOR, 37036, 0 },
+	{ 84, -1374, -2068, HANGARS_FLOOR, 40536, 0 },
+	{ 80, 2806, 1357, HANGARS_FLOOR, 20536, 0 },
+	{ 80, -195, -1910, HANGARS_FLOOR, 54372, 0 },
+	{ 3, 2178, 506, -830, 40036, 1500 },
+	{ 2, 1100, -503, HANGARS_FLOOR, 49036, 0 },
 	{ 1, -1003, 280, -825, 16600, 0 },
 };
 
 static const HangarsDefaultLine s_defaultFamilyMap[] = {
-	{ 315, 821, -6618, HANGARS_FLOOR, 30600, 0 },	   { 314, 2431, -5447, HANGARS_FLOOR, 61536, 0 },
-	{ 309, 626, -6397, HANGARS_FLOOR, 736, 0 },		   { 313, 1577, -6663, HANGARS_FLOOR, 500, 0 },
-	{ 80, -1954, -7445, HANGARS_FLOOR, 31236, 0 },	   { 80, -1938, -7445, -4997, 31236, 0 },
-	{ 83, -1231, -8544, -5003, 32736, 0x4000 },		   { 83, -1481, -8444, -5003, 45736, 0x4000 },
-	{ 83, -1821, -8464, -5003, 32736, 0x4000 },		   { 84, -1834, -6154, HANGARS_FLOOR, 42736, 0 },
-	{ 84, 1939, -8013, HANGARS_FLOOR, 31800, 0 },	   { 80, -1954, -7445, -4888, 31236, 0 },
-	{ 80, -1978, -7386, -4781, 31736, 0 },			   { 310, 1484, -8339, -5133, 29700, 20400 },
-	{ 310, 1384, -8339, HANGARS_FLOOR, 32036, 0 },	   { 83, -2061, -8344, -5003, 32736, 0x4000 },
+	{ 315, 821, -6618, HANGARS_FLOOR, 30600, 0 },
+	{ 314, 2431, -5447, HANGARS_FLOOR, 61536, 0 },
+	{ 309, 626, -6397, HANGARS_FLOOR, 736, 0 },
+	{ 313, 1577, -6663, HANGARS_FLOOR, 500, 0 },
+	{ 80, -1954, -7445, HANGARS_FLOOR, 31236, 0 },
+	{ 80, -1938, -7445, -4997, 31236, 0 },
+	{ 83, -1231, -8544, -5003, 32736, 0x4000 },
+	{ 83, -1481, -8444, -5003, 45736, 0x4000 },
+	{ 83, -1821, -8464, -5003, 32736, 0x4000 },
+	{ 84, -1834, -6154, HANGARS_FLOOR, 42736, 0 },
+	{ 84, 1939, -8013, HANGARS_FLOOR, 31800, 0 },
+	{ 80, -1954, -7445, -4888, 31236, 0 },
+	{ 80, -1978, -7386, -4781, 31736, 0 },
+	{ 310, 1484, -8339, -5133, 29700, 20400 },
+	{ 310, 1384, -8339, HANGARS_FLOOR, 32036, 0 },
+	{ 83, -2061, -8344, -5003, 32736, 0x4000 },
 	{ 83, -1511, -6734, HANGARS_FLOOR, 27736, 0x8000 },
 };
 
@@ -498,7 +524,8 @@ static void Hangars_ResolveMap(int family) {
 		entry->headingXY = (uint16_t)AeronConfigNode_Int(AeronConfigNode_SequenceGet(line, 5), 0);
 		entry->headingZ = (uint16_t)AeronConfigNode_Int(AeronConfigNode_SequenceGet(line, 6), 0);
 		profile = AeronConfigNode_String(AeronConfigNode_SequenceGet(line, 7), NULL);
-		snprintf(entry->objectProfile, sizeof entry->objectProfile, "%s", profile != NULL ? profile : "Default");
+		snprintf(entry->objectProfile, sizeof entry->objectProfile, "%s",
+				 profile != NULL ? profile : "Default");
 		entry->isFloorInverted = (int8_t)AeronConfigNode_Int(AeronConfigNode_SequenceGet(line, 8), -1);
 	}
 	s_mapCounts[family] = (int)count;
@@ -520,7 +547,8 @@ static void Hangars_ResolveCamera(int family) {
 			continue;
 		}
 		for (axis = 0; axis < 3; ++axis) {
-			camera->offsets[key][axis] = (int)AeronConfigNode_Int(AeronConfigNode_SequenceGet(offset, axis), 0);
+			camera->offsets[key][axis] =
+				(int)AeronConfigNode_Int(AeronConfigNode_SequenceGet(offset, axis), 0);
 		}
 	}
 }
@@ -580,8 +608,8 @@ int XwaHangars_Resolve(void) {
 	} else {
 		/* A mission that swaps the mothership's model uses the substitute's
 		   settings and hangar. */
-		const char* substitute =
-			AeronConfigNode_String(AeronConfigNode_MapGet(AeronConfigNode_MapGet(s_mission, "ships"), key), NULL);
+		const char* substitute = AeronConfigNode_String(
+			AeronConfigNode_MapGet(AeronConfigNode_MapGet(s_mission, "ships"), key), NULL);
 
 		if (substitute != NULL && strlen(substitute) < sizeof key) {
 			strcpy(key, substitute);
@@ -633,10 +661,10 @@ int XwaHangars_Resolve(void) {
 		}
 	}
 	if (changed) {
-		Aeron_LogInfo("xwa.models", "hangar: ship '%s' IFF %d (%s), model '%s', %d layers, %d map lines, %d swaps",
-					  hasShip ? s_shipKey : "", s_shipIff, ship != NULL ? "settings" : "default settings",
-					  s_hangarModel[0] != '\0' ? s_hangarModel : "hangar", s_layerCount, s_mapCounts[0],
-					  s_swapCount);
+		Aeron_LogInfo(
+			"xwa.models", "hangar: ship '%s' IFF %d (%s), model '%s', %d layers, %d map lines, %d swaps",
+			hasShip ? s_shipKey : "", s_shipIff, ship != NULL ? "settings" : "default settings",
+			s_hangarModel[0] != '\0' ? s_hangarModel : "hangar", s_layerCount, s_mapCounts[0], s_swapCount);
 	}
 	return changed;
 }
@@ -741,7 +769,8 @@ static void Hangars_ReloadUsedTypes(int hangar) {
 	uint32_t objIdx;
 	unsigned int objectType;
 
-	if (s_settings == NULL || g_launchRefObjIdx < 0 || (uint32_t)g_launchRefObjIdx >= g_objectTableSlotCount) {
+	if (s_settings == NULL || g_launchRefObjIdx < 0 ||
+		(uint32_t)g_launchRefObjIdx >= g_objectTableSlotCount) {
 		return;
 	}
 	hangarFlightGroup = g_objectTable[g_launchRefObjIdx].flightGroupIdx;

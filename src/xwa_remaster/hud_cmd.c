@@ -83,7 +83,8 @@ static void cmd_rows(const XwaHudCrt* crt, float rows[9]) {
 }
 
 static int cmd_rows_mirrored(const float rows[9]) {
-	return rows[0] * (rows[4] * rows[8] - rows[5] * rows[7]) - rows[1] * (rows[3] * rows[8] - rows[5] * rows[6]) +
+	return rows[0] * (rows[4] * rows[8] - rows[5] * rows[7]) -
+			   rows[1] * (rows[3] * rows[8] - rows[5] * rows[6]) +
 			   rows[2] * (rows[3] * rows[7] - rows[4] * rows[6]) <
 		   0.0f;
 }
@@ -218,7 +219,9 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 		instance.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
 	}
 	/* A mirrored view reverses the winding of every face it shows. */
-	instance.cull_mode = roll_align ? AERON_CULL_NONE : cmd_rows_mirrored(rows) ? AERON_CULL_FRONT : AERON_CULL_BACK;
+	instance.cull_mode = roll_align                ? AERON_CULL_NONE
+						 : cmd_rows_mirrored(rows) ? AERON_CULL_FRONT
+												   : AERON_CULL_BACK;
 	memcpy(instance.transform, transform, sizeof transform);
 	memcpy(instance.prev_transform, transform, sizeof transform);
 	if (object->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK && s_cmd.table_count < 2) {
@@ -229,7 +232,8 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 		s_cmd.table_count++;
 	} else if (s_cmd.table_count < 2) {
 		AeronSceneMeshTable* table = &s_cmd.tables[s_cmd.table_count];
-		if (XwaRemasterShip_NeedsMeshTable(mesh, object) && XwaRemasterShip_BuildMeshTable(mesh, object, table)) {
+		if (XwaRemasterShip_NeedsMeshTable(mesh, object) &&
+			XwaRemasterShip_BuildMeshTable(mesh, object, table)) {
 			instance.mesh_table = table;
 			s_cmd.table_count++;
 		}
@@ -239,10 +243,10 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 		XwaRemasterGlowMarks_SubmitObject(s_cmd.scene, cmd, assets, snapshot, object, mesh, transform,
 										  instance.mesh_table, 1.0f);
 		if (glow_ref) {
-			XwaRemasterShip_SubmitEngineGlows(
-				s_cmd.scene, mesh, transform, AERON_OPT_UNITS_PER_METER, instance.mesh_table,
-				object->eg_knockout_mask, cmd_engine_glow_scale(object, snapshot->tick_index), NULL, NULL,
-				glow_ref);
+			XwaRemasterShip_SubmitEngineGlows(s_cmd.scene, mesh, transform, AERON_OPT_UNITS_PER_METER,
+											  instance.mesh_table, object->eg_knockout_mask,
+											  cmd_engine_glow_scale(object, snapshot->tick_index), NULL, NULL,
+											  glow_ref);
 		}
 		if (object->has_craft) {
 			const uint32_t remaining = CMD_MAX_POINT_CANDIDATES - s_cmd.point_candidate_count;
@@ -445,8 +449,8 @@ static uint32_t cmd_finalize_point_lights(void) {
 		return 0;
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < s_cmd.point_candidate_count; i++) {
-		if (XwaRemasterShip_ScenePointLight(&s_cmd.point_candidates[i], config.match_distance_m, config.range_scale,
-											&s_cmd.point_scene[count]))
+		if (XwaRemasterShip_ScenePointLight(&s_cmd.point_candidates[i], config.match_distance_m,
+											config.range_scale, &s_cmd.point_scene[count]))
 			count++;
 	}
 	s_cmd.point_candidate_count = count;

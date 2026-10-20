@@ -33,10 +33,10 @@ typedef enum XwaHangarShuttleAnimation {
 } XwaHangarShuttleAnimation;
 
 typedef struct XwaHangarDroid {
-	int load;           /* LoadDroids && LoadDroidN */
+	int load; /* LoadDroids && LoadDroidN */
 	int positionZ;
 	int isFloorInverted; /* IsDroidsFloorInverted || IsDroidNFloorInverted */
-	int update;         /* load && DroidNUpdate */
+	int update;          /* load && DroidNUpdate */
 	uint16_t modelType;
 	int markings;
 	char objectProfile[XWA_HANGAR_PROFILE_MAX];

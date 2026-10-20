@@ -336,7 +336,7 @@ static int hud_cache_asset(XwaRemasterAssets* assets, XwaHudAssetId asset, const
 	}
 	if (asset == XWA_HUD_ASSET_SHIELD_HULL && hud && hud->instruments.shield_silhouette_sprite)
 		ok &= hud_cache_frame(assets, OBJ_HullIconTextureGroup26000,
-								hud->instruments.shield_silhouette_sprite / 100);
+							  hud->instruments.shield_silhouette_sprite / 100);
 	return ok;
 }
 
@@ -374,8 +374,8 @@ void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* sna
 		const uint8_t bit = (uint8_t)(1u << tier);
 		if (!(requested_fonts & bit) || (hud_assets.prepared.resolved_font_mask & bit))
 			continue;
-		hud_assets.fonts[tier] = XwaRemasterAssets_FlightFont(
-				assets, tier, &hud_assets.font_atlas_scales[tier]);
+		hud_assets.fonts[tier] =
+			XwaRemasterAssets_FlightFont(assets, tier, &hud_assets.font_atlas_scales[tier]);
 		if (hud_assets.fonts[tier]) {
 			hud_assets.prepared.resolved_font_mask |= bit;
 			hud_assets.prepared.missing_font_mask &= (uint8_t)~bit;
@@ -418,8 +418,7 @@ const XwaAssetRef* XwaRemasterHud_AssetFrame(int object_type, int classic_frame_
 	return cached->state == 1 ? &cached->ref : NULL;
 }
 
-const AeronFontAtlas* XwaRemasterHud_FlightFont(int tier,
-		float* out_atlas_scale) {
+const AeronFontAtlas* XwaRemasterHud_FlightFont(int tier, float* out_atlas_scale) {
 	if (tier < 0 || tier >= 3 || !(hud_assets.prepared.resolved_font_mask & (1u << tier))) {
 		hud_uncached_asset();
 		return NULL;

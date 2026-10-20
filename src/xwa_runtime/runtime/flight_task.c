@@ -1,7 +1,7 @@
 #include "xwa_runtime/runtime/flight_task.h"
+#include "xwa/flight/hangar.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/port.h"
-#include "xwa/flight/hangar.h"
 
 #include "aeron/aeron.h"
 #include "xwa/assets/file_io.h"
