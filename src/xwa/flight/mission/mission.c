@@ -42,6 +42,7 @@
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_art.h"
 #include "xwa_runtime/models/mission_backdrops.h"
+#include "xwa_runtime/models/mission_tie.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/skins.h"
@@ -7565,9 +7566,13 @@ uint16_t Mission_Init(char* fileName) {
 		return 0;
 	}
 #ifdef XWA_MODERN
-	/* Modern port: read the mission's object profile selections, articulation
-	   overrides, hangar settings and art of its own, before any flight-group
-	   object is created or texture loaded. */
+	/* Modern port: read the mission's flight-group values, object profile
+	   selections, articulation overrides, hangar settings and art of its own,
+	   before any flight-group object is created or texture loaded. The
+	   flight-group values come first, as XWAU's hook_mission_tie sets them
+	   right after the .TIE is read, so the readers after them see them. */
+	XwaMissionTie_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
+							  (int16_t)g_missionHeader.numFlightGroups);
 	XwaObjectProfiles_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 								  (int16_t)g_missionHeader.numFlightGroups);
 	XwaArticulation_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
