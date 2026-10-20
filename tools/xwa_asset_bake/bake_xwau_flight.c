@@ -7,8 +7,11 @@
  * XWAU ships it; nothing is upscaled. Each image's classic size is the size
  * XWAU draws it:
  *   - most images: their own size;
- *   - the images of a group in Resdata/BackdropScales.txt: their size times
- *     the scale / 256, as XWAU's backdrop hook draws them;
+ *   - backdrop images: their size times their scale / 256, as XWAU's
+ *     backdrop hook draws them. The scale comes from
+ *     Resdata/BackdropScales.txt. A group that the file doesn't list gets the
+ *     game's default backdrop scale, read from XWINGALLIANCE.EXE: 256 in the
+ *     stock game, 128 in XWAU's executable;
  *   - hull icons (26000) and map icons (14800): their size times
  *     HullIconScale or MapIconScale / 256, as XWAU's hull icon hook draws them.
  *
@@ -63,6 +66,27 @@
 #define FLIGHT_REROLL_SECONDS 5
 /* alt_frames_1 to alt_frames_4, then ds2_frames. */
 #define FLIGHT_SET_COUNT 5
+/* Addresses in XWINGALLIANCE.EXE. Mission_Init multiplies a backdrop's
+ * mission scale by the float at FLIGHT_EXE_BACKDROP_SCALE. The backdrop table
+ * has FLIGHT_BACKDROP_COUNT entries of 3 bytes: a model type (16 bits) and
+ * flags (8 bits). The model type table has 24-byte entries, with the texture
+ * group at byte 20. */
+#define FLIGHT_EXE_IMAGE_BASE 0x400000u
+#define FLIGHT_EXE_BACKDROP_SCALE 0x5A93ACu
+#define FLIGHT_EXE_BACKDROP_TABLE 0x5B1140u
+#define FLIGHT_EXE_MODEL_TYPES 0x5FB240u
+#define FLIGHT_EXE_MODEL_TYPE_SIZE 24u
+#define FLIGHT_EXE_MODEL_TYPE_GROUP 20u
+#define FLIGHT_BACKDROP_COUNT 104
+/* Backdrop flag 1: the backdrop picks its frame in the mission. */
+#define FLIGHT_BACKDROP_PICKS_FRAME 1
+/* The Death Star backdrop never picks a frame. Its beam copies its scale. */
+#define FLIGHT_DEATH_STAR_GROUP 6250
+#define FLIGHT_DEATH_STAR_BEAM_GROUP 6251
+/* XWAU's backdrop hook adds backdrops 104 to 255, with groups 6304 to 6455
+ * that pick their frame. */
+#define FLIGHT_EXTRA_BACKDROP_GROUP 6304
+#define FLIGHT_EXTRA_BACKDROP_COUNT 152
 
 typedef struct FlightDat {
 	char name[256];
@@ -76,6 +100,12 @@ typedef struct FlightScale {
 	int image;
 	int scale;
 } FlightScale;
+
+/* A group that missions use as a backdrop. */
+typedef struct FlightBackdrop {
+	int group;
+	int picks_frame;
+} FlightBackdrop;
 
 /* A DAT material file: Materials/dat-<group>.mat or dat-<group>-<id>.mat. */
 typedef struct FlightMaterialFile {
@@ -103,6 +133,9 @@ typedef struct FlightContext {
 	int dat_count;
 	FlightScale* scales;
 	int scale_count;
+	float backdrop_scale;      /* the default backdrop scale, 256 = 1.0 */
+	FlightBackdrop* backdrops; /* empty when the executable couldn't be read */
+	int backdrop_count;
 	int hull_icon_scale;
 	int map_icon_scale;
 	FlightMaterialFile* materials;
@@ -225,13 +258,123 @@ static void flight_read_backdrop_scales(FlightContext* ctx) {
 			known = ctx->scales[k].group == (int)values[0] && ctx->scales[k].image == (int)values[1];
 		if (known)
 			continue;
-		FlightScale* grown = (FlightScale*)realloc(ctx->scales, (size_t)(ctx->scale_count + 1) * sizeof *grown);
+		FlightScale* grown =
+			(FlightScale*)realloc(ctx->scales, (size_t)(ctx->scale_count + 1) * sizeof *grown);
 		if (!grown)
 			break;
 		ctx->scales = grown;
 		ctx->scales[ctx->scale_count++] = (FlightScale) { (int)values[0], (int)values[1], (int)values[2] };
 	}
 	XwauLines_Free(&lines);
+}
+
+/* Returns the `size` bytes of the executable at address `va`, or NULL when
+ * no section holds them. */
+static const uint8_t* flight_exe_at(const uint8_t* exe, size_t exe_size, uint32_t va, uint32_t size) {
+	if (exe_size < 0x40 || exe[0] != 'M' || exe[1] != 'Z')
+		return NULL;
+	const uint32_t pe = (uint32_t)exe[0x3C] | (uint32_t)exe[0x3D] << 8 | (uint32_t)exe[0x3E] << 16 |
+						(uint32_t)exe[0x3F] << 24;
+	if ((size_t)pe + 24 > exe_size || memcmp(exe + pe, "PE\0\0", 4) != 0)
+		return NULL;
+	const uint16_t section_count = (uint16_t)(exe[pe + 6] | exe[pe + 7] << 8);
+	const uint16_t optional_size = (uint16_t)(exe[pe + 20] | exe[pe + 21] << 8);
+	const uint8_t* section = exe + pe + 24 + optional_size;
+	if (va < FLIGHT_EXE_IMAGE_BASE)
+		return NULL;
+	const uint32_t rva = va - FLIGHT_EXE_IMAGE_BASE;
+	for (uint16_t i = 0; i < section_count; ++i, section += 40) {
+		if ((size_t)(section + 40 - exe) > exe_size)
+			return NULL;
+		uint32_t fields[4]; /* virtual size, virtual address, raw size, raw offset */
+		for (int f = 0; f < 4; ++f) {
+			const uint8_t* p = section + 8 + 4 * f;
+			fields[f] = (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
+		}
+		if (rva >= fields[1] && rva - fields[1] + size <= fields[2]) {
+			const size_t offset = (size_t)fields[3] + (rva - fields[1]);
+			return offset + size <= exe_size ? exe + offset : NULL;
+		}
+	}
+	return NULL;
+}
+
+static void flight_add_backdrop(FlightContext* ctx, int group, int picks_frame) {
+	for (int i = 0; i < ctx->backdrop_count; ++i) {
+		if (ctx->backdrops[i].group == group) {
+			ctx->backdrops[i].picks_frame |= picks_frame;
+			return;
+		}
+	}
+	FlightBackdrop* grown =
+		(FlightBackdrop*)realloc(ctx->backdrops, (size_t)(ctx->backdrop_count + 1) * sizeof *grown);
+	if (!grown)
+		return;
+	ctx->backdrops = grown;
+	ctx->backdrops[ctx->backdrop_count++] = (FlightBackdrop) { group, picks_frame };
+}
+
+/* Reads the default backdrop scale and the backdrop groups from the XWAU
+ * executable. Without them, every group keeps the stock default of 256 and
+ * the scales of BackdropScales.txt apply to any group. */
+static void flight_read_exe(FlightContext* ctx) {
+	ctx->backdrop_scale = 256.0f;
+	char path[1100];
+	if (!Xwau_FindFile(ctx->opt->xwau_root, "XWINGALLIANCE.EXE", path, sizeof path)) {
+		fprintf(stderr, "xwau: no XWINGALLIANCE.EXE in %s. Backdrops get the stock scale of 256\n",
+				ctx->opt->xwau_root);
+		return;
+	}
+	FILE* fp = fopen(path, "rb");
+	uint8_t* exe = NULL;
+	long size = -1;
+	if (fp && fseek(fp, 0, SEEK_END) == 0 && (size = ftell(fp)) > 0 && fseek(fp, 0, SEEK_SET) == 0 &&
+		(exe = (uint8_t*)malloc((size_t)size)) != NULL && fread(exe, 1, (size_t)size, fp) != (size_t)size) {
+		free(exe);
+		exe = NULL;
+	}
+	if (fp)
+		fclose(fp);
+	const uint8_t* scale = exe ? flight_exe_at(exe, (size_t)size, FLIGHT_EXE_BACKDROP_SCALE, 4) : NULL;
+	const uint8_t* table =
+		exe ? flight_exe_at(exe, (size_t)size, FLIGHT_EXE_BACKDROP_TABLE, 3 * FLIGHT_BACKDROP_COUNT) : NULL;
+	float value = 0.0f;
+	if (scale)
+		memcpy(&value, scale, sizeof value);
+	if (!scale || !table || !(value > 0.0f && value <= 65536.0f)) {
+		fprintf(stderr, "xwau: %s isn't the expected game executable. Backdrops get the stock scale of 256\n",
+				path);
+		free(exe);
+		return;
+	}
+	ctx->backdrop_scale = value;
+	for (int i = 0; i < FLIGHT_BACKDROP_COUNT; ++i) {
+		const uint16_t type = (uint16_t)(table[3 * i] | table[3 * i + 1] << 8);
+		const uint8_t flags = table[3 * i + 2];
+		const uint8_t* entry =
+			type != 0
+				? flight_exe_at(exe, (size_t)size, FLIGHT_EXE_MODEL_TYPES + FLIGHT_EXE_MODEL_TYPE_SIZE * type,
+								FLIGHT_EXE_MODEL_TYPE_SIZE)
+				: NULL;
+		if (!entry)
+			continue;
+		const int group =
+			(int16_t)(entry[FLIGHT_EXE_MODEL_TYPE_GROUP] | entry[FLIGHT_EXE_MODEL_TYPE_GROUP + 1] << 8);
+		if (group > 0)
+			flight_add_backdrop(
+				ctx, group, (flags & FLIGHT_BACKDROP_PICKS_FRAME) != 0 && group != FLIGHT_DEATH_STAR_GROUP);
+	}
+	for (int i = 0; i < FLIGHT_EXTRA_BACKDROP_COUNT; ++i)
+		flight_add_backdrop(ctx, FLIGHT_EXTRA_BACKDROP_GROUP + i, 1);
+	free(exe);
+}
+
+static const FlightBackdrop* flight_find_backdrop(const FlightContext* ctx, int group) {
+	for (int i = 0; i < ctx->backdrop_count; ++i) {
+		if (ctx->backdrops[i].group == group)
+			return &ctx->backdrops[i];
+	}
+	return NULL;
 }
 
 /* Lists the DAT material files of Materials: dat-<group>.mat and
@@ -376,7 +519,7 @@ static int flight_is_baked_group(int group) {
 	if (group >= 20001 && group <= 20232)
 		return 0; /* craft pictures, frontend */
 	if (group == FLIGHT_FONT_GROUP)
-		return 0; /* font atlases instead */
+		return 0;         /* font atlases instead */
 	return group >= 1000; /* below: BLASTMARKS.DAT's animations, which opt2gltf effects imports */
 }
 
@@ -384,11 +527,23 @@ static int flight_is_planet_group(int group) { return group >= 6000 && group <= 
 
 /* The scale, where 256 means 1.0, at which XWAU draws the image at
  * `position` in `group`. */
-static int flight_scale(const FlightContext* ctx, int group, int position) {
+static double flight_scale(const FlightContext* ctx, int group, int position) {
 	if (group == FLIGHT_HULL_ICON_GROUP)
 		return ctx->hull_icon_scale;
 	if (group == FLIGHT_MAP_ICON_GROUP)
 		return ctx->map_icon_scale;
+	/* The beam copies the scale of the Death Star backdrop. */
+	if (group == FLIGHT_DEATH_STAR_BEAM_GROUP)
+		return flight_scale(ctx, FLIGHT_DEATH_STAR_GROUP, -1);
+	if (ctx->backdrop_count > 0) {
+		const FlightBackdrop* backdrop = flight_find_backdrop(ctx, group);
+		if (!backdrop)
+			return 256;
+		/* The hook looks for the image `frame - 1`. A backdrop that doesn't
+		   pick its frame has frame 0, so only the group's scale applies. */
+		if (!backdrop->picks_frame)
+			position = -1;
+	}
 	/* XWAU's backdrop hook looks for the image first, then the group. */
 	for (int i = 0; i < ctx->scale_count; ++i) {
 		if (ctx->scales[i].group == group && ctx->scales[i].image == position)
@@ -398,7 +553,7 @@ static int flight_scale(const FlightContext* ctx, int group, int position) {
 		if (ctx->scales[i].group == group && ctx->scales[i].image == -1)
 			return ctx->scales[i].scale;
 	}
-	return 256;
+	return ctx->backdrop_scale;
 }
 
 /* XWAU's tools store an offset that isn't whole as 8000 + 10 * value. */
@@ -415,8 +570,8 @@ static void flight_free_frames(BakeFrame* frames, int count) {
 }
 
 /* Packs `frames` and writes <atlas_dir>/<base>.yaml with its pages. */
-static int flight_write_atlas(FlightContext* ctx, const char* base, const BakeFrame* frames, const uint16_t* ids,
-							  int count, const char* header) {
+static int flight_write_atlas(FlightContext* ctx, const char* base, const BakeFrame* frames,
+							  const uint16_t* ids, int count, const char* header) {
 	AeronCpuAtlas pages = { 0 };
 	AeronAtlasImage* placed = NULL;
 	if (!BakeSprites_BuildAtlas(frames, count, 0, &placed, &pages)) {
@@ -545,7 +700,8 @@ static void flight_bake_frame_sets(FlightContext* ctx, int group, char* header, 
 			frame_ids[i] = (uint16_t)listed[i];
 		for (int i = 0; ok && i < count; ++i) {
 			XwauDatImage image;
-			ok = XwauDat_LoadImageFrom(dat, material.set_group[set], frame_ids[i], &image, error, sizeof error);
+			ok = XwauDat_LoadImageFrom(dat, material.set_group[set], frame_ids[i], &image, error,
+									   sizeof error);
 			if (!ok) {
 				fprintf(stderr, "xwau: %s: %s\n", path, error);
 				break;
@@ -610,8 +766,8 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 		ok = XwauDat_GetImageInfo(dat, group, images[i].id, &info) &&
 			 XwauDat_LoadImageFrom(dat, group, images[i].id, &image, error, sizeof error);
 		if (!ok) {
-			fprintf(stderr, "xwau: %s: group %d image %d can't be decoded: %s\n", ctx->dats[images[i].dat].name,
-					group, images[i].id, error);
+			fprintf(stderr, "xwau: %s: group %d image %d can't be decoded: %s\n",
+					ctx->dats[images[i].dat].name, group, images[i].id, error);
 			break;
 		}
 		BakeFrame* frame = &frames[i];
@@ -811,9 +967,12 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 	ctx.hull_icon_scale = flight_hull_icon_setting(&ctx, "HullIconScale", 256);
 	ctx.map_icon_scale = flight_hull_icon_setting(&ctx, "MapIconScale", 256);
 	flight_read_backdrop_scales(&ctx);
+	flight_read_exe(&ctx);
 	flight_list_materials(&ctx);
-	printf("xwau: %d DAT files, %d backdrop scales, %d DAT materials, hull icon scale %d, map icon scale %d\n",
-		   ctx.dat_count, ctx.scale_count, ctx.material_count, ctx.hull_icon_scale, ctx.map_icon_scale);
+	printf("xwau: %d DAT files, %d backdrop scales, default backdrop scale %g for %d backdrop groups, %d DAT "
+		   "materials, hull icon scale %d, map icon scale %d\n",
+		   ctx.dat_count, ctx.scale_count, (double)ctx.backdrop_scale, ctx.backdrop_count, ctx.material_count,
+		   ctx.hull_icon_scale, ctx.map_icon_scale);
 
 	int* groups = NULL;
 	int group_count = 0;
@@ -849,6 +1008,7 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 		XwauDat_Close(ctx.dats[f].dat);
 	free(ctx.dats);
 	free(ctx.scales);
+	free(ctx.backdrops);
 	free(ctx.materials);
 	return stats->failures == 0;
 }
