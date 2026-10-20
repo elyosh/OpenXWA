@@ -27,8 +27,8 @@
  * (20001-20232), which xwau-frontend converts; the font group 16000, which
  * the game copies glyphs out of, so it gets font atlases instead; and the
  * groups below 1000 (the blast mark animations of BLASTMARKS.DAT), which
- * opt2gltf effects imports. PlanetCustom.dat and BACKDROP_SPECIAL.DAT are
- * left out too: missions add them for XWAU's own backdrops.
+ * opt2gltf effects imports. BACKDROP_SPECIAL.DAT is left out too: three
+ * missions add it for their own sun.
  *
  * The XWAU install is read with host file I/O, and file names are matched in
  * any case.
@@ -185,18 +185,23 @@ static void flight_open_dat(FlightContext* ctx, const char* rel) {
 	file->dat = dat;
 }
 
-/* Opens Planet2.dat, then the files of RESDATA.TXT in order. Every mission
- * lists Planet2.dat first in its [Resdata] section, so its images win, as
- * in XWAU. */
+/* Opens Planet2.dat and PlanetCustom.dat, then the files of RESDATA.TXT in
+ * order. Every mission lists Planet2.dat first in its [Resdata] section, so
+ * its images win, as in XWAU. PlanetCustom.dat comes next in the missions
+ * that list it. Its groups are in no other file, so baking it for every
+ * mission only adds them. */
 static int flight_open_dats(FlightContext* ctx) {
 	char list_path[1100];
 	if (!Xwau_FindFile(ctx->opt->xwau_root, "RESDATA.TXT", list_path, sizeof list_path)) {
 		fprintf(stderr, "xwau: no RESDATA.TXT in %s\n", ctx->opt->xwau_root);
 		return 0;
 	}
-	char planet2[1100];
-	if (Xwau_FindFile(ctx->opt->xwau_root, "Resdata/Planet2.dat", planet2, sizeof planet2))
-		flight_open_dat(ctx, "Resdata/Planet2.dat");
+	static const char* const planets[] = { "Resdata/Planet2.dat", "Resdata/PlanetCustom.dat" };
+	for (size_t i = 0; i < sizeof planets / sizeof planets[0]; ++i) {
+		char path[1100];
+		if (Xwau_FindFile(ctx->opt->xwau_root, planets[i], path, sizeof path))
+			flight_open_dat(ctx, planets[i]);
+	}
 	FILE* fp = fopen(list_path, "r");
 	if (!fp)
 		return 0;
