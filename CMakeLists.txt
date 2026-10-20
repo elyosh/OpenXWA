@@ -226,6 +226,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/object_profiles.c
     src/xwa_runtime/models/skins.c
     src/xwa_runtime/models/opt_synth.c
+    src/xwa_runtime/models/resdata_sets.c
     src/xwa_runtime/runtime/flight_pause_task.c
     src/xwa_runtime/runtime/flight_task.c
     src/xwa_runtime/runtime/frontend_task.c

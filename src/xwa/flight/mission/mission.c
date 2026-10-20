@@ -43,6 +43,7 @@
 #include "xwa_runtime/models/mission_backdrops.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
+#include "xwa_runtime/models/resdata_sets.h"
 #include "xwa_runtime/models/skins.h"
 #endif
 
@@ -7565,14 +7566,15 @@ uint16_t Mission_Init(char* fileName) {
 	}
 #ifdef XWA_MODERN
 	/* Modern port: read the mission's object profile selections, articulation
-	   overrides and hangar settings, before any flight-group object is
-	   created. */
+	   overrides, hangar settings and art of its own, before any flight-group
+	   object is created or texture loaded. */
 	XwaObjectProfiles_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 								  (int16_t)g_missionHeader.numFlightGroups);
 	XwaArticulation_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 								(int16_t)g_missionHeader.numFlightGroups);
 	XwaSkins_LoadMission(fileName);
 	XwaHangars_LoadMission(fileName);
+	XwaResdataSets_LoadMission(fileName);
 #endif
 
 	if (g_pilotData.campaignMode) {

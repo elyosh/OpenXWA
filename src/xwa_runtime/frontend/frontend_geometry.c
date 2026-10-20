@@ -8,6 +8,7 @@
 #include "xwa/assets/object_type_info.h"
 #include "xwa/util/byte_order.h"
 #include "xwa/util/memory.h"
+#include "xwa_runtime/models/resdata_sets.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -605,11 +606,19 @@ const XwaGeometryAtlas* XwaFrontendGeometry_FindFile(const char* fileName) {
 const XwaGeometryAtlas* XwaFrontendGeometry_FindGroup(int group) {
 	static int fontReported;
 	char key[XWA_GEOMETRY_KEY_SIZE];
-	char path[64];
+	char path[96];
 	const XwaGeometryAtlas* atlas;
+	const char* set;
 
-	snprintf(key, sizeof(key), "group_%d", group);
-	snprintf(path, sizeof(path), "resdata/atlas/group_%d.yaml", group);
+	set = XwaResdataSets_GroupSet(group);
+	if (set != NULL) {
+		/* The mission's own art (resdata_sets.h). */
+		snprintf(key, sizeof(key), "%s/group_%d", set, group);
+		snprintf(path, sizeof(path), "resdata/sets/%s/group_%d.yaml", set, group);
+	} else {
+		snprintf(key, sizeof(key), "group_%d", group);
+		snprintf(path, sizeof(path), "resdata/atlas/group_%d.yaml", group);
+	}
 	atlas = geometry_find(key, NULL, path, 1);
 	/* The game copies the flight font's glyph pixels (flight_text.c), so the
 	   font group keeps its DAT images. The HD fonts come from flight/fonts. */
