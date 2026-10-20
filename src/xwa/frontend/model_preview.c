@@ -311,7 +311,7 @@ int ModelPreview_LoadTexture237(void) {
 }
 
 // FUNCTION: XWA 0x50E5C0
-char ModelPreview_LoadModel(const char* modelName, int objectType) {
+char ModelPreview_LoadModel(const char* modelName, int craftType) {
 	char baseName[256];
 	char fileName[256];
 	char* dot;
@@ -407,7 +407,7 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 	strcpy(g_modelPreviewOptFileName, baseName);
 	strcat(g_modelPreviewOptFileName, ".opt");
 
-	g_modelPreviewObjectType = g_objectTypeTables.craftTypeToObjectType[objectType];
+	g_modelPreviewObjectType = g_objectTypeTables.craftTypeToObjectType[craftType];
 	g_modelPreviewOpt = (OptimizedPolyObject*)Memory_LockHandle(handle);
 	if (!g_modelPreviewOpt) {
 		OptModel_FreeHandle(handle);
