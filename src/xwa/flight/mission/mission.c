@@ -35,6 +35,7 @@
 #include "xwa/util/time.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
+#include "aeron/log.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
@@ -8040,6 +8041,17 @@ uint16_t Mission_Init(char* fileName) {
 		ObjectTypeId backdropType;
 
 		backdropId = g_missionFlightGroups[g_currentFlightGroupIdx].fg.backdrop;
+#ifdef XWA_MODERN
+		/* Modern port: some mods' mission files use backdrop ids past the
+		   stock table, which the stock game reads past its end. These place
+		   no backdrop. */
+		if (backdropId >= XWA_MISSION_BACKDROP_DESCRIPTOR_COUNT) {
+			Aeron_LogWarn("xwa.mission",
+						  "flight group %d: backdrop id %d is past the stock table; it places nothing",
+						  (int)g_currentFlightGroupIdx, backdropId);
+			backdropId = 0;
+		}
+#endif
 		if (backdropId != 0 &&
 			(ObjectTypeId)g_objectTypeTables
 					.craftTypeToObjectType[g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType] ==
