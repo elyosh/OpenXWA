@@ -41,6 +41,7 @@
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_names.h"
 #include "xwa_runtime/models/hangars.h"
+#include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/mission_art.h"
 #include "xwa_runtime/models/mission_backdrops.h"
 #include "xwa_runtime/models/mission_settings.h"
@@ -7595,8 +7596,8 @@ uint16_t Mission_Init(char* fileName) {
 #ifdef XWA_MODERN
 	/* Modern port: read the mission's settings, flight-group values, object
 	   profile selections, articulation overrides, hangar settings, art of its
-	   own, model swaps and craft names, before any flight-group object is
-	   created or any model or texture loaded.
+	   own, model swaps, craft names and headlights, before any flight-group
+	   object is created or any model or texture loaded.
 	   The flight-group values come right after the .TIE is read, so the
 	   readers after them see them. A mod can also make each mission load
 	   start without the combat music state of the previous mission. */
@@ -7616,6 +7617,7 @@ uint16_t Mission_Init(char* fileName) {
 	XwaModelSwaps_LoadMission(fileName);
 	XwaCraftNames_LoadMission(fileName);
 	XwaCraftNames_Apply();
+	XwaHeadlights_LoadMission(fileName);
 #endif
 
 	if (g_pilotData.campaignMode) {

@@ -16,6 +16,7 @@
  *   model_swaps: ...       (model_swaps.h)
  *   craft_names: ...       (craft_names.h)
  *   concourse: ...         (frontend/concourse_planet.h)
+ *   headlights: true       (headlights.h)
  */
 
 #include <stddef.h>

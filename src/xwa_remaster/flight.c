@@ -3220,6 +3220,46 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
 	}
 }
 
+/* The player craft's headlight (XwaHeadlight), converted as a light that a
+ * GLB model authors in Blender: a one-sided light of P watts gives
+ * P * 683 / pi candela straight ahead, and point_lights.model_light_intensity
+ * turns candela into the scene's units. It starts at the seat's eye in every
+ * view, as the pulse lights do, and points along the nose. The pool always
+ * keeps it. The hyperspace tunnel doesn't add it, as in XWAU. */
+static void fl_add_headlight(const XwaSnapshot* snap, const float player_bw[9], const float player_pos[3]) {
+	const XwaHeadlight* h = &snap->headlight;
+	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f) || !h->on || !player_bw) {
+		return;
+	}
+	const XwaCockpit* k = &snap->cockpit;
+	const float u = AERON_OPT_UNITS_PER_METER;
+	/* Metres along the craft's right, up and forward axes to world units.
+	 * player_bw's rows are right, ship-backward and up. */
+	float transform[16] = { 0 };
+	for (int r = 0; r < 3; r++) {
+		transform[r * 4 + 0] = player_bw[0 * 3 + r] * u;
+		transform[r * 4 + 1] = player_bw[2 * 3 + r] * u;
+		transform[r * 4 + 2] = -player_bw[1 * 3 + r] * u;
+		transform[r * 4 + 3] = player_pos[r] + player_bw[0 * 3 + r] * k->seat_eye_local[0] +
+							   player_bw[1 * 3 + r] * k->seat_eye_local[1] +
+							   player_bw[2 * 3 + r] * k->seat_eye_local[2];
+	}
+	transform[15] = 1.0f;
+	AeronFlightLight light;
+	memset(&light, 0, sizeof light);
+	light.position.x = h->position_m[0];
+	light.position.y = h->position_m[1];
+	light.position.z = h->position_m[2];
+	memcpy(light.color, h->color, sizeof light.color);
+	light.intensity = h->power_w * 683.0f / 3.14159265f;
+	light.shape = AERON_FLIGHT_LIGHT_POINT;
+	light.direction.z = 1.0f;
+	AeronSceneLight scene_light;
+	if (AeronScene_FlightLight(&light, transform, u, s.plight.model_light_intensity, &scene_light)) {
+		fl_pool_add(&scene_light, 0, 1);
+	}
+}
+
 /* Convert the candidates to scene lights with the calibration into the
  * pool, discarding invalid records. */
 static void fl_finalize_point_lights(void) {
@@ -5282,11 +5322,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		AeronScene_AddMeshInstance(s.scene, &s.bolts[bi]);
 	}
 
-	/* Local-player pulse lights (player basis known after the walk),
-	 * then the finalized candidates into the light pool (submitted with
-	 * the cockpit's lights) + the lit PBR env. */
+	/* Local-player pulse lights and headlight (player basis known after
+	 * the walk), then the finalized candidates into the light pool
+	 * (submitted with the cockpit's lights) + the lit PBR env. */
 	if (player_found && player_f) {
 		fl_derive_pulse_lights(snap, player_bw, player_local, 0);
+		fl_add_headlight(snap, player_bw, player_local);
 	}
 	fl_finalize_point_lights();
 	if (!fl_configure_clustered_lights(s.scene)) {

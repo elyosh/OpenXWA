@@ -659,6 +659,17 @@ typedef struct XwaLightPulse {
 } XwaLightPulse;
 #define XWA_SNAP_MAX_LIGHT_PULSES 6
 
+/* The player craft's headlight (headlights.h): a one-sided light along the
+ * nose, from the seat's eye plus `position_m` along the craft's axes (X
+ * right, Y up, Z forward). `color` is linear and `power_w` the power of a
+ * Blender area light. */
+typedef struct XwaHeadlight {
+	uint8_t on;
+	float position_m[3];
+	float color[3];
+	float power_w;
+} XwaHeadlight;
+
 /* Snapshot capacity for coordinate strips after the engine aligns the
  * segment count to the texture frame count. The original 32-frame
  * WrapBack group builds 128 segments and therefore needs 129 coords. */
@@ -1242,6 +1253,7 @@ typedef struct XwaSnapshot {
 	uint8_t cockpit_valid;
 	XwaLightPulse light_pulses[XWA_SNAP_MAX_LIGHT_PULSES];
 	uint8_t light_pulse_active;
+	XwaHeadlight headlight;
 	XwaBackdrop backdrops[XWA_SNAP_MAX_BACKDROPS];
 	uint32_t backdrop_count;
 	XwaGlowMark glow_marks[XWA_SNAP_MAX_GLOW_MARKS];
