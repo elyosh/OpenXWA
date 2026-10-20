@@ -1,5 +1,6 @@
 #include "xwa/frontend/model_preview.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -406,6 +407,17 @@ char ModelPreview_LoadModel(const char* modelName, int craftType) {
 	g_loadedModels.byObjectType[0] = handle;
 	strcpy(g_modelPreviewOptFileName, baseName);
 	strcat(g_modelPreviewOptFileName, ".opt");
+#ifdef XWA_MODERN
+	/* Modern port: the name of the model that loaded, which the HD preview
+	   draws. */
+	{
+		char swapped[sizeof g_modelPreviewOptFileName];
+
+		if (XwaModelSwaps_FileName(g_modelPreviewOptFileName, swapped, sizeof swapped)) {
+			strcpy(g_modelPreviewOptFileName, swapped);
+		}
+	}
+#endif
 
 	g_modelPreviewObjectType = g_objectTypeTables.craftTypeToObjectType[craftType];
 	g_modelPreviewOpt = (OptimizedPolyObject*)Memory_LockHandle(handle);

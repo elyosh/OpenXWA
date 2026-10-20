@@ -5,6 +5,7 @@
 
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
@@ -2019,7 +2020,14 @@ uint16_t OptModel_LoadHandle(const char* fileName) {
 	int savedVertCapacity;
 	int savedEdgeCapacity;
 	int savedCurVertexCount;
+	char swappedFileName[XWA_MODEL_SOURCE_KEY_MAX + 32];
 
+	/* Modern port: a mission can load another model in place of this one.
+	 * Everything below, the model def included, then uses that model. */
+	if (XwaModelSwaps_FileName(fileName, swappedFileName, sizeof swappedFileName)) {
+		Aeron_LogInfo("xwa.assets", "OPT '%s': the mission loads '%s' instead", fileName, swappedFileName);
+		fileName = swappedFileName;
+	}
 	/* Modern port: GLB replacements enter as a synthesized payload image;
 	 * everything after the file read runs unchanged. */
 	source = XwaModelSource_Resolve(fileName, NULL, 0);

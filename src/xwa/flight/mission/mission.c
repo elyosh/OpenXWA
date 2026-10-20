@@ -44,6 +44,7 @@
 #include "xwa_runtime/models/mission_backdrops.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/mission_tie.h"
+#include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/skins.h"
@@ -7592,8 +7593,9 @@ uint16_t Mission_Init(char* fileName) {
 	}
 #ifdef XWA_MODERN
 	/* Modern port: read the mission's settings, flight-group values, object
-	   profile selections, articulation overrides, hangar settings and art of
-	   its own, before any flight-group object is created or texture loaded.
+	   profile selections, articulation overrides, hangar settings, art of its
+	   own and model swaps, before any flight-group object is created or any
+	   model or texture loaded.
 	   The flight-group values come right after the .TIE is read, so the
 	   readers after them see them. A mod can also make each mission load
 	   start without the combat music state of the previous mission. */
@@ -7610,6 +7612,7 @@ uint16_t Mission_Init(char* fileName) {
 	XwaSkins_LoadMission(fileName);
 	XwaHangars_LoadMission(fileName);
 	XwaMissionArt_LoadMission(fileName);
+	XwaModelSwaps_LoadMission(fileName);
 #endif
 
 	if (g_pilotData.campaignMode) {

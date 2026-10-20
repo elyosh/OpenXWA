@@ -9,6 +9,7 @@
 #include "xwa/util/memory.h"
 #include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/models/render_model.h"
 
 #include <math.h>
@@ -71,6 +72,16 @@ static int OptSynth_IsLaserHardpoint(int32_t type) {
 	return type == 0 || (type >= 1 && type <= 6) || (type >= 9 && type <= 11) || type == 18;
 }
 
+/* The key whose object type the checks below use: the key the mission swaps
+   for `key`, else `key`. A swapped-in model, such as
+   superstardestroyerrecentered, then gets the checks of the model it
+   replaces. */
+static const char* OptSynth_TypeKey(const char* key) {
+	const char* source = XwaModelSwaps_SourceOf(key);
+
+	return source != NULL ? source : key;
+}
+
 static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model) {
 	char reason[160];
 	uint32_t gunnerCount;
@@ -110,18 +121,18 @@ static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model
 		snprintf(reason, sizeof reason, "%u Cockpit (type 31) hardpoints (at most 1)", cockpitEyeCount);
 		return OptSynth_Fail(key, reason);
 	}
-	if (cockpitEyeCount != 0 && XwaModelSource_IsCockpitClassKey(key)) {
+	if (cockpitEyeCount != 0 && XwaModelSource_IsCockpitClassKey(OptSynth_TypeKey(key))) {
 		Aeron_LogWarn("xwa.models",
 					  "replacement '%s': cockpit models ignore Cockpit (type 31) hardpoints; the pilot eye "
 					  "belongs on the craft model",
 					  key);
 	}
 
-	if (!XwaModelRole_Validate(key, model, reason, sizeof reason)) {
+	if (!XwaModelRole_Validate(OptSynth_TypeKey(key), model, reason, sizeof reason)) {
 		return OptSynth_Fail(key, reason);
 	}
 
-	if (XwaModelSource_KeyRequiresFloatHardpoints(key)) {
+	if (XwaModelSource_KeyRequiresFloatHardpoints(OptSynth_TypeKey(key))) {
 		int hasLaser = 0;
 		int hasMainHull = 0;
 
@@ -223,7 +234,7 @@ static int OptSynth_ValidateSimulation(const char* key, const AeronOptSimModel* 
 	}
 	/* The model def stores the count in a byte: 256 reads back as none, which
 	   sends the warhead launch point to the MainHull-vertex fallback. */
-	if (floatHardpoints >= 256 && XwaModelSource_KeyRequiresFloatHardpoints(key)) {
+	if (floatHardpoints >= 256 && XwaModelSource_KeyRequiresFloatHardpoints(OptSynth_TypeKey(key))) {
 		return OptSynth_Fail(key, "256 or more float hardpoints (the model def holds at most 255)");
 	}
 	return 1;
@@ -239,7 +250,7 @@ static void OptSynth_WarnDenseCockpit(const char* key, const AeronFlightModel* m
 	double smallestMeanEdge;
 	int smallestComponent;
 
-	if (!XwaModelSource_IsCockpitClassKey(key)) {
+	if (!XwaModelSource_IsCockpitClassKey(OptSynth_TypeKey(key))) {
 		return;
 	}
 	faceTotal = 0;

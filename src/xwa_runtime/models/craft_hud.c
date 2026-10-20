@@ -6,6 +6,7 @@
 #include "xwa/assets/object_type.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/models/model_swaps.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -200,7 +201,9 @@ void XwaCraftHud_LoadMission(const struct XwaFlightGroup* flightGroups, size_t s
 		}
 		read[objectType] = 1;
 		type = &s_types[objectType];
-		if (!XwaModelSource_TypeKey(objectType, key)) {
+		/* The model that the type loads in this mission, as the swap's
+		   target has its own HUD settings. */
+		if (!XwaModelSwaps_TypeKey(objectType, key)) {
 			continue;
 		}
 		snprintf(path, sizeof path, "flight/models/%s.yaml", key);

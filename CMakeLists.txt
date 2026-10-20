@@ -224,6 +224,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/mission_file.c
     src/xwa_runtime/models/mission_tie.c
     src/xwa_runtime/models/mission_settings.c
+    src/xwa_runtime/models/model_swaps.c
     src/xwa_runtime/models/model_source.c
     src/xwa_runtime/models/object_profiles.c
     src/xwa_runtime/models/skins.c
