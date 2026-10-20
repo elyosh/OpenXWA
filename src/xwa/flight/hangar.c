@@ -3064,6 +3064,13 @@ void Hangar_RenderScene(void) {
 				uint16_t objectType;
 
 				objectType = (uint16_t)backdrop->objectType;
+#ifdef XWA_MODERN
+				/* Modern port: the extra planets come after the stock types
+				   (mission_backdrops.h) and aren't suns. */
+				if (objectType >= XWA_STOCK_OBJECT_TYPE_COUNT) {
+					objectType = OBJ_None;
+				}
+#endif
 				if (objectType >= OBJ_BackdropTextureGroup9001_Sprite1100_521) {
 					if (objectType >= OBJ_BackdropTextureGroup9005_Sprite1500 && backdrop->viewDirQ20.z > 0 &&
 						FlightView_IsLensFlareSourceVisible(

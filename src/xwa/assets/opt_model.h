@@ -3,6 +3,10 @@
 
 #include <stdint.h>
 
+#ifdef XWA_MODERN
+#include "xwa/assets/object_type.h"
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -67,7 +71,12 @@ typedef struct OptTextureData {
 	int32_t height;
 } OptTextureData;
 
+#ifdef XWA_MODERN
+/* Modern port: every object type, the extra planets included. */
+#define XWA_LOADED_MODEL_COUNT OBJ_Count
+#else
 #define XWA_LOADED_MODEL_COUNT 557
+#endif
 
 typedef union LoadedModelHandleTable {
 	uint16_t byObjectType[XWA_LOADED_MODEL_COUNT];

@@ -966,7 +966,7 @@ static int CraftDefinitions_LoadFile(CraftFile* file) {
 		return 0;
 	}
 	if (!CraftDefinitions_ReadInt(file->path, AeronConfigNode_MapGet(file->root, "object_type"),
-								  "object_type", 0, OBJ_Count - 1, &value)) {
+								  "object_type", 0, XWA_STOCK_OBJECT_TYPE_COUNT - 1, &value)) {
 		Aeron_LogError("xwa.craft", "%s: the file needs an object_type. It is ignored", file->path);
 		return 0;
 	}
@@ -1084,7 +1084,8 @@ static void CraftDefinitions_ApplyRules(const CraftFile* file) {
 	int flag;
 
 	node = AeronConfigNode_MapGet(file->root, "sounds_like");
-	if (node != NULL && CraftDefinitions_ReadInt(file->path, node, "sounds_like", 0, OBJ_Count - 1, &value)) {
+	if (node != NULL && CraftDefinitions_ReadInt(file->path, node, "sounds_like", 0,
+												 XWA_STOCK_OBJECT_TYPE_COUNT - 1, &value)) {
 		s_soundsLike[file->objectType] = (uint16_t)(value + 1);
 	}
 	node = AeronConfigNode_MapGet(file->root, "beam_allowed");
@@ -1120,7 +1121,8 @@ static int CraftDefinitions_LoadCraftTypeFile(CraftTypeFile* file) {
 	file->objectType = -1;
 	node = AeronConfigNode_MapGet(file->root, "object_type");
 	if (node != NULL) {
-		if (!CraftDefinitions_ReadInt(file->path, node, "object_type", 0, OBJ_Count - 1, &value)) {
+		if (!CraftDefinitions_ReadInt(file->path, node, "object_type", 0, XWA_STOCK_OBJECT_TYPE_COUNT - 1,
+									  &value)) {
 			Aeron_LogError("xwa.craft", "%s: the file is ignored", file->path);
 			return 0;
 		}

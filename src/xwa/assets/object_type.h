@@ -8,8 +8,8 @@
  *     number that missions, pilot files, SHIPLIST.TXT and SPECDESC.TXT use.
  *     It holds the object type;
  *   - the object type (ObjectTypeId, g_objectTypes at 0x5FB240, 557
- *     entries): the list row of the model, the craft record, genus, family
- *     and flags;
+ *     entries, and 152 more in the modern build for extra planets): the list
+ *     row of the model, the craft record, genus, family and flags;
  *   - the craft record (g_modelDefs at 0x5BB480, 265 entries, ModelDefIndex):
  *     stats, weapons, cockpit eye and names.
  * Other sources name them differently. The developers call the object type a
@@ -577,10 +577,19 @@ typedef enum ObjectTypeId {
 	OBJ_AnimationTextureGroup3400 = 554,
 	OBJ_AnimationTextureGroup3500 = 555,
 	OBJ_DSLaserPowerSource = 556,
+#ifdef XWA_MODERN
+	/* Modern port: 152 planets after the stock types, one for each backdrop
+	   id from 104 to 255 (xwa_runtime/models/mission_backdrops.h). */
+	OBJ_FirstExtraPlanet = 557,
+	OBJ_Count = 557 + 152
+#else
 	OBJ_Count = 557
+#endif
 } ObjectTypeId;
 
 enum {
+	/* The object types of the stock table. */
+	XWA_STOCK_OBJECT_TYPE_COUNT = 557,
 	XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT = 232,
 	XWA_OBJECT_TYPE_TABLE_WORD_COUNT = 404,
 	XWA_MISSION_BACKDROP_DESCRIPTOR_COUNT = 104,

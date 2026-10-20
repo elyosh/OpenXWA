@@ -415,6 +415,8 @@ static XwaOptHandleState g_optHandles[XWA_SNAP_MAX_OPT_ASSETS];
 static uint16_t g_optHandleSlots[UINT16_MAX + 1];
 static uint64_t g_optAssetGeneration;
 static uint8_t g_textureAssets[XWA_SNAP_MAX_TEXTURE_ASSETS];
+/* Every object type can have textures. */
+typedef char xwa_snap_texture_assets_size[(XWA_SNAP_MAX_TEXTURE_ASSETS >= OBJ_Count) ? 1 : -1];
 static uint64_t g_textureAssetGeneration;
 
 void XwaSnapshot_NoteOptLoad(uint16_t public_handle, const char* file_name, uint8_t source) {

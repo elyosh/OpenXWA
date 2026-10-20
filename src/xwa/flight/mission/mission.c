@@ -40,6 +40,7 @@
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/hangars.h"
+#include "xwa_runtime/models/mission_backdrops.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/skins.h"
@@ -8039,17 +8040,24 @@ uint16_t Mission_Init(char* fileName) {
 	while ((int16_t)g_currentFlightGroupIdx < (int16_t)g_missionHeader.numFlightGroups) {
 		int backdropId;
 		ObjectTypeId backdropType;
+#ifdef XWA_MODERN
+		const ObjectTypeBackdropDescriptor* backdropDescriptor;
+#endif
 
 		backdropId = g_missionFlightGroups[g_currentFlightGroupIdx].fg.backdrop;
 #ifdef XWA_MODERN
 		/* Modern port: some mods' mission files use backdrop ids past the
-		   stock table, which the stock game reads past its end. These place
-		   no backdrop. The id is a 32-bit field, so a negative one is out of
-		   the table too. */
-		if (backdropId < 0 || backdropId >= XWA_MISSION_BACKDROP_DESCRIPTOR_COUNT) {
-			Aeron_LogWarn("xwa.mission",
-						  "flight group %d: backdrop id %d is outside the stock table; it places nothing",
-						  (int)g_currentFlightGroupIdx, backdropId);
+		   stock table, which the stock game reads past its end.
+		   flight/flight.yaml can give ids 104 to 255 a planet
+		   (mission_backdrops.h); other ids place no backdrop. The id is a
+		   32-bit field, so a negative one is out of the table too. */
+		backdropDescriptor = XwaMissionBackdrops_Descriptor(backdropId);
+		if (backdropDescriptor == NULL) {
+			Aeron_LogWarn(
+				"xwa.mission",
+				"flight group %d: backdrop id %d is outside the stock table, and flight/flight.yaml "
+				"gives it no planet; it places nothing",
+				(int)g_currentFlightGroupIdx, backdropId);
 			backdropId = 0;
 		}
 #endif
@@ -8057,7 +8065,11 @@ uint16_t Mission_Init(char* fileName) {
 			(ObjectTypeId)g_objectTypeTables
 					.craftTypeToObjectType[g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType] ==
 				OBJ_BackdropTextureGroup9001_Sprite1100_263) {
+#ifdef XWA_MODERN
+			backdropType = (ObjectTypeId)backdropDescriptor->objectType;
+#else
 			backdropType = (ObjectTypeId)g_objectTypeTables.missionBackdropDescriptors[backdropId].objectType;
+#endif
 			if (backdropType != OBJ_None &&
 				(g_objectTypes[(ObjectTypeId)backdropType].flags & OBJECT_TYPE_FLAG_SINGLE_MIP_LEVEL) != 0) {
 				unsigned int backdropRegion;
@@ -8196,8 +8208,12 @@ uint16_t Mission_Init(char* fileName) {
 					backdropR = 0.0f;
 					backdropIntensity = 0.0f;
 
+#ifdef XWA_MODERN
+					g_backdropRecordsByRegion[0][flatIdx].flags = backdropDescriptor->flags;
+#else
 					g_backdropRecordsByRegion[0][flatIdx].flags =
 						g_objectTypeTables.missionBackdropDescriptors[backdropId].flags;
+#endif
 					if ((g_backdropRecordsByRegion[0][flatIdx].flags & 4) != 0) {
 						g_backdropRecordsByRegion[0][flatIdx].drawFlags = 1;
 					} else if (backdropType != OBJ_DeathStarFireTextureGroup6250_Sprite000 &&

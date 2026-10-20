@@ -38,6 +38,7 @@
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/hangars.h"
+#include "xwa_runtime/models/mission_backdrops.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
@@ -138,6 +139,7 @@ int XwaPort_Init(void) {
 	XwaTime_Reset();
 	File_SetVfs(Aeron_GetVfs());
 	XwaText_Load();
+	XwaMissionBackdrops_Init();
 	XwaCraftDefinitions_Apply();
 	XwaModelSource_Init();
 	XwaHangars_Init();
