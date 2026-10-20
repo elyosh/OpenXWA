@@ -1143,15 +1143,15 @@ typedef struct XwaFrontendGroupAsset {
 	int16_t group;
 } XwaFrontendGroupAsset;
 
-#define XWA_SNAP_MAX_RESDATA_GROUPS 64
-#define XWA_SNAP_RESDATA_SET_NAME_MAX 32
+#define XWA_SNAP_MAX_MISSION_ART_GROUPS 64
+#define XWA_SNAP_MISSION_ART_NAME_MAX 32
 
-/* A group that the mission draws from a set of its own, in
- * resdata/sets/<set> (xwa_runtime/models/resdata_sets.h). */
-typedef struct XwaResdataGroup {
+/* A group that the mission draws from its own art, in
+ * resdata/mission_art/<art> (xwa_runtime/models/mission_art.h). */
+typedef struct XwaMissionArtGroup {
 	int16_t group;
-	char set[XWA_SNAP_RESDATA_SET_NAME_MAX];
-} XwaResdataGroup;
+	char art[XWA_SNAP_MISSION_ART_NAME_MAX];
+} XwaMissionArtGroup;
 
 /* ---- snapshot ------------------------------------------------------ */
 
@@ -1209,11 +1209,11 @@ typedef struct XwaSnapshot {
 	uint64_t texture_asset_generation;
 	XwaTextureAsset texture_assets[XWA_SNAP_MAX_TEXTURE_ASSETS];
 	uint32_t texture_asset_count;
-	/* The groups that the mission draws from its own sets;
-	 * resdata_generation changes when they do. */
-	uint64_t resdata_generation;
-	XwaResdataGroup resdata_groups[XWA_SNAP_MAX_RESDATA_GROUPS];
-	uint32_t resdata_group_count;
+	/* The groups that the mission draws from its own art;
+	 * mission_art_generation changes when they do. */
+	uint64_t mission_art_generation;
+	XwaMissionArtGroup mission_art_groups[XWA_SNAP_MAX_MISSION_ART_GROUPS];
+	uint32_t mission_art_group_count;
 	/* XWAU skins (xwa_runtime/models/skins.h): the mission's selections and
 	 * the markings values each model's objects use; skin_generation changes
 	 * when either does. */
@@ -1301,7 +1301,8 @@ void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, con
 							uint32_t opaque_fill_color, int32_t orientation_mode);
 /* DAT atlas sprite. x/y is the FINAL anchored blit position (the
  * caller adds the payload anchor first — aeron atlas convention:
- * origins are baked into the draw position at emit time). */
+ * the origin is already added to the draw position when the sprite
+ * is emitted). */
 void XwaSnapshot_EmitAtlasSprite(int group_id, int index, int x, int y, int img_w, int img_h);
 /* Emits a frontend video record: the current frame of the player in `slot`,
  * stretched over the rectangle x, y, width, height in 640x480 units. */
@@ -1396,8 +1397,8 @@ void XwaSnapshotExport_CaptureOptAssets(XwaSnapshot* snapshot);
 void XwaSnapshot_NoteTextureLoad(uint16_t object_type);
 void XwaSnapshot_NoteTextureFree(uint16_t object_type);
 void XwaSnapshotExport_CaptureTextureAssets(XwaSnapshot* snapshot);
-/* Copies the groups of the mission's own sets into the snapshot. */
-void XwaSnapshotExport_CaptureResdataSets(XwaSnapshot* snapshot);
+/* Copies the groups of the mission's own art into the snapshot. */
+void XwaSnapshotExport_CaptureMissionArt(XwaSnapshot* snapshot);
 
 /* Engine-side frontend resource/group observers and committed residency set. */
 void XwaSnapshot_NoteSpriteGroupLoad(int16_t group);

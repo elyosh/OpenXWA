@@ -40,10 +40,10 @@
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/hangars.h"
+#include "xwa_runtime/models/mission_art.h"
 #include "xwa_runtime/models/mission_backdrops.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
-#include "xwa_runtime/models/resdata_sets.h"
 #include "xwa_runtime/models/skins.h"
 #endif
 
@@ -7574,7 +7574,7 @@ uint16_t Mission_Init(char* fileName) {
 								(int16_t)g_missionHeader.numFlightGroups);
 	XwaSkins_LoadMission(fileName);
 	XwaHangars_LoadMission(fileName);
-	XwaResdataSets_LoadMission(fileName);
+	XwaMissionArt_LoadMission(fileName);
 #endif
 
 	if (g_pilotData.campaignMode) {

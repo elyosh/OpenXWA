@@ -2313,8 +2313,8 @@ int FrontImage_DrawAtlasSprite(int16_t groupId, int16_t index, int16_t x, int16_
 	g_atlasColorTable = (const unsigned char*)payload + payload->palette16Offset;
 #ifdef XWA_MODERN
 	/* Remaster snapshot observer. Emits the anchored blit position and
-	 * the sprite dims (aeron atlas convention: origins are baked into
-	 * the draw position at emit time). */
+	 * the sprite dims (aeron atlas convention: the origin is already
+	 * added to the draw position when the sprite is emitted). */
 	XwaSnapshot_EmitAtlasSprite(groupId, index, x + (int16_t)payload->anchorX, y + (int16_t)payload->anchorY,
 								sprite->width, sprite->height);
 #endif
@@ -2574,7 +2574,8 @@ int FrontImage_GetAtlasSpriteBounds(FrontendRect* out, int groupId, uint16_t ind
 	{
 		/* XWA_MODERN: in an atlas with game geometry, a frame can set its own
 		   bounds, for example a tooltip area larger than the image. */
-		const XwaGeometryFrame* frame = XwaFrontendGeometry_FindFrame(XwaFrontendGeometry_FindGroup(groupId), index);
+		const XwaGeometryFrame* frame =
+			XwaFrontendGeometry_FindFrame(XwaFrontendGeometry_FindGroup(groupId), index);
 
 		if (frame != NULL && frame->has_bounds) {
 			out->left = XwaFrontendGeometry_UnitX(frame->bounds[0]);

@@ -432,7 +432,7 @@ void XwaSnapshot_Commit(void) {
 	snapshot_capture_frontend_assets(s);
 	XwaSnapshotExport_CaptureOptAssets(s);
 	XwaSnapshotExport_CaptureTextureAssets(s);
-	XwaSnapshotExport_CaptureResdataSets(s);
+	XwaSnapshotExport_CaptureMissionArt(s);
 	XwaSkins_Capture(s);
 	/* Shared 3D lighting state: the FlightLight directional table
 	 * (world space), read-only sample once per tick. Lights every 3D

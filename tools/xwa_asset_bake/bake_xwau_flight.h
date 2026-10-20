@@ -13,11 +13,11 @@ typedef struct BakeXwauFlightOptions {
 } BakeXwauFlightOptions;
 
 typedef struct BakeXwauFlightStats {
-	int atlases;    /* group atlases written, frame sets included */
-	int images;     /* images written into them */
-	int frame_sets; /* alternative frame sets written */
-	int sets;       /* sets of the missions' own art written (resdata/sets) */
-	int font_tiers; /* flight font tiers written */
+	int atlases;     /* group atlases written, frame sets included */
+	int images;      /* images written into them */
+	int frame_sets;  /* alternative frame sets written */
+	int mission_art; /* DATs whose mission art was written (resdata/mission_art) */
+	int font_tiers;  /* flight font tiers written */
 	int failures;
 } BakeXwauFlightStats;
 

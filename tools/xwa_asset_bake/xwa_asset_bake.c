@@ -148,9 +148,9 @@ int main(int argc, char** argv) {
 											 .planet_max = planet_max };
 		BakeXwauFlightStats fstats;
 		const int ok = BakeXwau_RunFlight(&fopt, &fstats);
-		printf("bake done: %d atlases with %d images, %d alternative frame sets, %d mission sets, %d flight "
-			   "font tiers, %d failures\n",
-			   fstats.atlases, fstats.images, fstats.frame_sets, fstats.sets, fstats.font_tiers,
+		printf("bake done: %d atlases with %d images, %d alternative frame sets, %d mission art folders, %d "
+			   "flight font tiers, %d failures\n",
+			   fstats.atlases, fstats.images, fstats.frame_sets, fstats.mission_art, fstats.font_tiers,
 			   fstats.failures);
 		return ok ? 0 : 1;
 	}

@@ -8,7 +8,7 @@
 #include "xwa/assets/object_type_info.h"
 #include "xwa/util/byte_order.h"
 #include "xwa/util/memory.h"
-#include "xwa_runtime/models/resdata_sets.h"
+#include "xwa_runtime/models/mission_art.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -608,13 +608,13 @@ const XwaGeometryAtlas* XwaFrontendGeometry_FindGroup(int group) {
 	char key[XWA_GEOMETRY_KEY_SIZE];
 	char path[96];
 	const XwaGeometryAtlas* atlas;
-	const char* set;
+	const char* art;
 
-	set = XwaResdataSets_GroupSet(group);
-	if (set != NULL) {
-		/* The mission's own art (resdata_sets.h). */
-		snprintf(key, sizeof(key), "%s/group_%d", set, group);
-		snprintf(path, sizeof(path), "resdata/sets/%s/group_%d.yaml", set, group);
+	art = XwaMissionArt_GroupSource(group);
+	if (art != NULL) {
+		/* The mission's own art (mission_art.h). */
+		snprintf(key, sizeof(key), "%s/group_%d", art, group);
+		snprintf(path, sizeof(path), "resdata/mission_art/%s/group_%d.yaml", art, group);
 	} else {
 		snprintf(key, sizeof(key), "group_%d", group);
 		snprintf(path, sizeof(path), "resdata/atlas/group_%d.yaml", group);

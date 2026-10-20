@@ -19,7 +19,7 @@
 #include "xwa/frontend/frontend_display.h" /* g_pixelFormat555 */
 #include "xwa/render/renderer.h"           /* g_flightTextPalette */
 #include "xwa/render/renderer_internal.h"  /* g_flightCharToColorLut */
-#include "xwa_runtime/models/resdata_sets.h"
+#include "xwa_runtime/models/mission_art.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -526,31 +526,31 @@ void XwaSnapshotExport_CaptureTextureAssets(XwaSnapshot* snapshot) {
 	}
 }
 
-typedef char xwa_snap_resdata_sizes[(XWA_SNAP_MAX_RESDATA_GROUPS >= XWA_RESDATA_SET_GROUPS_MAX &&
-									 XWA_SNAP_RESDATA_SET_NAME_MAX == XWA_RESDATA_SET_NAME_MAX)
-										? 1
-										: -1];
+typedef char xwa_snap_mission_art_sizes[(XWA_SNAP_MAX_MISSION_ART_GROUPS >= XWA_MISSION_ART_GROUPS_MAX &&
+										 XWA_SNAP_MISSION_ART_NAME_MAX == XWA_MISSION_ART_NAME_MAX)
+											? 1
+											: -1];
 
-void XwaSnapshotExport_CaptureResdataSets(XwaSnapshot* snapshot) {
+void XwaSnapshotExport_CaptureMissionArt(XwaSnapshot* snapshot) {
 	int count;
 
 	if (!snapshot) {
 		return;
 	}
-	snapshot->resdata_generation = XwaResdataSets_Generation();
-	snapshot->resdata_group_count = 0;
-	count = XwaResdataSets_Count();
-	for (int i = 0; i < count && i < XWA_SNAP_MAX_RESDATA_GROUPS; i++) {
-		XwaResdataGroup* entry = &snapshot->resdata_groups[snapshot->resdata_group_count];
+	snapshot->mission_art_generation = XwaMissionArt_Generation();
+	snapshot->mission_art_group_count = 0;
+	count = XwaMissionArt_Count();
+	for (int i = 0; i < count && i < XWA_SNAP_MAX_MISSION_ART_GROUPS; i++) {
+		XwaMissionArtGroup* entry = &snapshot->mission_art_groups[snapshot->mission_art_group_count];
 		int group = 0;
-		const char* set = NULL;
+		const char* art = NULL;
 
-		if (!XwaResdataSets_At(i, &group, &set)) {
+		if (!XwaMissionArt_At(i, &group, &art)) {
 			continue;
 		}
 		entry->group = (int16_t)group;
-		snprintf(entry->set, sizeof entry->set, "%s", set);
-		snapshot->resdata_group_count++;
+		snprintf(entry->art, sizeof entry->art, "%s", art);
+		snapshot->mission_art_group_count++;
 	}
 }
 

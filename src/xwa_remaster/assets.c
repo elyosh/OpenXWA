@@ -122,7 +122,7 @@ typedef struct FrameSets {
 
 typedef struct GroupSlot {
 	int16_t group;
-	char set[XWA_SNAP_RESDATA_SET_NAME_MAX]; /* the mission's set it comes from, or "" */
+	char art[XWA_SNAP_MISSION_ART_NAME_MAX]; /* the mission art it comes from, or "" */
 	uint8_t mod_status;                      /* AssetLoadStatus */
 	uint8_t frontend_resident;
 	uint8_t flight_resident;
@@ -156,11 +156,11 @@ struct XwaRemasterAssets {
 	uint64_t texture_asset_generation;
 	uint32_t generation;
 	int32_t mission_index; /* from the snapshot, for the frame sets' `missions` */
-	/* The groups that the mission draws from its own sets, from the
-	   snapshot (xwa_runtime/models/resdata_sets.h). */
-	XwaResdataGroup resdata_groups[XWA_SNAP_MAX_RESDATA_GROUPS];
-	uint32_t resdata_group_count;
-	uint64_t resdata_generation;
+	/* The groups that the mission draws from its own art, from the
+	   snapshot (xwa_runtime/models/mission_art.h). */
+	XwaMissionArtGroup mission_art_groups[XWA_SNAP_MAX_MISSION_ART_GROUPS];
+	uint32_t mission_art_group_count;
+	uint64_t mission_art_generation;
 	uint32_t frame_set_random;  /* xorshift32 state */
 	uint32_t frame_set_updates; /* counts XwaRemasterAssets_UpdateFrameSets calls */
 };
@@ -190,7 +190,7 @@ XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_origina
 	}
 	a->frontend_asset_generation = UINT64_MAX;
 	a->texture_asset_generation = UINT64_MAX;
-	a->resdata_generation = UINT64_MAX;
+	a->mission_art_generation = UINT64_MAX;
 	a->generation = ++assets_next_generation;
 	if (!a->generation)
 		a->generation = ++assets_next_generation;
@@ -453,40 +453,40 @@ static void assets_file_texture_path(const XwaRemasterAssets* a, const FileSlot*
 
 static FrameSets* assets_read_frame_sets(const XwaRemasterAssets* a, int group);
 
-/* The set of the mission's own art that group `group` comes from, or "" for
-   the shared atlases. */
-static const char* assets_group_set(const XwaRemasterAssets* a, int group) {
-	for (uint32_t i = 0; i < a->resdata_group_count; i++) {
-		if (a->resdata_groups[i].group == (int16_t)group)
-			return a->resdata_groups[i].set;
+/* The mission art that group `group` comes from, or "" for the shared
+   atlases. */
+static const char* assets_group_source(const XwaRemasterAssets* a, int group) {
+	for (uint32_t i = 0; i < a->mission_art_group_count; i++) {
+		if (a->mission_art_groups[i].group == (int16_t)group)
+			return a->mission_art_groups[i].art;
 	}
 	return "";
 }
 
-/* Takes the groups of the mission's own sets from the snapshot. A group
-   whose set changes gets a slot of its own, and its old slot is released
+/* Takes the groups of the mission's own art from the snapshot. A group
+   whose source changes gets a slot of its own, and its old slot is released
    when it isn't seen any more. */
-static void assets_take_resdata_sets(XwaRemasterAssets* a, const XwaSnapshot* snapshot) {
-	uint32_t count = snapshot->resdata_group_count;
-	if (count > XWA_SNAP_MAX_RESDATA_GROUPS)
-		count = XWA_SNAP_MAX_RESDATA_GROUPS;
-	memcpy(a->resdata_groups, snapshot->resdata_groups, count * sizeof a->resdata_groups[0]);
-	a->resdata_group_count = count;
-	a->resdata_generation = snapshot->resdata_generation;
+static void assets_take_mission_art(XwaRemasterAssets* a, const XwaSnapshot* snapshot) {
+	uint32_t count = snapshot->mission_art_group_count;
+	if (count > XWA_SNAP_MAX_MISSION_ART_GROUPS)
+		count = XWA_SNAP_MAX_MISSION_ART_GROUPS;
+	memcpy(a->mission_art_groups, snapshot->mission_art_groups, count * sizeof a->mission_art_groups[0]);
+	a->mission_art_group_count = count;
+	a->mission_art_generation = snapshot->mission_art_generation;
 }
 
 /* The folder of a slot's atlas, under the mod folder. */
 static void assets_group_folder(const GroupSlot* slot, char* folder, size_t size) {
-	if (slot->set[0])
-		snprintf(folder, size, "resdata/sets/%s", slot->set);
+	if (slot->art[0])
+		snprintf(folder, size, "resdata/mission_art/%s", slot->art);
 	else
 		snprintf(folder, size, "resdata/atlas");
 }
 
 static GroupSlot* assets_group_slot(XwaRemasterAssets* a, int group) {
-	const char* set = assets_group_set(a, group);
+	const char* art = assets_group_source(a, group);
 	for (int i = 0; i < a->group_count; i++) {
-		if (a->groups[i].group == (int16_t)group && strcmp(a->groups[i].set, set) == 0) {
+		if (a->groups[i].group == (int16_t)group && strcmp(a->groups[i].art, art) == 0) {
 			return &a->groups[i];
 		}
 	}
@@ -496,7 +496,7 @@ static GroupSlot* assets_group_slot(XwaRemasterAssets* a, int group) {
 	GroupSlot* s = &a->groups[a->group_count++];
 	memset(s, 0, sizeof *s);
 	s->group = (int16_t)group;
-	snprintf(s->set, sizeof s->set, "%s", set);
+	snprintf(s->art, sizeof s->art, "%s", art);
 	char folder[96];
 	char probe[768];
 	assets_group_folder(s, folder, sizeof folder);
@@ -504,8 +504,8 @@ static GroupSlot* assets_group_slot(XwaRemasterAssets* a, int group) {
 	const AssetLoadStatus status = assets_probe_file(probe);
 	if (status == ASSET_LOAD_SUCCESS) {
 		s->mod_status = Aeron_SpriteAtlasLoad(&s->atlas, probe) ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
-		/* A mission's own set has no alternative frame sets. */
-		if (s->mod_status == ASSET_LOAD_SUCCESS && !s->set[0])
+		/* A mission's own art has no alternative frame sets. */
+		if (s->mod_status == ASSET_LOAD_SUCCESS && !s->art[0])
 			s->frame_sets = assets_read_frame_sets(a, group);
 	} else {
 		s->mod_status = (uint8_t)status;
@@ -514,9 +514,9 @@ static GroupSlot* assets_group_slot(XwaRemasterAssets* a, int group) {
 }
 
 static GroupSlot* assets_group_find(XwaRemasterAssets* a, int group) {
-	const char* set = assets_group_set(a, group);
+	const char* art = assets_group_source(a, group);
 	for (int i = 0; i < a->group_count; i++) {
-		if (a->groups[i].group == (int16_t)group && strcmp(a->groups[i].set, set) == 0) {
+		if (a->groups[i].group == (int16_t)group && strcmp(a->groups[i].art, art) == 0) {
 			return &a->groups[i];
 		}
 	}
@@ -1163,7 +1163,7 @@ int XwaRemasterAssets_FrontendAtlasSprite(XwaRemasterAssets* a, int group, int i
 int XwaRemasterAssets_FlightTexturesNeedSync(const XwaRemasterAssets* a, const XwaSnapshot* snapshot) {
 	return a && snapshot &&
 		   (a->texture_asset_generation != snapshot->texture_asset_generation ||
-			a->resdata_generation != snapshot->resdata_generation);
+			a->mission_art_generation != snapshot->mission_art_generation);
 }
 
 int XwaRemasterAssets_SyncFlightTextures(XwaRemasterAssets* a, AeronCommandBuffer* cmd,
@@ -1173,7 +1173,7 @@ int XwaRemasterAssets_SyncFlightTextures(XwaRemasterAssets* a, AeronCommandBuffe
 	}
 	if (!XwaRemasterAssets_FlightTexturesNeedSync(a, snapshot))
 		return 1;
-	assets_take_resdata_sets(a, snapshot);
+	assets_take_mission_art(a, snapshot);
 
 	uint32_t live_type_count = snapshot->texture_asset_count;
 	if (live_type_count > XWA_SNAP_MAX_TEXTURE_ASSETS) {
