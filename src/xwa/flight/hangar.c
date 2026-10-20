@@ -508,7 +508,7 @@ static void Hangar_DrawReadyCraftPanel(void) {
 	modelIndex = GetModelIndexFromType(g_objectTable[g_players[g_localPlayer].objectIndex].objectType);
 	if (modelIndex != 0xffffu) {
 		strcpy(buffer, g_strHangarMiscStrings[HANGAR_MISC_YOUR_CRAFT]);
-		strcat(buffer, g_modelDefs[modelIndex].nameAlt);
+		strcat(buffer, g_modelDefs[modelIndex].longName);
 	}
 	FlightText_SetCursor(0, 16);
 	FlightText_SetColor(0x3au);
@@ -4169,7 +4169,7 @@ after_key:
 								g_curCraft->warheadData[wslot].weaponType = 3;
 								g_curCraft->warheadData[wslot].laserCharge = 127;
 								g_curCraft->warheadData[wslot].turretTargetObjIdx = -1;
-								value = g_modelDefs[modelIndex].warheadLauncherValue[slot];
+								value = g_modelDefs[modelIndex].warheadLauncherCapacity[slot];
 								ammoIdx = g_hangarWarheadList[g_hangarMenuCursor[1]];
 								if (slot && modelIndex == (uint16_t)GetModelIndexFromType(OBJ_MissileBoat))
 									ammoIdx = 5;
@@ -6674,7 +6674,7 @@ void Hangar_ServicePlayerCraft(int dtTicks) {
 							}
 
 							baseMaxCount = (uint16_t)MATH2_fraction(
-								g_modelDefs[modelIndex].warheadLauncherValue[launcherIdx],
+								g_modelDefs[modelIndex].warheadLauncherCapacity[launcherIdx],
 								g_warheadAmmoCounts[warheadCatalogIdx]);
 							adjustedMaxCount = baseMaxCount;
 							if (baseMaxCount == 0) {
@@ -6910,7 +6910,7 @@ void Hangar_DrawProvingGroundStatusPanel(void) {
 	strcpy(text, g_strHangarMiscStrings[HANGAR_MISC_YOUR_CRAFT]);
 	savedLineStep = (uint16_t)lineStep;
 	rowY = (uint16_t)lineStep + 18;
-	strcpy(text, g_modelDefs[modelIndex].nameAlt);
+	strcpy(text, g_modelDefs[modelIndex].longName);
 	FlightText_SetCursor(20, rowY);
 	FlightText_DrawStringCentered(text);
 
@@ -7205,11 +7205,11 @@ void Hangar_BuildCraftSelectMenu(void) {
 
 		craftType = g_hangarCraftList[listIndex];
 		if (craftType != OBJ_None) {
-			const char* nameAlt;
+			const char* longName;
 
-			nameAlt = g_modelDefs[(uint16_t)GetModelIndexFromType(craftType)].nameAlt;
-			if (nameAlt != NULL) {
-				strcpy(g_hangarMenuItemLabels[1][g_hangarMenuItemCount[1]], nameAlt);
+			longName = g_modelDefs[(uint16_t)GetModelIndexFromType(craftType)].longName;
+			if (longName != NULL) {
+				strcpy(g_hangarMenuItemLabels[1][g_hangarMenuItemCount[1]], longName);
 				++g_hangarMenuItemCount[1];
 			}
 		}

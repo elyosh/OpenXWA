@@ -592,8 +592,6 @@ int Skirmish_BuildFlightGroupDutyOrders(int combatSimSlotIdx, int fgIndex) {
 		TRIGGER_PERCENT_OF = 50,
 		TRIGGER_DESTROYED = 5,
 
-		CRAFT_TYPE_SUPER_BACKDROP = 99,
-
 		SKIRMISH_TEAM_GLOBAL_GROUP_STRIDE = 3,
 		SKIRMISH_REGION_ORDER_STRIDE = 4,
 		SKIRMISH_ORDER_CLONE_COUNT = 4,
@@ -1281,7 +1279,7 @@ int Skirmish_BuildFlightGroupDutyOrders(int combatSimSlotIdx, int fgIndex) {
 			break;
 	}
 
-	if (g_combatSimSlots[combatSimSlotIdx].craftType == CRAFT_TYPE_SUPER_BACKDROP) {
+	if (g_combatSimSlots[combatSimSlotIdx].craftType == CRAFT_TYPE_MARAUDER_CORVETTE) {
 		int orderIndex;
 
 		for (orderIndex = 0; orderIndex < SKIRMISH_ORDER_CLONE_COUNT; ++orderIndex) {
@@ -1835,14 +1833,6 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 		SHIP_CATEGORY_MINE = 8,
 		SHIP_CATEGORY_UTILITY = 9,
 
-		CRAFT_TYPE_ASTEROID_MIN = 75,
-		CRAFT_TYPE_ASTEROID_MAX = 77,
-		CRAFT_TYPE_ASTEROID_3 = 77,
-		CRAFT_TYPE_HYPER_BUOY = 85,
-		CRAFT_TYPE_SPACE_DEBRIS = 86,
-		CRAFT_TYPE_BACKDROP = 183,
-		CRAFT_TYPE_CLUSTER_MINE_A = 77,
-
 		GLOBAL_GROUP_FIGHTERS = 1,
 		GLOBAL_GROUP_HEAVY_CRAFT = 2,
 		GLOBAL_GROUP_PRIMARY = 3,
@@ -2003,7 +1993,7 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 		g_frontendMission->flightGroups[fgIndex].numberOfCraft = g_combatSimSlots[slotIndex].numberOfCraft;
 		g_frontendMission->flightGroups[fgIndex].groupAI = g_combatSimSlots[slotIndex].groupAI;
 		g_frontendMission->flightGroups[fgIndex].warhead = g_combatSimSlots[slotIndex].warhead;
-		if (g_frontendMission->flightGroups[fgIndex].craftType == CRAFT_TYPE_CLUSTER_MINE_A) {
+		if (g_frontendMission->flightGroups[fgIndex].craftType == CRAFT_TYPE_MINE_3) {
 			g_frontendMission->flightGroups[fgIndex].warhead = 3;
 		}
 		g_frontendMission->flightGroups[fgIndex].countermeasures =
@@ -2324,7 +2314,7 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 			radius = distance * 79.5;
 			for (angleIndex = 0; angleIndex < 8; ++angleIndex) {
 				angle = (double)angleIndex * 0.7853981633974483;
-				g_frontendMission->flightGroups[fgIndex].craftType = CRAFT_TYPE_SPACE_DEBRIS;
+				g_frontendMission->flightGroups[fgIndex].craftType = CRAFT_TYPE_ASTEROID;
 				g_frontendMission->flightGroups[fgIndex].numberOfWaves = 0;
 				g_frontendMission->flightGroups[fgIndex].numberOfCraft = 3;
 				g_frontendMission->flightGroups[fgIndex].status1 = STATUS_SCENERY;
@@ -2342,7 +2332,7 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 			}
 
 			for (angleIndex = 0; angleIndex < 3; ++angleIndex) {
-				g_frontendMission->flightGroups[fgIndex].craftType = CRAFT_TYPE_SPACE_DEBRIS;
+				g_frontendMission->flightGroups[fgIndex].craftType = CRAFT_TYPE_ASTEROID;
 				g_frontendMission->flightGroups[fgIndex].numberOfWaves = 0;
 				g_frontendMission->flightGroups[fgIndex].numberOfCraft = 3;
 				g_frontendMission->flightGroups[fgIndex].status1 = STATUS_SCENERY;
@@ -2361,7 +2351,7 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 			}
 
 			for (angleIndex = 0; angleIndex < 3; ++angleIndex) {
-				g_frontendMission->flightGroups[fgIndex].craftType = CRAFT_TYPE_SPACE_DEBRIS;
+				g_frontendMission->flightGroups[fgIndex].craftType = CRAFT_TYPE_ASTEROID;
 				g_frontendMission->flightGroups[fgIndex].numberOfWaves = 0;
 				g_frontendMission->flightGroups[fgIndex].numberOfCraft = 3;
 				g_frontendMission->flightGroups[fgIndex].status1 = STATUS_SCENERY;
@@ -2380,7 +2370,7 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 			}
 
 			for (angleIndex = 1; angleIndex < 9; angleIndex += 2) {
-				g_frontendMission->flightGroups[fgIndex].craftType = CRAFT_TYPE_SPACE_DEBRIS;
+				g_frontendMission->flightGroups[fgIndex].craftType = CRAFT_TYPE_ASTEROID;
 				g_frontendMission->flightGroups[fgIndex].numberOfWaves = 0;
 				g_frontendMission->flightGroups[fgIndex].numberOfCraft = 3;
 				g_frontendMission->flightGroups[fgIndex].status1 = STATUS_SCENERY;
@@ -2398,7 +2388,7 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 				++fgIndex;
 			}
 
-			g_frontendMission->flightGroups[fgIndex].craftType = CRAFT_TYPE_SPACE_DEBRIS;
+			g_frontendMission->flightGroups[fgIndex].craftType = CRAFT_TYPE_ASTEROID;
 			g_frontendMission->flightGroups[fgIndex].numberOfWaves = 0;
 			g_frontendMission->flightGroups[fgIndex].numberOfCraft = 6;
 			g_frontendMission->flightGroups[fgIndex].status1 = STATUS_SCENERY;
@@ -2418,51 +2408,49 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 			orderIndex = regionIndex * REGION_STRIDE;
 
 			for (angleIndex = 0; angleIndex < 8; ++angleIndex) {
-				int asteroidFgIndex;
+				int mineFgIndex;
 
-				asteroidFgIndex = fgIndex++;
+				mineFgIndex = fgIndex++;
 				angle = (double)angleIndex * 0.7853981633974483;
-				g_frontendMission->flightGroups[asteroidFgIndex].craftType =
-					rand() % (CRAFT_TYPE_ASTEROID_MAX - CRAFT_TYPE_ASTEROID_MIN + 1) +
-					CRAFT_TYPE_ASTEROID_MIN;
-				g_frontendMission->flightGroups[asteroidFgIndex].numberOfWaves = 0;
-				g_frontendMission->flightGroups[asteroidFgIndex].numberOfCraft = 2;
-				g_frontendMission->flightGroups[asteroidFgIndex].status1 = STATUS_SCENERY;
-				g_frontendMission->flightGroups[asteroidFgIndex].globalGroup = GLOBAL_GROUP_SCENERY;
-				g_frontendMission->flightGroups[asteroidFgIndex].iff = NEUTRAL_IFF;
-				g_frontendMission->flightGroups[asteroidFgIndex].team = NEUTRAL_TEAM;
-				if (g_frontendMission->flightGroups[asteroidFgIndex].craftType == CRAFT_TYPE_ASTEROID_3) {
-					g_frontendMission->flightGroups[asteroidFgIndex].warhead = 3;
+				g_frontendMission->flightGroups[mineFgIndex].craftType =
+					rand() % (CRAFT_TYPE_MINE_3 - CRAFT_TYPE_MINE_1 + 1) + CRAFT_TYPE_MINE_1;
+				g_frontendMission->flightGroups[mineFgIndex].numberOfWaves = 0;
+				g_frontendMission->flightGroups[mineFgIndex].numberOfCraft = 2;
+				g_frontendMission->flightGroups[mineFgIndex].status1 = STATUS_SCENERY;
+				g_frontendMission->flightGroups[mineFgIndex].globalGroup = GLOBAL_GROUP_SCENERY;
+				g_frontendMission->flightGroups[mineFgIndex].iff = NEUTRAL_IFF;
+				g_frontendMission->flightGroups[mineFgIndex].team = NEUTRAL_TEAM;
+				if (g_frontendMission->flightGroups[mineFgIndex].craftType == CRAFT_TYPE_MINE_3) {
+					g_frontendMission->flightGroups[mineFgIndex].warhead = 3;
 				}
-				g_frontendMission->flightGroups[asteroidFgIndex].missionPoints[XWA_FG_POINT_START_1].x =
+				g_frontendMission->flightGroups[mineFgIndex].missionPoints[XWA_FG_POINT_START_1].x =
 					(int16_t)(int)(cos(angle) * radius);
-				g_frontendMission->flightGroups[asteroidFgIndex].missionPoints[XWA_FG_POINT_START_1].y =
+				g_frontendMission->flightGroups[mineFgIndex].missionPoints[XWA_FG_POINT_START_1].y =
 					(int16_t)(int)(sin(angle) * radius);
-				g_frontendMission->flightGroups[asteroidFgIndex].missionPoints[XWA_FG_POINT_START_1].z = 0;
-				g_frontendMission->flightGroups[asteroidFgIndex].missionPointRegions[XWA_FG_POINT_START_1] =
+				g_frontendMission->flightGroups[mineFgIndex].missionPoints[XWA_FG_POINT_START_1].z = 0;
+				g_frontendMission->flightGroups[mineFgIndex].missionPointRegions[XWA_FG_POINT_START_1] =
 					regionIndex;
-				g_frontendMission->flightGroups[asteroidFgIndex].orders[orderIndex].target1Type =
+				g_frontendMission->flightGroups[mineFgIndex].orders[orderIndex].target1Type =
 					TARGET_GLOBAL_GROUP;
-				g_frontendMission->flightGroups[asteroidFgIndex].orders[orderIndex].target1 =
+				g_frontendMission->flightGroups[mineFgIndex].orders[orderIndex].target1 =
 					GLOBAL_GROUP_ORDER_TARGET_1;
-				g_frontendMission->flightGroups[asteroidFgIndex].orders[orderIndex].target1OrTarget2 = 1;
-				g_frontendMission->flightGroups[asteroidFgIndex].orders[orderIndex].target2Type =
+				g_frontendMission->flightGroups[mineFgIndex].orders[orderIndex].target1OrTarget2 = 1;
+				g_frontendMission->flightGroups[mineFgIndex].orders[orderIndex].target2Type =
 					TARGET_GLOBAL_GROUP;
-				g_frontendMission->flightGroups[asteroidFgIndex].orders[orderIndex].target2 =
+				g_frontendMission->flightGroups[mineFgIndex].orders[orderIndex].target2 =
 					GLOBAL_GROUP_ORDER_TARGET_2;
 			}
 
 			for (angleIndex = 1; angleIndex < 4; ++angleIndex) {
 				g_frontendMission->flightGroups[fgIndex].craftType =
-					(uint8_t)(rand() % (CRAFT_TYPE_ASTEROID_MAX - CRAFT_TYPE_ASTEROID_MIN + 1) +
-							  CRAFT_TYPE_ASTEROID_MIN);
+					(uint8_t)(rand() % (CRAFT_TYPE_MINE_3 - CRAFT_TYPE_MINE_1 + 1) + CRAFT_TYPE_MINE_1);
 				g_frontendMission->flightGroups[fgIndex].numberOfWaves = 0;
 				g_frontendMission->flightGroups[fgIndex].numberOfCraft = 2;
 				g_frontendMission->flightGroups[fgIndex].status1 = STATUS_SCENERY;
 				g_frontendMission->flightGroups[fgIndex].globalGroup = GLOBAL_GROUP_SCENERY;
 				g_frontendMission->flightGroups[fgIndex].iff = NEUTRAL_IFF;
 				g_frontendMission->flightGroups[fgIndex].team = NEUTRAL_TEAM;
-				if (g_frontendMission->flightGroups[fgIndex].craftType == CRAFT_TYPE_ASTEROID_3) {
+				if (g_frontendMission->flightGroups[fgIndex].craftType == CRAFT_TYPE_MINE_3) {
 					g_frontendMission->flightGroups[fgIndex].warhead = 3;
 				}
 				g_frontendMission->flightGroups[fgIndex].missionPoints[XWA_FG_POINT_START_1].x =
@@ -2484,15 +2472,14 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 
 			for (angleIndex = 5; angleIndex < 8; ++angleIndex) {
 				g_frontendMission->flightGroups[fgIndex].craftType =
-					(uint8_t)(rand() % (CRAFT_TYPE_ASTEROID_MAX - CRAFT_TYPE_ASTEROID_MIN + 1) +
-							  CRAFT_TYPE_ASTEROID_MIN);
+					(uint8_t)(rand() % (CRAFT_TYPE_MINE_3 - CRAFT_TYPE_MINE_1 + 1) + CRAFT_TYPE_MINE_1);
 				g_frontendMission->flightGroups[fgIndex].numberOfWaves = 0;
 				g_frontendMission->flightGroups[fgIndex].numberOfCraft = 2;
 				g_frontendMission->flightGroups[fgIndex].status1 = STATUS_SCENERY;
 				g_frontendMission->flightGroups[fgIndex].globalGroup = GLOBAL_GROUP_SCENERY;
 				g_frontendMission->flightGroups[fgIndex].iff = NEUTRAL_IFF;
 				g_frontendMission->flightGroups[fgIndex].team = NEUTRAL_TEAM;
-				if (g_frontendMission->flightGroups[fgIndex].craftType == CRAFT_TYPE_ASTEROID_3) {
+				if (g_frontendMission->flightGroups[fgIndex].craftType == CRAFT_TYPE_MINE_3) {
 					g_frontendMission->flightGroups[fgIndex].warhead = 3;
 				}
 				g_frontendMission->flightGroups[fgIndex].missionPoints[XWA_FG_POINT_START_1].x =
@@ -2514,15 +2501,14 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 
 			for (angleIndex = 1; angleIndex < 9; angleIndex += 2) {
 				g_frontendMission->flightGroups[fgIndex].craftType =
-					(uint8_t)(rand() % (CRAFT_TYPE_ASTEROID_MAX - CRAFT_TYPE_ASTEROID_MIN + 1) +
-							  CRAFT_TYPE_ASTEROID_MIN);
+					(uint8_t)(rand() % (CRAFT_TYPE_MINE_3 - CRAFT_TYPE_MINE_1 + 1) + CRAFT_TYPE_MINE_1);
 				g_frontendMission->flightGroups[fgIndex].numberOfWaves = 0;
 				g_frontendMission->flightGroups[fgIndex].numberOfCraft = 2;
 				g_frontendMission->flightGroups[fgIndex].status1 = STATUS_SCENERY;
 				g_frontendMission->flightGroups[fgIndex].globalGroup = GLOBAL_GROUP_SCENERY;
 				g_frontendMission->flightGroups[fgIndex].iff = NEUTRAL_IFF;
 				g_frontendMission->flightGroups[fgIndex].team = NEUTRAL_TEAM;
-				if (g_frontendMission->flightGroups[fgIndex].craftType == CRAFT_TYPE_ASTEROID_3) {
+				if (g_frontendMission->flightGroups[fgIndex].craftType == CRAFT_TYPE_MINE_3) {
 					g_frontendMission->flightGroups[fgIndex].warhead = 3;
 				}
 				g_frontendMission->flightGroups[fgIndex].missionPoints[XWA_FG_POINT_START_1].x = 0;
@@ -2543,15 +2529,14 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 			}
 
 			g_frontendMission->flightGroups[fgIndex].craftType =
-				(uint8_t)(rand() % (CRAFT_TYPE_ASTEROID_MAX - CRAFT_TYPE_ASTEROID_MIN + 1) +
-						  CRAFT_TYPE_ASTEROID_MIN);
+				(uint8_t)(rand() % (CRAFT_TYPE_MINE_3 - CRAFT_TYPE_MINE_1 + 1) + CRAFT_TYPE_MINE_1);
 			g_frontendMission->flightGroups[fgIndex].numberOfWaves = 0;
 			g_frontendMission->flightGroups[fgIndex].numberOfCraft = 2;
 			g_frontendMission->flightGroups[fgIndex].status1 = STATUS_SCENERY;
 			g_frontendMission->flightGroups[fgIndex].globalGroup = GLOBAL_GROUP_SCENERY;
 			g_frontendMission->flightGroups[fgIndex].iff = NEUTRAL_IFF;
 			g_frontendMission->flightGroups[fgIndex].team = NEUTRAL_TEAM;
-			if (g_frontendMission->flightGroups[fgIndex].craftType == CRAFT_TYPE_ASTEROID_3) {
+			if (g_frontendMission->flightGroups[fgIndex].craftType == CRAFT_TYPE_MINE_3) {
 				g_frontendMission->flightGroups[fgIndex].warhead = 3;
 			}
 			g_frontendMission->flightGroups[fgIndex].missionPoints[XWA_FG_POINT_START_1].x = 0;

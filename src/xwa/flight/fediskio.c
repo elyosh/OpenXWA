@@ -476,7 +476,7 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 				}
 
 				if (!handled) {
-					if ((g_modelTypeTable[loadedModelSlot].flags & MODEL_TYPE_FLAG_EXPANDED_TARGET_PROBE) ==
+					if ((g_modelTypeTable[loadedModelSlot].flags & MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) ==
 						0) {
 						uint16_t weaponType = (uint16_t)(outType + 279);
 						int foundGroup;
@@ -564,7 +564,7 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 		}
 	}
 
-	if ((g_modelTypeTable[loadedModelSlot].flags & MODEL_TYPE_FLAG_EXPANDED_TARGET_PROBE) == 0) {
+	if ((g_modelTypeTable[loadedModelSlot].flags & MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) == 0) {
 		uint8_t weaponSlot;
 		int remainingGroups;
 #ifdef XWA_MODERN
@@ -3501,7 +3501,7 @@ void FeDiskIo_LoadResources(void) {
 						}
 
 						if ((g_modelTypeTable[loadedModelType].flags &
-							 MODEL_TYPE_FLAG_EXPANDED_TARGET_PROBE) != 0) {
+							 MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0) {
 							if (g_modelDefs[(uint16_t)g_modelTypeTable[loadedModelType].modelIndex]
 									.floatHardpointCount != 0) {
 								ModelFloatHardpoint* hardpoint;

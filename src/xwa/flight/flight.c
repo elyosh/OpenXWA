@@ -5348,7 +5348,7 @@ static __inline void Flight_UpdateAiCraftOrientation(uint16_t objectIdx, AiContr
 				}
 
 				if ((g_modelTypeTable[(uint16_t)g_objectTable[objectIdx].objectType].flags &
-					 MODEL_TYPE_FLAG_YAW_UPDATES_ANGLE_D) != 0) {
+					 MODEL_TYPE_FLAG_SPINS) != 0) {
 					g_objectTable[objectIdx].angleD =
 						(uint16_t)(g_objectTable[objectIdx].angleD +
 								   (uint16_t)(g_objectTable[objectIdx].yaw - oldYaw));

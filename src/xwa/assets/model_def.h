@@ -42,8 +42,8 @@ typedef struct ModelFloatHardpoint {
 #pragma pack(pop)
 
 typedef struct ModelDef {
-	char* nameLong;
-	char* nameAlt;
+	char* shortName; /* the species short name, or the default model name */
+	char* longName;  /* the species long name, without its gender */
 	uint16_t craftPointValue;
 	uint16_t ratingWeight;
 	uint8_t hasHyperdrive;
@@ -77,7 +77,7 @@ typedef struct ModelDef {
 	uint8_t warheadLauncherFirstSlot[2];
 	uint8_t warheadLauncherLastSlot[2];
 	uint8_t warheadLauncherSlotCount[2];
-	uint8_t warheadLauncherValue[2];
+	uint8_t warheadLauncherCapacity[2]; /* the ammunition, scaled by g_warheadAmmoCounts */
 	ModelWeaponHardpoint weaponHardpoints[XWA_CRAFT_WEAPON_SLOT_COUNT];
 	OptEngineGlow* engineGlows[XWA_CRAFT_ENGINE_EMITTER_COUNT];
 	uint8_t engineGlowMeshIdx[XWA_CRAFT_ENGINE_EMITTER_COUNT];

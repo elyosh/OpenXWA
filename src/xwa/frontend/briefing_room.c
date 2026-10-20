@@ -377,7 +377,7 @@ int BriefingRoom_DrawOrderOfBattle(FrontendRect* rect, int revealCount) {
 				return 1;
 			}
 
-			count = g_oobCraftCounts[shipEntry->typeId];
+			count = g_oobCraftCounts[shipEntry->craftType];
 			if (count == 0) {
 				continue;
 			}

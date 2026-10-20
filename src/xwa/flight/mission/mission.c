@@ -5900,7 +5900,7 @@ short Mission_SpawnFlightGroupWaveCraft(uint16_t instanceFilter) {
 	// Announce a named flight group's arrival in the local player's region.
 	if (missionRunning && instanceFilter == 0xFFFF && didSpawn &&
 		(uint16_t)GetModelIndexFromType(g_spawnObjectType) != 0xFFFF &&
-		g_modelDefs[(uint16_t)GetModelIndexFromType(g_spawnObjectType)].nameAlt &&
+		g_modelDefs[(uint16_t)GetModelIndexFromType(g_spawnObjectType)].longName &&
 		g_spawnRegionIdx == g_players[g_localPlayer].regionIndex) {
 		msg_reportfgcreation(g_currentFlightGroupIdx, GetModelIndexFromType(g_spawnObjectType));
 	}
@@ -6374,7 +6374,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			}
 			g_curCraft->laserConvergeLevel = convergeLevel;
 
-			// Expanded-probe craft place warhead-class laser groups into free slots.
+			// Craft that fire from float hardpoints put their turret groups into free slots.
 			if ((g_modelTypeTable[(uint16_t)g_spawnObjectType].flags & 0x800) != 0) {
 				for (g = 0; g < 3; ++g) {
 					uint8_t remaining = g_modelDefs[modelIndex].laserGroupSlotCount[g];
@@ -6466,7 +6466,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 								else
 									warheadAmmoClass = 3;
 								ammo = (uint8_t)MATH2_fraction(
-									g_modelDefs[modelIndex].warheadLauncherValue[launcher],
+									g_modelDefs[modelIndex].warheadLauncherCapacity[launcher],
 									(uint16_t)g_warheadAmmoCounts[warheadAmmoClass]);
 								if (!ammo)
 									ammo = 1;
@@ -9735,7 +9735,7 @@ int Mission_ComputeCraftLoadoutPointValue(int craftType, int warheadType, int be
 		loadoutPointValue = 0;
 		for (launcherIdx = 0; launcherIdx < 2; ++launcherIdx) {
 			if (g_modelDefs[modelIndex].warheadLauncherType[1] != 0 && launcherIdx == 0) {
-				int rounds = g_modelDefs[modelIndex].warheadLauncherValue[0];
+				int rounds = g_modelDefs[modelIndex].warheadLauncherCapacity[0];
 				rounds = (uint8_t)MATH2_fraction(rounds, g_warheadAmmoCounts[3]);
 				if (rounds == 0)
 					rounds = 1;
@@ -9745,7 +9745,7 @@ int Mission_ComputeCraftLoadoutPointValue(int craftType, int warheadType, int be
 			if (((g_modelDefs[modelIndex].warheadLauncherType[1] != 0 && launcherIdx == 1) ||
 				 (g_modelDefs[modelIndex].warheadLauncherType[1] == 0 && launcherIdx == 0)) &&
 				warheadType != 0) {
-				int rounds2 = g_modelDefs[modelIndex].warheadLauncherValue[launcherIdx];
+				int rounds2 = g_modelDefs[modelIndex].warheadLauncherCapacity[launcherIdx];
 				rounds2 = (uint8_t)MATH2_fraction(rounds2, g_warheadAmmoCounts[warheadType]);
 				if (rounds2 == 0)
 					rounds2 = 1;

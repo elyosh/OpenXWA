@@ -2362,7 +2362,7 @@ static __inline const char* goals_GetObjectTypeDisplayName(uint16_t objectType, 
 
 	modelIdx = GetModelIndexFromType(objectType);
 	if (modelIdx != (ModelIndex)0xffff) {
-		return plural ? g_strSpeciesNamesPlural[modelIdx] : g_modelDefs[modelIdx].nameLong;
+		return plural ? g_strSpeciesNamesPlural[modelIdx] : g_modelDefs[modelIdx].shortName;
 	}
 	if ((uint16_t)objectType >= (uint16_t)OBJ_CommSat1 && (uint16_t)objectType <= (uint16_t)OBJ_NavBuoy2) {
 		return g_strBuoyNames[(uint16_t)objectType - (uint16_t)OBJ_CommSat1];
@@ -8784,7 +8784,7 @@ void Hud_AppendObjectDisplayName(uint16_t objectOrWaypointIdx, char formatFlags)
 				modelIndex = GetModelIndexFromType(objectType);
 				if (modelIndex != 0xffffu) {
 					modelIndex = GetModelIndexFromType(objectType);
-					FlightText_AppendScratchString(g_modelDefs[modelIndex].nameLong);
+					FlightText_AppendScratchString(g_modelDefs[modelIndex].shortName);
 				} else {
 					FlightText_SetScratch(g_strComponentStrings[32]);
 				}
@@ -9080,7 +9080,7 @@ void Hud_UpdateTargetInfoCache(void) {
 								 g_objectTable[targetCraft->carriedObjectIndex].objectType)) == 0xffffu) {
 							strcat(g_hudTargetStatusText, g_strWarheadUnknown);
 						} else {
-							strcat(g_hudTargetStatusText, g_modelDefs[modelIndex].nameLong);
+							strcat(g_hudTargetStatusText, g_modelDefs[modelIndex].shortName);
 						}
 						statusText = NULL;
 						strcat(g_hudTargetStatusText, " : ");
@@ -15782,7 +15782,7 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 		g_msgArgTable[0] = 0x8000u;
 		g_msgArgTable[1] = 0x8001u;
 		g_msgPtrs[1] = g_missionFlightGroups[flightGroupIdx].fg.name;
-		g_msgPtrs[0] = g_modelDefs[speciesIdx].nameAlt;
+		g_msgPtrs[0] = g_modelDefs[speciesIdx].longName;
 		msg_emitInFlightMessage(MSG_BUOY_ACTIVATED, playerIdx);
 		return;
 	}
@@ -15793,7 +15793,7 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 		playerIdx = g_localPlayer;
 		if (iff != (uint16_t)g_players[playerIdx].iff) {
 			if (numberOfCraft == 1) {
-				g_msgPtrs[1] = g_modelDefs[speciesIdx].nameAlt;
+				g_msgPtrs[1] = g_modelDefs[speciesIdx].longName;
 			} else {
 				g_msgPtrs[1] = g_strSpeciesNamesPlural[speciesIdx];
 			}
@@ -15807,7 +15807,7 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 			g_msgArgTable[0] = 0x8000u;
 			g_msgArgTable[1] = 0x8001u;
 			g_msgArgTable[2] = clicks;
-			g_msgPtrs[0] = g_modelDefs[speciesIdx].nameAlt;
+			g_msgPtrs[0] = g_modelDefs[speciesIdx].longName;
 			g_msgPtrs[1] = g_missionFlightGroups[flightGroupIdx].fg.name;
 			msg_emitInFlightMessage(MSG_ENTERING_OBJ, playerIdx);
 			return;
@@ -15816,7 +15816,7 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 		g_msgArgTable[1] = 0x8001u;
 		g_msgArgTable[2] = 0x8002u;
 		g_msgArgTable[3] = clicks;
-		g_msgPtrs[1] = g_modelDefs[speciesIdx].nameAlt;
+		g_msgPtrs[1] = g_modelDefs[speciesIdx].longName;
 		g_msgPtrs[2] = g_missionFlightGroups[flightGroupIdx].fg.name;
 		msg_emitInFlightMessage(MSG_ENTERING_OBJS, playerIdx);
 	}
@@ -15842,7 +15842,7 @@ void msg_emitCraftMessage(uint16_t objIdx, CraftData* craft, int16_t msgTemplate
 			g_msgSenderIff = (uint8_t)g_objectTable[objIdx].mobj->iff;
 			modelIndex = craft->modelIndex;
 			g_msgArgTable[0] = 0x8000u;
-			g_msgPtrs[0] = g_modelDefs[modelIndex].nameLong;
+			g_msgPtrs[0] = g_modelDefs[modelIndex].shortName;
 			if ((int8_t)craft->iffVisibility[(uint16_t)g_players[g_localPlayer].playerIff] >= 0) {
 				g_msgPtrs[1] = g_missionFlightGroups[flightGroupIdx].fg.name;
 			} else {
@@ -15887,7 +15887,7 @@ int msg_radioMessage(uint16_t objIdx, CraftData* craft, int16_t hudMessageId, ui
 		} else {
 			const char* modelName;
 
-			modelName = g_modelDefs[craft->modelIndex].nameLong;
+			modelName = g_modelDefs[craft->modelIndex].shortName;
 			g_msgArgTable[0] = 0x8000u;
 			g_msgPtrs[1] = g_missionFlightGroups[flightGroupIdx].fg.name;
 			g_msgArgTable[1] = 0x8001u;
@@ -15921,7 +15921,7 @@ void msg_reportmessage(uint16_t objIdx, CraftData* craft, int16_t msgTemplateId)
 	if (g_objectTable[objIdx].regionIdx == g_players[g_localPlayer].regionIndex) {
 		flightGroupIdx = g_objectTable[objIdx].flightGroupIdx;
 		g_msgSenderIff = g_missionFlightGroups[flightGroupIdx].fg.iff;
-		modelName = g_modelDefs[craft->modelIndex].nameLong;
+		modelName = g_modelDefs[craft->modelIndex].shortName;
 		g_msgArgTable[0] = 0x8000u;
 		g_msgPtrs[1] = g_missionFlightGroups[flightGroupIdx].fg.name;
 		g_msgArgTable[1] = 0x8001u;
@@ -16249,7 +16249,7 @@ void msg_formatObjectName(uint16_t objIdx, uint16_t nameMode, char* outName) {
 				char ch;
 
 				outCursor = outName;
-				text = g_modelDefs[craft->modelIndex].nameAlt;
+				text = g_modelDefs[craft->modelIndex].longName;
 				ch = *text;
 				while (ch) {
 					*outCursor = ch;
@@ -16264,7 +16264,7 @@ void msg_formatObjectName(uint16_t objIdx, uint16_t nameMode, char* outName) {
 				char ch;
 
 				outCursor = outName;
-				text = g_modelDefs[craft->modelIndex].nameLong;
+				text = g_modelDefs[craft->modelIndex].shortName;
 				ch = *text;
 				while (ch) {
 					*outCursor = ch;
@@ -16363,7 +16363,7 @@ void msg_emitLocalPlayerCraftMessage(uint16_t messageId) {
 
 	objectIdx = g_players[g_localPlayer].objectIndex;
 	g_msgSenderIff = (uint8_t)g_objectTable[objectIdx].mobj->iff;
-	g_msgPtrs[0] = g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelIndex].nameLong;
+	g_msgPtrs[0] = g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelIndex].shortName;
 	g_msgArgTable[0] = 0x8000u;
 	g_msgPtrs[1] = g_missionFlightGroups[g_objectTable[objectIdx].flightGroupIdx].fg.name;
 	g_msgArgTable[1] = 0x8001u;

@@ -15,7 +15,7 @@ enum {
 
 typedef struct ShipListEntry {
 	char name[256];
-	ObjectTypeId typeId;
+	int craftType; /* the line of SHIPLIST.TXT */
 	int category;
 	int field264;
 	int flyable;

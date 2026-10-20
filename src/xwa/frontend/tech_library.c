@@ -271,11 +271,11 @@ int BuildCraftTechStats(CraftTechStats* stats) {
 	for (group = 0; group < 2; ++group) {
 		if (g_modelDefs[modelIndex].warheadLauncherType[group]) {
 			int launcherSlotCount;
-			int launcherValue;
+			int launcherCapacity;
 
 			launcherSlotCount = g_modelDefs[modelIndex].warheadLauncherSlotCount[group];
-			launcherValue = g_modelDefs[modelIndex].warheadLauncherValue[group];
-			stats->warheadRating += launcherSlotCount * launcherValue;
+			launcherCapacity = g_modelDefs[modelIndex].warheadLauncherCapacity[group];
+			stats->warheadRating += launcherSlotCount * launcherCapacity;
 		}
 	}
 
@@ -310,7 +310,7 @@ int BuildCraftTechStats(CraftTechStats* stats) {
 char* GetCraftTypeModelLongName(int craftType) {
 	unsigned int objectType;
 	uint16_t modelIndex;
-	char* nameLong;
+	char* shortName;
 
 	objectType = g_objectTypeTables.craftTypeToObjectType[craftType];
 	if ((uint16_t)objectType < OBJ_Count) {
@@ -319,11 +319,11 @@ char* GetCraftTypeModelLongName(int craftType) {
 		modelIndex = UINT16_MAX;
 	}
 	if (modelIndex != UINT16_MAX) {
-		nameLong = g_modelDefs[modelIndex].nameLong;
-		if (nameLong == NULL) {
+		shortName = g_modelDefs[modelIndex].shortName;
+		if (shortName == NULL) {
 			return "NA";
 		}
-		return nameLong;
+		return shortName;
 	}
 	return NULL;
 }
@@ -663,10 +663,11 @@ int TechLibrary_UpdateModelControls(void) {
 				selectedIndex = 1;
 				g_techLibrarySelectedShipListIdx = selectedIndex;
 			}
-		} while (selectedIndex != previousIndex && !g_pilotData.craftKnown[g_shipList[selectedIndex].typeId]);
+		} while (selectedIndex != previousIndex &&
+				 !g_pilotData.craftKnown[g_shipList[selectedIndex].craftType]);
 
 		memset(&g_techLibraryCraftStats, 0, sizeof(g_techLibraryCraftStats));
-		g_techLibraryCraftStats.craftType = shipList[selectedIndex].typeId;
+		g_techLibraryCraftStats.craftType = shipList[selectedIndex].craftType;
 		BuildCraftTechStats(&g_techLibraryCraftStats);
 		g_techLibraryModelLoadCountdown = 40;
 		ModelPreview_SetObjectWorldPosition(0, 300 * g_techLibraryZoomDistanceScale, 0);
@@ -684,10 +685,11 @@ int TechLibrary_UpdateModelControls(void) {
 				selectedIndex = shipCount - 1;
 				g_techLibrarySelectedShipListIdx = selectedIndex;
 			}
-		} while (selectedIndex != previousIndex && !g_pilotData.craftKnown[g_shipList[selectedIndex].typeId]);
+		} while (selectedIndex != previousIndex &&
+				 !g_pilotData.craftKnown[g_shipList[selectedIndex].craftType]);
 
 		memset(&g_techLibraryCraftStats, 0, sizeof(g_techLibraryCraftStats));
-		g_techLibraryCraftStats.craftType = shipList[selectedIndex].typeId;
+		g_techLibraryCraftStats.craftType = shipList[selectedIndex].craftType;
 		BuildCraftTechStats(&g_techLibraryCraftStats);
 		g_techLibraryModelLoadCountdown = 40;
 		ModelPreview_SetObjectWorldPosition(0, 300 * g_techLibraryZoomDistanceScale, 0);
@@ -713,10 +715,10 @@ int TechLibrary_UpdateModelControls(void) {
 			}
 		} while (selectedIndex != previousIndex &&
 				 (g_shipList[selectedIndex].category == category ||
-				  !g_pilotData.craftKnown[g_shipList[selectedIndex].typeId]));
+				  !g_pilotData.craftKnown[g_shipList[selectedIndex].craftType]));
 
 		memset(&g_techLibraryCraftStats, 0, sizeof(g_techLibraryCraftStats));
-		g_techLibraryCraftStats.craftType = shipList[selectedIndex].typeId;
+		g_techLibraryCraftStats.craftType = shipList[selectedIndex].craftType;
 		BuildCraftTechStats(&g_techLibraryCraftStats);
 		g_techLibraryModelLoadCountdown = 40;
 		ModelPreview_SetObjectWorldPosition(0, 300 * g_techLibraryZoomDistanceScale, 0);
@@ -736,10 +738,10 @@ int TechLibrary_UpdateModelControls(void) {
 			}
 		} while (selectedIndex != previousIndex &&
 				 (g_shipList[selectedIndex].category == category ||
-				  !g_pilotData.craftKnown[g_shipList[selectedIndex].typeId]));
+				  !g_pilotData.craftKnown[g_shipList[selectedIndex].craftType]));
 
 		memset(&g_techLibraryCraftStats, 0, sizeof(g_techLibraryCraftStats));
-		g_techLibraryCraftStats.craftType = shipList[selectedIndex].typeId;
+		g_techLibraryCraftStats.craftType = shipList[selectedIndex].craftType;
 		BuildCraftTechStats(&g_techLibraryCraftStats);
 		g_techLibraryModelLoadCountdown = 40;
 		ModelPreview_SetObjectWorldPosition(0, 300 * g_techLibraryZoomDistanceScale, 0);
@@ -1073,11 +1075,11 @@ int TechLibrary_GenerateCraftSpecCache(void) {
 		for (shipIndex = 1; shipIndex < g_shipCount; ++shipIndex) {
 			char* craftModelName;
 
-			craftModelName = FeDiskIo_GetCraftModelName((unsigned int)g_shipList[shipIndex].typeId);
+			craftModelName = FeDiskIo_GetCraftModelName((unsigned int)g_shipList[shipIndex].craftType);
 			if (craftModelName != NULL) {
-				ModelPreview_LoadModel(craftModelName, g_shipList[shipIndex].typeId);
+				ModelPreview_LoadModel(craftModelName, g_shipList[shipIndex].craftType);
 				memset(&g_techLibraryCraftStats, 0, sizeof(g_techLibraryCraftStats));
-				g_techLibraryCraftStats.craftType = g_shipList[shipIndex].typeId;
+				g_techLibraryCraftStats.craftType = g_shipList[shipIndex].craftType;
 				BuildCraftTechStats(&g_techLibraryCraftStats);
 			}
 			File_WriteCount(stream, &g_techLibraryCraftStats, sizeof(g_techLibraryCraftStats));
@@ -1184,7 +1186,7 @@ int TechLibrary_Update(int frameCounter) {
 
 		foundNewCraft = 0;
 		for (shipIndex = 1; shipIndex < g_shipCount; ++shipIndex) {
-			if (g_pilotData.craftKnown[g_shipList[shipIndex].typeId] != 2) {
+			if (g_pilotData.craftKnown[g_shipList[shipIndex].craftType] != 2) {
 				++g_techLibrarySelectedShipListIdx;
 				if (g_techLibrarySelectedShipListIdx >= g_shipCount) {
 					g_techLibrarySelectedShipListIdx = 1;
@@ -1198,7 +1200,7 @@ int TechLibrary_Update(int frameCounter) {
 		if (!foundNewCraft) {
 			g_techLibrarySelectedShipListIdx = 1;
 			for (shipIndex = 1; shipIndex < g_shipCount; ++shipIndex) {
-				if (g_pilotData.craftKnown[g_shipList[shipIndex].typeId]) {
+				if (g_pilotData.craftKnown[g_shipList[shipIndex].craftType]) {
 					break;
 				}
 				++g_techLibrarySelectedShipListIdx;
@@ -1220,7 +1222,7 @@ int TechLibrary_Update(int frameCounter) {
 		ModelPreview_LoadTexture237();
 		TechLibrary_LoadSpecTextTable();
 		memset(&g_techLibraryCraftStats, 0, sizeof(g_techLibraryCraftStats));
-		g_techLibraryCraftStats.craftType = g_shipList[g_techLibrarySelectedShipListIdx].typeId;
+		g_techLibraryCraftStats.craftType = g_shipList[g_techLibrarySelectedShipListIdx].craftType;
 		BuildCraftTechStats(&g_techLibraryCraftStats);
 		g_techLibraryModelLoadCountdown = TECH_LIBRARY_MODEL_LOAD_FRAMES;
 		ModelPreview_SetWhiteDirectionalLight(g_techLibraryLightX, g_techLibraryLightY, g_techLibraryLightZ);
@@ -1287,7 +1289,7 @@ int TechLibrary_Update(int frameCounter) {
 		char* craftModelName;
 
 		craftModelName =
-			FeDiskIo_GetCraftModelName((unsigned int)g_shipList[g_techLibrarySelectedShipListIdx].typeId);
+			FeDiskIo_GetCraftModelName((unsigned int)g_shipList[g_techLibrarySelectedShipListIdx].craftType);
 		if (craftModelName != NULL) {
 			XwaFile* stream;
 
@@ -1301,16 +1303,17 @@ int TechLibrary_Update(int frameCounter) {
 			stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
 #endif
 			if (stream == NULL) {
-				ModelPreview_LoadModel(craftModelName, g_shipList[g_techLibrarySelectedShipListIdx].typeId);
+				ModelPreview_LoadModel(craftModelName,
+									   g_shipList[g_techLibrarySelectedShipListIdx].craftType);
 			} else {
 				File_Close(stream);
 				ModelPreview_LoadModel(g_frontendScratchBuffer,
-									   g_shipList[g_techLibrarySelectedShipListIdx].typeId);
+									   g_shipList[g_techLibrarySelectedShipListIdx].craftType);
 			}
 			ModelPreview_SetObjectWorldPosition(
 				0, TECH_LIBRARY_MODEL_DISTANCE_STEP * g_techLibraryZoomDistanceScale, 0);
 			memset(&g_techLibraryCraftStats, 0, sizeof(g_techLibraryCraftStats));
-			g_techLibraryCraftStats.craftType = g_shipList[g_techLibrarySelectedShipListIdx].typeId;
+			g_techLibraryCraftStats.craftType = g_shipList[g_techLibrarySelectedShipListIdx].craftType;
 			BuildCraftTechStats(&g_techLibraryCraftStats);
 		}
 	}
@@ -1398,8 +1401,8 @@ int TechLibrary_Update(int frameCounter) {
 		if (g_techLibraryModelLoadCountdown == 1) {
 			char* craftModelName;
 
-			craftModelName =
-				FeDiskIo_GetCraftModelName((unsigned int)g_shipList[g_techLibrarySelectedShipListIdx].typeId);
+			craftModelName = FeDiskIo_GetCraftModelName(
+				(unsigned int)g_shipList[g_techLibrarySelectedShipListIdx].craftType);
 			if (craftModelName != NULL) {
 				XwaFile* stream;
 
@@ -1414,17 +1417,17 @@ int TechLibrary_Update(int frameCounter) {
 #endif
 				if (stream == NULL) {
 					ModelPreview_LoadModel(craftModelName,
-										   g_shipList[g_techLibrarySelectedShipListIdx].typeId);
+										   g_shipList[g_techLibrarySelectedShipListIdx].craftType);
 				} else {
 					ModelPreview_LoadModel(g_frontendScratchBuffer,
-										   g_shipList[g_techLibrarySelectedShipListIdx].typeId);
+										   g_shipList[g_techLibrarySelectedShipListIdx].craftType);
 				}
 				ModelPreview_SetObjectWorldPosition(
 					0, TECH_LIBRARY_MODEL_DISTANCE_STEP * g_techLibraryZoomDistanceScale, 0);
 				memset(&g_techLibraryCraftStats, 0, sizeof(g_techLibraryCraftStats));
-				g_techLibraryCraftStats.craftType = g_shipList[g_techLibrarySelectedShipListIdx].typeId;
+				g_techLibraryCraftStats.craftType = g_shipList[g_techLibrarySelectedShipListIdx].craftType;
 				BuildCraftTechStats(&g_techLibraryCraftStats);
-				g_pilotData.craftKnown[g_shipList[g_techLibrarySelectedShipListIdx].typeId] = 1;
+				g_pilotData.craftKnown[g_shipList[g_techLibrarySelectedShipListIdx].craftType] = 1;
 			}
 			g_techLibrarySpecPageAnimCounter = 0;
 			g_techLibraryDescriptionScrollCounter = 0;
@@ -1527,7 +1530,7 @@ int TechLibrary_Update(int frameCounter) {
 				char* craftModelName;
 
 				craftModelName = FeDiskIo_GetCraftModelName(
-					(unsigned int)g_shipList[g_techLibrarySelectedShipListIdx].typeId);
+					(unsigned int)g_shipList[g_techLibrarySelectedShipListIdx].craftType);
 				if (craftModelName != NULL) {
 					XwaFile* stream;
 
@@ -1542,16 +1545,17 @@ int TechLibrary_Update(int frameCounter) {
 #endif
 					if (stream == NULL) {
 						ModelPreview_LoadModel(craftModelName,
-											   g_shipList[g_techLibrarySelectedShipListIdx].typeId);
+											   g_shipList[g_techLibrarySelectedShipListIdx].craftType);
 					} else {
 						File_Close(stream);
 						ModelPreview_LoadModel(g_frontendScratchBuffer,
-											   g_shipList[g_techLibrarySelectedShipListIdx].typeId);
+											   g_shipList[g_techLibrarySelectedShipListIdx].craftType);
 					}
 					ModelPreview_SetObjectWorldPosition(
 						0, TECH_LIBRARY_MODEL_DISTANCE_STEP * g_techLibraryZoomDistanceScale, 0);
 					memset(&g_techLibraryCraftStats, 0, sizeof(g_techLibraryCraftStats));
-					g_techLibraryCraftStats.craftType = g_shipList[g_techLibrarySelectedShipListIdx].typeId;
+					g_techLibraryCraftStats.craftType =
+						g_shipList[g_techLibrarySelectedShipListIdx].craftType;
 					BuildCraftTechStats(&g_techLibraryCraftStats);
 				}
 			}

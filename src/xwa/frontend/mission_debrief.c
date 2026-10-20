@@ -1655,7 +1655,7 @@ int MissionDebrief_DrawPlayerStatisticsPage(void) {
 			g_debriefCraftKillRowHasData = 0;
 			rowHasData = 0;
 			for (missionType = 0; missionType < 1; ++missionType) {
-				typeId = g_shipList[shipIndex].typeId + missionType * SHIP_TYPE_TO_SHIP_LIST_CAPACITY;
+				typeId = g_shipList[shipIndex].craftType + missionType * SHIP_TYPE_TO_SHIP_LIST_CAPACITY;
 				if (g_pilotData.objectStats.killsPerCraftPerMT[0][typeId] ||
 					g_pilotData.objectStats.killsSharedPerCraftPerMT[0][typeId]) {
 					rowHasData = 1;
@@ -1710,7 +1710,7 @@ int MissionDebrief_DrawPlayerStatisticsPage(void) {
 
 		for (missionType = 0; missionType < 1; ++missionType) {
 			for (shipIndex = 0; shipIndex < g_shipCount; ++shipIndex) {
-				typeId = g_shipList[shipIndex].typeId + missionType * SHIP_TYPE_TO_SHIP_LIST_CAPACITY;
+				typeId = g_shipList[shipIndex].craftType + missionType * SHIP_TYPE_TO_SHIP_LIST_CAPACITY;
 				g_debriefAssistTotalByMissionType[missionType] +=
 					g_pilotData.objectStats.killsAssistsPerCraftPerMT[0][typeId];
 				g_debriefTotalKillsSharedByMissionType[missionType] +=
@@ -1950,7 +1950,7 @@ int MissionDebrief_DrawPlayerStatisticsPage(void) {
 	}
 
 	for (shipIndex = 0; shipIndex < g_shipCount; ++shipIndex) {
-		typeId = g_shipList[shipIndex].typeId;
+		typeId = g_shipList[shipIndex].craftType;
 		fullKills = g_pilotData.objectStats.killsPerCraftPerMT[0][typeId];
 		sharedKills = g_pilotData.objectStats.killsSharedPerCraftPerMT[0][typeId];
 		g_debriefCraftKillRowHasData = 0;

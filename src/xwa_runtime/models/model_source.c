@@ -639,7 +639,7 @@ int XwaModelSource_KeyRequiresFloatHardpoints(const char* key) {
 
 			if ((info->recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) != 0 && info->textureGroup == 0 &&
 				info->frameCount == (uint16_t)row &&
-				(info->flags & MODEL_TYPE_FLAG_EXPANDED_TARGET_PROBE) != 0) {
+				(info->flags & MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0) {
 				return 1;
 			}
 		}

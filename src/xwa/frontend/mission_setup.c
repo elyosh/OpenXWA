@@ -416,9 +416,9 @@ static __inline int MissionSetup_DrawSelectedSlotCraftList(int allFlyable,
 		}
 
 		if (scanCount >= g_missionSetupCraftListScrollOffset) {
-			if (GetCraftTypeModelLongName(g_shipList[shipIdx].typeId) != NULL) {
+			if (GetCraftTypeModelLongName(g_shipList[shipIdx].craftType) != NULL) {
 				sprintf(g_frontendScratchBuffer, "%s (%s)", g_shipList[shipIdx].name,
-						GetCraftTypeModelLongName(g_shipList[shipIdx].typeId));
+						GetCraftTypeModelLongName(g_shipList[shipIdx].craftType));
 			} else {
 				sprintf(g_frontendScratchBuffer, "%s", g_shipList[shipIdx].name);
 			}
@@ -428,13 +428,13 @@ static __inline int MissionSetup_DrawSelectedSlotCraftList(int allFlyable,
 											  g_colorPaleBlue, shipIdx + 80, 0, "settingsound");
 			if (g_pilotData.missionDirectoryId == MISSION_DIRECTORY_SKIRMISH) {
 				sprintf(g_frontendScratchBuffer, "%d",
-						MissionSetup_ComputeSelectedSlotPointTotalForCraft(g_shipList[shipIdx].typeId));
+						MissionSetup_ComputeSelectedSlotPointTotalForCraft(g_shipList[shipIdx].craftType));
 				FrontendText_Draw(10, g_frontendScratchBuffer, rect->left + 230, rect->top + 3,
 								  g_colorLightBlue);
 			}
 
 			if (buttonResult) {
-				g_selectedCombatSimSlot.craftType = (uint16_t)g_shipList[shipIdx].typeId;
+				g_selectedCombatSimSlot.craftType = (uint16_t)g_shipList[shipIdx].craftType;
 				MissionSetup_ClampSelectedSlotForCraftCategory(loadoutOptions, stats);
 				g_missionSetupSubpanelMode = 0;
 				if (g_selectedCombatSimSlot.craftType) {

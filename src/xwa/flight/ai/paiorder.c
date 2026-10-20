@@ -2236,7 +2236,7 @@ char paiorder_stopgohomeorder(void) {
 				if (g_objectTable[g_paiContext.aiObjIdx].genusId != GENUS_SatelliteBuoy) {
 					fsfx_SpeakTacticalOfficerEvent(4, 77, g_paiContext.aiObjIdx, 0xffffu);
 					g_msgSenderIff = (uint8_t)g_objectTable[g_paiContext.aiObjIdx].mobj->iff;
-					msg_addMessagePtr(0, g_modelDefs[g_curCraft->modelIndex].nameLong);
+					msg_addMessagePtr(0, g_modelDefs[g_curCraft->modelIndex].shortName);
 					msg_addMessagePtr(
 						1,
 						(const char*)&g_missionFlightGroups[g_paiContext.curOrderCoord.fields.flightGroupIdx]

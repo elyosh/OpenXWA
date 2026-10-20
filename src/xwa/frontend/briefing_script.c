@@ -268,7 +268,7 @@ void BriefingScript_AdvanceFrame(int16_t initializeState) {
 						int16_t iconIndex;
 
 						iconIndex = args[0];
-						g_briefingMapCurrentRegionIcons[iconIndex].objectType = (int8_t)args[1];
+						g_briefingMapCurrentRegionIcons[iconIndex].craftType = (int8_t)args[1];
 						g_briefingMapCurrentRegionIcons[iconIndex].iconClass = (uint8_t)args[2];
 						break;
 					}

@@ -56,7 +56,7 @@ typedef struct PaiContext {
 	int aiTargetSearchOriginX;
 	int aiTargetSearchOriginY;
 	int aiTargetSearchOriginZ;
-	uint8_t aiSelfModelUsesExpandedTargetProbe;
+	uint8_t aiSelfModelFiresFromFloatHardpoints;
 } PaiContext;
 #pragma pack(pop)
 
@@ -68,7 +68,7 @@ typedef char pai_context_plan_cursor_offset[(offsetof(PaiContext, planCursor) ==
 typedef char
 	pai_context_target_range_offset[(offsetof(PaiContext, aiTargetSearchRangeLimit) == 0x37) ? 1 : -1];
 typedef char pai_context_expanded_probe_offset
-	[(offsetof(PaiContext, aiSelfModelUsesExpandedTargetProbe) == 0x47) ? 1 : -1];
+	[(offsetof(PaiContext, aiSelfModelFiresFromFloatHardpoints) == 0x47) ? 1 : -1];
 #endif
 
 enum {

@@ -861,8 +861,8 @@ void laser_weaponsfire(void) {
 	}
 }
 
-static __inline int laser_ObjectTypeUsesExpandedTargetProbe(ObjectTypeId objectType) {
-	return (g_modelTypeTable[objectType].flags & MODEL_TYPE_FLAG_EXPANDED_TARGET_PROBE) != 0;
+static __inline int laser_ObjectTypeFiresFromFloatHardpoints(ObjectTypeId objectType) {
+	return (g_modelTypeTable[objectType].flags & MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0;
 }
 
 static __inline void laser_RotateWorldDeltaToObjectLocal(ObjectRecord* obj, int dx, int dy, int dz) {
@@ -1250,7 +1250,7 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 	modelIndex = g_curCraft->modelIndex;
 	ownerObj = &g_objectTable[(uint16_t)ownerObjIdx];
 
-	if (!laser_ObjectTypeUsesExpandedTargetProbe(ownerObj->objectType)) {
+	if (!laser_ObjectTypeFiresFromFloatHardpoints(ownerObj->objectType)) {
 		meshIdx = g_modelDefs[modelIndex].weaponHardpoints[launcherIdx].meshIdx;
 		hardpointIdx = g_modelDefs[modelIndex].weaponHardpoints[launcherIdx].alternateMeshHardpointIdx;
 		if (g_curCraft->componentHp[meshIdx] == 0) {
@@ -1319,7 +1319,7 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 	launchX = ownerObj->world_x;
 	launchY = ownerObj->world_y;
 	launchZ = ownerObj->world_z;
-	if (laser_ObjectTypeUsesExpandedTargetProbe(ownerObj->objectType)) {
+	if (laser_ObjectTypeFiresFromFloatHardpoints(ownerObj->objectType)) {
 		Mission_ResolveObjectOrMissionPointWorldLoc(targetRef, 0, 0, 0);
 		dx = worldlocx - launchX;
 		dy = worldlocy - launchY;
@@ -1381,7 +1381,7 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 	{
 		int collisionBlocked;
 
-		if (laser_ObjectTypeUsesExpandedTargetProbe(ownerObj->objectType)) {
+		if (laser_ObjectTypeFiresFromFloatHardpoints(ownerObj->objectType)) {
 			g_collideSweepRejectNearStartHits = 1;
 			g_collideSweepSkipSsdMeshOrdinal = meshIdx;
 			collisionBlocked = collide_CheckSweptModelCollision(ownerObjIdx, ownerObjIdx);

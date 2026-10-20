@@ -572,6 +572,22 @@ enum {
 	XWA_OBJECT_TYPE_TABLE_TAIL_WORD_COUNT = 12,
 };
 
+/* The craft types that the code uses by number. A craft type is the type that
+   a mission gives a flight group, and the line of SHIPLIST.TXT and
+   SPECDESC.TXT; g_objectTypeTables.craftTypeToObjectType gives its object
+   type. The names are those of SHIPLIST.TXT. */
+typedef enum CraftTypeId {
+	CRAFT_TYPE_MINE_1 = 75,
+	CRAFT_TYPE_MINE_2 = 76,
+	CRAFT_TYPE_MINE_3 = 77,
+	CRAFT_TYPE_HYPER_BUOY = 85,
+	CRAFT_TYPE_ASTEROID = 86,
+	CRAFT_TYPE_MARAUDER_CORVETTE = 99,
+	CRAFT_TYPE_WORKER_DROID = 182,
+	CRAFT_TYPE_BACKDROP = 183,
+	CRAFT_TYPE_DEATH_STAR_2 = 227,
+} CraftTypeId;
+
 #ifdef XWA_MODERN
 #define XWA_CRAFT_TYPE_REVERSE_SEARCH_COUNT XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT
 #else

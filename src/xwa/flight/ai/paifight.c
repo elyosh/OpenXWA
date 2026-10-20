@@ -697,7 +697,7 @@ int16_t paifight_FindNearestAttackerOfMatchingTarget(uint16_t target1Type, uint1
 
 					projectileRangeLimit = g_paiContext.aiTargetSearchRangeLimit;
 					bestProjectileObjIdx = 0xffffu;
-					if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+					if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 						projectileRangeLimit +=
 							(uint32_t)
 								g_modelTypeTable[(uint16_t)g_objectTable[g_paiContext.aiObjIdx].objectType]
@@ -743,7 +743,7 @@ int16_t paifight_FindNearestAttackerOfMatchingTarget(uint16_t target1Type, uint1
 								}
 
 								if (turretTargetCount == 0) {
-									if (!g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+									if (!g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 										Mission_ResolveObjectOrMissionPointWorldLoc(projectileObjIdx, 0, 0,
 																					0);
 										g_collisionProbeWorldX = worldlocx;
@@ -2014,7 +2014,7 @@ char paifight_gunneroffenseorder(void) {
 				g_paifightSearchOriginX = originX;
 				g_paifightSearchOriginY = originY;
 				g_paifightSearchOriginZ = originZ;
-				if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+				if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 					g_paiContext.aiTargetSearchOriginX = originX;
 					g_paiContext.aiTargetSearchOriginY = originY;
 					g_paiContext.aiTargetSearchOriginZ = originZ;
@@ -2380,7 +2380,7 @@ static __inline void paifight_SetGunnerSelfDefenseSearchOrigin(unsigned int lase
 	g_paifightSearchOriginY = g_paiContext.aiCurrentPointY;
 	g_paifightSearchOriginX = g_paiContext.aiCurrentPointX;
 	g_paifightSearchOriginZ = g_paiContext.aiCurrentPointZ;
-	if (!g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+	if (!g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 		pai_calcrotatedpoint(&g_objectTable[g_paiContext.aiObjIdx],
 							 g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[laserSlot].x,
 							 g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[laserSlot].z,
@@ -2401,7 +2401,7 @@ static __inline void paifight_SetGunnerSelfDefenseSearchOrigin(unsigned int lase
 }
 
 static __inline int paifight_HasClearTurretSelfDefenseShotYXZ(uint16_t targetObjIdx) {
-	if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+	if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 		return 1;
 	}
 
@@ -2419,7 +2419,7 @@ static __inline int paifight_HasClearTurretSelfDefenseShotYXZ(uint16_t targetObj
 }
 
 static __inline int paifight_HasClearTurretSelfDefenseShotXYZ(uint16_t targetObjIdx) {
-	if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+	if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 		return 1;
 	}
 
@@ -2437,7 +2437,7 @@ static __inline int paifight_HasClearTurretSelfDefenseShotXYZ(uint16_t targetObj
 }
 
 static __inline int paifight_HasClearTurretSelfDefenseShotZXY(uint16_t targetObjIdx) {
-	if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+	if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 		return 1;
 	}
 
@@ -3057,7 +3057,7 @@ char paifight_gunnerselfdefenseorder(void) {
 					if (defenseRangeLimit == 0) {
 						defenseRangeLimit = weaponType != 4u ? 0x20000u : 0x10000u;
 					}
-					if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+					if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 						defenseRangeLimit +=
 							g_modelTypeTable[(uint16_t)g_objectTable[g_paiContext.aiObjIdx].objectType]
 								.maxBoundsExtent;
@@ -3099,7 +3099,7 @@ char paifight_gunnerselfdefenseorder(void) {
 				if (defenseRangeLimit == 0) {
 					defenseRangeLimit = 0x10000u;
 				}
-				if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+				if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 					defenseRangeLimit +=
 						g_modelTypeTable[(uint16_t)g_objectTable[g_paiContext.aiObjIdx].objectType]
 							.maxBoundsExtent;
@@ -3162,7 +3162,7 @@ char paifight_gunnerselfdefenseorder(void) {
 				}
 
 #ifndef XWA_MODERN
-				if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+				if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 					defenseRangeLimit +=
 						g_modelTypeTable[(uint16_t)g_objectTable[g_paiContext.aiObjIdx].objectType]
 							.maxBoundsExtent;
@@ -3200,7 +3200,7 @@ char paifight_gunnerselfdefenseorder(void) {
 					}
 
 					craft = g_curCraft;
-					if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+					if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 						rangeScore = paifight_ApplyTurretTargetRangePenalty(candidateObjIdx, rangeScore);
 					}
 
@@ -3350,7 +3350,7 @@ int16_t paifight_FindNearestGunnerTargetInCandidateSet(uint16_t target1Type, uin
 
 	bestObjIdx = 0xffffu;
 	bestRangeScore = g_paiContext.aiTargetSearchRangeLimit;
-	if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+	if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 		bestRangeScore +=
 			(uint32_t)g_modelTypeTable[(uint16_t)g_objectTable[g_paiContext.aiObjIdx].objectType]
 				.maxBoundsExtent;
@@ -3371,7 +3371,7 @@ int16_t paifight_FindNearestGunnerTargetInCandidateSet(uint16_t target1Type, uin
 				(g_objectTable[objectIdx].genusId != GENUS_Fighter &&
 				 g_objectTable[objectIdx].genusId != GENUS_Transport) ||
 				rangeScore >= 0x10000u) {
-				if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+				if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 					WarheadInventoryEntry* weapon;
 					int laserSlot;
 
@@ -3390,7 +3390,7 @@ int16_t paifight_FindNearestGunnerTargetInCandidateSet(uint16_t target1Type, uin
 				if (rangeScore < bestRangeScore) {
 					char hasClearSweep;
 
-					if (!g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+					if (!g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 						Mission_ResolveObjectOrMissionPointWorldLoc(objectIdx, 0, 0, 0);
 						g_collisionProbeWorldX = worldlocx;
 						g_collisionProbeWorldY = worldlocy;
@@ -3441,7 +3441,7 @@ int16_t paifight_FindNearestGunnerTargetInCandidateSet(uint16_t target1Type, uin
 															   worldlocy - g_paifightSearchOriginY,
 															   worldlocz - g_paifightSearchOriginZ);
 				g_targetRangeScore = (int)rangeScore;
-				if (g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+				if (g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 					WarheadInventoryEntry* weapon;
 					int laserSlot;
 
@@ -3460,7 +3460,7 @@ int16_t paifight_FindNearestGunnerTargetInCandidateSet(uint16_t target1Type, uin
 				if (rangeScore < bestRangeScore) {
 					int hasClearSweep;
 
-					if (!g_paiContext.aiSelfModelUsesExpandedTargetProbe) {
+					if (!g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 						g_collisionProbeWorldX = worldlocx;
 						g_collisionProbeWorldY = worldlocy;
 						g_collisionProbeWorldZ = worldlocz;
@@ -3482,7 +3482,7 @@ int16_t paifight_FindNearestGunnerTargetInCandidateSet(uint16_t target1Type, uin
 		++objectIdx;
 	}
 
-	if (!g_paiContext.aiSelfModelUsesExpandedTargetProbe &&
+	if (!g_paiContext.aiSelfModelFiresFromFloatHardpoints &&
 		bestRangeScore > g_paiContext.aiTargetSearchRangeLimit) {
 		bestObjIdx = 0xffffu;
 	}

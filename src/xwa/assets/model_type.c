@@ -21,38 +21,51 @@
 // GLOBAL: XWA 0x5FB240
 ModelTypeInfo g_modelTypeTable[OBJ_Count] = {
 	[OBJ_None] = MODEL_TYPE_ENTRY(0x00u, 0x00u, 0u, 0u, 0, 0x0000u, -1, 0xffffu, 0u),
-	[OBJ_XWing] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 0, OBJ_None, 0u),
-	[OBJ_YWing] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 1, OBJ_None, 1u),
-	[OBJ_AWing] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 2, OBJ_None, 2u),
-	[OBJ_BWing] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 3, OBJ_None, 3u),
-	[OBJ_TIEFighter] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 4, OBJ_None, 4u),
-	[OBJ_TIEInterceptor] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 5, OBJ_None, 5u),
-	[OBJ_TIEBomber] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 6, OBJ_None, 6u),
-	[OBJ_TIEAdvanced] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 7, OBJ_None, 7u),
-	[OBJ_TIEDefender] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 8, OBJ_None, 8u),
-	[OBJ_IrdFighter] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 9, OBJ_None, 9u),
-	[OBJ_ToscanFighter] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 10, OBJ_None, 10u),
-	[OBJ_MissileBoat] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 11, OBJ_None, 11u),
-	[OBJ_Twing] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 12, OBJ_None, 12u),
-	[OBJ_Z95] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 13, OBJ_None, 13u),
-	[OBJ_R41] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 14, OBJ_None, 14u),
-	[OBJ_AssaultGunboat] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 15, OBJ_None, 15u),
-	[OBJ_SkiprayBlastBoat] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 16, OBJ_None, 16u),
-	[OBJ_TIEBizarro] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 17, OBJ_None, 17u),
-	[OBJ_TIEBigGun] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 18, OBJ_None, 18u),
-	[OBJ_TIEWarheads] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 19, OBJ_None, 19u),
-	[OBJ_TIEBomb] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 20, OBJ_None, 20u),
-	[OBJ_TIEBooster] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 21, OBJ_None, 21u),
-	[OBJ_CloakshapeFighter] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 22, OBJ_None, 22u),
-	[OBJ_RazorFighter] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 23, OBJ_None, 23u),
-	[OBJ_PlanetaryFighter] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 24, OBJ_None, 24u),
-	[OBJ_SupaFighter] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 25, OBJ_None, 25u),
-	[OBJ_Piggyback] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 26, OBJ_None, 26u),
-	[OBJ_Booster] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 0u, 0, 0x0043u, 27, OBJ_None, 27u),
-	[OBJ_PreybirdFighter] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 28, OBJ_None, 28u),
-	[OBJ_XWing_030] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 29, OBJ_None, 29u),
-	[OBJ_SlaveOne] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 30, OBJ_None, 30u),
-	[OBJ_SlaveTwo] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 31, OBJ_None, 31u),
+	[OBJ_XWing] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 0, MODEL_TYPE_LIST_SPACECRAFT, 0u),
+	[OBJ_YWing] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 1, MODEL_TYPE_LIST_SPACECRAFT, 1u),
+	[OBJ_AWing] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 2, MODEL_TYPE_LIST_SPACECRAFT, 2u),
+	[OBJ_BWing] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 3, MODEL_TYPE_LIST_SPACECRAFT, 3u),
+	[OBJ_TIEFighter] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 4, MODEL_TYPE_LIST_SPACECRAFT, 4u),
+	[OBJ_TIEInterceptor] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 5, MODEL_TYPE_LIST_SPACECRAFT, 5u),
+	[OBJ_TIEBomber] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 6, MODEL_TYPE_LIST_SPACECRAFT, 6u),
+	[OBJ_TIEAdvanced] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 7, MODEL_TYPE_LIST_SPACECRAFT, 7u),
+	[OBJ_TIEDefender] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 8, MODEL_TYPE_LIST_SPACECRAFT, 8u),
+	[OBJ_IrdFighter] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 9, MODEL_TYPE_LIST_SPACECRAFT, 9u),
+	[OBJ_ToscanFighter] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 10, MODEL_TYPE_LIST_SPACECRAFT, 10u),
+	[OBJ_MissileBoat] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 11, MODEL_TYPE_LIST_SPACECRAFT, 11u),
+	[OBJ_Twing] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 12, MODEL_TYPE_LIST_SPACECRAFT, 12u),
+	[OBJ_Z95] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 13, MODEL_TYPE_LIST_SPACECRAFT, 13u),
+	[OBJ_R41] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 0u, 0, 0x0043u, 14, MODEL_TYPE_LIST_SPACECRAFT, 14u),
+	[OBJ_AssaultGunboat] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 15, MODEL_TYPE_LIST_SPACECRAFT, 15u),
+	[OBJ_SkiprayBlastBoat] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 16, MODEL_TYPE_LIST_SPACECRAFT, 16u),
+	[OBJ_TIEBizarro] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 17, MODEL_TYPE_LIST_SPACECRAFT, 17u),
+	[OBJ_TIEBigGun] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 18, MODEL_TYPE_LIST_SPACECRAFT, 18u),
+	[OBJ_TIEWarheads] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 19, MODEL_TYPE_LIST_SPACECRAFT, 19u),
+	[OBJ_TIEBomb] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 20, MODEL_TYPE_LIST_SPACECRAFT, 20u),
+	[OBJ_TIEBooster] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 21, MODEL_TYPE_LIST_SPACECRAFT, 21u),
+	[OBJ_CloakshapeFighter] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 22, MODEL_TYPE_LIST_SPACECRAFT, 22u),
+	[OBJ_RazorFighter] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 23, MODEL_TYPE_LIST_SPACECRAFT, 23u),
+	[OBJ_PlanetaryFighter] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 24, MODEL_TYPE_LIST_SPACECRAFT, 24u),
+	[OBJ_SupaFighter] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 25, MODEL_TYPE_LIST_SPACECRAFT, 25u),
+	[OBJ_Piggyback] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 26, MODEL_TYPE_LIST_SPACECRAFT, 26u),
+	[OBJ_Booster] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 0u, 0, 0x0043u, 27, MODEL_TYPE_LIST_SPACECRAFT, 27u),
+	[OBJ_PreybirdFighter] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 28, MODEL_TYPE_LIST_SPACECRAFT, 28u),
+	[OBJ_XWing_030] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 29, MODEL_TYPE_LIST_SPACECRAFT, 29u),
+	[OBJ_SlaveOne] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 30, MODEL_TYPE_LIST_SPACECRAFT, 30u),
+	[OBJ_SlaveTwo] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 0u, 0, 0x0043u, 31, MODEL_TYPE_LIST_SPACECRAFT, 31u),
 	[OBJ_NoAsset_033] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 0u, 0, 0x0043u, 32, 0xffffu, 0u),
 	[OBJ_NoAsset_034] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 0u, 0, 0x0043u, 33, 0xffffu, 0u),
 	[OBJ_NoAsset_035] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 0u, 0, 0x0043u, 34, 0xffffu, 0u),
@@ -63,79 +76,127 @@ ModelTypeInfo g_modelTypeTable[OBJ_Count] = {
 	[OBJ_NoAsset_040] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 0u, 0, 0x0043u, 39, 0xffffu, 0u),
 	[OBJ_NoAsset_041] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 0u, 0, 0x0043u, 40, 0xffffu, 0u),
 	[OBJ_NoAsset_042] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 0u, 0, 0x0043u, 41, 0xffffu, 0u),
-	[OBJ_Tug] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 2u, 0, 0x0043u, 42, OBJ_None, 32u),
-	[OBJ_CombatUtilityVehicle] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 2u, 0, 0x0043u, 43, OBJ_None, 33u),
-	[OBJ_HeavyLifter] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 2u, 0, 0x0043u, 44, OBJ_None, 34u),
-	[OBJ_MoleMiner] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 2u, 0, 0x0043u, 45, OBJ_None, 35u),
-	[OBJ_EscapePod] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 0u, 2u, 0, 0x0043u, 46, OBJ_None, 36u),
-	[OBJ_EscapePodA] = MODEL_TYPE_ENTRY(0x02u, 0x09u, 0u, 2u, 0, 0x0043u, 47, OBJ_None, 153u),
+	[OBJ_Tug] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 2u, 0, 0x0043u, 42, MODEL_TYPE_LIST_SPACECRAFT, 32u),
+	[OBJ_CombatUtilityVehicle] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 2u, 0, 0x0043u, 43, MODEL_TYPE_LIST_SPACECRAFT, 33u),
+	[OBJ_HeavyLifter] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 2u, 0, 0x0043u, 44, MODEL_TYPE_LIST_SPACECRAFT, 34u),
+	[OBJ_MoleMiner] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 2u, 0, 0x0043u, 45, MODEL_TYPE_LIST_SPACECRAFT, 35u),
+	[OBJ_EscapePod] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 0u, 2u, 0, 0x0043u, 46, MODEL_TYPE_LIST_SPACECRAFT, 36u),
+	[OBJ_EscapePodA] =
+		MODEL_TYPE_ENTRY(0x02u, 0x09u, 0u, 2u, 0, 0x0043u, 47, MODEL_TYPE_LIST_SPACECRAFT, 153u),
 	[OBJ_NoAsset_049] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 2u, 0, 0x0043u, 48, 0xffffu, 0u),
-	[OBJ_Shuttle] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 49, OBJ_None, 37u),
-	[OBJ_EscortShuttle] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 50, OBJ_None, 38u),
-	[OBJ_StormtrooperTransport] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 51, OBJ_None, 39u),
-	[OBJ_AssaultTransport] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 52, OBJ_None, 40u),
-	[OBJ_EscortTransport] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 53, OBJ_None, 41u),
-	[OBJ_SystemPatrolCraft] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 54, OBJ_None, 42u),
-	[OBJ_ScoutCraft] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 55, OBJ_None, 43u),
-	[OBJ_MuurianTransport] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 56, OBJ_None, 44u),
-	[OBJ_CorellianTransport2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 57, OBJ_None, 45u),
-	[OBJ_MilleniumFalcon2] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 1u, 0, 0x0043u, 58, OBJ_None, 46u),
-	[OBJ_Outrider] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 59, OBJ_None, 47u),
-	[OBJ_ImperialLandingCraft] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 60, OBJ_None, 48u),
-	[OBJ_AssaultShuttle] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 61, OBJ_None, 49u),
-	[OBJ_LuxuryYacht] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 62, OBJ_None, 50u),
-	[OBJ_FerryboatLiner] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 63, OBJ_None, 51u),
-	[OBJ_FamilyTransport] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 64, OBJ_None, 52u),
+	[OBJ_Shuttle] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 49, MODEL_TYPE_LIST_SPACECRAFT, 37u),
+	[OBJ_EscortShuttle] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 50, MODEL_TYPE_LIST_SPACECRAFT, 38u),
+	[OBJ_StormtrooperTransport] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 51, MODEL_TYPE_LIST_SPACECRAFT, 39u),
+	[OBJ_AssaultTransport] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 52, MODEL_TYPE_LIST_SPACECRAFT, 40u),
+	[OBJ_EscortTransport] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 53, MODEL_TYPE_LIST_SPACECRAFT, 41u),
+	[OBJ_SystemPatrolCraft] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 54, MODEL_TYPE_LIST_SPACECRAFT, 42u),
+	[OBJ_ScoutCraft] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 55, MODEL_TYPE_LIST_SPACECRAFT, 43u),
+	[OBJ_MuurianTransport] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 56, MODEL_TYPE_LIST_SPACECRAFT, 44u),
+	[OBJ_CorellianTransport2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 57, MODEL_TYPE_LIST_SPACECRAFT, 45u),
+	[OBJ_MilleniumFalcon2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 1u, 0, 0x0043u, 58, MODEL_TYPE_LIST_SPACECRAFT, 46u),
+	[OBJ_Outrider] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 59, MODEL_TYPE_LIST_SPACECRAFT, 47u),
+	[OBJ_ImperialLandingCraft] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 60, MODEL_TYPE_LIST_SPACECRAFT, 48u),
+	[OBJ_AssaultShuttle] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 61, MODEL_TYPE_LIST_SPACECRAFT, 49u),
+	[OBJ_LuxuryYacht] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 62, MODEL_TYPE_LIST_SPACECRAFT, 50u),
+	[OBJ_FerryboatLiner] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 63, MODEL_TYPE_LIST_SPACECRAFT, 51u),
+	[OBJ_FamilyTransport] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 1u, 0, 0x0043u, 64, MODEL_TYPE_LIST_SPACECRAFT, 52u),
 	[OBJ_NoAsset_066] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 1u, 0, 0x0043u, 65, 0xffffu, 0u),
 	[OBJ_NoAsset_067] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 1u, 0, 0x0043u, 66, 0xffffu, 0u),
 	[OBJ_NoAsset_068] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 1u, 0, 0x0043u, 67, 0xffffu, 0u),
 	[OBJ_NoAsset_069] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 1u, 0, 0x0043u, 68, 0xffffu, 0u),
 	[OBJ_NoAsset_070] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 1u, 0, 0x0043u, 69, 0xffffu, 0u),
-	[OBJ_ContainerBrick] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 70, OBJ_None, 53u),
-	[OBJ_ContainerHexBox] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 71, OBJ_None, 54u),
-	[OBJ_ContainerTube] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 72, OBJ_None, 55u),
-	[OBJ_ContainerPronged] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 73, OBJ_None, 56u),
-	[OBJ_ContainerHemisphere] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 74, OBJ_None, 57u),
-	[OBJ_ContainerSlotted] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 75, OBJ_None, 58u),
-	[OBJ_ContainerHourglass] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 76, OBJ_None, 59u),
-	[OBJ_ContainerGem] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 77, OBJ_None, 60u),
-	[OBJ_ContainerYshaped] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 78, OBJ_None, 61u),
-	[OBJ_CargoCanister] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 79, OBJ_None, 62u),
-	[OBJ_PropaneTank] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 80, OBJ_None, 63u),
-	[OBJ_ContainerGrande] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 81, OBJ_None, 64u),
-	[OBJ_ContainerBox] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 82, OBJ_None, 65u),
-	[OBJ_ContainerSphere] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 83, OBJ_None, 66u),
-	[OBJ_ContainerHanger] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 84, OBJ_None, 67u),
+	[OBJ_ContainerBrick] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 70, MODEL_TYPE_LIST_SPACECRAFT, 53u),
+	[OBJ_ContainerHexBox] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 71, MODEL_TYPE_LIST_SPACECRAFT, 54u),
+	[OBJ_ContainerTube] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 72, MODEL_TYPE_LIST_SPACECRAFT, 55u),
+	[OBJ_ContainerPronged] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 73, MODEL_TYPE_LIST_SPACECRAFT, 56u),
+	[OBJ_ContainerHemisphere] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 74, MODEL_TYPE_LIST_SPACECRAFT, 57u),
+	[OBJ_ContainerSlotted] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 75, MODEL_TYPE_LIST_SPACECRAFT, 58u),
+	[OBJ_ContainerHourglass] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 76, MODEL_TYPE_LIST_SPACECRAFT, 59u),
+	[OBJ_ContainerGem] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 77, MODEL_TYPE_LIST_SPACECRAFT, 60u),
+	[OBJ_ContainerYshaped] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 78, MODEL_TYPE_LIST_SPACECRAFT, 61u),
+	[OBJ_CargoCanister] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 79, MODEL_TYPE_LIST_SPACECRAFT, 62u),
+	[OBJ_PropaneTank] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 80, MODEL_TYPE_LIST_SPACECRAFT, 63u),
+	[OBJ_ContainerGrande] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 81, MODEL_TYPE_LIST_SPACECRAFT, 64u),
+	[OBJ_ContainerBox] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 82, MODEL_TYPE_LIST_SPACECRAFT, 65u),
+	[OBJ_ContainerSphere] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 83, MODEL_TYPE_LIST_SPACECRAFT, 66u),
+	[OBJ_ContainerHanger] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 17u, 0, 0x0043u, 84, MODEL_TYPE_LIST_SPACECRAFT, 67u),
 	[OBJ_NoAsset_086] = MODEL_TYPE_ENTRY(0x02u, 0x01u, 0u, 17u, 0, 0x0043u, 85, 0xffffu, 0u),
 	[OBJ_NoAsset_087] = MODEL_TYPE_ENTRY(0x02u, 0x01u, 0u, 17u, 0, 0x0043u, 86, 0xffffu, 0u),
 	[OBJ_NoAsset_088] = MODEL_TYPE_ENTRY(0x02u, 0x01u, 0u, 17u, 0, 0x0043u, 87, 0xffffu, 0u),
 	[OBJ_NoAsset_089] = MODEL_TYPE_ENTRY(0x02u, 0x01u, 0u, 17u, 0, 0x0043u, 88, 0xffffu, 0u),
 	[OBJ_NoAsset_090] = MODEL_TYPE_ENTRY(0x02u, 0x01u, 0u, 17u, 0, 0x0043u, 89, 0xffffu, 0u),
-	[OBJ_BulkFreighter] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 90, OBJ_None, 68u),
-	[OBJ_CargoFerry] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 91, OBJ_None, 69u),
-	[OBJ_ModularConveyor] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 92, OBJ_None, 70u),
-	[OBJ_ContainerTransport] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 93, OBJ_None, 71u),
-	[OBJ_TunaBoat2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 94, OBJ_None, 72u),
-	[OBJ_StarGalleon] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 95, OBJ_None, 73u),
-	[OBJ_ModActionTransport] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 96, OBJ_None, 74u),
-	[OBJ_MobquetTransport] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 97, OBJ_None, 75u),
-	[OBJ_XiytiarTransport] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 98, OBJ_None, 76u),
-	[OBJ_FreighterConB] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 99, OBJ_None, 77u),
-	[OBJ_FreighterConG] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 100, OBJ_None, 78u),
-	[OBJ_FreighterBox] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 101, OBJ_None, 79u),
-	[OBJ_XWing_103] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 102, OBJ_None, 0u),
-	[OBJ_XWing_104] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 103, OBJ_None, 0u),
-	[OBJ_CrewCabinFront] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 104, OBJ_None, 136u),
-	[OBJ_ConnectorRod] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0042u, 105, OBJ_None, 137u),
-	[OBJ_EngineBack] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 106, OBJ_None, 138u),
-	[OBJ_XWing_108] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 107, OBJ_None, 0u),
-	[OBJ_XWing_109] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 108, OBJ_None, 0u),
-	[OBJ_EngineFront] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 109, OBJ_None, 139u),
-	[OBJ_CrewCabinBack] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 110, OBJ_None, 140u),
-	[OBJ_XWing_112] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 111, OBJ_None, 0u),
-	[OBJ_XWing_113] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 112, OBJ_None, 0u),
-	[OBJ_XWing_114] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 113, OBJ_None, 0u),
-	[OBJ_Suprosa] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 114, OBJ_None, 142u),
+	[OBJ_BulkFreighter] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 90, MODEL_TYPE_LIST_SPACECRAFT, 68u),
+	[OBJ_CargoFerry] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 91, MODEL_TYPE_LIST_SPACECRAFT, 69u),
+	[OBJ_ModularConveyor] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 92, MODEL_TYPE_LIST_SPACECRAFT, 70u),
+	[OBJ_ContainerTransport] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 93, MODEL_TYPE_LIST_SPACECRAFT, 71u),
+	[OBJ_TunaBoat2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 94, MODEL_TYPE_LIST_SPACECRAFT, 72u),
+	[OBJ_StarGalleon] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 95, MODEL_TYPE_LIST_SPACECRAFT, 73u),
+	[OBJ_ModActionTransport] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 96, MODEL_TYPE_LIST_SPACECRAFT, 74u),
+	[OBJ_MobquetTransport] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 97, MODEL_TYPE_LIST_SPACECRAFT, 75u),
+	[OBJ_XiytiarTransport] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 98, MODEL_TYPE_LIST_SPACECRAFT, 76u),
+	[OBJ_FreighterConB] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 99, MODEL_TYPE_LIST_SPACECRAFT, 77u),
+	[OBJ_FreighterConG] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 100, MODEL_TYPE_LIST_SPACECRAFT, 78u),
+	[OBJ_FreighterBox] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 101, MODEL_TYPE_LIST_SPACECRAFT, 79u),
+	[OBJ_XWing_103] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 102, MODEL_TYPE_LIST_SPACECRAFT, 0u),
+	[OBJ_XWing_104] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 103, MODEL_TYPE_LIST_SPACECRAFT, 0u),
+	[OBJ_CrewCabinFront] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 104, MODEL_TYPE_LIST_SPACECRAFT, 136u),
+	[OBJ_ConnectorRod] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0042u, 105, MODEL_TYPE_LIST_SPACECRAFT, 137u),
+	[OBJ_EngineBack] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 106, MODEL_TYPE_LIST_SPACECRAFT, 138u),
+	[OBJ_XWing_108] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 107, MODEL_TYPE_LIST_SPACECRAFT, 0u),
+	[OBJ_XWing_109] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 108, MODEL_TYPE_LIST_SPACECRAFT, 0u),
+	[OBJ_EngineFront] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 109, MODEL_TYPE_LIST_SPACECRAFT, 139u),
+	[OBJ_CrewCabinBack] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 110, MODEL_TYPE_LIST_SPACECRAFT, 140u),
+	[OBJ_XWing_112] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 111, MODEL_TYPE_LIST_SPACECRAFT, 0u),
+	[OBJ_XWing_113] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 112, MODEL_TYPE_LIST_SPACECRAFT, 0u),
+	[OBJ_XWing_114] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 113, MODEL_TYPE_LIST_SPACECRAFT, 0u),
+	[OBJ_Suprosa] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 114, MODEL_TYPE_LIST_SPACECRAFT, 142u),
 	[OBJ_NoAsset_116] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 115, 0xffffu, 0u),
 	[OBJ_NoAsset_117] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 116, 0xffffu, 0u),
 	[OBJ_NoAsset_118] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 117, 0xffffu, 0u),
@@ -146,65 +207,117 @@ ModelTypeInfo g_modelTypeTable[OBJ_Count] = {
 	[OBJ_NoAsset_123] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 122, 0xffffu, 0u),
 	[OBJ_NoAsset_124] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 123, 0xffffu, 0u),
 	[OBJ_NoAsset_125] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 3u, 0, 0x0043u, 124, 0xffffu, 0u),
-	[OBJ_Corvette2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 125, OBJ_None, 80u),
-	[OBJ_ModCorvette] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 126, OBJ_None, 81u),
-	[OBJ_Frigate2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 127, OBJ_None, 82u),
-	[OBJ_ModFrigate] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 128, OBJ_None, 83u),
-	[OBJ_PassengerLiner] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 129, OBJ_None, 84u),
-	[OBJ_CarrackCruiser] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 130, OBJ_None, 85u),
-	[OBJ_StrikeCruiser] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 131, OBJ_None, 86u),
-	[OBJ_EscortCarrier] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 132, OBJ_None, 87u),
-	[OBJ_Dreadnaught2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 133, OBJ_None, 88u),
-	[OBJ_CalamariCruiserNew] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 134, OBJ_None, 89u),
-	[OBJ_LightCalamariCruiser] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 135, OBJ_None, 90u),
-	[OBJ_Interdictor2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 136, OBJ_None, 91u),
-	[OBJ_VictoryStarDestroyer2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 137, OBJ_None, 92u),
-	[OBJ_ImperialStarDestroyer2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 138, OBJ_None, 93u),
-	[OBJ_SuperStarDestroyer] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 139, OBJ_None, 94u),
-	[OBJ_ModStrikeCruiser] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 163, OBJ_None, 95u),
-	[OBJ_LancerFrigate] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 141, OBJ_None, 96u),
-	[OBJ_BulkCruiser] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 142, OBJ_None, 97u),
-	[OBJ_AssaultFrigate] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 143, OBJ_None, 98u),
-	[OBJ_CorellianGunship] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 144, OBJ_None, 99u),
-	[OBJ_MarauderCorvette] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 145, OBJ_None, 100u),
-	[OBJ_ImperialResearchShip] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 146, OBJ_None, 101u),
-	[OBJ_CalamariWinged] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 147, OBJ_None, 135u),
-	[OBJ_VictoryStarDestroyer2_149] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 148, OBJ_None, 92u),
+	[OBJ_Corvette2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 125, MODEL_TYPE_LIST_SPACECRAFT, 80u),
+	[OBJ_ModCorvette] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 126, MODEL_TYPE_LIST_SPACECRAFT, 81u),
+	[OBJ_Frigate2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 127, MODEL_TYPE_LIST_SPACECRAFT, 82u),
+	[OBJ_ModFrigate] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 128, MODEL_TYPE_LIST_SPACECRAFT, 83u),
+	[OBJ_PassengerLiner] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 129, MODEL_TYPE_LIST_SPACECRAFT, 84u),
+	[OBJ_CarrackCruiser] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 130, MODEL_TYPE_LIST_SPACECRAFT, 85u),
+	[OBJ_StrikeCruiser] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 131, MODEL_TYPE_LIST_SPACECRAFT, 86u),
+	[OBJ_EscortCarrier] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 132, MODEL_TYPE_LIST_SPACECRAFT, 87u),
+	[OBJ_Dreadnaught2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 133, MODEL_TYPE_LIST_SPACECRAFT, 88u),
+	[OBJ_CalamariCruiserNew] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 134, MODEL_TYPE_LIST_SPACECRAFT, 89u),
+	[OBJ_LightCalamariCruiser] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 135, MODEL_TYPE_LIST_SPACECRAFT, 90u),
+	[OBJ_Interdictor2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 136, MODEL_TYPE_LIST_SPACECRAFT, 91u),
+	[OBJ_VictoryStarDestroyer2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 137, MODEL_TYPE_LIST_SPACECRAFT, 92u),
+	[OBJ_ImperialStarDestroyer2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 138, MODEL_TYPE_LIST_SPACECRAFT, 93u),
+	[OBJ_SuperStarDestroyer] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 139, MODEL_TYPE_LIST_SPACECRAFT, 94u),
+	[OBJ_ModStrikeCruiser] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 163, MODEL_TYPE_LIST_SPACECRAFT, 95u),
+	[OBJ_LancerFrigate] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 141, MODEL_TYPE_LIST_SPACECRAFT, 96u),
+	[OBJ_BulkCruiser] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 142, MODEL_TYPE_LIST_SPACECRAFT, 97u),
+	[OBJ_AssaultFrigate] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 143, MODEL_TYPE_LIST_SPACECRAFT, 98u),
+	[OBJ_CorellianGunship] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0043u, 144, MODEL_TYPE_LIST_SPACECRAFT, 99u),
+	[OBJ_MarauderCorvette] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 145, MODEL_TYPE_LIST_SPACECRAFT, 100u),
+	[OBJ_ImperialResearchShip] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0043u, 146, MODEL_TYPE_LIST_SPACECRAFT, 101u),
+	[OBJ_CalamariWinged] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 147, MODEL_TYPE_LIST_SPACECRAFT, 135u),
+	[OBJ_VictoryStarDestroyer2_149] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 148, MODEL_TYPE_LIST_SPACECRAFT, 92u),
 	[OBJ_ImperialStarDestroyer2_150] =
-		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 149, OBJ_None, 141u),
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 4u, 0, 0x0843u, 149, MODEL_TYPE_LIST_SPACECRAFT, 141u),
 	[OBJ_NoAsset_151] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 4u, 0, 0x0043u, 150, 0xffffu, 0u),
 	[OBJ_NoAsset_152] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 5u, 0, 0x0043u, 151, 0xffffu, 0u),
-	[OBJ_Platform1] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 152, OBJ_None, 102u),
-	[OBJ_Platform2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 153, OBJ_None, 103u),
-	[OBJ_Platform3] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 154, OBJ_None, 104u),
-	[OBJ_Platform4] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 155, OBJ_None, 105u),
-	[OBJ_Platform5] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 156, OBJ_None, 106u),
-	[OBJ_Platform6] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 157, OBJ_None, 107u),
-	[OBJ_AsteroidBase] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 158, OBJ_None, 108u),
-	[OBJ_Factory] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 159, OBJ_None, 109u),
-	[OBJ_ShipYard] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 160, OBJ_None, 110u),
-	[OBJ_RepairYard] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 161, OBJ_None, 111u),
-	[OBJ_GolanOne] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 162, OBJ_None, 112u),
-	[OBJ_GolanTwo] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 163, OBJ_None, 113u),
-	[OBJ_GolanThree] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 164, OBJ_None, 114u),
-	[OBJ_DerilynPlatform] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 165, OBJ_None, 115u),
-	[OBJ_SensorArray] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 166, OBJ_None, 116u),
-	[OBJ_CommRelay] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 167, OBJ_None, 117u),
-	[OBJ_SpaceColony1] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 168, OBJ_None, 118u),
-	[OBJ_SpaceColony2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 169, OBJ_None, 119u),
-	[OBJ_SpaceColony3] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 170, OBJ_None, 120u),
-	[OBJ_Casino] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 171, OBJ_None, 121u),
-	[OBJ_CargoFacility1] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 172, OBJ_None, 122u),
-	[OBJ_CargoFacility2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 173, OBJ_None, 123u),
-	[OBJ_AsteroidMiningUnit] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 174, OBJ_None, 124u),
-	[OBJ_ProcessingPlant] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 175, OBJ_None, 125u),
-	[OBJ_RebelPlatform] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0843u, 176, OBJ_None, 126u),
-	[OBJ_ImperialResearchCenter] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 177, OBJ_None, 127u),
-	[OBJ_FamilyBase] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 178, OBJ_None, 128u),
-	[OBJ_FamilyRepairYard] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 179, OBJ_None, 129u),
-	[OBJ_PirateShipyard] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 180, OBJ_None, 130u),
-	[OBJ_IndustrialComplex] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 181, OBJ_None, 131u),
-	[OBJ_PirateJunkyardBase] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 182, OBJ_None, 132u),
+	[OBJ_Platform1] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 152, MODEL_TYPE_LIST_SPACECRAFT, 102u),
+	[OBJ_Platform2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 153, MODEL_TYPE_LIST_SPACECRAFT, 103u),
+	[OBJ_Platform3] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 154, MODEL_TYPE_LIST_SPACECRAFT, 104u),
+	[OBJ_Platform4] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 155, MODEL_TYPE_LIST_SPACECRAFT, 105u),
+	[OBJ_Platform5] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 156, MODEL_TYPE_LIST_SPACECRAFT, 106u),
+	[OBJ_Platform6] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 157, MODEL_TYPE_LIST_SPACECRAFT, 107u),
+	[OBJ_AsteroidBase] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 158, MODEL_TYPE_LIST_SPACECRAFT, 108u),
+	[OBJ_Factory] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 159, MODEL_TYPE_LIST_SPACECRAFT, 109u),
+	[OBJ_ShipYard] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 160, MODEL_TYPE_LIST_SPACECRAFT, 110u),
+	[OBJ_RepairYard] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 161, MODEL_TYPE_LIST_SPACECRAFT, 111u),
+	[OBJ_GolanOne] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 162, MODEL_TYPE_LIST_SPACECRAFT, 112u),
+	[OBJ_GolanTwo] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 163, MODEL_TYPE_LIST_SPACECRAFT, 113u),
+	[OBJ_GolanThree] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 164, MODEL_TYPE_LIST_SPACECRAFT, 114u),
+	[OBJ_DerilynPlatform] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 165, MODEL_TYPE_LIST_SPACECRAFT, 115u),
+	[OBJ_SensorArray] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 166, MODEL_TYPE_LIST_SPACECRAFT, 116u),
+	[OBJ_CommRelay] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 167, MODEL_TYPE_LIST_SPACECRAFT, 117u),
+	[OBJ_SpaceColony1] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 168, MODEL_TYPE_LIST_SPACECRAFT, 118u),
+	[OBJ_SpaceColony2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 169, MODEL_TYPE_LIST_SPACECRAFT, 119u),
+	[OBJ_SpaceColony3] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 170, MODEL_TYPE_LIST_SPACECRAFT, 120u),
+	[OBJ_Casino] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 171, MODEL_TYPE_LIST_SPACECRAFT, 121u),
+	[OBJ_CargoFacility1] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 172, MODEL_TYPE_LIST_SPACECRAFT, 122u),
+	[OBJ_CargoFacility2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 173, MODEL_TYPE_LIST_SPACECRAFT, 123u),
+	[OBJ_AsteroidMiningUnit] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 174, MODEL_TYPE_LIST_SPACECRAFT, 124u),
+	[OBJ_ProcessingPlant] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 175, MODEL_TYPE_LIST_SPACECRAFT, 125u),
+	[OBJ_RebelPlatform] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0843u, 176, MODEL_TYPE_LIST_SPACECRAFT, 126u),
+	[OBJ_ImperialResearchCenter] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 177, MODEL_TYPE_LIST_SPACECRAFT, 127u),
+	[OBJ_FamilyBase] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 178, MODEL_TYPE_LIST_SPACECRAFT, 128u),
+	[OBJ_FamilyRepairYard] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 179, MODEL_TYPE_LIST_SPACECRAFT, 129u),
+	[OBJ_PirateShipyard] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 180, MODEL_TYPE_LIST_SPACECRAFT, 130u),
+	[OBJ_IndustrialComplex] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 181, MODEL_TYPE_LIST_SPACECRAFT, 131u),
+	[OBJ_PirateJunkyardBase] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 5u, 0, 0x0043u, 182, MODEL_TYPE_LIST_SPACECRAFT, 132u),
 	[OBJ_NoAsset_184] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 5u, 0, 0x0043u, 183, 0xffffu, 0u),
 	[OBJ_NoAsset_185] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 5u, 0, 0x0043u, 184, 0xffffu, 0u),
 	[OBJ_NoAsset_186] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 5u, 0, 0x0043u, 185, 0xffffu, 0u),
@@ -213,43 +326,63 @@ ModelTypeInfo g_modelTypeTable[OBJ_Count] = {
 	[OBJ_NoAsset_189] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 5u, 0, 0x0043u, 188, 0xffffu, 0u),
 	[OBJ_NoAsset_190] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 5u, 0, 0x0043u, 189, 0xffffu, 0u),
 	[OBJ_NoAsset_191] = MODEL_TYPE_ENTRY(0x02u, 0x81u, 0u, 5u, 0, 0x0043u, 190, 0xffffu, 0u),
-	[OBJ_LaserBat] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x0043u, 191, OBJ_XWing, 40u),
-	[OBJ_IonBat] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x0043u, 192, OBJ_XWing, 39u),
-	[OBJ_AsteroidLaserBattery] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x0043u, 193, OBJ_None, 133u),
-	[OBJ_AsteroidWarheadLauncher] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x0043u, 194, OBJ_None, 134u),
-	[OBJ_GunPlatform] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 195, OBJ_XWing, 6u),
-	[OBJ_GunPad] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 196, OBJ_XWing, 43u),
-	[OBJ_GunWarheadPad] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 197, OBJ_XWing, 44u),
-	[OBJ_HomingMineA] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 198, OBJ_XWing, 41u),
-	[OBJ_HomingMineB] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 199, OBJ_XWing, 42u),
-	[OBJ_ProximityMineA] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 200, OBJ_XWing, 45u),
-	[OBJ_ProximityMineB] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 201, OBJ_XWing, 46u),
-	[OBJ_RebelPilot] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 0u, 18u, 0, 0x0043u, 202, OBJ_XWing, 51u),
-	[OBJ_ImperialPilot] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 0u, 18u, 0, 0x0043u, 203, OBJ_XWing, 52u),
-	[OBJ_CivilianPilot] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 0u, 18u, 0, 0x0043u, 204, OBJ_XWing, 53u),
-	[OBJ_ZeroGStormtrooper] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 18u, 0, 0x0043u, 205, OBJ_XWing, 54u),
-	[OBJ_ZeroGUtility] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 18u, 0, 0x0043u, 206, OBJ_XWing, 55u),
-	[OBJ_Marko] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 18u, 0, 0x0043u, 207, OBJ_XWing, 56u),
-	[OBJ_R2D2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 18u, 0, 0x0043u, 208, OBJ_XWing, 57u),
-	[OBJ_CommSat1] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 9u, 0, 0x1043u, 209, OBJ_XWing, 0u),
-	[OBJ_CommSat2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 9u, 0, 0x1043u, 210, OBJ_XWing, 1u),
-	[OBJ_CommSat3] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 2u, 9u, 0, 0x1043u, 211, OBJ_XWing, 2u),
-	[OBJ_Probe] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 2u, 9u, 0, 0x1043u, 212, OBJ_XWing, 7u),
-	[OBJ_ProbeCapsule] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 9u, 0, 0x0043u, 213, OBJ_XWing, 50u),
-	[OBJ_NavBuoy1] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 9u, 0, 0x1047u, 214, OBJ_XWing, 47u),
-	[OBJ_NavBuoy2] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 9u, 0, 0x1047u, 215, OBJ_XWing, 48u),
-	[OBJ_NavBuoy3] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 9u, 0, 0x1047u, 216, OBJ_XWing, 49u),
-	[OBJ_HyperBuoy] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 9u, 0, 0x1047u, 217, OBJ_XWing, 8u),
-	[OBJ_Mine1] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 1u, 8u, 0, 0x0083u, -1, OBJ_XWing, 3u),
-	[OBJ_Mine2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 1u, 8u, 0, 0x0083u, -1, OBJ_XWing, 4u),
-	[OBJ_Mine3] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 1u, 8u, 0, 0x0083u, -1, OBJ_XWing, 5u),
+	[OBJ_LaserBat] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x0043u, 191, MODEL_TYPE_LIST_EQUIPMENT, 40u),
+	[OBJ_IonBat] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x0043u, 192, MODEL_TYPE_LIST_EQUIPMENT, 39u),
+	[OBJ_AsteroidLaserBattery] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x0043u, 193, MODEL_TYPE_LIST_SPACECRAFT, 133u),
+	[OBJ_AsteroidWarheadLauncher] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x0043u, 194, MODEL_TYPE_LIST_SPACECRAFT, 134u),
+	[OBJ_GunPlatform] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 195, MODEL_TYPE_LIST_EQUIPMENT, 6u),
+	[OBJ_GunPad] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 196, MODEL_TYPE_LIST_EQUIPMENT, 43u),
+	[OBJ_GunWarheadPad] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 197, MODEL_TYPE_LIST_EQUIPMENT, 44u),
+	[OBJ_HomingMineA] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 198, MODEL_TYPE_LIST_EQUIPMENT, 41u),
+	[OBJ_HomingMineB] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 199, MODEL_TYPE_LIST_EQUIPMENT, 42u),
+	[OBJ_ProximityMineA] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 200, MODEL_TYPE_LIST_EQUIPMENT, 45u),
+	[OBJ_ProximityMineB] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 19u, 0, 0x1043u, 201, MODEL_TYPE_LIST_EQUIPMENT, 46u),
+	[OBJ_RebelPilot] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 0u, 18u, 0, 0x0043u, 202, MODEL_TYPE_LIST_EQUIPMENT, 51u),
+	[OBJ_ImperialPilot] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 0u, 18u, 0, 0x0043u, 203, MODEL_TYPE_LIST_EQUIPMENT, 52u),
+	[OBJ_CivilianPilot] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 0u, 18u, 0, 0x0043u, 204, MODEL_TYPE_LIST_EQUIPMENT, 53u),
+	[OBJ_ZeroGStormtrooper] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 18u, 0, 0x0043u, 205, MODEL_TYPE_LIST_EQUIPMENT, 54u),
+	[OBJ_ZeroGUtility] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 18u, 0, 0x0043u, 206, MODEL_TYPE_LIST_EQUIPMENT, 55u),
+	[OBJ_Marko] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 18u, 0, 0x0043u, 207, MODEL_TYPE_LIST_EQUIPMENT, 56u),
+	[OBJ_R2D2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 18u, 0, 0x0043u, 208, MODEL_TYPE_LIST_EQUIPMENT, 57u),
+	[OBJ_CommSat1] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 9u, 0, 0x1043u, 209, MODEL_TYPE_LIST_EQUIPMENT, 0u),
+	[OBJ_CommSat2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 9u, 0, 0x1043u, 210, MODEL_TYPE_LIST_EQUIPMENT, 1u),
+	[OBJ_CommSat3] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 2u, 9u, 0, 0x1043u, 211, MODEL_TYPE_LIST_EQUIPMENT, 2u),
+	[OBJ_Probe] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 2u, 9u, 0, 0x1043u, 212, MODEL_TYPE_LIST_EQUIPMENT, 7u),
+	[OBJ_ProbeCapsule] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 9u, 0, 0x0043u, 213, MODEL_TYPE_LIST_EQUIPMENT, 50u),
+	[OBJ_NavBuoy1] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 9u, 0, 0x1047u, 214, MODEL_TYPE_LIST_EQUIPMENT, 47u),
+	[OBJ_NavBuoy2] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 9u, 0, 0x1047u, 215, MODEL_TYPE_LIST_EQUIPMENT, 48u),
+	[OBJ_NavBuoy3] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 9u, 0, 0x1047u, 216, MODEL_TYPE_LIST_EQUIPMENT, 49u),
+	[OBJ_HyperBuoy] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 0u, 9u, 0, 0x1047u, 217, MODEL_TYPE_LIST_EQUIPMENT, 8u),
+	[OBJ_Mine1] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 1u, 8u, 0, 0x0083u, -1, MODEL_TYPE_LIST_EQUIPMENT, 3u),
+	[OBJ_Mine2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 1u, 8u, 0, 0x0083u, -1, MODEL_TYPE_LIST_EQUIPMENT, 4u),
+	[OBJ_Mine3] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 1u, 8u, 0, 0x0083u, -1, MODEL_TYPE_LIST_EQUIPMENT, 5u),
 	[OBJ_NoAsset_222] = MODEL_TYPE_ENTRY(0x00u, 0x00u, 3u, 11u, 0, 0x0040u, -1, 0xffffu, 0u),
-	[OBJ_AsteroidHR1] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, OBJ_XWing, 11u),
-	[OBJ_AsteroidHR2] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, OBJ_XWing, 12u),
-	[OBJ_AsteroidHR3] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, OBJ_XWing, 13u),
-	[OBJ_AsteroidHR4] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, OBJ_XWing, 14u),
-	[OBJ_AsteroidHR5] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, OBJ_XWing, 15u),
-	[OBJ_AsteroidHR6] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, OBJ_XWing, 16u),
+	[OBJ_AsteroidHR1] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 11u),
+	[OBJ_AsteroidHR2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 12u),
+	[OBJ_AsteroidHR3] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 13u),
+	[OBJ_AsteroidHR4] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 14u),
+	[OBJ_AsteroidHR5] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 15u),
+	[OBJ_AsteroidHR6] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 3u, 10u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 16u),
 	[OBJ_NoAsset_229] = MODEL_TYPE_ENTRY(0x00u, 0x00u, 3u, 10u, 480, 0x0080u, -1, 0xffffu, 0u),
 	[OBJ_NoAsset_230] = MODEL_TYPE_ENTRY(0x00u, 0x00u, 3u, 10u, 480, 0x0080u, -1, 0xffffu, 0u),
 	[OBJ_NoAsset_231] = MODEL_TYPE_ENTRY(0x00u, 0x00u, 3u, 10u, 480, 0x0080u, -1, 0xffffu, 0u),
@@ -327,146 +460,251 @@ ModelTypeInfo g_modelTypeTable[OBJ_Count] = {
 		MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 5u, 13u, 1664, 0x8548u, -1, 0x0BBEu, 0u),
 	[OBJ_AnimationTextureGroup2007] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 5u, 13u, 1664, 0x8540u, -1, 0x07D7u, 0u),
 	[OBJ_AnimationTextureGroup2008] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 5u, 13u, 1664, 0x8540u, -1, 0x07D8u, 0u),
-	[OBJ_LaserRebel] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, OBJ_XWing, 17u),
-	[OBJ_LaserRebelTurbo] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, OBJ_XWing, 18u),
-	[OBJ_LaserImperial] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, OBJ_XWing, 19u),
-	[OBJ_LaserImperialTurbo] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, OBJ_XWing, 20u),
-	[OBJ_LaserIon] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, OBJ_XWing, 22u),
-	[OBJ_LaserIonTurbo] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, OBJ_XWing, 23u),
-	[OBJ_WarheadTorpedo] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, OBJ_XWing, 24u),
-	[OBJ_WarheadMissile] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, OBJ_XWing, 25u),
-	[OBJ_WarheadLaser1] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, OBJ_XWing, 18u),
-	[OBJ_WarheadLaser2] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, OBJ_XWing, 20u),
-	[OBJ_WarheadIon] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, OBJ_XWing, 23u),
-	[OBJ_WarheadAdvancedTorpedo] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, OBJ_XWing, 24u),
-	[OBJ_WarheadAdvancedMissile] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, OBJ_XWing, 25u),
-	[OBJ_WarheadSpaceBomb] = MODEL_TYPE_ENTRY(0x03u, 0x89u, 1u, 7u, 2048, 0x0043u, -1, OBJ_XWing, 26u),
-	[OBJ_WarheadRocket] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, OBJ_XWing, 27u),
-	[OBJ_WarheadMagPulse] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, OBJ_XWing, 28u),
-	[OBJ_WarheadIonPulse] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, OBJ_XWing, 28u),
-	[OBJ_WarheadLaser3] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, OBJ_XWing, 18u),
-	[OBJ_WarheadFlare] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 597, 0x0043u, -1, OBJ_XWing, 29u),
+	[OBJ_LaserRebel] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 17u),
+	[OBJ_LaserRebelTurbo] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 18u),
+	[OBJ_LaserImperial] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 19u),
+	[OBJ_LaserImperialTurbo] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 20u),
+	[OBJ_LaserIon] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 22u),
+	[OBJ_LaserIonTurbo] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 23u),
+	[OBJ_WarheadTorpedo] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, MODEL_TYPE_LIST_EQUIPMENT, 24u),
+	[OBJ_WarheadMissile] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, MODEL_TYPE_LIST_EQUIPMENT, 25u),
+	[OBJ_WarheadLaser1] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, MODEL_TYPE_LIST_EQUIPMENT, 18u),
+	[OBJ_WarheadLaser2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, MODEL_TYPE_LIST_EQUIPMENT, 20u),
+	[OBJ_WarheadIon] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, MODEL_TYPE_LIST_EQUIPMENT, 23u),
+	[OBJ_WarheadAdvancedTorpedo] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, MODEL_TYPE_LIST_EQUIPMENT, 24u),
+	[OBJ_WarheadAdvancedMissile] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, MODEL_TYPE_LIST_EQUIPMENT, 25u),
+	[OBJ_WarheadSpaceBomb] =
+		MODEL_TYPE_ENTRY(0x03u, 0x89u, 1u, 7u, 2048, 0x0043u, -1, MODEL_TYPE_LIST_EQUIPMENT, 26u),
+	[OBJ_WarheadRocket] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, MODEL_TYPE_LIST_EQUIPMENT, 27u),
+	[OBJ_WarheadMagPulse] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, MODEL_TYPE_LIST_EQUIPMENT, 28u),
+	[OBJ_WarheadIonPulse] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0043u, -1, MODEL_TYPE_LIST_EQUIPMENT, 28u),
+	[OBJ_WarheadLaser3] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, MODEL_TYPE_LIST_EQUIPMENT, 18u),
+	[OBJ_WarheadFlare] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 597, 0x0043u, -1, MODEL_TYPE_LIST_EQUIPMENT, 29u),
 	[OBJ_SparkTextureGroup3002_299] = MODEL_TYPE_ENTRY(0x02u, 0x0Eu, 1u, 7u, 2048, 0x8140u, -1, 0x0BBAu, 0u),
 	[OBJ_ChaffTextureGroup5000] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 5u, 13u, 1280, 0x8140u, -1, 0x1388u, 0u),
-	[OBJ_LaserRebelTurbo_301] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, OBJ_XWing, 18u),
-	[OBJ_LaserRebelTurbo_302] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, OBJ_XWing, 18u),
-	[OBJ_LaserImperialTurbo_303] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, OBJ_XWing, 20u),
-	[OBJ_LaserImperialTurbo_304] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, OBJ_XWing, 20u),
-	[OBJ_LaserImperialTurbo_305] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, OBJ_XWing, 20u),
-	[OBJ_LaserImperialDS] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 0, 0x0000u, -1, OBJ_XWing, 21u),
+	[OBJ_LaserRebelTurbo_301] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, MODEL_TYPE_LIST_EQUIPMENT, 18u),
+	[OBJ_LaserRebelTurbo_302] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, MODEL_TYPE_LIST_EQUIPMENT, 18u),
+	[OBJ_LaserImperialTurbo_303] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 20u),
+	[OBJ_LaserImperialTurbo_304] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, MODEL_TYPE_LIST_EQUIPMENT, 20u),
+	[OBJ_LaserImperialTurbo_305] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 2048, 0x0000u, -1, MODEL_TYPE_LIST_EQUIPMENT, 20u),
+	[OBJ_LaserImperialDS] =
+		MODEL_TYPE_ENTRY(0x03u, 0x09u, 1u, 7u, 0, 0x0000u, -1, MODEL_TYPE_LIST_EQUIPMENT, 21u),
 	[OBJ_NoAsset_307] = MODEL_TYPE_ENTRY(0x01u, 0x00u, 1u, 7u, 2048, 0x0000u, -1, 0xffffu, 0u),
-	[OBJ_Hangar] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 249, OBJ_XWing, 30u),
-	[OBJ_HangarCrane] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 250, OBJ_XWing, 31u),
-	[OBJ_HangarCrate] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 251, OBJ_XWing, 32u),
-	[OBJ_HangarDroid] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 252, OBJ_XWing, 33u),
-	[OBJ_HangarDroid2] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 253, OBJ_XWing, 34u),
-	[OBJ_HangarGenerator] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 254, OBJ_XWing, 35u),
-	[OBJ_HangarMonitor] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 255, OBJ_XWing, 36u),
-	[OBJ_HangarWorkStand] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 256, OBJ_XWing, 37u),
-	[OBJ_HangarRoofCrane] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 257, OBJ_XWing, 38u),
-	[OBJ_CorellianTransportGunner] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 218, OBJ_XWing, 58u),
-	[OBJ_NoTextureAsset_318] = MODEL_TYPE_ENTRY(0x00u, 0x00u, 6u, 14u, 0, 0x0043u, -1, OBJ_None, 0u),
-	[OBJ_NoTextureAsset_319] = MODEL_TYPE_ENTRY(0x00u, 0x00u, 6u, 14u, 0, 0x0043u, -1, OBJ_None, 0u),
+	[OBJ_Hangar] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 249, MODEL_TYPE_LIST_EQUIPMENT, 30u),
+	[OBJ_HangarCrane] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 250, MODEL_TYPE_LIST_EQUIPMENT, 31u),
+	[OBJ_HangarCrate] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 251, MODEL_TYPE_LIST_EQUIPMENT, 32u),
+	[OBJ_HangarDroid] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 252, MODEL_TYPE_LIST_EQUIPMENT, 33u),
+	[OBJ_HangarDroid2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 253, MODEL_TYPE_LIST_EQUIPMENT, 34u),
+	[OBJ_HangarGenerator] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 254, MODEL_TYPE_LIST_EQUIPMENT, 35u),
+	[OBJ_HangarMonitor] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 255, MODEL_TYPE_LIST_EQUIPMENT, 36u),
+	[OBJ_HangarWorkStand] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 256, MODEL_TYPE_LIST_EQUIPMENT, 37u),
+	[OBJ_HangarRoofCrane] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 257, MODEL_TYPE_LIST_EQUIPMENT, 38u),
+	[OBJ_CorellianTransportGunner] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0000u, 218, MODEL_TYPE_LIST_EQUIPMENT, 58u),
+	[OBJ_NoTextureAsset_318] =
+		MODEL_TYPE_ENTRY(0x00u, 0x00u, 6u, 14u, 0, 0x0043u, -1, MODEL_TYPE_LIST_SPACECRAFT, 0u),
+	[OBJ_NoTextureAsset_319] =
+		MODEL_TYPE_ENTRY(0x00u, 0x00u, 6u, 14u, 0, 0x0043u, -1, MODEL_TYPE_LIST_SPACECRAFT, 0u),
 	[OBJ_DeathStarIITextureGroup17001] =
 		MODEL_TYPE_ENTRY(0x03u, 0x2Eu, 4u, 12u, 480, 0x4128u, -1, 0x4269u, 0u),
 	[OBJ_DeathStarIITextureGroup17002] =
 		MODEL_TYPE_ENTRY(0x03u, 0x2Eu, 4u, 12u, 5000, 0x8300u, -1, 0x426Au, 0u),
-	[OBJ_DSContainer] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 0u, 0, 0x0040u, 259, OBJ_XWing, 59u),
-	[OBJ_DSReactorCore] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 5u, 0, 0x0043u, 263, OBJ_XWing, 60u),
-	[OBJ_DSReactorCylinder] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 5u, 0, 0x0080u, 264, OBJ_XWing, 61u),
-	[OBJ_DSTripodGun] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 18u, 0, 0x0043u, 261, OBJ_XWing, 62u),
-	[OBJ_DSFocusLens] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 20u, 0, 0x0040u, 258, OBJ_XWing, 63u),
-	[OBJ_DSTankwlights] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 64u),
-	[OBJ_DSTankwlights2] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 65u),
-	[OBJ_DSBentTubeGray] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 66u),
-	[OBJ_DSTankwPipeRed01] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 67u),
-	[OBJ_DSBentTubeRed] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 68u),
-	[OBJ_DSBentTubeRedLites01] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 69u),
-	[OBJ_DSBentTubeRedLites02] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 70u),
-	[OBJ_DSBentTubeRedLites03] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 71u),
-	[OBJ_DSBentTubeRedLites04] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 72u),
-	[OBJ_DSBentTubeRedLites05] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 73u),
-	[OBJ_DSTankwPipeBlue01] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 74u),
-	[OBJ_DSBentTubeBlue01] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 75u),
-	[OBJ_DSBentTubeBlueLites01] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 76u),
-	[OBJ_DSBentTubeBlueLites02] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 77u),
-	[OBJ_DSBentTubeBlueLites03] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 78u),
-	[OBJ_DSBentTubeBlueLites04] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 79u),
-	[OBJ_DSTwoTank] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 80u),
-	[OBJ_DSTwoTank2] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 81u),
-	[OBJ_DSGirder] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 82u),
-	[OBJ_DSGirder02] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 83u),
-	[OBJ_DSGirder03] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 84u),
-	[OBJ_DSReactorCoreRoom] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 5u, 0, 0x0080u, 262, OBJ_XWing, 85u),
-	[OBJ_DSAccelChamber] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 86u),
-	[OBJ_DSFocusChamber] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 87u),
-	[OBJ_DS3rdRoom] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 5u, 0, 0x0080u, 260, OBJ_XWing, 88u),
-	[OBJ_DSEntrance] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 89u),
-	[OBJ_DSReactorRoomTube] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 90u),
-	[OBJ_DSAccelTube] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 91u),
-	[OBJ_DSYNotTube] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 92u),
-	[OBJ_DSAngleTube] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 93u),
-	[OBJ_DSDeadEnd] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 94u),
-	[OBJ_DSTubeEntry] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 95u),
-	[OBJ_DSTriRoomEntrance] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 96u),
-	[OBJ_DSTriRoom] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 97u),
-	[OBJ_DSTriRoomExit] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 98u),
-	[OBJ_DSBigTubeEntrance] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 99u),
-	[OBJ_DSBigTube] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 100u),
-	[OBJ_DSBigTubeExit] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 101u),
-	[OBJ_DSSquareTube01] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 102u),
-	[OBJ_DSBasement] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 103u),
-	[OBJ_DSBasement01] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 104u),
-	[OBJ_DSBasement02] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 105u),
-	[OBJ_DSAlphaWalls] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 106u),
-	[OBJ_DSAlphaWalls01] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 107u),
-	[OBJ_DSAlphaWalls02] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 108u),
-	[OBJ_DS3LayerTube] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 109u),
-	[OBJ_DSBoxInBox1] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 110u),
-	[OBJ_DSBoxInBox2] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 111u),
-	[OBJ_DSBoxInBox3] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, OBJ_XWing, 112u),
-	[OBJ_ChuteMouth] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 219, OBJ_XWing, 115u),
-	[OBJ_ChuteTunnel] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 220, OBJ_XWing, 116u),
-	[OBJ_SalvageRoom] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 221, OBJ_XWing, 117u),
-	[OBJ_Compactor] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0040u, 222, OBJ_XWing, 118u),
-	[OBJ_AccelRing] = MODEL_TYPE_ENTRY(0x03u, 0x49u, 6u, 21u, 0, 0x0043u, 223, OBJ_XWing, 119u),
-	[OBJ_AccelRing2] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0043u, 224, OBJ_XWing, 120u),
-	[OBJ_SmeltingRoom] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0040u, 225, OBJ_XWing, 121u),
-	[OBJ_SRTubeNOBend] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 226, OBJ_XWing, 122u),
-	[OBJ_SRTubeUP] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 227, OBJ_XWing, 123u),
-	[OBJ_SRTubeDown] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 228, OBJ_XWing, 124u),
-	[OBJ_SRTubeLH] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 229, OBJ_XWing, 125u),
-	[OBJ_SRTubeRH] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 230, OBJ_XWing, 126u),
-	[OBJ_Centrifuge] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0040u, 231, OBJ_XWing, 127u),
-	[OBJ_AccelRing3] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0043u, 232, OBJ_XWing, 128u),
-	[OBJ_ContainerGrandePG] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0043u, 233, OBJ_XWing, 129u),
-	[OBJ_Asteroid01] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 234, OBJ_XWing, 130u),
-	[OBJ_Asteroid02] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 235, OBJ_XWing, 131u),
-	[OBJ_Asteroid03] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0040u, 236, OBJ_XWing, 132u),
-	[OBJ_Junk01] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 237, OBJ_XWing, 133u),
-	[OBJ_Junk02] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 238, OBJ_XWing, 134u),
-	[OBJ_Junk03] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 239, OBJ_XWing, 135u),
-	[OBJ_Junk04] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 240, OBJ_XWing, 136u),
-	[OBJ_Junk05] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 241, OBJ_XWing, 137u),
-	[OBJ_Junk06] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 242, OBJ_XWing, 138u),
-	[OBJ_Junk07] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 243, OBJ_XWing, 139u),
-	[OBJ_Junk08] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 244, OBJ_XWing, 140u),
-	[OBJ_Junk09] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 245, OBJ_XWing, 141u),
-	[OBJ_Junk10] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 246, OBJ_XWing, 142u),
-	[OBJ_JunkBlock] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0043u, 247, OBJ_XWing, 143u),
-	[OBJ_MoltenBlock] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0043u, 248, OBJ_XWing, 144u),
-	[OBJ_Rubble01] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 145u),
-	[OBJ_Rubble02] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 146u),
-	[OBJ_Rubble03] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 147u),
-	[OBJ_Rubble04] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 148u),
-	[OBJ_Rubble05] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 149u),
-	[OBJ_Rubble06] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 150u),
-	[OBJ_Rubble07] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 151u),
-	[OBJ_Rubble08] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 152u),
-	[OBJ_Rubble09] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 153u),
-	[OBJ_Rubble10] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 154u),
-	[OBJ_Rubble11] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 155u),
-	[OBJ_Rubble12] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, OBJ_XWing, 156u),
+	[OBJ_DSContainer] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 0u, 0, 0x0040u, 259, MODEL_TYPE_LIST_EQUIPMENT, 59u),
+	[OBJ_DSReactorCore] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 5u, 0, 0x0043u, 263, MODEL_TYPE_LIST_EQUIPMENT, 60u),
+	[OBJ_DSReactorCylinder] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 5u, 0, 0x0080u, 264, MODEL_TYPE_LIST_EQUIPMENT, 61u),
+	[OBJ_DSTripodGun] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 18u, 0, 0x0043u, 261, MODEL_TYPE_LIST_EQUIPMENT, 62u),
+	[OBJ_DSFocusLens] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 20u, 0, 0x0040u, 258, MODEL_TYPE_LIST_EQUIPMENT, 63u),
+	[OBJ_DSTankwlights] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 64u),
+	[OBJ_DSTankwlights2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 65u),
+	[OBJ_DSBentTubeGray] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 66u),
+	[OBJ_DSTankwPipeRed01] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 67u),
+	[OBJ_DSBentTubeRed] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 68u),
+	[OBJ_DSBentTubeRedLites01] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 69u),
+	[OBJ_DSBentTubeRedLites02] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 70u),
+	[OBJ_DSBentTubeRedLites03] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 71u),
+	[OBJ_DSBentTubeRedLites04] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 72u),
+	[OBJ_DSBentTubeRedLites05] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 73u),
+	[OBJ_DSTankwPipeBlue01] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 74u),
+	[OBJ_DSBentTubeBlue01] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 75u),
+	[OBJ_DSBentTubeBlueLites01] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 76u),
+	[OBJ_DSBentTubeBlueLites02] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 77u),
+	[OBJ_DSBentTubeBlueLites03] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 78u),
+	[OBJ_DSBentTubeBlueLites04] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 79u),
+	[OBJ_DSTwoTank] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 80u),
+	[OBJ_DSTwoTank2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 81u),
+	[OBJ_DSGirder] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 82u),
+	[OBJ_DSGirder02] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 83u),
+	[OBJ_DSGirder03] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 84u),
+	[OBJ_DSReactorCoreRoom] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 5u, 0, 0x0080u, 262, MODEL_TYPE_LIST_EQUIPMENT, 85u),
+	[OBJ_DSAccelChamber] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 86u),
+	[OBJ_DSFocusChamber] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 87u),
+	[OBJ_DS3rdRoom] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 5u, 0, 0x0080u, 260, MODEL_TYPE_LIST_EQUIPMENT, 88u),
+	[OBJ_DSEntrance] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 89u),
+	[OBJ_DSReactorRoomTube] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 90u),
+	[OBJ_DSAccelTube] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 91u),
+	[OBJ_DSYNotTube] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 92u),
+	[OBJ_DSAngleTube] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 93u),
+	[OBJ_DSDeadEnd] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 94u),
+	[OBJ_DSTubeEntry] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 95u),
+	[OBJ_DSTriRoomEntrance] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 96u),
+	[OBJ_DSTriRoom] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 97u),
+	[OBJ_DSTriRoomExit] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 98u),
+	[OBJ_DSBigTubeEntrance] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 99u),
+	[OBJ_DSBigTube] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 100u),
+	[OBJ_DSBigTubeExit] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 101u),
+	[OBJ_DSSquareTube01] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 102u),
+	[OBJ_DSBasement] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 103u),
+	[OBJ_DSBasement01] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 104u),
+	[OBJ_DSBasement02] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 105u),
+	[OBJ_DSAlphaWalls] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 106u),
+	[OBJ_DSAlphaWalls01] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 107u),
+	[OBJ_DSAlphaWalls02] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 108u),
+	[OBJ_DS3LayerTube] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 109u),
+	[OBJ_DSBoxInBox1] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 110u),
+	[OBJ_DSBoxInBox2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 111u),
+	[OBJ_DSBoxInBox3] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 6u, 15u, 0, 0x0080u, -1, MODEL_TYPE_LIST_EQUIPMENT, 112u),
+	[OBJ_ChuteMouth] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 219, MODEL_TYPE_LIST_EQUIPMENT, 115u),
+	[OBJ_ChuteTunnel] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 220, MODEL_TYPE_LIST_EQUIPMENT, 116u),
+	[OBJ_SalvageRoom] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 221, MODEL_TYPE_LIST_EQUIPMENT, 117u),
+	[OBJ_Compactor] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0040u, 222, MODEL_TYPE_LIST_EQUIPMENT, 118u),
+	[OBJ_AccelRing] =
+		MODEL_TYPE_ENTRY(0x03u, 0x49u, 6u, 21u, 0, 0x0043u, 223, MODEL_TYPE_LIST_EQUIPMENT, 119u),
+	[OBJ_AccelRing2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0043u, 224, MODEL_TYPE_LIST_EQUIPMENT, 120u),
+	[OBJ_SmeltingRoom] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0040u, 225, MODEL_TYPE_LIST_EQUIPMENT, 121u),
+	[OBJ_SRTubeNOBend] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 226, MODEL_TYPE_LIST_EQUIPMENT, 122u),
+	[OBJ_SRTubeUP] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 227, MODEL_TYPE_LIST_EQUIPMENT, 123u),
+	[OBJ_SRTubeDown] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 228, MODEL_TYPE_LIST_EQUIPMENT, 124u),
+	[OBJ_SRTubeLH] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 229, MODEL_TYPE_LIST_EQUIPMENT, 125u),
+	[OBJ_SRTubeRH] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 230, MODEL_TYPE_LIST_EQUIPMENT, 126u),
+	[OBJ_Centrifuge] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0040u, 231, MODEL_TYPE_LIST_EQUIPMENT, 127u),
+	[OBJ_AccelRing3] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0043u, 232, MODEL_TYPE_LIST_EQUIPMENT, 128u),
+	[OBJ_ContainerGrandePG] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0043u, 233, MODEL_TYPE_LIST_EQUIPMENT, 129u),
+	[OBJ_Asteroid01] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 234, MODEL_TYPE_LIST_EQUIPMENT, 130u),
+	[OBJ_Asteroid02] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 235, MODEL_TYPE_LIST_EQUIPMENT, 131u),
+	[OBJ_Asteroid03] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 14u, 0, 0x0040u, 236, MODEL_TYPE_LIST_EQUIPMENT, 132u),
+	[OBJ_Junk01] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 237, MODEL_TYPE_LIST_EQUIPMENT, 133u),
+	[OBJ_Junk02] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 238, MODEL_TYPE_LIST_EQUIPMENT, 134u),
+	[OBJ_Junk03] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 239, MODEL_TYPE_LIST_EQUIPMENT, 135u),
+	[OBJ_Junk04] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 240, MODEL_TYPE_LIST_EQUIPMENT, 136u),
+	[OBJ_Junk05] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 241, MODEL_TYPE_LIST_EQUIPMENT, 137u),
+	[OBJ_Junk06] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 242, MODEL_TYPE_LIST_EQUIPMENT, 138u),
+	[OBJ_Junk07] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 243, MODEL_TYPE_LIST_EQUIPMENT, 139u),
+	[OBJ_Junk08] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 244, MODEL_TYPE_LIST_EQUIPMENT, 140u),
+	[OBJ_Junk09] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 245, MODEL_TYPE_LIST_EQUIPMENT, 141u),
+	[OBJ_Junk10] = MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0040u, 246, MODEL_TYPE_LIST_EQUIPMENT, 142u),
+	[OBJ_JunkBlock] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0043u, 247, MODEL_TYPE_LIST_EQUIPMENT, 143u),
+	[OBJ_MoltenBlock] =
+		MODEL_TYPE_ENTRY(0x03u, 0x41u, 6u, 21u, 0, 0x0043u, 248, MODEL_TYPE_LIST_EQUIPMENT, 144u),
+	[OBJ_Rubble01] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 145u),
+	[OBJ_Rubble02] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 146u),
+	[OBJ_Rubble03] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 147u),
+	[OBJ_Rubble04] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 148u),
+	[OBJ_Rubble05] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 149u),
+	[OBJ_Rubble06] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 150u),
+	[OBJ_Rubble07] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 151u),
+	[OBJ_Rubble08] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 152u),
+	[OBJ_Rubble09] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 153u),
+	[OBJ_Rubble10] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 154u),
+	[OBJ_Rubble11] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 155u),
+	[OBJ_Rubble12] = MODEL_TYPE_ENTRY(0x03u, 0x09u, 3u, 20u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 156u),
 	[OBJ_FontTextureGroup16000] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 4u, 12u, 512, 0x8128u, -1, 0x3E80u, 0u),
 	[OBJ_BlastMarkTextureGroup3050] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 5u, 13u, 1664, 0x8548u, -1, 0x0BEAu, 0u),
 	[OBJ_HudTextureGroup13000_Sprite000] =
@@ -542,18 +780,30 @@ ModelTypeInfo g_modelTypeTable[OBJ_Count] = {
 		MODEL_TYPE_ENTRY(0x03u, 0x06u, 4u, 12u, 480, 0x4120u, -1, 0x186Au, 0u),
 	[OBJ_DeathStarFireTextureGroup6251] =
 		MODEL_TYPE_ENTRY(0x03u, 0x06u, 4u, 12u, 120, 0x8120u, -1, 0x186Bu, 0u),
-	[OBJ_WorkDroid1] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0040u, -1, OBJ_XWing, 157u),
-	[OBJ_WorkDroid2] = MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0040u, -1, OBJ_XWing, 158u),
-	[OBJ_CorvetteExplode] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, OBJ_None, 144u),
-	[OBJ_CorvetteExplode_492] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, OBJ_None, 145u),
-	[OBJ_CorvetteExplode_493] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, OBJ_None, 146u),
-	[OBJ_CorvetteExplode_494] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, OBJ_None, 147u),
-	[OBJ_CorvetteExplode_495] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, OBJ_None, 148u),
-	[OBJ_CorvetteExplode_496] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, OBJ_None, 149u),
-	[OBJ_CorvetteExplode_497] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, OBJ_None, 150u),
-	[OBJ_CorvetteExplode_498] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, OBJ_None, 151u),
-	[OBJ_CorvetteExplode_499] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, OBJ_None, 152u),
-	[OBJ_EscapePodA_500] = MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, OBJ_None, 153u),
+	[OBJ_WorkDroid1] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 157u),
+	[OBJ_WorkDroid2] =
+		MODEL_TYPE_ENTRY(0x03u, 0x01u, 6u, 2u, 0, 0x0040u, -1, MODEL_TYPE_LIST_EQUIPMENT, 158u),
+	[OBJ_CorvetteExplode] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, MODEL_TYPE_LIST_SPACECRAFT, 144u),
+	[OBJ_CorvetteExplode_492] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, MODEL_TYPE_LIST_SPACECRAFT, 145u),
+	[OBJ_CorvetteExplode_493] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, MODEL_TYPE_LIST_SPACECRAFT, 146u),
+	[OBJ_CorvetteExplode_494] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, MODEL_TYPE_LIST_SPACECRAFT, 147u),
+	[OBJ_CorvetteExplode_495] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, MODEL_TYPE_LIST_SPACECRAFT, 148u),
+	[OBJ_CorvetteExplode_496] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, MODEL_TYPE_LIST_SPACECRAFT, 149u),
+	[OBJ_CorvetteExplode_497] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, MODEL_TYPE_LIST_SPACECRAFT, 150u),
+	[OBJ_CorvetteExplode_498] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, MODEL_TYPE_LIST_SPACECRAFT, 151u),
+	[OBJ_CorvetteExplode_499] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, MODEL_TYPE_LIST_SPACECRAFT, 152u),
+	[OBJ_EscapePodA_500] =
+		MODEL_TYPE_ENTRY(0x03u, 0x81u, 0u, 3u, 0, 0x0040u, -1, MODEL_TYPE_LIST_SPACECRAFT, 153u),
 	[OBJ_NebulaTextureGroup7001_Sprite100] =
 		MODEL_TYPE_ENTRY(0x03u, 0x06u, 4u, 12u, 480, 0x4020u, -1, 0x1B59u, 100u),
 	[OBJ_NebulaTextureGroup7002_Sprite200] =
@@ -640,13 +890,15 @@ ModelTypeInfo g_modelTypeTable[OBJ_Count] = {
 	[OBJ_ParticleTextureGroup22007] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 3u, 11u, 512, 0x8148u, -1, 0x55F7u, 0u),
 	[OBJ_AnimationTextureGroup3055] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 5u, 13u, 1664, 0x8348u, -1, 0x0BEFu, 0u),
 	[OBJ_HullIconTextureGroup26000] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 4u, 12u, 512, 0x8120u, -1, 0x6590u, 0u),
-	[OBJ_DSLaserInternal] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 1u, 7u, 0, 0x0000u, -1, OBJ_XWing, 113u),
+	[OBJ_DSLaserInternal] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 1u, 7u, 0, 0x0000u, -1, MODEL_TYPE_LIST_EQUIPMENT, 113u),
 	[OBJ_AnimationTextureGroup3200] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 5u, 13u, 1664, 0x8548u, -1, 0x0C80u, 0u),
 	[OBJ_AnimationTextureGroup3100] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 5u, 13u, 1664, 0x8548u, -1, 0x0C1Cu, 0u),
 	[OBJ_AnimationTextureGroup3300] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 5u, 13u, 1664, 0x8548u, -1, 0x0CE4u, 0u),
 	[OBJ_AnimationTextureGroup3400] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 5u, 13u, 1664, 0x8548u, -1, 0x0D48u, 0u),
 	[OBJ_AnimationTextureGroup3500] = MODEL_TYPE_ENTRY(0x03u, 0x0Eu, 5u, 13u, 1664, 0x8548u, -1, 0x0DACu, 0u),
-	[OBJ_DSLaserPowerSource] = MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 15u, 0, 0x0083u, -1, OBJ_XWing, 114u),
+	[OBJ_DSLaserPowerSource] =
+		MODEL_TYPE_ENTRY(0x03u, 0x29u, 0u, 15u, 0, 0x0083u, -1, MODEL_TYPE_LIST_EQUIPMENT, 114u),
 };
 
 #undef MODEL_TYPE_ENTRY

@@ -54,7 +54,6 @@
 #include <string.h>
 
 enum {
-	BRIEFING_DEATH_STAR_OBJECT_TYPE = 227,
 	BRIEFING_PREVIEW_SCRATCH_PITCH = 1280,
 	BRIEFING_PREVIEW_SCRATCH_HEIGHT = 480,
 	BRIEFING_TRANSPARENT_WORD = 8224,
@@ -134,14 +133,14 @@ const double g_briefingKilometersScale = 0.001;
 CraftTechStats stats;
 extern int g_currentCdDisk;
 
-static __inline int BriefingMap_GetSelectedObjectType(void) {
-	return (uint8_t)g_briefingMapCurrentRegionIcons[g_briefingMapPrimaryHighlightIconIndex].objectType;
+static __inline int BriefingMap_GetSelectedCraftType(void) {
+	return (uint8_t)g_briefingMapCurrentRegionIcons[g_briefingMapPrimaryHighlightIconIndex].craftType;
 }
 
-static __inline void BriefingMap_SetPreviewOrientation(int objectType) {
+static __inline void BriefingMap_SetPreviewOrientation(int craftType) {
 	int category;
 
-	category = g_shipList[g_shipTypeToShipListIndex[objectType]].category;
+	category = g_shipList[g_shipTypeToShipListIndex[craftType]].category;
 	if (category != 7 && category != 8 && category != 9 && category != 10) {
 		ModelPreview_SetObjectEulerDegrees((float)g_briefingModelDefaultPitchDeg, (float)yawDeg,
 										   (float)rollDeg);
@@ -557,7 +556,7 @@ void BriefingMap_DrawRevealedLabelIfActive(const char* text, int colorRampGroup,
 void BriefingMap_DrawCraftIconHighlight(FrontendRect* viewportRect, int unused, int16_t briefingIconIndex,
 										int highlightPhase) {
 	int iconIndex;
-	int16_t objectType;
+	int16_t craftType;
 	int colorBase;
 	int16_t screenX;
 	int16_t screenY;
@@ -573,7 +572,7 @@ void BriefingMap_DrawCraftIconHighlight(FrontendRect* viewportRect, int unused, 
 	iconIndex = (int16_t)briefingIconIndex;
 	mapX = g_briefingMapCurrentRegionIcons[iconIndex].mapX;
 	mapY = g_briefingMapCurrentRegionIcons[iconIndex].mapY;
-	objectType = (uint8_t)g_briefingMapCurrentRegionIcons[iconIndex].objectType;
+	craftType = (uint8_t)g_briefingMapCurrentRegionIcons[iconIndex].craftType;
 	switch (g_briefingMapCurrentRegionIcons[iconIndex].iconClass) {
 		case 0:
 			colorBase = 0;
@@ -596,12 +595,12 @@ void BriefingMap_DrawCraftIconHighlight(FrontendRect* viewportRect, int unused, 
 			break;
 	}
 
-	if (objectType < 0) {
+	if (craftType < 0) {
 		return;
 	}
 
 	BriefingMap_ProjectPointToViewport(viewportRect, mapX, mapY, &screenX, &screenY);
-	shipListIndex = g_shipTypeToShipListIndex[objectType];
+	shipListIndex = g_shipTypeToShipListIndex[craftType];
 	iconWidth = g_shipList[shipListIndex].iconRect.right - g_shipList[shipListIndex].iconRect.left + 1;
 	iconHeight = g_shipList[shipListIndex].iconRect.bottom - g_shipList[shipListIndex].iconRect.top + 1;
 	/* The two 90-degree orientation modes are the odd values 1 and 3. */
@@ -762,11 +761,11 @@ void BriefingMap_DrawOverlays(FrontendRect* viewportRect, int unused) {
 		remaining = FRONTEND_BRIEFING_MAP_ICON_COUNT;
 		do {
 			int iconIndex;
-			int16_t objectType;
+			int16_t craftType;
 
 			iconIndex = i;
-			objectType = (uint8_t)g_briefingMapCurrentRegionIcons[iconIndex].objectType;
-			if (objectType) {
+			craftType = (uint8_t)g_briefingMapCurrentRegionIcons[iconIndex].craftType;
+			if (craftType) {
 				int shipListIndex;
 				int iconWidth;
 				int iconHeight;
@@ -797,7 +796,7 @@ void BriefingMap_DrawOverlays(FrontendRect* viewportRect, int unused) {
 						break;
 				}
 
-				shipListIndex = g_shipTypeToShipListIndex[objectType];
+				shipListIndex = g_shipTypeToShipListIndex[craftType];
 				iconWidth =
 					g_shipList[shipListIndex].iconRect.right - g_shipList[shipListIndex].iconRect.left + 1;
 				iconHeight =
@@ -930,7 +929,7 @@ int BriefingMap_DrawCraftCharacteristicsPanel(FrontendRect* rect, int revealStep
 	FrontendText_DrawAlignedInRect(10, g_frontendScratchBuffer, &recta, 0, 1, color);
 	FrontendDraw_RectOffsetXY(&recta, 0, 24);
 
-	if (stats.craftType != 227) {
+	if (stats.craftType != CRAFT_TYPE_DEATH_STAR_2) {
 		if (g_briefingCraftStatsRevealEnabled > 0) {
 			revealStep -= 3;
 			if (revealStep < 0) {
@@ -1384,7 +1383,7 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 
 		if (g_briefingSelectionRevealComplete) {
 			if (g_briefingPlaybackActive) {
-				if (BriefingMap_GetSelectedObjectType() == BRIEFING_DEATH_STAR_OBJECT_TYPE) {
+				if (BriefingMap_GetSelectedCraftType() == CRAFT_TYPE_DEATH_STAR_2) {
 					if (!(g_briefingDsBriefAnimTick % 2)) {
 						FrontImage_AdvanceSpriteFrame("dsbrief", 1);
 					}
@@ -1396,11 +1395,11 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 					}
 				}
 			}
-			BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedObjectType());
+			BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedCraftType());
 			ModelPreview_SetObjectWorldPosition(
 				0, g_briefingSelectionPreviewBaseY + 800 * (17 - g_briefingMapPrimaryHighlightPhase), 0);
 			if (g_briefingMapPrimaryHighlightPhase == 17) {
-				if (BriefingMap_GetSelectedObjectType() == BRIEFING_DEATH_STAR_OBJECT_TYPE) {
+				if (BriefingMap_GetSelectedCraftType() == CRAFT_TYPE_DEATH_STAR_2) {
 					FrontImage_DrawSprite("dsbrief", 188, 88);
 				} else {
 					ModelPreview_SetObjectWorldPosition(0, g_briefingSelectionPreviewBaseY - 600, 0);
@@ -1409,7 +1408,7 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 					ModelPreview_RenderViewport(rect.left, rect.top, rect.right - rect.left + 1,
 												rect.bottom - rect.top + 1, NULL, 0, 0);
 				}
-			} else if (BriefingMap_GetSelectedObjectType() != BRIEFING_DEATH_STAR_OBJECT_TYPE) {
+			} else if (BriefingMap_GetSelectedCraftType() != CRAFT_TYPE_DEATH_STAR_2) {
 #ifdef XWA_MODERN
 				DebugPrintf(NULL);
 #else
@@ -1422,8 +1421,8 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 											rect.bottom - rect.top + 1, NULL, 0, 0);
 			}
 		} else if (g_briefingMapPrimaryHighlightPhase < 17 &&
-				   BriefingMap_GetSelectedObjectType() != BRIEFING_DEATH_STAR_OBJECT_TYPE) {
-			BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedObjectType());
+				   BriefingMap_GetSelectedCraftType() != CRAFT_TYPE_DEATH_STAR_2) {
+			BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedCraftType());
 			ModelPreview_SetObjectWorldPosition(
 				0, g_briefingSelectionPreviewBaseY + 800 * (17 - g_briefingMapPrimaryHighlightPhase), 0);
 			if (g_briefingMapPrimaryHighlightPhase == 17) {
@@ -1467,7 +1466,7 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 				revealWidth = outX - rect.left + 1;
 				revealHeight = outY - rect.top + 1;
 
-				if (BriefingMap_GetSelectedObjectType() == BRIEFING_DEATH_STAR_OBJECT_TYPE) {
+				if (BriefingMap_GetSelectedCraftType() == CRAFT_TYPE_DEATH_STAR_2) {
 					FrontendDisplay_GetScreenClipRect(&outRect);
 					FrontendDraw_RectCopy(&previewClip, viewportRect);
 					previewClip.right = outX;
@@ -1476,7 +1475,7 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 					FrontImage_DrawSprite("dsbrief", 188, 88);
 					FrontendDisplay_SetScreenClipRect640x480(&outRect);
 				} else if (g_gameConfig.use3dHardware[0]) {
-					BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedObjectType());
+					BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedCraftType());
 					ModelPreview_SetObjectWorldPosition(0, g_briefingSelectionPreviewBaseY - 600, 0);
 					ModelPreview_SetWhiteDirectionalLight(g_briefingModelLightDx, g_briefingModelLightDy,
 														  g_briefingModelLightDz);
@@ -1496,7 +1495,7 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 					}
 				}
 #ifdef XWA_MODERN
-				if (BriefingMap_GetSelectedObjectType() != BRIEFING_DEATH_STAR_OBJECT_TYPE) {
+				if (BriefingMap_GetSelectedCraftType() != CRAFT_TYPE_DEATH_STAR_2) {
 					/* Remaster: the loop below composites the SCRATCH
 					 * wireframe over the solid model in the L-shaped
 					 * unrevealed remainder. */
@@ -1562,7 +1561,7 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 								default:
 									break;
 							}
-						} else if (BriefingMap_GetSelectedObjectType() != BRIEFING_DEATH_STAR_OBJECT_TYPE) {
+						} else if (BriefingMap_GetSelectedCraftType() != CRAFT_TYPE_DEATH_STAR_2) {
 							sourcePixel = *(unsigned short*)&selectionRow[2 * col];
 							if (sourcePixel != BRIEFING_TRANSPARENT_WORD) {
 								*(unsigned short*)&drawRow[2 * col] = sourcePixel;
@@ -1627,18 +1626,18 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 				if (++g_briefingMapPrimaryHighlightPhase == 12) {
 					g_briefingSelectionRevealComplete = 0;
 					yawDeg = 225.0;
-					if (BriefingMap_GetSelectedObjectType() == BRIEFING_DEATH_STAR_OBJECT_TYPE) {
+					if (BriefingMap_GetSelectedCraftType() == CRAFT_TYPE_DEATH_STAR_2) {
 						if (g_pilotData.campaignMode) {
 							FrontImage_RegisterResourceDefault("frontres\\dsbrief\\dsbrief.flc", "dsbrief");
 						} else {
 							FrontImage_RegisterResourceDefault("frontres\\dsbrief\\dsbriefc.flc", "dsbrief");
 						}
-						stats.craftType = BRIEFING_DEATH_STAR_OBJECT_TYPE;
+						stats.craftType = CRAFT_TYPE_DEATH_STAR_2;
 						g_briefingDsBriefAnimTick = 0;
 						FrontImage_SetSpriteFrame("dsbrief", 0);
 					} else {
 						craftModelName =
-							FeDiskIo_GetCraftModelName((unsigned int)BriefingMap_GetSelectedObjectType());
+							FeDiskIo_GetCraftModelName((unsigned int)BriefingMap_GetSelectedCraftType());
 						if (craftModelName) {
 							strcpy(g_frontendScratchBuffer, craftModelName);
 							g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
@@ -1650,21 +1649,21 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 							stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
 #endif
 							if (stream == NULL) {
-								ModelPreview_LoadModel(craftModelName, BriefingMap_GetSelectedObjectType());
+								ModelPreview_LoadModel(craftModelName, BriefingMap_GetSelectedCraftType());
 							} else {
 								File_Close(stream);
 								ModelPreview_LoadModel(g_frontendScratchBuffer,
-													   BriefingMap_GetSelectedObjectType());
+													   BriefingMap_GetSelectedCraftType());
 							}
 						}
 						memset(&stats, 0, sizeof(stats));
-						stats.craftType = BriefingMap_GetSelectedObjectType();
+						stats.craftType = BriefingMap_GetSelectedCraftType();
 						BuildCraftTechStats(&stats);
 						ModelBounds_ComputeMaxMinExtentRatio(0);
 						g_briefingSelectionPreviewBaseY = 600;
 						ModelPreview_SetWhiteDirectionalLight(g_briefingModelLightDx, g_briefingModelLightDy,
 															  g_briefingModelLightDz);
-						if (BriefingMap_GetSelectedObjectType() == 127) {
+						if (BriefingMap_GetSelectedCraftType() == 127) {
 							ModelPreview_SetNodeSwitchIndex(1);
 						} else {
 							ModelPreview_SetNodeSwitchIndex(0);
@@ -1679,10 +1678,10 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 					Seed = 0;
 					FrontendDraw_RectCopy(&rect, &viewport);
 					FrontendDisplay_SetScreenClipRect640x480(&rect);
-					if (BriefingMap_GetSelectedObjectType() != BRIEFING_DEATH_STAR_OBJECT_TYPE) {
+					if (BriefingMap_GetSelectedCraftType() != CRAFT_TYPE_DEATH_STAR_2) {
 						ModelPreview_SetWhiteDirectionalLight(g_briefingModelLightDx, g_briefingModelLightDy,
 															  g_briefingModelLightDz);
-						BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedObjectType());
+						BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedCraftType());
 						ModelPreview_SetObjectWorldPosition(0, g_briefingSelectionPreviewBaseY - 600, 0);
 #ifdef XWA_MODERN
 						DebugPrintf(NULL);
@@ -1707,10 +1706,10 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 
 					FrontendDraw_RectCopy(&rect, &viewport);
 					FrontendDisplay_SetScreenClipRect640x480(&rect);
-					if (BriefingMap_GetSelectedObjectType() != BRIEFING_DEATH_STAR_OBJECT_TYPE) {
+					if (BriefingMap_GetSelectedCraftType() != CRAFT_TYPE_DEATH_STAR_2) {
 						ModelPreview_SetWhiteDirectionalLight(g_briefingModelLightDx, g_briefingModelLightDy,
 															  g_briefingModelLightDz);
-						BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedObjectType());
+						BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedCraftType());
 						BriefingMap_ClearPreviewScratchRect(g_briefingPreviewImageBuffer, &rect);
 						ModelPreview_SetObjectWorldPosition(0, g_briefingSelectionPreviewBaseY - 600, 0);
 						if (g_gameConfig.use3dHardware[0]) {
@@ -1737,7 +1736,7 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 					XwaSnapshot_EmitSurfaceEvent(XWA_SURFACE_EVENT_EXTERNAL_CLEAR, rect.left, rect.top,
 												 rect.right, rect.bottom);
 #endif
-					BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedObjectType());
+					BriefingMap_SetPreviewOrientation(BriefingMap_GetSelectedCraftType());
 					ModelPreview_SetObjectWorldPosition(0, g_briefingSelectionPreviewBaseY - 600, 0);
 #ifdef XWA_MODERN
 					DebugPrintf(NULL);
@@ -2274,9 +2273,9 @@ int MissionBriefing_Update(int frameCounter) {
 	if (FrontendDisplay_GetReactivatedFlag()) {
 		if (g_briefingMapPrimaryHighlightActive && g_briefingMapPrimaryHighlightPhase <= 17 &&
 			g_briefingMapPrimaryHighlightPhase >= 12 &&
-			g_briefingMapCurrentRegionIcons[g_briefingMapPrimaryHighlightIconIndex].objectType !=
-				(int8_t)0xe3) {
-			craftModelName = FeDiskIo_GetCraftModelName((unsigned int)BriefingMap_GetSelectedObjectType());
+			g_briefingMapCurrentRegionIcons[g_briefingMapPrimaryHighlightIconIndex].craftType !=
+				(int8_t)CRAFT_TYPE_DEATH_STAR_2) {
+			craftModelName = FeDiskIo_GetCraftModelName((unsigned int)BriefingMap_GetSelectedCraftType());
 			if (craftModelName != NULL) {
 				strcpy(g_frontendScratchBuffer, craftModelName);
 				g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
@@ -2288,13 +2287,13 @@ int MissionBriefing_Update(int frameCounter) {
 				stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
 #endif
 				if (stream == NULL) {
-					ModelPreview_LoadModel(craftModelName, BriefingMap_GetSelectedObjectType());
+					ModelPreview_LoadModel(craftModelName, BriefingMap_GetSelectedCraftType());
 				} else {
 					File_Close(stream);
-					ModelPreview_LoadModel(g_frontendScratchBuffer, BriefingMap_GetSelectedObjectType());
+					ModelPreview_LoadModel(g_frontendScratchBuffer, BriefingMap_GetSelectedCraftType());
 				}
 				memset(&stats, 0, sizeof(stats));
-				stats.craftType = BriefingMap_GetSelectedObjectType();
+				stats.craftType = BriefingMap_GetSelectedCraftType();
 				BuildCraftTechStats(&stats);
 			}
 		}
@@ -2703,9 +2702,9 @@ int MissionBriefing_Update(int frameCounter) {
 		previousBrightness != g_gameConfig.brightness[0]) {
 		if (g_briefingMapPrimaryHighlightActive && g_briefingMapPrimaryHighlightPhase <= 17 &&
 			g_briefingMapPrimaryHighlightPhase >= 12 &&
-			g_briefingMapCurrentRegionIcons[g_briefingMapPrimaryHighlightIconIndex].objectType !=
-				(int8_t)0xe3) {
-			craftModelName = FeDiskIo_GetCraftModelName((unsigned int)BriefingMap_GetSelectedObjectType());
+			g_briefingMapCurrentRegionIcons[g_briefingMapPrimaryHighlightIconIndex].craftType !=
+				(int8_t)CRAFT_TYPE_DEATH_STAR_2) {
+			craftModelName = FeDiskIo_GetCraftModelName((unsigned int)BriefingMap_GetSelectedCraftType());
 			if (craftModelName != NULL) {
 				strcpy(g_frontendScratchBuffer, craftModelName);
 				g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
@@ -2717,13 +2716,13 @@ int MissionBriefing_Update(int frameCounter) {
 				stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
 #endif
 				if (stream == NULL) {
-					ModelPreview_LoadModel(craftModelName, BriefingMap_GetSelectedObjectType());
+					ModelPreview_LoadModel(craftModelName, BriefingMap_GetSelectedCraftType());
 				} else {
 					File_Close(stream);
-					ModelPreview_LoadModel(g_frontendScratchBuffer, BriefingMap_GetSelectedObjectType());
+					ModelPreview_LoadModel(g_frontendScratchBuffer, BriefingMap_GetSelectedCraftType());
 				}
 				memset(&stats, 0, sizeof(stats));
-				stats.craftType = BriefingMap_GetSelectedObjectType();
+				stats.craftType = BriefingMap_GetSelectedCraftType();
 				BuildCraftTechStats(&stats);
 			}
 		}

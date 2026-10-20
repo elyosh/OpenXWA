@@ -143,7 +143,7 @@ static const CraftField s_laserFields[] = {
 static const CraftField s_warheadFields[] = {
 	{ "type", offsetof(ModelDef, warheadLauncherType), CRAFT_FIELD_U16 },
 	{ "count", offsetof(ModelDef, warheadLauncherSlotCount), CRAFT_FIELD_U8 },
-	{ "capacity", offsetof(ModelDef, warheadLauncherValue), CRAFT_FIELD_U8 },
+	{ "capacity", offsetof(ModelDef, warheadLauncherCapacity), CRAFT_FIELD_U8 },
 };
 
 /* The keys of one entry of `turrets`, for each of the two turret seats.
@@ -1298,11 +1298,11 @@ void XwaCraftDefinitions_ApplyNames(void) {
 
 		if (names->shortName != NULL) {
 			g_strSpeciesNames[record] = names->shortName;
-			g_modelDefs[record].nameLong = names->shortName;
+			g_modelDefs[record].shortName = names->shortName;
 		}
 		if (names->longName != NULL) {
 			g_strSpeciesNamesLong[record] = names->longName;
-			g_modelDefs[record].nameAlt = names->longName;
+			g_modelDefs[record].longName = names->longName;
 		}
 		if (names->plural != NULL) {
 			g_strSpeciesNamesPlural[record] = names->plural;

@@ -94,8 +94,8 @@ int Pilot_CreateNew(const char* pilotName) {
 			g_pilotData.kalidorCresent = 0;
 			if (g_shipCount > 0) {
 				for (i = 0; i < g_shipCount; ++i) {
-					if (g_shipList[i].typeId != OBJ_IndustrialComplex) {
-						g_pilotData.craftKnown[g_shipList[i].typeId] = 1;
+					if (g_shipList[i].craftType != CRAFT_TYPE_WORKER_DROID) {
+						g_pilotData.craftKnown[g_shipList[i].craftType] = 1;
 					}
 				}
 			}
@@ -138,7 +138,7 @@ int Pilot_CreateNew(const char* pilotName) {
 	if (g_shipCount > 0) {
 		for (i = 0; i < g_shipCount; ++i) {
 			if (g_shipList[i].known) {
-				g_pilotData.craftKnown[g_shipList[i].typeId] = 1;
+				g_pilotData.craftKnown[g_shipList[i].craftType] = 1;
 			}
 		}
 	}

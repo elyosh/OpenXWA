@@ -42,7 +42,7 @@ typedef struct FrontendBriefingContent {
 } FrontendBriefingContent;
 
 typedef struct FrontendBriefingMapIconState {
-	int8_t objectType;
+	int8_t craftType;
 	uint8_t iconClass;
 	int16_t mapX;
 	int16_t mapY;

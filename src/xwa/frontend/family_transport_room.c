@@ -986,7 +986,7 @@ int FamilyTransportRoom_DrawPilotStatsPage(int statCategory) {
 		for (shipIndex = 0; shipIndex < g_shipCount; ++shipIndex) {
 			int typeId;
 
-			typeId = g_shipList[shipIndex].typeId;
+			typeId = g_shipList[shipIndex].craftType;
 			if (g_pilotData.factionStatistics[factionIndex].stats.killsPerCraftPerMT[statCategory][typeId] ||
 				g_pilotData.factionStatistics[factionIndex]
 					.stats.killsSharedPerCraftPerMT[statCategory][typeId]) {
@@ -1006,7 +1006,7 @@ int FamilyTransportRoom_DrawPilotStatsPage(int statCategory) {
 		for (shipIndex = 0; shipIndex < g_shipCount; ++shipIndex) {
 			int typeId;
 
-			typeId = g_shipList[shipIndex].typeId;
+			typeId = g_shipList[shipIndex].craftType;
 			g_statsAssists[statCategory] += g_pilotData.factionStatistics[factionIndex]
 												.stats.killsAssistsPerCraftPerMT[statCategory][typeId];
 			g_statsSharedKills[statCategory] += g_pilotData.factionStatistics[factionIndex]
@@ -1155,7 +1155,7 @@ int FamilyTransportRoom_DrawPilotStatsPage(int statCategory) {
 		int typeId;
 		int hasKills;
 
-		typeId = g_shipList[shipIndex].typeId;
+		typeId = g_shipList[shipIndex].craftType;
 		hasKills = 0;
 		if (g_pilotData.factionStatistics[factionIndex].stats.killsPerCraftPerMT[statCategory][typeId] ||
 			g_pilotData.factionStatistics[factionIndex]
@@ -1256,7 +1256,7 @@ int FamilyTransportRoom_DrawCombatSimulatorRecordPage(int statCategory) {
 		for (shipIndex = 0; shipIndex < g_shipCount; ++shipIndex) {
 			int typeId;
 
-			typeId = g_shipList[shipIndex].typeId;
+			typeId = g_shipList[shipIndex].craftType;
 			g_combatRecordRowVisible = 0;
 			if (g_pilotData.factionStatistics[2].stats.killsPerCraftPerMT[statCategory][typeId] ||
 				g_pilotData.factionStatistics[2].stats.killsSharedPerCraftPerMT[statCategory][typeId]) {
@@ -1308,7 +1308,7 @@ int FamilyTransportRoom_DrawCombatSimulatorRecordPage(int statCategory) {
 		for (shipIndex = 0; shipIndex < g_shipCount; ++shipIndex) {
 			int typeId;
 
-			typeId = g_shipList[shipIndex].typeId;
+			typeId = g_shipList[shipIndex].craftType;
 			g_combatRecordAssists[statCategory] +=
 				g_pilotData.factionStatistics[2].stats.killsAssistsPerCraftPerMT[statCategory][typeId];
 			g_combatRecordSharedKills[statCategory] +=
@@ -1569,7 +1569,7 @@ draw_total_score:
 		int sharedKills;
 
 		g_combatRecordRowVisible = 0;
-		typeId = g_shipList[shipIndex].typeId;
+		typeId = g_shipList[shipIndex].craftType;
 		kills = g_pilotData.factionStatistics[2].stats.killsPerCraftPerMT[statCategory][typeId];
 		sharedKills = g_pilotData.factionStatistics[2].stats.killsSharedPerCraftPerMT[statCategory][typeId];
 		if (kills || sharedKills) {

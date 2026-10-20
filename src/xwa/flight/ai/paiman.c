@@ -3897,7 +3897,7 @@ void paiman_setturn(uint16_t turnStep) {
 	if (yawDelta <= turnThreshold) {
 		g_objectTable[g_paiContext.aiObjIdx].yaw = targetYaw;
 		if ((g_modelTypeTable[g_objectTable[g_paiContext.aiObjIdx].objectType].flags &
-			 MODEL_TYPE_FLAG_YAW_UPDATES_ANGLE_D) != 0) {
+			 MODEL_TYPE_FLAG_SPINS) != 0) {
 			g_objectTable[g_paiContext.aiObjIdx].angleD =
 				(uint16_t)(g_objectTable[g_paiContext.aiObjIdx].angleD +
 						   (uint16_t)(g_objectTable[g_paiContext.aiObjIdx].yaw - oldYaw));
@@ -4413,7 +4413,7 @@ static char paiman_boardmaneuver(void) {
 						if (i == 1)
 							warhead = 5;
 						targetCount =
-							(uint16_t)MATH2_fraction(g_modelDefs[targetModelIdx].warheadLauncherValue[i],
+							(uint16_t)MATH2_fraction(g_modelDefs[targetModelIdx].warheadLauncherCapacity[i],
 													 g_warheadAmmoCounts[warhead]);
 						if (targetCount == 0)
 							targetCount = 1;

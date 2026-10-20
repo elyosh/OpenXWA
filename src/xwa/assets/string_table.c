@@ -379,7 +379,7 @@ static int StringTable_StoreSpeciesLongNames(XwaFile* stream) {
 
 			g_strSpeciesNamesLong[i] = resolved + 2;
 			if (modelDefIndex >= 0) {
-				g_modelDefs[modelDefIndex].nameAlt = resolved + 2;
+				g_modelDefs[modelDefIndex].longName = resolved + 2;
 			}
 		}
 	}
@@ -413,7 +413,7 @@ static int StringTable_StoreDefaultModelName(XwaFile* stream) {
 	}
 
 	for (i = 0; i < XWA_MODEL_DEF_COUNT; ++i) {
-		g_modelDefs[i].nameLong = g_strDefaultModelName;
+		g_modelDefs[i].shortName = g_strDefaultModelName;
 	}
 
 	return 1;
@@ -433,7 +433,7 @@ static int StringTable_StoreSpeciesNames(XwaFile* stream) {
 
 			g_strSpeciesNames[i] = resolved;
 			if (modelDefIndex >= 0) {
-				g_modelDefs[modelDefIndex].nameLong = resolved;
+				g_modelDefs[modelDefIndex].shortName = resolved;
 			}
 		}
 	}

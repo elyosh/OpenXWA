@@ -1758,7 +1758,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 			}
 		}
 
-		if (g_modelTypeTable[obj->objectType].flags & MODEL_TYPE_FLAG_YAW_UPDATES_ANGLE_D) {
+		if (g_modelTypeTable[obj->objectType].flags & MODEL_TYPE_FLAG_SPINS) {
 			obj->angleD = (uint16_t)(obj->angleD + (((uint16_t)g_elapsedTicks << 12) / 236));
 			obj->mobj->orientMatrixDirty = 1;
 		}

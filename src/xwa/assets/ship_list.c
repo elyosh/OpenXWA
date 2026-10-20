@@ -55,7 +55,7 @@ int ShipList_Load(void) {
 
 	memset(list, 0, sizeof(ShipListEntry) * SHIP_LIST_MAX_ENTRIES);
 	strcpy(g_shipList->name, FrontendString_Get(STR_SKIRMISH_NOT_USED));
-	g_shipList->typeId = 0;
+	g_shipList->craftType = 0;
 	g_shipList->category = 0;
 	g_shipList->field264 = 0;
 	g_shipList->flyable = 0;
@@ -86,7 +86,7 @@ int ShipList_Load(void) {
 
 		if (*token != '*') {
 			strcpy(g_shipList[g_shipCount].name, token);
-			g_shipList[g_shipCount].typeId = (int)i;
+			g_shipList[g_shipCount].craftType = (int)i;
 			g_shipList[g_shipCount].category = 255;
 
 			strcpy(lineBuffer, strtok(NULL, ",\n"));
@@ -181,7 +181,7 @@ int ShipList_Load(void) {
 		unsigned int index;
 
 		for (index = 0; index < (unsigned int)g_shipCount; ++index) {
-			g_shipTypeToShipListIndex[g_shipList[index].typeId] = (int)index;
+			g_shipTypeToShipListIndex[g_shipList[index].craftType] = (int)index;
 		}
 	}
 

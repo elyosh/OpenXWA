@@ -35,6 +35,14 @@ typedef enum ModelTypeAssetFlags {
 	MODEL_TYPE_ASSET_NOT_DEATH_STAR = 0x80,
 } ModelTypeAssetFlags;
 
+/* The textureGroup of an object type that has a model row
+   (MODEL_TYPE_RECORD_TEXTURE_BACKED): the list of the row. frameCount is then
+   the row, counted from 0. */
+typedef enum ModelTypeList {
+	MODEL_TYPE_LIST_SPACECRAFT = 0, /* FlightModels\Spacecraft0.LST */
+	MODEL_TYPE_LIST_EQUIPMENT = 1,  /* FlightModels\Equipment0.LST */
+} ModelTypeList;
+
 typedef enum ModelTypeRecordFlags {
 	MODEL_TYPE_RECORD_TEXTURE_BACKED = 0x02,
 } ModelTypeRecordFlags;
@@ -44,8 +52,12 @@ typedef enum ModelTypeFlags {
 	MODEL_TYPE_FLAG_HARDWARE_ONLY = 0x0008,
 	MODEL_TYPE_FLAG_ANIMATION_LOOPS = 0x0200,
 	MODEL_TYPE_FLAG_SINGLE_MIP_LEVEL = 0x20,
-	MODEL_TYPE_FLAG_EXPANDED_TARGET_PROBE = 0x0800,
-	MODEL_TYPE_FLAG_YAW_UPDATES_ANGLE_D = 0x1000,
+	/* The craft fires from float hardpoints spread over its hull, not from its
+	   weapon hardpoints: the large starships and the Rebel platform. */
+	MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS = 0x0800,
+	/* The object spins: angleD turns with time and follows its yaw (gun
+	   platforms, mines, satellites and buoys). */
+	MODEL_TYPE_FLAG_SPINS = 0x1000,
 	MODEL_TYPE_FLAG_COLLISION_FACEGROUPS = 0x2000,
 } ModelTypeFlags;
 

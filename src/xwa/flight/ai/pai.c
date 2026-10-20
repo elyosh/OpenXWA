@@ -597,9 +597,9 @@ void pai_setupcraftcontext(int objIdx) {
 	g_paiContext.aiPlanInitialManeuverId = *g_paiContext.planCursor++;
 	g_paiContext.aiRequireLiveOrderTarget = 0;
 	g_paiContext.nullPlanId = (uint8_t)pai_findplanbyname("nullpln");
-	g_paiContext.aiSelfModelUsesExpandedTargetProbe =
+	g_paiContext.aiSelfModelFiresFromFloatHardpoints =
 		(uint8_t)((g_modelTypeTable[g_objectTable[g_paiContext.aiObjIdx].objectType].flags &
-				   MODEL_TYPE_FLAG_EXPANDED_TARGET_PROBE) != 0);
+				   MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0);
 }
 
 // FUNCTION: XWA 0x4A5210
