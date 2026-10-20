@@ -6,8 +6,8 @@
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
 #include "xwa/assets/model_texture.h"
-#include "xwa/assets/model_type.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/assets/string_table.h"
 #include "xwa/audio/fsfx.h"
@@ -139,10 +139,10 @@ char FeDiskIo_LoadFlightSfxBanks(void) {
 }
 
 // FUNCTION: XWA 0x4343C0
-uint8_t* FeDiskIo_GetMeshVertexComponentMap(int modelType, int meshIndex) {
+uint8_t* FeDiskIo_GetMeshVertexComponentMap(int objectType, int meshIndex) {
 	MemoryHandle handle;
 
-	handle = g_modelFloatHardpointDataHandles[modelType];
+	handle = g_modelFloatHardpointDataHandles[objectType];
 	if (!handle) {
 		return 0;
 	}
@@ -151,10 +151,10 @@ uint8_t* FeDiskIo_GetMeshVertexComponentMap(int modelType, int meshIndex) {
 }
 
 // FUNCTION: XWA 0x4343F0
-ModelFloatHardpoint* FeDiskIo_GetMeshFloatHardpoint(int modelType, uint8_t hardpointIndex) {
+ModelFloatHardpoint* FeDiskIo_GetMeshFloatHardpoint(int objectType, uint8_t hardpointIndex) {
 	ModelFloatHardpoint* hardpoints;
 
-	hardpoints = (ModelFloatHardpoint*)Memory_LockHandle(g_modelFloatHardpointDataHandles[modelType]);
+	hardpoints = (ModelFloatHardpoint*)Memory_LockHandle(g_modelFloatHardpointDataHandles[objectType]);
 	return &hardpoints[hardpointIndex];
 }
 
@@ -227,7 +227,7 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 
 	modelSlot = loadedModelSlot & -(g_flightRenderToFrontend == 0);
 	result = ModelBounds_GetMaxExtent(modelSlot);
-	g_modelTypeTable[modelSlot].maxBoundsExtent = result;
+	g_objectTypes[modelSlot].maxBoundsExtent = result;
 
 	if (modelEntryIdx == 0xffffu) {
 		if (loadedModelSlot == 293) {
@@ -476,7 +476,7 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 				}
 
 				if (!handled) {
-					if ((g_modelTypeTable[loadedModelSlot].flags & MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) ==
+					if ((g_objectTypes[loadedModelSlot].flags & OBJECT_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) ==
 						0) {
 						uint16_t weaponType = (uint16_t)(outType + 279);
 						int foundGroup;
@@ -508,10 +508,10 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 									g_modelDefs[modelEntryIdx].laserGroupWeaponType[group] = weaponType;
 									if (meshType == MESH_GunTurret || meshType == MESH_RotaryGunTurret ||
 										meshType == MESH_SmallGun ||
-										g_modelTypeTable[loadedModelSlot].genusId == GENUS_Freighter ||
-										g_modelTypeTable[loadedModelSlot].genusId == GENUS_Container ||
-										g_modelTypeTable[loadedModelSlot].genusId == GENUS_Platform ||
-										g_modelTypeTable[loadedModelSlot].genusId == GENUS_Starship) {
+										g_objectTypes[loadedModelSlot].genusId == GENUS_Freighter ||
+										g_objectTypes[loadedModelSlot].genusId == GENUS_Container ||
+										g_objectTypes[loadedModelSlot].genusId == GENUS_Platform ||
+										g_objectTypes[loadedModelSlot].genusId == GENUS_Starship) {
 										g_modelDefs[modelEntryIdx].laserGroupWeaponKind[group] = 4;
 									} else if (outType == OPT_HARDPOINT_IonCannon ||
 											   outType == OPT_HARDPOINT_MagPulse) {
@@ -564,7 +564,7 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 		}
 	}
 
-	if ((g_modelTypeTable[loadedModelSlot].flags & MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) == 0) {
+	if ((g_objectTypes[loadedModelSlot].flags & OBJECT_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) == 0) {
 		uint8_t weaponSlot;
 		int remainingGroups;
 #ifdef XWA_MODERN
@@ -894,7 +894,7 @@ void FeDiskIo_LoadCockpitGlowEmitters(unsigned int modelSlot) {
 }
 
 // FUNCTION: XWA 0x432120
-int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
+int16_t FeDiskIo_LoadTexturesForType(uint16_t objectType) {
 	uint16_t levelCount;
 	int spriteIndex;
 	uint16_t flags;
@@ -903,19 +903,19 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 #ifdef XWA_MODERN
 	/* When an atlas with game geometry defines this group, its images have
 	   no pixels. XwaGeometryTextures_* make the texture levels for them. */
-	const int geometryGroup = XwaFrontendGeometry_FindGroup(g_modelTypeTable[modelType].textureGroup) != NULL;
+	const int geometryGroup = XwaFrontendGeometry_FindGroup(g_objectTypes[objectType].textureGroup) != NULL;
 #endif
 
 	FlightNet_BroadcastStillLoadingPulse();
 
-	if (modelType == MODEL_TEXTURE_PAIR_MODEL_TYPE) {
+	if (objectType == MODEL_TEXTURE_PAIR_OBJECT_TYPE) {
 		FeDiskIo_LoadTexturesForType(MODEL_TEXTURE_PAIR_LOAD_TYPE);
 	}
 
 	levelCount = 4;
 	spriteIndex = 0;
 	if (g_useHardware3D) {
-		flags = g_modelTypeTable[modelType].flags;
+		flags = g_objectTypes[objectType].flags;
 		if ((flags & 0x8000) != 0) {
 			format = SPRITE_TEXTURE_FORMAT_ARGB4444;
 		} else if ((flags & 0x4000) != 0) {
@@ -926,7 +926,7 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 		if ((flags & 0x0400) != 0) {
 			format |= SPRITE_TEXTURE_FORMAT_CK_BORDER;
 		}
-	} else if ((g_modelTypeTable[modelType].flags & 0xc000) != 0) {
+	} else if ((g_objectTypes[objectType].flags & 0xc000) != 0) {
 		format =
 			Display_IsPixelFormat555() ? SPRITE_TEXTURE_FORMAT_PAL555_CK : SPRITE_TEXTURE_FORMAT_PAL565_CK;
 	} else {
@@ -934,8 +934,8 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 											: SPRITE_TEXTURE_FORMAT_PAL565_OPAQUE;
 	}
 
-	flags = g_modelTypeTable[modelType].flags;
-	if ((flags & MODEL_TYPE_FLAG_SINGLE_MIP_LEVEL) != 0) {
+	flags = g_objectTypes[objectType].flags;
+	if ((flags & OBJECT_TYPE_FLAG_SINGLE_MIP_LEVEL) != 0) {
 		baseShift = 0;
 		levelCount = 1;
 	} else {
@@ -945,37 +945,37 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 	if ((flags & 0x0100) != 0) {
 		uint16_t spriteCount;
 
-		spriteCount = SpriteResource_GetGroupSpriteCount((int16_t)g_modelTypeTable[modelType].textureGroup);
-		g_modelTypeTable[modelType].frameCount = spriteCount;
+		spriteCount = SpriteResource_GetGroupSpriteCount((int16_t)g_objectTypes[objectType].textureGroup);
+		g_objectTypes[objectType].frameCount = spriteCount;
 		if (spriteCount == 0 || spriteCount == 0xffff) {
-			return (int16_t)SpriteResource_UnloadGroup((int16_t)g_modelTypeTable[modelType].textureGroup);
+			return (int16_t)SpriteResource_UnloadGroup((int16_t)g_objectTypes[objectType].textureGroup);
 		}
 		{
 			TexLevel* texLevel;
 
-			g_modelTypeTable[modelType].texLevels = (TexLevel*)Memory_CallocTagged(
+			g_objectTypes[objectType].texLevels = (TexLevel*)Memory_CallocTagged(
 				MODEL_TEXTURE_SPECIESTMINFO_TAG, (uint16_t)(levelCount * spriteCount), sizeof(TexLevel));
-			texLevel = g_modelTypeTable[modelType].texLevels;
-			if (g_modelTypeTable[modelType].texLevels == NULL) {
+			texLevel = g_objectTypes[objectType].texLevels;
+			if (g_objectTypes[objectType].texLevels == NULL) {
 				FeDiskIo_FatalError(0);
 			}
 
 			for (; (uint16_t)spriteIndex < spriteCount; ++spriteIndex) {
 #ifdef XWA_MODERN
 				if (geometryGroup) {
-					XwaGeometryTextures_ConvertByIndex((int16_t)g_modelTypeTable[modelType].textureGroup,
+					XwaGeometryTextures_ConvertByIndex((int16_t)g_objectTypes[objectType].textureGroup,
 													   spriteIndex, format, texLevel, (char)baseShift,
 													   levelCount);
 				} else
 #endif
-					SpriteTexture_ConvertByIndex((int16_t)g_modelTypeTable[modelType].textureGroup,
-												 spriteIndex, format, texLevel, (char)baseShift, levelCount);
+					SpriteTexture_ConvertByIndex((int16_t)g_objectTypes[objectType].textureGroup, spriteIndex,
+												 format, texLevel, (char)baseShift, levelCount);
 				if (g_useHardware3D) {
 					int levelIndex;
 
 					if (levelCount > 0) {
 						for (levelIndex = 0; levelIndex < levelCount; ++levelIndex) {
-							if (modelType != MODEL_TEXTURE_FONT_MODEL_TYPE) {
+							if (objectType != MODEL_TEXTURE_FONT_OBJECT_TYPE) {
 #ifdef XWA_MODERN
 								if (geometryGroup) {
 									XwaGeometryTextures_UploadLevel(texLevel++);
@@ -990,17 +990,17 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 				} else {
 					texLevel += levelCount;
 				}
-				DebugPrintf((const char*)(intptr_t)(int16_t)g_modelTypeTable[modelType].textureGroup,
+				DebugPrintf((const char*)(intptr_t)(int16_t)g_objectTypes[objectType].textureGroup,
 							spriteIndex);
 			}
 
-			if (g_useHardware3D && modelType == MODEL_TEXTURE_FONT_MODEL_TYPE) {
+			if (g_useHardware3D && objectType == MODEL_TEXTURE_FONT_OBJECT_TYPE) {
 				TexLevel* remappedTexLevels;
 				uint16_t remapCount;
 
 				DebugPrintfChannel(0x10000, "Starting to remap fonts..\n");
 				remappedTexLevels = FlightText_RemapHardwareFontTextures(
-					g_modelTypeTable[MODEL_TEXTURE_FONT_MODEL_TYPE].texLevels);
+					g_objectTypes[MODEL_TEXTURE_FONT_OBJECT_TYPE].texLevels);
 				remapCount = FlightText_GetHardwareRemapTextureCount();
 				if (remapCount > 0) {
 					int remapRemaining;
@@ -1021,15 +1021,15 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 			(TexLevel*)Memory_CallocTagged(MODEL_TEXTURE_SPECIESTMINFO_TAG, levelCount, sizeof(TexLevel));
 #ifdef XWA_MODERN
 		if (geometryGroup) {
-			XwaGeometryTextures_ConvertById(g_modelTypeTable[modelType].textureGroup,
-											g_modelTypeTable[modelType].frameCount, format, texLevel,
+			XwaGeometryTextures_ConvertById(g_objectTypes[objectType].textureGroup,
+											g_objectTypes[objectType].frameCount, format, texLevel,
 											(char)baseShift, levelCount);
 		} else
 #endif
-			SpriteTexture_ConvertById(g_modelTypeTable[modelType].textureGroup,
-									  g_modelTypeTable[modelType].frameCount, format, texLevel,
-									  (char)baseShift, levelCount);
-		g_modelTypeTable[modelType].curTexLevel = texLevel;
+			SpriteTexture_ConvertById(g_objectTypes[objectType].textureGroup,
+									  g_objectTypes[objectType].frameCount, format, texLevel, (char)baseShift,
+									  levelCount);
+		g_objectTypes[objectType].curTexLevel = texLevel;
 		if (g_useHardware3D) {
 			if (levelCount > 0) {
 				int singleLevelsRemaining;
@@ -1052,39 +1052,39 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 	{
 		int16_t unloadResult;
 
-		unloadResult = (int16_t)SpriteResource_UnloadGroup((int16_t)g_modelTypeTable[modelType].textureGroup);
-		XwaSnapshot_NoteTextureLoad(modelType);
+		unloadResult = (int16_t)SpriteResource_UnloadGroup((int16_t)g_objectTypes[objectType].textureGroup);
+		XwaSnapshot_NoteTextureLoad(objectType);
 		return unloadResult;
 	}
 #else
-	return (int16_t)SpriteResource_UnloadGroup((int16_t)g_modelTypeTable[modelType].textureGroup);
+	return (int16_t)SpriteResource_UnloadGroup((int16_t)g_objectTypes[objectType].textureGroup);
 #endif
 }
 
 // FUNCTION: XWA 0x432400
-void FeDiskIo_FreeTexturesForType(uint16_t modelType) {
+void FeDiskIo_FreeTexturesForType(uint16_t objectType) {
 	TexLevel* texLevels;
 	uint16_t levelIndex;
 	uint16_t frameCount;
 	uint16_t levelCount;
 
-	levelCount = (g_modelTypeTable[modelType].flags & MODEL_TYPE_FLAG_SINGLE_MIP_LEVEL) != 0 ? 1 : 4;
-	if (modelType == MODEL_TEXTURE_PAIR_MODEL_TYPE) {
+	levelCount = (g_objectTypes[objectType].flags & OBJECT_TYPE_FLAG_SINGLE_MIP_LEVEL) != 0 ? 1 : 4;
+	if (objectType == MODEL_TEXTURE_PAIR_OBJECT_TYPE) {
 		FeDiskIo_FreeTexturesForType(MODEL_TEXTURE_PAIR_LOAD_TYPE);
 	}
 
-	if ((g_modelTypeTable[modelType].flags & 0x0100) != 0) {
-		frameCount = g_modelTypeTable[modelType].frameCount;
-		g_modelTypeTable[modelType].frameCount = 0;
-		texLevels = g_modelTypeTable[modelType].texLevels;
+	if ((g_objectTypes[objectType].flags & 0x0100) != 0) {
+		frameCount = g_objectTypes[objectType].frameCount;
+		g_objectTypes[objectType].frameCount = 0;
+		texLevels = g_objectTypes[objectType].texLevels;
 	} else {
-		texLevels = g_modelTypeTable[modelType].curTexLevel;
+		texLevels = g_objectTypes[objectType].curTexLevel;
 		frameCount = 1;
 	}
 
 	levelIndex = 0;
-	g_modelTypeTable[modelType].texLevels = NULL;
-	g_modelTypeTable[modelType].curTexLevel = NULL;
+	g_objectTypes[objectType].texLevels = NULL;
+	g_objectTypes[objectType].curTexLevel = NULL;
 	if (texLevels != NULL) {
 		for (; levelIndex < levelCount * frameCount; ++levelIndex) {
 			if (texLevels[levelIndex].image != NULL) {
@@ -1099,12 +1099,12 @@ void FeDiskIo_FreeTexturesForType(uint16_t modelType) {
 
 	Memory_FreeTagged(MODEL_TEXTURE_SPECIESTMINFO_TAG, texLevels);
 #ifdef XWA_MODERN
-	XwaSnapshot_NoteTextureFree(modelType);
+	XwaSnapshot_NoteTextureFree(objectType);
 #endif
 }
 
 // FUNCTION: XWA 0x432750
-int16_t FeDiskIo_SelectTextureFrame(uint16_t modelType, uint16_t frame, int screenSize) {
+int16_t FeDiskIo_SelectTextureFrame(uint16_t objectType, uint16_t frame, int screenSize) {
 	TexLevel* texLevels;
 	uint16_t levelsPerFrame;
 	TexLevel* selectedLevel;
@@ -1112,30 +1112,30 @@ int16_t FeDiskIo_SelectTextureFrame(uint16_t modelType, uint16_t frame, int scre
 	int scaledScreenSize;
 
 	selectedLevel = NULL;
-	if (g_useHardware3D == 0 && modelType == 481) {
+	if (g_useHardware3D == 0 && objectType == 481) {
 		if (frame == 2) {
-			modelType = 453;
+			objectType = 453;
 			frame = 7;
 		} else if (frame == 3) {
-			modelType = 453;
+			objectType = 453;
 			frame = 5;
 		} else if (frame == 4 || frame == 5) {
-			g_modelTypeTable[481].curTexLevel = selectedLevel;
+			g_objectTypes[481].curTexLevel = selectedLevel;
 			return (int16_t)screenSize;
 		}
 	}
 
-	texLevels = g_modelTypeTable[modelType].texLevels;
+	texLevels = g_objectTypes[objectType].texLevels;
 	if (texLevels == NULL) {
 		return (int16_t)screenSize;
 	}
 
-	if (frame <= 0 || frame > g_modelTypeTable[modelType].frameCount) {
-		g_modelTypeTable[modelType].curTexLevel = selectedLevel;
+	if (frame <= 0 || frame > g_objectTypes[objectType].frameCount) {
+		g_objectTypes[objectType].curTexLevel = selectedLevel;
 		return (int16_t)screenSize;
 	}
 
-	levelsPerFrame = (g_modelTypeTable[modelType].flags & 0x20) != 0 ? 1 : 4;
+	levelsPerFrame = (g_objectTypes[objectType].flags & 0x20) != 0 ? 1 : 4;
 	selectedLevel = &texLevels[(uint16_t)((frame - 1) * levelsPerFrame)];
 	nextLevel = selectedLevel;
 	do {
@@ -1152,7 +1152,7 @@ int16_t FeDiskIo_SelectTextureFrame(uint16_t modelType, uint16_t frame, int scre
 	} while (nextLevel->width != 0 && levelsPerFrame > 1 && (uint16_t)screenSize <= 0x00c0);
 #endif
 
-	g_modelTypeTable[modelType].curTexLevel = selectedLevel;
+	g_objectTypes[objectType].curTexLevel = selectedLevel;
 	return (int16_t)scaledScreenSize;
 }
 
@@ -1619,67 +1619,67 @@ void FeDiskIo_FreeGlobalBuffers(void) {
 
 // FUNCTION: XWA 0x431020
 void FeDiskIo_FreeModelResources(void) {
-	int modelType;
-	uint16_t textureModelType;
+	int objectType;
+	uint16_t textureObjectType;
 	uint8_t missionType;
 
 	Mission_FreeObjectStorageHandles();
 	fsfx_UnloadAllEffects_Thunk();
 	FeDiskIo_FreeGlobalBuffers();
 
-	for (modelType = 0; modelType < XWA_LOADED_MODEL_COUNT; ++modelType) {
-		if (g_loadedModels.byObjectType[modelType] != 0) {
-			int duplicateModelType;
+	for (objectType = 0; objectType < XWA_LOADED_MODEL_COUNT; ++objectType) {
+		if (g_loadedModels.byObjectType[objectType] != 0) {
+			int duplicateObjectType;
 
-			for (duplicateModelType = modelType + 1; duplicateModelType < XWA_LOADED_MODEL_COUNT;
-				 ++duplicateModelType) {
-				if (g_loadedModels.byObjectType[duplicateModelType] ==
-					g_loadedModels.byObjectType[modelType]) {
-					g_modelTypeTable[duplicateModelType].curTexLevel = NULL;
-					g_loadedModels.byObjectType[duplicateModelType] = 0;
-					g_modelTypeTable[duplicateModelType].texLevels = NULL;
+			for (duplicateObjectType = objectType + 1; duplicateObjectType < XWA_LOADED_MODEL_COUNT;
+				 ++duplicateObjectType) {
+				if (g_loadedModels.byObjectType[duplicateObjectType] ==
+					g_loadedModels.byObjectType[objectType]) {
+					g_objectTypes[duplicateObjectType].curTexLevel = NULL;
+					g_loadedModels.byObjectType[duplicateObjectType] = 0;
+					g_objectTypes[duplicateObjectType].texLevels = NULL;
 				}
 			}
 
-			OptModel_FreeHandle(g_loadedModels.byObjectType[modelType]);
-			g_modelTypeTable[modelType].curTexLevel = NULL;
-			g_loadedModels.byObjectType[modelType] = 0;
+			OptModel_FreeHandle(g_loadedModels.byObjectType[objectType]);
+			g_objectTypes[objectType].curTexLevel = NULL;
+			g_loadedModels.byObjectType[objectType] = 0;
 #ifdef XWA_MODERN
-			/* The original writes g_modelTypeTable[XWA_LOADED_MODEL_COUNT].texLevels
-			 * here because duplicateModelType has reached the loop bound. That landed
+			/* The original writes g_objectTypes[XWA_LOADED_MODEL_COUNT].texLevels
+			 * here because duplicateObjectType has reached the loop bound. That landed
 			 * in linker padding in the 32-bit image; omit the non-semantic overflow in
 			 * the portable build without changing any valid model-table state. */
 #else
-			g_modelTypeTable[duplicateModelType].texLevels = NULL;
+			g_objectTypes[duplicateObjectType].texLevels = NULL;
 #endif
 		}
 
-		if (g_modelFloatHardpointDataHandles[modelType] != 0) {
-			Memory_FreeHandle("FLOATHARDPTS", g_modelFloatHardpointDataHandles[modelType]);
-			g_modelFloatHardpointDataHandles[modelType] = 0;
+		if (g_modelFloatHardpointDataHandles[objectType] != 0) {
+			Memory_FreeHandle("FLOATHARDPTS", g_modelFloatHardpointDataHandles[objectType]);
+			g_modelFloatHardpointDataHandles[objectType] = 0;
 		}
 	}
 
 	missionType = g_missionHeader.body.missionType;
-	for (textureModelType = 0; textureModelType < OBJ_Count; ++textureModelType) {
+	for (textureObjectType = 0; textureObjectType < OBJ_Count; ++textureObjectType) {
 		uint8_t assetFlags;
 
-		if ((g_modelTypeTable[textureModelType].recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) == 0) {
+		if ((g_objectTypes[textureObjectType].recordFlags & OBJECT_TYPE_RECORD_TEXTURE_BACKED) == 0) {
 			continue;
 		}
 
-		assetFlags = g_modelTypeTable[textureModelType].assetFlags;
-		if ((assetFlags & MODEL_TYPE_ASSET_TEXTURE_UNLOAD_CLASS_MASK) != 0 &&
-			((assetFlags & MODEL_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 || g_provingGroundsModeActive) &&
-			(assetFlags & MODEL_TYPE_ASSET_TEXTURE_READY) != 0 &&
-			((assetFlags & MODEL_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
+		assetFlags = g_objectTypes[textureObjectType].assetFlags;
+		if ((assetFlags & OBJECT_TYPE_ASSET_TEXTURE_UNLOAD_CLASS_MASK) != 0 &&
+			((assetFlags & OBJECT_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 || g_provingGroundsModeActive) &&
+			(assetFlags & OBJECT_TYPE_ASSET_TEXTURE_READY) != 0 &&
+			((assetFlags & OBJECT_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
 			 missionType == XWA_MISSION_TYPE_DEATH_STAR) &&
-			((assetFlags & MODEL_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
+			((assetFlags & OBJECT_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
 			 missionType != XWA_MISSION_TYPE_DEATH_STAR) &&
 			(g_useHardware3D ||
-			 (g_modelTypeTable[textureModelType].flags & MODEL_TYPE_FLAG_HARDWARE_ONLY) == 0) &&
-			(assetFlags & MODEL_TYPE_ASSET_TEXTURE_DRAW) != 0) {
-			FeDiskIo_FreeTexturesForType(textureModelType);
+			 (g_objectTypes[textureObjectType].flags & OBJECT_TYPE_FLAG_HARDWARE_ONLY) == 0) &&
+			(assetFlags & OBJECT_TYPE_ASSET_TEXTURE_DRAW) != 0) {
+			FeDiskIo_FreeTexturesForType(textureObjectType);
 			missionType = g_missionHeader.body.missionType;
 		}
 	}
@@ -3304,10 +3304,10 @@ char* FeDiskIo_GetCraftModelName(unsigned int craftType) {
 				if (line[0] != '\0') {
 					++rowIndex;
 					for (objectType = 0; objectType < OBJ_Count; ++objectType) {
-						if ((g_modelTypeTable[objectType].recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) !=
+						if ((g_objectTypes[objectType].recordFlags & OBJECT_TYPE_RECORD_TEXTURE_BACKED) !=
 								0 &&
-							g_modelTypeTable[objectType].textureGroup == textureGroup &&
-							g_modelTypeTable[objectType].frameCount == (uint16_t)rowIndex - 1) {
+							g_objectTypes[objectType].textureGroup == textureGroup &&
+							g_objectTypes[objectType].frameCount == (uint16_t)rowIndex - 1) {
 #ifdef XWA_MODERN
 							if (objectType < sizeof(g_craftModelNames) / sizeof(g_craftModelNames[0])) {
 								strncpy(g_craftModelNames[objectType], line,
@@ -3354,27 +3354,27 @@ void FeDiskIo_LoadResources(void) {
 #endif
 	uint8_t hardpointCount;
 	int builtModelCount;
-	ModelTypeInfo* modelInfo;
+	ObjectTypeInfo* modelInfo;
 	int rowIndex;
 	TexLevel* texLevel;
 	const char* listName;
 	MemoryHandle modelHandle;
-	int loadedModelType;
+	int loadedObjectType;
 	uint16_t loadedModelSlot;
 	uint16_t textureGroup;
-	int remainingModelTypes;
+	int remainingObjectTypes;
 
-	modelInfo = g_modelTypeTable;
+	modelInfo = g_objectTypes;
 	memset(g_modelFloatHardpointDataHandles, 0, sizeof(g_modelFloatHardpointDataHandles));
 	memset(&g_loadedModels, 0, sizeof(g_loadedModels));
 	builtModelCount = 0;
-	remainingModelTypes = XWA_LOADED_MODEL_COUNT;
+	remainingObjectTypes = XWA_LOADED_MODEL_COUNT;
 	do {
 		modelInfo->curTexLevel = NULL;
 		modelInfo->texLevels = NULL;
 		++modelInfo;
-		--remainingModelTypes;
-	} while (remainingModelTypes != 0);
+		--remainingObjectTypes;
+	} while (remainingObjectTypes != 0);
 
 	textureGroup = 0;
 	listName = g_craftModelListNames[0];
@@ -3403,7 +3403,7 @@ void FeDiskIo_LoadResources(void) {
 		while (fgets(line, sizeof(line), stream) != NULL) {
 #endif
 			char* cursor;
-			uint16_t matchingModelType;
+			uint16_t matchingObjectType;
 			char matched;
 			uint8_t matchedAssetFlags;
 
@@ -3421,20 +3421,20 @@ void FeDiskIo_LoadResources(void) {
 
 			++rowIndex;
 			matched = 0;
-			for (matchingModelType = 0; matchingModelType < XWA_LOADED_MODEL_COUNT; ++matchingModelType) {
+			for (matchingObjectType = 0; matchingObjectType < XWA_LOADED_MODEL_COUNT; ++matchingObjectType) {
 				uint8_t assetFlags;
 
-				assetFlags = g_modelTypeTable[matchingModelType].assetFlags;
-				if ((g_modelTypeTable[matchingModelType].recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) !=
+				assetFlags = g_objectTypes[matchingObjectType].assetFlags;
+				if ((g_objectTypes[matchingObjectType].recordFlags & OBJECT_TYPE_RECORD_TEXTURE_BACKED) !=
 						0 &&
-					g_modelTypeTable[matchingModelType].textureGroup == textureGroup &&
-					g_modelTypeTable[matchingModelType].frameCount == (uint16_t)rowIndex - 1 &&
-					(assetFlags & MODEL_TYPE_ASSET_TEXTURE_READY) == 0 &&
-					(assetFlags & MODEL_TYPE_ASSET_TEXTURE_UNLOAD_CLASS_MASK) != 0 &&
-					((assetFlags & MODEL_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 || g_provingGroundsModeActive) &&
-					((assetFlags & MODEL_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
+					g_objectTypes[matchingObjectType].textureGroup == textureGroup &&
+					g_objectTypes[matchingObjectType].frameCount == (uint16_t)rowIndex - 1 &&
+					(assetFlags & OBJECT_TYPE_ASSET_TEXTURE_READY) == 0 &&
+					(assetFlags & OBJECT_TYPE_ASSET_TEXTURE_UNLOAD_CLASS_MASK) != 0 &&
+					((assetFlags & OBJECT_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 || g_provingGroundsModeActive) &&
+					((assetFlags & OBJECT_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
 					 g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) &&
-					((assetFlags & MODEL_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
+					((assetFlags & OBJECT_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
 					 g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR)) {
 					matched = 1;
 					matchedAssetFlags = (uint8_t)assetFlags;
@@ -3447,7 +3447,7 @@ void FeDiskIo_LoadResources(void) {
 
 				modelHandle = 0;
 				texLevel = NULL;
-				hasLoadedModel = (matchedAssetFlags & MODEL_TYPE_ASSET_MODEL_LOADED) != 0;
+				hasLoadedModel = (matchedAssetFlags & OBJECT_TYPE_ASSET_MODEL_LOADED) != 0;
 				if (hasLoadedModel) {
 					modelHandle = OptModel_LoadHandle(line);
 					FlightNet_BroadcastStillLoadingPulse();
@@ -3479,45 +3479,45 @@ void FeDiskIo_LoadResources(void) {
 					uint8_t assetFlags;
 					uint16_t modelIndex;
 
-					loadedModelType = loadedModelSlot;
-					assetFlags = g_modelTypeTable[loadedModelType].assetFlags;
-					if ((g_modelTypeTable[loadedModelType].recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) !=
+					loadedObjectType = loadedModelSlot;
+					assetFlags = g_objectTypes[loadedObjectType].assetFlags;
+					if ((g_objectTypes[loadedObjectType].recordFlags & OBJECT_TYPE_RECORD_TEXTURE_BACKED) !=
 							0 &&
-						g_modelTypeTable[loadedModelType].textureGroup == textureGroup &&
-						g_modelTypeTable[loadedModelType].frameCount == (uint16_t)rowIndex - 1 &&
-						(assetFlags & MODEL_TYPE_ASSET_TEXTURE_READY) == 0 &&
-						(assetFlags & MODEL_TYPE_ASSET_TEXTURE_UNLOAD_CLASS_MASK) != 0 &&
-						((assetFlags & MODEL_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 ||
+						g_objectTypes[loadedObjectType].textureGroup == textureGroup &&
+						g_objectTypes[loadedObjectType].frameCount == (uint16_t)rowIndex - 1 &&
+						(assetFlags & OBJECT_TYPE_ASSET_TEXTURE_READY) == 0 &&
+						(assetFlags & OBJECT_TYPE_ASSET_TEXTURE_UNLOAD_CLASS_MASK) != 0 &&
+						((assetFlags & OBJECT_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 ||
 						 g_provingGroundsModeActive) &&
-						((assetFlags & MODEL_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
+						((assetFlags & OBJECT_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
 						 g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) &&
-						((assetFlags & MODEL_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
+						((assetFlags & OBJECT_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
 						 g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR)) {
-						g_modelTypeTable[loadedModelType].curTexLevel = texLevel;
-						modelIndex = (uint16_t)g_modelTypeTable[loadedModelType].modelDefIndex;
-						g_loadedModels.byObjectType[loadedModelType] = modelHandle;
+						g_objectTypes[loadedObjectType].curTexLevel = texLevel;
+						modelIndex = (uint16_t)g_objectTypes[loadedObjectType].modelDefIndex;
+						g_loadedModels.byObjectType[loadedObjectType] = modelHandle;
 						if (hasLoadedModel) {
 							FeDiskIo_BuildModelDef(modelIndex, loadedModelSlot);
 							++builtModelCount;
 						}
 
-						if ((g_modelTypeTable[loadedModelType].flags &
-							 MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0) {
-							if (g_modelDefs[(uint16_t)g_modelTypeTable[loadedModelType].modelDefIndex]
+						if ((g_objectTypes[loadedObjectType].flags &
+							 OBJECT_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0) {
+							if (g_modelDefs[(uint16_t)g_objectTypes[loadedObjectType].modelDefIndex]
 									.floatHardpointCount != 0) {
 								ModelFloatHardpoint* hardpoint;
 								int remainingHardpoints;
 
 								hardpointCount =
-									g_modelDefs[(uint16_t)g_modelTypeTable[loadedModelType].modelDefIndex]
+									g_modelDefs[(uint16_t)g_objectTypes[loadedObjectType].modelDefIndex]
 										.floatHardpointCount;
 								hardpoint = (ModelFloatHardpoint*)Memory_LockHandle(
-									g_modelFloatHardpointDataHandles[loadedModelType]);
+									g_modelFloatHardpointDataHandles[loadedObjectType]);
 								remainingHardpoints = hardpointCount;
 								do {
 									hardpoint->componentIndex =
 										(uint8_t)ModelMesh_FindFloatHardpointComponent(
-											loadedModelType, hardpoint->x, hardpoint->negY, hardpoint->z);
+											loadedObjectType, hardpoint->x, hardpoint->negY, hardpoint->z);
 									++hardpoint;
 									--remainingHardpoints;
 								} while (remainingHardpoints != 0);
@@ -3531,7 +3531,7 @@ void FeDiskIo_LoadResources(void) {
 								uint8_t** rootMap;
 
 								model = (OptimizedPolyObject*)Memory_LockHandle(
-									g_loadedModels.byObjectType[loadedModelType]);
+									g_loadedModels.byObjectType[loadedObjectType]);
 								OptModel_AdjustOptimizedPolyObjectPointers(model);
 								allocSize = sizeof(*rootMap) * (size_t)model->rootNodeCount;
 								for (rootNodeIdx = 0; rootNodeIdx < model->rootNodeCount; ++rootNodeIdx) {
@@ -3560,13 +3560,13 @@ void FeDiskIo_LoadResources(void) {
 								if (handle == 0) {
 									FeDiskIo_FatalError(0);
 								}
-								g_modelFloatHardpointDataHandles[loadedModelType] = handle;
+								g_modelFloatHardpointDataHandles[loadedObjectType] = handle;
 								rootMap = (uint8_t**)Memory_LockHandle(handle);
 								for (rootNodeIdx = 0; rootNodeIdx < model->rootNodeCount; ++rootNodeIdx) {
 									rootMap[rootNodeIdx] = NULL;
 								}
 								Memory_UnlockHandle(handle);
-								Memory_UnlockHandle(g_loadedModels.byObjectType[loadedModelType]);
+								Memory_UnlockHandle(g_loadedModels.byObjectType[loadedObjectType]);
 							}
 						}
 					}
@@ -3597,27 +3597,27 @@ void FeDiskIo_LoadResources(void) {
 
 	{
 		uint8_t missionType;
-		int modelType;
-		ModelTypeInfo* info;
+		int objectType;
+		ObjectTypeInfo* info;
 
 		missionType = g_missionHeader.body.missionType;
-		info = g_modelTypeTable;
-		for (modelType = 0; (uint16_t)modelType < XWA_LOADED_MODEL_COUNT; ++modelType, ++info) {
-			if ((info->recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) != 0) {
+		info = g_objectTypes;
+		for (objectType = 0; (uint16_t)objectType < XWA_LOADED_MODEL_COUNT; ++objectType, ++info) {
+			if ((info->recordFlags & OBJECT_TYPE_RECORD_TEXTURE_BACKED) != 0) {
 				uint8_t assetFlags;
 
 				assetFlags = info->assetFlags;
-				if ((assetFlags & MODEL_TYPE_ASSET_TEXTURE_UNLOAD_CLASS_MASK) != 0 &&
-					((assetFlags & MODEL_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 || g_provingGroundsModeActive) &&
-					(assetFlags & MODEL_TYPE_ASSET_TEXTURE_READY) != 0 &&
-					((assetFlags & MODEL_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
+				if ((assetFlags & OBJECT_TYPE_ASSET_TEXTURE_UNLOAD_CLASS_MASK) != 0 &&
+					((assetFlags & OBJECT_TYPE_ASSET_SPECIAL_MODE_ONLY) == 0 || g_provingGroundsModeActive) &&
+					(assetFlags & OBJECT_TYPE_ASSET_TEXTURE_READY) != 0 &&
+					((assetFlags & OBJECT_TYPE_ASSET_DEATH_STAR_ONLY) == 0 ||
 					 missionType == XWA_MISSION_TYPE_DEATH_STAR) &&
-					((assetFlags & MODEL_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
+					((assetFlags & OBJECT_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
 					 missionType != XWA_MISSION_TYPE_DEATH_STAR) &&
-					(g_useHardware3D || (info->flags & MODEL_TYPE_FLAG_HARDWARE_ONLY) == 0) &&
-					(assetFlags & MODEL_TYPE_ASSET_TEXTURE_DRAW) != 0) {
-					FeDiskIo_LoadTexturesForType(modelType);
-					DebugPrintf((const char*)(uintptr_t)modelType);
+					(g_useHardware3D || (info->flags & OBJECT_TYPE_FLAG_HARDWARE_ONLY) == 0) &&
+					(assetFlags & OBJECT_TYPE_ASSET_TEXTURE_DRAW) != 0) {
+					FeDiskIo_LoadTexturesForType(objectType);
+					DebugPrintf((const char*)(uintptr_t)objectType);
 					missionType = g_missionHeader.body.missionType;
 				}
 			}

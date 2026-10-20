@@ -279,7 +279,7 @@ typedef struct XwaDirLight {
 	float color[3]; /* r, g, b in [0,1] */
 	/* ObjectTypeId of the source backdrop, or 0 for synthetic/studio
 	 * lights. Sun types 521..530 are also the lens-flare sources. */
-	uint16_t source_backdrop_model_type;
+	uint16_t source_backdrop_object_type;
 	/* Index of that backdrop in the snapshot's backdrops[] (the current
 	 * region's records in record order), or -1. */
 	int16_t source_backdrop_index;
@@ -679,7 +679,7 @@ typedef struct XwaLightPulse {
  * 1.5) / 256, gated on the camera's forward-row Z sign (side 4 > 0,
  * side 5 < 0). Suns also feed dir_lights and lens flares. */
 typedef struct XwaBackdrop {
-	uint16_t model_type; /* ObjectTypeId (DAT texture group binding) */
+	uint16_t object_type; /* ObjectTypeId (DAT texture group binding) */
 	uint8_t frame;
 	uint8_t flags; /* WorldRectRecord.flags (1 = fixed frame, 2 = strip) */
 	uint8_t draw_flags;
@@ -713,7 +713,7 @@ typedef struct XwaGlowMark {
 	uint8_t world_segment_mode;
 	uint8_t persistent_until_cleared;
 	uint32_t generation;
-	uint16_t texture_model_type;
+	uint16_t texture_object_type;
 	uint16_t texture_frame; /* resolved DAT frame; 1-based */
 	uint32_t age_ticks;     /* blast age; animated records use current frame */
 	float center[3];
@@ -749,7 +749,7 @@ typedef struct XwaTrailEmitter {
 	uint16_t owner_slot;
 	uint16_t owner_signature;
 	uint8_t trail_kind;
-	uint16_t texture_model_type;
+	uint16_t texture_object_type;
 	uint16_t texture_frame;
 	uint32_t argb_color;
 	float ribbon_width;
@@ -809,7 +809,7 @@ typedef struct XwaParticleEffect {
 	uint8_t hide_owner_external;
 	uint8_t hide_owner_film;
 	uint8_t point_light; /* intended effect-origin light; object effects only */
-	uint16_t texture_model_type;
+	uint16_t texture_object_type;
 	uint32_t render_flags; /* legacy material/filter state */
 	XwaPreciseWorldPoint emitter_world_pos;
 	uint32_t first_particle;
@@ -1122,11 +1122,11 @@ typedef struct XwaSkinUse {
 	uint8_t all_markings;
 } XwaSkinUse;
 
-/* One sprite-textured model type whose classic TexLevel storage is live.
+/* One sprite-textured object type whose classic TexLevel storage is live.
  * The remaster mirrors the corresponding baked atlas pages while this type
  * remains in the authoritative set. */
 typedef struct XwaTextureAsset {
-	uint16_t model_type;
+	uint16_t object_type;
 } XwaTextureAsset;
 
 /* One baked source-file identity currently owned by a classic named
@@ -1378,8 +1378,8 @@ void XwaSnapshot_NoteOptFree(uint16_t public_handle);
 void XwaSnapshotExport_CaptureOptAssets(XwaSnapshot* snapshot);
 
 /* Engine-side texture-model observers and committed live-set capture. */
-void XwaSnapshot_NoteTextureLoad(uint16_t model_type);
-void XwaSnapshot_NoteTextureFree(uint16_t model_type);
+void XwaSnapshot_NoteTextureLoad(uint16_t object_type);
+void XwaSnapshot_NoteTextureFree(uint16_t object_type);
 void XwaSnapshotExport_CaptureTextureAssets(XwaSnapshot* snapshot);
 
 /* Engine-side frontend resource/group observers and committed residency set. */
@@ -1391,9 +1391,9 @@ void XwaSnapshot_NoteSpriteGroupsReset(void);
  * or NULL when the handle is 0/unregistered. */
 const char* XwaSnapshotExport_OptHandleName(uint16_t public_handle);
 
-/* A sprite-textured model type's DAT binding.
+/* A sprite-textured object type's DAT binding.
  * Returns 0 when the type has none. Two classic binding kinds
- * (g_modelTypeTable flags bit 0x100):
+ * (g_objectTypes flags bit 0x100):
  *   frames_mode 1: the WHOLE group loads as frames; a draw's frame N
  *     selects the group's Nth sprite in group order (1-based —
  *     FeDiskIo_SelectTextureFrame).
@@ -1403,7 +1403,7 @@ int XwaSnapshotExport_ModelTextureBinding(int object_type, int* out_group, int* 
 										  int* out_sprite_id);
 
 /* Side accessor for the billboard geometry laws: the frame's BASE
- * (level-0) classic texture dims and the model type's maxBoundsExtent.
+ * (level-0) classic texture dims and the object type's maxBoundsExtent.
  * Mirrors FeDiskIo_SelectTextureFrame's frame lookup without the mip
  * walk (the level shift compensation makes level 0 the geometry
  * authority: half extents are (dim * projected_size) >> 9 px at any
@@ -1416,12 +1416,12 @@ int XwaSnapshotExport_ModelTextureBinding(int object_type, int* out_group, int* 
 int XwaSnapshotExport_ModelTexFrame(int object_type, int frame, int* out_w, int* out_h, int* out_max_bounds);
 
 /* Side accessor for the wreck-flame law (Damage_QueueCraftBillboards):
- * the model type's per-mesh OPT mesh types (MeshType values; flames
+ * the object type's per-mesh OPT mesh types (MeshType values; flames
  * attach to MESH_Fuselage == 3 slots). Returns the mesh count (0 when
  * the type has no meshes), filling up to XWA_SNAP_MAX_MESH_SLOTS. */
 int XwaSnapshotExport_ModelMeshTypes(int object_type, uint8_t out_types[XWA_SNAP_MAX_MESH_SLOTS]);
 
-/* Side accessor: a model type's animation frame count (mission-static
+/* Side accessor: a object type's animation frame count (mission-static
  * table value; the explosion lens-flare window law reads it). 0 for
  * out-of-range types. */
 int XwaSnapshotExport_ModelFrameCount(int object_type);

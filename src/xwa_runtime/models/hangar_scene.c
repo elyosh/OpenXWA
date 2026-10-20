@@ -1,8 +1,8 @@
 #include "xwa_runtime/models/hangar_scene.h"
 
 #include "xwa/assets/model_def.h"
-#include "xwa/assets/model_type.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/flight/flight.h"
 #include "xwa/flight/hangar.h"
 #include "xwa/flight/mission/mission.h"
@@ -121,7 +121,7 @@ static void HangarScene_Dress(uint16_t objIdx, uint16_t objectType, int markings
    profile only with a ShuttleModelIndex; it applies here in all cases. */
 static void HangarScene_SpawnShuttle(void) {
 	const XwaHangarObjects* objects = XwaHangars_Objects();
-	const uint16_t objectType = objects->shuttleModelType != 0 ? objects->shuttleModelType : OBJ_Shuttle;
+	const uint16_t objectType = objects->shuttleObjectType != 0 ? objects->shuttleObjectType : OBJ_Shuttle;
 
 	g_hangarShuttleState.objectIdx = HangarScene_SpawnOnFloor(
 		objectType, objects->shuttlePosition[0], objects->shuttlePosition[1], objects->shuttlePosition[2],
@@ -167,10 +167,10 @@ void XwaHangarScene_Spawn(int family) {
 			uint16_t objIdx = 0;
 
 			if (settings->load) {
-				objIdx = HangarScene_SpawnOnFloor(settings->modelType, places[droid][0], places[droid][1],
+				objIdx = HangarScene_SpawnOnFloor(settings->objectType, places[droid][0], places[droid][1],
 												  settings->positionZ, (uint16_t)places[droid][2],
 												  settings->isFloorInverted);
-				HangarScene_Dress(objIdx, settings->modelType, settings->markings, settings->objectProfile);
+				HangarScene_Dress(objIdx, settings->objectType, settings->markings, settings->objectProfile);
 			}
 			sceneSlot = g_hangarSceneObjectCount;
 			g_hangarSceneObjects[sceneSlot].objectIdx = objIdx;
@@ -226,15 +226,15 @@ void XwaHangarScene_Rebuild(void) {
 	const uint8_t hangarFlightGroup = launchRef->flightGroupIdx;
 	uint32_t objIdx;
 
-	g_hangarBackdropModelType = g_pilotData.hangarType ? 179 : OBJ_Hangar;
-	launchRef->objectType = (ObjectTypeId)g_hangarBackdropModelType;
-	XwaHangars_ReleaseStaleModel((uint16_t)g_hangarBackdropModelType);
-	if (!g_loadedModels.byObjectType[(uint16_t)g_hangarBackdropModelType]) {
-		Hangar_LoadCraftModelByType((ObjectTypeId)g_hangarBackdropModelType);
+	g_hangarBackdropObjectType = g_pilotData.hangarType ? 179 : OBJ_Hangar;
+	launchRef->objectType = (ObjectTypeId)g_hangarBackdropObjectType;
+	XwaHangars_ReleaseStaleModel((uint16_t)g_hangarBackdropObjectType);
+	if (!g_loadedModels.byObjectType[(uint16_t)g_hangarBackdropObjectType]) {
+		Hangar_LoadCraftModelByType((ObjectTypeId)g_hangarBackdropObjectType);
 		Math_SetFpuSinglePrecisionMode();
 	}
 	g_launchBaseZ = launchRef->world_z +
-					g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)g_hangarBackdropModelType)]
+					g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)g_hangarBackdropObjectType)]
 						.meshAttachData[6];
 	/* The hook keeps the setup offset; the entering craft's applies here. */
 	launchRef->world_x += s_launchRefOffset[0];
@@ -243,7 +243,7 @@ void XwaHangarScene_Rebuild(void) {
 	launchRef->mobj->prevWorldX = launchRef->world_x;
 	launchRef->mobj->prevWorldY = launchRef->world_y;
 	XwaHangarScene_SetHangarMarkings();
-	if (g_hangarBackdropModelType == OBJ_Hangar) {
+	if (g_hangarBackdropObjectType == OBJ_Hangar) {
 		int16_t hangarModelIdx = GetModelDefIndexFromType(OBJ_Hangar);
 		double worldX = (double)launchRef->world_x;
 		float worldY = (float)launchRef->world_y;
@@ -268,7 +268,7 @@ void XwaHangarScene_Rebuild(void) {
 	}
 	Mission_SetActiveRegionObjectRanges(launchRef->regionIdx);
 	g_hangarSceneObjectCount = 0;
-	XwaHangarScene_Spawn(g_hangarBackdropModelType != OBJ_Hangar);
+	XwaHangarScene_Spawn(g_hangarBackdropObjectType != OBJ_Hangar);
 }
 
 /* ---- placement (hook_hangars GetCraftElevation, GetPlayerCraft and its floor
@@ -376,7 +376,7 @@ void XwaHangarScene_PlaceOnLaunchRail(int objIdx) {
 
 	object->world_x += XwaHangarScene_PlayerOffset(objIdx, 0);
 	object->world_y = g_objectTable[g_launchRefObjIdx].world_y +
-					  (g_hangarBackdropModelType == OBJ_Hangar ? -800 : -6800) +
+					  (g_hangarBackdropObjectType == OBJ_Hangar ? -800 : -6800) +
 					  XwaHangarScene_PlayerOffset(objIdx, 1);
 	XwaHangarScene_PlacePlayerAtRest(objIdx);
 }
@@ -387,7 +387,7 @@ void XwaHangarScene_PlaceOnLaunchRail(int objIdx) {
 int XwaHangarScene_ShuttleLoaded(void) { return s_shuttleLoaded; }
 
 void XwaHangarScene_EnsureShuttle(void) {
-	if (!s_shuttleLoaded && g_hangarBackdropModelType == OBJ_Hangar) {
+	if (!s_shuttleLoaded && g_hangarBackdropObjectType == OBJ_Hangar) {
 		HangarScene_SpawnShuttle();
 	}
 }
@@ -572,7 +572,7 @@ static int HangarScene_PlayerShot(int family, int* x, int* y, int* z) {
 }
 
 int XwaHangarScene_CameraShot(int shotIndex, int* x, int* y, int* z) {
-	const int family = g_hangarBackdropModelType != OBJ_Hangar;
+	const int family = g_hangarBackdropObjectType != OBJ_Hangar;
 	const int shot = (uint16_t)shotIndex;
 
 	if (!family) {

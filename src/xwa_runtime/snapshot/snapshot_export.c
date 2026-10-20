@@ -12,7 +12,7 @@
 #include "aeron/log.h"
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/opt_model.h"          /* g_loadedModels */
 #include "xwa/assets/sprite_texture.h"     /* TexLevel */
 #include "xwa/flight/flight_light.h"       /* point-light intensity tables */
@@ -81,7 +81,7 @@ int XwaSnapshotExport_ModelTextureBinding(int object_type, int* out_group, int* 
 	if (object_type <= 0 || object_type >= OBJ_Count) {
 		return 0;
 	}
-	const ModelTypeInfo* info = &g_modelTypeTable[object_type];
+	const ObjectTypeInfo* info = &g_objectTypes[object_type];
 	if (info->textureGroup == 0xffffu) {
 		return 0;
 	}
@@ -104,7 +104,7 @@ int XwaSnapshotExport_ModelTexFrame(int object_type, int frame, int* out_w, int*
 	if (object_type <= 0 || object_type >= OBJ_Count) {
 		return 0;
 	}
-	const ModelTypeInfo* info = &g_modelTypeTable[object_type];
+	const ObjectTypeInfo* info = &g_objectTypes[object_type];
 	if (info->texLevels == NULL || frame <= 0 || frame > info->frameCount) {
 		return 0;
 	}
@@ -128,7 +128,7 @@ int XwaSnapshotExport_ModelFrameCount(int object_type) {
 	if (object_type <= 0 || object_type >= OBJ_Count) {
 		return 0;
 	}
-	return g_modelTypeTable[object_type].frameCount;
+	return g_objectTypes[object_type].frameCount;
 }
 
 /* Classic point-light source laws — the per-type switch of
@@ -493,19 +493,19 @@ void XwaSnapshotExport_CaptureOptAssets(XwaSnapshot* snapshot) {
 	}
 }
 
-void XwaSnapshot_NoteTextureLoad(uint16_t model_type) {
-	if (model_type == 0 || model_type >= XWA_SNAP_MAX_TEXTURE_ASSETS || g_textureAssets[model_type]) {
+void XwaSnapshot_NoteTextureLoad(uint16_t object_type) {
+	if (object_type == 0 || object_type >= XWA_SNAP_MAX_TEXTURE_ASSETS || g_textureAssets[object_type]) {
 		return;
 	}
-	g_textureAssets[model_type] = 1;
+	g_textureAssets[object_type] = 1;
 	g_textureAssetGeneration++;
 }
 
-void XwaSnapshot_NoteTextureFree(uint16_t model_type) {
-	if (model_type == 0 || model_type >= XWA_SNAP_MAX_TEXTURE_ASSETS || !g_textureAssets[model_type]) {
+void XwaSnapshot_NoteTextureFree(uint16_t object_type) {
+	if (object_type == 0 || object_type >= XWA_SNAP_MAX_TEXTURE_ASSETS || !g_textureAssets[object_type]) {
 		return;
 	}
-	g_textureAssets[model_type] = 0;
+	g_textureAssets[object_type] = 0;
 	g_textureAssetGeneration++;
 }
 
@@ -515,11 +515,11 @@ void XwaSnapshotExport_CaptureTextureAssets(XwaSnapshot* snapshot) {
 	}
 	snapshot->texture_asset_generation = g_textureAssetGeneration;
 	snapshot->texture_asset_count = 0;
-	for (uint16_t model_type = 0; model_type < XWA_SNAP_MAX_TEXTURE_ASSETS; model_type++) {
-		if (!g_textureAssets[model_type]) {
+	for (uint16_t object_type = 0; object_type < XWA_SNAP_MAX_TEXTURE_ASSETS; object_type++) {
+		if (!g_textureAssets[object_type]) {
 			continue;
 		}
-		snapshot->texture_assets[snapshot->texture_asset_count++].model_type = model_type;
+		snapshot->texture_assets[snapshot->texture_asset_count++].object_type = object_type;
 	}
 }
 

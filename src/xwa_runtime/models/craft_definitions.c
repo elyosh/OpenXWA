@@ -5,8 +5,8 @@
 #include "aeron/log.h"
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/model_def.h"
-#include "xwa/assets/model_type.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/string_table.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/text/text_overrides.h"
@@ -167,10 +167,9 @@ static const CraftField s_turretFields[] = {
 };
 
 static const char* const s_topKeys[] = {
-	"version",      "object_type", "model",        "list",  "model_type",
-	"craft_record", "sounds_like", "beam_allowed", "names",
+	"version", "object_type",        "model",        "list",        "genus",        "family",
+	"flags",   "craft_record_index", "craft_record", "sounds_like", "beam_allowed", "names",
 };
-static const char* const s_modelTypeKeys[] = { "genus", "family", "flags", "craft_record_index" };
 static const char* const s_recordArrayKeys[] = { "lasers",      "warheads",     "turrets",
 												 "cockpit_eye", "cockpit_name", "mesh_attach" };
 static const char* const s_nameKeys[] = { "short", "long", "plural", "gender" };
@@ -890,9 +889,9 @@ static int CraftDefinitions_AddRow(int list, int objectType, const char* model, 
 	added->row = firstRow + s_addedRowCount[list];
 	snprintf(added->line, sizeof added->line, "FlightModels\\%s.opt", model);
 	++s_addedRowCount[list];
-	g_modelTypeTable[objectType].textureGroup = (uint16_t)list;
-	g_modelTypeTable[objectType].frameCount = (uint16_t)added->row;
-	g_modelTypeTable[objectType].recordFlags |= MODEL_TYPE_RECORD_TEXTURE_BACKED;
+	g_objectTypes[objectType].textureGroup = (uint16_t)list;
+	g_objectTypes[objectType].frameCount = (uint16_t)added->row;
+	g_objectTypes[objectType].recordFlags |= OBJECT_TYPE_RECORD_TEXTURE_BACKED;
 	return 1;
 }
 
@@ -952,7 +951,7 @@ static void CraftDefinitions_FreeNames(CraftFileNames* list) {
    the craft record that it writes. Returns 0 when the file can't be used. */
 static int CraftDefinitions_LoadFile(CraftFile* file) {
 	AeronConfigError error;
-	const AeronConfigNode* modelType;
+	const AeronConfigNode* node;
 	int64_t value;
 
 	memset(&error, 0, sizeof error);
@@ -972,11 +971,11 @@ static int CraftDefinitions_LoadFile(CraftFile* file) {
 		return 0;
 	}
 	file->objectType = (int)value;
-	file->finalRecord = g_modelTypeTable[file->objectType].modelDefIndex;
-	modelType = AeronConfigNode_MapGet(file->root, "model_type");
-	if (AeronConfigNode_MapGet(modelType, "craft_record_index") != NULL) {
-		if (!CraftDefinitions_ReadInt(file->path, AeronConfigNode_MapGet(modelType, "craft_record_index"),
-									  "model_type.craft_record_index", 0, XWA_MODEL_DEF_COUNT - 1, &value)) {
+	file->finalRecord = g_objectTypes[file->objectType].modelDefIndex;
+	node = AeronConfigNode_MapGet(file->root, "craft_record_index");
+	if (node != NULL) {
+		if (!CraftDefinitions_ReadInt(file->path, node, "craft_record_index", 0, XWA_MODEL_DEF_COUNT - 1,
+									  &value)) {
 			return 0;
 		}
 		file->finalRecord = (int)value;
@@ -1028,12 +1027,11 @@ static void CraftDefinitions_CheckOwners(CraftFile* files, size_t count) {
 	for (a = 0; a < count; ++a) {
 		int objectType;
 
-		if (files[a].ignored || AeronConfigNode_MapGet(AeronConfigNode_MapGet(files[a].root, "model_type"),
-													   "craft_record_index") == NULL) {
+		if (files[a].ignored || AeronConfigNode_MapGet(files[a].root, "craft_record_index") == NULL) {
 			continue;
 		}
 		for (objectType = 0; objectType < OBJ_Count; ++objectType) {
-			int record = g_modelTypeTable[objectType].modelDefIndex;
+			int record = g_objectTypes[objectType].modelDefIndex;
 
 			if (objectType == files[a].objectType) {
 				continue;
@@ -1055,28 +1053,25 @@ static void CraftDefinitions_CheckOwners(CraftFile* files, size_t count) {
 	}
 }
 
-static void CraftDefinitions_ApplyModelType(const CraftFile* file, const AeronConfigNode* node) {
-	ModelTypeInfo* info = &g_modelTypeTable[file->objectType];
+/* Writes `genus`, `family`, `flags` and `craft_record_index`. */
+static void CraftDefinitions_ApplyObjectType(const CraftFile* file) {
+	ObjectTypeInfo* info = &g_objectTypes[file->objectType];
+	const AeronConfigNode* node;
 	int64_t value;
 
-	CraftDefinitions_CheckKeys(file->path, node, "model_type", s_modelTypeKeys,
-							   sizeof s_modelTypeKeys / sizeof s_modelTypeKeys[0]);
-	if (AeronConfigNode_MapGet(node, "genus") != NULL &&
-		CraftDefinitions_ReadInt(file->path, AeronConfigNode_MapGet(node, "genus"), "model_type.genus", 0,
-								 UINT8_MAX, &value)) {
+	node = AeronConfigNode_MapGet(file->root, "genus");
+	if (node != NULL && CraftDefinitions_ReadInt(file->path, node, "genus", 0, UINT8_MAX, &value)) {
 		info->genusId = (uint8_t)value;
 	}
-	if (AeronConfigNode_MapGet(node, "family") != NULL &&
-		CraftDefinitions_ReadInt(file->path, AeronConfigNode_MapGet(node, "family"), "model_type.family", 0,
-								 UINT8_MAX, &value)) {
+	node = AeronConfigNode_MapGet(file->root, "family");
+	if (node != NULL && CraftDefinitions_ReadInt(file->path, node, "family", 0, UINT8_MAX, &value)) {
 		info->familyId = (uint8_t)value;
 	}
-	if (AeronConfigNode_MapGet(node, "flags") != NULL &&
-		CraftDefinitions_ReadInt(file->path, AeronConfigNode_MapGet(node, "flags"), "model_type.flags", 0,
-								 UINT16_MAX, &value)) {
+	node = AeronConfigNode_MapGet(file->root, "flags");
+	if (node != NULL && CraftDefinitions_ReadInt(file->path, node, "flags", 0, UINT16_MAX, &value)) {
 		info->flags = (uint16_t)value;
 	}
-	if (AeronConfigNode_MapGet(node, "craft_record_index") != NULL) {
+	if (AeronConfigNode_MapGet(file->root, "craft_record_index") != NULL) {
 		Aeron_LogInfo("xwa.craft", "object type %d uses craft record %d instead of %d", file->objectType,
 					  file->finalRecord, info->modelDefIndex);
 		info->modelDefIndex = (int16_t)file->finalRecord;
@@ -1167,7 +1162,7 @@ static int CraftDefinitions_ApplyCraftTypeFile(const CraftTypeFile* file) {
 	/* A reserved slot that no object type file fills has no list row, and
 	   neither has object type 0: the game would list a craft that it can't
 	   load. */
-	if (g_modelTypeTable[objectType].textureGroup == CRAFT_NO_LIST) {
+	if (g_objectTypes[objectType].textureGroup == CRAFT_NO_LIST) {
 		Aeron_LogError("xwa.craft",
 					   "%s: craft type %d would use object type %d, which loads nothing. The file is "
 					   "ignored",
@@ -1239,7 +1234,7 @@ static void CraftDefinitions_ApplyObjectTypes(const CraftFileNames* list) {
 
 	for (i = 0; i < list->count; ++i) {
 		CraftFile* file = &files[i];
-		const ModelTypeInfo* info;
+		const ObjectTypeInfo* info;
 		const AeronConfigNode* node;
 		char model[XWA_MODEL_SOURCE_KEY_MAX];
 		int hasModel;
@@ -1248,7 +1243,7 @@ static void CraftDefinitions_ApplyObjectTypes(const CraftFileNames* list) {
 		if (file->ignored) {
 			continue;
 		}
-		info = &g_modelTypeTable[file->objectType];
+		info = &g_objectTypes[file->objectType];
 		CraftDefinitions_CheckKeys(file->path, file->root, "", s_topKeys,
 								   sizeof s_topKeys / sizeof s_topKeys[0]);
 		node = AeronConfigNode_MapGet(file->root, "list");
@@ -1285,10 +1280,7 @@ static void CraftDefinitions_ApplyObjectTypes(const CraftFileNames* list) {
 					  info->textureGroup == CRAFT_NO_LIST ? "fills a reserved slot" : "changes a stock type",
 					  hasModel ? ", model " : "", hasModel ? model : "");
 
-		node = AeronConfigNode_MapGet(file->root, "model_type");
-		if (node != NULL) {
-			CraftDefinitions_ApplyModelType(file, node);
-		}
+		CraftDefinitions_ApplyObjectType(file);
 		if (hasModel && !CraftDefinitions_AddRow(listIndex, file->objectType, model, rowCounts[listIndex])) {
 			Aeron_LogError("xwa.craft", "%s: out of memory for the model's row", file->path);
 		}

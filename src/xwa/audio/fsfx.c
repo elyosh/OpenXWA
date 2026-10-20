@@ -1,7 +1,7 @@
 #include "xwa/audio/fsfx.h"
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/model_def.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/audio/sound.h"
 #include "xwa/config/game_config.h"
 #include "xwa/flight/ai/pai.h"
@@ -2527,9 +2527,9 @@ void fsfx_UpdateFlightSfx(void) {
 			collide_roughdistance3d(prevX - g_objPrevX[g_localPlayer], prevY - g_objPrevY[g_localPlayer],
 									prevZ - g_objPrevZ[g_localPlayer]);
 		if (g_sound3DEnabled) {
-			threshold = g_modelTypeTable[objectType].maxBoundsExtent + 2048;
+			threshold = g_objectTypes[objectType].maxBoundsExtent + 2048;
 		} else {
-			threshold = g_modelTypeTable[objectType].maxBoundsExtent + 1024;
+			threshold = g_objectTypes[objectType].maxBoundsExtent + 1024;
 		}
 
 		if (currentDistance < threshold && previousDistance >= threshold) {
@@ -2559,13 +2559,13 @@ void fsfx_UpdateNearbyWeaponLoop(void) {
 		return;
 	}
 
-	genusId = g_modelTypeTable[OBJ_HyperBuoy].genusId;
+	genusId = g_objectTypes[OBJ_HyperBuoy].genusId;
 	g_objectSlotRangeByGenus[genusId].next = g_activeRegionObjectSlotStart;
 	g_objectSlotRangeByGenus[genusId].end = g_activeRegionCraftObjectSlotEnd;
 
 	for (objIdx = g_objectSlotRangeByGenus[genusId].next; objIdx < g_objectSlotRangeByGenus[genusId].end;
 		 ++objIdx) {
-		if ((g_modelTypeTable[(uint16_t)g_objectTable[objIdx].objectType].flags & 4u) == 0) {
+		if ((g_objectTypes[(uint16_t)g_objectTable[objIdx].objectType].flags & 4u) == 0) {
 			continue;
 		}
 

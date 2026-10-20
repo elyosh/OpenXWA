@@ -3,7 +3,7 @@
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/audio/fsfx.h"
 #include "xwa/flight/ai/pai.h"
 #include "xwa/flight/ai/pai_plan.h"
@@ -231,7 +231,7 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 	}
 
 	objectTypeId = (uint16_t)objectType;
-	objIdx = Object_AllocSlotForGenus(g_modelTypeTable[objectTypeId].genusId);
+	objIdx = Object_AllocSlotForGenus(g_objectTypes[objectTypeId].genusId);
 	if (objIdx == 0xffffu) {
 		return 0xffffu;
 	}
@@ -278,8 +278,8 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 		g_nextObjectSignature = 2;
 	}
 
-	g_objectTable[objIdx].mobj->state = g_modelTypeTable[objectTypeId].familyId;
-	g_objectTable[objIdx].mobj->instanceExtent = g_modelTypeTable[objectTypeId].maxBoundsExtent;
+	g_objectTable[objIdx].mobj->state = g_objectTypes[objectTypeId].familyId;
+	g_objectTable[objIdx].mobj->instanceExtent = g_objectTypes[objectTypeId].maxBoundsExtent;
 	g_objectTable[objIdx].world_x = g_objectTable[sourceObjIdx].world_x;
 	g_objectTable[objIdx].world_y = g_objectTable[sourceObjIdx].world_y;
 	g_objectTable[objIdx].world_z = g_objectTable[sourceObjIdx].world_z;
@@ -287,7 +287,7 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 	g_objectTable[objIdx].mobj->prevWorldY = g_objectTable[objIdx].world_y;
 	g_objectTable[objIdx].mobj->prevWorldZ = g_objectTable[objIdx].world_z;
 	collide_ResetObjectProximityForSlot(objIdx);
-	g_objectTable[objIdx].mobj->damageAmount = g_modelTypeTable[objectTypeId].maxBoundsExtent;
+	g_objectTable[objIdx].mobj->damageAmount = g_objectTypes[objectTypeId].maxBoundsExtent;
 	g_objectTable[objIdx].mobj->lifetimeTimer = 0;
 	g_objectTable[objIdx].mobj->framesAlive = 0;
 	g_objectTable[objIdx].mobj->sourceObjIdx = -1;
@@ -776,7 +776,7 @@ uint16_t Object_SpawnDetachedComponent(uint16_t sourceObjIdx, uint8_t componentI
 	mobj->state = 3;
 	g_objectTable[objectIdx].genusId = GENUS_Debris;
 	g_objectTable[objectIdx].mobj->instanceExtent =
-		g_modelTypeTable[(uint16_t)g_objectTable[sourceObjIdx].objectType].maxBoundsExtent;
+		g_objectTypes[(uint16_t)g_objectTable[sourceObjIdx].objectType].maxBoundsExtent;
 	g_objectTable[objectIdx].objectType = OBJ_NoAsset_222;
 	g_objectTable[objectIdx].mobj->sourceObjectType = g_objectTable[sourceObjIdx].objectType;
 	g_objectTable[objectIdx].playerOwnerIdx = -1;
@@ -829,7 +829,7 @@ uint16_t Object_SpawnEffectFragment(uint16_t sourceObjIdx) {
 	g_objectTable[objectIdx].genusId = GENUS_Explosion;
 	g_objectTable[objectIdx].objectType = (uint16_t)((GameRand() & 1) + OBJ_SparkTextureGroup3002);
 	g_objectTable[objectIdx].mobj->instanceExtent =
-		g_modelTypeTable[g_objectTable[objectIdx].objectType].maxBoundsExtent;
+		g_objectTypes[g_objectTable[objectIdx].objectType].maxBoundsExtent;
 	g_objectTable[objectIdx].mobj->sourceObjectType = g_objectTable[sourceObjIdx].objectType;
 	g_objectTable[objectIdx].playerOwnerIdx = -1;
 
@@ -912,8 +912,7 @@ uint16_t Object_SpawnLocalEffectFragment(uint16_t sourceObjIdx) {
 	g_objectTable[objectIdx].mobj->state = 5;
 	g_objectTable[objectIdx].genusId = GENUS_Explosion;
 	g_objectTable[objectIdx].objectType = OBJ_ChaffTextureGroup5000;
-	g_objectTable[objectIdx].mobj->instanceExtent =
-		g_modelTypeTable[OBJ_ChaffTextureGroup5000].maxBoundsExtent;
+	g_objectTable[objectIdx].mobj->instanceExtent = g_objectTypes[OBJ_ChaffTextureGroup5000].maxBoundsExtent;
 	g_objectTable[objectIdx].mobj->sourceObjectType = g_objectTable[sourceObjIdx].objectType;
 	g_objectTable[objectIdx].playerOwnerIdx = -1;
 
@@ -1070,7 +1069,7 @@ int Object_SpawnExplosionSpriteCloud(ObjectRecord* sourceObj, int sourceGenus) {
 				g_objectTable[objectIdx].mobj->instanceExtent = 0xfffff;
 			} else {
 				g_objectTable[objectIdx].mobj->instanceExtent =
-					g_modelTypeTable[(uint16_t)sourceObj->objectType].maxBoundsExtent / spriteCount;
+					g_objectTypes[(uint16_t)sourceObj->objectType].maxBoundsExtent / spriteCount;
 			}
 			g_objectTable[objectIdx].mobj->sourceObjIdx = -1;
 			g_objectTable[objectIdx].mobj->sourceObjectType = sourceObj->objectType;
@@ -1758,7 +1757,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 			}
 		}
 
-		if (g_modelTypeTable[obj->objectType].flags & MODEL_TYPE_FLAG_SPINS) {
+		if (g_objectTypes[obj->objectType].flags & OBJECT_TYPE_FLAG_SPINS) {
 			obj->angleD = (uint16_t)(obj->angleD + (((uint16_t)g_elapsedTicks << 12) / 236));
 			obj->mobj->orientMatrixDirty = 1;
 		}

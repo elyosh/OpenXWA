@@ -2,7 +2,7 @@
 
 #include "aeron/log.h"
 #include "xwa/assets/model_def.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/flight/player/player.h"
 #include "xwa_runtime/models/model_roles.h"

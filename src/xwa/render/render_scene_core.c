@@ -66,7 +66,7 @@ void RenderNonCraftSceneObject(uint16_t objectIndex) {
 	objectType = g_objectTable[objectIndex].objectType;
 	objectTypeIdx = (uint16_t)objectType;
 
-	if (g_modelTypeTable[objectTypeIdx].texLevels == NULL) {
+	if (g_objectTypes[objectTypeIdx].texLevels == NULL) {
 		if (g_objectTable[objectIndex].typeSpecificByte[0] == 0) {
 			Damage_QueueCraftBillboards(objectIndex);
 			RenderScene_DrawObjectModel(&g_objectTable[objectIndex]);
@@ -720,7 +720,7 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 
 				g_renderFlags = 64;
 				laserScale = -(g_deathStarTunnelLaserRegions[regionIdx].remainingDistance /
-							   (float)g_modelTypeTable[OBJ_LaserImperialDS].maxBoundsExtent);
+							   (float)g_objectTypes[OBJ_LaserImperialDS].maxBoundsExtent);
 				mesh.viewOrient[0] *= g_sw3dLaserScale;
 				mesh.viewOrient[1] *= g_sw3dLaserScale;
 				mesh.viewOrient[2] *= g_sw3dLaserScale;

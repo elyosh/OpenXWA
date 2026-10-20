@@ -217,9 +217,8 @@ XwaRemasterHyperspace* XwaRemasterHyperspace_Create(const XwaFlightHyperspaceTun
 		.address_v = AERON_ADDRESS_CLAMP_TO_EDGE,
 		.address_w = AERON_ADDRESS_CLAMP_TO_EDGE,
 	});
-	if (!h->streak_vs || !h->streak_fs || !h->tunnel_vs || !h->tunnel_fs ||
-		!h->environment_pipeline || !h->environment_atlas || !h->environment_cube ||
-		!h->environment_sampler) {
+	if (!h->streak_vs || !h->streak_fs || !h->tunnel_vs || !h->tunnel_fs || !h->environment_pipeline ||
+		!h->environment_atlas || !h->environment_cube || !h->environment_sampler) {
 		Aeron_LogError("xwa.remaster", "hyperspace: GPU resource creation failed");
 		XwaRemasterHyperspace_Destroy(h);
 		return NULL;
@@ -372,8 +371,8 @@ static void hyper_add_uniform_ambient(XwaShipAmbientCube* cube, const float colo
 
 static void hyper_build_transition_lighting(XwaRemasterHyperspace* h, float flash_alpha) {
 	float color[3];
-	const float scale = h->params.brightness * h->params.highlight_strength *
-						h->params.mesh_ambient_strength * flash_alpha;
+	const float scale =
+		h->params.brightness * h->params.highlight_strength * h->params.mesh_ambient_strength * flash_alpha;
 	for (int channel = 0; channel < 3; channel++) {
 		color[channel] = h->params.cap_color[channel] * scale;
 	}
@@ -405,13 +404,13 @@ static int hyper_generate_environment(XwaRemasterHyperspace* h, AeronCommandBuff
 	 * Generate into a 2D atlas and copy each completed face into the sampled cube. */
 	for (uint32_t face = 0; face < 6; face++) {
 		if (!Aeron_CopyTextureCmd(cmd, &(AeronTextureCopyDesc) {
-				.source = h->environment_atlas,
-				.source_x = face * HYPER_ENVIRONMENT_FACE_SIZE,
-				.destination = h->environment_cube,
-				.destination_layer = face,
-				.width = HYPER_ENVIRONMENT_FACE_SIZE,
-				.height = HYPER_ENVIRONMENT_FACE_SIZE,
-			})) {
+										   .source = h->environment_atlas,
+										   .source_x = face * HYPER_ENVIRONMENT_FACE_SIZE,
+										   .destination = h->environment_cube,
+										   .destination_layer = face,
+										   .width = HYPER_ENVIRONMENT_FACE_SIZE,
+										   .height = HYPER_ENVIRONMENT_FACE_SIZE,
+									   })) {
 			return 0;
 		}
 	}
@@ -455,7 +454,7 @@ static void hyper_build_tunnel_lighting(XwaRemasterHyperspace* h, const float ca
 		for (int channel = 0; channel < 3; channel++) {
 			h->lighting.key.color[channel] = XwaRemaster_LinearToSrgb(linear_key[channel] / intensity);
 		}
-		h->lighting.key.source_backdrop_model_type = 0;
+		h->lighting.key.source_backdrop_object_type = 0;
 		h->lighting.key.source_backdrop_index = -1;
 		h->lighting.key_count = 1;
 	}
@@ -472,8 +471,8 @@ int XwaRemasterHyperspace_GetPreparedLighting(const XwaRemasterHyperspace* h,
 }
 
 int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* cmd, const XwaSnapshot* snap,
-								  const float view_proj[16], const float camera_rows[9], int rt_w, int rt_h, int force_tunnel,
-								  float tunnel_time_seconds,
+								  const float view_proj[16], const float camera_rows[9], int rt_w, int rt_h,
+								  int force_tunnel, float tunnel_time_seconds,
 								  const XwaRemasterHyperspaceTunnelView* tunnel_view) {
 	if (!h || !cmd || !snap || !view_proj || !camera_rows) {
 		return 0;

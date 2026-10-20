@@ -83,7 +83,7 @@ set(XWA_RECOVERED_SOURCES
     src/xwa/assets/model_def.c
     src/xwa/assets/model_mesh.c
     src/xwa/assets/model_texture.c
-    src/xwa/assets/model_type.c
+    src/xwa/assets/object_type_info.c
     src/xwa/assets/object_type.c
     src/xwa/assets/opt_model.c
     src/xwa/assets/ship_list.c
@@ -541,7 +541,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa/assets/model_def.h
     src/xwa/assets/model_mesh.h
     src/xwa/assets/model_texture.h
-    src/xwa/assets/model_type.h
+    src/xwa/assets/object_type_info.h
     src/xwa/assets/object_type.h
     src/xwa/assets/opt_model.h
     src/xwa/assets/ship_list.h

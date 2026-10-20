@@ -5,7 +5,7 @@
 #include "aeron/image.h"
 #include "aeron/log.h"
 #include "xwa/assets/model_texture.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/util/byte_order.h"
 #include "xwa/util/memory.h"
 
@@ -613,7 +613,7 @@ const XwaGeometryAtlas* XwaFrontendGeometry_FindGroup(int group) {
 	atlas = geometry_find(key, NULL, path, 1);
 	/* The game copies the flight font's glyph pixels (flight_text.c), so the
 	   font group keeps its DAT images. The HD fonts come from flight/fonts. */
-	if (atlas != NULL && group == g_modelTypeTable[MODEL_TEXTURE_FONT_MODEL_TYPE].textureGroup) {
+	if (atlas != NULL && group == g_objectTypes[MODEL_TEXTURE_FONT_OBJECT_TYPE].textureGroup) {
 		if (!fontReported) {
 			Aeron_LogError("xwa.frontend",
 						   "%s: the flight font group can't use an atlas, so the game "

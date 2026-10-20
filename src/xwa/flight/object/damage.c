@@ -1000,7 +1000,7 @@ void Craft_SpawnMainHullExplosionEffects(uint16_t sourceObjIdx, uint16_t forceAt
 
 	if (forceAtFirstHullMesh) {
 		unsigned int explosionIdx = Craft_SpawnExplosionObjectAtMesh(
-			sourceObjIdx, hullMeshes[0], g_modelTypeTable[(uint16_t)objectType].maxBoundsExtent >> 4, 0);
+			sourceObjIdx, hullMeshes[0], g_objectTypes[(uint16_t)objectType].maxBoundsExtent >> 4, 0);
 		fsfx_PlaySound(24, sourceObjIdx, g_localPlayer);
 		if (explosionIdx != 0xFFFF && genusId != 18) {
 			if (g_objectTable[sourceObjIdx].objectType == OBJ_XiytiarTransport) {
@@ -1016,7 +1016,7 @@ void Craft_SpawnMainHullExplosionEffects(uint16_t sourceObjIdx, uint16_t forceAt
 	result = hullMeshes[(uint16_t)((uint16_t)GameRand() % hullMeshCount)];
 	if (g_curCraft->componentHp[result]) {
 		result = (uint16_t)Craft_SpawnExplosionObjectAtMesh(
-			sourceObjIdx, result, g_modelTypeTable[(uint16_t)objectType].maxBoundsExtent >> 4, 1);
+			sourceObjIdx, result, g_objectTypes[(uint16_t)objectType].maxBoundsExtent >> 4, 1);
 		if (result != 0xFFFF && genusId != 18) {
 			collide_ApplyDefaultProximityDamage(result, 0x7D0u, sourceObjIdx);
 			fsfx_PlaySound(fsfx_PickRandomSmallExplosionSfx(), result, g_localPlayer);
@@ -1033,7 +1033,7 @@ unsigned int Craft_SpawnExplosionObjectAtMesh(uint16_t sourceObjIdx, uint16_t me
 	Vec3f* vertices;
 	int vertexCount;
 	int selectedVertexIdx;
-	int modelType;
+	int objectType;
 	int localX;
 	int localY;
 	int localZ;
@@ -1042,15 +1042,15 @@ unsigned int Craft_SpawnExplosionObjectAtMesh(uint16_t sourceObjIdx, uint16_t me
 	vertices = NULL;
 	sourceObj = &g_objectTable[sourceObjIdx];
 	sourceObjectType = sourceObj->objectType;
-	modelType = (uint16_t)sourceObjectType;
+	objectType = (uint16_t)sourceObjectType;
 	selectedVertexIdx = useRandomVertex;
 
 	if (!useRandomVertex) {
-		localX = ModelMesh_GetCenterX(modelType, meshIdx);
+		localX = ModelMesh_GetCenterX(objectType, meshIdx);
 		localY = ModelMesh_GetCenterY((uint16_t)sourceObjectType, meshIdx);
-		localZ = ModelMesh_GetCenterZ(modelType, meshIdx);
+		localZ = ModelMesh_GetCenterZ(objectType, meshIdx);
 	} else {
-		ModelMesh_GetVerticesData(modelType, meshIdx, &vertices, &vertexCount);
+		ModelMesh_GetVerticesData(objectType, meshIdx, &vertices, &vertexCount);
 		if (vertices == NULL) {
 			return 0xffff;
 		}
@@ -1102,7 +1102,7 @@ unsigned int Craft_SpawnExplosionObjectAtMesh(uint16_t sourceObjIdx, uint16_t me
 
 		particleRand = GameRand2();
 		if (vertices == NULL) {
-			ModelMesh_GetVerticesData(modelType, meshIdx, &vertices, &vertexCount);
+			ModelMesh_GetVerticesData(objectType, meshIdx, &vertices, &vertexCount);
 			if (vertices == NULL) {
 				return 4095;
 			}
@@ -1116,7 +1116,7 @@ unsigned int Craft_SpawnExplosionObjectAtMesh(uint16_t sourceObjIdx, uint16_t me
 			Vec3f* normals;
 
 			normals = NULL;
-			ModelMesh_GetVertexNormalsData(modelType, meshIdx, &normals);
+			ModelMesh_GetVertexNormalsData(objectType, meshIdx, &normals);
 			if (normals != NULL) {
 				direction.x = normals[(uint16_t)selectedVertexIdx].x;
 				direction.y = normals[(uint16_t)selectedVertexIdx].y;

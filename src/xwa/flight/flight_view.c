@@ -308,7 +308,7 @@ int FlightView_ComputeSeatEyeOffset(int playerIdx) {
 		CraftData* craft;
 		OptRotationScale* launcherRotScale;
 		OptRotationScale* beamRotScale;
-		uint16_t turretModelType;
+		uint16_t turretObjectType;
 		uint16_t meshCount;
 		int meshIdx;
 		int remainingMeshCount;
@@ -321,21 +321,21 @@ int FlightView_ComputeSeatEyeOffset(int playerIdx) {
 		vec.y = (float)(g_hardpointOriginOffset[1] - g_modelDefs[modelIndex].turretSeatPosY[seatTableIdx]);
 		vec.z = (float)(g_hardpointOriginOffset[2] + g_modelDefs[modelIndex].turretSeatPosZ[seatTableIdx]);
 
-		turretModelType = g_modelDefs[modelIndex].turretObjectType[seatTableIdx];
-		meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretModelType);
+		turretObjectType = g_modelDefs[modelIndex].turretObjectType[seatTableIdx];
+		meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretObjectType);
 		if (meshCount > 0u) {
 			meshIdx = 0;
 			remainingMeshCount = meshCount;
 			do {
-				switch (ModelMesh_GetObjectTypeMeshType((int)turretModelType, meshIdx)) {
+				switch (ModelMesh_GetObjectTypeMeshType((int)turretObjectType, meshIdx)) {
 					case MESH_RotaryGunTurret:
-						(void)ModelMesh_GetRotScaleData((int)turretModelType, meshIdx);
+						(void)ModelMesh_GetRotScaleData((int)turretObjectType, meshIdx);
 						break;
 					case MESH_RotaryLauncher:
-						launcherRotScale = ModelMesh_GetRotScaleData((int)turretModelType, meshIdx);
+						launcherRotScale = ModelMesh_GetRotScaleData((int)turretObjectType, meshIdx);
 						break;
 					case MESH_RotaryBeamSystem:
-						beamRotScale = ModelMesh_GetRotScaleData((int)turretModelType, meshIdx);
+						beamRotScale = ModelMesh_GetRotScaleData((int)turretObjectType, meshIdx);
 						break;
 					default:
 						break;
@@ -423,13 +423,13 @@ void FlightView_RenderCockpitModel(void) {
 	savedLoadedModel = *loadedModelSlot;
 	if (g_players[g_localPlayer].currentSeatIdx != 0) {
 		ModelDefIndex modelIndex;
-		uint16_t turretModelType;
+		uint16_t turretObjectType;
 
 		modelIndex = GetModelDefIndexFromType(objectType);
-		turretModelType =
+		turretObjectType =
 			g_modelDefs[modelIndex].turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
-		if (turretModelType != 0) {
-			*loadedModelSlot = g_loadedModels.byObjectType[turretModelType];
+		if (turretObjectType != 0) {
+			*loadedModelSlot = g_loadedModels.byObjectType[turretObjectType];
 		} else {
 			FLIGHT_VIEW_OUTPUT_DEBUG_STRING("Can't find cockpit model\n");
 		}
@@ -577,7 +577,7 @@ int FlightView_FinishCameraFocusTransition(int playerIdx, uint16_t transitionDur
 		objectTable = g_objectTable;
 		extentShift = 0;
 		g_curModelMaxExtent =
-			g_modelTypeTable[(uint16_t)objectTable[g_players[player].viewState.cameraFocusObjIdx].objectType]
+			g_objectTypes[(uint16_t)objectTable[g_players[player].viewState.cameraFocusObjIdx].objectType]
 				.maxBoundsExtent /
 			2;
 		halfExtent = g_curModelMaxExtent;
@@ -709,7 +709,7 @@ void FlightView_UpdatePlaybackCamera(int playerIdx) {
 
 							extentShift = 0;
 							g_curModelMaxExtent =
-								g_modelTypeTable
+								g_objectTypes
 									[(uint16_t)g_objectTable[g_players[playerIdx].viewState.cameraFocusObjIdx]
 										 .objectType]
 										.maxBoundsExtent /
@@ -774,7 +774,7 @@ void FlightView_UpdatePlaybackCamera(int playerIdx) {
 
 										entryObjIdx = entry->objectIdx;
 										objectType = (uint16_t)g_objectTable[entryObjIdx].objectType;
-										if (entry->sortDepth - g_modelTypeTable[objectType].maxBoundsExtent <
+										if (entry->sortDepth - g_objectTypes[objectType].maxBoundsExtent <
 												viewZ &&
 											entryObjIdx != playerObjIdx && entryObjIdx != collisionObjIdx) {
 											if (objectType < OBJ_DSTankwlights) {
@@ -929,9 +929,9 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 
 					extentShift = 0;
 					g_curModelMaxExtent =
-						g_modelTypeTable[(uint16_t)
-											 g_objectTable[g_players[playerIdx].viewState.cameraFocusObjIdx]
-												 .objectType]
+						g_objectTypes[(uint16_t)
+										  g_objectTable[g_players[playerIdx].viewState.cameraFocusObjIdx]
+											  .objectType]
 							.maxBoundsExtent /
 						2;
 					halfExtent = g_curModelMaxExtent;
@@ -1010,7 +1010,7 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 
 								entryObjIdx = (unsigned int)entry->objectIdx;
 								objectType = (uint16_t)g_objectTable[entryObjIdx].objectType;
-								if (entry->sortDepth - g_modelTypeTable[objectType].maxBoundsExtent < viewZ &&
+								if (entry->sortDepth - g_objectTypes[objectType].maxBoundsExtent < viewZ &&
 									entryObjIdx != playerObjIdx && entryObjIdx != collisionObjIdx) {
 									if (objectType < OBJ_DSTankwlights) {
 										if (objectType >= OBJ_DSReactorCoreRoom) {
@@ -1256,7 +1256,7 @@ char FlightView_IsLensFlareSourceVisible(int worldX, int worldY, int worldZ) {
 		unsigned int objIdx;
 
 		objIdx = (unsigned int)entry->objectIdx;
-		if (entry->viewZ + g_modelTypeTable[(uint16_t)objectTable[objIdx].objectType].maxBoundsExtent > 0 &&
+		if (entry->viewZ + g_objectTypes[(uint16_t)objectTable[objIdx].objectType].maxBoundsExtent > 0 &&
 			playerObjIdx != (int)objIdx) {
 			if (collide_CheckSweptModelCollision((unsigned int)playerObjIdx, objIdx) > 0) {
 				visible = 0;
@@ -1763,10 +1763,9 @@ char FlightView_Render(void) {
 		}
 
 		if (objectType == OBJ_NoAsset_222 && g_objectTable[OBJ_NoAsset_222].mobj != NULL) {
-			maxBoundsExtent =
-				g_modelTypeTable[g_objectTable[objectIdx].mobj->sourceObjectType].maxBoundsExtent;
+			maxBoundsExtent = g_objectTypes[g_objectTable[objectIdx].mobj->sourceObjectType].maxBoundsExtent;
 		} else {
-			maxBoundsExtent = g_modelTypeTable[(uint16_t)objectType].maxBoundsExtent;
+			maxBoundsExtent = g_objectTypes[(uint16_t)objectType].maxBoundsExtent;
 		}
 		g_curModelMaxExtent = maxBoundsExtent;
 		switch (g_objectTable[objectIdx].genusId) {
@@ -1845,8 +1844,8 @@ char FlightView_Render(void) {
 			WorldRectRecord* backdrop;
 
 			backdrop = &g_backdropRecordsByRegion[regionIndex][backdropIdx];
-			if (backdrop->modelType >= OBJ_BackdropTextureGroup9001_Sprite1100_521 &&
-				backdrop->modelType <= OBJ_BackdropTextureGroup9010_Sprite2000 &&
+			if (backdrop->objectType >= OBJ_BackdropTextureGroup9001_Sprite1100_521 &&
+				backdrop->objectType <= OBJ_BackdropTextureGroup9010_Sprite2000 &&
 				backdrop->viewDirQ20.z > 0 &&
 				FlightView_IsLensFlareSourceVisible(
 					backdrop->worldDirQ20.x + g_players[g_localPlayer].viewState.savedTargetX,
@@ -1872,7 +1871,7 @@ char FlightView_Render(void) {
 			g_objRenderState[(uint16_t)objIdx].drawnThisFrame = 0;
 		}
 
-		g_curModelMaxExtent = g_modelTypeTable[(uint16_t)obj->objectType].maxBoundsExtent;
+		g_curModelMaxExtent = g_objectTypes[(uint16_t)obj->objectType].maxBoundsExtent;
 		if (!FlightView_IsStaticRenderGenus(obj->genusId)) {
 			continue;
 		}
@@ -1897,7 +1896,7 @@ char FlightView_Render(void) {
 			continue;
 		}
 
-		g_curModelMaxExtent = g_modelTypeTable[(uint16_t)obj->objectType].maxBoundsExtent;
+		g_curModelMaxExtent = g_objectTypes[(uint16_t)obj->objectType].maxBoundsExtent;
 		cullFlags =
 			FlightView_CullObjectSphereToViewport((uint16_t)objIdx, g_curModelMaxExtent, &projectedRadius);
 		g_renderFlags = cullFlags;
@@ -1940,7 +1939,7 @@ char FlightView_Render(void) {
 							continue;
 						}
 						savedModel = g_loadedModels.byObjectType[(uint16_t)obj->objectType];
-						g_curModelMaxExtent = g_modelTypeTable[(uint16_t)obj->objectType].maxBoundsExtent;
+						g_curModelMaxExtent = g_objectTypes[(uint16_t)obj->objectType].maxBoundsExtent;
 						g_camRelWorldX = obj->world_x;
 						g_camRelWorldY = obj->world_y;
 						g_camRelWorldZ = obj->world_z;
@@ -1949,15 +1948,15 @@ char FlightView_Render(void) {
 							g_loadedModels.byObjectType[(uint16_t)obj->objectType] = g_cockpitModel;
 						} else {
 							ModelDefIndex modelIndex;
-							uint16_t turretModelType;
+							uint16_t turretObjectType;
 
 							modelIndex = (ModelDefIndex)GetModelDefIndexFromType(obj->objectType);
-							turretModelType =
+							turretObjectType =
 								g_modelDefs[(uint16_t)modelIndex]
 									.turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
-							if (turretModelType != 0) {
+							if (turretObjectType != 0) {
 								g_loadedModels.byObjectType[(uint16_t)obj->objectType] =
-									g_loadedModels.byObjectType[turretModelType];
+									g_loadedModels.byObjectType[turretObjectType];
 							} else {
 								OutputDebugStringA("Can't find cockpit model\n");
 							}
@@ -2098,7 +2097,7 @@ char FlightView_Render(void) {
 				case GENUS_Explosion: {
 					unsigned int flareFrame;
 
-					flareFrame = (unsigned int)g_modelTypeTable[(uint16_t)obj->objectType].frameCount - 4u -
+					flareFrame = (unsigned int)g_objectTypes[(uint16_t)obj->objectType].frameCount - 4u -
 								 (unsigned int)obj->typeSpecificByte[0];
 					viewX = entry->viewX;
 					viewY = entry->viewY;

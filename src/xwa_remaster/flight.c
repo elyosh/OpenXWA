@@ -2137,7 +2137,7 @@ static void fl_submit_view_quad(AeronSceneBillboardStage stage, const float corn
 	fl_submit_view_quad_ex(stage, corners, uvs, ref, argb, anchor_local, 0.0f, NULL, 1.0f);
 }
 
-/* Resolve a model-type-bound DAT frame from the baked resdata group
+/* Resolve a object-type-bound DAT frame from the baked resdata group
  * atlases, per the classic binding kind: group-frame types select the
  * frame's POSITION in group order (FeDiskIo_SelectTextureFrame,
  * 1-based; frame <= 0 selects nothing); single-sprite types bind one
@@ -2167,20 +2167,20 @@ static void fl_world_to_view(const float cam[9], float x, float y, float z, floa
 }
 
 static int fl_backdrop_is_sun(const XwaBackdrop* b) {
-	return b->model_type >= XWA_SNAP_TYPE_BACKDROP_SUN_FIRST &&
-		   b->model_type <= XWA_SNAP_TYPE_BACKDROP_SUN_LAST;
+	return b->object_type >= XWA_SNAP_TYPE_BACKDROP_SUN_FIRST &&
+		   b->object_type <= XWA_SNAP_TYPE_BACKDROP_SUN_LAST;
 }
 
 /* Backdrop selection for fl_derive_backdrops: every record, every record
  * except backdrop suns, or one record index (>= 0). */
 enum { FL_BACKDROPS_ALL = -1, FL_BACKDROPS_NO_SUNS = XWA_FLIGHT_CAPTURE_BACKDROPS_NO_SUNS };
 
-/* Whether `rule` hides the DAT image that `model_type` draws for `frame`. */
+/* Whether `rule` hides the DAT image that `object_type` draws for `frame`. */
 static int fl_backdrop_hidden(XwaRemasterAssets* assets, const XwaEnvironmentBackdropRule* rule,
-							  int model_type, int frame) {
+							  int object_type, int frame) {
 	int group = 0;
 	int image = 0;
-	return rule && XwaRemasterAssets_FlightModelImageId(assets, model_type, frame, &group, &image) &&
+	return rule && XwaRemasterAssets_FlightModelImageId(assets, object_type, frame, &group, &image) &&
 		   XwaRemasterEnvironment_BackdropHidden(rule, group, image);
 }
 
@@ -2205,7 +2205,7 @@ static void fl_log_kept_backdrops(const XwaSnapshot* snap, XwaRemasterAssets* as
 		const int frame = (b->flags & 1u) ? b->frame : 1;
 		int group = 0;
 		int image = 0;
-		if (!XwaRemasterAssets_FlightModelImageId(assets, b->model_type, frame, &group, &image)) {
+		if (!XwaRemasterAssets_FlightModelImageId(assets, b->object_type, frame, &group, &image)) {
 			continue;
 		}
 		length +=
@@ -2242,7 +2242,7 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 			if (b->strip_segment_count == 0 || b->strip_segments_per_frame == 0) {
 				continue;
 			}
-			if (!fl_resolve_type_frame(assets, b->model_type, frame, &ref)) {
+			if (!fl_resolve_type_frame(assets, b->object_type, frame, &ref)) {
 				continue;
 			}
 			int32_t hh = b->strip_half_height;
@@ -2255,7 +2255,7 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 					if (seg_in_frame > b->strip_segments_per_frame) {
 						seg_in_frame -= b->strip_segments_per_frame;
 						frame++;
-						if (!fl_resolve_type_frame(assets, b->model_type, frame, &ref)) {
+						if (!fl_resolve_type_frame(assets, b->object_type, frame, &ref)) {
 							break;
 						}
 						if (ref.classic_h > 0 && prev_h > 0 && ref.classic_h != prev_h) {
@@ -2270,7 +2270,7 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 					u0 = 0.0f;
 				}
 				const float u1 = (float)seg_in_frame / (float)b->strip_segments_per_frame;
-				if (fl_backdrop_hidden(assets, hide, b->model_type, frame)) {
+				if (fl_backdrop_hidden(assets, hide, b->object_type, frame)) {
 					continue;
 				}
 				FlBackdropQuad* q = &out[count++];
@@ -2300,9 +2300,9 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 			if ((b->side == 4 && !(fwd_z > 0.0f)) || (b->side == 5 && !(fwd_z < 0.0f))) {
 				continue;
 			}
-			if (count >= capacity || !fl_resolve_type_frame(assets, b->model_type, frame, &ref) ||
+			if (count >= capacity || !fl_resolve_type_frame(assets, b->object_type, frame, &ref) ||
 				ref.classic_w <= 0 || ref.classic_h <= 0 ||
-				fl_backdrop_hidden(assets, hide, b->model_type, frame)) {
+				fl_backdrop_hidden(assets, hide, b->object_type, frame)) {
 				continue;
 			}
 			const int ext_w = ((int)b->angular_scale * (ref.classic_w + (ref.classic_w >> 1))) >> 8;
@@ -2756,8 +2756,8 @@ static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* as
 	for (uint32_t i = 0; !authored && i < snap->backdrop_count && s.lens_src_count < FL_MAX_LENS_SOURCES;
 		 i++) {
 		const XwaBackdrop* b = &snap->backdrops[i];
-		if (b->model_type < XWA_SNAP_TYPE_BACKDROP_SUN_FIRST ||
-			b->model_type > XWA_SNAP_TYPE_BACKDROP_SUN_LAST) {
+		if (b->object_type < XWA_SNAP_TYPE_BACKDROP_SUN_FIRST ||
+			b->object_type > XWA_SNAP_TYPE_BACKDROP_SUN_LAST) {
 			continue;
 		}
 		float v[3];
@@ -4352,7 +4352,7 @@ static void fl_remove_hidden_backdrop_lights(const XwaSnapshot* snap, XwaRemaste
 		const int16_t source = light->source_backdrop_index;
 		if (source >= 0 && (uint32_t)source < snap->backdrop_count) {
 			const XwaBackdrop* b = &snap->backdrops[source];
-			if (!fl_backdrop_is_sun(b) && fl_backdrop_hidden(assets, s.environment.backdrops, b->model_type,
+			if (!fl_backdrop_is_sun(b) && fl_backdrop_hidden(assets, s.environment.backdrops, b->object_type,
 															 (b->flags & 1u) ? b->frame : 1)) {
 				dropped++;
 				continue;
@@ -4402,7 +4402,7 @@ static void fl_apply_authored_lighting(const XwaSnapshot* snap, XwaRemasterAsset
 	}
 	uint32_t kept = 0;
 	for (uint32_t i = 0; i < snap->dir_light_count && count < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
-		if (snap->dir_lights[i].source_backdrop_model_type == 0) {
+		if (snap->dir_lights[i].source_backdrop_object_type == 0) {
 			out->authored_lights[count++] = snap->dir_lights[i];
 			kept++;
 		}
@@ -4679,7 +4679,7 @@ int XwaRemasterFlight_CaptureBackdropHidden(const XwaSnapshot* snap, XwaRemaster
 		return 1;
 	}
 	const XwaBackdrop* b = &snap->backdrops[index];
-	return b->hidden || fl_backdrop_hidden(assets, hide, b->model_type, (b->flags & 1u) ? b->frame : 1);
+	return b->hidden || fl_backdrop_hidden(assets, hide, b->object_type, (b->flags & 1u) ? b->frame : 1);
 }
 
 uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float crows[9],

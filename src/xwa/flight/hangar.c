@@ -7,7 +7,7 @@
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
 #include "xwa/assets/model_texture.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/assets/string_table.h"
 #include "xwa/audio/fsfx.h"
@@ -280,7 +280,7 @@ int g_unusedHangarShuttleMeshFlagLatch;
 // GLOBAL: XWA 0x9C6750
 int g_hangarReturnToFlightAvailable;
 // GLOBAL: XWA 0x9C6754
-int16_t g_hangarBackdropModelType;
+int16_t g_hangarBackdropObjectType;
 // GLOBAL: XWA 0x9C6760
 uint16_t g_hangarWarheadList[9];
 // GLOBAL: XWA 0x9C6780
@@ -856,15 +856,15 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 					/* Modern port (XWAU hook_hangars SelectHangarModelIndex): the
 					   family base for the family base, the hangar for any other
 					   mothership. */
-					g_hangarBackdropModelType = mt == OBJ_FamilyBase ? 179 : 308;
+					g_hangarBackdropObjectType = mt == OBJ_FamilyBase ? 179 : 308;
 				} else
 #endif
 					if (mt == OBJ_CalamariCruiserNew) {
-					g_hangarBackdropModelType = 308;
+					g_hangarBackdropObjectType = 308;
 				} else {
-					g_hangarBackdropModelType = 179;
+					g_hangarBackdropObjectType = 179;
 					if (mt == OBJ_CalamariWinged) {
-						g_hangarBackdropModelType = 308;
+						g_hangarBackdropObjectType = 308;
 					}
 				}
 			}
@@ -918,7 +918,7 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 			g_hangarMenuCursor[1] = 0;
 			Hangar_BuildMenu(1);
 			if (fromObjIdx != 0xFFFF || g_hangarMissionResolved || missionWasEnding) {
-				if (g_hangarBackdropModelType == 308) {
+				if (g_hangarBackdropObjectType == 308) {
 					g_objectTable[g_hangarPlayerObjIdx].world_x = g_objectTable[g_launchRefObjIdx].world_x;
 					g_objectTable[g_hangarPlayerObjIdx].world_y =
 						g_objectTable[g_launchRefObjIdx].world_y + 3000;
@@ -945,7 +945,7 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 				newc->beamLevel = 0;
 				newc->shieldRedirect = 0;
 				newc->laserRedirect = 0;
-				if (g_useHardware3D && g_hangarBackdropModelType != 179) {
+				if (g_useHardware3D && g_hangarBackdropObjectType != 179) {
 					Renderer_FlushTextureCacheAndReturnTrue();
 					Hangar_RenderFourStepCameraTransition();
 					Math_SetFpuSinglePrecisionMode();
@@ -991,7 +991,7 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 				g_flightSfxSideEffectGate = 0;
 				g_gameTime = 0;
 			}
-			if (g_useHardware3D && g_hangarBackdropModelType != 179) {
+			if (g_useHardware3D && g_hangarBackdropObjectType != 179) {
 				Renderer_FlushTextureCacheAndReturnTrue();
 				Hangar_RenderFourStepCameraTransition();
 				Math_SetFpuSinglePrecisionMode();
@@ -1414,11 +1414,11 @@ int Hangar_EnterCraft(uint16_t fromObjIdx) {
 			if (fromObjIdx != 0xFFFF) {
 				ObjectTypeId mt = g_objectTable[fromObjIdx].objectType;
 				if (mt == OBJ_CalamariCruiserNew) {
-					g_hangarBackdropModelType = 308;
+					g_hangarBackdropObjectType = 308;
 				} else {
-					g_hangarBackdropModelType = 179;
+					g_hangarBackdropObjectType = 179;
 					if (mt == OBJ_CalamariWinged) {
-						g_hangarBackdropModelType = 308;
+						g_hangarBackdropObjectType = 308;
 					}
 				}
 			}
@@ -1472,7 +1472,7 @@ int Hangar_EnterCraft(uint16_t fromObjIdx) {
 			g_hangarMenuCursor[1] = 0;
 			Hangar_BuildMenu(1);
 			if (fromObjIdx != 0xFFFF || g_hangarMissionResolved || missionWasEnding) {
-				if (g_hangarBackdropModelType == 308) {
+				if (g_hangarBackdropObjectType == 308) {
 					g_objectTable[g_hangarPlayerObjIdx].world_x = g_objectTable[g_launchRefObjIdx].world_x;
 					g_objectTable[g_hangarPlayerObjIdx].world_y =
 						g_objectTable[g_launchRefObjIdx].world_y + 3000;
@@ -1492,7 +1492,7 @@ int Hangar_EnterCraft(uint16_t fromObjIdx) {
 				newc->beamLevel = 0;
 				newc->shieldRedirect = 0;
 				newc->laserRedirect = 0;
-				if (g_useHardware3D && g_hangarBackdropModelType != 179) {
+				if (g_useHardware3D && g_hangarBackdropObjectType != 179) {
 					Renderer_FlushTextureCacheAndReturnTrue();
 					Hangar_RenderFourStepCameraTransition();
 					Math_SetFpuSinglePrecisionMode();
@@ -1538,7 +1538,7 @@ int Hangar_EnterCraft(uint16_t fromObjIdx) {
 				g_flightSfxSideEffectGate = 0;
 				g_gameTime = 0;
 			}
-			if (g_useHardware3D && g_hangarBackdropModelType != 179) {
+			if (g_useHardware3D && g_hangarBackdropObjectType != 179) {
 				Renderer_FlushTextureCacheAndReturnTrue();
 				Hangar_RenderFourStepCameraTransition();
 				Math_SetFpuSinglePrecisionMode();
@@ -2147,11 +2147,11 @@ int Hangar_UpdateLaunch(int dtMs) {
 #ifdef XWA_MODERN
 			/* Modern port (XWAU hook_hangars): PlayerAnimationStraightLine farther. */
 			if (g_objectTable[objIdx].world_y >
-				(g_hangarBackdropModelType != 308 ? -900 : 2500) + g_objectTable[g_launchRefObjIdx].world_y +
+				(g_hangarBackdropObjectType != 308 ? -900 : 2500) + g_objectTable[g_launchRefObjIdx].world_y +
 					(XwaHangars_IsActive() ? XwaHangars_Objects()->playerAnimationStraightLine : 0)) {
 #else
-			if (g_objectTable[objIdx].world_y >
-				(g_hangarBackdropModelType != 308 ? -900 : 2500) + g_objectTable[g_launchRefObjIdx].world_y) {
+			if (g_objectTable[objIdx].world_y > (g_hangarBackdropObjectType != 308 ? -900 : 2500) +
+													g_objectTable[g_launchRefObjIdx].world_y) {
 #endif
 				g_launchAnimDone = 1;
 				g_launchSeqPhase = 4;
@@ -2166,7 +2166,7 @@ int Hangar_UpdateLaunch(int dtMs) {
 			int railZ;
 
 			g_objectTable[g_hangarPlayerObjIdx].world_y -= (int64_t)g_hangarLaunchMoveSpeed * dtMsa;
-			decel = (g_hangarBackdropModelType == 308) ? 0.16f : 0.085000001f;
+			decel = (g_hangarBackdropObjectType == 308) ? 0.16f : 0.085000001f;
 			if (g_hangarLaunchMoveSpeed > 3.0f) {
 				g_hangarLaunchMoveSpeed = g_hangarLaunchMoveSpeed - (float)((double)dtMsa * decel);
 			}
@@ -2230,10 +2230,11 @@ int Hangar_UpdateLaunch(int dtMs) {
 			g_objectTable[objIdx].mobj->moveVectorDirty = 1;
 #ifdef XWA_MODERN
 			if (g_objectTable[objIdx].world_y <=
-				(g_hangarBackdropModelType != 308 ? -6800 : -800) + g_objectTable[g_launchRefObjIdx].world_y +
+				(g_hangarBackdropObjectType != 308 ? -6800 : -800) +
+					g_objectTable[g_launchRefObjIdx].world_y +
 					(XwaHangars_IsActive() ? XwaHangarScene_PlayerOffset(objIdx, 1) : 0)) {
 #else
-			if (g_objectTable[objIdx].world_y <= (g_hangarBackdropModelType != 308 ? -6800 : -800) +
+			if (g_objectTable[objIdx].world_y <= (g_hangarBackdropObjectType != 308 ? -6800 : -800) +
 													 g_objectTable[g_launchRefObjIdx].world_y) {
 #endif
 				g_launchSeqPhase = 6;
@@ -2338,7 +2339,7 @@ int Hangar_UpdateLaunch(int dtMs) {
 #else
 			if (g_objectTable[objIdx].world_z <= g_launchBaseZ + railZ) {
 #endif
-				if (g_hangarBackdropModelType == 308) {
+				if (g_hangarBackdropObjectType == 308) {
 					g_objectTable[objIdx].world_x = g_objectTable[g_launchRefObjIdx].world_x;
 					g_objectTable[objIdx].world_y = g_objectTable[g_launchRefObjIdx].world_y - 800;
 				} else {
@@ -2391,7 +2392,7 @@ int Hangar_UpdateLaunch(int dtMs) {
 		Hangar_SetCameraShot((uint16_t)GameRand() % 10);
 	}
 
-	if (g_hangarBackdropModelType == 308) {
+	if (g_hangarBackdropObjectType == 308) {
 		Hangar_UpdateHangarDroidTraffic(dtMsa);
 #ifdef XWA_MODERN
 		/* Modern port (XWAU hook_hangars HangarShuttleUpdateHook): no shuttle, no traffic. */
@@ -2402,7 +2403,7 @@ int Hangar_UpdateLaunch(int dtMs) {
 		Hangar_UpdateShuttleTrafficCycle(dtMsa);
 #endif
 		Hangar_UpdateRoofCraneMotion(dtMsa);
-	} else if (g_hangarBackdropModelType == 179) {
+	} else if (g_hangarBackdropObjectType == 179) {
 		Hangar_UpdateFamilyBaseDroidTraffic(dtMsa);
 	}
 	Hangar_HandleInput();
@@ -2760,7 +2761,7 @@ void Hangar_LaunchPlayerCraft(void) {
 	Hud_RestorePlayerHudState(g_localPlayer);
 	g_inHangarReady = 0;
 	if (g_useHardware3D || (Hud_RedrawSoftwareHudFrame(), g_useHardware3D)) {
-		if (g_hangarBackdropModelType != 179) {
+		if (g_hangarBackdropObjectType != 179) {
 			Renderer_FlushTextureCacheAndReturnTrue();
 			Hangar_RenderFourStepCameraTransition();
 			Math_SetFpuSinglePrecisionMode();
@@ -2979,9 +2980,9 @@ void Hangar_RenderScene(void) {
 			}
 
 			if (objectType == OBJ_NoAsset_222 && g_objectTable[OBJ_NoAsset_222].mobj != NULL) {
-				g_curModelMaxExtent = g_modelTypeTable[obj->mobj->sourceObjectType].maxBoundsExtent;
+				g_curModelMaxExtent = g_objectTypes[obj->mobj->sourceObjectType].maxBoundsExtent;
 			} else {
-				g_curModelMaxExtent = g_modelTypeTable[objectType].maxBoundsExtent;
+				g_curModelMaxExtent = g_objectTypes[objectType].maxBoundsExtent;
 			}
 
 			switch (obj->genusId) {
@@ -3060,11 +3061,11 @@ void Hangar_RenderScene(void) {
 		if (backdropIdx < (uint32_t)g_backdropCountByRegion[regionIndex]) {
 			backdrop = g_backdropRecordsByRegion[regionIndex];
 			do {
-				uint16_t modelType;
+				uint16_t objectType;
 
-				modelType = (uint16_t)backdrop->modelType;
-				if (modelType >= OBJ_BackdropTextureGroup9001_Sprite1100_521) {
-					if (modelType >= OBJ_BackdropTextureGroup9005_Sprite1500 && backdrop->viewDirQ20.z > 0 &&
+				objectType = (uint16_t)backdrop->objectType;
+				if (objectType >= OBJ_BackdropTextureGroup9001_Sprite1100_521) {
+					if (objectType >= OBJ_BackdropTextureGroup9005_Sprite1500 && backdrop->viewDirQ20.z > 0 &&
 						FlightView_IsLensFlareSourceVisible(
 							backdrop->worldDirQ20.x + g_players[g_localPlayer].viewState.savedTargetX,
 							backdrop->worldDirQ20.y + g_players[g_localPlayer].viewState.savedTargetY,
@@ -3099,7 +3100,7 @@ void Hangar_RenderScene(void) {
 		if (g_useHardware3D) {
 			g_objRenderState[objectIdx].drawnThisFrame = 0;
 		}
-		g_curModelMaxExtent = g_modelTypeTable[objectType].maxBoundsExtent;
+		g_curModelMaxExtent = g_objectTypes[objectType].maxBoundsExtent;
 		switch (g_objectTable[objectIdx].genusId) {
 			case GENUS_Mine:
 			case GENUS_Asteroid:
@@ -3182,21 +3183,21 @@ void Hangar_RenderScene(void) {
 						continue;
 					}
 					savedModel = g_loadedModels.byObjectType[objectType];
-					g_curModelMaxExtent = g_modelTypeTable[objectType].maxBoundsExtent;
+					g_curModelMaxExtent = g_objectTypes[objectType].maxBoundsExtent;
 					g_camRelWorldX = g_objectTable[objectIdx].world_x;
 					g_camRelWorldY = g_objectTable[objectIdx].world_y;
 					g_camRelWorldZ = g_objectTable[objectIdx].world_z;
 					g_cockpitViewActive = 1;
 					if (g_players[g_localPlayer].currentSeatIdx != 0) {
 						ModelDefIndex modelIndex;
-						uint16_t turretModelType;
+						uint16_t turretObjectType;
 
 						modelIndex = (ModelDefIndex)GetModelDefIndexFromType((ObjectTypeId)objectType);
-						turretModelType = g_modelDefs[(uint16_t)modelIndex]
-											  .turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
-						if (turretModelType != 0) {
+						turretObjectType = g_modelDefs[(uint16_t)modelIndex]
+											   .turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
+						if (turretObjectType != 0) {
 							g_loadedModels.byObjectType[objectType] =
-								g_loadedModels.byObjectType[turretModelType];
+								g_loadedModels.byObjectType[turretObjectType];
 						} else {
 							HANGAR_OUTPUT_DEBUG_STRING("Can't find cockpit model\n");
 						}
@@ -4620,7 +4621,7 @@ void Hangar_SetCameraShot(int shotIndex) {
 		goto shot_placed;
 	}
 #endif
-	if (g_hangarBackdropModelType == 308) {
+	if (g_hangarBackdropObjectType == 308) {
 		switch ((uint16_t)shotIndex) {
 			case 0:
 				goto cockpit_shot;
@@ -5302,15 +5303,15 @@ lbl58:
 	Hangar_BuildMenu(1);
 
 	// Carrier hangar (308) for the default hangar type, family base model (179) otherwise.
-	g_hangarBackdropModelType = g_pilotData.hangarType ? 179 : OBJ_Hangar;
+	g_hangarBackdropObjectType = g_pilotData.hangarType ? 179 : OBJ_Hangar;
 #ifdef XWA_MODERN
 	/* Modern port (XWAU hook_hangars HangarOptReloadHook): the command ship's
 	   hangar settings, and its own hangar model in place of a loaded one. */
 	XwaHangars_Resolve();
-	XwaHangars_ReleaseStaleModel((uint16_t)g_hangarBackdropModelType);
+	XwaHangars_ReleaseStaleModel((uint16_t)g_hangarBackdropObjectType);
 #endif
-	if (!g_loadedModels.byObjectType[(uint16_t)g_hangarBackdropModelType]) {
-		Hangar_LoadCraftModelByType((ObjectTypeId)g_hangarBackdropModelType);
+	if (!g_loadedModels.byObjectType[(uint16_t)g_hangarBackdropObjectType]) {
+		Hangar_LoadCraftModelByType((ObjectTypeId)g_hangarBackdropObjectType);
 		Math_SetFpuSinglePrecisionMode();
 	}
 
@@ -5318,7 +5319,7 @@ lbl58:
 	g_launchRefObjIdx = Object_AllocSlotForGenus(GENUS_Utility);
 	launchRefIdx = (uint16_t)g_launchRefObjIdx;
 	g_objectTable[launchRefIdx].regionIdx = (uint8_t)g_hangarSceneRegionIdx;
-	g_objectTable[launchRefIdx].objectType = (ObjectTypeId)g_hangarBackdropModelType;
+	g_objectTable[launchRefIdx].objectType = (ObjectTypeId)g_hangarBackdropObjectType;
 	g_objectTable[launchRefIdx].objectSignature = 1;
 	g_objectTable[launchRefIdx].mobj->state = 6;
 	g_objectTable[launchRefIdx].genusId = GENUS_Utility;
@@ -5335,7 +5336,7 @@ lbl58:
 	g_objectTable[launchRefIdx].mobj->moveVectorDirty = 1;
 	g_objectTable[launchRefIdx].flightGroupIdx = (uint8_t)((uint8_t)g_missionHeader.numFlightGroups + 1);
 	mobj = g_objectTable[launchRefIdx].mobj;
-	if (g_hangarBackdropModelType == 179) {
+	if (g_hangarBackdropObjectType == 179) {
 		mobj->iff = 5;
 	} else {
 		mobj->iff = 0;
@@ -5396,7 +5397,7 @@ lbl58:
 	}
 #endif
 
-	if (g_hangarBackdropModelType == OBJ_Hangar) {
+	if (g_hangarBackdropObjectType == OBJ_Hangar) {
 		g_objectTable[launchRefIdx].world_x = g_objectTable[g_hangarPlayerObjIdx].world_x;
 		g_objectTable[launchRefIdx].world_y = g_objectTable[g_hangarPlayerObjIdx].world_y + 800;
 	} else {
@@ -5410,7 +5411,7 @@ lbl58:
 #endif
 	g_objectTable[launchRefIdx].world_z =
 		g_launchBaseZ -
-		g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)g_hangarBackdropModelType)]
+		g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)g_hangarBackdropObjectType)]
 			.meshAttachData[6];
 
 	g_objectTable[launchRefIdx].mobj->prevWorldX = g_objectTable[launchRefIdx].world_x;
@@ -5421,7 +5422,7 @@ lbl58:
 	FVIEW_calcrotateorient(g_objectTable[launchRefIdx].roll, g_objectTable[launchRefIdx].angleD,
 						   &g_objectTable[launchRefIdx]);
 
-	if (g_hangarBackdropModelType == OBJ_Hangar) {
+	if (g_hangarBackdropObjectType == OBJ_Hangar) {
 		int16_t hangarModelIdx = GetModelDefIndexFromType(OBJ_Hangar);
 		double worldX = (double)g_objectTable[launchRefIdx].world_x;
 		float worldY = (float)g_objectTable[launchRefIdx].world_y;
@@ -5434,7 +5435,7 @@ lbl58:
 		RenderScene_DisableProjectionYClamp();
 	}
 
-	if (g_hangarBackdropModelType == OBJ_Hangar) {
+	if (g_hangarBackdropObjectType == OBJ_Hangar) {
 #ifdef XWA_MODERN
 		/* Modern port (XWAU hook_hangars): the scene from the hangar settings. */
 		if (XwaHangars_IsActive()) {
@@ -5609,7 +5610,7 @@ lbl58:
 				{
 					ObjectTypeId spawnObjectType = g_objectTable[srcIdx].objectType;
 					g_spawnLinkedObjectFlag = 1;
-					g_spawnGenusId = g_modelTypeTable[(uint16_t)spawnObjectType].genusId;
+					g_spawnGenusId = g_objectTypes[(uint16_t)spawnObjectType].genusId;
 				}
 				g_spawnStatus1 = g_missionFlightGroups[containerFgIdx].fg.status1;
 				g_spawnStatus2 = g_missionFlightGroups[containerFgIdx].fg.status2;
@@ -5650,17 +5651,17 @@ lbl58:
 }
 
 // FUNCTION: XWA 0x462640
-int Hangar_GetLaunchModelZOffset(int modelType) {
-	modelType &= 0xffff;
-	if (modelType != 4) {
-		return ModelBounds_GetSizeZ(modelType) / 2;
+int Hangar_GetLaunchModelZOffset(int objectType) {
+	objectType &= 0xffff;
+	if (objectType != 4) {
+		return ModelBounds_GetSizeZ(objectType) / 2;
 	}
 
 	return 50;
 }
 
 // FUNCTION: XWA 0x456AE0
-int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t modelType, int relX, int relY, int relZ,
+int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t objectType, int relX, int relY, int relZ,
 											  Q16Angle relYaw, Q16Angle relPitch) {
 	int objIdx;
 	int componentIdx;
@@ -5669,27 +5670,27 @@ int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t modelType, int relX, int 
 #ifdef XWA_MODERN
 	/* Modern port (XWAU hook_hangars HangarObjectCreateHook): a type whose
 	   hangar swap changed reloads. */
-	XwaHangars_ReleaseStaleModel(modelType);
+	XwaHangars_ReleaseStaleModel(objectType);
 #endif
-	if (g_loadedModels.byObjectType[modelType] == 0) {
-		Hangar_LoadCraftModelByType(modelType);
+	if (g_loadedModels.byObjectType[objectType] == 0) {
+		Hangar_LoadCraftModelByType(objectType);
 		Math_SetFpuSinglePrecisionMode();
-		if (g_loadedModels.byObjectType[modelType] == 0) {
+		if (g_loadedModels.byObjectType[objectType] == 0) {
 			return -1;
 		}
 	}
 
-	g_modelTypeTable[modelType].assetFlags |= 0x10u;
-	objIdx = Object_AllocSlotForGenus(g_modelTypeTable[modelType].genusId);
+	g_objectTypes[objectType].assetFlags |= 0x10u;
+	objIdx = Object_AllocSlotForGenus(g_objectTypes[objectType].genusId);
 	if (objIdx == 0xffffu) {
 		return 0;
 	}
 
 	g_objectTable[objIdx].regionIdx = (uint8_t)g_hangarSceneRegionIdx;
-	g_objectTable[objIdx].objectType = (ObjectTypeId)modelType;
+	g_objectTable[objIdx].objectType = (ObjectTypeId)objectType;
 	g_objectTable[objIdx].objectSignature = 1;
-	g_objectTable[objIdx].mobj->state = g_modelTypeTable[modelType].familyId;
-	g_objectTable[objIdx].genusId = g_modelTypeTable[modelType].genusId;
+	g_objectTable[objIdx].mobj->state = g_objectTypes[objectType].familyId;
+	g_objectTable[objIdx].genusId = g_objectTypes[objectType].genusId;
 	g_objectTable[objIdx].mobj->rollImpulseRate = 0;
 	g_objectTable[objIdx].mobj->speed = 0;
 	g_objectTable[objIdx].mobj->speedRemainder = 0;
@@ -5718,7 +5719,7 @@ int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t modelType, int relX, int 
 		g_curCraft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
 #endif
 
-		if (modelType == OBJ_Shuttle) {
+		if (objectType == OBJ_Shuttle) {
 			g_curCraft->engineOutputScale = 0xffffu;
 		} else {
 			g_curCraft->engineOutputScale = 0;
@@ -5755,7 +5756,7 @@ int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t modelType, int relX, int 
 	} else {
 		int zOffset;
 
-		zOffset = modelType;
+		zOffset = objectType;
 		if (zOffset != 4) {
 			zOffset = ModelBounds_GetSizeZ(zOffset) / 2;
 		} else {
@@ -5765,7 +5766,7 @@ int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t modelType, int relX, int 
 #ifdef XWA_MODERN
 		/* Modern port (XWAU hook_hangars): the [Size] elevation, on the floor side. */
 		if (XwaHangars_IsActive()) {
-			g_objectTable[objIdx].world_z = XwaHangarScene_ObjectFloorZ(modelType);
+			g_objectTable[objIdx].world_z = XwaHangarScene_ObjectFloorZ(objectType);
 		}
 #endif
 	}
@@ -5778,7 +5779,7 @@ int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t modelType, int relX, int 
 	/* Modern port: hide the components of this prop's default object profile,
 	 * as destroyed. The flight group it inherits from the launch reference is
 	 * past the mission's, which has no selection. */
-	XwaObjectProfiles_Apply(modelType, 0xFFFF, g_objectTable[objIdx].mobj->nodeSwitchIndex, g_curCraft);
+	XwaObjectProfiles_Apply(objectType, 0xFFFF, g_objectTable[objIdx].mobj->nodeSwitchIndex, g_curCraft);
 #endif
 	FVIEW_calcrotatemove(g_objectTable[objIdx].pitch, g_objectTable[objIdx].yaw, &g_objectTable[objIdx]);
 	FVIEW_calcrotateorient(g_objectTable[objIdx].roll, g_objectTable[objIdx].angleD, &g_objectTable[objIdx]);
@@ -7574,15 +7575,15 @@ void Hangar_FormatCountermeasureName(int16_t cmTypeId, char* outBuf) {
 }
 
 // FUNCTION: XWA 0x462670
-ObjectIndex Hangar_SwitchPlayerCraft(int newModelType) {
+ObjectIndex Hangar_SwitchPlayerCraft(int newObjectType) {
 	uint16_t playerObjIdx;
 	int componentIdx;
 	int componentsLeft;
 	int oldObjectType;
 	int engineSfxSlot;
-	uint16_t modelType;
+	uint16_t objectType;
 	ModelDefIndex modelIndex;
-	uint16_t turretModelType;
+	uint16_t turretObjectType;
 	ObjectIndex newObjIdx;
 
 	playerObjIdx = (uint16_t)g_hangarPlayerObjIdx;
@@ -7664,7 +7665,7 @@ ObjectIndex Hangar_SwitchPlayerCraft(int newModelType) {
 			engineSfxSlot = -1;
 			break;
 		default:
-			engineSfxSlot = newModelType;
+			engineSfxSlot = newObjectType;
 			break;
 	}
 
@@ -7672,25 +7673,25 @@ ObjectIndex Hangar_SwitchPlayerCraft(int newModelType) {
 		Sound_StopOldestInstance(g_sfxIds[engineSfxSlot]);
 	}
 
-	modelType = (uint16_t)newModelType;
-	if (g_loadedModels.byObjectType[modelType] == 0) {
-		if (Hangar_LoadCraftModelByType((ObjectTypeId)newModelType) == 0) {
+	objectType = (uint16_t)newObjectType;
+	if (g_loadedModels.byObjectType[objectType] == 0) {
+		if (Hangar_LoadCraftModelByType((ObjectTypeId)newObjectType) == 0) {
 			return (ObjectIndex)-1;
 		}
 		Math_SetFpuSinglePrecisionMode();
 	}
 
-	modelIndex = GetModelDefIndexFromType((ObjectTypeId)newModelType);
+	modelIndex = GetModelDefIndexFromType((ObjectTypeId)newObjectType);
 	if (modelIndex != (ModelDefIndex)0xffffu) {
-		turretModelType = g_modelDefs[(uint16_t)modelIndex].turretObjectType[0];
-		if (turretModelType != OBJ_None && g_loadedModels.byObjectType[turretModelType] == 0) {
-			Hangar_LoadCraftModelByType((ObjectTypeId)turretModelType);
+		turretObjectType = g_modelDefs[(uint16_t)modelIndex].turretObjectType[0];
+		if (turretObjectType != OBJ_None && g_loadedModels.byObjectType[turretObjectType] == 0) {
+			Hangar_LoadCraftModelByType((ObjectTypeId)turretObjectType);
 			Math_SetFpuSinglePrecisionMode();
 		}
 	}
 
 	oldObjectType = g_objectTable[g_hangarPlayerObjIdx].objectType;
-	if (g_modelTypeTable[(uint16_t)oldObjectType].assetFlags == 0 &&
+	if (g_objectTypes[(uint16_t)oldObjectType].assetFlags == 0 &&
 		g_loadedModels.byObjectType[(uint16_t)oldObjectType] != 0) {
 		OptModel_FreeHandle(g_loadedModels.byObjectType[(uint16_t)oldObjectType]);
 		g_loadedModels.byObjectType[(uint16_t)g_objectTable[g_hangarPlayerObjIdx].objectType] = 0;
@@ -7701,12 +7702,12 @@ ObjectIndex Hangar_SwitchPlayerCraft(int newModelType) {
 	g_spawnLinkedObjectFlag = 1;
 	g_spawnIff = g_missionFlightGroups[g_currentFlightGroupIdx].fg.iff;
 	g_spawnTeamId = g_missionFlightGroups[g_currentFlightGroupIdx].fg.team;
-	g_spawnGenusId = (ModelGenusId)g_modelTypeTable[(uint16_t)newModelType].genusId;
+	g_spawnGenusId = (ModelGenusId)g_objectTypes[(uint16_t)newObjectType].genusId;
 	g_spawnStatus1 = g_missionFlightGroups[g_currentFlightGroupIdx].fg.status1;
 	g_spawnStatus2 = g_missionFlightGroups[g_currentFlightGroupIdx].fg.status2;
 
 	newObjIdx =
-		Mission_InitFlightGroupObjectSlot((ObjectTypeId)newModelType, (ObjectIndex)g_hangarPlayerObjIdx);
+		Mission_InitFlightGroupObjectSlot((ObjectTypeId)newObjectType, (ObjectIndex)g_hangarPlayerObjIdx);
 	if (newObjIdx != (ObjectIndex)-1) {
 		uint16_t objectIdx;
 
@@ -7723,14 +7724,14 @@ ObjectIndex Hangar_SwitchPlayerCraft(int newModelType) {
 		uint16_t craftType;
 
 		for (craftType = 0; craftType < XWA_CRAFT_TYPE_REVERSE_SEARCH_COUNT; ++craftType) {
-			if (g_objectTypeTables.craftTypeToObjectType[craftType] == modelType) {
+			if (g_objectTypeTables.craftTypeToObjectType[craftType] == objectType) {
 				g_yardSelectedCraftType = (uint8_t)craftType;
 				g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType = (uint8_t)craftType;
 				break;
 			}
 		}
 		g_yardCurrentCraftScoreTable =
-			Yard_FindCraftScoreTableByObjectType((ObjectTypeId)modelType, g_yardHighScoreTable);
+			Yard_FindCraftScoreTableByObjectType((ObjectTypeId)objectType, g_yardHighScoreTable);
 	}
 
 	return newObjIdx;

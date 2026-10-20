@@ -842,7 +842,7 @@ void RenderScene_DrawMeshFaces(SceneMesh* mesh) {
 					TexLevel* texLevel;
 
 					FeDiskIo_SelectTextureFrame(0xEDu, 2u, 256);
-					texLevel = g_modelTypeTable[237].curTexLevel;
+					texLevel = g_objectTypes[237].curTexLevel;
 					std3D_AddToTextureCache((Std3DTextureSurface*)texLevel->image);
 					primaryTexture = &((Std3DTextureSurface*)texLevel->image)->cacheNode;
 					pass2Texture = NULL;

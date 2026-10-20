@@ -7,21 +7,21 @@
 extern "C" {
 #endif
 
-/* Nonzero once a model type's bounds are computed, per model type. */
+/* Nonzero once a object type's bounds are computed, per object type. */
 extern int g_modelBoundsCached[];
 
-void ModelBounds_EnsureCached(int modelType);
-int ModelBounds_GetMaxExtent(int modelType);
-int ModelBounds_GetMinY(int modelType);
-int ModelBounds_GetMinZ(int modelType);
-int ModelBounds_GetMaxY(int modelType);
-int ModelBounds_GetMaxZ(int modelType);
-Vec3f* ModelBounds_GetMinVector(int modelType);
-Vec3f* ModelBounds_GetMaxVector(int modelType);
-int ModelBounds_GetSizeX(int modelType);
-int ModelBounds_GetSizeY(int modelType);
-int ModelBounds_GetSizeZ(int modelType);
-double ModelBounds_ComputeMaxMinExtentRatio(int modelType);
+void ModelBounds_EnsureCached(int objectType);
+int ModelBounds_GetMaxExtent(int objectType);
+int ModelBounds_GetMinY(int objectType);
+int ModelBounds_GetMinZ(int objectType);
+int ModelBounds_GetMaxY(int objectType);
+int ModelBounds_GetMaxZ(int objectType);
+Vec3f* ModelBounds_GetMinVector(int objectType);
+Vec3f* ModelBounds_GetMaxVector(int objectType);
+int ModelBounds_GetSizeX(int objectType);
+int ModelBounds_GetSizeY(int objectType);
+int ModelBounds_GetSizeZ(int objectType);
+double ModelBounds_ComputeMaxMinExtentRatio(int objectType);
 int ModelBounds_ClearCache(void);
 
 #ifdef __cplusplus

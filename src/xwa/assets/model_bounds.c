@@ -1,7 +1,7 @@
 #include "xwa/assets/model_bounds.h"
 
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/frontend/frontend_display.h"
 #include "xwa/util/memory.h"
 
@@ -13,7 +13,7 @@ Vec3f g_modelBoundsMin[XWA_LOADED_MODEL_COUNT];
 Vec3f g_modelBoundsMax[XWA_LOADED_MODEL_COUNT];
 
 // FUNCTION: XWA 0x485310
-void ModelBounds_EnsureCached(int modelType) {
+void ModelBounds_EnsureCached(int objectType) {
 	OptimizedPolyObject* model;
 	Vec3f minBounds;
 	Vec3f maxBounds;
@@ -22,11 +22,11 @@ void ModelBounds_EnsureCached(int modelType) {
 	minBounds.x = minBounds.y = minBounds.z = 1073741800.0f;
 	maxBounds.x = maxBounds.y = maxBounds.z = -1073741800.0f;
 
-	if (!g_flightRenderToFrontend && !(g_modelTypeTable[modelType].assetFlags & 1)) {
+	if (!g_flightRenderToFrontend && !(g_objectTypes[objectType].assetFlags & 1)) {
 		return;
 	}
 
-	model = (OptimizedPolyObject*)Memory_LockHandle(g_loadedModels.byObjectType[modelType]);
+	model = (OptimizedPolyObject*)Memory_LockHandle(g_loadedModels.byObjectType[objectType]);
 	OptModel_AdjustOptimizedPolyObjectPointers(model);
 
 	for (i = 0; i < model->rootNodeCount; ++i) {
@@ -140,30 +140,30 @@ void ModelBounds_EnsureCached(int modelType) {
 		}
 	}
 
-	g_modelBoundsCached[modelType] = 1;
-	g_modelBoundsMin[modelType].x = minBounds.x;
-	g_modelBoundsMin[modelType].y = minBounds.y;
-	g_modelBoundsMin[modelType].z = minBounds.z;
-	g_modelBoundsMax[modelType].x = maxBounds.x;
-	g_modelBoundsMax[modelType].y = maxBounds.y;
-	g_modelBoundsMax[modelType].z = maxBounds.z;
-	Memory_UnlockHandle(g_loadedModels.byObjectType[modelType]);
+	g_modelBoundsCached[objectType] = 1;
+	g_modelBoundsMin[objectType].x = minBounds.x;
+	g_modelBoundsMin[objectType].y = minBounds.y;
+	g_modelBoundsMin[objectType].z = minBounds.z;
+	g_modelBoundsMax[objectType].x = maxBounds.x;
+	g_modelBoundsMax[objectType].y = maxBounds.y;
+	g_modelBoundsMax[objectType].z = maxBounds.z;
+	Memory_UnlockHandle(g_loadedModels.byObjectType[objectType]);
 }
 
 // FUNCTION: XWA 0x4855D0
-int ModelBounds_GetMaxExtent(int modelType) {
+int ModelBounds_GetMaxExtent(int objectType) {
 	double extentX;
 	double extentY;
 	float extent[3];
 
-	if (!g_modelBoundsCached[modelType]) {
-		ModelBounds_EnsureCached(modelType);
+	if (!g_modelBoundsCached[objectType]) {
+		ModelBounds_EnsureCached(objectType);
 	}
-	extentY = g_modelBoundsMax[modelType].y;
-	extent[1] = (float)(extentY - g_modelBoundsMin[modelType].y);
-	extentX = g_modelBoundsMax[modelType].x;
-	extentX -= g_modelBoundsMin[modelType].x;
-	extent[2] = g_modelBoundsMax[modelType].z - g_modelBoundsMin[modelType].z;
+	extentY = g_modelBoundsMax[objectType].y;
+	extent[1] = (float)(extentY - g_modelBoundsMin[objectType].y);
+	extentX = g_modelBoundsMax[objectType].x;
+	extentX -= g_modelBoundsMin[objectType].x;
+	extent[2] = g_modelBoundsMax[objectType].z - g_modelBoundsMin[objectType].z;
 
 	if (extent[1] >= extentX && extent[1] >= extent[2]) {
 		return (int)extent[1];
@@ -175,92 +175,92 @@ int ModelBounds_GetMaxExtent(int modelType) {
 }
 
 // FUNCTION: XWA 0x485680
-int ModelBounds_GetMinY(int modelType) {
-	if (!g_modelBoundsCached[modelType]) {
-		ModelBounds_EnsureCached(modelType);
+int ModelBounds_GetMinY(int objectType) {
+	if (!g_modelBoundsCached[objectType]) {
+		ModelBounds_EnsureCached(objectType);
 	}
-	return (int)g_modelBoundsMin[modelType].y;
+	return (int)g_modelBoundsMin[objectType].y;
 }
 
 // FUNCTION: XWA 0x4856B0
-int ModelBounds_GetMinZ(int modelType) {
-	if (!g_modelBoundsCached[modelType]) {
-		ModelBounds_EnsureCached(modelType);
+int ModelBounds_GetMinZ(int objectType) {
+	if (!g_modelBoundsCached[objectType]) {
+		ModelBounds_EnsureCached(objectType);
 	}
-	return (int)g_modelBoundsMin[modelType].z;
+	return (int)g_modelBoundsMin[objectType].z;
 }
 
 // FUNCTION: XWA 0x4856E0
-int ModelBounds_GetMaxY(int modelType) {
-	if (!g_modelBoundsCached[modelType]) {
-		ModelBounds_EnsureCached(modelType);
+int ModelBounds_GetMaxY(int objectType) {
+	if (!g_modelBoundsCached[objectType]) {
+		ModelBounds_EnsureCached(objectType);
 	}
-	return (int)g_modelBoundsMax[modelType].y;
+	return (int)g_modelBoundsMax[objectType].y;
 }
 
 // FUNCTION: XWA 0x485710
-int ModelBounds_GetMaxZ(int modelType) {
-	if (!g_modelBoundsCached[modelType]) {
-		ModelBounds_EnsureCached(modelType);
+int ModelBounds_GetMaxZ(int objectType) {
+	if (!g_modelBoundsCached[objectType]) {
+		ModelBounds_EnsureCached(objectType);
 	}
-	return (int)g_modelBoundsMax[modelType].z;
+	return (int)g_modelBoundsMax[objectType].z;
 }
 
 // FUNCTION: XWA 0x485740
-Vec3f* ModelBounds_GetMinVector(int modelType) {
-	if (!g_modelBoundsCached[modelType]) {
-		ModelBounds_EnsureCached(modelType);
+Vec3f* ModelBounds_GetMinVector(int objectType) {
+	if (!g_modelBoundsCached[objectType]) {
+		ModelBounds_EnsureCached(objectType);
 	}
-	return &g_modelBoundsMin[modelType];
+	return &g_modelBoundsMin[objectType];
 }
 
 // FUNCTION: XWA 0x485770
-Vec3f* ModelBounds_GetMaxVector(int modelType) {
-	if (!g_modelBoundsCached[modelType]) {
-		ModelBounds_EnsureCached(modelType);
+Vec3f* ModelBounds_GetMaxVector(int objectType) {
+	if (!g_modelBoundsCached[objectType]) {
+		ModelBounds_EnsureCached(objectType);
 	}
-	return &g_modelBoundsMax[modelType];
+	return &g_modelBoundsMax[objectType];
 }
 
 // FUNCTION: XWA 0x4857A0
-int ModelBounds_GetSizeX(int modelType) {
-	if (!g_modelBoundsCached[modelType]) {
-		ModelBounds_EnsureCached(modelType);
+int ModelBounds_GetSizeX(int objectType) {
+	if (!g_modelBoundsCached[objectType]) {
+		ModelBounds_EnsureCached(objectType);
 	}
-	return (int)(g_modelBoundsMax[modelType].x - g_modelBoundsMin[modelType].x);
+	return (int)(g_modelBoundsMax[objectType].x - g_modelBoundsMin[objectType].x);
 }
 
 // FUNCTION: XWA 0x4857E0
-int ModelBounds_GetSizeY(int modelType) {
-	if (!g_modelBoundsCached[modelType]) {
-		ModelBounds_EnsureCached(modelType);
+int ModelBounds_GetSizeY(int objectType) {
+	if (!g_modelBoundsCached[objectType]) {
+		ModelBounds_EnsureCached(objectType);
 	}
-	return (int)(g_modelBoundsMax[modelType].y - g_modelBoundsMin[modelType].y);
+	return (int)(g_modelBoundsMax[objectType].y - g_modelBoundsMin[objectType].y);
 }
 
 // FUNCTION: XWA 0x485820
-int ModelBounds_GetSizeZ(int modelType) {
-	if (!g_modelBoundsCached[modelType]) {
-		ModelBounds_EnsureCached(modelType);
+int ModelBounds_GetSizeZ(int objectType) {
+	if (!g_modelBoundsCached[objectType]) {
+		ModelBounds_EnsureCached(objectType);
 	}
-	return (int)(g_modelBoundsMax[modelType].z - g_modelBoundsMin[modelType].z);
+	return (int)(g_modelBoundsMax[objectType].z - g_modelBoundsMin[objectType].z);
 }
 
 // FUNCTION: XWA 0x485860
-double ModelBounds_ComputeMaxMinExtentRatio(int modelType) {
+double ModelBounds_ComputeMaxMinExtentRatio(int objectType) {
 	double extentX;
 	double extentY;
 	double extentZ;
 	double ratio;
 
-	g_modelTypeTable[0].assetFlags = 1;
-	g_modelBoundsCached[modelType] = 0;
-	ModelBounds_EnsureCached(modelType);
+	g_objectTypes[0].assetFlags = 1;
+	g_modelBoundsCached[objectType] = 0;
+	ModelBounds_EnsureCached(objectType);
 
-	extentZ = g_modelBoundsMax[modelType].z - g_modelBoundsMin[modelType].z;
+	extentZ = g_modelBoundsMax[objectType].z - g_modelBoundsMin[objectType].z;
 
-	if ((extentY = g_modelBoundsMax[modelType].y - g_modelBoundsMin[modelType].y) <
-		(extentX = g_modelBoundsMax[modelType].x - g_modelBoundsMin[modelType].x)) {
+	if ((extentY = g_modelBoundsMax[objectType].y - g_modelBoundsMin[objectType].y) <
+		(extentX = g_modelBoundsMax[objectType].x - g_modelBoundsMin[objectType].x)) {
 		if (extentY > extentZ) {
 			ratio = extentX / extentZ;
 		} else if (extentX > extentZ) {
@@ -276,7 +276,7 @@ double ModelBounds_ComputeMaxMinExtentRatio(int modelType) {
 		ratio = extentZ / extentX;
 	}
 
-	g_modelTypeTable[0].assetFlags = 0;
+	g_objectTypes[0].assetFlags = 0;
 	return ratio;
 }
 

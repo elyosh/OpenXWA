@@ -1794,7 +1794,7 @@ char paiorder_lookforparkorder(void) {
 	if (targetObjIdx != 0xffffu) {
 		Mission_ResolveObjectOrMissionPointWorldLoc(targetObjIdx, 0, 0, 0);
 		targetModelIndex =
-			(uint16_t)g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].modelDefIndex;
+			(uint16_t)g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].modelDefIndex;
 		bestRange = UINT32_MAX;
 		dockPointCount = (uint16_t)g_modelDefs[targetModelIndex].dockPointCount;
 		selectedDockPoint = 0xffff;
@@ -3029,7 +3029,7 @@ char paiorder_checkdeliverorder(void) {
 
 			Mission_ResolveObjectOrMissionPointWorldLoc(nearestObjIdx, 0, 0, 0);
 			targetObj = &g_objectTable[nearestObjIdx];
-			modelIndex = (uint16_t)g_modelTypeTable[targetObj->objectType].modelDefIndex;
+			modelIndex = (uint16_t)g_objectTypes[targetObj->objectType].modelDefIndex;
 			selectedDockScore = 0xffffffffu;
 			dockIdx = 0;
 			dockPointCount = g_modelDefs[modelIndex].dockPointCount;
@@ -3259,7 +3259,7 @@ char paiorder_UpdateInspectionVisibility(unsigned int inspectorObjIdx, unsigned 
 	}
 
 	inspectionRadius =
-		4u * (unsigned int)g_modelTypeTable[g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
+		4u * (unsigned int)g_objectTypes[g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
 	if (inspectionRadius < 0x2800u) {
 		inspectionRadius = 0x2800u;
 	}

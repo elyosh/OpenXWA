@@ -4,8 +4,8 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/model_bounds.h"
-#include "xwa/assets/model_type.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/flight/flight.h"
 #include "xwa/flight/hangar.h"
@@ -309,7 +309,7 @@ static void Hangars_ResolveObjects(void) {
 
 	memset(o, 0, sizeof *o);
 	o->loadShuttle = Hangars_Int("LoadShuttle", 1) == 1;
-	o->shuttleModelType = (uint16_t)Hangars_Int("ShuttleModelIndex", 0);
+	o->shuttleObjectType = (uint16_t)Hangars_Int("ShuttleModelIndex", 0);
 	o->shuttleMarkings = Hangars_Int("ShuttleMarkings", 0);
 	Hangars_Profile("ShuttleObjectProfile", o->shuttleObjectProfile);
 	o->shuttlePosition[0] = Hangars_Int("ShuttlePositionX", 0x467);
@@ -342,7 +342,7 @@ static void Hangars_ResolveObjects(void) {
 		droid->positionZ = Hangars_Int(keys[index][1], droidsPositionZ);
 		droid->isFloorInverted = isDroidsFloorInverted || Hangars_Int(keys[index][2], 0) != 0;
 		droid->update = droid->load && Hangars_Int(keys[index][3], 1) != 0;
-		droid->modelType =
+		droid->objectType =
 			(uint16_t)Hangars_Int(keys[index][4], index == 0 ? OBJ_HangarDroid : OBJ_HangarDroid2);
 		droid->markings = Hangars_Int(keys[index][5], 0);
 		Hangars_Profile(keys[index][6], droid->objectProfile);
@@ -756,7 +756,7 @@ void XwaHangars_ReleaseStaleModel(uint16_t objectType) {
 				  desired[0] != '\0' ? desired : "stock", loaded[0] != '\0' ? loaded : "stock");
 	OptModel_FreeHandle(handle);
 	g_loadedModels.byObjectType[objectType] = 0;
-	g_modelTypeTable[objectType].curTexLevel = NULL;
+	g_objectTypes[objectType].curTexLevel = NULL;
 	g_modelBoundsCached[objectType] = 0;
 	s_loaded[objectType].handle = 0;
 }

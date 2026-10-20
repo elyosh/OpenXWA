@@ -699,8 +699,8 @@ void paiman_initparkmaneuver(void) {
 																.fg.missionPointRegions[XWA_FG_POINT_START_1],
 															0);
 				targetModelIndex =
-					(uint16_t)g_modelTypeTable[g_objectTypeTables.craftTypeToObjectType
-												   [g_missionFlightGroups[targetFgIdx].fg.craftType]]
+					(uint16_t)g_objectTypes[g_objectTypeTables.craftTypeToObjectType
+												[g_missionFlightGroups[targetFgIdx].fg.craftType]]
 						.modelDefIndex;
 				break;
 			}
@@ -714,7 +714,7 @@ void paiman_initparkmaneuver(void) {
 	} else {
 		Mission_ResolveObjectOrMissionPointWorldLoc(targetObjIdx, 0, 0, 0);
 		targetModelIndex =
-			(uint16_t)g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].modelDefIndex;
+			(uint16_t)g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].modelDefIndex;
 	}
 
 	bestRange = UINT32_MAX;
@@ -2657,7 +2657,7 @@ static char paiman_escortmaneuver(void) {
 		targetCraft = g_objectTable[targetObjIdx].mobj->pCraft;
 		targetAi = pai_GetEffectiveAIController(targetCraft);
 		escortRange = 0x8000u;
-		if (g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent >= 3000) {
+		if (g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent >= 3000) {
 			escortRange = 0x20000u;
 		}
 
@@ -2741,7 +2741,7 @@ static char paiman_escortmaneuver(void) {
 			pai_calcrotatedpoint(&g_objectTable[targetObjIdx], g_aiCourseOrderLocalOffsetXByVar[variable1],
 								 g_aiCourseOrderLocalOffsetYByVar[variable1],
 								 g_aiCourseOrderLocalOffsetZByVar[variable1]);
-			if (g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent >= 3000) {
+			if (g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent >= 3000) {
 				int rotatedZ = g_rotatedZ;
 				int rotatedY = g_rotatedY;
 				int rotatedX = g_rotatedX;
@@ -3730,7 +3730,7 @@ bool paiman_UpdatePlayerTargetTrackingAutopilot(unsigned int playerIdx) {
 
 			Mission_ResolveObjectOrMissionPointWorldLoc(targetObjIdx, 0, 0, 0);
 			targetBackOffset =
-				6 * g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
+				6 * g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
 			if (targetBackOffset > 0x8000) {
 				targetBackOffset = 0x8000;
 			}
@@ -3788,7 +3788,7 @@ static char paiman_followtargetmaneuver(void) {
 	}
 
 	Mission_ResolveObjectOrMissionPointWorldLoc(targetObjIdx, 0, 0, 0);
-	targetBackOffset = 6 * g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
+	targetBackOffset = 6 * g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
 	if (targetBackOffset > 0x8000) {
 		targetBackOffset = 0x8000;
 	}
@@ -3897,8 +3897,8 @@ void paiman_setturn(uint16_t turnStep) {
 
 	if (yawDelta <= turnThreshold) {
 		g_objectTable[g_paiContext.aiObjIdx].yaw = targetYaw;
-		if ((g_modelTypeTable[g_objectTable[g_paiContext.aiObjIdx].objectType].flags &
-			 MODEL_TYPE_FLAG_SPINS) != 0) {
+		if ((g_objectTypes[g_objectTable[g_paiContext.aiObjIdx].objectType].flags & OBJECT_TYPE_FLAG_SPINS) !=
+			0) {
 			g_objectTable[g_paiContext.aiObjIdx].angleD =
 				(uint16_t)(g_objectTable[g_paiContext.aiObjIdx].angleD +
 						   (uint16_t)(g_objectTable[g_paiContext.aiObjIdx].yaw - oldYaw));

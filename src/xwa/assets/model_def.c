@@ -4,7 +4,7 @@
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/frontend/frontend_display.h"
 
 #include "model_def_static_data.inc"
@@ -82,7 +82,7 @@ static int ModelDef_GetProjectileDamage(ObjectTypeId objectType) {
 }
 
 int ModelDef_IsFloatingHardpointModel(uint16_t loadedModelSlot) {
-	return (g_modelTypeTable[loadedModelSlot].flags & 0x0800u) != 0;
+	return (g_objectTypes[loadedModelSlot].flags & 0x0800u) != 0;
 }
 
 // FUNCTION: XWA 0x4DD160
@@ -101,7 +101,7 @@ int ComputeCraftCombatRating(ObjectTypeId objectType) {
 	if ((uint16_t)objectType >= OBJ_Count) {
 		modelIndex = -1;
 	} else {
-		modelIndex = g_modelTypeTable[(uint16_t)objectType].modelDefIndex;
+		modelIndex = g_objectTypes[(uint16_t)objectType].modelDefIndex;
 	}
 	if (modelIndex == -1) {
 		return 5;
@@ -115,7 +115,7 @@ int ComputeCraftCombatRating(ObjectTypeId objectType) {
 	}
 
 	durabilityScore = (shieldScore + modelDef->hullStrength / 100) / 2;
-	genusId = g_modelTypeTable[objectType].genusId;
+	genusId = g_objectTypes[objectType].genusId;
 	if (genusId == GENUS_Starship || genusId == GENUS_Platform) {
 		durabilityScore *= 16;
 	} else if (genusId == GENUS_Freighter || genusId == GENUS_Container) {

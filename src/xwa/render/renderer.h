@@ -85,7 +85,7 @@ typedef void (*FlightDrawRadarTargetMarkerFn)(void);
 typedef int (*FlightRestoreRadarTargetMarkerFn)(void);
 typedef void (*FlightDrawLineFn)(int x1, int y1, int x2, int y2, uint8_t colorIdx);
 typedef struct WorldRectRecord {
-	uint16_t modelType;
+	uint16_t objectType;
 	Vec3i worldDirQ20;
 	Vec3i viewDirQ20;
 	int stripSegmentCount;
@@ -188,7 +188,7 @@ typedef struct ObjectMeshTextureLayerBlock {
 	uint16_t poolIndex;
 	int currentFrame;
 	uint16_t active;
-	uint16_t modelType;
+	uint16_t objectType;
 	uint16_t persistentUntilCleared;
 	int effectParam;
 	uint8_t gap716[4];
@@ -235,7 +235,7 @@ typedef struct GlowMarkRequest {
 	uint16_t effectParam;
 	GlowMarkRequestGeometry geom;
 	uint16_t deriveUvAxesFromReference;
-	uint16_t modelType;
+	uint16_t objectType;
 	uint8_t persistentUntilCleared;
 	float scaleU;
 	float scaleV;
@@ -289,13 +289,13 @@ struct ObjectTrailEmitter {
 	float alphaFadeStart;
 	float alphaFadeRate;
 	uint16_t animFrameCount;
-	uint16_t animModelType;
+	uint16_t animObjectType;
 	int animTicksAccum;
 	float animRateScale;
 	int forwardOffset;
 	unsigned int argbColor;
 	TexLevel* curTexLevel;
-	uint32_t textureModelType;
+	uint32_t textureObjectType;
 	float texVRate;
 	unsigned int renderFlags;
 	int trailKind;
@@ -352,7 +352,7 @@ enum {
 };
 
 typedef struct ModelTextureOverrideSlot {
-	uint16_t modelType;
+	uint16_t objectType;
 	OptNode* textureNode;
 } ModelTextureOverrideSlot;
 
@@ -700,7 +700,7 @@ extern int g_camRelWorldX;
 extern int g_camRelWorldY;
 extern int g_camRelWorldZ;
 extern int g_curModelMaxExtent;
-extern int g_modelPreviewModelType;
+extern int g_modelPreviewObjectType;
 extern ObjectRecord* g_objectTable;
 extern Vec3f g_modelPreviewViewDelta;
 extern int g_drawingOwnCraft;
@@ -1148,11 +1148,11 @@ int RenderScene_CullMeshFaces(SceneMesh* mesh);
 int RenderScene_CullMeshFacesFromView(SceneMesh* mesh);
 void GlowMark_AppendObjectMeshTextureLayers(SceneMesh* mesh, ObjectMeshTextureLayerBlock* layerBlocks);
 void GlowMark_ClearPendingRequests(void);
-ObjectMeshTextureLayerBlock* GlowMark_AllocShieldPatch(uint16_t sourceModelType, int unused);
-ObjectMeshTextureLayerBlock* GlowMark_AllocAnimatedPatch(uint16_t effectParamIndex, uint16_t modelType);
+ObjectMeshTextureLayerBlock* GlowMark_AllocShieldPatch(uint16_t sourceObjectType, int unused);
+ObjectMeshTextureLayerBlock* GlowMark_AllocAnimatedPatch(uint16_t effectParamIndex, uint16_t objectType);
 void GlowMark_UpdateActivePatches(void);
 void GlowMark_EvictOldestBlastMarkPatch(void);
-void GlowMark_QueueRandomObjectSurfaceEffect(unsigned int objectIndex, int16_t effectModelType, float scale);
+void GlowMark_QueueRandomObjectSurfaceEffect(unsigned int objectIndex, int16_t effectObjectType, float scale);
 void GlowMark_QueueCraftDamageSurfaceEffects(uint16_t objectIndex);
 void GlowMark_BeginMeshFacePatch(ObjectMeshTextureLayerBlock* patch);
 void GlowMark_MarkFaceData(ObjectMeshTextureLayerBlock* patch, OptNode* faceDataNode);
@@ -1265,22 +1265,22 @@ void RenderScene_DrawNoAssetSourceModel(ObjectRecord* obj, int nodeSwitchIndex);
 void RenderNonCraftSceneObject(uint16_t objectIndex);
 void EngineGlow_RenderForObject(unsigned int objIdx);
 void EngineGlow_RenderSceneGlows(void);
-GlowMarkRequest* GlowMark_QueueRequest(uint16_t objectIndex, int16_t effectParam, int16_t modelType,
+GlowMarkRequest* GlowMark_QueueRequest(uint16_t objectIndex, int16_t effectParam, int16_t objectType,
 									   float scaleU, float scaleV);
 void GlowMark_CreateEngineKnockoutBlastMark(unsigned int objectIndex, uint8_t emitterIndex);
 void GlowMark_ClearEngineKnockoutBlastMarks(unsigned int objectIndex);
-void Backdrop_DrawModelTexQuadAtScreen(ObjectTypeId modelType, int screenX, int screenY, int16_t angle,
+void Backdrop_DrawModelTexQuadAtScreen(ObjectTypeId objectType, int screenX, int screenY, int16_t angle,
 									   int16_t screenScale);
-void Backdrop_ProjectAndDrawScreenQuad(int viewX, int viewY, int viewZ, int16_t angle, ObjectTypeId modelType,
-									   int16_t screenScale);
-void Backdrop_DrawHardwareAxisQuad(ObjectTypeId modelType, int viewX, int viewY, int viewZ,
+void Backdrop_ProjectAndDrawScreenQuad(int viewX, int viewY, int viewZ, int16_t angle,
+									   ObjectTypeId objectType, int16_t screenScale);
+void Backdrop_DrawHardwareAxisQuad(ObjectTypeId objectType, int viewX, int viewY, int viewZ,
 								   int halfWidthAxisX, int halfWidthAxisY, int halfWidthAxisZ,
 								   int halfHeightAxisX, int halfHeightAxisY, int halfHeightAxisZ,
 								   uint16_t screenScale);
 void Backdrop_RenderCurrentRegion(void);
 void Backdrop_BuildCoordinateBuffers(void);
 void Backdrop_FreeCoordinateBuffers(void);
-char RenderQuad_DrawModelTexture(ObjectTypeId modelType, FlightTexQuad* quad, int argbColor);
+char RenderQuad_DrawModelTexture(ObjectTypeId objectType, FlightTexQuad* quad, int argbColor);
 int FlightSw_PrepareSpriteRotationTables(int16_t rotationAngle, ...);
 char* FlightSw_BuildSpriteTintRemapTables(Sprite* sprite);
 char FlightSw_DrawRotatedSpriteQuad(int16_t screenX, int16_t screenY, int16_t screenSize, Sprite* sprite);

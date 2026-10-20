@@ -11,7 +11,7 @@
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
 #include "xwa/assets/model_texture.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/assets/string_table.h"
 #include "xwa/audio/fsfx.h"
@@ -1392,7 +1392,7 @@ ObjectIndex FilmOverlay_FindNextSelectableObject(ObjectIndex currentObjIdx, int1
 				obj = &objects[candidate];
 				objectType = objects[candidate].objectType;
 				if (objectType != OBJ_None &&
-					(g_modelTypeTable[objectType].flags & MODEL_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) != 0) {
+					(g_objectTypes[objectType].flags & OBJECT_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) != 0) {
 					mobj = obj->mobj;
 					if (mobj == NULL) {
 						return (ObjectIndex)candidate;
@@ -1749,7 +1749,7 @@ void FlightObject_UpdateDebrisAndTransientAnimations(void) {
 				g_objectTable[debrisObjIdx].objectType =
 					(uint16_t)(OBJ_DebrisTextureGroup4000 + (GameRand2() & 3u));
 				g_objectTable[debrisObjIdx].mobj->instanceExtent =
-					g_modelTypeTable[g_objectTable[debrisObjIdx].objectType].maxBoundsExtent;
+					g_objectTypes[g_objectTable[debrisObjIdx].objectType].maxBoundsExtent;
 
 				if (g_objectTable[localPlayerObjIdx].mobj->orientMatrixDirty) {
 					FVIEW_calcrotatemove(g_objectTable[localPlayerObjIdx].pitch,
@@ -1804,18 +1804,18 @@ void FlightObject_UpdateDebrisAndTransientAnimations(void) {
 
 				if (g_objectTable[currentObjIdx].mobj != NULL &&
 					g_objectTable[currentObjIdx].objectType != OBJ_None) {
-					ModelTypeInfo* modelInfo;
+					ObjectTypeInfo* modelInfo;
 
 					animFrame = g_objectTable[currentObjIdx].typeSpecificByte[0];
 					g_flightObjectAnimFrameScratch = animFrame;
-					modelInfo = &g_modelTypeTable[g_objectTable[currentObjIdx].objectType];
+					modelInfo = &g_objectTypes[g_objectTable[currentObjIdx].objectType];
 					if (g_flightObjectAnimFrameScratch != 0 && modelInfo->texLevels != NULL) {
 						if (g_flightObjectAnimFrameScratch == 0xffffu) {
 							animFrame = 0;
 						}
 						g_flightObjectAnimFrameScratch = (uint16_t)(animFrame + 1u);
 						if (g_flightObjectAnimFrameScratch > modelInfo->frameCount) {
-							if ((modelInfo->flags & MODEL_TYPE_FLAG_ANIMATION_LOOPS) != 0) {
+							if ((modelInfo->flags & OBJECT_TYPE_FLAG_ANIMATION_LOOPS) != 0) {
 								g_flightObjectAnimFrameScratch = 1;
 							} else {
 								g_flightObjectAnimFrameScratch = 0;
@@ -1852,7 +1852,7 @@ void FlightObject_UpdateDebrisAndTransientAnimations(void) {
 void FlightObject_UpdateSpecialBehavior(void) {
 	uint32_t objIdx;
 	int16_t objectType;
-	int modelType;
+	int objectTypeIndex;
 
 #ifdef XWA_MODERN
 	/* Modern port: S-foils and landing gear of articulated models, and the
@@ -1881,7 +1881,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 					objectType = g_objectTable[(uint16_t)objIdx].objectType;
 					if ((uint16_t)objectType != 0) {
 						g_curCraft = mobj->pCraft;
-						modelType = (uint16_t)objectType;
+						objectTypeIndex = (uint16_t)objectType;
 
 #ifdef XWA_MODERN
 						if (XwaArticulation_StepsSFoils(objIdx)) {
@@ -1896,7 +1896,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 								case 17:
 								case 50: {
 									uint16_t meshCount =
-										(uint16_t)ModelMesh_GetObjectTypeMeshCount(modelType);
+										(uint16_t)ModelMesh_GetObjectTypeMeshCount(objectTypeIndex);
 									int16_t anyRotated = 0;
 									int m;
 									int remainingMeshes;
@@ -1905,7 +1905,8 @@ void FlightObject_UpdateSpecialBehavior(void) {
 										m = 0;
 										remainingMeshes = meshCount;
 										do {
-											MeshType meshType = ModelMesh_GetObjectTypeMeshType(modelType, m);
+											MeshType meshType =
+												ModelMesh_GetObjectTypeMeshType(objectTypeIndex, m);
 
 											// Falcon bridge fold (no completion accounting).
 											if (meshType == MESH_Bridge && objectType == 4 &&
@@ -2045,20 +2046,20 @@ void FlightObject_UpdateSpecialBehavior(void) {
 			}
 
 			if (g_objectTable[(uint16_t)objIdx].mobj == NULL) {
-				if (objectType != 0 && g_modelTypeTable[objectType].texLevels != NULL) {
+				if (objectType != 0 && g_objectTypes[objectType].texLevels != NULL) {
 					uint16_t frame;
-					ModelTypeInfo* modelInfo;
+					ObjectTypeInfo* modelInfo;
 
 					frame = g_objectTable[(uint16_t)objIdx].typeSpecificByte[0];
 					g_flightObjectAnimFrameScratch = frame;
-					modelInfo = &g_modelTypeTable[g_objectTable[(uint16_t)objIdx].objectType];
+					modelInfo = &g_objectTypes[g_objectTable[(uint16_t)objIdx].objectType];
 					if (g_flightObjectAnimFrameScratch != 0 && modelInfo->texLevels != NULL) {
 						if (g_flightObjectAnimFrameScratch == 0xffffu) {
 							frame = 0;
 						}
 						g_flightObjectAnimFrameScratch = (uint16_t)(frame + 1u);
 						if (g_flightObjectAnimFrameScratch > modelInfo->frameCount) {
-							if ((modelInfo->flags & MODEL_TYPE_FLAG_ANIMATION_LOOPS) != 0) {
+							if ((modelInfo->flags & OBJECT_TYPE_FLAG_ANIMATION_LOOPS) != 0) {
 								g_flightObjectAnimFrameScratch = 1;
 							} else {
 								g_flightObjectAnimFrameScratch = 0;
@@ -2098,18 +2099,18 @@ void FlightObject_UpdateSpecialBehavior(void) {
 				case GENUS_Explosion:
 					if (objectType != OBJ_NoAsset_222) {
 						uint16_t frame;
-						ModelTypeInfo* modelInfo;
+						ObjectTypeInfo* modelInfo;
 
 						frame = g_objectTable[(uint16_t)objIdx].typeSpecificByte[0];
 						g_flightObjectAnimFrameScratch = frame;
-						modelInfo = &g_modelTypeTable[g_objectTable[(uint16_t)objIdx].objectType];
+						modelInfo = &g_objectTypes[g_objectTable[(uint16_t)objIdx].objectType];
 						if (g_flightObjectAnimFrameScratch != 0 && modelInfo->texLevels != NULL) {
 							if (g_flightObjectAnimFrameScratch == 0xffffu) {
 								frame = 0;
 							}
 							g_flightObjectAnimFrameScratch = (uint16_t)(frame + 1u);
 							if (g_flightObjectAnimFrameScratch > modelInfo->frameCount) {
-								if ((modelInfo->flags & MODEL_TYPE_FLAG_ANIMATION_LOOPS) != 0) {
+								if ((modelInfo->flags & OBJECT_TYPE_FLAG_ANIMATION_LOOPS) != 0) {
 									g_flightObjectAnimFrameScratch = 1;
 								} else {
 									g_flightObjectAnimFrameScratch = 0;
@@ -2138,8 +2139,8 @@ void FlightObject_UpdateSpecialBehavior(void) {
 			}
 
 			// --- craft genus block ---
-			modelType = (uint16_t)objectType;
-			meshCount = ModelMesh_GetObjectTypeMeshCount(modelType);
+			objectTypeIndex = (uint16_t)objectType;
+			meshCount = ModelMesh_GetObjectTypeMeshCount(objectTypeIndex);
 			g_curCraft = g_objectTable[(uint16_t)objIdx].mobj->pCraft;
 			ai = pai_GetEffectiveAIController(g_curCraft);
 			doRotate = 0;
@@ -2156,7 +2157,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 			// Damaged craft eject crew/escape pods over time.
 			if (g_objectTable[(uint16_t)objIdx].mobj->ejectionSpawnCount != 0) {
 				if (g_curCraft->objectKind != 3 || objectType == OBJ_NoAsset_222 ||
-					ModelMesh_HasFuselage(modelType) || g_objectTable[(uint16_t)objIdx].genusId == 0) {
+					ModelMesh_HasFuselage(objectTypeIndex) || g_objectTable[(uint16_t)objIdx].genusId == 0) {
 					if (g_curCraft->systemHitFlag && (uint16_t)GameRand() < 0x800u) {
 						FlightObject_SpawnEscapePodOrPilot((uint16_t)objIdx);
 						--g_objectTable[(uint16_t)objIdx].mobj->ejectionSpawnCount;
@@ -2178,7 +2179,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 					}
 					meshIdx = g_modelDefs[g_curCraft->modelDefIndex].weaponHardpoints[slot].meshIdx;
 					if (!g_curCraft->componentHp[meshIdx] ||
-						ModelMesh_GetObjectTypeMeshType(modelType, meshIdx) != MESH_RotaryGunTurret) {
+						ModelMesh_GetObjectTypeMeshType(objectTypeIndex, meshIdx) != MESH_RotaryGunTurret) {
 						continue;
 					}
 					if (g_curCraft->warheadData[slot].turretTargetObjIdx == -1) {
@@ -2188,7 +2189,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 							g_curCraft->meshRotation[meshIdx] ^= 1u;
 						}
 					} else {
-						OptRotationScale* rs = ModelMesh_GetRotScaleData(modelType, meshIdx);
+						OptRotationScale* rs = ModelMesh_GetRotScaleData(objectTypeIndex, meshIdx);
 						ObjectRecord* to = &g_objectTable[objIdx];
 						MobileObject* tm;
 						int side, fwd, up, rotationProj, dirProj, upProj;
@@ -2229,7 +2230,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 			// Per-mesh: animated textures, hull-damage effects, crew/gun mesh idle spin.
 			remainingMeshes = meshCount;
 			for (m = 0; remainingMeshes != 0; ++m, --remainingMeshes) {
-				MeshType meshType = ModelMesh_GetObjectTypeMeshType(modelType, m);
+				MeshType meshType = ModelMesh_GetObjectTypeMeshType(objectTypeIndex, m);
 
 				if (meshType == 3) {
 					// Animated-texture mesh: advance the frame stored in componentState[49],
@@ -2241,11 +2242,11 @@ void FlightObject_UpdateSpecialBehavior(void) {
 					g_flightObjectAnimFrameScratch = frame;
 					g_objectTable[(uint16_t)objIdx].objectType = OBJ_AnimationTextureGroup2008;
 					if (frame != 0 &&
-						g_modelTypeTable[g_objectTable[(uint16_t)objIdx].objectType].texLevels != NULL) {
-						ModelTypeInfo* mi = &g_modelTypeTable[g_objectTable[(uint16_t)objIdx].objectType];
+						g_objectTypes[g_objectTable[(uint16_t)objIdx].objectType].texLevels != NULL) {
+						ObjectTypeInfo* mi = &g_objectTypes[g_objectTable[(uint16_t)objIdx].objectType];
 						g_flightObjectAnimFrameScratch = (uint16_t)(frame + 1u);
 						if (g_flightObjectAnimFrameScratch > mi->frameCount) {
-							if ((mi->flags & MODEL_TYPE_FLAG_ANIMATION_LOOPS) != 0) {
+							if ((mi->flags & OBJECT_TYPE_FLAG_ANIMATION_LOOPS) != 0) {
 								g_flightObjectAnimFrameScratch = 1;
 							} else {
 								g_flightObjectAnimFrameScratch = 0;
@@ -2267,7 +2268,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 				// Cosmetic hull breakup effects on a dying craft.
 				if (g_curCraft->objectKind == 3) {
 					if (objectType != OBJ_NoAsset_222) {
-						if (ModelMesh_HasFuselage(modelType) ||
+						if (ModelMesh_HasFuselage(objectTypeIndex) ||
 							g_objectTable[(uint16_t)objIdx].genusId == 0) {
 							if ((uint16_t)GameRand() < 0x1800u) {
 								Object_SpawnEffectFragment((uint16_t)objIdx);
@@ -2303,9 +2304,9 @@ void FlightObject_UpdateSpecialBehavior(void) {
 					if ((g_gameTime & 0xFFF) != 0) {
 						Vec3f localOffset;
 						Vec3f direction = { 0.0f, 1.0f, 0.0f };
-						int minY = -ModelBounds_GetMinY(modelType);
-						int sizeX = ModelBounds_GetSizeX(modelType);
-						int sizeZ = ModelBounds_GetSizeZ(modelType);
+						int minY = -ModelBounds_GetMinY(objectTypeIndex);
+						int sizeX = ModelBounds_GetSizeX(objectTypeIndex);
+						int sizeZ = ModelBounds_GetSizeZ(objectTypeIndex);
 
 						localOffset.x = (float)(Particle_RandSignedUnitFloat() * (double)sizeX);
 						localOffset.y = (float)((double)minY * 1.25);
@@ -2370,7 +2371,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 			if (elapsed < warmupTicks) {
 				// Warm-up: ramp the beam emitter sprite frame.
 				double t = (double)elapsed / (double)warmupTicks;
-				uint16_t frameCount = g_modelTypeTable[488].frameCount;
+				uint16_t frameCount = g_objectTypes[488].frameCount;
 
 				if (t >= 0.5) {
 					WorldRectRecord* spr = g_deathStarTunnelLaserRegions[regionIdx].beamSpriteRect;
@@ -2438,7 +2439,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 						(float)((1.0 - frac) * g_deathStarTunnelLaserRegions[regionIdx].remainingDistance);
 					g_deathStarTunnelLaserRegions[regionIdx].beamSpriteRect->frame = 0;
 				} else {
-					uint16_t frameCount = g_modelTypeTable[488].frameCount;
+					uint16_t frameCount = g_objectTypes[488].frameCount;
 					WorldRectRecord* spr = g_deathStarTunnelLaserRegions[regionIdx].beamSpriteRect;
 					spr->frame =
 						(spr->frame == frameCount - 1) ? (uint8_t)frameCount : (uint8_t)(frameCount - 1);
@@ -3223,7 +3224,7 @@ static CraftData* FlightWorldState_SerializedCraft(uint32_t slot) {
 	const ObjectRecord* obj = &g_objectTable[slot];
 
 	if (obj->objectType == OBJ_None || obj->mobj == NULL || obj->mobj->pCraft == NULL ||
-		(g_modelTypeTable[(uint16_t)obj->objectType].recordFlags & 4u) != 0) {
+		(g_objectTypes[(uint16_t)obj->objectType].recordFlags & 4u) != 0) {
 		return NULL;
 	}
 	return obj->mobj->pCraft;
@@ -3743,7 +3744,7 @@ int Flight_SaveWorldState(void) {
 		if (g_objectTable[slot].objectType != OBJ_None) {
 			uint16_t recordFlags;
 
-			recordFlags = g_modelTypeTable[(uint16_t)g_objectTable[slot].objectType].recordFlags;
+			recordFlags = g_objectTypes[(uint16_t)g_objectTable[slot].objectType].recordFlags;
 			if (g_objectTable[slot].mobj != NULL) {
 				g_objectTable[slot].mobj =
 					(MobileObject*)((uint8_t*)g_objectTable[slot].mobj - (uint32_t)g_mobileObjectPoolBase);
@@ -3927,7 +3928,7 @@ int Flight_SaveWorldState(void) {
 			FlightWorldState_SerializeObjectRecord(&serializedObj, obj);
 			FlightWorldState_WriteBlock(&cursor, &serializedObj, sizeof(serializedObj));
 
-			recordFlags = g_modelTypeTable[objectType].recordFlags;
+			recordFlags = g_objectTypes[objectType].recordFlags;
 			mobj = obj->mobj;
 			if (mobj != NULL) {
 				FlightSerializedMobileObject serializedMobj;
@@ -4046,7 +4047,7 @@ int Flight_ChecksumWorldState(int expectedChecksum, int serverTicks) {
 			uint32_t encodedMobj;
 			uint16_t recordFlags;
 
-			recordFlags = g_modelTypeTable[(uint16_t)g_objectTable[slot].objectType].recordFlags;
+			recordFlags = g_objectTypes[(uint16_t)g_objectTable[slot].objectType].recordFlags;
 			serializedObj = cursor;
 			byteCount = 35;
 			do {
@@ -4321,7 +4322,7 @@ void Flight_RestoreWorldState(void) {
 		if (objectType != OBJ_None) {
 			uint16_t recordFlags;
 
-			recordFlags = g_modelTypeTable[objectType].recordFlags;
+			recordFlags = g_objectTypes[objectType].recordFlags;
 			memcpy(obj, cursor, sizeof(FlightSerializedObjectRecord));
 			cursor += sizeof(FlightSerializedObjectRecord);
 
@@ -4449,7 +4450,7 @@ void Flight_RestoreWorldState(void) {
 
 			serializedObj = (const FlightSerializedObjectRecord*)cursor;
 			cursor += sizeof(*serializedObj);
-			recordFlags = g_modelTypeTable[objectType].recordFlags;
+			recordFlags = g_objectTypes[objectType].recordFlags;
 			FlightWorldState_RestoreObjectRecord(obj, serializedObj);
 
 			if (obj->mobj != NULL) {
@@ -5352,8 +5353,8 @@ static __inline void Flight_UpdateAiCraftOrientation(uint16_t objectIdx, AiContr
 					}
 				}
 
-				if ((g_modelTypeTable[(uint16_t)g_objectTable[objectIdx].objectType].flags &
-					 MODEL_TYPE_FLAG_SPINS) != 0) {
+				if ((g_objectTypes[(uint16_t)g_objectTable[objectIdx].objectType].flags &
+					 OBJECT_TYPE_FLAG_SPINS) != 0) {
 					g_objectTable[objectIdx].angleD =
 						(uint16_t)(g_objectTable[objectIdx].angleD +
 								   (uint16_t)(g_objectTable[objectIdx].yaw - oldYaw));
@@ -6247,8 +6248,8 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 					Film_WriteBytesBuffered(&g_modelTextureOverrideNextSlot,
 											sizeof(g_modelTextureOverrideNextSlot));
 					for (loopIdx = 0; (int)loopIdx < 32; ++loopIdx) {
-						Film_WriteBytesBuffered(&g_modelTextureOverrideSlots[loopIdx].modelType,
-												sizeof(g_modelTextureOverrideSlots[loopIdx].modelType));
+						Film_WriteBytesBuffered(&g_modelTextureOverrideSlots[loopIdx].objectType,
+												sizeof(g_modelTextureOverrideSlots[loopIdx].objectType));
 					}
 
 					Film_WriteBytesBuffered(&g_escapePodPilotFlightGroupIdx,
@@ -6377,11 +6378,11 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 			if (g_filmVersion != 0) {
 				Film_ReadBytes(&g_modelTextureOverrideNextSlot, sizeof(g_modelTextureOverrideNextSlot));
 				for (loopIdx = 0; (int)loopIdx < 32; ++loopIdx) {
-					Film_ReadBytes(&g_modelTextureOverrideSlots[loopIdx].modelType,
-								   sizeof(g_modelTextureOverrideSlots[loopIdx].modelType));
-					if (g_modelTextureOverrideSlots[loopIdx].modelType != 0) {
+					Film_ReadBytes(&g_modelTextureOverrideSlots[loopIdx].objectType,
+								   sizeof(g_modelTextureOverrideSlots[loopIdx].objectType));
+					if (g_modelTextureOverrideSlots[loopIdx].objectType != 0) {
 						ModelMesh_AssignDebrisTexSlot(
-							(ObjectTypeId)g_modelTextureOverrideSlots[loopIdx].modelType, (uint16_t)loopIdx);
+							(ObjectTypeId)g_modelTextureOverrideSlots[loopIdx].objectType, (uint16_t)loopIdx);
 					}
 				}
 			}
@@ -6830,8 +6831,7 @@ int Pause_ProcessInput(void) {
 					g_filmOverlayViewState.cameraFocusObjIdx = g_players[g_localPlayer].objectIndex;
 					if (g_filmOverlayViewState.cameraFocusObjIdx != 0xffff) {
 						g_filmOverlayViewState.cameraDistance =
-							g_modelTypeTable[g_objectTable[g_filmOverlayViewState.cameraFocusObjIdx]
-												 .objectType]
+							g_objectTypes[g_objectTable[g_filmOverlayViewState.cameraFocusObjIdx].objectType]
 								.maxBoundsExtent +
 							512;
 					}
@@ -6868,7 +6868,7 @@ int Pause_ProcessInput(void) {
 				fsfx_PlaySound(67, 0xffffu, (unsigned int)g_localPlayer);
 				if (g_filmOverlayViewState.cameraFocusObjIdx != 0xffff) {
 					g_filmOverlayViewState.cameraDistance =
-						g_modelTypeTable[g_objectTable[g_filmOverlayViewState.cameraFocusObjIdx].objectType]
+						g_objectTypes[g_objectTable[g_filmOverlayViewState.cameraFocusObjIdx].objectType]
 							.maxBoundsExtent +
 						512;
 					g_filmOverlayViewState.hudAimX = (uint16_t)(int16_t)-2790;
@@ -6904,7 +6904,7 @@ int Pause_ProcessInput(void) {
 				fsfx_PlaySound(67, 0xffffu, (unsigned int)g_localPlayer);
 				if (g_filmOverlayViewState.cameraFocusObjIdx != 0xffff) {
 					g_filmOverlayViewState.cameraDistance =
-						g_modelTypeTable[g_objectTable[g_filmOverlayViewState.cameraFocusObjIdx].objectType]
+						g_objectTypes[g_objectTable[g_filmOverlayViewState.cameraFocusObjIdx].objectType]
 							.maxBoundsExtent +
 						512;
 					g_filmOverlayViewState.hudAimX = (uint16_t)(int16_t)-2790;
@@ -7009,7 +7009,7 @@ toggle_film_overlay:
 			g_filmOverlayViewState.savedHudAimY = 0;
 			if (g_filmOverlayViewState.cameraFocusObjIdx != 0xffff) {
 				g_filmOverlayViewState.cameraDistance =
-					g_modelTypeTable[g_objectTable[g_filmOverlayViewState.cameraFocusObjIdx].objectType]
+					g_objectTypes[g_objectTable[g_filmOverlayViewState.cameraFocusObjIdx].objectType]
 						.maxBoundsExtent +
 					512;
 			} else {
@@ -7036,7 +7036,7 @@ clear_film_aim_target:
 	fsfx_PlaySound(67, 0xffffu, (unsigned int)g_localPlayer);
 	if (g_filmOverlayViewState.cameraFocusObjIdx != 0xffff) {
 		g_filmOverlayViewState.cameraDistance =
-			g_modelTypeTable[g_objectTable[g_filmOverlayViewState.cameraFocusObjIdx].objectType]
+			g_objectTypes[g_objectTable[g_filmOverlayViewState.cameraFocusObjIdx].objectType]
 				.maxBoundsExtent +
 			512;
 		g_filmOverlayViewState.hudAimX = (uint16_t)(int16_t)-2790;
@@ -7194,7 +7194,7 @@ int Flight_CheckMissionEndAndExitRequest(void) {
 
 			return (uint8_t)result;
 		}
-		if (g_hangarBackdropModelType == 179) {
+		if (g_hangarBackdropObjectType == 179) {
 			uint8_t goalStatus =
 				g_missionFlightRuntimeState
 					.teamGoalStatus[(uint16_t)g_players[g_localPlayer].playerIff][TEAM_GOAL_PRIMARY];
@@ -8165,7 +8165,7 @@ static __inline uint16_t FlightAction_CycleFlaggedTarget(unsigned int playerIdx)
 	while (remaining-- != 0) {
 		ObjectRecord* candidate = &g_objectTable[candidateIdx];
 		if (candidate->objectType != OBJ_None &&
-			(g_modelTypeTable[(uint16_t)candidate->objectType].flags & 4) != 0) {
+			(g_objectTypes[(uint16_t)candidate->objectType].flags & 4) != 0) {
 			if (candidateIdx != (uint16_t)player->currentTargetObjectIdx) {
 				return candidateIdx;
 			}
@@ -8557,7 +8557,7 @@ static __inline void FlightAction_FocusNewestPlayerProjectile(unsigned int playe
 				player->viewState.savedHudAimX = player->viewState.hudAimX;
 				player->viewState.savedHudAimY = player->viewState.hudAimY;
 				player->viewState.cameraDistance =
-					4 * g_modelTypeTable[(uint16_t)projectile->objectType].maxBoundsExtent;
+					4 * g_objectTypes[(uint16_t)projectile->objectType].maxBoundsExtent;
 				if (player->viewState.cameraDistance > 0x2000) {
 					player->viewState.cameraDistance = 0x2000;
 				}
@@ -9749,8 +9749,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					int focusObjIdx = g_players[currentPlayerIdx].viewState.cameraFocusObjIdx;
 					if (focusObjIdx != 0xffff) {
 						g_players[currentPlayerIdx].viewState.cameraDistance =
-							g_modelTypeTable[(uint16_t)g_objectTable[focusObjIdx].objectType]
-								.maxBoundsExtent +
+							g_objectTypes[(uint16_t)g_objectTable[focusObjIdx].objectType].maxBoundsExtent +
 							512;
 					} else if (g_players[currentPlayerIdx].currentTargetObjectIdx != 0xffffu) {
 						g_players[currentPlayerIdx].viewState.savedTargetX =
@@ -9763,9 +9762,9 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 							g_objectTable[(uint16_t)g_players[currentPlayerIdx].currentTargetObjectIdx]
 								.world_z;
 						g_players[currentPlayerIdx].viewState.cameraDistance =
-							g_modelTypeTable[(uint16_t)g_objectTable[(uint16_t)g_players[currentPlayerIdx]
-																		 .currentTargetObjectIdx]
-												 .objectType]
+							g_objectTypes[(uint16_t)g_objectTable[(uint16_t)g_players[currentPlayerIdx]
+																	  .currentTargetObjectIdx]
+											  .objectType]
 								.maxBoundsExtent +
 							512;
 						FVIEW_BuildCameraOrient(0, (int16_t)g_players[currentPlayerIdx].viewState.viewPitch,
@@ -9785,9 +9784,9 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 						g_objectTable[(uint16_t)g_players[currentPlayerIdx].currentTargetObjectIdx].world_y;
 					g_players[currentPlayerIdx].viewState.savedTargetZ =
 						g_objectTable[(uint16_t)g_players[currentPlayerIdx].currentTargetObjectIdx].world_z +
-						16 * g_modelTypeTable[(uint16_t)g_objectTable[(uint16_t)g_players[currentPlayerIdx]
-																		  .currentTargetObjectIdx]
-												  .objectType]
+						16 * g_objectTypes[(uint16_t)g_objectTable[(uint16_t)g_players[currentPlayerIdx]
+																	   .currentTargetObjectIdx]
+											   .objectType]
 								 .maxBoundsExtent;
 				}
 				break;
@@ -10145,7 +10144,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 						g_players[currentPlayerIdx].viewState.savedTargetX = targetObj->world_x;
 						g_players[currentPlayerIdx].viewState.savedTargetY = targetObj->world_y;
 						g_players[currentPlayerIdx].viewState.cameraDistance =
-							16 * g_modelTypeTable[(uint16_t)targetObj->objectType].maxBoundsExtent;
+							16 * g_objectTypes[(uint16_t)targetObj->objectType].maxBoundsExtent;
 					}
 					g_players[currentPlayerIdx].pendingActionTimer = 0;
 					g_players[currentPlayerIdx].pendingActionId = 0;
@@ -10250,9 +10249,9 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					g_players[currentPlayerIdx].viewState.cameraFocusObjIdx =
 						(uint16_t)g_players[currentPlayerIdx].currentTargetObjectIdx;
 					g_players[currentPlayerIdx].viewState.cameraDistance =
-						4 * g_modelTypeTable[(uint16_t)g_objectTable[(uint16_t)g_players[currentPlayerIdx]
-																		 .currentTargetObjectIdx]
-												 .objectType]
+						4 * g_objectTypes[(uint16_t)g_objectTable[(uint16_t)g_players[currentPlayerIdx]
+																	  .currentTargetObjectIdx]
+											  .objectType]
 								.maxBoundsExtent;
 					if (g_players[currentPlayerIdx].viewState.cameraDistance > 0x2000) {
 						g_players[currentPlayerIdx].viewState.cameraDistance = 0x2000;
@@ -11605,10 +11604,9 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 						step = (int16_t)MATH2_ABoverC32((int16_t)view->cameraDistanceStep,
 														(uint16_t)g_elapsedTicks, 236);
 						view->cameraDistance -= step;
-						minDist =
-							g_modelTypeTable[(uint16_t)g_objectTable[view->cameraFocusObjIdx].objectType]
-								.maxBoundsExtent +
-							512;
+						minDist = g_objectTypes[(uint16_t)g_objectTable[view->cameraFocusObjIdx].objectType]
+									  .maxBoundsExtent +
+								  512;
 						if (view->cameraDistance < minDist) {
 							view->cameraDistance = minDist;
 						}
@@ -11635,20 +11633,19 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 								g_objectTable[view->aimTargetIdx].world_y - view->savedTargetY,
 								g_objectTable[view->aimTargetIdx].world_z - view->savedTargetZ);
 							if (targetDistance <
-								g_modelTypeTable[(uint16_t)g_objectTable[view->aimTargetIdx].objectType]
+								g_objectTypes[(uint16_t)g_objectTable[view->aimTargetIdx].objectType]
 										.maxBoundsExtent +
 									512) {
 #ifdef XWA_MODERN
 								int correction =
 									targetDistance -
-									g_modelTypeTable[(uint16_t)g_objectTable[view->aimTargetIdx].objectType]
+									g_objectTypes[(uint16_t)g_objectTable[view->aimTargetIdx].objectType]
 										.maxBoundsExtent -
 									512;
 #else
 								int correction =
 									targetDistance -
-									g_modelTypeTable[(uint16_t)g_objectTable[view->cameraFocusObjIdx]
-														 .objectType]
+									g_objectTypes[(uint16_t)g_objectTable[view->cameraFocusObjIdx].objectType]
 										.maxBoundsExtent -
 									512;
 #endif

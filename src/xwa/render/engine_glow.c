@@ -84,11 +84,11 @@ void GlowMark_InitFrameScalesAndPools(void) {
 	uint16_t patchIndex;
 
 	{
-		ModelTypeInfo* modelInfo;
+		ObjectTypeInfo* modelInfo;
 		uint16_t maxExtent;
 		uint16_t frame;
 
-		modelInfo = &g_modelTypeTable[OBJ_AnimationTextureGroup3100];
+		modelInfo = &g_objectTypes[OBJ_AnimationTextureGroup3100];
 		maxExtent = 0;
 		frame = 0;
 		while (frame < modelInfo->frameCount) {
@@ -130,11 +130,11 @@ void GlowMark_InitFrameScalesAndPools(void) {
 	}
 
 	{
-		ModelTypeInfo* modelInfo;
+		ObjectTypeInfo* modelInfo;
 		uint16_t maxExtent;
 		uint16_t frame;
 
-		modelInfo = &g_modelTypeTable[OBJ_AnimationTextureGroup2007];
+		modelInfo = &g_objectTypes[OBJ_AnimationTextureGroup2007];
 		maxExtent = 0;
 		frame = 0;
 		while (frame < modelInfo->frameCount) {
@@ -176,11 +176,11 @@ void GlowMark_InitFrameScalesAndPools(void) {
 	}
 
 	{
-		ModelTypeInfo* modelInfo;
+		ObjectTypeInfo* modelInfo;
 		uint16_t maxExtent;
 		uint16_t frame;
 
-		modelInfo = &g_modelTypeTable[OBJ_AnimationTextureGroup3055];
+		modelInfo = &g_objectTypes[OBJ_AnimationTextureGroup3055];
 		maxExtent = 0;
 		frame = 0;
 		while (frame < modelInfo->frameCount) {
@@ -223,11 +223,11 @@ void GlowMark_InitFrameScalesAndPools(void) {
 	}
 
 	{
-		ModelTypeInfo* modelInfo;
+		ObjectTypeInfo* modelInfo;
 		uint16_t maxExtent;
 		uint16_t frame;
 
-		modelInfo = &g_modelTypeTable[OBJ_AnimationTextureGroup3005];
+		modelInfo = &g_objectTypes[OBJ_AnimationTextureGroup3005];
 		maxExtent = 0;
 		frame = 0;
 		while (frame < modelInfo->frameCount) {
@@ -269,11 +269,11 @@ void GlowMark_InitFrameScalesAndPools(void) {
 	}
 
 	{
-		ModelTypeInfo* modelInfo;
+		ObjectTypeInfo* modelInfo;
 		uint16_t maxExtent;
 		uint16_t frame;
 
-		modelInfo = &g_modelTypeTable[OBJ_AnimationTextureGroup2008];
+		modelInfo = &g_objectTypes[OBJ_AnimationTextureGroup2008];
 		maxExtent = 0;
 		frame = 0;
 		while (frame < modelInfo->frameCount) {
@@ -315,11 +315,11 @@ void GlowMark_InitFrameScalesAndPools(void) {
 	}
 
 	{
-		ModelTypeInfo* modelInfo;
+		ObjectTypeInfo* modelInfo;
 		uint16_t maxExtent;
 		uint16_t frame;
 
-		modelInfo = &g_modelTypeTable[OBJ_BlastMarkTextureGroup3050];
+		modelInfo = &g_objectTypes[OBJ_BlastMarkTextureGroup3050];
 		maxExtent = 0;
 		frame = 0;
 		while (frame < modelInfo->frameCount) {
@@ -463,10 +463,10 @@ void GlowMark_ShutdownFrameScalesAndPools(void) {
 }
 
 // FUNCTION: XWA 0x4E77C0
-ObjectMeshTextureLayerBlock* GlowMark_AllocShieldPatch(uint16_t sourceModelType, int unused) {
+ObjectMeshTextureLayerBlock* GlowMark_AllocShieldPatch(uint16_t sourceObjectType, int unused) {
 	ObjectMeshTextureLayerBlock* freeNext;
 	ObjectMeshTextureLayerBlock* patch;
-	ObjectTypeId textureModelType;
+	ObjectTypeId textureObjectType;
 	TexLevel* texLevel;
 	Std3DTextureSurface* texture;
 	int faceIndex;
@@ -489,14 +489,14 @@ ObjectMeshTextureLayerBlock* GlowMark_AllocShieldPatch(uint16_t sourceModelType,
 		patch->effectParam = -1;
 		patch->baseScale = 1.0f;
 
-		switch ((ObjectTypeId)sourceModelType) {
+		switch ((ObjectTypeId)sourceObjectType) {
 			case OBJ_LaserRebel:
 			case OBJ_LaserRebelTurbo:
 			case OBJ_WarheadLaser1:
 			case OBJ_WarheadLaser3:
 			case OBJ_LaserRebelTurbo_301:
 			case OBJ_LaserRebelTurbo_302:
-				textureModelType = OBJ_AnimationTextureGroup3200;
+				textureObjectType = OBJ_AnimationTextureGroup3200;
 				break;
 
 			case OBJ_LaserImperial:
@@ -506,40 +506,40 @@ ObjectMeshTextureLayerBlock* GlowMark_AllocShieldPatch(uint16_t sourceModelType,
 			case OBJ_LaserImperialTurbo_304:
 			case OBJ_LaserImperialTurbo_305:
 			case OBJ_LaserImperialDS:
-				textureModelType = OBJ_AnimationTextureGroup3300;
+				textureObjectType = OBJ_AnimationTextureGroup3300;
 				break;
 
 			case OBJ_LaserIon:
 			case OBJ_LaserIonTurbo:
 			case OBJ_WarheadIon:
 			case OBJ_WarheadIonPulse:
-				textureModelType = OBJ_AnimationTextureGroup3100;
+				textureObjectType = OBJ_AnimationTextureGroup3100;
 				break;
 
 			case OBJ_WarheadMagPulse:
 			case OBJ_WarheadFlare:
-				textureModelType = OBJ_AnimationTextureGroup3400;
+				textureObjectType = OBJ_AnimationTextureGroup3400;
 				break;
 
 			case OBJ_WarheadMissile:
 			case OBJ_WarheadAdvancedMissile:
 			case OBJ_WarheadRocket:
-				textureModelType = OBJ_AnimationTextureGroup3500;
+				textureObjectType = OBJ_AnimationTextureGroup3500;
 				break;
 
 			default:
-				textureModelType = OBJ_AnimationTextureGroup3500;
+				textureObjectType = OBJ_AnimationTextureGroup3500;
 				break;
 		}
 
-		FeDiskIo_SelectTextureFrame((uint16_t)textureModelType, 1u, 256);
-		texLevel = g_modelTypeTable[(uint16_t)textureModelType].curTexLevel;
+		FeDiskIo_SelectTextureFrame((uint16_t)textureObjectType, 1u, 256);
+		texLevel = g_objectTypes[(uint16_t)textureObjectType].curTexLevel;
 		texture = NULL;
 		if (texLevel != NULL && texLevel->image != NULL) {
 			texture = (Std3DTextureSurface*)texLevel->image;
 		}
 
-		switch ((ObjectTypeId)sourceModelType) {
+		switch ((ObjectTypeId)sourceObjectType) {
 			case OBJ_LaserRebelTurbo:
 			case OBJ_LaserImperialTurbo:
 			case OBJ_LaserIonTurbo: {
@@ -603,7 +603,7 @@ ObjectMeshTextureLayerBlock* GlowMark_AllocShieldPatch(uint16_t sourceModelType,
 			facePatch->passes[0].uvScale = (float)(unsigned int)g_shieldGlowFrameScales[0] * patch->baseScale;
 		}
 
-		patch->modelType = (uint16_t)textureModelType;
+		patch->objectType = (uint16_t)textureObjectType;
 #ifdef XWA_MODERN
 		XwaSnapshot_NoteGlowMarkAllocation(patch, 1);
 #endif
@@ -612,12 +612,12 @@ ObjectMeshTextureLayerBlock* GlowMark_AllocShieldPatch(uint16_t sourceModelType,
 }
 
 // FUNCTION: XWA 0x4E7DF0
-ObjectMeshTextureLayerBlock* GlowMark_AllocAnimatedPatch(uint16_t effectParamIndex, uint16_t modelType) {
+ObjectMeshTextureLayerBlock* GlowMark_AllocAnimatedPatch(uint16_t effectParamIndex, uint16_t objectType) {
 	ObjectMeshTextureLayerBlock* patch;
 	int faceIndex;
 
 	patch = NULL;
-	if (modelType == OBJ_BlastMarkTextureGroup3050) {
+	if (objectType == OBJ_BlastMarkTextureGroup3050) {
 		Std3DTextureSurface* texture;
 		unsigned int damage;
 		uint16_t frame;
@@ -670,7 +670,7 @@ ObjectMeshTextureLayerBlock* GlowMark_AllocAnimatedPatch(uint16_t effectParamInd
 			patch->currentFrame = (int)frame + 1;
 			FeDiskIo_SelectTextureFrame(OBJ_BlastMarkTextureGroup3050, (uint16_t)patch->currentFrame, 256);
 			texture = NULL;
-			texLevel = g_modelTypeTable[OBJ_BlastMarkTextureGroup3050].curTexLevel;
+			texLevel = g_objectTypes[OBJ_BlastMarkTextureGroup3050].curTexLevel;
 			if (texLevel != NULL && texLevel->image != NULL) {
 				texture = (Std3DTextureSurface*)texLevel->image;
 			}
@@ -693,7 +693,7 @@ ObjectMeshTextureLayerBlock* GlowMark_AllocAnimatedPatch(uint16_t effectParamInd
 				facePatch->passes[0].color = (uint32_t)patch->effectParam;
 			}
 
-			patch->modelType = OBJ_BlastMarkTextureGroup3050;
+			patch->objectType = OBJ_BlastMarkTextureGroup3050;
 #ifdef XWA_MODERN
 			XwaSnapshot_NoteGlowMarkAllocation(patch, (uint16_t)patch->currentFrame);
 #endif
@@ -709,7 +709,7 @@ ObjectMeshTextureLayerBlock* GlowMark_AllocAnimatedPatch(uint16_t effectParamInd
 		TexLevel* texLevel;
 
 		texture = NULL;
-		switch (modelType) {
+		switch (objectType) {
 			case OBJ_AnimationTextureGroup3005:
 				frameScales = g_hullLightFrameScales;
 				break;
@@ -738,8 +738,8 @@ ObjectMeshTextureLayerBlock* GlowMark_AllocAnimatedPatch(uint16_t effectParamInd
 			patch->effectParam = -1;
 			patch->baseScale = 1.0f;
 
-			FeDiskIo_SelectTextureFrame(modelType, 1u, 256);
-			texLevel = g_modelTypeTable[modelType].curTexLevel;
+			FeDiskIo_SelectTextureFrame(objectType, 1u, 256);
+			texLevel = g_objectTypes[objectType].curTexLevel;
 			if (texLevel != NULL && texLevel->image != NULL) {
 				texture = (Std3DTextureSurface*)texLevel->image;
 			}
@@ -760,7 +760,7 @@ ObjectMeshTextureLayerBlock* GlowMark_AllocAnimatedPatch(uint16_t effectParamInd
 				facePatch->passes[0].texture = texture;
 				facePatch->passes[0].uvScale = (float)(unsigned int)frameScales[0] * patch->baseScale;
 			}
-			patch->modelType = modelType;
+			patch->objectType = objectType;
 #ifdef XWA_MODERN
 			XwaSnapshot_NoteGlowMarkAllocation(patch, 1);
 #endif
@@ -782,22 +782,22 @@ void GlowMark_UpdateActivePatches(void) {
 	patchIndex = 0;
 	patch = g_glowMarkPatchPool;
 	while (patchIndex <= g_glowMarkMaxActiveIndex) {
-		int modelType;
+		int objectType;
 		unsigned int currentFrame;
 		int* currentFramePtr;
 		uint8_t* frameScales;
 		uint16_t* activePtr;
-		uint16_t* modelTypePtr;
+		uint16_t* objectTypePtr;
 
 		activePtr = &patch->active;
-		modelTypePtr = &patch->modelType;
+		objectTypePtr = &patch->objectType;
 		currentFramePtr = &patch->currentFrame;
 		if (*activePtr != 0) {
 			currentFrame = (unsigned int)*currentFramePtr + 1u;
 			*currentFramePtr = (int)currentFrame;
-			modelType = *modelTypePtr;
-			if (modelType <= OBJ_AnimationTextureGroup3055) {
-				switch (modelType) {
+			objectType = *objectTypePtr;
+			if (objectType <= OBJ_AnimationTextureGroup3055) {
+				switch (objectType) {
 					case OBJ_AnimationTextureGroup3055:
 						frameScales = g_tractorBeamFrameScales;
 						break;
@@ -817,14 +817,14 @@ void GlowMark_UpdateActivePatches(void) {
 			} else {
 				frameScales = g_shieldGlowFrameScales;
 			}
-			if (currentFrame <= (unsigned int)g_modelTypeTable[modelType].frameCount) {
+			if (currentFrame <= (unsigned int)g_objectTypes[objectType].frameCount) {
 				lastGlowActive = patchIndex;
-				FeDiskIo_SelectTextureFrame(*modelTypePtr, (uint16_t)*currentFramePtr, 256);
+				FeDiskIo_SelectTextureFrame(*objectTypePtr, (uint16_t)*currentFramePtr, 256);
 				{
 					TexLevel* texLevel;
 					int faceIndex;
 
-					texLevel = g_modelTypeTable[*modelTypePtr].curTexLevel;
+					texLevel = g_objectTypes[*objectTypePtr].curTexLevel;
 					if (texLevel != NULL && texLevel->image != NULL) {
 						for (faceIndex = 0; faceIndex < patch->facePatchCount; ++faceIndex) {
 							MeshExtraTextureLayer* facePatch;
@@ -849,7 +849,7 @@ void GlowMark_UpdateActivePatches(void) {
 							}
 						}
 						*activePtr = 0;
-						*currentFramePtr = g_modelTypeTable[*modelTypePtr].frameCount;
+						*currentFramePtr = g_objectTypes[*objectTypePtr].frameCount;
 					}
 				}
 			} else {
@@ -1167,7 +1167,7 @@ void GlowMark_CreateEngineKnockoutBlastMark(unsigned int objectIndex, uint8_t em
 	OptEngineGlow* glow;
 	GlowMarkRequest* request;
 
-	modelIndex = g_modelTypeTable[(uint16_t)g_objectTable[objectIndex].objectType].modelDefIndex;
+	modelIndex = g_objectTypes[(uint16_t)g_objectTable[objectIndex].objectType].modelDefIndex;
 	if ((uint8_t)emitterIndex >= g_modelDefs[modelIndex].engineGlowCount) {
 		return;
 	}
@@ -1216,7 +1216,7 @@ void GlowMark_CreateEngineKnockoutBlastMark(unsigned int objectIndex, uint8_t em
 				request->persistentUntilCleared = 0;
 				request->effectParam = OBJ_WarheadSpaceBomb;
 				request->objectIndex = objectIndex;
-				request->modelType = OBJ_BlastMarkTextureGroup3050;
+				request->objectType = OBJ_BlastMarkTextureGroup3050;
 				oldPending = g_objRenderState[objectIndex].pendingGlowMarks;
 				g_objRenderState[objectIndex].pendingGlowMarks = request;
 				g_objRenderState[objectIndex].pendingGlowMarks->next = oldPending;
@@ -1277,13 +1277,13 @@ char GlowMark_SpawnLocalPlayerHitEffects(void) {
 	savedModelHandle = *loadedModelSlot;
 	if (g_players[g_localPlayer].currentSeatIdx != 0) {
 		ModelDefIndex modelIndex;
-		uint16_t turretModelType;
+		uint16_t turretObjectType;
 
 		modelIndex = GetModelDefIndexFromType(objectType);
-		turretModelType =
+		turretObjectType =
 			g_modelDefs[modelIndex].turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
-		if (turretModelType != 0) {
-			*loadedModelSlot = g_loadedModels.byObjectType[turretModelType];
+		if (turretObjectType != 0) {
+			*loadedModelSlot = g_loadedModels.byObjectType[turretObjectType];
 		} else {
 			g_OutputDebugStringA("Can't find cockpit model\n");
 		}
@@ -1344,7 +1344,7 @@ char GlowMark_SpawnLocalPlayerHitEffects(void) {
 					request->objectIndex = objectIndex;
 					request->persistentUntilCleared = 0;
 					request->effectParam = 0;
-					request->modelType = OBJ_AnimationTextureGroup3005;
+					request->objectType = OBJ_AnimationTextureGroup3005;
 
 					oldHead = g_objRenderState[objectIndex].pendingGlowMarks;
 					g_objRenderState[objectIndex].pendingGlowMarks = request;
@@ -1386,7 +1386,7 @@ char GlowMark_SpawnLocalPlayerHitEffects(void) {
 					request->objectIndex = objectIndex;
 					request->persistentUntilCleared = 0;
 					request->effectParam = 0;
-					request->modelType = OBJ_AnimationTextureGroup3005;
+					request->objectType = OBJ_AnimationTextureGroup3005;
 
 					oldHead = g_objRenderState[objectIndex].pendingGlowMarks;
 					g_objRenderState[objectIndex].pendingGlowMarks = request;
@@ -1508,7 +1508,8 @@ void GlowMark_EvictOldestBlastMarkPatch(void) {
 }
 
 // FUNCTION: XWA 0x4E9580
-void GlowMark_QueueRandomObjectSurfaceEffect(unsigned int objectIndex, int16_t effectModelType, float scale) {
+void GlowMark_QueueRandomObjectSurfaceEffect(unsigned int objectIndex, int16_t effectObjectType,
+											 float scale) {
 	int objectTableIndex;
 	uint16_t objectType;
 	Vec3f* boundsMax;
@@ -1550,7 +1551,7 @@ void GlowMark_QueueRandomObjectSurfaceEffect(unsigned int objectIndex, int16_t e
 	g_collisionProbeWorldY = g_rotatedY + g_objectTable[objectTableIndex].world_y;
 	g_collisionProbeWorldZ = g_rotatedZ + g_objectTable[objectTableIndex].world_z;
 
-	trig2_rho = (int)g_modelTypeTable[(uint16_t)g_objectTable[objectTableIndex].objectType].maxBoundsExtent;
+	trig2_rho = (int)g_objectTypes[(uint16_t)g_objectTable[objectTableIndex].objectType].maxBoundsExtent;
 	trig2_theta = (uint16_t)GameRand2();
 	trig2_phi = (uint16_t)GameRand2();
 	trig2_ptoc3dim();
@@ -1577,7 +1578,7 @@ void GlowMark_QueueRandomObjectSurfaceEffect(unsigned int objectIndex, int16_t e
 				g_glowMarkSegmentStartWorld[2] = g_collisionProbeWorldZ;
 			}
 		}
-		GlowMark_QueueRequest(objectIndex, 0, effectModelType, scale, scale);
+		GlowMark_QueueRequest(objectIndex, 0, effectObjectType, scale, scale);
 	}
 
 	g_collisionSegmentStartWorldX = g_glowMarkSavedCollisionSegmentStartX;
@@ -1617,7 +1618,7 @@ void GlowMark_QueueCraftDamageSurfaceEffects(uint16_t objectIndex) {
 
 		scale = g_glowMarkSurfaceEffectBaseScale -
 				(((float)(uint16_t)GameRand2() * g_glowMarkRandU16ToUnitFloatScale) *
-				 g_modelTypeTable[g_objectTable[objectIndex].objectType].maxBoundsExtent) *
+				 g_objectTypes[g_objectTable[objectIndex].objectType].maxBoundsExtent) *
 					g_glowMarkDamageEffectScale;
 		GlowMark_QueueRandomObjectSurfaceEffect(objectIndex, OBJ_AnimationTextureGroup2007, scale);
 	}
@@ -1630,7 +1631,7 @@ void GlowMark_QueueCraftDamageSurfaceEffects(uint16_t objectIndex) {
 
 		scale = g_glowMarkSurfaceEffectBaseScale -
 				(((float)(uint16_t)GameRand2() * g_glowMarkRandU16ToUnitFloatScale) *
-				 g_modelTypeTable[g_objectTable[objectIndex].objectType].maxBoundsExtent) *
+				 g_objectTypes[g_objectTable[objectIndex].objectType].maxBoundsExtent) *
 					g_glowMarkDamageEffectScale;
 		GlowMark_QueueRandomObjectSurfaceEffect(objectIndex, OBJ_AnimationTextureGroup3005, scale);
 	}
@@ -1640,7 +1641,7 @@ void GlowMark_QueueCraftDamageSurfaceEffects(uint16_t objectIndex) {
 
 		scale = g_glowMarkSurfaceEffectBaseScale -
 				(((float)(uint16_t)GameRand2() * g_glowMarkRandU16ToUnitFloatScale) *
-				 g_modelTypeTable[g_objectTable[objectIndex].objectType].maxBoundsExtent) *
+				 g_objectTypes[g_objectTable[objectIndex].objectType].maxBoundsExtent) *
 					g_glowMarkDamageEffectScale;
 		GlowMark_QueueRandomObjectSurfaceEffect(objectIndex, OBJ_AnimationTextureGroup3055, scale);
 	}
@@ -1656,7 +1657,7 @@ void GlowMark_QueueCraftDamageSurfaceEffects(uint16_t objectIndex) {
 
 					scale = g_glowMarkSurfaceEffectBaseScale -
 							(((float)(uint16_t)GameRand2() * g_glowMarkRandU16ToUnitFloatScale) *
-							 g_modelTypeTable[g_objectTable[objectIndex].objectType].maxBoundsExtent) *
+							 g_objectTypes[g_objectTable[objectIndex].objectType].maxBoundsExtent) *
 								g_glowMarkAccelRingEffectScale;
 					if ((unsigned int)g_objectTable[objectIndex]
 							.mobj->pCraft->damageFromPlayer[g_localPlayer] > 0) {
@@ -1788,7 +1789,7 @@ static __inline int EngineGlow_MeshRotationAngleQ16(unsigned char meshRotation) 
 // FUNCTION: XWA 0x42DB60
 int16_t EngineGlow_BuildProjectedQuad(unsigned int objIdx, const OptEngineGlow* glow, unsigned char meshIdx,
 									  int* outViewQuad, float scale) {
-	ObjectTypeId modelTypeForMesh;
+	ObjectTypeId objectTypeForMesh;
 	CraftData* craft;
 	uint16_t meshRotation;
 	int positionZ;
@@ -1799,9 +1800,9 @@ int16_t EngineGlow_BuildProjectedQuad(unsigned int objIdx, const OptEngineGlow* 
 	float dimensionRatio;
 
 	if (g_flightRenderToFrontend) {
-		modelTypeForMesh = (ObjectTypeId)g_modelPreviewModelType;
+		objectTypeForMesh = (ObjectTypeId)g_modelPreviewObjectType;
 	} else {
-		modelTypeForMesh = g_objectTable[objIdx].objectType;
+		objectTypeForMesh = g_objectTable[objIdx].objectType;
 	}
 	if (!glow) {
 		return 0;
@@ -1819,8 +1820,8 @@ int16_t EngineGlow_BuildProjectedQuad(unsigned int objIdx, const OptEngineGlow* 
 	g_rotatedZ = positionZ;
 	if (meshRotation) {
 		ModelMesh_ApplyAnimatedMeshRotationToPoint(
-			(int16_t)EngineGlow_MeshRotationAngleQ16((unsigned char)meshRotation), (uint16_t)modelTypeForMesh,
-			meshIdx, g_rotatedX, g_rotatedY, positionZ);
+			(int16_t)EngineGlow_MeshRotationAngleQ16((unsigned char)meshRotation),
+			(uint16_t)objectTypeForMesh, meshIdx, g_rotatedX, g_rotatedY, positionZ);
 		positionZ = g_rotatedZ;
 	}
 
@@ -1859,8 +1860,8 @@ int16_t EngineGlow_BuildProjectedQuad(unsigned int objIdx, const OptEngineGlow* 
 	g_rotatedZ = positionZ;
 	if (meshRotation) {
 		ModelMesh_ApplyAnimatedMeshRotationToPoint(
-			(int16_t)EngineGlow_MeshRotationAngleQ16((unsigned char)meshRotation), (uint16_t)modelTypeForMesh,
-			meshIdx, g_rotatedX, g_rotatedY, positionZ);
+			(int16_t)EngineGlow_MeshRotationAngleQ16((unsigned char)meshRotation),
+			(uint16_t)objectTypeForMesh, meshIdx, g_rotatedX, g_rotatedY, positionZ);
 		positionZ = g_rotatedZ;
 	}
 	pai_RotateLocalVectorToWorldScratchMaybeStatic(&g_objectTable[objIdx], g_rotatedX, positionZ,
@@ -1875,8 +1876,8 @@ int16_t EngineGlow_BuildProjectedQuad(unsigned int objIdx, const OptEngineGlow* 
 	g_rotatedZ = positionZ;
 	if (meshRotation) {
 		ModelMesh_ApplyAnimatedMeshRotationToPoint(
-			(int16_t)EngineGlow_MeshRotationAngleQ16((unsigned char)meshRotation), (uint16_t)modelTypeForMesh,
-			meshIdx, g_rotatedX, g_rotatedY, positionZ);
+			(int16_t)EngineGlow_MeshRotationAngleQ16((unsigned char)meshRotation),
+			(uint16_t)objectTypeForMesh, meshIdx, g_rotatedX, g_rotatedY, positionZ);
 		positionZ = g_rotatedZ;
 	}
 	pai_RotateLocalVectorToWorldScratchMaybeStatic(&g_objectTable[objIdx], g_rotatedX, positionZ,
@@ -1891,8 +1892,8 @@ int16_t EngineGlow_BuildProjectedQuad(unsigned int objIdx, const OptEngineGlow* 
 	g_rotatedZ = positionZ;
 	if (meshRotation) {
 		ModelMesh_ApplyAnimatedMeshRotationToPoint(
-			(int16_t)EngineGlow_MeshRotationAngleQ16((unsigned char)meshRotation), (uint16_t)modelTypeForMesh,
-			meshIdx, g_rotatedX, g_rotatedY, positionZ);
+			(int16_t)EngineGlow_MeshRotationAngleQ16((unsigned char)meshRotation),
+			(uint16_t)objectTypeForMesh, meshIdx, g_rotatedX, g_rotatedY, positionZ);
 		positionZ = g_rotatedZ;
 	}
 	pai_RotateLocalVectorToWorldScratchMaybeStatic(&g_objectTable[objIdx], g_rotatedX, positionZ,
@@ -2064,7 +2065,7 @@ void EngineGlow_RenderForObject(unsigned int objIdx) {
 	objectIndex = objIdx & 0xffffu;
 	obj = &g_objectTable[objectIndex];
 	objectType = (uint16_t)obj->objectType;
-	modelIndex = (uint16_t)g_modelTypeTable[objectType].modelDefIndex;
+	modelIndex = (uint16_t)g_objectTypes[objectType].modelDefIndex;
 	scale = 0.0f;
 
 	if (objectIndex != (unsigned int)g_players[g_localPlayer].objectIndex) {
@@ -2185,7 +2186,7 @@ void EngineGlow_RenderForObject(unsigned int objIdx) {
 				int viewQuad[15];
 
 				FeDiskIo_SelectTextureFrame(OBJ_LightingEffectTextureGroup1000, 1u, 256);
-				texLevel = g_modelTypeTable[OBJ_LightingEffectTextureGroup1000].curTexLevel;
+				texLevel = g_objectTypes[OBJ_LightingEffectTextureGroup1000].curTexLevel;
 				if (EngineGlow_BuildProjectedQuad(objectIndex, glow, meshIdx, viewQuad, scale)) {
 					int minDepth;
 					int cornerIndex;
@@ -2231,7 +2232,7 @@ void EngineGlow_RenderSceneGlows(void) {
 	}
 
 	if (g_flightRenderToFrontend) {
-		ObjectTypeId modelType;
+		ObjectTypeId objectType;
 		int modelIndex;
 		unsigned int engineGlowCount;
 		OptEngineGlow** engineGlows;
@@ -2239,8 +2240,8 @@ void EngineGlow_RenderSceneGlows(void) {
 		float scale;
 		unsigned int glowIndex;
 
-		modelType = (ObjectTypeId)g_modelPreviewModelType;
-		modelIndex = g_modelTypeTable[modelType].modelDefIndex;
+		objectType = (ObjectTypeId)g_modelPreviewObjectType;
+		modelIndex = g_objectTypes[objectType].modelDefIndex;
 		if (modelIndex == -1) {
 			return;
 		}
@@ -2259,7 +2260,7 @@ void EngineGlow_RenderSceneGlows(void) {
 
 			glow = engineGlows[glowIndex];
 			FeDiskIo_SelectTextureFrame(OBJ_LightingEffectTextureGroup1000, 1u, 256);
-			texLevel = g_modelTypeTable[OBJ_LightingEffectTextureGroup1000].curTexLevel;
+			texLevel = g_objectTypes[OBJ_LightingEffectTextureGroup1000].curTexLevel;
 			if (EngineGlow_BuildProjectedQuad(0, glow, engineGlowMeshIdx[glowIndex], viewQuad, scale)) {
 				int minDepth;
 				int cornerIndex;
@@ -2273,7 +2274,7 @@ void EngineGlow_RenderSceneGlows(void) {
 						minDepth = cornerZ;
 					}
 				}
-				if (modelType == OBJ_SuperStarDestroyer) {
+				if (objectType == OBJ_SuperStarDestroyer) {
 					minDepth = EngineGlow_AdjustSuperStarDestroyerDepth(0, minDepth, glow);
 				}
 				if (minDepth < 1) {

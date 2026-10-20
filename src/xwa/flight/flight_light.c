@@ -3,7 +3,7 @@
 
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/flight/flight.h"
 #include "xwa/flight/mission/mission.h"
 #include "xwa/flight/object/collision.h"
@@ -511,7 +511,7 @@ void FlightLight_AppendScenePointLightForObject(ObjectRecord* obj) {
 
 	appendLight = 1;
 	objectType = obj->objectType;
-	modelIndex = g_modelTypeTable[(uint16_t)objectType].modelDefIndex;
+	modelIndex = g_objectTypes[(uint16_t)objectType].modelDefIndex;
 	if (g_localLightsLevel != 2 && obj->genusId != GENUS_Explosion &&
 		obj->genusId != GENUS_DeathStarTunnelSegment) {
 		return;
@@ -947,7 +947,7 @@ void FlightLight_BuildObjectPointLights(ObjectRecord* obj) {
 			dstLight = g_objectPointLights;
 			while (1) {
 				deltaY = g_scenePointLights[sceneLightIdx].fixed.y - worldY;
-				cullDistance = g_modelTypeTable[(uint16_t)obj->objectType].maxBoundsExtent +
+				cullDistance = g_objectTypes[(uint16_t)obj->objectType].maxBoundsExtent +
 							   g_scenePointLights[sceneLightIdx].cullRadius;
 				deltaX = g_scenePointLights[sceneLightIdx].fixed.x - worldX;
 				deltaZ = g_scenePointLights[sceneLightIdx].fixed.z - worldZ;

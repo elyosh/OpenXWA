@@ -8,8 +8,8 @@
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
 #include "xwa/assets/model_texture.h"
-#include "xwa/assets/model_type.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/flight/fediskio.h"
 #include "xwa/flight/flight_light.h"
@@ -407,7 +407,7 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 	strcpy(g_modelPreviewOptFileName, baseName);
 	strcat(g_modelPreviewOptFileName, ".opt");
 
-	g_modelPreviewModelType = g_objectTypeTables.craftTypeToObjectType[objectType];
+	g_modelPreviewObjectType = g_objectTypeTables.craftTypeToObjectType[objectType];
 	g_modelPreviewOpt = (OptimizedPolyObject*)Memory_LockHandle(handle);
 	if (!g_modelPreviewOpt) {
 		OptModel_FreeHandle(handle);
@@ -453,8 +453,8 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 	}
 
 	ModelBounds_ClearCache();
-	FeDiskIo_BuildModelDef((uint16_t)g_modelTypeTable[g_modelPreviewModelType].modelDefIndex,
-						   (uint16_t)g_modelPreviewModelType);
+	FeDiskIo_BuildModelDef((uint16_t)g_objectTypes[g_modelPreviewObjectType].modelDefIndex,
+						   (uint16_t)g_modelPreviewObjectType);
 
 	memset(&g_modelPreviewMobileObject, 0, sizeof(g_modelPreviewMobileObject));
 	g_modelPreviewObject.objectType = OBJ_None;
@@ -471,7 +471,7 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 	/* Modern port: hide the components of the selected object profile, as
 	 * destroyed: the ship-info flight group's while a briefing plays, none
 	 * otherwise (the tech library has no mission). */
-	XwaObjectProfiles_Apply((uint16_t)g_modelPreviewModelType,
+	XwaObjectProfiles_Apply((uint16_t)g_modelPreviewObjectType,
 							g_briefingPlaybackActive ? (int)(uint16_t)g_briefingMapPrimaryHighlightIconIndex
 													 : 0xFFFF,
 							0, &g_modelPreviewCraftData);
@@ -501,7 +501,7 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 									(int)(lightY * g_modelPreviewNegativeOne * g_modelPreviewQ15Scale),
 									(int)(lightZ * g_modelPreviewQ15Scale), 0.80000001f, 1.0f, 1.0f, 1.0f);
 
-	if (g_frontendD3DInitialized && g_modelTypeTable[g_modelPreviewModelType].modelDefIndex != -1) {
+	if (g_frontendD3DInitialized && g_objectTypes[g_modelPreviewObjectType].modelDefIndex != -1) {
 		OptNode* firstRootNode;
 
 		opt = (OptimizedPolyObject*)Memory_LockHandle(g_loadedModels.byObjectType[0]);
@@ -519,14 +519,14 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 			int glowIndex;
 			int glowCount;
 
-			glowCount = ModelMesh_CountEngineGlows(g_modelPreviewModelType, i);
+			glowCount = ModelMesh_CountEngineGlows(g_modelPreviewObjectType, i);
 			glowIndex = 0;
 			glowCount &= 0xffff;
 			for (; glowIndex < glowCount; ++glowIndex) {
 				OptEngineGlow* engineGlowParam;
 				float* glowValue;
 
-				engineGlowParam = ModelMesh_GetEngineGlowParam(g_modelPreviewModelType, i, glowIndex);
+				engineGlowParam = ModelMesh_GetEngineGlowParam(g_modelPreviewObjectType, i, glowIndex);
 				glowValue = &engineGlowParam->position.x;
 				*glowValue *= g_modelPreviewScaleFactor;
 				glowValue = &engineGlowParam->position.y;

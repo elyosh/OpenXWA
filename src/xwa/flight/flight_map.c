@@ -5,7 +5,7 @@
 
 #include "xwa/assets/flight_model.h"
 #include "xwa/assets/model_def.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/flight/ai/pai.h"
 #include "xwa/flight/ai/pai_plan.h"
 #include "xwa/flight/ai/paifight.h"
@@ -587,7 +587,7 @@ void FlightMap_DrawObjectPass(int pass) {
 				case GENUS_WeaponEmplacement:
 				case GENUS_Rubble:
 					if ((g_renderListHead->sortDepth >> 4) >
-						g_modelTypeTable[(uint16_t)g_objectTable[objectIdx].objectType].maxBoundsExtent) {
+						g_objectTypes[(uint16_t)g_objectTable[objectIdx].objectType].maxBoundsExtent) {
 						FlightMap_DrawObjectIconAtViewPos(objectIdx, viewX, viewY, viewZ);
 					} else {
 						g_curCraft = g_objectTable[objectIdx].mobj->pCraft;
@@ -643,7 +643,7 @@ void FlightMap_DrawObjectPass(int pass) {
 					break;
 				case GENUS_Mine:
 					if ((g_renderListHead->sortDepth >> 4) >
-						g_modelTypeTable[(uint16_t)g_objectTable[objectIdx].objectType].maxBoundsExtent) {
+						g_objectTypes[(uint16_t)g_objectTable[objectIdx].objectType].maxBoundsExtent) {
 						FlightMap_DrawObjectIconAtViewPos(objectIdx, viewX, viewY, viewZ);
 						break;
 					}
@@ -1474,7 +1474,7 @@ int FlightMap_PickObjectNearestScreenCenter(int playerIdx) {
 						case 1:
 						case 2:
 							if (RenderList_ProjectObjectBoundsForCulling(
-									objectIdx, g_modelTypeTable[objectType].maxBoundsExtent, playerIdx)) {
+									objectIdx, g_objectTypes[objectType].maxBoundsExtent, playerIdx)) {
 								int projectedX;
 								int projectedY;
 								int score;
@@ -1522,7 +1522,7 @@ int FlightMap_PickObjectNearestScreenCenter(int playerIdx) {
 				genusId = obj->genusId;
 				if (genusId == GENUS_Mine || genusId == GENUS_DeathStarTunnelSegment) {
 					if (RenderList_ProjectObjectBoundsForCulling(
-							objectIdx, g_modelTypeTable[objectType].maxBoundsExtent, playerIdx)) {
+							objectIdx, g_objectTypes[objectType].maxBoundsExtent, playerIdx)) {
 						int projectedX;
 						int projectedY;
 						int score;
@@ -1605,7 +1605,7 @@ void FlightMap_RenderView(void) {
 			case GENUS_PilotDroid:
 			case GENUS_WeaponEmplacement:
 				if (RenderList_ProjectObjectBoundsForCulling(
-						(uint16_t)objectIdx, g_modelTypeTable[objectType].maxBoundsExtent, g_localPlayer)) {
+						(uint16_t)objectIdx, g_objectTypes[objectType].maxBoundsExtent, g_localPlayer)) {
 					FlightMap_QueueDynamicRenderObject((int)objectIdx, viewZ, viewX, viewY, viewZ, 0x1f,
 													   g_screenWidth);
 				}
@@ -1616,7 +1616,7 @@ void FlightMap_RenderView(void) {
 			case GENUS_Debris:
 			case GENUS_Explosion:
 				if (FlightView_IsObjectSphereVisible((int)objectIdx,
-													 g_modelTypeTable[objectType].maxBoundsExtent)) {
+													 g_objectTypes[objectType].maxBoundsExtent)) {
 					FlightMap_QueueDynamicRenderObject((int)objectIdx, viewZ, viewX, viewY, viewZ, 0x1f,
 													   g_screenWidth);
 				}
@@ -1641,7 +1641,7 @@ void FlightMap_RenderView(void) {
 		genusId = obj->genusId;
 		if (genusId == GENUS_Mine || genusId == GENUS_DeathStarTunnelSegment) {
 			if (RenderList_ProjectObjectBoundsForCulling(
-					(uint16_t)objectIdx, g_modelTypeTable[objectType].maxBoundsExtent, g_localPlayer)) {
+					(uint16_t)objectIdx, g_objectTypes[objectType].maxBoundsExtent, g_localPlayer)) {
 				RenderList_QueueObject((int)objectIdx, viewZ, viewX, viewY, viewZ, 0x1f,
 									   *(int*)&g_screenWidth);
 			}

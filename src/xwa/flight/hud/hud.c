@@ -7,7 +7,7 @@
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
 #include "xwa/assets/model_texture.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/sprite_resource.h"
 #include "xwa/assets/string_table.h"
 #include "xwa/audio/fsfx.h"
@@ -5471,7 +5471,7 @@ void Hud_DrawFilmMfdFrames2D(void) {
 // FUNCTION: XWA 0x4696F0
 void Hud_DrawRadarFrames3D(void) {
 	enum {
-		HUD_RADAR_FRAME_MODEL_TYPE = OBJ_HudTextureGroup12000,
+		HUD_RADAR_FRAME_OBJECT_TYPE = OBJ_HudTextureGroup12000,
 		HUD_RADAR_FRAME_BASE_SIZE = 256,
 		HUD_RADAR_FRAME_LEFT_FRAME = 27,
 		HUD_RADAR_FRAME_RIGHT_FRAME = 28,
@@ -5492,28 +5492,28 @@ void Hud_DrawRadarFrames3D(void) {
 
 		quad.screenX = g_hudCenterX - (uint16_t)g_hudRadarFrameLeftOffsetX;
 		quad.screenY = g_screenHeight - (uint16_t)g_hudRadarFrameOffsetY;
-		FeDiskIo_SelectTextureFrame(HUD_RADAR_FRAME_MODEL_TYPE, HUD_RADAR_FRAME_LEFT_FRAME,
+		FeDiskIo_SelectTextureFrame(HUD_RADAR_FRAME_OBJECT_TYPE, HUD_RADAR_FRAME_LEFT_FRAME,
 									HUD_RADAR_FRAME_BASE_SIZE);
-		RenderQuad_DrawModelTexture(HUD_RADAR_FRAME_MODEL_TYPE, &quad, g_hudColors[0]);
+		RenderQuad_DrawModelTexture(HUD_RADAR_FRAME_OBJECT_TYPE, &quad, g_hudColors[0]);
 
 		quad.screenX = g_hudCenterX + (uint16_t)g_hudRadarFrameRightOffsetX;
 		quad.screenY = g_screenHeight - (uint16_t)g_hudRadarFrameOffsetY;
-		FeDiskIo_SelectTextureFrame(HUD_RADAR_FRAME_MODEL_TYPE, HUD_RADAR_FRAME_RIGHT_FRAME,
+		FeDiskIo_SelectTextureFrame(HUD_RADAR_FRAME_OBJECT_TYPE, HUD_RADAR_FRAME_RIGHT_FRAME,
 									HUD_RADAR_FRAME_BASE_SIZE);
-		RenderQuad_DrawModelTexture(HUD_RADAR_FRAME_MODEL_TYPE, &quad, g_hudColors[0]);
+		RenderQuad_DrawModelTexture(HUD_RADAR_FRAME_OBJECT_TYPE, &quad, g_hudColors[0]);
 
 		if (!g_provingGroundsModeActive) {
 			quad.screenX = g_hudCenterX - 48;
 			quad.screenY = g_screenHeight - 16;
-			FeDiskIo_SelectTextureFrame(HUD_RADAR_FRAME_MODEL_TYPE, HUD_RADAR_FRAME_BOTTOM_LEFT_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_RADAR_FRAME_OBJECT_TYPE, HUD_RADAR_FRAME_BOTTOM_LEFT_FRAME,
 										HUD_RADAR_FRAME_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_RADAR_FRAME_MODEL_TYPE, &quad, -1);
+			RenderQuad_DrawModelTexture(HUD_RADAR_FRAME_OBJECT_TYPE, &quad, -1);
 
 			quad.screenX = g_hudCenterX + 30;
 			quad.screenY = g_screenHeight - 16;
-			FeDiskIo_SelectTextureFrame(HUD_RADAR_FRAME_MODEL_TYPE, HUD_RADAR_FRAME_BOTTOM_RIGHT_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_RADAR_FRAME_OBJECT_TYPE, HUD_RADAR_FRAME_BOTTOM_RIGHT_FRAME,
 										HUD_RADAR_FRAME_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_RADAR_FRAME_MODEL_TYPE, &quad, -1);
+			RenderQuad_DrawModelTexture(HUD_RADAR_FRAME_OBJECT_TYPE, &quad, -1);
 		}
 	}
 }
@@ -5521,7 +5521,7 @@ void Hud_DrawRadarFrames3D(void) {
 // FUNCTION: XWA 0x469890
 void Hud_DrawRadars3D(void) {
 	enum {
-		HUD_RADAR_SCOPE_MODEL_TYPE = OBJ_HudTextureGroup12000,
+		HUD_RADAR_SCOPE_OBJECT_TYPE = OBJ_HudTextureGroup12000,
 		HUD_RADAR_SCOPE_BASE_SIZE = 256,
 		HUD_RADAR_SCOPE_FRONT_FRAME = 45,
 		HUD_RADAR_SCOPE_REAR_FRAME = 46,
@@ -5552,11 +5552,11 @@ void Hud_DrawRadars3D(void) {
 		quad.screenX = (uint16_t)g_hudRadarScopeOffsetX;
 		quad.screenY = g_screenHeight - (uint16_t)g_hudRadarScopeOffsetY;
 		if ((craft->activeHudFeatureMask & 0x80u) != 0) {
-			FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_MODEL_TYPE, HUD_RADAR_SCOPE_FRONT_FRAME, baseSize);
-			RenderQuad_DrawModelTexture(HUD_RADAR_SCOPE_MODEL_TYPE, &quad, g_hudColors[0]);
+			FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_OBJECT_TYPE, HUD_RADAR_SCOPE_FRONT_FRAME, baseSize);
+			RenderQuad_DrawModelTexture(HUD_RADAR_SCOPE_OBJECT_TYPE, &quad, g_hudColors[0]);
 		} else {
-			FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_MODEL_TYPE, HUD_RADAR_SCOPE_FRONT_FRAME, baseSize);
-			RenderQuad_DrawModelTexture(HUD_RADAR_SCOPE_MODEL_TYPE, &quad, g_hudColors[0]);
+			FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_OBJECT_TYPE, HUD_RADAR_SCOPE_FRONT_FRAME, baseSize);
+			RenderQuad_DrawModelTexture(HUD_RADAR_SCOPE_OBJECT_TYPE, &quad, g_hudColors[0]);
 		}
 	}
 
@@ -5566,28 +5566,30 @@ void Hud_DrawRadars3D(void) {
 
 		if ((craft->activeHudFeatureMask & 0x100u) != 0) {
 			if ((craft->systemFlags & 0x100u) != 0) {
-				FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_MODEL_TYPE, HUD_RADAR_SCOPE_REAR_FRAME, baseSize);
+				FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_OBJECT_TYPE, HUD_RADAR_SCOPE_REAR_FRAME,
+											baseSize);
 			} else {
-				FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_MODEL_TYPE, HUD_RADAR_SCOPE_DEAD_FRAME, baseSize);
+				FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_OBJECT_TYPE, HUD_RADAR_SCOPE_DEAD_FRAME,
+											baseSize);
 			}
-			RenderQuad_DrawModelTexture(HUD_RADAR_SCOPE_MODEL_TYPE, &quad, g_hudColors[0]);
+			RenderQuad_DrawModelTexture(HUD_RADAR_SCOPE_OBJECT_TYPE, &quad, g_hudColors[0]);
 			return;
 		}
 
 		if ((craft->systemFlags & 0x100u) != 0) {
-			FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_MODEL_TYPE, HUD_RADAR_SCOPE_REAR_FRAME, baseSize);
+			FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_OBJECT_TYPE, HUD_RADAR_SCOPE_REAR_FRAME, baseSize);
 		} else {
-			FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_MODEL_TYPE, HUD_RADAR_SCOPE_DEAD_FRAME, baseSize);
+			FeDiskIo_SelectTextureFrame(HUD_RADAR_SCOPE_OBJECT_TYPE, HUD_RADAR_SCOPE_DEAD_FRAME, baseSize);
 		}
 
-		RenderQuad_DrawModelTexture(HUD_RADAR_SCOPE_MODEL_TYPE, &quad, g_hudColors[0]);
+		RenderQuad_DrawModelTexture(HUD_RADAR_SCOPE_OBJECT_TYPE, &quad, g_hudColors[0]);
 	}
 }
 
 // FUNCTION: XWA 0x469A80
 void Hud_DrawPowerSettings3D(void) {
 	enum {
-		HUD_POWER_MODEL_TYPE = OBJ_HudTextureGroup12000,
+		HUD_POWER_OBJECT_TYPE = OBJ_HudTextureGroup12000,
 		HUD_POWER_BASE_SIZE = 256,
 		HUD_POWER_PIP_FRAME = 0x0c,
 		HUD_POWER_RESERVE_FRAME = 0x0d,
@@ -5631,8 +5633,8 @@ void Hud_DrawPowerSettings3D(void) {
 			color = craft->laserProjectileTypeId[0] != OBJ_LaserRebel ? HUD_POWER_LASER_GREEN_COLOR
 																	  : HUD_POWER_LASER_RED_COLOR;
 			while (laserPipCount > 0) {
-				FeDiskIo_SelectTextureFrame(HUD_POWER_MODEL_TYPE, HUD_POWER_PIP_FRAME, HUD_POWER_BASE_SIZE);
-				RenderQuad_DrawModelTexture(HUD_POWER_MODEL_TYPE, &quad, color);
+				FeDiskIo_SelectTextureFrame(HUD_POWER_OBJECT_TYPE, HUD_POWER_PIP_FRAME, HUD_POWER_BASE_SIZE);
+				RenderQuad_DrawModelTexture(HUD_POWER_OBJECT_TYPE, &quad, color);
 				--laserPipCount;
 				quad.screenY += (uint16_t)g_hudPowerPipSpacingY;
 			}
@@ -5646,8 +5648,8 @@ void Hud_DrawPowerSettings3D(void) {
 			quad.screenX = (uint16_t)g_hudPowerShieldPipX;
 			quad.screenY = screenHeight - (uint16_t)g_hudPowerShieldPipTopY;
 			while (shieldPipCount > 0) {
-				FeDiskIo_SelectTextureFrame(HUD_POWER_MODEL_TYPE, HUD_POWER_PIP_FRAME, HUD_POWER_BASE_SIZE);
-				RenderQuad_DrawModelTexture(HUD_POWER_MODEL_TYPE, &quad, HUD_POWER_SHIELD_COLOR);
+				FeDiskIo_SelectTextureFrame(HUD_POWER_OBJECT_TYPE, HUD_POWER_PIP_FRAME, HUD_POWER_BASE_SIZE);
+				RenderQuad_DrawModelTexture(HUD_POWER_OBJECT_TYPE, &quad, HUD_POWER_SHIELD_COLOR);
 				--shieldPipCount;
 				quad.screenY += (uint16_t)g_hudPowerPipSpacingY;
 			}
@@ -5672,8 +5674,8 @@ void Hud_DrawPowerSettings3D(void) {
 			quad.screenX -= beamPipRightOffset;
 			quad.screenY = screenHeight - (uint16_t)g_hudPowerBeamPipTopY;
 			while (beamPipCount > 0) {
-				FeDiskIo_SelectTextureFrame(HUD_POWER_MODEL_TYPE, HUD_POWER_PIP_FRAME, HUD_POWER_BASE_SIZE);
-				RenderQuad_DrawModelTexture(HUD_POWER_MODEL_TYPE, &quad, HUD_POWER_BEAM_COLOR);
+				FeDiskIo_SelectTextureFrame(HUD_POWER_OBJECT_TYPE, HUD_POWER_PIP_FRAME, HUD_POWER_BASE_SIZE);
+				RenderQuad_DrawModelTexture(HUD_POWER_OBJECT_TYPE, &quad, HUD_POWER_BEAM_COLOR);
 				--beamPipCount;
 				quad.screenY += (uint16_t)g_hudPowerPipSpacingY;
 			}
@@ -5704,9 +5706,9 @@ void Hud_DrawPowerSettings3D(void) {
 			reserveY = (double)(g_screenHeight - (uint16_t)g_hudPowerBeamReserveTopY);
 			reserveY += (double)reserveIdx * g_hudPowerBeamReserveStep;
 			quad.screenY = (int)reserveY;
-			FeDiskIo_SelectTextureFrame(HUD_POWER_MODEL_TYPE, HUD_POWER_BEAM_RESERVE_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_POWER_OBJECT_TYPE, HUD_POWER_BEAM_RESERVE_FRAME,
 										HUD_POWER_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_POWER_MODEL_TYPE, &quad, -1);
+			RenderQuad_DrawModelTexture(HUD_POWER_OBJECT_TYPE, &quad, -1);
 		}
 	} else {
 		uint16_t reserveCount;
@@ -5717,8 +5719,8 @@ void Hud_DrawPowerSettings3D(void) {
 		quad.screenY = screenHeight - (uint16_t)g_hudPowerUnallocatedPipTopY;
 		drawCount = reserveCount;
 		while (drawCount > 0) {
-			FeDiskIo_SelectTextureFrame(HUD_POWER_MODEL_TYPE, HUD_POWER_RESERVE_FRAME, HUD_POWER_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_POWER_MODEL_TYPE, &quad, -1);
+			FeDiskIo_SelectTextureFrame(HUD_POWER_OBJECT_TYPE, HUD_POWER_RESERVE_FRAME, HUD_POWER_BASE_SIZE);
+			RenderQuad_DrawModelTexture(HUD_POWER_OBJECT_TYPE, &quad, -1);
 			--drawCount;
 			quad.screenY += (uint16_t)g_hudPowerReservePipSpacingY;
 		}
@@ -6022,7 +6024,7 @@ void Hud_SetupLaserChargePositions3D(void) {
 // FUNCTION: XWA 0x46A7F0
 void Hud_DrawLaserCharge3D(void) {
 	enum {
-		HUD_LASER_CHARGE_MODEL_TYPE = OBJ_HudTextureGroup12000,
+		HUD_LASER_CHARGE_OBJECT_TYPE = OBJ_HudTextureGroup12000,
 		HUD_LASER_CHARGE_BASE_SIZE = 256,
 		HUD_LASER_CHARGE_DUAL_FRAME_BASE = 2300,
 		HUD_LASER_CHARGE_TRIPLE_FRAME_BASE = 2500,
@@ -6085,10 +6087,10 @@ void Hud_DrawLaserCharge3D(void) {
 		for (i = 1; (unsigned int)i <= laserCount; ++i) {
 			quad.screenX = g_hudLaserChargeQuads[i].screenX;
 			quad.screenY = g_hudLaserChargeQuads[i].screenY;
-			FeDiskIo_SelectTextureFrame(HUD_LASER_CHARGE_MODEL_TYPE,
+			FeDiskIo_SelectTextureFrame(HUD_LASER_CHARGE_OBJECT_TYPE,
 										frameBase / HUD_LASER_CHARGE_FRAME_DIVISOR,
 										HUD_LASER_CHARGE_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_LASER_CHARGE_MODEL_TYPE, &quad, g_hudColors[0]);
+			RenderQuad_DrawModelTexture(HUD_LASER_CHARGE_OBJECT_TYPE, &quad, g_hudColors[0]);
 		}
 
 		Hud_DrawEnergyBar3D(g_hudEnergyBankLaserSelector, laserCount);
@@ -6106,10 +6108,10 @@ void Hud_DrawLaserCharge3D(void) {
 		for (i = 1; (unsigned int)i <= ionCount; ++i) {
 			quad.screenX = g_hudIonChargeQuads[i].screenX;
 			quad.screenY = g_hudIonChargeQuads[i].screenY;
-			FeDiskIo_SelectTextureFrame(HUD_LASER_CHARGE_MODEL_TYPE,
+			FeDiskIo_SelectTextureFrame(HUD_LASER_CHARGE_OBJECT_TYPE,
 										frameBase / HUD_LASER_CHARGE_FRAME_DIVISOR,
 										HUD_LASER_CHARGE_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_LASER_CHARGE_MODEL_TYPE, &quad, g_hudColors[0]);
+			RenderQuad_DrawModelTexture(HUD_LASER_CHARGE_OBJECT_TYPE, &quad, g_hudColors[0]);
 		}
 
 		Hud_DrawEnergyBar3D(g_hudEnergyBankIonSelector, ionCount);
@@ -6119,7 +6121,7 @@ void Hud_DrawLaserCharge3D(void) {
 // FUNCTION: XWA 0x46AA20
 void Hud_DrawEnergyBar3D(int isIonBank, int bankWeaponCount) {
 	enum {
-		HUD_ENERGY_BAR_MODEL_TYPE = OBJ_HudTextureGroup12000,
+		HUD_ENERGY_BAR_OBJECT_TYPE = OBJ_HudTextureGroup12000,
 		HUD_ENERGY_BAR_BASE_SIZE = 256,
 		HUD_ENERGY_BAR_FRAME_DEFAULT = 0x18,
 		HUD_ENERGY_BAR_FRAME_TRIPLE = 0x1a,
@@ -6245,26 +6247,26 @@ void Hud_DrawEnergyBar3D(int isIonBank, int bankWeaponCount) {
 					quad.screenX += chargeSegmentStepX;
 				}
 				if (bankWeaponCount == 3) {
-					FeDiskIo_SelectTextureFrame(HUD_ENERGY_BAR_MODEL_TYPE, HUD_ENERGY_BAR_FRAME_TRIPLE,
+					FeDiskIo_SelectTextureFrame(HUD_ENERGY_BAR_OBJECT_TYPE, HUD_ENERGY_BAR_FRAME_TRIPLE,
 												HUD_ENERGY_BAR_BASE_SIZE);
 				} else {
-					FeDiskIo_SelectTextureFrame(HUD_ENERGY_BAR_MODEL_TYPE, HUD_ENERGY_BAR_FRAME_DEFAULT,
+					FeDiskIo_SelectTextureFrame(HUD_ENERGY_BAR_OBJECT_TYPE, HUD_ENERGY_BAR_FRAME_DEFAULT,
 												HUD_ENERGY_BAR_BASE_SIZE);
 				}
-				RenderQuad_DrawModelTexture(HUD_ENERGY_BAR_MODEL_TYPE, &quad, color);
+				RenderQuad_DrawModelTexture(HUD_ENERGY_BAR_OBJECT_TYPE, &quad, color);
 			}
 
 			if (emptySegments != 0) {
 				for (segment = emptySegments; segment >= 1; --segment) {
 					quad.screenX += chargeSegmentStepX;
 					if (bankWeaponCount == 3) {
-						FeDiskIo_SelectTextureFrame(HUD_ENERGY_BAR_MODEL_TYPE, HUD_ENERGY_BAR_FRAME_TRIPLE,
+						FeDiskIo_SelectTextureFrame(HUD_ENERGY_BAR_OBJECT_TYPE, HUD_ENERGY_BAR_FRAME_TRIPLE,
 													HUD_ENERGY_BAR_BASE_SIZE);
 					} else {
-						FeDiskIo_SelectTextureFrame(HUD_ENERGY_BAR_MODEL_TYPE, HUD_ENERGY_BAR_FRAME_DEFAULT,
+						FeDiskIo_SelectTextureFrame(HUD_ENERGY_BAR_OBJECT_TYPE, HUD_ENERGY_BAR_FRAME_DEFAULT,
 													HUD_ENERGY_BAR_BASE_SIZE);
 					}
-					RenderQuad_DrawModelTexture(HUD_ENERGY_BAR_MODEL_TYPE, &quad, secondaryColor);
+					RenderQuad_DrawModelTexture(HUD_ENERGY_BAR_OBJECT_TYPE, &quad, secondaryColor);
 				}
 			}
 		}
@@ -6542,7 +6544,7 @@ void Hud_DrawShieldStrength3D(void) {
 // FUNCTION: XWA 0x46B4F0
 void Hud_DrawBeamStrength3D(void) {
 	enum {
-		HUD_BEAM_MODEL_TYPE = OBJ_HudTextureGroup12000,
+		HUD_BEAM_OBJECT_TYPE = OBJ_HudTextureGroup12000,
 		HUD_BEAM_BASE_SIZE = 256,
 		HUD_BEAM_GAUGE_FRAME = 0x2c,
 		HUD_BEAM_ICON_FRAME = 0x1d,
@@ -6605,14 +6607,14 @@ void Hud_DrawBeamStrength3D(void) {
 
 		quad.screenX = g_screenWidth - (uint16_t)g_hudBeamGaugeRightOffsetX;
 		quad.screenY = g_screenHeight - (uint16_t)g_hudBeamGaugeBottomOffsetY;
-		FeDiskIo_SelectTextureFrame(HUD_BEAM_MODEL_TYPE, HUD_BEAM_GAUGE_FRAME, HUD_BEAM_BASE_SIZE);
-		RenderQuad_DrawModelTexture(HUD_BEAM_MODEL_TYPE, &quad, g_hudColors[0]);
+		FeDiskIo_SelectTextureFrame(HUD_BEAM_OBJECT_TYPE, HUD_BEAM_GAUGE_FRAME, HUD_BEAM_BASE_SIZE);
+		RenderQuad_DrawModelTexture(HUD_BEAM_OBJECT_TYPE, &quad, g_hudColors[0]);
 
 		quad.screenX = g_screenWidth - (uint16_t)g_hudBeamIconRightOffsetX;
 		quad.screenY = g_screenHeight - (uint16_t)g_hudBeamIconBottomOffsetY;
-		FeDiskIo_SelectTextureFrame(HUD_BEAM_MODEL_TYPE, HUD_BEAM_ICON_FRAME, HUD_BEAM_BASE_SIZE);
+		FeDiskIo_SelectTextureFrame(HUD_BEAM_OBJECT_TYPE, HUD_BEAM_ICON_FRAME, HUD_BEAM_BASE_SIZE);
 		color = beamIsActive ? (int)HUD_BEAM_ICON_ACTIVE_COLOR : (int)HUD_BEAM_ICON_INACTIVE_COLOR;
-		RenderQuad_DrawModelTexture(HUD_BEAM_MODEL_TYPE, &quad, color);
+		RenderQuad_DrawModelTexture(HUD_BEAM_OBJECT_TYPE, &quad, color);
 
 		quad.screenX = g_screenWidth - (uint16_t)g_hudBeamChargeRightOffsetX;
 		quad.screenY = g_screenHeight - (uint16_t)g_hudBeamChargeBottomOffsetY;
@@ -6646,8 +6648,8 @@ void Hud_DrawBeamStrength3D(void) {
 			}
 
 			if (beamPresent > 0) {
-				FeDiskIo_SelectTextureFrame(HUD_BEAM_MODEL_TYPE, frame, HUD_BEAM_BASE_SIZE);
-				RenderQuad_DrawModelTexture(HUD_BEAM_MODEL_TYPE, &quad, color);
+				FeDiskIo_SelectTextureFrame(HUD_BEAM_OBJECT_TYPE, frame, HUD_BEAM_BASE_SIZE);
+				RenderQuad_DrawModelTexture(HUD_BEAM_OBJECT_TYPE, &quad, color);
 			}
 
 			++frame;
@@ -6685,14 +6687,14 @@ void Hud_DrawBeamStrength3D(void) {
 
 	quad.screenX = g_screenWidth - (uint16_t)g_hudBeamGaugeRightOffsetX;
 	quad.screenY = g_screenHeight - (uint16_t)g_hudBeamGaugeBottomOffsetY;
-	FeDiskIo_SelectTextureFrame(HUD_BEAM_MODEL_TYPE, HUD_BEAM_GAUGE_FRAME, HUD_BEAM_BASE_SIZE);
-	RenderQuad_DrawModelTexture(HUD_BEAM_MODEL_TYPE, &quad, g_hudColors[0]);
+	FeDiskIo_SelectTextureFrame(HUD_BEAM_OBJECT_TYPE, HUD_BEAM_GAUGE_FRAME, HUD_BEAM_BASE_SIZE);
+	RenderQuad_DrawModelTexture(HUD_BEAM_OBJECT_TYPE, &quad, g_hudColors[0]);
 }
 
 // FUNCTION: XWA 0x46B8A0
 void Hud_DrawMfdFrames3D(void) {
 	enum {
-		HUD_MFD_FRAME_MODEL_TYPE = OBJ_HudTextureGroup12000,
+		HUD_MFD_FRAME_OBJECT_TYPE = OBJ_HudTextureGroup12000,
 		HUD_MFD_FRAME_BASE_SIZE = 256,
 		HUD_MFD_FRAME_BACK_FRAME = 1,
 		HUD_MFD_FRAME_FRONT_FRAME = 2
@@ -6718,20 +6720,20 @@ void Hud_DrawMfdFrames3D(void) {
 	if (g_players[g_localPlayer].mfd.enabled[1] || g_inHangarReady) {
 		quad.screenX = (uint16_t)g_hudMfdFrameSideOffsetX;
 		quad.screenY = (uint16_t)g_hudMfdFrameY;
-		FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_MODEL_TYPE, HUD_MFD_FRAME_BACK_FRAME,
+		FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_OBJECT_TYPE, HUD_MFD_FRAME_BACK_FRAME,
 									HUD_MFD_FRAME_BASE_SIZE);
 		quad.screenSize <<= 1;
-		RenderQuad_DrawModelTexture(HUD_MFD_FRAME_MODEL_TYPE, &quad, g_hudColors[0]);
+		RenderQuad_DrawModelTexture(HUD_MFD_FRAME_OBJECT_TYPE, &quad, g_hudColors[0]);
 		quad.screenSize >>= 1;
 
 		if (g_players[g_localPlayer].mfd.activeIndex == 1) {
-			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_MODEL_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_OBJECT_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
 										HUD_MFD_FRAME_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_MODEL_TYPE, &quad, g_hudColors[1]);
+			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_OBJECT_TYPE, &quad, g_hudColors[1]);
 		} else {
-			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_MODEL_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_OBJECT_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
 										HUD_MFD_FRAME_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_MODEL_TYPE, &quad, g_hudColors[0]);
+			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_OBJECT_TYPE, &quad, g_hudColors[0]);
 		}
 	}
 
@@ -6739,20 +6741,20 @@ void Hud_DrawMfdFrames3D(void) {
 		quad.screenX = g_screenWidth - (uint16_t)g_hudMfdFrameSideOffsetX;
 		quad.screenY = (uint16_t)g_hudMfdFrameY;
 		g_currentQuadTexCoords = g_mfdFrameQuadTexCoords;
-		FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_MODEL_TYPE, HUD_MFD_FRAME_BACK_FRAME,
+		FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_OBJECT_TYPE, HUD_MFD_FRAME_BACK_FRAME,
 									HUD_MFD_FRAME_BASE_SIZE);
 		quad.screenSize <<= 1;
-		RenderQuad_DrawModelTexture(HUD_MFD_FRAME_MODEL_TYPE, &quad, g_hudColors[0]);
+		RenderQuad_DrawModelTexture(HUD_MFD_FRAME_OBJECT_TYPE, &quad, g_hudColors[0]);
 		quad.screenSize >>= 1;
 
 		if (g_players[g_localPlayer].mfd.activeIndex == 2) {
-			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_MODEL_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_OBJECT_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
 										HUD_MFD_FRAME_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_MODEL_TYPE, &quad, g_hudColors[1]);
+			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_OBJECT_TYPE, &quad, g_hudColors[1]);
 		} else {
-			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_MODEL_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_OBJECT_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
 										HUD_MFD_FRAME_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_MODEL_TYPE, &quad, g_hudColors[0]);
+			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_OBJECT_TYPE, &quad, g_hudColors[0]);
 		}
 		g_currentQuadTexCoords = g_defaultQuadTexCoords;
 	}
@@ -6761,7 +6763,7 @@ void Hud_DrawMfdFrames3D(void) {
 // FUNCTION: XWA 0x46BAB0
 void Hud_DrawFilmMfdFrames3D(void) {
 	enum {
-		HUD_MFD_FRAME_MODEL_TYPE = OBJ_HudTextureGroup12000,
+		HUD_MFD_FRAME_OBJECT_TYPE = OBJ_HudTextureGroup12000,
 		HUD_MFD_FRAME_BASE_SIZE = 256,
 		HUD_MFD_FRAME_BACK_FRAME = 1,
 		HUD_MFD_FRAME_FRONT_FRAME = 2
@@ -6804,14 +6806,14 @@ void Hud_DrawFilmMfdFrames3D(void) {
 
 		quad.screenX = (uint16_t)g_hudMfdFrameSideOffsetX;
 		quad.screenY = (uint16_t)g_hudMfdFrameY;
-		FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_MODEL_TYPE, HUD_MFD_FRAME_BACK_FRAME,
+		FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_OBJECT_TYPE, HUD_MFD_FRAME_BACK_FRAME,
 									HUD_MFD_FRAME_BASE_SIZE);
 		quad.screenSize <<= 1;
-		RenderQuad_DrawModelTexture(HUD_MFD_FRAME_MODEL_TYPE, &quad, g_hudColors[0]);
+		RenderQuad_DrawModelTexture(HUD_MFD_FRAME_OBJECT_TYPE, &quad, g_hudColors[0]);
 		quad.screenSize >>= 1;
-		FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_MODEL_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
+		FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_OBJECT_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
 									HUD_MFD_FRAME_BASE_SIZE);
-		RenderQuad_DrawModelTexture(HUD_MFD_FRAME_MODEL_TYPE, &quad, g_hudColors[0]);
+		RenderQuad_DrawModelTexture(HUD_MFD_FRAME_OBJECT_TYPE, &quad, g_hudColors[0]);
 	}
 
 	localPlayer = g_localPlayer;
@@ -6834,14 +6836,14 @@ void Hud_DrawFilmMfdFrames3D(void) {
 			quad.screenX = g_screenWidth - (uint16_t)g_hudMfdFrameSideOffsetX;
 			quad.screenY = (uint16_t)g_hudMfdFrameY;
 			g_currentQuadTexCoords = g_mfdFrameQuadTexCoords;
-			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_MODEL_TYPE, HUD_MFD_FRAME_BACK_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_OBJECT_TYPE, HUD_MFD_FRAME_BACK_FRAME,
 										HUD_MFD_FRAME_BASE_SIZE);
 			quad.screenSize <<= 1;
-			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_MODEL_TYPE, &quad, g_hudColors[0]);
+			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_OBJECT_TYPE, &quad, g_hudColors[0]);
 			quad.screenSize >>= 1;
-			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_MODEL_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_MFD_FRAME_OBJECT_TYPE, HUD_MFD_FRAME_FRONT_FRAME,
 										HUD_MFD_FRAME_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_MODEL_TYPE, &quad, g_hudColors[0]);
+			RenderQuad_DrawModelTexture(HUD_MFD_FRAME_OBJECT_TYPE, &quad, g_hudColors[0]);
 		}
 	}
 	g_currentQuadTexCoords = g_defaultQuadTexCoords;
@@ -6850,7 +6852,7 @@ void Hud_DrawFilmMfdFrames3D(void) {
 // FUNCTION: XWA 0x46BD00
 void Hud_DrawReticle3D(void) {
 	enum {
-		HUD_RETICLE_MODEL_TYPE = OBJ_HudTextureGroup12000,
+		HUD_RETICLE_OBJECT_TYPE = OBJ_HudTextureGroup12000,
 		HUD_RETICLE_BASE_SIZE = 256,
 		HUD_RETICLE_LASER_FRAME = 5,
 		HUD_RETICLE_HIT_FRAME = 6,
@@ -6992,13 +6994,13 @@ void Hud_DrawReticle3D(void) {
 #ifdef XWA_MODERN
 					XwaSnapshotHud_NoteReticleReady(laserSlot, laserReadyState == 9);
 #endif
-					FeDiskIo_SelectTextureFrame(HUD_RETICLE_MODEL_TYPE, HUD_RETICLE_LASER_PIP_FRAME,
+					FeDiskIo_SelectTextureFrame(HUD_RETICLE_OBJECT_TYPE, HUD_RETICLE_LASER_PIP_FRAME,
 												HUD_RETICLE_BASE_SIZE);
-					RenderQuad_DrawModelTexture(HUD_RETICLE_MODEL_TYPE, &quad, g_hudColors[0]);
+					RenderQuad_DrawModelTexture(HUD_RETICLE_OBJECT_TYPE, &quad, g_hudColors[0]);
 					if (laserReadyState == 9) {
-						FeDiskIo_SelectTextureFrame(HUD_RETICLE_MODEL_TYPE, HUD_RETICLE_LASER_READY_FRAME,
+						FeDiskIo_SelectTextureFrame(HUD_RETICLE_OBJECT_TYPE, HUD_RETICLE_LASER_READY_FRAME,
 													HUD_RETICLE_BASE_SIZE);
-						RenderQuad_DrawModelTexture(HUD_RETICLE_MODEL_TYPE, &quad, -1);
+						RenderQuad_DrawModelTexture(HUD_RETICLE_OBJECT_TYPE, &quad, -1);
 					}
 				}
 
@@ -7065,11 +7067,11 @@ void Hud_DrawReticle3D(void) {
 #endif
 
 	if (g_players[g_localPlayer].selectedWeaponMode == 0) {
-		FeDiskIo_SelectTextureFrame(HUD_RETICLE_MODEL_TYPE, HUD_RETICLE_LASER_FRAME, HUD_RETICLE_BASE_SIZE);
-		RenderQuad_DrawModelTexture(HUD_RETICLE_MODEL_TYPE, &quad, g_hudColors[0]);
+		FeDiskIo_SelectTextureFrame(HUD_RETICLE_OBJECT_TYPE, HUD_RETICLE_LASER_FRAME, HUD_RETICLE_BASE_SIZE);
+		RenderQuad_DrawModelTexture(HUD_RETICLE_OBJECT_TYPE, &quad, g_hudColors[0]);
 		if (inRange) {
-			FeDiskIo_SelectTextureFrame(HUD_RETICLE_MODEL_TYPE, lockFrame, HUD_RETICLE_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_RETICLE_MODEL_TYPE, &quad, -1);
+			FeDiskIo_SelectTextureFrame(HUD_RETICLE_OBJECT_TYPE, lockFrame, HUD_RETICLE_BASE_SIZE);
+			RenderQuad_DrawModelTexture(HUD_RETICLE_OBJECT_TYPE, &quad, -1);
 		}
 		return;
 	}
@@ -7078,8 +7080,8 @@ void Hud_DrawReticle3D(void) {
 		return;
 	}
 
-	FeDiskIo_SelectTextureFrame(HUD_RETICLE_MODEL_TYPE, HUD_RETICLE_WARHEAD_FRAME, HUD_RETICLE_BASE_SIZE);
-	RenderQuad_DrawModelTexture(HUD_RETICLE_MODEL_TYPE, &quad, g_hudColors[0]);
+	FeDiskIo_SelectTextureFrame(HUD_RETICLE_OBJECT_TYPE, HUD_RETICLE_WARHEAD_FRAME, HUD_RETICLE_BASE_SIZE);
+	RenderQuad_DrawModelTexture(HUD_RETICLE_OBJECT_TYPE, &quad, g_hudColors[0]);
 	if (g_players[g_localPlayer].currentTargetObjectIdx != 0xffffu) {
 		if (g_players[g_localPlayer].missileLockState == 2) {
 			int16_t lockTimer;
@@ -7101,16 +7103,16 @@ void Hud_DrawReticle3D(void) {
 					color = -65536;
 				}
 			}
-			FeDiskIo_SelectTextureFrame(HUD_RETICLE_MODEL_TYPE, HUD_RETICLE_WARHEAD_LOCK_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_RETICLE_OBJECT_TYPE, HUD_RETICLE_WARHEAD_LOCK_FRAME,
 										HUD_RETICLE_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_RETICLE_MODEL_TYPE, &quad, color);
+			RenderQuad_DrawModelTexture(HUD_RETICLE_OBJECT_TYPE, &quad, color);
 			fsfx_UpdateTargetingTone(2);
 			return;
 		}
 		if (g_players[g_localPlayer].missileLockState == 3) {
-			FeDiskIo_SelectTextureFrame(HUD_RETICLE_MODEL_TYPE, HUD_RETICLE_WARHEAD_LOCK_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_RETICLE_OBJECT_TYPE, HUD_RETICLE_WARHEAD_LOCK_FRAME,
 										HUD_RETICLE_BASE_SIZE);
-			RenderQuad_DrawModelTexture(HUD_RETICLE_MODEL_TYPE, &quad, -65536);
+			RenderQuad_DrawModelTexture(HUD_RETICLE_OBJECT_TYPE, &quad, -65536);
 			fsfx_UpdateTargetingTone(3);
 			return;
 		}
@@ -9459,8 +9461,8 @@ void Hud_DrawRadarBlips(void) {
 		uint8_t objectKind;
 
 		if (objIdx == (uint32_t)g_players[g_localPlayer].objectIndex ||
-			(g_modelTypeTable[g_objectTable[objIdx].objectType].flags &
-			 MODEL_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) == 0) {
+			(g_objectTypes[g_objectTable[objIdx].objectType].flags &
+			 OBJECT_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) == 0) {
 			continue;
 		}
 
@@ -9481,23 +9483,23 @@ void Hud_DrawRadarBlips(void) {
 	}
 
 	for (objIdx = g_projectileObjectSlotStart; objIdx < g_projectileObjectSlotEnd; ++objIdx) {
-		if ((g_modelTypeTable[(uint16_t)g_objectTable[objIdx].objectType].flags &
-			 MODEL_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) != 0) {
+		if ((g_objectTypes[(uint16_t)g_objectTable[objIdx].objectType].flags &
+			 OBJECT_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) != 0) {
 			Hud_AddBlipToRadar((uint16_t)objIdx);
 		}
 	}
 
 	for (objIdx = g_objScanStart; objIdx < g_regionStaticObjectSlotEnd; ++objIdx) {
-		if ((g_modelTypeTable[(uint16_t)g_objectTable[objIdx].objectType].flags &
-			 MODEL_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) != 0) {
+		if ((g_objectTypes[(uint16_t)g_objectTable[objIdx].objectType].flags &
+			 OBJECT_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) != 0) {
 			Hud_AddBlipToRadar((uint16_t)objIdx);
 		}
 	}
 
 	if (g_provingGroundsModeActive) {
 		for (objIdx = g_salvageJunkObjectSlotStart; objIdx < g_debrisObjectSlotStart; ++objIdx) {
-			if ((g_modelTypeTable[(uint16_t)g_objectTable[objIdx].objectType].flags &
-				 MODEL_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) != 0) {
+			if ((g_objectTypes[(uint16_t)g_objectTable[objIdx].objectType].flags &
+				 OBJECT_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) != 0) {
 				Hud_AddBlipToRadar((uint16_t)objIdx);
 			}
 		}
@@ -10518,7 +10520,7 @@ Hud_GetCraftPointerInlinedWithDebug(void(XWA_HUD_STDCALL* debugOutput)(const cha
 // FUNCTION: XWA 0x478200
 void Hud_DrawCMD3D(void) {
 	enum {
-		HUD_CMD_FRAME_MODEL_TYPE = OBJ_HudTextureGroup12000,
+		HUD_CMD_FRAME_OBJECT_TYPE = OBJ_HudTextureGroup12000,
 		HUD_CMD_FRAME_TEXTURE_FRAME = 11,
 		HUD_CMD_FRAME_BASE_SIZE = 256,
 		HUD_CMD_FRAME_D3D_FLAGS = 0x9612
@@ -10527,7 +10529,7 @@ void Hud_DrawCMD3D(void) {
 	void(XWA_HUD_STDCALL * debugOutput)(const char*);
 	FlightTexQuad quad;
 	CraftData* craft;
-	ModelTypeInfo* modelTypeInfo;
+	ObjectTypeInfo* objectTypeInfo;
 	TexLevel* texLevel;
 
 	craft = NULL;
@@ -10552,21 +10554,22 @@ void Hud_DrawCMD3D(void) {
 
 	quad.screenSize = (uint16_t)(int)((double)quad.screenSize * (double)g_flightHudScaleFactor);
 	if (g_players[g_localPlayer].mapCameraState) {
-		FeDiskIo_SelectTextureFrame(HUD_CMD_FRAME_MODEL_TYPE, HUD_CMD_FRAME_TEXTURE_FRAME,
+		FeDiskIo_SelectTextureFrame(HUD_CMD_FRAME_OBJECT_TYPE, HUD_CMD_FRAME_TEXTURE_FRAME,
 									HUD_CMD_FRAME_BASE_SIZE);
 	} else {
 		if ((craft->activeHudFeatureMask & 1u) != 0) {
-			FeDiskIo_SelectTextureFrame(HUD_CMD_FRAME_MODEL_TYPE, HUD_CMD_FRAME_TEXTURE_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_CMD_FRAME_OBJECT_TYPE, HUD_CMD_FRAME_TEXTURE_FRAME,
 										HUD_CMD_FRAME_BASE_SIZE);
 		} else {
-			FeDiskIo_SelectTextureFrame(HUD_CMD_FRAME_MODEL_TYPE, HUD_CMD_FRAME_TEXTURE_FRAME,
+			FeDiskIo_SelectTextureFrame(HUD_CMD_FRAME_OBJECT_TYPE, HUD_CMD_FRAME_TEXTURE_FRAME,
 										HUD_CMD_FRAME_BASE_SIZE);
 		}
 	}
 
-	modelTypeInfo = &g_modelTypeTable[HUD_CMD_FRAME_MODEL_TYPE];
-	texLevel = modelTypeInfo->curTexLevel;
-	if ((modelTypeInfo->assetFlags & (MODEL_TYPE_ASSET_TEXTURE_DRAW | MODEL_TYPE_ASSET_TEXTURE_READY)) == 0 ||
+	objectTypeInfo = &g_objectTypes[HUD_CMD_FRAME_OBJECT_TYPE];
+	texLevel = objectTypeInfo->curTexLevel;
+	if ((objectTypeInfo->assetFlags & (OBJECT_TYPE_ASSET_TEXTURE_DRAW | OBJECT_TYPE_ASSET_TEXTURE_READY)) ==
+			0 ||
 		texLevel == NULL) {
 		return;
 	}
@@ -10865,7 +10868,7 @@ void Hud_Update3DCrt(uint16_t x, uint16_t y, uint16_t width, uint16_t height, in
 					continue;
 				}
 
-				maxBoundsExtent = g_modelTypeTable[obj->objectType].maxBoundsExtent;
+				maxBoundsExtent = g_objectTypes[obj->objectType].maxBoundsExtent;
 				g_curModelMaxExtent = maxBoundsExtent;
 				genusId = obj->genusId;
 				if (genusId >= GENUS_PlayerProjectile) {
@@ -10930,7 +10933,7 @@ void Hud_Update3DCrt(uint16_t x, uint16_t y, uint16_t width, uint16_t height, in
 			for (objIdx = (uint16_t)g_localTransientSlotStart; objIdx < g_localTransientSlotEnd; ++objIdx) {
 				if (g_objectTable[objIdx].objectType != 0 &&
 					g_objectTable[objIdx].genusId == GENUS_Explosion) {
-					g_curModelMaxExtent = g_modelTypeTable[g_objectTable[objIdx].objectType].maxBoundsExtent;
+					g_curModelMaxExtent = g_objectTypes[g_objectTable[objIdx].objectType].maxBoundsExtent;
 					if (FlightView_IsObjectSphereVisible((int)objIdx, g_curModelMaxExtent)) {
 						FVIEW_SetObjectTransform(g_objectTable[objIdx].roll, g_objectTable[objIdx].pitch,
 												 g_objectTable[objIdx].yaw, g_objectTable[objIdx].angleD,
@@ -11278,16 +11281,16 @@ int Hud_PointCamera(uint16_t targetObjIdx, int16_t fitDistanceFlag, int playerId
 					maxBoundsExtent = (int)((uint32_t)(largestA + largestB) >> 1)
 									  << (uint8_t)g_modelDefs[modelIndex].boundSizeShift;
 				} else {
-					maxBoundsExtent = g_modelTypeTable[(uint16_t)g_objectTable[resolvedTargetIdx].objectType]
-										  .maxBoundsExtent;
+					maxBoundsExtent =
+						g_objectTypes[(uint16_t)g_objectTable[resolvedTargetIdx].objectType].maxBoundsExtent;
 				}
 			} else {
 				maxBoundsExtent =
-					g_modelTypeTable[(uint16_t)g_objectTable[resolvedTargetIdx].objectType].maxBoundsExtent;
+					g_objectTypes[(uint16_t)g_objectTable[resolvedTargetIdx].objectType].maxBoundsExtent;
 			}
 		} else {
 			maxBoundsExtent =
-				g_modelTypeTable[(uint16_t)g_objectTable[resolvedTargetIdx].objectType].maxBoundsExtent;
+				g_objectTypes[(uint16_t)g_objectTable[resolvedTargetIdx].objectType].maxBoundsExtent;
 		}
 		distanceDivisor = 102;
 		if (!fitDistanceFlag) {
@@ -15774,7 +15777,7 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 	g_msgArgTable[0] = numberOfCraft;
 	iff = fg->iff;
 	g_msgSenderIff = iff;
-	if ((g_modelTypeTable[objectType].flags & 4u) != 0) {
+	if ((g_objectTypes[objectType].flags & 4u) != 0) {
 		int playerIdx;
 
 		g_msgArgTable[2] = clicks;

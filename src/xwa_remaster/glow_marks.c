@@ -13,17 +13,17 @@
 #include <string.h>
 
 typedef struct GlowGeometryCache {
-	uint16_t                     owner_signature;
-	uint8_t                      pool_kind;
-	uint8_t                      pool_index;
-	uint32_t                     generation;
-	const AeronSceneMesh*        mesh;
+	uint16_t owner_signature;
+	uint8_t pool_kind;
+	uint8_t pool_index;
+	uint32_t generation;
+	const AeronSceneMesh* mesh;
 	AeronSceneMeshOverlayVertex* vertices;
-	uint32_t                     vertex_count;
+	uint32_t vertex_count;
 } GlowGeometryCache;
 
-static GlowGeometryCache   s_cache[XWA_SNAP_MAX_GLOW_MARKS];
-static uint32_t            s_next_cache_replacement;
+static GlowGeometryCache s_cache[XWA_SNAP_MAX_GLOW_MARKS];
+static uint32_t s_next_cache_replacement;
 static AeronFaceBvhScratch s_candidate_scratch;
 
 /* Integer hash (lowbias32) of a mark's pool slot and generation. */
@@ -50,7 +50,7 @@ static int blast_mark_frame(const XwaGlowMark* mark, const XwaSnapshot* snapshot
 	const AeronEffectData* effect_data = XwaRemasterShip_EffectData();
 	int group = 0, frames_mode = 0, sprite_id = 0;
 	if (!effect_data || mark->pool_kind != 1 ||
-		!XwaSnapshotExport_ModelTextureBinding(mark->texture_model_type, &group, &frames_mode, &sprite_id) ||
+		!XwaSnapshotExport_ModelTextureBinding(mark->texture_object_type, &group, &frames_mode, &sprite_id) ||
 		!frames_mode) {
 		return 0;
 	}
@@ -83,9 +83,9 @@ static int blast_mark_frame(const XwaGlowMark* mark, const XwaSnapshot* snapshot
 	return *texture != NULL;
 }
 
-static int resolve_texture_frame(XwaRemasterAssets* assets, int texture_model_type, int texture_frame,
+static int resolve_texture_frame(XwaRemasterAssets* assets, int texture_object_type, int texture_frame,
 								 XwaAssetRef* resolved_frame) {
-	return XwaRemasterAssets_FlightModelFrame(assets, texture_model_type, texture_frame, resolved_frame);
+	return XwaRemasterAssets_FlightModelFrame(assets, texture_object_type, texture_frame, resolved_frame);
 }
 
 static uint8_t projected_uv_outcode_within(float projected_u, float projected_v, float limit) {
@@ -130,8 +130,8 @@ static uint32_t build_candidate_slabs(const XwaGlowMark* mark, AeronFaceBvhSlab 
 	}
 	const double units = AERON_OPT_UNITS_PER_METER;
 	const float* axes[2] = { mark->u_axis, mark->v_axis };
-	const float  inv_scales[2] = { mark->inv_scale_u, mark->inv_scale_v };
-	const float  along_normal[2] = { dot3(mark->u_axis, mark->normal), dot3(mark->v_axis, mark->normal) };
+	const float inv_scales[2] = { mark->inv_scale_u, mark->inv_scale_v };
+	const float along_normal[2] = { dot3(mark->u_axis, mark->normal), dot3(mark->v_axis, mark->normal) };
 	for (int axis = 0; axis < 2; axis++) {
 		AeronFaceBvhSlab* slab = &slabs[axis];
 		for (int coordinate_axis = 0; coordinate_axis < 3; coordinate_axis++) {
@@ -169,7 +169,7 @@ static int reserve_triangle(GlowGeometryCache* cache, uint32_t vertex_count, uin
 	return 1;
 }
 
-static GlowGeometryCache* find_or_allocate_geometry_cache(const XwaGlowMark*    mark,
+static GlowGeometryCache* find_or_allocate_geometry_cache(const XwaGlowMark* mark,
 														  const AeronSceneMesh* mesh) {
 	for (uint32_t cache_index = 0; cache_index < XWA_SNAP_MAX_GLOW_MARKS; cache_index++) {
 		GlowGeometryCache* cached_geometry = &s_cache[cache_index];
@@ -184,10 +184,10 @@ static GlowGeometryCache* find_or_allocate_geometry_cache(const XwaGlowMark*    
 	free(replacement->vertices);
 	memset(replacement, 0, sizeof *replacement);
 	replacement->owner_signature = mark->owner_signature;
-	replacement->pool_kind       = mark->pool_kind;
-	replacement->pool_index      = mark->pool_index;
-	replacement->generation      = mark->generation;
-	replacement->mesh            = mesh;
+	replacement->pool_kind = mark->pool_kind;
+	replacement->pool_index = mark->pool_index;
+	replacement->generation = mark->generation;
+	replacement->mesh = mesh;
 	return replacement;
 }
 
@@ -202,15 +202,15 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 	}
 	/* Render-BVH candidates, ascending, when the mesh has one; otherwise
 	 * every triangle. Either way the per-triangle code decides. */
-	const uint32_t*  candidates      = NULL;
-	uint32_t         candidate_count = mesh->index_count / 3;
+	const uint32_t* candidates = NULL;
+	uint32_t candidate_count = mesh->index_count / 3;
 	AeronFaceBvhSlab slabs[3];
-	const uint32_t   slab_count = mesh->render_bvh ? build_candidate_slabs(mark, slabs) : 0;
+	const uint32_t slab_count = mesh->render_bvh ? build_candidate_slabs(mark, slabs) : 0;
 	if (slab_count && mesh->render_bvh->face_count == mesh->index_count / 3) {
 		const uint32_t count =
 			AeronFaceBvh_CollectSlabs(mesh->render_bvh, slabs, slab_count, &s_candidate_scratch);
 		if (count != UINT32_MAX) {
-			candidates      = s_candidate_scratch.indices;
+			candidates = s_candidate_scratch.indices;
 			candidate_count = count;
 		}
 	}
@@ -220,7 +220,8 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 	}
 	uint32_t output_vertex_count = 0;
 	for (uint32_t candidate_index = 0; candidate_index < candidate_count; candidate_index++) {
-		const uint32_t triangle_index_offset = 3 * (candidates ? candidates[candidate_index] : candidate_index);
+		const uint32_t triangle_index_offset =
+			3 * (candidates ? candidates[candidate_index] : candidate_index);
 		const AeronSceneMeshCpuVertex* triangle_vertices[3] = {
 			&mesh->cpu_vertices[mesh->cpu_indices[triangle_index_offset]],
 			&mesh->cpu_vertices[mesh->cpu_indices[triangle_index_offset + 1]],
@@ -240,12 +241,12 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 			edge_from_vertex_0_to_2[coordinate_axis] =
 				triangle_vertices[2]->pos[coordinate_axis] - triangle_vertices[0]->pos[coordinate_axis];
 		}
-		face_normal[0]           = edge_from_vertex_0_to_1[1] * edge_from_vertex_0_to_2[2] -
-								   edge_from_vertex_0_to_1[2] * edge_from_vertex_0_to_2[1];
-		face_normal[1]           = edge_from_vertex_0_to_1[2] * edge_from_vertex_0_to_2[0] -
-								   edge_from_vertex_0_to_1[0] * edge_from_vertex_0_to_2[2];
-		face_normal[2]           = edge_from_vertex_0_to_1[0] * edge_from_vertex_0_to_2[1] -
-								   edge_from_vertex_0_to_1[1] * edge_from_vertex_0_to_2[0];
+		face_normal[0] = edge_from_vertex_0_to_1[1] * edge_from_vertex_0_to_2[2] -
+						 edge_from_vertex_0_to_1[2] * edge_from_vertex_0_to_2[1];
+		face_normal[1] = edge_from_vertex_0_to_1[2] * edge_from_vertex_0_to_2[0] -
+						 edge_from_vertex_0_to_1[0] * edge_from_vertex_0_to_2[2];
+		face_normal[2] = edge_from_vertex_0_to_1[0] * edge_from_vertex_0_to_2[1] -
+						 edge_from_vertex_0_to_1[1] * edge_from_vertex_0_to_2[0];
 		float face_normal_length = sqrtf(face_normal[0] * face_normal[0] + face_normal[1] * face_normal[1] +
 										 face_normal[2] * face_normal[2]);
 		if (face_normal_length < 1e-6f) {
@@ -269,9 +270,9 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 				face_normal[coordinate_axis] = -face_normal[coordinate_axis];
 			}
 		}
-		float   plane_distances[3];
-		float   projected_u[3];
-		float   projected_v[3];
+		float plane_distances[3];
+		float projected_u[3];
+		float projected_v[3];
 		uint8_t shared_clip_mask = 15;
 		for (int triangle_vertex_index = 0; triangle_vertex_index < 3; triangle_vertex_index++) {
 			float relative_position[3];
@@ -310,10 +311,10 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 		 * the largest square the mark will reach. */
 		if (mark->world_segment_mode && mark->layer_uv_scale_min > 0.0f) {
 			const float visible_limit = 0.5f / mark->layer_uv_scale_min;
-			uint8_t     visible_clip_mask = 15;
+			uint8_t visible_clip_mask = 15;
 			for (int triangle_vertex_index = 0; triangle_vertex_index < 3; triangle_vertex_index++) {
-				visible_clip_mask &= projected_uv_outcode_within(projected_u[triangle_vertex_index],
-																 projected_v[triangle_vertex_index], visible_limit);
+				visible_clip_mask &= projected_uv_outcode_within(
+					projected_u[triangle_vertex_index], projected_v[triangle_vertex_index], visible_limit);
 			}
 			if (visible_clip_mask) {
 				continue;
@@ -352,8 +353,8 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 			AeronSceneMeshOverlayVertex* overlay_vertex = &cache->vertices[output_vertex_count++];
 			memcpy(overlay_vertex->pos, triangle_vertices[triangle_vertex_index]->pos,
 				   sizeof overlay_vertex->pos);
-			overlay_vertex->uv[0]      = projected_u[triangle_vertex_index];
-			overlay_vertex->uv[1]      = projected_v[triangle_vertex_index];
+			overlay_vertex->uv[0] = projected_u[triangle_vertex_index];
+			overlay_vertex->uv[1] = projected_v[triangle_vertex_index];
 			overlay_vertex->component = triangle_vertices[triangle_vertex_index]->component;
 		}
 	}
@@ -395,7 +396,7 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 			texture_frame.v0 = blast_rect[1] + blast_crop[1] * height;
 			texture_frame.u1 = blast_rect[0] + blast_crop[2] * width;
 			texture_frame.v1 = blast_rect[1] + blast_crop[3] * height;
-		} else if (!resolve_texture_frame(assets, mark->texture_model_type, mark->texture_frame,
+		} else if (!resolve_texture_frame(assets, mark->texture_object_type, mark->texture_frame,
 										  &texture_frame)) {
 			continue;
 		}
@@ -404,18 +405,18 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 		if (!cached_geometry->vertices || !cached_geometry->vertex_count) {
 			continue;
 		}
-		const float               atlas_frame_width  = texture_frame.u1 - texture_frame.u0;
-		const float               atlas_frame_height = texture_frame.v1 - texture_frame.v0;
+		const float atlas_frame_width = texture_frame.u1 - texture_frame.u0;
+		const float atlas_frame_height = texture_frame.v1 - texture_frame.v0;
 		AeronSceneMeshOverlayDesc overlay;
 		memset(&overlay, 0, sizeof overlay);
-		overlay.vertices     = cached_geometry->vertices;
+		overlay.vertices = cached_geometry->vertices;
 		overlay.vertex_count = cached_geometry->vertex_count;
-		overlay.texture      = texture_frame.texture;
+		overlay.texture = texture_frame.texture;
 		overlay.texture_array = blast_texture;
 		overlay.texture_layer = blast_layer;
 		overlay.texture_max_lod = blast_max_lod;
 		memcpy(overlay.transform, transform, sizeof overlay.transform);
-		overlay.mesh_table  = mesh_table;
+		overlay.mesh_table = mesh_table;
 		overlay.uv_xform[0] = texture_frame.u0 + 0.5f * atlas_frame_width;
 		overlay.uv_xform[1] = texture_frame.v0 + 0.5f * atlas_frame_height;
 		overlay.uv_xform[2] = mark->layer_uv_scale * atlas_frame_width;
@@ -435,7 +436,7 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 		overlay.depth_bias_view = 0.05f;
 		/* Remaster DAT atlases are premultiplied; PMA implements the
 		 * classic source-alpha result without applying alpha twice. */
-		overlay.blend     = AERON_SCENE_MESH_OVERLAY_BLEND_PMA;
+		overlay.blend = AERON_SCENE_MESH_OVERLAY_BLEND_PMA;
 		overlay.cull_mode = AERON_CULL_BACK;
 		AeronScene_AddMeshOverlay(scene, &overlay);
 	}

@@ -5,7 +5,7 @@
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/assets/string_table.h"
 #include "xwa/audio/fsfx.h"
@@ -909,7 +909,7 @@ int Yard_SpawnObjectAtWorldPos(ObjectTypeId objectType, int worldX, int worldY, 
 		}
 	}
 
-	objIdx = Object_AllocSlotForGenus(g_modelTypeTable[objectTypeId].genusId);
+	objIdx = Object_AllocSlotForGenus(g_objectTypes[objectTypeId].genusId);
 	if ((uint16_t)objIdx == 0xffffu) {
 		return 0xffff;
 	}
@@ -922,7 +922,7 @@ int Yard_SpawnObjectAtWorldPos(ObjectTypeId objectType, int worldX, int worldY, 
 	g_objectTable[objIdx].regionIdx = g_players[g_localPlayer].regionIndex;
 	g_objectTable[objIdx].objectType = objectType;
 	g_objectTable[objIdx].objectSignature = 1;
-	g_objectTable[objIdx].genusId = g_modelTypeTable[objectTypeId].genusId;
+	g_objectTable[objIdx].genusId = g_objectTypes[objectTypeId].genusId;
 	g_objectTable[objIdx].flightGroupIdx = g_yardSpawnFlightGroupIdx;
 	g_objectTable[objIdx].roll = 0;
 	g_objectTable[objIdx].angleD = 0;
@@ -935,7 +935,7 @@ int Yard_SpawnObjectAtWorldPos(ObjectTypeId objectType, int worldX, int worldY, 
 
 	mobj = g_objectTable[objIdx].mobj;
 	if (mobj != NULL) {
-		mobj->state = g_modelTypeTable[objectTypeId].familyId;
+		mobj->state = g_objectTypes[objectTypeId].familyId;
 		mobj->rollImpulseRate = 0;
 		mobj->speed = 0;
 		mobj->speedRemainder = 0;

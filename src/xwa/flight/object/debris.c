@@ -2,8 +2,8 @@
 
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/config/game_config.h"
 #include "xwa/flight/flight.h"
@@ -244,19 +244,19 @@ void Debris_SpawnObjectFragments(int sourceObjIdx, int sourceMeshIdx) {
 	}
 
 	{
-		int modelType;
+		int objectType;
 		int16_t sourceModelMarker;
 		unsigned int meshCount;
 		uint32_t meshIdx;
 		int densityLevel;
 
-		modelType = sourceObjectType;
-		sourceModelMarker = ModelMesh_AllocDebrisTexSlot((ObjectTypeId)modelType);
+		objectType = sourceObjectType;
+		sourceModelMarker = ModelMesh_AllocDebrisTexSlot((ObjectTypeId)objectType);
 		if ((uint16_t)sourceModelMarker == 0xffffu) {
 			return;
 		}
 
-		meshCount = (unsigned int)ModelMesh_GetObjectTypeMeshCount(modelType);
+		meshCount = (unsigned int)ModelMesh_GetObjectTypeMeshCount(objectType);
 		meshIdx = 0;
 		if (meshIdx < meshCount) {
 			densityLevel = g_debrisDensityLevel;
@@ -306,7 +306,7 @@ void Debris_SpawnObjectFragments(int sourceObjIdx, int sourceMeshIdx) {
 						fragmentsForMesh = (uint32_t)(densityLevel - 3);
 					}
 
-					g_rubbleSpawnVolumeBudget = ModelMesh_GetBoundsVolume(modelType, (int)meshIdx);
+					g_rubbleSpawnVolumeBudget = ModelMesh_GetBoundsVolume(objectType, (int)meshIdx);
 					Debris_ResetRubbleUsedInSpawn();
 					g_rubbleSpawnRemainingCount = fragmentsForMesh;
 
@@ -461,7 +461,7 @@ int Debris_AllocRubbleObject(int sourceObjIdx) {
 	int yawJitter;
 	int pitchJitter;
 
-	newObjIdxWord = Object_AllocSlotForGenus(g_modelTypeTable[OBJ_Rubble02].genusId);
+	newObjIdxWord = Object_AllocSlotForGenus(g_objectTypes[OBJ_Rubble02].genusId);
 	newObjIdx = newObjIdxWord;
 	if (newObjIdxWord == 0xffffu) {
 		return newObjIdx;
@@ -476,11 +476,11 @@ int Debris_AllocRubbleObject(int sourceObjIdx) {
 	g_objectTable[newObjIdx].playerOwnerIdx = -1;
 	g_objectTable[newObjIdx].regionIdx = g_objectTable[sourceObjIdx].regionIdx;
 	g_objectTable[newObjIdx].objectType = OBJ_Rubble02;
-	g_objectTable[newObjIdx].genusId = g_modelTypeTable[OBJ_Rubble02].genusId;
+	g_objectTable[newObjIdx].genusId = g_objectTypes[OBJ_Rubble02].genusId;
 	g_objectTable[newObjIdx].objectSignature = 0xffffu;
 	g_objectTable[newObjIdx].flightGroupIdx = g_objectTable[sourceObjIdx].flightGroupIdx;
-	g_objectTable[newObjIdx].mobj->state = g_modelTypeTable[OBJ_Rubble02].familyId;
-	g_objectTable[newObjIdx].mobj->instanceExtent = g_modelTypeTable[OBJ_Rubble02].maxBoundsExtent;
+	g_objectTable[newObjIdx].mobj->state = g_objectTypes[OBJ_Rubble02].familyId;
+	g_objectTable[newObjIdx].mobj->instanceExtent = g_objectTypes[OBJ_Rubble02].maxBoundsExtent;
 	g_objectTable[newObjIdx].world_x = g_objectTable[sourceObjIdx].world_x;
 	g_objectTable[newObjIdx].world_y = g_objectTable[sourceObjIdx].world_y;
 	g_objectTable[newObjIdx].world_z = g_objectTable[sourceObjIdx].world_z;
@@ -488,7 +488,7 @@ int Debris_AllocRubbleObject(int sourceObjIdx) {
 	g_objectTable[newObjIdx].mobj->prevWorldY = g_objectTable[newObjIdx].world_y;
 	g_objectTable[newObjIdx].mobj->prevWorldZ = g_objectTable[newObjIdx].world_z;
 	collide_ResetObjectProximityForSlot(newObjIdx);
-	g_objectTable[newObjIdx].mobj->damageAmount = g_modelTypeTable[OBJ_Rubble02].maxBoundsExtent;
+	g_objectTable[newObjIdx].mobj->damageAmount = g_objectTypes[OBJ_Rubble02].maxBoundsExtent;
 	g_objectTable[newObjIdx].mobj->lifetimeTimer = (uint16_t)GameRand() % 7552 + 1888;
 	g_objectTable[newObjIdx].mobj->framesAlive = 0;
 	g_objectTable[newObjIdx].mobj->sourceObjIdx = (int16_t)sourceObjIdx;

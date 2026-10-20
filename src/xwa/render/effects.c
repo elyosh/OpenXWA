@@ -382,7 +382,7 @@ Particle_SetEffectTemplate(int templateIdx, float velocityAttractionScale, float
 						   float colorRandomR, float colorRandomG, float colorRandomB, float colorEndA,
 						   float colorEndR, float colorEndG, float colorEndB, float particleSizeBase,
 						   float particleSizeGrowth, float particleSizeRandom, int particleLifetimeTicks,
-						   int initialAgeRandomTicks, int randomizeColorEndpoints, uint16_t textureModelType,
+						   int initialAgeRandomTicks, int randomizeColorEndpoints, uint16_t textureObjectType,
 						   uint16_t textureFrame, float billboardScaleMultiplier, uint32_t renderFlags,
 						   uint32_t bilinearRenderFlags, int clearField64TexLevel) {
 	ParticleEffectTemplate* def;
@@ -412,12 +412,12 @@ Particle_SetEffectTemplate(int templateIdx, float velocityAttractionScale, float
 	def->particleLifetimeTicks = particleLifetimeTicks;
 	def->initialAgeRandomTicks = initialAgeRandomTicks;
 	def->randomizeColorEndpoints = randomizeColorEndpoints;
-	def->textureModelType = textureModelType;
+	def->textureObjectType = textureObjectType;
 
-	FeDiskIo_SelectTextureFrame(textureModelType, textureFrame, 256);
+	FeDiskIo_SelectTextureFrame(textureObjectType, textureFrame, 256);
 	def->billboardScale = (uint16_t)(int64_t)((double)g_projScaleDiv512 * (double)billboardScaleMultiplier);
-	def->staticTexLevel = g_modelTypeTable[textureModelType].curTexLevel;
-	def->field64TexLevel = clearField64TexLevel ? NULL : g_modelTypeTable[textureModelType].curTexLevel;
+	def->staticTexLevel = g_objectTypes[textureObjectType].curTexLevel;
+	def->field64TexLevel = clearField64TexLevel ? NULL : g_objectTypes[textureObjectType].curTexLevel;
 	def->renderFlags = g_bilinearEnabled ? bilinearRenderFlags : renderFlags;
 }
 
@@ -427,7 +427,7 @@ static void Particle_SetTemplateGapFloat(int templateIdx, size_t offset, float v
 
 // FUNCTION: XWA 0x4C6030
 void Particle_InitEffectTemplates(void) {
-	uint16_t randomTextureModelType;
+	uint16_t randomTextureObjectType;
 
 	g_worldParticleEffects = NULL;
 	Particle_ResetPools();
@@ -471,10 +471,10 @@ void Particle_InitEffectTemplates(void) {
 							   0.2f, 0.0f, 0.0f, 0.0f, 0.0f, 0.5f, 0.0f, 0.050000001f, 0.0f, 0.0f, 78, 15, 0,
 							   277, 1, 1664.0f, 36370, 36754, 1);
 
-	randomTextureModelType = (uint16_t)((GameRand2() & 3u) + 233u);
+	randomTextureObjectType = (uint16_t)((GameRand2() & 3u) + 233u);
 	Particle_SetEffectTemplate(6, 1.0f, 0.0089999996f, 0.0042372881f, 30.0f, 10.0f, 1.0f, 1.0f, 1.0f, 1.0f,
 							   0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f, 2.0f, 0.0f, 1.0f, 236, 157, 0,
-							   randomTextureModelType, 1, 1024.0f, 3602, 3986, 0);
+							   randomTextureObjectType, 1, 1024.0f, 3602, 3986, 0);
 	Particle_SetEffectTemplate(8, 1.0f, 0.0024999999f, 0.0042372881f, 10.0f, 4.0f, 0.80000001f, 0.89999998f,
 							   0.0f, 0.89999998f, 0.0f, 0.0f, 0.0f, 0.0f, 0.2f, 0.0f, 0.0f, 0.0f, 0.2f,
 							   0.0000095338992f, 0.0f, 236, 78, 0, 277, 1, 2664.0f, 36370, 36754, 0);
@@ -484,7 +484,7 @@ void Particle_InitEffectTemplates(void) {
 void Particle_InitEffectType0(ParticleEffect* effect) {
 	ParticleEffectTemplate* def;
 	unsigned int maxParticles;
-	uint16_t textureModelType;
+	uint16_t textureObjectType;
 	uint16_t frameCount;
 	uint16_t randValue;
 
@@ -519,10 +519,10 @@ void Particle_InitEffectType0(ParticleEffect* effect) {
 	effect->accelY = 0.0f;
 	effect->accelZ = 0.0f;
 	effect->useAttachedTransform = 1;
-	textureModelType = (uint16_t)(OBJ_DebrisTextureGroup4000 + (GameRand2() & 3u));
+	textureObjectType = (uint16_t)(OBJ_DebrisTextureGroup4000 + (GameRand2() & 3u));
 	def = effect->def;
-	effect->textureModelType = textureModelType;
-	frameCount = g_modelTypeTable[textureModelType].frameCount;
+	effect->textureObjectType = textureObjectType;
+	frameCount = g_objectTypes[textureObjectType].frameCount;
 	effect->textureFrameCount = frameCount;
 	effect->textureAnimRate = (float)frameCount * 0.5f;
 
@@ -703,8 +703,8 @@ void Particle_InitEffectType3(ParticleEffect* effect) {
 		maxParticles = 25u;
 	}
 	effect->maxParticles = (int)maxParticles;
-	effect->textureModelType = 275;
-	frameCount = g_modelTypeTable[275].frameCount;
+	effect->textureObjectType = 275;
+	frameCount = g_objectTypes[275].frameCount;
 	effect->textureFrameCount = frameCount;
 	effect->textureAnimRate = (float)frameCount;
 
@@ -760,8 +760,8 @@ void Particle_InitEffectType4(ParticleEffect* effect) {
 	effect->accelY = 0.0f;
 	effect->accelZ = -20.0f;
 	effect->useAttachedTransform = 0;
-	effect->textureModelType = def->textureModelType;
-	frameCount = g_modelTypeTable[effect->textureModelType].frameCount;
+	effect->textureObjectType = def->textureObjectType;
+	frameCount = g_objectTypes[effect->textureObjectType].frameCount;
 	effect->textureFrameCount = frameCount;
 	effect->textureAnimRate = (float)frameCount;
 
@@ -886,8 +886,8 @@ void Particle_InitEffectType6(ParticleEffect* effect) {
 	effect->accelY = 0.0f;
 	effect->accelZ = 0.0f;
 	effect->useAttachedTransform = 1;
-	effect->textureModelType = 544;
-	frameCount = g_modelTypeTable[544].frameCount;
+	effect->textureObjectType = 544;
+	frameCount = g_objectTypes[544].frameCount;
 	effect->textureFrameCount = frameCount;
 	effect->textureAnimRate = (float)frameCount;
 
@@ -939,8 +939,8 @@ void Particle_InitEffectType7(ParticleEffect* effect) {
 	effect->accelY = 0.0f;
 	effect->accelZ = 0.0f;
 	effect->useAttachedTransform = 1;
-	effect->textureModelType = 275;
-	frameCount = g_modelTypeTable[275].frameCount;
+	effect->textureObjectType = 275;
+	frameCount = g_objectTypes[275].frameCount;
 	effect->textureFrameCount = frameCount;
 	effect->textureAnimRate = (float)frameCount;
 
@@ -996,8 +996,8 @@ void Particle_InitEffectType8(ParticleEffect* effect) {
 	effect->accelY = 0.0f;
 	effect->accelZ = 0.0f;
 	effect->useAttachedTransform = 1;
-	effect->textureModelType = 275;
-	frameCount = g_modelTypeTable[275].frameCount;
+	effect->textureObjectType = 275;
+	frameCount = g_objectTypes[275].frameCount;
 	effect->textureFrameCount = frameCount;
 	effect->textureAnimRate = (float)frameCount;
 
@@ -1070,7 +1070,7 @@ void Particle_InitEffectType10(ParticleEffect* effect) {
 void Particle_InitEffectType11(ParticleEffect* effect) {
 	ParticleEffectTemplate* def;
 	int maxParticles;
-	uint16_t textureModelType;
+	uint16_t textureObjectType;
 	uint16_t frameCount;
 	uint16_t randValue;
 
@@ -1102,10 +1102,10 @@ void Particle_InitEffectType11(ParticleEffect* effect) {
 	effect->accelY = 0.0f;
 	effect->accelZ = 0.0f;
 	effect->useAttachedTransform = 1;
-	textureModelType = (uint16_t)((GameRand2() & 3u) + 233u);
+	textureObjectType = (uint16_t)((GameRand2() & 3u) + 233u);
 	def = effect->def;
-	effect->textureModelType = textureModelType;
-	frameCount = g_modelTypeTable[textureModelType].frameCount;
+	effect->textureObjectType = textureObjectType;
+	frameCount = g_objectTypes[textureObjectType].frameCount;
 	effect->textureFrameCount = frameCount;
 	effect->textureAnimRate = (float)frameCount * g_particleHalfFloat;
 
@@ -1277,7 +1277,7 @@ void Particle_SpawnTransientObjectFromRecord(ParticleRecord* particle) {
 	g_objectTable[objectIdx].mobj->lifetimeTimer = 0;
 	g_objectTable[objectIdx].mobj->sourceObjIdx = -1;
 	g_objectTable[objectIdx].mobj->instanceExtent =
-		g_modelTypeTable[(uint16_t)g_objectTable[objectIdx].objectType].maxBoundsExtent >> 2;
+		g_objectTypes[(uint16_t)g_objectTable[objectIdx].objectType].maxBoundsExtent >> 2;
 
 	maxVelocity = (velX > velY ? velX : velY) > velZ ? (velX > velY ? velX : velY) : velZ;
 	g_objectTable[objectIdx].mobj->speed = (uint16_t)((uint8_t)(236 * maxVelocity / g_elapsedTicks) << 8);
@@ -2669,19 +2669,19 @@ void ObjectTrail_InitTorpedoEmitter(ObjectTrailEmitter* trail) {
 	trail->alphaFadeStart = 0.2f;
 	trail->alphaFadeRate = 1.25f;
 	trail->startAlphaBias = -0.75f;
-	trail->sourceModelExtent = (uint16_t)g_modelTypeTable[OBJ_WarheadTorpedo].maxBoundsExtent;
+	trail->sourceModelExtent = (uint16_t)g_objectTypes[OBJ_WarheadTorpedo].maxBoundsExtent;
 	trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_NEAREST;
 	if (g_bilinearEnabled) {
 		trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_BILINEAR;
 	}
 
-	trail->textureModelType = (uint32_t)OBJ_TrailTextureGroup21000_Sprite000;
+	trail->textureObjectType = (uint32_t)OBJ_TrailTextureGroup21000_Sprite000;
 	trail->forwardOffset = -300;
 	trail->argbColor = (unsigned int)-1;
 	trail->ribbonWidth = 35.0f;
-	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureModelType, 1u, 256);
+	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureObjectType, 1u, 256);
 	texVRate = g_particleFiveFloat / (float)trail->lifetimeTicks;
-	trail->curTexLevel = g_modelTypeTable[trail->textureModelType].curTexLevel;
+	trail->curTexLevel = g_objectTypes[trail->textureObjectType].curTexLevel;
 	trail->animTicksAccum = 0;
 	trail->texVRate = texVRate;
 }
@@ -2697,19 +2697,19 @@ void ObjectTrail_InitMagPulseEmitter(ObjectTrailEmitter* trail) {
 	trail->alphaFadeStart = 0.2f;
 	trail->alphaFadeRate = 1.25f;
 	trail->startAlphaBias = -0.5f;
-	trail->sourceModelExtent = (uint16_t)g_modelTypeTable[OBJ_WarheadTorpedo].maxBoundsExtent;
+	trail->sourceModelExtent = (uint16_t)g_objectTypes[OBJ_WarheadTorpedo].maxBoundsExtent;
 	trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_NEAREST;
 	if (g_bilinearEnabled) {
 		trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_BILINEAR;
 	}
 
-	trail->textureModelType = (uint32_t)OBJ_TrailTextureGroup21005;
+	trail->textureObjectType = (uint32_t)OBJ_TrailTextureGroup21005;
 	trail->forwardOffset = -300;
 	trail->argbColor = (unsigned int)-1;
 	trail->ribbonWidth = 36.0f;
-	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureModelType, 1u, 256);
+	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureObjectType, 1u, 256);
 	texVRate = g_particleFiveFloat / (float)trail->lifetimeTicks;
-	trail->curTexLevel = g_modelTypeTable[trail->textureModelType].curTexLevel;
+	trail->curTexLevel = g_objectTypes[trail->textureObjectType].curTexLevel;
 	trail->animTicksAccum = 0;
 	trail->texVRate = texVRate;
 }
@@ -2725,19 +2725,19 @@ void ObjectTrail_InitIonPulseEmitter(ObjectTrailEmitter* trail) {
 	trail->alphaFadeStart = 0.2f;
 	trail->alphaFadeRate = 1.25f;
 	trail->startAlphaBias = -0.5f;
-	trail->sourceModelExtent = (uint16_t)g_modelTypeTable[OBJ_WarheadTorpedo].maxBoundsExtent;
+	trail->sourceModelExtent = (uint16_t)g_objectTypes[OBJ_WarheadTorpedo].maxBoundsExtent;
 	trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_NEAREST;
 	if (g_bilinearEnabled) {
 		trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_BILINEAR;
 	}
 
-	trail->textureModelType = (uint32_t)OBJ_TrailTextureGroup21010;
+	trail->textureObjectType = (uint32_t)OBJ_TrailTextureGroup21010;
 	trail->forwardOffset = -300;
 	trail->argbColor = (unsigned int)-1;
 	trail->ribbonWidth = 35.0f;
-	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureModelType, 1u, 256);
+	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureObjectType, 1u, 256);
 	texVRate = g_particleFiveFloat / (float)trail->lifetimeTicks;
-	trail->curTexLevel = g_modelTypeTable[trail->textureModelType].curTexLevel;
+	trail->curTexLevel = g_objectTypes[trail->textureObjectType].curTexLevel;
 	trail->animTicksAccum = 0;
 	trail->texVRate = texVRate;
 }
@@ -2751,19 +2751,19 @@ void ObjectTrail_InitMissileEmitter(ObjectTrailEmitter* trail) {
 	trail->alphaFadeStart = 0.2f;
 	trail->alphaFadeRate = 1.25f;
 	trail->startAlphaBias = 0.0f;
-	trail->sourceModelExtent = (uint16_t)g_modelTypeTable[OBJ_WarheadMissile].maxBoundsExtent;
+	trail->sourceModelExtent = (uint16_t)g_objectTypes[OBJ_WarheadMissile].maxBoundsExtent;
 	trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_NEAREST;
 	if (g_bilinearEnabled) {
 		trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_BILINEAR;
 	}
 
-	trail->textureModelType = (uint32_t)OBJ_TrailTextureGroup21020;
+	trail->textureObjectType = (uint32_t)OBJ_TrailTextureGroup21020;
 	trail->forwardOffset = -300;
 	trail->argbColor = (unsigned int)-1;
 	trail->ribbonWidth = 35.0f;
-	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureModelType, 1u, 256);
+	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureObjectType, 1u, 256);
 	texVRate = g_particleUnitFloat / (float)trail->lifetimeTicks;
-	trail->curTexLevel = g_modelTypeTable[trail->textureModelType].curTexLevel;
+	trail->curTexLevel = g_objectTypes[trail->textureObjectType].curTexLevel;
 	trail->animFrameCount = 0;
 	trail->animRateScale = 1.0f;
 	trail->animTicksAccum = 0;
@@ -2779,19 +2779,19 @@ void ObjectTrail_InitRocketEmitter(ObjectTrailEmitter* trail) {
 	trail->alphaFadeStart = 0.2f;
 	trail->alphaFadeRate = 1.25f;
 	trail->startAlphaBias = 0.75f;
-	trail->sourceModelExtent = (uint16_t)g_modelTypeTable[OBJ_WarheadMissile].maxBoundsExtent;
+	trail->sourceModelExtent = (uint16_t)g_objectTypes[OBJ_WarheadMissile].maxBoundsExtent;
 	trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_NEAREST;
 	if (g_bilinearEnabled) {
 		trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_BILINEAR;
 	}
 
-	trail->textureModelType = (uint32_t)OBJ_TrailTextureGroup21020;
+	trail->textureObjectType = (uint32_t)OBJ_TrailTextureGroup21020;
 	trail->forwardOffset = -300;
 	trail->argbColor = (unsigned int)-1;
 	trail->ribbonWidth = 100.0f;
-	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureModelType, 1u, 256);
+	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureObjectType, 1u, 256);
 	texVRate = g_particleUnitFloat / (float)trail->lifetimeTicks;
-	trail->curTexLevel = g_modelTypeTable[trail->textureModelType].curTexLevel;
+	trail->curTexLevel = g_objectTypes[trail->textureObjectType].curTexLevel;
 	trail->animFrameCount = 0;
 	trail->animRateScale = 1.0f;
 	trail->animTicksAccum = 0;
@@ -2807,19 +2807,19 @@ void ObjectTrail_InitAdvancedTorpedoEmitter(ObjectTrailEmitter* trail) {
 	trail->alphaFadeStart = 0.2f;
 	trail->alphaFadeRate = 1.25f;
 	trail->startAlphaBias = 1.0f;
-	trail->sourceModelExtent = (uint16_t)g_modelTypeTable[OBJ_WarheadAdvancedTorpedo].maxBoundsExtent;
+	trail->sourceModelExtent = (uint16_t)g_objectTypes[OBJ_WarheadAdvancedTorpedo].maxBoundsExtent;
 	trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_NEAREST;
 	if (g_bilinearEnabled) {
 		trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_BILINEAR;
 	}
 
-	trail->textureModelType = (uint32_t)OBJ_TrailTextureGroup21015;
+	trail->textureObjectType = (uint32_t)OBJ_TrailTextureGroup21015;
 	trail->forwardOffset = -300;
 	trail->argbColor = (unsigned int)-1;
 	trail->ribbonWidth = 35.0f;
-	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureModelType, 1u, 256);
+	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureObjectType, 1u, 256);
 	texVRate = g_particleUnitFloat / (float)trail->lifetimeTicks;
-	trail->curTexLevel = g_modelTypeTable[trail->textureModelType].curTexLevel;
+	trail->curTexLevel = g_objectTypes[trail->textureObjectType].curTexLevel;
 	trail->animFrameCount = 0;
 	trail->animRateScale = 1.0f;
 	trail->animTicksAccum = 0;
@@ -2835,19 +2835,19 @@ void ObjectTrail_InitAdvancedMissileEmitter(ObjectTrailEmitter* trail) {
 	trail->alphaFadeStart = 0.2f;
 	trail->alphaFadeRate = 1.25f;
 	trail->startAlphaBias = 1.0f;
-	trail->sourceModelExtent = (uint16_t)g_modelTypeTable[OBJ_WarheadAdvancedMissile].maxBoundsExtent;
+	trail->sourceModelExtent = (uint16_t)g_objectTypes[OBJ_WarheadAdvancedMissile].maxBoundsExtent;
 	trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_NEAREST;
 	if (g_bilinearEnabled) {
 		trail->renderFlags = OBJECT_TRAIL_RENDER_FLAGS_BILINEAR;
 	}
 
-	trail->textureModelType = (uint32_t)OBJ_TrailTextureGroup21025;
+	trail->textureObjectType = (uint32_t)OBJ_TrailTextureGroup21025;
 	trail->forwardOffset = -300;
 	trail->argbColor = (unsigned int)-1;
 	trail->ribbonWidth = 35.0f;
-	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureModelType, 1u, 256);
+	FeDiskIo_SelectTextureFrame((uint16_t)trail->textureObjectType, 1u, 256);
 	texVRate = g_particleUnitFloat / (float)trail->lifetimeTicks;
-	trail->curTexLevel = g_modelTypeTable[trail->textureModelType].curTexLevel;
+	trail->curTexLevel = g_objectTypes[trail->textureObjectType].curTexLevel;
 	trail->animFrameCount = 0;
 	trail->animRateScale = 1.0f;
 	trail->animTicksAccum = 0;

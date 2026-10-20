@@ -1,7 +1,7 @@
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
 
-#include "xwa/assets/model_type.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/string_table.h"
 #include "xwa/flight/ai/pai.h"
 #include "xwa/flight/flight.h"
@@ -310,7 +310,7 @@ void XwaSnapshotFlightMap_CaptureObject(XwaSnapshot* snapshot, uint32_t slot, ui
 	memset(map, 0, sizeof *map);
 	map->flight_object_index = flight_object_index;
 	map->label_offset = UINT16_MAX;
-	map->max_bounds_extent = g_modelTypeTable[(uint16_t)object->objectType].maxBoundsExtent;
+	map->max_bounds_extent = g_objectTypes[(uint16_t)object->objectType].maxBoundsExtent;
 	map->box_extent = Targeting_GetObjectBoxExtent((int)slot);
 	map->render_kind = render_kind;
 	map->cull_kind = cull_kind;

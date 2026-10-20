@@ -5,7 +5,7 @@
 #include "aeron/log.h"
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/model_def.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa_runtime/models/craft_definitions.h"
 
 #include <stdint.h>
@@ -224,7 +224,7 @@ static int ModelSource_AddCockpitKey(const char* key) {
 
 /* `<name>cockpit` for every model definition name, the fallbacks
    FeDiskIo_LoadCockpitModel tries, and the Equipment0.LST key of every
-   turret-seat model type. */
+   turret-seat object type. */
 static int ModelSource_BuildCockpitKeys(void) {
 	int modelIndex;
 	int ok;
@@ -252,13 +252,13 @@ static int ModelSource_BuildCockpitKeys(void) {
 
 		for (seat = 0; ok && seat < 2; ++seat) {
 			uint16_t objectType = g_modelDefs[modelIndex].turretObjectType[seat];
-			const ModelTypeInfo* info;
+			const ObjectTypeInfo* info;
 
 			if (objectType == 0 || objectType >= OBJ_Count) {
 				continue;
 			}
-			info = &g_modelTypeTable[objectType];
-			if ((info->recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) != 0 && info->textureGroup == 1 &&
+			info = &g_objectTypes[objectType];
+			if ((info->recordFlags & OBJECT_TYPE_RECORD_TEXTURE_BACKED) != 0 && info->textureGroup == 1 &&
 				(int)info->frameCount < s_equipmentRowCount) {
 				ok = ModelSource_AddCockpitKey(s_equipmentRows[info->frameCount]);
 			}
@@ -593,14 +593,14 @@ int XwaModelSource_AddKey(const char* key) {
 }
 
 int XwaModelSource_TypeKey(unsigned int objectType, char* key) {
-	const ModelTypeInfo* info;
+	const ObjectTypeInfo* info;
 	const char* rowKey = NULL;
 
 	if (!s_replacementsEnabled || !s_initialized || objectType >= OBJ_Count) {
 		return 0;
 	}
-	info = &g_modelTypeTable[objectType];
-	if ((info->recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) == 0) {
+	info = &g_objectTypes[objectType];
+	if ((info->recordFlags & OBJECT_TYPE_RECORD_TEXTURE_BACKED) == 0) {
 		return 0;
 	}
 	if (info->textureGroup == 0 && (int)info->frameCount < s_craftRowCount) {
@@ -635,11 +635,11 @@ int XwaModelSource_KeyRequiresFloatHardpoints(const char* key) {
 			continue;
 		}
 		for (objectType = 0; objectType < OBJ_Count; ++objectType) {
-			const ModelTypeInfo* info = &g_modelTypeTable[objectType];
+			const ObjectTypeInfo* info = &g_objectTypes[objectType];
 
-			if ((info->recordFlags & MODEL_TYPE_RECORD_TEXTURE_BACKED) != 0 && info->textureGroup == 0 &&
+			if ((info->recordFlags & OBJECT_TYPE_RECORD_TEXTURE_BACKED) != 0 && info->textureGroup == 0 &&
 				info->frameCount == (uint16_t)row &&
-				(info->flags & MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0) {
+				(info->flags & OBJECT_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0) {
 				return 1;
 			}
 		}

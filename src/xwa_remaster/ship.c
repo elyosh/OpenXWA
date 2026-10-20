@@ -524,7 +524,7 @@ typedef struct PbrLightFS {
 	float key_probe_shadow;     /* fraction of the probe light that the key shadow removes */
 	float debug_isolate_term;
 	float key_shadow_facing; /* nonzero: the key shadow only as surfaces face the light */
-	float reserved_xvt; /* formerly the XvT flat-shading switch */
+	float reserved_xvt;      /* formerly the XvT flat-shading switch */
 	float ssao_intensity;
 	float ssao_power;
 	float reserved_ssao_rt[2]; /* formerly the AO target size, which Aeron provides */
@@ -568,37 +568,21 @@ void XwaRemasterShip_ConfigurePbrTuning(const XwaShipPbrTuning* in) {
 		g_pbr_tuning = *in;
 	}
 }
-int XwaRemasterShip_BackfaceFill(void) {
-	return g_backface_fill;
-}
+int XwaRemasterShip_BackfaceFill(void) { return g_backface_fill; }
 
-void XwaRemasterShip_SetBackfaceFill(int enabled) {
-	g_backface_fill = enabled != 0;
-}
+void XwaRemasterShip_SetBackfaceFill(int enabled) { g_backface_fill = enabled != 0; }
 
-int XwaRemasterShip_KeyShadowAllSides(void) {
-	return g_key_shadow_all_sides;
-}
+int XwaRemasterShip_KeyShadowAllSides(void) { return g_key_shadow_all_sides; }
 
-void XwaRemasterShip_SetKeyShadowAllSides(int enabled) {
-	g_key_shadow_all_sides = enabled != 0;
-}
+void XwaRemasterShip_SetKeyShadowAllSides(int enabled) { g_key_shadow_all_sides = enabled != 0; }
 
-int XwaRemasterShip_ShipOcclusion(void) {
-	return g_ship_occlusion;
-}
+int XwaRemasterShip_ShipOcclusion(void) { return g_ship_occlusion; }
 
-void XwaRemasterShip_SetShipOcclusion(int enabled) {
-	g_ship_occlusion = enabled != 0;
-}
+void XwaRemasterShip_SetShipOcclusion(int enabled) { g_ship_occlusion = enabled != 0; }
 
-int XwaRemasterShip_FloorReflection(void) {
-	return g_floor_reflection;
-}
+int XwaRemasterShip_FloorReflection(void) { return g_floor_reflection; }
 
-void XwaRemasterShip_SetFloorReflection(int enabled) {
-	g_floor_reflection = enabled != 0;
-}
+void XwaRemasterShip_SetFloorReflection(int enabled) { g_floor_reflection = enabled != 0; }
 
 void XwaRemasterShip_GetPbrTuningDefault(XwaShipPbrTuning* out) {
 	if (out) {
@@ -630,8 +614,8 @@ static float ship_directional_light_luminance(const XwaDirLight* light) {
 }
 
 static int ship_directional_light_is_sun(const XwaDirLight* light) {
-	return light && light->source_backdrop_model_type >= XWA_SNAP_TYPE_BACKDROP_SUN_FIRST &&
-		   light->source_backdrop_model_type <= XWA_SNAP_TYPE_BACKDROP_SUN_LAST;
+	return light && light->source_backdrop_object_type >= XWA_SNAP_TYPE_BACKDROP_SUN_FIRST &&
+		   light->source_backdrop_object_type <= XWA_SNAP_TYPE_BACKDROP_SUN_LAST;
 }
 
 const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* lights,
@@ -720,9 +704,8 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 		isfinite(environment_map->strength) && environment_map->strength > 0.0f) {
 		/* Basis vectors become the rows of the world-to-local matrix, in
 		 * the space the instances were submitted in. */
-		const float* const source_basis[3] = {
-			environment_map->right, environment_map->up, environment_map->forward
-		};
+		const float* const source_basis[3] = { environment_map->right, environment_map->up,
+											   environment_map->forward };
 		AeronScenePbrEnvironment environment;
 		memset(&environment, 0, sizeof environment);
 		environment.diffuse = environment_map->texture;
@@ -798,7 +781,8 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 		}
 		float col[3];
 		for (int c = 0; c < 3; c++) {
-			col[c] = XwaRemaster_SrgbToLinear(l->color[c]) * l->intensity * g_pbr_tuning.sun_illuminance_scale;
+			col[c] =
+				XwaRemaster_SrgbToLinear(l->color[c]) * l->intensity * g_pbr_tuning.sun_illuminance_scale;
 		}
 		if (li == 0) {
 			memcpy(env.directional_dir, d, sizeof d);
@@ -901,7 +885,8 @@ static int s_default_mesh_table_ready;
 
 /* Every component visible, unhighlighted, at full emissive, with `rows` (or the
  * identity when NULL) as its transform. */
-static void ship_mesh_table_init(const AeronSceneMesh* mesh, const float (*rows)[4], AeronSceneMeshTable* out) {
+static void ship_mesh_table_init(const AeronSceneMesh* mesh, const float (*rows)[4],
+								 AeronSceneMeshTable* out) {
 	const AeronSceneMeshTable* d = &s_default_mesh_table;
 	if (!s_default_mesh_table_ready) {
 		for (uint32_t mi = 0; mi < AERON_MAX_MESH_COMPONENTS; mi++) {
@@ -1128,7 +1113,7 @@ int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaC
 			if (c->aim_angle_b != 0) {
 				float local_rotation[3][4];
 				ship_mat3x4_rotation_about_pivot(local_rotation, r->axis, r->pivot,
-											 (float)c->aim_angle_b * q16);
+												 (float)c->aim_angle_b * q16);
 				if (has_bwing_compensation) {
 					ship_mat3x4_mul(out->rows[mi], bwing_compensation, local_rotation);
 				} else {
@@ -1171,9 +1156,8 @@ int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaC
 }
 
 int XwaRemasterShip_BuildPreviousCockpitMeshTable(
-	const AeronSceneMesh* mesh, const XwaCockpit* current_cockpit,
-	const XwaFlightObject* current_anchor, const XwaCockpit* previous_cockpit,
-	const XwaFlightObject* previous_anchor, AeronSceneMeshTable* out) {
+	const AeronSceneMesh* mesh, const XwaCockpit* current_cockpit, const XwaFlightObject* current_anchor,
+	const XwaCockpit* previous_cockpit, const XwaFlightObject* previous_anchor, AeronSceneMeshTable* out) {
 	if (!mesh || !current_cockpit || !current_anchor || !previous_cockpit || !previous_anchor || !out ||
 		!current_anchor->has_craft || !previous_anchor->has_craft ||
 		current_anchor->object_type != previous_anchor->object_type ||

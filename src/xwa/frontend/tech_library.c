@@ -4,8 +4,8 @@
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/linez.h"
 #include "xwa/assets/model_def.h"
-#include "xwa/assets/model_type.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/ship_list.h"
 #include "xwa/assets/string_table.h"
 #include "xwa/audio/music.h"
@@ -200,10 +200,10 @@ int BuildCraftTechStats(CraftTechStats* stats) {
 	int group;
 
 	objectType = g_objectTypeTables.craftTypeToObjectType[stats->craftType];
-	stats->genusId = g_modelTypeTable[objectType].genusId;
+	stats->genusId = g_objectTypes[objectType].genusId;
 
 	if (objectType < OBJ_Count) {
-		modelIndex = g_modelTypeTable[(uint16_t)objectType].modelDefIndex;
+		modelIndex = g_objectTypes[(uint16_t)objectType].modelDefIndex;
 	} else {
 		modelIndex = UINT16_MAX;
 	}
@@ -314,7 +314,7 @@ char* GetCraftTypeModelLongName(int craftType) {
 
 	objectType = g_objectTypeTables.craftTypeToObjectType[craftType];
 	if ((uint16_t)objectType < OBJ_Count) {
-		modelIndex = (uint16_t)g_modelTypeTable[(uint16_t)objectType].modelDefIndex;
+		modelIndex = (uint16_t)g_objectTypes[(uint16_t)objectType].modelDefIndex;
 	} else {
 		modelIndex = UINT16_MAX;
 	}

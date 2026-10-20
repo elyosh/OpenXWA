@@ -7,7 +7,7 @@
  *   - the craft type (craftTypeToObjectType, 0x5B0F70, 232 entries): the
  *     number that missions, pilot files, SHIPLIST.TXT and SPECDESC.TXT use.
  *     It holds the object type;
- *   - the object type (ObjectTypeId, g_modelTypeTable at 0x5FB240, 557
+ *   - the object type (ObjectTypeId, g_objectTypes at 0x5FB240, 557
  *     entries): the list row of the model, the craft record, genus, family
  *     and flags;
  *   - the craft record (g_modelDefs at 0x5BB480, 265 entries, ModelDefIndex):
@@ -584,7 +584,7 @@ enum {
 	XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT = 232,
 	XWA_OBJECT_TYPE_TABLE_WORD_COUNT = 404,
 	XWA_MISSION_BACKDROP_DESCRIPTOR_COUNT = 104,
-	XWA_CRAFT_COMPANION_MODEL_TYPE_PAIR_COUNT = 2,
+	XWA_CRAFT_COMPANION_OBJECT_TYPE_PAIR_COUNT = 2,
 	XWA_OBJECT_TYPE_TABLE_TAIL_WORD_COUNT = 12,
 };
 
@@ -633,14 +633,14 @@ enum {
 
 #pragma pack(push, 1)
 typedef struct ObjectTypeBackdropDescriptor {
-	uint16_t modelType;
+	uint16_t objectType;
 	uint8_t flags;
 } ObjectTypeBackdropDescriptor;
 
 typedef struct ObjectTypeTables {
 	uint16_t craftTypeToObjectType[XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT];
 	ObjectTypeBackdropDescriptor missionBackdropDescriptors[XWA_MISSION_BACKDROP_DESCRIPTOR_COUNT];
-	uint16_t craftCompanionModelTypes[2 * XWA_CRAFT_COMPANION_MODEL_TYPE_PAIR_COUNT];
+	uint16_t craftCompanionObjectTypes[2 * XWA_CRAFT_COMPANION_OBJECT_TYPE_PAIR_COUNT];
 	// No direct xrefs found; retained to preserve the original data layout.
 	uint16_t unknownObjectTypeWords[XWA_OBJECT_TYPE_TABLE_TAIL_WORD_COUNT];
 } ObjectTypeTables;

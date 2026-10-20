@@ -1134,7 +1134,7 @@ int XwaRemasterAssets_SyncFlightTextures(XwaRemasterAssets* a, AeronCommandBuffe
 		int group = 0;
 		int frames_mode = 0;
 		int sprite_id = 0;
-		if (!XwaSnapshotExport_ModelTextureBinding(snapshot->texture_assets[i].model_type, &group,
+		if (!XwaSnapshotExport_ModelTextureBinding(snapshot->texture_assets[i].object_type, &group,
 												   &frames_mode, &sprite_id)) {
 			continue;
 		}

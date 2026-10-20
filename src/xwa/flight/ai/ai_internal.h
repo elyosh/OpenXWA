@@ -11,7 +11,7 @@
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/audio/fsfx.h"
 #include "xwa/audio/music.h"
 #include "xwa/flight/flight.h"

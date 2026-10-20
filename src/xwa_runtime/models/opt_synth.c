@@ -41,13 +41,15 @@ enum {
 /* Articulation names OpenXWA reads. A
    `cargo_clamps.` group may end with any carried model's encoded name, and
    `variant.<name>.` may prefix any group but `crew`. */
-static const char* const s_articulationGroups[] = { "sfoils",  "landing_gear", "hangar_doors", "hatches",
-													"warheads_bay", "cargo_clamps.open", "cargo_clamps.close",
-													"crew" };
+static const char* const s_articulationGroups[] = {
+	"sfoils",       "landing_gear",      "hangar_doors",       "hatches",
+	"warheads_bay", "cargo_clamps.open", "cargo_clamps.close", "crew"
+};
 static const char* const s_articulationBehaviors[] = { "swing", "random", "random_pause" };
-static const char* const s_articulationSettings[] = { "step_ticks",           "sfoils.close_in_hyperspace",
-													  "sfoils.allow_fire_closed", "sfoils.park_closed",
-													  "hangar_doors.distance", "crew.update_all" };
+static const char* const s_articulationSettings[] = {
+	"step_ticks",         "sfoils.close_in_hyperspace", "sfoils.allow_fire_closed",
+	"sfoils.park_closed", "hangar_doors.distance",      "crew.update_all"
+};
 
 static int OptSynth_IsKnownName(const char* name, const char* const* names, size_t count) {
 	size_t index;
@@ -136,7 +138,7 @@ static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model
 		   any, the warhead launch point falls back to MainHull vertices, which
 		   reads out of range when there is no MainHull. */
 		if (!hasLaser) {
-			return OptSynth_Fail(key, "its model type needs a laser hardpoint (type 0-6, 9-11 or 18)");
+			return OptSynth_Fail(key, "its object type needs a laser hardpoint (type 0-6, 9-11 or 18)");
 		}
 		/* The original code, and XWAU, run without a MainHull: hardpoints go to
 		   the nearest weapon-system mesh (root 0 when there is none), and only
@@ -307,14 +309,15 @@ static void OptSynth_WarnUnknownArticulations(const char* key, const AeronFlight
 		if (!OptSynth_IsKnownName(group, s_articulationGroups,
 								  sizeof s_articulationGroups / sizeof s_articulationGroups[0]) &&
 			strncmp(group, "cargo_clamps.", 13) != 0) {
-			Aeron_LogWarn("xwa.models", "replacement '%s': component %u has unknown articulation group '%s'", key,
-						  articulation->component, articulation->group);
+			Aeron_LogWarn("xwa.models", "replacement '%s': component %u has unknown articulation group '%s'",
+						  key, articulation->component, articulation->group);
 		}
 		if (articulation->behavior[0] != '\0' &&
 			!OptSynth_IsKnownName(articulation->behavior, s_articulationBehaviors,
 								  sizeof s_articulationBehaviors / sizeof s_articulationBehaviors[0])) {
-			Aeron_LogWarn("xwa.models", "replacement '%s': component %u has unknown articulation behavior '%s'",
-						  key, articulation->component, articulation->behavior);
+			Aeron_LogWarn("xwa.models",
+						  "replacement '%s': component %u has unknown articulation behavior '%s'", key,
+						  articulation->component, articulation->behavior);
 		}
 	}
 	for (index = 0; index < model->articulation_setting_count; ++index) {
@@ -790,7 +793,8 @@ const AeronFlightComponentSet* OptSynth_FindComponentSet(const OptimizedPolyObje
 	return NULL;
 }
 
-int32_t OptSynth_GetArticulationSetting(const OptimizedPolyObject* model, const char* name, int32_t fallback) {
+int32_t OptSynth_GetArticulationSetting(const OptimizedPolyObject* model, const char* name,
+										int32_t fallback) {
 	const XwaOptSynthData* synth = OptSynth_GetModelData(model);
 	uint32_t index;
 

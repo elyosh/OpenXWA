@@ -5,7 +5,7 @@
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
 #include "xwa/assets/model_texture.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/config/game_config.h"
 #include "xwa/flight/fediskio.h"
 #include "xwa/flight/flight.h"
@@ -157,7 +157,7 @@ int g_camRelWorldZ;
 // GLOBAL: XWA 0x7D4BD0
 int g_curModelMaxExtent;
 // GLOBAL: XWA 0x7827A8
-int g_modelPreviewModelType;
+int g_modelPreviewObjectType;
 // GLOBAL: XWA 0x7B33C4
 ObjectRecord* g_objectTable;
 // GLOBAL: XWA 0x91ACC0

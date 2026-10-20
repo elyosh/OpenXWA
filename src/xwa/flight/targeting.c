@@ -54,12 +54,12 @@ int Targeting_GetObjectBoxExtent(int objectIdx) {
 				extent <<= (uint8_t)g_modelDefs[modelIndex].boundSizeShift;
 				return extent;
 			}
-			return g_modelTypeTable[(uint16_t)obj->objectType].maxBoundsExtent;
+			return g_objectTypes[(uint16_t)obj->objectType].maxBoundsExtent;
 		}
-		return g_modelTypeTable[(uint16_t)obj->objectType].maxBoundsExtent;
+		return g_objectTypes[(uint16_t)obj->objectType].maxBoundsExtent;
 	}
 
-	return g_modelTypeTable[(uint16_t)obj->objectType].maxBoundsExtent;
+	return g_objectTypes[(uint16_t)obj->objectType].maxBoundsExtent;
 }
 
 // FUNCTION: XWA 0x505C90
@@ -254,11 +254,10 @@ int16_t Targeting_ScoreCandidate(uint16_t candidateObjIdx, int16_t mode, int pla
 				((int16_t)(modelDef->boundSizeX + modelDef->boundSizeY + modelDef->boundSizeZ) / 3)
 				<< (uint8_t)modelDef->boundSizeShift;
 		} else {
-			maxBoundsExtent =
-				g_modelTypeTable[(uint16_t)g_objectTable[candidateRef].objectType].maxBoundsExtent;
+			maxBoundsExtent = g_objectTypes[(uint16_t)g_objectTable[candidateRef].objectType].maxBoundsExtent;
 		}
 	} else {
-		maxBoundsExtent = g_modelTypeTable[(uint16_t)g_objectTable[candidateRef].objectType].maxBoundsExtent;
+		maxBoundsExtent = g_objectTypes[(uint16_t)g_objectTable[candidateRef].objectType].maxBoundsExtent;
 	}
 
 	boundsScore = maxBoundsExtent >> shift;

@@ -598,8 +598,8 @@ void pai_setupcraftcontext(int objIdx) {
 	g_paiContext.aiRequireLiveOrderTarget = 0;
 	g_paiContext.nullPlanId = (uint8_t)pai_findplanbyname("nullpln");
 	g_paiContext.aiSelfModelFiresFromFloatHardpoints =
-		(uint8_t)((g_modelTypeTable[g_objectTable[g_paiContext.aiObjIdx].objectType].flags &
-				   MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0);
+		(uint8_t)((g_objectTypes[g_objectTable[g_paiContext.aiObjIdx].objectType].flags &
+				   OBJECT_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0);
 }
 
 // FUNCTION: XWA 0x4A5210
@@ -1075,7 +1075,7 @@ int16_t pai_FindNearestBoardingTarget(uint16_t target1Type, uint16_t target1, in
 	objectIdx = (uint16_t)g_objScanStart;
 	while ((uint32_t)objectIdx < g_regionStaticObjectSlotEnd) {
 		if (g_objectTable[objectIdx].objectType != OBJ_None &&
-			(g_modelTypeTable[(uint16_t)g_objectTable[objectIdx].objectType].flags & 2u) != 0) {
+			(g_objectTypes[(uint16_t)g_objectTable[objectIdx].objectType].flags & 2u) != 0) {
 			int matchesTarget1;
 			int matchesTarget2;
 

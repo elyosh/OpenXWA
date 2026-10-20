@@ -61,8 +61,8 @@ int XwaModelSource_TypeKey(unsigned int objectType, char* key);
 int XwaModelSource_NormalizeKey(const char* fileName, char* key);
 /* `key` may also be a file name; it is normalized first. */
 int XwaModelSource_IsCockpitClassKey(const char* key);
-/* True when a Spacecraft0.LST row with this key is bound to a model type
-   flagged MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS, whose loads read float
+/* True when a Spacecraft0.LST row with this key is bound to a object type
+   flagged OBJECT_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS, whose loads read float
    hardpoints. */
 int XwaModelSource_KeyRequiresFloatHardpoints(const char* key);
 

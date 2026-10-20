@@ -217,7 +217,7 @@ int FlightText_BuildWidthTables(void) {
 				surface = (IDirectDrawSurface*)((Std3DTextureSurface*)texLevel->image)->pSrcSurface;
 				surface->lpVtbl->Unlock(surface, NULL);
 			}
-			texLevel = &g_modelTypeTable[MODEL_TEXTURE_FONT_MODEL_TYPE].texLevels[page];
+			texLevel = &g_objectTypes[MODEL_TEXTURE_FONT_OBJECT_TYPE].texLevels[page];
 			memset(&surfaceDesc, 0, sizeof(surfaceDesc));
 			surfaceDesc.dwSize = sizeof(surfaceDesc);
 			surface = (IDirectDrawSurface*)((Std3DTextureSurface*)texLevel->image)->pSrcSurface;
@@ -240,7 +240,7 @@ int FlightText_BuildWidthTables(void) {
 				surface = (IDirectDrawSurface*)((Std3DTextureSurface*)texLevel->image)->pSrcSurface;
 				surface->lpVtbl->Unlock(surface, NULL);
 			}
-			texLevel = &g_modelTypeTable[MODEL_TEXTURE_FONT_MODEL_TYPE].texLevels[page];
+			texLevel = &g_objectTypes[MODEL_TEXTURE_FONT_OBJECT_TYPE].texLevels[page];
 			memset(&surfaceDesc, 0, sizeof(surfaceDesc));
 			surfaceDesc.dwSize = sizeof(surfaceDesc);
 			surface = (IDirectDrawSurface*)((Std3DTextureSurface*)texLevel->image)->pSrcSurface;
@@ -263,7 +263,7 @@ int FlightText_BuildWidthTables(void) {
 				surface = (IDirectDrawSurface*)((Std3DTextureSurface*)texLevel->image)->pSrcSurface;
 				surface->lpVtbl->Unlock(surface, NULL);
 			}
-			texLevel = &g_modelTypeTable[MODEL_TEXTURE_FONT_MODEL_TYPE].texLevels[page];
+			texLevel = &g_objectTypes[MODEL_TEXTURE_FONT_OBJECT_TYPE].texLevels[page];
 			memset(&surfaceDesc, 0, sizeof(surfaceDesc));
 			surfaceDesc.dwSize = sizeof(surfaceDesc);
 			surface = (IDirectDrawSurface*)((Std3DTextureSurface*)texLevel->image)->pSrcSurface;
@@ -694,8 +694,8 @@ TexLevel* FlightText_RemapHardwareFontTextures(TexLevel* sourceTexBlocks) {
 	Memory_FreeTagged(MODEL_TEXTURE_RESOURCEITEM_TAG, sourceTexBlocks[1].image);
 	Memory_FreeTagged(MODEL_TEXTURE_RESOURCEITEM_TAG, sourceTexBlocks[2].image);
 	Memory_FreeTagged(MODEL_TEXTURE_SPECIESTMINFO_TAG, sourceTexBlocks);
-	g_modelTypeTable[MODEL_TEXTURE_FONT_MODEL_TYPE].texLevels = texLevels;
-	g_modelTypeTable[MODEL_TEXTURE_FONT_MODEL_TYPE].frameCount = FLIGHT_TEXT_HW_FONT_REMAPPED_PAGES;
+	g_objectTypes[MODEL_TEXTURE_FONT_OBJECT_TYPE].texLevels = texLevels;
+	g_objectTypes[MODEL_TEXTURE_FONT_OBJECT_TYPE].frameCount = FLIGHT_TEXT_HW_FONT_REMAPPED_PAGES;
 	return texLevels;
 }
 
@@ -901,7 +901,7 @@ static void FlightText_SubmitGlyphQuad(int x, int y, int w, int h, uint8_t ch, i
 	if (g_useHardware3D) {
 
 		glyph = &g_flightActiveFontHwMetadata[ch];
-		texLevel = &g_modelTypeTable[418].texLevels[glyph->texturePage];
+		texLevel = &g_objectTypes[418].texLevels[glyph->texturePage];
 		if (texLevel == NULL) {
 			return;
 		}

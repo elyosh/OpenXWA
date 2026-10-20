@@ -250,7 +250,8 @@ static uint32_t env_capture_collect_suns(const XwaSnapshot* snap, XwaRemasterAss
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < snap->backdrop_count; i++) {
 		const XwaBackdrop* b = &snap->backdrops[i];
-		if (b->model_type < XWA_SNAP_TYPE_BACKDROP_SUN_FIRST || b->model_type > XWA_SNAP_TYPE_BACKDROP_SUN_LAST ||
+		if (b->object_type < XWA_SNAP_TYPE_BACKDROP_SUN_FIRST ||
+			b->object_type > XWA_SNAP_TYPE_BACKDROP_SUN_LAST ||
 			XwaRemasterFlight_CaptureBackdropHidden(snap, assets, i, hide)) {
 			continue;
 		}
@@ -308,7 +309,8 @@ static int env_capture_sun_sprite(const XwaSnapshot* snap, XwaRemasterAssets* as
 	float max_tan = 0.0f;
 	if (!XwaRemasterFlight_CaptureCamera(right, down, forward, 1.0f, ENV_CAPTURE_SPRITE_SIZE, &camera,
 										 crows) ||
-		XwaRemasterFlight_CaptureBackdrops(NULL, crows, snap, assets, (int)sun->backdrop, NULL, &max_tan) == 0 ||
+		XwaRemasterFlight_CaptureBackdrops(NULL, crows, snap, assets, (int)sun->backdrop, NULL, &max_tan) ==
+			0 ||
 		!(max_tan > 0.0f)) {
 		Aeron_LogWarn("xwa.remaster", "environment capture: sun backdrop %u has no quads in front of it",
 					  sun->backdrop);

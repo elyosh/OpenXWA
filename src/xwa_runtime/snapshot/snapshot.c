@@ -20,8 +20,8 @@
 
 #include "aeron/aeron.h"
 #include "xwa/assets/model_def.h"
-#include "xwa/assets/model_type.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/flight/fediskio.h"
 #include "xwa/flight/flight.h"
@@ -82,8 +82,8 @@ static GlowMarkCaptureMeta g_blast_mark_meta[32];
 static uint32_t g_glow_mark_generation;
 
 /* Frame-scale table GlowMark_UpdateActivePatches selects for an animated mark. */
-static const uint8_t* snapshot_glow_mark_frame_scales(uint16_t model_type) {
-	switch (model_type) {
+static const uint8_t* snapshot_glow_mark_frame_scales(uint16_t object_type) {
+	switch (object_type) {
 		case OBJ_AnimationTextureGroup3055:
 			return g_tractorBeamFrameScales;
 		case OBJ_AnimationTextureGroup3005:
@@ -104,29 +104,29 @@ static const uint8_t* snapshot_glow_mark_frame_scales(uint16_t model_type) {
  * value the update would have written instead. Blast marks never change it. */
 static float snapshot_glow_mark_uv_scale(const ObjectMeshTextureLayerBlock* p, int pool_kind) {
 	const float stored = p->facePatches[0].passes[0].uvScale;
-	if (pool_kind != 0 || p->facePatchCount > 0 || p->currentFrame <= 1 || p->modelType >= OBJ_Count ||
-		p->currentFrame > (int)g_modelTypeTable[p->modelType].frameCount) {
+	if (pool_kind != 0 || p->facePatchCount > 0 || p->currentFrame <= 1 || p->objectType >= OBJ_Count ||
+		p->currentFrame > (int)g_objectTypes[p->objectType].frameCount) {
 		return stored;
 	}
-	const uint8_t* frame_scales = snapshot_glow_mark_frame_scales(p->modelType);
+	const uint8_t* frame_scales = snapshot_glow_mark_frame_scales(p->objectType);
 	return frame_scales ? (float)(unsigned int)frame_scales[p->currentFrame - 1] * p->baseScale : stored;
 }
 
 /* Smallest uvScale `p` will use from now until its animation ends: animated
  * marks advance one frame per GlowMark_UpdateActivePatches call through the
- * same table, up to the model type's frameCount; baseScale is fixed at
+ * same table, up to the object type's frameCount; baseScale is fixed at
  * allocation. */
 static float snapshot_glow_mark_min_uv_scale(const ObjectMeshTextureLayerBlock* p, int pool_kind,
 											 float current_scale) {
 	float min_scale = current_scale;
-	if (pool_kind != 0 || p->modelType >= OBJ_Count) {
+	if (pool_kind != 0 || p->objectType >= OBJ_Count) {
 		return min_scale > 0.0f ? min_scale : 0.0f;
 	}
-	const uint8_t* frame_scales = snapshot_glow_mark_frame_scales(p->modelType);
+	const uint8_t* frame_scales = snapshot_glow_mark_frame_scales(p->objectType);
 	if (!frame_scales) {
 		return 0.0f;
 	}
-	const int frame_count = (int)g_modelTypeTable[p->modelType].frameCount;
+	const int frame_count = (int)g_objectTypes[p->objectType].frameCount;
 	for (int frame = p->currentFrame + 1; frame <= frame_count; frame++) {
 		const float scale = (float)(unsigned int)frame_scales[frame - 1] * p->baseScale;
 		if (scale < min_scale) {
@@ -259,7 +259,7 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 		fprintf(fp,
 				"trail owner %u:%u kind %u tex %u:%u points %u+%u width %.2f bias %.3f "
 				"fade %.3f,%.3f color %08x\n",
-				e->owner_slot, e->owner_signature, e->trail_kind, e->texture_model_type, e->texture_frame,
+				e->owner_slot, e->owner_signature, e->trail_kind, e->texture_object_type, e->texture_frame,
 				e->first_point, e->point_count, (double)e->ribbon_width, (double)e->start_alpha_bias,
 				(double)e->alpha_fade_start, (double)e->alpha_fade_rate, e->argb_color);
 		for (uint32_t j = 0; j < e->point_count; j++) {
@@ -275,7 +275,7 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 				"peffect id %u owner %u:%u src %u render_region %u type %u mode %u tex %u "
 				"particles %u+%u light %u emitter %.3f,%.3f,%.3f flags %08x\n",
 				e->stable_id, e->owner_slot, e->owner_signature, e->source_kind, e->render_region,
-				e->effect_type, e->billboard_mode, e->texture_model_type, e->first_particle,
+				e->effect_type, e->billboard_mode, e->texture_object_type, e->first_particle,
 				e->particle_count, e->point_light, snapshot_precise_coord(&e->emitter_world_pos, 0),
 				snapshot_precise_coord(&e->emitter_world_pos, 1),
 				snapshot_precise_coord(&e->emitter_world_pos, 2), e->render_flags);
@@ -381,7 +381,7 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 		fprintf(fp,
 				"backdrop type %u f%u side %u flags %u hid %u dir %.0f,%.0f,%.0f scale %u "
 				"col %.2f,%.2f,%.2f i%.2f segs %u spf %u hh %d\n",
-				b->model_type, b->frame, b->side, b->flags, b->hidden, (double)b->world_dir[0],
+				b->object_type, b->frame, b->side, b->flags, b->hidden, (double)b->world_dir[0],
 				(double)b->world_dir[1], (double)b->world_dir[2], b->angular_scale, (double)b->color[0],
 				(double)b->color[1], (double)b->color[2], (double)b->intensity, b->strip_segment_count,
 				b->strip_segments_per_frame, b->strip_half_height);
@@ -392,7 +392,7 @@ static void snapshot_debug_dump(const XwaSnapshot* s) {
 				"glow owner %u:%u pool %u:%u gen %u type %u frame %u age %u "
 				"center %.2f,%.2f,%.2f inv %.6f,%.6f layer %.3f persistent %u\n",
 				m->owner_slot, m->owner_signature, m->pool_kind, m->pool_index, m->generation,
-				m->texture_model_type, m->texture_frame, m->age_ticks, (double)m->center[0],
+				m->texture_object_type, m->texture_frame, m->age_ticks, (double)m->center[0],
 				(double)m->center[1], (double)m->center[2], (double)m->inv_scale_u, (double)m->inv_scale_v,
 				(double)m->layer_uv_scale, m->persistent_until_cleared);
 	}
@@ -452,12 +452,12 @@ void XwaSnapshot_Commit(void) {
 			o->color[0] = dl->colorR;
 			o->color[1] = dl->colorG;
 			o->color[2] = dl->colorB;
-			o->source_backdrop_model_type = 0;
+			o->source_backdrop_object_type = 0;
 			o->source_backdrop_index = -1;
 			const int backdrop_idx = g_directionalLightBackdropIndices[i];
 			if (region >= 0 && region < XWA_BACKDROP_REGION_COUNT && backdrop_idx >= 0 &&
 				backdrop_idx < g_backdropCountByRegion[region]) {
-				o->source_backdrop_model_type = g_backdropRecordsByRegion[region][backdrop_idx].modelType;
+				o->source_backdrop_object_type = g_backdropRecordsByRegion[region][backdrop_idx].objectType;
 				/* backdrops[] holds at most XWA_SNAP_MAX_BACKDROPS records. */
 				if (backdrop_idx < XWA_SNAP_MAX_BACKDROPS) {
 					o->source_backdrop_index = (int16_t)backdrop_idx;
@@ -1241,8 +1241,8 @@ static int snapshot_particle_capture_effect(XwaSnapshot* s, const ParticleEffect
 	dst->hide_owner_external = (uint8_t)(!child_effect && !effect->useAttachedTransform);
 	dst->hide_owner_film = dst->hide_owner_external;
 	dst->point_light = (uint8_t)contributes_light;
-	dst->texture_model_type =
-		effect->textureFrameCount ? effect->textureModelType : effect->def->textureModelType;
+	dst->texture_object_type =
+		effect->textureFrameCount ? effect->textureObjectType : effect->def->textureObjectType;
 	dst->render_flags = effect->def->renderFlags;
 	dst->first_particle = s->particle_count;
 	if (effect->useAttachedTransform) {
@@ -1552,7 +1552,7 @@ void XwaSnapshot_CaptureFlight(void) {
 				dst->owner_slot = (uint16_t)slot;
 				dst->owner_signature = owner->objectSignature;
 				dst->trail_kind = (uint8_t)src->trailKind;
-				dst->texture_model_type = (uint16_t)src->textureModelType;
+				dst->texture_object_type = (uint16_t)src->textureObjectType;
 				/* Every recovered trail initializer uses the non-animated path.
 				 * Keep the resolved field in the POD contract so animated emitters
 				 * have an explicit frame value. */
@@ -1616,7 +1616,7 @@ void XwaSnapshot_CaptureFlight(void) {
 			m->pool_kind = (uint8_t)pool_kind;
 			m->pool_index = (uint8_t)i;
 			m->generation = meta[i].generation;
-			m->texture_model_type = p->modelType;
+			m->texture_object_type = p->objectType;
 			m->texture_frame = pool_kind ? meta[i].texture_frame : (uint16_t)p->currentFrame;
 			m->age_ticks = (uint32_t)p->currentFrame;
 			m->world_segment_mode = meta[i].world_segment_mode;
@@ -1667,7 +1667,7 @@ void XwaSnapshot_CaptureFlight(void) {
 		c->ds_beam_world_pos[2] = g_deathStarTunnelLaserRegions[regionIdx].pointLightZ;
 
 		const int object_idx = g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx;
-		const int model_extent = g_modelTypeTable[OBJ_LaserImperialDS].maxBoundsExtent;
+		const int model_extent = g_objectTypes[OBJ_LaserImperialDS].maxBoundsExtent;
 		if (object_idx >= 0 && (uint32_t)object_idx < g_objectTableSlotCount && model_extent > 0) {
 			const ObjectRecord* object = &g_objectTable[object_idx];
 			if (object->objectType == OBJ_LaserImperialDS) {
@@ -1778,7 +1778,7 @@ void XwaSnapshot_CaptureFlight(void) {
 			for (; n < count; n++) {
 				const WorldRectRecord* w = &g_backdropRecordsByRegion[region][n];
 				XwaBackdrop* b = &s->backdrops[n];
-				b->model_type = w->modelType;
+				b->object_type = w->objectType;
 				b->frame = w->frame;
 				b->flags = w->flags;
 				b->draw_flags = w->drawFlags;

@@ -3,7 +3,7 @@
 
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/model_def.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/audio/fsfx.h"
 #include "xwa/audio/music.h"
 #include "xwa/config/game_config.h"
@@ -687,8 +687,8 @@ uint16_t static_laserstaticcollide(unsigned int sourceObjIdx, unsigned int stati
 	g_collisionSweepStartZ = worldlocz;
 	g_collisionSweepEndZ = worldlocz;
 
-	hitRadius = g_modelTypeTable[staticObjectType].maxBoundsExtent +
-				g_modelTypeTable[(uint16_t)g_objectTable[sourceObjIdx].objectType].maxBoundsExtent;
+	hitRadius = g_objectTypes[staticObjectType].maxBoundsExtent +
+				g_objectTypes[(uint16_t)g_objectTable[sourceObjIdx].objectType].maxBoundsExtent;
 	broadRadius = hitRadius + 0x20000;
 
 	dx = g_collisionProbeWorldX - worldlocx;
@@ -785,9 +785,9 @@ uint16_t collide_lasercraftcollide(unsigned int attackerObjIdx, unsigned int tar
 	int probeWorldZ;
 
 	targetBoundsExtent =
-		(unsigned int)g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
+		(unsigned int)g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
 	attackerBoundsExtent =
-		(unsigned int)g_modelTypeTable[(uint16_t)g_objectTable[attackerObjIdx].objectType].maxBoundsExtent;
+		(unsigned int)g_objectTypes[(uint16_t)g_objectTable[attackerObjIdx].objectType].maxBoundsExtent;
 	broadRadius = targetBoundsExtent + attackerBoundsExtent + 0x20000u;
 	g_approxDist = (int)broadRadius;
 
@@ -1031,7 +1031,7 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 		localUp = hardpoint->z;
 		localFwd = hardpoint->y;
 	} else {
-		uint16_t turretModelType;
+		uint16_t turretObjectType;
 		OptRotationScale* gunTurretRotScale;
 		OptRotationScale* launcherRotScale;
 		OptRotationScale* beamRotScale;
@@ -1043,28 +1043,28 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 		gunTurretRotScale = NULL;
 		launcherRotScale = NULL;
 		beamRotScale = NULL;
-		turretModelType = g_modelDefs[shooterModelIndex].turretObjectType[turretSeatIdx];
-		meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretModelType);
+		turretObjectType = g_modelDefs[shooterModelIndex].turretObjectType[turretSeatIdx];
+		meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretObjectType);
 		for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
 			MeshType meshType;
 
-			meshType = ModelMesh_GetObjectTypeMeshType(turretModelType, meshIdx);
+			meshType = ModelMesh_GetObjectTypeMeshType(turretObjectType, meshIdx);
 			switch (meshType) {
 				case MESH_RotaryGunTurret:
-					gunTurretRotScale = ModelMesh_GetRotScaleData(turretModelType, meshIdx);
+					gunTurretRotScale = ModelMesh_GetRotScaleData(turretObjectType, meshIdx);
 					break;
 				case MESH_RotaryLauncher:
-					launcherRotScale = ModelMesh_GetRotScaleData(turretModelType, meshIdx);
+					launcherRotScale = ModelMesh_GetRotScaleData(turretObjectType, meshIdx);
 					break;
 				case MESH_RotaryBeamSystem:
-					beamRotScale = ModelMesh_GetRotScaleData(turretModelType, meshIdx);
+					beamRotScale = ModelMesh_GetRotScaleData(turretObjectType, meshIdx);
 					break;
 				default:
 					break;
 			}
 		}
 
-		turretModelIndex = GetModelDefIndexFromType((ObjectTypeId)turretModelType);
+		turretModelIndex = GetModelDefIndexFromType((ObjectTypeId)turretObjectType);
 		turretModelDef = &g_modelDefs[turretModelIndex];
 		localSide = turretModelDef->weaponHardpoints[0].x;
 		localUp = turretModelDef->weaponHardpoints[0].z;
@@ -2457,15 +2457,13 @@ int collide_CheckSweptModelCollision(unsigned int sourceObjIdx, uint16_t targetO
 		worldStart[2] = g_collisionSegmentStartWorldZ;
 
 		sourceObj = &g_objectTable[(uint16_t)sourceObjIdx];
-		if (sourceObj->mobj != NULL &&
-			g_modelTypeTable[(uint16_t)sourceObj->objectType].modelDefIndex != -1 &&
+		if (sourceObj->mobj != NULL && g_objectTypes[(uint16_t)sourceObj->objectType].modelDefIndex != -1 &&
 			(((g_collideSweepAllowUnownedTargets & 1) != 0) || sourceObj->playerOwnerIdx != -1) &&
 			!g_collisionStagedModelProbe) {
 			ModelDef* modelDef;
 
 			g_collideSweepAuxHardpointIdx = auxHardpointIdx + 1;
-			modelDef =
-				&g_modelDefs[(uint16_t)g_modelTypeTable[(uint16_t)sourceObj->objectType].modelDefIndex];
+			modelDef = &g_modelDefs[(uint16_t)g_objectTypes[(uint16_t)sourceObj->objectType].modelDefIndex];
 			if ((unsigned int)g_collideSweepAuxHardpointIdx >= modelDef->auxHardpointCount) {
 				g_collideSweepAuxHardpointIdx = -1;
 				continueAuxSearch = 0;
@@ -2533,7 +2531,7 @@ void collide_TestSweepAgainstModelMeshes(unsigned int sourceObjIdx, unsigned int
 
 	targetObj = &g_objectTable[targetObjIdx];
 	g_collideFaceGroupChildSelector = 1;
-	if ((g_modelTypeTable[targetObj->objectType].flags & MODEL_TYPE_FLAG_COLLISION_FACEGROUPS) != 0) {
+	if ((g_objectTypes[targetObj->objectType].flags & OBJECT_TYPE_FLAG_COLLISION_FACEGROUPS) != 0) {
 		ObjectRecord* sourceObj;
 
 		g_collideFaceGroupChildSelector = 2;
@@ -2840,7 +2838,7 @@ void collide_ConvertObjectToExplosion(unsigned int objIdx, ObjectTypeId explosio
 	}
 
 	g_objectTable[objIdx].mobj->instanceExtent =
-		g_modelTypeTable[(uint16_t)g_objectTable[objIdx].objectType].maxBoundsExtent;
+		g_objectTypes[(uint16_t)g_objectTable[objIdx].objectType].maxBoundsExtent;
 	g_objectTable[objIdx].objectType = explosionObjectType;
 	g_objectTable[objIdx].genusId = GENUS_Explosion;
 	g_objectTable[objIdx].mobj->state = 5;
@@ -2884,13 +2882,13 @@ void collide_InsertMobileObjectProximityCandidate(MobileObjectProximityList* lis
 											  owner->world_y - g_objectTable[candidateObjIdx].world_y,
 											  owner->world_z - g_objectTable[candidateObjIdx].world_z);
 
-	clearance = g_modelTypeTable[(uint16_t)owner->objectType].maxBoundsExtent;
+	clearance = g_objectTypes[(uint16_t)owner->objectType].maxBoundsExtent;
 	if (distance >= clearance) {
 		clearance = distance - clearance;
 	} else {
 		clearance = -1;
 	}
-	distance = g_modelTypeTable[(uint16_t)g_objectTable[candidateObjIdx].objectType].maxBoundsExtent;
+	distance = g_objectTypes[(uint16_t)g_objectTable[candidateObjIdx].objectType].maxBoundsExtent;
 	if (clearance >= distance) {
 		clearance -= distance;
 	} else {
@@ -3472,7 +3470,7 @@ int collide_GetSweptHitRadius(unsigned int attackerObjIdx, unsigned int targetOb
 
 	objects = g_objectTable;
 	targetType = objects[targetObjIdx].objectType;
-	radius = g_modelTypeTable[(uint16_t)targetType].maxBoundsExtent;
+	radius = g_objectTypes[(uint16_t)targetType].maxBoundsExtent;
 
 	if (objects[targetObjIdx].genusId == GENUS_NpcProjectile ||
 		objects[targetObjIdx].genusId == GENUS_PlayerProjectile) {
@@ -3559,7 +3557,7 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 
 	hostileObj = &g_objectTable[hostileObjIdx];
 	withinDisruptionPoint = 0;
-	targetBoundsExtent = g_modelTypeTable[(uint16_t)hostileObj->objectType].maxBoundsExtent;
+	targetBoundsExtent = g_objectTypes[(uint16_t)hostileObj->objectType].maxBoundsExtent;
 	deltaX = g_objectTable[ownerObjIdx].world_x - hostileObj->world_x;
 	deltaY = g_objectTable[ownerObjIdx].world_y - hostileObj->world_y;
 	deltaZ = g_objectTable[ownerObjIdx].world_z - hostileObj->world_z;
@@ -4214,8 +4212,8 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 		/* Fuselage / station: either a stationary explosion or a spinning breakup. */
 		{
 			uint16_t spd;
-			if ((damageKind && g_modelTypeTable[damageKind].maxBoundsExtent > 1095 &&
-				 !g_modelTypeTable[damageKind].familyId) ||
+			if ((damageKind && g_objectTypes[damageKind].maxBoundsExtent > 1095 &&
+				 !g_objectTypes[damageKind].familyId) ||
 				damageKind == 78 || (spd = g_objectTable[targetObjIdx].mobj->speed) == 0 ||
 				g_provingGroundsModeActive) {
 				g_objectTable[targetObjIdx].mobj->pCraft->throttleSpeed = 0;
@@ -4414,10 +4412,10 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 				}
 			}
 		} else {
-			if ((unsigned int)g_modelTypeTable[damageKind].maxBoundsExtent >= 0x8000)
+			if ((unsigned int)g_objectTypes[damageKind].maxBoundsExtent >= 0x8000)
 				damageAmount = 0x20000;
 			else
-				damageAmount = 4 * g_modelTypeTable[damageKind].maxBoundsExtent;
+				damageAmount = 4 * g_objectTypes[damageKind].maxBoundsExtent;
 		}
 		damage = damageAmount;
 	}
@@ -5594,10 +5592,10 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 			g_objectTable[effectSlot].mobj->sourceObjIdx = -1;
 			if (shieldTotal) {
 				g_objectTable[effectSlot].mobj->instanceExtent =
-					g_modelTypeTable[(uint16_t)g_objectTable[effectSlot].objectType].maxBoundsExtent >> 1;
+					g_objectTypes[(uint16_t)g_objectTable[effectSlot].objectType].maxBoundsExtent >> 1;
 			} else {
 				g_objectTable[effectSlot].mobj->instanceExtent =
-					g_modelTypeTable[(uint16_t)g_objectTable[effectSlot].objectType].maxBoundsExtent;
+					g_objectTypes[(uint16_t)g_objectTable[effectSlot].objectType].maxBoundsExtent;
 			}
 			g_objectTable[effectSlot].mobj->speed = g_objectTable[targetObjIdx].mobj->speed;
 			g_objectTable[effectSlot].pitch = g_objectTable[targetObjIdx].pitch;
@@ -5744,7 +5742,7 @@ int collide_ApplyProximityDamageFalloff(unsigned int sourceObjIdx, unsigned int 
 
 				if (g_objectTable[idx].genusId == 5) {
 					unsigned int half =
-						g_modelTypeTable[(uint16_t)g_objectTable[idx].objectType].maxBoundsExtent / 2;
+						g_objectTypes[(uint16_t)g_objectTable[idx].objectType].maxBoundsExtent / 2;
 					if (half > dist)
 						dist = 0;
 					else
@@ -5899,7 +5897,7 @@ void static_laserhitstatic(unsigned int sourceObjIdx, unsigned int staticObjIdx,
 		g_objectTable[sourceObjIdx].typeSpecificByte[0] = 1;
 		g_objectTable[sourceObjIdx].mobj->speed = 0;
 		g_objectTable[sourceObjIdx].mobj->instanceExtent =
-			g_modelTypeTable[(uint16_t)g_objectTable[sourceObjIdx].objectType].maxBoundsExtent;
+			g_objectTypes[(uint16_t)g_objectTable[sourceObjIdx].objectType].maxBoundsExtent;
 		g_objectTable[sourceObjIdx].mobj->framesAlive = 0;
 		g_objectTable[sourceObjIdx].mobj->lifetimeTimer = 0;
 		g_objectTable[sourceObjIdx].mobj->sourceObjIdx = -1;
@@ -5945,7 +5943,7 @@ void collide_ApplyEngineWashDamage(int victimObjIdx, int sourceObjIdx) {
 
 	{
 		uint16_t sourceType = sourceObj->objectType;
-		sourceBoundsExtent = g_modelTypeTable[sourceType].maxBoundsExtent;
+		sourceBoundsExtent = g_objectTypes[sourceType].maxBoundsExtent;
 	}
 	deltaX = g_objectTable[victimObjIdx].world_x - sourceObj->world_x;
 	deltaY = g_objectTable[victimObjIdx].world_y - sourceObj->world_y;
@@ -6347,7 +6345,7 @@ static __inline void collide_HandleTargetInspection(int playerIdx, unsigned int 
 	}
 
 	broadRadius =
-		4u * (unsigned int)g_modelTypeTable[(uint16_t)g_objectTable[targetIdx].objectType].maxBoundsExtent;
+		4u * (unsigned int)g_objectTypes[(uint16_t)g_objectTable[targetIdx].objectType].maxBoundsExtent;
 	if (broadRadius < 0x2800u) {
 		broadRadius = 10240;
 	}

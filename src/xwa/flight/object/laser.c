@@ -3,7 +3,7 @@
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/audio/fsfx.h"
 #include "xwa/flight/ai/pai.h"
 #include "xwa/flight/ai/pai_plan.h"
@@ -862,7 +862,7 @@ void laser_weaponsfire(void) {
 }
 
 static __inline int laser_ObjectTypeFiresFromFloatHardpoints(ObjectTypeId objectType) {
-	return (g_modelTypeTable[objectType].flags & MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0;
+	return (g_objectTypes[objectType].flags & OBJECT_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0;
 }
 
 static __inline void laser_RotateWorldDeltaToObjectLocal(ObjectRecord* obj, int dx, int dy, int dz) {
@@ -1539,7 +1539,7 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 static __inline void laser_GetTurretProjectileHardpoint(ModelDefIndex firerModelIndex, int turretSeatIdx,
 														int playerIdx, int16_t* outSide, int16_t* outUp,
 														int16_t* outFwd) {
-	uint16_t turretModelType;
+	uint16_t turretObjectType;
 	uint16_t meshCount;
 	OptRotationScale* gunTurretRotScale;
 	OptRotationScale* launcherRotScale;
@@ -1552,21 +1552,21 @@ static __inline void laser_GetTurretProjectileHardpoint(ModelDefIndex firerModel
 	gunTurretRotScale = NULL;
 	launcherRotScale = NULL;
 	beamRotScale = NULL;
-	turretModelType = g_modelDefs[firerModelIndex].turretObjectType[turretSeatIdx];
-	meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretModelType);
+	turretObjectType = g_modelDefs[firerModelIndex].turretObjectType[turretSeatIdx];
+	meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretObjectType);
 	for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
 		MeshType meshType;
 
-		meshType = ModelMesh_GetObjectTypeMeshType(turretModelType, meshIdx);
+		meshType = ModelMesh_GetObjectTypeMeshType(turretObjectType, meshIdx);
 		switch (meshType) {
 			case MESH_RotaryGunTurret:
-				gunTurretRotScale = ModelMesh_GetRotScaleData(turretModelType, meshIdx);
+				gunTurretRotScale = ModelMesh_GetRotScaleData(turretObjectType, meshIdx);
 				break;
 			case MESH_RotaryLauncher:
-				launcherRotScale = ModelMesh_GetRotScaleData(turretModelType, meshIdx);
+				launcherRotScale = ModelMesh_GetRotScaleData(turretObjectType, meshIdx);
 				break;
 			case MESH_RotaryBeamSystem:
-				beamRotScale = ModelMesh_GetRotScaleData(turretModelType, meshIdx);
+				beamRotScale = ModelMesh_GetRotScaleData(turretObjectType, meshIdx);
 				break;
 		}
 	}
@@ -1576,7 +1576,7 @@ static __inline void laser_GetTurretProjectileHardpoint(ModelDefIndex firerModel
 		g_players[playerIdx].gunnerHardpointToggle = 0;
 	}
 	hardpointSlot = g_players[playerIdx].gunnerHardpointToggle;
-	turretModelIndex = (ModelDefIndex)GetModelDefIndexFromType((ObjectTypeId)turretModelType);
+	turretModelIndex = (ModelDefIndex)GetModelDefIndexFromType((ObjectTypeId)turretObjectType);
 	turretModelDef = &g_modelDefs[turretModelIndex];
 	*outSide = turretModelDef->weaponHardpoints[hardpointSlot].x;
 	*outUp = turretModelDef->weaponHardpoints[hardpointSlot].z;

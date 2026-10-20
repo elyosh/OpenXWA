@@ -229,7 +229,7 @@ void GlowMark_ClearPendingRequests(void) {
 }
 
 // FUNCTION: XWA 0x4E9440
-GlowMarkRequest* GlowMark_QueueRequest(uint16_t objectIndex, int16_t effectParam, int16_t modelType,
+GlowMarkRequest* GlowMark_QueueRequest(uint16_t objectIndex, int16_t effectParam, int16_t objectType,
 									   float scaleU, float scaleV) {
 	GlowMarkRequest* request;
 	GlowMarkRequest* oldHead;
@@ -264,7 +264,7 @@ GlowMarkRequest* GlowMark_QueueRequest(uint16_t objectIndex, int16_t effectParam
 		request->objectIndex = objectIndex;
 		request->scaleU = scaleU;
 		request->scaleV = scaleV;
-		request->modelType = (uint16_t)modelType;
+		request->objectType = (uint16_t)objectType;
 		request->effectParam = (uint16_t)effectParam;
 		request->persistentUntilCleared = 0;
 
@@ -305,10 +305,10 @@ void GlowMark_ProcessPendingRequests(uint16_t objectIndex) {
 		float patchMaxZ;
 
 		previousTail = glowMarkTail;
-		if (request->modelType == 552u) {
+		if (request->objectType == 552u) {
 			patch = GlowMark_AllocShieldPatch(request->effectParam, 0);
 		} else {
-			patch = GlowMark_AllocAnimatedPatch(request->effectParam, request->modelType);
+			patch = GlowMark_AllocAnimatedPatch(request->effectParam, request->objectType);
 		}
 		glowMarkTail = patch;
 		if (patch == NULL) {
@@ -332,7 +332,7 @@ void GlowMark_ProcessPendingRequests(uint16_t objectIndex) {
 			int localEndZ;
 
 			if (request->scaleU == -1.0f) {
-				maxBoundsExtent = (float)g_modelTypeTable[(uint16_t)obj->objectType].maxBoundsExtent;
+				maxBoundsExtent = (float)g_objectTypes[(uint16_t)obj->objectType].maxBoundsExtent;
 				g_glowMarkInvScaleU = 2.0f / maxBoundsExtent;
 				g_glowMarkInvScaleV = g_glowMarkInvScaleU;
 			} else {

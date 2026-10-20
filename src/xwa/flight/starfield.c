@@ -2,7 +2,7 @@
 #include "xwa/flight/fediskio.h"
 
 #include "xwa/assets/model_texture.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/flight/flight.h"
 #include "xwa/flight/flight_display.h"
@@ -1020,12 +1020,12 @@ void Flight_InitInboundHyperspaceStreaks(void) {
 
 // FUNCTION: XWA 0x47D710
 void Flight_RenderHyperspaceTransitionEffects(void) {
-	ObjectTypeId tunnelModelType;
-	int modelType;
+	ObjectTypeId tunnelObjectType;
+	int objectType;
 	FlightTexQuad quad;
 
-	tunnelModelType = OBJ_AnimationTextureGroup3051;
-	modelType = OBJ_AnimationTextureGroup3051;
+	tunnelObjectType = OBJ_AnimationTextureGroup3051;
+	objectType = OBJ_AnimationTextureGroup3051;
 
 	if (g_players[g_localPlayer].hyperspacePhase != PLAYER_HYPERSPACE_REGION_TRANSFER) {
 		ObjectRecord savedObject0;
@@ -1124,7 +1124,7 @@ void Flight_RenderHyperspaceTransitionEffects(void) {
 				fadeTicks *= g_hyperspaceTransitionTickScale;
 				fadeTicks *= g_hyperspaceTransitionAlphaScale;
 				alpha = (int)fadeTicks;
-				modelType = OBJ_LightingEffectTextureGroup1000;
+				objectType = OBJ_LightingEffectTextureGroup1000;
 
 				quad.screenY = g_flightVpCenterY - g_projOffsetY;
 				quad.screenX = g_flightVpCenterX;
@@ -1169,7 +1169,7 @@ void Flight_RenderHyperspaceTransitionEffects(void) {
 				phaseTicksAsDouble *= g_hyperspaceTransitionTickScale;
 				alpha = (int)((g_hyperspaceTransitionUnitScale - phaseTicksAsDouble) *
 							  g_hyperspaceTransitionAlphaScale);
-				modelType = OBJ_LightingEffectTextureGroup1000;
+				objectType = OBJ_LightingEffectTextureGroup1000;
 
 				quad.screenY = g_flightVpCenterY - g_projOffsetY;
 				quad.screenX = g_flightVpCenterX;
@@ -1222,20 +1222,20 @@ void Flight_RenderHyperspaceTransitionEffects(void) {
 
 		g_objectTable[0] = savedObject0;
 		*g_objectTable[0].mobj = savedMobile0;
-		tunnelModelType = (ObjectTypeId)modelType;
+		tunnelObjectType = (ObjectTypeId)objectType;
 		*laserModel = savedLaserModelHeader;
 	}
 
 	if (g_players[g_localPlayer].hyperspacePhase == PLAYER_HYPERSPACE_REGION_TRANSFER) {
-		uint16_t tunnelModelTypeIndex;
+		uint16_t tunnelObjectTypeIndex;
 		int tunnelFrameQ16;
 		unsigned int frame;
 
-		tunnelModelTypeIndex = (uint16_t)tunnelModelType;
+		tunnelObjectTypeIndex = (uint16_t)tunnelObjectType;
 		g_hyperspaceTunnelFrameQ16 += 786432 * (uint16_t)g_elapsedTicks / 236;
 		tunnelFrameQ16 = g_hyperspaceTunnelFrameQ16;
 		frame = (unsigned int)tunnelFrameQ16 >> 16;
-		if (frame > g_modelTypeTable[tunnelModelTypeIndex].frameCount) {
+		if (frame > g_objectTypes[tunnelObjectTypeIndex].frameCount) {
 			frame = 1;
 			g_hyperspaceTunnelFrameQ16 = (tunnelFrameQ16 & 0xffffu) | 0x10000u;
 		}
@@ -1244,10 +1244,10 @@ void Flight_RenderHyperspaceTransitionEffects(void) {
 		quad.screenY = g_flightVpCenterY - g_projOffsetY;
 		quad.depthZ = 0x4000;
 		quad.rotationAngle = 0;
-		FeDiskIo_SelectTextureFrame(tunnelModelType, (uint16_t)frame, 256);
+		FeDiskIo_SelectTextureFrame(tunnelObjectType, (uint16_t)frame, 256);
 		quad.screenSize =
 			(uint16_t)(int)((float)-g_projOffsetY - (float)g_flightVpWidth * g_hyperspaceTunnelWidthScale);
-		RenderQuad_DrawModelTexture((ObjectTypeId)tunnelModelTypeIndex, &quad, -1);
+		RenderQuad_DrawModelTexture((ObjectTypeId)tunnelObjectTypeIndex, &quad, -1);
 	}
 }
 

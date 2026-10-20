@@ -96,7 +96,7 @@ void DeathStar_PreloadSegmentObjectTextures(ObjectRecord* object, int firstFrame
 
 	result = object->objectType;
 	modelHandle = g_loadedModels.byObjectType[result];
-	if (modelHandle == 0 || (g_modelTypeTable[result].assetFlags & MODEL_TYPE_ASSET_MODEL_LOADED) == 0) {
+	if (modelHandle == 0 || (g_objectTypes[result].assetFlags & OBJECT_TYPE_ASSET_MODEL_LOADED) == 0) {
 		return;
 	}
 
@@ -122,7 +122,7 @@ void DeathStar_PreloadSegmentObjectTextures(ObjectRecord* object, int firstFrame
 }
 
 // FUNCTION: XWA 0x42BD20
-void Backdrop_DrawModelTexQuadAtScreen(ObjectTypeId modelType, int screenX, int screenY, int16_t angle,
+void Backdrop_DrawModelTexQuadAtScreen(ObjectTypeId objectType, int screenX, int screenY, int16_t angle,
 									   int16_t screenScale) {
 	FlightTexQuad quad;
 
@@ -132,7 +132,7 @@ void Backdrop_DrawModelTexQuadAtScreen(ObjectTypeId modelType, int screenX, int 
 	quad.screenX = screenX;
 	viewZ = 0x7FFFFFFF;
 	quad.screenSize = (uint16_t)screenScale;
-	RenderQuad_DrawModelTexture(modelType, &quad, -1);
+	RenderQuad_DrawModelTexture(objectType, &quad, -1);
 }
 
 // Projects a camera-space coordinate to the screen: (value << perspShift + g_projScaleHalfInt) / z,
@@ -169,8 +169,8 @@ static inline int Backdrop_ProjectDivSaturated(int value, int z) {
 }
 
 // FUNCTION: XWA 0x407330
-void Backdrop_ProjectAndDrawScreenQuad(int viewX, int viewY, int viewZ, int16_t angle, ObjectTypeId modelType,
-									   int16_t screenScale) {
+void Backdrop_ProjectAndDrawScreenQuad(int viewX, int viewY, int viewZ, int16_t angle,
+									   ObjectTypeId objectType, int16_t screenScale) {
 	int projectedX;
 	int projectedY;
 
@@ -205,7 +205,7 @@ void Backdrop_ProjectAndDrawScreenQuad(int viewX, int viewY, int viewZ, int16_t 
 		projectedY = viewX;
 	}
 
-	Backdrop_DrawModelTexQuadAtScreen((uint16_t)modelType, g_flightVpCenterX + projectedX,
+	Backdrop_DrawModelTexQuadAtScreen((uint16_t)objectType, g_flightVpCenterX + projectedX,
 									  g_flightVpHeight - projectedY - g_projOffsetY - g_flightVpCenterY,
 									  angle, screenScale);
 }
@@ -224,7 +224,7 @@ static __inline int Backdrop_ComputeTextureAxisExtent(uint16_t texSize, uint16_t
 }
 
 // FUNCTION: XWA 0x407480
-void Backdrop_DrawHardwareAxisQuad(ObjectTypeId modelType, int viewX, int viewY, int viewZ,
+void Backdrop_DrawHardwareAxisQuad(ObjectTypeId objectType, int viewX, int viewY, int viewZ,
 								   int halfWidthAxisX, int halfWidthAxisY, int halfWidthAxisZ,
 								   int halfHeightAxisX, int halfHeightAxisY, int halfHeightAxisZ,
 								   uint16_t screenScale) {
@@ -236,9 +236,9 @@ void Backdrop_DrawHardwareAxisQuad(ObjectTypeId modelType, int viewX, int viewY,
 	int* corner;
 	int cornerCount;
 
-	curTexLevel = g_modelTypeTable[(uint16_t)modelType].curTexLevel;
-	if ((g_modelTypeTable[(uint16_t)modelType].assetFlags &
-		 (MODEL_TYPE_ASSET_TEXTURE_DRAW | MODEL_TYPE_ASSET_TEXTURE_READY)) == 0 ||
+	curTexLevel = g_objectTypes[(uint16_t)objectType].curTexLevel;
+	if ((g_objectTypes[(uint16_t)objectType].assetFlags &
+		 (OBJECT_TYPE_ASSET_TEXTURE_DRAW | OBJECT_TYPE_ASSET_TEXTURE_READY)) == 0 ||
 		curTexLevel == NULL) {
 		return;
 	}
@@ -420,7 +420,7 @@ static __inline void RenderBillboard_EmitClippedTrailQuad(ProjVertex* vertBuf, S
 }
 
 static __inline uint32_t RenderBillboard_GetTrailTextureModelKey(const ObjectTrailEmitter* trail) {
-	return trail->textureModelType;
+	return trail->textureObjectType;
 }
 
 // FUNCTION: XWA 0x44C1C0
@@ -496,13 +496,13 @@ void RenderBillboard_DrawSpriteFacingCamera(ParticleEffect* effect, unsigned int
 		float screenY;
 
 		if (effect->textureFrameCount != 0) {
-			FeDiskIo_SelectTextureFrame(effect->textureModelType,
+			FeDiskIo_SelectTextureFrame(effect->textureObjectType,
 										(uint16_t)(((int)((particle->ageTicks * effect->textureAnimRate) *
 														  effectDef->colorDeltaScale) %
 													effect->textureFrameCount) +
 												   1),
 										256);
-			curTexLevel = g_modelTypeTable[effect->textureModelType].curTexLevel;
+			curTexLevel = g_objectTypes[effect->textureObjectType].curTexLevel;
 			if (curTexLevel->image != NULL) {
 				Std3DTextureSurface* textureSurface;
 
@@ -802,13 +802,13 @@ void RenderBillboard_DrawOriented(ParticleEffect* effect, unsigned int renderFla
 
 		if (effect->textureFrameCount != 0) {
 			FeDiskIo_SelectTextureFrame(
-				effect->textureModelType,
+				effect->textureObjectType,
 				(uint16_t)(((uint16_t)(int)((float)particle->ageTicks * effectDef->colorDeltaScale *
 											effect->textureAnimRate) %
 							effect->textureFrameCount) +
 						   1),
 				256);
-			curTexLevel = g_modelTypeTable[effect->textureModelType].curTexLevel;
+			curTexLevel = g_objectTypes[effect->textureObjectType].curTexLevel;
 			if (curTexLevel->image != NULL) {
 				Std3DTextureSurface* textureSurface;
 
@@ -1139,13 +1139,13 @@ void RenderBillboard_DrawStretched(ParticleEffect* effect, unsigned int renderFl
 
 		if (effect->textureFrameCount != 0) {
 			FeDiskIo_SelectTextureFrame(
-				effect->textureModelType,
+				effect->textureObjectType,
 				(uint16_t)(((uint16_t)(int)(effectDef->colorDeltaScale * effect->textureAnimRate *
 											particle->ageTicks) %
 							effect->textureFrameCount) +
 						   1),
 				256);
-			curTexLevel = g_modelTypeTable[effect->textureModelType].curTexLevel;
+			curTexLevel = g_objectTypes[effect->textureObjectType].curTexLevel;
 			if (curTexLevel->image != NULL) {
 				Std3DTextureSurface* textureSurface;
 
@@ -1479,8 +1479,8 @@ void RenderBillboard_DrawOrientedStretched(ParticleEffect* effect, unsigned int 
 			frameScale = effectDef->colorDeltaScale * effect->textureAnimRate;
 			frame = (int)(frameScale * particle->ageTicks);
 			frame = (frame % effect->textureFrameCount) + 1;
-			FeDiskIo_SelectTextureFrame(effect->textureModelType, (uint16_t)frame, 256);
-			curTexLevel = g_modelTypeTable[effect->textureModelType].curTexLevel;
+			FeDiskIo_SelectTextureFrame(effect->textureObjectType, (uint16_t)frame, 256);
+			curTexLevel = g_objectTypes[effect->textureObjectType].curTexLevel;
 			if (curTexLevel->image != NULL) {
 				Std3DTextureSurface* textureSurface;
 
@@ -1719,7 +1719,7 @@ void RenderBillboard_DrawOrientedStretched(ParticleEffect* effect, unsigned int 
 					frame = (int)(frameScale * particle->ageTicks);
 					frame = (frame % effect->textureFrameCount) + 1;
 					FeDiskIo_SelectTextureFrame(OBJ_ParticleTextureGroup22003, (uint16_t)frame, 256);
-					curTexLevel = g_modelTypeTable[OBJ_ParticleTextureGroup22003].curTexLevel;
+					curTexLevel = g_objectTypes[OBJ_ParticleTextureGroup22003].curTexLevel;
 					if (curTexLevel->image != NULL) {
 						std3D_AddToTextureCache((Std3DTextureSurface*)curTexLevel->image);
 						if (g_pStd3DCurDevice->caps.bSquareOnlyTexture) {
@@ -1886,14 +1886,14 @@ void RenderBillboard_DrawObjectTrail(ObjectTrailEmitter* trail) {
 
 			frameTickScale = (float)trail->animTicksAccum * trail->animRateScale;
 			FeDiskIo_SelectTextureFrame(
-				trail->animModelType,
+				trail->animObjectType,
 				(uint16_t)(((uint16_t)(int)(frameTickScale * trail->ageRate) % trail->animFrameCount) + 1),
 				256);
 		} else {
-			FeDiskIo_SelectTextureFrame(trail->textureModelType, 1u, (int)trailScreenScale);
+			FeDiskIo_SelectTextureFrame(trail->textureObjectType, 1u, (int)trailScreenScale);
 		}
 
-		trail->curTexLevel = g_modelTypeTable[RenderBillboard_GetTrailTextureModelKey(trail)].curTexLevel;
+		trail->curTexLevel = g_objectTypes[RenderBillboard_GetTrailTextureModelKey(trail)].curTexLevel;
 		if (trail->curTexLevel != NULL && trail->curTexLevel->image != NULL) {
 			Std3DTextureSurface* textureSurface;
 
@@ -2120,11 +2120,12 @@ void Backdrop_DrawCoordinateStrip(WorldRectRecord* worldRect) {
 		frame = 1;
 	}
 
-	if (g_modelTypeTable[(uint16_t)worldRect->modelType].texLevels != NULL) {
-		FeDiskIo_SelectTextureFrame((uint16_t)worldRect->modelType, (uint16_t)frame, worldRect->angularScale);
+	if (g_objectTypes[(uint16_t)worldRect->objectType].texLevels != NULL) {
+		FeDiskIo_SelectTextureFrame((uint16_t)worldRect->objectType, (uint16_t)frame,
+									worldRect->angularScale);
 	}
 
-	curTexLevel = g_modelTypeTable[(uint16_t)worldRect->modelType].curTexLevel;
+	curTexLevel = g_objectTypes[(uint16_t)worldRect->objectType].curTexLevel;
 	if (curTexLevel == NULL) {
 		return;
 	}
@@ -2185,11 +2186,11 @@ void Backdrop_DrawCoordinateStrip(WorldRectRecord* worldRect) {
 				g_backdropStripTexCoords[0].u = 0.0f;
 				segmentInFrame -= stripSegmentsPerFrame;
 				++frame;
-				FeDiskIo_SelectTextureFrame((uint16_t)worldRect->modelType, (uint16_t)frame,
+				FeDiskIo_SelectTextureFrame((uint16_t)worldRect->objectType, (uint16_t)frame,
 											worldRect->angularScale);
-				if (g_modelTypeTable[(uint16_t)worldRect->modelType].curTexLevel->height !=
+				if (g_objectTypes[(uint16_t)worldRect->objectType].curTexLevel->height !=
 					curTexLevel->height) {
-					stripHalfHeight = g_modelTypeTable[(uint16_t)worldRect->modelType].curTexLevel->height *
+					stripHalfHeight = g_objectTypes[(uint16_t)worldRect->objectType].curTexLevel->height *
 									  stripHalfHeight / curTexLevel->height;
 					corners[0] = TRANSFM2_CamMatDotRow0(
 						worldRect->stripCoords[coordIndex - 1].x, worldRect->stripCoords[coordIndex - 1].y,
@@ -2217,7 +2218,7 @@ void Backdrop_DrawCoordinateStrip(WorldRectRecord* worldRect) {
 					corners[10] = corners[7];
 					corners[11] = corners[8];
 				}
-				curTexLevel = g_modelTypeTable[(uint16_t)worldRect->modelType].curTexLevel;
+				curTexLevel = g_objectTypes[(uint16_t)worldRect->objectType].curTexLevel;
 			} else {
 				g_backdropStripTexCoords[3].u = g_backdropStripTexCoords[1].u;
 				g_backdropStripTexCoords[0].u = g_backdropStripTexCoords[1].u;
@@ -2266,7 +2267,7 @@ void Backdrop_RenderCurrentRegion(void) {
 	int regionIndex;
 	unsigned int recordIdx;
 	int screenScale;
-	uint16_t modelType;
+	uint16_t objectType;
 	TexLevel* curTexLevel;
 	int viewX;
 	int viewY;
@@ -2317,7 +2318,7 @@ void Backdrop_RenderCurrentRegion(void) {
 									 g_backdropRecordsByRegion[0][flatRecordIdx].worldDirQ20.z);
 
 		if ((g_backdropRecordsByRegion[0][flatRecordIdx].flags & 1u) != 0) {
-			FeDiskIo_SelectTextureFrame((uint16_t)g_backdropRecordsByRegion[0][flatRecordIdx].modelType,
+			FeDiskIo_SelectTextureFrame((uint16_t)g_backdropRecordsByRegion[0][flatRecordIdx].objectType,
 										g_backdropRecordsByRegion[0][flatRecordIdx].frame,
 										g_backdropRecordsByRegion[0][flatRecordIdx].angularScale);
 		}
@@ -2353,7 +2354,7 @@ void Backdrop_RenderCurrentRegion(void) {
 						halfWidthAxisZ = g_camMatR2_X;
 						worldX = record->worldDirQ20.x;
 						halfWidthAxisX = g_camMatR0_X;
-						modelType = record->modelType;
+						objectType = record->objectType;
 
 						record->viewDirQ20.x = TRANSFM2_CamMatDotRow0(worldX, worldY, worldZ);
 						record->viewDirQ20.y = TRANSFM2_CamMatDotRow1(worldX, worldY, worldZ);
@@ -2366,9 +2367,9 @@ void Backdrop_RenderCurrentRegion(void) {
 						viewY = record->viewDirQ20.y >> 9;
 						viewZ = record->viewDirQ20.z >> 9;
 
-						curTexLevel = g_modelTypeTable[(uint16_t)modelType].curTexLevel;
-						if ((g_modelTypeTable[(uint16_t)modelType].assetFlags &
-							 (MODEL_TYPE_ASSET_TEXTURE_DRAW | MODEL_TYPE_ASSET_TEXTURE_READY)) != 0 &&
+						curTexLevel = g_objectTypes[(uint16_t)objectType].curTexLevel;
+						if ((g_objectTypes[(uint16_t)objectType].assetFlags &
+							 (OBJECT_TYPE_ASSET_TEXTURE_DRAW | OBJECT_TYPE_ASSET_TEXTURE_READY)) != 0 &&
 							curTexLevel != NULL) {
 							halfHeightPixels =
 								Backdrop_ComputeTextureAxisExtent(curTexLevel->height, screenScale);
@@ -2415,7 +2416,7 @@ void Backdrop_RenderCurrentRegion(void) {
 					} else {
 						Backdrop_ProjectAndDrawScreenQuad(
 							record->viewDirQ20.x >> 9, record->viewDirQ20.y >> 9, record->viewDirQ20.z >> 9,
-							angle, modelType, screenScale);
+							angle, objectType, screenScale);
 					}
 				}
 				break;
@@ -2428,7 +2429,7 @@ void Backdrop_RenderCurrentRegion(void) {
 
 					record = &g_backdropRecordsByRegion[0][flatRecordIdx];
 					angle = (int16_t)(0x8000 - trig2_arctan(g_camMatR1_X, g_camMatR0_X));
-					modelType = record->modelType;
+					objectType = record->objectType;
 					screenScale = record->angularScale;
 					halfWidthAxisX = g_camMatR0_X;
 					halfWidthAxisY = g_camMatR1_X;
@@ -2452,9 +2453,9 @@ void Backdrop_RenderCurrentRegion(void) {
 						viewY = record->viewDirQ20.y >> 9;
 						viewZ = record->viewDirQ20.z >> 9;
 
-						curTexLevel = g_modelTypeTable[(uint16_t)modelType].curTexLevel;
-						if ((g_modelTypeTable[(uint16_t)modelType].assetFlags &
-							 (MODEL_TYPE_ASSET_TEXTURE_DRAW | MODEL_TYPE_ASSET_TEXTURE_READY)) != 0 &&
+						curTexLevel = g_objectTypes[(uint16_t)objectType].curTexLevel;
+						if ((g_objectTypes[(uint16_t)objectType].assetFlags &
+							 (OBJECT_TYPE_ASSET_TEXTURE_DRAW | OBJECT_TYPE_ASSET_TEXTURE_READY)) != 0 &&
 							curTexLevel != NULL) {
 							halfHeightPixels =
 								Backdrop_ComputeTextureAxisExtent(curTexLevel->height, screenScale);
@@ -2501,7 +2502,7 @@ void Backdrop_RenderCurrentRegion(void) {
 					} else {
 						Backdrop_ProjectAndDrawScreenQuad(
 							record->viewDirQ20.x >> 9, record->viewDirQ20.y >> 9, record->viewDirQ20.z >> 9,
-							angle, modelType, screenScale);
+							angle, objectType, screenScale);
 					}
 				}
 				break;
@@ -2529,7 +2530,7 @@ void Backdrop_RenderCurrentRegion(void) {
 						halfHeightAxisY = g_camMatR1_Y;
 						worldX = record->worldDirQ20.x;
 						halfWidthAxisX = g_camMatR0_Y;
-						modelType = record->modelType;
+						objectType = record->objectType;
 
 						record->viewDirQ20.x = TRANSFM2_CamMatDotRow0(worldX, worldY, worldZ);
 						record->viewDirQ20.y = TRANSFM2_CamMatDotRow1(worldX, worldY, worldZ);
@@ -2542,9 +2543,9 @@ void Backdrop_RenderCurrentRegion(void) {
 						viewY = record->viewDirQ20.y >> 9;
 						viewZ = record->viewDirQ20.z >> 9;
 
-						curTexLevel = g_modelTypeTable[(uint16_t)modelType].curTexLevel;
-						if ((g_modelTypeTable[(uint16_t)modelType].assetFlags &
-							 (MODEL_TYPE_ASSET_TEXTURE_DRAW | MODEL_TYPE_ASSET_TEXTURE_READY)) != 0 &&
+						curTexLevel = g_objectTypes[(uint16_t)objectType].curTexLevel;
+						if ((g_objectTypes[(uint16_t)objectType].assetFlags &
+							 (OBJECT_TYPE_ASSET_TEXTURE_DRAW | OBJECT_TYPE_ASSET_TEXTURE_READY)) != 0 &&
 							curTexLevel != NULL) {
 							halfHeightPixels =
 								Backdrop_ComputeTextureAxisExtent(curTexLevel->height, screenScale);
@@ -2591,7 +2592,7 @@ void Backdrop_RenderCurrentRegion(void) {
 					} else {
 						Backdrop_ProjectAndDrawScreenQuad(
 							record->viewDirQ20.x >> 9, record->viewDirQ20.y >> 9, record->viewDirQ20.z >> 9,
-							angle, modelType, screenScale);
+							angle, objectType, screenScale);
 					}
 				}
 				break;
@@ -2619,7 +2620,7 @@ void Backdrop_RenderCurrentRegion(void) {
 						halfWidthAxisZ = g_camMatR2_Y;
 						worldX = record->worldDirQ20.x;
 						halfWidthAxisX = g_camMatR0_Y;
-						modelType = record->modelType;
+						objectType = record->objectType;
 
 						record->viewDirQ20.x = TRANSFM2_CamMatDotRow0(worldX, worldY, worldZ);
 						record->viewDirQ20.y = TRANSFM2_CamMatDotRow1(worldX, worldY, worldZ);
@@ -2627,7 +2628,7 @@ void Backdrop_RenderCurrentRegion(void) {
 					}
 					if (g_useHardware3D) {
 						Backdrop_DrawHardwareAxisQuad(
-							modelType, record->viewDirQ20.x >> 9, record->viewDirQ20.y >> 9,
+							objectType, record->viewDirQ20.x >> 9, record->viewDirQ20.y >> 9,
 							record->viewDirQ20.z >> 9, halfWidthAxisX, halfWidthAxisY, halfWidthAxisZ,
 							halfHeightAxisX, halfHeightAxisY, halfHeightAxisZ, screenScale);
 					} else {
@@ -2708,10 +2709,10 @@ void Backdrop_RenderCurrentRegion(void) {
 							}
 						}
 
-						Backdrop_DrawModelTexQuadAtScreen((uint16_t)modelType, g_flightVpCenterX + projectedX,
-														  g_flightVpHeight - projectedY - g_projOffsetY -
-															  g_flightVpCenterY,
-														  angle, screenScale);
+						Backdrop_DrawModelTexQuadAtScreen(
+							(uint16_t)objectType, g_flightVpCenterX + projectedX,
+							g_flightVpHeight - projectedY - g_projOffsetY - g_flightVpCenterY, angle,
+							screenScale);
 					}
 				}
 				break;
@@ -2722,7 +2723,7 @@ void Backdrop_RenderCurrentRegion(void) {
 
 					record = &g_backdropRecordsByRegion[0][flatRecordIdx];
 					angle = (int16_t)-trig2_arctan(g_camMatR1_X, g_camMatR0_X);
-					modelType = record->modelType;
+					objectType = record->objectType;
 					screenScale = record->angularScale;
 					halfWidthAxisX = g_camMatR0_Y;
 					halfWidthAxisY = g_camMatR1_Y;
@@ -2746,9 +2747,9 @@ void Backdrop_RenderCurrentRegion(void) {
 						viewY = record->viewDirQ20.y >> 9;
 						viewZ = record->viewDirQ20.z >> 9;
 
-						curTexLevel = g_modelTypeTable[(uint16_t)modelType].curTexLevel;
-						if ((g_modelTypeTable[(uint16_t)modelType].assetFlags &
-							 (MODEL_TYPE_ASSET_TEXTURE_DRAW | MODEL_TYPE_ASSET_TEXTURE_READY)) != 0 &&
+						curTexLevel = g_objectTypes[(uint16_t)objectType].curTexLevel;
+						if ((g_objectTypes[(uint16_t)objectType].assetFlags &
+							 (OBJECT_TYPE_ASSET_TEXTURE_DRAW | OBJECT_TYPE_ASSET_TEXTURE_READY)) != 0 &&
 							curTexLevel != NULL) {
 							halfHeightPixels =
 								Backdrop_ComputeTextureAxisExtent(curTexLevel->height, screenScale);
@@ -2795,7 +2796,7 @@ void Backdrop_RenderCurrentRegion(void) {
 					} else {
 						Backdrop_ProjectAndDrawScreenQuad(
 							record->viewDirQ20.x >> 9, record->viewDirQ20.y >> 9, record->viewDirQ20.z >> 9,
-							angle, modelType, screenScale);
+							angle, objectType, screenScale);
 					}
 				}
 				break;
@@ -2806,7 +2807,7 @@ void Backdrop_RenderCurrentRegion(void) {
 
 					record = &g_backdropRecordsByRegion[0][flatRecordIdx];
 					angle = (int16_t)-trig2_arctan(g_camMatR1_X, g_camMatR0_X);
-					modelType = record->modelType;
+					objectType = record->objectType;
 					screenScale = record->angularScale;
 					halfWidthAxisX = g_camMatR0_Y;
 					halfWidthAxisY = g_camMatR1_Y;
@@ -2825,7 +2826,7 @@ void Backdrop_RenderCurrentRegion(void) {
 					}
 					if (g_useHardware3D) {
 						Backdrop_DrawHardwareAxisQuad(
-							modelType, record->viewDirQ20.x >> 9, record->viewDirQ20.y >> 9,
+							objectType, record->viewDirQ20.x >> 9, record->viewDirQ20.y >> 9,
 							record->viewDirQ20.z >> 9, halfWidthAxisX, halfWidthAxisY, halfWidthAxisZ,
 							halfHeightAxisX, halfHeightAxisY, halfHeightAxisZ, screenScale);
 					} else {
@@ -2906,10 +2907,10 @@ void Backdrop_RenderCurrentRegion(void) {
 							}
 						}
 
-						Backdrop_DrawModelTexQuadAtScreen((uint16_t)modelType, g_flightVpCenterX + projectedX,
-														  g_flightVpHeight - projectedY - g_projOffsetY -
-															  g_flightVpCenterY,
-														  angle, screenScale);
+						Backdrop_DrawModelTexQuadAtScreen(
+							(uint16_t)objectType, g_flightVpCenterX + projectedX,
+							g_flightVpHeight - projectedY - g_projOffsetY - g_flightVpCenterY, angle,
+							screenScale);
 					}
 				}
 				break;
@@ -2940,20 +2941,20 @@ void Backdrop_BuildCoordinateBuffers(void) {
 			if ((record->flags & 1u) == 0) {
 				continue;
 			}
-			if ((uint16_t)record->modelType == OBJ_DeathStarFireTextureGroup6250_Sprite000 ||
-				(uint16_t)record->modelType == OBJ_DeathStarFireTextureGroup6251) {
+			if ((uint16_t)record->objectType == OBJ_DeathStarFireTextureGroup6250_Sprite000 ||
+				(uint16_t)record->objectType == OBJ_DeathStarFireTextureGroup6251) {
 				if (*recordFrame < 1) {
 					*recordFrame = 1;
 				}
 			} else {
 				uint8_t usedFrameBitmap[100];
-				ObjectTypeId modelType;
+				ObjectTypeId objectType;
 				TexLevel* texLevels;
 				int scanRegionIdx;
 				int frameIdx;
 
 				memset(usedFrameBitmap, 0, sizeof(usedFrameBitmap));
-				modelType = record->modelType;
+				objectType = record->objectType;
 				for (scanRegionIdx = 0; scanRegionIdx < g_missionRegionCount; ++scanRegionIdx) {
 					unsigned int scanRecordIdx;
 
@@ -2965,7 +2966,7 @@ void Backdrop_BuildCoordinateBuffers(void) {
 
 						scanRecord = &g_backdropRecordsByRegion[scanRegionIdx][scanRecordIdx];
 						scanFrame = &scanRecord->frame;
-						if ((uint16_t)scanRecord->modelType != (uint16_t)modelType) {
+						if ((uint16_t)scanRecord->objectType != (uint16_t)objectType) {
 							continue;
 						}
 						if (*scanFrame < 1) {
@@ -2977,9 +2978,9 @@ void Backdrop_BuildCoordinateBuffers(void) {
 					}
 				}
 
-				texLevels = g_modelTypeTable[(uint16_t)modelType].texLevels;
+				texLevels = g_objectTypes[(uint16_t)objectType].texLevels;
 				if (texLevels != NULL) {
-					for (frameIdx = 0; frameIdx < g_modelTypeTable[(uint16_t)modelType].frameCount;
+					for (frameIdx = 0; frameIdx < g_objectTypes[(uint16_t)objectType].frameCount;
 						 ++frameIdx) {
 						if (usedFrameBitmap[frameIdx] == 0 && texLevels[frameIdx].image != NULL) {
 							if (g_useHardware3D) {
@@ -3033,15 +3034,15 @@ void Backdrop_BuildCoordinateBuffers(void) {
 				continue;
 			}
 
-			if (g_modelTypeTable[(uint16_t)record->modelType].texLevels != NULL) {
+			if (g_objectTypes[(uint16_t)record->objectType].texLevels != NULL) {
 				if ((record->flags & 1u) != 0) {
-					FeDiskIo_SelectTextureFrame((uint16_t)record->modelType, record->frame, 256);
+					FeDiskIo_SelectTextureFrame((uint16_t)record->objectType, record->frame, 256);
 				} else {
-					FeDiskIo_SelectTextureFrame((uint16_t)record->modelType, 1u, 256);
+					FeDiskIo_SelectTextureFrame((uint16_t)record->objectType, 1u, 256);
 				}
 			}
 
-			curTexLevel = g_modelTypeTable[(uint16_t)record->modelType].curTexLevel;
+			curTexLevel = g_objectTypes[(uint16_t)record->objectType].curTexLevel;
 			if (curTexLevel == NULL) {
 				continue;
 			}
@@ -3061,9 +3062,8 @@ void Backdrop_BuildCoordinateBuffers(void) {
 				double arcBase;
 				double textureAspectRatio;
 
-				textureAspectRatio =
-					(double)g_modelTypeTable[(uint16_t)record->modelType].curTexLevel->height /
-					(double)g_modelTypeTable[(uint16_t)record->modelType].curTexLevel->width;
+				textureAspectRatio = (double)g_objectTypes[(uint16_t)record->objectType].curTexLevel->height /
+									 (double)g_objectTypes[(uint16_t)record->objectType].curTexLevel->width;
 				arcBase = (double)record->angularScale * 0.00390625 * (double)dirRadius;
 				stripArcWidth = (int)(arcBase * 3.141592653589793);
 				stripArcHeight = (int)(textureAspectRatio * arcBase * 3.141592653589793);
@@ -3076,18 +3076,18 @@ void Backdrop_BuildCoordinateBuffers(void) {
 				stripSegmentCount = 16;
 			}
 
-			if (g_modelTypeTable[(uint16_t)record->modelType].texLevels != NULL) {
+			if (g_objectTypes[(uint16_t)record->objectType].texLevels != NULL) {
 				imageFrameCount = 0;
 				do {
-					FeDiskIo_SelectTextureFrame((uint16_t)record->modelType, (uint16_t)(imageFrameCount + 1),
+					FeDiskIo_SelectTextureFrame((uint16_t)record->objectType, (uint16_t)(imageFrameCount + 1),
 												256);
 					++imageFrameCount;
-				} while (g_modelTypeTable[(uint16_t)record->modelType].curTexLevel != NULL);
+				} while (g_objectTypes[(uint16_t)record->objectType].curTexLevel != NULL);
 				--imageFrameCount;
 			} else {
 				record->flags &= (uint8_t)~1u;
 				record->frame = 0;
-				if (g_modelTypeTable[(uint16_t)record->modelType].curTexLevel == NULL) {
+				if (g_objectTypes[(uint16_t)record->objectType].curTexLevel == NULL) {
 					DebugPrintfChannel(1024, "No image for bg [%d][%d].\n", regionIdx, recordIdx);
 					record->stripSegmentCount = 0;
 					record->stripCoords = NULL;
@@ -3158,7 +3158,7 @@ void Backdrop_BuildCoordinateBuffers(void) {
 			record->stripCoords = stripCoords;
 			record->stripHalfHeight = stripHalfHeight;
 
-			if ((uint16_t)record->modelType == OBJ_DeathStarFireTextureGroup6250_Sprite000) {
+			if ((uint16_t)record->objectType == OBJ_DeathStarFireTextureGroup6250_Sprite000) {
 				DeathStarTunnelLaserRegionState* laser;
 				WorldRectRecord* emitter;
 				WorldRectRecord* beamSprite;
@@ -3185,8 +3185,8 @@ void Backdrop_BuildCoordinateBuffers(void) {
 				FeDiskIo_SelectTextureFrame(OBJ_DeathStarFireTextureGroup6250_Sprite000, 1u, 256);
 				laserAngularScale = emitter->angularScale;
 				laserAngle =
-					(double)(laserAngularScale * g_modelTypeTable[OBJ_DeathStarFireTextureGroup6250_Sprite000]
-													 .curTexLevel->width) *
+					(double)(laserAngularScale *
+							 g_objectTypes[OBJ_DeathStarFireTextureGroup6250_Sprite000].curTexLevel->width) *
 					-0.800000011920929 / laserDirRadius;
 				laserAngleCos = cos(laserAngle);
 				laserAngleSin = sin(laserAngle);
@@ -3195,7 +3195,7 @@ void Backdrop_BuildCoordinateBuffers(void) {
 				laserNewY = (int)((double)laserDirY * laserAngleCos - laserAngleSin * (double)laserDirX);
 				laserNewZ =
 					laserDirZ - (int)((float)(laserAngularScale *
-											  g_modelTypeTable[OBJ_DeathStarFireTextureGroup6250_Sprite000]
+											  g_objectTypes[OBJ_DeathStarFireTextureGroup6250_Sprite000]
 												  .curTexLevel->height) *
 									  -1.15f);
 
@@ -3271,7 +3271,7 @@ void RenderBillboard_DrawRollAlignedObjectModel(uint16_t objectIndex) {
 void SceneBillboard_QueueObjectTextured(uint16_t objectIndex) {
 	ObjectRecord* obj;
 	ObjectTypeId objectType;
-	int modelTypeIndex;
+	int objectTypeIndex;
 	uint16_t frame;
 	int axisX;
 	int axisY;
@@ -3294,8 +3294,8 @@ void SceneBillboard_QueueObjectTextured(uint16_t objectIndex) {
 		return;
 	}
 
-	modelTypeIndex = (uint16_t)obj->objectType;
-	if (!g_modelTypeTable[modelTypeIndex].texLevels) {
+	objectTypeIndex = (uint16_t)obj->objectType;
+	if (!g_objectTypes[objectTypeIndex].texLevels) {
 		return;
 	}
 
@@ -3349,7 +3349,7 @@ void SceneBillboard_QueueObjectTextured(uint16_t objectIndex) {
 
 	mobj = obj->mobj;
 	screenSize = ((unsigned int)mobj->instanceExtent << 8) /
-				 (unsigned int)g_modelTypeTable[modelTypeIndex].maxBoundsExtent;
+				 (unsigned int)g_objectTypes[objectTypeIndex].maxBoundsExtent;
 	if (obj->objectType < OBJ_DebrisTextureGroup4000 || obj->objectType > OBJ_DebrisTextureGroup4003) {
 		screenSize <<= 3;
 	}
@@ -3450,7 +3450,7 @@ void SceneBillboard_RenderQueuedTextured(int drawTargetComponentMarkers) {
 
 		if (objectType == OBJ_DeathStarIITextureGroup17002) {
 			screenSize = DeathStar_ComputeScaledProjectedBillboardSize(
-				entry->depthZ, g_modelTypeTable[OBJ_DeathStarIITextureGroup17002].maxBoundsExtent,
+				entry->depthZ, g_objectTypes[OBJ_DeathStarIITextureGroup17002].maxBoundsExtent,
 				(uint16_t)entry->screenSize);
 		} else {
 			clampTo1024 = 1;
@@ -3459,7 +3459,7 @@ void SceneBillboard_RenderQueuedTextured(int drawTargetComponentMarkers) {
 				clampTo1024 = 0;
 			}
 			screenSize = SceneBillboard_ComputeProjectedSize(
-				entry->depthZ, g_modelTypeTable[(uint16_t)objectType].maxBoundsExtent,
+				entry->depthZ, g_objectTypes[(uint16_t)objectType].maxBoundsExtent,
 				(uint16_t)entry->screenSize, clampTo1024);
 		}
 
@@ -3494,25 +3494,25 @@ void SceneBillboard_RenderQueuedTextured(int drawTargetComponentMarkers) {
 					   g_objectTable[currentTargetObjectIdx].genusId == GENUS_Platform ||
 					   g_objectTable[currentTargetObjectIdx].genusId == GENUS_Freighter) {
 				CraftData* craft;
-				int modelType;
+				int objectType;
 				MeshType selectedMeshType;
 
 				Targeting_DrawObjectBox(currentTargetObjectIdx,
 										(uint16_t)g_players[g_localPlayer].selectedTargetComponent, 0x3Fu);
-				modelType = (uint16_t)g_objectTable[currentTargetObjectIdx].objectType;
+				objectType = (uint16_t)g_objectTable[currentTargetObjectIdx].objectType;
 				selectedMeshType = ModelMesh_GetObjectTypeMeshType(
-					modelType, (uint16_t)g_players[g_localPlayer].selectedTargetComponent);
+					objectType, (uint16_t)g_players[g_localPlayer].selectedTargetComponent);
 				if (selectedMeshType == MESH_WeaponSystem1 || selectedMeshType == MESH_WeaponSystem2) {
 					int meshCount;
 					uint16_t meshIndex;
 
-					meshCount = ModelMesh_GetObjectTypeMeshCount(modelType);
+					meshCount = ModelMesh_GetObjectTypeMeshCount(objectType);
 					meshIndex = 0;
 					craft = g_objectTable[currentTargetObjectIdx].mobj->pCraft;
 					while ((int)(uint16_t)meshIndex < meshCount) {
 						if (meshIndex != (uint16_t)g_players[g_localPlayer].selectedTargetComponent &&
 							craft->componentHp[meshIndex] &&
-							ModelMesh_GetObjectTypeMeshType(modelType, meshIndex) == selectedMeshType) {
+							ModelMesh_GetObjectTypeMeshType(objectType, meshIndex) == selectedMeshType) {
 							Targeting_DrawObjectBox(currentTargetObjectIdx, meshIndex, 0x36u);
 						}
 						++meshIndex;

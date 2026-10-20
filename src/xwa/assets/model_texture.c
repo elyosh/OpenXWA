@@ -3,7 +3,7 @@
 #include "xwa/flight/fediskio.h"
 
 #include "xwa/assets/file_io.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/sprite_resource.h"
 #include "xwa/assets/sprite_texture.h"
 #include "xwa/frontend/frontend_display.h"
@@ -42,11 +42,11 @@ static ModelTextureDefaultTexture* g_defaultWhiteTextureDescPtr;
 void ModelTexture_CacheHyperspaceTunnelFrames(void) {
 	uint16_t frame;
 
-	for (frame = 0; frame < g_modelTypeTable[OBJ_AnimationTextureGroup3051].frameCount; ++frame) {
+	for (frame = 0; frame < g_objectTypes[OBJ_AnimationTextureGroup3051].frameCount; ++frame) {
 		FeDiskIo_SelectTextureFrame(OBJ_AnimationTextureGroup3051, frame, 256);
-		if (g_modelTypeTable[OBJ_AnimationTextureGroup3051].curTexLevel != NULL) {
+		if (g_objectTypes[OBJ_AnimationTextureGroup3051].curTexLevel != NULL) {
 			std3D_AddToTextureCache(
-				(Std3DTextureSurface*)g_modelTypeTable[OBJ_AnimationTextureGroup3051].curTexLevel->image);
+				(Std3DTextureSurface*)g_objectTypes[OBJ_AnimationTextureGroup3051].curTexLevel->image);
 		}
 	}
 }

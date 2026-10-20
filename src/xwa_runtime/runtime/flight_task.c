@@ -1614,7 +1614,7 @@ void XwaFlightTask_Tick(void) {
 					g_debrisEnabled = 0;
 					DeathStar_Init();
 				}
-				g_hangarBackdropModelType = 0;
+				g_hangarBackdropObjectType = 0;
 				if (g_provingGroundsModeActive) {
 					if (g_pilotData.meleeMissionIndex == -1) {
 						g_yardChallengeMode = g_pilotData.provingGroundsMissionPerPlayer[0];

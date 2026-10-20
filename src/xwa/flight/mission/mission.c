@@ -6,7 +6,7 @@
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/audio/fsfx.h"
 #include "xwa/audio/music.h"
 #include "xwa/config/game_config.h"
@@ -1521,14 +1521,14 @@ uint16_t Mission_FlightGroupMatchesTriggerVariable(uint16_t fgIdx, uint16_t vari
 			break;
 
 		case TRIGVAR_SHIP_CLASS:
-			if (g_genusConvert[variable] == g_modelTypeTable[(uint16_t)objectType].genusId) {
+			if (g_genusConvert[variable] == g_objectTypes[(uint16_t)objectType].genusId) {
 				result = 1;
 				return result;
 			}
 			break;
 
 		case TRIGVAR_OBJECT_TYPE:
-			if (g_familyConvert[variable] == g_modelTypeTable[(uint16_t)objectType].familyId) {
+			if (g_familyConvert[variable] == g_objectTypes[(uint16_t)objectType].familyId) {
 				result = 1;
 				return result;
 			}
@@ -1620,14 +1620,14 @@ uint16_t Mission_FlightGroupMatchesTriggerVariable(uint16_t fgIdx, uint16_t vari
 			break;
 
 		case TRIGVAR_NOT_SHIP_CLASS:
-			if (g_genusConvert[variable] != g_modelTypeTable[(uint16_t)objectType].genusId) {
+			if (g_genusConvert[variable] != g_objectTypes[(uint16_t)objectType].genusId) {
 				result = 1;
 				return result;
 			}
 			break;
 
 		case TRIGVAR_NOT_OBJECT_TYPE:
-			if (g_familyConvert[variable] != g_modelTypeTable[(uint16_t)objectType].familyId) {
+			if (g_familyConvert[variable] != g_objectTypes[(uint16_t)objectType].familyId) {
 				result = 1;
 				return result;
 			}
@@ -1746,13 +1746,13 @@ int Mission_ObjectMatchesTriggerVariableEx(uint16_t objectIdx, uint16_t variable
 			break;
 
 		case TRIGVAR_SHIP_CLASS:
-			if (g_genusConvert[variable] == g_modelTypeTable[(uint16_t)objectType].genusId) {
+			if (g_genusConvert[variable] == g_objectTypes[(uint16_t)objectType].genusId) {
 				return 1;
 			}
 			break;
 
 		case TRIGVAR_OBJECT_TYPE:
-			if (g_familyConvert[variable] == g_modelTypeTable[(uint16_t)objectType].familyId) {
+			if (g_familyConvert[variable] == g_objectTypes[(uint16_t)objectType].familyId) {
 				return 1;
 			}
 			break;
@@ -2025,13 +2025,13 @@ int Mission_ObjectMatchesTriggerVariableEx(uint16_t objectIdx, uint16_t variable
 			break;
 
 		case TRIGVAR_NOT_SHIP_CLASS:
-			if (g_genusConvert[variable] != g_modelTypeTable[(uint16_t)objectType].genusId) {
+			if (g_genusConvert[variable] != g_objectTypes[(uint16_t)objectType].genusId) {
 				return 1;
 			}
 			break;
 
 		case TRIGVAR_NOT_OBJECT_TYPE:
-			if (g_familyConvert[variable] != g_modelTypeTable[(uint16_t)objectType].familyId) {
+			if (g_familyConvert[variable] != g_objectTypes[(uint16_t)objectType].familyId) {
 				return 1;
 			}
 			break;
@@ -4047,14 +4047,14 @@ void Mission_ResolveFormationSlotWorldLoc(uint16_t flightGroupIdx, uint16_t form
 	objectType =
 		(ObjectTypeId)
 			g_objectTypeTables.craftTypeToObjectType[g_missionFlightGroups[flightGroupIdx].fg.craftType];
-	modelIndex = g_modelTypeTable[objectType].modelDefIndex;
+	modelIndex = g_objectTypes[objectType].modelDefIndex;
 	modelMaxZ = ModelBounds_GetMaxZ(objectType);
 
 	Mission_ResolveObjectOrMissionPointWorldLoc(0x8000u, flightGroupIdx, 0, 0);
-	if (g_modelTypeTable[objectType].flags & 0x80) {
+	if (g_objectTypes[objectType].flags & 0x80) {
 		ModelGenusId genusId;
 
-		genusId = g_modelTypeTable[objectType].genusId;
+		genusId = g_objectTypes[objectType].genusId;
 		if (genusId == GENUS_SatelliteBuoy) {
 			int startX;
 
@@ -4470,7 +4470,7 @@ void Mission_ProcessFlightGroupWaveCompletion(uint16_t flightGroupIdx) {
 
 	craftObjType = (uint16_t)g_objectTypeTables
 					   .craftTypeToObjectType[g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType];
-	if (!(g_modelTypeTable[craftObjType].flags & 0x80))
+	if (!(g_objectTypes[craftObjType].flags & 0x80))
 		Mission_SpawnFlightGroupWaveCraft(0xFFFFu);
 	else
 		Mission_SpawnFlightGroupStaticObjects(0xFFFFu);
@@ -4552,7 +4552,7 @@ static __inline void Mission_SpawnCurrentFlightGroupAtMissionStart(void) {
 	g_missionFgStats[g_currentFlightGroupIdx].hasArrived = 1;
 	objType = (ObjectTypeId)g_objectTypeTables
 				  .craftTypeToObjectType[g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType];
-	if ((g_modelTypeTable[(uint16_t)objType].flags & 0x80) == 0) {
+	if ((g_objectTypes[(uint16_t)objType].flags & 0x80) == 0) {
 		g_missionFgStats[g_currentFlightGroupIdx].wavesRemaining =
 			g_missionFlightGroups[g_currentFlightGroupIdx].fg.numberOfWaves;
 		Mission_SpawnFlightGroupWaveCraft(0xFFFFu);
@@ -4761,7 +4761,7 @@ void Mission_InitFlightRuntimeState(void) {
 			instances = numberOfCraft;
 			objType = (ObjectTypeId)
 						  g_objectTypeTables.craftTypeToObjectType[g_missionFlightGroups[cur].fg.craftType];
-			if (g_modelTypeTable[(uint16_t)objType].genusId == GENUS_Mine)
+			if (g_objectTypes[(uint16_t)objType].genusId == GENUS_Mine)
 				instances = numberOfCraft * numberOfCraft;
 			if (objType == OBJ_CrewCabinFront || objType == OBJ_EngineFront)
 				instances *= 2;
@@ -4832,7 +4832,7 @@ void Mission_InitFlightRuntimeState(void) {
 		// Count this FG's craft toward its team's countable-craft flag.
 		objType2 = (ObjectTypeId)g_objectTypeTables
 					   .craftTypeToObjectType[g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType];
-		if ((g_modelTypeTable[(uint16_t)objType2].flags & 0x20) == 0)
+		if ((g_objectTypes[(uint16_t)objType2].flags & 0x20) == 0)
 			g_missionFlightRuntimeState
 				.teamHasCountableCraft[g_missionFlightGroups[g_currentFlightGroupIdx].fg.team] = 1;
 	}
@@ -5183,7 +5183,7 @@ void Mission_UpdateFlightGroupArrivals(void) {
 					char hasNoInstance = 1;
 					int craftObjType = g_objectTypeTables.craftTypeToObjectType
 										   [g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType];
-					if (!(g_modelTypeTable[craftObjType].flags & 0x80)) {
+					if (!(g_objectTypes[craftObjType].flags & 0x80)) {
 						// Normal craft: a live, non-departing craft of this FG counts.
 						unsigned int slot;
 						for (slot = 0; slot < g_objectTableSlotCount; ++slot) {
@@ -5294,7 +5294,7 @@ void Mission_UpdateFlightGroupArrivals(void) {
 								spawnRegion = g_missionFlightGroups[g_currentFlightGroupIdx]
 												  .fg.missionPointRegions[XWA_FG_POINT_START_1];
 							Mission_SetActiveRegionObjectRanges(spawnRegion);
-							isBig = (int16_t)g_modelTypeTable
+							isBig = (int16_t)g_objectTypes
 										[g_objectTypeTables.craftTypeToObjectType
 											 [g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType]]
 											.flags;
@@ -5350,7 +5350,7 @@ void Mission_UpdateFlightGroupArrivals(void) {
 				{
 					int craftObjType = g_objectTypeTables.craftTypeToObjectType
 										   [g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType];
-					int16_t isBig = (int16_t)(g_modelTypeTable[craftObjType].flags & 0x80);
+					int16_t isBig = (int16_t)(g_objectTypes[craftObjType].flags & 0x80);
 					if (!isBig) {
 						unsigned int slot = g_activeRegionObjectSlotStart;
 						int free = 0;
@@ -5389,12 +5389,12 @@ void Mission_UpdateFlightGroupArrivals(void) {
 }
 
 // Resolves the model genus id for a flight group's craft type, matching the
-// inline g_modelTypeTable[g_objectTypeTables.craftTypeToObjectType[craftType]].genusId lookup
+// inline g_objectTypes[g_objectTypeTables.craftTypeToObjectType[craftType]].genusId lookup
 // the original performs in several places.
 static __inline ModelGenusId Mission_FlightGroupCraftGenus(uint16_t fgIdx) {
 	uint16_t objType =
 		(uint16_t)g_objectTypeTables.craftTypeToObjectType[g_missionFlightGroups[fgIdx].fg.craftType];
-	return g_modelTypeTable[objType].genusId;
+	return g_objectTypes[objType].genusId;
 }
 
 // FUNCTION: XWA 0x418720
@@ -5405,8 +5405,8 @@ static __inline ModelGenusId Mission_FlightGroupCraftGenus(uint16_t fgIdx) {
 // 0xFFFF for all.
 short Mission_StartFlightGroupArrival(uint16_t instanceFilter) {
 	g_missionFgStats[g_currentFlightGroupIdx].hasArrived = 1;
-	if ((g_modelTypeTable[(uint16_t)g_objectTypeTables.craftTypeToObjectType
-							  [g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType]]
+	if ((g_objectTypes[(uint16_t)g_objectTypeTables.craftTypeToObjectType
+						   [g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType]]
 			 .flags &
 		 0x80) == 0) {
 		g_missionFgStats[g_currentFlightGroupIdx].wavesRemaining =
@@ -5580,7 +5580,7 @@ short Mission_SpawnFlightGroupWaveCraft(uint16_t instanceFilter) {
 						Mission_SetActiveRegionObjectRanges((uint8_t)region);
 						craftObjType = (uint16_t)g_objectTypeTables.craftTypeToObjectType
 										   [g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType];
-						if (!(g_modelTypeTable[craftObjType].flags & 0x80)) {
+						if (!(g_objectTypes[craftObjType].flags & 0x80)) {
 							unsigned int craftSlot = g_activeRegionObjectSlotStart;
 							unsigned int free = 0;
 							if (g_activeRegionObjectSlotStart >= g_activeRegionCraftObjectSlotEnd)
@@ -5935,7 +5935,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		objType = objectTypeOverride;
 	}
 	objectType = (uint16_t)objType;
-	if (!(uint16_t)objType || (g_modelTypeTable[objectType].flags & 0x20) != 0)
+	if (!(uint16_t)objType || (g_objectTypes[objectType].flags & 0x20) != 0)
 		return -1;
 
 	// Allocate (or reuse) the object slot.
@@ -6048,7 +6048,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 
 	// Collision damage amount derived from bounds, with per-type overrides.
 	{
-		int damage = g_modelTypeTable[objectType].maxBoundsExtent;
+		int damage = g_objectTypes[objectType].maxBoundsExtent;
 		switch (objectType) {
 			case OBJ_ContainerGem:
 				damage *= 8;
@@ -6087,7 +6087,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 	g_objectTable[objIdx].mobj->team = g_spawnTeamId;
 	g_objectTable[objIdx].genusId = g_spawnGenusId;
 	g_objectTable[objIdx].regionIdx = (uint8_t)regionIdx;
-	g_objectTable[objIdx].mobj->state = g_modelTypeTable[objectType].familyId;
+	g_objectTable[objIdx].mobj->state = g_objectTypes[objectType].familyId;
 	g_objectTable[objIdx].mobj->motionFlags = 0;
 	if (((uint16_t)existingObjIdx == 0xFFFF)) {
 		g_objectTable[objIdx].mobj->framesAlive = 0;
@@ -6324,7 +6324,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			uint16_t g;
 			uint16_t launcher;
 			uint16_t slot;
-			if ((g_modelTypeTable[(uint16_t)g_spawnObjectType].flags & 0x800) == 0) {
+			if ((g_objectTypes[(uint16_t)g_spawnObjectType].flags & 0x800) == 0) {
 				for (g = 0; g < 3; ++g) {
 					g_curCraft->laserProjectileTypeId[g] = g_modelDefs[modelIndex].laserGroupWeaponType[g];
 					if (g_curCraft->laserProjectileTypeId[g]) {
@@ -6375,7 +6375,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			g_curCraft->laserConvergeLevel = convergeLevel;
 
 			// Craft that fire from float hardpoints put their turret groups into free slots.
-			if ((g_modelTypeTable[(uint16_t)g_spawnObjectType].flags & 0x800) != 0) {
+			if ((g_objectTypes[(uint16_t)g_spawnObjectType].flags & 0x800) != 0) {
 				for (g = 0; g < 3; ++g) {
 					uint8_t remaining = g_modelDefs[modelIndex].laserGroupSlotCount[g];
 					if (g_modelDefs[modelIndex].laserGroupWeaponKind[g] >= 4 && remaining) {
@@ -7022,7 +7022,7 @@ uint16_t Mission_SpawnPreparedObject(uint16_t flightGroupIdx, uint16_t genusId, 
 		g_objectTable[objectIdx].genusId = (ModelGenusId)genusId;
 		g_objectTable[objectIdx].objectType = objectType;
 		g_objectTable[objectIdx].typeSpecificWord = 1023;
-		if ((g_modelTypeTable[(uint16_t)objectType].assetFlags & 6u) != 0) {
+		if ((g_objectTypes[(uint16_t)objectType].assetFlags & 6u) != 0) {
 			g_objectTable[objectIdx].typeSpecificByte[0] = 1;
 		} else {
 			g_objectTable[objectIdx].typeSpecificByte[0] = 0;
@@ -7057,11 +7057,11 @@ void Mission_SpawnFlightGroupStaticObjects(uint16_t instanceFilter) {
 	objectType =
 		(ObjectTypeId)
 			g_objectTypeTables.craftTypeToObjectType[g_missionFlightGroups[flightGroupIdx].fg.craftType];
-	if ((int8_t)g_modelTypeTable[(uint16_t)objectType].flags >= 0) {
+	if ((int8_t)g_objectTypes[(uint16_t)objectType].flags >= 0) {
 		return;
 	}
 
-	switch (g_modelTypeTable[(uint16_t)objectType].genusId) {
+	switch (g_objectTypes[(uint16_t)objectType].genusId) {
 		case GENUS_Asteroid: {
 			GameRand_SavePrimarySeed();
 			Math_SeedRandom(GameRand_GetSavedSeed());
@@ -7234,7 +7234,7 @@ void Mission_CreateRegionMarkerObjects(int worldX, int worldY, int worldZ) {
 		g_objectTable[objectIdx].typeSpecificByte[0] = 2;
 		g_objectTable[objectIdx].mobj->speed = 0;
 		g_objectTable[objectIdx].mobj->instanceExtent =
-			g_modelTypeTable[OBJ_ExplosionTextureGroup2000].maxBoundsExtent;
+			g_objectTypes[OBJ_ExplosionTextureGroup2000].maxBoundsExtent;
 		g_objectTable[objectIdx].mobj->framesAlive = 0;
 		g_objectTable[objectIdx].mobj->lifetimeTimer = 0;
 		g_objectTable[objectIdx].pitch = 0;
@@ -7523,7 +7523,7 @@ uint16_t Mission_Init(char* fileName) {
 	}
 
 	for (slot = 0; slot < 32; ++slot) {
-		g_modelTextureOverrideSlots[slot].modelType = 0;
+		g_modelTextureOverrideSlots[slot].objectType = 0;
 		g_modelTextureOverrideSlots[slot].textureNode = NULL;
 	}
 	g_modelTextureOverrideNextSlot = 0;
@@ -7536,8 +7536,8 @@ uint16_t Mission_Init(char* fileName) {
 	}
 
 	for (slot = 0; slot < OBJ_Count; ++slot) {
-		if (g_modelTypeTable[slot].recordFlags != 0) {
-			g_modelTypeTable[slot].assetFlags &= (uint8_t)~MISSION_MODEL_ASSET_REQUIRED;
+		if (g_objectTypes[slot].recordFlags != 0) {
+			g_objectTypes[slot].assetFlags &= (uint8_t)~MISSION_MODEL_ASSET_REQUIRED;
 		}
 	}
 
@@ -7926,35 +7926,35 @@ uint16_t Mission_Init(char* fileName) {
 
 		objectType =
 			(ObjectTypeId)g_objectTypeTables.craftTypeToObjectType[g_missionFlightGroups[fgIdx].fg.craftType];
-		g_modelTypeTable[objectType].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
+		g_objectTypes[objectType].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
 		{
-			const uint16_t* companionModelTypes;
+			const uint16_t* companionObjectTypes;
 
-			companionModelTypes = g_objectTypeTables.craftCompanionModelTypes;
-			for (slot = 0; companionModelTypes[0] != OBJ_None; ++slot, companionModelTypes += 2) {
-				if ((ObjectTypeId)companionModelTypes[0] == objectType) {
-					g_modelTypeTable[companionModelTypes[1]].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
+			companionObjectTypes = g_objectTypeTables.craftCompanionObjectTypes;
+			for (slot = 0; companionObjectTypes[0] != OBJ_None; ++slot, companionObjectTypes += 2) {
+				if ((ObjectTypeId)companionObjectTypes[0] == objectType) {
+					g_objectTypes[companionObjectTypes[1]].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
 					break;
 				}
 			}
 		}
 		if (objectType == OBJ_AsteroidHR1) {
 			for (slot = 1; slot <= 5; ++slot) {
-				g_modelTypeTable[OBJ_AsteroidHR1 + slot].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
+				g_objectTypes[OBJ_AsteroidHR1 + slot].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
 			}
 		}
 		if (objectType == OBJ_CrewCabinFront) {
-			g_modelTypeTable[OBJ_ConnectorRod].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
-			g_modelTypeTable[OBJ_EngineBack].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
+			g_objectTypes[OBJ_ConnectorRod].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
+			g_objectTypes[OBJ_EngineBack].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
 		}
 		if (objectType == OBJ_EngineFront) {
-			g_modelTypeTable[OBJ_ConnectorRod].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
-			g_modelTypeTable[OBJ_CrewCabinBack].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
+			g_objectTypes[OBJ_ConnectorRod].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
+			g_objectTypes[OBJ_CrewCabinBack].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
 		}
 
 		modelIndex = GetModelDefIndexFromType(objectType);
 		if (modelIndex != 0xffffu && g_modelDefs[modelIndex].turretObjectType[0] != 0) {
-			g_modelTypeTable[g_modelDefs[modelIndex].turretObjectType[0]].assetFlags |=
+			g_objectTypes[g_modelDefs[modelIndex].turretObjectType[0]].assetFlags |=
 				MISSION_MODEL_ASSET_REQUIRED;
 		}
 
@@ -8044,9 +8044,9 @@ uint16_t Mission_Init(char* fileName) {
 			(ObjectTypeId)g_objectTypeTables
 					.craftTypeToObjectType[g_missionFlightGroups[g_currentFlightGroupIdx].fg.craftType] ==
 				OBJ_BackdropTextureGroup9001_Sprite1100_263) {
-			backdropType = (ObjectTypeId)g_objectTypeTables.missionBackdropDescriptors[backdropId].modelType;
-			if (backdropType != OBJ_None && (g_modelTypeTable[(ObjectTypeId)backdropType].flags &
-											 MODEL_TYPE_FLAG_SINGLE_MIP_LEVEL) != 0) {
+			backdropType = (ObjectTypeId)g_objectTypeTables.missionBackdropDescriptors[backdropId].objectType;
+			if (backdropType != OBJ_None &&
+				(g_objectTypes[(ObjectTypeId)backdropType].flags & OBJECT_TYPE_FLAG_SINGLE_MIP_LEVEL) != 0) {
 				unsigned int backdropRegion;
 				unsigned int recordIdx;
 				unsigned int flatIdx;
@@ -8064,7 +8064,7 @@ uint16_t Mission_Init(char* fileName) {
 				recordIdx = (unsigned int)g_backdropCountByRegion[backdropRegion];
 				if (recordIdx < XWA_BACKDROP_RECORDS_PER_REGION) {
 					flatIdx = recordIdx + XWA_BACKDROP_RECORDS_PER_REGION * backdropRegion;
-					g_backdropRecordsByRegion[0][flatIdx].modelType = backdropType;
+					g_backdropRecordsByRegion[0][flatIdx].objectType = backdropType;
 					g_backdropRecordsByRegion[0][flatIdx].worldDirQ20.x =
 						g_missionFlightGroups[g_currentFlightGroupIdx]
 							.fg.missionPoints[XWA_FG_POINT_START_1]
@@ -8177,7 +8177,7 @@ uint16_t Mission_Init(char* fileName) {
 						g_backdropRecordsByRegion[0][flatIdx].worldDirQ20.z);
 
 					backdropScale = 1.0f;
-					g_modelTypeTable[(ObjectTypeId)backdropType].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
+					g_objectTypes[(ObjectTypeId)backdropType].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
 					backdropB = 0.0f;
 					backdropG = 0.0f;
 					backdropR = 0.0f;
@@ -8270,7 +8270,7 @@ uint16_t Mission_Init(char* fileName) {
 					++g_backdropCountByRegion[backdropRegion];
 
 					laser->beamSpriteRect = &g_backdropRecordsByRegion[0][laserFlatIdx + 1];
-					g_backdropRecordsByRegion[0][laserFlatIdx + 1].modelType =
+					g_backdropRecordsByRegion[0][laserFlatIdx + 1].objectType =
 						OBJ_DeathStarFireTextureGroup6251;
 					g_backdropRecordsByRegion[0][laserFlatIdx + 1].worldDirQ20 =
 						g_backdropRecordsByRegion[0][laserFlatIdx].worldDirQ20;
@@ -8448,7 +8448,7 @@ static __inline int Mission_ComputeKillCreditPointValue(unsigned int victimObjId
 	int pointValue;
 
 	objectType = Mission_GetKillCreditObjectType(victimObjIdx);
-	if (g_modelTypeTable[objectType].familyId == 0) {
+	if (g_objectTypes[objectType].familyId == 0) {
 		return Mission_ComputeCraftPointValue(victimObjIdx);
 	}
 
@@ -8777,7 +8777,7 @@ void Mission_CreditPlayerKillContribution(uint16_t victimObjIdx, int specialCarg
 		unsigned int objectType;
 
 		objectType = Mission_GetKillCreditObjectType(victimObjIdx);
-		if (g_modelTypeTable[objectType].familyId == 0) {
+		if (g_objectTypes[objectType].familyId == 0) {
 			pointValue = Mission_ComputeCraftPointValue(victimObjIdx);
 		} else {
 			if ((objectType >= 0xd2u && objectType <= 0xd4u) ||
@@ -8846,7 +8846,7 @@ void Mission_CreditPlayerKillContribution(uint16_t victimObjIdx, int specialCarg
 		unsigned int objectType;
 
 		objectType = Mission_GetKillCreditObjectType(victimObjIdx);
-		if (g_modelTypeTable[objectType].familyId == 0) {
+		if (g_objectTypes[objectType].familyId == 0) {
 			pointValue = Mission_ComputeCraftPointValue(victimObjIdx);
 		} else {
 			if ((objectType >= 0xd2u && objectType <= 0xd4u) ||
@@ -8959,7 +8959,7 @@ int Mission_CreditTeamKillContribution(uint16_t victimObjIdx, int specialCargoFl
 		int goalScoreResult;
 
 		objectType = Mission_GetKillCreditObjectType(victimObjIdx);
-		if (g_modelTypeTable[objectType].familyId == 0) {
+		if (g_objectTypes[objectType].familyId == 0) {
 			killPointValue = Mission_ComputeCraftPointValue(victimObjIdx);
 		} else {
 			if ((objectType >= 0xd2u && objectType <= 0xd4u) ||
@@ -9726,7 +9726,7 @@ int Mission_ComputeCraftLoadoutPointValue(int craftType, int warheadType, int be
 										  int countermeasureType) {
 	int loadoutPointValue;
 	int objType = g_objectTypeTables.craftTypeToObjectType[craftType];
-	if (g_modelTypeTable[objType].familyId == 0) {
+	if (g_objectTypes[objType].familyId == 0) {
 		unsigned int launcherIdx;
 		int modelIndex = (uint16_t)GetModelDefIndexFromType((ObjectTypeId)objType);
 		if (modelIndex == 0xFFFF)

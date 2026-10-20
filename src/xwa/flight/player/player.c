@@ -4,7 +4,7 @@
 #include "xwa/assets/flight_model.h"
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/audio/fsfx.h"
 #include "xwa/flight/ai/pai.h"
 #include "xwa/flight/ai/pai_plan.h"
@@ -389,7 +389,7 @@ void Player_HandleDockBoardCommand(unsigned int playerIdx) {
 
 						objectTable = g_objectTable;
 						modelIndex =
-							g_modelTypeTable[(uint16_t)objectTable[targetObjIdx].objectType].modelDefIndex;
+							g_objectTypes[(uint16_t)objectTable[targetObjIdx].objectType].modelDefIndex;
 						dockPointCount = g_modelDefs[modelIndex].dockPointCount;
 						if (dockPointCount != 0) {
 
@@ -628,16 +628,15 @@ void Player_HandlePickupCommand(unsigned int playerIdx) {
 						targetObj = &g_objectTable[targetObjOffset];
 						if ((targetObj->mobj == NULL || targetObj->mobj->speed == 0 ||
 							 g_provingGroundsModeActive) &&
-							(g_modelTypeTable[(uint16_t)targetObj->objectType].flags & 4u) == 0) {
-							targetHalfExtent = (unsigned int)g_modelTypeTable[(uint16_t)targetObj->objectType]
+							(g_objectTypes[(uint16_t)targetObj->objectType].flags & 4u) == 0) {
+							targetHalfExtent = (unsigned int)g_objectTypes[(uint16_t)targetObj->objectType]
 												   .maxBoundsExtent >>
 											   1;
 							if (targetObj->genusId == GENUS_Fighter || targetObj->genusId == GENUS_Utility ||
 								targetObj->genusId == GENUS_PilotDroid ||
 								targetObj->genusId == GENUS_WeaponEmplacement ||
-								(unsigned int)
-										g_modelTypeTable[(uint16_t)g_objectTable[activeObjIdx].objectType]
-											.maxBoundsExtent > targetHalfExtent ||
+								(unsigned int)g_objectTypes[(uint16_t)g_objectTable[activeObjIdx].objectType]
+										.maxBoundsExtent > targetHalfExtent ||
 								targetObj->objectType == OBJ_PropaneTank) {
 								pai_ObjectRefDirectionToObjectRef(targetObjIdxWide, activeObjIdx);
 								if ((unsigned int)trig2_polardistance < 0x2000u) {
@@ -2188,7 +2187,7 @@ int Player_FindNearestEnemyFighter(int playerIdx, int excludeObjIdx) {
 								genusId != GENUS_Container && genusId != GENUS_Platform &&
 								(genusId != GENUS_PilotDroid || objectType == OBJ_ZeroGStormtrooper) &&
 								genusId != GENUS_SatelliteBuoy && genusId != GENUS_Utility &&
-								(g_modelTypeTable[(uint16_t)objectType].flags & 4u) == 0) {
+								(g_objectTypes[(uint16_t)objectType].flags & 4u) == 0) {
 								CraftData* craft;
 
 								craft = mobj->pCraft;
@@ -2410,7 +2409,7 @@ uint16_t Player_PickTargetInSight(int playerIdx) {
 		objectIndex = (uint16_t)objIdx;
 		objectType = g_objectTable[objectIndex].objectType;
 		if (objectType != OBJ_None && objectIndex != g_players[playerIdx].objectIndex &&
-			(g_modelTypeTable[objectType].flags & 1u) != 0) {
+			(g_objectTypes[objectType].flags & 1u) != 0) {
 			if (Targeting_ScoreCandidate(objIdx, 1, playerIdx, 0xffffu)) {
 				if ((uint32_t)g_targetRangeScore < bestRange) {
 					priorityObjIdx = (uint16_t)objIdx;
@@ -2431,7 +2430,7 @@ uint16_t Player_PickTargetInSight(int playerIdx) {
 
 		objectIndex = (uint16_t)objIdx;
 		objectType = g_objectTable[objectIndex].objectType;
-		if (objectType != OBJ_None && (g_modelTypeTable[objectType].flags & 1u) != 0) {
+		if (objectType != OBJ_None && (g_objectTypes[objectType].flags & 1u) != 0) {
 			if (Targeting_ScoreCandidate(objIdx, 1, playerIdx, 0xffffu)) {
 				if ((uint32_t)g_targetRangeScore < bestRange) {
 					priorityObjIdx = (uint16_t)objIdx;
@@ -2730,7 +2729,7 @@ void Player_StepExtView(int playerIdx) {
 			targetObjIdx = (uint16_t)currentTargetObjectIdx;
 			viewState->cameraFocusObjIdx = targetObjIdx;
 			viewState->cameraDistance =
-				4 * g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
+				4 * g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
 			if (player->mapCameraState > 1u) {
 				player->mapCameraState = 1;
 				viewState->hudAimX = 0;
@@ -3155,9 +3154,9 @@ void Player_EndFlightParticipation(int playerIdx) {
 			g_players[playerIdx].viewState.savedTargetY =
 				objectTable[g_players[playerIdx].currentTargetObjectIdx].world_y;
 			g_players[playerIdx].viewState.cameraDistance =
-				16 * g_modelTypeTable[(uint16_t)objectTable[g_players[playerIdx].currentTargetObjectIdx]
-										  .objectType]
-						 .maxBoundsExtent;
+				16 *
+				g_objectTypes[(uint16_t)objectTable[g_players[playerIdx].currentTargetObjectIdx].objectType]
+					.maxBoundsExtent;
 		}
 		g_players[playerIdx].regionSessionId = 0;
 		g_players[playerIdx].objectIndex = 0xffff;
@@ -3259,8 +3258,8 @@ uint16_t Player_CycleTargetAnyIFF(int startObjIdx, int direction, int playerIdx)
 			}
 
 			if (objectType != OBJ_None &&
-				(g_modelTypeTable[(uint16_t)g_objectTable[resultObjIdx].objectType].flags &
-				 MODEL_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) != 0) {
+				(g_objectTypes[(uint16_t)g_objectTable[resultObjIdx].objectType].flags &
+				 OBJECT_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) != 0) {
 				MobileObject* mobj;
 
 				mobj = obj->mobj;
@@ -3343,8 +3342,7 @@ uint16_t Player_CycleTarget(int startObjIdx, int direction, int playerIdx, int i
 			obj = &g_objectTable[(uint16_t)startObjIdx];
 			objectType = g_objectTable[(uint16_t)startObjIdx].objectType;
 			if (objectType != OBJ_None &&
-				(g_modelTypeTable[(uint16_t)objectType].flags & MODEL_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) !=
-					0 &&
+				(g_objectTypes[(uint16_t)objectType].flags & OBJECT_TYPE_FLAG_FILM_OVERLAY_SELECTABLE) != 0 &&
 				((modeFlags & 1) == 0 || obj->genusId != GENUS_Mine)) {
 				int team;
 				int playerIff;
@@ -3955,7 +3953,7 @@ int16_t Player_FindNearestObjective(int goalCondType, int playerIdx) {
 
 		objectType = g_objectTable[objIdx].objectType;
 		if (objectType == OBJ_None || objIdx == (uint32_t)g_players[playerIdx].objectIndex ||
-			(g_modelTypeTable[(uint16_t)objectType].flags & 3u) == 0) {
+			(g_objectTypes[(uint16_t)objectType].flags & 3u) == 0) {
 			continue;
 		}
 
@@ -4087,7 +4085,7 @@ int16_t Player_FindNearestObjective(int goalCondType, int playerIdx) {
 		int goalIdx;
 
 		objectType = g_objectTable[objIdx].objectType;
-		if (objectType == OBJ_None || (g_modelTypeTable[(uint16_t)objectType].flags & 3u) == 0) {
+		if (objectType == OBJ_None || (g_objectTypes[(uint16_t)objectType].flags & 3u) == 0) {
 			continue;
 		}
 

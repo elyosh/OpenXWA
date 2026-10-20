@@ -147,72 +147,72 @@ int ModelMesh_GetObjectTypeMeshCount(int objectType);
 void ModelMesh_BuildObjectTypeMeshCache(void);
 OptNode* ModelMesh_FindFirstMeshVertsNode(OptNode* node);
 OptNode* ModelMesh_FindFirstVertexNormalsNode(OptNode* node);
-void ModelMesh_GetVertexNormalsData(int modelType, int meshIndex, Vec3f** outNormals);
-OptNode* ModelMesh_GetVerticesData(int modelType, int meshIndex, Vec3f** outVertices, int* outVertexCount);
+void ModelMesh_GetVertexNormalsData(int objectType, int meshIndex, Vec3f** outNormals);
+OptNode* ModelMesh_GetVerticesData(int objectType, int meshIndex, Vec3f** outVertices, int* outVertexCount);
 OptNode* ModelMesh_FindFirstRotScaleNode(OptNode* node);
 MeshDescriptor* ModelMesh_FindDescriptorNodeRecursive(OptNode* node, OptimizedPolyObject* model);
 OptNode* ModelMesh_FindHullTexNode(OptNode* node);
-int16_t ModelMesh_AssignDebrisTexSlot(ObjectTypeId modelType, uint16_t slotId);
-int16_t ModelMesh_AllocDebrisTexSlot(ObjectTypeId modelType);
-int ModelMesh_FindNearestLiveFloatHardpoint(int modelType, int localX, int localY, int localZ,
+int16_t ModelMesh_AssignDebrisTexSlot(ObjectTypeId objectType, uint16_t slotId);
+int16_t ModelMesh_AllocDebrisTexSlot(ObjectTypeId objectType);
+int ModelMesh_FindNearestLiveFloatHardpoint(int objectType, int localX, int localY, int localZ,
 											int excludedCount, int* excludedHardpointIndices,
 											struct ModelFloatHardpoint* hardpoints, CraftData* craft);
-int ModelMesh_FindNearestVertexForPoint(int modelType, int localX, int localY, int localZ, int meshIndex,
+int ModelMesh_FindNearestVertexForPoint(int objectType, int localX, int localY, int localZ, int meshIndex,
 										int excludedCount, int* excludedVertexIndices,
 										uint8_t* vertexComponentMap, CraftData* craft);
-OptRotationScale* ModelMesh_GetRotScaleData(int modelType, int meshIndex);
-void ModelMesh_ApplyAnimatedMeshRotationToPoint(int angleQ16, unsigned int modelType, unsigned int meshIdx,
+OptRotationScale* ModelMesh_GetRotScaleData(int objectType, int meshIndex);
+void ModelMesh_ApplyAnimatedMeshRotationToPoint(int angleQ16, unsigned int objectType, unsigned int meshIdx,
 												int localX, int localY, int localZ);
 MeshDescriptor* ModelMesh_GetDescriptor(int modelSlot, int meshIndex);
 MeshDescriptor* ModelMesh_GetObjectTypeMeshDescriptor(int objectType, int meshIndex);
-int ModelMesh_GetVertexX(int modelType, int meshIndex, int vertexIndex);
-int ModelMesh_GetVertexY(int modelType, int meshIndex, int vertexIndex);
-int ModelMesh_GetVertexZ(int modelType, int meshIndex, int vertexIndex);
-int ModelMesh_PickRandomVertex(int modelType, int meshIndex, Vec3f** outVertex);
-int ModelMesh_GetCenterX(int modelType, int meshIndex);
-int ModelMesh_GetCenterY(int modelType, int meshIndex);
-int ModelMesh_GetCenterZ(int modelType, int meshIndex);
+int ModelMesh_GetVertexX(int objectType, int meshIndex, int vertexIndex);
+int ModelMesh_GetVertexY(int objectType, int meshIndex, int vertexIndex);
+int ModelMesh_GetVertexZ(int objectType, int meshIndex, int vertexIndex);
+int ModelMesh_PickRandomVertex(int objectType, int meshIndex, Vec3f** outVertex);
+int ModelMesh_GetCenterX(int objectType, int meshIndex);
+int ModelMesh_GetCenterY(int objectType, int meshIndex);
+int ModelMesh_GetCenterZ(int objectType, int meshIndex);
 int ModelMesh_GetComponentFocusX(int objectType, int componentIdx);
 int ModelMesh_GetComponentFocusY(int objectType, int componentIdx);
 int ModelMesh_GetComponentFocusZ(int objectType, int componentIdx);
 int ModelMesh_GetComponentMaxExtent(int objectType, int componentIdx);
-int ModelMesh_GetBoundsMinX(int modelType, int meshIndex);
-int ModelMesh_GetBoundsMinY(int modelType, int meshIndex);
-int ModelMesh_GetBoundsMinZ(int modelType, int meshIndex);
-int ModelMesh_GetBoundsMaxX(int modelType, int meshIndex);
-int ModelMesh_GetBoundsMaxY(int modelType, int meshIndex);
-int ModelMesh_GetBoundsMaxZ(int modelType, int meshIndex);
-int ModelMesh_GetBoundsSizeX(int modelType, int meshIndex);
-int ModelMesh_GetBoundsSizeY(int modelType, int meshIndex);
-int ModelMesh_GetBoundsSizeZ(int modelType, int meshIndex);
-int ModelMesh_GetBoundsVolume(int modelType, int meshIndex);
-int ModelMesh_FindNearestByBounds(int modelType, int localX, int localY, int localZ);
-int ModelMesh_FindNearestLiveMainHullByBounds(int modelType, int localX, int localY, int localZ,
+int ModelMesh_GetBoundsMinX(int objectType, int meshIndex);
+int ModelMesh_GetBoundsMinY(int objectType, int meshIndex);
+int ModelMesh_GetBoundsMinZ(int objectType, int meshIndex);
+int ModelMesh_GetBoundsMaxX(int objectType, int meshIndex);
+int ModelMesh_GetBoundsMaxY(int objectType, int meshIndex);
+int ModelMesh_GetBoundsMaxZ(int objectType, int meshIndex);
+int ModelMesh_GetBoundsSizeX(int objectType, int meshIndex);
+int ModelMesh_GetBoundsSizeY(int objectType, int meshIndex);
+int ModelMesh_GetBoundsSizeZ(int objectType, int meshIndex);
+int ModelMesh_GetBoundsVolume(int objectType, int meshIndex);
+int ModelMesh_FindNearestByBounds(int objectType, int localX, int localY, int localZ);
+int ModelMesh_FindNearestLiveMainHullByBounds(int objectType, int localX, int localY, int localZ,
 											  CraftData* craft);
-int ModelMesh_FindFloatHardpointComponent(int modelType, int localX, int localY, int localZ);
-int ModelMesh_FindNearestLiveComponentByType(int modelType, MeshType meshTypeFilter, int localX, int localY,
+int ModelMesh_FindFloatHardpointComponent(int objectType, int localX, int localY, int localZ);
+int ModelMesh_FindNearestLiveComponentByType(int objectType, MeshType meshTypeFilter, int localX, int localY,
 											 int localZ, CraftData* craft);
-int ModelMesh_HasFuselage(int modelType);
-int ModelMesh_GetTargetId(int modelType, int meshIndex);
+int ModelMesh_HasFuselage(int objectType);
+int ModelMesh_GetTargetId(int objectType, int meshIndex);
 MeshType ModelMesh_GetType(int modelSlot, int meshIndex);
 MeshType ModelMesh_GetObjectTypeMeshType(int objectType, int meshIndex);
 int ModelMesh_IsObjectTypeMeshDamageable(int objectType, int meshIndex);
-int ModelMesh_HasExplosionType1(int modelType, int meshIndex);
+int ModelMesh_HasExplosionType1(int objectType, int meshIndex);
 int ModelMesh_CountHardpointNodesRecursive(OptNode* node, OptimizedPolyObject* optBase);
-int ModelMesh_CountHardpoints(int modelType, int meshIndex);
-int ModelMesh_GetAlternateHardpointIndex(int modelType, int meshIndex, int hardpointIndex);
+int ModelMesh_CountHardpoints(int objectType, int meshIndex);
+int ModelMesh_GetAlternateHardpointIndex(int objectType, int meshIndex, int hardpointIndex);
 OptNode* ModelMesh_FindNthHardpointNodeRecursive(OptNode* node, OptimizedPolyObject* optBase,
 												 int hardpointIndex);
-int ModelMesh_GetHardpointX(int modelType, int meshIndex, int hardpointIndex);
-int ModelMesh_GetHardpointY(int modelType, int meshIndex, int hardpointIndex);
-int ModelMesh_GetHardpointZ(int modelType, int meshIndex, int hardpointIndex);
-void ModelMesh_GetHardpoint(int modelType, int meshIndex, int hardpointIndex, OptHardpointType* outType,
+int ModelMesh_GetHardpointX(int objectType, int meshIndex, int hardpointIndex);
+int ModelMesh_GetHardpointY(int objectType, int meshIndex, int hardpointIndex);
+int ModelMesh_GetHardpointZ(int objectType, int meshIndex, int hardpointIndex);
+void ModelMesh_GetHardpoint(int objectType, int meshIndex, int hardpointIndex, OptHardpointType* outType,
 							int* outX, int* outY, int* outZ);
 int ModelMesh_CountEngineGlowNodesRecursive(OptNode* node, OptimizedPolyObject* model);
-int ModelMesh_CountEngineGlows(int modelType, int meshIndex);
+int ModelMesh_CountEngineGlows(int objectType, int meshIndex);
 OptNode* ModelMesh_FindNthEngineGlowNodeRecursive(OptNode* node, OptimizedPolyObject* model,
 												  int engineGlowIndex);
-OptEngineGlow* ModelMesh_GetEngineGlowParam(int modelType, int meshIndex, int engineGlowIndex);
+OptEngineGlow* ModelMesh_GetEngineGlowParam(int objectType, int meshIndex, int engineGlowIndex);
 int ModelMesh_FindBridgeIndex(OptimizedPolyObject* model);
 
 extern ObjectTypeMeshCache g_objectTypeMeshCache[OBJ_Count];

@@ -37,7 +37,7 @@ typedef struct XwaHangarDroid {
 	int positionZ;
 	int isFloorInverted; /* IsDroidsFloorInverted || IsDroidNFloorInverted */
 	int update;          /* load && DroidNUpdate */
-	uint16_t modelType;
+	uint16_t objectType;
 	int markings;
 	char objectProfile[XWA_HANGAR_PROFILE_MAX];
 } XwaHangarDroid;
@@ -50,7 +50,7 @@ typedef struct XwaHangarPlayerCraft {
 /* The HangarObjects settings, with hook_hangars' defaults. */
 typedef struct XwaHangarObjects {
 	int loadShuttle;
-	uint16_t shuttleModelType; /* 0: the stock shuttle */
+	uint16_t shuttleObjectType; /* 0: the stock shuttle */
 	int shuttleMarkings;
 	char shuttleObjectProfile[XWA_HANGAR_PROFILE_MAX];
 	int shuttlePosition[3];

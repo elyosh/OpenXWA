@@ -342,7 +342,7 @@ ObjectTypeTables g_objectTypeTables = {
 	[103] = { OBJ_NebulaTextureGroup7015_Sprite1500, 4 },
 	},
 
-	.craftCompanionModelTypes = {
+	.craftCompanionObjectTypes = {
 		OBJ_Corvette2,
 		OBJ_CorvetteExplode,
 		OBJ_None,

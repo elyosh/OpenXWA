@@ -2,8 +2,8 @@
 
 #include "aeron/aeron.h"
 #include "aeron/scene/billboard.h"
-#include "xwa_remaster/color.h"
 #include "aeron/scene/world.h"
+#include "xwa_remaster/color.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -144,8 +144,7 @@ XwaRemasterParticles* XwaRemasterParticles_Create(void) {
 	XwaRemasterParticles* particles = (XwaRemasterParticles*)calloc(1, sizeof *particles);
 	if (!particles)
 		return NULL;
-	particles->quads =
-		(PreparedParticleQuad*)calloc(XWA_SNAP_MAX_PARTICLES, sizeof *particles->quads);
+	particles->quads = (PreparedParticleQuad*)calloc(XWA_SNAP_MAX_PARTICLES, sizeof *particles->quads);
 	if (!particles->quads) {
 		free(particles);
 		return NULL;
@@ -281,7 +280,7 @@ static void particle_build_previous(PreparedParticleQuad* q, const XwaParticleEf
 	if (!previous_effect || !previous_particle || !history_view)
 		return;
 	int classic_w = 0, classic_h = 0, max_bounds = 0;
-	if (!XwaSnapshotExport_ModelTexFrame(previous_effect->texture_model_type,
+	if (!XwaSnapshotExport_ModelTexFrame(previous_effect->texture_object_type,
 										 previous_particle->texture_frame, &classic_w, &classic_h,
 										 &max_bounds) ||
 		classic_w <= 0 || classic_h <= 0) {
@@ -331,12 +330,12 @@ void XwaRemasterParticles_Prepare(XwaRemasterParticles* particles, AeronCommandB
 			}
 			const XwaParticle* particle = &snapshot->particles[effect->first_particle + j];
 			int classic_w = 0, classic_h = 0, max_bounds = 0;
-			if (!XwaSnapshotExport_ModelTexFrame(effect->texture_model_type, particle->texture_frame,
+			if (!XwaSnapshotExport_ModelTexFrame(effect->texture_object_type, particle->texture_frame,
 												 &classic_w, &classic_h, &max_bounds) ||
 				classic_w <= 0 || classic_h <= 0)
 				continue;
 			XwaAssetRef ref;
-			if (!XwaRemasterAssets_FlightModelFrame(assets, effect->texture_model_type,
+			if (!XwaRemasterAssets_FlightModelFrame(assets, effect->texture_object_type,
 													particle->texture_frame, &ref))
 				continue;
 			PreparedParticleQuad* q = &particles->quads[particles->count];
@@ -638,7 +637,7 @@ void XwaRemasterTrails_Prepare(XwaRemasterTrails* trails, AeronCommandBuffer* cm
 		if (!owner)
 			continue;
 		XwaAssetRef ref;
-		if (!XwaRemasterAssets_FlightModelFrame(assets, emitter->texture_model_type, emitter->texture_frame,
+		if (!XwaRemasterAssets_FlightModelFrame(assets, emitter->texture_object_type, emitter->texture_frame,
 												&ref))
 			continue;
 		trails_build_emitter(trails, view, emitter, owner->render_region,

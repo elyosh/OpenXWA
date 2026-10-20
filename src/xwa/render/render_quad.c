@@ -905,33 +905,33 @@ void RenderQuad_DrawGlow(int* corners5, int depthZ, Std3DTextureSurface* tex, in
 }
 
 // FUNCTION: XWA 0x42BD80
-char RenderQuad_DrawModelTexture(ObjectTypeId modelType, FlightTexQuad* quad, int argbColor) {
+char RenderQuad_DrawModelTexture(ObjectTypeId objectType, FlightTexQuad* quad, int argbColor) {
 	uint8_t assetFlags;
 	int d3dFlags;
 
-	assetFlags = g_modelTypeTable[modelType].assetFlags;
-	if (g_modelTypeTable[modelType].curTexLevel == NULL ||
-		(assetFlags & (MODEL_TYPE_ASSET_TEXTURE_DRAW | MODEL_TYPE_ASSET_TEXTURE_READY)) == 0) {
+	assetFlags = g_objectTypes[objectType].assetFlags;
+	if (g_objectTypes[objectType].curTexLevel == NULL ||
+		(assetFlags & (OBJECT_TYPE_ASSET_TEXTURE_DRAW | OBJECT_TYPE_ASSET_TEXTURE_READY)) == 0) {
 		return (char)assetFlags;
 	}
 
 	if (g_useHardware3D) {
 		TexLevel* curTexLevel;
 
-		curTexLevel = g_modelTypeTable[modelType].curTexLevel;
+		curTexLevel = g_objectTypes[objectType].curTexLevel;
 		d3dFlags = 0x8612;
 		if (g_bilinearEnabled &&
-			((modelType != OBJ_HudTextureGroup12000 && modelType != OBJ_MapIconTextureGroup14800 &&
-			  modelType != OBJ_HullIconTextureGroup26000) ||
+			((objectType != OBJ_HudTextureGroup12000 && objectType != OBJ_MapIconTextureGroup14800 &&
+			  objectType != OBJ_HullIconTextureGroup26000) ||
 			 g_flightHudScaleFactor != g_renderQuadUnitFloat)) {
 			d3dFlags = 0x8792;
 		}
-		if ((g_modelTypeTable[modelType].flags & MODEL_TYPE_FLAG_SINGLE_MIP_LEVEL) == 0) {
+		if ((g_objectTypes[objectType].flags & OBJECT_TYPE_FLAG_SINGLE_MIP_LEVEL) == 0) {
 			d3dFlags += 0x800;
 		}
 
 		curTexLevel->argbColor = argbColor;
-		if (modelType >= OBJ_ExplosionTextureGroup2000 && modelType <= OBJ_ExplosionTextureGroup2005) {
+		if (objectType >= OBJ_ExplosionTextureGroup2000 && objectType <= OBJ_ExplosionTextureGroup2005) {
 			int maxTexDim;
 			int maxTexDimQ8;
 			int depthZ;
@@ -953,7 +953,7 @@ char RenderQuad_DrawModelTexture(ObjectTypeId modelType, FlightTexQuad* quad, in
 		Sprite* sprite;
 
 		g_flightSwRotSpriteSpanRunsEnabled = 1;
-		sprite = g_modelTypeTable[modelType].curTexLevel->image;
+		sprite = g_objectTypes[objectType].curTexLevel->image;
 		FlightSw_PrepareSpriteRotationTables(quad->rotationAngle, 2);
 		FlightSw_BuildSpriteTintRemapTables(sprite);
 		return FlightSw_DrawRotatedSpriteQuad((int16_t)quad->screenX, (int16_t)quad->screenY,

@@ -3,7 +3,7 @@
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
-#include "xwa/assets/model_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/audio/fsfx.h"
 #include "xwa/audio/sound.h"
 #include "xwa/flight/ai/pai.h"
@@ -627,7 +627,7 @@ void DeathStar_Init(void) {
 	uint8_t flightGroupIdx;
 	float ricochetDamageScale;
 	int meshIdx;
-	int modelType;
+	int objectType;
 	uint32_t objIdx;
 
 	Math_SeedRandom((uint16_t)timeGetTime());
@@ -709,16 +709,16 @@ void DeathStar_Init(void) {
 	memset(g_deathStarObjectPointTables, 0, sizeof(g_deathStarObjectPointTables));
 
 	{
-		int modelTypeCount;
+		int objectTypeCount;
 
-		modelType = OBJ_DSReactorCore;
-		modelTypeCount = OBJ_ChuteMouth - OBJ_DSReactorCore;
+		objectType = OBJ_DSReactorCore;
+		objectTypeCount = OBJ_ChuteMouth - OBJ_DSReactorCore;
 		do {
 			DeathStarObjectPointTable* pointTable;
 			uint16_t meshCount;
 
-			pointTable = &g_deathStarObjectPointTables[modelType - OBJ_DSReactorCore];
-			meshCount = (uint16_t)ModelMesh_GetCount(modelType);
+			pointTable = &g_deathStarObjectPointTables[objectType - OBJ_DSReactorCore];
+			meshCount = (uint16_t)ModelMesh_GetCount(objectType);
 			pointTable->attachPointCount = 0;
 			pointTable->spawnPointCount = 0;
 			if (meshCount > 0u) {
@@ -728,7 +728,7 @@ void DeathStar_Init(void) {
 				do {
 					uint16_t hardpointCount;
 
-					hardpointCount = (uint16_t)ModelMesh_CountHardpoints(modelType, meshIdx);
+					hardpointCount = (uint16_t)ModelMesh_CountHardpoints(objectType, meshIdx);
 					if (hardpointCount != 0 && hardpointCount > 0u) {
 						int hardpointCountRemaining;
 						int hardpointIdx;
@@ -741,7 +741,7 @@ void DeathStar_Init(void) {
 						hardpointIdx = 0;
 						hardpointCountRemaining = hardpointCount;
 						do {
-							ModelMesh_GetHardpoint(modelType, meshIdx, hardpointIdx, &outType, &outX, &outY,
+							ModelMesh_GetHardpoint(objectType, meshIdx, hardpointIdx, &outType, &outX, &outY,
 												   &outZ);
 							switch (outType) {
 								case OPT_HARDPOINT_AccStart:
@@ -770,8 +770,8 @@ void DeathStar_Init(void) {
 				} while (--meshCountRemaining != 0);
 				meshIdx = 0;
 			}
-			++modelType;
-		} while (--modelTypeCount != 0);
+			++objectType;
+		} while (--objectTypeCount != 0);
 	}
 
 	DeathStar_BuildSegmentSets();
@@ -1253,7 +1253,7 @@ void DeathStar_HandleReactorHit(unsigned int projectileObjIdx, unsigned int reac
 						MobileObject* pm = g_objectTable[projectileObjIdx].mobj;
 						unsigned int dmg =
 							pm ? (unsigned int)pm->damageAmount
-							   : g_modelTypeTable[(uint16_t)g_objectTable[projectileObjIdx].objectType]
+							   : g_objectTypes[(uint16_t)g_objectTable[projectileObjIdx].objectType]
 									 .maxBoundsExtent;
 						lensCraft->hullDamage = hullDamage + dmg;
 						if ((unsigned int)g_objectTable[reactorObjIdx].mobj->pCraft->hullDamage >
@@ -1429,7 +1429,7 @@ void DeathStar_UpdateFollowOverrideCraft(int objectIdx) {
 		object->mobj->moveVectorDirty = 1;
 		object->mobj->speed =
 			3 *
-			g_modelDefs[(uint16_t)g_modelTypeTable[(uint16_t)g_deathStarFollowLeaderObjectType].modelDefIndex]
+			g_modelDefs[(uint16_t)g_objectTypes[(uint16_t)g_deathStarFollowLeaderObjectType].modelDefIndex]
 				.maxSpeed;
 		object->mobj->pCraft->objectKind = 9;
 	}
@@ -1804,7 +1804,7 @@ void DeathStar_InitFollowOverrideState(void) {
 	g_deathStarFollowLeaderObjIdx = g_deathStarPlayerObjIdx;
 	sampleWorldY = 0;
 	g_deathStarFollowLeaderObjectType = g_objectTable[g_deathStarPlayerObjIdx].objectType;
-	g_deathStarFollowLeaderExtentX4 = 4 * g_modelTypeTable[g_deathStarFollowLeaderObjectType].maxBoundsExtent;
+	g_deathStarFollowLeaderExtentX4 = 4 * g_objectTypes[g_deathStarFollowLeaderObjectType].maxBoundsExtent;
 	g_deathStarFollowBaseDesiredSpacing = 30 * (int)g_flightDifficulty + 110;
 
 	for (sampleIdx = 29; sampleIdx >= 0; --sampleIdx) {
@@ -1861,7 +1861,7 @@ void DeathStar_SpawnScriptedObjects(void) {
 		uint16_t segmentSetIdx;
 
 		if (def->allocationMode == mobileAllocationMode) {
-			objIdx = Object_AllocSlotForGenus(g_modelTypeTable[def->objectType].genusId);
+			objIdx = Object_AllocSlotForGenus(g_objectTypes[def->objectType].genusId);
 		} else {
 			objIdx = Object_FindFreeMissionSlot();
 		}
@@ -1897,7 +1897,7 @@ void DeathStar_SpawnScriptedObjects(void) {
 
 			objectType = def->objectType;
 			obj->objectType = objectType;
-			obj->genusId = g_modelTypeTable[objectType].genusId;
+			obj->genusId = g_objectTypes[objectType].genusId;
 		}
 		obj->yaw = def->yaw;
 		obj->pitch = def->pitch;
@@ -1957,7 +1957,7 @@ void DeathStar_SpawnScriptedObjects(void) {
 				const int spawnedObjIdx = (int16_t)def->spawnedObjIdx;
 
 				g_currentFlightGroupIdx = (uint8_t)g_deathStarTripodGunFgIdx;
-				g_spawnGenusId = g_modelTypeTable[OBJ_DSTripodGun].genusId;
+				g_spawnGenusId = g_objectTypes[OBJ_DSTripodGun].genusId;
 				g_deathStarTripodGunObjIdx = spawnedObjIdx;
 				g_spawnStatus1 = g_missionFlightGroups[(uint8_t)g_deathStarTripodGunFgIdx].fg.status1;
 				g_spawnStatus2 = g_missionFlightGroups[(uint8_t)g_deathStarTripodGunFgIdx].fg.status2;
@@ -2021,7 +2021,7 @@ void DeathStar_SpawnScriptedObjects(void) {
 				const int spawnedObjIdx = (int16_t)def->spawnedObjIdx;
 
 				g_currentFlightGroupIdx = (uint8_t)g_deathStarReactorCoreFgIdx;
-				g_spawnGenusId = g_modelTypeTable[OBJ_DSReactorCore].genusId;
+				g_spawnGenusId = g_objectTypes[OBJ_DSReactorCore].genusId;
 				g_deathStarReactorCoreObjIdx = spawnedObjIdx;
 				g_spawnStatus1 = g_missionFlightGroups[(uint8_t)g_deathStarReactorCoreFgIdx].fg.status1;
 				g_spawnStatus2 = g_missionFlightGroups[(uint8_t)g_deathStarReactorCoreFgIdx].fg.status2;
@@ -2270,9 +2270,9 @@ void DeathStar_InitMobileObjectForType(uint16_t objectType, unsigned int objIdx)
 	mobj = g_objectTable[objIdx].mobj;
 	objectTypeIndex = (uint16_t)objectType;
 
-	mobj->state = g_modelTypeTable[objectTypeIndex].familyId;
+	mobj->state = g_objectTypes[objectTypeIndex].familyId;
 	mobj->motionFlags = 0;
-	mobj->instanceExtent = g_modelTypeTable[objectTypeIndex].maxBoundsExtent;
+	mobj->instanceExtent = g_objectTypes[objectTypeIndex].maxBoundsExtent;
 	mobj->simStateTimestamp = 0;
 	mobj->prevWorldX = g_objectTable[objIdx].world_x;
 	mobj->prevWorldY = g_objectTable[objIdx].world_y;
@@ -2284,7 +2284,7 @@ void DeathStar_InitMobileObjectForType(uint16_t objectType, unsigned int objIdx)
 	mobj->spinAngleQ16 = 0;
 	mobj->speed = 0;
 	mobj->speedRemainder = 0;
-	mobj->damageAmount = g_modelTypeTable[objectTypeIndex].maxBoundsExtent;
+	mobj->damageAmount = g_objectTypes[objectTypeIndex].maxBoundsExtent;
 	mobj->iff = 2;
 	mobj->team = 2;
 	mobj->lifetimeTimer = 0;
@@ -2298,7 +2298,7 @@ void DeathStar_InitMobileObjectForType(uint16_t objectType, unsigned int objIdx)
 	mobj->moveVectorDirty = 1;
 	mobj->orientMatrixDirty = 1;
 
-	modelIndex = g_modelTypeTable[objectTypeIndex].modelDefIndex;
+	modelIndex = g_objectTypes[objectTypeIndex].modelDefIndex;
 	if (modelIndex != 0xffffu) {
 		craft = mobj->pCraft;
 		memset(craft, 0, sizeof(*craft));
@@ -2814,7 +2814,7 @@ void DeathStar_SpawnSegmentChildObject(DeathStarChildObjectRef* childList, uint1
 		child->objectSignature = object->objectSignature;
 
 		object->objectType = (ObjectTypeId)child->objectType;
-		object->genusId = (ModelGenusId)g_modelTypeTable[(uint16_t)object->objectType].genusId;
+		object->genusId = (ModelGenusId)g_objectTypes[(uint16_t)object->objectType].genusId;
 		object->yaw = parentSegment->yaw;
 		object->pitch = parentSegment->pitch;
 		object->yaw = (Q16Angle)(object->yaw + (child->angleByteOffsets & 0xff00u));
@@ -2863,8 +2863,8 @@ void DeathStar_UpdateFollowChainSlot(int followSlotIdx) {
 	}
 
 	slot->desiredSpacing = g_deathStarFollowBaseDesiredSpacing;
-	extentSum = (int)g_modelTypeTable[object->objectType].maxBoundsExtent +
-				(int)g_modelTypeTable[g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
+	extentSum = (int)g_objectTypes[object->objectType].maxBoundsExtent +
+				(int)g_objectTypes[g_objectTable[targetObjIdx].objectType].maxBoundsExtent;
 	desiredSpacing = g_deathStarFollowBaseDesiredSpacing - (int)((double)extentSum * -0.039999999);
 	slot->desiredSpacing = desiredSpacing;
 	if (targetObjIdx != leaderObjIdx) {
@@ -3222,7 +3222,7 @@ void DeathStar_InitZeroGStormtrooperWaypoints(void) {
 	segment->worldZ = 0;
 	segment->worldY = 0;
 	segment->worldX = 0;
-	g_modelTypeTable[OBJ_DSTripodGun].flags &= (uint16_t)~0x0003u;
+	g_objectTypes[OBJ_DSTripodGun].flags &= (uint16_t)~0x0003u;
 	g_deathStarTripodGunsActivated = 0;
 }
 
@@ -3292,7 +3292,7 @@ void DeathStar_InitReactorAssaultState(void) {
 		g_deathStarReactorExplosionSpawnCount = 0;
 		g_deathStarTunnelBillboardScale = 20.0f;
 		g_deathStarReactorShockwaveDistance =
-			(float)g_modelTypeTable[(uint16_t)coreObj->objectType].maxBoundsExtent;
+			(float)g_objectTypes[(uint16_t)coreObj->objectType].maxBoundsExtent;
 		g_missionFlightGroups[(uint8_t)g_deathStarReactorCoreFgIdx].fg.status2 =
 			DEATH_STAR_REACTOR_STATUS_DESTROYED;
 		g_missionFlightGroups[(uint8_t)g_deathStarReactorCoreFgIdx].fg.status1 =
@@ -3499,7 +3499,7 @@ void DeathStar_UpdateEntranceSegment(int16_t activeSegmentSlotIdx, int16_t curre
 				g_deathStarEntranceTransitionTimer = 800;
 
 				maxBoundsExtent =
-					g_modelTypeTable[g_objectTable[g_deathStarPlayerObjIdx].objectType].maxBoundsExtent;
+					g_objectTypes[g_objectTable[g_deathStarPlayerObjIdx].objectType].maxBoundsExtent;
 				g_players[g_localPlayer].viewState.cameraDistance = maxBoundsExtent / 3 + 2 * maxBoundsExtent;
 				g_players[g_localPlayer].viewState.hudAimX = -4097;
 				g_players[g_localPlayer].viewState.hudAimY = 30720;
@@ -3524,7 +3524,7 @@ void DeathStar_UpdateEntranceSegment(int16_t activeSegmentSlotIdx, int16_t curre
 
 				localPlayerIdx = g_localPlayer;
 				maxBoundsExtent =
-					g_modelTypeTable[g_objectTable[transitionPlayerObjIdx].objectType].maxBoundsExtent;
+					g_objectTypes[g_objectTable[transitionPlayerObjIdx].objectType].maxBoundsExtent;
 				g_players[localPlayerIdx].viewState.cameraDistance =
 					maxBoundsExtent / 3 + 2 * g_deathStarEntranceTransitionTimer * maxBoundsExtent / 800;
 				if (g_deathStarEntranceTransitionTimer < 500) {
@@ -3550,7 +3550,7 @@ void DeathStar_UpdateAccelChamberSegment(int16_t activeSegmentSlotIdx, int16_t c
 
 	if ((unsigned int)(g_deathStarTunnelTimer - g_deathStarAccelChamberLastContainerSpawnTime) >
 		(unsigned int)g_deathStarAccelChamberContainerSpawnInterval) {
-		objectIdx = Object_AllocSlotForGenus(g_modelTypeTable[OBJ_DSContainer].genusId);
+		objectIdx = Object_AllocSlotForGenus(g_objectTypes[OBJ_DSContainer].genusId);
 		if (objectIdx != 0xffffu) {
 			ObjectRecord* object;
 			MobileObject* mobj;
@@ -3567,7 +3567,7 @@ void DeathStar_UpdateAccelChamberSegment(int16_t activeSegmentSlotIdx, int16_t c
 
 			object->flightGroupIdx = g_deathStarGeneratedObjectFgIdx;
 			object->objectType = OBJ_DSContainer;
-			object->genusId = g_modelTypeTable[OBJ_DSContainer].genusId;
+			object->genusId = g_objectTypes[OBJ_DSContainer].genusId;
 			object->roll = 0;
 			object->regionIdx = 0;
 			object->typeSpecificWord = 0;
@@ -3832,7 +3832,7 @@ void DeathStar_UpdateContainerCollisions(int16_t activeSegmentSlotIdx, int16_t c
 		ModelGenusId containerGenus;
 		uint32_t objectIdx;
 
-		containerGenus = g_modelTypeTable[OBJ_DSContainer].genusId;
+		containerGenus = g_objectTypes[OBJ_DSContainer].genusId;
 		for (objectIdx = g_objectSlotRangeByGenus[containerGenus].next;
 			 objectIdx < g_objectSlotRangeByGenus[containerGenus].end; ++objectIdx) {
 			if (g_objectTable[objectIdx].objectType == OBJ_DSContainer) {
@@ -3945,7 +3945,7 @@ void DeathStar_ClearAccelChamberContainersAtSegment(int16_t currentSegmentIdx, i
 		g_objectTable[g_deathStarPlayerObjIdx].mobj->pCraft->objectKind = DEATH_STAR_CRAFT_KIND_NORMAL;
 	}
 
-	containerGenus = g_modelTypeTable[OBJ_DSContainer].genusId;
+	containerGenus = g_objectTypes[OBJ_DSContainer].genusId;
 	for (objectIdx = (uint16_t)g_objectSlotRangeByGenus[containerGenus].next;
 		 objectIdx < g_objectSlotRangeByGenus[containerGenus].end; ++objectIdx) {
 		if (g_objectTable[objectIdx].objectType == OBJ_DSContainer) {
@@ -4002,11 +4002,11 @@ void DeathStar_ActivateTripodGunsNearFocusChamber(int16_t currentSegmentIdx, int
 													 playerObj->world_y - focusChamberObj->world_y,
 													 playerObj->world_z - focusChamberObj->world_z);
 
-	activationDistance = (int)((float)g_modelTypeTable[OBJ_DS3rdRoom].maxBoundsExtent *
+	activationDistance = (int)((float)g_objectTypes[OBJ_DS3rdRoom].maxBoundsExtent *
 							   g_deathStarTripodGunActivationDistanceScale);
 	if (distanceToFocusChamber < activationDistance) {
 		DeathStar_RefreshFollowOverrideCandidates();
-		g_modelTypeTable[OBJ_DSTripodGun].flags |= 0x0003u;
+		g_objectTypes[OBJ_DSTripodGun].flags |= 0x0003u;
 		g_deathStarTripodGunsActivated = 1;
 	}
 }
@@ -4122,12 +4122,12 @@ void DeathStarTunnel_UpdateReactorDestructionSequence(int16_t activeSegmentSlotI
 					uint16_t r = (uint16_t)GameRand();
 					explosionType = (ObjectTypeId)(r % 5 + 264);
 					extent = spawnCount / 3 *
-							 ((unsigned int)g_modelTypeTable[(uint16_t)explosionType].maxBoundsExtent >> 2);
-					ext270 = g_modelTypeTable[270].maxBoundsExtent;
+							 ((unsigned int)g_objectTypes[(uint16_t)explosionType].maxBoundsExtent >> 2);
+					ext270 = g_objectTypes[270].maxBoundsExtent;
 				} else {
-					ext270 = g_modelTypeTable[270].maxBoundsExtent;
+					ext270 = g_objectTypes[270].maxBoundsExtent;
 					explosionType = (ObjectTypeId)270;
-					extent = (unsigned int)g_modelTypeTable[270].maxBoundsExtent * spawnCount;
+					extent = (unsigned int)g_objectTypes[270].maxBoundsExtent * spawnCount;
 				}
 				if (spawnCount == 35) {
 					explosionType = (ObjectTypeId)270;
@@ -4167,12 +4167,12 @@ void DeathStarTunnel_UpdateReactorDestructionSequence(int16_t activeSegmentSlotI
 				unsigned int frame = 0;
 				for (i = 0; i < 5; ++i) {
 					unsigned int newIdx = DeathStarTunnel_SpawnExplosionEffectObject(
-						OBJ_DeathStarIITextureGroup17002, g_modelTypeTable[321].maxBoundsExtent);
+						OBJ_DeathStarIITextureGroup17002, g_objectTypes[321].maxBoundsExtent);
 					g_deathStarReactorShockwaveObjIdx[i] = newIdx;
 					if (newIdx != 0xFFFF) {
 						g_objectTable[newIdx].typeSpecificByte[0] =
-							(uint8_t)(frame % g_modelTypeTable[(uint16_t)g_objectTable[newIdx].objectType]
-												  .frameCount);
+							(uint8_t)(frame %
+									  g_objectTypes[(uint16_t)g_objectTable[newIdx].objectType].frameCount);
 						g_objectTable[g_deathStarReactorShockwaveObjIdx[i]].typeSpecificWord = 1000;
 					}
 					frame += 2;
@@ -4816,7 +4816,7 @@ void DeathStar_SpawnLaserPowerSourceObject(void) {
 		object->playerOwnerIdx = -1;
 		object->mobj = 0;
 		object->objectType = OBJ_DSLaserPowerSource;
-		object->genusId = (ModelGenusId)g_modelTypeTable[OBJ_DSLaserPowerSource].genusId;
+		object->genusId = (ModelGenusId)g_objectTypes[OBJ_DSLaserPowerSource].genusId;
 
 #ifdef XWA_MODERN
 		if (g_deathStarSegmentSets[2].segments == NULL || g_deathStarSegmentSets[2].count == 0) {
@@ -4921,7 +4921,7 @@ int DeathStar_SpawnReactorDebrisGirders(void) {
 			objectIdx = result;
 			g_objectTable[objectIdx].objectType = OBJ_DSGirder;
 			g_objectTable[objectIdx].genusId =
-				(ModelGenusId)g_modelTypeTable[(uint16_t)g_objectTable[result].objectType].genusId;
+				(ModelGenusId)g_objectTypes[(uint16_t)g_objectTable[result].objectType].genusId;
 			g_objectTable[objectIdx].world_x = segment->worldX + offsetX;
 			g_objectTable[objectIdx].world_y = segment->worldY + offsetY;
 			g_objectTable[objectIdx].world_z = segment->worldZ + offsetZ;
@@ -5101,7 +5101,7 @@ void DeathStar_SelectLaserTarget(int preferredTargetObjIdx) {
 				}
 
 				maxBoundsExtent =
-					(int)g_modelTypeTable[(uint16_t)objects[scanObjIdx].objectType].maxBoundsExtent;
+					(int)g_objectTypes[(uint16_t)objects[scanObjIdx].objectType].maxBoundsExtent;
 				if (maxBoundsExtent <= bestExtent) {
 					continue;
 				}
@@ -5130,7 +5130,7 @@ void DeathStar_SelectLaserTarget(int preferredTargetObjIdx) {
 				if (collide_CheckSweptModelCollision(scanObjIdx, scanObjIdx) == 0) {
 					preferredTargetObjIdx = (int)scanObjIdx;
 					bestExtent =
-						(int)g_modelTypeTable[(uint16_t)g_objectTable[scanObjIdx].objectType].maxBoundsExtent;
+						(int)g_objectTypes[(uint16_t)g_objectTable[scanObjIdx].objectType].maxBoundsExtent;
 					objects = g_objectTable;
 				} else {
 					objects = g_objectTable;
@@ -5201,17 +5201,17 @@ void DeathStar_FireLaserAtTarget(void) {
 
 	g_deathStarTunnelLaserRegions[regionIdx].pointLightX =
 		(int)((g_deathStarTunnelLaserRegions[regionIdx].remainingDistance -
-			   (float)g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent) *
+			   (float)g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent) *
 				  deltaX +
 			  (float)g_deathStarTunnelLaserRegions[regionIdx].beamStartX);
 	g_deathStarTunnelLaserRegions[regionIdx].pointLightY =
 		(int)((g_deathStarTunnelLaserRegions[regionIdx].remainingDistance -
-			   (float)g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent) *
+			   (float)g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent) *
 				  deltaY +
 			  (float)g_deathStarTunnelLaserRegions[regionIdx].beamStartY);
 	g_deathStarTunnelLaserRegions[regionIdx].pointLightZ =
 		(int)((g_deathStarTunnelLaserRegions[regionIdx].remainingDistance -
-			   (float)g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent) *
+			   (float)g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent) *
 				  deltaZ +
 			  (float)g_deathStarTunnelLaserRegions[regionIdx].beamStartZ);
 

@@ -10,7 +10,10 @@
  *   object_type: 138
  *   model: victorystardestroyer   # loads flight/models/victorystardestroyer.glb
  *   list: spacecraft              # or equipment
- *   model_type: {genus: 4, family: 0, flags: 0x43, craft_record_index: 140}
+ *   genus: 4
+ *   family: 0
+ *   flags: 0x43
+ *   craft_record_index: 140       # uses craft record 140 instead of its own
  *   craft_record: {hull: 16590, shields: 5000, speed: 50, ...}
  *   sounds_like: 5                # uses the engine and launch sounds of type 5
  *   beam_allowed: true            # keeps the beam that its flight group gives

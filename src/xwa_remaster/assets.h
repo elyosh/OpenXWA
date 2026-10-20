@@ -94,7 +94,7 @@ int XwaRemasterAssets_FlightModelFrame(XwaRemasterAssets* a, int object_type, in
  * picks again among its own images and its sets. `snapshot` gives the
  * mission index for the sets' `missions`. */
 void XwaRemasterAssets_UpdateFrameSets(XwaRemasterAssets* a, const struct XwaSnapshot* snapshot);
-/* Gets the DAT group and image id that a flight model type draws for a
+/* Gets the DAT group and image id that a flight object type draws for a
  * frame. A single-image type gives its own image. A type drawn by frame
  * gives the id of the group's frame-th image, or the frame index when the
  * atlas has no ids. Returns 0 when the type has no texture group. */

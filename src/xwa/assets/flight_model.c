@@ -5,8 +5,8 @@
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_mesh.h"
 #include "xwa/assets/model_texture.h"
-#include "xwa/assets/model_type.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/assets/object_type_info.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/flight/fediskio.h"
 #include "xwa/flight/flight.h"
@@ -52,21 +52,19 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 	char modelName[100];
 	uint16_t modelHandle;
 	char path[256];
-	uint16_t modelType;
 	TexLevel* texLevel;
 	int meshCount;
 	int meshIndex;
 
 	g_loadingModel = 1;
-	modelType = (uint16_t)objectType;
 
 #ifdef XWA_MODERN
 	/* Modern port (XWAU hook_hangars HangarOptLoadHook): the hangar settings
 	   may load another model for this type, the command ship's own hangar or a
 	   swapped hangar object. */
-	if (!XwaHangars_ModelFileName(modelType, modelName, sizeof modelName))
+	if (!XwaHangars_ModelFileName(objectType, modelName, sizeof modelName))
 #endif
-		switch (modelType) {
+		switch (objectType) {
 			case OBJ_AWing:
 				strcpy(modelName, "Awing.opt");
 				break;
@@ -240,7 +238,7 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 				/* Modern port (XWAU hook_hangars removes this filter): with hangar
 				   settings, any type with a model list row loads, as hangar maps
 				   place any of them. */
-				if (XwaHangars_TypeFileName(modelType, modelName, sizeof modelName)) {
+				if (XwaHangars_TypeFileName(objectType, modelName, sizeof modelName)) {
 					break;
 				}
 #endif
@@ -263,20 +261,20 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 		g_loadingModel = 0;
 		return 0;
 	}
-	g_loadedModels.byObjectType[modelType] = modelHandle;
+	g_loadedModels.byObjectType[objectType] = modelHandle;
 #ifdef XWA_MODERN
-	XwaHangars_ModelLoaded(modelType, modelHandle);
+	XwaHangars_ModelLoaded(objectType, modelHandle);
 #endif
-	g_modelTypeTable[modelType].curTexLevel = texLevel;
-	FeDiskIo_BuildModelDef((uint16_t)g_modelTypeTable[modelType].modelDefIndex, modelType);
+	g_objectTypes[objectType].curTexLevel = texLevel;
+	FeDiskIo_BuildModelDef((uint16_t)g_objectTypes[objectType].modelDefIndex, objectType);
 
-	meshCount = ModelMesh_GetCount(modelType);
-	g_objectTypeMeshCache[modelType].meshCount = meshCount;
+	meshCount = ModelMesh_GetCount(objectType);
+	g_objectTypeMeshCache[objectType].meshCount = meshCount;
 	for (meshIndex = 0; meshIndex < meshCount; ++meshIndex) {
-		g_objectTypeMeshCache[modelType].meshTypes[meshIndex] = ModelMesh_GetType(modelType, meshIndex);
-		g_objectTypeMeshCache[modelType].meshDescriptors[meshIndex] =
-			ModelMesh_GetDescriptor(modelType, meshIndex);
-		DebugPrintf((const char*)(uintptr_t)modelType, meshIndex);
+		g_objectTypeMeshCache[objectType].meshTypes[meshIndex] = ModelMesh_GetType(objectType, meshIndex);
+		g_objectTypeMeshCache[objectType].meshDescriptors[meshIndex] =
+			ModelMesh_GetDescriptor(objectType, meshIndex);
+		DebugPrintf((const char*)(uintptr_t)objectType, meshIndex);
 	}
 
 	g_loadingModel = 0;
