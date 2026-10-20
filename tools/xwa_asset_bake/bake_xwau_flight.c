@@ -3,7 +3,15 @@
  *
  * Each image group of the DAT files that XWAU's RESDATA.TXT lists becomes an
  * atlas with game geometry, so the whole game uses XWAU's frame counts, sizes
- * and anchors (frontend_geometry.h). Each image is packed at the resolution
+ * and anchors (frontend_geometry.h). The DATs that missions add in their
+ * [Resdata] sections are sorted:
+ *   - a DAT whose groups are in no other file is baked with the others, for
+ *     all missions: missions that don't add it never use its groups (XU's
+ *     Planet2.dat and PlanetCustom.dat);
+ *   - any other DAT becomes a set, which only the missions that add it use
+ *     (XU's BACKDROP_SPECIAL.DAT). Each of its groups is built from the DAT,
+ *     then the other files, with the first image winning, as in XWAU
+ *     (resdata_sets.h in the game). Each image is packed at the resolution
  * XWAU ships it; nothing is upscaled. Each image's classic size is the size
  * XWAU draws it:
  *   - most images: their own size;
@@ -19,6 +27,7 @@
  *   <out>/resdata/atlas/group_<g>.yaml        with group_<g>.ktx2, group_<g>_p<N>.ktx2
  *   <out>/resdata/atlas/group_<g>_alt<n>.yaml the alternative explosion sets of
  *   <out>/resdata/atlas/group_<g>_ds2.yaml    Materials/dat-<g>.mat, with their pages
+ *   <out>/resdata/sets/<set>/group_<g>.yaml   the groups of a set, with their pages
  *   <out>/flight/fonts/font_tier_<n>.{ktx2,fnt}  XWAU's flight font
  *   <out>/flight/fonts/fonts.yaml             the TrueType font that XWAU's ddraw
  *                                             draws flight text with
@@ -27,8 +36,7 @@
  * (20001-20232), which xwau-frontend converts; the font group 16000, which
  * the game copies glyphs out of, so it gets font atlases instead; and the
  * groups below 1000 (the blast mark animations of BLASTMARKS.DAT), which
- * opt2gltf effects imports. BACKDROP_SPECIAL.DAT is left out too: three
- * missions add it for their own sun.
+ * opt2gltf effects imports.
  *
  * The XWAU install is read with host file I/O, and file names are matched in
  * any case.
@@ -37,6 +45,7 @@
 #include "bake_xwau_flight.h"
 
 #include "bake_flight_fonts.h"
+#include "util.h"
 #include "xwa_2d.h"
 #include "xwau_config.h"
 #include "xwau_dat.h"
@@ -93,6 +102,13 @@ typedef struct FlightDat {
 	XwauDat* dat;
 } FlightDat;
 
+/* A DAT that missions add in their [Resdata] section and that replaces
+ * images that other files also have: it becomes a set of its own. */
+typedef struct FlightSetDat {
+	FlightDat file;
+	char set[64]; /* the set's name, its folder in resdata/sets */
+} FlightSetDat;
+
 /* One BackdropScales.txt entry. `image` is the image's position in its
  * group, or -1 for the whole group. */
 typedef struct FlightScale {
@@ -140,6 +156,9 @@ typedef struct FlightContext {
 	int map_icon_scale;
 	FlightMaterialFile* materials;
 	int material_count;
+	FlightSetDat* sets;
+	int set_count;
+	const char* baking_set; /* the set whose groups are being baked, or NULL */
 } FlightContext;
 
 typedef struct FlightImage {
@@ -185,22 +204,155 @@ static void flight_open_dat(FlightContext* ctx, const char* rel) {
 	file->dat = dat;
 }
 
-/* Opens Planet2.dat and PlanetCustom.dat, then the files of RESDATA.TXT in
- * order. Every mission lists Planet2.dat first in its [Resdata] section, so
- * its images win, as in XWAU. PlanetCustom.dat comes next in the missions
- * that list it. Its groups are in no other file, so baking it for every
- * mission only adds them. */
+/* The set name of DAT `name`: its name without the extension, in lower case,
+ * with any character other than a letter, a digit, '_' or '-' made '_'. */
+static void flight_set_name(const char* name, char* out, size_t size) {
+	size_t n = 0;
+	const char* dot = strrchr(name, '.');
+	for (const char* c = name; *c && c != dot && n + 1 < size; ++c) {
+		const char lower = (char)tolower((unsigned char)*c);
+		out[n++] = isalnum((unsigned char)lower) || lower == '-' ? lower : '_';
+	}
+	out[n] = '\0';
+}
+
+/* Adds a DAT that a mission adds, once. A file that RESDATA.TXT also lists
+ * is baked with that list. XWAU skips files that don't exist. */
+static void flight_add_mission_dat(FlightContext* ctx, FlightDat** dats, int* count, const char* rel) {
+	char path[1100], error[256];
+	if (!Xwau_FindFile(ctx->opt->xwau_root, rel, path, sizeof path))
+		return;
+	const char* name = strrchr(path, '/');
+	name = name ? name + 1 : path;
+	for (int i = 0; i < ctx->dat_count; ++i) {
+		if (strcasecmp(ctx->dats[i].name, name) == 0)
+			return;
+	}
+	for (int i = 0; i < *count; ++i) {
+		if (strcasecmp((*dats)[i].name, name) == 0)
+			return;
+	}
+	XwauDat* dat = XwauDat_Open(path, error, sizeof error);
+	FlightDat* grown = dat ? (FlightDat*)realloc(*dats, (size_t)(*count + 1) * sizeof *grown) : NULL;
+	if (!grown) {
+		fprintf(stderr, "xwau: %s\n", dat ? "out of memory" : error);
+		XwauDat_Close(dat);
+		ctx->stats->failures++;
+		return;
+	}
+	*dats = grown;
+	snprintf(grown[*count].name, sizeof grown[*count].name, "%s", name);
+	grown[*count].dat = dat;
+	++*count;
+}
+
+/* Adds the DATs that mission `base` (such as "Missions/1b0m1fw") adds: the
+ * lines of <base>_Resdata.txt, else of the [Resdata] section of <base>.ini,
+ * as XWAU's backdrop hook reads them. */
+static void flight_read_mission_resdata(FlightContext* ctx, FlightDat** dats, int* count, const char* base) {
+	char rel[1200], path[1100];
+	XwauLines lines = { 0 };
+	snprintf(rel, sizeof rel, "%s_Resdata.txt", base);
+	XwauLines_Read(Xwau_FindFile(ctx->opt->xwau_root, rel, path, sizeof path) ? path : NULL, "",
+				   XWAU_RULES_CPP, &lines);
+	if (!lines.count) {
+		XwauLines_Free(&lines);
+		snprintf(rel, sizeof rel, "%s.ini", base);
+		XwauLines_Read(Xwau_FindFile(ctx->opt->xwau_root, rel, path, sizeof path) ? path : NULL, "Resdata",
+					   XWAU_RULES_CPP, &lines);
+	}
+	for (size_t i = 0; i < lines.count; ++i) {
+		char line[512];
+		snprintf(line, sizeof line, "%s", lines.items[i]);
+		const char* dat = Xwau_Trim(line, XWAU_RULES_CPP);
+		if (dat[0])
+			flight_add_mission_dat(ctx, dats, count, dat);
+	}
+	XwauLines_Free(&lines);
+}
+
+/* Whether a DAT of `dats` other than `self` has group `group`. */
+static int flight_others_have_group(const FlightDat* dats, int count, const XwauDat* self, int group) {
+	const int* images;
+	for (int i = 0; i < count; ++i) {
+		if (dats[i].dat != self && XwauDat_ListGroup(dats[i].dat, group, &images) > 0)
+			return 1;
+	}
+	return 0;
+}
+
+/* Opens the DATs that the missions add (Missions/, Melee/ and Combat/), and
+ * sorts them. A DAT whose groups are in no other file is baked with the
+ * normal list, in front of it, for all missions: missions that don't add it
+ * never use its groups. Any other DAT becomes a set. */
+static void flight_open_mission_dats(FlightContext* ctx) {
+	static const char* const dirs[] = { "Missions", "Melee", "Combat" };
+	FlightDat* added = NULL;
+	int added_count = 0;
+	for (size_t d = 0; d < sizeof dirs / sizeof dirs[0]; ++d) {
+		char dir[1100];
+		if (!Xwau_FindDir(ctx->opt->xwau_root, dirs[d], dir, sizeof dir))
+			continue;
+		size_t count = 0;
+		char** entries = ListDir(dir, true, &count);
+		for (size_t i = 0; i < count; ++i) {
+			const size_t len = strlen(entries[i]);
+			char base[1100];
+			if (len <= 4 || strcasecmp(entries[i] + len - 4, ".tie") != 0)
+				continue;
+			snprintf(base, sizeof base, "%s/%.*s", dirs[d], (int)(len - 4), entries[i]);
+			flight_read_mission_resdata(ctx, &added, &added_count, base);
+		}
+		FreeList(entries, count);
+	}
+	FlightDat* shared = (FlightDat*)calloc((size_t)(added_count + ctx->dat_count) + 1, sizeof *shared);
+	int shared_count = 0;
+	for (int m = 0; shared && m < added_count; ++m) {
+		const int* list;
+		const size_t n = XwauDat_ListGroups(added[m].dat, &list);
+		int* groups = (int*)malloc((n ? n : 1) * sizeof *groups);
+		int overlaps = 0;
+		if (groups)
+			memcpy(groups, list, n * sizeof *groups);
+		for (size_t g = 0; groups && g < n && !overlaps; ++g) {
+			overlaps = flight_others_have_group(ctx->dats, ctx->dat_count, added[m].dat, groups[g]) ||
+					   flight_others_have_group(added, added_count, added[m].dat, groups[g]);
+		}
+		free(groups);
+		FlightSetDat* set =
+			overlaps ? (FlightSetDat*)realloc(ctx->sets, (size_t)(ctx->set_count + 1) * sizeof *ctx->sets)
+					 : NULL;
+		if (set) {
+			ctx->sets = set;
+			set = &ctx->sets[ctx->set_count++];
+			set->file = added[m];
+			flight_set_name(added[m].name, set->set, sizeof set->set);
+			printf("xwau: %s replaces images of other files, so it becomes the set %s\n", added[m].name,
+				   set->set);
+		} else if (overlaps) {
+			XwauDat_Close(added[m].dat);
+			ctx->stats->failures++;
+		} else {
+			shared[shared_count++] = added[m];
+			printf("xwau: %s has groups of its own, so it is baked for all missions\n", added[m].name);
+		}
+	}
+	if (shared) {
+		memcpy(shared + shared_count, ctx->dats, (size_t)ctx->dat_count * sizeof *shared);
+		free(ctx->dats);
+		ctx->dats = shared;
+		ctx->dat_count += shared_count;
+	}
+	free(added);
+}
+
+/* Opens the files of RESDATA.TXT in order, and the files that the missions
+ * add (flight_open_mission_dats). */
 static int flight_open_dats(FlightContext* ctx) {
 	char list_path[1100];
 	if (!Xwau_FindFile(ctx->opt->xwau_root, "RESDATA.TXT", list_path, sizeof list_path)) {
 		fprintf(stderr, "xwau: no RESDATA.TXT in %s\n", ctx->opt->xwau_root);
 		return 0;
-	}
-	static const char* const planets[] = { "Resdata/Planet2.dat", "Resdata/PlanetCustom.dat" };
-	for (size_t i = 0; i < sizeof planets / sizeof planets[0]; ++i) {
-		char path[1100];
-		if (Xwau_FindFile(ctx->opt->xwau_root, planets[i], path, sizeof path))
-			flight_open_dat(ctx, planets[i]);
 	}
 	FILE* fp = fopen(list_path, "r");
 	if (!fp)
@@ -214,6 +366,7 @@ static int flight_open_dats(FlightContext* ctx) {
 			flight_open_dat(ctx, line);
 	}
 	fclose(fp);
+	flight_open_mission_dats(ctx);
 	return ctx->dat_count > 0;
 }
 
@@ -756,7 +909,8 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 	}
 	char header[4096];
 	snprintf(header, sizeof header, "game_geometry: true\nunits: game\n");
-	if (group >= FLIGHT_FIRST_EXPLOSION_GROUP && group <= FLIGHT_LAST_EXPLOSION_GROUP)
+	/* The alternative frame sets stay with the shared atlases. */
+	if (group >= FLIGHT_FIRST_EXPLOSION_GROUP && group <= FLIGHT_LAST_EXPLOSION_GROUP && !ctx->baking_set)
 		flight_bake_frame_sets(ctx, group, header, sizeof header);
 
 	BakeFrame* frames = (BakeFrame*)calloc((size_t)count, sizeof *frames);
@@ -798,7 +952,8 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 	char base[64];
 	snprintf(base, sizeof base, "group_%d", group);
 	if (ok && flight_write_atlas(ctx, base, frames, ids, count, header)) {
-		printf("resdata group %d: %d images%s\n", group, count, resized ? ", planets shrunk" : "");
+		printf("resdata %s%sgroup %d: %d images%s\n", ctx->baking_set ? ctx->baking_set : "",
+			   ctx->baking_set ? " " : "", group, count, resized ? ", planets shrunk" : "");
 	} else {
 		fprintf(stderr, "xwau: group %d failed\n", group);
 		ctx->stats->failures++;
@@ -806,6 +961,50 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 	flight_free_frames(frames, frames ? count : 0);
 	free(ids);
 	free(images);
+}
+
+/* Bakes each group of a set into resdata/sets/<set>/. A group is built from
+ * the set's DAT, then the other files, with the first image winning, as in
+ * XWAU, so it also holds the images that the set's DAT doesn't replace. */
+static void flight_bake_set(FlightContext* ctx, const FlightSetDat* set) {
+	const int* list;
+	const size_t n = XwauDat_ListGroups(set->file.dat, &list);
+	int* groups = (int*)malloc((n ? n : 1) * sizeof *groups);
+	FlightDat* dats = (FlightDat*)calloc((size_t)ctx->dat_count + 1, sizeof *dats);
+	if (!groups || !dats) {
+		free(groups);
+		free(dats);
+		ctx->stats->failures++;
+		return;
+	}
+	memcpy(groups, list, n * sizeof *groups);
+	dats[0] = set->file;
+	memcpy(dats + 1, ctx->dats, (size_t)ctx->dat_count * sizeof *dats);
+	FlightDat* const normal = ctx->dats;
+	const int normal_count = ctx->dat_count;
+	char normal_dir[sizeof ctx->atlas_dir];
+	memcpy(normal_dir, ctx->atlas_dir, sizeof normal_dir);
+	ctx->dats = dats;
+	ctx->dat_count = normal_count + 1;
+	ctx->baking_set = set->set;
+	snprintf(ctx->atlas_dir, sizeof ctx->atlas_dir, "%s/resdata/sets/%s", ctx->opt->sprites->out_root,
+			 set->set);
+	int baked = 0;
+	for (size_t g = 0; g < n; ++g) {
+		if (!flight_is_baked_group(groups[g]) ||
+			(ctx->opt->sprites->group_filter >= 0 && groups[g] != ctx->opt->sprites->group_filter))
+			continue;
+		flight_bake_group(ctx, groups[g]);
+		baked++;
+	}
+	ctx->dats = normal;
+	ctx->dat_count = normal_count;
+	ctx->baking_set = NULL;
+	memcpy(ctx->atlas_dir, normal_dir, sizeof normal_dir);
+	if (baked)
+		ctx->stats->sets++;
+	free(dats);
+	free(groups);
 }
 
 /* XWAU's flight font: the font tiers that flight/fonts holds, built from
@@ -1003,6 +1202,8 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 		qsort(groups, (size_t)group_count, sizeof *groups, flight_compare_ints);
 	for (int g = 0; g < group_count; ++g)
 		flight_bake_group(&ctx, groups[g]);
+	for (int k = 0; k < ctx.set_count; ++k)
+		flight_bake_set(&ctx, &ctx.sets[k]);
 	if (opt->sprites->group_filter < 0 || opt->sprites->group_filter == FLIGHT_FONT_GROUP) {
 		flight_bake_fonts(&ctx);
 		flight_write_fonts_yaml(&ctx);
@@ -1011,7 +1212,10 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 	free(groups);
 	for (int f = 0; f < ctx.dat_count; ++f)
 		XwauDat_Close(ctx.dats[f].dat);
+	for (int k = 0; k < ctx.set_count; ++k)
+		XwauDat_Close(ctx.sets[k].file.dat);
 	free(ctx.dats);
+	free(ctx.sets);
 	free(ctx.scales);
 	free(ctx.backdrops);
 	free(ctx.materials);
