@@ -542,6 +542,31 @@ int StringTable_LoadGameStrings(void) {
 		return 2;
 	}
 
+#ifdef XWA_MODERN
+	/* The original reads these tables only for the genders that the long names
+	   use. A mod can set a craft's gender after the load, so both are read
+	   whenever the file has them. A missing table is an error only when a craft
+	   needs it; otherwise it stays empty. */
+	{
+		const int loadFailed = g_stringLoadFailed;
+		const int hasFeminine = StringTable_StoreGoalConditionTable(stream, g_strGoalCondFeminine);
+		const int hasNeutered =
+			hasFeminine && StringTable_StoreGoalConditionTable(stream, g_strGoalCondNeutered);
+
+		if ((!hasFeminine && StringTable_HasCraftGender(1)) ||
+			(!hasNeutered && StringTable_HasCraftGender(2))) {
+			File_Close(stream);
+			return 2;
+		}
+		if (!hasFeminine) {
+			memset(g_strGoalCondFeminine, 0, sizeof(g_strGoalCondFeminine));
+		}
+		if (!hasNeutered) {
+			memset(g_strGoalCondNeutered, 0, sizeof(g_strGoalCondNeutered));
+			g_stringLoadFailed = loadFailed;
+		}
+	}
+#else
 	if (StringTable_HasCraftGender(1) &&
 		!StringTable_StoreGoalConditionTable(stream, g_strGoalCondFeminine)) {
 		File_Close(stream);
@@ -553,6 +578,7 @@ int StringTable_LoadGameStrings(void) {
 		File_Close(stream);
 		return 2;
 	}
+#endif
 
 	if (g_stringLoadFailed) {
 		File_Close(stream);

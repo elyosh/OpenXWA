@@ -234,6 +234,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/snapshot/snapshot_export.c
     src/xwa_runtime/snapshot/snapshot_flight_map.c
     src/xwa_runtime/snapshot/snapshot_hud.c
+    src/xwa_runtime/text/text_overrides.c
     src/xwa_runtime/timing/host_clock.c
     src/xwa_runtime/timing/modern_flight_timing.c
 )

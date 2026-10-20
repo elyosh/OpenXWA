@@ -3,6 +3,9 @@
 #include "xwa/assets/file_io.h"
 #include "xwa/util/byte_order.h"
 #include "xwa/util/memory.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/text/text_overrides.h"
+#endif
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -184,6 +187,17 @@ char* Linez_ResolveString(char* key) {
 
 	defaultText = strchr(key + 1, '!');
 	++defaultText;
+#ifdef XWA_MODERN
+	{
+		/* A mod's text replaces the text of xwa.tab, and is used even when
+		   there is no xwa.tab. */
+		char* modText = XwaText_Find(key + 1);
+
+		if (modText != NULL) {
+			return modText;
+		}
+	}
+#endif
 	if (g_linezTextBuffer == NULL) {
 		return defaultText;
 	}

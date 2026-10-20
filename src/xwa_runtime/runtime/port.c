@@ -44,6 +44,7 @@
 #include "xwa_runtime/runtime/movie_task.h"
 #include "xwa_runtime/runtime/presentation.h"
 #include "xwa_runtime/snapshot/snapshot.h"
+#include "xwa_runtime/text/text_overrides.h"
 #include "xwa_runtime/timing/host_clock.h"
 
 #include <stdio.h>
@@ -135,6 +136,7 @@ int XwaPort_Init(void) {
 	XwaRumble_RegisterProvider();
 	XwaTime_Reset();
 	File_SetVfs(Aeron_GetVfs());
+	XwaText_Load();
 	XwaModelSource_Init();
 	XwaHangars_Init();
 	XwaCraftHud_Init();
