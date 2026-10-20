@@ -3,7 +3,7 @@
 #include <stddef.h>
 
 #define MODEL_TYPE_ENTRY(recordFlags_, assetFlags_, familyId_, genusId_, maxBoundsExtent_, flags_,           \
-						 modelIndex_, textureGroup_, frameCount_)                                            \
+						 modelDefIndex_, textureGroup_, frameCount_)                                         \
 	{                                                                                                        \
 		.recordFlags = (recordFlags_),                                                                       \
 		.assetFlags = (assetFlags_),                                                                         \
@@ -13,7 +13,7 @@
 		.curTexLevel = NULL,                                                                                 \
 		.texLevels = NULL,                                                                                   \
 		.flags = (flags_),                                                                                   \
-		.modelIndex = (modelIndex_),                                                                         \
+		.modelDefIndex = (modelDefIndex_),                                                                   \
 		.textureGroup = (textureGroup_),                                                                     \
 		.frameCount = (frameCount_),                                                                         \
 	}
@@ -904,10 +904,10 @@ ModelTypeInfo g_modelTypeTable[OBJ_Count] = {
 #undef MODEL_TYPE_ENTRY
 
 // FUNCTION: XWA 0x4DCE30
-ModelIndex GetModelIndexFromType(uint16_t objectType) {
+ModelDefIndex GetModelDefIndexFromType(uint16_t objectType) {
 	if ((uint16_t)objectType >= OBJ_Count) {
 		return -1;
 	}
 
-	return g_modelTypeTable[(uint16_t)objectType].modelIndex;
+	return g_modelTypeTable[(uint16_t)objectType].modelDefIndex;
 }

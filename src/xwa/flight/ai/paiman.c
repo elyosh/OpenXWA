@@ -701,7 +701,7 @@ void paiman_initparkmaneuver(void) {
 				targetModelIndex =
 					(uint16_t)g_modelTypeTable[g_objectTypeTables.craftTypeToObjectType
 												   [g_missionFlightGroups[targetFgIdx].fg.craftType]]
-						.modelIndex;
+						.modelDefIndex;
 				break;
 			}
 
@@ -714,7 +714,7 @@ void paiman_initparkmaneuver(void) {
 	} else {
 		Mission_ResolveObjectOrMissionPointWorldLoc(targetObjIdx, 0, 0, 0);
 		targetModelIndex =
-			(uint16_t)g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].modelIndex;
+			(uint16_t)g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].modelDefIndex;
 	}
 
 	bestRange = UINT32_MAX;
@@ -775,7 +775,8 @@ void paiman_initparkmaneuver(void) {
 		g_paiContext.aiController->aimPointX = g_objectTable[g_paiContext.aiObjIdx].world_x;
 		g_paiContext.aiController->aimPointY = g_objectTable[g_paiContext.aiObjIdx].world_y;
 		g_paiContext.aiController->aimPointZ = g_objectTable[g_paiContext.aiObjIdx].world_z;
-		g_objectTable[g_paiContext.aiObjIdx].world_z -= g_modelDefs[g_curCraft->modelIndex].meshAttachData[4];
+		g_objectTable[g_paiContext.aiObjIdx].world_z -=
+			g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4];
 
 		g_objectTable[g_paiContext.aiObjIdx].mobj->prevWorldX = g_objectTable[g_paiContext.aiObjIdx].world_x;
 		g_objectTable[g_paiContext.aiObjIdx].mobj->prevWorldY = g_objectTable[g_paiContext.aiObjIdx].world_y;
@@ -1182,7 +1183,7 @@ static char paiman_attackmaneuver(void) {
 	g_curCraft->pushAccumY = 0;
 	g_curCraft->pushAccumZ = 0;
 	targetObjIdx = g_paiContext.aiController->targetObjIdx;
-	reactionThreshold = g_modelDefs[g_curCraft->modelIndex].field_13;
+	reactionThreshold = g_modelDefs[g_curCraft->modelDefIndex].field_13;
 
 	if (g_paiContext.aiController->maneuverPhase != 0) {
 		if (g_paiContext.aiController->maneuverPhase == 2) {
@@ -1797,7 +1798,7 @@ void paiman_calcformation(void) {
 	formY = (int16_t)(g_formPosY[formationType][formationSlot] - g_formPosY[formationType][0]);
 	formZ = (int16_t)(g_formPosZ[formationType][formationSlot] - g_formPosZ[formationType][0]);
 
-	modelIndex = leaderCraft->modelIndex;
+	modelIndex = leaderCraft->modelDefIndex;
 	separationScale = (uint8_t)leaderCraft->aiFlight.separation + 1;
 	boundSizeX = (int16_t)g_modelDefs[modelIndex].boundSizeX;
 	boundSizeZ = (int16_t)g_modelDefs[modelIndex].boundSizeZ;
@@ -3185,7 +3186,7 @@ bool paiman_UpdateBoardOrPickupAutopilot(unsigned int playerIdx) {
 
 	if (targetObj->mobj != NULL) {
 		targetCraft = targetObj->mobj->pCraft;
-		targetModelIdx = targetCraft->modelIndex;
+		targetModelIdx = targetCraft->modelDefIndex;
 	} else {
 		targetModelIdx = 0xffffu;
 	}
@@ -3204,18 +3205,18 @@ bool paiman_UpdateBoardOrPickupAutopilot(unsigned int playerIdx) {
 				localForward = g_modelDefs[targetModelIdx].meshAttachData[0];
 				if (targetObj->genusId == GENUS_Fighter || targetObj->genusId == GENUS_Transport) {
 					attachDelta = g_modelDefs[targetModelIdx].meshAttachData[1] -
-								  g_modelDefs[boarderCraft->modelIndex].meshAttachData[3];
+								  g_modelDefs[boarderCraft->modelDefIndex].meshAttachData[3];
 				} else if (g_objectTable[boarderObjIdx].genusId == GENUS_Fighter ||
 						   g_objectTable[boarderObjIdx].genusId == GENUS_Transport) {
 					attachDelta = g_modelDefs[targetModelIdx].meshAttachData[1] -
-								  g_modelDefs[boarderCraft->modelIndex].meshAttachData[4];
+								  g_modelDefs[boarderCraft->modelDefIndex].meshAttachData[4];
 				} else {
 					attachDelta = g_modelDefs[targetModelIdx].meshAttachData[2] -
-								  g_modelDefs[boarderCraft->modelIndex].meshAttachData[4];
+								  g_modelDefs[boarderCraft->modelDefIndex].meshAttachData[4];
 				}
 				if (targetObj->objectType != OBJ_SpaceColony2) {
 					attachDelta += 2 * (g_modelDefs[targetModelIdx].meshAttachData[2] -
-										g_modelDefs[g_curCraft->modelIndex].meshAttachData[4]);
+										g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4]);
 				}
 				if (attachDelta < 0) {
 					attachDelta = 0x7000;
@@ -3277,14 +3278,14 @@ bool paiman_UpdateBoardOrPickupAutopilot(unsigned int playerIdx) {
 				localForward = g_modelDefs[targetModelIdx].meshAttachData[0];
 				if (targetObj->genusId == GENUS_Fighter || targetObj->genusId == GENUS_Transport) {
 					attachDelta = g_modelDefs[targetModelIdx].meshAttachData[1] -
-								  g_modelDefs[boarderCraft->modelIndex].meshAttachData[3];
+								  g_modelDefs[boarderCraft->modelDefIndex].meshAttachData[3];
 				} else if (g_objectTable[boarderObjIdx].genusId == GENUS_Fighter ||
 						   g_objectTable[boarderObjIdx].genusId == GENUS_Transport) {
 					attachDelta = g_modelDefs[targetModelIdx].meshAttachData[1] -
-								  g_modelDefs[boarderCraft->modelIndex].meshAttachData[4];
+								  g_modelDefs[boarderCraft->modelDefIndex].meshAttachData[4];
 				} else {
 					attachDelta = g_modelDefs[targetModelIdx].meshAttachData[2] -
-								  g_modelDefs[boarderCraft->modelIndex].meshAttachData[4];
+								  g_modelDefs[boarderCraft->modelDefIndex].meshAttachData[4];
 				}
 				pai_RotateLocalVectorToWorldScratch(targetObj, 0, attachDelta, localForward);
 				dx = g_objectTable[targetObjIdx].world_x - g_objectTable[boarderObjIdx].world_x + g_rotatedX;
@@ -3980,9 +3981,9 @@ bool paiman_UpdatePlayerDeliveryAutopilot(unsigned int playerIdx) {
 			carriedObj = &g_objectTable[carriedObjIdx];
 			carriedGenus = carriedObj->genusId;
 			if (carriedGenus <= GENUS_Utility) {
-				attachOffset = g_modelDefs[playerCraft->modelIndex].meshAttachData[3];
+				attachOffset = g_modelDefs[playerCraft->modelDefIndex].meshAttachData[3];
 			} else {
-				attachOffset = g_modelDefs[playerCraft->modelIndex].meshAttachData[4];
+				attachOffset = g_modelDefs[playerCraft->modelDefIndex].meshAttachData[4];
 			}
 
 			carriedSizeZ = ModelBounds_GetSizeZ((uint16_t)carriedObj->objectType);
@@ -4023,9 +4024,9 @@ bool paiman_UpdatePlayerDeliveryAutopilot(unsigned int playerIdx) {
 			carriedObj = &g_objectTable[carriedObjIdx];
 			carriedGenus = carriedObj->genusId;
 			if (carriedGenus <= GENUS_Utility) {
-				attachOffset = g_modelDefs[playerCraft->modelIndex].meshAttachData[3];
+				attachOffset = g_modelDefs[playerCraft->modelDefIndex].meshAttachData[3];
 			} else {
-				attachOffset = g_modelDefs[playerCraft->modelIndex].meshAttachData[4];
+				attachOffset = g_modelDefs[playerCraft->modelDefIndex].meshAttachData[4];
 			}
 
 			alignZOffset = ModelBounds_GetSizeZ((uint16_t)carriedObj->objectType) - attachOffset;
@@ -4151,7 +4152,7 @@ static char paiman_boardmaneuver(void) {
 	if (mobj != NULL) {
 		craft = mobj->pCraft;
 		targetAi = pai_GetEffectiveAIController(craft);
-		targetModelIdx = craft->modelIndex;
+		targetModelIdx = craft->modelDefIndex;
 		targetFlightGroupIdx = g_objectTable[targetObjIdx].flightGroupIdx;
 		targetOutcomeFlightGroupIdx = g_objectTable[targetObjIdx].flightGroupIdx;
 		targetSignature = g_objectTable[targetObjIdx].objectSignature;
@@ -4175,17 +4176,17 @@ static char paiman_boardmaneuver(void) {
 				if (g_objectTable[targetObjIdx].genusId == GENUS_Fighter ||
 					g_objectTable[targetObjIdx].genusId == GENUS_Transport) {
 					upOffset = targetModelDef->meshAttachData[1] -
-							   g_modelDefs[g_curCraft->modelIndex].meshAttachData[3];
+							   g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[3];
 				} else if (g_objectTable[g_paiContext.aiObjIdx].genusId == GENUS_Fighter ||
 						   g_objectTable[g_paiContext.aiObjIdx].genusId == GENUS_Transport) {
 					upOffset = targetModelDef->meshAttachData[1] + targetModelDef->meshAttachData[2] -
-							   g_modelDefs[g_curCraft->modelIndex].meshAttachData[4];
+							   g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4];
 				} else {
 					upOffset = 2 * targetModelDef->meshAttachData[2] -
-							   g_modelDefs[g_curCraft->modelIndex].meshAttachData[4];
+							   g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4];
 				}
 				extraOffset = 2 * (targetModelDef->meshAttachData[2] -
-								   g_modelDefs[g_curCraft->modelIndex].meshAttachData[4]);
+								   g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4]);
 				if (extraOffset > 932)
 					extraOffset = 932;
 				pai_RotateLocalVectorToWorldScratch(objRecord, 0, upOffset + extraOffset, attachZ);
@@ -4266,14 +4267,14 @@ static char paiman_boardmaneuver(void) {
 				if (g_objectTable[targetObjIdx].genusId == GENUS_Fighter ||
 					g_objectTable[targetObjIdx].genusId == GENUS_Transport) {
 					upOffset = targetModelDef->meshAttachData[1] -
-							   g_modelDefs[g_curCraft->modelIndex].meshAttachData[3];
+							   g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[3];
 				} else if (g_objectTable[g_paiContext.aiObjIdx].genusId == GENUS_Fighter ||
 						   g_objectTable[g_paiContext.aiObjIdx].genusId == GENUS_Transport) {
 					upOffset = targetModelDef->meshAttachData[1] -
-							   g_modelDefs[g_curCraft->modelIndex].meshAttachData[4];
+							   g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4];
 				} else {
 					upOffset = targetModelDef->meshAttachData[2] -
-							   g_modelDefs[g_curCraft->modelIndex].meshAttachData[4];
+							   g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4];
 				}
 				pai_RotateLocalVectorToWorldScratch(objRecord, 0, upOffset, attachZ);
 				g_curCraft->pushAccumX = g_rotatedX + g_objectTable[targetObjIdx].world_x -
@@ -6078,9 +6079,9 @@ static char paiman_releasemaneuver(void) {
 			int absZ;
 
 			if (g_objectTable[carriedObjectIndex].genusId <= GENUS_Utility)
-				attachOffset = g_modelDefs[g_curCraft->modelIndex].meshAttachData[3];
+				attachOffset = g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[3];
 			else
-				attachOffset = g_modelDefs[g_curCraft->modelIndex].meshAttachData[4];
+				attachOffset = g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4];
 			dropZ =
 				ModelBounds_GetSizeZ((uint16_t)g_objectTable[carriedObjectIndex].objectType) - attachOffset;
 
@@ -6247,7 +6248,7 @@ static char paiman_parkmaneuver(void) {
 					else
 						g_curCraft->aiFlight.headingState = 2;
 				}
-				localZOffset = -g_modelDefs[g_curCraft->modelIndex].meshAttachData[4];
+				localZOffset = -g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4];
 				g_curCraft->pushAccumX =
 					g_paiContext.aiController->aimPointX - g_objectTable[g_paiContext.aiObjIdx].world_x;
 				absX = g_curCraft->pushAccumX;

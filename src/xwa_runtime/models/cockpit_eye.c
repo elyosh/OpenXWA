@@ -48,13 +48,13 @@ void XwaCockpitEye_ApplyHardpointX(uint16_t modelEntryIdx, unsigned short object
 
 static int CockpitEye_PlayerModelIndex(void) {
 	int objectIdx;
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 
 	if (g_localPlayer < 0 || (uint16_t)g_players[g_localPlayer].objectIndex == 0xffffu) {
 		return -1;
 	}
 	objectIdx = (uint16_t)g_players[g_localPlayer].objectIndex;
-	modelIndex = GetModelIndexFromType(g_objectTable[objectIdx].objectType);
+	modelIndex = GetModelDefIndexFromType(g_objectTable[objectIdx].objectType);
 	return modelIndex >= XWA_MODEL_DEF_COUNT ? -1 : (int)modelIndex;
 }
 

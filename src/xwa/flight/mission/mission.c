@@ -1908,7 +1908,7 @@ int Mission_ObjectMatchesTriggerVariableEx(uint16_t objectIdx, uint16_t variable
 					warheadLauncherCount = (uint8_t)craft->warheadLauncherCount;
 					count = 0;
 					if (warheadLauncherCount > 0) {
-						warheadLauncherFirstSlot = g_modelDefs[craft->modelIndex].warheadLauncherFirstSlot;
+						warheadLauncherFirstSlot = g_modelDefs[craft->modelDefIndex].warheadLauncherFirstSlot;
 						do {
 							lastSlot = warheadLauncherFirstSlot[2];
 							firstCount = craft->warheadData[*warheadLauncherFirstSlot++].count;
@@ -2347,7 +2347,7 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 
 								craft = object->mobj->pCraft;
 								matchesCondition = 0;
-								maxShield = 2 * g_modelDefs[craft->modelIndex].shieldStrength;
+								maxShield = 2 * g_modelDefs[craft->modelDefIndex].shieldStrength;
 								if (condition == MISSION_COND_SHIELDS_DEPLETED) {
 									if (craft->shieldFront + craft->shieldRear <= 0) {
 										matchesCondition = 1;
@@ -2377,7 +2377,7 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 									uint16_t launcherIdx;
 									uint16_t warheadCount;
 
-									modelDef = &g_modelDefs[craft->modelIndex];
+									modelDef = &g_modelDefs[craft->modelDefIndex];
 									warheadCount = 0;
 									for (launcherIdx = 0; launcherIdx < craft->warheadLauncherCount;
 										 ++launcherIdx) {
@@ -4040,14 +4040,14 @@ void Mission_ResolveObjectOrMissionPointWorldLoc(unsigned int objOrMissionPointR
 // FUNCTION: XWA 0x41EA00
 void Mission_ResolveFormationSlotWorldLoc(uint16_t flightGroupIdx, uint16_t formationSlotIdx,
 										  uint16_t basisObjIdx) {
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 	uint16_t objectType;
 	int16_t modelMaxZ;
 
 	objectType =
 		(ObjectTypeId)
 			g_objectTypeTables.craftTypeToObjectType[g_missionFlightGroups[flightGroupIdx].fg.craftType];
-	modelIndex = g_modelTypeTable[objectType].modelIndex;
+	modelIndex = g_modelTypeTable[objectType].modelDefIndex;
 	modelMaxZ = ModelBounds_GetMaxZ(objectType);
 
 	Mission_ResolveObjectOrMissionPointWorldLoc(0x8000u, flightGroupIdx, 0, 0);
@@ -4856,10 +4856,10 @@ void Mission_InitFlightRuntimeState(void) {
 				int parentMountY;
 				int parentMountX;
 				CraftData* childCraft = g_objectTable[childIdx].mobj->pCraft;
-				ModelIndex childModel = childCraft->modelIndex;
-				pai_calcrotatedpoint(parent, g_modelDefs[parentCraft->modelIndex].childMountPoints[0],
-									 g_modelDefs[parentCraft->modelIndex].childMountPoints[1],
-									 g_modelDefs[parentCraft->modelIndex].childMountPoints[2]);
+				ModelDefIndex childModel = childCraft->modelDefIndex;
+				pai_calcrotatedpoint(parent, g_modelDefs[parentCraft->modelDefIndex].childMountPoints[0],
+									 g_modelDefs[parentCraft->modelDefIndex].childMountPoints[1],
+									 g_modelDefs[parentCraft->modelDefIndex].childMountPoints[2]);
 				parentMountX = g_rotatedX;
 				parentMountY = g_rotatedY;
 				parentMountZ = g_rotatedZ;
@@ -5628,7 +5628,7 @@ short Mission_SpawnFlightGroupWaveCraft(uint16_t instanceFilter) {
 		g_spawnFormation = g_missionFlightGroups[g_currentFlightGroupIdx].fg.formation;
 		g_spawnFormationSpacing = g_missionFlightGroups[g_currentFlightGroupIdx].fg.formationSpacing;
 	} else {
-		ModelIndex modelIndex;
+		ModelDefIndex modelIndex;
 		// --- Launch from an existing mothership -----------------------------
 		int16_t motherFg = g_missionFlightGroups[g_currentFlightGroupIdx].fg.arrivalMothership;
 		int foundMother = 0;
@@ -5667,7 +5667,7 @@ short Mission_SpawnFlightGroupWaveCraft(uint16_t instanceFilter) {
 			return 0;
 
 		g_curCraft = g_objectTable[motherObjIdx].mobj->pCraft;
-		modelIndex = g_curCraft->modelIndex;
+		modelIndex = g_curCraft->modelDefIndex;
 		// Launch position = mothership hangar attach point (mesh slots 5..7).
 		pai_RotateLocalVectorToWorldScratch(
 			&g_objectTable[motherObjIdx], g_modelDefs[modelIndex].meshAttachData[5],
@@ -5813,7 +5813,7 @@ short Mission_SpawnFlightGroupWaveCraft(uint16_t instanceFilter) {
 								rodCraft = g_objectTable[rod].mobj->pCraft;
 								rodCraft->nextLinkObjectIdx = inited;
 								rodSeq = linkSeq + 1;
-								rodCraft->modelIndex = GetModelIndexFromType(OBJ_ConnectorRod);
+								rodCraft->modelDefIndex = GetModelDefIndexFromType(OBJ_ConnectorRod);
 								rodCraft->linkSequenceIndex = (uint16_t)rodSeq;
 								g_objectTable[inited].mobj->pCraft->linkedPrevObjectIdx = rod;
 								// Mid segment spawned with the segment FG context.
@@ -5850,7 +5850,7 @@ short Mission_SpawnFlightGroupWaveCraft(uint16_t instanceFilter) {
 						tailRodCraft = g_objectTable[tailRod].mobj->pCraft;
 						tailRodSeq = linkSeq + 1;
 						tailRodCraft->nextLinkObjectIdx = inited;
-						tailRodCraft->modelIndex = GetModelIndexFromType(OBJ_ConnectorRod);
+						tailRodCraft->modelDefIndex = GetModelDefIndexFromType(OBJ_ConnectorRod);
 						tailRodCraft->linkSequenceIndex = (uint16_t)tailRodSeq;
 						g_objectTable[inited].mobj->pCraft->linkedPrevObjectIdx = tailRod;
 						// Matching back piece spawned from the saved head FG.
@@ -5867,7 +5867,7 @@ short Mission_SpawnFlightGroupWaveCraft(uint16_t instanceFilter) {
 							backType = (headType != OBJ_CrewCabinFront) ? OBJ_CrewCabinBack : OBJ_EngineBack;
 							backCraft = g_objectTable[back].mobj->pCraft;
 							backCraft->nextLinkObjectIdx = tailRod;
-							backCraft->modelIndex = GetModelIndexFromType(backType);
+							backCraft->modelDefIndex = GetModelDefIndexFromType(backType);
 							backCraft->linkSequenceIndex = (uint8_t)(tailRodSeq + 1);
 							g_objectTable[tailRod].mobj->pCraft->linkedPrevObjectIdx = back;
 							g_spawnStatus1 = g_spawnSavedStatus1;
@@ -5899,10 +5899,10 @@ short Mission_SpawnFlightGroupWaveCraft(uint16_t instanceFilter) {
 
 	// Announce a named flight group's arrival in the local player's region.
 	if (missionRunning && instanceFilter == 0xFFFF && didSpawn &&
-		(uint16_t)GetModelIndexFromType(g_spawnObjectType) != 0xFFFF &&
-		g_modelDefs[(uint16_t)GetModelIndexFromType(g_spawnObjectType)].longName &&
+		(uint16_t)GetModelDefIndexFromType(g_spawnObjectType) != 0xFFFF &&
+		g_modelDefs[(uint16_t)GetModelDefIndexFromType(g_spawnObjectType)].longName &&
 		g_spawnRegionIdx == g_players[g_localPlayer].regionIndex) {
-		msg_reportfgcreation(g_currentFlightGroupIdx, GetModelIndexFromType(g_spawnObjectType));
+		msg_reportfgcreation(g_currentFlightGroupIdx, GetModelDefIndexFromType(g_spawnObjectType));
 	}
 	return 1;
 }
@@ -5920,7 +5920,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 	int playerOwnerIdx = 0;
 	int boundPlayerSlot;
 	uint8_t hasPlayerOwner;
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 	int groupAiSaved;
 	uint8_t engineGlowCount;
 
@@ -6080,8 +6080,8 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		g_objectTable[objIdx].mobj->damageAmount = damage;
 	}
 
-	modelIndex = GetModelIndexFromType(objType);
-	g_curCraft->modelIndex = modelIndex;
+	modelIndex = GetModelDefIndexFromType(objType);
+	g_curCraft->modelDefIndex = modelIndex;
 	g_objectTable[objIdx].mobj->iff = g_spawnIff;
 	g_spawnLastAssignedIff = (uint8_t)g_objectTable[objIdx].mobj->iff;
 	g_objectTable[objIdx].mobj->team = g_spawnTeamId;
@@ -7902,7 +7902,7 @@ uint16_t Mission_Init(char* fileName) {
 
 	for (fgIdx = 0; fgIdx < (int16_t)g_missionHeader.numFlightGroups; ++fgIdx) {
 		ObjectTypeId objectType;
-		ModelIndex modelIndex;
+		ModelDefIndex modelIndex;
 
 		if (g_missionFlightGroups[fgIdx].playerOwnerIdx != -1) {
 			if (g_missionFlightGroups[fgIdx].fg.numberOfCraft > 1u) {
@@ -7952,9 +7952,9 @@ uint16_t Mission_Init(char* fileName) {
 			g_modelTypeTable[OBJ_CrewCabinBack].assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
 		}
 
-		modelIndex = GetModelIndexFromType(objectType);
-		if (modelIndex != 0xffffu && g_modelDefs[modelIndex].turretModelIndex[0] != 0) {
-			g_modelTypeTable[g_modelDefs[modelIndex].turretModelIndex[0]].assetFlags |=
+		modelIndex = GetModelDefIndexFromType(objectType);
+		if (modelIndex != 0xffffu && g_modelDefs[modelIndex].turretObjectType[0] != 0) {
+			g_modelTypeTable[g_modelDefs[modelIndex].turretObjectType[0]].assetFlags |=
 				MISSION_MODEL_ASSET_REQUIRED;
 		}
 
@@ -8567,9 +8567,9 @@ void Mission_CreditDestructionDamageContributors(uint16_t sourceObjIdx, uint16_t
 				 strcmp(planName, "exithangarpln") == 0 || strcmp(planName, "enterhangarpln") == 0 ||
 				 strcmp(planName, "disabledpln") == 0 || strcmp(planName, "selfdestroypln") == 0) &&
 				creditedOwnerIdx == -1;
-			if (GetModelIndexFromType(g_objectTable[victimObjIdx].objectType) != 0xffffu) {
+			if (GetModelDefIndexFromType(g_objectTable[victimObjIdx].objectType) != 0xffffu) {
 				victimRatingWeight =
-					g_modelDefs[(uint16_t)GetModelIndexFromType(g_objectTable[victimObjIdx].objectType)]
+					g_modelDefs[(uint16_t)GetModelDefIndexFromType(g_objectTable[victimObjIdx].objectType)]
 						.ratingWeight;
 				if (victimRatingWeight == 0) {
 					suppressRatingAward = 1;
@@ -8579,9 +8579,9 @@ void Mission_CreditDestructionDamageContributors(uint16_t sourceObjIdx, uint16_t
 			playerObjectType =
 				(ObjectTypeId)g_objectTypeTables
 					.craftTypeToObjectType[g_missionFlightGroups[player->boundFlightGroupIdx].fg.craftType];
-			if (GetModelIndexFromType(playerObjectType) != 0xffffu) {
+			if (GetModelDefIndexFromType(playerObjectType) != 0xffffu) {
 				playerRatingWeight =
-					g_modelDefs[(uint16_t)GetModelIndexFromType(playerObjectType)].ratingWeight;
+					g_modelDefs[(uint16_t)GetModelDefIndexFromType(playerObjectType)].ratingWeight;
 			}
 
 			if (creditedOwnerIdx == -1) {
@@ -9728,7 +9728,7 @@ int Mission_ComputeCraftLoadoutPointValue(int craftType, int warheadType, int be
 	int objType = g_objectTypeTables.craftTypeToObjectType[craftType];
 	if (g_modelTypeTable[objType].familyId == 0) {
 		unsigned int launcherIdx;
-		int modelIndex = (uint16_t)GetModelIndexFromType((ObjectTypeId)objType);
+		int modelIndex = (uint16_t)GetModelDefIndexFromType((ObjectTypeId)objType);
 		if (modelIndex == 0xFFFF)
 			return 0;
 
@@ -9779,7 +9779,7 @@ unsigned int Mission_ComputeCraftPointValue(int objIdx) {
 	unsigned int launcherIdx;
 
 	craft = g_objectTable[objIdx].mobj->pCraft;
-	modelIndex = GetModelIndexFromType(g_objectTable[objIdx].objectType);
+	modelIndex = GetModelDefIndexFromType(g_objectTable[objIdx].objectType);
 	if (modelIndex == 0xffffu) {
 		return 0;
 	}

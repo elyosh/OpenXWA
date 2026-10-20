@@ -217,7 +217,7 @@ static __inline int laser_IsLargeLockTargetGenus(ModelGenusId genusId) {
 static __inline void laser_UpdatePlayerWarheadLock(uint16_t objectIdx, int playerIdx) {
 	uint16_t currentTargetObjIdx;
 	uint16_t loadedWarheadCount;
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 
 	if (g_players[playerIdx].selectedWeaponMode == 0) {
 		return;
@@ -226,10 +226,10 @@ static __inline void laser_UpdatePlayerWarheadLock(uint16_t objectIdx, int playe
 #ifdef XWA_MODERN
 	loadedWarheadCount = 0;
 #endif
-	if ((int16_t)GetModelIndexFromType(g_objectTable[objectIdx].objectType) != -1) {
+	if ((int16_t)GetModelDefIndexFromType(g_objectTable[objectIdx].objectType) != -1) {
 		uint16_t firstSlot;
 
-		modelIndex = (ModelIndex)GetModelIndexFromType(g_objectTable[objectIdx].objectType);
+		modelIndex = (ModelDefIndex)GetModelDefIndexFromType(g_objectTable[objectIdx].objectType);
 		firstSlot = g_modelDefs[modelIndex].warheadLauncherFirstSlot[g_players[playerIdx].selectedWarhead];
 		loadedWarheadCount =
 			g_curCraft->warheadData[firstSlot + 1u].count + g_curCraft->warheadData[firstSlot].count;
@@ -296,10 +296,10 @@ static __inline void laser_UpdatePlayerWarheadLock(uint16_t objectIdx, int playe
 			}
 
 			{
-				ModelIndex missileBoatModelIndex;
+				ModelDefIndex missileBoatModelIndex;
 
-				missileBoatModelIndex = (ModelIndex)GetModelIndexFromType(OBJ_MissileBoat);
-				modelIndex = (ModelIndex)GetModelIndexFromType(g_objectTable[objectIdx].objectType);
+				missileBoatModelIndex = (ModelDefIndex)GetModelDefIndexFromType(OBJ_MissileBoat);
+				modelIndex = (ModelDefIndex)GetModelDefIndexFromType(g_objectTable[objectIdx].objectType);
 				lockThreshold = (uint16_t)(modelIndex != missileBoatModelIndex ? 708u : 354u);
 			}
 			lockTicks = (int16_t)g_curCraft->warheadLockTicks;
@@ -448,7 +448,7 @@ static __inline void laser_UpdateAiPowerRedirects(uint16_t objectIdx, int* shiel
 				g_curCraft->laserRedirect = 3;
 			}
 
-			shieldMax = 4 * g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelIndex].shieldStrength;
+			shieldMax = 4 * g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelDefIndex].shieldStrength;
 			if (g_curCraft->shieldFront < shieldMax) {
 				int chargeBudget;
 				int16_t totalLaserCharge;
@@ -665,7 +665,7 @@ void laser_weaponsfire(void) {
 						int maxShield;
 
 						g_curCraft->shieldFront += shieldDelta;
-						maxShield = 2 * g_modelDefs[g_curCraft->modelIndex].shieldStrength;
+						maxShield = 2 * g_modelDefs[g_curCraft->modelDefIndex].shieldStrength;
 						if (g_curCraft->shieldFront < 0) {
 							g_curCraft->shieldFront = 0;
 						}
@@ -676,7 +676,7 @@ void laser_weaponsfire(void) {
 						int maxShield;
 
 						g_curCraft->shieldRear += shieldDelta;
-						maxShield = 2 * g_modelDefs[g_curCraft->modelIndex].shieldStrength;
+						maxShield = 2 * g_modelDefs[g_curCraft->modelDefIndex].shieldStrength;
 						if (g_curCraft->shieldRear < 0) {
 							g_curCraft->shieldRear = 0;
 						}
@@ -687,7 +687,7 @@ void laser_weaponsfire(void) {
 						int maxShield;
 
 						g_curCraft->shieldFront += shieldDelta / 2;
-						maxShield = 2 * g_modelDefs[g_curCraft->modelIndex].shieldStrength;
+						maxShield = 2 * g_modelDefs[g_curCraft->modelDefIndex].shieldStrength;
 						if (g_curCraft->shieldFront < 0) {
 							g_curCraft->shieldFront = 0;
 						}
@@ -695,7 +695,7 @@ void laser_weaponsfire(void) {
 							g_curCraft->shieldFront = maxShield;
 						}
 						g_curCraft->shieldRear += shieldDelta / 2;
-						maxShield = 2 * g_modelDefs[g_curCraft->modelIndex].shieldStrength;
+						maxShield = 2 * g_modelDefs[g_curCraft->modelDefIndex].shieldStrength;
 						if (g_curCraft->shieldRear < 0) {
 							g_curCraft->shieldRear = 0;
 						}
@@ -916,7 +916,7 @@ static __inline void laser_RotateObjectLocalToWorldOffset(ObjectRecord* obj, int
 	g_rotatedZ = Xwa_Dot3Q15Inline(sideZ, upZ, fwdZ, localSide, localUp, localFwd);
 }
 
-static __inline uint16_t laser_ComputeLauncherCooldownTicks(ModelIndex modelIndex, uint16_t launcherIdx,
+static __inline uint16_t laser_ComputeLauncherCooldownTicks(ModelDefIndex modelIndex, uint16_t launcherIdx,
 															int ownerPlayerIdx) {
 	uint16_t cooldown;
 
@@ -941,7 +941,7 @@ static __inline uint16_t laser_ComputeLauncherCooldownTicks(ModelIndex modelInde
 }
 
 static __inline uint16_t laser_SelectWarheadLauncherProjectileType(ObjectRecord* ownerObj,
-																   ModelIndex modelIndex,
+																   ModelDefIndex modelIndex,
 																   uint16_t launcherIdx) {
 	uint16_t projectileType;
 
@@ -983,7 +983,7 @@ static __inline uint16_t laser_SelectWarheadLauncherProjectileType(ObjectRecord*
 	return projectileType;
 }
 
-static __inline int laser_GetLargeObjectLauncherPoint(ObjectRecord* ownerObj, ModelIndex modelIndex,
+static __inline int laser_GetLargeObjectLauncherPoint(ObjectRecord* ownerObj, ModelDefIndex modelIndex,
 													  uint16_t launcherIdx, int* outMeshIdx,
 													  uint8_t* outHardpointIdx) {
 	int excludedHardpointIndices[256];
@@ -1063,7 +1063,7 @@ static __inline int laser_GetLargeObjectLauncherPoint(ObjectRecord* ownerObj, Mo
 	return 1;
 }
 
-static __inline void laser_GetModelHardpointLauncherPoint(ObjectRecord* ownerObj, ModelIndex modelIndex,
+static __inline void laser_GetModelHardpointLauncherPoint(ObjectRecord* ownerObj, ModelDefIndex modelIndex,
 														  uint16_t launcherIdx, int initialMeshIdx,
 														  uint8_t initialHardpointIdx, int* outMeshIdx,
 														  uint8_t* outHardpointIdx) {
@@ -1219,7 +1219,7 @@ static __inline void laser_ApplyWarheadLauncherAimError(ObjectRecord* ownerObj, 
 
 // FUNCTION: XWA 0x4E1760
 void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, uint16_t targetRef) {
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 	ObjectRecord* ownerObj;
 	int meshIdx;
 	uint8_t hardpointIdx;
@@ -1247,7 +1247,7 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 		return;
 	}
 
-	modelIndex = g_curCraft->modelIndex;
+	modelIndex = g_curCraft->modelDefIndex;
 	ownerObj = &g_objectTable[(uint16_t)ownerObjIdx];
 
 	if (!laser_ObjectTypeFiresFromFloatHardpoints(ownerObj->objectType)) {
@@ -1299,7 +1299,7 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 			if ((g_curCraft->workingSubsystems & 0x10u) == 0) {
 				return;
 			}
-			if (g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[launcherIdx].z < -64) {
+			if (g_modelDefs[g_curCraft->modelDefIndex].weaponHardpoints[launcherIdx].z < -64) {
 				uint8_t inputDisabledFlag;
 
 				if (g_curCraft->carriedObjectIndex != 0xffffu) {
@@ -1536,7 +1536,7 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 	fsfx_triggerweaponsfx(projectileObjIdx, g_localPlayer);
 }
 
-static __inline void laser_GetTurretProjectileHardpoint(ModelIndex firerModelIndex, int turretSeatIdx,
+static __inline void laser_GetTurretProjectileHardpoint(ModelDefIndex firerModelIndex, int turretSeatIdx,
 														int playerIdx, int16_t* outSide, int16_t* outUp,
 														int16_t* outFwd) {
 	uint16_t turretModelType;
@@ -1544,7 +1544,7 @@ static __inline void laser_GetTurretProjectileHardpoint(ModelIndex firerModelInd
 	OptRotationScale* gunTurretRotScale;
 	OptRotationScale* launcherRotScale;
 	OptRotationScale* beamRotScale;
-	ModelIndex turretModelIndex;
+	ModelDefIndex turretModelIndex;
 	ModelDef* turretModelDef;
 	uint16_t hardpointSlot;
 	uint16_t meshIdx;
@@ -1552,7 +1552,7 @@ static __inline void laser_GetTurretProjectileHardpoint(ModelIndex firerModelInd
 	gunTurretRotScale = NULL;
 	launcherRotScale = NULL;
 	beamRotScale = NULL;
-	turretModelType = g_modelDefs[firerModelIndex].turretModelIndex[turretSeatIdx];
+	turretModelType = g_modelDefs[firerModelIndex].turretObjectType[turretSeatIdx];
 	meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretModelType);
 	for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
 		MeshType meshType;
@@ -1576,7 +1576,7 @@ static __inline void laser_GetTurretProjectileHardpoint(ModelIndex firerModelInd
 		g_players[playerIdx].gunnerHardpointToggle = 0;
 	}
 	hardpointSlot = g_players[playerIdx].gunnerHardpointToggle;
-	turretModelIndex = (ModelIndex)GetModelIndexFromType((ObjectTypeId)turretModelType);
+	turretModelIndex = (ModelDefIndex)GetModelDefIndexFromType((ObjectTypeId)turretModelType);
 	turretModelDef = &g_modelDefs[turretModelIndex];
 	*outSide = turretModelDef->weaponHardpoints[hardpointSlot].x;
 	*outUp = turretModelDef->weaponHardpoints[hardpointSlot].z;
@@ -1644,7 +1644,7 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 	ObjectRecord* firerObj;
 	CraftData* firerCraft;
 	WarheadGuidanceState* guidance;
-	ModelIndex firerModelIndex;
+	ModelDefIndex firerModelIndex;
 	uint16_t firerObjectType;
 	int turretSeatIdx;
 	int16_t localSide;
@@ -1720,7 +1720,7 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 		g_objectTable[projectileObjIdx].mobj->framesAlive = 1;
 		g_objectTable[projectileObjIdx].mobj->sourceObjIdx = (int16_t)firerObjIdx;
 		g_objectTable[projectileObjIdx].mobj->sourceObjectType = firerObjectType;
-		firerModelIndex = (ModelIndex)GetModelIndexFromType(firerObjectType);
+		firerModelIndex = (ModelDefIndex)GetModelDefIndexFromType(firerObjectType);
 		g_objectTable[projectileObjIdx].mobj->iff = firerObj->mobj->iff;
 #ifdef XWA_MODERN
 		if (playerIdx != -1 && g_players[playerIdx].objectIndex == (int)firerObjIdx) {
@@ -2087,7 +2087,7 @@ int laser_firemissile(int firerObjIdx, int warheadSlot, int projectileType, unsi
 			if (fireMode < 2u) {
 				unsigned int firstSlot;
 
-				firstSlot = g_modelDefs[g_curCraft->modelIndex].warheadLauncherFirstSlot[fireMode];
+				firstSlot = g_modelDefs[g_curCraft->modelDefIndex].warheadLauncherFirstSlot[fireMode];
 				if (g_curCraft->warheadData[firstSlot].count >=
 					g_curCraft->warheadData[firstSlot + 1].count) {
 					g_curCraft->warheadLauncherFlags[fireMode] &= 0x7fu;
@@ -2105,7 +2105,7 @@ int laser_firemissile(int firerObjIdx, int warheadSlot, int projectileType, unsi
 void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int playerIdx,
 						   uint16_t updateFireDelay) {
 	AiController* effectiveAi;
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 	uint16_t firstSlot;
 	uint16_t lastSlot;
 	int remainingShots;
@@ -2121,7 +2121,7 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 	slotStep = 0;
 	g_curCraft = g_objectTable[shooterObjIdx].mobj->pCraft;
 	effectiveAi = pai_GetEffectiveAIController(g_curCraft);
-	modelIndex = g_curCraft->modelIndex;
+	modelIndex = g_curCraft->modelDefIndex;
 #ifdef XWA_MODERN
 	/* Modern port: articulated models use XWAU's gate (hook_sfoils
 	   NoFireMessageHook): moving S-foils, closed S-foils unless
@@ -2132,7 +2132,8 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 #endif
 		if (playerIdx == g_localPlayer) {
 #ifdef XWA_MODERN
-			msg_emitInFlightMessage(XwaArticulation_Message(shooterObjIdx, MSG_SFOILS_NO_FIRE), g_localPlayer);
+			msg_emitInFlightMessage(XwaArticulation_Message(shooterObjIdx, MSG_SFOILS_NO_FIRE),
+									g_localPlayer);
 #else
 			msg_emitInFlightMessage(MSG_SFOILS_NO_FIRE, g_localPlayer);
 #endif
@@ -2171,8 +2172,8 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 			remainingShots = 1;
 			slotStep = 1;
 			if (firingPlayerIdx != -1 &&
-				g_modelDefs[g_curCraft->modelIndex].laserGroupWeaponKind[laserGroupIdx] == 4 &&
-				g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[firstSlot].z < -64) {
+				g_modelDefs[g_curCraft->modelDefIndex].laserGroupWeaponKind[laserGroupIdx] == 4 &&
+				g_modelDefs[g_curCraft->modelDefIndex].weaponHardpoints[firstSlot].z < -64) {
 				if (g_curCraft->carriedObjectIndex != 0xffffu) {
 					return;
 				}
@@ -2249,8 +2250,8 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 									g_curCraft->warheadData[slotIdx].laserCharge =
 										(uint8_t)(g_curCraft->warheadData[slotIdx].laserCharge - 3u);
 								}
-							} else if (modelIndex == GetModelIndexFromType(OBJ_TIEFighter) ||
-									   modelIndex == GetModelIndexFromType(OBJ_TIEBomber)) {
+							} else if (modelIndex == GetModelDefIndexFromType(OBJ_TIEFighter) ||
+									   modelIndex == GetModelDefIndexFromType(OBJ_TIEBomber)) {
 								g_curCraft->warheadData[slotIdx].laserCharge =
 									(uint8_t)(g_curCraft->warheadData[slotIdx].laserCharge - 3u);
 							} else {
@@ -2349,7 +2350,7 @@ void laser_firerocketsystem(int firerObjIdx, unsigned int fireMode) {
 
 	g_curCraft = g_objectTable[firerObjIdx].mobj->pCraft;
 	fireFlags = g_curCraft->warheadLauncherFlags[fireMode];
-	firstSlot = g_modelDefs[g_curCraft->modelIndex].warheadLauncherFirstSlot[fireMode];
+	firstSlot = g_modelDefs[g_curCraft->modelDefIndex].warheadLauncherFirstSlot[fireMode];
 	firedCount = 0;
 	blockedByLoadedSlot = 0;
 
@@ -2497,7 +2498,7 @@ void laser_fireplayerweapon(int playerIdx) {
 				int remainingGroups;
 
 				laserGroupWeaponKind =
-					g_modelDefs[(uint16_t)GetModelIndexFromType(
+					g_modelDefs[(uint16_t)GetModelDefIndexFromType(
 									g_objectTable[g_players[playerIdx].objectIndex].objectType)]
 						.laserGroupWeaponKind;
 				laserGroupIdx = 0;
@@ -2520,7 +2521,7 @@ void laser_fireplayerweapon(int playerIdx) {
 					int remainingGroups;
 
 					laserGroupWeaponKind =
-						g_modelDefs[(uint16_t)GetModelIndexFromType(
+						g_modelDefs[(uint16_t)GetModelDefIndexFromType(
 										g_objectTable[g_players[playerIdx].objectIndex].objectType)]
 							.laserGroupWeaponKind;
 					laserGroupIdx = 0;
@@ -2562,7 +2563,7 @@ void laser_fireplayerweapon(int playerIdx) {
 			{
 				unsigned int firstSlot;
 
-				firstSlot = g_modelDefs[craft->modelIndex]
+				firstSlot = g_modelDefs[craft->modelDefIndex]
 								.warheadLauncherFirstSlot[g_players[playerIdx].selectedWarhead];
 				if (craft->warheadData[firstSlot + 1u].count + craft->warheadData[firstSlot].count == 0) {
 					g_players[playerIdx].selectedWeaponMode = 0;
@@ -3025,7 +3026,7 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 		g_objectTable[(uint16_t)projectileObjIdx].mobj->framesAlive = 1;
 		g_objectTable[(uint16_t)projectileObjIdx].mobj->sourceObjIdx = (int16_t)ownerObjIdx;
 		g_objectTable[(uint16_t)projectileObjIdx].mobj->sourceObjectType = ownerObjectType;
-		(void)GetModelIndexFromType(ownerObjectType);
+		(void)GetModelDefIndexFromType(ownerObjectType);
 		g_objectTable[(uint16_t)projectileObjIdx].mobj->iff = ownerObj->mobj->iff;
 		g_objectTable[(uint16_t)projectileObjIdx].mobj->team = ownerObj->mobj->team;
 		g_objectTable[(uint16_t)projectileObjIdx].pitch = (Q16Angle)(0x8000u - ownerObj->pitch);

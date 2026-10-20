@@ -2358,10 +2358,10 @@ static __inline int16_t goals_ExtraLineIfWouldWrap(const char* text) {
 }
 
 static __inline const char* goals_GetObjectTypeDisplayName(uint16_t objectType, int plural) {
-	ModelIndex modelIdx;
+	ModelDefIndex modelIdx;
 
-	modelIdx = GetModelIndexFromType(objectType);
-	if (modelIdx != (ModelIndex)0xffff) {
+	modelIdx = GetModelDefIndexFromType(objectType);
+	if (modelIdx != (ModelDefIndex)0xffff) {
 		return plural ? g_strSpeciesNamesPlural[modelIdx] : g_modelDefs[modelIdx].shortName;
 	}
 	if ((uint16_t)objectType >= (uint16_t)OBJ_CommSat1 && (uint16_t)objectType <= (uint16_t)OBJ_NavBuoy2) {
@@ -2383,7 +2383,7 @@ int16_t goals_DrawConditionText(uint16_t craftType, uint16_t condition, uint16_t
 
 	condition = (uint16_t)(condition + conditionRowBase);
 	craftType = g_objectTypeTables.craftTypeToObjectType[craftType];
-	modelIndex = GetModelIndexFromType((ObjectTypeId)craftType);
+	modelIndex = GetModelDefIndexFromType((ObjectTypeId)craftType);
 	if (modelIndex != -1) {
 		switch (g_craftGender[(uint16_t)modelIndex]) {
 			case 0:
@@ -3388,9 +3388,9 @@ void Hud_SetupReticle(void) {
 
 			pai_RotateLocalVectorToWorldScratch(
 				&g_objectTable[g_players[g_localPlayer].objectIndex],
-				g_modelDefs[craft->modelIndex].weaponHardpoints[reticleSlot].x,
-				g_modelDefs[craft->modelIndex].weaponHardpoints[reticleSlot].z,
-				-g_modelDefs[craft->modelIndex].weaponHardpoints[reticleSlot].y);
+				g_modelDefs[craft->modelDefIndex].weaponHardpoints[reticleSlot].x,
+				g_modelDefs[craft->modelDefIndex].weaponHardpoints[reticleSlot].z,
+				-g_modelDefs[craft->modelDefIndex].weaponHardpoints[reticleSlot].y);
 
 			g_camRelWorldX = g_objectTable[g_players[g_localPlayer].objectIndex].world_x + g_rotatedX;
 			g_camRelWorldY = g_objectTable[g_players[g_localPlayer].objectIndex].world_y + g_rotatedY;
@@ -6864,8 +6864,8 @@ void Hud_DrawReticle3D(void) {
 	FlightTexQuad quad;
 	CraftData* craft;
 	uint16_t objectType;
-	ModelIndex missileBoatModelIndex;
-	ModelIndex modelIndex;
+	ModelDefIndex missileBoatModelIndex;
+	ModelDefIndex modelIndex;
 	uint16_t lockFrame;
 	uint8_t inRange;
 	uint16_t lockRange;
@@ -6894,13 +6894,13 @@ void Hud_DrawReticle3D(void) {
 		return;
 	}
 
-	modelIndex = GetModelIndexFromType(objectType);
-	if (modelIndex == (ModelIndex)0xffff) {
+	modelIndex = GetModelDefIndexFromType(objectType);
+	if (modelIndex == (ModelDefIndex)0xffff) {
 		return;
 	}
 
-	missileBoatModelIndex = GetModelIndexFromType(OBJ_MissileBoat);
-	if (missileBoatModelIndex == (ModelIndex)0xffff) {
+	missileBoatModelIndex = GetModelDefIndexFromType(OBJ_MissileBoat);
+	if (missileBoatModelIndex == (ModelDefIndex)0xffff) {
 		return;
 	}
 
@@ -6941,7 +6941,7 @@ void Hud_DrawReticle3D(void) {
 				int linkGroup;
 
 				laserReadyState = 10;
-				linkGroup = laserSlot > g_modelDefs[craft->modelIndex].laserGroupLastSlot[0];
+				linkGroup = laserSlot > g_modelDefs[craft->modelDefIndex].laserGroupLastSlot[0];
 				if ((int8_t)craft->warheadData[laserSlot].laserCharge <= 0) {
 					laserReadyState = 10;
 				} else if ((g_players[g_localPlayer].selectedWeaponMode == 0 &&
@@ -7629,7 +7629,7 @@ void Hud_DetermineLockStatus(void) {
 					int linkGroup;
 
 					laserReadyState = 10;
-					linkGroup = laserSlot > g_modelDefs[craft->modelIndex].laserGroupLastSlot[0];
+					linkGroup = laserSlot > g_modelDefs[craft->modelDefIndex].laserGroupLastSlot[0];
 					if ((int8_t)craft->warheadData[laserSlot].laserCharge > 0) {
 						if (g_players[g_localPlayer].selectedWarhead == linkGroup) {
 							switch (craft->laserLinkMode[linkGroup]) {
@@ -8247,10 +8247,10 @@ void Hud_DrawReticle2D(void) {
 	if (objectType == OBJ_None) {
 		return;
 	}
-	if (GetModelIndexFromType(objectType) == (ModelIndex)0xffff) {
+	if (GetModelDefIndexFromType(objectType) == (ModelDefIndex)0xffff) {
 		return;
 	}
-	if (GetModelIndexFromType(OBJ_MissileBoat) == (ModelIndex)0xffff) {
+	if (GetModelDefIndexFromType(OBJ_MissileBoat) == (ModelDefIndex)0xffff) {
 		return;
 	}
 
@@ -8290,7 +8290,7 @@ void Hud_DrawReticle2D(void) {
 				int linkGroup;
 
 				laserReadyState = 10;
-				linkGroup = laserSlot > g_modelDefs[craft->modelIndex].laserGroupLastSlot[0];
+				linkGroup = laserSlot > g_modelDefs[craft->modelDefIndex].laserGroupLastSlot[0];
 				if ((int8_t)craft->warheadData[laserSlot].laserCharge > 0 &&
 					player->selectedWarhead == linkGroup) {
 					switch (craft->laserLinkMode[linkGroup]) {
@@ -8779,11 +8779,11 @@ void Hud_AppendObjectDisplayName(uint16_t objectOrWaypointIdx, char formatFlags)
 
 			craft = g_objectTable[objectIdx].mobj->pCraft;
 			if ((formatFlags & 1) != 0) {
-				ModelIndex modelIndex;
+				ModelDefIndex modelIndex;
 
-				modelIndex = GetModelIndexFromType(objectType);
+				modelIndex = GetModelDefIndexFromType(objectType);
 				if (modelIndex != 0xffffu) {
-					modelIndex = GetModelIndexFromType(objectType);
+					modelIndex = GetModelDefIndexFromType(objectType);
 					FlightText_AppendScratchString(g_modelDefs[modelIndex].shortName);
 				} else {
 					FlightText_SetScratch(g_strComponentStrings[32]);
@@ -8970,9 +8970,9 @@ void Hud_SetHudViewState(int hudViewState, int playerIdx) {
 			if (g_players[g_localPlayer].objectIndex == 0xffff || hudViewState == 18) {
 				g_projOffsetY = 0;
 			} else {
-				g_projOffsetY =
-					g_modelDefs[g_objectTable[g_players[g_localPlayer].objectIndex].mobj->pCraft->modelIndex]
-						.gunsightOffsetY;
+				g_projOffsetY = g_modelDefs[g_objectTable[g_players[g_localPlayer].objectIndex]
+												.mobj->pCraft->modelDefIndex]
+									.gunsightOffsetY;
 			}
 		}
 		g_projOffsetYf = (float)g_projOffsetY;
@@ -9068,7 +9068,7 @@ void Hud_UpdateTargetInfoCache(void) {
 						}
 					} else {
 						CraftData* carriedCraft;
-						ModelIndex modelIndex;
+						ModelDefIndex modelIndex;
 
 						if (statusText[0] != '\0') {
 							strcpy(g_hudTargetStatusText, statusText);
@@ -9076,7 +9076,7 @@ void Hud_UpdateTargetInfoCache(void) {
 						}
 
 						if (g_objectTable[targetCraft->carriedObjectIndex].objectType == OBJ_None ||
-							(modelIndex = GetModelIndexFromType(
+							(modelIndex = GetModelDefIndexFromType(
 								 g_objectTable[targetCraft->carriedObjectIndex].objectType)) == 0xffffu) {
 							strcat(g_hudTargetStatusText, g_strWarheadUnknown);
 						} else {
@@ -9119,7 +9119,7 @@ void Hud_UpdateTargetInfoCache(void) {
 			} else {
 				shieldTotal = targetCraft->shieldRear + targetCraft->shieldFront;
 				shieldNumerator = shieldTotal >> 1;
-				shieldDenominator = (uint32_t)(2 * g_modelDefs[targetCraft->modelIndex].shieldStrength);
+				shieldDenominator = (uint32_t)(2 * g_modelDefs[targetCraft->modelDefIndex].shieldStrength);
 			}
 			if (shieldDenominator != 0) {
 				shieldPct = 2u * ((uint16_t)MATH2_percentage(shieldNumerator, shieldDenominator) / 0x28fu);
@@ -9153,7 +9153,7 @@ void Hud_UpdateTargetInfoCache(void) {
 					uint16_t systemStrength;
 
 					subsystemDamage = targetCraft->subsystemDamage;
-					systemStrength = g_modelDefs[targetCraft->modelIndex].systemStrength;
+					systemStrength = g_modelDefs[targetCraft->modelDefIndex].systemStrength;
 					if (subsystemDamage >= systemStrength) {
 						systemPct = 0;
 					} else {
@@ -9883,7 +9883,7 @@ void Hud_UpdateWarheadCnt(void) {
 		return;
 	}
 
-	modelIndex = GetModelIndexFromType(objectType);
+	modelIndex = GetModelDefIndexFromType(objectType);
 	if (modelIndex == -1) {
 		return;
 	}
@@ -9962,12 +9962,12 @@ void Hud_OutputWarheadCount(uint16_t warheadSlotIdx, int16_t displaySlot, int16_
 		return;
 	}
 
-	modelIndex = GetModelIndexFromType(objectType);
+	modelIndex = GetModelDefIndexFromType(objectType);
 	if (modelIndex == -1) {
 		return;
 	}
 
-	missileBoatModelIndex = GetModelIndexFromType(OBJ_MissileBoat);
+	missileBoatModelIndex = GetModelDefIndexFromType(OBJ_MissileBoat);
 	if (missileBoatModelIndex == -1) {
 		return;
 	}
@@ -10205,7 +10205,7 @@ void Hud_UpdateThreatIndicators(void) {
 				}
 
 				if ((uint16_t)craft->warheadData[laserSlotIdx].turretTargetObjIdx == localPlayerObjIdx) {
-					meshIdx = g_modelDefs[craft->modelIndex].weaponHardpoints[laserSlotIdx].meshIdx;
+					meshIdx = g_modelDefs[craft->modelDefIndex].weaponHardpoints[laserSlotIdx].meshIdx;
 					if (craft->componentHp[meshIdx] != 0) {
 						turretThreatState = 1;
 					}
@@ -11252,9 +11252,9 @@ int Hud_PointCamera(uint16_t targetObjIdx, int16_t fitDistanceFlag, int playerId
 
 		if (g_objectTable[resolvedTargetIdx].mobj != NULL) {
 			if (g_objectTable[resolvedTargetIdx].mobj->pCraft != NULL) {
-				ModelIndex modelIndex;
+				ModelDefIndex modelIndex;
 
-				modelIndex = GetModelIndexFromType(g_objectTable[resolvedTargetIdx].objectType);
+				modelIndex = GetModelDefIndexFromType(g_objectTable[resolvedTargetIdx].objectType);
 				if (modelIndex != 0xffffu) {
 					int16_t sizeX;
 					int16_t sizeY;
@@ -12046,9 +12046,9 @@ void Hud_UpdateHUDText(void) {
 		warheadLauncherCount = craft->warheadLauncherCount;
 		objectType = (ObjectTypeId)g_objectTable[g_players[g_localPlayer].objectIndex].objectType;
 		if (objectType != OBJ_None) {
-			ModelIndex modelIndex;
+			ModelDefIndex modelIndex;
 
-			modelIndex = GetModelIndexFromType(objectType);
+			modelIndex = GetModelDefIndexFromType(objectType);
 			if (modelIndex != 0xffffu) {
 				ModelDef* modelDef;
 				uint16_t launcherSlotCount;
@@ -13128,12 +13128,12 @@ void Hud_DrawCmdTargetComponentLine(void) {
 			showPercent = 1;
 			if (meshType == MESH_Engine) {
 				uint16_t objectType;
-				ModelIndex modelIndex;
+				ModelDefIndex modelIndex;
 
 				objectType = g_objectTable[targetObjIdx].objectType;
 				if (objectType != OBJ_None) {
-					modelIndex = (ModelIndex)GetModelIndexFromType(objectType);
-					if (modelIndex != (ModelIndex)0xffff) {
+					modelIndex = (ModelDefIndex)GetModelDefIndexFromType(objectType);
+					if (modelIndex != (ModelDefIndex)0xffff) {
 						uint8_t engineEmitterIdx;
 						uint32_t glowIndex;
 
@@ -15840,7 +15840,7 @@ void msg_emitCraftMessage(uint16_t objIdx, CraftData* craft, int16_t msgTemplate
 		if (g_objectTable[objIdx].regionIdx == g_players[g_localPlayer].regionIndex) {
 			flightGroupIdx = g_objectTable[objIdx].flightGroupIdx;
 			g_msgSenderIff = (uint8_t)g_objectTable[objIdx].mobj->iff;
-			modelIndex = craft->modelIndex;
+			modelIndex = craft->modelDefIndex;
 			g_msgArgTable[0] = 0x8000u;
 			g_msgPtrs[0] = g_modelDefs[modelIndex].shortName;
 			if ((int8_t)craft->iffVisibility[(uint16_t)g_players[g_localPlayer].playerIff] >= 0) {
@@ -15887,7 +15887,7 @@ int msg_radioMessage(uint16_t objIdx, CraftData* craft, int16_t hudMessageId, ui
 		} else {
 			const char* modelName;
 
-			modelName = g_modelDefs[craft->modelIndex].shortName;
+			modelName = g_modelDefs[craft->modelDefIndex].shortName;
 			g_msgArgTable[0] = 0x8000u;
 			g_msgPtrs[1] = g_missionFlightGroups[flightGroupIdx].fg.name;
 			g_msgArgTable[1] = 0x8001u;
@@ -15921,7 +15921,7 @@ void msg_reportmessage(uint16_t objIdx, CraftData* craft, int16_t msgTemplateId)
 	if (g_objectTable[objIdx].regionIdx == g_players[g_localPlayer].regionIndex) {
 		flightGroupIdx = g_objectTable[objIdx].flightGroupIdx;
 		g_msgSenderIff = g_missionFlightGroups[flightGroupIdx].fg.iff;
-		modelName = g_modelDefs[craft->modelIndex].shortName;
+		modelName = g_modelDefs[craft->modelDefIndex].shortName;
 		g_msgArgTable[0] = 0x8000u;
 		g_msgPtrs[1] = g_missionFlightGroups[flightGroupIdx].fg.name;
 		g_msgArgTable[1] = 0x8001u;
@@ -16249,7 +16249,7 @@ void msg_formatObjectName(uint16_t objIdx, uint16_t nameMode, char* outName) {
 				char ch;
 
 				outCursor = outName;
-				text = g_modelDefs[craft->modelIndex].longName;
+				text = g_modelDefs[craft->modelDefIndex].longName;
 				ch = *text;
 				while (ch) {
 					*outCursor = ch;
@@ -16264,7 +16264,7 @@ void msg_formatObjectName(uint16_t objIdx, uint16_t nameMode, char* outName) {
 				char ch;
 
 				outCursor = outName;
-				text = g_modelDefs[craft->modelIndex].shortName;
+				text = g_modelDefs[craft->modelDefIndex].shortName;
 				ch = *text;
 				while (ch) {
 					*outCursor = ch;
@@ -16363,7 +16363,7 @@ void msg_emitLocalPlayerCraftMessage(uint16_t messageId) {
 
 	objectIdx = g_players[g_localPlayer].objectIndex;
 	g_msgSenderIff = (uint8_t)g_objectTable[objectIdx].mobj->iff;
-	g_msgPtrs[0] = g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelIndex].shortName;
+	g_msgPtrs[0] = g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelDefIndex].shortName;
 	g_msgArgTable[0] = 0x8000u;
 	g_msgPtrs[1] = g_missionFlightGroups[g_objectTable[objectIdx].flightGroupIdx].fg.name;
 	g_msgArgTable[1] = 0x8001u;
@@ -19364,7 +19364,7 @@ char Mfd_IsCommandMenuItemAvailable(uint16_t playerIdx, uint16_t menuRow, int16_
 			return 0;
 		}
 
-		modelIndex = GetModelIndexFromType(objectType);
+		modelIndex = GetModelDefIndexFromType(objectType);
 		if ((uint16_t)modelIndex == invalidObjectIdx) {
 			return 0;
 		}
@@ -19383,16 +19383,16 @@ char Mfd_IsCommandMenuItemAvailable(uint16_t playerIdx, uint16_t menuRow, int16_
 				}
 				return 0;
 			case 4:
-				if (g_modelDefs[(uint16_t)modelIndex].turretModelIndex[0] == 0) {
+				if (g_modelDefs[(uint16_t)modelIndex].turretObjectType[0] == 0) {
 					return 0;
 				}
-				if (g_modelDefs[(uint16_t)modelIndex].turretModelIndex[1] == 0) {
+				if (g_modelDefs[(uint16_t)modelIndex].turretObjectType[1] == 0) {
 					return 0;
 				}
 				break;
 			case 5:
-				if (g_modelDefs[(uint16_t)modelIndex].turretModelIndex[0] == 0 ||
-					g_modelDefs[(uint16_t)modelIndex].turretModelIndex[1] == 0) {
+				if (g_modelDefs[(uint16_t)modelIndex].turretObjectType[0] == 0 ||
+					g_modelDefs[(uint16_t)modelIndex].turretObjectType[1] == 0) {
 					return 0;
 				}
 				break;

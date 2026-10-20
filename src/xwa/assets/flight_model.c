@@ -44,7 +44,7 @@ int Craft_GetObjectMaxShield(unsigned short objIdx) {
 	CraftData* craft;
 
 	craft = g_objectTable[(uint16_t)objIdx].mobj->pCraft;
-	return 2 * g_modelDefs[craft->modelIndex].shieldStrength;
+	return 2 * g_modelDefs[craft->modelDefIndex].shieldStrength;
 }
 
 // FUNCTION: XWA 0x456FA0
@@ -66,186 +66,186 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 	   swapped hangar object. */
 	if (!XwaHangars_ModelFileName(modelType, modelName, sizeof modelName))
 #endif
-	switch (modelType) {
-		case OBJ_AWing:
-			strcpy(modelName, "Awing.opt");
-			break;
-		case OBJ_XWing:
-			strcpy(modelName, "Xwing.opt");
-			break;
-		case OBJ_YWing:
-			strcpy(modelName, "Ywing.opt");
-			break;
-		case OBJ_BWing:
-			strcpy(modelName, "Bwing.opt");
-			break;
-		case OBJ_Z95:
-			strcpy(modelName, "Z-95.opt");
-			break;
-		case OBJ_Tug:
-			strcpy(modelName, "Tug.opt");
-			break;
-		case OBJ_Shuttle:
-			strcpy(modelName, "Shuttle.opt");
-			break;
-		case OBJ_CorellianTransport2:
-			strcpy(modelName, "CorellianTransport2.opt");
-			break;
-		case OBJ_MilleniumFalcon2:
-			strcpy(modelName, "MilleniumFalcon2.opt");
-			break;
-		case OBJ_FamilyTransport:
-			strcpy(modelName, "FamilyTransport.opt");
-			break;
-		case OBJ_CargoCanister:
-			strcpy(modelName, "CargoCanister.opt");
-			break;
-		case OBJ_ContainerBox:
-			strcpy(modelName, "ContainerBox.opt");
-			break;
-		case OBJ_ContainerSphere:
-			strcpy(modelName, "ContainerSphere.opt");
-			break;
-		case OBJ_FamilyBase:
-			strcpy(modelName, "FamilyBase.opt");
-			break;
-		case OBJ_Hangar:
-			strcpy(modelName, "Hangar.opt");
-			break;
-		case OBJ_HangarCrane:
-			strcpy(modelName, "HangarCrane.opt");
-			break;
-		case OBJ_HangarCrate:
-			strcpy(modelName, "HangarCrate.opt");
-			break;
-		case OBJ_HangarDroid:
-			strcpy(modelName, "HangarDroid.opt");
-			break;
-		case OBJ_HangarDroid2:
-			strcpy(modelName, "HangarDroid2.opt");
-			break;
-		case OBJ_HangarGenerator:
-			strcpy(modelName, "HangarGenerator.opt");
-			break;
-		case OBJ_HangarMonitor:
-			strcpy(modelName, "HangarMonitor.opt");
-			break;
-		case OBJ_HangarWorkStand:
-			strcpy(modelName, "HangarWorkstand.opt");
-			break;
-		case OBJ_HangarRoofCrane:
-			strcpy(modelName, "HangarRoofCrane.opt");
-			break;
-		case OBJ_WorkDroid1:
-			strcpy(modelName, "WorkDroid1.opt");
-			break;
-		case OBJ_WorkDroid2:
-			strcpy(modelName, "WorkDroid2.opt");
-			break;
-		case OBJ_CorellianTransportGunner:
-			strcpy(modelName, "CorellianTransportGunner.opt");
-			break;
-		case OBJ_ChuteMouth:
-			strcpy(modelName, "ChuteMouth.opt");
-			break;
-		case OBJ_ChuteTunnel:
-			strcpy(modelName, "ChuteTunnel.opt");
-			break;
-		case OBJ_SalvageRoom:
-			strcpy(modelName, "SalvageRoom.opt");
-			break;
-		case OBJ_Compactor:
-			strcpy(modelName, "Compactor.opt");
-			break;
-		case OBJ_AccelRing:
-			strcpy(modelName, "AccelRing.opt");
-			break;
-		case OBJ_AccelRing2:
-			strcpy(modelName, "AccelRing2.opt");
-			break;
-		case OBJ_SmeltingRoom:
-			strcpy(modelName, "SmeltingRoom.opt");
-			break;
-		case OBJ_SRTubeNOBend:
-			strcpy(modelName, "SR_TubeNOBend.opt");
-			break;
-		case OBJ_SRTubeUP:
-			strcpy(modelName, "SR_TubeUP.opt");
-			break;
-		case OBJ_SRTubeDown:
-			strcpy(modelName, "SR_TubeDown.opt");
-			break;
-		case OBJ_SRTubeLH:
-			strcpy(modelName, "SR_TubeLH.opt");
-			break;
-		case OBJ_SRTubeRH:
-			strcpy(modelName, "SR_TubeRH.opt");
-			break;
-		case OBJ_Centrifuge:
-			strcpy(modelName, "Centrifuge.opt");
-			break;
-		case OBJ_AccelRing3:
-			strcpy(modelName, "AccelRing3.opt");
-			break;
-		case OBJ_ContainerGrandePG:
-			strcpy(modelName, "ContainerGrandePG.opt");
-			break;
-		case OBJ_Asteroid01:
-			strcpy(modelName, "Asteroid01.opt");
-			break;
-		case OBJ_Asteroid02:
-			strcpy(modelName, "Asteroid02.opt");
-			break;
-		case OBJ_Asteroid03:
-			strcpy(modelName, "Asteroid03.opt");
-			break;
-		case OBJ_Junk01:
-			strcpy(modelName, "Junk01.opt");
-			break;
-		case OBJ_Junk02:
-			strcpy(modelName, "Junk02.opt");
-			break;
-		case OBJ_Junk03:
-			strcpy(modelName, "Junk03.opt");
-			break;
-		case OBJ_Junk04:
-			strcpy(modelName, "Junk04.opt");
-			break;
-		case OBJ_Junk05:
-			strcpy(modelName, "Junk05.opt");
-			break;
-		case OBJ_Junk06:
-			strcpy(modelName, "Junk06.opt");
-			break;
-		case OBJ_Junk07:
-			strcpy(modelName, "Junk07.opt");
-			break;
-		case OBJ_Junk08:
-			strcpy(modelName, "Junk08.opt");
-			break;
-		case OBJ_Junk09:
-			strcpy(modelName, "Junk09.opt");
-			break;
-		case OBJ_Junk10:
-			strcpy(modelName, "Junk10.opt");
-			break;
-		case OBJ_JunkBlock:
-			strcpy(modelName, "JunkBlock.opt");
-			break;
-		case OBJ_MoltenBlock:
-			strcpy(modelName, "MoltenBlock.opt");
-			break;
-		default:
-#ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars removes this filter): with hangar
-			   settings, any type with a model list row loads, as hangar maps
-			   place any of them. */
-			if (XwaHangars_TypeFileName(modelType, modelName, sizeof modelName)) {
+		switch (modelType) {
+			case OBJ_AWing:
+				strcpy(modelName, "Awing.opt");
 				break;
-			}
+			case OBJ_XWing:
+				strcpy(modelName, "Xwing.opt");
+				break;
+			case OBJ_YWing:
+				strcpy(modelName, "Ywing.opt");
+				break;
+			case OBJ_BWing:
+				strcpy(modelName, "Bwing.opt");
+				break;
+			case OBJ_Z95:
+				strcpy(modelName, "Z-95.opt");
+				break;
+			case OBJ_Tug:
+				strcpy(modelName, "Tug.opt");
+				break;
+			case OBJ_Shuttle:
+				strcpy(modelName, "Shuttle.opt");
+				break;
+			case OBJ_CorellianTransport2:
+				strcpy(modelName, "CorellianTransport2.opt");
+				break;
+			case OBJ_MilleniumFalcon2:
+				strcpy(modelName, "MilleniumFalcon2.opt");
+				break;
+			case OBJ_FamilyTransport:
+				strcpy(modelName, "FamilyTransport.opt");
+				break;
+			case OBJ_CargoCanister:
+				strcpy(modelName, "CargoCanister.opt");
+				break;
+			case OBJ_ContainerBox:
+				strcpy(modelName, "ContainerBox.opt");
+				break;
+			case OBJ_ContainerSphere:
+				strcpy(modelName, "ContainerSphere.opt");
+				break;
+			case OBJ_FamilyBase:
+				strcpy(modelName, "FamilyBase.opt");
+				break;
+			case OBJ_Hangar:
+				strcpy(modelName, "Hangar.opt");
+				break;
+			case OBJ_HangarCrane:
+				strcpy(modelName, "HangarCrane.opt");
+				break;
+			case OBJ_HangarCrate:
+				strcpy(modelName, "HangarCrate.opt");
+				break;
+			case OBJ_HangarDroid:
+				strcpy(modelName, "HangarDroid.opt");
+				break;
+			case OBJ_HangarDroid2:
+				strcpy(modelName, "HangarDroid2.opt");
+				break;
+			case OBJ_HangarGenerator:
+				strcpy(modelName, "HangarGenerator.opt");
+				break;
+			case OBJ_HangarMonitor:
+				strcpy(modelName, "HangarMonitor.opt");
+				break;
+			case OBJ_HangarWorkStand:
+				strcpy(modelName, "HangarWorkstand.opt");
+				break;
+			case OBJ_HangarRoofCrane:
+				strcpy(modelName, "HangarRoofCrane.opt");
+				break;
+			case OBJ_WorkDroid1:
+				strcpy(modelName, "WorkDroid1.opt");
+				break;
+			case OBJ_WorkDroid2:
+				strcpy(modelName, "WorkDroid2.opt");
+				break;
+			case OBJ_CorellianTransportGunner:
+				strcpy(modelName, "CorellianTransportGunner.opt");
+				break;
+			case OBJ_ChuteMouth:
+				strcpy(modelName, "ChuteMouth.opt");
+				break;
+			case OBJ_ChuteTunnel:
+				strcpy(modelName, "ChuteTunnel.opt");
+				break;
+			case OBJ_SalvageRoom:
+				strcpy(modelName, "SalvageRoom.opt");
+				break;
+			case OBJ_Compactor:
+				strcpy(modelName, "Compactor.opt");
+				break;
+			case OBJ_AccelRing:
+				strcpy(modelName, "AccelRing.opt");
+				break;
+			case OBJ_AccelRing2:
+				strcpy(modelName, "AccelRing2.opt");
+				break;
+			case OBJ_SmeltingRoom:
+				strcpy(modelName, "SmeltingRoom.opt");
+				break;
+			case OBJ_SRTubeNOBend:
+				strcpy(modelName, "SR_TubeNOBend.opt");
+				break;
+			case OBJ_SRTubeUP:
+				strcpy(modelName, "SR_TubeUP.opt");
+				break;
+			case OBJ_SRTubeDown:
+				strcpy(modelName, "SR_TubeDown.opt");
+				break;
+			case OBJ_SRTubeLH:
+				strcpy(modelName, "SR_TubeLH.opt");
+				break;
+			case OBJ_SRTubeRH:
+				strcpy(modelName, "SR_TubeRH.opt");
+				break;
+			case OBJ_Centrifuge:
+				strcpy(modelName, "Centrifuge.opt");
+				break;
+			case OBJ_AccelRing3:
+				strcpy(modelName, "AccelRing3.opt");
+				break;
+			case OBJ_ContainerGrandePG:
+				strcpy(modelName, "ContainerGrandePG.opt");
+				break;
+			case OBJ_Asteroid01:
+				strcpy(modelName, "Asteroid01.opt");
+				break;
+			case OBJ_Asteroid02:
+				strcpy(modelName, "Asteroid02.opt");
+				break;
+			case OBJ_Asteroid03:
+				strcpy(modelName, "Asteroid03.opt");
+				break;
+			case OBJ_Junk01:
+				strcpy(modelName, "Junk01.opt");
+				break;
+			case OBJ_Junk02:
+				strcpy(modelName, "Junk02.opt");
+				break;
+			case OBJ_Junk03:
+				strcpy(modelName, "Junk03.opt");
+				break;
+			case OBJ_Junk04:
+				strcpy(modelName, "Junk04.opt");
+				break;
+			case OBJ_Junk05:
+				strcpy(modelName, "Junk05.opt");
+				break;
+			case OBJ_Junk06:
+				strcpy(modelName, "Junk06.opt");
+				break;
+			case OBJ_Junk07:
+				strcpy(modelName, "Junk07.opt");
+				break;
+			case OBJ_Junk08:
+				strcpy(modelName, "Junk08.opt");
+				break;
+			case OBJ_Junk09:
+				strcpy(modelName, "Junk09.opt");
+				break;
+			case OBJ_Junk10:
+				strcpy(modelName, "Junk10.opt");
+				break;
+			case OBJ_JunkBlock:
+				strcpy(modelName, "JunkBlock.opt");
+				break;
+			case OBJ_MoltenBlock:
+				strcpy(modelName, "MoltenBlock.opt");
+				break;
+			default:
+#ifdef XWA_MODERN
+				/* Modern port (XWAU hook_hangars removes this filter): with hangar
+				   settings, any type with a model list row loads, as hangar maps
+				   place any of them. */
+				if (XwaHangars_TypeFileName(modelType, modelName, sizeof modelName)) {
+					break;
+				}
 #endif
-			return 0;
-	}
+				return 0;
+		}
 
 	strcpy(path, "FlightModels\\");
 	strcat(path, modelName);
@@ -268,7 +268,7 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 	XwaHangars_ModelLoaded(modelType, modelHandle);
 #endif
 	g_modelTypeTable[modelType].curTexLevel = texLevel;
-	FeDiskIo_BuildModelDef((uint16_t)g_modelTypeTable[modelType].modelIndex, modelType);
+	FeDiskIo_BuildModelDef((uint16_t)g_modelTypeTable[modelType].modelDefIndex, modelType);
 
 	meshCount = ModelMesh_GetCount(modelType);
 	g_objectTypeMeshCache[modelType].meshCount = meshCount;

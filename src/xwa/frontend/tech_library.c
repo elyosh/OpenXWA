@@ -203,7 +203,7 @@ int BuildCraftTechStats(CraftTechStats* stats) {
 	stats->genusId = g_modelTypeTable[objectType].genusId;
 
 	if (objectType < OBJ_Count) {
-		modelIndex = g_modelTypeTable[(uint16_t)objectType].modelIndex;
+		modelIndex = g_modelTypeTable[(uint16_t)objectType].modelDefIndex;
 	} else {
 		modelIndex = UINT16_MAX;
 	}
@@ -314,7 +314,7 @@ char* GetCraftTypeModelLongName(int craftType) {
 
 	objectType = g_objectTypeTables.craftTypeToObjectType[craftType];
 	if ((uint16_t)objectType < OBJ_Count) {
-		modelIndex = (uint16_t)g_modelTypeTable[(uint16_t)objectType].modelIndex;
+		modelIndex = (uint16_t)g_modelTypeTable[(uint16_t)objectType].modelDefIndex;
 	} else {
 		modelIndex = UINT16_MAX;
 	}

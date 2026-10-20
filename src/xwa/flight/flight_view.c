@@ -279,7 +279,7 @@ static void FVIEW_StoreCamShadow(const double m[9]) {
 // FUNCTION: XWA 0x497610
 int FlightView_ComputeSeatEyeOffset(int playerIdx) {
 	int objectIdx;
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 	Vec3f vec;
 	float axisAngle[4];
 	Matrix3x3 out;
@@ -294,7 +294,7 @@ int FlightView_ComputeSeatEyeOffset(int playerIdx) {
 		return 0;
 	}
 
-	modelIndex = GetModelIndexFromType(g_objectTable[objectIdx].objectType);
+	modelIndex = GetModelDefIndexFromType(g_objectTable[objectIdx].objectType);
 	if (modelIndex == 0xffffu) {
 		return 0;
 	}
@@ -321,7 +321,7 @@ int FlightView_ComputeSeatEyeOffset(int playerIdx) {
 		vec.y = (float)(g_hardpointOriginOffset[1] - g_modelDefs[modelIndex].turretSeatPosY[seatTableIdx]);
 		vec.z = (float)(g_hardpointOriginOffset[2] + g_modelDefs[modelIndex].turretSeatPosZ[seatTableIdx]);
 
-		turretModelType = g_modelDefs[modelIndex].turretModelIndex[seatTableIdx];
+		turretModelType = g_modelDefs[modelIndex].turretObjectType[seatTableIdx];
 		meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretModelType);
 		if (meshCount > 0u) {
 			meshIdx = 0;
@@ -422,12 +422,12 @@ void FlightView_RenderCockpitModel(void) {
 	loadedModelSlot = &g_loadedModels.byObjectType[objectType];
 	savedLoadedModel = *loadedModelSlot;
 	if (g_players[g_localPlayer].currentSeatIdx != 0) {
-		ModelIndex modelIndex;
+		ModelDefIndex modelIndex;
 		uint16_t turretModelType;
 
-		modelIndex = GetModelIndexFromType(objectType);
+		modelIndex = GetModelDefIndexFromType(objectType);
 		turretModelType =
-			g_modelDefs[modelIndex].turretModelIndex[g_players[g_localPlayer].currentSeatIdx - 1];
+			g_modelDefs[modelIndex].turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
 		if (turretModelType != 0) {
 			*loadedModelSlot = g_loadedModels.byObjectType[turretModelType];
 		} else {
@@ -1948,13 +1948,13 @@ char FlightView_Render(void) {
 						if (g_players[g_localPlayer].currentSeatIdx == 0) {
 							g_loadedModels.byObjectType[(uint16_t)obj->objectType] = g_cockpitModel;
 						} else {
-							ModelIndex modelIndex;
+							ModelDefIndex modelIndex;
 							uint16_t turretModelType;
 
-							modelIndex = (ModelIndex)GetModelIndexFromType(obj->objectType);
+							modelIndex = (ModelDefIndex)GetModelDefIndexFromType(obj->objectType);
 							turretModelType =
 								g_modelDefs[(uint16_t)modelIndex]
-									.turretModelIndex[g_players[g_localPlayer].currentSeatIdx - 1];
+									.turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
 							if (turretModelType != 0) {
 								g_loadedModels.byObjectType[(uint16_t)obj->objectType] =
 									g_loadedModels.byObjectType[turretModelType];
@@ -3012,7 +3012,7 @@ int FVIEW_BuildCameraOrient(int16_t rollQ16, int16_t pitchQ16, int16_t yawQ16, i
 							int playerIdx) {
 	CraftData* craft;
 	MobileObject* playerMobj;
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 	int cameraAxisX;
 	int cameraAxisY;
 	int cameraAxisZ;
@@ -3070,7 +3070,7 @@ int FVIEW_BuildCameraOrient(int16_t rollQ16, int16_t pitchQ16, int16_t yawQ16, i
 	if (playerIdx >= 0 && g_players[playerIdx].currentSeatIdx != 0 &&
 		g_players[playerIdx].mapCameraState == 0) {
 		playerObjectIdx = g_players[playerIdx].objectIndex;
-		modelIndex = GetModelIndexFromType(g_objectTable[playerObjectIdx].objectType);
+		modelIndex = GetModelDefIndexFromType(g_objectTable[playerObjectIdx].objectType);
 
 		if (modelIndex != 0xffffu) {
 			savedAxisX = g_curMatR1_X;

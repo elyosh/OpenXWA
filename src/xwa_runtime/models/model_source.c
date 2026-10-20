@@ -251,7 +251,7 @@ static int ModelSource_BuildCockpitKeys(void) {
 		int seat;
 
 		for (seat = 0; ok && seat < 2; ++seat) {
-			uint16_t objectType = g_modelDefs[modelIndex].turretModelIndex[seat];
+			uint16_t objectType = g_modelDefs[modelIndex].turretObjectType[seat];
 			const ModelTypeInfo* info;
 
 			if (objectType == 0 || objectType >= OBJ_Count) {

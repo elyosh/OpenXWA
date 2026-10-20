@@ -101,7 +101,7 @@ int ComputeCraftCombatRating(ObjectTypeId objectType) {
 	if ((uint16_t)objectType >= OBJ_Count) {
 		modelIndex = -1;
 	} else {
-		modelIndex = g_modelTypeTable[(uint16_t)objectType].modelIndex;
+		modelIndex = g_modelTypeTable[(uint16_t)objectType].modelDefIndex;
 	}
 	if (modelIndex == -1) {
 		return 5;

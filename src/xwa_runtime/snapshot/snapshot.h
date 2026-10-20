@@ -529,9 +529,9 @@ typedef struct XwaFlightCamera {
 	 * hangar draws that region's backdrops. The hangar objects are in a
 	 * synthetic region, so `region` cannot be used there. */
 	uint8_t mission_region;
-	uint8_t map_mode;         /* player.mapCameraState */
-	uint8_t film_overlay;     /* film playback with overlay camera */
-	uint8_t in_hangar;        /* g_inHangarReady (hangar scene phase) */
+	uint8_t map_mode;     /* player.mapCameraState */
+	uint8_t film_overlay; /* film playback with overlay camera */
+	uint8_t in_hangar;    /* g_inHangarReady (hangar scene phase) */
 	/* Death Star tunnel/interior mode. Type-2006 explosion billboards
 	 * skip the 1024 projected-size clamp. */
 	uint8_t death_star_mode;
@@ -615,7 +615,7 @@ typedef struct XwaCockpit {
 	/* Cockpit OPT basename from the loaded-handle registry: seat 0 =
 	 * g_cockpitModel (includes the classic Tie/CombatSim fallback
 	 * cockpits); turret seats = the seat's turret model
-	 * (g_modelDefs turretModelIndex[seat-1]). Empty = none loaded. */
+	 * (g_modelDefs turretObjectType[seat-1]). Empty = none loaded. */
 	char model_name[40];
 	/* The own craft's "<name>Exterior.opt" variant (g_exteriorModel) —
 	 * the classic swaps it in for the PLAYER object in external view

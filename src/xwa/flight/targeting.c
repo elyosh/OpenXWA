@@ -45,7 +45,7 @@ int Targeting_GetObjectBoxExtent(int objectIdx) {
 	if (mobj != NULL) {
 		craft = mobj->pCraft;
 		if (craft != NULL) {
-			modelIndex = craft->modelIndex;
+			modelIndex = craft->modelDefIndex;
 			if (modelIndex != 0xffff) {
 				extent = ((int16_t)g_modelDefs[modelIndex].boundSizeZ +
 						  (int16_t)g_modelDefs[modelIndex].boundSizeY +
@@ -249,7 +249,7 @@ int16_t Targeting_ScoreCandidate(uint16_t candidateObjIdx, int16_t mode, int pla
 		if (g_objectTable[candidateRef].mobj->pCraft != NULL) {
 			ModelDef* modelDef;
 
-			modelDef = &g_modelDefs[g_objectTable[candidateRef].mobj->pCraft->modelIndex];
+			modelDef = &g_modelDefs[g_objectTable[candidateRef].mobj->pCraft->modelDefIndex];
 			maxBoundsExtent =
 				((int16_t)(modelDef->boundSizeX + modelDef->boundSizeY + modelDef->boundSizeZ) / 3)
 				<< (uint8_t)modelDef->boundSizeShift;

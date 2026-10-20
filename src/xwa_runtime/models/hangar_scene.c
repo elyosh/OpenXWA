@@ -234,7 +234,7 @@ void XwaHangarScene_Rebuild(void) {
 		Math_SetFpuSinglePrecisionMode();
 	}
 	g_launchBaseZ = launchRef->world_z +
-					g_modelDefs[(uint16_t)GetModelIndexFromType((ObjectTypeId)g_hangarBackdropModelType)]
+					g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)g_hangarBackdropModelType)]
 						.meshAttachData[6];
 	/* The hook keeps the setup offset; the entering craft's applies here. */
 	launchRef->world_x += s_launchRefOffset[0];
@@ -244,7 +244,7 @@ void XwaHangarScene_Rebuild(void) {
 	launchRef->mobj->prevWorldY = launchRef->world_y;
 	XwaHangarScene_SetHangarMarkings();
 	if (g_hangarBackdropModelType == OBJ_Hangar) {
-		int16_t hangarModelIdx = GetModelIndexFromType(OBJ_Hangar);
+		int16_t hangarModelIdx = GetModelDefIndexFromType(OBJ_Hangar);
 		double worldX = (double)launchRef->world_x;
 		float worldY = (float)launchRef->world_y;
 		RenderScene_EnableProjectionYClamp(

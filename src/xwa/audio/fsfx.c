@@ -1476,7 +1476,7 @@ int fsfx_UpdateTargetingTone(int state) {
 			return 1;
 		}
 	} else if (state == 2) {
-		ModelIndex missileBoatModelIndex;
+		ModelDefIndex missileBoatModelIndex;
 		uint16_t seekerScale;
 
 		if (Sound_CountPlayingInstances(g_sfxIds[77]) != 0) {
@@ -1486,8 +1486,8 @@ int fsfx_UpdateTargetingTone(int state) {
 		}
 		g_targetingToneWeaponReadyQueued = 0;
 
-		missileBoatModelIndex = GetModelIndexFromType(OBJ_MissileBoat);
-		if (GetModelIndexFromType(g_objectTable[g_players[g_localPlayer].objectIndex].objectType) ==
+		missileBoatModelIndex = GetModelDefIndexFromType(OBJ_MissileBoat);
+		if (GetModelDefIndexFromType(g_objectTable[g_players[g_localPlayer].objectIndex].objectType) ==
 			missileBoatModelIndex) {
 			seekerScale = 354;
 		} else {
@@ -1695,10 +1695,10 @@ void fsfx_UpdateMissileThreatWarning(void) {
 			}
 
 			if ((int16_t)craft->warheadLockTicks > armedLockStrength) {
-				ModelIndex modelIndex;
+				ModelDefIndex modelIndex;
 
-				modelIndex = GetModelIndexFromType((ObjectTypeId)g_objectTable[objIdx].objectType);
-				if (modelIndex == (ModelIndex)0xffff) {
+				modelIndex = GetModelDefIndexFromType((ObjectTypeId)g_objectTable[objIdx].objectType);
+				if (modelIndex == (ModelDefIndex)0xffff) {
 					continue;
 				}
 
@@ -1732,7 +1732,7 @@ void fsfx_UpdateMissileThreatWarning(void) {
 
 			if ((int16_t)craft->warheadLockTicks > armedLockStrength) {
 				for (launcherIdx = 0; launcherIdx < craft->warheadLauncherCount; ++launcherIdx) {
-					ModelIndex modelIndex;
+					ModelDefIndex modelIndex;
 					int warheadSlot;
 					int lastSlot;
 
@@ -1740,8 +1740,8 @@ void fsfx_UpdateMissileThreatWarning(void) {
 						continue;
 					}
 
-					modelIndex = GetModelIndexFromType((ObjectTypeId)g_objectTable[objIdx].objectType);
-					if (modelIndex == (ModelIndex)0xffff) {
+					modelIndex = GetModelDefIndexFromType((ObjectTypeId)g_objectTable[objIdx].objectType);
+					if (modelIndex == (ModelDefIndex)0xffff) {
 						continue;
 					}
 

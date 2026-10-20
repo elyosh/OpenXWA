@@ -453,7 +453,7 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 	}
 
 	ModelBounds_ClearCache();
-	FeDiskIo_BuildModelDef((uint16_t)g_modelTypeTable[g_modelPreviewModelType].modelIndex,
+	FeDiskIo_BuildModelDef((uint16_t)g_modelTypeTable[g_modelPreviewModelType].modelDefIndex,
 						   (uint16_t)g_modelPreviewModelType);
 
 	memset(&g_modelPreviewMobileObject, 0, sizeof(g_modelPreviewMobileObject));
@@ -472,8 +472,9 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 	 * destroyed: the ship-info flight group's while a briefing plays, none
 	 * otherwise (the tech library has no mission). */
 	XwaObjectProfiles_Apply((uint16_t)g_modelPreviewModelType,
-							g_briefingPlaybackActive ? (int)(uint16_t)g_briefingMapPrimaryHighlightIconIndex : 0xFFFF, 0,
-							&g_modelPreviewCraftData);
+							g_briefingPlaybackActive ? (int)(uint16_t)g_briefingMapPrimaryHighlightIconIndex
+													 : 0xFFFF,
+							0, &g_modelPreviewCraftData);
 #endif
 	g_modelPreviewAngleD = 0;
 
@@ -500,7 +501,7 @@ char ModelPreview_LoadModel(const char* modelName, int objectType) {
 									(int)(lightY * g_modelPreviewNegativeOne * g_modelPreviewQ15Scale),
 									(int)(lightZ * g_modelPreviewQ15Scale), 0.80000001f, 1.0f, 1.0f, 1.0f);
 
-	if (g_frontendD3DInitialized && g_modelTypeTable[g_modelPreviewModelType].modelIndex != -1) {
+	if (g_frontendD3DInitialized && g_modelTypeTable[g_modelPreviewModelType].modelDefIndex != -1) {
 		OptNode* firstRootNode;
 
 		opt = (OptimizedPolyObject*)Memory_LockHandle(g_loadedModels.byObjectType[0]);

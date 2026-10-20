@@ -1429,7 +1429,7 @@ void DeathStar_UpdateFollowOverrideCraft(int objectIdx) {
 		object->mobj->moveVectorDirty = 1;
 		object->mobj->speed =
 			3 *
-			g_modelDefs[(uint16_t)g_modelTypeTable[(uint16_t)g_deathStarFollowLeaderObjectType].modelIndex]
+			g_modelDefs[(uint16_t)g_modelTypeTable[(uint16_t)g_deathStarFollowLeaderObjectType].modelDefIndex]
 				.maxSpeed;
 		object->mobj->pCraft->objectKind = 9;
 	}
@@ -2298,11 +2298,11 @@ void DeathStar_InitMobileObjectForType(uint16_t objectType, unsigned int objIdx)
 	mobj->moveVectorDirty = 1;
 	mobj->orientMatrixDirty = 1;
 
-	modelIndex = g_modelTypeTable[objectTypeIndex].modelIndex;
+	modelIndex = g_modelTypeTable[objectTypeIndex].modelDefIndex;
 	if (modelIndex != 0xffffu) {
 		craft = mobj->pCraft;
 		memset(craft, 0, sizeof(*craft));
-		craft->modelIndex = (uint16_t)modelIndex;
+		craft->modelDefIndex = (uint16_t)modelIndex;
 		craft->leader_obj_idx = -1;
 		craft->workingSubsystems = 0x03ffu;
 		craft->aiFlight.maxSpeedCache = g_modelDefs[(uint16_t)modelIndex].maxSpeed;
@@ -3360,8 +3360,8 @@ void DeathStar_InitReactorAssaultState(void) {
 	}
 
 	craft = g_objectTable[g_deathStarReactorAssaultCraftObjIdx].mobj->pCraft;
-	craft->warheadData[g_modelDefs[craft->modelIndex].warheadLauncherFirstSlot[0]].count = 1;
-	craft->warheadData[g_modelDefs[craft->modelIndex].warheadLauncherLastSlot[0]].count = 1;
+	craft->warheadData[g_modelDefs[craft->modelDefIndex].warheadLauncherFirstSlot[0]].count = 1;
+	craft->warheadData[g_modelDefs[craft->modelDefIndex].warheadLauncherLastSlot[0]].count = 1;
 }
 
 // FUNCTION: XWA 0x428270

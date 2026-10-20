@@ -1167,7 +1167,7 @@ void GlowMark_CreateEngineKnockoutBlastMark(unsigned int objectIndex, uint8_t em
 	OptEngineGlow* glow;
 	GlowMarkRequest* request;
 
-	modelIndex = g_modelTypeTable[(uint16_t)g_objectTable[objectIndex].objectType].modelIndex;
+	modelIndex = g_modelTypeTable[(uint16_t)g_objectTable[objectIndex].objectType].modelDefIndex;
 	if ((uint8_t)emitterIndex >= g_modelDefs[modelIndex].engineGlowCount) {
 		return;
 	}
@@ -1185,7 +1185,7 @@ void GlowMark_CreateEngineKnockoutBlastMark(unsigned int objectIndex, uint8_t em
 	g_objRenderState[objectIndex].engineGlowKnockouts = mark;
 	mark->emitterIndex = (uint8_t)emitterIndex;
 	mark->objectIndex = objectIndex;
-	mark->modelIndex = modelIndex;
+	mark->modelDefIndex = modelIndex;
 	mark->next = oldHead;
 
 	glow = g_modelDefs[modelIndex].engineGlows[(uint8_t)emitterIndex];
@@ -1276,12 +1276,12 @@ char GlowMark_SpawnLocalPlayerHitEffects(void) {
 	loadedModelSlot = &g_loadedModels.byObjectType[(uint16_t)objectType];
 	savedModelHandle = *loadedModelSlot;
 	if (g_players[g_localPlayer].currentSeatIdx != 0) {
-		ModelIndex modelIndex;
+		ModelDefIndex modelIndex;
 		uint16_t turretModelType;
 
-		modelIndex = GetModelIndexFromType(objectType);
+		modelIndex = GetModelDefIndexFromType(objectType);
 		turretModelType =
-			g_modelDefs[modelIndex].turretModelIndex[g_players[g_localPlayer].currentSeatIdx - 1];
+			g_modelDefs[modelIndex].turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
 		if (turretModelType != 0) {
 			*loadedModelSlot = g_loadedModels.byObjectType[turretModelType];
 		} else {
@@ -1624,7 +1624,7 @@ void GlowMark_QueueCraftDamageSurfaceEffects(uint16_t objectIndex) {
 
 	craft = g_objectTable[objectIndex].mobj->pCraft;
 	if (((craft->workingSubsystems == 0 && craft->subsystemDamage != 0) ||
-		 craft->subsystemDamage > g_modelDefs[craft->modelIndex].systemStrength) &&
+		 craft->subsystemDamage > g_modelDefs[craft->modelDefIndex].systemStrength) &&
 		(GameRand2() & 0x0f) != 0) {
 		float scale;
 
@@ -2064,7 +2064,7 @@ void EngineGlow_RenderForObject(unsigned int objIdx) {
 	objectIndex = objIdx & 0xffffu;
 	obj = &g_objectTable[objectIndex];
 	objectType = (uint16_t)obj->objectType;
-	modelIndex = (uint16_t)g_modelTypeTable[objectType].modelIndex;
+	modelIndex = (uint16_t)g_modelTypeTable[objectType].modelDefIndex;
 	scale = 0.0f;
 
 	if (objectIndex != (unsigned int)g_players[g_localPlayer].objectIndex) {
@@ -2240,7 +2240,7 @@ void EngineGlow_RenderSceneGlows(void) {
 		unsigned int glowIndex;
 
 		modelType = (ObjectTypeId)g_modelPreviewModelType;
-		modelIndex = g_modelTypeTable[modelType].modelIndex;
+		modelIndex = g_modelTypeTable[modelType].modelDefIndex;
 		if (modelIndex == -1) {
 			return;
 		}

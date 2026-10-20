@@ -123,7 +123,7 @@ unsigned int Craft_ApplyEngineEmitterDamage(uint16_t objIdx, uint16_t engineEmit
 		destroyedCount = 0;
 		remainingDamage -= scaledHealth;
 		*health = (uint8_t)destroyedCount;
-		engineGlowCount = g_modelDefs[g_curCraft->modelIndex].engineGlowCount;
+		engineGlowCount = g_modelDefs[g_curCraft->modelDefIndex].engineGlowCount;
 		for (glowIndex = 0; glowIndex < engineGlowCount; ++glowIndex) {
 			if (g_curCraft->engineEmitterHealth[glowIndex] == 0) {
 				++destroyedCount;
@@ -153,7 +153,7 @@ unsigned int Craft_ApplyEngineEmitterDamage(uint16_t objIdx, uint16_t engineEmit
 // FUNCTION: XWA 0x4E0E10
 unsigned int Craft_DamageNearestEngineEmitterForMesh(uint16_t objIdx, int16_t componentId,
 													 unsigned int damage) {
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 	float nearestDistSq;
 	int emitterIdx;
 	int meshIdx;
@@ -161,7 +161,7 @@ unsigned int Craft_DamageNearestEngineEmitterForMesh(uint16_t objIdx, int16_t co
 	uint16_t engineGlowCount;
 
 	selectedEmitter = -1;
-	modelIndex = GetModelIndexFromType(g_objectTable[objIdx].objectType);
+	modelIndex = GetModelDefIndexFromType(g_objectTable[objIdx].objectType);
 	nearestDistSq = flt_5A9EC8;
 	meshIdx = componentId;
 	meshIdx += 0xffff;
@@ -506,12 +506,12 @@ void FlightLight_SetLocalPlayerPulseEnabled(int pulseSlot, int enabled) {
 // FUNCTION: XWA 0x4F22B0
 void FlightLight_AppendScenePointLightForObject(ObjectRecord* obj) {
 	uint16_t objectType;
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 	int16_t appendLight;
 
 	appendLight = 1;
 	objectType = obj->objectType;
-	modelIndex = g_modelTypeTable[(uint16_t)objectType].modelIndex;
+	modelIndex = g_modelTypeTable[(uint16_t)objectType].modelDefIndex;
 	if (g_localLightsLevel != 2 && obj->genusId != GENUS_Explosion &&
 		obj->genusId != GENUS_DeathStarTunnelSegment) {
 		return;
@@ -838,7 +838,7 @@ void FlightLight_AppendScenePointLightForObject(ObjectRecord* obj) {
 			}
 			g_scenePointLightCount = lightIdx + 1;
 		}
-	} else if (modelIndex != (ModelIndex)0xffff) {
+	} else if (modelIndex != (ModelDefIndex)0xffff) {
 		int glowIdx;
 		uint8_t engineGlowCount;
 

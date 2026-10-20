@@ -20,7 +20,7 @@ typedef struct ModelTypeInfo {
 	TexLevel* curTexLevel;
 	TexLevel* texLevels;
 	uint16_t flags;
-	int16_t modelIndex;
+	int16_t modelDefIndex; /* the craft record, or -1 */
 	uint16_t textureGroup;
 	uint16_t frameCount;
 } ModelTypeInfo;
@@ -63,7 +63,7 @@ typedef enum ModelTypeFlags {
 
 extern ModelTypeInfo g_modelTypeTable[OBJ_Count];
 
-ModelIndex GetModelIndexFromType(uint16_t objectType);
+ModelDefIndex GetModelDefIndexFromType(uint16_t objectType);
 
 #ifdef __cplusplus
 }

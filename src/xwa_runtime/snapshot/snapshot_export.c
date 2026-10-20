@@ -537,7 +537,7 @@ const char* XwaSnapshotExport_ModelName(int object_type) {
 	}
 	/* Fallback: the craft model-def name. */
 	if (object_type < OBJ_Count) {
-		const ModelIndex idx = GetModelIndexFromType((uint16_t)object_type);
+		const ModelDefIndex idx = GetModelDefIndexFromType((uint16_t)object_type);
 		if ((int)idx >= 0 && (int)idx < XWA_MODEL_DEF_COUNT) {
 			const char* name = g_modelDefs[idx].name;
 			if (name && name[0]) {

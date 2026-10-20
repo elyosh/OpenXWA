@@ -278,7 +278,7 @@ void Yard_InitChallengeScene(void) {
 				ObjectTypeId ringType;
 				int16_t yaw;
 				int16_t pitch;
-				ModelIndex modelIndex;
+				ModelDefIndex modelIndex;
 				ObjectRecord* object;
 
 				if (checkpointIdx < 4u) {
@@ -326,7 +326,7 @@ void Yard_InitChallengeScene(void) {
 				}
 				checkpoint->field04 = 2;
 				g_yardBuildParentObjIdx = checkpoint->objectIdx;
-				modelIndex = GetModelIndexFromType(ringType);
+				modelIndex = GetModelDefIndexFromType(ringType);
 				pai_RotateLocalVectorToWorldScratch(
 					&g_objectTable[g_yardBuildParentObjIdx], g_modelDefs[modelIndex].childMountPoints[3],
 					g_modelDefs[modelIndex].childMountPoints[4], g_modelDefs[modelIndex].childMountPoints[5]);
@@ -346,7 +346,7 @@ void Yard_InitChallengeScene(void) {
 				ObjectTypeId ringType;
 				int16_t yaw;
 				int16_t pitch;
-				ModelIndex modelIndex;
+				ModelDefIndex modelIndex;
 				ObjectRecord* object;
 
 				if (checkpointIdx < 8u) {
@@ -389,7 +389,7 @@ void Yard_InitChallengeScene(void) {
 				}
 				g_yardBuildParentObjIdx = checkpoint->objectIdx;
 				checkpoint->field04 = 2;
-				modelIndex = GetModelIndexFromType(ringType);
+				modelIndex = GetModelDefIndexFromType(ringType);
 				pai_RotateLocalVectorToWorldScratch(
 					&g_objectTable[g_yardBuildParentObjIdx], g_modelDefs[modelIndex].childMountPoints[3],
 					g_modelDefs[modelIndex].childMountPoints[4], g_modelDefs[modelIndex].childMountPoints[5]);
@@ -416,7 +416,7 @@ void Yard_InitChallengeScene(void) {
 				ObjectTypeId ringType;
 				int16_t yaw;
 				int16_t pitch;
-				ModelIndex modelIndex;
+				ModelDefIndex modelIndex;
 				ObjectRecord* object;
 
 				if (checkpointIdx < 4u) {
@@ -464,7 +464,7 @@ void Yard_InitChallengeScene(void) {
 				}
 				checkpoint->field04 = 2;
 				g_yardBuildParentObjIdx = checkpoint->objectIdx;
-				modelIndex = GetModelIndexFromType(ringType);
+				modelIndex = GetModelDefIndexFromType(ringType);
 				pai_RotateLocalVectorToWorldScratch(
 					&g_objectTable[g_yardBuildParentObjIdx], g_modelDefs[modelIndex].childMountPoints[3],
 					g_modelDefs[modelIndex].childMountPoints[4], g_modelDefs[modelIndex].childMountPoints[5]);
@@ -484,7 +484,7 @@ void Yard_InitChallengeScene(void) {
 				ObjectTypeId ringType;
 				int16_t yaw;
 				int16_t pitch;
-				ModelIndex modelIndex;
+				ModelDefIndex modelIndex;
 				ObjectRecord* object;
 
 				if (checkpointIdx < 8u) {
@@ -527,7 +527,7 @@ void Yard_InitChallengeScene(void) {
 				}
 				g_yardBuildParentObjIdx = checkpoint->objectIdx;
 				checkpoint->field04 = 2;
-				modelIndex = GetModelIndexFromType(ringType);
+				modelIndex = GetModelDefIndexFromType(ringType);
 				pai_RotateLocalVectorToWorldScratch(
 					&g_objectTable[g_yardBuildParentObjIdx], g_modelDefs[modelIndex].childMountPoints[3],
 					g_modelDefs[modelIndex].childMountPoints[4], g_modelDefs[modelIndex].childMountPoints[5]);
@@ -554,7 +554,7 @@ void Yard_InitChallengeScene(void) {
 				ObjectTypeId ringType;
 				int16_t yaw;
 				int16_t pitch;
-				ModelIndex modelIndex;
+				ModelDefIndex modelIndex;
 				ObjectRecord* object;
 
 				if (checkpointIdx < 4u) {
@@ -590,7 +590,7 @@ void Yard_InitChallengeScene(void) {
 				}
 				checkpoint->field04 = 2;
 				g_yardBuildParentObjIdx = checkpoint->objectIdx;
-				modelIndex = GetModelIndexFromType(ringType);
+				modelIndex = GetModelDefIndexFromType(ringType);
 				pai_RotateLocalVectorToWorldScratch(
 					&g_objectTable[g_yardBuildParentObjIdx], g_modelDefs[modelIndex].childMountPoints[3],
 					g_modelDefs[modelIndex].childMountPoints[4], g_modelDefs[modelIndex].childMountPoints[5]);
@@ -614,7 +614,7 @@ void Yard_InitChallengeScene(void) {
 				ObjectTypeId ringType;
 				int16_t yaw;
 				int16_t pitch;
-				ModelIndex modelIndex;
+				ModelDefIndex modelIndex;
 				ObjectRecord* object;
 
 				if (checkpointIdx < 4u) {
@@ -642,7 +642,7 @@ void Yard_InitChallengeScene(void) {
 				}
 				g_yardBuildParentObjIdx = checkpoint->objectIdx;
 				checkpoint->field04 = 2;
-				modelIndex = GetModelIndexFromType(ringType);
+				modelIndex = GetModelDefIndexFromType(ringType);
 				pai_RotateLocalVectorToWorldScratch(
 					&g_objectTable[g_yardBuildParentObjIdx], g_modelDefs[modelIndex].childMountPoints[3],
 					g_modelDefs[modelIndex].childMountPoints[4], g_modelDefs[modelIndex].childMountPoints[5]);
@@ -674,7 +674,7 @@ void Yard_InitChallengeScene(void) {
 
 	if (g_yardChallengeMode >= 6u && g_yardR2D2ObjIdx != 0xffff) {
 		int parentType;
-		ModelIndex modelIndex;
+		ModelDefIndex modelIndex;
 		int worldX;
 		int worldY;
 		int worldZ;
@@ -682,18 +682,18 @@ void Yard_InitChallengeScene(void) {
 		switch (g_yardChallengeMode) {
 			case 6:
 				parentObjIdx = g_yardContext.smeltingRoomObjIdx;
-				modelIndex = GetModelIndexFromType(OBJ_SmeltingRoom);
+				modelIndex = GetModelDefIndexFromType(OBJ_SmeltingRoom);
 				break;
 
 			case 7:
 				parentObjIdx = g_yardContainerGrandeObjIdx;
-				modelIndex = GetModelIndexFromType(OBJ_ContainerGrandePG);
+				modelIndex = GetModelDefIndexFromType(OBJ_ContainerGrandePG);
 				break;
 
 			default:
 				parentType = playerIdx;
 				parentObjIdx = parentType;
-				modelIndex = (ModelIndex)parentType;
+				modelIndex = (ModelDefIndex)parentType;
 				break;
 		}
 
@@ -771,10 +771,10 @@ void Yard_InitChallengeScene(void) {
 
 		for (dockIdx = 0; dockIdx < 3u; ++dockIdx) {
 			const Vec3i* dockPoint;
-			ModelIndex modelIndex;
+			ModelDefIndex modelIndex;
 			ObjectRecord* centrifugeObj;
 
-			modelIndex = GetModelIndexFromType(OBJ_Centrifuge);
+			modelIndex = GetModelDefIndexFromType(OBJ_Centrifuge);
 			/* The three molten-block launch positions use dock points 0, 2, and 4. */
 			dockPoint = &g_modelDefs[modelIndex].dockPoints[dockIdx * 2u];
 			pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_yardCentrifugeObjIdx], dockPoint->x,
@@ -1067,7 +1067,7 @@ int Yard_SpawnObjectAtWorldPos(ObjectTypeId objectType, int worldX, int worldY, 
 
 			FlightObject_InitMeshAnimationDefaults(objIdx);
 			if ((g_curCraft->systemFlags & 0x10u) != 0) {
-				ModelIndex modelIndex;
+				ModelDefIndex modelIndex;
 				uint16_t laserSlotCount;
 				int initGroupIdx;
 				uint16_t groupIdx;
@@ -1084,8 +1084,8 @@ int Yard_SpawnObjectAtWorldPos(ObjectTypeId objectType, int worldX, int worldY, 
 					g_curCraft->laserLastFireTimestamp[initGroupIdx] = 0;
 				}
 
-				modelIndex = (ModelIndex)GetModelIndexFromType((ObjectTypeId)objectTypeId);
-				g_curCraft->modelIndex = modelIndex;
+				modelIndex = (ModelDefIndex)GetModelDefIndexFromType((ObjectTypeId)objectTypeId);
+				g_curCraft->modelDefIndex = modelIndex;
 				for (groupIdx = 0; groupIdx < 3; ++groupIdx) {
 					g_curCraft->laserProjectileTypeId[groupIdx] =
 						g_modelDefs[modelIndex].laserGroupWeaponType[groupIdx];
@@ -1156,7 +1156,7 @@ int Yard_SpawnObjectAtWorldPos(ObjectTypeId objectType, int worldX, int worldY, 
 int Yard_SpawnJunkBlockAtChamberDock(void) {
 	int slotIdx;
 	int* stateValue;
-	ModelIndex compactorModelIdx;
+	ModelDefIndex compactorModelIdx;
 	int objIdx;
 	YardTrackedObjectState* state;
 
@@ -1171,7 +1171,7 @@ int Yard_SpawnJunkBlockAtChamberDock(void) {
 
 	if (slotIdx < g_yardContext.smeltingJunkStateCount ||
 		(g_yardContext.smeltingJunkStateCount < 9 && (slotIdx = g_yardContext.smeltingJunkStateCount, 1))) {
-		compactorModelIdx = GetModelIndexFromType(OBJ_Compactor);
+		compactorModelIdx = GetModelDefIndexFromType(OBJ_Compactor);
 		pai_RotateLocalVectorToWorldScratch(
 			&g_objectTable[g_yardContext.compactorObjIdx], g_modelDefs[compactorModelIdx].dockPoints[1].x,
 			g_modelDefs[compactorModelIdx].dockPoints[1].z, g_modelDefs[compactorModelIdx].dockPoints[1].y);
@@ -1470,7 +1470,7 @@ void Yard_UpdatePeriodicRubbleSpawner(int deltaTicks) {
 int Yard_SpawnChildAtMount(ObjectTypeId childType, int parentObjIdx, int mountSelector, int yawArg,
 						   int pitchArg, int angleMode) {
 	uint16_t parentType;
-	ModelIndex parentModelIdx;
+	ModelDefIndex parentModelIdx;
 	int mountLocalSide;
 	int mountLocalUp;
 	int mountLocalFwd;
@@ -1483,13 +1483,13 @@ int Yard_SpawnChildAtMount(ObjectTypeId childType, int parentObjIdx, int mountSe
 	Q16Angle yaw;
 	Q16Angle pitch;
 	int childObjIdx;
-	ModelIndex childModelIdx;
+	ModelDefIndex childModelIdx;
 	int childMountWorldX;
 	int childMountWorldY;
 	int childMountWorldZ;
 
 	parentType = g_objectTable[parentObjIdx].objectType;
-	parentModelIdx = GetModelIndexFromType(parentType);
+	parentModelIdx = GetModelDefIndexFromType(parentType);
 
 	switch (mountSelector) {
 		case 0:
@@ -1581,7 +1581,7 @@ int Yard_SpawnChildAtMount(ObjectTypeId childType, int parentObjIdx, int mountSe
 	}
 
 	childObjIdx = Yard_SpawnObjectAtWorldPos(childType, parentWorldX, parentWorldY, parentWorldZ, yaw, pitch);
-	childModelIdx = GetModelIndexFromType(childType);
+	childModelIdx = GetModelDefIndexFromType(childType);
 	switch (mountSelector) {
 		case 0:
 		case 3:
@@ -1747,9 +1747,9 @@ void Yard_UpdateSmeltingJunkStates(int deltaTicks) {
 					break;
 
 				case 6: {
-					ModelIndex smeltingModelIdx;
+					ModelDefIndex smeltingModelIdx;
 
-					smeltingModelIdx = GetModelIndexFromType(OBJ_SmeltingRoom);
+					smeltingModelIdx = GetModelDefIndexFromType(OBJ_SmeltingRoom);
 					pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_yardContext.smeltingRoomObjIdx],
 														g_modelDefs[smeltingModelIdx].dockPoints[0].x,
 														g_modelDefs[smeltingModelIdx].dockPoints[0].z,
@@ -1765,9 +1765,9 @@ void Yard_UpdateSmeltingJunkStates(int deltaTicks) {
 				}
 
 				case 7: {
-					ModelIndex smeltingModelIdx;
+					ModelDefIndex smeltingModelIdx;
 
-					smeltingModelIdx = GetModelIndexFromType(OBJ_SmeltingRoom);
+					smeltingModelIdx = GetModelDefIndexFromType(OBJ_SmeltingRoom);
 					pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_yardContext.smeltingRoomObjIdx],
 														g_modelDefs[smeltingModelIdx].dockPoints[1].x,
 														g_modelDefs[smeltingModelIdx].dockPoints[1].z,
@@ -1857,7 +1857,7 @@ void Yard_UpdateCentrifugeContainerStates(int deltaTicks) {
 					break;
 
 				case 2: {
-					ModelIndex centrifugeModelIdx;
+					ModelDefIndex centrifugeModelIdx;
 
 #ifdef XWA_MODERN
 					if (Yard_ModernIsLegacyCadenceDue()) {
@@ -1871,7 +1871,7 @@ void Yard_UpdateCentrifugeContainerStates(int deltaTicks) {
 					}
 #endif
 
-					centrifugeModelIdx = GetModelIndexFromType(OBJ_Centrifuge);
+					centrifugeModelIdx = GetModelDefIndexFromType(OBJ_Centrifuge);
 					pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_yardCentrifugeObjIdx],
 														g_modelDefs[centrifugeModelIdx].meshAttachData[8],
 														g_modelDefs[centrifugeModelIdx].meshAttachData[9],
@@ -1922,9 +1922,9 @@ void Yard_UpdateCentrifugeContainerStates(int deltaTicks) {
 					break;
 
 				case 4: {
-					ModelIndex containerModelIdx;
+					ModelDefIndex containerModelIdx;
 
-					containerModelIdx = GetModelIndexFromType(OBJ_ContainerGrandePG);
+					containerModelIdx = GetModelDefIndexFromType(OBJ_ContainerGrandePG);
 					pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_yardContainerGrandeObjIdx],
 														g_modelDefs[containerModelIdx].dockPoints[0].x,
 														g_modelDefs[containerModelIdx].dockPoints[0].z,
@@ -1949,7 +1949,7 @@ void Yard_UpdateCentrifugeContainerStates(int deltaTicks) {
 				}
 
 				case 7: {
-					ModelIndex containerModelIdx;
+					ModelDefIndex containerModelIdx;
 
 #ifdef XWA_MODERN
 					if (Yard_ModernIsLegacyCadenceDue()) {
@@ -1963,7 +1963,7 @@ void Yard_UpdateCentrifugeContainerStates(int deltaTicks) {
 					}
 #endif
 
-					containerModelIdx = GetModelIndexFromType(OBJ_ContainerGrandePG);
+					containerModelIdx = GetModelDefIndexFromType(OBJ_ContainerGrandePG);
 					pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_yardContainerGrandeObjIdx],
 														g_modelDefs[containerModelIdx].dockPoints[1].x,
 														g_modelDefs[containerModelIdx].dockPoints[1].z,
@@ -2443,7 +2443,7 @@ void Yard_UpdateCentrifugeMechanisms(int deltaTicks) {
 
 // FUNCTION: XWA 0x517EE0
 void Yard_UpdateRubbleChunkMotion(int deltaTicks) {
-	ModelIndex compactorModelIdx;
+	ModelDefIndex compactorModelIdx;
 	int dock0WorldX;
 	int dock0WorldY;
 	int dock0WorldZ;
@@ -2452,7 +2452,7 @@ void Yard_UpdateRubbleChunkMotion(int deltaTicks) {
 	int dock2WorldZ;
 	uint16_t slotIdx;
 
-	compactorModelIdx = GetModelIndexFromType(OBJ_Compactor);
+	compactorModelIdx = GetModelDefIndexFromType(OBJ_Compactor);
 	pai_RotateLocalVectorToWorldScratch(
 		&g_objectTable[g_yardContext.compactorObjIdx], g_modelDefs[compactorModelIdx].dockPoints[0].x,
 		g_modelDefs[compactorModelIdx].dockPoints[0].z, g_modelDefs[compactorModelIdx].dockPoints[0].y);
@@ -2516,7 +2516,7 @@ void Yard_UpdateRubbleChunkMotion(int deltaTicks) {
 				break;
 			}
 			case 2: {
-				ModelIndex modelIdx;
+				ModelDefIndex modelIdx;
 				MobileObject* rubbleMobj;
 				Q16Angle currentYaw;
 				Q16Angle currentPitch;
@@ -2543,7 +2543,7 @@ void Yard_UpdateRubbleChunkMotion(int deltaTicks) {
 				worldY = g_objectTable[objectIdx].world_y;
 				worldZ = g_objectTable[objectIdx].world_z;
 
-				modelIdx = GetModelIndexFromType(OBJ_Compactor);
+				modelIdx = GetModelDefIndexFromType(OBJ_Compactor);
 				pai_RotateLocalVectorToWorldScratch(
 					&g_objectTable[g_yardContext.compactorObjIdx], g_modelDefs[modelIdx].dockPoints[1].x,
 					g_modelDefs[modelIdx].dockPoints[1].z, g_modelDefs[modelIdx].dockPoints[1].y);
@@ -3097,7 +3097,7 @@ void Yard_UpdateSmeltingRoomTurrets(int deltaTicks) {
 
 			projectileObjIdx = (uint16_t)Object_AllocSlotForGenus(GENUS_NpcProjectile);
 			if (projectileObjIdx != 0xffff) {
-				ModelIndex smeltingModelIdx;
+				ModelDefIndex smeltingModelIdx;
 				int hardpointSlot;
 				WarheadGuidanceState* guidance;
 				int targetObjIdx;
@@ -3105,7 +3105,7 @@ void Yard_UpdateSmeltingRoomTurrets(int deltaTicks) {
 				int playerObjIdx;
 
 				hardpointSlot = g_yardContext.smeltingRoomTurretMeshIdx - 3;
-				smeltingModelIdx = GetModelIndexFromType(OBJ_SmeltingRoom);
+				smeltingModelIdx = GetModelDefIndexFromType(OBJ_SmeltingRoom);
 
 				ModelMesh_ApplyAnimatedMeshRotationToPoint(
 					smeltingCraft->meshRotation[SMELTINGROOM_TURRET(g_yardContext.smeltingRoomTurretMeshIdx)]
@@ -3571,10 +3571,10 @@ int Yard_BuildAdvancedChallengeCourse(void) {
 		}
 		g_yardBuildParentObjIdx = checkpoint->objectIdx;
 		{
-			ModelIndex modelIndex;
+			ModelDefIndex modelIndex;
 			ObjectRecord* object;
 
-			modelIndex = GetModelIndexFromType(ringType);
+			modelIndex = GetModelDefIndexFromType(ringType);
 			pai_RotateLocalVectorToWorldScratch(
 				&g_objectTable[g_yardBuildParentObjIdx], g_modelDefs[modelIndex].childMountPoints[3],
 				g_modelDefs[modelIndex].childMountPoints[4], g_modelDefs[modelIndex].childMountPoints[5]);
@@ -3753,10 +3753,10 @@ int Yard_BuildAdvancedChallengeCourse(void) {
 		}
 		g_yardBuildParentObjIdx = checkpoint->objectIdx;
 		{
-			ModelIndex modelIndex;
+			ModelDefIndex modelIndex;
 			ObjectRecord* object;
 
-			modelIndex = GetModelIndexFromType(ringType);
+			modelIndex = GetModelDefIndexFromType(ringType);
 			pai_RotateLocalVectorToWorldScratch(
 				&g_objectTable[g_yardBuildParentObjIdx], g_modelDefs[modelIndex].childMountPoints[3],
 				g_modelDefs[modelIndex].childMountPoints[4], g_modelDefs[modelIndex].childMountPoints[5]);
@@ -4265,9 +4265,9 @@ int Yard_ShouldRenderChallengeObject(unsigned int objectIdx) {
 			switch (objectType) {
 				case OBJ_AccelRing:
 				case OBJ_AccelRing2: {
-					ModelIndex smeltingModel;
+					ModelDefIndex smeltingModel;
 
-					smeltingModel = GetModelIndexFromType(OBJ_SmeltingRoom);
+					smeltingModel = GetModelDefIndexFromType(OBJ_SmeltingRoom);
 					pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_yardContext.smeltingRoomObjIdx],
 														g_modelDefs[smeltingModel].meshAttachData[5],
 														g_modelDefs[smeltingModel].meshAttachData[6],
@@ -4290,12 +4290,12 @@ int Yard_ShouldRenderChallengeObject(unsigned int objectIdx) {
 				case OBJ_SRTubeDown:
 				case OBJ_SRTubeLH:
 				case OBJ_SRTubeRH: {
-					ModelIndex smeltingModel;
+					ModelDefIndex smeltingModel;
 
 					if (objectIdx > (unsigned int)(g_yardAdvancedCourseTubeFirstObjIdx + 4)) {
 						return false;
 					}
-					smeltingModel = GetModelIndexFromType(OBJ_SmeltingRoom);
+					smeltingModel = GetModelDefIndexFromType(OBJ_SmeltingRoom);
 					pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_yardContext.smeltingRoomObjIdx],
 														g_modelDefs[smeltingModel].childMountPoints[0],
 														g_modelDefs[smeltingModel].childMountPoints[1],
@@ -4369,9 +4369,9 @@ int Yard_ShouldRenderChallengeObject(unsigned int objectIdx) {
 				case OBJ_AccelRing:
 				case OBJ_AccelRing3:
 				case OBJ_Asteroid02: {
-					ModelIndex centrifugeModel;
+					ModelDefIndex centrifugeModel;
 
-					centrifugeModel = GetModelIndexFromType(OBJ_Centrifuge);
+					centrifugeModel = GetModelDefIndexFromType(OBJ_Centrifuge);
 					pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_yardCentrifugeObjIdx],
 														g_modelDefs[centrifugeModel].meshAttachData[8],
 														g_modelDefs[centrifugeModel].meshAttachData[9],
@@ -4950,12 +4950,12 @@ void Yard_UpdateChallengeProgressAndScoring(int deltaTicks) {
 						int loX;
 						int loY;
 						int loZ;
-						ModelIndex compModel2;
+						ModelDefIndex compModel2;
 						ObjectRecord* compObj2;
 						int hiY;
 						int hiZ;
 						int px;
-						ModelIndex compModel = GetModelIndexFromType(OBJ_Compactor);
+						ModelDefIndex compModel = GetModelDefIndexFromType(OBJ_Compactor);
 						pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_yardContext.compactorObjIdx],
 															g_modelDefs[compModel].dockPoints[0].x,
 															g_modelDefs[compModel].dockPoints[0].z,
@@ -4964,7 +4964,7 @@ void Yard_UpdateChallengeProgressAndScoring(int deltaTicks) {
 						loX = g_rotatedX + compObj->world_x;
 						loY = g_rotatedY + compObj->world_y;
 						loZ = g_rotatedZ + compObj->world_z;
-						compModel2 = GetModelIndexFromType(OBJ_Compactor);
+						compModel2 = GetModelDefIndexFromType(OBJ_Compactor);
 						pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_yardContext.compactorObjIdx],
 															g_modelDefs[compModel2].dockPoints[2].x,
 															g_modelDefs[compModel2].dockPoints[2].z,

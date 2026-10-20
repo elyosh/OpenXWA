@@ -97,7 +97,7 @@ typedef struct ModelDef {
 	int16_t turretSeatPosX[2];
 	int16_t turretMountAngleB[2];
 	int16_t turretMountAngleA[2];
-	uint16_t turretModelIndex[2];
+	uint16_t turretObjectType[2]; /* the object type of each turret seat's model */
 	int16_t turretAimLimitA[2];
 	int16_t turretAimLimitB[2];
 	int meshAttachData[11];

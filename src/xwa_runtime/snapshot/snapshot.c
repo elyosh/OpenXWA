@@ -1726,8 +1726,8 @@ void XwaSnapshot_CaptureFlight(void) {
 				handle = g_cockpitModel;
 			} else {
 				const uint16_t turretType =
-					g_modelDefs[(uint16_t)GetModelIndexFromType((uint16_t)pobj->objectType)]
-						.turretModelIndex[(k->seat - 1) & 1];
+					g_modelDefs[(uint16_t)GetModelDefIndexFromType((uint16_t)pobj->objectType)]
+						.turretObjectType[(k->seat - 1) & 1];
 				if (turretType != 0) {
 					handle = g_loadedModels.byObjectType[turretType];
 				}

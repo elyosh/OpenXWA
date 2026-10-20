@@ -866,7 +866,7 @@ int Flight_UpdateFighterWarnings(char resetState) {
 										 ++laserSlotIdx, ++weapon) {
 										if (weapon->weaponType >= 4u &&
 											(uint16_t)weapon->turretTargetObjIdx == candidateObjIdx &&
-											turretCraft->componentHp[g_modelDefs[turretCraft->modelIndex]
+											turretCraft->componentHp[g_modelDefs[turretCraft->modelDefIndex]
 																		 .weaponHardpoints[laserSlotIdx]
 																		 .meshIdx] != 0) {
 											fsfx_speakorderack(g_localPlayer, (int)candidateObjIdx, 4, -1,
@@ -1858,7 +1858,8 @@ void FlightObject_UpdateSpecialBehavior(void) {
 	/* Modern port: S-foils and landing gear of articulated models, and the
 	   stock S-foils in the high-rate mode, move on every sim step; phase 1
 	   skips them. The crew meshes' drawn angles follow phase 2's crew steps. */
-	for (objIdx = g_activeRegionObjectSlotStart; (uint16_t)objIdx < g_activeRegionCraftObjectSlotEnd; ++objIdx) {
+	for (objIdx = g_activeRegionObjectSlotStart; (uint16_t)objIdx < g_activeRegionCraftObjectSlotEnd;
+		 ++objIdx) {
 		XwaArticulation_StepSFoils(objIdx);
 	}
 	for (objIdx = g_activeRegionObjectSlotStart; (uint16_t)objIdx < g_regionStaticObjectSlotEnd; ++objIdx) {
@@ -1887,124 +1888,127 @@ void FlightObject_UpdateSpecialBehavior(void) {
 							/* Stepped above, every sim step. */
 						} else
 #endif
-						switch ((uint16_t)objectType) {
-							case 1:
-							case 4:
-							case 12:
-							case 16:
-							case 17:
-							case 50: {
-								uint16_t meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(modelType);
-								int16_t anyRotated = 0;
-								int m;
-								int remainingMeshes;
+							switch ((uint16_t)objectType) {
+								case 1:
+								case 4:
+								case 12:
+								case 16:
+								case 17:
+								case 50: {
+									uint16_t meshCount =
+										(uint16_t)ModelMesh_GetObjectTypeMeshCount(modelType);
+									int16_t anyRotated = 0;
+									int m;
+									int remainingMeshes;
 
-								if (meshCount > 0) {
-									m = 0;
-									remainingMeshes = meshCount;
-									do {
-										MeshType meshType = ModelMesh_GetObjectTypeMeshType(modelType, m);
+									if (meshCount > 0) {
+										m = 0;
+										remainingMeshes = meshCount;
+										do {
+											MeshType meshType = ModelMesh_GetObjectTypeMeshType(modelType, m);
 
-										// Falcon bridge fold (no completion accounting).
-										if (meshType == MESH_Bridge && objectType == 4 &&
-											(g_curCraft->sFoilState & 1)) {
-											uint8_t mr = g_curCraft->meshRotation[m];
-											if (g_curCraft->sFoilState & 2) {
-												if (mr < 0x40) {
-													g_curCraft->meshRotation[m] = (uint8_t)(mr + 2);
-												}
-											} else if (mr > 0) {
-												g_curCraft->meshRotation[m] = (uint8_t)(mr - 2);
-												if (g_curCraft->meshRotation[m] > 0x80) {
-													g_curCraft->meshRotation[m] = 0;
+											// Falcon bridge fold (no completion accounting).
+											if (meshType == MESH_Bridge && objectType == 4 &&
+												(g_curCraft->sFoilState & 1)) {
+												uint8_t mr = g_curCraft->meshRotation[m];
+												if (g_curCraft->sFoilState & 2) {
+													if (mr < 0x40) {
+														g_curCraft->meshRotation[m] = (uint8_t)(mr + 2);
+													}
+												} else if (mr > 0) {
+													g_curCraft->meshRotation[m] = (uint8_t)(mr - 2);
+													if (g_curCraft->meshRotation[m] > 0x80) {
+														g_curCraft->meshRotation[m] = 0;
+													}
 												}
 											}
-										}
-										// Launcher arms (type 12).
-										if (meshType == MESH_Launcher && objectType == 12 &&
-											(g_curCraft->sFoilState & 1)) {
-											uint8_t mr = g_curCraft->meshRotation[m];
-											if (g_curCraft->sFoilState & 2) {
-												if (mr < 0x20) {
-													g_curCraft->meshRotation[m] = (uint8_t)(mr + 1);
+											// Launcher arms (type 12).
+											if (meshType == MESH_Launcher && objectType == 12 &&
+												(g_curCraft->sFoilState & 1)) {
+												uint8_t mr = g_curCraft->meshRotation[m];
+												if (g_curCraft->sFoilState & 2) {
+													if (mr < 0x20) {
+														g_curCraft->meshRotation[m] = (uint8_t)(mr + 1);
+														anyRotated = 1;
+													}
+												} else if (mr > 0) {
+													g_curCraft->meshRotation[m] = (uint8_t)(mr - 1);
 													anyRotated = 1;
 												}
-											} else if (mr > 0) {
-												g_curCraft->meshRotation[m] = (uint8_t)(mr - 1);
-												anyRotated = 1;
 											}
-										}
-										// Folding wings / rotary panels.
-										if (meshType == MESH_RotaryWing && (g_curCraft->sFoilState & 1)) {
-											if (g_curCraft->sFoilState & 2) {
-												if ((uint16_t)objectType == 1) {
-													int maxRotation = ModelMesh_GetCenterZ(1, m) < 0 ? 12 : 8;
-													if (g_curCraft->meshRotation[m] < maxRotation) {
-														++g_curCraft->meshRotation[m];
-														anyRotated = 1;
+											// Folding wings / rotary panels.
+											if (meshType == MESH_RotaryWing && (g_curCraft->sFoilState & 1)) {
+												if (g_curCraft->sFoilState & 2) {
+													if ((uint16_t)objectType == 1) {
+														int maxRotation =
+															ModelMesh_GetCenterZ(1, m) < 0 ? 12 : 8;
+														if (g_curCraft->meshRotation[m] < maxRotation) {
+															++g_curCraft->meshRotation[m];
+															anyRotated = 1;
+														}
+													} else if ((uint16_t)objectType == 4) {
+														if (g_curCraft->meshRotation[m] < 0x40u) {
+															g_curCraft->meshRotation[m] += 2;
+															anyRotated = 1;
+														}
+													} else if ((uint16_t)objectType == 50) {
+														if (g_curCraft->meshRotation[m] < 0x60u) {
+															g_curCraft->meshRotation[m] += 2;
+															anyRotated = 1;
+														}
+													} else if ((uint16_t)objectType == 17) {
+														if (g_curCraft->meshRotation[m] < 0x40u) {
+															g_curCraft->meshRotation[m] += 2;
+															anyRotated = 1;
+														}
+													} else if ((uint16_t)objectType == 12) {
+														if (g_curCraft->meshRotation[m] < 0x42u) {
+															g_curCraft->meshRotation[m] += 2;
+															anyRotated = 1;
+														}
 													}
-												} else if ((uint16_t)objectType == 4) {
-													if (g_curCraft->meshRotation[m] < 0x40u) {
-														g_curCraft->meshRotation[m] += 2;
-														anyRotated = 1;
-													}
-												} else if ((uint16_t)objectType == 50) {
-													if (g_curCraft->meshRotation[m] < 0x60u) {
-														g_curCraft->meshRotation[m] += 2;
-														anyRotated = 1;
-													}
-												} else if ((uint16_t)objectType == 17) {
-													if (g_curCraft->meshRotation[m] < 0x40u) {
-														g_curCraft->meshRotation[m] += 2;
-														anyRotated = 1;
-													}
-												} else if ((uint16_t)objectType == 12) {
-													if (g_curCraft->meshRotation[m] < 0x42u) {
-														g_curCraft->meshRotation[m] += 2;
-														anyRotated = 1;
-													}
-												}
-											} else {
-												if ((uint16_t)objectType == 1) {
-													if (g_curCraft->meshRotation[m] > 0) {
-														--g_curCraft->meshRotation[m];
-														anyRotated = 1;
-													}
-												} else if ((uint16_t)objectType == 4 ||
-														   (uint16_t)objectType == 50 ||
-														   (uint16_t)objectType == 17 ||
-														   (uint16_t)objectType == 12) {
-													if (g_curCraft->meshRotation[m] > 0) {
-														g_curCraft->meshRotation[m] -= 2;
-														anyRotated = 1;
+												} else {
+													if ((uint16_t)objectType == 1) {
+														if (g_curCraft->meshRotation[m] > 0) {
+															--g_curCraft->meshRotation[m];
+															anyRotated = 1;
+														}
+													} else if ((uint16_t)objectType == 4 ||
+															   (uint16_t)objectType == 50 ||
+															   (uint16_t)objectType == 17 ||
+															   (uint16_t)objectType == 12) {
+														if (g_curCraft->meshRotation[m] > 0) {
+															g_curCraft->meshRotation[m] -= 2;
+															anyRotated = 1;
+														}
 													}
 												}
 											}
-										}
-										++m;
-									} while (--remainingMeshes != 0);
-								}
+											++m;
+										} while (--remainingMeshes != 0);
+									}
 
-								if (g_curCraft->sFoilState & 1) {
-									if (g_curCraft->sFoilState & 2) {
-										if (!anyRotated) {
-											g_curCraft->sFoilState = 2;
+									if (g_curCraft->sFoilState & 1) {
+										if (g_curCraft->sFoilState & 2) {
+											if (!anyRotated) {
+												g_curCraft->sFoilState = 2;
+												msg_emitInFlightMessage(
+													MSG_SFOILS_CLOSED,
+													g_objectTable[(uint16_t)objIdx].playerOwnerIdx);
+											}
+										} else if (!anyRotated) {
+											g_curCraft->sFoilState = 0;
 											msg_emitInFlightMessage(
-												MSG_SFOILS_CLOSED,
+												MSG_SFOILS_OPEN,
 												g_objectTable[(uint16_t)objIdx].playerOwnerIdx);
 										}
-									} else if (!anyRotated) {
-										g_curCraft->sFoilState = 0;
-										msg_emitInFlightMessage(
-											MSG_SFOILS_OPEN, g_objectTable[(uint16_t)objIdx].playerOwnerIdx);
 									}
+									break;
 								}
-								break;
+								default:
+									g_curCraft->sFoilState = 0;
+									break;
 							}
-							default:
-								g_curCraft->sFoilState = 0;
-								break;
-						}
 					}
 				}
 				++objIdx;
@@ -2172,7 +2176,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 					if (g_curCraft->warheadData[slot].weaponType < 4u) {
 						continue;
 					}
-					meshIdx = g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[slot].meshIdx;
+					meshIdx = g_modelDefs[g_curCraft->modelDefIndex].weaponHardpoints[slot].meshIdx;
 					if (!g_curCraft->componentHp[meshIdx] ||
 						ModelMesh_GetObjectTypeMeshType(modelType, meshIdx) != MESH_RotaryGunTurret) {
 						continue;
@@ -4671,9 +4675,10 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_QUICK_START &&
 						g_playerFlightGroupWaveMode == 1 &&
 						g_missionFlightGroups[flightGroupIdx].fg.numberOfWaves != 99 &&
-						(uint16_t)GetModelIndexFromType(g_objectTable[playerObjIdx].objectType) != 0xFFFF) {
+						(uint16_t)GetModelDefIndexFromType(g_objectTable[playerObjIdx].objectType) !=
+							0xFFFF) {
 						g_players[playerIdx].missionStats.missionScore +=
-							g_modelDefs[GetModelIndexFromType(g_objectTable[playerObjIdx].objectType)]
+							g_modelDefs[GetModelDefIndexFromType(g_objectTable[playerObjIdx].objectType)]
 								.craftPointValue;
 					}
 					if (g_players[playerIdx].objectIndex != 0xFFFF) {
@@ -5456,7 +5461,7 @@ void Flight_UpdateCraftSteeringAndSpeed(void) {
 			oldPitch = g_objectTable[(uint16_t)slot].pitch;
 			oldYaw = g_objectTable[(uint16_t)slot].yaw;
 			oldRoll = g_objectTable[(uint16_t)slot].roll;
-			g_curCraftModelIndex.words[0] = g_curCraft->modelIndex;
+			g_curCraftModelIndex.words[0] = g_curCraft->modelDefIndex;
 			playerOwnerIdx = g_objectTable[(uint16_t)slot].playerOwnerIdx;
 			aiDriven = playerOwnerIdx == -1 || g_players[playerOwnerIdx].aiControlledFlag;
 
@@ -7636,7 +7641,7 @@ static __inline void FlightAction_EmitSystemCondition(uint16_t systemMsgId, uint
 }
 
 static __inline int FlightAction_ShieldLaserTransferStep(ObjectRecord const* obj) {
-	return GetModelIndexFromType(obj->objectType) == GetModelIndexFromType(OBJ_MissileBoat) ? 32 : 4;
+	return GetModelDefIndexFromType(obj->objectType) == GetModelDefIndexFromType(OBJ_MissileBoat) ? 32 : 4;
 }
 
 static __inline int FlightAction_TransferShieldsToLasers(unsigned int playerIdx, ObjectRecord const* obj,
@@ -7781,7 +7786,7 @@ static __inline void FlightAction_TransferAllLasersToShields(unsigned int player
 
 static __inline void FlightAction_TransferLasersToShields(unsigned int playerIdx, ObjectRecord const* obj,
 														  CraftData* craft) {
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 	int maxShield;
 	int shieldDeficit;
 	int shieldStep;
@@ -7799,8 +7804,8 @@ static __inline void FlightAction_TransferLasersToShields(unsigned int playerIdx
 		return;
 	}
 
-	modelIndex = (ModelIndex)GetModelIndexFromType(obj->objectType);
-	if (modelIndex == (ModelIndex)0xffffu) {
+	modelIndex = (ModelDefIndex)GetModelDefIndexFromType(obj->objectType);
+	if (modelIndex == (ModelDefIndex)0xffffu) {
 		FlightAction_EmitSystemCondition(MSG_SHIELDS, MSG_DAMAGED, playerIdx);
 		return;
 	}
@@ -9253,9 +9258,9 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 						FlightAction_PlayEngineClick(currentPlayerIdx);
 						FlightAction_EmitSystemCondition(MSG_SHIELDS, MSG_DAMAGED, currentPlayerIdx);
 					} else {
-						ModelIndex modelIndex =
-							(ModelIndex)GetModelIndexFromType(g_objectTable[(uint16_t)objIdx].objectType);
-						if (modelIndex == (ModelIndex)0xffffu) {
+						ModelDefIndex modelIndex = (ModelDefIndex)GetModelDefIndexFromType(
+							g_objectTable[(uint16_t)objIdx].objectType);
+						if (modelIndex == (ModelDefIndex)0xffffu) {
 							break;
 						}
 						g_hudShieldPercentLabelsInitialized = 0;
@@ -9304,7 +9309,8 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					if (articulation == XWA_ARTICULATION_STOCK && g_currentActionKey == KEY_CTRL_L) {
 						break;
 					}
-					if (articulation == XWA_ARTICULATION_REFUSED || articulation == XWA_ARTICULATION_NOT_EQUIPPED) {
+					if (articulation == XWA_ARTICULATION_REFUSED ||
+						articulation == XWA_ARTICULATION_NOT_EQUIPPED) {
 						msg_emitInFlightMessage(refusal, (int)currentPlayerIdx);
 						break;
 					}
@@ -9316,8 +9322,9 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 								fsfx_PlaySound(120, 0xffffu, currentPlayerIdx);
 							}
 							msg_emitInFlightMessage(
-								XwaArticulation_Message((uint16_t)objIdx, (craft->sFoilState & 2) ? MSG_SFOILS_CLOSING
-																								   : MSG_SFOILS_OPENING),
+								XwaArticulation_Message((uint16_t)objIdx, (craft->sFoilState & 2)
+																			  ? MSG_SFOILS_CLOSING
+																			  : MSG_SFOILS_OPENING),
 								(int)currentPlayerIdx);
 						}
 						break;
@@ -9357,9 +9364,9 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					} else if (g_players[currentPlayerIdx].selectedWarhead >= craft->cannonClassCount) {
 						g_players[currentPlayerIdx].selectedWarhead = 0;
 						if (craft->warheadLauncherCount) {
-							ModelIndex modelIndex =
-								(ModelIndex)GetModelIndexFromType(g_objectTable[(uint16_t)objIdx].objectType);
-							if (modelIndex != (ModelIndex)0xffffu) {
+							ModelDefIndex modelIndex = (ModelDefIndex)GetModelDefIndexFromType(
+								g_objectTable[(uint16_t)objIdx].objectType);
+							if (modelIndex != (ModelDefIndex)0xffffu) {
 								uint8_t firstSlot =
 									g_modelDefs[(uint16_t)modelIndex].warheadLauncherFirstSlot[0];
 								uint8_t primaryCount = craft->warheadData[firstSlot].count;
@@ -9436,9 +9443,9 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 						} else {
 							uint8_t mode;
 							uint8_t group = g_players[currentPlayerIdx].selectedWarhead;
-							ModelIndex modelIndex =
-								(ModelIndex)GetModelIndexFromType(g_objectTable[(uint16_t)objIdx].objectType);
-							if (modelIndex == (ModelIndex)0xffffu ||
+							ModelDefIndex modelIndex = (ModelDefIndex)GetModelDefIndexFromType(
+								g_objectTable[(uint16_t)objIdx].objectType);
+							if (modelIndex == (ModelDefIndex)0xffffu ||
 								g_modelDefs[(uint16_t)modelIndex].laserGroupSlotCount[group] == 1) {
 								fsfx_PlaySound(133, 0xffffu, currentPlayerIdx);
 								break;
@@ -9486,7 +9493,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 				break;
 			case KEY_Z:
 				if (!g_players[currentPlayerIdx].hasCheckpointFlag) {
-					uint8_t convergeMode = g_modelDefs[craft->modelIndex].laserConvergeMode;
+					uint8_t convergeMode = g_modelDefs[craft->modelDefIndex].laserConvergeMode;
 					if (convergeMode == 1) {
 						craft->laserConvergeLevel = (uint8_t)((craft->laserConvergeLevel + 1) % 4);
 						msg_emitInFlightMessage(
@@ -11915,10 +11922,10 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 #endif
 
 		if (seatIdx >= 0 && !swappedControls && !g_players[playerIdx].viewState.externalCameraActive) {
-			ModelIndex modelIndex = (ModelIndex)GetModelIndexFromType(
+			ModelDefIndex modelIndex = (ModelDefIndex)GetModelDefIndexFromType(
 				(ObjectTypeId)g_objectTable[g_players[playerIdx].objectIndex].objectType);
 			if (g_objectTable[g_players[playerIdx].objectIndex].objectType != OBJ_None &&
-				modelIndex != (ModelIndex)0xffffu) {
+				modelIndex != (ModelDefIndex)0xffffu) {
 				int16_t limitA;
 				int16_t limitB;
 #ifdef XWA_MODERN

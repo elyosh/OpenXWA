@@ -184,7 +184,7 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 	int objectGenus;
 	int objIdx;
 	int16_t fgIdx;
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 	int i;
 	uint16_t yawDelta;
 	uint16_t pitchDelta;
@@ -266,7 +266,7 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 
 	++g_missionFlightGroups[fgIdx].fg.numberOfCraft;
 
-	modelIndex = (ModelIndex)GetModelIndexFromType(objectTypeId);
+	modelIndex = (ModelDefIndex)GetModelDefIndexFromType(objectTypeId);
 
 	g_objectTable[objIdx].flightGroupIdx = (uint8_t)g_escapePodPilotFlightGroupIdx;
 	g_objectTable[objIdx].playerOwnerIdx = -1;
@@ -334,7 +334,7 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 
 	craft->effectiveAiObjectLink = NULL;
 	craft->turretAim.effectiveAiObjectSignature = 0;
-	craft->modelIndex = modelIndex;
+	craft->modelDefIndex = modelIndex;
 	craft->craftIndexInGroup = 0;
 	craft->leader_obj_idx = -1;
 	craft->aiLinkResolving = 0;
@@ -986,7 +986,7 @@ int Object_SpawnExplosionSpriteCloud(ObjectRecord* sourceObj, int sourceGenus) {
 	unsigned int modelIndex;
 	(void)sourceGenus;
 
-	modelIndex = (ModelIndex)GetModelIndexFromType(sourceObj->objectType);
+	modelIndex = (ModelDefIndex)GetModelDefIndexFromType(sourceObj->objectType);
 	stepX = sourceObj->world_x;
 	stepY = sourceObj->world_y;
 	stepZ = sourceObj->world_z;
@@ -1935,7 +1935,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 									maxPushRate = 5000;
 									break;
 								default:
-									maxPushRate = g_modelDefs[mc->modelIndex].maxPushRate;
+									maxPushRate = g_modelDefs[mc->modelDefIndex].maxPushRate;
 									break;
 							}
 						} else {
@@ -2003,21 +2003,22 @@ void Object_UpdateLifetimeAndMovement(void) {
 						int carriedIdx = mc->carriedObjectIndex;
 						MobileObject* carriedMobj = g_objectTable[carriedIdx].mobj;
 						if (carriedMobj) {
-							int carriedModelIndex = carriedMobj->pCraft->modelIndex;
+							int carriedModelIndex = carriedMobj->pCraft->modelDefIndex;
 							int childOffset;
 							int parentOffset;
 							if (g_objectTable[carriedIdx].genusId > GENUS_Utility) {
 								if (g_objectTable[objIdx].genusId > GENUS_Utility) {
 									childOffset =
-										g_modelDefs[carriedMobj->pCraft->modelIndex].meshAttachData[2];
+										g_modelDefs[carriedMobj->pCraft->modelDefIndex].meshAttachData[2];
 								} else {
 									childOffset =
-										g_modelDefs[carriedMobj->pCraft->modelIndex].meshAttachData[1];
+										g_modelDefs[carriedMobj->pCraft->modelDefIndex].meshAttachData[1];
 								}
-								parentOffset = g_modelDefs[mc->modelIndex].meshAttachData[4];
+								parentOffset = g_modelDefs[mc->modelDefIndex].meshAttachData[4];
 							} else {
-								childOffset = g_modelDefs[carriedMobj->pCraft->modelIndex].meshAttachData[1];
-								parentOffset = g_modelDefs[mc->modelIndex].meshAttachData[3];
+								childOffset =
+									g_modelDefs[carriedMobj->pCraft->modelDefIndex].meshAttachData[1];
+								parentOffset = g_modelDefs[mc->modelDefIndex].meshAttachData[3];
 							}
 							pai_RotateLocalVectorToWorldScratch(
 								obj, 0, parentOffset - childOffset,
@@ -2036,15 +2037,15 @@ void Object_UpdateLifetimeAndMovement(void) {
 						while (linkedPrev != 0xFFFF) {
 							int prevIdx = linkedPrev;
 							CraftData* prevCraft = g_objectTable[prevIdx].mobj->pCraft;
-							ModelIndex prevModelIndex = prevCraft->modelIndex;
+							ModelDefIndex prevModelIndex = prevCraft->modelDefIndex;
 							int mountX;
 							int mountY;
 							int mountZ;
 							ObjectRecord* prevObj;
 							pai_RotateLocalVectorToWorldScratch(
-								curLink, (int16_t)g_modelDefs[parentCraft->modelIndex].childMountPoints[0],
-								(int16_t)g_modelDefs[parentCraft->modelIndex].childMountPoints[1],
-								(int16_t)g_modelDefs[parentCraft->modelIndex].childMountPoints[2]);
+								curLink, (int16_t)g_modelDefs[parentCraft->modelDefIndex].childMountPoints[0],
+								(int16_t)g_modelDefs[parentCraft->modelDefIndex].childMountPoints[1],
+								(int16_t)g_modelDefs[parentCraft->modelDefIndex].childMountPoints[2]);
 							mountX = g_rotatedX;
 							mountY = g_rotatedY;
 							mountZ = g_rotatedZ;

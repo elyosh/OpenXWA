@@ -3494,7 +3494,7 @@ void FeDiskIo_LoadResources(void) {
 						((assetFlags & MODEL_TYPE_ASSET_NOT_DEATH_STAR) == 0 ||
 						 g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR)) {
 						g_modelTypeTable[loadedModelType].curTexLevel = texLevel;
-						modelIndex = (uint16_t)g_modelTypeTable[loadedModelType].modelIndex;
+						modelIndex = (uint16_t)g_modelTypeTable[loadedModelType].modelDefIndex;
 						g_loadedModels.byObjectType[loadedModelType] = modelHandle;
 						if (hasLoadedModel) {
 							FeDiskIo_BuildModelDef(modelIndex, loadedModelSlot);
@@ -3503,13 +3503,13 @@ void FeDiskIo_LoadResources(void) {
 
 						if ((g_modelTypeTable[loadedModelType].flags &
 							 MODEL_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) != 0) {
-							if (g_modelDefs[(uint16_t)g_modelTypeTable[loadedModelType].modelIndex]
+							if (g_modelDefs[(uint16_t)g_modelTypeTable[loadedModelType].modelDefIndex]
 									.floatHardpointCount != 0) {
 								ModelFloatHardpoint* hardpoint;
 								int remainingHardpoints;
 
 								hardpointCount =
-									g_modelDefs[(uint16_t)g_modelTypeTable[loadedModelType].modelIndex]
+									g_modelDefs[(uint16_t)g_modelTypeTable[loadedModelType].modelDefIndex]
 										.floatHardpointCount;
 								hardpoint = (ModelFloatHardpoint*)Memory_LockHandle(
 									g_modelFloatHardpointDataHandles[loadedModelType]);
@@ -3689,12 +3689,12 @@ static __inline void FeDiskIo_FinalizeCockpitModelLoad(uint16_t objectType) {
 	}
 
 	{
-		uint16_t turretModelIndex;
+		uint16_t turretObjectType;
 
-		turretModelIndex =
-			g_modelDefs[(uint16_t)GetModelIndexFromType((ObjectTypeId)objectType)].turretModelIndex[0];
-		if (turretModelIndex != 0) {
-			if (g_loadedModels.byObjectType[turretModelIndex] != 0) {
+		turretObjectType =
+			g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)objectType)].turretObjectType[0];
+		if (turretObjectType != 0) {
+			if (g_loadedModels.byObjectType[turretObjectType] != 0) {
 				g_players[g_localPlayer].cockpitToggleAvailable = 1;
 				return;
 			}
@@ -3732,7 +3732,7 @@ void FeDiskIo_LoadCockpitModel(void) {
 
 	if ((int32_t)g_players[g_localPlayer].boundObjectSignature > 0) {
 		objectType = (uint16_t)g_objectTable[g_players[g_localPlayer].objectIndex].objectType;
-		modelName = g_modelDefs[(uint16_t)GetModelIndexFromType((ObjectTypeId)objectType)].name;
+		modelName = g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)objectType)].name;
 	} else {
 		int playerIdx;
 		PilotNetworkPlayer* networkPlayer;
@@ -3746,7 +3746,7 @@ void FeDiskIo_LoadCockpitModel(void) {
 				flightGroupIdx = g_pilotData.networkPlayers[playerIdx].flightGroupId;
 				craftType = g_missionFlightGroups[flightGroupIdx].fg.craftType;
 				objectType = (uint16_t)g_objectTypeTables.craftTypeToObjectType[craftType];
-				modelName = g_modelDefs[(uint16_t)GetModelIndexFromType((ObjectTypeId)objectType)].name;
+				modelName = g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)objectType)].name;
 				break;
 			}
 		}
@@ -3853,7 +3853,7 @@ void FeDiskIo_LoadExteriorModel(void) {
 	}
 
 resolve_model_name:
-	modelName = g_modelDefs[(uint16_t)GetModelIndexFromType((ObjectTypeId)objectType)].name;
+	modelName = g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)objectType)].name;
 
 load_model:
 	strcpy(pathBuffer, flightModelsDir);

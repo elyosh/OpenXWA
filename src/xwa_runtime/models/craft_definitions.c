@@ -161,7 +161,7 @@ static const CraftField s_turretFields[] = {
 	{ "z", offsetof(ModelDef, turretSeatPosZ), CRAFT_FIELD_I16 },
 	{ "mount_angle_a", offsetof(ModelDef, turretMountAngleA), CRAFT_FIELD_I16 },
 	{ "mount_angle_b", offsetof(ModelDef, turretMountAngleB), CRAFT_FIELD_I16 },
-	{ "object_type", offsetof(ModelDef, turretModelIndex), CRAFT_FIELD_U16 },
+	{ "object_type", offsetof(ModelDef, turretObjectType), CRAFT_FIELD_U16 },
 	{ "aim_limit_a", offsetof(ModelDef, turretAimLimitA), CRAFT_FIELD_I16 },
 	{ "aim_limit_b", offsetof(ModelDef, turretAimLimitB), CRAFT_FIELD_I16 },
 };
@@ -972,7 +972,7 @@ static int CraftDefinitions_LoadFile(CraftFile* file) {
 		return 0;
 	}
 	file->objectType = (int)value;
-	file->finalRecord = g_modelTypeTable[file->objectType].modelIndex;
+	file->finalRecord = g_modelTypeTable[file->objectType].modelDefIndex;
 	modelType = AeronConfigNode_MapGet(file->root, "model_type");
 	if (AeronConfigNode_MapGet(modelType, "craft_record_index") != NULL) {
 		if (!CraftDefinitions_ReadInt(file->path, AeronConfigNode_MapGet(modelType, "craft_record_index"),
@@ -1033,7 +1033,7 @@ static void CraftDefinitions_CheckOwners(CraftFile* files, size_t count) {
 			continue;
 		}
 		for (objectType = 0; objectType < OBJ_Count; ++objectType) {
-			int record = g_modelTypeTable[objectType].modelIndex;
+			int record = g_modelTypeTable[objectType].modelDefIndex;
 
 			if (objectType == files[a].objectType) {
 				continue;
@@ -1078,8 +1078,8 @@ static void CraftDefinitions_ApplyModelType(const CraftFile* file, const AeronCo
 	}
 	if (AeronConfigNode_MapGet(node, "craft_record_index") != NULL) {
 		Aeron_LogInfo("xwa.craft", "object type %d uses craft record %d instead of %d", file->objectType,
-					  file->finalRecord, info->modelIndex);
-		info->modelIndex = (int16_t)file->finalRecord;
+					  file->finalRecord, info->modelDefIndex);
+		info->modelDefIndex = (int16_t)file->finalRecord;
 	}
 }
 

@@ -732,7 +732,7 @@ void FlightMap_DrawObjectPass(int pass) {
 
 								mobj = g_objectTable[objectIdx].mobj;
 								if (mobj != NULL && mobj->pCraft != NULL) {
-									objectOrWaypointIdx = mobj->pCraft->modelIndex;
+									objectOrWaypointIdx = mobj->pCraft->modelDefIndex;
 								}
 							}
 							if (objectOrWaypointIdx != 0xffffu) {

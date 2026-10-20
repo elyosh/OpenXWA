@@ -237,7 +237,7 @@ static int map_order_endpoint(uint16_t object_slot, int32_t out_world[3]) {
 		}
 		ref = controller->targetObjIdx;
 	} else {
-		ref = craft->modelIndex;
+		ref = craft->modelDefIndex;
 	}
 	return ref != 0xffffu && map_resolve_ref(ref, object->flightGroupIdx, object->regionIdx, out_world);
 }

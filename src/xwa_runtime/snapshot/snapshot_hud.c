@@ -374,7 +374,7 @@ static void hud_capture_instruments(XwaHudState* out, const ObjectRecord* object
 	XwaHudInstruments* instruments = &out->instruments;
 	int i;
 	instruments->player_object_type = object->objectType;
-	instruments->player_model_index = craft->modelIndex;
+	instruments->player_model_index = craft->modelDefIndex;
 	instruments->throttle_speed = craft->throttleSpeed;
 	instruments->speed = mobile->speed;
 	instruments->engine_output_scale = craft->engineOutputScale;
@@ -511,10 +511,10 @@ static void hud_capture_direct_state(XwaHudState* out) {
 		return;
 	}
 	craft = mobile->pCraft;
-	if (craft->modelIndex >= XWA_MODEL_DEF_COUNT) {
+	if (craft->modelDefIndex >= XWA_MODEL_DEF_COUNT) {
 		return;
 	}
-	model = &g_modelDefs[craft->modelIndex];
+	model = &g_modelDefs[craft->modelDefIndex];
 	hud_capture_instruments(out, object, mobile, craft, model);
 	out->valid = 1;
 }

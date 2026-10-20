@@ -960,7 +960,7 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 	uint16_t targetIdx;
 	ObjectRecord* shooterObj;
 	CraftData* shooterCraft;
-	ModelIndex shooterModelIndex;
+	ModelDefIndex shooterModelIndex;
 	int turretSeatIdx;
 	uint16_t projectileType;
 	uint16_t projectileSpeed;
@@ -1007,7 +1007,7 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 
 	shooterObj = &g_objectTable[shooterIdx];
 	shooterCraft = shooterObj->mobj->pCraft;
-	shooterModelIndex = shooterCraft->modelIndex;
+	shooterModelIndex = shooterCraft->modelDefIndex;
 	projectileType =
 		g_modelDefs[shooterModelIndex].laserGroupWeaponType[g_players[g_localPlayer].selectedWarhead];
 	if ((int8_t)shooterCraft->warheadData[(uint16_t)hardpointIndex].laserCharge >= 64) {
@@ -1037,13 +1037,13 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 		OptRotationScale* beamRotScale;
 		uint16_t meshCount;
 		uint16_t meshIdx;
-		ModelIndex turretModelIndex;
+		ModelDefIndex turretModelIndex;
 		ModelDef* turretModelDef;
 
 		gunTurretRotScale = NULL;
 		launcherRotScale = NULL;
 		beamRotScale = NULL;
-		turretModelType = g_modelDefs[shooterModelIndex].turretModelIndex[turretSeatIdx];
+		turretModelType = g_modelDefs[shooterModelIndex].turretObjectType[turretSeatIdx];
 		meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretModelType);
 		for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
 			MeshType meshType;
@@ -1064,7 +1064,7 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 			}
 		}
 
-		turretModelIndex = GetModelIndexFromType((ObjectTypeId)turretModelType);
+		turretModelIndex = GetModelDefIndexFromType((ObjectTypeId)turretModelType);
 		turretModelDef = &g_modelDefs[turretModelIndex];
 		localSide = turretModelDef->weaponHardpoints[0].x;
 		localUp = turretModelDef->weaponHardpoints[0].z;
@@ -2457,13 +2457,15 @@ int collide_CheckSweptModelCollision(unsigned int sourceObjIdx, uint16_t targetO
 		worldStart[2] = g_collisionSegmentStartWorldZ;
 
 		sourceObj = &g_objectTable[(uint16_t)sourceObjIdx];
-		if (sourceObj->mobj != NULL && g_modelTypeTable[(uint16_t)sourceObj->objectType].modelIndex != -1 &&
+		if (sourceObj->mobj != NULL &&
+			g_modelTypeTable[(uint16_t)sourceObj->objectType].modelDefIndex != -1 &&
 			(((g_collideSweepAllowUnownedTargets & 1) != 0) || sourceObj->playerOwnerIdx != -1) &&
 			!g_collisionStagedModelProbe) {
 			ModelDef* modelDef;
 
 			g_collideSweepAuxHardpointIdx = auxHardpointIdx + 1;
-			modelDef = &g_modelDefs[(uint16_t)g_modelTypeTable[(uint16_t)sourceObj->objectType].modelIndex];
+			modelDef =
+				&g_modelDefs[(uint16_t)g_modelTypeTable[(uint16_t)sourceObj->objectType].modelDefIndex];
 			if ((unsigned int)g_collideSweepAuxHardpointIdx >= modelDef->auxHardpointCount) {
 				g_collideSweepAuxHardpointIdx = -1;
 				continueAuxSearch = 0;
@@ -2725,7 +2727,7 @@ void collide_TestSweepAgainstModelMeshes(unsigned int sourceObjIdx, unsigned int
 int collide_GetMobileObjectProximitySpeedQ12(unsigned int objIdx) {
 	MobileObject* mobj;
 	int maxSpeed;
-	ModelIndex modelIndex;
+	ModelDefIndex modelIndex;
 
 	mobj = g_objectTable[objIdx].mobj;
 	if (mobj == NULL) {
@@ -2734,7 +2736,7 @@ int collide_GetMobileObjectProximitySpeedQ12(unsigned int objIdx) {
 
 	switch (mobj->state) {
 		case 0:
-			modelIndex = GetModelIndexFromType(g_objectTable[objIdx].objectType);
+			modelIndex = GetModelDefIndexFromType(g_objectTable[objIdx].objectType);
 			if ((uint16_t)modelIndex == 0xffffu) {
 				return 0;
 			}
@@ -2758,7 +2760,7 @@ int collide_GetMobileObjectProximitySpeedQ12(unsigned int objIdx) {
 				break;
 			}
 
-			modelIndex = GetModelIndexFromType(objectType);
+			modelIndex = GetModelDefIndexFromType(objectType);
 			if ((uint16_t)modelIndex == 0xffffu) {
 				return 0;
 			}
@@ -3461,8 +3463,7 @@ void collide_ResetNeighborProximityLists(uint16_t objIdx) {
 // *allowModelSweep is cleared when the radius is inflated past the target's
 // size (space bombs, flares, multiplayer player-vs-player shots), so callers
 // keep those hits on the box test instead of the per-face model sweep.
-int collide_GetSweptHitRadius(unsigned int attackerObjIdx, unsigned int targetObjIdx,
-							  int* allowModelSweep) {
+int collide_GetSweptHitRadius(unsigned int attackerObjIdx, unsigned int targetObjIdx, int* allowModelSweep) {
 	uint16_t targetType;
 	int radius;
 	ObjectRecord* objects;
@@ -3578,7 +3579,7 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 	if (hostileCraft->workingSubsystems == 0) {
 		return;
 	}
-	if (hostileCraft->modelIndex == 0xffffu) {
+	if (hostileCraft->modelDefIndex == 0xffffu) {
 		return;
 	}
 
@@ -3587,7 +3588,7 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 		return;
 	}
 
-	modelIndex = GetModelIndexFromType(hostileType);
+	modelIndex = GetModelDefIndexFromType(hostileType);
 	if ((uint16_t)modelIndex == 0xffffu) {
 		return;
 	}
@@ -4129,7 +4130,7 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 		if (!ModelMesh_HasFuselage((uint16_t)destroyedType) && g_objectTable[targetObjIdx].genusId &&
 			g_objectTable[targetObjIdx].genusId != 9) {
 			/* Debris breakup: random tumble + scheduled final explosion. */
-			ModelIndex modelIndex = targetCraft->modelIndex;
+			ModelDefIndex modelIndex = targetCraft->modelDefIndex;
 			uint16_t yawMag = (GameRand() & 0x3FFF) + 0x2000;
 			uint16_t* tumblePtr = &g_modelDefs[modelIndex].maxTumbleAngle;
 			uint16_t pitchMag;
@@ -4377,7 +4378,7 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 				if (g_missionFormatVersion >= 14) {
 					ModelGenusId tgtGenus = g_objectTable[targetObjIdx].genusId;
 					if (tgtGenus == GENUS_Starship || tgtGenus == GENUS_Platform) {
-						int modelIdx = GetModelIndexFromType((ObjectTypeId)damageKind);
+						int modelIdx = GetModelDefIndexFromType((ObjectTypeId)damageKind);
 						if (modelIdx != 0xFFFF) {
 							unsigned int launcherCount = srcCraft->warheadLauncherCount;
 							if (launcherCount != 0) {
@@ -4626,8 +4627,8 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 		int shieldsUp = (targetCraft->shieldFront + targetCraft->shieldRear) != 0;
 		if (shieldsUp) {
 			if (g_flightDifficulty != 2) {
-				ModelIndex modelIdx = GetModelIndexFromType(g_objectTable[targetObjIdx].objectType);
-				if (modelIdx != (ModelIndex)0xFFFF && g_modelDefs[modelIdx].engineGlowCount) {
+				ModelDefIndex modelIdx = GetModelDefIndexFromType(g_objectTable[targetObjIdx].objectType);
+				if (modelIdx != (ModelDefIndex)0xFFFF && g_modelDefs[modelIdx].engineGlowCount) {
 					savedCurCraft = g_curCraft;
 					g_curCraft = targetCraft;
 					damage = Craft_DamageNearestEngineEmitterForMesh((uint16_t)targetObjIdx,
@@ -4644,8 +4645,8 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 				}
 			}
 		} else {
-			ModelIndex modelIdx = GetModelIndexFromType(g_objectTable[targetObjIdx].objectType);
-			if (modelIdx != (ModelIndex)0xFFFF && g_modelDefs[modelIdx].engineGlowCount) {
+			ModelDefIndex modelIdx = GetModelDefIndexFromType(g_objectTable[targetObjIdx].objectType);
+			if (modelIdx != (ModelDefIndex)0xFFFF && g_modelDefs[modelIdx].engineGlowCount) {
 				savedCurCraft = g_curCraft;
 				g_curCraft = targetCraft;
 				damage = Craft_DamageNearestEngineEmitterForMesh((uint16_t)targetObjIdx, (int16_t)componentId,
@@ -4814,11 +4815,11 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 					if (damageKind == 296)
 						targetCraft->subsystemDamage += 30;
 				}
-				if (targetCraft->modelIndex == (ModelIndex)0xFFFF)
+				if (targetCraft->modelDefIndex == (ModelDefIndex)0xFFFF)
 					systemStrengthRemaining = 100;
 				else
 					systemStrengthRemaining =
-						g_modelDefs[targetCraft->modelIndex].systemStrength - targetCraft->subsystemDamage;
+						g_modelDefs[targetCraft->modelDefIndex].systemStrength - targetCraft->subsystemDamage;
 				if (targetCraft->workingSubsystems && systemStrengthRemaining <= 10) {
 					if ((int)damage > 0) {
 						int count = (damage + 199) / 0xC8;
@@ -4852,7 +4853,7 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 					}
 					if (!targetCraft->workingSubsystems) {
 						targetCraft->shieldFront = 0;
-						targetCraft->subsystemDamage = g_modelDefs[targetCraft->modelIndex].systemStrength;
+						targetCraft->subsystemDamage = g_modelDefs[targetCraft->modelDefIndex].systemStrength;
 						targetCraft->shieldRear = 0;
 						msg_emitCraftMessage((uint16_t)targetObjIdx, targetCraft, 145);
 						if (fsfx_SpeakTacticalOfficerEvent(4, 93, targetObjIdx, 0xFFFF) &&
@@ -4903,8 +4904,8 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 			} else {
 				/* Component then hull damage. */
 				if (!missionStatus20DamageCap && (uint16_t)componentId != 0xFFFF) {
-					ModelIndex modelIdx = GetModelIndexFromType(g_objectTable[targetObjIdx].objectType);
-					if (modelIdx != (ModelIndex)0xFFFF && g_modelDefs[modelIdx].engineGlowCount) {
+					ModelDefIndex modelIdx = GetModelDefIndexFromType(g_objectTable[targetObjIdx].objectType);
+					if (modelIdx != (ModelDefIndex)0xFFFF && g_modelDefs[modelIdx].engineGlowCount) {
 						savedCurCraft = g_curCraft;
 						g_curCraft = targetCraft;
 						damage = Craft_DamageNearestEngineEmitterForMesh((uint16_t)targetObjIdx,
@@ -5977,7 +5978,7 @@ void collide_ApplyEngineWashDamage(int victimObjIdx, int sourceObjIdx) {
 		int xExtent, zExtent, engineMeshExtent;
 		int washLength, depthIntoWash;
 		double intensity;
-		ModelIndex modelIdx;
+		ModelDefIndex modelIdx;
 		int washDamage, playerOwnerIdx;
 		MobileObject* vm;
 
@@ -6041,9 +6042,9 @@ void collide_ApplyEngineWashDamage(int victimObjIdx, int sourceObjIdx) {
 			}
 
 			DebugPrintf((const char*)(uintptr_t)(uint16_t)objType, meshIndex);
-			modelIdx = GetModelIndexFromType(sourceObj->objectType);
+			modelIdx = GetModelDefIndexFromType(sourceObj->objectType);
 			intensity = g_engineWashFullIntensity;
-			if (modelIdx != (ModelIndex)0xFFFF) {
+			if (modelIdx != (ModelDefIndex)0xFFFF) {
 				unsigned int g;
 				for (g = 0; g < g_modelDefs[modelIdx].engineGlowCount; ++g) {
 					if (g_modelDefs[modelIdx].engineGlowMeshIdx[g] == meshIndex) {
@@ -6193,7 +6194,7 @@ void collide_applySurfaceRicochet(unsigned int objectObjIdx, unsigned int hitAga
 		float dotScale = (float)dot * g_collideRicochetQ15Scale;
 		double speedRatio;
 		float dmg;
-		hullStrength = (unsigned int)g_modelDefs[objCraft->modelIndex].hullStrength;
+		hullStrength = (unsigned int)g_modelDefs[objCraft->modelDefIndex].hullStrength;
 		speedRatio = (double)g_objectTable[objectObjIdx].mobj->speed /
 					 (double)(uint16_t)objCraft->aiFlight.maxSpeedCache;
 		dmg = speedRatio * (double)hullStrength * (double)(dotScale * dotScale) *
@@ -6526,9 +6527,10 @@ static __inline void collide_HandleDepartureDockPrompt(int playerIdx, unsigned i
 			if (ot == OBJ_CalamariCruiserNew || ot == OBJ_CalamariWinged) {
 #endif
 				// Evaluate the mirrored (-X) docking offset first.
-				pai_RotateLocalVectorToWorldScratch(cand, -g_modelDefs[ccraft->modelIndex].meshAttachData[5],
-													g_modelDefs[ccraft->modelIndex].meshAttachData[6],
-													g_modelDefs[ccraft->modelIndex].meshAttachData[7]);
+				pai_RotateLocalVectorToWorldScratch(cand,
+													-g_modelDefs[ccraft->modelDefIndex].meshAttachData[5],
+													g_modelDefs[ccraft->modelDefIndex].meshAttachData[6],
+													g_modelDefs[ccraft->modelDefIndex].meshAttachData[7]);
 				g_collisionSweepEndX += g_rotatedX;
 				g_collisionSweepEndY += g_rotatedY;
 				g_collisionSweepEndZ += g_rotatedZ;
@@ -6552,9 +6554,9 @@ static __inline void collide_HandleDepartureDockPrompt(int playerIdx, unsigned i
 			}
 
 			// Evaluate the primary (+X) docking offset.
-			pai_RotateLocalVectorToWorldScratch(cand, g_modelDefs[ccraft->modelIndex].meshAttachData[5],
-												g_modelDefs[ccraft->modelIndex].meshAttachData[6],
-												g_modelDefs[ccraft->modelIndex].meshAttachData[7]);
+			pai_RotateLocalVectorToWorldScratch(cand, g_modelDefs[ccraft->modelDefIndex].meshAttachData[5],
+												g_modelDefs[ccraft->modelDefIndex].meshAttachData[6],
+												g_modelDefs[ccraft->modelDefIndex].meshAttachData[7]);
 			g_collisionSweepEndX += g_rotatedX;
 			g_collisionSweepEndY += g_rotatedY;
 			g_collisionSweepEndZ += g_rotatedZ;
@@ -6801,9 +6803,9 @@ static __inline void collide_CaptureImpactPlane(void) {
 
 // Returns nonzero if the projectile hit landed on one of the target model's engine-glow meshes.
 static __inline int collide_HitMeshIsEngineGlow(ObjectTypeId targetType, uint16_t hitComponent) {
-	ModelIndex modelIdx = GetModelIndexFromType(targetType);
+	ModelDefIndex modelIdx = GetModelDefIndexFromType(targetType);
 	unsigned int i;
-	if (modelIdx == (ModelIndex)0xFFFF) {
+	if (modelIdx == (ModelDefIndex)0xFFFF) {
 		return 0;
 	}
 	for (i = 0; i < g_modelDefs[modelIdx].engineGlowCount; ++i) {
@@ -7014,8 +7016,7 @@ void collide_collisions(void) {
 						int allowModelSweep;
 						int hitRadius = collide_GetSweptHitRadius(sourceObjIdx, candIdx, &allowModelSweep);
 						isRicochet = 1;
-						if ((!allowModelSweep || hitRadius < 1095) &&
-							cand->objectType != OBJ_ContainerGem) {
+						if ((!allowModelSweep || hitRadius < 1095) && cand->objectType != OBJ_ContainerGem) {
 							ModelGenusId cg = cand->genusId;
 							if (cg != GENUS_DeathStarTunnelSegment &&
 								(cg != GENUS_PilotDroid || !g_provingGroundsModeActive) &&

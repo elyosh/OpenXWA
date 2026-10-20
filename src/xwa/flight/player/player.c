@@ -172,11 +172,11 @@ void Player_AutoGunnerToggle(unsigned int playerIdx) {
 	}
 
 	if (g_objectTable[playerObjIdx].genusId == GENUS_Fighter) {
-		ModelIndex modelIndex;
+		ModelDefIndex modelIndex;
 
-		modelIndex = (ModelIndex)GetModelIndexFromType(g_objectTable[playerObjIdx].objectType);
-		if (g_modelDefs[(uint16_t)modelIndex].turretModelIndex[0] == 0 &&
-			g_modelDefs[(uint16_t)modelIndex].turretModelIndex[1] == 0) {
+		modelIndex = (ModelDefIndex)GetModelDefIndexFromType(g_objectTable[playerObjIdx].objectType);
+		if (g_modelDefs[(uint16_t)modelIndex].turretObjectType[0] == 0 &&
+			g_modelDefs[(uint16_t)modelIndex].turretObjectType[1] == 0) {
 			return;
 		}
 	}
@@ -381,7 +381,7 @@ void Player_HandleDockBoardCommand(unsigned int playerIdx) {
 				if ((unsigned int)trig2_polardistance < 0xa000u) {
 
 					{
-						ModelIndex modelIndex;
+						ModelDefIndex modelIndex;
 						uint16_t dockPointCount;
 						uint16_t bestDockPointIdx;
 						uint32_t bestRangeScore;
@@ -389,7 +389,7 @@ void Player_HandleDockBoardCommand(unsigned int playerIdx) {
 
 						objectTable = g_objectTable;
 						modelIndex =
-							g_modelTypeTable[(uint16_t)objectTable[targetObjIdx].objectType].modelIndex;
+							g_modelTypeTable[(uint16_t)objectTable[targetObjIdx].objectType].modelDefIndex;
 						dockPointCount = g_modelDefs[modelIndex].dockPointCount;
 						if (dockPointCount != 0) {
 
@@ -1128,7 +1128,8 @@ void Player_HandleHyperspaceCommand(CraftData* craft, unsigned int playerIdx, ch
 #ifdef XWA_MODERN
 			/* Modern port: articulated models close their S-foils only with
 			   sfoils.close_in_hyperspace (XWAU hook_sfoils SFoilsFilterHook). */
-			if (XwaArticulation_TriggerPasses(g_players[playerIdx].objectIndex, XWA_ARTICULATION_HYPERSPACE_DEPARTURE,
+			if (XwaArticulation_TriggerPasses(g_players[playerIdx].objectIndex,
+											  XWA_ARTICULATION_HYPERSPACE_DEPARTURE,
 											  objectType == OBJ_XWing || objectType == OBJ_BWing) &&
 				(craft->sFoilState & 2u) == 0) {
 #else
@@ -1601,7 +1602,7 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 	}
 
 	for (groupIdx = 0; groupIdx < 3; ++groupIdx) {
-		ModelIndex modelIndex;
+		ModelDefIndex modelIndex;
 		uint8_t mountType;
 
 		selectedCraft->laserLinkMode[groupIdx] = 1;
@@ -1610,7 +1611,7 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 		selectedCraft->laserFireCooldownTicks[groupIdx] = 0;
 		selectedCraft->laserLastFireTimestamp[groupIdx] = 0;
 
-		modelIndex = (ModelIndex)GetModelIndexFromType(g_objectTable[selectedObjIdx].objectType);
+		modelIndex = (ModelDefIndex)GetModelDefIndexFromType(g_objectTable[selectedObjIdx].objectType);
 		if (selectedCraft->laserProjectileTypeId[groupIdx] != 0) {
 			mountType = g_modelDefs[(uint16_t)modelIndex].laserGroupWeaponKind[groupIdx];
 			if (mountType == 1 || mountType == 2) {
@@ -1639,7 +1640,7 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 		int maxShieldPerFace;
 		uint8_t shieldMode;
 
-		maxShieldPerFace = 2 * g_modelDefs[selectedCraft->modelIndex].shieldStrength;
+		maxShieldPerFace = 2 * g_modelDefs[selectedCraft->modelDefIndex].shieldStrength;
 		shieldMode = (uint8_t)g_players[playerIdx].savedCraftSettingsRaw[5];
 		selectedCraft->shieldDistribMode = shieldMode;
 		switch (shieldMode) {
@@ -1758,7 +1759,7 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 	g_players[playerIdx].engineWashSourceObjIdx = -1;
 	g_playerFlightTransientTimers[playerIdx].field_18 = 0;
 
-	(void)GetModelIndexFromType(g_objectTable[g_players[playerIdx].objectIndex].objectType);
+	(void)GetModelDefIndexFromType(g_objectTable[g_players[playerIdx].objectIndex].objectType);
 	g_players[playerIdx].viewState.hudAimXSnapState = 0;
 	g_players[playerIdx].lookYawOffset = 0;
 	g_players[playerIdx].lookPitchOffset = 0;
@@ -1850,7 +1851,7 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 		g_playerFlightTransientTimers[linkedPlayerIdx].field_18 = 0;
 		g_players[linkedPlayerIdx].engineWashSourceObjIdx = -1;
 
-		(void)GetModelIndexFromType(g_objectTable[g_players[linkedPlayerIdx].objectIndex].objectType);
+		(void)GetModelDefIndexFromType(g_objectTable[g_players[linkedPlayerIdx].objectIndex].objectType);
 		g_players[linkedPlayerIdx].viewState.hudAimXSnapState = 0;
 		g_players[linkedPlayerIdx].viewState.hudAimX = 0;
 		g_players[linkedPlayerIdx].viewState.hudAimY = 0;
@@ -2033,7 +2034,7 @@ int Player_UnbindFromCurrentCraft(int playerIdx, int requireAnotherOwnedCraft, i
 
 			craft->throttleSpeed = throttle;
 			g_objectTable[objectIndex].mobj->speed =
-				(uint16_t)MATH2_fraction(g_modelDefs[craft->modelIndex].maxSpeed, throttle);
+				(uint16_t)MATH2_fraction(g_modelDefs[craft->modelDefIndex].maxSpeed, throttle);
 			g_objectTable[objectIndex].mobj->speedRemainder = 0;
 
 			g_curCraft = craft;
@@ -2904,7 +2905,7 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 					if ((meshType == MESH_MainHull || meshType == MESH_Fuselage)
 #ifdef XWA_MODERN
 						&& !Player_IsTargetComponentHidden(
-							(uint16_t)g_players[playerIdx].currentTargetObjectIdx, meshIdx)
+							   (uint16_t)g_players[playerIdx].currentTargetObjectIdx, meshIdx)
 #endif
 					) {
 						g_players[playerIdx].selectedTargetComponent = (int16_t)(uint16_t)meshIdx;
@@ -3452,7 +3453,7 @@ static __inline void Player_BackDeathCameraAwayFromObject(unsigned int playerIdx
 		return;
 	}
 
-	modelIndex = GetModelIndexFromType(obj->objectType);
+	modelIndex = GetModelDefIndexFromType(obj->objectType);
 	if (modelIndex == 0xffff) {
 		return;
 	}
@@ -3719,7 +3720,7 @@ int Player_HandleCraftDestruction(unsigned int playerIdx) {
 		Player_StartPostDestructionState(checkpointPlayerIdx, 0xFFFFu, topAttackerPlayerIdx);
 
 	// Turn the craft into a tumbling destroyed object with a short lifetime.
-	modelIndex = pCraft->modelIndex;
+	modelIndex = pCraft->modelDefIndex;
 	spinRate = (uint16_t)((GameRand() & 0x3FFF) + 0x2000);
 	maxTumbleAngle = g_modelDefs[modelIndex].maxTumbleAngle;
 	while (spinRate > maxTumbleAngle)

@@ -1904,7 +1904,7 @@ char paifight_gunneroffenseorder(void) {
 
 	hasTurretMount = 0;
 	groupIdx = 3;
-	laserGroupWeaponKind = g_modelDefs[craft->modelIndex].laserGroupWeaponKind;
+	laserGroupWeaponKind = g_modelDefs[craft->modelDefIndex].laserGroupWeaponKind;
 	do {
 		if (*laserGroupWeaponKind >= 4u) {
 			hasTurretMount = 1;
@@ -1943,7 +1943,7 @@ char paifight_gunneroffenseorder(void) {
 				searchFlags = currentCraft->warheadData[state.laserSlot].weaponType != 4u ? 0x50u : 0x30u;
 				g_paiContext.aiTargetSearchFlags = (uint8_t)searchFlags;
 				g_paiContext.aiTargetSearchRangeLimit =
-					(uint32_t)g_modelDefs[currentCraft->modelIndex]
+					(uint32_t)g_modelDefs[currentCraft->modelDefIndex]
 						.laserGroupFireRange[currentCraft->warheadData[state.laserSlot].weaponGroupIdx];
 				if (g_paiContext.aiTargetSearchRangeLimit == 0) {
 					g_paiContext.aiTargetSearchRangeLimit = 0x10000u;
@@ -2021,9 +2021,9 @@ char paifight_gunneroffenseorder(void) {
 				} else {
 					pai_calcrotatedpoint(
 						&g_objectTable[g_paiContext.aiObjIdx],
-						g_modelDefs[currentCraft->modelIndex].weaponHardpoints[state.laserSlot].x,
-						g_modelDefs[currentCraft->modelIndex].weaponHardpoints[state.laserSlot].z,
-						g_modelDefs[currentCraft->modelIndex].weaponHardpoints[state.laserSlot].y);
+						g_modelDefs[currentCraft->modelDefIndex].weaponHardpoints[state.laserSlot].x,
+						g_modelDefs[currentCraft->modelDefIndex].weaponHardpoints[state.laserSlot].z,
+						g_modelDefs[currentCraft->modelDefIndex].weaponHardpoints[state.laserSlot].y);
 					if (g_objectTable[g_paiContext.aiObjIdx].objectType == OBJ_ImperialStarDestroyer2) {
 						g_rotatedX <<= 1;
 						g_rotatedY <<= 1;
@@ -2166,16 +2166,16 @@ char paifight_missiledefenseorder(void) {
 			int warheadSlot;
 
 			currentLauncherIdx = (uint16_t)launcherIdx;
-			firstSlot = g_modelDefs[craft->modelIndex].warheadLauncherFirstSlot[currentLauncherIdx];
+			firstSlot = g_modelDefs[craft->modelDefIndex].warheadLauncherFirstSlot[currentLauncherIdx];
 			warheadSlot = (uint16_t)firstSlot;
 			while (warheadSlot <
-				   g_modelDefs[craft->modelIndex].warheadLauncherLastSlot[currentLauncherIdx] + 1) {
+				   g_modelDefs[craft->modelDefIndex].warheadLauncherLastSlot[currentLauncherIdx] + 1) {
 				uint16_t bestTargetObjIdx;
 				uint32_t bestRangeScore;
 				uint16_t objectIdx;
 
 				if (craft->componentState
-						[g_modelDefs[craft->modelIndex].weaponHardpoints[warheadSlot].meshIdx] == 0) {
+						[g_modelDefs[craft->modelDefIndex].weaponHardpoints[warheadSlot].meshIdx] == 0) {
 					if ((craft->warheadData[warheadSlot].projectileTypeId == OBJ_WarheadMissile ||
 						 craft->warheadData[warheadSlot].projectileTypeId == OBJ_WarheadAdvancedMissile) &&
 						craft->warheadData[warheadSlot].count != 0 &&
@@ -2187,9 +2187,9 @@ char paifight_missiledefenseorder(void) {
 						g_paifightSearchOriginZ = g_paiContext.aiCurrentPointZ;
 						pai_calcrotatedpoint(
 							&g_objectTable[g_paiContext.aiObjIdx],
-							g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[warheadSlot].x,
-							g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[warheadSlot].z,
-							g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[warheadSlot].y);
+							g_modelDefs[g_curCraft->modelDefIndex].weaponHardpoints[warheadSlot].x,
+							g_modelDefs[g_curCraft->modelDefIndex].weaponHardpoints[warheadSlot].z,
+							g_modelDefs[g_curCraft->modelDefIndex].weaponHardpoints[warheadSlot].y);
 						if (g_objectTable[g_paiContext.aiObjIdx].objectType == OBJ_ImperialStarDestroyer2) {
 							g_rotatedX <<= 1;
 							g_rotatedY <<= 1;
@@ -2382,9 +2382,9 @@ static __inline void paifight_SetGunnerSelfDefenseSearchOrigin(unsigned int lase
 	g_paifightSearchOriginZ = g_paiContext.aiCurrentPointZ;
 	if (!g_paiContext.aiSelfModelFiresFromFloatHardpoints) {
 		pai_calcrotatedpoint(&g_objectTable[g_paiContext.aiObjIdx],
-							 g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[laserSlot].x,
-							 g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[laserSlot].z,
-							 g_modelDefs[g_curCraft->modelIndex].weaponHardpoints[laserSlot].y);
+							 g_modelDefs[g_curCraft->modelDefIndex].weaponHardpoints[laserSlot].x,
+							 g_modelDefs[g_curCraft->modelDefIndex].weaponHardpoints[laserSlot].z,
+							 g_modelDefs[g_curCraft->modelDefIndex].weaponHardpoints[laserSlot].y);
 		if (g_objectTable[g_paiContext.aiObjIdx].objectType == OBJ_ImperialStarDestroyer2) {
 			g_rotatedX <<= 1;
 			g_rotatedY <<= 1;
@@ -2623,7 +2623,7 @@ char paifight_fightershootorder(void) {
 			case GENUS_WeaponEmplacement: {
 				uint8_t convergeMode;
 
-				convergeMode = g_modelDefs[g_curCraft->modelIndex].laserConvergeMode;
+				convergeMode = g_modelDefs[g_curCraft->modelDefIndex].laserConvergeMode;
 				if (convergeMode == 1) {
 					g_curCraft->laserConvergeLevel = 2;
 				} else if (convergeMode == 2) {
@@ -2761,8 +2761,8 @@ char paifight_fightershootorder(void) {
 			uint16_t firstSlot;
 			uint16_t lastSlot;
 
-			firstSlot = g_modelDefs[g_curCraft->modelIndex].warheadLauncherFirstSlot[launcherIdx];
-			lastSlot = g_modelDefs[g_curCraft->modelIndex].warheadLauncherLastSlot[launcherIdx];
+			firstSlot = g_modelDefs[g_curCraft->modelDefIndex].warheadLauncherFirstSlot[launcherIdx];
+			lastSlot = g_modelDefs[g_curCraft->modelDefIndex].warheadLauncherLastSlot[launcherIdx];
 			for (warheadSlot = firstSlot; warheadSlot <= lastSlot; ++warheadSlot) {
 				if (g_curCraft->warheadData[warheadSlot].count != 0) {
 					hasUsableWarhead = 1;
@@ -2787,7 +2787,7 @@ char paifight_fightershootorder(void) {
 		pendingWarheadDamage = 0;
 		pendingIonPulseScore = 0;
 		remainingSystemStrength =
-			(uint16_t)(g_modelDefs[g_curCraft->modelIndex].systemStrength - g_curCraft->subsystemDamage);
+			(uint16_t)(g_modelDefs[g_curCraft->modelDefIndex].systemStrength - g_curCraft->subsystemDamage);
 		componentHitCount = 0;
 		if (isDisablePlan) {
 			for (launcherIdx = 0; launcherIdx < warheadLauncherCount; ++launcherIdx) {
@@ -2964,7 +2964,7 @@ char paifight_fightershootorder(void) {
 						firingCraft->warheadLauncherFlags[launcherIdx] = 3;
 					} else {
 						firstSlot =
-							g_modelDefs[firingCraft->modelIndex].warheadLauncherFirstSlot[launcherIdx];
+							g_modelDefs[firingCraft->modelDefIndex].warheadLauncherFirstSlot[launcherIdx];
 						if (firingCraft->warheadData[firstSlot].count >=
 							firingCraft->warheadData[firstSlot + 1].count) {
 							firingCraft->warheadLauncherFlags[launcherIdx] = 1;
@@ -3052,7 +3052,7 @@ char paifight_gunnerselfdefenseorder(void) {
 						g_objectTable[lastAttackerObjIdx].world_z - g_paifightSearchOriginZ);
 					g_targetRangeScore = (int)rangeScore;
 					defenseRangeLimit =
-						(uint32_t)g_modelDefs[craft->modelIndex]
+						(uint32_t)g_modelDefs[craft->modelDefIndex]
 							.laserGroupFireRange[craft->warheadData[laserSlot].weaponGroupIdx];
 					if (defenseRangeLimit == 0) {
 						defenseRangeLimit = weaponType != 4u ? 0x20000u : 0x10000u;
@@ -3094,7 +3094,7 @@ char paifight_gunnerselfdefenseorder(void) {
 				int16_t bestProjectileObjIdx;
 
 				bestProjectileObjIdx = -1;
-				defenseRangeLimit = (uint32_t)g_modelDefs[craft->modelIndex]
+				defenseRangeLimit = (uint32_t)g_modelDefs[craft->modelDefIndex]
 										.laserGroupFireRange[craft->warheadData[laserSlot].weaponGroupIdx];
 				if (defenseRangeLimit == 0) {
 					defenseRangeLimit = 0x10000u;
@@ -3150,12 +3150,12 @@ char paifight_gunnerselfdefenseorder(void) {
 
 				bestLargeObjIdx = 0xffffu;
 				bestOtherObjIdx = 0xffffu;
-				bestLargeRange = (uint32_t)g_modelDefs[craft->modelIndex]
+				bestLargeRange = (uint32_t)g_modelDefs[craft->modelDefIndex]
 									 .laserGroupFireRange[craft->warheadData[laserSlot].weaponGroupIdx];
 				if (bestLargeRange == 0) {
 					bestLargeRange = 0x10000u;
 				}
-				bestOtherRange = (uint32_t)g_modelDefs[craft->modelIndex]
+				bestOtherRange = (uint32_t)g_modelDefs[craft->modelDefIndex]
 									 .laserGroupFireRange[craft->warheadData[laserSlot].weaponGroupIdx];
 				if (bestOtherRange == 0) {
 					bestOtherRange = 0x10000u;

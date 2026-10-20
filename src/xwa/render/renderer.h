@@ -259,7 +259,7 @@ typedef struct ObjectRenderState {
 
 struct EngineGlowKnockoutMark {
 	uint16_t objectIndex;
-	uint16_t modelIndex;
+	uint16_t modelDefIndex;
 	uint8_t emitterIndex;
 	ObjectMeshTextureLayerBlock* blastMark;
 	EngineGlowKnockoutMark* next;

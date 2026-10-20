@@ -530,7 +530,8 @@ int ModelMesh_FindNearestLiveFloatHardpoint(int modelType, int localX, int local
 	target.y = (float)localY;
 	target.z = (float)localZ;
 
-	floatHardpointCount = g_modelDefs[(uint16_t)g_modelTypeTable[modelType].modelIndex].floatHardpointCount;
+	floatHardpointCount =
+		g_modelDefs[(uint16_t)g_modelTypeTable[modelType].modelDefIndex].floatHardpointCount;
 	markCount = excludedCount;
 	if (markCount >= floatHardpointCount) {
 		markCount = floatHardpointCount - 1;

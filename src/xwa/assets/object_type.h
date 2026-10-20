@@ -3,6 +3,22 @@
 
 #include <stdint.h>
 
+/* The game describes a craft at three levels, each a fixed table:
+ *   - the craft type (craftTypeToObjectType, 0x5B0F70, 232 entries): the
+ *     number that missions, pilot files, SHIPLIST.TXT and SPECDESC.TXT use.
+ *     It holds the object type;
+ *   - the object type (ObjectTypeId, g_modelTypeTable at 0x5FB240, 557
+ *     entries): the list row of the model, the craft record, genus, family
+ *     and flags;
+ *   - the craft record (g_modelDefs at 0x5BB480, 265 entries, ModelDefIndex):
+ *     stats, weapons, cockpit eye and names.
+ * Other sources name them differently. The developers call the object type a
+ * species ("Species %i has over %i jamming points", the SPECIESTMINFO tag,
+ * TIE's _species table next to _genus), and the mission's number a species
+ * before it is converted (TIE's speciesconvert); SHIPLIST.TXT keys craft
+ * types as SPECIES_<n>. XWAU's hooks call the craft type CraftId, the object
+ * type ModelIndex and the craft record CraftIndex. */
+
 typedef enum ObjectTypeId {
 	OBJ_None = 0,
 	OBJ_XWing = 1,

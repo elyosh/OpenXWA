@@ -347,7 +347,7 @@ char paiorder_flyhomeotherregionorder(void) {
 	uint16_t mothershipObjIdx;
 	uint16_t flightGroupIdx;
 
-	if (!g_modelDefs[g_curCraft->modelIndex].hasHyperdrive) {
+	if (!g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive) {
 		return 0;
 	}
 
@@ -494,7 +494,7 @@ char paiorder_flyhomeorder(void) {
 				uint16_t modelIndex;
 
 				mothershipCraft = g_objectTable[mothershipObjIdx].mobj->pCraft;
-				modelIndex = mothershipCraft->modelIndex;
+				modelIndex = mothershipCraft->modelDefIndex;
 				pai_RotateLocalVectorToWorldScratch(
 					&g_objectTable[mothershipObjIdx], g_modelDefs[modelIndex].meshAttachData[8],
 					g_modelDefs[modelIndex].meshAttachData[9], g_modelDefs[modelIndex].meshAttachData[10]);
@@ -577,7 +577,7 @@ char paiorder_enterhangarorder(void) {
 		g_paiContext.aiController->hasLiveTarget = 0;
 
 		mothershipCraft = g_objectTable[mothershipObjIdx].mobj->pCraft;
-		modelIndex = mothershipCraft->modelIndex;
+		modelIndex = mothershipCraft->modelDefIndex;
 		pai_RotateLocalVectorToWorldScratch(
 			&g_objectTable[mothershipObjIdx], g_modelDefs[modelIndex].meshAttachData[5],
 			g_modelDefs[modelIndex].meshAttachData[6], g_modelDefs[modelIndex].meshAttachData[7]);
@@ -1049,11 +1049,11 @@ char paiorder_underattackorder(void) {
 		unsigned int attackerObjIdx;
 		MobileObject* attackerMobj;
 
-		selfMaxSpeed = g_modelDefs[g_curCraft->modelIndex].maxSpeed;
+		selfMaxSpeed = g_modelDefs[g_curCraft->modelDefIndex].maxSpeed;
 		attackerObjIdx = (unsigned int)(int16_t)g_curCraft->lastAttackerObjIdx & 0xffffu;
 		attackerMobj = g_objectTable[attackerObjIdx].mobj;
 		if (attackerMobj->state == 0) {
-			attackerMaxSpeed = g_modelDefs[attackerMobj->pCraft->modelIndex].maxSpeed;
+			attackerMaxSpeed = g_modelDefs[attackerMobj->pCraft->modelDefIndex].maxSpeed;
 		} else {
 			attackerMaxSpeed = 900;
 		}
@@ -1290,7 +1290,7 @@ char paiorder_rocketsonboardorder(void) {
 			uint16_t lastSlot;
 			uint16_t weaponSlot;
 
-			modelDef = &g_modelDefs[craft->modelIndex];
+			modelDef = &g_modelDefs[craft->modelDefIndex];
 			lastSlot = modelDef->warheadLauncherLastSlot[launcherIdx];
 			firstSlot = modelDef->warheadLauncherFirstSlot[launcherIdx];
 			weaponSlot = firstSlot;
@@ -1365,9 +1365,10 @@ char paiorder_awaitboardorder(void) {
 			msg_emitCraftMessage((uint16_t)g_paiContext.aiObjIdx, g_curCraft, 146);
 		}
 
-		engineGlowCount = g_modelDefs[g_curCraft->modelIndex].engineGlowCount;
+		engineGlowCount = g_modelDefs[g_curCraft->modelDefIndex].engineGlowCount;
 		for (engineIndex = 0; engineIndex < engineGlowCount; ++engineIndex) {
-			g_curCraft->engineEmitterHealth[engineIndex] = g_modelDefs[g_curCraft->modelIndex].componentMaxHp;
+			g_curCraft->engineEmitterHealth[engineIndex] =
+				g_modelDefs[g_curCraft->modelDefIndex].componentMaxHp;
 		}
 
 		if (g_useHardware3D) {
@@ -1541,8 +1542,10 @@ char paiorder_abortmissionorder(void) {
 						unsigned int firstSlot;
 						unsigned int lastSlot;
 
-						firstSlot = g_modelDefs[g_curCraft->modelIndex].warheadLauncherFirstSlot[launcherIdx];
-						lastSlot = g_modelDefs[g_curCraft->modelIndex].warheadLauncherLastSlot[launcherIdx];
+						firstSlot =
+							g_modelDefs[g_curCraft->modelDefIndex].warheadLauncherFirstSlot[launcherIdx];
+						lastSlot =
+							g_modelDefs[g_curCraft->modelDefIndex].warheadLauncherLastSlot[launcherIdx];
 						if (firstSlot <= lastSlot) {
 							int slotCount;
 							WarheadInventoryEntry* warhead;
@@ -1791,7 +1794,7 @@ char paiorder_lookforparkorder(void) {
 	if (targetObjIdx != 0xffffu) {
 		Mission_ResolveObjectOrMissionPointWorldLoc(targetObjIdx, 0, 0, 0);
 		targetModelIndex =
-			(uint16_t)g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].modelIndex;
+			(uint16_t)g_modelTypeTable[(uint16_t)g_objectTable[targetObjIdx].objectType].modelDefIndex;
 		bestRange = UINT32_MAX;
 		dockPointCount = (uint16_t)g_modelDefs[targetModelIndex].dockPointCount;
 		selectedDockPoint = 0xffff;
@@ -2104,7 +2107,7 @@ char paiorder_abortmotherwaitorder(void) {
 		return 0;
 	}
 
-	if (!g_modelDefs[g_curCraft->modelIndex].hasHyperdrive) {
+	if (!g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive) {
 		return 0;
 	}
 
@@ -2236,7 +2239,7 @@ char paiorder_stopgohomeorder(void) {
 				if (g_objectTable[g_paiContext.aiObjIdx].genusId != GENUS_SatelliteBuoy) {
 					fsfx_SpeakTacticalOfficerEvent(4, 77, g_paiContext.aiObjIdx, 0xffffu);
 					g_msgSenderIff = (uint8_t)g_objectTable[g_paiContext.aiObjIdx].mobj->iff;
-					msg_addMessagePtr(0, g_modelDefs[g_curCraft->modelIndex].shortName);
+					msg_addMessagePtr(0, g_modelDefs[g_curCraft->modelDefIndex].shortName);
 					msg_addMessagePtr(
 						1,
 						(const char*)&g_missionFlightGroups[g_paiContext.curOrderCoord.fields.flightGroupIdx]
@@ -2859,7 +2862,7 @@ char paiorder_waitrunorder(void) {
 char paiorder_hyperspaceorder(void) {
 	if (g_curCraft->leader_obj_idx == -1 || g_curCraft->aiFlight.missionAbortedFlag != 0 ||
 		strcmp(g_planTable[g_paiContext.aiController->pendingPlanId].name, "flyhomeevadepln") == 0) {
-		if (g_modelDefs[g_curCraft->modelIndex].hasHyperdrive != 0) {
+		if (g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive != 0) {
 			if (!g_curCraft->wasCaptured) {
 				uint8_t departMethod;
 
@@ -3026,7 +3029,7 @@ char paiorder_checkdeliverorder(void) {
 
 			Mission_ResolveObjectOrMissionPointWorldLoc(nearestObjIdx, 0, 0, 0);
 			targetObj = &g_objectTable[nearestObjIdx];
-			modelIndex = (uint16_t)g_modelTypeTable[targetObj->objectType].modelIndex;
+			modelIndex = (uint16_t)g_modelTypeTable[targetObj->objectType].modelDefIndex;
 			selectedDockScore = 0xffffffffu;
 			dockIdx = 0;
 			dockPointCount = g_modelDefs[modelIndex].dockPointCount;
