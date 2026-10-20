@@ -46,6 +46,7 @@
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/hangar_scene.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/object_profiles.h"
@@ -2531,7 +2532,11 @@ void Hangar_LaunchPlayerCraft(void) {
 		int launchSfxSlot;
 
 		launchSfxSlot = -1;
+#ifdef XWA_MODERN
+		switch (XwaCraftDefinitions_SoundObjectType(g_objectTable[g_hangarPlayerObjIdx].objectType)) {
+#else
 		switch (g_objectTable[g_hangarPlayerObjIdx].objectType) {
+#endif
 			case OBJ_TIEFighter:
 			case OBJ_TIEInterceptor:
 			case OBJ_TIEBomber:

@@ -200,7 +200,7 @@ void XwaCraftHud_LoadMission(const struct XwaFlightGroup* flightGroups, size_t s
 		}
 		read[objectType] = 1;
 		type = &s_types[objectType];
-		if (!XwaModelSource_TypeKey(objectType, 1, key)) {
+		if (!XwaModelSource_TypeKey(objectType, key)) {
 			continue;
 		}
 		snprintf(path, sizeof path, "flight/craft/%s.yaml", key);

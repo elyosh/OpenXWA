@@ -36,6 +36,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/object_profiles.h"
@@ -6621,10 +6622,16 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 
 		// Beam weapon.
 		g_curCraft->beamTypeId = g_missionFlightGroups[g_currentFlightGroupIdx].fg.beam;
+#ifdef XWA_MODERN
+		/* A mod's object file can allow or forbid beams by object type. */
+		if (!XwaCraftDefinitions_BeamAllowed(g_spawnObjectType))
+			g_curCraft->beamTypeId = 0;
+#else
 		if (g_spawnObjectType == OBJ_XWing || g_spawnObjectType == OBJ_YWing ||
 			g_spawnObjectType == OBJ_BWing || g_spawnObjectType == OBJ_AWing ||
 			g_spawnObjectType == OBJ_Z95 || g_spawnObjectType == OBJ_TIEFighter)
 			g_curCraft->beamTypeId = 0;
+#endif
 		g_curCraft->beamLevel = 2;
 		g_curCraft->beamPresent = 9999;
 		if (!g_curCraft->beamTypeId) {

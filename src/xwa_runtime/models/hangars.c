@@ -572,7 +572,7 @@ int XwaHangars_Resolve(void) {
 	root = AeronConfigFile_Root(s_settings);
 	key[0] = '\0';
 	hasShip = !g_provingGroundsModeActive && Hangars_CommandShip(&objectType, &iff, &markings) &&
-			  XwaModelSource_TypeKey(objectType, 1, key);
+			  XwaModelSource_TypeKey(objectType, key);
 	if (!hasShip) {
 		key[0] = '\0';
 		iff = 0;
@@ -668,7 +668,7 @@ static void Hangars_DesiredKey(uint16_t objectType, char* key) {
 		strcpy(key, s_hangarModel);
 		return;
 	}
-	if (!s_inHangar || !XwaModelSource_TypeKey(objectType, 1, typeKey)) {
+	if (!s_inHangar || !XwaModelSource_TypeKey(objectType, typeKey)) {
 		return;
 	}
 	for (swap = 0; swap < s_swapCount; ++swap) {
@@ -695,7 +695,7 @@ int XwaHangars_TypeFileName(uint16_t objectType, char* fileName, unsigned int fi
 	HangarsKey key;
 	int written;
 
-	if (s_settings == NULL || !XwaModelSource_TypeKey(objectType, 0, key)) {
+	if (s_settings == NULL || !XwaModelSource_TypeKey(objectType, key)) {
 		return 0;
 	}
 	written = snprintf(fileName, fileNameSize, "%s.opt", key);
@@ -786,7 +786,7 @@ int XwaHangars_CraftElevation(uint16_t objectType, int inverted) {
 	HangarsKey key;
 
 	Hangars_DesiredKey(objectType, key);
-	if (s_settings != NULL && (key[0] != '\0' || XwaModelSource_TypeKey(objectType, 1, key))) {
+	if (s_settings != NULL && (key[0] != '\0' || XwaModelSource_TypeKey(objectType, key))) {
 		const AeronConfigNode* crafts = AeronConfigNode_MapGet(AeronConfigFile_Root(s_settings), "crafts");
 
 		elevation = AeronConfigNode_MapGet(AeronConfigNode_MapGet(crafts, key), "elevation");
@@ -839,7 +839,7 @@ int XwaHangars_CraftCamera(uint16_t objectType, int family, int inverted, int of
 	int axis;
 
 	/* The hook reads the [Camera] of the type's own model, never a swap. */
-	if (s_settings != NULL && XwaModelSource_TypeKey(objectType, 1, key)) {
+	if (s_settings != NULL && XwaModelSource_TypeKey(objectType, key)) {
 		const AeronConfigNode* crafts = AeronConfigNode_MapGet(AeronConfigFile_Root(s_settings), "crafts");
 
 		camera = AeronConfigNode_MapGet(AeronConfigNode_MapGet(crafts, key), "camera");

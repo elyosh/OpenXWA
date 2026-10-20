@@ -42,6 +42,10 @@ int XwaText_Set(const char* id, const char* text);
  * the game keeps pointers to them. */
 char* XwaText_Find(const char* id);
 
+/* Turns UTF-8 `text` into Latin-1, in place. Returns 0 when the text isn't
+   valid UTF-8 or has a character that Latin-1 doesn't have. */
+int XwaText_ToLatin1(char* text);
+
 #ifdef __cplusplus
 }
 #endif

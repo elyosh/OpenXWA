@@ -134,7 +134,7 @@ void XwaHangars_PlayerOffset(uint16_t objectType, int offset[3]);
    of its stock one ("<key>.opt", resolved by the model source), or 0: the
    command ship's hangar model for the hangar, a HangarObjects swap. */
 int XwaHangars_ModelFileName(uint16_t objectType, char* fileName, unsigned int fileNameSize);
-/* The stock model file of any type with a model list row, for the types
+/* The model file of any type's list row, for the types
    Hangar_LoadCraftModelByType has no name for (hook_hangars removes its
    type filter); 0 without settings. */
 int XwaHangars_TypeFileName(uint16_t objectType, char* fileName, unsigned int fileNameSize);

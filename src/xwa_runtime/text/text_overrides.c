@@ -130,11 +130,9 @@ char* XwaText_Find(const char* id) {
 	return found ? s_entries[index].text : NULL;
 }
 
-/* Turns UTF-8 `text` into Latin-1, in place. Latin-1 holds the characters up
-   to U+00FF, which UTF-8 writes as one byte below 0x80, or as 0xC2 or 0xC3
-   followed by a byte from 0x80 to 0xBF. Returns 0 when the text has another
-   byte sequence. */
-static int XwaText_Utf8ToLatin1(char* text) {
+/* Latin-1 holds the characters up to U+00FF, which UTF-8 writes as one byte
+   below 0x80, or as 0xC2 or 0xC3 followed by a byte from 0x80 to 0xBF. */
+int XwaText_ToLatin1(char* text) {
 	const unsigned char* read = (const unsigned char*)text;
 	char* write = text;
 
@@ -203,7 +201,7 @@ void XwaText_Load(void) {
 			Aeron_LogError("xwa.text", "%s: out of memory. The rest of the file is ignored", s_stringsPath);
 			break;
 		}
-		if (!XwaText_Utf8ToLatin1(latin1)) {
+		if (!XwaText_ToLatin1(latin1)) {
 			Aeron_LogWarn("xwa.text",
 						  "%s:%d: the text of %s has a character that isn't in Latin-1, so the game can't "
 						  "show it. It is ignored",

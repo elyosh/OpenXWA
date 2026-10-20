@@ -6,6 +6,7 @@
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/model_type.h"
+#include "xwa_runtime/models/craft_definitions.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -43,20 +44,12 @@ static ModelSourceKeyText* s_equipmentRows;
 static int s_equipmentRowCount;
 static ModelSourceCockpitKey* s_equipmentKeys;
 static int s_equipmentKeyCount;
+/* The model definition names that aren't craft keys, so that their
+   `<name>exterior` keys are known too. */
+static ModelSourceCraftKey* s_nameKeys;
+static int s_nameKeyCount;
 
 static const char s_exteriorSuffix[] = "exterior";
-
-/* flight/models/model_map.yaml in the mod folder: stock key -> GLB key, for model sets whose
-   file names differ from the stock ones. Without the file the mapping is the
-   identity. */
-typedef struct ModelSourceMapEntry {
-	ModelSourceKeyText stockKey;
-	ModelSourceKeyText glbKey;
-} ModelSourceMapEntry;
-
-static const char s_modelMapPath[] = "flight/models/model_map.yaml";
-static ModelSourceMapEntry* s_mapEntries;
-static int s_mapEntryCount;
 
 /* GLB keys no model list names, added by the settings that load them
    (XwaModelSource_AddKey); they map to themselves. */
@@ -92,19 +85,8 @@ int XwaModelSource_NormalizeKey(const char* fileName, char* key) {
 	return 1;
 }
 
-static const char* ModelSource_GlbKeyFor(const char* key) {
-	int i;
-
-	for (i = 0; i < s_mapEntryCount; ++i) {
-		if (strcmp(s_mapEntries[i].stockKey, key) == 0) {
-			return s_mapEntries[i].glbKey;
-		}
-	}
-	return key;
-}
-
 int XwaModelSource_GlbPath(const char* key, char* path, size_t pathSize) {
-	int written = snprintf(path, pathSize, "flight/models/%s.glb", ModelSource_GlbKeyFor(key));
+	int written = snprintf(path, pathSize, "flight/models/%s.glb", key);
 	return written > 0 && (size_t)written < pathSize;
 }
 
@@ -140,9 +122,10 @@ static int ModelSource_Grow(void** items, int count, size_t itemSize) {
 }
 
 /* Reads a FlightModels list the way FeDiskIo_LoadResources does: line ends
-   trimmed, empty lines skipped, rows numbered from 1. Each row's key goes to
-   `rows`. Returns 0 if the list cannot be read. */
-static int ModelSource_ReadList(const char* path, ModelSourceKeyText** rows, int* rowCount) {
+   trimmed, empty lines skipped, rows numbered from 0, then the rows that the
+   object files add to list `list` (craft_definitions.h). Each row's key goes
+   to `rows`. Returns 0 if the list cannot be read. */
+static int ModelSource_ReadList(const char* path, int list, ModelSourceKeyText** rows, int* rowCount) {
 	char line[256];
 	XwaFile* stream;
 
@@ -152,26 +135,36 @@ static int ModelSource_ReadList(const char* path, ModelSourceKeyText** rows, int
 	if (stream == NULL) {
 		return 0;
 	}
-	while (File_ReadLine(stream, line, sizeof line)) {
+	for (;;) {
+		/* The row that the line goes to: the next one for a line of the
+		   file, its own number for an added row. */
+		int row = *rowCount;
 		char* cursor;
 
+		if (!File_ReadLine(stream, line, sizeof line) &&
+			!XwaCraftDefinitions_NextAddedRow(list, &row, line, sizeof line)) {
+			break;
+		}
 		for (cursor = line; *cursor != '\0' && *cursor != '\r' && *cursor != '\n'; ++cursor) {
 		}
 		*cursor = '\0';
 		if (line[0] == '\0') {
 			continue;
 		}
-		if (!ModelSource_Grow((void**)rows, *rowCount, sizeof **rows)) {
-			File_Close(stream);
-			free(*rows);
-			*rows = NULL;
-			*rowCount = 0;
-			return 0;
-		}
-		if (!XwaModelSource_NormalizeKey(line, (*rows)[*rowCount])) {
+		while (*rowCount <= row) {
+			if (!ModelSource_Grow((void**)rows, *rowCount, sizeof **rows)) {
+				File_Close(stream);
+				free(*rows);
+				*rows = NULL;
+				*rowCount = 0;
+				return 0;
+			}
 			(*rows)[*rowCount][0] = '\0';
+			++*rowCount;
 		}
-		++*rowCount;
+		if (!XwaModelSource_NormalizeKey(line, (*rows)[row])) {
+			(*rows)[row][0] = '\0';
+		}
 	}
 	File_Close(stream);
 	return 1;
@@ -274,6 +267,60 @@ static int ModelSource_BuildCockpitKeys(void) {
 	return ok;
 }
 
+static ModelSourceCraftKey* ModelSource_FindNameKey(const char* key) {
+	int i;
+
+	for (i = 0; i < s_nameKeyCount; ++i) {
+		if (strcmp(s_nameKeys[i].key, key) == 0) {
+			return &s_nameKeys[i];
+		}
+	}
+	return NULL;
+}
+
+/* Every model definition name that isn't a craft key.
+   FeDiskIo_LoadExteriorModel loads `<name>Exterior.opt`, so the name's
+   `exterior` key must be known even when no list row has the name, as with
+   an object file's cockpit_name. */
+static int ModelSource_BuildNameKeys(void) {
+	int modelIndex;
+
+	for (modelIndex = 0; modelIndex < XWA_MODEL_DEF_COUNT; ++modelIndex) {
+		ModelSourceKeyText key;
+		ModelSourceCraftKey* entry;
+
+		if (g_modelDefs[modelIndex].name[0] == '\0' ||
+			!XwaModelSource_NormalizeKey(g_modelDefs[modelIndex].name, key) ||
+			strlen(key) + sizeof s_exteriorSuffix > XWA_MODEL_SOURCE_KEY_MAX ||
+			ModelSource_FindCraftKey(key) != NULL || ModelSource_FindNameKey(key) != NULL) {
+			continue;
+		}
+		if (!ModelSource_Grow((void**)&s_nameKeys, s_nameKeyCount, sizeof *s_nameKeys)) {
+			return 0;
+		}
+		entry = &s_nameKeys[s_nameKeyCount++];
+		memset(entry, 0, sizeof *entry);
+		strcpy(entry->key, key);
+	}
+	return 1;
+}
+
+/* The craft or name key whose `exterior` key is `key`, or NULL. */
+static ModelSourceCraftKey* ModelSource_FindExteriorBase(const char* key) {
+	const size_t suffixLength = sizeof s_exteriorSuffix - 1;
+	const size_t length = strlen(key);
+	ModelSourceKeyText base;
+	ModelSourceCraftKey* found;
+
+	if (length <= suffixLength || strcmp(key + length - suffixLength, s_exteriorSuffix) != 0) {
+		return NULL;
+	}
+	memcpy(base, key, length - suffixLength);
+	base[length - suffixLength] = '\0';
+	found = ModelSource_FindCraftKey(base);
+	return found != NULL ? found : ModelSource_FindNameKey(base);
+}
+
 /* Every Equipment0.LST model. Recovered code reaches the components of some
    of them by number; those sites resolve component roles
    (xwa_runtime/models/model_roles.h), so their layout is free too. */
@@ -312,9 +359,9 @@ static void ModelSource_Reset(void) {
 	free(s_cockpitKeys);
 	free(s_equipmentRows);
 	free(s_equipmentKeys);
-	free(s_mapEntries);
-	s_mapEntries = NULL;
-	s_mapEntryCount = 0;
+	free(s_nameKeys);
+	s_nameKeys = NULL;
+	s_nameKeyCount = 0;
 	free(s_addedKeys);
 	s_addedKeys = NULL;
 	s_addedKeyCount = 0;
@@ -350,8 +397,6 @@ static int ModelSource_IsValidKeyText(const char* text) {
 /* A key the resolver can produce: a craft, its exterior, a cockpit-class or
    an equipment key. */
 static int ModelSource_IsKnownKey(const char* key) {
-	const size_t suffixLength = sizeof s_exteriorSuffix - 1;
-	const size_t length = strlen(key);
 	int i;
 
 	if (ModelSource_FindCraftKey(key) != NULL || ModelSource_FindCockpitKey(key) != NULL) {
@@ -362,94 +407,30 @@ static int ModelSource_IsKnownKey(const char* key) {
 			return 1;
 		}
 	}
-	if (length > suffixLength && strcmp(key + length - suffixLength, s_exteriorSuffix) == 0) {
-		ModelSourceKeyText base;
-
-		memcpy(base, key, length - suffixLength);
-		base[length - suffixLength] = '\0';
-		return ModelSource_FindCraftKey(base) != NULL;
-	}
-	return 0;
-}
-
-/* Loads the model map once the key sets are built. Returns 0 after writing the
-   reason to `message` when the map is invalid; an absent map is valid. */
-static int ModelSource_LoadMap(char* message, size_t messageSize) {
-	AeronConfigFile* config = NULL;
-	AeronConfigError error;
-	const AeronConfigNode* root;
-	const AeronConfigNode* models;
-	size_t count;
-	size_t index;
-
-	if (!ModelSource_FileExists(s_modelMapPath)) {
-		return 1;
-	}
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, s_modelMapPath, &config, &error)) {
-		snprintf(message, messageSize, "%s:%d: %s", s_modelMapPath, error.line, error.message);
-		return 0;
-	}
-	root = AeronConfigFile_Root(config);
-	models = AeronConfigNode_MapGet(root, "models");
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Type(AeronConfigNode_MapGet(root, "version")) != AERON_CONFIG_INT ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1 ||
-		AeronConfigNode_Type(models) != AERON_CONFIG_MAP) {
-		snprintf(message, messageSize, "%s: expected 'version: 1' and a 'models' map", s_modelMapPath);
-		AeronConfigFile_Destroy(config);
-		return 0;
-	}
-	count = AeronConfigNode_MapCount(models);
-	s_mapEntries = count ? (ModelSourceMapEntry*)calloc(count, sizeof *s_mapEntries) : NULL;
-	if (count && s_mapEntries == NULL) {
-		snprintf(message, messageSize, "%s: out of memory", s_modelMapPath);
-		AeronConfigFile_Destroy(config);
-		return 0;
-	}
-	for (index = 0; index < count; ++index) {
-		const char* key = AeronConfigNode_MapKeyAt(models, index);
-		const char* value = AeronConfigNode_String(AeronConfigNode_MapValueAt(models, index), NULL);
-		char path[XWA_MODEL_SOURCE_KEY_MAX + 32];
-		int i;
-
-		if (!ModelSource_IsValidKeyText(key) || !ModelSource_IsValidKeyText(value)) {
-			snprintf(message, messageSize,
-					 "%s: '%s: %s' is not a pair of [a-z0-9._-] keys of 1 to %d characters", s_modelMapPath,
-					 key ? key : "", value ? value : "", XWA_MODEL_SOURCE_KEY_MAX - 1);
-			AeronConfigFile_Destroy(config);
-			return 0;
-		}
-		for (i = 0; i < s_mapEntryCount; ++i) {
-			if (strcmp(s_mapEntries[i].stockKey, key) == 0) {
-				snprintf(message, messageSize, "%s: '%s' is mapped twice", s_modelMapPath, key);
-				AeronConfigFile_Destroy(config);
-				return 0;
-			}
-		}
-		if (!ModelSource_IsKnownKey(key)) {
-			snprintf(message, messageSize,
-					 "%s: '%s' is not a craft, exterior, cockpit or equipment model key", s_modelMapPath,
-					 key);
-			AeronConfigFile_Destroy(config);
-			return 0;
-		}
-		snprintf(path, sizeof path, "flight/models/%s.glb", value);
-		if (!ModelSource_FileExists(path)) {
-			snprintf(message, messageSize, "%s: '%s' maps to missing '%s'", s_modelMapPath, key, path);
-			AeronConfigFile_Destroy(config);
-			return 0;
-		}
-		strcpy(s_mapEntries[s_mapEntryCount].stockKey, key);
-		strcpy(s_mapEntries[s_mapEntryCount].glbKey, value);
-		++s_mapEntryCount;
-	}
-	AeronConfigFile_Destroy(config);
-	Aeron_LogInfo("xwa.models", "model map: %d entries", s_mapEntryCount);
-	return 1;
+	return ModelSource_FindExteriorBase(key) != NULL;
 }
 
 void XwaModelSource_Configure(int replacementsEnabled) { s_replacementsEnabled = replacementsEnabled != 0; }
+
+int XwaModelSource_ReplacementsConfigured(void) { return s_replacementsEnabled; }
+
+/* Finds whether the GLBs of a craft or name key and of its exterior exist,
+   and returns how many do. */
+static int ModelSource_ProbeCraftKey(ModelSourceCraftKey* entry) {
+	char exteriorKey[XWA_MODEL_SOURCE_KEY_MAX + sizeof s_exteriorSuffix];
+
+	entry->hasGlb = (uint8_t)ModelSource_GlbExists(entry->key);
+	snprintf(exteriorKey, sizeof exteriorKey, "%s%s", entry->key, s_exteriorSuffix);
+	entry->hasExteriorGlb =
+		(uint8_t)(strlen(exteriorKey) < XWA_MODEL_SOURCE_KEY_MAX && ModelSource_GlbExists(exteriorKey));
+	if (entry->hasGlb) {
+		Aeron_LogInfo("xwa.models", "replacement: %s", entry->key);
+	}
+	if (entry->hasExteriorGlb) {
+		Aeron_LogInfo("xwa.models", "replacement: %s", exteriorKey);
+	}
+	return entry->hasGlb + entry->hasExteriorGlb;
+}
 
 void XwaModelSource_Init(void) {
 	int glbCount;
@@ -460,7 +441,7 @@ void XwaModelSource_Init(void) {
 		Aeron_LogInfo("xwa.models", "model replacements: disabled");
 		return;
 	}
-	if (!ModelSource_ReadList("FlightModels\\Spacecraft0.LST", &s_craftRows, &s_craftRowCount)) {
+	if (!ModelSource_ReadList("FlightModels\\Spacecraft0.LST", 0, &s_craftRows, &s_craftRowCount)) {
 		Aeron_LogError("xwa.models",
 					   "cannot read FlightModels\\Spacecraft0.LST; model replacements disabled");
 		return;
@@ -472,54 +453,35 @@ void XwaModelSource_Init(void) {
 			return;
 		}
 	}
-	if (!ModelSource_ReadList("FlightModels\\Equipment0.LST", &s_equipmentRows, &s_equipmentRowCount)) {
+	if (!ModelSource_ReadList("FlightModels\\Equipment0.LST", 1, &s_equipmentRows, &s_equipmentRowCount)) {
 		Aeron_LogWarn("xwa.models",
 					  "cannot read FlightModels\\Equipment0.LST; equipment and turret seats keep their OPT");
 	}
-	if (!ModelSource_BuildCockpitKeys() || !ModelSource_BuildEquipmentKeys()) {
+	if (!ModelSource_BuildCockpitKeys() || !ModelSource_BuildEquipmentKeys() ||
+		!ModelSource_BuildNameKeys()) {
 		Aeron_LogError("xwa.models", "out of memory building the model replacement set");
 		ModelSource_Reset();
 		return;
 	}
-	{
-		char message[256];
-
-		if (!ModelSource_LoadMap(message, sizeof message)) {
-			/* Like an invalid GLB: the installed model set is broken. */
-			Aeron_LogError("xwa.models", "invalid model map: %s", message);
-			ModelSource_Reset();
-			Aeron_RequestFatalError("OpenXWA", message);
-			return;
-		}
+	if (ModelSource_FileExists("flight/models/model_map.yaml")) {
+		Aeron_LogWarn("xwa.models",
+					  "flight/models/model_map.yaml is no longer read: an object type's file in "
+					  "flight/objects gives it another model");
 	}
 
 	glbCount = 0;
 	for (i = 0; i < s_craftKeyCount; ++i) {
-		ModelSourceCraftKey* entry = &s_craftKeys[i];
-		char exteriorKey[XWA_MODEL_SOURCE_KEY_MAX + sizeof s_exteriorSuffix];
-
-		entry->hasGlb = (uint8_t)ModelSource_GlbExists(entry->key);
-		snprintf(exteriorKey, sizeof exteriorKey, "%s%s", entry->key, s_exteriorSuffix);
-		entry->hasExteriorGlb =
-			(uint8_t)(strlen(exteriorKey) < XWA_MODEL_SOURCE_KEY_MAX && ModelSource_GlbExists(exteriorKey));
-		if (entry->hasGlb) {
-			Aeron_LogInfo("xwa.models", "replacement: %s (%s.glb)", entry->key,
-						  ModelSource_GlbKeyFor(entry->key));
-			++glbCount;
-		}
-		if (entry->hasExteriorGlb) {
-			Aeron_LogInfo("xwa.models", "replacement: %s (%s.glb)", exteriorKey,
-						  ModelSource_GlbKeyFor(exteriorKey));
-			++glbCount;
-		}
+		glbCount += ModelSource_ProbeCraftKey(&s_craftKeys[i]);
+	}
+	for (i = 0; i < s_nameKeyCount; ++i) {
+		glbCount += ModelSource_ProbeCraftKey(&s_nameKeys[i]);
 	}
 	for (i = 0; i < s_cockpitKeyCount; ++i) {
 		ModelSourceCockpitKey* entry = &s_cockpitKeys[i];
 
 		entry->hasGlb = (uint8_t)ModelSource_GlbExists(entry->key);
 		if (entry->hasGlb) {
-			Aeron_LogInfo("xwa.models", "replacement: %s (%s.glb)", entry->key,
-						  ModelSource_GlbKeyFor(entry->key));
+			Aeron_LogInfo("xwa.models", "replacement: %s", entry->key);
 			++glbCount;
 		}
 	}
@@ -529,15 +491,15 @@ void XwaModelSource_Init(void) {
 		entry->hasGlb =
 			(uint8_t)(ModelSource_FindCockpitKey(entry->key) == NULL && ModelSource_GlbExists(entry->key));
 		if (entry->hasGlb) {
-			Aeron_LogInfo("xwa.models", "replacement: %s (%s.glb)", entry->key,
-						  ModelSource_GlbKeyFor(entry->key));
+			Aeron_LogInfo("xwa.models", "replacement: %s", entry->key);
 			++glbCount;
 		}
 	}
 	s_initialized = 1;
 	Aeron_LogInfo("xwa.models",
-				  "model replacements: %d GLB (%d craft keys, %d cockpit-class keys, %d equipment keys)",
-				  glbCount, s_craftKeyCount, s_cockpitKeyCount, s_equipmentKeyCount);
+				  "model replacements: %d GLB (%d craft keys, %d cockpit-class keys, %d equipment keys, %d "
+				  "names for exteriors)",
+				  glbCount, s_craftKeyCount, s_cockpitKeyCount, s_equipmentKeyCount, s_nameKeyCount);
 }
 
 XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_t glbPathSize) {
@@ -545,7 +507,6 @@ XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_
 	const char* glbKey;
 	const ModelSourceCraftKey* craft;
 	const ModelSourceCockpitKey* cockpit;
-	size_t length;
 	int i;
 
 	if (!s_replacementsEnabled || !s_initialized || !XwaModelSource_NormalizeKey(fileName, key)) {
@@ -557,14 +518,8 @@ XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_
 	if (craft != NULL && craft->hasGlb) {
 		glbKey = key;
 	}
-	length = strlen(key);
-	if (glbKey == NULL && length > sizeof s_exteriorSuffix - 1 &&
-		strcmp(key + length - (sizeof s_exteriorSuffix - 1), s_exteriorSuffix) == 0) {
-		ModelSourceKeyText base;
-
-		memcpy(base, key, length - (sizeof s_exteriorSuffix - 1));
-		base[length - (sizeof s_exteriorSuffix - 1)] = '\0';
-		craft = ModelSource_FindCraftKey(base);
+	if (glbKey == NULL) {
+		craft = ModelSource_FindExteriorBase(key);
 		if (craft != NULL && craft->hasExteriorGlb) {
 			glbKey = key;
 		} else if (craft != NULL && craft->hasGlb) {
@@ -637,7 +592,7 @@ int XwaModelSource_AddKey(const char* key) {
 	return 1;
 }
 
-int XwaModelSource_TypeKey(unsigned int objectType, int mapped, char* key) {
+int XwaModelSource_TypeKey(unsigned int objectType, char* key) {
 	const ModelTypeInfo* info;
 	const char* rowKey = NULL;
 
@@ -656,7 +611,7 @@ int XwaModelSource_TypeKey(unsigned int objectType, int mapped, char* key) {
 	if (rowKey == NULL || rowKey[0] == '\0') {
 		return 0;
 	}
-	strcpy(key, mapped ? ModelSource_GlbKeyFor(rowKey) : rowKey);
+	strcpy(key, rowKey);
 	return 1;
 }
 

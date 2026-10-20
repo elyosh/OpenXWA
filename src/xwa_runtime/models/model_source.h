@@ -6,15 +6,9 @@
  * built from that GLB for simulation and rendering instead of its
  * OPT. The replacement set is fixed by XwaModelSource_Init. A key is the
  * model file's basename without extension, lower-cased
- * ("FlightModels\\XWing.opt" -> "xwing").
- *
- * flight/models/model_map.yaml (optional) names a different GLB for a key,
- * for model sets that rename stock models:
- *   version: 1
- *   models:
- *     tunaboat2: mediumtransport
- * Craft, exterior, cockpit and equipment keys are all mapped explicitly; a key
- * keeps its identity everywhere else (roles, simulation, render registry). */
+ * ("FlightModels\\XWing.opt" -> "xwing"), and a key always loads the GLB of
+ * the same name. To give an object type another model, a mod gives it a list
+ * row of its own in its object file (craft_definitions.h). */
 
 #include "xwa/assets/file_io.h"
 
@@ -36,11 +30,14 @@ typedef enum XwaModelSource {
 
 /* Called before XwaPort_Init; replacements require the HD renderer. */
 void XwaModelSource_Configure(int replacementsEnabled);
+/* Whether XwaModelSource_Configure turned replacements on. Unlike
+   XwaModelSource_ReplacementsEnabled, it can be asked before
+   XwaModelSource_Init. */
+int XwaModelSource_ReplacementsConfigured(void);
 /* Builds the replacement set once the VFS is ready. */
 void XwaModelSource_Init(void);
 /* Writes the mod-root path of `key`'s replacement GLB
-   ("flight/models/<glb key>.glb"), where the GLB key is the key's entry in
-   flight/models/model_map.yaml, or the key itself. Returns 0 when it does not fit. */
+   ("flight/models/<key>.glb"). Returns 0 when it does not fit. */
 int XwaModelSource_GlbPath(const char* key, char* path, size_t pathSize);
 /* `glbPath` (optional) receives the mod-root path of the GLB when the
    result is XWA_MODEL_SOURCE_GLB. */
@@ -56,10 +53,9 @@ int XwaModelSource_ReplacementsEnabled(void);
    the key now resolves to a GLB. */
 int XwaModelSource_AddKey(const char* key);
 /* Writes the key of `objectType`'s model list row to `key`
-   (XWA_MODEL_SOURCE_KEY_MAX bytes); `mapped` gives the GLB key it resolves
-   to (through the model map). Returns 0 when replacements are off or the
-   type has no row. */
-int XwaModelSource_TypeKey(unsigned int objectType, int mapped, char* key);
+   (XWA_MODEL_SOURCE_KEY_MAX bytes). Returns 0 when replacements are off or
+   the type has no row. */
+int XwaModelSource_TypeKey(unsigned int objectType, char* key);
 /* Writes `fileName`'s key (basename without extension, lower-cased) to `key`
    (XWA_MODEL_SOURCE_KEY_MAX bytes). Returns 0 for an empty or overlong name. */
 int XwaModelSource_NormalizeKey(const char* fileName, char* key);

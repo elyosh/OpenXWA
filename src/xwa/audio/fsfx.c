@@ -25,6 +25,7 @@
 #include "xwa/util/string.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -1920,7 +1921,12 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 
 	if (objectIndex != 0xffff) {
 		objectType = (uint8_t)objectTable[objectIndex].objectType;
+#ifdef XWA_MODERN
+		/* A mod's object file can give the type another type's sounds. */
+		switch (XwaCraftDefinitions_SoundObjectType(objectType)) {
+#else
 		switch (objectType) {
+#endif
 			case 5:
 			case 6:
 			case 7:
@@ -2058,7 +2064,11 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 	}
 
 	if (g_players[g_localPlayer].mapCameraState) {
+#ifdef XWA_MODERN
+		switch (XwaCraftDefinitions_SoundObjectType((uint8_t)g_playerEngineLoopObjectType)) {
+#else
 		switch ((uint8_t)g_playerEngineLoopObjectType) {
+#endif
 			case 5:
 			case 6:
 			case 7:
@@ -2408,7 +2418,11 @@ void fsfx_UpdateFlightSfx(void) {
 
 		sfxSlot = 0xffffu;
 		objectType = (uint16_t)sourceObj->objectType;
+#ifdef XWA_MODERN
+		switch (XwaCraftDefinitions_SoundObjectType(objectType)) {
+#else
 		switch (objectType) {
+#endif
 			case OBJ_TIEFighter:
 			case OBJ_TIEInterceptor:
 			case OBJ_TIEBomber:

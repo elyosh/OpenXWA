@@ -35,6 +35,7 @@
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/input/rumble_provider.h"
 #include "xwa_runtime/input/winmm_joystick_provider.h"
+#include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/model_source.h"
@@ -137,6 +138,7 @@ int XwaPort_Init(void) {
 	XwaTime_Reset();
 	File_SetVfs(Aeron_GetVfs());
 	XwaText_Load();
+	XwaCraftDefinitions_Apply();
 	XwaModelSource_Init();
 	XwaHangars_Init();
 	XwaCraftHud_Init();
@@ -157,6 +159,7 @@ int XwaPort_Init(void) {
 		XwaPort_FreeStartupAssets();
 		return 0;
 	}
+	XwaCraftDefinitions_ApplyNames();
 	/* Original _WinMain@16 render startup: allocate scene buffers, initialize the
 	   D3D texture pool, then enable the frontend model-render path. */
 	sw3d_InitSceneBuffers();

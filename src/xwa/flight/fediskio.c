@@ -35,6 +35,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/frontend_geometry.h"
+#include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/geometry_textures.h"
 #endif
 #include "xwa_runtime/snapshot/snapshot.h"
@@ -3282,7 +3283,9 @@ char* FeDiskIo_GetCraftModelName(unsigned int craftType) {
 #endif
 			rowIndex = 0;
 #ifdef XWA_MODERN
-			while (File_ReadLine(stream, line, sizeof(line))) {
+			/* After the last line, the rows that the mod's object files add. */
+			while (File_ReadLine(stream, line, sizeof(line)) ||
+				   XwaCraftDefinitions_NextAddedRow(textureGroup, &rowIndex, line, sizeof(line))) {
 #else
 			while (fgets(line, sizeof(line), (FILE*)stream) != NULL) {
 #endif
@@ -3392,7 +3395,9 @@ void FeDiskIo_LoadResources(void) {
 
 		rowIndex = 0;
 #ifdef XWA_MODERN
-		while (File_ReadLine(stream, line, sizeof(line))) {
+		/* After the last line, the rows that the mod's object files add. */
+		while (File_ReadLine(stream, line, sizeof(line)) ||
+			   XwaCraftDefinitions_NextAddedRow(textureGroup, &rowIndex, line, sizeof(line))) {
 #else
 		while (fgets(line, sizeof(line), stream) != NULL) {
 #endif
