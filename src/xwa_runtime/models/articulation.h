@@ -2,12 +2,10 @@
 #define XWA_RUNTIME_MODELS_ARTICULATION_H
 
 /* Articulations: the S-foils, landing gear and other moving parts a GLB
- * replacement lists on its model root. They
- * reproduce XWAU's hook_sfoils and hook_pilot on the stock state: each
+ * replacement lists on its model root. They work on the stock state: each
  * articulation turns CraftData.meshRotation[component], and S-foils and
- * landing gear share CraftData.sFoilState. Unlike XWAU, which steps them
- * once per period, they move on every sim step by a fine angle
- * (CraftData.articulationAngles) at the same speeds.
+ * landing gear share CraftData.sFoilState. They move on every sim step by a
+ * fine angle (CraftData.articulationAngles).
  *
  * Each entry point applies only to a craft whose model lists the group it
  * drives; for every other craft the caller keeps the original code. All
@@ -68,7 +66,7 @@ XwaArticulationTriggerResult XwaArticulation_Trigger(unsigned int objIdx, XwaArt
 int XwaArticulation_TriggerPasses(unsigned int objIdx, XwaArticulationTrigger trigger, int stockTest);
 
 /* The message to show for the object in place of stock message
-   `messageId`: for an articulated model, XWAU's fire-gate text, and the
+   `messageId`: for an articulated model, its own fire-gate text, and the
    landing-gear texts for the S-foil motion messages while a Ctrl+L motion
    runs; `messageId` otherwise. */
 uint16_t XwaArticulation_Message(unsigned int objIdx, uint16_t messageId);
@@ -78,7 +76,8 @@ uint16_t XwaArticulation_Message(unsigned int objIdx, uint16_t messageId);
    or landing gear. */
 int XwaArticulation_FireBlocked(unsigned int objIdx, int stockBlocked);
 
-/* AI events, at the sites XWAU's hooks use. */
+/* AI events: leaving and entering hyperspace, parking and entering a
+   hangar. */
 void XwaArticulation_AiOutOfHyperspaceInit(unsigned int objIdx);
 void XwaArticulation_AiOutOfHyperspaceStep(unsigned int objIdx, int maneuverTimer);
 void XwaArticulation_AiIntoHyperspace(unsigned int objIdx);
@@ -88,29 +87,29 @@ void XwaArticulation_AiParkEnd(unsigned int objIdx);
 void XwaArticulation_AiEnterHangarOrder(unsigned int objIdx);
 
 /* FlightObject_AnimateCrewMeshRotations for a GLB replacement: steps the
-   model's `crew` articulations (XWAU hook_pilot behaviors swing, random and
-   random_pause), the `random` ones first, then the others, each in
-   component order (the stock order: side, forward, limbs). With
-   `resetToNeutral` they return to 0. Returns 0 for a stock OPT, for which
-   the original code runs; a replacement without crew animates nothing. */
+   model's `crew` articulations (behaviors swing, random and random_pause),
+   the `random` ones first, then the others, each in component order (the
+   stock order: side, forward, limbs). With `resetToNeutral` they return to
+   0. Returns 0 for a stock OPT, for which the original code runs; a
+   replacement without crew animates nothing. */
 int XwaArticulation_AnimateCrew(unsigned int objIdx, int resetToNeutral);
 
 /* Nonzero when the object's model lists crew and sets crew.update_all: its
-   crew animates for every object and in any view, as XWAU's. */
+   crew animates for every object and in any view. */
 int XwaArticulation_CrewUpdatesAll(unsigned int objIdx);
 
-/* The hangar crew step for every object whose model sets crew.update_all
-   (XWAU calls the special-behavior pass from the hangar). */
+/* The hangar crew step for every object whose model sets
+   crew.update_all. */
 void XwaArticulation_StepHangarCrew(void);
 
 /* Every sim step: the crew meshes' drawn angles follow the crew animation's
-   own steps (stock or XWAU, on the crew timer) at their speed. For one
-   object, and in the hangar for every object. */
+   own steps (on the crew timer) at their speed. For one object, and in the
+   hangar for every object. */
 void XwaArticulation_StepCrewAngles(unsigned int objIdx);
 void XwaArticulation_StepHangarCrewAngles(void);
 
-/* Hatches, hangar doors, warheads bay and cargo clamps (XWAU hook_sfoils).
-   Hatches are off in multiplayer, as XWAU's. */
+/* Hatches, hangar doors, warheads bay and cargo clamps. Hatches are off in
+   multiplayer. */
 
 /* Hangar exit: the hatches close at once. */
 void XwaArticulation_CloseHatches(unsigned int objIdx);
@@ -148,8 +147,7 @@ void XwaArticulation_LoadMission(const char* missionPath, const struct XwaFlight
 void XwaArticulation_InitMissionStart(unsigned int objIdx);
 
 /* Nonzero when `object` is drawn with the B-wing's bridge alignment: the
-   B-wing, and any object-table craft whose model has articulations (XWAU
-   drops the type test). */
+   B-wing, and any object-table craft whose model has articulations. */
 int XwaArticulation_AlignsBridge(const struct ObjectRecord* object);
 
 /* The renderer's angles of the object's first `count` meshes, in 1/256 of a

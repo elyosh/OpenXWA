@@ -27,7 +27,7 @@ typedef struct ShipMeshAsset {
 	uint8_t source; /* XwaModelSource the simulation loaded */
 	AeronSceneMesh* mesh;
 	int pending_new;
-	/* A GLB with XWAU skin variants (xwa_remaster/skins.h) and the hash of
+	/* A GLB with skin variants (xwa_remaster/skins.h) and the hash of
 	   the markings variants its mesh was created with; NULL otherwise. */
 	XwaRemasterSkinModel* skin;
 	uint64_t markings_variants_hash;

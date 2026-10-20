@@ -493,10 +493,9 @@ int main(int argc, char** argv) {
 				XwaPort_ToggleMouseCapture();
 				toggled = 1;
 			}
-			/* Ctrl+H toggles the Dynamic Cockpit holograms (XWAU's binding)
-			 * while a cockpit with screens is shown, skipping the tick so the
-			 * chord (control code 0x08, KEY_BACKSPACE) never reaches classic
-			 * input. */
+			/* Ctrl+H toggles the Dynamic Cockpit holograms while a cockpit
+			 * with screens is shown, skipping the tick so the chord (control
+			 * code 0x08, KEY_BACKSPACE) never reaches classic input. */
 			if (in && (in->key_down[AERON_KEY_LCTRL] || in->key_down[AERON_KEY_RCTRL]) &&
 				!(in->key_down[AERON_KEY_LALT] || in->key_down[AERON_KEY_RALT]) &&
 				in->key_pressed[AERON_KEY_A + ('h' - 'a')] && XwaRemasterDc_Active()) {

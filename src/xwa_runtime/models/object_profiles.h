@@ -40,9 +40,9 @@ void XwaObjectProfiles_LoadMission(const char* missionPath, const struct XwaFlig
 void XwaObjectProfiles_Apply(uint16_t objectType, int flightGroupIdx, uint8_t markings,
 							 struct CraftData* craft);
 
-/* Shows every component, then hides those of profile `profile`, as XWAU's
-   hook_hangars ApplyObjectProfile does for hangar objects (a profile the
-   model does not define hides nothing). No-op for stock models. */
+/* Shows every component, then hides those of profile `profile`. Used for
+   hangar objects. A profile the model does not define hides nothing. No-op
+   for stock models. */
 void XwaObjectProfiles_ApplyNamed(uint16_t objectType, const char* profile, struct CraftData* craft);
 
 #ifdef __cplusplus

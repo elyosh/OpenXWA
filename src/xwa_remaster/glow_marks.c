@@ -39,7 +39,7 @@ static uint32_t mark_hash(uint32_t pool_index, uint32_t generation) {
 
 /* A blast-pool mark whose DAT image has an effects.yaml flipbook: its frame
  * at the flight clock, offset by a phase per mark, as an array-texture
- * overlay source. XWAU samples the image at tex * 0.35 + 0.3 (its crop),
+ * overlay source. The image is sampled at tex * 0.35 + 0.3 (its crop),
  * tex being the classic frame's UV, over every face the classic pass
  * draws, with the game's CLAMP addressing: the classic square shows the
  * crop and the rest of the image spreads around it. `rect` is the whole

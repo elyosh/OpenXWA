@@ -543,7 +543,8 @@ char paiorder_enterhangarorder(void) {
 	unsigned int distance;
 
 #ifdef XWA_MODERN
-	/* Modern port: XWAU hook_sfoils AIEnterHangarOrderHook. */
+	/* Modern port: articulated craft entering a hangar, and those that
+	   follow them, close their S-foils. */
 	XwaArticulation_AiEnterHangarOrder(g_paiContext.aiObjIdx);
 #endif
 	g_curCraft->aiFlight.separation = 1;
@@ -1851,7 +1852,8 @@ char paiorder_lookforparkorder(void) {
 			g_paiContext.aiController->aimPointZ =
 				worldlocz + g_modelDefs[targetModelIndex].dockPoints[selectedDockPoint].z;
 #ifdef XWA_MODERN
-			/* Modern port: XWAU hook_sfoils AILookForParkOrderHook. */
+			/* Modern port: an articulated craft ordered to park may close
+			   its S-foils. */
 			XwaArticulation_AiParkOrder(g_paiContext.aiObjIdx);
 #endif
 			return 1;
@@ -2908,8 +2910,8 @@ char paiorder_hyperspaceorder(void) {
 		g_paiContext.aiController->maneuverTimer = 2360;
 		paiman_setpower((int)g_paiContext.aiObjIdx, 0xffffu);
 #ifdef XWA_MODERN
-		/* Modern port: XWAU hook_sfoils SFoilsAIHyperspaceOrderHook, keeping
-		   the paiman_setpower call that hook loses. */
+		/* Modern port: an articulated craft ordered into hyperspace may
+		   close its S-foils. */
 		XwaArticulation_AiIntoHyperspace(g_paiContext.aiObjIdx);
 #endif
 	}

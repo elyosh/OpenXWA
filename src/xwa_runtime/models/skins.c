@@ -22,6 +22,10 @@ typedef struct SkinsFlightGroup {
 	uint16_t objectType;
 	uint8_t markings;
 	uint8_t player;
+	uint8_t playerCraft; /* the player's craft number in the wave */
+	/* The markings of the player's own craft, when the mission gives them
+	   (XwaSkins_UseCraftMarkings), or -1. */
+	int16_t playerMarkings;
 } SkinsFlightGroup;
 
 /* A use registered during the mission: objects of `objectType` show
@@ -135,12 +139,16 @@ void XwaSkins_SetFlightGroups(const struct XwaFlightGroup* flightGroups, size_t 
 		group->objectType = g_objectTypeTables.craftTypeToObjectType[fg->craftType];
 		group->markings = fg->markings;
 		group->player = fg->playerNumber != 0;
+		group->playerCraft = fg->playerCraft;
+		group->playerMarkings = -1;
 	}
 }
 
 /* Whether objects of `objectType` showing `markings` are registered: by a
    flight group or a use. */
-static uint32_t Skins_RegisteredSlot(uint32_t key) { return (key * 2654435761u) & (SKINS_REGISTERED_SIZE - 1); }
+static uint32_t Skins_RegisteredSlot(uint32_t key) {
+	return (key * 2654435761u) & (SKINS_REGISTERED_SIZE - 1);
+}
 
 static void Skins_RegisteredInsert(uint32_t key) {
 	uint32_t slot = Skins_RegisteredSlot(key);
@@ -173,7 +181,8 @@ static int Skins_Registered(uint16_t objectType, int markings) {
 	if (s_registeredDirty) {
 		memset(s_registered, 0, sizeof s_registered);
 		for (index = 0; index < s_flightGroupCount; ++index) {
-			Skins_RegisteredInsert((uint32_t)s_flightGroups[index].objectType * 512u + s_flightGroups[index].markings);
+			Skins_RegisteredInsert((uint32_t)s_flightGroups[index].objectType * 512u +
+								   s_flightGroups[index].markings);
 		}
 		for (index = 0; index < s_useCount; ++index) {
 			Skins_RegisteredInsert((uint32_t)s_uses[index].objectType * 512u +
@@ -219,6 +228,19 @@ void XwaSkins_UseMarkings(uint16_t objectType, int markings) {
 
 void XwaSkins_UseAllMarkings(uint16_t objectType) { Skins_Register(objectType, 0, 1); }
 
+void XwaSkins_UseCraftMarkings(int flightGroupIdx, int craft, int markings) {
+	SkinsFlightGroup* group;
+
+	if (flightGroupIdx < 0 || flightGroupIdx >= s_flightGroupCount || markings < 0 || markings > 255) {
+		return;
+	}
+	group = &s_flightGroups[flightGroupIdx];
+	Skins_Register(group->objectType, markings, 0);
+	if (group->player && group->playerCraft == craft) {
+		group->playerMarkings = (int16_t)markings;
+	}
+}
+
 /* Whether the model loaded as `name` is a GLB. */
 static int Skins_IsGlb(const XwaSnapshot* snapshot, const char* name) {
 	char key[XWA_MODEL_SOURCE_KEY_MAX];
@@ -248,8 +270,9 @@ static void Skins_RegisterShown(const XwaSnapshot* snapshot) {
 	for (index = 0; index < snapshot->flight_object_count; ++index) {
 		const XwaFlightObject* object = &snapshot->flight_objects[index];
 		/* A debris chunk draws its source's model with its markings. */
-		const uint16_t objectType =
-			object->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK ? object->source_object_type : object->object_type;
+		const uint16_t objectType = object->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK
+										? object->source_object_type
+										: object->object_type;
 
 		if (!object->has_mobj || Skins_Registered(objectType, object->node_switch)) {
 			continue;
@@ -278,7 +301,8 @@ static void Skins_AddUse(XwaSnapshot* snapshot, const char* name, int markings, 
 	}
 	hash = (hash ^ (uint32_t)markings) * 16777619u;
 	hash = (hash ^ (uint32_t)all) * 16777619u;
-	for (slot = hash & (SKINS_USE_TABLE_SIZE - 1); s_useTable[slot]; slot = (slot + 1) & (SKINS_USE_TABLE_SIZE - 1)) {
+	for (slot = hash & (SKINS_USE_TABLE_SIZE - 1); s_useTable[slot];
+		 slot = (slot + 1) & (SKINS_USE_TABLE_SIZE - 1)) {
 		const XwaSkinUse* use = &snapshot->skin_uses[s_useTable[slot] - 1];
 
 		if (use->markings == markings && use->all_markings == all && strcmp(use->key, key) == 0) {
@@ -329,10 +353,16 @@ void XwaSkins_Capture(XwaSnapshot* snapshot) {
 		const SkinsFlightGroup* group = &s_flightGroups[index];
 
 		Skins_AddUse(snapshot, XwaSnapshotExport_ModelName(group->objectType), group->markings, 0);
-		/* The player cockpit and exterior show their craft's markings. */
+		/* The player cockpit and exterior show their craft's markings: the
+		   flight group's, or those that the mission gives the player's
+		   craft. */
 		if (group->player) {
 			Skins_AddUse(snapshot, snapshot->cockpit.model_name, group->markings, 0);
 			Skins_AddUse(snapshot, snapshot->cockpit.exterior_name, group->markings, 0);
+		}
+		if (group->player && group->playerMarkings >= 0) {
+			Skins_AddUse(snapshot, snapshot->cockpit.model_name, group->playerMarkings, 0);
+			Skins_AddUse(snapshot, snapshot->cockpit.exterior_name, group->playerMarkings, 0);
 		}
 	}
 	Skins_RegisterShown(snapshot);

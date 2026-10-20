@@ -140,7 +140,7 @@ static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model
 		if (!hasLaser) {
 			return OptSynth_Fail(key, "its object type needs a laser hardpoint (type 0-6, 9-11 or 18)");
 		}
-		/* The original code, and XWAU, run without a MainHull: hardpoints go to
+		/* The original code runs without a MainHull: hardpoints go to
 		   the nearest weapon-system mesh (root 0 when there is none), and only
 		   MainHull-keyed effects are lost. */
 		if (!hasMainHull) {

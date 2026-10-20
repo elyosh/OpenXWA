@@ -1092,9 +1092,9 @@ void XwaRemasterHudFixed_SetDynamicCockpit(int active, uint32_t erased_regions) 
 	fixed_dc_erased = active ? erased_regions : 0u;
 }
 
-/* The XWAU Dynamic Cockpit region (dynamic_cockpit.c) whose panel image a
- * record draws, or -1: the HUD.dat images xwa_ddraw_d3d11 renders to its
- * background layer (is_DC_HUDRegionSrc). */
+/* The Dynamic Cockpit region (dynamic_cockpit.c) whose panel image a record
+ * draws, or -1: the HUD.dat images that make up the Dynamic Cockpit's
+ * background layer. */
 static int fixed_panel_region(const XwaHudDrawRecord* r) {
 	if (r->object_type != OBJ_HudTextureGroup12000)
 		return -1;

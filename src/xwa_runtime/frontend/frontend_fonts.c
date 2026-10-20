@@ -401,8 +401,8 @@ const XwaFrontendFont* XwaFrontendFonts_Get(int font_size) {
 /* ---- flight ------------------------------------------------------------ */
 
 /* With metrics: font, the font's own line height puts the baseline at the
-   font's ascent, as DirectWrite does in XWAU when it draws a character at
-   the top of its line. With metrics: game, the line is the tier's height. */
+   font's ascent, as DirectWrite does when it draws a character at the top
+   of its line. With metrics: game, the line is the tier's height. */
 const XwaFrontendFont* XwaFlightFonts_Get(int font_size) {
 	return fonts_get(g_flightFonts, font_size, fonts_height(g_flightFonts, font_size, font_size));
 }

@@ -16,8 +16,7 @@
  * species ("Species %i has over %i jamming points", the SPECIESTMINFO tag,
  * TIE's _species table next to _genus), and the mission's number a species
  * before it is converted (TIE's speciesconvert); SHIPLIST.TXT keys craft
- * types as SPECIES_<n>. XWAU's hooks call the craft type CraftId, the object
- * type ModelIndex and the craft record CraftIndex. */
+ * types as SPECIES_<n>. */
 
 typedef enum ObjectTypeId {
 	OBJ_None = 0,
@@ -619,10 +618,10 @@ typedef enum CraftTypeId {
 #define XWA_CRAFT_TYPE_REVERSE_SEARCH_COUNT OBJ_Count
 #endif
 
-/* Per-craft model limits. The modern build raises them to what the X-Wing
- * Alliance Upgrade hooks configure, for GLB replacement models: 255 meshes,
- * 255 engine glows and 120 weapon slots. Stock models keep the stock limits
- * (at most 47 meshes and 13 glows; weapon slots are cut at 16 per model). */
+/* Per-craft model limits. The modern build raises them for GLB replacement
+ * models: 255 meshes, 255 engine glows and 120 weapon slots. Stock models
+ * keep the stock limits (at most 47 meshes and 13 glows; weapon slots are
+ * cut at 16 per model). */
 #ifdef XWA_MODERN
 enum {
 	XWA_CRAFT_MESH_SLOT_COUNT = 255,

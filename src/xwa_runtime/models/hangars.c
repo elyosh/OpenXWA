@@ -20,10 +20,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Modern port module; no original counterpart. It reproduces the settings
-   lookup of XWAU's hook_hangars (hangar.cpp: GetCommandShipModelIndex,
-   GetCustomFileLines, CustomFileLinesHangarObjects) over the layers the
-   model conversion imports. */
+/* Modern port module; no original counterpart. It looks up the hangar
+   settings of the command ship in the layers that the model conversion
+   imports. */
 
 #define HANGARS_LAYERS 4
 #define HANGARS_LIST_MAX 64
@@ -164,7 +163,7 @@ void XwaHangars_LoadMission(const char* missionPath) {
 
 int XwaHangars_IsActive(void) { return s_settings != NULL; }
 
-/* ---- command ship (hook_hangars GetCommandShipModelIndex, ...Iff, ...Markings) */
+/* ---- command ship: its model, IFF and markings -------------------------- */
 
 /* The mothership of flight group `fgIdx`: its arrival mothership (when
    `arrivalFirst` and it arrives by one), else its departure mothership. */
@@ -282,7 +281,7 @@ static int Hangars_List(const char* name, int* values) {
 	return (int)count;
 }
 
-/* ASCII case-insensitive equality, as the hook's _stricmp compares. */
+/* ASCII case-insensitive equality, as _stricmp compares. */
 static int Hangars_EqualNoCase(const char* a, const char* b) {
 	for (; *a != '\0' && *b != '\0'; ++a, ++b) {
 		const char ca = *a >= 'A' && *a <= 'Z' ? (char)(*a - 'A' + 'a') : *a;
@@ -406,8 +405,8 @@ static const AeronConfigNode* Hangars_Section(const char* name) {
 	return NULL;
 }
 
-/* hook_hangars' layouts without a map section (HangarMapHook,
-   FamHangarMapHook): the stock layouts at the highest detail level. */
+/* The layouts without a map section: the stock layouts at the highest
+   detail level. */
 typedef struct HangarsDefaultLine {
 	uint16_t objectType;
 	int x;
@@ -514,7 +513,7 @@ static void Hangars_ResolveMap(int family) {
 		const char* profile;
 
 		if (AeronConfigNode_SequenceCount(line) != 9) {
-			continue; /* a line the hook skips: objectType 0 */
+			continue; /* a line that places nothing: objectType 0 */
 		}
 		entry->objectType = (uint16_t)AeronConfigNode_Int(AeronConfigNode_SequenceGet(line, 0), 0);
 		entry->markings = (int)AeronConfigNode_Int(AeronConfigNode_SequenceGet(line, 1), 0);
@@ -867,7 +866,7 @@ int XwaHangars_CraftCamera(uint16_t objectType, int family, int inverted, int of
 	HangarsKey key;
 	int axis;
 
-	/* The hook reads the [Camera] of the type's own model, never a swap. */
+	/* The camera comes from the type's own model, never from a swap. */
 	if (s_settings != NULL && XwaModelSource_TypeKey(objectType, key)) {
 		const AeronConfigNode* crafts = AeronConfigNode_MapGet(AeronConfigFile_Root(s_settings), "crafts");
 

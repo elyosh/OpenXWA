@@ -59,9 +59,8 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 	g_loadingModel = 1;
 
 #ifdef XWA_MODERN
-	/* Modern port (XWAU hook_hangars HangarOptLoadHook): the hangar settings
-	   may load another model for this type, the command ship's own hangar or a
-	   swapped hangar object. */
+	/* Modern port: the hangar settings may load another model for this
+	   type, the command ship's own hangar or a swapped hangar object. */
 	if (!XwaHangars_ModelFileName(objectType, modelName, sizeof modelName))
 #endif
 		switch (objectType) {
@@ -235,9 +234,9 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 				break;
 			default:
 #ifdef XWA_MODERN
-				/* Modern port (XWAU hook_hangars removes this filter): with hangar
-				   settings, any type with a model list row loads, as hangar maps
-				   place any of them. */
+				/* Modern port: with hangar settings, this filter is skipped. Any
+				   type with a model list row loads, since hangar maps can place
+				   any of them. */
 				if (XwaHangars_TypeFileName(objectType, modelName, sizeof modelName)) {
 					break;
 				}

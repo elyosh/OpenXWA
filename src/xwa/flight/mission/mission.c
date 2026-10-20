@@ -6973,6 +6973,18 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		} while (aimCount);
 	}
 
+#ifdef XWA_MODERN
+	/* Modern port: a mission can give one craft of a flight group its own
+	   markings. Only a new craft gets them. */
+	if ((uint16_t)existingObjIdx == 0xFFFF) {
+		const int markings = XwaMissionTie_CraftMarkings(g_currentFlightGroupIdx, g_spawnCraftOrdinal);
+
+		if (markings >= 0) {
+			g_objectTable[objIdx].mobj->nodeSwitchIndex = (uint8_t)markings;
+		}
+	}
+#endif
+
 	return objIdx;
 }
 
@@ -7569,8 +7581,8 @@ uint16_t Mission_Init(char* fileName) {
 	/* Modern port: read the mission's flight-group values, object profile
 	   selections, articulation overrides, hangar settings and art of its own,
 	   before any flight-group object is created or texture loaded. The
-	   flight-group values come first, as XWAU's hook_mission_tie sets them
-	   right after the .TIE is read, so the readers after them see them. */
+	   flight-group values come first, right after the .TIE is read, so the
+	   readers after them see them. */
 	XwaMissionTie_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 							  (int16_t)g_missionHeader.numFlightGroups);
 	XwaObjectProfiles_LoadMission(fileName, &g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
@@ -8007,13 +8019,14 @@ uint16_t Mission_Init(char* fileName) {
 
 #ifdef XWA_MODERN
 	/* Modern port: the skins that the renderer loads depend on the flight
-	   groups' markings, and the craft HUD settings depend on their craft
-	   types. Both are final once the loop above has set up the player
-	   groups. */
+	   groups' markings and on the markings that the mission gives single
+	   craft, and the craft HUD settings depend on the craft types. All are
+	   final once the loop above has set up the player groups. */
 	XwaSkins_SetFlightGroups(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 							 (int16_t)g_missionHeader.numFlightGroups);
 	XwaCraftHud_LoadMission(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 							(int16_t)g_missionHeader.numFlightGroups);
+	XwaMissionTie_UseSkins();
 #endif
 
 	GameRand_SavePrimarySeed();

@@ -6516,7 +6516,7 @@ static __inline void collide_HandleDepartureDockPrompt(int playerIdx, unsigned i
 
 			ot = cand->objectType;
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars SelectHangarInsideAnimation): with
+			/* Modern port: with
 			   hangar settings, every mothership but the family base also offers
 			   the mirrored dock point, as the Calamari cruisers do. */
 			if (ot == OBJ_CalamariCruiserNew || ot == OBJ_CalamariWinged ||

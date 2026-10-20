@@ -59,15 +59,15 @@ typedef struct DcRect {
 } DcRect;
 
 /* Dynamic_Cockpit_Internal_Areas.cfg source_def / screen_def lines in index
- * order, with the four rectangles LoadDCInternalCoordinates overrides; the
- * anchors follow Direct3DDevice::Execute. Sources 42-56 are placed from the
- * HUD text and laser charges, not from this table.
+ * order, with four rectangles replaced by fixed values. Each anchor is the
+ * HUD image that its rectangle is measured in. Sources 42-56 are placed from
+ * the HUD text and laser charges, not from this table.
  *
  * Deviation: the right message box uses the left box's rectangles mirrored
  * (source 12, region 6). The game draws that box as the left one mirrored
- * (g_mfdFrameQuadTexCoords), and the HD HUD lays out its text the same way;
- * XWAU's own rectangles sit 28 of 256 pixels further right, which crops the
- * left of the text and leaves it outside the erased region. */
+ * (g_mfdFrameQuadTexCoords), and the HD HUD lays out its text the same way.
+ * The file's own rectangles sit 28 of 256 pixels further right, which would
+ * crop the left of the text and leave it outside the erased region. */
 static const DcRect dc_sources[XWA_DC_SOURCE_COUNT] = {
 	{ DC_ANCHOR_LEFT_SENSOR, 128, 128, 25.5f, 18.5f, 114.5f, 106.5f, "LEFT_SENSOR_SRC" },
 	{ DC_ANCHOR_RIGHT_SENSOR, 128, 128, 13.5f, 19.5f, 102.5f, 107.5f, "RIGHT_SENSOR_SRC" },
@@ -81,7 +81,7 @@ static const DcRect dc_sources[XWA_DC_SOURCE_COUNT] = {
 	{ DC_ANCHOR_TARGET, 256, 128, 60, -12, 127, 5, "QUAD_LASERS_LEFT_SRC" },
 	{ DC_ANCHOR_TARGET, 256, 128, 135, -12, 202, 5, "QUAD_LASERS_RIGHT_SRC" },
 	{ DC_ANCHOR_LEFT_MSG, 256, 256, 28, 64, 218, 200, "LEFT_TEXT_BOX_SRC" },
-	{ DC_ANCHOR_RIGHT_MSG, 256, 256, 38, 64, 228, 200, "RIGHT_TEXT_BOX_SRC" }, /* XWAU: 66..256 */
+	{ DC_ANCHOR_RIGHT_MSG, 256, 256, 38, 64, 228, 200, "RIGHT_TEXT_BOX_SRC" }, /* the file: 66..256 */
 	{ DC_ANCHOR_TOP_LEFT, 256, 32, 67, 0, 147, 25, "SPEED_THROTTLE_SRC" },
 	{ DC_ANCHOR_TOP_LEFT, 256, 32, 200, 0, 256, 25, "MISSILES_SRC" },
 	{ DC_ANCHOR_TOP_RIGHT, 256, 32, 110, 0, 190, 25, "NAME_TIME_SRC" },
@@ -136,7 +136,7 @@ static const DcRect dc_regions[XWA_DC_REGION_COUNT] = {
 	{ DC_ANCHOR_BEAM, 128, 128, 25, 14, 102, 116, "BEAM_REGION" },
 	{ DC_ANCHOR_TARGET, 256, 128, 0, -35, 256, 128, "TARGET_AND_LASERS_REGION" },
 	{ DC_ANCHOR_LEFT_MSG, 256, 256, 26, 50, 229, 202, "LEFT_TEXT_BOX_REGION" },
-	{ DC_ANCHOR_RIGHT_MSG, 256, 256, 27, 50, 230, 202, "RIGHT_TEXT_BOX_REGION" }, /* XWAU: 53..256 */
+	{ DC_ANCHOR_RIGHT_MSG, 256, 256, 27, 50, 230, 202, "RIGHT_TEXT_BOX_REGION" }, /* the file: 53..256 */
 	{ DC_ANCHOR_TOP_LEFT, 256, 32, 13, 0, 242, 35, "TOP_LEFT_REGION" },
 	{ DC_ANCHOR_TOP_RIGHT, 256, 32, 14, 0, 243, 35, "TOP_RIGHT_REGION" },
 	{ DC_ANCHOR_PANES_READY_SYSTEM, 0, 0, 0, 0, 0, 0, "TEXT_RADIOSYS_REGION" },
@@ -307,9 +307,9 @@ static int dc_pane_box(XwaHudAnchorId id, float box[4]) {
 	return 1;
 }
 
-/* Places `rect`: an image rectangle maps onto its anchor's quad as
- * ComputeCoordsFromUV does (mirrored draws included, as XWAU ignores the
- * mirror); a pane rectangle is the pane's layout anchor. */
+/* Places `rect`: an image rectangle maps onto its anchor's quad, with the
+ * same mapping for mirrored draws (the mirror is ignored); a pane rectangle
+ * is the pane's layout anchor. */
 static int dc_place(const DcRect* rect, const float quads[DC_ANCHOR_IMAGE_COUNT][4], uint32_t quads_valid,
 					float box[4]) {
 	if (rect->anchor > DC_ANCHOR_NONE && rect->anchor < DC_ANCHOR_IMAGE_COUNT) {
@@ -401,8 +401,8 @@ void XwaRemasterDc_BeginFrame(const XwaSnapshot* snapshot, const AeronSceneMesh*
 		dc.auto_h = target_h;
 	}
 
-	/* Hologram time and fade follow game time, so they hold while paused
-	 * (XWAU's 0.04 per frame at 60 fps). */
+	/* Hologram time and fade follow game time, so they hold while paused.
+	 * The fade moves by 2.4 per second (0.04 per frame at 60 fps). */
 	float dt = 0.0f;
 	if (snapshot) {
 		if (dc.have_game_ticks && snapshot->game_time_ticks >= dc.last_game_ticks)
@@ -600,7 +600,7 @@ static void dc_build_frame(const XwaSnapshot* snapshot) {
 		f->color_state = 1u;
 	f->flags = dc.settings.classic_hud ? AERON_SCENE_SCREEN_HIDE_TRANSPARENT : AERON_SCENE_SCREEN_BAR_VISIBLE;
 	f->display_strength = dc.settings.display_emissive_strength;
-	/* CraftData.throttleSpeed (0xF0), XWAU's EngineThrottleInput. */
+	/* CraftData.throttleSpeed (0xF0). */
 	f->bar_level = hud ? (float)hud->instruments.throttle_speed / 65535.0f : 0.0f;
 	f->holo_time = dc.holo_time;
 	f->holo_fade = dc.holo_fade;
@@ -731,7 +731,8 @@ void XwaRemasterDc_PlaceFrame(int target_w, int target_h) {
 	if (dc.atlas[0] && dc.atlas[1] && (dc.active || dc.warm_pending)) {
 		static const float clear_rgba[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
 		for (int i = 0; i < 2; ++i) {
-			AeronDrawList_Begin(dc.capture_list[i], NULL, dc.atlas_w, dc.atlas_h, AERON_DRAWLIST2D_LOAD, NULL);
+			AeronDrawList_Begin(dc.capture_list[i], NULL, dc.atlas_w, dc.atlas_h, AERON_DRAWLIST2D_LOAD,
+								NULL);
 			/* A transparent pixel makes the warm-up capture build the
 			 * HUD sprites' pipeline for the atlas format. */
 			if (!dc.active)
@@ -746,7 +747,8 @@ void XwaRemasterDc_PlaceFrame(int target_w, int target_h) {
 
 /* Adds `record` to `list` moved by (dx, dy) and clipped to `scissor`
  * (NULL or empty: unclipped). */
-typedef void (*DcEmitFn)(AeronDrawList2D* list, const void* record, int dx, int dy, const AeronRectI* scissor);
+typedef void (*DcEmitFn)(AeronDrawList2D* list, const void* record, int dx, int dy,
+						 const AeronRectI* scissor);
 
 static int dc_scissor_set(const AeronRectI* s) { return s && s->width > 0 && s->height > 0; }
 
@@ -790,7 +792,8 @@ static int dc_visible_pieces(const int box[4], int pieces[DC_MAX_PIECES][4]) {
  * own clip. */
 static void dc_route(AeronDrawList2D* screen, XwaRemasterDcLayer layer, const float bounds[4],
 					 const AeronRectI* scissor, DcEmitFn emit, const void* record) {
-	int box[4] = { (int)floorf(bounds[0]), (int)floorf(bounds[1]), (int)ceilf(bounds[2]), (int)ceilf(bounds[3]) };
+	int box[4] = { (int)floorf(bounds[0]), (int)floorf(bounds[1]), (int)ceilf(bounds[2]),
+				   (int)ceilf(bounds[3]) };
 	if (dc_scissor_set(scissor)) {
 		box[0] = box[0] > scissor->x ? box[0] : scissor->x;
 		box[1] = box[1] > scissor->y ? box[1] : scissor->y;
@@ -828,7 +831,7 @@ static void dc_route(AeronDrawList2D* screen, XwaRemasterDcLayer layer, const fl
 		if (!dc_overlap(box, r))
 			continue;
 		const int dx = dc.capture_slot[c][0] - r[0], dy = dc.capture_slot[c][1] - r[1];
-		int       x0 = r[0], y0 = r[1], x1 = r[2], y1 = r[3];
+		int x0 = r[0], y0 = r[1], x1 = r[2], y1 = r[3];
 		if (dc_scissor_set(scissor)) {
 			x0 = x0 > scissor->x ? x0 : scissor->x;
 			y0 = y0 > scissor->y ? y0 : scissor->y;
@@ -842,7 +845,8 @@ static void dc_route(AeronDrawList2D* screen, XwaRemasterDcLayer layer, const fl
 
 static int dc_routing(void) { return dc.active && dc.capture_open; }
 
-static void dc_emit_sprite(AeronDrawList2D* list, const void* record, int dx, int dy, const AeronRectI* scissor) {
+static void dc_emit_sprite(AeronDrawList2D* list, const void* record, int dx, int dy,
+						   const AeronRectI* scissor) {
 	AeronDrawList2DSprite sprite = *(const AeronDrawList2DSprite*)record;
 	sprite.dst_x += (float)dx;
 	sprite.dst_y += (float)dy;
@@ -867,7 +871,8 @@ void XwaRemasterDc_AddSprite(AeronDrawList2D* screen, XwaRemasterDcLayer layer,
 	dc_route(screen, layer, bounds, &sprite->scissor, dc_emit_sprite, sprite);
 }
 
-static void dc_emit_quad4(AeronDrawList2D* list, const void* record, int dx, int dy, const AeronRectI* scissor) {
+static void dc_emit_quad4(AeronDrawList2D* list, const void* record, int dx, int dy,
+						  const AeronRectI* scissor) {
 	AeronDrawList2DQuad4 quad = *(const AeronDrawList2DQuad4*)record;
 	for (int c = 0; c < 4; ++c) {
 		quad.corners[c][0] += (float)dx;
@@ -877,7 +882,8 @@ static void dc_emit_quad4(AeronDrawList2D* list, const void* record, int dx, int
 	AeronDrawList_AddQuad4(list, &quad);
 }
 
-void XwaRemasterDc_AddQuad4(AeronDrawList2D* screen, XwaRemasterDcLayer layer, const AeronDrawList2DQuad4* quad) {
+void XwaRemasterDc_AddQuad4(AeronDrawList2D* screen, XwaRemasterDcLayer layer,
+							const AeronDrawList2DQuad4* quad) {
 	if (!screen || !quad)
 		return;
 	if (!dc_routing()) {
@@ -900,14 +906,15 @@ typedef struct DcFill {
 	AeronBlit2DBlend blend;
 } DcFill;
 
-static void dc_emit_fill(AeronDrawList2D* list, const void* record, int dx, int dy, const AeronRectI* scissor) {
+static void dc_emit_fill(AeronDrawList2D* list, const void* record, int dx, int dy,
+						 const AeronRectI* scissor) {
 	const DcFill* f = (const DcFill*)record;
 	AeronDrawList_AddFill(list, f->x + (float)dx, f->y + (float)dy, f->w, f->h, f->rgba, f->blend,
 						  dc_scissor_set(scissor) ? scissor : NULL);
 }
 
-void XwaRemasterDc_AddFill(AeronDrawList2D* screen, XwaRemasterDcLayer layer, float x, float y, float w, float h,
-						   const float rgba[4], AeronBlit2DBlend blend, const AeronRectI* scissor) {
+void XwaRemasterDc_AddFill(AeronDrawList2D* screen, XwaRemasterDcLayer layer, float x, float y, float w,
+						   float h, const float rgba[4], AeronBlit2DBlend blend, const AeronRectI* scissor) {
 	if (!screen || !rgba)
 		return;
 	if (!dc_routing()) {

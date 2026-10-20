@@ -452,8 +452,7 @@ typedef struct XwaFlightObject {
 	int32_t hull_damage;
 	int32_t hull_max;
 	/* Shields (CraftData.shieldFront, shieldRear) and whether a tractor or
-	 * jamming beam holds the craft (CraftData.beamEffectAccum[1], [2] != 0;
-	 * XWAU's IsUnderBeamEffect). */
+	 * jamming beam holds the craft (CraftData.beamEffectAccum[1], [2] != 0). */
 	int32_t shield_front;
 	int32_t shield_rear;
 	uint8_t beam_tractor;
@@ -1214,7 +1213,7 @@ typedef struct XwaSnapshot {
 	uint64_t mission_art_generation;
 	XwaMissionArtGroup mission_art_groups[XWA_SNAP_MAX_MISSION_ART_GROUPS];
 	uint32_t mission_art_group_count;
-	/* XWAU skins (xwa_runtime/models/skins.h): the mission's selections and
+	/* Skins (xwa_runtime/models/skins.h): the mission's selections and
 	 * the markings values each model's objects use; skin_generation changes
 	 * when either does. */
 	uint64_t skin_generation;

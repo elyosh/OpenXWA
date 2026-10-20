@@ -1126,7 +1126,7 @@ void Player_HandleHyperspaceCommand(CraftData* craft, unsigned int playerIdx, ch
 			objectType = g_objectTable[g_players[playerIdx].objectIndex].objectType;
 #ifdef XWA_MODERN
 			/* Modern port: articulated models close their S-foils only with
-			   sfoils.close_in_hyperspace (XWAU hook_sfoils SFoilsFilterHook). */
+			   sfoils.close_in_hyperspace. */
 			if (XwaArticulation_TriggerPasses(g_players[playerIdx].objectIndex,
 											  XWA_ARTICULATION_HYPERSPACE_DEPARTURE,
 											  objectType == OBJ_XWing || objectType == OBJ_BWing) &&

@@ -595,8 +595,7 @@ static void Hangar_UpdateReadyAutoCamera(PlayerData* player) {
 				   playerObj->world_z - focusObj->world_z);
 		if (g_hangarCamFocusObj == g_hangarRoofCraneState.objectIdx) {
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars HangarRoofCraneCameraHook): above
-			   the crane on any axis. */
+			/* Modern port: the camera stays above the crane on any axis. */
 			if (XwaHangars_IsActive()) {
 				XwaHangarScene_FollowCrane(&player->viewState.savedTargetX, &player->viewState.savedTargetY,
 										   &player->viewState.savedTargetZ);
@@ -635,9 +634,9 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 	int i;
 
 #ifdef XWA_MODERN
-	/* Modern port (XWAU hook_hangars HangarReloadHook): entering the hangar of
-	   another command ship (another mothership docked with) rebuilds the scene
-	   for its settings; the same one gets its hangar object models back. */
+	/* Modern port: entering the hangar of another command ship (another
+	   mothership docked with) rebuilds the scene for its settings; the same one
+	   gets its hangar object models back. */
 	if (XwaHangars_IsActive()) {
 		if (XwaHangars_Resolve()) {
 			XwaHangarScene_Rebuild();
@@ -775,7 +774,8 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 			g_objectTable[g_hangarPlayerObjIdx].world_y = g_objectTable[g_launchRefObjIdx].world_y + 9000;
 			g_objectTable[g_hangarPlayerObjIdx].world_z = g_launchBaseZ + 353;
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars HangarShuttleReenterPositionHook). */
+			/* Modern port: the re-entry start of the player who flies in the
+			   shuttle, from the hangar settings. */
 			if (XwaHangars_IsActive()) {
 				XwaHangarScene_PlaceShuttleReentry(g_hangarPlayerObjIdx);
 			}
@@ -853,9 +853,9 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 				ObjectTypeId mt = g_objectTable[fromObjIdx].objectType;
 #ifdef XWA_MODERN
 				if (XwaHangars_IsActive()) {
-					/* Modern port (XWAU hook_hangars SelectHangarModelIndex): the
-					   family base for the family base, the hangar for any other
-					   mothership. */
+					/* Modern port: inside the family base, the backdrop is the
+					   family base model; inside any other mothership, it is the
+					   hangar model. */
 					g_hangarBackdropObjectType = mt == OBJ_FamilyBase ? 179 : 308;
 				} else
 #endif
@@ -930,8 +930,9 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 				}
 				g_objectTable[g_hangarPlayerObjIdx].world_z = g_launchBaseZ + 547;
 #ifdef XWA_MODERN
-				/* Modern port (XWAU hook_hangars): with the player's offset and
-				   PlayerAnimationStraightLine farther out, at its re-entry height. */
+				/* Modern port: with the player's offset and
+				   PlayerAnimationStraightLine farther out, at its re-entry
+				   height. */
 				if (XwaHangars_IsActive()) {
 					XwaHangarScene_PlaceReentryStart(g_hangarPlayerObjIdx);
 				}
@@ -1075,9 +1076,9 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 				if (crewTimer == 0) {
 					g_flightGlobalCountdownTimers[2] = 15;
 #ifdef XWA_MODERN
-					/* Modern port: models with crew.update_all animate their crew in
-					   the hangar too, for every object and in any view (XWAU's
-					   patch at 0x458C9E). */
+					/* Modern port: models with crew.update_all animate their
+					   crew in the hangar too, for every object and in any
+					   view. */
 					if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive &&
 						!XwaArticulation_CrewUpdatesAll(g_players[g_localPlayer].objectIndex)) {
 						FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex,
@@ -1616,9 +1617,9 @@ int Hangar_EnterCraft(uint16_t fromObjIdx) {
 				if (crewTimer == 0) {
 					g_flightGlobalCountdownTimers[2] = 15;
 #ifdef XWA_MODERN
-					/* Modern port: models with crew.update_all animate their crew in
-					   the hangar too, for every object and in any view (XWAU's
-					   patch at 0x458C9E). */
+					/* Modern port: models with crew.update_all animate their
+					   crew in the hangar too, for every object and in any
+					   view. */
 					if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive &&
 						!XwaArticulation_CrewUpdatesAll(g_players[g_localPlayer].objectIndex)) {
 						FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex,
@@ -2013,7 +2014,8 @@ int Hangar_UpdateLaunch(int dtMs) {
 
 	// ---- launch-animation phase machine ----
 #ifdef XWA_MODERN
-	/* Modern port: XWAU hook_sfoils PlayerCraftHatchHook. */
+	/* Modern port: the player's hatches open and close with the launch
+	   phase. */
 	XwaArticulation_StepLaunchHatches(g_hangarPlayerObjIdx);
 #endif
 	playerObjIdx = g_hangarPlayerObjIdx;
@@ -2074,8 +2076,8 @@ int Hangar_UpdateLaunch(int dtMs) {
 			double rate;
 
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): the climb leaves the player's floor
-			   side, up to its heights. */
+			/* Modern port: the climb leaves the player's floor side, up to its
+			   heights. */
 			if (XwaHangars_IsActive()) {
 				XwaHangarScene_PlayerRise(g_hangarPlayerObjIdx, dtMsa);
 			} else {
@@ -2145,7 +2147,7 @@ int Hangar_UpdateLaunch(int dtMs) {
 			g_objectTable[objIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objIdx].mobj->moveVectorDirty = 1;
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): PlayerAnimationStraightLine farther. */
+			/* Modern port: farther by PlayerAnimationStraightLine. */
 			if (g_objectTable[objIdx].world_y >
 				(g_hangarBackdropObjectType != 308 ? -900 : 2500) + g_objectTable[g_launchRefObjIdx].world_y +
 					(XwaHangars_IsActive() ? XwaHangars_Objects()->playerAnimationStraightLine : 0)) {
@@ -2174,9 +2176,9 @@ int Hangar_UpdateLaunch(int dtMs) {
 				g_hangarLaunchMoveSpeed = 3.0f;
 			}
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): no deceleration nor descent on the
-			   PlayerAnimationStraightLine, then the player's heights, floor side
-			   and offset. */
+			/* Modern port: no deceleration nor descent on the
+			   PlayerAnimationStraightLine, then the player's heights, floor
+			   side and offset. */
 			if (XwaHangars_IsActive() && XwaHangarScene_ReentryStraight(objIdx)) {
 				g_hangarLaunchMoveSpeed += (float)dtMsa * decel;
 			} else if (XwaHangars_IsActive()
@@ -2350,8 +2352,8 @@ int Hangar_UpdateLaunch(int dtMs) {
 					g_launchBaseZ +
 					Hangar_GetLaunchModelZOffset(g_objectTable[g_hangarPlayerObjIdx].objectType);
 #ifdef XWA_MODERN
-				/* Modern port (XWAU hook_hangars): parked with the player's
-				   elevation, floor side and offset. */
+				/* Modern port: parked with the player's elevation, floor side
+				   and offset. */
 				if (XwaHangars_IsActive()) {
 					XwaHangarScene_PlaceOnLaunchRail(objIdx);
 				}
@@ -2395,7 +2397,7 @@ int Hangar_UpdateLaunch(int dtMs) {
 	if (g_hangarBackdropObjectType == 308) {
 		Hangar_UpdateHangarDroidTraffic(dtMsa);
 #ifdef XWA_MODERN
-		/* Modern port (XWAU hook_hangars HangarShuttleUpdateHook): no shuttle, no traffic. */
+		/* Modern port: without a shuttle, there is no shuttle traffic. */
 		if (!XwaHangars_IsActive() || XwaHangarScene_ShuttleLoaded()) {
 			Hangar_UpdateShuttleTrafficCycle(dtMsa);
 		}
@@ -2739,7 +2741,7 @@ void Hangar_LaunchPlayerCraft(void) {
 #ifdef XWA_MODERN
 	XwaArticulation_CloseHatches(newObjIdx);
 	/* Modern port: articulated models open their S-foils and raise their
-	   landing gear (XWAU hook_sfoils SFoilsFilterHook). */
+	   landing gear. */
 	if (XwaArticulation_TriggerPasses(newObjIdx, XWA_ARTICULATION_LAUNCH,
 									  g_objectTable[newObjIdx].objectType == OBJ_XWing ||
 										  g_objectTable[newObjIdx].objectType == OBJ_BWing)) {
@@ -3384,7 +3386,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 	objectIdx = g_hangarShuttleState.objectIdx;
 	sourceObjIdx = objectIdx;
 #ifdef XWA_MODERN
-	/* Modern port: XWAU hook_sfoils ShuttleHatchHook. */
+	/* Modern port: the shuttle's hatches open and close with its move state. */
 	XwaArticulation_StepShuttleHatches((unsigned int)objectIdx);
 #endif
 	decisionTime = 4u * (unsigned int)g_gameTime;
@@ -3410,7 +3412,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 
 			pan = 64;
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): away from its floor side. */
+			/* Modern port: away from its floor side. */
 			if (XwaHangars_IsActive()) {
 				XwaHangarScene_ShuttleRise(2 * dtTicks);
 			} else {
@@ -3460,7 +3462,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 
 		case 2: {
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): the short way to heading 0. */
+			/* Modern port: the short way to heading 0. */
 			int turned = 0;
 
 			if (XwaHangars_IsActive()) {
@@ -3474,7 +3476,8 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			g_objectTable[objectIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objectIdx].mobj->moveVectorDirty = 1;
 #ifdef XWA_MODERN
-			/* Modern port: XWAU hook_sfoils SFoilsHangarShuttleHook. */
+			/* Modern port: an articulated model moves its own hatches
+			   instead. */
 			if (!XwaArticulation_StepShuttleBlock((unsigned int)objectIdx, XWA_ARTICULATION_SHUTTLE_HATCHES,
 												  dtTicks))
 #endif
@@ -3545,7 +3548,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			}
 			targetY = g_objectTable[g_launchRefObjIdx].world_y + 2400;
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): ShuttleAnimationStraightLine farther. */
+			/* Modern port: farther by ShuttleAnimationStraightLine. */
 			if (XwaHangars_IsActive()) {
 				targetY += XwaHangars_Objects()->shuttleAnimationStraightLine;
 			}
@@ -3568,7 +3571,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			g_objectTable[objectIdx].world_y +=
 				dtTicks * (int)(cos(angleRadians) * g_hangarShuttleState.moveSpeed);
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): along ShuttleAnimation. */
+			/* Modern port: along ShuttleAnimation. */
 			if (XwaHangars_IsActive()) {
 				XwaHangarScene_ShuttleSideStep(
 					dtTicks * (int)(sin(angleRadians) * g_hangarShuttleState.moveSpeed), dtTicks);
@@ -3582,7 +3585,8 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 #endif
 			craft->throttleSpeed = (uint16_t)(4096 - (int)(g_hangarShuttleState.moveSpeed * -256.0f));
 #ifdef XWA_MODERN
-			/* Modern port: XWAU hook_sfoils SFoilsHangarShuttleHook. */
+			/* Modern port: an articulated model opens its S-foils and landing
+			   gear instead. */
 			if (!XwaArticulation_StepShuttleBlock((unsigned int)objectIdx, XWA_ARTICULATION_SHUTTLE_OPEN,
 												  dtTicks))
 #endif
@@ -3633,7 +3637,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			g_objectTable[objectIdx].world_y +=
 				dtTicks * (int)(cos(angleRadians) * g_hangarShuttleState.moveSpeed);
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): along ShuttleAnimation. */
+			/* Modern port: along ShuttleAnimation. */
 			if (XwaHangars_IsActive()) {
 				XwaHangarScene_ShuttleSideStep(
 					dtTicks * (int)(sin(angleRadians) * g_hangarShuttleState.moveSpeed), dtTicks);
@@ -3655,7 +3659,8 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				}
 				{
 #ifdef XWA_MODERN
-					/* Modern port: XWAU hook_sfoils SFoilsHangarShuttleHook. */
+					/* Modern port: an articulated model closes its S-foils and
+					   landing gear instead. */
 					if (!XwaArticulation_StepShuttleBlock((unsigned int)objectIdx,
 														  XWA_ARTICULATION_SHUTTLE_CLOSE, dtTicks))
 #endif
@@ -3695,8 +3700,8 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 
 			g_objectTable[objectIdx].world_y -= (int)g_hangarShuttleState.moveSpeed * dtTicks;
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): 0.1 deceleration and no nudge
-			   toward the stock X, for the configured landing place. */
+			/* Modern port: 0.1 deceleration and no nudge toward the stock X,
+			   for the configured landing place. */
 			g_hangarShuttleState.moveSpeed =
 				g_hangarShuttleState.moveSpeed - (float)dtTicks * (XwaHangars_IsActive() ? 0.1f : 0.13f);
 			targetX = XwaHangars_IsActive() ? g_objectTable[objectIdx].world_x
@@ -3744,7 +3749,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				Sound_SetLatestInstanceVolume(g_sfxIds[150], volume);
 			}
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): the landing place ShuttlePositionX/Y. */
+			/* Modern port: the landing place ShuttlePositionX/Y. */
 			if (g_hangarShuttleState.moveSpeed <= 0.0f ||
 				g_objectTable[objectIdx].world_y <=
 					g_objectTable[g_launchRefObjIdx].world_y +
@@ -3772,7 +3777,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 
 		case 8: {
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): to ShuttleOrientation. */
+			/* Modern port: to ShuttleOrientation. */
 			int turned = 0;
 
 			if (XwaHangars_IsActive()) {
@@ -3786,7 +3791,8 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			g_objectTable[objectIdx].mobj->orientMatrixDirty = 1;
 			g_objectTable[objectIdx].mobj->moveVectorDirty = 1;
 #ifdef XWA_MODERN
-			/* Modern port: XWAU hook_sfoils SFoilsHangarShuttleHook. */
+			/* Modern port: an articulated model moves its own hatches
+			   instead. */
 			if (!XwaArticulation_StepShuttleBlock((unsigned int)objectIdx, XWA_ARTICULATION_SHUTTLE_HATCHES,
 												  dtTicks))
 #endif
@@ -3825,7 +3831,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			int distance;
 
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): back to its floor side. */
+			/* Modern port: back to its floor side. */
 			if (XwaHangars_IsActive()) {
 				XwaHangarScene_ShuttleRise(-2 * dtTicks);
 			} else {
@@ -3860,7 +3866,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				}
 			}
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): lands at its [Size] elevation. */
+			/* Modern port: lands at its [Size] elevation. */
 			if (XwaHangars_IsActive() ? !XwaHangarScene_ShuttleAbove(XwaHangarScene_ShuttleRestElevation())
 									  : g_objectTable[objectIdx].world_z <= g_launchBaseZ + 138) {
 #else
@@ -3896,7 +3902,8 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				fsfx_PlaySound(147, sourceObjIdx, (unsigned int)g_localPlayer);
 			}
 #ifdef XWA_MODERN
-			/* Modern port: XWAU hook_sfoils SFoilsHangarShuttleHook. */
+			/* Modern port: an articulated model closes its S-foils and landing
+			   gear instead. */
 			if (!XwaArticulation_StepShuttleBlock((unsigned int)objectIdx, XWA_ARTICULATION_SHUTTLE_CLOSE,
 												  dtTicks))
 #endif
@@ -3942,7 +3949,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				Sound_SetLatestInstanceVolume(g_sfxIds[150], volume);
 			}
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): the landing place ShuttlePositionX/Y. */
+			/* Modern port: the landing place ShuttlePositionX/Y. */
 			if (g_hangarShuttleState.moveSpeed <= 0.0f ||
 				g_objectTable[objectIdx].world_y <=
 					g_objectTable[g_launchRefObjIdx].world_y +
@@ -4293,7 +4300,7 @@ after_key:
 				sizeZ = ModelBounds_GetSizeZ((uint16_t)g_objectTable[g_hangarPlayerObjIdx].objectType) / 2;
 			g_objectTable[placementObjIdx].world_z = g_launchBaseZ + sizeZ;
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars): the new craft's elevation, floor side and offset. */
+			/* Modern port: the new craft's elevation, floor side and offset. */
 			if (XwaHangars_IsActive()) {
 				XwaHangarScene_PlacePlayerAtRest(placementObjIdx);
 			}
@@ -4622,8 +4629,7 @@ void Hangar_SetCameraShot(int shotIndex) {
 	g_hangarCamFocusObj = noObject;
 
 #ifdef XWA_MODERN
-	/* Modern port (XWAU hook_hangars HangarCameraPositionHook): the shots
-	   from the camera sections. */
+	/* Modern port: the shots from the camera sections. */
 	if (XwaHangars_IsActive() && XwaHangarScene_CameraShot(shotIndex, &worldX, &worldY, &worldZ)) {
 		goto shot_placed;
 	}
@@ -5312,8 +5318,8 @@ lbl58:
 	// Carrier hangar (308) for the default hangar type, family base model (179) otherwise.
 	g_hangarBackdropObjectType = g_pilotData.hangarType ? 179 : OBJ_Hangar;
 #ifdef XWA_MODERN
-	/* Modern port (XWAU hook_hangars HangarOptReloadHook): the command ship's
-	   hangar settings, and its own hangar model in place of a loaded one. */
+	/* Modern port: the command ship's hangar settings, and its own hangar model
+	   in place of a loaded one. */
 	XwaHangars_Resolve();
 	XwaHangars_ReleaseStaleModel((uint16_t)g_hangarBackdropObjectType);
 #endif
@@ -5350,7 +5356,7 @@ lbl58:
 	}
 	g_objectTable[launchRefIdx].mobj->team = g_objectTable[g_hangarPlayerObjIdx].mobj->team;
 #ifdef XWA_MODERN
-	/* Modern port (XWAU hook_hangars HangarReloadHook): the hangar's markings. */
+	/* Modern port: the hangar's markings. */
 	if (XwaHangars_IsActive()) {
 		XwaHangarScene_SetHangarMarkings();
 	}
@@ -5397,8 +5403,7 @@ lbl58:
 	}
 	g_launchBaseZ = g_objectTable[g_hangarPlayerObjIdx].world_z - halfSizeZ;
 #ifdef XWA_MODERN
-	/* Modern port (XWAU hook_hangars): the player's [Size] elevation, floor
-	   side and offset. */
+	/* Modern port: the player's [Size] elevation, floor side and offset. */
 	if (XwaHangars_IsActive()) {
 		g_launchBaseZ = XwaHangarScene_FloorZ(g_hangarPlayerObjIdx);
 	}
@@ -5444,7 +5449,7 @@ lbl58:
 
 	if (g_hangarBackdropObjectType == OBJ_Hangar) {
 #ifdef XWA_MODERN
-		/* Modern port (XWAU hook_hangars): the scene from the hangar settings. */
+		/* Modern port: the scene from the hangar settings. */
 		if (XwaHangars_IsActive()) {
 			XwaHangarScene_Spawn(0);
 		} else {
@@ -5526,7 +5531,7 @@ lbl58:
 #endif
 	} else {
 #ifdef XWA_MODERN
-		/* Modern port (XWAU hook_hangars): the scene from the hangar settings. */
+		/* Modern port: the scene from the hangar settings. */
 		if (XwaHangars_IsActive()) {
 			XwaHangarScene_Spawn(1);
 		} else {
@@ -5675,8 +5680,7 @@ int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t objectType, int relX, int
 	int systemIdx;
 
 #ifdef XWA_MODERN
-	/* Modern port (XWAU hook_hangars HangarObjectCreateHook): a type whose
-	   hangar swap changed reloads. */
+	/* Modern port: a type whose hangar swap changed is loaded again. */
 	XwaHangars_ReleaseStaleModel(objectType);
 #endif
 	if (g_loadedModels.byObjectType[objectType] == 0) {
@@ -5771,7 +5775,7 @@ int16_t Hangar_SpawnObjectRelativeToLaunchRef(uint16_t objectType, int relX, int
 		}
 		g_objectTable[objIdx].world_z = zOffset + g_launchBaseZ;
 #ifdef XWA_MODERN
-		/* Modern port (XWAU hook_hangars): the [Size] elevation, on the floor side. */
+		/* Modern port: the [Size] elevation, on the floor side. */
 		if (XwaHangars_IsActive()) {
 			g_objectTable[objIdx].world_z = XwaHangarScene_ObjectFloorZ(objectType);
 		}
@@ -5808,8 +5812,8 @@ void Hangar_UpdateRoofCraneMotion(int dtTicks) {
 
 			worldX = &g_objectTable[objectIdx].world_x;
 #ifdef XWA_MODERN
-			/* Modern port (XWAU hook_hangars HangarRoofCraneUpdateHook): along
-			   HangarRoofCraneAxis; targetWorldX holds the target on it. */
+			/* Modern port: along HangarRoofCraneAxis; targetWorldX holds the
+			   target on it. */
 			if (XwaHangars_IsActive()) {
 				worldX = XwaHangarScene_CraneCoordinate();
 			}
@@ -5864,8 +5868,8 @@ void Hangar_UpdateRoofCraneMotion(int dtTicks) {
 				}
 
 #ifdef XWA_MODERN
-				/* Modern port (XWAU hook_hangars HangarRoofCraneInitHook): within
-				   HangarRoofCraneLow/HighOffset of the crane's place. */
+				/* Modern port: within HangarRoofCraneLow/HighOffset of the
+				   crane's place. */
 				if (XwaHangars_IsActive()) {
 					g_hangarRoofCraneState.targetWorldX = XwaHangarScene_CraneTarget(offset);
 					g_hangarRoofCraneState.moveState = 1;
@@ -5902,7 +5906,7 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 		unsigned int objectIdx;
 
 #ifdef XWA_MODERN
-		/* Modern port (XWAU hook_hangars HangarDroidsUpdateHook): Droid1/2Update. */
+		/* Modern port: the droids move only when Droid1/2Update allow it. */
 		if (XwaHangars_IsActive() && !XwaHangarScene_DroidUpdates(sceneIdx)) {
 			++sceneIdx;
 			continue;
@@ -6152,7 +6156,7 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 
 #ifdef XWA_MODERN
 		/* Modern port: a droid model with crew.update_all moves through the
-		   crew update instead (XWAU's droid hooks skip this motion). */
+		   crew update instead of this motion. */
 		if (XwaArticulation_CrewUpdatesAll(objectIdx)) {
 		} else if (XwaModernFlightTiming_IsHighRate()) {
 			Hangar_ModernUpdateHangarDroidMesh(sceneIdx, objectIdx, dtTicks);

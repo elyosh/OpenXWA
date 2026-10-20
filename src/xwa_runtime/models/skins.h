@@ -14,10 +14,15 @@
  *
  * The renderer creates each model's mesh with only the variants its objects
  * use. This module tells it, through the snapshot, the mission's selections
- * and the markings values used: every flight group's, the player cockpit
- * and exterior with their flight group's, the frontend previews', and those
- * registered during the mission (hangar objects, the objects whose markings
- * game code changes). An object shown with markings nothing registered is
+ * and the markings values used:
+ *   - every flight group's;
+ *   - those that the mission gives single craft (mission_tie.h);
+ *   - the player cockpit and exterior with the markings of the player's
+ *     craft;
+ *   - the frontend previews';
+ *   - those registered during the mission (hangar objects, the objects whose
+ *     markings game code changes).
+ * When an object is shown with markings that nothing registered, they are
  * registered then (logged for a GLB), and its mesh is created again. Uses
  * last until the next mission is loaded. */
 
@@ -45,6 +50,13 @@ void XwaSkins_SetFlightGroups(const struct XwaFlightGroup* flightGroups, size_t 
    `markings`, or every markings value (game code changes them). */
 void XwaSkins_UseMarkings(uint16_t objectType, int markings);
 void XwaSkins_UseAllMarkings(uint16_t objectType);
+
+/* Registers, for the rest of the mission, that craft `craft` (its number in
+   its wave) of flight group `flightGroupIdx` shows `markings`. When it is
+   the player's craft, its cockpit and exterior show them too. Call after
+   XwaSkins_SetFlightGroups, since the flight group gives the object type and
+   the player's craft. */
+void XwaSkins_UseCraftMarkings(int flightGroupIdx, int craft, int markings);
 
 /* Exports the selections and the markings values used into `snapshot`,
    after its loaded models, cockpit and previews; skin_generation changes

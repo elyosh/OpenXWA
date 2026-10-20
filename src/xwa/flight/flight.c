@@ -1459,8 +1459,7 @@ void FlightObject_AnimateCrewMeshRotations(int objectIndex, int resetToNeutral) 
 #ifdef XWA_MODERN
 	/* Modern port: a GLB replacement's component layout is authored freely,
 	 * so it animates its own crew articulations, never the stock ordinals
-	 * below (XWAU hook_pilot PilotHook). A replacement without them animates
-	 * nothing. */
+	 * below. A replacement without them animates nothing. */
 	if (XwaArticulation_AnimateCrew((unsigned int)objectIndex, resetToNeutral)) {
 		return;
 	}
@@ -1618,7 +1617,7 @@ void FlightObject_InitMeshAnimationDefaults(int objIdx) {
 
 #ifdef XWA_MODERN
 	/* Modern port: a model listing S-foils or landing gear sets them from its
-	   articulations instead (XWAU hook_sfoils SFoilsHook1). */
+	   articulations instead. */
 	if (XwaArticulation_InitLeavingHangar((unsigned int)objIdx)) {
 		return;
 	}
@@ -2322,8 +2321,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 
 #ifdef XWA_MODERN
 			/* Modern port: a model with crew.update_all animates its crew for
-			   every object, in any view (XWAU's patch at 0x4024EB). Pilots keep
-			   their own call below. */
+			   every object, in any view. Pilots keep their own call below. */
 			if ((g_objectTable[(uint16_t)objIdx].playerOwnerIdx != -1 && g_flightPlayerCount == 1 &&
 				 g_players[g_localPlayer].viewState.externalCameraActive) ||
 				(objectType != OBJ_RebelPilot && objectType != OBJ_ImperialPilot &&
@@ -4980,8 +4978,8 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					po = &g_objectTable[g_players[playerIdx].objectIndex];
 					arrivedType = (ObjectTypeId)po->objectType;
 #ifdef XWA_MODERN
-					/* Modern port: articulated models decide from their S-foils
-					   (XWAU hook_sfoils SFoilsFilterHook). */
+					/* Modern port: articulated models decide from their
+					   S-foils. */
 					if (XwaArticulation_TriggerPasses(g_players[playerIdx].objectIndex,
 													  XWA_ARTICULATION_HYPERSPACE_ARRIVAL,
 													  arrivedType == OBJ_XWing || arrivedType == OBJ_BWing)) {
@@ -6009,7 +6007,7 @@ void Flight_StepSimToTime(int targetTimestamp) {
 				collide_collisions();
 #ifdef XWA_MODERN
 				/* Modern port: warheads bay, cargo clamps and hangar doors of
-				   articulated models (XWAU hook_sfoils HangarDoorsHook). */
+				   articulated models. */
 				XwaArticulation_StepWorld();
 #endif
 				if (!g_flightSimSideEffectsSuppressed && g_flightMissionEndPending == 1) {
@@ -9296,8 +9294,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			case KEY_V:
 #ifdef XWA_MODERN
 				/* Modern port: articulated models toggle their S-foils (V) or
-				   landing gear (Ctrl+L), as XWAU's hook_sfoils does. The
-				   original ignores Ctrl+L. */
+				   landing gear (Ctrl+L). The original ignores Ctrl+L. */
 				if (objIdx != 0xffff) {
 					uint16_t refusal = 0;
 					const XwaArticulationTriggerResult articulation = XwaArticulation_Trigger(

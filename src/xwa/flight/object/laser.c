@@ -2123,9 +2123,9 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 	effectiveAi = pai_GetEffectiveAIController(g_curCraft);
 	modelIndex = g_curCraft->modelDefIndex;
 #ifdef XWA_MODERN
-	/* Modern port: articulated models use XWAU's gate (hook_sfoils
-	   NoFireMessageHook): moving S-foils, closed S-foils unless
-	   sfoils.allow_fire_closed, or lowered landing gear. */
+	/* Modern port: articulated models can't fire with moving S-foils,
+	   closed S-foils unless sfoils.allow_fire_closed, or lowered landing
+	   gear. */
 	if (XwaArticulation_FireBlocked(shooterObjIdx, g_curCraft->sFoilState != 0)) {
 #else
 	if (g_curCraft->sFoilState != 0) {

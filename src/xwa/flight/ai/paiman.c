@@ -581,7 +581,8 @@ void paiman_initparkmaneuver(void) {
 	uint8_t elapsedSeconds;
 
 #ifdef XWA_MODERN
-	/* Modern port: XWAU hook_sfoils AIParkManrHook. */
+	/* Modern port: an articulated craft starting to park may close its
+	   S-foils and landing gear at once. */
 	XwaArticulation_AiParkStart(g_paiContext.aiObjIdx);
 #endif
 	elapsedHours = g_missionElapsedClock.hours;
@@ -2050,7 +2051,8 @@ int paiman_initoutofhyperspacemaneuver(void) {
 	g_paiContext.aiController->thinkInterval = 29;
 #ifdef XWA_MODERN
 	{
-		/* Modern port: XWAU hook_sfoils SFoilsAIOutOfHyperspace1Hook. */
+		/* Modern port: an articulated craft may come out of hyperspace with
+		   its S-foils closed. */
 		const int result = Music_TriggerOutOfHyperspaceSequenceForObject(g_paiContext.aiObjIdx);
 
 		XwaArticulation_AiOutOfHyperspaceInit(g_paiContext.aiObjIdx);
@@ -2095,7 +2097,8 @@ void paiman_initintohyperspacemaneuver(void) {
 	g_paiContext.aiController->maneuverPhase = 0;
 	pai_CalcAnglesToAimPoint();
 #ifdef XWA_MODERN
-	/* Modern port: XWAU hook_sfoils SFoilsAIIntoHyperspace1Hook. */
+	/* Modern port: an articulated craft going into hyperspace may close its
+	   S-foils. */
 	XwaArticulation_AiIntoHyperspace(g_paiContext.aiObjIdx);
 #endif
 	if (trig2_polardistance == 0) {
@@ -5629,7 +5632,8 @@ static char paiman_outofhyperspacemaneuver(void) {
 	PlanRecord* plan;
 
 #ifdef XWA_MODERN
-	/* Modern port: XWAU hook_sfoils SFoilsAIOutOfHyperspace2Hook. */
+	/* Modern port: an articulated craft out of hyperspace opens its S-foils
+	   once the maneuver timer is low enough. */
 	XwaArticulation_AiOutOfHyperspaceStep(g_paiContext.aiObjIdx, g_paiContext.aiController->maneuverTimer);
 #endif
 	pai_GetEffectiveAIController(g_paiContext.aiTargetCraft);
@@ -6304,7 +6308,8 @@ static char paiman_parkmaneuver(void) {
 			if (g_paiContext.aiController->maneuverTimer == 0) {
 				++g_paiContext.aiController->maneuverPhase;
 #ifdef XWA_MODERN
-				/* Modern port: XWAU hook_sfoils AIParkManrFunctionHook. */
+				/* Modern port: an articulated craft done parking opens its
+				   S-foils. */
 				XwaArticulation_AiParkEnd(g_paiContext.aiObjIdx);
 #endif
 			}

@@ -24,10 +24,10 @@
 #include <stdint.h>
 #include <string.h>
 
-/* Modern port module; no original counterpart. It does what XWAU's
-   hook_sfoils does for the craft whose GLB model lists articulations,
-   on the stock CraftData
-   state. Craft without them never reach it. */
+/* Modern port module; no original counterpart. It moves the S-foils,
+   landing gear and other parts of the craft whose GLB model lists
+   articulations, on the stock CraftData state. Craft without them never
+   reach it. */
 
 /* CraftData.articulationMotion: the groups a key started; 0 moves both. */
 enum { ARTICULATION_MOTION_BOTH = 0, ARTICULATION_MOTION_SFOILS = 1, ARTICULATION_MOTION_LANDING_GEAR = 2 };
@@ -47,7 +47,7 @@ enum {
 
 /* The into-hyperspace maneuver (g_maneuverInitTable[21]). */
 #define ARTICULATION_INTO_HYPERSPACE_MANEUVER 21
-/* XWAU's step period for SFoilsAnimationSpeed 1, in ticks. */
+/* The default step period (the model's step_ticks), in ticks. */
 #define ARTICULATION_STEP_TICKS 15
 /* AI maneuvers that drive the cargo clamps (g_maneuverInitTable). */
 #define ARTICULATION_BOARD_MANEUVER 18
@@ -61,7 +61,8 @@ enum {
 #define ARTICULATION_CREW_TICKS 15
 #define ARTICULATION_STOCK_SFOILS_MAX 32
 #define ARTICULATION_HANGAR_DOORS_DISTANCE 0x4000
-/* XWAU's AI out-of-hyperspace maneuver opens the S-foils from this timer. */
+/* The AI's out-of-hyperspace maneuver opens the S-foils once its timer is
+   at or below this. */
 #define ARTICULATION_OUT_OF_HYPERSPACE_OPEN_TIMER 0x2ac
 
 static CraftData* Articulation_Craft(unsigned int objIdx) {
@@ -90,9 +91,8 @@ typedef struct ArticulationModel {
 /* The longest variant name a group can follow: `variant.<name>.sfoils`. */
 #define ARTICULATION_VARIANT_MAX (AERON_FLIGHT_TAG_MAX - 1 - 8 - 1 - 6)
 
-/* The current mission's selections for a flight group (hook_sfoils'
-   [<Section>_fg_N] sections, as a model variant, and [mission_tie] start
-   lines). */
+/* The current mission's selections for a flight group: a model variant and
+   the groups that start at their angle. */
 typedef struct ArticulationFlightGroup {
 	int start; /* ARTICULATION_SFOILS and ARTICULATION_LANDING_GEAR, set to their angle at spawn */
 	char variant[ARTICULATION_VARIANT_MAX + 1];
@@ -127,8 +127,8 @@ static const char* Articulation_VariantGroup(const AeronFlightArticulation* arti
 	return articulation->group + prefix + length + 1;
 }
 
-/* hook_sfoils MergeFileLines: the variant's entries first, then the model's
-   whose group and component the variant does not list. */
+/* The variant's entries first, then the model's whose group and component
+   the variant does not list. */
 static void Articulation_BuildMerged(ArticulationMerged* merged, const XwaOptSynthData* synth,
 									 const char* variant) {
 	uint32_t index;
@@ -303,9 +303,8 @@ static int32_t Articulation_Setting(const ArticulationModel* model, const char* 
 	return fallback;
 }
 
-/* hook_sfoils AreSFoilsOpened / AreLandingGearsClosed: every mesh of the
-   list at 0. A missing landing-gear list counts as closed; a missing S-foil
-   list does not count as open. */
+/* Whether every mesh of the list is at 0. A missing landing-gear list counts
+   as closed; a missing S-foil list does not count as open. */
 static int Articulation_AtRest(const ArticulationModel* model, const CraftData* craft, int list) {
 	uint32_t index;
 
@@ -360,7 +359,7 @@ static int Articulation_MoveToward(CraftData* craft, int component, int angle, i
 	return 1;
 }
 
-/* Sets the meshes of `lists` to their angle (the byte wraps, as XWAU's). */
+/* Sets the meshes of `lists` to their angle (the byte wraps). */
 static void Articulation_SetToAngle(const ArticulationModel* model, CraftData* craft, int lists) {
 	uint32_t index;
 
@@ -398,7 +397,7 @@ static int Articulation_StepEntry(CraftData* craft, const AeronFlightArticulatio
 								   step, articulation->angle < 0);
 }
 
-/* hook_sfoils' common step over a group. */
+/* Steps every mesh of a group toward its angle, or back to 0. */
 static void Articulation_StepGroup(const ArticulationModel* model, CraftData* craft, const char* group,
 								   int toAngle, int32_t unit) {
 	uint32_t index;
@@ -412,8 +411,8 @@ static void Articulation_StepGroup(const ArticulationModel* model, CraftData* cr
 	}
 }
 
-/* hook_sfoils SetCraftMeshRotationAngles: toward `angle` (each entry's own
-   when `angle` is -1), from either side. */
+/* Steps a group toward `angle` (each entry's own when `angle` is -1), from
+   either side. */
 static void Articulation_StepGroupToward(const ArticulationModel* model, CraftData* craft, const char* group,
 										 int angle, int32_t unit) {
 	uint32_t index;
@@ -440,7 +439,7 @@ static void Articulation_SetGroup(const ArticulationModel* model, CraftData* cra
 	}
 }
 
-/* hook_sfoils GetHatches: no hatches in multiplayer. */
+/* No hatches in multiplayer. */
 static int Articulation_HatchesActive(void) {
 	return g_flightPlayerCount <= 1;
 }
@@ -456,8 +455,8 @@ int XwaArticulation_InitLeavingHangar(unsigned int objIdx) {
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
 
-	/* hook_sfoils SFoilsHook1: the hatches open at the start of the hangar
-	   scene, whatever else the model has. */
+	/* The hatches open at the start of the hangar scene, whatever else the
+	   model has. */
 	if (craft != NULL && model != NULL && g_launchSeqPhase == 0 && Articulation_HatchesActive()) {
 		Articulation_SetGroup(model, craft, "hatches", 1);
 	}
@@ -470,10 +469,9 @@ int XwaArticulation_InitLeavingHangar(unsigned int objIdx) {
 }
 
 /* How far a unit of speed moves over `elapsed` time units, in 1/256 units: a
-   speed is in units per `period`. XWAU steps once per period
-   (ObjectIndexTime::RetrieveTimeSpeed); here the motion is spread over it.
-   The remainder stays in CraftData.articulationTicks, one per `clock` as
-   XWAU keeps one accumulator per feature. */
+   speed is in units per `period`, and the motion is spread over the period.
+   The remainder stays in CraftData.articulationTicks, one per `clock`, so
+   each feature keeps its own. */
 static int32_t Articulation_Advance(CraftData* craft, int clock, int elapsed, int32_t period) {
 	uint32_t total;
 
@@ -485,8 +483,7 @@ static int32_t Articulation_Advance(CraftData* craft, int clock, int elapsed, in
 	return (int32_t)(total / (uint32_t)period);
 }
 
-/* Over this sim step, at the model's step_ticks period (15 x XWAU's
-   SFoilsAnimationSpeed). */
+/* Over this sim step, at the model's step_ticks period. */
 static int32_t Articulation_StepUnit(const ArticulationModel* model, CraftData* craft, int clock) {
 	return Articulation_Advance(craft, clock, g_elapsedTicks,
 								Articulation_Setting(model, "step_ticks", ARTICULATION_STEP_TICKS));
@@ -616,10 +613,9 @@ void XwaArticulation_StepSFoils(unsigned int objIdx) {
 	}
 	object = &g_objectTable[objIdx];
 
-	/* hook_sfoils SFoilsHook2: a key moves its own group; a player's closing
-	   (hyperspace) and the AI's into-hyperspace maneuver move the S-foils;
-	   anything else moves both. XWAU keeps the key flags for the local
-	   player only; here they are the craft's. */
+	/* A key moves its own group; a player's closing (hyperspace) and the
+	   AI's into-hyperspace maneuver move the S-foils; anything else moves
+	   both. The key flags are the craft's. */
 	if (craft->articulationMotion == ARTICULATION_MOTION_SFOILS) {
 		lists = ARTICULATION_SFOILS;
 	} else if (craft->articulationMotion == ARTICULATION_MOTION_LANDING_GEAR) {
@@ -647,8 +643,8 @@ void XwaArticulation_StepSFoils(unsigned int objIdx) {
 	}
 
 	/* The original completion (FlightObject_UpdateSpecialBehavior, phase 1),
-	   with the landing-gear texts after Ctrl+L (hook_sfoils SetSFoilsText,
-	   before the key motion ends). */
+	   with the landing-gear texts after Ctrl+L, before the key motion
+	   ends. */
 	if ((craft->sFoilState & 1) != 0 && !moved) {
 		const uint16_t messageId = XwaArticulation_Message(objIdx, (craft->sFoilState & 2) != 0 ? MSG_SFOILS_CLOSED
 																								 : MSG_SFOILS_OPEN);
@@ -685,7 +681,8 @@ XwaArticulationTriggerResult XwaArticulation_Trigger(unsigned int objIdx, XwaArt
 	sfoilsOpen = Articulation_AtRest(model, craft, ARTICULATION_SFOILS);
 	landingGearClosed = Articulation_AtRest(model, craft, ARTICULATION_LANDING_GEAR);
 
-	/* hook_sfoils SFoilsFilterHook. */
+	/* The S-foil and landing-gear keys. Each is refused while the other
+	   group moves, or when the other group is in the way. */
 	switch (trigger) {
 		case XWA_ARTICULATION_KEY_SFOILS:
 			if (craft->articulationMotion == ARTICULATION_MOTION_LANDING_GEAR) {
@@ -753,14 +750,14 @@ uint16_t XwaArticulation_Message(unsigned int objIdx, uint16_t messageId) {
 	if (craft == NULL || !Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR)) {
 		return messageId;
 	}
-	/* hook_sfoils NoFireMessageHook's gate has its own text. */
+	/* The fire gate has its own text. */
 	if (messageId == MSG_SFOILS_NO_FIRE) {
 		return MSG_ARTICULATION_NO_FIRE;
 	}
 	if (craft->articulationMotion != ARTICULATION_MOTION_LANDING_GEAR) {
 		return messageId;
 	}
-	/* hook_sfoils SetSFoilsText: closing lowers the gear. */
+	/* For the landing gear, closing lowers the gear. */
 	switch (messageId) {
 		case MSG_SFOILS_OPENING:
 			return MSG_LANDING_GEAR_RAISING;
@@ -792,7 +789,9 @@ int XwaArticulation_FireBlocked(unsigned int objIdx, int stockBlocked) {
 	if (craft == NULL || !Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR)) {
 		return stockBlocked;
 	}
-	/* hook_sfoils NoFireMessageHook. */
+	/* No firing while the S-foils move, while they are closed (unless the
+	   model sets sfoils.allow_fire_closed), or while the landing gear is
+	   down. */
 	hasSFoils = Articulation_Has(model, ARTICULATION_SFOILS);
 	blocked = 0;
 	if (hasSFoils && !Articulation_AtRest(model, craft, ARTICULATION_SFOILS)) {
@@ -811,9 +810,8 @@ void XwaArticulation_AiOutOfHyperspaceInit(unsigned int objIdx) {
 	CraftData* craft = Articulation_Craft(objIdx);
 	uint32_t index;
 
-	/* hook_sfoils SFoilsAIOutOfHyperspace1Hook. XWAU clears every mesh
-	   rotation; only the articulated ones are cleared here, so turret aim
-	   survives. */
+	/* The craft arrives with its S-foils closed. Only the articulated mesh
+	   rotations are cleared, so turret aim survives. */
 	if (craft == NULL || !Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR) ||
 		Articulation_Setting(model, "sfoils.close_in_hyperspace", 0) == 0) {
 		return;
@@ -834,7 +832,8 @@ void XwaArticulation_AiOutOfHyperspaceStep(unsigned int objIdx, int maneuverTime
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
 
-	/* hook_sfoils SFoilsAIOutOfHyperspace2Hook. */
+	/* Out of hyperspace, the S-foils open once the maneuver timer is low
+	   enough. */
 	if (craft == NULL || !Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR) ||
 		Articulation_Setting(model, "sfoils.close_in_hyperspace", 0) == 0) {
 		return;
@@ -849,7 +848,7 @@ void XwaArticulation_AiIntoHyperspace(unsigned int objIdx) {
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
 
-	/* hook_sfoils SFoilsAIIntoHyperspace1Hook and SFoilsAIHyperspaceOrderHook. */
+	/* Into hyperspace, the S-foils close. */
 	if (craft != NULL && Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR) &&
 		Articulation_Setting(model, "sfoils.close_in_hyperspace", 0) != 0) {
 		craft->sFoilState = 3;
@@ -861,7 +860,7 @@ void XwaArticulation_AiParkOrder(unsigned int objIdx) {
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
 
-	/* hook_sfoils AILookForParkOrderHook. */
+	/* An order to park closes the S-foils. */
 	if (craft != NULL && Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR) &&
 		Articulation_Setting(model, "sfoils.park_closed", 0) != 0) {
 		craft->sFoilState = 3;
@@ -873,7 +872,7 @@ void XwaArticulation_AiParkStart(unsigned int objIdx) {
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
 
-	/* hook_sfoils AIParkManrHook. */
+	/* When parking starts, the S-foils and landing gear are closed at once. */
 	if (craft != NULL && Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR) &&
 		Articulation_Setting(model, "sfoils.park_closed", 0) != 0) {
 		Articulation_SetToAngle(model, craft, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR);
@@ -886,7 +885,7 @@ void XwaArticulation_AiParkEnd(unsigned int objIdx) {
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
 
-	/* hook_sfoils AIParkManrFunctionHook. */
+	/* When parking ends, the S-foils open. */
 	if (craft != NULL && Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR) &&
 		Articulation_Setting(model, "sfoils.park_closed", 0) != 0) {
 		craft->sFoilState = 1;
@@ -896,9 +895,8 @@ void XwaArticulation_AiParkEnd(unsigned int objIdx) {
 void XwaArticulation_AiEnterHangarOrder(unsigned int objIdx) {
 	uint32_t follower;
 
-	/* hook_sfoils AIEnterHangarOrderHook: the leader and every craft that
-	   follows it close their S-foils (and lower their landing gear). XWAU
-	   does it for any craft; here for those with S-foils or landing gear. */
+	/* The leader and every craft that follows it close their S-foils (and
+	   lower their landing gear), when they have S-foils or landing gear. */
 	if (XwaArticulation_HasSFoilsOrLandingGear(objIdx)) {
 		Articulation_Craft(objIdx)->sFoilState = 3;
 	}
@@ -911,8 +909,8 @@ void XwaArticulation_AiEnterHangarOrder(unsigned int objIdx) {
 	}
 }
 
-/* hook_pilot PilotHook, behaviors 0 (swing), 1 (random) and 2
-   (random_pause), on the signed byte as the hook's `char&`. */
+/* Steps a crew entry with its behavior, swing, random or random_pause, on
+   the angle as a signed byte. */
 static void Articulation_StepCrewEntry(uint8_t* byte, const AeronFlightArticulation* articulation) {
 	const int angle = articulation->angle;
 	const int speed = articulation->speed;
@@ -1124,10 +1122,10 @@ static int Articulation_CrewMeshes(unsigned int objIdx, const ArticulationModel*
 	return count;
 }
 
-/* The crew logic keeps its stock and XWAU steps, with the direction in the
-   angle's low bit and its random choices on the crew timer; the crew meshes'
-   fine angles follow those signed angles at their speed on every step, and
-   only the drawing reads them. */
+/* The crew logic keeps its own steps, with the direction in the angle's low
+   bit and its random choices on the crew timer; the crew meshes' fine
+   angles follow those signed angles at their speed on every step, and only
+   the drawing reads them. */
 void XwaArticulation_StepCrewAngles(unsigned int objIdx) {
 	ArticulationModel view;
 	ArticulationCrewMesh meshes[ARTICULATION_CREW_MAX];
@@ -1169,7 +1167,7 @@ void XwaArticulation_CloseHatches(unsigned int objIdx) {
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	CraftData* craft = Articulation_Craft(objIdx);
 
-	/* hook_sfoils SFoilsFilterHook at the hangar exit. */
+	/* At the hangar exit, the hatches close at once. */
 	if (craft != NULL && model != NULL && Articulation_HatchesActive()) {
 		Articulation_SetGroup(model, craft, "hatches", 0);
 	}
@@ -1181,7 +1179,7 @@ void XwaArticulation_StepLaunchHatches(unsigned int objIdx) {
 	CraftData* craft = Articulation_Craft(objIdx);
 	int32_t unit;
 
-	/* hook_sfoils PlayerCraftHatchHook: phases 1-4 close the hatches (and
+	/* Launch phases 1-4 close the hatches (and
 	   raise the landing gear from phase 2), 7-8 open them. */
 	if (craft == NULL || !Articulation_HasGroup(model, "hatches") || !Articulation_HatchesActive()) {
 		return;
@@ -1203,7 +1201,7 @@ void XwaArticulation_StepShuttleHatches(unsigned int objIdx) {
 	CraftData* craft = Articulation_Craft(objIdx);
 	int32_t unit;
 
-	/* hook_sfoils ShuttleHatchHook: open while parked (0), closing while
+	/* The shuttle's hatches: open while parked (0), closing while
 	   leaving (1-7), opening while landing (9). */
 	if (craft == NULL || !Articulation_HasGroup(model, "hatches") || !Articulation_HatchesActive()) {
 		return;
@@ -1228,16 +1226,16 @@ int XwaArticulation_StepShuttleBlock(unsigned int objIdx, XwaArticulationShuttle
 	if (craft == NULL || model == NULL) {
 		return 0;
 	}
-	/* XWAU removes the original hatch and custom-mesh motion; the hatch group
-	   takes it over (XwaArticulation_StepShuttleHatches). */
+	/* The hatch group replaces the original hatch and custom-mesh motion
+	   (XwaArticulation_StepShuttleHatches). */
 	if (step == XWA_ARTICULATION_SHUTTLE_HATCHES) {
 		return Articulation_HasGroup(model, "hatches");
 	}
 	if (!Articulation_Has(model, ARTICULATION_SFOILS | ARTICULATION_LANDING_GEAR)) {
 		return 0;
 	}
-	/* hook_sfoils SFoilsHangarShuttleHook moves (speed * dt + 1) / 2 per call:
-	   at the original's frames (dt 2), a speed is units per frame. */
+	/* The shuttle's S-foils move (speed * dt + 1) / 2 per call: at the
+	   original's frames (dt 2), a speed is units per frame. */
 	unit = Articulation_Advance(craft, ARTICULATION_CLOCK_SHUTTLE, dtTicks, ARTICULATION_SHUTTLE_CADENCE);
 	for (index = 0; index < model->articulationCount; ++index) {
 		const AeronFlightArticulation* articulation = &model->articulations[index];
@@ -1249,8 +1247,7 @@ int XwaArticulation_StepShuttleBlock(unsigned int objIdx, XwaArticulationShuttle
 	return 1;
 }
 
-/* hook_sfoils HandleWarheadsBay: the local player's bay opens while warheads
-   are armed. */
+/* The local player's warheads bay opens while warheads are armed. */
 static void Articulation_StepWarheadsBay(void) {
 	const int objIdx = g_players[g_localPlayer].objectIndex;
 	ArticulationModel view;
@@ -1270,7 +1267,7 @@ static void Articulation_StepWarheadsBay(void) {
 
 /* The cargo-clamp group for carrying object `carriedObjIdx`:
    `cargo_clamps.` and its model's encoded name when the model lists it, else
-   `cargo_clamps.close` (hook_sfoils GetCargoClampsList). */
+   `cargo_clamps.close`. */
 static void Articulation_CarriedGroup(const ArticulationModel* model, unsigned int carriedObjIdx, char* group,
 									  size_t size) {
 	ArticulationModel carriedView;
@@ -1303,7 +1300,8 @@ static void Articulation_CarriedGroup(const ArticulationModel* model, unsigned i
 	}
 }
 
-/* hook_sfoils HandleCargoClamps. */
+/* The cargo clamps open to board a craft, hold the carried one, and open to
+   release it, closing once it is gone. */
 static void Articulation_StepCargoClamps(unsigned int objIdx) {
 	ArticulationModel view;
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
@@ -1334,7 +1332,7 @@ static void Articulation_StepCargoClamps(unsigned int objIdx) {
 	}
 }
 
-/* hook_sfoils Distance: the octagonal distance. */
+/* The octagonal distance. */
 static int Articulation_Distance(const ObjectRecord* a, const ObjectRecord* b) {
 	const int x = abs(a->world_x - b->world_x);
 	const int y = abs(a->world_y - b->world_y);
@@ -1349,7 +1347,7 @@ static int Articulation_Distance(const ObjectRecord* a, const ObjectRecord* b) {
 	return x / 4 + y / 4 + z;
 }
 
-/* hook_sfoils HangarDoorsHook: a starship, freighter or platform opens its
+/* A starship, freighter or platform opens its
    hangar doors while a craft of its team is within the distance and no other
    team's is. */
 static void Articulation_StepHangarDoors(unsigned int objIdx) {
@@ -1581,7 +1579,7 @@ void XwaArticulation_InitMissionStart(unsigned int objIdx) {
 	CraftData* craft = Articulation_Craft(objIdx);
 	const unsigned int fgIdx = craft != NULL ? g_objectTable[objIdx].flightGroupIdx : ARTICULATION_FLIGHT_GROUPS;
 
-	/* hook_sfoils InitSFoilsLandingGearsHook: the meshes at their angle;
+	/* The start lines set the meshes at their angle;
 	   sFoilState stays as it is. */
 	if (model != NULL && fgIdx < ARTICULATION_FLIGHT_GROUPS && s_flightGroups[fgIdx].start != 0) {
 		Articulation_SetToAngle(model, craft, s_flightGroups[fgIdx].start);

@@ -553,11 +553,11 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 					}
 
 #ifdef XWA_MODERN
-					/* Modern port: articulated models are aligned on their bridge too,
-					   each looked up in its own model (XWAU drops the type test and the
-					   B-wing cache). Both answers depend only on the object and its
-					   model, so each is found once per draw instead of once per root:
-					   a bridge search walks every root. */
+					/* Modern port: articulated models are aligned on their bridge too.
+					   The B-wing keeps its cached bridge, and other models look it up
+					   in their own model. Both answers depend only on the object and
+					   its model, so each is found once per draw instead of once per
+					   root: a bridge search walks every root. */
 					if (alignsBridge < 0) {
 						alignsBridge = XwaArticulation_AlignsBridge(obj) ? 1 : 0;
 					}
@@ -899,11 +899,11 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 				}
 
 #ifdef XWA_MODERN
-				/* Modern port: articulated models are aligned on their bridge too,
-				   each looked up in its own model (XWAU drops the type test and the
-				   B-wing cache). Both answers depend only on the object and its
-				   model, so each is found once per draw instead of once per root:
-				   a bridge search walks every root. */
+				/* Modern port: articulated models are aligned on their bridge too.
+				   The B-wing keeps its cached bridge, and other models look it up
+				   in their own model. Both answers depend only on the object and
+				   its model, so each is found once per draw instead of once per
+				   root: a bridge search walks every root. */
 				if (alignsBridge < 0) {
 					alignsBridge = XwaArticulation_AlignsBridge(obj) ? 1 : 0;
 				}

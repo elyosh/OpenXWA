@@ -1,10 +1,10 @@
 #ifndef XWA_RUNTIME_MODELS_HANGARS_H
 #define XWA_RUNTIME_MODELS_HANGARS_H
 
-/* Modern port: per-mothership hangar settings (XWAU hook_hangars).
+/* Modern port: per-mothership hangar settings.
  *
  * flight/hangars.yaml in the mod folder holds the settings layers (written by the model
- * conversion from XWAU's FlightModels files): a default layer, one per ship
+ * conversion from the mod's FlightModels files): a default layer, one per ship
  * model with variants per IFF, and the crafts' hangar cameras and
  * elevations. A mission adds its own layer (`hangar` in its mission file).
  * For the hangar's command ship, the layers mission > ship IFF > ship >
@@ -12,8 +12,8 @@
  * each map or camera section whole from the first layer that has it.
  *
  * While settings are active (the file exists and model replacements are on),
- * the hangar code takes them instead of its stock layout, as hook_hangars
- * does; otherwise it runs its stock code unchanged. */
+ * the hangar code takes them instead of its stock layout; otherwise it runs
+ * its stock code unchanged. */
 
 #include <stdint.h>
 
@@ -47,7 +47,7 @@ typedef struct XwaHangarPlayerCraft {
 	int offset[3];
 } XwaHangarPlayerCraft;
 
-/* The HangarObjects settings, with hook_hangars' defaults. */
+/* The HangarObjects settings, with their defaults. */
 typedef struct XwaHangarObjects {
 	int loadShuttle;
 	uint16_t shuttleObjectType; /* 0: the stock shuttle */
@@ -80,8 +80,9 @@ typedef struct XwaHangarObjects {
 	int playerFloorInvertedTypeCount;
 } XwaHangarObjects;
 
-/* One HangarMap line; objectType 0 is a line the hook skips (it still takes
-   its place among the first four, which name the droid and crane targets). */
+/* One HangarMap line; objectType 0 is a line that places nothing (it still
+   takes its place among the first four, which name the droid and crane
+   targets). */
 typedef struct XwaHangarMapEntry {
 	uint16_t objectType;
 	int markings;
@@ -102,16 +103,16 @@ typedef struct XwaHangarCamera {
 void XwaHangars_Init(void);
 /* Reads the mission's `hangar` layer (its mission file); NULL clears it. */
 void XwaHangars_LoadMission(const char* missionPath);
-/* Picks the layers for the hangar's command ship, as hook_hangars finds it
-   from the hangar player and its flight group. Returns 1 when the result
-   differs from the previous one. */
+/* Picks the layers for the hangar's command ship, found from the hangar
+   player and its flight group. Returns 1 when the result differs from the
+   previous one. */
 int XwaHangars_Resolve(void);
 /* True while settings apply (see above). */
 int XwaHangars_IsActive(void);
 
 const XwaHangarObjects* XwaHangars_Objects(void);
 /* The map section (`family`: the family base's). Without one in any layer,
-   hook_hangars' default layout: the stock one at the highest detail level. */
+   the default layout: the stock one at the highest detail level. */
 const XwaHangarMapEntry* XwaHangars_Map(int family, int* count);
 const XwaHangarCamera* XwaHangars_Camera(int family);
 /* The command ship's markings (FG markings, 0 without a command ship). */
@@ -135,8 +136,8 @@ void XwaHangars_PlayerOffset(uint16_t objectType, int offset[3]);
    command ship's hangar model for the hangar, a HangarObjects swap. */
 int XwaHangars_ModelFileName(uint16_t objectType, char* fileName, unsigned int fileNameSize);
 /* The model file of any type's list row, for the types
-   Hangar_LoadCraftModelByType has no name for (hook_hangars removes its
-   type filter); 0 without settings. */
+   Hangar_LoadCraftModelByType has no name for (its type filter is skipped);
+   0 without settings. */
 int XwaHangars_TypeFileName(uint16_t objectType, char* fileName, unsigned int fileNameSize);
 /* Records the handle Hangar_LoadCraftModelByType loaded for `objectType`. */
 void XwaHangars_ModelLoaded(uint16_t objectType, uint16_t handle);

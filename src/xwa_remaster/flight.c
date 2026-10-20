@@ -146,7 +146,7 @@ typedef struct FlStateOnsets {
 	float onset[32];
 } FlStateOnsets;
 
-/* The player's target event, one at a time (XWAU's TargetEvent). */
+/* The player's target event, one at a time. */
 enum {
 	FL_TARGET_NONE,
 	FL_TARGET_SELECTED,
@@ -3439,7 +3439,7 @@ static uint32_t fl_damage_stage(const XwaFlightObject* object) {
 	return object->has_craft ? fl_hull_stage(object->hull_damage, object->hull_max) : 0u;
 }
 
-/* The energy effect an object shows (XWAU's shield/beam instance event):
+/* The energy effect an object shows:
  * 3 under a jamming beam, else 2 under a tractor beam, else 1 when its
  * shields are down (or it has none), else 0. */
 static uint32_t fl_energy(const XwaFlightObject* object) {
@@ -3457,8 +3457,8 @@ static uint32_t fl_energy(const XwaFlightObject* object) {
 
 /* When the object's current energy effect started, in animation seconds:
  * now when it changed, counting an object not seen before as showing none
- * (XWAU fires the event then, so a craft without shields flashes once when
- * it appears), or when the clock went back. */
+ * (so a craft without shields flashes once when it appears), or when the
+ * clock went back. */
 static float fl_energy_start(const XwaFlightObject* object, uint32_t energy) {
 	const float now = s.snap ? (float)((double)s.snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS) : 0.0f;
 	if (object->slot >= XWA_SNAP_MAX_FLIGHT_OBJECTS) {
@@ -3484,12 +3484,12 @@ static uint32_t fl_cannon_range(int first, int last) {
 	return bits;
 }
 
-/* The cannons that fire next, bit i for hardpoint i (XWAU's cannon-ready
- * events). Per cannon set, link mode 1 marks the next hardpoint, 2 every
- * second one from it to the end of the set, 3 the set and 4 every
- * hardpoint; set 0 is the lasers and set 1 the ions, counted by weapon
- * type. None is ready with warheads armed; otherwise the set not selected
- * is not, unless a mode is 4; nor is a cannon without energy. */
+/* The cannons that fire next, bit i for hardpoint i. Per cannon set, link
+ * mode 1 marks the next hardpoint, 2 every second one from it to the end of
+ * the set, 3 the set and 4 every hardpoint; set 0 is the lasers and set 1
+ * the ions, counted by weapon type. None is ready with warheads armed;
+ * otherwise the set not selected is not, unless a mode is 4; nor is a
+ * cannon without energy. */
 static uint32_t fl_cannons_ready(const XwaHudState* hud) {
 	const XwaHudInstruments* in = &hud->instruments;
 	const int count =
@@ -3569,15 +3569,14 @@ static void fl_state_onsets_update(FlStateOnsets* states, uint32_t mask, uint32_
 	states->mask = mask;
 }
 
-/* This frame's player states, on the player's craft and cockpit (XWAU's
- * game events): the threat indicators as the classic HUD last drew them
- * (cleared on hangar entry), the cannons ready, the broken instruments, the
- * hull stage, the target event (warhead lock over laser lock over a
- * selected target, with `target` set for any of them) and the hangar. A state
- * fires when it becomes set; `target` when the target event becomes
- * "selected". The debug override's states fire the same way. All of it
- * starts over when the clock goes back. Repeating the update for a snapshot
- * changes nothing. */
+/* This frame's player states, on the player's craft and cockpit: the
+ * threat indicators as the classic HUD last drew them (cleared on hangar
+ * entry), the cannons ready, the broken instruments, the hull stage, the
+ * target event (warhead lock over laser lock over a selected target, with
+ * `target` set for any of them) and the hangar. A state fires when it
+ * becomes set; `target` when the target event becomes "selected". The debug
+ * override's states fire the same way. All of it starts over when the clock
+ * goes back. Repeating the update for a snapshot changes nothing. */
 static void fl_update_material_states(const XwaSnapshot* snap, float now) {
 	if (now < s.states_time) {
 		memset(&s.player_states, 0, sizeof s.player_states);

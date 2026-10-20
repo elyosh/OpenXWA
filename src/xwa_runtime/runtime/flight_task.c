@@ -882,7 +882,7 @@ static void XwaFlightTask_RunHangarReadyFrame(void) {
 		if (fire) {
 			g_flightGlobalCountdownTimers[2] = 15;
 			/* Models with crew.update_all animate their crew in the hangar too,
-			   for every object and in any view (XWAU's patch at 0x458C9E). */
+			   for every object and in any view. */
 			if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive &&
 				!XwaArticulation_CrewUpdatesAll(g_players[g_localPlayer].objectIndex)) {
 				FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex, 0);
@@ -905,8 +905,8 @@ static void XwaFlightTask_RunHangarReadyFrame(void) {
 		Sound_Update3DListenerAndSources();
 	}
 	if (g_launchAnimDone || g_flightExitRequest || !g_inHangarReady) {
-		/* Leaving the hangar (XWAU hook_hangars HangarExitHook): the other
-		   objects get their own models back from the hangar's swaps. */
+		/* Leaving the hangar: the other objects get their own models back
+		   from the hangar's swaps. */
 		XwaHangars_LeaveHangar();
 		if (g_xwaFlightTaskHangarContinuation == XWA_FLIGHT_TASK_HANGAR_CONTINUE_MISSION_START) {
 			g_xwaFlightTaskPhase = XWA_FLIGHT_TASK_PHASE_MISSION_START;

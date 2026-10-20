@@ -64,8 +64,8 @@ char* g_strMapStrings[17];
 #ifdef XWA_MODERN
 char* g_strInFlightMessages[XWA_IN_FLIGHT_MESSAGE_COUNT];
 
-/* Modern port: the messages after the stock table, in hud.h id order. They
-   are XWAU hook_sfoils' English texts; the first byte is the pane type. */
+/* Modern port: the messages after the stock table, in hud.h id order, in
+   English. The first byte is the pane type. */
 static const char* const s_modernInFlightMessages[XWA_IN_FLIGHT_MESSAGE_COUNT - 538] = {
 	"\003Landing Gears opening",
 	"\003Landing Gears closing",

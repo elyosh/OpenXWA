@@ -7,8 +7,8 @@
  * FlightView_ComputeSeatEyeOffset reads every frame. FeDiskIo_BuildModelDef sets Y
  * and Z from a Cockpit (type 31) hardpoint on the craft model and never X;
  * no stock OPT has one. For a GLB replacement the hardpoint places the whole
- * eye, so converted XWAU models and authored models carry the eye that XWAU's
- * EXE patch or CockpitPov files give the craft. */
+ * eye, so converted and authored models carry the eye that the mod gives
+ * the craft (in its patched craft table or its CockpitPov files). */
 
 #include <stdint.h>
 

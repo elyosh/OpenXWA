@@ -1176,9 +1176,9 @@ static void xwa_tool_cockpit_eye(int* open, void* user) {
 		edit_model = -1;
 		ImGui::TextDisabled("No player craft.");
 	}
-	ImGui::TextDisabled("Craft-table cockpit eye (+0x238), the values XWAU's CockpitPovX/Y/Z\n"
-						"set. Edits last until the model is reloaded. A GLB sets it with one\n"
-						"Cockpit (type 31) hardpoint on the craft model.");
+	ImGui::TextDisabled("The cockpit eye in the craft table (+0x238). Edits last until the\n"
+						"model is reloaded. A GLB sets it with one Cockpit (type 31)\n"
+						"hardpoint on the craft model.");
 
 	ImGui::End();
 	*open = b ? 1 : 0;
