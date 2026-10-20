@@ -31,7 +31,8 @@ enum {
 	CRAFT_SHIP_LIST_LINE_MAX = 256,
 };
 
-static const char s_objectsDir[] = "flight/objects";
+static const char s_objectTypesDir[] = "flight/object_types";
+static const char s_craftTypesDir[] = "flight/craft_types";
 static const char* const s_listPaths[CRAFT_LIST_COUNT] = { "FlightModels\\Spacecraft0.LST",
 														   "FlightModels\\Equipment0.LST" };
 
@@ -45,12 +46,18 @@ typedef struct CraftFile {
 	int record;
 	/* The craft record that the object type uses once the file applies. */
 	int finalRecord;
-	/* The craft types of `craft_types`, in the file's order; -1 for a key
-	   that isn't a craft type. */
-	int craftTypes[XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT];
-	int craftTypeCount;
 	int ignored;
 } CraftFile;
+
+typedef struct CraftTypeFile {
+	char path[256];
+	AeronConfigFile* file;
+	const AeronConfigNode* root;
+	int craftType;
+	/* The object type of `object_type`, or -1 when the file leaves it out. */
+	int objectType;
+	int ignored;
+} CraftTypeFile;
 
 typedef struct CraftAddedRow {
 	char line[XWA_MODEL_SOURCE_KEY_MAX + 32];
@@ -161,13 +168,14 @@ static const CraftField s_turretFields[] = {
 
 static const char* const s_topKeys[] = {
 	"version",      "object_type", "model",        "list",  "model_type",
-	"craft_record", "sounds_like", "beam_allowed", "names", "craft_types",
+	"craft_record", "sounds_like", "beam_allowed", "names",
 };
 static const char* const s_modelTypeKeys[] = { "genus", "family", "flags", "craft_record_index" };
 static const char* const s_recordArrayKeys[] = { "lasers",      "warheads",     "turrets",
 												 "cockpit_eye", "cockpit_name", "mesh_attach" };
 static const char* const s_nameKeys[] = { "short", "long", "plural", "gender" };
-static const char* const s_craftTypeKeys[] = { "ship_list", "tech_room" };
+static const char* const s_craftTypeKeys[] = { "version", "craft_type", "object_type", "ship_list",
+											   "tech_room" };
 static const char* const s_shipListKeys[] = { "name",     "category", "flyable", "known",
 											  "skirmish", "hidden",   "icon" };
 /* The tech room keys, their IDs and the size of their field in the tech room
@@ -201,7 +209,7 @@ static void CraftDefinitions_CheckKeys(const char* path, const AeronConfigNode* 
 		const char* key = AeronConfigNode_MapKeyAt(node, i);
 
 		if (!CraftDefinitions_InList(key, keys, count)) {
-			Aeron_LogError("xwa.craft", "%s:%d: %s%s%s isn't a key of object files. It is ignored", path,
+			Aeron_LogError("xwa.craft", "%s:%d: the file can't have the key %s%s%s. It is ignored", path,
 						   AeronConfigNode_Line(AeronConfigNode_MapValueAt(node, i)), where,
 						   where[0] ? "." : "", key);
 		}
@@ -446,7 +454,7 @@ static void CraftDefinitions_ApplyRecord(const CraftFile* file, const AeronConfi
 									  (uint8_t*)def + s_recordFields[f].offset, s_recordFields[f].kind);
 		} else if (!CraftDefinitions_InList(key, s_recordArrayKeys,
 											sizeof s_recordArrayKeys / sizeof s_recordArrayKeys[0])) {
-			Aeron_LogError("xwa.craft", "%s:%d: craft_record.%s isn't a key of object files. It is ignored",
+			Aeron_LogError("xwa.craft", "%s:%d: the file can't have the key craft_record.%s. It is ignored",
 						   file->path, AeronConfigNode_Line(AeronConfigNode_MapValueAt(node, i)), key);
 		}
 	}
@@ -555,9 +563,8 @@ static void CraftDefinitions_Trim(char* text) {
 }
 
 /* Makes the SPECIES_<n> text override from `node`, over the line that the
-   game would read today. */
-static void CraftDefinitions_ApplyShipList(const CraftFile* file, int craftType,
-										   const AeronConfigNode* node) {
+   game would read today. `path` is the craft type file. */
+static void CraftDefinitions_ApplyShipList(const char* path, int craftType, const AeronConfigNode* node) {
 	char id[32];
 	char base[CRAFT_SHIP_LIST_LINE_MAX];
 	char* fields[13] = { NULL };
@@ -579,7 +586,7 @@ static void CraftDefinitions_ApplyShipList(const CraftFile* file, int craftType,
 	int written;
 
 	snprintf(id, sizeof id, "SPECIES_%d", craftType);
-	CraftDefinitions_CheckKeys(file->path, node, "ship_list", s_shipListKeys,
+	CraftDefinitions_CheckKeys(path, node, "ship_list", s_shipListKeys,
 							   sizeof s_shipListKeys / sizeof s_shipListKeys[0]);
 	CraftDefinitions_ReadShipList();
 	/* The line that the game would read today: text/strings.yaml's, else
@@ -611,9 +618,9 @@ static void CraftDefinitions_ApplyShipList(const CraftFile* file, int craftType,
 
 	item = AeronConfigNode_MapGet(node, "name");
 	if (item != NULL) {
-		name = CraftDefinitions_ReadText(file->path, item, "ship_list.name", CRAFT_SHIP_LIST_LINE_MAX - 1);
+		name = CraftDefinitions_ReadText(path, item, "ship_list.name", CRAFT_SHIP_LIST_LINE_MAX - 1);
 		if (name != NULL && strchr(name, ',') != NULL) {
-			Aeron_LogError("xwa.craft", "%s:%d: ship_list.name can't have a comma. It is ignored", file->path,
+			Aeron_LogError("xwa.craft", "%s:%d: ship_list.name can't have a comma. It is ignored", path,
 						   AeronConfigNode_Line(item));
 			free(name);
 			name = NULL;
@@ -621,10 +628,10 @@ static void CraftDefinitions_ApplyShipList(const CraftFile* file, int craftType,
 	}
 	item = AeronConfigNode_MapGet(node, "category");
 	if (item != NULL) {
-		category = CraftDefinitions_ReadText(file->path, item, "ship_list.category", 64);
+		category = CraftDefinitions_ReadText(path, item, "ship_list.category", 64);
 		if (category != NULL && strchr(category, ',') != NULL) {
-			Aeron_LogError("xwa.craft", "%s:%d: ship_list.category can't have a comma. It is ignored",
-						   file->path, AeronConfigNode_Line(item));
+			Aeron_LogError("xwa.craft", "%s:%d: ship_list.category can't have a comma. It is ignored", path,
+						   AeronConfigNode_Line(item));
 			free(category);
 			category = NULL;
 		} else if (category != NULL &&
@@ -634,7 +641,7 @@ static void CraftDefinitions_ApplyShipList(const CraftFile* file, int craftType,
 				"xwa.craft",
 				"%s:%d: '%s' isn't one of the game's ship list categories, so the game leaves craft "
 				"type %d out of the list",
-				file->path, AeronConfigNode_Line(item), category, craftType);
+				path, AeronConfigNode_Line(item), category, craftType);
 		}
 	}
 	item = AeronConfigNode_MapGet(node, "flyable");
@@ -647,33 +654,33 @@ static void CraftDefinitions_ApplyShipList(const CraftFile* file, int craftType,
 			flyable = 2;
 		} else {
 			Aeron_LogError("xwa.craft", "%s:%d: ship_list.flyable needs true, false or gunner. It is ignored",
-						   file->path, AeronConfigNode_Line(item));
+						   path, AeronConfigNode_Line(item));
 		}
 	}
 	item = AeronConfigNode_MapGet(node, "known");
 	if (item != NULL) {
-		CraftDefinitions_ReadBool(file->path, item, "ship_list.known", &known);
+		CraftDefinitions_ReadBool(path, item, "ship_list.known", &known);
 	}
 	item = AeronConfigNode_MapGet(node, "skirmish");
 	if (item != NULL) {
-		CraftDefinitions_ReadBool(file->path, item, "ship_list.skirmish", &skirmish);
+		CraftDefinitions_ReadBool(path, item, "ship_list.skirmish", &skirmish);
 	}
 	item = AeronConfigNode_MapGet(node, "hidden");
 	if (item != NULL) {
-		CraftDefinitions_ReadBool(file->path, item, "ship_list.hidden", &hidden);
+		CraftDefinitions_ReadBool(path, item, "ship_list.hidden", &hidden);
 	}
 	item = AeronConfigNode_MapGet(node, "icon");
 	if (item != NULL) {
 		if (AeronConfigNode_Type(item) != AERON_CONFIG_SEQUENCE || AeronConfigNode_SequenceCount(item) != 4) {
 			Aeron_LogError("xwa.craft",
-						   "%s:%d: ship_list.icon needs [left, top, right, bottom]. It is ignored",
-						   file->path, AeronConfigNode_Line(item));
+						   "%s:%d: ship_list.icon needs [left, top, right, bottom]. It is ignored", path,
+						   AeronConfigNode_Line(item));
 		} else {
 			int read[4];
 
 			for (i = 0; i < 4; ++i) {
-				if (!CraftDefinitions_ReadInt(file->path, AeronConfigNode_SequenceGet(item, i),
-											  "ship_list.icon", 0, 4096, &value)) {
+				if (!CraftDefinitions_ReadInt(path, AeronConfigNode_SequenceGet(item, i), "ship_list.icon", 0,
+											  4096, &value)) {
 					break;
 				}
 				read[i] = (int)value;
@@ -704,20 +711,18 @@ static void CraftDefinitions_ApplyShipList(const CraftFile* file, int craftType,
 		Aeron_LogError("xwa.craft",
 					   "%s: the ship list line of craft type %d is longer than the game's %d "
 					   "characters. It is ignored",
-					   file->path, craftType, CRAFT_SHIP_LIST_LINE_MAX - 1);
+					   path, craftType, CRAFT_SHIP_LIST_LINE_MAX - 1);
 		return;
 	}
 	if (fromStrings) {
-		Aeron_LogInfo("xwa.craft", "%s: replaces the text of %s from text/strings.yaml", file->path, id);
+		Aeron_LogInfo("xwa.craft", "%s: replaces the text of %s from text/strings.yaml", path, id);
 	}
 	if (!XwaText_Set(id, line)) {
-		Aeron_LogError("xwa.craft", "%s: out of memory for the ship list of craft type %d", file->path,
-					   craftType);
+		Aeron_LogError("xwa.craft", "%s: out of memory for the ship list of craft type %d", path, craftType);
 	}
 }
 
-static void CraftDefinitions_ApplyTechRoom(const CraftFile* file, int craftType,
-										   const AeronConfigNode* node) {
+static void CraftDefinitions_ApplyTechRoom(const char* path, int craftType, const AeronConfigNode* node) {
 	size_t f;
 
 	for (f = 0; f < AeronConfigNode_MapCount(node); ++f) {
@@ -730,8 +735,8 @@ static void CraftDefinitions_ApplyTechRoom(const CraftFile* file, int craftType,
 			}
 		}
 		if (i == sizeof s_techRoomFields / sizeof s_techRoomFields[0]) {
-			Aeron_LogError("xwa.craft", "%s:%d: tech_room.%s isn't a key of object files. It is ignored",
-						   file->path, AeronConfigNode_Line(AeronConfigNode_MapValueAt(node, f)), key);
+			Aeron_LogError("xwa.craft", "%s:%d: the file can't have the key tech_room.%s. It is ignored",
+						   path, AeronConfigNode_Line(AeronConfigNode_MapValueAt(node, f)), key);
 			continue;
 		}
 		{
@@ -741,17 +746,16 @@ static void CraftDefinitions_ApplyTechRoom(const CraftFile* file, int craftType,
 
 			snprintf(what, sizeof what, "tech_room.%s", key);
 			snprintf(id, sizeof id, "SPEC_%d_%s", craftType, s_techRoomFields[i].id);
-			text = CraftDefinitions_ReadText(file->path, AeronConfigNode_MapValueAt(node, f), what,
+			text = CraftDefinitions_ReadText(path, AeronConfigNode_MapValueAt(node, f), what,
 											 s_techRoomFields[i].size - 1);
 			if (text == NULL) {
 				continue;
 			}
 			if (XwaText_Find(id) != NULL) {
-				Aeron_LogInfo("xwa.craft", "%s: replaces the text of %s from text/strings.yaml", file->path,
-							  id);
+				Aeron_LogInfo("xwa.craft", "%s: replaces the text of %s from text/strings.yaml", path, id);
 			}
 			if (!XwaText_Set(id, text)) {
-				Aeron_LogError("xwa.craft", "%s: out of memory for %s", file->path, id);
+				Aeron_LogError("xwa.craft", "%s: out of memory for %s", path, id);
 			}
 			free(text);
 		}
@@ -921,31 +925,31 @@ static int CraftDefinitions_CompareNames(const void* left, const void* right) {
 	return strcmp(*(char* const*)left, *(char* const*)right);
 }
 
-/* Reads the craft type numbers of `craft_types` into the file. */
-static void CraftDefinitions_ReadCraftTypes(CraftFile* file) {
-	const AeronConfigNode* craftTypes = AeronConfigNode_MapGet(file->root, "craft_types");
-	size_t i;
+/* Lists the YAML files of `dir` in the mod folder, sorted by name. */
+static void CraftDefinitions_ListFiles(const char* dir, CraftFileNames* list) {
+	char pattern[64];
 
-	file->craftTypeCount = 0;
-	for (i = 0; i < AeronConfigNode_MapCount(craftTypes) && i < XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT; ++i) {
-		const char* key = AeronConfigNode_MapKeyAt(craftTypes, i);
-		char* end;
-		const long craftType = strtol(key, &end, 10);
-
-		if (*key == '\0' || *end != '\0' || craftType < 1 ||
-			craftType >= XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT) {
-			Aeron_LogError("xwa.craft", "%s:%d: craft type '%s' isn't one from 1 to %d. It is ignored",
-						   file->path, AeronConfigNode_Line(AeronConfigNode_MapValueAt(craftTypes, i)), key,
-						   XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT - 1);
-			file->craftTypes[file->craftTypeCount++] = -1;
-			continue;
-		}
-		file->craftTypes[file->craftTypeCount++] = (int)craftType;
+	snprintf(pattern, sizeof pattern, "%s/*.yaml", dir);
+	File_Glob(AERON_VFS_ROOT_MOD, pattern, AERON_VFS_GLOB_FILES | AERON_VFS_GLOB_CASE_INSENSITIVE,
+			  CraftDefinitions_CollectFile, list);
+	if (list->count > 1) {
+		qsort(list->names, list->count, sizeof *list->names, CraftDefinitions_CompareNames);
 	}
 }
 
-/* Loads the file, checks its version and object type, and finds the craft
-   record that it writes. Returns 0 when the file can't be used. */
+static void CraftDefinitions_FreeNames(CraftFileNames* list) {
+	size_t i;
+
+	for (i = 0; i < list->count; ++i) {
+		free(list->names[i]);
+	}
+	free(list->names);
+	list->names = NULL;
+	list->count = 0;
+}
+
+/* Loads an object type file, checks its version and object type, and finds
+   the craft record that it writes. Returns 0 when the file can't be used. */
 static int CraftDefinitions_LoadFile(CraftFile* file) {
 	AeronConfigError error;
 	const AeronConfigNode* modelType;
@@ -987,12 +991,11 @@ static int CraftDefinitions_LoadFile(CraftFile* file) {
 		}
 		file->record = file->finalRecord;
 	}
-	CraftDefinitions_ReadCraftTypes(file);
 	return 1;
 }
 
-/* Ignores both files when two of them set the same object type, craft type
-   or craft record, and a file whose craft_record_index names a record that
+/* Ignores both files when two object type files set the same object type or
+   craft record, and a file whose craft_record_index names a record that
    another object type uses. */
 static void CraftDefinitions_CheckOwners(CraftFile* files, size_t count) {
 	size_t a;
@@ -1004,8 +1007,6 @@ static void CraftDefinitions_CheckOwners(CraftFile* files, size_t count) {
 		}
 		for (b = a + 1; b < count; ++b) {
 			char why[64] = "";
-			int i;
-			int j;
 
 			if (files[b].ignored) {
 				continue;
@@ -1014,14 +1015,6 @@ static void CraftDefinitions_CheckOwners(CraftFile* files, size_t count) {
 				snprintf(why, sizeof why, "object type %d", files[a].objectType);
 			} else if (files[a].record >= 0 && files[a].record == files[b].record) {
 				snprintf(why, sizeof why, "craft record %d", files[a].record);
-			}
-			for (i = 0; why[0] == '\0' && i < files[a].craftTypeCount; ++i) {
-				for (j = 0; j < files[b].craftTypeCount; ++j) {
-					if (files[a].craftTypes[i] >= 0 && files[a].craftTypes[i] == files[b].craftTypes[j]) {
-						snprintf(why, sizeof why, "craft type %d", files[a].craftTypes[i]);
-						break;
-					}
-				}
 			}
 			if (why[0] != '\0') {
 				Aeron_LogError("xwa.craft", "%s and %s both set %s. Both files are ignored", files[a].path,
@@ -1105,41 +1098,102 @@ static void CraftDefinitions_ApplyRules(const CraftFile* file) {
 	}
 }
 
-static void CraftDefinitions_ApplyCraftTypes(const CraftFile* file) {
-	const AeronConfigNode* craftTypes = AeronConfigNode_MapGet(file->root, "craft_types");
-	int i;
+/* Loads a craft type file and checks its version, craft type and object
+   type. Returns 0 when the file can't be used. */
+static int CraftDefinitions_LoadCraftTypeFile(CraftTypeFile* file) {
+	AeronConfigError error;
+	const AeronConfigNode* node;
+	int64_t value;
 
-	for (i = 0; i < file->craftTypeCount; ++i) {
-		const AeronConfigNode* entry = AeronConfigNode_MapValueAt(craftTypes, (size_t)i);
-		const int craftType = file->craftTypes[i];
-		uint16_t* mapped;
+	memset(&error, 0, sizeof error);
+	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, file->path, &file->file, &error)) {
+		Aeron_LogError("xwa.craft", "%s:%d: %s. The file is ignored", file->path, error.line, error.message);
+		return 0;
+	}
+	file->root = AeronConfigFile_Root(file->file);
+	if (AeronConfigNode_Type(file->root) != AERON_CONFIG_MAP ||
+		AeronConfigNode_Int(AeronConfigNode_MapGet(file->root, "version"), 0) != 1) {
+		Aeron_LogError("xwa.craft", "%s: the file needs 'version: 1'. It is ignored", file->path);
+		return 0;
+	}
+	if (!CraftDefinitions_ReadInt(file->path, AeronConfigNode_MapGet(file->root, "craft_type"), "craft_type",
+								  1, XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT - 1, &value)) {
+		Aeron_LogError("xwa.craft", "%s: the file needs a craft_type. It is ignored", file->path);
+		return 0;
+	}
+	file->craftType = (int)value;
+	file->objectType = -1;
+	node = AeronConfigNode_MapGet(file->root, "object_type");
+	if (node != NULL) {
+		if (!CraftDefinitions_ReadInt(file->path, node, "object_type", 0, OBJ_Count - 1, &value)) {
+			Aeron_LogError("xwa.craft", "%s: the file is ignored", file->path);
+			return 0;
+		}
+		file->objectType = (int)value;
+	}
+	return 1;
+}
 
-		if (craftType < 0) {
+/* Ignores both files when two craft type files set the same craft type. */
+static void CraftDefinitions_CheckCraftTypeOwners(CraftTypeFile* files, size_t count) {
+	size_t a;
+	size_t b;
+
+	for (a = 0; a < count; ++a) {
+		if (files[a].ignored) {
 			continue;
 		}
-		mapped = &g_objectTypeTables.craftTypeToObjectType[craftType];
-		if (*mapped != (uint16_t)file->objectType) {
-			Aeron_LogInfo("xwa.craft", "craft type %d now is object type %d instead of %d", craftType,
-						  file->objectType, *mapped);
-			*mapped = (uint16_t)file->objectType;
-		}
-		if (AeronConfigNode_Type(entry) == AERON_CONFIG_NULL) {
-			continue;
-		}
-		if (AeronConfigNode_Type(entry) != AERON_CONFIG_MAP) {
-			Aeron_LogError("xwa.craft", "%s:%d: craft type %d needs a map of ship_list and tech_room",
-						   file->path, AeronConfigNode_Line(entry), craftType);
-			continue;
-		}
-		CraftDefinitions_CheckKeys(file->path, entry, "", s_craftTypeKeys,
-								   sizeof s_craftTypeKeys / sizeof s_craftTypeKeys[0]);
-		if (AeronConfigNode_MapGet(entry, "ship_list") != NULL) {
-			CraftDefinitions_ApplyShipList(file, craftType, AeronConfigNode_MapGet(entry, "ship_list"));
-		}
-		if (AeronConfigNode_MapGet(entry, "tech_room") != NULL) {
-			CraftDefinitions_ApplyTechRoom(file, craftType, AeronConfigNode_MapGet(entry, "tech_room"));
+		for (b = a + 1; b < count; ++b) {
+			if (!files[b].ignored && files[a].craftType == files[b].craftType) {
+				Aeron_LogError("xwa.craft", "%s and %s both set craft type %d. Both files are ignored",
+							   files[a].path, files[b].path, files[a].craftType);
+				files[a].ignored = 1;
+				files[b].ignored = 1;
+			}
 		}
 	}
+}
+
+/* Links the craft type to its object type and makes the text overrides of
+   its ship list line and tech room entry. Returns 0 when the file is
+   ignored. */
+static int CraftDefinitions_ApplyCraftTypeFile(const CraftTypeFile* file) {
+	uint16_t* mapped = &g_objectTypeTables.craftTypeToObjectType[file->craftType];
+	const int objectType = file->objectType >= 0 ? file->objectType : *mapped;
+	const AeronConfigNode* node;
+
+	CraftDefinitions_CheckKeys(file->path, file->root, "", s_craftTypeKeys,
+							   sizeof s_craftTypeKeys / sizeof s_craftTypeKeys[0]);
+	/* A reserved slot that no object type file fills has no list row, and
+	   neither has object type 0: the game would list a craft that it can't
+	   load. */
+	if (g_modelTypeTable[objectType].textureGroup == CRAFT_NO_LIST) {
+		Aeron_LogError("xwa.craft",
+					   "%s: craft type %d would use object type %d, which loads nothing. The file is "
+					   "ignored",
+					   file->path, file->craftType, objectType);
+		return 0;
+	}
+	if (*mapped != (uint16_t)objectType) {
+		Aeron_LogInfo("xwa.craft", "craft type %d now is object type %d instead of %d", file->craftType,
+					  objectType, *mapped);
+		*mapped = (uint16_t)objectType;
+	}
+	node = AeronConfigNode_MapGet(file->root, "ship_list");
+	if (node != NULL && AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.craft", "%s:%d: ship_list needs a map. It is ignored", file->path,
+					   AeronConfigNode_Line(node));
+	} else if (node != NULL) {
+		CraftDefinitions_ApplyShipList(file->path, file->craftType, node);
+	}
+	node = AeronConfigNode_MapGet(file->root, "tech_room");
+	if (node != NULL && AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.craft", "%s:%d: tech_room needs a map. It is ignored", file->path,
+					   AeronConfigNode_Line(node));
+	} else if (node != NULL) {
+		CraftDefinitions_ApplyTechRoom(file->path, file->craftType, node);
+	}
+	return 1;
 }
 
 /* Checks a chain of sounds_like: the object type that a type sounds like
@@ -1158,49 +1212,32 @@ static void CraftDefinitions_CheckSounds(void) {
 	}
 }
 
-void XwaCraftDefinitions_Apply(void) {
-	CraftFileNames list = { NULL, 0 };
+/* Applies the object type files `list` of s_objectTypesDir. */
+static void CraftDefinitions_ApplyObjectTypes(const CraftFileNames* list) {
 	CraftFile* files;
 	int rowCounts[CRAFT_LIST_COUNT];
 	size_t i;
 	int applied = 0;
 
-	if (!File_Glob(AERON_VFS_ROOT_MOD, "flight/objects/*.yaml",
-				   AERON_VFS_GLOB_FILES | AERON_VFS_GLOB_CASE_INSENSITIVE, CraftDefinitions_CollectFile,
-				   &list) ||
-		list.count == 0) {
-		for (i = 0; i < list.count; ++i) {
-			free(list.names[i]);
-		}
-		free(list.names);
+	if (list->count == 0) {
 		return;
 	}
-	if (!XwaModelSource_ReplacementsConfigured()) {
-		Aeron_LogInfo("xwa.craft", "model replacements are off, so the %zu files of %s are skipped",
-					  list.count, s_objectsDir);
-		for (i = 0; i < list.count; ++i) {
-			free(list.names[i]);
-		}
-		free(list.names);
-		return;
-	}
-	qsort(list.names, list.count, sizeof *list.names, CraftDefinitions_CompareNames);
-	files = (CraftFile*)calloc(list.count, sizeof *files);
+	files = (CraftFile*)calloc(list->count, sizeof *files);
 	if (files == NULL) {
-		Aeron_LogError("xwa.craft", "out of memory for the files of %s", s_objectsDir);
+		Aeron_LogError("xwa.craft", "out of memory for the files of %s", s_objectTypesDir);
 		return;
 	}
 	for (i = 0; i < CRAFT_LIST_COUNT; ++i) {
 		rowCounts[i] = CraftDefinitions_CountRows(s_listPaths[i]);
 	}
 
-	for (i = 0; i < list.count; ++i) {
-		snprintf(files[i].path, sizeof files[i].path, "%s/%s", s_objectsDir, list.names[i]);
+	for (i = 0; i < list->count; ++i) {
+		snprintf(files[i].path, sizeof files[i].path, "%s/%s", s_objectTypesDir, list->names[i]);
 		files[i].ignored = !CraftDefinitions_LoadFile(&files[i]);
 	}
-	CraftDefinitions_CheckOwners(files, list.count);
+	CraftDefinitions_CheckOwners(files, list->count);
 
-	for (i = 0; i < list.count; ++i) {
+	for (i = 0; i < list->count; ++i) {
 		CraftFile* file = &files[i];
 		const ModelTypeInfo* info;
 		const AeronConfigNode* node;
@@ -1269,24 +1306,74 @@ void XwaCraftDefinitions_Apply(void) {
 			CraftDefinitions_ReadNames(file, node);
 		}
 		CraftDefinitions_ApplyRules(file);
-		CraftDefinitions_ApplyCraftTypes(file);
 		++applied;
 	}
 	CraftDefinitions_CheckSounds();
 
-	for (i = 0; i < list.count; ++i) {
+	for (i = 0; i < list->count; ++i) {
 		AeronConfigFile_Destroy(files[i].file);
-		free(list.names[i]);
 	}
 	free(files);
-	free(list.names);
+	Aeron_LogInfo("xwa.craft", "%s: %d of %zu files apply, with %d added rows", s_objectTypesDir, applied,
+				  list->count, s_addedRowCount[0] + s_addedRowCount[1]);
+}
+
+/* Applies the craft type files `list` of s_craftTypesDir, after the object
+   type files, which can give a reserved slot the row that a craft type
+   needs. */
+static void CraftDefinitions_ApplyCraftTypes(const CraftFileNames* list) {
+	CraftTypeFile* files;
+	size_t i;
+	int applied = 0;
+
+	if (list->count == 0) {
+		return;
+	}
+	files = (CraftTypeFile*)calloc(list->count, sizeof *files);
+	if (files == NULL) {
+		Aeron_LogError("xwa.craft", "out of memory for the files of %s", s_craftTypesDir);
+		return;
+	}
+	for (i = 0; i < list->count; ++i) {
+		snprintf(files[i].path, sizeof files[i].path, "%s/%s", s_craftTypesDir, list->names[i]);
+		files[i].ignored = !CraftDefinitions_LoadCraftTypeFile(&files[i]);
+	}
+	CraftDefinitions_CheckCraftTypeOwners(files, list->count);
+	for (i = 0; i < list->count; ++i) {
+		if (!files[i].ignored) {
+			applied += CraftDefinitions_ApplyCraftTypeFile(&files[i]);
+		}
+	}
+
+	for (i = 0; i < list->count; ++i) {
+		AeronConfigFile_Destroy(files[i].file);
+	}
+	free(files);
 	for (i = 0; i < XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT; ++i) {
 		free(s_shipListLines[i]);
 		s_shipListLines[i] = NULL;
 	}
 	s_shipListRead = 0;
-	Aeron_LogInfo("xwa.craft", "%s: %d of %zu files apply, with %d added rows", s_objectsDir, applied,
-				  list.count, s_addedRowCount[0] + s_addedRowCount[1]);
+	Aeron_LogInfo("xwa.craft", "%s: %d of %zu files apply", s_craftTypesDir, applied, list->count);
+}
+
+void XwaCraftDefinitions_Apply(void) {
+	CraftFileNames objectTypes = { NULL, 0 };
+	CraftFileNames craftTypes = { NULL, 0 };
+
+	CraftDefinitions_ListFiles(s_objectTypesDir, &objectTypes);
+	CraftDefinitions_ListFiles(s_craftTypesDir, &craftTypes);
+	if (objectTypes.count + craftTypes.count != 0 && !XwaModelSource_ReplacementsConfigured()) {
+		Aeron_LogInfo("xwa.craft",
+					  "model replacements are off, so the %zu files of %s and the %zu files of %s are "
+					  "skipped",
+					  objectTypes.count, s_objectTypesDir, craftTypes.count, s_craftTypesDir);
+	} else {
+		CraftDefinitions_ApplyObjectTypes(&objectTypes);
+		CraftDefinitions_ApplyCraftTypes(&craftTypes);
+	}
+	CraftDefinitions_FreeNames(&objectTypes);
+	CraftDefinitions_FreeNames(&craftTypes);
 }
 
 void XwaCraftDefinitions_ApplyNames(void) {

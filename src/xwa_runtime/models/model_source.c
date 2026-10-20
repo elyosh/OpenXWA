@@ -123,7 +123,7 @@ static int ModelSource_Grow(void** items, int count, size_t itemSize) {
 
 /* Reads a FlightModels list the way FeDiskIo_LoadResources does: line ends
    trimmed, empty lines skipped, rows numbered from 0, then the rows that the
-   object files add to list `list` (craft_definitions.h). Each row's key goes
+   object type files add to list `list` (craft_definitions.h). Each row's key goes
    to `rows`. Returns 0 if the list cannot be read. */
 static int ModelSource_ReadList(const char* path, int list, ModelSourceKeyText** rows, int* rowCount) {
 	char line[256];
@@ -281,7 +281,7 @@ static ModelSourceCraftKey* ModelSource_FindNameKey(const char* key) {
 /* Every model definition name that isn't a craft key.
    FeDiskIo_LoadExteriorModel loads `<name>Exterior.opt`, so the name's
    `exterior` key must be known even when no list row has the name, as with
-   an object file's cockpit_name. */
+   an object type file's cockpit_name. */
 static int ModelSource_BuildNameKeys(void) {
 	int modelIndex;
 
@@ -466,7 +466,7 @@ void XwaModelSource_Init(void) {
 	if (ModelSource_FileExists("flight/models/model_map.yaml")) {
 		Aeron_LogWarn("xwa.models",
 					  "flight/models/model_map.yaml is no longer read: an object type's file in "
-					  "flight/objects gives it another model");
+					  "flight/object_types gives it another model");
 	}
 
 	glbCount = 0;

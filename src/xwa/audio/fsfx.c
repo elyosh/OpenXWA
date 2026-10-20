@@ -1922,7 +1922,7 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 	if (objectIndex != 0xffff) {
 		objectType = (uint8_t)objectTable[objectIndex].objectType;
 #ifdef XWA_MODERN
-		/* A mod's object file can give the type another type's sounds. */
+		/* A mod's object type file can give the type another type's sounds. */
 		switch (XwaCraftDefinitions_SoundObjectType(objectType)) {
 #else
 		switch (objectType) {

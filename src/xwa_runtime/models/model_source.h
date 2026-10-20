@@ -8,7 +8,7 @@
  * model file's basename without extension, lower-cased
  * ("FlightModels\\XWing.opt" -> "xwing"), and a key always loads the GLB of
  * the same name. To give an object type another model, a mod gives it a list
- * row of its own in its object file (craft_definitions.h). */
+ * row of its own in its object type file (craft_definitions.h). */
 
 #include "xwa/assets/file_io.h"
 

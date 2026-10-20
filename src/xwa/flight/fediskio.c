@@ -964,11 +964,12 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 #ifdef XWA_MODERN
 				if (geometryGroup) {
 					XwaGeometryTextures_ConvertByIndex((int16_t)g_modelTypeTable[modelType].textureGroup,
-													   spriteIndex, format, texLevel, (char)baseShift, levelCount);
+													   spriteIndex, format, texLevel, (char)baseShift,
+													   levelCount);
 				} else
 #endif
-				SpriteTexture_ConvertByIndex((int16_t)g_modelTypeTable[modelType].textureGroup, spriteIndex,
-											 format, texLevel, (char)baseShift, levelCount);
+					SpriteTexture_ConvertByIndex((int16_t)g_modelTypeTable[modelType].textureGroup,
+												 spriteIndex, format, texLevel, (char)baseShift, levelCount);
 				if (g_useHardware3D) {
 					int levelIndex;
 
@@ -980,7 +981,7 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 									XwaGeometryTextures_UploadLevel(texLevel++);
 								} else
 #endif
-								FeDiskIo_UploadTexLevelToStd3D(texLevel++);
+									FeDiskIo_UploadTexLevelToStd3D(texLevel++);
 							} else {
 								++texLevel;
 							}
@@ -1025,9 +1026,9 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 											(char)baseShift, levelCount);
 		} else
 #endif
-		SpriteTexture_ConvertById(g_modelTypeTable[modelType].textureGroup,
-								  g_modelTypeTable[modelType].frameCount, format, texLevel, (char)baseShift,
-								  levelCount);
+			SpriteTexture_ConvertById(g_modelTypeTable[modelType].textureGroup,
+									  g_modelTypeTable[modelType].frameCount, format, texLevel,
+									  (char)baseShift, levelCount);
 		g_modelTypeTable[modelType].curTexLevel = texLevel;
 		if (g_useHardware3D) {
 			if (levelCount > 0) {
@@ -1040,7 +1041,7 @@ int16_t FeDiskIo_LoadTexturesForType(uint16_t modelType) {
 						XwaGeometryTextures_UploadLevel(texLevel++);
 					} else
 #endif
-					FeDiskIo_UploadTexLevelToStd3D(texLevel++);
+						FeDiskIo_UploadTexLevelToStd3D(texLevel++);
 					--singleLevelsRemaining;
 				} while (singleLevelsRemaining != 0);
 			}
@@ -3283,7 +3284,7 @@ char* FeDiskIo_GetCraftModelName(unsigned int craftType) {
 #endif
 			rowIndex = 0;
 #ifdef XWA_MODERN
-			/* After the last line, the rows that the mod's object files add. */
+			/* After the last line, the rows that the mod's object type files add. */
 			while (File_ReadLine(stream, line, sizeof(line)) ||
 				   XwaCraftDefinitions_NextAddedRow(textureGroup, &rowIndex, line, sizeof(line))) {
 #else
@@ -3395,7 +3396,7 @@ void FeDiskIo_LoadResources(void) {
 
 		rowIndex = 0;
 #ifdef XWA_MODERN
-		/* After the last line, the rows that the mod's object files add. */
+		/* After the last line, the rows that the mod's object type files add. */
 		while (File_ReadLine(stream, line, sizeof(line)) ||
 			   XwaCraftDefinitions_NextAddedRow(textureGroup, &rowIndex, line, sizeof(line))) {
 #else

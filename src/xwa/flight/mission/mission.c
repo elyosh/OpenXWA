@@ -6623,7 +6623,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		// Beam weapon.
 		g_curCraft->beamTypeId = g_missionFlightGroups[g_currentFlightGroupIdx].fg.beam;
 #ifdef XWA_MODERN
-		/* A mod's object file can allow or forbid beams by object type. */
+		/* A mod's object type file can allow or forbid beams by object type. */
 		if (!XwaCraftDefinitions_BeamAllowed(g_spawnObjectType))
 			g_curCraft->beamTypeId = 0;
 #else

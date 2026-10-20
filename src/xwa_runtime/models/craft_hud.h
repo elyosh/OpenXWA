@@ -11,9 +11,9 @@
  *   hull_icons: [0, 2600, ...]
  *   map_icons: [0, 100, ...]
  *
- * flight/craft/<model key>.yaml holds one craft's settings. The model key is
- * the name of the craft's GLB, as model_source.h gives it. All keys are
- * optional:
+ * flight/models/<model key>.yaml, next to the model's GLB, holds the model's
+ * settings. The model key is the name of the GLB, as model_source.h gives
+ * it. All keys are optional:
  *
  *   version: 1
  *   hud:
@@ -24,11 +24,11 @@
  * given as a 1-based position in the group. `colors` sets the HUD's inner and
  * border colours, as ARGB.
  *
- * The game reads hud.yaml once at startup. It reads the craft files when a
- * mission loads, for the craft types that the mission's flight groups use.
- * The craft files only work with model replacements on, because the model
- * keys come from the replacement list. Without the files, the game uses its
- * own tables and colours. */
+ * The game reads hud.yaml once at startup. It reads the model settings files
+ * when a mission loads, for the craft types that the mission's flight groups
+ * use. They only work with model replacements on, because the model keys
+ * come from the replacement list. Without the files, the game uses its own
+ * tables and colours. */
 
 #include <stddef.h>
 #include <stdint.h>
@@ -43,8 +43,8 @@ enum { XWA_CRAFT_HUD_RETICLE_SLOTS = 23 };
 
 /* Reads flight/hud.yaml. */
 void XwaCraftHud_Init(void);
-/* Reads the craft files for the craft types that the mission's flight
-   groups use, and drops the previous mission's settings. `flightGroups`
+/* Reads the model settings files of the models that the mission's flight
+   groups load, and drops the previous mission's settings. `flightGroups`
    points to the first flight group, `stride` is the distance between two
    flight groups, and `count` is their number. Call it after the flight
    groups' craft types are final. */
@@ -58,7 +58,7 @@ uint16_t XwaCraftHud_HullIcon(unsigned int objectType, uint16_t stockId);
    list. */
 uint16_t XwaCraftHud_MapIcon(unsigned int objectType, uint16_t stockId);
 /* Replaces colors[0] (inner) and colors[1] (border) with the colours that
-   the craft file of `objectType` sets. A colour that the file doesn't set
+   the model settings file of `objectType`'s model sets. A colour that the file doesn't set
    stays the same. */
 void XwaCraftHud_Colors(unsigned int objectType, uint32_t colors[2]);
 /* Returns the image that reticle slot `slot` draws for `objectType`, as a

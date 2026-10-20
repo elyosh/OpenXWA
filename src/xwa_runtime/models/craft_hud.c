@@ -203,14 +203,14 @@ void XwaCraftHud_LoadMission(const struct XwaFlightGroup* flightGroups, size_t s
 		if (!XwaModelSource_TypeKey(objectType, key)) {
 			continue;
 		}
-		snprintf(path, sizeof path, "flight/craft/%s.yaml", key);
+		snprintf(path, sizeof path, "flight/models/%s.yaml", key);
 		CraftHud_ReadCraft(path, type);
 		if (type->colorFlags != 0 || CraftHud_HasReticle(type)) {
 			craftCount++;
 		}
 	}
 	if (craftCount != 0) {
-		Aeron_LogInfo("xwa.hud", "flight/craft: HUD settings for %d of the mission's craft types",
+		Aeron_LogInfo("xwa.hud", "flight/models: HUD settings for %d of the mission's craft types",
 					  craftCount);
 	}
 }
