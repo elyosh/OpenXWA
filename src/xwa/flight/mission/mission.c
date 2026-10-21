@@ -38,7 +38,6 @@
 #include "aeron/log.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_definitions.h"
-#include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_names.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/headlights.h"
@@ -46,6 +45,7 @@
 #include "xwa_runtime/models/mission_backdrops.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/mission_tie.h"
+#include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
@@ -8046,12 +8046,12 @@ uint16_t Mission_Init(char* fileName) {
 #ifdef XWA_MODERN
 	/* Modern port: the skins that the renderer loads depend on the flight
 	   groups' markings and on the markings that the mission gives single
-	   craft, and the craft HUD settings depend on the craft types. All are
+	   craft, and the model settings depend on the craft types. All are
 	   final once the loop above has set up the player groups. */
 	XwaSkins_SetFlightGroups(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 							 (int16_t)g_missionHeader.numFlightGroups);
-	XwaCraftHud_LoadMission(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
-							(int16_t)g_missionHeader.numFlightGroups);
+	XwaModelSettings_LoadMission(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
+								 (int16_t)g_missionHeader.numFlightGroups);
 	XwaMissionTie_UseSkins();
 #endif
 

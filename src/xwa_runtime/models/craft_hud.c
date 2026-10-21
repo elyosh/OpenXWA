@@ -4,11 +4,8 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
-#include "xwa/frontend/frontend_mission.h"
-#include "xwa_runtime/models/model_source.h"
-#include "xwa_runtime/models/model_swaps.h"
+#include "xwa_runtime/models/model_settings.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -122,17 +119,11 @@ static int CraftHud_ReadColor(const char* path, const AeronConfigNode* colors, c
 	return 1;
 }
 
-static void CraftHud_ReadCraft(const char* path, CraftHudType* type) {
-	AeronConfigFile* file = CraftHud_LoadFile(path);
-	const AeronConfigNode* hud;
+static void CraftHud_ReadCraft(const char* path, const AeronConfigNode* hud, CraftHudType* type) {
 	const AeronConfigNode* reticle;
 	const AeronConfigNode* colors;
 	size_t index;
 
-	if (file == NULL) {
-		return;
-	}
-	hud = AeronConfigNode_MapGet(AeronConfigFile_Root(file), "hud");
 	reticle = AeronConfigNode_MapGet(hud, "reticle");
 	for (index = 0; index < AeronConfigNode_MapCount(reticle); ++index) {
 		const char* key = AeronConfigNode_MapKeyAt(reticle, index);
@@ -157,18 +148,6 @@ static void CraftHud_ReadCraft(const char* path, CraftHudType* type) {
 	if (CraftHud_ReadColor(path, colors, "border", &type->border)) {
 		type->colorFlags |= CRAFT_HUD_HAS_BORDER;
 	}
-	AeronConfigFile_Destroy(file);
-}
-
-static int CraftHud_HasReticle(const CraftHudType* type) {
-	int slot;
-
-	for (slot = 0; slot < XWA_CRAFT_HUD_RETICLE_SLOTS; ++slot) {
-		if (type->reticle[slot] != 0) {
-			return 1;
-		}
-	}
-	return 0;
 }
 
 void XwaCraftHud_Init(void) {
@@ -179,42 +158,11 @@ void XwaCraftHud_Init(void) {
 	CraftHud_ReadIcons();
 }
 
-void XwaCraftHud_LoadMission(const struct XwaFlightGroup* flightGroups, size_t stride, int count) {
-	static uint8_t read[OBJ_Count];
-	int index;
-	int craftCount = 0;
+void XwaCraftHud_ClearModelSettings(void) { memset(s_types, 0, sizeof s_types); }
 
-	memset(s_types, 0, sizeof s_types);
-	memset(read, 0, sizeof read);
-	for (index = 0; index < count; ++index) {
-		const struct XwaFlightGroup* fg =
-			(const struct XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)index * stride);
-		const unsigned int objectType = fg->craftType < XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT
-											? g_objectTypeTables.craftTypeToObjectType[fg->craftType]
-											: OBJ_None;
-		char key[XWA_MODEL_SOURCE_KEY_MAX];
-		char path[XWA_MODEL_SOURCE_KEY_MAX + 32];
-		CraftHudType* type;
-
-		if (objectType >= OBJ_Count || read[objectType]) {
-			continue;
-		}
-		read[objectType] = 1;
-		type = &s_types[objectType];
-		/* The model that the type loads in this mission, as the swap's
-		   target has its own HUD settings. */
-		if (!XwaModelSwaps_TypeKey(objectType, key)) {
-			continue;
-		}
-		snprintf(path, sizeof path, "flight/models/%s.yaml", key);
-		CraftHud_ReadCraft(path, type);
-		if (type->colorFlags != 0 || CraftHud_HasReticle(type)) {
-			craftCount++;
-		}
-	}
-	if (craftCount != 0) {
-		Aeron_LogInfo("xwa.hud", "flight/models: HUD settings for %d of the mission's craft types",
-					  craftCount);
+void XwaCraftHud_ReadModelSettings(unsigned int objectType, const char* path, const AeronConfigNode* group) {
+	if (objectType < OBJ_Count && group != NULL) {
+		CraftHud_ReadCraft(path, group, &s_types[objectType]);
 	}
 }
 
@@ -239,6 +187,7 @@ void XwaCraftHud_Colors(unsigned int objectType, uint32_t colors[2]) {
 	if (objectType >= OBJ_Count) {
 		return;
 	}
+	XwaModelSettings_Ensure(objectType);
 	type = &s_types[objectType];
 	if (type->colorFlags & CRAFT_HUD_HAS_INNER) {
 		colors[0] = type->inner;
@@ -252,5 +201,6 @@ int XwaCraftHud_Reticle(unsigned int objectType, int slot) {
 	if (objectType >= OBJ_Count || slot < 0 || slot >= XWA_CRAFT_HUD_RETICLE_SLOTS) {
 		return 0;
 	}
+	XwaModelSettings_Ensure(objectType);
 	return s_types[objectType].reticle[slot];
 }

@@ -11,11 +11,9 @@
  *   hull_icons: [0, 2600, ...]
  *   map_icons: [0, 100, ...]
  *
- * flight/models/<model key>.yaml, next to the model's GLB, holds the model's
- * settings. The model key is the name of the GLB, as model_source.h gives
- * it. All keys are optional:
+ * The `hud` group of a model settings file (model_settings.h) holds the
+ * craft's own HUD settings. All keys are optional:
  *
- *   version: 1
  *   hud:
  *     reticle: {5: 135, 6: 136}
  *     colors: {inner: 0xff00ff00, border: 0xff008000}
@@ -24,11 +22,8 @@
  * given as a 1-based position in the group. `colors` sets the HUD's inner and
  * border colours, as ARGB.
  *
- * The game reads hud.yaml once at startup. It reads the model settings files
- * when a mission loads, for the craft types that the mission's flight groups
- * use. They only work with model replacements on, because the model keys
- * come from the replacement list. Without the files, the game uses its own
- * tables and colours. */
+ * The game reads hud.yaml once at startup. Without the files, the game uses
+ * its own tables and colours. */
 
 #include <stddef.h>
 #include <stdint.h>
@@ -37,18 +32,19 @@
 extern "C" {
 #endif
 
-struct XwaFlightGroup;
+struct AeronConfigNode;
 
 enum { XWA_CRAFT_HUD_RETICLE_SLOTS = 23 };
 
 /* Reads flight/hud.yaml. */
 void XwaCraftHud_Init(void);
-/* Reads the model settings files of the models that the mission's flight
-   groups load, and drops the previous mission's settings. `flightGroups`
-   points to the first flight group, `stride` is the distance between two
-   flight groups, and `count` is their number. Call it after the flight
-   groups' craft types are final. */
-void XwaCraftHud_LoadMission(const struct XwaFlightGroup* flightGroups, size_t stride, int count);
+/* Drops the previous mission's HUD settings. Called by model_settings.c. */
+void XwaCraftHud_ClearModelSettings(void);
+/* Reads the `hud` group of `objectType`'s model settings file, or does
+   nothing when `group` is NULL. `path` is the file, for the log. Called by
+   model_settings.c. */
+void XwaCraftHud_ReadModelSettings(unsigned int objectType, const char* path,
+								   const struct AeronConfigNode* group);
 
 /* Returns the image id of the hull icon for `objectType`. With a
    `hull_icons` list, it returns the list's value, or 0 for a type past the

@@ -226,6 +226,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/mission_file.c
     src/xwa_runtime/models/mission_tie.c
     src/xwa_runtime/models/mission_settings.c
+    src/xwa_runtime/models/model_settings.c
     src/xwa_runtime/models/model_swaps.c
     src/xwa_runtime/models/craft_names.c
     src/xwa_runtime/models/model_source.c
