@@ -43,6 +43,7 @@
 #include "xwa_runtime/models/mission_backdrops.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/frontend_task.h"
@@ -150,6 +151,7 @@ int XwaPort_Init(void) {
 	XwaHangars_Init();
 	XwaCraftHud_Init();
 	XwaCraftWeapons_Init();
+	XwaShieldRecharge_Init();
 	if (SpriteResource_LoadCatalog("Resdata.txt") != 0) {
 		Aeron_LogError("xwa.assets", "Failed to load required sprite catalog 'Resdata.txt'");
 	}

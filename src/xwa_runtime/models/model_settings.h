@@ -9,6 +9,7 @@
  *   engine_glows: {...}   # engine_glows.h
  *   weapons: {...}        # craft_weapons.h
  *   stats_profiles: {...} # stats_profiles.h
+ *   shield: {...}         # shield_recharge.h
  *
  * Each top-level key is a group that one module owns. This module reads the
  * files and hands each group to its module, which keeps the values it needs

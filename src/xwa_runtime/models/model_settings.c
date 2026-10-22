@@ -10,6 +10,7 @@
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/model_swaps.h"
+#include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/stats_profiles.h"
 
 #include <stdio.h>
@@ -33,6 +34,7 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "engine_glows", XwaEngineGlows_ClearModelSettings, XwaEngineGlows_ReadModelSettings },
 	{ "weapons", XwaCraftWeapons_ClearModelSettings, XwaCraftWeapons_ReadModelSettings },
 	{ "stats_profiles", XwaStatsProfiles_ClearModelSettings, XwaStatsProfiles_ReadModelSettings },
+	{ "shield", XwaShieldRecharge_ClearModelSettings, XwaShieldRecharge_ReadModelSettings },
 };
 
 /* A model file that this mission has looked for. `file` is NULL when the

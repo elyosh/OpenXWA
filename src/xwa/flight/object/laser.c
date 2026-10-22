@@ -29,6 +29,7 @@
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/mission_settings.h"
+#include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -641,6 +642,10 @@ void laser_weaponsfire(void) {
 			laser_UpdatePlayerBeamWeapon(playerIdx);
 
 			shieldRechargeRate = 20;
+#ifdef XWA_MODERN
+			/* Modern port: a mod's shield recharge rules (shield_recharge.h). */
+			XwaShieldRecharge_Rate(objectIdx, 0, &shieldRechargeRate);
+#endif
 			for (scanObjIdx = g_activeRegionObjectSlotStart;
 				 (uint16_t)scanObjIdx < g_activeRegionCraftObjectSlotEnd; ++scanObjIdx) {
 				if (g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR) {
@@ -658,6 +663,10 @@ void laser_weaponsfire(void) {
 			}
 			g_curCraft = g_objectTable[objectIdx].mobj->pCraft;
 			laser_UpdateAiPowerRedirects(objectIdx, &shieldRechargeRate);
+#ifdef XWA_MODERN
+			/* Modern port: a mod's shield recharge rules (shield_recharge.h). */
+			XwaShieldRecharge_Rate(objectIdx, 1, &shieldRechargeRate);
+#endif
 		}
 
 		if (doPeriodicPowerUpdate) {
@@ -677,10 +686,13 @@ void laser_weaponsfire(void) {
 
 						g_curCraft->shieldFront += shieldDelta;
 #ifdef XWA_MODERN
-						/* Modern port: the craft's stats profile (stats_profiles.h). */
+						/* Modern port: the craft's stats profile (stats_profiles.h), and a
+						   mod's shield recharge rules (shield_recharge.h). */
 						maxShield =
-							2 * XwaStatsProfiles_Value(objectIdx, XWA_STATS_SHIELDS,
-													   g_modelDefs[g_curCraft->modelDefIndex].shieldStrength);
+							2 * XwaShieldRecharge_MaxShield(
+									objectIdx, XwaStatsProfiles_Value(
+												   objectIdx, XWA_STATS_SHIELDS,
+												   g_modelDefs[g_curCraft->modelDefIndex].shieldStrength));
 #else
 						maxShield = 2 * g_modelDefs[g_curCraft->modelDefIndex].shieldStrength;
 #endif
@@ -695,10 +707,13 @@ void laser_weaponsfire(void) {
 
 						g_curCraft->shieldRear += shieldDelta;
 #ifdef XWA_MODERN
-						/* Modern port: the craft's stats profile (stats_profiles.h). */
+						/* Modern port: the craft's stats profile (stats_profiles.h), and a
+						   mod's shield recharge rules (shield_recharge.h). */
 						maxShield =
-							2 * XwaStatsProfiles_Value(objectIdx, XWA_STATS_SHIELDS,
-													   g_modelDefs[g_curCraft->modelDefIndex].shieldStrength);
+							2 * XwaShieldRecharge_MaxShield(
+									objectIdx, XwaStatsProfiles_Value(
+												   objectIdx, XWA_STATS_SHIELDS,
+												   g_modelDefs[g_curCraft->modelDefIndex].shieldStrength));
 #else
 						maxShield = 2 * g_modelDefs[g_curCraft->modelDefIndex].shieldStrength;
 #endif

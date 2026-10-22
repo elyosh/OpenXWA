@@ -233,6 +233,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/craft_names.c
     src/xwa_runtime/models/model_source.c
     src/xwa_runtime/models/object_profiles.c
+    src/xwa_runtime/models/shield_recharge.c
     src/xwa_runtime/models/skins.c
     src/xwa_runtime/models/stats_profiles.c
     src/xwa_runtime/models/opt_synth.c

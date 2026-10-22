@@ -49,6 +49,7 @@
 #include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
+#include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #endif
@@ -7636,6 +7637,7 @@ uint16_t Mission_Init(char* fileName) {
 	XwaMissionArt_LoadMission(fileName);
 	XwaModelSwaps_LoadMission(fileName);
 	XwaStatsProfiles_LoadMission(fileName);
+	XwaShieldRecharge_LoadMission();
 	XwaCraftNames_LoadMission(fileName);
 	XwaCraftNames_Apply();
 	XwaHeadlights_LoadMission(fileName);
