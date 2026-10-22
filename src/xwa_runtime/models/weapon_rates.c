@@ -4,6 +4,7 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/flight/object/laser.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/models/mission_settings.h"
@@ -23,15 +24,67 @@ enum {
 	WEAPON_RATES_COOLDOWN,
 	WEAPON_RATES_DECHARGE_PERCENT,
 	WEAPON_RATES_RECHARGE_PERCENT,
+	WEAPON_RATES_ENERGY_TRANSFER,
+	WEAPON_RATES_ENERGY_TRANSFER_PENALTY,
+	WEAPON_RATES_ENERGY_TRANSFER_LASER_LIMIT,
+	WEAPON_RATES_ENERGY_TRANSFER_SHIELD_LIMIT,
+	WEAPON_RATES_TORPEDOES_PER_PASS,
+	WEAPON_RATES_TORPEDOES_PER_TARGET,
+	WEAPON_RATES_IMPACT_SPIN,
+	WEAPON_RATES_IMPACT_SPIN_SPEED_PERCENT,
+	WEAPON_RATES_IMPACT_SPIN_ANGLE_PERCENT,
+	WEAPON_RATES_MAX_SYSTEM_DAMAGE,
+	WEAPON_RATES_SYSTEM_DAMAGE_284,
+	WEAPON_RATES_SYSTEM_DAMAGE_285,
+	WEAPON_RATES_SYSTEM_DAMAGE_290,
+	WEAPON_RATES_SYSTEM_DAMAGE_296,
 	WEAPON_RATES_KEYS
 };
 
-static const char* const s_keys[WEAPON_RATES_KEYS] = { "decharge", "recharge", "cooldown", "decharge_percent",
-													   "recharge_percent" };
+/* The groups of the `weapons` section that this module reads. */
+enum {
+	WEAPON_RATES_GROUP_RATES,
+	WEAPON_RATES_GROUP_ENERGY_TRANSFER,
+	WEAPON_RATES_GROUP_AI_TORPEDOES,
+	WEAPON_RATES_GROUP_IMPACT_SPIN,
+	WEAPON_RATES_GROUP_SYSTEM_DAMAGE,
+	WEAPON_RATES_GROUPS
+};
 
-/* The `rates` of a model file or of flight/flight.yaml. -1 means not set. */
+static const char* const s_groups[WEAPON_RATES_GROUPS] = { "rates", "energy_transfer", "ai_torpedoes",
+														   "impact_spin", "system_damage" };
+
+typedef struct WeaponRatesKey {
+	uint8_t group;
+	const char* name;
+} WeaponRatesKey;
+
+static const WeaponRatesKey s_keys[WEAPON_RATES_KEYS] = {
+	{ WEAPON_RATES_GROUP_RATES, "decharge" },
+	{ WEAPON_RATES_GROUP_RATES, "recharge" },
+	{ WEAPON_RATES_GROUP_RATES, "cooldown" },
+	{ WEAPON_RATES_GROUP_RATES, "decharge_percent" },
+	{ WEAPON_RATES_GROUP_RATES, "recharge_percent" },
+	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "rate" },
+	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "penalty" },
+	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "laser_limit" },
+	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "shield_limit" },
+	{ WEAPON_RATES_GROUP_AI_TORPEDOES, "per_pass" },
+	{ WEAPON_RATES_GROUP_AI_TORPEDOES, "per_target" },
+	{ WEAPON_RATES_GROUP_IMPACT_SPIN, "enabled" },
+	{ WEAPON_RATES_GROUP_IMPACT_SPIN, "speed_percent" },
+	{ WEAPON_RATES_GROUP_IMPACT_SPIN, "angle_percent" },
+	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, "max" },
+	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, "284" },
+	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, "285" },
+	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, "290" },
+	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, "296" },
+};
+
+/* The values of a model file or of flight/flight.yaml. -1 means not set.
+   `group` has a bit for each group that the file has. */
 typedef struct WeaponRatesSet {
-	uint8_t set;
+	uint8_t group;
 	int32_t value[WEAPON_RATES_KEYS];
 } WeaponRatesSet;
 
@@ -55,22 +108,45 @@ static int WeaponRates_ReadInt(const char* path, const char* where, const AeronC
 	return 1;
 }
 
-static void WeaponRates_ReadSet(const char* path, const char* where, const AeronConfigNode* rates,
-								WeaponRatesSet* set) {
+/* Reads the groups of the `weapons` section `weapons` into `set`. */
+static void WeaponRates_ReadSet(const char* path, const AeronConfigNode* weapons, WeaponRatesSet* set) {
+	int group;
 	int key;
 
+	memset(set, 0, sizeof *set);
 	memset(set->value, 0xff, sizeof set->value);
-	if (AeronConfigNode_Type(rates) != AERON_CONFIG_MAP) {
-		Aeron_LogWarn("xwa.models", "%s: %s isn't a map. It is ignored", path, where);
-		return;
+	for (group = 0; group < WEAPON_RATES_GROUPS; ++group) {
+		const AeronConfigNode* node = AeronConfigNode_MapGet(weapons, s_groups[group]);
+
+		if (node == NULL) {
+			continue;
+		}
+		if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+			Aeron_LogWarn("xwa.models", "%s: weapons.%s isn't a map. It is ignored", path, s_groups[group]);
+			continue;
+		}
+		set->group |= (uint8_t)(1u << group);
 	}
-	set->set = 1;
 	for (key = 0; key < WEAPON_RATES_KEYS; ++key) {
-		const AeronConfigNode* node = AeronConfigNode_MapGet(rates, s_keys[key]);
+		const AeronConfigNode* node;
 		char name[64];
 
-		if (node != NULL) {
-			snprintf(name, sizeof name, "%s.%s", where, s_keys[key]);
+		if (!(set->group & (1u << s_keys[key].group))) {
+			continue;
+		}
+		node = AeronConfigNode_MapGet(AeronConfigNode_MapGet(weapons, s_groups[s_keys[key].group]),
+									  s_keys[key].name);
+		if (node == NULL) {
+			continue;
+		}
+		snprintf(name, sizeof name, "weapons.%s.%s", s_groups[s_keys[key].group], s_keys[key].name);
+		if (key == WEAPON_RATES_IMPACT_SPIN) {
+			if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+				Aeron_LogWarn("xwa.models", "%s: %s must be true or false. It is ignored", path, name);
+			} else {
+				set->value[key] = AeronConfigNode_Bool(node, 0) != 0;
+			}
+		} else {
 			WeaponRates_ReadInt(path, name, node, &set->value[key]);
 		}
 	}
@@ -101,10 +177,8 @@ void XwaWeaponRates_Init(void) {
 		AeronConfigFile_Destroy(file);
 		return;
 	}
-	if ((node = AeronConfigNode_MapGet(section, "rates")) != NULL) {
-		WeaponRates_ReadSet(WEAPON_RATES_FLIGHT_YAML, "weapons.rates", node, &s_defaults);
-		s_active |= s_defaults.set;
-	}
+	WeaponRates_ReadSet(WEAPON_RATES_FLIGHT_YAML, section, &s_defaults);
+	s_active = (s_defaults.group & (1u << WEAPON_RATES_GROUP_RATES)) != 0;
 	if ((node = AeronConfigNode_MapGet(section, "decharge_percent")) != NULL) {
 		s_active |= WeaponRates_ReadInt(WEAPON_RATES_FLIGHT_YAML, "weapons.decharge_percent", node,
 										&s_dechargePercent);
@@ -120,23 +194,24 @@ void XwaWeaponRates_ClearModelSettings(void) { memset(s_models, 0, sizeof s_mode
 
 void XwaWeaponRates_ReadModelSettings(unsigned int objectType, const char* path,
 									  const AeronConfigNode* group) {
-	const AeronConfigNode* rates;
-
 	/* craft_weapons.c logs a `weapons` group that isn't a map. */
 	if (objectType >= OBJ_Count || AeronConfigNode_Type(group) != AERON_CONFIG_MAP) {
 		return;
 	}
-	rates = AeronConfigNode_MapGet(group, "rates");
-	if (rates != NULL) {
-		WeaponRates_ReadSet(path, "weapons.rates", rates, &s_models[objectType]);
-	}
+	WeaponRates_ReadSet(path, group, &s_models[objectType]);
 }
 
-/* Returns the model rates of object type `objectType`, or NULL if it has
+/* Returns the model values of object type `objectType`, or NULL if it has
    none. */
 static const WeaponRatesSet* WeaponRates_Model(unsigned int objectType) {
 	XwaModelSettings_Ensure(objectType);
-	return objectType < OBJ_Count && s_models[objectType].set ? &s_models[objectType] : NULL;
+	return objectType < OBJ_Count && s_models[objectType].group ? &s_models[objectType] : NULL;
+}
+
+/* Whether the model has a `rates` map, which turns the rates on for its
+   craft. */
+static int WeaponRates_HasRates(const WeaponRatesSet* model) {
+	return model != NULL && (model->group & (1u << WEAPON_RATES_GROUP_RATES)) != 0;
 }
 
 /* Returns the model's value of `key`. If the model has none, returns the
@@ -176,7 +251,7 @@ int XwaWeaponRates_Decharge(unsigned int objIdx, int* rate) {
 	const ObjectRecord* object = &g_objectTable[objIdx];
 	const WeaponRatesSet* model = WeaponRates_Model(object->objectType);
 
-	if (!s_active && model == NULL) {
+	if (!s_active && !WeaponRates_HasRates(model)) {
 		return 0;
 	}
 	*rate = WeaponRates_DechargeRate(object, model);
@@ -188,7 +263,7 @@ void XwaWeaponRates_Recharge(unsigned int objIdx, int16_t chargeBasis, int16_t* 
 	const WeaponRatesSet* model = WeaponRates_Model(object->objectType);
 	int32_t rate;
 
-	if (!s_active && model == NULL) {
+	if (!s_active && !WeaponRates_HasRates(model)) {
 		return;
 	}
 	rate = WeaponRates_Value(model, WEAPON_RATES_RECHARGE);
@@ -223,5 +298,108 @@ int XwaWeaponRates_CanFire(unsigned int objIdx, unsigned int rackIdx, int laser)
 		g_curCraft->componentHp[rack->lastFireMeshIdx] == 0) {
 		return 0;
 	}
+	return 1;
+}
+
+/* Returns the value of `key` for object `objIdx`, or `stock` when neither
+   its model file nor flight/flight.yaml sets it. */
+static int WeaponRates_ObjectValue(unsigned int objIdx, int key, int stock) {
+	const int32_t value = WeaponRates_Value(WeaponRates_Model(g_objectTable[objIdx].objectType), key);
+
+	return value >= 0 ? value : stock;
+}
+
+int XwaWeaponRates_EnergyTransfer(unsigned int objIdx, int stock) {
+	return WeaponRates_ObjectValue(objIdx, WEAPON_RATES_ENERGY_TRANSFER, stock);
+}
+
+int XwaWeaponRates_EnergyTransferToShields(unsigned int objIdx, int rate) {
+	const int step = rate - WeaponRates_ObjectValue(objIdx, WEAPON_RATES_ENERGY_TRANSFER_PENALTY, 0);
+
+	/* The game divides by the step. */
+	return step > 0 ? step : 1;
+}
+
+int XwaWeaponRates_EnergyTransferLaserLimit(unsigned int objIdx) {
+	return WeaponRates_ObjectValue(objIdx, WEAPON_RATES_ENERGY_TRANSFER_LASER_LIMIT, 100);
+}
+
+int XwaWeaponRates_EnergyTransferShieldLimit(unsigned int objIdx) {
+	return WeaponRates_ObjectValue(objIdx, WEAPON_RATES_ENERGY_TRANSFER_SHIELD_LIMIT, 800);
+}
+
+int XwaWeaponRates_AiTorpedoesPerPass(unsigned int objIdx, int stock) {
+	return WeaponRates_ObjectValue(objIdx, WEAPON_RATES_TORPEDOES_PER_PASS, stock);
+}
+
+int XwaWeaponRates_AiTorpedoesPerTarget(unsigned int objIdx, int stock) {
+	return WeaponRates_ObjectValue(objIdx, WEAPON_RATES_TORPEDOES_PER_TARGET, stock);
+}
+
+int XwaWeaponRates_ImpactSpin(unsigned int objIdx, int stock) {
+	return WeaponRates_ObjectValue(objIdx, WEAPON_RATES_IMPACT_SPIN, stock);
+}
+
+void XwaWeaponRates_ScaleImpactSpin(unsigned int objIdx, unsigned int impactObjIdx, int* speed, int* angle) {
+	int32_t percent;
+
+	if (laser_GetProjectileWarheadClass(g_objectTable[impactObjIdx].objectType) <= 0) {
+		return;
+	}
+	percent = WeaponRates_ObjectValue(objIdx, WEAPON_RATES_IMPACT_SPIN_SPEED_PERCENT, 100);
+	*speed = (int16_t)(((int64_t)(int16_t)*speed * percent + 50) / 100);
+	percent = WeaponRates_ObjectValue(objIdx, WEAPON_RATES_IMPACT_SPIN_ANGLE_PERCENT, 100);
+	*angle = (int16_t)(((int64_t)(int16_t)*angle * percent + 50) / 100);
+}
+
+int XwaWeaponRates_AddSystemDamage(unsigned int objIdx, unsigned int projectileObjIdx, int weapon,
+								   uint16_t* damage) {
+	const WeaponRatesSet* target = WeaponRates_Model(g_objectTable[objIdx].objectType);
+	const MobileObject* projectile = g_objectTable[projectileObjIdx].mobj;
+	const WeaponRatesSet* source = NULL;
+	const unsigned int systemDamage = 1u << WEAPON_RATES_GROUP_SYSTEM_DAMAGE;
+	int32_t max;
+	int32_t added;
+	int key;
+
+	if (projectile != NULL) {
+		source = WeaponRates_Model(projectile->sourceObjectType);
+	}
+	if (!s_active && !(s_defaults.group & systemDamage) &&
+		(target == NULL || !(target->group & systemDamage)) &&
+		(source == NULL || !(source->group & systemDamage))) {
+		return 0;
+	}
+	max = WeaponRates_Value(target, WEAPON_RATES_MAX_SYSTEM_DAMAGE);
+	if (max < 0) {
+		max = 1000;
+	}
+	if (*damage >= max) {
+		return 1;
+	}
+	switch (weapon) {
+		case OBJ_LaserIon:
+			key = WEAPON_RATES_SYSTEM_DAMAGE_284;
+			added = 1;
+			break;
+		case OBJ_LaserIonTurbo:
+			key = WEAPON_RATES_SYSTEM_DAMAGE_285;
+			added = 2;
+			break;
+		case OBJ_WarheadIon:
+			key = WEAPON_RATES_SYSTEM_DAMAGE_290;
+			added = 4;
+			break;
+		case OBJ_WarheadIonPulse:
+			key = WEAPON_RATES_SYSTEM_DAMAGE_296;
+			added = 30;
+			break;
+		default:
+			return 1;
+	}
+	if (WeaponRates_Value(source, key) >= 0) {
+		added = WeaponRates_Value(source, key);
+	}
+	*damage = (uint16_t)((int64_t)*damage + added < max ? *damage + added : max);
 	return 1;
 }

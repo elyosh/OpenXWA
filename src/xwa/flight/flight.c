@@ -64,6 +64,7 @@
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -7716,7 +7717,14 @@ static __inline void FlightAction_EmitSystemCondition(uint16_t systemMsgId, uint
 }
 
 static __inline int FlightAction_ShieldLaserTransferStep(ObjectRecord const* obj) {
+#ifdef XWA_MODERN
+	/* Modern port: a mod can change the energy transfer rate. */
+	return XwaWeaponRates_EnergyTransfer(
+		(unsigned int)(obj - g_objectTable),
+		GetModelDefIndexFromType(obj->objectType) == GetModelDefIndexFromType(OBJ_MissileBoat) ? 32 : 4);
+#else
 	return GetModelDefIndexFromType(obj->objectType) == GetModelDefIndexFromType(OBJ_MissileBoat) ? 32 : 4;
+#endif
 }
 
 static __inline int FlightAction_TransferShieldsToLasers(unsigned int playerIdx, ObjectRecord const* obj,
@@ -7727,6 +7735,9 @@ static __inline int FlightAction_TransferShieldsToLasers(unsigned int playerIdx,
 	int shieldRequested;
 	int shieldRemoved;
 	int chargesToAdd;
+#ifdef XWA_MODERN
+	int laserLimit;
+#endif
 	if (g_players[playerIdx].hasCheckpointFlag) {
 		return 1;
 	}
@@ -7744,7 +7755,13 @@ static __inline int FlightAction_TransferShieldsToLasers(unsigned int playerIdx,
 	}
 
 	shieldStep = FlightAction_ShieldLaserTransferStep(obj);
+#ifdef XWA_MODERN
+	/* Modern port: a mod can change how much charge one transfer moves. */
+	laserLimit = XwaWeaponRates_EnergyTransferLaserLimit((unsigned int)(obj - g_objectTable));
+	shieldRequested = (laserDeficit > laserLimit ? laserLimit : laserDeficit) * shieldStep;
+#else
 	shieldRequested = (laserDeficit > 100 ? 100 : laserDeficit) * shieldStep;
+#endif
 	shieldRemoved = 0;
 
 	if (craft->shieldDistribMode == 0) {
@@ -7766,7 +7783,11 @@ static __inline int FlightAction_TransferShieldsToLasers(unsigned int playerIdx,
 	if (chargesToAdd != 0) {
 		uint16_t attempts;
 		uint8_t slot = 0;
+#ifdef XWA_MODERN
+		for (attempts = 0; chargesToAdd > 0 && attempts < laserLimit; ++attempts) {
+#else
 		for (attempts = 0; chargesToAdd > 0 && attempts < 100; ++attempts) {
+#endif
 			if (craft->warheadData[slot].laserCharge != 127 && craft->warheadData[slot].weaponType < 4) {
 				++craft->warheadData[slot].laserCharge;
 			}
@@ -7868,6 +7889,9 @@ static __inline void FlightAction_TransferLasersToShields(unsigned int playerIdx
 	int chargesToDrain;
 	uint8_t slot;
 	uint16_t attempts;
+#ifdef XWA_MODERN
+	int laserLimit;
+#endif
 	if (g_players[playerIdx].hasCheckpointFlag) {
 		return;
 	}
@@ -7896,11 +7920,24 @@ static __inline void FlightAction_TransferLasersToShields(unsigned int playerIdx
 	if (shieldDeficit < 0) {
 		shieldDeficit = 0;
 	}
+#ifdef XWA_MODERN
+	/* Modern port: a mod can change how much energy one transfer moves, and
+	   what the charge is worth. XWAU limits the loop below with the laser
+	   limit, so OpenXWA does too. */
+	if (shieldDeficit > XwaWeaponRates_EnergyTransferShieldLimit((unsigned int)(obj - g_objectTable))) {
+		shieldDeficit = XwaWeaponRates_EnergyTransferShieldLimit((unsigned int)(obj - g_objectTable));
+	}
+
+	shieldStep = XwaWeaponRates_EnergyTransferToShields((unsigned int)(obj - g_objectTable),
+														FlightAction_ShieldLaserTransferStep(obj));
+	laserLimit = XwaWeaponRates_EnergyTransferLaserLimit((unsigned int)(obj - g_objectTable));
+#else
 	if (shieldDeficit > 800) {
 		shieldDeficit = 800;
 	}
 
 	shieldStep = FlightAction_ShieldLaserTransferStep(obj);
+#endif
 	chargesToDrain = shieldDeficit / shieldStep;
 	if (chargesToDrain == 0) {
 		FlightAction_PlayEngineClick(playerIdx);
@@ -7908,7 +7945,11 @@ static __inline void FlightAction_TransferLasersToShields(unsigned int playerIdx
 	}
 
 	slot = 0;
+#ifdef XWA_MODERN
+	for (attempts = 0; chargesToDrain > 0 && attempts < laserLimit; ++attempts) {
+#else
 	for (attempts = 0; chargesToDrain > 0 && attempts < 100; ++attempts) {
+#endif
 		if (craft->warheadData[slot].laserCharge > 0 && craft->warheadData[slot].weaponType < 4) {
 			--craft->warheadData[slot].laserCharge;
 			--chargesToDrain;

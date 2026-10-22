@@ -39,7 +39,37 @@
  *     platform or satellite doesn't fire lasers or warheads from a rack
  *     whose mesh is destroyed.
  *
- * The rates and the rules change the simulation. */
+ * The same `weapons` section, in flight/flight.yaml or in a model file, has
+ * other groups. They follow the same order: the model's value, then the value
+ * of flight/flight.yaml, then the stock value. All keys are optional:
+ *
+ *   weapons:
+ *     energy_transfer: {rate: 4, penalty: 0, laser_limit: 100, shield_limit: 800}
+ *     ai_torpedoes: {per_pass: 6, per_target: 16}
+ *     impact_spin: {enabled: true, speed_percent: 100, angle_percent: 100}
+ *     system_damage: {max: 1000, 284: 1, 285: 2, 290: 4, 296: 30}
+ *
+ *   - energy_transfer changes how the player moves energy between the lasers
+ *     and the shields. `rate` is the shield energy that one unit of laser
+ *     charge is worth: 32 for the Missile Boat and 4 for other craft in the
+ *     stock game. When the lasers charge the shields, each unit is worth
+ *     `rate` minus `penalty`. `laser_limit` is the most laser charge that one
+ *     key press moves, and `shield_limit` the most shield energy.
+ *   - ai_torpedoes limits the warheads that an AI craft fires at a starship,
+ *     a freighter, a platform or a similar target: `per_pass` in one attack
+ *     run, and `per_target` homing on the target at once.
+ *   - impact_spin decides whether a warhead hit spins the craft that it hits.
+ *     The stock game uses the game option. `speed_percent` and
+ *     `angle_percent` scale the spin.
+ *   - system_damage changes the damage that ion weapons do to a craft's
+ *     systems. `max` is the most system damage that the craft can take. The
+ *     weapon keys give the damage of one hit of weapon types 284, 285, 290
+ *     and 296. They come from the model of the craft that fired.
+ *     With these values, or with the rates on, system damage stops at `max`,
+ *     as in XWAU. The stock game stops adding damage once it reaches 1000,
+ *     but a hit can take it past 1000.
+ *
+ * The rates and the rules change the simulation. So do the other groups. */
 
 #include <stdint.h>
 
@@ -74,6 +104,35 @@ int XwaWeaponRates_Cooldown(unsigned int objIdx);
    firing rack `rackIdx` of g_curCraft, its craft. `laser` is 1 for the
    laser racks, 0 for the warhead launchers. */
 int XwaWeaponRates_CanFire(unsigned int objIdx, unsigned int rackIdx, int laser);
+
+/* Returns the shield energy that one unit of laser charge of object
+   `objIdx` is worth, or `stock`. */
+int XwaWeaponRates_EnergyTransfer(unsigned int objIdx, int stock);
+/* Returns what one unit of laser charge of object `objIdx` is worth when it
+   charges the shields: `rate`, the value of XwaWeaponRates_EnergyTransfer,
+   minus the penalty, and at least 1. */
+int XwaWeaponRates_EnergyTransferToShields(unsigned int objIdx, int rate);
+/* Returns the most laser charge that one transfer of object `objIdx` moves:
+   100 in the stock game. */
+int XwaWeaponRates_EnergyTransferLaserLimit(unsigned int objIdx);
+/* Returns the most shield energy that one transfer of object `objIdx` moves:
+   800 in the stock game. */
+int XwaWeaponRates_EnergyTransferShieldLimit(unsigned int objIdx);
+/* Return the warhead limits of AI object `objIdx` against a big target, or
+   `stock`. */
+int XwaWeaponRates_AiTorpedoesPerPass(unsigned int objIdx, int stock);
+int XwaWeaponRates_AiTorpedoesPerTarget(unsigned int objIdx, int stock);
+/* Returns 1 when a warhead hit spins object `objIdx`. `stock` is the game
+   option. */
+int XwaWeaponRates_ImpactSpin(unsigned int objIdx, int stock);
+/* Scales `*speed` and `*angle`, the spin that object `impactObjIdx` gives
+   object `objIdx`, when `impactObjIdx` is a warhead. */
+void XwaWeaponRates_ScaleImpactSpin(unsigned int objIdx, unsigned int impactObjIdx, int* speed, int* angle);
+/* Adds the system damage that a hit of `weapon`, fired as projectile
+   `projectileObjIdx`, does to object `objIdx`, to `*damage`, and returns 1.
+   Returns 0 for the stock rule. */
+int XwaWeaponRates_AddSystemDamage(unsigned int objIdx, unsigned int projectileObjIdx, int weapon,
+								   uint16_t* damage);
 
 #ifdef __cplusplus
 }

@@ -41,6 +41,7 @@
  *     fire_needs_decharge_rate: true
  *     no_starship_fire_from_destroyed_racks: true
  *     starship_ambient_sounds: true
+ *     no_player_warhead_slot_cap: true
  *
  * classic_hide_destroyed_engine_glows only changes drawing: the classic
  * renderer doesn't draw the engine glows of a destroyed or hidden mesh, nor
@@ -61,7 +62,12 @@
  * when a craft can fire. They change the simulation.
  *
  * starship_ambient_sounds plays a craft's ambient sound from the sound bank
- * when the player is near it. */
+ * when the player is near it.
+ *
+ * no_player_warhead_slot_cap lets each warhead rack of a player's craft hold
+ * more than 9 warheads, when the craft starts and when it reloads in the
+ * hangar. The stock game only allows it for the Missile Boat. It changes the
+ * simulation. */
 
 #include <stdint.h>
 
@@ -90,6 +96,7 @@ int XwaMissionSettings_AiAttackUsesMaxSpeedCache(void);
 int XwaMissionSettings_FireNeedsDechargeRate(void);
 int XwaMissionSettings_NoStarshipFireFromDestroyedRacks(void);
 int XwaMissionSettings_StarshipAmbientSounds(void);
+int XwaMissionSettings_NoPlayerWarheadSlotCap(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);

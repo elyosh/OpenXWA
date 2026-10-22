@@ -8,6 +8,7 @@
  *     1: { name: "Red", craft: 1, markings: 4 }
  *     5: { name: "Gold", craft: 2, iff: 2, pilot_voice: "Rebel_Pilot3" }
  *     26: { name: "Red", craft: 1, craft_markings: { 0: 0, 1: 1 } }
+ *     0: { name: "Alpha", craft: 5, warheads: { missiles: 80 } }
  *
  * Each entry names a flight group by its position in the mission's .TIE,
  * with the optional `name` and `craft` checks of mission_file.h. Its keys are
@@ -15,7 +16,8 @@
  * `pilot_voice` is the name of the pilot's voice, up to 19 characters.
  * `craft_markings` gives single craft their own markings, from 0 to 255. Its
  * keys are the craft's number in its wave, from 0, so the same craft of
- * every wave gets them. */
+ * every wave gets them. `warheads` gives the flight group's warhead pools
+ * (XwaWarheadPools_ReadFlightGroup). */
 
 #include <stddef.h>
 

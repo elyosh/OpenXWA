@@ -35,6 +35,7 @@
 #include "xwa/math/scalar.h"
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
@@ -13195,10 +13196,25 @@ void Hud_DrawCmdTargetComponentLine(void) {
 					showPercent = 0;
 				}
 			} else {
+#ifdef XWA_MODERN
+				/* Modern port: a mod can change the strength by mesh type for
+				   each model. A strength of 0 counts as 1. */
+				int strength = XwaComponentStrength_Value(g_objectTable[targetObjIdx].objectType, meshType,
+														  g_meshTypeComponentMaxHp[meshType]);
+
+				if (strength <= 0) {
+					strength = 1;
+				}
+				componentPercent =
+					(uint8_t)(int)((float)targetCraft->componentHp[(uint16_t)g_players[g_localPlayer]
+																	   .selectedTargetComponent] /
+								   ((float)strength * g_hudComponentPercentScale));
+#else
 				componentPercent =
 					(uint8_t)(int)((float)targetCraft->componentHp[(uint16_t)g_players[g_localPlayer]
 																	   .selectedTargetComponent] /
 								   ((float)g_meshTypeComponentMaxHp[meshType] * g_hudComponentPercentScale));
+#endif
 			}
 		}
 

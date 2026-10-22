@@ -7,13 +7,15 @@
  *   version: 1
  *   hud: {...}            # craft_hud.h
  *   engine_glows: {...}   # engine_glows.h
- *   weapons: {...}        # craft_weapons.h; `rates`: weapon_rates.h
+ *   weapons: {...}        # craft_weapons.h; `rates` and others: weapon_rates.h
  *   stats_profiles: {...} # stats_profiles.h
  *   shield: {...}         # shield_recharge.h
  *   sound: {...}          # craft_sounds.h
+ *   component_strength: {...} # component_strength.h
  *
  * Each top-level key is a group that one module owns, except `weapons`,
- * whose `rates` belong to weapon_rates.h. This module reads the files and
+ * whose `rates`, `energy_transfer`, `ai_torpedoes`, `impact_spin` and
+ * `system_damage` belong to weapon_rates.h. This module reads the files and
  * hands each group to its module, which keeps the values it needs in a
  * table by object type.
  *

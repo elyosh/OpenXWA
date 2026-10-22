@@ -38,6 +38,7 @@
 #include "aeron/log.h"
 #include "xwa_runtime/audio/mission_sounds.h"
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_names.h"
 #include "xwa_runtime/models/hangars.h"
@@ -53,6 +54,7 @@
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/warhead_pools.h"
 #endif
 
 #include <locale.h>
@@ -6506,9 +6508,21 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 									ammo >>= 1;
 								if (!ammo)
 									ammo = 1;
+#ifdef XWA_MODERN
+								/* Modern port: a mod can lift the cap of 9 warheads,
+								   and limit the warheads by flight group. */
+								if (hasPlayerOwner && ammo > 9 &&
+									g_objectTable[objIdx].objectType != OBJ_MissileBoat &&
+									!XwaMissionSettings_NoPlayerWarheadSlotCap())
+									ammo = 9;
+								ammo = (uint8_t)XwaWarheadPools_Limit(
+									XwaWarheadPools_Left(g_currentFlightGroupIdx, warheadAmmoClass),
+									lastSlot - firstSlot + 1, ammo);
+#else
 								if (hasPlayerOwner && ammo > 9 &&
 									g_objectTable[objIdx].objectType != OBJ_MissileBoat)
 									ammo = 9;
+#endif
 								g_curCraft->warheadData[slot].count = ammo;
 							}
 						}
@@ -6725,7 +6739,14 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 					if (objType == OBJ_SuperStarDestroyer && meshType == MESH_ShieldGenerator)
 						g_curCraft->componentHp[meshIdx] = (uint8_t)(2 * g_meshTypeComponentMaxHp[8] - 1);
 					else
+#ifdef XWA_MODERN
+						/* Modern port: a mod can change the strength by mesh
+						   type for each model. */
+						g_curCraft->componentHp[meshIdx] = (uint8_t)XwaComponentStrength_Value(
+							(unsigned int)objectType, meshType, g_meshTypeComponentMaxHp[meshType]);
+#else
 						g_curCraft->componentHp[meshIdx] = g_meshTypeComponentMaxHp[meshType];
+#endif
 				}
 				if ((g_spawnStatus1 == 5 || g_spawnStatus2 == 5 || g_spawnStatus1 == 14 ||
 					 g_spawnStatus2 == 14) &&

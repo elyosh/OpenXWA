@@ -43,6 +43,7 @@
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/weapon_rates.h"
 #endif
 
 #include <math.h>
@@ -1406,6 +1407,10 @@ void collide_applyCraftImpactBounce(unsigned int sourceObjIdx, unsigned int impa
 	if ((uint16_t)yawMagnitude > 0x4000u) {
 		yawMagnitude = 0x8000 - yawMagnitude;
 	}
+#ifdef XWA_MODERN
+	/* Modern port: a mod can scale the spin of a warhead hit. */
+	XwaWeaponRates_ScaleImpactSpin(sourceObjIdx, impactObjIdx, &impactSpeed, &yawMagnitude);
+#endif
 	if (impactObjIdx >= g_activeRegionObjectSlotStart && impactObjIdx < g_activeRegionCraftObjectSlotEnd) {
 		if ((uint16_t)yawMagnitude < 0x4000u) {
 			impactSpeed -=
@@ -4843,7 +4848,16 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 				/* Ion / subsystem damage: degrade systems instead of the hull. */
 				int16_t systemStrengthRemaining;
 				int i;
+#ifdef XWA_MODERN
+				/* Modern port: a mod can change the system damage of ion
+				   weapons. */
+				if (!missionStatus20DamageCap &&
+					!XwaWeaponRates_AddSystemDamage(targetObjIdx, damageSourceObjIdx, damageKind,
+													&targetCraft->subsystemDamage) &&
+					targetCraft->subsystemDamage < 0x3E8u) {
+#else
 				if (!missionStatus20DamageCap && targetCraft->subsystemDamage < 0x3E8u) {
+#endif
 					if (damageKind == 284)
 						targetCraft->subsystemDamage += 1;
 					if (damageKind == 285)
@@ -5376,7 +5390,12 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 			}
 
 			// Warhead-class projectiles physically bounce the struck craft when enabled.
+#ifdef XWA_MODERN
+			/* Modern port: a mod can turn the spin on or off for each craft. */
+			if (XwaWeaponRates_ImpactSpin(targetObjIdx, g_craftImpactBounceEnabled)) {
+#else
 			if (g_craftImpactBounceEnabled) {
+#endif
 				if (targetCraft->objectKind == 0) {
 #ifdef XWA_MODERN
 					if (laser_GetProjectileWarheadClass(g_objectTable[projectileObjIdx].objectType) > 0)

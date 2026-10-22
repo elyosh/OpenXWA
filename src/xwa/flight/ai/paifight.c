@@ -1,6 +1,7 @@
 #include "xwa/flight/ai/ai_internal.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/weapon_rates.h"
 #endif
 
 // GLOBAL: XWA 0x917E60
@@ -2725,8 +2726,15 @@ char paifight_fightershootorder(void) {
 		targetGenus == GENUS_Container || targetGenus == GENUS_WeaponEmplacement ||
 		(targetGenus == GENUS_Transport && g_missionFormatVersion >= 14)) {
 		desiredWarheadClass = 2;
+#ifdef XWA_MODERN
+		/* Modern port: a mod can change how many warheads the AI fires at a
+		   big target. */
+		maxWarheadShots = (int16_t)XwaWeaponRates_AiTorpedoesPerPass(g_paiContext.aiObjIdx, 6);
+		maxComponentHits = (uint16_t)XwaWeaponRates_AiTorpedoesPerTarget(g_paiContext.aiObjIdx, 16);
+#else
 		maxWarheadShots = 6;
 		maxComponentHits = 16;
+#endif
 		fireRangeLimit = g_paiContext.aiSkillTier != 2 ? 203610u : 244332u;
 	} else {
 		maxComponentHits = 2;

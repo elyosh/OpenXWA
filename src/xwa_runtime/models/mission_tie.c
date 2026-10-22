@@ -5,6 +5,7 @@
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa_runtime/models/mission_file.h"
 #include "xwa_runtime/models/skins.h"
+#include "xwa_runtime/models/warhead_pools.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -111,6 +112,7 @@ void XwaMissionTie_LoadMission(const char* missionPath, XwaFlightGroup* flightGr
 	int set = 0;
 
 	s_craftMarkingCount = 0;
+	XwaWarheadPools_Clear();
 	if (missionPath == NULL || XwaMissionFile_Load(missionPath, &config, path, sizeof path) <= 0) {
 		return;
 	}
@@ -159,6 +161,8 @@ void XwaMissionTie_LoadMission(const char* missionPath, XwaFlightGroup* flightGr
 		if (craftMarkings != NULL) {
 			set += MissionTie_ReadCraftMarkings(path, key, craftMarkings, fgIdx);
 		}
+		set +=
+			XwaWarheadPools_ReadFlightGroup(path, key, fgIdx, fg, AeronConfigNode_MapGet(entry, "warheads"));
 	}
 	AeronConfigFile_Destroy(config);
 	if (set != 0) {

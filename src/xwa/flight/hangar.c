@@ -53,6 +53,7 @@
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/warhead_pools.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -4255,6 +4256,9 @@ after_key:
 							int first;
 							int last;
 							int wslot;
+#ifdef XWA_MODERN
+							int poolLeft = -1;
+#endif
 
 							++g_curCraft->warheadLauncherCount;
 							first = g_modelDefs[modelIndex].warheadLauncherFirstSlot[slot];
@@ -4286,8 +4290,24 @@ after_key:
 									count >>= 1;
 								if (!count)
 									count = 1;
+#ifdef XWA_MODERN
+								/* Modern port: a mod can lift the cap of 9 warheads,
+								   and the flight group's pool pays for the
+								   warheads. Each rack gets at most its share of
+								   what the pool had. */
+								if (count > 9 && (uint16_t)objType != 12 &&
+									!XwaMissionSettings_NoPlayerWarheadSlotCap())
+									count = 9;
+								if (wslot == first)
+									poolLeft = XwaWarheadPools_Left(g_objectTable[objectIndex].flightGroupIdx,
+																	ammoIdx);
+								count = (uint8_t)XwaWarheadPools_Limit(poolLeft, last - first + 1, count);
+								XwaWarheadPools_Take(g_objectTable[objectIndex].flightGroupIdx, ammoIdx,
+													 count);
+#else
 								if (count > 9 && (uint16_t)objType != 12)
 									count = 9;
+#endif
 								g_curCraft->warheadData[wslot].count = count;
 							}
 						}
@@ -6760,6 +6780,10 @@ void Hangar_ServicePlayerCraft(int dtTicks) {
 					firstSlot = g_modelDefs[modelIndex].warheadLauncherFirstSlot[launcherIdx];
 					if (firstSlot <= lastSlot) {
 						int slotIdx;
+#ifdef XWA_MODERN
+						const int fgIdx = g_objectTable[g_hangarPlayerObjIdx].flightGroupIdx;
+						int poolLeft = -1;
+#endif
 
 						for (slotIdx = firstSlot; slotIdx <= lastSlot; ++slotIdx) {
 							uint16_t warheadCatalogIdx;
@@ -6803,16 +6827,36 @@ void Hangar_ServicePlayerCraft(int dtTicks) {
 							if (adjustedMaxCount == 0) {
 								adjustedMaxCount = 1;
 							}
+#ifdef XWA_MODERN
+							/* Modern port: a mod can lift the cap of 9 warheads,
+							   and the flight group's pool pays for each warhead.
+							   Each rack gets at most its share of what the pool
+							   had. */
+							if (adjustedMaxCount > 9u &&
+								g_objectTable[g_hangarPlayerObjIdx].objectType != OBJ_MissileBoat &&
+								!XwaMissionSettings_NoPlayerWarheadSlotCap()) {
+								adjustedMaxCount = 9;
+							}
+							if (slotIdx == firstSlot) {
+								poolLeft = XwaWarheadPools_Left(fgIdx, warheadCatalogIdx);
+							}
+							adjustedMaxCount = (uint16_t)XwaWarheadPools_Limit(
+								poolLeft, lastSlot - firstSlot + 1, adjustedMaxCount);
+#else
 							if (adjustedMaxCount > 9u &&
 								g_objectTable[g_hangarPlayerObjIdx].objectType != OBJ_MissileBoat) {
 								adjustedMaxCount = 9;
 							}
+#endif
 
 							if (craft->warheadData[slotIdx].count < adjustedMaxCount) {
 								uint8_t count;
 
 								count = (uint8_t)(craft->warheadData[slotIdx].count + 1u);
 								craft->warheadData[slotIdx].count = count;
+#ifdef XWA_MODERN
+								XwaWarheadPools_Take(fgIdx, warheadCatalogIdx, 1);
+#endif
 								rearmedAny = 1;
 								if (count < adjustedMaxCount) {
 									rearmIncomplete = 1;
@@ -7551,6 +7595,18 @@ char Hangar_BuildMenu(int resetCursor) {
 								label = g_strWarheadNames[warheadType - OBJ_WarheadTorpedo];
 							}
 							strcpy(g_hangarMenuItemLabels[1][itemIndex], label);
+#ifdef XWA_MODERN
+							/* Modern port: the warheads left in the flight group's
+							   pool. */
+							if (warheadType != 0 &&
+								XwaWarheadPools_Left(playerObj->flightGroupIdx, *warheadListEntry) >= 0) {
+								char* text = g_hangarMenuItemLabels[1][itemIndex];
+								const size_t length = strlen(text);
+
+								snprintf(text + length, HANGAR_MENU_TEXT_LENGTH - length, " (%d)",
+										 XwaWarheadPools_Left(playerObj->flightGroupIdx, *warheadListEntry));
+							}
+#endif
 							g_hangarMenuItemCount[1] = ++itemIndex;
 							if (warheadType == g_curCraft->warheadSlotTypeIds[0]) {
 								g_hangarMenuCursor[1] = listIndex;

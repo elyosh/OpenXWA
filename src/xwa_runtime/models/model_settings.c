@@ -5,6 +5,7 @@
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/frontend/frontend_mission.h"
+#include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
@@ -39,6 +40,7 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "stats_profiles", XwaStatsProfiles_ClearModelSettings, XwaStatsProfiles_ReadModelSettings },
 	{ "shield", XwaShieldRecharge_ClearModelSettings, XwaShieldRecharge_ReadModelSettings },
 	{ "sound", XwaCraftSounds_ClearModelSettings, XwaCraftSounds_ReadModelSettings },
+	{ "component_strength", XwaComponentStrength_ClearModelSettings, XwaComponentStrength_ReadModelSettings },
 };
 
 /* A model file that this mission has looked for. `file` is NULL when the
