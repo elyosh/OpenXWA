@@ -27,6 +27,7 @@
 #include "xwa/util/random.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -1470,6 +1471,12 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 	g_objectTable[projectileObjIdx].mobj->framesAlive = 1;
 	g_objectTable[projectileObjIdx].mobj->sourceObjIdx = (int16_t)ownerObjIdx;
 	g_objectTable[projectileObjIdx].mobj->sourceObjectType = ownerObj->objectType;
+#ifdef XWA_MODERN
+	/* Modern port: XWAU's [WeaponColor] gives the bolt the colour of its
+	   firing craft, as its markings (craft_weapons.h). */
+	g_objectTable[projectileObjIdx].mobj->nodeSwitchIndex =
+		XwaCraftWeapons_BoltMarkings(ownerObj->objectType, ownerObj->mobj->nodeSwitchIndex, projectileType);
+#endif
 	g_objectTable[projectileObjIdx].mobj->orientMatrixDirty = 1;
 	g_objectTable[projectileObjIdx].mobj->moveVectorDirty = 1;
 	g_objectTable[projectileObjIdx].mobj->speed = g_projectileSpeedByType[projectileType - OBJ_LaserRebel];
@@ -1723,6 +1730,12 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 		g_objectTable[projectileObjIdx].mobj->sourceObjectType = firerObjectType;
 		firerModelIndex = (ModelDefIndex)GetModelDefIndexFromType(firerObjectType);
 		g_objectTable[projectileObjIdx].mobj->iff = firerObj->mobj->iff;
+#ifdef XWA_MODERN
+		/* Modern port: XWAU's [WeaponColor] gives the bolt the colour of its
+		   firing craft, as its markings (craft_weapons.h). */
+		g_objectTable[projectileObjIdx].mobj->nodeSwitchIndex =
+			XwaCraftWeapons_BoltMarkings(firerObjectType, firerObj->mobj->nodeSwitchIndex, projectileType);
+#endif
 #ifdef XWA_MODERN
 		if (playerIdx != -1 && g_players[playerIdx].objectIndex == (int)firerObjIdx) {
 #else

@@ -3073,6 +3073,14 @@ static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* 
 }
 
 /* Accessor-law sources (everything except engine glows + pulses). */
+/* Whether a bolt's model has lights of its own, which replace the stock
+ * bolt light. */
+static int fl_projectile_has_model_lights(const XwaFlightObject* f) {
+	const AeronSceneMesh* mesh =
+		XwaRemasterShip_MeshForNameWithSource(XwaSnapshotExport_ModelName(f->object_type), NULL);
+	return mesh && mesh->light_count > 0;
+}
+
 static void fl_derive_point_lights(const XwaSnapshot* snap) {
 	if (!s.plight.enabled) {
 		return;
@@ -3137,6 +3145,8 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 						AERON_OPT_METERS_PER_UNIT;
 				}
 			}
+		} else if (fl_object_is_projectile(f) && fl_projectile_has_model_lights(f)) {
+			/* The bolt's model lights it (fl_add_model_lights). */
 		} else if (fl_object_is_projectile(f) &&
 				   fl_projectile_streak(snap, f, cam->world_pos, local, half_axis)) {
 			XwaShipPointLight* light = fl_pl_push(local, cxi);
@@ -3368,9 +3378,11 @@ static uint8_t fl_probe_set_owner(uint32_t i) {
  * is authored in candela, so point_lights.match_distance_m does not apply;
  * point_lights.model_light_intensity converts it to the scene's units.
  * `skip_baked` leaves out the lights baked into the model's probes, while
- * its probe set is placed. */
+ * its probe set is placed. `variant` is the instance's variant index: a
+ * light that names variants shines only with them. */
 static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transform[16],
-								const AeronSceneMeshTable* table, int keep, int skip_baked) {
+								const AeronSceneMeshTable* table, uint32_t variant, int keep,
+								int skip_baked) {
 	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f)) {
 		return;
 	}
@@ -3379,7 +3391,7 @@ static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transfor
 		if (skip_baked && mesh->lights[i].baked) {
 			continue;
 		}
-		if (AeronScene_MeshLight(mesh, i, transform, AERON_OPT_UNITS_PER_METER, table,
+		if (AeronScene_MeshLight(mesh, i, transform, AERON_OPT_UNITS_PER_METER, table, variant,
 								 s.plight.model_light_intensity, &light)) {
 			s.pl_model_count++;
 			fl_pool_add(&light, 1, keep);
@@ -3985,7 +3997,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 		s.table_count++;
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
-	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, 1, 0);
+	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 1, 0);
 	if (player_f) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 										  inst.mesh_table, s.glow_mark_emissive_strength);
@@ -5286,9 +5298,13 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			inst.cull_mode = AERON_CULL_NONE;
 			inst.velocity_stamp = 1;
 			s.bolts[s.bolt_count++] = inst;
+			/* A bolt model with lights is lit by them, for the colour it
+			 * shows, instead of the stock light (fl_derive_point_lights). */
+			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant, 0, 0);
 		} else {
 			AeronScene_AddMeshInstance(s.scene, &inst);
-			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, 0, inst.probe_set_owner != 0);
+			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant, 0,
+								inst.probe_set_owner != 0);
 			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, prepared.mesh, model_matrix,
 											  inst.mesh_table, s.glow_mark_emissive_strength);
 			/* State-derived engine glows for this craft (classic scale
@@ -5409,7 +5425,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				}
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
-			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, 1, 0);
+			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 1, 0);
 			if (player_f) {
 				XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 												  inst.mesh_table, s.glow_mark_emissive_strength);

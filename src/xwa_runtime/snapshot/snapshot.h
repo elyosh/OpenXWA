@@ -741,6 +741,10 @@ typedef struct XwaGlowMark {
 	 * animation (its largest visible square); 0 when some frame has no
 	 * scale, which leaves the overlay unclipped. */
 	float layer_uv_scale_min;
+	/* The mark's RGB tint, from its colour (ObjectMeshTextureLayerBlock.
+	 * effectParam), 0 for the stock white. Impact marks get one from XWAU's
+	 * impact colours (craft_weapons.h). */
+	uint32_t tint;
 	/* Engine/OPT mesh ordinals traversed at creation: bit n % 64 of word
 	 * n / 64 is mesh n. All zero leaves the overlay unfiltered. */
 	uint64_t mesh_mask[XWA_SNAP_GLOW_MARK_MESH_WORDS];
@@ -920,6 +924,10 @@ typedef struct XwaHudInstruments {
 	uint8_t laser_link_mode[6];
 	uint8_t laser_link_next_slot[3];
 	uint16_t laser_projectile_type[3];
+	/* The charge bar colours, ARGB: laser full and empty, ion full and
+	 * empty. The stock ones (Hud_DrawEnergyBar3D), or the craft's
+	 * (craft_weapons.h). */
+	uint32_t energy_bar_colors[4];
 	uint8_t weapon_type[XWA_SNAP_MAX_WEAPON_SLOTS];
 	uint8_t laser_charge[XWA_SNAP_MAX_WEAPON_SLOTS];
 	uint8_t warhead_count[XWA_SNAP_MAX_WEAPON_SLOTS];

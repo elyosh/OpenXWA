@@ -1635,6 +1635,7 @@ void XwaSnapshot_CaptureFlight(void) {
 			m->layer_uv_scale = snapshot_glow_mark_uv_scale(p, pool_kind);
 			m->layer_uv_scale_min = snapshot_glow_mark_min_uv_scale(p, pool_kind, m->layer_uv_scale);
 			memcpy(m->mesh_mask, meta[i].mesh_mask, sizeof m->mesh_mask);
+			m->tint = p->effectParam != -1 ? (uint32_t)p->effectParam & 0xffffffu : 0;
 		}
 	}
 

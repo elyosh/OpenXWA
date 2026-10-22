@@ -11,6 +11,7 @@
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/craft_hud.h"
+#include "xwa_runtime/models/craft_weapons.h"
 
 #include <string.h>
 
@@ -421,6 +422,14 @@ static void hud_capture_instruments(XwaHudState* out, const ObjectRecord* object
 		   sizeof instruments->laser_link_next_slot);
 	memcpy(instruments->laser_projectile_type, craft->laserProjectileTypeId,
 		   sizeof instruments->laser_projectile_type);
+	instruments->energy_bar_colors[XWA_CRAFT_WEAPONS_LASER_HIGH] =
+		craft->laserProjectileTypeId[0] == OBJ_LaserRebel ? 0xffff0000u : 0xff00fc0fu;
+	instruments->energy_bar_colors[XWA_CRAFT_WEAPONS_LASER_LOW] =
+		craft->laserProjectileTypeId[0] == OBJ_LaserRebel ? 0xff9b1e00u : 0xff008c00u;
+	instruments->energy_bar_colors[XWA_CRAFT_WEAPONS_ION_HIGH] = 0xff00b4ffu;
+	instruments->energy_bar_colors[XWA_CRAFT_WEAPONS_ION_LOW] = 0xff006992u;
+	XwaCraftWeapons_EnergyBarColors(object->objectType, mobile->nodeSwitchIndex,
+									instruments->energy_bar_colors);
 	for (i = 0; i < XWA_SNAP_MAX_WEAPON_SLOTS; i++) {
 		instruments->weapon_type[i] = craft->warheadData[i].weaponType;
 		instruments->laser_charge[i] = craft->warheadData[i].laserCharge;

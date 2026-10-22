@@ -3,6 +3,7 @@
 #include "xwa/util/string.h"
 
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
@@ -244,6 +245,9 @@ GlowMarkRequest* GlowMark_QueueRequest(uint16_t objectIndex, int16_t effectParam
 		request = &g_glowMarkRequestPool[g_glowMarkRequestCount];
 		request->next = NULL;
 		++g_glowMarkRequestCount;
+#ifdef XWA_MODERN
+		XwaCraftWeapons_ClearImpactTint(request);
+#endif
 	}
 
 	if (request != NULL) {
@@ -315,6 +319,13 @@ void GlowMark_ProcessPendingRequests(uint16_t objectIndex) {
 			break;
 		}
 
+#ifdef XWA_MODERN
+		/* Modern port: an impact colour (XWAU's [WeaponColor]) replaces the
+		   mark's white, which the classic renderer draws as its colour. */
+		if (XwaCraftWeapons_ImpactTint(request) != 0) {
+			patch->effectParam = (int)(0xff000000u | XwaCraftWeapons_ImpactTint(request));
+		}
+#endif
 		patch->objectIndex = objectIndex;
 		patch->persistentUntilCleared = request->persistentUntilCleared;
 		patch->prevActive = previousTail;

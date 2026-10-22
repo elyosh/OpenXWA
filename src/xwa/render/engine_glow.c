@@ -4,6 +4,7 @@
 #include "xwa/render/renderer_internal.h"
 
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/snapshot/snapshot.h"
@@ -1205,6 +1206,9 @@ void GlowMark_CreateEngineKnockoutBlastMark(unsigned int objectIndex, uint8_t em
 				request = &g_glowMarkRequestPool[g_glowMarkRequestCount];
 				request->next = NULL;
 				++g_glowMarkRequestCount;
+#ifdef XWA_MODERN
+				XwaCraftWeapons_ClearImpactTint(request);
+#endif
 			}
 
 			if (request != NULL) {
@@ -1333,6 +1337,9 @@ char GlowMark_SpawnLocalPlayerHitEffects(void) {
 					request = &g_glowMarkRequestPool[g_glowMarkRequestCount];
 					request->next = NULL;
 					++g_glowMarkRequestCount;
+#ifdef XWA_MODERN
+					XwaCraftWeapons_ClearImpactTint(request);
+#endif
 				}
 
 				if (request != NULL) {
@@ -1375,6 +1382,9 @@ char GlowMark_SpawnLocalPlayerHitEffects(void) {
 					request = &g_glowMarkRequestPool[g_glowMarkRequestCount];
 					request->next = NULL;
 					++g_glowMarkRequestCount;
+#ifdef XWA_MODERN
+					XwaCraftWeapons_ClearImpactTint(request);
+#endif
 				}
 
 				if (request != NULL) {

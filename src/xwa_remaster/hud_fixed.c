@@ -428,18 +428,15 @@ static void fixed_build_charge(const XwaHudState* h, const XwaRemasterHudVisibil
 	for (int i = 0; i < laser_count; i++)
 		fixed_emit(XWA_HUD_WIDGET_LASER_CHARGE, OBJ_HudTextureGroup12000, laser_frame, laser[i].x, laser[i].y,
 				   256, h->hud_colors[0], 0);
-	const uint32_t laser_primary =
-		h->instruments.laser_projectile_type[0] == OBJ_LaserRebel ? 0xffff0000u : 0xff00fc0fu;
-	const uint32_t laser_secondary =
-		h->instruments.laser_projectile_type[0] == OBJ_LaserRebel ? 0xff9b1e00u : 0xff008c00u;
+	const uint32_t* bar_colors = h->instruments.energy_bar_colors;
 	fixed_emit_energy_bank(h, XWA_HUD_WIDGET_LASER_CHARGE, laser, 0, laser_count, laser_count == 3,
-						   laser_primary, laser_secondary);
+						   bar_colors[0], bar_colors[1]);
 	const int ion_frame = ion_count == 3 ? 25 : 23;
 	for (int i = 0; i < ion_count; i++)
 		fixed_emit(XWA_HUD_WIDGET_ION_CHARGE, OBJ_HudTextureGroup12000, ion_frame, ion[i].x, ion[i].y, 256,
 				   h->hud_colors[0], 0);
 	fixed_emit_energy_bank(h, XWA_HUD_WIDGET_ION_CHARGE, ion, laser_count, ion_count, ion_count == 3,
-						   0xff00b4ffu, 0xff006992u);
+						   bar_colors[2], bar_colors[3]);
 }
 
 static uint16_t fixed_q16_div(uint32_t numerator, uint32_t denominator) {

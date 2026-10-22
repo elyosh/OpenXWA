@@ -37,6 +37,7 @@
 #include "xwa_runtime/input/winmm_joystick_provider.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
+#include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/mission_backdrops.h"
@@ -148,6 +149,7 @@ int XwaPort_Init(void) {
 	XwaModelSource_Init();
 	XwaHangars_Init();
 	XwaCraftHud_Init();
+	XwaCraftWeapons_Init();
 	if (SpriteResource_LoadCatalog("Resdata.txt") != 0) {
 		Aeron_LogError("xwa.assets", "Failed to load required sprite catalog 'Resdata.txt'");
 	}

@@ -37,6 +37,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/collision_bvh.h"
+#include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
@@ -7419,12 +7420,24 @@ void collide_collisions(void) {
 							}
 							candCraft = cand->mobj->pCraft;
 							if (candCraft && (candCraft->shieldFront || candCraft->shieldRear)) {
+#ifdef XWA_MODERN
+								XwaCraftWeapons_TintImpactMark(
+									GlowMark_QueueRequest(candIdx, (int16_t)projType, 552, -1.0f, -1.0f),
+									obj->mobj, (uint16_t)projType);
+#else
 								GlowMark_QueueRequest(candIdx, (int16_t)projType, 552, -1.0f, -1.0f);
+#endif
 								goto finalize;
 							}
 							if ((uint16_t)projType == 284 || (uint16_t)projType == 285 ||
 								(uint16_t)projType == 290 || (uint16_t)projType == 296) {
+#ifdef XWA_MODERN
+								XwaCraftWeapons_TintImpactMark(
+									GlowMark_QueueRequest(candIdx, (int16_t)projType, 279, -1.0f, -1.0f),
+									obj->mobj, (uint16_t)projType);
+#else
 								GlowMark_QueueRequest(candIdx, (int16_t)projType, 279, -1.0f, -1.0f);
+#endif
 								goto finalize;
 							}
 
@@ -7455,8 +7468,15 @@ void collide_collisions(void) {
 										placeMark = !collide_HitMeshIsEngineGlow(cand->objectType,
 																				 (uint16_t)hitComponent);
 										if (placeMark) {
+#ifdef XWA_MODERN
+											XwaCraftWeapons_TintImpactMark(
+												GlowMark_QueueRequest(candIdx, (int16_t)projType, 419, -1.0f,
+																	  -1.0f),
+												obj->mobj, (uint16_t)projType);
+#else
 											GlowMark_QueueRequest(candIdx, (int16_t)projType, 419, -1.0f,
 																  -1.0f);
+#endif
 										}
 										if (g_glowMarkWorldSegmentMode) {
 											Particle_AttachEffectToObject(0, candIdx, NULL, NULL);
@@ -7478,7 +7498,13 @@ void collide_collisions(void) {
 								placeMark =
 									!collide_HitMeshIsEngineGlow(cand->objectType, (uint16_t)hitComponent);
 								if (placeMark) {
+#ifdef XWA_MODERN
+									XwaCraftWeapons_TintImpactMark(
+										GlowMark_QueueRequest(candIdx, (int16_t)projType, 419, -1.0f, -1.0f),
+										obj->mobj, (uint16_t)projType);
+#else
 									GlowMark_QueueRequest(candIdx, (int16_t)projType, 419, -1.0f, -1.0f);
+#endif
 								}
 								if (g_glowMarkWorldSegmentMode) {
 									Particle_AttachEffectToObject(0, candIdx, NULL, NULL);

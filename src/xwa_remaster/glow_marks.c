@@ -5,6 +5,7 @@
 #include "aeron/asset/opt_model.h"
 #include "aeron/collision/face_bvh.h"
 #include "aeron/scene/mesh_overlay.h"
+#include "xwa_remaster/color.h"
 #include "xwa_remaster/ship.h"
 
 #include <math.h>
@@ -429,6 +430,13 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 		const float mark_emissive_strength = mark->pool_kind == 0 ? emissive_strength : 1.0f;
 		overlay.color[0] = overlay.color[1] = overlay.color[2] = mark_emissive_strength;
 		overlay.color[3] = 1.0f;
+		if (mark->tint != 0) {
+			/* The classic pass colour modulates the texture. */
+			for (int c = 0; c < 3; c++) {
+				overlay.color[c] *=
+					XwaRemaster_SrgbToLinear((float)(mark->tint >> (16 - 8 * c) & 0xffu) / 255.0f);
+			}
+		}
 		/* The classic extra-texture pass reuses the hull's transformed
 		 * vertices exactly. Aeron's compact overlay uses a separate vertex
 		 * shader, so pull only its test depth slightly toward the camera to
