@@ -25,6 +25,9 @@
 #include "xwa/util/debug.h"
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/craft_sounds.h"
+#endif
 
 #include <math.h>
 #include <stddef.h>
@@ -1536,7 +1539,13 @@ void Object_UpdateLifetimeAndMovement(void) {
 						collide_ConvertObjectToExplosion(objIdx, (ObjectTypeId)((GameRand() & 1) + 267), 0);
 						g_objectTable[objIdx].mobj->instanceExtent =
 							(unsigned int)g_objectTable[objIdx].mobj->instanceExtent >> 1;
+#ifdef XWA_MODERN
+						/* Modern port: a mod's explosion sounds (craft_sounds.h). */
+						fsfx_PlaySound(XwaCraftSounds_Explosion(objIdx, fsfx_PickRandomSmallExplosionSfx()),
+									   objIdx, g_localPlayer);
+#else
 						fsfx_PlaySound(fsfx_PickRandomSmallExplosionSfx(), objIdx, g_localPlayer);
+#endif
 						ForceFeedback_PlayProximityEffectForObject(1, objIdx);
 						goto movement;
 

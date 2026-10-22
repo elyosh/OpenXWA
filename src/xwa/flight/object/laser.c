@@ -27,6 +27,7 @@
 #include "xwa/util/random.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/shield_recharge.h"
@@ -3347,7 +3348,13 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 
 		if (guidance->targetObjIdx != 0xffffu &&
 			g_objectTable[guidance->targetObjIdx].playerOwnerIdx == g_localPlayer) {
+#ifdef XWA_MODERN
+			/* Modern port: a mod's warning sound (craft_sounds.h). */
+			fsfx_QueueVoiceSfx(XwaCraftSounds_Interface(XWA_SOUND_BANK_PLAYER_TARGETED, 61), 0, 0, 0, 0xffff,
+							   0xffff);
+#else
 			fsfx_QueueVoiceSfx(61, 0, 0, 0, 0xffff, 0xffff);
+#endif
 		}
 		if (g_objectTable[ownerObjIdx].playerOwnerIdx != -1) {
 			fsfx_triggerweaponsfx((unsigned int)resultObjIdx,

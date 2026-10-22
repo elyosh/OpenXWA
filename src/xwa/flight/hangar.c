@@ -47,6 +47,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_definitions.h"
+#include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/hangar_scene.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_settings.h"
@@ -2062,12 +2063,25 @@ int Hangar_UpdateLaunch(int dtMs) {
 				}
 				g_objectTable[g_hangarPlayerObjIdx].mobj->pCraft->throttleSpeed = 4096;
 				fsfx_UpdatePlayerEngineLoop();
+#ifdef XWA_MODERN
+				{
+					/* Modern port: a mod's take-off sounds (craft_sounds.h). */
+					const unsigned int objectType = g_objectTable[g_hangarPlayerObjIdx].objectType;
+					const int stockSlot =
+						objectType == OBJ_CorellianTransport2 || objectType == OBJ_FamilyTransport ? 139
+																								   : 132;
+
+					fsfx_PlaySound(XwaCraftSounds_TakeOff(objectType, stockSlot), g_hangarPlayerObjIdx,
+								   g_localPlayer);
+				}
+#else
 				if (g_objectTable[g_hangarPlayerObjIdx].objectType == OBJ_CorellianTransport2 ||
 					g_objectTable[g_hangarPlayerObjIdx].objectType == OBJ_FamilyTransport) {
 					fsfx_PlaySound(139, g_hangarPlayerObjIdx, g_localPlayer);
 				} else {
 					fsfx_PlaySound(132, g_hangarPlayerObjIdx, g_localPlayer);
 				}
+#endif
 			}
 			break;
 		case 1: {
@@ -2308,7 +2322,13 @@ int Hangar_UpdateLaunch(int dtMs) {
 			if (g_objectTable[objIdx].yaw < 0x6000u) {
 				g_objectTable[objIdx].yaw = 0;
 				g_launchSeqPhase = 7;
+#ifdef XWA_MODERN
+				/* Modern port: a mod's engine slowing sounds (craft_sounds.h). */
+				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_ENGINE_SLOWING, playerObjIdx, 131),
+							   playerObjIdx, g_localPlayer);
+#else
 				fsfx_PlaySound(131, playerObjIdx, g_localPlayer);
+#endif
 			}
 			break;
 		}
@@ -2365,7 +2385,13 @@ int Hangar_UpdateLaunch(int dtMs) {
 				g_launchSeqPhase = 8;
 				g_objectTable[g_hangarPlayerObjIdx].mobj->pCraft->throttleSpeed = 0;
 				g_hangarServiceCooldown = 236;
+#ifdef XWA_MODERN
+				/* Modern port: a mod's canopy sounds (craft_sounds.h). */
+				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_CANOPY_OPENING, playerObjIdx, 131),
+							   playerObjIdx, g_localPlayer);
+#else
 				fsfx_PlaySound(131, playerObjIdx, g_localPlayer);
+#endif
 				g_objectTable[g_hangarPlayerObjIdx].mobj->pCraft->throttleSpeed = 0;
 				Hangar_SetCameraShot(0);
 				if (g_provingGroundsModeActive) {
@@ -2616,6 +2642,10 @@ void Hangar_LaunchPlayerCraft(void) {
 			default:
 				break;
 		}
+#ifdef XWA_MODERN
+		/* Modern port: a mod's fly-by sounds (craft_sounds.h). */
+		launchSfxSlot = XwaCraftSounds_FlyBy(g_objectTable[g_hangarPlayerObjIdx].objectType, launchSfxSlot);
+#endif
 
 		if (launchSfxSlot != -1) {
 			fsfx_PlaySound(launchSfxSlot, g_hangarPlayerObjIdx, (unsigned int)g_localPlayer);
@@ -3414,8 +3444,16 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 			if (decisionTime >= (unsigned int)g_hangarShuttleState.nextDecisionTime &&
 				g_hangarPlayerObjIdx != g_hangarShuttleState.objectIdx) {
 				g_hangarShuttleState.moveState = 1;
+#ifdef XWA_MODERN
+				/* Modern port: a mod's shuttle sounds (craft_sounds.h). */
+				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_TAKE_OFF, sourceObjIdx, 132),
+							   sourceObjIdx, (unsigned int)g_localPlayer);
+				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_SHUTTLE_TAKE_OFF, sourceObjIdx, 149),
+							   sourceObjIdx, (unsigned int)g_localPlayer);
+#else
 				fsfx_PlaySound(132, sourceObjIdx, (unsigned int)g_localPlayer);
 				fsfx_PlaySound(149, sourceObjIdx, (unsigned int)g_localPlayer);
+#endif
 				if (g_launchSeqPhase != 5) {
 					fsfx_PlaySound(2641, 0xffffu, (unsigned int)g_localPlayer);
 				}
@@ -3525,7 +3563,13 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 #endif
 				g_objectTable[objectIdx].yaw = 0;
 				g_hangarShuttleState.moveState = 3;
+#ifdef XWA_MODERN
+				/* Modern port: a mod's shuttle sounds (craft_sounds.h). */
+				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_SHUTTLE_BLAST_OFF, sourceObjIdx, 146),
+							   sourceObjIdx, (unsigned int)g_localPlayer);
+#else
 				fsfx_PlaySound(146, sourceObjIdx, (unsigned int)g_localPlayer);
+#endif
 			}
 			break;
 		}
@@ -3786,8 +3830,16 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				g_objectTable[objectIdx].roll = 0;
 				g_hangarShuttleState.moveSpeed = 0.0f;
 				g_hangarShuttleState.moveState = 8;
+#ifdef XWA_MODERN
+				/* Modern port: a mod's shuttle sounds (craft_sounds.h). */
+				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_SHUTTLE_SHUT_DOWN, sourceObjIdx, 148),
+							   sourceObjIdx, (unsigned int)g_localPlayer);
+				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_ENGINE_SLOWING, sourceObjIdx, 131),
+							   sourceObjIdx, (unsigned int)g_localPlayer);
+#else
 				fsfx_PlaySound(148, sourceObjIdx, (unsigned int)g_localPlayer);
 				fsfx_PlaySound(131, sourceObjIdx, (unsigned int)g_localPlayer);
+#endif
 			}
 			break;
 		}
@@ -3986,8 +4038,16 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				g_objectTable[objectIdx].roll = 0;
 				g_hangarShuttleState.moveSpeed = 0.0f;
 				g_hangarShuttleState.moveState = 8;
+#ifdef XWA_MODERN
+				/* Modern port: a mod's shuttle sounds (craft_sounds.h). */
+				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_SHUTTLE_SHUT_DOWN, sourceObjIdx, 148),
+							   sourceObjIdx, (unsigned int)g_localPlayer);
+				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_ENGINE_SLOWING, sourceObjIdx, 131),
+							   sourceObjIdx, (unsigned int)g_localPlayer);
+#else
 				fsfx_PlaySound(148, sourceObjIdx, (unsigned int)g_localPlayer);
 				fsfx_PlaySound(131, sourceObjIdx, (unsigned int)g_localPlayer);
+#endif
 			}
 			break;
 		}

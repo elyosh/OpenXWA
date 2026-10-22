@@ -10,6 +10,7 @@
  *   weapons: {...}        # craft_weapons.h; `rates`: weapon_rates.h
  *   stats_profiles: {...} # stats_profiles.h
  *   shield: {...}         # shield_recharge.h
+ *   sound: {...}          # craft_sounds.h
  *
  * Each top-level key is a group that one module owns, except `weapons`,
  * whose `rates` belong to weapon_rates.h. This module reads the files and

@@ -18,6 +18,9 @@
 #include "xwa/render/renderer_internal.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/random.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/craft_sounds.h"
+#endif
 
 #include <math.h>
 #include <string.h>
@@ -701,6 +704,10 @@ unsigned int Craft_DamageComponent(uint16_t objIdx, int componentId, unsigned in
 				g_objectTable[explosionObjIdx].mobj->orientMatrixDirty = 1;
 				g_objectTable[explosionObjIdx].mobj->moveVectorDirty = 1;
 				sfxSlot = fsfx_PickRandomSmallExplosionSfx();
+#ifdef XWA_MODERN
+				/* Modern port: a mod's explosion sounds (craft_sounds.h). */
+				sfxSlot = XwaCraftSounds_Explosion(explosionObjIdx, sfxSlot);
+#endif
 				fsfx_PlaySound(sfxSlot, explosionObjIdx, (unsigned int)g_localPlayer);
 				ForceFeedback_PlayProximityEffectForObject(1, explosionObjIdx);
 				g_objectTable[explosionObjIdx].mobj->instanceExtent =
@@ -1019,7 +1026,13 @@ void Craft_SpawnMainHullExplosionEffects(uint16_t sourceObjIdx, uint16_t forceAt
 			sourceObjIdx, result, g_objectTypes[(uint16_t)objectType].maxBoundsExtent >> 4, 1);
 		if (result != 0xFFFF && genusId != 18) {
 			collide_ApplyDefaultProximityDamage(result, 0x7D0u, sourceObjIdx);
+#ifdef XWA_MODERN
+			/* Modern port: a mod's explosion sounds (craft_sounds.h). */
+			fsfx_PlaySound(XwaCraftSounds_Explosion(result, fsfx_PickRandomSmallExplosionSfx()), result,
+						   g_localPlayer);
+#else
 			fsfx_PlaySound(fsfx_PickRandomSmallExplosionSfx(), result, g_localPlayer);
+#endif
 			ForceFeedback_PlayProximityEffectForObject(1, result);
 		}
 	}

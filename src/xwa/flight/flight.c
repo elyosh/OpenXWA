@@ -60,6 +60,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/stats_profiles.h"
@@ -4634,10 +4635,18 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 				g_hyperspaceFxPhaseLatch = 2;
 				if (playerIdx == (unsigned int)g_localPlayer) {
 					int li;
+#ifdef XWA_MODERN
+					/* Modern port: a mod's hyperspace sounds (craft_sounds.h). */
+					const int startSlot =
+						XwaCraftSounds_HyperStart(playerIdx, g_players[playerIdx].iff == 1 ? 115 : 118);
+					if (startSlot != -1)
+						fsfx_PlaySound(startSlot, 0xFFFFu, g_localPlayer);
+#else
 					if (g_players[playerIdx].iff == 1)
 						fsfx_PlaySound(115, 0xFFFFu, g_localPlayer);
 					else
 						fsfx_PlaySound(118, 0xFFFFu, g_localPlayer);
+#endif
 					ForceFeedback_PlayHyperspaceOutboundEffect();
 					Music_TriggerSequence(2190, g_players[playerIdx].regionIndex, 3);
 					// Snapshot the live lights as fade base, then fade to black.
@@ -4665,8 +4674,19 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 			}
 			if (playerIdx == (unsigned int)g_localPlayer) {
 				FlightLight_BlendDirectionalLightTargets(1.0f);
+#ifdef XWA_MODERN
+				/* Modern port: a mod's hyperspace sounds (craft_sounds.h). The
+				   playing test checks the slot that plays. */
+				{
+					const int zoomSlot =
+						XwaCraftSounds_HyperZoom(playerIdx, g_players[playerIdx].iff == 1 ? 116 : -1);
+					if (zoomSlot != -1 && !Sound_CountPlayingInstances(g_sfxIds[zoomSlot]))
+						fsfx_PlaySound(zoomSlot, 0xFFFFu, g_localPlayer);
+				}
+#else
 				if (g_players[playerIdx].iff == 1 && !Sound_CountPlayingInstances(g_sfxIds[116]))
 					fsfx_PlaySound(116, 0xFFFFu, g_localPlayer);
+#endif
 			}
 			{
 				int flightGroupIdx = g_objectTable[playerObjIdx].flightGroupIdx;
@@ -4753,10 +4773,14 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					int li;
 #ifdef XWA_MODERN
 					/* Modern port: a jump to a region that the mission lists as
-					   interdicted plays the abort sound. */
-					fsfx_PlaySound(
-						XwaMissionSettings_InterdictedRegion(g_players[playerIdx].regionIndex) ? 119 : 117,
-						0xFFFFu, g_localPlayer);
+					   interdicted plays the abort sound. A mod can change both
+					   sounds (craft_sounds.h). */
+					const int interdicted =
+						XwaMissionSettings_InterdictedRegion(g_players[playerIdx].regionIndex);
+					const int endSlot =
+						XwaCraftSounds_HyperEnd(playerIdx, interdicted, interdicted ? 119 : 117);
+					if (endSlot != -1)
+						fsfx_PlaySound(endSlot, 0xFFFFu, g_localPlayer);
 #else
 					fsfx_PlaySound(117, 0xFFFFu, g_localPlayer);
 #endif
@@ -10213,7 +10237,15 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					g_players[currentPlayerIdx].viewState.transitionTimer = 0;
 					g_players[currentPlayerIdx].viewState.cameraDistance = 0x40000;
 					if (mapTargetObjIdx != -1) {
+#ifdef XWA_MODERN
+						/* Modern port: a mod's map enter sound replaces the target
+						   select sound of this call (craft_sounds.h). */
+						XwaCraftSounds_SetMapEnter(1);
 						Player_SetTarget((int16_t)mapTargetObjIdx, currentPlayerIdx);
+						XwaCraftSounds_SetMapEnter(0);
+#else
+						Player_SetTarget((int16_t)mapTargetObjIdx, currentPlayerIdx);
+#endif
 					}
 					g_players[currentPlayerIdx].viewState.cameraFocusObjIdx = 0xffff;
 					g_players[currentPlayerIdx].viewState.aimTargetIdx = 0xffff;

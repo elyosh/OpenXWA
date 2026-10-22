@@ -6,6 +6,7 @@
 #include "xwa/assets/object_type.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa_runtime/models/craft_hud.h"
+#include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/model_source.h"
@@ -37,6 +38,7 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "weapons", XwaWeaponRates_ClearModelSettings, XwaWeaponRates_ReadModelSettings },
 	{ "stats_profiles", XwaStatsProfiles_ClearModelSettings, XwaStatsProfiles_ReadModelSettings },
 	{ "shield", XwaShieldRecharge_ClearModelSettings, XwaShieldRecharge_ReadModelSettings },
+	{ "sound", XwaCraftSounds_ClearModelSettings, XwaCraftSounds_ReadModelSettings },
 };
 
 /* A model file that this mission has looked for. `file` is NULL when the

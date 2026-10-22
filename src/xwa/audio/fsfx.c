@@ -27,6 +27,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/models/craft_definitions.h"
+#include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -355,6 +356,11 @@ int fsfx_LoadSfxList(char* fileName, int baseSoundId, const char* waveDir) {
 				continue;
 			}
 
+#ifdef XWA_MODERN
+			/* Modern port: both variants of the fly-by sounds load, because a
+			   mod's model can pick either one (craft_sounds.h). The game picks
+			   the variant that fits the sound mode, as before. */
+#else
 			if (!g_sound3DEnabled) {
 				switch (sfxSlot) {
 					case 102:
@@ -382,6 +388,7 @@ int fsfx_LoadSfxList(char* fileName, int baseSoundId, const char* waveDir) {
 						break;
 				}
 			}
+#endif
 
 			if (g_sfxIds[sfxSlot] == -1) {
 				strcpy(g_fsfxSfxLoadPath, waveDir);
@@ -1912,7 +1919,13 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 	int baseFrequency;
 	ObjectRecord* objectTable;
 	CraftData* craft;
+#ifdef XWA_MODERN
+	/* Modern port: the whole object type, since a mod's sounds are by object
+	   type (craft_sounds.h). */
+	unsigned int objectType;
+#else
 	uint8_t objectType;
+#endif
 
 	if (g_flightSimSideEffectsSuppressed) {
 		return;
@@ -1933,7 +1946,11 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 	objectTable = g_objectTable;
 
 	if (objectIndex != 0xffff) {
+#ifdef XWA_MODERN
+		objectType = objectTable[objectIndex].objectType;
+#else
 		objectType = (uint8_t)objectTable[objectIndex].objectType;
+#endif
 #ifdef XWA_MODERN
 		/* A mod's object type file can give the type another type's sounds. */
 		switch (XwaCraftDefinitions_SoundObjectType(objectType)) {
@@ -2014,6 +2031,10 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 				}
 				break;
 		}
+#ifdef XWA_MODERN
+		/* Modern port: a mod's engine sounds (craft_sounds.h). */
+		XwaCraftSounds_Interior(objectType, &engineSlot, &baseFrequency, &useHighQualityStep);
+#endif
 	}
 
 	if (engineSlot != -1) {
@@ -2022,7 +2043,11 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 		int throttleStep;
 		int frequency;
 
+#ifdef XWA_MODERN
+		g_playerEngineLoopObjectType = (int)objectType;
+#else
 		*(uint8_t*)&g_playerEngineLoopObjectType = objectType;
+#endif
 		if (g_players[g_localPlayer].regionSessionId != 1) {
 			craft = objectTable[objectIndex].mobj->pCraft;
 			if ((craft->workingSubsystems & 0x40u) != 0) {
@@ -2034,7 +2059,15 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 					configVolume = (uint16_t)(13u * configVolume);
 				}
 
+#ifdef XWA_MODERN
+				/* Modern port: a sound bank slot has its own volume (sound_banks.h). */
+				volume = ((uint32_t)configVolume * (uint32_t)(engineSlot >= XWA_SOUND_BANKS_FIRST_SLOT
+																  ? XwaSoundBanks_Volume(engineSlot)
+																  : g_fsfxBaseVolumeBySfxSlot[engineSlot])) >>
+						 7;
+#else
 				volume = ((uint32_t)configVolume * (uint32_t)g_fsfxBaseVolumeBySfxSlot[engineSlot]) >> 7;
+#endif
 				throttleStep = (int)MATH2_divide(craft->throttleSpeed, 0xffffu);
 				throttleStep &= 0xffff;
 				throttleStep = throttleStep / 655;
@@ -2133,6 +2166,9 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 		}
 
 #ifdef XWA_MODERN
+		/* Modern port: a mod's engine sounds (craft_sounds.h). */
+		XwaCraftSounds_Interior((unsigned int)g_playerEngineLoopObjectType, &engineSlot, &baseFrequency,
+								&useHighQualityStep);
 		if (engineSlot == -1) {
 			return;
 		}
@@ -2374,6 +2410,10 @@ void fsfx_UpdateFlightSfx(void) {
 		} else {
 			sfxSlot = SFX_ENGINE_WASH_OTHER;
 		}
+#ifdef XWA_MODERN
+		/* Modern port: a mod's wash sounds (craft_sounds.h). */
+		sfxSlot = XwaCraftSounds_Wash(objectType, sfxSlot);
+#endif
 
 		washVolume = 16 * g_players[g_localPlayer].engineWashStrength;
 		if (washVolume > 127) {
@@ -2384,10 +2424,20 @@ void fsfx_UpdateFlightSfx(void) {
 			scaledVolume = 127;
 		}
 
+#ifdef XWA_MODERN
+		/* Modern port: a silent bank slot counts as playing once it has
+		   started, so the message comes once per wash (craft_sounds.h). */
+		if (!XwaCraftSounds_WashPlaying(sfxSlot)) {
+			msg_emitInFlightMessage(MSG_ENGINE_WASH_DAMAGE, g_localPlayer);
+			Sound_QueueEffect(g_sfxIds[sfxSlot], 1, 1, scaledVolume, 65, 64, -1, 0xffffu);
+			XwaCraftSounds_WashStarted(sfxSlot);
+		} else {
+#else
 		if (Sound_CountPlayingInstances(g_sfxIds[sfxSlot]) == 0) {
 			msg_emitInFlightMessage(MSG_ENGINE_WASH_DAMAGE, g_localPlayer);
 			Sound_QueueEffect(g_sfxIds[sfxSlot], 1, 1, scaledVolume, 65, 64, -1, 0xffffu);
 		} else {
+#endif
 			Sound_SetLatestInstanceVolume(g_sfxIds[sfxSlot], scaledVolume);
 		}
 	} else {
@@ -2397,6 +2447,10 @@ void fsfx_UpdateFlightSfx(void) {
 		if (Sound_CountPlayingInstances(g_sfxIds[SFX_ENGINE_WASH_OTHER]) != 0) {
 			Sound_StopOldestInstance(g_sfxIds[SFX_ENGINE_WASH_OTHER]);
 		}
+#ifdef XWA_MODERN
+		/* Modern port: also stops a mod's wash sound (craft_sounds.h). */
+		XwaCraftSounds_StopWash();
+#endif
 	}
 
 	for (sourceObjIdx = g_activeRegionObjectSlotStart; sourceObjIdx < g_activeRegionCraftObjectSlotEnd;
@@ -2516,6 +2570,10 @@ void fsfx_UpdateFlightSfx(void) {
 				}
 				break;
 		}
+#ifdef XWA_MODERN
+		/* Modern port: a mod's fly-by sounds (craft_sounds.h). */
+		sfxSlot = (uint16_t)XwaCraftSounds_FlyBy(objectType, sfxSlot == 0xffffu ? -1 : sfxSlot);
+#endif
 		if (sfxSlot == 0xffffu) {
 			continue;
 		}
@@ -2969,6 +3027,16 @@ int fsfx_triggerweaponsfx(unsigned int sourceObjIdx, unsigned int playerIdx) {
 	sourceObj = &g_objectTable[sourceObjIdx];
 	objectType = sourceObj->objectType;
 
+#ifdef XWA_MODERN
+	{
+		int sfxSlot;
+
+		/* Modern port: a mod's weapon sounds (craft_sounds.h). */
+		if (XwaCraftSounds_Weapon(sourceObjIdx, &sfxSlot)) {
+			return sfxSlot != -1 ? fsfx_PlaySound(sfxSlot, (uint16_t)sourceObjIdx, playerIdx) : 0;
+		}
+	}
+#endif
 	switch (objectType) {
 		case OBJ_LaserRebel:
 		case OBJ_LaserRebelTurbo:

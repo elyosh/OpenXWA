@@ -33,6 +33,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #endif
@@ -1788,7 +1789,12 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 	g_players[playerIdx].viewState.field_32 = 0;
 	Hud_SetHudViewState(19, (int)playerIdx);
 	if (playerIdx == (unsigned int)g_localPlayer) {
+#ifdef XWA_MODERN
+		/* Modern port: a mod's map exit sound (craft_sounds.h). */
+		fsfx_PlaySound(XwaCraftSounds_Interface(XWA_SOUND_BANK_MAP_EXIT, 17), 0xffffu, playerIdx);
+#else
 		fsfx_PlaySound(17, 0xffffu, playerIdx);
+#endif
 	}
 
 	if (linkedPlayerIdx != -1) {
@@ -2602,7 +2608,12 @@ int Player_ResetGunnerSeatCameraState(unsigned int playerIdx, int objectIndex, i
 		g_players[playerIdx].inputDisabledFlag = 0;
 	}
 	if (playerIdx == (unsigned int)g_localPlayer) {
+#ifdef XWA_MODERN
+		/* Modern port: a mod's turret switch sound (craft_sounds.h). */
+		fsfx_PlaySound(XwaCraftSounds_Interface(XWA_SOUND_BANK_TURRET_SWITCH, 17), 0xffffu, playerIdx);
+#else
 		fsfx_PlaySound(17, 0xffffu, playerIdx);
+#endif
 	}
 	return 0;
 }
@@ -2895,11 +2906,22 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 		}
 	}
 	if (targetingAvailable) {
+#ifdef XWA_MODERN
+		/* Modern port: a mod's target select sound, and the map's own sound
+		   (craft_sounds.h). */
+		const int targetSelectSlot = XwaCraftSounds_TargetSelect(playerIdx, 75);
+#endif
 		if ((uint16_t)newTargetObjIdx == (uint16_t)g_players[playerIdx].currentTargetObjectIdx) {
 			return;
 		}
 
+#ifdef XWA_MODERN
+		if (targetSelectSlot != -1) {
+			fsfx_PlaySound(targetSelectSlot, 0xffffu, playerIdx);
+		}
+#else
 		fsfx_PlaySound(75, 0xffffu, playerIdx);
+#endif
 		g_players[playerIdx].currentTargetObjectIdx = (int16_t)newTargetObjIdx;
 		g_players[playerIdx].selectedTargetComponent = 0;
 		g_players[playerIdx].targetSubState = 0;
