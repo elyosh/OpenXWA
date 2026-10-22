@@ -1,12 +1,12 @@
 #ifndef XWA_RUNTIME_MODELS_WEAPON_RATES_H
 #define XWA_RUNTIME_MODELS_WEAPON_RATES_H
 
-/* A mod's laser rates: the charge that a shot takes, the charge that comes
- * back at each power update, and the time between shots.
+/* Laser rates that a mod can set: how much charge a shot uses, how much
+ * charge comes back at each power update, and the time between shots.
  *
- * The `weapons` section of flight/flight.yaml gives every craft's rates,
- * and a model settings file (model_settings.h) can change each one for its
- * craft. All keys are optional:
+ * The `weapons` section of flight/flight.yaml sets the rates for every
+ * craft. A model settings file can change any of them for
+ * its craft. All keys are optional:
  *
  *   weapons:
  *     rates: {decharge: 4, recharge: 2, cooldown: 47,
@@ -14,8 +14,9 @@
  *     decharge_percent: 100           # in flight/flight.yaml only
  *     recharge_percent: 100
  *
- * For each key, a craft takes its model's value, else flight/flight.yaml's
- * `rates` value. Without either, the stock values apply:
+ * For each key, the game uses the value from the craft's model file. If
+ * there is none, it uses the `rates` value from flight/flight.yaml, and if
+ * that is missing too, the stock value:
  *   - decharge: 3 for the TIE Fighter and the TIE Bomber, 4 for other
  *     starfighters, 3 for other craft;
  *   - recharge: 3 for the TIE Fighter and the TIE Bomber, else 2;
@@ -24,14 +25,13 @@
  * The decharge rate is scaled by `rates.decharge_percent`, then by the
  * global `decharge_percent`. The recharge rate is scaled the same way.
  *
- * The rates replace the stock ones when flight/flight.yaml has `rates` or
- * a global percent, or when the craft's model file has `rates`. Without
- * them, the stock code runs. Only a player's shots take the decharge rate,
- * and only from laser racks of weapon types 1 to 3; the AI's shots take 1,
- * as in the stock game. The cooldown counts for every craft.
+ * The rates replace the stock ones when flight/flight.yaml has `rates` or a
+ * global percent, or when the craft's model file has `rates`. Otherwise the
+ * stock code runs. The decharge rate only applies to the player's shots, and
+ * only to laser racks of weapon types 1 to 3. AI shots still use 1 charge, as
+ * in the stock game. The cooldown applies to every craft.
  *
- * Two rules of flight/flight.yaml also change when a craft can fire
- * (mission_settings.h):
+ * Two rules of flight/flight.yaml also change when a craft can fire:
  *   - fire_needs_decharge_rate: a craft fires a base laser (types 280, 282
  *     and 284) only when the rack's charge is at least the craft's decharge
  *     rate, instead of above 0;

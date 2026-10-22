@@ -645,7 +645,7 @@ void laser_weaponsfire(void) {
 
 			shieldRechargeRate = 20;
 #ifdef XWA_MODERN
-			/* Modern port: a mod's shield recharge rules (shield_recharge.h). */
+			/* Modern port: a mod can change how shields recharge. */
 			XwaShieldRecharge_Rate(objectIdx, 0, &shieldRechargeRate);
 #endif
 			for (scanObjIdx = g_activeRegionObjectSlotStart;
@@ -666,7 +666,7 @@ void laser_weaponsfire(void) {
 			g_curCraft = g_objectTable[objectIdx].mobj->pCraft;
 			laser_UpdateAiPowerRedirects(objectIdx, &shieldRechargeRate);
 #ifdef XWA_MODERN
-			/* Modern port: a mod's shield recharge rules (shield_recharge.h). */
+			/* Modern port: a mod can change how shields recharge. */
 			XwaShieldRecharge_Rate(objectIdx, 1, &shieldRechargeRate);
 #endif
 		}
@@ -689,7 +689,7 @@ void laser_weaponsfire(void) {
 						g_curCraft->shieldFront += shieldDelta;
 #ifdef XWA_MODERN
 						/* Modern port: the craft's stats profile (stats_profiles.h), and a
-						   mod's shield recharge rules (shield_recharge.h). */
+						   mod's shield recharge rules. */
 						maxShield =
 							2 * XwaShieldRecharge_MaxShield(
 									objectIdx, XwaStatsProfiles_Value(
@@ -710,7 +710,7 @@ void laser_weaponsfire(void) {
 						g_curCraft->shieldRear += shieldDelta;
 #ifdef XWA_MODERN
 						/* Modern port: the craft's stats profile (stats_profiles.h), and a
-						   mod's shield recharge rules (shield_recharge.h). */
+						   mod's shield recharge rules. */
 						maxShield =
 							2 * XwaShieldRecharge_MaxShield(
 									objectIdx, XwaStatsProfiles_Value(
@@ -781,7 +781,7 @@ void laser_weaponsfire(void) {
 							chargeDelta = (int16_t)(3 * chargeBasis);
 						}
 #ifdef XWA_MODERN
-						/* Modern port: a mod's laser rates (weapon_rates.h). */
+						/* Modern port: a mod can change the laser rates. */
 						XwaWeaponRates_Recharge(objectIdx, chargeBasis, &chargeDelta);
 #endif
 						g_curCraft->warheadData[slotIdx].laserCharge =
@@ -2105,7 +2105,7 @@ int laser_firemissile(int firerObjIdx, int warheadSlot, int projectileType, unsi
 	if (g_curCraft->warheadData[warheadSlot].weaponType == 3 &&
 		g_curCraft->warheadData[warheadSlot].count > 0) {
 #ifdef XWA_MODERN
-		/* Modern port: a mod's firing rules (weapon_rates.h). */
+		/* Modern port: a mod's rules can stop a craft from firing. */
 		projectileObjIdx = XwaWeaponRates_CanFire((unsigned int)firerObjIdx, (unsigned int)warheadSlot, 0)
 							   ? laser_createprojectile((unsigned int)firerObjIdx, warheadSlot,
 														(ObjectTypeId)projectileType, playerOwnerIdx)
@@ -2331,7 +2331,7 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 					projectileTypeId = (uint16_t)(projectileTypeId + 1u);
 				}
 #ifdef XWA_MODERN
-				/* Modern port: a mod's firing rules (weapon_rates.h). */
+				/* Modern port: a mod's rules can stop a craft from firing. */
 				projectileObjIdx =
 					XwaWeaponRates_CanFire(shooterObjIdx, slotIdx, 1)
 						? laser_createprojectile(shooterObjIdx, slotIdx, (ObjectTypeId)projectileTypeId,
@@ -2353,7 +2353,7 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 #ifdef XWA_MODERN
 							int dechargeRate;
 
-							/* Modern port: a mod's laser rates (weapon_rates.h). */
+							/* Modern port: a mod can change the laser rates. */
 							if (XwaWeaponRates_Decharge(shooterObjIdx, &dechargeRate)) {
 								if (g_curCraft->warheadData[slotIdx].weaponType < 4u) {
 									g_curCraft->warheadData[slotIdx].laserCharge =
@@ -2447,7 +2447,7 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 			firedCount = 1;
 		}
 #ifdef XWA_MODERN
-		/* Modern port: a mod's laser rates (weapon_rates.h). */
+		/* Modern port: a mod can change the laser rates. */
 		{
 			const int cooldown = XwaWeaponRates_Cooldown(shooterObjIdx);
 
@@ -3349,7 +3349,7 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 		if (guidance->targetObjIdx != 0xffffu &&
 			g_objectTable[guidance->targetObjIdx].playerOwnerIdx == g_localPlayer) {
 #ifdef XWA_MODERN
-			/* Modern port: a mod's warning sound (craft_sounds.h). */
+			/* Modern port: a mod can change the warning sound. */
 			fsfx_QueueVoiceSfx(XwaCraftSounds_Interface(XWA_SOUND_BANK_PLAYER_TARGETED, 61), 0, 0, 0, 0xffff,
 							   0xffff);
 #else

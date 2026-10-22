@@ -109,7 +109,7 @@ char FeDiskIo_LoadFlightSfxBanks(void) {
 			strcat(fileName, "SfxBlastNew.lst");
 			fsfx_LoadSfxList(fileName, 4, waveDir);
 #ifdef XWA_MODERN
-			/* Modern port: a mod's sound banks (sound_banks.h). */
+			/* Modern port: also load a mod's sound banks. */
 			XwaSoundBanks_LoadFlight(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 									 (int16_t)g_missionHeader.numFlightGroups);
 #endif

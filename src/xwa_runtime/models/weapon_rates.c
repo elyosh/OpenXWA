@@ -41,7 +41,8 @@ static int32_t s_dechargePercent;
 static int32_t s_rechargePercent;
 static WeaponRatesSet s_models[OBJ_Count];
 
-/* Reads a number of 0 or more into `out`. Logs and returns 0 otherwise. */
+/* Reads a number of 0 or more into `out`. If the node isn't such a number,
+   logs it and returns 0. */
 static int WeaponRates_ReadInt(const char* path, const char* where, const AeronConfigNode* node,
 							   int32_t* out) {
 	const int64_t value = AeronConfigNode_Int(node, -1);
@@ -131,13 +132,15 @@ void XwaWeaponRates_ReadModelSettings(unsigned int objectType, const char* path,
 	}
 }
 
-/* The model rates of object type `objectType`, or NULL. */
+/* Returns the model rates of object type `objectType`, or NULL if it has
+   none. */
 static const WeaponRatesSet* WeaponRates_Model(unsigned int objectType) {
 	XwaModelSettings_Ensure(objectType);
 	return objectType < OBJ_Count && s_models[objectType].set ? &s_models[objectType] : NULL;
 }
 
-/* The model's value of `key`, else the default one, else -1. */
+/* Returns the model's value of `key`. If the model has none, returns the
+   default value, or -1 if that isn't set either. */
 static int32_t WeaponRates_Value(const WeaponRatesSet* model, int key) {
 	return model != NULL && model->value[key] >= 0 ? model->value[key] : s_defaults.value[key];
 }
@@ -146,7 +149,7 @@ static int WeaponRates_IsTieFighterOrBomber(const ObjectRecord* object) {
 	return object->objectType == OBJ_TIEFighter || object->objectType == OBJ_TIEBomber;
 }
 
-/* `rate` scaled by the key's percent, then by the global percent. */
+/* Returns `rate` scaled by the percent key, then by the global percent. */
 static int WeaponRates_Scale(const WeaponRatesSet* model, int32_t rate, int percentKey, int32_t global) {
 	int32_t percent = WeaponRates_Value(model, percentKey);
 

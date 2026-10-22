@@ -40,6 +40,7 @@
  *     ai_attack_uses_max_speed_cache: true
  *     fire_needs_decharge_rate: true
  *     no_starship_fire_from_destroyed_racks: true
+ *     starship_ambient_sounds: true
  *
  * classic_hide_destroyed_engine_glows only changes drawing: the classic
  * renderer doesn't draw the engine glows of a destroyed or hidden mesh, nor
@@ -57,7 +58,10 @@
  * speeds. It changes the simulation.
  *
  * fire_needs_decharge_rate and no_starship_fire_from_destroyed_racks change
- * when a craft can fire (weapon_rates.h). They change the simulation. */
+ * when a craft can fire. They change the simulation.
+ *
+ * starship_ambient_sounds plays a craft's ambient sound from the sound bank
+ * when the player is near it. */
 
 #include <stdint.h>
 
@@ -85,6 +89,7 @@ int XwaMissionSettings_WeaponIffSwap(void);
 int XwaMissionSettings_AiAttackUsesMaxSpeedCache(void);
 int XwaMissionSettings_FireNeedsDechargeRate(void);
 int XwaMissionSettings_NoStarshipFireFromDestroyedRacks(void);
+int XwaMissionSettings_StarshipAmbientSounds(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);

@@ -18,7 +18,7 @@ extern "C" {
    - the mission files, MISSIONS/, MELEE/ and COMBAT/<mission>.TIE;
    - the mission lists, <same folders>/MISSION.LST, and MISSIONS/EMAIL.TXT;
    - the sounds, WAVE/...: the mission voices, the briefing, debriefing and
-	 concourse voices, and the sound banks (xwa_runtime/audio/sound_banks.h);
+	 concourse voices, and the sound banks;
    - the cutscene table, FRONTRES/CUTSCENE/CUTSCENE.TXT.
 
    Returns 1 when the mod folder has a copy of game file `path`, and writes

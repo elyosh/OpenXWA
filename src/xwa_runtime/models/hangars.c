@@ -680,6 +680,14 @@ const XwaHangarCamera* XwaHangars_Camera(int family) { return &s_cameras[family 
 
 uint8_t XwaHangars_CommandShipMarkings(void) { return s_shipMarkings; }
 
+int XwaHangars_CommandShipType(void) {
+	uint16_t objectType;
+	uint8_t iff;
+	uint8_t markings;
+
+	return Hangars_CommandShip(&objectType, &iff, &markings) && objectType != 0 ? objectType : -1;
+}
+
 /* ---- models ------------------------------------------------------------- */
 
 /* The key the settings load for `objectType`; empty for the stock model. */

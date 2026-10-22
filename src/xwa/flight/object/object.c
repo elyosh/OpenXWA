@@ -1540,7 +1540,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 						g_objectTable[objIdx].mobj->instanceExtent =
 							(unsigned int)g_objectTable[objIdx].mobj->instanceExtent >> 1;
 #ifdef XWA_MODERN
-						/* Modern port: a mod's explosion sounds (craft_sounds.h). */
+						/* Modern port: a mod can change the explosion sounds. */
 						fsfx_PlaySound(XwaCraftSounds_Explosion(objIdx, fsfx_PickRandomSmallExplosionSfx()),
 									   objIdx, g_localPlayer);
 #else

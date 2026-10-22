@@ -1790,7 +1790,7 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 	Hud_SetHudViewState(19, (int)playerIdx);
 	if (playerIdx == (unsigned int)g_localPlayer) {
 #ifdef XWA_MODERN
-		/* Modern port: a mod's map exit sound (craft_sounds.h). */
+		/* Modern port: a mod can change the map exit sound. */
 		fsfx_PlaySound(XwaCraftSounds_Interface(XWA_SOUND_BANK_MAP_EXIT, 17), 0xffffu, playerIdx);
 #else
 		fsfx_PlaySound(17, 0xffffu, playerIdx);
@@ -2609,7 +2609,7 @@ int Player_ResetGunnerSeatCameraState(unsigned int playerIdx, int objectIndex, i
 	}
 	if (playerIdx == (unsigned int)g_localPlayer) {
 #ifdef XWA_MODERN
-		/* Modern port: a mod's turret switch sound (craft_sounds.h). */
+		/* Modern port: a mod can change the turret switch sound. */
 		fsfx_PlaySound(XwaCraftSounds_Interface(XWA_SOUND_BANK_TURRET_SWITCH, 17), 0xffffu, playerIdx);
 #else
 		fsfx_PlaySound(17, 0xffffu, playerIdx);
@@ -2907,8 +2907,8 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 	}
 	if (targetingAvailable) {
 #ifdef XWA_MODERN
-		/* Modern port: a mod's target select sound, and the map's own sound
-		   (craft_sounds.h). */
+		/* Modern port: a mod can change the target select sound, and give
+		   the map its own sound. */
 		const int targetSelectSlot = XwaCraftSounds_TargetSelect(playerIdx, 75);
 #endif
 		if ((uint16_t)newTargetObjIdx == (uint16_t)g_players[playerIdx].currentTargetObjectIdx) {

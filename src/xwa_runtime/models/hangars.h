@@ -117,6 +117,9 @@ const XwaHangarMapEntry* XwaHangars_Map(int family, int* count);
 const XwaHangarCamera* XwaHangars_Camera(int family);
 /* The command ship's markings (FG markings, 0 without a command ship). */
 uint8_t XwaHangars_CommandShipMarkings(void);
+/* Returns the object type of the hangar's command ship, or -1 if there is
+   none. It works without flight/hangars.yaml. */
+int XwaHangars_CommandShipType(void);
 /* How high `objectType` stands off the hangar floor (GetCraftElevation): the
    [Size] ClosedSFoilsElevation, or ClosedSFoilsElevationInverted below an
    inverted floor, of the model it loads (`crafts` in hangars.yaml); without

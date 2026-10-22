@@ -63,6 +63,7 @@ static int s_weaponIffSwap;
 static int s_aiAttackUsesMaxSpeedCache;
 static int s_fireNeedsDechargeRate;
 static int s_noStarshipFireFromDestroyedRacks;
+static int s_starshipAmbientSounds;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -393,6 +394,7 @@ void XwaMissionSettings_Init(void) {
 	s_aiAttackUsesMaxSpeedCache = 0;
 	s_fireNeedsDechargeRate = 0;
 	s_noStarshipFireFromDestroyedRacks = 0;
+	s_starshipAmbientSounds = 0;
 	MissionSettings_ResetTargets();
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SETTINGS_FLIGHT_YAML, &file,
@@ -439,6 +441,10 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "no_starship_fire_from_destroyed_racks", node,
 								 &s_noStarshipFireFromDestroyedRacks);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "starship_ambient_sounds")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "starship_ambient_sounds", node,
+								 &s_starshipAmbientSounds);
+	}
 	MissionSettings_Read(SETTINGS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "mission_settings"), &s_defaults);
 	s_settings = s_defaults;
 	AeronConfigFile_Destroy(file);
@@ -470,6 +476,8 @@ int XwaMissionSettings_AiAttackUsesMaxSpeedCache(void) { return s_aiAttackUsesMa
 int XwaMissionSettings_FireNeedsDechargeRate(void) { return s_fireNeedsDechargeRate; }
 
 int XwaMissionSettings_NoStarshipFireFromDestroyedRacks(void) { return s_noStarshipFireFromDestroyedRacks; }
+
+int XwaMissionSettings_StarshipAmbientSounds(void) { return s_starshipAmbientSounds; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

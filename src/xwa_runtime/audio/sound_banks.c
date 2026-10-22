@@ -23,12 +23,12 @@
 enum {
 	SOUND_BANKS_BY_NAME = -1,
 	SOUND_BANKS_BY_POSITION = 0,
-	SOUND_BANKS_BY_TYPE = 1 /* more for several entries by object type */
+	SOUND_BANKS_BY_TYPE = 1 /* or the number of entries for each object type */
 };
 
 typedef struct SoundBankInfo {
 	const char* key;  /* the key in flight/sounds.yaml */
-	const char* name; /* the start of its sound effect names */
+	const char* name; /* the prefix of its sound effect names */
 	int layout;
 } SoundBankInfo;
 
@@ -254,14 +254,16 @@ void XwaSoundBanks_Init(void) {
 	Aeron_LogInfo("xwa.audio", SOUND_BANKS_YAML ": %d sounds in %d entries", sounds, s_slotCount);
 }
 
-/* Whether the game loads sound effects in this flight (FeDiskIo_LoadFlightSfxBanks). */
+/* Whether the game loads sound effects in this flight, as in
+   FeDiskIo_LoadFlightSfxBanks. */
 static int SoundBanks_SfxEnabled(void) {
 	return g_flightConfSfxEnabled && (g_gameConfig.sfxExteriorEnabled || g_gameConfig.sfxInteriorEnabled ||
 									  g_gameConfig.sfxEngineEnabled);
 }
 
-/* Loads the sound of bank slot `slot`, from the first bank slot. Returns 1
-   when the entry has a sound that wasn't tried yet. */
+/* Loads the sound of bank slot `slot`, counted from the first bank slot.
+   Returns 1 if the entry has a sound and this flight hadn't tried to load it
+   yet. */
 static int SoundBanks_Load(XwaSoundBank bank, int slot) {
 	const SoundBankEntry* entry = &s_entries[slot];
 	const char* file;
@@ -273,9 +275,9 @@ static int SoundBanks_Load(XwaSoundBank bank, int slot) {
 		return 0;
 	}
 	s_tried[slot] = 1;
-	/* The effect's name is the bank's name and the file's name without
-	   its folder and extension, so a file that several entries of a bank
-	   use loads once. */
+	/* The effect's name is the bank's name plus the file name, without the
+	   folder and the extension. So when several entries of a bank use the
+	   same file, it only loads once. */
 	file = entry->file;
 	stem = file + strlen(file);
 	while (stem > file && stem[-1] != '\\' && stem[-1] != '/') {

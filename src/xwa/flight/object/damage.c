@@ -705,7 +705,7 @@ unsigned int Craft_DamageComponent(uint16_t objIdx, int componentId, unsigned in
 				g_objectTable[explosionObjIdx].mobj->moveVectorDirty = 1;
 				sfxSlot = fsfx_PickRandomSmallExplosionSfx();
 #ifdef XWA_MODERN
-				/* Modern port: a mod's explosion sounds (craft_sounds.h). */
+				/* Modern port: a mod can change the explosion sounds. */
 				sfxSlot = XwaCraftSounds_Explosion(explosionObjIdx, sfxSlot);
 #endif
 				fsfx_PlaySound(sfxSlot, explosionObjIdx, (unsigned int)g_localPlayer);
@@ -1027,7 +1027,7 @@ void Craft_SpawnMainHullExplosionEffects(uint16_t sourceObjIdx, uint16_t forceAt
 		if (result != 0xFFFF && genusId != 18) {
 			collide_ApplyDefaultProximityDamage(result, 0x7D0u, sourceObjIdx);
 #ifdef XWA_MODERN
-			/* Modern port: a mod's explosion sounds (craft_sounds.h). */
+			/* Modern port: a mod can change the explosion sounds. */
 			fsfx_PlaySound(XwaCraftSounds_Explosion(result, fsfx_PickRandomSmallExplosionSfx()), result,
 						   g_localPlayer);
 #else

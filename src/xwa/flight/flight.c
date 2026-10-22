@@ -4636,7 +4636,7 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 				if (playerIdx == (unsigned int)g_localPlayer) {
 					int li;
 #ifdef XWA_MODERN
-					/* Modern port: a mod's hyperspace sounds (craft_sounds.h). */
+					/* Modern port: a mod can change the hyperspace sounds. */
 					const int startSlot =
 						XwaCraftSounds_HyperStart(playerIdx, g_players[playerIdx].iff == 1 ? 115 : 118);
 					if (startSlot != -1)
@@ -4675,8 +4675,8 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 			if (playerIdx == (unsigned int)g_localPlayer) {
 				FlightLight_BlendDirectionalLightTargets(1.0f);
 #ifdef XWA_MODERN
-				/* Modern port: a mod's hyperspace sounds (craft_sounds.h). The
-				   playing test checks the slot that plays. */
+				/* Modern port: a mod can change the hyperspace sounds. The check
+				   for a playing sound uses the slot that plays. */
 				{
 					const int zoomSlot =
 						XwaCraftSounds_HyperZoom(playerIdx, g_players[playerIdx].iff == 1 ? 116 : -1);
@@ -4773,8 +4773,7 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					int li;
 #ifdef XWA_MODERN
 					/* Modern port: a jump to a region that the mission lists as
-					   interdicted plays the abort sound. A mod can change both
-					   sounds (craft_sounds.h). */
+					   interdicted plays the abort sound. A mod can change both sounds. */
 					const int interdicted =
 						XwaMissionSettings_InterdictedRegion(g_players[playerIdx].regionIndex);
 					const int endSlot =
@@ -6097,6 +6096,10 @@ void Flight_StepSimToTime(int targetTimestamp) {
 
 			g_flightSideEffectsEnabled = 1;
 			FlightObject_UpdateDebrisAndTransientAnimations();
+#ifdef XWA_MODERN
+			/* Modern port: play a mod's starship ambient sounds. */
+			XwaCraftSounds_UpdateAmbient();
+#endif
 			if (g_useHardware3D) {
 #ifdef XWA_MODERN
 				if (XwaModernFlightTiming_AdvanceGlowMarkAnimation((uint16_t)g_elapsedTicks)) {
@@ -10238,8 +10241,8 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					g_players[currentPlayerIdx].viewState.cameraDistance = 0x40000;
 					if (mapTargetObjIdx != -1) {
 #ifdef XWA_MODERN
-						/* Modern port: a mod's map enter sound replaces the target
-						   select sound of this call (craft_sounds.h). */
+						/* Modern port: in this call, a mod's map enter sound
+						   replaces the target select sound. */
 						XwaCraftSounds_SetMapEnter(1);
 						Player_SetTarget((int16_t)mapTargetObjIdx, currentPlayerIdx);
 						XwaCraftSounds_SetMapEnter(0);

@@ -2065,7 +2065,7 @@ int Hangar_UpdateLaunch(int dtMs) {
 				fsfx_UpdatePlayerEngineLoop();
 #ifdef XWA_MODERN
 				{
-					/* Modern port: a mod's take-off sounds (craft_sounds.h). */
+					/* Modern port: a mod can change the take-off sound. */
 					const unsigned int objectType = g_objectTable[g_hangarPlayerObjIdx].objectType;
 					const int stockSlot =
 						objectType == OBJ_CorellianTransport2 || objectType == OBJ_FamilyTransport ? 139
@@ -2323,7 +2323,7 @@ int Hangar_UpdateLaunch(int dtMs) {
 				g_objectTable[objIdx].yaw = 0;
 				g_launchSeqPhase = 7;
 #ifdef XWA_MODERN
-				/* Modern port: a mod's engine slowing sounds (craft_sounds.h). */
+				/* Modern port: a mod can change the engine slowing sound. */
 				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_ENGINE_SLOWING, playerObjIdx, 131),
 							   playerObjIdx, g_localPlayer);
 #else
@@ -2386,7 +2386,7 @@ int Hangar_UpdateLaunch(int dtMs) {
 				g_objectTable[g_hangarPlayerObjIdx].mobj->pCraft->throttleSpeed = 0;
 				g_hangarServiceCooldown = 236;
 #ifdef XWA_MODERN
-				/* Modern port: a mod's canopy sounds (craft_sounds.h). */
+				/* Modern port: a mod can change the canopy sound. */
 				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_CANOPY_OPENING, playerObjIdx, 131),
 							   playerObjIdx, g_localPlayer);
 #else
@@ -2529,7 +2529,12 @@ int Hangar_UpdateLaunch(int dtMs) {
 	}
 
 	if (g_gameTime >= g_hangarNextAmbientSoundTime) {
+#ifdef XWA_MODERN
+		/* Modern port: a mod can give each command ship its own hangar ambience. */
+		fsfx_PlaySound(XwaCraftSounds_HangarAmbient((uint16_t)GameRand2() % 10), 0xFFFFu, g_localPlayer);
+#else
 		fsfx_PlaySound((uint16_t)GameRand2() % 10 + 151, 0xFFFFu, g_localPlayer);
+#endif
 		g_hangarNextAmbientSoundTime = g_gameTime + 236 * ((GameRand2() & 7) + 9);
 	}
 	Mission_SetActiveRegionObjectRanges(g_players[g_localPlayer].regionIndex);
@@ -2643,7 +2648,7 @@ void Hangar_LaunchPlayerCraft(void) {
 				break;
 		}
 #ifdef XWA_MODERN
-		/* Modern port: a mod's fly-by sounds (craft_sounds.h). */
+		/* Modern port: a mod can change the fly-by sounds. */
 		launchSfxSlot = XwaCraftSounds_FlyBy(g_objectTable[g_hangarPlayerObjIdx].objectType, launchSfxSlot);
 #endif
 
@@ -3445,7 +3450,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				g_hangarPlayerObjIdx != g_hangarShuttleState.objectIdx) {
 				g_hangarShuttleState.moveState = 1;
 #ifdef XWA_MODERN
-				/* Modern port: a mod's shuttle sounds (craft_sounds.h). */
+				/* Modern port: a mod can change the shuttle sounds. */
 				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_TAKE_OFF, sourceObjIdx, 132),
 							   sourceObjIdx, (unsigned int)g_localPlayer);
 				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_SHUTTLE_TAKE_OFF, sourceObjIdx, 149),
@@ -3564,7 +3569,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				g_objectTable[objectIdx].yaw = 0;
 				g_hangarShuttleState.moveState = 3;
 #ifdef XWA_MODERN
-				/* Modern port: a mod's shuttle sounds (craft_sounds.h). */
+				/* Modern port: a mod can change the shuttle sounds. */
 				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_SHUTTLE_BLAST_OFF, sourceObjIdx, 146),
 							   sourceObjIdx, (unsigned int)g_localPlayer);
 #else
@@ -3831,7 +3836,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				g_hangarShuttleState.moveSpeed = 0.0f;
 				g_hangarShuttleState.moveState = 8;
 #ifdef XWA_MODERN
-				/* Modern port: a mod's shuttle sounds (craft_sounds.h). */
+				/* Modern port: a mod can change the shuttle sounds. */
 				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_SHUTTLE_SHUT_DOWN, sourceObjIdx, 148),
 							   sourceObjIdx, (unsigned int)g_localPlayer);
 				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_ENGINE_SLOWING, sourceObjIdx, 131),
@@ -4039,7 +4044,7 @@ void Hangar_UpdateShuttleTrafficCycle(int dtTicks) {
 				g_hangarShuttleState.moveSpeed = 0.0f;
 				g_hangarShuttleState.moveState = 8;
 #ifdef XWA_MODERN
-				/* Modern port: a mod's shuttle sounds (craft_sounds.h). */
+				/* Modern port: a mod can change the shuttle sounds. */
 				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_SHUTTLE_SHUT_DOWN, sourceObjIdx, 148),
 							   sourceObjIdx, (unsigned int)g_localPlayer);
 				fsfx_PlaySound(XwaCraftSounds_Hangar(XWA_SOUND_BANK_ENGINE_SLOWING, sourceObjIdx, 131),

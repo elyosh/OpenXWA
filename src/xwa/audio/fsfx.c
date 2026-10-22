@@ -357,9 +357,9 @@ int fsfx_LoadSfxList(char* fileName, int baseSoundId, const char* waveDir) {
 			}
 
 #ifdef XWA_MODERN
-			/* Modern port: both variants of the fly-by sounds load, because a
-			   mod's model can pick either one (craft_sounds.h). The game picks
-			   the variant that fits the sound mode, as before. */
+			/* Modern port: load both variants of the fly-by sounds, because a
+			   mod's model can choose either one. Without that,
+			   the game still picks the variant for the current sound mode. */
 #else
 			if (!g_sound3DEnabled) {
 				switch (sfxSlot) {
@@ -425,9 +425,9 @@ int fsfx_LoadSfxList(char* fileName, int baseSoundId, const char* waveDir) {
 												   (uint16_t)minDistanceOrRolloff)) {
 					g_sfxIds[sfxSlot] = 0;
 #ifdef XWA_MODERN
-					/* Modern port: the tables have entries for slots 0 to 195 only.
-					   The stock code writes past their end for a later slot whose
-					   list has a volume or a distance column. */
+					/* Modern port: the tables only have entries for slots 0 to 195.
+					   The stock code writes past their end when a list loaded at
+					   slot 196 or later has a volume or distance column. */
 					if (explicitDistanceSeen && sfxSlot < 196u) {
 						g_fsfxMinDistanceOrRolloffBySfxSlot[sfxSlot] = (uint16_t)minDistanceOrRolloff;
 					}
@@ -1920,8 +1920,8 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 	ObjectRecord* objectTable;
 	CraftData* craft;
 #ifdef XWA_MODERN
-	/* Modern port: the whole object type, since a mod's sounds are by object
-	   type (craft_sounds.h). */
+	/* Modern port: keep the whole object type, because a mod chooses its
+	   sounds by object type. */
 	unsigned int objectType;
 #else
 	uint8_t objectType;
@@ -2032,7 +2032,7 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 				break;
 		}
 #ifdef XWA_MODERN
-		/* Modern port: a mod's engine sounds (craft_sounds.h). */
+		/* Modern port: a mod can change the engine sounds. */
 		XwaCraftSounds_Interior(objectType, &engineSlot, &baseFrequency, &useHighQualityStep);
 #endif
 	}
@@ -2060,7 +2060,7 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 				}
 
 #ifdef XWA_MODERN
-				/* Modern port: a sound bank slot has its own volume (sound_banks.h). */
+				/* Modern port: a sound bank slot has its own volume. */
 				volume = ((uint32_t)configVolume * (uint32_t)(engineSlot >= XWA_SOUND_BANKS_FIRST_SLOT
 																  ? XwaSoundBanks_Volume(engineSlot)
 																  : g_fsfxBaseVolumeBySfxSlot[engineSlot])) >>
@@ -2166,7 +2166,7 @@ void fsfx_UpdatePlayerEngineLoop(void) {
 		}
 
 #ifdef XWA_MODERN
-		/* Modern port: a mod's engine sounds (craft_sounds.h). */
+		/* Modern port: a mod can change the engine sounds. */
 		XwaCraftSounds_Interior((unsigned int)g_playerEngineLoopObjectType, &engineSlot, &baseFrequency,
 								&useHighQualityStep);
 		if (engineSlot == -1) {
@@ -2411,7 +2411,7 @@ void fsfx_UpdateFlightSfx(void) {
 			sfxSlot = SFX_ENGINE_WASH_OTHER;
 		}
 #ifdef XWA_MODERN
-		/* Modern port: a mod's wash sounds (craft_sounds.h). */
+		/* Modern port: a mod can change the wash sounds. */
 		sfxSlot = XwaCraftSounds_Wash(objectType, sfxSlot);
 #endif
 
@@ -2426,7 +2426,7 @@ void fsfx_UpdateFlightSfx(void) {
 
 #ifdef XWA_MODERN
 		/* Modern port: a silent bank slot counts as playing once it has
-		   started, so the message comes once per wash (craft_sounds.h). */
+		   started, so the message shows once per wash. */
 		if (!XwaCraftSounds_WashPlaying(sfxSlot)) {
 			msg_emitInFlightMessage(MSG_ENGINE_WASH_DAMAGE, g_localPlayer);
 			Sound_QueueEffect(g_sfxIds[sfxSlot], 1, 1, scaledVolume, 65, 64, -1, 0xffffu);
@@ -2448,7 +2448,7 @@ void fsfx_UpdateFlightSfx(void) {
 			Sound_StopOldestInstance(g_sfxIds[SFX_ENGINE_WASH_OTHER]);
 		}
 #ifdef XWA_MODERN
-		/* Modern port: also stops a mod's wash sound (craft_sounds.h). */
+		/* Modern port: also stop a mod's wash sound. */
 		XwaCraftSounds_StopWash();
 #endif
 	}
@@ -2571,7 +2571,7 @@ void fsfx_UpdateFlightSfx(void) {
 				break;
 		}
 #ifdef XWA_MODERN
-		/* Modern port: a mod's fly-by sounds (craft_sounds.h). */
+		/* Modern port: a mod can change the fly-by sounds. */
 		sfxSlot = (uint16_t)XwaCraftSounds_FlyBy(objectType, sfxSlot == 0xffffu ? -1 : sfxSlot);
 #endif
 		if (sfxSlot == 0xffffu) {
@@ -3031,7 +3031,7 @@ int fsfx_triggerweaponsfx(unsigned int sourceObjIdx, unsigned int playerIdx) {
 	{
 		int sfxSlot;
 
-		/* Modern port: a mod's weapon sounds (craft_sounds.h). */
+		/* Modern port: a mod can change the weapon sounds. */
 		if (XwaCraftSounds_Weapon(sourceObjIdx, &sfxSlot)) {
 			return sfxSlot != -1 ? fsfx_PlaySound(sfxSlot, (uint16_t)sourceObjIdx, playerIdx) : 0;
 		}
@@ -3115,7 +3115,7 @@ unsigned int fsfx_ComputeSourceVolume(unsigned int sourceObjOrPointRef, unsigned
 		}
 
 #ifdef XWA_MODERN
-		/* Modern port: a sound bank slot has its own volume (sound_banks.h). */
+		/* Modern port: a sound bank slot has its own volume. */
 		if (sfxSlot >= XWA_SOUND_BANKS_FIRST_SLOT) {
 			baseVolume = XwaSoundBanks_Volume(sfxSlot);
 		} else
@@ -3147,8 +3147,7 @@ unsigned int fsfx_ComputeDistanceVolume(int dx, int dy, int dz, unsigned int sfx
 	unsigned int result;
 
 #ifdef XWA_MODERN
-	/* Modern port: a sound bank slot has its own volume and distance
-	   (sound_banks.h). */
+	/* Modern port: a sound bank slot has its own volume and distance. */
 	if (sfxSlot >= XWA_SOUND_BANKS_FIRST_SLOT) {
 		minDistance = XwaSoundBanks_Distance(sfxSlot);
 		baseVolume = XwaSoundBanks_Volume(sfxSlot);
@@ -3168,8 +3167,8 @@ unsigned int fsfx_ComputeDistanceVolume(int dx, int dy, int dz, unsigned int sfx
 		unsigned int maxSound3DDistance;
 
 #ifdef XWA_MODERN
-		/* Modern port: the stock code reads the distance table past its end
-		   for slots from 196 on. These slots use minDistance. */
+		/* Modern port: for slots 196 and up, the stock code reads past the
+		   end of the distance table. Use minDistance for these slots. */
 		remainingSound3DDistance =
 			sfxSlot < 196u ? g_fsfxMinDistanceOrRolloffBySfxSlot[sfxSlot] : minDistance;
 		maxSound3DDistance = 2 * remainingSound3DDistance;

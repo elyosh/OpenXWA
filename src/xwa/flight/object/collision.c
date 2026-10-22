@@ -2875,7 +2875,7 @@ void collide_ConvertObjectToExplosion(unsigned int objIdx, ObjectTypeId explosio
 
 	if (playSfxAndFeedback) {
 #ifdef XWA_MODERN
-		/* Modern port: a mod's explosion sounds (craft_sounds.h). */
+		/* Modern port: a mod can change the explosion sounds. */
 		fsfx_PlaySound(XwaCraftSounds_Explosion(objIdx, fsfx_PickRandomSmallExplosionSfx()), objIdx,
 					   (unsigned int)g_localPlayer);
 #else
@@ -4144,7 +4144,7 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 		uint16_t destroyedType = g_objectTable[targetObjIdx].objectType;
 		ForceFeedback_PlayProximityEffectForObject(1, targetObjIdx);
 #ifdef XWA_MODERN
-		/* Modern port: a mod's explosion sounds (craft_sounds.h). */
+		/* Modern port: a mod can change the explosion sounds. */
 		fsfx_PlaySound(XwaCraftSounds_Explosion(targetObjIdx, fsfx_PickRandomSmallExplosionSfx()),
 					   targetObjIdx, g_localPlayer);
 #else
@@ -5684,7 +5684,7 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 				}
 				ForceFeedback_PlayProximityEffectForObject(1, effectSlot);
 #ifdef XWA_MODERN
-				/* Modern port: a mod's explosion sounds (craft_sounds.h). */
+				/* Modern port: a mod can change the explosion sounds. */
 				fsfx_PlaySound(XwaCraftSounds_Explosion(effectSlot, fsfx_PickRandomSmallExplosionSfx()),
 							   effectSlot, g_localPlayer);
 #else
@@ -5979,7 +5979,7 @@ void static_laserhitstatic(unsigned int sourceObjIdx, unsigned int staticObjIdx,
 			return;
 		}
 #ifdef XWA_MODERN
-		/* Modern port: a mod's explosion sounds (craft_sounds.h). */
+		/* Modern port: a mod can change the explosion sounds. */
 		fsfx_PlaySound(XwaCraftSounds_Explosion(sourceObjIdx, fsfx_PickRandomSmallExplosionSfx()),
 					   sourceObjIdx, g_localPlayer);
 #else

@@ -1,8 +1,8 @@
 #ifndef XWA_RUNTIME_AUDIO_SOUND_BANKS_H
 #define XWA_RUNTIME_AUDIO_SOUND_BANKS_H
 
-/* A mod's sound banks: sets of sounds picked by object type, such as each
- * craft's engine or weapon sounds. flight/sounds.yaml lists them:
+/* Sound banks are lists of sounds that a mod gives each object type, such as
+ * a craft's engine or weapon sounds. They are listed in flight/sounds.yaml:
  *
  *   version: 1
  *   banks:
@@ -20,21 +20,22 @@
  *       sounds:
  *         map_exit: {file: ...}
  *
- * `count` is the bank's number of entries. An entry within the count that
- * has no sound is silent. The banks and their entries are listed with
- * XwaSoundBank below. `volume` (0 to 127, 127 by default) and `distance` (the
- * 3D sound distance, 8192 by default) work like the columns of the game's
+ * `count` is the number of entries in the bank. If an entry below the count
+ * has no sound, it is silent. XwaSoundBank below lists the banks and how
+ * their entries are numbered. `volume` (0 to 127, default 127) and `distance`
+ * (the 3D sound distance, default 8192) work like the columns of the game's
  * .lst files.
  *
- * Each bank entry has a sound effect slot from 2872 on, past the game's
- * slots, so the game's sound functions play it like any other slot. A
- * bank's sounds load at flight start with the game's sound effects, but only
- * those of the object types that the mission's flight groups use. Another
- * entry loads the first time it is asked for. The banks load with the sound
- * effect settings, whatever the voice setting.
+ * Each bank entry gets its own sound effect slot. These slots start at 2872,
+ * after the game's own slots, so the game's sound functions can play them
+ * like any other slot.
  *
- * Nothing plays the banks yet: the functions that pick a craft's sounds come
- * next. */
+ * At flight start, the banks load the sounds of the object types that the
+ * mission's flight groups use. Any other entry loads the first time it is
+ * needed. The banks load when sound effects are on, whether voices are on or
+ * off.
+ *
+ * craft_sounds.h decides which bank entry each craft plays. */
 
 #include <stddef.h>
 #include <stdint.h>
