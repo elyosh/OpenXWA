@@ -22,7 +22,6 @@ static int GameFiles_EndsWith(const char* text, const char* suffix) {
    the mod folder can replace. */
 static int GameFiles_IsModFile(const char* path) {
 	static const char* const missionFolders[] = { "missions/", "melee/", "combat/" };
-	static const char* const voiceFolders[] = { "wave/missionvoice/", "wave/frontend/" };
 	size_t i;
 
 	for (i = 0; i < sizeof missionFolders / sizeof missionFolders[0]; ++i) {
@@ -37,12 +36,7 @@ static int GameFiles_IsModFile(const char* path) {
 	if (strcmp(path, "missions/email.txt") == 0 || strcmp(path, "frontres/cutscene/cutscene.txt") == 0) {
 		return 1;
 	}
-	for (i = 0; i < sizeof voiceFolders / sizeof voiceFolders[0]; ++i) {
-		if (strncmp(path, voiceFolders[i], strlen(voiceFolders[i])) == 0) {
-			return 1;
-		}
-	}
-	return 0;
+	return strncmp(path, "wave/", 5) == 0;
 }
 
 int XwaGameFiles_Find(AeronVfs* vfs, const char* path, char* modPath, size_t modPathSize) {

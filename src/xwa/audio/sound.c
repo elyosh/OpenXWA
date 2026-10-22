@@ -1,5 +1,6 @@
 #include "xwa/audio/sound.h"
 #ifdef XWA_MODERN
+#include "aeron/log.h"
 #include "xwa/assets/file_io.h"
 #endif
 #include "xwa/audio/fsfx.h"
@@ -20,7 +21,7 @@
 #include <string.h>
 
 // GLOBAL: XWA 0x917E80
-int g_sfxIds[2872];
+int g_sfxIds[XWA_SFX_SLOT_COUNT];
 // GLOBAL: XWA 0x91B844
 void* g_directSound;
 // GLOBAL: XWA 0x5BA994
@@ -40,7 +41,7 @@ SoundQueueEntry g_soundQueue[5];
 // GLOBAL: XWA 0x968B95
 int g_soundCount;
 // GLOBAL: XWA 0x91B850
-SoundEffectDef g_soundDefs[1536];
+SoundEffectDef g_soundDefs[XWA_SOUND_EFFECT_COUNT];
 // GLOBAL: XWA 0x91B848
 IDirectSoundBuffer* g_primarySoundBuffer;
 // GLOBAL: XWA 0x91B84C
@@ -122,7 +123,7 @@ uint8_t Sound_Init_Sound_Engine(void* hwnd) {
 	g_activeSoundCount = 0;
 	g_soundCount = 0;
 	g_nextSoundInstanceSeq = 0;
-	for (index = 0; index < 1536; ++index) {
+	for (index = 0; index < XWA_SOUND_EFFECT_COUNT; ++index) {
 		g_soundDefs[index].buffer = 0;
 		g_soundDefs[index].buffer3D = 0;
 		g_soundDefs[index].name[0] = '\0';
@@ -341,7 +342,7 @@ uint8_t Sound_Shutdown_Sound_Engine(void) {
 		return 1;
 	}
 
-	index = 1535;
+	index = XWA_SOUND_EFFECT_COUNT - 1;
 	do {
 		Sound_UnloadEffectByName(g_soundDefs[index].name);
 		--index;
@@ -357,7 +358,7 @@ uint8_t Sound_Shutdown_Sound_Engine(void) {
 
 	g_directSound = NULL;
 	g_sound3DEnabled = 0;
-	for (index = 0; index < 1536; ++index) {
+	for (index = 0; index < XWA_SOUND_EFFECT_COUNT; ++index) {
 		g_soundDefs[index].buffer = NULL;
 		g_soundDefs[index].buffer3D = NULL;
 		g_soundDefs[index].name[0] = '\0';
@@ -384,7 +385,13 @@ uint8_t Sound_LoadEffectEx(const char* fileName, const char* name, int create3DF
 	if (fileName[0] == '\0' || name[0] == '\0') {
 		return 0;
 	}
-	if (g_soundCount >= 1536 || g_directSound == NULL) {
+	if (g_soundCount >= XWA_SOUND_EFFECT_COUNT || g_directSound == NULL) {
+#ifdef XWA_MODERN
+		if (g_directSound != NULL) {
+			Aeron_LogWarn("xwa.audio", "%s: not loaded, the game has %d sound effects already", fileName,
+						  XWA_SOUND_EFFECT_COUNT);
+		}
+#endif
 		return 0;
 	}
 
@@ -451,7 +458,7 @@ uint8_t Sound_LoadEffect(const char* fileName, const char* name, uint16_t minDis
 void Sound_UnloadAllEffects(void) {
 	int defIndex;
 
-	defIndex = 1535;
+	defIndex = XWA_SOUND_EFFECT_COUNT - 1;
 	do {
 		Sound_UnloadEffectByName(g_soundDefs[defIndex].name);
 		--defIndex;

@@ -25,6 +25,7 @@
 #include "xwa/util/string.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -416,12 +417,24 @@ int fsfx_LoadSfxList(char* fileName, int baseSoundId, const char* waveDir) {
 				if (shouldLoad && Sound_LoadEffect(g_fsfxSfxLoadPath, g_fsfxSfxNameTable[sfxSlot],
 												   (uint16_t)minDistanceOrRolloff)) {
 					g_sfxIds[sfxSlot] = 0;
+#ifdef XWA_MODERN
+					/* Modern port: the tables have entries for slots 0 to 195 only.
+					   The stock code writes past their end for a later slot whose
+					   list has a volume or a distance column. */
+					if (explicitDistanceSeen && sfxSlot < 196u) {
+						g_fsfxMinDistanceOrRolloffBySfxSlot[sfxSlot] = (uint16_t)minDistanceOrRolloff;
+					}
+					if (explicitVolumeSeen && sfxSlot < 196u) {
+						g_fsfxBaseVolumeBySfxSlot[sfxSlot] = baseVolume;
+					}
+#else
 					if (explicitDistanceSeen) {
 						g_fsfxMinDistanceOrRolloffBySfxSlot[sfxSlot] = (uint16_t)minDistanceOrRolloff;
 					}
 					if (explicitVolumeSeen) {
 						g_fsfxBaseVolumeBySfxSlot[sfxSlot] = baseVolume;
 					}
+#endif
 				}
 			}
 
@@ -3033,7 +3046,13 @@ unsigned int fsfx_ComputeSourceVolume(unsigned int sourceObjOrPointRef, unsigned
 			interiorVolume = 13u * interiorVolume;
 		}
 
-		if (sfxSlot < 196u) {
+#ifdef XWA_MODERN
+		/* Modern port: a sound bank slot has its own volume (sound_banks.h). */
+		if (sfxSlot >= XWA_SOUND_BANKS_FIRST_SLOT) {
+			baseVolume = XwaSoundBanks_Volume(sfxSlot);
+		} else
+#endif
+			if (sfxSlot < 196u) {
 			baseVolume = g_fsfxBaseVolumeBySfxSlot[sfxSlot];
 		} else {
 			baseVolume = g_fsfxDefaultBaseVolume;
@@ -3059,7 +3078,15 @@ unsigned int fsfx_ComputeDistanceVolume(int dx, int dy, int dz, unsigned int sfx
 	unsigned int distance;
 	unsigned int result;
 
-	if (sfxSlot >= 196u) {
+#ifdef XWA_MODERN
+	/* Modern port: a sound bank slot has its own volume and distance
+	   (sound_banks.h). */
+	if (sfxSlot >= XWA_SOUND_BANKS_FIRST_SLOT) {
+		minDistance = XwaSoundBanks_Distance(sfxSlot);
+		baseVolume = XwaSoundBanks_Volume(sfxSlot);
+	} else
+#endif
+		if (sfxSlot >= 196u) {
 		minDistance = 0x2000;
 		baseVolume = 112;
 	} else {
@@ -3072,8 +3099,16 @@ unsigned int fsfx_ComputeDistanceVolume(int dx, int dy, int dz, unsigned int sfx
 		unsigned int remainingSound3DDistance;
 		unsigned int maxSound3DDistance;
 
+#ifdef XWA_MODERN
+		/* Modern port: the stock code reads the distance table past its end
+		   for slots from 196 on. These slots use minDistance. */
+		remainingSound3DDistance =
+			sfxSlot < 196u ? g_fsfxMinDistanceOrRolloffBySfxSlot[sfxSlot] : minDistance;
+		maxSound3DDistance = 2 * remainingSound3DDistance;
+#else
 		maxSound3DDistance = 2 * g_fsfxMinDistanceOrRolloffBySfxSlot[sfxSlot];
 		remainingSound3DDistance = g_fsfxMinDistanceOrRolloffBySfxSlot[sfxSlot];
+#endif
 		if (distance > maxSound3DDistance) {
 			return 0;
 		}

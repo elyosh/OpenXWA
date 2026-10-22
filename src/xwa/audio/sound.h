@@ -123,7 +123,18 @@ typedef char active_sound_instance_buffer_offset[(offsetof(ActiveSoundInstance, 
 typedef char sound_queue_entry_size[(sizeof(SoundQueueEntry) == 0x2D) ? 1 : -1];
 typedef char sound_queue_entry_priority_offset[(offsetof(SoundQueueEntry, priority) == 0x14) ? 1 : -1];
 
-extern int                 g_sfxIds[2872];
+#ifdef XWA_MODERN
+/* Modern port: the slots from 2872 on belong to a mod's sound banks
+   (xwa_runtime/audio/sound_banks.h), and the banks need more effects.
+   Effects are runtime state only. */
+#define XWA_SFX_SLOT_COUNT (2872 + 16384)
+#define XWA_SOUND_EFFECT_COUNT 4096
+#else
+#define XWA_SFX_SLOT_COUNT 2872
+#define XWA_SOUND_EFFECT_COUNT 1536
+#endif
+
+extern int g_sfxIds[XWA_SFX_SLOT_COUNT];
 extern const int           g_directSoundVolumeMillibelTable[128];
 extern void*               g_directSound;
 extern int                 g_maxActiveSounds;
@@ -134,7 +145,7 @@ extern uint8_t             g_sound3DEnabled;
 extern ActiveSoundInstance g_activeSoundInstances[32];
 extern SoundQueueEntry     g_soundQueue[5];
 extern int                 g_soundCount;
-extern SoundEffectDef      g_soundDefs[1536];
+extern SoundEffectDef g_soundDefs[XWA_SOUND_EFFECT_COUNT];
 extern IDirectSoundBuffer*     g_primarySoundBuffer;
 extern IDirectSound3DListener* g_sound3DListener;
 extern uint8_t                 g_soundHardware3DBuffersAvailable;

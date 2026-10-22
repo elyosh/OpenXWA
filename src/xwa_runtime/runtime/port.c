@@ -21,6 +21,7 @@
 #include "xwa/render/renderer.h"
 #include "xwa/util/memory.h"
 #include "xwa/xwa_options.h"
+#include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
@@ -154,6 +155,7 @@ int XwaPort_Init(void) {
 	XwaCraftWeapons_Init();
 	XwaShieldRecharge_Init();
 	XwaWeaponRates_Init();
+	XwaSoundBanks_Init();
 	if (SpriteResource_LoadCatalog("Resdata.txt") != 0) {
 		Aeron_LogError("xwa.assets", "Failed to load required sprite catalog 'Resdata.txt'");
 	}

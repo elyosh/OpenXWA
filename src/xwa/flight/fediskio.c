@@ -34,6 +34,7 @@
 #include "xwa_runtime/models/cockpit_eye.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/geometry_textures.h"
@@ -107,6 +108,11 @@ char FeDiskIo_LoadFlightSfxBanks(void) {
 
 			strcat(fileName, "SfxBlastNew.lst");
 			fsfx_LoadSfxList(fileName, 4, waveDir);
+#ifdef XWA_MODERN
+			/* Modern port: a mod's sound banks (sound_banks.h). */
+			XwaSoundBanks_LoadFlight(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
+									 (int16_t)g_missionHeader.numFlightGroups);
+#endif
 
 			if (g_flightPlayerCount == 1 && g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR) {
 				strcpy(fileName, baseWaveDir);

@@ -14,12 +14,11 @@ extern "C" {
 
 /* The mod folder's game/ folder holds files with the same paths as in the
    game folder. A file there replaces the game's file with the same path,
-   found in any case. Only the files that come with a mod's missions are
-   looked for there:
+   found in any case. Only these files are looked for there:
    - the mission files, MISSIONS/, MELEE/ and COMBAT/<mission>.TIE;
    - the mission lists, <same folders>/MISSION.LST, and MISSIONS/EMAIL.TXT;
-   - the mission voices, WAVE/MISSIONVOICE/...;
-   - the briefing, debriefing and concourse voices, WAVE/FRONTEND/...;
+   - the sounds, WAVE/...: the mission voices, the briefing, debriefing and
+	 concourse voices, and the sound banks (xwa_runtime/audio/sound_banks.h);
    - the cutscene table, FRONTRES/CUTSCENE/CUTSCENE.TXT.
 
    Returns 1 when the mod folder has a copy of game file `path`, and writes
