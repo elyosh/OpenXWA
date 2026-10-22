@@ -8389,28 +8389,31 @@ static __inline int FlightAction_TargetComponentSelectable(ObjectTypeId objectTy
 														   CraftData const* targetCraft,
 														   uint16_t componentIdx) {
 	MeshType meshType;
+	int targetId;
+	int meshCount;
+	int meshIdx;
 	if (targetCraft->componentState[componentIdx] != 0) {
 		return 0;
 	}
 
 	meshType = ModelMesh_GetObjectTypeMeshType((uint16_t)objectType, componentIdx);
-	if (meshType != MESH_MiscHull && meshType != MESH_Antenna) {
-		int meshCount;
-		int meshIdx;
-		int targetId = ModelMesh_GetTargetId((uint16_t)objectType, componentIdx);
-		if (targetId == 0 || (targetId == 1 && meshType != 1 && meshType != 3)) {
-			return targetCraft->componentHp[componentIdx] != 0;
-		}
+	if (meshType == MESH_MiscHull || meshType == MESH_Antenna) {
+		return 0;
+	}
 
-		meshCount = ModelMesh_GetObjectTypeMeshCount((uint16_t)objectType);
-		for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
-			if (ModelMesh_GetTargetId((uint16_t)objectType, meshIdx) == targetId &&
-				ModelMesh_GetObjectTypeMeshType((uint16_t)objectType, meshIdx) == meshType) {
-				if ((uint16_t)meshIdx != componentIdx) {
-					return 0;
-				}
-				break;
+	targetId = ModelMesh_GetTargetId((uint16_t)objectType, componentIdx);
+	if (targetId == 0 || (targetId == 1 && meshType != 1 && meshType != 3)) {
+		return targetCraft->componentHp[componentIdx] != 0;
+	}
+
+	meshCount = ModelMesh_GetObjectTypeMeshCount((uint16_t)objectType);
+	for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
+		if (ModelMesh_GetTargetId((uint16_t)objectType, meshIdx) == targetId &&
+			ModelMesh_GetObjectTypeMeshType((uint16_t)objectType, meshIdx) == meshType) {
+			if ((uint16_t)meshIdx != componentIdx) {
+				return 0;
 			}
+			break;
 		}
 	}
 
