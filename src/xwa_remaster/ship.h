@@ -105,9 +105,8 @@ int XwaRemasterShip_BuildDebrisMeshTable(const AeronSceneMesh* mesh, const XwaFl
 int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaCockpit* c,
 										  const XwaFlightObject* anchor, AeronSceneMeshTable* out);
 int XwaRemasterShip_BuildPreviousCockpitMeshTable(
-	const AeronSceneMesh* mesh, const XwaCockpit* current_cockpit,
-	const XwaFlightObject* current_anchor, const XwaCockpit* previous_cockpit,
-	const XwaFlightObject* previous_anchor, AeronSceneMeshTable* out);
+	const AeronSceneMesh* mesh, const XwaCockpit* current_cockpit, const XwaFlightObject* current_anchor,
+	const XwaCockpit* previous_cockpit, const XwaFlightObject* previous_anchor, AeronSceneMeshTable* out);
 
 /* Process-wide PBR tuning globals consumed by every lit
  * XwaRemasterShip_SetPbrEnv submit (stored in the combined PbrLightFS
@@ -137,14 +136,14 @@ void XwaRemasterShip_GetPbrTuningDefault(XwaShipPbrTuning* out);
 /* Dark back-face fill behind hairline cracks (AeronScene_SetBackfaceFill).
  * On by default; the debug inspector toggles it for comparison and
  * profiling. */
-int  XwaRemasterShip_BackfaceFill(void);
+int XwaRemasterShip_BackfaceFill(void);
 void XwaRemasterShip_SetBackfaceFill(int enabled);
 
 /* When the key light is in the probes (a hangar's ceiling light), its
  * shadow takes the probe light from its side whichever way surfaces face.
  * On by default; off, only as surfaces face the light (N.L), which the
  * debug inspector toggles for comparison. */
-int  XwaRemasterShip_KeyShadowAllSides(void);
+int XwaRemasterShip_KeyShadowAllSides(void);
 void XwaRemasterShip_SetKeyShadowAllSides(int enabled);
 
 /* With the hangar's probes, the ships inside their grid take the probe
@@ -152,22 +151,22 @@ void XwaRemasterShip_SetKeyShadowAllSides(int enabled);
  * landing gear and the reflections of the bright ceiling darken. It replaces
  * the key light shadow's cut. On by default; the debug inspector toggles it
  * for comparison. */
-int  XwaRemasterShip_ShipOcclusion(void);
+int XwaRemasterShip_ShipOcclusion(void);
 void XwaRemasterShip_SetShipOcclusion(int enabled);
 
 /* When the hangar's probes have a reflection plane, the hangar's floor
  * reflects the ships on it. On by default; the debug
  * inspector toggles it for comparison. */
-int  XwaRemasterShip_FloorReflection(void);
+int XwaRemasterShip_FloorReflection(void);
 void XwaRemasterShip_SetFloorReflection(int enabled);
 
 /* Per-frame SSAO inputs for XwaRemasterShip_SetPbrEnv (mirrors TIE's
  * FlightPbrAoParams). NULL disables AO (intensity 0): the FS leaves
  * the ambient term untouched. */
 typedef struct XwaShipAoParams {
-	float intensity;  /* 0 = off; else ambient-occlusion lerp weight */
-	float power;      /* pow(ao, power) contrast — 1 = linear */
-	float direct;     /* AO weight on direct diffuse (0 = ambient-only) */
+	float intensity; /* 0 = off; else ambient-occlusion lerp weight */
+	float power;     /* pow(ao, power) contrast — 1 = linear */
+	float direct;    /* AO weight on direct diffuse (0 = ambient-only) */
 } XwaShipAoParams;
 
 /* One punctual-light source in the classic SOURCE law's terms (world
@@ -228,7 +227,8 @@ typedef struct XwaShipEnvironmentMap {
  * dims.x/y over 2000 emits a light at its (articulated) anchor —
  * intensity dim.z x engineScale x 300, color = core color (the classic
  * range, engineScale x 16384, only selected lights); engineScale is the power margin x output scale
- * (no throttle/flicker — those belong to the glow SIZE law). Color
+ * (no throttle/flicker — those belong to the glow SIZE law). A glow in
+ * `f->eg_hidden_mask` has no light, as in XWAU. Color
  * carries the classic intensity premultiplied (linear HDR); the
  * caller applies its global scale knobs. Returns lights appended. */
 uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh, const float transform[16],
@@ -291,7 +291,9 @@ float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f);
  * layout) with uniform scale `model_scale`; `table` applies rotary-
  * mesh articulation to emitters on rotated meshes (NULL = none);
  * `knockout_mask` (8 words; NULL = none) bit N (word N >> 5) skips
- * destroyed emitter N; `scale` is the
+ * destroyed emitter N; `hidden_mask` (same layout; NULL = none) skips
+ * emitter N that the model's `engine_glows` hides at the craft's speed
+ * (XwaFlightObject.eg_hidden_mask); `scale` is the
  * classic intensity scale (EngineGlowScale / the preview's fixed
  * ~0.6 flickered base; <= 0 skips everything). `crows`/`cam_pos`
  * convert space->view for the view-dependent parts (NULL/NULL =
@@ -299,8 +301,8 @@ float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f);
 void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh* mesh,
 									   const float transform[16], float model_scale,
 									   const AeronSceneMeshTable* table, const uint32_t* knockout_mask,
-									   float scale, const float crows[9], const float cam_pos[3],
-									   const XwaAssetRef* tex);
+									   const uint32_t* hidden_mask, float scale, const float crows[9],
+									   const float cam_pos[3], const XwaAssetRef* tex);
 
 #ifdef __cplusplus
 }

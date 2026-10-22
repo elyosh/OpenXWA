@@ -1239,8 +1239,8 @@ float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f) {
 void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh* mesh,
 									   const float transform[16], float model_scale,
 									   const AeronSceneMeshTable* table, const uint32_t* knockout_mask,
-									   float scale, const float crows[9], const float cam_pos[3],
-									   const XwaAssetRef* tex) {
+									   const uint32_t* hidden_mask, float scale, const float crows[9],
+									   const float cam_pos[3], const XwaAssetRef* tex) {
 	if (!scene || !mesh || !mesh->engine_glow_count || !transform || scale <= 0.0f ||
 		s_engine_emissive_strength <= 0.0f || !tex || !tex->texture) {
 		return;
@@ -1259,7 +1259,8 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 
 	for (uint32_t gi = 0; gi < mesh->engine_glow_count; gi++) {
 		const AeronFlightEngineGlow* g = &mesh->engine_glows[gi];
-		if (!g->enabled || (knockout_mask && gi < 256 && (knockout_mask[gi >> 5] & (1u << (gi & 31))))) {
+		if (!g->enabled || (knockout_mask && gi < 256 && (knockout_mask[gi >> 5] & (1u << (gi & 31)))) ||
+			(hidden_mask && gi < 256 && (hidden_mask[gi >> 5] & (1u << (gi & 31))))) {
 			continue;
 		}
 		/* A glow is not drawn without its component (destroyed, or hidden
@@ -1514,6 +1515,10 @@ uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh
 		const float dim_y = g->dimensions.y * AERON_OPT_UNITS_PER_METER;
 		const float dim_z = g->dimensions.z * AERON_OPT_UNITS_PER_METER;
 		if (!g->enabled || (dim_x <= 2000.0f && dim_y <= 2000.0f)) {
+			continue;
+		}
+		/* Nor while the model's `engine_glows` hides the glow. */
+		if (gi < 256 && (f->eg_hidden_mask[gi >> 5] & (1u << (gi & 31)))) {
 			continue;
 		}
 		/* Nor without its component (destroyed, or hidden by an object

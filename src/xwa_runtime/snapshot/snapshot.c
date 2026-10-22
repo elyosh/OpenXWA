@@ -13,6 +13,7 @@
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
@@ -1514,6 +1515,8 @@ void XwaSnapshot_CaptureFlight(void) {
 						f->eg_knockout_mask[k->emitterIndex >> 5] |= 1u << (k->emitterIndex & 31);
 					}
 				}
+				XwaEngineGlows_HiddenMask(o->objectType, m->speed, (uint16_t)cd->aiFlight.maxSpeedCache,
+										  f->eg_hidden_mask);
 			}
 		}
 	}

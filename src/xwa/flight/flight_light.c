@@ -16,6 +16,11 @@
 #include "xwa/util/debug.h"
 #include "xwa/util/time.h"
 
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/engine_glows.h"
+#include "xwa_runtime/models/mission_settings.h"
+#endif
+
 #include <stddef.h>
 #include <string.h>
 
@@ -869,6 +874,15 @@ void FlightLight_AppendScenePointLightForObject(ObjectRecord* obj) {
 			}
 
 			craft = obj->mobj->pCraft;
+#ifdef XWA_MODERN
+			/* Modern port: the glow's light follows the glow (engine_glows.c,
+			   rules.classic_hide_destroyed_engine_glows). */
+			if ((XwaMissionSettings_ClassicHideDestroyedEngineGlows() && craft->componentHp[meshIdx] == 0) ||
+				XwaEngineGlows_Hidden((unsigned int)obj->objectType, (unsigned int)glowIdx, obj->mobj->speed,
+									  (uint16_t)craft->aiFlight.maxSpeedCache)) {
+				continue;
+			}
+#endif
 			engineScale =
 				(double)(16 - craft->laserRedirect - craft->shieldRedirect - craft->beamLevel) * 0.0625;
 			engineScale = ((float)craft->engineOutputScale * 0.000015259022f) * engineScale;

@@ -6,6 +6,7 @@
 #include "xwa/assets/object_type.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa_runtime/models/craft_hud.h"
+#include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/model_swaps.h"
 
@@ -27,6 +28,7 @@ typedef struct ModelSettingsGroup {
 
 static const ModelSettingsGroup s_groups[] = {
 	{ "hud", XwaCraftHud_ClearModelSettings, XwaCraftHud_ReadModelSettings },
+	{ "engine_glows", XwaEngineGlows_ClearModelSettings, XwaEngineGlows_ReadModelSettings },
 };
 
 /* A model file that this mission has looked for. `file` is NULL when the

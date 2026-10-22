@@ -30,12 +30,16 @@
  * in missions 49 to 52, and the player put in the turret at 0:00:08 in
  * mission 1. Without the files, the game is stock.
  *
- * flight/flight.yaml can also change two rules for every mission:
+ * flight/flight.yaml can also change rules for every mission:
  *
  *   rules:
  *     reset_combat_music_at_mission_load: true
  *     hangar_red_alert_any_mothership: true
- */
+ *     classic_hide_destroyed_engine_glows: true
+ *
+ * The last one only changes drawing: the classic renderer doesn't draw the
+ * engine glows of a destroyed or hidden mesh, nor their lights, as the HD
+ * renderer already does. */
 
 #include <stdint.h>
 
@@ -56,6 +60,7 @@ void XwaMissionSettings_LoadMission(const char* missionPath);
 /* The rules of flight/flight.yaml. */
 int XwaMissionSettings_ResetCombatMusicAtMissionLoad(void);
 int XwaMissionSettings_HangarRedAlertAnyMothership(void);
+int XwaMissionSettings_ClassicHideDestroyedEngineGlows(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);

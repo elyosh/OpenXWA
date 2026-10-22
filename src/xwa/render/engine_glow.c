@@ -4,6 +4,8 @@
 #include "xwa/render/renderer_internal.h"
 
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/engine_glows.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -2180,6 +2182,20 @@ void EngineGlow_RenderForObject(unsigned int objIdx) {
 				}
 				knockout = knockout->next;
 			}
+#ifdef XWA_MODERN
+			/* Modern port: a model's `engine_glows` hides glows by speed, and
+			   rules.classic_hide_destroyed_engine_glows skips the glows of
+			   destroyed or hidden meshes. */
+			if (drawEmitter && g_curCraft != NULL) {
+				if (XwaMissionSettings_ClassicHideDestroyedEngineGlows() &&
+					(g_curCraft->componentHp[meshIdx] == 0 || g_curCraft->componentState[meshIdx] != 0)) {
+					drawEmitter = 0;
+				} else if (XwaEngineGlows_Hidden(objectType, emitterIndex, obj->mobj->speed,
+												 (uint16_t)g_curCraft->aiFlight.maxSpeedCache)) {
+					drawEmitter = 0;
+				}
+			}
+#endif
 
 			if (drawEmitter && !glow->isDisabled) {
 				TexLevel* texLevel;

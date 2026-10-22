@@ -243,10 +243,10 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 		XwaRemasterGlowMarks_SubmitObject(s_cmd.scene, cmd, assets, snapshot, object, mesh, transform,
 										  instance.mesh_table, 1.0f);
 		if (glow_ref) {
-			XwaRemasterShip_SubmitEngineGlows(s_cmd.scene, mesh, transform, AERON_OPT_UNITS_PER_METER,
-											  instance.mesh_table, object->eg_knockout_mask,
-											  cmd_engine_glow_scale(object, snapshot->tick_index), NULL, NULL,
-											  glow_ref);
+			XwaRemasterShip_SubmitEngineGlows(
+				s_cmd.scene, mesh, transform, AERON_OPT_UNITS_PER_METER, instance.mesh_table,
+				object->eg_knockout_mask, object->eg_hidden_mask,
+				cmd_engine_glow_scale(object, snapshot->tick_index), NULL, NULL, glow_ref);
 		}
 		if (object->has_craft) {
 			const uint32_t remaining = CMD_MAX_POINT_CANDIDATES - s_cmd.point_candidate_count;

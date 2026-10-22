@@ -6,6 +6,7 @@
  *
  *   version: 1
  *   hud: {...}            # craft_hud.h
+ *   engine_glows: {...}   # engine_glows.h
  *
  * Each top-level key is a group that one module owns. This module reads the
  * files and hands each group to its module, which keeps the values it needs

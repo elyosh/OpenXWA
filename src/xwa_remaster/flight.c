@@ -3815,7 +3815,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 			fl_derive_wreck_flames(f, snapshot_index, context->assets, NULL, NULL);
 		if (s.glow_ok) {
 			XwaRemasterShip_SubmitEngineGlows(s.scene, prepared.mesh, model_matrix, AERON_OPT_UNITS_PER_METER,
-											  prepared.table, f->eg_knockout_mask,
+											  prepared.table, f->eg_knockout_mask, f->eg_hidden_mask,
 											  XwaRemasterShip_EngineGlowScale(f), s.crows, s.camera_local,
 											  &s.glow_ref);
 		}
@@ -3991,9 +3991,10 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 										  inst.mesh_table, s.glow_mark_emissive_strength);
 	}
 	if (s.glow_ok && player_f) {
-		XwaRemasterShip_SubmitEngineGlows(
-			s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER, inst.mesh_table, player_f->eg_knockout_mask,
-			XwaRemasterShip_EngineGlowScale(player_f), s.crows, s.camera_local, &s.glow_ref);
+		XwaRemasterShip_SubmitEngineGlows(s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER,
+										  inst.mesh_table, player_f->eg_knockout_mask,
+										  player_f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(player_f),
+										  s.crows, s.camera_local, &s.glow_ref);
 	}
 }
 
@@ -5293,10 +5294,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			/* State-derived engine glows for this craft (classic scale
 			 * gates — no craft / dead subsystems — return 0 and skip). */
 			if (s.glow_ok) {
-				XwaRemasterShip_SubmitEngineGlows(s.scene, prepared.mesh, model_matrix,
-												  AERON_OPT_UNITS_PER_METER, inst.mesh_table,
-												  f->eg_knockout_mask, XwaRemasterShip_EngineGlowScale(f),
-												  s.crows, s.camera_local, &s.glow_ref);
+				XwaRemasterShip_SubmitEngineGlows(
+					s.scene, prepared.mesh, model_matrix, AERON_OPT_UNITS_PER_METER, inst.mesh_table,
+					f->eg_knockout_mask, f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(f), s.crows,
+					s.camera_local, &s.glow_ref);
 			}
 			/* Capital engine glows double as point lights (the classic
 			 * modelIndex branch: raw dims over 2000 only). */
@@ -5417,10 +5418,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * when internal + cockpit visible), scale/knockouts from
 			 * the PLAYER craft's state. */
 			if (s.glow_ok && player_f) {
-				XwaRemasterShip_SubmitEngineGlows(s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER,
-												  inst.mesh_table, player_f->eg_knockout_mask,
-												  XwaRemasterShip_EngineGlowScale(player_f), s.crows,
-												  s.camera_local, &s.glow_ref);
+				XwaRemasterShip_SubmitEngineGlows(
+					s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER, inst.mesh_table,
+					player_f->eg_knockout_mask, player_f->eg_hidden_mask,
+					XwaRemasterShip_EngineGlowScale(player_f), s.crows, s.camera_local, &s.glow_ref);
 			}
 		}
 	}
