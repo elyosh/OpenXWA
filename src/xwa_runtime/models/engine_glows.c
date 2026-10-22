@@ -98,7 +98,7 @@ void XwaEngineGlows_ReadModelSettings(unsigned int objectType, const char* path,
 			!EngineGlows_ReadLimit(path, key, entry, "min_speed_mglt", ENGINE_GLOWS_MAX_MGLT, &mglt)) {
 			continue;
 		}
-		/* XWAU's limit is (int)(mglt * 2.25f + 0.5f) raw units. */
+		/* The limit is (int)(mglt * 2.25f + 0.5f) raw units, in integers. */
 		rule.minSpeed = mglt != 0 ? (9 * mglt + 2) / 4 : 0;
 		if (rule.minPercent != 0 || rule.minSpeed != 0) {
 			type->rules[type->count++] = rule;
@@ -106,7 +106,7 @@ void XwaEngineGlows_ReadModelSettings(unsigned int objectType, const char* path,
 	}
 }
 
-/* XWAU's rule. The hook reads both speeds as signed 16-bit values. */
+/* Both speeds are read as signed 16-bit values. */
 static int EngineGlows_RuleHides(const EngineGlowRule* rule, int speed, int maxSpeed) {
 	const int speedPercent = speed * 100 / maxSpeed;
 

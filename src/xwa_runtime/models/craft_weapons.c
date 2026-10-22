@@ -135,8 +135,8 @@ static void CraftWeapons_ReadSet(const char* path, const char* where, const Aero
 	}
 }
 
-/* The markings of a bolt of weapon index `weapon`, as in XWAU: the value
-   for any markings, then the markings value's default and own value. */
+/* The markings of a bolt of weapon index `weapon`: the value for any
+   markings, then the markings value's default and own value. */
 static uint8_t CraftWeapons_Variant(const CraftWeaponsType* type, const WeaponColorSet* byMarkings,
 									int weapon) {
 	int variant = type->colors.variant[weapon];

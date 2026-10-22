@@ -7,6 +7,7 @@
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/mission_settings.h"
+#include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -1636,9 +1637,17 @@ void GlowMark_QueueCraftDamageSurfaceEffects(uint16_t objectIndex) {
 	}
 
 	craft = g_objectTable[objectIndex].mobj->pCraft;
+#ifdef XWA_MODERN
+	/* Modern port: the craft's stats profile (stats_profiles.h). */
+	if (((craft->workingSubsystems == 0 && craft->subsystemDamage != 0) ||
+		 craft->subsystemDamage > XwaStatsProfiles_Value(objectIndex, XWA_STATS_SYSTEM_STRENGTH,
+														 g_modelDefs[craft->modelDefIndex].systemStrength)) &&
+		(GameRand2() & 0x0f) != 0) {
+#else
 	if (((craft->workingSubsystems == 0 && craft->subsystemDamage != 0) ||
 		 craft->subsystemDamage > g_modelDefs[craft->modelDefIndex].systemStrength) &&
 		(GameRand2() & 0x0f) != 0) {
+#endif
 		float scale;
 
 		scale = g_glowMarkSurfaceEffectBaseScale -

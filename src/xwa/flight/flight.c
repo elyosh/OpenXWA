@@ -62,6 +62,7 @@
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
+#include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -5031,6 +5032,18 @@ void Flight_SlewObjectSpeedTowardTarget(int objectIdx, int targetSpeed, int allo
 		uint16_t fracDelta;
 		uint16_t oldRemainder;
 
+#ifdef XWA_MODERN
+		/* Modern port: the craft's stats profile (stats_profiles.h). */
+		const uint16_t accelRate =
+			(uint16_t)XwaStatsProfiles_Value((unsigned int)objectIdx, XWA_STATS_ACCELERATION,
+											 g_modelDefs[(uint16_t)g_curCraftModelIndex.packed].accelRate);
+
+		step = (uint16_t)MATH2_fraction(accelRate, 0x4000u);
+		if (step == 0) {
+			step = 1;
+		}
+		step += (uint16_t)MATH2_fraction((uint16_t)(accelRate - step), (uint16_t)fracQ16);
+#else
 		step =
 			(uint16_t)MATH2_fraction(g_modelDefs[(uint16_t)g_curCraftModelIndex.packed].accelRate, 0x4000u);
 		if (step == 0) {
@@ -5039,6 +5052,7 @@ void Flight_SlewObjectSpeedTowardTarget(int objectIdx, int targetSpeed, int allo
 		step += (uint16_t)MATH2_fraction(
 			(uint16_t)(g_modelDefs[(uint16_t)g_curCraftModelIndex.packed].accelRate - step),
 			(uint16_t)fracQ16);
+#endif
 		mobj = g_objectTable[objectIdx].mobj;
 		if (mobj->pCraft->slamActive != 0) {
 			step *= 3;
@@ -5054,7 +5068,14 @@ void Flight_SlewObjectSpeedTowardTarget(int objectIdx, int targetSpeed, int allo
 		oldRemainder = mobj->speedRemainder;
 		mobj->speedRemainder = (uint16_t)(oldRemainder + fracDelta);
 		if (g_objectTable[objectIdx].mobj->speedRemainder < oldRemainder) {
+#ifdef XWA_MODERN
+			/* Modern port: the craft's stats profile (stats_profiles.h). */
+			g_objectTable[objectIdx].mobj->speed =
+				(uint16_t)(g_objectTable[objectIdx].mobj->speed +
+						   XwaStatsProfiles_Value((unsigned int)objectIdx, XWA_STATS_SPEED_INCREMENT, 1));
+#else
 			++g_objectTable[objectIdx].mobj->speed;
+#endif
 		}
 
 		g_objectTable[objectIdx].mobj->speed = (uint16_t)(g_objectTable[objectIdx].mobj->speed + wholeDelta);
@@ -5068,6 +5089,18 @@ void Flight_SlewObjectSpeedTowardTarget(int objectIdx, int targetSpeed, int allo
 		uint16_t fracDelta;
 		uint16_t oldRemainder;
 
+#ifdef XWA_MODERN
+		/* Modern port: the craft's stats profile (stats_profiles.h). */
+		const uint16_t decelRate =
+			(uint16_t)XwaStatsProfiles_Value((unsigned int)objectIdx, XWA_STATS_DECELERATION,
+											 g_modelDefs[(uint16_t)g_curCraftModelIndex.packed].decelRate);
+
+		step = (uint16_t)MATH2_fraction(decelRate, 0x4000u);
+		if (step == 0) {
+			step = 1;
+		}
+		step += (uint16_t)MATH2_fraction((uint16_t)(decelRate - step), (uint16_t)(0xffffu - fracQ16));
+#else
 		step =
 			(uint16_t)MATH2_fraction(g_modelDefs[(uint16_t)g_curCraftModelIndex.packed].decelRate, 0x4000u);
 		if (step == 0) {
@@ -5076,6 +5109,7 @@ void Flight_SlewObjectSpeedTowardTarget(int objectIdx, int targetSpeed, int allo
 		step += (uint16_t)MATH2_fraction(
 			(uint16_t)(g_modelDefs[(uint16_t)g_curCraftModelIndex.packed].decelRate - step),
 			(uint16_t)(0xffffu - fracQ16));
+#endif
 
 		speedDelta = -speedDelta;
 		if (speedDelta >= step) {
@@ -5089,7 +5123,14 @@ void Flight_SlewObjectSpeedTowardTarget(int objectIdx, int targetSpeed, int allo
 		oldRemainder = g_objectTable[objectIdx].mobj->speedRemainder;
 		g_objectTable[objectIdx].mobj->speedRemainder = (uint16_t)(oldRemainder - fracDelta);
 		if (g_objectTable[objectIdx].mobj->speedRemainder > oldRemainder) {
+#ifdef XWA_MODERN
+			/* Modern port: the craft's stats profile (stats_profiles.h). */
+			g_objectTable[objectIdx].mobj->speed =
+				(uint16_t)(g_objectTable[objectIdx].mobj->speed -
+						   XwaStatsProfiles_Value((unsigned int)objectIdx, XWA_STATS_SPEED_DECREMENT, 1));
+#else
 			--g_objectTable[objectIdx].mobj->speed;
+#endif
 		}
 
 		g_objectTable[objectIdx].mobj->speed = (uint16_t)(g_objectTable[objectIdx].mobj->speed - wholeDelta);
@@ -7817,7 +7858,13 @@ static __inline void FlightAction_TransferLasersToShields(unsigned int playerIdx
 		return;
 	}
 
+#ifdef XWA_MODERN
+	/* Modern port: the craft's stats profile (stats_profiles.h). */
+	maxShield = 2 * XwaStatsProfiles_Value((unsigned int)(obj - g_objectTable), XWA_STATS_SHIELDS,
+										   g_modelDefs[(uint16_t)modelIndex].shieldStrength);
+#else
 	maxShield = 2 * g_modelDefs[(uint16_t)modelIndex].shieldStrength;
+#endif
 	shieldDeficit = 2 * maxShield - craft->shieldFront - craft->shieldRear;
 	if (shieldDeficit < 0) {
 		shieldDeficit = 0;
@@ -9285,8 +9332,17 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 						if (craft->shieldDistribMode == 1) {
 							int maxShield = Craft_GetObjectMaxShield(
 								(unsigned short)g_players[currentPlayerIdx].objectIndex);
+#ifdef XWA_MODERN
+							/* Modern port: the craft's stats profile (stats_profiles.h). */
+							uint16_t shieldScale = (uint16_t)MATH2_percentage(
+								(uint32_t)XwaStatsProfiles_Value(
+									(uint16_t)objIdx, XWA_STATS_SHIELDS,
+									g_modelDefs[(uint16_t)modelIndex].shieldStrength),
+								(uint32_t)maxShield);
+#else
 							uint16_t shieldScale = (uint16_t)MATH2_percentage(
 								g_modelDefs[(uint16_t)modelIndex].shieldStrength, (uint32_t)maxShield);
+#endif
 							int totalShield =
 								(int16_t)((uint16_t)craft->shieldFront + (uint16_t)craft->shieldRear);
 							if (totalShield > 0) {

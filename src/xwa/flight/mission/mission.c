@@ -50,6 +50,7 @@
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/skins.h"
+#include "xwa_runtime/models/stats_profiles.h"
 #endif
 
 #include <locale.h>
@@ -2355,7 +2356,14 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 
 								craft = object->mobj->pCraft;
 								matchesCondition = 0;
+#ifdef XWA_MODERN
+								/* Modern port: the craft's stats profile (stats_profiles.h). */
+								maxShield = 2 * XwaStatsProfiles_Value(
+													objectIdx, XWA_STATS_SHIELDS,
+													g_modelDefs[craft->modelDefIndex].shieldStrength);
+#else
 								maxShield = 2 * g_modelDefs[craft->modelDefIndex].shieldStrength;
+#endif
 								if (condition == MISSION_COND_SHIELDS_DEPLETED) {
 									if (craft->shieldFront + craft->shieldRear <= 0) {
 										matchesCondition = 1;
@@ -6591,9 +6599,13 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 
 	if (modelIndex != 0xFFFF) {
 		// Hyperdrive availability.
+#ifndef XWA_MODERN
+		/* Modern port: XwaStatsProfiles_ApplyNewCraft removes the hyperdrive at
+		   the end, with the craft's stats profile. */
 		if (!g_modelDefs[modelIndex].hasHyperdrive && g_spawnStatus1 != 9 && g_spawnStatus2 != 9 &&
 			g_spawnStatus1 != 16 && g_spawnStatus2 != 16)
 			g_curCraft->systemFlags ^= 0x80;
+#endif
 		if (g_spawnStatus1 == 6 || g_spawnStatus2 == 6)
 			g_curCraft->systemFlags ^= 0x80;
 
@@ -6632,6 +6644,9 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			g_curCraft->shieldRear *= 2;
 		}
 		g_curCraft->shieldRedirect = 2;
+#ifndef XWA_MODERN
+		/* Modern port: XwaStatsProfiles_ApplyNewCraft removes the shields at the
+		   end, with the craft's stats profile. */
 		if (!g_modelDefs[modelIndex].hasShields && g_spawnStatus1 != 8 && g_spawnStatus2 != 8 &&
 			g_spawnStatus1 != 16 && g_spawnStatus2 != 16) {
 			g_curCraft->systemFlags ^= 1;
@@ -6639,6 +6654,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			g_curCraft->shieldRear = 0;
 			g_curCraft->installedHudFeatureMask ^= 0x800;
 		}
+#endif
 
 		// Beam weapon.
 		g_curCraft->beamTypeId = g_missionFlightGroups[g_currentFlightGroupIdx].fg.beam;
@@ -6999,6 +7015,10 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			g_objectTable[objIdx].mobj->nodeSwitchIndex = (uint8_t)markings;
 		}
 	}
+	/* Modern port: the craft's stats profile applies after its markings, also
+	   to a craft made again (the player's craft change in the hangar, the
+	   Death Star objects) (stats_profiles.h). */
+	XwaStatsProfiles_ApplyNewCraft(objIdx);
 #endif
 
 	return objIdx;
@@ -7615,6 +7635,7 @@ uint16_t Mission_Init(char* fileName) {
 	XwaHangars_LoadMission(fileName);
 	XwaMissionArt_LoadMission(fileName);
 	XwaModelSwaps_LoadMission(fileName);
+	XwaStatsProfiles_LoadMission(fileName);
 	XwaCraftNames_LoadMission(fileName);
 	XwaCraftNames_Apply();
 	XwaHeadlights_LoadMission(fileName);

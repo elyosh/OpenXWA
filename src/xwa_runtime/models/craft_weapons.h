@@ -2,9 +2,8 @@
 #define XWA_RUNTIME_MODELS_CRAFT_WEAPONS_H
 
 /* Weapon colours by firing craft: the colour of its bolts, of the impact
- * marks they leave, and of the player's charge bars. This is XWAU's
- * [WeaponColor]. Also whether the craft fires its side's weapons, XWAU's
- * WeaponSwitchBasedOnIff.
+ * marks they leave, and of the player's charge bars. Also whether the craft
+ * fires its side's weapons.
  *
  * The `weapons` group of a model settings file (model_settings.h) holds a
  * craft's colours. All keys are optional:
@@ -94,7 +93,7 @@ int XwaCraftWeapons_ImpactColor(unsigned int objectType, int markings, unsigned 
 								uint32_t* rgb);
 /* Gives mark request `request` (NULL does nothing) the impact colour of
    `bolt`, a bolt of `weaponType`, from its firing craft's object type and
-   current markings, as XWAU does. */
+   current markings. */
 void XwaCraftWeapons_TintImpactMark(const struct GlowMarkRequest* request, const struct MobileObject* bolt,
 									unsigned int weaponType);
 /* Removes the colour of a request of g_glowMarkRequestPool when the game

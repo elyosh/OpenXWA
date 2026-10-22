@@ -3235,7 +3235,7 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
  * P * 683 / pi candela straight ahead, and point_lights.model_light_intensity
  * turns candela into the scene's units. It starts at the seat's eye in every
  * view, as the pulse lights do, and points along the nose. The pool always
- * keeps it. The hyperspace tunnel doesn't add it, as in XWAU. */
+ * keeps it. The hyperspace tunnel doesn't add it. */
 static void fl_add_headlight(const XwaSnapshot* snap, const float player_bw[9], const float player_pos[3]) {
 	const XwaHeadlight* h = &snap->headlight;
 	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f) || !h->on || !player_bw) {

@@ -1,4 +1,7 @@
 #include "xwa/flight/ai/ai_internal.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/stats_profiles.h"
+#endif
 
 // GLOBAL: XWA 0x917E60
 int g_paifightSearchOriginX;
@@ -2784,8 +2787,16 @@ char paifight_fightershootorder(void) {
 		durabilityScore = (uint32_t)targetCraft->shieldFront;
 		pendingWarheadDamage = 0;
 		pendingIonPulseScore = 0;
+#ifdef XWA_MODERN
+		/* Modern port: the craft's stats profile (stats_profiles.h). */
+		remainingSystemStrength =
+			(uint16_t)(XwaStatsProfiles_Value(g_paiContext.aiObjIdx, XWA_STATS_SYSTEM_STRENGTH,
+											  g_modelDefs[g_curCraft->modelDefIndex].systemStrength) -
+					   g_curCraft->subsystemDamage);
+#else
 		remainingSystemStrength =
 			(uint16_t)(g_modelDefs[g_curCraft->modelDefIndex].systemStrength - g_curCraft->subsystemDamage);
+#endif
 		componentHitCount = 0;
 		if (isDisablePlan) {
 			for (launcherIdx = 0; launcherIdx < warheadLauncherCount; ++launcherIdx) {

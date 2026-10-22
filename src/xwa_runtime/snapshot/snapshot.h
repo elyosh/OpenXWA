@@ -742,8 +742,8 @@ typedef struct XwaGlowMark {
 	 * scale, which leaves the overlay unclipped. */
 	float layer_uv_scale_min;
 	/* The mark's RGB tint, from its colour (ObjectMeshTextureLayerBlock.
-	 * effectParam), 0 for the stock white. Impact marks get one from XWAU's
-	 * impact colours (craft_weapons.h). */
+	 * effectParam), 0 for the stock white. Impact marks get one from the
+	 * impact colours of craft_weapons.h. */
 	uint32_t tint;
 	/* Engine/OPT mesh ordinals traversed at creation: bit n % 64 of word
 	 * n / 64 is mesh n. All zero leaves the overlay unfiltered. */

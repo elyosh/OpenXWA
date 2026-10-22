@@ -14,6 +14,7 @@
  *   articulations: ...     (articulation.h)
  *   hangar: ...            (hangars.h)
  *   model_swaps: ...       (model_swaps.h)
+ *   stats_profiles: ...    (stats_profiles.h)
  *   craft_names: ...       (craft_names.h)
  *   concourse: ...         (frontend/concourse_planet.h)
  *   headlights: true       (headlights.h)

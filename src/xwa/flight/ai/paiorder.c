@@ -1,6 +1,8 @@
 #include "xwa/flight/ai/ai_internal.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/mission_settings.h"
+#include "xwa_runtime/models/stats_profiles.h"
 #endif
 
 // GLOBAL: XWA 0x5B7670
@@ -347,7 +349,13 @@ char paiorder_flyhomeotherregionorder(void) {
 	uint16_t mothershipObjIdx;
 	uint16_t flightGroupIdx;
 
+#ifdef XWA_MODERN
+	/* Modern port: the craft's stats profile (stats_profiles.h). */
+	if (!XwaStatsProfiles_Value(g_paiContext.aiObjIdx, XWA_STATS_HAS_HYPERDRIVE,
+								g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive)) {
+#else
 	if (!g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive) {
+#endif
 		return 0;
 	}
 
@@ -1050,11 +1058,25 @@ char paiorder_underattackorder(void) {
 		unsigned int attackerObjIdx;
 		MobileObject* attackerMobj;
 
+#ifdef XWA_MODERN
+		/* Modern port: a mod can compare the craft's own top speeds, which
+		   their stats profiles can change (rules.ai_attack_uses_max_speed_cache). */
+		selfMaxSpeed = XwaMissionSettings_AiAttackUsesMaxSpeedCache()
+						   ? (uint16_t)g_curCraft->aiFlight.maxSpeedCache
+						   : g_modelDefs[g_curCraft->modelDefIndex].maxSpeed;
+#else
 		selfMaxSpeed = g_modelDefs[g_curCraft->modelDefIndex].maxSpeed;
+#endif
 		attackerObjIdx = (unsigned int)(int16_t)g_curCraft->lastAttackerObjIdx & 0xffffu;
 		attackerMobj = g_objectTable[attackerObjIdx].mobj;
 		if (attackerMobj->state == 0) {
+#ifdef XWA_MODERN
+			attackerMaxSpeed = XwaMissionSettings_AiAttackUsesMaxSpeedCache()
+								   ? (uint16_t)attackerMobj->pCraft->aiFlight.maxSpeedCache
+								   : g_modelDefs[attackerMobj->pCraft->modelDefIndex].maxSpeed;
+#else
 			attackerMaxSpeed = g_modelDefs[attackerMobj->pCraft->modelDefIndex].maxSpeed;
+#endif
 		} else {
 			attackerMaxSpeed = 900;
 		}
@@ -2109,7 +2131,13 @@ char paiorder_abortmotherwaitorder(void) {
 		return 0;
 	}
 
+#ifdef XWA_MODERN
+	/* Modern port: the craft's stats profile (stats_profiles.h). */
+	if (!XwaStatsProfiles_Value(g_paiContext.aiObjIdx, XWA_STATS_HAS_HYPERDRIVE,
+								g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive)) {
+#else
 	if (!g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive) {
+#endif
 		return 0;
 	}
 
@@ -2864,7 +2892,13 @@ char paiorder_waitrunorder(void) {
 char paiorder_hyperspaceorder(void) {
 	if (g_curCraft->leader_obj_idx == -1 || g_curCraft->aiFlight.missionAbortedFlag != 0 ||
 		strcmp(g_planTable[g_paiContext.aiController->pendingPlanId].name, "flyhomeevadepln") == 0) {
+#ifdef XWA_MODERN
+		/* Modern port: the craft's stats profile (stats_profiles.h). */
+		if (XwaStatsProfiles_Value(g_paiContext.aiObjIdx, XWA_STATS_HAS_HYPERDRIVE,
+								   g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive) != 0) {
+#else
 		if (g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive != 0) {
+#endif
 			if (!g_curCraft->wasCaptured) {
 				uint8_t departMethod;
 

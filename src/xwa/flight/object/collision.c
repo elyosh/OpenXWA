@@ -41,6 +41,7 @@
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
+#include "xwa_runtime/models/stats_profiles.h"
 #endif
 
 #include <math.h>
@@ -4387,8 +4388,10 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 				damageAmount = srcMobj->damageAmount;
 #ifdef XWA_MODERN
 				/* Modern port: a mission can turn warhead collision damage
-				   off. */
-				if (g_missionFormatVersion >= 14 && XwaMissionSettings_WarheadCollisionDamage()) {
+				   off, and so can the source craft's stats profile
+				   (stats_profiles.h). */
+				if (g_missionFormatVersion >= 14 && XwaMissionSettings_WarheadCollisionDamage() &&
+					XwaStatsProfiles_Value(damageSourceObjIdx, XWA_STATS_WARHEAD_COLLISION_DAMAGE, 1)) {
 #else
 				if (g_missionFormatVersion >= 14) {
 #endif
@@ -4840,8 +4843,17 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 				if (targetCraft->modelDefIndex == (ModelDefIndex)0xFFFF)
 					systemStrengthRemaining = 100;
 				else
+#ifdef XWA_MODERN
+					/* Modern port: the craft's stats profile (stats_profiles.h). */
+					systemStrengthRemaining =
+						(int16_t)(XwaStatsProfiles_Value(
+									  targetObjIdx, XWA_STATS_SYSTEM_STRENGTH,
+									  g_modelDefs[targetCraft->modelDefIndex].systemStrength) -
+								  targetCraft->subsystemDamage);
+#else
 					systemStrengthRemaining =
 						g_modelDefs[targetCraft->modelDefIndex].systemStrength - targetCraft->subsystemDamage;
+#endif
 				if (targetCraft->workingSubsystems && systemStrengthRemaining <= 10) {
 					if ((int)damage > 0) {
 						int count = (damage + 199) / 0xC8;
@@ -4875,7 +4887,14 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 					}
 					if (!targetCraft->workingSubsystems) {
 						targetCraft->shieldFront = 0;
+#ifdef XWA_MODERN
+						/* Modern port: the craft's stats profile (stats_profiles.h). */
+						targetCraft->subsystemDamage = (uint16_t)XwaStatsProfiles_Value(
+							targetObjIdx, XWA_STATS_SYSTEM_STRENGTH,
+							g_modelDefs[targetCraft->modelDefIndex].systemStrength);
+#else
 						targetCraft->subsystemDamage = g_modelDefs[targetCraft->modelDefIndex].systemStrength;
+#endif
 						targetCraft->shieldRear = 0;
 						msg_emitCraftMessage((uint16_t)targetObjIdx, targetCraft, 145);
 						if (fsfx_SpeakTacticalOfficerEvent(4, 93, targetObjIdx, 0xFFFF) &&
@@ -6216,7 +6235,13 @@ void collide_applySurfaceRicochet(unsigned int objectObjIdx, unsigned int hitAga
 		float dotScale = (float)dot * g_collideRicochetQ15Scale;
 		double speedRatio;
 		float dmg;
+#ifdef XWA_MODERN
+		/* Modern port: the craft's stats profile (stats_profiles.h). */
+		hullStrength = (unsigned int)XwaStatsProfiles_Value(
+			objectObjIdx, XWA_STATS_HULL, g_modelDefs[objCraft->modelDefIndex].hullStrength);
+#else
 		hullStrength = (unsigned int)g_modelDefs[objCraft->modelDefIndex].hullStrength;
+#endif
 		speedRatio = (double)g_objectTable[objectObjIdx].mobj->speed /
 					 (double)(uint16_t)objCraft->aiFlight.maxSpeedCache;
 		dmg = speedRatio * (double)hullStrength * (double)(dotScale * dotScale) *

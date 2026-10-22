@@ -37,6 +37,7 @@
  *     hangar_red_alert_any_mothership: true
  *     classic_hide_destroyed_engine_glows: true
  *     weapon_iff_swap: false
+ *     ai_attack_uses_max_speed_cache: true
  *
  * classic_hide_destroyed_engine_glows only changes drawing: the classic
  * renderer doesn't draw the engine glows of a destroyed or hidden mesh, nor
@@ -46,7 +47,12 @@
  * starship and launcher fire the weapon of the firing craft's side, for
  * example Imperial lasers instead of Rebel lasers. With false, no fire
  * changes; with true, every shot changes. A model settings file can choose
- * for its craft (craft_weapons.h). */
+ * for its craft (craft_weapons.h).
+ *
+ * ai_attack_uses_max_speed_cache makes a craft under attack compare its own
+ * top speed and its attacker's (aiFlight.maxSpeedCache), which stats
+ * profiles can change (stats_profiles.h), instead of their records' top
+ * speeds. It changes the simulation. */
 
 #include <stdint.h>
 
@@ -71,6 +77,7 @@ int XwaMissionSettings_ClassicHideDestroyedEngineGlows(void);
 /* 1 or 0 when flight/flight.yaml sets weapon_iff_swap, -1 for the stock
    rule. */
 int XwaMissionSettings_WeaponIffSwap(void);
+int XwaMissionSettings_AiAttackUsesMaxSpeedCache(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);

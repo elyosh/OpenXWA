@@ -60,6 +60,7 @@ static int s_resetCombatMusic;
 static int s_redAlertAnyMothership;
 static int s_classicHideDestroyedEngineGlows;
 static int s_weaponIffSwap;
+static int s_aiAttackUsesMaxSpeedCache;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -387,6 +388,7 @@ void XwaMissionSettings_Init(void) {
 	s_redAlertAnyMothership = 0;
 	s_classicHideDestroyedEngineGlows = 0;
 	s_weaponIffSwap = -1;
+	s_aiAttackUsesMaxSpeedCache = 0;
 	MissionSettings_ResetTargets();
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SETTINGS_FLIGHT_YAML, &file,
@@ -421,6 +423,10 @@ void XwaMissionSettings_Init(void) {
 	if ((node = AeronConfigNode_MapGet(rules, "weapon_iff_swap")) != NULL) {
 		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "weapon_iff_swap", node, &s_weaponIffSwap);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "ai_attack_uses_max_speed_cache")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "ai_attack_uses_max_speed_cache", node,
+								 &s_aiAttackUsesMaxSpeedCache);
+	}
 	MissionSettings_Read(SETTINGS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "mission_settings"), &s_defaults);
 	s_settings = s_defaults;
 	AeronConfigFile_Destroy(file);
@@ -446,6 +452,8 @@ int XwaMissionSettings_HangarRedAlertAnyMothership(void) { return s_redAlertAnyM
 int XwaMissionSettings_ClassicHideDestroyedEngineGlows(void) { return s_classicHideDestroyedEngineGlows; }
 
 int XwaMissionSettings_WeaponIffSwap(void) { return s_weaponIffSwap; }
+
+int XwaMissionSettings_AiAttackUsesMaxSpeedCache(void) { return s_aiAttackUsesMaxSpeedCache; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

@@ -13,7 +13,6 @@
  * hidden while the craft's speed is below `min_speed_percent` of its top
  * speed (CraftData.aiFlight.maxSpeedCache), or below `min_speed_mglt`. Both
  * keys are optional. A craft with a top speed of 0 shows all its glows.
- * This is XWAU's [EngineGlows].
  *
  * The setting only changes drawing: the classic glows and their lights, and
  * the HD renderer's through the snapshot. */

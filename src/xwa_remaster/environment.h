@@ -20,8 +20,8 @@
  * the backdrop flares and lights. With `hidden_backdrop_lights: remove`, it
  * leaves out the lights of hidden backdrops that are not suns.
  * `backdrop_light_scale` multiplies the lights of backdrops that are not
- * suns (planets, nebulae), hidden or not: XWAU's renderer cuts them to 0.25,
- * and its missions are tuned for that. A mission or
+ * suns (planets, nebulae), hidden or not, for missions made for a renderer
+ * that shows these lights weaker. A mission or
  * region without an entry uses the default environment. Without a default,
  * and in Death Star mode, it uses the classic HD path (the Death Star
  * behaviour in Death Star mode). In a hangar, the selection uses the region

@@ -51,6 +51,7 @@
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/object_profiles.h"
+#include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -6626,8 +6627,15 @@ void Hangar_ServicePlayerCraft(int dtTicks) {
 		uint8_t status1;
 		uint8_t status2;
 
+#ifdef XWA_MODERN
+		/* Modern port: the craft's stats profile (stats_profiles.h). */
+		craft->shieldFront = XwaStatsProfiles_Value(g_hangarPlayerObjIdx, XWA_STATS_SHIELDS,
+													g_modelDefs[modelIndex].shieldStrength);
+		craft->shieldRear = craft->shieldFront;
+#else
 		craft->shieldFront = g_modelDefs[modelIndex].shieldStrength;
 		craft->shieldRear = g_modelDefs[modelIndex].shieldStrength;
+#endif
 
 		boundFlightGroupIdx = g_players[g_localPlayer].boundFlightGroupIdx;
 		status1 = g_missionFlightGroups[boundFlightGroupIdx].fg.status1;

@@ -36,6 +36,7 @@
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/mission_settings.h"
+#include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #endif
 #include "xwa/render/effects.h"
@@ -9129,7 +9130,15 @@ void Hud_UpdateTargetInfoCache(void) {
 			} else {
 				shieldTotal = targetCraft->shieldRear + targetCraft->shieldFront;
 				shieldNumerator = shieldTotal >> 1;
+#ifdef XWA_MODERN
+				/* Modern port: the craft's stats profile (stats_profiles.h). */
+				shieldDenominator =
+					(uint32_t)(2 * XwaStatsProfiles_Value(
+									   targetObjIdx, XWA_STATS_SHIELDS,
+									   g_modelDefs[targetCraft->modelDefIndex].shieldStrength));
+#else
 				shieldDenominator = (uint32_t)(2 * g_modelDefs[targetCraft->modelDefIndex].shieldStrength);
+#endif
 			}
 			if (shieldDenominator != 0) {
 				shieldPct = 2u * ((uint16_t)MATH2_percentage(shieldNumerator, shieldDenominator) / 0x28fu);
@@ -9163,7 +9172,14 @@ void Hud_UpdateTargetInfoCache(void) {
 					uint16_t systemStrength;
 
 					subsystemDamage = targetCraft->subsystemDamage;
+#ifdef XWA_MODERN
+					/* Modern port: the craft's stats profile (stats_profiles.h). */
+					systemStrength = (uint16_t)XwaStatsProfiles_Value(
+						targetObjIdx, XWA_STATS_SYSTEM_STRENGTH,
+						g_modelDefs[targetCraft->modelDefIndex].systemStrength);
+#else
 					systemStrength = g_modelDefs[targetCraft->modelDefIndex].systemStrength;
+#endif
 					if (subsystemDamage >= systemStrength) {
 						systemPct = 0;
 					} else {

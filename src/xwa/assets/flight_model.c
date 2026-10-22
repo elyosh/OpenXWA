@@ -21,6 +21,7 @@
 #include "xwa/util/memory.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/hangars.h"
+#include "xwa_runtime/models/stats_profiles.h"
 #endif
 
 #include <stdint.h>
@@ -44,7 +45,13 @@ int Craft_GetObjectMaxShield(unsigned short objIdx) {
 	CraftData* craft;
 
 	craft = g_objectTable[(uint16_t)objIdx].mobj->pCraft;
+#ifdef XWA_MODERN
+	/* Modern port: the craft's stats profile (stats_profiles.h). */
+	return 2 * XwaStatsProfiles_Value(objIdx, XWA_STATS_SHIELDS,
+									  g_modelDefs[craft->modelDefIndex].shieldStrength);
+#else
 	return 2 * g_modelDefs[craft->modelDefIndex].shieldStrength;
+#endif
 }
 
 // FUNCTION: XWA 0x456FA0

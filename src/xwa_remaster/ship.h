@@ -229,7 +229,7 @@ typedef struct XwaShipEnvironmentMap {
  * intensity dim.z x engineScale x 300, color = core color (the classic
  * range, engineScale x 16384, only selected lights); engineScale is the power margin x output scale
  * (no throttle/flicker — those belong to the glow SIZE law). A glow in
- * `f->eg_hidden_mask` has no light, as in XWAU. Color
+ * `f->eg_hidden_mask` has no light. Color
  * carries the classic intensity premultiplied (linear HDR); the
  * caller applies its global scale knobs. Returns lights appended. */
 uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh, const float transform[16],

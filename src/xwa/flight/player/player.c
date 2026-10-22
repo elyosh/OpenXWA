@@ -34,6 +34,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/opt_synth.h"
+#include "xwa_runtime/models/stats_profiles.h"
 #endif
 
 #include <stddef.h>
@@ -1640,7 +1641,14 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 		int maxShieldPerFace;
 		uint8_t shieldMode;
 
+#ifdef XWA_MODERN
+		/* Modern port: the craft's stats profile (stats_profiles.h). */
+		maxShieldPerFace =
+			2 * XwaStatsProfiles_Value(selectedObjIdx, XWA_STATS_SHIELDS,
+									   g_modelDefs[selectedCraft->modelDefIndex].shieldStrength);
+#else
 		maxShieldPerFace = 2 * g_modelDefs[selectedCraft->modelDefIndex].shieldStrength;
+#endif
 		shieldMode = (uint8_t)g_players[playerIdx].savedCraftSettingsRaw[5];
 		selectedCraft->shieldDistribMode = shieldMode;
 		switch (shieldMode) {
@@ -2036,6 +2044,11 @@ int Player_UnbindFromCurrentCraft(int playerIdx, int requireAnotherOwnedCraft, i
 			g_objectTable[objectIndex].mobj->speed =
 				(uint16_t)MATH2_fraction(g_modelDefs[craft->modelDefIndex].maxSpeed, throttle);
 			g_objectTable[objectIndex].mobj->speedRemainder = 0;
+#ifdef XWA_MODERN
+			/* Modern port: the speed follows the craft's own top speed, which its
+			   stats profile can change (stats_profiles.h). */
+			XwaStatsProfiles_ScaleSpeed(objectIndex);
+#endif
 
 			g_curCraft = craft;
 			pai_setupcraftcontext(objectIndex);
