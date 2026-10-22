@@ -18,6 +18,7 @@
  *   craft_names: ...       (craft_names.h)
  *   concourse: ...         (frontend/concourse_planet.h)
  *   headlights: true       (headlights.h)
+ *   sounds: ...            (audio/mission_sounds.h)
  */
 
 #include <stddef.h>

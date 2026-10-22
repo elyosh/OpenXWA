@@ -36,6 +36,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "aeron/log.h"
+#include "xwa_runtime/audio/mission_sounds.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_names.h"
@@ -7641,6 +7642,7 @@ uint16_t Mission_Init(char* fileName) {
 	XwaCraftNames_LoadMission(fileName);
 	XwaCraftNames_Apply();
 	XwaHeadlights_LoadMission(fileName);
+	XwaMissionSounds_LoadMission(fileName);
 #endif
 
 	if (g_pilotData.campaignMode) {

@@ -2,6 +2,7 @@
 #ifdef XWA_MODERN
 #include "aeron/log.h"
 #include "xwa/assets/file_io.h"
+#include "xwa_runtime/audio/mission_sounds.h"
 #endif
 #include "xwa/audio/fsfx.h"
 #include "xwa/audio/music.h"
@@ -451,7 +452,12 @@ uint8_t Sound_LoadEffectEx(const char* fileName, const char* name, int create3DF
 
 // FUNCTION: XWA 0x4DAD20
 uint8_t Sound_LoadEffect(const char* fileName, const char* name, uint16_t minDistanceOrRolloff) {
+#ifdef XWA_MODERN
+	/* Modern port: a mission can load another file for a sound. */
+	return Sound_LoadEffectEx(XwaMissionSounds_Replace(fileName), name, 0, minDistanceOrRolloff);
+#else
 	return Sound_LoadEffectEx(fileName, name, 0, minDistanceOrRolloff);
+#endif
 }
 
 // FUNCTION: XWA 0x4DAF80
