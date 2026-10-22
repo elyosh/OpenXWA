@@ -293,6 +293,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/hud_layout.c
     src/xwa_remaster/hud_text.c
     src/xwa_remaster/preview.c
+    src/xwa_remaster/scene_lights.c
     src/xwa_remaster/ship.c
     src/xwa_remaster/skins.c
     src/xwa_remaster/opt_mesh.c

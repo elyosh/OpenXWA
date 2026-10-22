@@ -245,8 +245,10 @@ static int env_capture_sun_order(const void* a, const void* b) {
  * hides are left out. */
 static uint32_t env_capture_collect_suns(const XwaSnapshot* snap, XwaRemasterAssets* assets,
 										 const XwaEnvironmentBackdropRule* hide, EnvCaptureSun* suns) {
-	const XwaDirLight* key =
-		XwaRemasterShip_SelectKeyDirectionalLight(snap->dir_lights, snap->dir_light_count);
+	XwaRemasterDirLight lights[XWA_SNAP_MAX_DIR_LIGHTS];
+	const uint32_t light_count =
+		XwaRemaster_ReadGameDirLights(snap->dir_lights, snap->dir_light_count, lights);
+	const XwaRemasterDirLight* key = XwaRemasterShip_SelectKeyDirectionalLight(lights, light_count);
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < snap->backdrop_count; i++) {
 		const XwaBackdrop* b = &snap->backdrops[i];
@@ -264,21 +266,24 @@ static uint32_t env_capture_collect_suns(const XwaSnapshot* snap, XwaRemasterAss
 		}
 		sun->color_linear[0] = sun->color_linear[1] = sun->color_linear[2] = 1.0f;
 		/* The brightest directional produced by this backdrop. */
-		const XwaDirLight* linked = NULL;
-		for (uint32_t j = 0; j < snap->dir_light_count && j < XWA_SNAP_MAX_DIR_LIGHTS; j++) {
-			const XwaDirLight* light = &snap->dir_lights[j];
-			if (light->source_backdrop_index != (int16_t)i || !(light->intensity > 0.0f)) {
+		const XwaRemasterDirLight* linked = NULL;
+		float linked_peak = 0.0f;
+		for (uint32_t j = 0; j < light_count; j++) {
+			const XwaRemasterDirLight* light = &lights[j];
+			const float peak = fmaxf(light->color[0], fmaxf(light->color[1], light->color[2]));
+			if (light->source_backdrop_index != (int16_t)i || !(peak > 0.0f)) {
 				continue;
 			}
-			if (!linked || light->intensity > linked->intensity) {
+			if (!linked || peak > linked_peak) {
 				linked = light;
+				linked_peak = peak;
 			}
 		}
 		if (linked) {
 			for (int c = 0; c < 3; c++) {
-				sun->color_linear[c] = XwaRemaster_SrgbToLinear(linked->color[c]);
+				sun->color_linear[c] = linked->color[c] / linked_peak;
 			}
-			sun->intensity = linked->intensity > 16.0f ? 16.0f : linked->intensity;
+			sun->intensity = linked_peak > 16.0f ? 16.0f : linked_peak;
 			sun->luminance = sun->intensity * env_capture_luminance(sun->color_linear);
 			sun->primary = linked == key;
 		}

@@ -14,6 +14,7 @@
 #include "aeron/scene/mesh.h"
 #include "aeron/scene/scene3d.h"
 #include "xwa_remaster/assets.h"
+#include "xwa_remaster/scene_lights.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #ifdef __cplusplus
@@ -238,12 +239,12 @@ uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh
 
 /* Select the semantic key directional: the brightest active sun
  * backdrop when present, otherwise the greatest linear luminance. */
-const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* lights, uint32_t light_count);
+const XwaRemasterDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaRemasterDirLight* lights,
+																	 uint32_t light_count);
 
 /* Queue the shared PBR fragment environment (PbrLightFS b1, including
- * lighting tuning) as a scene frame uniform, built from the snapshot's
- * captured WORLD-space dir_lights
- * channel. The FS lights in the space the instances were submitted
+ * lighting tuning) as a scene frame uniform, built from WORLD-space linear
+ * directional lights (scene_lights.h). The FS lights in the space the instances were submitted
  * in, so the env must match that convention:
  *   - world-space instances (flight driver): cam_rows = NULL (light
  *     dirs stay world-space), cam_pos = world camera position;
@@ -254,8 +255,7 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
  * ambient (and optionally direct-diffuse) term; NULL = AO off.
  * The key light is lights[key_index] when key_index is in range, otherwise
  * SelectKeyDirectionalLight's choice. Directional light
- * colors are decoded to linear and scaled by their intensity and the
- * tuning's sun_illuminance_scale. Punctual records are submitted
+ * colors are scaled by the tuning's sun_illuminance_scale. Punctual records are submitted
  * separately through AeronScene_AddLight. `ambient_cube` optionally
  * replaces the uniform ambient fill; `environment_map`, when given,
  * selects the scene's diffuse environment (otherwise the scene's selection,
@@ -263,7 +263,7 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
  * the key light is in the probe sets' bake (the hangar's ceiling light):
  * inside a probe grid it then only casts shadows, which remove that share
  * of the probe light; < 0 for a normal key light. */
-void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, uint32_t light_count,
+void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* lights, uint32_t light_count,
 							   int32_t key_index, const float cam_rows[9], const float cam_pos[3],
 							   const XwaShipAoParams* ao, const XwaShipAmbientCube* ambient_cube,
 							   const XwaShipEnvironmentMap* environment_map, float key_probe_shadow);

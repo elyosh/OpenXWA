@@ -18,7 +18,10 @@
  * with `backdrops: keep` draws the mission's backdrops over the sky instead,
  * except the hidden ones (XwaRemasterEnvironment_BackdropHidden). It keeps
  * the backdrop flares and lights. With `hidden_backdrop_lights: remove`, it
- * leaves out the lights of hidden backdrops that are not suns. A mission or
+ * leaves out the lights of hidden backdrops that are not suns.
+ * `backdrop_light_scale` multiplies the lights of backdrops that are not
+ * suns (planets, nebulae), hidden or not: XWAU's renderer cuts them to 0.25,
+ * and its missions are tuned for that. A mission or
  * region without an entry uses the default environment. Without a default,
  * and in Death Star mode, it uses the classic HD path (the Death Star
  * behaviour in Death Star mode). In a hangar, the selection uses the region
@@ -89,6 +92,9 @@ typedef struct XwaEnvironmentBackdropRule {
 	/* Set by hidden_backdrop_lights: remove. Hidden backdrops that are not
 	 * suns then make no light. */
 	bool remove_hidden_lights;
+	/* backdrop_light_scale: multiplies the linear light of backdrops that are
+	 * not suns. 1 unless set. */
+	float light_scale;
 	uint8_t hide_count;
 	uint8_t show_count;
 	uint32_t hide[XWA_ENV_BACKDROP_LIST_MAX];

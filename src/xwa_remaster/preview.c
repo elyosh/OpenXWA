@@ -178,7 +178,10 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	/* Eye-space lighting env: the engine's own preview light
 	 * (world-space dir_lights channel) rotated by this view's captured
 	 * camera; camera at the origin. */
-	XwaRemasterShip_SetPbrEnv(s.scene, lights, light_count, -1, p->cam_rows, NULL, ao_on ? &ao : NULL,
+	XwaRemasterDirLight linear_lights[XWA_SNAP_MAX_DIR_LIGHTS];
+	const uint32_t linear_light_count = XwaRemaster_ReadGameDirLights(lights, light_count, linear_lights);
+	XwaRemasterShip_SetPbrEnv(s.scene, linear_lights, linear_light_count, -1, p->cam_rows, NULL,
+							  ao_on ? &ao : NULL,
 							  /*ambient_cube=*/NULL, /*environment_map=*/NULL, /*key_probe_shadow=*/-1.0f);
 
 	/* Model->eye ("world") instance. The engine consumes the captured

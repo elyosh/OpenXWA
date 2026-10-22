@@ -227,6 +227,7 @@ static int env_read_backdrops(const AeronConfigNode* node, const char* what,
 	const AeronConfigNode* hide = AeronConfigNode_MapGet(node, "hide_backdrops");
 	const AeronConfigNode* show = AeronConfigNode_MapGet(node, "show_backdrops");
 	const AeronConfigNode* lights = AeronConfigNode_MapGet(node, "hidden_backdrop_lights");
+	const AeronConfigNode* scale = AeronConfigNode_MapGet(node, "backdrop_light_scale");
 	if (mode) {
 		const char* value =
 			AeronConfigNode_Type(mode) == AERON_CONFIG_STRING ? AeronConfigNode_String(mode, "") : "";
@@ -237,9 +238,10 @@ static int env_read_backdrops(const AeronConfigNode* node, const char* what,
 		}
 	}
 	if (out->mode != XWA_ENV_BACKDROPS_KEEP) {
-		static const char* const names[] = { "hide_backdrops", "show_backdrops", "hidden_backdrop_lights" };
-		const AeronConfigNode* const nodes[] = { hide, show, lights };
-		for (int i = 0; i < 3; i++) {
+		static const char* const names[] = { "hide_backdrops", "show_backdrops", "hidden_backdrop_lights",
+											 "backdrop_light_scale" };
+		const AeronConfigNode* const nodes[] = { hide, show, lights, scale };
+		for (int i = 0; i < 4; i++) {
 			if (nodes[i]) {
 				return env_node_error(nodes[i], "%s: '%s' needs 'backdrops: keep'", what, names[i]);
 			}
@@ -254,6 +256,14 @@ static int env_read_backdrops(const AeronConfigNode* node, const char* what,
 			return env_node_error(lights, "%s: 'hidden_backdrop_lights' must be 'keep' or 'remove'", what);
 		}
 	}
+	if (scale) {
+		const AeronConfigNodeType type = AeronConfigNode_Type(scale);
+		const double value = AeronConfigNode_Float(scale, -1.0);
+		if ((type != AERON_CONFIG_INT && type != AERON_CONFIG_FLOAT) || !(value >= 0.0 && value <= 4.0)) {
+			return env_node_error(scale, "%s: 'backdrop_light_scale' must be a number from 0 to 4", what);
+		}
+		out->light_scale = (float)value;
+	}
 	return (!hide || env_read_backdrop_list(hide, what, "hide_backdrops", &out->hide_all, out->hide,
 											&out->hide_count)) &&
 		   (!show || env_read_backdrop_list(show, what, "show_backdrops", &out->show_all, out->show,
@@ -264,12 +274,14 @@ static int env_read_backdrops(const AeronConfigNode* node, const char* what,
  * name or a map with `environment`, an optional `rotation_degrees` and the
  * optional backdrop fields. */
 static int env_add_reference(const AeronConfigNode* node, const char* what, int32_t* out_index) {
-	static const char* const fields[] = { "environment",    "rotation_degrees", "backdrops",
-										  "hide_backdrops", "show_backdrops",   "hidden_backdrop_lights" };
+	static const char* const fields[] = { "environment",         "rotation_degrees", "backdrops",
+										  "hide_backdrops",      "show_backdrops",   "hidden_backdrop_lights",
+										  "backdrop_light_scale" };
 	const AeronConfigNode* name_node = node;
 	const AeronConfigNode* rotation_node = NULL;
 	XwaEnvironmentBackdropRule backdrops;
 	memset(&backdrops, 0, sizeof backdrops);
+	backdrops.light_scale = 1.0f;
 	if (AeronConfigNode_Type(node) == AERON_CONFIG_MAP) {
 		if (!env_check_fields(node, what, fields, sizeof fields / sizeof fields[0])) {
 			return 0;

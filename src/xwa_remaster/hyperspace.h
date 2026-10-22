@@ -25,7 +25,7 @@ typedef struct XwaRemasterHyperspaceTunnelView {
 typedef struct XwaRemasterHyperspaceLighting {
 	XwaShipAmbientCube ambient_add;
 	XwaShipEnvironmentMap environment;
-	XwaDirLight key;
+	XwaRemasterDirLight key;
 	uint32_t key_count;
 	uint8_t active;
 } XwaRemasterHyperspaceLighting;
@@ -39,8 +39,8 @@ void XwaRemasterHyperspace_SetParams(XwaRemasterHyperspace* hyperspace,
  * Must run before AeronScene_Render opens its render passes. */
 int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* hyperspace, AeronCommandBuffer* command_buffer,
 								  const XwaSnapshot* snapshot, const float view_proj[16],
-								  const float camera_rows[9], int rt_w, int rt_h,
-								  int force_tunnel, float tunnel_time_seconds,
+								  const float camera_rows[9], int rt_w, int rt_h, int force_tunnel,
+								  float tunnel_time_seconds,
 								  const XwaRemasterHyperspaceTunnelView* tunnel_view);
 
 /* Returns the lighting contribution built by the latest successful Prepare. */

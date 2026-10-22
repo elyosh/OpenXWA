@@ -602,30 +602,27 @@ void XwaRemasterShip_GetAmbientCube(XwaShipAmbientCube* out) {
 	}
 }
 
-static float ship_directional_light_luminance(const XwaDirLight* light) {
-	if (!light || !(light->intensity > 0.0f) || !isfinite(light->intensity)) {
+static float ship_directional_light_luminance(const XwaRemasterDirLight* light) {
+	if (!light) {
 		return 0.0f;
 	}
-	const float r = XwaRemaster_SrgbToLinear(light->color[0]);
-	const float g = XwaRemaster_SrgbToLinear(light->color[1]);
-	const float b = XwaRemaster_SrgbToLinear(light->color[2]);
-	const float luminance = light->intensity * (0.2126f * r + 0.7152f * g + 0.0722f * b);
+	const float luminance = 0.2126f * light->color[0] + 0.7152f * light->color[1] + 0.0722f * light->color[2];
 	return isfinite(luminance) && luminance > 0.0f ? luminance : 0.0f;
 }
 
-static int ship_directional_light_is_sun(const XwaDirLight* light) {
+static int ship_directional_light_is_sun(const XwaRemasterDirLight* light) {
 	return light && light->source_backdrop_object_type >= XWA_SNAP_TYPE_BACKDROP_SUN_FIRST &&
 		   light->source_backdrop_object_type <= XWA_SNAP_TYPE_BACKDROP_SUN_LAST;
 }
 
-const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* lights,
-															 uint32_t light_count) {
+const XwaRemasterDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaRemasterDirLight* lights,
+																	 uint32_t light_count) {
 	if (!lights) {
 		return NULL;
 	}
 	const uint32_t count = light_count > XWA_SNAP_MAX_DIR_LIGHTS ? XWA_SNAP_MAX_DIR_LIGHTS : light_count;
-	const XwaDirLight* brightest = NULL;
-	const XwaDirLight* brightest_sun = NULL;
+	const XwaRemasterDirLight* brightest = NULL;
+	const XwaRemasterDirLight* brightest_sun = NULL;
 	float brightest_luminance = 0.0f;
 	float brightest_sun_luminance = 0.0f;
 	for (uint32_t i = 0; i < count; i++) {
@@ -642,7 +639,7 @@ const XwaDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaDirLight* 
 	return brightest_sun ? brightest_sun : brightest;
 }
 
-void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, uint32_t light_count,
+void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* lights, uint32_t light_count,
 							   int32_t key_index, const float cam_rows[9], const float cam_pos[3],
 							   const XwaShipAoParams* ao, const XwaShipAmbientCube* ambient_cube,
 							   const XwaShipEnvironmentMap* environment_map, float key_probe_shadow) {
@@ -672,8 +669,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	AeronScene_SetBackfaceFill(scene, g_backface_fill);
 
 	/* HD relight: authored ambient fill (tuning.ambient, linear) plus
-	 * sun illuminance = decode(classic light color) x intensity x
-	 * sun_illuminance_scale. The game state
+	 * sun illuminance = linear light x sun_illuminance_scale. The game state
 	 * contributes the art direction (light directions, colors, relative
 	 * intensities); the response curve belongs to the shading and
 	 * present chain. */
@@ -730,20 +726,19 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 	 * intensity, unless the caller names the key (authored environments
 	 * declare their primary). The classic sums plain Lambert per
 	 * ADDITIONAL light, so the three brightest remaining lights feed
-	 * diffuse-only extra slots. Each light's color is decoded to linear
-	 * and scaled by its intensity. */
-	const XwaDirLight* sorted[XWA_SNAP_MAX_DIR_LIGHTS];
+	 * diffuse-only extra slots. */
+	const XwaRemasterDirLight* sorted[XWA_SNAP_MAX_DIR_LIGHTS];
 	float sorted_luminance[XWA_SNAP_MAX_DIR_LIGHTS];
 	const uint32_t n =
 		!lights ? 0 : (light_count > XWA_SNAP_MAX_DIR_LIGHTS ? XWA_SNAP_MAX_DIR_LIGHTS : light_count);
-	const XwaDirLight* key = key_index >= 0 && (uint32_t)key_index < n
-								 ? &lights[key_index]
-								 : XwaRemasterShip_SelectKeyDirectionalLight(lights, n);
+	const XwaRemasterDirLight* key = key_index >= 0 && (uint32_t)key_index < n
+										 ? &lights[key_index]
+										 : XwaRemasterShip_SelectKeyDirectionalLight(lights, n);
 	for (uint32_t i = 0; i < n; i++) {
 		sorted[i] = &lights[i];
 		sorted_luminance[i] = ship_directional_light_luminance(sorted[i]);
 		for (uint32_t j = i; j > 0 && sorted_luminance[j] > sorted_luminance[j - 1]; j--) {
-			const XwaDirLight* t = sorted[j];
+			const XwaRemasterDirLight* t = sorted[j];
 			sorted[j] = sorted[j - 1];
 			sorted[j - 1] = t;
 			const float score = sorted_luminance[j];
@@ -762,7 +757,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 		sorted[0] = key;
 	}
 	for (uint32_t li = 0; li < n && li < 4; li++) {
-		const XwaDirLight* l = sorted[li];
+		const XwaRemasterDirLight* l = sorted[li];
 		float d[3];
 		if (cam_rows) {
 			/* eye = (R0.w, R1.w, R2.w) — world->eye by the view's g_camMat. */
@@ -781,8 +776,7 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaDirLight* lights, u
 		}
 		float col[3];
 		for (int c = 0; c < 3; c++) {
-			col[c] =
-				XwaRemaster_SrgbToLinear(l->color[c]) * l->intensity * g_pbr_tuning.sun_illuminance_scale;
+			col[c] = l->color[c] * g_pbr_tuning.sun_illuminance_scale;
 		}
 		if (li == 0) {
 			memcpy(env.directional_dir, d, sizeof d);

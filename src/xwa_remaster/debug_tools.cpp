@@ -1303,6 +1303,7 @@ extern "C" void XwaRemasterDebugTools_EnvironmentRows(void* user) {
 												: "none");
 			ImGui::Text("Lights of hidden backdrops: %s",
 						backdrops->remove_hidden_lights ? "removed, except suns" : "kept");
+			ImGui::Text("Lights of backdrops other than suns: x %.2f", (double)backdrops->light_scale);
 		}
 	}
 	bool probes = XwaRemasterFlight_Probes() != 0;

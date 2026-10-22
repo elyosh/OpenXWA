@@ -4291,8 +4291,10 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 		fl_add_ambient_cube(&ambient, &hyperspace_lighting.ambient_add);
 	}
 	const uint8_t phase = preview ? XWA_HYPERSPACE_TUNNEL : snap->hyperspace.phase;
-	const XwaDirLight* directional_lights = snap->dir_lights;
-	uint32_t directional_light_count = snap->dir_light_count;
+	XwaRemasterDirLight game_lights[XWA_SNAP_MAX_DIR_LIGHTS];
+	const XwaRemasterDirLight* directional_lights = game_lights;
+	uint32_t directional_light_count =
+		XwaRemaster_ReadGameDirLights(snap->dir_lights, snap->dir_light_count, game_lights);
 	if (phase == XWA_HYPERSPACE_TUNNEL) {
 		directional_lights = lighting_ready ? &hyperspace_lighting.key : NULL;
 		directional_light_count = lighting_ready ? hyperspace_lighting.key_count : 0;
@@ -4322,9 +4324,12 @@ static int fl_environment_keeps_backdrops(void) {
 }
 
 typedef struct FlSceneLighting {
-	const XwaDirLight* lights;
+	const XwaRemasterDirLight* lights;
 	uint32_t light_count;
-	XwaDirLight hangar_key;
+	/* The game's lights, read as linear lights (scene_lights.h). */
+	XwaRemasterDirLight game_lights[XWA_SNAP_MAX_DIR_LIGHTS];
+	uint32_t game_light_count;
+	XwaRemasterDirLight hangar_key;
 	XwaShipAmbientCube ambient_cube;
 	const XwaShipAmbientCube* ambient;
 	int hangar_override;
@@ -4334,7 +4339,7 @@ typedef struct FlSceneLighting {
 	 * key selection. environment_lights is set when the environment's lights
 	 * replace the recovered ones. */
 	const AeronPreparedEnvironment* environment;
-	XwaDirLight authored_lights[XWA_SNAP_MAX_DIR_LIGHTS];
+	XwaRemasterDirLight authored_lights[XWA_SNAP_MAX_DIR_LIGHTS];
 	int32_t key_index;
 	int shadow_allowed;
 	float shadow_angular_radius_degrees;
@@ -4358,21 +4363,12 @@ static int fl_is_default_hangar_lighting(const XwaSnapshot* snap) {
 		   fabsf(light->color[2] - 1.0f) <= epsilon;
 }
 
-/* An environment light as a runtime directional: the largest linear channel
- * is the scalar intensity, and the normalized colour is sRGB-encoded so the
- * PBR path decodes it back without loss. Never a backdrop source. */
-static void fl_environment_light_to_dir_light(const AeronEnvironmentLight* light, XwaDirLight* out) {
+/* An environment light as a scene directional. Never a backdrop source. */
+static void fl_environment_light_to_dir_light(const AeronEnvironmentLight* light, XwaRemasterDirLight* out) {
 	memset(out, 0, sizeof *out);
 	out->source_backdrop_index = -1;
 	memcpy(out->world_dir, light->direction_world, sizeof out->world_dir);
-	const float peak = fmaxf(light->color_linear[0], fmaxf(light->color_linear[1], light->color_linear[2]));
-	if (!(peak > 0.0f) || !isfinite(peak)) {
-		return;
-	}
-	out->intensity = peak;
-	for (int channel = 0; channel < 3; channel++) {
-		out->color[channel] = XwaRemaster_LinearToSrgb(light->color_linear[channel] / peak);
-	}
+	memcpy(out->color, light->color_linear, sizeof out->color);
 }
 
 /* While an environment is bound it owns the ambient: its authored fill
@@ -4391,6 +4387,36 @@ static void fl_set_environment_ambient(FlSceneLighting* out, const AeronPrepared
 	fl_set_ambient_fill(out, environment->settings.ambient_fill);
 }
 
+/* With `backdrop_light_scale`, multiplies the game lights of backdrops that
+ * are not suns. */
+static void fl_scale_backdrop_lights(const XwaSnapshot* snap, FlSceneLighting* out) {
+	const float scale = s.environment.backdrops->light_scale;
+	if (scale == 1.0f) {
+		return;
+	}
+	uint32_t scaled = 0;
+	for (uint32_t i = 0; i < out->game_light_count; i++) {
+		XwaRemasterDirLight* light = &out->game_lights[i];
+		const int16_t source = light->source_backdrop_index;
+		if (source >= 0 && (uint32_t)source < snap->backdrop_count &&
+			!fl_backdrop_is_sun(&snap->backdrops[source])) {
+			for (int channel = 0; channel < 3; channel++) {
+				light->color[channel] *= scale;
+			}
+			scaled++;
+		}
+	}
+	static char logged_mission[sizeof snap->mission_path];
+	static int logged_region = -1;
+	const int region = snap->flight_camera.mission_region;
+	if (scaled && (region != logged_region || strcmp(logged_mission, snap->mission_path) != 0)) {
+		logged_region = region;
+		snprintf(logged_mission, sizeof logged_mission, "%s", snap->mission_path);
+		Aeron_LogInfo("xwa.remaster", "environment: region %d scales the lights of %u backdrop(s) by %g",
+					  region, scaled, (double)scale);
+	}
+}
+
 /* With `hidden_backdrop_lights: remove`, uses the recovered lights, except
  * the lights of hidden backdrops that are not suns. The cube's lighting
  * replaces them. Suns keep their light, because a sun painted in the sky is
@@ -4399,8 +4425,8 @@ static void fl_remove_hidden_backdrop_lights(const XwaSnapshot* snap, XwaRemaste
 											 FlSceneLighting* out) {
 	uint32_t count = 0;
 	uint32_t dropped = 0;
-	for (uint32_t i = 0; i < snap->dir_light_count && i < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
-		const XwaDirLight* light = &snap->dir_lights[i];
+	for (uint32_t i = 0; i < out->game_light_count; i++) {
+		const XwaRemasterDirLight* light = &out->game_lights[i];
 		const int16_t source = light->source_backdrop_index;
 		if (source >= 0 && (uint32_t)source < snap->backdrop_count) {
 			const XwaBackdrop* b = &snap->backdrops[source];
@@ -4428,9 +4454,10 @@ static void fl_remove_hidden_backdrop_lights(const XwaSnapshot* snap, XwaRemaste
 /* Applies a region environment. Its fill replaces the ambient. If the
  * environment has directional lights (an environment with a sky always has
  * them), they replace the directional lights derived from backdrops, unless
- * the environment keeps the backdrops: then the recovered lights stay, minus
- * those fl_remove_hidden_backdrop_lights leaves out, and the key light is
- * chosen from them as without an environment.
+ * the environment keeps the backdrops: then the recovered lights stay,
+ * scaled by fl_scale_backdrop_lights, minus those
+ * fl_remove_hidden_backdrop_lights leaves out, and the key light is chosen
+ * from them as without an environment.
  * Recovered lights without a backdrop source are kept, because they are not
  * known to belong to the sky. The environment's declared primary light then
  * becomes the key light and the only shadow caster. An environment without
@@ -4440,6 +4467,7 @@ static void fl_apply_authored_lighting(const XwaSnapshot* snap, XwaRemasterAsset
 	out->environment = environment;
 	fl_set_environment_ambient(out, environment);
 	if (fl_environment_keeps_backdrops()) {
+		fl_scale_backdrop_lights(snap, out);
 		if (s.environment.backdrops->remove_hidden_lights) {
 			fl_remove_hidden_backdrop_lights(snap, assets, out);
 		}
@@ -4453,9 +4481,9 @@ static void fl_apply_authored_lighting(const XwaSnapshot* snap, XwaRemasterAsset
 		fl_environment_light_to_dir_light(&environment->lights[i], &out->authored_lights[count++]);
 	}
 	uint32_t kept = 0;
-	for (uint32_t i = 0; i < snap->dir_light_count && count < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
-		if (snap->dir_lights[i].source_backdrop_object_type == 0) {
-			out->authored_lights[count++] = snap->dir_lights[i];
+	for (uint32_t i = 0; i < out->game_light_count && count < XWA_SNAP_MAX_DIR_LIGHTS; i++) {
+		if (out->game_lights[i].source_backdrop_object_type == 0) {
+			out->authored_lights[count++] = out->game_lights[i];
 			kept++;
 		}
 	}
@@ -4492,25 +4520,24 @@ static void fl_build_hangar_lighting(const XwaSnapshot* snap, FlSceneLighting* o
 	 * white key. Preserve state-driven hangar lighting such as carrier alarms. */
 	out->hangar_override = 1;
 	if (fl_is_default_hangar_lighting(snap)) {
+		/* The configured colour is sRGB and the intensity linear. */
 		memcpy(out->hangar_key.world_dir, s.hangar_lighting.direction, sizeof out->hangar_key.world_dir);
-		out->hangar_key.intensity = s.hangar_lighting.intensity;
-		memcpy(out->hangar_key.color, s.hangar_lighting.color, sizeof out->hangar_key.color);
+		for (int channel = 0; channel < 3; channel++) {
+			out->hangar_key.color[channel] =
+				XwaRemaster_SrgbToLinear(s.hangar_lighting.color[channel]) * s.hangar_lighting.intensity;
+		}
+		out->hangar_key.source_backdrop_object_type = 0;
 		out->hangar_key.source_backdrop_index = -1;
 		out->lights = &out->hangar_key;
 		out->light_count = 1;
 	}
 
-	const XwaDirLight* ambient_light =
+	const XwaRemasterDirLight* ambient_light =
 		XwaRemasterShip_SelectKeyDirectionalLight(out->lights, out->light_count);
 	float ambient_color[3] = { 1.0f, 1.0f, 1.0f };
 	if (ambient_light) {
-		float radiance[3];
-		float peak = 0.0f;
-		for (int channel = 0; channel < 3; channel++) {
-			radiance[channel] =
-				XwaRemaster_SrgbToLinear(ambient_light->color[channel]) * ambient_light->intensity;
-			peak = fmaxf(peak, radiance[channel]);
-		}
+		const float* radiance = ambient_light->color;
+		const float peak = fmaxf(radiance[0], fmaxf(radiance[1], radiance[2]));
 		if (peak > 0.0f) {
 			const float influence = fminf(peak, 1.0f);
 			for (int channel = 0; channel < 3; channel++) {
@@ -4533,8 +4560,10 @@ static void fl_build_hangar_lighting(const XwaSnapshot* snap, FlSceneLighting* o
 static void fl_build_scene_lighting(const XwaSnapshot* snap, XwaRemasterAssets* assets,
 									const XwaFlightCamera* cam, FlSceneLighting* out) {
 	memset(out, 0, sizeof *out);
-	out->lights = snap->dir_lights;
-	out->light_count = snap->dir_light_count;
+	out->game_light_count =
+		XwaRemaster_ReadGameDirLights(snap->dir_lights, snap->dir_light_count, out->game_lights);
+	out->lights = out->game_lights;
+	out->light_count = out->game_light_count;
 	out->key_index = -1;
 	out->shadow_allowed = 1;
 	out->shadow_angular_radius_degrees = s.shadows.light_angular_radius_degrees;
@@ -4564,14 +4593,14 @@ static void fl_build_scene_lighting(const XwaSnapshot* snap, XwaRemasterAssets* 
 
 /* The shadow-casting key: lights[key_index] when in range (an authored
  * primary), otherwise the recovered key selection. */
-static int fl_key_directional_light(const XwaDirLight* lights, uint32_t light_count, int32_t key_index,
-									float out_direction[3]) {
+static int fl_key_directional_light(const XwaRemasterDirLight* lights, uint32_t light_count,
+									int32_t key_index, float out_direction[3]) {
 	if (!lights || !out_direction || light_count == 0) {
 		return 0;
 	}
-	const XwaDirLight* key = key_index >= 0 && (uint32_t)key_index < light_count
-								 ? &lights[key_index]
-								 : XwaRemasterShip_SelectKeyDirectionalLight(lights, light_count);
+	const XwaRemasterDirLight* key = key_index >= 0 && (uint32_t)key_index < light_count
+										 ? &lights[key_index]
+										 : XwaRemasterShip_SelectKeyDirectionalLight(lights, light_count);
 	if (!key) {
 		return 0;
 	}
@@ -4645,8 +4674,11 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	XwaRemasterParticles_SubmitRegion(s.particles, s.scene, snap, snap->flight_camera.region);
 	XwaRemasterTrails_SubmitRegion(s.trails, s.scene, snap->flight_camera.region);
 	fl_submit_billboards();
-	XwaRemasterShip_SetPbrEnv(s.scene, snap->dir_lights, snap->dir_light_count, -1, NULL, s.camera_local,
-							  NULL, NULL, NULL, -1.0f);
+	XwaRemasterDirLight lights[XWA_SNAP_MAX_DIR_LIGHTS];
+	const uint32_t light_count =
+		XwaRemaster_ReadGameDirLights(snap->dir_lights, snap->dir_light_count, lights);
+	XwaRemasterShip_SetPbrEnv(s.scene, lights, light_count, -1, NULL, s.camera_local, NULL, NULL, NULL,
+							  -1.0f);
 	if (!AeronScene_Render(s.scene, cmd)) {
 		s.snap = NULL;
 		return NULL;

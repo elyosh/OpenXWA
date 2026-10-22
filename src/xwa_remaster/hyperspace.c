@@ -442,18 +442,13 @@ static void hyper_build_tunnel_lighting(XwaRemasterHyperspace* h, const float ca
 	float key_direction[3] = { h->tunnel_uniform.tunnel_forward[0], h->tunnel_uniform.tunnel_forward[1],
 							   h->tunnel_uniform.tunnel_forward[2] };
 	hyper_view_to_world(camera_rows, key_direction, h->lighting.key.world_dir);
-	float linear_key[3];
-	float intensity = 0.0f;
+	float peak = 0.0f;
 	const float key_scale = h->params.brightness * h->params.highlight_strength * h->params.mesh_key_strength;
 	for (int channel = 0; channel < 3; channel++) {
-		linear_key[channel] = h->params.cap_color[channel] * key_scale;
-		intensity = fmaxf(intensity, linear_key[channel]);
+		h->lighting.key.color[channel] = h->params.cap_color[channel] * key_scale;
+		peak = fmaxf(peak, h->lighting.key.color[channel]);
 	}
-	if (hyper_normalize(h->lighting.key.world_dir) && isfinite(intensity) && intensity > 0.0f) {
-		h->lighting.key.intensity = intensity;
-		for (int channel = 0; channel < 3; channel++) {
-			h->lighting.key.color[channel] = XwaRemaster_LinearToSrgb(linear_key[channel] / intensity);
-		}
+	if (hyper_normalize(h->lighting.key.world_dir) && isfinite(peak) && peak > 0.0f) {
 		h->lighting.key.source_backdrop_object_type = 0;
 		h->lighting.key.source_backdrop_index = -1;
 		h->lighting.key_count = 1;
