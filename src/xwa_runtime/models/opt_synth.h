@@ -53,6 +53,11 @@ typedef struct XwaOptSynthData {
 	/* Named component sets (object profiles); members may be past meshCount. */
 	uint32_t componentSetCount;
 	AeronFlightComponentSet* componentSets;
+	/* The sets `collision.off` (components that nothing collides with) and
+	   `targetable` (the only components the player can target), or NULL. They
+	   point into componentSets. */
+	const AeronFlightComponentSet* noCollision;
+	const AeronFlightComponentSet* targetable;
 	/* The GLB is parsed once: after the simulation data is built, the parsed
 	   model keeps what the HD renderer needs until it has built its mesh
 	   (xwa_runtime/models/render_model.h). */
@@ -84,6 +89,13 @@ const XwaOptSynthMesh* OptSynth_FindMeshForNode(const OptimizedPolyObject* model
 int OptSynth_FindModelComponentByTag(const OptimizedPolyObject* model, const char* tag);
 /* The model's component set `name`, or NULL. */
 const AeronFlightComponentSet* OptSynth_FindComponentSet(const OptimizedPolyObject* model, const char* name);
+/* Returns 0 when the model's `collision.off` set lists component `mesh`
+   (0-based), so that nothing collides with it, else 1. */
+int OptSynth_MeshCollides(const OptimizedPolyObject* model, int mesh);
+/* Returns 0 when the model that `objectType` loaded has a `targetable` set
+   that doesn't list component `mesh` (0-based), so that the player can't
+   target it, else 1. */
+int OptSynth_TypeMeshTargetable(unsigned int objectType, int mesh);
 /* The model's articulation setting `name`, or `fallback` when it has none. */
 int32_t OptSynth_GetArticulationSetting(const OptimizedPolyObject* model, const char* name, int32_t fallback);
 

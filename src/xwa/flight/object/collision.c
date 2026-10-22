@@ -2617,8 +2617,18 @@ void collide_TestSweepAgainstModelMeshes(unsigned int sourceObjIdx, unsigned int
 		{
 			MeshDescriptor* descriptor;
 
+#ifdef XWA_MODERN
+			/* Modern port: nothing collides with a mesh that the model's
+			   `collision.off` set lists, such as the force field of a hangar
+			   opening. Without a descriptor, the loop skips the mesh. */
+			descriptor = OptSynth_MeshCollides(model, g_collideSweepCurrentMeshOrdinal - 1)
+							 ? ModelMesh_GetObjectTypeMeshDescriptor(targetObj->objectType,
+																	 g_collideSweepCurrentMeshOrdinal - 1)
+							 : NULL;
+#else
 			descriptor = ModelMesh_GetObjectTypeMeshDescriptor(targetObj->objectType,
 															   g_collideSweepCurrentMeshOrdinal - 1);
+#endif
 			if (descriptor != NULL) {
 				MobileObject* targetMobj;
 

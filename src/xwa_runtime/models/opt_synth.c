@@ -345,6 +345,7 @@ static XwaOptSynthData* OptSynth_CreateData(const char* key, const AeronFlightMo
 	XwaOptSynthData* synth;
 	uint32_t tagTotal;
 	uint32_t component;
+	uint32_t setIndex;
 	const uint32_t articulationCount = model->articulation_count;
 	const uint32_t settingCount = model->articulation_setting_count;
 	const uint32_t setCount = model->component_set_count;
@@ -385,6 +386,13 @@ static XwaOptSynthData* OptSynth_CreateData(const char* key, const AeronFlightMo
 		memcpy(synth->componentSets, model->component_sets, setCount * sizeof *synth->componentSets);
 	}
 	synth->componentSetCount = setCount;
+	for (setIndex = 0; setIndex < setCount; ++setIndex) {
+		if (strcmp(synth->componentSets[setIndex].name, "collision.off") == 0) {
+			synth->noCollision = &synth->componentSets[setIndex];
+		} else if (strcmp(synth->componentSets[setIndex].name, "targetable") == 0) {
+			synth->targetable = &synth->componentSets[setIndex];
+		}
+	}
 	if (articulationCount != 0) {
 		memcpy(synth->articulations, model->articulations, articulationCount * sizeof *synth->articulations);
 	}
@@ -802,6 +810,30 @@ const AeronFlightComponentSet* OptSynth_FindComponentSet(const OptimizedPolyObje
 		}
 	}
 	return NULL;
+}
+
+static int OptSynth_SetHasComponent(const AeronFlightComponentSet* set, int mesh) {
+	return mesh >= 0 && mesh < 256 && (set->members[mesh / 32] & (1u << (mesh % 32))) != 0;
+}
+
+int OptSynth_MeshCollides(const OptimizedPolyObject* model, int mesh) {
+	const XwaOptSynthData* synth = OptSynth_GetModelData(model);
+
+	return synth == NULL || synth->noCollision == NULL || !OptSynth_SetHasComponent(synth->noCollision, mesh);
+}
+
+int OptSynth_TypeMeshTargetable(unsigned int objectType, int mesh) {
+	const MemoryHandle handle = objectType < OBJ_Count ? g_loadedModels.byObjectType[objectType] : 0;
+	const OptimizedPolyObject* model;
+	const XwaOptSynthData* synth;
+
+	model = handle != 0 ? (const OptimizedPolyObject*)Memory_LockHandle(handle) : NULL;
+	if (model == NULL) {
+		return 1;
+	}
+	synth = OptSynth_GetModelData(model);
+	Memory_UnlockHandle(handle);
+	return synth == NULL || synth->targetable == NULL || OptSynth_SetHasComponent(synth->targetable, mesh);
 }
 
 int32_t OptSynth_GetArticulationSetting(const OptimizedPolyObject* model, const char* name,

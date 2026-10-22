@@ -8395,6 +8395,13 @@ static __inline int FlightAction_TargetComponentSelectable(ObjectTypeId objectTy
 	if (targetCraft->componentState[componentIdx] != 0) {
 		return 0;
 	}
+#ifdef XWA_MODERN
+	/* Modern port: a model's `targetable` set limits the components that the
+	   player can target. */
+	if (!OptSynth_TypeMeshTargetable((unsigned int)objectType, componentIdx)) {
+		return 0;
+	}
+#endif
 
 	meshType = ModelMesh_GetObjectTypeMeshType((uint16_t)objectType, componentIdx);
 	if (meshType == MESH_MiscHull || meshType == MESH_Antenna) {

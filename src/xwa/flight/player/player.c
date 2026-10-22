@@ -33,6 +33,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/opt_synth.h"
 #endif
 
 #include <stddef.h>
@@ -2838,13 +2839,16 @@ int8_t Player_CanRadioCommandCraft(unsigned int targetObjIdx, int playerIdx) {
 }
 
 #ifdef XWA_MODERN
-/* Modern port: nonzero when component `meshIdx` of object `objIdx` is not
-   drawn (destroyed, or hidden by an object profile), so it cannot be a new
-   target's aim point. */
-static int Player_IsTargetComponentHidden(unsigned int objIdx, unsigned int meshIdx) {
+/* Modern port: nonzero when component `meshIdx` of object `objIdx` can't be
+   a new target's aim point: it isn't drawn (destroyed, or hidden by an object
+   profile), or the model's `targetable` set doesn't list it. */
+static int Player_IsTargetComponentExcluded(unsigned int objIdx, unsigned int meshIdx) {
 	const MobileObject* mobj = g_objectTable[objIdx].mobj;
 
-	return mobj != NULL && mobj->pCraft != NULL && mobj->pCraft->componentState[meshIdx] != 0;
+	if (mobj != NULL && mobj->pCraft != NULL && mobj->pCraft->componentState[meshIdx] != 0) {
+		return 1;
+	}
+	return !OptSynth_TypeMeshTargetable((unsigned int)g_objectTable[objIdx].objectType, (int)meshIdx);
 }
 #endif
 
@@ -2903,7 +2907,7 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 						meshIdx);
 					if ((meshType == MESH_MainHull || meshType == MESH_Fuselage)
 #ifdef XWA_MODERN
-						&& !Player_IsTargetComponentHidden(
+						&& !Player_IsTargetComponentExcluded(
 							   (uint16_t)g_players[playerIdx].currentTargetObjectIdx, meshIdx)
 #endif
 					) {
@@ -2935,7 +2939,7 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 							ModelMesh_GetObjectTypeMeshType(g_objectTable[targetObjIdx].objectType, meshIdx);
 						if ((meshType == MESH_MainHull || meshType == MESH_Fuselage)
 #ifdef XWA_MODERN
-							&& !Player_IsTargetComponentHidden(targetObjIdx, meshIdx)
+							&& !Player_IsTargetComponentExcluded(targetObjIdx, meshIdx)
 #endif
 						) {
 							unsigned int distance;
@@ -2964,7 +2968,7 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 																   selectedMeshIdx);
 						if ((meshType == MESH_MainHull || meshType == MESH_Fuselage)
 #ifdef XWA_MODERN
-							&& !Player_IsTargetComponentHidden(targetObjIdx, selectedMeshIdx)
+							&& !Player_IsTargetComponentExcluded(targetObjIdx, selectedMeshIdx)
 #endif
 						) {
 							break;
