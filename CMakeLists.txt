@@ -236,6 +236,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/shield_recharge.c
     src/xwa_runtime/models/skins.c
     src/xwa_runtime/models/stats_profiles.c
+    src/xwa_runtime/models/weapon_rates.c
     src/xwa_runtime/models/opt_synth.c
     src/xwa_runtime/models/mission_art.c
     src/xwa_runtime/runtime/flight_pause_task.c

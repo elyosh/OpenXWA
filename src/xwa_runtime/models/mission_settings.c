@@ -61,6 +61,8 @@ static int s_redAlertAnyMothership;
 static int s_classicHideDestroyedEngineGlows;
 static int s_weaponIffSwap;
 static int s_aiAttackUsesMaxSpeedCache;
+static int s_fireNeedsDechargeRate;
+static int s_noStarshipFireFromDestroyedRacks;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -389,6 +391,8 @@ void XwaMissionSettings_Init(void) {
 	s_classicHideDestroyedEngineGlows = 0;
 	s_weaponIffSwap = -1;
 	s_aiAttackUsesMaxSpeedCache = 0;
+	s_fireNeedsDechargeRate = 0;
+	s_noStarshipFireFromDestroyedRacks = 0;
 	MissionSettings_ResetTargets();
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SETTINGS_FLIGHT_YAML, &file,
@@ -427,6 +431,14 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "ai_attack_uses_max_speed_cache", node,
 								 &s_aiAttackUsesMaxSpeedCache);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "fire_needs_decharge_rate")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "fire_needs_decharge_rate", node,
+								 &s_fireNeedsDechargeRate);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_starship_fire_from_destroyed_racks")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "no_starship_fire_from_destroyed_racks", node,
+								 &s_noStarshipFireFromDestroyedRacks);
+	}
 	MissionSettings_Read(SETTINGS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "mission_settings"), &s_defaults);
 	s_settings = s_defaults;
 	AeronConfigFile_Destroy(file);
@@ -454,6 +466,10 @@ int XwaMissionSettings_ClassicHideDestroyedEngineGlows(void) { return s_classicH
 int XwaMissionSettings_WeaponIffSwap(void) { return s_weaponIffSwap; }
 
 int XwaMissionSettings_AiAttackUsesMaxSpeedCache(void) { return s_aiAttackUsesMaxSpeedCache; }
+
+int XwaMissionSettings_FireNeedsDechargeRate(void) { return s_fireNeedsDechargeRate; }
+
+int XwaMissionSettings_NoStarshipFireFromDestroyedRacks(void) { return s_noStarshipFireFromDestroyedRacks; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

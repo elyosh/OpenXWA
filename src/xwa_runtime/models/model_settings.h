@@ -7,13 +7,14 @@
  *   version: 1
  *   hud: {...}            # craft_hud.h
  *   engine_glows: {...}   # engine_glows.h
- *   weapons: {...}        # craft_weapons.h
+ *   weapons: {...}        # craft_weapons.h; `rates`: weapon_rates.h
  *   stats_profiles: {...} # stats_profiles.h
  *   shield: {...}         # shield_recharge.h
  *
- * Each top-level key is a group that one module owns. This module reads the
- * files and hands each group to its module, which keeps the values it needs
- * in a table by object type.
+ * Each top-level key is a group that one module owns, except `weapons`,
+ * whose `rates` belong to weapon_rates.h. This module reads the files and
+ * hands each group to its module, which keeps the values it needs in a
+ * table by object type.
  *
  * The files are per model, but the game code only knows object types. Which
  * model an object type loads depends on the mission: its list row's model,

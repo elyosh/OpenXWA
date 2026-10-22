@@ -38,6 +38,8 @@
  *     classic_hide_destroyed_engine_glows: true
  *     weapon_iff_swap: false
  *     ai_attack_uses_max_speed_cache: true
+ *     fire_needs_decharge_rate: true
+ *     no_starship_fire_from_destroyed_racks: true
  *
  * classic_hide_destroyed_engine_glows only changes drawing: the classic
  * renderer doesn't draw the engine glows of a destroyed or hidden mesh, nor
@@ -52,7 +54,10 @@
  * ai_attack_uses_max_speed_cache makes a craft under attack compare its own
  * top speed and its attacker's (aiFlight.maxSpeedCache), which stats
  * profiles can change (stats_profiles.h), instead of their records' top
- * speeds. It changes the simulation. */
+ * speeds. It changes the simulation.
+ *
+ * fire_needs_decharge_rate and no_starship_fire_from_destroyed_racks change
+ * when a craft can fire (weapon_rates.h). They change the simulation. */
 
 #include <stdint.h>
 
@@ -78,6 +83,8 @@ int XwaMissionSettings_ClassicHideDestroyedEngineGlows(void);
    rule. */
 int XwaMissionSettings_WeaponIffSwap(void);
 int XwaMissionSettings_AiAttackUsesMaxSpeedCache(void);
+int XwaMissionSettings_FireNeedsDechargeRate(void);
+int XwaMissionSettings_NoStarshipFireFromDestroyedRacks(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);

@@ -31,6 +31,7 @@
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -778,6 +779,10 @@ void laser_weaponsfire(void) {
 							g_objectTable[objectIdx].objectType == OBJ_TIEBomber) {
 							chargeDelta = (int16_t)(3 * chargeBasis);
 						}
+#ifdef XWA_MODERN
+						/* Modern port: a mod's laser rates (weapon_rates.h). */
+						XwaWeaponRates_Recharge(objectIdx, chargeBasis, &chargeDelta);
+#endif
 						g_curCraft->warheadData[slotIdx].laserCharge =
 							(uint8_t)(g_curCraft->warheadData[slotIdx].laserCharge + chargeDelta);
 						if (chargeDelta < 0 && (int8_t)g_curCraft->warheadData[slotIdx].laserCharge < 0) {
@@ -2098,8 +2103,16 @@ int laser_firemissile(int firerObjIdx, int warheadSlot, int projectileType, unsi
 	projectileObjIdx = 0xffff;
 	if (g_curCraft->warheadData[warheadSlot].weaponType == 3 &&
 		g_curCraft->warheadData[warheadSlot].count > 0) {
+#ifdef XWA_MODERN
+		/* Modern port: a mod's firing rules (weapon_rates.h). */
+		projectileObjIdx = XwaWeaponRates_CanFire((unsigned int)firerObjIdx, (unsigned int)warheadSlot, 0)
+							   ? laser_createprojectile((unsigned int)firerObjIdx, warheadSlot,
+														(ObjectTypeId)projectileType, playerOwnerIdx)
+							   : 0xffff;
+#else
 		projectileObjIdx = laser_createprojectile((unsigned int)firerObjIdx, warheadSlot,
 												  (ObjectTypeId)projectileType, playerOwnerIdx);
+#endif
 		if (projectileObjIdx != 0xffff) {
 
 			++g_curCraft->warheadsFiredCount;
@@ -2316,8 +2329,17 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 					laserCharge >= 64) {
 					projectileTypeId = (uint16_t)(projectileTypeId + 1u);
 				}
+#ifdef XWA_MODERN
+				/* Modern port: a mod's firing rules (weapon_rates.h). */
+				projectileObjIdx =
+					XwaWeaponRates_CanFire(shooterObjIdx, slotIdx, 1)
+						? laser_createprojectile(shooterObjIdx, slotIdx, (ObjectTypeId)projectileTypeId,
+												 firingPlayerIdx)
+						: 0xffff;
+#else
 				projectileObjIdx = laser_createprojectile(shooterObjIdx, slotIdx,
 														  (ObjectTypeId)projectileTypeId, firingPlayerIdx);
+#endif
 				if (projectileObjIdx != 0xffff) {
 					WarheadGuidanceState* guidance;
 
@@ -2327,7 +2349,19 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 					if (g_missionFlightGroups[g_objectTable[shooterObjIdx].flightGroupIdx].fg.status1 != 21 &&
 						g_missionFlightGroups[g_objectTable[shooterObjIdx].flightGroupIdx].fg.status2 != 21) {
 						if (firingPlayerIdx != -1) {
-							if (g_objectTable[shooterObjIdx].genusId) {
+#ifdef XWA_MODERN
+							int dechargeRate;
+
+							/* Modern port: a mod's laser rates (weapon_rates.h). */
+							if (XwaWeaponRates_Decharge(shooterObjIdx, &dechargeRate)) {
+								if (g_curCraft->warheadData[slotIdx].weaponType < 4u) {
+									g_curCraft->warheadData[slotIdx].laserCharge =
+										(uint8_t)(g_curCraft->warheadData[slotIdx].laserCharge -
+												  dechargeRate);
+								}
+							} else
+#endif
+								if (g_objectTable[shooterObjIdx].genusId) {
 								if (g_curCraft->warheadData[slotIdx].weaponType < 4u) {
 									g_curCraft->warheadData[slotIdx].laserCharge =
 										(uint8_t)(g_curCraft->warheadData[slotIdx].laserCharge - 3u);
@@ -2411,6 +2445,22 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 		if (firedCount == 0) {
 			firedCount = 1;
 		}
+#ifdef XWA_MODERN
+		/* Modern port: a mod's laser rates (weapon_rates.h). */
+		{
+			const int cooldown = XwaWeaponRates_Cooldown(shooterObjIdx);
+
+			if (firingPlayerIdx != -1) {
+				g_curCraft->laserFireCooldownTicks[0] =
+					(uint16_t)(g_curCraft->laserFireCooldownTicks[0] + cooldown * firedCount + 2);
+				g_curCraft->laserLastFireTimestamp[0] += cooldown * firedCount + 2;
+			} else {
+				g_curCraft->laserFireCooldownTicks[laserGroupIdx] =
+					(uint16_t)(g_curCraft->laserFireCooldownTicks[laserGroupIdx] + cooldown * firedCount + 2);
+				g_curCraft->laserLastFireTimestamp[laserGroupIdx] += cooldown * firedCount + 2;
+			}
+		}
+#else
 		if (firingPlayerIdx != -1) {
 			g_curCraft->laserFireCooldownTicks[0] =
 				(uint16_t)(g_curCraft->laserFireCooldownTicks[0] + 47 * firedCount + 2);
@@ -2420,6 +2470,7 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 				(uint16_t)(g_curCraft->laserFireCooldownTicks[laserGroupIdx] + 47 * firedCount + 2);
 			g_curCraft->laserLastFireTimestamp[laserGroupIdx] += 47 * firedCount + 2;
 		}
+#endif
 	}
 }
 
