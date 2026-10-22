@@ -59,6 +59,7 @@ static MissionSettings s_settings;
 static int s_resetCombatMusic;
 static int s_redAlertAnyMothership;
 static int s_classicHideDestroyedEngineGlows;
+static int s_weaponIffSwap;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -385,6 +386,7 @@ void XwaMissionSettings_Init(void) {
 	s_resetCombatMusic = 0;
 	s_redAlertAnyMothership = 0;
 	s_classicHideDestroyedEngineGlows = 0;
+	s_weaponIffSwap = -1;
 	MissionSettings_ResetTargets();
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SETTINGS_FLIGHT_YAML, &file,
@@ -416,6 +418,9 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "classic_hide_destroyed_engine_glows", node,
 								 &s_classicHideDestroyedEngineGlows);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "weapon_iff_swap")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "weapon_iff_swap", node, &s_weaponIffSwap);
+	}
 	MissionSettings_Read(SETTINGS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "mission_settings"), &s_defaults);
 	s_settings = s_defaults;
 	AeronConfigFile_Destroy(file);
@@ -439,6 +444,8 @@ int XwaMissionSettings_ResetCombatMusicAtMissionLoad(void) { return s_resetComba
 int XwaMissionSettings_HangarRedAlertAnyMothership(void) { return s_redAlertAnyMothership; }
 
 int XwaMissionSettings_ClassicHideDestroyedEngineGlows(void) { return s_classicHideDestroyedEngineGlows; }
+
+int XwaMissionSettings_WeaponIffSwap(void) { return s_weaponIffSwap; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

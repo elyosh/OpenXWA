@@ -36,10 +36,17 @@
  *     reset_combat_music_at_mission_load: true
  *     hangar_red_alert_any_mothership: true
  *     classic_hide_destroyed_engine_glows: true
+ *     weapon_iff_swap: false
  *
- * The last one only changes drawing: the classic renderer doesn't draw the
- * engine glows of a destroyed or hidden mesh, nor their lights, as the HD
- * renderer already does. */
+ * classic_hide_destroyed_engine_glows only changes drawing: the classic
+ * renderer doesn't draw the engine glows of a destroyed or hidden mesh, nor
+ * their lights, as the HD renderer already does.
+ *
+ * weapon_iff_swap changes which weapon a craft fires. The stock game gives
+ * starship and launcher fire the weapon of the firing craft's side, for
+ * example Imperial lasers instead of Rebel lasers. With false, no fire
+ * changes; with true, every shot changes. A model settings file can choose
+ * for its craft (craft_weapons.h). */
 
 #include <stdint.h>
 
@@ -61,6 +68,9 @@ void XwaMissionSettings_LoadMission(const char* missionPath);
 int XwaMissionSettings_ResetCombatMusicAtMissionLoad(void);
 int XwaMissionSettings_HangarRedAlertAnyMothership(void);
 int XwaMissionSettings_ClassicHideDestroyedEngineGlows(void);
+/* 1 or 0 when flight/flight.yaml sets weapon_iff_swap, -1 for the stock
+   rule. */
+int XwaMissionSettings_WeaponIffSwap(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);

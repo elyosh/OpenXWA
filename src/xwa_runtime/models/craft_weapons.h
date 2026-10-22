@@ -3,12 +3,14 @@
 
 /* Weapon colours by firing craft: the colour of its bolts, of the impact
  * marks they leave, and of the player's charge bars. This is XWAU's
- * [WeaponColor].
+ * [WeaponColor]. Also whether the craft fires its side's weapons, XWAU's
+ * WeaponSwitchBasedOnIff.
  *
  * The `weapons` group of a model settings file (model_settings.h) holds a
  * craft's colours. All keys are optional:
  *
  *   weapons:
+ *     switch_by_iff: true              # fire the weapons of the craft's side
  *     colors:                          # any markings
  *       variant: {default: 3, 284: 1}  # the bolts' markings, by weapon type
  *       impact: {280: 0xff0000}        # RGB; 0 keeps the stock white mark
@@ -34,7 +36,16 @@
  * bars take `by_markings[m]`'s colour, else `colors`', else the stock one.
  *
  * The colours only change drawing. A bolt's markings are part of the world
- * state, but no simulation code reads them. */
+ * state, but no simulation code reads them.
+ *
+ * Each projectile type 280 to 306 belongs to the Rebel side, the Imperial
+ * side or none, and each IFF counts as one of the two sides. The stock game
+ * gives starship and launcher fire the weapon of the firing craft's side:
+ * an Imperial craft that fires Rebel lasers fires Imperial lasers instead.
+ * `switch_by_iff: true` does this for every shot of the craft, and false
+ * for none. Without it, the `rules.weapon_iff_swap` value of
+ * flight/flight.yaml applies, else the stock rule. This changes the
+ * simulation. */
 
 #include <stdint.h>
 
@@ -68,6 +79,14 @@ void XwaCraftWeapons_ReadModelSettings(unsigned int objectType, const char* path
 /* Returns the markings of a bolt of `weaponType` fired by a craft of
    `objectType` with `markings`: 0 without settings, as in the stock game. */
 uint8_t XwaCraftWeapons_BoltMarkings(unsigned int objectType, uint8_t markings, unsigned int weaponType);
+/* Returns 1 when every shot of a craft of `objectType` takes the weapon of
+   its side, 0 when none does, and -1 for the stock rule: only starship and
+   launcher fire does. */
+int XwaCraftWeapons_SwitchByIff(unsigned int objectType);
+/* Returns the projectile type that a craft of `iff` fires for
+   `weaponType`: the other side's type when the weapon belongs to the other
+   side, else `weaponType`. This is the stock test of starship fire. */
+unsigned int XwaCraftWeapons_IffWeaponType(uint8_t iff, unsigned int weaponType);
 /* Writes the RGB impact colour of a bolt of `weaponType` from a craft of
    `objectType` with `markings`. `markings` is -1 when the firing craft is
    gone. Returns 0 when the mark keeps its stock white. */

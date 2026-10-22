@@ -4,8 +4,10 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
+#include "xwa/flight/object/laser.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/render/renderer.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/skins.h"
 
@@ -37,6 +39,7 @@ typedef struct WeaponColorSet {
 
 typedef struct CraftWeaponsType {
 	WeaponColorSet colors;
+	int8_t switchByIff; /* 1 or 0, -1 when not set */
 	uint16_t markingsCount;
 	uint8_t markings[256];
 	WeaponColorSet byMarkings[];
@@ -212,6 +215,7 @@ void XwaCraftWeapons_ClearModelSettings(void) {
 void XwaCraftWeapons_ReadModelSettings(unsigned int objectType, const char* path,
 									   const AeronConfigNode* group) {
 	const AeronConfigNode* byMarkings;
+	const AeronConfigNode* node;
 	CraftWeaponsType* type;
 	size_t count;
 	size_t index;
@@ -231,6 +235,13 @@ void XwaCraftWeapons_ReadModelSettings(unsigned int objectType, const char* path
 	type = (CraftWeaponsType*)calloc(1, sizeof *type + count * sizeof type->byMarkings[0]);
 	if (type == NULL) {
 		return;
+	}
+	type->switchByIff = -1;
+	node = AeronConfigNode_MapGet(group, "switch_by_iff");
+	if (node != NULL && AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+		Aeron_LogWarn("xwa.models", "%s: weapons.switch_by_iff must be true or false. It is ignored", path);
+	} else if (node != NULL) {
+		type->switchByIff = (int8_t)(AeronConfigNode_Bool(node, 0) != 0);
 	}
 	CraftWeapons_ClearSet(&type->colors);
 	CraftWeapons_ReadSet(path, "weapons.colors", AeronConfigNode_MapGet(group, "colors"), &type->colors);
@@ -274,6 +285,30 @@ uint8_t XwaCraftWeapons_BoltMarkings(unsigned int objectType, uint8_t markings, 
 	}
 	return CraftWeapons_Variant(type, CraftWeapons_ByMarkings(type, markings),
 								(int)(weaponType - CRAFT_WEAPONS_FIRST));
+}
+
+int XwaCraftWeapons_SwitchByIff(unsigned int objectType) {
+	const CraftWeaponsType* type = CraftWeapons_Type(objectType);
+
+	if (type != NULL && type->switchByIff >= 0) {
+		return type->switchByIff;
+	}
+	return XwaMissionSettings_WeaponIffSwap();
+}
+
+unsigned int XwaCraftWeapons_IffWeaponType(uint8_t iff, unsigned int weaponType) {
+	unsigned int index = weaponType - OBJ_LaserRebel;
+	uint8_t side;
+
+	if (weaponType < OBJ_LaserRebel || weaponType > OBJ_LaserImperialDS ||
+		iff >= sizeof g_projectileRequiredIffByShooterIff) {
+		return weaponType;
+	}
+	side = g_projectileRequiredIffByType[index];
+	if (side != 0xffu && g_projectileRequiredIffByShooterIff[iff] != side) {
+		return g_projectileAlternateIffTypeByType[index];
+	}
+	return weaponType;
 }
 
 int XwaCraftWeapons_ImpactColor(unsigned int objectType, int markings, unsigned int weaponType,

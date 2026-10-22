@@ -16,6 +16,11 @@ extern const uint16_t g_projectileLifetimeFracQ16ByType[OBJ_LaserImperialDS - OB
 extern const uint16_t g_projectileSpeedByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
 extern const int      g_projectileDamageByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
 extern const uint8_t  g_projectileWarheadClassByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
+/* The side of each projectile type (0 or 1, 0xff for none), the projectile type of
+   the other side, and the side of each IFF. */
+extern const uint8_t g_projectileRequiredIffByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
+extern const uint16_t g_projectileAlternateIffTypeByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
+extern const uint8_t g_projectileRequiredIffByShooterIff[8];
 
 #ifdef XWA_MODERN
 /* Returns -1 when objectType cannot index the compact projectile tables. */

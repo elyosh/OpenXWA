@@ -967,6 +967,13 @@ static __inline uint16_t laser_SelectWarheadLauncherProjectileType(ObjectRecord*
 		uint8_t requiredIff;
 
 		projectileType = g_curCraft->warheadData[launcherIdx].projectileTypeId;
+#ifdef XWA_MODERN
+		/* Modern port: XWAU's WeaponSwitchBasedOnIff can turn off the swap
+		   to the craft's side's weapon (craft_weapons.h). */
+		if (XwaCraftWeapons_SwitchByIff(ownerObj->objectType) == 0) {
+			return projectileType;
+		}
+#endif
 		typeIdx = (uint16_t)projectileType - OBJ_LaserRebel;
 #ifdef XWA_MODERN
 		requiredIff = g_projectileRequiredIffByType[typeIdx];
@@ -1718,6 +1725,15 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 
 		firerObj = &g_objectTable[firerObjIdx];
 		firerObjectType = firerObj->objectType;
+#ifdef XWA_MODERN
+		/* Modern port: XWAU's WeaponSwitchBasedOnIff gives every shot of some
+		   craft the weapon of their side (craft_weapons.h). The player's slot
+		   choice above keeps the type it was given, as in XWAU. */
+		if (XwaCraftWeapons_SwitchByIff(firerObjectType) == 1) {
+			projectileType =
+				(ObjectTypeId)XwaCraftWeapons_IffWeaponType((uint8_t)firerObj->mobj->iff, projectileType);
+		}
+#endif
 
 		projectileTypeIdx = (unsigned int)(projectileType - OBJ_LaserRebel);
 		g_objectTable[projectileObjIdx].mobj->state = 1;
