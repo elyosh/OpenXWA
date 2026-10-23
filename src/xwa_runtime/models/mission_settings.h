@@ -45,6 +45,13 @@
  *     gunner_weapon_select_in_seat: true
  *     gunner_fires_selected_group: true
  *     gunner_fires_warheads: true
+ *     no_fire_from_destroyed_hardpoints: true
+ *     tie_fighter_energy_step_always_high: true
+ *     player_decharge_lasers_only: true
+ *     rearm_follows_both_statuses: true
+ *     warhead_collision_bonus_any_target: true
+ *     turbolaser_hardpoint_types: true
+ *     gun_turret_hardpoints: true
  *
  * classic_hide_destroyed_engine_glows only changes drawing: the classic
  * renderer doesn't draw the engine glows of a destroyed or hidden mesh, nor
@@ -82,7 +89,28 @@
  *     gunner cockpit has a hardpoint for it. In the stock game, it fires
  *     every turret laser group;
  *   - gunner_fires_warheads: a seat fires warheads only when the gunner
- *     cockpit has a warhead hardpoint. */
+ *     cockpit has a warhead hardpoint.
+ *
+ * The weapon rules change how craft fire. They change the simulation:
+ *   - no_fire_from_destroyed_hardpoints: a craft doesn't fire a laser or a
+ *     warhead from a hardpoint whose mesh is destroyed;
+ *   - tie_fighter_energy_step_always_high: the TIE Fighter always gets its
+ *     larger speed step for each step of energy moved to or from its
+ *     engines. In the stock game, it gets it only with spare engine power;
+ *   - player_decharge_lasers_only: a player's shot only takes charge from a
+ *     laser rack. In the stock game, a starfighter's shot takes charge from
+ *     any rack that fires;
+ *   - rearm_follows_both_statuses: when a supply craft rearms a craft, it
+ *     reads both warhead statuses of the craft's flight group, like the other
+ *     warhead loads do. In the stock game, it only reads the first status;
+ *   - warhead_collision_bonus_any_target: when a craft hits another craft,
+ *     its warheads add to the damage whatever the target is. In the stock
+ *     game, they only add to it when the target is a starship or a platform;
+ *   - turbolaser_hardpoint_types: OPT hardpoint types 33 to 37 are weapon
+ *     types 301 to 305, and type 38 is weapon type 307. In the stock game,
+ *     hardpoint type N is weapon type N + 279;
+ *   - gun_turret_hardpoints: XWAU's rules for the hardpoints of gun turret
+ *     meshes. A gun turret mesh doesn't fire at targets behind it. */
 
 #include <stdint.h>
 
@@ -115,6 +143,13 @@ int XwaMissionSettings_NoPlayerWarheadSlotCap(void);
 int XwaMissionSettings_GunnerWeaponSelectInSeat(void);
 int XwaMissionSettings_GunnerFiresSelectedGroup(void);
 int XwaMissionSettings_GunnerFiresWarheads(void);
+int XwaMissionSettings_NoFireFromDestroyedHardpoints(void);
+int XwaMissionSettings_TieFighterEnergyStepAlwaysHigh(void);
+int XwaMissionSettings_PlayerDechargeLasersOnly(void);
+int XwaMissionSettings_RearmFollowsBothStatuses(void);
+int XwaMissionSettings_WarheadCollisionBonusAnyTarget(void);
+int XwaMissionSettings_TurbolaserHardpointTypes(void);
+int XwaMissionSettings_GunTurretHardpoints(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);

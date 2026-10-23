@@ -239,7 +239,9 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/gunner_seats.c
     src/xwa_runtime/models/skins.c
     src/xwa_runtime/models/stats_profiles.c
+    src/xwa_runtime/models/turret_hardpoints.c
     src/xwa_runtime/models/weapon_rates.c
+    src/xwa_runtime/models/weapon_stats.c
     src/xwa_runtime/audio/sound_banks.c
     src/xwa_runtime/audio/mission_sounds.c
     src/xwa_runtime/models/craft_sounds.c

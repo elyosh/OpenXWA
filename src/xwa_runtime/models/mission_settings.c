@@ -68,6 +68,13 @@ static int s_noPlayerWarheadSlotCap;
 static int s_gunnerWeaponSelectInSeat;
 static int s_gunnerFiresSelectedGroup;
 static int s_gunnerFiresWarheads;
+static int s_noFireFromDestroyedHardpoints;
+static int s_tieFighterEnergyStepAlwaysHigh;
+static int s_playerDechargeLasersOnly;
+static int s_rearmFollowsBothStatuses;
+static int s_warheadCollisionBonusAnyTarget;
+static int s_turbolaserHardpointTypes;
+static int s_gunTurretHardpoints;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -403,6 +410,13 @@ void XwaMissionSettings_Init(void) {
 	s_gunnerWeaponSelectInSeat = 0;
 	s_gunnerFiresSelectedGroup = 0;
 	s_gunnerFiresWarheads = 0;
+	s_noFireFromDestroyedHardpoints = 0;
+	s_tieFighterEnergyStepAlwaysHigh = 0;
+	s_playerDechargeLasersOnly = 0;
+	s_rearmFollowsBothStatuses = 0;
+	s_warheadCollisionBonusAnyTarget = 0;
+	s_turbolaserHardpointTypes = 0;
+	s_gunTurretHardpoints = 0;
 	MissionSettings_ResetTargets();
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SETTINGS_FLIGHT_YAML, &file,
@@ -468,6 +482,33 @@ void XwaMissionSettings_Init(void) {
 	if ((node = AeronConfigNode_MapGet(rules, "gunner_fires_warheads")) != NULL) {
 		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "gunner_fires_warheads", node, &s_gunnerFiresWarheads);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_fire_from_destroyed_hardpoints")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "no_fire_from_destroyed_hardpoints", node,
+								 &s_noFireFromDestroyedHardpoints);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "tie_fighter_energy_step_always_high")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "tie_fighter_energy_step_always_high", node,
+								 &s_tieFighterEnergyStepAlwaysHigh);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "player_decharge_lasers_only")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "player_decharge_lasers_only", node,
+								 &s_playerDechargeLasersOnly);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "rearm_follows_both_statuses")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "rearm_follows_both_statuses", node,
+								 &s_rearmFollowsBothStatuses);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "warhead_collision_bonus_any_target")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "warhead_collision_bonus_any_target", node,
+								 &s_warheadCollisionBonusAnyTarget);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "turbolaser_hardpoint_types")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "turbolaser_hardpoint_types", node,
+								 &s_turbolaserHardpointTypes);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "gun_turret_hardpoints")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "gun_turret_hardpoints", node, &s_gunTurretHardpoints);
+	}
 	MissionSettings_Read(SETTINGS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "mission_settings"), &s_defaults);
 	s_settings = s_defaults;
 	AeronConfigFile_Destroy(file);
@@ -509,6 +550,20 @@ int XwaMissionSettings_GunnerWeaponSelectInSeat(void) { return s_gunnerWeaponSel
 int XwaMissionSettings_GunnerFiresSelectedGroup(void) { return s_gunnerFiresSelectedGroup; }
 
 int XwaMissionSettings_GunnerFiresWarheads(void) { return s_gunnerFiresWarheads; }
+
+int XwaMissionSettings_NoFireFromDestroyedHardpoints(void) { return s_noFireFromDestroyedHardpoints; }
+
+int XwaMissionSettings_TieFighterEnergyStepAlwaysHigh(void) { return s_tieFighterEnergyStepAlwaysHigh; }
+
+int XwaMissionSettings_PlayerDechargeLasersOnly(void) { return s_playerDechargeLasersOnly; }
+
+int XwaMissionSettings_RearmFollowsBothStatuses(void) { return s_rearmFollowsBothStatuses; }
+
+int XwaMissionSettings_WarheadCollisionBonusAnyTarget(void) { return s_warheadCollisionBonusAnyTarget; }
+
+int XwaMissionSettings_TurbolaserHardpointTypes(void) { return s_turbolaserHardpointTypes; }
+
+int XwaMissionSettings_GunTurretHardpoints(void) { return s_gunTurretHardpoints; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

@@ -68,6 +68,11 @@
  *     With these values, or with the rates on, system damage stops at `max`,
  *     as in XWAU. The stock game stops adding damage once it reaches 1000,
  *     but a hit can take it past 1000.
+ * A weapon profile can set the decharge rate, the recharge rate and the
+ * cooldown of each weapon type. Its values take the place of the `rates`
+ * values, and the percents still scale them. A rack uses the rates of its
+ * weapon type. Once its charge reaches the profile's high_power_charge, it
+ * uses the rates of the next type, its high-power type.
  *
  * The rates and the rules change the simulation. So do the other groups. */
 
@@ -90,16 +95,20 @@ void XwaWeaponRates_ClearModelSettings(void);
 void XwaWeaponRates_ReadModelSettings(unsigned int objectType, const char* path,
 									  const struct AeronConfigNode* group);
 
-/* Writes the charge that a player's shot from object `objIdx` takes from
-   its rack into `rate`, and returns 1. Returns 0 for the stock rule. */
-int XwaWeaponRates_Decharge(unsigned int objIdx, int* rate);
-/* Replaces `*chargeDelta`, the stock charge that comes back to each laser
-   rack of object `objIdx`, with `chargeBasis` times the craft's recharge
-   rate. Does nothing for the stock rule. */
-void XwaWeaponRates_Recharge(unsigned int objIdx, int16_t chargeBasis, int16_t* chargeDelta);
-/* Returns the time that each laser fired by object `objIdx` adds before
-   its next shot: 47 for the stock rule. */
-int XwaWeaponRates_Cooldown(unsigned int objIdx);
+/* Writes into `rate` the charge that a player's shot takes from rack
+   `rackIdx` of object `objIdx`, and returns 1. Returns 0 for the stock rule.
+   g_curCraft must be the object's craft. */
+int XwaWeaponRates_Decharge(unsigned int objIdx, unsigned int rackIdx, int* rate);
+/* Replaces `*chargeDelta`, the stock charge that comes back to laser rack
+   `rackIdx` of object `objIdx`, with `chargeBasis` times the rack's recharge
+   rate. Does nothing for the stock rule. g_curCraft must be the object's
+   craft. */
+void XwaWeaponRates_Recharge(unsigned int objIdx, unsigned int rackIdx, int16_t chargeBasis,
+							 int16_t* chargeDelta);
+/* Returns the time that each shot of a laser group of object `objIdx` adds
+   before the group's next shot. `weapon` is the last weapon type that the
+   group fired. The stock value is 47. */
+int XwaWeaponRates_Cooldown(unsigned int objIdx, unsigned int weapon);
 /* Returns 0 when the rules of flight/flight.yaml keep object `objIdx` from
    firing rack `rackIdx` of g_curCraft, its craft. `laser` is 1 for the
    laser racks, 0 for the warhead launchers. */

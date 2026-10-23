@@ -54,6 +54,7 @@
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/warhead_pools.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -4289,7 +4290,14 @@ after_key:
 								ammoIdx = g_hangarWarheadList[g_hangarMenuCursor[1]];
 								if (slot && modelIndex == (uint16_t)GetModelDefIndexFromType(OBJ_MissileBoat))
 									ammoIdx = 5;
+#ifdef XWA_MODERN
+								/* Modern port: a mod's warhead profile can
+								   change the number of warheads. */
+								count = XwaWeaponStats_WarheadCapacity(objectIndex, ammoIdx, value,
+																	   g_warheadAmmoCounts[ammoIdx]);
+#else
 								count = MATH2_fraction(value, g_warheadAmmoCounts[ammoIdx]);
+#endif
 								if (!count)
 									count = 1;
 								status1 = g_missionFlightGroups[boundFG].fg.status1;
@@ -6814,9 +6822,18 @@ void Hangar_ServicePlayerCraft(int dtTicks) {
 								(void)GetModelDefIndexFromType(OBJ_MissileBoat);
 							}
 
+#ifdef XWA_MODERN
+							/* Modern port: a mod's warhead profile can change
+							   the number of warheads. */
+							baseMaxCount = XwaWeaponStats_WarheadCapacity(
+								g_hangarPlayerObjIdx, warheadCatalogIdx,
+								g_modelDefs[modelIndex].warheadLauncherCapacity[launcherIdx],
+								g_warheadAmmoCounts[warheadCatalogIdx]);
+#else
 							baseMaxCount = (uint16_t)MATH2_fraction(
 								g_modelDefs[modelIndex].warheadLauncherCapacity[launcherIdx],
 								g_warheadAmmoCounts[warheadCatalogIdx]);
+#endif
 							adjustedMaxCount = baseMaxCount;
 							if (baseMaxCount == 0) {
 								baseMaxCount = 1;

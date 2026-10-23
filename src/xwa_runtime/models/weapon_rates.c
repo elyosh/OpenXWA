@@ -9,6 +9,9 @@
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_settings.h"
+#include "xwa_runtime/models/weapon_stats.h"
+
+#include <limits.h>
 
 #include <stdint.h>
 #include <stdio.h>
@@ -234,7 +237,28 @@ static int WeaponRates_Scale(const WeaponRatesSet* model, int32_t rate, int perc
 	return (int)((int64_t)rate * percent / 100 * global / 100);
 }
 
-static int WeaponRates_DechargeRate(const ObjectRecord* object, const WeaponRatesSet* model) {
+/* Returns the weapon type that rack `rack` of object `objIdx` fires: its
+   type, or the next type when its charge reaches the high-power charge. */
+static unsigned int WeaponRates_RackWeapon(unsigned int objIdx, const WarheadInventoryEntry* rack) {
+	const unsigned int weapon = rack->projectileTypeId;
+
+	return (int8_t)rack->laserCharge >=
+				   XwaWeaponStats_Value((int)objIdx, weapon, XWA_WEAPON_STAT_HIGH_POWER_CHARGE, 64)
+			   ? weapon + 1
+			   : weapon;
+}
+
+/* Returns 1 when the weapon profile of object `objIdx` sets `stat` for
+   `weapon`. */
+static int WeaponRates_HasStat(unsigned int objIdx, unsigned int weapon, XwaWeaponStat stat) {
+	return XwaWeaponStats_Value((int)objIdx, weapon, stat, INT_MIN) != INT_MIN;
+}
+
+/* Returns the charge that a shot of `weapon` by object `objIdx` uses: the
+   weapon profile's value, or the model's, or the stock value, scaled by the
+   percents. */
+static int WeaponRates_DechargeRate(unsigned int objIdx, const WeaponRatesSet* model, unsigned int weapon) {
+	const ObjectRecord* object = &g_objectTable[objIdx];
 	int32_t rate = WeaponRates_Value(model, WEAPON_RATES_DECHARGE);
 
 	if (rate < 0) {
@@ -244,41 +268,48 @@ static int WeaponRates_DechargeRate(const ObjectRecord* object, const WeaponRate
 			rate = 3;
 		}
 	}
+	rate = XwaWeaponStats_Value((int)objIdx, weapon, XWA_WEAPON_STAT_DECHARGE_RATE, rate);
 	return WeaponRates_Scale(model, rate, WEAPON_RATES_DECHARGE_PERCENT, s_dechargePercent);
 }
 
-int XwaWeaponRates_Decharge(unsigned int objIdx, int* rate) {
-	const ObjectRecord* object = &g_objectTable[objIdx];
-	const WeaponRatesSet* model = WeaponRates_Model(object->objectType);
+int XwaWeaponRates_Decharge(unsigned int objIdx, unsigned int rackIdx, int* rate) {
+	const WeaponRatesSet* model = WeaponRates_Model(g_objectTable[objIdx].objectType);
+	const unsigned int weapon = WeaponRates_RackWeapon(objIdx, &g_curCraft->warheadData[rackIdx]);
 
-	if (!s_active && !WeaponRates_HasRates(model)) {
+	if (!s_active && !WeaponRates_HasRates(model) &&
+		!WeaponRates_HasStat(objIdx, weapon, XWA_WEAPON_STAT_DECHARGE_RATE)) {
 		return 0;
 	}
-	*rate = WeaponRates_DechargeRate(object, model);
+	*rate = WeaponRates_DechargeRate(objIdx, model, weapon);
 	return 1;
 }
 
-void XwaWeaponRates_Recharge(unsigned int objIdx, int16_t chargeBasis, int16_t* chargeDelta) {
+void XwaWeaponRates_Recharge(unsigned int objIdx, unsigned int rackIdx, int16_t chargeBasis,
+							 int16_t* chargeDelta) {
 	const ObjectRecord* object = &g_objectTable[objIdx];
 	const WeaponRatesSet* model = WeaponRates_Model(object->objectType);
+	const unsigned int weapon = WeaponRates_RackWeapon(objIdx, &g_curCraft->warheadData[rackIdx]);
 	int32_t rate;
 
-	if (!s_active && !WeaponRates_HasRates(model)) {
+	if (!s_active && !WeaponRates_HasRates(model) &&
+		!WeaponRates_HasStat(objIdx, weapon, XWA_WEAPON_STAT_RECHARGE_RATE)) {
 		return;
 	}
 	rate = WeaponRates_Value(model, WEAPON_RATES_RECHARGE);
 	if (rate < 0) {
 		rate = WeaponRates_IsTieFighterOrBomber(object) ? 3 : 2;
 	}
+	rate = XwaWeaponStats_Value((int)objIdx, weapon, XWA_WEAPON_STAT_RECHARGE_RATE, rate);
 	rate = WeaponRates_Scale(model, rate, WEAPON_RATES_RECHARGE_PERCENT, s_rechargePercent);
 	*chargeDelta = (int16_t)((int64_t)rate * chargeBasis);
 }
 
-int XwaWeaponRates_Cooldown(unsigned int objIdx) {
+int XwaWeaponRates_Cooldown(unsigned int objIdx, unsigned int weapon) {
 	const int32_t cooldown =
 		WeaponRates_Value(WeaponRates_Model(g_objectTable[objIdx].objectType), WEAPON_RATES_COOLDOWN);
 
-	return cooldown >= 0 ? cooldown : 47;
+	return XwaWeaponStats_Value((int)objIdx, weapon, XWA_WEAPON_STAT_FIRE_RATE,
+								cooldown >= 0 ? cooldown : 47);
 }
 
 int XwaWeaponRates_CanFire(unsigned int objIdx, unsigned int rackIdx, int laser) {
@@ -288,7 +319,8 @@ int XwaWeaponRates_CanFire(unsigned int objIdx, unsigned int rackIdx, int laser)
 	if (laser && XwaMissionSettings_FireNeedsDechargeRate() &&
 		(rack->projectileTypeId == OBJ_LaserRebel || rack->projectileTypeId == OBJ_LaserImperial ||
 		 rack->projectileTypeId == OBJ_LaserIon) &&
-		(int8_t)rack->laserCharge < WeaponRates_DechargeRate(object, WeaponRates_Model(object->objectType))) {
+		(int8_t)rack->laserCharge < WeaponRates_DechargeRate(objIdx, WeaponRates_Model(object->objectType),
+															 WeaponRates_RackWeapon(objIdx, rack))) {
 		return 0;
 	}
 	if (XwaMissionSettings_NoStarshipFireFromDestroyedRacks() &&

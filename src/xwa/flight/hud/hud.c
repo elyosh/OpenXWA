@@ -38,6 +38,7 @@
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #endif
 #include "xwa/render/effects.h"
@@ -6219,6 +6220,17 @@ void Hud_DrawEnergyBar3D(int isIonBank, int bankWeaponCount) {
 	do {
 		uint32_t emptySegments;
 		int16_t charge;
+#ifdef XWA_MODERN
+		/* Modern port: the bar changes colour at the high-power charge, which a
+		   mod's weapon profile can change. */
+		const int highPowerCharge =
+			XwaWeaponStats_Value(g_players[g_localPlayer].objectIndex,
+								 craft->warheadData[endWeapon - weaponCount].projectileTypeId,
+								 XWA_WEAPON_STAT_HIGH_POWER_CHARGE, HUD_ENERGY_BAR_OVERCHARGE_BASE);
+#define HUD_ENERGY_BAR_HIGH_CHARGE highPowerCharge
+#else
+#define HUD_ENERGY_BAR_HIGH_CHARGE HUD_ENERGY_BAR_OVERCHARGE_BASE
+#endif
 
 		emptySegments = 0;
 		charge = (int8_t)*chargePtr;
@@ -6231,22 +6243,22 @@ void Hud_DrawEnergyBar3D(int isIonBank, int bankWeaponCount) {
 
 			++charge;
 			displayCharge = (uint16_t)charge;
-			if (charge <= HUD_ENERGY_BAR_OVERCHARGE_BASE) {
+			if (charge <= HUD_ENERGY_BAR_HIGH_CHARGE) {
 				color = secondaryColor;
 			} else {
 				color = primaryColor;
-				displayCharge = (uint16_t)(charge - HUD_ENERGY_BAR_OVERCHARGE_BASE);
+				displayCharge = (uint16_t)(charge - HUD_ENERGY_BAR_HIGH_CHARGE);
 			}
 
 			filledSegments = displayCharge / HUD_ENERGY_BAR_SEGMENT_CHARGE;
 			if (filledSegments == 0 &&
-				(charge < HUD_ENERGY_BAR_SEGMENT_CHARGE || charge > HUD_ENERGY_BAR_OVERCHARGE_BASE)) {
+				(charge < HUD_ENERGY_BAR_SEGMENT_CHARGE || charge > HUD_ENERGY_BAR_HIGH_CHARGE)) {
 				filledSegments = 1;
 			}
 			if (filledSegments > g_hudEnergyBarMaxSegments) {
 				filledSegments = g_hudEnergyBarMaxSegments;
 			}
-			if (charge > HUD_ENERGY_BAR_OVERCHARGE_BASE) {
+			if (charge > HUD_ENERGY_BAR_HIGH_CHARGE) {
 				emptySegments = g_hudEnergyBarMaxSegments - filledSegments;
 			}
 
@@ -6281,6 +6293,7 @@ void Hud_DrawEnergyBar3D(int isIonBank, int bankWeaponCount) {
 				}
 			}
 		}
+#undef HUD_ENERGY_BAR_HIGH_CHARGE
 		chargePtr += sizeof(*craft->warheadData);
 		anchorY += sizeof(*chargeQuads) / sizeof(*anchorY);
 		--weaponCount;

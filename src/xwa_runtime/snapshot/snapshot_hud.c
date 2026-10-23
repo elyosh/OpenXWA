@@ -12,6 +12,7 @@
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_weapons.h"
+#include "xwa_runtime/models/weapon_stats.h"
 
 #include <string.h>
 
@@ -433,6 +434,9 @@ static void hud_capture_instruments(XwaHudState* out, const ObjectRecord* object
 	for (i = 0; i < XWA_SNAP_MAX_WEAPON_SLOTS; i++) {
 		instruments->weapon_type[i] = craft->warheadData[i].weaponType;
 		instruments->laser_charge[i] = craft->warheadData[i].laserCharge;
+		instruments->laser_high_charge[i] = (uint8_t)XwaWeaponStats_Value(
+			(int)(object - g_objectTable), craft->warheadData[i].projectileTypeId,
+			XWA_WEAPON_STAT_HIGH_POWER_CHARGE, 64);
 		instruments->warhead_count[i] = craft->warheadData[i].count;
 		out->reticle.hardpoint_kind[i] = craft->warheadData[i].weaponType;
 		out->reticle.hardpoint_local[i][0] = model->weaponHardpoints[i].x;

@@ -66,6 +66,7 @@
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/weapon_rates.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -5586,6 +5587,26 @@ void Flight_UpdateCraftSteeringAndSpeed(void) {
 						maxSpeed = (uint16_t)g_curCraft->aiFlight.maxSpeedCache;
 						enginePowerMargin = 6 - g_curCraft->laserRedirect - g_curCraft->shieldRedirect -
 											g_curCraft->beamLevel;
+#ifdef XWA_MODERN
+						/* Modern port: a mod's weapon profile can change the
+						   speed step. A mod can also give the TIE Fighter its
+						   larger step without spare engine power. */
+						{
+							int step;
+
+							if (g_objectTable[(uint16_t)slot].objectType == OBJ_TIEBomber) {
+								step = 0x1000;
+							} else if (g_objectTable[(uint16_t)slot].objectType == OBJ_TIEFighter &&
+									   ((int16_t)enginePowerMargin > 0 ||
+										XwaMissionSettings_TieFighterEnergyStepAlwaysHigh())) {
+								step = 0x3000;
+							} else {
+								step = 0x2000;
+							}
+							speedBonusStep = (uint16_t)MATH2_fraction(
+								maxSpeed, (uint16_t)XwaWeaponStats_EnergySpeedStep((uint16_t)slot, step));
+						}
+#else
 						if (g_objectTable[(uint16_t)slot].objectType == OBJ_TIEBomber) {
 							speedBonusStep = (uint16_t)MATH2_fraction(maxSpeed, 0x1000u);
 						} else if (g_objectTable[(uint16_t)slot].objectType == OBJ_TIEFighter &&
@@ -5594,6 +5615,7 @@ void Flight_UpdateCraftSteeringAndSpeed(void) {
 						} else {
 							speedBonusStep = (uint16_t)MATH2_fraction(maxSpeed, 0x2000u);
 						}
+#endif
 						targetSpeed = (uint16_t)MATH2_fraction(
 							(uint16_t)(enginePowerMargin * speedBonusStep + maxSpeed), motionFrac);
 						if (g_curCraft->slamActive != 0) {
@@ -9600,11 +9622,28 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 								break;
 							}
 							mode = (uint8_t)(craft->laserLinkMode[group] + 1);
+#ifdef XWA_MODERN
+							/* Modern port: a mod can stop the player from
+							   linking the lasers and the ions. */
+							if (mode == 4 && craft->cannonClassCount == 2 &&
+								!XwaWeaponStats_LinkingRule(
+									(uint16_t)objIdx, XWA_WEAPON_LINKING_PREVENT_PLAYER_LINKED_LASERS_ION)) {
+								craft->laserLinkMode[0] = 4;
+								craft->laserLinkMode[1] = 4;
+							}
+							if (mode > (craft->cannonClassCount == 2 &&
+												!XwaWeaponStats_LinkingRule(
+													(uint16_t)objIdx,
+													XWA_WEAPON_LINKING_PREVENT_PLAYER_LINKED_LASERS_ION)
+											? 4
+											: 3)) {
+#else
 							if (mode == 4 && craft->cannonClassCount == 2) {
 								craft->laserLinkMode[0] = 4;
 								craft->laserLinkMode[1] = 4;
 							}
 							if (mode > (craft->cannonClassCount == 2 ? 4 : 3)) {
+#endif
 								mode = 1;
 								if (craft->cannonClassCount == 2) {
 									if (group) {
@@ -9618,6 +9657,11 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 								mode == 2) {
 								mode = 3;
 							}
+#ifdef XWA_MODERN
+							/* Modern port: a mod's weapon profile can set the
+							   link mode. */
+							mode = (uint8_t)XwaWeaponStats_LaserLink((uint16_t)objIdx, mode);
+#endif
 							craft->laserLinkMode[group] = mode;
 							craft->laserLinkNextSlot[group] =
 								g_modelDefs[(uint16_t)modelIndex].laserGroupFirstSlot[group];

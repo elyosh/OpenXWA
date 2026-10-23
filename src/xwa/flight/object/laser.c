@@ -33,7 +33,9 @@
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/turret_hardpoints.h"
 #include "xwa_runtime/models/weapon_rates.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -783,7 +785,7 @@ void laser_weaponsfire(void) {
 						}
 #ifdef XWA_MODERN
 						/* Modern port: a mod can change the laser rates. */
-						XwaWeaponRates_Recharge(objectIdx, chargeBasis, &chargeDelta);
+						XwaWeaponRates_Recharge(objectIdx, slotIdx, chargeBasis, &chargeDelta);
 #endif
 						g_curCraft->warheadData[slotIdx].laserCharge =
 							(uint8_t)(g_curCraft->warheadData[slotIdx].laserCharge + chargeDelta);
@@ -977,17 +979,42 @@ static __inline void laser_RotateObjectLocalToWorldOffset(ObjectRecord* obj, int
 	g_rotatedZ = Xwa_Dot3Q15Inline(sideZ, upZ, fwdZ, localSide, localUp, localFwd);
 }
 
-static __inline uint16_t laser_ComputeLauncherCooldownTicks(ModelDefIndex modelIndex, uint16_t launcherIdx,
-															int ownerPlayerIdx) {
+static __inline uint16_t laser_ComputeLauncherCooldownTicks(
+#ifdef XWA_MODERN
+	unsigned int ownerObjIdx,
+#endif
+	ModelDefIndex modelIndex, uint16_t launcherIdx, int ownerPlayerIdx) {
 	uint16_t cooldown;
 
 	cooldown = g_modelDefs[modelIndex]
 				   .laserGroupFireCooldownTicks[g_curCraft->warheadData[launcherIdx].weaponGroupIdx];
+#ifdef XWA_MODERN
+	/* Modern port: a mod's weapon profile can change the fire ratio. When the
+	   craft swaps its weapons for its side's weapons, the profile of the new
+	   weapon is used. */
+	{
+		unsigned int weapon = g_curCraft->warheadData[launcherIdx].projectileTypeId;
+
+		if (XwaCraftWeapons_SwitchByIff(g_objectTable[ownerObjIdx].objectType) == 1) {
+			weapon = XwaCraftWeapons_IffWeaponType((uint8_t)g_objectTable[ownerObjIdx].mobj->iff, weapon);
+		}
+		cooldown =
+			(uint16_t)XwaWeaponStats_Value((int)ownerObjIdx, weapon, XWA_WEAPON_STAT_FIRE_RATIO, cooldown);
+	}
+#endif
 	if (cooldown == 0) {
 		cooldown = (uint16_t)(g_curCraft->warheadData[launcherIdx].weaponType != 4 ? 236u : 118u);
 	}
 	if (ownerPlayerIdx == -1) {
 		uint16_t skill;
+
+#ifdef XWA_MODERN
+		/* Modern port: a mod can scale the fire ratio by the flight group's
+		   rank instead of the AI's skill. */
+		if (XwaWeaponStats_HasFireRatioByRank()) {
+			return (uint16_t)XwaWeaponStats_FireRatioByRank(ownerObjIdx, cooldown);
+		}
+#endif
 
 		skill = pai_GetEffectiveSkillValue(g_curCraft);
 		if (skill < 0x4000u) {
@@ -1080,9 +1107,18 @@ static __inline int laser_GetLargeObjectLauncherPoint(ObjectRecord* ownerObj, Mo
 		}
 
 		floatHardpoints = FeDiskIo_GetMeshFloatHardpoint(ownerObj->objectType, 0);
-		hardpointIdx = ModelMesh_FindNearestLiveFloatHardpoint(
-			ownerObj->objectType, g_rotatedX, g_rotatedY, g_rotatedZ, excludedCount, excludedHardpointIndices,
-			floatHardpoints, g_curCraft);
+#ifdef XWA_MODERN
+		/* Modern port: a mod can stop a gun turret mesh from firing at a target
+		   behind it. */
+		if (XwaMissionSettings_GunTurretHardpoints()) {
+			hardpointIdx = XwaTurretHardpoints_FindNearestLive(
+				ownerObj->objectType, g_rotatedX, g_rotatedY, g_rotatedZ, excludedCount,
+				excludedHardpointIndices, floatHardpoints, g_curCraft);
+		} else
+#endif
+			hardpointIdx = ModelMesh_FindNearestLiveFloatHardpoint(
+				ownerObj->objectType, g_rotatedX, g_rotatedY, g_rotatedZ, excludedCount,
+				excludedHardpointIndices, floatHardpoints, g_curCraft);
 		if (hardpointIdx == 0xffu) {
 			return 0;
 		}
@@ -1221,10 +1257,37 @@ static __inline void laser_GetModelHardpointLauncherPoint(ObjectRecord* ownerObj
 }
 
 static __inline void laser_ApplyWarheadLauncherAimError(ObjectRecord* ownerObj, ObjectRecord* targetObj,
+#ifdef XWA_MODERN
+														uint16_t projectileType,
+#endif
 														int16_t* pitch, uint16_t* yaw) {
 	int yawError;
 	int pitchError;
+#ifdef XWA_MODERN
+	/* Modern port: a mod's weapon profile can change the spread. An AI turret
+	   that isn't precise spreads its shots like a player. */
+	const int ownerObjIdx = (int)(ownerObj - g_objectTable);
+	const unsigned int spreadMask =
+		(unsigned int)XwaWeaponStats_Value(ownerObjIdx, projectileType, XWA_WEAPON_STAT_SPREAD_MASK, 0xff);
+	const unsigned int halfSpreadMask = spreadMask >= 0xffu ? 0x7fu : (spreadMask + 1u) / 2u - 1u;
 
+	if (ownerObj->playerOwnerIdx != -1 ||
+		!XwaWeaponStats_Value(ownerObjIdx, projectileType, XWA_WEAPON_STAT_PRECISE, 1)) {
+		MobileObject* targetMobj;
+
+		targetMobj = targetObj->mobj;
+		if (targetMobj != NULL && targetMobj->speed != 0) {
+			yawError = (int)(GameRand() & halfSpreadMask);
+			yawError += (int)(GameRand() & spreadMask);
+		} else {
+			yawError = (int)(GameRand() & spreadMask);
+		}
+		if ((uint16_t)GameRand() >= 0x8000u) {
+			yawError = -yawError;
+		}
+		*yaw = (uint16_t)(*yaw + yawError);
+		pitchError = (int)(GameRand() & spreadMask);
+#else
 	if (ownerObj->playerOwnerIdx != -1) {
 		MobileObject* targetMobj;
 
@@ -1240,6 +1303,7 @@ static __inline void laser_ApplyWarheadLauncherAimError(ObjectRecord* ownerObj, 
 		}
 		*yaw = (uint16_t)(*yaw + yawError);
 		pitchError = (uint8_t)GameRand();
+#endif
 		if ((uint16_t)GameRand() >= 0x8000u) {
 			*pitch = (int16_t)(*pitch - pitchError);
 			if (((uint16_t)*pitch & 0x8000u) != 0) {
@@ -1380,8 +1444,13 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 			}
 		}
 
+#ifdef XWA_MODERN
+		g_curCraft->warheadData[launcherIdx].turretRotBucket =
+			(int16_t)laser_ComputeLauncherCooldownTicks(ownerObjIdx, modelIndex, launcherIdx, ownerPlayerIdx);
+#else
 		g_curCraft->warheadData[launcherIdx].turretRotBucket =
 			(int16_t)laser_ComputeLauncherCooldownTicks(modelIndex, launcherIdx, ownerPlayerIdx);
+#endif
 	}
 
 	launchX = ownerObj->world_x;
@@ -1426,6 +1495,12 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 
 		rangeLimit = (uint32_t)g_modelDefs[modelIndex]
 						 .laserGroupFireRange[g_curCraft->warheadData[launcherIdx].weaponGroupIdx];
+#ifdef XWA_MODERN
+		/* Modern port: a mod's weapon profile can change the range. */
+		rangeLimit = (uint32_t)XwaWeaponStats_Value((int)ownerObjIdx,
+													g_curCraft->warheadData[launcherIdx].projectileTypeId,
+													XWA_WEAPON_STAT_RANGE, (int)rangeLimit);
+#endif
 		if (rangeLimit == 0) {
 			rangeLimit = (g_curCraft->warheadData[launcherIdx].weaponType != 5) ? 81920u : 163840u;
 		}
@@ -1475,7 +1550,10 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 
 			trig2_ctop(dx, dy, dz);
 #ifdef XWA_MODERN
-			projectileSpeed = g_projectileSpeedByType[projectileType - OBJ_LaserRebel];
+			/* Modern port: a mod's weapon profile can change the speed. */
+			projectileSpeed =
+				(uint16_t)XwaWeaponStats_Value((int)ownerObjIdx, projectileType, XWA_WEAPON_STAT_SPEED,
+											   g_projectileSpeedByType[projectileType - OBJ_LaserRebel]);
 #else
 			projectileSpeed = g_projectileSpeedByObjectType_BiasedBase[projectileType];
 #endif
@@ -1514,7 +1592,11 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 	trig2_ctop(targetX - launchX, targetY - launchY, targetZ - launchZ);
 	pitch = (int16_t)targetPitch;
 	yaw = trig2_xyangle;
+#ifdef XWA_MODERN
+	laser_ApplyWarheadLauncherAimError(ownerObj, &g_objectTable[targetRef], projectileType, &pitch, &yaw);
+#else
 	laser_ApplyWarheadLauncherAimError(ownerObj, &g_objectTable[targetRef], &pitch, &yaw);
+#endif
 
 	projectileObjIdx = Object_AllocSlotForGenus(GENUS_NpcProjectile);
 	if (projectileObjIdx == 0xffffu) {
@@ -1545,24 +1627,46 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 #endif
 	g_objectTable[projectileObjIdx].mobj->orientMatrixDirty = 1;
 	g_objectTable[projectileObjIdx].mobj->moveVectorDirty = 1;
+#ifdef XWA_MODERN
+	/* Modern port: a mod's weapon profile can change the speed, the power and
+	   the lifetime. */
+	g_objectTable[projectileObjIdx].mobj->speed =
+		(uint16_t)XwaWeaponStats_Value((int)ownerObjIdx, projectileType, XWA_WEAPON_STAT_SPEED,
+									   g_projectileSpeedByType[projectileType - OBJ_LaserRebel]);
+	g_objectTable[projectileObjIdx].mobj->damageAmount =
+		XwaWeaponStats_Value((int)ownerObjIdx, projectileType, XWA_WEAPON_STAT_POWER,
+							 g_projectileDamageByType[projectileType - OBJ_LaserRebel]);
+#else
 	g_objectTable[projectileObjIdx].mobj->speed = g_projectileSpeedByType[projectileType - OBJ_LaserRebel];
 	g_objectTable[projectileObjIdx].mobj->damageAmount =
 		g_projectileDamageByType[projectileType - OBJ_LaserRebel];
+#endif
 
 	{
 		uint16_t speedTicks;
 		uint16_t wholeSeconds;
 		uint16_t frac;
 
+#ifdef XWA_MODERN
+		speedTicks = (uint16_t)XwaWeaponStats_Value((int)ownerObjIdx, projectileType, XWA_WEAPON_STAT_SPEED,
+													g_projectileSpeedByType[projectileType - OBJ_LaserRebel]);
+		speedTicks = (uint16_t)(speedTicks / 5 + 18u * speedTicks);
+#else
 		speedTicks = (uint16_t)(g_projectileSpeedByType[projectileType - OBJ_LaserRebel] / 5 +
 								18u * g_projectileSpeedByType[projectileType - OBJ_LaserRebel]);
+#endif
 		wholeSeconds = (uint16_t)((int)trig2_polardistance / speedTicks);
 		frac = (uint16_t)((int)trig2_polardistance % speedTicks);
 		frac = MATH2_divide(frac, speedTicks);
 		g_objectTable[projectileObjIdx].mobj->lifetimeTimer = 236 * wholeSeconds;
 		projectileMobj = g_objectTable[projectileObjIdx].mobj;
 		projectileMobj->lifetimeTimer += (uint16_t)MATH2_fraction(frac, 236u);
+#ifdef XWA_MODERN
+		g_objectTable[projectileObjIdx].mobj->lifetimeTimer +=
+			XwaWeaponStats_Value((int)ownerObjIdx, projectileType, XWA_WEAPON_STAT_DURATION_OFFSET, 59);
+#else
 		g_objectTable[projectileObjIdx].mobj->lifetimeTimer += 59;
+#endif
 		projectileMobj = g_objectTable[projectileObjIdx].mobj;
 		projectileMobj->lifetimeTimer += GameRand() & 0x1f;
 	}
@@ -1743,6 +1847,19 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 	int spawnZ;
 	unsigned int projectileTypeIdx;
 
+#ifdef XWA_MODERN
+	/* Modern port: a mod can stop a craft from firing from a hardpoint whose
+	   mesh is destroyed. */
+	if (XwaMissionSettings_NoFireFromDestroyedHardpoints() && g_curCraft != NULL && weaponSlotIdx >= 0 &&
+		weaponSlotIdx < XWA_CRAFT_WEAPON_SLOT_COUNT) {
+		const uint8_t meshIdx =
+			g_modelDefs[g_curCraft->modelDefIndex].weaponHardpoints[weaponSlotIdx].meshIdx;
+
+		if (meshIdx < XWA_CRAFT_MESH_SLOT_COUNT && g_curCraft->componentHp[meshIdx] == 0) {
+			return 0xffff;
+		}
+	}
+#endif
 	if (playerIdx != -1) {
 		uint16_t slotEnd;
 
@@ -1851,6 +1968,53 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 		}
 
 		guidance = g_objectTable[projectileObjIdx].mobj->pWarheadGuidance;
+#ifdef XWA_MODERN
+		/* Modern port: a mod's weapon profile can change the speed, the power
+		   and the lifetime. It also sets how much of the firing craft's speed
+		   is added to the power. */
+		{
+			const uint16_t speed =
+				(uint16_t)XwaWeaponStats_Value((int)firerObjIdx, projectileType, XWA_WEAPON_STAT_SPEED,
+											   g_projectileSpeedByType[projectileTypeIdx]);
+			const int power = XwaWeaponStats_Value((int)firerObjIdx, projectileType, XWA_WEAPON_STAT_POWER,
+												   g_projectileDamageByType[projectileTypeIdx]);
+			uint16_t lifetimeTimer;
+
+			if (g_objectTable[projectileObjIdx].objectType == OBJ_WarheadSpaceBomb) {
+				g_objectTable[projectileObjIdx].mobj->speed = firerObj->mobj->speed;
+				guidance->minSpeed = (uint16_t)(g_objectTable[projectileObjIdx].mobj->speed + speed);
+			} else {
+				g_objectTable[projectileObjIdx].mobj->speed = (uint16_t)(firerObj->mobj->speed + speed);
+				guidance->minSpeed = g_objectTable[projectileObjIdx].mobj->speed;
+			}
+
+			if (firerObj->genusId != GENUS_PilotDroid || g_projectileWarheadClassByType[projectileTypeIdx]) {
+				g_objectTable[projectileObjIdx].mobj->damageAmount =
+					power + (int)firerObj->mobj->speed *
+								XwaWeaponStats_Value((int)firerObjIdx, projectileType,
+													 XWA_WEAPON_STAT_POWER_SPEED_PERCENT, 100) /
+								100;
+				if ((uint32_t)g_objectTable[projectileObjIdx].mobj->damageAmount < (uint32_t)power) {
+					g_objectTable[projectileObjIdx].mobj->damageAmount = power;
+				}
+			} else {
+				g_objectTable[projectileObjIdx].mobj->damageAmount = (uint32_t)power >> 2;
+			}
+
+			lifetimeTimer =
+				(uint16_t)(236u * (uint16_t)XwaWeaponStats_Value(
+									  (int)firerObjIdx, projectileType, XWA_WEAPON_STAT_DURATION_SECONDS,
+									  g_projectileLifetimeSecondsByObjectType[projectileType]));
+			lifetimeTimer =
+				(uint16_t)(lifetimeTimer +
+						   MATH2_fraction((uint16_t)XwaWeaponStats_Value(
+											  (int)firerObjIdx, projectileType,
+											  XWA_WEAPON_STAT_DURATION_FRACTION,
+											  g_projectileLifetimeFracQ16ByObjectType[projectileType]),
+										  236u));
+			g_objectTable[projectileObjIdx].mobj->lifetimeTimer = lifetimeTimer;
+		}
+#else
 		if (g_objectTable[projectileObjIdx].objectType == OBJ_WarheadSpaceBomb) {
 			g_objectTable[projectileObjIdx].mobj->speed = firerObj->mobj->speed;
 			guidance->minSpeed = (uint16_t)(g_objectTable[projectileObjIdx].mobj->speed +
@@ -1882,6 +2046,7 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 						   MATH2_fraction(g_projectileLifetimeFracQ16ByObjectType[projectileType], 236u));
 			g_objectTable[projectileObjIdx].mobj->lifetimeTimer = lifetimeTimer;
 		}
+#endif
 
 		spawnX = firerObj->world_x;
 		spawnY = firerObj->world_y;
@@ -2096,8 +2261,16 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 			projectileObj->mobj->velocityOverrideDirX = (int16_t)-firerObj->mobj->cachedUpX;
 			projectileObj->mobj->velocityOverrideDirY = (int16_t)-firerObj->mobj->cachedUpY;
 			projectileObj->mobj->velocityOverrideDirZ = (int16_t)-firerObj->mobj->cachedUpZ;
+#ifdef XWA_MODERN
+			projectileObj->mobj->velocityOverrideSpeed =
+				(uint16_t)((uint16_t)XwaWeaponStats_Value(
+							   (int)firerObjIdx, OBJ_WarheadSpaceBomb, XWA_WEAPON_STAT_SPEED,
+							   g_projectileSpeedByType[OBJ_WarheadSpaceBomb - OBJ_LaserRebel]) >>
+						   2);
+#else
 			projectileObj->mobj->velocityOverrideSpeed =
 				(uint16_t)(g_projectileSpeedByType[OBJ_WarheadSpaceBomb - OBJ_LaserRebel] >> 2);
+#endif
 			projectileObj->mobj->velocityOverrideElapsed = 0;
 			projectileObj->mobj->velocityOverrideActive = 1;
 		}
@@ -2254,7 +2427,12 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 
 	firingPlayerIdx = playerIdx;
 	firedCount = 0;
+#ifdef XWA_MODERN
+	/* Modern port: a mod's weapon profile can set the link mode. */
+	switch (XwaWeaponStats_LaserLink(shooterObjIdx, g_curCraft->laserLinkMode[laserGroupIdx])) {
+#else
 	switch (g_curCraft->laserLinkMode[laserGroupIdx]) {
+#endif
 		case 3:
 			slotStep = 1;
 			firstSlot = g_modelDefs[modelIndex].laserGroupFirstSlot[laserGroupIdx];
@@ -2340,11 +2518,22 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 				unsigned int projectileObjIdx;
 
 				projectileTypeId = g_curCraft->warheadData[slotIdx].projectileTypeId;
+#ifdef XWA_MODERN
+				/* Modern port: a mod's weapon profile can change the charge at
+				   which a laser fires its high-power shot. */
+				if ((projectileTypeId == OBJ_LaserRebel || projectileTypeId == OBJ_LaserImperial ||
+					 projectileTypeId == OBJ_LaserIon) &&
+					laserCharge >= XwaWeaponStats_Value((int)shooterObjIdx, projectileTypeId,
+														XWA_WEAPON_STAT_HIGH_POWER_CHARGE, 64)) {
+					projectileTypeId = (uint16_t)(projectileTypeId + 1u);
+				}
+#else
 				if ((projectileTypeId == OBJ_LaserRebel || projectileTypeId == OBJ_LaserImperial ||
 					 projectileTypeId == OBJ_LaserIon) &&
 					laserCharge >= 64) {
 					projectileTypeId = (uint16_t)(projectileTypeId + 1u);
 				}
+#endif
 #ifdef XWA_MODERN
 				/* Modern port: a mod's rules can stop a craft from firing. */
 				projectileObjIdx =
@@ -2368,13 +2557,19 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 #ifdef XWA_MODERN
 							int dechargeRate;
 
-							/* Modern port: a mod can change the laser rates. */
-							if (XwaWeaponRates_Decharge(shooterObjIdx, &dechargeRate)) {
+							/* Modern port: a mod can change the laser rates,
+							   and make a shot take charge from laser racks
+							   only. */
+							if (XwaWeaponRates_Decharge(shooterObjIdx, slotIdx, &dechargeRate)) {
 								if (g_curCraft->warheadData[slotIdx].weaponType < 4u) {
 									g_curCraft->warheadData[slotIdx].laserCharge =
 										(uint8_t)(g_curCraft->warheadData[slotIdx].laserCharge -
 												  dechargeRate);
 								}
+							} else if (XwaMissionSettings_PlayerDechargeLasersOnly() &&
+									   g_curCraft->warheadData[slotIdx].weaponType >= 4u) {
+								/* A rack that isn't a laser rack keeps its
+								   charge. */
 							} else
 #endif
 								if (g_objectTable[shooterObjIdx].genusId) {
@@ -2464,7 +2659,7 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 #ifdef XWA_MODERN
 		/* Modern port: a mod can change the laser rates. */
 		{
-			const int cooldown = XwaWeaponRates_Cooldown(shooterObjIdx);
+			const int cooldown = XwaWeaponRates_Cooldown(shooterObjIdx, projectileTypeId);
 
 			if (firingPlayerIdx != -1) {
 				g_curCraft->laserFireCooldownTicks[0] =
@@ -2536,6 +2731,21 @@ void laser_firerocketsystem(int firerObjIdx, unsigned int fireMode) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	/* Modern port: a mod's weapon profile can change the fire rate. A mod can
+	   also multiply it by the number of warheads fired. */
+	{
+		int fireRate = XwaWeaponStats_Value(
+			firerObjIdx, g_curCraft->warheadSlotTypeIds[fireMode], XWA_WEAPON_STAT_FIRE_RATE,
+			g_objectTable[firerObjIdx].objectType == OBJ_TIEWarheads ? 118 : 472);
+
+		if (XwaWeaponStats_LimitLinkedWarheadFireRate()) {
+			fireRate *= firedCount;
+		}
+		g_curCraft->warheadLauncherCooldownTicks[fireMode] =
+			(uint16_t)(g_curCraft->warheadLauncherCooldownTicks[fireMode] + fireRate);
+	}
+#else
 	if (g_objectTable[firerObjIdx].objectType == OBJ_TIEWarheads) {
 		g_curCraft->warheadLauncherCooldownTicks[fireMode] =
 			(uint16_t)(g_curCraft->warheadLauncherCooldownTicks[fireMode] + 118u);
@@ -2543,6 +2753,7 @@ void laser_firerocketsystem(int firerObjIdx, unsigned int fireMode) {
 		g_curCraft->warheadLauncherCooldownTicks[fireMode] =
 			(uint16_t)(g_curCraft->warheadLauncherCooldownTicks[fireMode] + 472u);
 	}
+#endif
 
 	if (g_objectTable[firerObjIdx].playerOwnerIdx == g_localPlayer && !blockedByLoadedSlot) {
 		uint16_t warheadKindIndex;
@@ -3031,11 +3242,30 @@ void laser_UpdateMineWeaponFire(int mineObjIdx) {
 		g_objectTable[projectileObjIdx].yaw = (Q16Angle)projectileYaw;
 		g_objectTable[projectileObjIdx].mobj->orientMatrixDirty = 1;
 		g_objectTable[projectileObjIdx].mobj->moveVectorDirty = 1;
+#ifdef XWA_MODERN
+		/* Modern port: the mine's weapon profile can change the speed, the
+		   lifetime and the power. */
+		g_objectTable[projectileObjIdx].mobj->speed =
+			(uint16_t)((uint16_t)XwaWeaponStats_Value(mineObjIdx, projectileType, XWA_WEAPON_STAT_SPEED,
+													  g_projectileSpeedByType[projectileTypeIdx]) >>
+					   1);
+		g_objectTable[projectileObjIdx].mobj->lifetimeTimer =
+			2 * (uint16_t)(236u * (uint16_t)XwaWeaponStats_Value(
+									  mineObjIdx, projectileType, XWA_WEAPON_STAT_DURATION_SECONDS,
+									  g_projectileLifetimeSecondsByType[projectileTypeIdx]) +
+						   MATH2_fraction((uint16_t)XwaWeaponStats_Value(
+											  mineObjIdx, projectileType, XWA_WEAPON_STAT_DURATION_FRACTION,
+											  g_projectileLifetimeFracQ16ByType[projectileTypeIdx]),
+										  236u));
+		g_objectTable[projectileObjIdx].mobj->damageAmount = XwaWeaponStats_Value(
+			mineObjIdx, projectileType, XWA_WEAPON_STAT_POWER, g_projectileDamageByType[projectileTypeIdx]);
+#else
 		g_objectTable[projectileObjIdx].mobj->speed =
 			(uint16_t)(g_projectileSpeedByType[projectileTypeIdx] >> 1);
 		g_objectTable[projectileObjIdx].mobj->lifetimeTimer =
 			2 * laser_GetProjectileLifetimeTicks(projectileType);
 		g_objectTable[projectileObjIdx].mobj->damageAmount = g_projectileDamageByType[projectileTypeIdx];
+#endif
 
 		FVIEW_calcrotatemove((int16_t)projectilePitch, (int16_t)projectileYaw,
 							 &g_objectTable[projectileObjIdx]);
@@ -3132,6 +3362,26 @@ uint16_t laser_createprojectilefromstatic(uint16_t staticObjIdx, uint16_t shoote
 	g_objectTable[projectileObjIdx].yaw = 0;
 	projectileMobj = g_objectTable[projectileObjIdx].mobj;
 	guidance = projectileMobj->pWarheadGuidance;
+#ifdef XWA_MODERN
+	/* Modern port: a mod's weapon profile can change the speed, the power and
+	   the lifetime. */
+	projectileMobj->speed =
+		(uint16_t)XwaWeaponStats_Value(staticObjIdx, projectileObjectType, XWA_WEAPON_STAT_SPEED,
+									   g_projectileSpeedByType[projectileObjectType - OBJ_LaserRebel]);
+	guidance->minSpeed = g_objectTable[projectileObjIdx].mobj->speed;
+	g_objectTable[projectileObjIdx].mobj->damageAmount =
+		XwaWeaponStats_Value(staticObjIdx, projectileObjectType, XWA_WEAPON_STAT_POWER,
+							 g_projectileDamageByType[projectileObjectType - OBJ_LaserRebel]);
+	g_objectTable[projectileObjIdx].mobj->lifetimeTimer =
+		(int)(uint16_t)(236u * (uint16_t)XwaWeaponStats_Value(
+								   staticObjIdx, projectileObjectType, XWA_WEAPON_STAT_DURATION_SECONDS,
+								   g_projectileLifetimeSecondsByObjectType[projectileObjectType]) +
+						MATH2_fraction((uint16_t)XwaWeaponStats_Value(
+										   staticObjIdx, projectileObjectType,
+										   XWA_WEAPON_STAT_DURATION_FRACTION,
+										   g_projectileLifetimeFracQ16ByObjectType[projectileObjectType]),
+									   236u));
+#else
 	projectileMobj->speed = g_projectileSpeedByType[projectileObjectType - OBJ_LaserRebel];
 	guidance->minSpeed = g_objectTable[projectileObjIdx].mobj->speed;
 	g_objectTable[projectileObjIdx].mobj->damageAmount =
@@ -3139,6 +3389,7 @@ uint16_t laser_createprojectilefromstatic(uint16_t staticObjIdx, uint16_t shoote
 	g_objectTable[projectileObjIdx].mobj->lifetimeTimer =
 		(int)(uint16_t)(236u * g_projectileLifetimeSecondsByObjectType[projectileObjectType] +
 						MATH2_fraction(g_projectileLifetimeFracQ16ByObjectType[projectileObjectType], 236u));
+#endif
 
 	Mission_ResolveObjectOrMissionPointWorldLoc(staticObjIdx, 0, 0, 0);
 	spawnX = worldlocx;
@@ -3261,6 +3512,44 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 		g_objectTable[(uint16_t)projectileObjIdx].angleD = 0;
 		g_objectTable[(uint16_t)projectileObjIdx].yaw = (Q16Angle)(ownerObj->yaw + 0x8000u);
 		guidance = g_objectTable[(uint16_t)projectileObjIdx].mobj->pWarheadGuidance;
+#ifdef XWA_MODERN
+		/* Modern port: a mod's weapon profile can change the speed, the power
+		   and the lifetime. It also sets how much of the owner's speed is added
+		   to the power. */
+		{
+			const uint16_t speed = (uint16_t)XwaWeaponStats_Value(
+				(int)ownerObjIdx, projectileObjectType, XWA_WEAPON_STAT_SPEED,
+				g_projectileSpeedByType[projectileObjectType - OBJ_LaserRebel]);
+			const int power =
+				XwaWeaponStats_Value((int)ownerObjIdx, projectileObjectType, XWA_WEAPON_STAT_POWER,
+									 g_projectileDamageByType[projectileObjectType - OBJ_LaserRebel]);
+			uint16_t wholeSecondsTicks;
+
+			g_objectTable[(uint16_t)projectileObjIdx].mobj->speed = (uint16_t)(speed >> 1);
+			guidance->minSpeed = (uint16_t)(speed + ownerObj->mobj->speed);
+			g_objectTable[(uint16_t)projectileObjIdx].mobj->damageAmount =
+				power + (int)ownerObj->mobj->speed *
+							XwaWeaponStats_Value((int)ownerObjIdx, projectileObjectType,
+												 XWA_WEAPON_STAT_POWER_SPEED_PERCENT, 100) /
+							100;
+			if ((uint32_t)g_objectTable[(uint16_t)projectileObjIdx].mobj->damageAmount < (uint32_t)power) {
+				g_objectTable[(uint16_t)projectileObjIdx].mobj->damageAmount = power;
+			}
+			wholeSecondsTicks =
+				(uint16_t)(236u * (uint16_t)XwaWeaponStats_Value(
+									  (int)ownerObjIdx, projectileObjectType,
+									  XWA_WEAPON_STAT_DURATION_SECONDS,
+									  g_projectileLifetimeSecondsByObjectType[projectileObjectType]));
+			wholeSecondsTicks =
+				(uint16_t)(wholeSecondsTicks +
+						   MATH2_fraction((uint16_t)XwaWeaponStats_Value(
+											  (int)ownerObjIdx, projectileObjectType,
+											  XWA_WEAPON_STAT_DURATION_FRACTION,
+											  g_projectileLifetimeFracQ16ByObjectType[projectileObjectType]),
+										  236u));
+			g_objectTable[(uint16_t)projectileObjIdx].mobj->lifetimeTimer = wholeSecondsTicks;
+		}
+#else
 		g_objectTable[(uint16_t)projectileObjIdx].mobj->speed =
 			(uint16_t)(g_projectileSpeedByType[projectileObjectType - OBJ_LaserRebel] >> 1);
 		guidance->minSpeed = (uint16_t)(g_projectileSpeedByType[projectileObjectType - OBJ_LaserRebel] +
@@ -3283,6 +3572,7 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 										  236u));
 			g_objectTable[(uint16_t)projectileObjIdx].mobj->lifetimeTimer = wholeSecondsTicks;
 		}
+#endif
 		g_objectTable[(uint16_t)projectileObjIdx].mobj->orientMatrixDirty = 1;
 		g_objectTable[(uint16_t)projectileObjIdx].mobj->moveVectorDirty = 1;
 

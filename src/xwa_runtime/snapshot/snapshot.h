@@ -933,6 +933,9 @@ typedef struct XwaHudInstruments {
 	uint32_t energy_bar_colors[4];
 	uint8_t weapon_type[XWA_SNAP_MAX_WEAPON_SLOTS];
 	uint8_t laser_charge[XWA_SNAP_MAX_WEAPON_SLOTS];
+	/* The charge at which each rack fires its high-power shot: 64, or the
+	 * value of the weapon profile. The charge bar changes colour there. */
+	uint8_t laser_high_charge[XWA_SNAP_MAX_WEAPON_SLOTS];
 	uint8_t warhead_count[XWA_SNAP_MAX_WEAPON_SLOTS];
 	uint16_t warhead_lock_ticks;
 	uint8_t system_display_slot[11];

@@ -394,14 +394,15 @@ static void fixed_emit_energy_bank(const XwaHudState* h, XwaHudWidgetId widget,
 			!(c->working_subsystems & 0x10u))
 			continue;
 		charge++;
-		uint32_t color = charge <= 64 ? secondary : primary;
-		int display = charge <= 64 ? charge : charge - 64;
+		const int high = c->laser_high_charge[start + i];
+		uint32_t color = charge <= high ? secondary : primary;
+		int display = charge <= high ? charge : charge - high;
 		int filled = display / 10;
-		if (!filled && (charge < 10 || charge > 64))
+		if (!filled && (charge < 10 || charge > high))
 			filled = 1;
 		if (filled > 6)
 			filled = 6;
-		int empty = charge > 64 ? 6 - filled : 0;
+		int empty = charge > high ? 6 - filled : 0;
 		const int step = triple ? 7 : 10;
 		int x = points[i].x - (triple ? 17 : 24);
 		for (int segment = 0; segment < filled; segment++) {

@@ -16,6 +16,7 @@
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/weapon_rates.h"
+#include "xwa_runtime/models/weapon_stats.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,6 +39,7 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "engine_glows", XwaEngineGlows_ClearModelSettings, XwaEngineGlows_ReadModelSettings },
 	{ "weapons", XwaCraftWeapons_ClearModelSettings, XwaCraftWeapons_ReadModelSettings },
 	{ "weapons", XwaWeaponRates_ClearModelSettings, XwaWeaponRates_ReadModelSettings },
+	{ "weapons", XwaWeaponStats_ClearModelSettings, XwaWeaponStats_ReadModelSettings },
 	{ "stats_profiles", XwaStatsProfiles_ClearModelSettings, XwaStatsProfiles_ReadModelSettings },
 	{ "shield", XwaShieldRecharge_ClearModelSettings, XwaShieldRecharge_ReadModelSettings },
 	{ "sound", XwaCraftSounds_ClearModelSettings, XwaCraftSounds_ReadModelSettings },

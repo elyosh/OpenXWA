@@ -33,6 +33,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/skins.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -3215,8 +3216,16 @@ void Yard_UpdateSmeltingRoomTurrets(int deltaTicks) {
 				g_objectTable[projectileObjIdx].mobj->orientMatrixDirty = 1;
 				g_objectTable[projectileObjIdx].mobj->moveVectorDirty = 1;
 				g_objectTable[projectileObjIdx].mobj->speed = 400;
+#ifdef XWA_MODERN
+				/* Modern port: a mod's weapon profile can change the power. */
+				g_objectTable[projectileObjIdx].mobj->damageAmount =
+					XwaWeaponStats_Value(g_objectTable[projectileObjIdx].mobj->sourceObjIdx,
+										 OBJ_LaserRebelTurbo_301, XWA_WEAPON_STAT_POWER,
+										 g_projectileDamageByType[OBJ_LaserRebelTurbo_301 - OBJ_LaserRebel]);
+#else
 				g_objectTable[projectileObjIdx].mobj->damageAmount =
 					g_projectileDamageByType[OBJ_LaserRebelTurbo_301 - OBJ_LaserRebel];
+#endif
 				g_objectTable[projectileObjIdx].mobj->lifetimeTimer = 236;
 				FVIEW_calcrotatemove(g_objectTable[projectileObjIdx].pitch,
 									 g_objectTable[projectileObjIdx].yaw, &g_objectTable[projectileObjIdx]);

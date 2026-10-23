@@ -17,7 +17,9 @@
  * `craft_markings` gives single craft their own markings, from 0 to 255. Its
  * keys are the craft's number in its wave, from 0, so the same craft of
  * every wave gets them. `warheads` gives the flight group's warhead pools
- * (XwaWarheadPools_ReadFlightGroup). */
+ * (XwaWarheadPools_ReadFlightGroup). `weapon_profile`, `warhead_profile`,
+ * `energy_profile` and `linking_profile` pick the flight group's weapon
+ * profiles. */
 
 #include <stddef.h>
 

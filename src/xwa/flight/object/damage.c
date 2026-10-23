@@ -20,6 +20,7 @@
 #include "xwa/util/random.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/craft_sounds.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #endif
 
 #include <math.h>
@@ -508,11 +509,26 @@ unsigned int Craft_DamageComponent(uint16_t objIdx, int componentId, unsigned in
 			return damageAmount;
 		}
 
+#ifdef XWA_MODERN
+		/* Modern port: a mod can set the damage factor of each difficulty. */
+		{
+			int scaled;
+
+			if (XwaWeaponStats_DamageByDifficulty((int)damageAmount, &scaled)) {
+				damageAmount = (unsigned int)scaled;
+			} else if (g_flightDifficulty == 1) {
+				damageAmount >>= 2;
+			} else if (g_flightDifficulty == 0) {
+				damageAmount >>= 1;
+			}
+		}
+#else
 		if (g_flightDifficulty == 1) {
 			damageAmount >>= 2;
 		} else if (g_flightDifficulty == 0) {
 			damageAmount >>= 1;
 		}
+#endif
 	}
 	if (damageAmount == 0) {
 		damageAmount = 1;

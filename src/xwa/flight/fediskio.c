@@ -40,6 +40,9 @@
 #include "xwa_runtime/models/geometry_textures.h"
 #endif
 #include "xwa_runtime/models/gunner_seats.h"
+#include "xwa_runtime/models/mission_settings.h"
+#include "xwa_runtime/models/turret_hardpoints.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <stdio.h>
@@ -485,7 +488,18 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 				if (!handled) {
 					if ((g_objectTypes[loadedModelSlot].flags & OBJECT_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) ==
 						0) {
+#ifdef XWA_MODERN
+						/* Modern port: a mod can map hardpoint types 33 to 38
+						   to the turbolasers. A model can also set which
+						   hardpoint types are lasers and which are warheads. */
+						uint16_t weaponType = (uint16_t)(XwaMissionSettings_TurbolaserHardpointTypes()
+															 ? XwaWeaponStats_HardpointWeaponType(outType)
+															 : outType + 279);
+						const int hardpointKind = XwaWeaponStats_HardpointKind(
+							loadedModelSlot, outType, g_optHardpointWeaponGroupKindByType[outType]);
+#else
 						uint16_t weaponType = (uint16_t)(outType + 279);
+#endif
 						int foundGroup;
 						int group;
 
@@ -505,7 +519,11 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 							}
 						}
 						if (!foundGroup) {
+#ifdef XWA_MODERN
+							if (hardpointKind == 1) {
+#else
 							if (g_optHardpointWeaponGroupKindByType[outType] == 1) {
+#endif
 								for (group = 0; group < 3; ++group) {
 									if (!g_modelDefs[modelEntryIdx].laserGroupWeaponType[group]) {
 										break;
@@ -527,7 +545,11 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 										g_modelDefs[modelEntryIdx].laserGroupWeaponKind[group] = 1;
 									}
 								}
+#ifdef XWA_MODERN
+							} else if (hardpointKind == 2) {
+#else
 							} else if (g_optHardpointWeaponGroupKindByType[outType] == 2) {
+#endif
 								for (group = 0; group < 2; ++group) {
 									if (!g_modelDefs[modelEntryIdx].warheadLauncherType[group]) {
 										break;
@@ -539,8 +561,14 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 							}
 						}
 					} else {
+#ifdef XWA_MODERN
+						if (outType == OPT_HARDPOINT_None ||
+							XwaWeaponStats_HardpointKind(loadedModelSlot, outType,
+														 g_optHardpointWeaponGroupKindByType[outType]) == 1) {
+#else
 						if (outType == OPT_HARDPOINT_None ||
 							g_optHardpointWeaponGroupKindByType[outType] == 1) {
+#endif
 							int originalX = outX;
 							int floatSlot;
 
@@ -555,7 +583,16 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 								++floatNegYWrite;
 								++floatZWrite;
 							}
+#ifdef XWA_MODERN
+							/* Modern port: a mod can stop the hardpoints of gun
+							   turret meshes from being mirrored. */
+							if (floatSlot < 256 &&
+								!(XwaMissionSettings_GunTurretHardpoints() &&
+								  XwaTurretHardpoints_IsTurretMesh(meshType)) &&
+								(originalX > 256 || originalX < -256)) {
+#else
 							if (floatSlot < 256 && (originalX > 256 || originalX < -256)) {
+#endif
 								*floatXWrite = -originalX;
 								*floatNegYWrite = -outY;
 								*floatZWrite = outZ;
@@ -600,7 +637,13 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 					*laserGroupWeaponType = 0;
 					laserGroupFirstSlot[9] = 0;
 				} else {
+#ifdef XWA_MODERN
+					targetType = (uint16_t)(XwaMissionSettings_TurbolaserHardpointTypes()
+												? XwaWeaponStats_WeaponHardpointType(*laserGroupWeaponType)
+												: *laserGroupWeaponType - 279);
+#else
 					targetType = (uint16_t)(*laserGroupWeaponType - 279);
+#endif
 					startSlot = weaponSlot;
 					if (meshCount > 0) {
 						scanMesh = 0;
@@ -701,7 +744,13 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 				if (weaponSlot == FEDISKIO_WEAPON_SLOT_LIMIT) {
 					*warheadLauncherType = 0;
 				} else {
+#ifdef XWA_MODERN
+					targetType = (uint16_t)(XwaMissionSettings_TurbolaserHardpointTypes()
+												? XwaWeaponStats_WeaponHardpointType(*warheadLauncherType)
+												: *warheadLauncherType - 279);
+#else
 					targetType = (uint16_t)(*warheadLauncherType - 279);
+#endif
 					startSlot = weaponSlot;
 					if (meshCount > 0) {
 						scanMesh = 0;
@@ -3534,9 +3583,22 @@ void FeDiskIo_LoadResources(void) {
 									g_modelFloatHardpointDataHandles[loadedObjectType]);
 								remainingHardpoints = hardpointCount;
 								do {
+#ifdef XWA_MODERN
+									/* Modern port: a mod can give each float
+									   hardpoint to a gun turret mesh. */
+									hardpoint->componentIndex =
+										(uint8_t)(XwaMissionSettings_GunTurretHardpoints()
+													  ? XwaTurretHardpoints_FloatHardpointComponent(
+															loadedObjectType, hardpoint->x, hardpoint->negY,
+															hardpoint->z)
+													  : ModelMesh_FindFloatHardpointComponent(
+															loadedObjectType, hardpoint->x, hardpoint->negY,
+															hardpoint->z));
+#else
 									hardpoint->componentIndex =
 										(uint8_t)ModelMesh_FindFloatHardpointComponent(
 											loadedObjectType, hardpoint->x, hardpoint->negY, hardpoint->z);
+#endif
 									++hardpoint;
 									--remainingHardpoints;
 								} while (remainingHardpoints != 0);

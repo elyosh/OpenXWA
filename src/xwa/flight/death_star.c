@@ -31,6 +31,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/skins.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -5266,8 +5267,19 @@ void DeathStar_FireLaserAtTarget(void) {
 	g_objectTable[laserObjIdx].angleD = 0;
 	g_objectTable[laserObjIdx].mobj->moveVectorDirty = 0;
 	g_objectTable[laserObjIdx].mobj->orientMatrixDirty = 1;
+#ifdef XWA_MODERN
+	/* Modern port: the weapon profile of the Death Star fire's model can change
+	   the speed and the power. */
+	g_objectTable[laserObjIdx].mobj->speed = (uint16_t)XwaWeaponStats_TypeValue(
+		OBJ_DeathStarFireTextureGroup6250_Sprite000, OBJ_LaserImperialDS, XWA_WEAPON_STAT_SPEED,
+		g_projectileSpeedByType[DEATH_STAR_LASER_PROJECTILE_IDX]);
+	g_objectTable[laserObjIdx].mobj->damageAmount = XwaWeaponStats_TypeValue(
+		OBJ_DeathStarFireTextureGroup6250_Sprite000, OBJ_LaserImperialDS, XWA_WEAPON_STAT_POWER,
+		g_projectileDamageByType[DEATH_STAR_LASER_PROJECTILE_IDX]);
+#else
 	g_objectTable[laserObjIdx].mobj->speed = g_projectileSpeedByType[DEATH_STAR_LASER_PROJECTILE_IDX];
 	g_objectTable[laserObjIdx].mobj->damageAmount = g_projectileDamageByType[DEATH_STAR_LASER_PROJECTILE_IDX];
+#endif
 #ifndef XWA_MODERN
 	moveX = 236 * *(const int*)&g_projectileLifetimeSecondsByType[DEATH_STAR_LASER_PROJECTILE_IDX];
 #else
@@ -5281,6 +5293,12 @@ void DeathStar_FireLaserAtTarget(void) {
 	guidance->targetObjIdx = 0xffffu;
 	guidance->targetSignature = 0;
 	guidance->targetComponentIdx = 0xffffu;
+#ifdef XWA_MODERN
+	guidance->minSpeed = (uint16_t)XwaWeaponStats_TypeValue(
+		OBJ_DeathStarFireTextureGroup6250_Sprite000, OBJ_LaserImperialDS, XWA_WEAPON_STAT_SPEED,
+		g_projectileSpeedByType[DEATH_STAR_LASER_PROJECTILE_IDX]);
+#else
 	guidance->minSpeed = g_projectileSpeedByType[DEATH_STAR_LASER_PROJECTILE_IDX];
+#endif
 	guidance->sourcePlayerIdx = -1;
 }

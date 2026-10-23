@@ -27,6 +27,7 @@
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/craft_sounds.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #endif
 
 #include <math.h>
@@ -1618,8 +1619,16 @@ void Object_UpdateLifetimeAndMovement(void) {
 								int ownerPlayer =
 									g_objectTable[(uint16_t)obj->mobj->sourceObjIdx].playerOwnerIdx;
 								if (ownerPlayer != -1) {
+#ifdef XWA_MODERN
+									/* Modern port: a mod's weapon profile can
+									   change the score. */
+									g_players[ownerPlayer].missionStats.missionScore -= XwaWeaponStats_Value(
+										obj->mobj->sourceObjIdx, obj->objectType, XWA_WEAPON_STAT_SCORE,
+										g_warheadProjectilePointValueByObjectType[obj->objectType]);
+#else
 									g_players[ownerPlayer].missionStats.missionScore -=
 										g_warheadProjectilePointValueByObjectType[obj->objectType];
+#endif
 								}
 							}
 							goto movement;
@@ -2097,11 +2106,24 @@ void Object_UpdateLifetimeAndMovement(void) {
 						if (fm->velocityOverrideActive) {
 							uint16_t speed = fm->speed;
 							if (speed < pWG->minSpeed) {
+#ifdef XWA_MODERN
+								/* Modern port: a mod's weapon profile can
+								   change the speed. */
+								fm->speed =
+									(uint16_t)(speed + (uint16_t)g_elapsedTicks *
+														   (uint16_t)XwaWeaponStats_Value(
+															   fm->sourceObjIdx, OBJ_WarheadSpaceBomb,
+															   XWA_WEAPON_STAT_SPEED,
+															   g_projectileSpeedByType[OBJ_WarheadSpaceBomb -
+																					   OBJ_LaserRebel]) /
+														   236);
+#else
 								fm->speed =
 									(uint16_t)(speed + (uint16_t)g_elapsedTicks *
 														   g_projectileSpeedByType[OBJ_WarheadSpaceBomb -
 																				   OBJ_LaserRebel] /
 														   236);
+#endif
 							} else {
 								fm->velocityOverrideActive = 0;
 							}

@@ -56,6 +56,7 @@
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/warhead_pools.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #endif
 
 #include <locale.h>
@@ -6498,9 +6499,18 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 										g_missionFlightGroups[g_currentFlightGroupIdx].fg.warhead;
 								else
 									warheadAmmoClass = 3;
+#ifdef XWA_MODERN
+								/* Modern port: a mod's warhead profile can
+								   change the number of warheads. */
+								ammo = (uint8_t)XwaWeaponStats_WarheadCapacity(
+									objIdx, warheadAmmoClass,
+									g_modelDefs[modelIndex].warheadLauncherCapacity[launcher],
+									(uint16_t)g_warheadAmmoCounts[warheadAmmoClass]);
+#else
 								ammo = (uint8_t)MATH2_fraction(
 									g_modelDefs[modelIndex].warheadLauncherCapacity[launcher],
 									(uint16_t)g_warheadAmmoCounts[warheadAmmoClass]);
+#endif
 								if (!ammo)
 									ammo = 1;
 								if (g_spawnStatus1 == 1 || g_spawnStatus2 == 1)
@@ -9336,6 +9346,25 @@ void Mission_RecordProjectileHitStats(unsigned int projectileObjIdx, char awardW
 
 			++ownerCraft->warheadHitsScoredCount;
 			flightGroupIdx = g_objectTable[ownerObjIdx].flightGroupIdx;
+#ifdef XWA_MODERN
+			/* Modern port: a mod's weapon profile can change the score. */
+			if (projectileObjIdx < playerProjectileSlotEnd && ownerPlayerIdx != -1) {
+				++g_players[ownerPlayerIdx].perMissionKills.warheadHits;
+				if (!awardWarheadPoints) {
+					return;
+				}
+				g_players[ownerPlayerIdx].missionStats.missionScore += XwaWeaponStats_Value(
+					ownerObjIdx, g_objectTable[projectileObjIdx].objectType, XWA_WEAPON_STAT_SCORE,
+					g_warheadProjectilePointValueByObjectType[g_objectTable[projectileObjIdx].objectType]);
+			}
+			if (awardWarheadPoints) {
+				g_missionFlightRuntimeState
+					.teamScores[TEAM_SCORE_MISSION]
+							   [g_missionFlightGroups[flightGroupIdx].fg.team] += XwaWeaponStats_Value(
+					ownerObjIdx, g_objectTable[projectileObjIdx].objectType, XWA_WEAPON_STAT_SCORE,
+					g_warheadProjectilePointValueByObjectType[g_objectTable[projectileObjIdx].objectType]);
+			}
+#else
 			if (projectileObjIdx < playerProjectileSlotEnd && ownerPlayerIdx != -1) {
 				++g_players[ownerPlayerIdx].perMissionKills.warheadHits;
 				if (!awardWarheadPoints) {
@@ -9349,6 +9378,7 @@ void Mission_RecordProjectileHitStats(unsigned int projectileObjIdx, char awardW
 					.teamScores[TEAM_SCORE_MISSION][g_missionFlightGroups[flightGroupIdx].fg.team] +=
 					g_warheadProjectilePointValueByObjectType[g_objectTable[projectileObjIdx].objectType];
 			}
+#endif
 			break;
 		}
 

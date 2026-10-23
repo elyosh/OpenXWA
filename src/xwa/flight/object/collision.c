@@ -45,6 +45,7 @@
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/weapon_rates.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #endif
 
 #include <math.h>
@@ -1016,6 +1017,25 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 	shooterModelIndex = shooterCraft->modelDefIndex;
 	projectileType =
 		g_modelDefs[shooterModelIndex].laserGroupWeaponType[g_players[g_localPlayer].selectedWarhead];
+#ifdef XWA_MODERN
+	/* Modern port: a mod's weapon profile can change the high-power charge, the
+	   speed and the lifetime. */
+	if ((int8_t)shooterCraft->warheadData[(uint16_t)hardpointIndex].laserCharge >=
+		XwaWeaponStats_Value(shooterIdx, projectileType, XWA_WEAPON_STAT_HIGH_POWER_CHARGE, 64)) {
+		++projectileType;
+	}
+
+	projectileSpeed =
+		(uint16_t)XwaWeaponStats_Value(shooterIdx, projectileType, XWA_WEAPON_STAT_SPEED,
+									   g_projectileSpeedByType[projectileType - OBJ_LaserRebel]);
+	lifetimeTicks = 236u * (uint32_t)(uint16_t)XwaWeaponStats_Value(
+							   shooterIdx, projectileType, XWA_WEAPON_STAT_DURATION_SECONDS,
+							   g_projectileLifetimeSecondsByType[projectileType - OBJ_LaserRebel]);
+	lifetimeTicks += (uint16_t)MATH2_fraction(
+		236u,
+		(uint16_t)XwaWeaponStats_Value(shooterIdx, projectileType, XWA_WEAPON_STAT_DURATION_FRACTION,
+									   g_projectileLifetimeFracQ16ByType[projectileType - OBJ_LaserRebel]));
+#else
 	if ((int8_t)shooterCraft->warheadData[(uint16_t)hardpointIndex].laserCharge >= 64) {
 		++projectileType;
 	}
@@ -1024,6 +1044,7 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 	lifetimeTicks = 236u * (uint32_t)g_projectileLifetimeSecondsByType[projectileType - OBJ_LaserRebel];
 	lifetimeTicks +=
 		(uint16_t)MATH2_fraction(236u, g_projectileLifetimeFracQ16ByType[projectileType - OBJ_LaserRebel]);
+#endif
 
 	g_collisionSegmentStartWorldX = shooterObj->world_x;
 	g_collisionSegmentStartWorldY = shooterObj->world_y;
@@ -4422,7 +4443,13 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 				if (g_missionFormatVersion >= 14) {
 #endif
 					ModelGenusId tgtGenus = g_objectTable[targetObjIdx].genusId;
+#ifdef XWA_MODERN
+					/* Modern port: a mod can give the bonus for any target. */
+					if (XwaMissionSettings_WarheadCollisionBonusAnyTarget() || tgtGenus == GENUS_Starship ||
+						tgtGenus == GENUS_Platform) {
+#else
 					if (tgtGenus == GENUS_Starship || tgtGenus == GENUS_Platform) {
+#endif
 						int modelIdx = GetModelDefIndexFromType((ObjectTypeId)damageKind);
 						if (modelIdx != 0xFFFF) {
 							unsigned int launcherCount = srcCraft->warheadLauncherCount;
@@ -4442,12 +4469,24 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 											g_modelDefs[modelIdx].warheadLauncherFirstSlot[launcher];
 										uint8_t lastSlot =
 											g_modelDefs[modelIdx].warheadLauncherLastSlot[launcher];
+#ifdef XWA_MODERN
+										/* Modern port: a mod's weapon profile
+										   can change the power. */
+										damageAmount +=
+											((srcCraft->warheadData[firstSlot].count +
+											  srcCraft->warheadData[lastSlot].count) *
+											 (unsigned int)XwaWeaponStats_Value(
+												 (int)damageSourceObjIdx, slotType, XWA_WEAPON_STAT_POWER,
+												 g_projectileDamageByType[slotType - OBJ_LaserRebel])) >>
+											3;
+#else
 										damageAmount +=
 											((srcCraft->warheadData[firstSlot].count +
 											  srcCraft->warheadData[lastSlot].count) *
 											 (unsigned int)
 												 g_projectileDamageByType[slotType - OBJ_LaserRebel]) >>
 											3;
+#endif
 									}
 								}
 							}

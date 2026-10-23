@@ -7,6 +7,8 @@
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/mission_settings.h"
+#include "xwa_runtime/models/weapon_stats.h"
 #endif
 
 // GLOBAL: XWA 0x9AF178
@@ -1684,7 +1686,14 @@ void paiman_calcplanelead(int targetObjIdx) {
 			}
 		}
 
+#ifdef XWA_MODERN
+		/* Modern port: a mod's weapon profile can change the speed. */
+		projectileSpeed =
+			(uint16_t)XwaWeaponStats_Value(g_paiContext.aiObjIdx, projectileType, XWA_WEAPON_STAT_SPEED,
+										   g_projectileSpeedByType[projectileType - OBJ_LaserRebel]);
+#else
 		projectileSpeed = g_projectileSpeedByType[projectileType - OBJ_LaserRebel];
+#endif
 		combinedSpeed = (uint16_t)(g_objectTable[g_paiContext.aiObjIdx].mobj->speed + projectileSpeed);
 		yawDelta = (uint16_t)(g_objectTable[targetObjIdx].yaw - g_objectTable[g_paiContext.aiObjIdx].yaw);
 		targetSpeed = g_objectTable[targetObjIdx].mobj->speed;
@@ -4416,6 +4425,30 @@ static char paiman_boardmaneuver(void) {
 							g_missionFlightGroups[g_objectTable[targetObjIdx].flightGroupIdx].fg.warhead;
 						if (i == 1)
 							warhead = 5;
+#ifdef XWA_MODERN
+						/* Modern port: a mod's warhead profile can change the
+						   number of warheads. A mod can also make the rearm
+						   read both warhead statuses of the flight group. */
+						targetCount = XwaWeaponStats_WarheadCapacity(
+							targetObjIdx, warhead, g_modelDefs[targetModelIdx].warheadLauncherCapacity[i],
+							g_warheadAmmoCounts[warhead]);
+						if (targetCount == 0)
+							targetCount = 1;
+						status1 =
+							g_missionFlightGroups[g_objectTable[targetObjIdx].flightGroupIdx].fg.status1;
+						{
+							const uint8_t status2 =
+								XwaMissionSettings_RearmFollowsBothStatuses()
+									? g_missionFlightGroups[g_objectTable[targetObjIdx].flightGroupIdx]
+										  .fg.status2
+									: 0;
+
+							if (status1 == 1 || status2 == 1)
+								targetCount = (uint16_t)(targetCount * 2);
+							else if (status1 == 2 || status2 == 2)
+								targetCount = (uint16_t)(targetCount >> 1);
+						}
+#else
 						targetCount =
 							(uint16_t)MATH2_fraction(g_modelDefs[targetModelIdx].warheadLauncherCapacity[i],
 													 g_warheadAmmoCounts[warhead]);
@@ -4427,6 +4460,7 @@ static char paiman_boardmaneuver(void) {
 							targetCount = (uint16_t)(targetCount * 2);
 						else if (status1 == 2)
 							targetCount = (uint16_t)(targetCount >> 1);
+#endif
 						if (targetCount == 0)
 							targetCount = 1;
 						if (targetCount > 99u)
