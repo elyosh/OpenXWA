@@ -34,6 +34,8 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_sounds.h"
+#include "xwa_runtime/models/gunner_seats.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #endif
@@ -178,10 +180,20 @@ void Player_AutoGunnerToggle(unsigned int playerIdx) {
 		ModelDefIndex modelIndex;
 
 		modelIndex = (ModelDefIndex)GetModelDefIndexFromType(g_objectTable[playerObjIdx].objectType);
+#ifdef XWA_MODERN
+		/* Modern port: a mod can give any craft gunner seats. */
+		if (XwaGunnerSeats_Count(g_objectTable[playerObjIdx].objectType) == 0 ||
+			(XwaGunnerSeats_Count(g_objectTable[playerObjIdx].objectType) < 0 &&
+			 g_modelDefs[(uint16_t)modelIndex].turretObjectType[0] == 0 &&
+			 g_modelDefs[(uint16_t)modelIndex].turretObjectType[1] == 0)) {
+			return;
+		}
+#else
 		if (g_modelDefs[(uint16_t)modelIndex].turretObjectType[0] == 0 &&
 			g_modelDefs[(uint16_t)modelIndex].turretObjectType[1] == 0) {
 			return;
 		}
+#endif
 	}
 
 	if (g_players[playerIdx].currentSeatIdx == 0) {
@@ -2624,6 +2636,9 @@ void Player_CycleGunnerSeat(int playerIdx, void* forcePilotFlag) {
 	int objectIndex;
 	int objectType;
 	int otherPlayerIdx;
+#ifdef XWA_MODERN
+	int seatCount;
+#endif
 
 	objectIndex = g_players[playerIdx].objectIndex;
 	if (objectIndex != 0xffff) {
@@ -2639,73 +2654,114 @@ void Player_CycleGunnerSeat(int playerIdx, void* forcePilotFlag) {
 
 		objectIndex = g_players[playerIdx].objectIndex;
 		objectType = g_objectTable[objectIndex].objectType;
-		switch (objectType) {
-			case OBJ_MilleniumFalcon2:
-			case OBJ_FamilyTransport:
-				if (g_players[playerIdx].hasCheckpointFlag != 0) {
+#ifdef XWA_MODERN
+		/* Modern port: a mod can give any craft gunner seats. The craft then
+		   cycles through its own seats, as the Falcon does. */
+		seatCount = XwaGunnerSeats_Count((unsigned int)objectType);
+		if (seatCount > 0) {
+			if (g_players[playerIdx].hasCheckpointFlag != 0) {
+				++g_players[playerIdx].currentSeatIdx;
+				if (g_players[playerIdx].currentSeatIdx > seatCount) {
+					g_players[playerIdx].currentSeatIdx = 1;
+				}
+				Player_ResetGunnerSeatCameraState(playerIdx, g_players[playerIdx].objectIndex, 0);
+			} else {
+				otherPlayerIdx = 0;
+				for (;;) {
+					if (otherPlayerIdx >= XWA_PLAYER_COUNT) {
+						otherPlayerIdx = -1;
+						break;
+					}
+					if (otherPlayerIdx != (int)playerIdx && g_players[otherPlayerIdx].connectedFlag != 0 &&
+						g_players[otherPlayerIdx].hasCheckpointFlag != 0 &&
+						g_players[otherPlayerIdx].boundFlightGroupIdx ==
+							g_players[playerIdx].boundFlightGroupIdx) {
+						break;
+					}
+					++otherPlayerIdx;
+				}
+				if (otherPlayerIdx == -1) {
 					++g_players[playerIdx].currentSeatIdx;
-					if (g_players[playerIdx].currentSeatIdx > 2) {
-						g_players[playerIdx].currentSeatIdx = 1;
+					if (forcePilotFlag != NULL || g_players[playerIdx].currentSeatIdx > seatCount) {
+						g_players[playerIdx].currentSeatIdx = 0;
 					}
 					Player_ResetGunnerSeatCameraState(playerIdx, g_players[playerIdx].objectIndex, 0);
-				} else {
-					otherPlayerIdx = 0;
-					for (;;) {
-						if (otherPlayerIdx >= XWA_PLAYER_COUNT) {
-							otherPlayerIdx = -1;
-							break;
-						}
-						if (otherPlayerIdx != (int)playerIdx &&
-							g_players[otherPlayerIdx].connectedFlag != 0 &&
-							g_players[otherPlayerIdx].hasCheckpointFlag != 0 &&
-							g_players[otherPlayerIdx].boundFlightGroupIdx ==
-								g_players[playerIdx].boundFlightGroupIdx) {
-							break;
-						}
-						++otherPlayerIdx;
-					}
-					if (otherPlayerIdx == -1) {
+				}
+			}
+		} else if (seatCount < 0)
+#endif
+			switch (objectType) {
+				case OBJ_MilleniumFalcon2:
+				case OBJ_FamilyTransport:
+					if (g_players[playerIdx].hasCheckpointFlag != 0) {
 						++g_players[playerIdx].currentSeatIdx;
-						if (forcePilotFlag != NULL || g_players[playerIdx].currentSeatIdx > 2) {
-							g_players[playerIdx].currentSeatIdx = 0;
+						if (g_players[playerIdx].currentSeatIdx > 2) {
+							g_players[playerIdx].currentSeatIdx = 1;
 						}
 						Player_ResetGunnerSeatCameraState(playerIdx, g_players[playerIdx].objectIndex, 0);
+					} else {
+						otherPlayerIdx = 0;
+						for (;;) {
+							if (otherPlayerIdx >= XWA_PLAYER_COUNT) {
+								otherPlayerIdx = -1;
+								break;
+							}
+							if (otherPlayerIdx != (int)playerIdx &&
+								g_players[otherPlayerIdx].connectedFlag != 0 &&
+								g_players[otherPlayerIdx].hasCheckpointFlag != 0 &&
+								g_players[otherPlayerIdx].boundFlightGroupIdx ==
+									g_players[playerIdx].boundFlightGroupIdx) {
+								break;
+							}
+							++otherPlayerIdx;
+						}
+						if (otherPlayerIdx == -1) {
+							++g_players[playerIdx].currentSeatIdx;
+							if (forcePilotFlag != NULL || g_players[playerIdx].currentSeatIdx > 2) {
+								g_players[playerIdx].currentSeatIdx = 0;
+							}
+							Player_ResetGunnerSeatCameraState(playerIdx, g_players[playerIdx].objectIndex, 0);
+						}
 					}
-				}
-				break;
+					break;
 
-			case OBJ_CorellianTransport2:
-				if (g_players[playerIdx].hasCheckpointFlag == 0) {
-					otherPlayerIdx = 0;
-					for (;;) {
-						if (otherPlayerIdx >= XWA_PLAYER_COUNT) {
-							otherPlayerIdx = -1;
-							break;
+				case OBJ_CorellianTransport2:
+					if (g_players[playerIdx].hasCheckpointFlag == 0) {
+						otherPlayerIdx = 0;
+						for (;;) {
+							if (otherPlayerIdx >= XWA_PLAYER_COUNT) {
+								otherPlayerIdx = -1;
+								break;
+							}
+							if (otherPlayerIdx != (int)playerIdx &&
+								g_players[otherPlayerIdx].connectedFlag != 0 &&
+								g_players[otherPlayerIdx].hasCheckpointFlag != 0 &&
+								g_players[otherPlayerIdx].boundFlightGroupIdx ==
+									g_players[playerIdx].boundFlightGroupIdx) {
+								break;
+							}
+							++otherPlayerIdx;
 						}
-						if (otherPlayerIdx != (int)playerIdx &&
-							g_players[otherPlayerIdx].connectedFlag != 0 &&
-							g_players[otherPlayerIdx].hasCheckpointFlag != 0 &&
-							g_players[otherPlayerIdx].boundFlightGroupIdx ==
-								g_players[playerIdx].boundFlightGroupIdx) {
-							break;
+						if (otherPlayerIdx == -1) {
+							++g_players[playerIdx].currentSeatIdx;
+							if (forcePilotFlag != NULL || g_players[playerIdx].currentSeatIdx > 1) {
+								g_players[playerIdx].currentSeatIdx = 0;
+							}
+							Player_ResetGunnerSeatCameraState(playerIdx, g_players[playerIdx].objectIndex, 0);
 						}
-						++otherPlayerIdx;
 					}
-					if (otherPlayerIdx == -1) {
-						++g_players[playerIdx].currentSeatIdx;
-						if (forcePilotFlag != NULL || g_players[playerIdx].currentSeatIdx > 1) {
-							g_players[playerIdx].currentSeatIdx = 0;
-						}
-						Player_ResetGunnerSeatCameraState(playerIdx, g_players[playerIdx].objectIndex, 0);
-					}
-				}
-				break;
-		}
+					break;
+			}
 
 		objectIndex = g_players[playerIdx].objectIndex;
 		objectType = g_objectTable[objectIndex].objectType;
+#ifdef XWA_MODERN
+		if (seatCount > 0 || (seatCount < 0 && objectType >= OBJ_CorellianTransport2 &&
+							  (objectType <= OBJ_MilleniumFalcon2 || objectType == OBJ_FamilyTransport))) {
+#else
 		if (objectType >= OBJ_CorellianTransport2 &&
 			(objectType <= OBJ_MilleniumFalcon2 || objectType == OBJ_FamilyTransport)) {
+#endif
 			if (g_players[playerIdx].currentSeatIdx != 0) {
 				g_players[playerIdx].turretAutoFireState = 1;
 				msg_emitInFlightMessage(MSG_GUNNER, (int)playerIdx);
@@ -2726,7 +2782,17 @@ void Player_CycleGunnerSeat(int playerIdx, void* forcePilotFlag) {
 		}
 	}
 
-	if (g_players[playerIdx].currentSeatIdx > 0) {
+#ifdef XWA_MODERN
+	/* Modern port: a mod can keep the selected weapon in a gunner seat. */
+	if (g_players[playerIdx].currentSeatIdx > 0 && XwaMissionSettings_GunnerWeaponSelectInSeat()) {
+		g_players[playerIdx].lookYawOffset = 0;
+		g_players[playerIdx].lookPitchOffset = 0;
+		if (playerIdx == (unsigned int)g_localPlayer) {
+			g_padlockMouseLookEnabled = 0;
+		}
+	} else
+#endif
+		if (g_players[playerIdx].currentSeatIdx > 0) {
 		g_players[playerIdx].selectedWarhead = 0;
 		g_players[playerIdx].selectedWeaponMode = 0;
 		g_players[playerIdx].lookYawOffset = 0;

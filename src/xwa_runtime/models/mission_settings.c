@@ -65,6 +65,9 @@ static int s_fireNeedsDechargeRate;
 static int s_noStarshipFireFromDestroyedRacks;
 static int s_starshipAmbientSounds;
 static int s_noPlayerWarheadSlotCap;
+static int s_gunnerWeaponSelectInSeat;
+static int s_gunnerFiresSelectedGroup;
+static int s_gunnerFiresWarheads;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -397,6 +400,9 @@ void XwaMissionSettings_Init(void) {
 	s_noStarshipFireFromDestroyedRacks = 0;
 	s_starshipAmbientSounds = 0;
 	s_noPlayerWarheadSlotCap = 0;
+	s_gunnerWeaponSelectInSeat = 0;
+	s_gunnerFiresSelectedGroup = 0;
+	s_gunnerFiresWarheads = 0;
 	MissionSettings_ResetTargets();
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SETTINGS_FLIGHT_YAML, &file,
@@ -451,6 +457,17 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "no_player_warhead_slot_cap", node,
 								 &s_noPlayerWarheadSlotCap);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "gunner_weapon_select_in_seat")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "gunner_weapon_select_in_seat", node,
+								 &s_gunnerWeaponSelectInSeat);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "gunner_fires_selected_group")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "gunner_fires_selected_group", node,
+								 &s_gunnerFiresSelectedGroup);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "gunner_fires_warheads")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "gunner_fires_warheads", node, &s_gunnerFiresWarheads);
+	}
 	MissionSettings_Read(SETTINGS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "mission_settings"), &s_defaults);
 	s_settings = s_defaults;
 	AeronConfigFile_Destroy(file);
@@ -486,6 +503,12 @@ int XwaMissionSettings_NoStarshipFireFromDestroyedRacks(void) { return s_noStars
 int XwaMissionSettings_StarshipAmbientSounds(void) { return s_starshipAmbientSounds; }
 
 int XwaMissionSettings_NoPlayerWarheadSlotCap(void) { return s_noPlayerWarheadSlotCap; }
+
+int XwaMissionSettings_GunnerWeaponSelectInSeat(void) { return s_gunnerWeaponSelectInSeat; }
+
+int XwaMissionSettings_GunnerFiresSelectedGroup(void) { return s_gunnerFiresSelectedGroup; }
+
+int XwaMissionSettings_GunnerFiresWarheads(void) { return s_gunnerFiresWarheads; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

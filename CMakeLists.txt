@@ -236,6 +236,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/object_profiles.c
     src/xwa_runtime/models/shield_recharge.c
     src/xwa_runtime/models/component_strength.c
+    src/xwa_runtime/models/gunner_seats.c
     src/xwa_runtime/models/skins.c
     src/xwa_runtime/models/stats_profiles.c
     src/xwa_runtime/models/weapon_rates.c

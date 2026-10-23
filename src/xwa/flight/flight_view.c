@@ -17,6 +17,7 @@
 #include "aeron/log.h"
 #include "xwa/flight/flight_debug.h"
 #include "xwa_runtime/hooks/orientation_hook.h"
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #endif
@@ -317,11 +318,32 @@ int FlightView_ComputeSeatEyeOffset(int playerIdx) {
 		beamRotScale = NULL;
 		launcherRotScale = NULL;
 
+#ifdef XWA_MODERN
+		/* Modern port: a mod can give the seat its own position and
+		   cockpit. */
+		{
+			const unsigned int objectType = g_objectTable[objectIdx].objectType;
+
+			vec.x = (float)(g_hardpointOriginOffset[0] +
+							XwaGunnerSeats_Value(objectType, seatTableIdx, XWA_GUNNER_SEAT_X,
+												 g_modelDefs[modelIndex].turretSeatPosX[seatTableIdx]));
+			vec.y = (float)(g_hardpointOriginOffset[1] -
+							XwaGunnerSeats_Value(objectType, seatTableIdx, XWA_GUNNER_SEAT_Y,
+												 g_modelDefs[modelIndex].turretSeatPosY[seatTableIdx]));
+			vec.z = (float)(g_hardpointOriginOffset[2] +
+							XwaGunnerSeats_Value(objectType, seatTableIdx, XWA_GUNNER_SEAT_Z,
+												 g_modelDefs[modelIndex].turretSeatPosZ[seatTableIdx]));
+			turretObjectType =
+				(uint16_t)XwaGunnerSeats_Value(objectType, seatTableIdx, XWA_GUNNER_SEAT_COCKPIT,
+											   g_modelDefs[modelIndex].turretObjectType[seatTableIdx]);
+		}
+#else
 		vec.x = (float)(g_hardpointOriginOffset[0] + g_modelDefs[modelIndex].turretSeatPosX[seatTableIdx]);
 		vec.y = (float)(g_hardpointOriginOffset[1] - g_modelDefs[modelIndex].turretSeatPosY[seatTableIdx]);
 		vec.z = (float)(g_hardpointOriginOffset[2] + g_modelDefs[modelIndex].turretSeatPosZ[seatTableIdx]);
 
 		turretObjectType = g_modelDefs[modelIndex].turretObjectType[seatTableIdx];
+#endif
 		meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretObjectType);
 		if (meshCount > 0u) {
 			meshIdx = 0;
@@ -426,8 +448,15 @@ void FlightView_RenderCockpitModel(void) {
 		uint16_t turretObjectType;
 
 		modelIndex = GetModelDefIndexFromType(objectType);
+#ifdef XWA_MODERN
+		/* Modern port: a mod can give the seat its own cockpit. */
+		turretObjectType = (uint16_t)XwaGunnerSeats_Value(
+			objectType, g_players[g_localPlayer].currentSeatIdx - 1, XWA_GUNNER_SEAT_COCKPIT,
+			g_modelDefs[modelIndex].turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1]);
+#else
 		turretObjectType =
 			g_modelDefs[modelIndex].turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
+#endif
 		if (turretObjectType != 0) {
 			*loadedModelSlot = g_loadedModels.byObjectType[turretObjectType];
 		} else {
@@ -1951,9 +1980,18 @@ char FlightView_Render(void) {
 							uint16_t turretObjectType;
 
 							modelIndex = (ModelDefIndex)GetModelDefIndexFromType(obj->objectType);
+#ifdef XWA_MODERN
+							/* Modern port: a mod can give the seat its own cockpit. */
+							turretObjectType = (uint16_t)XwaGunnerSeats_Value(
+								obj->objectType, g_players[g_localPlayer].currentSeatIdx - 1,
+								XWA_GUNNER_SEAT_COCKPIT,
+								g_modelDefs[(uint16_t)modelIndex]
+									.turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1]);
+#else
 							turretObjectType =
 								g_modelDefs[(uint16_t)modelIndex]
 									.turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
+#endif
 							if (turretObjectType != 0) {
 								g_loadedModels.byObjectType[(uint16_t)obj->objectType] =
 									g_loadedModels.byObjectType[turretObjectType];
@@ -3078,8 +3116,20 @@ int FVIEW_BuildCameraOrient(int16_t rollQ16, int16_t pitchQ16, int16_t yawQ16, i
 			craft = playerMobj->pCraft;
 			savedAxisZ = g_curMatR1_Z;
 
+#ifdef XWA_MODERN
+			/* Modern port: a mod can give the seat its own mount angles. */
+			mountAngleB = XwaGunnerSeats_Value(
+				g_objectTable[playerObjectIdx].objectType, g_players[playerIdx].currentSeatIdx - 1,
+				XWA_GUNNER_SEAT_MOUNT_ANGLE_B,
+				g_modelDefs[modelIndex].turretMountAngleB[g_players[playerIdx].currentSeatIdx - 1]);
+			mountAngleA = XwaGunnerSeats_Value(
+				g_objectTable[playerObjectIdx].objectType, g_players[playerIdx].currentSeatIdx - 1,
+				XWA_GUNNER_SEAT_MOUNT_ANGLE_A,
+				g_modelDefs[modelIndex].turretMountAngleA[g_players[playerIdx].currentSeatIdx - 1]);
+#else
 			mountAngleB = g_modelDefs[modelIndex].turretMountAngleB[g_players[playerIdx].currentSeatIdx - 1];
 			mountAngleA = g_modelDefs[modelIndex].turretMountAngleA[g_players[playerIdx].currentSeatIdx - 1];
+#endif
 #ifdef XWA_MODERN
 			shadowSavedAxis[0] = camShadow[3];
 			shadowSavedAxis[1] = camShadow[4];

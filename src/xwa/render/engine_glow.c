@@ -15,6 +15,7 @@
 #include "xwa/assets/model_bounds.h"
 #include "xwa/flight/flight.h"
 #include "xwa/flight/object/laser.h"
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/model_roles.h"
 
 #ifndef XWA_MODERN
@@ -1287,8 +1288,15 @@ char GlowMark_SpawnLocalPlayerHitEffects(void) {
 		uint16_t turretObjectType;
 
 		modelIndex = GetModelDefIndexFromType(objectType);
+#ifdef XWA_MODERN
+		/* Modern port: a mod can give the seat its own cockpit. */
+		turretObjectType = (uint16_t)XwaGunnerSeats_Value(
+			objectType, g_players[g_localPlayer].currentSeatIdx - 1, XWA_GUNNER_SEAT_COCKPIT,
+			g_modelDefs[modelIndex].turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1]);
+#else
 		turretObjectType =
 			g_modelDefs[modelIndex].turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
+#endif
 		if (turretObjectType != 0) {
 			*loadedModelSlot = g_loadedModels.byObjectType[turretObjectType];
 		} else {

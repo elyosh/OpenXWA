@@ -39,6 +39,7 @@
 #include "xwa_runtime/models/collision_bvh.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
@@ -1048,7 +1049,14 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 		gunTurretRotScale = NULL;
 		launcherRotScale = NULL;
 		beamRotScale = NULL;
+#ifdef XWA_MODERN
+		/* Modern port: a mod can give the seat its own cockpit. */
+		turretObjectType =
+			(uint16_t)XwaGunnerSeats_Value(shooterObj->objectType, turretSeatIdx, XWA_GUNNER_SEAT_COCKPIT,
+										   g_modelDefs[shooterModelIndex].turretObjectType[turretSeatIdx]);
+#else
 		turretObjectType = g_modelDefs[shooterModelIndex].turretObjectType[turretSeatIdx];
+#endif
 		meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretObjectType);
 		for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
 			MeshType meshType;

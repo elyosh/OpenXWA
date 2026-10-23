@@ -45,6 +45,7 @@
 #include "xwa/util/debug.h"
 #include "xwa/util/string.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/timing/host_clock.h"
 
 #include <math.h>
@@ -19461,6 +19462,15 @@ char Mfd_IsCommandMenuItemAvailable(uint16_t playerIdx, uint16_t menuRow, int16_
 				}
 				return 0;
 			case 4:
+#ifdef XWA_MODERN
+				/* Modern port: a mod can give any craft gunner seats. */
+				if (XwaGunnerSeats_Count(objectType) >= 0) {
+					if (XwaGunnerSeats_Count(objectType) == 0) {
+						return 0;
+					}
+					break;
+				}
+#endif
 				if (g_modelDefs[(uint16_t)modelIndex].turretObjectType[0] == 0) {
 					return 0;
 				}
@@ -19469,6 +19479,14 @@ char Mfd_IsCommandMenuItemAvailable(uint16_t playerIdx, uint16_t menuRow, int16_
 				}
 				break;
 			case 5:
+#ifdef XWA_MODERN
+				if (XwaGunnerSeats_Count(objectType) >= 0) {
+					if (XwaGunnerSeats_Count(objectType) == 0) {
+						return 0;
+					}
+					break;
+				}
+#endif
 				if (g_modelDefs[(uint16_t)modelIndex].turretObjectType[0] == 0 ||
 					g_modelDefs[(uint16_t)modelIndex].turretObjectType[1] == 0) {
 					return 0;

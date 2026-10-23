@@ -10,6 +10,7 @@
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/engine_glows.h"
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/models/shield_recharge.h"
@@ -41,6 +42,7 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "shield", XwaShieldRecharge_ClearModelSettings, XwaShieldRecharge_ReadModelSettings },
 	{ "sound", XwaCraftSounds_ClearModelSettings, XwaCraftSounds_ReadModelSettings },
 	{ "component_strength", XwaComponentStrength_ClearModelSettings, XwaComponentStrength_ReadModelSettings },
+	{ "gunner_seats", XwaGunnerSeats_ClearModelSettings, XwaGunnerSeats_ReadModelSettings },
 };
 
 /* A model file that this mission has looked for. `file` is NULL when the

@@ -61,6 +61,7 @@
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_sounds.h"
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/stats_profiles.h"
@@ -9490,8 +9491,16 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 				}
 				break;
 			case KEY_W:
+#ifdef XWA_MODERN
+				/* Modern port: a mod can let the weapon key work in a gunner
+				   seat. */
+				if (!g_players[currentPlayerIdx].hasCheckpointFlag &&
+					(!g_players[currentPlayerIdx].currentSeatIdx ||
+					 XwaMissionSettings_GunnerWeaponSelectInSeat())) {
+#else
 				if (!g_players[currentPlayerIdx].hasCheckpointFlag &&
 					!g_players[currentPlayerIdx].currentSeatIdx) {
+#endif
 					g_players[currentPlayerIdx].selectedWarhead =
 						(uint8_t)(g_players[currentPlayerIdx].selectedWarhead + 1);
 					if (g_players[currentPlayerIdx].selectedWeaponMode) {
@@ -12179,8 +12188,18 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 						(Q16Angle)(craft->turretAim.aimAngleB[seatIdx] + (int)accum);
 				}
 #endif
+#ifdef XWA_MODERN
+				/* Modern port: a mod can give the seat its own aim limits. */
+				limitA = (int16_t)XwaGunnerSeats_Value(
+					g_objectTable[g_players[playerIdx].objectIndex].objectType, seatIdx,
+					XWA_GUNNER_SEAT_AIM_LIMIT_A, g_modelDefs[(uint16_t)modelIndex].turretAimLimitA[seatIdx]);
+				limitB = (int16_t)XwaGunnerSeats_Value(
+					g_objectTable[g_players[playerIdx].objectIndex].objectType, seatIdx,
+					XWA_GUNNER_SEAT_AIM_LIMIT_B, g_modelDefs[(uint16_t)modelIndex].turretAimLimitB[seatIdx]);
+#else
 				limitA = g_modelDefs[(uint16_t)modelIndex].turretAimLimitA[seatIdx];
 				limitB = g_modelDefs[(uint16_t)modelIndex].turretAimLimitB[seatIdx];
+#endif
 				if ((int16_t)craft->turretAim.aimAngleA[seatIdx] > limitA) {
 					craft->turretAim.aimAngleA[seatIdx] = (uint16_t)limitA;
 #ifdef XWA_MODERN

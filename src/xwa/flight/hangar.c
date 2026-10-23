@@ -64,6 +64,7 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/model_roles.h"
 #include <math.h>
 #include <stddef.h>
@@ -3255,8 +3256,17 @@ void Hangar_RenderScene(void) {
 						uint16_t turretObjectType;
 
 						modelIndex = (ModelDefIndex)GetModelDefIndexFromType((ObjectTypeId)objectType);
+#ifdef XWA_MODERN
+						/* Modern port: a mod can give the seat its own cockpit. */
+						turretObjectType = (uint16_t)XwaGunnerSeats_Value(
+							(unsigned int)objectType, g_players[g_localPlayer].currentSeatIdx - 1,
+							XWA_GUNNER_SEAT_COCKPIT,
+							g_modelDefs[(uint16_t)modelIndex]
+								.turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1]);
+#else
 						turretObjectType = g_modelDefs[(uint16_t)modelIndex]
 											   .turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1];
+#endif
 						if (turretObjectType != 0) {
 							g_loadedModels.byObjectType[objectType] =
 								g_loadedModels.byObjectType[turretObjectType];
@@ -7838,7 +7848,23 @@ ObjectIndex Hangar_SwitchPlayerCraft(int newObjectType) {
 	}
 
 	modelIndex = GetModelDefIndexFromType((ObjectTypeId)newObjectType);
-	if (modelIndex != (ModelDefIndex)0xffffu) {
+#ifdef XWA_MODERN
+	/* Modern port: a mod can give each seat its own cockpit, so every seat's
+	   cockpit loads. */
+	if (modelIndex != (ModelDefIndex)0xffffu && XwaGunnerSeats_Count((unsigned int)newObjectType) >= 0) {
+		int seat;
+
+		for (seat = 0; seat < XwaGunnerSeats_Count((unsigned int)newObjectType); ++seat) {
+			turretObjectType =
+				(uint16_t)XwaGunnerSeats_Value((unsigned int)newObjectType, seat, XWA_GUNNER_SEAT_COCKPIT, 0);
+			if (turretObjectType != OBJ_None && g_loadedModels.byObjectType[turretObjectType] == 0) {
+				Hangar_LoadCraftModelByType((ObjectTypeId)turretObjectType);
+				Math_SetFpuSinglePrecisionMode();
+			}
+		}
+	} else
+#endif
+		if (modelIndex != (ModelDefIndex)0xffffu) {
 		turretObjectType = g_modelDefs[(uint16_t)modelIndex].turretObjectType[0];
 		if (turretObjectType != OBJ_None && g_loadedModels.byObjectType[turretObjectType] == 0) {
 			Hangar_LoadCraftModelByType((ObjectTypeId)turretObjectType);

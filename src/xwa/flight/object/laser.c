@@ -29,6 +29,7 @@
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/stats_profiles.h"
@@ -1625,7 +1626,15 @@ static __inline void laser_GetTurretProjectileHardpoint(ModelDefIndex firerModel
 	gunTurretRotScale = NULL;
 	launcherRotScale = NULL;
 	beamRotScale = NULL;
+#ifdef XWA_MODERN
+	/* Modern port: a mod can give the seat its own cockpit, and the shots
+	   leave from its hardpoints. */
+	turretObjectType = (uint16_t)XwaGunnerSeats_Value(
+		g_objectTable[g_players[playerIdx].objectIndex].objectType, turretSeatIdx, XWA_GUNNER_SEAT_COCKPIT,
+		g_modelDefs[firerModelIndex].turretObjectType[turretSeatIdx]);
+#else
 	turretObjectType = g_modelDefs[firerModelIndex].turretObjectType[turretSeatIdx];
+#endif
 	meshCount = (uint16_t)ModelMesh_GetObjectTypeMeshCount(turretObjectType);
 	for (meshIdx = 0; meshIdx < meshCount; ++meshIdx) {
 		MeshType meshType;
@@ -1691,7 +1700,13 @@ static __inline void laser_GetTurretProjectileHardpoint(ModelDefIndex firerModel
 		vec.x = vec.x + beamRotScale->pivot.x;
 		vec.y = vec.y + beamRotScale->pivot.y;
 		vec.z = vec.z + beamRotScale->pivot.z;
+#ifdef XWA_MODERN
+		/* Modern port: a mod chooses which seats are upside down. */
+		if (XwaGunnerSeats_Value(g_objectTable[g_players[playerIdx].objectIndex].objectType, turretSeatIdx,
+								 XWA_GUNNER_SEAT_INVERTED, turretSeatIdx == 1)) {
+#else
 		if (turretSeatIdx == 1) {
+#endif
 			Matrix3x3 mirror = { { 1.0f, 0.0f, 0.0f, 0.0f, -1.0f, 0.0f, 0.0f, 0.0f, -1.0f } };
 
 			vec.x -= g_players[playerIdx].seatEyeLocalX;
@@ -2598,7 +2613,21 @@ void laser_fireplayerweapon(int playerIdx) {
 		}
 
 		currentSeatIdx = g_players[playerIdx].currentSeatIdx;
+#ifdef XWA_MODERN
+		/* Modern port: with a mod's seats, a seat that faces down, like the
+		   stock second seat, is the one that a carried object blocks. */
+		if (XwaGunnerSeats_Count(g_objectTable[objectIndex].objectType) >= 0
+				? currentSeatIdx != 0 &&
+					  (uint16_t)XwaGunnerSeats_Value(g_objectTable[objectIndex].objectType,
+													 currentSeatIdx - 1, XWA_GUNNER_SEAT_MOUNT_ANGLE_A,
+													 0) > 0xA000u &&
+					  (uint16_t)XwaGunnerSeats_Value(g_objectTable[objectIndex].objectType,
+													 currentSeatIdx - 1, XWA_GUNNER_SEAT_MOUNT_ANGLE_A,
+													 0) < 0xE000u
+				: currentSeatIdx == 2) {
+#else
 		if (currentSeatIdx == 2) {
+#endif
 			if (craft->carriedObjectIndex != 0xffffu) {
 				msg_emitInFlightMessage(MSG_GUNNER_BLOCKED, playerIdx);
 				return;
@@ -2648,19 +2677,58 @@ void laser_fireplayerweapon(int playerIdx) {
 					g_modelDefs[(uint16_t)GetModelDefIndexFromType(
 									g_objectTable[g_players[playerIdx].objectIndex].objectType)]
 						.laserGroupWeaponKind;
-				laserGroupIdx = 0;
-				remainingGroups = 3;
-				do {
-					if (*laserGroupWeaponKind == 4) {
-						laser_firelasersystem((unsigned int)g_players[playerIdx].objectIndex, laserGroupIdx,
-											  playerIdx, 1u);
+#ifdef XWA_MODERN
+				/* Modern port: a mod can make a seat fire only the first turret
+				   group, or the first ion group when the player selected the
+				   ions, and only when the seat's cockpit has a hardpoint for
+				   it. */
+				if (XwaMissionSettings_GunnerFiresSelectedGroup()) {
+					const unsigned int objectType =
+						g_objectTable[g_players[playerIdx].objectIndex].objectType;
+					const uint16_t cockpitType = (uint16_t)XwaGunnerSeats_Value(
+						objectType, currentSeatIdx - 1, XWA_GUNNER_SEAT_COCKPIT,
+						g_modelDefs[(uint16_t)GetModelDefIndexFromType(objectType)]
+							.turretObjectType[(currentSeatIdx - 1) & 1]);
+					const int wantedKind = g_players[playerIdx].selectedWarhead == 0   ? 4
+										   : g_players[playerIdx].selectedWarhead == 1 ? 2
+																					   : -1;
+
+					for (laserGroupIdx = 0; wantedKind != -1 && laserGroupIdx < 3; ++laserGroupIdx) {
+						if (laserGroupWeaponKind[laserGroupIdx] == wantedKind) {
+							if (XwaGunnerSeats_CockpitHasHardpoint(
+									cockpitType, wantedKind == 4 ? XWA_GUNNER_HARDPOINT_LASER
+																 : XWA_GUNNER_HARDPOINT_ION)) {
+								laser_firelasersystem((unsigned int)g_players[playerIdx].objectIndex,
+													  laserGroupIdx, playerIdx, 1u);
+							}
+							break;
+						}
 					}
-					++laserGroupIdx;
-					++laserGroupWeaponKind;
-					--remainingGroups;
-				} while (remainingGroups != 0);
+				} else {
+#endif
+					laserGroupIdx = 0;
+					remainingGroups = 3;
+					do {
+						if (*laserGroupWeaponKind == 4) {
+							laser_firelasersystem((unsigned int)g_players[playerIdx].objectIndex,
+												  laserGroupIdx, playerIdx, 1u);
+						}
+						++laserGroupIdx;
+						++laserGroupWeaponKind;
+						--remainingGroups;
+					} while (remainingGroups != 0);
+#ifdef XWA_MODERN
+				}
+#endif
 			}
+#ifdef XWA_MODERN
+			/* Modern port: a mod can stop the turret groups from also firing
+			   forward. */
+			if (g_players[playerIdx].turretAutoFireState == 0 &&
+				XwaGunnerSeats_ForwardFire(g_objectTable[g_players[playerIdx].objectIndex].objectType)) {
+#else
 			if (g_players[playerIdx].turretAutoFireState == 0) {
+#endif
 				if (g_players[playerIdx].selectedWarhead == 0 ||
 					craft->laserLinkMode[g_players[playerIdx].selectedWarhead] == 4) {
 					uint8_t* laserGroupWeaponKind;
@@ -2705,7 +2773,19 @@ void laser_fireplayerweapon(int playerIdx) {
 		}
 
 		if ((craft->workingSubsystems & 8u) != 0) {
-			laser_firerocketsystem(objectIndex, selectedWarhead);
+#ifdef XWA_MODERN
+			/* Modern port: with a mod's rule, a seat fires warheads only when
+			   its cockpit has a warhead hardpoint. */
+			if (g_players[playerIdx].currentSeatIdx == 0 || !XwaMissionSettings_GunnerFiresWarheads() ||
+				XwaGunnerSeats_CockpitHasHardpoint(
+					(uint16_t)XwaGunnerSeats_Value(
+						g_objectTable[objectIndex].objectType, g_players[playerIdx].currentSeatIdx - 1,
+						XWA_GUNNER_SEAT_COCKPIT,
+						g_modelDefs[(uint16_t)GetModelDefIndexFromType(g_objectTable[objectIndex].objectType)]
+							.turretObjectType[(g_players[playerIdx].currentSeatIdx - 1) & 1]),
+					XWA_GUNNER_HARDPOINT_WARHEAD))
+#endif
+				laser_firerocketsystem(objectIndex, selectedWarhead);
 			craft = g_objectTable[objectIndex].mobj->pCraft;
 			{
 				unsigned int firstSlot;

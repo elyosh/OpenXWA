@@ -18,6 +18,14 @@
  *   sounds_like: 5                # uses the engine and launch sounds of type 5
  *   beam_allowed: true            # keeps the beam that its flight group gives
  *   names: {short: 'QF/Cr', long: 'Quasar Fire Carrier', plural: '...', gender: m}
+ *   gunner_cockpit: true          # the cockpit of a gunner seat
+ *
+ * `gunner_cockpit` makes the object type a gunner seat's cockpit, like the
+ * stock type 317, and gives it type 317's asset flags. Its model then loads
+ * in every mission that has a craft with that seat, Death Star missions
+ * included. The game doesn't pair the hardpoints of its turret meshes, so
+ * its two gun hardpoints become weapon slots 0 and 1 of its craft record.
+ * The type needs a craft record of its own.
  *
  * Every key but `version` and `object_type` is optional, and a key left out
  * keeps the game's value. With `model`, the object type gets a list row of
@@ -66,6 +74,9 @@ unsigned int XwaCraftDefinitions_SoundObjectType(unsigned int objectType);
    it. In the stock game, the X-wing, Y-wing, A-wing, B-wing, Z-95 and TIE
    Fighter don't. */
 int XwaCraftDefinitions_BeamAllowed(unsigned int objectType);
+/* Whether `objectType` is a gunner seat's cockpit added by an object type
+   file (`gunner_cockpit: true`). */
+int XwaCraftDefinitions_GunnerCockpit(unsigned int objectType);
 
 /* Gives the list readers the rows that the object type files add to list `list`
    (0 for Spacecraft0.LST, 1 for Equipment0.LST), after the last line of the

@@ -612,13 +612,15 @@ typedef struct XwaHyperspaceState {
  * PLAYER object and draws whenever the view is internal
  * (hangar.c render loop); flight anchors to the camera FOCUS object
  * and requires cockpit_visible plus the seat's availability flag
- * (FlightView_Render queue conditions). Gunner seat 2 additionally
- * flips the model about the seat's eye point (basis * diag(1,-1,-1)). */
+ * (FlightView_Render queue conditions). An inverted gunner seat, such as
+ * the stock seat 2, additionally flips the model about the seat's eye point
+ * (basis * diag(1,-1,-1)). */
 typedef struct XwaCockpit {
 	/* Cockpit OPT basename from the loaded-handle registry: seat 0 =
 	 * g_cockpitModel (includes the classic Tie/CombatSim fallback
 	 * cockpits); turret seats = the seat's turret model
-	 * (g_modelDefs turretObjectType[seat-1]). Empty = none loaded. */
+	 * (g_modelDefs turretObjectType[seat-1], or the model's gunner seat).
+	 * Empty = none loaded. */
 	char model_name[40];
 	/* The own craft's "<name>Exterior.opt" variant (g_exteriorModel) —
 	 * the classic swaps it in for the PLAYER object in external view
@@ -627,6 +629,7 @@ typedef struct XwaCockpit {
 	 * OPT). */
 	char exterior_name[40];
 	uint8_t seat;             /* player currentSeatIdx (0 = pilot) */
+	uint8_t inverted;         /* the gunner seat is drawn upside down */
 	uint8_t look_available;   /* player cockpitLookAvailable (seat-0 gate) */
 	uint8_t toggle_available; /* player cockpitToggleAvailable (turret gate) */
 	/* Turret-seat aim (craft turretAim, seat-1 slot; 0 for the pilot

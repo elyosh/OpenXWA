@@ -79,6 +79,7 @@ static int s_addedRowCount[CRAFT_LIST_COUNT];
 static uint16_t s_soundsLike[OBJ_Count];
 /* 0 for the stock rule, 1 when a file allows the beam, 2 when it doesn't. */
 static uint8_t s_beamRule[OBJ_Count];
+static uint8_t s_gunnerCockpit[OBJ_Count];
 static CraftNames* s_names;
 static int s_nameCount;
 /* The text of each SHIPLIST.TXT line after its ID, by craft type, read when
@@ -167,8 +168,9 @@ static const CraftField s_turretFields[] = {
 };
 
 static const char* const s_topKeys[] = {
-	"version", "object_type",        "model",        "list",        "genus",        "family",
-	"flags",   "craft_record_index", "craft_record", "sounds_like", "beam_allowed", "names",
+	"version",        "object_type",        "model",        "list",        "genus",        "family",
+	"flags",          "craft_record_index", "craft_record", "sounds_like", "beam_allowed", "names",
+	"gunner_cockpit",
 };
 static const char* const s_recordArrayKeys[] = { "lasers",      "warheads",     "turrets",
 												 "cockpit_eye", "cockpit_name", "mesh_attach" };
@@ -1092,6 +1094,13 @@ static void CraftDefinitions_ApplyRules(const CraftFile* file) {
 	if (node != NULL && CraftDefinitions_ReadBool(file->path, node, "beam_allowed", &flag)) {
 		s_beamRule[file->objectType] = (uint8_t)(flag ? 1 : 2);
 	}
+	node = AeronConfigNode_MapGet(file->root, "gunner_cockpit");
+	if (node != NULL && CraftDefinitions_ReadBool(file->path, node, "gunner_cockpit", &flag) && flag) {
+		s_gunnerCockpit[file->objectType] = 1;
+		/* The stock gunner cockpit's asset flags, so it also loads in Death
+		   Star missions. */
+		g_objectTypes[file->objectType].assetFlags = 0x01;
+	}
 }
 
 /* Loads a craft type file and checks its version, craft type and object
@@ -1419,6 +1428,10 @@ int XwaCraftDefinitions_BeamAllowed(unsigned int objectType) {
 	}
 	return !(objectType == OBJ_XWing || objectType == OBJ_YWing || objectType == OBJ_BWing ||
 			 objectType == OBJ_AWing || objectType == OBJ_Z95 || objectType == OBJ_TIEFighter);
+}
+
+int XwaCraftDefinitions_GunnerCockpit(unsigned int objectType) {
+	return objectType < OBJ_Count && s_gunnerCockpit[objectType] != 0;
 }
 
 int XwaCraftDefinitions_NextAddedRow(int list, int* rowIndex, char* line, size_t lineSize) {

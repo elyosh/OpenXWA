@@ -39,6 +39,7 @@
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/geometry_textures.h"
 #endif
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <stdio.h>
@@ -637,10 +638,22 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 										g_modelDefs[modelEntryIdx]
 											.weaponHardpoints[weaponSlot]
 											.alternateMeshHardpointIdx = 0xff;
+#ifdef XWA_MODERN
+										/* Modern port: the gunner cockpits that a mod adds
+										   are like type 317, and their turret hardpoints
+										   aren't paired either. */
+										if (loadedModelSlot != 317 &&
+											!XwaCraftDefinitions_GunnerCockpit(loadedModelSlot) &&
+											(meshType == MESH_GunTurret ||
+											 meshType == MESH_RotaryGunTurret)) {
+											pairedSlot = weaponSlot;
+										}
+#else
 										if (loadedModelSlot != 317 && (meshType == MESH_GunTurret ||
 																	   meshType == MESH_RotaryGunTurret)) {
 											pairedSlot = weaponSlot;
 										}
+#endif
 										++weaponSlot;
 										if (weaponSlot == FEDISKIO_WEAPON_SLOT_LIMIT) {
 											break;
@@ -3697,8 +3710,20 @@ static __inline void FeDiskIo_FinalizeCockpitModelLoad(uint16_t objectType) {
 	{
 		uint16_t turretObjectType;
 
+#ifdef XWA_MODERN
+		/* Modern port: a mod can give each seat its own cockpit. The seats are
+		   available when the first seat's cockpit is loaded, and every seat's
+		   cockpit loads with it. */
+		turretObjectType = (uint16_t)XwaGunnerSeats_Value(
+			(unsigned int)objectType, 0, XWA_GUNNER_SEAT_COCKPIT,
+			g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)objectType)].turretObjectType[0]);
+		if (XwaGunnerSeats_Count((unsigned int)objectType) == 0) {
+			turretObjectType = 0;
+		}
+#else
 		turretObjectType =
 			g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)objectType)].turretObjectType[0];
+#endif
 		if (turretObjectType != 0) {
 			if (g_loadedModels.byObjectType[turretObjectType] != 0) {
 				g_players[g_localPlayer].cockpitToggleAvailable = 1;

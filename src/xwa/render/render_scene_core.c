@@ -7,6 +7,7 @@
 #ifdef XWA_MODERN
 #include "xwa/frontend/frontend_display.h" /* g_flightRenderToFrontend */
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/opt_synth.h"
 #endif
 
@@ -449,7 +450,15 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 		mesh.orient[8] = g_objViewMatF_R2_Z;
 		Math3D_RotateVec3(&mesh.pos, (Matrix3x3*)mesh.orient);
 
+#ifdef XWA_MODERN
+		/* Modern port: a mod chooses which seats are upside down. */
+		if (g_cockpitViewActive && g_players[g_localPlayer].currentSeatIdx != 0 &&
+			XwaGunnerSeats_Value(g_objectTable[g_players[g_localPlayer].objectIndex].objectType,
+								 g_players[g_localPlayer].currentSeatIdx - 1, XWA_GUNNER_SEAT_INVERTED,
+								 g_players[g_localPlayer].currentSeatIdx == 2)) {
+#else
 		if (g_cockpitViewActive && g_players[g_localPlayer].currentSeatIdx == 2) {
+#endif
 			pivot.x = mesh.pos.x;
 			pivot.y = mesh.pos.y;
 			pivot.z = mesh.pos.z;

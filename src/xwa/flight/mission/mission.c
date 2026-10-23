@@ -41,6 +41,7 @@
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_names.h"
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/mission_art.h"
@@ -8046,7 +8047,20 @@ uint16_t Mission_Init(char* fileName) {
 		}
 
 		modelIndex = GetModelDefIndexFromType(objectType);
-		if (modelIndex != 0xffffu && g_modelDefs[modelIndex].turretObjectType[0] != 0) {
+#ifdef XWA_MODERN
+		/* Modern port: a mod can give each seat its own cockpit, so every
+		   seat's cockpit loads. */
+		if (XwaGunnerSeats_Count((unsigned int)objectType) >= 0) {
+			int seat;
+
+			for (seat = 0; seat < XwaGunnerSeats_Count((unsigned int)objectType); ++seat) {
+				g_objectTypes[XwaGunnerSeats_Value((unsigned int)objectType, seat, XWA_GUNNER_SEAT_COCKPIT,
+												   0)]
+					.assetFlags |= MISSION_MODEL_ASSET_REQUIRED;
+			}
+		} else
+#endif
+			if (modelIndex != 0xffffu && g_modelDefs[modelIndex].turretObjectType[0] != 0) {
 			g_objectTypes[g_modelDefs[modelIndex].turretObjectType[0]].assetFlags |=
 				MISSION_MODEL_ASSET_REQUIRED;
 		}

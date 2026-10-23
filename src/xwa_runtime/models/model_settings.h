@@ -12,6 +12,7 @@
  *   shield: {...}         # shield_recharge.h
  *   sound: {...}          # craft_sounds.h
  *   component_strength: {...} # component_strength.h
+ *   gunner_seats: {...}   # gunner_seats.h
  *
  * Each top-level key is a group that one module owns, except `weapons`,
  * whose `rates`, `energy_transfer`, `ai_torpedoes`, `impact_spin` and

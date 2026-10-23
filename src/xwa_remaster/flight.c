@@ -2018,7 +2018,7 @@ static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const XwaFlightObj
 	}
 	float delta[3];
 	fl_world_to_view(camera_rows, eye_offset[0], eye_offset[1], eye_offset[2], delta);
-	if (cockpit->seat == 2) {
+	if (cockpit->inverted) {
 		/* Classic gunner rear-turret flip about the seat's eye point. The flip acts
 		 * in eye space, so move the anchor basis there and back. */
 		float eye_basis[9];
@@ -3948,7 +3948,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 		w[a] = -(snap->cockpit.seat_eye_world_offset[a] + snap->cockpit.camera_pan[a] * 0.0625f);
 	}
 	fl_world_to_view(s.crows, w[0], w[1], w[2], delta);
-	if (snap->cockpit.seat == 2) {
+	if (snap->cockpit.inverted) {
 		float be[9];
 		for (int i = 0; i < 3; i++) {
 			for (int j = 0; j < 3; j++) {

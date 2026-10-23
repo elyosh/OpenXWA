@@ -42,6 +42,9 @@
  *     no_starship_fire_from_destroyed_racks: true
  *     starship_ambient_sounds: true
  *     no_player_warhead_slot_cap: true
+ *     gunner_weapon_select_in_seat: true
+ *     gunner_fires_selected_group: true
+ *     gunner_fires_warheads: true
  *
  * classic_hide_destroyed_engine_glows only changes drawing: the classic
  * renderer doesn't draw the engine glows of a destroyed or hidden mesh, nor
@@ -67,7 +70,19 @@
  * no_player_warhead_slot_cap lets each warhead rack of a player's craft hold
  * more than 9 warheads, when the craft starts and when it reloads in the
  * hangar. The stock game only allows it for the Missile Boat. It changes the
- * simulation. */
+ * simulation.
+ *
+ * The gunner rules change what a player can do in a gunner seat. They change
+ * the simulation:
+ *   - gunner_weapon_select_in_seat: the weapon key works in a seat, and a
+ *     seat change keeps the selected weapon. In the stock game, the key is
+ *     blocked and a seat change goes back to the lasers;
+ *   - gunner_fires_selected_group: a seat fires the first turret laser group,
+ *     or the first ion group when the player selected the ions, if the
+ *     gunner cockpit has a hardpoint for it. In the stock game, it fires
+ *     every turret laser group;
+ *   - gunner_fires_warheads: a seat fires warheads only when the gunner
+ *     cockpit has a warhead hardpoint. */
 
 #include <stdint.h>
 
@@ -97,6 +112,9 @@ int XwaMissionSettings_FireNeedsDechargeRate(void);
 int XwaMissionSettings_NoStarshipFireFromDestroyedRacks(void);
 int XwaMissionSettings_StarshipAmbientSounds(void);
 int XwaMissionSettings_NoPlayerWarheadSlotCap(void);
+int XwaMissionSettings_GunnerWeaponSelectInSeat(void);
+int XwaMissionSettings_GunnerFiresSelectedGroup(void);
+int XwaMissionSettings_GunnerFiresWarheads(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);

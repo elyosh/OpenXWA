@@ -43,6 +43,7 @@
 #include "xwa/render/effects.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/gunner_seats.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -1733,9 +1734,12 @@ void XwaSnapshot_CaptureFlight(void) {
 			if (k->seat == 0) {
 				handle = g_cockpitModel;
 			} else {
-				const uint16_t turretType =
+				const uint16_t turretType = (uint16_t)XwaGunnerSeats_Value(
+					pobj->objectType, k->seat - 1, XWA_GUNNER_SEAT_COCKPIT,
 					g_modelDefs[(uint16_t)GetModelDefIndexFromType((uint16_t)pobj->objectType)]
-						.turretObjectType[(k->seat - 1) & 1];
+						.turretObjectType[(k->seat - 1) & 1]);
+				k->inverted = (uint8_t)XwaGunnerSeats_Value(pobj->objectType, k->seat - 1,
+															XWA_GUNNER_SEAT_INVERTED, k->seat == 2);
 				if (turretType != 0) {
 					handle = g_loadedModels.byObjectType[turretType];
 				}

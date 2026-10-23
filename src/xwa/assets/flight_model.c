@@ -20,6 +20,7 @@
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #endif
@@ -245,6 +246,10 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 				   type with a model list row loads, since hangar maps can place
 				   any of them. */
 				if (XwaHangars_TypeFileName(objectType, modelName, sizeof modelName)) {
+					break;
+				}
+				/* A gunner cockpit that a mod adds loads by its own list row. */
+				if (XwaGunnerSeats_CockpitFileName(objectType, modelName, sizeof modelName)) {
 					break;
 				}
 #endif
