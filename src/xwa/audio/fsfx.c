@@ -28,6 +28,7 @@
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_sounds.h"
+#include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -1513,6 +1514,12 @@ int fsfx_UpdateTargetingTone(int state) {
 		} else {
 			seekerScale = 708;
 		}
+#ifdef XWA_MODERN
+		/* Modern port: a mod can change how long a lock takes for each
+		   craft. */
+		seekerScale = (uint16_t)XwaWarheadLock_Value(g_players[g_localPlayer].objectIndex,
+													 XWA_WARHEAD_LOCK_TICKS, seekerScale);
+#endif
 		if (g_gameTime - g_targetingToneLastSeekBeepTime >
 			141 *
 					(seekerScale - (int16_t)g_objectTable[g_players[g_localPlayer].objectIndex]

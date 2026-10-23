@@ -1,6 +1,7 @@
 #include "xwa/flight/ai/ai_internal.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #endif
@@ -2774,12 +2775,27 @@ char paifight_fightershootorder(void) {
 		maxWarheadShots = 6;
 		maxComponentHits = 16;
 #endif
+#ifdef XWA_MODERN
+		/* Modern port: a mod can change the AI's warhead ranges for each
+		   craft. */
+		fireRangeLimit =
+			g_paiContext.aiSkillTier != 2
+				? (uint32_t)XwaWarheadLock_Value(g_paiContext.aiObjIdx, XWA_WARHEAD_LOCK_AI_RANGE_BIG, 203610)
+				: (uint32_t)XwaWarheadLock_Value(g_paiContext.aiObjIdx,
+												 XWA_WARHEAD_LOCK_AI_RANGE_BIG_TOP_TIER, 244332);
+#else
 		fireRangeLimit = g_paiContext.aiSkillTier != 2 ? 203610u : 244332u;
+#endif
 	} else {
 		maxComponentHits = 2;
 		desiredWarheadClass = 1;
 		maxWarheadShots = 1;
+#ifdef XWA_MODERN
+		fireRangeLimit =
+			(uint32_t)XwaWarheadLock_Value(g_paiContext.aiObjIdx, XWA_WARHEAD_LOCK_AI_RANGE_SMALL, 101805);
+#else
 		fireRangeLimit = 101805u;
+#endif
 	}
 
 	acceptAnyWarhead = 0;
@@ -2994,7 +3010,15 @@ char paifight_fightershootorder(void) {
 	{
 		uint16_t lockThreshold;
 
+#ifdef XWA_MODERN
+		/* Modern port: a mod can change how long the AI takes to lock for
+		   each craft. */
+		lockThreshold = (uint16_t)((unsigned int)XwaWarheadLock_Value(
+									   g_paiContext.aiObjIdx, XWA_WARHEAD_LOCK_AI_TICKS_PER_TIER, 472) *
+								   (g_paiContext.aiSkillTier + 1u));
+#else
 		lockThreshold = (uint16_t)(472u * (g_paiContext.aiSkillTier + 1u));
+#endif
 		if (g_paiContext.aiSkillTier == 2) {
 			g_curCraft->warheadLockTicks =
 				(uint16_t)(g_curCraft->warheadLockTicks + (uint16_t)g_paiContext.aiController->thinkInterval);

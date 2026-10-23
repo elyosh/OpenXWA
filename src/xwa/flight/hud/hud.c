@@ -38,6 +38,7 @@
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #endif
@@ -6932,6 +6933,11 @@ void Hud_DrawReticle3D(void) {
 
 	quad.screenSize = (uint16_t)(int)((double)quad.screenSize * (double)g_flightHudScaleFactor);
 	lockRange = modelIndex == missileBoatModelIndex ? 354 : 708;
+#ifdef XWA_MODERN
+	/* Modern port: a mod can change how long a lock takes for each craft. */
+	lockRange = (uint16_t)XwaWarheadLock_Value(g_players[g_localPlayer].objectIndex, XWA_WARHEAD_LOCK_TICKS,
+											   lockRange);
+#endif
 	lockRangeDivisor = lockRange / 200;
 
 	if (Hud_AbsLookDegreesFromOffset(g_players[g_localPlayer].lookYawOffset) >= 45 ||

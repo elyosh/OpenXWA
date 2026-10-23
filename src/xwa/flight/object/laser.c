@@ -34,6 +34,7 @@
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/turret_hardpoints.h"
+#include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
@@ -265,16 +266,31 @@ static __inline void laser_UpdatePlayerWarheadLock(uint16_t objectIdx, int playe
 			pai_ObjectRefDirectionToObjectRef(objectIdx, currentTargetObjIdx);
 		}
 
+#ifdef XWA_MODERN
+		/* Modern port: a mod can change the player's lock ranges for each
+		   craft. */
+		lockRange = (uint32_t)XwaWarheadLock_Value(objectIdx, XWA_WARHEAD_LOCK_RANGE_SMALL, 101805);
+#else
 		lockRange = 101805u;
+#endif
 		if (currentTargetObjIdx >= g_activeRegionObjectSlotStart &&
 			currentTargetObjIdx < g_activeRegionCraftObjectSlotEnd) {
 			if (g_objectTable[currentTargetObjIdx].genusId == GENUS_Starship ||
 				g_objectTable[currentTargetObjIdx].genusId == GENUS_Platform ||
 				g_objectTable[currentTargetObjIdx].genusId == GENUS_Container ||
 				g_objectTable[currentTargetObjIdx].genusId == GENUS_Freighter) {
+#ifdef XWA_MODERN
+				lockRange = (uint32_t)XwaWarheadLock_Value(objectIdx, XWA_WARHEAD_LOCK_RANGE_BIG, 244332);
+#else
 				lockRange = 244332u;
+#endif
 			} else if (g_objectTable[currentTargetObjIdx].genusId == GENUS_Transport) {
+#ifdef XWA_MODERN
+				lockRange =
+					(uint32_t)XwaWarheadLock_Value(objectIdx, XWA_WARHEAD_LOCK_RANGE_TRANSPORT, 162888);
+#else
 				lockRange = 162888u;
+#endif
 			}
 		}
 
@@ -310,6 +326,12 @@ static __inline void laser_UpdatePlayerWarheadLock(uint16_t objectIdx, int playe
 				missileBoatModelIndex = (ModelDefIndex)GetModelDefIndexFromType(OBJ_MissileBoat);
 				modelIndex = (ModelDefIndex)GetModelDefIndexFromType(g_objectTable[objectIdx].objectType);
 				lockThreshold = (uint16_t)(modelIndex != missileBoatModelIndex ? 708u : 354u);
+#ifdef XWA_MODERN
+				/* Modern port: a mod can change how long a lock takes on the
+				   HUD for each craft. */
+				lockThreshold =
+					(uint16_t)XwaWarheadLock_Value(objectIdx, XWA_WARHEAD_LOCK_TICKS, lockThreshold);
+#endif
 			}
 			lockTicks = (int16_t)g_curCraft->warheadLockTicks;
 			if (lockTicks >= (int)lockThreshold) {
@@ -2318,7 +2340,14 @@ int laser_firemissile(int firerObjIdx, int warheadSlot, int projectileType, unsi
 			if (fireMode < 2u) {
 				int homingTier;
 
+#ifdef XWA_MODERN
+				/* Modern port: a mod can change how fast a lock gains homing
+				   levels for each craft. */
+				homingTier = (int16_t)g_curCraft->warheadLockTicks /
+							 XwaWarheadLock_Value(firerObjIdx, XWA_WARHEAD_LOCK_TICKS_PER_HOMING_LEVEL, 236);
+#else
 				homingTier = (int16_t)g_curCraft->warheadLockTicks / 236;
+#endif
 				guidance->homingTier = (uint8_t)homingTier;
 				if (guidance->homingTier > 6u) {
 					guidance->homingTier = 6;

@@ -15,6 +15,7 @@
 #include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
 
@@ -45,6 +46,7 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "sound", XwaCraftSounds_ClearModelSettings, XwaCraftSounds_ReadModelSettings },
 	{ "component_strength", XwaComponentStrength_ClearModelSettings, XwaComponentStrength_ReadModelSettings },
 	{ "gunner_seats", XwaGunnerSeats_ClearModelSettings, XwaGunnerSeats_ReadModelSettings },
+	{ "warhead_lock", XwaWarheadLock_ClearModelSettings, XwaWarheadLock_ReadModelSettings },
 };
 
 /* A model file that this mission has looked for. `file` is NULL when the
