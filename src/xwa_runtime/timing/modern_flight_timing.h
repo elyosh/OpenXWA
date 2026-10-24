@@ -29,6 +29,8 @@ int XwaModernFlightTiming_IsLegacyCadenceDue(void);
 XwaModernAiCadence XwaModernFlightTiming_BeginAiAdvance(uint16_t elapsed_ticks);
 int XwaModernFlightTiming_AdvanceTransientAnimation(uint16_t elapsed_ticks);
 int XwaModernFlightTiming_AdvanceGlowMarkAnimation(uint16_t elapsed_ticks);
+int XwaModernFlightTiming_ScaleStepTicks(int step_start_time, uint16_t elapsed_ticks, uint32_t rate,
+										 uint32_t divisor);
 
 #ifdef __cplusplus
 }

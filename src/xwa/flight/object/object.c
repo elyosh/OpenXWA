@@ -28,6 +28,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/weapon_stats.h"
+#include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
 #include <math.h>
@@ -2217,17 +2218,36 @@ void Object_UpdateLifetimeAndMovement(void) {
 							yaw = obj->yaw;
 							yawDeltaU = (uint16_t)(trig2_xyangle - yaw);
 							yawDelta = (int16_t)yawDeltaU;
+#ifdef XWA_MODERN
+							/* Modern port: a homing warhead turns and changes speed at
+							   its table rates with any step size. With 1-tick steps,
+							   the stock division gives 0 for any rate below 236 a
+							   second. */
+							turnStep = XwaModernFlightTiming_ScaleStepTicks(
+								g_gameTime, (uint16_t)g_elapsedTicks,
+								g_projectileHomingTurnRateByProfile[profile], 236);
+#else
 							turnStep =
 								g_projectileHomingTurnRateByProfile[profile] * (uint16_t)g_elapsedTicks / 236;
+#endif
 							absYaw = (yawDelta >= 0) ? yawDelta : -yawDelta;
 							if (absYaw <= (int)(uint16_t)turnStep) {
 								obj->yaw = trig2_xyangle;
 								if (obj->mobj->speed < pWG->minSpeed) {
+#ifdef XWA_MODERN
+									obj->mobj->speed =
+										(uint16_t)(obj->mobj->speed +
+												   XwaModernFlightTiming_ScaleStepTicks(
+													   g_gameTime, (uint16_t)g_elapsedTicks,
+													   g_projectileHomingSpeedAdjustRateByProfile[profile],
+													   236));
+#else
 									obj->mobj->speed =
 										(uint16_t)(obj->mobj->speed +
 												   (uint16_t)g_elapsedTicks *
 													   g_projectileHomingSpeedAdjustRateByProfile[profile] /
 													   236);
+#endif
 								}
 							} else {
 								int step = (uint16_t)turnStep;
@@ -2238,11 +2258,20 @@ void Object_UpdateLifetimeAndMovement(void) {
 								obj->yaw = (uint16_t)(yaw + step);
 								spd = obj->mobj->speed;
 								if (spd > 0xC8) {
+#ifdef XWA_MODERN
+									obj->mobj->speed =
+										(uint16_t)(spd -
+												   XwaModernFlightTiming_ScaleStepTicks(
+													   g_gameTime, (uint16_t)g_elapsedTicks,
+													   g_projectileHomingSpeedAdjustRateByProfile[profile],
+													   236));
+#else
 									obj->mobj->speed =
 										(uint16_t)(spd -
 												   (uint16_t)g_elapsedTicks *
 													   g_projectileHomingSpeedAdjustRateByProfile[profile] /
 													   236);
+#endif
 									if (obj->mobj->speed < 0xC8) {
 										obj->mobj->speed = 200;
 									}
@@ -2253,8 +2282,14 @@ void Object_UpdateLifetimeAndMovement(void) {
 							pitch = obj->pitch;
 							pitchDeltaU = (uint16_t)(targetPitch - pitch);
 							pitchDelta = (int16_t)pitchDeltaU;
+#ifdef XWA_MODERN
+							pitchStep = XwaModernFlightTiming_ScaleStepTicks(
+								g_gameTime, (uint16_t)g_elapsedTicks,
+								g_projectileHomingTurnRateByProfile[profile], 236);
+#else
 							pitchStep =
 								g_projectileHomingTurnRateByProfile[profile] * (uint16_t)g_elapsedTicks / 236;
+#endif
 							absPitch = (pitchDelta >= 0) ? pitchDelta : -pitchDelta;
 							if (absPitch <= (int)(uint16_t)pitchStep) {
 								obj->pitch = targetPitch;

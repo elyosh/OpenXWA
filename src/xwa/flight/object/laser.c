@@ -26,6 +26,7 @@
 #include "xwa/render/renderer_internal.h"
 #include "xwa/util/random.h"
 #ifdef XWA_MODERN
+#include "xwa/util/time.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
@@ -315,8 +316,17 @@ static __inline void laser_UpdatePlayerWarheadLock(uint16_t objectIdx, int playe
 
 				targetCraft = g_objectTable[currentTargetObjIdx].mobj->pCraft;
 				if (targetCraft->cmTypeId == 1 && targetCraft->chaffActiveTimer != 0) {
+#ifdef XWA_MODERN
+					/* Modern port: chaff halves the lock's growth with any
+					   step size. */
+					g_curCraft->warheadLockTicks =
+						(uint16_t)(g_curCraft->warheadLockTicks -
+								   (uint16_t)XwaModernFlightTiming_ScaleStepTicks(
+									   g_gameTime, (uint16_t)g_elapsedTicks, 1, 2));
+#else
 					g_curCraft->warheadLockTicks =
 						(uint16_t)(g_curCraft->warheadLockTicks - ((uint16_t)g_elapsedTicks >> 1));
+#endif
 				}
 			}
 
@@ -380,9 +390,18 @@ static __inline void laser_UpdatePlayerWarheadLock(uint16_t objectIdx, int playe
 		}
 
 		if ((int16_t)g_curCraft->warheadLockTicks > 0) {
+#ifdef XWA_MODERN
+			/* Modern port: a lost lock falls 1.5 ticks per tick with any
+			   step size. */
+			g_curCraft->warheadLockTicks = (uint16_t)(g_curCraft->warheadLockTicks -
+													  (uint16_t)XwaModernFlightTiming_ScaleStepTicks(
+														  g_gameTime, (uint16_t)g_elapsedTicks, 1, 2) -
+													  (uint16_t)g_elapsedTicks);
+#else
 			g_curCraft->warheadLockTicks =
 				(uint16_t)(g_curCraft->warheadLockTicks - ((uint16_t)g_elapsedTicks >> 1) -
 						   (uint16_t)g_elapsedTicks);
+#endif
 			if ((int16_t)g_curCraft->warheadLockTicks < 0) {
 				g_curCraft->warheadLockTicks = 0;
 			}
@@ -3082,7 +3101,14 @@ void laser_UpdateMineWeaponFire(int mineObjIdx) {
 		uint8_t cooldown;
 
 		cooldown = g_objectTable[mineIdx].typeSpecificByte[1];
+#ifdef XWA_MODERN
+		/* Modern port: a mine's cooldown runs out with any step size. With
+		   1-tick steps, the stock step of 0 would stop it for good. */
+		cooldownStep =
+			(uint16_t)XwaModernFlightTiming_ScaleStepTicks(g_gameTime, (uint16_t)g_elapsedTicks, 1, 2);
+#else
 		cooldownStep = (uint16_t)g_elapsedTicks >> 1;
+#endif
 		if ((uint16_t)cooldown > cooldownStep) {
 			g_objectTable[mineIdx].typeSpecificByte[1] = (uint8_t)(cooldown - cooldownStep);
 			return;

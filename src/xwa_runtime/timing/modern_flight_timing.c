@@ -144,3 +144,23 @@ int XwaModernFlightTiming_AdvanceGlowMarkAnimation(uint16_t elapsed_ticks) {
 	g_pendingGlowMarkAnimationTicks -= XWA_MODERN_COMPATIBILITY_STEP_TICKS;
 	return 1;
 }
+
+/* Returns elapsed_ticks * rate / divisor, for the stock code that scales a
+   step's ticks this way, such as elapsed_ticks >> 1 (rate 1, divisor 2) or
+   a rate per second (divisor 236). The division drops the remainder on each
+   step. The stock steps are at least 8 ticks long, so little is lost, but a
+   high-rate step can be 1 tick long: 1 >> 1 is 0, and so is any rate below
+   236 per second. So in high-rate mode, this returns how much
+   game time * rate / divisor grows over the step, from `step_start_time`.
+   Over several steps, the results then add up to the full rate, whatever the
+   size of the steps. */
+int XwaModernFlightTiming_ScaleStepTicks(int step_start_time, uint16_t elapsed_ticks, uint32_t rate,
+										 uint32_t divisor) {
+	int64_t start_time;
+
+	if (!XwaModernFlightTiming_IsHighRate()) {
+		return (int)((int64_t)elapsed_ticks * rate / divisor);
+	}
+	start_time = step_start_time;
+	return (int)((start_time + elapsed_ticks) * rate / divisor - start_time * rate / divisor);
+}
