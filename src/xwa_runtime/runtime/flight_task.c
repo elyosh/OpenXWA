@@ -630,17 +630,26 @@ static int XwaFlightTask_WaitForFrameStepDue(void) {
 	return g_inputTimestamp - g_gameTime >= XwaModernFlightTiming_StepTicks();
 }
 
+/* Port deviation: a negative prediction counts as 0. The original moves the
+   target toward `desiredTimestamp` by at most an eighth of the prediction.
+   From a negative prediction, that moves it away instead, further on each
+   frame, and the game time runs away. With steps of at least 8 ticks the
+   prediction stays near 8, and normal flight waits until the input clock is
+   ahead of the game time, which keeps it positive. But film playback doesn't
+   wait, and with the high-rate timing a recorded step can be 1 tick, so the
+   prediction can reach -1 there. */
 static int XwaFlightTask_SmoothedStepTarget(int desiredTimestamp, int currentGameTime) {
+	const int predicted = g_xwaFlightTaskPredictedFrameDelta > 0 ? g_xwaFlightTaskPredictedFrameDelta : 0;
 	int target;
 
 	if (g_xwaFlightTaskLastStepTargetTimestamp != 0) {
-		target = g_xwaFlightTaskLastStepTargetTimestamp + g_xwaFlightTaskPredictedFrameDelta;
+		target = g_xwaFlightTaskLastStepTargetTimestamp + predicted;
 		if (target < desiredTimestamp) {
 			int delta;
 
 			delta = desiredTimestamp - target;
-			if (delta > (g_xwaFlightTaskPredictedFrameDelta >> 3)) {
-				delta = g_xwaFlightTaskPredictedFrameDelta >> 3;
+			if (delta > (predicted >> 3)) {
+				delta = predicted >> 3;
 			}
 			if (delta == 0) {
 				delta = 1;
@@ -653,8 +662,8 @@ static int XwaFlightTask_SmoothedStepTarget(int desiredTimestamp, int currentGam
 			int delta;
 
 			delta = target - desiredTimestamp;
-			if (delta > (g_xwaFlightTaskPredictedFrameDelta >> 3)) {
-				delta = g_xwaFlightTaskPredictedFrameDelta >> 3;
+			if (delta > (predicted >> 3)) {
+				delta = predicted >> 3;
 			}
 			if (delta == 0) {
 				delta = 1;
