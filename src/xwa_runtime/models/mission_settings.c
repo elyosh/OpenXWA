@@ -75,6 +75,8 @@ static int s_rearmFollowsBothStatuses;
 static int s_warheadCollisionBonusAnyTarget;
 static int s_turbolaserHardpointTypes;
 static int s_gunTurretHardpoints;
+static int s_hangarJamming;
+static int s_superStarDestroyerJamming;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -417,6 +419,8 @@ void XwaMissionSettings_Init(void) {
 	s_warheadCollisionBonusAnyTarget = 0;
 	s_turbolaserHardpointTypes = 0;
 	s_gunTurretHardpoints = 0;
+	s_hangarJamming = 1;
+	s_superStarDestroyerJamming = 0;
 	MissionSettings_ResetTargets();
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SETTINGS_FLIGHT_YAML, &file,
@@ -509,6 +513,13 @@ void XwaMissionSettings_Init(void) {
 	if ((node = AeronConfigNode_MapGet(rules, "gun_turret_hardpoints")) != NULL) {
 		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "gun_turret_hardpoints", node, &s_gunTurretHardpoints);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "hangar_jamming")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "hangar_jamming", node, &s_hangarJamming);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "super_star_destroyer_jamming")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "super_star_destroyer_jamming", node,
+								 &s_superStarDestroyerJamming);
+	}
 	MissionSettings_Read(SETTINGS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "mission_settings"), &s_defaults);
 	s_settings = s_defaults;
 	AeronConfigFile_Destroy(file);
@@ -564,6 +575,10 @@ int XwaMissionSettings_WarheadCollisionBonusAnyTarget(void) { return s_warheadCo
 int XwaMissionSettings_TurbolaserHardpointTypes(void) { return s_turbolaserHardpointTypes; }
 
 int XwaMissionSettings_GunTurretHardpoints(void) { return s_gunTurretHardpoints; }
+
+int XwaMissionSettings_HangarJamming(void) { return s_hangarJamming; }
+
+int XwaMissionSettings_SuperStarDestroyerJamming(void) { return s_superStarDestroyerJamming; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

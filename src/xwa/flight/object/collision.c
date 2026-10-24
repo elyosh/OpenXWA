@@ -41,6 +41,7 @@
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/hangars.h"
+#include "xwa_runtime/models/jamming.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/stats_profiles.h"
@@ -3608,6 +3609,15 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 	int attachFwd;
 	int attachUp;
 	int deltaZ;
+#ifdef XWA_MODERN
+	XwaJammingRule rule;
+	int hasModelRule;
+
+	/* Modern port: a mod can turn jamming off. */
+	if (!XwaMissionSettings_HangarJamming()) {
+		return;
+	}
+#endif
 
 	hostileObj = &g_objectTable[hostileObjIdx];
 	withinDisruptionPoint = 0;
@@ -3636,17 +3646,31 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 	}
 
 	hostileType = hostileObj->objectType;
+#ifdef XWA_MODERN
+	/* Modern port: the model can have its own rule. Without one, the rule is
+	   the stock rule of the type, which the tests below then follow. */
+	hasModelRule = XwaJamming_Rule(hostileType, &rule);
+	if (!rule.enabled) {
+		return;
+	}
+#else
 	if (hostileType == OBJ_ImperialResearchCenter) {
 		return;
 	}
+#endif
 
 	modelIndex = GetModelDefIndexFromType(hostileType);
 	if ((uint16_t)modelIndex == 0xffffu) {
 		return;
 	}
 
+#ifdef XWA_MODERN
+	if (rule.range >= 0) {
+		if (hostileObjIdx <= rule.range) {
+#else
 	if (hostileObj->objectType == OBJ_Factory) {
 		if (hostileObjIdx <= 4096) {
+#endif
 		} else {
 			return;
 		}
@@ -3673,6 +3697,23 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 		attachUp = g_modelDefs[(uint16_t)modelIndex].meshAttachData[6];
 		attachFwd = g_modelDefs[(uint16_t)modelIndex].meshAttachData[7];
 
+#ifdef XWA_MODERN
+		if (rule.direction == XWA_JAMMING_DOWN) {
+			if (localUp > 0) {
+				return;
+			}
+		}
+		if (rule.direction == XWA_JAMMING_UP) {
+			if (localUp < 0) {
+				return;
+			}
+		}
+		if (rule.behavior == XWA_JAMMING_RULE_NONE) {
+			return;
+		}
+
+		if (rule.behavior == XWA_JAMMING_RULE_HANGAR_POINT) {
+#else
 		if (hostileObj->objectType == OBJ_ImperialStarDestroyer2 ||
 			hostileObj->objectType == OBJ_Interdictor2 ||
 			hostileObj->objectType == OBJ_VictoryStarDestroyer2) {
@@ -3682,6 +3723,7 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 		}
 
 		if (hostileObj->objectType == OBJ_SuperStarDestroyer) {
+#endif
 			int upDelta;
 			int absAttachUp;
 
@@ -3701,8 +3743,18 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 				targetBoundsExtent >> 3) {
 				return;
 			}
+#ifdef XWA_MODERN
+			/* Modern port: the stock code never jams here, so the Super Star
+			   Destroyer never jams. A model's rule, or a mod's
+			   super_star_destroyer_jamming, makes it jam. */
+			withinDisruptionPoint = hasModelRule || XwaMissionSettings_SuperStarDestroyerJamming();
+#endif
 		} else {
+#ifdef XWA_MODERN
+			if (rule.behavior == XWA_JAMMING_RULE_HANGAR_MESH_CENTER) {
+#else
 			if (hostileObj->objectType == OBJ_RepairYard) {
+#endif
 				int meshCount;
 				int meshIdx;
 				int distance;

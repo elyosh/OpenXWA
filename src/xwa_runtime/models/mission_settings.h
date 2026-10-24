@@ -52,6 +52,8 @@
  *     warhead_collision_bonus_any_target: true
  *     turbolaser_hardpoint_types: true
  *     gun_turret_hardpoints: true
+ *     hangar_jamming: false
+ *     super_star_destroyer_jamming: true
  *
  * classic_hide_destroyed_engine_glows only changes drawing: the classic
  * renderer doesn't draw the engine glows of a destroyed or hidden mesh, nor
@@ -110,7 +112,13 @@
  *     types 301 to 305, and type 38 is weapon type 307. In the stock game,
  *     hardpoint type N is weapon type N + 279;
  *   - gun_turret_hardpoints: XWAU's rules for the hardpoints of gun turret
- *     meshes. A gun turret mesh doesn't fire at targets behind it. */
+ *     meshes. A gun turret mesh doesn't fire at targets behind it.
+ *
+ * The jamming rules change where a player's weapons are jammed near an
+ * enemy starship or platform (jamming.h). They change the simulation:
+ *   - hangar_jamming: false turns jamming off for every craft;
+ *   - super_star_destroyer_jamming: the Super Star Destroyer jams near its
+ *     hangar. In the stock game, it never jams. */
 
 #include <stdint.h>
 
@@ -150,6 +158,9 @@ int XwaMissionSettings_RearmFollowsBothStatuses(void);
 int XwaMissionSettings_WarheadCollisionBonusAnyTarget(void);
 int XwaMissionSettings_TurbolaserHardpointTypes(void);
 int XwaMissionSettings_GunTurretHardpoints(void);
+/* 1 unless flight/flight.yaml sets hangar_jamming to false. */
+int XwaMissionSettings_HangarJamming(void);
+int XwaMissionSettings_SuperStarDestroyerJamming(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);
