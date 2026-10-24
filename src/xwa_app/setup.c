@@ -100,6 +100,34 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			}
 			continue;
 		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--play-film");
+		if (!pass_through && (value || strcmp(argv[i], "--play-film") == 0)) {
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, "%s requires a film name", "--play-film");
+				}
+				value = argv[i];
+			}
+			if (!setup_copy_path(out->play_film, sizeof out->play_film, value, "--play-film", error,
+								 error_size)) {
+				return 0;
+			}
+			continue;
+		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--benchmark-out");
+		if (!pass_through && (value || strcmp(argv[i], "--benchmark-out") == 0)) {
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, "%s requires a path", "--benchmark-out");
+				}
+				value = argv[i];
+			}
+			if (!setup_copy_path(out->benchmark_out, sizeof out->benchmark_out, value, "--benchmark-out",
+								 error, error_size)) {
+				return 0;
+			}
+			continue;
+		}
 		if (!setup_append_argument(out->game_command_line, sizeof out->game_command_line, argv[i])) {
 			return setup_error(error, error_size, "%s", "OpenXWA command line is too long");
 		}

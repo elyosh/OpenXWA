@@ -16,6 +16,7 @@
 #include "xwa/frontend/net_transport.h"
 #include "xwa/util/memory.h"
 #include "xwa/xwa_options.h"
+#include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/timing/host_clock.h"
 
 #include <string.h>
@@ -75,7 +76,12 @@ int XwaFrontendTask_Init(void) {
 	   Aeron/static storage replacements. */
 	Config_Load();
 
-	if (g_optSkipIntro || g_optIsHost || g_optIsClient) {
+	if (XwaFilmBenchmark_IsRequested()) {
+		/* As with skipintro, but the first screen starts the film. */
+		updateFn = XwaFilmBenchmark_StartScreen;
+		exitFn = 0;
+		modeInitFn = Frontend_LoadResources;
+	} else if (g_optSkipIntro || g_optIsHost || g_optIsClient) {
 		updateFn = Concourse_Update;
 		exitFn = Concourse_Exit;
 		modeInitFn = Frontend_LoadResources;

@@ -14,6 +14,11 @@ typedef struct XwaLaunchOptions {
 	char game_data_path[XWA_HOST_CONFIG_PATH_CAPACITY];
 	char resource_root[XWA_HOST_CONFIG_PATH_CAPACITY];
 	char mod_path[XWA_HOST_CONFIG_PATH_CAPACITY];
+	/* --play-film: a film of the user folder's film folder to play, after
+	   which the game quits. --benchmark-out: the CSV file, in the user
+	   folder, that gets its frame times. */
+	char play_film[256];
+	char benchmark_out[XWA_HOST_CONFIG_PATH_CAPACITY];
 	char game_command_line[1024];
 } XwaLaunchOptions;
 

@@ -3,6 +3,7 @@
 #include "aeron/aeron.h"
 #include "aeron/compat/ddraw.h"
 #include "aeron/compat/host.h"
+#include "aeron/time.h"
 #include "aeron/vfs.h"
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/linez.h"
@@ -49,6 +50,7 @@
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
+#include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/frontend_task.h"
@@ -319,7 +321,14 @@ static void XwaPort_TickBody(int32_t delta_us) {
 			XwaTime_AdvanceHostClock(delta_us);
 		}
 
-		XwaFlightTask_Tick();
+		{
+			const uint32_t framesBefore = XwaFlightTask_FramesRun();
+			const uint64_t tickStartUs = Aeron_NowUs();
+
+			XwaFlightTask_Tick();
+			XwaFilmBenchmark_NoteFlight(XwaFlightTask_FramesRun() != framesBefore,
+										Aeron_NowUs() - tickStartUs);
+		}
 		if (wasPaused) {
 			/* Retain the complete paused view, including captured HUD draws.
 			 * The resume frame also skips simulation and snapshot publication. */
@@ -360,8 +369,13 @@ static void XwaPort_TickBody(int32_t delta_us) {
 			FrontendDisplay_ClearPresentFrameReady();
 			XwaSnapshot_CaptureMission();
 		} else {
+			const uint64_t captureStartUs = Aeron_NowUs();
+
 			XwaSnapshot_CaptureMission();
 			XwaSnapshot_CaptureFlight();
+			XwaSnapshot_Commit();
+			XwaFilmBenchmark_NoteCapture(Aeron_NowUs() - captureStartUs);
+			return;
 		}
 		XwaSnapshot_Commit();
 		return;
@@ -458,7 +472,8 @@ void XwaPort_Shutdown(void) {
 }
 
 int XwaPort_ShouldQuit(void) {
-	return g_xwaPortShouldQuit || File_HasFatalError() || XwaFrontendTask_ShouldQuit();
+	return g_xwaPortShouldQuit || File_HasFatalError() || XwaFrontendTask_ShouldQuit() ||
+		   XwaFilmBenchmark_ShouldQuit();
 }
 
 int XwaPort_GetExitCode(void) {
@@ -466,7 +481,7 @@ int XwaPort_GetExitCode(void) {
 		return File_GetFatalExitCode();
 	}
 
-	return 0;
+	return XwaFilmBenchmark_ExitCode();
 }
 
 uint64_t XwaPort_NextWakeDelayUs(void) {

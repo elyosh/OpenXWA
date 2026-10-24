@@ -1,5 +1,6 @@
 #include "aeron/main.h"
 #include "aeron/aeron.h"
+#include "aeron/time.h"
 #include "host_config.h"
 #include "setup.h"
 #include "window_icon.h"
@@ -9,6 +10,7 @@
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/film_state.h"
 #include "xwa_runtime/runtime/movie_task.h"
 #include "xwa_runtime/runtime/port.h"
@@ -429,6 +431,7 @@ int main(int argc, char** argv) {
 	XwaPort_SetCommandLine(launch.game_command_line);
 	XwaModernFlightTiming_Configure(host_config.flight_simulation_step_ticks);
 	XwaFilmState_Configure(selected_mod);
+	XwaFilmBenchmark_Configure(launch.play_film, launch.benchmark_out);
 	/* XwaRemaster_Init succeeded above, so the HD renderer is available. */
 	XwaModelSource_Configure(!host_config.force_opt_models);
 	XwaMovieTask_Configure(host_config.prefer_original_movies);
@@ -449,6 +452,7 @@ int main(int argc, char** argv) {
 		int paused = 0;
 		int last_fullscreen = Aeron_Fullscreen();
 		while (!Aeron_QuitRequested() && !XwaPort_ShouldQuit()) {
+			const uint64_t frame_start_us = Aeron_NowUs();
 			const int32_t delta_us = Aeron_BeginFrame();
 			const AeronInputSnapshot* in = Aeron_InputSnapshot();
 			int toggled = 0;
@@ -516,7 +520,9 @@ int main(int argc, char** argv) {
 			if (Aeron_QuitRequested() || XwaPort_ShouldQuit()) {
 				break;
 			}
+			const uint64_t remaster_start_us = Aeron_NowUs();
 			XwaRemaster_Frame(delta_us);
+			const uint64_t remaster_us = Aeron_NowUs() - remaster_start_us;
 			if (Aeron_QuitRequested() || XwaPort_ShouldQuit()) {
 				break;
 			}
@@ -524,6 +530,7 @@ int main(int argc, char** argv) {
 				Aeron_RequestFatalRendererError("frame presentation");
 				break;
 			}
+			XwaFilmBenchmark_NoteHostFrame(remaster_us, Aeron_NowUs() - frame_start_us);
 			uint64_t wake_us = presentation_interval_us();
 			if (!paused) {
 				const uint64_t task_us = XwaPort_NextWakeDelayUs();

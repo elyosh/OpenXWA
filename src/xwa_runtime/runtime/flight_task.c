@@ -1,5 +1,6 @@
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa/flight/hangar.h"
+#include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/port.h"
 
@@ -115,6 +116,7 @@ static int g_xwaFlightTaskPingPrevHostDropCount;
 static int g_xwaFlightTaskPingDropScore;
 static int g_xwaFlightTaskRecoveryCountdownState;
 static int g_xwaFlightTaskDirectWorldCleanup;
+static uint32_t g_xwaFlightTaskFramesRun;
 /* The cleanup waits for the film name prompt, and keeps its state meanwhile. */
 static int g_xwaFlightTaskFilmSavePending;
 static int g_xwaFlightTaskFilmSaveRestartMission;
@@ -1755,6 +1757,7 @@ void XwaFlightTask_Tick(void) {
 				return;
 
 			case XWA_FLIGHT_TASK_PHASE_FRAME:
+				++g_xwaFlightTaskFramesRun;
 				if (g_flightPlayerCount == 1) {
 					XwaFlightTask_RunSinglePlayerFrame();
 					/* Alt+P requested by Flight_UpdateEntity takes ownership only
@@ -1831,7 +1834,10 @@ void XwaFlightTask_Tick(void) {
 				}
 				Backdrop_FreeCoordinateBuffers();
 				FlightStarfield_Shutdown();
-				if (restartMission || g_filmPlaybackMode == 3 || g_filmPlaybackMode == 2) {
+				/* A film plays again from the start when it ends. The film
+				   benchmark ends the flight instead. */
+				if ((restartMission || g_filmPlaybackMode == 3 || g_filmPlaybackMode == 2) &&
+					!XwaFilmBenchmark_IsPlaying()) {
 					int playerCount;
 
 					g_flightDisplaySurfacesActive = 1;
@@ -2022,3 +2028,5 @@ void XwaFlightTask_DelayNextFrame(uint64_t delayUs) {
 		g_xwaFlightTaskNextWakeElapsedUs = wakeUs;
 	}
 }
+
+uint32_t XwaFlightTask_FramesRun(void) { return g_xwaFlightTaskFramesRun; }

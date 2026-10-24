@@ -29,6 +29,7 @@
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"
 #include "xwa/xwa_options.h"
+#include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/flight_task.h"
 
 #include <stdio.h>
@@ -205,6 +206,9 @@ int FrontendFlight_BeginPendingLaunch(void) {
 }
 
 void FrontendFlight_CompleteLaunchSession(int flightResult) {
+#ifdef XWA_MODERN
+	XwaFilmBenchmark_FlightEnded();
+#endif
 	if (g_filmFilePath[0]) {
 		memcpy(&g_pilotData, &g_pilotDataSnapshot, sizeof(g_pilotData));
 	}
