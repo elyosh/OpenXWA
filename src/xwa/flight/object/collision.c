@@ -4487,8 +4487,7 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 				damageAmount = srcMobj->damageAmount;
 #ifdef XWA_MODERN
 				/* Modern port: a mission can turn warhead collision damage
-				   off, and so can the source craft's stats profile
-				   (stats_profiles.h). */
+				   off, and so can the source craft's stats profile. */
 				if (g_missionFormatVersion >= 14 && XwaMissionSettings_WarheadCollisionDamage() &&
 					XwaStatsProfiles_Value(damageSourceObjIdx, XWA_STATS_WARHEAD_COLLISION_DAMAGE, 1)) {
 #else
@@ -4970,7 +4969,6 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 					systemStrengthRemaining = 100;
 				else
 #ifdef XWA_MODERN
-					/* Modern port: the craft's stats profile (stats_profiles.h). */
 					systemStrengthRemaining =
 						(int16_t)(XwaStatsProfiles_Value(
 									  targetObjIdx, XWA_STATS_SYSTEM_STRENGTH,
@@ -5014,7 +5012,6 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 					if (!targetCraft->workingSubsystems) {
 						targetCraft->shieldFront = 0;
 #ifdef XWA_MODERN
-						/* Modern port: the craft's stats profile (stats_profiles.h). */
 						targetCraft->subsystemDamage = (uint16_t)XwaStatsProfiles_Value(
 							targetObjIdx, XWA_STATS_SYSTEM_STRENGTH,
 							g_modelDefs[targetCraft->modelDefIndex].systemStrength);
@@ -6379,7 +6376,6 @@ void collide_applySurfaceRicochet(unsigned int objectObjIdx, unsigned int hitAga
 		double speedRatio;
 		float dmg;
 #ifdef XWA_MODERN
-		/* Modern port: the craft's stats profile (stats_profiles.h). */
 		hullStrength = (unsigned int)XwaStatsProfiles_Value(
 			objectObjIdx, XWA_STATS_HULL, g_modelDefs[objCraft->modelDefIndex].hullStrength);
 #else

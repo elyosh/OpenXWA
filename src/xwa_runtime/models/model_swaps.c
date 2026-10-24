@@ -22,6 +22,8 @@ typedef struct ModelSwap {
 
 static ModelSwap s_swaps[MODEL_SWAPS_MAX];
 static int s_swapCount;
+/* Counts the calls to XwaModelSwaps_LoadMission. */
+static int s_loadCount;
 
 /* The tech room shows every model as it is. */
 static int ModelSwaps_Active(void) {
@@ -47,6 +49,7 @@ void XwaModelSwaps_LoadMission(const char* missionPath) {
 	size_t i;
 
 	s_swapCount = 0;
+	++s_loadCount;
 	if (missionPath == NULL || XwaMissionFile_Load(missionPath, &config, path, sizeof path) <= 0) {
 		return;
 	}
@@ -119,6 +122,8 @@ int XwaModelSwaps_TypeKey(unsigned int objectType, char* key) {
 	}
 	return 1;
 }
+
+int XwaModelSwaps_State(void) { return s_loadCount * 2 + ModelSwaps_Active(); }
 
 const char* XwaModelSwaps_SourceOf(const char* key) {
 	char normalized[XWA_MODEL_SOURCE_KEY_MAX];

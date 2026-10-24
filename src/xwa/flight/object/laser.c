@@ -499,7 +499,6 @@ static __inline void laser_UpdateAiPowerRedirects(uint16_t objectIdx, int* shiel
 			}
 
 #ifdef XWA_MODERN
-			/* Modern port: the craft's stats profile (stats_profiles.h). */
 			shieldMax =
 				4 * XwaStatsProfiles_Value(
 						objectIdx, XWA_STATS_SHIELDS,
@@ -732,8 +731,8 @@ void laser_weaponsfire(void) {
 
 						g_curCraft->shieldFront += shieldDelta;
 #ifdef XWA_MODERN
-						/* Modern port: the craft's stats profile (stats_profiles.h), and a
-						   mod's shield recharge rules. */
+						/* Modern port: a mod can double the cap of a
+						   starfighter's shields. */
 						maxShield =
 							2 * XwaShieldRecharge_MaxShield(
 									objectIdx, XwaStatsProfiles_Value(
@@ -753,8 +752,8 @@ void laser_weaponsfire(void) {
 
 						g_curCraft->shieldRear += shieldDelta;
 #ifdef XWA_MODERN
-						/* Modern port: the craft's stats profile (stats_profiles.h), and a
-						   mod's shield recharge rules. */
+						/* Modern port: a mod can double the cap of a
+						   starfighter's shields. */
 						maxShield =
 							2 * XwaShieldRecharge_MaxShield(
 									objectIdx, XwaStatsProfiles_Value(
@@ -774,7 +773,6 @@ void laser_weaponsfire(void) {
 
 						g_curCraft->shieldFront += shieldDelta / 2;
 #ifdef XWA_MODERN
-						/* Modern port: the craft's stats profile (stats_profiles.h). */
 						maxShield =
 							2 * XwaStatsProfiles_Value(objectIdx, XWA_STATS_SHIELDS,
 													   g_modelDefs[g_curCraft->modelDefIndex].shieldStrength);
@@ -789,7 +787,6 @@ void laser_weaponsfire(void) {
 						}
 						g_curCraft->shieldRear += shieldDelta / 2;
 #ifdef XWA_MODERN
-						/* Modern port: the craft's stats profile (stats_profiles.h). */
 						maxShield =
 							2 * XwaStatsProfiles_Value(objectIdx, XWA_STATS_SHIELDS,
 													   g_modelDefs[g_curCraft->modelDefIndex].shieldStrength);
@@ -1096,7 +1093,7 @@ static __inline uint16_t laser_SelectWarheadLauncherProjectileType(ObjectRecord*
 		projectileType = g_curCraft->warheadData[launcherIdx].projectileTypeId;
 #ifdef XWA_MODERN
 		/* Modern port: a mod can turn off the swap to the craft's side's
-		   weapon (craft_weapons.h). */
+		   weapon. */
 		if (XwaCraftWeapons_SwitchByIff(ownerObj->objectType) == 0) {
 			return projectileType;
 		}
@@ -1662,7 +1659,7 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 	g_objectTable[projectileObjIdx].mobj->sourceObjectType = ownerObj->objectType;
 #ifdef XWA_MODERN
 	/* Modern port: the bolt gets the colour of its firing craft, as its
-	   markings (craft_weapons.h). */
+	   markings. */
 	g_objectTable[projectileObjIdx].mobj->nodeSwitchIndex =
 		XwaCraftWeapons_BoltMarkings(ownerObj->objectType, ownerObj->mobj->nodeSwitchIndex, projectileType);
 #endif
@@ -1958,8 +1955,8 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 		firerObjectType = firerObj->objectType;
 #ifdef XWA_MODERN
 		/* Modern port: a mod can give every shot of some craft the weapon of
-		   their side (craft_weapons.h). The player's slot choice above keeps
-		   the type it was given. */
+		   their side. The player's slot choice above keeps the type it was
+		   given. */
 		if (XwaCraftWeapons_SwitchByIff(firerObjectType) == 1) {
 			projectileType =
 				(ObjectTypeId)XwaCraftWeapons_IffWeaponType((uint8_t)firerObj->mobj->iff, projectileType);
@@ -1979,7 +1976,7 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 		g_objectTable[projectileObjIdx].mobj->iff = firerObj->mobj->iff;
 #ifdef XWA_MODERN
 		/* Modern port: the bolt gets the colour of its firing craft, as its
-		   markings (craft_weapons.h). */
+		   markings. */
 		g_objectTable[projectileObjIdx].mobj->nodeSwitchIndex =
 			XwaCraftWeapons_BoltMarkings(firerObjectType, firerObj->mobj->nodeSwitchIndex, projectileType);
 #endif

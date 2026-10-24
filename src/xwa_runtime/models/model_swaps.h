@@ -2,8 +2,8 @@
 #define XWA_RUNTIME_MODELS_MODEL_SWAPS_H
 
 /* Model swaps: a mission can load another model in place of one, for every
- * object that loads it, in the `model_swaps` section of its mission file
- * (mission_file.h), keyed by model key:
+ * object that loads it, in the `model_swaps` section of its mission file, keyed
+ * by model key:
  *
  *   model_swaps:
  *     superstardestroyer: superstardestroyerrecentered
@@ -35,6 +35,11 @@ int XwaModelSwaps_FileName(const char* fileName, char* out, size_t outSize);
    mission to `key` (XWA_MODEL_SOURCE_KEY_MAX bytes): the swap's target,
    else the type's own key. Returns 0 when the type has no key. */
 int XwaModelSwaps_TypeKey(unsigned int objectType, char* key);
+
+/* A number that changes whenever the swaps can change: when a mission's
+   swaps are read, and when the tech room turns them off or on. Code that
+   keeps values by object type reads them again when it changes. */
+int XwaModelSwaps_State(void);
 
 /* The key that the mission swaps for `key`, or NULL when `key` is no
    swap's target. Checks that depend on the object type, such as the float

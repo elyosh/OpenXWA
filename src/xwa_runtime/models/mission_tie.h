@@ -11,7 +11,7 @@
  *     0: { name: "Alpha", craft: 5, warheads: { missiles: 80 } }
  *
  * Each entry names a flight group by its position in the mission's .TIE,
- * with the optional `name` and `craft` checks of mission_file.h. Its keys are
+ * with the optional `name` and `craft` checks of mission files. Its keys are
  * optional: `markings` and `iff` are numbers from 0 to 255, and
  * `pilot_voice` is the name of the pilot's voice, up to 19 characters.
  * `craft_markings` gives single craft their own markings, from 0 to 255. Its

@@ -75,7 +75,7 @@
 
 /* Component roles of the animated hangar props. XWA_MODEL_ROLE is the stock
  * component outside XWA_MODERN; a GLB replacement names its component with a
- * role tag instead (see xwa_runtime/models/model_roles.h). */
+ * role tag instead. */
 #define HANGARCRANE_ARM                                                                                      \
 	XWA_MODEL_ROLE(g_objectTable[g_hangarCraneObjIdx].objectType, XWA_ROLE_HANGARCRANE_ARM, 0)
 #define HANGARDROID_NOD(objectIdx)                                                                           \
@@ -3122,8 +3122,8 @@ void Hangar_RenderScene(void) {
 
 				objectType = (uint16_t)backdrop->objectType;
 #ifdef XWA_MODERN
-				/* Modern port: the extra planets come after the stock types
-				   (mission_backdrops.h) and aren't suns. */
+				/* Modern port: the extra planets come after the stock types and
+				   aren't suns. */
 				if (objectType >= XWA_STOCK_OBJECT_TYPE_COUNT) {
 					objectType = OBJ_None;
 				}
@@ -6731,7 +6731,6 @@ void Hangar_ServicePlayerCraft(int dtTicks) {
 		uint8_t status2;
 
 #ifdef XWA_MODERN
-		/* Modern port: the craft's stats profile (stats_profiles.h). */
 		craft->shieldFront = XwaStatsProfiles_Value(g_hangarPlayerObjIdx, XWA_STATS_SHIELDS,
 													g_modelDefs[modelIndex].shieldStrength);
 		craft->shieldRear = craft->shieldFront;

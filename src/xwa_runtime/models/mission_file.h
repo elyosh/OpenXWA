@@ -6,19 +6,19 @@
  * load:
  *
  *   version: 1
- *   resdata: ...           (mission_art.h)
- *   settings: ...          (mission_settings.h)
- *   flight_groups: ...     (mission_tie.h)
- *   object_profiles: ...   (object_profiles.h)
- *   skins: ...             (skins.h)
- *   articulations: ...     (articulation.h)
- *   hangar: ...            (hangars.h)
- *   model_swaps: ...       (model_swaps.h)
- *   stats_profiles: ...    (stats_profiles.h)
- *   craft_names: ...       (craft_names.h)
- *   concourse: ...         (frontend/concourse_planet.h)
- *   headlights: true       (headlights.h)
- *   sounds: ...            (audio/mission_sounds.h)
+ *   resdata: ...           # the mission's own art
+ *   settings: ...          # mission settings
+ *   flight_groups: ...     # changes to the flight groups of the .TIE
+ *   object_profiles: ...   # object profiles
+ *   skins: ...             # skin selections
+ *   articulations: ...     # articulated model settings
+ *   hangar: ...            # the hangar
+ *   model_swaps: ...       # models loaded in place of others
+ *   stats_profiles: ...    # the stats profile choices
+ *   craft_names: ...       # craft names
+ *   concourse: ...         # the concourse planet
+ *   headlights: true       # the craft headlights
+ *   sounds: ...            # sound replacements
  */
 
 #include <stddef.h>

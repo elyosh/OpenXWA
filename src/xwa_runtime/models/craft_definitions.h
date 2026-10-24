@@ -45,7 +45,7 @@
  *
  * `object_type` links the craft type to that object type, which needs a list
  * row once the object type files apply. The ship list and tech room keys
- * become text overrides (text_overrides.h).
+ * become text overrides.
  *
  * The game uses the numbers in the files; the file names only appear in the
  * log. Two files that set the same object type, craft record or craft type

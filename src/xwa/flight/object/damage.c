@@ -1212,7 +1212,7 @@ void Damage_QueueCraftBillboards(uint16_t objectIndex) {
 		if ((uint16_t)ModelMesh_GetObjectTypeMeshType(objectTypeInt, meshIdx) == (uint16_t)MESH_Fuselage) {
 			craft = g_objectTable[objectIndex].mobj->pCraft;
 			if (craft->componentState[meshIdx] == 0) {
-				frame = XWA_CRAFT_ANIM_FRAME(craft); /* modern port: own field, see object.h */
+				frame = XWA_CRAFT_ANIM_FRAME(craft); /* modern port: its own field */
 				if (frame != 0) {
 					if (haveBillboardAngle == 0) {
 						int angle;

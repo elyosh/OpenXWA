@@ -18,10 +18,9 @@
  * yet: the renderer has no cone lights. Without the section there are no
  * headlights. Every key but `power_w` is optional.
  *
- * A mission turns them on with `headlights: true` in its mission file
- * (mission_file.h): they are then on while the player isn't in the
- * hangar. In the other missions, with `auto_turn_on`, they are on while
- * there is no directional light. */
+ * A mission turns them on with `headlights: true` in its mission file: they are
+ * then on while the player isn't in the hangar. In the other missions, with
+ * `auto_turn_on`, they are on while there is no directional light. */
 
 #ifdef __cplusplus
 extern "C" {

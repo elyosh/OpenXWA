@@ -179,8 +179,8 @@ static const char* const s_craftTypeKeys[] = { "version", "craft_type", "object_
 											   "tech_room" };
 static const char* const s_shipListKeys[] = { "name",     "category", "flyable", "known",
 											  "skirmish", "hidden",   "icon" };
-/* The tech room keys, their IDs and the size of their field in the tech room
-   (tech_library.h), which keeps one byte for the end of the text. */
+/* The tech room keys, their IDs and the size of their field in the tech room,
+   which keeps one byte for the end of the text. */
 static const struct {
 	const char* key;
 	const char* id;

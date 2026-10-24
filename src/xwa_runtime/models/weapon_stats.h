@@ -150,19 +150,22 @@ typedef enum XwaWeaponLinkingRule {
 /* Reads the `weapons` section of flight/flight.yaml. Called once at
    startup. */
 void XwaWeaponStats_Init(void);
-/* Drops the previous mission's model values. Called by model_settings.c. */
+/* Drops the previous mission's model values. Called by the model settings
+   reader. */
 void XwaWeaponStats_ClearModelSettings(void);
 /* Reads the profiles in the `weapons` group of the model settings file of
    `objectType`. Does nothing when `group` is NULL. `path` is the file name,
-   for the log. Called by model_settings.c. */
+   for the log. Called by the model settings reader. */
 void XwaWeaponStats_ReadModelSettings(unsigned int objectType, const char* path,
 									  const struct AeronConfigNode* group);
 
-/* Starts a mission with no profiles. Called by mission_tie.c. */
+/* Starts a mission with no profiles. Called when the mission's flight groups
+   are read. */
 void XwaWeaponStats_ClearFlightGroups(void);
 /* Reads the profiles that flight group `fgIdx` picks in its entry `entry`.
-   `fgKey` is the entry's key and `path` the mission file, for the log.
-   Called by mission_tie.c. Returns the number of profiles read. */
+   `fgKey` is the entry's key and `path` the mission file, for the log. Called
+   when the mission's flight groups are read. Returns the number of profiles
+   read. */
 int XwaWeaponStats_ReadFlightGroup(const char* path, const char* fgKey, int fgIdx,
 								   const struct AeronConfigNode* entry);
 

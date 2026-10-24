@@ -406,6 +406,23 @@ int32_t XwaStatsProfiles_Value(unsigned int objIdx, XwaStatsField field, int32_t
 	return value;
 }
 
+int XwaStatsProfiles_DefaultValue(unsigned int objectType, XwaStatsField field, int32_t* value) {
+	const StatsProfilesType* type;
+	int index;
+
+	if (objectType >= OBJ_Count) {
+		return 0;
+	}
+	XwaModelSettings_Ensure(objectType);
+	type = s_types[objectType];
+	if (type == NULL || (index = StatsProfiles_Find(type, "default")) < 0 ||
+		!(type->profiles[index].setMask & (1u << field))) {
+		return 0;
+	}
+	*value = type->profiles[index].value[field];
+	return 1;
+}
+
 void XwaStatsProfiles_ScaleSpeed(unsigned int objIdx) {
 	MobileObject* mobj = g_objectTable[objIdx].mobj;
 	CraftData* craft = mobj != NULL ? mobj->pCraft : NULL;
@@ -467,7 +484,8 @@ void XwaStatsProfiles_ApplyNewCraft(unsigned int objIdx) {
 		craft->shieldRear = (int)((uint32_t)craft->shieldRear * (uint32_t)percent / 100u);
 	}
 
-	/* The stock removal (mission.c), with the profile's values. */
+	/* Removes the shields and the hyperdrive as
+	   Mission_InitFlightGroupObjectSlot does, with the profile's values. */
 	hasShields = XwaStatsProfiles_Value(objIdx, XWA_STATS_HAS_SHIELDS, record->hasShields != 0) != 0;
 	if (!hasShields && g_spawnStatus1 != 8 && g_spawnStatus2 != 8 && g_spawnStatus1 != 16 &&
 		g_spawnStatus2 != 16) {

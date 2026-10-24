@@ -2363,7 +2363,6 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 								craft = object->mobj->pCraft;
 								matchesCondition = 0;
 #ifdef XWA_MODERN
-								/* Modern port: the craft's stats profile (stats_profiles.h). */
 								maxShield = 2 * XwaStatsProfiles_Value(
 													objectIdx, XWA_STATS_SHIELDS,
 													g_modelDefs[craft->modelDefIndex].shieldStrength);
@@ -7049,9 +7048,10 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			g_objectTable[objIdx].mobj->nodeSwitchIndex = (uint8_t)markings;
 		}
 	}
-	/* Modern port: the craft's stats profile applies after its markings, also
-	   to a craft made again (the player's craft change in the hangar, the
-	   Death Star objects) (stats_profiles.h). */
+	/* Modern port: the craft gets its stats profile here, after its markings,
+	   since the profile can depend on them. A craft that is made again, such
+	   as the player's new craft in the hangar or a Death Star object, gets it
+	   again. */
 	XwaStatsProfiles_ApplyNewCraft(objIdx);
 #endif
 
@@ -8162,11 +8162,10 @@ uint16_t Mission_Init(char* fileName) {
 
 		backdropId = g_missionFlightGroups[g_currentFlightGroupIdx].fg.backdrop;
 #ifdef XWA_MODERN
-		/* Modern port: some mods' mission files use backdrop ids past the
-		   stock table, which the stock game reads past its end.
-		   flight/flight.yaml can give ids 104 to 255 a planet
-		   (mission_backdrops.h); other ids place no backdrop. The id is a
-		   32-bit field, so a negative one is out of the table too. */
+		/* Modern port: some mods' mission files use backdrop ids past the stock
+		   table, which the stock game reads past its end. flight/flight.yaml
+		   can give ids 104 to 255 a planet; other ids place no backdrop. The id
+		   is a 32-bit field, so a negative one is out of the table too. */
 		backdropDescriptor = XwaMissionBackdrops_Descriptor(backdropId);
 		if (backdropDescriptor == NULL) {
 			Aeron_LogWarn(

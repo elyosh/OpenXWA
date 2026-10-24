@@ -2,7 +2,7 @@
 #define XWA_RUNTIME_MODELS_COMPONENT_STRENGTH_H
 
 /* The strength of a model's components, from the `component_strength` group
- * of its model settings file (model_settings.h):
+ * of its model settings file:
  *
  *   component_strength: {gun_turret: 18, small_gun: 18, shield_generator: 36}
  *
@@ -27,11 +27,11 @@ extern "C" {
 
 struct AeronConfigNode;
 
-/* Drops the previous mission's values. Called by model_settings.c. */
+/* Drops the previous mission's values. Called by the model settings reader. */
 void XwaComponentStrength_ClearModelSettings(void);
 /* Reads the `component_strength` group of `objectType`'s model settings
    file, or does nothing when `group` is NULL. `path` is the file, for the
-   log. Called by model_settings.c. */
+   log. Called by the model settings reader. */
 void XwaComponentStrength_ReadModelSettings(unsigned int objectType, const char* path,
 											const struct AeronConfigNode* group);
 

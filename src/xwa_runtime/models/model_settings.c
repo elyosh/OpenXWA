@@ -59,6 +59,8 @@ typedef struct ModelSettingsFile {
 } ModelSettingsFile;
 
 static uint8_t s_read[OBJ_Count];
+/* XwaModelSwaps_State when the values were last dropped. */
+static int s_swapState;
 static ModelSettingsFile* s_files;
 static size_t s_fileCount;
 static size_t s_fileCapacity;
@@ -164,6 +166,7 @@ void XwaModelSettings_LoadMission(const struct XwaFlightGroup* flightGroups, siz
 	int typeCount = 0;
 
 	ModelSettings_Clear();
+	s_swapState = XwaModelSwaps_State();
 	for (index = 0; index < count; ++index) {
 		const struct XwaFlightGroup* fg =
 			(const struct XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)index * stride);
@@ -183,6 +186,14 @@ void XwaModelSettings_LoadMission(const struct XwaFlightGroup* flightGroups, siz
 }
 
 void XwaModelSettings_Ensure(unsigned int objectType) {
+	const int swapState = XwaModelSwaps_State();
+
+	/* In the frontend, each mission has its own swaps, and the tech room has
+	   none, so an object type's model can change. */
+	if (swapState != s_swapState) {
+		ModelSettings_Clear();
+		s_swapState = swapState;
+	}
 	if (objectType < OBJ_Count && !s_read[objectType]) {
 		ModelSettings_Read(objectType);
 	}

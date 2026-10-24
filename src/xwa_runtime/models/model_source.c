@@ -123,8 +123,8 @@ static int ModelSource_Grow(void** items, int count, size_t itemSize) {
 
 /* Reads a FlightModels list the way FeDiskIo_LoadResources does: line ends
    trimmed, empty lines skipped, rows numbered from 0, then the rows that the
-   object type files add to list `list` (craft_definitions.h). Each row's key goes
-   to `rows`. Returns 0 if the list cannot be read. */
+   object type files add to list `list`. Each row's key goes to `rows`. Returns
+   0 if the list cannot be read. */
 static int ModelSource_ReadList(const char* path, int list, ModelSourceKeyText** rows, int* rowCount) {
 	char line[256];
 	XwaFile* stream;
@@ -322,8 +322,8 @@ static ModelSourceCraftKey* ModelSource_FindExteriorBase(const char* key) {
 }
 
 /* Every Equipment0.LST model. Recovered code reaches the components of some
-   of them by number; those sites resolve component roles
-   (xwa_runtime/models/model_roles.h), so their layout is free too. */
+   of them by number; those sites resolve component roles, so their layout is
+   free too. */
 static int ModelSource_BuildEquipmentKeys(void) {
 	int row;
 

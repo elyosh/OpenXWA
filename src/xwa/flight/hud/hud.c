@@ -9152,7 +9152,6 @@ void Hud_UpdateTargetInfoCache(void) {
 				shieldTotal = targetCraft->shieldRear + targetCraft->shieldFront;
 				shieldNumerator = shieldTotal >> 1;
 #ifdef XWA_MODERN
-				/* Modern port: the craft's stats profile (stats_profiles.h). */
 				shieldDenominator =
 					(uint32_t)(2 * XwaStatsProfiles_Value(
 									   targetObjIdx, XWA_STATS_SHIELDS,
@@ -9194,7 +9193,6 @@ void Hud_UpdateTargetInfoCache(void) {
 
 					subsystemDamage = targetCraft->subsystemDamage;
 #ifdef XWA_MODERN
-					/* Modern port: the craft's stats profile (stats_profiles.h). */
 					systemStrength = (uint16_t)XwaStatsProfiles_Value(
 						targetObjIdx, XWA_STATS_SYSTEM_STRENGTH,
 						g_modelDefs[targetCraft->modelDefIndex].systemStrength);

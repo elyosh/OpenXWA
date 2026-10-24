@@ -4,10 +4,10 @@
 /* Stats profiles: values of a craft that replace those of its craft record,
  * chosen by mission, by markings, for players and by difficulty.
  *
- * A model settings file (model_settings.h) holds the model's profiles, by
- * name. Each profile is whole: a variant doesn't take values from another
- * one. The keys are those of the object type files' `craft_record`, in the
- * record's units, and all are optional:
+ * A model settings file holds the model's profiles, by name. Each profile is
+ * whole: a variant doesn't take values from another one. The keys are those of
+ * the object type files' `craft_record`, in the record's units, and all are
+ * optional:
  *
  *   stats_profiles:
  *     default: {speed: 86, acceleration: 9, deceleration: 20, pitch_rate: 512,
@@ -20,8 +20,8 @@
  *     default_player: {...}
  *     default_player_hard: {...}
  *
- * A mission file (mission_file.h) picks the profiles of its craft, by
- * model key, and can scale some values for every craft, in percent:
+ * A mission file picks the profiles of its craft, by model key, and can scale
+ * some values for every craft, in percent:
  *
  *   stats_profiles:
  *     models:
@@ -75,11 +75,12 @@ typedef enum XwaStatsField {
 	XWA_STATS_FIELDS
 } XwaStatsField;
 
-/* Drops the previous mission's profiles. Called by model_settings.c. */
+/* Drops the previous mission's profiles. Called by the model settings
+   reader. */
 void XwaStatsProfiles_ClearModelSettings(void);
 /* Reads the `stats_profiles` group of `objectType`'s model settings file,
    or does nothing when `group` is NULL. `path` is the file, for the log.
-   Called by model_settings.c. */
+   Called by the model settings reader. */
 void XwaStatsProfiles_ReadModelSettings(unsigned int objectType, const char* path,
 										const struct AeronConfigNode* group);
 
@@ -92,12 +93,16 @@ void XwaStatsProfiles_LoadMission(const char* missionPath);
    the mission's percent for the fields that take one. */
 int32_t XwaStatsProfiles_Value(unsigned int objIdx, XwaStatsField field, int32_t stock);
 
+/* Sets `value` to `field` of the `default` profile of `objectType`'s model,
+   without the mission's choices and percents, for the ratings of a craft
+   type. Returns 0 when the profile doesn't set it. */
+int XwaStatsProfiles_DefaultValue(unsigned int objectType, XwaStatsField field, int32_t* value);
+
 /* Gives a craft that Mission_InitFlightGroupObjectSlot has just set up the
-   values of its profile and the mission's percents: the top speed, the
-   three rates, the hull, the damage threshold and the shields. Then removes
-   the shields and the hyperdrive that the craft doesn't have, which the
-   stock code does before (mission.c), and scales the craft's speed to its
-   new top speed. */
+   values of its profile and the mission's percents: the top speed, the three
+   rates, the hull, the damage threshold and the shields. Then removes the
+   shields and the hyperdrive that the craft doesn't have, which the stock code
+   does before, and scales the craft's speed to its new top speed. */
 void XwaStatsProfiles_ApplyNewCraft(unsigned int objIdx);
 
 /* Scales the speed of object `objIdx` from its record's top speed to its

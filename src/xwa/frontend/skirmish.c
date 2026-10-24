@@ -11,6 +11,9 @@
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/math/scalar.h"
 #include "xwa/util/memory.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/tech_ratings.h"
+#endif
 
 #include <math.h>
 #include <stddef.h>
@@ -1874,8 +1877,10 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 	};
 
 	XwaFile* outputStream;
+#ifndef XWA_MODERN
 	XwaFile* specStream;
 	size_t specSize;
+#endif
 	int previousTeam;
 	int slotIndex;
 	int fgIndex;
@@ -1902,6 +1907,11 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 		strcpy(g_pilotData.missionFileName, outMissionFile);
 	}
 
+#ifdef XWA_MODERN
+	/* Modern port: the ratings are computed live, with the mod's models and
+	   stats profiles, instead of read from spec.rci. */
+	XwaTechRatings_BuildTable(&g_cachedCraftTechStats, &g_cachedCraftTechStatsCount);
+#else
 	specStream = File_Open(AERON_VFS_ROOT_ASSET, "spec.rci", "rb");
 	if (specStream != NULL) {
 		specSize = (size_t)File_GetSize(specStream);
@@ -1916,6 +1926,7 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 		}
 		File_Close(specStream);
 	}
+#endif
 
 	srand(g_gameConfig.randomSeed);
 	Math_SetFpuSinglePrecisionMode();

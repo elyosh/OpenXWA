@@ -47,7 +47,6 @@ int Craft_GetObjectMaxShield(unsigned short objIdx) {
 
 	craft = g_objectTable[(uint16_t)objIdx].mobj->pCraft;
 #ifdef XWA_MODERN
-	/* Modern port: the craft's stats profile (stats_profiles.h). */
 	return 2 * XwaStatsProfiles_Value(objIdx, XWA_STATS_SHIELDS,
 									  g_modelDefs[craft->modelDefIndex].shieldStrength);
 #else

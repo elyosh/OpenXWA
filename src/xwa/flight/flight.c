@@ -5059,7 +5059,6 @@ void Flight_SlewObjectSpeedTowardTarget(int objectIdx, int targetSpeed, int allo
 		uint16_t oldRemainder;
 
 #ifdef XWA_MODERN
-		/* Modern port: the craft's stats profile (stats_profiles.h). */
 		const uint16_t accelRate =
 			(uint16_t)XwaStatsProfiles_Value((unsigned int)objectIdx, XWA_STATS_ACCELERATION,
 											 g_modelDefs[(uint16_t)g_curCraftModelIndex.packed].accelRate);
@@ -5095,7 +5094,6 @@ void Flight_SlewObjectSpeedTowardTarget(int objectIdx, int targetSpeed, int allo
 		mobj->speedRemainder = (uint16_t)(oldRemainder + fracDelta);
 		if (g_objectTable[objectIdx].mobj->speedRemainder < oldRemainder) {
 #ifdef XWA_MODERN
-			/* Modern port: the craft's stats profile (stats_profiles.h). */
 			g_objectTable[objectIdx].mobj->speed =
 				(uint16_t)(g_objectTable[objectIdx].mobj->speed +
 						   XwaStatsProfiles_Value((unsigned int)objectIdx, XWA_STATS_SPEED_INCREMENT, 1));
@@ -5116,7 +5114,6 @@ void Flight_SlewObjectSpeedTowardTarget(int objectIdx, int targetSpeed, int allo
 		uint16_t oldRemainder;
 
 #ifdef XWA_MODERN
-		/* Modern port: the craft's stats profile (stats_profiles.h). */
 		const uint16_t decelRate =
 			(uint16_t)XwaStatsProfiles_Value((unsigned int)objectIdx, XWA_STATS_DECELERATION,
 											 g_modelDefs[(uint16_t)g_curCraftModelIndex.packed].decelRate);
@@ -5150,7 +5147,6 @@ void Flight_SlewObjectSpeedTowardTarget(int objectIdx, int targetSpeed, int allo
 		g_objectTable[objectIdx].mobj->speedRemainder = (uint16_t)(oldRemainder - fracDelta);
 		if (g_objectTable[objectIdx].mobj->speedRemainder > oldRemainder) {
 #ifdef XWA_MODERN
-			/* Modern port: the craft's stats profile (stats_profiles.h). */
 			g_objectTable[objectIdx].mobj->speed =
 				(uint16_t)(g_objectTable[objectIdx].mobj->speed -
 						   XwaStatsProfiles_Value((unsigned int)objectIdx, XWA_STATS_SPEED_DECREMENT, 1));
@@ -7933,7 +7929,6 @@ static __inline void FlightAction_TransferLasersToShields(unsigned int playerIdx
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: the craft's stats profile (stats_profiles.h). */
 	maxShield = 2 * XwaStatsProfiles_Value((unsigned int)(obj - g_objectTable), XWA_STATS_SHIELDS,
 										   g_modelDefs[(uint16_t)modelIndex].shieldStrength);
 #else
@@ -9424,7 +9419,6 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 							int maxShield = Craft_GetObjectMaxShield(
 								(unsigned short)g_players[currentPlayerIdx].objectIndex);
 #ifdef XWA_MODERN
-							/* Modern port: the craft's stats profile (stats_profiles.h). */
 							uint16_t shieldScale = (uint16_t)MATH2_percentage(
 								(uint32_t)XwaStatsProfiles_Value(
 									(uint16_t)objIdx, XWA_STATS_SHIELDS,

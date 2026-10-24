@@ -87,11 +87,12 @@ struct AeronConfigNode;
 /* Reads the rates of the `weapons` section of flight/flight.yaml. Called
    once at startup. */
 void XwaWeaponRates_Init(void);
-/* Drops the previous mission's model rates. Called by model_settings.c. */
+/* Drops the previous mission's model rates. Called by the model settings
+   reader. */
 void XwaWeaponRates_ClearModelSettings(void);
 /* Reads `rates` from the `weapons` group of `objectType`'s model settings
    file, or does nothing when `group` is NULL. `path` is the file, for the
-   log. Called by model_settings.c. */
+   log. Called by the model settings reader. */
 void XwaWeaponRates_ReadModelSettings(unsigned int objectType, const char* path,
 									  const struct AeronConfigNode* group);
 

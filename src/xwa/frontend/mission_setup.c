@@ -41,6 +41,7 @@
 #include "xwa/frontend/skirmish.h"
 #include "xwa/movie/movie.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/tech_ratings.h"
 #include "xwa_runtime/runtime/movie_task.h"
 #endif
 #include "xwa/util/byte_order.h"
@@ -7474,7 +7475,9 @@ void MissionSetup_BuildBriefingText(char* outText) {
 
 // FUNCTION: XWA 0x5438B0
 int MissionSetup_Update(int frameCounter) {
+#ifndef XWA_MODERN
 	size_t specSize;
+#endif
 	int i;
 	int j;
 	int packetType;
@@ -7493,7 +7496,9 @@ int MissionSetup_Update(int frameCounter) {
 	int playerId;
 	unsigned int selectedIndex;
 	uint32_t tickNow;
+#ifndef XWA_MODERN
 	XwaFile* specFile;
+#endif
 	NetPlayerInfo* playerRoster;
 	MissionListEntry* missionEntry;
 	FrontendRect rect;
@@ -7552,6 +7557,11 @@ int MissionSetup_Update(int frameCounter) {
 			}
 		}
 
+#ifdef XWA_MODERN
+		/* Modern port: the ratings are computed live, with the mod's models and
+		   stats profiles, instead of read from spec.rci. */
+		XwaTechRatings_BuildTable(&g_cachedCraftTechStats, &g_cachedCraftTechStatsCount);
+#else
 		specFile = File_Open(AERON_VFS_ROOT_ASSET, "spec.rci", "rb");
 		if (specFile != NULL) {
 			specSize = (size_t)File_GetSize(specFile);
@@ -7566,6 +7576,7 @@ int MissionSetup_Update(int frameCounter) {
 			}
 			File_Close(specFile);
 		}
+#endif
 
 		MissionSetup_LoadBattleSprites();
 		FrontendText_SetGlyphGradientBg(g_colorNearBlack);

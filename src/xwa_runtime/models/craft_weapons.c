@@ -190,7 +190,7 @@ void XwaCraftWeapons_Init(void) {
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, CRAFT_WEAPONS_FLIGHT_YAML, &file,
 									&error)) {
-		/* mission_backdrops.c logs a file that can't be read. */
+		/* The backdrops code already logs this error. */
 		return;
 	}
 	root = AeronConfigFile_Root(file);

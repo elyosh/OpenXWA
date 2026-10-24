@@ -2,7 +2,7 @@
 #define XWA_RUNTIME_MODELS_WARHEAD_LOCK_H
 
 /* The warhead lock settings of a model, from the `warhead_lock` group of its
- * model settings file (model_settings.h). All keys are optional:
+ * model settings file. All keys are optional:
  *
  *   warhead_lock:
  *     lock_range: {small: 102400, big: 244332, transport: 101805}
@@ -51,11 +51,11 @@ typedef enum XwaWarheadLockValue {
 	XWA_WARHEAD_LOCK_VALUES
 } XwaWarheadLockValue;
 
-/* Drops the previous mission's values. Called by model_settings.c. */
+/* Drops the previous mission's values. Called by the model settings reader. */
 void XwaWarheadLock_ClearModelSettings(void);
 /* Reads the `warhead_lock` group of `objectType`'s model settings file, or
    does nothing when `group` is NULL. `path` is the file, for the log.
-   Called by model_settings.c. */
+   Called by the model settings reader. */
 void XwaWarheadLock_ReadModelSettings(unsigned int objectType, const char* path,
 									  const struct AeronConfigNode* group);
 

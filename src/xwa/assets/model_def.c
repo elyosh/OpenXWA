@@ -6,6 +6,9 @@
 #include "xwa/assets/model_mesh.h"
 #include "xwa/assets/object_type_info.h"
 #include "xwa/frontend/frontend_display.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/models/tech_ratings.h"
+#endif
 
 #include "model_def_static_data.inc"
 
@@ -97,6 +100,9 @@ int ComputeCraftCombatRating(ObjectTypeId objectType) {
 	int weaponScore;
 	int rating;
 	int group;
+#ifdef XWA_MODERN
+	ModelDef profiledRecord;
+#endif
 
 	if ((uint16_t)objectType >= OBJ_Count) {
 		modelIndex = -1;
@@ -107,7 +113,15 @@ int ComputeCraftCombatRating(ObjectTypeId objectType) {
 		return 5;
 	}
 
+#ifdef XWA_MODERN
+	/* Modern port: the values of the model's default stats profile, for the
+	   ratings and for the points that the craft is worth. */
+	profiledRecord = g_modelDefs[modelIndex];
+	XwaTechRatings_ProfileRecord((unsigned int)objectType, &profiledRecord);
+	modelDef = &profiledRecord;
+#else
 	modelDef = &g_modelDefs[modelIndex];
+#endif
 	if (modelDef->hasShields) {
 		shieldScore = modelDef->shieldStrength / 100;
 	} else {

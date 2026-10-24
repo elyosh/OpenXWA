@@ -578,7 +578,7 @@ typedef enum ObjectTypeId {
 	OBJ_DSLaserPowerSource = 556,
 #ifdef XWA_MODERN
 	/* Modern port: 152 planets after the stock types, one for each backdrop
-	   id from 104 to 255 (xwa_runtime/models/mission_backdrops.h). */
+	   id from 104 to 255. */
 	OBJ_FirstExtraPlanet = 557,
 	OBJ_Count = 557 + 152
 #else

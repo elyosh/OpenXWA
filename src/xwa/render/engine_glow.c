@@ -1646,7 +1646,6 @@ void GlowMark_QueueCraftDamageSurfaceEffects(uint16_t objectIndex) {
 
 	craft = g_objectTable[objectIndex].mobj->pCraft;
 #ifdef XWA_MODERN
-	/* Modern port: the craft's stats profile (stats_profiles.h). */
 	if (((craft->workingSubsystems == 0 && craft->subsystemDamage != 0) ||
 		 craft->subsystemDamage > XwaStatsProfiles_Value(objectIndex, XWA_STATS_SYSTEM_STRENGTH,
 														 g_modelDefs[craft->modelDefIndex].systemStrength)) &&

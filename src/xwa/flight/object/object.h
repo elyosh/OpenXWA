@@ -285,9 +285,8 @@ typedef struct CraftData {
 	/* The original keeps the animated-texture frame / wreck-flame byte in
 	 * componentState[49], which a model with 50+ meshes uses as a mesh. */
 	uint8_t animatedTextureFrame;
-	/* Articulated models (xwa_runtime/models/articulation.h): the step
-	 * accumulators' remainders, in 1/256 ticks, one per group clock, and
-	 * the groups a key started (0 = both). */
+	/* Articulated models: the step accumulators' remainders, in 1/256 ticks,
+	 * one per group clock, and the groups a key started (0 = both). */
 	uint16_t articulationTicks[6];
 	uint8_t articulationMotion;
 	/* Their meshes' fine angles, in 1/256 meshRotation units: articulated

@@ -2,7 +2,7 @@
 #define XWA_RUNTIME_MODELS_GUNNER_SEATS_H
 
 /* The gunner seats of a model, from the `gunner_seats` group of its model
- * settings file (model_settings.h):
+ * settings file:
  *
  *   gunner_seats:
  *     forward_fire: false
@@ -60,11 +60,11 @@ typedef enum XwaGunnerHardpoint {
 	XWA_GUNNER_HARDPOINT_WARHEAD
 } XwaGunnerHardpoint;
 
-/* Drops the previous mission's seats. Called by model_settings.c. */
+/* Drops the previous mission's seats. Called by the model settings reader. */
 void XwaGunnerSeats_ClearModelSettings(void);
 /* Reads the `gunner_seats` group of `objectType`'s model settings file, or
    does nothing when `group` is NULL. `path` is the file, for the log.
-   Called by model_settings.c. */
+   Called by the model settings reader. */
 void XwaGunnerSeats_ReadModelSettings(unsigned int objectType, const char* path,
 									  const struct AeronConfigNode* group);
 

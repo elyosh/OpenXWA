@@ -2,7 +2,7 @@
 #define XWA_RUNTIME_MODELS_ENGINE_GLOWS_H
 
 /* Engine glows that show by speed, from the `engine_glows` group of a model
- * settings file (model_settings.h):
+ * settings file:
  *
  *   engine_glows:
  *     0: {min_speed_percent: 1}     # hidden when the craft stops
@@ -27,11 +27,12 @@ struct AeronConfigNode;
 
 enum { XWA_ENGINE_GLOWS_MASK_WORDS = 8 };
 
-/* Drops the previous mission's settings. Called by model_settings.c. */
+/* Drops the previous mission's settings. Called by the model settings
+   reader. */
 void XwaEngineGlows_ClearModelSettings(void);
 /* Reads the `engine_glows` group of `objectType`'s model settings file, or
    does nothing when `group` is NULL. `path` is the file, for the log. Called
-   by model_settings.c. */
+   by the model settings reader. */
 void XwaEngineGlows_ReadModelSettings(unsigned int objectType, const char* path,
 									  const struct AeronConfigNode* group);
 

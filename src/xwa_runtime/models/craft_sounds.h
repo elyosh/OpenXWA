@@ -71,10 +71,11 @@ extern "C" {
 
 struct AeronConfigNode;
 
-/* Drops the previous mission's model sounds. Called by model_settings.c. */
+/* Drops the previous mission's model sounds. Called by the model settings
+   reader. */
 void XwaCraftSounds_ClearModelSettings(void);
 /* Reads the `sound` group of `objectType`'s model settings file. `path` is
-   the file, for the log. Called by model_settings.c. */
+   the file, for the log. Called by the model settings reader. */
 void XwaCraftSounds_ReadModelSettings(unsigned int objectType, const char* path,
 									  const struct AeronConfigNode* group);
 

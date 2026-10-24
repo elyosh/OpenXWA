@@ -3,7 +3,7 @@
 
 /* Modern port: hands the HD renderer the flight model the simulation parsed
  * for a GLB replacement, so each GLB is read and parsed once. Implemented by
- * the synthesizer (opt_synth.c). */
+ * the OPT synthesizer. */
 
 #include "aeron/asset/flight_model.h"
 

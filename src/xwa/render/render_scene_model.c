@@ -320,8 +320,8 @@ void GlowMark_ProcessPendingRequests(uint16_t objectIndex) {
 		}
 
 #ifdef XWA_MODERN
-		/* Modern port: an impact colour (craft_weapons.h) replaces the
-		   mark's white, which the classic renderer draws as its colour. */
+		/* Modern port: an impact colour replaces the mark's white, which the
+		   classic renderer draws as its colour. */
 		if (XwaCraftWeapons_ImpactTint(request) != 0) {
 			patch->effectParam = (int)(0xff000000u | XwaCraftWeapons_ImpactTint(request));
 		}

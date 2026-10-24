@@ -8,7 +8,7 @@
 
 enum {
 	GEOMETRY_TEXTURES_SPRITE_HEADER_SIZE = 18,
-	/* The group index in sprite_resource.c has 8-byte entries: a 16-bit id,
+	/* The group index of a sprite resource has 8-byte entries: a 16-bit id,
 	   then a 32-bit offset into the data. */
 	GEOMETRY_TEXTURES_INDEX_ENTRY_SIZE = 8,
 	GEOMETRY_TEXTURES_INDEX_OFFSET = 2,

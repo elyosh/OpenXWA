@@ -2,8 +2,7 @@
 #define XWA_RUNTIME_MODELS_JAMMING_H
 
 /* How a model jams the weapons of an enemy player near its hangar, from the
- * `jamming` group of its model settings file (model_settings.h). All keys
- * are optional:
+ * `jamming` group of its model settings file. All keys are optional:
  *
  *   jamming:
  *     enabled: true
@@ -32,8 +31,7 @@
  *     Interdictor use hangar_and_jamming_points, and jam only below;
  *   - the Super Star Destroyer uses hangar_point. In the stock game, its
  *     test never jams, so it doesn't jam unless the model has the group, or
- *     flight/flight.yaml sets `rules.super_star_destroyer_jamming`
- *     (mission_settings.h);
+ *     flight/flight.yaml sets `rules.super_star_destroyer_jamming`;
  *   - the Repair Yard uses hangar_mesh_center;
  *   - the other types use hangar_and_jamming_points.
  *
@@ -67,11 +65,12 @@ typedef struct XwaJammingRule {
 	XwaJammingBehavior behavior;
 } XwaJammingRule;
 
-/* Drops the previous mission's values. Called by model_settings.c. */
+/* Drops the previous mission's values. Called by the model settings
+   reader. */
 void XwaJamming_ClearModelSettings(void);
 /* Reads the `jamming` group of `objectType`'s model settings file, or does
    nothing when `group` is NULL. `path` is the file, for the log. Called by
-   model_settings.c. */
+   the model settings reader. */
 void XwaJamming_ReadModelSettings(unsigned int objectType, const char* path,
 								  const struct AeronConfigNode* group);
 

@@ -5,29 +5,31 @@
  * flight/models/<model key>.yaml, next to each model's GLB:
  *
  *   version: 1
- *   hud: {...}            # craft_hud.h
- *   engine_glows: {...}   # engine_glows.h
- *   weapons: {...}        # craft_weapons.h; `rates` and others: weapon_rates.h
- *   stats_profiles: {...} # stats_profiles.h
- *   shield: {...}         # shield_recharge.h
- *   sound: {...}          # craft_sounds.h
- *   component_strength: {...} # component_strength.h
- *   gunner_seats: {...}   # gunner_seats.h
+ *   hud: {...}                # the reticle and HUD colours
+ *   engine_glows: {...}       # glows that show by speed
+ *   weapons: {...}            # weapon colours, rates and profiles
+ *   stats_profiles: {...}     # speeds, rates, hull and shields
+ *   shield: {...}             # shield recharge
+ *   sound: {...}              # craft sounds
+ *   component_strength: {...} # strength by mesh type
+ *   gunner_seats: {...}       # gunner seats
+ *   warhead_lock: {...}       # warhead lock ranges and times
+ *   jamming: {...}            # jamming near the hangar
  *
  * Each top-level key is a group that one module owns, except `weapons`,
  * whose `rates`, `energy_transfer`, `ai_torpedoes`, `impact_spin` and
- * `system_damage` belong to weapon_rates.h. This module reads the files and
+ * `system_damage` belong to the weapon rates. This module reads the files and
  * hands each group to its module, which keeps the values it needs in a
  * table by object type.
  *
  * The files are per model, but the game code only knows object types. Which
- * model an object type loads depends on the mission: its list row's model,
- * or the target of a mission swap (model_swaps.h). So the settings are read
- * again for each mission. At mission load, the module reads the settings of
- * the object types that the mission's flight groups use. Any other object
- * type, such as a craft that the player switches to in the hangar, gets its
- * settings the first time a module asks for them. Each model file is parsed
- * once per mission, even when several object types load the same model.
+ * model an object type loads depends on the mission: its list row's model, or
+ * the target of a mission swap. So the settings are read again for each
+ * mission. At mission load, the module reads the settings of the object types
+ * that the mission's flight groups use. Any other object type, such as a craft
+ * that the player switches to in the hangar, gets its settings the first time a
+ * module asks for them. Each model file is parsed once per mission, even when
+ * several object types load the same model.
  *
  * The files only apply with model replacements on, because the model keys
  * come from the replacement list. Without them, every module keeps the

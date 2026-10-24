@@ -1,9 +1,9 @@
 #ifndef XWA_RUNTIME_MODELS_CRAFT_NAMES_H
 #define XWA_RUNTIME_MODELS_CRAFT_NAMES_H
 
-/* A mission's craft names: a mission can rename the craft of a model for
- * its length, in the `craft_names` section of its mission file
- * (mission_file.h), keyed by model key. Every key is optional:
+/* A mission's craft names: a mission can rename the craft of a model for its
+ * length, in the `craft_names` section of its mission file, keyed by model key.
+ * Every key is optional:
  *
  *   craft_names:
  *     containerbrick: { ship_list: "Imperial II Star Destroyer 70", name: "Spec",

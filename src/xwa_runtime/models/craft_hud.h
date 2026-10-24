@@ -11,8 +11,8 @@
  *   hull_icons: [0, 2600, ...]
  *   map_icons: [0, 100, ...]
  *
- * The `hud` group of a model settings file (model_settings.h) holds the
- * craft's own HUD settings. All keys are optional:
+ * The `hud` group of a model settings file holds the craft's own HUD settings.
+ * All keys are optional:
  *
  *   hud:
  *     reticle: {5: 135, 6: 136}
@@ -38,11 +38,12 @@ enum { XWA_CRAFT_HUD_RETICLE_SLOTS = 23 };
 
 /* Reads flight/hud.yaml. */
 void XwaCraftHud_Init(void);
-/* Drops the previous mission's HUD settings. Called by model_settings.c. */
+/* Drops the previous mission's HUD settings. Called by the model settings
+   reader. */
 void XwaCraftHud_ClearModelSettings(void);
 /* Reads the `hud` group of `objectType`'s model settings file, or does
    nothing when `group` is NULL. `path` is the file, for the log. Called by
-   model_settings.c. */
+   the model settings reader. */
 void XwaCraftHud_ReadModelSettings(unsigned int objectType, const char* path,
 								   const struct AeronConfigNode* group);
 

@@ -26,8 +26,7 @@
  * `double_starfighter_shields`, a starfighter's shields charge up to twice
  * the usual maximum.
  *
- * A model's rate comes from the `shield` group of its model settings file
- * (model_settings.h):
+ * A model's rate comes from the `shield` group of its model settings file:
  *
  *   shield: {per_generator_rate: 5, player_rate: 40, delay_seconds: 30}
  *   shield: {rate: 20}
@@ -50,11 +49,12 @@ struct AeronConfigNode;
 /* Reads the `shield_recharge` section of flight/flight.yaml. Called once
    at startup. */
 void XwaShieldRecharge_Init(void);
-/* Drops the previous mission's model rates. Called by model_settings.c. */
+/* Drops the previous mission's model rates. Called by the model settings
+   reader. */
 void XwaShieldRecharge_ClearModelSettings(void);
 /* Reads the `shield` group of `objectType`'s model settings file, or does
    nothing when `group` is NULL. `path` is the file, for the log. Called by
-   model_settings.c. */
+   the model settings reader. */
 void XwaShieldRecharge_ReadModelSettings(unsigned int objectType, const char* path,
 										 const struct AeronConfigNode* group);
 /* Starts a mission with no recharge delays. */

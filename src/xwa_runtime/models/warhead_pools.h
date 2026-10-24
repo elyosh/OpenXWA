@@ -3,7 +3,7 @@
 
 /* The warheads that a flight group has in its hangar for the whole mission.
  * They come from the `warheads` key of the flight group's entry in the
- * mission file (mission_tie.h):
+ * mission file:
  *
  *   flight_groups:
  *     0: { name: "Alpha", craft: 5, warheads: { missiles: 80, torpedoes: 40 } }
@@ -37,11 +37,12 @@ extern "C" {
 struct AeronConfigNode;
 struct XwaFlightGroup;
 
-/* Starts a mission with no pools. Called by mission_tie.c. */
+/* Starts a mission with no pools. Called when the mission's flight groups are
+   read. */
 void XwaWarheadPools_Clear(void);
-/* Reads the `warheads` map of flight group `fgIdx`, `fg`, whose entry has
-   the key `fgKey` in the mission file `path`. Called by mission_tie.c.
-   Returns the number of values read. */
+/* Reads the `warheads` map of flight group `fgIdx`, `fg`, whose entry has the
+   key `fgKey` in the mission file `path`. Called when the mission's flight
+   groups are read. Returns the number of values read. */
 int XwaWarheadPools_ReadFlightGroup(const char* path, const char* fgKey, int fgIdx,
 									const struct XwaFlightGroup* fg, const struct AeronConfigNode* warheads);
 

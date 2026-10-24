@@ -421,8 +421,8 @@ int FlightLoading_DetachFrontendSurfaces(void) {
 	return 1;
 }
 
-/* Port task-shell glue (no original counterpart): the tick shell (xwa_port.c)
- * queries whether the in-flight frontend overlay surfaces are currently attached. */
+/* Port task-shell glue (no original counterpart): the tick shell queries
+ * whether the in-flight frontend overlay surfaces are currently attached. */
 int FlightLoading_AreFrontendSurfacesAttached(void) {
 	return g_flightOverlayBackBufferSurface != 0 || g_flightOverlayOffscreenSurface != 0;
 }

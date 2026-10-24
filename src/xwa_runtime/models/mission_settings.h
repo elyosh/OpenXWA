@@ -3,9 +3,9 @@
 
 /* A mod's mission settings: rules that the stock game ties to some missions,
  * made data, and a few more. They come from the `settings` section of a
- * mission's file (mission_file.h), over the `mission_settings` section of
- * flight/flight.yaml, which gives defaults for every mission. Both sections
- * take the same keys, and every key is optional:
+ * mission's file, over the `mission_settings` section of flight/flight.yaml,
+ * which gives defaults for every mission. Both sections take the same keys, and
+ * every key is optional:
  *
  *   settings:
  *     red_alert: true                    # the hangar's red alert
@@ -63,12 +63,11 @@
  * starship and launcher fire the weapon of the firing craft's side, for
  * example Imperial lasers instead of Rebel lasers. With false, no fire
  * changes; with true, every shot changes. A model settings file can choose
- * for its craft (craft_weapons.h).
+ * for its craft.
  *
- * ai_attack_uses_max_speed_cache makes a craft under attack compare its own
- * top speed and its attacker's (aiFlight.maxSpeedCache), which stats
- * profiles can change (stats_profiles.h), instead of their records' top
- * speeds. It changes the simulation.
+ * ai_attack_uses_max_speed_cache makes a craft under attack compare its own top
+ * speed and its attacker's (aiFlight.maxSpeedCache), which stats profiles can
+ * change, instead of their records' top speeds. It changes the simulation.
  *
  * fire_needs_decharge_rate and no_starship_fire_from_destroyed_racks change
  * when a craft can fire. They change the simulation.
@@ -115,7 +114,7 @@
  *     meshes. A gun turret mesh doesn't fire at targets behind it.
  *
  * The jamming rules change where a player's weapons are jammed near an
- * enemy starship or platform (jamming.h). They change the simulation:
+ * enemy starship or platform. They change the simulation:
  *   - hangar_jamming: false turns jamming off for every craft;
  *   - super_star_destroyer_jamming: the Super Star Destroyer jams near its
  *     hangar. In the stock game, it never jams. */

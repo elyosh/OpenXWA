@@ -350,7 +350,6 @@ char paiorder_flyhomeotherregionorder(void) {
 	uint16_t flightGroupIdx;
 
 #ifdef XWA_MODERN
-	/* Modern port: the craft's stats profile (stats_profiles.h). */
 	if (!XwaStatsProfiles_Value(g_paiContext.aiObjIdx, XWA_STATS_HAS_HYPERDRIVE,
 								g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive)) {
 #else
@@ -2132,7 +2131,6 @@ char paiorder_abortmotherwaitorder(void) {
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: the craft's stats profile (stats_profiles.h). */
 	if (!XwaStatsProfiles_Value(g_paiContext.aiObjIdx, XWA_STATS_HAS_HYPERDRIVE,
 								g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive)) {
 #else
@@ -2893,7 +2891,6 @@ char paiorder_hyperspaceorder(void) {
 	if (g_curCraft->leader_obj_idx == -1 || g_curCraft->aiFlight.missionAbortedFlag != 0 ||
 		strcmp(g_planTable[g_paiContext.aiController->pendingPlanId].name, "flyhomeevadepln") == 0) {
 #ifdef XWA_MODERN
-		/* Modern port: the craft's stats profile (stats_profiles.h). */
 		if (XwaStatsProfiles_Value(g_paiContext.aiObjIdx, XWA_STATS_HAS_HYPERDRIVE,
 								   g_modelDefs[g_curCraft->modelDefIndex].hasHyperdrive) != 0) {
 #else

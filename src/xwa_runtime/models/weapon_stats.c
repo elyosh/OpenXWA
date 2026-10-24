@@ -441,7 +441,7 @@ void XwaWeaponStats_Init(void) {
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, WEAPON_STATS_FLIGHT_YAML, &file,
 									&error)) {
-		/* mission_backdrops.c logs a file that can't be read. */
+		/* The backdrops code already logs this error. */
 		return;
 	}
 	root = AeronConfigFile_Root(file);
@@ -500,7 +500,7 @@ void XwaWeaponStats_ClearModelSettings(void) {
 
 void XwaWeaponStats_ReadModelSettings(unsigned int objectType, const char* path,
 									  const AeronConfigNode* group) {
-	/* craft_weapons.c logs a `weapons` group that isn't a map. */
+	/* The weapon colours code logs a `weapons` group that isn't a map. */
 	if (objectType >= OBJ_Count || AeronConfigNode_Type(group) != AERON_CONFIG_MAP) {
 		return;
 	}

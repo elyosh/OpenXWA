@@ -33,6 +33,7 @@
 #include "xwa/xwa_options.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/models/tech_ratings.h"
 #endif
 
 #include <stdint.h>
@@ -236,6 +237,11 @@ int BuildCraftTechStats(CraftTechStats* stats) {
 	if (shiftedBound > boundSize) {
 		boundSize = shiftedBound;
 	}
+#ifdef XWA_MODERN
+	/* Modern port: the size of the model's file, so that a craft whose model
+	   isn't loaded gets its own size, not the record's. */
+	XwaTechRatings_BoundSize(stats->craftType, &boundSize);
+#endif
 
 	{
 		double displayedSize;
@@ -302,6 +308,10 @@ int BuildCraftTechStats(CraftTechStats* stats) {
 			break;
 	}
 
+#ifdef XWA_MODERN
+	/* Modern port: the values of the model's default stats profile. */
+	XwaTechRatings_ApplyProfile(objectType, stats);
+#endif
 	stats->combatRating = ComputeCraftCombatRating((ObjectTypeId)objectType);
 	return 1;
 }

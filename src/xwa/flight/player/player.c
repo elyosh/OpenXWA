@@ -1655,7 +1655,6 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 		uint8_t shieldMode;
 
 #ifdef XWA_MODERN
-		/* Modern port: the craft's stats profile (stats_profiles.h). */
 		maxShieldPerFace =
 			2 * XwaStatsProfiles_Value(selectedObjIdx, XWA_STATS_SHIELDS,
 									   g_modelDefs[selectedCraft->modelDefIndex].shieldStrength);
@@ -2064,7 +2063,7 @@ int Player_UnbindFromCurrentCraft(int playerIdx, int requireAnotherOwnedCraft, i
 			g_objectTable[objectIndex].mobj->speedRemainder = 0;
 #ifdef XWA_MODERN
 			/* Modern port: the speed follows the craft's own top speed, which its
-			   stats profile can change (stats_profiles.h). */
+			   stats profile can change. */
 			XwaStatsProfiles_ScaleSpeed(objectIndex);
 #endif
 

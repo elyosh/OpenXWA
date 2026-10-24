@@ -5,8 +5,8 @@
  * marks they leave, and of the player's charge bars. Also whether the craft
  * fires its side's weapons.
  *
- * The `weapons` group of a model settings file (model_settings.h) holds a
- * craft's colours. All keys are optional:
+ * The `weapons` group of a model settings file holds a craft's colours. All
+ * keys are optional:
  *
  *   weapons:
  *     switch_by_iff: true              # fire the weapons of the craft's side
@@ -67,11 +67,12 @@ enum {
 /* Reads the `weapons` section of flight/flight.yaml. Called once at
    startup. */
 void XwaCraftWeapons_Init(void);
-/* Drops the previous mission's settings. Called by model_settings.c. */
+/* Drops the previous mission's settings. Called by the model settings
+   reader. */
 void XwaCraftWeapons_ClearModelSettings(void);
 /* Reads the `weapons` group of `objectType`'s model settings file, or does
    nothing when `group` is NULL. `path` is the file, for the log. Called by
-   model_settings.c. */
+   the model settings reader. */
 void XwaCraftWeapons_ReadModelSettings(unsigned int objectType, const char* path,
 									   const struct AeronConfigNode* group);
 

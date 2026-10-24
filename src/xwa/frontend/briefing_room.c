@@ -290,7 +290,7 @@ static int BriefingRoom_ListedFlightGroup(int flightGroupIndex) {
 }
 
 /* Modern port: the ship list name of a flight group's craft, or the name
-   that the mission gives it (craft_names.h). */
+   that the mission gives it. */
 static const char* BriefingRoom_ShipName(const XwaFlightGroup* flightGroup, const ShipListEntry* shipEntry) {
 	const char* name = XwaCraftNames_ShipListName(flightGroup->craftType);
 

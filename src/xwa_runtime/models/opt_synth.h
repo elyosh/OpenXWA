@@ -59,8 +59,7 @@ typedef struct XwaOptSynthData {
 	const AeronFlightComponentSet* noCollision;
 	const AeronFlightComponentSet* targetable;
 	/* The GLB is parsed once: after the simulation data is built, the parsed
-	   model keeps what the HD renderer needs until it has built its mesh
-	   (xwa_runtime/models/render_model.h). */
+	   model keeps what the HD renderer needs until it has built its mesh. */
 	int hasRenderModel;
 	AeronFlightModel renderModel;
 	struct XwaOptSynthData* nextLive; /* loaded replacements, for XwaRenderModel_Find */

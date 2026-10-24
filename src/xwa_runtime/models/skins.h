@@ -3,10 +3,10 @@
 
 /* Which look each model shows for each markings value.
  *
- * A model's GLB names, in its markings list, the material variant each
- * markings value shows. A mission may select others in the `skins` section
- * of its mission file (mission_file.h), keyed by GLB name and markings
- * value; null selects the model's own materials:
+ * A model's GLB names, in its markings list, the material variant each markings
+ * value shows. A mission may select others in the `skins` section of its
+ * mission file, keyed by GLB name and markings value; null selects the model's
+ * own materials:
  *
  *   skins:
  *     awing:
@@ -16,7 +16,7 @@
  * use. This module tells it, through the snapshot, the mission's selections
  * and the markings values used:
  *   - every flight group's;
- *   - those that the mission gives single craft (mission_tie.h);
+ *   - those that the mission gives single craft in its flight groups;
  *   - the player cockpit and exterior with the markings of the player's
  *     craft;
  *   - the frontend previews';

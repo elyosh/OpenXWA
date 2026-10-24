@@ -239,6 +239,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/gunner_seats.c
     src/xwa_runtime/models/skins.c
     src/xwa_runtime/models/stats_profiles.c
+    src/xwa_runtime/models/tech_ratings.c
     src/xwa_runtime/models/turret_hardpoints.c
     src/xwa_runtime/models/weapon_rates.c
     src/xwa_runtime/models/warhead_lock.c

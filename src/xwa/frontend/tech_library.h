@@ -29,6 +29,9 @@ typedef struct TechLibrarySpecText {
 } TechLibrarySpecText;
 
 extern TechLibrarySpecText* g_techLibrarySpecTextTable;
+extern const double g_techLibraryRatingScale;
+extern const double g_techLibraryNegativeRoundingOffset;
+extern const float g_techLibraryManeuverScale;
 
 int BuildCraftTechStats(CraftTechStats* stats);
 char* GetCraftTypeModelLongName(int craftType);

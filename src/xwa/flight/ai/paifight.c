@@ -2851,7 +2851,6 @@ char paifight_fightershootorder(void) {
 		pendingWarheadDamage = 0;
 		pendingIonPulseScore = 0;
 #ifdef XWA_MODERN
-		/* Modern port: the craft's stats profile (stats_profiles.h). */
 		remainingSystemStrength =
 			(uint16_t)(XwaStatsProfiles_Value(g_paiContext.aiObjIdx, XWA_STATS_SYSTEM_STRENGTH,
 											  g_modelDefs[g_curCraft->modelDefIndex].systemStrength) -
