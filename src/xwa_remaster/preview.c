@@ -229,7 +229,9 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 		 * reads the table until AeronScene_Render below. */
 		static AeronSceneMeshTable hidden;
 		const AeronSceneMeshTable* table =
-			XwaRemasterShip_BuildHiddenMeshTable(mesh, p->component_state, &hidden) ? &hidden : NULL;
+			XwaRemasterShip_BuildHiddenMeshTable(mesh, p->component_state, XWA_SNAP_MAX_MESH_SLOTS, &hidden)
+				? &hidden
+				: NULL;
 		inst.mesh_table = table;
 		AeronScene_AddMeshInstance(s.scene, &inst);
 

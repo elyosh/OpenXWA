@@ -2679,7 +2679,8 @@ static void fl_derive_wreck_flames(const XwaFlightObject* f, uint32_t snap_index
 		float rot = previous_base.rot;
 		const float roll_rad = (float)(int16_t)pf->roll * FL_Q16_TO_RAD;
 		for (int mesh = 0; mesh < previous_mesh_count; mesh++) {
-			if (previous_mesh_types[mesh] == XWA_SNAP_MESH_FUSELAGE && pf->component_state[mesh] == 0) {
+			if (previous_mesh_types[mesh] == XWA_SNAP_MESH_FUSELAGE &&
+				XwaFlightObject_ComponentState(pf, mesh) == 0) {
 				rot += roll_rad;
 				previous_rot[mesh] = rot;
 				previous_flame[mesh] = 1;
@@ -2690,7 +2691,7 @@ static void fl_derive_wreck_flames(const XwaFlightObject* f, uint32_t snap_index
 	const float roll_rad = (float)(int16_t)f->roll * FL_Q16_TO_RAD;
 	float rot = base_geometry.rot;
 	for (int mesh = 0; mesh < mesh_count; mesh++) {
-		if (mesh_types[mesh] != XWA_SNAP_MESH_FUSELAGE || f->component_state[mesh] != 0) {
+		if (mesh_types[mesh] != XWA_SNAP_MESH_FUSELAGE || XwaFlightObject_ComponentState(f, mesh) != 0) {
 			continue;
 		}
 		rot += roll_rad; /* classic: billboardAngle += roll per queued flame */
@@ -2715,28 +2716,41 @@ static int fl_bb_depth_cmp(const void* pa, const void* pb) {
 	return za < zb ? 1 : (za > zb ? -1 : 0);
 }
 
-static void fl_derive_billboards(const XwaSnapshot* snap, XwaRemasterAssets* assets,
-								 const XwaFlightCamera* history_cam, const float history_world_to_view[9]) {
-	s.bb_count = 0;
+/* Derives the billboards of entry `i`: a transient object, or an explosion,
+ * debris or salvage of the main slots. */
+static void fl_derive_billboard_object(const XwaSnapshot* snap, uint32_t i, XwaRemasterAssets* assets,
+									   const XwaFlightCamera* history_cam,
+									   const float history_world_to_view[9]) {
+	const XwaFlightObject* f = &snap->flight_objects[i];
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	/* Slot topology is authoritative: several dynamic effect spawners
 	 * leave ObjectRecord.regionIdx stale. */
-	for (uint32_t i = 0; i < snap->flight_object_count; i++) {
-		const XwaFlightObject* f = &snap->flight_objects[i];
-		if (!fl_object_in_render_region(f, cam->region)) {
-			continue;
+	if (!fl_object_in_render_region(f, cam->region)) {
+		return;
+	}
+	if (f->slot_class == XWA_SNAP_SLOT_TRANSIENT) {
+		if (f->genus == XWA_SNAP_GENUS_DEBRIS && cam->external) {
+			return; /* classic hides transient debris externally */
 		}
-		if (f->slot_class == XWA_SNAP_SLOT_TRANSIENT) {
-			if (f->genus == XWA_SNAP_GENUS_DEBRIS && cam->external) {
-				continue; /* classic hides transient debris externally */
-			}
+		fl_derive_object_billboard(f, i, assets, history_cam, history_world_to_view);
+	} else if (f->slot_class == XWA_SNAP_SLOT_MAIN) {
+		if (f->genus == XWA_SNAP_GENUS_EXPLOSION || f->genus == XWA_SNAP_GENUS_DEBRIS) {
 			fl_derive_object_billboard(f, i, assets, history_cam, history_world_to_view);
-		} else if (f->slot_class == XWA_SNAP_SLOT_MAIN) {
-			if (f->genus == XWA_SNAP_GENUS_EXPLOSION || f->genus == XWA_SNAP_GENUS_DEBRIS) {
-				fl_derive_object_billboard(f, i, assets, history_cam, history_world_to_view);
-			} else if (f->genus == XWA_SNAP_GENUS_SALVAGE_JUNK) {
-				fl_derive_wreck_flames(f, i, assets, history_cam, history_world_to_view);
-			}
+		} else if (f->genus == XWA_SNAP_GENUS_SALVAGE_JUNK) {
+			fl_derive_wreck_flames(f, i, assets, history_cam, history_world_to_view);
+		}
+	}
+}
+
+static void fl_derive_billboards(const XwaSnapshot* snap, XwaRemasterAssets* assets,
+								 const XwaFlightCamera* history_cam, const float history_world_to_view[9]) {
+	static const XwaFlightObjectList lists[] = { XWA_SNAP_LIST_EXPLOSION, XWA_SNAP_LIST_DEBRIS,
+												 XWA_SNAP_LIST_TRANSIENT };
+	s.bb_count = 0;
+	for (uint32_t li = 0; li < sizeof lists / sizeof lists[0]; li++) {
+		for (uint32_t k = 0; k < snap->flight_list_count[lists[li]]; k++) {
+			fl_derive_billboard_object(snap, snap->flight_lists[lists[li]][k], assets, history_cam,
+									   history_world_to_view);
 		}
 	}
 	/* Classic flush order: back-to-front across the whole set. */
@@ -2851,8 +2865,10 @@ static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* as
 
 	/* Explosion flashes: the render walk's case-13 window (current-region
 	 * MAIN slots only — transient sparks never queue flares). */
-	for (uint32_t i = 0; i < snap->flight_object_count && s.lens_src_count < FL_MAX_LENS_SOURCES; i++) {
-		const XwaFlightObject* f = &snap->flight_objects[i];
+	for (uint32_t k = 0;
+		 k < snap->flight_list_count[XWA_SNAP_LIST_EXPLOSION] && s.lens_src_count < FL_MAX_LENS_SOURCES;
+		 k++) {
+		const XwaFlightObject* f = &snap->flight_objects[snap->flight_lists[XWA_SNAP_LIST_EXPLOSION][k]];
 		if (!fl_object_in_render_region(f, cam->region) || f->slot_class != XWA_SNAP_SLOT_MAIN ||
 			f->genus != XWA_SNAP_GENUS_EXPLOSION) {
 			continue;
@@ -3375,33 +3391,40 @@ static void fl_place_probe_sets(AeronCommandBuffer* cmd, const XwaSnapshot* snap
 	float distances[AERON_SCENE_MAX_PROBE_SETS];
 	uint32_t count = 0;
 	s.probe_set_count = 0;
-	for (uint32_t i = 0; s_probes_enabled && i < snap->flight_object_count; i++) {
-		const XwaFlightObject* f = &snap->flight_objects[i];
-		if (!fl_object_in_render_region(f, cam->region) || f->genus == XWA_SNAP_GENUS_EXPLOSION ||
-			fl_object_is_projectile(f) || f->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK) {
-			continue;
-		}
-		const AeronSceneMesh* mesh = XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(f->object_type));
-		AeronProbeSet* probes = mesh ? mesh->probes : NULL;
-		if (!probes) {
-			continue;
-		}
-		float delta[3];
-		AeronWorld_DeltaI32(cam->world_pos, f->world_pos, delta);
-		const float distance = delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2];
-		/* Insert by distance; the farthest drops past the limit. */
-		uint32_t k = count < AERON_SCENE_MAX_PROBE_SETS ? count++ : AERON_SCENE_MAX_PROBE_SETS;
-		for (; k > 0 && distances[k - 1] > distance; k--) {
-			if (k < AERON_SCENE_MAX_PROBE_SETS) {
-				distances[k] = distances[k - 1];
-				sets[k] = sets[k - 1];
-				s.probe_set_object[k] = s.probe_set_object[k - 1];
+	/* The explosions and projectiles have no probes. */
+	static const XwaFlightObjectList lists[] = { XWA_SNAP_LIST_CRAFT, XWA_SNAP_LIST_DEBRIS,
+												 XWA_SNAP_LIST_TRANSIENT };
+	for (uint32_t li = 0; s_probes_enabled && li < sizeof lists / sizeof lists[0]; li++) {
+		for (uint32_t li_k = 0; li_k < snap->flight_list_count[lists[li]]; li_k++) {
+			const uint32_t i = snap->flight_lists[lists[li]][li_k];
+			const XwaFlightObject* f = &snap->flight_objects[i];
+			if (!fl_object_in_render_region(f, cam->region) || f->genus == XWA_SNAP_GENUS_EXPLOSION ||
+				fl_object_is_projectile(f) || f->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK) {
+				continue;
 			}
-		}
-		if (k < AERON_SCENE_MAX_PROBE_SETS) {
-			distances[k] = distance;
-			sets[k] = probes;
-			s.probe_set_object[k] = i;
+			const AeronSceneMesh* mesh =
+				XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(f->object_type));
+			AeronProbeSet* probes = mesh ? mesh->probes : NULL;
+			if (!probes) {
+				continue;
+			}
+			float delta[3];
+			AeronWorld_DeltaI32(cam->world_pos, f->world_pos, delta);
+			const float distance = delta[0] * delta[0] + delta[1] * delta[1] + delta[2] * delta[2];
+			/* Insert by distance; the farthest drops past the limit. */
+			uint32_t k = count < AERON_SCENE_MAX_PROBE_SETS ? count++ : AERON_SCENE_MAX_PROBE_SETS;
+			for (; k > 0 && distances[k - 1] > distance; k--) {
+				if (k < AERON_SCENE_MAX_PROBE_SETS) {
+					distances[k] = distances[k - 1];
+					sets[k] = sets[k - 1];
+					s.probe_set_object[k] = s.probe_set_object[k - 1];
+				}
+			}
+			if (k < AERON_SCENE_MAX_PROBE_SETS) {
+				distances[k] = distance;
+				sets[k] = probes;
+				s.probe_set_object[k] = i;
+			}
 		}
 	}
 	for (uint32_t k = 0; k < count; k++) {
@@ -3921,29 +3944,22 @@ static void fl_hyper_find_poses(const XwaSnapshot* snap, const XwaFlightCamera* 
 	/* FlightView_RenderCockpitModel is a separate special-mode draw and
 	 * always passes the local player's object, unlike the ordinary flight
 	 * render-list cockpit which is attached to cameraFocusObjIdx. */
-	const int32_t anchor_slot = cam->player_obj_idx;
-	for (uint32_t i = 0; i < snap->flight_object_count; i++) {
-		const XwaFlightObject* f = &snap->flight_objects[i];
-		if ((int32_t)f->slot != anchor_slot && (int32_t)f->slot != cam->player_obj_idx) {
-			continue;
-		}
-		float cur[3][3], bw[9];
-		if (f->has_mobj && !f->orient_dirty)
-			fl_curmat_from_cached(f->rows, cur);
-		else
-			fl_curmat_from_euler(f, cur);
-		fl_object_world(cur, bw);
-		if ((int32_t)f->slot == anchor_slot) {
-			memcpy(anchor_bw, bw, 9 * sizeof(float));
-			*anchor_found = 1;
-		}
-		if ((int32_t)f->slot == cam->player_obj_idx) {
-			*player_f = f;
-			memcpy(player_bw, bw, 9 * sizeof(float));
-			fl_object_local(f, player_local);
-			*player_found = 1;
-		}
+	const XwaFlightObject* f = fl_object_by_slot(snap, cam->player_obj_idx);
+	if (!f) {
+		return;
 	}
+	float cur[3][3], bw[9];
+	if (f->has_mobj && !f->orient_dirty)
+		fl_curmat_from_cached(f->rows, cur);
+	else
+		fl_curmat_from_euler(f, cur);
+	fl_object_world(cur, bw);
+	memcpy(anchor_bw, bw, 9 * sizeof(float));
+	*anchor_found = 1;
+	*player_f = f;
+	memcpy(player_bw, bw, 9 * sizeof(float));
+	fl_object_local(f, player_local);
+	*player_found = 1;
 }
 
 static int fl_hyper_normalize_axis(float axis[3]) {

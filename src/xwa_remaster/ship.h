@@ -75,11 +75,10 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f);
 
 /* Build a static mesh table that hides the slots whose component_state is
- * nonzero (a craft's componentState). Returns 1 when any slot hides
- * (callers skip the table bind otherwise). */
-int XwaRemasterShip_BuildHiddenMeshTable(const AeronSceneMesh* mesh,
-										 const uint8_t component_state[XWA_SNAP_MAX_MESH_SLOTS],
-										 AeronSceneMeshTable* out);
+ * nonzero (the `count` values of a craft's componentState). Returns 1 when
+ * any slot hides (callers skip the table bind otherwise). */
+int XwaRemasterShip_BuildHiddenMeshTable(const AeronSceneMesh* mesh, const uint8_t* component_state,
+										 uint32_t count, AeronSceneMeshTable* out);
 
 /* Build the previous articulation table required for motion vectors when
  * rotary state changed between matched snapshots. Returns 0 when the current

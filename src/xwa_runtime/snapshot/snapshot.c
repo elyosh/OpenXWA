@@ -8,6 +8,7 @@
  */
 
 #include "xwa_runtime/snapshot/snapshot.h"
+#include "xwa/assets/model_mesh.h"
 #include "xwa_runtime/frontend/frontend_fonts.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
@@ -173,6 +174,8 @@ void XwaSnapshot_BeginTick(void) {
 	s->cockpit_valid = 0;
 	s->flight_object_count = 0;
 	s->flight_slot_count = 0;
+	s->flight_mesh_count = 0;
+	memset(s->flight_list_count, 0, sizeof s->flight_list_count);
 	memset(&s->flight_map, 0, sizeof s->flight_map);
 	s->flight_camera_valid = 0;
 	s->mission_path[0] = '\0';
@@ -525,10 +528,26 @@ const XwaSnapshot* XwaSnapshot_Current(void) { return g_current_slot >= 0 ? &g_s
 
 void XwaSnapshot_Shutdown(void) {
 	for (int i = 0; i < 3; i++) {
-		free(g_slots[i].flight_slot_index);
-		g_slots[i].flight_slot_index = NULL;
-		g_slots[i].flight_slot_count = 0;
-		g_slots[i].flight_slot_capacity = 0;
+		XwaSnapshot* s = &g_slots[i];
+		free(s->flight_objects);
+		free(s->flight_slot_index);
+		free(s->flight_component_states);
+		free(s->flight_mesh_angles);
+		for (int list = 0; list < XWA_SNAP_LIST_COUNT; list++) {
+			free(s->flight_lists[list]);
+			s->flight_lists[list] = NULL;
+			s->flight_list_count[list] = 0;
+		}
+		s->flight_objects = NULL;
+		s->flight_object_count = 0;
+		s->flight_object_capacity = 0;
+		s->flight_slot_index = NULL;
+		s->flight_slot_count = 0;
+		s->flight_slot_capacity = 0;
+		s->flight_component_states = NULL;
+		s->flight_mesh_angles = NULL;
+		s->flight_mesh_count = 0;
+		s->flight_mesh_capacity = 0;
 	}
 }
 
@@ -1413,13 +1432,92 @@ static int snapshot_reserve_slot_index(XwaSnapshot* s, uint32_t count) {
 	return 1;
 }
 
+/* Copies the meshes of craft `cd` to the mesh areas of `s`, at its model's
+ * mesh count. The entry gets its offset; XwaSnapshot_CaptureFlight sets its
+ * pointers once the areas stop growing. */
+static void snapshot_capture_meshes(XwaSnapshot* s, XwaFlightObject* f, const ObjectRecord* o,
+									const CraftData* cd) {
+	int count = ModelMesh_GetObjectTypeMeshCount(o->objectType);
+	if (count <= 0) {
+		return;
+	}
+	if (count > XWA_SNAP_MAX_MESH_SLOTS) {
+		count = XWA_SNAP_MAX_MESH_SLOTS;
+	}
+	if (s->flight_mesh_count + (uint32_t)count > s->flight_mesh_capacity) {
+		uint32_t capacity = s->flight_mesh_capacity ? s->flight_mesh_capacity : 4096;
+		while (capacity < s->flight_mesh_count + (uint32_t)count) {
+			capacity *= 2;
+		}
+		uint8_t* states = realloc(s->flight_component_states, capacity);
+		if (states == NULL) {
+			return;
+		}
+		s->flight_component_states = states;
+		uint16_t* angles = realloc(s->flight_mesh_angles, (size_t)capacity * sizeof *angles);
+		if (angles == NULL) {
+			return;
+		}
+		s->flight_mesh_angles = angles;
+		s->flight_mesh_capacity = capacity;
+	}
+	f->mesh_offset = s->flight_mesh_count;
+	f->mesh_count = (uint16_t)count;
+	memcpy(s->flight_component_states + f->mesh_offset, cd->componentState, (size_t)count);
+	XwaArticulation_DrawnAngles(o, s->flight_mesh_angles + f->mesh_offset, (size_t)count);
+	s->flight_mesh_count += (uint32_t)count;
+}
+
+static XwaFlightObjectList snapshot_object_list(const XwaFlightObject* f) {
+	if (f->slot_class == XWA_SNAP_SLOT_TRANSIENT) {
+		return XWA_SNAP_LIST_TRANSIENT;
+	}
+	if (f->slot_class == XWA_SNAP_SLOT_MAIN) {
+		switch (f->genus) {
+			case XWA_SNAP_GENUS_EXPLOSION:
+				return XWA_SNAP_LIST_EXPLOSION;
+			case XWA_SNAP_GENUS_DEBRIS:
+			case XWA_SNAP_GENUS_SALVAGE_JUNK:
+				return XWA_SNAP_LIST_DEBRIS;
+			case XWA_SNAP_GENUS_PLAYER_PROJECTILE:
+			case XWA_SNAP_GENUS_NPC_PROJECTILE:
+				return XWA_SNAP_LIST_PROJECTILE;
+			default:
+				break;
+		}
+	}
+	return XWA_SNAP_LIST_CRAFT;
+}
+
+/* Makes the object array and the lists of `s` hold `count` objects. They
+ * grow when a mission captures more slots, so once per mission at most. */
+static int snapshot_reserve_objects(XwaSnapshot* s, uint32_t count) {
+	if (count <= s->flight_object_capacity) {
+		return 1;
+	}
+	XwaFlightObject* objects = realloc(s->flight_objects, (size_t)count * sizeof *objects);
+	if (objects == NULL) {
+		return 0;
+	}
+	s->flight_objects = objects;
+	for (int list = 0; list < XWA_SNAP_LIST_COUNT; list++) {
+		uint32_t* indices = realloc(s->flight_lists[list], (size_t)count * sizeof *indices);
+		if (indices == NULL) {
+			return 0;
+		}
+		s->flight_lists[list] = indices;
+	}
+	s->flight_object_capacity = count;
+	return 1;
+}
+
 /* Captures the object in slot `i` into `s`, when the slot holds one. */
 static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_state_slot_count) {
 	const ObjectRecord* o = &g_objectTable[i];
 	if (o->objectType == OBJ_None) {
 		return;
 	}
-	if (s->flight_object_count >= XWA_SNAP_MAX_FLIGHT_OBJECTS) {
+	if (s->flight_object_count >= s->flight_object_capacity) {
 		s->dropped_records++;
 		return;
 	}
@@ -1437,14 +1535,10 @@ static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_
 	f->world_pos[0] = o->world_x;
 	f->world_pos[1] = o->world_y;
 	f->world_pos[2] = o->world_z;
-	f->prev_world_pos[0] = o->world_x;
-	f->prev_world_pos[1] = o->world_y;
-	f->prev_world_pos[2] = o->world_z;
 	f->yaw = o->yaw;
 	f->pitch = o->pitch;
 	f->roll = o->roll;
 	f->angle_d = o->angleD;
-	f->player_owner = o->playerOwnerIdx;
 	/* Billboard-law state (see header): the sprite frame / debris
 	 * component selector, the type-2006 depth pull-in, and the
 	 * render walk's slot-range dispatch class. */
@@ -1454,9 +1548,6 @@ static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_
 	if (m) {
 		f->has_mobj = 1;
 		f->iff = m->iff;
-		f->team = m->team;
-		f->state = m->state;
-		f->motion_flags = m->motionFlags;
 		f->node_switch = m->nodeSwitchIndex;
 		f->orient_dirty = m->orientMatrixDirty;
 		f->source_obj = m->sourceObjIdx;
@@ -1466,9 +1557,6 @@ static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_
 		f->render_offset[0] = (float)m->renderOffsetX;
 		f->render_offset[1] = (float)m->renderOffsetY;
 		f->render_offset[2] = (float)m->renderOffsetZ;
-		f->prev_world_pos[0] = m->prevWorldX;
-		f->prev_world_pos[1] = m->prevWorldY;
-		f->prev_world_pos[2] = m->prevWorldZ;
 		f->rows[0] = m->cachedSideX;
 		f->rows[1] = m->cachedSideY;
 		f->rows[2] = m->cachedSideZ;
@@ -1485,24 +1573,19 @@ static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_
 		const CraftData* cd = m->pCraft;
 		if (cd) {
 			f->has_craft = 1;
-			f->sfoil_state = cd->sFoilState;
 			f->bridge_aligned = (uint8_t)(XwaArticulation_AlignsBridge(o) != 0);
 			f->carried_object_slot = cd->carriedObjectIndex;
 			if (cd->carriedObjectIndex != 0xffffu && cd->carriedObjectIndex < g_objectTableSlotCount &&
 				g_objectTable[cd->carriedObjectIndex].objectType != OBJ_None) {
 				f->carried_object_signature = g_objectTable[cd->carriedObjectIndex].objectSignature;
 			}
-			f->system_flags = cd->systemFlags;
-			f->subsystem_damage = cd->subsystemDamage;
 			f->hull_damage = cd->hullDamage;
 			f->hull_max = cd->hullMax;
 			f->shield_front = cd->shieldFront;
 			f->shield_rear = cd->shieldRear;
 			f->beam_tractor = (uint8_t)(cd->beamEffectAccum[1] != 0);
 			f->beam_jamming = (uint8_t)(cd->beamEffectAccum[2] != 0);
-			memcpy(f->component_state, cd->componentState, sizeof f->component_state);
-			XwaArticulation_DrawnAngles(o, f->mesh_angle, XWA_SNAP_MAX_MESH_SLOTS);
-			memcpy(f->component_hp, cd->componentHp, sizeof f->component_hp);
+			snapshot_capture_meshes(s, f, o, cd);
 			f->anim_frame = XWA_CRAFT_ANIM_FRAME(cd);
 			/* Engine-glow scale inputs (EngineGlow_RenderObjectGlows). */
 			f->object_kind = cd->objectKind;
@@ -1533,6 +1616,8 @@ void XwaSnapshot_CaptureFlight(void) {
 	XwaSnapshot* s = wr();
 	s->flight_object_count = 0;
 	s->flight_slot_count = 0;
+	s->flight_mesh_count = 0;
+	memset(s->flight_list_count, 0, sizeof s->flight_list_count);
 	s->hyperspace_streak_count = 0;
 	s->particle_effect_count = 0;
 	s->particle_count = 0;
@@ -1592,11 +1677,27 @@ void XwaSnapshot_CaptureFlight(void) {
 		ranges.region_start < render_state_slot_count ? ranges.region_start : render_state_slot_count;
 	const uint32_t render_end =
 		ranges.region_end < render_state_slot_count ? ranges.region_end : render_state_slot_count;
+	if (!snapshot_reserve_objects(s, (ranges.region_end - ranges.region_start) +
+										 (ranges.local_end - ranges.local_start))) {
+		s->flight_slot_count = 0;
+		return;
+	}
 	for (uint32_t i = ranges.region_start; i < ranges.region_end; i++) {
 		snapshot_capture_object(s, i, render_state_slot_count);
 	}
 	for (uint32_t i = ranges.local_start; i < ranges.local_end; i++) {
 		snapshot_capture_object(s, i, render_state_slot_count);
+	}
+	/* The mesh areas don't grow any more: point the entries into them, and
+	 * sort the entries into the lists. */
+	for (uint32_t i = 0; i < s->flight_object_count; i++) {
+		XwaFlightObject* f = &s->flight_objects[i];
+		if (f->mesh_count != 0) {
+			f->component_state = s->flight_component_states + f->mesh_offset;
+			f->mesh_angle = s->flight_mesh_angles + f->mesh_offset;
+		}
+		const XwaFlightObjectList list = snapshot_object_list(f);
+		s->flight_lists[list][s->flight_list_count[list]++] = i;
 	}
 
 	XwaSnapshotFlightMap_Begin(s);

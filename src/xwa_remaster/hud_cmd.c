@@ -24,7 +24,9 @@
 #include <string.h>
 
 #define CMD_NEAR_Z 64.0f
-#define CMD_MAX_BILLBOARDS (XWA_SNAP_MAX_FLIGHT_OBJECTS + XWA_SNAP_MAX_MESH_SLOTS * 2)
+/* The CMD's sprites: the target's and its projectiles' effects. More are
+   dropped (cmd_add_billboard). */
+#define CMD_MAX_BILLBOARDS 2048
 #define CMD_MAX_POINT_CANDIDATES 256
 
 typedef struct CmdBillboard {
@@ -336,7 +338,7 @@ static void cmd_add_wreck_flames(const XwaFlightObject* object, const XwaHudCrt*
 	float rotation = cmd_billboard_rotation(transform);
 	const float roll = (float)(int16_t)object->roll * (2.0f * 3.14159265358979323846f / 65536.0f);
 	for (int i = 0; i < mesh_count; i++) {
-		if (mesh_types[i] == XWA_SNAP_MESH_FUSELAGE && object->component_state[i] == 0) {
+		if (mesh_types[i] == XWA_SNAP_MESH_FUSELAGE && XwaFlightObject_ComponentState(object, i) == 0) {
 			rotation += roll;
 			cmd_add_billboard(object, center, rotation, object->anim_frame, XWA_SNAP_TYPE_FLAME_2008, 256,
 							  assets, crt);

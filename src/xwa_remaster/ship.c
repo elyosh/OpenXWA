@@ -859,14 +859,15 @@ static int ship_bwing_compensation(const AeronSceneMesh* mesh, const XwaFlightOb
 		return 0;
 	}
 	const int bridge_component = ship_bwing_bridge_component(mesh, components);
-	if (bridge_component < 0 || f->mesh_angle[bridge_component] == 0) {
+	if (bridge_component < 0 || XwaFlightObject_MeshAngle(f, bridge_component) == 0) {
 		return 0;
 	}
 	/* The classic B-Wing walker rotates every mesh root by the Bridge
 	 * rotation around model -Y before applying that root's local rotation. */
 	static const float axis[3] = { 0.0f, -1.0f, 0.0f };
 	static const float pivot[3] = { 0.0f, 0.0f, 0.0f };
-	const float angle = (float)f->mesh_angle[bridge_component] * (-2.0f * 3.14159265358979323846f / 65536.0f);
+	const float angle =
+		(float)XwaFlightObject_MeshAngle(f, bridge_component) * (-2.0f * 3.14159265358979323846f / 65536.0f);
 	ship_mat3x4_rotation_about_pivot(out, axis, pivot, angle);
 	return 1;
 }
@@ -915,12 +916,13 @@ int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 	const uint32_t components = ship_state_components(mesh);
 	if (f->bridge_aligned) {
 		const int bridge_component = ship_bwing_bridge_component(mesh, components);
-		if (bridge_component >= 0 && f->mesh_angle[bridge_component] != 0) {
+		if (bridge_component >= 0 && XwaFlightObject_MeshAngle(f, bridge_component) != 0) {
 			return 1;
 		}
 	}
 	for (uint32_t mi = 0; mi < components; mi++) {
-		if (f->component_state[mi] != 0 || (mesh->component_rot[mi].has_rotation && f->mesh_angle[mi] != 0)) {
+		if (XwaFlightObject_ComponentState(f, mi) != 0 ||
+			(mesh->component_rot[mi].has_rotation && XwaFlightObject_MeshAngle(f, mi) != 0)) {
 			return 1;
 		}
 	}
@@ -940,13 +942,13 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 	for (uint32_t mi = 0; mi < components; mi++) {
 		/* Classic blown-off gate: the node walk SKIPS a mesh when
 		 * componentState[ordinal-1] != 0 (render_scene_core). */
-		if (f->component_state[mi] != 0) {
+		if (XwaFlightObject_ComponentState(f, mi) != 0) {
 			out->visibility_packed[mi >> 2][mi & 3] = 0.0f;
 			any = 1;
 			continue;
 		}
 		const AeronMeshRot* r = &mesh->component_rot[mi];
-		if (!r->has_rotation || f->mesh_angle[mi] == 0) {
+		if (!r->has_rotation || XwaFlightObject_MeshAngle(f, mi) == 0) {
 			continue;
 		}
 		/* Classic: mesh.rotAngle = meshRotation[ordinal-1] * 2pi/256
@@ -959,7 +961,8 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 		 * explicit -meshRotation corroborates. Our table is consumed
 		 * straight (v' = R v), so negate here. mesh_angle carries
 		 * meshRotation in 1/256 units. */
-		const float angle = (float)f->mesh_angle[mi] * (-2.0f * 3.14159265358979323846f / 65536.0f);
+		const float angle =
+			(float)XwaFlightObject_MeshAngle(f, mi) * (-2.0f * 3.14159265358979323846f / 65536.0f);
 		float local_rotation[3][4];
 		ship_mat3x4_rotation_about_pivot(local_rotation, r->axis, r->pivot, angle);
 		if (has_bwing_compensation) {
@@ -972,13 +975,15 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 	return any;
 }
 
-int XwaRemasterShip_BuildHiddenMeshTable(const AeronSceneMesh* mesh,
-										 const uint8_t component_state[XWA_SNAP_MAX_MESH_SLOTS],
-										 AeronSceneMeshTable* out) {
+int XwaRemasterShip_BuildHiddenMeshTable(const AeronSceneMesh* mesh, const uint8_t* component_state,
+										 uint32_t count, AeronSceneMeshTable* out) {
 	if (!mesh || !component_state || !out) {
 		return 0;
 	}
-	const uint32_t components = ship_state_components(mesh);
+	uint32_t components = ship_state_components(mesh);
+	if (components > count) {
+		components = count;
+	}
 	int any = 0;
 	ship_mesh_table_init(mesh, NULL, out);
 	for (uint32_t mi = 0; mi < components; mi++) {
@@ -1004,14 +1009,15 @@ int XwaRemasterShip_BuildPreviousMeshTable(const AeronSceneMesh* mesh, const Xwa
 		const int bridge_component = ship_bwing_bridge_component(mesh, components);
 		/* Bridge rotation drives every root, independently of whether the
 		 * Bridge mesh itself has a usable local rotation node. */
-		if (bridge_component >= 0 &&
-			current->mesh_angle[bridge_component] != previous->mesh_angle[bridge_component]) {
+		if (bridge_component >= 0 && XwaFlightObject_MeshAngle(current, bridge_component) !=
+										 XwaFlightObject_MeshAngle(previous, bridge_component)) {
 			XwaRemasterShip_BuildMeshTable(mesh, previous, out);
 			return 1;
 		}
 	}
 	for (uint32_t mi = 0; mi < components; ++mi) {
-		if (mesh->component_rot[mi].has_rotation && current->mesh_angle[mi] != previous->mesh_angle[mi]) {
+		if (mesh->component_rot[mi].has_rotation &&
+			XwaFlightObject_MeshAngle(current, mi) != XwaFlightObject_MeshAngle(previous, mi)) {
 			/* BuildMeshTable always initializes out. Its zero return is expected
 			 * when the previous pose is identity and the current pose is not. */
 			XwaRemasterShip_BuildMeshTable(mesh, previous, out);
@@ -1093,7 +1099,7 @@ int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaC
 	 * gun meshes, and half of it into launcher meshes. */
 	const AeronMeshRot* beam_rot = NULL;
 	for (uint32_t mi = 0; mi < components; mi++) {
-		if (anchor->component_state[mi] != 0) {
+		if (XwaFlightObject_ComponentState(anchor, mi) != 0) {
 			out->visibility_packed[mi >> 2][mi & 3] = 0.0f;
 			any = 1;
 			continue;
@@ -1149,6 +1155,13 @@ int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaC
 	return any;
 }
 
+/* Whether two snapshots' entries of the same craft show different
+ * componentState values. */
+static int ship_component_states_differ(const XwaFlightObject* a, const XwaFlightObject* b) {
+	return a->mesh_count != b->mesh_count ||
+		   (a->mesh_count != 0 && memcmp(a->component_state, b->component_state, a->mesh_count) != 0);
+}
+
 int XwaRemasterShip_BuildPreviousCockpitMeshTable(
 	const AeronSceneMesh* mesh, const XwaCockpit* current_cockpit, const XwaFlightObject* current_anchor,
 	const XwaCockpit* previous_cockpit, const XwaFlightObject* previous_anchor, AeronSceneMeshTable* out) {
@@ -1160,8 +1173,7 @@ int XwaRemasterShip_BuildPreviousCockpitMeshTable(
 	}
 
 	if (current_cockpit->seat == 0) {
-		if (memcmp(current_anchor->component_state, previous_anchor->component_state,
-				   sizeof current_anchor->component_state) != 0) {
+		if (ship_component_states_differ(current_anchor, previous_anchor)) {
 			XwaRemasterShip_BuildMeshTable(mesh, previous_anchor, out);
 			return 1;
 		}
@@ -1170,13 +1182,12 @@ int XwaRemasterShip_BuildPreviousCockpitMeshTable(
 
 	int changed = current_cockpit->aim_angle_a != previous_cockpit->aim_angle_a ||
 				  current_cockpit->aim_angle_b != previous_cockpit->aim_angle_b ||
-				  memcmp(current_anchor->component_state, previous_anchor->component_state,
-						 sizeof current_anchor->component_state) != 0;
+				  ship_component_states_differ(current_anchor, previous_anchor);
 	if (!changed && current_anchor->bridge_aligned) {
 		const uint32_t components = ship_state_components(mesh);
 		const int bridge_component = ship_bwing_bridge_component(mesh, components);
-		changed = bridge_component >= 0 && current_anchor->mesh_angle[bridge_component] !=
-											   previous_anchor->mesh_angle[bridge_component];
+		changed = bridge_component >= 0 && XwaFlightObject_MeshAngle(current_anchor, bridge_component) !=
+											   XwaFlightObject_MeshAngle(previous_anchor, bridge_component);
 	}
 	if (!changed) {
 		return 0;
@@ -1517,7 +1528,8 @@ uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh
 		}
 		/* Nor without its component (destroyed, or hidden by an object
 		 * profile). */
-		if (g->component_index < XWA_SNAP_MAX_MESH_SLOTS && f->component_state[g->component_index] != 0) {
+		if (g->component_index < XWA_SNAP_MAX_MESH_SLOTS &&
+			XwaFlightObject_ComponentState(f, g->component_index) != 0) {
 			continue;
 		}
 		const float intensity = dim_z * engine_scale * 300.0f;

@@ -9,8 +9,11 @@
  * XwaSnapshot_Commit() makes it the current one, and the current one
  * becomes the previous one. XwaSnapshot_Current()/Previous() expose
  * stable read-only views for the remaster driver's interpolation.
- * Float-only 3D, stable ids, fixed caps with logged truncation. A
- * snapshot only points into its own storage, never into the engine's.
+ * Float-only 3D, stable ids. A snapshot only points into its own
+ * storage, never into the engine's. The flight objects' arrays grow to
+ * the size of the captured slots, so no object is dropped; the other
+ * records (2D draws, glyphs, HUD, particles) have fixed caps with logged
+ * truncation.
  *
  * Determinism rule: emitters are read-only observers on the sim; no
  * sim or net code may branch on snapshot state (lockstep-safe).
@@ -354,36 +357,41 @@ typedef struct XwaDirLight {
 #define XWA_SNAP_TYPE_BACKDROP_SUN_FIRST 521
 #define XWA_SNAP_TYPE_BACKDROP_SUN_LAST 530
 
+/* One object of the captured slots. The fields that the remaster's walks
+ * test come first, then the pose, so that an object a walk skips costs one
+ * cache line. */
 typedef struct XwaFlightObject {
-	uint16_t signature;    /* ObjectRecord.objectSignature (stable id) */
-	uint16_t slot;         /* object-table index */
-	uint16_t object_type;  /* ObjectTypeId (model index) */
 	uint8_t genus;         /* ModelGenusId */
-	uint8_t fg_idx;        /* flight-group index */
-	uint8_t region;        /* raw ObjectRecord.regionIdx; not a render-visibility gate */
+	uint8_t slot_class;    /* XWA_SNAP_SLOT_* — the render walk's intrinsic
+							* slot-range dispatch (flight_view.c): MAIN slots
+							* take the genus switch; TRANSIENT slots
+							* queue as billboards for any genus (angleD
+							* forced 0, GENUS_Debris hidden in external
+							* view); STATIC-genus slots take the
+							* RenderNonCraftSceneObject path. */
 	uint8_t render_region; /* slot-derived region used by renderer visibility */
-	int8_t iff;            /* from MobileObject (0 when no mobj) */
-	uint8_t team;
-	uint8_t state; /* MobileObject.state */
-	uint8_t motion_flags;
+	uint8_t has_craft;     /* the craft fields below are valid */
+	uint16_t object_type;  /* ObjectTypeId (model index) */
+	uint16_t slot;         /* object-table index */
+	uint16_t signature;    /* ObjectRecord.objectSignature (stable id) */
+	uint8_t has_mobj;      /* mobj-derived fields valid */
+	uint8_t orient_dirty;  /* MobileObject.orientMatrixDirty */
+	/* Exact engine coordinates. Renderers subtract their frame/view origin
+	 * before converting to float. */
+	int32_t world_pos[3];
+	uint16_t yaw, pitch, roll, angle_d; /* Q16 angles */
+	int16_t rows[9];                    /* cached side, fwd, up (Q15), row-major */
+	/* Debris/breakup spin (FVIEW_calcrotateorient applies it after the
+	 * Euler compose; the cached rows above already include it). */
+	int16_t spin_angle; /* Q16; 0 = none */
+	float spin_axis[3];
 	/* MobileObject.nodeSwitchIndex — the OPT variant selector (mission
 	 * sets it from the flight group's `markings`); maps to the HD mesh's
 	 * KHR material variant. */
 	uint8_t node_switch;
-	uint8_t has_mobj;     /* mobj-derived fields valid */
-	uint8_t orient_dirty; /* MobileObject.orientMatrixDirty */
-	int16_t source_obj;   /* MobileObject.sourceObjIdx */
-	uint16_t speed;       /* MobileObject.speed (raw) */
 	/* ---- billboard-law state (SceneBillboard_QueueObjectTextured
 	 * inputs; the HD driver derives explosion/debris/spark sprites from
 	 * these). */
-	uint8_t slot_class;          /* XWA_SNAP_SLOT_* — the render walk's intrinsic
-								  * slot-range dispatch (flight_view.c): MAIN slots
-								  * take the genus switch; TRANSIENT slots
-								  * queue as billboards for any genus (angleD
-								  * forced 0, GENUS_Debris hidden in external
-								  * view); STATIC-genus slots take the
-								  * RenderNonCraftSceneObject path. */
 	uint8_t type_specific_0;     /* ObjectRecord.typeSpecificByte[0]: sprite
 								  * animation frame (billboard types; 0 = not
 								  * drawn); 2*componentIdx for debris chunks. */
@@ -391,6 +399,8 @@ typedef struct XwaFlightObject {
 								  * view-depth pull-in (draw-order bias). */
 	uint16_t source_object_type; /* MobileObject.sourceObjectType (SSD blast
 								  * rule; debris-chunk model resolution). */
+	int16_t source_obj;          /* MobileObject.sourceObjIdx */
+	uint16_t speed;              /* MobileObject.speed (raw) */
 	int32_t instance_extent;     /* MobileObject.instanceExtent (spawn size;
 								  * preserve the full engine value — billboard
 								  * size narrows only after its classic scaling) */
@@ -398,37 +408,27 @@ typedef struct XwaFlightObject {
 	 * component's focus point in native OPT units, set at detach from the
 	 * mesh descriptor). */
 	float render_offset[3];
-	/* Exact engine coordinates. Renderers subtract their frame/view origin
-	 * before converting to float. */
-	int32_t world_pos[3];
-	int32_t prev_world_pos[3];          /* MobileObject.prevWorld* (== world_pos when !has_mobj) */
-	uint16_t yaw, pitch, roll, angle_d; /* Q16 angles */
-	int16_t rows[9];                    /* cached side, fwd, up (Q15), row-major */
-	/* Debris/breakup spin (FVIEW_calcrotateorient applies it after the
-	 * Euler compose; the cached rows above already include it). */
-	int16_t spin_angle; /* Q16; 0 = none */
-	float spin_axis[3];
-	int32_t player_owner;
-	/* ---- v2: craft component pools (CraftData; valid when has_craft).
-	 * componentState drives damage-texture selection per mesh,
-	 * mesh_angle the articulated meshes (turrets, rotaries),
-	 * component_hp the blown-off threshold; sfoil_state the s-foil
-	 * open/close animation. */
-	uint8_t has_craft;
-	uint8_t sfoil_state;
+	/* Only read by the debug dump. */
+	uint8_t fg_idx; /* flight-group index */
+	uint8_t region; /* raw ObjectRecord.regionIdx; not a render-visibility gate */
+	int8_t iff;     /* from MobileObject (0 when no mobj) */
+	/* ---- craft (CraftData; valid when has_craft). */
 	/* The whole model turns with its Bridge component's rotation: the
 	 * B-wing, and articulated models (XwaArticulation_AlignsBridge). */
 	uint8_t bridge_aligned;
 	uint16_t carried_object_slot;      /* CraftData.carriedObjectIndex */
 	uint16_t carried_object_signature; /* stable identity, 0 when absent */
-	uint16_t system_flags;             /* CraftData.systemFlags */
-	uint16_t subsystem_damage;         /* CraftData.subsystemDamage */
-	uint8_t component_state[XWA_SNAP_MAX_MESH_SLOTS];
-	/* CraftData.meshRotation in 1/256 units (a full turn is 65536), with the
-	 * articulated meshes drawn between their steps
-	 * (XwaArticulation_DrawnAngles). */
-	uint16_t mesh_angle[XWA_SNAP_MAX_MESH_SLOTS];
-	uint8_t component_hp[XWA_SNAP_MAX_MESH_SLOTS];
+	/* The model's meshes, in the snapshot's mesh areas: componentState,
+	 * which drives the damage-texture selection and hides blown-off meshes,
+	 * and the mesh angles (CraftData.meshRotation in 1/256 units, a full turn
+	 * is 65536, with the articulated meshes drawn between their steps:
+	 * XwaArticulation_DrawnAngles). mesh_count is the model's mesh count;
+	 * read them with XwaFlightObject_ComponentState and
+	 * XwaFlightObject_MeshAngle, which return 0 past it. */
+	const uint8_t* component_state;
+	const uint16_t* mesh_angle;
+	uint32_t mesh_offset; /* the capture's offset into the mesh areas */
+	uint16_t mesh_count;
 	/* Animated-texture frame / wreck-flame byte (XWA_CRAFT_ANIM_FRAME; the
 	 * original's componentState[49]). */
 	uint8_t anim_frame;
@@ -465,8 +465,27 @@ typedef struct XwaFlightObject {
 	uint8_t beam_jamming;
 } XwaFlightObject;
 
-#define XWA_SNAP_MAX_FLIGHT_OBJECTS 1664
-#define XWA_SNAP_MAX_FLIGHT_MAP_OBJECTS XWA_SNAP_MAX_FLIGHT_OBJECTS
+static inline uint8_t XwaFlightObject_ComponentState(const XwaFlightObject* object, uint32_t mesh) {
+	return mesh < object->mesh_count ? object->component_state[mesh] : 0;
+}
+
+static inline uint16_t XwaFlightObject_MeshAngle(const XwaFlightObject* object, uint32_t mesh) {
+	return mesh < object->mesh_count ? object->mesh_angle[mesh] : 0;
+}
+
+/* The lists of entry indices by kind (XwaSnapshot.flight_lists), each in
+ * slot order. Every captured object is in exactly one. */
+typedef enum XwaFlightObjectList {
+	XWA_SNAP_LIST_TRANSIENT,  /* the local transient slots */
+	XWA_SNAP_LIST_EXPLOSION,  /* main slots, explosion genus */
+	XWA_SNAP_LIST_DEBRIS,     /* main slots, debris and salvage genus */
+	XWA_SNAP_LIST_PROJECTILE, /* main slots, projectile genus */
+	XWA_SNAP_LIST_CRAFT,      /* the rest: craft, and static and other objects */
+	XWA_SNAP_LIST_COUNT
+} XwaFlightObjectList;
+
+/* The map's own list of objects; objects past it are dropped and counted. */
+#define XWA_SNAP_MAX_FLIGHT_MAP_OBJECTS 1664
 #define XWA_SNAP_FLIGHT_MAP_LABEL_BYTES 65535
 
 typedef enum XwaFlightMapRenderKind {
@@ -1253,15 +1272,27 @@ typedef struct XwaSnapshot {
 	XwaSkinUse skin_uses[XWA_SNAP_MAX_SKIN_USES];
 	uint32_t skin_use_count;
 
-	XwaFlightObject flight_objects[XWA_SNAP_MAX_FLIGHT_OBJECTS];
+	/* The objects of the captured slots, in slot order. The array holds
+	 * every captured slot, so nothing is dropped; it grows when a mission has
+	 * more slots. The buffer owns its arrays. */
+	XwaFlightObject* flight_objects;
 	uint32_t flight_object_count;
+	uint32_t flight_object_capacity;
 	/* For each slot of the object table, the index of its entry in
 	 * flight_objects, or -1. flight_slot_count is the table's slot count
-	 * when the flight was captured, 0 otherwise. The buffer owns the array
+	 * when the flight was captured, 0 otherwise
 	 * (XwaSnapshot_FlightObjectAtSlot). */
 	int32_t* flight_slot_index;
 	uint32_t flight_slot_count;
 	uint32_t flight_slot_capacity;
+	/* The craft's meshes (XwaFlightObject.component_state, mesh_angle). */
+	uint8_t* flight_component_states;
+	uint16_t* flight_mesh_angles;
+	uint32_t flight_mesh_count;
+	uint32_t flight_mesh_capacity;
+	/* Entry indices by kind (XwaFlightObjectList). */
+	uint32_t* flight_lists[XWA_SNAP_LIST_COUNT];
+	uint32_t flight_list_count[XWA_SNAP_LIST_COUNT];
 	XwaFlightMapState flight_map;
 	XwaFlightCamera flight_camera;
 	uint8_t flight_camera_valid;
