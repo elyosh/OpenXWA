@@ -869,6 +869,19 @@ static void xwa_tool_hdr(int* open, void* user) {
 						   "%.2f")) {
 			AeronScenePresent_SetAgxPunchySaturation(punchy_saturation);
 		}
+		float highlight_saturation = AeronScenePresent_AgxHighlightSaturation();
+		if (ImGui::SliderFloat("Highlight saturation", &highlight_saturation, 0.0f, 3.0f, "%.2f")) {
+			AeronScenePresent_SetAgxHighlightSaturation(highlight_saturation);
+		}
+		float highlight_range[2];
+		AeronScenePresent_AgxHighlightRange(&highlight_range[0], &highlight_range[1]);
+		if (ImGui::SliderFloat2("Highlight EV (start, end)", highlight_range, -2.0f, 12.0f, "%.1f")) {
+			AeronScenePresent_SetAgxHighlightRange(highlight_range[0], highlight_range[1]);
+		}
+		float highlight_hue = AeronScenePresent_AgxHighlightHue();
+		if (ImGui::SliderFloat("Highlight hue kept", &highlight_hue, 0.0f, 1.0f, "%.2f")) {
+			AeronScenePresent_SetAgxHighlightHue(highlight_hue);
+		}
 	}
 
 	ImGui::TextUnformatted("ACES pre-exposure");
