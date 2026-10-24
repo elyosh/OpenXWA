@@ -270,7 +270,9 @@ XwaFrontendLayout XwaFrontendScreens_Layout(void) {
 	int layout;
 
 	screens_load();
-	if (XwaSnapshot_SceneKind() == XWA_SCENE_LOADING) {
+	/* The flight task draws the loading screen before the tick sets the scene
+	   kind, so the attached surfaces also mean it is shown. */
+	if (XwaSnapshot_SceneKind() == XWA_SCENE_LOADING || FlightLoading_AreFrontendSurfacesAttached()) {
 		shown = SCREEN_LOADING;
 		layout = screens_listed_layout(SCREEN_LOADING);
 		if (layout < 0) {
