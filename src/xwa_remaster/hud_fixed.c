@@ -628,25 +628,13 @@ static void fixed_build_radar(const XwaHudState* h, const XwaRemasterHudVisibili
 }
 
 static const XwaFlightObject* fixed_player_object(const XwaSnapshot* snapshot, const XwaHudState* h) {
-	if (!snapshot)
-		return NULL;
-	for (uint32_t i = 0; i < snapshot->flight_object_count; i++) {
-		const XwaFlightObject* object = &snapshot->flight_objects[i];
-		if (object->slot == h->player_slot && object->signature == h->player_signature)
-			return object;
-	}
-	return NULL;
+	return XwaSnapshot_FindFlightObject(snapshot, h->player_slot, h->player_signature);
 }
 
 static const XwaFlightObject* fixed_target_object(const XwaSnapshot* snapshot, const XwaHudState* h) {
-	if (!snapshot || !h->target.valid)
+	if (!h->target.valid)
 		return NULL;
-	for (uint32_t i = 0; i < snapshot->flight_object_count; i++) {
-		const XwaFlightObject* object = &snapshot->flight_objects[i];
-		if (object->slot == h->target.slot && object->signature == h->target.signature)
-			return object;
-	}
-	return NULL;
+	return XwaSnapshot_FindFlightObject(snapshot, h->target.slot, h->target.signature);
 }
 
 static int16_t fixed_arrow_angle(float dx, float dy) {

@@ -13,12 +13,7 @@ static AeronDrawList2D* box_lists[2];
 static XwaHudPreparedBoxState box_prepared;
 
 static const XwaFlightObject* box_find_object(const XwaSnapshot* snapshot, const XwaHudTargetBox* box) {
-	for (uint32_t i = 0; i < snapshot->flight_object_count; i++) {
-		const XwaFlightObject* object = &snapshot->flight_objects[i];
-		if (object->slot == box->slot && object->signature == box->signature)
-			return object;
-	}
-	return NULL;
+	return XwaSnapshot_FindFlightObject(snapshot, box->slot, box->signature);
 }
 
 static void box_output_transform(const XwaHudLayoutProfile* profile, int target_w, int target_h, int* out_x,

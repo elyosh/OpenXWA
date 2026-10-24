@@ -106,12 +106,7 @@ void XwaRemasterTrails_Destroy(XwaRemasterTrails* trails) {
 
 static const XwaFlightObject* effect_find_owner(const XwaSnapshot* snapshot, uint16_t slot,
 												uint16_t signature) {
-	for (uint32_t i = 0; i < snapshot->flight_object_count; i++) {
-		const XwaFlightObject* object = &snapshot->flight_objects[i];
-		if (object->slot == slot && object->signature == signature)
-			return object;
-	}
-	return NULL;
+	return XwaSnapshot_FindFlightObject(snapshot, slot, signature);
 }
 
 static void effect_world_to_eye(const XwaRemasterEffectView* view, const int32_t world[3], float eye[3]) {

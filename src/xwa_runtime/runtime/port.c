@@ -454,6 +454,7 @@ void XwaPort_Shutdown(void) {
 	XwaMovieTask_Shutdown();
 	Pilot_Save(0);
 	XwaFrontendTask_Shutdown();
+	XwaSnapshot_Shutdown();
 	XwaFrontendGeometry_Shutdown();
 	XwaFrontendScreens_Shutdown();
 	XwaConcourseLayout_Shutdown();

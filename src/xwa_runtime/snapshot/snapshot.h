@@ -5,16 +5,18 @@
  * XwaSnapshot — per-tick POD game-state snapshot for the remaster
  * driver.
  *
- * Double-buffered slots: emitters fill the write slot during
- * XwaPort_Tick; XwaSnapshot_Commit() flips it, after which
- * XwaSnapshot_Current()/Previous() expose stable read-only views for
- * the remaster driver's interpolation. Float-only 3D, no engine
- * pointers, stable ids, fixed caps with logged truncation.
+ * Three buffers: emitters fill the write buffer during XwaPort_Tick;
+ * XwaSnapshot_Commit() makes it the current one, and the current one
+ * becomes the previous one. XwaSnapshot_Current()/Previous() expose
+ * stable read-only views for the remaster driver's interpolation.
+ * Float-only 3D, stable ids, fixed caps with logged truncation. A
+ * snapshot only points into its own storage, never into the engine's.
  *
  * Determinism rule: emitters are read-only observers on the sim; no
  * sim or net code may branch on snapshot state (lockstep-safe).
  */
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -1253,6 +1255,13 @@ typedef struct XwaSnapshot {
 
 	XwaFlightObject flight_objects[XWA_SNAP_MAX_FLIGHT_OBJECTS];
 	uint32_t flight_object_count;
+	/* For each slot of the object table, the index of its entry in
+	 * flight_objects, or -1. flight_slot_count is the table's slot count
+	 * when the flight was captured, 0 otherwise. The buffer owns the array
+	 * (XwaSnapshot_FlightObjectAtSlot). */
+	int32_t* flight_slot_index;
+	uint32_t flight_slot_count;
+	uint32_t flight_slot_capacity;
 	XwaFlightMapState flight_map;
 	XwaFlightCamera flight_camera;
 	uint8_t flight_camera_valid;
@@ -1305,6 +1314,26 @@ void XwaSnapshot_Commit(void);
 
 const XwaSnapshot* XwaSnapshot_Current(void);
 const XwaSnapshot* XwaSnapshot_Previous(void);
+
+/* Frees the buffers' arrays, when the game shuts down. */
+void XwaSnapshot_Shutdown(void);
+
+/* The entry of object table slot `slot`, or NULL when the slot is empty or
+ * wasn't captured. */
+static inline const XwaFlightObject* XwaSnapshot_FlightObjectAtSlot(const XwaSnapshot* snapshot,
+																	uint32_t slot) {
+	if (snapshot == NULL || slot >= snapshot->flight_slot_count || snapshot->flight_slot_index[slot] < 0) {
+		return NULL;
+	}
+	return &snapshot->flight_objects[snapshot->flight_slot_index[slot]];
+}
+
+/* The entry of slot `slot` when it holds the object `signature`, or NULL. */
+static inline const XwaFlightObject* XwaSnapshot_FindFlightObject(const XwaSnapshot* snapshot, uint32_t slot,
+																  uint32_t signature) {
+	const XwaFlightObject* object = XwaSnapshot_FlightObjectAtSlot(snapshot, slot);
+	return object != NULL && object->signature == signature ? object : NULL;
+}
 
 /* ---- emitters (engine hooks; read-only observers) ------------------ */
 

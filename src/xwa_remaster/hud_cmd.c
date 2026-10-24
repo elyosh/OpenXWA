@@ -66,12 +66,7 @@ static const XwaHudLayoutProfile* cmd_profile(XwaHudProfileIndex index) {
 
 static const XwaFlightObject* cmd_find_object(const XwaSnapshot* snapshot, uint16_t slot,
 											  uint16_t signature) {
-	for (uint32_t i = 0; i < snapshot->flight_object_count; i++) {
-		const XwaFlightObject* object = &snapshot->flight_objects[i];
-		if (object->slot == slot && object->signature == signature)
-			return object;
-	}
-	return NULL;
+	return XwaSnapshot_FindFlightObject(snapshot, slot, signature);
 }
 
 /* The CMD camera rows as captured. Hud_PointCamera's shortcut for a target

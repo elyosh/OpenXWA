@@ -139,6 +139,16 @@ typedef struct FlEnergyState {
 	float start;
 } FlEnergyState;
 
+/* Elements in blocks that never move, so pointers to them stay valid while
+ * the pool grows. A frame empties the pool and keeps its blocks. */
+typedef struct FlBlockPool {
+	uint8_t** blocks;
+	uint32_t block_count;
+	uint32_t used;
+} FlBlockPool;
+
+enum { FL_TABLES_PER_BLOCK = 64, FL_ANIMS_PER_BLOCK = 256 };
+
 /* Material states (bit per AERON_ANIM_STATE_*) and when each last fired,
  * in animation seconds. */
 typedef struct FlStateOnsets {
@@ -240,7 +250,8 @@ static struct {
 	int mb_enabled;
 	float mb_prev_vp[16];
 	const XwaSnapshot* mb_prev_snap;
-	int32_t mb_prev_index[XWA_SNAP_MAX_FLIGHT_OBJECTS];
+	int32_t* mb_prev_index;
+	uint32_t mb_prev_index_capacity;
 	/* Host-time span represented by the retained velocity buffer. */
 	uint64_t mb_pose_host_us;
 	uint64_t mb_velocity_span_us;
@@ -312,26 +323,23 @@ static struct {
 	uint32_t pl_culled[2]; /* [model] */
 	uint32_t pl_dropped[2];
 
-	/* Projectile instances, collected during the walk and submitted
-	 * AFTER every ship (instances draw in submission order): their
-	 * alpha-BLEND ranges neither write depth nor enter the prepass, so
-	 * they only composite correctly against the complete opaque depth.
-	 * The cockpit submits after them (canopy glass still tints them).
-	 * Roll-aligned per the classic law at transform derive. */
-	AeronSceneMeshInstance bolts[XWA_SNAP_MAX_FLIGHT_OBJECTS];
+	/* Projectile instances, collected during the walk and submitted after
+	 * every ship. Roll-aligned per the classic law at transform derive.
+	 * Aeron copies an instance when it is added, so the array can grow. */
+	AeronSceneMeshInstance* bolts;
 	uint32_t bolt_count;
+	uint32_t bolt_capacity;
 
-	/* Mesh-table pool — AeronScene_AddMeshInstance borrows the table
-	 * pointer for the frame, so tables must outlive the submit walk. Each
-	 * object can require current and previous articulation, plus two cockpit
-	 * tables. */
-	AeronSceneMeshTable tables[XWA_SNAP_MAX_FLIGHT_OBJECTS * 2 + 2];
-	uint32_t table_count;
-	/* Material animation states, borrowed by instances like the tables. */
-	AeronSceneMaterialAnim anims[XWA_SNAP_MAX_FLIGHT_OBJECTS + 2];
-	uint32_t anim_count;
-	/* Energy effect per object slot. */
-	FlEnergyState energy_states[XWA_SNAP_MAX_FLIGHT_OBJECTS];
+	/* AeronScene_AddMeshInstance borrows the mesh table and animation
+	 * pointers until AeronScene_Render returns, so they come from pools
+	 * whose blocks never move (FlBlockPool). */
+	FlBlockPool table_pool;
+	FlBlockPool anim_pool;
+	/* Energy effect per object slot, for the slots of the snapshot's object
+	 * table, and the mission they belong to. */
+	FlEnergyState* energy_states;
+	uint32_t energy_state_count;
+	char energy_mission[sizeof(((XwaSnapshot*)0)->mission_path)];
 	XwaFlightMaterialAnimOverride anim_override;
 	/* Player states and the debug override's, with the animation time they
 	 * were last updated at; the target event and the threat indicators as
@@ -345,6 +353,83 @@ static struct {
 	int map_present;
 	int suppress_hud;
 } s;
+
+/* The next element of `pool`, without taking it (pool->used++ takes it), or
+ * NULL when out of memory. */
+static void* fl_pool_peek(FlBlockPool* pool, size_t element_size, uint32_t per_block) {
+	const uint32_t block = pool->used / per_block;
+	if (block == pool->block_count) {
+		uint8_t** blocks = realloc(pool->blocks, (size_t)(block + 1) * sizeof *blocks);
+		if (!blocks) {
+			return NULL;
+		}
+		pool->blocks = blocks;
+		blocks[block] = malloc(element_size * per_block);
+		if (!blocks[block]) {
+			return NULL;
+		}
+		pool->block_count++;
+	}
+	return pool->blocks[block] + (size_t)(pool->used % per_block) * element_size;
+}
+
+static void fl_pool_free(FlBlockPool* pool) {
+	for (uint32_t i = 0; i < pool->block_count; i++) {
+		free(pool->blocks[i]);
+	}
+	free(pool->blocks);
+	memset(pool, 0, sizeof *pool);
+}
+
+static AeronSceneMeshTable* fl_table_peek(void) {
+	return fl_pool_peek(&s.table_pool, sizeof(AeronSceneMeshTable), FL_TABLES_PER_BLOCK);
+}
+
+static void fl_push_bolt(const AeronSceneMeshInstance* inst) {
+	if (s.bolt_count == s.bolt_capacity) {
+		const uint32_t capacity = s.bolt_capacity ? s.bolt_capacity * 2 : 256;
+		AeronSceneMeshInstance* bolts = realloc(s.bolts, (size_t)capacity * sizeof *bolts);
+		if (!bolts) {
+			return;
+		}
+		s.bolts = bolts;
+		s.bolt_capacity = capacity;
+	}
+	s.bolts[s.bolt_count++] = *inst;
+}
+
+static int fl_reserve_prev_index(uint32_t count) {
+	if (count > s.mb_prev_index_capacity) {
+		int32_t* index = realloc(s.mb_prev_index, (size_t)count * sizeof *index);
+		if (!index) {
+			return 0;
+		}
+		s.mb_prev_index = index;
+		s.mb_prev_index_capacity = count;
+	}
+	return 1;
+}
+
+/* Gives the energy states one entry per slot of the snapshot's object table,
+ * and clears them when the mission changes. */
+static void fl_prepare_energy_states(const XwaSnapshot* snap) {
+	if (strcmp(s.energy_mission, snap->mission_path) != 0) {
+		snprintf(s.energy_mission, sizeof s.energy_mission, "%s", snap->mission_path);
+		if (s.energy_states) {
+			memset(s.energy_states, 0, (size_t)s.energy_state_count * sizeof *s.energy_states);
+		}
+	}
+	if (snap->flight_slot_count > s.energy_state_count) {
+		FlEnergyState* states = realloc(s.energy_states, (size_t)snap->flight_slot_count * sizeof *states);
+		if (!states) {
+			return;
+		}
+		memset(states + s.energy_state_count, 0,
+			   (size_t)(snap->flight_slot_count - s.energy_state_count) * sizeof *states);
+		s.energy_states = states;
+		s.energy_state_count = snap->flight_slot_count;
+	}
+}
 
 /* XWA world -> cube basis of the procedural starfield (see the starfield
  * comment in XwaRemasterFlight_Render). */
@@ -1938,15 +2023,7 @@ static const XwaFlightObject* fl_instance_motion(AeronSceneMeshInstance* inst, c
 static void fl_world_to_view(const float cam[9], float x, float y, float z, float out[3]);
 
 static const XwaFlightObject* fl_object_by_slot(const XwaSnapshot* snap, int32_t slot) {
-	if (!snap || slot < 0) {
-		return NULL;
-	}
-	for (uint32_t i = 0; i < snap->flight_object_count; ++i) {
-		if ((int32_t)snap->flight_objects[i].slot == slot) {
-			return &snap->flight_objects[i];
-		}
-	}
-	return NULL;
+	return slot >= 0 ? XwaSnapshot_FlightObjectAtSlot(snap, (uint32_t)slot) : NULL;
 }
 
 static const XwaFlightObject* fl_cockpit_anchor(const XwaSnapshot* snap, const XwaFlightCamera* cam) {
@@ -3513,7 +3590,7 @@ static uint32_t fl_energy(const XwaFlightObject* object) {
  * clock went back. */
 static float fl_energy_start(const XwaFlightObject* object, uint32_t energy) {
 	const float now = s.snap ? (float)((double)s.snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS) : 0.0f;
-	if (object->slot >= XWA_SNAP_MAX_FLIGHT_OBJECTS) {
+	if (object->slot >= s.energy_state_count) {
 		return now;
 	}
 	FlEnergyState* state = &s.energy_states[object->slot];
@@ -3697,10 +3774,11 @@ static void fl_set_animation_time(const XwaSnapshot* snap) {
 /* An object's material animation state for this frame, from the pool. The
  * player's craft carries the player states. */
 static const AeronSceneMaterialAnim* fl_object_anim(const XwaFlightObject* object) {
-	if (s.anim_count >= sizeof s.anims / sizeof s.anims[0]) {
+	AeronSceneMaterialAnim* anim = fl_pool_peek(&s.anim_pool, sizeof *anim, FL_ANIMS_PER_BLOCK);
+	if (!anim) {
 		return NULL;
 	}
-	AeronSceneMaterialAnim* anim = &s.anims[s.anim_count++];
+	s.anim_pool.used++;
 	memset(anim, 0, sizeof *anim);
 	anim->seed = (uint32_t)object->slot << 16 | object->signature;
 	anim->damage_stage = fl_damage_stage(object);
@@ -3746,15 +3824,12 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 	memset(out, 0, sizeof *out);
 	if (object->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK) {
 		out->mesh = XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(object->source_object_type));
-		if (!out->mesh || s.table_count >= XWA_SNAP_MAX_FLIGHT_OBJECTS * 2 + 2) {
-			return 0;
-		}
-		out->table = &s.tables[s.table_count];
-		if (!XwaRemasterShip_BuildDebrisMeshTable(out->mesh, object, out->table)) {
+		out->table = out->mesh ? fl_table_peek() : NULL;
+		if (!out->table || !XwaRemasterShip_BuildDebrisMeshTable(out->mesh, object, out->table)) {
 			out->table = NULL;
 			return 0;
 		}
-		s.table_count++;
+		s.table_pool.used++;
 		return 1;
 	}
 
@@ -3764,12 +3839,11 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 	if (!out->mesh) {
 		return 0;
 	}
-	if (s.table_count < XWA_SNAP_MAX_FLIGHT_OBJECTS * 2 + 2) {
-		AeronSceneMeshTable* candidate = &s.tables[s.table_count];
-		if (XwaRemasterShip_NeedsMeshTable(out->mesh, object) &&
-			XwaRemasterShip_BuildMeshTable(out->mesh, object, candidate)) {
+	if (XwaRemasterShip_NeedsMeshTable(out->mesh, object)) {
+		AeronSceneMeshTable* candidate = fl_table_peek();
+		if (candidate && XwaRemasterShip_BuildMeshTable(out->mesh, object, candidate)) {
 			out->table = candidate;
-			s.table_count++;
+			s.table_pool.used++;
 		}
 	}
 	out->anim = fl_object_anim(object);
@@ -3991,10 +4065,10 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	inst.zero_velocity = 1;
 	inst.cull_mode = AERON_CULL_BACK;
 	inst.anim = player_f ? fl_object_anim(player_f) : NULL;
-	AeronSceneMeshTable* tb = &s.tables[s.table_count];
-	if (XwaRemasterShip_BuildCockpitMeshTable(cockpit_mesh, &snap->cockpit, player_f, tb)) {
+	AeronSceneMeshTable* tb = fl_table_peek();
+	if (tb && XwaRemasterShip_BuildCockpitMeshTable(cockpit_mesh, &snap->cockpit, player_f, tb)) {
 		inst.mesh_table = tb;
-		s.table_count++;
+		s.table_pool.used++;
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
 	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 1, 0);
@@ -4233,8 +4307,9 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	/* Cockpit glow texture is the only ordinary-flight atlas dependency
 	 * retained by the special scene. */
 	s.glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &s.glow_ref);
-	s.table_count = 0;
-	s.anim_count = 0;
+	s.table_pool.used = 0;
+	s.anim_pool.used = 0;
+	fl_prepare_energy_states(snap);
 	fl_begin_point_lights(flight_view);
 	s.snap = snap;
 
@@ -4644,8 +4719,9 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	s.snap = snap;
 	s.map_present = 1;
 	s.mb_enabled = 0;
-	s.table_count = 0;
-	s.anim_count = 0;
+	s.table_pool.used = 0;
+	s.anim_pool.used = 0;
+	fl_prepare_energy_states(snap);
 	s.bb_count = 0;
 	s.glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &s.glow_ref);
 	fl_set_temporal(host_time_us, 0);
@@ -4878,23 +4954,15 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			mb_regen = !paused || fl_temporal_pose_changed(snap, prev);
 			/* Prev lookup by stable identity: objectSignature is unique
 			 * per spawn (slot reuse bumps it), so signature + slot pins
-			 * the same live object across the pair. Same-index fast path
-			 * first (slots are stable while an object lives). */
-			for (uint32_t i = 0; i < snap->flight_object_count; i++) {
-				const XwaFlightObject* f = &snap->flight_objects[i];
-				s.mb_prev_index[i] = -1;
-				if (i < prev->flight_object_count && prev->flight_objects[i].signature == f->signature &&
-					prev->flight_objects[i].slot == f->slot) {
-					s.mb_prev_index[i] = (int32_t)i;
-					continue;
+			 * the same live object across the pair. */
+			if (fl_reserve_prev_index(snap->flight_object_count)) {
+				for (uint32_t i = 0; i < snap->flight_object_count; i++) {
+					const XwaFlightObject* f = &snap->flight_objects[i];
+					const XwaFlightObject* pf = XwaSnapshot_FindFlightObject(prev, f->slot, f->signature);
+					s.mb_prev_index[i] = pf ? (int32_t)(pf - prev->flight_objects) : -1;
 				}
-				for (uint32_t j = 0; j < prev->flight_object_count; j++) {
-					if (prev->flight_objects[j].signature == f->signature &&
-						prev->flight_objects[j].slot == f->slot) {
-						s.mb_prev_index[i] = (int32_t)j;
-						break;
-					}
-				}
+			} else {
+				s.mb_enabled = 0;
 			}
 		}
 	}
@@ -5174,8 +5242,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const int ao_on = s.ssao.ssao_quality > 0 && s.ssao.ssao_intensity > 0.0f;
 
 	s.bolt_count = 0;
-	s.table_count = 0;
-	s.anim_count = 0;
+	s.table_pool.used = 0;
+	s.anim_pool.used = 0;
+	fl_prepare_energy_states(snap);
 	fl_place_probe_sets(cmd, snap, &flight_view);
 
 	/* Derive every object transform from the STATE channel: cached rows
@@ -5308,10 +5377,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		 * the frame (the scene keeps the pointer until Render). */
 		inst.mesh_table = prepared.table;
 		inst.anim = prepared.anim;
-		AeronSceneMeshTable* prev_tb = &s.tables[s.table_count];
-		if (XwaRemasterShip_BuildPreviousMeshTable(prepared.mesh, f, previous_f, prev_tb)) {
+		AeronSceneMeshTable* prev_tb = fl_table_peek();
+		if (prev_tb && XwaRemasterShip_BuildPreviousMeshTable(prepared.mesh, f, previous_f, prev_tb)) {
 			inst.prev_mesh_table = prev_tb;
-			s.table_count++;
+			s.table_pool.used++;
 		}
 		if (hide_object_model) {
 			const int is_hidden_player = (int32_t)f->slot == cam->player_obj_idx;
@@ -5329,7 +5398,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * STAMP sweep instead. */
 			inst.cull_mode = AERON_CULL_NONE;
 			inst.velocity_stamp = 1;
-			s.bolts[s.bolt_count++] = inst;
+			fl_push_bolt(&inst);
 			/* A bolt model with lights is lit by them, for the colour it
 			 * shows, instead of the stock light (fl_derive_point_lights). */
 			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant, 0, 0);
@@ -5360,13 +5429,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		}
 	}
 
-	/* Projectile instances submit AFTER every ship: instances draw in
-	 * submission order, and the bolts' alpha-BLEND ranges (soft-edged
-	 * classic bolt textures) neither write depth nor enter the prepass,
-	 * so they only composite correctly against the complete opaque
-	 * depth. The cockpit submits after them, keeping the canopy-glass
-	 * tint over bolts seen through it. (Re-authored OPAQUE emissive
-	 * bolts are order-independent; this ordering stays harmless.) */
+	/* Projectile instances submit after every ship. The scene's transparent
+	 * pass sorts the blended ranges from far to near, so the order of
+	 * submission doesn't change how the bolts composite; it only keeps the
+	 * cockpit last. */
 	for (uint32_t bi = 0; bi < s.bolt_count; bi++) {
 		AeronScene_AddMeshInstance(s.scene, &s.bolts[bi]);
 	}
@@ -5442,18 +5508,19 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * behind. */
 			inst.velocity_stamp_screens = 1;
 			inst.anim = player_f ? fl_object_anim(player_f) : NULL;
-			AeronSceneMeshTable* tb = &s.tables[s.table_count];
-			if (XwaRemasterShip_BuildCockpitMeshTable(cockpit_mesh, &snap->cockpit, cockpit_anchor, tb)) {
+			AeronSceneMeshTable* tb = fl_table_peek();
+			if (tb &&
+				XwaRemasterShip_BuildCockpitMeshTable(cockpit_mesh, &snap->cockpit, cockpit_anchor, tb)) {
 				inst.mesh_table = tb;
-				s.table_count++;
+				s.table_pool.used++;
 			}
 			if (cockpit_history_valid) {
-				AeronSceneMeshTable* prev_tb = &s.tables[s.table_count];
-				if (XwaRemasterShip_BuildPreviousCockpitMeshTable(cockpit_mesh, &snap->cockpit,
-																  cockpit_anchor, &prev->cockpit,
-																  previous_cockpit_anchor, prev_tb)) {
+				AeronSceneMeshTable* prev_tb = fl_table_peek();
+				if (prev_tb && XwaRemasterShip_BuildPreviousCockpitMeshTable(
+								   cockpit_mesh, &snap->cockpit, cockpit_anchor, &prev->cockpit,
+								   previous_cockpit_anchor, prev_tb)) {
 					inst.prev_mesh_table = prev_tb;
-					s.table_count++;
+					s.table_pool.used++;
 				}
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
@@ -5502,6 +5569,11 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 }
 
 void XwaRemasterFlight_Shutdown(void) {
+	fl_pool_free(&s.table_pool);
+	fl_pool_free(&s.anim_pool);
+	free(s.bolts);
+	free(s.mb_prev_index);
+	free(s.energy_states);
 	XwaRemasterFlightMap_Shutdown();
 	XwaRemasterProbeOutlines_Shutdown();
 	XwaRemasterEnvironment_Shutdown();

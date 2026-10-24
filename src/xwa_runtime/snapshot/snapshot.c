@@ -172,6 +172,7 @@ void XwaSnapshot_BeginTick(void) {
 	s->hyperspace_streak_count = 0;
 	s->cockpit_valid = 0;
 	s->flight_object_count = 0;
+	s->flight_slot_count = 0;
 	memset(&s->flight_map, 0, sizeof s->flight_map);
 	s->flight_camera_valid = 0;
 	s->mission_path[0] = '\0';
@@ -521,6 +522,15 @@ void XwaSnapshot_Commit(void) {
 }
 
 const XwaSnapshot* XwaSnapshot_Current(void) { return g_current_slot >= 0 ? &g_slots[g_current_slot] : 0; }
+
+void XwaSnapshot_Shutdown(void) {
+	for (int i = 0; i < 3; i++) {
+		free(g_slots[i].flight_slot_index);
+		g_slots[i].flight_slot_index = NULL;
+		g_slots[i].flight_slot_count = 0;
+		g_slots[i].flight_slot_capacity = 0;
+	}
+}
 
 const XwaSnapshot* XwaSnapshot_Previous(void) { return g_previous_slot >= 0 ? &g_slots[g_previous_slot] : 0; }
 
@@ -1357,9 +1367,24 @@ void XwaSnapshot_CaptureMission(void) {
 	s->mission_index = g_selectedMissionListIndex;
 }
 
+/* Makes the slot index of `s` hold `count` slots. It grows when a mission
+ * has more slots, so once per mission at most. */
+static int snapshot_reserve_slot_index(XwaSnapshot* s, uint32_t count) {
+	if (count > s->flight_slot_capacity) {
+		int32_t* index = realloc(s->flight_slot_index, (size_t)count * sizeof *index);
+		if (index == NULL) {
+			return 0;
+		}
+		s->flight_slot_index = index;
+		s->flight_slot_capacity = count;
+	}
+	return 1;
+}
+
 void XwaSnapshot_CaptureFlight(void) {
 	XwaSnapshot* s = wr();
 	s->flight_object_count = 0;
+	s->flight_slot_count = 0;
 	s->hyperspace_streak_count = 0;
 	s->particle_effect_count = 0;
 	s->particle_count = 0;
@@ -1408,8 +1433,13 @@ void XwaSnapshot_CaptureFlight(void) {
 	if (render_state_slot_count > g_objectTableSlotCount) {
 		render_state_slot_count = g_objectTableSlotCount;
 	}
+	if (!snapshot_reserve_slot_index(s, g_objectTableSlotCount)) {
+		return;
+	}
+	s->flight_slot_count = g_objectTableSlotCount;
 	for (uint32_t i = 0; i < g_objectTableSlotCount; i++) {
 		const ObjectRecord* o = &g_objectTable[i];
+		s->flight_slot_index[i] = -1;
 		if (o->objectType == OBJ_None) {
 			continue;
 		}
@@ -1417,6 +1447,7 @@ void XwaSnapshot_CaptureFlight(void) {
 			s->dropped_records++;
 			continue;
 		}
+		s->flight_slot_index[i] = (int32_t)s->flight_object_count;
 		XwaFlightObject* f = &s->flight_objects[s->flight_object_count++];
 		memset(f, 0, sizeof *f);
 		f->signature = o->objectSignature;
@@ -1523,18 +1554,11 @@ void XwaSnapshot_CaptureFlight(void) {
 	}
 
 	XwaSnapshotFlightMap_Begin(s);
-	uint32_t flight_index = 0;
 	for (uint32_t slot = g_regionMainObjectSlotStart;
 		 s->flight_map.active && slot < g_regionStaticObjectSlotEnd && slot < g_objectTableSlotCount;
 		 slot++) {
-		while (flight_index < s->flight_object_count && s->flight_objects[flight_index].slot < slot) {
-			flight_index++;
-		}
-		const uint16_t index =
-			flight_index < s->flight_object_count && s->flight_objects[flight_index].slot == slot
-				? (uint16_t)flight_index
-				: UINT16_MAX;
-		XwaSnapshotFlightMap_CaptureObject(s, slot, index);
+		const int32_t index = s->flight_slot_index[slot];
+		XwaSnapshotFlightMap_CaptureObject(s, slot, index >= 0 ? (uint16_t)index : UINT16_MAX);
 	}
 	XwaSnapshotFlightMap_End(s);
 	/* Object trails are persistent renderer STATE. ObjectTrail_Update has
