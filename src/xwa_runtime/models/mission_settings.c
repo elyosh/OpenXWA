@@ -103,6 +103,22 @@ static void MissionSettings_ResetTargets(void) {
 	}
 }
 
+void XwaMissionSettings_SaveFlightState(int32_t* lastTarget) {
+	int i;
+
+	for (i = 0; i < XWA_PLAYER_COUNT; ++i) {
+		lastTarget[i] = s_lastTargetObjIdx[i];
+	}
+}
+
+void XwaMissionSettings_RestoreFlightState(const int32_t* lastTarget) {
+	int i;
+
+	for (i = 0; i < XWA_PLAYER_COUNT; ++i) {
+		s_lastTargetObjIdx[i] = lastTarget[i];
+	}
+}
+
 static int MissionSettings_Has(const uint8_t* bits, int index) {
 	return index >= 0 && index < SETTINGS_FLIGHT_GROUPS && (bits[index / 8] & (1u << (index % 8))) != 0;
 }

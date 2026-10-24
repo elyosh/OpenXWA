@@ -30,6 +30,9 @@
 #define HANGARS_FLIGHT_GROUPS 192
 
 typedef char HangarsKey[XWA_MODEL_SOURCE_KEY_MAX];
+typedef char xwa_hangars_flight_state_key[(sizeof(((XwaHangarsFlightState*)0)->shipKey) == sizeof(HangarsKey))
+											  ? 1
+											  : -1];
 
 typedef struct HangarsSwap {
 	HangarsKey source;
@@ -583,6 +586,48 @@ static void Hangars_ResolveSwaps(void) {
 	}
 }
 
+/* Builds the resolved tables for the command ship in s_shipKey and s_shipIff
+   (-1: no ship), whose settings are `ship`. */
+static void Hangars_Build(const AeronConfigNode* ship) {
+	const AeronConfigNode* root = AeronConfigFile_Root(s_settings);
+
+	/* mission > ship IFF > ship > default; the proving ground reads the
+	   default only. */
+	s_layerCount = 0;
+	if (!s_provingGround && s_mission != NULL) {
+		s_layers[s_layerCount++] = s_mission;
+	}
+	if (ship != NULL) {
+		char iffKey[8];
+		const AeronConfigNode* variant;
+
+		snprintf(iffKey, sizeof iffKey, "%u", (unsigned int)(s_shipIff >= 0 ? s_shipIff : 0));
+		variant = AeronConfigNode_MapGet(AeronConfigNode_MapGet(ship, "iff"), iffKey);
+		if (variant != NULL) {
+			s_layers[s_layerCount++] = variant;
+		}
+		s_layers[s_layerCount++] = ship;
+	}
+	if (AeronConfigNode_MapGet(root, "default") != NULL) {
+		s_layers[s_layerCount++] = AeronConfigNode_MapGet(root, "default");
+	}
+
+	Hangars_ResolveObjects();
+	Hangars_ResolveMap(0);
+	Hangars_ResolveMap(1);
+	Hangars_ResolveCamera(0);
+	Hangars_ResolveCamera(1);
+	Hangars_ResolveSwaps();
+	s_hangarModel[0] = '\0';
+	{
+		const char* model = AeronConfigNode_String(AeronConfigNode_MapGet(ship, "model"), NULL);
+
+		if (model != NULL && strlen(model) < sizeof s_hangarModel && XwaModelSource_AddKey(model)) {
+			strcpy(s_hangarModel, model);
+		}
+	}
+}
+
 int XwaHangars_Resolve(void) {
 	const AeronConfigNode* root;
 	const AeronConfigNode* ship = NULL;
@@ -623,42 +668,7 @@ int XwaHangars_Resolve(void) {
 	strcpy(s_shipKey, key);
 	s_shipIff = hasShip ? iff : -1;
 	s_shipMarkings = markings;
-
-	/* mission > ship IFF > ship > default; the proving ground reads the
-	   default only. */
-	s_layerCount = 0;
-	if (!g_provingGroundsModeActive && s_mission != NULL) {
-		s_layers[s_layerCount++] = s_mission;
-	}
-	if (ship != NULL) {
-		char iffKey[8];
-		const AeronConfigNode* variant;
-
-		snprintf(iffKey, sizeof iffKey, "%u", (unsigned int)iff);
-		variant = AeronConfigNode_MapGet(AeronConfigNode_MapGet(ship, "iff"), iffKey);
-		if (variant != NULL) {
-			s_layers[s_layerCount++] = variant;
-		}
-		s_layers[s_layerCount++] = ship;
-	}
-	if (AeronConfigNode_MapGet(root, "default") != NULL) {
-		s_layers[s_layerCount++] = AeronConfigNode_MapGet(root, "default");
-	}
-
-	Hangars_ResolveObjects();
-	Hangars_ResolveMap(0);
-	Hangars_ResolveMap(1);
-	Hangars_ResolveCamera(0);
-	Hangars_ResolveCamera(1);
-	Hangars_ResolveSwaps();
-	s_hangarModel[0] = '\0';
-	{
-		const char* model = AeronConfigNode_String(AeronConfigNode_MapGet(ship, "model"), NULL);
-
-		if (model != NULL && strlen(model) < sizeof s_hangarModel && XwaModelSource_AddKey(model)) {
-			strcpy(s_hangarModel, model);
-		}
-	}
+	Hangars_Build(ship);
 	if (changed) {
 		Aeron_LogInfo(
 			"xwa.models", "hangar: ship '%s' IFF %d (%s), model '%s', %d layers, %d map lines, %d swaps",
@@ -666,6 +676,40 @@ int XwaHangars_Resolve(void) {
 			s_hangarModel[0] != '\0' ? s_hangarModel : "hangar", s_layerCount, s_mapCounts[0], s_swapCount);
 	}
 	return changed;
+}
+
+void XwaHangars_SaveFlightState(XwaHangarsFlightState* state) {
+	memset(state, 0, sizeof *state);
+	state->resolved = (uint8_t)s_resolved;
+	state->inHangar = (uint8_t)s_inHangar;
+	state->provingGround = (uint8_t)(s_provingGround != 0);
+	state->shipMarkings = s_shipMarkings;
+	state->shipIff = s_shipIff;
+	memcpy(state->shipKey, s_shipKey, sizeof state->shipKey);
+}
+
+void XwaHangars_RestoreFlightState(const XwaHangarsFlightState* state) {
+	const AeronConfigNode* ship;
+
+	if (s_settings == NULL) {
+		return;
+	}
+	s_resolved = state->resolved;
+	s_inHangar = state->inHangar;
+	s_provingGround = state->provingGround;
+	s_shipMarkings = state->shipMarkings;
+	s_shipIff = state->shipIff;
+	memcpy(s_shipKey, state->shipKey, sizeof s_shipKey);
+	s_shipKey[sizeof s_shipKey - 1] = '\0';
+	if (!s_resolved) {
+		return;
+	}
+	ship =
+		AeronConfigNode_MapGet(AeronConfigNode_MapGet(AeronConfigFile_Root(s_settings), "ships"), s_shipKey);
+	Hangars_Build(s_shipIff >= 0 ? ship : NULL);
+	if (s_inHangar) {
+		XwaHangars_ReapplyHangarModels();
+	}
 }
 
 const XwaHangarObjects* XwaHangars_Objects(void) { return &s_objects; }

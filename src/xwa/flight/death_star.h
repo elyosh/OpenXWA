@@ -254,6 +254,22 @@ void DeathStar_UpdateLoopingObjectSfxVolume(int channelIdx, unsigned int sourceO
 											int useDirectVolume);
 void DeathStar_WriteFilmStateBlock(void);
 void DeathStar_ReadFilmStateBlock(void);
+#ifdef XWA_MODERN
+/* The reactor values that the high-rate timing keeps between steps, for
+   films: the random drift and shockwave light drawn at the last legacy
+   cadence, and the fractions that the drift and turns carry over. */
+typedef struct DeathStarModernFlightState {
+	int32_t reactorRandomDrift[3];
+	int32_t reactorRandomDriftRemainder[3];
+	int32_t reactorCylinderYawRemainder;
+	int32_t reactorCoreDriftSpeedRemainder;
+	int32_t reactorCorePitchRemainder;
+	double reactorCoreDirectedDriftRemainder[3];
+	uint16_t shockwaveLightValue;
+} DeathStarModernFlightState;
+void DeathStar_ModernSaveFlightState(DeathStarModernFlightState* state);
+void DeathStar_ModernRestoreFlightState(const DeathStarModernFlightState* state);
+#endif
 
 #ifdef __cplusplus
 }

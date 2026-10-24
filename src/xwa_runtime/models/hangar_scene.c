@@ -16,6 +16,8 @@
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/skins.h"
 
+#include <string.h>
+
 /* Modern port module; no original counterpart. It builds the hangar scene
    from the hangar settings, with the same spawns as Hangar_SetupReadyScene,
    and places the objects and the player on the settings' floor. */
@@ -632,4 +634,19 @@ void XwaHangarScene_FollowCrane(int* x, int* y, int* z) {
 	*x = crane->world_x;
 	*y = crane->world_y + 654;
 	*z = crane->world_z - 8;
+}
+
+void XwaHangarScene_SaveFlightState(XwaHangarSceneFlightState* state) {
+	memset(state, 0, sizeof *state);
+	state->launchRefOffset[0] = s_launchRefOffset[0];
+	state->launchRefOffset[1] = s_launchRefOffset[1];
+	state->reentryStartY = s_reentryStartY;
+	state->shuttleLoaded = (uint8_t)(s_shuttleLoaded != 0);
+}
+
+void XwaHangarScene_RestoreFlightState(const XwaHangarSceneFlightState* state) {
+	s_launchRefOffset[0] = state->launchRefOffset[0];
+	s_launchRefOffset[1] = state->launchRefOffset[1];
+	s_reentryStartY = state->reentryStartY;
+	s_shuttleLoaded = state->shuttleLoaded;
 }

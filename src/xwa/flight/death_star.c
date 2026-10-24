@@ -215,6 +215,39 @@ static double g_modernDeathStarReactorCoreDirectedDriftRemainderY;
 static double g_modernDeathStarReactorCoreDirectedDriftRemainderZ;
 static uint16_t g_modernDeathStarShockwaveLightValue;
 
+void DeathStar_ModernSaveFlightState(DeathStarModernFlightState* state) {
+	memset(state, 0, sizeof *state);
+	state->reactorRandomDrift[0] = g_modernDeathStarReactorRandomDriftX;
+	state->reactorRandomDrift[1] = g_modernDeathStarReactorRandomDriftY;
+	state->reactorRandomDrift[2] = g_modernDeathStarReactorRandomDriftZ;
+	state->reactorRandomDriftRemainder[0] = g_modernDeathStarReactorRandomDriftRemainderX;
+	state->reactorRandomDriftRemainder[1] = g_modernDeathStarReactorRandomDriftRemainderY;
+	state->reactorRandomDriftRemainder[2] = g_modernDeathStarReactorRandomDriftRemainderZ;
+	state->reactorCylinderYawRemainder = g_modernDeathStarReactorCylinderYawRemainder;
+	state->reactorCoreDriftSpeedRemainder = g_modernDeathStarReactorCoreDriftSpeedRemainder;
+	state->reactorCorePitchRemainder = g_modernDeathStarReactorCorePitchRemainder;
+	state->reactorCoreDirectedDriftRemainder[0] = g_modernDeathStarReactorCoreDirectedDriftRemainderX;
+	state->reactorCoreDirectedDriftRemainder[1] = g_modernDeathStarReactorCoreDirectedDriftRemainderY;
+	state->reactorCoreDirectedDriftRemainder[2] = g_modernDeathStarReactorCoreDirectedDriftRemainderZ;
+	state->shockwaveLightValue = g_modernDeathStarShockwaveLightValue;
+}
+
+void DeathStar_ModernRestoreFlightState(const DeathStarModernFlightState* state) {
+	g_modernDeathStarReactorRandomDriftX = state->reactorRandomDrift[0];
+	g_modernDeathStarReactorRandomDriftY = state->reactorRandomDrift[1];
+	g_modernDeathStarReactorRandomDriftZ = state->reactorRandomDrift[2];
+	g_modernDeathStarReactorRandomDriftRemainderX = state->reactorRandomDriftRemainder[0];
+	g_modernDeathStarReactorRandomDriftRemainderY = state->reactorRandomDriftRemainder[1];
+	g_modernDeathStarReactorRandomDriftRemainderZ = state->reactorRandomDriftRemainder[2];
+	g_modernDeathStarReactorCylinderYawRemainder = state->reactorCylinderYawRemainder;
+	g_modernDeathStarReactorCoreDriftSpeedRemainder = state->reactorCoreDriftSpeedRemainder;
+	g_modernDeathStarReactorCorePitchRemainder = state->reactorCorePitchRemainder;
+	g_modernDeathStarReactorCoreDirectedDriftRemainderX = state->reactorCoreDirectedDriftRemainder[0];
+	g_modernDeathStarReactorCoreDirectedDriftRemainderY = state->reactorCoreDirectedDriftRemainder[1];
+	g_modernDeathStarReactorCoreDirectedDriftRemainderZ = state->reactorCoreDirectedDriftRemainder[2];
+	g_modernDeathStarShockwaveLightValue = state->shockwaveLightValue;
+}
+
 static int DeathStar_ModernScaleWithRemainder(int value, int elapsedTicks, int divisor, int* remainder) {
 	int numerator;
 	int scaled;

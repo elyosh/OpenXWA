@@ -33,7 +33,7 @@ static int s_doubleStarfighterShields;
 static int32_t s_ratePercent;
 static ShieldRechargeModel s_models[OBJ_Count];
 /* The mission time until which a flight group doesn't recharge, or 0. */
-static int s_delayUntil[256];
+static int s_delayUntil[XWA_SHIELD_RECHARGE_FLIGHT_GROUPS];
 
 static void ShieldRecharge_ReadBool(const AeronConfigNode* section, const char* key, int* out) {
 	const AeronConfigNode* node = AeronConfigNode_MapGet(section, key);
@@ -144,6 +144,22 @@ void XwaShieldRecharge_ReadModelSettings(unsigned int objectType, const char* pa
 }
 
 void XwaShieldRecharge_LoadMission(void) { memset(s_delayUntil, 0, sizeof s_delayUntil); }
+
+void XwaShieldRecharge_SaveFlightState(int32_t delayUntil[XWA_SHIELD_RECHARGE_FLIGHT_GROUPS]) {
+	int i;
+
+	for (i = 0; i < XWA_SHIELD_RECHARGE_FLIGHT_GROUPS; ++i) {
+		delayUntil[i] = s_delayUntil[i];
+	}
+}
+
+void XwaShieldRecharge_RestoreFlightState(const int32_t delayUntil[XWA_SHIELD_RECHARGE_FLIGHT_GROUPS]) {
+	int i;
+
+	for (i = 0; i < XWA_SHIELD_RECHARGE_FLIGHT_GROUPS; ++i) {
+		s_delayUntil[i] = delayUntil[i];
+	}
+}
 
 static const ShieldRechargeModel* ShieldRecharge_Model(unsigned int objectType) {
 	XwaModelSettings_Ensure(objectType);

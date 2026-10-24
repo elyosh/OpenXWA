@@ -30,6 +30,8 @@
  *
  * The pools change the simulation. */
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -57,6 +59,14 @@ int XwaWarheadPools_Limit(int left, int racks, int count);
 /* Takes `count` warheads of type `warheadType` from the pool of flight group
    `fgIdx`, in single-player flights. */
 void XwaWarheadPools_Take(int fgIdx, int warheadType, int count);
+
+/* g_missionFlightGroups holds 192. */
+enum { XWA_WARHEAD_POOLS_FLIGHT_GROUPS = 192, XWA_WARHEAD_POOLS_TYPES = 10 };
+/* For films: copies the warheads left by flight group and type (-1: no
+   limit) to `left`, or back from it. */
+void XwaWarheadPools_SaveFlightState(int32_t left[XWA_WARHEAD_POOLS_FLIGHT_GROUPS][XWA_WARHEAD_POOLS_TYPES]);
+void XwaWarheadPools_RestoreFlightState(
+	const int32_t left[XWA_WARHEAD_POOLS_FLIGHT_GROUPS][XWA_WARHEAD_POOLS_TYPES]);
 
 #ifdef __cplusplus
 }

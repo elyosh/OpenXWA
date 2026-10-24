@@ -3,6 +3,7 @@
 #include "aeron/aeron.h"
 #include "aeron/compat/ddraw.h"
 #include "aeron/compat/host.h"
+#include "aeron/vfs.h"
 #include "xwa/assets/file_io.h"
 #include "xwa/assets/linez.h"
 #include "xwa/assets/opt_model.h"
@@ -146,6 +147,11 @@ int XwaPort_Init(void) {
 	XwaRumble_RegisterProvider();
 	XwaTime_Reset();
 	File_SetVfs(Aeron_GetVfs());
+	/* The game saves recorded films in the film folder and doesn't create it.
+	   The installer of the original game did. */
+	if (!AeronVfs_CreateDirectory(Aeron_GetVfs(), AERON_VFS_ROOT_USER, "film")) {
+		Aeron_LogError("xwa", "Failed to create the film folder in the user folder");
+	}
 	XwaText_Load();
 	XwaMissionBackdrops_Init();
 	XwaMissionSettings_Init();

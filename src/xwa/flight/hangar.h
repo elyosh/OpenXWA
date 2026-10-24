@@ -112,6 +112,10 @@ int Hangar_BeginEnterCraft(uint16_t fromObjIdx);
 int Hangar_TakeReadyLoopRequest(void);
 /* Complete a pending nonblocking options modal before hangar timing resumes. */
 int Hangar_ContinueOptionsModal(void);
+/* Starts the hangar's high-rate cadence again, and reads the crane's and
+   droids' directions from their mesh rotations. Film recording and playback
+   call it at the film's first step. */
+void Hangar_ModernRestartCadence(void);
 #endif
 int Hangar_EnterCraft(uint16_t fromObjIdx);
 void Hangar_HandleInput(void);

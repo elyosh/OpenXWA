@@ -115,6 +115,10 @@ static int g_xwaFlightTaskPingPrevHostDropCount;
 static int g_xwaFlightTaskPingDropScore;
 static int g_xwaFlightTaskRecoveryCountdownState;
 static int g_xwaFlightTaskDirectWorldCleanup;
+/* The cleanup waits for the film name prompt, and keeps its state meanwhile. */
+static int g_xwaFlightTaskFilmSavePending;
+static int g_xwaFlightTaskFilmSaveRestartMission;
+static int g_xwaFlightTaskFilmSaveDirectWorldCleanup;
 static XwaFlightTaskHangarContinuation g_xwaFlightTaskHangarContinuation;
 static int g_xwaFlightTaskPendingHangarTicks;
 
@@ -447,7 +451,7 @@ static int XwaFlightTask_LoadFilmHeader(const char* filmFilePath) {
 	}
 
 	g_filmPlaybackMode = 1;
-	if (!Film_ReadBytes(&ignored, sizeof(ignored)) || !Film_ReadBytes(&ignored, sizeof(ignored)) ||
+	if (!Film_ReadBytes(&ignored, sizeof(ignored)) ||
 		!Film_ReadBytes(&g_filmVersion, sizeof(g_filmVersion)) ||
 		!Film_ReadBytes(g_currentMissionFile, sizeof(g_currentMissionFile))) {
 		g_filmPlaybackMode = 0;
@@ -971,6 +975,11 @@ static int XwaFlightTask_RunSinglePlayerFrame(void) {
 	g_inputTimestamp += (int)Time_GetFrameDelta();
 	timing.networkProcessTicks = g_inputTimestamp - timing.preStepTimestamp;
 	missionEndPending = Flight_CheckMissionEndAndExitRequest();
+	/* The mission ended during a recording, and the film name prompt is open.
+	   The check runs again once it closes. */
+	if (Flight_IsFilmSavePending()) {
+		return 1;
+	}
 	if (XwaFlightTask_EnterRequestedHangarReady(XWA_FLIGHT_TASK_HANGAR_CONTINUE_FLIGHT)) {
 		return 1;
 	}
@@ -1269,6 +1278,7 @@ int XwaFlightTask_Init(char* missionCmdLine, const char* filmFilePath) {
 	g_xwaFlightTaskPingDropScore = 0;
 	g_xwaFlightTaskRecoveryCountdownState = 0;
 	g_xwaFlightTaskDirectWorldCleanup = 0;
+	g_xwaFlightTaskFilmSavePending = 0;
 	g_xwaFlightTaskHangarContinuation = XWA_FLIGHT_TASK_HANGAR_CONTINUE_MISSION_START;
 	g_xwaFlightTaskPendingHangarTicks = 0;
 	(void)Hangar_TakeReadyLoopRequest();
@@ -1386,7 +1396,7 @@ void XwaFlightTask_Tick(void) {
 		return;
 	}
 	/* Modal continuations discard their elapsed host time; do not simulate on the completion frame. */
-	if (Flight_ContinueOptionsModal() || Hangar_ContinueOptionsModal()) {
+	if (Flight_ContinueOptionsModal() || Hangar_ContinueOptionsModal() || Flight_ContinueFilmSave()) {
 		g_xwaFlightTaskNextWakeElapsedUs = nowUs + XWA_FLIGHT_FRAME_US;
 		return;
 	}
@@ -1752,31 +1762,47 @@ void XwaFlightTask_Tick(void) {
 				int restartMission;
 				int directWorldCleanup;
 
-				g_xwaFlightTaskLoadingHold = 0;
-				XwaModernFlightTiming_EndSession();
-				directWorldCleanup = g_xwaFlightTaskDirectWorldCleanup;
-				g_xwaFlightTaskDirectWorldCleanup = 0;
-				restartMission = g_xwaFlightTaskRestartMission;
-				if (!directWorldCleanup && g_flightExitRequest == 2) {
-					restartMission = !g_provingGroundsModeActive || g_pilotData.meleeMissionIndex == -1;
-				}
-				if (!directWorldCleanup) {
-					ForceFeedback_StopAllEffects();
-					ForceFeedback_EnableEffects();
-				}
-				if (directWorldCleanup || g_flightPlayerCount > 1) {
-					Flight_FreeWorldStateBuffers();
-				}
-				Sound_StopAllInstances();
-				if (!g_filmPlaybackMode && g_filmRecording) {
-					Music_PauseIfInitialized();
-					Film_FlushWriteBuffer();
-					if (g_filmFile != NULL) {
-						File_Close(g_filmFile);
-						g_filmFile = NULL;
+				if (!g_xwaFlightTaskFilmSavePending) {
+					g_xwaFlightTaskLoadingHold = 0;
+					XwaModernFlightTiming_EndSession();
+					directWorldCleanup = g_xwaFlightTaskDirectWorldCleanup;
+					g_xwaFlightTaskDirectWorldCleanup = 0;
+					restartMission = g_xwaFlightTaskRestartMission;
+					if (!directWorldCleanup && g_flightExitRequest == 2) {
+						restartMission = !g_provingGroundsModeActive || g_pilotData.meleeMissionIndex == -1;
 					}
-					g_filmRecording = 0;
+					if (!directWorldCleanup) {
+						ForceFeedback_StopAllEffects();
+						ForceFeedback_EnableEffects();
+					}
+					if (directWorldCleanup || g_flightPlayerCount > 1) {
+						Flight_FreeWorldStateBuffers();
+					}
+					Sound_StopAllInstances();
+					if (!g_filmPlaybackMode && g_filmRecording) {
+						Music_PauseIfInitialized();
+						Film_FlushWriteBuffer();
+						if (g_filmFile != NULL) {
+							File_Close(g_filmFile);
+							g_filmFile = NULL;
+						}
+						g_filmRecording = 0;
+						g_xwaFlightTaskFilmSavePending = 1;
+						g_xwaFlightTaskFilmSaveRestartMission = restartMission;
+						g_xwaFlightTaskFilmSaveDirectWorldCleanup = directWorldCleanup;
+					}
+				} else {
+					restartMission = g_xwaFlightTaskFilmSaveRestartMission;
+					directWorldCleanup = g_xwaFlightTaskFilmSaveDirectWorldCleanup;
+				}
+				if (g_xwaFlightTaskFilmSavePending) {
+					/* The film name prompt runs over several ticks. The cleanup
+					   goes on once it closes. */
 					FlightFilm_SaveTempRecordingWithPrompt();
+					if (FlightDisplay_IsFrontendModalActive()) {
+						return;
+					}
+					g_xwaFlightTaskFilmSavePending = 0;
 					Music_ResumeIfInitialized();
 				}
 				if (!g_flightReturnToMissionSetupRequested && !g_filmPlaybackMode) {
@@ -1978,4 +2004,12 @@ int XwaFlightTask_GetResult(void) { return g_xwaFlightTaskResult; }
 uint64_t XwaFlightTask_NextWakeDelayUs(void) {
 	const uint64_t nowUs = XwaTime_GetElapsedUs();
 	return g_xwaFlightTaskNextWakeElapsedUs > nowUs ? g_xwaFlightTaskNextWakeElapsedUs - nowUs : 0;
+}
+
+void XwaFlightTask_DelayNextFrame(uint64_t delayUs) {
+	const uint64_t wakeUs = XwaTime_GetElapsedUs() + delayUs;
+
+	if (g_xwaFlightTaskNextWakeElapsedUs < wakeUs) {
+		g_xwaFlightTaskNextWakeElapsedUs = wakeUs;
+	}
 }

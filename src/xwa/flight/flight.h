@@ -454,6 +454,11 @@ void Flight_ModernResetHighRateIntegration(void);
    Returns 0 when it isn't open. Flight timing resumes only after the menu
    closes. */
 int Flight_ContinueOptionsModal(void);
+/* While the film name prompt of a stopped recording is open, runs one more
+   step of it and returns 1. It also returns 1 on the tick it closes. Returns
+   0 when no film is being saved. */
+int Flight_ContinueFilmSave(void);
+int Flight_IsFilmSavePending(void);
 #endif
 int Flight_PumpWindowMessages(void);
 int Pause_ProcessInput(void);

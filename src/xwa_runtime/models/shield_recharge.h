@@ -40,6 +40,8 @@
  *
  * The rules change the simulation. */
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -59,6 +61,12 @@ void XwaShieldRecharge_ReadModelSettings(unsigned int objectType, const char* pa
 										 const struct AeronConfigNode* group);
 /* Starts a mission with no recharge delays. */
 void XwaShieldRecharge_LoadMission(void);
+
+enum { XWA_SHIELD_RECHARGE_FLIGHT_GROUPS = 256 };
+/* For films: copies the mission time until which each flight group doesn't
+   recharge (0: it recharges) to `delayUntil`, or back from it. */
+void XwaShieldRecharge_SaveFlightState(int32_t delayUntil[XWA_SHIELD_RECHARGE_FLIGHT_GROUPS]);
+void XwaShieldRecharge_RestoreFlightState(const int32_t delayUntil[XWA_SHIELD_RECHARGE_FLIGHT_GROUPS]);
 
 /* Replaces `*rate`, the stock recharge rate of object `objIdx`, with the
    mod's, and sets the AI's shields to recharge as the rules say. `aiUpdate`

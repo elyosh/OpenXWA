@@ -21,10 +21,17 @@ void XwaModernFlightTiming_Configure(int requested_step_ticks);
 void XwaModernFlightTiming_BeginSession(int player_count);
 void XwaModernFlightTiming_EndSession(void);
 int XwaModernFlightTiming_StepTicks(void);
+/* Uses `step_ticks` for the rest of the flight session: a film plays with
+   the step that it was recorded with. Values outside 1 to 8 are ignored. */
+void XwaModernFlightTiming_UseFilmStepTicks(int step_ticks);
 int XwaModernFlightTiming_HangarStepTicks(void);
 int XwaModernFlightTiming_IsHighRate(void);
 
 void XwaModernFlightTiming_BeginAdvance(uint16_t elapsed_ticks);
+/* Starts the cadences again from 0, then begins the advance of the current
+   step. Film recording and playback call it at the same step, so that the
+   cadences run on the same steps in both. */
+void XwaModernFlightTiming_RestartCadence(uint16_t elapsed_ticks);
 int XwaModernFlightTiming_IsLegacyCadenceDue(void);
 XwaModernAiCadence XwaModernFlightTiming_BeginAiAdvance(uint16_t elapsed_ticks);
 int XwaModernFlightTiming_AdvanceTransientAnimation(uint16_t elapsed_ticks);

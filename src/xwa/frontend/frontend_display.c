@@ -571,14 +571,26 @@ int FrontendDisplay_ClearBackBuffer(void) {
 				}
 			}
 			if (wasLocked) {
+#ifdef XWA_MODERN
+				/* A pointer doesn't fit in an int on 64-bit hosts. */
+				g_drawSurfacePtr = FrontendDisplay_LockBackBuffer();
+				result = (int)(intptr_t)g_drawSurfacePtr;
+#else
 				result = (int)(intptr_t)FrontendDisplay_LockBackBuffer();
 				g_drawSurfacePtr = (unsigned char*)(intptr_t)result;
+#endif
 			}
 			return result;
 		relock:
 			if (wasLocked) {
+#ifdef XWA_MODERN
+				/* A pointer doesn't fit in an int on 64-bit hosts. */
+				g_drawSurfacePtr = FrontendDisplay_LockBackBuffer();
+				result = (int)(intptr_t)g_drawSurfacePtr;
+#else
 				result = (int)(intptr_t)FrontendDisplay_LockBackBuffer();
 				g_drawSurfacePtr = (unsigned char*)(intptr_t)result;
+#endif
 			}
 		}
 	}

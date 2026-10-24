@@ -18,6 +18,9 @@ int XwaFlightTask_IsComplete(void);
 int XwaFlightTask_IsHoldingLoadingScreen(void);
 int XwaFlightTask_GetResult(void);
 uint64_t XwaFlightTask_NextWakeDelayUs(void);
+/* Runs the next frame no sooner than `delayUs` from now. Film playback uses
+ * it to play the recorded steps at their real speed. */
+void XwaFlightTask_DelayNextFrame(uint64_t delayUs);
 
 #ifdef __cplusplus
 }

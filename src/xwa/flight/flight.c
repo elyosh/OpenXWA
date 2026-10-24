@@ -51,6 +51,7 @@
 #include "xwa/render/effects.h"
 #include "xwa/render/renderer.h"
 #include "xwa/render/renderer_internal.h"
+#include "xwa/util/byte_order.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"
 #include "xwa/util/random.h"
@@ -69,6 +70,8 @@
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
+#include "xwa_runtime/runtime/film_state.h"
+#include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -3192,23 +3195,38 @@ static void FlightWorldState_RestoreCraftData(CraftData* dst, const FlightSerial
 
 #ifdef XWA_MODERN
 /* World-state extension block (modern port; no original counterpart). It
- * carries the CraftData ranges past the original sizes, for craft whose model
- * is a GLB replacement, after the last original item (g_players):
- *   u8 magic[4] 'XWEX', u8 version 1, u16 record count, then per record:
- *   u16 object slot, componentState[49..254], meshRotation[50..254],
- *   componentHp[50..254], engineEmitterHealth[16..254], warheadData[16..119].
- * Without such craft no block is written, so the state matches the original's
- * byte for byte. */
+ * carries the CraftData fields that the original doesn't have, after the last
+ * original item (g_players):
+ *   u8 magic[4] 'XWEX', u8 version 2, u16 record count, then per record, for
+ *   craft whose model is a GLB replacement: u16 object slot,
+ *   componentState[49..254], meshRotation[50..254], componentHp[50..254],
+ *   engineEmitterHealth[16..254], warheadData[16..119];
+ *   then u16 articulation record count, then per record, for craft whose
+ *   articulation state isn't 0 (its value at spawn): u16 object slot,
+ *   articulationTicks[6], articulationMotion, articulationAngles[255].
+ * Version 1 has no articulation records. Without such craft no block is
+ * written, so the state matches the original's byte for byte. */
 static const uint8_t g_flightWorldExtensionMagic[4] = { 'X', 'W', 'E', 'X' };
 enum {
-	FLIGHT_WORLD_EXTENSION_VERSION = 1,
+	FLIGHT_WORLD_EXTENSION_VERSION = 2,
 	FLIGHT_WORLD_EXTENSION_HEADER_SIZE = 7,
 	FLIGHT_WORLD_EXTENSION_RECORD_SIZE =
 		2 + (XWA_CRAFT_MESH_SLOT_COUNT - 49) + 2 * (XWA_CRAFT_MESH_SLOT_COUNT - XWA_STOCK_MESH_SLOT_COUNT) +
 		(XWA_CRAFT_ENGINE_EMITTER_COUNT - XWA_STOCK_ENGINE_EMITTER_COUNT) +
 		(XWA_CRAFT_WEAPON_SLOT_COUNT - XWA_STOCK_WEAPON_SLOT_COUNT) * (int)sizeof(WarheadInventoryEntry),
+	FLIGHT_WORLD_EXTENSION_ARTICULATION_RECORD_SIZE = 2 + (int)sizeof(((CraftData*)0)->articulationTicks) +
+													  1 + (int)sizeof(((CraftData*)0)->articulationAngles),
 };
 typedef char xwa_flight_world_extension_record_size[(FLIGHT_WORLD_EXTENSION_RECORD_SIZE == 2313) ? 1 : -1];
+typedef char xwa_flight_world_extension_articulation_record_size
+	[(FLIGHT_WORLD_EXTENSION_ARTICULATION_RECORD_SIZE == 525) ? 1 : -1];
+
+/* The largest extension block, for the world-state buffer. */
+static size_t FlightWorldState_ExtensionCapacity(void) {
+	return FLIGHT_WORLD_EXTENSION_HEADER_SIZE + 2 +
+		   (size_t)(FLIGHT_WORLD_EXTENSION_RECORD_SIZE + FLIGHT_WORLD_EXTENSION_ARTICULATION_RECORD_SIZE) *
+			   g_craftObjectSlotsTotal;
+}
 
 typedef struct FlightWorldExtensionRange {
 	uint16_t fieldOffset;
@@ -3239,17 +3257,44 @@ static CraftData* FlightWorldState_SerializedCraft(uint32_t slot) {
 	return obj->mobj->pCraft;
 }
 
+static int FlightWorldState_HasArticulation(const CraftData* craft) {
+	size_t i;
+
+	if (craft->articulationMotion != 0) {
+		return 1;
+	}
+	for (i = 0; i < sizeof craft->articulationTicks / sizeof craft->articulationTicks[0]; ++i) {
+		if (craft->articulationTicks[i] != 0) {
+			return 1;
+		}
+	}
+	for (i = 0; i < sizeof craft->articulationAngles / sizeof craft->articulationAngles[0]; ++i) {
+		if (craft->articulationAngles[i] != 0) {
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static void FlightWorldState_WriteExtension(uint8_t** cursor) {
 	uint32_t slot;
 	uint16_t count = 0;
+	uint16_t articulationCount = 0;
 
 	for (slot = 0; slot < g_regionObjectSlotEnd; ++slot) {
-		if (FlightWorldState_SerializedCraft(slot) != NULL &&
-			XwaModelRole_IsReplacement((unsigned short)g_objectTable[slot].objectType)) {
+		const CraftData* craft = FlightWorldState_SerializedCraft(slot);
+
+		if (craft == NULL) {
+			continue;
+		}
+		if (XwaModelRole_IsReplacement((unsigned short)g_objectTable[slot].objectType)) {
 			++count;
 		}
+		if (FlightWorldState_HasArticulation(craft)) {
+			++articulationCount;
+		}
 	}
-	if (count == 0) {
+	if (count == 0 && articulationCount == 0) {
 		return;
 	}
 	FlightWorldState_WriteBlock(cursor, g_flightWorldExtensionMagic, sizeof g_flightWorldExtensionMagic);
@@ -3272,6 +3317,19 @@ static void FlightWorldState_WriteExtension(uint8_t** cursor) {
 				g_flightWorldExtensionRanges[range].size);
 		}
 	}
+	FlightWorldState_WriteBlock(cursor, &articulationCount, sizeof articulationCount);
+	for (slot = 0; slot < g_regionObjectSlotEnd; ++slot) {
+		const CraftData* craft = FlightWorldState_SerializedCraft(slot);
+		const uint16_t objectSlot = (uint16_t)slot;
+
+		if (craft == NULL || !FlightWorldState_HasArticulation(craft)) {
+			continue;
+		}
+		FlightWorldState_WriteBlock(cursor, &objectSlot, sizeof objectSlot);
+		FlightWorldState_WriteBlock(cursor, craft->articulationTicks, sizeof craft->articulationTicks);
+		FlightWorldState_WriteBlock(cursor, &craft->articulationMotion, sizeof craft->articulationMotion);
+		FlightWorldState_WriteBlock(cursor, craft->articulationAngles, sizeof craft->articulationAngles);
+	}
 }
 
 /* Resets the extension ranges of every saved craft to their spawn values, then
@@ -3281,6 +3339,7 @@ static void FlightWorldState_RestoreExtension(const uint8_t* cursor) {
 	uint32_t slot;
 	uint16_t count;
 	uint16_t record;
+	uint8_t version;
 
 	for (slot = 0; slot < g_regionObjectSlotEnd; ++slot) {
 		CraftData* craft = FlightWorldState_SerializedCraft(slot);
@@ -3297,12 +3356,16 @@ static void FlightWorldState_RestoreExtension(const uint8_t* cursor) {
 			   XWA_CRAFT_ENGINE_EMITTER_COUNT - XWA_STOCK_ENGINE_EMITTER_COUNT);
 		memset(&craft->warheadData[XWA_STOCK_WEAPON_SLOT_COUNT], 0,
 			   (XWA_CRAFT_WEAPON_SLOT_COUNT - XWA_STOCK_WEAPON_SLOT_COUNT) * sizeof(WarheadInventoryEntry));
+		memset(craft->articulationTicks, 0, sizeof craft->articulationTicks);
+		craft->articulationMotion = 0;
+		memset(craft->articulationAngles, 0, sizeof craft->articulationAngles);
 	}
 	if (cursor < g_worldStateBuffer || end - cursor < FLIGHT_WORLD_EXTENSION_HEADER_SIZE ||
 		memcmp(cursor, g_flightWorldExtensionMagic, sizeof g_flightWorldExtensionMagic) != 0 ||
-		cursor[4] != FLIGHT_WORLD_EXTENSION_VERSION) {
+		(cursor[4] != 1 && cursor[4] != FLIGHT_WORLD_EXTENSION_VERSION)) {
 		return;
 	}
+	version = cursor[4];
 	memcpy(&count, cursor + 5, sizeof count);
 	cursor += FLIGHT_WORLD_EXTENSION_HEADER_SIZE;
 	for (record = 0; record < count && end - cursor >= FLIGHT_WORLD_EXTENSION_RECORD_SIZE; ++record) {
@@ -3321,6 +3384,27 @@ static void FlightWorldState_RestoreExtension(const uint8_t* cursor) {
 			}
 			cursor += g_flightWorldExtensionRanges[range].size;
 		}
+	}
+	if (version < 2 || end - cursor < (ptrdiff_t)sizeof count) {
+		return;
+	}
+	memcpy(&count, cursor, sizeof count);
+	cursor += sizeof count;
+	for (record = 0; record < count && end - cursor >= FLIGHT_WORLD_EXTENSION_ARTICULATION_RECORD_SIZE;
+		 ++record) {
+		uint16_t objectSlot;
+		CraftData* craft;
+
+		memcpy(&objectSlot, cursor, sizeof objectSlot);
+		craft = objectSlot < g_regionObjectSlotEnd ? FlightWorldState_SerializedCraft(objectSlot) : NULL;
+		cursor += sizeof objectSlot;
+		if (craft != NULL) {
+			memcpy(craft->articulationTicks, cursor, sizeof craft->articulationTicks);
+			craft->articulationMotion = cursor[sizeof craft->articulationTicks];
+			memcpy(craft->articulationAngles, cursor + sizeof craft->articulationTicks + 1,
+				   sizeof craft->articulationAngles);
+		}
+		cursor += FLIGHT_WORLD_EXTENSION_ARTICULATION_RECORD_SIZE - sizeof objectSlot;
 	}
 }
 #endif
@@ -3399,8 +3483,7 @@ void Flight_AllocWorldStateBuffers(void) {
 	GameRand_GetPrimarySeed();
 	bufferSize += 3023u * (uint32_t)g_flightPlayerCount + 22086u;
 #ifdef XWA_MODERN
-	bufferSize +=
-		FLIGHT_WORLD_EXTENSION_HEADER_SIZE + FLIGHT_WORLD_EXTENSION_RECORD_SIZE * g_craftObjectSlotsTotal;
+	bufferSize += FlightWorldState_ExtensionCapacity();
 #endif
 
 	g_worldStateHandle = Memory_AllocHandle("WORLDSTATEDATA", bufferSize);
@@ -5935,6 +6018,25 @@ void Flight_StepSimToTime(int targetTimestamp) {
 			g_filmPlaybackStepCatchupTicks = 0;
 		} else {
 			g_filmPlaybackStepCatchupTicks += (int)Time_GetSimStepDelta();
+#ifdef XWA_MODERN
+			/* The original waits here until the real time of the recorded step
+			   has passed. The port's clock only moves between host ticks, so
+			   that loop would never end. Instead, the flight task waits for the
+			   missing time before its next frame. The counter keeps the time
+			   still owed (as a negative value), so that the next steps of this
+			   frame add their own wait to it. */
+			{
+				const int waitTicks = (int)(uint16_t)g_elapsedTicks - g_filmPlaybackStepCatchupTicks;
+
+				if (waitTicks > 0 && waitTicks < 0x1d8) {
+					g_filmPlaybackStepCatchupTicks = -waitTicks;
+					XwaFlightTask_DelayNextFrame(4000u * (uint32_t)waitTicks);
+				} else {
+					g_filmPlaybackStepCatchupTicks = 0;
+				}
+			}
+			currentGameTime = g_gameTime;
+#else
 			if ((uint32_t)(uint16_t)g_elapsedTicks - (uint32_t)g_filmPlaybackStepCatchupTicks < 0x1d8u &&
 				(uint32_t)g_filmPlaybackStepCatchupTicks < (uint16_t)g_elapsedTicks) {
 				do {
@@ -5943,6 +6045,7 @@ void Flight_StepSimToTime(int targetTimestamp) {
 			}
 			currentGameTime = g_gameTime;
 			g_filmPlaybackStepCatchupTicks = 0;
+#endif
 		}
 
 		Flight_AdvanceOneStep((int)(uint16_t)g_elapsedTicks + currentGameTime);
@@ -6173,6 +6276,93 @@ void Flight_StepSimToTime(int targetTimestamp) {
 	Music_Update();
 }
 
+#ifdef XWA_MODERN
+/* The original writes the superlaser state of each region to the film as its
+   raw 114 bytes. The port's struct has 64-bit pointers and padding, so these
+   functions write and read the original layout field by field. The two
+   pointers are written as 0. On reading, the struct keeps the pointers that
+   the mission load set: the film plays the same mission, and the addresses
+   of the recording session mean nothing here. */
+enum { FLIGHT_FILM_TUNNEL_LASER_SIZE = 0x72 };
+
+static void Flight_FilmWriteTunnelLaserState(const DeathStarTunnelLaserRegionState* laser) {
+	uint8_t bytes[FLIGHT_FILM_TUNNEL_LASER_SIZE];
+	uint32_t remainingDistance;
+	int i;
+
+	memset(bytes, 0, sizeof(bytes));
+	ByteOrder_WriteU16Le(&bytes[0x00], (uint16_t)laser->enabled);
+	ByteOrder_WriteU16Le(&bytes[0x02], (uint16_t)laser->shotActive);
+	ByteOrder_WriteU16Le(&bytes[0x04], (uint16_t)laser->alternateDelayPhase);
+	ByteOrder_WriteU16Le(&bytes[0x06], (uint16_t)laser->beamLightActive);
+	ByteOrder_WriteU32Le(&bytes[0x08], (uint32_t)laser->warmupTicks);
+	ByteOrder_WriteU32Le(&bytes[0x0C], (uint32_t)laser->holdTicks);
+	ByteOrder_WriteU32Le(&bytes[0x10], (uint32_t)laser->travelTicks);
+	ByteOrder_WriteU32Le(&bytes[0x14], (uint32_t)laser->shotStartGameTime);
+	ByteOrder_WriteU32Le(&bytes[0x18], (uint32_t)laser->targetObjIdx);
+	ByteOrder_WriteU32Le(&bytes[0x1C], (uint32_t)laser->laserObjIdx);
+	ByteOrder_WriteU32Le(&bytes[0x20], (uint32_t)laser->firstShotDelayTicks);
+	ByteOrder_WriteU32Le(&bytes[0x24], (uint32_t)laser->repeatShotDelayTicks);
+	ByteOrder_WriteU16Le(&bytes[0x30], (uint16_t)laser->gap30);
+	ByteOrder_WriteU32Le(&bytes[0x32], (uint32_t)laser->emitterOffsetX);
+	ByteOrder_WriteU32Le(&bytes[0x36], (uint32_t)laser->emitterOffsetY);
+	ByteOrder_WriteU32Le(&bytes[0x3A], (uint32_t)laser->emitterOffsetZ);
+	for (i = 0; i < 4; ++i) {
+		ByteOrder_WriteU32Le(&bytes[0x3E + 4 * i], (uint32_t)laser->targetFlightGroupIds[i]);
+	}
+	ByteOrder_WriteU32Le(&bytes[0x4E], (uint32_t)laser->targetFlightGroupCount);
+	ByteOrder_WriteU32Le(&bytes[0x52], (uint32_t)laser->nextTargetFlightGroupIndex);
+	ByteOrder_WriteU32Le(&bytes[0x56], (uint32_t)laser->beamStartX);
+	ByteOrder_WriteU32Le(&bytes[0x5A], (uint32_t)laser->beamStartY);
+	ByteOrder_WriteU32Le(&bytes[0x5E], (uint32_t)laser->beamStartZ);
+	ByteOrder_WriteU32Le(&bytes[0x62], (uint32_t)laser->pointLightX);
+	ByteOrder_WriteU32Le(&bytes[0x66], (uint32_t)laser->pointLightY);
+	ByteOrder_WriteU32Le(&bytes[0x6A], (uint32_t)laser->pointLightZ);
+	memcpy(&remainingDistance, &laser->remainingDistance, sizeof(remainingDistance));
+	ByteOrder_WriteU32Le(&bytes[0x6E], remainingDistance);
+	Film_WriteBytesBuffered(bytes, sizeof(bytes));
+}
+
+static void Flight_FilmReadTunnelLaserState(DeathStarTunnelLaserRegionState* laser) {
+	uint8_t bytes[FLIGHT_FILM_TUNNEL_LASER_SIZE];
+	uint32_t remainingDistance;
+	int i;
+
+	if (!Film_ReadBytes(bytes, sizeof(bytes))) {
+		return;
+	}
+	laser->enabled = (int16_t)ByteOrder_ReadU16Le(&bytes[0x00]);
+	laser->shotActive = (int16_t)ByteOrder_ReadU16Le(&bytes[0x02]);
+	laser->alternateDelayPhase = (int16_t)ByteOrder_ReadU16Le(&bytes[0x04]);
+	laser->beamLightActive = (int16_t)ByteOrder_ReadU16Le(&bytes[0x06]);
+	laser->warmupTicks = ByteOrder_ReadI32Le(&bytes[0x08]);
+	laser->holdTicks = ByteOrder_ReadI32Le(&bytes[0x0C]);
+	laser->travelTicks = ByteOrder_ReadI32Le(&bytes[0x10]);
+	laser->shotStartGameTime = ByteOrder_ReadI32Le(&bytes[0x14]);
+	laser->targetObjIdx = ByteOrder_ReadI32Le(&bytes[0x18]);
+	laser->laserObjIdx = ByteOrder_ReadI32Le(&bytes[0x1C]);
+	laser->firstShotDelayTicks = ByteOrder_ReadI32Le(&bytes[0x20]);
+	laser->repeatShotDelayTicks = ByteOrder_ReadI32Le(&bytes[0x24]);
+	laser->gap30 = (int16_t)ByteOrder_ReadU16Le(&bytes[0x30]);
+	laser->emitterOffsetX = ByteOrder_ReadI32Le(&bytes[0x32]);
+	laser->emitterOffsetY = ByteOrder_ReadI32Le(&bytes[0x36]);
+	laser->emitterOffsetZ = ByteOrder_ReadI32Le(&bytes[0x3A]);
+	for (i = 0; i < 4; ++i) {
+		laser->targetFlightGroupIds[i] = ByteOrder_ReadI32Le(&bytes[0x3E + 4 * i]);
+	}
+	laser->targetFlightGroupCount = ByteOrder_ReadI32Le(&bytes[0x4E]);
+	laser->nextTargetFlightGroupIndex = ByteOrder_ReadI32Le(&bytes[0x52]);
+	laser->beamStartX = ByteOrder_ReadI32Le(&bytes[0x56]);
+	laser->beamStartY = ByteOrder_ReadI32Le(&bytes[0x5A]);
+	laser->beamStartZ = ByteOrder_ReadI32Le(&bytes[0x5E]);
+	laser->pointLightX = ByteOrder_ReadI32Le(&bytes[0x62]);
+	laser->pointLightY = ByteOrder_ReadI32Le(&bytes[0x66]);
+	laser->pointLightZ = ByteOrder_ReadI32Le(&bytes[0x6A]);
+	remainingDistance = ByteOrder_ReadU32Le(&bytes[0x6E]);
+	memcpy(&laser->remainingDistance, &remainingDistance, sizeof(laser->remainingDistance));
+}
+#endif
+
 // FUNCTION: XWA 0x4F6B70
 void Flight_AdvanceOneStep(int targetTimestamp) {
 	uint32_t loopIdx;
@@ -6208,7 +6398,13 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 					headerValue = 2;
 					Film_WriteBytesBuffered(&headerValue, 2u);
 				}
+#ifdef XWA_MODERN
+				/* Version 6: the port's state block follows the header
+				   (XwaFilmState_Write). */
+				headerValue = 6;
+#else
 				headerValue = 5;
+#endif
 				Film_WriteBytesBuffered(&headerValue, 2u);
 				Film_WriteBytesBuffered(g_currentMissionFile, sizeof(g_currentMissionFile));
 
@@ -6302,8 +6498,7 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 						GameRand_GetPrimarySeed();
 						bufferSize += 3023u * (uint32_t)g_flightPlayerCount + 22086u;
 #ifdef XWA_MODERN
-						bufferSize += FLIGHT_WORLD_EXTENSION_HEADER_SIZE +
-									  FLIGHT_WORLD_EXTENSION_RECORD_SIZE * g_craftObjectSlotsTotal;
+						bufferSize += FlightWorldState_ExtensionCapacity();
 #endif
 
 						g_worldStateHandle = Memory_AllocHandle("WORLDSTATEDATA", bufferSize);
@@ -6338,8 +6533,12 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 
 					for (loopIdx = 0; (int)loopIdx < (int)g_activeMissionRegionCount; ++loopIdx) {
 						if (g_deathStarTunnelLaserRegions[loopIdx].enabled) {
+#ifdef XWA_MODERN
+							Flight_FilmWriteTunnelLaserState(&g_deathStarTunnelLaserRegions[loopIdx]);
+#else
 							Film_WriteBytesBuffered(&g_deathStarTunnelLaserRegions[loopIdx],
 													sizeof(g_deathStarTunnelLaserRegions[loopIdx]));
+#endif
 						}
 					}
 
@@ -6403,6 +6602,16 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 					Film_WriteBytesBuffered(&g_filmStepInputTimestamp, sizeof(g_filmStepInputTimestamp));
 					Film_WriteBytesBuffered(&targetTimestamp, sizeof(targetTimestamp));
 					Film_WriteBytesBuffered(&dtMs, sizeof(dtMs));
+#ifdef XWA_MODERN
+					XwaFilmState_Write();
+					/* The film starts here. The cadences of the high-rate
+					   timing and the fractions of turret aim aren't in the
+					   film, so recording and playback both start them again
+					   from 0 at this step. */
+					XwaModernFlightTiming_RestartCadence((uint16_t)g_elapsedTicks);
+					Flight_ModernResetHighRateIntegration();
+					Hangar_ModernRestartCadence();
+#endif
 				}
 				Time_GetFrameDelta();
 			}
@@ -6429,8 +6638,7 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 				GameRand_GetPrimarySeed();
 				bufferSize += 3023u * (uint32_t)g_flightPlayerCount + 22086u;
 #ifdef XWA_MODERN
-				bufferSize += FLIGHT_WORLD_EXTENSION_HEADER_SIZE +
-							  FLIGHT_WORLD_EXTENSION_RECORD_SIZE * g_craftObjectSlotsTotal;
+				bufferSize += FlightWorldState_ExtensionCapacity();
 #endif
 
 				g_worldStateHandle = Memory_AllocHandle("WORLDSTATEDATA", bufferSize);
@@ -6468,8 +6676,12 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 
 			for (loopIdx = 0; (int)loopIdx < (int)g_activeMissionRegionCount; ++loopIdx) {
 				if (g_deathStarTunnelLaserRegions[loopIdx].enabled) {
+#ifdef XWA_MODERN
+					Flight_FilmReadTunnelLaserState(&g_deathStarTunnelLaserRegions[loopIdx]);
+#else
 					Film_ReadBytes(&g_deathStarTunnelLaserRegions[loopIdx],
 								   sizeof(g_deathStarTunnelLaserRegions[loopIdx]));
+#endif
 				}
 			}
 
@@ -6537,6 +6749,11 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 			Film_ReadBytes(&g_filmStepInputTimestamp, sizeof(g_filmStepInputTimestamp));
 			Film_ReadBytes(&targetTimestamp, sizeof(targetTimestamp));
 			Film_ReadBytes(&dtMs, sizeof(dtMs));
+#ifdef XWA_MODERN
+			if ((uint16_t)g_filmVersion > 5u) {
+				XwaFilmState_Read();
+			}
+#endif
 
 			g_inputTimestamp = g_filmStepInputTimestamp;
 			if (g_elapsedTicks == 0) {
@@ -6553,6 +6770,12 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 			g_mfdLeftNeedsRedraw = 1;
 			g_mfdRightNeedsRedraw = 1;
 			g_filmPlaybackMode = 2;
+#ifdef XWA_MODERN
+			/* As at the start of the recording. */
+			XwaModernFlightTiming_RestartCadence((uint16_t)g_elapsedTicks);
+			Flight_ModernResetHighRateIntegration();
+			Hangar_ModernRestartCadence();
+#endif
 			Time_GetFrameDelta();
 		}
 	}
@@ -7249,6 +7472,45 @@ process_film_overlay_input:
 	return 1;
 }
 
+#ifdef XWA_MODERN
+/* The film name prompt runs over several ticks (FlightFilm_RunNamePrompt),
+   so the code that saves a film waits for it to close. */
+typedef enum FlightFilmSave {
+	FLIGHT_FILM_SAVE_NONE = 0,
+	FLIGHT_FILM_SAVE_STOP_KEY,
+	FLIGHT_FILM_SAVE_MISSION_END,
+} FlightFilmSave;
+
+static FlightFilmSave g_flightFilmSavePending;
+
+int Flight_ContinueFilmSave(void) {
+	if (g_flightFilmSavePending == FLIGHT_FILM_SAVE_NONE) {
+		return 0;
+	}
+
+	FlightFilm_SaveTempRecordingWithPrompt();
+	if (FlightDisplay_IsFrontendModalActive()) {
+		return 1;
+	}
+
+	Music_ResumeIfInitialized();
+	Time_GetFrameDelta();
+	if (g_flightFilmSavePending == FLIGHT_FILM_SAVE_STOP_KEY) {
+		g_actionKey = KEY_NONE;
+		sub_4D4640();
+	}
+	g_flightFilmSavePending = FLIGHT_FILM_SAVE_NONE;
+	return 1;
+}
+
+int Flight_IsFilmSavePending(void) { return g_flightFilmSavePending != FLIGHT_FILM_SAVE_NONE; }
+
+static void Flight_BeginFilmSave(FlightFilmSave save) {
+	g_flightFilmSavePending = save;
+	(void)Flight_ContinueFilmSave();
+}
+#endif
+
 // FUNCTION: XWA 0x5117F0
 // Decide whether the flight loop should continue, return to the hangar, restart/debrief,
 // or save a recorded film, based on film playback/record state, end-of-mission flags, and
@@ -7341,9 +7603,16 @@ int Flight_CheckMissionEndAndExitRequest(void) {
 				g_inputTimestamp = Time_GetFrameDelta() + g_inputTimestamp;
 				Sound_StopAllInstances();
 				Music_PauseIfInitialized();
+#ifdef XWA_MODERN
+				Flight_BeginFilmSave(FLIGHT_FILM_SAVE_MISSION_END);
+				if (Flight_IsFilmSavePending()) {
+					return 0;
+				}
+#else
 				FlightFilm_SaveTempRecordingWithPrompt();
 				Music_ResumeIfInitialized();
 				Time_GetFrameDelta();
+#endif
 			}
 			if (g_filmPlaybackMode == 2) {
 				g_flightMissionEndPending = 1;
@@ -8639,7 +8908,7 @@ static __inline void FlightAction_ToggleFilmRecording(unsigned int playerIdx) {
 			g_inputTimestamp += Time_GetFrameDelta();
 			Sound_StopAllInstances();
 			Music_PauseIfInitialized();
-			FlightFilm_SaveTempRecordingWithPrompt();
+			Flight_BeginFilmSave(FLIGHT_FILM_SAVE_STOP_KEY);
 #else
 			fclose((FILE*)g_filmFile);
 			g_filmFile = NULL;
@@ -8653,11 +8922,11 @@ static __inline void FlightAction_ToggleFilmRecording(unsigned int playerIdx) {
 				remove(filmPath);
 				rename("film\\tempfilm.tmp", filmPath);
 			}
-#endif
 			Music_ResumeIfInitialized();
 			Time_GetFrameDelta();
 			g_actionKey = KEY_NONE;
 			sub_4D4640();
+#endif
 		}
 		return;
 	}

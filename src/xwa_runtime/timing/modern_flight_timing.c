@@ -69,6 +69,15 @@ void XwaModernFlightTiming_EndSession(void) {
 
 int XwaModernFlightTiming_StepTicks(void) { return g_effectiveStepTicks; }
 
+void XwaModernFlightTiming_UseFilmStepTicks(int step_ticks) {
+	if (step_ticks < XWA_MODERN_UNLOCKED_STEP_TICKS || step_ticks > XWA_MODERN_COMPATIBILITY_STEP_TICKS ||
+		step_ticks == g_effectiveStepTicks) {
+		return;
+	}
+	Aeron_LogInfo("xwa.flight.timing", "film: step %d instead of %d", step_ticks, g_effectiveStepTicks);
+	g_effectiveStepTicks = step_ticks;
+}
+
 int XwaModernFlightTiming_HangarStepTicks(void) {
 	return XwaModernFlightTiming_IsHighRate() ? XWA_MODERN_HANGAR_STEP_TICKS : g_effectiveStepTicks;
 }
@@ -92,6 +101,11 @@ void XwaModernFlightTiming_BeginAdvance(uint16_t elapsed_ticks) {
 	} else {
 		g_legacyCadenceDue = 0;
 	}
+}
+
+void XwaModernFlightTiming_RestartCadence(uint16_t elapsed_ticks) {
+	XwaModernFlightTiming_ResetAccumulators();
+	XwaModernFlightTiming_BeginAdvance(elapsed_ticks);
 }
 
 int XwaModernFlightTiming_IsLegacyCadenceDue(void) { return g_legacyCadenceDue; }

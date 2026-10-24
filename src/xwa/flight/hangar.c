@@ -5046,6 +5046,28 @@ static void Hangar_ModernResetCadenceSensitiveState(void) {
 	}
 }
 
+static int Hangar_ModernHasCraft(int objectIdx) {
+	return objectIdx >= 0 && (uint32_t)objectIdx < g_regionObjectSlotEnd &&
+		   g_objectTable[objectIdx].objectType != OBJ_None && g_objectTable[objectIdx].mobj != NULL &&
+		   g_objectTable[objectIdx].mobj->pCraft != NULL;
+}
+
+void Hangar_ModernRestartCadence(void) {
+	int sceneIdx;
+
+	/* Without the scene (it is cleared or not built yet), the state is read
+	   again when the scene is set up. */
+	if (!Hangar_ModernHasCraft(g_hangarCraneObjIdx)) {
+		return;
+	}
+	for (sceneIdx = 0; sceneIdx < g_hangarSceneObjectCount && sceneIdx < 10; ++sceneIdx) {
+		if (!Hangar_ModernHasCraft(g_hangarSceneObjects[sceneIdx].objectIdx)) {
+			return;
+		}
+	}
+	Hangar_ModernResetCadenceSensitiveState();
+}
+
 static void Hangar_ModernBeginLegacyCadence(int dtTicks) {
 	if (!XwaModernFlightTiming_IsHighRate()) {
 		g_modernHangarLegacyCadenceTicks = 0;

@@ -155,6 +155,12 @@ void XwaMissionSettings_Init(void);
    for its briefing. */
 void XwaMissionSettings_LoadMission(const char* missionPath);
 
+/* For films: copies the last target that each player picked with the
+   targetCycle key (-1: none yet) to `lastTarget`, or back from it. The array
+   has one value per player (XWA_PLAYER_COUNT). */
+void XwaMissionSettings_SaveFlightState(int32_t* lastTarget);
+void XwaMissionSettings_RestoreFlightState(const int32_t* lastTarget);
+
 /* The rules of flight/flight.yaml. */
 int XwaMissionSettings_ResetCombatMusicAtMissionLoad(void);
 int XwaMissionSettings_HangarRedAlertAnyMothership(void);

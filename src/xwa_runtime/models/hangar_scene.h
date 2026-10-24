@@ -84,6 +84,15 @@ int XwaHangarScene_CameraShot(int shotIndex, int* x, int* y, int* z);
 /* The crane shot's camera, above the crane on any axis. */
 void XwaHangarScene_FollowCrane(int* x, int* y, int* z);
 
+/* The scene state that changes during a flight, for films. */
+typedef struct XwaHangarSceneFlightState {
+	int32_t launchRefOffset[2];
+	int32_t reentryStartY;
+	uint8_t shuttleLoaded;
+} XwaHangarSceneFlightState;
+void XwaHangarScene_SaveFlightState(XwaHangarSceneFlightState* state);
+void XwaHangarScene_RestoreFlightState(const XwaHangarSceneFlightState* state);
+
 #ifdef __cplusplus
 }
 #endif

@@ -113,6 +113,21 @@ int XwaHangars_Resolve(void);
 /* True while settings apply (see above). */
 int XwaHangars_IsActive(void);
 
+/* The command ship that the last resolution used, for films. */
+typedef struct XwaHangarsFlightState {
+	uint8_t resolved;
+	uint8_t inHangar;
+	uint8_t provingGround;
+	uint8_t shipMarkings;
+	int32_t shipIff; /* -1: no command ship */
+	char shipKey[64];
+} XwaHangarsFlightState;
+void XwaHangars_SaveFlightState(XwaHangarsFlightState* state);
+/* Sets the command ship of the last resolution and builds its tables again,
+   without rebuilding the scene. In the hangar, the hangar objects get their
+   swapped models back. */
+void XwaHangars_RestoreFlightState(const XwaHangarsFlightState* state);
+
 const XwaHangarObjects* XwaHangars_Objects(void);
 /* The map section (`family`: the family base's). Without one in any layer,
    the default layout: the stock one at the highest detail level. */

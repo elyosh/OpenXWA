@@ -10,9 +10,8 @@
 
 /* Modern port module; no original counterpart. */
 
-/* g_missionFlightGroups holds 192. */
-#define WARHEAD_POOLS_FLIGHT_GROUPS 192
-#define WARHEAD_POOLS_TYPES 10
+#define WARHEAD_POOLS_FLIGHT_GROUPS XWA_WARHEAD_POOLS_FLIGHT_GROUPS
+#define WARHEAD_POOLS_TYPES XWA_WARHEAD_POOLS_TYPES
 
 static const char* const s_types[WARHEAD_POOLS_TYPES] = {
 	"space_bombs",        "heavy_rockets", "missiles",   "torpedoes",           "advanced_missiles",
@@ -27,6 +26,15 @@ static int s_cleared;
 void XwaWarheadPools_Clear(void) {
 	memset(s_left, 0xff, sizeof s_left);
 	s_cleared = 1;
+}
+
+void XwaWarheadPools_SaveFlightState(int32_t left[XWA_WARHEAD_POOLS_FLIGHT_GROUPS][XWA_WARHEAD_POOLS_TYPES]) {
+	memcpy(left, s_left, sizeof s_left);
+}
+
+void XwaWarheadPools_RestoreFlightState(
+	const int32_t left[XWA_WARHEAD_POOLS_FLIGHT_GROUPS][XWA_WARHEAD_POOLS_TYPES]) {
+	memcpy(s_left, left, sizeof s_left);
 }
 
 int XwaWarheadPools_ReadFlightGroup(const char* path, const char* fgKey, int fgIdx, const XwaFlightGroup* fg,
