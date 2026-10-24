@@ -66,8 +66,8 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 	g_loadingModel = 1;
 
 #ifdef XWA_MODERN
-	/* Modern port: the hangar settings may load another model for this
-	   type, the command ship's own hangar or a swapped hangar object. */
+	/* The hangar settings can load another model for this type: the command
+	   ship's own hangar, or a hangar object that the settings swap in. */
 	if (!XwaHangars_ModelFileName(objectType, modelName, sizeof modelName))
 #endif
 		switch (objectType) {
@@ -241,13 +241,14 @@ int16_t Hangar_LoadCraftModelByType(uint16_t objectType) {
 				break;
 			default:
 #ifdef XWA_MODERN
-				/* Modern port: with hangar settings, this filter is skipped. Any
-				   type with a model list row loads, since hangar maps can place
-				   any of them. */
+				/* With hangar settings, this filter is skipped. Any type with a
+				   model list row loads, since hangar maps can place any of
+				   them. */
 				if (XwaHangars_TypeFileName(objectType, modelName, sizeof modelName)) {
 					break;
 				}
-				/* A gunner cockpit that a mod adds loads by its own list row. */
+				/* A gunner cockpit added by a mod loads the model of its own
+				   list row. */
 				if (XwaGunnerSeats_CockpitFileName(objectType, modelName, sizeof modelName)) {
 					break;
 				}

@@ -507,7 +507,8 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 			++componentIndex;
 		} while (--remainingComponents != 0);
 #ifdef XWA_MODERN
-		craft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
+		/* The original loop cleared this byte as componentState[49]. */
+		craft->animatedTextureFrame = 0;
 		memset(craft->articulationTicks, 0, sizeof craft->articulationTicks);
 		craft->articulationMotion = 0;
 		memset(craft->articulationAngles, 0, sizeof craft->articulationAngles);
@@ -1131,10 +1132,11 @@ void Object_ClearSlotState(uint32_t objIdx) {
 			   offsetof(CraftData, warheadData[14].count) +
 				   sizeof(g_objectTable[objIdx].mobj->pCraft->warheadData[14].count));
 #ifdef XWA_MODERN
-		/* Modern port: the prefix cleared above held the animated-texture
-		 * byte as componentState[49], and no rack past 15. Clear the byte and
-		 * the racks only a GLB replacement has; rack 15 keeps its original
-		 * behaviour. */
+		/* In the original, the memset above also cleared the animated-texture
+		   byte, which it kept as componentState[49]. Clear that byte, the
+		   articulation state and the racks that only a GLB replacement has. The
+		   memset doesn't reach warheadData[15], which keeps its original
+		   behaviour. */
 		g_objectTable[objIdx].mobj->pCraft->animatedTextureFrame = 0;
 		memset(g_objectTable[objIdx].mobj->pCraft->articulationTicks, 0,
 			   sizeof g_objectTable[objIdx].mobj->pCraft->articulationTicks);
@@ -1542,7 +1544,6 @@ void Object_UpdateLifetimeAndMovement(void) {
 						g_objectTable[objIdx].mobj->instanceExtent =
 							(unsigned int)g_objectTable[objIdx].mobj->instanceExtent >> 1;
 #ifdef XWA_MODERN
-						/* Modern port: a mod can change the explosion sounds. */
 						fsfx_PlaySound(XwaCraftSounds_Explosion(objIdx, fsfx_PickRandomSmallExplosionSfx()),
 									   objIdx, g_localPlayer);
 #else
@@ -1621,8 +1622,6 @@ void Object_UpdateLifetimeAndMovement(void) {
 									g_objectTable[(uint16_t)obj->mobj->sourceObjIdx].playerOwnerIdx;
 								if (ownerPlayer != -1) {
 #ifdef XWA_MODERN
-									/* Modern port: a mod's weapon profile can
-									   change the score. */
 									g_players[ownerPlayer].missionStats.missionScore -= XwaWeaponStats_Value(
 										obj->mobj->sourceObjIdx, obj->objectType, XWA_WEAPON_STAT_SCORE,
 										g_warheadProjectilePointValueByObjectType[obj->objectType]);
@@ -2108,8 +2107,6 @@ void Object_UpdateLifetimeAndMovement(void) {
 							uint16_t speed = fm->speed;
 							if (speed < pWG->minSpeed) {
 #ifdef XWA_MODERN
-								/* Modern port: a mod's weapon profile can
-								   change the speed. */
 								fm->speed =
 									(uint16_t)(speed + (uint16_t)g_elapsedTicks *
 														   (uint16_t)XwaWeaponStats_Value(
@@ -2219,10 +2216,10 @@ void Object_UpdateLifetimeAndMovement(void) {
 							yawDeltaU = (uint16_t)(trig2_xyangle - yaw);
 							yawDelta = (int16_t)yawDeltaU;
 #ifdef XWA_MODERN
-							/* Modern port: a homing warhead turns and changes speed at
-							   its table rates with any step size. With 1-tick steps,
-							   the stock division gives 0 for any rate below 236 a
-							   second. */
+							/* A homing warhead turns and changes speed at its
+							   table rates with any step size. With 1-tick
+							   steps, the stock division gives 0 for any rate
+							   below 236 a second. */
 							turnStep = XwaModernFlightTiming_ScaleStepTicks(
 								g_gameTime, (uint16_t)g_elapsedTicks,
 								g_projectileHomingTurnRateByProfile[profile], 236);

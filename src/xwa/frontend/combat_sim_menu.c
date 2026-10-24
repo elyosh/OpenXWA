@@ -105,8 +105,8 @@ int CombatSimMenu_Update(int frameCounter) {
 					FrontendScreen_SetCallbacks(MultiplayerSetup_Update, MultiplayerSetup_Exit);
 				}
 #ifdef XWA_MODERN
-				/* XWA_MODERN: frontend/concourse/layout.yaml can move the pod doors
-				   and their selection areas. */
+				/* Frontend/concourse/layout.yaml can move the pod doors and
+				   their selection areas. */
 				XwaConcourseLayout_DrawSprite("multi", "combat_room.multiplayer.door", 24, 140);
 #else
 				FrontImage_DrawSprite("multi", 24, 140);
@@ -285,7 +285,7 @@ int CombatSimMenu_Update(int frameCounter) {
 		FrontendText_DrawCentered(15, FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT), &rect, color);
 	} else {
 #ifdef XWA_MODERN
-		/* XWA_MODERN: the back door's hit area moves with the door. */
+		/* The back door's hit area moves with the door. */
 		XwaConcourseLayout_AssignMovedRect(&rect, "combat_room.back_door", 299, 90, 326, 22, 412, 148);
 #else
 		FrontendDraw_RectAssign(&rect, 326, 22, 412, 148);

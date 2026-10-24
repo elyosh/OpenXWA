@@ -113,7 +113,6 @@ char FeDiskIo_LoadFlightSfxBanks(void) {
 			strcat(fileName, "SfxBlastNew.lst");
 			fsfx_LoadSfxList(fileName, 4, waveDir);
 #ifdef XWA_MODERN
-			/* Modern port: also load a mod's sound banks. */
 			XwaSoundBanks_LoadFlight(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 									 (int16_t)g_missionHeader.numFlightGroups);
 #endif
@@ -319,7 +318,8 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 	g_modelDefs[modelEntryIdx].childMountPoints[5] = ModelBounds_GetMaxY(modelSlot);
 	g_modelDefs[modelEntryIdx].childMountPoints[4] = 0;
 #ifdef XWA_MODERN
-	/* Modern port: restore the pilot eye before the hardpoints set it. */
+	/* Reset the pilot eye before the hardpoint walk, so that a model without a
+	   Cockpit hardpoint doesn't keep the eye of the model loaded before it. */
 	XwaCockpitEye_ResetModelDef(modelEntryIdx);
 #endif
 	g_modelDefs[modelEntryIdx].dockPointCount = 0;
@@ -416,8 +416,8 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 							g_modelDefs[modelEntryIdx].cockpitEyeZ = (int16_t)outZ;
 							g_modelDefs[modelEntryIdx].cockpitEyeY = (int16_t)outY;
 #ifdef XWA_MODERN
-							/* Modern port: a GLB replacement's Cockpit hardpoint
-							 * also sets X. */
+							/* The original ignores the X of the Cockpit
+							   hardpoint. A GLB replacement uses it. */
 							XwaCockpitEye_ApplyHardpointX(modelEntryIdx, (unsigned short)modelSlot, outX);
 #endif
 							handled = 1;
@@ -489,9 +489,9 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 					if ((g_objectTypes[loadedModelSlot].flags & OBJECT_TYPE_FLAG_FLOAT_HARDPOINT_WEAPONS) ==
 						0) {
 #ifdef XWA_MODERN
-						/* Modern port: a mod can map hardpoint types 33 to 38
-						   to the turbolasers. A model can also set which
-						   hardpoint types are lasers and which are warheads. */
+						/* A mod can map hardpoint types 33 to 38 to the
+						   turbolasers. A model can also set which hardpoint
+						   types are lasers and which are warheads. */
 						uint16_t weaponType = (uint16_t)(XwaMissionSettings_TurbolaserHardpointTypes()
 															 ? XwaWeaponStats_HardpointWeaponType(outType)
 															 : outType + 279);
@@ -584,8 +584,8 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 								++floatZWrite;
 							}
 #ifdef XWA_MODERN
-							/* Modern port: a mod can stop the hardpoints of gun
-							   turret meshes from being mirrored. */
+							/* A mod can stop the hardpoints of gun turret
+							   meshes from being mirrored. */
 							if (floatSlot < 256 &&
 								!(XwaMissionSettings_GunTurretHardpoints() &&
 								  XwaTurretHardpoints_IsTurretMesh(meshType)) &&
@@ -612,8 +612,8 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 		uint8_t weaponSlot;
 		int remainingGroups;
 #ifdef XWA_MODERN
-		/* Modern port: GLB replacements keep up to 120 weapon slots (the
-		 * original compares against 16 below). */
+		/* A GLB replacement keeps up to 120 weapon slots, like X-Wing Alliance
+		   Upgrade. Other models keep the original 16. */
 		const int weaponSlotLimit = XWA_MODEL_WEAPON_SLOT_LIMIT(modelSlot);
 #define FEDISKIO_WEAPON_SLOT_LIMIT weaponSlotLimit
 #else
@@ -682,9 +682,9 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 											.weaponHardpoints[weaponSlot]
 											.alternateMeshHardpointIdx = 0xff;
 #ifdef XWA_MODERN
-										/* Modern port: the gunner cockpits that a mod adds
-										   are like type 317, and their turret hardpoints
-										   aren't paired either. */
+										/* The gunner cockpits that a mod adds
+										   are like type 317, and their turret
+										   hardpoints aren't paired either. */
 										if (loadedModelSlot != 317 &&
 											!XwaCraftDefinitions_GunnerCockpit(loadedModelSlot) &&
 											(meshType == MESH_GunTurret ||
@@ -1713,10 +1713,12 @@ void FeDiskIo_FreeModelResources(void) {
 			g_objectTypes[objectType].curTexLevel = NULL;
 			g_loadedModels.byObjectType[objectType] = 0;
 #ifdef XWA_MODERN
-			/* The original writes g_objectTypes[XWA_LOADED_MODEL_COUNT].texLevels
-			 * here because duplicateObjectType has reached the loop bound. That landed
-			 * in linker padding in the 32-bit image; omit the non-semantic overflow in
-			 * the portable build without changing any valid model-table state. */
+			/* The original writes
+			   g_objectTypes[XWA_LOADED_MODEL_COUNT].texLevels here, because
+			   duplicateObjectType has reached the loop bound. In the 32-bit
+			   executable that write lands in linker padding. The port leaves
+			   out this out-of-bounds write. No valid model table entry
+			   changes. */
 #else
 			g_objectTypes[duplicateObjectType].texLevels = NULL;
 #endif
@@ -3352,7 +3354,8 @@ char* FeDiskIo_GetCraftModelName(unsigned int craftType) {
 #endif
 			rowIndex = 0;
 #ifdef XWA_MODERN
-			/* After the last line, the rows that the mod's object type files add. */
+			/* After the last line of the file, read the rows that the mod's
+			   object type files add. */
 			while (File_ReadLine(stream, line, sizeof(line)) ||
 				   XwaCraftDefinitions_NextAddedRow(textureGroup, &rowIndex, line, sizeof(line))) {
 #else
@@ -3464,7 +3467,8 @@ void FeDiskIo_LoadResources(void) {
 
 		rowIndex = 0;
 #ifdef XWA_MODERN
-		/* After the last line, the rows that the mod's object type files add. */
+		/* After the last line of the file, read the rows that the mod's object
+		   type files add. */
 		while (File_ReadLine(stream, line, sizeof(line)) ||
 			   XwaCraftDefinitions_NextAddedRow(textureGroup, &rowIndex, line, sizeof(line))) {
 #else
@@ -3584,8 +3588,8 @@ void FeDiskIo_LoadResources(void) {
 								remainingHardpoints = hardpointCount;
 								do {
 #ifdef XWA_MODERN
-									/* Modern port: a mod can give each float
-									   hardpoint to a gun turret mesh. */
+									/* A mod can give each float hardpoint to a
+									   gun turret mesh. */
 									hardpoint->componentIndex =
 										(uint8_t)(XwaMissionSettings_GunTurretHardpoints()
 													  ? XwaTurretHardpoints_FloatHardpointComponent(
@@ -3773,9 +3777,9 @@ static __inline void FeDiskIo_FinalizeCockpitModelLoad(uint16_t objectType) {
 		uint16_t turretObjectType;
 
 #ifdef XWA_MODERN
-		/* Modern port: a mod can give each seat its own cockpit. The seats are
-		   available when the first seat's cockpit is loaded, and every seat's
-		   cockpit loads with it. */
+		/* A mod can give each seat its own cockpit. The seats are available
+		   when the first seat's cockpit is loaded, and every seat's cockpit
+		   loads with it. */
 		turretObjectType = (uint16_t)XwaGunnerSeats_Value(
 			(unsigned int)objectType, 0, XWA_GUNNER_SEAT_COCKPIT,
 			g_modelDefs[(uint16_t)GetModelDefIndexFromType((ObjectTypeId)objectType)].turretObjectType[0]);

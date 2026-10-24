@@ -2960,8 +2960,8 @@ int MissionSetup_DrawMissionDescriptionPanel(void) {
 	FrontendRect rect;
 
 #ifdef XWA_MODERN
-	/* XWA_MODERN: mission_selection_x in frontend/concourse/layout.yaml moves
-	   the description panel for Tour of Duty and melee missions. */
+	/* Mission_selection_x in frontend/concourse/layout.yaml moves the
+	   description panel for Tour of Duty and melee missions. */
 	if (g_pilotData.missionDirectoryId == MISSION_DIRECTORY_TOUR) {
 		xOffset = XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection_x", 230.0f));
 	} else {
@@ -7517,8 +7517,8 @@ int MissionSetup_Update(int frameCounter) {
 		}
 		g_missionSetupTourButtonEnabled = 1;
 #ifdef XWA_MODERN
-		/* Modern port: a mod can choose the pod's movie in
-		   frontend/movies/movies.yaml; it is "pod" otherwise. */
+		/* A mod can choose the pod's movie in frontend/movies/movies.yaml; it
+		   is "pod" otherwise. */
 		if (!entryMoviePending && !g_skipFrontendEntryMovie &&
 			g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_SINGLEPLAYER &&
 			Movie_Play(XwaMovieTask_RoomMovie(XWA_MOVIE_ROOM_SINGLE_PLAYER_POD), 1)) {
@@ -7558,8 +7558,8 @@ int MissionSetup_Update(int frameCounter) {
 		}
 
 #ifdef XWA_MODERN
-		/* Modern port: the ratings are computed live, with the mod's models and
-		   stats profiles, instead of read from spec.rci. */
+		/* The ratings are computed live, with the mod's models and stats
+		   profiles, instead of read from spec.rci. */
 		XwaTechRatings_BuildTable(&g_cachedCraftTechStats, &g_cachedCraftTechStatsCount);
 #else
 		specFile = File_Open(AERON_VFS_ROOT_ASSET, "spec.rci", "rb");

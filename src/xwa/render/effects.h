@@ -217,12 +217,13 @@ double Particle_RandUnitFloat(void);
 double Particle_RandSignedUnitFloat(void);
 
 #ifdef XWA_MODERN
-/* Snapshot-only allocation generations. Stable while an allocation is live;
- * never consumed by simulation/render branching and never exposes pointers. */
+/* IDs for the snapshot, made from allocation generations. An ID stays the same
+ * while its effect or record is allocated. The simulation and the renderer
+ * never branch on them, and they don't expose pointers. */
 uint32_t Particle_SnapshotEffectId(const ParticleEffect* effect);
 uint32_t Particle_SnapshotRecordId(const ParticleRecord* particle);
-/* Modern render-only precise positions. These sidecars do not alter the
- * recovered particle layouts or feed back into simulation. */
+/* Precise positions, for rendering only. They are kept outside the recovered
+ * particle structs and never feed back into the simulation. */
 int Particle_SnapshotEffectPoint(const ParticleEffect* effect, int32_t base[3], float offset[3]);
 int Particle_SnapshotRecordPoint(const ParticleRecord* particle, int32_t base[3], float offset[3]);
 void Particle_SetWorldEffectPreciseOrigin(ParticleEffect* effect, const int32_t world[3]);

@@ -408,8 +408,8 @@ char ModelPreview_LoadModel(const char* modelName, int craftType) {
 	strcpy(g_modelPreviewOptFileName, baseName);
 	strcat(g_modelPreviewOptFileName, ".opt");
 #ifdef XWA_MODERN
-	/* Modern port: the name of the model that loaded, which the HD preview
-	   draws. */
+	/* When the mission swaps the model, keep the name of the file that loaded
+	   instead. The HD preview draws that file. */
 	{
 		char swapped[sizeof g_modelPreviewOptFileName];
 
@@ -480,9 +480,10 @@ char ModelPreview_LoadModel(const char* modelName, int craftType) {
 	g_modelPreviewObject.yaw = 0;
 	g_modelPreviewObject.roll = 0;
 #ifdef XWA_MODERN
-	/* Modern port: hide the components of the selected object profile, as
-	 * destroyed: the ship-info flight group's while a briefing plays, none
-	 * otherwise (the tech library has no mission). */
+	/* Hide the components that the selected object profile hides, as if they
+	   were destroyed. During a briefing, the profile is the one of the
+	   ship-info flight group. Otherwise no profile is selected, since the tech
+	   library has no mission. */
 	XwaObjectProfiles_Apply((uint16_t)g_modelPreviewObjectType,
 							g_briefingPlaybackActive ? (int)(uint16_t)g_briefingMapPrimaryHighlightIconIndex
 													 : 0xFFFF,
@@ -684,9 +685,9 @@ int ModelPreview_RenderViewport(int x, int y, int width, int height, void* softw
 
 #ifdef XWA_MODERN
 	{
-		/* Remaster snapshot observer — after FVIEW_SetObjectTransform
-		 * and the view rotation so the record carries the engine's
-		 * resolved object->eye basis + eye-space position. */
+		/* Record the preview for the snapshot after FVIEW_SetObjectTransform
+		   and the view rotation, so that the record has the object-to-eye basis
+		   and the eye-space position that the engine computed. */
 		XwaModelPreview snapPreview;
 		memset(&snapPreview, 0, sizeof snapPreview);
 		snapPreview.wireframe = 0;
@@ -695,8 +696,8 @@ int ModelPreview_RenderViewport(int x, int y, int width, int height, void* softw
 		snapPreview.roll = g_modelPreviewObject.roll;
 		snapPreview.angle_d = g_modelPreviewAngleD;
 		{
-			/* Basename only — path components would truncate long
-			 * names (CorellianTransport2Exterior.opt). */
+			/* Only the file name: with the path, long names such as
+			   CorellianTransport2Exterior.opt wouldn't fit in opt_name. */
 			const char* base = g_modelPreviewOptFileName;
 			for (const char* c = g_modelPreviewOptFileName; *c; c++) {
 				if (*c == '\\' || *c == '/') {
@@ -729,9 +730,9 @@ int ModelPreview_RenderViewport(int x, int y, int width, int height, void* softw
 		snapPreview.eye_delta[1] = g_modelPreviewViewDelta.y;
 		snapPreview.eye_delta[2] = g_modelPreviewViewDelta.z;
 		snapPreview.model_scale = (float)g_modelPreviewScaleFactor;
-		/* This view's camera (world->eye), for rotating the WORLD-space
-		 * dir_lights channel into the eye space the basis/delta above
-		 * live in. Same g_camMat the wireframe path consumes below. */
+		/* This view's world-to-eye camera, for rotating the dir_lights channel
+		   from world space into the eye space of the basis and delta above. The
+		   wireframe path below uses the same g_camMat. */
 		snapPreview.cam_rows[0] = (float)g_camMatR0_X * (1.0f / 32768.0f);
 		snapPreview.cam_rows[1] = (float)g_camMatR0_Y * (1.0f / 32768.0f);
 		snapPreview.cam_rows[2] = (float)g_camMatR0_Z * (1.0f / 32768.0f);
@@ -839,7 +840,6 @@ int ModelPreview_RenderWireframeViewport(int x, int y, int width, int height, in
 	}
 #ifdef XWA_MODERN
 	{
-		/* Remaster snapshot observer. */
 		XwaModelPreview snapPreview;
 		memset(&snapPreview, 0, sizeof snapPreview);
 		snapPreview.wireframe = 1;

@@ -110,8 +110,9 @@ int g_imPauseCount;
 char g_imLogBuf[256];
 
 #ifdef XWA_MODERN
-/* Managed MCMP streams share the ImMcmpStream type with cast raw-file
-   handles. Pointer equality is defined for both kinds of handle. */
+/* Managed MCMP streams and raw file handles cast to ImMcmpStream share one
+   type. This tells them apart by comparing addresses with ==, which is well
+   defined for both kinds of handle. */
 static int ImMcmpIsManagedStream(const ImMcmpStream* stream) {
 	size_t i;
 

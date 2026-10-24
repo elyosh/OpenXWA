@@ -124,9 +124,9 @@ typedef char sound_queue_entry_size[(sizeof(SoundQueueEntry) == 0x2D) ? 1 : -1];
 typedef char sound_queue_entry_priority_offset[(offsetof(SoundQueueEntry, priority) == 0x14) ? 1 : -1];
 
 #ifdef XWA_MODERN
-/* Modern port: slots 2872 and up are for a mod's sound banks. The banks
-   also need room for more effects. This is safe because effects are only
-   runtime state. */
+/* Slots 2872 and up are for a mod's sound banks, which also need room for more
+   effects. Making these tables bigger is safe because they are only runtime
+   state. */
 #define XWA_SFX_SLOT_COUNT (2872 + 16384)
 #define XWA_SOUND_EFFECT_COUNT 4096
 #else

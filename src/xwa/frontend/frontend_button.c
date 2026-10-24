@@ -359,8 +359,8 @@ int FrontendButton_DrawSpriteWithHoverText(FrontendRect* buttonRect, char* upSpr
 	FrontendCursor_GetPos(&outX, &outY);
 	FrontendDraw_RectCopy(&clippedRect, buttonRect);
 #ifdef XWA_MODERN
-	/* XWA_MODERN: if the up image has atlas geometry, the hit rectangle starts
-	   at the button's top left corner and has the size of the up image. */
+	/* If the up image has atlas geometry, the hit rectangle starts at the
+	   button's top left corner and has the size of the up image. */
 	if (XwaFrontendGeometry_ResourceHasGeometry(upSpriteName)) {
 		FrontImage_GetResourceRect(upSpriteName, &sourceRect);
 		clippedRect.right = clippedRect.left + (sourceRect.right - sourceRect.left);

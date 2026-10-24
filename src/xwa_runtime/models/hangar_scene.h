@@ -1,8 +1,9 @@
 #ifndef XWA_RUNTIME_MODELS_HANGAR_SCENE_H
 #define XWA_RUNTIME_MODELS_HANGAR_SCENE_H
 
-/* Modern port: the hangar scene from the hangar settings. The hangar code calls
- * these instead of its stock spawns while settings are active. */
+/* Modern port: builds the hangar scene from the hangar settings. While hangar
+   settings are active, the hangar code calls these functions instead of its
+   stock spawn code. */
 
 #include <stdint.h>
 

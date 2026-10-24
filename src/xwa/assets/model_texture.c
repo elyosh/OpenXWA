@@ -251,7 +251,9 @@ ModelTextureDefaultTexture* ModelTexture_GetDefaultWhiteTexture(void) {
 	g_defaultWhiteTexture.desc.width = 8;
 	g_defaultWhiteTexture.desc.height = 8;
 
-	/* Built in scratch: the in-place build below relies on the packed layout. */
+	/* Built in a scratch buffer, then copied out. The original builds in place:
+	   the shade table lands right after the 64 base texels, and the copy to
+	   shadeTable relies on the packed layout. */
 	ModelTexture_BuildPalettedShadeTable(g_defaultWhiteTextureBuildScratch, g_defaultWhiteTextureRgb24, 8, 8);
 	memcpy(g_defaultWhiteTexture.data.baseTexels, g_defaultWhiteTextureBuildScratch,
 		   sizeof(g_defaultWhiteTexture.data.baseTexels));

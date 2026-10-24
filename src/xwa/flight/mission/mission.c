@@ -2988,9 +2988,8 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 					object = &g_objectTable[objectIdx];
 					if (object->objectType == 0 ||
 #ifdef XWA_MODERN
-						/* Modern port: a mission can make the proximity
-						   triggers skip objects without craft data, such as
-						   projectiles. */
+						/* A mission can make the proximity triggers skip
+						   objects without craft data, such as projectiles. */
 						(XwaMissionSettings_SkipProjectilesProximityCheck() &&
 						 (object->mobj == NULL || object->mobj->pCraft == NULL)) ||
 #endif
@@ -6499,8 +6498,6 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 								else
 									warheadAmmoClass = 3;
 #ifdef XWA_MODERN
-								/* Modern port: a mod's warhead profile can
-								   change the number of warheads. */
 								ammo = (uint8_t)XwaWeaponStats_WarheadCapacity(
 									objIdx, warheadAmmoClass,
 									g_modelDefs[modelIndex].warheadLauncherCapacity[launcher],
@@ -6519,8 +6516,9 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 								if (!ammo)
 									ammo = 1;
 #ifdef XWA_MODERN
-								/* Modern port: a mod can lift the cap of 9 warheads,
-								   and limit the warheads by flight group. */
+								/* A mod can lift the cap of 9 warheads for the
+								   player's craft, and a mission can limit the
+								   warheads of each flight group. */
 								if (hasPlayerOwner && ammo > 9 &&
 									g_objectTable[objIdx].objectType != OBJ_MissileBoat &&
 									!XwaMissionSettings_NoPlayerWarheadSlotCap())
@@ -6626,8 +6624,9 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 	if (modelIndex != 0xFFFF) {
 		// Hyperdrive availability.
 #ifndef XWA_MODERN
-		/* Modern port: XwaStatsProfiles_ApplyNewCraft removes the hyperdrive at
-		   the end, with the craft's stats profile. */
+		/* Modern port: XwaStatsProfiles_ApplyNewCraft removes the hyperdrive
+		   later, at the end of the craft's setup, because the craft's stats
+		   profile can say whether it has one. */
 		if (!g_modelDefs[modelIndex].hasHyperdrive && g_spawnStatus1 != 9 && g_spawnStatus2 != 9 &&
 			g_spawnStatus1 != 16 && g_spawnStatus2 != 16)
 			g_curCraft->systemFlags ^= 0x80;
@@ -6671,8 +6670,9 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		}
 		g_curCraft->shieldRedirect = 2;
 #ifndef XWA_MODERN
-		/* Modern port: XwaStatsProfiles_ApplyNewCraft removes the shields at the
-		   end, with the craft's stats profile. */
+		/* Modern port: XwaStatsProfiles_ApplyNewCraft removes the shields
+		   later, at the end of the craft's setup, because the craft's stats
+		   profile can say whether it has them. */
 		if (!g_modelDefs[modelIndex].hasShields && g_spawnStatus1 != 8 && g_spawnStatus2 != 8 &&
 			g_spawnStatus1 != 16 && g_spawnStatus2 != 16) {
 			g_curCraft->systemFlags ^= 1;
@@ -6685,7 +6685,6 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		// Beam weapon.
 		g_curCraft->beamTypeId = g_missionFlightGroups[g_currentFlightGroupIdx].fg.beam;
 #ifdef XWA_MODERN
-		/* A mod's object type file can allow or forbid beams by object type. */
 		if (!XwaCraftDefinitions_BeamAllowed(g_spawnObjectType))
 			g_curCraft->beamTypeId = 0;
 #else
@@ -6729,11 +6728,11 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			g_curCraft->componentHp[i] = 0xFF;
 		}
 #ifdef XWA_MODERN
-		g_curCraft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
+		/* The byte that the stock loop above clears as componentState[49]. */
+		g_curCraft->animatedTextureFrame = 0;
 		memset(g_curCraft->articulationTicks, 0, sizeof g_curCraft->articulationTicks);
 		g_curCraft->articulationMotion = 0;
 		memset(g_curCraft->articulationAngles, 0, sizeof g_curCraft->articulationAngles);
-		/* Modern port: the mission's start poses for articulated models. */
 		XwaArticulation_InitMissionStart(objIdx);
 #endif
 	}
@@ -6750,8 +6749,6 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 						g_curCraft->componentHp[meshIdx] = (uint8_t)(2 * g_meshTypeComponentMaxHp[8] - 1);
 					else
 #ifdef XWA_MODERN
-						/* Modern port: a mod can change the strength by mesh
-						   type for each model. */
 						g_curCraft->componentHp[meshIdx] = (uint8_t)XwaComponentStrength_Value(
 							(unsigned int)objectType, meshType, g_meshTypeComponentMaxHp[meshType]);
 #else
@@ -6775,10 +6772,10 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		(uint16_t)g_spawnObjectType <= OBJ_Platform5) {
 		uint8_t beam = g_missionFlightGroups[g_currentFlightGroupIdx].fg.beam;
 #ifdef XWA_MODERN
-		/* Modern port: a GLB replacement names these components with role
-		 * tags instead of the per-platform table, which assumes the stock
-		 * layout. Any beam hides platform.hidden_by_beam; jamming and decoy
-		 * beams (all but tractor, 1) also hide platform.hidden_by_jamming_decoy. */
+		/* A GLB replacement names these components with role tags instead of
+		 * the per-platform table, which assumes the stock layout. Any beam
+		 * hides platform.hidden_by_beam; jamming and decoy beams (all but
+		 * tractor, 1) also hide platform.hidden_by_jamming_decoy. */
 		if (beam && XwaModelRole_IsReplacement((uint16_t)g_spawnObjectType)) {
 			int components[XWA_OPT_SYNTH_MAX_COMPONENTS];
 			int count;
@@ -6817,8 +6814,8 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: hide the components of the object profile selected for
-	 * this flight group, as destroyed. Only GLB replacements carry profiles. */
+	/* The components that the craft's object profile hides are marked as
+	 * destroyed. Only GLB replacements have object profiles. */
 	XwaObjectProfiles_Apply((uint16_t)g_spawnObjectType, g_currentFlightGroupIdx,
 							g_objectTable[objIdx].mobj->nodeSwitchIndex, g_curCraft);
 #endif
@@ -7039,8 +7036,8 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: a mission can give one craft of a flight group its own
-	   markings. Only a new craft gets them. */
+	/* A mission can give one craft of a flight group its own markings. Only a
+	   new craft gets them. */
 	if ((uint16_t)existingObjIdx == 0xFFFF) {
 		const int markings = XwaMissionTie_CraftMarkings(g_currentFlightGroupIdx, g_spawnCraftOrdinal);
 
@@ -7048,9 +7045,9 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			g_objectTable[objIdx].mobj->nodeSwitchIndex = (uint8_t)markings;
 		}
 	}
-	/* Modern port: the craft gets its stats profile here, after its markings,
-	   since the profile can depend on them. A craft that is made again, such
-	   as the player's new craft in the hangar or a Death Star object, gets it
+	/* The craft gets its stats profile here, after its markings, since the
+	   profile can depend on them. A craft that is made again, such as the
+	   player's new craft in the hangar or a Death Star object, gets it
 	   again. */
 	XwaStatsProfiles_ApplyNewCraft(objIdx);
 #endif
@@ -7648,13 +7645,13 @@ uint16_t Mission_Init(char* fileName) {
 		return 0;
 	}
 #ifdef XWA_MODERN
-	/* Modern port: read the mission's settings, flight-group values, object
-	   profile selections, articulation overrides, hangar settings, art of its
-	   own, model swaps, craft names and headlights, before any flight-group
-	   object is created or any model or texture loaded.
-	   The flight-group values come right after the .TIE is read, so the
-	   readers after them see them. A mod can also make each mission load
-	   start without the combat music state of the previous mission. */
+	/* Read the mission's own data before any flight-group object is created or
+	   any model or texture is loaded: its settings, flight-group values, object
+	   profiles, articulation, skins, hangar settings, art, model swaps, stats
+	   profiles, craft names, headlights and sounds. The flight-group values are
+	   read right after the settings, so the readers after them see them. A mod
+	   can also clear the combat music state of the previous mission at each
+	   mission load. */
 	if (XwaMissionSettings_ResetCombatMusicAtMissionLoad()) {
 		g_musicCombatSeen = 0;
 	}
@@ -8058,8 +8055,8 @@ uint16_t Mission_Init(char* fileName) {
 
 		modelIndex = GetModelDefIndexFromType(objectType);
 #ifdef XWA_MODERN
-		/* Modern port: a mod can give each seat its own cockpit, so every
-		   seat's cockpit loads. */
+		/* When a mod gives the craft gunner seats, load the cockpit of every
+		   seat instead of the stock turret cockpit. */
 		if (XwaGunnerSeats_Count((unsigned int)objectType) >= 0) {
 			int seat;
 
@@ -8114,10 +8111,10 @@ uint16_t Mission_Init(char* fileName) {
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: the skins that the renderer loads depend on the flight
-	   groups' markings and on the markings that the mission gives single
-	   craft, and the model settings depend on the craft types. All are
-	   final once the loop above has set up the player groups. */
+	/* The skins that the renderer loads depend on the flight groups' markings
+	   and on the markings that the mission gives single craft, and the model
+	   settings depend on the craft types. All are final once the loop above has
+	   set up the player groups. */
 	XwaSkins_SetFlightGroups(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 							 (int16_t)g_missionHeader.numFlightGroups);
 	XwaModelSettings_LoadMission(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
@@ -8162,10 +8159,10 @@ uint16_t Mission_Init(char* fileName) {
 
 		backdropId = g_missionFlightGroups[g_currentFlightGroupIdx].fg.backdrop;
 #ifdef XWA_MODERN
-		/* Modern port: some mods' mission files use backdrop ids past the stock
-		   table, which the stock game reads past its end. flight/flight.yaml
-		   can give ids 104 to 255 a planet; other ids place no backdrop. The id
-		   is a 32-bit field, so a negative one is out of the table too. */
+		/* Some mods' mission files use backdrop ids past the stock table, which
+		   the stock game reads past its end. flight/flight.yaml can give ids
+		   104 to 255 a planet; other ids place no backdrop. The id is a 32-bit
+		   field, so a negative one is out of the table too. */
 		backdropDescriptor = XwaMissionBackdrops_Descriptor(backdropId);
 		if (backdropDescriptor == NULL) {
 			Aeron_LogWarn(
@@ -9346,7 +9343,6 @@ void Mission_RecordProjectileHitStats(unsigned int projectileObjIdx, char awardW
 			++ownerCraft->warheadHitsScoredCount;
 			flightGroupIdx = g_objectTable[ownerObjIdx].flightGroupIdx;
 #ifdef XWA_MODERN
-			/* Modern port: a mod's weapon profile can change the score. */
 			if (projectileObjIdx < playerProjectileSlotEnd && ownerPlayerIdx != -1) {
 				++g_players[ownerPlayerIdx].perMissionKills.warheadHits;
 				if (!awardWarheadPoints) {

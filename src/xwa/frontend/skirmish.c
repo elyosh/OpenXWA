@@ -1908,8 +1908,8 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: the ratings are computed live, with the mod's models and
-	   stats profiles, instead of read from spec.rci. */
+	/* The ratings are computed live, with the mod's models and stats profiles,
+	   instead of read from spec.rci. */
 	XwaTechRatings_BuildTable(&g_cachedCraftTechStats, &g_cachedCraftTechStatsCount);
 #else
 	specStream = File_Open(AERON_VFS_ROOT_ASSET, "spec.rci", "rb");

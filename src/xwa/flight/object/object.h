@@ -289,8 +289,9 @@ typedef struct CraftData {
 	 * one per group clock, and the groups a key started (0 = both). */
 	uint16_t articulationTicks[6];
 	uint8_t articulationMotion;
-	/* Their meshes' fine angles, in 1/256 meshRotation units: articulated
-	 * meshes move by them on every step, crew meshes are drawn by them. */
+	/* The fine angles of their meshes, in 1/256 meshRotation units. Articulated
+	 * meshes move by these angles on every step, and crew meshes are drawn at
+	 * these angles. */
 	uint16_t articulationAngles[XWA_CRAFT_MESH_SLOT_COUNT];
 #endif
 } CraftData;

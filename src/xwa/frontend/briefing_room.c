@@ -120,7 +120,7 @@ int BriefingRoom_PrepareTourBriefing(void) {
 	g_gameConfig.randomSeed = rand();
 	MissionSetup_BuildBriefingText(g_briefingText);
 #ifdef XWA_MODERN
-	/* Modern port: a mission's text lines replace its order of battle. */
+	/* A mission's text lines replace its order of battle. */
 	if (XwaMissionSettings_OrderOfBattleLineCount() > 0) {
 		memset(g_oobCraftCounts, 0, sizeof g_oobCraftCounts);
 		g_oobEntryCount = 0;
@@ -273,10 +273,10 @@ int BriefingRoom_DrawMissionBriefingTextReveal(int revealRadius) {
 }
 
 #ifdef XWA_MODERN
-/* Modern port: with a list of flight groups in the mission's settings, the
-   order of battle shows the listed ones that aren't fighters, whatever
-   their team and arrival, each with its name when the settings give one.
-   Returns -1 without a list. */
+/* When the mission's settings list flight groups, the order of battle shows the
+   listed flight groups that aren't fighters, whatever their team and arrival.
+   Returns 1 when the order of battle shows the flight group, 0 when it doesn't,
+   and -1 when there is no list. */
 static int BriefingRoom_ListedFlightGroup(int flightGroupIndex) {
 	const XwaFlightGroup* flightGroup = &g_frontendMission->flightGroups[flightGroupIndex];
 	const int listed = XwaMissionSettings_OrderOfBattleListed(flightGroupIndex);
@@ -289,16 +289,16 @@ static int BriefingRoom_ListedFlightGroup(int flightGroupIndex) {
 	return category >= 2 && category <= 7;
 }
 
-/* Modern port: the ship list name of a flight group's craft, or the name
-   that the mission gives it. */
+/* The ship list name that the mission gives the flight group's craft type, or
+   else the stock ship list name. */
 static const char* BriefingRoom_ShipName(const XwaFlightGroup* flightGroup, const ShipListEntry* shipEntry) {
 	const char* name = XwaCraftNames_ShipListName(flightGroup->craftType);
 
 	return name != NULL ? name : shipEntry->name;
 }
 
-/* Modern port: the text lines that replace the order of battle, under its
-   title, from the settings' top when they give one. */
+/* Draws the order of battle title with the mission's text lines under it, in
+   place of the order of battle. The settings can set their top. */
 static void BriefingRoom_DrawOrderOfBattleLines(FrontendRect* rect, int revealCount) {
 	FrontendRect textRect;
 	int line;
@@ -521,9 +521,8 @@ int BriefingRoom_ComputeOrderOfBattle(void) {
 
 		flightGroup = &g_frontendMission->flightGroups[flightGroupIndex];
 #ifdef XWA_MODERN
-		/* Modern port: with a list of flight groups in the mission's
-		   settings, only its fighters are counted, whatever their team and
-		   arrival. */
+		/* When the mission's settings list flight groups, only the listed
+		   fighters are counted, whatever their team and arrival. */
 		if (XwaMissionSettings_OrderOfBattleListed(flightGroupIndex) >= 0) {
 			if (XwaMissionSettings_OrderOfBattleListed(flightGroupIndex) &&
 				g_shipList[g_shipTypeToShipListIndex[flightGroup->craftType]].category == 1) {
@@ -753,8 +752,8 @@ int BriefingRoom_Update(int frameCounter) {
 
 #ifdef XWA_MODERN
 		{
-			/* XWA_MODERN: briefing.squad_logos in frontend/concourse/layout.yaml
-			   can move the squadron logo for each logo number. The title and the
+			/* Briefing.squad_logos in frontend/concourse/layout.yaml can move
+			   the squadron logo for each logo number. The title and the
 			   order-of-battle list move with it. */
 			float logoX;
 			float logoY;
@@ -796,9 +795,9 @@ int BriefingRoom_Update(int frameCounter) {
 			FrontendDisplay_DisableOffscreenRestore();
 			FrontendDisplay_UnlockBackBuffer();
 #ifdef XWA_MODERN
-			/* Modern port: a mission can have its own room movie,
-			   <mission>_marko or <mission>_briefroom, which plays instead of
-			   the original one when it exists. */
+			/* A mission can have its own room movie, <mission>_marko or
+			   <mission>_briefroom, which plays instead of the original one when
+			   it exists. */
 			if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				if (XwaMovieTask_BeginForMission("marko", 1)) {
 					g_briefingRoomState = BRIEFING_ROOM_WAIT_ROOM_MOVIE;

@@ -1,14 +1,15 @@
 #ifndef XWA_RUNTIME_MODELS_MODEL_SOURCE_H
 #define XWA_RUNTIME_MODELS_MODEL_SOURCE_H
 
-/* Modern port: chooses where each flight model comes from. With replacements
- * enabled, a model whose key has a `flight/models/<key>.glb` in the mod folder is
- * built from that GLB for simulation and rendering instead of its
- * OPT. The replacement set is fixed by XwaModelSource_Init. A key is the
- * model file's basename without extension, lower-cased
- * ("FlightModels\\XWing.opt" -> "xwing"), and a key always loads the GLB of
- * the same name. To give an object type another model, a mod gives it a list
- * row of its own in its object type file. */
+/* Modern port: chooses where each flight model comes from. When replacements
+ * are enabled, a model whose key has a `flight/models/<key>.glb` in the mod
+ * folder is built from that GLB, for simulation and rendering, instead of from
+ * its OPT. XwaModelSource_Init builds the set of replacements, and
+ * XwaModelSource_AddKey can add keys that no model list names. A key is the
+ * model file's name without its folder or extension, in lower case
+ * ("FlightModels\\XWing.opt" -> "xwing"), and a key always loads the GLB with
+ * the same name. To give an object type a different model, a mod gives it a
+ * model list row of its own in its object type file. */
 
 #include "xwa/assets/file_io.h"
 

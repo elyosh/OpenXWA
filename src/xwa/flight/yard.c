@@ -915,8 +915,9 @@ int Yard_SpawnObjectAtWorldPos(ObjectTypeId objectType, int worldX, int worldY, 
 		return 0xffff;
 	}
 #ifdef XWA_MODERN
-	/* Modern port: the challenges change their objects' markings during play
-	   (rings, rooms, tubes, containers), so every value's look is loaded. */
+	/* The challenges change the markings of their objects during play (rings,
+	   rooms, tubes, containers), so the look of every markings value is
+	   loaded. */
 	XwaSkins_UseAllMarkings(objectTypeId);
 #endif
 
@@ -1019,7 +1020,7 @@ int Yard_SpawnObjectAtWorldPos(ObjectTypeId objectType, int worldX, int worldY, 
 				g_curCraft->componentHp[componentIdx] = 0xffu;
 			}
 #ifdef XWA_MODERN
-			g_curCraft->animatedTextureFrame = 0; /* modern port: the loop cleared it as componentState[49] */
+			g_curCraft->animatedTextureFrame = 0; /* The loop cleared it as componentState[49] */
 #endif
 
 			meshCount = ModelMesh_GetObjectTypeMeshCount((ObjectTypeId)objectTypeId);
@@ -1263,8 +1264,8 @@ void Yard_UpdateCompactorCycle(int deltaTicks) {
 
 		case 1:
 #ifdef XWA_MODERN
-			/* Modern port: a GLB replacement names its four doors with roles;
-			 * door n opens to stock limit n. */
+			/* A GLB replacement names its four doors with roles; door n opens
+			 * to stock limit n. */
 			if (XwaModelRole_IsReplacement((uint16_t)compactorObj->objectType)) {
 				uint16_t door;
 
@@ -1323,7 +1324,7 @@ void Yard_UpdateCompactorCycle(int deltaTicks) {
 
 		case 3:
 #ifdef XWA_MODERN
-			/* Modern port: close the replacement's door roles (see case 1). */
+			/* Close the replacement's door roles (see case 1). */
 			if (XwaModelRole_IsReplacement((uint16_t)compactorObj->objectType)) {
 				uint16_t door;
 
@@ -3217,7 +3218,6 @@ void Yard_UpdateSmeltingRoomTurrets(int deltaTicks) {
 				g_objectTable[projectileObjIdx].mobj->moveVectorDirty = 1;
 				g_objectTable[projectileObjIdx].mobj->speed = 400;
 #ifdef XWA_MODERN
-				/* Modern port: a mod's weapon profile can change the power. */
 				g_objectTable[projectileObjIdx].mobj->damageAmount =
 					XwaWeaponStats_Value(g_objectTable[projectileObjIdx].mobj->sourceObjIdx,
 										 OBJ_LaserRebelTurbo_301, XWA_WEAPON_STAT_POWER,

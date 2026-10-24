@@ -133,9 +133,9 @@ int Concourse_DrawPlanet(void) {
 	height = out.bottom - out.top + 1;
 #ifdef XWA_MODERN
 	{
-		/* XWA_MODERN: frontend/concourse/layout.yaml can set the range for the
-		   planet's random centre, rounded to whole units. If a range is empty,
-		   the planet uses its left or top value. rand() is still called so the
+		/* Frontend/concourse/layout.yaml can set the range for the planet's
+		   random centre, rounded to whole units. If a range is empty, the
+		   planet uses its left or top value. rand() is still called so the
 		   random sequence stays the same. Then the mission file can set each
 		   axis of the centre. */
 		const int left = XwaConcourseLayout_Round(XwaConcourseLayout_X("planet.left", 0.0f));
@@ -165,9 +165,9 @@ int Concourse_InitStarfield(void) {
 	int colorValue;
 	int starIndex;
 #ifdef XWA_MODERN
-	/* XWA_MODERN: a background with atlas geometry draws nothing on the draw
-	   surface, so its pixels can't show where the window is. A mask from the
-	   mod folder is used instead. */
+	/* A background with atlas geometry draws nothing on the draw surface, so
+	   its pixels can't show where the window is. A mask from the mod folder is
+	   used instead. */
 	const int useMask = XwaFrontendGeometry_ResourceHasGeometry("concourse");
 #endif
 
@@ -816,7 +816,7 @@ int Concourse_Update(int frameCounter) {
 					backdrop = g_frontendMission->flightGroups[i].backdrop;
 					if ((unsigned int)backdrop < 0x3du && backdrop != 0 && backdrop != 55) {
 #ifdef XWA_MODERN
-						/* XWA_MODERN: the mission's own planet image replaces this one. */
+						/* The mission's own planet image replaces this one. */
 						if (XwaConcoursePlanet_Image() < 0) {
 							Concourse_LoadPlanetSprite(g_frontendMission->flightGroups[i].backdrop);
 						}
@@ -844,8 +844,8 @@ int Concourse_Update(int frameCounter) {
 #endif
 		}
 #ifdef XWA_MODERN
-		/* XWA_MODERN: the planet image that the mission file sets. The stock
-		   pick above still runs, so the random sequence stays the same. */
+		/* The planet image that the mission file sets. The stock pick above
+		   still runs, so the random sequence stays the same. */
 		if (XwaConcoursePlanet_Image() >= 0) {
 			Concourse_LoadPlanetSprite(XwaConcoursePlanet_Image() - CONCOURSE_PLANET_GROUP_ID_BASE);
 		}
@@ -875,9 +875,9 @@ int Concourse_Update(int frameCounter) {
 	}
 
 #ifdef XWA_MODERN
-	/* XWA_MODERN: frontend/concourse/layout.yaml can move the doors. Moved doors
-	   are drawn at their exact, unrounded position. `starfield: false` hides the
-	   stars. They are still set up, so the random sequence stays the same. */
+	/* Frontend/concourse/layout.yaml can move the doors. Moved doors are drawn
+	   at their exact, unrounded position. `starfield: false` hides the stars.
+	   They are still set up, so the random sequence stays the same. */
 	if (XwaConcourseLayout_Bool("starfield", 1)) {
 		Concourse_DrawStarfield(frame);
 	}
@@ -1025,8 +1025,8 @@ int Concourse_Update(int frameCounter) {
 
 #ifdef XWA_MODERN
 	{
-		/* XWA_MODERN: if layout.yaml sets doors.marko, Marko's hit box starts at
-		   his sprite position instead of 20 units left and 30 units above it. */
+		/* If layout.yaml sets doors.marko, Marko's hit box starts at his sprite
+		   position instead of 20 units left and 30 units above it. */
 		int markoX;
 		int markoY;
 
@@ -1150,7 +1150,7 @@ int Concourse_Exit(int frameCounter) {
 	(void)frameCounter;
 
 #ifdef XWA_MODERN
-	/* XWA_MODERN: stop the animations from frontend/animations.yaml. */
+	/* Stop the animations from frontend/animations.yaml. */
 	XwaRoomAnims_Leave("concourse");
 #endif
 	FrontendWaveStream_Shutdown();

@@ -971,9 +971,9 @@ int16_t SpriteResource_LoadGroup(int16_t groupId) {
 	}
 
 	{
-		/* XWA_MODERN: if the mod folder has an atlas with game geometry for this
-		   group, the group is built from the atlas and the DAT files are not
-		   read. This also lets a mod add new groups. */
+		/* If the mod folder has an atlas with game geometry for this group, the
+		   group is built from the atlas and the DAT files are not read. This
+		   also lets a mod add new groups. */
 		const XwaGeometryAtlas* atlas = XwaFrontendGeometry_FindGroup(groupId);
 
 		if (atlas != NULL) {

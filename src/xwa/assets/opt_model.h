@@ -72,7 +72,7 @@ typedef struct OptTextureData {
 } OptTextureData;
 
 #ifdef XWA_MODERN
-/* Modern port: every object type, the extra planets included. */
+/* Every object type, the extra planets included. */
 #define XWA_LOADED_MODEL_COUNT OBJ_Count
 #else
 #define XWA_LOADED_MODEL_COUNT 557

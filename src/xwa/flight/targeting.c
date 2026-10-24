@@ -320,9 +320,10 @@ void Targeting_DrawObjectBox(uint16_t objectIdx, uint16_t componentIdx, uint8_t 
 				? Targeting_GetObjectBoxExtent(objectIdx)
 				: ModelMesh_GetComponentMaxExtent((uint16_t)captureObj->objectType, componentIdx) / 3;
 		const PlayerData* capturePlayer = &g_players[g_localPlayer];
-		/* The classic component-size branch compares only the component
-		 * index; preserve that exact gate even if another object's box uses
-		 * the same component index. Whole-object selected is diagnostic. */
+		/* The classic component-size branch only compares the component index.
+		 * Keep that exact test, even when another object's box uses the same
+		 * component index. For a whole-object box, `selected` is only for
+		 * diagnostics. */
 		const int selected = componentIdx == 0xffffu
 								 ? objectIdx == (uint16_t)capturePlayer->currentTargetObjectIdx
 								 : componentIdx == (uint16_t)capturePlayer->selectedTargetComponent;

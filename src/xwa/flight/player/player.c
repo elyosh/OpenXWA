@@ -181,7 +181,9 @@ void Player_AutoGunnerToggle(unsigned int playerIdx) {
 
 		modelIndex = (ModelDefIndex)GetModelDefIndexFromType(g_objectTable[playerObjIdx].objectType);
 #ifdef XWA_MODERN
-		/* Modern port: a mod can give any craft gunner seats. */
+		/* A mod can give any craft gunner seats. A count of -1 means that the
+		   model has no gunner seat settings, so the stock test of the turret
+		   cockpits applies. */
 		if (XwaGunnerSeats_Count(g_objectTable[playerObjIdx].objectType) == 0 ||
 			(XwaGunnerSeats_Count(g_objectTable[playerObjIdx].objectType) < 0 &&
 			 g_modelDefs[(uint16_t)modelIndex].turretObjectType[0] == 0 &&
@@ -1140,7 +1142,7 @@ void Player_HandleHyperspaceCommand(CraftData* craft, unsigned int playerIdx, ch
 
 			objectType = g_objectTable[g_players[playerIdx].objectIndex].objectType;
 #ifdef XWA_MODERN
-			/* Modern port: articulated models close their S-foils only with
+			/* Articulated models close their S-foils only with
 			   sfoils.close_in_hyperspace. */
 			if (XwaArticulation_TriggerPasses(g_players[playerIdx].objectIndex,
 											  XWA_ARTICULATION_HYPERSPACE_DEPARTURE,
@@ -1801,7 +1803,6 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 	Hud_SetHudViewState(19, (int)playerIdx);
 	if (playerIdx == (unsigned int)g_localPlayer) {
 #ifdef XWA_MODERN
-		/* Modern port: a mod can change the map exit sound. */
 		fsfx_PlaySound(XwaCraftSounds_Interface(XWA_SOUND_BANK_MAP_EXIT, 17), 0xffffu, playerIdx);
 #else
 		fsfx_PlaySound(17, 0xffffu, playerIdx);
@@ -2062,8 +2063,9 @@ int Player_UnbindFromCurrentCraft(int playerIdx, int requireAnotherOwnedCraft, i
 				(uint16_t)MATH2_fraction(g_modelDefs[craft->modelDefIndex].maxSpeed, throttle);
 			g_objectTable[objectIndex].mobj->speedRemainder = 0;
 #ifdef XWA_MODERN
-			/* Modern port: the speed follows the craft's own top speed, which its
-			   stats profile can change. */
+			/* The lines above set the speed from the model's top speed. Scale
+			   it to the craft's own top speed, which its stats profile can
+			   change. */
 			XwaStatsProfiles_ScaleSpeed(objectIndex);
 #endif
 
@@ -2620,7 +2622,6 @@ int Player_ResetGunnerSeatCameraState(unsigned int playerIdx, int objectIndex, i
 	}
 	if (playerIdx == (unsigned int)g_localPlayer) {
 #ifdef XWA_MODERN
-		/* Modern port: a mod can change the turret switch sound. */
 		fsfx_PlaySound(XwaCraftSounds_Interface(XWA_SOUND_BANK_TURRET_SWITCH, 17), 0xffffu, playerIdx);
 #else
 		fsfx_PlaySound(17, 0xffffu, playerIdx);
@@ -2654,8 +2655,8 @@ void Player_CycleGunnerSeat(int playerIdx, void* forcePilotFlag) {
 		objectIndex = g_players[playerIdx].objectIndex;
 		objectType = g_objectTable[objectIndex].objectType;
 #ifdef XWA_MODERN
-		/* Modern port: a mod can give any craft gunner seats. The craft then
-		   cycles through its own seats, as the Falcon does. */
+		/* A mod can give any craft gunner seats. The craft then cycles through
+		   its own seats, as the Falcon does. */
 		seatCount = XwaGunnerSeats_Count((unsigned int)objectType);
 		if (seatCount > 0) {
 			if (g_players[playerIdx].hasCheckpointFlag != 0) {
@@ -2782,7 +2783,7 @@ void Player_CycleGunnerSeat(int playerIdx, void* forcePilotFlag) {
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: a mod can keep the selected weapon in a gunner seat. */
+	/* A mod can keep the selected weapon in a gunner seat. */
 	if (g_players[playerIdx].currentSeatIdx > 0 && XwaMissionSettings_GunnerWeaponSelectInSeat()) {
 		g_players[playerIdx].lookYawOffset = 0;
 		g_players[playerIdx].lookPitchOffset = 0;
@@ -2928,9 +2929,9 @@ int8_t Player_CanRadioCommandCraft(unsigned int targetObjIdx, int playerIdx) {
 }
 
 #ifdef XWA_MODERN
-/* Modern port: nonzero when component `meshIdx` of object `objIdx` can't be
-   a new target's aim point: it isn't drawn (destroyed, or hidden by an object
-   profile), or the model's `targetable` set doesn't list it. */
+/* Nonzero when component `meshIdx` of object `objIdx` can't be a new target's
+   aim point: it isn't drawn (destroyed, or hidden by an object profile), or the
+   model's `targetable` set doesn't list it. */
 static int Player_IsTargetComponentExcluded(unsigned int objIdx, unsigned int meshIdx) {
 	const MobileObject* mobj = g_objectTable[objIdx].mobj;
 
@@ -2972,8 +2973,9 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 	}
 	if (targetingAvailable) {
 #ifdef XWA_MODERN
-		/* Modern port: a mod can change the target select sound, and give
-		   the map its own sound. */
+		/* A mod can change the target select sound. When the map calls this and
+		   the mod has a map enter sound, that sound plays instead and the slot
+		   is -1. */
 		const int targetSelectSlot = XwaCraftSounds_TargetSelect(playerIdx, 75);
 #endif
 		if ((uint16_t)newTargetObjIdx == (uint16_t)g_players[playerIdx].currentTargetObjectIdx) {

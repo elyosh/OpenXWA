@@ -268,8 +268,6 @@ static __inline void laser_UpdatePlayerWarheadLock(uint16_t objectIdx, int playe
 		}
 
 #ifdef XWA_MODERN
-		/* Modern port: a mod can change the player's lock ranges for each
-		   craft. */
 		lockRange = (uint32_t)XwaWarheadLock_Value(objectIdx, XWA_WARHEAD_LOCK_RANGE_SMALL, 101805);
 #else
 		lockRange = 101805u;
@@ -317,8 +315,7 @@ static __inline void laser_UpdatePlayerWarheadLock(uint16_t objectIdx, int playe
 				targetCraft = g_objectTable[currentTargetObjIdx].mobj->pCraft;
 				if (targetCraft->cmTypeId == 1 && targetCraft->chaffActiveTimer != 0) {
 #ifdef XWA_MODERN
-					/* Modern port: chaff halves the lock's growth with any
-					   step size. */
+					/* Chaff halves the lock's growth with any step size. */
 					g_curCraft->warheadLockTicks =
 						(uint16_t)(g_curCraft->warheadLockTicks -
 								   (uint16_t)XwaModernFlightTiming_ScaleStepTicks(
@@ -337,8 +334,9 @@ static __inline void laser_UpdatePlayerWarheadLock(uint16_t objectIdx, int playe
 				modelIndex = (ModelDefIndex)GetModelDefIndexFromType(g_objectTable[objectIdx].objectType);
 				lockThreshold = (uint16_t)(modelIndex != missileBoatModelIndex ? 708u : 354u);
 #ifdef XWA_MODERN
-				/* Modern port: a mod can change how long a lock takes on the
-				   HUD for each craft. */
+				/* A mod can change how long a lock takes for each craft. It
+				   only changes the HUD and the sounds, not the warhead's
+				   homing. */
 				lockThreshold =
 					(uint16_t)XwaWarheadLock_Value(objectIdx, XWA_WARHEAD_LOCK_TICKS, lockThreshold);
 #endif
@@ -391,8 +389,7 @@ static __inline void laser_UpdatePlayerWarheadLock(uint16_t objectIdx, int playe
 
 		if ((int16_t)g_curCraft->warheadLockTicks > 0) {
 #ifdef XWA_MODERN
-			/* Modern port: a lost lock falls 1.5 ticks per tick with any
-			   step size. */
+			/* A lost lock falls 1.5 ticks per tick with any step size. */
 			g_curCraft->warheadLockTicks = (uint16_t)(g_curCraft->warheadLockTicks -
 													  (uint16_t)XwaModernFlightTiming_ScaleStepTicks(
 														  g_gameTime, (uint16_t)g_elapsedTicks, 1, 2) -
@@ -688,7 +685,6 @@ void laser_weaponsfire(void) {
 
 			shieldRechargeRate = 20;
 #ifdef XWA_MODERN
-			/* Modern port: a mod can change how shields recharge. */
 			XwaShieldRecharge_Rate(objectIdx, 0, &shieldRechargeRate);
 #endif
 			for (scanObjIdx = g_activeRegionObjectSlotStart;
@@ -709,7 +705,6 @@ void laser_weaponsfire(void) {
 			g_curCraft = g_objectTable[objectIdx].mobj->pCraft;
 			laser_UpdateAiPowerRedirects(objectIdx, &shieldRechargeRate);
 #ifdef XWA_MODERN
-			/* Modern port: a mod can change how shields recharge. */
 			XwaShieldRecharge_Rate(objectIdx, 1, &shieldRechargeRate);
 #endif
 		}
@@ -731,8 +726,8 @@ void laser_weaponsfire(void) {
 
 						g_curCraft->shieldFront += shieldDelta;
 #ifdef XWA_MODERN
-						/* Modern port: a mod can double the cap of a
-						   starfighter's shields. */
+						/* A mod can double the cap of a starfighter's
+						   shields. */
 						maxShield =
 							2 * XwaShieldRecharge_MaxShield(
 									objectIdx, XwaStatsProfiles_Value(
@@ -752,8 +747,8 @@ void laser_weaponsfire(void) {
 
 						g_curCraft->shieldRear += shieldDelta;
 #ifdef XWA_MODERN
-						/* Modern port: a mod can double the cap of a
-						   starfighter's shields. */
+						/* A mod can double the cap of a starfighter's
+						   shields. */
 						maxShield =
 							2 * XwaShieldRecharge_MaxShield(
 									objectIdx, XwaStatsProfiles_Value(
@@ -822,7 +817,6 @@ void laser_weaponsfire(void) {
 							chargeDelta = (int16_t)(3 * chargeBasis);
 						}
 #ifdef XWA_MODERN
-						/* Modern port: a mod can change the laser rates. */
 						XwaWeaponRates_Recharge(objectIdx, slotIdx, chargeBasis, &chargeDelta);
 #endif
 						g_curCraft->warheadData[slotIdx].laserCharge =
@@ -1027,9 +1021,9 @@ static __inline uint16_t laser_ComputeLauncherCooldownTicks(
 	cooldown = g_modelDefs[modelIndex]
 				   .laserGroupFireCooldownTicks[g_curCraft->warheadData[launcherIdx].weaponGroupIdx];
 #ifdef XWA_MODERN
-	/* Modern port: a mod's weapon profile can change the fire ratio. When the
-	   craft swaps its weapons for its side's weapons, the profile of the new
-	   weapon is used. */
+	/* A mod's weapon profile can change the fire ratio. When the craft swaps
+	   its weapons for its side's weapons, the profile of the new weapon is
+	   used. */
 	{
 		unsigned int weapon = g_curCraft->warheadData[launcherIdx].projectileTypeId;
 
@@ -1047,8 +1041,8 @@ static __inline uint16_t laser_ComputeLauncherCooldownTicks(
 		uint16_t skill;
 
 #ifdef XWA_MODERN
-		/* Modern port: a mod can scale the fire ratio by the flight group's
-		   rank instead of the AI's skill. */
+		/* A mod can scale the fire ratio by the flight group's rank instead of
+		   the AI's skill. */
 		if (XwaWeaponStats_HasFireRatioByRank()) {
 			return (uint16_t)XwaWeaponStats_FireRatioByRank(ownerObjIdx, cooldown);
 		}
@@ -1092,8 +1086,7 @@ static __inline uint16_t laser_SelectWarheadLauncherProjectileType(ObjectRecord*
 
 		projectileType = g_curCraft->warheadData[launcherIdx].projectileTypeId;
 #ifdef XWA_MODERN
-		/* Modern port: a mod can turn off the swap to the craft's side's
-		   weapon. */
+		/* A mod can turn off the swap to the weapon of the craft's side. */
 		if (XwaCraftWeapons_SwitchByIff(ownerObj->objectType) == 0) {
 			return projectileType;
 		}
@@ -1146,8 +1139,8 @@ static __inline int laser_GetLargeObjectLauncherPoint(ObjectRecord* ownerObj, Mo
 
 		floatHardpoints = FeDiskIo_GetMeshFloatHardpoint(ownerObj->objectType, 0);
 #ifdef XWA_MODERN
-		/* Modern port: a mod can stop a gun turret mesh from firing at a target
-		   behind it. */
+		/* A mod can stop a gun turret mesh from firing at a target behind
+		   it. */
 		if (XwaMissionSettings_GunTurretHardpoints()) {
 			hardpointIdx = XwaTurretHardpoints_FindNearestLive(
 				ownerObj->objectType, g_rotatedX, g_rotatedY, g_rotatedZ, excludedCount,
@@ -1302,8 +1295,8 @@ static __inline void laser_ApplyWarheadLauncherAimError(ObjectRecord* ownerObj, 
 	int yawError;
 	int pitchError;
 #ifdef XWA_MODERN
-	/* Modern port: a mod's weapon profile can change the spread. An AI turret
-	   that isn't precise spreads its shots like a player. */
+	/* A mod's weapon profile can change the spread. An AI turret that isn't
+	   precise spreads its shots like a player. */
 	const int ownerObjIdx = (int)(ownerObj - g_objectTable);
 	const unsigned int spreadMask =
 		(unsigned int)XwaWeaponStats_Value(ownerObjIdx, projectileType, XWA_WEAPON_STAT_SPREAD_MASK, 0xff);
@@ -1534,7 +1527,6 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 		rangeLimit = (uint32_t)g_modelDefs[modelIndex]
 						 .laserGroupFireRange[g_curCraft->warheadData[launcherIdx].weaponGroupIdx];
 #ifdef XWA_MODERN
-		/* Modern port: a mod's weapon profile can change the range. */
 		rangeLimit = (uint32_t)XwaWeaponStats_Value((int)ownerObjIdx,
 													g_curCraft->warheadData[launcherIdx].projectileTypeId,
 													XWA_WEAPON_STAT_RANGE, (int)rangeLimit);
@@ -1588,7 +1580,6 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 
 			trig2_ctop(dx, dy, dz);
 #ifdef XWA_MODERN
-			/* Modern port: a mod's weapon profile can change the speed. */
 			projectileSpeed =
 				(uint16_t)XwaWeaponStats_Value((int)ownerObjIdx, projectileType, XWA_WEAPON_STAT_SPEED,
 											   g_projectileSpeedByType[projectileType - OBJ_LaserRebel]);
@@ -1658,16 +1649,15 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 	g_objectTable[projectileObjIdx].mobj->sourceObjIdx = (int16_t)ownerObjIdx;
 	g_objectTable[projectileObjIdx].mobj->sourceObjectType = ownerObj->objectType;
 #ifdef XWA_MODERN
-	/* Modern port: the bolt gets the colour of its firing craft, as its
-	   markings. */
+	/* A mod can set the bolt's markings from the firing craft's markings, so
+	   the bolt can take the craft's colour. Without settings they are 0, as in
+	   the stock game. */
 	g_objectTable[projectileObjIdx].mobj->nodeSwitchIndex =
 		XwaCraftWeapons_BoltMarkings(ownerObj->objectType, ownerObj->mobj->nodeSwitchIndex, projectileType);
 #endif
 	g_objectTable[projectileObjIdx].mobj->orientMatrixDirty = 1;
 	g_objectTable[projectileObjIdx].mobj->moveVectorDirty = 1;
 #ifdef XWA_MODERN
-	/* Modern port: a mod's weapon profile can change the speed, the power and
-	   the lifetime. */
 	g_objectTable[projectileObjIdx].mobj->speed =
 		(uint16_t)XwaWeaponStats_Value((int)ownerObjIdx, projectileType, XWA_WEAPON_STAT_SPEED,
 									   g_projectileSpeedByType[projectileType - OBJ_LaserRebel]);
@@ -1769,8 +1759,8 @@ static __inline void laser_GetTurretProjectileHardpoint(ModelDefIndex firerModel
 	launcherRotScale = NULL;
 	beamRotScale = NULL;
 #ifdef XWA_MODERN
-	/* Modern port: a mod can give the seat its own cockpit, and the shots
-	   leave from its hardpoints. */
+	/* A mod can give the seat its own cockpit, and the shots leave from its
+	   hardpoints. */
 	turretObjectType = (uint16_t)XwaGunnerSeats_Value(
 		g_objectTable[g_players[playerIdx].objectIndex].objectType, turretSeatIdx, XWA_GUNNER_SEAT_COCKPIT,
 		g_modelDefs[firerModelIndex].turretObjectType[turretSeatIdx]);
@@ -1843,7 +1833,6 @@ static __inline void laser_GetTurretProjectileHardpoint(ModelDefIndex firerModel
 		vec.y = vec.y + beamRotScale->pivot.y;
 		vec.z = vec.z + beamRotScale->pivot.z;
 #ifdef XWA_MODERN
-		/* Modern port: a mod chooses which seats are upside down. */
 		if (XwaGunnerSeats_Value(g_objectTable[g_players[playerIdx].objectIndex].objectType, turretSeatIdx,
 								 XWA_GUNNER_SEAT_INVERTED, turretSeatIdx == 1)) {
 #else
@@ -1886,8 +1875,6 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 	unsigned int projectileTypeIdx;
 
 #ifdef XWA_MODERN
-	/* Modern port: a mod can stop a craft from firing from a hardpoint whose
-	   mesh is destroyed. */
 	if (XwaMissionSettings_NoFireFromDestroyedHardpoints() && g_curCraft != NULL && weaponSlotIdx >= 0 &&
 		weaponSlotIdx < XWA_CRAFT_WEAPON_SLOT_COUNT) {
 		const uint8_t meshIdx =
@@ -1954,9 +1941,9 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 		firerObj = &g_objectTable[firerObjIdx];
 		firerObjectType = firerObj->objectType;
 #ifdef XWA_MODERN
-		/* Modern port: a mod can give every shot of some craft the weapon of
-		   their side. The player's slot choice above keeps the type it was
-		   given. */
+		/* A mod can make every shot of some craft take the weapon of the
+		   craft's side. The player's projectile slot above was chosen with the
+		   original type. */
 		if (XwaCraftWeapons_SwitchByIff(firerObjectType) == 1) {
 			projectileType =
 				(ObjectTypeId)XwaCraftWeapons_IffWeaponType((uint8_t)firerObj->mobj->iff, projectileType);
@@ -1975,8 +1962,9 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 		firerModelIndex = (ModelDefIndex)GetModelDefIndexFromType(firerObjectType);
 		g_objectTable[projectileObjIdx].mobj->iff = firerObj->mobj->iff;
 #ifdef XWA_MODERN
-		/* Modern port: the bolt gets the colour of its firing craft, as its
-		   markings. */
+		/* A mod can set the bolt's markings from the firing craft's markings,
+		   so the bolt can take the craft's colour. Without settings they are 0,
+		   as in the stock game. */
 		g_objectTable[projectileObjIdx].mobj->nodeSwitchIndex =
 			XwaCraftWeapons_BoltMarkings(firerObjectType, firerObj->mobj->nodeSwitchIndex, projectileType);
 #endif
@@ -2007,9 +1995,9 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 
 		guidance = g_objectTable[projectileObjIdx].mobj->pWarheadGuidance;
 #ifdef XWA_MODERN
-		/* Modern port: a mod's weapon profile can change the speed, the power
-		   and the lifetime. It also sets how much of the firing craft's speed
-		   is added to the power. */
+		/* A mod's weapon profile can change the speed, the power and the
+		   lifetime. It also sets how much of the firing craft's speed is added
+		   to the power. */
 		{
 			const uint16_t speed =
 				(uint16_t)XwaWeaponStats_Value((int)firerObjIdx, projectileType, XWA_WEAPON_STAT_SPEED,
@@ -2331,7 +2319,6 @@ int laser_firemissile(int firerObjIdx, int warheadSlot, int projectileType, unsi
 	if (g_curCraft->warheadData[warheadSlot].weaponType == 3 &&
 		g_curCraft->warheadData[warheadSlot].count > 0) {
 #ifdef XWA_MODERN
-		/* Modern port: a mod's rules can stop a craft from firing. */
 		projectileObjIdx = XwaWeaponRates_CanFire((unsigned int)firerObjIdx, (unsigned int)warheadSlot, 0)
 							   ? laser_createprojectile((unsigned int)firerObjIdx, warheadSlot,
 														(ObjectTypeId)projectileType, playerOwnerIdx)
@@ -2357,8 +2344,6 @@ int laser_firemissile(int firerObjIdx, int warheadSlot, int projectileType, unsi
 				int homingTier;
 
 #ifdef XWA_MODERN
-				/* Modern port: a mod can change how fast a lock gains homing
-				   levels for each craft. */
 				homingTier = (int16_t)g_curCraft->warheadLockTicks /
 							 XwaWarheadLock_Value(firerObjIdx, XWA_WARHEAD_LOCK_TICKS_PER_HOMING_LEVEL, 236);
 #else
@@ -2452,9 +2437,8 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 	effectiveAi = pai_GetEffectiveAIController(g_curCraft);
 	modelIndex = g_curCraft->modelDefIndex;
 #ifdef XWA_MODERN
-	/* Modern port: articulated models can't fire with moving S-foils,
-	   closed S-foils unless sfoils.allow_fire_closed, or lowered landing
-	   gear. */
+	/* Articulated models can't fire with moving S-foils, closed S-foils unless
+	   sfoils.allow_fire_closed, or lowered landing gear. */
 	if (XwaArticulation_FireBlocked(shooterObjIdx, g_curCraft->sFoilState != 0)) {
 #else
 	if (g_curCraft->sFoilState != 0) {
@@ -2473,7 +2457,6 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 	firingPlayerIdx = playerIdx;
 	firedCount = 0;
 #ifdef XWA_MODERN
-	/* Modern port: a mod's weapon profile can set the link mode. */
 	switch (XwaWeaponStats_LaserLink(shooterObjIdx, g_curCraft->laserLinkMode[laserGroupIdx])) {
 #else
 	switch (g_curCraft->laserLinkMode[laserGroupIdx]) {
@@ -2564,8 +2547,8 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 
 				projectileTypeId = g_curCraft->warheadData[slotIdx].projectileTypeId;
 #ifdef XWA_MODERN
-				/* Modern port: a mod's weapon profile can change the charge at
-				   which a laser fires its high-power shot. */
+				/* A mod's weapon profile can change the charge at which a laser
+				   fires its high-power shot. */
 				if ((projectileTypeId == OBJ_LaserRebel || projectileTypeId == OBJ_LaserImperial ||
 					 projectileTypeId == OBJ_LaserIon) &&
 					laserCharge >= XwaWeaponStats_Value((int)shooterObjIdx, projectileTypeId,
@@ -2580,7 +2563,6 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 				}
 #endif
 #ifdef XWA_MODERN
-				/* Modern port: a mod's rules can stop a craft from firing. */
 				projectileObjIdx =
 					XwaWeaponRates_CanFire(shooterObjIdx, slotIdx, 1)
 						? laser_createprojectile(shooterObjIdx, slotIdx, (ObjectTypeId)projectileTypeId,
@@ -2602,9 +2584,10 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 #ifdef XWA_MODERN
 							int dechargeRate;
 
-							/* Modern port: a mod can change the laser rates,
-							   and make a shot take charge from laser racks
-							   only. */
+							/* A mod can change how much charge a player's shot
+							   takes. The stock game takes charge from every
+							   rack of a fighter, and a mod can limit this to
+							   laser racks. */
 							if (XwaWeaponRates_Decharge(shooterObjIdx, slotIdx, &dechargeRate)) {
 								if (g_curCraft->warheadData[slotIdx].weaponType < 4u) {
 									g_curCraft->warheadData[slotIdx].laserCharge =
@@ -2702,7 +2685,6 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 			firedCount = 1;
 		}
 #ifdef XWA_MODERN
-		/* Modern port: a mod can change the laser rates. */
 		{
 			const int cooldown = XwaWeaponRates_Cooldown(shooterObjIdx, projectileTypeId);
 
@@ -2777,8 +2759,8 @@ void laser_firerocketsystem(int firerObjIdx, unsigned int fireMode) {
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: a mod's weapon profile can change the fire rate. A mod can
-	   also multiply it by the number of warheads fired. */
+	/* A mod's weapon profile can change the fire rate. A mod can also multiply
+	   it by the number of warheads fired. */
 	{
 		int fireRate = XwaWeaponStats_Value(
 			firerObjIdx, g_curCraft->warheadSlotTypeIds[fireMode], XWA_WEAPON_STAT_FIRE_RATE,
@@ -2835,8 +2817,6 @@ void laser_fireplayerweapon(int playerIdx) {
 		return;
 	}
 #ifdef XWA_MODERN
-	/* Modern port: a mission can take the player's lasers or warheads
-	   away. */
 	if (XwaMissionSettings_PlayerLasersDisabled() && XwaMissionSettings_PlayerWarheadsDisabled()) {
 		return;
 	}
@@ -2870,8 +2850,8 @@ void laser_fireplayerweapon(int playerIdx) {
 
 		currentSeatIdx = g_players[playerIdx].currentSeatIdx;
 #ifdef XWA_MODERN
-		/* Modern port: with a mod's seats, a seat that faces down, like the
-		   stock second seat, is the one that a carried object blocks. */
+		/* When a mod sets the seats, a carried object blocks every seat that
+		   faces down, like the stock second seat. */
 		if (XwaGunnerSeats_Count(g_objectTable[objectIndex].objectType) >= 0
 				? currentSeatIdx != 0 &&
 					  (uint16_t)XwaGunnerSeats_Value(g_objectTable[objectIndex].objectType,
@@ -2934,10 +2914,10 @@ void laser_fireplayerweapon(int playerIdx) {
 									g_objectTable[g_players[playerIdx].objectIndex].objectType)]
 						.laserGroupWeaponKind;
 #ifdef XWA_MODERN
-				/* Modern port: a mod can make a seat fire only the first turret
-				   group, or the first ion group when the player selected the
-				   ions, and only when the seat's cockpit has a hardpoint for
-				   it. */
+				/* Instead of every turret group, a mod can make a seat fire
+				   only the first turret group, or the first ion group when the
+				   player selected the ions. It fires only when the seat's
+				   cockpit has a hardpoint for that weapon. */
 				if (XwaMissionSettings_GunnerFiresSelectedGroup()) {
 					const unsigned int objectType =
 						g_objectTable[g_players[playerIdx].objectIndex].objectType;
@@ -2978,8 +2958,7 @@ void laser_fireplayerweapon(int playerIdx) {
 #endif
 			}
 #ifdef XWA_MODERN
-			/* Modern port: a mod can stop the turret groups from also firing
-			   forward. */
+			/* A mod can stop the turret groups from also firing forward. */
 			if (g_players[playerIdx].turretAutoFireState == 0 &&
 				XwaGunnerSeats_ForwardFire(g_objectTable[g_players[playerIdx].objectIndex].objectType)) {
 #else
@@ -3030,8 +3009,8 @@ void laser_fireplayerweapon(int playerIdx) {
 
 		if ((craft->workingSubsystems & 8u) != 0) {
 #ifdef XWA_MODERN
-			/* Modern port: with a mod's rule, a seat fires warheads only when
-			   its cockpit has a warhead hardpoint. */
+			/* With a mod's rule, a seat fires warheads only when its cockpit
+			   has a warhead hardpoint. */
 			if (g_players[playerIdx].currentSeatIdx == 0 || !XwaMissionSettings_GunnerFiresWarheads() ||
 				XwaGunnerSeats_CockpitHasHardpoint(
 					(uint16_t)XwaGunnerSeats_Value(
@@ -3099,8 +3078,8 @@ void laser_UpdateMineWeaponFire(int mineObjIdx) {
 
 		cooldown = g_objectTable[mineIdx].typeSpecificByte[1];
 #ifdef XWA_MODERN
-		/* Modern port: a mine's cooldown runs out with any step size. With
-		   1-tick steps, the stock step of 0 would stop it for good. */
+		/* A mine's cooldown runs out with any step size. With 1-tick steps, the
+		   stock step of 0 would stop it for good. */
 		cooldownStep =
 			(uint16_t)XwaModernFlightTiming_ScaleStepTicks(g_gameTime, (uint16_t)g_elapsedTicks, 1, 2);
 #else
@@ -3295,8 +3274,6 @@ void laser_UpdateMineWeaponFire(int mineObjIdx) {
 		g_objectTable[projectileObjIdx].mobj->orientMatrixDirty = 1;
 		g_objectTable[projectileObjIdx].mobj->moveVectorDirty = 1;
 #ifdef XWA_MODERN
-		/* Modern port: the mine's weapon profile can change the speed, the
-		   lifetime and the power. */
 		g_objectTable[projectileObjIdx].mobj->speed =
 			(uint16_t)((uint16_t)XwaWeaponStats_Value(mineObjIdx, projectileType, XWA_WEAPON_STAT_SPEED,
 													  g_projectileSpeedByType[projectileTypeIdx]) >>
@@ -3415,8 +3392,6 @@ uint16_t laser_createprojectilefromstatic(uint16_t staticObjIdx, uint16_t shoote
 	projectileMobj = g_objectTable[projectileObjIdx].mobj;
 	guidance = projectileMobj->pWarheadGuidance;
 #ifdef XWA_MODERN
-	/* Modern port: a mod's weapon profile can change the speed, the power and
-	   the lifetime. */
 	projectileMobj->speed =
 		(uint16_t)XwaWeaponStats_Value(staticObjIdx, projectileObjectType, XWA_WEAPON_STAT_SPEED,
 									   g_projectileSpeedByType[projectileObjectType - OBJ_LaserRebel]);
@@ -3565,9 +3540,9 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 		g_objectTable[(uint16_t)projectileObjIdx].yaw = (Q16Angle)(ownerObj->yaw + 0x8000u);
 		guidance = g_objectTable[(uint16_t)projectileObjIdx].mobj->pWarheadGuidance;
 #ifdef XWA_MODERN
-		/* Modern port: a mod's weapon profile can change the speed, the power
-		   and the lifetime. It also sets how much of the owner's speed is added
-		   to the power. */
+		/* A mod's weapon profile can change the speed, the power and the
+		   lifetime. It also sets how much of the owner's speed is added to the
+		   power. */
 		{
 			const uint16_t speed = (uint16_t)XwaWeaponStats_Value(
 				(int)ownerObjIdx, projectileObjectType, XWA_WEAPON_STAT_SPEED,
@@ -3771,7 +3746,6 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 		if (guidance->targetObjIdx != 0xffffu &&
 			g_objectTable[guidance->targetObjIdx].playerOwnerIdx == g_localPlayer) {
 #ifdef XWA_MODERN
-			/* Modern port: a mod can change the warning sound. */
 			fsfx_QueueVoiceSfx(XwaCraftSounds_Interface(XWA_SOUND_BANK_PLAYER_TARGETED, 61), 0, 0, 0, 0xffff,
 							   0xffff);
 #else

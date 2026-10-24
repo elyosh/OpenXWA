@@ -64,8 +64,8 @@ char* g_strMapStrings[17];
 #ifdef XWA_MODERN
 char* g_strInFlightMessages[XWA_IN_FLIGHT_MESSAGE_COUNT];
 
-/* Modern port: the messages after the stock table, in the order of their
-   ids, in English. The first byte is the pane type. */
+/* The messages after the stock table, in the order of their ids, in English.
+   The first byte is the pane type. */
 static const char* const s_modernInFlightMessages[XWA_IN_FLIGHT_MESSAGE_COUNT - 538] = {
 	"\003Landing Gears opening",
 	"\003Landing Gears closing",

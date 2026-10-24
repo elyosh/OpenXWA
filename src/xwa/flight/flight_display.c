@@ -1659,7 +1659,9 @@ void FlightPalette_BuildRgbRange(RgbTriplet* srcRgb, RgbTriplet* dstRgb, int sta
 		{
 			RgbTriplet* src;
 
-			/* The original x86 loop uses a 32-bit pointer delta that truncates on 64-bit hosts. */
+			/* The original x86 loop reads part of the source through a 32-bit
+			   offset from the destination pointer, which truncates on 64-bit
+			   hosts. This loop steps both pointers instead. */
 			src = &srcRgb[startIndex];
 			dst = &dstRgb[startIndex];
 			remaining = count;

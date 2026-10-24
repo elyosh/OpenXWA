@@ -2189,8 +2189,8 @@ int Config_CutsceneViewerScreen(void) {
 
 #ifdef XWA_MODERN
 	{
-		/* XWA_MODERN: cutscene_viewer.scroll_bar_x in frontend/concourse/layout.yaml
-		   moves the cutscene viewer's scroll bar. Its width stays the same. */
+		/* Cutscene_viewer.scroll_bar_x in frontend/concourse/layout.yaml moves
+		   the cutscene viewer's scroll bar. Its width stays the same. */
 		const int scrollLeft =
 			XwaConcourseLayout_Round(XwaConcourseLayout_X("cutscene_viewer.scroll_bar_x", 31.0f));
 
@@ -5317,7 +5317,8 @@ void Config_ApplyModernInputOptions(const XwaModernInputOptions* options) {
 									   strcmp(previousDevice.path, options->controller.device.path) != 0 ||
 									   previousDevice.ordinal != options->controller.device.ordinal);
 	g_gameConfig.rudderEnabled = (uint8_t)options->controller.roll_enabled;
-	/* Axis inversion is applied at the Aeron-to-WinMM mapping boundary. */
+	/* The axes are inverted where the Aeron input becomes WinMM joystick
+	   values, so the game's own flip settings stay off. */
 	g_gameConfig.flipRudder = 0;
 	g_gameConfig.flipY = 0;
 	g_gameConfig.ffEnabled = (uint8_t)options->controller.rumble_enabled;

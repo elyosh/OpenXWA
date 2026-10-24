@@ -583,8 +583,8 @@ void paiman_initparkmaneuver(void) {
 	uint8_t elapsedSeconds;
 
 #ifdef XWA_MODERN
-	/* Modern port: an articulated craft starting to park may close its
-	   S-foils and landing gear at once. */
+	/* An articulated craft starting to park may close its S-foils and landing
+	   gear at once. */
 	XwaArticulation_AiParkStart(g_paiContext.aiObjIdx);
 #endif
 	elapsedHours = g_missionElapsedClock.hours;
@@ -1687,7 +1687,6 @@ void paiman_calcplanelead(int targetObjIdx) {
 		}
 
 #ifdef XWA_MODERN
-		/* Modern port: a mod's weapon profile can change the speed. */
 		projectileSpeed =
 			(uint16_t)XwaWeaponStats_Value(g_paiContext.aiObjIdx, projectileType, XWA_WEAPON_STAT_SPEED,
 										   g_projectileSpeedByType[projectileType - OBJ_LaserRebel]);
@@ -2060,8 +2059,8 @@ int paiman_initoutofhyperspacemaneuver(void) {
 	g_paiContext.aiController->thinkInterval = 29;
 #ifdef XWA_MODERN
 	{
-		/* Modern port: an articulated craft may come out of hyperspace with
-		   its S-foils closed. */
+		/* An articulated craft may come out of hyperspace with its S-foils
+		   closed. */
 		const int result = Music_TriggerOutOfHyperspaceSequenceForObject(g_paiContext.aiObjIdx);
 
 		XwaArticulation_AiOutOfHyperspaceInit(g_paiContext.aiObjIdx);
@@ -2106,8 +2105,7 @@ void paiman_initintohyperspacemaneuver(void) {
 	g_paiContext.aiController->maneuverPhase = 0;
 	pai_CalcAnglesToAimPoint();
 #ifdef XWA_MODERN
-	/* Modern port: an articulated craft going into hyperspace may close its
-	   S-foils. */
+	/* An articulated craft going into hyperspace may close its S-foils. */
 	XwaArticulation_AiIntoHyperspace(g_paiContext.aiObjIdx);
 #endif
 	if (trig2_polardistance == 0) {
@@ -2745,7 +2743,9 @@ static char paiman_escortmaneuver(void) {
 									g_paiContext.curOrderCoord.fields.orderSlot]
 							.variable1;
 #ifdef XWA_MODERN
-			/* Avoid the original's adjacent-global read; position 13 is the center of the 27-entry grid. */
+			/* With a value of 27 or more, the original reads past the end of
+			   these tables into the next global. Use position 13 instead, the
+			   center of the 27-entry grid. */
 			if (variable1 >= 27) {
 				variable1 = 13;
 			}
@@ -4426,9 +4426,9 @@ static char paiman_boardmaneuver(void) {
 						if (i == 1)
 							warhead = 5;
 #ifdef XWA_MODERN
-						/* Modern port: a mod's warhead profile can change the
-						   number of warheads. A mod can also make the rearm
-						   read both warhead statuses of the flight group. */
+						/* A mod can make the rearm also read the flight group's
+						   second status, so either status can double or halve
+						   the number of warheads. */
 						targetCount = XwaWeaponStats_WarheadCapacity(
 							targetObjIdx, warhead, g_modelDefs[targetModelIdx].warheadLauncherCapacity[i],
 							g_warheadAmmoCounts[warhead]);
@@ -5666,7 +5666,7 @@ static char paiman_outofhyperspacemaneuver(void) {
 	PlanRecord* plan;
 
 #ifdef XWA_MODERN
-	/* Modern port: an articulated craft out of hyperspace opens its S-foils
+	/* An articulated craft that closed its S-foils for hyperspace opens them
 	   once the maneuver timer is low enough. */
 	XwaArticulation_AiOutOfHyperspaceStep(g_paiContext.aiObjIdx, g_paiContext.aiController->maneuverTimer);
 #endif
@@ -6342,8 +6342,8 @@ static char paiman_parkmaneuver(void) {
 			if (g_paiContext.aiController->maneuverTimer == 0) {
 				++g_paiContext.aiController->maneuverPhase;
 #ifdef XWA_MODERN
-				/* Modern port: an articulated craft done parking opens its
-				   S-foils. */
+				/* An articulated craft that closed its S-foils to park opens
+				   them when it is done parking. */
 				XwaArticulation_AiParkEnd(g_paiContext.aiObjIdx);
 #endif
 			}

@@ -272,7 +272,8 @@ struct ObjectTrailPoint {
 	float texV;
 	ObjectTrailPoint* next;
 #ifdef XWA_MODERN
-	/* Exact shadow of `world`, captured before the original float cast. */
+	/* `world` as exact integers, saved before the original code converts it to
+	   float. */
 	int32_t preciseWorld[3];
 #endif
 };

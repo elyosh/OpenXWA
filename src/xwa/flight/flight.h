@@ -184,8 +184,8 @@ typedef enum GameActionKey {
 	KEY_CONSOLE_TOGGLE = 0x111,
 	KEY_NEXT_PLAYER_CRAFT = 0x11e,
 #ifdef XWA_MODERN
-	/* Modern port: Ctrl+L (DInput Ctrl table), the landing-gear key of
-	 * articulated models; the original ignores it. */
+	/* Ctrl+L, from the DirectInput Ctrl key table. It is the landing-gear key
+	 * of articulated models. The original ignores it. */
 	KEY_CTRL_L = 0x11a,
 #endif
 } GameActionKey;
@@ -450,7 +450,9 @@ void Flight_AdvanceOneStep(int targetTimestamp);
 void Flight_StepSimToTime(int targetTimestamp);
 #ifdef XWA_MODERN
 void Flight_ModernResetHighRateIntegration(void);
-/* Complete a pending nonblocking options modal before flight timing resumes. */
+/* While the options menu is open, runs one more step of it and returns 1.
+   Returns 0 when it isn't open. Flight timing resumes only after the menu
+   closes. */
 int Flight_ContinueOptionsModal(void);
 #endif
 int Flight_PumpWindowMessages(void);

@@ -1128,7 +1128,8 @@ int MissionDebrief_Exit(int frameCounter) {
 	Keyboard_FlushCharBuffer();
 	FrontendMouse_ClearInputGate();
 #ifdef XWA_MODERN
-	/* Modern port: the mission's craft names end with its debriefing. */
+	/* The mission's craft names last until the end of its debriefing. Then the
+	   stock names come back. */
 	XwaCraftNames_Restore();
 #endif
 	return 0;
@@ -2441,10 +2442,10 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 				height = rect.bottom - rect.top + 1;
 				x = 152 - (width >> 1);
 #ifdef XWA_MODERN
-				/* XWA_MODERN: award_ceremony in frontend/concourse/layout.yaml can
-				   move the award images by their centre, move their labels and
-				   hide the labels. Moving an image doesn't move its label; labels
-				   only move by their own text offsets. */
+				/* Award_ceremony in frontend/concourse/layout.yaml can move the
+				   award images by their centre, move their labels and hide the
+				   labels. Moving an image doesn't move its label; labels only
+				   move by their own text offsets. */
 				XwaConcourseLayout_DrawSpriteCentered(g_frontendScratchBuffer, "award_ceremony.battle.images",
 													  1, 152, 360, width, height);
 #else
@@ -2659,7 +2660,7 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 			sprintf(g_frontendScratchBuffer, "wave\\frontend\\MEDALANDPROMOTION\\%s", waveName);
 			parsedFirst = FrontendWaveStream_PlayWaveFile(g_frontendScratchBuffer, 0, 0);
 #ifdef XWA_MODERN
-			/* Modern port: a mission can have its own award ceremony movie,
+			/* A mission can have its own award ceremony movie,
 			   <mission>_ceremony, which plays instead of the original one when
 			   it exists. */
 			if (XwaMovieTask_BeginForMission("ceremony", 1)) {

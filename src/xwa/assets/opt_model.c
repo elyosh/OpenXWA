@@ -1255,7 +1255,9 @@ int OptModel_PrepareTextures(OptNode* node, OptimizedPolyObject* model, int mode
 
 		textureData = (OptTextureData*)node->param2;
 		dataSize = textureData->height * textureData->width;
-		/* XWA_MODERN keeps OPT address fields serialized; resolve them through the native model. */
+		/* The modern build keeps the OPT address fields as 32-bit addresses
+		 * into the serialized image. Turn them into pointers through the native
+		 * model. */
 		palette = (uint16_t*)OptModel_AddressToPtr(native, textureData->paletteAddress, 2);
 		if (dataSize == textureData->textureSize) {
 			dataSize = textureData->dataSize;
@@ -2022,14 +2024,14 @@ uint16_t OptModel_LoadHandle(const char* fileName) {
 	int savedCurVertexCount;
 	char swappedFileName[XWA_MODEL_SOURCE_KEY_MAX + 32];
 
-	/* Modern port: a mission can load another model in place of this one.
-	 * Everything below, the model def included, then uses that model. */
+	/* A mission can load another model in place of this one. Everything below,
+	 * the model def included, then uses that model. */
 	if (XwaModelSwaps_FileName(fileName, swappedFileName, sizeof swappedFileName)) {
 		Aeron_LogInfo("xwa.assets", "OPT '%s': the mission loads '%s' instead", fileName, swappedFileName);
 		fileName = swappedFileName;
 	}
-	/* Modern port: GLB replacements enter as a synthesized payload image;
-	 * everything after the file read runs unchanged. */
+	/* For a GLB replacement, OptSynth builds the payload image that an OPT file
+	 * would hold, so everything after the file read runs unchanged. */
 	source = XwaModelSource_Resolve(fileName, NULL, 0);
 	if (source == XWA_MODEL_SOURCE_SUPPRESSED) {
 		Aeron_LogInfo("xwa.assets", "OPT '%s' suppressed: its base craft is a GLB replacement", fileName);
@@ -2122,8 +2124,9 @@ uint16_t OptModel_LoadHandle(const char* fileName) {
 		modelNative->model.rootNodeCount, meshCount, g_useHardware3D,
 		source == XWA_MODEL_SOURCE_GLB ? "glb" : "opt");
 
-	/* Snapshot the processed model's lifetime. The remaster mirrors this
-	 * authoritative set after the tick instead of loading from draw calls. */
+	/* Record the loaded model for the snapshot. After the tick, the remaster
+	 * loads the same set of models from these records, instead of from the draw
+	 * calls. */
 	XwaSnapshot_NoteOptLoad((uint16_t)(modelHandle | 0x8000), fileName, (uint8_t)source);
 #else
 	Aeron_LogInfo("xwa.assets",

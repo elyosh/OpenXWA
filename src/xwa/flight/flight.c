@@ -1463,9 +1463,9 @@ void FlightObject_AnimateCrewMeshRotations(int objectIndex, int resetToNeutral) 
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: a GLB replacement's component layout is authored freely,
-	 * so it animates its own crew articulations, never the stock ordinals
-	 * below. A replacement without them animates nothing. */
+	/* A GLB replacement can order its components freely, so it animates its own
+	   crew articulations instead of using the stock mesh indices below. A
+	   replacement without crew articulations animates nothing. */
 	if (XwaArticulation_AnimateCrew((unsigned int)objectIndex, resetToNeutral)) {
 		return;
 	}
@@ -1622,8 +1622,8 @@ void FlightObject_InitMeshAnimationDefaults(int objIdx) {
 	g_curCraft = pCraft;
 
 #ifdef XWA_MODERN
-	/* Modern port: a model listing S-foils or landing gear sets them from its
-	   articulations instead. */
+	/* A model listing S-foils or landing gear sets them from its articulations
+	   instead. */
 	if (XwaArticulation_InitLeavingHangar((unsigned int)objIdx)) {
 		return;
 	}
@@ -1860,9 +1860,9 @@ void FlightObject_UpdateSpecialBehavior(void) {
 	int objectTypeIndex;
 
 #ifdef XWA_MODERN
-	/* Modern port: S-foils and landing gear of articulated models, and the
-	   stock S-foils in the high-rate mode, move on every sim step; phase 1
-	   skips them. The crew meshes' drawn angles follow phase 2's crew steps. */
+	/* S-foils and landing gear of articulated models, and the stock S-foils in
+	   the high-rate mode, move on every sim step; phase 1 skips them. The crew
+	   meshes' drawn angles follow phase 2's crew steps. */
 	for (objIdx = g_activeRegionObjectSlotStart; (uint16_t)objIdx < g_activeRegionCraftObjectSlotEnd;
 		 ++objIdx) {
 		XwaArticulation_StepSFoils(objIdx);
@@ -2240,7 +2240,9 @@ void FlightObject_UpdateSpecialBehavior(void) {
 				if (meshType == 3) {
 					// Animated-texture mesh: advance the frame stored in componentState[49],
 					// temporarily reusing OBJ_AnimationTextureGroup2008's model info.
-					// Modern port: XWA_CRAFT_ANIM_FRAME keeps that byte in its own field.
+					// Modern port: XWA_CRAFT_ANIM_FRAME keeps the frame in its
+					// own field, because a model with 50 or more meshes uses
+					// componentState[49] for a mesh.
 					ObjectTypeId savedType = g_objectTable[(uint16_t)objIdx].objectType;
 					uint16_t frame = XWA_CRAFT_ANIM_FRAME(g_curCraft);
 
@@ -2326,8 +2328,8 @@ void FlightObject_UpdateSpecialBehavior(void) {
 			}
 
 #ifdef XWA_MODERN
-			/* Modern port: a model with crew.update_all animates its crew for
-			   every object, in any view. Pilots keep their own call below. */
+			/* A model with crew.update_all animates its crew for every object,
+			   in any view. Pilots keep their own call below. */
 			if ((g_objectTable[(uint16_t)objIdx].playerOwnerIdx != -1 && g_flightPlayerCount == 1 &&
 				 g_players[g_localPlayer].viewState.externalCameraActive) ||
 				(objectType != OBJ_RebelPilot && objectType != OBJ_ImperialPilot &&
@@ -2520,10 +2522,11 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 		}
 
 #ifdef XWA_MODERN
-		/* Modern mouse flight control, injected before the input frame is
-		 * packed so films, replays, and net lockstep stay source-agnostic.
-		 * The mouse overrides any axis it deflects; the joystick keeps the
-		 * rest. Cockpit mouse look owns the pointer while enabled. */
+		/* Mouse flight control. It runs before the input frame is packed, so
+		   films, replays and net lockstep see the same input whether it came
+		   from the mouse or the joystick. The mouse replaces any axis it moves;
+		   the joystick keeps the others. While cockpit mouse look is on, mouse
+		   flight is suspended. */
 		if (g_padlockMouseLookEnabled) {
 			XwaMouseFlight_Suspend();
 		} else if (XwaMouseFlight_Sample()) {
@@ -2560,9 +2563,9 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 		}
 
 #ifdef XWA_MODERN
-		/* A short right-button tap emits the target-in-sight action, like the
-		 * original joystick button 2 tap. Taps made while typing a message are
-		 * consumed and discarded — KEY_ALT_1 would insert a taunt there. */
+		/* A short right-button tap sends the target-in-sight key, like a tap of
+		   joystick button 2. A tap made while the player is typing a message is
+		   dropped, because KEY_ALT_1 would insert a taunt there. */
 		if (key == 0 && !g_padlockMouseLookEnabled && XwaMouseFlight_TakeTargetTap() &&
 			g_players[g_localPlayer].msgTypeId == 0) {
 			key = KEY_ALT_1;
@@ -3223,7 +3226,8 @@ static const FlightWorldExtensionRange g_flightWorldExtensionRanges[] = {
 	  (XWA_CRAFT_WEAPON_SLOT_COUNT - XWA_STOCK_WEAPON_SLOT_COUNT) * sizeof(WarheadInventoryEntry) },
 };
 
-/* The craft of a slot whose CraftData the world state serializes, or NULL. */
+/* Returns the craft in `slot` if the world state saves its CraftData, or
+   NULL. */
 static CraftData* FlightWorldState_SerializedCraft(uint32_t slot) {
 	const ObjectRecord* obj = &g_objectTable[slot];
 
@@ -3269,9 +3273,8 @@ static void FlightWorldState_WriteExtension(uint8_t** cursor) {
 	}
 }
 
-/* Resets the extension ranges of every serialized craft to their spawn
- * defaults, then applies the block at `cursor` when g_worldStateSize holds
- * one. */
+/* Resets the extension ranges of every saved craft to their spawn values, then
+   applies the extension block at `cursor` if the world state contains one. */
 static void FlightWorldState_RestoreExtension(const uint8_t* cursor) {
 	const uint8_t* end = g_worldStateBuffer + g_worldStateSize;
 	uint32_t slot;
@@ -4264,7 +4267,8 @@ int Flight_ChecksumWorldState(int expectedChecksum, int serverTicks) {
 		} while (--byteCount != 0);
 	}
 #ifdef XWA_MODERN
-	/* Modern port: the world-state extension block follows the players. */
+	/* The checksum also covers the world-state extension block, which follows
+	   the players. */
 	if (g_worldStateBuffer + g_worldStateSize > cursor) {
 		byteCount = (uint32_t)(g_worldStateBuffer + g_worldStateSize - cursor);
 		do {
@@ -4639,7 +4643,6 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 				if (playerIdx == (unsigned int)g_localPlayer) {
 					int li;
 #ifdef XWA_MODERN
-					/* Modern port: a mod can change the hyperspace sounds. */
 					const int startSlot =
 						XwaCraftSounds_HyperStart(playerIdx, g_players[playerIdx].iff == 1 ? 115 : 118);
 					if (startSlot != -1)
@@ -4678,8 +4681,6 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 			if (playerIdx == (unsigned int)g_localPlayer) {
 				FlightLight_BlendDirectionalLightTargets(1.0f);
 #ifdef XWA_MODERN
-				/* Modern port: a mod can change the hyperspace sounds. The check
-				   for a playing sound uses the slot that plays. */
 				{
 					const int zoomSlot =
 						XwaCraftSounds_HyperZoom(playerIdx, g_players[playerIdx].iff == 1 ? 116 : -1);
@@ -4775,8 +4776,9 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 				if (playerIdx == (unsigned int)g_localPlayer) {
 					int li;
 #ifdef XWA_MODERN
-					/* Modern port: a jump to a region that the mission lists as
-					   interdicted plays the abort sound. A mod can change both sounds. */
+					/* A jump into a region that the mission lists as
+					   interdicted plays the abort sound instead of the arrival
+					   sound. */
 					const int interdicted =
 						XwaMissionSettings_InterdictedRegion(g_players[playerIdx].regionIndex);
 					const int endSlot =
@@ -5014,8 +5016,8 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					po = &g_objectTable[g_players[playerIdx].objectIndex];
 					arrivedType = (ObjectTypeId)po->objectType;
 #ifdef XWA_MODERN
-					/* Modern port: articulated models decide from their
-					   S-foils. */
+					/* A model with S-foil or landing gear articulations decides
+					   from those. Other craft keep the X-wing/B-wing test. */
 					if (XwaArticulation_TriggerPasses(g_players[playerIdx].objectIndex,
 													  XWA_ARTICULATION_HYPERSPACE_ARRIVAL,
 													  arrivedType == OBJ_XWing || arrivedType == OBJ_BWing)) {
@@ -5584,7 +5586,7 @@ void Flight_UpdateCraftSteeringAndSpeed(void) {
 						enginePowerMargin = 6 - g_curCraft->laserRedirect - g_curCraft->shieldRedirect -
 											g_curCraft->beamLevel;
 #ifdef XWA_MODERN
-						/* Modern port: a mod's weapon profile can change the
+						/* A mod's weapon profile can change the
 						   speed step. A mod can also give the TIE Fighter its
 						   larger step without spare engine power. */
 						{
@@ -6099,8 +6101,9 @@ void Flight_StepSimToTime(int targetTimestamp) {
 				Flight_UpdateCraftSteeringAndSpeed();
 				collide_collisions();
 #ifdef XWA_MODERN
-				/* Modern port: warheads bay, cargo clamps and hangar doors of
-				   articulated models. */
+				/* Moves the articulated parts of the world: the
+				   local player's warheads bay, then the region's cargo clamps
+				   and hangar doors. */
 				XwaArticulation_StepWorld();
 #endif
 				if (!g_flightSimSideEffectsSuppressed && g_flightMissionEndPending == 1) {
@@ -6117,7 +6120,6 @@ void Flight_StepSimToTime(int targetTimestamp) {
 			g_flightSideEffectsEnabled = 1;
 			FlightObject_UpdateDebrisAndTransientAnimations();
 #ifdef XWA_MODERN
-			/* Modern port: play a mod's starship ambient sounds. */
 			XwaCraftSounds_UpdateAmbient();
 #endif
 			if (g_useHardware3D) {
@@ -6445,7 +6447,7 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 			Film_ReadBytes(&loopIdx, sizeof(loopIdx));
 			Film_ReadBytes(g_worldStateBuffer, loopIdx);
 #ifdef XWA_MODERN
-			/* Modern port: the restore reads the extension block up to this size. */
+			/* The restore reads the extension block up to this size. */
 			g_worldStateSize = (int)loopIdx;
 #endif
 			Flight_RestoreWorldState();
@@ -7737,7 +7739,6 @@ static __inline void FlightAction_EmitSystemCondition(uint16_t systemMsgId, uint
 
 static __inline int FlightAction_ShieldLaserTransferStep(ObjectRecord const* obj) {
 #ifdef XWA_MODERN
-	/* Modern port: a mod can change the energy transfer rate. */
 	return XwaWeaponRates_EnergyTransfer(
 		(unsigned int)(obj - g_objectTable),
 		GetModelDefIndexFromType(obj->objectType) == GetModelDefIndexFromType(OBJ_MissileBoat) ? 32 : 4);
@@ -7775,7 +7776,7 @@ static __inline int FlightAction_TransferShieldsToLasers(unsigned int playerIdx,
 
 	shieldStep = FlightAction_ShieldLaserTransferStep(obj);
 #ifdef XWA_MODERN
-	/* Modern port: a mod can change how much charge one transfer moves. */
+	/* A mod can change how much charge one transfer moves. */
 	laserLimit = XwaWeaponRates_EnergyTransferLaserLimit((unsigned int)(obj - g_objectTable));
 	shieldRequested = (laserDeficit > laserLimit ? laserLimit : laserDeficit) * shieldStep;
 #else
@@ -7939,9 +7940,9 @@ static __inline void FlightAction_TransferLasersToShields(unsigned int playerIdx
 		shieldDeficit = 0;
 	}
 #ifdef XWA_MODERN
-	/* Modern port: a mod can change how much energy one transfer moves, and
-	   what the charge is worth. XWAU limits the loop below with the laser
-	   limit, so OpenXWA does too. */
+	/* A mod can change how much shield energy one transfer moves, and what one
+	   unit of laser charge is worth. XWAU also caps the loop below with the
+	   laser limit instead of 100, so OpenXWA does the same. */
 	if (shieldDeficit > XwaWeaponRates_EnergyTransferShieldLimit((unsigned int)(obj - g_objectTable))) {
 		shieldDeficit = XwaWeaponRates_EnergyTransferShieldLimit((unsigned int)(obj - g_objectTable));
 	}
@@ -8529,8 +8530,8 @@ static __inline int FlightAction_TargetComponentSelectable(ObjectTypeId objectTy
 		return 0;
 	}
 #ifdef XWA_MODERN
-	/* Modern port: a model's `targetable` set limits the components that the
-	   player can target. */
+	/* A model's `targetable` set limits the components that the player can
+	   target. */
 	if (!OptSynth_TypeMeshTargetable((unsigned int)objectType, componentIdx)) {
 		return 0;
 	}
@@ -9453,8 +9454,8 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 #endif
 			case KEY_V:
 #ifdef XWA_MODERN
-				/* Modern port: articulated models toggle their S-foils (V) or
-				   landing gear (Ctrl+L). The original ignores Ctrl+L. */
+				/* Articulated models toggle their S-foils (V) or landing gear
+				   (Ctrl+L). The original ignores Ctrl+L. */
 				if (objIdx != 0xffff) {
 					uint16_t refusal = 0;
 					const XwaArticulationTriggerResult articulation = XwaArticulation_Trigger(
@@ -9508,8 +9509,6 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 				break;
 			case KEY_W:
 #ifdef XWA_MODERN
-				/* Modern port: a mod can let the weapon key work in a gunner
-				   seat. */
 				if (!g_players[currentPlayerIdx].hasCheckpointFlag &&
 					(!g_players[currentPlayerIdx].currentSeatIdx ||
 					 XwaMissionSettings_GunnerWeaponSelectInSeat())) {
@@ -9617,8 +9616,6 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 							}
 							mode = (uint8_t)(craft->laserLinkMode[group] + 1);
 #ifdef XWA_MODERN
-							/* Modern port: a mod can stop the player from
-							   linking the lasers and the ions. */
 							if (mode == 4 && craft->cannonClassCount == 2 &&
 								!XwaWeaponStats_LinkingRule(
 									(uint16_t)objIdx, XWA_WEAPON_LINKING_PREVENT_PLAYER_LINKED_LASERS_ION)) {
@@ -9652,8 +9649,8 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 								mode = 3;
 							}
 #ifdef XWA_MODERN
-							/* Modern port: a mod's weapon profile can set the
-							   link mode. */
+							/* A weapon profile that sets the link mode replaces
+							   the mode the key picked. */
 							mode = (uint8_t)XwaWeaponStats_LaserLink((uint16_t)objIdx, mode);
 #endif
 							craft->laserLinkMode[group] = mode;
@@ -10277,8 +10274,8 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 				g_missionHeader.body.missionType != XWA_MISSION_TYPE_DEATH_STAR &&
 				!g_players[currentPlayerIdx].hasCheckpointFlag &&
 #ifdef XWA_MODERN
-				/* Modern port: no map in a mission that forces the player into
-				   the turret. */
+				/* No map in a mission that forces the player into the
+				   turret. */
 				(XwaMissionSettings_ForcePlayerInTurret() >= 0
 					 ? !XwaMissionSettings_ForcePlayerInTurret()
 					 : g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 1) &&
@@ -10329,8 +10326,8 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					g_players[currentPlayerIdx].viewState.cameraDistance = 0x40000;
 					if (mapTargetObjIdx != -1) {
 #ifdef XWA_MODERN
-						/* Modern port: in this call, a mod's map enter sound
-						   replaces the target select sound. */
+						/* In this call, a mod's map enter sound replaces the
+						   target select sound. */
 						XwaCraftSounds_SetMapEnter(1);
 						Player_SetTarget((int16_t)mapTargetObjIdx, currentPlayerIdx);
 						XwaCraftSounds_SetMapEnter(0);
@@ -10366,8 +10363,8 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			if (g_provingGroundsModeActive) {
 				Yard_TargetCurrentObjective(currentPlayerIdx);
 #ifdef XWA_MODERN
-				/* Modern port: a mission can make the O key target craft of
-				   some flight groups. */
+				/* A mission can make the O key target craft of some flight
+				   groups. */
 			} else if (XwaMissionSettings_TargetKey((int)currentPlayerIdx)) {
 #endif
 			} else {
@@ -11145,8 +11142,9 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 	FlightInput_ScaleAxesForFlight();
 
 #ifdef XWA_MODERN
-	/* Modern port: a mission can put the player in the turret, at its own
-	   time. */
+	/* A mission can choose whether the player is put in the
+	   turret, and at what mission time. A mission that doesn't set it keeps
+	   the stock test. */
 	if ((XwaMissionSettings_ForcePlayerInTurret() >= 0
 			 ? XwaMissionSettings_ForcePlayerInTurretAt(
 				   g_missionElapsedClock.hours, g_missionElapsedClock.minutes, g_missionElapsedClock.seconds)
@@ -11173,8 +11171,9 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 #endif
 	) {
 #ifdef XWA_MODERN
-/* The legacy interactive console parser is not part of the port; keep its key-swallowing
-   boundary so console-page input does not leak into flight actions. */
+		/* The port doesn't include the original console command parser.
+		   Keys on the console page are still dropped here, so they don't
+		   trigger flight actions. */
 #endif
 		g_currentActionKey = KEY_NONE;
 	}
@@ -12227,7 +12226,6 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 				}
 #endif
 #ifdef XWA_MODERN
-				/* Modern port: a mod can give the seat its own aim limits. */
 				limitA = (int16_t)XwaGunnerSeats_Value(
 					g_objectTable[g_players[playerIdx].objectIndex].objectType, seatIdx,
 					XWA_GUNNER_SEAT_AIM_LIMIT_A, g_modelDefs[(uint16_t)modelIndex].turretAimLimitA[seatIdx]);

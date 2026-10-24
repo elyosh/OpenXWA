@@ -209,8 +209,8 @@ int FrontendMission_LoadForBriefing(void) {
 	FrontendMission_Reset();
 	FrontendMission_LoadCurrentMissionData();
 #ifdef XWA_MODERN
-	/* Modern port: read the briefing mission's object profile selections,
-	   skins and model swaps, for the ship-info preview. The path is the one
+	/* Read the briefing mission's object profile selections, skins and model
+	   swaps, for the ship-info preview. The path is the one
 	   FrontendMission_LoadCurrentMissionData opens. */
 	if (g_missionList != NULL) {
 		char missionPath[256];
@@ -995,9 +995,9 @@ int FrontendMission_LoadCurrent(void) {
 		sprintf(buffer, "%s\\%s", g_campaignDirNames[missionDirectoryId],
 				missionList[missionListIndex].fileName);
 #ifdef XWA_MODERN
-		/* Modern port: the briefing room's order of battle reads the
-		   mission's settings and craft names, and the frontend's previews
-		   show the models that the mission swaps in. */
+		/* The briefing room's order of battle reads the mission's settings and
+		   craft names, and the frontend's previews show the models that the
+		   mission swaps in. */
 		XwaMissionSettings_LoadMission(buffer);
 		XwaCraftNames_LoadMission(buffer);
 		XwaModelSwaps_LoadMission(buffer);

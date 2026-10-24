@@ -383,8 +383,8 @@ void BriefingMap_DrawGrid(FrontendRect* viewportRect) {
 
 	FrontendDraw_RectCopy(&dst, viewportRect);
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer: marks the lines below as the grid, so a mod
-	   can draw it with its own colours and line width. */
+	/* Tell the remaster that the lines below are the grid, so a mod can draw it
+	   with its own colours and line width. */
 	XwaSnapshot_BeginBriefingGrid((uint32_t)(uint16_t)g_briefingMapMajorGridColor);
 #endif
 
@@ -1643,7 +1643,8 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 							g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 							strcat(g_frontendScratchBuffer, "Exterior.opt");
 #ifdef XWA_MODERN
-							/* Modern port: GLB replacements decide whether the model exists. */
+							/* A GLB replacement can provide the Exterior model,
+							   or suppress it so that the normal model loads. */
 							stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
 #else
 							stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
@@ -1731,8 +1732,9 @@ int16_t BriefingMap_DrawViewportAndSelection(FrontendRect* viewportRect, Fronten
 					FrontendDraw_RectCopy(&rect, &viewport);
 					BriefingMap_ClearPreviewScratchRect(g_briefingSelectionImageBuffer, &rect);
 #ifdef XWA_MODERN
-					/* Remaster: reset the external RT before the wireframe
-					 * renders into it (classic scratch wipe above). */
+					/* Remaster: clear the external render target before the
+					 * wireframe is drawn into it, as the classic code clears
+					 * the scratch buffer above. */
 					XwaSnapshot_EmitSurfaceEvent(XWA_SURFACE_EVENT_EXTERNAL_CLEAR, rect.left, rect.top,
 												 rect.right, rect.bottom);
 #endif
@@ -2281,7 +2283,8 @@ int MissionBriefing_Update(int frameCounter) {
 				g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 				strcat(g_frontendScratchBuffer, "Exterior.opt");
 #ifdef XWA_MODERN
-				/* Modern port: GLB replacements decide whether the model exists. */
+				/* A GLB replacement can provide the Exterior model, or suppress
+				   it so that the normal model loads. */
 				stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
 #else
 				stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
@@ -2710,7 +2713,8 @@ int MissionBriefing_Update(int frameCounter) {
 				g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 				strcat(g_frontendScratchBuffer, "Exterior.opt");
 #ifdef XWA_MODERN
-				/* Modern port: GLB replacements decide whether the model exists. */
+				/* A GLB replacement can provide the Exterior model, or suppress
+				   it so that the normal model loads. */
 				stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
 #else
 				stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");

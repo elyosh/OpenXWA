@@ -509,7 +509,8 @@ int FrontendFileStream_PrimeFromQueuedFile(int slot, const char* pathPrefix) {
 
 			writeChunk = chunkPtrs[g_frontendFileStreamWriteChunkIdx[slot]];
 #ifdef XWA_MODERN
-			/* Frame-driven port time does not advance during this preload loop. */
+			/* The original's delay loop before each read is left out: port time
+			   is frame driven and does not advance inside this loop. */
 			bytesRead = File_ReadPartial(g_frontendFileStreamFiles[slot], writeChunk, 0x2000);
 #else
 			{

@@ -266,8 +266,8 @@ static void FamilyTransportRoom_DrawNormalBackgroundLayer(void) {
 
 	FrontImage_DrawSpriteOpaque("background", 0, 0);
 #ifdef XWA_MODERN
-	/* XWA_MODERN: frontend/concourse/layout.yaml can set which missions unlock
-	   the cologne and Lady Blue, and so which award text they show. */
+	/* Frontend/concourse/layout.yaml can set which missions unlock the cologne
+	   and Lady Blue, and so which award text they show. */
 	if (XwaConcourseLayout_Unlocked("family_room.cologne_mission", 9)) {
 #else
 	if (g_pilotData.tourOfDutyMissions[8].completedCount) {
@@ -337,8 +337,8 @@ static void FamilyTransportRoom_DrawMedalCaseZoomLayer(void) {
 			sprintf(buffer, "battlezoom%d", i);
 #ifdef XWA_MODERN
 			{
-				/* XWA_MODERN: frontend/concourse/layout.yaml can move the medals
-				   and the Kalidor crescent in the medal case. */
+				/* Frontend/concourse/layout.yaml can move the medals and the
+				   Kalidor crescent in the medal case. */
 				int x = g_familyMedalZoomOffsetX[i];
 				int y = g_familyMedalZoomOffsetY[i];
 
@@ -941,7 +941,7 @@ int FrontendFamily_DrawEmailMonitor(int frameCounter) {
 	if (g_frontendFamilyHasNewEmail) {
 		FrontImage_SetSpriteFrame("emailmon", frameCounter % 20 / 4);
 #ifdef XWA_MODERN
-		/* XWA_MODERN: frontend/concourse/layout.yaml can move the monitor. */
+		/* Frontend/concourse/layout.yaml can move the monitor. */
 		XwaConcourseLayout_DrawSprite("emailmon", "family_room.monitor", 426, 243);
 #else
 		FrontImage_DrawSprite("emailmon", 426, 243);
@@ -2070,8 +2070,8 @@ int FamilyTransportRoom_Update(int frameCounter) {
 
 		if (FrontendWaveStream_IsPlaying()) {
 #ifdef XWA_MODERN
-			/* XWA_MODERN: frontend/concourse/layout.yaml can move Marko's eye
-			   and the room's hit areas. */
+			/* Frontend/concourse/layout.yaml can move Marko's eye and the
+			   room's hit areas. */
 			XwaConcourseLayout_DrawSprite("mkeye", "family_room.marko_eye", 160, 200);
 #else
 			FrontImage_DrawSprite("mkeye", 160, 200);

@@ -503,11 +503,11 @@ int RenderScene_ProjectPreviewWireframeModel(ObjectRecord* obj) {
 				}
 
 #ifdef XWA_MODERN
-				/* Modern port: articulated models are aligned on their bridge too.
-				   The B-wing keeps its cached bridge, and other models look it up
-				   in their own model. Both answers depend only on the object and
-				   its model, so each is found once per draw instead of once per
-				   root: a bridge search walks every root. */
+				/* Articulated models are aligned on their bridge too. The
+				   B-wing keeps its cached bridge, and other models look it up
+				   in their own model. Both answers depend only on the object
+				   and its model, so each is found once per draw instead of once
+				   per root: a bridge search walks every root. */
 				if (alignsBridge < 0) {
 					alignsBridge = XwaArticulation_AlignsBridge(obj) ? 1 : 0;
 				}
@@ -555,8 +555,8 @@ int RenderScene_ProjectPreviewWireframeModel(ObjectRecord* obj) {
 
 		++g_curLayerId;
 #ifdef XWA_MODERN
-		/* Modern port: GLB replacement models have no classic faces to
-		 * project; the HD renderer draws the preview. */
+		/* GLB replacement models have no classic faces to project; the HD
+		 * renderer draws the preview. */
 		if (!OptSynth_IsSynthesized(model)) {
 			RenderScene_WalkPreviewOptNodeForProjection(model, node, &mesh);
 		}

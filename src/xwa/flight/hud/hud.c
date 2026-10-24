@@ -3794,7 +3794,6 @@ void Hud_RenderHud(void) {
 			}
 			Hud_DrawPowerSettings3D();
 #ifdef XWA_MODERN
-			/* Modern port: without lasers, no laser charge. */
 			if (!XwaMissionSettings_PlayerLasersDisabled()) {
 				Hud_DrawLaserCharge3D();
 			}
@@ -6222,8 +6221,8 @@ void Hud_DrawEnergyBar3D(int isIonBank, int bankWeaponCount) {
 		uint32_t emptySegments;
 		int16_t charge;
 #ifdef XWA_MODERN
-		/* Modern port: the bar changes colour at the high-power charge, which a
-		   mod's weapon profile can change. */
+		/* The bar changes colour at the high-power charge, which a mod's weapon
+		   profile can change. */
 		const int highPowerCharge =
 			XwaWeaponStats_Value(g_players[g_localPlayer].objectIndex,
 								 craft->warheadData[endWeapon - weaponCount].projectileTypeId,
@@ -6934,7 +6933,6 @@ void Hud_DrawReticle3D(void) {
 	quad.screenSize = (uint16_t)(int)((double)quad.screenSize * (double)g_flightHudScaleFactor);
 	lockRange = modelIndex == missileBoatModelIndex ? 354 : 708;
 #ifdef XWA_MODERN
-	/* Modern port: a mod can change how long a lock takes for each craft. */
 	lockRange = (uint16_t)XwaWarheadLock_Value(g_players[g_localPlayer].objectIndex, XWA_WARHEAD_LOCK_TICKS,
 											   lockRange);
 #endif
@@ -11348,8 +11346,9 @@ int Hud_PointCamera(uint16_t targetObjIdx, int16_t fitDistanceFlag, int playerId
 
 		cameraDistance = (uint16_t)(fitDistance + ((uint16_t)fitDistance >> 2));
 #ifdef XWA_MODERN
-		/* Preserve the scalar before the legacy Q15 projection changes its
-		 * effective magnitude as the camera rotates. */
+		/* Keep the exact camera distance for the snapshot. The Q15 products
+		 * below truncate, so the length of the saved target vector changes as
+		 * the camera rotates. */
 		g_hudCrtCameraDistance = (int32_t)((uint32_t)cameraDistance << (uint8_t)fitDistanceShift);
 #endif
 		g_players[playerIdx].viewState.savedTargetX = Xwa_Q15MulReuseFirstSlot(cameraDistance, g_camMatR2_X);
@@ -13215,8 +13214,8 @@ void Hud_DrawCmdTargetComponentLine(void) {
 				}
 			} else {
 #ifdef XWA_MODERN
-				/* Modern port: a mod can change the strength by mesh type for
-				   each model. A strength of 0 counts as 1. */
+				/* A strength of 0 counts as 1, so the percent below doesn't
+				   divide by zero. */
 				int strength = XwaComponentStrength_Value(g_objectTable[targetObjIdx].objectType, meshType,
 														  g_meshTypeComponentMaxHp[meshType]);
 
@@ -15781,8 +15780,9 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 
 	missionDescriptionId = g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId];
 #ifdef XWA_MODERN
-	/* Modern port: a mission can choose the IFF whose arrival messages are
-	   skipped. */
+	/* A mission can choose for each IFF whether its arrival messages are
+	   skipped. Without a choice, the stock rule skips the arrivals of IFF 1 in
+	   missions 49 to 52. */
 	if (XwaMissionSettings_SkipArrivalMessages(g_missionFlightGroups[flightGroupIdx].fg.iff) > 0) {
 		return;
 	}
@@ -15885,8 +15885,8 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 			g_msgPtrs[0] = g_modelDefs[speciesIdx].longName;
 			g_msgPtrs[1] = g_missionFlightGroups[flightGroupIdx].fg.name;
 #ifdef XWA_MODERN
-			/* Modern port: a mission that skips the hyperspace messages skips
-			   the "entering area" messages too. */
+			/* A mission that skips the hyperspace messages skips the "entering
+			   area" messages too. */
 			if (XwaMissionSettings_SkipHyperspacedMessages() > 0) {
 				return;
 			}
@@ -15923,8 +15923,9 @@ void msg_emitCraftMessage(uint16_t objIdx, CraftData* craft, int16_t msgTemplate
 	int16_t craftNumber;
 
 #ifdef XWA_MODERN
-	/* Modern port: a mission can skip message 143, or keep it in mission
-	   49. */
+	/* A mission's choice to skip the hyperspace messages also decides whether
+	   message 143 is skipped. Without a choice, the stock rule skips it only in
+	   mission 49. */
 	if ((XwaMissionSettings_SkipHyperspacedMessages() >= 0
 			 ? !XwaMissionSettings_SkipHyperspacedMessages()
 			 : g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 49) ||
@@ -19480,7 +19481,7 @@ char Mfd_IsCommandMenuItemAvailable(uint16_t playerIdx, uint16_t menuRow, int16_
 				return 0;
 			case 4:
 #ifdef XWA_MODERN
-				/* Modern port: a mod can give any craft gunner seats. */
+				/* A mod can give any craft gunner seats. */
 				if (XwaGunnerSeats_Count(objectType) >= 0) {
 					if (XwaGunnerSeats_Count(objectType) == 0) {
 						return 0;

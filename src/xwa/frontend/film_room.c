@@ -274,8 +274,8 @@ int FilmRoom_Update(int frameCounter) {
 
 	if (frameCounter == 0 || entryMoviePending) {
 		if (!entryMoviePending && !g_skipFrontendEntryMovie) {
-			/* Modern port: a mod can choose the film room's movie in
-			   frontend/movies/movies.yaml; it is "pod" otherwise. */
+			/* A mod can choose the film room's movie. Without one, it is "pod",
+			   as in the original. */
 			if (Movie_Play(XwaMovieTask_RoomMovie(XWA_MOVIE_ROOM_FILM), 1)) {
 				entryMoviePending = 1;
 				return 0;

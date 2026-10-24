@@ -66,9 +66,9 @@ int Frontend_CycleScrollableFocus(void) {
 
 	firstControlId = g_scrollableControlIds[0];
 #ifdef XWA_MODERN
-	// DEVIATION: the original uses memcpy here, but the source and destination
-	// overlap (dest = src - one entry), so memcpy is undefined behavior on the
-	// overlap. memmove is the overlap-safe equivalent for modern builds.
+	/* DEVIATION: the original uses memcpy here, but the source and the
+	   destination overlap (the destination is one entry before the source).
+	   memcpy is undefined on overlapping memory, so the port uses memmove. */
 	memmove(g_scrollableControlIds, &g_scrollableControlIds[1], (size_t)(4 * g_scrollableControlCount - 4));
 #else
 	memcpy(g_scrollableControlIds, &g_scrollableControlIds[1], (size_t)(4 * g_scrollableControlCount - 4));

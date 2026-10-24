@@ -1289,7 +1289,6 @@ char GlowMark_SpawnLocalPlayerHitEffects(void) {
 
 		modelIndex = GetModelDefIndexFromType(objectType);
 #ifdef XWA_MODERN
-		/* Modern port: a mod can give the seat its own cockpit. */
 		turretObjectType = (uint16_t)XwaGunnerSeats_Value(
 			objectType, g_players[g_localPlayer].currentSeatIdx - 1, XWA_GUNNER_SEAT_COCKPIT,
 			g_modelDefs[modelIndex].turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1]);
@@ -2209,9 +2208,9 @@ void EngineGlow_RenderForObject(unsigned int objIdx) {
 				knockout = knockout->next;
 			}
 #ifdef XWA_MODERN
-			/* Modern port: a model's `engine_glows` hides glows by speed, and
-			   rules.classic_hide_destroyed_engine_glows skips the glows of
-			   destroyed or hidden meshes. */
+			/* No glow when the mod hides the glows of destroyed meshes and its
+			   mesh is destroyed or hidden, or when the model shows the glow
+			   only at other speeds. */
 			if (drawEmitter && g_curCraft != NULL) {
 				if (XwaMissionSettings_ClassicHideDestroyedEngineGlows() &&
 					(g_curCraft->componentHp[meshIdx] == 0 || g_curCraft->componentState[meshIdx] != 0)) {

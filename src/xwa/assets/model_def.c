@@ -114,8 +114,8 @@ int ComputeCraftCombatRating(ObjectTypeId objectType) {
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: the values of the model's default stats profile, for the
-	   ratings and for the points that the craft is worth. */
+	/* Use the values of the model's default stats profile, both for the ratings
+	   and for the points that the craft is worth. */
 	profiledRecord = g_modelDefs[modelIndex];
 	XwaTechRatings_ProfileRecord((unsigned int)objectType, &profiledRecord);
 	modelDef = &profiledRecord;

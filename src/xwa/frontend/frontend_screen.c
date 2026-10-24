@@ -303,9 +303,10 @@ void FrontendScreen_PopState(void) {
 
 	if (states[newStackTop].savedImage.pixelCount > 0) {
 #ifdef XWA_MODERN
-		/* Remaster: both bpp branches below restore the saved region
-		 * of the persistent surface (raw pixel copies / BlitOpaque —
-		 * unhookable as draws). One event covers the pop. */
+		/* Remaster: both bpp branches below restore the saved region of the
+		   persistent surface. They copy raw pixels or call BlitOpaque, which
+		   the snapshot can't record as draws, so one event covers the whole
+		   pop. */
 		XwaSnapshot_EmitSurfaceEvent(XWA_SURFACE_EVENT_SCREEN_POP_RESTORE, states[newStackTop].savedRect.left,
 									 states[newStackTop].savedRect.top, states[newStackTop].savedRect.right,
 									 states[newStackTop].savedRect.bottom);
@@ -413,8 +414,8 @@ int FrontendScreen_RunFrame(void) {
 	exitFn = state->exitFn;
 	g_frontendScreenRunFrameActive = 1;
 #ifdef XWA_MODERN
-	/* XWA_MODERN: the screen that runs this tick sets the frontend frame's
-	   layout. */
+	/* Records the screen that runs this tick, since its layout is the frontend
+	   frame's layout, and counts the frame. */
 	XwaFrontendScreens_NoteRun();
 #endif
 	result = state->updateFn(g_frameCounter);

@@ -801,6 +801,8 @@ int XwaArticulation_FireBlocked(unsigned int objIdx, int stockBlocked) {
 		!Articulation_AtRest(model, craft, ARTICULATION_LANDING_GEAR)) {
 		blocked = 1;
 	}
+	/* Bit 0 of sFoilState is set while the S-foils move, so moving S-foils
+	   block firing even with sfoils.allow_fire_closed. */
 	return (hasSFoils && (craft->sFoilState & 1) != 0) || blocked;
 }
 

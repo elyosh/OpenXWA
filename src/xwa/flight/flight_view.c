@@ -60,19 +60,20 @@ const float flt_5A9ABC = 0.000047936861f;
 const float flt_5A9AC0 = 0.000030518509f;
 
 #ifdef XWA_MODERN
-/* Double-precision shadow of the camera basis. The Q15 camera integers are
- * rebuilt through chained truncated rotations every frame, so their few-LSB
- * error requantizes with each pan step. Because the renderer applies the
- * object rotation (about the model origin) and the view translation in
- * separate stages, that common camera error displaces vertices by
- * error * distance-from-model-origin: on huge OPTs (Azzameen platform,
- * capital ships) whole surfaces visibly jump by many pixels while panning.
- * The shadow rebuilds the same rotation chain in double precision from the
- * same angle inputs, giving a smooth camera matrix for rendering. The Q15
- * integers are untouched. Each shadow is tagged with the exact Q15 camera
- * matrix published with it. Consumers use the shadow only while that tag still
- * matches g_camMat; temporary viewport cameras save and restore the complete
- * tagged state and the independently writable legacy float view matrix. */
+/* A double-precision copy (the shadow) of the camera basis. Every frame, the
+   game builds the Q15 camera matrix from a chain of rotations that each
+   truncate. The result is off in its last few bits, and the error changes with
+   each pan step. The renderer rotates an object about its model origin and
+   applies the view translation in a separate step, so this camera error moves
+   each vertex by the error times its distance from the model origin. On huge
+   models (the Azzameen platform, capital ships) whole surfaces jump by many
+   pixels while the camera pans. The shadow builds the same rotation chain in
+   double precision from the same angles, which gives a smooth camera matrix for
+   rendering. The Q15 matrix doesn't change. Each shadow keeps a copy of the
+   exact Q15 matrix that was published with it, and code uses the shadow only
+   while that copy still matches g_camMat. Temporary viewport cameras save and
+   restore the whole shadow state, and also the legacy float view matrix, which
+   other code can write directly. */
 static double g_camShadow[9];
 static int g_camShadowSource[9];
 static int g_camShadowValid;
@@ -169,9 +170,10 @@ static void FVIEW_CopyCamMatInts(int rows[9]) {
 	rows[8] = g_camMatR2_Z;
 }
 
-/* Ownership is exact, not inferred from angular proximity. Target-inset and
- * padlock cameras can legitimately be very close to the main camera, so a
- * tolerance can accept a smooth basis belonging to the wrong camera. */
+/* The shadow belongs to the current camera only when the Q15 matrices match
+   exactly. The target inset and padlock cameras can be very close to the main
+   camera, so a match within a tolerance could use the shadow of the wrong
+   camera. */
 static int FVIEW_CamShadowMatchesInts(void) {
 	return g_camShadowValid && g_camShadowSource[0] == g_camMatR0_X && g_camShadowSource[1] == g_camMatR0_Y &&
 		   g_camShadowSource[2] == g_camMatR0_Z && g_camShadowSource[3] == g_camMatR1_X &&
@@ -238,8 +240,9 @@ void FVIEW_RestoreRenderCameraStateForViewport(void) {
 	if (!FVIEW_CamShadowMatchesInts()) {
 		g_camShadowValid = 0;
 	}
-	/* g_viewMtx is independently writable legacy render state. Restoring the
-	 * exact saved floats avoids requantizing an unshadowed camera through Q15. */
+	/* Other code can write g_viewMtx directly. Restore the saved floats as they
+	   were, so that a camera without a shadow isn't rounded again through
+	   Q15. */
 	FVIEW_RestoreViewMtx(g_savedViewportViewMtx);
 }
 
@@ -319,8 +322,6 @@ int FlightView_ComputeSeatEyeOffset(int playerIdx) {
 		launcherRotScale = NULL;
 
 #ifdef XWA_MODERN
-		/* Modern port: a mod can give the seat its own position and
-		   cockpit. */
 		{
 			const unsigned int objectType = g_objectTable[objectIdx].objectType;
 
@@ -449,7 +450,6 @@ void FlightView_RenderCockpitModel(void) {
 
 		modelIndex = GetModelDefIndexFromType(objectType);
 #ifdef XWA_MODERN
-		/* Modern port: a mod can give the seat its own cockpit. */
 		turretObjectType = (uint16_t)XwaGunnerSeats_Value(
 			objectType, g_players[g_localPlayer].currentSeatIdx - 1, XWA_GUNNER_SEAT_COCKPIT,
 			g_modelDefs[modelIndex].turretObjectType[g_players[g_localPlayer].currentSeatIdx - 1]);
@@ -1981,7 +1981,6 @@ char FlightView_Render(void) {
 
 							modelIndex = (ModelDefIndex)GetModelDefIndexFromType(obj->objectType);
 #ifdef XWA_MODERN
-							/* Modern port: a mod can give the seat its own cockpit. */
 							turretObjectType = (uint16_t)XwaGunnerSeats_Value(
 								obj->objectType, g_players[g_localPlayer].currentSeatIdx - 1,
 								XWA_GUNNER_SEAT_COCKPIT,
@@ -3117,7 +3116,6 @@ int FVIEW_BuildCameraOrient(int16_t rollQ16, int16_t pitchQ16, int16_t yawQ16, i
 			savedAxisZ = g_curMatR1_Z;
 
 #ifdef XWA_MODERN
-			/* Modern port: a mod can give the seat its own mount angles. */
 			mountAngleB = XwaGunnerSeats_Value(
 				g_objectTable[playerObjectIdx].objectType, g_players[playerIdx].currentSeatIdx - 1,
 				XWA_GUNNER_SEAT_MOUNT_ANGLE_B,
@@ -3367,12 +3365,13 @@ int FVIEW_ComputeObjectViewMatrix(void) {
 	g_objViewMat_R2_Z = value;
 
 #ifdef XWA_MODERN
-	/* Geometry-wobble fix: when the double camera shadow's exact Q15 source
-	 * tag still matches g_camMat, derive the float matrix from it instead of the
-	 * truncated Q15 product, so the per-frame requantization of the camera
-	 * basis cannot displace models far from their origin. Same (R0, R2, R1)
-	 * row arrangement as the integer matrix above. Any other camera writer
-	 * fails the match and keeps the original integer-derived floats. */
+	/* Fix for wobbling geometry: while the double-precision camera shadow still
+	   matches g_camMat exactly, build the float matrix from the shadow instead
+	   of the truncated Q15 product. The camera's rounding error, which changes
+	   every frame, then can't move models that are far from their origin. The
+	   rows are in the same (R0, R2, R1) order as the integer matrix above. When
+	   another camera wrote g_camMat, the match fails and the floats computed
+	   from the integers above stay. */
 	if (FVIEW_CamShadowMatchesInts()) {
 		g_objViewMatF_R0_X =
 			(float)(((double)g_curMatR0_X * g_camShadow[0] + (double)g_curMatR0_Y * g_camShadow[1] +

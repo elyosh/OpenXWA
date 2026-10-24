@@ -875,10 +875,9 @@ void FlightLight_AppendScenePointLightForObject(ObjectRecord* obj) {
 
 			craft = obj->mobj->pCraft;
 #ifdef XWA_MODERN
-			/* Modern port: no light from a glow that isn't drawn. A glow isn't
-			   drawn when its mesh is destroyed, if the mod hides the glows of
-			   destroyed meshes, or when the model shows it only at other
-			   speeds. */
+			/* No light from a glow that isn't drawn. A glow isn't drawn when
+			   its mesh is destroyed, if the mod hides the glows of destroyed
+			   meshes, or when the model shows it only at other speeds. */
 			if ((XwaMissionSettings_ClassicHideDestroyedEngineGlows() && craft->componentHp[meshIdx] == 0) ||
 				XwaEngineGlows_Hidden((unsigned int)obj->objectType, (unsigned int)glowIdx, obj->mobj->speed,
 									  (uint16_t)craft->aiFlight.maxSpeedCache)) {

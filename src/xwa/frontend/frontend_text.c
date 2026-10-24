@@ -656,7 +656,6 @@ int FrontendText_GetFontHeight(int fontSize) {
 		font = g_fontBySize[fontSize];
 		if (font != NULL) {
 #ifdef XWA_MODERN
-			/* XWA_MODERN: frontend/fonts/fonts.yaml can set the height. */
 			return XwaFrontendFonts_Height(fontSize, font->glyphHeight[0]);
 #else
 			return font->glyphHeight[0];
@@ -700,11 +699,10 @@ int FrontendText_MeasureWidth(const char* str, int fontSize) {
 
 #ifdef XWA_MODERN
 	{
-		/* XWA_MODERN: on a wide screen, the draw functions below scale each
-		   glyph's advance by XwaFrontendScreens_TextScale256, so the measured
-		   width is scaled the same way. With metrics: font in
-		   frontend/fonts/fonts.yaml, the width is the sum of the font's
-		   advances. */
+		/* On a wide screen, the draw functions below scale each glyph's advance
+		   by XwaFrontendScreens_TextScale256, so the measured width is scaled
+		   the same way. When the font settings set `metrics: font`, the width
+		   is the sum of the font's advances. */
 		const int scale256 = XwaFrontendScreens_TextScale256();
 		if (XwaFrontendFonts_UsesFontMetrics(fontSize)) {
 			long long width256 = 0;
@@ -776,7 +774,6 @@ int FrontendText_Draw(int fontSize, const char* str, int x, int y, int color) {
 
 				result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
-				/* Remaster snapshot observer. */
 				XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor,
 										  font->charSpacing + glyphWidth[(unsigned char)*text], textScale256);
 #endif
@@ -854,7 +851,6 @@ int FrontendText_DrawReveal(unsigned int fontSize, const char* str, int x, int y
 					result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 				}
 #ifdef XWA_MODERN
-				/* Remaster snapshot observer. */
 				XwaSnapshot_EmitGlyphFrac(
 					(int)fontSize, (unsigned char)str[index], x, xFrac, y,
 					index == revealCount ? (unsigned int)g_textColorCodes[4] : currentColor,
@@ -931,7 +927,6 @@ int FrontendText_DrawRightAligned(int fontSize, const char* str, int xRight, int
 
 			result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
-			/* Remaster snapshot observer. */
 			XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor,
 									  font->charSpacing + font->glyphWidth[(unsigned char)*text],
 									  textScale256);
@@ -1012,7 +1007,6 @@ int FrontendText_DrawCentered(int fontSize, const char* str, FrontendRect* rect,
 
 				result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
-				/* Remaster snapshot observer. */
 				XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor,
 										  font->charSpacing + font->glyphWidth[(unsigned char)*text],
 										  textScale256);
@@ -1110,7 +1104,6 @@ int FrontendText_DrawCenteredReveal(int fontSize, const char* str, FrontendRect*
 					if (index == firstRevealIndex || index == lastRevealIndex) {
 						result |= FrontImage_DrawGlyph(glyph, x, y, (unsigned int)g_textColorCodes[4], 1);
 #ifdef XWA_MODERN
-						/* Remaster snapshot observer. */
 						XwaSnapshot_EmitGlyphFrac(
 							(int)fontSize, (unsigned char)str[index], x, xFrac, y,
 							(unsigned int)g_textColorCodes[4],
@@ -1119,7 +1112,6 @@ int FrontendText_DrawCenteredReveal(int fontSize, const char* str, FrontendRect*
 					} else {
 						result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
-						/* Remaster snapshot observer. */
 						XwaSnapshot_EmitGlyphFrac(
 							(int)fontSize, (unsigned char)str[index], x, xFrac, y, currentColor,
 							font->charSpacing + font->glyphWidth[(unsigned char)str[index]], textScale256);
@@ -1217,7 +1209,6 @@ int FrontendText_DrawAlignedInRect(int fontSize, const char* str, FrontendRect* 
 
 					result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
-					/* Remaster snapshot observer. */
 					XwaSnapshot_EmitGlyphFrac((int)fontSize, (unsigned char)*text, x, xFrac, y, currentColor,
 											  font->charSpacing + glyphWidth[(unsigned char)*text],
 											  textScale256);
@@ -1388,7 +1379,6 @@ int FrontendText_DrawWrapped(int fontSize, const char* str, FrontendRect* rect, 
 					glyph[8] = (intptr_t)((unsigned char*)font->pGlyphBits + font->glyphBitOffset[ch]);
 					result |= FrontImage_DrawGlyph(glyph, x, y, currentColor, 1);
 #ifdef XWA_MODERN
-					/* Remaster snapshot observer. */
 					XwaSnapshot_EmitGlyphFrac((int)fontSize, ch, x, xFrac, y, currentColor,
 											  font->glyphWidth[ch] + font->charSpacing, textScale256);
 #endif

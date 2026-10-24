@@ -1447,9 +1447,10 @@ void Particle_UpdateEffect(ParticleEffect* effect) {
 				float elapsed;
 				float growthAge;
 
-				/* The recovered update adds growth * newAge once per legacy update.
-				 * Integrate the quadratic extension of that recurrence so substeps
-				 * remain smooth and land on the same value every eight ticks. */
+				/* The original update adds growth * newAge once per legacy
+				   update (eight ticks). Here the quadratic formula of that sum
+				   spreads the growth over the elapsed ticks, so the size grows
+				   smoothly and has the same value every eight ticks. */
 				elapsed = (float)(uint16_t)g_elapsedTicks;
 				growthAge = elapsed *
 							((float)(2 * oldAgeTicks) + elapsed + (float)PARTICLE_LEGACY_UPDATE_TICKS) *
@@ -1580,10 +1581,11 @@ void Particle_UpdateEffect(ParticleEffect* effect) {
 		int firstBoundaryAge;
 		int duePeriods;
 
-		/* Particle templates express spawnBatchCount per legacy update, not
-		 * per elapsed tick. Retain a per-effect phase so records still advance
-		 * every high-rate frame while emission and its RNG/callback side effects
-		 * occur once per original eight-tick period. */
+		/* Particle templates give spawnBatchCount per legacy update (eight
+		   ticks), not per tick. Keep a phase for each effect, so that the
+		   particles still move on every high-rate frame, while emission and its
+		   random numbers and callbacks happen once per original eight-tick
+		   period. */
 		modernState = Particle_ModernEffectState(effect);
 		pendingBefore = modernState ? modernState->pendingEmissionTicks : 0;
 		elapsedTicks = (int)(uint16_t)g_elapsedTicks;

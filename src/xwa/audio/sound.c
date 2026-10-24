@@ -453,7 +453,6 @@ uint8_t Sound_LoadEffectEx(const char* fileName, const char* name, int create3DF
 // FUNCTION: XWA 0x4DAD20
 uint8_t Sound_LoadEffect(const char* fileName, const char* name, uint16_t minDistanceOrRolloff) {
 #ifdef XWA_MODERN
-	/* Modern port: a mission can load another file for a sound. */
 	return Sound_LoadEffectEx(XwaMissionSounds_Replace(fileName), name, 0, minDistanceOrRolloff);
 #else
 	return Sound_LoadEffectEx(fileName, name, 0, minDistanceOrRolloff);
@@ -531,9 +530,9 @@ int Sound_QueueEffect(int soundId, int param2, int loop, int priority, int volum
 	}
 
 #ifdef XWA_MODERN
-	// DEVIATION: the original uses memcpy here, but the source and destination
-	// overlap (dest = src + one entry), so memcpy is undefined behavior on the
-	// overlap. memmove is the overlap-safe equivalent for modern builds.
+	/* DEVIATION: the original uses memcpy here, but the source and the
+	   destination overlap (the destination is one entry after the source).
+	   memcpy is undefined on overlapping memory, so the port uses memmove. */
 	memmove(&g_soundQueue[queueIndex + 1], &g_soundQueue[queueIndex],
 			(size_t)(g_soundQueueCount - queueIndex) * sizeof(g_soundQueue[0]));
 #else

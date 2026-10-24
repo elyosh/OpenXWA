@@ -34,7 +34,8 @@ int g_imNavCsInitialized;
 #define IM_TAG_TEXT 0x54455854
 
 #if defined(XWA_MODERN)
-// SYNC chunks may not be naturally aligned in modern host buffers.
+/* SYNC chunk data may not be aligned in the port's buffers, so each value is
+   read with memcpy. */
 static inline uint32_t ImReadNative32(const char* values, int index) {
 	uint32_t value;
 

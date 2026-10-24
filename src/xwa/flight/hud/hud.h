@@ -667,7 +667,7 @@ typedef enum InFlightMessageId {
 	MSG_NOW_DISABLED = 536,
 	MSG_TOTAL_MESSAGES = 537,
 #ifdef XWA_MODERN
-	/* Modern port: articulated models' messages, after the stock table; see
+	/* The messages of articulated models come after the stock table. See
 	   XWA_IN_FLIGHT_MESSAGE_COUNT. */
 	MSG_LANDING_GEAR_LOWERING = 538,
 	MSG_LANDING_GEAR_RAISING = 539,

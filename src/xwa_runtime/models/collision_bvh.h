@@ -2,10 +2,11 @@
 #define XWA_RUNTIME_MODELS_COLLISION_BVH_H
 
 /* Modern port: FaceData collision for GLB replacement models. Their FaceData
- * nodes are stubs; the faces and a BVH live in the model's synthesizer side
- * data, the faces stored in the BVH's leaf order. Each candidate face runs
- * through the same per-face code as a stock FaceData loop, in ascending face
- * order, so results match a linear scan over the stored faces. */
+   nodes are stubs. The faces and a BVH are kept in the model's synthesizer side
+   data, with the faces stored in the BVH's leaf order. Each candidate face goes
+   through the same per-face code as a stock FaceData loop. The exact walk tests
+   its candidates in ascending face order, so it gets the same result as a
+   linear scan over the stored faces. */
 
 #include "xwa/assets/opt_model.h"
 #include "xwa/flight/object/collision.h"

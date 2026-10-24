@@ -1,19 +1,22 @@
 #ifndef XWA_RUNTIME_MODELS_HANGARS_H
 #define XWA_RUNTIME_MODELS_HANGARS_H
 
-/* Modern port: per-mothership hangar settings.
+/* Modern port: hangar settings for each mothership.
  *
- * flight/hangars.yaml in the mod folder holds the settings layers (written by the model
- * conversion from the mod's FlightModels files): a default layer, one per ship
- * model with variants per IFF, and the crafts' hangar cameras and
- * elevations. A mission adds its own layer (`hangar` in its mission file).
- * For the hangar's command ship, the layers mission > ship IFF > ship >
- * default give each object setting from the first layer that sets it, and
- * each map or camera section whole from the first layer that has it.
+ * flight/hangars.yaml in the mod folder holds the settings in layers. The
+ * model conversion writes it from the mod's FlightModels files. It has a
+ * default layer, a layer for each ship model with variants for each IFF,
+ * and the hangar cameras and elevations of the craft. A mission can add its
+ * own layer (`hangar` in its mission file).
  *
- * While settings are active (the file exists and model replacements are on),
- * the hangar code takes them instead of its stock layout; otherwise it runs
- * its stock code unchanged. */
+ * For the command ship of the hangar, the layers are searched in this
+ * order: mission, ship IFF, ship, default. Each object setting comes from
+ * the first layer that sets it. Each map or camera section comes whole from
+ * the first layer that has it.
+ *
+ * While the settings are active (the file exists and model replacements are
+ * on), the hangar code uses them instead of its stock layout. Otherwise it
+ * runs its stock code unchanged. */
 
 #include <stdint.h>
 

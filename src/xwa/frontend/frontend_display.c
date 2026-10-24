@@ -594,7 +594,6 @@ void FrontendDisplay_ClearOffscreenSurface(void) {
 	DDBLTFX fx;
 
 #ifdef XWA_MODERN
-	/* Remaster: offscreen-surface colorfill. */
 	XwaSnapshot_EmitSurfaceEventAux(XWA_SURFACE_EVENT_OFFSCREEN_CLEAR, 0, 0, 639, 479,
 									(int)(uint16_t)g_surfaceClearColor, 0);
 #endif
@@ -640,7 +639,6 @@ int FrontendDisplay_LockOffscreenSurface(void) {
 	DDSURFACEDESC desc;
 
 #ifdef XWA_MODERN
-	/* Remaster: draws now target the persistent offscreen surface. */
 	XwaSnapshot_SetEmitTarget(XWA_EMIT_TARGET_OFFSCREEN);
 #endif
 

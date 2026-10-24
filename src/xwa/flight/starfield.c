@@ -460,10 +460,10 @@ void FlightStarfield_Render(void) {
 	}
 
 #ifdef XWA_MODERN
-	/* Deviation: the stars below are drawn only into the classic back
-	   buffer. In a classic frame that is never shown (the HD renderer draws
-	   its own sky), they are skipped; the palette cycle above still advances.
-	   The trig2 scratch the scan leaves behind is not reproduced. */
+	/* Deviation: the stars below are drawn only into the classic back buffer.
+	   When that frame won't be shown (the HD renderer draws its own sky), they
+	   are skipped. The palette cycle above still advances. The values the scan
+	   leaves in the trig2 scratch are not reproduced. */
 	if (XwaPort_IsClassicFlightFrameDiscarded()) {
 		return;
 	}

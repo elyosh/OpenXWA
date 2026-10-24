@@ -2288,8 +2288,8 @@ int FrontImage_DrawSprite(const char* name, int x, int y) {
 	}
 
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer (non-atlas path; the atlas branch
-	 * above emits inside FrontImage_DrawAtlasSprite). */
+	/* Snapshot record for the remaster. The atlas path above needs none here,
+	 * because FrontImage_DrawAtlasSprite sends its own. */
 	XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE, name, currentFrame, 0, x, y, desc->image[currentFrame].width,
 						   desc->image[currentFrame].height, 0, 0, 0);
 #endif
@@ -2312,9 +2312,8 @@ int FrontImage_DrawAtlasSprite(int16_t groupId, int16_t index, int16_t x, int16_
 	g_atlasColorTable = (const unsigned char*)payload;
 	g_atlasColorTable = (const unsigned char*)payload + payload->palette16Offset;
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer. Emits the anchored blit position and
-	 * the sprite dims (aeron atlas convention: the origin is already
-	 * added to the draw position when the sprite is emitted). */
+	/* Snapshot record for the remaster: the sprite's size, and its draw
+	 * position with the anchor already added, as Aeron atlases expect. */
 	XwaSnapshot_EmitAtlasSprite(groupId, index, x + (int16_t)payload->anchorX, y + (int16_t)payload->anchorY,
 								sprite->width, sprite->height);
 #endif
@@ -2572,8 +2571,8 @@ int FrontImage_GetAtlasSpriteBounds(FrontendRect* out, int groupId, uint16_t ind
 	FrontendDraw_RectOffsetXY(out, (int)payload->anchorX, (int)payload->anchorY);
 #ifdef XWA_MODERN
 	{
-		/* XWA_MODERN: in an atlas with game geometry, a frame can set its own
-		   bounds, for example a tooltip area larger than the image. */
+		/* In an atlas with game geometry, a frame can set its own bounds, for
+		   example a tooltip area larger than the image. */
 		const XwaGeometryFrame* frame =
 			XwaFrontendGeometry_FindFrame(XwaFrontendGeometry_FindGroup(groupId), index);
 
@@ -2844,7 +2843,6 @@ int FrontImage_DrawSpriteOpaque(const char* name, int x, int y) {
 	}
 #ifdef XWA_MODERN
 	{
-		/* Remaster snapshot observer (opaque). */
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
 		const ImageResource* snapImage = &snapDesc->image[snapDesc->currentFrame];
 		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_OPAQUE, name, snapDesc->currentFrame, 0, x, y,
@@ -3264,7 +3262,6 @@ int FrontImage_DrawSpriteTranslucent(const char* name, int x, int y) {
 	}
 #ifdef XWA_MODERN
 	{
-		/* Remaster snapshot observer (translucent). */
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
 		XwaSnapshot_EmitSprite(XWA_DRAW2D_SPRITE_TRANSLUCENT, name, snapDesc->currentFrame, 0, x, y,
 							   snapDesc->image[snapDesc->currentFrame].width,
@@ -3362,7 +3359,6 @@ int FrontImage_DrawSpriteRectTransparent(const char* name, FrontendRect* srcRect
 	}
 #ifdef XWA_MODERN
 	{
-		/* Remaster snapshot observer. */
 		int16_t snapSrc[4] = { (int16_t)srcRect->left, (int16_t)srcRect->top, (int16_t)srcRect->right,
 							   (int16_t)srcRect->bottom };
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
@@ -3510,7 +3506,6 @@ int FrontImage_DrawSpriteRectTinted(const char* name, FrontendRect* srcRect, int
 	}
 #ifdef XWA_MODERN
 	{
-		/* Remaster snapshot observer. */
 		int16_t snapSrc[4] = { (int16_t)srcRect->left, (int16_t)srcRect->top, (int16_t)srcRect->right,
 							   (int16_t)srcRect->bottom };
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
@@ -3881,7 +3876,6 @@ int FrontImage_DrawSpriteRectOriented(const char* name, FrontendRect* srcRect, i
 	}
 #ifdef XWA_MODERN
 	{
-		/* Remaster snapshot observer. */
 		int16_t snapSrc[4] = { (int16_t)srcRect->left, (int16_t)srcRect->top, (int16_t)srcRect->right,
 							   (int16_t)srcRect->bottom };
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
@@ -4442,7 +4436,6 @@ int FrontImage_DrawSpriteRectTintedOriented(const char* name, FrontendRect* srcR
 	}
 #ifdef XWA_MODERN
 	{
-		/* Remaster snapshot observer. */
 		int16_t snapSrc[4] = { (int16_t)srcRect->left, (int16_t)srcRect->top, (int16_t)srcRect->right,
 							   (int16_t)srcRect->bottom };
 		const ResourceDescriptor* snapDesc = g_resourceTable[index].desc;
@@ -4481,11 +4474,11 @@ int FrontImage_LoadCbmResource(const char* srcFile, const char* name) {
 	int i;
 
 #ifdef XWA_MODERN
-	/* XWA_MODERN: if the mod folder has an atlas with game geometry for this
-	   image, the frame count, sizes and bounds come from the atlas and the
-	   image file is not read. Both register functions call this function
-	   first, so the BMP and FLC decoders, FrontImage_ComputeImageBounds, the
-	   RLE compression and the CBM cache are skipped too. */
+	/* If the mod folder has an atlas with game geometry for this image, the
+	   frame count, sizes and bounds come from the atlas and the image file is
+	   not read. Both register functions call this function first, so the BMP
+	   and FLC decoders, FrontImage_ComputeImageBounds, the RLE compression and
+	   the CBM cache are skipped too. */
 	{
 		const XwaGeometryAtlas* atlas = XwaFrontendGeometry_FindFile(srcFile);
 

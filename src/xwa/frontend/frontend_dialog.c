@@ -233,8 +233,8 @@ int FrontendDialog_CreatePilotNameCallback(int frameState) {
 	FrontendText_DrawCentered(15, string, &rect, 0xffff);
 
 #ifdef XWA_MODERN
-	/* XWA_MODERN: create_pilot.name_field in frontend/concourse/layout.yaml can
-	   move the name field. It is written as [x, y, width, height]. */
+	/* Create_pilot.name_field in frontend/concourse/layout.yaml can move the
+	   name field. It is written as [x, y, width, height]. */
 	XwaConcourseLayout_AssignRect(&rect, "create_pilot.name_field", 250, 245, 440, 265);
 #else
 	FrontendDraw_RectAssign(&rect, 250, 245, 440, 265);
@@ -294,8 +294,8 @@ int FrontendDialog_BeginConfirmDialog(const char* line1, const char* line2, cons
 		return 0;
 	}
 
-	/* An explicit new prompt supersedes an unclaimed result from a caller that
-	   did not retain its original blocking call across frames. */
+	/* A new prompt drops a result that nobody took, which happens when a caller
+	   stops repeating its blocking call before the dialog ends. */
 	g_frontDialogConfirmResultReady = 0;
 	g_dialogResult = 0;
 	FrontendText_PushGlyphGradientBg(FrontendDisplay_PackRGB(0x10, 0x10, 0x40));

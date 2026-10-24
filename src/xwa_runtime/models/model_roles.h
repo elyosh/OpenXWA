@@ -70,8 +70,9 @@ typedef enum XwaModelRole {
 } XwaModelRole;
 
 #ifdef XWA_MODERN
-/* `stockComponent` for a stock model; for a replacement, the component
-   carrying the role's tag (always present for a required role). */
+/* Returns `stockComponent` for a stock model. For a replacement, returns the
+   first component that carries the role's tag, or `stockComponent` when none
+   does. */
 int XwaModelRole_Resolve(unsigned short objectType, XwaModelRole role, int stockComponent);
 /* Nonzero when `objectType`'s loaded model is a GLB replacement. */
 int XwaModelRole_IsReplacement(unsigned short objectType);
@@ -85,14 +86,14 @@ int XwaModelRole_CollectTag(unsigned short objectType, const char* tagName, int*
 	XwaModelRole_Resolve((unsigned short)(objectType), (role), (stockComponent))
 
 struct AeronFlightModel;
-/* Warns when replacement `key` does not carry each of its single roles on
-   exactly one component. Never rejects the model: a missing role resolves to
-   the stock component number. `reason` is unused. */
+/* Warns when replacement `key` doesn't tag exactly one component with each of
+   its single roles. It never rejects the model: a missing role resolves to the
+   stock component number. Always returns 1; `reason` is unused. */
 int XwaModelRole_Validate(const char* key, const struct AeronFlightModel* model, char* reason,
 						  unsigned int reasonSize);
-/* Weapon slots a model def keeps: the X-Wing Alliance Upgrade cutoff of 120
-   for GLB replacements, the original 16 for stock OPTs (17 of which have more
-   weapon hardpoints and rely on the cut). */
+/* The number of weapon slots a model def keeps: 120 (the X-Wing Alliance
+   Upgrade limit) for GLB replacements, and the original 16 for stock OPTs. 17
+   stock OPTs have more weapon hardpoints than 16 and rely on that cut. */
 #define XWA_MODEL_WEAPON_SLOT_LIMIT(objectType)                                                              \
 	(XwaModelRole_IsReplacement((unsigned short)(objectType)) ? XWA_CRAFT_WEAPON_SLOT_COUNT                  \
 															  : XWA_STOCK_WEAPON_SLOT_COUNT)

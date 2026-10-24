@@ -160,7 +160,8 @@ extern char* g_strShipFamily[8];
 extern char* g_strShipGenus[17];
 extern char* g_strMapStrings[17];
 #ifdef XWA_MODERN
-/* The 538 stock messages, then the modern port's, from MSG_LANDING_GEAR_LOWERING on. */
+/* The 538 stock messages, followed by the 10 messages the modern port adds,
+   starting at MSG_LANDING_GEAR_LOWERING. */
 #define XWA_IN_FLIGHT_MESSAGE_COUNT 548
 extern char* g_strInFlightMessages[XWA_IN_FLIGHT_MESSAGE_COUNT];
 #else

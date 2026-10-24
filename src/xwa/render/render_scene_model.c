@@ -320,8 +320,8 @@ void GlowMark_ProcessPendingRequests(uint16_t objectIndex) {
 		}
 
 #ifdef XWA_MODERN
-		/* Modern port: an impact colour replaces the mark's white, which the
-		   classic renderer draws as its colour. */
+		/* An impact colour replaces the mark's white, which the classic
+		   renderer draws as its colour. */
 		if (XwaCraftWeapons_ImpactTint(request) != 0) {
 			patch->effectParam = (int)(0xff000000u | XwaCraftWeapons_ImpactTint(request));
 		}
@@ -557,8 +557,10 @@ void GlowMark_ProcessPendingRequests(uint16_t objectIndex) {
 													glowMarkTail, (unsigned int)(g_glowMarkMeshOrdinal - 1));
 #endif
 #ifdef XWA_MODERN
-												/* Modern port: the HD renderer projects marks onto
-												 * a GLB replacement's own vertices. */
+												/* The HD renderer projects
+												 * marks onto a GLB
+												 * replacement's own
+												 * vertices. */
 												if (!OptSynth_IsSynthesized(model)) {
 													GlowMark_CollectModelFaces(glowMarkTail, model, node);
 												}

@@ -257,8 +257,8 @@ int FrontendDraw_AddDirtyRect(FrontendRect* rect) {
 // FUNCTION: XWA 0x5420D0
 int FrontendDraw_BeginExternalSurface(unsigned char* pixels, int pitch) {
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer: subsequent 2D records route to the
-	 * external/scratch surface (briefing-map source etc.). */
+	/* The snapshot records the 2D draws that follow against the scratch surface
+	   (for example the source of the briefing map), not the screen. */
 	XwaSnapshot_SetEmitTarget(XWA_EMIT_TARGET_EXTERNAL);
 #endif
 	FrontendDisplay_UnlockBackBuffer();
@@ -281,7 +281,6 @@ int FrontendDraw_EndExternalSurface(void) {
 // FUNCTION: XWA 0x543490
 void FrontendDraw_HorizontalLineClipped(int x0, int x1, int y, int color) {
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer. */
 	XwaSnapshot_EmitPaint(XWA_PAINT_HLINE, x0, y, x1, y, 0, 0, (uint32_t)color);
 #endif
 
@@ -386,7 +385,6 @@ fillBytes:
 // FUNCTION: XWA 0x5435E0
 void FrontendDraw_VerticalLineClipped(int y0, int y1, int x, int color) {
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer. */
 	XwaSnapshot_EmitPaint(XWA_PAINT_VLINE, x, y0, x, y1, 0, 0, (uint32_t)color);
 #endif
 
@@ -496,7 +494,6 @@ void FrontendDraw_VerticalLineClipped(int y0, int y1, int x, int color) {
 // FUNCTION: XWA 0x542C90
 void FrontendDraw_Line(int x0, int y0, int x1, int y1, int color) {
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer. */
 	XwaSnapshot_EmitPaint(XWA_PAINT_LINE, x0, y0, x1, y1, 0, 0, (uint32_t)color);
 #endif
 
@@ -795,7 +792,6 @@ void FrontendDraw_Line(int x0, int y0, int x1, int y1, int color) {
 // FUNCTION: XWA 0x542120
 void FrontendDraw_LineAntialiased(int x0, int y0, int x1, int y1, unsigned int color) {
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer. */
 	XwaSnapshot_EmitPaint(XWA_PAINT_LINE_AA, x0, y0, x1, y1, 0, 0, color);
 #endif
 
@@ -1151,7 +1147,6 @@ void FrontendDraw_LineAntialiased(int x0, int y0, int x1, int y1, unsigned int c
 // FUNCTION: XWA 0x558D90
 void FrontendDraw_FillRectTranslucent(FrontendRect* rect, int dx, int dy, unsigned int color) {
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer. */
 	XwaSnapshot_EmitPaint(XWA_PAINT_FILL_TRANSLUCENT, rect->left, rect->top, rect->right, rect->bottom, dx,
 						  dy, color);
 #endif
@@ -1236,7 +1231,6 @@ void FrontendDraw_FillRectTranslucent(FrontendRect* rect, int dx, int dy, unsign
 // FUNCTION: XWA 0x5590D0
 void FrontendDraw_RectOutline(FrontendRect* rect, int dx, int dy, int color) {
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer. */
 	XwaSnapshot_EmitPaint(XWA_PAINT_RECT_OUTLINE, rect->left, rect->top, rect->right, rect->bottom, dx, dy,
 						  (uint32_t)color);
 #endif
@@ -1347,8 +1341,8 @@ void FrontendDraw_Rect(FrontendRect* rect, int dx, int dy, int color, int filled
 	}
 
 #ifdef XWA_MODERN
-	/* Remaster snapshot observer (filled path only; the unfilled path
-	 * emits through RectOutline above). */
+	/* Only a filled rectangle is recorded here. An outline is recorded by
+	   FrontendDraw_RectOutline, called above. */
 	XwaSnapshot_EmitPaint(XWA_PAINT_FILL_RECT, rect->left, rect->top, rect->right, rect->bottom, dx, dy,
 						  (uint32_t)color);
 #endif

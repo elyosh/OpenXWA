@@ -451,7 +451,6 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 		Math3D_RotateVec3(&mesh.pos, (Matrix3x3*)mesh.orient);
 
 #ifdef XWA_MODERN
-		/* Modern port: a mod chooses which seats are upside down. */
 		if (g_cockpitViewActive && g_players[g_localPlayer].currentSeatIdx != 0 &&
 			XwaGunnerSeats_Value(g_objectTable[g_players[g_localPlayer].objectIndex].objectType,
 								 g_players[g_localPlayer].currentSeatIdx - 1, XWA_GUNNER_SEAT_INVERTED,
@@ -540,7 +539,8 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 		}
 
 #ifdef XWA_MODERN
-		/* Found on first use, once per draw (see the bridge alignment below). */
+		/* Looked up on first use, once per draw (see the bridge alignment
+		   below). -1 and -2 mean not looked up yet. */
 		int alignsBridge = -1;
 		int modelBridgeIndex = -2;
 #endif
@@ -562,11 +562,12 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 					}
 
 #ifdef XWA_MODERN
-					/* Modern port: articulated models are aligned on their bridge too.
-					   The B-wing keeps its cached bridge, and other models look it up
-					   in their own model. Both answers depend only on the object and
-					   its model, so each is found once per draw instead of once per
-					   root: a bridge search walks every root. */
+					/* Articulated models are aligned on their bridge too. The
+					   B-wing keeps its cached bridge, and other models look it
+					   up in their own model. Both answers depend only on the
+					   object and its model, so each is found once per draw
+					   instead of once per root: a bridge search walks every
+					   root. */
 					if (alignsBridge < 0) {
 						alignsBridge = XwaArticulation_AlignsBridge(obj) ? 1 : 0;
 					}
@@ -743,8 +744,8 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 
 			g_meshRenderFlags = g_renderFlags;
 #ifdef XWA_MODERN
-			/* Modern port: a GLB replacement model has no classic geometry;
-			 * the HD renderer draws it. */
+			/* A GLB replacement model has no classic geometry; the HD renderer
+			 * draws it. */
 			if (OptSynth_IsSynthesized(model)) {
 				drawMesh = 0;
 			}
@@ -888,7 +889,8 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 	}
 
 #ifdef XWA_MODERN
-	/* Found on first use, once per draw (see the bridge alignment below). */
+	/* Looked up on first use, once per draw (see the bridge alignment below).
+	   -1 and -2 mean not looked up yet. */
 	int alignsBridge = -1;
 	int modelBridgeIndex = -2;
 #endif
@@ -908,7 +910,7 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 				}
 
 #ifdef XWA_MODERN
-				/* Modern port: articulated models are aligned on their bridge too.
+				/* Articulated models are aligned on their bridge too.
 				   The B-wing keeps its cached bridge, and other models look it up
 				   in their own model. Both answers depend only on the object and
 				   its model, so each is found once per draw instead of once per
@@ -991,7 +993,7 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 
 		++g_curLayerId;
 #ifdef XWA_MODERN
-		/* Modern port: GLB replacement models are drawn by the HD renderer. */
+		/* GLB replacement models are drawn by the HD renderer. */
 		if (!OptSynth_IsSynthesized(model)) {
 			RenderScene_DrawModelNodeHardware(model, node, &mesh);
 		}
@@ -1139,7 +1141,7 @@ void RenderScene_DrawNoAssetSourceModel(ObjectRecord* obj, int nodeSwitchIndex) 
 		if (nodeType == OPT_TEXTURE || nodeType == OPT_TEXTURE_REF) {
 			++g_curLayerId;
 #ifdef XWA_MODERN
-			/* Modern port: GLB replacement models are drawn by the HD renderer. */
+			/* GLB replacement models are drawn by the HD renderer. */
 			if (!OptSynth_IsSynthesized(model)) {
 				RenderScene_DrawModelNode(model, node, &mesh);
 			}

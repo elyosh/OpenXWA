@@ -3,12 +3,13 @@
 
 /* Modern port: the pilot eye of GLB replacement models.
  *
- * XWA places the pilot eye at the model def's cockpitEyeX/Y/Z (+0x238), which
- * FlightView_ComputeSeatEyeOffset reads every frame. FeDiskIo_BuildModelDef sets Y
- * and Z from a Cockpit (type 31) hardpoint on the craft model and never X;
- * no stock OPT has one. For a GLB replacement the hardpoint places the whole
- * eye, so converted and authored models carry the eye that the mod gives
- * the craft (in its patched craft table or its CockpitPov files). */
+ * XWA places the pilot eye at the model def's cockpitEyeX/Y/Z (+0x238),
+ * which FlightView_ComputeSeatEyeOffset reads every frame.
+ * FeDiskIo_BuildModelDef sets Y and Z from the craft model's Cockpit
+ * hardpoint (type 31), but never X. No stock OPT has this hardpoint. For a
+ * GLB replacement, the hardpoint also sets X, so converted and authored
+ * models can carry the eye position that the mod gives the craft (in its
+ * patched craft table or its CockpitPov files). */
 
 #include <stdint.h>
 

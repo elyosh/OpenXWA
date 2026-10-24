@@ -76,7 +76,8 @@ int FrontendCursor_SetLabel(const void* text) {
 #ifdef XWA_MODERN
 	size_t length;
 
-	/* Avoid the original fixed-width source over-read for ordinary C strings. */
+	/* The original always copies 255 bytes, which reads past the end of a short
+	   string. Copy only the string. */
 	length = strnlen((const char*)text, sizeof(g_cursorLabelText) - 1);
 	memcpy(g_cursorLabelText, text, length);
 	g_cursorLabelText[length] = 0;

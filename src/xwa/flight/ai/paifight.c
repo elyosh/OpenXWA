@@ -1950,7 +1950,6 @@ char paifight_gunneroffenseorder(void) {
 					(uint32_t)g_modelDefs[currentCraft->modelDefIndex]
 						.laserGroupFireRange[currentCraft->warheadData[state.laserSlot].weaponGroupIdx];
 #ifdef XWA_MODERN
-				/* Modern port: a mod's weapon profile can change the range. */
 				g_paiContext.aiTargetSearchRangeLimit = (uint32_t)XwaWeaponStats_Value(
 					g_paiContext.aiObjIdx, currentCraft->warheadData[state.laserSlot].projectileTypeId,
 					XWA_WEAPON_STAT_RANGE, (int)g_paiContext.aiTargetSearchRangeLimit);
@@ -2615,7 +2614,6 @@ char paifight_fightershootorder(void) {
 			laserLinkMode = (uint16_t)(((int)trig2_polardistance < 0x4000) + 1);
 		}
 #ifdef XWA_MODERN
-		/* Modern port: a mod's weapon profile can set the link mode. */
 		laserLinkMode = (uint16_t)XwaWeaponStats_LaserLink(g_paiContext.aiObjIdx, laserLinkMode);
 #endif
 		laserLinkModeHi = g_aiFighterShootLinkSlot3ValueBySkill[g_paiContext.aiSkillTier];
@@ -2664,8 +2662,8 @@ char paifight_fightershootorder(void) {
 				} else {
 					classLinkMode = 0;
 #ifdef XWA_MODERN
-					/* Modern port: a mod can stop the AI from firing lasers
-					   while it disables its target. */
+					/* A mod can stop the AI from firing lasers while it
+					   disables its target. */
 					if (!XwaWeaponStats_LinkingRule(
 							g_paiContext.aiObjIdx, XWA_WEAPON_LINKING_PREVENT_AI_LASERS_ION_WHEN_DISABLING) &&
 						targetObjIdx >= (uint16_t)g_activeRegionObjectSlotStart &&
@@ -2691,8 +2689,6 @@ char paifight_fightershootorder(void) {
 
 								pendingTargetGenus = g_objectTable[targetObjIdx].genusId;
 #ifdef XWA_MODERN
-								/* Modern port: a mod's weapon profile can
-								   change the power. */
 								damage = (uint32_t)XwaWeaponStats_Value(
 									projectileObj->mobj->sourceObjIdx, projectileObj->objectType,
 									XWA_WEAPON_STAT_POWER,
@@ -2731,8 +2727,6 @@ char paifight_fightershootorder(void) {
 						classLinkMode = (uint8_t)laserLinkMode;
 					}
 #ifdef XWA_MODERN
-					/* Modern port: a mod can stop the AI from firing ions when
-					   it doesn't disable its target. */
 				} else if (!XwaWeaponStats_LinkingRule(
 							   g_paiContext.aiObjIdx, XWA_WEAPON_LINKING_PREVENT_AI_ION_WHEN_NOT_DISABLING) &&
 						   (!g_paiContext.aiController->hasLiveTarget ||
@@ -2767,8 +2761,6 @@ char paifight_fightershootorder(void) {
 		(targetGenus == GENUS_Transport && g_missionFormatVersion >= 14)) {
 		desiredWarheadClass = 2;
 #ifdef XWA_MODERN
-		/* Modern port: a mod can change how many warheads the AI fires at a
-		   big target. */
 		maxWarheadShots = (int16_t)XwaWeaponRates_AiTorpedoesPerPass(g_paiContext.aiObjIdx, 6);
 		maxComponentHits = (uint16_t)XwaWeaponRates_AiTorpedoesPerTarget(g_paiContext.aiObjIdx, 16);
 #else
@@ -2776,8 +2768,6 @@ char paifight_fightershootorder(void) {
 		maxComponentHits = 16;
 #endif
 #ifdef XWA_MODERN
-		/* Modern port: a mod can change the AI's warhead ranges for each
-		   craft. */
 		fireRangeLimit =
 			g_paiContext.aiSkillTier != 2
 				? (uint32_t)XwaWarheadLock_Value(g_paiContext.aiObjIdx, XWA_WARHEAD_LOCK_AI_RANGE_BIG, 203610)
@@ -2872,8 +2862,6 @@ char paifight_fightershootorder(void) {
 					uint32_t damage;
 
 #ifdef XWA_MODERN
-					/* Modern port: a mod's weapon profile can change the
-					   power. */
 					damage = (uint32_t)XwaWeaponStats_Value(
 						g_paiContext.aiObjIdx, warheadType, XWA_WEAPON_STAT_POWER,
 						g_projectileDamageByType[(uint16_t)warheadType - OBJ_LaserRebel]);
@@ -2914,8 +2902,6 @@ char paifight_fightershootorder(void) {
 					uint32_t damage;
 
 #ifdef XWA_MODERN
-					/* Modern port: a mod's weapon profile can change the
-					   power. */
 					damage = (uint32_t)XwaWeaponStats_Value(
 						projectileObj->mobj->sourceObjIdx, projectileObj->objectType, XWA_WEAPON_STAT_POWER,
 						g_projectileDamageByType[(uint16_t)projectileObj->objectType - OBJ_LaserRebel]);
@@ -3010,8 +2996,6 @@ char paifight_fightershootorder(void) {
 		uint16_t lockThreshold;
 
 #ifdef XWA_MODERN
-		/* Modern port: a mod can change how long the AI takes to lock for
-		   each craft. */
 		lockThreshold = (uint16_t)((unsigned int)XwaWarheadLock_Value(
 									   g_paiContext.aiObjIdx, XWA_WARHEAD_LOCK_AI_TICKS_PER_TIER, 472) *
 								   (g_paiContext.aiSkillTier + 1u));
@@ -3150,8 +3134,6 @@ char paifight_gunnerselfdefenseorder(void) {
 						(uint32_t)g_modelDefs[craft->modelDefIndex]
 							.laserGroupFireRange[craft->warheadData[laserSlot].weaponGroupIdx];
 #ifdef XWA_MODERN
-					/* Modern port: a mod's weapon profile can change the
-					   range. */
 					defenseRangeLimit = (uint32_t)XwaWeaponStats_Value(
 						g_paiContext.aiObjIdx, craft->warheadData[laserSlot].projectileTypeId,
 						XWA_WEAPON_STAT_RANGE, (int)defenseRangeLimit);
@@ -3199,7 +3181,6 @@ char paifight_gunnerselfdefenseorder(void) {
 				defenseRangeLimit = (uint32_t)g_modelDefs[craft->modelDefIndex]
 										.laserGroupFireRange[craft->warheadData[laserSlot].weaponGroupIdx];
 #ifdef XWA_MODERN
-				/* Modern port: a mod's weapon profile can change the range. */
 				defenseRangeLimit = (uint32_t)XwaWeaponStats_Value(
 					g_paiContext.aiObjIdx, craft->warheadData[laserSlot].projectileTypeId,
 					XWA_WEAPON_STAT_RANGE, (int)defenseRangeLimit);
@@ -3266,7 +3247,6 @@ char paifight_gunnerselfdefenseorder(void) {
 				bestOtherRange = (uint32_t)g_modelDefs[craft->modelDefIndex]
 									 .laserGroupFireRange[craft->warheadData[laserSlot].weaponGroupIdx];
 #ifdef XWA_MODERN
-				/* Modern port: a mod's weapon profile can change the range. */
 				bestLargeRange = (uint32_t)XwaWeaponStats_Value(
 					g_paiContext.aiObjIdx, craft->warheadData[laserSlot].projectileTypeId,
 					XWA_WEAPON_STAT_RANGE, (int)bestLargeRange);

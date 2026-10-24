@@ -50,7 +50,7 @@ uint32_t DirectSound_GetPlayCursor(IDirectSoundBuffer* buffer);
 int FrontendSound_ReleaseForFlight(void);
 int FrontendSound_RecreateAfterFlight(void* hwnd);
 #ifdef XWA_MODERN
-/* Modern port: `root` is the VFS root that holds `fileName`. */
+/* `root` is the VFS root that holds `fileName`. */
 int FrontendSound_LoadSound(AeronVfsRoot root, char* fileName, char* soundName);
 int FrontendSound_LoadSoundFile(AeronVfsRoot root, char* fileName, char* soundName, int create3DFlags);
 #else

@@ -79,8 +79,9 @@ typedef char xwa_point_light_size[(sizeof(PointLight) == 0x30) ? 1 : -1];
 extern int g_dirLightCount;
 extern DirectionalLight g_directionalLights[8];
 #ifdef XWA_MODERN
-/* Modern snapshot provenance; -1 for directionals not created from a
- * current-region backdrop. Kept outside the recovered light layout. */
+/* For the modern snapshot: the index, in the current region's backdrops, of the
+ * backdrop that each directional light comes from, or -1 when the light doesn't
+ * come from a backdrop. Kept outside the recovered light layout. */
 extern int16_t g_directionalLightBackdropIndices[8];
 #endif
 extern const float flt_5A9F54;

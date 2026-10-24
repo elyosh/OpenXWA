@@ -1136,9 +1136,9 @@ void DeathStar_HandleReactorHit(unsigned int projectileObjIdx, unsigned int reac
 					reactorCraft = g_objectTable[reactorObjIdx].mobj->pCraft;
 					g_curCraft = reactorCraft;
 #ifdef XWA_MODERN
-					/* Modern port: a GLB replacement names the regenerator and
-					 * reactor with roles; map a hit on either to its stock
-					 * component so the cases below apply. */
+					/* A GLB replacement names the regenerator and reactor with
+					 * roles; map a hit on either to its stock component so the
+					 * cases below apply. */
 					if (XwaModelRole_IsReplacement(OBJ_DSReactorCore)) {
 						if (hitComponentId == (unsigned int)XWA_MODEL_ROLE(
 												  OBJ_DSReactorCore, XWA_ROLE_DSREACTORCORE_REGENERATOR, 1)) {
@@ -1873,8 +1873,9 @@ void DeathStar_SpawnScriptedObjects(void) {
 
 		def->spawnedObjIdx = (uint16_t)objIdx;
 #ifdef XWA_MODERN
-		/* Modern port: the scripted objects' markings change during play (the
-		   reactor and its cylinder), so every value's look is loaded. */
+		/* The game changes the markings of some scripted objects during play
+		   (the reactor and its cylinder), so the skins of every markings value
+		   are loaded. */
 		XwaSkins_UseAllMarkings(def->objectType);
 #endif
 		obj = &g_objectTable[objIdx];
@@ -5268,8 +5269,6 @@ void DeathStar_FireLaserAtTarget(void) {
 	g_objectTable[laserObjIdx].mobj->moveVectorDirty = 0;
 	g_objectTable[laserObjIdx].mobj->orientMatrixDirty = 1;
 #ifdef XWA_MODERN
-	/* Modern port: the weapon profile of the Death Star fire's model can change
-	   the speed and the power. */
 	g_objectTable[laserObjIdx].mobj->speed = (uint16_t)XwaWeaponStats_TypeValue(
 		OBJ_DeathStarFireTextureGroup6250_Sprite000, OBJ_LaserImperialDS, XWA_WEAPON_STAT_SPEED,
 		g_projectileSpeedByType[DEATH_STAR_LASER_PROJECTILE_IDX]);

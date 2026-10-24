@@ -238,8 +238,8 @@ int BuildCraftTechStats(CraftTechStats* stats) {
 		boundSize = shiftedBound;
 	}
 #ifdef XWA_MODERN
-	/* Modern port: the size of the model's file, so that a craft whose model
-	   isn't loaded gets its own size, not the record's. */
+	/* Read the size from the model's file, so that a craft whose model isn't
+	   loaded gets its own size instead of the one in its model record. */
 	XwaTechRatings_BoundSize(stats->craftType, &boundSize);
 #endif
 
@@ -309,7 +309,6 @@ int BuildCraftTechStats(CraftTechStats* stats) {
 	}
 
 #ifdef XWA_MODERN
-	/* Modern port: the values of the model's default stats profile. */
 	XwaTechRatings_ApplyProfile(objectType, stats);
 #endif
 	stats->combatRating = ComputeCraftCombatRating((ObjectTypeId)objectType);
@@ -1307,7 +1306,7 @@ int TechLibrary_Update(int frameCounter) {
 			g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 			strcat(g_frontendScratchBuffer, "Exterior.opt");
 #ifdef XWA_MODERN
-			/* Modern port: GLB replacements decide whether the model exists. */
+			/* GLB replacements decide whether the model exists. */
 			stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
 #else
 			stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
@@ -1420,7 +1419,7 @@ int TechLibrary_Update(int frameCounter) {
 				g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 				strcat(g_frontendScratchBuffer, "Exterior.opt");
 #ifdef XWA_MODERN
-				/* Modern port: GLB replacements decide whether the model exists. */
+				/* GLB replacements decide whether the model exists. */
 				stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
 #else
 				stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");
@@ -1548,7 +1547,7 @@ int TechLibrary_Update(int frameCounter) {
 					g_frontendScratchBuffer[strlen(g_frontendScratchBuffer) - 4] = '\0';
 					strcat(g_frontendScratchBuffer, "Exterior.opt");
 #ifdef XWA_MODERN
-					/* Modern port: GLB replacements decide whether the model exists. */
+					/* GLB replacements decide whether the model exists. */
 					stream = XwaModelSource_OpenModelFile(g_frontendScratchBuffer);
 #else
 					stream = File_Open(AERON_VFS_ROOT_ASSET, g_frontendScratchBuffer, "rb");

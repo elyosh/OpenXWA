@@ -1019,8 +1019,6 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 	projectileType =
 		g_modelDefs[shooterModelIndex].laserGroupWeaponType[g_players[g_localPlayer].selectedWarhead];
 #ifdef XWA_MODERN
-	/* Modern port: a mod's weapon profile can change the high-power charge, the
-	   speed and the lifetime. */
 	if ((int8_t)shooterCraft->warheadData[(uint16_t)hardpointIndex].laserCharge >=
 		XwaWeaponStats_Value(shooterIdx, projectileType, XWA_WEAPON_STAT_HIGH_POWER_CHARGE, 64)) {
 		++projectileType;
@@ -1072,7 +1070,6 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 		launcherRotScale = NULL;
 		beamRotScale = NULL;
 #ifdef XWA_MODERN
-		/* Modern port: a mod can give the seat its own cockpit. */
 		turretObjectType =
 			(uint16_t)XwaGunnerSeats_Value(shooterObj->objectType, turretSeatIdx, XWA_GUNNER_SEAT_COCKPIT,
 										   g_modelDefs[shooterModelIndex].turretObjectType[turretSeatIdx]);
@@ -1438,7 +1435,6 @@ void collide_applyCraftImpactBounce(unsigned int sourceObjIdx, unsigned int impa
 		yawMagnitude = 0x8000 - yawMagnitude;
 	}
 #ifdef XWA_MODERN
-	/* Modern port: a mod can scale the spin of a warhead hit. */
 	XwaWeaponRates_ScaleImpactSpin(sourceObjIdx, impactObjIdx, &impactSpeed, &yawMagnitude);
 #endif
 	if (impactObjIdx >= g_activeRegionObjectSlotStart && impactObjIdx < g_activeRegionCraftObjectSlotEnd) {
@@ -2656,9 +2652,9 @@ void collide_TestSweepAgainstModelMeshes(unsigned int sourceObjIdx, unsigned int
 			MeshDescriptor* descriptor;
 
 #ifdef XWA_MODERN
-			/* Modern port: nothing collides with a mesh that the model's
-			   `collision.off` set lists, such as the force field of a hangar
-			   opening. Without a descriptor, the loop skips the mesh. */
+			/* Nothing collides with a mesh that the model's `collision.off` set
+			   lists, such as the force field of a hangar opening. Without a
+			   descriptor, the loop skips the mesh. */
 			descriptor = OptSynth_MeshCollides(model, g_collideSweepCurrentMeshOrdinal - 1)
 							 ? ModelMesh_GetObjectTypeMeshDescriptor(targetObj->objectType,
 																	 g_collideSweepCurrentMeshOrdinal - 1)
@@ -2910,7 +2906,6 @@ void collide_ConvertObjectToExplosion(unsigned int objIdx, ObjectTypeId explosio
 
 	if (playSfxAndFeedback) {
 #ifdef XWA_MODERN
-		/* Modern port: a mod can change the explosion sounds. */
 		fsfx_PlaySound(XwaCraftSounds_Explosion(objIdx, fsfx_PickRandomSmallExplosionSfx()), objIdx,
 					   (unsigned int)g_localPlayer);
 #else
@@ -3314,9 +3309,11 @@ void collide_RefreshMobileObjectProximityCandidates(MobileObjectProximityList* l
 				}
 
 #ifdef XWA_MODERN
-				// Impact effects can remain in projectile slots after the projectile is converted
-				// in place. The original lookup reads adjacent globals for those non-projectile
-				// object types; reject them before indexing the bounded modern table.
+				/* Impact effects can stay in projectile slots after a
+				   projectile turns into one in place. For those object types,
+				   the original lookup below reads outside the table, into the
+				   globals next to it. Skip them before the lookup, since the
+				   port's table is bounded. */
 				if (candidateObjIdx >= g_projectileObjectSlotStart &&
 					((uint16_t)candidateType < OBJ_LaserRebel ||
 					 (uint16_t)candidateType > OBJ_LaserImperialDS)) {
@@ -3613,7 +3610,6 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 	XwaJammingRule rule;
 	int hasModelRule;
 
-	/* Modern port: a mod can turn jamming off. */
 	if (!XwaMissionSettings_HangarJamming()) {
 		return;
 	}
@@ -3647,8 +3643,9 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 
 	hostileType = hostileObj->objectType;
 #ifdef XWA_MODERN
-	/* Modern port: the model can have its own rule. Without one, the rule is
-	   the stock rule of the type, which the tests below then follow. */
+	/* The model can set its own jamming rule. The fields it doesn't set keep
+	   the stock rule of the type. The tests below apply the rule in place of
+	   the stock type checks. */
 	hasModelRule = XwaJamming_Rule(hostileType, &rule);
 	if (!rule.enabled) {
 		return;
@@ -3744,9 +3741,9 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 				return;
 			}
 #ifdef XWA_MODERN
-			/* Modern port: the stock code never jams here, so the Super Star
-			   Destroyer never jams. A model's rule, or a mod's
-			   super_star_destroyer_jamming, makes it jam. */
+			/* The stock code never jams here, so the Super Star Destroyer never
+			   jams. Here a craft jams if its model has its own jamming rule, or
+			   if the mod sets super_star_destroyer_jamming. */
 			withinDisruptionPoint = hasModelRule || XwaMissionSettings_SuperStarDestroyerJamming();
 #endif
 		} else {
@@ -4230,7 +4227,6 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 		uint16_t destroyedType = g_objectTable[targetObjIdx].objectType;
 		ForceFeedback_PlayProximityEffectForObject(1, targetObjIdx);
 #ifdef XWA_MODERN
-		/* Modern port: a mod can change the explosion sounds. */
 		fsfx_PlaySound(XwaCraftSounds_Explosion(targetObjIdx, fsfx_PickRandomSmallExplosionSfx()),
 					   targetObjIdx, g_localPlayer);
 #else
@@ -4377,7 +4373,9 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 				direction.x = 0.0f;
 				direction.y = 1.0f;
 				direction.z = 0.0f;
-				/* Modern port: XWA_CRAFT_ANIM_FRAME is componentState[49]'s own field. */
+				/* Modern port: XWA_CRAFT_ANIM_FRAME is a separate field. The
+				   original uses componentState[49], which a model with 50 or
+				   more meshes uses for a mesh. */
 				if ((uint16_t)GameRand2() <= 0x6000) {
 					XWA_CRAFT_ANIM_FRAME(targetCraft) = 1;
 				} else {
@@ -4486,8 +4484,6 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 			} else {
 				damageAmount = srcMobj->damageAmount;
 #ifdef XWA_MODERN
-				/* Modern port: a mission can turn warhead collision damage
-				   off, and so can the source craft's stats profile. */
 				if (g_missionFormatVersion >= 14 && XwaMissionSettings_WarheadCollisionDamage() &&
 					XwaStatsProfiles_Value(damageSourceObjIdx, XWA_STATS_WARHEAD_COLLISION_DAMAGE, 1)) {
 #else
@@ -4495,7 +4491,6 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 #endif
 					ModelGenusId tgtGenus = g_objectTable[targetObjIdx].genusId;
 #ifdef XWA_MODERN
-					/* Modern port: a mod can give the bonus for any target. */
 					if (XwaMissionSettings_WarheadCollisionBonusAnyTarget() || tgtGenus == GENUS_Starship ||
 						tgtGenus == GENUS_Platform) {
 #else
@@ -4521,8 +4516,6 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 										uint8_t lastSlot =
 											g_modelDefs[modelIdx].warheadLauncherLastSlot[launcher];
 #ifdef XWA_MODERN
-										/* Modern port: a mod's weapon profile
-										   can change the power. */
 										damageAmount +=
 											((srcCraft->warheadData[firstSlot].count +
 											  srcCraft->warheadData[lastSlot].count) *
@@ -4762,8 +4755,6 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 		int shieldsUp = (targetCraft->shieldFront + targetCraft->shieldRear) != 0;
 		if (shieldsUp) {
 #ifdef XWA_MODERN
-			/* Modern port: a mission can let shots damage components through
-			   the shields on Hard too. */
 			if (g_flightDifficulty != 2 || XwaMissionSettings_DamageThroughShieldsOnHard()) {
 #else
 			if (g_flightDifficulty != 2) {
@@ -4947,8 +4938,9 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 				int16_t systemStrengthRemaining;
 				int i;
 #ifdef XWA_MODERN
-				/* Modern port: a mod can change the system damage of ion
-				   weapons. */
+				/* A mod can set the system damage of ion weapons. When it does,
+				   the call adds that damage and the stock damage below is
+				   skipped. */
 				if (!missionStatus20DamageCap &&
 					!XwaWeaponRates_AddSystemDamage(targetObjIdx, damageSourceObjIdx, damageKind,
 													&targetCraft->subsystemDamage) &&
@@ -5487,7 +5479,6 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 
 			// Warhead-class projectiles physically bounce the struck craft when enabled.
 #ifdef XWA_MODERN
-			/* Modern port: a mod can turn the spin on or off for each craft. */
 			if (XwaWeaponRates_ImpactSpin(targetObjIdx, g_craftImpactBounceEnabled)) {
 #else
 			if (g_craftImpactBounceEnabled) {
@@ -5799,7 +5790,6 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 				}
 				ForceFeedback_PlayProximityEffectForObject(1, effectSlot);
 #ifdef XWA_MODERN
-				/* Modern port: a mod can change the explosion sounds. */
 				fsfx_PlaySound(XwaCraftSounds_Explosion(effectSlot, fsfx_PickRandomSmallExplosionSfx()),
 							   effectSlot, g_localPlayer);
 #else
@@ -6094,7 +6084,6 @@ void static_laserhitstatic(unsigned int sourceObjIdx, unsigned int staticObjIdx,
 			return;
 		}
 #ifdef XWA_MODERN
-		/* Modern port: a mod can change the explosion sounds. */
 		fsfx_PlaySound(XwaCraftSounds_Explosion(sourceObjIdx, fsfx_PickRandomSmallExplosionSfx()),
 					   sourceObjIdx, g_localPlayer);
 #else
@@ -6704,9 +6693,9 @@ static __inline void collide_HandleDepartureDockPrompt(int playerIdx, unsigned i
 
 			ot = cand->objectType;
 #ifdef XWA_MODERN
-			/* Modern port: with
-			   hangar settings, every mothership but the family base also offers
-			   the mirrored dock point, as the Calamari cruisers do. */
+			/* While hangar settings apply, every mothership except the family
+			   base also offers the mirrored dock point, like the Calamari
+			   cruisers. */
 			if (ot == OBJ_CalamariCruiserNew || ot == OBJ_CalamariWinged ||
 				(XwaHangars_IsActive() && ot != OBJ_FamilyBase)) {
 #else

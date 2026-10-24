@@ -550,8 +550,8 @@ char paiorder_enterhangarorder(void) {
 	unsigned int distance;
 
 #ifdef XWA_MODERN
-	/* Modern port: articulated craft entering a hangar, and those that
-	   follow them, close their S-foils. */
+	/* Articulated craft entering a hangar, and those that follow them, close
+	   their S-foils. */
 	XwaArticulation_AiEnterHangarOrder(g_paiContext.aiObjIdx);
 #endif
 	g_curCraft->aiFlight.separation = 1;
@@ -1058,8 +1058,9 @@ char paiorder_underattackorder(void) {
 		MobileObject* attackerMobj;
 
 #ifdef XWA_MODERN
-		/* Modern port: a mod can compare the craft's own top speeds, which
-		   their stats profiles can change (rules.ai_attack_uses_max_speed_cache). */
+		/* With rules.ai_attack_uses_max_speed_cache, a craft under attack
+		   compares its own top speed and its attacker's as their stats profiles
+		   set them, instead of the top speeds of their model records. */
 		selfMaxSpeed = XwaMissionSettings_AiAttackUsesMaxSpeedCache()
 						   ? (uint16_t)g_curCraft->aiFlight.maxSpeedCache
 						   : g_modelDefs[g_curCraft->modelDefIndex].maxSpeed;
@@ -1873,8 +1874,8 @@ char paiorder_lookforparkorder(void) {
 			g_paiContext.aiController->aimPointZ =
 				worldlocz + g_modelDefs[targetModelIndex].dockPoints[selectedDockPoint].z;
 #ifdef XWA_MODERN
-			/* Modern port: an articulated craft ordered to park may close
-			   its S-foils. */
+			/* A craft ordered to park closes its S-foils when its model sets
+			   sfoils.park_closed. */
 			XwaArticulation_AiParkOrder(g_paiContext.aiObjIdx);
 #endif
 			return 1;
@@ -2941,8 +2942,8 @@ char paiorder_hyperspaceorder(void) {
 		g_paiContext.aiController->maneuverTimer = 2360;
 		paiman_setpower((int)g_paiContext.aiObjIdx, 0xffffu);
 #ifdef XWA_MODERN
-		/* Modern port: an articulated craft ordered into hyperspace may
-		   close its S-foils. */
+		/* A craft ordered into hyperspace closes its S-foils when its model
+		   sets sfoils.close_in_hyperspace. */
 		XwaArticulation_AiIntoHyperspace(g_paiContext.aiObjIdx);
 #endif
 	}
