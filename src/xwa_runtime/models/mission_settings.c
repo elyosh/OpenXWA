@@ -77,6 +77,9 @@ static int s_turbolaserHardpointTypes;
 static int s_gunTurretHardpoints;
 static int s_hangarJamming;
 static int s_superStarDestroyerJamming;
+static int s_twoLauncherFixes;
+static int s_missileDefenseAnyWarhead;
+static int s_rackCountFromRecord;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -421,6 +424,9 @@ void XwaMissionSettings_Init(void) {
 	s_gunTurretHardpoints = 0;
 	s_hangarJamming = 1;
 	s_superStarDestroyerJamming = 0;
+	s_twoLauncherFixes = 0;
+	s_missileDefenseAnyWarhead = 0;
+	s_rackCountFromRecord = 0;
 	MissionSettings_ResetTargets();
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SETTINGS_FLIGHT_YAML, &file,
@@ -520,6 +526,17 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "super_star_destroyer_jamming", node,
 								 &s_superStarDestroyerJamming);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "two_launcher_fixes")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "two_launcher_fixes", node, &s_twoLauncherFixes);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "starship_missile_defense_any_warhead")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "starship_missile_defense_any_warhead", node,
+								 &s_missileDefenseAnyWarhead);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "weapon_rack_count_from_record")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "weapon_rack_count_from_record", node,
+								 &s_rackCountFromRecord);
+	}
 	MissionSettings_Read(SETTINGS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "mission_settings"), &s_defaults);
 	s_settings = s_defaults;
 	AeronConfigFile_Destroy(file);
@@ -579,6 +596,12 @@ int XwaMissionSettings_GunTurretHardpoints(void) { return s_gunTurretHardpoints;
 int XwaMissionSettings_HangarJamming(void) { return s_hangarJamming; }
 
 int XwaMissionSettings_SuperStarDestroyerJamming(void) { return s_superStarDestroyerJamming; }
+
+int XwaMissionSettings_TwoLauncherFixes(void) { return s_twoLauncherFixes; }
+
+int XwaMissionSettings_StarshipMissileDefenseAnyWarhead(void) { return s_missileDefenseAnyWarhead; }
+
+int XwaMissionSettings_WeaponRackCountFromRecord(void) { return s_rackCountFromRecord; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

@@ -65,6 +65,7 @@
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
@@ -9519,7 +9520,14 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					g_players[currentPlayerIdx].selectedWarhead =
 						(uint8_t)(g_players[currentPlayerIdx].selectedWarhead + 1);
 					if (g_players[currentPlayerIdx].selectedWeaponMode) {
+#ifdef XWA_MODERN
+						/* An empty second launcher is skipped. */
+						if (g_players[currentPlayerIdx].selectedWarhead >= craft->warheadLauncherCount ||
+							(XwaMissionSettings_TwoLauncherFixes() &&
+							 XwaWarheadLaunchers_Warheads(craft, 1) == 0)) {
+#else
 						if (g_players[currentPlayerIdx].selectedWarhead >= craft->warheadLauncherCount) {
+#endif
 							g_players[currentPlayerIdx].selectedWarhead = 0;
 							if (craft->cannonClassCount) {
 								g_players[currentPlayerIdx].selectedWeaponMode = 0;
@@ -9557,6 +9565,15 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 								}
 							}
 						}
+#ifdef XWA_MODERN
+						/* Switching to the warheads selects the second launcher
+						   when the first one is empty. */
+						if (XwaMissionSettings_TwoLauncherFixes() &&
+							g_players[currentPlayerIdx].selectedWeaponMode == 1 &&
+							craft->warheadLauncherCount > 1 && XwaWarheadLaunchers_Warheads(craft, 0) == 0) {
+							g_players[currentPlayerIdx].selectedWarhead = 1;
+						}
+#endif
 					}
 					if (g_players[currentPlayerIdx].selectedWeaponMode) {
 						if ((craft->workingSubsystems & 8) != 0) {

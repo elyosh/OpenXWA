@@ -1,5 +1,6 @@
 #include "xwa/flight/ai/ai_internal.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_rates.h"
@@ -2185,8 +2186,14 @@ char paifight_missiledefenseorder(void) {
 
 				if (craft->componentState
 						[g_modelDefs[craft->modelDefIndex].weaponHardpoints[warheadSlot].meshIdx] == 0) {
+#ifdef XWA_MODERN
+					if ((XwaMissionSettings_StarshipMissileDefenseAnyWarhead() ||
+						 craft->warheadData[warheadSlot].projectileTypeId == OBJ_WarheadMissile ||
+						 craft->warheadData[warheadSlot].projectileTypeId == OBJ_WarheadAdvancedMissile) &&
+#else
 					if ((craft->warheadData[warheadSlot].projectileTypeId == OBJ_WarheadMissile ||
 						 craft->warheadData[warheadSlot].projectileTypeId == OBJ_WarheadAdvancedMissile) &&
+#endif
 						craft->warheadData[warheadSlot].count != 0 &&
 						craft->warheadData[warheadSlot].turretRotBucket <= 0) {
 

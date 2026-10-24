@@ -55,6 +55,7 @@
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/warhead_pools.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #endif
@@ -6438,7 +6439,14 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			}
 
 			g_curCraft->laserRedirect = 2;
+#ifdef XWA_MODERN
+			g_curCraft->laserSlotCount =
+				XwaMissionSettings_WeaponRackCountFromRecord()
+					? XwaWarheadLaunchers_RackCount((uint16_t)g_curCraft->modelDefIndex)
+					: (uint8_t)laserSlotAccum;
+#else
 			g_curCraft->laserSlotCount = (uint8_t)laserSlotAccum;
+#endif
 
 			// Laser HUD bit cleared when no cannon-class weapons (per hangar/player rules).
 			if (g_curCraft->cannonClassCount == 0 && (!(uint8_t)objectTypeOverride || g_inHangarReady))

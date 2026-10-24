@@ -8,6 +8,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/mission_settings.h"
+#include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #endif
 
@@ -4421,10 +4422,23 @@ static char paiman_boardmaneuver(void) {
 						uint16_t targetCount;
 						uint8_t status1;
 
+#ifdef XWA_MODERN
+						/* The stock game reloads the flight group's warhead,
+						   and index 5 for the second launcher. */
+						if (XwaMissionSettings_TwoLauncherFixes()) {
+							warhead = XwaWarheadLaunchers_Index(craft->warheadSlotTypeIds[i]);
+						} else {
+							warhead =
+								g_missionFlightGroups[g_objectTable[targetObjIdx].flightGroupIdx].fg.warhead;
+							if (i == 1)
+								warhead = 5;
+						}
+#else
 						warhead =
 							g_missionFlightGroups[g_objectTable[targetObjIdx].flightGroupIdx].fg.warhead;
 						if (i == 1)
 							warhead = 5;
+#endif
 #ifdef XWA_MODERN
 						/* A mod can make the rearm also read the flight group's
 						   second status, so either status can double or halve

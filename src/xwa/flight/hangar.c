@@ -53,6 +53,7 @@
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/warhead_pools.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
@@ -4260,6 +4261,13 @@ after_key:
 							g_warheadTypeIds[g_hangarWarheadList[g_hangarMenuCursor[1]]];
 						g_curCraft->warheadLauncherFlags[slot] = 1;
 						g_curCraft->warheadLauncherCooldownTicks[slot] = 0;
+#ifdef XWA_MODERN
+						/* The stock count above starts again from 0, so loading
+						   one launcher drops the other one from the count. */
+						if (XwaMissionSettings_TwoLauncherFixes()) {
+							g_curCraft->warheadLauncherCount = XwaWarheadLaunchers_Loaded(g_curCraft);
+						}
+#endif
 						if (oldType != g_curCraft->warheadSlotTypeIds[slot]) {
 							if (g_curCraft->warheadSlotTypeIds[slot])
 								fsfx_PlaySound(2630, 0xFFFFu, g_localPlayer);
@@ -4274,7 +4282,13 @@ after_key:
 							int poolLeft = -1;
 #endif
 
+#ifdef XWA_MODERN
+							if (!XwaMissionSettings_TwoLauncherFixes()) {
+								++g_curCraft->warheadLauncherCount;
+							}
+#else
 							++g_curCraft->warheadLauncherCount;
+#endif
 							first = g_modelDefs[modelIndex].warheadLauncherFirstSlot[slot];
 							last = g_modelDefs[modelIndex].warheadLauncherLastSlot[slot];
 							for (wslot = first; wslot <= last; ++wslot) {
@@ -4291,8 +4305,17 @@ after_key:
 								g_curCraft->warheadData[wslot].turretTargetObjIdx = -1;
 								value = g_modelDefs[modelIndex].warheadLauncherCapacity[slot];
 								ammoIdx = g_hangarWarheadList[g_hangarMenuCursor[1]];
+#ifdef XWA_MODERN
+								/* The stock game gives the Missile Boat's second
+								   launcher the number of warheads of index 5,
+								   whatever it loads. */
+								if (!XwaMissionSettings_TwoLauncherFixes() && slot &&
+									modelIndex == (uint16_t)GetModelDefIndexFromType(OBJ_MissileBoat))
+									ammoIdx = 5;
+#else
 								if (slot && modelIndex == (uint16_t)GetModelDefIndexFromType(OBJ_MissileBoat))
 									ammoIdx = 5;
+#endif
 #ifdef XWA_MODERN
 								count = XwaWeaponStats_WarheadCapacity(objectIndex, ammoIdx, value,
 																	   g_warheadAmmoCounts[ammoIdx]);
@@ -7575,6 +7598,9 @@ char Hangar_BuildMenu(int resetCursor) {
 			int objectIndex;
 			ObjectRecord* playerObj;
 			int scrollLimit;
+#ifdef XWA_MODERN
+			int warheadRow;
+#endif
 
 			strcpy(g_hangarMenuColTitle[0], g_strHangarMenuTitles[HANGAR_MENU_TITLE_CRAFT_MENU]);
 			strcpy(g_hangarMenuItemLabels[0][0], g_strHangarMenuItems[HANGAR_MENU_ITEM_CRAFT_LAUNCH]);
@@ -7593,14 +7619,31 @@ char Hangar_BuildMenu(int resetCursor) {
 
 			objectIndex = g_players[localPlayerIdx].objectIndex;
 			playerObj = &g_objectTable[objectIndex];
+#ifdef XWA_MODERN
+			if (XwaMissionSettings_TwoLauncherFixes() ? XwaWarheadLaunchers_HasSecond(playerObj->objectType)
+													  : playerObj->objectType == OBJ_MissileBoat) {
+#else
 			if (playerObj->objectType == OBJ_MissileBoat) {
+#endif
 				strcpy(g_hangarMenuItemLabels[0][4], g_strHangarMenuItems[HANGAR_MENU_ITEM_MB_LOAD_PRIMARY]);
 				strcpy(g_hangarMenuItemLabels[0][2],
 					   g_strHangarMenuItems[HANGAR_MENU_ITEM_MB_LOAD_SECONDARY]);
 			}
 
 			g_hangarMenuScroll[1] = 0;
+#ifdef XWA_MODERN
+			/* Row 2 loads the second launcher, so it lists the warheads too.
+			   The stock game builds no list for it, even for the Missile
+			   Boat. */
+			warheadRow = g_hangarMenuCursor[0];
+			if (warheadRow == 2 && XwaMissionSettings_TwoLauncherFixes() &&
+				XwaWarheadLaunchers_HasSecond(playerObj->objectType)) {
+				warheadRow = 4;
+			}
+			switch (warheadRow) {
+#else
 			switch (g_hangarMenuCursor[0]) {
+#endif
 				case 3:
 					Hangar_BuildCraftSelectMenu();
 					break;
@@ -7643,7 +7686,13 @@ char Hangar_BuildMenu(int resetCursor) {
 							}
 #endif
 							g_hangarMenuItemCount[1] = ++itemIndex;
+#ifdef XWA_MODERN
+							/* Row 2 highlights the warhead of the second
+							   launcher. */
+							if (warheadType == g_curCraft->warheadSlotTypeIds[g_hangarMenuCursor[0] != 4]) {
+#else
 							if (warheadType == g_curCraft->warheadSlotTypeIds[0]) {
+#endif
 								g_hangarMenuCursor[1] = listIndex;
 							}
 						}

@@ -54,6 +54,9 @@
  *     gun_turret_hardpoints: true
  *     hangar_jamming: false
  *     super_star_destroyer_jamming: true
+ *     two_launcher_fixes: true
+ *     starship_missile_defense_any_warhead: true
+ *     weapon_rack_count_from_record: true
  *
  * classic_hide_destroyed_engine_glows only changes drawing: the classic
  * renderer doesn't draw the engine glows of a destroyed or hidden mesh, nor
@@ -117,7 +120,24 @@
  * enemy starship or platform. They change the simulation:
  *   - hangar_jamming: false turns jamming off for every craft;
  *   - super_star_destroyer_jamming: the Super Star Destroyer jams near its
- *     hangar. In the stock game, it never jams. */
+ *     hangar. In the stock game, it never jams.
+ *
+ * The warhead rules change how craft load and fire warheads. They change the
+ * simulation:
+ *   - two_launcher_fixes: fixes for craft with two warhead launchers. The
+ *     hangar menu offers the second launcher for any such craft, not only the
+ *     Missile Boat, and lists its warheads. Loading a launcher keeps both
+ *     launchers counted, and the second launcher gets the number of warheads
+ *     of the warhead that it loads. A supply craft reloads the warhead that
+ *     each launcher holds, not the flight group's. The weapon key skips an
+ *     empty launcher;
+ *   - starship_missile_defense_any_warhead: a starship's missile defense fires
+ *     any warhead. In the stock game, it only fires missiles and advanced
+ *     missiles;
+ *   - weapon_rack_count_from_record: a craft's rack count (laserSlotCount)
+ *     covers the racks of every laser group and warhead launcher of its craft
+ *     record. In the stock game, it adds up the racks of the laser groups, and
+ *     the turret racks of craft that fire from float hardpoints. */
 
 #include <stdint.h>
 
@@ -160,6 +180,9 @@ int XwaMissionSettings_GunTurretHardpoints(void);
 /* 1 unless flight/flight.yaml sets hangar_jamming to false. */
 int XwaMissionSettings_HangarJamming(void);
 int XwaMissionSettings_SuperStarDestroyerJamming(void);
+int XwaMissionSettings_TwoLauncherFixes(void);
+int XwaMissionSettings_StarshipMissileDefenseAnyWarhead(void);
+int XwaMissionSettings_WeaponRackCountFromRecord(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);
