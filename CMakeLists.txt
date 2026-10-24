@@ -218,6 +218,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/geometry_textures.c
     src/xwa_runtime/models/craft_hud.c
     src/xwa_runtime/models/craft_weapons.c
+    src/xwa_runtime/models/docking.c
     src/xwa_runtime/models/engine_glows.c
     src/xwa_runtime/models/articulation.c
     src/xwa_runtime/models/model_roles.c

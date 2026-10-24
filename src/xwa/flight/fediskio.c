@@ -37,6 +37,7 @@
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/models/craft_definitions.h"
+#include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/geometry_textures.h"
 #endif
 #include "xwa_runtime/models/gunner_seats.h"
@@ -387,6 +388,11 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 							break;
 						case 9:
 							g_modelDefs[modelEntryIdx].meshAttachData[3] = outZ;
+#ifdef XWA_MODERN
+							if (XwaDocking_DockToSmallSetsBig()) {
+								g_modelDefs[modelEntryIdx].meshAttachData[4] = outZ;
+							}
+#endif
 							g_modelDefs[modelEntryIdx].meshAttachData[0] = outY;
 							handled = 1;
 							break;

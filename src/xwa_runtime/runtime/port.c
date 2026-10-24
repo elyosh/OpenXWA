@@ -39,6 +39,7 @@
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_weapons.h"
+#include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/mission_backdrops.h"
@@ -148,6 +149,7 @@ int XwaPort_Init(void) {
 	XwaText_Load();
 	XwaMissionBackdrops_Init();
 	XwaMissionSettings_Init();
+	XwaDocking_Init();
 	XwaHeadlights_Init();
 	XwaCraftDefinitions_Apply();
 	XwaModelSource_Init();

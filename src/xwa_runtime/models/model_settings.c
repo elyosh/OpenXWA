@@ -9,6 +9,7 @@
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
+#include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/jamming.h"
@@ -49,6 +50,7 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "gunner_seats", XwaGunnerSeats_ClearModelSettings, XwaGunnerSeats_ReadModelSettings },
 	{ "warhead_lock", XwaWarheadLock_ClearModelSettings, XwaWarheadLock_ReadModelSettings },
 	{ "jamming", XwaJamming_ClearModelSettings, XwaJamming_ReadModelSettings },
+	{ "docking", XwaDocking_ClearModelSettings, XwaDocking_ReadModelSettings },
 };
 
 /* A model file that this mission has looked for. `file` is NULL when the

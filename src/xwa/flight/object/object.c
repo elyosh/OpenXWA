@@ -27,6 +27,7 @@
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/craft_sounds.h"
+#include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -2037,9 +2038,18 @@ void Object_UpdateLifetimeAndMovement(void) {
 									g_modelDefs[carriedMobj->pCraft->modelDefIndex].meshAttachData[1];
 								parentOffset = g_modelDefs[mc->modelDefIndex].meshAttachData[3];
 							}
+#ifdef XWA_MODERN
+							pai_RotateLocalVectorToWorldScratch(
+								obj, 0, parentOffset - childOffset,
+								XwaDocking_CarriedOffsetsCarrierDockPoint()
+									? g_modelDefs[mc->modelDefIndex].meshAttachData[0] -
+										  g_modelDefs[carriedModelIndex].meshAttachData[0]
+									: g_modelDefs[carriedModelIndex].meshAttachData[0]);
+#else
 							pai_RotateLocalVectorToWorldScratch(
 								obj, 0, parentOffset - childOffset,
 								g_modelDefs[carriedModelIndex].meshAttachData[0]);
+#endif
 							g_objectTable[carriedIdx].world_x = obj->world_x + g_rotatedX;
 							g_objectTable[carriedIdx].world_y = obj->world_y + g_rotatedY;
 							g_objectTable[carriedIdx].world_z = obj->world_z + g_rotatedZ;

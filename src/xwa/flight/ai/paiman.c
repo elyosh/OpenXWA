@@ -7,6 +7,7 @@
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/weapon_stats.h"
@@ -3227,10 +3228,23 @@ bool paiman_UpdateBoardOrPickupAutopilot(unsigned int playerIdx) {
 					attachDelta = g_modelDefs[targetModelIdx].meshAttachData[2] -
 								  g_modelDefs[boarderCraft->modelDefIndex].meshAttachData[4];
 				}
+#ifdef XWA_MODERN
+				if (XwaDocking_PlayerApproachHeight()) {
+					attachDelta += 2 * (XwaDocking_ApproachHeight(
+											targetObj->objectType,
+											g_modelDefs[targetModelIdx].meshAttachData[2] -
+												g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4]) /
+										2);
+				} else if (targetObj->objectType != OBJ_SpaceColony2) {
+					attachDelta += 2 * (g_modelDefs[targetModelIdx].meshAttachData[2] -
+										g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4]);
+				}
+#else
 				if (targetObj->objectType != OBJ_SpaceColony2) {
 					attachDelta += 2 * (g_modelDefs[targetModelIdx].meshAttachData[2] -
 										g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4]);
 				}
+#endif
 				if (attachDelta < 0) {
 					attachDelta = 0x7000;
 				}
@@ -3338,6 +3352,13 @@ bool paiman_UpdateBoardOrPickupAutopilot(unsigned int playerIdx) {
 				boarderCraft->pushAccumX = 0;
 				boarderCraft->pushAccumY = 0;
 				boarderCraft->pushAccumZ = 0;
+#ifdef XWA_MODERN
+				if (XwaDocking_PlayerSnapsToTargetOrientation()) {
+					g_objectTable[boarderObjIdx].yaw = targetObj->yaw;
+					g_objectTable[boarderObjIdx].pitch = targetObj->pitch;
+					g_objectTable[boarderObjIdx].roll = targetObj->roll;
+				}
+#endif
 				ai->maneuverPhase = 2;
 
 				{
@@ -4202,6 +4223,11 @@ static char paiman_boardmaneuver(void) {
 								   g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4]);
 				if (extraOffset > 932)
 					extraOffset = 932;
+#ifdef XWA_MODERN
+				if (XwaDocking_AiOffsetsOwnDockPoint()) {
+					attachZ -= g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[0];
+				}
+#endif
 				pai_RotateLocalVectorToWorldScratch(objRecord, 0, upOffset + extraOffset, attachZ);
 				g_paiContext.aiController->aimPointX = g_rotatedX + g_objectTable[targetObjIdx].world_x;
 				g_paiContext.aiController->aimPointY = g_rotatedY + g_objectTable[targetObjIdx].world_y;
@@ -4289,6 +4315,11 @@ static char paiman_boardmaneuver(void) {
 					upOffset = targetModelDef->meshAttachData[2] -
 							   g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[4];
 				}
+#ifdef XWA_MODERN
+				if (XwaDocking_AiOffsetsOwnDockPoint()) {
+					attachZ -= g_modelDefs[g_curCraft->modelDefIndex].meshAttachData[0];
+				}
+#endif
 				pai_RotateLocalVectorToWorldScratch(objRecord, 0, upOffset, attachZ);
 				g_curCraft->pushAccumX = g_rotatedX + g_objectTable[targetObjIdx].world_x -
 										 g_objectTable[g_paiContext.aiObjIdx].world_x;
