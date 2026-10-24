@@ -95,7 +95,6 @@ typedef struct FlBillboard {
 	float prev_corners[4][3];
 	uint8_t has_prev;
 } FlBillboard;
-#define FL_MAX_BILLBOARDS 2048
 
 /* One lens-flare source (classic LensFlare_QueueSource): the anchored
  * screen position the 7-quad train derives from at submit. */
@@ -295,8 +294,11 @@ static struct {
 	 * render passes). */
 	FlBackdropQuad bd_quads[FL_MAX_BACKDROP_QUADS];
 	uint32_t bd_count;
-	FlBillboard bb[FL_MAX_BILLBOARDS];
+	/* The frame's billboards. Aeron copies a billboard when it is added, so
+	 * the array can grow. */
+	FlBillboard* bb;
 	uint32_t bb_count;
+	uint32_t bb_capacity;
 	XwaAssetRef glow_ref;
 	int glow_ok;
 	/* Lens flares: sources + the per-ring flare sprite frames of
@@ -2498,8 +2500,14 @@ static void fl_bb_geometry_corners_local(const FlBillboardGeometry* g, const Xwa
 
 static void fl_bb_push(const FlBillboardGeometry* g, const XwaAssetRef* ref, uint32_t argb,
 					   const float (*prev_corners)[3], float emissive_strength) {
-	if (s.bb_count >= FL_MAX_BILLBOARDS) {
-		return;
+	if (s.bb_count == s.bb_capacity) {
+		const uint32_t capacity = s.bb_capacity ? s.bb_capacity * 2 : 1024;
+		FlBillboard* grown = realloc(s.bb, (size_t)capacity * sizeof *grown);
+		if (!grown) {
+			return;
+		}
+		s.bb = grown;
+		s.bb_capacity = capacity;
 	}
 	FlBillboard* b = &s.bb[s.bb_count++];
 	memcpy(b->center, g->center, sizeof b->center);
@@ -5588,6 +5596,7 @@ void XwaRemasterFlight_Shutdown(void) {
 	fl_pool_free(&s.table_pool);
 	fl_pool_free(&s.anim_pool);
 	free(s.bolts);
+	free(s.bb);
 	free(s.mb_prev_index);
 	free(s.energy_states);
 	XwaRemasterFlightMap_Shutdown();
