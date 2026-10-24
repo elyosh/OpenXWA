@@ -50,6 +50,7 @@ static int g_frontDialogConfirmActive;
 static int g_frontDialogConfirmResultReady;
 static int g_frontDialogConfirmCursorWasVisible;
 static int g_frontDialogConfirmOverlayTextWasEnabled;
+static FrontendConfirmClick g_frontDialogConfirmClick;
 #endif
 static int g_frontDialogEditActive;
 static int g_frontDialogEditSavedGlyphGradientBg;
@@ -298,6 +299,7 @@ int FrontendDialog_BeginConfirmDialog(const char* line1, const char* line2, cons
 	   stops repeating its blocking call before the dialog ends. */
 	g_frontDialogConfirmResultReady = 0;
 	g_dialogResult = 0;
+	g_frontDialogConfirmClick = FRONTEND_CONFIRM_CLICK_NONE;
 	FrontendText_PushGlyphGradientBg(FrontendDisplay_PackRGB(0x10, 0x10, 0x40));
 	g_frontDialogConfirmOverlayTextWasEnabled = FrontendButton_IsOverlayTextEnabled();
 	g_frontDialogConfirmCursorWasVisible = FrontendCursor_IsVisible();
@@ -361,6 +363,35 @@ int FrontendDialog_TakeConfirmDialogResult(int* result) {
 		*result = g_dialogResult;
 	}
 	return 1;
+}
+
+int FrontendDialog_ConfirmClick(FrontendConfirmClick id, int clicked, int* answered, const char* line1,
+								const char* line2, const char* line3, const char* okayLabel,
+								const char* cancelLabel) {
+	int result;
+
+	if (answered) {
+		*answered = 0;
+	}
+	if (clicked) {
+		if (FrontendDialog_BeginConfirmDialog(line1, line2, line3, okayLabel, cancelLabel)) {
+			g_frontDialogConfirmClick = id;
+		}
+		return 0;
+	}
+	if (!FrontendDialog_ConfirmClickPending(id) || !FrontendDialog_TakeConfirmDialogResult(&result)) {
+		return 0;
+	}
+
+	g_frontDialogConfirmClick = FRONTEND_CONFIRM_CLICK_NONE;
+	if (answered) {
+		*answered = 1;
+	}
+	return result;
+}
+
+int FrontendDialog_ConfirmClickPending(FrontendConfirmClick id) {
+	return id != FRONTEND_CONFIRM_CLICK_NONE && g_frontDialogConfirmClick == id;
 }
 #endif
 

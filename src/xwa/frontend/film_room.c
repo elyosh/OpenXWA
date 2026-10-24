@@ -224,11 +224,20 @@ int FilmRoom_DrawLoadDeleteButtons(void) {
 											   g_colorLightBlue, 22, "settingsound");
 	FrontendDraw_RectAssign(&buttonRect, 320, 351, 419, 363);
 	FrontendText_DrawCentered(10, FrontendString_Get(STR_GAME_DELETE), &buttonRect, textColor);
+#ifdef XWA_MODERN
+	if (pressed || FrontendDialog_ConfirmClickPending(FRONTEND_CONFIRM_CLICK_DELETE_FILM)) {
+		if (FrontendDialog_ConfirmClick(FRONTEND_CONFIRM_CLICK_DELETE_FILM, pressed, NULL,
+										FrontendString_Get(STR_FILM_CONFIRM_DELETE1),
+										FrontendString_Get(STR_FILM_CONFIRM_DELETE2),
+										FrontendString_Get(STR_FILM_CONFIRM_DELETE3),
+										FrontendString_Get(STR_OKAY), FrontendString_Get(STR_CANCEL))) {
+#else
 	if (pressed) {
 		if (FrontendDialog_ShowConfirmDialog(FrontendString_Get(STR_FILM_CONFIRM_DELETE1),
 											 FrontendString_Get(STR_FILM_CONFIRM_DELETE2),
 											 FrontendString_Get(STR_FILM_CONFIRM_DELETE3),
 											 FrontendString_Get(STR_OKAY), FrontendString_Get(STR_CANCEL))) {
+#endif
 			node = g_filmRoomFilmList->head;
 			g_frontendScratchBuffer[0] = '\0';
 			filmCount = g_filmRoomFilmList->count;

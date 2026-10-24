@@ -2632,6 +2632,19 @@ int MissionBriefing_Update(int frameCounter) {
 		}
 		if (g_frontendRightBarAnimState == 1) {
 			if (Net_IsHost()) {
+#ifdef XWA_MODERN
+				{
+					if (FrontendDialog_ConfirmClick(
+							FRONTEND_CONFIRM_CLICK_RESTART_HOSTED_BRIEFING,
+							FrontendButton_DrawSpriteWithHoverText(
+								&rect, "back", "back", (void*)FrontendString_Get(STR_RETURN_SELECT_MISSION),
+								(unsigned int)g_colorPaleBlue, (unsigned int)g_colorLightBlue, 8,
+								"buttonsound"),
+							NULL, FrontendString_Get(STR_ARE_YOU_SURE_RESTART1),
+							FrontendString_Get(STR_ARE_YOU_SURE_RESTART2),
+							FrontendString_Get(STR_ARE_YOU_SURE_RESTART3), FrontendString_Get(STR_OKAY),
+							FrontendString_Get(STR_CANCEL))) {
+#else
 				if (FrontendButton_DrawSpriteWithHoverText(
 						&rect, "back", "back", (void*)FrontendString_Get(STR_RETURN_SELECT_MISSION),
 						(unsigned int)g_colorPaleBlue, (unsigned int)g_colorLightBlue, 8, "buttonsound")) {
@@ -2640,11 +2653,25 @@ int MissionBriefing_Update(int frameCounter) {
 														 FrontendString_Get(STR_ARE_YOU_SURE_RESTART3),
 														 FrontendString_Get(STR_OKAY),
 														 FrontendString_Get(STR_CANCEL))) {
+#endif
 						g_frontendNetPacketScratch.packetType = 'S';
 						Net_SendPacketAndFlush(0, &g_frontendNetPacketScratch, 4u);
 					}
 				}
 			} else {
+#ifdef XWA_MODERN
+				{
+					if (FrontendDialog_ConfirmClick(
+							FRONTEND_CONFIRM_CLICK_LEAVE_JOINED_BRIEFING,
+							FrontendButton_DrawSpriteWithHoverText(
+								&rect, "back", "back", (void*)FrontendString_Get(STR_LEAVE),
+								(unsigned int)g_colorPaleBlue, (unsigned int)g_colorLightBlue, 8,
+								"buttonsound"),
+							NULL, FrontendString_Get(STR_GAME_IN_PROGRESS1),
+							FrontendString_Get(STR_GAME_IN_PROGRESS2),
+							FrontendString_Get(STR_GAME_IN_PROGRESS3), FrontendString_Get(STR_OKAY),
+							FrontendString_Get(STR_CANCEL))) {
+#else
 				if (FrontendButton_DrawSpriteWithHoverText(
 						&rect, "back", "back", (void*)FrontendString_Get(STR_LEAVE),
 						(unsigned int)g_colorPaleBlue, (unsigned int)g_colorLightBlue, 8, "buttonsound")) {
@@ -2653,6 +2680,7 @@ int MissionBriefing_Update(int frameCounter) {
 														 FrontendString_Get(STR_GAME_IN_PROGRESS3),
 														 FrontendString_Get(STR_OKAY),
 														 FrontendString_Get(STR_CANCEL))) {
+#endif
 						g_skipFrontendEntryMovie = 1;
 						g_frontendNetPacketScratch.packetType = 'G';
 						Net_SendPacketAndFlush(Net_GetHostPlayerId(), &g_frontendNetPacketScratch, 4u);

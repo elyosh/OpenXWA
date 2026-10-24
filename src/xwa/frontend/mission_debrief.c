@@ -900,14 +900,27 @@ int MissionDebrief_Update(int frameCounter) {
 			result = FrontendButton_DrawSpriteWithHoverText(&scratch.rect, "begin", "begin",
 															(void*)FrontendString_Get(STR_FLY_AGAIN),
 															g_colorPaleBlue, g_colorLightBlue, 7, "flysound");
+#ifdef XWA_MODERN
+			if (result || FrontendDialog_ConfirmClickPending(FRONTEND_CONFIRM_CLICK_FLY_AGAIN)) {
+#else
 			if (result) {
+#endif
 				if (g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_SINGLEPLAYER) {
 					if (g_pilotData.campaignMode && g_missionOutcome) {
+#ifdef XWA_MODERN
+						result = FrontendDialog_ConfirmClick(FRONTEND_CONFIRM_CLICK_FLY_AGAIN, result, NULL,
+															 FrontendString_Get(STR_DEBRIEF_REFLY_CONFIRM1),
+															 FrontendString_Get(STR_DEBRIEF_REFLY_CONFIRM2),
+															 FrontendString_Get(STR_DEBRIEF_REFLY_CONFIRM3),
+															 FrontendString_Get(STR_OKAY),
+															 FrontendString_Get(STR_CANCEL));
+#else
 						result = FrontendDialog_ShowConfirmDialog(
 							FrontendString_Get(STR_DEBRIEF_REFLY_CONFIRM1),
 							FrontendString_Get(STR_DEBRIEF_REFLY_CONFIRM2),
 							FrontendString_Get(STR_DEBRIEF_REFLY_CONFIRM3), FrontendString_Get(STR_OKAY),
 							FrontendString_Get(STR_CANCEL));
+#endif
 					} else {
 						result = 1;
 					}
@@ -964,6 +977,13 @@ int MissionDebrief_Update(int frameCounter) {
 						&scratch.rect, "back", "back",
 						(void*)FrontendString_Get(STR_DISCONNECT_FROM_GAME_SESSION), g_colorPaleBlue,
 						g_colorLightBlue, 8, "buttonsound");
+#ifdef XWA_MODERN
+					result = FrontendDialog_ConfirmClick(
+						FRONTEND_CONFIRM_CLICK_DISCONNECT_DEBRIEF, result, NULL,
+						FrontendString_Get(STR_GAME_IN_PROGRESS1), FrontendString_Get(STR_GAME_IN_PROGRESS2),
+						FrontendString_Get(STR_GAME_IN_PROGRESS3), FrontendString_Get(STR_OKAY),
+						FrontendString_Get(STR_CANCEL));
+#else
 					if (result) {
 						result = FrontendDialog_ShowConfirmDialog(FrontendString_Get(STR_GAME_IN_PROGRESS1),
 																  FrontendString_Get(STR_GAME_IN_PROGRESS2),
@@ -971,6 +991,7 @@ int MissionDebrief_Update(int frameCounter) {
 																  FrontendString_Get(STR_OKAY),
 																  FrontendString_Get(STR_CANCEL));
 					}
+#endif
 				}
 				if (result) {
 					g_frontendNetPacketScratch.packetType = 71;
@@ -1055,7 +1076,11 @@ int MissionDebrief_Update(int frameCounter) {
 				result = FrontendButton_DrawSpriteWithHoverText(
 					&scratch.rect, "leave", "leave", (void*)FrontendString_Get(STR_MAP_LEAVE_OF_ABSENCE),
 					g_colorPaleBlue, g_colorLightBlue, 6, "buttonsound");
+#ifdef XWA_MODERN
+				if (result || FrontendDialog_ConfirmClickPending(FRONTEND_CONFIRM_CLICK_SKIP_MISSION)) {
+#else
 				if (result) {
+#endif
 					result = MissionDebrief_ConfirmSkipMission();
 					if (result) {
 						g_frontendQuickStartLaunchFlag = 0;
@@ -2337,6 +2362,21 @@ int MissionDebrief_ConfirmSkipMission(void) {
 	int promptLine;
 	int confirmed;
 	int responseLine;
+#ifdef XWA_MODERN
+	int answered;
+
+	/* The dialog runs over several frames (FrontendDialog_ConfirmClick). The
+	   first call plays the question and opens the dialog. The call that gets
+	   the answer goes on with the end of the function. */
+	if (FrontendDialog_ConfirmClickPending(FRONTEND_CONFIRM_CLICK_SKIP_MISSION)) {
+		confirmed = FrontendDialog_ConfirmClick(FRONTEND_CONFIRM_CLICK_SKIP_MISSION, 0, &answered, NULL, NULL,
+												NULL, NULL, NULL);
+		if (!answered) {
+			return 0;
+		}
+		goto dialog_answered;
+	}
+#endif
 
 	promptLine = rand() % 2;
 	briefingOfficer = g_frontendMission->header.briefingOfficer;
@@ -2353,10 +2393,17 @@ int MissionDebrief_ConfirmSkipMission(void) {
 		strcat(g_frontendScratchBuffer, waveName);
 		FrontendWaveStream_PlayWaveFile(g_frontendScratchBuffer, 0, 0);
 
+#ifdef XWA_MODERN
+		FrontendDialog_ConfirmClick(
+			FRONTEND_CONFIRM_CLICK_SKIP_MISSION, 1, NULL, FrontendString_Get(STR_MAP_LEAVE_MESSAGE_1A),
+			FrontendString_Get(STR_MAP_LEAVE_MESSAGE_1B), FrontendString_Get(STR_MAP_LEAVE_MESSAGE_1C),
+			FrontendString_Get(STR_OKAY), FrontendString_Get(STR_CANCEL));
+#else
 		confirmed = FrontendDialog_ShowConfirmDialog(
 			FrontendString_Get(STR_MAP_LEAVE_MESSAGE_1A), FrontendString_Get(STR_MAP_LEAVE_MESSAGE_1B),
 			FrontendString_Get(STR_MAP_LEAVE_MESSAGE_1C), FrontendString_Get(STR_OKAY),
 			FrontendString_Get(STR_CANCEL));
+#endif
 	} else {
 		if (briefingOfficer == 0) {
 			sprintf(waveName, "G2DE002.wav");
@@ -2369,11 +2416,23 @@ int MissionDebrief_ConfirmSkipMission(void) {
 		strcat(g_frontendScratchBuffer, waveName);
 		FrontendWaveStream_PlayWaveFile(g_frontendScratchBuffer, 0, 0);
 
+#ifdef XWA_MODERN
+		FrontendDialog_ConfirmClick(
+			FRONTEND_CONFIRM_CLICK_SKIP_MISSION, 1, NULL, FrontendString_Get(STR_MAP_LEAVE_MESSAGE_2A),
+			FrontendString_Get(STR_MAP_LEAVE_MESSAGE_2B), FrontendString_Get(STR_MAP_LEAVE_MESSAGE_2C),
+			FrontendString_Get(STR_OKAY), FrontendString_Get(STR_CANCEL));
+#else
 		confirmed = FrontendDialog_ShowConfirmDialog(
 			FrontendString_Get(STR_MAP_LEAVE_MESSAGE_2A), FrontendString_Get(STR_MAP_LEAVE_MESSAGE_2B),
 			FrontendString_Get(STR_MAP_LEAVE_MESSAGE_2C), FrontendString_Get(STR_OKAY),
 			FrontendString_Get(STR_CANCEL));
+#endif
 	}
+#ifdef XWA_MODERN
+	return 0;
+
+dialog_answered:
+#endif
 
 	FrontendWaveStream_Shutdown();
 

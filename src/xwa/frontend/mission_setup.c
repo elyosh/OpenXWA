@@ -7286,11 +7286,20 @@ int MissionSetup_DrawMissionTypeControls(void) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	{
+		if (FrontendDialog_ConfirmClick(FRONTEND_CONFIRM_CLICK_CLEAR_SKIRMISH, clearSkirmishRequested, NULL,
+										FrontendString_Get(STR_GAME_CLEAR_SKIRMISH_CONFIRM1),
+										FrontendString_Get(STR_GAME_CLEAR_SKIRMISH_CONFIRM2),
+										FrontendString_Get(STR_GAME_CLEAR_SKIRMISH_CONFIRM3),
+										FrontendString_Get(STR_OKAY), FrontendString_Get(STR_CANCEL))) {
+#else
 	if (clearSkirmishRequested) {
 		if (FrontendDialog_ShowConfirmDialog(FrontendString_Get(STR_GAME_CLEAR_SKIRMISH_CONFIRM1),
 											 FrontendString_Get(STR_GAME_CLEAR_SKIRMISH_CONFIRM2),
 											 FrontendString_Get(STR_GAME_CLEAR_SKIRMISH_CONFIRM3),
 											 FrontendString_Get(STR_OKAY), FrontendString_Get(STR_CANCEL))) {
+#endif
 			memset(g_combatSimSlots, 0, sizeof(g_combatSimSlots));
 			FrontendMission_LoadCurrent();
 			MissionSetup_CountActiveTeams();
@@ -8427,6 +8436,17 @@ int MissionSetup_Update(int frameCounter) {
 				} else {
 					backText = FrontendString_Get(STR_BACK_TO_CONCOURSE);
 				}
+#ifdef XWA_MODERN
+				changed = FrontendButton_DrawSpriteWithHoverText(
+					&rect, (char*)"back", (char*)"back", (void*)backText, (unsigned int)g_colorPaleBlue,
+					(unsigned int)g_colorLightBlue, 8, (char*)"buttonsound");
+				{
+					changed = FrontendDialog_ConfirmClick(
+						FRONTEND_CONFIRM_CLICK_LEAVE_HOSTED_SETUP, changed, NULL,
+						FrontendString_Get(STR_HOSTING_GAME1), FrontendString_Get(STR_HOSTING_GAME2),
+						FrontendString_Get(STR_HOSTING_GAME3), FrontendString_Get(STR_OKAY),
+						FrontendString_Get(STR_CANCEL));
+#else
 				if (FrontendButton_DrawSpriteWithHoverText(
 						&rect, (char*)"back", (char*)"back", (void*)backText, (unsigned int)g_colorPaleBlue,
 						(unsigned int)g_colorLightBlue, 8, (char*)"buttonsound")) {
@@ -8434,6 +8454,7 @@ int MissionSetup_Update(int frameCounter) {
 						FrontendString_Get(STR_HOSTING_GAME1), FrontendString_Get(STR_HOSTING_GAME2),
 						FrontendString_Get(STR_HOSTING_GAME3), FrontendString_Get(STR_OKAY),
 						FrontendString_Get(STR_CANCEL));
+#endif
 					if (changed) {
 						g_skipFrontendEntryMovie = 1;
 						g_frontendNetPacketScratch.packetType = 70;
@@ -8455,6 +8476,17 @@ int MissionSetup_Update(int frameCounter) {
 				} else {
 					backText = FrontendString_Get(STR_BACK_TO_CONCOURSE);
 				}
+#ifdef XWA_MODERN
+				if (FrontendDialog_ConfirmClick(
+						FRONTEND_CONFIRM_CLICK_LEAVE_JOINED_SETUP,
+						FrontendButton_DrawSpriteWithHoverText(&rect, (char*)"back", (char*)"back",
+															   (void*)backText, (unsigned int)g_colorPaleBlue,
+															   (unsigned int)g_colorLightBlue, 8,
+															   (char*)"buttonsound"),
+						NULL, FrontendString_Get(STR_GAME_IN_PROGRESS1),
+						FrontendString_Get(STR_GAME_IN_PROGRESS2), FrontendString_Get(STR_GAME_IN_PROGRESS3),
+						FrontendString_Get(STR_OKAY), FrontendString_Get(STR_CANCEL))) {
+#else
 				if (FrontendButton_DrawSpriteWithHoverText(
 						&rect, (char*)"back", (char*)"back", (void*)backText, (unsigned int)g_colorPaleBlue,
 						(unsigned int)g_colorLightBlue, 8, (char*)"buttonsound") &&
@@ -8462,6 +8494,7 @@ int MissionSetup_Update(int frameCounter) {
 						FrontendString_Get(STR_GAME_IN_PROGRESS1), FrontendString_Get(STR_GAME_IN_PROGRESS2),
 						FrontendString_Get(STR_GAME_IN_PROGRESS3), FrontendString_Get(STR_OKAY),
 						FrontendString_Get(STR_CANCEL))) {
+#endif
 					g_skipFrontendEntryMovie = 1;
 					g_frontendNetPacketScratch.packetType = 71;
 					Net_SendPacketAndFlush(Net_GetHostPlayerId(), &g_frontendNetPacketScratch, 4u);
