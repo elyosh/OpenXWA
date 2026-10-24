@@ -1337,7 +1337,39 @@ static int snapshot_particle_capture_dispatch(XwaSnapshot* s, const ParticleEffe
 	return snapshot_particle_capture_effect(s, effect, owner, owner_slot, 0);
 }
 
-static void snapshot_capture_particles(XwaSnapshot* s, uint32_t render_state_slot_count) {
+/* The slots that the capture walks. The renderer only draws the camera's
+ * region, which is the local player's in every view, and no other reader
+ * needs another region: so the capture takes the slots of that region
+ * (region_start to region_end) and the local transient slots (local_start
+ * to local_end). Without a valid layout (during loading), it takes every
+ * slot. The ranges come from the region index and the table's layout, not
+ * from the active region's globals, which change many times during a tick. */
+typedef struct SnapshotCaptureRanges {
+	uint32_t region_start, region_end;
+	uint32_t local_start, local_end;
+} SnapshotCaptureRanges;
+
+static SnapshotCaptureRanges snapshot_capture_ranges(void) {
+	SnapshotCaptureRanges ranges;
+	const uint32_t region = (uint32_t)g_players[g_localPlayer].regionIndex;
+
+	if (g_missionRegionCount > 0 && region < (uint32_t)g_missionRegionCount && g_objectSlotsPerRegion != 0 &&
+		(region + 1) * g_objectSlotsPerRegion <= g_regionObjectSlotEnd &&
+		g_localTransientSlotStart <= g_localTransientSlotEnd &&
+		g_localTransientSlotEnd <= g_objectTableSlotCount) {
+		ranges.region_start = region * g_objectSlotsPerRegion;
+		ranges.region_end = ranges.region_start + g_objectSlotsPerRegion;
+		ranges.local_start = g_localTransientSlotStart;
+		ranges.local_end = g_localTransientSlotEnd;
+	} else {
+		ranges.region_start = 0;
+		ranges.region_end = g_objectTableSlotCount;
+		ranges.local_start = ranges.local_end = g_objectTableSlotCount;
+	}
+	return ranges;
+}
+
+static void snapshot_capture_particles(XwaSnapshot* s, uint32_t slot_start, uint32_t slot_end) {
 	uint32_t walked_effects = 0;
 	for (const ParticleEffect* effect = g_worldParticleEffects;
 		 effect && walked_effects++ < XWA_SNAP_MAX_PARTICLE_EFFECTS; effect = effect->next) {
@@ -1345,7 +1377,7 @@ static void snapshot_capture_particles(XwaSnapshot* s, uint32_t render_state_slo
 			return;
 		}
 	}
-	for (uint32_t slot = 0; slot < render_state_slot_count; slot++) {
+	for (uint32_t slot = slot_start; slot < slot_end; slot++) {
 		const ObjectRecord* owner = &g_objectTable[slot];
 		if (owner->objectType == OBJ_None) {
 			continue;
@@ -1379,6 +1411,122 @@ static int snapshot_reserve_slot_index(XwaSnapshot* s, uint32_t count) {
 		s->flight_slot_capacity = count;
 	}
 	return 1;
+}
+
+/* Captures the object in slot `i` into `s`, when the slot holds one. */
+static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_state_slot_count) {
+	const ObjectRecord* o = &g_objectTable[i];
+	if (o->objectType == OBJ_None) {
+		return;
+	}
+	if (s->flight_object_count >= XWA_SNAP_MAX_FLIGHT_OBJECTS) {
+		s->dropped_records++;
+		return;
+	}
+	s->flight_slot_index[i] = (int32_t)s->flight_object_count;
+	XwaFlightObject* f = &s->flight_objects[s->flight_object_count++];
+	memset(f, 0, sizeof *f);
+	f->signature = o->objectSignature;
+	f->slot = (uint16_t)i;
+	f->object_type = o->objectType;
+	f->genus = o->genusId;
+	f->fg_idx = o->flightGroupIdx;
+	f->region = o->regionIdx;
+	snapshot_classify_object_slot(i, (uint8_t)g_players[g_localPlayer].regionIndex, &f->render_region,
+								  &f->slot_class);
+	f->world_pos[0] = o->world_x;
+	f->world_pos[1] = o->world_y;
+	f->world_pos[2] = o->world_z;
+	f->prev_world_pos[0] = o->world_x;
+	f->prev_world_pos[1] = o->world_y;
+	f->prev_world_pos[2] = o->world_z;
+	f->yaw = o->yaw;
+	f->pitch = o->pitch;
+	f->roll = o->roll;
+	f->angle_d = o->angleD;
+	f->player_owner = o->playerOwnerIdx;
+	/* Billboard-law state (see header): the sprite frame / debris
+	 * component selector, the type-2006 depth pull-in, and the
+	 * render walk's slot-range dispatch class. */
+	f->type_specific_0 = o->typeSpecificByte[0];
+	f->type_specific_w = o->typeSpecificWord;
+	const MobileObject* m = o->mobj;
+	if (m) {
+		f->has_mobj = 1;
+		f->iff = m->iff;
+		f->team = m->team;
+		f->state = m->state;
+		f->motion_flags = m->motionFlags;
+		f->node_switch = m->nodeSwitchIndex;
+		f->orient_dirty = m->orientMatrixDirty;
+		f->source_obj = m->sourceObjIdx;
+		f->speed = m->speed;
+		f->instance_extent = m->instanceExtent;
+		f->source_object_type = m->sourceObjectType;
+		f->render_offset[0] = (float)m->renderOffsetX;
+		f->render_offset[1] = (float)m->renderOffsetY;
+		f->render_offset[2] = (float)m->renderOffsetZ;
+		f->prev_world_pos[0] = m->prevWorldX;
+		f->prev_world_pos[1] = m->prevWorldY;
+		f->prev_world_pos[2] = m->prevWorldZ;
+		f->rows[0] = m->cachedSideX;
+		f->rows[1] = m->cachedSideY;
+		f->rows[2] = m->cachedSideZ;
+		f->rows[3] = m->cachedFwdX;
+		f->rows[4] = m->cachedFwdY;
+		f->rows[5] = m->cachedFwdZ;
+		f->rows[6] = m->cachedUpX;
+		f->rows[7] = m->cachedUpY;
+		f->rows[8] = m->cachedUpZ;
+		f->spin_angle = m->spinAngleQ16;
+		f->spin_axis[0] = m->spinAxisX;
+		f->spin_axis[1] = m->spinAxisY;
+		f->spin_axis[2] = m->spinAxisZ;
+		const CraftData* cd = m->pCraft;
+		if (cd) {
+			f->has_craft = 1;
+			f->sfoil_state = cd->sFoilState;
+			f->bridge_aligned = (uint8_t)(XwaArticulation_AlignsBridge(o) != 0);
+			f->carried_object_slot = cd->carriedObjectIndex;
+			if (cd->carriedObjectIndex != 0xffffu && cd->carriedObjectIndex < g_objectTableSlotCount &&
+				g_objectTable[cd->carriedObjectIndex].objectType != OBJ_None) {
+				f->carried_object_signature = g_objectTable[cd->carriedObjectIndex].objectSignature;
+			}
+			f->system_flags = cd->systemFlags;
+			f->subsystem_damage = cd->subsystemDamage;
+			f->hull_damage = cd->hullDamage;
+			f->hull_max = cd->hullMax;
+			f->shield_front = cd->shieldFront;
+			f->shield_rear = cd->shieldRear;
+			f->beam_tractor = (uint8_t)(cd->beamEffectAccum[1] != 0);
+			f->beam_jamming = (uint8_t)(cd->beamEffectAccum[2] != 0);
+			memcpy(f->component_state, cd->componentState, sizeof f->component_state);
+			XwaArticulation_DrawnAngles(o, f->mesh_angle, XWA_SNAP_MAX_MESH_SLOTS);
+			memcpy(f->component_hp, cd->componentHp, sizeof f->component_hp);
+			f->anim_frame = XWA_CRAFT_ANIM_FRAME(cd);
+			/* Engine-glow scale inputs (EngineGlow_RenderObjectGlows). */
+			f->object_kind = cd->objectKind;
+			f->eg_working = (uint8_t)(cd->workingSubsystems != 0);
+			f->eg_shield_redirect = cd->shieldRedirect;
+			f->eg_laser_redirect = cd->laserRedirect;
+			f->eg_beam_level = cd->beamLevel;
+			f->eg_throttle = cd->throttleSpeed;
+			f->eg_output_scale = cd->engineOutputScale;
+			f->eg_max_speed = (uint16_t)cd->aiFlight.maxSpeedCache;
+			/* Per-emitter damage knockouts -> bitmask (read-only walk
+			 * of the render-state list). g_objRenderState is allocated
+			 * with the flight scene — NULL during mission loading. */
+			memset(f->eg_knockout_mask, 0, sizeof f->eg_knockout_mask);
+			if (i < render_state_slot_count) {
+				for (const EngineGlowKnockoutMark* k = g_objRenderState[i].engineGlowKnockouts; k != NULL;
+					 k = k->next) {
+					f->eg_knockout_mask[k->emitterIndex >> 5] |= 1u << (k->emitterIndex & 31);
+				}
+			}
+			XwaEngineGlows_HiddenMask(o->objectType, m->speed, (uint16_t)cd->aiFlight.maxSpeedCache,
+									  f->eg_hidden_mask);
+		}
+	}
 }
 
 void XwaSnapshot_CaptureFlight(void) {
@@ -1437,126 +1585,22 @@ void XwaSnapshot_CaptureFlight(void) {
 		return;
 	}
 	s->flight_slot_count = g_objectTableSlotCount;
-	for (uint32_t i = 0; i < g_objectTableSlotCount; i++) {
-		const ObjectRecord* o = &g_objectTable[i];
-		s->flight_slot_index[i] = -1;
-		if (o->objectType == OBJ_None) {
-			continue;
-		}
-		if (s->flight_object_count >= XWA_SNAP_MAX_FLIGHT_OBJECTS) {
-			s->dropped_records++;
-			continue;
-		}
-		s->flight_slot_index[i] = (int32_t)s->flight_object_count;
-		XwaFlightObject* f = &s->flight_objects[s->flight_object_count++];
-		memset(f, 0, sizeof *f);
-		f->signature = o->objectSignature;
-		f->slot = (uint16_t)i;
-		f->object_type = o->objectType;
-		f->genus = o->genusId;
-		f->fg_idx = o->flightGroupIdx;
-		f->region = o->regionIdx;
-		snapshot_classify_object_slot(i, (uint8_t)g_players[g_localPlayer].regionIndex, &f->render_region,
-									  &f->slot_class);
-		f->world_pos[0] = o->world_x;
-		f->world_pos[1] = o->world_y;
-		f->world_pos[2] = o->world_z;
-		f->prev_world_pos[0] = o->world_x;
-		f->prev_world_pos[1] = o->world_y;
-		f->prev_world_pos[2] = o->world_z;
-		f->yaw = o->yaw;
-		f->pitch = o->pitch;
-		f->roll = o->roll;
-		f->angle_d = o->angleD;
-		f->player_owner = o->playerOwnerIdx;
-		/* Billboard-law state (see header): the sprite frame / debris
-		 * component selector, the type-2006 depth pull-in, and the
-		 * render walk's slot-range dispatch class. */
-		f->type_specific_0 = o->typeSpecificByte[0];
-		f->type_specific_w = o->typeSpecificWord;
-		const MobileObject* m = o->mobj;
-		if (m) {
-			f->has_mobj = 1;
-			f->iff = m->iff;
-			f->team = m->team;
-			f->state = m->state;
-			f->motion_flags = m->motionFlags;
-			f->node_switch = m->nodeSwitchIndex;
-			f->orient_dirty = m->orientMatrixDirty;
-			f->source_obj = m->sourceObjIdx;
-			f->speed = m->speed;
-			f->instance_extent = m->instanceExtent;
-			f->source_object_type = m->sourceObjectType;
-			f->render_offset[0] = (float)m->renderOffsetX;
-			f->render_offset[1] = (float)m->renderOffsetY;
-			f->render_offset[2] = (float)m->renderOffsetZ;
-			f->prev_world_pos[0] = m->prevWorldX;
-			f->prev_world_pos[1] = m->prevWorldY;
-			f->prev_world_pos[2] = m->prevWorldZ;
-			f->rows[0] = m->cachedSideX;
-			f->rows[1] = m->cachedSideY;
-			f->rows[2] = m->cachedSideZ;
-			f->rows[3] = m->cachedFwdX;
-			f->rows[4] = m->cachedFwdY;
-			f->rows[5] = m->cachedFwdZ;
-			f->rows[6] = m->cachedUpX;
-			f->rows[7] = m->cachedUpY;
-			f->rows[8] = m->cachedUpZ;
-			f->spin_angle = m->spinAngleQ16;
-			f->spin_axis[0] = m->spinAxisX;
-			f->spin_axis[1] = m->spinAxisY;
-			f->spin_axis[2] = m->spinAxisZ;
-			const CraftData* cd = m->pCraft;
-			if (cd) {
-				f->has_craft = 1;
-				f->sfoil_state = cd->sFoilState;
-				f->bridge_aligned = (uint8_t)(XwaArticulation_AlignsBridge(o) != 0);
-				f->carried_object_slot = cd->carriedObjectIndex;
-				if (cd->carriedObjectIndex != 0xffffu && cd->carriedObjectIndex < g_objectTableSlotCount &&
-					g_objectTable[cd->carriedObjectIndex].objectType != OBJ_None) {
-					f->carried_object_signature = g_objectTable[cd->carriedObjectIndex].objectSignature;
-				}
-				f->system_flags = cd->systemFlags;
-				f->subsystem_damage = cd->subsystemDamage;
-				f->hull_damage = cd->hullDamage;
-				f->hull_max = cd->hullMax;
-				f->shield_front = cd->shieldFront;
-				f->shield_rear = cd->shieldRear;
-				f->beam_tractor = (uint8_t)(cd->beamEffectAccum[1] != 0);
-				f->beam_jamming = (uint8_t)(cd->beamEffectAccum[2] != 0);
-				memcpy(f->component_state, cd->componentState, sizeof f->component_state);
-				XwaArticulation_DrawnAngles(o, f->mesh_angle, XWA_SNAP_MAX_MESH_SLOTS);
-				memcpy(f->component_hp, cd->componentHp, sizeof f->component_hp);
-				f->anim_frame = XWA_CRAFT_ANIM_FRAME(cd);
-				/* Engine-glow scale inputs (EngineGlow_RenderObjectGlows). */
-				f->object_kind = cd->objectKind;
-				f->eg_working = (uint8_t)(cd->workingSubsystems != 0);
-				f->eg_shield_redirect = cd->shieldRedirect;
-				f->eg_laser_redirect = cd->laserRedirect;
-				f->eg_beam_level = cd->beamLevel;
-				f->eg_throttle = cd->throttleSpeed;
-				f->eg_output_scale = cd->engineOutputScale;
-				f->eg_max_speed = (uint16_t)cd->aiFlight.maxSpeedCache;
-				/* Per-emitter damage knockouts -> bitmask (read-only walk
-				 * of the render-state list). g_objRenderState is allocated
-				 * with the flight scene — NULL during mission loading. */
-				memset(f->eg_knockout_mask, 0, sizeof f->eg_knockout_mask);
-				if (i < render_state_slot_count) {
-					for (const EngineGlowKnockoutMark* k = g_objRenderState[i].engineGlowKnockouts; k != NULL;
-						 k = k->next) {
-						f->eg_knockout_mask[k->emitterIndex >> 5] |= 1u << (k->emitterIndex & 31);
-					}
-				}
-				XwaEngineGlows_HiddenMask(o->objectType, m->speed, (uint16_t)cd->aiFlight.maxSpeedCache,
-										  f->eg_hidden_mask);
-			}
-		}
+	memset(s->flight_slot_index, 0xff, (size_t)g_objectTableSlotCount * sizeof *s->flight_slot_index);
+	const SnapshotCaptureRanges ranges = snapshot_capture_ranges();
+	/* Render state exists for the regions' slots only. */
+	const uint32_t render_start =
+		ranges.region_start < render_state_slot_count ? ranges.region_start : render_state_slot_count;
+	const uint32_t render_end =
+		ranges.region_end < render_state_slot_count ? ranges.region_end : render_state_slot_count;
+	for (uint32_t i = ranges.region_start; i < ranges.region_end; i++) {
+		snapshot_capture_object(s, i, render_state_slot_count);
+	}
+	for (uint32_t i = ranges.local_start; i < ranges.local_end; i++) {
+		snapshot_capture_object(s, i, render_state_slot_count);
 	}
 
 	XwaSnapshotFlightMap_Begin(s);
-	for (uint32_t slot = g_regionMainObjectSlotStart;
-		 s->flight_map.active && slot < g_regionStaticObjectSlotEnd && slot < g_objectTableSlotCount;
-		 slot++) {
+	for (uint32_t slot = ranges.region_start; s->flight_map.active && slot < ranges.region_end; slot++) {
 		const int32_t index = s->flight_slot_index[slot];
 		XwaSnapshotFlightMap_CaptureObject(s, slot, index >= 0 ? (uint16_t)index : UINT16_MAX);
 	}
@@ -1566,7 +1610,7 @@ void XwaSnapshot_CaptureFlight(void) {
 	 * the linked state here without invoking it again and without trusting
 	 * ObjectTrailEmitter.pointCount (the list is the geometry authority). */
 	if (g_objRenderState != NULL) {
-		for (uint32_t slot = 0; slot < render_state_slot_count; slot++) {
+		for (uint32_t slot = render_start; slot < render_end; slot++) {
 			const ObjectRecord* owner = &g_objectTable[slot];
 			if (owner->objectType == OBJ_None) {
 				continue;
@@ -1619,7 +1663,7 @@ void XwaSnapshot_CaptureFlight(void) {
 	/* Particle lists are persistent renderer state. Capture the already-updated
 	 * records without advancing them or consuming the game RNG. */
 	if (g_objRenderState != NULL) {
-		snapshot_capture_particles(s, render_state_slot_count);
+		snapshot_capture_particles(s, render_start, render_end);
 	}
 
 	/* Active legacy surface-projector state. Pool records persist across
