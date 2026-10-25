@@ -283,7 +283,7 @@ static uint32_t env_capture_collect_suns(const XwaSnapshot* snap, XwaRemasterAss
 			for (int c = 0; c < 3; c++) {
 				sun->color_linear[c] = linked->color[c] / linked_peak;
 			}
-			sun->intensity = linked_peak > 16.0f ? 16.0f : linked_peak;
+			sun->intensity = fminf(linked_peak, AERON_ENV_MAX_LIGHT_INTENSITY);
 			sun->luminance = sun->intensity * env_capture_luminance(sun->color_linear);
 			sun->primary = linked == key;
 		}

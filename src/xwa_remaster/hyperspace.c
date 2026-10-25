@@ -6,6 +6,7 @@
 #include "aeron/asset/opt_model.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/flight.h"
+#include "xwa_remaster/scene_lights.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -326,7 +327,8 @@ static void hyper_emit_streak(HyperStreakVertex* out, const XwaHyperspaceStreak*
 		};
 		hyper_widescreen_remap(p, camera_rows, x_scale);
 		memcpy(out[v].position, p, sizeof p);
-		out[v].color[0] = out[v].color[1] = out[v].color[2] = out[v].color[3] = 1.0f;
+		out[v].color[0] = out[v].color[1] = out[v].color[2] = XwaRemaster_ClassicRadiance();
+		out[v].color[3] = 1.0f;
 	}
 }
 
@@ -371,8 +373,8 @@ static void hyper_add_uniform_ambient(XwaShipAmbientCube* cube, const float colo
 
 static void hyper_build_transition_lighting(XwaRemasterHyperspace* h, float flash_alpha) {
 	float color[3];
-	const float scale =
-		h->params.brightness * h->params.highlight_strength * h->params.mesh_ambient_strength * flash_alpha;
+	const float scale = h->params.brightness * h->params.highlight_strength *
+						h->params.mesh_ambient_strength * flash_alpha * XwaRemaster_ClassicRadiance();
 	for (int channel = 0; channel < 3; channel++) {
 		color[channel] = h->params.cap_color[channel] * scale;
 	}
@@ -443,7 +445,8 @@ static void hyper_build_tunnel_lighting(XwaRemasterHyperspace* h, const float ca
 							   h->tunnel_uniform.tunnel_forward[2] };
 	hyper_view_to_world(camera_rows, key_direction, h->lighting.key.world_dir);
 	float peak = 0.0f;
-	const float key_scale = h->params.brightness * h->params.highlight_strength * h->params.mesh_key_strength;
+	const float key_scale = h->params.brightness * h->params.highlight_strength *
+							h->params.mesh_key_strength * XwaRemaster_ClassicRadiance();
 	for (int channel = 0; channel < 3; channel++) {
 		h->lighting.key.color[channel] = h->params.cap_color[channel] * key_scale;
 		peak = fmaxf(peak, h->lighting.key.color[channel]);
@@ -480,7 +483,9 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 	h->tunnel_uniform.view[1] = (float)rt_h;
 	h->tunnel_uniform.view[2] = 0.5f;
 	h->tunnel_uniform.view[3] = hyper_transition_center_y(&snap->flight_camera);
-	h->tunnel_uniform.appearance[0] = h->params.brightness;
+	/* The tunnel's colours are classic image values, shown at the classic
+	 * radiance. Its cockpit lighting follows from that radiance. */
+	h->tunnel_uniform.appearance[0] = h->params.brightness * XwaRemaster_ClassicRadiance();
 	h->tunnel_uniform.appearance[1] = h->params.highlight_strength;
 	memcpy(h->tunnel_uniform.cap_color, h->params.cap_color, 3 * sizeof(float));
 	memcpy(h->view_proj, view_proj, sizeof h->view_proj);

@@ -262,12 +262,11 @@ int XwaRemasterCapturedLighting_Environment(const XwaSnapshot* snap, const XwaEn
 	}
 	memcpy(out->world_to_local, cl_world_to_cube, sizeof out->world_to_local);
 	if (XwaRemasterEnvironment_KeepsBackdrops(selection)) {
-		/* Use the environment's strengths, or 1 for a cube it does not have. */
+		/* The capture drew the sky at the environment's intensity, so only its
+		 * relative strengths apply, or 1 for a cube it does not have. */
 		const AeronEnvironmentDefinition* settings = &selection->prepared->settings;
-		out->diffuse_strength =
-			selection->prepared->diffuse ? settings->intensity * settings->diffuse_strength : 1.0f;
-		out->specular_strength =
-			selection->prepared->specular ? settings->intensity * settings->specular_strength : 1.0f;
+		out->diffuse_strength = selection->prepared->diffuse ? settings->diffuse_strength : 1.0f;
+		out->specular_strength = selection->prepared->specular ? settings->specular_strength : 1.0f;
 	} else {
 		out->diffuse_strength = g.options.diffuse_strength;
 		out->specular_strength = g.options.specular_strength;

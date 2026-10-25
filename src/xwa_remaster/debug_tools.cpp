@@ -34,6 +34,8 @@
 #include "xwa_runtime/models/cockpit_eye.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
+#include <algorithm>
+#include <cfloat>
 #include <cstdio>
 #include <cstring>
 #include <imgui.h>
@@ -54,11 +56,17 @@ static void xwa_tool_pbr(int* open, void* user) {
 	XwaRemasterShip_GetPbrTuning(&t);
 	bool changed = false;
 
-	changed |= ImGui::SliderFloat("Sun illuminance scale", &t.sun_illuminance_scale, 0.0f, 8.0f, "%.3f");
-	ImGui::TextDisabled("Illuminance per unit of sun intensity; pi = as bright as the classic.");
+	float classic_light = XwaRemaster_ClassicLightIlluminance();
+	if (ImGui::SliderFloat("Classic light illuminance", &classic_light, 0.0f, 2000.0f, "%.1f W/m^2",
+						   ImGuiSliderFlags_Logarithmic)) {
+		XwaRemaster_SetClassicLightIlluminance(classic_light);
+	}
+	ImGui::TextDisabled("Illuminance of a classic light of brightness 1 (suns, the game's\n"
+						"lights): %.0f lux. 186 W/m^2 is the sun at the Earth's distance.",
+						(double)(classic_light * AERON_SCENE_LUMENS_PER_WATT));
 	changed |=
 		ImGui::ColorEdit3("Ambient fill", t.ambient, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
-	ImGui::TextDisabled("Linear ambient cube fill.");
+	ImGui::TextDisabled("Ambient cube fill, radiance in W/m^2/sr.");
 	bool adapt = t.spec_geom_adapt != 0.0f;
 	if (ImGui::Checkbox("Spec normal adaptation", &adapt)) {
 		t.spec_geom_adapt = adapt ? 1.0f : 0.0f;
@@ -138,6 +146,7 @@ static void xwa_tool_pbr(int* open, void* user) {
 	ImGui::Separator();
 	if (ImGui::Button("Reset to defaults")) {
 		XwaRemasterShip_GetPbrTuningDefault(&t);
+		XwaRemaster_SetClassicLightIlluminance(XwaRemaster_ClassicLightIlluminanceDefault());
 		XwaRemasterShip_SetBackfaceFill(1);
 		changed = true;
 	}
@@ -386,7 +395,8 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 		ImGui::BeginDisabled();
 	}
 	changed |= ImGui::SliderFloat3("Direction (surface to light)", p.direction, -1.0f, 1.0f, "%.3f");
-	changed |= ImGui::SliderFloat("Intensity", &p.intensity, 0.0f, 4.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Illuminance", &p.intensity, 0.0f, 2000.0f, "%.2f W/m^2",
+								  ImGuiSliderFlags_Logarithmic);
 	changed |= ImGui::ColorEdit3("Light color", p.color, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 	bool ship_occlusion = XwaRemasterShip_ShipOcclusion() != 0;
 	if (ImGui::Checkbox("Ship occlusion", &ship_occlusion)) {
@@ -490,11 +500,13 @@ static void xwa_tool_point_lights(int* open, void* user) {
 	changed |=
 		ImGui::SliderFloat("Range scale", &p.range_scale, 0.25f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
 	ImGui::TextDisabled("Multiplies the distance where a light falls under\n"
-						"1/250 of a unit of illuminance and ends.");
-	changed |= ImGui::SliderFloat("Model light intensity", &p.model_light_intensity, 0.0f, 0.1f, "%.6f",
-								  ImGuiSliderFlags_Logarithmic);
-	ImGui::TextDisabled("Scene illuminance per lux of lights authored in models\n"
-						"(candela). 1/683 = 0.001464; 0 = off.");
+						"1/250 of a unit of illuminance after the exposure and ends.");
+	bool model_lights = p.model_lights != 0;
+	if (ImGui::Checkbox("Model lights", &model_lights)) {
+		p.model_lights = model_lights ? 1 : 0;
+		changed = true;
+	}
+	ImGui::TextDisabled("Lights authored in models (candela), and the headlight.");
 
 	ImGui::Separator();
 	if (ImGui::Button("Reset to defaults")) {
@@ -838,6 +850,82 @@ static void xwa_tool_hdr(int* open, void* user) {
 	if (!hdr_active) {
 		ImGui::TextColored(ImVec4(1, 0.7f, 0.3f, 1),
 						   "SDR composition active — the piecewise curve is in use regardless.");
+	}
+
+	ImGui::Separator();
+	ImGui::TextUnformatted("Exposure");
+	XwaFlightExposureParams exposure = {};
+	XwaRemasterFlight_GetExposure(&exposure);
+	bool metered = exposure.metered != 0;
+	bool exposure_changed = ImGui::Checkbox("Metered", &metered);
+	exposure.metered = metered ? 1 : 0;
+	exposure_changed |=
+		ImGui::SliderFloat(metered ? "EV100 anchor" : "EV100", &exposure.ev100, 0.0f, 20.0f, "%.2f");
+	exposure_changed |= ImGui::SliderFloat("Compensation", &exposure.compensation, -5.0f, 5.0f, "%+.2f EV");
+	if (metered) {
+		exposure_changed |= ImGui::SliderFloat("Metering", &exposure.metering, 0.0f, 1.0f, "%.2f");
+		ImGui::TextDisabled("0 keeps the anchor, 1 follows the meter fully.");
+		exposure_changed |= ImGui::DragFloatRange2("Limits", &exposure.min_ev100, &exposure.max_ev100, 0.1f,
+												   -6.0f, 24.0f, "min %.1f", "max %.1f");
+		exposure_changed |=
+			ImGui::SliderFloat("Brighten speed", &exposure.brighten_speed, 0.1f, 10.0f, "%.2f /s");
+		exposure_changed |=
+			ImGui::SliderFloat("Darken speed", &exposure.darken_speed, 0.1f, 10.0f, "%.2f /s");
+		exposure_changed |=
+			ImGui::DragFloatRange2("Percentiles", &exposure.low_percent, &exposure.high_percent, 0.5f, 0.0f,
+								   100.0f, "low %.0f%%", "high %.0f%%");
+		exposure_changed |= ImGui::SliderFloat("Sky weight", &exposure.sky_weight, 0.0f, 1.0f, "%.2f");
+		exposure_changed |= ImGui::SliderFloat("Near weight", &exposure.near_weight, 0.0f, 1.0f, "%.2f");
+		exposure_changed |=
+			ImGui::SliderFloat("Near distance", &exposure.near_distance, 0.0f, 20.0f, "%.1f m");
+		exposure_changed |= ImGui::SliderFloat("Edge weight", &exposure.edge_weight, 0.0f, 1.0f, "%.2f");
+		bool max_channel = exposure.max_channel != 0;
+		exposure_changed |= ImGui::Checkbox("Meter the largest channel", &max_channel);
+		exposure.max_channel = max_channel ? 1 : 0;
+		ImGui::SameLine();
+		bool freeze = exposure.freeze != 0;
+		exposure_changed |= ImGui::Checkbox("Freeze", &freeze);
+		exposure.freeze = freeze ? 1 : 0;
+	}
+	if (ImGui::Button("Reset exposure")) {
+		XwaRemasterFlight_GetExposureDefault(&exposure);
+		exposure_changed = true;
+	}
+	if (exposure_changed) {
+		XwaRemasterFlight_SetExposure(&exposure);
+	}
+	AeronSceneExposureReadout readout;
+	if (metered && XwaRemasterFlight_GetExposureReadout(&readout)) {
+		ImGui::Text("EV100 %.2f, target %.2f, metered %.2f%s", (double)readout.ev100,
+					(double)readout.target_ev100, (double)readout.metered_ev100,
+					readout.metered ? "" : " (nothing to meter)");
+		ImGui::Text("Averaged from EV100 %.1f to %.1f; geometry %.0f%% of the weight",
+					(double)readout.low_ev100, (double)readout.high_ev100, 100.0 * readout.geometry_share);
+		const float first = AERON_SCENE_EXPOSURE_FIRST_EV100;
+		const float span = AERON_SCENE_EXPOSURE_BINS * AERON_SCENE_EXPOSURE_BIN_EV;
+		char label[48];
+		snprintf(label, sizeof label, "EV100 %.0f to %.0f", (double)first, (double)(first + span));
+		ImGui::PlotHistogram("##exposure_histogram", readout.histogram, AERON_SCENE_EXPOSURE_BINS, 0, label,
+							 0.0f, FLT_MAX, ImVec2(0.0f, 80.0f));
+		/* The averaged range in white, the current EV in yellow. */
+		const ImVec2 lo = ImGui::GetItemRectMin();
+		const ImVec2 hi = ImGui::GetItemRectMax();
+		ImDrawList* draw = ImGui::GetWindowDrawList();
+		auto mark = [&](float ev, ImU32 color) {
+			const float t = std::clamp((ev - first) / span, 0.0f, 1.0f);
+			const float x = lo.x + t * (hi.x - lo.x);
+			draw->AddLine(ImVec2(x, lo.y), ImVec2(x, hi.y), color);
+		};
+		mark(readout.low_ev100, IM_COL32(255, 255, 255, 160));
+		mark(readout.high_ev100, IM_COL32(255, 255, 255, 160));
+		mark(readout.ev100, IM_COL32(255, 220, 64, 255));
+	} else if (metered) {
+		ImGui::TextDisabled("No metering yet.");
+	} else {
+		ImGui::TextDisabled("Exposed at EV100 %.2f: scene values x %.4g before the tonemap.\n"
+							"Higher EV100 is darker; %.3f shows a scene value of 1 as 1.",
+							(double)(exposure.ev100 - exposure.compensation),
+							(double)XwaRemasterFlight_Exposure(), (double)AERON_SCENE_UNIT_EXPOSURE_EV100);
 	}
 
 	ImGui::Separator();

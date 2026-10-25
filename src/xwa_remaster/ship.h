@@ -41,6 +41,8 @@ AeronSceneMesh* XwaRemasterShip_MeshForName(const char* name);
  * XWA_MODEL_SOURCE_OPT for an in-memory OPT conversion, XWA_MODEL_SOURCE_GLB
  * for a replacement GLB. */
 AeronSceneMesh* XwaRemasterShip_MeshForNameWithSource(const char* name, uint8_t* out_source);
+/* The emission of a projectile OPT, as radiance: its strength in the
+ * settings at the classic radiance. */
 float XwaRemasterShip_OptProjectileEmissiveStrength(void);
 /* The process's effect atlas (flight/effects in the mod folder), which ship meshes resolve
  * their animated materials in; scenes drawing them use it
@@ -113,13 +115,9 @@ int XwaRemasterShip_BuildPreviousCockpitMeshTable(
  * environment block). The required remaster/config.yaml profile defines the HD
  * relight baseline. Mutated by the debug inspector; not persisted. */
 typedef struct XwaShipPbrTuning {
-	/* Illuminance per unit of directional-light value (the decoded
-	 * colour x intensity of suns, the hangar key and environment lights); pi
-	 * shades as brightly as the classic renderer. */
-	float sun_illuminance_scale;
 	float spec_geom_adapt;    /* 0/1: blend spec normal toward the face */
 	float debug_isolate_term; /* PbrIsolateMode (0 = off) */
-	float ambient[3];         /* ambient cube fill (linear RGB) */
+	float ambient[3];         /* ambient cube fill, radiance in W/m^2/sr */
 	/* Debug material override (debug inspector only): every PBR material
 	 * shaded with this metallic and perceptual roughness. */
 	float debug_material_override; /* 0/1 */
@@ -186,15 +184,16 @@ typedef struct XwaShipPointLight {
 } XwaShipPointLight;
 
 /* A classic-intensity source as a physical scene light: an inverse-square
- * sphere (or tube) of XWA_SHIP_POINT_LIGHT_RADIUS_M whose Lambert diffuse
- * is as bright as the classic law (0.5 * intensity / d) at
- * `match_distance_m` (or the light's own), so brighter closer and dimmer
- * farther.
- * `range_scale` multiplies the distance where it falls under 1/250 of a
- * unit of illuminance. Returns zero for a light that emits nothing. */
+ * sphere (or tube) of XWA_SHIP_POINT_LIGHT_RADIUS_M whose illuminance at
+ * `match_distance_m` (or the light's own) is what the classic law
+ * (0.5 * intensity / d) gives in units of the classic light calibration, so
+ * brighter closer and dimmer farther.
+ * The light ends where it gives under 1/250 of a unit of illuminance after
+ * `exposure` (AeronScenePresent_ExposureFromEv100), times `range_scale`.
+ * Returns zero for a light that emits nothing. */
 #define XWA_SHIP_POINT_LIGHT_RADIUS_M 0.25f
 int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float match_distance_m, float range_scale,
-									AeronSceneLight* out);
+									float exposure, AeronSceneLight* out);
 
 /* Optional per-frame linear ambient cube. NULL selects the process-wide
  * uniform ambient value from XwaShipPbrTuning. */
@@ -253,8 +252,8 @@ const XwaRemasterDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaRe
  * `ao` carries the per-frame SSAO inputs the FS folds into the
  * ambient (and optionally direct-diffuse) term; NULL = AO off.
  * The key light is lights[key_index] when key_index is in range, otherwise
- * SelectKeyDirectionalLight's choice. Directional light
- * colors are scaled by the tuning's sun_illuminance_scale. Punctual records are submitted
+ * SelectKeyDirectionalLight's choice. Light colours are illuminance in
+ * W/m^2 (scene_lights.h) and are used as they are. Punctual records are submitted
  * separately through AeronScene_AddLight. `ambient_cube` optionally
  * replaces the uniform ambient fill; `environment_map`, when given,
  * selects the scene's diffuse environment (otherwise the scene's selection,

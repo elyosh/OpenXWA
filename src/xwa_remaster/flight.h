@@ -104,6 +104,38 @@ void XwaRemasterFlight_GetHangarLighting(XwaFlightHangarLightingParams* out);
 void XwaRemasterFlight_SetHangarLighting(const XwaFlightHangarLightingParams* in);
 void XwaRemasterFlight_GetHangarLightingDefault(XwaFlightHangarLightingParams* out);
 
+/* Camera exposure (remaster/config.yaml `exposure:` mapping + the debug
+ * inspector). Fixed, the image is exposed at ev100 - compensation. Metered,
+ * the flight scene meters it from its image (AeronScene_SetAutoExposure). */
+typedef struct XwaFlightExposureParams {
+	int   metered;
+	float ev100;        /* fixed mode, and the anchor of partial metering */
+	float compensation; /* EV added to brightness */
+	float metering;     /* 0 = ev100, 1 = the metered EV */
+	float min_ev100;
+	float max_ev100;
+	float brighten_speed; /* per second, when the scene gets darker */
+	float darken_speed;   /* per second, when the scene gets brighter */
+	float low_percent;
+	float high_percent;
+	float sky_weight;
+	float near_weight;   /* geometry nearer than near_distance: the cockpit */
+	float near_distance; /* metres */
+	float edge_weight;
+	int   max_channel; /* meter the largest of r, g and b instead of luminance */
+	int   freeze;      /* keep the current EV; debug only, not in the file */
+} XwaFlightExposureParams;
+
+void XwaRemasterFlight_GetExposure(XwaFlightExposureParams* out);
+void XwaRemasterFlight_SetExposure(const XwaFlightExposureParams* in);
+void XwaRemasterFlight_GetExposureDefault(XwaFlightExposureParams* out);
+/* The exposure the tonemap applies to scene values
+ * (AeronScenePresent_ExposureFromEv100): the fixed one, or the newest the
+ * meter read back. 1 before the configuration loads. */
+float XwaRemasterFlight_Exposure(void);
+/* The flight scene's newest metering; 0 when there is none. */
+int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out);
+
 /* Point-light knobs (remaster/config.yaml `point_lights:` mapping + the debug
  * inspector). The classic SOURCE laws fix each light's color and classic
  * intensity; the scene evaluates them as physical sphere lights as bright
@@ -114,7 +146,7 @@ typedef struct XwaFlightPointLightParams {
 	int cluster_debug;
 	float match_distance_m;      /* metres at which a light is as bright as the classic law */
 	float range_scale;           /* multiplies the derived falloff range */
-	float model_light_intensity; /* scene illuminance per lux of lights authored in models (candela) */
+	int model_lights;            /* lights authored in models, and the headlight */
 } XwaFlightPointLightParams;
 
 /* The game's light candidates, the models' lights, and those of both whose

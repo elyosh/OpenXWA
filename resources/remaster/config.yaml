@@ -112,6 +112,10 @@ models:
   # true: original OPT models for simulation and rendering.
   # false: flight/models/<key>.glb replacements in the mod folder, where present, for both.
   force_opt: false
+  # Classic emission (the OPTs' lit texels, projectiles, engine glows,
+  # explosions, glow marks, cockpit screens) is shown at the radiance of a
+  # backdrop texel: classic_lighting.illuminance / pi. These strengths
+  # multiply it.
   opt_emissive_strength: 6.0
   opt_projectile_emissive_strength: 20.0
   engine_emissive_strength: 10.0
@@ -146,16 +150,18 @@ texture_filtering:
   max_anisotropy: 8.0
 hangar_lighting:
   # Artificial ceiling source for the enclosed hangar. The launch-reference
-  # backdrop receives shadows but does not cast into this light.
+  # backdrop receives shadows but does not cast into this light. It replaces
+  # the classic hangar light, but not the classic red alert lights.
   enabled: true
   direction_x: 0.0
   direction_y: 0.0
   direction_z: 1.0
-  intensity: 0.8
+  intensity: 2.0  # illuminance in W/m^2 (1366 lux), up to 2000
   color_r: 1.0
   color_g: 1.0
   color_b: 1.0
-  # Linear ambient cube: +Z ceiling fill, horizontal wall bounce, -Z floor bounce.
+  # Ambient cube in W/m^2/sr, up to 1000: +Z ceiling fill, horizontal wall
+  # bounce, -Z floor bounce. It takes the key light's hue.
   ambient_ceiling: 0.16
   ambient_sides: 0.10
   ambient_floor: 0.06
@@ -187,7 +193,7 @@ environment_maps:
 # reproduces the classic FlightStarfield_Render on the GPU.
 starfield:
   exposure: 1.0
-  brightness: 1.0   # peak star brightness (tuned for the tonemap)
+  brightness: 1.0   # peak star brightness, at the classic radiance
   density: 0.4      # grid-cell occupancy; star count ~= 6*grid^2*density
   grid: 32          # cells per cube-face edge (angular spacing)
   # Dot geometry in classic viewport pixels, scaled by the viewport->render
@@ -202,7 +208,7 @@ hyperspace_tunnel:
   travel_speed: 13.0      # forward rate; 8 matches the reference shader
   rotation_speed: -2.3   # radians per second around the tunnel axis
   noise_scale: 0.5       # multiplier for all simplex octave frequencies
-  brightness: 1.0        # final linear emission before bloom and tonemapping
+  brightness: 1.0        # tunnel brightness, at the classic radiance
   highlight_strength: 3.0 # cyan-white noise highlights and cap light; independent of the blue body
   focal_length: 0.9     # tunnel perspective; larger values narrow the apparent opening
   twist: 0.1       # reference angular shear: 1.25 / (2 * pi)
@@ -210,7 +216,7 @@ hyperspace_tunnel:
   cap_falloff: 30.0        # exponential falloff outside the core
   mesh_ambient_strength: 0.7  # tunnel radiance contribution to HD cockpit diffuse lighting
   mesh_environment_roughness: 1.0 # 0 = sharp field, 1 = cosine-hemisphere diffuse convolution
-  mesh_key_strength: 0.15      # cap-colored HD cockpit directional/specular lighting
+  mesh_key_strength: 0.377     # cap-colored HD cockpit directional/specular lighting, a factor of the tunnel radiance
   dark_color_r: 0.0      # reference tunnel reaches black between noise structures
   dark_color_g: 0.0
   dark_color_b: 0.0
@@ -228,31 +234,65 @@ point_lights:
   cluster_depth_slices: 24
   cluster_debug: false       # occupancy view; debug-UI builds only
   # The game's lights (lasers, explosions, engines) are physical
-  # inverse-square sphere lights from the classic intensities, as bright
-  # as the classic law this many metres away, so brighter closer and
-  # dimmer farther.
+  # inverse-square sphere lights from the classic intensities. This many
+  # metres away they give what the classic law gives, converted by
+  # classic_lighting, so brighter closer and dimmer farther.
   match_distance_m: 27.5
   # Multiplies the distance where a light falls under 1/250 of a unit of
-  # illuminance and ends.
+  # illuminance after the exposure, and ends.
   range_scale: 1.0
   # Lights authored in models (such as the converted cockpits' interior
-  # light) are in candela: this is the scene illuminance per lux they give.
-  # 1/683 makes the scene's units Blender's W/m^2 (683 lm/W), so the white
-  # sun (about 2.5) matches a Blender sun of that strength. 0 disables them.
-  model_light_intensity: 0.0014641288
+  # light) and the headlight. They are in candela.
+  model_lights: true
+classic_lighting:
+  # Converts the classic game's lights (suns and other backdrops, the game's
+  # lights in the hangar, lasers, explosions, engines), which have no unit.
+  # This is the illuminance in W/m^2 of a classic light of brightness 1.
+  # 186 makes the white sun the real sun at the Earth's distance
+  # (127,000 lux). Above 0, up to 2000.
+  illuminance: 186.0
 lighting:
-  # Illuminance per unit of the game's sun intensity (also the hangar and
-  # environment-package lights). Pi shades as brightly as the classic
-  # renderer; 0.8 x pi is the tuned look.
-  sun_illuminance_scale: 2.513
   spec_geom_adapt: true
-  ambient_r: 0.08
-  ambient_g: 0.08
-  ambient_b: 0.08
+  # Ambient fill in W/m^2/sr, where no environment gives one. 5.9 gives a
+  # surface 10% of the white sun's light.
+  ambient_r: 5.9
+  ambient_g: 5.9
+  ambient_b: 5.9
   # Scale of all emitted light (illumination, screens, holograms, lasers,
   # glows, explosions). Emitters far brighter than lit surfaces are what
   # visibly glow through bloom.
   emissive_scale: 1.0
+exposure:
+  # Camera exposure in EV100: the image shows the scene (W/m^2 at 683 lm/W)
+  # as a camera at ISO 100 would. A higher value makes the image darker.
+  # A sunlit scene is about 15. EVs are -6 to 24.
+  # fixed: the image is exposed at ev100 - compensation.
+  # metered: the exposure is metered from the image each frame, and adapts.
+  mode: "metered"
+  ev100: 15.0          # fixed mode, and the anchor of partial metering
+  compensation: 0.0    # EV added to brightness, -10 to 10
+  # 0 = ev100, 1 = full metering. Partial keeps part of the difference
+  # between scenes: a dim region still looks dimmer.
+  metering: 0.6
+  min_ev100: 4.0
+  max_ev100: 18.0
+  # Adaptation rate per second, in each direction. The gap in EV shrinks as
+  # e^(-speed * t): at 1.5, 78% of it is closed after one second.
+  brighten_speed: 1.5  # when the scene gets darker
+  darken_speed: 3.0    # when the scene gets brighter
+  # The meter averages the EV of the weighted pixels between two
+  # percentiles. The high one leaves out the sun disc and laser bolts.
+  low_percent: 10.0
+  high_percent: 90.0
+  # Weight of pixels with no geometry (sky, backdrops, effects over empty
+  # space), so that black space doesn't decide the exposure of a ship.
+  sky_weight: 0.1
+  # Weight of geometry nearer than near_distance metres: the cockpit, so
+  # that its dark interior doesn't decide the exposure of the view outside.
+  near_weight: 0.1
+  near_distance: 5.0
+  edge_weight: 0.25    # weight at the screen's corners; 1 at the centre
+  channel: "luminance" # luminance, or max: the largest of r, g and b
 bloom:
   # Fraction of the scene's light the bloom scatters (no threshold), 0 to 1.
   # The scattered light leaves its source, so lit surfaces do not brighten.

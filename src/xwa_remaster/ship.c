@@ -227,9 +227,12 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 		return mesh;
 	}
 
+	/* The OPT's emission is classic, shown at the classic radiance. A mesh
+	 * keeps the radiance it was built with. */
 	char opt_error[256];
-	if (!XwaRemasterOptMesh_Build(Aeron_GetVfs(), key, s_opt_smooth_angle_degrees, s_opt_emissive_strength,
-								  &model, opt_error, sizeof opt_error)) {
+	if (!XwaRemasterOptMesh_Build(Aeron_GetVfs(), key, s_opt_smooth_angle_degrees,
+								  s_opt_emissive_strength * XwaRemaster_ClassicRadiance(), &model, opt_error,
+								  sizeof opt_error)) {
 		Aeron_LogWarn("xwa.remaster", "mesh: OPT load failed '%s': %s", key, opt_error);
 		ship_set_failure(cmd, "Ship model '%s': OPT load failed: %s", key, opt_error);
 		return NULL;
@@ -478,7 +481,9 @@ AeronSceneMesh* XwaRemasterShip_MeshForName(const char* name) {
 	return XwaRemasterShip_MeshForNameWithSource(name, NULL);
 }
 
-float XwaRemasterShip_OptProjectileEmissiveStrength(void) { return s_opt_projectile_emissive_strength; }
+float XwaRemasterShip_OptProjectileEmissiveStrength(void) {
+	return s_opt_projectile_emissive_strength * XwaRemaster_ClassicRadiance();
+}
 
 AeronEffectAtlas* XwaRemasterShip_EffectAtlas(void) {
 	if (!s_effect_atlas) {
@@ -668,11 +673,10 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* l
 								   g_pbr_tuning.debug_metallic, g_pbr_tuning.debug_roughness);
 	AeronScene_SetBackfaceFill(scene, g_backface_fill);
 
-	/* HD relight: authored ambient fill (tuning.ambient, linear) plus
-	 * sun illuminance = linear light x sun_illuminance_scale. The game state
-	 * contributes the art direction (light directions, colors, relative
-	 * intensities); the response curve belongs to the shading and
-	 * present chain. */
+	/* HD relight: authored ambient fill (tuning.ambient, radiance) plus the
+	 * directional lights' illuminance. The game state contributes the art
+	 * direction (light directions, colors, relative intensities); the
+	 * response curve belongs to the exposure and the present chain. */
 
 	/* The FS lights in the space the instances were submitted in:
 	 * world-space instances pass cam_rows = NULL (light dirs stay
@@ -774,16 +778,12 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* l
 			d[1] /= len;
 			d[2] /= len;
 		}
-		float col[3];
-		for (int c = 0; c < 3; c++) {
-			col[c] = l->color[c] * g_pbr_tuning.sun_illuminance_scale;
-		}
 		if (li == 0) {
 			memcpy(env.directional_dir, d, sizeof d);
-			memcpy(env.sun_color, col, sizeof col);
+			memcpy(env.sun_color, l->color, sizeof env.sun_color);
 		} else {
 			memcpy(env.extra_dir[li - 1], d, sizeof d);
-			memcpy(env.extra_col[li - 1], col, sizeof col);
+			memcpy(env.extra_col[li - 1], l->color, 3 * sizeof(float));
 		}
 	}
 	AeronScene_SetFrameUniformData(scene, AERON_SHADER_STAGE_FRAGMENT, 1, &env, sizeof env);
@@ -1458,22 +1458,24 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 	}
 }
 
-/* Point lights end under this illuminance. The window has already faded
- * the light to almost nothing there, and a shorter range keeps fewer
- * lights per cluster; even in a dark region, 1/250 instead of 1/1000
- * changes no pixel by more than a few levels. */
+/* Point lights end under this illuminance after the exposure. The window
+ * has already faded the light to almost nothing there, and a shorter range
+ * keeps fewer lights per cluster; even in a dark region, 1/250 instead of
+ * 1/1000 changes no pixel by more than a few levels. */
 #define SHIP_POINT_LIGHT_CUTOFF 0.004f
 
 int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float match_distance_m, float range_scale,
-									AeronSceneLight* out) {
-	if (!light || !out) {
+									float exposure, AeronSceneLight* out) {
+	if (!light || !out || !(exposure > 0.0f)) {
 		return 0;
 	}
-	/* The classic law lights a texture by 0.5 * c / d, and the Lambert
-	 * BRDF by I / (pi * d^2): equal at the match distance D (world units)
-	 * when I = 0.5 * c * D * pi. */
+	/* The classic law lights a texture by 0.5 * c / d, as a classic
+	 * directional light of brightness 0.5 * c / d would. Such a light gives
+	 * an illuminance of G times its brightness (the classic light
+	 * calibration), and a point light I / d^2: equal at the match distance D
+	 * (world units) when I = 0.5 * c * D * G. */
 	const float distance_m = light->match_distance_m > 0.0f ? light->match_distance_m : match_distance_m;
-	const float scale = 0.5f * distance_m * AERON_OPT_UNITS_PER_METER * 3.14159265f;
+	const float scale = 0.5f * distance_m * AERON_OPT_UNITS_PER_METER * XwaRemaster_ClassicLightIlluminance();
 	float peak = 0.0f;
 	memset(out, 0, sizeof *out);
 	for (int c = 0; c < 3; c++) {
@@ -1484,7 +1486,7 @@ int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float match_
 			peak = out->color[c];
 		}
 	}
-	out->radius = sqrtf(peak / SHIP_POINT_LIGHT_CUTOFF) * range_scale;
+	out->radius = sqrtf(peak * exposure / SHIP_POINT_LIGHT_CUTOFF) * range_scale;
 	out->source_radius = XWA_SHIP_POINT_LIGHT_RADIUS_M * AERON_OPT_UNITS_PER_METER;
 	return peak > 0.0f && isfinite(peak) && out->radius > 0.0f && isfinite(out->radius) &&
 		   isfinite(out->pos[0]) && isfinite(out->pos[1]) && isfinite(out->pos[2]);

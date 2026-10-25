@@ -6,6 +6,7 @@
 #include "aeron/collision/face_bvh.h"
 #include "aeron/scene/mesh_overlay.h"
 #include "xwa_remaster/color.h"
+#include "xwa_remaster/scene_lights.h"
 #include "xwa_remaster/ship.h"
 
 #include <math.h>
@@ -427,8 +428,10 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 		overlay.uv_rect[2] = blast ? blast_rect[2] : texture_frame.u1;
 		overlay.uv_rect[3] = blast ? blast_rect[3] : texture_frame.v1;
 		overlay.texture_clamp = (uint8_t)blast;
+		/* The mark is a classic image, shown at the classic radiance. */
 		const float mark_emissive_strength = mark->pool_kind == 0 ? emissive_strength : 1.0f;
-		overlay.color[0] = overlay.color[1] = overlay.color[2] = mark_emissive_strength;
+		overlay.color[0] = overlay.color[1] = overlay.color[2] =
+			mark_emissive_strength * XwaRemaster_ClassicRadiance();
 		overlay.color[3] = 1.0f;
 		if (mark->tint != 0) {
 			/* The classic pass colour modulates the texture. */

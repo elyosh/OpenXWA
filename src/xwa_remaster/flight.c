@@ -70,6 +70,14 @@ enum {
 	FL_FSR_RESET_UNSPECIFIED = 1u << 21,
 };
 
+/* The resets that are cuts for the eye too, where the metered exposure
+ * takes its target at once instead of adapting. Region changes, hyperspace
+ * and the hangar door adapt. */
+#define FL_EXPOSURE_SNAP_REASONS                                                                             \
+	(FL_FSR_RESET_INITIAL | FL_FSR_RESET_NO_PREVIOUS_SNAPSHOT | FL_FSR_RESET_PREVIOUS_MAP |                  \
+	 FL_FSR_RESET_EXTERNAL_VIEW_CHANGE | FL_FSR_RESET_FILM_OVERLAY_CHANGE |                                  \
+	 FL_FSR_RESET_GAME_TIME_ROLLBACK | FL_FSR_RESET_COCKPIT_MODEL | FL_FSR_RESET_RENDER_RESUMED)
+
 #define FL_MAX_BACKDROP_QUADS (XWA_SNAP_MAX_BACKDROPS * (XWA_SNAP_MAX_STRIP_COORDS - 1))
 typedef struct FlBackdropQuad {
 	float corners[4][3];
@@ -212,6 +220,8 @@ static struct {
 	int shadow_debug_atlas_cascade;
 	XwaFlightHangarLightingParams hangar_lighting;
 	XwaFlightHangarLightingParams hangar_lighting_default;
+	XwaFlightExposureParams exposure;
+	XwaFlightExposureParams exposure_default;
 	/* Point-light calibration knobs (same lifecycle as ssao). */
 	XwaFlightPointLightParams plight;
 	XwaFlightPointLightParams plight_default;
@@ -458,6 +468,9 @@ static void fl_draw_before_opaque(AeronCommandBuffer* command_buffer, AeronRende
 static void fl_request_fsr_reset(uint32_t reasons) {
 	s.fsr_reset_pending = 1;
 	s.fsr_reset_reasons |= reasons ? reasons : FL_FSR_RESET_UNSPECIFIED;
+	if ((reasons & FL_EXPOSURE_SNAP_REASONS) && s.scene) {
+		AeronScene_SnapExposure(s.scene);
+	}
 }
 
 static void fl_append_fsr_reset_reason(char* text, size_t capacity, const char* reason) {
@@ -555,9 +568,21 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"hangar_lighting.ambient_ceiling",
 		"hangar_lighting.ambient_sides",
 		"hangar_lighting.ambient_floor",
+		"exposure.ev100",
+		"exposure.compensation",
+		"exposure.metering",
+		"exposure.min_ev100",
+		"exposure.max_ev100",
+		"exposure.brighten_speed",
+		"exposure.darken_speed",
+		"exposure.low_percent",
+		"exposure.high_percent",
+		"exposure.sky_weight",
+		"exposure.near_weight",
+		"exposure.near_distance",
+		"exposure.edge_weight",
 		"point_lights.match_distance_m",
 		"point_lights.range_scale",
-		"point_lights.model_light_intensity",
 		"starfield.exposure",
 		"starfield.brightness",
 		"starfield.density",
@@ -589,7 +614,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"hyperspace_tunnel.cap_color_r",
 		"hyperspace_tunnel.cap_color_g",
 		"hyperspace_tunnel.cap_color_b",
-		"lighting.sun_illuminance_scale",
+		"classic_lighting.illuminance",
 		"lighting.ambient_r",
 		"lighting.ambient_g",
 		"lighting.ambient_b",
@@ -608,9 +633,12 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"motion_blur.camera_blur",       "motion_blur.pause_keep_blur", "motion_blur.velocity_viz",
 		"texture_filtering.anisotropic", "hangar_lighting.enabled",     "lighting.spec_geom_adapt",
 		"dynamic_cockpit.enabled",       "dynamic_cockpit.classic_hud", "dynamic_cockpit.holograms",
+		"point_lights.model_lights",
 	};
 	static const char* strings[] = {
 		"temporal_upscaling.mode",
+		"exposure.mode",
+		"exposure.channel",
 	};
 	for (size_t i = 0; i < sizeof ints / sizeof ints[0]; i++) {
 		if (!fl_cfg_has_type(config, ints[i], AERON_CONFIG_INT)) {
@@ -639,18 +667,46 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 	return 1;
 }
 
+/* Largest authored light values: illuminance in W/m^2 (ten times the sun at
+ * the Earth's distance) and radiance in W/m^2/sr. */
+#define FL_ILLUMINANCE_MAX 2000.0f
+#define FL_RADIANCE_MAX 1000.0f
+
 static int fl_hangar_lighting_config_valid(const XwaFlightHangarLightingParams* p, float direction_length) {
 	return direction_length > 0.0001f && isfinite(direction_length) && p->intensity >= 0.0f &&
-		   p->intensity <= 4.0f && p->color[0] >= 0.0f && p->color[0] <= 4.0f && p->color[1] >= 0.0f &&
-		   p->color[1] <= 4.0f && p->color[2] >= 0.0f && p->color[2] <= 4.0f && p->ambient_ceiling >= 0.0f &&
-		   p->ambient_ceiling <= 4.0f && p->ambient_sides >= 0.0f && p->ambient_sides <= 4.0f &&
-		   p->ambient_floor >= 0.0f && p->ambient_floor <= 4.0f;
+		   p->intensity <= FL_ILLUMINANCE_MAX && p->color[0] >= 0.0f && p->color[0] <= 4.0f &&
+		   p->color[1] >= 0.0f && p->color[1] <= 4.0f && p->color[2] >= 0.0f && p->color[2] <= 4.0f &&
+		   p->ambient_ceiling >= 0.0f && p->ambient_ceiling <= FL_RADIANCE_MAX && p->ambient_sides >= 0.0f &&
+		   p->ambient_sides <= FL_RADIANCE_MAX && p->ambient_floor >= 0.0f &&
+		   p->ambient_floor <= FL_RADIANCE_MAX;
+}
+
+#define FL_EXPOSURE_EV100_MIN -6.0f
+#define FL_EXPOSURE_EV100_MAX 24.0f
+#define FL_EXPOSURE_COMPENSATION_MAX 10.0f
+#define FL_EXPOSURE_SPEED_MAX 20.0f
+#define FL_EXPOSURE_NEAR_MAX 100.0f
+
+static int fl_in_range(float v, float lo, float hi) { return isfinite(v) && v >= lo && v <= hi; }
+
+static int fl_exposure_config_valid(const XwaFlightExposureParams* p) {
+	return fl_in_range(p->ev100, FL_EXPOSURE_EV100_MIN, FL_EXPOSURE_EV100_MAX) &&
+		   fl_in_range(p->compensation, -FL_EXPOSURE_COMPENSATION_MAX, FL_EXPOSURE_COMPENSATION_MAX) &&
+		   fl_in_range(p->metering, 0.0f, 1.0f) &&
+		   fl_in_range(p->min_ev100, FL_EXPOSURE_EV100_MIN, FL_EXPOSURE_EV100_MAX) &&
+		   fl_in_range(p->max_ev100, p->min_ev100, FL_EXPOSURE_EV100_MAX) &&
+		   fl_in_range(p->brighten_speed, 0.0f, FL_EXPOSURE_SPEED_MAX) && p->brighten_speed > 0.0f &&
+		   fl_in_range(p->darken_speed, 0.0f, FL_EXPOSURE_SPEED_MAX) && p->darken_speed > 0.0f &&
+		   fl_in_range(p->low_percent, 0.0f, 100.0f) &&
+		   fl_in_range(p->high_percent, p->low_percent, 100.0f) && p->high_percent > p->low_percent &&
+		   fl_in_range(p->sky_weight, 0.0f, 1.0f) && fl_in_range(p->near_weight, 0.0f, 1.0f) &&
+		   fl_in_range(p->near_distance, 0.0f, FL_EXPOSURE_NEAR_MAX) &&
+		   fl_in_range(p->edge_weight, 0.0f, 1.0f);
 }
 
 static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
 	return p->cluster_depth_slices >= 4 && p->cluster_depth_slices <= 64 && isfinite(p->match_distance_m) &&
-		   p->match_distance_m > 0.0f && isfinite(p->range_scale) && p->range_scale > 0.0f &&
-		   isfinite(p->model_light_intensity) && p->model_light_intensity >= 0.0f;
+		   p->match_distance_m > 0.0f && isfinite(p->range_scale) && p->range_scale > 0.0f;
 }
 
 static int fl_sky_config_valid(void) {
@@ -744,8 +800,7 @@ static int fl_load_hyperspace_config(const AeronConfigFile* config, const char* 
 }
 
 static int fl_pbr_config_valid(const XwaShipPbrTuning* p) {
-	return isfinite(p->sun_illuminance_scale) && p->sun_illuminance_scale >= 0.0f &&
-		   isfinite(p->ambient[0]) && p->ambient[0] >= 0.0f && isfinite(p->ambient[1]) &&
+	return isfinite(p->ambient[0]) && p->ambient[0] >= 0.0f && isfinite(p->ambient[1]) &&
 		   p->ambient[1] >= 0.0f && isfinite(p->ambient[2]) && p->ambient[2] >= 0.0f;
 }
 
@@ -848,13 +903,50 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	for (int axis = 0; axis < 3; axis++) {
 		s.hangar_lighting.direction[axis] /= hangar_direction_length;
 	}
+	const char* exposure_mode = AeronConfigFile_GetString(cf, "exposure.mode", "");
+	const char* exposure_channel = AeronConfigFile_GetString(cf, "exposure.channel", "");
+	s.exposure.metered = strcmp(exposure_mode, "metered") == 0;
+	s.exposure.max_channel = strcmp(exposure_channel, "max") == 0;
+	s.exposure.ev100 = (float)AeronConfigFile_GetFloat(cf, "exposure.ev100", 0.0);
+	s.exposure.compensation = (float)AeronConfigFile_GetFloat(cf, "exposure.compensation", 0.0);
+	s.exposure.metering = (float)AeronConfigFile_GetFloat(cf, "exposure.metering", 0.0);
+	s.exposure.min_ev100 = (float)AeronConfigFile_GetFloat(cf, "exposure.min_ev100", 0.0);
+	s.exposure.max_ev100 = (float)AeronConfigFile_GetFloat(cf, "exposure.max_ev100", 0.0);
+	s.exposure.brighten_speed = (float)AeronConfigFile_GetFloat(cf, "exposure.brighten_speed", 0.0);
+	s.exposure.darken_speed = (float)AeronConfigFile_GetFloat(cf, "exposure.darken_speed", 0.0);
+	s.exposure.low_percent = (float)AeronConfigFile_GetFloat(cf, "exposure.low_percent", 0.0);
+	s.exposure.high_percent = (float)AeronConfigFile_GetFloat(cf, "exposure.high_percent", 0.0);
+	s.exposure.sky_weight = (float)AeronConfigFile_GetFloat(cf, "exposure.sky_weight", 0.0);
+	s.exposure.near_weight = (float)AeronConfigFile_GetFloat(cf, "exposure.near_weight", 0.0);
+	s.exposure.near_distance = (float)AeronConfigFile_GetFloat(cf, "exposure.near_distance", 0.0);
+	s.exposure.edge_weight = (float)AeronConfigFile_GetFloat(cf, "exposure.edge_weight", 0.0);
+	s.exposure.freeze = 0;
+	if ((!s.exposure.metered && strcmp(exposure_mode, "fixed") != 0) ||
+		(!s.exposure.max_channel && strcmp(exposure_channel, "luminance") != 0)) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: exposure.mode must be fixed or metered, and exposure.channel "
+					   "luminance or max",
+					   path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	if (!fl_exposure_config_valid(&s.exposure)) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: invalid exposure settings: EVs between %g and %g with min_ev100 <= max_ev100, "
+					   "compensation within %g EV, metering and the weights between 0 and 1, speeds above 0 "
+					   "and up to %g, 0 <= low_percent < high_percent <= 100, and near_distance up to %g m",
+					   path, (double)FL_EXPOSURE_EV100_MIN, (double)FL_EXPOSURE_EV100_MAX,
+					   (double)FL_EXPOSURE_COMPENSATION_MAX, (double)FL_EXPOSURE_SPEED_MAX,
+					   (double)FL_EXPOSURE_NEAR_MAX);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
 	s.plight.enabled = AeronConfigFile_GetBool(cf, "point_lights.enabled", 0);
 	s.plight.cluster_depth_slices = (int)AeronConfigFile_GetInt(cf, "point_lights.cluster_depth_slices", 0);
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
 	s.plight.match_distance_m = (float)AeronConfigFile_GetFloat(cf, "point_lights.match_distance_m", 0.0);
 	s.plight.range_scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.range_scale", 0.0);
-	s.plight.model_light_intensity =
-		(float)AeronConfigFile_GetFloat(cf, "point_lights.model_light_intensity", 0.0);
+	s.plight.model_lights = AeronConfigFile_GetBool(cf, "point_lights.model_lights", 0);
 	if (!fl_point_lights_config_valid(&s.plight)) {
 		Aeron_LogError("xwa.remaster", "%s: invalid point_lights settings", path);
 		AeronConfigFile_Destroy(cf);
@@ -889,9 +981,19 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 
+	const float classic_light_illuminance =
+		(float)AeronConfigFile_GetFloat(cf, "classic_lighting.illuminance", 0.0);
+	if (!isfinite(classic_light_illuminance) || classic_light_illuminance <= 0.0f ||
+		classic_light_illuminance > FL_ILLUMINANCE_MAX) {
+		Aeron_LogError("xwa.remaster", "%s: classic_lighting.illuminance must be above 0 and at most %g",
+					   path, (double)FL_ILLUMINANCE_MAX);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	XwaRemaster_ConfigureClassicLightIlluminance(classic_light_illuminance);
+
 	XwaShipPbrTuning pbr;
 	memset(&pbr, 0, sizeof pbr);
-	pbr.sun_illuminance_scale = (float)AeronConfigFile_GetFloat(cf, "lighting.sun_illuminance_scale", 0.0);
 	pbr.spec_geom_adapt = AeronConfigFile_GetBool(cf, "lighting.spec_geom_adapt", 0) ? 1.0f : 0.0f;
 	pbr.ambient[0] = (float)AeronConfigFile_GetFloat(cf, "lighting.ambient_r", 0.0);
 	pbr.ambient[1] = (float)AeronConfigFile_GetFloat(cf, "lighting.ambient_g", 0.0);
@@ -996,6 +1098,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.ssao_default = s.ssao;
 	s.shadows_default = s.shadows;
 	s.hangar_lighting_default = s.hangar_lighting;
+	s.exposure_default = s.exposure;
 	s.plight_default = s.plight;
 	s.texture_filtering_default = s.texture_filtering;
 	s.hyperspace_params_default = s.hyperspace_params;
@@ -1192,13 +1295,13 @@ static void fl_sanitize_hangar_lighting(XwaFlightHangarLightingParams* params) {
 	} else {
 		memcpy(params->direction, s.hangar_lighting_default.direction, sizeof params->direction);
 	}
-	params->intensity = fminf(fmaxf(params->intensity, 0.0f), 4.0f);
+	params->intensity = fminf(fmaxf(params->intensity, 0.0f), FL_ILLUMINANCE_MAX);
 	for (int channel = 0; channel < 3; channel++) {
 		params->color[channel] = fminf(fmaxf(params->color[channel], 0.0f), 4.0f);
 	}
-	params->ambient_ceiling = fminf(fmaxf(params->ambient_ceiling, 0.0f), 4.0f);
-	params->ambient_sides = fminf(fmaxf(params->ambient_sides, 0.0f), 4.0f);
-	params->ambient_floor = fminf(fmaxf(params->ambient_floor, 0.0f), 4.0f);
+	params->ambient_ceiling = fminf(fmaxf(params->ambient_ceiling, 0.0f), FL_RADIANCE_MAX);
+	params->ambient_sides = fminf(fmaxf(params->ambient_sides, 0.0f), FL_RADIANCE_MAX);
+	params->ambient_floor = fminf(fmaxf(params->ambient_floor, 0.0f), FL_RADIANCE_MAX);
 }
 
 void XwaRemasterFlight_GetHangarLighting(XwaFlightHangarLightingParams* out) {
@@ -1220,6 +1323,55 @@ void XwaRemasterFlight_GetHangarLightingDefault(XwaFlightHangarLightingParams* o
 	if (out && fl_cfg_ensure()) {
 		*out = s.hangar_lighting_default;
 	}
+}
+
+void XwaRemasterFlight_GetExposure(XwaFlightExposureParams* out) {
+	if (out && fl_cfg_ensure()) {
+		*out = s.exposure;
+	}
+}
+
+void XwaRemasterFlight_SetExposure(const XwaFlightExposureParams* in) {
+	if (!in || !fl_cfg_ensure()) {
+		return;
+	}
+	XwaFlightExposureParams p = *in;
+	p.ev100 = fminf(fmaxf(p.ev100, FL_EXPOSURE_EV100_MIN), FL_EXPOSURE_EV100_MAX);
+	p.compensation =
+		fminf(fmaxf(p.compensation, -FL_EXPOSURE_COMPENSATION_MAX), FL_EXPOSURE_COMPENSATION_MAX);
+	p.metering = fminf(fmaxf(p.metering, 0.0f), 1.0f);
+	p.min_ev100 = fminf(fmaxf(p.min_ev100, FL_EXPOSURE_EV100_MIN), FL_EXPOSURE_EV100_MAX);
+	p.max_ev100 = fminf(fmaxf(p.max_ev100, p.min_ev100), FL_EXPOSURE_EV100_MAX);
+	p.brighten_speed = fminf(fmaxf(p.brighten_speed, 0.01f), FL_EXPOSURE_SPEED_MAX);
+	p.darken_speed = fminf(fmaxf(p.darken_speed, 0.01f), FL_EXPOSURE_SPEED_MAX);
+	p.low_percent = fminf(fmaxf(p.low_percent, 0.0f), 99.0f);
+	p.high_percent = fminf(fmaxf(p.high_percent, p.low_percent + 1.0f), 100.0f);
+	p.sky_weight = fminf(fmaxf(p.sky_weight, 0.0f), 1.0f);
+	p.near_weight = fminf(fmaxf(p.near_weight, 0.0f), 1.0f);
+	p.near_distance = fminf(fmaxf(p.near_distance, 0.0f), FL_EXPOSURE_NEAR_MAX);
+	p.edge_weight = fminf(fmaxf(p.edge_weight, 0.0f), 1.0f);
+	s.exposure = p;
+}
+
+void XwaRemasterFlight_GetExposureDefault(XwaFlightExposureParams* out) {
+	if (out && fl_cfg_ensure()) {
+		*out = s.exposure_default;
+	}
+}
+
+float XwaRemasterFlight_Exposure(void) {
+	if (!fl_cfg_ensure()) {
+		return 1.0f;
+	}
+	AeronSceneExposureReadout readout;
+	if (s.exposure.metered && s.scene && AeronScene_GetExposureReadout(s.scene, &readout)) {
+		return readout.exposure;
+	}
+	return AeronScenePresent_ExposureFromEv100(s.exposure.ev100 - s.exposure.compensation);
+}
+
+int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out) {
+	return out && s.scene && AeronScene_GetExposureReadout(s.scene, out);
 }
 
 void XwaRemasterFlight_GetPointLights(XwaFlightPointLightParams* out) {
@@ -3338,15 +3490,15 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
 
 /* The player craft's headlight (XwaHeadlight), converted as a light that a
  * GLB model authors in Blender: a one-sided light of P watts gives
- * P * 683 / pi candela straight ahead, and point_lights.model_light_intensity
- * turns candela into the scene's units. With an angle, it is a spot light
+ * P * 683 / pi candela straight ahead, which the scene takes at 683 lm/W
+ * (AERON_SCENE_LUMENS_PER_WATT). With an angle, it is a spot light
  * with the same intensity straight ahead, which fades from the nose out to
  * the angle. It starts at the seat's eye in every view, as the pulse lights
  * do, and points along the nose. The pool always keeps it. The hyperspace
  * tunnel doesn't add it. */
 static void fl_add_headlight(const XwaSnapshot* snap, const float player_bw[9], const float player_pos[3]) {
 	const XwaHeadlight* h = &snap->headlight;
-	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f) || !h->on || !player_bw) {
+	if (!s.plight.enabled || !s.plight.model_lights || !h->on || !player_bw) {
 		return;
 	}
 	const XwaCockpit* k = &snap->cockpit;
@@ -3374,7 +3526,7 @@ static void fl_add_headlight(const XwaSnapshot* snap, const float player_bw[9], 
 	light.direction.z = 1.0f;
 	light.spot_outer_angle = h->angle_degrees * (3.14159265f / 180.0f);
 	AeronSceneLight scene_light;
-	if (AeronScene_FlightLight(&light, transform, u, s.plight.model_light_intensity, &scene_light)) {
+	if (AeronScene_FlightLight(&light, transform, u, 1.0f / AERON_SCENE_LUMENS_PER_WATT, &scene_light)) {
 		fl_pool_add(&scene_light, 0, 1);
 	}
 }
@@ -3385,10 +3537,11 @@ static void fl_finalize_point_lights(void) {
 	if (!s.plight.enabled) {
 		return;
 	}
+	const float exposure = XwaRemasterFlight_Exposure();
 	for (uint32_t i = 0; i < s.pl_cand_count; i++) {
 		AeronSceneLight light;
 		if (!XwaRemasterShip_ScenePointLight(&s.pl_cand[i], s.plight.match_distance_m, s.plight.range_scale,
-											 &light)) {
+											 exposure, &light)) {
 			s.pl_invalid_count++;
 			continue;
 		}
@@ -3492,14 +3645,14 @@ static uint8_t fl_probe_set_owner(uint32_t i) {
 /* Lights authored in a model (AeronFlightLight), placed by its instance,
  * into the pool; `keep` always keeps them (the cockpit's). Their intensity
  * is authored in candela, so point_lights.match_distance_m does not apply;
- * point_lights.model_light_intensity converts it to the scene's units.
+ * the scene takes it at 683 lm/W (AERON_SCENE_LUMENS_PER_WATT).
  * `skip_baked` leaves out the lights baked into the model's probes, while
  * its probe set is placed. `variant` is the instance's variant index: a
  * light that names variants shines only with them. */
 static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transform[16],
 								const AeronSceneMeshTable* table, uint32_t variant, int keep,
 								int skip_baked) {
-	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f)) {
+	if (!s.plight.enabled || !s.plight.model_lights) {
 		return;
 	}
 	for (uint32_t i = 0; i < mesh->light_count; ++i) {
@@ -3508,7 +3661,7 @@ static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transfor
 			continue;
 		}
 		if (AeronScene_MeshLight(mesh, i, transform, AERON_OPT_UNITS_PER_METER, table, variant,
-								 s.plight.model_light_intensity, &light)) {
+								 1.0f / AERON_SCENE_LUMENS_PER_WATT, &light)) {
 			s.pl_model_count++;
 			fl_pool_add(&light, 1, keep);
 		}
@@ -3800,6 +3953,37 @@ static void fl_update_material_states(const XwaSnapshot* snap, float now) {
 	fl_state_onsets_update(&s.player_states, mask, fired, now);
 	const uint32_t forced = s.anim_override.enabled ? s.anim_override.state_mask : 0u;
 	fl_state_onsets_update(&s.override_states, forced, forced & ~s.override_states.mask, now);
+}
+
+/* Begins the scene's frame with its exposure, fixed or metered, and with
+ * the classic images (screens, glows, explosions) at the classic radiance. */
+static int fl_begin_scene(const AeronSceneCamera* camera) {
+	if (s.exposure.metered) {
+		const XwaFlightExposureParams* e = &s.exposure;
+		const AeronSceneAutoExposure meter = {
+			.ev100 = e->ev100,
+			.compensation = e->compensation,
+			.metering = e->metering,
+			.min_ev100 = e->min_ev100,
+			.max_ev100 = e->max_ev100,
+			.brighten_speed = e->brighten_speed,
+			.darken_speed = e->darken_speed,
+			.low_percent = e->low_percent,
+			.high_percent = e->high_percent,
+			.sky_weight = e->sky_weight,
+			.near_weight = e->near_weight,
+			.near_distance = e->near_distance,
+			.edge_weight = e->edge_weight,
+			.channel = e->max_channel ? AERON_SCENE_EXPOSURE_MAX : AERON_SCENE_EXPOSURE_LUMINANCE,
+			.freeze = e->freeze,
+		};
+		AeronScene_SetAutoExposure(s.scene, &meter);
+	} else {
+		AeronScene_SetAutoExposure(s.scene, NULL);
+		AeronScene_SetExposure(s.scene, XwaRemasterFlight_Exposure());
+	}
+	AeronScene_SetImageRadiance(s.scene, XwaRemaster_ClassicRadiance());
+	return AeronScene_Begin(s.scene, camera);
 }
 
 /* Sets the scene's animation clock from the snapshot and updates the
@@ -4153,8 +4337,13 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	Aeron_SetViewport(pass, &full_target);
 	Aeron_SetScissor(pass, &full_target);
 	static const float present_tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	/* The flight scene's exposure, on the GPU: metered from this frame. The
+	 * map keeps the CPU value. */
+	AeronTexture* const exposure_tex = s.map_present ? NULL : AeronScene_ExposureTexture(s.scene);
 	AeronScenePresentChain_Draw(chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
-								s.map_present ? 0.0f : AeronSceneBloom_Intensity(), s.rt_w, s.rt_h,
+								s.map_present ? 0.0f : AeronSceneBloom_Intensity(),
+								exposure_tex ? 1.0f : XwaRemasterFlight_Exposure(), exposure_tex, s.rt_w,
+								s.rt_h,
 								/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0);
 	if (s.suppress_hud) {
 		return;
@@ -4350,7 +4539,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	 * before returning to ordinary flight. */
 	fl_set_temporal(host_time_us, 0);
 	fl_set_animation_time(snap);
-	if (!AeronScene_Begin(s.scene, &flight_view->camera)) {
+	if (!fl_begin_scene(&flight_view->camera)) {
 		Aeron_CommandBufferSetFailure(cmd, "Hyperspace scene initialization failed");
 		s.snap = NULL;
 		return NULL;
@@ -4627,7 +4816,7 @@ static void fl_build_hangar_lighting(const XwaSnapshot* snap, FlSceneLighting* o
 	 * white key. Preserve state-driven hangar lighting such as carrier alarms. */
 	out->hangar_override = 1;
 	if (fl_is_default_hangar_lighting(snap)) {
-		/* The configured colour is sRGB and the intensity linear. */
+		/* The configured colour is sRGB, and the intensity is illuminance in W/m^2. */
 		memcpy(out->hangar_key.world_dir, s.hangar_lighting.direction, sizeof out->hangar_key.world_dir);
 		for (int channel = 0; channel < 3; channel++) {
 			out->hangar_key.color[channel] =
@@ -4641,15 +4830,14 @@ static void fl_build_hangar_lighting(const XwaSnapshot* snap, FlSceneLighting* o
 
 	const XwaRemasterDirLight* ambient_light =
 		XwaRemasterShip_SelectKeyDirectionalLight(out->lights, out->light_count);
+	/* The ambient takes the key light's hue, not its brightness. */
 	float ambient_color[3] = { 1.0f, 1.0f, 1.0f };
 	if (ambient_light) {
-		const float* radiance = ambient_light->color;
-		const float peak = fmaxf(radiance[0], fmaxf(radiance[1], radiance[2]));
+		const float* color = ambient_light->color;
+		const float peak = fmaxf(color[0], fmaxf(color[1], color[2]));
 		if (peak > 0.0f) {
-			const float influence = fminf(peak, 1.0f);
 			for (int channel = 0; channel < 3; channel++) {
-				const float hue = radiance[channel] / peak;
-				ambient_color[channel] = 1.0f + (hue - 1.0f) * influence;
+				ambient_color[channel] = color[channel] / peak;
 			}
 		}
 	}
@@ -4764,7 +4952,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	XwaRemasterTrails_Prepare(s.trails, cmd, snap, assets, &effect_view);
 
 	fl_set_animation_time(snap);
-	if (!AeronScene_Begin(s.scene, &view->camera)) {
+	if (!fl_begin_scene(&view->camera)) {
 		s.snap = NULL;
 		return NULL;
 	}
@@ -4900,7 +5088,8 @@ uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float cro
 		}
 		if (scene) {
 			fl_submit_view_quad_to(&target, AERON_SCENE_BILLBOARD_STAGE_SKY, quads[i].corners, quads[i].uvs,
-								   &quads[i].ref, 0xffffffffu, NULL, 0.0f, NULL, 1.0f);
+								   &quads[i].ref, 0xffffffffu, NULL, 0.0f, NULL,
+								   XwaRemaster_ClassicRadiance());
 		}
 	}
 	if (out_max_tan) {
@@ -5148,7 +5337,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	}
 	fl_set_temporal(host_time_us, 1);
 	fl_set_animation_time(snap);
-	if (!AeronScene_Begin(s.scene, &flight_view.camera)) {
+	if (!fl_begin_scene(&flight_view.camera)) {
 		Aeron_CommandBufferSetFailure(cmd, "Flight scene initialization failed");
 		s.snap = NULL;
 		return NULL;
@@ -5231,9 +5420,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * both OFF (states 0x612/0x2612); the SKY stage's far-depth GE test
 	 * against the cleared / prepass buffer reproduces that (behind all
 	 * geometry, visible elsewhere). */
+	const float backdrop_radiance = XwaRemaster_ClassicRadiance();
 	for (uint32_t i = 0; i < s.bd_count; i++) {
-		fl_submit_view_quad(AERON_SCENE_BILLBOARD_STAGE_SKY, s.bd_quads[i].corners, s.bd_quads[i].uvs,
-							&s.bd_quads[i].ref, 0xffffffffu, NULL);
+		fl_submit_view_quad_ex(AERON_SCENE_BILLBOARD_STAGE_SKY, s.bd_quads[i].corners, s.bd_quads[i].uvs,
+							   &s.bd_quads[i].ref, 0xffffffffu, NULL, 0.0f, NULL, backdrop_radiance);
 	}
 	/* Post stack: SSAO per the render config + motion blur (both
 	 * activate the scene's depth/normal(+velocity) prepass + forward

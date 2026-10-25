@@ -33,6 +33,7 @@
 #include "aeron/scene/scene3d.h"
 #include "aeron/time.h"
 #include "xwa_remaster/flight.h"
+#include "xwa_remaster/scene_lights.h"
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/skins.h"
 #include "xwa_remaster/xwa_remaster.h"
@@ -149,6 +150,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	cam.near_z = PREVIEW_NEAR_Z;
 	/* The frontend has no game clock: animations follow the host's. */
 	AeronScene_SetAnimationTime(s.scene, (double)Aeron_NowUs() * 1.0e-6);
+	AeronScene_SetImageRadiance(s.scene, XwaRemaster_ClassicRadiance());
 	if (!AeronScene_Begin(s.scene, &cam)) {
 		Aeron_CommandBufferSetFailure(cmd, "Model-preview scene initialization failed");
 		return NULL;
@@ -289,7 +291,8 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	}
 	static const float tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	AeronScenePresentChain_Draw(s.chain, pp, scene_tex, s.chain_sampler, bloom_tex, bloom_intensity,
-								PREVIEW_RT_W, PREVIEW_RT_H, /*bar_y_uv=*/1.0f, tint,
+								XwaRemasterFlight_Exposure(), NULL, PREVIEW_RT_W, PREVIEW_RT_H, /*bar_y_uv=*/1.0f,
+								tint,
 								/*src_coverage=*/1);
 	Aeron_EndRenderPass(pp);
 	return Aeron_RenderTargetGetTexture(s.present[slot]);

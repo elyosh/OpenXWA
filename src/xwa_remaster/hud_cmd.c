@@ -14,6 +14,7 @@
 #include "xwa_remaster/glow_marks.h"
 #include "xwa_remaster/hud_cmd_math.h"
 #include "xwa_remaster/hud_layout.h"
+#include "xwa_remaster/scene_lights.h"
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/skins.h"
 #include "xwa_remaster/xwa_remaster.h"
@@ -447,7 +448,8 @@ static uint32_t cmd_finalize_point_lights(void) {
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < s_cmd.point_candidate_count; i++) {
 		if (XwaRemasterShip_ScenePointLight(&s_cmd.point_candidates[i], config.match_distance_m,
-											config.range_scale, &s_cmd.point_scene[count]))
+											config.range_scale, XwaRemasterFlight_Exposure(),
+											&s_cmd.point_scene[count]))
 			count++;
 	}
 	s_cmd.point_candidate_count = count;
@@ -604,6 +606,7 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	XwaRemasterParticles_Prepare(s_cmd.particles, cmd, snapshot, NULL, assets, &effect_view, NULL);
 	XwaRemasterTrails_Prepare(s_cmd.trails, cmd, snapshot, assets, &effect_view);
 	AeronScene_SetAnimationTime(s_cmd.scene, (double)snapshot->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS);
+	AeronScene_SetImageRadiance(s_cmd.scene, XwaRemaster_ClassicRadiance());
 	if (!AeronScene_Begin(s_cmd.scene, &camera)) {
 		Aeron_CommandBufferSetFailure(cmd, "HUD CMD scene initialization failed");
 		return;
@@ -708,8 +711,9 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	if (!pass)
 		return;
 	static const float tint[4] = { 1, 1, 1, 1 };
-	AeronScenePresentChain_Draw(s_cmd.present, pass, scene_texture, s_cmd.sampler, NULL, 0.0f, width, height,
-								/*bar_y_uv=*/1.0f, tint, /*src_coverage=*/1);
+	AeronScenePresentChain_Draw(s_cmd.present, pass, scene_texture, s_cmd.sampler, NULL, 0.0f,
+								XwaRemasterFlight_Exposure(), NULL, width, height, /*bar_y_uv=*/1.0f, tint,
+								/*src_coverage=*/1);
 	Aeron_EndRenderPass(pass);
 	s_cmd.output = Aeron_RenderTargetGetTexture(s_cmd.present_rt);
 	s_cmd.prepared.valid = s_cmd.output != NULL;

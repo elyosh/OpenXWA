@@ -3,6 +3,7 @@
 #include "xwa_remaster/sky_stars.h"
 
 #include "aeron/aeron.h"
+#include "xwa_remaster/scene_lights.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -143,7 +144,8 @@ int XwaRemasterSkyStars_Prepare(XwaRemasterSkyStars* stars, const AeronScene3D* 
 	stars->vertex_uniform.geom[1] = params->pixel_pitch_px * pixel_scale;
 	stars->vertex_uniform.geom[2] = (float)params->game_time_ticks;
 	stars->vertex_uniform.geom[3] = params->flare_strength;
-	stars->vertex_uniform.tone[0] = exposure * params->brightness;
+	/* Stars are classic image values, shown at the classic radiance. */
+	stars->vertex_uniform.tone[0] = exposure * params->brightness * XwaRemaster_ClassicRadiance();
 	stars->vertex_uniform.tone[1] = 1.0f;
 
 	stars->fragment_uniform[0] = params->core_radius_px * pixel_scale;
