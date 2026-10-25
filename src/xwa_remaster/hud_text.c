@@ -428,10 +428,18 @@ void XwaRemasterHudText_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex pr
 /* Builds the atlases of the flight font from flight/fonts/fonts.yaml, for the
  * sizes that the prepared glyphs are drawn at. */
 static void text_prepare_faces(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, const XwaHudLayout* layout,
-							   float output_scale) {
+							   const XwaHudLayoutProfile* profile, float output_scale) {
 	XwaRemasterFlightFace face;
 	int last_tier = -1;
 	float last_size = -1.0f;
+	/* Each tier at its font size too, the size of most of its text, so that
+	 * the first text of a tier later in the flight doesn't wait for its
+	 * atlas. */
+	const float source_pixel_scale = (float)profile->reference_h / text_prepared.screen_h;
+	for (int tier = 0; tier < 3; tier++) {
+		const float size_px = XwaRemasterText_FlightTierFontSize(tier) * source_pixel_scale * output_scale;
+		XwaRemasterText_PrepareFlightFace(cmd, assets, tier, size_px);
+	}
 	if (text_prepared.arrow_glyph_count &&
 		XwaRemasterText_FlightFaceMetrics(text_prepared.arrow_tier, &face)) {
 		for (uint16_t i = 0; i < text_prepared.arrow_glyph_count; i++) {
@@ -518,7 +526,7 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 		(void)AeronDrawList_Prepare(text_list, cmd);
 		return;
 	}
-	text_prepare_faces(cmd, assets, layout, output_scale);
+	text_prepare_faces(cmd, assets, layout, profile, output_scale);
 	XwaRemasterHud_BeginRenderPhase();
 	if (text_prepared.arrow_glyph_count) {
 		const AeronFontAtlas* font = XwaRemasterHud_FlightFont(text_prepared.arrow_tier, NULL);
