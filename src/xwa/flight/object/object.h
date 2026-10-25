@@ -406,6 +406,14 @@ struct ObjectRecord {
 	MobileObject* mobj;
 };
 
+#ifdef XWA_MODERN
+/* The most slots the object table can have. A reference below 0x8000 is an
+ * object slot and one of 0x8000 or more is a mission point, and many fields
+ * hold slots in 16-bit signed values, so the table can have at most 32768
+ * slots. The arrays indexed by slot have this many entries. */
+#define XWA_MAX_OBJECTS 32768
+#endif
+
 extern uint32_t g_objScanStart;
 extern uint32_t g_localTransientSlotStart;
 extern uint32_t g_localTransientSlotEnd;

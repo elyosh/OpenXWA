@@ -10,7 +10,11 @@ extern "C" {
 extern int g_paifightSearchOriginX;
 extern int g_paifightSearchOriginY;
 extern int g_paifightSearchOriginZ;
+#ifdef XWA_MODERN
+extern uint8_t g_paifightGunnerTargetCandidateSet[2 * XWA_MAX_OBJECTS];
+#else
 extern uint8_t g_paifightGunnerTargetCandidateSet[3328];
+#endif
 
 char paifight_scanfortargetorder(void);
 char paifight_checkescortorder(void);

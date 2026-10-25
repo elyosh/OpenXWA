@@ -484,8 +484,10 @@ typedef enum XwaFlightObjectList {
 	XWA_SNAP_LIST_COUNT
 } XwaFlightObjectList;
 
-/* The map's own list of objects; objects past it are dropped and counted. */
-#define XWA_SNAP_MAX_FLIGHT_MAP_OBJECTS 1664
+/* The map's own list of objects; objects past it are dropped and counted.
+ * The largest region of the mods has about 300 craft, so this leaves room for
+ * their shots and explosions. */
+#define XWA_SNAP_MAX_FLIGHT_MAP_OBJECTS 4096
 #define XWA_SNAP_FLIGHT_MAP_LABEL_BYTES 65535
 
 typedef enum XwaFlightMapRenderKind {
@@ -860,8 +862,11 @@ typedef struct XwaParticleEffect {
 
 /* ---- HUD channel --------------------------------------------------- */
 
-#define XWA_SNAP_MAX_HUD_RADAR_BLIPS 96
-#define XWA_SNAP_MAX_HUD_TARGET_BOXES 512
+/* Both radar scopes, with HUD_RADAR_MAX_BLIPS blips each. */
+#define XWA_SNAP_MAX_HUD_RADAR_BLIPS 2048
+/* The boxes of a frame: one for each craft that the HUD or the map boxes,
+ * and the target's components. */
+#define XWA_SNAP_MAX_HUD_TARGET_BOXES 2048
 #define XWA_SNAP_MAX_HUD_GLYPHS 4096
 #define XWA_SNAP_MAX_HUD_PANES 22
 
@@ -1129,8 +1134,10 @@ typedef struct XwaHudState {
 #define XWA_SNAP_MAX_SURFACE_EVENTS 64
 #define XWA_SNAP_MAX_BACKDROPS 32  /* engine: 32 records per region */
 #define XWA_SNAP_MAX_GLOW_MARKS 56 /* exact: 24 animated + 32 blast */
-#define XWA_SNAP_MAX_TRAIL_EMITTERS 512
-#define XWA_SNAP_MAX_TRAIL_POINTS 4096
+/* Warheads have trails, and a mod's larger projectile counts can have
+ * hundreds of warheads alive in a region. */
+#define XWA_SNAP_MAX_TRAIL_EMITTERS 2048
+#define XWA_SNAP_MAX_TRAIL_POINTS 16384
 #define XWA_SNAP_MAX_TRAIL_POINTS_PER_EMITTER 256
 #define XWA_SNAP_MAX_PARTICLE_EFFECTS 36
 #define XWA_SNAP_MAX_PARTICLES 3600

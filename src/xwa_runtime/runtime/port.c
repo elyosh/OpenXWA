@@ -45,6 +45,7 @@
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/mission_backdrops.h"
+#include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/shield_recharge.h"
@@ -158,6 +159,7 @@ int XwaPort_Init(void) {
 	XwaMissionBackdrops_Init();
 	XwaMissionSettings_Init();
 	XwaDocking_Init();
+	XwaObjectLimits_Init();
 	XwaHeadlights_Init();
 	XwaCraftDefinitions_Apply();
 	XwaModelSource_Init();

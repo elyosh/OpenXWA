@@ -17,7 +17,13 @@ int g_paifightSearchOriginY;
 int g_paifightSearchOriginZ;
 
 // GLOBAL: XWA 0x9AF180
+#ifdef XWA_MODERN
+/* Two entries for each slot of the object table, which can have more than
+ * the original's 1664 slots. */
+uint8_t g_paifightGunnerTargetCandidateSet[2 * XWA_MAX_OBJECTS];
+#else
 uint8_t g_paifightGunnerTargetCandidateSet[3328];
+#endif
 
 // GLOBAL: XWA 0x5B6DE8
 static const unsigned int g_aiFighterShootMaxRangeBySkill[3] = { 0x6000, 0x8000, 0xa000 };

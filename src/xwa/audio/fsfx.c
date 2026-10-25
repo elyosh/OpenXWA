@@ -28,6 +28,7 @@
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_sounds.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -96,7 +97,13 @@ int g_fsfxVoiceQueueSfxSlot[128];
 // GLOBAL: XWA 0x9E8D40
 int g_fsfxVoiceQueueObjIdx[128];
 // GLOBAL: XWA 0x9CFD60
+#ifdef XWA_MODERN
+/* One entry for each slot of the object table, which can have more than the
+ * original's 1664 slots. */
+int g_fsfxTacOfficerLastSpeakSecondsByObj[XWA_MAX_OBJECTS];
+#else
 int g_fsfxTacOfficerLastSpeakSecondsByObj[1664];
+#endif
 // GLOBAL: XWA 0x9D1AA0
 uint8_t g_fsfxVoiceLinePlayCounts[12][196];
 // GLOBAL: XWA 0x5B3EF8
@@ -2981,7 +2988,14 @@ int fsfx_PlaySound(int sfxSlot, unsigned int sourceObjOrPointRef, unsigned int p
 		}
 	}
 
+#ifdef XWA_MODERN
+	/* The overlapping_fly_by_sounds rule lets the fly-by and engine wash
+	 * sounds of several craft play at once. */
+	if (!XwaMissionSettings_OverlappingFlyBySounds() && (unsigned int)sfxSlot >= 101u &&
+		(unsigned int)sfxSlot <= 114u) {
+#else
 	if ((unsigned int)sfxSlot >= 101u && (unsigned int)sfxSlot <= 114u) {
+#endif
 		if (Sound_CountPlayingInstances(g_sfxIds[sfxSlot]) != 0) {
 			return 0;
 		}

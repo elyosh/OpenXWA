@@ -6400,8 +6400,9 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 				}
 #ifdef XWA_MODERN
 				/* Version 6: the port's state block follows the header
-				   (XwaFilmState_Write). */
-				headerValue = 6;
+				   (XwaFilmState_Write). Version 7: the object table's layout
+				   comes before the world state (XwaFilmState_WriteLayout). */
+				headerValue = 7;
 #else
 				headerValue = 5;
 #endif
@@ -6514,6 +6515,9 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 					}
 
 					Flight_SaveWorldState();
+#ifdef XWA_MODERN
+					XwaFilmState_WriteLayout();
+#endif
 					loopIdx = (uint32_t)g_worldStateSize;
 					Film_WriteBytesBuffered(&loopIdx, sizeof(loopIdx));
 					Film_WriteBytesBuffered(g_worldStateBuffer, loopIdx);
@@ -6653,13 +6657,25 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 				g_worldStateDupBuffer = (uint8_t*)Memory_LockHandle(g_worldStateDupHandle);
 			}
 
+#ifdef XWA_MODERN
+			/* A world state saved with another layout of the object table
+			   can't be restored into this one. The playback stops, and the
+			   film reads nothing more. */
+			if (!XwaFilmState_ReadLayout((uint16_t)g_filmVersion > 6u)) {
+				g_filmPlaybackMode = 3;
+			}
+			if (g_filmPlaybackMode != 3) {
+				Film_ReadBytes(&loopIdx, sizeof(loopIdx));
+				Film_ReadBytes(g_worldStateBuffer, loopIdx);
+				/* The restore reads the extension block up to this size. */
+				g_worldStateSize = (int)loopIdx;
+				Flight_RestoreWorldState();
+			}
+#else
 			Film_ReadBytes(&loopIdx, sizeof(loopIdx));
 			Film_ReadBytes(g_worldStateBuffer, loopIdx);
-#ifdef XWA_MODERN
-			/* The restore reads the extension block up to this size. */
-			g_worldStateSize = (int)loopIdx;
-#endif
 			Flight_RestoreWorldState();
+#endif
 			if (allocatedWorldState) {
 				Memory_FreeHandle("WORLDSTATEDATA", g_worldStateHandle);
 				g_worldStateHandle = 0;

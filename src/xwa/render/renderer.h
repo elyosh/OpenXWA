@@ -316,8 +316,13 @@ typedef struct RenderObjectListEntry {
 	int projectedRadius;
 } RenderObjectListEntry;
 
-/* Capacity of the per-frame visible-object render list (VISIBLEOBJECTS). */
+/* Capacity of the per-frame visible-object render list (VISIBLEOBJECTS). The
+ * port's object table can have more than the original's 1664 slots. */
+#ifdef XWA_MODERN
+#define RENDER_OBJECT_LIST_CAPACITY XWA_MAX_OBJECTS
+#else
 #define RENDER_OBJECT_LIST_CAPACITY 1664
+#endif
 
 typedef struct FlightTexQuad {
 	int screenX;

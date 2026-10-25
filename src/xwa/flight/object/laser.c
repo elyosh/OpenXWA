@@ -32,6 +32,7 @@
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/mission_settings.h"
+#include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/turret_hardpoints.h"
@@ -1889,9 +1890,16 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 		uint16_t slotEnd;
 
 		projectileGenus = GENUS_PlayerProjectile;
+#ifdef XWA_MODERN
+		/* Each player's block has the size of the mod's player_projectiles. */
+		projectileObjIdx = (uint16_t)(g_objectSlotRangeByGenus[GENUS_PlayerProjectile].next +
+									  XwaObjectLimits_PlayerProjectiles() * (uint32_t)playerIdx);
+		slotEnd = (uint16_t)(projectileObjIdx + XwaObjectLimits_PlayerProjectiles());
+#else
 		projectileObjIdx =
 			(uint16_t)(g_objectSlotRangeByGenus[GENUS_PlayerProjectile].next + 12u * (uint32_t)playerIdx);
 		slotEnd = (uint16_t)(projectileObjIdx + 12u);
+#endif
 		if (g_projectileWarheadClassByType[projectileType - OBJ_LaserRebel] != 0) {
 			projectileObjIdx = (uint16_t)(projectileObjIdx + 8u);
 		}
@@ -3475,9 +3483,16 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 		uint32_t playerSlotEnd;
 
 		projectileGenus = GENUS_PlayerProjectile;
+#ifdef XWA_MODERN
+		playerSlotStart =
+			g_objectSlotRangeByGenus[GENUS_PlayerProjectile].next +
+			XwaObjectLimits_PlayerProjectiles() * (uint32_t)g_objectTable[ownerObjIdx].playerOwnerIdx;
+		playerSlotEnd = playerSlotStart + XwaObjectLimits_PlayerProjectiles();
+#else
 		playerSlotStart = g_objectSlotRangeByGenus[GENUS_PlayerProjectile].next +
 						  12u * (uint32_t)g_objectTable[ownerObjIdx].playerOwnerIdx;
 		playerSlotEnd = playerSlotStart + 12u;
+#endif
 		if (g_projectileWarheadClassByType[projectileObjectType - OBJ_LaserRebel] != 0) {
 			playerSlotStart += 8u;
 		}

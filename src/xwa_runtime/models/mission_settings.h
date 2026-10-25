@@ -57,6 +57,7 @@
  *     two_launcher_fixes: true
  *     starship_missile_defense_any_warhead: true
  *     weapon_rack_count_from_record: true
+ *     overlapping_fly_by_sounds: true
  *
  * classic_hide_destroyed_engine_glows only changes drawing: the classic
  * renderer doesn't draw the engine glows of a destroyed or hidden mesh, nor
@@ -137,7 +138,11 @@
  *   - weapon_rack_count_from_record: a craft's rack count (laserSlotCount)
  *     covers the racks of every laser group and warhead launcher of its craft
  *     record. In the stock game, it adds up the racks of the laser groups, and
- *     the turret racks of craft that fire from float hardpoints. */
+ *     the turret racks of craft that fire from float hardpoints.
+ *
+ * overlapping_fly_by_sounds lets the fly-by sounds of several craft play at
+ * once, and the engine wash sounds too. In the stock game, fsfx_PlaySound
+ * doesn't start one of these sounds while it is already playing. */
 
 #include <stdint.h>
 
@@ -189,6 +194,7 @@ int XwaMissionSettings_SuperStarDestroyerJamming(void);
 int XwaMissionSettings_TwoLauncherFixes(void);
 int XwaMissionSettings_StarshipMissileDefenseAnyWarhead(void);
 int XwaMissionSettings_WeaponRackCountFromRecord(void);
+int XwaMissionSettings_OverlappingFlyBySounds(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);

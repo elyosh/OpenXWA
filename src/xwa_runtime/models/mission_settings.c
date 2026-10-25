@@ -80,6 +80,7 @@ static int s_superStarDestroyerJamming;
 static int s_twoLauncherFixes;
 static int s_missileDefenseAnyWarhead;
 static int s_rackCountFromRecord;
+static int s_overlappingFlyBySounds;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -443,6 +444,7 @@ void XwaMissionSettings_Init(void) {
 	s_twoLauncherFixes = 0;
 	s_missileDefenseAnyWarhead = 0;
 	s_rackCountFromRecord = 0;
+	s_overlappingFlyBySounds = 0;
 	MissionSettings_ResetTargets();
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SETTINGS_FLIGHT_YAML, &file,
@@ -553,6 +555,10 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "weapon_rack_count_from_record", node,
 								 &s_rackCountFromRecord);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "overlapping_fly_by_sounds")) != NULL) {
+		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "overlapping_fly_by_sounds", node,
+								 &s_overlappingFlyBySounds);
+	}
 	MissionSettings_Read(SETTINGS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "mission_settings"), &s_defaults);
 	s_settings = s_defaults;
 	AeronConfigFile_Destroy(file);
@@ -618,6 +624,8 @@ int XwaMissionSettings_TwoLauncherFixes(void) { return s_twoLauncherFixes; }
 int XwaMissionSettings_StarshipMissileDefenseAnyWarhead(void) { return s_missileDefenseAnyWarhead; }
 
 int XwaMissionSettings_WeaponRackCountFromRecord(void) { return s_rackCountFromRecord; }
+
+int XwaMissionSettings_OverlappingFlyBySounds(void) { return s_overlappingFlyBySounds; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

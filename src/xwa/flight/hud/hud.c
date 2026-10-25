@@ -37,6 +37,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/mission_settings.h"
+#include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_stats.h"
@@ -1003,6 +1004,17 @@ HudCockpitMaskSprite g_hudCockpitMaskSprites[6] = {
 uint8_t g_radarEllipseClampTable[74];
 // GLOBAL: XWA 0x68C8F0
 int g_radarEllipseClampRadius;
+#ifdef XWA_MODERN
+/* The mod's radar_blips count sets how many of them each scope uses. */
+// GLOBAL: XWA 0x68BDA8
+RadarBlip g_radarForeBlipBufferA[HUD_RADAR_MAX_BLIPS];
+// GLOBAL: XWA 0x68BEC8
+RadarBlip g_radarForeBlipBufferB[HUD_RADAR_MAX_BLIPS];
+// GLOBAL: XWA 0x68C1E0
+RadarBlip g_radarAftBlipBufferA[HUD_RADAR_MAX_BLIPS];
+// GLOBAL: XWA 0x68C300
+RadarBlip g_radarAftBlipBufferB[HUD_RADAR_MAX_BLIPS];
+#else
 // GLOBAL: XWA 0x68BDA8
 RadarBlip g_radarForeBlipBufferA[48];
 // GLOBAL: XWA 0x68BEC8
@@ -1011,6 +1023,7 @@ RadarBlip g_radarForeBlipBufferB[48];
 RadarBlip g_radarAftBlipBufferA[48];
 // GLOBAL: XWA 0x68C300
 RadarBlip g_radarAftBlipBufferB[48];
+#endif
 // GLOBAL: XWA 0x68C858
 RadarBlipCount g_radarForeBlipCount;
 // GLOBAL: XWA 0x68C85C
@@ -9686,7 +9699,7 @@ void Hud_AddBlipToRadar(uint16_t targetObjIdx) {
 
 #ifdef XWA_MODERN
 		uint16_t blipIdx = g_radarForeBlipCount.lowWord;
-		if (blipIdx < 47u) {
+		if (blipIdx + 1u < XwaObjectLimits_RadarBlips()) {
 			XwaSnapshotHud_NoteRadarBlip(targetObjIdx, g_objectTable[targetObjIdx].objectSignature, 0,
 										 targetObjIdx ==
 											 (uint16_t)g_players[g_localPlayer].currentTargetObjectIdx,
@@ -9706,13 +9719,19 @@ void Hud_AddBlipToRadar(uint16_t targetObjIdx) {
 		g_radarForeDrawBlips[(uint16_t)g_radarForeBlipCount.value].y = (uint16_t)radary;
 		g_radarForeDrawBlips[(uint16_t)g_radarForeBlipCount.value].color = (uint16_t)color;
 		g_radarForeBlipCount.lowWord += 1;
+#ifdef XWA_MODERN
+		if (g_radarForeBlipCount.lowWord == XwaObjectLimits_RadarBlips()) {
+			g_radarForeBlipCount.lowWord = (uint16_t)(XwaObjectLimits_RadarBlips() - 1u);
+		}
+#else
 		if (g_radarForeBlipCount.lowWord == 48u) {
 			g_radarForeBlipCount.lowWord = 47;
 		}
+#endif
 	} else if (!foreRadar && g_hudElementEnabled[2].enabled) {
 #ifdef XWA_MODERN
 		uint16_t blipIdx = g_radarAftBlipCount.lowWord;
-		if (blipIdx < 47u) {
+		if (blipIdx + 1u < XwaObjectLimits_RadarBlips()) {
 			XwaSnapshotHud_NoteRadarBlip(targetObjIdx, g_objectTable[targetObjIdx].objectSignature, 1,
 										 targetObjIdx ==
 											 (uint16_t)g_players[g_localPlayer].currentTargetObjectIdx,
@@ -9731,9 +9750,15 @@ void Hud_AddBlipToRadar(uint16_t targetObjIdx) {
 		g_radarAftDrawBlips[(uint16_t)g_radarAftBlipCount.value].y = (uint16_t)radary;
 		g_radarAftDrawBlips[(uint16_t)g_radarAftBlipCount.value].color = (uint16_t)color;
 		g_radarAftBlipCount.lowWord += 1;
+#ifdef XWA_MODERN
+		if (g_radarAftBlipCount.lowWord == XwaObjectLimits_RadarBlips()) {
+			g_radarAftBlipCount.lowWord = (uint16_t)(XwaObjectLimits_RadarBlips() - 1u);
+		}
+#else
 		if (g_radarAftBlipCount.lowWord == 48u) {
 			g_radarAftBlipCount.lowWord = 47;
 		}
+#endif
 	}
 
 	if ((uint16_t)g_players[g_localPlayer].currentTargetObjectIdx == targetObjIdx) {
@@ -17701,6 +17726,13 @@ void Mfd_DrawFriendlyCraftPage(int mfdSide, void* mfdSurface) {
 							objects[tableIdx].objectType != OBJ_CivilianPilot) {
 							craft = objects[tableIdx].mobj->pCraft;
 							if (craft->objectKind != 3 && craft->objectKind != 4) {
+#ifdef XWA_MODERN
+								/* The list holds 192 craft, and a region can have
+								 * more. The page stops at 192. */
+								if (rowCount >= MFD_FRIENDLY_CRAFT_MAX_ROWS) {
+									break;
+								}
+#endif
 								rows[rowCount++] =
 									((uint32_t)objects[tableIdx].mobj->team << 24) | (uint16_t)objIdx;
 							}
@@ -18153,6 +18185,13 @@ void Mfd_DrawFlightGroupsPage(int mfdSide, void* mfdSurface) {
 			if (rowCraft->objectKind == 3 || rowCraft->objectKind == 4) {
 				continue;
 			}
+#ifdef XWA_MODERN
+			/* The list holds 192 craft, and a region can have more. The page
+			 * stops at 192. */
+			if (rowCount >= MFD_FLIGHT_GROUPS_MAX_ROWS) {
+				break;
+			}
+#endif
 			rows[rowCount++] = ((uint32_t)objectTeam << 24) | (uint16_t)objIdx;
 		}
 	}

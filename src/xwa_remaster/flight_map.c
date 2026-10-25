@@ -15,6 +15,7 @@
 #define MAP_GRID_STEP 0x10000
 #define MAP_ICON_GROUP 14800
 #define MAP_ICON_CACHE_SIZE 256
+#define MAP_FIRST_OBJECT_CAPACITY 1664
 
 typedef struct MapPreparedObject {
 	const XwaFlightMapObject* map;
@@ -333,10 +334,12 @@ static void map_after_meshes(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aer
 int XwaRemasterFlightMap_Init(void) {
 	if (map_state.annotations[0])
 		return 1;
-	map_state.annotations[0] = AeronDrawList_Create(XWA_SNAP_MAX_FLIGHT_MAP_OBJECTS * 16);
-	map_state.annotations[1] = AeronDrawList_Create(XWA_SNAP_MAX_FLIGHT_MAP_OBJECTS * 16);
+	/* The lists grow when a map has more objects. They start with room for
+	 * 1664 objects. */
+	map_state.annotations[0] = AeronDrawList_Create(MAP_FIRST_OBJECT_CAPACITY * 16);
+	map_state.annotations[1] = AeronDrawList_Create(MAP_FIRST_OBJECT_CAPACITY * 16);
 	map_state.grid = AeronDrawList_Create(96);
-	map_state.text = AeronDrawList_Create(XWA_SNAP_MAX_FLIGHT_MAP_OBJECTS * 48);
+	map_state.text = AeronDrawList_Create(MAP_FIRST_OBJECT_CAPACITY * 48);
 	if (map_state.annotations[0] && map_state.annotations[1] && map_state.grid && map_state.text)
 		return 1;
 	XwaRemasterFlightMap_Shutdown();

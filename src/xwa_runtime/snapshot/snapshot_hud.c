@@ -16,6 +16,8 @@
 
 #include <string.h>
 
+typedef char hud_radar_blips_fit[XWA_SNAP_MAX_HUD_RADAR_BLIPS >= 2 * HUD_RADAR_MAX_BLIPS ? 1 : -1];
+
 typedef struct XwaHudCaptureSlot {
 	XwaHudState completed;
 	XwaHudState building;

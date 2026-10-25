@@ -221,6 +221,13 @@ int Film_ReadBytes(void* dst, int size) {
 		g_filmPlaybackMode = 3;
 		return 0;
 	}
+#ifdef XWA_MODERN
+	/* A stopped playback reads nothing more, so a film that can't play
+	   doesn't fill the game's state with bytes read at the wrong place. */
+	if (g_filmPlaybackMode == 3) {
+		return 0;
+	}
+#endif
 
 	{
 		uint8_t* cursor;

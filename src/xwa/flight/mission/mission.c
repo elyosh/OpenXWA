@@ -50,6 +50,7 @@
 #include "xwa_runtime/models/mission_tie.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/model_swaps.h"
+#include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/shield_recharge.h"
@@ -7471,6 +7472,10 @@ uint16_t Mission_Init(char* fileName) {
 	}
 	fileName[lastNonWhitespace + 1u] = 0;
 
+#ifdef XWA_MODERN
+	XwaObjectLimits_LoadMission(fileName, (uint32_t)g_pilotData.regionsCount, (uint32_t)g_flightPlayerCount,
+								g_provingGroundsModeActive);
+#endif
 	g_missionRegionCount = g_pilotData.regionsCount;
 	if (g_provingGroundsModeActive) {
 		g_craftObjectSlotsTotal = 36u * (uint32_t)g_pilotData.regionsCount;
@@ -7478,12 +7483,41 @@ uint16_t Mission_Init(char* fileName) {
 		g_salvageJunkObjectSlotsPerRegion = 224;
 		g_craftObjectSlotsPerRegion = g_craftObjectSlotsTotal / (uint32_t)g_pilotData.regionsCount;
 	} else {
+#ifdef XWA_MODERN
+		g_craftObjectSlotsPerRegion = XwaObjectLimits_CraftPerRegion();
+		g_craftObjectSlotsTotal = g_craftObjectSlotsPerRegion * (uint32_t)g_pilotData.regionsCount;
+#else
 		g_craftObjectSlotsPerRegion = 96;
 		g_craftObjectSlotsTotal = 96u * (uint32_t)g_pilotData.regionsCount;
+#endif
 		g_salvageJunkObjectSlotsTotal = 0;
 		g_salvageJunkObjectSlotsPerRegion = 0;
 	}
 
+#ifdef XWA_MODERN
+	/* The mod's object counts. The original computes the 32 explosion slots
+	 * of each region once and uses them for the explosion and the debris
+	 * blocks, so one count sets both. */
+	{
+		const uint32_t explosionSlotsTotal =
+			XwaObjectLimits_ExplosionsPerRegion() * (uint32_t)g_pilotData.regionsCount;
+
+		g_sharedPlayerProjectileSlotsPerRegion = 32;
+		g_playerProjectileSlotsTotal = XwaObjectLimits_PlayerProjectiles() * (uint32_t)g_flightPlayerCount;
+		if (g_flightPlayerCount == 1) {
+			g_sharedPlayerProjectileSlotsPerRegion = 16;
+		}
+		g_projectileObjectSlotsPerRegion = g_sharedPlayerProjectileSlotsPerRegion +
+										   g_playerProjectileSlotsTotal +
+										   XwaObjectLimits_AiProjectilesPerRegion();
+		g_projectileObjectSlotsTotal = g_projectileObjectSlotsPerRegion * (uint32_t)g_pilotData.regionsCount;
+		g_explosionObjectSlotsTotal = explosionSlotsTotal;
+		g_regionMainObjectSlotsTotal = g_craftObjectSlotsTotal + g_projectileObjectSlotsTotal +
+									   explosionSlotsTotal + explosionSlotsTotal +
+									   g_salvageJunkObjectSlotsTotal;
+		g_debrisObjectSlotsTotal = explosionSlotsTotal;
+	}
+#else
 	g_sharedPlayerProjectileSlotsPerRegion = 32;
 	g_playerProjectileSlotsTotal = 12u * (uint32_t)g_flightPlayerCount;
 	if (g_flightPlayerCount == 1) {
@@ -7497,6 +7531,7 @@ uint16_t Mission_Init(char* fileName) {
 								   32u * (uint32_t)g_pilotData.regionsCount +
 								   32u * (uint32_t)g_pilotData.regionsCount + g_salvageJunkObjectSlotsTotal;
 	g_debrisObjectSlotsTotal = 32u * (uint32_t)g_pilotData.regionsCount;
+#endif
 	g_localDebrisObjectSlotsTotal = 8;
 	g_localEffectObjectSlotsTotal = 24;
 	g_mobileObjectCharDataCount = 0;

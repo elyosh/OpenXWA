@@ -3,8 +3,11 @@
 #include "aeron/log.h"
 #include "xwa/flight/death_star.h"
 #include "xwa/flight/film.h"
+#include "xwa/flight/flight.h"
 #include "xwa/flight/hangar.h"
+#include "xwa/flight/object/object.h"
 #include "xwa/flight/player/player.h"
+#include "xwa/render/renderer.h"
 #include "xwa/util/byte_order.h"
 #include "xwa_runtime/models/hangar_scene.h"
 #include "xwa_runtime/models/hangars.h"
@@ -329,4 +332,64 @@ void XwaFilmState_Read(void) {
 	XwaHangars_RestoreFlightState(&hangars);
 	XwaHangarScene_RestoreFlightState(&scene);
 	DeathStar_ModernRestoreFlightState(&deathStar);
+}
+
+/* The table's layout: its slots, and the slots of its craft, projectile,
+   player projectile and explosion blocks. */
+enum { FILM_LAYOUT_VALUES = 5 };
+
+static void FilmState_Layout(uint32_t values[FILM_LAYOUT_VALUES]) {
+	values[0] = g_objectTableSlotCount;
+	values[1] = g_craftObjectSlotsTotal;
+	values[2] = g_projectileObjectSlotsTotal;
+	values[3] = g_playerProjectileSlotsTotal;
+	values[4] = g_explosionObjectSlotsTotal;
+}
+
+void XwaFilmState_WriteLayout(void) {
+	uint8_t bytes[4 * FILM_LAYOUT_VALUES];
+	uint32_t values[FILM_LAYOUT_VALUES];
+	int i;
+
+	FilmState_Layout(values);
+	for (i = 0; i < FILM_LAYOUT_VALUES; ++i) {
+		ByteOrder_WriteU32Le(bytes + 4 * i, values[i]);
+	}
+	Film_WriteBytesBuffered(bytes, sizeof bytes);
+}
+
+int XwaFilmState_ReadLayout(int filmHasLayout) {
+	uint8_t bytes[4 * FILM_LAYOUT_VALUES];
+	uint32_t values[FILM_LAYOUT_VALUES];
+	int i;
+
+	FilmState_Layout(values);
+	if (!filmHasLayout) {
+		/* Older films have the stock layout. */
+		if (g_craftObjectSlotsPerRegion == (g_provingGroundsModeActive ? 36u : 96u) &&
+			g_playerProjectileSlotsTotal == 12u * (uint32_t)g_flightPlayerCount &&
+			g_projectileObjectSlotsPerRegion ==
+				g_sharedPlayerProjectileSlotsPerRegion + g_playerProjectileSlotsTotal + 64u &&
+			g_explosionObjectSlotsTotal == 32u * (uint32_t)g_missionRegionCount) {
+			return 1;
+		}
+		Aeron_LogError("xwa.film",
+					   "film: recorded with the stock object counts, and the mod changes them; it "
+					   "can't play");
+		return 0;
+	}
+	if (!Film_ReadBytes(bytes, sizeof bytes)) {
+		return 0;
+	}
+	for (i = 0; i < FILM_LAYOUT_VALUES; ++i) {
+		if (ByteOrder_ReadU32Le(bytes + 4 * i) != values[i]) {
+			Aeron_LogError(
+				"xwa.film",
+				"film: recorded with an object table of %u slots, and this one has %u, or its blocks "
+				"differ; it can't play",
+				ByteOrder_ReadU32Le(bytes), values[0]);
+			return 0;
+		}
+	}
+	return 1;
 }

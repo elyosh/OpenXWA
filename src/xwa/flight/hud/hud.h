@@ -110,6 +110,12 @@ typedef struct RadarBlip {
 	uint16_t color;
 } RadarBlip;
 
+#ifdef XWA_MODERN
+/* The most blips on each radar scope. A mod's radar_blips count can ask for
+ * more than the original's 48. */
+#define HUD_RADAR_MAX_BLIPS 1024
+#endif
+
 typedef union RadarBlipCount {
 	int value;
 	uint16_t lowWord;
@@ -1040,10 +1046,17 @@ extern uint8_t             g_sceneBypassCockpitMask;
 extern HudCockpitMaskSprite g_hudCockpitMaskSprites[6];
 extern uint8_t             g_radarEllipseClampTable[74];
 extern int                 g_radarEllipseClampRadius;
+#ifdef XWA_MODERN
+extern RadarBlip           g_radarForeBlipBufferA[HUD_RADAR_MAX_BLIPS];
+extern RadarBlip           g_radarForeBlipBufferB[HUD_RADAR_MAX_BLIPS];
+extern RadarBlip           g_radarAftBlipBufferA[HUD_RADAR_MAX_BLIPS];
+extern RadarBlip           g_radarAftBlipBufferB[HUD_RADAR_MAX_BLIPS];
+#else
 extern RadarBlip           g_radarForeBlipBufferA[48];
 extern RadarBlip           g_radarForeBlipBufferB[48];
 extern RadarBlip           g_radarAftBlipBufferA[48];
 extern RadarBlip           g_radarAftBlipBufferB[48];
+#endif
 extern RadarBlipCount      g_radarForeBlipCount;
 extern RadarBlipCount      g_radarAftBlipCount;
 extern uint16_t            g_radarForePrevBlipCount;

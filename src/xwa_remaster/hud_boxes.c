@@ -24,8 +24,10 @@ static void box_output_transform(const XwaHudLayoutProfile* profile, int target_
 int XwaRemasterHudBoxes_Init(void) {
 	if (box_lists[0] && box_lists[1])
 		return 1;
-	box_lists[0] = AeronDrawList_Create(XWA_HUD_MAX_PREPARED_BOXES * 8);
-	box_lists[1] = AeronDrawList_Create(XWA_HUD_MAX_PREPARED_BOXES * 8);
+	/* The lists grow when a frame has more boxes. They start with room for
+	 * 512. */
+	box_lists[0] = AeronDrawList_Create(512 * 8);
+	box_lists[1] = AeronDrawList_Create(512 * 8);
 	if (!box_lists[0] || !box_lists[1]) {
 		AeronDrawList_Destroy(box_lists[0]);
 		AeronDrawList_Destroy(box_lists[1]);

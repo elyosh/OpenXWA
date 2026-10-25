@@ -50,7 +50,12 @@ extern uint8_t                           g_fsfxVoiceQueueSpeakerType[128];
 extern uint8_t                           g_fsfxVoiceQueueCategory[128];
 extern int                               g_fsfxVoiceQueueSfxSlot[128];
 extern int                               g_fsfxVoiceQueueObjIdx[128];
+#ifdef XWA_MODERN
+/* XWA_MAX_OBJECTS entries. */
+extern int                               g_fsfxTacOfficerLastSpeakSecondsByObj[];
+#else
 extern int                               g_fsfxTacOfficerLastSpeakSecondsByObj[1664];
+#endif
 extern uint8_t                           g_fsfxVoiceLinePlayCounts[12][196];
 extern const uint8_t                     g_fsfxDesignationToVoiceVariant[24];
 extern const uint8_t                     g_fsfxHostileVoiceVariantRemap[16];
