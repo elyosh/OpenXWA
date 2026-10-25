@@ -133,6 +133,11 @@ void XwaRemasterFlight_GetExposureDefault(XwaFlightExposureParams* out);
  * (AeronScenePresent_ExposureFromEv100): the fixed one, or the newest the
  * meter read back. 1 before the configuration loads. */
 float XwaRemasterFlight_Exposure(void);
+/* The debug view drawn in place of the flight image
+ * (AeronScenePresentDebugView): the image, false colour, or the meter's
+ * weights. Debug only, not in the settings. */
+int XwaRemasterFlight_PresentDebugView(void);
+void XwaRemasterFlight_SetPresentDebugView(int view);
 /* The flight scene's newest metering; 0 when there is none. */
 int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out);
 /* The fixed exposure of a view lit by its own lights (the CMD display, the
@@ -153,6 +158,9 @@ typedef struct XwaFlightPointLightParams {
 	float match_distance_m;      /* metres at which a light is as bright as the classic law */
 	float range_scale;           /* multiplies the derived falloff range */
 	int model_lights;            /* lights authored in models, and the headlight */
+	/* Multiplies the lights authored in models, to find a calibration by
+	 * eye; debug only, not in the settings. 1 by default. */
+	float model_light_scale;
 } XwaFlightPointLightParams;
 
 /* The game's light candidates, the models' lights, and those of both whose

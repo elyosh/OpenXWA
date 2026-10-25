@@ -36,6 +36,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <imgui.h>
@@ -507,6 +508,12 @@ static void xwa_tool_point_lights(int* open, void* user) {
 		changed = true;
 	}
 	ImGui::TextDisabled("Lights authored in models (candela), and the headlight.");
+	if (ImGui::SliderFloat("Model light scale", &p.model_light_scale, 0.1f, 100.0f, "x%.2f",
+						   ImGuiSliderFlags_Logarithmic)) {
+		changed = true;
+	}
+	ImGui::TextDisabled("Multiplies the models' lights (not the headlight), to find their\n"
+						"calibration by eye. Not saved.");
 
 	ImGui::Separator();
 	if (ImGui::Button("Reset to defaults")) {
@@ -926,6 +933,49 @@ static void xwa_tool_hdr(int* open, void* user) {
 							"Higher EV100 is darker; %.3f shows a scene value of 1 as 1.",
 							(double)(exposure.ev100 - exposure.compensation),
 							(double)XwaRemasterFlight_Exposure(), (double)AERON_SCENE_UNIT_EXPOSURE_EV100);
+	}
+
+	ImGui::Separator();
+	ImGui::TextUnformatted("Debug view");
+	int view = XwaRemasterFlight_PresentDebugView();
+	int new_view = view;
+	ImGui::RadioButton("Image", &new_view, AERON_SCENE_PRESENT_IMAGE);
+	ImGui::SameLine();
+	ImGui::RadioButton("False colour", &new_view, AERON_SCENE_PRESENT_FALSE_COLOR);
+	ImGui::SameLine();
+	ImGui::RadioButton("Meter weights", &new_view, AERON_SCENE_PRESENT_METER_WEIGHT);
+	if (new_view != view) {
+		XwaRemasterFlight_SetPresentDebugView(new_view);
+	}
+	if (new_view == AERON_SCENE_PRESENT_FALSE_COLOR) {
+		/* Matches AeronTonemapFalseColor's bands (linear colours). */
+		static const float bands[13][3] = {
+			{ 0.02f, 0.00f, 0.05f }, { 0.15f, 0.00f, 0.30f }, { 0.00f, 0.00f, 0.60f },
+			{ 0.00f, 0.20f, 1.00f }, { 0.00f, 0.50f, 0.50f }, { 0.00f, 0.40f, 0.10f },
+			{ 0.25f, 0.25f, 0.25f }, { 0.30f, 0.70f, 0.00f }, { 1.00f, 1.00f, 0.00f },
+			{ 1.00f, 0.40f, 0.00f }, { 1.00f, 0.00f, 0.00f }, { 1.00f, 0.00f, 0.50f },
+			{ 1.00f, 1.00f, 1.00f },
+		};
+		static const char* const labels[13] = { "< -5", "-5", "-4", "-3", "-2", "-1",  "grey",
+												"+1",   "+2", "+3", "+4", "+5", "clip" };
+		for (int i = 0; i < 13; i++) {
+			const ImVec4 colour(powf(bands[i][0], 1.0f / 2.2f), powf(bands[i][1], 1.0f / 2.2f),
+								powf(bands[i][2], 1.0f / 2.2f), 1.0f);
+			if (i > 0) {
+				ImGui::SameLine(0.0f, 2.0f);
+			}
+			ImGui::PushID(i);
+			ImGui::ColorButton("##band", colour, ImGuiColorEditFlags_NoTooltip, ImVec2(28.0f, 16.0f));
+			ImGui::PopID();
+			if (ImGui::IsItemHovered()) {
+				ImGui::SetTooltip("%s", labels[i]);
+			}
+		}
+		ImGui::TextDisabled("Stops from mid-grey (0.18 after the exposure), one band per stop;\n"
+							"grey is mid-grey to +1. White is AgX's white, where the image clips.");
+	} else if (new_view == AERON_SCENE_PRESENT_METER_WEIGHT) {
+		ImGui::TextDisabled("Blue: sky. Orange: near geometry (the cockpit). Green: other geometry.\n"
+							"Brighter counts more; black isn't counted. Needs the metered exposure.");
 	}
 
 	ImGui::Separator();

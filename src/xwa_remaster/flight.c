@@ -222,6 +222,7 @@ static struct {
 	XwaFlightHangarLightingParams hangar_lighting_default;
 	XwaFlightExposureParams exposure;
 	XwaFlightExposureParams exposure_default;
+	int present_debug_view; /* AeronScenePresentDebugView */
 	/* Point-light calibration knobs (same lifecycle as ssao). */
 	XwaFlightPointLightParams plight;
 	XwaFlightPointLightParams plight_default;
@@ -947,6 +948,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.plight.match_distance_m = (float)AeronConfigFile_GetFloat(cf, "point_lights.match_distance_m", 0.0);
 	s.plight.range_scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.range_scale", 0.0);
 	s.plight.model_lights = AeronConfigFile_GetBool(cf, "point_lights.model_lights", 0);
+	s.plight.model_light_scale = 1.0f;
 	if (!fl_point_lights_config_valid(&s.plight)) {
 		Aeron_LogError("xwa.remaster", "%s: invalid point_lights settings", path);
 		AeronConfigFile_Destroy(cf);
@@ -1385,6 +1387,14 @@ float XwaRemasterFlight_LightMeterExposure(const XwaRemasterDirLight* lights, ui
 	return AeronScenePresent_ExposureFromEv100(ev100 - s.exposure.compensation);
 }
 
+int XwaRemasterFlight_PresentDebugView(void) { return s.present_debug_view; }
+
+void XwaRemasterFlight_SetPresentDebugView(int view) {
+	s.present_debug_view = view >= AERON_SCENE_PRESENT_IMAGE && view <= AERON_SCENE_PRESENT_METER_WEIGHT
+							   ? view
+							   : AERON_SCENE_PRESENT_IMAGE;
+}
+
 int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out) {
 	return out && s.scene && AeronScene_GetExposureReadout(s.scene, out);
 }
@@ -1402,6 +1412,8 @@ void XwaRemasterFlight_SetPointLights(const XwaFlightPointLightParams* in) {
 		if (!fl_cfg_ensure())
 			return;
 		s.plight = *in;
+		s.plight.model_light_scale =
+			isfinite(in->model_light_scale) ? fminf(fmaxf(in->model_light_scale, 0.01f), 1000.0f) : 1.0f;
 	}
 }
 
@@ -3676,7 +3688,7 @@ static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transfor
 			continue;
 		}
 		if (AeronScene_MeshLight(mesh, i, transform, AERON_OPT_UNITS_PER_METER, table, variant,
-								 1.0f / AERON_SCENE_LUMENS_PER_WATT, &light)) {
+								 s.plight.model_light_scale / AERON_SCENE_LUMENS_PER_WATT, &light)) {
 			s.pl_model_count++;
 			fl_pool_add(&light, 1, keep);
 		}
@@ -4356,6 +4368,13 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	/* The flight scene's exposure, on the GPU: metered from this frame. The
 	 * map keeps the CPU value. */
 	AeronTexture* const exposure_tex = s.map_present ? NULL : AeronScene_ExposureTexture(s.scene);
+	/* The weight view needs the meter, which the map doesn't run. */
+	AeronScenePresentDebug debug = { .view = (AeronScenePresentDebugView)s.present_debug_view };
+	if (debug.view == AERON_SCENE_PRESENT_METER_WEIGHT &&
+		(s.map_present || !AeronScene_GetMeterDebug(s.scene, &debug))) {
+		debug.view = AERON_SCENE_PRESENT_IMAGE;
+	}
+	AeronScenePresentChain_SetDebug(chain, &debug);
 	AeronScenePresentChain_Draw(chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
 								s.map_present ? 0.0f : AeronSceneBloom_Intensity(),
 								exposure_tex ? 1.0f : XwaRemasterFlight_Exposure(), exposure_tex, s.rt_w,
