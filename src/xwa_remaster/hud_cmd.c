@@ -60,6 +60,8 @@ static struct {
 	uint32_t point_candidate_dropped;
 	uint32_t particle_light_ids[XWA_SNAP_MAX_PARTICLE_EFFECTS];
 	uint32_t particle_light_id_count;
+	/* This frame's exposure, metered from the display's own lights. */
+	float exposure;
 } s_cmd;
 
 static const XwaHudLayoutProfile* cmd_profile(XwaHudProfileIndex index) {
@@ -448,8 +450,7 @@ static uint32_t cmd_finalize_point_lights(void) {
 	uint32_t count = 0;
 	for (uint32_t i = 0; i < s_cmd.point_candidate_count; i++) {
 		if (XwaRemasterShip_ScenePointLight(&s_cmd.point_candidates[i], config.match_distance_m,
-											config.range_scale, XwaRemasterFlight_Exposure(),
-											&s_cmd.point_scene[count]))
+											config.range_scale, s_cmd.exposure, &s_cmd.point_scene[count]))
 			count++;
 	}
 	s_cmd.point_candidate_count = count;
@@ -685,14 +686,16 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	XwaRemasterTrails_SubmitOwner(s_cmd.trails, s_cmd.scene, target->slot, target->signature);
 	cmd_add_particle_lights(snapshot, rows, target, target->slot, target->signature);
 	cmd_submit_billboards();
+	XwaRemasterDirLight lights[XWA_SNAP_MAX_DIR_LIGHTS];
+	const uint32_t light_count =
+		XwaRemaster_ReadGameDirLights(snapshot->dir_lights, snapshot->dir_light_count, lights);
+	s_cmd.exposure = XwaRemasterFlight_LightMeterExposure(lights, light_count);
+	AeronScene_SetExposure(s_cmd.scene, s_cmd.exposure);
 	cmd_submit_point_lights(cmd_finalize_point_lights());
 	if (!cmd_configure_clustered_lights()) {
 		Aeron_CommandBufferSetFailure(cmd, "HUD CMD clustered-light configuration failed");
 		return;
 	}
-	XwaRemasterDirLight lights[XWA_SNAP_MAX_DIR_LIGHTS];
-	const uint32_t light_count =
-		XwaRemaster_ReadGameDirLights(snapshot->dir_lights, snapshot->dir_light_count, lights);
 	XwaRemasterShip_SetPbrEnv(s_cmd.scene, lights, light_count, -1, rows, NULL, NULL, /*ambient_cube=*/NULL,
 							  /*environment_map=*/NULL,
 							  /*key_probe_shadow=*/-1.0f);
@@ -711,8 +714,8 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	if (!pass)
 		return;
 	static const float tint[4] = { 1, 1, 1, 1 };
-	AeronScenePresentChain_Draw(s_cmd.present, pass, scene_texture, s_cmd.sampler, NULL, 0.0f,
-								XwaRemasterFlight_Exposure(), NULL, width, height, /*bar_y_uv=*/1.0f, tint,
+	AeronScenePresentChain_Draw(s_cmd.present, pass, scene_texture, s_cmd.sampler, NULL, 0.0f, s_cmd.exposure,
+								NULL, width, height, /*bar_y_uv=*/1.0f, tint,
 								/*src_coverage=*/1);
 	Aeron_EndRenderPass(pass);
 	s_cmd.output = Aeron_RenderTargetGetTexture(s_cmd.present_rt);

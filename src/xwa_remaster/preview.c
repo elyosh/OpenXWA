@@ -182,6 +182,9 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	 * camera; camera at the origin. */
 	XwaRemasterDirLight linear_lights[XWA_SNAP_MAX_DIR_LIGHTS];
 	const uint32_t linear_light_count = XwaRemaster_ReadGameDirLights(lights, light_count, linear_lights);
+	/* The preview's exposure comes from its own light. */
+	const float exposure = XwaRemasterFlight_LightMeterExposure(linear_lights, linear_light_count);
+	AeronScene_SetExposure(s.scene, exposure);
 	XwaRemasterShip_SetPbrEnv(s.scene, linear_lights, linear_light_count, -1, p->cam_rows, NULL,
 							  ao_on ? &ao : NULL,
 							  /*ambient_cube=*/NULL, /*environment_map=*/NULL, /*key_probe_shadow=*/-1.0f);
@@ -290,9 +293,8 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 		return NULL;
 	}
 	static const float tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
-	AeronScenePresentChain_Draw(s.chain, pp, scene_tex, s.chain_sampler, bloom_tex, bloom_intensity,
-								XwaRemasterFlight_Exposure(), NULL, PREVIEW_RT_W, PREVIEW_RT_H, /*bar_y_uv=*/1.0f,
-								tint,
+	AeronScenePresentChain_Draw(s.chain, pp, scene_tex, s.chain_sampler, bloom_tex, bloom_intensity, exposure,
+								NULL, PREVIEW_RT_W, PREVIEW_RT_H, /*bar_y_uv=*/1.0f, tint,
 								/*src_coverage=*/1);
 	Aeron_EndRenderPass(pp);
 	return Aeron_RenderTargetGetTexture(s.present[slot]);

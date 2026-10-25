@@ -1364,10 +1364,25 @@ float XwaRemasterFlight_Exposure(void) {
 		return 1.0f;
 	}
 	AeronSceneExposureReadout readout;
-	if (s.exposure.metered && s.scene && AeronScene_GetExposureReadout(s.scene, &readout)) {
+	if (s.exposure.metered && !s.map_present && s.scene && AeronScene_GetExposureReadout(s.scene, &readout)) {
 		return readout.exposure;
 	}
 	return AeronScenePresent_ExposureFromEv100(s.exposure.ev100 - s.exposure.compensation);
+}
+
+float XwaRemasterFlight_LightMeterExposure(const XwaRemasterDirLight* lights, uint32_t count) {
+	if (!fl_cfg_ensure()) {
+		return 1.0f;
+	}
+	float illuminance = 0.0f;
+	for (uint32_t i = 0; lights && i < count; i++) {
+		const float* c = lights[i].color;
+		illuminance = fmaxf(illuminance, 0.2126f * c[0] + 0.7152f * c[1] + 0.0722f * c[2]);
+	}
+	const float ev100 = illuminance > 0.0f && isfinite(illuminance)
+							? log2f(illuminance * AERON_SCENE_LUMENS_PER_WATT * 100.0f / 250.0f)
+							: s.exposure.ev100;
+	return AeronScenePresent_ExposureFromEv100(ev100 - s.exposure.compensation);
 }
 
 int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out) {
@@ -3958,7 +3973,8 @@ static void fl_update_material_states(const XwaSnapshot* snap, float now) {
 /* Begins the scene's frame with its exposure, fixed or metered, and with
  * the classic images (screens, glows, explosions) at the classic radiance. */
 static int fl_begin_scene(const AeronSceneCamera* camera) {
-	if (s.exposure.metered) {
+	/* The map has a fixed exposure; leaving it snaps the meter. */
+	if (s.exposure.metered && !s.map_present) {
 		const XwaFlightExposureParams* e = &s.exposure;
 		const AeronSceneAutoExposure meter = {
 			.ev100 = e->ev100,

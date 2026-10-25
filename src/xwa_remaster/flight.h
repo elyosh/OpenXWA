@@ -135,6 +135,12 @@ void XwaRemasterFlight_GetExposureDefault(XwaFlightExposureParams* out);
 float XwaRemasterFlight_Exposure(void);
 /* The flight scene's newest metering; 0 when there is none. */
 int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out);
+/* The fixed exposure of a view lit by its own lights (the CMD display, the
+ * model preview): its brightest directional light metered as incident
+ * light, EV100 = log2(E * 100 / 250) with E in lux, minus the compensation.
+ * Without a light, ev100 - compensation. */
+struct XwaRemasterDirLight;
+float XwaRemasterFlight_LightMeterExposure(const struct XwaRemasterDirLight* lights, uint32_t count);
 
 /* Point-light knobs (remaster/config.yaml `point_lights:` mapping + the debug
  * inspector). The classic SOURCE laws fix each light's color and classic
