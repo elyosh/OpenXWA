@@ -76,6 +76,9 @@ uint8_t* xwa2d_decode_indexed(const uint8_t* pixels, size_t pixel_size, int comp
 		return rgba;
 	}
 
+	/* Each row is a 4-byte size, then tokens up to 0x80. As the game's
+	 * full-width blit does, the size is skipped and the next row starts after
+	 * the 0x80: some mods' files give sizes without their own 4 bytes. */
 	const uint8_t* p = pixels;
 	const uint8_t* end = pixels + pixel_size;
 	const int region_width = bounds_right + 1;
@@ -83,39 +86,36 @@ uint8_t* xwa2d_decode_indexed(const uint8_t* pixels, size_t pixel_size, int comp
 	for (int y = 0; y < region_height && y < height; y++) {
 		if ((size_t)(end - p) < 4)
 			goto malformed;
-		uint32_t row_size = xwa2d_u32(p);
-		if (row_size < 5 || row_size > (uint32_t)(end - p))
-			goto malformed;
-		const uint8_t* row_end = p + row_size;
 		p += 4;
 		int x = 0;
-		while (p < row_end) {
+		for (;;) {
+			if (p >= end)
+				goto malformed;
 			uint8_t token = *p++;
+			if (token == 0x80u)
+				break;
+			/* Nothing is drawn past the frame's bounds. */
+			const int draw = x < region_width;
 			if ((token & 0xc0u) == 0x40u) {
 				x += token & 0x3fu;
 			} else if (token & 0x80u) {
 				int length = token & 0x7fu;
-				if (!length)
-					break;
-				if (length > row_end - p)
+				if (length > end - p)
 					goto malformed;
-				for (int i = 0; i < length && x + i < width; i++)
+				for (int i = 0; draw && i < length && x + i < width; i++)
 					indexed_pixel(rgba + ((size_t)y * width + x + i) * 4, palette, p[i]);
 				p += length;
 				x += length;
 			} else {
 				int length = token;
-				if (!length || p >= row_end)
+				if (!length || p >= end)
 					goto malformed;
 				uint8_t value = *p++;
-				for (int i = 0; i < length && x + i < width; i++)
+				for (int i = 0; draw && i < length && x + i < width; i++)
 					indexed_pixel(rgba + ((size_t)y * width + x + i) * 4, palette, value);
 				x += length;
 			}
-			if (x >= region_width)
-				break;
 		}
-		p = row_end;
 	}
 	return rgba;
 

@@ -59,8 +59,8 @@ static int usage(const char* argv0) {
 			"  <out-root>/flight/fonts. Needs no stock data. Uses --png, --ktx2,\n"
 			"  --quality, --no-zstd and --group like sprites.\n"
 			"  --xwau <dir>       the XWAU install (required)\n"
-			"  --planet-max <px>  halve planet images until they are at most this\n"
-			"                     wide (default: 2048; 0 keeps them as they are)\n",
+			"  --planet-max <px>  scale planet images down to at most this wide\n"
+			"                     (default: 2048; 0 keeps them as they are)\n",
 			argv0);
 	return 2;
 }

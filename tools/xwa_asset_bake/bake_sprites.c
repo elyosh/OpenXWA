@@ -40,9 +40,6 @@
 #include <strings.h>
 #include <sys/stat.h>
 
-#define BAKE_MAX_ATLAS_DIM 8192
-#define BAKE_HD_PAD        8 /* HD-texel gutter between packed frames */
-
 /* ---- small utilities ------------------------------------------------- */
 
 int BakeSprites_MakeDirs(const char* path) {

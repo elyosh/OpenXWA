@@ -65,6 +65,8 @@
 #define FLIGHT_FONT_GROUP 16000
 #define FLIGHT_HULL_ICON_GROUP 26000
 #define FLIGHT_MAP_ICON_GROUP 14800
+/* The largest image that fits in an atlas page with its gutters. */
+#define FLIGHT_MAX_IMAGE (BAKE_MAX_ATLAS_DIM - 2 * BAKE_HD_PAD)
 /* XWAU's ddraw wrapper picks alternative explosions only for these groups
  * (Direct3DDevice.cpp: DATGroupId - 2000, MAX_XWA_EXPLOSIONS). */
 #define FLIGHT_FIRST_EXPLOSION_GROUP 2000
@@ -802,19 +804,27 @@ static FlightImage* flight_group_images(const FlightContext* ctx, int group, int
 	return images;
 }
 
-/* Halves `frame` until it is at most `max_width` wide. Its classic size
+/* Scales `frame` down to at most `max_width` wide and `max_height` high,
+ * keeping its proportions; 0 doesn't limit that side. Its classic size
  * doesn't change. */
-static int flight_shrink(BakeFrame* frame, int max_width) {
-	while (max_width > 0 && frame->w > max_width) {
-		int w = 0, h = 0;
-		uint8_t* smaller = Aeron_ImageDownsampleStraightAlphaRgba8(frame->rgba, frame->w, frame->h, &w, &h);
-		if (!smaller)
-			return 0;
-		free(frame->rgba);
-		frame->rgba = smaller;
-		frame->w = w;
-		frame->h = h;
-	}
+static int flight_fit(BakeFrame* frame, int max_width, int max_height) {
+	double scale = 1.0;
+	if (max_width > 0 && frame->w > max_width)
+		scale = (double)max_width / frame->w;
+	if (max_height > 0 && frame->h * scale > max_height)
+		scale = (double)max_height / frame->h;
+	if (scale >= 1.0)
+		return 1;
+	int w = (int)floor(frame->w * scale), h = (int)floor(frame->h * scale);
+	w = w < 1 ? 1 : w;
+	h = h < 1 ? 1 : h;
+	uint8_t* smaller = Aeron_ImageResizeSrgbRgba8(frame->rgba, frame->w, frame->h, w, h);
+	if (!smaller)
+		return 0;
+	free(frame->rgba);
+	frame->rgba = smaller;
+	frame->w = w;
+	frame->h = h;
 	return 1;
 }
 
@@ -923,6 +933,7 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 	uint16_t* ids = (uint16_t*)calloc((size_t)count, sizeof *ids);
 	int ok = frames && ids;
 	int resized = 0;
+	int fitted = 0;
 	char error[256];
 	for (int i = 0; ok && i < count; ++i) {
 		const XwauDat* dat = ctx->dats[images[i].dat].dat;
@@ -951,15 +962,22 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 		ids[i] = (uint16_t)images[i].id;
 		flight_image_light(ctx, group, images[i].id, frame);
 		if (flight_is_planet_group(group) && ctx->opt->planet_max > 0 && frame->w > ctx->opt->planet_max) {
-			ok = flight_shrink(frame, ctx->opt->planet_max);
+			ok = flight_fit(frame, ctx->opt->planet_max, 0);
 			resized++;
+		}
+		/* An image larger than an atlas page is scaled down to fit, such as
+		   TFTC's galaxy and nebula backdrops, which are 8912 pixels wide. */
+		if (ok && (frame->w > FLIGHT_MAX_IMAGE || frame->h > FLIGHT_MAX_IMAGE)) {
+			ok = flight_fit(frame, FLIGHT_MAX_IMAGE, FLIGHT_MAX_IMAGE);
+			fitted++;
 		}
 	}
 	char base[64];
 	snprintf(base, sizeof base, "group_%d", group);
 	if (ok && flight_write_atlas(ctx, base, frames, ids, count, header)) {
-		printf("resdata %s%sgroup %d: %d images%s\n", ctx->art_name ? ctx->art_name : "",
-			   ctx->art_name ? " " : "", group, count, resized ? ", planets shrunk" : "");
+		printf("resdata %s%sgroup %d: %d images%s%s\n", ctx->art_name ? ctx->art_name : "",
+			   ctx->art_name ? " " : "", group, count, resized ? ", planets shrunk" : "",
+			   fitted ? ", scaled down to fit an atlas page" : "");
 	} else {
 		fprintf(stderr, "xwau: group %d failed\n", group);
 		ctx->stats->failures++;

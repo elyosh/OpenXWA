@@ -9,7 +9,7 @@
 typedef struct BakeXwauFlightOptions {
 	const BakeSpriteOptions* sprites; /* out_root, formats, BC7 quality and group_filter */
 	const char* xwau_root;            /* the XWAU install */
-	int planet_max;                   /* halve planet images wider than this; 0 keeps them */
+	int planet_max;                   /* scale planet images wider than this down to it; 0 keeps them */
 } BakeXwauFlightOptions;
 
 typedef struct BakeXwauFlightStats {

@@ -22,6 +22,8 @@
  *                                                   these videos by hand too
  *   <out>/frontend/fonts/fonts.yaml                 the text font; copy the font file
  *                                                   by hand from Windows' Fonts folder
+ *   <out>/frontend/movies/movies.yaml               the film room's and the pods' movies;
+ *                                                   copy XWAU's Movies folder by hand
  *
  * Standard files that match stock and have no HD image are left to the stock
  * bake. The XWAU install is read with host file I/O, and file names are
@@ -1716,6 +1718,41 @@ static void write_fonts_yaml(XwauContext* ctx) {
 	printf("xwau: copy consolab.ttf from Windows' Fonts folder to frontend/fonts/\n");
 }
 
+/* Writes frontend/movies/movies.yaml, the movies of the film room and the
+ * two pods, from the FilmPodMovie, SinglePodMovie and MultiPodMovie settings.
+ * Each is "pod" without the setting, as in XWAU, which is the game's own
+ * movie, so the file is only written when one of them names another. */
+static void write_movies_yaml(XwauContext* ctx) {
+	static const char* const keys[] = { "FilmPodMovie", "SinglePodMovie", "MultiPodMovie" };
+	static const char* const rooms[] = { "film_room", "single_player_pod", "multiplayer_pod" };
+	char hooks[1100], movies[3][128];
+	const char* section;
+	int changed = 0;
+	if (!find_hook_settings(ctx->opt->xwau_root, hooks, sizeof hooks, &section))
+		return;
+	for (int i = 0; i < 3; ++i) {
+		if (!read_key_string(hooks, section, keys[i], movies[i], sizeof movies[i]) || !movies[i][0])
+			snprintf(movies[i], sizeof movies[i], "pod");
+		changed |= strcasecmp(movies[i], "pod") != 0;
+	}
+	if (!changed)
+		return;
+	char dir[1100], path[1200];
+	snprintf(dir, sizeof dir, "%s/frontend/movies", ctx->opt->sprites->out_root);
+	BakeSprites_MakeDirs(dir);
+	snprintf(path, sizeof path, "%s/movies.yaml", dir);
+	FILE* fp = fopen(path, "w");
+	if (!fp) {
+		ctx->stats->failures++;
+		return;
+	}
+	fprintf(fp, "# Made by xwa_asset_bake xwau-frontend from FilmPodMovie, SinglePodMovie and\n"
+				"# MultiPodMovie. The movies come from XWAU's Movies folder.\n");
+	for (int i = 0; i < 3; ++i)
+		fprintf(fp, "%s: %s\n", rooms[i], movies[i]);
+	fclose(fp);
+}
+
 static void write_animations_yaml(XwauContext* ctx) {
 	char list[1100];
 	if (!find_ci(ctx->opt->xwau_root, "ConcourseAnimations.txt", list, sizeof list))
@@ -2055,6 +2092,7 @@ int BakeXwau_RunFrontend(const BakeXwauOptions* opt, BakeXwauStats* stats) {
 	write_animations_yaml(&ctx);
 	write_video_yamls(&ctx);
 	write_fonts_yaml(&ctx);
+	write_movies_yaml(&ctx);
 
 	free(ctx.regions);
 	for (int i = 0; i < ctx.wide_key_count; ++i)
