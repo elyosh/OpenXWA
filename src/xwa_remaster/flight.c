@@ -3067,8 +3067,10 @@ static void fl_begin_point_lights(const XwaRemasterFlightView* view) {
 	memcpy(s.pl_eye, view->camera.pos, sizeof s.pl_eye);
 }
 
-/* Add a scene light to the pool unless its reach (range plus half length)
- * misses the view. Its score is its peak intensity over the squared
+/* Add a scene light to the pool unless what it lights misses the view: the
+ * sphere of its range around it (plus a tube's half length), or a spot
+ * light's cone (AeronScene_LightBounds), which can reach past the range
+ * along its axis. Its score is its peak intensity over the squared
  * distance from the camera to its nearest point (at least its source
  * radius away); `keep` scores it INFINITY. A full pool replaces its
  * lowest score. */
@@ -3077,10 +3079,13 @@ static void fl_pool_add(const AeronSceneLight* light, int model, int keep) {
 		sqrtf(light->half_axis[0] * light->half_axis[0] + light->half_axis[1] * light->half_axis[1] +
 			  light->half_axis[2] * light->half_axis[2]);
 	const float reach = light->radius + half_length;
+	float bound[3], bound_radius;
+	AeronScene_LightBounds(light, bound, &bound_radius);
 	for (int p = 0; p < 5; p++) {
 		const float* plane = s.pl_frustum[p];
 		if (plane[0] * light->pos[0] + plane[1] * light->pos[1] + plane[2] * light->pos[2] + plane[3] <
-			-reach) {
+				-reach ||
+			plane[0] * bound[0] + plane[1] * bound[1] + plane[2] * bound[2] + plane[3] < -bound_radius) {
 			s.pl_culled[model]++;
 			return;
 		}
@@ -3334,9 +3339,11 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
 /* The player craft's headlight (XwaHeadlight), converted as a light that a
  * GLB model authors in Blender: a one-sided light of P watts gives
  * P * 683 / pi candela straight ahead, and point_lights.model_light_intensity
- * turns candela into the scene's units. It starts at the seat's eye in every
- * view, as the pulse lights do, and points along the nose. The pool always
- * keeps it. The hyperspace tunnel doesn't add it. */
+ * turns candela into the scene's units. With an angle, it is a spot light
+ * with the same intensity straight ahead, which fades from the nose out to
+ * the angle. It starts at the seat's eye in every view, as the pulse lights
+ * do, and points along the nose. The pool always keeps it. The hyperspace
+ * tunnel doesn't add it. */
 static void fl_add_headlight(const XwaSnapshot* snap, const float player_bw[9], const float player_pos[3]) {
 	const XwaHeadlight* h = &snap->headlight;
 	if (!s.plight.enabled || !(s.plight.model_light_intensity > 0.0f) || !h->on || !player_bw) {
@@ -3365,6 +3372,7 @@ static void fl_add_headlight(const XwaSnapshot* snap, const float player_bw[9], 
 	light.intensity = h->power_w * 683.0f / 3.14159265f;
 	light.shape = AERON_FLIGHT_LIGHT_POINT;
 	light.direction.z = 1.0f;
+	light.spot_outer_angle = h->angle_degrees * (3.14159265f / 180.0f);
 	AeronSceneLight scene_light;
 	if (AeronScene_FlightLight(&light, transform, u, s.plight.model_light_intensity, &scene_light)) {
 		fl_pool_add(&scene_light, 0, 1);

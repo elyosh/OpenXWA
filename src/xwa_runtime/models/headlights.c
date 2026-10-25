@@ -20,6 +20,8 @@ static int s_autoTurnOn;
 static float s_position[3];
 static float s_color[3];
 static float s_power;
+/* Where the cone ends, from the nose; 0 without a cone. */
+static float s_angle;
 /* The loaded mission turns them on. */
 static int s_mission;
 
@@ -65,6 +67,7 @@ void XwaHeadlights_Init(void) {
 	memcpy(s_position, kPosition, sizeof s_position);
 	memcpy(s_color, kColor, sizeof s_color);
 	s_power = 0.0f;
+	s_angle = 0.0f;
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, HEADLIGHTS_FLIGHT_YAML, &file,
 									&error)) {
@@ -92,6 +95,16 @@ void XwaHeadlights_Init(void) {
 		Aeron_LogError("xwa.flight", "%s:%d: headlights: power_w must be a number of watts above 0",
 					   HEADLIGHTS_FLIGHT_YAML, AeronConfigNode_Line(node != NULL ? node : section));
 		ok = 0;
+	}
+	node = AeronConfigNode_MapGet(section, "angle_degrees");
+	if (node != NULL) {
+		s_angle = (float)AeronConfigNode_Float(node, -1.0);
+		if (!(s_angle > 0.0f && s_angle <= 90.0f)) {
+			Aeron_LogError("xwa.flight",
+						   "%s:%d: headlights: angle_degrees must be a number above 0, at most 90",
+						   HEADLIGHTS_FLIGHT_YAML, AeronConfigNode_Line(node));
+			ok = 0;
+		}
 	}
 	node = AeronConfigNode_MapGet(section, "auto_turn_on");
 	if (node != NULL && AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
@@ -138,4 +151,5 @@ void XwaHeadlights_Capture(XwaSnapshot* snapshot) {
 	memcpy(out->position_m, s_position, sizeof out->position_m);
 	memcpy(out->color, s_color, sizeof out->color);
 	out->power_w = s_power;
+	out->angle_degrees = s_angle;
 }

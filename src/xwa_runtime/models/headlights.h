@@ -12,10 +12,12 @@
  *     angle_degrees: 25
  *     auto_turn_on: true
  *
- * The light is one-sided and points along the nose. Its colour and its
- * power in watts are those of a Blender area light, as for the lights of
- * the GLB models. `angle_degrees` is the width of a cone, which isn't used
- * yet: the renderer has no cone lights. Without the section there are no
+ * The light points along the nose. Its colour and its power in watts are
+ * those of a Blender area light, as for the lights of the GLB models: P
+ * watts give P * 683 / pi candela straight ahead. `angle_degrees` (above 0,
+ * at most 90) makes it a spot light that ends at that angle from the nose,
+ * fading from the nose out, as XWAU's headlights do. Without it, the light
+ * is one-sided, with a cosine falloff. Without the section there are no
  * headlights. Every key but `power_w` is optional.
  *
  * A mission turns them on with `headlights: true` in its mission file: they are

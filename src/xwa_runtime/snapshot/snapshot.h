@@ -698,6 +698,8 @@ typedef struct XwaHeadlight {
 	float position_m[3];
 	float color[3];
 	float power_w;
+	/* Where the cone ends, from the nose; 0 for a one-sided light. */
+	float angle_degrees;
 } XwaHeadlight;
 
 /* Snapshot capacity for coordinate strips after the engine aligns the
