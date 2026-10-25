@@ -8465,6 +8465,15 @@ uint16_t Mission_Init(char* fileName) {
 					g_backdropRecordsByRegion[0][laserFlatIdx + 1].flags =
 						g_backdropRecordsByRegion[0][laserFlatIdx].flags;
 					g_backdropRecordsByRegion[0][laserFlatIdx + 1].frame = 1;
+#ifdef XWA_MODERN
+					/* The original leaves the beam's light as the previous
+					   mission left this record, and that light then lights
+					   the region. The beam has no light. */
+					g_backdropRecordsByRegion[0][laserFlatIdx + 1].colorR = 0.0f;
+					g_backdropRecordsByRegion[0][laserFlatIdx + 1].colorG = 0.0f;
+					g_backdropRecordsByRegion[0][laserFlatIdx + 1].colorB = 0.0f;
+					g_backdropRecordsByRegion[0][laserFlatIdx + 1].intensity = 0.0f;
+#endif
 					laser->nextTargetFlightGroupIndex = 0;
 
 					if (g_missionFlightGroups[g_currentFlightGroupIdx].fg.name[0] != 0) {
