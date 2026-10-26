@@ -545,7 +545,10 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 			if (!drawn)
 				continue;
 			text_set_tint(&sprite, text_prepared.arrow_glyphs[i].argb);
-			XwaRemasterDc_AddSprite(text_list, XWA_DC_LAYER_TEXT, &sprite);
+			/* The text next to the target arrow and the target box follows
+			 * the target: never captured by the cockpit's screens nor hidden
+			 * by the erased regions. */
+			AeronDrawList_AddSprite(text_list, &sprite);
 		}
 	}
 	for (uint16_t i = 0; i < text_prepared.glyph_count; i++) {

@@ -7,3 +7,4 @@ build/
 imgui.ini
 .decompmatch/
 cmake-build-*/
+.clangd

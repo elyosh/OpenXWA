@@ -1191,10 +1191,10 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 			quad.texture = sprite.texture;
 			quad.blend = sprite.blend;
 			quad.filter = sprite.filter;
-			if (panel)
-				AeronDrawList_AddQuad4(fixed_list, &quad);
-			else
-				XwaRemasterDc_AddQuad4(fixed_list, XWA_DC_LAYER_GRAPHICS, &quad);
+			/* The arrows follow the target across the screen, like the
+			 * target boxes: never captured by the cockpit's screens nor
+			 * hidden by the erased regions. */
+			AeronDrawList_AddQuad4(fixed_list, &quad);
 		} else if (panel) {
 			AeronDrawList_AddSprite(fixed_list, &sprite);
 		} else {
