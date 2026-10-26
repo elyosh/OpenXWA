@@ -712,6 +712,26 @@ typedef struct XwaHeadlight {
 	float angle_degrees;
 } XwaHeadlight;
 
+/* The groups of the particle lights (particle_lights.h). */
+typedef enum XwaParticleLightGroup {
+	XWA_PARTICLE_LIGHT_COCKPIT_SPARKS, /* effect 4 */
+	XWA_PARTICLE_LIGHT_COCKPIT_SMOKE,  /* effect 2 */
+	XWA_PARTICLE_LIGHT_CRAFT_DAMAGE,   /* the other effects on objects */
+	XWA_PARTICLE_LIGHT_GROUP_COUNT
+} XwaParticleLightGroup;
+
+/* The mod's light for a group of particle effects, in place of the game's:
+ * a Blender point light of `power_w` watts at the emitter (0: no light).
+ * `color` is linear; without `has_color`, the light has the game's colour.
+ * With `fade`, it dims to nothing over the effect's life. */
+typedef struct XwaParticleLight {
+	uint8_t defined;
+	uint8_t has_color;
+	uint8_t fade;
+	float color[3];
+	float power_w;
+} XwaParticleLight;
+
 /* Snapshot capacity for coordinate strips after the engine aligns the
  * segment count to the texture frame count. The original 32-frame
  * WrapBack group builds 128 segments and therefore needs 129 coords. */
@@ -865,6 +885,9 @@ typedef struct XwaParticleEffect {
 	uint8_t hide_owner_external;
 	uint8_t hide_owner_film;
 	uint8_t point_light; /* intended effect-origin light; object effects only */
+	/* The effect's age, and its life in game ticks (-1: no end). */
+	int32_t age_ticks;
+	int32_t lifetime_ticks;
 	uint16_t texture_object_type;
 	uint32_t render_flags; /* legacy material/filter state */
 	XwaPreciseWorldPoint emitter_world_pos;
@@ -1331,6 +1354,7 @@ typedef struct XwaSnapshot {
 	XwaLightPulse light_pulses[XWA_SNAP_MAX_LIGHT_PULSES];
 	uint8_t light_pulse_active;
 	XwaHeadlight headlight;
+	XwaParticleLight particle_lights[XWA_PARTICLE_LIGHT_GROUP_COUNT];
 	XwaBackdrop backdrops[XWA_SNAP_MAX_BACKDROPS];
 	uint32_t backdrop_count;
 	XwaGlowMark glow_marks[XWA_SNAP_MAX_GLOW_MARKS];

@@ -17,6 +17,7 @@
 #include "xwa_runtime/models/cockpit_alert_lights.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/headlights.h"
+#include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
@@ -1289,6 +1290,8 @@ static int snapshot_particle_capture_effect(XwaSnapshot* s, const ParticleEffect
 	dst->hide_owner_external = (uint8_t)(!child_effect && !effect->useAttachedTransform);
 	dst->hide_owner_film = dst->hide_owner_external;
 	dst->point_light = (uint8_t)contributes_light;
+	dst->age_ticks = effect->ageTicks;
+	dst->lifetime_ticks = effect->lifetimeTicks;
 	dst->texture_object_type =
 		effect->textureFrameCount ? effect->textureObjectType : effect->def->textureObjectType;
 	dst->render_flags = effect->def->renderFlags;
@@ -1901,6 +1904,7 @@ void XwaSnapshot_CaptureFlight(void) {
 
 	XwaCockpitAlertLights_Capture(s);
 	XwaHeadlights_Capture(s);
+	XwaParticleLights_Capture(s);
 
 	/* Player cockpit STATE (see XwaCockpit): model identity from the
 	 * loaded-handle registry (seat 0 = g_cockpitModel incl. the classic

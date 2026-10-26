@@ -3366,6 +3366,48 @@ static int fl_projectile_has_model_lights(const XwaFlightObject* f) {
 	return mesh && mesh->light_count > 0;
 }
 
+/* The group of a particle effect's light (XwaParticleLightGroup): only
+ * the cockpit hits create effects 4 and 2. */
+static XwaParticleLightGroup fl_particle_light_group(const XwaParticleEffect* effect) {
+	return effect->effect_type == 4   ? XWA_PARTICLE_LIGHT_COCKPIT_SPARKS
+		   : effect->effect_type == 2 ? XWA_PARTICLE_LIGHT_COCKPIT_SMOKE
+									  : XWA_PARTICLE_LIGHT_CRAFT_DAMAGE;
+}
+
+/* A group's light is a Blender point light: P watts give P * 683 / (4 pi)
+ * candela, which the scene takes at 683 lm/W (AERON_SCENE_LUMENS_PER_WATT).
+ * With fade, it dims linearly over the effect's life. */
+int XwaRemasterFlight_ParticleLight(const XwaSnapshot* snapshot, const XwaParticleEffect* effect,
+									const float pos[3], AeronSceneLight* out) {
+	const XwaParticleLight* group = &snapshot->particle_lights[fl_particle_light_group(effect)];
+	if (!group->defined || !s.plight.model_lights) {
+		return -1;
+	}
+	float fade = 1.0f;
+	if (group->fade && effect->lifetime_ticks > 0) {
+		fade = 1.0f - (float)effect->age_ticks / (float)effect->lifetime_ticks;
+		fade = fade < 0.0f ? 0.0f : (fade > 1.0f ? 1.0f : fade);
+	}
+	if (!(group->power_w > 0.0f) || !(fade > 0.0f)) {
+		return 0;
+	}
+	const float u = AERON_OPT_UNITS_PER_METER;
+	float transform[16] = { 0 };
+	for (int r = 0; r < 3; r++) {
+		transform[r * 4 + r] = u;
+		transform[r * 4 + 3] = pos[r];
+	}
+	transform[15] = 1.0f;
+	AeronFlightLight light;
+	memset(&light, 0, sizeof light);
+	for (int c = 0; c < 3; c++) {
+		light.color[c] = group->has_color ? group->color[c] : XwaRemaster_SrgbToLinear(c < 2 ? 1.0f : 0.75f);
+	}
+	light.intensity = group->power_w * 683.0f / (4.0f * 3.14159265f) * fade;
+	light.shape = AERON_FLIGHT_LIGHT_POINT;
+	return AeronScene_FlightLight(&light, transform, u, 1.0f / AERON_SCENE_LUMENS_PER_WATT, out) ? 1 : 0;
+}
+
 static void fl_derive_point_lights(const XwaSnapshot* snap) {
 	if (!s.plight.enabled) {
 		return;
@@ -3447,19 +3489,27 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 	 * each eligible object-attached emitter (effect type 1 is excluded).
 	 * The recovered classic helper stores receiver-relative coordinates;
 	 * at the HD boundary this becomes the intended world emitter position
-	 * and participates in the same frame-global PBR light selection. */
+	 * and participates in the same frame-global PBR light selection. The
+	 * mod's light replaces it (XwaParticleLight), and the pool always keeps
+	 * the cockpit's. */
 	for (uint32_t i = 0; i < snap->particle_effect_count; i++) {
 		const XwaParticleEffect* effect = &snap->particle_effects[i];
 		if (!effect->point_light || effect->source_kind != XWA_PARTICLE_SOURCE_OBJECT ||
 			effect->render_region != cam->region) {
 			continue;
 		}
-		const float intensity = 125.0f;
-		const float cxi[3] = { intensity, intensity, XwaRemaster_SrgbToLinear(0.75f) * intensity };
 		float local[3];
 		AeronWorld_LocalPointI32F32(s.origin_world, effect->emitter_world_pos.base,
 									effect->emitter_world_pos.offset, local);
-		fl_pl_push(local, cxi);
+		AeronSceneLight light;
+		const int mod_light = XwaRemasterFlight_ParticleLight(snap, effect, local, &light);
+		if (mod_light > 0) {
+			fl_pool_add(&light, 0, fl_particle_light_group(effect) != XWA_PARTICLE_LIGHT_CRAFT_DAMAGE);
+		} else if (mod_light < 0) {
+			const float intensity = 125.0f;
+			const float cxi[3] = { intensity, intensity, XwaRemaster_SrgbToLinear(0.75f) * intensity };
+			fl_pl_push(local, cxi);
+		}
 	}
 }
 

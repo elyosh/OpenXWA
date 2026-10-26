@@ -177,6 +177,13 @@ typedef struct XwaFlightPointLightStats {
 	AeronSceneClusteredLightStats scene;
 } XwaFlightPointLightStats;
 
+/* The mod's light for particle effect `effect` of `snapshot`
+ * (XwaParticleLight), at `pos` in scene units. Returns -1 when the mod
+ * doesn't replace the game's light (or model lights are off), 0 when its
+ * light is off, 1 when `out` holds the light. */
+int XwaRemasterFlight_ParticleLight(const XwaSnapshot* snapshot, const XwaParticleEffect* effect,
+									const float pos[3], AeronSceneLight* out);
+
 void XwaRemasterFlight_GetPointLights(XwaFlightPointLightParams* out);
 void XwaRemasterFlight_SetPointLights(const XwaFlightPointLightParams* in);
 void XwaRemasterFlight_GetPointLightsDefault(XwaFlightPointLightParams* out);

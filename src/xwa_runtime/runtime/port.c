@@ -49,6 +49,7 @@
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/object_limits.h"
+#include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
@@ -163,6 +164,7 @@ int XwaPort_Init(void) {
 	XwaObjectLimits_Init();
 	XwaHeadlights_Init();
 	XwaCockpitAlertLights_Init();
+	XwaParticleLights_Init();
 	XwaCraftDefinitions_Apply();
 	XwaModelSource_Init();
 	XwaHangars_Init();

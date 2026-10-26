@@ -242,8 +242,9 @@ point_lights:
   # illuminance after the exposure, and ends.
   range_scale: 1.0
   # Lights authored in models (such as the converted cockpits' interior
-  # light), the headlight and the mod's cockpit alert lights. They are in
-  # candela. Without them, the alert lights are the game's.
+  # light), the headlight, and the mod's cockpit alert lights and particle
+  # lights. They are in candela. Without them, the alert lights and the
+  # particle lights are the game's.
   model_lights: true
 classic_lighting:
   # Converts the classic game's lights (suns and other backdrops, the game's

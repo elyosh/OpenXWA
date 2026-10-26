@@ -60,6 +60,9 @@ static struct {
 	uint32_t point_candidate_dropped;
 	uint32_t particle_light_ids[XWA_SNAP_MAX_PARTICLE_EFFECTS];
 	uint32_t particle_light_id_count;
+	/* The mod's particle lights (XwaRemasterFlight_ParticleLight). */
+	AeronSceneLight particle_scene[CMD_MAX_POINT_CANDIDATES];
+	uint32_t particle_scene_count;
 	/* This frame's exposure, metered from the display's own lights. */
 	float exposure;
 } s_cmd;
@@ -430,11 +433,19 @@ static void cmd_add_particle_lights(const XwaSnapshot* snapshot, const float row
 		float delta[3];
 		AeronWorld_LocalPointI32F32(target->world_pos, effect->emitter_world_pos.base,
 									effect->emitter_world_pos.offset, delta);
+		float pos[3];
+		for (int r = 0; r < 3; r++)
+			pos[r] = rows[r * 3] * delta[0] + rows[r * 3 + 1] * delta[1] + rows[r * 3 + 2] * delta[2];
+		pos[2] += cmd_camera_distance(&snapshot->hud.crt);
+		AeronSceneLight mod_light;
+		const int mod = XwaRemasterFlight_ParticleLight(snapshot, effect, pos, &mod_light);
+		if (mod > 0 && s_cmd.particle_scene_count < CMD_MAX_POINT_CANDIDATES)
+			s_cmd.particle_scene[s_cmd.particle_scene_count++] = mod_light;
+		if (mod >= 0)
+			continue;
 		XwaShipPointLight* light = &s_cmd.point_candidates[s_cmd.point_candidate_count++];
 		memset(light, 0, sizeof *light);
-		for (int r = 0; r < 3; r++)
-			light->pos[r] = rows[r * 3] * delta[0] + rows[r * 3 + 1] * delta[1] + rows[r * 3 + 2] * delta[2];
-		light->pos[2] += cmd_camera_distance(&snapshot->hud.crt);
+		memcpy(light->pos, pos, sizeof light->pos);
 		light->color[0] = light->color[1] = 125.0f;
 		light->color[2] = XwaRemaster_SrgbToLinear(0.75f) * 125.0f;
 	}
@@ -460,6 +471,10 @@ static uint32_t cmd_finalize_point_lights(void) {
 static void cmd_submit_point_lights(uint32_t count) {
 	for (uint32_t i = 0; i < count; ++i)
 		AeronScene_AddLight(s_cmd.scene, &s_cmd.point_scene[i]);
+	XwaFlightPointLightParams config;
+	XwaRemasterFlight_GetPointLights(&config);
+	for (uint32_t i = 0; config.enabled && i < s_cmd.particle_scene_count; ++i)
+		AeronScene_AddLight(s_cmd.scene, &s_cmd.particle_scene[i]);
 }
 
 static int cmd_configure_clustered_lights(void) {
@@ -618,6 +633,7 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	s_cmd.point_candidate_count = 0;
 	s_cmd.point_candidate_dropped = 0;
 	s_cmd.particle_light_id_count = 0;
+	s_cmd.particle_scene_count = 0;
 	XwaAssetRef glow_ref;
 	const int glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &glow_ref);
 	float target_transform[16];
