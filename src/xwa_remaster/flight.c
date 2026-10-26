@@ -3463,22 +3463,41 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 	}
 }
 
+/* Metres from the eye of the player's seat, along the craft's right, up
+ * and forward axes, to world units. player_bw's rows are right,
+ * ship-backward and up. */
+static void fl_seat_eye_transform(const XwaSnapshot* snap, const float player_bw[9],
+								  const float player_pos[3], float transform[16]) {
+	const XwaCockpit* k = &snap->cockpit;
+	const float u = AERON_OPT_UNITS_PER_METER;
+	memset(transform, 0, 16 * sizeof(float));
+	for (int r = 0; r < 3; r++) {
+		transform[r * 4 + 0] = player_bw[0 * 3 + r] * u;
+		transform[r * 4 + 1] = player_bw[2 * 3 + r] * u;
+		transform[r * 4 + 2] = -player_bw[1 * 3 + r] * u;
+		transform[r * 4 + 3] = player_pos[r] + player_bw[0 * 3 + r] * k->seat_eye_local[0] +
+							   player_bw[1 * 3 + r] * k->seat_eye_local[1] +
+							   player_bw[2 * 3 + r] * k->seat_eye_local[2];
+	}
+	transform[15] = 1.0f;
+}
+
 /* Local-player pulse lights: the classic cycle/fade envelope
  * (FlightLight_AppendLocalPlayerPulses) replayed from the sim clock;
  * position = the eye point of the player's seat in the craft's model space,
  * carried to world through the player basis. Callers may exclude semantic
- * slots whose visual role is replaced by a dedicated HD scene. */
+ * slots whose visual role is replaced by a dedicated HD scene. A pulse the
+ * mod replaces (XwaLightPulse.mod_defined) is a Blender point light of
+ * P watts, P * 683 / (4 pi) candela, with the same envelope; the pool always
+ * keeps it. Without model lights, it keeps the game's light. */
 static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_bw[9],
 								   const float player_pos[3], uint32_t excluded_slots) {
 	if (!s.plight.enabled || !snap->light_pulse_active || !player_bw) {
 		return;
 	}
-	const XwaCockpit* k = &snap->cockpit;
-	float world[3];
-	for (int r = 0; r < 3; r++) {
-		world[r] = player_pos[r] + player_bw[0 * 3 + r] * k->seat_eye_local[0] +
-				   player_bw[1 * 3 + r] * k->seat_eye_local[1] + player_bw[2 * 3 + r] * k->seat_eye_local[2];
-	}
+	float transform[16];
+	fl_seat_eye_transform(snap, player_bw, player_pos, transform);
+	const float world[3] = { transform[3], transform[7], transform[11] };
 	for (int p = 0; p < XWA_SNAP_MAX_LIGHT_PULSES; p++) {
 		if (excluded_slots & (1u << (uint32_t)p)) {
 			continue;
@@ -3507,6 +3526,25 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
 		} else {
 			fade = 1.0f;
 		}
+		if (pl->mod_defined && s.plight.model_lights) {
+			AeronFlightLight light;
+			memset(&light, 0, sizeof light);
+			light.position.x = pl->mod_position_m[0];
+			light.position.y = pl->mod_position_m[1];
+			light.position.z = pl->mod_position_m[2];
+			for (int c = 0; c < 3; c++) {
+				light.color[c] =
+					pl->mod_has_color ? pl->mod_color[c] : XwaRemaster_SrgbToLinear(pl->color[c]);
+			}
+			light.intensity = pl->mod_power_w * 683.0f / (4.0f * 3.14159265f) * fade;
+			light.shape = AERON_FLIGHT_LIGHT_POINT;
+			AeronSceneLight scene_light;
+			if (AeronScene_FlightLight(&light, transform, AERON_OPT_UNITS_PER_METER,
+									   1.0f / AERON_SCENE_LUMENS_PER_WATT, &scene_light)) {
+				fl_pool_add(&scene_light, 0, 1);
+			}
+			continue;
+		}
 		float cxi[3];
 		for (int c = 0; c < 3; c++) {
 			cxi[c] = XwaRemaster_SrgbToLinear(pl->color[c]) * pl->intensity * fade;
@@ -3528,20 +3566,8 @@ static void fl_add_headlight(const XwaSnapshot* snap, const float player_bw[9], 
 	if (!s.plight.enabled || !s.plight.model_lights || !h->on || !player_bw) {
 		return;
 	}
-	const XwaCockpit* k = &snap->cockpit;
-	const float u = AERON_OPT_UNITS_PER_METER;
-	/* Metres along the craft's right, up and forward axes to world units.
-	 * player_bw's rows are right, ship-backward and up. */
-	float transform[16] = { 0 };
-	for (int r = 0; r < 3; r++) {
-		transform[r * 4 + 0] = player_bw[0 * 3 + r] * u;
-		transform[r * 4 + 1] = player_bw[2 * 3 + r] * u;
-		transform[r * 4 + 2] = -player_bw[1 * 3 + r] * u;
-		transform[r * 4 + 3] = player_pos[r] + player_bw[0 * 3 + r] * k->seat_eye_local[0] +
-							   player_bw[1 * 3 + r] * k->seat_eye_local[1] +
-							   player_bw[2 * 3 + r] * k->seat_eye_local[2];
-	}
-	transform[15] = 1.0f;
+	float transform[16];
+	fl_seat_eye_transform(snap, player_bw, player_pos, transform);
 	AeronFlightLight light;
 	memset(&light, 0, sizeof light);
 	light.position.x = h->position_m[0];
@@ -3553,7 +3579,8 @@ static void fl_add_headlight(const XwaSnapshot* snap, const float player_bw[9], 
 	light.direction.z = 1.0f;
 	light.spot_outer_angle = h->angle_degrees * (3.14159265f / 180.0f);
 	AeronSceneLight scene_light;
-	if (AeronScene_FlightLight(&light, transform, u, 1.0f / AERON_SCENE_LUMENS_PER_WATT, &scene_light)) {
+	if (AeronScene_FlightLight(&light, transform, AERON_OPT_UNITS_PER_METER,
+							   1.0f / AERON_SCENE_LUMENS_PER_WATT, &scene_light)) {
 		fl_pool_add(&scene_light, 0, 1);
 	}
 }

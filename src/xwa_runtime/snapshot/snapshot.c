@@ -14,6 +14,7 @@
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/cockpit_alert_lights.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/skins.h"
@@ -1884,6 +1885,7 @@ void XwaSnapshot_CaptureFlight(void) {
 		dst->color[2] = src->colorB;
 	}
 
+	XwaCockpitAlertLights_Capture(s);
 	XwaHeadlights_Capture(s);
 
 	/* Player cockpit STATE (see XwaCockpit): model identity from the

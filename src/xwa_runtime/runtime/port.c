@@ -38,6 +38,7 @@
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/input/rumble_provider.h"
 #include "xwa_runtime/input/winmm_joystick_provider.h"
+#include "xwa_runtime/models/cockpit_alert_lights.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_weapons.h"
@@ -45,9 +46,9 @@
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/mission_backdrops.h"
-#include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
@@ -161,6 +162,7 @@ int XwaPort_Init(void) {
 	XwaDocking_Init();
 	XwaObjectLimits_Init();
 	XwaHeadlights_Init();
+	XwaCockpitAlertLights_Init();
 	XwaCraftDefinitions_Apply();
 	XwaModelSource_Init();
 	XwaHangars_Init();

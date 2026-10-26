@@ -686,6 +686,16 @@ typedef struct XwaLightPulse {
 	float intensity;
 	float cull_radius;
 	float color[3];
+	/* The mod's light in place of this one (cockpit_alert_lights.h): a
+	 * Blender point light of `mod_power_w` watts, `mod_position_m` from
+	 * the seat's eye along the craft's axes (X right, Y up, Z forward).
+	 * `mod_color` is linear; without `mod_has_color`, the light has the
+	 * game's colour. */
+	uint8_t mod_defined;
+	uint8_t mod_has_color;
+	float mod_position_m[3];
+	float mod_color[3];
+	float mod_power_w;
 } XwaLightPulse;
 #define XWA_SNAP_MAX_LIGHT_PULSES 6
 
