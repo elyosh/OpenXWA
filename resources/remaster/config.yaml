@@ -276,8 +276,8 @@ exposure:
   # 0 = ev100, 1 = full metering. Partial keeps part of the difference
   # between scenes: a dim region still looks dimmer.
   metering: 0.6
-  min_ev100: 12.0
-  max_ev100: 18.0
+  min_ev100: 13.0
+  max_ev100: 17.0
   # Adaptation rate per second, in each direction. The gap in EV shrinks as
   # e^(-speed * t): at 1.5, 78% of it is closed after one second.
   brighten_speed: 1.5  # when the scene gets darker
