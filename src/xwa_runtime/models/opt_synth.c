@@ -30,8 +30,9 @@ enum {
 	OPT_SYNTH_VERTEX_SAMPLE_COUNT = 256,
 };
 
-/* Cockpit-class models are hit-tested by the loose FaceData walk: up to nine
-   linear sweeps over every face per player hit, accepting near misses within
+/* The burn marks of a hit on the player's cockpit are placed with the loose
+   FaceData walk: up to nine linear sweeps over every face per hit, from the
+   eye to a cockpit spark hardpoint, accepting near misses within
    about 50 / edge length OPT units of a face edge. Stock cockpits (the twelve
    *Cockpit.opt plus CorellianTransportGunner.opt) have at most 629 faces and
    a smallest per-component mean edge of 1.1 OPT units, so warn only beyond
@@ -241,9 +242,9 @@ static int OptSynth_ValidateSimulation(const char* key, const AeronOptSimModel* 
 }
 
 /* Warns once when a cockpit-class model is denser than any stock cockpit:
-   more faces makes the loose hit-spark sweeps slower, and shorter edges widen
-   their near-miss tolerance. A collision mesh replaces the edge concern for
-   its component. */
+   more faces makes the loose sweeps of the burn marks slower, and shorter
+   edges widen their near-miss tolerance. A collision mesh replaces the edge
+   concern for its component. */
 static void OptSynth_WarnDenseCockpit(const char* key, const AeronFlightModel* model) {
 	uint32_t component;
 	uint32_t faceTotal;
@@ -298,7 +299,7 @@ static void OptSynth_WarnDenseCockpit(const char* key, const AeronFlightModel* m
 		Aeron_LogWarn(
 			"xwa.models",
 			"replacement '%s': cockpit component %d has a mean edge of %.2f OPT units (stock cockpits "
-			"stay above 1.1) and no collision mesh; hit sparks accept wide near misses",
+			"stay above 1.1) and no collision mesh; the burn marks of hits accept wide near misses",
 			key, smallestComponent, smallestMeanEdge);
 	}
 }
