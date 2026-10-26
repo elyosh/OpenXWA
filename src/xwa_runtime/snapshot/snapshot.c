@@ -1221,6 +1221,20 @@ static int snapshot_particle_transform(const ObjectRecord* owner, const Particle
 	out->emitter_base[0] = owner->world_x;
 	out->emitter_base[1] = owner->world_y;
 	out->emitter_base[2] = owner->world_z;
+	const PlayerData* player = &g_players[g_localPlayer];
+	if (owner - g_objectTable == (ptrdiff_t)player->objectIndex && !player->viewState.externalCameraActive) {
+		/* The cockpit hit effects on the player's craft, from the eye as
+		 * RenderBillboard_DrawOriented places them, the cockpit too. The
+		 * camera position rounds the eye offset and the pan to whole units,
+		 * so the craft's position would move them against the cockpit. */
+		const PlayerViewState* vs = &player->viewState;
+		out->emitter_base[0] = vs->savedTargetX;
+		out->emitter_base[1] = vs->savedTargetY;
+		out->emitter_base[2] = vs->savedTargetZ;
+		emitter.x -= player->seatEyeWorldOffsetX + (float)vs->cameraPanDeltaX * 0.0625f;
+		emitter.y -= player->seatEyeWorldOffsetY + (float)vs->cameraPanDeltaY * 0.0625f;
+		emitter.z -= player->seatEyeWorldOffsetZ + (float)vs->cameraPanDeltaZ * 0.0625f;
+	}
 	out->emitter_offset = emitter;
 	return 1;
 }

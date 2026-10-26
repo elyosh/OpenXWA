@@ -70,6 +70,12 @@ void XwaRemasterEffectView_Main(XwaRemasterEffectView* out, const XwaRemasterFli
 		for (int c = 0; c < 3; c++)
 			out->eye_to_scene[r * 3 + c] = world_to_eye[c * 3 + r];
 	memcpy(out->scene_origin, view->camera.pos, sizeof out->scene_origin);
+	/* The eye is at the camera, which is away from the origin in a view
+	 * built at another camera's origin, such as the previous frame's. */
+	for (int r = 0; r < 3; r++)
+		out->origin_eye[r] =
+			-(world_to_eye[r * 3] * view->camera.pos[0] + world_to_eye[r * 3 + 1] * view->camera.pos[1] +
+			  world_to_eye[r * 3 + 2] * view->camera.pos[2]);
 	out->focal_x_px = 0.5f * (float)view->viewport.width / tanf(view->camera.h_half_rad);
 	out->focal_y_px = 0.5f * (float)view->viewport.height / tanf(view->camera.v_half_rad);
 	out->classic_pixel_scale = view->classic_pixel_scale;
