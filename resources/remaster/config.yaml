@@ -156,15 +156,15 @@ hangar_lighting:
   direction_x: 0.0
   direction_y: 0.0
   direction_z: 1.0
-  intensity: 2.0  # illuminance in W/m^2 (1366 lux), up to 2000
+  intensity: 50.0  # illuminance in W/m^2 (34,150 lux), up to 2000
   color_r: 1.0
   color_g: 1.0
   color_b: 1.0
   # Ambient cube in W/m^2/sr, up to 1000: +Z ceiling fill, horizontal wall
   # bounce, -Z floor bounce. It takes the key light's hue.
-  ambient_ceiling: 0.16
-  ambient_sides: 0.10
-  ambient_floor: 0.06
+  ambient_ceiling: 0.4
+  ambient_sides: 0.6
+  ambient_floor: 0.5
 # Authored per-region HDR environments (sky, diffuse and specular lighting,
 # suns). The manifest path is relative to the mod folder. It holds the
 # `environments:` map and, under `xwa:`, the (mission, region) mapping and
@@ -274,7 +274,7 @@ exposure:
   # 0 = ev100, 1 = full metering. Partial keeps part of the difference
   # between scenes: a dim region still looks dimmer.
   metering: 0.6
-  min_ev100: 4.0
+  min_ev100: 12.0
   max_ev100: 18.0
   # Adaptation rate per second, in each direction. The gap in EV shrinks as
   # e^(-speed * t): at 1.5, 78% of it is closed after one second.
@@ -286,13 +286,13 @@ exposure:
   high_percent: 90.0
   # Weight of pixels with no geometry (sky, backdrops, effects over empty
   # space), so that black space doesn't decide the exposure of a ship.
-  sky_weight: 0.1
+  sky_weight: 0.2
   # Weight of geometry nearer than near_distance metres: the cockpit, so
   # that its dark interior doesn't decide the exposure of the view outside.
   near_weight: 0.1
   near_distance: 5.0
   edge_weight: 0.25    # weight at the screen's corners; 1 at the centre
-  channel: "luminance" # luminance, or max: the largest of r, g and b
+  channel: "max" # luminance, or max: the largest of r, g and b
 bloom:
   # Fraction of the scene's light the bloom scatters (no threshold), 0 to 1.
   # The scattered light leaves its source, so lit surfaces do not brighten.
