@@ -553,10 +553,8 @@ static int fl_cfg_has_type(const AeronConfigFile* config, const char* path, Aero
 
 static int fl_cfg_validate(const AeronConfigFile* config, const char** error_path) {
 	static const char* ints[] = {
-		"presentation.vsync_divisor",
-		"presentation.msaa_samples",
-		"motion_blur.quality",
-		"point_lights.cluster_depth_slices",
+		"presentation.vsync_divisor", "presentation.frames_in_flight",     "presentation.msaa_samples",
+		"motion_blur.quality",        "point_lights.cluster_depth_slices",
 	};
 	static const char* floats[] = {
 		"hangar_lighting.direction_x",
@@ -634,7 +632,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"motion_blur.camera_blur",       "motion_blur.pause_keep_blur", "motion_blur.velocity_viz",
 		"texture_filtering.anisotropic", "hangar_lighting.enabled",     "lighting.spec_geom_adapt",
 		"dynamic_cockpit.enabled",       "dynamic_cockpit.classic_hud", "dynamic_cockpit.holograms",
-		"point_lights.model_lights",
+		"point_lights.model_lights",     "presentation.latency_pacing",
 	};
 	static const char* strings[] = {
 		"temporal_upscaling.mode",
@@ -857,6 +855,13 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+	const int frames_in_flight = (int)AeronConfigFile_GetInt(cf, "presentation.frames_in_flight", 0);
+	if (!Aeron_SetFramesInFlight(frames_in_flight)) {
+		Aeron_LogError("xwa.remaster", "%s: presentation.frames_in_flight must be 1 or 2", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	Aeron_SetLatencyPacing(AeronConfigFile_GetBool(cf, "presentation.latency_pacing", 0));
 	const int msaa_samples = (int)AeronConfigFile_GetInt(cf, "presentation.msaa_samples", 0);
 	switch (msaa_samples) {
 		case 1:
@@ -1121,8 +1126,11 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	}
 	Aeron_LogInfo("xwa.remaster", "flight FSR 3.1.4 mode: %s%s", AeronTemporal_ModeName(s.fsr_mode),
 				  s.fsr_sharpness > 0.0f ? " with RCAS" : "");
-	Aeron_LogInfo("xwa.remaster", "presentation: %.2f Hz display, VSync divisor %d, %.2f fps target",
-				  Aeron_DisplayRefreshRate(), Aeron_PresentationVsyncDivisor(), Aeron_PresentationRate());
+	Aeron_LogInfo("xwa.remaster",
+				  "presentation: %.2f Hz display, VSync divisor %d, %.2f fps target, %d frames in flight, "
+				  "latency pacing %s",
+				  Aeron_DisplayRefreshRate(), Aeron_PresentationVsyncDivisor(), Aeron_PresentationRate(),
+				  Aeron_FramesInFlight(), Aeron_LatencyPacing() ? "on" : "off");
 	return 1;
 }
 

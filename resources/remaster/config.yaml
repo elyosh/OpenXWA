@@ -142,6 +142,14 @@ assets:
 presentation:
   # 1 renders at the display refresh rate; 2 renders at half refresh.
   vsync_divisor: 1
+  # Frames the GPU may work on at once, 1 or 2. With 2, the next frame
+  # starts while the GPU still draws the last one, which gives the GPU more
+  # of each refresh.
+  frames_in_flight: 2
+  # Starts each frame later by the time the last frames waited for the
+  # display with their GPU work done, so input is read closer to when the
+  # frame is shown. Only with vsync_divisor 1.
+  latency_pacing: true
   # Required shipped baseline; user config.yaml may override both values.
   msaa_samples: 2
   hdr_output: true

@@ -836,6 +836,15 @@ static void xwa_tool_hdr(int* open, void* user) {
 	if (ImGui::Combo("VSync rate", &vsync_rate, vsync_names, 2)) {
 		Aeron_SetPresentationVsyncDivisor(vsync_rate + 1);
 	}
+	static const char* flight_names[] = { "1", "2" };
+	int frames_in_flight = Aeron_FramesInFlight() - 1;
+	if (ImGui::Combo("Frames in flight", &frames_in_flight, flight_names, 2)) {
+		Aeron_SetFramesInFlight(frames_in_flight + 1);
+	}
+	bool latency_pacing = Aeron_LatencyPacing() != 0;
+	if (ImGui::Checkbox("Latency pacing", &latency_pacing)) {
+		Aeron_SetLatencyPacing(latency_pacing);
+	}
 
 	ImGui::Separator();
 	ImGui::TextUnformatted("SDR content decode (HDR composition)");
@@ -1061,6 +1070,12 @@ static void xwa_tool_hdr(int* open, void* user) {
 				hdr_active ? " (HDR_EXTENDED_LINEAR)" : " (SDR)");
 	ImGui::Text("Display refresh  : %.2f Hz", Aeron_DisplayRefreshRate());
 	ImGui::Text("Presentation rate: %.2f fps", Aeron_PresentationRate());
+	AeronPacingStats pacing;
+	Aeron_GetPacingStats(&pacing);
+	ImGui::Text("Pacing delay     : %.2f ms%s", pacing.delay_us / 1000.0, pacing.active ? "" : " (off)");
+	ImGui::Text("Image wait       : %.2f ms (median)", pacing.acquire_wait_us / 1000.0);
+	ImGui::Text("Late frames      : %u per second", pacing.late_frames);
+	ImGui::Text("GPU busy at vsync: %u per second", pacing.busy_frames);
 	ImGui::Text("Display headroom : %.2fx (drives the HDR peak scale)", (double)Aeron_OutputHdrHeadroom());
 	ImGui::Text("Swapchain format : %s", xwa_fmt_name(Aeron_SwapchainFormat()));
 
