@@ -1458,12 +1458,6 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 	}
 }
 
-/* Point lights end under this illuminance after the exposure. The window
- * has already faded the light to almost nothing there, and a shorter range
- * keeps fewer lights per cluster; even in a dark region, 1/250 instead of
- * 1/1000 changes no pixel by more than a few levels. */
-#define SHIP_POINT_LIGHT_CUTOFF 0.004f
-
 int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float match_distance_m, float range_scale,
 									float exposure, AeronSceneLight* out) {
 	if (!light || !out || !(exposure > 0.0f)) {
@@ -1486,7 +1480,7 @@ int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float match_
 			peak = out->color[c];
 		}
 	}
-	out->radius = sqrtf(peak * exposure / SHIP_POINT_LIGHT_CUTOFF) * range_scale;
+	out->radius = sqrtf(peak * exposure / AERON_SCENE_LIGHT_CUTOFF) * range_scale;
 	out->source_radius = XWA_SHIP_POINT_LIGHT_RADIUS_M * AERON_OPT_UNITS_PER_METER;
 	return peak > 0.0f && isfinite(peak) && out->radius > 0.0f && isfinite(out->radius) &&
 		   isfinite(out->pos[0]) && isfinite(out->pos[1]) && isfinite(out->pos[2]);

@@ -438,7 +438,7 @@ static void cmd_add_particle_lights(const XwaSnapshot* snapshot, const float row
 			pos[r] = rows[r * 3] * delta[0] + rows[r * 3 + 1] * delta[1] + rows[r * 3 + 2] * delta[2];
 		pos[2] += cmd_camera_distance(&snapshot->hud.crt);
 		AeronSceneLight mod_light;
-		const int mod = XwaRemasterFlight_ParticleLight(snapshot, effect, pos, &mod_light);
+		const int mod = XwaRemasterFlight_ParticleLight(snapshot, effect, pos, s_cmd.exposure, &mod_light);
 		if (mod > 0 && s_cmd.particle_scene_count < CMD_MAX_POINT_CANDIDATES)
 			s_cmd.particle_scene[s_cmd.particle_scene_count++] = mod_light;
 		if (mod >= 0)
@@ -634,6 +634,10 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	s_cmd.point_candidate_dropped = 0;
 	s_cmd.particle_light_id_count = 0;
 	s_cmd.particle_scene_count = 0;
+	XwaRemasterDirLight lights[XWA_SNAP_MAX_DIR_LIGHTS];
+	const uint32_t light_count =
+		XwaRemaster_ReadGameDirLights(snapshot->dir_lights, snapshot->dir_light_count, lights);
+	s_cmd.exposure = XwaRemasterFlight_LightMeterExposure(lights, light_count);
 	XwaAssetRef glow_ref;
 	const int glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &glow_ref);
 	float target_transform[16];
@@ -702,10 +706,6 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	XwaRemasterTrails_SubmitOwner(s_cmd.trails, s_cmd.scene, target->slot, target->signature);
 	cmd_add_particle_lights(snapshot, rows, target, target->slot, target->signature);
 	cmd_submit_billboards();
-	XwaRemasterDirLight lights[XWA_SNAP_MAX_DIR_LIGHTS];
-	const uint32_t light_count =
-		XwaRemaster_ReadGameDirLights(snapshot->dir_lights, snapshot->dir_light_count, lights);
-	s_cmd.exposure = XwaRemasterFlight_LightMeterExposure(lights, light_count);
 	AeronScene_SetExposure(s_cmd.scene, s_cmd.exposure);
 	cmd_submit_point_lights(cmd_finalize_point_lights());
 	if (!cmd_configure_clustered_lights()) {
