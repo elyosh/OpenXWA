@@ -38,6 +38,8 @@
 #include <string.h>
 
 #define FL_MB_REFERENCE_FRAME_US 32000u
+/* A game tick is 4 ms of game time. */
+#define FL_MB_GAME_TICK_US 4000u
 #define FL_DS_LASER_TRANSVERSE_SCALE 100.0f
 
 /* Reversed-Z near plane in engine view units. Cockpit geometry sits
@@ -262,7 +264,8 @@ static struct {
 	const XwaSnapshot* mb_prev_snap;
 	int32_t* mb_prev_index;
 	uint32_t mb_prev_index_capacity;
-	/* Host-time span represented by the retained velocity buffer. */
+	/* Time covered by the retained velocity buffer: the game time between
+	 * the two snapshots, or the host time when game time didn't move. */
 	uint64_t mb_pose_host_us;
 	uint64_t mb_velocity_span_us;
 	int mb_pose_host_valid;
@@ -5043,9 +5046,17 @@ static void fl_mb_reset_timing(uint64_t host_time_us) {
 	s.mb_pose_host_valid = 1;
 }
 
-static void fl_mb_record_pose(uint64_t host_time_us) {
-	s.mb_velocity_span_us =
-		s.mb_pose_host_valid && host_time_us > s.mb_pose_host_us ? host_time_us - s.mb_pose_host_us : 0;
+/* The simulation moves in whole game ticks, so a host frame can carry up
+ * to 4 ms more or less game time than it lasted. Dividing the movement by
+ * the host time would then make the blur too long or too short, by several
+ * times on a short frame. Game time is the time the movement covers. */
+static void fl_mb_record_pose(uint64_t host_time_us, uint32_t game_ticks) {
+	if (game_ticks > 0) {
+		s.mb_velocity_span_us = (uint64_t)game_ticks * FL_MB_GAME_TICK_US;
+	} else {
+		s.mb_velocity_span_us =
+			s.mb_pose_host_valid && host_time_us > s.mb_pose_host_us ? host_time_us - s.mb_pose_host_us : 0;
+	}
 	s.mb_pose_host_us = host_time_us;
 	s.mb_pose_host_valid = 1;
 }
@@ -5316,7 +5327,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	if (!s.mb_enabled || !s.mb_pose_host_valid) {
 		fl_mb_reset_timing(host_time_us);
 	} else if (mb_regen) {
-		fl_mb_record_pose(host_time_us);
+		fl_mb_record_pose(host_time_us, (uint32_t)(snap->game_time_ticks - prev->game_time_ticks));
 	}
 	s.mb_prev_snap = s.mb_enabled ? prev : NULL;
 	float previous_crows[9];
