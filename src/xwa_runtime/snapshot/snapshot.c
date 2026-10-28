@@ -19,6 +19,7 @@
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/skins.h"
+#include "xwa_runtime/models/surfaces.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/host_clock.h"
@@ -1626,6 +1627,7 @@ static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_
 			}
 			XwaEngineGlows_HiddenMask(o->objectType, m->speed, (uint16_t)cd->aiFlight.maxSpeedCache,
 									  f->eg_hidden_mask);
+			f->surface_hidden_mask = XwaSurfaces_HiddenMask(o->objectType, cd, m->speed);
 		}
 	}
 }

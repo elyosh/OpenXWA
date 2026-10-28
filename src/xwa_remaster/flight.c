@@ -3767,10 +3767,11 @@ static uint8_t fl_probe_set_owner(uint32_t i) {
  * the scene takes it at 683 lm/W (AERON_SCENE_LUMENS_PER_WATT).
  * `skip_baked` leaves out the lights baked into the model's probes, while
  * its probe set is placed. `variant` is the instance's variant index: a
- * light that names variants shines only with them. */
+ * light that names variants shines only with them. Lights in the instance's
+ * `hidden_tag_groups` are left out. */
 static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transform[16],
-								const AeronSceneMeshTable* table, uint32_t variant, int keep,
-								int skip_baked) {
+								const AeronSceneMeshTable* table, uint32_t variant,
+								uint32_t hidden_tag_groups, int keep, int skip_baked) {
 	if (!s.plight.enabled || !s.plight.model_lights) {
 		return;
 	}
@@ -3781,8 +3782,8 @@ static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transfor
 			continue;
 		}
 		if (AeronScene_MeshLight(mesh, i, transform, AERON_OPT_UNITS_PER_METER, table, variant,
-								 s.plight.model_light_scale / AERON_SCENE_LUMENS_PER_WATT, exposure,
-								 &light)) {
+								 hidden_tag_groups, s.plight.model_light_scale / AERON_SCENE_LUMENS_PER_WATT,
+								 exposure, &light)) {
 			s.pl_model_count++;
 			fl_pool_add(&light, 1, keep);
 		}
@@ -4226,6 +4227,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	memcpy(instance.transform, model_matrix, sizeof model_matrix);
 	memcpy(instance.prev_transform, model_matrix, sizeof model_matrix);
 	instance.variant = f->node_switch;
+	instance.hidden_tag_groups = XwaRemasterShip_HiddenTagGroups(prepared.mesh, f);
 	XwaRemasterSkins_CheckMarkings(instance.mesh, instance.variant);
 	instance.mesh_table = prepared.table;
 	instance.prev_mesh_table = prepared.table;
@@ -4409,7 +4411,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 		s.table_pool.used++;
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
-	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 1, 0);
+	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0);
 	if (player_f) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 										  inst.mesh_table, s.glow_mark_emissive_strength);
@@ -5702,6 +5704,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		inst.mesh = prepared.mesh;
 		memcpy(inst.transform, model_matrix, sizeof model_matrix);
 		inst.variant = f->node_switch;
+		inst.hidden_tag_groups = XwaRemasterShip_HiddenTagGroups(prepared.mesh, f);
 		inst.probe_set_owner = fl_probe_set_owner(i);
 		XwaRemasterSkins_CheckMarkings(inst.mesh, inst.variant);
 		if (scene_lighting.hangar_override && (int32_t)f->slot == cam->hangar_launch_ref_obj_idx) {
@@ -5760,11 +5763,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			fl_push_bolt(&inst);
 			/* A bolt model with lights is lit by them, for the colour it
 			 * shows, instead of the stock light (fl_derive_point_lights). */
-			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant, 0, 0);
+			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant,
+								inst.hidden_tag_groups, 0, 0);
 		} else {
 			AeronScene_AddMeshInstance(s.scene, &inst);
-			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant, 0,
-								inst.probe_set_owner != 0);
+			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant,
+								inst.hidden_tag_groups, 0, inst.probe_set_owner != 0);
 			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, prepared.mesh, model_matrix,
 											  inst.mesh_table, s.glow_mark_emissive_strength);
 			/* State-derived engine glows for this craft (classic scale
@@ -5883,7 +5887,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				}
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
-			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 1, 0);
+			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0);
 			if (player_f) {
 				XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 												  inst.mesh_table, s.glow_mark_emissive_strength);

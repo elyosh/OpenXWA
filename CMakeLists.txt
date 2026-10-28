@@ -220,6 +220,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/craft_weapons.c
     src/xwa_runtime/models/docking.c
     src/xwa_runtime/models/engine_glows.c
+    src/xwa_runtime/models/surfaces.c
     src/xwa_runtime/models/articulation.c
     src/xwa_runtime/models/model_roles.c
     src/xwa_runtime/models/hangar_scene.c

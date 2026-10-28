@@ -7,6 +7,7 @@
  *   version: 1
  *   hud: {...}                # the reticle and HUD colours
  *   engine_glows: {...}       # glows that show by speed
+ *   surfaces: {...}           # tagged surfaces and lights that show by state
  *   weapons: {...}            # weapon colours, rates and profiles
  *   stats_profiles: {...}     # speeds, rates, hull and shields
  *   shield: {...}             # shield recharge

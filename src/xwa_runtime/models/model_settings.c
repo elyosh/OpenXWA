@@ -17,6 +17,7 @@
 #include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/surfaces.h"
 #include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
@@ -40,6 +41,7 @@ typedef struct ModelSettingsGroup {
 static const ModelSettingsGroup s_groups[] = {
 	{ "hud", XwaCraftHud_ClearModelSettings, XwaCraftHud_ReadModelSettings },
 	{ "engine_glows", XwaEngineGlows_ClearModelSettings, XwaEngineGlows_ReadModelSettings },
+	{ "surfaces", XwaSurfaces_ClearModelSettings, XwaSurfaces_ReadModelSettings },
 	{ "weapons", XwaCraftWeapons_ClearModelSettings, XwaCraftWeapons_ReadModelSettings },
 	{ "weapons", XwaWeaponRates_ClearModelSettings, XwaWeaponRates_ReadModelSettings },
 	{ "weapons", XwaWeaponStats_ClearModelSettings, XwaWeaponStats_ReadModelSettings },

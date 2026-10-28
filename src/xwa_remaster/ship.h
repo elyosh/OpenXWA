@@ -76,6 +76,11 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
  * table. Checking first saves the table fill for most craft each frame. */
 int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f);
 
+/* The tag groups of `mesh` that `f` hides (AeronSceneMeshInstance
+ * .hidden_tag_groups): those named by the `surfaces` rules that hide their
+ * tag at the object's state (XwaFlightObject.surface_hidden_mask). */
+uint32_t XwaRemasterShip_HiddenTagGroups(const AeronSceneMesh* mesh, const XwaFlightObject* f);
+
 /* Build a static mesh table that hides the slots whose component_state is
  * nonzero (the `count` values of a craft's componentState). Returns 1 when
  * any slot hides (callers skip the table bind otherwise). */

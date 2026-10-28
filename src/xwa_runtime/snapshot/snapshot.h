@@ -453,6 +453,9 @@ typedef struct XwaFlightObject {
 	 * the same layout (engine_glows.h). Unlike knockouts, they also hide
 	 * the glow's light. */
 	uint32_t eg_hidden_mask[8];
+	/* The rules of the model's `surfaces` that hide their tag at the craft's
+	 * state: bit r for rule r (surfaces.h). */
+	uint32_t surface_hidden_mask;
 	/* Hull: CraftData.hullDamage (damage taken) and hullMax; the hull is
 	 * 100 * (1 - hull_damage / hull_max) percent. */
 	int32_t hull_damage;

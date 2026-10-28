@@ -12,6 +12,7 @@
 #include "xwa_remaster/skins.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/render_model.h"
+#include "xwa_runtime/models/surfaces.h"
 
 #include <math.h>
 #include <stdarg.h>
@@ -907,6 +908,23 @@ static void ship_mesh_table_init(const AeronSceneMesh* mesh, const float (*rows)
 	memcpy(out->highlight_packed, d->highlight_packed, count * sizeof(float));
 	memcpy(out->markings_packed, d->markings_packed, count * sizeof(float));
 	memcpy(out->emissive_packed, d->emissive_packed, count * sizeof(float));
+}
+
+uint32_t XwaRemasterShip_HiddenTagGroups(const AeronSceneMesh* mesh, const XwaFlightObject* f) {
+	if (!mesh || !f || !f->surface_hidden_mask) {
+		return 0;
+	}
+	uint32_t groups = 0;
+	for (unsigned rule = 0; rule < XWA_SURFACES_MAX_RULES; ++rule) {
+		const char* tag =
+			(f->surface_hidden_mask >> rule) & 1u ? XwaSurfaces_RuleTag(f->object_type, rule) : NULL;
+		for (uint32_t g = 0; tag && g < mesh->tag_groups.count; ++g) {
+			if (strcmp(mesh->tag_groups.names[g].name, tag) == 0) {
+				groups |= 1u << g;
+			}
+		}
+	}
+	return groups;
 }
 
 int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f) {
