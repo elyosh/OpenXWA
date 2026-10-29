@@ -265,6 +265,10 @@ typedef struct XwaFlightTemporalStats {
 	AeronTemporalProfileInfo profile;
 } XwaFlightTemporalStats;
 
+/* presentation.cockpit_fov_min_aspect, for the debug UI. */
+float XwaRemasterFlight_GetCockpitFovMinAspect(void);
+void XwaRemasterFlight_SetCockpitFovMinAspect(float aspect);
+
 void XwaRemasterFlight_GetTemporal(XwaFlightTemporalParams* out);
 void XwaRemasterFlight_SetTemporal(const XwaFlightTemporalParams* in);
 void XwaRemasterFlight_GetTemporalStats(XwaFlightTemporalStats* out);
@@ -277,7 +281,12 @@ typedef struct XwaRemasterFlightView {
 	float view_proj[16];
 	int32_t origin_world[3];
 	AeronRectI viewport;
+	/* Viewport pixels per classic screen pixel. */
 	float classic_pixel_scale;
+	/* Viewport pixels per classic pixel of a projected size, such as a
+	 * particle's. It is smaller than classic_pixel_scale when the view is
+	 * wider than the classic projection (presentation.cockpit_fov_min_aspect). */
+	float projection_pixel_scale;
 } XwaRemasterFlightView;
 
 int XwaRemasterFlight_BuildView(const XwaFlightCamera* camera, int target_w, int target_h,

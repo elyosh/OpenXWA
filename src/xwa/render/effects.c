@@ -375,6 +375,12 @@ static __inline void Particle_InitEffectColorRamp(ParticleEffect* effect) {
 	}
 }
 
+#ifdef XWA_MODERN
+/* The billboard scale multiplier of each template, so that the scales can
+   follow a change of the projection without a reset of the particles. */
+static float g_particleTemplateBillboardMultipliers[PARTICLE_EFFECT_TEMPLATE_COUNT];
+#endif
+
 static __inline void
 Particle_SetEffectTemplate(int templateIdx, float velocityAttractionScale, float velocityDamping,
 						   float colorDeltaScale, float speedBase, float speedRandom, float colorStartA,
@@ -416,6 +422,9 @@ Particle_SetEffectTemplate(int templateIdx, float velocityAttractionScale, float
 
 	FeDiskIo_SelectTextureFrame(textureObjectType, textureFrame, 256);
 	def->billboardScale = (uint16_t)(int64_t)((double)g_projScaleDiv512 * (double)billboardScaleMultiplier);
+#ifdef XWA_MODERN
+	g_particleTemplateBillboardMultipliers[templateIdx] = billboardScaleMultiplier;
+#endif
 	def->staticTexLevel = g_objectTypes[textureObjectType].curTexLevel;
 	def->field64TexLevel = clearField64TexLevel ? NULL : g_objectTypes[textureObjectType].curTexLevel;
 	def->renderFlags = g_bilinearEnabled ? bilinearRenderFlags : renderFlags;
@@ -424,6 +433,21 @@ Particle_SetEffectTemplate(int templateIdx, float velocityAttractionScale, float
 static void Particle_SetTemplateGapFloat(int templateIdx, size_t offset, float value) {
 	memcpy(&g_particleEffectTemplates[templateIdx].gap70[offset], &value, sizeof(value));
 }
+
+#ifdef XWA_MODERN
+void Particle_UpdateTemplateBillboardScales(void) {
+	int templateIdx;
+
+	for (templateIdx = 0; templateIdx < PARTICLE_EFFECT_TEMPLATE_COUNT; ++templateIdx) {
+		const float multiplier = g_particleTemplateBillboardMultipliers[templateIdx];
+
+		if (multiplier != 0.0f) {
+			g_particleEffectTemplates[templateIdx].billboardScale =
+				(uint16_t)(int64_t)((double)g_projScaleDiv512 * (double)multiplier);
+		}
+	}
+}
+#endif
 
 // FUNCTION: XWA 0x4C6030
 void Particle_InitEffectTemplates(void) {

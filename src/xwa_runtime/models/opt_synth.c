@@ -357,7 +357,15 @@ static XwaOptSynthData* OptSynth_CreateData(const char* key, const AeronFlightMo
 	}
 	tagTotal = 0;
 	for (component = 0; component < model->component_count; ++component) {
-		tagTotal += model->components[component].tag_count;
+		const AeronFlightComponent* item = &model->components[component];
+		uint32_t index;
+
+		tagTotal += item->tag_count;
+		for (index = 0; index < item->hardpoint_count; ++index) {
+			if (item->hardpoints[index].type == OPT_SYNTH_HARDPOINT_COCKPIT) {
+				synth->cockpitVerticalFov = item->hardpoints[index].vertical_fov;
+			}
+		}
 	}
 	synth->meshes = (XwaOptSynthMesh*)calloc(simulation->mesh_count, sizeof *synth->meshes);
 	synth->tagStorage = tagTotal != 0 ? (AeronFlightTag*)calloc(tagTotal, sizeof *synth->tagStorage) : NULL;
@@ -835,6 +843,22 @@ int OptSynth_TypeMeshTargetable(unsigned int objectType, int mesh) {
 	synth = OptSynth_GetModelData(model);
 	Memory_UnlockHandle(handle);
 	return synth == NULL || synth->targetable == NULL || OptSynth_SetHasComponent(synth->targetable, mesh);
+}
+
+float OptSynth_TypeCockpitVerticalFov(unsigned int objectType) {
+	const MemoryHandle handle = objectType < OBJ_Count ? g_loadedModels.byObjectType[objectType] : 0;
+	const OptimizedPolyObject* model;
+	const XwaOptSynthData* synth;
+	float fov;
+
+	model = handle != 0 ? (const OptimizedPolyObject*)Memory_LockHandle(handle) : NULL;
+	if (model == NULL) {
+		return 0.0f;
+	}
+	synth = OptSynth_GetModelData(model);
+	fov = synth != NULL ? synth->cockpitVerticalFov : 0.0f;
+	Memory_UnlockHandle(handle);
+	return fov;
 }
 
 int32_t OptSynth_GetArticulationSetting(const OptimizedPolyObject* model, const char* name,

@@ -15,6 +15,7 @@
 #include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/cockpit_alert_lights.h"
+#include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/particle_lights.h"
@@ -1877,6 +1878,7 @@ void XwaSnapshot_CaptureFlight(void) {
 		}
 	}
 	c->proj_scale = g_projScale;
+	c->cockpit_fov = (uint8_t)XwaCockpitView_Active();
 	c->vp_w = g_flightVpWidth;
 	c->vp_h = g_flightVpHeight;
 	c->vp_center_x = (int16_t)g_flightVpCenterX;

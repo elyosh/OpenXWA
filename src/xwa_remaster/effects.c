@@ -78,7 +78,8 @@ void XwaRemasterEffectView_Main(XwaRemasterEffectView* out, const XwaRemasterFli
 			  world_to_eye[r * 3 + 2] * view->camera.pos[2]);
 	out->focal_x_px = 0.5f * (float)view->viewport.width / tanf(view->camera.h_half_rad);
 	out->focal_y_px = 0.5f * (float)view->viewport.height / tanf(view->camera.v_half_rad);
-	out->classic_pixel_scale = view->classic_pixel_scale;
+	/* The effects' classic sizes come from the classic projection. */
+	out->classic_pixel_scale = view->projection_pixel_scale;
 	out->near_z = view->camera.near_z;
 }
 

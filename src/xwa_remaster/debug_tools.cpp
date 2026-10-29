@@ -32,6 +32,7 @@
 #include "aeron/time.h"
 #include "xwa/flight/flight_debug.h"
 #include "xwa_runtime/models/cockpit_eye.h"
+#include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <algorithm>
@@ -1301,7 +1302,7 @@ static void xwa_tool_flight_input(int* open, void* user) {
 
 static void xwa_tool_cockpit_eye(int* open, void* user) {
 	(void)user;
-	ImGui::SetNextWindowSize(ImVec2(430, 190), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(430, 300), ImGuiCond_FirstUseEver);
 	bool b = *open != 0;
 	if (!ImGui::Begin("Cockpit Eye", &b)) {
 		ImGui::End();
@@ -1345,6 +1346,22 @@ static void xwa_tool_cockpit_eye(int* open, void* user) {
 	ImGui::TextDisabled("The cockpit eye in the craft table (+0x238). Edits last until the\n"
 						"model is reloaded. A GLB sets it with one Cockpit (type 31)\n"
 						"hardpoint on the craft model.");
+
+	ImGui::Separator();
+	static const char* const fov_modes[] = { "Cockpit", "Wide", "Off" };
+	int fov_mode = (int)XwaCockpitView_Mode();
+	if (ImGui::Combo("Field of view", &fov_mode, fov_modes, IM_ARRAYSIZE(fov_modes))) {
+		XwaCockpitView_SetMode((XwaCockpitFovMode)fov_mode);
+	}
+	float min_aspect = XwaRemasterFlight_GetCockpitFovMinAspect();
+	if (ImGui::SliderFloat("Min aspect", &min_aspect, 0.0f, 2.5f, "%.3f")) {
+		XwaRemasterFlight_SetCockpitFovMinAspect(min_aspect);
+	}
+	ImGui::Text("Vertical field of view: %.1f degrees%s", XwaCockpitView_VerticalFovDegrees(),
+				XwaCockpitView_Active() ? "" : " (stock)");
+	ImGui::TextDisabled("The view of the craft model's pilot eye camera, or the wide view\n"
+						"of its model settings. A window narrower than the min aspect\n"
+						"keeps the horizontal view of that aspect.");
 
 	ImGui::End();
 	*open = b ? 1 : 0;

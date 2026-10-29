@@ -227,6 +227,9 @@ uint32_t Particle_SnapshotRecordId(const ParticleRecord* particle);
 int Particle_SnapshotEffectPoint(const ParticleEffect* effect, int32_t base[3], float offset[3]);
 int Particle_SnapshotRecordPoint(const ParticleRecord* particle, int32_t base[3], float offset[3]);
 void Particle_SetWorldEffectPreciseOrigin(ParticleEffect* effect, const int32_t world[3]);
+/* Sets each template's billboard scale again from g_projScaleDiv512, as
+   Particle_InitEffectTemplates does, without resetting the particles. */
+void Particle_UpdateTemplateBillboardScales(void);
 #endif
 
 /* Object-trail API. */

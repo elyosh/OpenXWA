@@ -51,6 +51,7 @@
 #include "xwa/util/time.h"
 #include "xwa_runtime/frontend/frontend_fonts.h"
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/timing/host_clock.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
@@ -597,6 +598,7 @@ static void XwaFlightTask_InitProjectionAndPalette(void) {
 	}
 	g_projScale = (float)(unsigned int)g_projScaleInt;
 	g_projScaleDiv512 = g_projScale * (1.0f / 512.0f);
+	XwaCockpitView_SaveStockProjection();
 
 	FlightSurface_Lock();
 	FlightSw_InitLineBuffer();

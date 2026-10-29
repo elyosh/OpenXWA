@@ -573,6 +573,9 @@ typedef struct XwaFlightCamera {
 	 * vp_center + proj_scale * xy/z, y down (TRANSFM2_ProjectScreen*).
 	 * Screen-space records (billboards) unproject through these. */
 	float proj_scale;      /* g_projScale (512 at 640x480) */
+	/* 1 when proj_scale comes from the field of view of the player's craft
+	 * (cockpit_view.h) rather than the stock view. */
+	uint8_t cockpit_fov;
 	uint16_t vp_w, vp_h;   /* g_flightVpWidth/Height */
 	int16_t vp_center_x;   /* g_flightVpCenterX */
 	int16_t vp_center_y;   /* g_flightVpCenterY */

@@ -153,6 +153,15 @@ presentation:
   # Required shipped baseline; user config.yaml may override both values.
   msaa_samples: 2
   hdr_output: true
+  # The field of view of the player's craft, from its model:
+  # cockpit: the view the model gives its pilot eye.
+  # wide: the wide view of the craft's model settings, else the cockpit view.
+  # off: the stock view.
+  cockpit_fov: 'cockpit'
+  # With a craft's field of view, a window narrower than this aspect gets a
+  # wider view, so that the horizontal field of view stays the one at this
+  # aspect. 1.778 is 16:9, as in XWAU. 0 turns it off.
+  cockpit_fov_min_aspect: 1.778
 texture_filtering:
   anisotropic: true
   max_anisotropy: 8.0

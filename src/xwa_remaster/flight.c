@@ -28,6 +28,7 @@
 #include "xwa_remaster/skins.h"
 #include "xwa_remaster/sky_stars.h"
 #include "xwa_remaster/xwa_remaster.h"
+#include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/presentation.h"
 #include "xwa_runtime/timing/host_clock.h"
@@ -230,6 +231,11 @@ static struct {
 	XwaFlightPointLightParams plight_default;
 	float explosion_genus_emissive_strength;
 	float glow_mark_emissive_strength;
+	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
+	 * window narrower than this aspect gets a wider view, so that the
+	 * horizontal field of view stays the one at this aspect. 0 turns it
+	 * off. */
+	float cockpit_fov_min_aspect;
 	XwaFlightTextureFilteringParams texture_filtering;
 	XwaFlightTextureFilteringParams texture_filtering_default;
 
@@ -560,6 +566,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"motion_blur.quality",        "point_lights.cluster_depth_slices",
 	};
 	static const char* floats[] = {
+		"presentation.cockpit_fov_min_aspect",
 		"hangar_lighting.direction_x",
 		"hangar_lighting.direction_y",
 		"hangar_lighting.direction_z",
@@ -638,6 +645,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"point_lights.model_lights",     "presentation.latency_pacing",
 	};
 	static const char* strings[] = {
+		"presentation.cockpit_fov",
 		"temporal_upscaling.mode",
 		"exposure.mode",
 		"exposure.channel",
@@ -885,6 +893,29 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 			return 0;
 	}
 	s.configured_hdr_output = AeronConfigFile_GetBool(cf, "presentation.hdr_output", 0);
+	{
+		static const char* const names[] = { "cockpit", "wide", "off" };
+		const char* name = AeronConfigFile_GetString(cf, "presentation.cockpit_fov", NULL);
+		int mode = -1;
+		for (int i = 0; i < 3; i++) {
+			if (name && strcmp(name, names[i]) == 0)
+				mode = i;
+		}
+		if (mode < 0) {
+			Aeron_LogError("xwa.remaster", "%s: presentation.cockpit_fov must be cockpit, wide or off", path);
+			AeronConfigFile_Destroy(cf);
+			return 0;
+		}
+		XwaCockpitView_SetMode((XwaCockpitFovMode)mode);
+	}
+	s.cockpit_fov_min_aspect =
+		(float)AeronConfigFile_GetFloat(cf, "presentation.cockpit_fov_min_aspect", 0.0);
+	if (!fl_in_range(s.cockpit_fov_min_aspect, 0.0f, 4.0f)) {
+		Aeron_LogError("xwa.remaster", "%s: presentation.cockpit_fov_min_aspect must be between 0 and 4",
+					   path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
 	s.shadow_debug_atlas_cascade = -1;
 	s.hangar_lighting.enabled = AeronConfigFile_GetBool(cf, "hangar_lighting.enabled", 0);
 	s.hangar_lighting.direction[0] = (float)AeronConfigFile_GetFloat(cf, "hangar_lighting.direction_x", 0.0);
@@ -1619,6 +1650,13 @@ void XwaRemasterFlight_SetHyperspaceTunnelPreview(int enabled) {
 
 int XwaRemasterFlight_HyperspaceTunnelPreviewEnabled(void) { return s.hyperspace_preview; }
 
+float XwaRemasterFlight_GetCockpitFovMinAspect(void) { return s.cockpit_fov_min_aspect; }
+
+void XwaRemasterFlight_SetCockpitFovMinAspect(float aspect) {
+	if (fl_in_range(aspect, 0.0f, 4.0f))
+		s.cockpit_fov_min_aspect = aspect;
+}
+
 void XwaRemasterFlight_GetTemporal(XwaFlightTemporalParams* out) {
 	if (!out) {
 		return;
@@ -1876,8 +1914,13 @@ static int fl_build_view_at_origin(const XwaFlightCamera* cam, const int32_t ori
 
 	memcpy(out->origin_world, origin_world, sizeof out->origin_world);
 	AeronWorld_LocalI32(origin_world, cam->world_pos, scene_camera->pos);
-	scene_camera->v_half_rad = atanf(hh / ps);
 	const float aspect = (float)target_w / (float)target_h;
+	/* With a craft's field of view, a window narrower than the minimum
+	 * aspect keeps the horizontal field of view of that aspect, as XWAU does
+	 * for 16:9: the whole view gets wider. */
+	const float widen =
+		cam->cockpit_fov && s.cockpit_fov_min_aspect > aspect ? s.cockpit_fov_min_aspect / aspect : 1.0f;
+	scene_camera->v_half_rad = atanf(hh * widen / ps);
 	scene_camera->h_half_rad = atanf(tanf(scene_camera->v_half_rad) * aspect);
 	scene_camera->near_z = FL_NEAR_Z;
 	scene_camera->proj_x_offset = (cx - hw) / hw;
@@ -1886,6 +1929,7 @@ static int fl_build_view_at_origin(const XwaFlightCamera* cam, const int32_t ori
 	fl_rows_to_quat(cam->rows, scene_camera->ori);
 	out->viewport = scene_camera->viewport;
 	out->classic_pixel_scale = (float)target_h / source_h;
+	out->projection_pixel_scale = out->classic_pixel_scale / widen;
 	AeronScene_ComputeViewProj(scene_camera, out->view_proj);
 	return 1;
 }
@@ -3136,9 +3180,9 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
 		const float projection = cam->proj_scale > 0.0f ? cam->proj_scale : 512.0f;
 		const float k = fl_lens_size[r] * (projection / 512.0f);
 		const float half_w_px =
-			(float)s.lens_dim[r][0] * k * (1.0f / 512.0f) * flight_view->classic_pixel_scale;
+			(float)s.lens_dim[r][0] * k * (1.0f / 512.0f) * flight_view->projection_pixel_scale;
 		const float half_h_px =
-			(float)s.lens_dim[r][1] * k * (1.0f / 512.0f) * flight_view->classic_pixel_scale;
+			(float)s.lens_dim[r][1] * k * (1.0f / 512.0f) * flight_view->projection_pixel_scale;
 		for (uint32_t si = 0; si < s.lens_src_count; si++) {
 			const FlLensSource* src = &s.lens_src[si];
 			const float dx = src->sx - ccx;

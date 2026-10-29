@@ -59,6 +59,9 @@ typedef struct XwaOptSynthData {
 	   point into componentSets. */
 	const AeronFlightComponentSet* noCollision;
 	const AeronFlightComponentSet* targetable;
+	/* The vertical field of view of the camera on the Cockpit (type 31)
+	   hardpoint, in radians, or 0. */
+	float cockpitVerticalFov;
 	/* The GLB is parsed once: after the simulation data is built, the parsed
 	   model keeps what the HD renderer needs until it has built its mesh. */
 	int hasRenderModel;
@@ -96,6 +99,9 @@ int OptSynth_MeshCollides(const OptimizedPolyObject* model, int mesh);
    that doesn't list component `mesh` (0-based), so that the player can't
    target it, else 1. */
 int OptSynth_TypeMeshTargetable(unsigned int objectType, int mesh);
+/* The vertical field of view, in radians, of the camera on the Cockpit
+   hardpoint of the model that `objectType` loaded, or 0 when it has none. */
+float OptSynth_TypeCockpitVerticalFov(unsigned int objectType);
 /* The model's articulation setting `name`, or `fallback` when it has none. */
 int32_t OptSynth_GetArticulationSetting(const OptimizedPolyObject* model, const char* name, int32_t fallback);
 

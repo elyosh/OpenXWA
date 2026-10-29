@@ -32,6 +32,7 @@
 #include "xwa/util/debug.h"
 #include "xwa/util/memory.h"
 #include "xwa_runtime/models/cockpit_eye.h"
+#include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/audio/sound_banks.h"
@@ -3754,6 +3755,10 @@ static __inline int FlightModel_IsTieCockpitObjectType(uint16_t objectType) {
 }
 
 static __inline void FeDiskIo_FinalizeCockpitModelLoad(uint16_t objectType) {
+#ifdef XWA_MODERN
+	/* The craft's field of view sets the projection. */
+	XwaCockpitView_Apply(objectType);
+#endif
 	if (g_cockpitModel != 0) {
 		uint16_t previousSlot0Handle;
 		int meshCount;

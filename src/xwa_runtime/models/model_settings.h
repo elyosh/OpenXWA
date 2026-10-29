@@ -16,6 +16,8 @@
  *   gunner_seats: {...}       # gunner seats
  *   warhead_lock: {...}       # warhead lock ranges and times
  *   jamming: {...}            # jamming near the hangar
+ *   docking: {...}            # the docking approach
+ *   cockpit_view: {...}       # the wide cockpit view
  *
  * Each top-level key is a group that one module owns, except `weapons`,
  * whose `rates`, `energy_transfer`, `ai_torpedoes`, `impact_spin` and

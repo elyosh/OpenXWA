@@ -5,6 +5,7 @@
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/frontend/frontend_mission.h"
+#include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_sounds.h"
@@ -53,6 +54,7 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "warhead_lock", XwaWarheadLock_ClearModelSettings, XwaWarheadLock_ReadModelSettings },
 	{ "jamming", XwaJamming_ClearModelSettings, XwaJamming_ReadModelSettings },
 	{ "docking", XwaDocking_ClearModelSettings, XwaDocking_ReadModelSettings },
+	{ "cockpit_view", XwaCockpitView_ClearModelSettings, XwaCockpitView_ReadModelSettings },
 };
 
 /* A model file that this mission has looked for. `file` is NULL when the
