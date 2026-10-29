@@ -105,15 +105,41 @@ int XwaRemasterShip_BuildPreviousMeshTable(const AeronSceneMesh* mesh, const Xwa
 int XwaRemasterShip_BuildDebrisMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,
 										 AeronSceneMeshTable* out);
 
+/* The values that move a cockpit model's controls (the model's `control`
+ * nodes), by the control's tags:
+ *   - cockpit.stick.x: the applied stick X, -1 left to +1 right;
+ *   - cockpit.stick.y: the applied stick Y, -1 forward to +1 back;
+ *   - cockpit.stick.roll: the applied roll input, -1 to +1;
+ *   - cockpit.throttle: the throttle, 0 to 1;
+ *   - cockpit.hyperspace: 0 to 1 while entering hyperspace (over 550
+ *     ticks), 1 in the tunnel, 1 to 0 while leaving it (over 190 ticks),
+ *     0 otherwise.
+ * A control takes the value of its first tag in this list, and a control
+ * without one stays at rest. Every other model's controls stay at rest. */
+typedef struct XwaRemasterCockpitControls {
+	float stick[3];
+	float throttle;
+	float hyperspace;
+} XwaRemasterCockpitControls;
+
+/* The control values of the snapshot's cockpit, whose craft is `anchor`. */
+void XwaRemasterShip_CockpitControls(const XwaSnapshot* snapshot, const XwaFlightObject* anchor,
+									 XwaRemasterCockpitControls* out);
+
 /* Mesh table for the cockpit model. Pilot cockpits inherit articulation
  * and component visibility from the anchor craft. Turret cockpits retain
  * that visibility and B-Wing root compensation, but replace per-root craft
- * rotation with the captured seat aim used by the classic cockpit walk. */
+ * rotation with the captured seat aim used by the classic cockpit walk.
+ * The controls move by `controls`, or stay at rest when it is NULL. */
 int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaCockpit* c,
-										  const XwaFlightObject* anchor, AeronSceneMeshTable* out);
+										  const XwaFlightObject* anchor,
+										  const XwaRemasterCockpitControls* controls,
+										  AeronSceneMeshTable* out);
 int XwaRemasterShip_BuildPreviousCockpitMeshTable(
 	const AeronSceneMesh* mesh, const XwaCockpit* current_cockpit, const XwaFlightObject* current_anchor,
-	const XwaCockpit* previous_cockpit, const XwaFlightObject* previous_anchor, AeronSceneMeshTable* out);
+	const XwaRemasterCockpitControls* current_controls, const XwaCockpit* previous_cockpit,
+	const XwaFlightObject* previous_anchor, const XwaRemasterCockpitControls* previous_controls,
+	AeronSceneMeshTable* out);
 
 /* Process-wide PBR tuning globals consumed by every lit
  * XwaRemasterShip_SetPbrEnv submit (stored in the combined PbrLightFS

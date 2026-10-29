@@ -831,15 +831,97 @@ static void ship_mat3x4_mul(float out[3][4], const float lhs[3][4], const float 
 	memcpy(out, result, sizeof result);
 }
 
-/* Components a mesh table fills: all the model's. Craft state covers the
- * first XWA_SNAP_MAX_MESH_SLOTS of them. */
-static uint32_t ship_table_components(const AeronSceneMesh* mesh) {
-	return mesh->component_count ? mesh->component_count : 1u;
-}
+/* Rows a mesh table fills: all the model's components, then its controls.
+ * Craft state covers the first XWA_SNAP_MAX_MESH_SLOTS components. */
+static uint32_t ship_table_rows(const AeronSceneMesh* mesh) { return mesh->row_count ? mesh->row_count : 1u; }
 
 static uint32_t ship_state_components(const AeronSceneMesh* mesh) {
-	const uint32_t components = ship_table_components(mesh);
+	const uint32_t components = mesh->component_count ? mesh->component_count : 1u;
 	return components < XWA_SNAP_MAX_MESH_SLOTS ? components : XWA_SNAP_MAX_MESH_SLOTS;
+}
+
+/* The value that `controls` gives `control` (XwaRemasterCockpitControls),
+ * or 0. */
+static float ship_control_value(const AeronFlightControl* control,
+								const XwaRemasterCockpitControls* controls) {
+	static const char* const tags[] = { "cockpit.stick.x", "cockpit.stick.y", "cockpit.stick.roll",
+										"cockpit.throttle", "cockpit.hyperspace" };
+	const float values[] = { controls->stick[0], controls->stick[1], controls->stick[2], controls->throttle,
+							 controls->hyperspace };
+	for (uint32_t t = 0; t < control->tag_count; t++) {
+		for (size_t k = 0; k < sizeof tags / sizeof tags[0]; k++) {
+			if (strcmp(control->tags[t].name, tags[k]) == 0) {
+				return values[k];
+			}
+		}
+	}
+	return 0.0f;
+}
+
+/* Fills the control rows of `out`, after its component rows: a control's
+ * row is its parent's row times its motion at its value from `controls`
+ * (at rest without them), and it takes its parent's lanes. Returns 1 when
+ * a control moved. */
+static int ship_mesh_table_controls(const AeronSceneMesh* mesh, const XwaRemasterCockpitControls* controls,
+									AeronSceneMeshTable* out) {
+	int moved = 0;
+	for (uint32_t k = 0; k < mesh->control_count; k++) {
+		const AeronFlightControl* control = &mesh->controls[k];
+		const uint32_t row = mesh->component_count + k;
+		const uint32_t parent = control->parent_row;
+		const float value = controls ? ship_control_value(control, controls) : 0.0f;
+		const float axis[3] = { control->axis.x, control->axis.y, control->axis.z };
+		if (value != 0.0f && (control->slides || control->angle != 0.0f)) {
+			float motion[3][4];
+			if (control->slides) {
+				ship_mat3x4_identity(motion);
+				for (int r = 0; r < 3; r++) {
+					motion[r][3] = value * axis[r];
+				}
+			} else {
+				const float pivot[3] = { control->pivot.x, control->pivot.y, control->pivot.z };
+				ship_mat3x4_rotation_about_pivot(motion, axis, pivot, value * control->angle);
+			}
+			ship_mat3x4_mul(out->rows[row], out->rows[parent], motion);
+			moved = 1;
+		} else {
+			memcpy(out->rows[row], out->rows[parent], sizeof out->rows[row]);
+		}
+		out->visibility_packed[row >> 2][row & 3] = out->visibility_packed[parent >> 2][parent & 3];
+		out->highlight_packed[row >> 2][row & 3] = out->highlight_packed[parent >> 2][parent & 3];
+		out->markings_packed[row >> 2][row & 3] = out->markings_packed[parent >> 2][parent & 3];
+		out->emissive_packed[row >> 2][row & 3] = out->emissive_packed[parent >> 2][parent & 3];
+	}
+	return moved;
+}
+
+void XwaRemasterShip_CockpitControls(const XwaSnapshot* snapshot, const XwaFlightObject* anchor,
+									 XwaRemasterCockpitControls* out) {
+	memset(out, 0, sizeof *out);
+	if (!snapshot) {
+		return;
+	}
+	for (int axis = 0; axis < 3; axis++) {
+		const float value = (float)snapshot->cockpit.stick_axis[axis] / 127.0f;
+		out->stick[axis] = value < -1.0f ? -1.0f : value;
+	}
+	if (anchor && anchor->has_craft) {
+		out->throttle = (float)anchor->eg_throttle / 65535.0f;
+	}
+	const float ticks = (float)snapshot->hyperspace.phase_elapsed_ticks;
+	switch (snapshot->hyperspace.phase) {
+		case XWA_HYPERSPACE_OUTBOUND:
+			out->hyperspace = fminf(1.0f, ticks / 550.0f);
+			break;
+		case XWA_HYPERSPACE_TUNNEL:
+			out->hyperspace = 1.0f;
+			break;
+		case XWA_HYPERSPACE_INBOUND:
+			out->hyperspace = fmaxf(0.0f, 1.0f - ticks / 190.0f);
+			break;
+		default:
+			break;
+	}
 }
 
 static int ship_bwing_bridge_component(const AeronSceneMesh* mesh, uint32_t components) {
@@ -894,7 +976,7 @@ static void ship_mesh_table_init(const AeronSceneMesh* mesh, const float (*rows)
 		}
 		s_default_mesh_table_ready = 1;
 	}
-	const uint32_t count = ship_table_components(mesh);
+	const uint32_t count = ship_table_rows(mesh);
 	out->component_count = count;
 	if (rows) {
 		for (uint32_t mi = 0; mi < count; mi++) {
@@ -990,6 +1072,7 @@ int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 		}
 		any = 1;
 	}
+	ship_mesh_table_controls(mesh, NULL, out);
 	return any;
 }
 
@@ -1010,6 +1093,7 @@ int XwaRemasterShip_BuildHiddenMeshTable(const AeronSceneMesh* mesh, const uint8
 			any = 1;
 		}
 	}
+	ship_mesh_table_controls(mesh, NULL, out);
 	return any;
 }
 
@@ -1053,7 +1137,7 @@ int XwaRemasterShip_BuildDebrisMeshTable(const AeronSceneMesh* mesh, const XwaFl
 	const uint32_t comp = (uint32_t)(f->type_specific_0 >> 1);
 	/* Every component of the model is filled: the shader clamps a vertex's
 	 * component into the table, so a shorter table would show other ones. */
-	out->component_count = ship_table_components(mesh);
+	out->component_count = ship_table_rows(mesh);
 	if (comp >= out->component_count) {
 		return 0;
 	}
@@ -1082,24 +1166,28 @@ int XwaRemasterShip_BuildDebrisMeshTable(const AeronSceneMesh* mesh, const XwaFl
 		const float angle = (float)f->spin_angle * (-2.0f * 3.14159265358979323846f / 65536.0f);
 		ship_mat3x4_rotation_about_pivot(out->rows[comp], f->spin_axis, pivot, angle);
 	}
+	ship_mesh_table_controls(mesh, NULL, out);
 	return 1;
 }
 
 int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaCockpit* c,
-										  const XwaFlightObject* anchor, AeronSceneMeshTable* out) {
+										  const XwaFlightObject* anchor,
+										  const XwaRemasterCockpitControls* controls,
+										  AeronSceneMeshTable* out) {
 	if (!mesh || !c || !anchor || !out || !anchor->has_craft) {
 		return 0;
 	}
 	if (c->seat == 0) {
 		/* The classic swaps only the model handle, then walks the cockpit
 		 * OPT with the anchor ObjectRecord's live craft state. */
-		return XwaRemasterShip_BuildMeshTable(mesh, anchor, out);
+		const int any = XwaRemasterShip_BuildMeshTable(mesh, anchor, out);
+		return ship_mesh_table_controls(mesh, controls, out) || any;
 	}
 
 	const uint32_t components = ship_state_components(mesh);
 	float bwing_compensation[3][4];
 	const int has_bwing_compensation = ship_bwing_compensation(mesh, anchor, components, bwing_compensation);
-	out->component_count = ship_table_components(mesh);
+	out->component_count = ship_table_rows(mesh);
 	for (uint32_t mi = 0; mi < out->component_count; mi++) {
 		if (has_bwing_compensation) {
 			memcpy(out->rows[mi], bwing_compensation, sizeof out->rows[mi]);
@@ -1170,7 +1258,7 @@ int XwaRemasterShip_BuildCockpitMeshTable(const AeronSceneMesh* mesh, const XwaC
 			}
 		}
 	}
-	return any;
+	return ship_mesh_table_controls(mesh, controls, out) || any;
 }
 
 /* Whether two snapshots' entries of the same craft show different
@@ -1182,20 +1270,34 @@ static int ship_component_states_differ(const XwaFlightObject* a, const XwaFligh
 
 int XwaRemasterShip_BuildPreviousCockpitMeshTable(
 	const AeronSceneMesh* mesh, const XwaCockpit* current_cockpit, const XwaFlightObject* current_anchor,
-	const XwaCockpit* previous_cockpit, const XwaFlightObject* previous_anchor, AeronSceneMeshTable* out) {
+	const XwaRemasterCockpitControls* current_controls, const XwaCockpit* previous_cockpit,
+	const XwaFlightObject* previous_anchor, const XwaRemasterCockpitControls* previous_controls,
+	AeronSceneMeshTable* out) {
 	if (!mesh || !current_cockpit || !current_anchor || !previous_cockpit || !previous_anchor || !out ||
 		!current_anchor->has_craft || !previous_anchor->has_craft ||
 		current_anchor->object_type != previous_anchor->object_type ||
 		current_cockpit->seat != previous_cockpit->seat) {
 		return 0;
 	}
+	/* Moving controls need the previous pose for their motion vectors. */
+	if (mesh->control_count != 0 && current_controls && previous_controls &&
+		memcmp(current_controls, previous_controls, sizeof *current_controls) != 0) {
+		XwaRemasterShip_BuildCockpitMeshTable(mesh, previous_cockpit, previous_anchor, previous_controls,
+											  out);
+		return 1;
+	}
 
 	if (current_cockpit->seat == 0) {
 		if (ship_component_states_differ(current_anchor, previous_anchor)) {
-			XwaRemasterShip_BuildMeshTable(mesh, previous_anchor, out);
+			XwaRemasterShip_BuildCockpitMeshTable(mesh, previous_cockpit, previous_anchor, previous_controls,
+												  out);
 			return 1;
 		}
-		return XwaRemasterShip_BuildPreviousMeshTable(mesh, current_anchor, previous_anchor, out);
+		if (XwaRemasterShip_BuildPreviousMeshTable(mesh, current_anchor, previous_anchor, out)) {
+			ship_mesh_table_controls(mesh, previous_controls, out);
+			return 1;
+		}
+		return 0;
 	}
 
 	int changed = current_cockpit->aim_angle_a != previous_cockpit->aim_angle_a ||
@@ -1213,7 +1315,7 @@ int XwaRemasterShip_BuildPreviousCockpitMeshTable(
 
 	/* The previous pose may be identity; the initialized table is still
 	 * required when the current cockpit has just begun moving. */
-	XwaRemasterShip_BuildCockpitMeshTable(mesh, previous_cockpit, previous_anchor, out);
+	XwaRemasterShip_BuildCockpitMeshTable(mesh, previous_cockpit, previous_anchor, previous_controls, out);
 	return 1;
 }
 
@@ -1288,7 +1390,7 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 		}
 		/* A glow is not drawn without its component (destroyed, or hidden
 		 * by an object profile). */
-		if (table && g->component_index < ship_table_components(mesh) &&
+		if (table && g->component_index < ship_table_rows(mesh) &&
 			table->visibility_packed[g->component_index >> 2][g->component_index & 3] == 0.0f) {
 			continue;
 		}
@@ -1300,7 +1402,7 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 		float ax_look[3] = { g->look.x, g->look.y, g->look.z };
 		float ax_right[3] = { g->right.x, g->right.y, g->right.z };
 		float ax_up[3] = { g->up.x, g->up.y, g->up.z };
-		if (table && g->component_index < ship_table_components(mesh)) {
+		if (table && g->component_index < ship_table_rows(mesh)) {
 			const float (*rw)[4] = table->rows[g->component_index];
 			float tp[3], tv[3];
 			for (int r = 0; r < 3; r++) {
@@ -1560,7 +1662,7 @@ uint32_t XwaRemasterShip_CollectEngineGlowPointLights(const AeronSceneMesh* mesh
 		/* Anchor: mesh-table articulation + instance transform (the
 		 * same chain the glow quads use). */
 		float p[3] = { g->position.x, g->position.y, g->position.z };
-		if (table && g->component_index < ship_table_components(mesh)) {
+		if (table && g->component_index < ship_table_rows(mesh)) {
 			const float (*rw)[4] = table->rows[g->component_index];
 			float tp[3];
 			for (int r = 0; r < 3; r++) {

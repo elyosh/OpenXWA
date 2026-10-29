@@ -1950,6 +1950,9 @@ void XwaSnapshot_CaptureFlight(void) {
 			k->camera_pan[0] = (float)vs->cameraPanDeltaX;
 			k->camera_pan[1] = (float)vs->cameraPanDeltaY;
 			k->camera_pan[2] = (float)vs->cameraPanDeltaZ;
+			k->stick_axis[0] = g_replayInputs[g_localPlayer].axisX;
+			k->stick_axis[1] = g_replayInputs[g_localPlayer].axisY;
+			k->stick_axis[2] = g_replayInputs[g_localPlayer].axisR;
 			const char* name = XwaSnapshotExport_OptHandleName(handle);
 			if (name != NULL) {
 				snprintf(k->model_name, sizeof k->model_name, "%s", name);

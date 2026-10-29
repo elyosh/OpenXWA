@@ -673,6 +673,11 @@ typedef struct XwaCockpit {
 	 * seat's position. The classic anchors the weapon-fire pulse point
 	 * lights here. */
 	float seat_eye_local[3];
+	/* The stick input that the simulation applied to the local player
+	 * (g_replayInputs): X, Y and roll, about -127 to 127, with X+ right and
+	 * Y+ back. It comes from the joystick or the mouse, in flight, films
+	 * and netplay alike. */
+	int8_t stick_axis[3];
 } XwaCockpit;
 
 /* Local-player weapon-fire light pulses (g_localPlayerLightPulses):

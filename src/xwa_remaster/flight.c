@@ -4406,7 +4406,9 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	inst.cull_mode = AERON_CULL_BACK;
 	inst.anim = player_f ? fl_object_anim(player_f) : NULL;
 	AeronSceneMeshTable* tb = fl_table_peek();
-	if (tb && XwaRemasterShip_BuildCockpitMeshTable(cockpit_mesh, &snap->cockpit, player_f, tb)) {
+	XwaRemasterCockpitControls controls;
+	XwaRemasterShip_CockpitControls(snap, player_f, &controls);
+	if (tb && XwaRemasterShip_BuildCockpitMeshTable(cockpit_mesh, &snap->cockpit, player_f, &controls, tb)) {
 		inst.mesh_table = tb;
 		s.table_pool.used++;
 	}
@@ -5872,16 +5874,20 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			inst.velocity_stamp_screens = 1;
 			inst.anim = player_f ? fl_object_anim(player_f) : NULL;
 			AeronSceneMeshTable* tb = fl_table_peek();
-			if (tb &&
-				XwaRemasterShip_BuildCockpitMeshTable(cockpit_mesh, &snap->cockpit, cockpit_anchor, tb)) {
+			XwaRemasterCockpitControls controls;
+			XwaRemasterShip_CockpitControls(snap, cockpit_anchor, &controls);
+			if (tb && XwaRemasterShip_BuildCockpitMeshTable(cockpit_mesh, &snap->cockpit, cockpit_anchor,
+															&controls, tb)) {
 				inst.mesh_table = tb;
 				s.table_pool.used++;
 			}
 			if (cockpit_history_valid) {
 				AeronSceneMeshTable* prev_tb = fl_table_peek();
+				XwaRemasterCockpitControls previous_controls;
+				XwaRemasterShip_CockpitControls(prev, previous_cockpit_anchor, &previous_controls);
 				if (prev_tb && XwaRemasterShip_BuildPreviousCockpitMeshTable(
-								   cockpit_mesh, &snap->cockpit, cockpit_anchor, &prev->cockpit,
-								   previous_cockpit_anchor, prev_tb)) {
+								   cockpit_mesh, &snap->cockpit, cockpit_anchor, &controls, &prev->cockpit,
+								   previous_cockpit_anchor, &previous_controls, prev_tb)) {
 					inst.prev_mesh_table = prev_tb;
 					s.table_pool.used++;
 				}

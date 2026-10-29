@@ -229,7 +229,12 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 			&mesh->cpu_vertices[mesh->cpu_indices[triangle_index_offset + 1]],
 			&mesh->cpu_vertices[mesh->cpu_indices[triangle_index_offset + 2]],
 		};
-		const int mesh_index = (int)floorf(triangle_vertices[0]->component + 0.5f);
+		/* A vertex's row is its component's, or a control's row past the
+		 * components. */
+		int mesh_index = (int)floorf(triangle_vertices[0]->component + 0.5f);
+		if (mesh_index >= (int)mesh->component_count && mesh_index < (int)mesh->row_count) {
+			mesh_index = (int)mesh->controls[mesh_index - (int)mesh->component_count].component;
+		}
 		if (mesh_index < 0 || mesh_index >= XWA_SNAP_MAX_MESH_SLOTS ||
 			(mesh_filtered && !(mark->mesh_mask[mesh_index / 64] & ((uint64_t)1 << (mesh_index % 64))))) {
 			continue;
