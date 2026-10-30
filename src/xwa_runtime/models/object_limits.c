@@ -5,6 +5,7 @@
 #include "aeron/log.h"
 #include "xwa/flight/hud/hud.h"
 #include "xwa/flight/object/object.h"
+#include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_file.h"
 
 #include <string.h>
@@ -110,12 +111,20 @@ void XwaObjectLimits_LoadMission(const char* missionPath, uint32_t regions, uint
 	AeronConfigFile* config = NULL;
 	char path[300];
 	uint32_t craft, salvage, shared, perRegion, available, excess;
+	int provingCraft;
 
 	s_limits = s_defaults;
 	if (missionPath != NULL && XwaMissionFile_Load(missionPath, &config, path, sizeof path) > 0) {
 		ObjectLimits_Read(path, AeronConfigNode_MapGet(AeronConfigFile_Root(config), "object_limits"),
 						  &s_limits);
 		AeronConfigFile_Destroy(config);
+	}
+	/* The proving grounds keep their 36 craft slots. With hangar settings, they
+	   get the craft count of the other missions instead, because a hangar map
+	   can need more slots. */
+	provingCraft = provingGrounds && !XwaHangars_IsActive();
+	if (provingCraft) {
+		s_limits.craft = LIMITS_PROVING_CRAFT;
 	}
 	if (regions == 0 || players == 0) {
 		return;
@@ -127,7 +136,7 @@ void XwaObjectLimits_LoadMission(const char* missionPath, uint32_t regions, uint
 	s_limits.radarBlips = ObjectLimits_Or(s_limits.radarBlips, LIMITS_STOCK_RADAR_BLIPS);
 
 	/* The slots of one region, as Mission_Init lays them out. */
-	craft = provingGrounds ? LIMITS_PROVING_CRAFT : s_limits.craft;
+	craft = s_limits.craft;
 	salvage = provingGrounds ? LIMITS_PROVING_SALVAGE : 0;
 	shared = players == 1 ? 16 : 32;
 	perRegion = craft + salvage + shared + players * s_limits.playerProjectiles + s_limits.aiProjectiles +
@@ -145,7 +154,7 @@ void XwaObjectLimits_LoadMission(const char* missionPath, uint32_t regions, uint
 			uint32_t floor;
 			uint32_t slots;
 		} steps[] = {
-			{ &s_limits.craft, provingGrounds ? s_limits.craft : LIMITS_STOCK_CRAFT, 1 },
+			{ &s_limits.craft, provingCraft ? LIMITS_PROVING_CRAFT : LIMITS_STOCK_CRAFT, 1 },
 			{ &s_limits.aiProjectiles, LIMITS_STOCK_AI_PROJECTILES, 1 },
 			/* Each explosion slot comes with a debris slot. */
 			{ &s_limits.explosions, LIMITS_STOCK_EXPLOSIONS, 2 },

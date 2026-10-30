@@ -7478,7 +7478,11 @@ uint16_t Mission_Init(char* fileName) {
 #endif
 	g_missionRegionCount = g_pilotData.regionsCount;
 	if (g_provingGroundsModeActive) {
+#ifdef XWA_MODERN
+		g_craftObjectSlotsTotal = XwaObjectLimits_CraftPerRegion() * (uint32_t)g_pilotData.regionsCount;
+#else
 		g_craftObjectSlotsTotal = 36u * (uint32_t)g_pilotData.regionsCount;
+#endif
 		g_salvageJunkObjectSlotsTotal = 224u * (uint32_t)g_pilotData.regionsCount;
 		g_salvageJunkObjectSlotsPerRegion = 224;
 		g_craftObjectSlotsPerRegion = g_craftObjectSlotsTotal / (uint32_t)g_pilotData.regionsCount;

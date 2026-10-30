@@ -15,8 +15,10 @@
  * of flight/flight.yaml for that mission. Every key is optional. Without
  * one, the stock count stays: 96 craft, 12 projectiles for each player, 64
  * projectiles for the AI, 32 explosions and 32 debris objects in each region,
- * and 48 blips on each radar scope. The proving grounds keep their 36 craft
- * slots and 224 salvage slots. radar_blips can be at most
+ * and 48 blips on each radar scope. The proving grounds keep their 224
+ * salvage slots and their 36 craft slots. With hangar settings, the proving
+ * grounds use craft_per_region like the other missions, because a hangar map
+ * can need more than 36 slots. radar_blips can be at most
  * HUD_RADAR_MAX_BLIPS.
  *
  * Each player searches its own block of player_projectiles slots for its

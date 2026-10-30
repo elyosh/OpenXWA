@@ -1,5 +1,6 @@
 #include "xwa_runtime/models/hangar_scene.h"
 
+#include "aeron/log.h"
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/assets/object_type_info.h"
@@ -31,20 +32,67 @@ static int s_reentryStartY;
 /* Whether the scene has a shuttle (LoadShuttle, or the player needed one). */
 static int s_shuttleLoaded;
 
+/* The number of free slots in the craft range of the active region. */
+static int HangarScene_FreeCraftSlots(void) {
+	const ObjectSlotRange* craft = &g_objectSlotRangeByGenus[GENUS_Fighter];
+	uint32_t objIdx;
+	int count = 0;
+
+	for (objIdx = craft->next; objIdx < craft->end; ++objIdx) {
+		if (g_objectTable[objIdx].objectType == 0) {
+			++count;
+		}
+	}
+	return count;
+}
+
+/* Whether objects of `objectType` take their slot from the craft range. */
+static int HangarScene_UsesCraftSlots(uint16_t objectType) {
+	const ObjectSlotRange* craft = &g_objectSlotRangeByGenus[GENUS_Fighter];
+	const ObjectSlotRange* range = &g_objectSlotRangeByGenus[g_objectTypes[objectType].genusId];
+
+	return range->next == craft->next && range->end == craft->end;
+}
+
+/* The craft slots that the scene still needs after the map: the family base's
+   work droid, or the hangar's droids, shuttle and roof crane, and then the
+   player's craft. */
+static int HangarScene_CraftSlotsAfterMap(int family) {
+	const XwaHangarObjects* objects = XwaHangars_Objects();
+
+	if (family) {
+		return 2;
+	}
+	return (objects->droids[0].load != 0) + (objects->droids[1].load != 0) + 3;
+}
+
 /* The layout, from the map section. Each line places an object with its
    markings and object profile; the first four are the objects the droid and
-   crane traffic refer to. A line that places nothing keeps its place. */
+   crane traffic refer to. A line that places nothing keeps its place.
+   The map objects share the craft slots of the hangar's region with the rest
+   of the scene and the player's craft. When a map needs more slots than the
+   region has free, its last lines aren't placed, so that the player's craft
+   always gets a slot. */
 static void HangarScene_SpawnMap(int family) {
 	const XwaHangarMapEntry* map;
 	int count;
 	int line;
+	int freeSlots;
+	int skipped = 0;
 
 	map = XwaHangars_Map(family, &count);
+	freeSlots = HangarScene_FreeCraftSlots() - HangarScene_CraftSlotsAfterMap(family);
 	for (line = 0; map != NULL && line < count; ++line) {
 		const XwaHangarMapEntry* entry = &map[line];
 		uint16_t objIdx;
+		int usesCraftSlots;
 
 		if (entry->objectType == 0) {
+			continue;
+		}
+		usesCraftSlots = HangarScene_UsesCraftSlots(entry->objectType);
+		if (usesCraftSlots && freeSlots <= 0) {
+			++skipped;
 			continue;
 		}
 		s_spawnFloorInverted = entry->isFloorInverted;
@@ -53,6 +101,9 @@ static void HangarScene_SpawnMap(int family) {
 																 entry->headingXY, entry->headingZ);
 		s_spawnFloorInverted = -1;
 		if (objIdx != 0xffffu && objIdx != 0) {
+			if (usesCraftSlots) {
+				--freeSlots;
+			}
 			g_objectTable[objIdx].mobj->nodeSwitchIndex = (uint8_t)entry->markings;
 			XwaSkins_UseMarkings(entry->objectType, g_objectTable[objIdx].mobj->nodeSwitchIndex);
 			XwaObjectProfiles_ApplyNamed(entry->objectType, entry->objectProfile,
@@ -90,6 +141,13 @@ static void HangarScene_SpawnMap(int family) {
 				}
 				break;
 		}
+	}
+	if (skipped != 0) {
+		Aeron_LogWarn(
+			"xwa.models",
+			"hangar map: %d object(s) not placed, because the hangar's region has no free craft slots "
+			"left for them",
+			skipped);
 	}
 }
 
