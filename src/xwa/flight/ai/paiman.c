@@ -2043,7 +2043,7 @@ void paiman_initkamikazemaneuver(void) {
 
 // FUNCTION: XWA 0x4AFD50
 int paiman_initoutofhyperspacemaneuver(void) {
-	g_curCraft->craftState = 6;
+	g_curCraft->craftState = CRAFT_STATE_LEAVING_HYPERSPACE;
 	g_objectTable[g_paiContext.aiObjIdx].mobj->speed = 3600;
 	g_paiContext.aiController->maneuverPhase = 0;
 	g_paiContext.aiController->aiPlanState = 236;
@@ -3097,7 +3097,7 @@ void paiman_ApplyBoardingPlanCompletionEffects(unsigned int boarderObjIdx, int p
 		if (g_objectTable[targetObjIdx].mobj != NULL) {
 			targetCraft->subsystemDamage = 0;
 			targetCraft->workingSubsystems = targetCraft->systemFlags;
-			targetCraft->craftState = 0;
+			targetCraft->craftState = CRAFT_STATE_NORMAL;
 			targetCraft->boardingState = 3;
 		}
 		msg_emitCraftMessage(boarderObjIdx, boarderCraft, MSG_REPORT_DOCK_COMP);
@@ -3582,7 +3582,7 @@ void paiman_TransferObjectToAiTeam(unsigned int objectIdx, CraftData* craft, uin
 	g_objectTable[objectIdx].mobj->team = g_objectTable[g_paiContext.aiObjIdx].mobj->team;
 	craft->workingSubsystems = craft->systemFlags;
 	craft->subsystemDamage = 0;
-	craft->craftState = 0;
+	craft->craftState = CRAFT_STATE_NORMAL;
 	craft->lastAttackerObjIdx = 0xffffu;
 }
 
@@ -4791,7 +4791,7 @@ static char paiman_boardmaneuver(void) {
 				if (g_objectTable[targetObjIdx].mobj != NULL) {
 					craft->subsystemDamage = 0;
 					craft->workingSubsystems = craft->systemFlags;
-					craft->craftState = 0;
+					craft->craftState = CRAFT_STATE_NORMAL;
 					craft->boardingState = 3;
 				}
 				msg_emitCraftMessage(g_paiContext.aiObjIdx, g_curCraft, MSG_REPORT_DOCK_COMP);
@@ -5028,7 +5028,7 @@ static char paiman_intohyperspacemaneuver(void) {
 				goto LABEL_187;
 			}
 
-			g_curCraft->craftState = 5;
+			g_curCraft->craftState = CRAFT_STATE_ENTERING_HYPERSPACE;
 			g_curCraft->aiFlight.enterFlag = 0;
 			g_curCraft->aiFlight.headingState = 0;
 			g_curCraft->aiFlight.turnState = 0;
@@ -5151,7 +5151,7 @@ static char paiman_intohyperspacemaneuver(void) {
 			}
 
 		LABEL_187:
-			if (g_curCraft->craftState != 5) {
+			if (g_curCraft->craftState != CRAFT_STATE_ENTERING_HYPERSPACE) {
 				paiman_setflighttotarget(0, 1);
 				if (strcmp(g_planTable[g_paiContext.aiController->currentPlanId].name, "hyperspacepln") ==
 					0) {
@@ -5176,7 +5176,7 @@ static char paiman_intohyperspacemaneuver(void) {
 			int departState;
 			uint16_t flightGroupIdx;
 
-			g_curCraft->craftState = 5;
+			g_curCraft->craftState = CRAFT_STATE_ENTERING_HYPERSPACE;
 			mothershipDepart = 0;
 			currentPlanId = g_paiContext.aiController->currentPlanId;
 			departState = 0;
@@ -5340,7 +5340,7 @@ static char paiman_intohyperspacemaneuver(void) {
 				return 0;
 			}
 
-			g_curCraft->craftState = 7;
+			g_curCraft->craftState = CRAFT_STATE_IN_HYPERSPACE;
 			++g_paiContext.aiController->orderScratch
 				  .goalProgress[g_paiContext.curOrderCoord.fields.regionIdx]
 							   [g_paiContext.curOrderCoord.fields.orderSlot];
@@ -5369,7 +5369,7 @@ static char paiman_intohyperspacemaneuver(void) {
 				if (m) {
 					CraftData* c = m->pCraft;
 					if (c) {
-						c->craftState = 7;
+						c->craftState = CRAFT_STATE_IN_HYPERSPACE;
 						++g_missionFgStats[g_objectTable[carriedIdx].flightGroupIdx]
 							  .tailEventCounts[g_objectTable[carriedIdx].regionIdx + 10];
 						if (g_missionFlightGroups[g_paiContext.curOrderCoord.fields.flightGroupIdx]
@@ -5391,7 +5391,7 @@ static char paiman_intohyperspacemaneuver(void) {
 				}
 				do {
 					CraftData* linkCraft = g_objectTable[link].mobj->pCraft;
-					linkCraft->craftState = 7;
+					linkCraft->craftState = CRAFT_STATE_IN_HYPERSPACE;
 					if (g_objectTable[link].flightGroupIdx !=
 						g_objectTable[g_paiContext.aiObjIdx].flightGroupIdx) {
 						++g_missionFgStats[g_objectTable[link].flightGroupIdx]
@@ -5440,7 +5440,8 @@ static char paiman_intohyperspacemaneuver(void) {
 				if (g_curCraft->leader_obj_idx != -1) {
 					effectiveAi = pai_GetEffectiveAIController(g_paiContext.aiTargetCraft);
 					if (g_objectTable[g_paiContext.aiLeaderObjIdx].objectType &&
-						(g_paiContext.aiTargetCraft->craftState == 7 || effectiveAi->maneuverMode == 21)) {
+						(g_paiContext.aiTargetCraft->craftState == CRAFT_STATE_IN_HYPERSPACE ||
+						 effectiveAi->maneuverMode == 21)) {
 						g_paiContext.aiController->aiPlanState = 59;
 						return 0;
 					}
@@ -5636,7 +5637,7 @@ static char paiman_intohyperspacemaneuver(void) {
 								CraftData* c = m->pCraft;
 								if (c) {
 									int fg = g_objectTable[carrierFreeSlot].flightGroupIdx;
-									c->craftState = 0;
+									c->craftState = CRAFT_STATE_NORMAL;
 									if (g_missionFlightGroups[fg].fg.specialCargoCraft == c->waveNumber) {
 										++g_missionFgStats[fg].tailEventCounts[orderIdx + 5];
 									}
@@ -5680,7 +5681,7 @@ static char paiman_intohyperspacemaneuver(void) {
 								}
 							}
 							prevSlot = (uint16_t)prevNewSlot;
-							c->craftState = 0;
+							c->craftState = CRAFT_STATE_NORMAL;
 							prevNewSlot = linkFreeSlot;
 							g_objectTable[prevSlot].mobj->pCraft->linkedPrevObjectIdx = linkFreeSlot;
 							c->nextLinkObjectIdx = prevSlot;
@@ -5766,7 +5767,7 @@ static char paiman_outofhyperspacemaneuver(void) {
 
 		pai_getplandataptrbyname("outofhyperspacepln")[3] = planId;
 		g_paiContext.aiController->thinkInterval = g_curCraft->aiFlight.objSignatures[0];
-		g_curCraft->craftState = 0;
+		g_curCraft->craftState = CRAFT_STATE_NORMAL;
 		g_paiContext.aiController->targetObjIdx = (uint16_t)-1;
 		g_paiContext.aiController->targetSignature = 0;
 		g_paiContext.aiController->hasLiveTarget = 0;

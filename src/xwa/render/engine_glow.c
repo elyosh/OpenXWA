@@ -2150,8 +2150,8 @@ void EngineGlow_RenderForObject(unsigned int objIdx) {
 			return;
 		}
 		switch (g_curCraft->craftState) {
-			case 5:
-			case 6: {
+			case CRAFT_STATE_ENTERING_HYPERSPACE:
+			case CRAFT_STATE_LEAVING_HYPERSPACE: {
 				uint16_t maxSpeed;
 				double boostWindow;
 				double speedDelta;

@@ -276,8 +276,6 @@ uint8_t g_deathStarLoopSfxActive[2];
 #define DEATH_STAR_SEGMENT_POINT_KIND_SPAWN 23
 #define DEATH_STAR_SEGMENT_POINT_KIND_ATTACH 24
 #define DEATH_STAR_SEGMENT_FLAG_REDIRECT_CHILDREN 0x200u
-#define DEATH_STAR_CRAFT_KIND_NORMAL 0
-#define DEATH_STAR_CRAFT_KIND_ACCEL_CHAMBER_PULL 8
 
 #if defined(__GNUC__) || defined(__clang__)
 #define DEATH_STAR_ALIGN_POINTER_TABLE __attribute__((aligned(sizeof(void*))))
@@ -1451,7 +1449,7 @@ void DeathStar_UpdateFollowOverrideCraft(int objectIdx) {
 		deltaZ = targetSample->worldZ - object->world_z;
 
 		if (collide_roughdistance3d(deltaX, deltaY, deltaZ) < 800) {
-			object->mobj->pCraft->craftState = DEATH_STAR_CRAFT_KIND_NORMAL;
+			object->mobj->pCraft->craftState = CRAFT_STATE_NORMAL;
 			DeathStar_AddFollowChainSlot(objectIdx);
 			return;
 		}
@@ -1465,7 +1463,7 @@ void DeathStar_UpdateFollowOverrideCraft(int objectIdx) {
 			3 *
 			g_modelDefs[(uint16_t)g_objectTypes[(uint16_t)g_deathStarFollowLeaderObjectType].modelDefIndex]
 				.maxSpeed;
-		object->mobj->pCraft->craftState = 9;
+		object->mobj->pCraft->craftState = CRAFT_STATE_DEATH_STAR_GUIDED;
 	}
 }
 
@@ -2348,7 +2346,7 @@ void DeathStar_InitMobileObjectForType(uint16_t objectType, unsigned int objIdx)
 		craft->aiController.pendingPlanId = 0;
 		craft->aiController.currentPlanId = 0;
 		craft->engineOutputScale = 0xffffu;
-		craft->craftState = 0;
+		craft->craftState = CRAFT_STATE_NORMAL;
 		craft->carrierObjIdx = 0xffffu;
 		craft->carriedObjectIndex = 0xffffu;
 		craft->aiController.targetComponent = 0xffffu;
@@ -3111,7 +3109,7 @@ void DeathStar_PositionPlayerAndFollowersAtStart(void) {
 	playerObj->world_y -= 35000;
 	playerObj->pitch = 0x4000u;
 	playerObj->roll = 0x1000u;
-	playerObj->mobj->pCraft->craftState = 9;
+	playerObj->mobj->pCraft->craftState = CRAFT_STATE_DEATH_STAR_GUIDED;
 
 	followerYOffset = 0;
 	objectIdx = g_activeRegionObjectSlotStart;
@@ -3550,7 +3548,7 @@ void DeathStar_UpdateEntranceSegment(int16_t activeSegmentSlotIdx, int16_t curre
 					g_deathStarEntranceTransitionTimer - (int)(uint16_t)g_elapsedTicks;
 				if (g_deathStarEntranceTransitionTimer < 0) {
 					g_deathStarEntranceTransitionTimer = 0;
-					transitionPlayerObj->mobj->pCraft->craftState = DEATH_STAR_CRAFT_KIND_NORMAL;
+					transitionPlayerObj->mobj->pCraft->craftState = CRAFT_STATE_NORMAL;
 					Player_StepExtView(g_localPlayer);
 					Hud_SetHudViewState(19, g_localPlayer);
 					g_deathStarEntranceTransitionState = 2;
@@ -3631,7 +3629,7 @@ void DeathStar_UpdateAccelChamberSegment(int16_t activeSegmentSlotIdx, int16_t c
 				(Q16Angle)(g_objectTable[chamberObjIdx].pitch + g_deathStarAccelChamberPitchOffset);
 			mobj->speed = 50;
 			object->mobj->speedRemainder = 0;
-			object->mobj->pCraft->craftState = 9;
+			object->mobj->pCraft->craftState = CRAFT_STATE_DEATH_STAR_GUIDED;
 		}
 
 		g_deathStarAccelChamberLastContainerSpawnTime = g_deathStarTunnelTimer;
@@ -3752,13 +3750,13 @@ void DeathStar_PullObjectTowardAccelChamber(int chamberObjIdx, ObjectRecord* tar
 
 	targetMobj = targetObj->mobj;
 	targetCraft = targetMobj->pCraft;
-	if (targetCraft->craftState == DEATH_STAR_CRAFT_KIND_ACCEL_CHAMBER_PULL) {
+	if (targetCraft->craftState == CRAFT_STATE_DEATH_STAR_PULLED) {
 		return;
 	}
 
 	if (targetObj->yaw == chamberObj->yaw && targetObj->pitch == chamberObj->pitch && distance < 700u) {
 		targetMobj->speed = 3000;
-		targetObj->mobj->pCraft->craftState = DEATH_STAR_CRAFT_KIND_ACCEL_CHAMBER_PULL;
+		targetObj->mobj->pCraft->craftState = CRAFT_STATE_DEATH_STAR_PULLED;
 		g_deathStarAccelChamberLightTimer = 250;
 		fsfx_PlaySound(161, chamberObjIdx, (unsigned int)g_localPlayer);
 		return;
@@ -3907,7 +3905,7 @@ void DeathStar_UpdateContainerCollision(int16_t activeSegmentSlotIdx, int contai
 												segmentObj->world_y - containerObj->world_y,
 												segmentObj->world_z - containerObj->world_z);
 
-	if (containerObj->mobj->pCraft->craftState == DEATH_STAR_CRAFT_KIND_ACCEL_CHAMBER_PULL &&
+	if (containerObj->mobj->pCraft->craftState == CRAFT_STATE_DEATH_STAR_PULLED &&
 		distanceToSegment < 5000u && containerObj->mobj->speed > 60u) {
 		uint16_t previousSpeed;
 
@@ -3916,9 +3914,9 @@ void DeathStar_UpdateContainerCollision(int16_t activeSegmentSlotIdx, int contai
 		if (containerObj->mobj->speed < 60u || previousSpeed <= containerObj->mobj->speed) {
 			containerObj->mobj->speed = 60;
 			if (containerObj->objectType == OBJ_DSContainer) {
-				containerObj->mobj->pCraft->craftState = 9;
+				containerObj->mobj->pCraft->craftState = CRAFT_STATE_DEATH_STAR_GUIDED;
 			} else {
-				containerObj->mobj->pCraft->craftState = DEATH_STAR_CRAFT_KIND_NORMAL;
+				containerObj->mobj->pCraft->craftState = CRAFT_STATE_NORMAL;
 				if (containerObjIdx == g_deathStarPlayerObjIdx) {
 					DeathStar_RefreshFollowOverrideCandidates();
 				}
@@ -3975,9 +3973,8 @@ void DeathStar_ClearAccelChamberContainersAtSegment(int16_t currentSegmentIdx, i
 		return;
 	}
 
-	if (g_objectTable[g_deathStarPlayerObjIdx].mobj->pCraft->craftState ==
-		DEATH_STAR_CRAFT_KIND_ACCEL_CHAMBER_PULL) {
-		g_objectTable[g_deathStarPlayerObjIdx].mobj->pCraft->craftState = DEATH_STAR_CRAFT_KIND_NORMAL;
+	if (g_objectTable[g_deathStarPlayerObjIdx].mobj->pCraft->craftState == CRAFT_STATE_DEATH_STAR_PULLED) {
+		g_objectTable[g_deathStarPlayerObjIdx].mobj->pCraft->craftState = CRAFT_STATE_NORMAL;
 	}
 
 	containerGenus = g_objectTypes[OBJ_DSContainer].genusId;

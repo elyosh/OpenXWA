@@ -344,7 +344,7 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 	craft->craftIndexInGroup = 0;
 	craft->leader_obj_idx = -1;
 	craft->aiLinkResolving = 0;
-	craft->craftState = 0;
+	craft->craftState = CRAFT_STATE_NORMAL;
 	craft->missionAccountingDone = 0;
 	craft->skillValue = 0;
 	craft->breakupPitchRate = 0;

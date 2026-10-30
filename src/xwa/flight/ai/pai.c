@@ -160,7 +160,8 @@ void pai_UpdateAllCraftAI(void) {
 			g_curCraft = g_objectTable[objIdx].mobj->pCraft;
 			aiController = pai_GetEffectiveAIController(g_curCraft);
 
-			if (g_curCraft->craftState != 3 && g_curCraft->craftState != 4 && aiController->thinkTimer <= 0) {
+			if (g_curCraft->craftState != CRAFT_STATE_DYING &&
+				g_curCraft->craftState != CRAFT_STATE_DESTROYED && aiController->thinkTimer <= 0) {
 				playerOwnerIdx = g_objectTable[objIdx].playerOwnerIdx;
 				if (playerOwnerIdx != -1 && !g_players[playerOwnerIdx].aiControlledFlag) {
 					if (g_players[playerOwnerIdx].currentSeatIdx == 0 &&
@@ -763,7 +764,7 @@ int16_t pai_FindMothershipObject(int16_t mothershipFlightGroupIdx) {
 		if (g_objectTable[objIdx].objectType != 0) {
 			craft = g_objectTable[objIdx].mobj->pCraft;
 			craftState = craft->craftState;
-			if (craftState != 4 && craftState != 3 &&
+			if (craftState != CRAFT_STATE_DESTROYED && craftState != CRAFT_STATE_DYING &&
 				(uint16_t)g_objectTable[objIdx].flightGroupIdx == (uint16_t)mothershipFlightGroupIdx &&
 				craft->leader_obj_idx == -1) {
 				return (int16_t)objIdx;
@@ -803,7 +804,7 @@ int16_t pai_FindMothershipObjectAnyRegion(int16_t mothershipFlightGroupIdx) {
 
 				craft = obj->mobj->pCraft;
 				craftState = craft->craftState;
-				if (craftState != 4 && craftState != 3 &&
+				if (craftState != CRAFT_STATE_DESTROYED && craftState != CRAFT_STATE_DYING &&
 					(uint16_t)obj->flightGroupIdx == (uint16_t)mothershipFlightGroupIdx &&
 					craft->leader_obj_idx == -1) {
 					return (int16_t)objIdx;
@@ -1271,7 +1272,8 @@ int pai_IsObjectTargetable(unsigned int objIdx) {
 			}
 
 			craftState = craft->craftState;
-			if (craftState == 1 || craftState == 3 || craftState == 4) {
+			if (craftState == CRAFT_STATE_1 || craftState == CRAFT_STATE_DYING ||
+				craftState == CRAFT_STATE_DESTROYED) {
 				return 0;
 			}
 

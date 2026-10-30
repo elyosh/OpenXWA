@@ -565,7 +565,7 @@ unsigned int Craft_DamageComponent(uint16_t objIdx, int componentId, unsigned in
 			damageAmount =
 				(unsigned int)(hullMax - 5 * (int)((uint32_t)hullMax / 100u) - hullDamage + 16 * componentHp);
 		} else if (g_objectTable[sourceObjIdx].objectType == OBJ_AWing &&
-				   g_objectTable[sourceObjIdx].mobj->pCraft->craftState == 3) {
+				   g_objectTable[sourceObjIdx].mobj->pCraft->craftState == CRAFT_STATE_DYING) {
 			int hullMax;
 			int hullDamage;
 			int componentHp;

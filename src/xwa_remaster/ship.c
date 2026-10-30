@@ -1334,7 +1334,8 @@ float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f) {
 	if (!f || !f->has_craft || !f->eg_output_scale || !f->eg_working) {
 		return 0.0f;
 	}
-	if (f->craft_state != 5 && f->craft_state != 6) {
+	if (f->craft_state != XWA_SNAP_CRAFT_STATE_ENTERING_HYPERSPACE &&
+		f->craft_state != XWA_SNAP_CRAFT_STATE_LEAVING_HYPERSPACE) {
 		/* Power-margin formula (EngineGlow_RenderObjectGlows): margin =
 		 * 16 - redirects, scaled by engineOutputScale and throttle,
 		 * ~6% flicker, floor 0.35. */
@@ -1349,7 +1350,7 @@ float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f) {
 		}
 		return s;
 	}
-	/* Craft states 5 and 6: speed-boost window over maxSpeedCache. */
+	/* Entering or leaving hyperspace: speed-boost window over maxSpeedCache. */
 	const double boost_window = (double)(4 * (3600 - (int)f->eg_max_speed));
 	const double speed_delta = (double)((int)f->speed - (int)f->eg_max_speed);
 	if (boost_window <= 0.0) {

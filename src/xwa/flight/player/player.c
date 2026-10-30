@@ -1259,7 +1259,7 @@ void Player_IssueAiWingmanTargetOrder(uint16_t targetObjIdx, int wingmanObjIdx, 
 					if (scanObj->playerOwnerIdx == -1 && scanObj->objectType != OBJ_None &&
 						g_missionFlightGroups[scanFlightGroupIdx].fg.team == g_players[playerIdx].playerIff) {
 						craft = scanObj->mobj->pCraft;
-						if (craft->craftState == 0) {
+						if (craft->craftState == CRAFT_STATE_NORMAL) {
 							int boundPlayerNumber;
 
 							boundPlayerNumber =
@@ -1324,7 +1324,7 @@ void Player_IssueAiWingmanTargetOrder(uint16_t targetObjIdx, int wingmanObjIdx, 
 		}
 	} else {
 		craft = g_objectTable[wingmanObjIdx].mobj->pCraft;
-		if (craft->craftState == 0) {
+		if (craft->craftState == CRAFT_STATE_NORMAL) {
 			AiController* aiController;
 
 			aiController = pai_GetEffectiveAIController(craft);
@@ -1510,7 +1510,9 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 						if (g_missionFlightGroups[candidate->flightGroupIdx].playerOwnerIdx ==
 							(int)playerIdx) {
 							craftState = candidateMobj->pCraft->craftState;
-							if (craftState != 3 && craftState != 5 && craftState != 4 &&
+							if (craftState != CRAFT_STATE_DYING &&
+								craftState != CRAFT_STATE_ENTERING_HYPERSPACE &&
+								craftState != CRAFT_STATE_DESTROYED &&
 								candidate->objectSignature == preferredObjectSignature) {
 								foundCraft = 1;
 								matchedPreferredSignature = 1;
@@ -1567,7 +1569,9 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 								uint8_t craftState;
 
 								craftState = candidateMobj->pCraft->craftState;
-								if (craftState != 3 && craftState != 5 && craftState != 4) {
+								if (craftState != CRAFT_STATE_DYING &&
+									craftState != CRAFT_STATE_ENTERING_HYPERSPACE &&
+									craftState != CRAFT_STATE_DESTROYED) {
 									selectedObjIdx = scanObjIdx;
 									foundCraft = 1;
 									break;
@@ -1943,7 +1947,9 @@ int Player_UnbindFromCurrentCraft(int playerIdx, int requireAnotherOwnedCraft, i
 						scanCraft = mobj->pCraft;
 						if (g_missionFlightGroups[scanObj->flightGroupIdx].playerOwnerIdx == playerIdx) {
 							craftState = scanCraft->craftState;
-							if (craftState != 3 && craftState != 5 && craftState != 4) {
+							if (craftState != CRAFT_STATE_DYING &&
+								craftState != CRAFT_STATE_ENTERING_HYPERSPACE &&
+								craftState != CRAFT_STATE_DESTROYED) {
 								++craftCount;
 								if ((uint16_t)craftCount > 1u) {
 									found = 1;
@@ -2234,7 +2240,8 @@ int Player_FindNearestEnemyFighter(int playerIdx, int excludeObjIdx) {
 										uint8_t craftState;
 
 										craftState = craft->craftState;
-										if (craftState == 0 || craftState == 6) {
+										if (craftState == CRAFT_STATE_NORMAL ||
+											craftState == CRAFT_STATE_LEAVING_HYPERSPACE) {
 											unsigned int objectIndex;
 
 											objectIndex = (unsigned int)g_players[playerIdx].objectIndex;
@@ -2344,7 +2351,7 @@ int16_t Player_FindAttackerOfTarget(uint16_t targetObjIdx, int16_t playerObjIdx)
 
 		qualifies = 0;
 		candidateCraft = g_objectTable[scanIdx].mobj->pCraft;
-		if (candidateCraft->workingSubsystems == 0 || candidateCraft->craftState != 0) {
+		if (candidateCraft->workingSubsystems == 0 || candidateCraft->craftState != CRAFT_STATE_NORMAL) {
 			continue;
 		}
 
@@ -2890,7 +2897,7 @@ int8_t Player_CanRadioCommandCraft(unsigned int targetObjIdx, int playerIdx) {
 	if (g_objectTable[targetObjIdx].mobj != NULL) {
 		g_curCraft = g_objectTable[targetObjIdx].mobj->pCraft;
 		if (g_curCraft != NULL) {
-			if (g_curCraft->craftState != 0) {
+			if (g_curCraft->craftState != CRAFT_STATE_NORMAL) {
 				return 0;
 			}
 
@@ -3181,7 +3188,7 @@ void Player_ValidateCurrentTargets(int playerIdx) {
 				CraftData* targetCraft;
 
 				targetCraft = targetMobj->pCraft;
-				if (targetCraft != NULL && targetCraft->craftState == 7) {
+				if (targetCraft != NULL && targetCraft->craftState == CRAFT_STATE_IN_HYPERSPACE) {
 					g_players[playerIdx].currentTargetObjectIdx = 0xffffu;
 				}
 			}
@@ -3394,8 +3401,9 @@ uint16_t Player_CycleTargetAnyIFF(int startObjIdx, int direction, int playerIdx)
 						}
 
 						g_curCraft = mobj->pCraft;
-						if (g_curCraft->craftState != 3 && g_curCraft->craftState != 4 &&
-							g_curCraft->craftState != 7) {
+						if (g_curCraft->craftState != CRAFT_STATE_DYING &&
+							g_curCraft->craftState != CRAFT_STATE_DESTROYED &&
+							g_curCraft->craftState != CRAFT_STATE_IN_HYPERSPACE) {
 							return (uint16_t)startObjIdx;
 						}
 					}
@@ -3524,8 +3532,9 @@ uint16_t Player_CycleTarget(int startObjIdx, int direction, int playerIdx, int i
 							}
 
 							g_curCraft = mobj->pCraft;
-							if (g_curCraft->craftState != 3 && g_curCraft->craftState != 4 &&
-								g_curCraft->craftState != 7) {
+							if (g_curCraft->craftState != CRAFT_STATE_DYING &&
+								g_curCraft->craftState != CRAFT_STATE_DESTROYED &&
+								g_curCraft->craftState != CRAFT_STATE_IN_HYPERSPACE) {
 								return (uint16_t)startObjIdx;
 							}
 						}
@@ -3835,7 +3844,7 @@ int Player_HandleCraftDestruction(unsigned int playerIdx) {
 	g_objectTable[altViewObjectIdx].mobj->renderOffsetY = 0;
 	g_objectTable[altViewObjectIdx].mobj->renderOffsetZ = 0;
 	MobileObject_SetRandomSpinAxis(altViewObjectIdx);
-	pCraft->craftState = 3;
+	pCraft->craftState = CRAFT_STATE_DYING;
 	g_objectTable[altViewObjectIdx].mobj->lifetimeTimer = 472;
 	mobj = g_objectTable[altViewObjectIdx].mobj;
 	if (mobj->speed < 20u)
@@ -4006,7 +4015,10 @@ int Player_HasAvailableOwnedCraft(int playerIdx) {
 							uint8_t craftState;
 
 							craftState = craft->craftState;
-							if (craftState != 3 && craftState != 5 && craftState != 4 && craftState != 7) {
+							if (craftState != CRAFT_STATE_DYING &&
+								craftState != CRAFT_STATE_ENTERING_HYPERSPACE &&
+								craftState != CRAFT_STATE_DESTROYED &&
+								craftState != CRAFT_STATE_IN_HYPERSPACE) {
 								found = 1;
 								break;
 							}
@@ -4155,7 +4167,8 @@ int16_t Player_FindNearestObjective(int goalCondType, int playerIdx) {
 			CraftData* craft;
 
 			craft = g_objectTable[objIdx].mobj->pCraft;
-			if (craft->craftState == 0 || craft->craftState == 6) {
+			if (craft->craftState == CRAFT_STATE_NORMAL ||
+				craft->craftState == CRAFT_STATE_LEAVING_HYPERSPACE) {
 				uint32_t objectRef;
 				int playerObjectIdx;
 

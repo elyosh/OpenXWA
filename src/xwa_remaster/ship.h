@@ -301,7 +301,8 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* l
  * of EngineGlow_RenderObjectGlows' scale derivation from the captured
  * eg_* craft state: the power-margin formula (16 - redirects,
  * engineOutputScale, throttle, min 0.35) for normal craft, the
- * speed-boost formula for craft states 5 and 6. Includes the classic ~6%
+ * speed-boost formula for craft entering or leaving
+ * hyperspace. Includes the classic ~6%
  * flicker (driver-side randomness — the classic consumed its render
  * RNG here, which read-only capture must not). Returns 0 when the
  * classic draws no glows (no craft / no engine output / subsystems

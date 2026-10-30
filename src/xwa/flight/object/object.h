@@ -45,6 +45,26 @@ enum {
 	GENUS_SalvageJunk = 21,
 };
 
+/* CraftData.craftState. 1 and 2 are tested but the recovered code never sets
+   them, so their meaning is unknown. */
+typedef enum CraftState {
+	CRAFT_STATE_NORMAL = 0,
+	CRAFT_STATE_1 = 1,
+	CRAFT_STATE_2 = 2,
+	/* Breaking up; it explodes when its lifetime timer runs out. */
+	CRAFT_STATE_DYING = 3,
+	/* Destroyed at once, with a lifetime of 1. */
+	CRAFT_STATE_DESTROYED = 4,
+	/* The hyperspace states, as the hangar's status text names them. */
+	CRAFT_STATE_ENTERING_HYPERSPACE = 5,
+	CRAFT_STATE_LEAVING_HYPERSPACE = 6,
+	CRAFT_STATE_IN_HYPERSPACE = 7,
+	/* Pulled by a Death Star accelerator chamber. */
+	CRAFT_STATE_DEATH_STAR_PULLED = 8,
+	/* Moved by the Death Star code; the player's controls are ignored. */
+	CRAFT_STATE_DEATH_STAR_GUIDED = 9,
+} CraftState;
+
 typedef struct ObjectRecord ObjectRecord;
 
 typedef struct MobileObjectProximityList {
@@ -170,9 +190,7 @@ typedef struct CraftData {
 	ModelDefIndex modelDefIndex;
 	int leader_obj_idx;
 	uint8_t aiLinkResolving;
-	/* 0 in normal flight, 3 while the craft is dying, 4 when it is destroyed at
-	   once. Other values are other states. */
-	uint8_t craftState;
+	uint8_t craftState; /* CraftState */
 	uint8_t missionAccountingDone;
 	uint16_t skillValue;
 	int16_t breakupPitchRate;

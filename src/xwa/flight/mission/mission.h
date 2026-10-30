@@ -217,7 +217,7 @@ extern uint8_t g_spawnUseExactPosition;
 extern Q16Angle g_spawnPitch;
 extern uint16_t g_spawnCraftOrdinal;
 extern uint16_t g_spawnObjectType;
-extern uint8_t g_spawnObjectKind;
+extern uint8_t g_spawnCraftState;
 extern uint8_t g_spawnStatus2;
 extern int g_spawnWorldX;
 extern int g_spawnWorldY;

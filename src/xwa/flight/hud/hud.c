@@ -9097,7 +9097,8 @@ void Hud_UpdateTargetInfoCache(void) {
 				targetObjIdx < g_activeRegionCraftObjectSlotEnd && targetCraft != NULL &&
 				targetMobj->state == 0) {
 				if ((int8_t)targetCraft->iffVisibility[(uint16_t)g_players[g_localPlayer].playerIff] <= 0 ||
-					targetCraft->craftState == 3 || targetCraft->craftState == 4) {
+					targetCraft->craftState == CRAFT_STATE_DYING ||
+					targetCraft->craftState == CRAFT_STATE_DESTROYED) {
 					statusText = g_strWarheadUnknown;
 				} else {
 					if (targetCraft->cargoIndex != 0xffu) {
@@ -9157,7 +9158,8 @@ void Hud_UpdateTargetInfoCache(void) {
 		targetMobj = g_objectTable[targetObjIdx].mobj;
 		if (targetMobj != NULL) {
 			targetCraft = targetMobj->pCraft;
-			if (targetCraft == NULL || targetCraft->craftState == 3 || targetCraft->craftState == 4) {
+			if (targetCraft == NULL || targetCraft->craftState == CRAFT_STATE_DYING ||
+				targetCraft->craftState == CRAFT_STATE_DESTROYED) {
 				shieldDenominator = 0;
 			} else {
 				shieldTotal = targetCraft->shieldRear + targetCraft->shieldFront;
@@ -9193,7 +9195,8 @@ void Hud_UpdateTargetInfoCache(void) {
 		targetMobj = g_objectTable[targetObjIdx].mobj;
 		if (targetMobj != NULL) {
 			targetCraft = targetMobj->pCraft;
-			if (targetCraft == NULL || targetCraft->craftState == 3 || targetCraft->craftState == 4) {
+			if (targetCraft == NULL || targetCraft->craftState == CRAFT_STATE_DYING ||
+				targetCraft->craftState == CRAFT_STATE_DESTROYED) {
 				systemPct = g_objectTable[targetObjIdx].typeSpecificWord != 0 ? 100 : 0;
 			} else {
 				if (targetCraft->workingSubsystems == 0) {
@@ -9238,7 +9241,8 @@ void Hud_UpdateTargetInfoCache(void) {
 			targetCraft = targetMobj->pCraft;
 			if (targetObjIdx >= g_activeRegionObjectSlotStart &&
 				targetObjIdx < g_activeRegionCraftObjectSlotEnd && targetCraft != NULL) {
-				if (targetCraft->craftState == 3 || targetCraft->craftState == 4) {
+				if (targetCraft->craftState == CRAFT_STATE_DYING ||
+					targetCraft->craftState == CRAFT_STATE_DESTROYED) {
 					hullPct = 0;
 				} else if ((uint32_t)targetCraft->hullDamage > (uint32_t)targetCraft->hullMax) {
 					hullPct = 1;
@@ -9529,7 +9533,7 @@ void Hud_DrawRadarBlips(void) {
 			continue;
 		}
 		craftState = craft->craftState;
-		if (craftState == 3 || craftState == 4) {
+		if (craftState == CRAFT_STATE_DYING || craftState == CRAFT_STATE_DESTROYED) {
 			continue;
 		}
 
@@ -10171,7 +10175,7 @@ void Hud_UpdateThreatIndicators(void) {
 		}
 
 		craft = mobj->pCraft;
-		if (craft->workingSubsystems == 0 || craft->craftState != 0) {
+		if (craft->workingSubsystems == 0 || craft->craftState != CRAFT_STATE_NORMAL) {
 			continue;
 		}
 
@@ -17727,7 +17731,8 @@ void Mfd_DrawFriendlyCraftPage(int mfdSide, void* mfdSurface) {
 							objects[tableIdx].objectType != OBJ_ImperialPilot &&
 							objects[tableIdx].objectType != OBJ_CivilianPilot) {
 							craft = objects[tableIdx].mobj->pCraft;
-							if (craft->craftState != 3 && craft->craftState != 4) {
+							if (craft->craftState != CRAFT_STATE_DYING &&
+								craft->craftState != CRAFT_STATE_DESTROYED) {
 #ifdef XWA_MODERN
 								/* The list holds 192 craft, and a region can have
 								 * more. The page stops at 192. */
@@ -17958,7 +17963,8 @@ void Mfd_DrawFriendlyCraftPage(int mfdSide, void* mfdSurface) {
 					continue;
 				}
 #endif
-				if (craft != NULL && craft->craftState != 3 && craft->craftState != 4) {
+				if (craft != NULL && craft->craftState != CRAFT_STATE_DYING &&
+					craft->craftState != CRAFT_STATE_DESTROYED) {
 					int avgShield;
 					int maxShield;
 
@@ -17986,7 +17992,7 @@ void Mfd_DrawFriendlyCraftPage(int mfdSide, void* mfdSurface) {
 					g_flightDrawCharFn('/');
 				}
 
-				if (craft->craftState != 3 && craft->craftState != 4) {
+				if (craft->craftState != CRAFT_STATE_DYING && craft->craftState != CRAFT_STATE_DESTROYED) {
 					if ((uint32_t)craft->hullDamage > (uint32_t)craft->hullMax) {
 						hullPct = 1;
 					} else {
@@ -18184,7 +18190,7 @@ void Mfd_DrawFlightGroupsPage(int mfdSide, void* mfdSurface) {
 				continue;
 			}
 			rowCraft = g_objectTable[tableIdx].mobj->pCraft;
-			if (rowCraft->craftState == 3 || rowCraft->craftState == 4) {
+			if (rowCraft->craftState == CRAFT_STATE_DYING || rowCraft->craftState == CRAFT_STATE_DESTROYED) {
 				continue;
 			}
 #ifdef XWA_MODERN
@@ -18421,7 +18427,8 @@ void Mfd_DrawFlightGroupsPage(int mfdSide, void* mfdSurface) {
 #endif
 
 					FlightText_SetCursor((int16_t)g_mfdFlightGroupsShieldHullValueX, (int16_t)y);
-					if (craft->craftState != 3 && craft->craftState != 4) {
+					if (craft->craftState != CRAFT_STATE_DYING &&
+						craft->craftState != CRAFT_STATE_DESTROYED) {
 						int avgShield;
 						int maxShield;
 
@@ -18447,7 +18454,8 @@ void Mfd_DrawFlightGroupsPage(int mfdSide, void* mfdSurface) {
 					FlightText_SetCursor(
 						(int16_t)(g_mfdFlightGroupsShieldHullValueX + FlightText_MeasureStringWidth("200/")),
 						(int16_t)y);
-					if (craft->craftState != 3 && craft->craftState != 4) {
+					if (craft->craftState != CRAFT_STATE_DYING &&
+						craft->craftState != CRAFT_STATE_DESTROYED) {
 						if ((uint32_t)craft->hullDamage <= (uint32_t)craft->hullMax) {
 							hullPct = Mfd_FriendlyCraftScaledPercent((uint16_t)MATH2_percentage(
 								(uint32_t)(craft->hullMax - craft->hullDamage), (uint32_t)craft->hullMax));
@@ -19689,7 +19697,7 @@ void Mfd_UpdateCommandMenuTargets(void) {
 				targetSlot = 1;
 			}
 
-			if (craft->craftState != 0) {
+			if (craft->craftState != CRAFT_STATE_NORMAL) {
 				continue;
 			}
 

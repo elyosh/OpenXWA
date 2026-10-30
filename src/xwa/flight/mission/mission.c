@@ -170,7 +170,7 @@ uint16_t g_spawnCraftOrdinal;
 // GLOBAL: XWA 0x9E96F2
 uint16_t g_spawnObjectType;
 // GLOBAL: XWA 0x9E96F4
-uint8_t g_spawnObjectKind;
+uint8_t g_spawnCraftState;
 // GLOBAL: XWA 0x9E96F5
 uint8_t g_spawnStatus2;
 // GLOBAL: XWA 0x9E96F8
@@ -4353,7 +4353,7 @@ void Mission_ProcessFlightGroupWaveCompletion(uint16_t flightGroupIdx) {
 					MobileObject* mobj = g_objectTable[scanSlot].mobj;
 					if (!mobj->state && g_objectTable[scanSlot].flightGroupIdx == flightGroupIdx) {
 						uint8_t craftState = mobj->pCraft->craftState;
-						if (craftState != 3 && craftState != 4) {
+						if (craftState != CRAFT_STATE_DYING && craftState != CRAFT_STATE_DESTROYED) {
 							clear = 0;
 							break;
 						}
@@ -4487,7 +4487,7 @@ void Mission_ProcessFlightGroupWaveCompletion(uint16_t flightGroupIdx) {
 					continue;
 				pCraft = mobj->pCraft;
 				kind = pCraft->craftState;
-				if (kind != 3 && kind != 4)
+				if (kind != CRAFT_STATE_DYING && kind != CRAFT_STATE_DESTROYED)
 					continue;
 				g_objectTable[reclaimSlot].objectType = OBJ_None;
 				if (pCraft->effectiveAiObjectLink) {
@@ -5230,7 +5230,7 @@ void Mission_UpdateFlightGroupArrivals(void) {
 										uint8_t kind;
 										g_curCraft = mobj->pCraft;
 										kind = g_curCraft->craftState;
-										if (kind != 3 && kind != 4) {
+										if (kind != CRAFT_STATE_DYING && kind != CRAFT_STATE_DESTROYED) {
 											hasNoInstance = 0;
 											break;
 										}
@@ -5728,7 +5728,7 @@ short Mission_SpawnFlightGroupWaveCraft(uint16_t instanceFilter) {
 
 	// --- Common spawn: populate g_spawn* context, then create the craft -----
 	g_spawnIff = g_missionFlightGroups[g_currentFlightGroupIdx].fg.iff;
-	g_spawnObjectKind = 0;
+	g_spawnCraftState = CRAFT_STATE_NORMAL;
 	g_spawnTeamId = g_missionFlightGroups[g_currentFlightGroupIdx].fg.team;
 	g_spawnStatus1 = g_missionFlightGroups[g_currentFlightGroupIdx].fg.status1;
 	g_spawnStatus2 = g_missionFlightGroups[g_currentFlightGroupIdx].fg.status2;
@@ -6872,7 +6872,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		}
 
 		if (modelIndex != 0xFFFF) {
-			g_curCraft->craftState = g_spawnObjectKind;
+			g_curCraft->craftState = g_spawnCraftState;
 			engineGlowCount = g_modelDefs[modelIndex].engineGlowCount;
 			if (((uint16_t)existingObjIdx == 0xFFFF))
 				g_curCraft->throttleSpeed = throttle;
@@ -7007,7 +7007,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 				throttle2 = g_orderThrottleToCraftThrottleSpeed
 					[g_missionFlightGroups[g_currentFlightGroupIdx].fg.orders[4 * g_spawnRegionIdx].throttle];
 			if (modelIndex != 0xFFFF) {
-				g_curCraft->craftState = g_spawnObjectKind;
+				g_curCraft->craftState = g_spawnCraftState;
 				if (((uint16_t)existingObjIdx == 0xFFFF))
 					g_curCraft->throttleSpeed = throttle2;
 				g_curCraft->engineOutputScale = -1;

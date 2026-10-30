@@ -1587,7 +1587,8 @@ void fsfx_UpdateVoiceQueue(void) {
 				object = &g_objectTable[objIdx];
 				if (object->objectSignature == g_fsfxVoiceQueueObjectSerial[queueIndex] &&
 					object->objectType != OBJ_None && object->mobj != NULL && object->mobj->pCraft != NULL &&
-					object->mobj->pCraft->craftState != 3 && object->mobj->pCraft->craftState != 4) {
+					object->mobj->pCraft->craftState != CRAFT_STATE_DYING &&
+					object->mobj->pCraft->craftState != CRAFT_STATE_DESTROYED) {
 					objectStillValid = 1;
 				}
 
@@ -1713,7 +1714,7 @@ void fsfx_UpdateMissileThreatWarning(void) {
 		}
 
 		craft = mobj->pCraft;
-		if (craft == NULL || craft->workingSubsystems == 0 || craft->craftState != 0) {
+		if (craft == NULL || craft->workingSubsystems == 0 || craft->craftState != CRAFT_STATE_NORMAL) {
 			continue;
 		}
 
@@ -2484,7 +2485,8 @@ void fsfx_UpdateFlightSfx(void) {
 
 		sourceMobj = sourceObj->mobj;
 		sourceCraft = sourceMobj->pCraft;
-		if (sourceCraft->craftState != 0 || sourceCraft->workingSubsystems == 0 || sourceMobj->speed == 0) {
+		if (sourceCraft->craftState != CRAFT_STATE_NORMAL || sourceCraft->workingSubsystems == 0 ||
+			sourceMobj->speed == 0) {
 			continue;
 		}
 

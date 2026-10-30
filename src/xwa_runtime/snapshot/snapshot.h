@@ -332,6 +332,13 @@ typedef struct XwaDirLight {
 #define XWA_SNAP_GENUS_RUBBLE 20
 #define XWA_SNAP_GENUS_SALVAGE_JUNK 21
 
+/* Craft states the driver dispatches on (mirrors CraftState). */
+#define XWA_SNAP_CRAFT_STATE_NORMAL 0
+#define XWA_SNAP_CRAFT_STATE_DYING 3
+#define XWA_SNAP_CRAFT_STATE_DESTROYED 4
+#define XWA_SNAP_CRAFT_STATE_ENTERING_HYPERSPACE 5
+#define XWA_SNAP_CRAFT_STATE_LEAVING_HYPERSPACE 6
+
 /* Intrinsic object-table slot classes (XwaFlightObject.slot_class). */
 #define XWA_SNAP_SLOT_OTHER 0
 #define XWA_SNAP_SLOT_MAIN 1
@@ -434,10 +441,10 @@ typedef struct XwaFlightObject {
 	uint8_t anim_frame;
 	/* ---- engine-glow state (EngineGlow_RenderObjectGlows inputs; the
 	 * HD driver derives the glow fans from these + the HD mesh's
-	 * flight-model engine glows). Craft states 5 and 6 use the speed-boost scale
-	 * formula (speed vs eg_max_speed); everything else the power-
+	 * flight-model engine glows). Craft states entering and leaving
+	 * hyperspace use the speed-boost scale formula (speed vs eg_max_speed); everything else the power-
 	 * margin formula (16 - redirects, engineOutputScale, throttle). */
-	uint8_t craft_state;        /* CraftData.craftState */
+	uint8_t craft_state;        /* CraftData.craftState, XWA_SNAP_CRAFT_STATE_* */
 	uint8_t eg_working;         /* CraftData.workingSubsystems != 0 */
 	uint8_t eg_shield_redirect; /* CraftData.shieldRedirect */
 	uint8_t eg_laser_redirect;  /* CraftData.laserRedirect */

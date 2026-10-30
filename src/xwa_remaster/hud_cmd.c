@@ -184,7 +184,8 @@ static AeronSceneMesh* cmd_mesh(const XwaFlightObject* object, uint8_t* out_sour
 static float cmd_engine_glow_scale(const XwaFlightObject* object, uint64_t tick_index) {
 	if (!object || !object->has_craft || !object->eg_output_scale || !object->eg_working)
 		return 0.0f;
-	if (object->craft_state == 5 || object->craft_state == 6) {
+	if (object->craft_state == XWA_SNAP_CRAFT_STATE_ENTERING_HYPERSPACE ||
+		object->craft_state == XWA_SNAP_CRAFT_STATE_LEAVING_HYPERSPACE) {
 		const double window = (double)(4 * (3600 - (int)object->eg_max_speed));
 		const double delta = (double)((int)object->speed - (int)object->eg_max_speed);
 		if (window <= 0.0)
@@ -848,7 +849,7 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	s_cmd.output = Aeron_RenderTargetGetTexture(s_cmd.present_rt);
 	/* With edges, the display shows the edges of the shaded image, and it is
 	   empty while the target is dying. */
-	const int blank = target->has_craft && target->craft_state == 3;
+	const int blank = target->has_craft && target->craft_state == XWA_SNAP_CRAFT_STATE_DYING;
 	if (display->style == XWA_TARGET_DISPLAY_EDGES) {
 		if (!cmd_draw_edges(cmd, display, crt, target, blank, width, height)) {
 			Aeron_CommandBufferSetFailure(cmd, "HUD CMD edge pass failed");

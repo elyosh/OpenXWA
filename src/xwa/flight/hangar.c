@@ -445,11 +445,11 @@ static void Hangar_FormatReadySourceStatus(char* buffer) {
 	(void)GetModelDefIndexFromType(sourceObj->objectType);
 
 	buffer[0] = '\0';
-	if (craft->craftState == 5) {
+	if (craft->craftState == CRAFT_STATE_ENTERING_HYPERSPACE) {
 		sprintf(buffer, "%s %s", fgName, g_strHangarMiscStrings[HANGAR_MISC_ENTERING_HYPERSPACE]);
-	} else if (craft->craftState == 6) {
+	} else if (craft->craftState == CRAFT_STATE_LEAVING_HYPERSPACE) {
 		sprintf(buffer, "%s %s", fgName, g_strHangarMiscStrings[HANGAR_MISC_LEAVING_HYPERSPACE]);
-	} else if (craft->craftState == 7) {
+	} else if (craft->craftState == CRAFT_STATE_IN_HYPERSPACE) {
 		sprintf(buffer, "%s %s", fgName, g_strHangarMiscStrings[HANGAR_MISC_IN_HYPERSPACE]);
 	} else {
 		AiController* ai;
@@ -3056,7 +3056,7 @@ void Hangar_RenderScene(void) {
 				case GENUS_PilotDroid:
 				case GENUS_WeaponEmplacement:
 					g_curCraft = obj->mobj->pCraft;
-					if (g_curCraft->craftState == 7) {
+					if (g_curCraft->craftState == CRAFT_STATE_IN_HYPERSPACE) {
 						break;
 					}
 					g_renderFlags = FlightView_CullObjectSphereToViewport(objectIdx, g_curModelMaxExtent,
@@ -7978,7 +7978,7 @@ ObjectIndex Hangar_SwitchPlayerCraft(int newObjectType) {
 	}
 
 	g_currentFlightGroupIdx = g_objectTable[g_hangarPlayerObjIdx].flightGroupIdx;
-	g_spawnObjectKind = 0;
+	g_spawnCraftState = CRAFT_STATE_NORMAL;
 	g_spawnLinkedObjectFlag = 1;
 	g_spawnIff = g_missionFlightGroups[g_currentFlightGroupIdx].fg.iff;
 	g_spawnTeamId = g_missionFlightGroups[g_currentFlightGroupIdx].fg.team;

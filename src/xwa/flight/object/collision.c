@@ -4263,7 +4263,7 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 					pitchRate = -pitchRate;
 			}
 			g_objectTable[targetObjIdx].mobj->pCraft->breakupPitchRate = pitchRate;
-			targetCraft->craftState = 3;
+			targetCraft->craftState = CRAFT_STATE_DYING;
 
 			if (damageSourceObjIdx != 0xFFFF &&
 				g_objectTable[damageSourceObjIdx].objectType == OBJ_LaserImperialDS &&
@@ -4285,7 +4285,7 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 				} else if (type == 47 || type == 48) {
 					frames = (GameRand() & 1) + 1;
 				} else if (type == 203 || type == 205 || type == 204 || type == 207 || type == 206) {
-					targetCraft->craftState = 4;
+					targetCraft->craftState = CRAFT_STATE_DESTROYED;
 					g_objectTable[targetObjIdx].mobj->lifetimeTimer = 1;
 					Craft_DetachDamageableComponent((uint16_t)targetObjIdx, 1, 0xFFFF);
 					fsfx_PlaySound(138, targetObjIdx, g_localPlayer);
@@ -4330,7 +4330,7 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 				fsfx_PlaySound(24, targetObjIdx, g_localPlayer);
 				ForceFeedback_PlayProximityEffectForObject(0, targetObjIdx);
 				*pPlayGeneric = 0;
-				targetCraft->craftState = 4;
+				targetCraft->craftState = CRAFT_STATE_DESTROYED;
 				return;
 			}
 			if (g_objectTable[targetObjIdx].playerOwnerIdx != -1) {
@@ -4341,7 +4341,7 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 					fsfx_PlaySound(24, targetObjIdx, g_localPlayer);
 					ForceFeedback_PlayProximityEffectForObject(0, targetObjIdx);
 					*pPlayGeneric = 0;
-					targetCraft->craftState = 4;
+					targetCraft->craftState = CRAFT_STATE_DESTROYED;
 					return;
 				}
 			}
@@ -4362,7 +4362,7 @@ static __inline void collide_HandleCraftDestruction(unsigned int targetObjIdx, C
 				g_objectTable[targetObjIdx].mobj->renderOffsetZ = 0;
 			}
 			MobileObject_SetRandomSpinAxis(targetObjIdx);
-			targetCraft->craftState = 3;
+			targetCraft->craftState = CRAFT_STATE_DYING;
 			if (g_objectTable[targetObjIdx].playerOwnerIdx != -1)
 				g_objectTable[targetObjIdx].mobj->lifetimeTimer = 708;
 			else
@@ -4508,7 +4508,7 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 									if (sourceGenus == GENUS_Starship &&
 										g_objectTable[damageSourceObjIdx].objectType == OBJ_Dreadnaught2 &&
 										g_objectTable[targetObjIdx].objectType == OBJ_SuperStarDestroyer &&
-										srcCraft->craftState != 3 && slotType == 293) {
+										srcCraft->craftState != CRAFT_STATE_DYING && slotType == 293) {
 										damageAmount += 4800000;
 									} else {
 										uint8_t firstSlot =
@@ -5157,7 +5157,8 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 						}
 						targetCraft->activeHudFeatureMask &= ~mask;
 					}
-					if (!targetCraft->craftState && (int)targetObjIdx != g_players[g_localPlayer].objectIndex)
+					if (targetCraft->craftState == CRAFT_STATE_NORMAL &&
+						(int)targetObjIdx != g_players[g_localPlayer].objectIndex)
 						fsfx_speakorderack(g_localPlayer, targetObjIdx, 7, 9, targetObjIdx, 0x8000);
 					handledThresholdFeedback = 1;
 				}
@@ -5234,11 +5235,11 @@ char collide_damagecraft(unsigned int targetObjIdx, unsigned int componentId, un
 		targetCraft->hullDamage = targetCraft->hullMax - 1;
 	craftState = targetCraft->craftState;
 	if (!g_flightSimSideEffectsSuppressed) {
-		if ((!craftState || craftState == 5) &&
+		if ((craftState == CRAFT_STATE_NORMAL || craftState == CRAFT_STATE_ENTERING_HYPERSPACE) &&
 			(unsigned int)targetCraft->hullDamage >= (unsigned int)targetCraft->hullMax)
 			collide_HandleCraftDestruction(targetObjIdx, targetCraft, damageKind, damageSourceObjIdx,
 										   creditPlayerIdx, attackerSrcIdx, &playGenericImpactFeedback);
-	} else if ((!craftState || craftState == 5) &&
+	} else if ((craftState == CRAFT_STATE_NORMAL || craftState == CRAFT_STATE_ENTERING_HYPERSPACE) &&
 			   (unsigned int)targetCraft->hullDamage >= (unsigned int)targetCraft->hullMax) {
 		targetCraft->hullDamage = targetCraft->hullMax - 1;
 	}
@@ -5483,7 +5484,7 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 #else
 			if (g_craftImpactBounceEnabled) {
 #endif
-				if (targetCraft->craftState == 0) {
+				if (targetCraft->craftState == CRAFT_STATE_NORMAL) {
 #ifdef XWA_MODERN
 					if (laser_GetProjectileWarheadClass(g_objectTable[projectileObjIdx].objectType) > 0)
 #else
@@ -5862,8 +5863,8 @@ int collide_ApplyProximityDamageFalloff(unsigned int sourceObjIdx, unsigned int 
 													   (uint16_t)g_objectTable[idx].objectType == 48)) ||
 					((uint16_t)g_objectTable[idx].objectType >= 0x196u &&
 					 (uint16_t)g_objectTable[idx].objectType <= 0x1A1u) ||
-					(targetMobj->pCraft &&
-					 (targetMobj->pCraft->craftState == 3 || targetMobj->pCraft->craftState == 4)))
+					(targetMobj->pCraft && (targetMobj->pCraft->craftState == CRAFT_STATE_DYING ||
+											targetMobj->pCraft->craftState == CRAFT_STATE_DESTROYED)))
 					continue;
 
 				targetX = targetMobj->prevWorldX;
@@ -6385,17 +6386,17 @@ void collide_applySurfaceRicochet(unsigned int objectObjIdx, unsigned int hitAga
 			CraftData* oc = om->pCraft;
 			if (!oc)
 				return;
-			if (oc->craftState >= 3) {
-				if (oc->craftState > 4) {
-					if (oc->craftState == 8) {
-						oc->craftState = 0;
+			if (oc->craftState >= CRAFT_STATE_DYING) {
+				if (oc->craftState > CRAFT_STATE_DESTROYED) {
+					if (oc->craftState == CRAFT_STATE_DEATH_STAR_PULLED) {
+						oc->craftState = CRAFT_STATE_NORMAL;
 						g_objectTable[objectObjIdx].mobj->speed /= 10;
 						g_objectTable[objectObjIdx].mobj->velocityOverrideSpeed /= 10;
 					}
 				} else {
 					oc->breakupYawRate = 0;
 					oc->breakupPitchRate = 0;
-					oc->craftState = 4;
+					oc->craftState = CRAFT_STATE_DESTROYED;
 					g_objectTable[objectObjIdx].mobj->velocityOverrideActive = 0;
 					g_objectTable[objectObjIdx].mobj->lifetimeTimer = 1;
 				}
@@ -6516,7 +6517,7 @@ static __inline void collide_HandleTargetInspection(int playerIdx, unsigned int 
 
 	tcraft = g_objectTable[targetIdx].mobj->pCraft;
 	craftState = tcraft->craftState;
-	if (craftState == 3 || craftState == 4 ||
+	if (craftState == CRAFT_STATE_DYING || craftState == CRAFT_STATE_DESTROYED ||
 		(int8_t)tcraft->iffVisibility[g_objectTable[objIdx].mobj->team] >= 1) {
 		return;
 	}
@@ -6678,7 +6679,7 @@ static __inline void collide_HandleDepartureDockPrompt(int playerIdx, unsigned i
 			g_collisionSweepStartZ = cand->mobj->prevWorldZ;
 
 			ccraft = cand->mobj->pCraft;
-			if (ccraft->craftState) {
+			if (ccraft->craftState != CRAFT_STATE_NORMAL) {
 				continue;
 			}
 

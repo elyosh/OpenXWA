@@ -866,7 +866,8 @@ int Flight_UpdateFighterWarnings(char resetState) {
 								CraftData* turretCraft;
 
 								turretCraft = turretObj->mobj->pCraft;
-								if (turretCraft->workingSubsystems != 0 && turretCraft->craftState == 0 &&
+								if (turretCraft->workingSubsystems != 0 &&
+									turretCraft->craftState == CRAFT_STATE_NORMAL &&
 									g_missionFlightGroups[turretObj->flightGroupIdx].fg.status1 != 5) {
 									int laserSlotIdx;
 									WarheadInventoryEntry* weapon;
@@ -892,7 +893,7 @@ int Flight_UpdateFighterWarnings(char resetState) {
 						if (g_objectTable[candidateObjIdx].mobj != NULL &&
 							g_objectTable[candidateObjIdx].mobj->pCraft != NULL &&
 							g_objectTable[candidateObjIdx].mobj->pCraft->workingSubsystems != 0 &&
-							g_objectTable[candidateObjIdx].mobj->pCraft->craftState == 0) {
+							g_objectTable[candidateObjIdx].mobj->pCraft->craftState == CRAFT_STATE_NORMAL) {
 							int dx;
 							int dy;
 							int dz;
@@ -1067,7 +1068,7 @@ void Flight_UpdateDynamicMusicState(void) {
 			}
 
 			craft = mobj->pCraft;
-			if (craft == NULL || craft->craftState) {
+			if (craft == NULL || craft->craftState != CRAFT_STATE_NORMAL) {
 				continue;
 			}
 
@@ -1424,8 +1425,9 @@ ObjectIndex FilmOverlay_FindNextSelectableObject(ObjectIndex currentObjIdx, int1
 							}
 
 							g_curCraft = mobj->pCraft;
-							if (g_curCraft->craftState != 3 && g_curCraft->craftState != 4 &&
-								g_curCraft->craftState != 7) {
+							if (g_curCraft->craftState != CRAFT_STATE_DYING &&
+								g_curCraft->craftState != CRAFT_STATE_DESTROYED &&
+								g_curCraft->craftState != CRAFT_STATE_IN_HYPERSPACE) {
 								return (ObjectIndex)candidate;
 							}
 						}
@@ -2164,7 +2166,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 
 			// Damaged craft eject crew/escape pods over time.
 			if (g_objectTable[(uint16_t)objIdx].mobj->ejectionSpawnCount != 0) {
-				if (g_curCraft->craftState != 3 || objectType == OBJ_NoAsset_222 ||
+				if (g_curCraft->craftState != CRAFT_STATE_DYING || objectType == OBJ_NoAsset_222 ||
 					ModelMesh_HasFuselage(objectTypeIndex) || g_objectTable[(uint16_t)objIdx].genusId == 0) {
 					if (g_curCraft->systemHitFlag && (uint16_t)GameRand() < 0x800u) {
 						FlightObject_SpawnEscapePodOrPilot((uint16_t)objIdx);
@@ -2276,7 +2278,7 @@ void FlightObject_UpdateSpecialBehavior(void) {
 				}
 
 				// Cosmetic hull breakup effects on a dying craft.
-				if (g_curCraft->craftState == 3) {
+				if (g_curCraft->craftState == CRAFT_STATE_DYING) {
 					if (objectType != OBJ_NoAsset_222) {
 						if (ModelMesh_HasFuselage(objectTypeIndex) ||
 							g_objectTable[(uint16_t)objIdx].genusId == 0) {
@@ -2309,7 +2311,8 @@ void FlightObject_UpdateSpecialBehavior(void) {
 			}
 
 			// Chaff cloud particles while chaff is active.
-			if (!g_curCraft->craftState && g_curCraft->cmTypeId == 1 && g_curCraft->chaffActiveTimer) {
+			if (g_curCraft->craftState == CRAFT_STATE_NORMAL && g_curCraft->cmTypeId == 1 &&
+				g_curCraft->chaffActiveTimer) {
 				if (g_useHardware3D && g_objRenderState[(uint16_t)objIdx].drawnThisFrame) {
 					if ((g_gameTime & 0xFFF) != 0) {
 						Vec3f localOffset;
@@ -4707,8 +4710,8 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 	uint8_t craftState = craft->craftState;
 
 	// A craft that is no longer a normal/escape-pod kind aborts hyperspace.
-	if (craftState != 0) {
-		if (craftState != 5) {
+	if (craftState != CRAFT_STATE_NORMAL) {
+		if (craftState != CRAFT_STATE_ENTERING_HYPERSPACE) {
 			g_players[playerIdx].hyperspacePhase = PLAYER_HYPERSPACE_PHASE_NONE;
 			if (playerIdx == (unsigned int)g_localPlayer) {
 				FlightLight_SetLocalPlayerPulseEnabled(4, 0);
@@ -4843,7 +4846,7 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					carriedCraft = g_objectTable[craft->carriedObjectIndex].mobj->pCraft;
 					if (carriedCraft) {
 						int cfg;
-						carriedCraft->craftState = 0;
+						carriedCraft->craftState = CRAFT_STATE_NORMAL;
 						cfg = g_objectTable[craft->carriedObjectIndex].flightGroupIdx;
 						if (g_missionFlightGroups[cfg].fg.specialCargoCraft == carriedCraft->waveNumber)
 							++g_missionFgStats[cfg]
@@ -4894,7 +4897,7 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 				int objIdx;
 				// Arrival complete: restore control and AI.
 				g_players[playerIdx].hyperspacePhase = PLAYER_HYPERSPACE_PHASE_NONE;
-				craft->craftState = 0;
+				craft->craftState = CRAFT_STATE_NORMAL;
 				objIdx = g_players[playerIdx].objectIndex;
 				g_objectTable[objIdx].mobj->moveVectorDirty = 1;
 				g_objectTable[objIdx].mobj->orientMatrixDirty = 1;
@@ -5080,7 +5083,7 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 								CraftData* ccraft = cmobj->pCraft;
 								if (ccraft) {
 									int cfg;
-									ccraft->craftState = 0;
+									ccraft->craftState = CRAFT_STATE_NORMAL;
 									cfg = g_objectTable[carrySlot].flightGroupIdx;
 									if (g_missionFlightGroups[cfg].fg.specialCargoCraft == ccraft->waveNumber)
 										++g_missionFgStats[cfg].tailEventCounts[targetRegion + 5];
@@ -5459,7 +5462,7 @@ static __inline void Flight_UpdateAiCraftOrientation(uint16_t objectIdx, AiContr
 		}
 	}
 
-	if (g_curCraft->craftState != 2) {
+	if (g_curCraft->craftState != CRAFT_STATE_2) {
 		uint8_t turnState;
 		uint16_t targetDelta;
 
@@ -5655,7 +5658,7 @@ void Flight_UpdateCraftSteeringAndSpeed(void) {
 			}
 
 			switch (g_curCraft->craftState) {
-				case 0: {
+				case CRAFT_STATE_NORMAL: {
 					uint16_t targetSpeed;
 
 					targetSpeed = (uint16_t)g_curCraft->commandedSpeed;
@@ -5722,15 +5725,15 @@ void Flight_UpdateCraftSteeringAndSpeed(void) {
 					break;
 				}
 
-				case 2:
+				case CRAFT_STATE_2:
 					if (g_objectTable[(uint16_t)slot].mobj->speed > 0u) {
 						Flight_DecelerateHyperspaceSpeedInline((uint16_t)slot, 20);
 					}
 					break;
 
-				case 1:
-				case 3:
-				case 4:
+				case CRAFT_STATE_1:
+				case CRAFT_STATE_DYING:
+				case CRAFT_STATE_DESTROYED:
 					if (g_objectTable[(uint16_t)slot].mobj->speed >
 						(uint16_t)g_curCraft->aiFlight.maxSpeedCache) {
 						Flight_DecelerateSpeedByStep((uint16_t)slot,
@@ -5740,11 +5743,11 @@ void Flight_UpdateCraftSteeringAndSpeed(void) {
 					}
 					/* Fall through: these modes clear the same AI motion state as mode 6. */
 
-				case 6:
+				case CRAFT_STATE_LEAVING_HYPERSPACE:
 					Flight_ResetAiMotionStates();
 					break;
 
-				case 5:
+				case CRAFT_STATE_ENTERING_HYPERSPACE:
 					if (g_curCraft->workingSubsystems != 0) {
 						Flight_AccelerateHyperspaceSpeedInline((uint16_t)slot, 1500);
 					} else {
@@ -5752,7 +5755,7 @@ void Flight_UpdateCraftSteeringAndSpeed(void) {
 							Flight_DecelerateHyperspaceSpeedInline((uint16_t)slot, 20);
 						}
 						if (g_objectTable[(uint16_t)slot].mobj->speed == 0) {
-							g_curCraft->craftState = 0;
+							g_curCraft->craftState = CRAFT_STATE_NORMAL;
 						}
 					}
 					break;
@@ -8416,7 +8419,8 @@ static __inline uint16_t FlightAction_FindNextPlayerCraftTarget(unsigned int pla
 
 		if (mobj == NULL || craft == NULL ||
 			(mobj->state == 0 &&
-			 (craft->craftState == 3 || craft->craftState == 4 || craft->craftState == 7))) {
+			 (craft->craftState == CRAFT_STATE_DYING || craft->craftState == CRAFT_STATE_DESTROYED ||
+			  craft->craftState == CRAFT_STATE_IN_HYPERSPACE))) {
 			continue;
 		}
 
@@ -8483,7 +8487,8 @@ static __inline uint16_t FlightAction_FindNearestLocatedHostilePlayerTarget(unsi
 		}
 
 		if (mobj->state == 0 &&
-			(craft->craftState == 3 || craft->craftState == 4 || craft->craftState == 7)) {
+			(craft->craftState == CRAFT_STATE_DYING || craft->craftState == CRAFT_STATE_DESTROYED ||
+			 craft->craftState == CRAFT_STATE_IN_HYPERSPACE)) {
 			continue;
 		}
 
@@ -8533,7 +8538,7 @@ static __inline uint16_t FlightAction_CycleAttackerTarget(unsigned int playerIdx
 		}
 
 		candidateCraft = candidate->mobj->pCraft;
-		if (candidateCraft->workingSubsystems == 0 || candidateCraft->craftState != 0 ||
+		if (candidateCraft->workingSubsystems == 0 || candidateCraft->craftState != CRAFT_STATE_NORMAL ||
 			FlightAction_IsPlayerTractorBeamVictim(candidateIdx, candidate, candidateCraft)) {
 			continue;
 		}
@@ -8624,8 +8629,9 @@ static __inline uint16_t FlightAction_FindNewestLeaderTarget(unsigned int player
 
 		candidateCraft = obj->mobj->pCraft;
 		if (candidateCraft->leader_obj_idx != -1 ||
-			(candidateCraft->craftState != 0 && candidateCraft->craftState != 2 &&
-			 candidateCraft->craftState != 6) ||
+			(candidateCraft->craftState != CRAFT_STATE_NORMAL &&
+			 candidateCraft->craftState != CRAFT_STATE_2 &&
+			 candidateCraft->craftState != CRAFT_STATE_LEAVING_HYPERSPACE) ||
 			FlightAction_IsPlayerTractorBeamVictim(objIdx, obj, candidateCraft)) {
 			continue;
 		}
@@ -8902,7 +8908,7 @@ static __inline void FlightAction_ToggleFilmRecording(unsigned int playerIdx) {
 
 	playerObjIdx = g_players[playerIdx].objectIndex;
 	if (playerObjIdx == -1 || g_provingGroundsModeActive ||
-		g_objectTable[(uint16_t)playerObjIdx].mobj->pCraft->craftState == 9) {
+		g_objectTable[(uint16_t)playerObjIdx].mobj->pCraft->craftState == CRAFT_STATE_DEATH_STAR_GUIDED) {
 		return;
 	}
 
@@ -11928,7 +11934,8 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 	}
 	seatIdx = g_players[playerIdx].currentSeatIdx - 1;
 	if (g_players[playerIdx].objectIndex != 0xffff &&
-		g_objectTable[g_players[playerIdx].objectIndex].mobj->pCraft->craftState == 9) {
+		g_objectTable[g_players[playerIdx].objectIndex].mobj->pCraft->craftState ==
+			CRAFT_STATE_DEATH_STAR_GUIDED) {
 		goto finish;
 	}
 
