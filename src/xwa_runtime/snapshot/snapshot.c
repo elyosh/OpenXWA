@@ -21,6 +21,7 @@
 #include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/models/surfaces.h"
+#include "xwa_runtime/snapshot/snapshot_camera.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/host_clock.h"
@@ -1835,6 +1836,7 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->world_pos[0] = vs->savedTargetX;
 	c->world_pos[1] = vs->savedTargetY;
 	c->world_pos[2] = vs->savedTargetZ;
+	XwaSnapshotCamera_PositionFraction(c->world_pos, c->world_pos_fraction);
 	FVIEW_CopyRenderCameraRows(c->rows);
 	c->view_pitch = vs->viewPitch;
 	c->view_yaw = vs->viewYaw;

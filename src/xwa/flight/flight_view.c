@@ -19,6 +19,7 @@
 #include "xwa_runtime/hooks/orientation_hook.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/runtime/port.h"
+#include "xwa_runtime/snapshot/snapshot_camera.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #endif
 
@@ -901,6 +902,9 @@ void FlightView_UpdatePlaybackCamera(int playerIdx) {
 void FlightView_UpdatePlayerCamera(int playerIdx) {
 	unsigned int cameraFocusObjIdx;
 
+#ifdef XWA_MODERN
+	XwaSnapshotCamera_BeginUpdate(playerIdx);
+#endif
 	if (g_players[playerIdx].mapCameraState) {
 		FlightMap_UpdateCamera(playerIdx);
 	} else {
@@ -984,6 +988,12 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 					g_players[playerIdx].viewState.savedTargetX -= clearanceX;
 					g_players[playerIdx].viewState.savedTargetY -= clearanceY;
 					g_players[playerIdx].viewState.savedTargetZ -= clearanceZ;
+#ifdef XWA_MODERN
+					XwaSnapshotCamera_NoteExternalCamera(
+						playerIdx, worldlocx, worldlocy, worldlocz,
+						(double)g_players[playerIdx].viewState.cameraDistance +
+							(double)halfExtent * (double)(1 << extentShift));
+#endif
 				}
 
 				if ((unsigned int)g_players[playerIdx].objectIndex != 0xffffu) {

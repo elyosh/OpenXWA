@@ -267,6 +267,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/runtime/port.c
     src/xwa_runtime/runtime/presentation.c
     src/xwa_runtime/snapshot/snapshot.c
+    src/xwa_runtime/snapshot/snapshot_camera.c
     src/xwa_runtime/snapshot/snapshot_export.c
     src/xwa_runtime/snapshot/snapshot_flight_map.c
     src/xwa_runtime/snapshot/snapshot_hud.c
@@ -669,6 +670,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/runtime/port.h
     src/xwa_runtime/runtime/presentation.h
     src/xwa_runtime/snapshot/snapshot.h
+    src/xwa_runtime/snapshot/snapshot_camera.h
     src/xwa_runtime/snapshot/snapshot_flight_map.h
     src/xwa_runtime/snapshot/snapshot_hud.h
     src/xwa_runtime/compat/middleware_crt.h

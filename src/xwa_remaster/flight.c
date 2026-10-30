@@ -1914,6 +1914,9 @@ static int fl_build_view_at_origin(const XwaFlightCamera* cam, const int32_t ori
 
 	memcpy(out->origin_world, origin_world, sizeof out->origin_world);
 	AeronWorld_LocalI32(origin_world, cam->world_pos, scene_camera->pos);
+	for (int axis = 0; axis < 3; axis++) {
+		scene_camera->pos[axis] += cam->world_pos_fraction[axis];
+	}
 	const float aspect = (float)target_w / (float)target_h;
 	/* With a craft's field of view, a window narrower than the minimum
 	 * aspect keeps the horizontal field of view of that aspect: the whole
@@ -2293,6 +2296,7 @@ static int fl_temporal_pose_changed(const XwaSnapshot* current, const XwaSnapsho
 	const XwaFlightCamera* cam = &current->flight_camera;
 	const XwaFlightCamera* prev_cam = &previous->flight_camera;
 	if (memcmp(cam->world_pos, prev_cam->world_pos, sizeof cam->world_pos) != 0 ||
+		memcmp(cam->world_pos_fraction, prev_cam->world_pos_fraction, sizeof cam->world_pos_fraction) != 0 ||
 		memcmp(cam->rows, prev_cam->rows, sizeof cam->rows) != 0 || cam->proj_scale != prev_cam->proj_scale ||
 		cam->vp_w != prev_cam->vp_w || cam->vp_h != prev_cam->vp_h ||
 		cam->vp_center_x != prev_cam->vp_center_x || cam->vp_center_y != prev_cam->vp_center_y ||
