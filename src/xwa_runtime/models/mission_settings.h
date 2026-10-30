@@ -114,8 +114,9 @@
  *   - turbolaser_hardpoint_types: OPT hardpoint types 33 to 37 are weapon
  *     types 301 to 305, and type 38 is weapon type 307. In the stock game,
  *     hardpoint type N is weapon type N + 279;
- *   - gun_turret_hardpoints: XWAU's rules for the hardpoints of gun turret
- *     meshes. A gun turret mesh doesn't fire at targets behind it.
+ *   - gun_turret_hardpoints: the rules for the hardpoints of gun turret
+ *     meshes (turret_hardpoints.h). A gun turret mesh doesn't fire at
+ *     targets behind it.
  *
  * The jamming rules change where a player's weapons are jammed near an
  * enemy starship or platform. They change the simulation:

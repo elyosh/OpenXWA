@@ -123,10 +123,10 @@ effects:
   explosion_genus_emissive_strength: 10.0
   glow_mark_emissive_strength: 20.0
 dynamic_cockpit:
-  # Cockpit displays showing the HUD, from XWAU Dynamic Cockpit data in
-  # converted cockpit models.
+  # Cockpit displays that show the HUD, from the screens of the cockpit
+  # models.
   enabled: true
-  # Keep the whole 2D HUD on screen (XWAU's D key); transparent displays
+  # Keep the whole 2D HUD on screen; transparent displays
   # without always_visible are hidden and the throttle bar is not drawn.
   classic_hud: false
   # Hologram displays visible; Ctrl+H toggles them in flight.
@@ -160,7 +160,7 @@ presentation:
   cockpit_fov: 'cockpit'
   # With a craft's field of view, a window narrower than this aspect gets a
   # wider view, so that the horizontal field of view stays the one at this
-  # aspect. 1.778 is 16:9, as in XWAU. 0 turns it off.
+  # aspect. 1.778 is 16:9. 0 turns it off.
   cockpit_fov_min_aspect: 1.778
 texture_filtering:
   anisotropic: true

@@ -1916,8 +1916,8 @@ static int fl_build_view_at_origin(const XwaFlightCamera* cam, const int32_t ori
 	AeronWorld_LocalI32(origin_world, cam->world_pos, scene_camera->pos);
 	const float aspect = (float)target_w / (float)target_h;
 	/* With a craft's field of view, a window narrower than the minimum
-	 * aspect keeps the horizontal field of view of that aspect, as XWAU does
-	 * for 16:9: the whole view gets wider. */
+	 * aspect keeps the horizontal field of view of that aspect: the whole
+	 * view gets wider. */
 	const float widen =
 		cam->cockpit_fov && s.cockpit_fov_min_aspect > aspect ? s.cockpit_fov_min_aspect / aspect : 1.0f;
 	scene_camera->v_half_rad = atanf(hh * widen / ps);

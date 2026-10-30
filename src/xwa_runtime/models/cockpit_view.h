@@ -18,9 +18,9 @@
  *
  * The view sets the game's projection (g_projScale and the values that go
  * with it) at the height of the game's screen, each time the player's
- * cockpit model loads. It applies to every view of the flight, as XWAU's
- * does. Only drawing reads the projection: the simulation, films and
- * netplay don't depend on it. */
+ * cockpit model loads. It applies to every view of the flight. Only drawing
+ * reads the projection: the simulation, films and netplay don't depend on
+ * it. */
 
 #ifdef __cplusplus
 extern "C" {

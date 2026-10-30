@@ -445,11 +445,11 @@ static void Hangar_FormatReadySourceStatus(char* buffer) {
 	(void)GetModelDefIndexFromType(sourceObj->objectType);
 
 	buffer[0] = '\0';
-	if (craft->objectKind == 5) {
+	if (craft->craftState == 5) {
 		sprintf(buffer, "%s %s", fgName, g_strHangarMiscStrings[HANGAR_MISC_ENTERING_HYPERSPACE]);
-	} else if (craft->objectKind == 6) {
+	} else if (craft->craftState == 6) {
 		sprintf(buffer, "%s %s", fgName, g_strHangarMiscStrings[HANGAR_MISC_LEAVING_HYPERSPACE]);
-	} else if (craft->objectKind == 7) {
+	} else if (craft->craftState == 7) {
 		sprintf(buffer, "%s %s", fgName, g_strHangarMiscStrings[HANGAR_MISC_IN_HYPERSPACE]);
 	} else {
 		AiController* ai;
@@ -3056,7 +3056,7 @@ void Hangar_RenderScene(void) {
 				case GENUS_PilotDroid:
 				case GENUS_WeaponEmplacement:
 					g_curCraft = obj->mobj->pCraft;
-					if (g_curCraft->objectKind == 7) {
+					if (g_curCraft->craftState == 7) {
 						break;
 					}
 					g_renderFlags = FlightView_CullObjectSphereToViewport(objectIdx, g_curModelMaxExtent,

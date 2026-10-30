@@ -1,7 +1,7 @@
 #ifndef XWA_RUNTIME_MODELS_TURRET_HARDPOINTS_H
 #define XWA_RUNTIME_MODELS_TURRET_HARDPOINTS_H
 
-/* XWAU's rules for the hardpoints of gun turret meshes. The rule
+/* Rules for the hardpoints of gun turret meshes. The rule
  * gun_turret_hardpoints in flight/flight.yaml turns them on. A gun turret
  * mesh is a mesh of type gun_turret, rotary_gun_turret, small_gun,
  * weapon_system_1 or weapon_system_2.

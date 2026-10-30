@@ -160,8 +160,7 @@ void pai_UpdateAllCraftAI(void) {
 			g_curCraft = g_objectTable[objIdx].mobj->pCraft;
 			aiController = pai_GetEffectiveAIController(g_curCraft);
 
-			if (g_curCraft->objectKind != GENUS_Freighter && g_curCraft->objectKind != GENUS_Starship &&
-				aiController->thinkTimer <= 0) {
+			if (g_curCraft->craftState != 3 && g_curCraft->craftState != 4 && aiController->thinkTimer <= 0) {
 				playerOwnerIdx = g_objectTable[objIdx].playerOwnerIdx;
 				if (playerOwnerIdx != -1 && !g_players[playerOwnerIdx].aiControlledFlag) {
 					if (g_players[playerOwnerIdx].currentSeatIdx == 0 &&
@@ -758,13 +757,13 @@ bool pai_IsPlanCompleteForOrderSlot(uint16_t planId, uint8_t orderSlot, uint8_t 
 int16_t pai_FindMothershipObject(int16_t mothershipFlightGroupIdx) {
 	uint32_t objIdx;
 	CraftData* craft;
-	uint8_t objectKind;
+	uint8_t craftState;
 
 	for (objIdx = g_activeRegionObjectSlotStart; objIdx < g_activeRegionCraftObjectSlotEnd; ++objIdx) {
 		if (g_objectTable[objIdx].objectType != 0) {
 			craft = g_objectTable[objIdx].mobj->pCraft;
-			objectKind = craft->objectKind;
-			if (objectKind != 4 && objectKind != 3 &&
+			craftState = craft->craftState;
+			if (craftState != 4 && craftState != 3 &&
 				(uint16_t)g_objectTable[objIdx].flightGroupIdx == (uint16_t)mothershipFlightGroupIdx &&
 				craft->leader_obj_idx == -1) {
 				return (int16_t)objIdx;
@@ -800,11 +799,11 @@ int16_t pai_FindMothershipObjectAnyRegion(int16_t mothershipFlightGroupIdx) {
 		while (objIdx < regionCraftEnd) {
 			if (obj->objectType != 0) {
 				CraftData* craft;
-				uint8_t objectKind;
+				uint8_t craftState;
 
 				craft = obj->mobj->pCraft;
-				objectKind = craft->objectKind;
-				if (objectKind != GENUS_Starship && objectKind != GENUS_Freighter &&
+				craftState = craft->craftState;
+				if (craftState != 4 && craftState != 3 &&
 					(uint16_t)obj->flightGroupIdx == (uint16_t)mothershipFlightGroupIdx &&
 					craft->leader_obj_idx == -1) {
 					return (int16_t)objIdx;
@@ -1252,7 +1251,7 @@ int pai_IsObjectTargetable(unsigned int objIdx) {
 	MobileObject* mobj;
 	AiController* aiController;
 	uint16_t objectType;
-	uint16_t objectKind;
+	uint16_t craftState;
 
 	if (objIdx == 0xffffu) {
 		return 0;
@@ -1271,8 +1270,8 @@ int pai_IsObjectTargetable(unsigned int objIdx) {
 				return 0;
 			}
 
-			objectKind = craft->objectKind;
-			if (objectKind == 1 || objectKind == 3 || objectKind == 4) {
+			craftState = craft->craftState;
+			if (craftState == 1 || craftState == 3 || craftState == 4) {
 				return 0;
 			}
 

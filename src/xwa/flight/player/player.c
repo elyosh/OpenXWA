@@ -1259,7 +1259,7 @@ void Player_IssueAiWingmanTargetOrder(uint16_t targetObjIdx, int wingmanObjIdx, 
 					if (scanObj->playerOwnerIdx == -1 && scanObj->objectType != OBJ_None &&
 						g_missionFlightGroups[scanFlightGroupIdx].fg.team == g_players[playerIdx].playerIff) {
 						craft = scanObj->mobj->pCraft;
-						if (craft->objectKind == 0) {
+						if (craft->craftState == 0) {
 							int boundPlayerNumber;
 
 							boundPlayerNumber =
@@ -1324,7 +1324,7 @@ void Player_IssueAiWingmanTargetOrder(uint16_t targetObjIdx, int wingmanObjIdx, 
 		}
 	} else {
 		craft = g_objectTable[wingmanObjIdx].mobj->pCraft;
-		if (craft->objectKind == 0) {
+		if (craft->craftState == 0) {
 			AiController* aiController;
 
 			aiController = pai_GetEffectiveAIController(craft);
@@ -1502,15 +1502,15 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 				while (selectedObjIdx < g_activeRegionCraftObjectSlotEnd) {
 					ObjectRecord* candidate;
 					MobileObject* candidateMobj;
-					uint8_t objectKind;
+					uint8_t craftState;
 
 					candidate = &g_objectTable[selectedObjIdx];
 					if (candidate->objectType != OBJ_None) {
 						candidateMobj = candidate->mobj;
 						if (g_missionFlightGroups[candidate->flightGroupIdx].playerOwnerIdx ==
 							(int)playerIdx) {
-							objectKind = candidateMobj->pCraft->objectKind;
-							if (objectKind != 3 && objectKind != 5 && objectKind != 4 &&
+							craftState = candidateMobj->pCraft->craftState;
+							if (craftState != 3 && craftState != 5 && craftState != 4 &&
 								candidate->objectSignature == preferredObjectSignature) {
 								foundCraft = 1;
 								matchedPreferredSignature = 1;
@@ -1564,10 +1564,10 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 							candidateMobj = candidate->mobj;
 							if (g_missionFlightGroups[candidate->flightGroupIdx].playerOwnerIdx ==
 								(int)playerIdx) {
-								uint8_t objectKind;
+								uint8_t craftState;
 
-								objectKind = candidateMobj->pCraft->objectKind;
-								if (objectKind != 3 && objectKind != 5 && objectKind != 4) {
+								craftState = candidateMobj->pCraft->craftState;
+								if (craftState != 3 && craftState != 5 && craftState != 4) {
 									selectedObjIdx = scanObjIdx;
 									foundCraft = 1;
 									break;
@@ -1937,13 +1937,13 @@ int Player_UnbindFromCurrentCraft(int playerIdx, int requireAnotherOwnedCraft, i
 					if (scanObj->objectType != OBJ_None) {
 						MobileObject* mobj;
 						CraftData* scanCraft;
-						uint8_t objectKind;
+						uint8_t craftState;
 
 						mobj = scanObj->mobj;
 						scanCraft = mobj->pCraft;
 						if (g_missionFlightGroups[scanObj->flightGroupIdx].playerOwnerIdx == playerIdx) {
-							objectKind = scanCraft->objectKind;
-							if (objectKind != 3 && objectKind != 5 && objectKind != 4) {
+							craftState = scanCraft->craftState;
+							if (craftState != 3 && craftState != 5 && craftState != 4) {
 								++craftCount;
 								if ((uint16_t)craftCount > 1u) {
 									found = 1;
@@ -2231,10 +2231,10 @@ int Player_FindNearestEnemyFighter(int playerIdx, int excludeObjIdx) {
 									craft->beamTimer == 0) {
 									craft = mobj->pCraft;
 									if (craft->workingSubsystems != 0) {
-										uint8_t objectKind;
+										uint8_t craftState;
 
-										objectKind = craft->objectKind;
-										if (objectKind == 0 || objectKind == 6) {
+										craftState = craft->craftState;
+										if (craftState == 0 || craftState == 6) {
 											unsigned int objectIndex;
 
 											objectIndex = (unsigned int)g_players[playerIdx].objectIndex;
@@ -2344,7 +2344,7 @@ int16_t Player_FindAttackerOfTarget(uint16_t targetObjIdx, int16_t playerObjIdx)
 
 		qualifies = 0;
 		candidateCraft = g_objectTable[scanIdx].mobj->pCraft;
-		if (candidateCraft->workingSubsystems == 0 || candidateCraft->objectKind != 0) {
+		if (candidateCraft->workingSubsystems == 0 || candidateCraft->craftState != 0) {
 			continue;
 		}
 
@@ -2890,7 +2890,7 @@ int8_t Player_CanRadioCommandCraft(unsigned int targetObjIdx, int playerIdx) {
 	if (g_objectTable[targetObjIdx].mobj != NULL) {
 		g_curCraft = g_objectTable[targetObjIdx].mobj->pCraft;
 		if (g_curCraft != NULL) {
-			if (g_curCraft->objectKind != 0) {
+			if (g_curCraft->craftState != 0) {
 				return 0;
 			}
 
@@ -3181,7 +3181,7 @@ void Player_ValidateCurrentTargets(int playerIdx) {
 				CraftData* targetCraft;
 
 				targetCraft = targetMobj->pCraft;
-				if (targetCraft != NULL && targetCraft->objectKind == GENUS_NpcProjectile) {
+				if (targetCraft != NULL && targetCraft->craftState == 7) {
 					g_players[playerIdx].currentTargetObjectIdx = 0xffffu;
 				}
 			}
@@ -3394,8 +3394,8 @@ uint16_t Player_CycleTargetAnyIFF(int startObjIdx, int direction, int playerIdx)
 						}
 
 						g_curCraft = mobj->pCraft;
-						if (g_curCraft->objectKind != 3 && g_curCraft->objectKind != 4 &&
-							g_curCraft->objectKind != 7) {
+						if (g_curCraft->craftState != 3 && g_curCraft->craftState != 4 &&
+							g_curCraft->craftState != 7) {
 							return (uint16_t)startObjIdx;
 						}
 					}
@@ -3524,9 +3524,8 @@ uint16_t Player_CycleTarget(int startObjIdx, int direction, int playerIdx, int i
 							}
 
 							g_curCraft = mobj->pCraft;
-							if (g_curCraft->objectKind != GENUS_Freighter &&
-								g_curCraft->objectKind != GENUS_Starship &&
-								g_curCraft->objectKind != GENUS_NpcProjectile) {
+							if (g_curCraft->craftState != 3 && g_curCraft->craftState != 4 &&
+								g_curCraft->craftState != 7) {
 								return (uint16_t)startObjIdx;
 							}
 						}
@@ -3836,7 +3835,7 @@ int Player_HandleCraftDestruction(unsigned int playerIdx) {
 	g_objectTable[altViewObjectIdx].mobj->renderOffsetY = 0;
 	g_objectTable[altViewObjectIdx].mobj->renderOffsetZ = 0;
 	MobileObject_SetRandomSpinAxis(altViewObjectIdx);
-	pCraft->objectKind = 3;
+	pCraft->craftState = 3;
 	g_objectTable[altViewObjectIdx].mobj->lifetimeTimer = 472;
 	mobj = g_objectTable[altViewObjectIdx].mobj;
 	if (mobj->speed < 20u)
@@ -4004,11 +4003,10 @@ int Player_HasAvailableOwnedCraft(int playerIdx) {
 
 						craft = obj->mobj->pCraft;
 						if (g_missionFlightGroups[obj->flightGroupIdx].playerOwnerIdx == playerIdx) {
-							uint8_t objectKind;
+							uint8_t craftState;
 
-							objectKind = craft->objectKind;
-							if (objectKind != GENUS_Freighter && objectKind != GENUS_Platform &&
-								objectKind != GENUS_Starship && objectKind != GENUS_NpcProjectile) {
+							craftState = craft->craftState;
+							if (craftState != 3 && craftState != 5 && craftState != 4 && craftState != 7) {
 								found = 1;
 								break;
 							}
@@ -4157,7 +4155,7 @@ int16_t Player_FindNearestObjective(int goalCondType, int playerIdx) {
 			CraftData* craft;
 
 			craft = g_objectTable[objIdx].mobj->pCraft;
-			if (craft->objectKind == GENUS_Fighter || craft->objectKind == GENUS_PlayerProjectile) {
+			if (craft->craftState == 0 || craft->craftState == 6) {
 				uint32_t objectRef;
 				int playerObjectIdx;
 

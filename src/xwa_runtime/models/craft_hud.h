@@ -22,6 +22,28 @@
  * given as a 1-based position in the group. `colors` sets the HUD's inner and
  * border colours, as ARGB.
  *
+ * The `target_display` group of hud.yaml sets how the target display shows
+ * the target:
+ *
+ *   target_display:
+ *     style: edges            # or shaded, the default
+ *     edges:
+ *       luminance: [0.33, 0.5, 0.16]
+ *       contrast: 3.0
+ *       colors: iff           # or friend_foe
+ *       iff: [[0.01, 0.45, 0.01], ...]   # six colours, by IFF 0 to 5
+ *       friend: [0.01, 0.32, 0.01]
+ *       foe: [0.32, 0.01, 0.01]
+ *       other: [0.01, 0.01, 0.21]
+ *
+ * `shaded` shows the lit model. `edges` shows only its edges: a Sobel filter
+ * on the luminance of the shaded display, in sRGB values, weighted by
+ * `luminance` and scaled by `contrast`. The edges take the colour of the
+ * target's IFF, or the friend or foe colour with `colors: friend_foe`.
+ * `other` is the colour of a target without an IFF colour. Colours are
+ * linear. With `edges`, every key is required, a 6-pixel border stays empty,
+ * and the display is empty while the target is dying.
+ *
  * The game reads hud.yaml once at startup. Without the files, the game uses
  * its own tables and colours. */
 
@@ -34,7 +56,24 @@ extern "C" {
 
 struct AeronConfigNode;
 
-enum { XWA_CRAFT_HUD_RETICLE_SLOTS = 23 };
+enum { XWA_CRAFT_HUD_RETICLE_SLOTS = 23, XWA_TARGET_DISPLAY_IFF_COLORS = 6 };
+
+typedef enum XwaTargetDisplayStyle {
+	XWA_TARGET_DISPLAY_SHADED = 0,
+	XWA_TARGET_DISPLAY_EDGES,
+} XwaTargetDisplayStyle;
+
+/* The `target_display` group of hud.yaml. Colours are linear. */
+typedef struct XwaTargetDisplay {
+	XwaTargetDisplayStyle style;
+	float luminance[3];
+	float contrast;
+	int friendFoe; /* `colors: friend_foe` */
+	float iff[XWA_TARGET_DISPLAY_IFF_COLORS][3];
+	float friendColor[3];
+	float foeColor[3];
+	float otherColor[3];
+} XwaTargetDisplay;
 
 /* Reads flight/hud.yaml. */
 void XwaCraftHud_Init(void);
@@ -62,6 +101,8 @@ void XwaCraftHud_Colors(unsigned int objectType, uint32_t colors[2]);
    1-based position in group 12000. Returns 0 when the craft doesn't change
    that slot. */
 int XwaCraftHud_Reticle(unsigned int objectType, int slot);
+/* The `target_display` group of hud.yaml, or the default: shaded. */
+const XwaTargetDisplay* XwaCraftHud_TargetDisplay(void);
 
 #ifdef __cplusplus
 }

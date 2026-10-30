@@ -106,7 +106,7 @@
  *     divided by 4 on medium;
  *   - limit_linked_warhead_fire_rate: the time between two warhead shots is
  *     multiplied by the number of warheads fired.
- * The factors are float32 values, as in XWAU. The game multiplies them in
+ * The factors are float32 values. The game multiplies them in
  * float32, which gives the same result on every platform.
  *
  * All of this changes the simulation. Without these settings, the stock code

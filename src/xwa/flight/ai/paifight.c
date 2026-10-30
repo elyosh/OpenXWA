@@ -1538,7 +1538,7 @@ char paifight_coverleaderorder(void) {
 		if (leaderCraft != NULL) {
 			lastAttackerObjIdx = leaderCraft->lastAttackerObjIdx;
 			if (lastAttackerObjIdx != 0xffffu && g_objectTable[lastAttackerObjIdx].objectType != OBJ_None &&
-				leaderCraft->objectKind == 0) {
+				leaderCraft->craftState == 0) {
 				if ((g_missionFlightGroups[g_objectTable[g_paiContext.aiObjIdx].flightGroupIdx]
 							 .playerOwnerIdx == -1 ||
 					 lastAttackerObjIdx != (uint16_t)g_curCraft->playerCommandAvoidTargetObjIdx) &&
@@ -1907,7 +1907,7 @@ char paifight_gunneroffenseorder(void) {
 	const uint8_t* laserGroupWeaponKind;
 
 	craft = g_curCraft;
-	if (craft->objectKind == 3 || craft->workingSubsystems == 0 ||
+	if (craft->craftState == 3 || craft->workingSubsystems == 0 ||
 		g_missionFlightGroups[g_objectTable[g_paiContext.aiObjIdx].flightGroupIdx].fg.status1 == 14 ||
 		g_missionFlightGroups[g_objectTable[g_paiContext.aiObjIdx].flightGroupIdx].fg.status2 == 14) {
 		return 0;
@@ -2169,7 +2169,7 @@ char paifight_missiledefenseorder(void) {
 	int launcherIdx;
 
 	craft = g_curCraft;
-	if (craft->objectKind == 3 || craft->workingSubsystems == 0 || craft->weaponFireInhibitTimer != 0 ||
+	if (craft->craftState == 3 || craft->workingSubsystems == 0 || craft->weaponFireInhibitTimer != 0 ||
 		g_objectTable[g_paiContext.aiObjIdx].genusId == 0) {
 		return 0;
 	}
@@ -3124,7 +3124,7 @@ char paifight_gunnerselfdefenseorder(void) {
 			g_curCraft->warheadData[laserSlot].lastFireMeshIdx = 0xffu;
 			g_curCraft->warheadData[laserSlot].lastFireHardpointIdx = 0xffu;
 			craft = g_curCraft;
-			if (craft->objectKind == 3 || craft->workingSubsystems == 0 ||
+			if (craft->craftState == 3 || craft->workingSubsystems == 0 ||
 				craft->weaponFireInhibitTimer != 0) {
 				continue;
 			}

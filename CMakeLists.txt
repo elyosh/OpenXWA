@@ -352,6 +352,7 @@ aeron_compile_hlsl(XWA_SHADER_OUTPUTS ${CMAKE_BINARY_DIR}/shaders
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_environment.comp.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/sky_stars.vert.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/sky_stars.frag.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/target_display_edges.frag.hlsl
 )
 add_custom_target(xwa_shaders DEPENDS ${XWA_SHADER_OUTPUTS})
 add_dependencies(xwa_remaster xwa_shaders)

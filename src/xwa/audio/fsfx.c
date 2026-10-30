@@ -1587,7 +1587,7 @@ void fsfx_UpdateVoiceQueue(void) {
 				object = &g_objectTable[objIdx];
 				if (object->objectSignature == g_fsfxVoiceQueueObjectSerial[queueIndex] &&
 					object->objectType != OBJ_None && object->mobj != NULL && object->mobj->pCraft != NULL &&
-					object->mobj->pCraft->objectKind != 3 && object->mobj->pCraft->objectKind != 4) {
+					object->mobj->pCraft->craftState != 3 && object->mobj->pCraft->craftState != 4) {
 					objectStillValid = 1;
 				}
 
@@ -1713,7 +1713,7 @@ void fsfx_UpdateMissileThreatWarning(void) {
 		}
 
 		craft = mobj->pCraft;
-		if (craft == NULL || craft->workingSubsystems == 0 || craft->objectKind != 0) {
+		if (craft == NULL || craft->workingSubsystems == 0 || craft->craftState != 0) {
 			continue;
 		}
 
@@ -2484,8 +2484,7 @@ void fsfx_UpdateFlightSfx(void) {
 
 		sourceMobj = sourceObj->mobj;
 		sourceCraft = sourceMobj->pCraft;
-		if (sourceCraft->objectKind != GENUS_Fighter || sourceCraft->workingSubsystems == 0 ||
-			sourceMobj->speed == 0) {
+		if (sourceCraft->craftState != 0 || sourceCraft->workingSubsystems == 0 || sourceMobj->speed == 0) {
 			continue;
 		}
 

@@ -243,11 +243,11 @@ static __inline uint16_t paiorder_FindMothershipObjectAnyRegion(const uint8_t* m
 			while (objIdx < regionCraftEnd) {
 				if (obj->objectType != 0) {
 					CraftData* craft;
-					uint8_t objectKind;
+					uint8_t craftState;
 
 					craft = obj->mobj->pCraft;
-					objectKind = craft->objectKind;
-					if (objectKind != GENUS_Starship && objectKind != GENUS_Freighter &&
+					craftState = craft->craftState;
+					if (craftState != 4 && craftState != 3 &&
 						obj->flightGroupIdx == *mothershipFlightGroupIdx && craft->leader_obj_idx == -1) {
 						return (uint16_t)objIdx;
 					}
@@ -404,11 +404,11 @@ char paiorder_flyhomeotherregionorder(void) {
 				while (objIdx < regionCraftEnd) {
 					if (obj->objectType != 0) {
 						CraftData* craft;
-						uint8_t objectKind;
+						uint8_t craftState;
 
 						craft = obj->mobj->pCraft;
-						objectKind = craft->objectKind;
-						if (objectKind != GENUS_Starship && objectKind != GENUS_Freighter &&
+						craftState = craft->craftState;
+						if (craftState != 4 && craftState != 3 &&
 							obj->flightGroupIdx ==
 								g_missionFlightGroups[flightGroupIdx].fg.alternateMothership &&
 							craft->leader_obj_idx == -1) {
@@ -1014,7 +1014,7 @@ char paiorder_underattackorder(void) {
 						g_objectTable[objectIdx].objectType != OBJ_None) {
 						if (Object_IsHostileToTeam(objectIdx,
 												   g_objectTable[g_paiContext.aiObjIdx].mobj->team)) {
-							if (g_curCraft->objectKind == 0 &&
+							if (g_curCraft->craftState == 0 &&
 								g_objectTable[objectIdx].genusId == GENUS_Fighter) {
 								if (pai_IsObjectWithinCurrentPointRange(objectIdx, attackerSearchRange) ==
 									1) {
@@ -1156,7 +1156,7 @@ char paiorder_avoidhitorder(void) {
 			if (g_objectTable[scanObjIdx].objectType != OBJ_None &&
 				Object_IsHostileToTeam((uint16_t)scanObjIdx,
 									   g_objectTable[g_paiContext.aiObjIdx].mobj->team) &&
-				g_curCraft->objectKind == 0 && g_objectTable[scanObjIdx].genusId == GENUS_Fighter &&
+				g_curCraft->craftState == 0 && g_objectTable[scanObjIdx].genusId == GENUS_Fighter &&
 				pai_IsObjectWithinCurrentPointRange(scanObjIdx, attackerSearchRange) == 1) {
 				uint16_t yawDelta;
 				uint16_t pitchDelta;
@@ -1744,7 +1744,7 @@ char paiorder_selfcaptureorder(void) {
 		g_objectTable[g_paiContext.aiObjIdx].mobj->iff = (int8_t)newIff;
 		g_curCraft->workingSubsystems = g_curCraft->systemFlags;
 		g_curCraft->subsystemDamage = 0;
-		g_curCraft->objectKind = 0;
+		g_curCraft->craftState = 0;
 		g_curCraft->lastAttackerObjIdx = 0xffffu;
 		g_curCraft->wasCaptured = 1;
 		msg_emitCraftMessage((uint16_t)g_paiContext.aiObjIdx, g_curCraft, 147);
@@ -2683,7 +2683,7 @@ char paiorder_leaderdeadorder(void) {
 	if (g_objectTable[leaderObjIdx].flightGroupIdx != g_objectTable[g_paiContext.aiObjIdx].flightGroupIdx) {
 		leaderDead = 1;
 	}
-	if (leaderCraft->objectKind == 3 || leaderCraft->objectKind == 4) {
+	if (leaderCraft->craftState == 3 || leaderCraft->craftState == 4) {
 		leaderDead = 1;
 	}
 	if (leaderCraft->aiFlight.missionAbortedFlag != 0) {
@@ -2913,7 +2913,7 @@ char paiorder_hyperspaceorder(void) {
 		return 0;
 	}
 
-	if (g_paiContext.aiTargetCraft->objectKind == 5) {
+	if (g_paiContext.aiTargetCraft->craftState == 5) {
 		{
 			AiController* effectiveTargetController;
 
@@ -2929,7 +2929,7 @@ char paiorder_hyperspaceorder(void) {
 			}
 		}
 
-		g_curCraft->objectKind = 5;
+		g_curCraft->craftState = 5;
 		g_curCraft->aiFlight.enterFlag = 0;
 		g_curCraft->aiFlight.headingState = 0;
 		g_curCraft->aiFlight.turnState = 0;

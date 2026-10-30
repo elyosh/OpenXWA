@@ -4352,8 +4352,8 @@ void Mission_ProcessFlightGroupWaveCompletion(uint16_t flightGroupIdx) {
 				if (g_objectTable[scanSlot].objectType) {
 					MobileObject* mobj = g_objectTable[scanSlot].mobj;
 					if (!mobj->state && g_objectTable[scanSlot].flightGroupIdx == flightGroupIdx) {
-						uint8_t objectKind = mobj->pCraft->objectKind;
-						if (objectKind != 3 && objectKind != 4) {
+						uint8_t craftState = mobj->pCraft->craftState;
+						if (craftState != 3 && craftState != 4) {
 							clear = 0;
 							break;
 						}
@@ -4486,7 +4486,7 @@ void Mission_ProcessFlightGroupWaveCompletion(uint16_t flightGroupIdx) {
 				if (mobj->state || g_objectTable[reclaimSlot].playerOwnerIdx != -1)
 					continue;
 				pCraft = mobj->pCraft;
-				kind = pCraft->objectKind;
+				kind = pCraft->craftState;
 				if (kind != 3 && kind != 4)
 					continue;
 				g_objectTable[reclaimSlot].objectType = OBJ_None;
@@ -5229,7 +5229,7 @@ void Mission_UpdateFlightGroupArrivals(void) {
 										o->flightGroupIdx == g_currentFlightGroupIdx) {
 										uint8_t kind;
 										g_curCraft = mobj->pCraft;
-										kind = g_curCraft->objectKind;
+										kind = g_curCraft->craftState;
 										if (kind != 3 && kind != 4) {
 											hasNoInstance = 0;
 											break;
@@ -6872,7 +6872,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 		}
 
 		if (modelIndex != 0xFFFF) {
-			g_curCraft->objectKind = g_spawnObjectKind;
+			g_curCraft->craftState = g_spawnObjectKind;
 			engineGlowCount = g_modelDefs[modelIndex].engineGlowCount;
 			if (((uint16_t)existingObjIdx == 0xFFFF))
 				g_curCraft->throttleSpeed = throttle;
@@ -7007,7 +7007,7 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 				throttle2 = g_orderThrottleToCraftThrottleSpeed
 					[g_missionFlightGroups[g_currentFlightGroupIdx].fg.orders[4 * g_spawnRegionIdx].throttle];
 			if (modelIndex != 0xFFFF) {
-				g_curCraft->objectKind = g_spawnObjectKind;
+				g_curCraft->craftState = g_spawnObjectKind;
 				if (((uint16_t)existingObjIdx == 0xFFFF))
 					g_curCraft->throttleSpeed = throttle2;
 				g_curCraft->engineOutputScale = -1;

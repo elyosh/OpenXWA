@@ -1810,7 +1810,7 @@ char FlightView_Render(void) {
 			case GENUS_PilotDroid:
 			case GENUS_WeaponEmplacement:
 				g_curCraft = g_objectTable[objectIdx].mobj->pCraft;
-				if (g_curCraft->objectKind == 7) {
+				if (g_curCraft->craftState == 7) {
 					break;
 				}
 				cullFlags =

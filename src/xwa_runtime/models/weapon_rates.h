@@ -65,8 +65,8 @@
  *     systems. `max` is the most system damage that the craft can take. The
  *     weapon keys give the damage of one hit of weapon types 284, 285, 290
  *     and 296. They come from the model of the craft that fired.
- *     With these values, or with the rates on, system damage stops at `max`,
- *     as in XWAU. The stock game stops adding damage once it reaches 1000,
+ *     With these values, or with the rates on, system damage stops at
+ *     `max`. The stock game stops adding damage once it reaches 1000,
  *     but a hit can take it past 1000.
  * A weapon profile can set the decharge rate, the recharge rate and the
  * cooldown of each weapon type. Its values take the place of the `rates`

@@ -434,10 +434,10 @@ typedef struct XwaFlightObject {
 	uint8_t anim_frame;
 	/* ---- engine-glow state (EngineGlow_RenderObjectGlows inputs; the
 	 * HD driver derives the glow fans from these + the HD mesh's
-	 * flight-model engine glows). objectKind 5/6 use the speed-boost scale
+	 * flight-model engine glows). Craft states 5 and 6 use the speed-boost scale
 	 * formula (speed vs eg_max_speed); everything else the power-
 	 * margin formula (16 - redirects, engineOutputScale, throttle). */
-	uint8_t object_kind;        /* CraftData.objectKind */
+	uint8_t craft_state;        /* CraftData.craftState */
 	uint8_t eg_working;         /* CraftData.workingSubsystems != 0 */
 	uint8_t eg_shield_redirect; /* CraftData.shieldRedirect */
 	uint8_t eg_laser_redirect;  /* CraftData.laserRedirect */
@@ -1089,6 +1089,9 @@ typedef struct XwaHudCrt {
 	uint8_t self_view;
 	uint8_t map_view;
 	uint8_t component_marker_visible;
+	/* The target is hostile to the local player's team
+	 * (Object_IsHostileToTeam). */
+	uint8_t target_hostile;
 	uint16_t target_slot, target_signature;
 	uint16_t selected_component;
 	uint16_t projectile_exclude_slots[2];

@@ -2149,7 +2149,7 @@ void EngineGlow_RenderForObject(unsigned int objIdx) {
 		if (g_curCraft == NULL || !g_curCraft->engineOutputScale || !g_curCraft->workingSubsystems) {
 			return;
 		}
-		switch (g_curCraft->objectKind) {
+		switch (g_curCraft->craftState) {
 			case 5:
 			case 6: {
 				uint16_t maxSpeed;

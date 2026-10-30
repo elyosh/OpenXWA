@@ -438,7 +438,7 @@ static __inline void laser_UpdatePlayerBeamWeapon(int playerIdx) {
 			currentTargetObjIdx = (uint16_t)g_players[playerIdx].currentTargetObjectIdx;
 			if (currentTargetObjIdx >= g_activeRegionObjectSlotStart &&
 				currentTargetObjIdx < g_activeRegionCraftObjectSlotEnd &&
-				g_objectTable[currentTargetObjIdx].mobj->pCraft->objectKind == 0 &&
+				g_objectTable[currentTargetObjIdx].mobj->pCraft->craftState == 0 &&
 				Targeting_ScoreCandidate(currentTargetObjIdx, 0, playerIdx, 0xffffu) &&
 				(uint32_t)g_targetRangeScore < 0x20000u) {
 				beamTargetObjIdx = currentTargetObjIdx;
@@ -889,7 +889,7 @@ void laser_weaponsfire(void) {
 		}
 
 		g_curCraft = g_objectTable[objectIdx].mobj->pCraft;
-		if (g_curCraft->objectKind != 4 && g_curCraft->objectKind != 3 &&
+		if (g_curCraft->craftState != 4 && g_curCraft->craftState != 3 &&
 			g_curCraft->weaponFireInhibitTimer == 0) {
 			uint16_t slotIdx;
 			uint16_t launcherIdx;
@@ -911,7 +911,7 @@ void laser_weaponsfire(void) {
 
 					if (g_objectTable[objectIdx].playerOwnerIdx == -1 && cooldown < (int16_t)g_elapsedTicks &&
 						g_curCraft->laserLinkMode[groupIdx] != 0) {
-						if ((g_curCraft->workingSubsystems & 0x10u) != 0 && g_curCraft->objectKind == 0) {
+						if ((g_curCraft->workingSubsystems & 0x10u) != 0 && g_curCraft->craftState == 0) {
 							laser_firelasersystem(objectIdx, groupIdx, -1, 1u);
 						}
 						--g_curCraft->laserLinkMode[groupIdx + 3];
@@ -3717,7 +3717,7 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 						continue;
 					}
 					scanCraft = scanObj->mobj->pCraft;
-					if (scanCraft->objectKind != 0) {
+					if (scanCraft->craftState != 0) {
 						continue;
 					}
 

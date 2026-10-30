@@ -1608,7 +1608,7 @@ static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_
 			snapshot_capture_meshes(s, f, o, cd);
 			f->anim_frame = XWA_CRAFT_ANIM_FRAME(cd);
 			/* Engine-glow scale inputs (EngineGlow_RenderObjectGlows). */
-			f->object_kind = cd->objectKind;
+			f->craft_state = cd->craftState;
 			f->eg_working = (uint8_t)(cd->workingSubsystems != 0);
 			f->eg_shield_redirect = cd->shieldRedirect;
 			f->eg_laser_redirect = cd->laserRedirect;

@@ -170,7 +170,9 @@ typedef struct CraftData {
 	ModelDefIndex modelDefIndex;
 	int leader_obj_idx;
 	uint8_t aiLinkResolving;
-	uint8_t objectKind;
+	/* 0 in normal flight, 3 while the craft is dying, 4 when it is destroyed at
+	   once. Other values are other states. */
+	uint8_t craftState;
 	uint8_t missionAccountingDone;
 	uint16_t skillValue;
 	int16_t breakupPitchRate;

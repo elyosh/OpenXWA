@@ -115,7 +115,7 @@ void XwaSurfaces_ReadModelSettings(unsigned int objectType, const char* path, co
 }
 
 /* A speed in raw units (2.25 per MGLT) is under `mglt` MGLT when 4 * speed
-   < 9 * mglt. That is the same as XWAU's (int)(speed / 2.25f) < mglt. */
+   < 9 * mglt, which is (int)(speed / 2.25f) < mglt without floats. */
 static int Surfaces_UnderMglt(int speed, int32_t mglt) { return 4 * (int64_t)speed < 9 * (int64_t)mglt; }
 
 static int Surfaces_RuleHides(const SurfaceRule* rule, const CraftData* craft, int speed) {

@@ -9097,7 +9097,7 @@ void Hud_UpdateTargetInfoCache(void) {
 				targetObjIdx < g_activeRegionCraftObjectSlotEnd && targetCraft != NULL &&
 				targetMobj->state == 0) {
 				if ((int8_t)targetCraft->iffVisibility[(uint16_t)g_players[g_localPlayer].playerIff] <= 0 ||
-					targetCraft->objectKind == 3 || targetCraft->objectKind == 4) {
+					targetCraft->craftState == 3 || targetCraft->craftState == 4) {
 					statusText = g_strWarheadUnknown;
 				} else {
 					if (targetCraft->cargoIndex != 0xffu) {
@@ -9157,7 +9157,7 @@ void Hud_UpdateTargetInfoCache(void) {
 		targetMobj = g_objectTable[targetObjIdx].mobj;
 		if (targetMobj != NULL) {
 			targetCraft = targetMobj->pCraft;
-			if (targetCraft == NULL || targetCraft->objectKind == 3 || targetCraft->objectKind == 4) {
+			if (targetCraft == NULL || targetCraft->craftState == 3 || targetCraft->craftState == 4) {
 				shieldDenominator = 0;
 			} else {
 				shieldTotal = targetCraft->shieldRear + targetCraft->shieldFront;
@@ -9193,7 +9193,7 @@ void Hud_UpdateTargetInfoCache(void) {
 		targetMobj = g_objectTable[targetObjIdx].mobj;
 		if (targetMobj != NULL) {
 			targetCraft = targetMobj->pCraft;
-			if (targetCraft == NULL || targetCraft->objectKind == 3 || targetCraft->objectKind == 4) {
+			if (targetCraft == NULL || targetCraft->craftState == 3 || targetCraft->craftState == 4) {
 				systemPct = g_objectTable[targetObjIdx].typeSpecificWord != 0 ? 100 : 0;
 			} else {
 				if (targetCraft->workingSubsystems == 0) {
@@ -9238,7 +9238,7 @@ void Hud_UpdateTargetInfoCache(void) {
 			targetCraft = targetMobj->pCraft;
 			if (targetObjIdx >= g_activeRegionObjectSlotStart &&
 				targetObjIdx < g_activeRegionCraftObjectSlotEnd && targetCraft != NULL) {
-				if (targetCraft->objectKind == 3 || targetCraft->objectKind == 4) {
+				if (targetCraft->craftState == 3 || targetCraft->craftState == 4) {
 					hullPct = 0;
 				} else if ((uint32_t)targetCraft->hullDamage > (uint32_t)targetCraft->hullMax) {
 					hullPct = 1;
@@ -9512,7 +9512,7 @@ void Hud_DrawRadarBlips(void) {
 
 	for (objIdx = g_activeRegionObjectSlotStart; objIdx < g_activeRegionCraftObjectSlotEnd; ++objIdx) {
 		CraftData* craft;
-		uint8_t objectKind;
+		uint8_t craftState;
 
 		if (objIdx == (uint32_t)g_players[g_localPlayer].objectIndex ||
 			(g_objectTypes[g_objectTable[objIdx].objectType].flags &
@@ -9528,8 +9528,8 @@ void Hud_DrawRadarBlips(void) {
 		if (Object_HasActiveDecoyBeam((uint16_t)objIdx)) {
 			continue;
 		}
-		objectKind = craft->objectKind;
-		if (objectKind == 3 || objectKind == 4) {
+		craftState = craft->craftState;
+		if (craftState == 3 || craftState == 4) {
 			continue;
 		}
 
@@ -10171,7 +10171,7 @@ void Hud_UpdateThreatIndicators(void) {
 		}
 
 		craft = mobj->pCraft;
-		if (craft->workingSubsystems == 0 || craft->objectKind != 0) {
+		if (craft->workingSubsystems == 0 || craft->craftState != 0) {
 			continue;
 		}
 
@@ -10745,6 +10745,8 @@ void Hud_Update3DCrt(uint16_t x, uint16_t y, uint16_t width, uint16_t height, in
 		capturedCrt.map_view = (uint8_t)(g_players[g_localPlayer].mapCameraState != 0);
 		capturedCrt.target_slot = targetObjIdx;
 		capturedCrt.target_signature = g_objectTable[targetObjIdx].objectSignature;
+		capturedCrt.target_hostile =
+			(uint8_t)(Object_IsHostileToTeam(targetObjIdx, g_players[g_localPlayer].playerIff) != 0);
 		capturedCrt.selected_component = (uint16_t)g_players[g_localPlayer].selectedTargetComponent;
 		capturedCrt.projectile_exclude_slots[0] = 0xffffu;
 		capturedCrt.projectile_exclude_slots[1] = 0xffffu;
@@ -17725,7 +17727,7 @@ void Mfd_DrawFriendlyCraftPage(int mfdSide, void* mfdSurface) {
 							objects[tableIdx].objectType != OBJ_ImperialPilot &&
 							objects[tableIdx].objectType != OBJ_CivilianPilot) {
 							craft = objects[tableIdx].mobj->pCraft;
-							if (craft->objectKind != 3 && craft->objectKind != 4) {
+							if (craft->craftState != 3 && craft->craftState != 4) {
 #ifdef XWA_MODERN
 								/* The list holds 192 craft, and a region can have
 								 * more. The page stops at 192. */
@@ -17956,7 +17958,7 @@ void Mfd_DrawFriendlyCraftPage(int mfdSide, void* mfdSurface) {
 					continue;
 				}
 #endif
-				if (craft != NULL && craft->objectKind != 3 && craft->objectKind != 4) {
+				if (craft != NULL && craft->craftState != 3 && craft->craftState != 4) {
 					int avgShield;
 					int maxShield;
 
@@ -17984,7 +17986,7 @@ void Mfd_DrawFriendlyCraftPage(int mfdSide, void* mfdSurface) {
 					g_flightDrawCharFn('/');
 				}
 
-				if (craft->objectKind != 3 && craft->objectKind != 4) {
+				if (craft->craftState != 3 && craft->craftState != 4) {
 					if ((uint32_t)craft->hullDamage > (uint32_t)craft->hullMax) {
 						hullPct = 1;
 					} else {
@@ -18182,7 +18184,7 @@ void Mfd_DrawFlightGroupsPage(int mfdSide, void* mfdSurface) {
 				continue;
 			}
 			rowCraft = g_objectTable[tableIdx].mobj->pCraft;
-			if (rowCraft->objectKind == 3 || rowCraft->objectKind == 4) {
+			if (rowCraft->craftState == 3 || rowCraft->craftState == 4) {
 				continue;
 			}
 #ifdef XWA_MODERN
@@ -18419,7 +18421,7 @@ void Mfd_DrawFlightGroupsPage(int mfdSide, void* mfdSurface) {
 #endif
 
 					FlightText_SetCursor((int16_t)g_mfdFlightGroupsShieldHullValueX, (int16_t)y);
-					if (craft->objectKind != 3 && craft->objectKind != 4) {
+					if (craft->craftState != 3 && craft->craftState != 4) {
 						int avgShield;
 						int maxShield;
 
@@ -18445,7 +18447,7 @@ void Mfd_DrawFlightGroupsPage(int mfdSide, void* mfdSurface) {
 					FlightText_SetCursor(
 						(int16_t)(g_mfdFlightGroupsShieldHullValueX + FlightText_MeasureStringWidth("200/")),
 						(int16_t)y);
-					if (craft->objectKind != 3 && craft->objectKind != 4) {
+					if (craft->craftState != 3 && craft->craftState != 4) {
 						if ((uint32_t)craft->hullDamage <= (uint32_t)craft->hullMax) {
 							hullPct = Mfd_FriendlyCraftScaledPercent((uint16_t)MATH2_percentage(
 								(uint32_t)(craft->hullMax - craft->hullDamage), (uint32_t)craft->hullMax));
@@ -19687,7 +19689,7 @@ void Mfd_UpdateCommandMenuTargets(void) {
 				targetSlot = 1;
 			}
 
-			if (craft->objectKind != 0) {
+			if (craft->craftState != 0) {
 				continue;
 			}
 

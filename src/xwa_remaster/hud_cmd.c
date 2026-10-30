@@ -18,6 +18,7 @@
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/skins.h"
 #include "xwa_remaster/xwa_remaster.h"
+#include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/model_source.h"
 
 #include <math.h>
@@ -44,6 +45,11 @@ static struct {
 	XwaRemasterParticles* particles;
 	AeronScenePresentChain* present;
 	AeronRenderTarget* present_rt;
+	/* The display's edges (target_display style `edges`). */
+	AeronRenderTarget* edge_rt;
+	AeronShader* edge_vs;
+	AeronShader* edge_fs;
+	AeronGraphicsPipeline* edge_pipeline;
 	AeronSampler* sampler;
 	AeronDrawList2D* draw_list;
 	int rt_w, rt_h;
@@ -178,7 +184,7 @@ static AeronSceneMesh* cmd_mesh(const XwaFlightObject* object, uint8_t* out_sour
 static float cmd_engine_glow_scale(const XwaFlightObject* object, uint64_t tick_index) {
 	if (!object || !object->has_craft || !object->eg_output_scale || !object->eg_working)
 		return 0.0f;
-	if (object->object_kind == 5 || object->object_kind == 6) {
+	if (object->craft_state == 5 || object->craft_state == 6) {
 		const double window = (double)(4 * (3600 - (int)object->eg_max_speed));
 		const double delta = (double)((int)object->speed - (int)object->eg_max_speed);
 		if (window <= 0.0)
@@ -491,6 +497,9 @@ static int cmd_configure_clustered_lights(void) {
 static void cmd_destroy_targets(void) {
 	if (s_cmd.present_rt)
 		Aeron_DestroyRenderTarget(s_cmd.present_rt);
+	if (s_cmd.edge_rt)
+		Aeron_DestroyRenderTarget(s_cmd.edge_rt);
+	s_cmd.edge_rt = NULL;
 	if (s_cmd.scene)
 		AeronScene_Destroy(s_cmd.scene);
 	s_cmd.present_rt = NULL;
@@ -539,6 +548,87 @@ static int cmd_ensure_targets(int width, int height) {
 	return 1;
 }
 
+/* The edge colour: the target's IFF colour, or the friend or foe colour, or
+   the `other` colour for a target without a mobile object or with another
+   IFF. Linear. */
+static const float* cmd_edge_color(const XwaTargetDisplay* display, const XwaHudCrt* crt,
+								   const XwaFlightObject* target) {
+	if (target->has_mobj && display->friendFoe)
+		return crt->target_hostile ? display->foeColor : display->friendColor;
+	if (target->has_mobj && target->iff >= 0 && target->iff < XWA_TARGET_DISPLAY_IFF_COLORS)
+		return display->iff[target->iff];
+	return display->otherColor;
+}
+
+static int cmd_ensure_edge_pipeline(void) {
+	if (s_cmd.edge_pipeline)
+		return 1;
+	if (!s_cmd.edge_vs)
+		s_cmd.edge_vs = Aeron_CreateShader(
+			&(AeronShaderDesc) { .name = "fullscreen.vert", .stage = AERON_SHADER_STAGE_VERTEX });
+	if (!s_cmd.edge_fs)
+		s_cmd.edge_fs = Aeron_CreateShader(&(AeronShaderDesc) { .name = "target_display_edges.frag",
+																.stage = AERON_SHADER_STAGE_FRAGMENT,
+																.sampler_count = 1,
+																.uniform_buffer_count = 1 });
+	if (!s_cmd.edge_vs || !s_cmd.edge_fs)
+		return 0;
+	const AeronColorTargetStateDesc target = { .format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT };
+	s_cmd.edge_pipeline = Aeron_CreateGraphicsPipeline(&(AeronGraphicsPipelineDesc) {
+		.vertex_shader = s_cmd.edge_vs,
+		.fragment_shader = s_cmd.edge_fs,
+		.primitive_type = AERON_PRIMITIVE_TRIANGLES,
+		.cull_mode = AERON_CULL_NONE,
+		.depth = { .depth_test = 0, .depth_write = 0, .compare = AERON_COMPARE_ALWAYS },
+		.color_target_count = 1,
+		.color_targets = &target,
+	});
+	return s_cmd.edge_pipeline != NULL;
+}
+
+/* Draws the edges of the tonemapped display into edge_rt
+   (target_display_edges.frag). Returns 0 on failure. */
+static int cmd_draw_edges(AeronCommandBuffer* cmd, const XwaTargetDisplay* display, const XwaHudCrt* crt,
+						  const XwaFlightObject* target, int blank, int width, int height) {
+	if (!cmd_ensure_edge_pipeline())
+		return 0;
+	if (!s_cmd.edge_rt)
+		s_cmd.edge_rt =
+			Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = width,
+																.height = height,
+																.format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
+																.debug_name = "xwa.hud.cmd_edges" });
+	AeronTexture* source = Aeron_RenderTargetGetTexture(s_cmd.present_rt);
+	if (!s_cmd.edge_rt || !source)
+		return 0;
+	const float* color = cmd_edge_color(display, crt, target);
+	struct {
+		float edge_color[4];
+		float luminance[4];
+		float size[4];
+	} uniform = {
+		{ XwaRemaster_LinearToSrgb(color[0]), XwaRemaster_LinearToSrgb(color[1]),
+		  XwaRemaster_LinearToSrgb(color[2]), blank ? 0.0f : 1.0f },
+		{ display->luminance[0], display->luminance[1], display->luminance[2], display->contrast },
+		{ (float)width, (float)height, 1.0f / (float)width, 1.0f / (float)height },
+	};
+	AeronRenderPass* pass =
+		Aeron_BeginRenderPass(&(AeronRenderPassDesc) { .color_target = s_cmd.edge_rt,
+													   .clear_color = 1,
+													   .clear_color_rgba = { 0, 0, 0, 0 },
+													   .command_buffer = cmd,
+													   .debug_label = "OpenXWA CMD display edges" });
+	if (!pass)
+		return 0;
+	Aeron_SetViewport(pass, &(AeronRectI) { 0, 0, width, height });
+	Aeron_BindGraphicsPipeline(pass, s_cmd.edge_pipeline);
+	Aeron_BindTextureSampler(pass, AERON_SHADER_STAGE_FRAGMENT, 0, source, s_cmd.sampler);
+	Aeron_BindUniformData(pass, AERON_SHADER_STAGE_FRAGMENT, 0, &uniform, (uint32_t)sizeof uniform);
+	Aeron_Draw(pass, 3, 0);
+	Aeron_EndRenderPass(pass);
+	return 1;
+}
+
 int XwaRemasterHudCmd_Init(void) {
 	if (!s_cmd.draw_list)
 		s_cmd.draw_list = AeronDrawList_Create(32); /* + erase-clipped pieces */
@@ -551,6 +641,12 @@ int XwaRemasterHudCmd_Init(void) {
 
 void XwaRemasterHudCmd_Shutdown(void) {
 	cmd_destroy_targets();
+	if (s_cmd.edge_pipeline)
+		Aeron_DestroyGraphicsPipeline(s_cmd.edge_pipeline);
+	if (s_cmd.edge_fs)
+		Aeron_DestroyShader(s_cmd.edge_fs);
+	if (s_cmd.edge_vs)
+		Aeron_DestroyShader(s_cmd.edge_vs);
 	XwaRemasterParticles_Destroy(s_cmd.particles);
 	s_cmd.particles = NULL;
 	XwaRemasterTrails_Destroy(s_cmd.trails);
@@ -636,8 +732,22 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	s_cmd.particle_light_id_count = 0;
 	s_cmd.particle_scene_count = 0;
 	XwaRemasterDirLight lights[XWA_SNAP_MAX_DIR_LIGHTS];
-	const uint32_t light_count =
+	uint32_t light_count =
 		XwaRemaster_ReadGameDirLights(snapshot->dir_lights, snapshot->dir_light_count, lights);
+	const XwaTargetDisplay* display = XwaCraftHud_TargetDisplay();
+	if (display->style == XWA_TARGET_DISPLAY_EDGES) {
+		/* The edges come from the target's shape and textures, so it is lit
+		   from the camera instead of by the game's lights. Its visible side
+		   is then never dark. The camera looks along its third row. */
+		const float illuminance = XwaRemaster_ClassicLightIlluminance();
+		memset(&lights[0], 0, sizeof lights[0]);
+		for (int k = 0; k < 3; k++) {
+			lights[0].world_dir[k] = -rows[6 + k];
+			lights[0].color[k] = illuminance;
+		}
+		lights[0].source_backdrop_index = -1;
+		light_count = 1;
+	}
 	s_cmd.exposure = XwaRemasterFlight_LightMeterExposure(lights, light_count);
 	XwaAssetRef glow_ref;
 	const int glow_ok = XwaRemasterAssets_FlightAtlasFrame(assets, 1000, 0, &glow_ref);
@@ -736,6 +846,16 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 								/*src_coverage=*/1);
 	Aeron_EndRenderPass(pass);
 	s_cmd.output = Aeron_RenderTargetGetTexture(s_cmd.present_rt);
+	/* With edges, the display shows the edges of the shaded image, and it is
+	   empty while the target is dying. */
+	const int blank = target->has_craft && target->craft_state == 3;
+	if (display->style == XWA_TARGET_DISPLAY_EDGES) {
+		if (!cmd_draw_edges(cmd, display, crt, target, blank, width, height)) {
+			Aeron_CommandBufferSetFailure(cmd, "HUD CMD edge pass failed");
+			return;
+		}
+		s_cmd.output = Aeron_RenderTargetGetTexture(s_cmd.edge_rt);
+	}
 	s_cmd.prepared.valid = s_cmd.output != NULL;
 	s_cmd.prepared.profile = (uint8_t)profile_id;
 	s_cmd.prepared.target_slot = target->slot;
@@ -748,7 +868,8 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	s_cmd.prepared.rect_y_ref = rect_y_ref;
 	s_cmd.prepared.rect_w_ref = rect_w_ref;
 	s_cmd.prepared.rect_h_ref = rect_h_ref;
-	if (s_cmd.prepared.valid && crt->component_marker_visible && target_transform[15] != 0.0f) {
+	if (s_cmd.prepared.valid && crt->component_marker_visible && target_transform[15] != 0.0f &&
+		!(display->style == XWA_TARGET_DISPLAY_EDGES && blank)) {
 		const float focus_opt[3] = { (float)crt->component_focus[0], (float)crt->component_focus[1],
 									 (float)crt->component_focus[2] };
 		float eye[3];
