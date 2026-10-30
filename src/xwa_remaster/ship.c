@@ -41,6 +41,8 @@ typedef struct ShipDesiredAsset {
 
 static ShipMeshAsset s_meshes[XWA_SNAP_MAX_OPT_ASSETS];
 static uint32_t s_mesh_count;
+/* Counts the changes of s_meshes (XwaRemasterShip_MeshGeneration). */
+static uint64_t s_mesh_generation;
 /* s_meshes index + 1 for each key (0 for an empty slot), with linear
  * probing. It is rebuilt whenever s_meshes changes. Entries with the same
  * key are met in s_meshes order, as a scan of s_meshes would meet them. */
@@ -452,6 +454,7 @@ void XwaRemasterShip_CommitSyncBatch(void) {
 		s_pending_skin_generation = UINT64_MAX;
 		s_opt_asset_generation = s_batch_generation;
 		s_skin_generation = s_batch_skin_generation;
+		s_mesh_generation++;
 		Aeron_LogDebug("xwa.remaster", "mesh assets: generation=%llu unique=%u",
 					   (unsigned long long)s_opt_asset_generation, s_mesh_count);
 	}
@@ -495,6 +498,23 @@ AeronEffectAtlas* XwaRemasterShip_EffectAtlas(void) {
 
 const AeronEffectData* XwaRemasterShip_EffectData(void) { return s_effect_data; }
 
+uint64_t XwaRemasterShip_MeshGeneration(void) { return s_mesh_generation; }
+
+uint32_t XwaRemasterShip_PrepareMeshes(AeronScene3D* scene, uint32_t* failed) {
+	uint32_t prepared = 0;
+	*failed = 0;
+	for (uint32_t i = 0; i < s_mesh_count; i++) {
+		if (!s_meshes[i].mesh) {
+			continue;
+		}
+		prepared++;
+		if (!AeronScene_PrepareMesh(scene, s_meshes[i].mesh, AERON_CULL_BACK)) {
+			(*failed)++;
+		}
+	}
+	return prepared;
+}
+
 void XwaRemasterShip_Shutdown(void) {
 	ship_pending_discard();
 	for (uint32_t i = 0; i < s_mesh_count; i++) {
@@ -502,6 +522,7 @@ void XwaRemasterShip_Shutdown(void) {
 	}
 	memset(s_meshes, 0, sizeof s_meshes);
 	s_mesh_count = 0;
+	s_mesh_generation++;
 	ship_mesh_lookup_rebuild();
 	AeronEffectData_Destroy(s_effect_data);
 	s_effect_data = NULL;

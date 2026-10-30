@@ -182,6 +182,12 @@ enum {
  * hook context, valid during AeronScene_Render only. */
 static struct {
 	AeronScene3D* scene;
+	/* scene_serial counts the scenes created. The prepared_ fields record
+	 * the scene and the mesh set whose pipelines fl_prepare_meshes last
+	 * created. */
+	uint64_t scene_serial;
+	uint64_t prepared_scene_serial;
+	uint64_t prepared_mesh_generation;
 	XwaRemasterTrails* trails;
 	XwaRemasterParticles* particles;
 	XwaRemasterHyperspace* hyperspace;
@@ -1809,6 +1815,7 @@ static int fl_ensure(int target_w, int target_h) {
 		return 0;
 	}
 	s.scene_requested_samples = requested_samples;
+	s.scene_serial++;
 	/* Decode the classic RGB555 clear color 0x0001 into the linear HDR scene. */
 	const float classic_clear_blue = powf(2.0f / 31.0f, 2.2f);
 	AeronScene_SetClearColor(s.scene, (const float[4]) { 0.0f, 0.0f, classic_clear_blue, 1.0f });
@@ -4127,6 +4134,28 @@ static void fl_update_material_states(const XwaSnapshot* snap, float now) {
 
 /* Begins the scene's frame with its exposure, fixed or metered, and with
  * the classic images (screens, glows, explosions) at the classic radiance. */
+/* Creates the pipelines of the loaded models when the scene or the models
+ * change: a scene keeps its pipelines for its whole life, and a new one (a
+ * new size or MSAA count) starts without them. This runs in a frame that is
+ * already a transition, such as the first one of a mission, rather than in
+ * the frame that first shows each model. */
+static void fl_prepare_meshes(void) {
+	const uint64_t generation = XwaRemasterShip_MeshGeneration();
+	if (s.prepared_scene_serial == s.scene_serial && s.prepared_mesh_generation == generation) {
+		return;
+	}
+	s.prepared_scene_serial = s.scene_serial;
+	s.prepared_mesh_generation = generation;
+	const uint64_t start_us = Aeron_NowUs();
+	uint32_t failed = 0;
+	const uint32_t models = XwaRemasterShip_PrepareMeshes(s.scene, &failed);
+	Aeron_LogInfo("xwa.remaster", "flight: pipelines of %u model(s) prepared in %.1f ms", models,
+				  (double)(Aeron_NowUs() - start_us) / 1000.0);
+	if (failed) {
+		Aeron_LogWarn("xwa.remaster", "flight: the pipelines of %u model(s) couldn't all be created", failed);
+	}
+}
+
 static int fl_begin_scene(const AeronSceneCamera* camera) {
 	/* The map has a fixed exposure; leaving it snaps the meter. */
 	if (s.exposure.metered && !s.map_present) {
@@ -4154,7 +4183,11 @@ static int fl_begin_scene(const AeronSceneCamera* camera) {
 		AeronScene_SetExposure(s.scene, XwaRemasterFlight_Exposure());
 	}
 	AeronScene_SetImageRadiance(s.scene, XwaRemaster_ClassicRadiance());
-	return AeronScene_Begin(s.scene, camera);
+	if (!AeronScene_Begin(s.scene, camera)) {
+		return 0;
+	}
+	fl_prepare_meshes();
+	return 1;
 }
 
 /* Sets the scene's animation clock from the snapshot and updates the

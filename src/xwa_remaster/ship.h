@@ -52,6 +52,14 @@ AeronEffectAtlas* XwaRemasterShip_EffectAtlas(void);
  * marks) in that atlas, loaded with the first ship mesh; NULL before or
  * without it. */
 const AeronEffectData* XwaRemasterShip_EffectData(void);
+/* A count that changes whenever the loaded meshes change. */
+uint64_t XwaRemasterShip_MeshGeneration(void);
+/* Creates in `scene` the pipelines each loaded mesh draws with
+ * (AeronScene_PrepareMesh), with the back-face culling of the flight
+ * objects. Bolts draw in batches, whose pipelines the scene creates when it
+ * starts. Returns the number of meshes, and sets *failed to the number
+ * whose pipelines couldn't all be created. */
+uint32_t XwaRemasterShip_PrepareMeshes(AeronScene3D* scene, uint32_t* failed);
 void XwaRemasterShip_Shutdown(void);
 void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissive_strength,
 							   float opt_projectile_emissive_strength, float engine_emissive_strength);
