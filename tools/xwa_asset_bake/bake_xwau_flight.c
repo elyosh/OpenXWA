@@ -1092,12 +1092,13 @@ static void flight_bake_fonts(FlightContext* ctx) {
 
 /* The TrueType font files of the font families that XWAU's ddraw can name
  * in TextFontFamily. The ddraw asks Windows for the family at the normal
- * weight, so the file is the family's regular file. */
+ * weight. Verdana can't be redistributed, so it becomes DejaVu Sans, an open
+ * font that OpenXWA ships and whose widths are close to Verdana's. */
 static const struct {
 	const char* family;
 	const char* file;
 } g_flightFontFiles[] = {
-	{ "Verdana", "verdana.ttf" },
+	{ "Verdana", "DejaVuSans.ttf" },
 };
 
 /* Reads the text settings of DDraw.cfg as XWAU's ddraw does (config.cpp):
@@ -1182,7 +1183,6 @@ static void flight_write_fonts_yaml(FlightContext* ctx) {
 			"default: {file: %s, metrics: font}\n",
 			file);
 	fclose(f);
-	ToolLog_Write(TOOL_LOG_INFO, "xwau: copy %s from Windows' Fonts folder to flight/fonts/", file);
 }
 
 static int flight_compare_ints(const void* lhs, const void* rhs) {

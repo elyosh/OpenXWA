@@ -533,6 +533,21 @@ if(XWA_BUILD_TOOLS)
     add_executable(xwa_asset_bake tools/xwa_asset_bake/xwa_asset_bake.c)
     target_link_libraries(xwa_asset_bake PRIVATE xwa_asset_bake_lib)
 
+    # The mod importer's engine: it imports an XWA Upgrade installation into
+    # a mod folder, in one process.
+    add_library(xwa_mod_import_lib STATIC
+        tools/mod_importer/authoring.c
+        tools/mod_importer/copies.c
+        tools/mod_importer/import.c
+        tools/mod_importer/log.c
+        tools/mod_importer/models.c
+    )
+    target_include_directories(xwa_mod_import_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools/mod_importer)
+    target_link_libraries(xwa_mod_import_lib
+        PUBLIC aeron_tool_log
+        PRIVATE xwa_asset_bake_lib opt2gltf_tool xwau_import_lib aeron_gltf_cook_tool aeron_effect_library
+            aeron_environment_bake_lib aeron_yaml_json aeron_cjson aeron)
+
     add_executable(imc_decode tools/imc_decode.c)
     target_link_libraries(imc_decode PRIVATE xwa_core)
 
@@ -556,7 +571,9 @@ if(XWA_BUILD_TOOLS)
     if(MSVC)
         target_compile_options(mission_dump PRIVATE /W4)
         target_compile_options(imc_decode PRIVATE /W4)
+        target_compile_options(xwa_mod_import_lib PRIVATE /W4)
     else()
+        target_compile_options(xwa_mod_import_lib PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(mission_dump PRIVATE
             -Wall -Wextra -Wpedantic -Wno-deprecated-declarations -fno-common)
         target_compile_options(imc_decode PRIVATE
@@ -688,6 +705,8 @@ set(XWA_FORMAT_HEADERS
     src/xwa/util/memory.h
     src/xwa/util/string.h
     src/xwa/util/time.h
+    tools/mod_importer/import.h
+    tools/mod_importer/import_internal.h
 )
 
 set(XWA_FORMAT_FILES

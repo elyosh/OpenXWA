@@ -20,8 +20,8 @@
  *                                                   by hand from XWAU's Resdata
  *   <out>/frontend/frontres/<dir>/video/<base>.yaml videos that replace images; copy
  *                                                   these videos by hand too
- *   <out>/frontend/fonts/fonts.yaml                 the text font; copy the font file
- *                                                   by hand from Windows' Fonts folder
+ *   <out>/frontend/fonts/fonts.yaml                 the text font, an open font that
+ *                                                   OpenXWA ships in place of Consolas
  *   <out>/frontend/movies/movies.yaml               the film room's and the pods' movies;
  *                                                   copy XWAU's Movies folder by hand
  *
@@ -1695,8 +1695,10 @@ static int find_anim_sound(const XwauContext* ctx, int id, char* out, size_t out
  * group becomes a group. A group whose name starts with + repeats the same
  * animation. Lines that OpenXWA can't play the same way are reported. */
 /* Writes frontend/fonts/fonts.yaml when XWAU draws the frontend text with a
- * system font (HDConcourseTextFont). XWAU draws it in bold, so the file names
- * the font's bold file, which must be copied by hand. */
+ * system font (HDConcourseTextFont). XWAU draws it in Consolas Bold, which
+ * can't be redistributed. The file names Inconsolata Bold instead, which
+ * OpenXWA ships. Both fonts are monospaced, and the spacing makes Inconsolata's
+ * advances (0.5 em) the same as Consolas Bold's (0.5498 em). */
 static void write_fonts_yaml(XwauContext* ctx) {
 	char hooks[1100], font[128] = "consolas";
 	const char* section;
@@ -1722,9 +1724,8 @@ static void write_fonts_yaml(XwauContext* ctx) {
 	}
 	fprintf(fp, "# Made by xwa_asset_bake xwau-frontend from HDConcourseTextFont.\n"
 				"version: 1\n"
-				"default: {file: consolab.ttf, metrics: font}\n");
+				"default: {file: Inconsolata-Bold.ttf, metrics: font, spacing: 0.0498}\n");
 	fclose(fp);
-	ToolLog_Write(TOOL_LOG_INFO, "xwau: copy consolab.ttf from Windows' Fonts folder to frontend/fonts/");
 }
 
 /* Writes frontend/movies/movies.yaml, the movies of the film room and the
