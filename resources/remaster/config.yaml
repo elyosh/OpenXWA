@@ -162,6 +162,35 @@ presentation:
   # wider view, so that the horizontal field of view stays the one at this
   # aspect. 1.778 is 16:9. 0 turns it off.
   cockpit_fov_min_aspect: 1.778
+# The camera lag and tilt, the cockpit sway and the HUD in the exterior view.
+# A mod's flight/flight.yaml can change these values, and this file's values
+# override the mod's. The options only offer Enhanced Camera, which sets
+# `enabled`.
+camera:
+  # Off keeps the original game's views.
+  enabled: false
+  # The exterior camera trails the craft's turns.
+  exterior_lag: true
+  # The camera turns by this many radians for each radian of lag, 0 to 2...
+  exterior_lag_strength: 0.47
+  # ...but by no more than this many degrees, 0 to 15.
+  exterior_lag_max: 4.05
+  # The exterior camera looks at the craft from this many degrees above,
+  # -30 to 30.
+  exterior_tilt: 10.0
+  # The cockpit sways with turns and speed changes.
+  cockpit_sway: true
+  # The eye moves this many world units for each radian of lag, 0 to 20.
+  cockpit_sway_strength: 5.0
+  # The eye moves back this many world units for each unit of speed change,
+  # 0 to 1.
+  cockpit_speed_sway: 0.075
+  # The eye moves no more than this many world units on each axis, 0 to 10.
+  cockpit_sway_max: 2.5
+  # How fast the lag and the sway catch up, in seconds, 0.05 to 2.
+  lag_time: 0.32
+  # Shows the HUD and the reticle in the exterior view of the player's craft.
+  exterior_hud: true
 texture_filtering:
   anisotropic: true
   max_anisotropy: 8.0

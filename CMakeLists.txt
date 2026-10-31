@@ -281,8 +281,11 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/timing/modern_flight_timing.c
 )
 
-# The input options, which the game and its configuration both use.
-set(XWA_INPUT_OPTIONS_SOURCES src/xwa_runtime/config/modern_input_options.c)
+# The input and camera options, which the game and its configuration both use.
+set(XWA_INPUT_OPTIONS_SOURCES
+    src/xwa_runtime/config/modern_camera_options.c
+    src/xwa_runtime/config/modern_input_options.c
+)
 add_library(xwa_input_options STATIC ${XWA_INPUT_OPTIONS_SOURCES})
 target_include_directories(xwa_input_options PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(xwa_input_options PUBLIC aeron)
@@ -693,6 +696,7 @@ if(XWA_BUILD_MOD_IMPORTER)
 endif()
 
 set(XWA_FORMAT_HEADERS
+    src/xwa_runtime/config/modern_camera_options.h
     src/xwa_runtime/config/modern_input_options.h
     src/xwa_runtime/config/modern_controller_options_screen.h
     src/xwa_runtime/config/modern_input_options_screen.h

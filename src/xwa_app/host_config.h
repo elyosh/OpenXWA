@@ -2,6 +2,7 @@
 #define XWA_APP_HOST_CONFIG_H
 
 #include "aeron/vfs.h"
+#include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 
@@ -47,6 +48,11 @@ typedef struct XwaHostConfig {
 	unsigned int video_options_override_mask;
 	XwaModernInputOptions input_defaults;
 	XwaModernInputOptions input_options;
+	XwaModernCameraOptions camera_options;
+	/* The player's camera values, for the keys that camera_override_mask
+	 * has (XwaModernCameraOptions_Keys). */
+	XwaModernCameraOptions camera_player_options;
+	unsigned int camera_override_mask;
 } XwaHostConfig;
 
 int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size);
@@ -64,6 +70,8 @@ int XwaHostConfig_SaveVideoOptions(AeronVfs* vfs, const XwaModernVideoOptions* o
 								   size_t error_size);
 int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* options, char* error,
 								   size_t error_size);
+/* Saves camera.enabled, and no other camera key. */
+int XwaHostConfig_SaveCameraEnabled(AeronVfs* vfs, int enabled, char* error, size_t error_size);
 
 #ifdef __cplusplus
 }

@@ -95,6 +95,10 @@ static int persist_modern_input_options(const XwaModernInputOptions* options, ch
 	return XwaHostConfig_SaveInputOptions(Aeron_GetVfs(), options, error, error_size);
 }
 
+static int persist_camera_enabled(int enabled, char* error, size_t error_size) {
+	return XwaHostConfig_SaveCameraEnabled(Aeron_GetVfs(), enabled, error, error_size);
+}
+
 /* paths.mod. It is kept when the original game is chosen, so the mod stays
  * in the list. */
 static char s_configured_mod[XWA_HOST_CONFIG_PATH_CAPACITY];
@@ -475,6 +479,8 @@ int main(int argc, char** argv) {
 	XwaModernInputOptions_Configure(&host_config.input_defaults, &host_config.input_options,
 									apply_modern_input_options, persist_modern_input_options);
 	apply_modern_input_options(&host_config.input_options);
+	XwaModernCameraOptions_Configure(&host_config.camera_options, &host_config.camera_player_options,
+									 host_config.camera_override_mask, persist_camera_enabled);
 	Aeron_LogInfo(
 		"xwa.config", "mouse flight control: %s (%s mode, sensitivity %d, invert Y: %s)",
 		host_config.input_options.mouse_flight_enabled ? "on" : "off",
