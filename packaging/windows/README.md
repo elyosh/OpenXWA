@@ -1,9 +1,11 @@
 # Windows build with GCC MinGW-w64
 
 This Docker build produces a self-contained x86-64 Windows package using GCC
-MinGW-w64. SDL3, zstd, and the required FFmpeg components are downloaded and
-built inside Docker; they are not vendored in this repository or required on
-the host.
+MinGW-w64, with OpenXWA and the OpenXWA Mod Importer. SDL3, zstd, and the
+required FFmpeg components are downloaded and built inside Docker; they are
+not vendored in this repository or required on the host. ISPC's Windows release
+is downloaded too, and runs under Wine: it compiles the importer's BC6H
+encoder.
 
 The build requires the Docker Buildx plugin.
 
@@ -60,6 +62,7 @@ After extraction, the package contains:
 ```text
 openxwa-0.0.0-dev-windows-x86_64-release/
 ├── OpenXWA.exe
+├── OpenXWA Mod Importer.exe
 ├── *.dll
 ├── licenses/
 ├── resources/
@@ -67,10 +70,12 @@ openxwa-0.0.0-dev-windows-x86_64-release/
 ```
 
 The DLL set includes SDL3, the minimal FFmpeg runtime, zstd, and the GCC
-MinGW-w64 runtime libraries imported by `OpenXWA.exe`. On first launch, OpenXWA
-asks for the original game-data directory and remembers the validated
-selection. The selected directory must contain `ALLIANCE`, `FLIGHTMODELS`, and
-`MISSIONS`. Application resources are resolved from the packaged `resources`
+MinGW-w64 runtime libraries imported by `OpenXWA.exe` and
+`OpenXWA Mod Importer.exe`. The importer imports a modded X-Wing Alliance
+installation into an OpenXWA mod folder, and chooses the mod that OpenXWA
+uses. On first launch, OpenXWA asks for the original game-data directory and
+remembers the validated selection. The selected directory must contain
+`ALLIANCE`, `FLIGHTMODELS`, and `MISSIONS`. Application resources are resolved from the packaged `resources`
 directory; original game assets are not included in the package.
 
 ## Dependency versions
@@ -81,7 +86,7 @@ the Dockerfile. Override a pin explicitly when testing an update:
 ```sh
 docker buildx build \
   --file packaging/windows/Dockerfile \
-  --build-arg SDL_VERSION=3.4.0 \
+  --build-arg SDL_VERSION=3.4.18 \
   --target artifact \
   --output type=local,dest=build/artifacts \
   .

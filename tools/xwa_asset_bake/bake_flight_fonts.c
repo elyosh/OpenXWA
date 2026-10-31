@@ -2,32 +2,17 @@
 
 #include "aeron/image.h"
 #include "bake_source.h"
+#include "bake_sprites.h"
 #include "ktx2_writer.h"
 #include "tool_log.h"
 #include "xwa_2d.h"
 
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h>
 
 #define FNT_MAGIC 0x544E4654u
 #define FNT_VERSION 2
-
-static int mkdir_p(const char* path) {
-	char tmp[1024];
-	snprintf(tmp, sizeof tmp, "%s", path);
-	for (char* p = tmp + 1; *p; p++) {
-		if (*p == '/') {
-			*p = '\0';
-			if (mkdir(tmp, 0755) != 0 && errno != EEXIST)
-				return 0;
-			*p = '/';
-		}
-	}
-	return mkdir(tmp, 0755) == 0 || errno == EEXIST;
-}
 
 static void wr_u16(FILE* f, uint16_t value) {
 	uint8_t b[2] = { (uint8_t)value, (uint8_t)(value >> 8) };
@@ -111,7 +96,7 @@ int BakeFlightFonts_WriteTiers(const BakeFlightFontsOptions* opt, const Xwa2dFra
 		return 0;
 	char dir[1024];
 	snprintf(dir, sizeof dir, "%s/flight/fonts", opt->out_root);
-	if (!mkdir_p(dir))
+	if (!BakeSprites_MakeDirs(dir))
 		return 0;
 	int baked = 0;
 	for (int tier = 0; tier < 3; tier++) {

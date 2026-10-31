@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ARG SDL_VERSION=3.4.0
+ARG SDL_VERSION=3.4.18
 ARG ZSTD_VERSION=1.5.7
 ARG FFMPEG_VERSION=8.0.1
 ARG SHADERCROSS_COMMIT=6b06e55c7c5d7e7a09a8a14f76e866dcfad5ab99
@@ -205,7 +205,36 @@ RUN cmake -S /src/aeron -B /build/aeron-host -G Ninja \
     && cmake --build /build/aeron-host --parallel \
     && cmake --install /build/aeron-host
 
-FROM build-base AS xwa-build
+# The mod importer's BC6H encoder is compiled by ISPC. ISPC's Linux release
+# only writes Linux objects, so the Windows release runs under Wine. The
+# OpenXWA build runs in this stage, where Wine is installed.
+FROM build-base AS ispc
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        wine \
+        wine64 \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG ISPC_VERSION=1.30.0
+ARG ISPC_WINDOWS_SHA256=e126a78fd15f12475bac6204f2536b3986e07973127e4f8e7336c3d304c4a69f
+
+ADD --checksum=sha256:${ISPC_WINDOWS_SHA256} \
+    https://github.com/ispc/ispc/releases/download/v${ISPC_VERSION}/ispc-v${ISPC_VERSION}-windows.zip \
+    /tmp/ispc.zip
+
+ENV WINEDEBUG=-all
+
+# Wine reads the build's absolute paths as paths on its Z: drive, which is
+# the root of the file system. The first run creates the Wine prefix.
+RUN mkdir -p /tmp/ispc /opt/ispc \
+    && unzip -q /tmp/ispc.zip -d /tmp/ispc \
+    && cp -a /tmp/ispc/*/. /opt/ispc/ \
+    && rm -rf /tmp/ispc /tmp/ispc.zip \
+    && printf '#!/bin/sh\nexec wine /opt/ispc/bin/ispc.exe "$@"\n' > /usr/local/bin/ispc \
+    && chmod +x /usr/local/bin/ispc \
+    && ispc --version
+
+FROM ispc AS xwa-build
 
 ARG XWA_BUILD_TYPE=Release
 ARG XWA_VERSION=0.0.0-dev
@@ -228,6 +257,7 @@ COPY cmake /src/cmake
 COPY resources /src/resources
 COPY shaders /src/shaders
 COPY src /src/src
+COPY tools /src/tools
 
 ENV LD_LIBRARY_PATH=/opt/xwa-host/lib
 
@@ -241,14 +271,16 @@ RUN case "${XWA_BUILD_TYPE}" in \
         -DCMAKE_TOOLCHAIN_FILE=/opt/xwa-toolchain.cmake \
         -DAERON_FSR3_SHADERGEN_EXECUTABLE=/opt/xwa-host/bin/aeron_fsr3_shadergen \
         -DAERON_SHADERCROSS_EXECUTABLE=/opt/xwa-host/bin/shadercross \
-        -DXWA_BUILD_TOOLS=OFF \
+        -DAERON_ISPC_EXECUTABLE=/usr/local/bin/ispc \
+        -DXWA_BUILD_TOOLS=ON \
         -DXWA_ENABLE_DEBUG_UI="${xwa_debug_ui}" \
         -DXWA_VERSION="${XWA_VERSION}" \
-    && cmake --build /build/xwa --target xwa --parallel
+    && cmake --build /build/xwa --target xwa xwa_mod_importer --parallel
 
 RUN mkdir -p /build/package/openxwa-windows-x86_64/licenses \
         /build/package/openxwa-windows-x86_64/shaders \
-    && cp /build/xwa/OpenXWA.exe /build/package/openxwa-windows-x86_64/ \
+    && cp /build/xwa/OpenXWA.exe "/build/xwa/OpenXWA Mod Importer.exe" \
+        /build/package/openxwa-windows-x86_64/ \
     && cp /build/xwa/shaders/*.dxil /build/xwa/shaders/*.spv \
         /build/package/openxwa-windows-x86_64/shaders/ \
     && cp -a /build/xwa/resources /build/package/openxwa-windows-x86_64/ \
@@ -260,6 +292,10 @@ RUN mkdir -p /build/package/openxwa-windows-x86_64/licenses \
         /build/package/openxwa-windows-x86_64/licenses/zstd.txt \
     && cp /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt \
         /build/package/openxwa-windows-x86_64/licenses/FFmpeg-LGPL-2.1.txt \
+    && cp /src/aeron/third_party/ispc_texcomp/LICENSE \
+        /build/package/openxwa-windows-x86_64/licenses/ISPC-Texture-Compressor.txt \
+    && cp /src/aeron/third_party/bcdec/LICENSE \
+        /build/package/openxwa-windows-x86_64/licenses/bcdec.txt \
     && cp -L /usr/share/doc/gcc-mingw-w64-x86-64-posix-runtime/copyright \
         /build/package/openxwa-windows-x86_64/licenses/GCC-MinGW-w64.txt \
     && cp -L /usr/share/doc/mingw-w64-x86-64-dev/copyright \
@@ -290,8 +326,12 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
     && test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_tunnel.frag.spv \
     && test -f /build/package/openxwa-windows-x86_64/resources/aeron/scene3d_defaults.yaml \
     && test -f /build/package/openxwa-windows-x86_64/resources/remaster/config.yaml \
+    && test -f /build/package/openxwa-windows-x86_64/resources/assets/fonts/menu.fnt \
     && x86_64-w64-mingw32-objdump -p \
         /build/package/openxwa-windows-x86_64/OpenXWA.exe \
+        | grep -Eq 'Subsystem[[:space:]]+00000002' \
+    && x86_64-w64-mingw32-objdump -p \
+        "/build/package/openxwa-windows-x86_64/OpenXWA Mod Importer.exe" \
         | grep -Eq 'Subsystem[[:space:]]+00000002' \
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
         x86_64-w64-mingw32-objdump -h \

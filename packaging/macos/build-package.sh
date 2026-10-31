@@ -5,7 +5,7 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/../.." && pwd)"
 
-sdl_version="${SDL_VERSION:-3.4.0}"
+sdl_version="${SDL_VERSION:-3.4.18}"
 zstd_version="${ZSTD_VERSION:-1.5.7}"
 ffmpeg_version="${FFMPEG_VERSION:-8.0.1}"
 shadercross_commit="${SHADERCROSS_COMMIT:-6b06e55c7c5d7e7a09a8a14f76e866dcfad5ab99}"
@@ -40,6 +40,7 @@ tool_prefix="${work_root}/tools"
 build_root="${work_root}/build"
 stage_root="${work_root}/stage-${build_variant}"
 application="${stage_root}/OpenXWA.app"
+importer="${stage_root}/OpenXWA Mod Importer.app"
 dmg="${artifact_dir}/openxwa-${application_version}-macos-${architecture}-${build_variant}.dmg"
 dmg_volume_name="OpenXWA"
 dmg_extras="${script_dir}/dmg"
@@ -48,6 +49,10 @@ cooker_prefix="${work_root}/cooker-dependencies"
 cooker_dir="${artifact_dir}/aeron_gltf_cook-macos"
 
 jobs=""
+# Set in main: the SDK that xcrun reports. Its path is the MacOSX.sdk link,
+# which stays the same when Xcode updates, so the cached build trees don't
+# keep a versioned SDK path that the update removed.
+sdk_path=""
 
 # Shared signing, notarization, and DMG helpers.
 source "${script_dir}/common.sh"
@@ -106,6 +111,7 @@ build_dependencies() {
         -DCMAKE_BUILD_TYPE=Release
         "-DCMAKE_OSX_ARCHITECTURES=${architecture}"
         "-DCMAKE_OSX_DEPLOYMENT_TARGET=${deployment_target}"
+        "-DCMAKE_OSX_SYSROOT=${sdk_path}"
     )
 
     clone_tag https://github.com/libsdl-org/SDL.git \
@@ -192,6 +198,7 @@ build_shadercross() {
         "-DCMAKE_PREFIX_PATH=${dependency_prefix}" \
         "-DCMAKE_OSX_ARCHITECTURES=${architecture}" \
         "-DCMAKE_OSX_DEPLOYMENT_TARGET=${deployment_target}" \
+        "-DCMAKE_OSX_SYSROOT=${sdk_path}" \
         -DLLVM_APPEND_VC_REV=OFF \
         -DSDLSHADERCROSS_CLI=ON \
         -DSDLSHADERCROSS_DXC=ON \
@@ -205,6 +212,8 @@ build_shadercross() {
     cmake --install "${build_root}/shadercross"
 }
 
+# OpenXWA and the mod importer. The importer is built from the tool
+# libraries, so the tools are on, and their BC6H encoder needs ISPC.
 build_application() {
     export PKG_CONFIG_PATH="${dependency_prefix}/lib/pkgconfig"
 
@@ -216,13 +225,14 @@ build_application() {
         "-DCMAKE_PREFIX_PATH=${dependency_prefix}" \
         "-DCMAKE_OSX_ARCHITECTURES=${architecture}" \
         "-DCMAKE_OSX_DEPLOYMENT_TARGET=${deployment_target}" \
+        "-DCMAKE_OSX_SYSROOT=${sdk_path}" \
         "-DAERON_SHADERCROSS_EXECUTABLE=${build_root}/shadercross/shadercross" \
-        -DXWA_BUILD_TOOLS=OFF \
+        -DXWA_BUILD_TOOLS=ON \
         "-DXWA_ENABLE_DEBUG_UI=${debug_ui}" \
         "-DXWA_MACOS_BUILD_VERSION=${build_version}" \
         "-DXWA_MACOS_BUNDLE_IDENTIFIER=${bundle_identifier}" \
         "-DXWA_VERSION=${application_version}"
-    cmake --build "${build_root}/xwa-${build_variant}" --target xwa \
+    cmake --build "${build_root}/xwa-${build_variant}" --target xwa xwa_mod_importer \
         --parallel "${jobs}"
 
     cmake -E remove_directory "${stage_root}"
@@ -247,6 +257,7 @@ build_cooker() {
         -DCMAKE_BUILD_TYPE=Release
         "-DCMAKE_OSX_ARCHITECTURES=arm64;x86_64"
         "-DCMAKE_OSX_DEPLOYMENT_TARGET=${deployment_target}"
+        "-DCMAKE_OSX_SYSROOT=${sdk_path}"
         "-DCMAKE_INSTALL_PREFIX=${cooker_prefix}"
     )
     local arch
@@ -302,35 +313,47 @@ build_cooker() {
 }
 
 stage_licenses() {
-    local license_dir="${application}/Contents/Resources/licenses"
+    local bundle
+    local license_dir
 
-    mkdir -p "${license_dir}"
-    cp "${source_root}/SDL-${sdl_version}/LICENSE.txt" "${license_dir}/SDL3.txt"
-    cp "${source_root}/zstd-${zstd_version}/LICENSE" "${license_dir}/zstd.txt"
-    cp "${source_root}/FFmpeg-${ffmpeg_version}/COPYING.LGPLv2.1" \
-        "${license_dir}/FFmpeg-LGPL-2.1.txt"
-    cp "${repo_root}/aeron/third_party/bc7enc/LICENSE" "${license_dir}/bc7enc.txt"
-    cp "${repo_root}/aeron/third_party/fidelityfx-fsr3/LICENSE.txt" \
-        "${license_dir}/FidelityFX-FSR3.txt"
-    cp "${repo_root}/aeron/third_party/libyaml/License" "${license_dir}/libyaml.txt"
+    for bundle in "${application}" "${importer}"; do
+        license_dir="${bundle}/Contents/Resources/licenses"
+        mkdir -p "${license_dir}"
+        cp "${source_root}/SDL-${sdl_version}/LICENSE.txt" "${license_dir}/SDL3.txt"
+        cp "${source_root}/zstd-${zstd_version}/LICENSE" "${license_dir}/zstd.txt"
+        cp "${source_root}/FFmpeg-${ffmpeg_version}/COPYING.LGPLv2.1" \
+            "${license_dir}/FFmpeg-LGPL-2.1.txt"
+        cp "${repo_root}/aeron/third_party/bc7enc/LICENSE" "${license_dir}/bc7enc.txt"
+        cp "${repo_root}/aeron/third_party/fidelityfx-fsr3/LICENSE.txt" \
+            "${license_dir}/FidelityFX-FSR3.txt"
+        cp "${repo_root}/aeron/third_party/libyaml/License" "${license_dir}/libyaml.txt"
+    done
+    # Code that only the importer uses.
+    license_dir="${importer}/Contents/Resources/licenses"
+    cp "${repo_root}/aeron/third_party/ispc_texcomp/LICENSE" \
+        "${license_dir}/ISPC-Texture-Compressor.txt"
+    cp "${repo_root}/aeron/third_party/bcdec/LICENSE" "${license_dir}/bcdec.txt"
     cp "${repo_root}/packaging/macos/PACKAGE-README.md" \
         "${application}/Contents/Resources/README.md"
 }
 
 validate_bundle_paths() {
+    local bundle
     local item
     local invalid=0
 
-    while IFS= read -r item; do
-        if file "${item}" | grep -q "Mach-O"; then
-            if otool -L "${item}" |
-                    grep -E -q "${dependency_prefix}|${tool_prefix}|/opt/homebrew|/usr/local"; then
-                echo "Non-relocatable library reference in ${item}:" >&2
-                otool -L "${item}" >&2
-                invalid=1
+    for bundle in "${application}" "${importer}"; do
+        while IFS= read -r item; do
+            if file "${item}" | grep -q "Mach-O"; then
+                if otool -L "${item}" |
+                        grep -E -q "${dependency_prefix}|${tool_prefix}|/opt/homebrew|/usr/local"; then
+                    echo "Non-relocatable library reference in ${item}:" >&2
+                    otool -L "${item}" >&2
+                    invalid=1
+                fi
             fi
-        fi
-    done < <(find "${application}" -type f -print)
+        done < <(find "${bundle}" -type f -print)
+    done
 
     if [[ "${invalid}" -ne 0 ]]; then
         exit 1
@@ -342,8 +365,8 @@ main() {
     local application_uuid
     local dsym_uuid
 
-    for command in clang cmake codesign ditto file git hdiutil make ninja \
-            otool pkg-config plutil sysctl xcrun; do
+    for command in clang cmake codesign ditto file git hdiutil ispc make \
+            ninja otool pkg-config plutil sysctl xcrun; do
         require_command "${command}"
     done
     if [[ "${cooker_enabled}" == 1 ]]; then
@@ -363,6 +386,7 @@ main() {
         exit 1
     fi
     jobs="$(sysctl -n hw.logicalcpu)"
+    sdk_path="$(xcrun --show-sdk-path)"
 
     mkdir -p "${source_root}" "${dependency_prefix}" "${tool_prefix}" \
         "${build_root}" "${artifact_dir}"
@@ -381,6 +405,10 @@ main() {
     test -f "${application}/Contents/Resources/shaders/hyperspace_tunnel.vert.msl"
     test -f "${application}/Contents/Resources/shaders/hyperspace_tunnel.frag.msl"
     plutil -lint "${application}/Contents/Info.plist"
+    test -x "${importer}/Contents/MacOS/OpenXWA Mod Importer"
+    test -f "${importer}/Contents/Resources/resources/assets/fonts/menu.fnt"
+    test -f "${importer}/Contents/Resources/shaders/fullscreen.frag.msl"
+    plutil -lint "${importer}/Contents/Info.plist"
     if [[ "${build_type}" == Debug ]]; then
         application_uuid="$(dwarfdump --uuid \
             "${application}/Contents/MacOS/OpenXWA" | awk 'NR == 1 {print $2}')"
@@ -393,10 +421,12 @@ main() {
         fi
     fi
     validate_bundle_paths
-    sign_bundle
+    sign_bundle "${application}"
+    sign_bundle "${importer}"
 
     if [[ "${notarize_enabled}" -eq 1 ]]; then
-        notarize_application
+        notarize_application "${application}"
+        notarize_application "${importer}"
     fi
 
     create_dmg
@@ -406,7 +436,7 @@ main() {
     fi
 
     echo "Created ${dmg}"
-    echo "Application bundle: ${application}"
+    echo "Application bundles: ${application}, ${importer}"
     if [[ "${cooker_enabled}" == 1 ]]; then
         echo "Add-on tools: ${cooker_dir}"
     fi

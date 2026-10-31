@@ -44,7 +44,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ARG SDL_VERSION=3.4.0
+ARG SDL_VERSION=3.4.18
 ARG ZSTD_VERSION=1.5.7
 ARG FFMPEG_VERSION=8.0.1
 ARG SHADERCROSS_COMMIT=6b06e55c7c5d7e7a09a8a14f76e866dcfad5ab99
@@ -170,6 +170,20 @@ RUN git clone https://github.com/libsdl-org/SDL_shadercross.git /deps/SDL_shader
         /deps/SDL_shadercross/external/DirectXShaderCompiler-binaries/linux/lib/libdxil.so \
         /opt/xwa-tools/lib/
 
+# The mod importer's BC6H encoder is compiled by ISPC.
+FROM build-base AS ispc
+
+ARG ISPC_VERSION=1.30.0
+ARG ISPC_LINUX_X64_SHA256=63e7d61037849fa1ed644f0398d21740ee9f880b9bf81f017c65eebe1d42c02b
+
+ADD --checksum=sha256:${ISPC_LINUX_X64_SHA256} \
+    https://github.com/ispc/ispc/releases/download/v${ISPC_VERSION}/ispc-v${ISPC_VERSION}-linux.tar.gz \
+    /tmp/ispc.tar.gz
+
+RUN mkdir -p /opt/ispc \
+    && tar -xzf /tmp/ispc.tar.gz -C /opt/ispc --strip-components=1 \
+    && /opt/ispc/bin/ispc --version
+
 FROM build-base AS xwa-build
 
 ARG XWA_BUILD_TYPE=Release
@@ -182,6 +196,7 @@ COPY --from=sdl-build /deps/SDL/LICENSE.txt /opt/xwa-licenses/SDL3.txt
 COPY --from=zstd-build /deps/zstd/LICENSE /opt/xwa-licenses/zstd.txt
 COPY --from=ffmpeg-build /deps/FFmpeg/COPYING.LGPLv2.1 /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt
 COPY --from=shader-tools /opt/xwa-tools /opt/xwa-tools
+COPY --from=ispc /opt/ispc /opt/ispc
 COPY CMakeLists.txt /src/CMakeLists.txt
 COPY README.md /src/README.md
 COPY aeron /src/aeron
@@ -189,6 +204,7 @@ COPY cmake /src/cmake
 COPY resources /src/resources
 COPY shaders /src/shaders
 COPY src /src/src
+COPY tools /src/tools
 
 ENV LD_LIBRARY_PATH=/opt/xwa-tools/lib:/opt/xwa-linux/lib
 ENV PKG_CONFIG_PATH=/opt/xwa-linux/lib/pkgconfig
@@ -202,15 +218,17 @@ RUN case "${XWA_BUILD_TYPE}" in \
         -DCMAKE_BUILD_TYPE="${XWA_BUILD_TYPE}" \
         -DCMAKE_PREFIX_PATH=/opt/xwa-linux \
         -DAERON_SHADERCROSS_EXECUTABLE=/opt/xwa-tools/bin/shadercross \
-        -DXWA_BUILD_TOOLS=OFF \
+        -DAERON_ISPC_EXECUTABLE=/opt/ispc/bin/ispc \
+        -DXWA_BUILD_TOOLS=ON \
         -DXWA_ENABLE_DEBUG_UI="${xwa_debug_ui}" \
         -DXWA_VERSION="${XWA_VERSION}" \
-    && cmake --build /build/xwa --target xwa --parallel
+    && cmake --build /build/xwa --target xwa xwa_mod_importer --parallel
 
 RUN mkdir -p /build/package/openxwa-linux-x86_64/licenses \
         /build/package/openxwa-linux-x86_64/lib \
         /build/package/openxwa-linux-x86_64/shaders \
-    && cp /build/xwa/OpenXWA /build/package/openxwa-linux-x86_64/ \
+    && cp /build/xwa/OpenXWA "/build/xwa/OpenXWA Mod Importer" \
+        /build/package/openxwa-linux-x86_64/ \
     && cp /build/xwa/shaders/*.spv \
         /build/package/openxwa-linux-x86_64/shaders/ \
     && cp -a /build/xwa/resources /build/package/openxwa-linux-x86_64/ \
@@ -222,6 +240,10 @@ RUN mkdir -p /build/package/openxwa-linux-x86_64/licenses \
         /build/package/openxwa-linux-x86_64/licenses/zstd.txt \
     && cp /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt \
         /build/package/openxwa-linux-x86_64/licenses/FFmpeg-LGPL-2.1.txt \
+    && cp /src/aeron/third_party/ispc_texcomp/LICENSE \
+        /build/package/openxwa-linux-x86_64/licenses/ISPC-Texture-Compressor.txt \
+    && cp /src/aeron/third_party/bcdec/LICENSE \
+        /build/package/openxwa-linux-x86_64/licenses/bcdec.txt \
     && cp -L /opt/xwa-linux/lib/libSDL3.so.0 \
         /build/package/openxwa-linux-x86_64/lib/ \
     && cp -L /opt/xwa-linux/lib/libavcodec.so.62 \
@@ -238,6 +260,7 @@ RUN mkdir -p /build/package/openxwa-linux-x86_64/licenses \
         /build/package/openxwa-linux-x86_64/lib/ \
     && patchelf --set-rpath '$ORIGIN/lib' \
         /build/package/openxwa-linux-x86_64/OpenXWA \
+        "/build/package/openxwa-linux-x86_64/OpenXWA Mod Importer" \
     && for library in /build/package/openxwa-linux-x86_64/lib/*.so*; do \
         patchelf --set-rpath '$ORIGIN' "$library"; \
     done
@@ -248,22 +271,27 @@ RUN test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.vert.s
     && test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_tunnel.frag.spv \
     && test -f /build/package/openxwa-linux-x86_64/resources/aeron/scene3d_defaults.yaml \
     && test -f /build/package/openxwa-linux-x86_64/resources/remaster/config.yaml \
-    && file /build/package/openxwa-linux-x86_64/OpenXWA \
-    && env -u LD_LIBRARY_PATH ldd /build/package/openxwa-linux-x86_64/OpenXWA \
-    && ! env -u LD_LIBRARY_PATH \
-        ldd /build/package/openxwa-linux-x86_64/OpenXWA | grep -q "not found" \
-    # The GCC runtime must resolve from the host, never from the package: the
-    # host's Mesa Vulkan ICDs dlopen into the process and bind whichever
-    # libstdc++ is already loaded, so a bundled (older) copy breaks Vulkan
-    # device enumeration on newer distros.
-    && ! env -u LD_LIBRARY_PATH \
-        ldd /build/package/openxwa-linux-x86_64/OpenXWA \
-        | grep -E 'libstdc[+][+]|libgcc_s' | grep -q '/build/package' \
+    && test -f /build/package/openxwa-linux-x86_64/resources/assets/fonts/menu.fnt \
+    && for program in OpenXWA "OpenXWA Mod Importer"; do \
+        file "/build/package/openxwa-linux-x86_64/${program}" \
+        && env -u LD_LIBRARY_PATH ldd "/build/package/openxwa-linux-x86_64/${program}" \
+        && ! env -u LD_LIBRARY_PATH \
+            ldd "/build/package/openxwa-linux-x86_64/${program}" | grep -q "not found" \
+        # The GCC runtime must resolve from the host, never from the package:
+        # the host's Mesa Vulkan ICDs dlopen into the process and bind
+        # whichever libstdc++ is already loaded, so a bundled (older) copy
+        # breaks Vulkan device enumeration on newer distros.
+        && ! env -u LD_LIBRARY_PATH \
+            ldd "/build/package/openxwa-linux-x86_64/${program}" \
+            | grep -E 'libstdc[+][+]|libgcc_s' | grep -q '/build/package' \
+        || exit 1; \
+    done \
     # Host baseline contract: glibc 2.35 and the GCC 12 runtime (Ubuntu 22.04
     # era). Fail packaging if any shipped object requires newer symbol
     # versions, or the glibc-2.36-only DT_RELR ABI, so a toolchain or
     # dependency bump cannot silently raise the floor.
     && for object in /build/package/openxwa-linux-x86_64/OpenXWA \
+        "/build/package/openxwa-linux-x86_64/OpenXWA Mod Importer" \
         /build/package/openxwa-linux-x86_64/lib/*.so*; do \
         if readelf -V "$object" | grep -q 'GLIBC_ABI_'; then \
             echo "$object requires a GLIBC_ABI_* version (DT_RELR needs glibc 2.36+)" >&2; \

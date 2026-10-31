@@ -1,6 +1,7 @@
 # Shared helpers for the macOS packaging scripts. Sourced by
 # build-package.sh and sign-package.sh after they define the globals used
-# here: application, artifact_dir, dmg, dmg_extras, dmg_volume_name,
+# here: application, importer (the mod importer's bundle, left out of the DMG
+# when it doesn't exist), artifact_dir, dmg, dmg_extras, dmg_volume_name,
 # sign_identity, notary_profile, notary_apple_id, notary_team_id,
 # notary_password, work_root, and optionally dsym_bundle (a debug-symbol
 # bundle packaged beside the application in the DMG).
@@ -41,7 +42,9 @@ resolve_notary_arguments() {
     fi
 }
 
+# Signs the bundle given, after the libraries in it.
 sign_bundle() {
+    local bundle="$1"
     local sign_arguments=(--force --sign "${sign_identity}")
     local item
 
@@ -53,10 +56,10 @@ sign_bundle() {
         if file "${item}" | grep -q "Mach-O"; then
             codesign "${sign_arguments[@]}" "${item}"
         fi
-    done < <(find "${application}/Contents/Frameworks" -type f -print)
+    done < <(find "${bundle}/Contents/Frameworks" -type f -print)
 
-    codesign "${sign_arguments[@]}" "${application}"
-    codesign --verify --deep --strict --verbose=2 "${application}"
+    codesign "${sign_arguments[@]}" "${bundle}"
+    codesign --verify --deep --strict --verbose=2 "${bundle}"
 }
 
 create_dmg() {
@@ -66,6 +69,9 @@ create_dmg() {
     rm -rf "${staging}" "${dmg}"
     mkdir -p "${staging}" "${artifact_dir}"
     ditto "${application}" "${staging}/OpenXWA.app"
+    if [[ -d "${importer}" ]]; then
+        ditto "${importer}" "${staging}/OpenXWA Mod Importer.app"
+    fi
     ln -s /Applications "${staging}/Applications"
 
     if [[ -n "${dsym_bundle}" ]]; then
@@ -104,20 +110,22 @@ create_dmg() {
     fi
 }
 
-# Notarize and staple the application first so a copy dragged out of the disk
-# image validates offline. The DMG built from the stapled application is then
+# Notarize and staple each application first so a copy dragged out of the disk
+# image validates offline. The DMG built from the stapled applications is then
 # submitted and stapled itself; its contents are already known to Apple, so
 # the second submission is quick.
 notarize_application() {
-    local notary_zip="${work_root}/notary/OpenXWA.zip"
+    local bundle="$1"
+    local notary_zip
 
+    notary_zip="${work_root}/notary/$(basename "${bundle}" .app).zip"
     mkdir -p "${work_root}/notary"
     rm -f "${notary_zip}"
-    ditto -c -k --sequesterRsrc --keepParent "${application}" "${notary_zip}"
+    ditto -c -k --sequesterRsrc --keepParent "${bundle}" "${notary_zip}"
     xcrun notarytool submit "${notary_zip}" "${notary_arguments[@]}" --wait
-    xcrun stapler staple "${application}"
-    xcrun stapler validate "${application}"
-    spctl --assess --type execute --verbose=4 "${application}"
+    xcrun stapler staple "${bundle}"
+    xcrun stapler validate "${bundle}"
+    spctl --assess --type execute --verbose=4 "${bundle}"
 }
 
 notarize_dmg() {

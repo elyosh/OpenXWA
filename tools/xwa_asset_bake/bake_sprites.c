@@ -34,28 +34,46 @@
 
 #include "aeron/vfs.h"
 
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>
+#endif
 
 /* ---- small utilities ------------------------------------------------- */
 
+static int make_dir(const char* path) {
+#ifdef _WIN32
+	return _mkdir(path);
+#else
+	return mkdir(path, 0755);
+#endif
+}
+
+static int is_dir(const char* path) {
+	struct stat st;
+	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+/* Creates the folder and its missing parents. Paths can use '/' or '\'. A
+ * folder that already exists, such as a drive root, counts as made. */
 int BakeSprites_MakeDirs(const char* path) {
 	char tmp[1024];
 	snprintf(tmp, sizeof tmp, "%s", path);
 	for (char* p = tmp + 1; *p; p++) {
-		if (*p == '/') {
+		if (*p == '/' || *p == '\\') {
+			const char separator = *p;
 			*p = '\0';
-			if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
+			if (make_dir(tmp) != 0 && !is_dir(tmp)) {
 				return 0;
 			}
-			*p = '/';
+			*p = separator;
 		}
 	}
-	return mkdir(tmp, 0755) == 0 || errno == EEXIST;
+	return make_dir(tmp) == 0 || is_dir(tmp);
 }
 
 static void lower_str(char* s) {

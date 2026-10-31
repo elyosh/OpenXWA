@@ -150,7 +150,7 @@ jobs:
           submodules: recursive
 
       - name: Install build tools
-        run: brew install cmake ninja pkg-config
+        run: brew install cmake ninja pkg-config ispc
 
       - name: Determine runner image version
         id: runner-image

@@ -21,5 +21,9 @@
 !src/
 !src/**
 
+!tools/*.c
+!tools/mod_importer/**
+!tools/xwa_asset_bake/**
+
 .git
 **/.git

@@ -35,6 +35,9 @@ endif()
 
 # Aeron engine (window, GPU HAL, input, audio, VFS) — shared git submodule.
 option(XWA_BUILD_TOOLS "Build OpenXWA and Aeron asset/developer tools" ON)
+# The mod importer is built from the tool libraries, so it needs the tools.
+include(CMakeDependentOption)
+cmake_dependent_option(XWA_BUILD_MOD_IMPORTER "Build the OpenXWA Mod Importer" ON "XWA_BUILD_TOOLS" OFF)
 set(AERON_BUILD_TOOLS ${XWA_BUILD_TOOLS})
 set(AERON_ENABLE_VIDEO ON)
 set(AERON_HOST_TOOLS_ONLY OFF)
@@ -441,6 +444,8 @@ if(APPLE)
         MACOSX_BUNDLE TRUE
         MACOSX_BUNDLE_INFO_PLIST
             "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/Info.plist.in"
+        MACOSX_BUNDLE_BUNDLE_NAME "OpenXWA"
+        MACOSX_BUNDLE_GUI_IDENTIFIER "${XWA_MACOS_BUNDLE_IDENTIFIER}"
         INSTALL_RPATH "@executable_path/../Frameworks"
     )
 
@@ -484,6 +489,7 @@ if(APPLE)
         list(APPEND XWA_MACOS_DEPENDENCY_DIRS "${prefix}/lib")
     endforeach()
     list(JOIN XWA_MACOS_DEPENDENCY_DIRS ";" XWA_MACOS_DEPENDENCY_DIRS)
+    set(XWA_MACOS_FIXUP_BUNDLE "OpenXWA.app")
     configure_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/FixupBundle.cmake.in"
         "${CMAKE_CURRENT_BINARY_DIR}/FixupMacBundle.cmake"
@@ -552,6 +558,11 @@ if(XWA_BUILD_TOOLS)
     add_executable(xwa_asset_bake tools/xwa_asset_bake/xwa_asset_bake.c)
     target_link_libraries(xwa_asset_bake PRIVATE xwa_asset_bake_lib)
 
+    add_executable(imc_decode tools/imc_decode.c)
+    target_link_libraries(imc_decode PRIVATE xwa_core)
+endif()
+
+if(XWA_BUILD_MOD_IMPORTER)
     # The mod importer's engine: it imports an XWA Upgrade installation into
     # a mod folder, in one process.
     add_library(xwa_mod_import_lib STATIC
@@ -578,9 +589,10 @@ if(XWA_BUILD_TOOLS)
     set_target_properties(xwa_mod_import PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
-    # The importer's window. It sits beside OpenXWA, with its own copy of
-    # the resources, and uses the shaders that Aeron compiles into the build
-    # folder.
+    # The importer's window. It needs Aeron's shaders and the fonts in
+    # resources/assets/fonts. On macOS it is a second bundle with its own
+    # copy of both. Elsewhere it sits beside OpenXWA, uses the same shaders
+    # folder and has its own copy of the resources.
     add_executable(xwa_mod_importer
         tools/mod_importer/app/main.c
         tools/mod_importer/app/ui.c
@@ -589,19 +601,52 @@ if(XWA_BUILD_TOOLS)
     set_target_properties(xwa_mod_importer PROPERTIES
         OUTPUT_NAME "OpenXWA Mod Importer"
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-    if(WIN32)
-        set_target_properties(xwa_mod_importer PROPERTIES WIN32_EXECUTABLE TRUE)
+    if(APPLE)
+        set_target_properties(xwa_mod_importer PROPERTIES
+            MACOSX_BUNDLE TRUE
+            MACOSX_BUNDLE_INFO_PLIST
+                "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/Info.plist.in"
+            MACOSX_BUNDLE_BUNDLE_NAME "OpenXWA Mod Importer"
+            MACOSX_BUNDLE_GUI_IDENTIFIER "${XWA_MACOS_BUNDLE_IDENTIFIER}.modimporter"
+            INSTALL_RPATH "@executable_path/../Frameworks"
+        )
+        target_sources(xwa_mod_importer PRIVATE "${XWA_MACOS_ICON}")
+
+        set(XWA_MOD_IMPORTER_FONTS
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/DejaVu-LICENSE.txt"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/DejaVuSans.ttf"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/Inconsolata-Bold.ttf"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/Inconsolata-OFL.txt"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.fnt"
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.png")
+        target_sources(xwa_mod_importer PRIVATE ${XWA_MOD_IMPORTER_FONTS})
+        set_source_files_properties(${XWA_MOD_IMPORTER_FONTS} PROPERTIES
+            HEADER_FILE_ONLY TRUE
+            MACOSX_PACKAGE_LOCATION Resources/resources/assets/fonts)
+
+        # Only Aeron's shaders: the game's own aren't used here. Their
+        # bundle location is set with the game's.
+        target_sources(xwa_mod_importer PRIVATE ${AERON_SHADER_OUTPUTS})
+
+        install(TARGETS xwa_mod_importer BUNDLE DESTINATION .)
+        set(XWA_MACOS_FIXUP_BUNDLE "OpenXWA Mod Importer.app")
+        configure_file(
+            "${CMAKE_CURRENT_SOURCE_DIR}/cmake/macos/FixupBundle.cmake.in"
+            "${CMAKE_CURRENT_BINARY_DIR}/FixupMacImporterBundle.cmake"
+            @ONLY
+        )
+        install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/FixupMacImporterBundle.cmake")
+    else()
+        if(WIN32)
+            set_target_properties(xwa_mod_importer PROPERTIES WIN32_EXECUTABLE TRUE)
+        endif()
+        add_custom_command(TARGET xwa_mod_importer POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                ${CMAKE_CURRENT_SOURCE_DIR}/resources
+                $<TARGET_FILE_DIR:xwa_mod_importer>/resources
+            COMMENT "Staging the mod importer's resources"
+        )
     endif()
-    add_custom_command(TARGET xwa_mod_importer POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${CMAKE_CURRENT_SOURCE_DIR}/resources
-            $<TARGET_FILE_DIR:xwa_mod_importer>/resources
-        COMMENT "Staging the mod importer's resources"
-    )
-
-    add_executable(imc_decode tools/imc_decode.c)
-    target_link_libraries(imc_decode PRIVATE xwa_core)
-
 endif()
 
 # Replacement-model simulation data must be bit-identical across compilers.
@@ -628,6 +673,15 @@ if(XWA_BUILD_TOOLS)
     if(MSVC)
         target_compile_options(mission_dump PRIVATE /W4)
         target_compile_options(imc_decode PRIVATE /W4)
+    else()
+        target_compile_options(mission_dump PRIVATE
+            -Wall -Wextra -Wpedantic -Wno-deprecated-declarations -fno-common)
+        target_compile_options(imc_decode PRIVATE
+            -Wall -Wextra -Wpedantic -Wno-deprecated-declarations -fno-common)
+    endif()
+endif()
+if(XWA_BUILD_MOD_IMPORTER)
+    if(MSVC)
         target_compile_options(xwa_mod_import_lib PRIVATE /W4)
         target_compile_options(xwa_mod_import PRIVATE /W4)
         target_compile_options(xwa_mod_importer PRIVATE /W4)
@@ -635,10 +689,6 @@ if(XWA_BUILD_TOOLS)
         target_compile_options(xwa_mod_import_lib PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(xwa_mod_import PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(xwa_mod_importer PRIVATE -Wall -Wextra -Wpedantic)
-        target_compile_options(mission_dump PRIVATE
-            -Wall -Wextra -Wpedantic -Wno-deprecated-declarations -fno-common)
-        target_compile_options(imc_decode PRIVATE
-            -Wall -Wextra -Wpedantic -Wno-deprecated-declarations -fno-common)
     endif()
 endif()
 

@@ -1,7 +1,7 @@
-set(bundle "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/OpenXWA.app")
+set(bundle "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/@XWA_MACOS_FIXUP_BUNDLE@")
 
 if(NOT IS_DIRECTORY "${bundle}")
-    message(FATAL_ERROR "OpenXWA application bundle was not installed: ${bundle}")
+    message(FATAL_ERROR "The application bundle was not installed: ${bundle}")
 endif()
 
 include(BundleUtilities)

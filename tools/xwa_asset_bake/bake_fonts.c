@@ -24,34 +24,18 @@
  */
 
 #include "bake_fonts.h"
+#include "bake_sprites.h"
 
 #include "font_atlas.h"
 #include "tool_log.h"
 #include "xwa_2d.h"
 
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
-#include <sys/stat.h>
 
 /* ---- pass -------------------------------------------------------------- */
-
-static int mkdir_p2(const char* path) {
-	char tmp[1024];
-	snprintf(tmp, sizeof tmp, "%s", path);
-	for (char* p = tmp + 1; *p; p++) {
-		if (*p == '/') {
-			*p = '\0';
-			if (mkdir(tmp, 0755) != 0 && errno != EEXIST) {
-				return 0;
-			}
-			*p = '/';
-		}
-	}
-	return mkdir(tmp, 0755) == 0 || errno == EEXIST;
-}
 
 static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_size) {
 	char source_path[64];
@@ -126,7 +110,7 @@ static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_s
 
 	char dir[1024];
 	snprintf(dir, sizeof dir, "%s/frontend/fonts", opt->out_root);
-	mkdir_p2(dir);
+	BakeSprites_MakeDirs(dir);
 	char basename[1100];
 	snprintf(basename, sizeof basename, "%s/font%d", dir, point_size);
 	char err[256];

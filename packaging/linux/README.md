@@ -1,9 +1,11 @@
 # Linux build
 
 This Docker build produces a relocatable OpenXWA package containing the
-executable, application resources, private shared libraries, and Vulkan SPIR-V
-shaders. SDL3, zstd, FFmpeg, and SDL_shadercross are downloaded and built
-inside Docker; they are not required on the host.
+OpenXWA and OpenXWA Mod Importer executables, application resources, private
+shared libraries, and Vulkan SPIR-V shaders. SDL3, zstd, FFmpeg, and
+SDL_shadercross are downloaded and built inside Docker; they are not required
+on the host. The ISPC release, which compiles the importer's BC6H encoder, is
+downloaded too.
 
 The package requires glibc 2.35 and the GCC 12 runtime or newer on the host
 (Ubuntu 22.04 era). It uses the Linux host's Vulkan driver, window system,
@@ -70,6 +72,13 @@ cd openxwa-0.0.0-dev-linux-x86_64-release
 ./OpenXWA
 ```
 
+The mod importer imports a modded X-Wing Alliance installation into an
+OpenXWA mod folder, and chooses the mod that OpenXWA uses. Run it with:
+
+```sh
+./"OpenXWA Mod Importer"
+```
+
 The executable and bundled libraries use relative RPATHs, so the extracted
 directory can be moved as a unit. On first launch, the game asks for the
 original game-data directory and remembers the validated selection. Packaged
@@ -85,7 +94,7 @@ the Dockerfile. Override a pin explicitly when testing an update:
 docker buildx build \
   --platform linux/amd64 \
   --file packaging/linux/Dockerfile \
-  --build-arg SDL_VERSION=3.4.0 \
+  --build-arg SDL_VERSION=3.4.18 \
   --target artifact \
   --output type=local,dest=build/artifacts \
   .
