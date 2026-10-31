@@ -34,11 +34,12 @@
 #define MOD_YAML_HEADER "# Made by the OpenXWA mod importer."
 #define LIBRARY_TAG "[aeron_gltf_cook] library"
 
-/* How much of the overall progress each phase takes, in percent. */
+/* How much of the overall progress each phase takes, in percent: the share
+ * of each phase in the times of TFTC-R and XWAU2025 imports. */
 static const int kPhaseWeights[XWA_MOD_IMPORT_PHASE_COUNT] = {
-	[XWA_MOD_IMPORT_MODELS] = 70,  [XWA_MOD_IMPORT_EFFECTS] = 5,   [XWA_MOD_IMPORT_CRAFT] = 2,
-	[XWA_MOD_IMPORT_MISSIONS] = 3, [XWA_MOD_IMPORT_SKYBOXES] = 10, [XWA_MOD_IMPORT_FRONTEND] = 5,
-	[XWA_MOD_IMPORT_FLIGHT] = 3,   [XWA_MOD_IMPORT_COPIES] = 2,
+	[XWA_MOD_IMPORT_MODELS] = 19,  [XWA_MOD_IMPORT_EFFECTS] = 20,  [XWA_MOD_IMPORT_CRAFT] = 1,
+	[XWA_MOD_IMPORT_MISSIONS] = 1, [XWA_MOD_IMPORT_SKYBOXES] = 21, [XWA_MOD_IMPORT_FRONTEND] = 10,
+	[XWA_MOD_IMPORT_FLIGHT] = 27,  [XWA_MOD_IMPORT_COPIES] = 1,
 };
 
 static const char* const kPhaseNames[XWA_MOD_IMPORT_PHASE_COUNT] = {

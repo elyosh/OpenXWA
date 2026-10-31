@@ -10,6 +10,7 @@
 #include "import_internal.h"
 #include "ktx2_writer.h"
 #include "model_conversion.h"
+#include "opt_gltf_write.h"
 
 static int compare_keys(const void* a, const void* b) {
 	return strcmp(((const ImportModel*)a)->key, ((const ImportModel*)b)->key);
@@ -213,37 +214,66 @@ static bool place_authoring(Pool* pool, ImportModel* model, char* gltf, char* pr
 	return true;
 }
 
+/* AeronGltfCookUriImageSource over a converted document. */
+static bool document_image(void* context, const char* uri, AeronGltfCookImageView* out) {
+	OptGltfImageView view;
+	if (!OptGltf_ImageViewByUri((const OptGltfDocument*)context, uri, &view))
+		return false;
+	out->rgba = view.rgba;
+	out->width = (int)view.width;
+	out->height = (int)view.height;
+	return true;
+}
+
+/* Converts the model in memory, writes its .gltf to `kept` for the effect
+ * libraries and the material check, and cooks it into `glb`. */
+static bool import_in_memory(Pool* pool, ImportModel* model, const char* kept, const char* glb) {
+	ModelConversionModel* built = NULL;
+	if (!ModelConversion_Build(&pool->conversion, model->opt, model->base, &built)) {
+		fail(pool->ctx, model, "conversion failed");
+		return false;
+	}
+	const OptGltfDocument* document = ModelConversion_Document(built);
+	const cgltf_data* data = OptGltf_Data((OptGltfDocument*)document);
+	size_t json_size = 0;
+	char* json = OptGltf_Json(document, &json_size);
+	bool cooked = false;
+	if (!json || !WriteWholeFile(kept, json, json_size))
+		fail(pool->ctx, model, "can't write its .gltf");
+	else {
+		const AeronGltfCookInput input = {
+			.json = json,
+			.json_size = json_size,
+			.label = kept,
+			.bin = data->buffers_count ? data->buffers[0].data : NULL,
+			.bin_size = data->buffers_count ? data->buffers[0].size : 0,
+			.images = document_image,
+			.images_context = (void*)document,
+		};
+		if (!(cooked = aeron_gltf_cook_model_input(&input, glb, &pool->cook, NULL)))
+			fail(pool->ctx, model, "cook failed");
+	}
+	free(json);
+	ModelConversion_FreeModel(built);
+	return cooked;
+}
+
 static void import_model(Pool* pool, ImportModel* model) {
 	ImportContext* ctx = pool->ctx;
 	const uint64_t start = Aeron_NowUs();
-	char gltf[IMPORT_PATH_CAP], glb[IMPORT_PATH_CAP], dir[IMPORT_PATH_CAP], kept[IMPORT_PATH_CAP];
-	char probes[IMPORT_PATH_CAP] = "";
+	char gltf[IMPORT_PATH_CAP], glb[IMPORT_PATH_CAP], probes[IMPORT_PATH_CAP] = "";
 	if (!PathFormat(glb, sizeof glb, "%s/%s.glb", pool->glb_dir, model->key) ||
-		!PathFormat(dir, sizeof dir, "%s/models/%s", ctx->work, model->key) ||
-		!PathFormat(kept, sizeof kept, "%s/gltf/%s.gltf", ctx->work, model->key)) {
+		(!pool->authoring && !PathFormat(gltf, sizeof gltf, "%s/gltf/%s.gltf", ctx->work, model->key))) {
 		fail(ctx, model, "path too long");
 		return;
 	}
 	if (pool->authoring) {
 		if (!place_authoring(pool, model, gltf, probes))
 			return;
-	} else if (!convert(pool, model, dir) || !PathFormat(gltf, sizeof gltf, "%s/%s.gltf", dir, model->key)) {
-		RemoveTree(dir);
-		return;
-	}
-	model->cooked = aeron_gltf_cook_model(gltf, glb, &pool->cook, probes[0] ? probes : NULL);
-	if (!model->cooked)
-		fail(ctx, model, "cook failed");
-	/* Without an authoring folder, only the .gltf is kept, for the effect
-	 * libraries and the material check. */
-	if (!pool->authoring) {
-		if (model->cooked && !Import_Rename(gltf, kept)) {
-			fail(ctx, model, "can't keep its .gltf");
-			model->cooked = false;
-		}
-		RemoveTree(dir);
-		snprintf(gltf, sizeof gltf, "%s", kept);
-	}
+		if (!(model->cooked = aeron_gltf_cook_model(gltf, glb, &pool->cook, probes[0] ? probes : NULL)))
+			fail(ctx, model, "cook failed");
+	} else
+		model->cooked = import_in_memory(pool, model, gltf, glb);
 	if (model->cooked && !(model->gltf = StrDup(gltf))) {
 		fail(ctx, model, "out of memory");
 		model->cooked = false;
@@ -293,11 +323,10 @@ bool ImportModels_Run(ImportContext* ctx, ImportModel* models, size_t count,
 	}
 	qsort(pool->order, count, sizeof *pool->order, compare_sizes);
 
-	char gltf_dir[IMPORT_PATH_CAP], models_dir[IMPORT_PATH_CAP];
+	char gltf_dir[IMPORT_PATH_CAP];
 	bool ok = PathFormat(pool->glb_dir, sizeof pool->glb_dir, "%s/flight/models", ctx->options->mod) &&
-			  PathFormat(gltf_dir, sizeof gltf_dir, "%s/gltf", ctx->work) &&
-			  PathFormat(models_dir, sizeof models_dir, "%s/models", ctx->work) && MakeDirs(pool->glb_dir) &&
-			  MakeDirs(gltf_dir) && MakeDirs(models_dir);
+			  PathFormat(gltf_dir, sizeof gltf_dir, "%s/gltf", ctx->work) && MakeDirs(pool->glb_dir) &&
+			  MakeDirs(gltf_dir);
 	if (!ok)
 		Import_Failed(ctx, "Can't create %s", pool->glb_dir);
 	SetReportProgram("opt2gltf");
