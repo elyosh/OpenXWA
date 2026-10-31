@@ -160,11 +160,11 @@ int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normal
 	const char* missing = NULL;
 
 	if (!vfs || !candidate || !candidate[0] || !normalized || strlen(candidate) >= normalized_capacity) {
-		return setup_error(error, error_size, "invalid game-data directory: %s", candidate);
+		return setup_error(error, error_size, "It can't be used: %s", candidate);
 	}
 	if (!AeronVfs_SetRoot(vfs, AERON_VFS_ROOT_ASSET, candidate) ||
 		!AeronVfs_SetRootOptions(vfs, AERON_VFS_ROOT_ASSET, AERON_VFS_ROOT_OPTION_CASE_INSENSITIVE_LOOKUP)) {
-		return setup_error(error, error_size, "could not use game-data directory: %s", candidate);
+		return setup_error(error, error_size, "It can't be used: %s", candidate);
 	}
 	if (setup_check_required_files(vfs, &missing)) {
 		snprintf(normalized, normalized_capacity, "%s", candidate);
@@ -175,12 +175,12 @@ int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normal
 	   merged into the root. Detect it so the failure explains the fix. */
 	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_ASSET, "ALLIANCE/RESDATA.TXT")) {
 		return setup_error(error, error_size,
-						   "this looks like an unmerged CD copy: copy the contents of its ALLIANCE "
-						   "directory into the selected folder (missing '%s')",
+						   "It looks like a copy of the CDs. Copy what is in its ALLIANCE folder into it. "
+						   "It has no %s.",
 						   missing);
 	}
 
-	return setup_error(error, error_size, "selected directory is missing '%s'", missing);
+	return setup_error(error, error_size, "It has no %s.", missing);
 }
 
 int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaHostConfig* host_config,

@@ -126,7 +126,8 @@ static void check_source(ImporterUi* app) {
 	char error[256];
 	app->source_ok = 0;
 	if (!app->source[0]) {
-		snprintf(app->source_message, sizeof app->source_message, "Choose the folder of the installation.");
+		snprintf(app->source_message, sizeof app->source_message,
+				 "Choose the folder where XWAU or TFTC is installed.");
 		return;
 	}
 	if (!XwaModImport_Detect(app->source, &install, error, sizeof error)) {
@@ -134,7 +135,7 @@ static void check_source(ImporterUi* app) {
 		return;
 	}
 	app->source_ok = 1;
-	snprintf(app->source_message, sizeof app->source_message, "%s - %zu models", install.name,
+	snprintf(app->source_message, sizeof app->source_message, "Found %s, with %zu models.", install.name,
 			 install.models);
 	if (!app->name_edited)
 		snprintf(app->name, sizeof app->name, "%s", install.name);
@@ -144,12 +145,13 @@ static void check_game(ImporterUi* app) {
 	char normalized[PATH_CAP], error[512], exe[PATH_CAP];
 	app->game_ok = 0;
 	if (!app->game[0]) {
-		snprintf(app->game_message, sizeof app->game_message, "Choose the original game's data folder.");
+		snprintf(app->game_message, sizeof app->game_message, "Choose your original X-Wing Alliance folder.");
 		return;
 	}
 	if (!XwaSetup_ValidateGameData(Aeron_GetVfs(), app->game, normalized, sizeof normalized, error,
 								   sizeof error)) {
-		snprintf(app->game_message, sizeof app->game_message, "%s", error);
+		snprintf(app->game_message, sizeof app->game_message,
+				 "This isn't a complete X-Wing Alliance folder. %s", error);
 		return;
 	}
 	if (!XwaModImport_FindGameExe(app->game, exe, sizeof exe)) {
@@ -330,9 +332,11 @@ static void draw_form(ImporterUi* app) {
 	AeronUiContext* ui = app->ui;
 	if (app->config_message[0])
 		AeronUi_Error(ui, app->config_message);
-	AeronUi_Header(ui, "Installation");
-	AeronUi_Help(ui, "An X-Wing Alliance Upgrade installation, such as XWAU or a TFTC release.");
-	if (path_row(app, "Installation", BROWSE_SOURCE, "Choose the XWA Upgrade installation"))
+	AeronUi_Header(ui, "Installations");
+	AeronUi_Help(ui,
+				 "The XWAU or TFTC installation to import, and your original X-Wing Alliance. They must be "
+				 "two different folders.");
+	if (path_row(app, "XWAU or TFTC", BROWSE_SOURCE, "Choose the XWAU or TFTC installation"))
 		app->checked = 0;
 	if (app->source_ok)
 		AeronUi_Label(ui, app->source_message);
@@ -340,12 +344,14 @@ static void draw_form(ImporterUi* app) {
 		AeronUi_Help(ui, app->source_message);
 	else
 		AeronUi_Error(ui, app->source_message);
-	if (path_row(app, "Original game", BROWSE_GAME, "Choose the original X-Wing Alliance game folder"))
+	if (path_row(app, "Original game", BROWSE_GAME, "Choose the original X-Wing Alliance folder"))
 		app->checked = 0;
 	if (!app->game[0])
 		AeronUi_Help(ui, app->game_message);
 	else if (app->game_message[0])
 		AeronUi_Error(ui, app->game_message);
+	else if (app->config_ok)
+		AeronUi_Help(ui, "OpenXWA uses this folder too.");
 
 	AeronUi_Spacer(ui, 8.0f);
 	AeronUi_Header(ui, "Mod");
@@ -357,11 +363,14 @@ static void draw_form(ImporterUi* app) {
 		app->mod_edited = 1;
 		app->checked = 0;
 	}
+	AeronUi_Help(ui,
+				 "The importer writes the mod here. OpenXWA finds mods in the mods folder of the original "
+				 "game.");
 	if (AeronUi_Toggle(ui, "Keep authoring files", &app->keep_authoring))
 		app->checked = 0;
 	AeronUi_Help(ui,
-				 "Keeps the glTF models and the effect images, for editing in Blender. Needs about as much "
-				 "space again as the mod.");
+				 "For modders. Also saves the models as glTF files, and the effect images, so you can edit "
+				 "them in Blender. This needs about as much disk space as the mod itself.");
 	if (app->keep_authoring &&
 		path_row(app, "Authoring folder", BROWSE_AUTHORING, "Choose the authoring folder")) {
 		app->authoring_edited = 1;
@@ -426,9 +435,9 @@ static void draw_done(ImporterUi* app) {
 	AeronUiContext* ui = app->ui;
 	static const char* const results[] = {
 		[XWA_MOD_IMPORT_OK] = "The import finished.",
-		[XWA_MOD_IMPORT_FAILURES] = "The import finished, but some items failed.",
+		[XWA_MOD_IMPORT_FAILURES] = "The import finished, but some parts couldn't be imported.",
 		[XWA_MOD_IMPORT_CANCELLED] = "The import was cancelled.",
-		[XWA_MOD_IMPORT_STOPPED] = "The import stopped.",
+		[XWA_MOD_IMPORT_STOPPED] = "The import stopped because of an error.",
 	};
 	char line[PATH_CAP + 64], time[64];
 	AeronUi_Header(ui, results[app->result]);
@@ -438,6 +447,9 @@ static void draw_done(ImporterUi* app) {
 	AeronUi_Label(ui, line);
 	snprintf(line, sizeof line, "Mod folder: %s", app->mod);
 	AeronUi_Label(ui, line);
+	const int usable = app->result == XWA_MOD_IMPORT_OK || app->result == XWA_MOD_IMPORT_FAILURES;
+	if (!usable)
+		AeronUi_Help(ui, "The mod can't be used. Import it again into the same folder to finish it.");
 	AeronUi_Help(ui, "The full log is in import.log in the mod folder.");
 
 	AeronUi_BeginColumns(ui, 2, (const float[]) { -480.0f, 1.0f });
@@ -454,6 +466,7 @@ static void draw_done(ImporterUi* app) {
 
 	if (app->progress.failed_count) {
 		AeronUi_Header(ui, "Failures");
+		AeronUi_Help(ui, "These parts are missing from the mod. The log has the details.");
 		const size_t count = app->progress.failed_count < LOG_LINES ? app->progress.failed_count : LOG_LINES;
 		for (size_t i = 0; i < count; ++i)
 			app->items[i] = (AeronUiListItem) { .id = i, .label = app->progress.failed[i] };
@@ -466,7 +479,6 @@ static void draw_done(ImporterUi* app) {
 	AeronUi_Spacer(ui, fmaxf(0.0f, AeronUi_AvailableHeight(ui) - BUTTON_ROWS_REF));
 	AeronUi_Separator(ui);
 	AeronUi_BeginColumns(ui, 3, NULL);
-	const int usable = app->result == XWA_MOD_IMPORT_OK || app->result == XWA_MOD_IMPORT_FAILURES;
 	if (AeronUi_ButtonEnabled(ui, "Use This Mod in OpenXWA", usable && app->config_ok))
 		use_mod(app, app->mod, app->done_message, sizeof app->done_message);
 	AeronUi_NextColumn(ui);
@@ -490,7 +502,7 @@ static void scan_mods(ImporterUi* app) {
 	app->mod_in_use = SIZE_MAX;
 	app->mods_scanned = 1;
 	if (!XwaModList_Scan(app->config.game_data_path, app->config.mod_path, &app->mods)) {
-		snprintf(app->mods_message, sizeof app->mods_message, "The mods can't be listed.");
+		snprintf(app->mods_message, sizeof app->mods_message, "The mods can't be listed. Try Refresh.");
 		return;
 	}
 	app->mod_labels = calloc(app->mods.count, sizeof *app->mod_labels);
@@ -511,7 +523,7 @@ static void scan_mods(ImporterUi* app) {
 		if (in_use)
 			app->mod_in_use = i;
 		snprintf(app->mod_labels[i], sizeof app->mod_labels[i], "%s%s%s", entry->name,
-				 entry->complete ? "" : " (incomplete)", in_use ? " (in use)" : "");
+				 entry->complete ? "" : " (import not finished)", in_use ? " (in use)" : "");
 		app->mod_items[i] = (AeronUiListItem) {
 			.id = i,
 			.label = app->mod_labels[i],
@@ -529,7 +541,9 @@ static void draw_mods(ImporterUi* app) {
 		scan_mods(app);
 	if (app->config_message[0])
 		AeronUi_Error(ui, app->config_message);
-	AeronUi_Help(ui, "The mod that OpenXWA uses. A change takes effect the next time OpenXWA starts.");
+	AeronUi_Help(ui,
+				 "Choose the mod that OpenXWA uses. The change takes effect the next time OpenXWA starts. "
+				 "OpenXWA finds mods in the mods folder of the original game.");
 	AeronUi_ListBox(ui, "Mods", app->mod_items, app->mod_items ? app->mods.count : 0, &app->mod_selected,
 					fmaxf(120.0f, AeronUi_AvailableHeight(ui) - BUTTON_ROWS_REF - 60.0f));
 	if (app->mods_message[0])
@@ -557,7 +571,8 @@ static void draw_modals(ImporterUi* app) {
 	const AeronUiWindowDesc desc = { .width_ref = 900.0f, .centered = 1 };
 	char text[PATH_CAP + 128];
 	if (app->replace_open && AeronUi_BeginModal(ui, "Replace the Mod", &app->replace_open, &desc)) {
-		snprintf(text, sizeof text, "%s has a mod made by the importer. Importing deletes it first.",
+		snprintf(text, sizeof text,
+				 "%s already has a mod made by the importer. Importing again deletes it and makes a new one.",
 				 app->mod);
 		AeronUi_Help(ui, text);
 		AeronUi_BeginColumns(ui, 2, NULL);
@@ -572,7 +587,7 @@ static void draw_modals(ImporterUi* app) {
 		AeronUi_EndModal(ui);
 	}
 	if (app->cancel_open && AeronUi_BeginModal(ui, "Cancel the Import", &app->cancel_open, &desc)) {
-		AeronUi_Help(ui, "The mod folder is left incomplete. Importing into it again replaces it.");
+		AeronUi_Help(ui, "The mod can't be used until it is imported again into the same folder.");
 		AeronUi_BeginColumns(ui, 2, NULL);
 		if (AeronUi_Button(ui, "Keep Importing"))
 			app->cancel_open = 0;
@@ -585,7 +600,8 @@ static void draw_modals(ImporterUi* app) {
 		AeronUi_EndModal(ui);
 	}
 	if (app->quit_open && AeronUi_BeginModal(ui, "Quit", &app->quit_open, &desc)) {
-		AeronUi_Help(ui, "An import is running. Quitting stops it and leaves the mod folder incomplete.");
+		AeronUi_Help(ui, "An import is running. If you quit, it stops, and the mod can't be used until it is "
+						 "imported again.");
 		AeronUi_BeginColumns(ui, 2, NULL);
 		if (AeronUi_Button(ui, "Keep Importing"))
 			app->quit_open = 0;
@@ -659,14 +675,16 @@ ImporterUi* ImporterUi_Create(char* error, size_t error_capacity) {
 	}
 	AeronCommandBuffer* command = Aeron_AcquireCommandBuffer();
 	if (!command) {
-		snprintf(error, error_capacity, "The font can't be uploaded.");
+		snprintf(error, error_capacity, "The window can't be set up.");
 		free(app);
 		return NULL;
 	}
 	if (!AeronFontAtlas_LoadVfs(&app->font, command, Aeron_GetVfs(), AERON_VFS_ROOT_RESOURCE,
 								"assets/fonts/menu", 64u * 1024u * 1024u)) {
 		Aeron_CancelCommandBuffer(command);
-		snprintf(error, error_capacity, "The font assets/fonts/menu.{fnt,png} is missing from %s.",
+		snprintf(error, error_capacity,
+				 "The importer's font, assets/fonts/menu.fnt and menu.png, is missing from %s. Reinstall "
+				 "OpenXWA.",
 				 Aeron_ResourceRoot());
 		free(app);
 		return NULL;

@@ -45,13 +45,13 @@ static const int kPhaseWeights[XWA_MOD_IMPORT_PHASE_COUNT] = {
 static const char* const kPhaseNames[XWA_MOD_IMPORT_PHASE_COUNT] = {
 	[XWA_MOD_IMPORT_PREPARE] = "Preparing",
 	[XWA_MOD_IMPORT_MODELS] = "Converting models",
-	[XWA_MOD_IMPORT_EFFECTS] = "Building effect libraries",
+	[XWA_MOD_IMPORT_EFFECTS] = "Converting effects",
 	[XWA_MOD_IMPORT_CRAFT] = "Importing craft settings",
 	[XWA_MOD_IMPORT_MISSIONS] = "Importing missions",
-	[XWA_MOD_IMPORT_SKYBOXES] = "Baking skyboxes",
+	[XWA_MOD_IMPORT_SKYBOXES] = "Converting skyboxes",
 	[XWA_MOD_IMPORT_HANGARS] = "Importing hangars",
-	[XWA_MOD_IMPORT_FRONTEND] = "Baking frontend art",
-	[XWA_MOD_IMPORT_FLIGHT] = "Baking flight art",
+	[XWA_MOD_IMPORT_FRONTEND] = "Converting menu art",
+	[XWA_MOD_IMPORT_FLIGHT] = "Converting flight art",
 	[XWA_MOD_IMPORT_COPIES] = "Copying files",
 	[XWA_MOD_IMPORT_FINISH] = "Finishing",
 };
@@ -226,7 +226,9 @@ bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* er
 	if (!Import_FindNoCase(source, "XWINGALLIANCE.EXE", false, path, sizeof path) || !info->models ||
 		(!Import_FindNoCase(source, "Hooks.ini", false, path, sizeof path) &&
 		 !Import_FindNoCase(source, "XWAUVersion.txt", false, path, sizeof path))) {
-		snprintf(error, error_cap, "This is not an XWA Upgrade installation.");
+		snprintf(error, error_cap,
+				 "This isn't an XWAU or TFTC installation. Choose the folder that has XWINGALLIANCE.EXE and "
+				 "the FlightModels folder.");
 		return false;
 	}
 	if (!read_line(source, "TFTCVersion.txt", 1, info->name, sizeof info->name) &&
@@ -301,7 +303,7 @@ XwaModImportCheck XwaModImport_Check(const XwaModImportOptions* options, char* e
 	}
 	if (!options->game || !IsDir(options->game) ||
 		!Import_FindNoCase(options->game, "FlightModels", true, path, sizeof path)) {
-		snprintf(error, error_cap, "Original game: this isn't the game's data folder.");
+		snprintf(error, error_cap, "Original game: this isn't an X-Wing Alliance folder.");
 		return XWA_MOD_IMPORT_CHECK_INVALID;
 	}
 	if (options->game_exe ? !IsFile(options->game_exe)
@@ -311,20 +313,22 @@ XwaModImportCheck XwaModImport_Check(const XwaModImportOptions* options, char* e
 	}
 	if (!options->resources || !PathFormat(path, sizeof path, "%s/assets/fonts", options->resources) ||
 		!IsDir(path)) {
-		snprintf(error, error_cap, "OpenXWA's resource folder has no assets/fonts folder.");
+		snprintf(error, error_cap,
+				 "The importer's resources/assets/fonts folder is missing. Reinstall OpenXWA.");
 		return XWA_MOD_IMPORT_CHECK_INVALID;
 	}
 	if (!options->mod || !options->mod[0]) {
-		snprintf(error, error_cap, "Mod folder: choose a folder.");
+		snprintf(error, error_cap, "Choose a mod folder.");
 		return XWA_MOD_IMPORT_CHECK_INVALID;
 	}
 	if (options->authoring &&
 		(inside(options->authoring, options->mod) || inside(options->mod, options->authoring))) {
-		snprintf(error, error_cap, "The authoring folder and the mod folder can't be inside each other.");
+		snprintf(error, error_cap,
+				 "The authoring folder and the mod folder must be separate: one can't be inside the other.");
 		return XWA_MOD_IMPORT_CHECK_INVALID;
 	}
 	if (IsFile(options->mod)) {
-		snprintf(error, error_cap, "Mod folder: this is a file.");
+		snprintf(error, error_cap, "The mod folder is a file. Choose a folder.");
 		return XWA_MOD_IMPORT_CHECK_INVALID;
 	}
 	switch (folder_state(options->mod)) {
@@ -334,12 +338,14 @@ XwaModImportCheck XwaModImport_Check(const XwaModImportOptions* options, char* e
 			if (options->replace)
 				return XWA_MOD_IMPORT_CHECK_OK;
 			snprintf(error, error_cap,
-					 "This folder has a mod made by the mod importer. Importing replaces it.");
+					 "The mod folder has a mod made by the importer. Importing replaces it.");
 			return XWA_MOD_IMPORT_CHECK_REPLACE;
 		case FOLDER_OTHER:
 			break;
 	}
-	snprintf(error, error_cap, "This folder isn't empty and wasn't made by the mod importer.");
+	snprintf(error, error_cap,
+			 "The mod folder has other files in it. Choose an empty folder, or one with a mod that the "
+			 "importer made.");
 	return XWA_MOD_IMPORT_CHECK_INVALID;
 }
 
