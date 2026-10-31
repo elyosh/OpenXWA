@@ -109,14 +109,16 @@ static int persist_mod_choice(const char* path, char* error, size_t error_size) 
 /* Gives the options the mods and the one in use. A mod from --mod is listed
  * too, so it shows as the one in use. */
 static void configure_mods(const XwaLaunchOptions* launch, const XwaHostConfig* host_config,
-						   const char* game_data, const char* selected_mod) {
+						   const char* selected_mod) {
 	XwaModList list;
 	XwaModernModEntry* entries;
 	const char* configured = launch->mod_path[0] ? selected_mod : host_config->mod_path;
+	char mods_folder[XWA_HOST_CONFIG_PATH_CAPACITY] = "";
 	size_t running = SIZE_MAX;
 
 	snprintf(s_configured_mod, sizeof s_configured_mod, "%s", host_config->mod_path);
-	if (!XwaModList_Scan(game_data, configured, &list)) {
+	XwaModList_Folder(host_config->mods_path, mods_folder, sizeof mods_folder);
+	if (!XwaModList_Scan(mods_folder, configured, &list)) {
 		Aeron_LogError("xwa.config", "the mods can't be listed");
 		return;
 	}
@@ -410,7 +412,7 @@ int main(int argc, char** argv) {
 	} else {
 		Aeron_LogInfo("xwa.config", "mod: %s (not found, original assets only)", selected_mod);
 	}
-	configure_mods(&launch, &host_config, selected_game_data, selected_mod);
+	configure_mods(&launch, &host_config, selected_mod);
 	Aeron_LogInfo("xwa.config", "resources: %s", Aeron_ResourceRoot());
 	Aeron_LogInfo("xwa.config", "flight simulation step: %d ticks", host_config.flight_simulation_step_ticks);
 	Aeron_LogInfo("xwa.config", "OPT smoothing angle: %.3g degrees",

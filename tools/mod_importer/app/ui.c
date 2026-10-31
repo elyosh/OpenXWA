@@ -34,7 +34,7 @@ typedef enum Screen {
 typedef enum Browse {
 	BROWSE_SOURCE,
 	BROWSE_GAME,
-	BROWSE_MOD,
+	BROWSE_MODS,
 	BROWSE_AUTHORING,
 } Browse;
 
@@ -44,16 +44,22 @@ struct ImporterUi {
 	int tab;
 	Screen screen;
 
-	/* The form. The mod folder follows the name, and the authoring folder
-	   the mod folder, until the user edits them. */
+	/* The form. The mod goes in <mods folder>/<name>. The name follows the
+	   installation, and the authoring folder the mod folder, until the user
+	   edits them. */
 	char source[PATH_CAP];
 	char game[PATH_CAP];
 	char name[256];
+	char mods_folder[PATH_CAP];
 	char mod[PATH_CAP];
 	char authoring[PATH_CAP];
 	char resources[PATH_CAP];
 	int keep_authoring;
-	int name_edited, mod_edited, authoring_edited;
+	int name_edited, authoring_edited;
+	/* The mods folder that OpenXWA lists, and whether it has mods that the
+	   form's other mods folder would leave out of the list. */
+	char saved_mods_folder[PATH_CAP];
+	int mods_left_behind;
 	int checked; /* the fields were checked since they last changed */
 	int source_ok, game_ok;
 	XwaModImportCheck check;
@@ -99,12 +105,27 @@ struct ImporterUi {
 
 static void load_config(ImporterUi* app) {
 	char error[512];
-	app->config_ok = XwaHostConfig_Load(Aeron_GetVfs(), &app->config, error, sizeof error);
+	app->config_ok = XwaHostConfig_LoadPaths(Aeron_GetVfs(), &app->config, error, sizeof error);
 	if (app->config_ok)
 		app->config_message[0] = '\0';
 	else
 		snprintf(app->config_message, sizeof app->config_message,
 				 "OpenXWA's configuration can't be read, so it can't be changed: %s", error);
+	if (!XwaModList_Folder(app->config.mods_path, app->saved_mods_folder, sizeof app->saved_mods_folder))
+		app->saved_mods_folder[0] = '\0';
+}
+
+/* Whether the mods folder that OpenXWA lists has mods, and the form has
+   another one. */
+static int mods_left_behind(const ImporterUi* app) {
+	XwaModList list;
+	if (!app->saved_mods_folder[0] || XwaModList_SamePath(app->mods_folder, app->saved_mods_folder) ||
+		!XwaModList_Scan(app->saved_mods_folder, NULL, &list))
+		return 0;
+	/* The first entry is the original game. */
+	const int found = list.count > 1;
+	XwaModList_Free(&list);
+	return found;
 }
 
 /* ---- Checking the form -------------------------------------------------- */
@@ -173,13 +194,19 @@ static void check_game(ImporterUi* app) {
 static void check_fields(ImporterUi* app) {
 	check_source(app);
 	check_game(app);
-	if (!app->mod_edited && app->game_ok && app->name[0])
-		XwaModImport_DefaultModFolder(app->game, app->name, app->mod, sizeof app->mod);
+	app->mod[0] = '\0';
+	if (app->mods_folder[0] && app->name[0])
+		XwaModImport_ModFolder(app->mods_folder, app->name, app->mod, sizeof app->mod);
 	if (!app->authoring_edited && app->mod[0])
 		snprintf(app->authoring, sizeof app->authoring, "%s-authoring", app->mod);
+	app->mods_left_behind = mods_left_behind(app);
 	app->check = XWA_MOD_IMPORT_CHECK_INVALID;
 	app->check_message[0] = '\0';
-	if (app->source_ok && app->game_ok) {
+	if (!app->name[0]) {
+		snprintf(app->check_message, sizeof app->check_message, "Enter a name for the mod.");
+	} else if (!app->mods_folder[0]) {
+		snprintf(app->check_message, sizeof app->check_message, "Choose a mods folder.");
+	} else if (app->source_ok && app->game_ok) {
 		fill_options(app, false);
 		app->check = XwaModImport_Check(&app->options, app->check_message, sizeof app->check_message);
 	}
@@ -191,7 +218,7 @@ static void check_fields(ImporterUi* app) {
 static char* browse_field(ImporterUi* app, Browse browse) {
 	return browse == BROWSE_SOURCE ? app->source
 		   : browse == BROWSE_GAME ? app->game
-		   : browse == BROWSE_MOD  ? app->mod
+		   : browse == BROWSE_MODS ? app->mods_folder
 								   : app->authoring;
 }
 
@@ -220,7 +247,6 @@ static void poll_dialog(ImporterUi* app) {
 	app->dialog = NULL;
 	if (status == AERON_FOLDER_DIALOG_SELECTED) {
 		snprintf(browse_field(app, app->browse), PATH_CAP, "%s", path);
-		app->mod_edited |= app->browse == BROWSE_MOD;
 		app->authoring_edited |= app->browse == BROWSE_AUTHORING;
 		app->checked = 0;
 	} else if (status == AERON_FOLDER_DIALOG_ERROR) {
@@ -272,6 +298,18 @@ static int import_thread(void* user) {
 }
 
 static void start_import(ImporterUi* app, bool replace) {
+	char error[512];
+	/* OpenXWA then lists the mods of this folder. */
+	if (app->config_ok && !XwaModList_SamePath(app->config.mods_path, app->mods_folder)) {
+		if (!XwaHostConfig_SaveModsPath(Aeron_GetVfs(), app->mods_folder, error, sizeof error)) {
+			snprintf(app->check_message, sizeof app->check_message,
+					 "The mods folder can't be saved in OpenXWA's configuration: %s", error);
+			return;
+		}
+		load_config(app);
+		app->mods_left_behind = 0;
+		app->mods_scanned = 0;
+	}
 	fill_options(app, replace);
 	if (app->progress_ready)
 		XwaModImport_ProgressFree(&app->progress);
@@ -359,13 +397,17 @@ static void draw_form(ImporterUi* app) {
 		app->name_edited = 1;
 		app->checked = 0;
 	}
-	if (path_row(app, "Mod folder", BROWSE_MOD, "Choose the mod folder")) {
-		app->mod_edited = 1;
+	if (path_row(app, "Mods folder", BROWSE_MODS, "Choose the mods folder"))
 		app->checked = 0;
+	AeronUi_Help(ui, "Where your mods are saved. OpenXWA lists the mods in this folder.");
+	if (app->mods_left_behind)
+		AeronUi_Error(ui, "OpenXWA will only list the mods in the new folder. Move your mods there to keep "
+						  "them in the list.");
+	if (app->mod[0]) {
+		char text[PATH_CAP + 64];
+		snprintf(text, sizeof text, "This mod is saved in %s.", app->mod);
+		AeronUi_Help(ui, text);
 	}
-	AeronUi_Help(ui,
-				 "The importer writes the mod here. OpenXWA finds mods in the mods folder of the original "
-				 "game.");
 	if (AeronUi_Toggle(ui, "Keep authoring files", &app->keep_authoring))
 		app->checked = 0;
 	AeronUi_Help(ui,
@@ -501,7 +543,7 @@ static void scan_mods(ImporterUi* app) {
 	app->mod_items = NULL;
 	app->mod_in_use = SIZE_MAX;
 	app->mods_scanned = 1;
-	if (!XwaModList_Scan(app->config.game_data_path, app->config.mod_path, &app->mods)) {
+	if (!XwaModList_Scan(app->saved_mods_folder, app->config.mod_path, &app->mods)) {
 		snprintf(app->mods_message, sizeof app->mods_message, "The mods can't be listed. Try Refresh.");
 		return;
 	}
@@ -542,8 +584,12 @@ static void draw_mods(ImporterUi* app) {
 	if (app->config_message[0])
 		AeronUi_Error(ui, app->config_message);
 	AeronUi_Help(ui,
-				 "Choose the mod that OpenXWA uses. The change takes effect the next time OpenXWA starts. "
-				 "OpenXWA finds mods in the mods folder of the original game.");
+				 "Choose the mod that OpenXWA uses. The change takes effect the next time OpenXWA starts.");
+	if (app->saved_mods_folder[0]) {
+		char text[PATH_CAP + 32];
+		snprintf(text, sizeof text, "Mods folder: %s", app->saved_mods_folder);
+		AeronUi_Help(ui, text);
+	}
 	AeronUi_ListBox(ui, "Mods", app->mod_items, app->mod_items ? app->mods.count : 0, &app->mod_selected,
 					fmaxf(120.0f, AeronUi_AvailableHeight(ui) - BUTTON_ROWS_REF - 60.0f));
 	if (app->mods_message[0])
@@ -700,6 +746,7 @@ ImporterUi* ImporterUi_Create(char* error, size_t error_capacity) {
 	load_config(app);
 	if (app->config_ok)
 		snprintf(app->game, sizeof app->game, "%s", app->config.game_data_path);
+	snprintf(app->mods_folder, sizeof app->mods_folder, "%s", app->saved_mods_folder);
 	app->log_selected = SIZE_MAX;
 	app->failure_selected = SIZE_MAX;
 	app->mod_selected = SIZE_MAX;

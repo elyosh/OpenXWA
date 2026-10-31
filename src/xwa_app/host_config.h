@@ -18,6 +18,8 @@ typedef struct XwaHostConfig {
 	char game_data_path[XWA_HOST_CONFIG_PATH_CAPACITY];
 	/* paths.mod. Empty when not set. */
 	char mod_path[XWA_HOST_CONFIG_PATH_CAPACITY];
+	/* paths.mods: the folder that holds the mods. Empty when not set. */
+	char mods_path[XWA_HOST_CONFIG_PATH_CAPACITY];
 	/* paths.use_mod: 0 runs the original game with no mod. 1 by default. */
 	int use_mod;
 	int flight_simulation_step_ticks;
@@ -48,7 +50,12 @@ typedef struct XwaHostConfig {
 } XwaHostConfig;
 
 int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size);
+/* Reads only paths.game_data, paths.mod, paths.mods and paths.use_mod from the user's
+ * config.yaml, without the shipped defaults. The rest of `out` is zero. For
+ * programs that only change those paths, such as the mod importer. */
+int XwaHostConfig_LoadPaths(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size);
 int XwaHostConfig_SaveGameDataPath(AeronVfs* vfs, const char* game_data_path, char* error, size_t error_size);
+int XwaHostConfig_SaveModsPath(AeronVfs* vfs, const char* mods_path, char* error, size_t error_size);
 /* Saves paths.mod, removed when `mod_path` is NULL or empty, and
  * paths.use_mod. */
 int XwaHostConfig_SaveModPath(AeronVfs* vfs, const char* mod_path, int use_mod, char* error,

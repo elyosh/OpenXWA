@@ -252,13 +252,15 @@ bool XwaModImport_FindGameExe(const char* game, char* out, size_t cap) {
 			Import_FindNoCase(alliance, "XWINGALLIANCE.EXE", false, out, cap));
 }
 
-bool XwaModImport_DefaultModFolder(const char* game, const char* name, char* out, size_t cap) {
+bool XwaModImport_ModFolder(const char* mods, const char* name, char* out, size_t cap) {
 	char folder[256];
 	LowerCopy(folder, sizeof folder, name);
 	for (char* c = folder; *c; ++c)
 		if (!isalnum((unsigned char)*c) && *c != '.' && *c != '-')
 			*c = '-';
-	return PathFormat(out, cap, "%s/mods/%s", game, folder[0] ? folder : "mod");
+	const size_t end = strlen(mods);
+	const bool separator = end && (mods[end - 1] == '/' || mods[end - 1] == '\\');
+	return PathFormat(out, cap, "%s%s%s", mods, separator ? "" : "/", folder[0] ? folder : "mod");
 }
 
 typedef enum FolderState {
@@ -344,8 +346,7 @@ XwaModImportCheck XwaModImport_Check(const XwaModImportOptions* options, char* e
 			break;
 	}
 	snprintf(error, error_cap,
-			 "The mod folder has other files in it. Choose an empty folder, or one with a mod that the "
-			 "importer made.");
+			 "The mod folder already has other files in it. Choose another mod name or mods folder.");
 	return XWA_MOD_IMPORT_CHECK_INVALID;
 }
 

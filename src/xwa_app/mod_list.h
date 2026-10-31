@@ -3,7 +3,7 @@
 
 /* The mods that OpenXWA can use:
  *   - the original game, with no mod;
- *   - each <game data>/mods/<folder> that has a mod.yaml;
+ *   - each folder of the mods folder (paths.mods) that has a mod.yaml;
  *   - the configured mod folder (paths.mod), when it is somewhere else.
  *
  * A mod.yaml gives the mod's name and whether its import finished:
@@ -35,10 +35,14 @@ typedef struct XwaModList {
 	size_t count;
 } XwaModList;
 
+/* Writes the mods folder: `configured` (paths.mods) when it is set, else
+ * the mods folder in Aeron_LocalDataPath. Needs Aeron to be running. */
+int XwaModList_Folder(const char* configured, char* out, size_t capacity);
+
 /* Lists the mods. The original game comes first, then the mods of
- * <game data>/mods by folder name, then the configured mod.
+ * `mods_folder` by folder name, then the configured mod. `mods_folder` and
  * `configured_mod` may be NULL or empty. Returns 0 when out of memory. */
-int XwaModList_Scan(const char* game_data, const char* configured_mod, XwaModList* out);
+int XwaModList_Scan(const char* mods_folder, const char* configured_mod, XwaModList* out);
 void XwaModList_Free(XwaModList* list);
 
 /* Whether two folder paths are the same, ignoring a final separator. */

@@ -1078,6 +1078,8 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 								  error, error_size) &&
 		host_config_optional_path(config, "paths.mod", out->mod_path, sizeof out->mod_path, error,
 								  error_size) &&
+		host_config_optional_path(config, "paths.mods", out->mods_path, sizeof out->mods_path, error,
+								  error_size) &&
 		host_config_use_mod(config, &out->use_mod, error, error_size) &&
 		host_config_simulation_step(config, &out->flight_simulation_step_ticks, error, error_size) &&
 		host_config_remaster_options(config, 0, out, error, error_size) &&
@@ -1085,6 +1087,50 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 								  error_size) &&
 		host_config_validate_input_maps(config, error, error_size) &&
 		host_config_input_options(config, 0, &out->input_options, error, error_size);
+	AeronConfigFile_Destroy(config);
+	return valid;
+}
+
+int XwaHostConfig_LoadPaths(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size) {
+	static const char* path = "config.yaml";
+	AeronConfigFile* config = NULL;
+	const AeronConfigNode* version;
+	const AeronConfigNode* paths;
+	int valid;
+
+	if (!vfs || !out) {
+		return host_config_error(error, error_size, "cannot load %s", path);
+	}
+	memset(out, 0, sizeof *out);
+	out->use_mod = 1;
+	if (!AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, path)) {
+		return 1;
+	}
+	if (!AeronConfigFile_LoadYaml(vfs, AERON_VFS_ROOT_USER, path, &config)) {
+		return host_config_error(error, error_size, "user configuration is invalid: %s", path);
+	}
+	if (AeronConfigNode_Type(AeronConfigFile_Root(config)) != AERON_CONFIG_MAP) {
+		AeronConfigFile_Destroy(config);
+		return host_config_error(error, error_size, "user configuration root must be a mapping: %s", path);
+	}
+	version = AeronConfigFile_GetNode(config, "version");
+	paths = AeronConfigFile_GetNode(config, "paths");
+	if (version &&
+		(AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1)) {
+		AeronConfigFile_Destroy(config);
+		return host_config_error(error, error_size, "unsupported configuration version in %s", path);
+	}
+	if (paths && AeronConfigNode_Type(paths) != AERON_CONFIG_MAP) {
+		AeronConfigFile_Destroy(config);
+		return host_config_error(error, error_size, "'paths' must be a mapping in %s", path);
+	}
+	valid = host_config_optional_path(config, "paths.game_data", out->game_data_path,
+									  sizeof out->game_data_path, error, error_size) &&
+			host_config_optional_path(config, "paths.mod", out->mod_path, sizeof out->mod_path, error,
+									  error_size) &&
+			host_config_optional_path(config, "paths.mods", out->mods_path, sizeof out->mods_path, error,
+									  error_size) &&
+			host_config_use_mod(config, &out->use_mod, error, error_size);
 	AeronConfigFile_Destroy(config);
 	return valid;
 }
@@ -1183,6 +1229,24 @@ int XwaHostConfig_SaveGameDataPath(AeronVfs* vfs, const char* game_data_path, ch
 		return 0;
 	}
 	if (!AeronConfigFile_SetString(document, "paths.game_data", game_data_path, &config_error)) {
+		AeronConfigFile_Destroy(document);
+		return host_config_error(error, error_size, "could not update user configuration: %s",
+								 config_error.message);
+	}
+	return host_config_save_user_document(vfs, document, error, error_size);
+}
+
+int XwaHostConfig_SaveModsPath(AeronVfs* vfs, const char* mods_path, char* error, size_t error_size) {
+	AeronConfigFile* document = NULL;
+	AeronConfigError config_error = { 0 };
+
+	if (!vfs || !mods_path || !mods_path[0] || strlen(mods_path) >= XWA_HOST_CONFIG_PATH_CAPACITY) {
+		return host_config_error(error, error_size, "cannot save invalid path to %s", "config.yaml");
+	}
+	if (!host_config_prepare_user_document(vfs, &document, error, error_size)) {
+		return 0;
+	}
+	if (!AeronConfigFile_SetString(document, "paths.mods", mods_path, &config_error)) {
 		AeronConfigFile_Destroy(document);
 		return host_config_error(error, error_size, "could not update user configuration: %s",
 								 config_error.message);

@@ -113,10 +113,10 @@ bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* er
  * ALLIANCE/, in any case. */
 bool XwaModImport_FindGameExe(const char* game, char* out, size_t cap);
 
-/* The suggested mod folder of the mod `name`: <game>/mods/<name>, with the
- * name in lower case and other characters than letters, digits, '.' and '-'
- * replaced by '-'. */
-bool XwaModImport_DefaultModFolder(const char* game, const char* name, char* out, size_t cap);
+/* The folder of the mod `name` in the mods folder `mods`: <mods>/<name>, with
+ * the name in lower case and other characters than letters, digits, '.' and
+ * '-' replaced by '-'. */
+bool XwaModImport_ModFolder(const char* mods, const char* name, char* out, size_t cap);
 
 /* Checks the options before an import. Writes the reason into `error` when
  * it doesn't return XWA_MOD_IMPORT_CHECK_OK. */
