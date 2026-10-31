@@ -1,5 +1,5 @@
 /*
- * xwa_asset_bake xwau-frontend: converts XWAU's frontend art for the mod
+ * The mod importer's frontend art: converts XWAU's frontend art for the mod
  * folder.
  *
  * XWAU replaces standard frontend files to change the frontend's layout, and
@@ -16,14 +16,14 @@
  *   <out>/resdata/atlas/group_<g>.yaml              with group_<g>.ktx2, group_<g>_p<N>.ktx2
  *   <out>/frontend/concourse/starfield_mask.png     where the concourse stars can show
  *   <out>/frontend/concourse/layout.yaml            room positions
- *   <out>/frontend/animations.yaml                  room animations; copy their videos
- *                                                   by hand from XWAU's Resdata
- *   <out>/frontend/frontres/<dir>/video/<base>.yaml videos that replace images; copy
- *                                                   these videos by hand too
+ *   <out>/frontend/animations.yaml                  room animations, whose videos and
+ *                                                   sounds the importer copies
+ *   <out>/frontend/frontres/<dir>/video/<base>.yaml videos that replace images, which
+ *                                                   the importer copies too
  *   <out>/frontend/fonts/fonts.yaml                 the text font, an open font that
  *                                                   OpenXWA ships in place of Consolas
- *   <out>/frontend/movies/movies.yaml               the film room's and the pods' movies;
- *                                                   copy XWAU's Movies folder by hand
+ *   <out>/frontend/movies/movies.yaml               the film room's and the pods' movies,
+ *                                                   from XWAU's Movies folder
  *
  * Standard files that match stock and have no HD image are left to the stock
  * bake. The XWAU install is read with host file I/O, and file names are
@@ -345,8 +345,8 @@ static int is_screen_background(const char* key, int width, int height);
  * when ConcourseBackgroundsWide.txt sets it to 0 or it is DPMED or CONFIGB
  * (the hook always sets those to 0), and wide in every other case. */
 static void note_background(XwauContext* ctx, const char* key, const char* list_key, int same_shape) {
-	XwauBackground* grown = (XwauBackground*)realloc(ctx->backgrounds, (size_t)(ctx->background_count + 1) *
-																		   sizeof *grown);
+	XwauBackground* grown =
+		(XwauBackground*)realloc(ctx->backgrounds, (size_t)(ctx->background_count + 1) * sizeof *grown);
 	if (!grown)
 		return;
 	ctx->backgrounds = grown;
@@ -399,7 +399,7 @@ static int write_atlas_yaml(const char* path, const XwauAtlas* atlas, const Aero
 	FILE* fp = fopen(path, "w");
 	if (!fp)
 		return 0;
-	fprintf(fp, "# Made by xwa_asset_bake xwau-frontend. Sizes, offsets and bounds are in\n"
+	fprintf(fp, "# Made by the OpenXWA mod importer. Sizes, offsets and bounds are in\n"
 				"# design pixels; the game takes its geometry from this file.\n");
 	fprintf(fp, "game_geometry: true\n");
 	fprintf(fp, "atlas: {w: %d, h: %d}\n", pages->pages[0].width, pages->pages[0].height);
@@ -817,7 +817,7 @@ static void write_video_yamls(XwauContext* ctx) {
 			continue;
 		}
 		fprintf(fp,
-				"# Made by xwa_asset_bake xwau-frontend. Sizes are in design pixels. The video\n"
+				"# Made by the OpenXWA mod importer. Sizes are in design pixels. The video\n"
 				"# comes from XWAU's Resdata folder.\n"
 				"video: %s\nsize: ",
 				v->webm);
@@ -975,7 +975,8 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 				 * (NET/Main.cs DrawItem, IsBackgroundName). */
 				char key[600];
 				snprintf(key, sizeof key, "%s/%s", dir_lower, base_lower);
-				if (is_screen_background(key, s->width, s->height) && !same_aspect(s->width, s->height, f->w, f->h))
+				if (is_screen_background(key, s->width, s->height) &&
+					!same_aspect(s->width, s->height, f->w, f->h))
 					f->fit = "screen_height";
 			}
 			if (map_icons) {
@@ -1431,7 +1432,7 @@ static void write_layout_yaml(XwauContext* ctx) {
 		ctx->stats->failures++;
 		return;
 	}
-	fprintf(fp, "# Made by xwa_asset_bake xwau-frontend from ConcourseDoors.txt, MedalsPositions.txt,\n"
+	fprintf(fp, "# Made by the OpenXWA mod importer from ConcourseDoors.txt, MedalsPositions.txt,\n"
 				"# the [hook_concourse] settings and the squadron logo files. Positions and sizes\n"
 				"# are in design pixels.\n"
 				"version: 1\n");
@@ -1722,7 +1723,7 @@ static void write_fonts_yaml(XwauContext* ctx) {
 		ctx->stats->failures++;
 		return;
 	}
-	fprintf(fp, "# Made by xwa_asset_bake xwau-frontend from HDConcourseTextFont.\n"
+	fprintf(fp, "# Made by the OpenXWA mod importer from HDConcourseTextFont.\n"
 				"version: 1\n"
 				"default: {file: Inconsolata-Bold.ttf, metrics: font, spacing: 0.0498}\n");
 	fclose(fp);
@@ -1756,7 +1757,7 @@ static void write_movies_yaml(XwauContext* ctx) {
 		ctx->stats->failures++;
 		return;
 	}
-	fprintf(fp, "# Made by xwa_asset_bake xwau-frontend from FilmPodMovie, SinglePodMovie and\n"
+	fprintf(fp, "# Made by the OpenXWA mod importer from FilmPodMovie, SinglePodMovie and\n"
 				"# MultiPodMovie. The movies come from XWAU's Movies folder.\n");
 	for (int i = 0; i < 3; ++i)
 		fprintf(fp, "%s: %s\n", rooms[i], movies[i]);
@@ -1846,10 +1847,9 @@ static void write_animations_yaml(XwauContext* ctx) {
 		return;
 	}
 	fprintf(fp,
-			"# Made by xwa_asset_bake xwau-frontend from ConcourseAnimations.txt. Positions and\n"
-			"# sizes are in design pixels, delays in seconds. Copy the videos from\n"
-			"# XWAU's Resdata folder, and the sounds from its Sfx folder, to\n"
-			"# frontend/animations/.\n"
+			"# Made by the OpenXWA mod importer from ConcourseAnimations.txt. Positions and\n"
+			"# sizes are in design pixels, delays in seconds. The videos come from\n"
+			"# XWAU's Resdata folder, and the sounds from its Sfx folder.\n"
 			"version: 1\n"
 			"groups:%s\n",
 			count ? "" : " []");
@@ -1953,8 +1953,9 @@ static int is_medal_view(const char* key, const char* prefix) {
 	const char* base = key + 7;
 	if (prefix[0])
 		return strncmp(base, prefix, strlen(prefix)) == 0;
-	return strcmp(base, "medback") != 0 && strcmp(base, "medalcase") != 0 && strncmp(base, "rankzoom", 8) != 0 &&
-		   strncmp(base, "lbattle", 7) != 0 && strncmp(base, "lkalidor", 8) != 0;
+	return strcmp(base, "medback") != 0 && strcmp(base, "medalcase") != 0 &&
+		   strncmp(base, "rankzoom", 8) != 0 && strncmp(base, "lbattle", 7) != 0 &&
+		   strncmp(base, "lkalidor", 8) != 0;
 }
 
 /* Returns the most common layout among a screen's backgrounds, and prints a
@@ -2011,8 +2012,8 @@ static void write_layouts(const XwauContext* ctx, FILE* fp) {
 		const char* dot = strchr(name, '.');
 		const char* fallback = "wide";
 		for (size_t j = 0; dot && j < SCREEN_COUNT; ++j)
-			if (strlen(k_screens[j].name) == (size_t)(dot - name) && strncmp(k_screens[j].name, name, (size_t)(dot - name)) == 0 &&
-				layouts[j])
+			if (strlen(k_screens[j].name) == (size_t)(dot - name) &&
+				strncmp(k_screens[j].name, name, (size_t)(dot - name)) == 0 && layouts[j])
 				fallback = layouts[j];
 		if (!layouts[i] || strcmp(layouts[i], fallback) == 0)
 			continue;
@@ -2057,7 +2058,7 @@ static void write_frontend_yaml(XwauContext* ctx) {
 		ctx->stats->failures++;
 		return;
 	}
-	fprintf(fp, "# Made by xwa_asset_bake xwau-frontend.\n"
+	fprintf(fp, "# Made by the OpenXWA mod importer.\n"
 				"version: 1\n"
 				"# The screen the frontend art is drawn for. Positions and sizes in the\n"
 				"# frontend's files are pixels of this screen.\n"

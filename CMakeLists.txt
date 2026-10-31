@@ -538,17 +538,16 @@ if(XWA_BUILD_TOOLS)
     target_include_directories(mission_dump PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-    # The bakes of xwa_asset_bake, which the mod importer also runs.
+    # The bakes of xwa_asset_bake. The mod importer's art bakes use their
+    # helpers.
     add_library(xwa_asset_bake_lib STATIC
         tools/xwa_asset_bake/bake_source.c
         tools/xwa_asset_bake/bake_flight_fonts.c
         tools/xwa_asset_bake/bake_fonts.c
         tools/xwa_asset_bake/bake_sprites.c
-        tools/xwa_asset_bake/bake_xwau.c
-        tools/xwa_asset_bake/bake_xwau_flight.c
     )
     target_include_directories(xwa_asset_bake_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools/xwa_asset_bake)
-    target_link_libraries(xwa_asset_bake_lib PUBLIC xwa_2d_formats imgbake xwau_files)
+    target_link_libraries(xwa_asset_bake_lib PUBLIC xwa_2d_formats imgbake)
 
     add_executable(xwa_asset_bake tools/xwa_asset_bake/xwa_asset_bake.c)
     target_link_libraries(xwa_asset_bake PRIVATE xwa_asset_bake_lib)
@@ -557,6 +556,8 @@ if(XWA_BUILD_TOOLS)
     # a mod folder, in one process.
     add_library(xwa_mod_import_lib STATIC
         tools/mod_importer/authoring.c
+        tools/mod_importer/bake_xwau.c
+        tools/mod_importer/bake_xwau_flight.c
         tools/mod_importer/copies.c
         tools/mod_importer/import.c
         tools/mod_importer/log.c

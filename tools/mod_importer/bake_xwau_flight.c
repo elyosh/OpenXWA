@@ -1,5 +1,5 @@
 /*
- * xwa_asset_bake xwau-flight: converts XWAU's flight art for the mod folder.
+ * The mod importer's flight art: converts XWAU's flight art for the mod folder.
  *
  * Each image group of the DAT files that XWAU's RESDATA.TXT lists becomes an
  * atlas with game geometry, so the whole game uses XWAU's frame counts, sizes
@@ -35,10 +35,10 @@
  *                                             draws flight text with
  *
  * Left out: the frontend groups (15000-15999) and the craft pictures
- * (20001-20232), which xwau-frontend converts; the font group 16000, which
+ * (20001-20232), which the frontend art converts; the font group 16000, which
  * the game copies glyphs out of, so it gets font atlases instead; and the
- * groups below 1000 (the blast mark animations of BLASTMARKS.DAT), which
- * opt2gltf effects imports.
+ * groups below 1000 (the blast mark animations of BLASTMARKS.DAT), which the
+ * effect libraries import.
  *
  * The XWAU install is read with host file I/O, and file names are matched in
  * any case.
@@ -692,7 +692,7 @@ static int flight_is_baked_group(int group) {
 		return 0; /* craft pictures, frontend */
 	if (group == FLIGHT_FONT_GROUP)
 		return 0;         /* font atlases instead */
-	return group >= 1000; /* below: BLASTMARKS.DAT's animations, which opt2gltf effects imports */
+	return group >= 1000; /* below: BLASTMARKS.DAT's animations, which the effect libraries import */
 }
 
 static int flight_is_planet_group(int group) { return group >= 6000 && group <= 6999; }
@@ -1178,7 +1178,7 @@ static void flight_write_fonts_yaml(FlightContext* ctx) {
 		return;
 	}
 	fprintf(f,
-			"# Made by xwa_asset_bake xwau-flight from TextFontFamily in DDraw.cfg.\n"
+			"# Made by the OpenXWA mod importer from TextFontFamily in DDraw.cfg.\n"
 			"version: 1\n"
 			"default: {file: %s, metrics: font}\n",
 			file);

@@ -13,8 +13,6 @@
 #include "bake_flight_fonts.h"
 #include "bake_fonts.h"
 #include "bake_sprites.h"
-#include "bake_xwau.h"
-#include "bake_xwau_flight.h"
 
 #include "aeron/vfs.h"
 
@@ -24,8 +22,7 @@
 
 static int usage(const char* argv0) {
 	fprintf(stderr,
-			"usage: %s [--assets <dir>] <sprites|fonts|flight-fonts|xwau-frontend|xwau-flight> <out-root> "
-			"[options]\n"
+			"usage: %s [--assets <dir>] <sprites|fonts|flight-fonts> <out-root> [options]\n"
 			"\n"
 			"  --assets <dir>   game data root (default: game_data)\n"
 			"\n"
@@ -46,21 +43,7 @@ static int usage(const char* argv0) {
 			"  --list <substr>  only bake frontres files whose dir/name\n"
 			"                   contains <substr>; skips the DAT pass\n"
 			"  --group <id>     only bake DAT sprite group <id>\n"
-			"  --dat-only       skip the frontres pass (resdata only)\n"
-			"\n"
-			"xwau-frontend: convert XWAU's frontend art into atlases, with frame\n"
-			"  counts, sizes and offsets in design pixels of a 2560x1440 screen.\n"
-			"  Files that match the stock ones (--assets) are left to the sprites\n"
-			"  bake. Uses the same format and quality options as sprites.\n"
-			"  --xwau <dir>     the XWAU install (required)\n"
-			"\n"
-			"xwau-flight: convert XWAU's flight image groups into atlases with game\n"
-			"  geometry, at the resolution XWAU ships them, and its flight font into\n"
-			"  <out-root>/flight/fonts. Needs no stock data. Uses --png, --ktx2,\n"
-			"  --quality, --no-zstd and --group like sprites.\n"
-			"  --xwau <dir>       the XWAU install (required)\n"
-			"  --planet-max <px>  scale planet images down to at most this wide\n"
-			"                     (default: 2048; 0 keeps them as they are)\n",
+			"  --dat-only       skip the frontres pass (resdata only)\n",
 			argv0);
 	return 2;
 }
@@ -76,9 +59,7 @@ int main(int argc, char** argv) {
 	opt.group_filter = -1;
 
 	const char* command = NULL;
-	const char* xwau_root = NULL;
 	int explicit_fmt = 0;
-	int planet_max = 2048;
 
 	for (int i = 1; i < argc; i++) {
 		const char* a = argv[i];
@@ -111,13 +92,6 @@ int main(int argc, char** argv) {
 			opt.group_filter = atoi(argv[++i]);
 		} else if (strcmp(a, "--dat-only") == 0) {
 			opt.dat_only = true;
-		} else if (strcmp(a, "--xwau") == 0 && i + 1 < argc) {
-			xwau_root = argv[++i];
-		} else if (strcmp(a, "--planet-max") == 0 && i + 1 < argc) {
-			planet_max = atoi(argv[++i]);
-			if (planet_max < 0) {
-				return usage(argv[0]);
-			}
 		} else if (a[0] == '-') {
 			fprintf(stderr, "unknown option: %s\n", a);
 			return usage(argv[0]);
@@ -132,38 +106,13 @@ int main(int argc, char** argv) {
 	const int cmd_sprites = command && strcmp(command, "sprites") == 0;
 	const int cmd_fonts = command && strcmp(command, "fonts") == 0;
 	const int cmd_flight_fonts = command && strcmp(command, "flight-fonts") == 0;
-	const int cmd_xwau = command && strcmp(command, "xwau-frontend") == 0;
-	const int cmd_xwau_flight = command && strcmp(command, "xwau-flight") == 0;
-	if ((!cmd_sprites && !cmd_fonts && !cmd_flight_fonts && !cmd_xwau && !cmd_xwau_flight) || !opt.out_root ||
-		((cmd_xwau || cmd_xwau_flight) && !xwau_root)) {
+	if ((!cmd_sprites && !cmd_fonts && !cmd_flight_fonts) || !opt.out_root) {
 		return usage(argv[0]);
 	}
 	if (!explicit_fmt) {
 		opt.write_png = true;
 		opt.write_ktx2 = true;
 	}
-	if (cmd_xwau_flight) {
-		const BakeXwauFlightOptions fopt = { .sprites = &opt,
-											 .xwau_root = xwau_root,
-											 .planet_max = planet_max };
-		BakeXwauFlightStats fstats;
-		const int ok = BakeXwau_RunFlight(&fopt, &fstats);
-		printf("bake done: %d atlases with %d images, %d alternative frame sets, %d mission art folders, %d "
-			   "flight font tiers, %d failures\n",
-			   fstats.atlases, fstats.images, fstats.frame_sets, fstats.mission_art, fstats.font_tiers,
-			   fstats.failures);
-		return ok ? 0 : 1;
-	}
-	if (cmd_xwau) {
-		const BakeXwauOptions xopt = { .sprites = &opt, .xwau_root = xwau_root, .stock_root = asset_root };
-		BakeXwauStats xstats;
-		const int ok = BakeXwau_RunFrontend(&xopt, &xstats);
-		printf("bake done: %d atlases, %d HD frames, %d frames upscaled from standard images, "
-			   "%d files left to the stock bake, %d failures\n",
-			   xstats.atlases, xstats.hd_frames, xstats.sd_frames, xstats.unchanged, xstats.failures);
-		return ok ? 0 : 1;
-	}
-
 	AeronVfsConfig cfg;
 	memset(&cfg, 0, sizeof cfg);
 	cfg.org_name = "xwa";

@@ -758,7 +758,7 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 		return result;
 
 	bool skyboxes = false;
-	SetReportProgram("xwau_import");
+	SetReportProgram("xwau");
 	if (!Import_Cancelled(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_CRAFT, 0);
 		craft(ctx);

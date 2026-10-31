@@ -1,8 +1,8 @@
 #ifndef XWA_BAKE_XWAU_FLIGHT_H
 #define XWA_BAKE_XWAU_FLIGHT_H
 
-/* xwa_asset_bake xwau-flight: converts XWAU's flight DAT groups into atlases
- * with game geometry. See bake_xwau_flight.c. */
+/* The mod importer's flight art: converts XWAU's flight DAT groups into
+ * atlases with game geometry. */
 
 #include "bake_sprites.h"
 

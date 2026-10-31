@@ -1,9 +1,9 @@
 #ifndef XWA_BAKE_XWAU_H
 #define XWA_BAKE_XWAU_H
 
-/* xwa_asset_bake xwau-frontend: converts XWAU's frontend art into atlases.
- * The atlases also hold the frame counts, sizes and offsets that the game
- * uses. See bake_xwau.c. */
+/* The mod importer's frontend art: converts XWAU's frontend art into
+ * atlases. The atlases also hold the frame counts, sizes and offsets that the
+ * game uses. */
 
 #include "bake_sprites.h"
 

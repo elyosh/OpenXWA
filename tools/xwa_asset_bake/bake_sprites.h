@@ -43,7 +43,7 @@ typedef struct BakeStats {
 /* Run both passes. Returns nonzero when no failure occurred. */
 int BakeSprites_Run(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeStats* stats);
 
-/* Helpers shared with the XWAU frontend import (bake_xwau.c). */
+/* Helpers shared with the mod importer's frontend art. */
 int BakeSprites_MakeDirs(const char* path);
 /* Writes `base_path`.png and/or .ktx2 (BC7, sRGB, premultiplied) per `opt`. */
 int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba, int w,
