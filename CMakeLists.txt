@@ -575,6 +575,27 @@ if(XWA_BUILD_TOOLS)
     set_target_properties(xwa_mod_import PROPERTIES
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
+    # The importer's window. It sits beside OpenXWA, with its own copy of
+    # the resources, and uses the shaders that Aeron compiles into the build
+    # folder.
+    add_executable(xwa_mod_importer
+        tools/mod_importer/app/main.c
+        tools/mod_importer/app/ui.c
+    )
+    target_link_libraries(xwa_mod_importer PRIVATE xwa_mod_import_lib xwa_host_config)
+    set_target_properties(xwa_mod_importer PROPERTIES
+        OUTPUT_NAME "OpenXWA Mod Importer"
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+    if(WIN32)
+        set_target_properties(xwa_mod_importer PROPERTIES WIN32_EXECUTABLE TRUE)
+    endif()
+    add_custom_command(TARGET xwa_mod_importer POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/resources
+            $<TARGET_FILE_DIR:xwa_mod_importer>/resources
+        COMMENT "Staging the mod importer's resources"
+    )
+
     add_executable(imc_decode tools/imc_decode.c)
     target_link_libraries(imc_decode PRIVATE xwa_core)
 
@@ -606,9 +627,11 @@ if(XWA_BUILD_TOOLS)
         target_compile_options(imc_decode PRIVATE /W4)
         target_compile_options(xwa_mod_import_lib PRIVATE /W4)
         target_compile_options(xwa_mod_import PRIVATE /W4)
+        target_compile_options(xwa_mod_importer PRIVATE /W4)
     else()
         target_compile_options(xwa_mod_import_lib PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(xwa_mod_import PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(xwa_mod_importer PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(mission_dump PRIVATE
             -Wall -Wextra -Wpedantic -Wno-deprecated-declarations -fno-common)
         target_compile_options(imc_decode PRIVATE
@@ -743,6 +766,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa/util/time.h
     tools/mod_importer/import.h
     tools/mod_importer/import_internal.h
+    tools/mod_importer/app/ui.h
 )
 
 set(XWA_FORMAT_FILES
