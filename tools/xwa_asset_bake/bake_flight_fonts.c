@@ -3,6 +3,7 @@
 #include "aeron/image.h"
 #include "bake_source.h"
 #include "bake_sprites.h"
+#include "bc7_codec.h"
 #include "ktx2_writer.h"
 #include "tool_log.h"
 #include "xwa_2d.h"
@@ -81,6 +82,7 @@ static int bake_tier(const BakeFlightFontsOptions* opt, int tier, const Xwa2dFon
 	snprintf(path, sizeof path, "%s.ktx2", base);
 	int ok = write_ktx2_bc7_with_generated_mips(path, hd_width, hd_height, hd, opt->bc7_quality, KTX2_TF_SRGB,
 												opt->zstd != 0);
+	bc7_codec_clear_cache(); /* as BakeSprites_EmitImage does */
 	free(hd);
 	if (ok) {
 		snprintf(path, sizeof path, "%s.fnt", base);

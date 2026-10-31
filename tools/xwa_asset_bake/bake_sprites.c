@@ -27,6 +27,7 @@
 #include "aeron/atlas_pack.h"
 #include "xwa_2d.h"
 
+#include "bc7_codec.h"
 #include "ktx2_writer.h"
 #include "png_write.h"
 #include "tool_log.h"
@@ -111,6 +112,9 @@ int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, c
 			ToolLog_Write(TOOL_LOG_ERROR, "  KTX2 write failed: %s", path);
 			ok = 0;
 		}
+		/* Images rarely share blocks, and the thread's cache would keep the
+		   blocks of every image until the program ends. */
+		bc7_codec_clear_cache();
 	}
 	return ok;
 }
