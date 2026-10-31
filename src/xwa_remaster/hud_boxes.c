@@ -152,7 +152,8 @@ void XwaRemasterHudBoxes_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 		const uint32_t modes = snapshot->hud.mode_flags;
 		box->readout =
 			(uint8_t)(source->component == 0xffffu && source->color_index == 59u &&
-					  ((snapshot->hud.mfd_enabled[0] != 0) || (modes & XWA_HUD_MODE_EXTERNAL_CAMERA) ||
+					  ((snapshot->hud.mfd_enabled[0] != 0) ||
+					   ((modes & XWA_HUD_MODE_EXTERNAL_CAMERA) && !(modes & XWA_HUD_MODE_EXTERIOR_HUD)) ||
 					   ((modes & XWA_HUD_MODE_FILM_PLAYBACK) && (modes & XWA_HUD_MODE_FILM_OVERLAY))) &&
 					  !(modes & XWA_HUD_MODE_HANGAR_READY) && center_x > viewport.x &&
 					  center_x < viewport.x + viewport.width && center_y > viewport.y &&

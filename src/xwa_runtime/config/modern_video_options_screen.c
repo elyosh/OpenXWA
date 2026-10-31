@@ -2,6 +2,7 @@
 
 #include "aeron/render.h"
 #include "xwa/assets/string_table.h"
+#include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_options_menu.h"
 #include "xwa_runtime/config/modern_video_options.h"
 
@@ -23,6 +24,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	static const char* const paper_white_texts[] = { "Auto",     "100 nits", "150 nits", "200 nits",
 													 "250 nits", "300 nits", "400 nits" };
 	XwaModernVideoOptions options;
+	XwaModernCameraOptions camera_options;
 	XwaModernOptionsMenu menu;
 	uint8_t window_mode;
 	uint8_t ssao;
@@ -36,6 +38,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	uint8_t hdr;
 	uint8_t sdr_gamma;
 	uint8_t paper_white;
+	uint8_t enhanced_camera;
 	int hdr_rows_disabled;
 	int motion_blur_amount_changed;
 	int changed;
@@ -58,8 +61,10 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	hdr = (uint8_t)(options.hdr_output != 0);
 	sdr_gamma = (uint8_t)options.sdr_gamma;
 	paper_white = (uint8_t)options.paper_white;
+	XwaModernCameraOptions_Get(&camera_options);
+	enhanced_camera = (uint8_t)(camera_options.enabled != 0);
 	changed = 0;
-	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 140, cursor_row, 11);
+	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 140, cursor_row, 12);
 	XwaModernOptionsMenu_DrawTitle(&menu, "OpenXWA Video Options");
 
 	changed |=
@@ -115,6 +120,13 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		options.paper_white = (XwaModernPaperWhite)paper_white;
 		XwaModernVideoOptions_Set(&options);
 	}
+	/* The exterior camera lag and tilt, the cockpit sway and the exterior HUD.
+	   A mod can turn them on. The player's choice is saved only once they
+	   change the row, so until then the row follows the mod. */
+	if (XwaModernOptionsMenu_DrawCycleU8(&menu, &enhanced_camera, "Enhanced Camera", toggle_texts, 2, 70,
+										 0)) {
+		XwaModernCameraOptions_SetEnabled(enhanced_camera);
+	}
 
 	back = XwaModernOptionsMenu_DrawAction(&menu, FrontendString_Get(STR_BACK), 69, 0);
 	back |= XwaModernOptionsMenu_TakeEscape(&menu);
@@ -123,5 +135,6 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	}
 
 	XwaModernVideoOptions_Flush();
+	XwaModernCameraOptions_Flush();
 	return 1;
 }

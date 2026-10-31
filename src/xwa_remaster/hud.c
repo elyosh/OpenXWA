@@ -434,7 +434,9 @@ void XwaRemasterHud_BuildVisibility(const XwaHudState* h, XwaRemasterHudVisibili
 	const int film_overlay = (modes & XWA_HUD_MODE_FILM_OVERLAY) != 0;
 	const int hangar = (modes & XWA_HUD_MODE_HANGAR_READY) != 0;
 	const int map = (modes & XWA_HUD_MODE_MAP) != 0;
-	const int external = (modes & XWA_HUD_MODE_EXTERNAL_CAMERA) != 0;
+	/* The exterior HUD works like the cockpit's. */
+	const int external =
+		(modes & XWA_HUD_MODE_EXTERNAL_CAMERA) != 0 && (modes & XWA_HUD_MODE_EXTERIOR_HUD) == 0;
 	const int hyperspace = (modes & XWA_HUD_MODE_HYPERSPACE) != 0;
 	const int region = (modes & XWA_HUD_MODE_REGION_SESSION) != 0;
 	const int mission_end = (modes & XWA_HUD_MODE_MISSION_END) != 0;

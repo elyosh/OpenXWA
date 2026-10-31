@@ -1139,6 +1139,9 @@ typedef enum XwaHudModeFlags {
 	XWA_HUD_MODE_COCKPIT_VISIBLE = 1u << 13,
 	XWA_HUD_MODE_PADLOCK = 1u << 14,
 	XWA_HUD_MODE_FILM_RECORDING = 1u << 15,
+	/* The exterior view shows the full HUD, which then works like the
+	 * cockpit's (XwaExteriorHud_Shown). */
+	XWA_HUD_MODE_EXTERIOR_HUD = 1u << 16,
 } XwaHudModeFlags;
 
 typedef struct XwaHudState {

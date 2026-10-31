@@ -196,6 +196,7 @@ set(XWA_RECOVERED_SOURCES
 
 set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/camera/camera_motion.c
+    src/xwa_runtime/camera/exterior_hud.c
     src/xwa_runtime/config/modern_controller_options_screen.c
     src/xwa_runtime/config/modern_input_options_screen.c
     src/xwa_runtime/config/modern_options_menu.c
@@ -698,6 +699,7 @@ endif()
 
 set(XWA_FORMAT_HEADERS
     src/xwa_runtime/camera/camera_motion.h
+    src/xwa_runtime/camera/exterior_hud.h
     src/xwa_runtime/config/modern_camera_options.h
     src/xwa_runtime/config/modern_input_options.h
     src/xwa_runtime/config/modern_controller_options_screen.h

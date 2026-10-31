@@ -9,6 +9,7 @@
 #include "xwa/flight/object/object.h"
 #include "xwa/flight/player/player.h"
 #include "xwa/render/renderer.h"
+#include "xwa_runtime/camera/exterior_hud.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_weapons.h"
@@ -324,12 +325,14 @@ static uint32_t hud_capture_mode_flags(const PlayerData* player) {
 		flags |= XWA_HUD_MODE_PADLOCK;
 	if (g_filmRecording)
 		flags |= XWA_HUD_MODE_FILM_RECORDING;
+	if (XwaExteriorHud_Shown(g_localPlayer))
+		flags |= XWA_HUD_MODE_EXTERIOR_HUD;
 	return flags;
 }
 
 static void hud_capture_top_level(XwaHudState* out, const PlayerData* player) {
 	int i;
-	out->hud_enabled = (uint8_t)(player->hudEnabled != 0);
+	out->hud_enabled = (uint8_t)(XwaExteriorHud_HudVisible(g_localPlayer) != 0);
 	out->film_mfd_visible = (uint8_t)(g_filmOverlayMfdVisible != 0);
 	out->classic_hud_scale = g_flightHudScaleFactor;
 	out->mode_flags = hud_capture_mode_flags(player);

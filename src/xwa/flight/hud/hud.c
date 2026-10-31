@@ -35,6 +35,7 @@
 #include "xwa/math/scalar.h"
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/camera/exterior_hud.h"
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/object_limits.h"
@@ -76,6 +77,22 @@ static int32_t g_hudCrtCameraDistance;
 #define HUD_PANE_POP() ((void)0)
 #define HUD_PANE_PARAM
 #define HUD_PANE_ARG(id_)
+#endif
+
+#ifdef XWA_MODERN
+/* With the enhanced camera, the exterior view of the player's craft can show
+   the full HUD. The HUD then treats it like the cockpit view, and the
+   reticle follows the craft's nose, as when the player looks around. */
+#define HUD_EXTERIOR_HIDES_HUD() XwaExteriorHud_HidesHud(g_localPlayer)
+#define HUD_VISIBLE() XwaExteriorHud_HudVisible(g_localPlayer)
+#define HUD_RETICLE_PROJECTED()                                                                              \
+	(g_players[g_localPlayer].lookYawOffset || g_players[g_localPlayer].lookPitchOffset ||                   \
+	 XwaExteriorHud_Shown(g_localPlayer))
+#else
+#define HUD_EXTERIOR_HIDES_HUD() g_players[g_localPlayer].viewState.externalCameraActive
+#define HUD_VISIBLE() g_players[g_localPlayer].hudEnabled
+#define HUD_RETICLE_PROJECTED()                                                                              \
+	(g_players[g_localPlayer].lookYawOffset || g_players[g_localPlayer].lookPitchOffset)
 #endif
 
 #ifndef XWA_MODERN
@@ -1208,7 +1225,7 @@ int16_t Hud_DrawBoxOverlayHW(int x, int y, int width, int height, int colorIdx, 
 		return result;
 	}
 
-	if ((g_players[g_localPlayer].mfd.enabled[0] || g_players[g_localPlayer].viewState.externalCameraActive ||
+	if ((g_players[g_localPlayer].mfd.enabled[0] || HUD_EXTERIOR_HIDES_HUD() ||
 		 (g_filmPlaybackMode && g_filmOverlayActive == 1)) &&
 		!g_inHangarReady && colorIdx == 59) {
 		int centerX;
@@ -3650,7 +3667,7 @@ void Hud_RenderHud(void) {
 		filmPlaybackMode = g_filmPlaybackMode;
 	}
 
-	if (g_players[g_localPlayer].hudEnabled) {
+	if (HUD_VISIBLE()) {
 		if (g_inHangarReady) {
 			if (g_useHardware3D) {
 				Hud_DrawCMD3D();
@@ -3756,8 +3773,7 @@ void Hud_RenderHud(void) {
 				return;
 			}
 
-			if (g_players[g_localPlayer].viewState.externalCameraActive &&
-				!g_players[g_localPlayer].regionSessionId) {
+			if (HUD_EXTERIOR_HIDES_HUD() && !g_players[g_localPlayer].regionSessionId) {
 				if (g_players[g_localPlayer].hyperspacePhase) {
 					return;
 				}
@@ -3852,8 +3868,7 @@ void Hud_RenderHud(void) {
 	}
 
 	if (g_useHardware3D) {
-		if ((!filmPlaybackMode || g_filmOverlayActive != 1) &&
-			g_players[g_localPlayer].viewState.externalCameraActive) {
+		if ((!filmPlaybackMode || g_filmOverlayActive != 1) && HUD_EXTERIOR_HIDES_HUD()) {
 			Hud_DrawTargetArrow3D();
 		}
 		if (g_systemMessagePaneVisible) {
@@ -6830,7 +6845,7 @@ void Hud_DrawFilmMfdFrames3D(void) {
 	leftMfdEnabled = g_players[localPlayer].mfd.enabled[1];
 	if (leftMfdEnabled || g_filmOverlayMfdVisible) {
 		if (!g_players[localPlayer].mapCameraState) {
-			if (!g_players[localPlayer].hudEnabled && !g_filmOverlayMfdVisible) {
+			if (!HUD_VISIBLE() && !g_filmOverlayMfdVisible) {
 				return;
 			}
 			if (!g_filmOverlayMfdVisible && leftMfdEnabled && g_filmOverlayActive) {
@@ -6858,7 +6873,7 @@ void Hud_DrawFilmMfdFrames3D(void) {
 	if (rightMfdEnabled || g_filmOverlayMfdVisible) {
 		if (g_filmOverlayMfdVisible || rightMfdEnabled) {
 			if (!g_players[localPlayer].mapCameraState) {
-				if (!g_players[localPlayer].hudEnabled && !g_filmOverlayMfdVisible) {
+				if (!HUD_VISIBLE() && !g_filmOverlayMfdVisible) {
 					return;
 				}
 				if (!g_filmOverlayMfdVisible && g_players[localPlayer].mfd.enabled[1] &&
@@ -6956,7 +6971,7 @@ void Hud_DrawReticle3D(void) {
 		return;
 	}
 
-	if (g_players[g_localPlayer].lookYawOffset || g_players[g_localPlayer].lookPitchOffset) {
+	if (HUD_RETICLE_PROJECTED()) {
 		int worldZ;
 
 		pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_players[g_localPlayer].objectIndex], 0, 0,
@@ -7017,7 +7032,7 @@ void Hud_DrawReticle3D(void) {
 					}
 				}
 
-				if (g_players[g_localPlayer].lookYawOffset || g_players[g_localPlayer].lookPitchOffset) {
+				if (HUD_RETICLE_PROJECTED()) {
 					int aimX;
 					int drawX;
 
@@ -7099,7 +7114,7 @@ void Hud_DrawReticle3D(void) {
 
 	quad.screenX = g_reticleCenterX;
 	quad.screenY = g_screenHeight - g_reticleCenterY;
-	if (g_players[g_localPlayer].lookYawOffset || g_players[g_localPlayer].lookPitchOffset) {
+	if (HUD_RETICLE_PROJECTED()) {
 		quad.screenX = g_reticleDrawX;
 		quad.screenY = g_screenHeight - g_reticleDrawY;
 	}
@@ -7895,7 +7910,7 @@ int Hud_UpdateHUD(void) {
 		g_drawTarget->pitch = g_surfacePitch;
 	}
 
-	if (g_players[g_localPlayer].hudEnabled) {
+	if (HUD_VISIBLE()) {
 		FlightText_SetWordWrap(0);
 		FlightText_SetClearLineBackground(0);
 		FlightText_SetShadowEnabled(0);
@@ -7905,13 +7920,12 @@ int Hud_UpdateHUD(void) {
 		}
 
 		if (!g_players[g_localPlayer].mapCameraState && (!g_filmPlaybackMode || g_filmOverlayActive != 1)) {
-			if ((g_players[g_localPlayer].viewState.externalCameraActive ||
-				 (g_filmPlaybackMode && g_filmOverlayActive == 1)) &&
+			if ((HUD_EXTERIOR_HIDES_HUD() || (g_filmPlaybackMode && g_filmOverlayActive == 1)) &&
 				g_hudElementEnabled[3].enabled) {
 				Hud_UpdateHUDText();
 			}
 
-			if (!g_players[g_localPlayer].viewState.externalCameraActive) {
+			if (!HUD_EXTERIOR_HIDES_HUD()) {
 				if (!g_players[g_localPlayer].mfd.enabled[0]) {
 					if (g_hudElementEnabled[3].enabled) {
 						Hud_UpdateHUDText();
@@ -7964,8 +7978,7 @@ int Hud_UpdateHUD(void) {
 
 	draw_overlays:
 		if (!g_useHardware3D) {
-			if (!g_players[g_localPlayer].viewState.externalCameraActive && !g_inHangarReady &&
-				!g_players[g_localPlayer].mapCameraState) {
+			if (!HUD_EXTERIOR_HIDES_HUD() && !g_inHangarReady && !g_players[g_localPlayer].mapCameraState) {
 				Hud_DrawReticle2D();
 				Hud_UpdateThreatIndicators();
 				if (!g_players[g_localPlayer].mfd.enabled[0] && g_hudElementEnabled[0].enabled) {
@@ -7981,8 +7994,7 @@ int Hud_UpdateHUD(void) {
 		goto finish;
 	}
 
-	if (!g_useHardware3D && (!g_filmPlaybackMode || g_filmOverlayActive != 1) &&
-		g_players[g_localPlayer].viewState.externalCameraActive) {
+	if (!g_useHardware3D && (!g_filmPlaybackMode || g_filmOverlayActive != 1) && HUD_EXTERIOR_HIDES_HUD()) {
 	draw_offscreen:
 		Hud_DrawOffscreenTargetIndicator2D();
 	}
@@ -10668,8 +10680,7 @@ void Hud_DrawHudTargetInsetIfEnabled(int playerIdx) {
 	insetX -= insetWidth >> 1;
 	insetY -= insetHeight;
 
-	if (!g_players[g_localPlayer].hudEnabled || !g_hudElementEnabled[0].enabled ||
-		playerIdx != g_localPlayer ||
+	if (!HUD_VISIBLE() || !g_hudElementEnabled[0].enabled || playerIdx != g_localPlayer ||
 		(!g_inHangarReady && (g_players[g_localPlayer].regionSessionId || g_flightMissionEndPending)) ||
 		g_players[g_localPlayer].hyperspacePhase != PLAYER_HYPERSPACE_PHASE_NONE) {
 		return;
@@ -10755,7 +10766,7 @@ void Hud_Update3DCrt(uint16_t x, uint16_t y, uint16_t width, uint16_t height, in
 		capturedCrt.projectile_exclude_slots[0] = 0xffffu;
 		capturedCrt.projectile_exclude_slots[1] = 0xffffu;
 		if (!g_replayViewMode) {
-			if (!g_players[g_localPlayer].viewState.externalCameraActive) {
+			if (!HUD_EXTERIOR_HIDES_HUD()) {
 				capturedCrt.projectile_exclude_slots[0] =
 					(uint16_t)g_players[g_localPlayer].viewState.cameraFocusObjIdx;
 			}
@@ -10925,7 +10936,7 @@ void Hud_Update3DCrt(uint16_t x, uint16_t y, uint16_t width, uint16_t height, in
 				int maxBoundsExtent;
 				int16_t genusId;
 				if ((objIdx == (uint32_t)g_players[g_localPlayer].viewState.cameraFocusObjIdx &&
-					 !g_players[g_localPlayer].viewState.externalCameraActive && !g_replayViewMode) ||
+					 !HUD_EXTERIOR_HIDES_HUD() && !g_replayViewMode) ||
 					(g_filmPlaybackMode && g_filmOverlayActive == 1 &&
 					 objIdx == (uint32_t)g_filmOverlayViewState.cameraFocusObjIdx &&
 					 !g_filmOverlayViewState.externalCameraActive && !g_replayViewMode) ||
@@ -15123,7 +15134,7 @@ void Hud_DrawBoxInXTrans(int x, int y, int width, int height, int colorIdx, int 
 		}
 	}
 
-	if ((g_players[g_localPlayer].mfd.enabled[0] || g_players[g_localPlayer].viewState.externalCameraActive ||
+	if ((g_players[g_localPlayer].mfd.enabled[0] || HUD_EXTERIOR_HIDES_HUD() ||
 		 (g_filmPlaybackMode && g_filmOverlayActive == 1)) &&
 		!g_inHangarReady && colorIdx == 59) {
 		int centerX;
