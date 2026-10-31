@@ -18,6 +18,8 @@ typedef struct XwaHostConfig {
 	char game_data_path[XWA_HOST_CONFIG_PATH_CAPACITY];
 	/* paths.mod. Empty when not set. */
 	char mod_path[XWA_HOST_CONFIG_PATH_CAPACITY];
+	/* paths.use_mod: 0 runs the original game with no mod. 1 by default. */
+	int use_mod;
 	int flight_simulation_step_ticks;
 	float model_smooth_angle_degrees;
 	float model_opt_emissive_strength;
@@ -47,6 +49,10 @@ typedef struct XwaHostConfig {
 
 int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size);
 int XwaHostConfig_SaveGameDataPath(AeronVfs* vfs, const char* game_data_path, char* error, size_t error_size);
+/* Saves paths.mod, removed when `mod_path` is NULL or empty, and
+ * paths.use_mod. */
+int XwaHostConfig_SaveModPath(AeronVfs* vfs, const char* mod_path, int use_mod, char* error,
+							  size_t error_size);
 int XwaHostConfig_SaveVideoOptions(AeronVfs* vfs, const XwaModernVideoOptions* options, char* error,
 								   size_t error_size);
 int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* options, char* error,

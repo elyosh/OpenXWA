@@ -251,6 +251,11 @@ static AssetLoadStatus assets_probe_file(const char* path) {
 	return ASSET_LOAD_SUCCESS;
 }
 
+/* assets_probe_file for a file of the mod. Without a mod, it is missing. */
+static AssetLoadStatus assets_probe_mod_file(const XwaRemasterAssets* a, const char* path) {
+	return a->root[0] ? assets_probe_file(path) : ASSET_LOAD_MISSING;
+}
+
 static int assets_texture_ref(const AeronImageCacheEntry* e, XwaAssetRef* out) {
 	if (!e || !e->tex) {
 		return 0;
@@ -395,7 +400,7 @@ static FileSlot* file_classify(XwaRemasterAssets* a, const char* key) {
 	const char* base = slash ? slash + 1 : key;
 	const int dlen = slash ? (int)(slash - key) : 0;
 	snprintf(path + pfx, sizeof path - pfx, "%.*s/sprites/%s.ktx2", dlen, key, base);
-	AssetLoadStatus probe = assets_probe_file(path);
+	AssetLoadStatus probe = assets_probe_mod_file(a, path);
 	if (probe == ASSET_LOAD_SUCCESS) {
 		s->kind = FILE_SINGLE;
 		return s;
@@ -405,7 +410,7 @@ static FileSlot* file_classify(XwaRemasterAssets* a, const char* key) {
 		return s;
 	}
 	snprintf(path + pfx, sizeof path - pfx, "%.*s/atlas/%s.yaml", dlen, key, base);
-	probe = assets_probe_file(path);
+	probe = assets_probe_mod_file(a, path);
 	if (probe == ASSET_LOAD_SUCCESS) {
 		s->kind = Aeron_SpriteAtlasLoad(&s->atlas, path) ? FILE_ATLAS : FILE_FAILED;
 		return s;
@@ -415,7 +420,7 @@ static FileSlot* file_classify(XwaRemasterAssets* a, const char* key) {
 		return s;
 	}
 	snprintf(path + pfx, sizeof path - pfx, "%.*s/atlas/%s/frame_00.ktx2", dlen, key, base);
-	probe = assets_probe_file(path);
+	probe = assets_probe_mod_file(a, path);
 	if (probe == ASSET_LOAD_SUCCESS) {
 		s->kind = FILE_FRAMEDIR;
 		return s;
@@ -501,7 +506,7 @@ static GroupSlot* assets_group_slot(XwaRemasterAssets* a, int group) {
 	char probe[768];
 	assets_group_folder(s, folder, sizeof folder);
 	snprintf(probe, sizeof probe, "%s/%s/group_%d.yaml", a->root, folder, group);
-	const AssetLoadStatus status = assets_probe_file(probe);
+	const AssetLoadStatus status = assets_probe_mod_file(a, probe);
 	if (status == ASSET_LOAD_SUCCESS) {
 		s->mod_status = Aeron_SpriteAtlasLoad(&s->atlas, probe) ? ASSET_LOAD_SUCCESS : ASSET_LOAD_FAILED;
 		/* A mission's own art has no alternative frame sets. */
@@ -1416,12 +1421,12 @@ static AssetLoadStatus assets_load_mod_flight_font(XwaRemasterAssets* a, AeronCo
 	if (snprintf(base, sizeof base, "%s/flight/fonts/font_tier_%d", a->root, tier) >= (int)sizeof base ||
 		snprintf(path, sizeof path, "%s.fnt", base) >= (int)sizeof path)
 		return ASSET_LOAD_FAILED;
-	AssetLoadStatus status = assets_probe_file(path);
+	AssetLoadStatus status = assets_probe_mod_file(a, path);
 	if (status != ASSET_LOAD_SUCCESS)
 		return status;
 	if (snprintf(path, sizeof path, "%s.ktx2", base) >= (int)sizeof path)
 		return ASSET_LOAD_FAILED;
-	status = assets_probe_file(path);
+	status = assets_probe_mod_file(a, path);
 	if (status != ASSET_LOAD_SUCCESS)
 		return status;
 	if (!AeronFontAtlas_LoadKtx2(&slot->atlas, cmd, base))
@@ -1505,7 +1510,7 @@ static AssetLoadStatus assets_load_original_frontend_font(XwaRemasterAssets* a, 
 static AssetLoadStatus assets_load_frontend_font(XwaRemasterAssets* a, AeronCommandBuffer* cmd, int font_size,
 												 const AeronFontAtlas** out) {
 	*out = NULL;
-	if (!a || a->root[0] == '\0') {
+	if (!a) {
 		return ASSET_LOAD_FAILED;
 	}
 	for (int i = 0; i < a->font_count; i++) {
@@ -1532,7 +1537,7 @@ static AssetLoadStatus assets_load_frontend_font(XwaRemasterAssets* a, AeronComm
 			char basename[640], path[672];
 			snprintf(basename, sizeof basename, "%s/frontend/fonts/font%d", a->root, font_size);
 			snprintf(path, sizeof path, "%s.fnt", basename);
-			status = assets_probe_file(path);
+			status = assets_probe_mod_file(a, path);
 			if (status == ASSET_LOAD_SUCCESS && !AeronFontAtlas_Load(&slot->atlas, cmd, basename))
 				status = ASSET_LOAD_FAILED;
 		}

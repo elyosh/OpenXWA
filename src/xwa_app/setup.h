@@ -31,9 +31,11 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normalized,
 							  size_t normalized_capacity, char* error, size_t error_size);
 
-/* Sets the mod root to the --mod path, else the paths.mod setting, else
- * <game data>/mod. Copies the path used to selected. The folder does not
- * have to exist. */
+/* Sets the mod root to the --mod path, else, unless paths.use_mod is false,
+ * the paths.mod setting, else <game data>/mod. Copies the path used to
+ * selected, which is empty when paths.use_mod is false: the mod root then
+ * stays unset and the game uses its own files only. The folder does not have
+ * to exist. */
 int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaHostConfig* host_config,
 						const char* game_data, char* selected, size_t selected_capacity, char* error,
 						size_t error_size);

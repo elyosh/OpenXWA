@@ -190,6 +190,11 @@ int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const Xwa
 
 	if (launch->mod_path[0]) {
 		length = snprintf(selected, selected_capacity, "%s", launch->mod_path);
+	} else if (!host_config->use_mod) {
+		if (selected_capacity) {
+			selected[0] = '\0';
+		}
+		return 1;
 	} else if (host_config->mod_path[0]) {
 		length = snprintf(selected, selected_capacity, "%s", host_config->mod_path);
 	} else {

@@ -355,7 +355,9 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 	AeronFileInfo mod_info;
-	if (AeronVfs_Stat(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, ".", &mod_info) && mod_info.is_directory) {
+	if (!selected_mod[0]) {
+		Aeron_LogInfo("xwa.config", "mod: none (paths.use_mod is false)");
+	} else if (AeronVfs_Stat(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, ".", &mod_info) && mod_info.is_directory) {
 		Aeron_LogInfo("xwa.config", "mod: %s", selected_mod);
 	} else {
 		Aeron_LogInfo("xwa.config", "mod: %s (not found, original assets only)", selected_mod);
