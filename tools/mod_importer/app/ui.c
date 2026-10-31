@@ -480,16 +480,6 @@ static void draw_done(ImporterUi* app) {
 
 /* ---- The Mods tab ------------------------------------------------------- */
 
-/* Whether two folder paths are the same, ignoring a final separator. */
-static int same_path(const char* a, const char* b) {
-	size_t length_a = strlen(a), length_b = strlen(b);
-	while (length_a > 1 && (a[length_a - 1] == '/' || a[length_a - 1] == '\\'))
-		--length_a;
-	while (length_b > 1 && (b[length_b - 1] == '/' || b[length_b - 1] == '\\'))
-		--length_b;
-	return length_a == length_b && strncmp(a, b, length_a) == 0;
-}
-
 static void scan_mods(ImporterUi* app) {
 	char current[PATH_CAP] = "";
 	XwaModList_Free(&app->mods);
@@ -511,16 +501,13 @@ static void scan_mods(ImporterUi* app) {
 	}
 	/* The mod that OpenXWA uses, as XwaSetup_SetModRoot picks it without
 	   --mod. */
-	if (app->config_ok && app->config.use_mod) {
-		if (app->config.mod_path[0])
-			snprintf(current, sizeof current, "%s", app->config.mod_path);
-		else if (app->config.game_data_path[0])
-			snprintf(current, sizeof current, "%s/mod", app->config.game_data_path);
-	}
+	if (app->config_ok && app->config.use_mod)
+		snprintf(current, sizeof current, "%s", app->config.mod_path);
 	for (size_t i = 0; i < app->mods.count; ++i) {
 		const XwaModEntry* entry = &app->mods.entries[i];
-		const int in_use = app->config_ok && (entry->path[0] ? current[0] && same_path(entry->path, current)
-															 : !app->config.use_mod);
+		const int in_use =
+			app->config_ok &&
+			(entry->path[0] ? current[0] && XwaModList_SamePath(entry->path, current) : !current[0]);
 		if (in_use)
 			app->mod_in_use = i;
 		snprintf(app->mod_labels[i], sizeof app->mod_labels[i], "%s%s%s", entry->name,

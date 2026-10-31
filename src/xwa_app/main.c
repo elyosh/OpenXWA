@@ -2,11 +2,13 @@
 #include "aeron/aeron.h"
 #include "aeron/time.h"
 #include "host_config.h"
+#include "mod_list.h"
 #include "setup.h"
 #include "window_icon.h"
 #include "xwa/config/game_config.h"
 #include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/xwa_remaster.h"
+#include "xwa_runtime/config/modern_mods.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/model_source.h"
@@ -17,7 +19,9 @@
 #include "xwa_runtime/runtime/presentation.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 enum {
@@ -89,6 +93,50 @@ static void apply_modern_input_options(const XwaModernInputOptions* options) {
 static int persist_modern_input_options(const XwaModernInputOptions* options, char* error,
 										size_t error_size) {
 	return XwaHostConfig_SaveInputOptions(Aeron_GetVfs(), options, error, error_size);
+}
+
+/* paths.mod. It is kept when the original game is chosen, so the mod stays
+ * in the list. */
+static char s_configured_mod[XWA_HOST_CONFIG_PATH_CAPACITY];
+
+static int persist_mod_choice(const char* path, char* error, size_t error_size) {
+	if (!path[0]) {
+		return XwaHostConfig_SaveModPath(Aeron_GetVfs(), s_configured_mod, 0, error, error_size);
+	}
+	return XwaHostConfig_SaveModPath(Aeron_GetVfs(), path, 1, error, error_size);
+}
+
+/* Gives the options the mods and the one in use. A mod from --mod is listed
+ * too, so it shows as the one in use. */
+static void configure_mods(const XwaLaunchOptions* launch, const XwaHostConfig* host_config,
+						   const char* game_data, const char* selected_mod) {
+	XwaModList list;
+	XwaModernModEntry* entries;
+	const char* configured = launch->mod_path[0] ? selected_mod : host_config->mod_path;
+	size_t running = SIZE_MAX;
+
+	snprintf(s_configured_mod, sizeof s_configured_mod, "%s", host_config->mod_path);
+	if (!XwaModList_Scan(game_data, configured, &list)) {
+		Aeron_LogError("xwa.config", "the mods can't be listed");
+		return;
+	}
+	entries = (XwaModernModEntry*)calloc(list.count ? list.count : 1, sizeof *entries);
+	if (!entries) {
+		XwaModList_Free(&list);
+		return;
+	}
+	for (size_t i = 0; i < list.count; ++i) {
+		entries[i].name = list.entries[i].name;
+		entries[i].path = list.entries[i].path;
+		entries[i].complete = list.entries[i].complete;
+		if (XwaModList_SamePath(list.entries[i].path, selected_mod)) {
+			running = i;
+		}
+	}
+	XwaModernMods_Configure(entries, list.count, running, launch->mod_path[0] != 0, persist_mod_choice);
+	Aeron_LogInfo("xwa.config", "mods: %zu listed, including the original game", list.count);
+	free(entries);
+	XwaModList_Free(&list);
 }
 
 static int show_first_launch_prompt(int* cancelled, char* error, size_t error_size) {
@@ -347,8 +395,8 @@ int main(int argc, char** argv) {
 	 * the game inside its unfocused pause. Ask for input focus back. */
 	Aeron_RaiseWindow();
 	Aeron_LogInfo("xwa.config", "game data: %s", selected_game_data);
-	if (!XwaSetup_SetModRoot(Aeron_GetVfs(), &launch, &host_config, selected_game_data, selected_mod,
-							 sizeof selected_mod, config_error, sizeof config_error)) {
+	if (!XwaSetup_SetModRoot(Aeron_GetVfs(), &launch, &host_config, selected_mod, sizeof selected_mod,
+							 config_error, sizeof config_error)) {
 		Aeron_LogError("xwa.config", "%s", config_error);
 		Aeron_FatalError("OpenXWA", config_error);
 		Aeron_Shutdown();
@@ -356,12 +404,13 @@ int main(int argc, char** argv) {
 	}
 	AeronFileInfo mod_info;
 	if (!selected_mod[0]) {
-		Aeron_LogInfo("xwa.config", "mod: none (paths.use_mod is false)");
+		Aeron_LogInfo("xwa.config", "mod: none, the original game");
 	} else if (AeronVfs_Stat(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, ".", &mod_info) && mod_info.is_directory) {
 		Aeron_LogInfo("xwa.config", "mod: %s", selected_mod);
 	} else {
 		Aeron_LogInfo("xwa.config", "mod: %s (not found, original assets only)", selected_mod);
 	}
+	configure_mods(&launch, &host_config, selected_game_data, selected_mod);
 	Aeron_LogInfo("xwa.config", "resources: %s", Aeron_ResourceRoot());
 	Aeron_LogInfo("xwa.config", "flight simulation step: %d ticks", host_config.flight_simulation_step_ticks);
 	Aeron_LogInfo("xwa.config", "OPT smoothing angle: %.3g degrees",

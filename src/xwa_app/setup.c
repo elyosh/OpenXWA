@@ -184,21 +184,18 @@ int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normal
 }
 
 int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaHostConfig* host_config,
-						const char* game_data, char* selected, size_t selected_capacity, char* error,
-						size_t error_size) {
+						char* selected, size_t selected_capacity, char* error, size_t error_size) {
 	int length;
 
 	if (launch->mod_path[0]) {
 		length = snprintf(selected, selected_capacity, "%s", launch->mod_path);
-	} else if (!host_config->use_mod) {
+	} else if (host_config->use_mod && host_config->mod_path[0]) {
+		length = snprintf(selected, selected_capacity, "%s", host_config->mod_path);
+	} else {
 		if (selected_capacity) {
 			selected[0] = '\0';
 		}
 		return 1;
-	} else if (host_config->mod_path[0]) {
-		length = snprintf(selected, selected_capacity, "%s", host_config->mod_path);
-	} else {
-		length = snprintf(selected, selected_capacity, "%s/mod", game_data);
 	}
 	if (length < 0 || (size_t)length >= selected_capacity ||
 		!AeronVfs_SetRoot(vfs, AERON_VFS_ROOT_MOD, selected) ||

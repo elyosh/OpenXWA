@@ -41,6 +41,8 @@
 #include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_input_options_screen.h"
+#include "xwa_runtime/config/modern_mods.h"
+#include "xwa_runtime/config/modern_mods_screen.h"
 #include "xwa_runtime/config/modern_pilot_profiles_screen.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/config/modern_video_options_screen.h"
@@ -179,7 +181,8 @@ int Config_MainMenuScreen(void) {
 #endif
 
 #ifdef XWA_MODERN
-	rowCount = g_configRestrictedOptionsModalActive ? 8 : 11;
+	/* Pilot Profiles, and outside flight, Mods. */
+	rowCount = g_configRestrictedOptionsModalActive ? 8 : 12;
 #else
 	rowCount = g_configRestrictedOptionsModalActive ? 7 : 10;
 #endif
@@ -409,6 +412,30 @@ int Config_MainMenuScreen(void) {
 	}
 	y += 25;
 	++rowIndex;
+
+	/* The mod is chosen at startup, so it can't change during a flight. */
+	if (!g_configRestrictedOptionsModalActive) {
+		text = "Mods";
+		titleWidth = FrontendText_MeasureWidth(text, 20);
+		textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+		buttonPressed =
+			FrontendButton_DrawMenuButton(textX, y, text, 20, g_colorPaleBlue, 31, 0, "settingsound");
+		if (g_menuCursorRow == rowIndex) {
+			FrontendText_Draw(20, text, textX, y, g_colorGreen);
+			if (keyState == CONFIG_KEY_ENTER) {
+				FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+				Keyboard_FlushCharBuffer();
+				keyState = 0;
+				buttonPressed = 1;
+			}
+		}
+		if (buttonPressed) {
+			g_pendingMenuScreen = 23;
+			g_menuCursorRow = 0;
+		}
+		y += 25;
+		++rowIndex;
+	}
 #endif
 
 	text = FrontendString_Get(STR_CONFIG_RETURN_TO_GAME);
@@ -2579,6 +2606,13 @@ int Config_OptionsDatapadUpdate(int frameState) {
 			}
 			done = 0;
 			break;
+		case 23:
+			if (XwaModernModsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
+				g_pendingMenuScreen = 0;
+				g_menuCursorRow = 9;
+			}
+			done = 0;
+			break;
 #endif
 		default:
 			done = 0;
@@ -2600,6 +2634,7 @@ int Config_OptionsDatapadUpdate(int frameState) {
 #ifdef XWA_MODERN
 		XwaModernVideoOptions_Flush();
 		XwaModernInputOptions_Flush();
+		XwaModernMods_Flush();
 		if (Movie_Play("dpclose", 1)) {
 			g_configOptionsDatapadClosingMovie = 1;
 			return 0;

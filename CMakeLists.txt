@@ -197,6 +197,8 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/config/modern_options_menu.c
     src/xwa_runtime/config/modern_pilot_profiles_screen.c
     src/xwa_runtime/config/modern_video_options.c
+    src/xwa_runtime/config/modern_mods.c
+    src/xwa_runtime/config/modern_mods_screen.c
     src/xwa_runtime/config/modern_video_options_screen.c
     src/xwa_runtime/hooks/orientation_hook.c
     src/xwa_runtime/frontend/awards.c
@@ -647,6 +649,8 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/config/modern_pilot_profiles_screen.h
     src/xwa_runtime/config/modern_video_options.h
     src/xwa_runtime/config/modern_video_options_screen.h
+    src/xwa_runtime/config/modern_mods.h
+    src/xwa_runtime/config/modern_mods_screen.h
     src/xwa/audio/cd_audio.h
     src/xwa/audio/music.h
     src/xwa/config/game_config.h

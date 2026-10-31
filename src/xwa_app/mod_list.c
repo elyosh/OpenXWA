@@ -47,8 +47,7 @@ static int mod_list_add(XwaModList* list, const char* name, const char* path, in
 	return 1;
 }
 
-/* Whether two folder paths are the same, ignoring a final separator. */
-static int mod_list_same_path(const char* a, const char* b) {
+int XwaModList_SamePath(const char* a, const char* b) {
 	size_t length_a = strlen(a);
 	size_t length_b = strlen(b);
 	while (length_a > 1 && (a[length_a - 1] == '/' || a[length_a - 1] == '\\')) {
@@ -70,7 +69,7 @@ static int mod_list_add_folder(XwaModList* list, AeronVfs* vfs, const char* path
 	int ok;
 
 	for (size_t i = 0; i < list->count; ++i) {
-		if (mod_list_same_path(list->entries[i].path, path)) {
+		if (XwaModList_SamePath(list->entries[i].path, path)) {
 			return 1;
 		}
 	}
@@ -106,10 +105,9 @@ static void mod_list_folder_name(const char* path, char* out, size_t capacity) {
 	snprintf(out, capacity, "%.*s", (int)(end - start), path + start);
 }
 
-/* Adds the mods of <game data>/mods, by folder name, then <game data>/mod. */
+/* Adds the mods of <game data>/mods, by folder name. */
 static int mod_list_scan_game_data(XwaModList* list, AeronVfs* vfs, const char* game_data) {
 	ModFolders folders = { 0 };
-	AeronFileInfo info;
 	char path[XWA_HOST_CONFIG_PATH_CAPACITY];
 	int ok = 1;
 
@@ -129,12 +127,6 @@ static int mod_list_scan_game_data(XwaModList* list, AeronVfs* vfs, const char* 
 		free(folders.names[i]);
 	}
 	free(folders.names);
-	if (ok && AeronVfs_Stat(vfs, AERON_VFS_ROOT_ASSET, "mod", &info) && info.is_directory) {
-		const int length = snprintf(path, sizeof path, "%s/mod", game_data);
-		if (length > 0 && (size_t)length < sizeof path) {
-			ok = mod_list_add_folder(list, vfs, path, "mod", 0);
-		}
-	}
 	return ok;
 }
 
