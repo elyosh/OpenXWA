@@ -8,7 +8,7 @@
  *   headlights:
  *     position_m: [0, 0, 20]      # from the craft's eye: X right, Y up, Z forward
  *     color: [0.944, 0.944, 1]    # linear
- *     power_w: 17671
+ *     power_w: 1314756
  *     angle_degrees: 25
  *     auto_turn_on: true
  *
