@@ -16,6 +16,7 @@
 #ifdef XWA_MODERN
 #include "aeron/log.h"
 #include "xwa/flight/flight_debug.h"
+#include "xwa_runtime/camera/camera_motion.h"
 #include "xwa_runtime/hooks/orientation_hook.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/runtime/port.h"
@@ -901,9 +902,12 @@ void FlightView_UpdatePlaybackCamera(int playerIdx) {
 // FUNCTION: XWA 0x4EE820
 void FlightView_UpdatePlayerCamera(int playerIdx) {
 	unsigned int cameraFocusObjIdx;
-
 #ifdef XWA_MODERN
+	int16_t exteriorPitchQ16;
+	int16_t exteriorYawQ16;
+
 	XwaSnapshotCamera_BeginUpdate(playerIdx);
+	XwaCameraMotion_Update(playerIdx);
 #endif
 	if (g_players[playerIdx].mapCameraState) {
 		FlightMap_UpdateCamera(playerIdx);
@@ -935,11 +939,24 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 					g_objectTable[g_players[playerIdx].viewState.cameraFocusObjIdx].pitch;
 				g_players[playerIdx].viewState.viewYaw =
 					g_objectTable[g_players[playerIdx].viewState.cameraFocusObjIdx].yaw;
+#ifdef XWA_MODERN
+				/* The enhanced camera trails the craft's turns and looks at it
+				   from above. The camera position below follows the turned
+				   rows. */
+				XwaCameraMotion_ExteriorOffsets(playerIdx, &exteriorPitchQ16, &exteriorYawQ16);
+				FVIEW_BuildCameraOrient(g_players[playerIdx].viewState.viewRoll,
+										(int16_t)g_players[playerIdx].viewState.viewPitch,
+										(int16_t)g_players[playerIdx].viewState.viewYaw, 0,
+										(int16_t)(g_players[playerIdx].viewState.hudAimX + exteriorPitchQ16),
+										(int16_t)(g_players[playerIdx].viewState.hudAimY + exteriorYawQ16),
+										NULL, playerIdx);
+#else
 				FVIEW_BuildCameraOrient(g_players[playerIdx].viewState.viewRoll,
 										(int16_t)g_players[playerIdx].viewState.viewPitch,
 										(int16_t)g_players[playerIdx].viewState.viewYaw, 0,
 										(int16_t)g_players[playerIdx].viewState.hudAimX,
 										(int16_t)g_players[playerIdx].viewState.hudAimY, NULL, playerIdx);
+#endif
 
 				Mission_ResolveObjectOrMissionPointWorldLoc(cameraFocusObjIdx, 0, 0, 0);
 				g_players[playerIdx].viewState.savedTargetX = worldlocx;

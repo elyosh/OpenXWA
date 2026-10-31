@@ -2319,7 +2319,8 @@ static int fl_temporal_pose_changed(const XwaSnapshot* current, const XwaSnapsho
 		   cockpit->aim_angle_b != prev_cockpit->aim_angle_b ||
 		   memcmp(cockpit->seat_eye_world_offset, prev_cockpit->seat_eye_world_offset,
 				  sizeof cockpit->seat_eye_world_offset) != 0 ||
-		   memcmp(cockpit->camera_pan, prev_cockpit->camera_pan, sizeof cockpit->camera_pan) != 0;
+		   memcmp(cockpit->camera_pan, prev_cockpit->camera_pan, sizeof cockpit->camera_pan) != 0 ||
+		   memcmp(cockpit->sway, prev_cockpit->sway, sizeof cockpit->sway) != 0;
 }
 
 static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const XwaFlightObject* anchor,
@@ -2338,7 +2339,8 @@ static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const XwaFlightObj
 
 	float eye_offset[3];
 	for (int axis = 0; axis < 3; ++axis) {
-		eye_offset[axis] = -(cockpit->seat_eye_world_offset[axis] + cockpit->camera_pan[axis] * 0.0625f);
+		eye_offset[axis] = -(cockpit->seat_eye_world_offset[axis] + cockpit->camera_pan[axis] * 0.0625f +
+							 cockpit->sway[axis]);
 	}
 	float delta[3];
 	fl_world_to_view(camera_rows, eye_offset[0], eye_offset[1], eye_offset[2], delta);
@@ -4440,7 +4442,8 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	memcpy(bw, anchor_bw, sizeof bw);
 	float w[3], delta[3];
 	for (int a = 0; a < 3; a++) {
-		w[a] = -(snap->cockpit.seat_eye_world_offset[a] + snap->cockpit.camera_pan[a] * 0.0625f);
+		w[a] = -(snap->cockpit.seat_eye_world_offset[a] + snap->cockpit.camera_pan[a] * 0.0625f +
+				 snap->cockpit.sway[a]);
 	}
 	fl_world_to_view(s.crows, w[0], w[1], w[2], delta);
 	if (snap->cockpit.inverted) {

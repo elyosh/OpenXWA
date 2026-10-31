@@ -24,6 +24,7 @@
 #include "xwa/util/memory.h"
 #include "xwa/xwa_options.h"
 #include "xwa_runtime/audio/sound_banks.h"
+#include "xwa_runtime/camera/camera_motion.h"
 #include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
@@ -164,6 +165,7 @@ int XwaPort_Init(void) {
 	XwaDocking_Init();
 	XwaObjectLimits_Init();
 	XwaHeadlights_Init();
+	XwaCameraMotion_Init();
 	XwaCockpitAlertLights_Init();
 	XwaParticleLights_Init();
 	XwaCraftDefinitions_Apply();
