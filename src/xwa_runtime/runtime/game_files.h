@@ -19,7 +19,10 @@ extern "C" {
    - the mission lists, <same folders>/MISSION.LST, and MISSIONS/EMAIL.TXT;
    - the sounds, WAVE/...: the mission voices, the briefing, debriefing and
 	 concourse voices, and the sound banks;
-   - the cutscene table, FRONTRES/CUTSCENE/CUTSCENE.TXT.
+   - the cutscene table, FRONTRES/CUTSCENE/CUTSCENE.TXT;
+   - the medal files in FRONTRES/MEDALS/: MEDALS.TXT, the missions that give
+	 the battle medals; MEDALS.LST, the medal images; and FAMILYAWARDS.TXT,
+	 the memento texts.
 
    Returns 1 when the mod folder has a copy of game file `path`, and writes
    the copy's path in the mod folder into `modPath`. Returns 0 otherwise. */

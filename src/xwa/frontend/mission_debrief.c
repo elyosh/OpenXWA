@@ -1,5 +1,6 @@
 #include "xwa/frontend/mission_debrief.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/concourse_layout.h"
 #include "xwa_runtime/models/craft_names.h"
 #endif
@@ -2481,7 +2482,11 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 	char separator;
 	int battleNumber;
 	int missionNumber;
+#ifdef XWA_MODERN
+	const char* awardName;
+#else
 	UIString awardNameString;
+#endif
 
 	if (frameCounter == 0) {
 		g_awardCeremonyState = 0;
@@ -2512,8 +2517,14 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 #endif
 				FrontImage_AdvanceSpriteFrame(g_frontendScratchBuffer, 1);
 
+#ifdef XWA_MODERN
+				/* Frontend/awards.yaml can name the medals and the Kalidor
+				   Crescent levels. */
+				strcpy(g_frontendScratchBuffer, XwaAwards_BattleMedalName(awardId - 1));
+#else
 				strcpy(g_frontendScratchBuffer,
 					   FrontendString_Get((UIString)(STR_FAMILY_BATTLE_MEDAL1 + awardId - 1)));
+#endif
 				rect.left = x + width + 30;
 				textWidth = FrontendText_MeasureWidth(g_frontendScratchBuffer, 12);
 				rect.top = 345;
@@ -2543,8 +2554,12 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 #endif
 				FrontImage_AdvanceSpriteFrame(g_frontendScratchBuffer, 1);
 
+#ifdef XWA_MODERN
+				strcpy(g_frontendScratchBuffer, XwaAwards_KalidorName(g_pilotData.kalidorCresent - 1));
+#else
 				strcpy(g_frontendScratchBuffer,
 					   FrontendString_Get((UIString)(STR_FAMILY_KALIDOR1 + g_pilotData.kalidorCresent - 1)));
+#endif
 				textWidth = FrontendText_MeasureWidth(g_frontendScratchBuffer, 12);
 				rect.left = x - textWidth - 60;
 				rect.top = 105;
@@ -2575,7 +2590,11 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 					FrontImage_DrawSprite(g_frontendScratchBuffer, 320 - (width >> 1), 240 - (height >> 1));
 #endif
 					FrontImage_AdvanceSpriteFrame(g_frontendScratchBuffer, 1);
+#ifdef XWA_MODERN
+					awardName = XwaAwards_BattleMedalName(awardId - 1);
+#else
 					awardNameString = (UIString)(STR_FAMILY_BATTLE_MEDAL1 + awardId - 1);
+#endif
 				} else {
 					sprintf(g_frontendScratchBuffer, "lkalidorzoom%d", g_pilotData.kalidorCresent - 1);
 					FrontImage_GetResourceRect(g_frontendScratchBuffer, &rect);
@@ -2588,9 +2607,17 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 					FrontImage_DrawSprite(g_frontendScratchBuffer, 320 - (width >> 1), 240 - (height >> 1));
 #endif
 					FrontImage_AdvanceSpriteFrame(g_frontendScratchBuffer, 1);
+#ifdef XWA_MODERN
+					awardName = XwaAwards_KalidorName(g_pilotData.kalidorCresent - 1);
+#else
 					awardNameString = (UIString)(STR_FAMILY_KALIDOR1 + g_pilotData.kalidorCresent - 1);
+#endif
 				}
+#ifdef XWA_MODERN
+				strcpy(g_frontendScratchBuffer, awardName);
+#else
 				strcpy(g_frontendScratchBuffer, FrontendString_Get(awardNameString));
+#endif
 
 				textWidth = FrontendText_MeasureWidth(g_frontendScratchBuffer, 15);
 				rect.left = 300 - (textWidth >> 1);

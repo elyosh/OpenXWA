@@ -36,6 +36,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/audio/sound_banks.h"
+#include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/docking.h"
@@ -1978,7 +1979,13 @@ static __inline void PilotData_UpdatePromotion(unsigned int missionCategory) {
 		if (pilotRating < (g_missionHeader.body.missionType == XWA_MISSION_TYPE_SIMULATOR_2 ? 24 : 7)) {
 			currentPromo = g_pilotData.currentRatingPromoPoints +
 						   g_players[g_localPlayer].missionStats.ratingPromoPoints;
+#ifdef XWA_MODERN
+			/* Frontend/awards.yaml can set the promotion thresholds. */
+			threshold = XwaAwards_RatingThreshold((int)pilotRating,
+												  g_pilotRatingPromotionPointThresholds[pilotRating]);
+#else
 			threshold = g_pilotRatingPromotionPointThresholds[pilotRating];
+#endif
 			g_pilotData.currentRatingPromoPoints = currentPromo;
 			if (g_pilotData.currentRatingWorsePromoPoints < threshold / 2) {
 				currentPromo += g_players[g_localPlayer].missionStats.worseRatingPromoPoints;
@@ -1998,8 +2005,15 @@ static __inline void PilotData_UpdatePromotion(unsigned int missionCategory) {
 			}
 
 			if (currentPromo >= 0) {
+#ifdef XWA_MODERN
+				g_pilotData.nextPromotionPercent =
+					100 * currentPromo /
+					XwaAwards_RatingThreshold((int)pilotRating,
+											  g_pilotRatingPromotionPointThresholds[pilotRating]);
+#else
 				g_pilotData.nextPromotionPercent =
 					100 * currentPromo / g_pilotRatingPromotionPointThresholds[pilotRating];
+#endif
 				if (g_pilotData.nextPromotionPercent > 100) {
 					g_pilotData.nextPromotionPercent = 100;
 				}
@@ -2039,7 +2053,13 @@ static __inline void PilotData_UpdatePromotion(unsigned int missionCategory) {
 		if (pilotRating < 24) {
 			currentPromo = g_pilotData.currentRatingPromoPoints +
 						   g_players[g_localPlayer].missionStats.ratingPromoPoints;
+#ifdef XWA_MODERN
+			/* Frontend/awards.yaml can set the promotion thresholds. */
+			threshold = XwaAwards_RatingThreshold((int)pilotRating,
+												  g_pilotRatingPromotionPointThresholds[pilotRating]);
+#else
 			threshold = g_pilotRatingPromotionPointThresholds[pilotRating];
+#endif
 			g_pilotData.currentRatingPromoPoints = currentPromo;
 			if (g_pilotData.currentRatingWorsePromoPoints < threshold / 2) {
 				currentPromo += g_players[g_localPlayer].missionStats.worseRatingPromoPoints;
@@ -2059,8 +2079,15 @@ static __inline void PilotData_UpdatePromotion(unsigned int missionCategory) {
 			}
 
 			if (currentPromo >= 0) {
+#ifdef XWA_MODERN
+				g_pilotData.nextPromotionPercent =
+					100 * currentPromo /
+					XwaAwards_RatingThreshold((int)pilotRating,
+											  g_pilotRatingPromotionPointThresholds[pilotRating]);
+#else
 				g_pilotData.nextPromotionPercent =
 					100 * currentPromo / g_pilotRatingPromotionPointThresholds[pilotRating];
+#endif
 				if (g_pilotData.nextPromotionPercent > 100) {
 					g_pilotData.nextPromotionPercent = 100;
 				}
@@ -2674,17 +2701,36 @@ int16_t FeDiskIo_CommitFlightResults(void) {
 				if (primary == 1) {
 					g_pilotData.tourOfDutyMissions[i].completedCount = 1;
 					g_pilotData.factionStatistics[g_pilotData.currentFactionId].score += score;
+#ifdef XWA_MODERN
+					/* Frontend/awards.yaml can set the rank thresholds, the number
+					   of Kalidor Crescent levels and their thresholds. */
+					if (statType == 0 && (unsigned int)g_pilotData.pilotRank < 8 &&
+						(unsigned int)g_pilotData.factionStatistics[g_pilotData.currentFactionId].score >=
+							XwaAwards_RankThreshold(
+								g_pilotData.pilotRank,
+								g_pilotRankPromotionScoreThresholds[g_pilotData.pilotRank])) {
+#else
 					if (statType == 0 && (unsigned int)g_pilotData.pilotRank < 8 &&
 						(unsigned int)g_pilotData.factionStatistics[g_pilotData.currentFactionId].score >=
 							g_pilotRankPromotionScoreThresholds[g_pilotData.pilotRank]) {
+#endif
 						g_pilotData.tacOfficerAnnounceNewRank = ++g_pilotData.pilotRank;
 					}
 					g_pilotData.factionStatistics[g_pilotData.currentFactionId].bonusScore +=
 						bonusScoreTenths;
+#ifdef XWA_MODERN
+					if (statType == 0 &&
+						(unsigned int)g_pilotData.kalidorCresent < (unsigned int)XwaAwards_KalidorLevels() &&
+						(unsigned int)g_pilotData.factionStatistics[g_pilotData.currentFactionId]
+								.bonusScore >=
+							XwaAwards_KalidorThreshold(g_pilotData.kalidorCresent,
+													   g_kalidorCrescentBonusScoreThresholds)) {
+#else
 					if (statType == 0 && (unsigned int)g_pilotData.kalidorCresent < 6 &&
 						(unsigned int)g_pilotData.factionStatistics[g_pilotData.currentFactionId]
 								.bonusScore >=
 							g_kalidorCrescentBonusScoreThresholds[g_pilotData.kalidorCresent]) {
+#endif
 						g_pilotData.familyNewMedal = ++g_pilotData.kalidorCresent;
 					}
 				}

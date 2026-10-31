@@ -1,5 +1,7 @@
 #include "xwa/frontend/frontend_image.h"
 #ifdef XWA_MODERN
+#include "xwa/frontend/frontend_medals.h"
+#include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
@@ -2441,6 +2443,20 @@ int FrontImage_RegisterAtlasSprites(void) {
 	FrontImage_RegisterAtlasSprite("settingbar", 15000, 4003, 1);
 	FrontImage_RegisterAtlasSprite("chatarm", 15000, 4500, 1);
 
+#ifdef XWA_MODERN
+	/* Frontend/awards.yaml can add mementos. The images of missions 100 and
+	   up start at 2000. */
+	for (i = 0; i < XwaAwards_MementoSprites(); ++i) {
+		sprintf(buffer, "medal%d", i);
+		FrontImage_RegisterAtlasSprite(buffer, 15900, (uint16_t)(i < 100 ? i + 100 : i + 1900), 1);
+	}
+
+	/* Medals.txt can list up to 20 battle medals. */
+	for (i = 0; i < FRONTEND_MEDAL_VALUE_COUNT; ++i) {
+		sprintf(buffer, "battle%d", i);
+		FrontImage_RegisterAtlasSprite(buffer, 15900, (uint16_t)(i + 200), 1);
+	}
+#else
 	for (i = 0; i < 53; ++i) {
 		sprintf(buffer, "medal%d", i);
 		FrontImage_RegisterAtlasSprite(buffer, 15900, (uint16_t)(i + 100), 1);
@@ -2450,6 +2466,7 @@ int FrontImage_RegisterAtlasSprites(void) {
 		sprintf(buffer, "battle%d", i);
 		FrontImage_RegisterAtlasSprite(buffer, 15900, (uint16_t)(i + 200), 1);
 	}
+#endif
 
 	for (i = 0; i < 7; ++i) {
 		sprintf(buffer, "rating%d", i);
@@ -2467,7 +2484,11 @@ int FrontImage_RegisterAtlasSprites(void) {
 		FrontImage_RegisterAtlasSprite(buffer, 15900, (uint16_t)(i + 500), 1);
 	}
 
+#ifdef XWA_MODERN
+	for (i = 0; i < XwaAwards_KalidorSprites(); ++i) {
+#else
 	for (i = 0; i < 6; ++i) {
+#endif
 		sprintf(buffer, "kalidor%d", i);
 		FrontImage_RegisterAtlasSprite(buffer, 15900, (uint16_t)(i + 600), 1);
 	}
@@ -2490,7 +2511,18 @@ int FrontImage_RegisterAtlasSprite(const char* name, uint16_t groupId, uint16_t 
 
 	if (frameCount != 0) {
 		do {
+#ifdef XWA_MODERN
+			/* A mod can have fewer medal images than the game loads. A missing
+			   image has empty bounds, so it can't be hovered or clicked. */
+			if (!FrontImage_GetAtlasSpriteBounds(&frameBounds, groupId, (uint16_t)(frameIndex + baseIndex))) {
+				frameBounds.left = 0x7fffffff;
+				frameBounds.top = 0x7fffffff;
+				frameBounds.right = 0;
+				frameBounds.bottom = 0;
+			}
+#else
 			FrontImage_GetAtlasSpriteBounds(&frameBounds, groupId, (uint16_t)(frameIndex + baseIndex));
+#endif
 			if (frameBounds.left < bounds.left) {
 				bounds.left = frameBounds.left;
 			}

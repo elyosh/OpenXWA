@@ -33,7 +33,9 @@ static int GameFiles_IsModFile(const char* path) {
 			return 1;
 		}
 	}
-	if (strcmp(path, "missions/email.txt") == 0 || strcmp(path, "frontres/cutscene/cutscene.txt") == 0) {
+	if (strcmp(path, "missions/email.txt") == 0 || strcmp(path, "frontres/cutscene/cutscene.txt") == 0 ||
+		strcmp(path, "frontres/medals/medals.txt") == 0 || strcmp(path, "frontres/medals/medals.lst") == 0 ||
+		strcmp(path, "frontres/medals/familyawards.txt") == 0) {
 		return 1;
 	}
 	return strncmp(path, "wave/", 5) == 0;

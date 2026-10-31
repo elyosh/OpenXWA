@@ -1382,12 +1382,13 @@ static void bake_resdata(XwauContext* ctx) {
 
 /* ---- room positions ------------------------------------------------------ */
 
+/* Decodes an XWAU position: a value above 8000 holds tenths of a unit. */
+static double xwau_units(int v) { return v > 8000 ? (v - 8000) / 10.0 : v; }
+
 /* Reads one ConcourseDoors.txt value the way XWAU does: the file's value,
- * else the hook's default (HC/concourse.cpp:1929-2030). A value above 8000
- * holds tenths of a unit. */
+ * else the hook's default (HC/concourse.cpp:1929-2030). */
 static double door_value(const char* doors, const char* key, int fallback) {
-	const int v = doors[0] ? read_key_int(doors, key, fallback) : fallback;
-	return v > 8000 ? (v - 8000) / 10.0 : v;
+	return xwau_units(doors[0] ? read_key_int(doors, key, fallback) : fallback);
 }
 
 static void write_design_point(FILE* fp, double x, double y) {
@@ -1528,15 +1529,16 @@ static void write_layout_yaml(XwauContext* ctx) {
 			if (!comma)
 				continue;
 			fprintf(fp, count++ ? ", " : "");
-			write_design_point(fp, (double)strtol(line, NULL, 0), (double)strtol(comma + 1, NULL, 0));
+			write_design_point(fp, xwau_units((int)strtol(line, NULL, 0)),
+							   xwau_units((int)strtol(comma + 1, NULL, 0)));
 		}
 		if (mp)
 			fclose(mp);
 		fprintf(fp, "]\n");
 	}
 	fprintf(fp, "  kalidor: ");
-	write_design_point(fp, HOOK_INT("KalidorCrescentPositionX", 224),
-					   HOOK_INT("KalidorCrescentPositionY", 168));
+	write_design_point(fp, xwau_units(HOOK_INT("KalidorCrescentPositionX", 224)),
+					   xwau_units(HOOK_INT("KalidorCrescentPositionY", 168)));
 	/* Award ceremony: images are placed by their centre, and texts are
 	 * offsets from where the stock game puts them. */
 	fprintf(fp, "\naward_ceremony:\n  zoom_texts: %s\n",

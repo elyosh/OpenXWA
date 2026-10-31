@@ -1,5 +1,6 @@
 #include "xwa/frontend/family_transport_room.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/concourse_layout.h"
 #endif
 
@@ -309,7 +310,12 @@ static void FamilyTransportRoom_DrawNormalBackgroundLayer(void) {
 			g_colorLightBlue);
 	}
 
+#ifdef XWA_MODERN
+	/* Frontend/awards.yaml can add Kalidor Crescent levels. */
+	for (i = 0; i < (unsigned int)XwaAwards_KalidorSprites(); ++i) {
+#else
 	for (i = 0; i < 6; ++i) {
+#endif
 		if (g_pilotData.kalidorCresent > (int)i) {
 			sprintf(buffer, "kalidor%d", i);
 			FrontImage_DrawSprite(buffer, 0, 0);
@@ -351,7 +357,12 @@ static void FamilyTransportRoom_DrawMedalCaseZoomLayer(void) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	/* Frontend/awards.yaml can add Kalidor Crescent levels. */
+	for (i = 0; i < (unsigned int)XwaAwards_KalidorSprites(); ++i) {
+#else
 	for (i = 0; i < 6; ++i) {
+#endif
 		if (g_pilotData.kalidorCresent > (int)i) {
 			sprintf(buffer, "kalidorzoom%d", i);
 #ifdef XWA_MODERN
@@ -571,18 +582,34 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 					if (g_pilotData.tourOfDutyMissions[g_missionList[missionListIndex].missionIdx]
 							.completedCount == 1) {
 						sprintf(buffer, "medal%d", g_missionList[missionListIndex].missionIdx);
+#ifdef XWA_MODERN
+						/* Frontend/awards.yaml can replace the mementos that have a
+						   detail view. */
+						if (XwaAwards_HasMementoImages()
+								? XwaAwards_MementoImage(g_missionList[missionListIndex].missionIdx) != NULL
+								: g_familyMedalHotspotEnabledByMission[g_missionList[missionListIndex]
+																		   .missionIdx] != 0) {
+#else
 						if (g_familyMedalHotspotEnabledByMission[g_missionList[missionListIndex]
 																	 .missionIdx]) {
+#endif
 							FrontImage_GetResourceRect(buffer, &rect);
 							if (FrontendDraw_PointInRect(&rect, outX, outY)) {
 								hotspotActive = 1;
 							}
 
+#ifdef XWA_MODERN
+							buttonResult = FrontendButton_DrawSimpleSpriteHitTest(
+								&rect, g_emptyString, g_emptyString,
+								XwaAwards_MementoName(g_missionList[missionListIndex].missionIdx), 12,
+								g_colorLightBlue, (int)missionListIndex + 35, "settingsound");
+#else
 							buttonResult = FrontendButton_DrawSimpleSpriteHitTest(
 								&rect, g_emptyString, g_emptyString,
 								FrontendString_Get((UIString)(g_missionList[missionListIndex].missionIdx +
 															  STR_FAMILY_MEDAL0)),
 								12, g_colorLightBlue, (int)missionListIndex + 35, "settingsound");
+#endif
 							if (buttonResult != 0) {
 								if (!g_frontendFamilyDetailMode) {
 									unsigned int awardTextIndex;
@@ -590,17 +617,31 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 									g_frontendRightBarAnimState = 0;
 									g_frontendFamilyDetailMode = 2;
 									g_familyTransportRoomPageOrRevealCounter = 0;
+#ifdef XWA_MODERN
+									strcpy(g_frontendFamilyDetailImagePath,
+										   XwaAwards_HasMementoImages()
+											   ? XwaAwards_MementoImage(
+													 g_missionList[missionListIndex].missionIdx)
+											   : g_familyMedalDetailImagePathByMission
+													 [g_missionList[missionListIndex].missionIdx]);
+#else
 									strcpy(
 										g_frontendFamilyDetailImagePath,
 										g_familyMedalDetailImagePathByMission[g_missionList[missionListIndex]
 																				  .missionIdx]);
+#endif
 									FrontendFamily_DrawRoomBackground();
 									FrontendSound_PlayUISound("panelarm", 1, 0, 255,
 															  12 * g_gameConfig.sfxDatapadVolume, 63);
+#ifdef XWA_MODERN
+									strcpy(g_frontendFamilyDetailTitle,
+										   XwaAwards_MementoName(g_missionList[missionListIndex].missionIdx));
+#else
 									strcpy(g_frontendFamilyDetailTitle,
 										   FrontendString_Get(
 											   (UIString)(g_missionList[missionListIndex].missionIdx +
 														  STR_FAMILY_MEDAL0)));
+#endif
 									g_frontendFamilySelectedAwardTextIdx = 0;
 									for (awardTextIndex = 0;
 										 awardTextIndex < (unsigned int)g_frontendFamilyAwardTextCount;
@@ -765,17 +806,28 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 						FrontendDraw_RectOffsetXY(&rect, g_familyMedalZoomOffsetX[medalIndex],
 												  g_familyMedalZoomOffsetY[medalIndex]);
 #endif
+#ifdef XWA_MODERN
+						/* Frontend/awards.yaml can name the medals. */
+						FrontendButton_DrawSpriteAtOriginWithTooltip(
+							&rect, g_emptyString, XwaAwards_BattleMedalName((int)medalIndex), 12,
+							g_colorLightBlue);
+#else
 						FrontendButton_DrawSpriteAtOriginWithTooltip(
 							&rect, g_emptyString,
 							FrontendString_Get((UIString)(medalIndex + STR_FAMILY_BATTLE_MEDAL1)), 12,
 							g_colorLightBlue);
+#endif
 					}
 
 					++medalIndex;
 				} while (medalIndex < (unsigned int)g_medalCount);
 			}
 
+#ifdef XWA_MODERN
+			for (medalIndex = 0; medalIndex < (unsigned int)XwaAwards_KalidorSprites(); ++medalIndex) {
+#else
 			for (medalIndex = 0; medalIndex < 6; ++medalIndex) {
+#endif
 				if ((unsigned int)g_pilotData.kalidorCresent > medalIndex) {
 					sprintf(buffer, "kalidorzoom%d", medalIndex);
 					FrontImage_GetResourceRect(buffer, &rect);
@@ -784,10 +836,16 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 #else
 					FrontendDraw_RectOffsetXY(&rect, 224, 168);
 #endif
+#ifdef XWA_MODERN
+					FrontendButton_DrawSpriteAtOriginWithTooltip(
+						&rect, g_emptyString, XwaAwards_KalidorName(g_pilotData.kalidorCresent - 1), 12,
+						g_colorLightBlue);
+#else
 					FrontendButton_DrawSpriteAtOriginWithTooltip(
 						&rect, g_emptyString,
 						FrontendString_Get((UIString)(g_pilotData.kalidorCresent + STR_FAMILY_KALIDOR1 - 1)),
 						12, g_colorLightBlue);
+#endif
 				}
 			}
 		}
