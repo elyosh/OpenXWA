@@ -575,8 +575,8 @@ typedef struct XwaFlightCamera {
 	/* Death Star tunnel/interior mode. Type-2006 explosion billboards
 	 * skip the 1024 projected-size clamp. */
 	uint8_t death_star_mode;
-	/* Death Star tunnel turbolaser beam light (the region's
-	 * g_deathStarTunnelLaserRegions state while a beam is active —
+	/* The light of the Death Star's superlaser near its target while a
+	 * shot travels (the region's g_deathStarSuperlaserRegions state;
 	 * classic: green, intensity 100000, cull 0x4000). */
 	uint8_t ds_beam_active;
 	int32_t ds_beam_world_pos[3];

@@ -742,7 +742,7 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 				float laserScale;
 
 				g_renderFlags = 64;
-				laserScale = -(g_deathStarTunnelLaserRegions[regionIdx].remainingDistance /
+				laserScale = -(g_deathStarSuperlaserRegions[regionIdx].remainingDistance /
 							   (float)g_objectTypes[OBJ_LaserImperialDS].maxBoundsExtent);
 				mesh.viewOrient[0] *= g_sw3dLaserScale;
 				mesh.viewOrient[1] *= g_sw3dLaserScale;

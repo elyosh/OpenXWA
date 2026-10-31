@@ -205,8 +205,8 @@ int  DeathStar_AreSegmentSetStartDistancesOrdered(void);
 void DeathStar_PopulateRandomSegmentChildren(int16_t segmentSetIdx,
 											 DeathStarSegmentDef* segment);
 int  DeathStar_BuildSegmentSets(void);
-void DeathStar_SelectLaserTarget(int preferredTargetObjIdx);
-void DeathStar_FireLaserAtTarget(void);
+void DeathStar_SelectSuperlaserTarget(int preferredTargetObjIdx);
+void DeathStar_FireSuperlaser(void);
 void DeathStar_Init(void);
 void DeathStar_InitMobileObjectForType(uint16_t objectType, unsigned int objIdx);
 void DeathStar_SpawnScriptedObjects(void);

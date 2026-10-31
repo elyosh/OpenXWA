@@ -836,7 +836,7 @@ RenderObjectListEntry* g_renderObjectListEntries = g_renderObjectListEntryStorag
 // GLOBAL: XWA 0x7D4B74
 RenderObjectListEntry* g_renderListHead;
 // GLOBAL: XWA 0x8C1A80
-DeathStarTunnelLaserRegionState g_deathStarTunnelLaserRegions[5];
+DeathStarSuperlaserRegionState g_deathStarSuperlaserRegions[5];
 // GLOBAL: XWA 0x5FF538
 const int flareSpriteOrColor[6] = {
 	0x08ffffff, 0x16ffffff, 0x32ffffff, 0x32ffffff, 0x16ffffff, 0x16ffffff,

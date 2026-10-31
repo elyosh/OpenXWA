@@ -2326,9 +2326,9 @@ void Backdrop_RenderCurrentRegion(void) {
 			continue;
 		}
 
-		beamSprite = g_deathStarTunnelLaserRegions[regionIndex].beamSpriteRect;
+		beamSprite = g_deathStarSuperlaserRegions[regionIndex].beamSpriteRect;
 		if (beamSprite != NULL && beamSprite == &g_backdropRecordsByRegion[0][flatRecordIdx] &&
-			g_deathStarTunnelLaserRegions[regionIndex].shotActive == 0) {
+			g_deathStarSuperlaserRegions[regionIndex].shotActive == 0) {
 			continue;
 		}
 
@@ -3184,7 +3184,7 @@ void Backdrop_BuildCoordinateBuffers(void) {
 			record->stripHalfHeight = stripHalfHeight;
 
 			if ((uint16_t)record->objectType == OBJ_DeathStarFireTextureGroup6250_Sprite000) {
-				DeathStarTunnelLaserRegionState* laser;
+				DeathStarSuperlaserRegionState* laser;
 				WorldRectRecord* emitter;
 				WorldRectRecord* beamSprite;
 				int laserDirX;
@@ -3199,7 +3199,7 @@ void Backdrop_BuildCoordinateBuffers(void) {
 				int laserNewY;
 				int laserNewZ;
 
-				laser = &g_deathStarTunnelLaserRegions[regionIdx];
+				laser = &g_deathStarSuperlaserRegions[regionIdx];
 				emitter = laser->emitterRect;
 				laserDirX = emitter->worldDirQ20.x;
 				laserDirY = emitter->worldDirQ20.y;

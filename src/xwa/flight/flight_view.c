@@ -1727,14 +1727,14 @@ char FlightView_Render(void) {
 	}
 
 	g_scenePointLightCount = 0;
-	if (g_deathStarTunnelLaserRegions[regionIdx].enabled &&
-		g_deathStarTunnelLaserRegions[regionIdx].beamLightActive) {
+	if (g_deathStarSuperlaserRegions[regionIdx].enabled &&
+		g_deathStarSuperlaserRegions[regionIdx].beamLightActive) {
 		PointLight* laserLight;
 
 		laserLight = &g_scenePointLights[0];
-		laserLight->fixed.x = g_deathStarTunnelLaserRegions[regionIdx].pointLightX;
-		laserLight->fixed.y = g_deathStarTunnelLaserRegions[regionIdx].pointLightY;
-		laserLight->fixed.z = g_deathStarTunnelLaserRegions[regionIdx].pointLightZ;
+		laserLight->fixed.x = g_deathStarSuperlaserRegions[regionIdx].pointLightX;
+		laserLight->fixed.y = g_deathStarSuperlaserRegions[regionIdx].pointLightY;
+		laserLight->fixed.z = g_deathStarSuperlaserRegions[regionIdx].pointLightZ;
 		laserLight->intensity = 100000.0f;
 		laserLight->colorR = 0.0f;
 		laserLight->colorG = 1.0f;

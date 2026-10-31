@@ -103,7 +103,7 @@ typedef struct WorldRectRecord {
 	uint8_t frame;
 } WorldRectRecord;
 
-typedef struct DeathStarTunnelLaserRegionState {
+typedef struct DeathStarSuperlaserRegionState {
 	int16_t enabled;
 	int16_t shotActive;
 	int16_t alternateDelayPhase;
@@ -132,7 +132,7 @@ typedef struct DeathStarTunnelLaserRegionState {
 	int pointLightY;
 	int pointLightZ;
 	float remainingDistance;
-} DeathStarTunnelLaserRegionState;
+} DeathStarSuperlaserRegionState;
 
 typedef struct OptTexCoord {
 	float u;
@@ -963,7 +963,7 @@ extern OptTexCoord g_backdropStripTexCoords[4];
 extern OptTexCoord* g_currentQuadTexCoords;
 extern RenderObjectListEntry* g_renderObjectListEntries;
 extern RenderObjectListEntry* g_renderListHead;
-extern DeathStarTunnelLaserRegionState g_deathStarTunnelLaserRegions[5];
+extern DeathStarSuperlaserRegionState g_deathStarSuperlaserRegions[5];
 extern const int flareSpriteOrColor[6];
 extern uint8_t g_meshClipCornerOutcodes[8];
 extern float g_meshClipScreenX[8];

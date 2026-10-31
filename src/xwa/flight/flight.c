@@ -1857,7 +1857,7 @@ void FlightObject_UpdateDebrisAndTransientAnimations(void) {
 //  2. Loose crew/pilot tumble, damaged-craft escape-pod ejection, hull explosion fragments,
 //     debris/animated-texture frame advance, rotary gun-turret idle-spin and target tracking,
 //     and active chaff cloud effects (crewMeshRotationUpdateTimer).
-//  3. Death Star tunnel super-laser warm-up / travel / hold sequencing and beam sweep damage
+//  3. Death Star superlaser warm-up / travel / hold sequencing and beam sweep damage
 //     for this region.
 void FlightObject_UpdateSpecialBehavior(void) {
 	uint32_t objIdx;
@@ -2352,33 +2352,33 @@ void FlightObject_UpdateSpecialBehavior(void) {
 		}
 	}
 
-	// ---- Phase 3: Death Star tunnel super-laser sequencing ----
-	if (g_deathStarTunnelLaserRegions[regionIdx].enabled) {
-		if (!g_deathStarTunnelLaserRegions[regionIdx].shotActive) {
-			int shotStartGameTime = g_deathStarTunnelLaserRegions[regionIdx].shotStartGameTime;
+	// ---- Phase 3: Death Star superlaser sequencing ----
+	if (g_deathStarSuperlaserRegions[regionIdx].enabled) {
+		if (!g_deathStarSuperlaserRegions[regionIdx].shotActive) {
+			int shotStartGameTime = g_deathStarSuperlaserRegions[regionIdx].shotStartGameTime;
 
-			if (g_deathStarTunnelLaserRegions[regionIdx].alternateDelayPhase) {
+			if (g_deathStarSuperlaserRegions[regionIdx].alternateDelayPhase) {
 				if (g_gameTime - shotStartGameTime >
-					g_deathStarTunnelLaserRegions[regionIdx].repeatShotDelayTicks) {
-					DeathStar_SelectLaserTarget(0xFFFFu);
-					g_deathStarTunnelLaserRegions[regionIdx].shotActive = 1;
-					g_deathStarTunnelLaserRegions[regionIdx].shotStartGameTime = g_gameTime;
-					g_deathStarTunnelLaserRegions[regionIdx].beamLightActive = 0;
+					g_deathStarSuperlaserRegions[regionIdx].repeatShotDelayTicks) {
+					DeathStar_SelectSuperlaserTarget(0xFFFFu);
+					g_deathStarSuperlaserRegions[regionIdx].shotActive = 1;
+					g_deathStarSuperlaserRegions[regionIdx].shotStartGameTime = g_gameTime;
+					g_deathStarSuperlaserRegions[regionIdx].beamLightActive = 0;
 				}
 			} else if (g_gameTime - shotStartGameTime >
-					   g_deathStarTunnelLaserRegions[regionIdx].firstShotDelayTicks) {
-				DeathStar_SelectLaserTarget(0xFFFFu);
-				g_deathStarTunnelLaserRegions[regionIdx].shotActive = 1;
-				g_deathStarTunnelLaserRegions[regionIdx].shotStartGameTime = g_gameTime;
-				g_deathStarTunnelLaserRegions[regionIdx].alternateDelayPhase = 1;
-				g_deathStarTunnelLaserRegions[regionIdx].beamLightActive = 0;
+					   g_deathStarSuperlaserRegions[regionIdx].firstShotDelayTicks) {
+				DeathStar_SelectSuperlaserTarget(0xFFFFu);
+				g_deathStarSuperlaserRegions[regionIdx].shotActive = 1;
+				g_deathStarSuperlaserRegions[regionIdx].shotStartGameTime = g_gameTime;
+				g_deathStarSuperlaserRegions[regionIdx].alternateDelayPhase = 1;
+				g_deathStarSuperlaserRegions[regionIdx].beamLightActive = 0;
 			}
 			return;
 		}
 
 		{
-			int elapsed = g_gameTime - g_deathStarTunnelLaserRegions[regionIdx].shotStartGameTime;
-			int warmupTicks = g_deathStarTunnelLaserRegions[regionIdx].warmupTicks;
+			int elapsed = g_gameTime - g_deathStarSuperlaserRegions[regionIdx].shotStartGameTime;
+			int warmupTicks = g_deathStarSuperlaserRegions[regionIdx].warmupTicks;
 
 			if (elapsed < warmupTicks) {
 				// Warm-up: ramp the beam emitter sprite frame.
@@ -2386,73 +2386,71 @@ void FlightObject_UpdateSpecialBehavior(void) {
 				uint16_t frameCount = g_objectTypes[488].frameCount;
 
 				if (t >= 0.5) {
-					WorldRectRecord* spr = g_deathStarTunnelLaserRegions[regionIdx].beamSpriteRect;
+					WorldRectRecord* spr = g_deathStarSuperlaserRegions[regionIdx].beamSpriteRect;
 					spr->frame =
 						(spr->frame == frameCount - 1) ? (uint8_t)frameCount : (uint8_t)(frameCount - 1);
 				} else {
 					int span = (uint16_t)(frameCount - 2);
-					g_deathStarTunnelLaserRegions[regionIdx].beamSpriteRect->frame =
+					g_deathStarSuperlaserRegions[regionIdx].beamSpriteRect->frame =
 						(uint8_t)((int64_t)((t + t) * (double)span) + 1);
 				}
 				return;
 			}
 
-			if (!g_deathStarTunnelLaserRegions[regionIdx].beamLightActive) {
-				DeathStar_FireLaserAtTarget();
+			if (!g_deathStarSuperlaserRegions[regionIdx].beamLightActive) {
+				DeathStar_FireSuperlaser();
 			}
-			if (elapsed > g_deathStarTunnelLaserRegions[regionIdx].warmupTicks +
-							  g_deathStarTunnelLaserRegions[regionIdx].travelTicks +
-							  g_deathStarTunnelLaserRegions[regionIdx].holdTicks) {
-				g_deathStarTunnelLaserRegions[regionIdx].shotActive = 0;
-				g_deathStarTunnelLaserRegions[regionIdx].beamLightActive = 0;
-				collide_damagecraft(g_deathStarTunnelLaserRegions[regionIdx].targetObjIdx, 0xFFFFu,
-									g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx, 0, 0);
-				g_objectTable[g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx].objectType = OBJ_None;
+			if (elapsed > g_deathStarSuperlaserRegions[regionIdx].warmupTicks +
+							  g_deathStarSuperlaserRegions[regionIdx].travelTicks +
+							  g_deathStarSuperlaserRegions[regionIdx].holdTicks) {
+				g_deathStarSuperlaserRegions[regionIdx].shotActive = 0;
+				g_deathStarSuperlaserRegions[regionIdx].beamLightActive = 0;
+				collide_damagecraft(g_deathStarSuperlaserRegions[regionIdx].targetObjIdx, 0xFFFFu,
+									g_deathStarSuperlaserRegions[regionIdx].laserObjIdx, 0, 0);
+				g_objectTable[g_deathStarSuperlaserRegions[regionIdx].laserObjIdx].objectType = OBJ_None;
 			}
 
 			{
-				int afterWarmup = elapsed - g_deathStarTunnelLaserRegions[regionIdx].warmupTicks;
-				if (afterWarmup >= g_deathStarTunnelLaserRegions[regionIdx].holdTicks) {
+				int afterWarmup = elapsed - g_deathStarSuperlaserRegions[regionIdx].warmupTicks;
+				if (afterWarmup >= g_deathStarSuperlaserRegions[regionIdx].holdTicks) {
 					// Travel: drive the laser object from beam start toward the target.
-					int travel = afterWarmup - g_deathStarTunnelLaserRegions[regionIdx].holdTicks;
+					int travel = afterWarmup - g_deathStarSuperlaserRegions[regionIdx].holdTicks;
 					double frac =
-						(double)travel / (double)g_deathStarTunnelLaserRegions[regionIdx].travelTicks;
+						(double)travel / (double)g_deathStarSuperlaserRegions[regionIdx].travelTicks;
 					double dx =
-						(double)g_objectTable[(uint16_t)g_deathStarTunnelLaserRegions[regionIdx].targetObjIdx]
+						(double)g_objectTable[(uint16_t)g_deathStarSuperlaserRegions[regionIdx].targetObjIdx]
 							.world_x -
-						(double)g_deathStarTunnelLaserRegions[regionIdx].beamStartX;
-					float dy =
-						(float)((double)g_objectTable[(uint16_t)g_deathStarTunnelLaserRegions[regionIdx]
-														  .targetObjIdx]
-									.world_y -
-								(double)g_deathStarTunnelLaserRegions[regionIdx].beamStartY);
-					float dz =
-						(float)((double)g_objectTable[(uint16_t)g_deathStarTunnelLaserRegions[regionIdx]
-														  .targetObjIdx]
-									.world_z -
-								(double)g_deathStarTunnelLaserRegions[regionIdx].beamStartZ);
+						(double)g_deathStarSuperlaserRegions[regionIdx].beamStartX;
+					float dy = (float)((double)g_objectTable[(uint16_t)g_deathStarSuperlaserRegions[regionIdx]
+																 .targetObjIdx]
+										   .world_y -
+									   (double)g_deathStarSuperlaserRegions[regionIdx].beamStartY);
+					float dz = (float)((double)g_objectTable[(uint16_t)g_deathStarSuperlaserRegions[regionIdx]
+																 .targetObjIdx]
+										   .world_z -
+									   (double)g_deathStarSuperlaserRegions[regionIdx].beamStartZ);
 					double dist = sqrt(dx * dx + (double)(dy * dy) + (double)(dz * dz));
 					double inv = 1.0 / dist;
 
-					g_deathStarTunnelLaserRegions[regionIdx].remainingDistance = (float)dist;
-					g_objectTable[g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx].world_x =
+					g_deathStarSuperlaserRegions[regionIdx].remainingDistance = (float)dist;
+					g_objectTable[g_deathStarSuperlaserRegions[regionIdx].laserObjIdx].world_x =
 						(int)(int64_t)(inv * dx * frac *
-										   g_deathStarTunnelLaserRegions[regionIdx].remainingDistance +
-									   (double)g_deathStarTunnelLaserRegions[regionIdx].beamStartX);
-					g_objectTable[g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx].world_y =
-						(int)(int64_t)(inv * dy * g_deathStarTunnelLaserRegions[regionIdx].remainingDistance *
+										   g_deathStarSuperlaserRegions[regionIdx].remainingDistance +
+									   (double)g_deathStarSuperlaserRegions[regionIdx].beamStartX);
+					g_objectTable[g_deathStarSuperlaserRegions[regionIdx].laserObjIdx].world_y =
+						(int)(int64_t)(inv * dy * g_deathStarSuperlaserRegions[regionIdx].remainingDistance *
 										   frac +
-									   (double)g_deathStarTunnelLaserRegions[regionIdx].beamStartY);
-					g_objectTable[g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx].world_z =
-						(int)(int64_t)(inv * dz * g_deathStarTunnelLaserRegions[regionIdx].remainingDistance *
+									   (double)g_deathStarSuperlaserRegions[regionIdx].beamStartY);
+					g_objectTable[g_deathStarSuperlaserRegions[regionIdx].laserObjIdx].world_z =
+						(int)(int64_t)(inv * dz * g_deathStarSuperlaserRegions[regionIdx].remainingDistance *
 										   frac +
-									   (double)g_deathStarTunnelLaserRegions[regionIdx].beamStartZ);
-					g_deathStarTunnelLaserRegions[regionIdx].remainingDistance =
-						(float)((1.0 - frac) * g_deathStarTunnelLaserRegions[regionIdx].remainingDistance);
-					g_deathStarTunnelLaserRegions[regionIdx].beamSpriteRect->frame = 0;
+									   (double)g_deathStarSuperlaserRegions[regionIdx].beamStartZ);
+					g_deathStarSuperlaserRegions[regionIdx].remainingDistance =
+						(float)((1.0 - frac) * g_deathStarSuperlaserRegions[regionIdx].remainingDistance);
+					g_deathStarSuperlaserRegions[regionIdx].beamSpriteRect->frame = 0;
 				} else {
 					uint16_t frameCount = g_objectTypes[488].frameCount;
-					WorldRectRecord* spr = g_deathStarTunnelLaserRegions[regionIdx].beamSpriteRect;
+					WorldRectRecord* spr = g_deathStarSuperlaserRegions[regionIdx].beamSpriteRect;
 					spr->frame =
 						(spr->frame == frameCount - 1) ? (uint8_t)frameCount : (uint8_t)(frameCount - 1);
 				}
@@ -2460,25 +2458,25 @@ void FlightObject_UpdateSpecialBehavior(void) {
 
 			// Sweep the beam segment against active craft for collateral damage.
 			g_collisionSegmentStartWorldX =
-				g_objectTable[g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx].world_x;
+				g_objectTable[g_deathStarSuperlaserRegions[regionIdx].laserObjIdx].world_x;
 			g_collisionSegmentStartWorldY =
-				g_objectTable[g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx].world_y;
+				g_objectTable[g_deathStarSuperlaserRegions[regionIdx].laserObjIdx].world_y;
 			g_collisionSegmentStartWorldZ =
-				g_objectTable[g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx].world_z;
+				g_objectTable[g_deathStarSuperlaserRegions[regionIdx].laserObjIdx].world_z;
 			g_collisionProbeWorldX =
-				g_objectTable[g_deathStarTunnelLaserRegions[regionIdx].targetObjIdx].world_x;
+				g_objectTable[g_deathStarSuperlaserRegions[regionIdx].targetObjIdx].world_x;
 			g_collisionProbeWorldY =
-				g_objectTable[g_deathStarTunnelLaserRegions[regionIdx].targetObjIdx].world_y;
+				g_objectTable[g_deathStarSuperlaserRegions[regionIdx].targetObjIdx].world_y;
 			g_collisionProbeWorldZ =
-				g_objectTable[g_deathStarTunnelLaserRegions[regionIdx].targetObjIdx].world_z;
+				g_objectTable[g_deathStarSuperlaserRegions[regionIdx].targetObjIdx].world_z;
 			objIdx = g_activeRegionObjectSlotStart;
 			if ((uint16_t)objIdx < g_activeRegionCraftObjectSlotEnd) {
 				do {
-					if ((uint16_t)objIdx != g_deathStarTunnelLaserRegions[regionIdx].targetObjIdx &&
-						collide_CheckSweptModelCollision(g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx,
+					if ((uint16_t)objIdx != g_deathStarSuperlaserRegions[regionIdx].targetObjIdx &&
+						collide_CheckSweptModelCollision(g_deathStarSuperlaserRegions[regionIdx].laserObjIdx,
 														 objIdx) > 0) {
 						collide_damagecraft((uint16_t)objIdx, 0xFFFFu,
-											g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx, 0, 0);
+											g_deathStarSuperlaserRegions[regionIdx].laserObjIdx, 0, 0);
 					}
 					++objIdx;
 				} while ((uint16_t)objIdx < g_activeRegionCraftObjectSlotEnd);
@@ -6285,10 +6283,10 @@ void Flight_StepSimToTime(int targetTimestamp) {
    pointers are written as 0. On reading, the struct keeps the pointers that
    the mission load set: the film plays the same mission, and the addresses
    of the recording session mean nothing here. */
-enum { FLIGHT_FILM_TUNNEL_LASER_SIZE = 0x72 };
+enum { FLIGHT_FILM_SUPERLASER_SIZE = 0x72 };
 
-static void Flight_FilmWriteTunnelLaserState(const DeathStarTunnelLaserRegionState* laser) {
-	uint8_t bytes[FLIGHT_FILM_TUNNEL_LASER_SIZE];
+static void Flight_FilmWriteSuperlaserState(const DeathStarSuperlaserRegionState* laser) {
+	uint8_t bytes[FLIGHT_FILM_SUPERLASER_SIZE];
 	uint32_t remainingDistance;
 	int i;
 
@@ -6325,8 +6323,8 @@ static void Flight_FilmWriteTunnelLaserState(const DeathStarTunnelLaserRegionSta
 	Film_WriteBytesBuffered(bytes, sizeof(bytes));
 }
 
-static void Flight_FilmReadTunnelLaserState(DeathStarTunnelLaserRegionState* laser) {
-	uint8_t bytes[FLIGHT_FILM_TUNNEL_LASER_SIZE];
+static void Flight_FilmReadSuperlaserState(DeathStarSuperlaserRegionState* laser) {
+	uint8_t bytes[FLIGHT_FILM_SUPERLASER_SIZE];
 	uint32_t remainingDistance;
 	int i;
 
@@ -6538,12 +6536,12 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 					Hangar_FilmWriteSceneObjectState();
 
 					for (loopIdx = 0; (int)loopIdx < (int)g_activeMissionRegionCount; ++loopIdx) {
-						if (g_deathStarTunnelLaserRegions[loopIdx].enabled) {
+						if (g_deathStarSuperlaserRegions[loopIdx].enabled) {
 #ifdef XWA_MODERN
-							Flight_FilmWriteTunnelLaserState(&g_deathStarTunnelLaserRegions[loopIdx]);
+							Flight_FilmWriteSuperlaserState(&g_deathStarSuperlaserRegions[loopIdx]);
 #else
-							Film_WriteBytesBuffered(&g_deathStarTunnelLaserRegions[loopIdx],
-													sizeof(g_deathStarTunnelLaserRegions[loopIdx]));
+							Film_WriteBytesBuffered(&g_deathStarSuperlaserRegions[loopIdx],
+													sizeof(g_deathStarSuperlaserRegions[loopIdx]));
 #endif
 						}
 					}
@@ -6693,12 +6691,12 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 			Hangar_FilmReadSceneObjectState();
 
 			for (loopIdx = 0; (int)loopIdx < (int)g_activeMissionRegionCount; ++loopIdx) {
-				if (g_deathStarTunnelLaserRegions[loopIdx].enabled) {
+				if (g_deathStarSuperlaserRegions[loopIdx].enabled) {
 #ifdef XWA_MODERN
-					Flight_FilmReadTunnelLaserState(&g_deathStarTunnelLaserRegions[loopIdx]);
+					Flight_FilmReadSuperlaserState(&g_deathStarSuperlaserRegions[loopIdx]);
 #else
-					Film_ReadBytes(&g_deathStarTunnelLaserRegions[loopIdx],
-								   sizeof(g_deathStarTunnelLaserRegions[loopIdx]));
+					Film_ReadBytes(&g_deathStarSuperlaserRegions[loopIdx],
+								   sizeof(g_deathStarSuperlaserRegions[loopIdx]));
 #endif
 				}
 			}

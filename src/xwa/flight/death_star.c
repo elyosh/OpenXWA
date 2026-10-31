@@ -5052,27 +5052,27 @@ void DeathStar_ApplyFollowSeparationOffset(int objectIdx, int followSlotIdx) {
 }
 
 // FUNCTION: XWA 0x493AD0
-void DeathStar_SelectLaserTarget(int preferredTargetObjIdx) {
+void DeathStar_SelectSuperlaserTarget(int preferredTargetObjIdx) {
 	uint32_t scanObjIdx;
 	int bestExtent;
 	ObjectRecord* objects;
 
 	bestExtent = -1;
-	if (g_deathStarTunnelLaserRegions[regionIdx].shotActive) {
+	if (g_deathStarSuperlaserRegions[regionIdx].shotActive) {
 		return;
 	}
 
 	if (preferredTargetObjIdx == 0xffff) {
 		const uint32_t targetScanEnd = g_activeRegionCraftObjectSlotEnd;
 		objects = g_objectTable;
-		if (g_deathStarTunnelLaserRegions[regionIdx].targetFlightGroupCount != 0 &&
-			g_deathStarTunnelLaserRegions[regionIdx].nextTargetFlightGroupIndex <
-				g_deathStarTunnelLaserRegions[regionIdx].targetFlightGroupCount) {
+		if (g_deathStarSuperlaserRegions[regionIdx].targetFlightGroupCount != 0 &&
+			g_deathStarSuperlaserRegions[regionIdx].nextTargetFlightGroupIndex <
+				g_deathStarSuperlaserRegions[regionIdx].targetFlightGroupCount) {
 			scanObjIdx = 1;
 			do {
 				uint32_t targetScanObjIdx;
-				const int targetFgIdx = g_deathStarTunnelLaserRegions[regionIdx]
-											.targetFlightGroupIds[g_deathStarTunnelLaserRegions[regionIdx]
+				const int targetFgIdx = g_deathStarSuperlaserRegions[regionIdx]
+											.targetFlightGroupIds[g_deathStarSuperlaserRegions[regionIdx]
 																	  .nextTargetFlightGroupIndex];
 
 				for (targetScanObjIdx = g_activeRegionObjectSlotStart; targetScanObjIdx < targetScanEnd;
@@ -5086,9 +5086,9 @@ void DeathStar_SelectLaserTarget(int preferredTargetObjIdx) {
 					preferredTargetObjIdx = (int)targetScanObjIdx;
 					scanObjIdx = 0;
 				}
-				++g_deathStarTunnelLaserRegions[regionIdx].nextTargetFlightGroupIndex;
-			} while (scanObjIdx != 0 && g_deathStarTunnelLaserRegions[regionIdx].nextTargetFlightGroupIndex <
-											g_deathStarTunnelLaserRegions[regionIdx].targetFlightGroupCount);
+				++g_deathStarSuperlaserRegions[regionIdx].nextTargetFlightGroupIndex;
+			} while (scanObjIdx != 0 && g_deathStarSuperlaserRegions[regionIdx].nextTargetFlightGroupIndex <
+											g_deathStarSuperlaserRegions[regionIdx].targetFlightGroupCount);
 		}
 
 		if (preferredTargetObjIdx == 0xffff) {
@@ -5141,9 +5141,9 @@ void DeathStar_SelectLaserTarget(int preferredTargetObjIdx) {
 				worldX = objects[scanObjIdx].world_x;
 				worldY = &objects[scanObjIdx].world_y;
 				worldZ = &objects[scanObjIdx].world_z;
-				emitterOffsetX = g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetX;
-				emitterOffsetY = g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetY;
-				emitterOffsetZ = g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetZ;
+				emitterOffsetX = g_deathStarSuperlaserRegions[regionIdx].emitterOffsetX;
+				emitterOffsetY = g_deathStarSuperlaserRegions[regionIdx].emitterOffsetY;
+				emitterOffsetZ = g_deathStarSuperlaserRegions[regionIdx].emitterOffsetZ;
 				deltaX = (float)((double)worldX - (double)emitterOffsetX);
 				deltaY = (float)((double)*worldY - (double)emitterOffsetY);
 				deltaZ = (float)((double)*worldZ - (double)emitterOffsetZ);
@@ -5173,14 +5173,14 @@ void DeathStar_SelectLaserTarget(int preferredTargetObjIdx) {
 
 	if (preferredTargetObjIdx != 0xffff) {
 		const int shotStartGameTime = g_gameTime;
-		g_deathStarTunnelLaserRegions[regionIdx].targetObjIdx = preferredTargetObjIdx;
-		g_deathStarTunnelLaserRegions[regionIdx].shotStartGameTime = shotStartGameTime;
-		g_deathStarTunnelLaserRegions[regionIdx].shotActive = 1;
+		g_deathStarSuperlaserRegions[regionIdx].targetObjIdx = preferredTargetObjIdx;
+		g_deathStarSuperlaserRegions[regionIdx].shotStartGameTime = shotStartGameTime;
+		g_deathStarSuperlaserRegions[regionIdx].shotActive = 1;
 	}
 }
 
 // FUNCTION: XWA 0x493E00
-void DeathStar_FireLaserAtTarget(void) {
+void DeathStar_FireSuperlaser(void) {
 	enum { DEATH_STAR_LASER_PROJECTILE_IDX = OBJ_LaserImperialDS - OBJ_LaserRebel };
 
 	PlayerData* player;
@@ -5199,7 +5199,7 @@ void DeathStar_FireLaserAtTarget(void) {
 	WarheadGuidanceState* guidance;
 	char debugMessage[32];
 
-	targetObjIdx = g_deathStarTunnelLaserRegions[regionIdx].targetObjIdx;
+	targetObjIdx = g_deathStarSuperlaserRegions[regionIdx].targetObjIdx;
 	sprintf(debugMessage, "ds %d  %d \n", targetObjIdx, g_objectTable[targetObjIdx].flightGroupIdx);
 	OutputDebugStringA(debugMessage);
 	if (targetObjIdx == 0xffff) {
@@ -5211,41 +5211,41 @@ void DeathStar_FireLaserAtTarget(void) {
 	savedTargetY = player->viewState.savedTargetY;
 	savedTargetZ = player->viewState.savedTargetZ;
 
-	g_deathStarTunnelLaserRegions[regionIdx].beamStartX =
-		savedTargetX + g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetX;
-	g_deathStarTunnelLaserRegions[regionIdx].beamStartY =
-		savedTargetY + g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetY;
-	g_deathStarTunnelLaserRegions[regionIdx].beamStartZ =
-		savedTargetZ + g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetZ;
+	g_deathStarSuperlaserRegions[regionIdx].beamStartX =
+		savedTargetX + g_deathStarSuperlaserRegions[regionIdx].emitterOffsetX;
+	g_deathStarSuperlaserRegions[regionIdx].beamStartY =
+		savedTargetY + g_deathStarSuperlaserRegions[regionIdx].emitterOffsetY;
+	g_deathStarSuperlaserRegions[regionIdx].beamStartZ =
+		savedTargetZ + g_deathStarSuperlaserRegions[regionIdx].emitterOffsetZ;
 
 	deltaX = (float)((double)g_objectTable[targetObjIdx].world_x -
-					 (double)(savedTargetX + g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetX));
+					 (double)(savedTargetX + g_deathStarSuperlaserRegions[regionIdx].emitterOffsetX));
 	deltaY = (float)((double)g_objectTable[targetObjIdx].world_y -
-					 (double)(savedTargetY + g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetY));
+					 (double)(savedTargetY + g_deathStarSuperlaserRegions[regionIdx].emitterOffsetY));
 	deltaZ = (float)((double)g_objectTable[targetObjIdx].world_z -
-					 (double)(savedTargetZ + g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetZ));
-	g_deathStarTunnelLaserRegions[regionIdx].remainingDistance = (float)sqrt(
+					 (double)(savedTargetZ + g_deathStarSuperlaserRegions[regionIdx].emitterOffsetZ));
+	g_deathStarSuperlaserRegions[regionIdx].remainingDistance = (float)sqrt(
 		(double)deltaX * (double)deltaX + (double)deltaY * (double)deltaY + (double)deltaZ * (double)deltaZ);
-	invDistance = (float)(1.0 / (double)g_deathStarTunnelLaserRegions[regionIdx].remainingDistance);
+	invDistance = (float)(1.0 / (double)g_deathStarSuperlaserRegions[regionIdx].remainingDistance);
 	deltaX *= invDistance;
 	deltaY *= invDistance;
 	deltaZ *= invDistance;
 
-	g_deathStarTunnelLaserRegions[regionIdx].pointLightX =
-		(int)((g_deathStarTunnelLaserRegions[regionIdx].remainingDistance -
+	g_deathStarSuperlaserRegions[regionIdx].pointLightX =
+		(int)((g_deathStarSuperlaserRegions[regionIdx].remainingDistance -
 			   (float)g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent) *
 				  deltaX +
-			  (float)g_deathStarTunnelLaserRegions[regionIdx].beamStartX);
-	g_deathStarTunnelLaserRegions[regionIdx].pointLightY =
-		(int)((g_deathStarTunnelLaserRegions[regionIdx].remainingDistance -
+			  (float)g_deathStarSuperlaserRegions[regionIdx].beamStartX);
+	g_deathStarSuperlaserRegions[regionIdx].pointLightY =
+		(int)((g_deathStarSuperlaserRegions[regionIdx].remainingDistance -
 			   (float)g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent) *
 				  deltaY +
-			  (float)g_deathStarTunnelLaserRegions[regionIdx].beamStartY);
-	g_deathStarTunnelLaserRegions[regionIdx].pointLightZ =
-		(int)((g_deathStarTunnelLaserRegions[regionIdx].remainingDistance -
+			  (float)g_deathStarSuperlaserRegions[regionIdx].beamStartY);
+	g_deathStarSuperlaserRegions[regionIdx].pointLightZ =
+		(int)((g_deathStarSuperlaserRegions[regionIdx].remainingDistance -
 			   (float)g_objectTypes[(uint16_t)g_objectTable[targetObjIdx].objectType].maxBoundsExtent) *
 				  deltaZ +
-			  (float)g_deathStarTunnelLaserRegions[regionIdx].beamStartZ);
+			  (float)g_deathStarSuperlaserRegions[regionIdx].beamStartZ);
 
 	laserObjIdx = Object_AllocSlotForGenus(GENUS_NpcProjectile);
 	if (laserObjIdx == 0xffffu) {
@@ -5268,8 +5268,8 @@ void DeathStar_FireLaserAtTarget(void) {
 		return;
 	}
 
-	g_deathStarTunnelLaserRegions[regionIdx].beamLightActive = 1;
-	g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx = (int)laserObjIdx;
+	g_deathStarSuperlaserRegions[regionIdx].beamLightActive = 1;
+	g_deathStarSuperlaserRegions[regionIdx].laserObjIdx = (int)laserObjIdx;
 	g_objectTable[laserObjIdx].mobj->state = 1;
 	g_objectTable[laserObjIdx].genusId = GENUS_NpcProjectile;
 	g_objectTable[laserObjIdx].objectType = OBJ_LaserImperialDS;
@@ -5279,11 +5279,11 @@ void DeathStar_FireLaserAtTarget(void) {
 	g_objectTable[laserObjIdx].mobj->sourceObjectType = OBJ_DeathStarFireTextureGroup6250_Sprite000;
 	g_objectTable[laserObjIdx].mobj->iff = 1;
 	g_objectTable[laserObjIdx].world_x = g_players[g_localPlayer].viewState.savedTargetX +
-										 g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetX;
+										 g_deathStarSuperlaserRegions[regionIdx].emitterOffsetX;
 	g_objectTable[laserObjIdx].world_y = g_players[g_localPlayer].viewState.savedTargetY +
-										 g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetY;
+										 g_deathStarSuperlaserRegions[regionIdx].emitterOffsetY;
 	g_objectTable[laserObjIdx].world_z = g_players[g_localPlayer].viewState.savedTargetZ +
-										 g_deathStarTunnelLaserRegions[regionIdx].emitterOffsetZ;
+										 g_deathStarSuperlaserRegions[regionIdx].emitterOffsetZ;
 	moveX = (int)(deltaX * 32767.0f);
 	moveY = (int)(deltaY * 32767.0f);
 	moveZ = (int)(deltaZ * 32767.0f);

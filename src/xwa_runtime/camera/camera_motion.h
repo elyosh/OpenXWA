@@ -37,8 +37,8 @@ void XwaCameraMotion_Update(int playerIdx);
 /* The exterior camera's extra pitch and yaw, in Q16 units, for
    FVIEW_BuildCameraOrient. They turn the camera toward where the craft was
    heading a moment ago, and tilt it to look at the craft from above. They
-   are zero when they don't apply, such as in the cockpit view, for another
-   craft, or in a Death Star mission. */
+   are zero when they don't apply, such as in the cockpit view or for
+   another craft. */
 void XwaCameraMotion_ExteriorOffsets(int playerIdx, int16_t* pitchQ16, int16_t* yawQ16);
 
 /* How far the local player's eye has moved from the seat, in world axes and

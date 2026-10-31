@@ -1864,14 +1864,14 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->death_star_mode = (uint8_t)(g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR);
 	/* DS tunnel turbolaser beam light (FlightView_Render's direct
 	 * scene-light write; regionIdx is the tunnel-region global). */
-	c->ds_beam_active = (uint8_t)(g_deathStarTunnelLaserRegions[regionIdx].enabled &&
-								  g_deathStarTunnelLaserRegions[regionIdx].beamLightActive);
+	c->ds_beam_active = (uint8_t)(g_deathStarSuperlaserRegions[regionIdx].enabled &&
+								  g_deathStarSuperlaserRegions[regionIdx].beamLightActive);
 	if (c->ds_beam_active) {
-		c->ds_beam_world_pos[0] = g_deathStarTunnelLaserRegions[regionIdx].pointLightX;
-		c->ds_beam_world_pos[1] = g_deathStarTunnelLaserRegions[regionIdx].pointLightY;
-		c->ds_beam_world_pos[2] = g_deathStarTunnelLaserRegions[regionIdx].pointLightZ;
+		c->ds_beam_world_pos[0] = g_deathStarSuperlaserRegions[regionIdx].pointLightX;
+		c->ds_beam_world_pos[1] = g_deathStarSuperlaserRegions[regionIdx].pointLightY;
+		c->ds_beam_world_pos[2] = g_deathStarSuperlaserRegions[regionIdx].pointLightZ;
 
-		const int object_idx = g_deathStarTunnelLaserRegions[regionIdx].laserObjIdx;
+		const int object_idx = g_deathStarSuperlaserRegions[regionIdx].laserObjIdx;
 		const int model_extent = g_objectTypes[OBJ_LaserImperialDS].maxBoundsExtent;
 		if (object_idx >= 0 && (uint32_t)object_idx < g_objectTableSlotCount && model_extent > 0) {
 			const ObjectRecord* object = &g_objectTable[object_idx];
@@ -1881,7 +1881,7 @@ void XwaSnapshot_CaptureFlight(void) {
 				beam->object_slot = (uint16_t)object_idx;
 				beam->object_signature = object->objectSignature;
 				beam->length_scale =
-					-g_deathStarTunnelLaserRegions[regionIdx].remainingDistance / (float)model_extent;
+					-g_deathStarSuperlaserRegions[regionIdx].remainingDistance / (float)model_extent;
 			}
 		}
 	}
@@ -1991,7 +1991,7 @@ void XwaSnapshot_CaptureFlight(void) {
 			if (count > XWA_SNAP_MAX_BACKDROPS) {
 				count = XWA_SNAP_MAX_BACKDROPS;
 			}
-			const WorldRectRecord* beam = g_deathStarTunnelLaserRegions[region].beamSpriteRect;
+			const WorldRectRecord* beam = g_deathStarSuperlaserRegions[region].beamSpriteRect;
 			for (; n < count; n++) {
 				const WorldRectRecord* w = &g_backdropRecordsByRegion[region][n];
 				XwaBackdrop* b = &s->backdrops[n];
@@ -2001,7 +2001,7 @@ void XwaSnapshot_CaptureFlight(void) {
 				b->draw_flags = w->drawFlags;
 				b->side = (uint8_t)w->side;
 				b->hidden = (uint8_t)((g_backdropsEnabled == 0 && w->drawFlags != 0) ||
-									  (beam == w && g_deathStarTunnelLaserRegions[region].shotActive == 0));
+									  (beam == w && g_deathStarSuperlaserRegions[region].shotActive == 0));
 				b->world_dir[0] = (float)w->worldDirQ20.x;
 				b->world_dir[1] = (float)w->worldDirQ20.y;
 				b->world_dir[2] = (float)w->worldDirQ20.z;

@@ -4,7 +4,6 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/flight/hangar.h"
-#include "xwa/flight/mission/mission.h"
 #include "xwa/flight/player/player.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/time.h"
@@ -303,12 +302,9 @@ void XwaCameraMotion_ExteriorOffsets(int playerIdx, int16_t* pitchQ16, int16_t* 
 	*pitchQ16 = 0;
 	*yawQ16 = 0;
 	XwaModernCameraOptions_Get(&options);
-	/* In a Death Star mission, the game fires lasers from the camera
-	   position, so moving the camera would change the mission. */
 	if (!options.enabled || playerIdx != g_localPlayer || !player->viewState.externalCameraActive ||
 		player->viewState.cameraFocusObjIdx != player->objectIndex || player->mapCameraState ||
-		g_inHangarReady || (g_filmPlaybackMode && g_filmOverlayActive == 1) ||
-		g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
+		g_inHangarReady || (g_filmPlaybackMode && g_filmOverlayActive == 1)) {
 		return;
 	}
 

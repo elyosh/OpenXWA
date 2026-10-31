@@ -8176,9 +8176,9 @@ uint16_t Mission_Init(char* fileName) {
 
 	memset(g_backdropCountByRegion, 0, sizeof(g_backdropCountByRegion));
 	{
-		DeathStarTunnelLaserRegionState* laser;
+		DeathStarSuperlaserRegionState* laser;
 
-		laser = g_deathStarTunnelLaserRegions;
+		laser = g_deathStarSuperlaserRegions;
 		for (teamIdx = 5; teamIdx != 0; --teamIdx, ++laser) {
 			laser->enabled = 0;
 			laser->shotActive = 0;
@@ -8437,7 +8437,7 @@ uint16_t Mission_Init(char* fileName) {
 					&& recordIdx < XWA_BACKDROP_RECORDS_PER_REGION
 #endif
 				) {
-					DeathStarTunnelLaserRegionState* laser;
+					DeathStarSuperlaserRegionState* laser;
 					const XwaOrder* order;
 					float firstShotDelay;
 					float repeatShotDelay;
@@ -8449,7 +8449,7 @@ uint16_t Mission_Init(char* fileName) {
 #endif
 
 					laserFlatIdx = recordIdx + XWA_BACKDROP_RECORDS_PER_REGION * backdropRegion;
-					laser = &g_deathStarTunnelLaserRegions[backdropRegion];
+					laser = &g_deathStarSuperlaserRegions[backdropRegion];
 					laser->emitterRect = &g_backdropRecordsByRegion[0][laserFlatIdx];
 					laser->enabled = 1;
 					laser->emitterOffsetX = g_backdropRecordsByRegion[0][laserFlatIdx].worldDirQ20.x;
