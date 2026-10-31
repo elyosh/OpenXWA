@@ -544,9 +544,18 @@ if(XWA_BUILD_TOOLS)
     )
     target_include_directories(xwa_mod_import_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools/mod_importer)
     target_link_libraries(xwa_mod_import_lib
-        PUBLIC aeron_tool_log
+        PUBLIC aeron_tool_log xwau_files aeron_yaml_json aeron
         PRIVATE xwa_asset_bake_lib opt2gltf_tool xwau_import_lib aeron_gltf_cook_tool aeron_effect_library
-            aeron_environment_bake_lib aeron_yaml_json aeron_cjson aeron)
+            aeron_environment_bake_lib aeron_cjson)
+
+    # The importer's command line, for development. It isn't packaged, so it
+    # falls back on the source tree's resources.
+    add_executable(xwa_mod_import tools/mod_importer/cli/main.c)
+    target_link_libraries(xwa_mod_import PRIVATE xwa_mod_import_lib)
+    target_compile_definitions(xwa_mod_import PRIVATE
+        XWA_MOD_IMPORT_RESOURCES="${CMAKE_CURRENT_SOURCE_DIR}/resources")
+    set_target_properties(xwa_mod_import PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
     add_executable(imc_decode tools/imc_decode.c)
     target_link_libraries(imc_decode PRIVATE xwa_core)
@@ -572,8 +581,10 @@ if(XWA_BUILD_TOOLS)
         target_compile_options(mission_dump PRIVATE /W4)
         target_compile_options(imc_decode PRIVATE /W4)
         target_compile_options(xwa_mod_import_lib PRIVATE /W4)
+        target_compile_options(xwa_mod_import PRIVATE /W4)
     else()
         target_compile_options(xwa_mod_import_lib PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(xwa_mod_import PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(mission_dump PRIVATE
             -Wall -Wextra -Wpedantic -Wno-deprecated-declarations -fno-common)
         target_compile_options(imc_decode PRIVATE
