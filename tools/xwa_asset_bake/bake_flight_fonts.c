@@ -3,6 +3,7 @@
 #include "aeron/image.h"
 #include "bake_source.h"
 #include "ktx2_writer.h"
+#include "tool_log.h"
 #include "xwa_2d.h"
 
 #include <errno.h>
@@ -101,7 +102,7 @@ static int bake_tier(const BakeFlightFontsOptions* opt, int tier, const Xwa2dFon
 		ok = write_fnt(path, font, scale);
 	}
 	if (ok)
-		printf("flight font tier %d -> %s.{ktx2,fnt}\n", tier, base);
+		ToolLog_Write(TOOL_LOG_INFO, "flight font tier %d -> %s.{ktx2,fnt}", tier, base);
 	return ok;
 }
 
@@ -117,7 +118,7 @@ int BakeFlightFonts_WriteTiers(const BakeFlightFontsOptions* opt, const Xwa2dFra
 		Xwa2dFontAtlas font = { 0 };
 		char error[256] = { 0 };
 		if (!Xwa2d_BuildFlightFontTier(group, tier, &font, error, sizeof error)) {
-			fprintf(stderr, "bake: flight font tier %d failed: %s\n", tier, error);
+			ToolLog_Write(TOOL_LOG_ERROR, "bake: flight font tier %d failed: %s", tier, error);
 			continue;
 		}
 		baked += bake_tier(opt, tier, &font);
@@ -135,7 +136,7 @@ int BakeFlightFonts_Run(const BakeFlightFontsOptions* opt, AeronVfs* vfs) {
 	if (!BakeSource_InitDatCatalog(vfs, &catalog, error, sizeof error) ||
 		!BakeSource_LoadDatGroup(&catalog, 16000, &source_group, error, sizeof error) ||
 		source_group.count < 3) {
-		fprintf(stderr, "bake: flight font source failed: %s\n", error);
+		ToolLog_Write(TOOL_LOG_ERROR, "bake: flight font source failed: %s", error);
 		BakeSource_FreeDatCatalog(&catalog);
 		Xwa2dFrameSet_Free(&source_group);
 		return 0;

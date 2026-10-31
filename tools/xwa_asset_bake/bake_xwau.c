@@ -33,6 +33,7 @@
 #include "bake_xwau.h"
 
 #include "png_write.h"
+#include "tool_log.h"
 #include "upscale.h"
 #include "xwa_2d.h"
 #include "xwau_dat.h"
@@ -468,7 +469,7 @@ static void emit_atlas(XwauContext* ctx, const char* dir, const char* base, cons
 	AeronCpuAtlas pages = { 0 };
 	AeronAtlasImage* placed = NULL;
 	if (!BakeSprites_BuildAtlas(frames, atlas->count, 0, &placed, &pages)) {
-		fprintf(stderr, "xwau: %s/%s could not be packed\n", dir, base);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s/%s could not be packed", dir, base);
 		free(frames);
 		ctx->stats->failures++;
 		return;
@@ -600,7 +601,7 @@ static int load_frontres_hd(const char* dir, const char* base, Xwa2dFrameSet* ou
 	if (find_ci(dir, name, path, sizeof path)) {
 		XwauDat* dat = XwauDat_Open(path, error, sizeof error);
 		if (!dat) {
-			fprintf(stderr, "xwau: %s\n", error);
+			ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s", error);
 			return -1;
 		}
 		const int* group_ids;
@@ -631,7 +632,7 @@ static int load_frontres_hd(const char* dir, const char* base, Xwa2dFrameSet* ou
 			for (int i = 0; i < n; ++i) {
 				XwauDatImage image;
 				if (!XwauDat_LoadImageFrom(dat, groups[g], sorted[i], &image, error, sizeof error)) {
-					fprintf(stderr, "xwau: %s\n", error);
+					ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s", error);
 					free(sorted);
 					Xwa2dFrameSet_Free(out);
 					XwauDat_Close(dat);
@@ -662,7 +663,7 @@ static int load_frontres_hd(const char* dir, const char* base, Xwa2dFrameSet* ou
 		const int ok = bytes && Xwa2d_DecodeCbm(bytes, size, out, error, sizeof error);
 		free(bytes);
 		if (!ok) {
-			fprintf(stderr, "xwau: %s: %s\n", path, error);
+			ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s: %s", path, error);
 			return -1;
 		}
 		return 1;
@@ -797,8 +798,9 @@ static void write_video_yamls(XwauContext* ctx) {
 		const int has_image = standard_image(ctx, v->dir, v->base, &count, &w, &h);
 		double size[2] = { v->size[0], v->size[1] };
 		if (size[0] == 0 && !has_image) {
-			fprintf(stderr, "xwau: skipping %s: it has no size and %s/%s has no standard image\n",
-					v->webm, v->dir, v->base);
+			ToolLog_Write(TOOL_LOG_WARNING,
+						  "xwau: skipping %s: it has no size and %s/%s has no standard image", v->webm,
+						  v->dir, v->base);
 			continue;
 		}
 		if (size[0] == 0) {
@@ -883,13 +885,13 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 	if (!ok && bytes && !is_cbm && !has_hd) {
 		/* The game's BMP and FLC loaders only read the stock formats, so the game
 		 * can't use this file either. XU's 32-bit MAPICONS/LICON.BMP is source art. */
-		printf("  note: skipping frontres/%s/%s: %s. The game can't read it either\n", dir_lower,
-			   file_name, error);
+		ToolLog_Write(TOOL_LOG_INFO, "  note: skipping frontres/%s/%s: %s. The game can't read it either",
+					  dir_lower, file_name, error);
 		Xwa2dFrameSet_Free(&sd);
 		return;
 	}
 	if (!ok || sd.count <= 0) {
-		fprintf(stderr, "xwau: %s: %s\n", path, error[0] ? error : "cannot read");
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s: %s", path, error[0] ? error : "cannot read");
 		Xwa2dFrameSet_Free(&sd);
 		Xwa2dFrameSet_Free(&hd);
 		XwauDat_Close(hd_dat);
@@ -995,9 +997,11 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 						f->offset[0] = info.offset_x * DESIGN_X;
 						f->offset[1] = info.offset_y * DESIGN_Y;
 					} else {
-						printf("  note: frontres/%s/%s frame %d has HD offset %d, %d, which XWAU ignores "
-							   "for map icons\n",
-							   dir_lower, base_lower, i, info.offset_x, info.offset_y);
+						ToolLog_Write(
+							TOOL_LOG_INFO,
+							"  note: frontres/%s/%s frame %d has HD offset %d, %d, which XWAU ignores "
+							"for map icons",
+							dir_lower, base_lower, i, info.offset_x, info.offset_y);
 					}
 				}
 			}
@@ -1077,7 +1081,7 @@ static int is_standard_image(const char* name) {
 static void bake_frontres(XwauContext* ctx) {
 	DIR* top = opendir(ctx->frontres);
 	if (!top) {
-		fprintf(stderr, "xwau: no Frontres folder in %s\n", ctx->opt->xwau_root);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: no Frontres folder in %s", ctx->opt->xwau_root);
 		ctx->stats->failures++;
 		return;
 	}
@@ -1148,7 +1152,7 @@ static void write_starfield_mask(XwauContext* ctx, const uint8_t* rgba, int w, i
 	BakeSprites_MakeDirs(dir);
 	snprintf(path, sizeof path, "%s/starfield_mask.png", dir);
 	if (!write_png_rgba_atomic(path, 640, 480, mask, error, sizeof error)) {
-		fprintf(stderr, "xwau: %s: %s\n", path, error);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s: %s", path, error);
 		ctx->stats->failures++;
 	}
 	free(mask);
@@ -1212,7 +1216,7 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 		f->offset[0] = xwau_value(placed->offset_x) * DESIGN_X;
 		f->offset[1] = xwau_value(placed->offset_y) * DESIGN_Y;
 		if (!XwauDat_LoadImageFrom(has_hd ? file->hd : file->sd, group, id, &image, error, sizeof error)) {
-			fprintf(stderr, "xwau: %s\n", error);
+			ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s", error);
 			ok = 0;
 			break;
 		}
@@ -1291,7 +1295,7 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 		char out_dir[1100], base[64];
 		snprintf(out_dir, sizeof out_dir, "%s/resdata/atlas", ctx->opt->sprites->out_root);
 		snprintf(base, sizeof base, "group_%d", group);
-		printf("resdata group %d: %d images\n", group, atlas.count);
+		ToolLog_Write(TOOL_LOG_INFO, "resdata group %d: %d images", group, atlas.count);
 		emit_atlas(ctx, out_dir, base, &atlas);
 	} else {
 		ctx->stats->failures++;
@@ -1305,7 +1309,7 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 static void bake_resdata(XwauContext* ctx) {
 	char list_path[1100];
 	if (!find_ci(ctx->opt->xwau_root, "RESDATA.TXT", list_path, sizeof list_path)) {
-		fprintf(stderr, "xwau: no RESDATA.TXT in %s\n", ctx->opt->xwau_root);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: no RESDATA.TXT in %s", ctx->opt->xwau_root);
 		ctx->stats->failures++;
 		return;
 	}
@@ -1352,7 +1356,7 @@ static void bake_resdata(XwauContext* ctx) {
 		if (find_ci(ctx->resdata, hd_name, path, sizeof path)) {
 			file->hd = XwauDat_Open(path, error, sizeof error);
 			if (!file->hd) {
-				fprintf(stderr, "xwau: %s\n", error);
+				ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s", error);
 				ctx->stats->failures++;
 			}
 		}
@@ -1677,7 +1681,8 @@ static int find_anim_sound(const XwauContext* ctx, int id, char* out, size_t out
 	for (char* part = strtok(file, "\\/"); part; part = strtok(NULL, "\\/")) {
 		char next[1400];
 		if (!find_ci(path, part, next, sizeof next)) {
-			fprintf(stderr, "xwau: Sfx.lst lists %s for %s, but the file is missing\n", listed, name);
+			ToolLog_Write(TOOL_LOG_WARNING, "xwau: Sfx.lst lists %s for %s, but the file is missing", listed,
+						  name);
 			return 0;
 		}
 		snprintf(path, sizeof path, "%s", next);
@@ -1700,8 +1705,10 @@ static void write_fonts_yaml(XwauContext* ctx) {
 		return;
 	read_key_string(hooks, section, "HDConcourseTextFont", font, sizeof font);
 	if (strcasecmp(font, "consolas") != 0) {
-		fprintf(stderr, "xwau: HDConcourseTextFont = %s: the font's bold file isn't known, fonts.yaml isn't written\n",
-				font);
+		ToolLog_Write(
+			TOOL_LOG_WARNING,
+			"xwau: HDConcourseTextFont = %s: the font's bold file isn't known, fonts.yaml isn't written",
+			font);
 		return;
 	}
 	char dir[1100], path[1200];
@@ -1717,7 +1724,7 @@ static void write_fonts_yaml(XwauContext* ctx) {
 				"version: 1\n"
 				"default: {file: consolab.ttf, metrics: font}\n");
 	fclose(fp);
-	printf("xwau: copy consolab.ttf from Windows' Fonts folder to frontend/fonts/\n");
+	ToolLog_Write(TOOL_LOG_INFO, "xwau: copy consolab.ttf from Windows' Fonts folder to frontend/fonts/");
 }
 
 /* Writes frontend/movies/movies.yaml, the movies of the film room and the
@@ -1795,29 +1802,32 @@ static void write_animations_yaml(XwauContext* ctx) {
 		snprintf(a.group, sizeof a.group, "%s", v[6 + k]);
 		snprintf(a.missions, sizeof a.missions, "%s", v[7 + k]);
 		if (strcasecmp(v[0], "concourse") != 0) {
-			fprintf(stderr,
-					"xwau: ConcourseAnimations.txt:%d: skipping this %s line: XWAU only draws concourse "
-					"animations\n",
-					number, v[0]);
+			ToolLog_Write(
+				TOOL_LOG_WARNING,
+				"xwau: ConcourseAnimations.txt:%d: skipping this %s line: XWAU only draws concourse "
+				"animations",
+				number, v[0]);
 			continue;
 		}
 		char name[64], webm[1200];
 		snprintf(name, sizeof name, "concourse_anim_%d.webm", a.id);
 		if (!find_ci(ctx->resdata, name, webm, sizeof webm)) {
-			fprintf(stderr,
-					"xwau: ConcourseAnimations.txt:%d: skipping concourse_anim_%d: it has no webm file, "
-					"and OpenXWA doesn't play DAT animations\n",
-					number, a.id);
+			ToolLog_Write(
+				TOOL_LOG_WARNING,
+				"xwau: ConcourseAnimations.txt:%d: skipping concourse_anim_%d: it has no webm file, "
+				"and OpenXWA doesn't play DAT animations",
+				number, a.id);
 			continue;
 		}
 		snprintf(a.video, sizeof a.video, "%s", strrchr(webm, '/') + 1);
 		if (!find_anim_sound(ctx, a.id, a.sound, sizeof a.sound))
 			a.sound[0] = '\0';
 		if (a.w == 0 || a.h == 0)
-			fprintf(stderr,
-					"xwau: ConcourseAnimations.txt:%d: concourse_anim_%d has no size. XWAU draws one video "
-					"pixel per 640x480 unit, OpenXWA one per design pixel\n",
-					number, a.id);
+			ToolLog_Write(
+				TOOL_LOG_WARNING,
+				"xwau: ConcourseAnimations.txt:%d: concourse_anim_%d has no size. XWAU draws one video "
+				"pixel per 640x480 unit, OpenXWA one per design pixel",
+				number, a.id);
 		XwauAnimLine* grown = (XwauAnimLine*)realloc(lines, (size_t)(count + 1) * sizeof *lines);
 		if (!grown)
 			break;
@@ -1868,16 +1878,16 @@ static void write_animations_yaml(XwauContext* ctx) {
 				continue;
 			}
 			if (!same_delay(a, b))
-				fprintf(
-					stderr,
+				ToolLog_Write(
+					TOOL_LOG_WARNING,
 					"xwau: ConcourseAnimations.txt:%d: this delay differs from the one on line %d. OpenXWA "
-					"has one delay per group, so %s uses the delay from line %d\n",
+					"has one delay per group, so %s uses the delay from line %d",
 					b->line, a->line, a->group, a->line);
 			if (apart == 1) {
-				fprintf(
-					stderr,
+				ToolLog_Write(
+					TOOL_LOG_WARNING,
 					"xwau: ConcourseAnimations.txt:%d: the lines of %s are not together. OpenXWA draws the "
-					"whole group at its first line, so the order with other groups can differ\n",
+					"whole group at its first line, so the order with other groups can differ",
 					b->line, a->group);
 				apart = 2;
 			}
@@ -1978,8 +1988,8 @@ static const char* screen_layout(const XwauContext* ctx, const XwauScreen* scree
 			best = n;
 	for (int i = 0; i < count; ++i)
 		if (strcmp(layouts[i], names[best]) != 0)
-			fprintf(stderr, "  note: %s is %s, but its background %s is %s\n", screen->name, names[best], keys[i],
-					layouts[i]);
+			ToolLog_Write(TOOL_LOG_WARNING, "  note: %s is %s, but its background %s is %s", screen->name,
+						  names[best], keys[i], layouts[i]);
 	return names[best];
 }
 
@@ -2070,7 +2080,7 @@ int BakeXwau_RunFrontend(const BakeXwauOptions* opt, BakeXwauStats* stats) {
 	ctx.stats = stats;
 	if (!find_ci(opt->xwau_root, "Frontres", ctx.frontres, sizeof ctx.frontres) ||
 		!find_ci(opt->xwau_root, "Resdata", ctx.resdata, sizeof ctx.resdata)) {
-		fprintf(stderr, "xwau: %s has no Frontres or Resdata folder\n", opt->xwau_root);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s has no Frontres or Resdata folder", opt->xwau_root);
 		stats->failures++;
 		return 0;
 	}

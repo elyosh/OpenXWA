@@ -47,6 +47,7 @@
 #include "bake_xwau_flight.h"
 
 #include "bake_flight_fonts.h"
+#include "tool_log.h"
 #include "util.h"
 #include "xwa_2d.h"
 #include "xwau_config.h"
@@ -182,7 +183,7 @@ static const char* const g_flightSetNames[FLIGHT_SET_COUNT] = { "alt1", "alt2", 
 static void flight_open_dat(FlightContext* ctx, const char* rel) {
 	char path[1100], error[256];
 	if (!Xwau_FindFile(ctx->opt->xwau_root, rel, path, sizeof path)) {
-		fprintf(stderr, "xwau: %s isn't in %s\n", rel, ctx->opt->xwau_root);
+		ToolLog_Write(TOOL_LOG_WARNING, "xwau: %s isn't in %s", rel, ctx->opt->xwau_root);
 		return;
 	}
 	const char* name = strrchr(path, '/');
@@ -193,7 +194,7 @@ static void flight_open_dat(FlightContext* ctx, const char* rel) {
 	}
 	XwauDat* dat = XwauDat_Open(path, error, sizeof error);
 	if (!dat) {
-		fprintf(stderr, "xwau: %s\n", error);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s", error);
 		ctx->stats->failures++;
 		return;
 	}
@@ -241,7 +242,7 @@ static void flight_add_mission_dat(FlightContext* ctx, FlightDat** dats, int* co
 	XwauDat* dat = XwauDat_Open(path, error, sizeof error);
 	FlightDat* grown = dat ? (FlightDat*)realloc(*dats, (size_t)(*count + 1) * sizeof *grown) : NULL;
 	if (!grown) {
-		fprintf(stderr, "xwau: %s\n", dat ? "out of memory" : error);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s", dat ? "out of memory" : error);
 		XwauDat_Close(dat);
 		ctx->stats->failures++;
 		return;
@@ -334,15 +335,17 @@ static void flight_open_mission_dats(FlightContext* ctx) {
 			art = &ctx->mission_art[ctx->mission_art_count++];
 			art->file = added[m];
 			flight_art_name(added[m].name, art->name, sizeof art->name);
-			printf("xwau: %s replaces images of other files, so it gets its own mission art, "
-				   "resdata/mission_art/%s\n",
-				   added[m].name, art->name);
+			ToolLog_Write(TOOL_LOG_INFO,
+						  "xwau: %s replaces images of other files, so it gets its own mission art, "
+						  "resdata/mission_art/%s",
+						  added[m].name, art->name);
 		} else if (overlaps) {
 			XwauDat_Close(added[m].dat);
 			ctx->stats->failures++;
 		} else {
 			shared[shared_count++] = added[m];
-			printf("xwau: %s has groups of its own, so it goes into the shared atlases\n", added[m].name);
+			ToolLog_Write(TOOL_LOG_INFO, "xwau: %s has groups of its own, so it goes into the shared atlases",
+						  added[m].name);
 		}
 	}
 	if (shared) {
@@ -359,7 +362,7 @@ static void flight_open_mission_dats(FlightContext* ctx) {
 static int flight_open_dats(FlightContext* ctx) {
 	char list_path[1100];
 	if (!Xwau_FindFile(ctx->opt->xwau_root, "RESDATA.TXT", list_path, sizeof list_path)) {
-		fprintf(stderr, "xwau: no RESDATA.TXT in %s\n", ctx->opt->xwau_root);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: no RESDATA.TXT in %s", ctx->opt->xwau_root);
 		return 0;
 	}
 	FILE* fp = fopen(list_path, "r");
@@ -415,8 +418,9 @@ static void flight_read_backdrop_scales(FlightContext* ctx) {
 		}
 		XwauLines_Free(&tokens);
 		if (!ok) {
-			fprintf(stderr, "xwau: %s: line '%s' isn't 'group, scale' or 'group, image, scale'\n", path,
-					lines.items[i]);
+			ToolLog_Write(TOOL_LOG_WARNING,
+						  "xwau: %s: line '%s' isn't 'group, scale' or 'group, image, scale'", path,
+						  lines.items[i]);
 			continue;
 		}
 		int known = 0;
@@ -487,8 +491,9 @@ static void flight_read_exe(FlightContext* ctx) {
 	ctx->backdrop_scale = 256.0f;
 	char path[1100];
 	if (!Xwau_FindFile(ctx->opt->xwau_root, "XWINGALLIANCE.EXE", path, sizeof path)) {
-		fprintf(stderr, "xwau: no XWINGALLIANCE.EXE in %s. Backdrops get the stock scale of 256\n",
-				ctx->opt->xwau_root);
+		ToolLog_Write(TOOL_LOG_WARNING,
+					  "xwau: no XWINGALLIANCE.EXE in %s. Backdrops get the stock scale of 256",
+					  ctx->opt->xwau_root);
 		return;
 	}
 	FILE* fp = fopen(path, "rb");
@@ -508,8 +513,9 @@ static void flight_read_exe(FlightContext* ctx) {
 	if (scale)
 		memcpy(&value, scale, sizeof value);
 	if (!scale || !table || !(value > 0.0f && value <= 65536.0f)) {
-		fprintf(stderr, "xwau: %s isn't the expected game executable. Backdrops get the stock scale of 256\n",
-				path);
+		ToolLog_Write(TOOL_LOG_WARNING,
+					  "xwau: %s isn't the expected game executable. Backdrops get the stock scale of 256",
+					  path);
 		free(exe);
 		return;
 	}
@@ -631,7 +637,7 @@ static int flight_read_material(const char* path, FlightMaterial* out) {
 				out->has_light = 1;
 				memcpy(out->light, rgb, sizeof rgb);
 			} else {
-				fprintf(stderr, "xwau: %s: Light needs three numbers\n", path);
+				ToolLog_Write(TOOL_LOG_WARNING, "xwau: %s: Light needs three numbers", path);
 			}
 		} else {
 			for (int set = 0; set < FLIGHT_SET_COUNT; ++set) {
@@ -654,7 +660,7 @@ static int flight_read_material(const char* path, FlightMaterial* out) {
 				char* group_end = NULL;
 				const long group = split ? strtol(split + 5, &group_end, 10) : 0;
 				if (!split || group_end == split + 5) {
-					fprintf(stderr, "xwau: %s: %s must be <file>.dat-<group>\n", path, param);
+					ToolLog_Write(TOOL_LOG_WARNING, "xwau: %s: %s must be <file>.dat-<group>", path, param);
 					break;
 				}
 				split[4] = '\0';
@@ -741,7 +747,7 @@ static int flight_write_atlas(FlightContext* ctx, const char* base, const BakeFr
 	AeronCpuAtlas pages = { 0 };
 	AeronAtlasImage* placed = NULL;
 	if (!BakeSprites_BuildAtlas(frames, count, 0, &placed, &pages)) {
-		fprintf(stderr, "xwau: %s could not be packed\n", base);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s could not be packed", base);
 		return 0;
 	}
 	BakeSprites_MakeDirs(ctx->atlas_dir);
@@ -843,10 +849,11 @@ static void flight_bake_frame_sets(FlightContext* ctx, int group, char* header, 
 	if (!any)
 		return;
 	if (material.blend_mode != 0) {
-		fprintf(stderr,
-				"xwau: %s: ExplosionBlendMode %d uses XWAU's procedural explosions, which OpenXWA doesn't "
-				"have; its sets aren't converted\n",
-				file->path, material.blend_mode);
+		ToolLog_Write(
+			TOOL_LOG_WARNING,
+			"xwau: %s: ExplosionBlendMode %d uses XWAU's procedural explosions, which OpenXWA doesn't "
+			"have; its sets aren't converted",
+			file->path, material.blend_mode);
 		return;
 	}
 	size_t used = strlen(header);
@@ -860,8 +867,8 @@ static void flight_bake_frame_sets(FlightContext* ctx, int group, char* header, 
 		XwauDat* dat = NULL;
 		if (!Xwau_FindFile(ctx->opt->xwau_root, material.set_dat[set], path, sizeof path) ||
 			!(dat = XwauDat_Open(path, error, sizeof error))) {
-			fprintf(stderr, "xwau: %s: %s: %s can't be read\n", file->path, g_flightSetKeys[set],
-					material.set_dat[set]);
+			ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s: %s: %s can't be read", file->path, g_flightSetKeys[set],
+						  material.set_dat[set]);
 			ctx->stats->failures++;
 			continue;
 		}
@@ -877,7 +884,7 @@ static void flight_bake_frame_sets(FlightContext* ctx, int group, char* header, 
 			ok = XwauDat_LoadImageFrom(dat, material.set_group[set], frame_ids[i], &image, error,
 									   sizeof error);
 			if (!ok) {
-				fprintf(stderr, "xwau: %s: %s\n", path, error);
+				ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s: %s", path, error);
 				break;
 			}
 			frames[i].rgba = image.rgba;
@@ -893,9 +900,10 @@ static void flight_bake_frame_sets(FlightContext* ctx, int group, char* header, 
 				used += (size_t)snprintf(header + used, header_size - used, ", missions: [%d]",
 										 FLIGHT_DEATH_STAR_MISSION_INDEX);
 			used += (size_t)snprintf(header + used, header_size - used, "}\n");
-			printf("resdata group %d: %s set, %d images\n", group, g_flightSetNames[set], count);
+			ToolLog_Write(TOOL_LOG_INFO, "resdata group %d: %s set, %d images", group, g_flightSetNames[set],
+						  count);
 		} else {
-			fprintf(stderr, "xwau: group %d: the %s set failed\n", group, g_flightSetNames[set]);
+			ToolLog_Write(TOOL_LOG_ERROR, "xwau: group %d: the %s set failed", group, g_flightSetNames[set]);
 			ctx->stats->failures++;
 		}
 		flight_free_frames(frames, frames && count > 0 ? count : 0);
@@ -942,8 +950,8 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 		ok = XwauDat_GetImageInfo(dat, group, images[i].id, &info) &&
 			 XwauDat_LoadImageFrom(dat, group, images[i].id, &image, error, sizeof error);
 		if (!ok) {
-			fprintf(stderr, "xwau: %s: group %d image %d can't be decoded: %s\n",
-					ctx->dats[images[i].dat].name, group, images[i].id, error);
+			ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s: group %d image %d can't be decoded: %s",
+						  ctx->dats[images[i].dat].name, group, images[i].id, error);
 			break;
 		}
 		BakeFrame* frame = &frames[i];
@@ -975,11 +983,11 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 	char base[64];
 	snprintf(base, sizeof base, "group_%d", group);
 	if (ok && flight_write_atlas(ctx, base, frames, ids, count, header)) {
-		printf("resdata %s%sgroup %d: %d images%s%s\n", ctx->art_name ? ctx->art_name : "",
-			   ctx->art_name ? " " : "", group, count, resized ? ", planets shrunk" : "",
-			   fitted ? ", scaled down to fit an atlas page" : "");
+		ToolLog_Write(TOOL_LOG_INFO, "resdata %s%sgroup %d: %d images%s%s",
+					  ctx->art_name ? ctx->art_name : "", ctx->art_name ? " " : "", group, count,
+					  resized ? ", planets shrunk" : "", fitted ? ", scaled down to fit an atlas page" : "");
 	} else {
-		fprintf(stderr, "xwau: group %d failed\n", group);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: group %d failed", group);
 		ctx->stats->failures++;
 	}
 	flight_free_frames(frames, frames ? count : 0);
@@ -1075,7 +1083,7 @@ static void flight_bake_fonts(FlightContext* ctx) {
 		ctx->stats->font_tiers = BakeFlightFonts_WriteTiers(&font_options, &set);
 	}
 	if (!ok || ctx->stats->font_tiers != 3) {
-		fprintf(stderr, "xwau: the flight font failed%s%s\n", ok ? "" : ": ", ok ? "" : error);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: the flight font failed%s%s", ok ? "" : ": ", ok ? "" : error);
 		ctx->stats->failures++;
 	}
 	Xwa2dFrameSet_Free(&set);
@@ -1148,22 +1156,23 @@ static void flight_write_fonts_yaml(FlightContext* ctx) {
 			file = g_flightFontFiles[i].file;
 	}
 	if (!file) {
-		fprintf(stderr,
-				"xwau: TextFontFamily = %s: the font's file isn't known, so flight/fonts/fonts.yaml isn't "
-				"written\n",
-				family);
+		ToolLog_Write(
+			TOOL_LOG_WARNING,
+			"xwau: TextFontFamily = %s: the font's file isn't known, so flight/fonts/fonts.yaml isn't "
+			"written",
+			family);
 		return;
 	}
 	if (width_delta != 0)
-		fprintf(stderr,
-				"xwau: TextWidthDelta = %d isn't converted. The flight text uses the font's own widths\n",
-				width_delta);
+		ToolLog_Write(TOOL_LOG_WARNING,
+					  "xwau: TextWidthDelta = %d isn't converted. The flight text uses the font's own widths",
+					  width_delta);
 	snprintf(dir, sizeof dir, "%s/flight/fonts", ctx->opt->sprites->out_root);
 	BakeSprites_MakeDirs(dir);
 	snprintf(path, sizeof path, "%s/fonts.yaml", dir);
 	FILE* f = fopen(path, "w");
 	if (!f) {
-		fprintf(stderr, "xwau: %s can't be written\n", path);
+		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s can't be written", path);
 		ctx->stats->failures++;
 		return;
 	}
@@ -1173,7 +1182,7 @@ static void flight_write_fonts_yaml(FlightContext* ctx) {
 			"default: {file: %s, metrics: font}\n",
 			file);
 	fclose(f);
-	printf("xwau: copy %s from Windows' Fonts folder to flight/fonts/\n", file);
+	ToolLog_Write(TOOL_LOG_INFO, "xwau: copy %s from Windows' Fonts folder to flight/fonts/", file);
 }
 
 static int flight_compare_ints(const void* lhs, const void* rhs) {
@@ -1198,10 +1207,12 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 	flight_read_backdrop_scales(&ctx);
 	flight_read_exe(&ctx);
 	flight_list_materials(&ctx);
-	printf("xwau: %d DAT files, %d backdrop scales, default backdrop scale %g for %d backdrop groups, %d DAT "
-		   "materials, hull icon scale %d, map icon scale %d\n",
-		   ctx.dat_count, ctx.scale_count, (double)ctx.backdrop_scale, ctx.backdrop_count, ctx.material_count,
-		   ctx.hull_icon_scale, ctx.map_icon_scale);
+	ToolLog_Write(
+		TOOL_LOG_INFO,
+		"xwau: %d DAT files, %d backdrop scales, default backdrop scale %g for %d backdrop groups, %d DAT "
+		"materials, hull icon scale %d, map icon scale %d",
+		ctx.dat_count, ctx.scale_count, (double)ctx.backdrop_scale, ctx.backdrop_count, ctx.material_count,
+		ctx.hull_icon_scale, ctx.map_icon_scale);
 
 	int* groups = NULL;
 	int group_count = 0;

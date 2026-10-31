@@ -26,6 +26,7 @@
 #include "bake_fonts.h"
 
 #include "font_atlas.h"
+#include "tool_log.h"
 #include "xwa_2d.h"
 
 #include <errno.h>
@@ -61,8 +62,8 @@ static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_s
 	char decode_error[256] = { 0 };
 	if (!AeronVfs_ReadAll(vfs, AERON_VFS_ROOT_ASSET, source_path, 0, &source_bytes, &source_size) ||
 		!Xwa2d_DecodeAbpFont(source_bytes, source_size, &source, decode_error, sizeof decode_error)) {
-		fprintf(stderr, "bake: font %d decode failed: %s\n", point_size,
-				decode_error[0] ? decode_error : "file read failed");
+		ToolLog_Write(TOOL_LOG_ERROR, "bake: font %d decode failed: %s", point_size,
+					  decode_error[0] ? decode_error : "file read failed");
 		free(source_bytes);
 		return 0;
 	}
@@ -131,10 +132,10 @@ static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_s
 	char err[256];
 	int  ok = font_atlas_write(&r, basename, err, sizeof err) ? 1 : 0;
 	if (!ok) {
-		fprintf(stderr, "bake: font %d write failed: %s\n", point_size, err);
+		ToolLog_Write(TOOL_LOG_ERROR, "bake: font %d write failed: %s", point_size, err);
 	} else {
-		printf("font %-3d -> %s.{png,fnt} (%dx%d, cell %dx%d, baseline %d)\n", point_size,
-			   basename, atlas_w, atlas_h, r.cell_w, r.cell_h, baseline);
+		ToolLog_Write(TOOL_LOG_INFO, "font %-3d -> %s.{png,fnt} (%dx%d, cell %dx%d, baseline %d)", point_size,
+					  basename, atlas_w, atlas_h, r.cell_w, r.cell_h, baseline);
 	}
 	free(rgba);
 	free(glyphs);
@@ -164,7 +165,7 @@ int BakeFonts_Run(const BakeFontsOptions* opt, AeronVfs* vfs) {
 	AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, ".", "TIMES*.ABP",
 				  AERON_VFS_GLOB_FILES | AERON_VFS_GLOB_CASE_INSENSITIVE, glob_collect_abp,
 				  &disc);
-	printf("bake: %d frontend fonts discovered\n", disc.count);
+	ToolLog_Write(TOOL_LOG_INFO, "bake: %d frontend fonts discovered", disc.count);
 	int baked = 0;
 	for (int i = 0; i < disc.count; i++) {
 		baked += bake_one_font(opt, vfs, disc.sizes[i]);

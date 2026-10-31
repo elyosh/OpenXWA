@@ -29,6 +29,7 @@
 
 #include "ktx2_writer.h"
 #include "png_write.h"
+#include "tool_log.h"
 #include "upscale.h"
 
 #include "aeron/vfs.h"
@@ -81,7 +82,7 @@ int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, c
 	if (opt->write_png) {
 		snprintf(path, sizeof path, "%s.png", base_path);
 		if (!write_png_rgba_atomic(path, w, h, rgba, err, sizeof err)) {
-			fprintf(stderr, "  PNG write failed: %s (%s)\n", path, err);
+			ToolLog_Write(TOOL_LOG_ERROR, "  PNG write failed: %s (%s)", path, err);
 			ok = 0;
 		}
 	}
@@ -89,7 +90,7 @@ int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, c
 		snprintf(path, sizeof path, "%s.ktx2", base_path);
 		if (!write_ktx2_bc7_with_generated_mips(path, w, h, rgba, opt->bc7_quality, KTX2_TF_SRGB,
 												opt->zstd)) {
-			fprintf(stderr, "  KTX2 write failed: %s\n", path);
+			ToolLog_Write(TOOL_LOG_ERROR, "  KTX2 write failed: %s", path);
 			ok = 0;
 		}
 	}
@@ -246,8 +247,8 @@ static void bake_one_file(const BakeSpriteOptions* opt, AeronVfs* vfs, const cha
 	char error[256] = { 0 };
 	const int ok = BakeSource_LoadFrontend(vfs, src, &decoded, error, sizeof error);
 	if (!ok || decoded.count <= 0) {
-		fprintf(stderr, "bake: decode failed: %s (%s)\n", src,
-				error[0] ? error : "file read failed");
+		ToolLog_Write(TOOL_LOG_ERROR, "bake: decode failed: %s (%s)", src,
+					  error[0] ? error : "file read failed");
 		Xwa2dFrameSet_Free(&decoded);
 		stats->failures++;
 		return;
@@ -307,7 +308,7 @@ static void emit_group_atlas(const BakeSpriteOptions* opt, const char* resdata_d
 	AeronCpuAtlas atlas = { 0 };
 	AeronAtlasImage* images = NULL;
 	if (!BakeSprites_BuildAtlas(frames, n, 0, &images, &atlas)) {
-		fprintf(stderr, "bake: group %u could not be packed within the atlas cap\n", group);
+		ToolLog_Write(TOOL_LOG_ERROR, "bake: group %u could not be packed within the atlas cap", group);
 		stats->failures++;
 		return;
 	}
@@ -337,7 +338,7 @@ static void emit_group_atlas(const BakeSpriteOptions* opt, const char* resdata_d
 		stats->failures++;
 	}
 	if (page_count > 1) {
-		printf("  group %u split across %d pages\n", group, page_count);
+		ToolLog_Write(TOOL_LOG_INFO, "  group %u split across %d pages", group, page_count);
 	}
 }
 
@@ -347,7 +348,7 @@ static void bake_dat_groups(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeSta
 	BakeDatCatalog catalog;
 	char catalog_error[256] = { 0 };
 	if (!BakeSource_InitDatCatalog(vfs, &catalog, catalog_error, sizeof catalog_error)) {
-		fprintf(stderr, "bake: DAT catalog failed: %s\n", catalog_error);
+		ToolLog_Write(TOOL_LOG_ERROR, "bake: DAT catalog failed: %s", catalog_error);
 		stats->failures++;
 		return;
 	}
@@ -362,7 +363,7 @@ static void bake_dat_groups(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeSta
 		const int decode_ok = BakeSource_LoadDatGroup(&catalog, group, &decoded, error, sizeof error);
 		if (!decode_ok || decoded.count <= 0) {
 			if (!decode_ok) {
-				fprintf(stderr, "bake: DAT group %u decode failed: %s\n", group, error);
+				ToolLog_Write(TOOL_LOG_ERROR, "bake: DAT group %u decode failed: %s", group, error);
 				stats->failures++;
 			}
 			Xwa2dFrameSet_Free(&decoded);
@@ -404,8 +405,8 @@ static void bake_dat_groups(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeSta
 			continue;
 		}
 
-		printf("resdata group %u: %d sprites (ids %u..%u)\n", group, n, kept_ids[0],
-			   kept_ids[n - 1]);
+		ToolLog_Write(TOOL_LOG_INFO, "resdata group %u: %d sprites (ids %u..%u)", group, n, kept_ids[0],
+					  kept_ids[n - 1]);
 		emit_group_atlas(opt, resdata_dir, group, frames, kept_ids, n, stats);
 		frames_free(frames, n);
 		free(kept_ids);
@@ -477,7 +478,7 @@ int BakeSprites_Run(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeStats* stat
 		AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, "FRONTRES", "*",
 					  AERON_VFS_GLOB_DIRECTORIES | AERON_VFS_GLOB_CASE_INSENSITIVE,
 					  glob_collect_dir, disc);
-		printf("bake: %d frontres directories discovered\n", disc->dir_count);
+		ToolLog_Write(TOOL_LOG_INFO, "bake: %d frontres directories discovered", disc->dir_count);
 	}
 
 	char filter[256] = { 0 };
@@ -493,7 +494,7 @@ int BakeSprites_Run(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeStats* stat
 		AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, sub, "*",
 					  AERON_VFS_GLOB_FILES | AERON_VFS_GLOB_CASE_INSENSITIVE, glob_collect_image,
 					  disc);
-		printf("frontres/%s: %d source images\n", disc->dirs[i], disc->file_count);
+		ToolLog_Write(TOOL_LOG_INFO, "frontres/%s: %d source images", disc->dirs[i], disc->file_count);
 		for (int f = 0; f < disc->file_count; f++) {
 			if (filter[0]) {
 				char key[560];
