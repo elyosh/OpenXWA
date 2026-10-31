@@ -43,8 +43,8 @@ void XwaCameraMotion_ExteriorOffsets(int playerIdx, int16_t* pitchQ16, int16_t* 
 
 /* How far the local player's eye has moved from the seat, in world axes and
    world units. The eye moves toward turns, and back while the craft speeds
-   up. The cockpit and the things drawn with it move the other way. It is
-   zero when it doesn't apply, such as in the exterior view. */
+   up. The HD renderer moves its camera by it. It is zero when it doesn't
+   apply, such as in the exterior view. */
 void XwaCameraMotion_CockpitSway(float out[3]);
 
 #ifdef __cplusplus

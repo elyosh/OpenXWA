@@ -7,7 +7,6 @@
 #include "xwa/util/memory.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
-#include "xwa_runtime/camera/camera_motion.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #else
 #include <windows.h>
@@ -748,18 +747,6 @@ void RenderBillboard_DrawOriented(ParticleEffect* effect, unsigned int renderFla
 		centerRel.y = relYBase + centerRel.y;
 		centerRel.z = relZBase - cameraPanDeltaZ * 0.0625f + centerRel.z;
 	}
-#ifdef XWA_MODERN
-	{
-		float sway[3];
-
-		/* The enhanced camera's sway moves the eye, so the cockpit moves the
-		   other way. */
-		XwaCameraMotion_CockpitSway(sway);
-		centerRel.x -= sway[0];
-		centerRel.y -= sway[1];
-		centerRel.z -= sway[2];
-	}
-#endif
 	if (TRANSFM2_ViewTransformZ(centerRel.x, centerRel.y, centerRel.z) < g_renderUnitFloat) {
 		return;
 	}
@@ -1461,18 +1448,6 @@ void RenderBillboard_DrawOrientedStretched(ParticleEffect* effect, unsigned int 
 		centerRel.y = relYBase + centerRel.y;
 		centerRel.z = relZBase - cameraPanDeltaZ * 0.0625f + centerRel.z;
 	}
-#ifdef XWA_MODERN
-	{
-		float sway[3];
-
-		/* The enhanced camera's sway moves the eye, so the cockpit moves the
-		   other way. */
-		XwaCameraMotion_CockpitSway(sway);
-		centerRel.x -= sway[0];
-		centerRel.y -= sway[1];
-		centerRel.z -= sway[2];
-	}
-#endif
 	if (TRANSFM2_ViewTransformZ(centerRel.x, centerRel.y, centerRel.z) < g_renderUnitFloat) {
 		return;
 	}

@@ -580,6 +580,10 @@ typedef struct XwaFlightCamera {
 	 * classic: green, intensity 100000, cull 0x4000). */
 	uint8_t ds_beam_active;
 	int32_t ds_beam_world_pos[3];
+	/* How far the enhanced camera's sway moves the eye, in world axes and
+	 * world units (XwaCameraMotion_CockpitSway). The HD renderer adds it to
+	 * world_pos for its camera. */
+	float sway[3];
 	/* ---- classic projection (resolution-dependent focal): screen =
 	 * vp_center + proj_scale * xy/z, y down (TRANSFM2_ProjectScreen*).
 	 * Screen-space records (billboards) unproject through these. */
@@ -647,7 +651,7 @@ typedef struct XwaHyperspaceState {
  * internal view, at that object's own orientation
  * (FVIEW_SetObjectTransform of its roll/pitch/yaw/angleD — the same
  * basis the driver derives for every flight object), positioned at
- * -(seat_eye_world_offset + camera_pan/16 + sway) rotated into eye space. Anchor
+ * -(seat_eye_world_offset + camera_pan/16) rotated into eye space. Anchor
  * and gates mirror the classic draw sites: the hangar anchors to the
  * PLAYER object and draws whenever the view is internal
  * (hangar.c render loop); flight anchors to the camera FOCUS object
@@ -682,10 +686,6 @@ typedef struct XwaCockpit {
 	 * world axes (player.seatEyeWorldOffset*). */
 	float seat_eye_world_offset[3];
 	float camera_pan[3]; /* viewState.cameraPanDelta* (classic scales by 1/16) */
-	/* How far the enhanced camera's sway has moved the eye, in world axes
-	 * and world units (XwaCameraMotion_CockpitSway). The cockpit moves the
-	 * other way, like for the eye offset and the pan. */
-	float sway[3];
 	/* The same eye point in the CRAFT's model space (player.seatEyeLocal*,
 	 * FlightView_ComputeSeatEyeOffset): the cockpit eye, or the turret
 	 * seat's position. The classic anchors the weapon-fire pulse point

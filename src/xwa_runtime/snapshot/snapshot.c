@@ -1233,17 +1233,12 @@ static int snapshot_particle_transform(const ObjectRecord* owner, const Particle
 		 * camera position rounds the eye offset and the pan to whole units,
 		 * so the craft's position would move them against the cockpit. */
 		const PlayerViewState* vs = &player->viewState;
-		float sway[3];
-		XwaCameraMotion_CockpitSway(sway);
 		out->emitter_base[0] = vs->savedTargetX;
 		out->emitter_base[1] = vs->savedTargetY;
 		out->emitter_base[2] = vs->savedTargetZ;
 		emitter.x -= player->seatEyeWorldOffsetX + (float)vs->cameraPanDeltaX * 0.0625f;
 		emitter.y -= player->seatEyeWorldOffsetY + (float)vs->cameraPanDeltaY * 0.0625f;
 		emitter.z -= player->seatEyeWorldOffsetZ + (float)vs->cameraPanDeltaZ * 0.0625f;
-		emitter.x -= sway[0];
-		emitter.y -= sway[1];
-		emitter.z -= sway[2];
 	}
 	out->emitter_offset = emitter;
 	return 1;
@@ -1862,8 +1857,9 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->film_overlay = (uint8_t)(g_filmPlaybackMode && g_filmOverlayActive == 1);
 	c->in_hangar = (uint8_t)(g_inHangarReady != 0);
 	c->death_star_mode = (uint8_t)(g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR);
-	/* DS tunnel turbolaser beam light (FlightView_Render's direct
-	 * scene-light write; regionIdx is the tunnel-region global). */
+	XwaCameraMotion_CockpitSway(c->sway);
+	/* The superlaser's light, as FlightView_Render writes it into the
+	 * scene lights, for the region in regionIdx. */
 	c->ds_beam_active = (uint8_t)(g_deathStarSuperlaserRegions[regionIdx].enabled &&
 								  g_deathStarSuperlaserRegions[regionIdx].beamLightActive);
 	if (c->ds_beam_active) {
@@ -1960,7 +1956,6 @@ void XwaSnapshot_CaptureFlight(void) {
 			k->camera_pan[0] = (float)vs->cameraPanDeltaX;
 			k->camera_pan[1] = (float)vs->cameraPanDeltaY;
 			k->camera_pan[2] = (float)vs->cameraPanDeltaZ;
-			XwaCameraMotion_CockpitSway(k->sway);
 			k->stick_axis[0] = g_replayInputs[g_localPlayer].axisX;
 			k->stick_axis[1] = g_replayInputs[g_localPlayer].axisY;
 			k->stick_axis[2] = g_replayInputs[g_localPlayer].axisR;

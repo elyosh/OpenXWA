@@ -6,7 +6,6 @@
 
 #ifdef XWA_MODERN
 #include "xwa/frontend/frontend_display.h" /* g_flightRenderToFrontend */
-#include "xwa_runtime/camera/camera_motion.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/opt_synth.h"
@@ -415,18 +414,6 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 							 g_players[g_localPlayer].viewState.cameraPanDeltaY * g_cockpitPanPositionScale;
 			mesh.viewPos.z = -g_players[g_localPlayer].seatEyeWorldOffsetZ -
 							 g_players[g_localPlayer].viewState.cameraPanDeltaZ * g_cockpitPanPositionScale;
-#ifdef XWA_MODERN
-			{
-				float sway[3];
-
-				/* The enhanced camera's sway moves the eye, so the cockpit moves the
-				   other way. */
-				XwaCameraMotion_CockpitSway(sway);
-				mesh.viewPos.x -= sway[0];
-				mesh.viewPos.y -= sway[1];
-				mesh.viewPos.z -= sway[2];
-			}
-#endif
 		}
 
 		mesh.viewOrient[0] = g_viewMtx00;
@@ -819,18 +806,6 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 						 g_players[g_localPlayer].viewState.cameraPanDeltaY * g_cockpitPanPositionScale;
 		mesh.viewPos.z = -g_players[g_localPlayer].seatEyeWorldOffsetZ -
 						 g_players[g_localPlayer].viewState.cameraPanDeltaZ * g_cockpitPanPositionScale;
-#ifdef XWA_MODERN
-		{
-			float sway[3];
-
-			/* The enhanced camera's sway moves the eye, so the cockpit moves the
-			   other way. */
-			XwaCameraMotion_CockpitSway(sway);
-			mesh.viewPos.x -= sway[0];
-			mesh.viewPos.y -= sway[1];
-			mesh.viewPos.z -= sway[2];
-		}
-#endif
 	}
 
 	viewMatrix.m[0] = g_viewMtx00;
@@ -1078,18 +1053,6 @@ void RenderScene_DrawNoAssetSourceModel(ObjectRecord* obj, int nodeSwitchIndex) 
 						 (double)g_players[g_localPlayer].viewState.cameraPanDeltaY * 0.0625;
 		mesh.viewPos.z = -g_players[g_localPlayer].seatEyeWorldOffsetZ -
 						 (double)g_players[g_localPlayer].viewState.cameraPanDeltaZ * 0.0625;
-#ifdef XWA_MODERN
-		{
-			float sway[3];
-
-			/* The enhanced camera's sway moves the eye, so the cockpit moves the
-			   other way. */
-			XwaCameraMotion_CockpitSway(sway);
-			mesh.viewPos.x -= sway[0];
-			mesh.viewPos.y -= sway[1];
-			mesh.viewPos.z -= sway[2];
-		}
-#endif
 	}
 
 	mesh.viewOrient[0] = g_viewMtx00;

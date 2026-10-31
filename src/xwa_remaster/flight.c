@@ -1921,8 +1921,9 @@ static int fl_build_view_at_origin(const XwaFlightCamera* cam, const int32_t ori
 
 	memcpy(out->origin_world, origin_world, sizeof out->origin_world);
 	AeronWorld_LocalI32(origin_world, cam->world_pos, scene_camera->pos);
+	/* The camera includes the enhanced camera's sway. */
 	for (int axis = 0; axis < 3; axis++) {
-		scene_camera->pos[axis] += cam->world_pos_fraction[axis];
+		scene_camera->pos[axis] += cam->world_pos_fraction[axis] + cam->sway[axis];
 	}
 	const float aspect = (float)target_w / (float)target_h;
 	/* With a craft's field of view, a window narrower than the minimum
@@ -2304,6 +2305,7 @@ static int fl_temporal_pose_changed(const XwaSnapshot* current, const XwaSnapsho
 	const XwaFlightCamera* prev_cam = &previous->flight_camera;
 	if (memcmp(cam->world_pos, prev_cam->world_pos, sizeof cam->world_pos) != 0 ||
 		memcmp(cam->world_pos_fraction, prev_cam->world_pos_fraction, sizeof cam->world_pos_fraction) != 0 ||
+		memcmp(cam->sway, prev_cam->sway, sizeof cam->sway) != 0 ||
 		memcmp(cam->rows, prev_cam->rows, sizeof cam->rows) != 0 || cam->proj_scale != prev_cam->proj_scale ||
 		cam->vp_w != prev_cam->vp_w || cam->vp_h != prev_cam->vp_h ||
 		cam->vp_center_x != prev_cam->vp_center_x || cam->vp_center_y != prev_cam->vp_center_y ||
@@ -2319,13 +2321,15 @@ static int fl_temporal_pose_changed(const XwaSnapshot* current, const XwaSnapsho
 		   cockpit->aim_angle_b != prev_cockpit->aim_angle_b ||
 		   memcmp(cockpit->seat_eye_world_offset, prev_cockpit->seat_eye_world_offset,
 				  sizeof cockpit->seat_eye_world_offset) != 0 ||
-		   memcmp(cockpit->camera_pan, prev_cockpit->camera_pan, sizeof cockpit->camera_pan) != 0 ||
-		   memcmp(cockpit->sway, prev_cockpit->sway, sizeof cockpit->sway) != 0;
+		   memcmp(cockpit->camera_pan, prev_cockpit->camera_pan, sizeof cockpit->camera_pan) != 0;
 }
 
-static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const XwaFlightObject* anchor,
-								   const float camera_rows[9], const float camera_local[3], float out[16]) {
-	if (!cockpit || !anchor || !camera_rows || !camera_local || !out) {
+/* `sway` is XwaFlightCamera.sway. The camera at `camera_local` includes it, so
+ * the cockpit is placed back by it, at the seat. */
+static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const float sway[3],
+								   const XwaFlightObject* anchor, const float camera_rows[9],
+								   const float camera_local[3], float out[16]) {
+	if (!cockpit || !sway || !anchor || !camera_rows || !camera_local || !out) {
 		return 0;
 	}
 	float cur[3][3];
@@ -2339,8 +2343,8 @@ static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const XwaFlightObj
 
 	float eye_offset[3];
 	for (int axis = 0; axis < 3; ++axis) {
-		eye_offset[axis] = -(cockpit->seat_eye_world_offset[axis] + cockpit->camera_pan[axis] * 0.0625f +
-							 cockpit->sway[axis]);
+		eye_offset[axis] =
+			-(cockpit->seat_eye_world_offset[axis] + cockpit->camera_pan[axis] * 0.0625f + sway[axis]);
 	}
 	float delta[3];
 	fl_world_to_view(camera_rows, eye_offset[0], eye_offset[1], eye_offset[2], delta);
@@ -4442,8 +4446,8 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	memcpy(bw, anchor_bw, sizeof bw);
 	float w[3], delta[3];
 	for (int a = 0; a < 3; a++) {
-		w[a] = -(snap->cockpit.seat_eye_world_offset[a] + snap->cockpit.camera_pan[a] * 0.0625f +
-				 snap->cockpit.sway[a]);
+		w[a] =
+			-(snap->cockpit.seat_eye_world_offset[a] + snap->cockpit.camera_pan[a] * 0.0625f + cam->sway[a]);
 	}
 	fl_world_to_view(s.crows, w[0], w[1], w[2], delta);
 	if (snap->cockpit.inverted) {
@@ -5928,7 +5932,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		AeronSceneMesh* cockpit_mesh = XwaRemasterShip_MeshForName(snap->cockpit.model_name);
 		if (cockpit_mesh) {
 			float m[16];
-			fl_cockpit_model_matrix(&snap->cockpit, cockpit_anchor, s.crows, s.camera_local, m);
+			fl_cockpit_model_matrix(&snap->cockpit, cam->sway, cockpit_anchor, s.crows, s.camera_local, m);
 			AeronSceneMeshInstance inst;
 			memset(&inst, 0, sizeof inst);
 			inst.mesh = cockpit_mesh;
@@ -5937,8 +5941,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			memcpy(inst.transform, m, sizeof m);
 			memcpy(inst.prev_transform, m, sizeof m);
 			if (cockpit_history_valid &&
-				fl_cockpit_model_matrix(&prev->cockpit, previous_cockpit_anchor, previous_crows,
-										previous_flight_view.camera.pos, inst.prev_transform)) {
+				fl_cockpit_model_matrix(&prev->cockpit, prev->flight_camera.sway, previous_cockpit_anchor,
+										previous_crows, previous_flight_view.camera.pos,
+										inst.prev_transform)) {
 				inst.zero_velocity = 0;
 			} else {
 				/* A history reset makes the zero-vector fallback correct for the
