@@ -17,8 +17,8 @@ int main(int argc, char** argv) {
 		.resource_path = "resources",
 		.shader_path = "shaders",
 		.window_title = "OpenXWA Mod Importer",
-		.window_width = 1280,
-		.window_height = 720,
+		/* No window size: the window fills most of the screen, at the
+		   logical size's aspect. */
 		.logical_width = 1920,
 		.logical_height = 1080,
 		.presentation_mode = AERON_PRESENTATION_ASPECT_FIT,
