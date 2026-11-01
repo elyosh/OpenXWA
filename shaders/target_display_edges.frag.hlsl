@@ -33,11 +33,10 @@ float4 StraightSrgb(float2 texel) {
 	return float4(LinearToSrgb(rgb), saturate(color.a));
 }
 
-float4 main(float4 position : SV_Position, float2 texcoord : TEXCOORD0) : SV_Target0 {
-	float  unused = texcoord.x * 0.0;
-	float2 texel  = floor(position.xy);
+float4 main(float4 position : SV_Position) : SV_Target0 {
+	float2 texel = floor(position.xy);
 	if (edge_color.a < 0.5 || any(texel < 6.0) || any(texel >= size.xy - 6.0))
-		return float4(unused, 0.0, 0.0, 0.0);
+		return float4(0.0, 0.0, 0.0, 0.0);
 
 	float c[9];
 	for (int i = 0; i < 3; ++i) {
@@ -55,5 +54,5 @@ float4 main(float4 position : SV_Position, float2 texcoord : TEXCOORD0) : SV_Tar
 	float3 display    = StraightSrgb(texel).rgb;
 	float3 rgb        = edge_rgb * edge_alpha + display * (1.0 - edge_alpha);
 	float  alpha      = edge_alpha * edge_alpha;
-	return float4(SrgbToLinear(saturate(rgb)) * alpha + unused, alpha);
+	return float4(SrgbToLinear(saturate(rgb)) * alpha, alpha);
 }
