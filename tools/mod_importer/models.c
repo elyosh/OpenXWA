@@ -36,7 +36,7 @@ static bool listed(const ImportModel* models, size_t count, const char* key) {
 static bool list_opts(ImportContext* ctx, ImportModel** models, size_t* count) {
 	char dir[IMPORT_PATH_CAP];
 	if (!Import_FindNoCase(ctx->options->source, "FlightModels", true, dir, sizeof dir)) {
-		Import_Failed(ctx, "%s has no FlightModels folder", ctx->options->source);
+		Import_Failed(ctx, "The installation has no FlightModels folder: %s", ctx->options->source);
 		return false;
 	}
 	size_t names_count = 0;
@@ -70,7 +70,7 @@ static bool list_opts(ImportContext* ctx, ImportModel** models, size_t* count) {
 	}
 	FreeList(names, names_count);
 	if (!ok)
-		Import_Failed(ctx, "Out of memory");
+		Import_Failed(ctx, "The computer ran out of memory.");
 	return ok;
 }
 
@@ -98,7 +98,7 @@ static bool list_authored(ImportContext* ctx, ImportModel** models, size_t* coun
 	}
 	FreeList(names, names_count);
 	if (!ok)
-		Import_Failed(ctx, "Out of memory");
+		Import_Failed(ctx, "The computer ran out of memory.");
 	return ok;
 }
 
@@ -109,8 +109,8 @@ bool ImportModels_List(ImportContext* ctx, ImportModel** models, size_t* count) 
 		return false;
 	if (!*count) {
 		Import_Failed(ctx,
-					  ctx->options->only_count ? "None of the models asked for is in %s"
-											   : "%s has no .opt files in FlightModels",
+					  ctx->options->only_count ? "None of the models asked for are in %s"
+											   : "The installation's FlightModels folder has no models: %s",
 					  ctx->options->source);
 		return false;
 	}
@@ -144,7 +144,7 @@ typedef struct Pool {
 } Pool;
 
 static void fail(ImportContext* ctx, ImportModel* model, const char* reason) {
-	ToolLog_Write(TOOL_LOG_ERROR, "%s: %s", model->key, reason);
+	ToolLog_Write(TOOL_LOG_ERROR, "The model %s couldn't be imported: %s.", model->key, reason);
 	model->failed = StrDup(reason);
 	Aeron_AtomicAdd(&ctx->progress->failures, 1);
 }
@@ -153,17 +153,17 @@ static void fail(ImportContext* ctx, ImportModel* model, const char* reason) {
 static bool convert(Pool* pool, ImportModel* model, const char* dir) {
 	char from[IMPORT_PATH_CAP], to[IMPORT_PATH_CAP];
 	if (!RemoveTree(dir) || !MakeDirs(dir)) {
-		fail(pool->ctx, model, "can't create its work folder");
+		fail(pool->ctx, model, "its work folder can't be created");
 		return false;
 	}
 	if (!ModelConversion_Convert(&pool->conversion, model->opt, model->base, dir)) {
-		fail(pool->ctx, model, "conversion failed");
+		fail(pool->ctx, model, "the conversion failed");
 		return false;
 	}
 	if (!PathFormat(from, sizeof from, "%s/%s.gltf", dir, model->base) ||
 		!PathFormat(to, sizeof to, "%s/%s.gltf", dir, model->key) ||
 		(strcmp(from, to) != 0 && !Import_Rename(from, to))) {
-		fail(pool->ctx, model, "can't rename its .gltf");
+		fail(pool->ctx, model, "its .gltf file can't be renamed");
 		return false;
 	}
 	return true;
@@ -190,7 +190,7 @@ static bool place_authoring(Pool* pool, ImportModel* model, char* gltf, char* pr
 		!PathFormat(dir, sizeof dir, "%s/%s", pool->authoring->folder, rel) ||
 		!PathFormat(gltf, IMPORT_PATH_CAP, "%s/%s.gltf", dir, model->key) ||
 		!PathFormat(staging, sizeof staging, "%s/models/.staging.%s", pool->authoring->folder, model->key)) {
-		fail(pool->ctx, model, "path too long");
+		fail(pool->ctx, model, "its path is too long");
 		return false;
 	}
 	model->state = model->opt ? ImportAuthoring_State(pool->authoring, rel) : IMPORT_AUTHORING_AUTHORED;
@@ -205,7 +205,7 @@ static bool place_authoring(Pool* pool, ImportModel* model, char* gltf, char* pr
 		}
 		if (!(model->files = ImportAuthoring_Place(pool->authoring, staging, rel))) {
 			RemoveTree(staging);
-			fail(pool->ctx, model, "can't place it in the authoring folder");
+			fail(pool->ctx, model, "it can't be placed in the authoring folder");
 			return false;
 		}
 	}
@@ -230,7 +230,7 @@ static bool document_image(void* context, const char* uri, AeronGltfCookImageVie
 static bool import_in_memory(Pool* pool, ImportModel* model, const char* kept, const char* glb) {
 	ModelConversionModel* built = NULL;
 	if (!ModelConversion_Build(&pool->conversion, model->opt, model->base, &built)) {
-		fail(pool->ctx, model, "conversion failed");
+		fail(pool->ctx, model, "the conversion failed");
 		return false;
 	}
 	const OptGltfDocument* document = ModelConversion_Document(built);
@@ -239,7 +239,7 @@ static bool import_in_memory(Pool* pool, ImportModel* model, const char* kept, c
 	char* json = OptGltf_Json(document, &json_size);
 	bool cooked = false;
 	if (!json || !WriteWholeFile(kept, json, json_size))
-		fail(pool->ctx, model, "can't write its .gltf");
+		fail(pool->ctx, model, "its .gltf file can't be written");
 	else {
 		const AeronGltfCookInput input = {
 			.json = json,
@@ -251,7 +251,7 @@ static bool import_in_memory(Pool* pool, ImportModel* model, const char* kept, c
 			.images_context = (void*)document,
 		};
 		if (!(cooked = aeron_gltf_cook_model_input(&input, glb, &pool->cook, NULL)))
-			fail(pool->ctx, model, "cook failed");
+			fail(pool->ctx, model, "it can't be prepared for the game");
 	}
 	free(json);
 	ModelConversion_FreeModel(built);
@@ -264,18 +264,18 @@ static void import_model(Pool* pool, ImportModel* model) {
 	char gltf[IMPORT_PATH_CAP], glb[IMPORT_PATH_CAP], probes[IMPORT_PATH_CAP] = "";
 	if (!PathFormat(glb, sizeof glb, "%s/%s.glb", pool->glb_dir, model->key) ||
 		(!pool->authoring && !PathFormat(gltf, sizeof gltf, "%s/gltf/%s.gltf", ctx->work, model->key))) {
-		fail(ctx, model, "path too long");
+		fail(ctx, model, "its path is too long");
 		return;
 	}
 	if (pool->authoring) {
 		if (!place_authoring(pool, model, gltf, probes))
 			return;
 		if (!(model->cooked = aeron_gltf_cook_model(gltf, glb, &pool->cook, probes[0] ? probes : NULL)))
-			fail(ctx, model, "cook failed");
+			fail(ctx, model, "it can't be prepared for the game");
 	} else
 		model->cooked = import_in_memory(pool, model, gltf, glb);
 	if (model->cooked && !(model->gltf = StrDup(gltf))) {
-		fail(ctx, model, "out of memory");
+		fail(ctx, model, "the computer ran out of memory");
 		model->cooked = false;
 	}
 	model->seconds = (double)(Aeron_NowUs() - start) / 1e6;
@@ -287,7 +287,7 @@ static int worker(void* user) {
 	Pool* pool = user;
 	for (;;) {
 		const int index = Aeron_AtomicAdd(&pool->next, 1);
-		if ((size_t)index >= pool->count || Import_Cancelled(pool->ctx))
+		if ((size_t)index >= pool->count || Import_ShouldStop(pool->ctx))
 			break;
 		ImportModel* model = pool->order[index];
 		import_model(pool, model);
@@ -310,7 +310,7 @@ bool ImportModels_Run(ImportContext* ctx, ImportModel* models, size_t count,
 	Pool* pool = calloc(1, sizeof *pool);
 	if (!pool || !(pool->order = malloc(count * sizeof *pool->order))) {
 		free(pool);
-		Import_Failed(ctx, "Out of memory");
+		Import_Failed(ctx, "The computer ran out of memory.");
 		return false;
 	}
 	pool->ctx = ctx;
@@ -328,10 +328,10 @@ bool ImportModels_Run(ImportContext* ctx, ImportModel* models, size_t count,
 			  PathFormat(gltf_dir, sizeof gltf_dir, "%s/gltf", ctx->work) && MakeDirs(pool->glb_dir) &&
 			  MakeDirs(gltf_dir);
 	if (!ok)
-		Import_Failed(ctx, "Can't create %s", pool->glb_dir);
+		Import_Failed(ctx, "The folder %s can't be created.", pool->glb_dir);
 	SetReportProgram("opt2gltf");
 	if (ok && !ModelConversion_InitXwau(&pool->conversion, ctx->options->source)) {
-		Import_Failed(ctx, "Can't read the installation's materials, missions and tables");
+		Import_Failed(ctx, "The installation's materials, missions and tables can't be read.");
 		ok = false;
 	}
 
@@ -357,7 +357,7 @@ bool ImportModels_Run(ImportContext* ctx, ImportModel* models, size_t count,
 			if (!(threads[started] = Aeron_ThreadCreate("model import", worker, pool)))
 				break;
 		if (!started) {
-			Import_Failed(ctx, "Can't start the model threads");
+			Import_Failed(ctx, "The model conversion can't be started.");
 			ok = false;
 		}
 		for (int i = 0; i < started; ++i)

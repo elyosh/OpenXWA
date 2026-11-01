@@ -35,6 +35,7 @@
 
 #include "aeron/vfs.h"
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,22 +60,41 @@ static int is_dir(const char* path) {
 	return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
-/* Creates the folder and its missing parents. Paths can use '/' or '\'. A
- * folder that already exists, such as a drive root, counts as made. */
+/* Creates the folder and its missing parents, and logs an error when it
+ * can't. Paths can use '/' or '\'. The parents are made from the deepest one
+ * that exists, so a drive such as "C:" is never made or checked: Windows
+ * reports that "C:" isn't a folder. */
 int BakeSprites_MakeDirs(const char* path) {
-	char tmp[1024];
-	snprintf(tmp, sizeof tmp, "%s", path);
-	for (char* p = tmp + 1; *p; p++) {
-		if (*p == '/' || *p == '\\') {
-			const char separator = *p;
-			*p = '\0';
-			if (make_dir(tmp) != 0 && !is_dir(tmp)) {
-				return 0;
-			}
-			*p = separator;
+	if (is_dir(path)) {
+		return 1;
+	}
+	char parent[1024];
+	const int length = snprintf(parent, sizeof parent, "%s", path);
+	if (length < 0 || length >= (int)sizeof parent) {
+		ToolLog_Write(TOOL_LOG_ERROR, "The folder %s can't be created: its path is too long.", path);
+		return 0;
+	}
+	/* The last separator, unless it follows a drive such as "C:". */
+	char* last = NULL;
+	for (char* p = parent + 1; *p; p++) {
+		if ((*p == '/' || *p == '\\') && p[-1] != ':') {
+			last = p;
 		}
 	}
-	return make_dir(tmp) == 0 || is_dir(tmp);
+	if (last) {
+		*last = '\0';
+		if (!BakeSprites_MakeDirs(parent)) {
+			return 0;
+		}
+	}
+	if (make_dir(path) != 0) {
+		const int error = errno;
+		if (!is_dir(path)) {
+			ToolLog_Write(TOOL_LOG_ERROR, "The folder %s can't be created: %s.", path, strerror(error));
+			return 0;
+		}
+	}
+	return 1;
 }
 
 static void lower_str(char* s) {
@@ -198,7 +218,10 @@ static void emit_frames(const BakeSpriteOptions* opt, const char* bundle_dir, co
 	if (n == 1 && !force_atlas) {
 		char dir[1040];
 		snprintf(dir, sizeof dir, "%s/sprites", bundle_dir);
-		BakeSprites_MakeDirs(dir);
+		if (!BakeSprites_MakeDirs(dir)) {
+			stats->failures++;
+			return;
+		}
 		snprintf(base, sizeof base, "%s/%s", dir, name);
 		if (BakeSprites_EmitImage(opt, base, frames[0].rgba, frames[0].w, frames[0].h)) {
 			stats->sprites++;
@@ -213,7 +236,12 @@ static void emit_frames(const BakeSpriteOptions* opt, const char* bundle_dir, co
 	if (BakeSprites_BuildAtlas(frames, n, 1, &images, &atlas)) {
 		char dir[1040];
 		snprintf(dir, sizeof dir, "%s/atlas", bundle_dir);
-		BakeSprites_MakeDirs(dir);
+		if (!BakeSprites_MakeDirs(dir)) {
+			free(images);
+			Aeron_AtlasBuildFree(&atlas);
+			stats->failures++;
+			return;
+		}
 		snprintf(base, sizeof base, "%s/%s", dir, name);
 		int ok = BakeSprites_EmitImage(opt, base, atlas.pages[0].rgba, atlas.pages[0].width, atlas.pages[0].height);
 		char yaml[1100];
@@ -235,7 +263,10 @@ static void emit_frames(const BakeSpriteOptions* opt, const char* bundle_dir, co
 	/* Frames too large to pack (room FLICs) — one file per frame. */
 	char dir[1040];
 	snprintf(dir, sizeof dir, "%s/atlas/%s", bundle_dir, name);
-	BakeSprites_MakeDirs(dir);
+	if (!BakeSprites_MakeDirs(dir)) {
+		stats->failures++;
+		return;
+	}
 	int ok = 1;
 	for (int i = 0; i < n; i++) {
 		snprintf(base, sizeof base, "%s/frame_%02d", dir, i);
@@ -326,7 +357,10 @@ static void emit_group_atlas(const BakeSpriteOptions* opt, const char* resdata_d
 							 BakeStats* stats) {
 	char dir[1040];
 	snprintf(dir, sizeof dir, "%s/atlas", resdata_dir);
-	BakeSprites_MakeDirs(dir);
+	if (!BakeSprites_MakeDirs(dir)) {
+		stats->failures++;
+		return;
+	}
 	AeronCpuAtlas atlas = { 0 };
 	AeronAtlasImage* images = NULL;
 	if (!BakeSprites_BuildAtlas(frames, n, 0, &images, &atlas)) {

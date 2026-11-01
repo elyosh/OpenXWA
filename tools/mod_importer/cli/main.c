@@ -24,8 +24,9 @@
  *                    case (repeatable)
  *
  * The log goes to stderr, and to <mod>/import.log. Ctrl+C cancels the
- * import. The exit code is 0 when nothing failed, 1 when something failed or
- * the import stopped, and 2 for a usage error.
+ * import. The import stops at the first failure. The exit code is 0 when the
+ * import finished, 1 when it stopped or was cancelled, and 2 for a usage
+ * error.
  */
 
 #include <signal.h>

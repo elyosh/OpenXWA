@@ -758,7 +758,11 @@ static int flight_write_atlas(FlightContext* ctx, const char* base, const BakeFr
 		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s could not be packed", base);
 		return 0;
 	}
-	BakeSprites_MakeDirs(ctx->atlas_dir);
+	if (!BakeSprites_MakeDirs(ctx->atlas_dir)) {
+		free(placed);
+		Aeron_AtlasBuildFree(&pages);
+		return 0;
+	}
 	int ok = 1;
 	for (int page = 0; page < pages.page_count; ++page) {
 		char path[1300];
@@ -1031,7 +1035,7 @@ static void flight_bake_mission_art(FlightContext* ctx, const FlightMissionArt* 
 	snprintf(ctx->atlas_dir, sizeof ctx->atlas_dir, "%s/resdata/mission_art/%s", ctx->opt->sprites->out_root,
 			 art->name);
 	int baked = 0;
-	for (size_t g = 0; g < n; ++g) {
+	for (size_t g = 0; g < n && ctx->stats->failures == 0; ++g) {
 		if (!flight_is_baked_group(groups[g]) ||
 			(ctx->opt->sprites->group_filter >= 0 && groups[g] != ctx->opt->sprites->group_filter))
 			continue;
@@ -1244,11 +1248,13 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 	}
 	if (group_count > 1)
 		qsort(groups, (size_t)group_count, sizeof *groups, flight_compare_ints);
-	for (int g = 0; g < group_count; ++g)
+	/* The bake stops at the first failure. */
+	for (int g = 0; g < group_count && stats->failures == 0; ++g)
 		flight_bake_group(&ctx, groups[g]);
-	for (int k = 0; k < ctx.mission_art_count; ++k)
+	for (int k = 0; k < ctx.mission_art_count && stats->failures == 0; ++k)
 		flight_bake_mission_art(&ctx, &ctx.mission_art[k]);
-	if (opt->sprites->group_filter < 0 || opt->sprites->group_filter == FLIGHT_FONT_GROUP) {
+	if (stats->failures == 0 &&
+		(opt->sprites->group_filter < 0 || opt->sprites->group_filter == FLIGHT_FONT_GROUP)) {
 		flight_bake_fonts(&ctx);
 		flight_write_fonts_yaml(&ctx);
 	}

@@ -8,6 +8,7 @@
 #include "import_internal.h"
 
 #define RING_LINES 2000
+#define ERROR_LINES 100
 
 struct XwaModImportLogRing {
 	AeronMutex* mutex;
@@ -58,6 +59,15 @@ static void sink(void* user, ToolLogLevel level, const char* line) {
 	ring->lines[slot] = StrDup(line);
 	ring->levels[slot] = level;
 	ring->count++;
+	XwaModImportProgress* progress = ring->progress;
+	if (level == TOOL_LOG_ERROR && progress->error_line_count < ERROR_LINES) {
+		char** grown = realloc(progress->error_lines, (progress->error_line_count + 1) * sizeof *grown);
+		if (grown) {
+			progress->error_lines = grown;
+			if ((grown[progress->error_line_count] = StrDup(line)))
+				progress->error_line_count++;
+		}
+	}
 	if (ring->echo)
 		ring->echo(ring->echo_user, level, line);
 	Aeron_MutexUnlock(ring->mutex);

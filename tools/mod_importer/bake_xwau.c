@@ -474,7 +474,13 @@ static void emit_atlas(XwauContext* ctx, const char* dir, const char* base, cons
 		ctx->stats->failures++;
 		return;
 	}
-	BakeSprites_MakeDirs(dir);
+	if (!BakeSprites_MakeDirs(dir)) {
+		free(placed);
+		Aeron_AtlasBuildFree(&pages);
+		free(frames);
+		ctx->stats->failures++;
+		return;
+	}
 	int ok = 1;
 	for (int page = 0; page < pages.page_count; ++page) {
 		char path[1200];
@@ -1087,7 +1093,7 @@ static void bake_frontres(XwauContext* ctx) {
 		return;
 	}
 	struct dirent* d;
-	while ((d = readdir(top)) != NULL) {
+	while (ctx->stats->failures == 0 && (d = readdir(top)) != NULL) {
 		char dir[1300];
 		snprintf(dir, sizeof dir, "%s/%s", ctx->frontres, d->d_name);
 		if (d->d_name[0] == '.' || !is_directory(dir))
@@ -1111,7 +1117,7 @@ static void bake_frontres(XwauContext* ctx) {
 		}
 		if (sub)
 			closedir(sub);
-		for (int i = 0; i < count; ++i)
+		for (int i = 0; i < count && ctx->stats->failures == 0; ++i)
 			bake_frontres_file(ctx, d->d_name, files[i]);
 		free(files);
 	}
@@ -1377,7 +1383,7 @@ static void bake_resdata(XwauContext* ctx) {
 				groups[group_count++] = list[g];
 		}
 	}
-	for (int g = 0; g < group_count; ++g)
+	for (int g = 0; g < group_count && ctx->stats->failures == 0; ++g)
 		bake_group(ctx, files, file_count, groups[g]);
 	for (int f = 0; f < file_count; ++f) {
 		XwauDat_Close(files[f].sd);
@@ -2099,14 +2105,18 @@ int BakeXwau_RunFrontend(const BakeXwauOptions* opt, BakeXwauStats* stats) {
 	read_wide_list(&ctx, opt->xwau_root);
 	find_videos(&ctx);
 
+	/* The bake stops at the first failure. */
 	bake_frontres(&ctx);
-	bake_resdata(&ctx);
-	write_frontend_yaml(&ctx);
-	write_layout_yaml(&ctx);
-	write_animations_yaml(&ctx);
-	write_video_yamls(&ctx);
-	write_fonts_yaml(&ctx);
-	write_movies_yaml(&ctx);
+	if (stats->failures == 0)
+		bake_resdata(&ctx);
+	if (stats->failures == 0) {
+		write_frontend_yaml(&ctx);
+		write_layout_yaml(&ctx);
+		write_animations_yaml(&ctx);
+		write_video_yamls(&ctx);
+		write_fonts_yaml(&ctx);
+		write_movies_yaml(&ctx);
+	}
 
 	free(ctx.regions);
 	for (int i = 0; i < ctx.wide_key_count; ++i)

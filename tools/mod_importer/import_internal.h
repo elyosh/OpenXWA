@@ -24,8 +24,11 @@ typedef struct ImportContext {
 	uint64_t phase_start; /* in microseconds */
 } ImportContext;
 
-/* Whether the import should stop. */
+/* Whether the import was cancelled. */
 bool Import_Cancelled(ImportContext* ctx);
+
+/* Whether the import should stop: it was cancelled, or something failed. */
+bool Import_ShouldStop(ImportContext* ctx);
 
 /* Starts a phase with `total` items (0: no count). */
 void Import_BeginPhase(ImportContext* ctx, XwaModImportPhase phase, int total);
@@ -34,8 +37,9 @@ void Import_BeginPhase(ImportContext* ctx, XwaModImportPhase phase, int total);
  * 1000. A negative `weight` takes it from the item count. */
 void Import_Advance(ImportContext* ctx, int items, int weight);
 
-/* Counts a failure and logs it as an error. The text is also listed in the
- * summary. Only the thread that runs the import calls it. */
+/* Counts a failure and logs it as an error. The import stops at the next
+ * check, as the mod would be broken. The text is also listed in the summary.
+ * Only the thread that runs the import calls it. */
 UTIL_PRINTF(2, 3) void Import_Failed(ImportContext* ctx, const char* format, ...);
 
 /* Lists a failure that a worker already counted and logged. */

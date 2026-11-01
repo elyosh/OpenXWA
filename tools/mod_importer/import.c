@@ -76,6 +76,10 @@ int XwaModImport_Overall(XwaModImportProgress* progress) {
 
 bool Import_Cancelled(ImportContext* ctx) { return Aeron_AtomicLoad(&ctx->progress->cancel) != 0; }
 
+bool Import_ShouldStop(ImportContext* ctx) {
+	return Import_Cancelled(ctx) || Aeron_AtomicLoad(&ctx->progress->failures) != 0;
+}
+
 static void end_phase(ImportContext* ctx) {
 	const int phase = Aeron_AtomicLoad(&ctx->progress->phase);
 	const uint64_t now = Aeron_NowUs();
@@ -362,6 +366,9 @@ void XwaModImport_ProgressFree(XwaModImportProgress* progress) {
 	for (size_t i = 0; i < progress->failed_count; ++i)
 		free(progress->failed[i]);
 	free(progress->failed);
+	for (size_t i = 0; i < progress->error_line_count; ++i)
+		free(progress->error_lines[i]);
+	free(progress->error_lines);
 	ImportLog_FreeRing(progress->log);
 	memset(progress, 0, sizeof *progress);
 }
@@ -394,8 +401,7 @@ static bool write_mod_yaml(ImportContext* ctx, bool complete) {
 	yaml_quoted(f, options->name && options->name[0] ? options->name : "Mod");
 	fprintf(f, "\ncomplete: %s\nsource: ", complete ? "true" : "false");
 	yaml_quoted(f, options->source);
-	fprintf(f, "\nimported: \"%04d-%02d-%02d\"\nfailures: %d\n", date.year, date.month, date.day,
-			Aeron_AtomicLoad(&ctx->progress->failures));
+	fprintf(f, "\nimported: \"%04d-%02d-%02d\"\n", date.year, date.month, date.day);
 	return fclose(f) == 0;
 }
 
@@ -427,12 +433,12 @@ static bool prepare(ImportContext* ctx) {
 	if (folder_state(options->mod) == FOLDER_IMPORTED) {
 		ToolLog_Write(TOOL_LOG_INFO, "Deleting the mod in %s", options->mod);
 		if (!clear_folder(options->mod)) {
-			Import_Failed(ctx, "Can't delete everything in %s", options->mod);
+			Import_Failed(ctx, "The old mod in %s can't be deleted.", options->mod);
 			return false;
 		}
 	}
 	if (!MakeDirs(options->mod) || !write_mod_yaml(ctx, false)) {
-		Import_Failed(ctx, "Can't write in %s", options->mod);
+		Import_Failed(ctx, "The mod folder %s can't be written to.", options->mod);
 		return false;
 	}
 	if (!PathFormat(path, sizeof path, "%s/import.log", options->mod) ||
@@ -440,7 +446,7 @@ static bool prepare(ImportContext* ctx) {
 		ToolLog_Write(TOOL_LOG_WARNING, "Can't write %s", path);
 	if (!PathFormat(ctx->work, sizeof ctx->work, "%s/.import", options->mod) || !RemoveTree(ctx->work) ||
 		!MakeDirs(ctx->work)) {
-		Import_Failed(ctx, "Can't create %s", ctx->work);
+		Import_Failed(ctx, "The folder %s can't be created.", ctx->work);
 		return false;
 	}
 	ToolLog_Write(TOOL_LOG_INFO, "Importing %s into %s", options->source, options->mod);
@@ -472,7 +478,7 @@ static void place_libraries(ImportContext* ctx, ImportAuthoring* authoring) {
 			if (files)
 				ImportAuthoring_Set(authoring, rel, files);
 			else
-				Import_Failed(ctx, "Can't place %s in the authoring folder", rel);
+				Import_Failed(ctx, "%s can't be placed in the authoring folder.", rel);
 		}
 	}
 	FreeList(names, count);
@@ -486,7 +492,7 @@ static void effects(ImportContext* ctx, ImportModel* models, size_t count, Impor
 	char out[IMPORT_PATH_CAP], sources[IMPORT_PATH_CAP], path[IMPORT_PATH_CAP], library[IMPORT_PATH_CAP];
 	if (!PathFormat(out, sizeof out, "%s/flight/effects", options->mod) || !MakeDirs(out) ||
 		!PathFormat(sources, sizeof sources, "%s/effects", authoring ? options->authoring : ctx->work)) {
-		Import_Failed(ctx, "Can't create %s", out);
+		Import_Failed(ctx, "The folder %s can't be created.", out);
 		return;
 	}
 
@@ -503,7 +509,7 @@ static void effects(ImportContext* ctx, ImportModel* models, size_t count, Impor
 	bool written = inputs && XwauLibrary_Rebuild(options->source, ctx->work, inputs, input_count);
 	free(inputs);
 	if (!written)
-		Import_Failed(ctx, "The effect libraries can't be written");
+		Import_Failed(ctx, "The effect libraries can't be written.");
 	else if (authoring)
 		place_libraries(ctx, authoring);
 
@@ -521,24 +527,24 @@ static void effects(ImportContext* ctx, ImportModel* models, size_t count, Impor
 		cooked += models[i].cooked;
 	Aeron_AtomicStore(&ctx->progress->total, (int)(libraries + cooked));
 
-	for (size_t i = 0; i < names_count && !Import_Cancelled(ctx); ++i) {
+	for (size_t i = 0; i < names_count && !Import_ShouldStop(ctx); ++i) {
 		if (!PathFormat(library, sizeof library, "%s/%s/%s.yaml", sources, names[i], names[i]) ||
 			!IsFile(library))
 			continue;
 		if (EffectLibrary_BuildLibrary(LIBRARY_TAG, library, NULL, out) == EFFECT_LIBRARY_FAILED)
-			Import_Failed(ctx, "Effect library %s failed", names[i]);
+			Import_Failed(ctx, "The effect library %s couldn't be built.", names[i]);
 		Import_Advance(ctx, 1, -1);
 	}
 	FreeList(names, names_count);
 	if (built && PathFormat(path, sizeof path, "%s/effects.yaml", sources) && IsFile(path)) {
 		char target[IMPORT_PATH_CAP];
 		if (!PathFormat(target, sizeof target, "%s/effects.yaml", out) || !Import_CopyFile(path, target))
-			Import_Failed(ctx, "Can't copy %s", path);
+			Import_Failed(ctx, "%s can't be copied.", path);
 	}
 
 	/* A model whose materials name what the libraries don't have isn't
 	 * kept, as its cook would have failed. */
-	for (size_t i = 0; i < count && !Import_Cancelled(ctx); ++i) {
+	for (size_t i = 0; i < count && !Import_ShouldStop(ctx); ++i) {
 		ImportModel* model = &models[i];
 		if (!model->cooked)
 			continue;
@@ -546,7 +552,8 @@ static void effects(ImportContext* ctx, ImportModel* models, size_t count, Impor
 			if (PathFormat(path, sizeof path, "%s/flight/models/%s.glb", options->mod, model->key))
 				remove(path);
 			model->cooked = false;
-			Import_Failed(ctx, "Model %s: material check failed", model->key);
+			Import_Failed(ctx, "The model %s uses materials that the effect libraries don't have.",
+						  model->key);
 		}
 		Import_Advance(ctx, 1, -1);
 	}
@@ -572,7 +579,7 @@ static void craft(ImportContext* ctx) {
 	ok = XwauSoundBanks_Write(options->source, flight, game_files) && ok;
 	XwauTextIds_Free(&moved);
 	if (!ok)
-		Import_Failed(ctx, "Craft settings failed");
+		Import_Failed(ctx, "The craft settings couldn't be imported.");
 }
 
 /* The missions' files and settings, the awards, and the skybox list. Returns
@@ -592,22 +599,22 @@ static bool missions(ImportContext* ctx, bool* skyboxes) {
 		return true;
 	if (!XwauGameFiles_Copy(options->source, options->game, game_files) ||
 		!XwauFlightSettings_Write(options->source, flight) || !XwauAwards_Write(options->source, awards)) {
-		Import_Failed(ctx, "Mission files failed");
+		Import_Failed(ctx, "The mission files couldn't be imported.");
 		return true;
 	}
 	XwauMissions* loaded = XwauMissions_Load(options->source, true);
 	if (!loaded) {
-		Import_Failed(ctx, "Can't load the missions");
+		Import_Failed(ctx, "The missions can't be read.");
 		return false;
 	}
 	const bool ok = XwauMissionFiles_Write(options->source, loaded, options->game, out);
 	XwauMissions_Free(loaded);
 	if (!ok) {
-		Import_Failed(ctx, "Mission files failed");
+		Import_Failed(ctx, "The mission files couldn't be imported.");
 		return true;
 	}
 	if (!MakeDirs(environments) || !XwauSkyboxes_Write(options->source, options->game, manifest, folders))
-		Import_Failed(ctx, "Skybox list failed");
+		Import_Failed(ctx, "The skybox list couldn't be imported.");
 	else
 		*skyboxes = true;
 	return true;
@@ -626,7 +633,7 @@ static void bake_skyboxes(ImportContext* ctx) {
 		total += *c == '\n';
 	Aeron_AtomicStore(&ctx->progress->total, total);
 	const int jobs = ctx->cores < ENVMAP_MAX_JOBS ? ctx->cores : ENVMAP_MAX_JOBS;
-	for (char* line = text; line && *line && !Import_Cancelled(ctx);) {
+	for (char* line = text; line && *line && !Import_ShouldStop(ctx);) {
 		char* end = strchr(line, '\n');
 		if (end)
 			*end = '\0';
@@ -661,9 +668,12 @@ static void bake_skyboxes(ImportContext* ctx) {
 			if ((is_overlay ? EnvBake_Overlay(&bake) : EnvBake_Sky(&bake)) == ENV_BAKE_OK)
 				baked++;
 			else
-				Import_Failed(ctx, "%s %s failed", fields[0], folder);
+				Import_Failed(ctx,
+							  is_overlay ? "The overlay %s couldn't be converted."
+										 : "The skybox %s couldn't be converted.",
+							  folder);
 		} else if (line[0])
-			Import_Failed(ctx, "Skybox list: bad line \"%s\"", line);
+			Import_Failed(ctx, "The skybox list has a line that can't be read: \"%s\"", line);
 		Import_Advance(ctx, 1, -1);
 		line = end ? end + 1 : NULL;
 	}
@@ -689,7 +699,7 @@ static void bake_frontend(ImportContext* ctx) {
 		"to the original game's art, %d failures",
 		stats.atlases, stats.hd_frames, stats.sd_frames, stats.unchanged, stats.failures);
 	if (!ok)
-		Import_Failed(ctx, "Frontend art: %d failures", stats.failures);
+		Import_Failed(ctx, "The menu art couldn't be converted.");
 }
 
 static void bake_flight(ImportContext* ctx) {
@@ -710,7 +720,7 @@ static void bake_flight(ImportContext* ctx) {
 		"flight font tiers, %d failures",
 		stats.atlases, stats.images, stats.frame_sets, stats.mission_art, stats.font_tiers, stats.failures);
 	if (!ok)
-		Import_Failed(ctx, "Flight art: %d failures", stats.failures);
+		Import_Failed(ctx, "The flight art couldn't be converted.");
 }
 
 /* ---- The import --------------------------------------------------------- */
@@ -718,8 +728,7 @@ static void bake_flight(ImportContext* ctx) {
 static void summary(ImportContext* ctx, XwaModImportResult result, uint64_t start) {
 	XwaModImportProgress* progress = ctx->progress;
 	const int seconds = (int)((Aeron_NowUs() - start) / 1000000);
-	static const char* const results[] = { "Import finished", "Import finished with failures",
-										   "Import cancelled", "Import stopped" };
+	static const char* const results[] = { "Import finished", "Import cancelled", "Import stopped" };
 	ToolLog_Write(TOOL_LOG_INFO, "%s in %dm %02ds: %d failures, %d warnings", results[result], seconds / 60,
 				  seconds % 60, Aeron_AtomicLoad(&progress->failures), Aeron_AtomicLoad(&progress->warnings));
 	for (int i = 0; i < XWA_MOD_IMPORT_PHASE_COUNT; ++i)
@@ -744,7 +753,7 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 	const bool converted = ImportModels_Run(ctx, models, count, options->authoring ? authoring : NULL);
 	for (size_t i = 0; i < count; ++i) {
 		if (models[i].failed)
-			Import_ListFailed(ctx, "Model %s: %s", models[i].key, models[i].failed);
+			Import_ListFailed(ctx, "The model %s couldn't be imported: %s.", models[i].key, models[i].failed);
 		if (models[i].files) {
 			char rel[IMPORT_PATH_CAP];
 			if (PathFormat(rel, sizeof rel, "models/%s", models[i].key)) {
@@ -755,54 +764,55 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 	}
 	if (options->authoring)
 		ImportAuthoring_Save(authoring);
-	XwaModImportResult result = !converted ? XWA_MOD_IMPORT_STOPPED : XWA_MOD_IMPORT_OK;
-	if (result == XWA_MOD_IMPORT_OK && !Import_Cancelled(ctx)) {
+	if (converted && !Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_EFFECTS, 0);
 		effects(ctx, models, count, options->authoring ? authoring : NULL);
 	}
 	ImportModels_Free(models, count);
-	if (result != XWA_MOD_IMPORT_OK)
-		return result;
+	if (!converted)
+		return XWA_MOD_IMPORT_STOPPED;
 
 	bool skyboxes = false;
 	SetReportProgram("xwau");
-	if (!Import_Cancelled(ctx)) {
+	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_CRAFT, 0);
 		craft(ctx);
 	}
-	if (!Import_Cancelled(ctx)) {
+	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_MISSIONS, 0);
 		if (!missions(ctx, &skyboxes))
 			return XWA_MOD_IMPORT_STOPPED;
 	}
-	if (!Import_Cancelled(ctx)) {
+	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_SKYBOXES, 0);
 		if (skyboxes)
 			bake_skyboxes(ctx);
 	}
-	if (!Import_Cancelled(ctx)) {
+	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_HANGARS, 0);
 		if (!XwauHangars_Write(options->source, ctx->game_exe, NULL, options->game, options->mod))
-			Import_Failed(ctx, "Hangars failed");
+			Import_Failed(ctx, "The hangars couldn't be imported.");
 	}
-	if (!Import_Cancelled(ctx)) {
+	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_FRONTEND, 0);
 		bake_frontend(ctx);
 	}
-	if (!Import_Cancelled(ctx)) {
+	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_FLIGHT, 0);
 		bake_flight(ctx);
 	}
-	if (!Import_Cancelled(ctx)) {
+	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_COPIES, 0);
 		ImportCopies_Run(ctx);
 	}
-	if (Import_Cancelled(ctx))
-		return XWA_MOD_IMPORT_CANCELLED;
+	if (Import_ShouldStop(ctx))
+		return XWA_MOD_IMPORT_STOPPED;
 	Import_BeginPhase(ctx, XWA_MOD_IMPORT_FINISH, 0);
-	if (!write_mod_yaml(ctx, true))
-		Import_Failed(ctx, "Can't write %s/mod.yaml", options->mod);
-	return Aeron_AtomicLoad(&ctx->progress->failures) ? XWA_MOD_IMPORT_FAILURES : XWA_MOD_IMPORT_OK;
+	if (!write_mod_yaml(ctx, true)) {
+		Import_Failed(ctx, "%s/mod.yaml can't be written.", options->mod);
+		return XWA_MOD_IMPORT_STOPPED;
+	}
+	return XWA_MOD_IMPORT_OK;
 }
 
 XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModImportProgress* progress) {
@@ -816,7 +826,7 @@ XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModIm
 	ImportLog_Open(progress, options);
 
 	XwaModImportResult result = run_phases(&ctx, &authoring);
-	if (result == XWA_MOD_IMPORT_OK || result == XWA_MOD_IMPORT_FAILURES)
+	if (result == XWA_MOD_IMPORT_OK)
 		Import_Advance(&ctx, 0, 1000);
 	else if (result == XWA_MOD_IMPORT_STOPPED && Import_Cancelled(&ctx))
 		result = XWA_MOD_IMPORT_CANCELLED;

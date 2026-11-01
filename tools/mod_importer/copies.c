@@ -47,7 +47,7 @@ static void copy_named(Copies* copies, const char* from, const char* name, const
 	char source[IMPORT_PATH_CAP], target[IMPORT_PATH_CAP];
 	if (strchr(name, '/') || strchr(name, '\\') || !from[0] ||
 		!Import_FindNoCase(from, name, false, source, sizeof source)) {
-		Import_Failed(copies->ctx, "%s: not in %s", name, from[0] ? from : "the installation");
+		Import_Failed(copies->ctx, "The file %s isn't in %s.", name, from[0] ? from : "the installation");
 		copies->missing++;
 		return;
 	}
@@ -55,7 +55,7 @@ static void copy_named(Copies* copies, const char* from, const char* name, const
 		Import_CopyFile(source, target))
 		copies->copied++;
 	else
-		Import_Failed(copies->ctx, "Can't copy %s to %s", source, to);
+		Import_Failed(copies->ctx, "%s can't be copied to %s.", source, to);
 }
 
 /* Copies the files that the `key` keys of the YAML file `yaml` name, from

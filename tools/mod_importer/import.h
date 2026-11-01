@@ -10,8 +10,9 @@
  * goes to <mod>/import.log, to the log lines of the progress, and to the
  * `echo` callback when there is one.
  *
- * The mod folder gets a mod.yaml. It says `complete: false` until every phase
- * has run. A folder that isn't empty is only cleared when its mod.yaml was
+ * The import stops at the first failure. The mod folder gets a mod.yaml. It
+ * says `complete: false` until every phase has run, and the game doesn't
+ * offer a mod that isn't complete. A folder that isn't empty is only cleared when its mod.yaml was
  * written by the importer and `replace` is set. The work files go in
  * <mod>/.import/, which is deleted at the end.
  *
@@ -65,9 +66,8 @@ typedef enum XwaModImportPhase {
 
 typedef enum XwaModImportResult {
 	XWA_MOD_IMPORT_OK,        /* every phase ran with no failure */
-	XWA_MOD_IMPORT_FAILURES,  /* every phase ran, and some items failed */
 	XWA_MOD_IMPORT_CANCELLED, /* stopped by `cancel` */
-	XWA_MOD_IMPORT_STOPPED,   /* stopped by an error that left nothing to work on */
+	XWA_MOD_IMPORT_STOPPED,   /* stopped by a failure */
 } XwaModImportResult;
 
 typedef struct XwaModImportLogRing XwaModImportLogRing;
@@ -89,6 +89,8 @@ typedef struct XwaModImportProgress {
 	int phase_ms[XWA_MOD_IMPORT_PHASE_COUNT]; /* how long each phase took */
 	char** failed;                            /* what failed, one line each */
 	size_t failed_count;
+	char** error_lines; /* the first error lines of the log, in order */
+	size_t error_line_count;
 	XwaModImportLogRing* log;
 } XwaModImportProgress;
 

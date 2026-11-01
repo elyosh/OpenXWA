@@ -477,21 +477,22 @@ static void draw_done(ImporterUi* app) {
 	AeronUiContext* ui = app->ui;
 	static const char* const results[] = {
 		[XWA_MOD_IMPORT_OK] = "The import finished.",
-		[XWA_MOD_IMPORT_FAILURES] = "The import finished, but some parts couldn't be imported.",
 		[XWA_MOD_IMPORT_CANCELLED] = "The import was cancelled.",
 		[XWA_MOD_IMPORT_STOPPED] = "The import stopped because of an error.",
 	};
 	char line[PATH_CAP + 64], time[64];
 	AeronUi_Header(ui, results[app->result]);
 	format_time(time, sizeof time, app->end_us - app->start_us);
-	snprintf(line, sizeof line, "Time: %s. Failures: %d. Warnings: %d.", time,
-			 Aeron_AtomicLoad(&app->progress.failures), Aeron_AtomicLoad(&app->progress.warnings));
+	snprintf(line, sizeof line, "Time: %s", time);
 	AeronUi_Label(ui, line);
 	snprintf(line, sizeof line, "Mod folder: %s", app->mod);
 	AeronUi_Label(ui, line);
-	const int usable = app->result == XWA_MOD_IMPORT_OK || app->result == XWA_MOD_IMPORT_FAILURES;
-	if (!usable)
-		AeronUi_Help(ui, "The mod can't be used. Import it again into the same folder to finish it.");
+	const int usable = app->result == XWA_MOD_IMPORT_OK;
+	if (app->result == XWA_MOD_IMPORT_CANCELLED)
+		AeronUi_Help(ui, "The mod can't be used yet. Import it again into the same folder to finish it.");
+	else if (!usable)
+		AeronUi_Help(ui, "The mod can't be used. Fix the problem shown below, then import it again into the "
+						 "same folder.");
 	AeronUi_Help(ui, "The full log is in import.log in the mod folder.");
 
 	AeronUi_BeginColumns(ui, 2, (const float[]) { -480.0f, 1.0f });
@@ -506,13 +507,14 @@ static void draw_done(ImporterUi* app) {
 		}
 	AeronUi_EndColumns(ui);
 
-	if (app->progress.failed_count) {
-		AeronUi_Header(ui, "Failures");
-		AeronUi_Help(ui, "These parts are missing from the mod. The log has the details.");
-		const size_t count = app->progress.failed_count < LOG_LINES ? app->progress.failed_count : LOG_LINES;
+	if (app->result == XWA_MOD_IMPORT_STOPPED && app->progress.error_line_count) {
+		AeronUi_Header(ui, "What went wrong");
+		AeronUi_Help(ui, "The first message usually explains the problem.");
+		const size_t count =
+			app->progress.error_line_count < LOG_LINES ? app->progress.error_line_count : LOG_LINES;
 		for (size_t i = 0; i < count; ++i)
-			app->items[i] = (AeronUiListItem) { .id = i, .label = app->progress.failed[i] };
-		AeronUi_ListBox(ui, "Failures", app->items, count, &app->failure_selected,
+			app->items[i] = (AeronUiListItem) { .id = i, .label = app->progress.error_lines[i] };
+		AeronUi_ListBox(ui, "Errors", app->items, count, &app->failure_selected,
 						fmaxf(120.0f, AeronUi_AvailableHeight(ui) - BUTTON_ROWS_REF - 60.0f));
 	}
 	if (app->done_message[0])
