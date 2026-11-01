@@ -11,13 +11,16 @@
 
 #define SUN_FLIGHT_YAML "flight/flight.yaml"
 
-#define SUN_SWITCH(field) { #field, 1, 0.0f, 1.0f, offsetof(XwaModernSunOptions, field) }
-#define SUN_NUMBER(field, min, max) { #field, 0, min, max, offsetof(XwaModernSunOptions, field) }
+#define SUN_SWITCH(field) { #field, 1, 1, 0.0f, 1.0f, offsetof(XwaModernSunOptions, field) }
+#define SUN_NUMBER(field, player, min, max)                                                                  \
+	{ #field, 0, player, min, max, offsetof(XwaModernSunOptions, field) }
 
 static const XwaModernSunOptionKey g_sunOptionKeys[] = {
 	SUN_SWITCH(procedural_sun),
 	SUN_SWITCH(procedural_flare),
-	SUN_NUMBER(flare_intensity, 0.0f, 10.0f),
+	SUN_NUMBER(flare_intensity, 1, 0.0f, 10.0f),
+	SUN_NUMBER(brightness, 0, 0.0f, 100.0f),
+	SUN_NUMBER(core_brightness, 0, 0.0f, 1000.0f),
 };
 
 #define SUN_KEY_COUNT (sizeof g_sunOptionKeys / sizeof g_sunOptionKeys[0])

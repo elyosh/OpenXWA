@@ -390,7 +390,9 @@ static int host_config_camera_options(const AeronConfigFile* config, int require
 }
 
 /* Reads the suns section. In the shipped file, `required` makes every key
- * required. `override_mask` gets a bit for each key that the file sets. */
+ * required. The player's file is read without `required`, and only for the
+ * keys that the player can set. `override_mask` gets a bit for each key that
+ * the file sets. */
 static int host_config_sun_options(const AeronConfigFile* config, int required, XwaModernSunOptions* out,
 								   unsigned int* override_mask, char* error, size_t error_size) {
 	size_t count;
@@ -399,6 +401,9 @@ static int host_config_sun_options(const AeronConfigFile* config, int required, 
 
 	*override_mask = 0;
 	for (size_t i = 0; i < count; ++i) {
+		if (!required && !keys[i].player) {
+			continue;
+		}
 		snprintf(key, sizeof key, "suns.%s", keys[i].name);
 		const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
 		if (!node) {

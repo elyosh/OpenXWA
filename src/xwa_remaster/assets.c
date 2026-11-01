@@ -267,6 +267,7 @@ static int assets_texture_ref(const AeronImageCacheEntry* e, XwaAssetRef* out) {
 	out->v1 = 1.0f;
 	out->w = e->w;
 	out->h = e->h;
+	out->has_light = 0;
 	return 1;
 }
 
@@ -313,6 +314,10 @@ static int apply_atlas_frame(const AeronSpriteAtlas* atlas, int frame, XwaAssetR
 	out->v1 = (r->y + r->h) / ah;
 	out->w = (int)(r->w + 0.5f);
 	out->h = (int)(r->h + 0.5f);
+	out->has_light = atlas->light && atlas->light[frame * 3] >= 0.0f;
+	if (out->has_light) {
+		memcpy(out->light, &atlas->light[frame * 3], sizeof out->light);
+	}
 	/* Classic dims: the per-frame YAML key is authoritative (each
 	 * frame's true original size — required once hand-authored frames
 	 * of arbitrary resolution mix into an atlas); the atlas-level

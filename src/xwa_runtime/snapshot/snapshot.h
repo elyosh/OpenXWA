@@ -738,6 +738,17 @@ typedef struct XwaHeadlight {
 	float angle_degrees;
 } XwaHeadlight;
 
+/* The settings of the procedural suns (modern_sun_options.h). */
+typedef struct XwaSunSettings {
+	uint8_t procedural_sun;
+	uint8_t procedural_flare;
+	float flare_intensity;
+	/* A multiple of the radiance of a white texel of a classic image. */
+	float brightness;
+	/* A multiple of the disc's radiance. */
+	float core_brightness;
+} XwaSunSettings;
+
 /* The groups of the particle lights (particle_lights.h). */
 typedef enum XwaParticleLightGroup {
 	XWA_PARTICLE_LIGHT_COCKPIT_SPARKS, /* effect 4 */
@@ -1386,6 +1397,7 @@ typedef struct XwaSnapshot {
 	XwaLightPulse light_pulses[XWA_SNAP_MAX_LIGHT_PULSES];
 	uint8_t light_pulse_active;
 	XwaHeadlight headlight;
+	XwaSunSettings suns;
 	XwaParticleLight particle_lights[XWA_PARTICLE_LIGHT_GROUP_COUNT];
 	XwaBackdrop backdrops[XWA_SNAP_MAX_BACKDROPS];
 	uint32_t backdrop_count;

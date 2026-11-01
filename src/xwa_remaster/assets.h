@@ -56,6 +56,10 @@ typedef struct XwaAssetRef {
 	float u0, v0, u1, v1;
 	int w, h;
 	int classic_w, classic_h;
+	/* The frame's `light` colour in its atlas, such as a sun's, from 0 to 1
+	 * per channel (sRGB). has_light is 0 when the frame has none. */
+	float light[3];
+	int has_light;
 } XwaAssetRef;
 
 /* `root` is the mod folder. `prefer_original_2d` changes

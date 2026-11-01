@@ -86,6 +86,9 @@ typedef struct FlBackdropQuad {
 	float corners[4][3];
 	float uvs[4][2];
 	XwaAssetRef ref;
+	/* The snapshot index of the backdrop sun that the quad draws, or -1 for
+	 * another backdrop. */
+	int sun;
 } FlBackdropQuad;
 
 /* One state-derived scene billboard (explosion/spark/debris/chaff
@@ -2410,6 +2413,17 @@ typedef struct FlQuadTarget {
 	const float* camera_local;
 } FlQuadTarget;
 
+/* Converts a quad's view-space corners to render-local space:
+ * local = camera_local + crows^T * view. */
+static void fl_view_corners_to_local(const FlQuadTarget* target, const float corners[4][3], float out[4][3]) {
+	for (int v = 0; v < 4; v++) {
+		for (int j = 0; j < 3; j++) {
+			out[v][j] = target->camera_local[j] + target->crows[0 * 3 + j] * corners[v][0] +
+						target->crows[1 * 3 + j] * corners[v][1] + target->crows[2 * 3 + j] * corners[v][2];
+		}
+	}
+}
+
 static void fl_submit_view_quad_to(const FlQuadTarget* target, AeronSceneBillboardStage stage,
 								   const float corners[4][3], const float uvs[4][2], const XwaAssetRef* ref,
 								   uint32_t argb, const float* anchor_local, float depth_bias,
@@ -2436,13 +2450,8 @@ static void fl_submit_view_quad_to(const FlQuadTarget* target, AeronSceneBillboa
 	tint[2] = XwaRemaster_SrgbToLinear((float)(argb & 0xffu) / 255.0f) * tint[3] * emissive_strength;
 	const float du = ref->u1 - ref->u0;
 	const float dv = ref->v1 - ref->v0;
+	fl_view_corners_to_local(target, corners, d.corners);
 	for (int v = 0; v < 4; v++) {
-		/* local = camera_local + crows^T * view */
-		for (int j = 0; j < 3; j++) {
-			d.corners[v][j] = target->camera_local[j] + target->crows[0 * 3 + j] * corners[v][0] +
-							  target->crows[1 * 3 + j] * corners[v][1] +
-							  target->crows[2 * 3 + j] * corners[v][2];
-		}
 		d.uv[v][0] = ref->u0 + uvs[v][0] * du;
 		d.uv[v][1] = ref->v0 + uvs[v][1] * dv;
 		memcpy(d.colors[v], tint, sizeof tint);
@@ -2459,6 +2468,39 @@ static void fl_submit_view_quad_ex(AeronSceneBillboardStage stage, const float c
 	const FlQuadTarget target = { s.scene, s.crows, s.camera_local };
 	fl_submit_view_quad_to(&target, stage, corners, uvs, ref, argb, anchor_local, depth_bias, prev_corners,
 						   emissive_strength);
+}
+
+/* The corona of a procedural sun moves by this many units per second of
+ * game time. */
+#define FL_STAR_TIME_PER_SECOND 0.6
+/* Each sun's corona time is offset by this many units times its backdrop
+ * index, so two suns don't show the same rays. */
+#define FL_STAR_TIME_OFFSET 37.0
+
+/* Queues a backdrop sun as a procedural star on its quad (AeronSceneBillboardStar).
+ * The sun's colour comes from its image's `light`; a sun without one is
+ * white. `radiance` is the radiance of the white of the sun's disc. */
+static void fl_submit_star_quad(const FlBackdropQuad* q, const XwaSnapshot* snap, float radiance) {
+	const FlQuadTarget target = { s.scene, s.crows, s.camera_local };
+	AeronSceneBillboardDesc d;
+	memset(&d, 0, sizeof d);
+	d.blend = AERON_SCENE_BILLBOARD_BLEND_PMA;
+	d.stage = AERON_SCENE_BILLBOARD_STAGE_SKY;
+	d.shader = AERON_SCENE_BILLBOARD_SHADER_STAR;
+	for (int c = 0; c < 3; c++) {
+		d.star.tint[c] = q->ref.has_light ? q->ref.light[c] : 1.0f;
+	}
+	d.star.time =
+		(float)((double)snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS * FL_STAR_TIME_PER_SECOND +
+				(double)q->sun * FL_STAR_TIME_OFFSET);
+	d.star.core_radiance = radiance * snap->suns.core_brightness;
+	fl_view_corners_to_local(&target, q->corners, d.corners);
+	memcpy(d.uv, q->uvs, sizeof d.uv);
+	for (int v = 0; v < 4; v++) {
+		d.colors[v][0] = d.colors[v][1] = d.colors[v][2] = radiance;
+		d.colors[v][3] = 1.0f;
+	}
+	AeronScene_AddBillboard(s.scene, &d);
 }
 
 static void fl_submit_view_quad(AeronSceneBillboardStage stage, const float corners[4][3],
@@ -2619,6 +2661,11 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 				q->uvs[3][0] = u0;
 				q->uvs[3][1] = 1.0f;
 				q->ref = ref;
+				/* A sun's strip that fits in one frame has u from 0 to 1 across
+				 * its segments, so a procedural star can be drawn on them. */
+				q->sun = fl_backdrop_is_sun(b) && b->strip_segment_count <= b->strip_segments_per_frame
+							 ? (int)i
+							 : -1;
 			}
 		} else if (b->side == 4 || b->side == 5) {
 			/* Axis quad: half width along world Y, half height along
@@ -2653,6 +2700,7 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 			}
 			memcpy(q->uvs, fl_default_uvs, sizeof q->uvs);
 			q->ref = ref;
+			q->sun = fl_backdrop_is_sun(b) ? (int)i : -1;
 		}
 	}
 	return count;
@@ -5651,6 +5699,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * geometry, visible elsewhere). */
 	const float backdrop_radiance = XwaRemaster_ClassicRadiance();
 	for (uint32_t i = 0; i < s.bd_count; i++) {
+		if (snap->suns.procedural_sun && s.bd_quads[i].sun >= 0) {
+			fl_submit_star_quad(&s.bd_quads[i], snap, backdrop_radiance * snap->suns.brightness);
+			continue;
+		}
 		fl_submit_view_quad_ex(AERON_SCENE_BILLBOARD_STAGE_SKY, s.bd_quads[i].corners, s.bd_quads[i].uvs,
 							   &s.bd_quads[i].ref, 0xffffffffu, NULL, 0.0f, NULL, backdrop_radiance);
 	}

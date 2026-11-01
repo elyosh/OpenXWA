@@ -10,6 +10,7 @@
 #include "xwa_runtime/snapshot/snapshot.h"
 #include "xwa/assets/model_mesh.h"
 #include "xwa_runtime/camera/camera_motion.h"
+#include "xwa_runtime/config/modern_sun_options.h"
 #include "xwa_runtime/frontend/frontend_fonts.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
@@ -1912,6 +1913,16 @@ void XwaSnapshot_CaptureFlight(void) {
 
 	XwaCockpitAlertLights_Capture(s);
 	XwaHeadlights_Capture(s);
+	{
+		XwaModernSunOptions sun_options;
+
+		XwaModernSunOptions_Get(&sun_options);
+		s->suns.procedural_sun = (uint8_t)(sun_options.procedural_sun != 0);
+		s->suns.procedural_flare = (uint8_t)(sun_options.procedural_flare != 0);
+		s->suns.flare_intensity = sun_options.flare_intensity;
+		s->suns.brightness = sun_options.brightness;
+		s->suns.core_brightness = sun_options.core_brightness;
+	}
 	XwaParticleLights_Capture(s);
 
 	/* Player cockpit STATE (see XwaCockpit): model identity from the

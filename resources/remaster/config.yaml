@@ -201,6 +201,12 @@ suns:
   procedural_flare: false
   # The flare's strength, 0 to 10.
   flare_intensity: 3.0
+  # The brightness of the sun's disc and rays, as a multiple of a white classic
+  # image, like effects.explosion_genus_emissive_strength, 0 to 100.
+  brightness: 1.0
+  # The light added in the sun's core, as a multiple of the disc's brightness,
+  # 0 to 1000. It makes the sun glow through the bloom.
+  core_brightness: 2.0
 texture_filtering:
   anisotropic: true
   max_anisotropy: 8.0
