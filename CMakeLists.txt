@@ -578,6 +578,7 @@ if(XWA_BUILD_MOD_IMPORTER)
         tools/mod_importer/bake_xwau.c
         tools/mod_importer/bake_xwau_flight.c
         tools/mod_importer/copies.c
+        tools/mod_importer/effects.c
         tools/mod_importer/import.c
         tools/mod_importer/log.c
         tools/mod_importer/models.c

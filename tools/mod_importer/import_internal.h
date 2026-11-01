@@ -13,6 +13,8 @@
 
 #define IMPORT_PATH_CAP 4096
 #define IMPORT_KEY_CAP 256
+/* How the messages of the effect library builder start. */
+#define IMPORT_LIBRARY_TAG "[aeron_gltf_cook] library"
 
 /* One import. */
 typedef struct ImportContext {
@@ -132,6 +134,13 @@ void ImportModels_Free(ImportModel* models, size_t count);
  * import has to stop. */
 bool ImportModels_Run(ImportContext* ctx, ImportModel* models, size_t count,
 					  const ImportAuthoring* authoring);
+
+/* Makes the effect libraries that the models' .gltf files `gltfs` name in
+ * memory, and builds them into folder `out`, on worker threads. Sets the
+ * phase's total to the libraries and `checks` more items. Failures are
+ * reported. */
+void ImportEffects_Build(ImportContext* ctx, const char* const* gltfs, size_t count, const char* out,
+						 size_t checks);
 
 /* Copies the videos, sounds, movies and fonts that the mod's files name. */
 void ImportCopies_Run(ImportContext* ctx);

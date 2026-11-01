@@ -32,7 +32,6 @@
 #include "xwau_text.h"
 
 #define MOD_YAML_HEADER "# Made by the OpenXWA mod importer."
-#define LIBRARY_TAG "[aeron_gltf_cook] library"
 
 /* How much of the overall progress each phase takes, in percent: the share
  * of each phase in the times of TFTC-R and XWAU2025 imports. */
@@ -487,59 +486,73 @@ static void place_libraries(ImportContext* ctx, ImportAuthoring* authoring) {
 
 /* Builds the effect libraries from the models' .gltf files, then checks the
  * materials of every cooked model against them. */
-static void effects(ImportContext* ctx, ImportModel* models, size_t count, ImportAuthoring* authoring) {
+/* Builds the libraries from their sources in the authoring folder, after
+ * writing there the ones that the imported models name. */
+static void build_sources(ImportContext* ctx, ImportAuthoring* authoring, const char* out, size_t cooked) {
 	const XwaModImportOptions* options = ctx->options;
-	char out[IMPORT_PATH_CAP], sources[IMPORT_PATH_CAP], path[IMPORT_PATH_CAP], library[IMPORT_PATH_CAP];
-	if (!PathFormat(out, sizeof out, "%s/flight/effects", options->mod) || !MakeDirs(out) ||
-		!PathFormat(sources, sizeof sources, "%s/effects", authoring ? options->authoring : ctx->work)) {
-		Import_Failed(ctx, "The folder %s can't be created.", out);
+	char sources[IMPORT_PATH_CAP], path[IMPORT_PATH_CAP], library[IMPORT_PATH_CAP];
+	if (!PathFormat(sources, sizeof sources, "%s/effects", options->authoring))
 		return;
-	}
-
-	/* The libraries that the models name. With an authoring folder, every
-	 * model there is read, as it is the project that the mod comes from. */
-	const char** inputs = calloc(count + 1, sizeof *inputs);
-	size_t input_count = 0;
-	if (authoring)
-		inputs[input_count++] = options->authoring;
-	else
-		for (size_t i = 0; inputs && i < count; ++i)
-			if (models[i].gltf)
-				inputs[input_count++] = models[i].gltf;
-	bool written = inputs && XwauLibrary_Rebuild(options->source, ctx->work, inputs, input_count);
-	free(inputs);
-	if (!written)
+	/* Every model of the authoring folder is read, as it is the project that
+	 * the mod comes from. */
+	const char* const inputs[] = { options->authoring };
+	if (!XwauLibrary_Rebuild(options->source, ctx->work, inputs, 1))
 		Import_Failed(ctx, "The effect libraries can't be written.");
-	else if (authoring)
+	else
 		place_libraries(ctx, authoring);
 
-	/* An authoring folder keeps the libraries of earlier imports, so they
+	/* The authoring folder keeps the libraries of earlier imports, so they
 	 * are built even when this import couldn't write its own. */
-	const bool built = written || authoring;
 	size_t names_count = 0;
-	char** names = built ? ListDir(sources, true, &names_count) : NULL;
+	char** names = ListDir(sources, true, &names_count);
 	size_t libraries = 0;
 	for (size_t i = 0; i < names_count; ++i)
 		libraries += PathFormat(library, sizeof library, "%s/%s/%s.yaml", sources, names[i], names[i]) &&
 					 IsFile(library);
-	size_t cooked = 0;
-	for (size_t i = 0; i < count; ++i)
-		cooked += models[i].cooked;
 	Aeron_AtomicStore(&ctx->progress->total, (int)(libraries + cooked));
 
 	for (size_t i = 0; i < names_count && !Import_ShouldStop(ctx); ++i) {
 		if (!PathFormat(library, sizeof library, "%s/%s/%s.yaml", sources, names[i], names[i]) ||
 			!IsFile(library))
 			continue;
-		if (EffectLibrary_BuildLibrary(LIBRARY_TAG, library, NULL, out) == EFFECT_LIBRARY_FAILED)
+		if (EffectLibrary_BuildLibrary(IMPORT_LIBRARY_TAG, library, NULL, out) == EFFECT_LIBRARY_FAILED)
 			Import_Failed(ctx, "The effect library %s couldn't be built.", names[i]);
 		Import_Advance(ctx, 1, -1);
 	}
 	FreeList(names, names_count);
-	if (built && PathFormat(path, sizeof path, "%s/effects.yaml", sources) && IsFile(path)) {
+	if (PathFormat(path, sizeof path, "%s/effects.yaml", sources) && IsFile(path)) {
 		char target[IMPORT_PATH_CAP];
 		if (!PathFormat(target, sizeof target, "%s/effects.yaml", out) || !Import_CopyFile(path, target))
 			Import_Failed(ctx, "%s can't be copied.", path);
+	}
+}
+
+/* Builds the effect libraries, then checks the materials of every cooked
+ * model against them. Without an authoring folder, the libraries are made
+ * in memory from the models' .gltf files and built straight into the mod. */
+static void effects(ImportContext* ctx, ImportModel* models, size_t count, ImportAuthoring* authoring) {
+	const XwaModImportOptions* options = ctx->options;
+	char out[IMPORT_PATH_CAP], path[IMPORT_PATH_CAP];
+	if (!PathFormat(out, sizeof out, "%s/flight/effects", options->mod) || !MakeDirs(out)) {
+		Import_Failed(ctx, "The folder %s can't be created.", out);
+		return;
+	}
+	size_t cooked = 0;
+	for (size_t i = 0; i < count; ++i)
+		cooked += models[i].cooked;
+	if (authoring) {
+		build_sources(ctx, authoring, out, cooked);
+	} else {
+		const char** inputs = calloc(count + 1, sizeof *inputs);
+		size_t input_count = 0;
+		for (size_t i = 0; inputs && i < count; ++i)
+			if (models[i].gltf)
+				inputs[input_count++] = models[i].gltf;
+		if (inputs)
+			ImportEffects_Build(ctx, inputs, input_count, out, cooked);
+		else
+			Import_Failed(ctx, "The computer ran out of memory.");
+		free(inputs);
 	}
 
 	/* A model whose materials name what the libraries don't have isn't
