@@ -222,13 +222,16 @@ ENV LD_LIBRARY_PATH=/opt/xwa-tools/lib:/opt/xwa-linux/lib
 ENV PKG_CONFIG_PATH=/opt/xwa-linux/lib/pkgconfig
 
 RUN case "${XWA_BUILD_TYPE}" in \
-        Release) xwa_debug_ui=OFF ;; \
-        Debug) xwa_debug_ui=ON ;; \
+        Release) xwa_debug_ui=OFF; xwa_release_flags="-O3 -DNDEBUG -g" ;; \
+        Debug) xwa_debug_ui=ON; xwa_release_flags="-O3 -DNDEBUG" ;; \
         *) echo "XWA_BUILD_TYPE must be Release or Debug" >&2; exit 2 ;; \
     esac \
     && cmake -S /src -B /build/xwa -G Ninja \
         -DCMAKE_BUILD_TYPE="${XWA_BUILD_TYPE}" \
         -DCMAKE_PREFIX_PATH=/opt/xwa-linux \
+        -DCMAKE_C_FLAGS_RELEASE="${xwa_release_flags}" \
+        -DCMAKE_CXX_FLAGS_RELEASE="${xwa_release_flags}" \
+        -DCMAKE_EXE_LINKER_FLAGS="-Wl,--build-id" \
         -DAERON_SHADERCROSS_EXECUTABLE=/opt/xwa-tools/bin/shadercross \
         -DAERON_ISPC_KERNEL_DIR=/opt/ispc-kernel \
         -DXWA_BUILD_TOOLS=ON \
@@ -275,7 +278,21 @@ RUN mkdir -p /build/package/openxwa-linux-x86_64/licenses \
         "/build/package/openxwa-linux-x86_64/OpenXWA Mod Importer" \
     && for library in /build/package/openxwa-linux-x86_64/lib/*.so*; do \
         patchelf --set-rpath '$ORIGIN' "$library"; \
-    done
+    done \
+    # Release symbols ship separately. The build ID matches them to the
+    # programs.
+    && if [ "${XWA_BUILD_TYPE}" = Release ]; then \
+        mkdir -p /build/symbols \
+        && cd /build/package/openxwa-linux-x86_64 \
+        && for program in OpenXWA "OpenXWA Mod Importer"; do \
+            objcopy --only-keep-debug "$program" "/build/symbols/${program}.debug" \
+            && cp "/build/symbols/${program}.debug" . \
+            && objcopy --strip-debug --add-gnu-debuglink="${program}.debug" "$program" \
+            && rm "${program}.debug" \
+            && cp "$program" /build/symbols/ \
+            || exit 1; \
+        done; \
+    fi
 
 RUN test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.vert.spv \
     && test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.frag.spv \
@@ -319,9 +336,19 @@ RUN test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.vert.s
             fi; \
         done; \
     done \
+    && for program in OpenXWA "OpenXWA Mod Importer"; do \
+        readelf -n "/build/package/openxwa-linux-x86_64/${program}" | grep -q 'Build ID' || exit 1; \
+    done \
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
         readelf --sections /build/package/openxwa-linux-x86_64/OpenXWA \
             | grep -q '\.debug_info'; \
+    else \
+        for program in OpenXWA "OpenXWA Mod Importer"; do \
+            ! readelf --sections "/build/package/openxwa-linux-x86_64/${program}" \
+                | grep -q '\.debug_info' \
+            && readelf --sections "/build/symbols/${program}.debug" | grep -q '\.debug_info' \
+            || exit 1; \
+        done; \
     fi \
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
         artifact_variant=debug; \
@@ -340,7 +367,20 @@ RUN test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.vert.s
         -C /build/package \
         -cJf "/build/artifacts/${package_name}.tar.xz" \
         "${package_name}" \
-    && tar -tJf "/build/artifacts/${package_name}.tar.xz"
+    && tar -tJf "/build/artifacts/${package_name}.tar.xz" \
+    && if [ "${XWA_BUILD_TYPE}" = Release ]; then \
+        mv /build/symbols "/build/${package_name}-symbols" \
+        && tar \
+            --sort=name \
+            --mtime="@0" \
+            --owner=0 \
+            --group=0 \
+            --numeric-owner \
+            -C /build \
+            -cJf "/build/artifacts/${package_name}-symbols.tar.xz" \
+            "${package_name}-symbols" \
+        && tar -tJf "/build/artifacts/${package_name}-symbols.tar.xz"; \
+    fi
 
 # aeron_gltf_cook and opt2gltf for the Blender add-on's Linux package: zstd
 # linked statically, no SDL (aeron/tools/gltf_cook/CMakeLists.txt).

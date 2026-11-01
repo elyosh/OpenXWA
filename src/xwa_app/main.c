@@ -344,6 +344,7 @@ int main(int argc, char** argv) {
 	memset(&config, 0, sizeof(config));
 	config.org_name = "TotallyOpen";
 	config.app_name = "OpenXWA";
+	config.app_version = OPENXWA_VERSION;
 	config.resource_root = launch.resource_root[0] ? launch.resource_root : NULL;
 	config.resource_path = "resources";
 	config.shader_path = "shaders";

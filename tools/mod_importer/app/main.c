@@ -14,6 +14,9 @@ int main(int argc, char** argv) {
 	AeronConfig config = {
 		.org_name = "TotallyOpen",
 		.app_name = "OpenXWA",
+		.app_version = OPENXWA_VERSION,
+		/* The game's user folder, but logs and crash dumps of its own. */
+		.diagnostics_name = "OpenXWA Mod Importer",
 		.resource_path = "resources",
 		.shader_path = "shaders",
 		.window_title = "OpenXWA Mod Importer",

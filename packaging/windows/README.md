@@ -27,6 +27,7 @@ The output is:
 
 ```text
 build/artifacts/openxwa-0.0.0-dev-windows-x86_64-release.zip
+build/artifacts/openxwa-0.0.0-dev-windows-x86_64-release-symbols.zip
 ```
 
 ## Build a debug package
@@ -48,7 +49,10 @@ build/artifacts/openxwa-0.0.0-dev-windows-x86_64-debug.zip
 
 `XWA_BUILD_TYPE` defaults to `Release` and accepts only `Release` or `Debug`.
 Debug packages contain MinGW DWARF debug information and enable the in-game
-debug UI. Release packages disable the debug UI.
+debug UI. Release packages disable the debug UI. They are compiled with debug
+information too, but it is removed from the programs and the bundled DLLs and
+published in the separate `-symbols` archive. Each shipped file keeps a
+`.gnu_debuglink` to its `.debug` file.
 
 `XWA_VERSION` sets the version in the package name and defaults to
 `0.0.0-dev`. CI passes the short commit hash for development builds and the
@@ -78,6 +82,22 @@ uses. On first launch, OpenXWA asks for the original game-data directory and
 remembers the validated selection. The selected directory must contain
 `ALLIANCE`, `FLIGHTMODELS`, and `MISSIONS`. Application resources are resolved from the packaged `resources`
 directory; original game assets are not included in the package.
+
+## Crash reports
+
+Logs, crash stacks and crash dumps are written to the `diagnostics` folder in
+the user folder, `%APPDATA%\TotallyOpen\OpenXWA`. Setting
+`AERON_TEST_CRASH=access|abort|stack` makes the program crash at startup, to
+test this.
+
+To find the source lines of a crash stack, extract the symbols archive of the
+same build. A frame such as `OpenXWA.exe+0x2d9dbb` is an offset from the
+program's base address, `0x140000000`. Add the two and pass the result to
+`llvm-symbolizer`, run from the symbols folder:
+
+```sh
+llvm-symbolizer --obj=OpenXWA.exe 0x1402d9dbb
+```
 
 ## Dependency versions
 

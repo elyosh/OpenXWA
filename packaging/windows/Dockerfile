@@ -274,13 +274,15 @@ COPY tools /src/tools
 ENV LD_LIBRARY_PATH=/opt/xwa-host/lib
 
 RUN case "${XWA_BUILD_TYPE}" in \
-        Release) xwa_debug_ui=OFF ;; \
-        Debug) xwa_debug_ui=ON ;; \
+        Release) xwa_debug_ui=OFF; xwa_release_flags="-O3 -DNDEBUG -g" ;; \
+        Debug) xwa_debug_ui=ON; xwa_release_flags="-O3 -DNDEBUG" ;; \
         *) echo "XWA_BUILD_TYPE must be Release or Debug" >&2; exit 2 ;; \
     esac \
     && cmake -S /src -B /build/xwa -G Ninja \
         -DCMAKE_BUILD_TYPE="${XWA_BUILD_TYPE}" \
         -DCMAKE_TOOLCHAIN_FILE=/opt/xwa-toolchain.cmake \
+        -DCMAKE_C_FLAGS_RELEASE="${xwa_release_flags}" \
+        -DCMAKE_CXX_FLAGS_RELEASE="${xwa_release_flags}" \
         -DAERON_FSR3_SHADERGEN_EXECUTABLE=/opt/xwa-host/bin/aeron_fsr3_shadergen \
         -DAERON_SHADERCROSS_EXECUTABLE=/opt/xwa-host/bin/shadercross \
         -DAERON_ISPC_KERNEL_DIR=/opt/ispc-kernel \
@@ -289,10 +291,27 @@ RUN case "${XWA_BUILD_TYPE}" in \
         -DXWA_VERSION="${XWA_VERSION}" \
     && cmake --build /build/xwa --target xwa xwa_mod_importer --parallel
 
+# Release builds compile with -g so that crash reports can be symbolized.
+# The debug information goes into a .debug file for each program, which is
+# published in a separate symbols archive. The shipped program only keeps a
+# .gnu_debuglink to it. Stripping only removes sections at the end of the
+# file, so the code addresses match the symbols exactly.
 RUN mkdir -p /build/package/openxwa-windows-x86_64/licenses \
         /build/package/openxwa-windows-x86_64/shaders \
     && cp /build/xwa/OpenXWA.exe "/build/xwa/OpenXWA Mod Importer.exe" \
         /build/package/openxwa-windows-x86_64/ \
+    && if [ "${XWA_BUILD_TYPE}" = Release ]; then \
+        mkdir -p /build/symbols \
+        && cd /build/package/openxwa-windows-x86_64 \
+        && for program in OpenXWA.exe "OpenXWA Mod Importer.exe"; do \
+            x86_64-w64-mingw32-objcopy --only-keep-debug "$program" "/build/symbols/${program}.debug" \
+            && cp "/build/symbols/${program}.debug" . \
+            && x86_64-w64-mingw32-objcopy --strip-debug --add-gnu-debuglink="${program}.debug" "$program" \
+            && rm "${program}.debug" \
+            && cp "$program" /build/symbols/ \
+            || exit 1; \
+        done; \
+    fi \
     && cp /build/xwa/shaders/*.dxil /build/xwa/shaders/*.spv \
         /build/package/openxwa-windows-x86_64/shaders/ \
     && cp -a /build/xwa/resources /build/package/openxwa-windows-x86_64/ \
@@ -326,6 +345,21 @@ RUN mkdir -p /build/package/openxwa-windows-x86_64/licenses \
             /build/package/openxwa-windows-x86_64/licenses/WinPixEventRuntime.txt \
         && cp /opt/xwa-licenses/WinPixEventRuntime-ThirdPartyNotices.txt \
             /build/package/openxwa-windows-x86_64/licenses/WinPixEventRuntime-ThirdPartyNotices.txt; \
+    fi \
+    # The bundled DLLs have debug information too, most of it in Debian's
+    # libstdc++. Split it in the same way.
+    && if [ "${XWA_BUILD_TYPE}" = Release ]; then \
+        cd /build/package/openxwa-windows-x86_64 \
+        && for library in *.dll; do \
+            if x86_64-w64-mingw32-objdump -h "$library" | grep -q '\.debug_'; then \
+                x86_64-w64-mingw32-objcopy --only-keep-debug "$library" "/build/symbols/${library}.debug" \
+                && cp "/build/symbols/${library}.debug" . \
+                && x86_64-w64-mingw32-objcopy --strip-debug --add-gnu-debuglink="${library}.debug" "$library" \
+                && rm "${library}.debug" \
+                && cp "$library" /build/symbols/ \
+                || exit 1; \
+            fi; \
+        done; \
     fi
 
 RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert.dxil \
@@ -350,6 +384,21 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
             /build/package/openxwa-windows-x86_64/OpenXWA.exe \
             | grep -q '\.debug_info' \
         && test -f /build/package/openxwa-windows-x86_64/WinPixEventRuntime.dll; \
+    else \
+        for program in OpenXWA.exe "OpenXWA Mod Importer.exe"; do \
+            ! x86_64-w64-mingw32-objdump -h \
+                "/build/package/openxwa-windows-x86_64/${program}" \
+                | grep -q '\.debug_info' \
+            && x86_64-w64-mingw32-objdump -h \
+                "/build/package/openxwa-windows-x86_64/${program}" \
+                | grep -q '\.gnu_debuglink' \
+            && x86_64-w64-mingw32-objdump -h "/build/symbols/${program}.debug" \
+                | grep -q '\.debug_info' \
+            || exit 1; \
+        done \
+        && for library in /build/package/openxwa-windows-x86_64/*.dll; do \
+            ! x86_64-w64-mingw32-objdump -h "$library" | grep -q '\.debug_' || exit 1; \
+        done; \
     fi \
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
         artifact_variant=debug; \
@@ -366,7 +415,16 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
     && LC_ALL=C sort -o /tmp/openxwa-windows-files /tmp/openxwa-windows-files \
     && TZ=UTC zip -X -9 -q "/build/artifacts/${package_name}.zip" \
         -@ < /tmp/openxwa-windows-files \
-    && unzip -tq "/build/artifacts/${package_name}.zip"
+    && unzip -tq "/build/artifacts/${package_name}.zip" \
+    && if [ "${XWA_BUILD_TYPE}" = Release ]; then \
+        symbols_name="${package_name}-symbols" \
+        && mv /build/symbols "/build/${symbols_name}" \
+        && find "/build/${symbols_name}" -exec touch -h -d "@315532800" {} + \
+        && cd /build \
+        && find "${symbols_name}" -print | LC_ALL=C sort \
+            | TZ=UTC zip -X -9 -q "/build/artifacts/${symbols_name}.zip" -@ \
+        && unzip -tq "/build/artifacts/${symbols_name}.zip"; \
+    fi
 
 # aeron_gltf_cook and opt2gltf for the Blender add-on's Windows package:
 # zstd and the MinGW runtime linked statically, no SDL (aeron/tools/

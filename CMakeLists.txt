@@ -434,6 +434,7 @@ set(XWA_VERSION "0.0.0-dev" CACHE STRING "OpenXWA application version")
 target_compile_definitions(xwa_core PRIVATE
     OPENXWA_VERSION="${XWA_VERSION}"
 )
+target_compile_definitions(xwa PRIVATE OPENXWA_VERSION="${XWA_VERSION}")
 
 if(APPLE)
     set(XWA_MACOS_BUILD_VERSION "1" CACHE STRING
@@ -607,6 +608,7 @@ if(XWA_BUILD_MOD_IMPORTER)
         tools/mod_importer/app/ui.c
     )
     target_link_libraries(xwa_mod_importer PRIVATE xwa_mod_import_lib xwa_host_config)
+    target_compile_definitions(xwa_mod_importer PRIVATE OPENXWA_VERSION="${XWA_VERSION}")
     set_target_properties(xwa_mod_importer PROPERTIES
         OUTPUT_NAME "OpenXWA Mod Importer"
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})

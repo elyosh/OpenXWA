@@ -33,6 +33,7 @@ The output is:
 
 ```text
 build/artifacts/openxwa-0.0.0-dev-linux-x86_64-release.tar.xz
+build/artifacts/openxwa-0.0.0-dev-linux-x86_64-release-symbols.tar.xz
 ```
 
 ## Build a debug package
@@ -55,7 +56,10 @@ build/artifacts/openxwa-0.0.0-dev-linux-x86_64-debug.tar.xz
 
 `XWA_BUILD_TYPE` defaults to `Release` and accepts only `Release` or `Debug`.
 Debug packages contain compiler debug information and enable the in-game debug
-UI. Release packages disable the debug UI.
+UI. Release packages disable the debug UI. They are compiled with debug
+information too, but it is removed from the programs and published in the
+separate `-symbols` archive. Each program keeps a `.gnu_debuglink` to its
+`.debug` file, and a build ID that matches the two.
 
 `XWA_VERSION` sets the version in the package name and defaults to
 `0.0.0-dev`. CI passes the short commit hash for development builds and the
@@ -85,6 +89,21 @@ directory can be moved as a unit. On first launch, the game asks for the
 original game-data directory and remembers the validated selection. Packaged
 resources are resolved beside the executable and are not user-configured.
 Original game assets are not included.
+
+## Crash reports
+
+Logs and crash stacks are written to the `diagnostics` folder in the user
+folder, `~/.local/share/TotallyOpen/OpenXWA`. Setting
+`AERON_TEST_CRASH=access|abort|stack` makes the program crash at startup, to
+test this.
+
+To find the source lines of a crash stack, extract the symbols archive of the
+same build. Pass the offset of a frame such as `OpenXWA(+0x2d9dbb)` to
+`llvm-symbolizer` as it is, run from the symbols folder:
+
+```sh
+llvm-symbolizer --obj=OpenXWA 0x2d9dbb
+```
 
 ## Dependency versions
 
