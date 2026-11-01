@@ -12,8 +12,11 @@
  *     Resdata/BackdropScales.txt. A group that the file doesn't list gets the
  *     game's default backdrop scale, read from XWINGALLIANCE.EXE: 256 in the
  *     stock game, 128 in XWAU's executable;
- *   - hull icons (26000) and map icons (14800): their size times
- *     HullIconScale or MapIconScale / 256, as XWAU's hull icon hook draws them.
+ *   - map icons (14800): their size times MapIconScale / 256, as XWAU's hull
+ *     icon hook draws them;
+ *   - hull icons (26000): their size times HullIconScale / 256, divided by
+ *     the HUD scale of a 1080p screen. XWAU's hook draws them without the
+ *     HUD scale.
  *
  * The DATs that missions add in their [Resdata] sections are sorted:
  *   - a DAT whose groups are in no other file goes into the shared atlases,
@@ -66,6 +69,11 @@
 #define FLIGHT_FONT_GROUP 16000
 #define FLIGHT_HULL_ICON_GROUP 26000
 #define FLIGHT_MAP_ICON_GROUP 14800
+/* XWAU's hull icon hook draws the icon in the shield display at HullIconScale
+ * in screen pixels, without the HUD scale, so the icon gets smaller next to
+ * the rest of the HUD as the resolution goes up. Its size is set to look as
+ * it does in XWAU at 1080p, where the HUD scale is 1080 / 600. */
+#define FLIGHT_HULL_ICON_HUD_SCALE (1080.0 / 600.0)
 /* The largest image that fits in an atlas page with its gutters. */
 #define FLIGHT_MAX_IMAGE (BAKE_MAX_ATLAS_DIM - 2 * BAKE_HD_PAD)
 /* XWAU's ddraw wrapper picks alternative explosions only for these groups
@@ -701,7 +709,7 @@ static int flight_is_planet_group(int group) { return group >= 6000 && group <= 
  * `position` in `group`. */
 static double flight_scale(const FlightContext* ctx, int group, int position) {
 	if (group == FLIGHT_HULL_ICON_GROUP)
-		return ctx->hull_icon_scale;
+		return ctx->hull_icon_scale / FLIGHT_HULL_ICON_HUD_SCALE;
 	if (group == FLIGHT_MAP_ICON_GROUP)
 		return ctx->map_icon_scale;
 	/* The beam copies the scale of the Death Star backdrop. */
