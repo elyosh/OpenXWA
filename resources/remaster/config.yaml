@@ -395,4 +395,4 @@ motion_blur:
   pause_keep_blur: true
   velocity_viz: false
 shadows:
-  receiver_local_near_distance_m: 3.0
+  receiver_local_near_distance_m: 1.5
