@@ -363,6 +363,8 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 			overlay_vertex->uv[0] = projected_u[triangle_vertex_index];
 			overlay_vertex->uv[1] = projected_v[triangle_vertex_index];
 			overlay_vertex->component = triangle_vertices[triangle_vertex_index]->component;
+			memcpy(overlay_vertex->normal, triangle_vertices[triangle_vertex_index]->normal,
+				   sizeof overlay_vertex->normal);
 		}
 	}
 	/* Shrink to the output; keep at least one vertex so an empty result
@@ -433,10 +435,12 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 		overlay.uv_rect[2] = blast ? blast_rect[2] : texture_frame.u1;
 		overlay.uv_rect[3] = blast ? blast_rect[3] : texture_frame.v1;
 		overlay.texture_clamp = (uint8_t)blast;
-		/* The mark is a classic image, shown at the classic radiance. */
-		const float mark_emissive_strength = mark->pool_kind == 0 ? emissive_strength : 1.0f;
+		/* A glow mark is a classic image, shown at the classic radiance. A
+		 * blast mark is part of the hull's colour, and the scene's lights
+		 * shade it as they shade the hull. */
+		overlay.lit = mark->pool_kind == 1;
 		overlay.color[0] = overlay.color[1] = overlay.color[2] =
-			mark_emissive_strength * XwaRemaster_ClassicRadiance();
+			overlay.lit ? 1.0f : emissive_strength * XwaRemaster_ClassicRadiance();
 		overlay.color[3] = 1.0f;
 		/* The impact colour tints the glow marks. Blast marks keep their own
 		 * colours. */
