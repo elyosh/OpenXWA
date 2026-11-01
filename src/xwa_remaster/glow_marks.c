@@ -438,8 +438,9 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 		overlay.color[0] = overlay.color[1] = overlay.color[2] =
 			mark_emissive_strength * XwaRemaster_ClassicRadiance();
 		overlay.color[3] = 1.0f;
-		if (mark->tint != 0) {
-			/* The classic pass colour modulates the texture. */
+		/* The impact colour tints the glow marks. Blast marks keep their own
+		 * colours. */
+		if (mark->pool_kind == 0 && mark->tint != 0) {
 			for (int c = 0; c < 3; c++) {
 				overlay.color[c] *=
 					XwaRemaster_SrgbToLinear((float)(mark->tint >> (16 - 8 * c) & 0xffu) / 255.0f);
