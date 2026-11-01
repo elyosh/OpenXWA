@@ -163,9 +163,8 @@ presentation:
   # aspect. 1.778 is 16:9. 0 turns it off.
   cockpit_fov_min_aspect: 1.778
 # The camera lag and tilt, the cockpit sway and the HUD in the exterior view.
-# A mod's flight/flight.yaml can change these values, and this file's values
-# override the mod's. The options only offer Enhanced Camera, which sets
-# `enabled`.
+# A mod can change these values. The options only offer Enhanced Camera,
+# which sets `enabled`.
 camera:
   # Off keeps the original game's views.
   enabled: false
@@ -191,8 +190,7 @@ camera:
   lag_time: 0.32
   # Shows the HUD and the reticle in the exterior view of the player's craft.
   exterior_hud: true
-# The procedural suns and their lens flare. A mod's flight/flight.yaml can
-# change these values, and this file's values override the mod's.
+# The procedural suns and their lens flare. A mod can change these values.
 suns:
   # Backdrop suns draw a procedural disc and corona in place of their image.
   procedural_sun: false
@@ -203,10 +201,10 @@ suns:
   flare_intensity: 3.0
   # The brightness of the sun's disc and rays, as a multiple of a white classic
   # image, like effects.explosion_genus_emissive_strength, 0 to 100.
-  brightness: 1.0
+  brightness: 1.2
   # The light added in the sun's core, as a multiple of the disc's brightness,
   # 0 to 1000. It makes the sun glow through the bloom.
-  core_brightness: 2.0
+  core_brightness: 1.0
   # The flare's shapes: halos, discs, hexagons and a streak, placed along the
   # line from the sun through the centre of the screen.
   flare_elements:
