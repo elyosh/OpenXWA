@@ -389,6 +389,46 @@ static int host_config_camera_options(const AeronConfigFile* config, int require
 	return 1;
 }
 
+/* Reads the suns section. In the shipped file, `required` makes every key
+ * required. `override_mask` gets a bit for each key that the file sets. */
+static int host_config_sun_options(const AeronConfigFile* config, int required, XwaModernSunOptions* out,
+								   unsigned int* override_mask, char* error, size_t error_size) {
+	size_t count;
+	const XwaModernSunOptionKey* keys = XwaModernSunOptions_Keys(&count);
+	char key[64];
+
+	*override_mask = 0;
+	for (size_t i = 0; i < count; ++i) {
+		snprintf(key, sizeof key, "suns.%s", keys[i].name);
+		const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+		if (!node) {
+			if (required) {
+				return host_config_error(error, error_size,
+										 "missing required remaster/config.yaml setting '%s'", key);
+			}
+			continue;
+		}
+		if (keys[i].is_switch) {
+			if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+				return host_config_error(error, error_size, "invalid '%s': expected true or false", key);
+			}
+			*(int*)((char*)out + keys[i].offset) = AeronConfigNode_Bool(node, 0);
+		} else {
+			const double value = AeronConfigNode_Float(node, NAN);
+			if (!isfinite(value) || value < keys[i].min || value > keys[i].max) {
+				if (error && error_size) {
+					snprintf(error, error_size, "invalid '%s': expected a number from %g to %g", key,
+							 (double)keys[i].min, (double)keys[i].max);
+				}
+				return 0;
+			}
+			*(float*)((char*)out + keys[i].offset) = (float)value;
+		}
+		*override_mask |= 1u << i;
+	}
+	return 1;
+}
+
 static int host_config_remaster_options(const AeronConfigFile* config, int required, XwaHostConfig* out,
 										char* error, size_t error_size) {
 	return host_config_model_smoothing(config, required, &out->model_smooth_angle_degrees, error,
@@ -428,9 +468,11 @@ static int host_config_load_shipped_config(AeronVfs* vfs, XwaHostConfig* out, ch
 		return host_config_error(error, error_size, "shipped configuration root must be a mapping: %s", path);
 	}
 	unsigned int camera_mask;
+	unsigned int sun_mask;
 	valid = host_config_remaster_options(config, 1, out, error, error_size) &&
 			host_config_input_options(config, 1, &out->input_options, error, error_size) &&
-			host_config_camera_options(config, 1, &out->camera_options, &camera_mask, error, error_size);
+			host_config_camera_options(config, 1, &out->camera_options, &camera_mask, error, error_size) &&
+			host_config_sun_options(config, 1, &out->sun_options, &sun_mask, error, error_size);
 	if (valid) {
 		out->input_defaults = out->input_options;
 	}
@@ -1136,7 +1178,9 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		host_config_validate_input_maps(config, error, error_size) &&
 		host_config_input_options(config, 0, &out->input_options, error, error_size) &&
 		host_config_camera_options(config, 0, &out->camera_player_options, &out->camera_override_mask, error,
-								   error_size);
+								   error_size) &&
+		host_config_sun_options(config, 0, &out->sun_player_options, &out->sun_override_mask, error,
+								error_size);
 	AeronConfigFile_Destroy(config);
 	return valid;
 }

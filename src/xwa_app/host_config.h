@@ -4,6 +4,7 @@
 #include "aeron/vfs.h"
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
+#include "xwa_runtime/config/modern_sun_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 
 #include <stddef.h>
@@ -53,6 +54,11 @@ typedef struct XwaHostConfig {
 	 * has (XwaModernCameraOptions_Keys). */
 	XwaModernCameraOptions camera_player_options;
 	unsigned int camera_override_mask;
+	XwaModernSunOptions sun_options;
+	/* The player's sun values, for the keys that sun_override_mask has
+	 * (XwaModernSunOptions_Keys). */
+	XwaModernSunOptions sun_player_options;
+	unsigned int sun_override_mask;
 } XwaHostConfig;
 
 int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size);

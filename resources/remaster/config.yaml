@@ -191,6 +191,16 @@ camera:
   lag_time: 0.32
   # Shows the HUD and the reticle in the exterior view of the player's craft.
   exterior_hud: true
+# The procedural suns and their lens flare. A mod's flight/flight.yaml can
+# change these values, and this file's values override the mod's.
+suns:
+  # Backdrop suns draw a procedural disc and corona in place of their image.
+  procedural_sun: false
+  # The sun that casts the shadows draws a procedural lens flare in place of
+  # the classic flare images.
+  procedural_flare: false
+  # The flare's strength, 0 to 10.
+  flare_intensity: 3.0
 texture_filtering:
   anisotropic: true
   max_anisotropy: 8.0

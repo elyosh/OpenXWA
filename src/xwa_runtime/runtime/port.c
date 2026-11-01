@@ -28,6 +28,7 @@
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
+#include "xwa_runtime/config/modern_sun_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/concourse_layout.h"
@@ -167,6 +168,7 @@ int XwaPort_Init(void) {
 	XwaObjectLimits_Init();
 	XwaHeadlights_Init();
 	XwaCameraMotion_Init();
+	XwaModernSunOptions_LoadMod();
 	XwaCockpitAlertLights_Init();
 	XwaParticleLights_Init();
 	XwaCraftDefinitions_Apply();

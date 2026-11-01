@@ -481,6 +481,8 @@ int main(int argc, char** argv) {
 	apply_modern_input_options(&host_config.input_options);
 	XwaModernCameraOptions_Configure(&host_config.camera_options, &host_config.camera_player_options,
 									 host_config.camera_override_mask, persist_camera_enabled);
+	XwaModernSunOptions_Configure(&host_config.sun_options, &host_config.sun_player_options,
+								  host_config.sun_override_mask);
 	Aeron_LogInfo(
 		"xwa.config", "mouse flight control: %s (%s mode, sensitivity %d, invert Y: %s)",
 		host_config.input_options.mouse_flight_enabled ? "on" : "off",
