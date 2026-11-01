@@ -5,6 +5,7 @@
 #include "aeron/log.h"
 #include "xwa/frontend/frontend_text.h"
 #include "xwa/render/renderer_internal.h"
+#include "xwa_runtime/text/text_overrides.h"
 
 #include <errno.h>
 #include <math.h>
@@ -31,14 +32,6 @@ typedef struct XwaFontSize {
 	int32_t advance256[256];
 	XwaFrontendFont font;
 } XwaFontSize;
-
-/* Windows-1252 bytes 0x80 to 0x9F. The bytes it leaves undefined keep their
-   value, which no font draws. */
-static const uint16_t k_cp1252[32] = {
-	0x20AC, 0x0081, 0x201A, 0x0192, 0x201E, 0x2026, 0x2020, 0x2021, 0x02C6, 0x2030, 0x0160,
-	0x2039, 0x0152, 0x008D, 0x017D, 0x008F, 0x0090, 0x2018, 0x2019, 0x201C, 0x201D, 0x2022,
-	0x2013, 0x2014, 0x02DC, 0x2122, 0x0161, 0x203A, 0x0153, 0x009D, 0x017E, 0x0178,
-};
 
 /* The fonts of one fonts file. */
 typedef struct XwaFontSet {
@@ -266,7 +259,7 @@ static void fonts_load(XwaFontSet* set) {
 	}
 	set->loaded = 1;
 	for (int i = 0; i < 256; i++) {
-		g_fontCodepoints[i] = i >= 0x80 && i < 0xA0 ? k_cp1252[i - 0x80] : (uint32_t)i;
+		g_fontCodepoints[i] = XwaText_Codepoint((unsigned char)i);
 	}
 	memset(&error, 0, sizeof(error));
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, set->path, &file, &error)) {

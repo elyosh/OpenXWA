@@ -8,6 +8,7 @@
 #include "xwa/render/renderer_internal.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/runtime/game_files.h"
+#include "xwa_runtime/text/text_overrides.h"
 #endif
 
 #include <stdio.h>
@@ -214,10 +215,14 @@ char File_GetCdDriveLetter(void) { return g_cdDriveLetter; }
 
 // FUNCTION: XWA 0x50E5A0
 void File_PrintFatalMessageAndExit(char* message, int exitCode) {
-	Aeron_LogInfo("xwa.file", "%s", message != NULL ? message : "");
 #ifdef XWA_MODERN
-	Aeron_FatalError("OpenXWA", message != NULL ? message : "");
+	char utf8[1024];
+
+	XwaText_ToUtf8(message != NULL ? message : "", utf8, sizeof utf8);
+	Aeron_LogInfo("xwa.file", "%s", utf8);
+	Aeron_FatalError("OpenXWA", utf8);
 #else
+	Aeron_LogInfo("xwa.file", "%s", message != NULL ? message : "");
 	Aeron_FatalError("X-Wing Alliance", message != NULL ? message : "");
 #endif
 	g_fileFatalExitCode = exitCode;

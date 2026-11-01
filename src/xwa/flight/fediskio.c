@@ -41,6 +41,7 @@
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/geometry_textures.h"
+#include "xwa_runtime/text/text_overrides.h"
 #endif
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/mission_settings.h"
@@ -3364,10 +3365,18 @@ void FeDiskIo_FatalError(uint16_t errorCode) {
 	}
 
 	exitCode = -255 - (int)errorCode;
-	Aeron_LogInfo("xwa.file", "%s", message);
 #ifdef XWA_MODERN
-	Aeron_FatalError("OpenXWA", message);
+	{
+		char utf8[3 * sizeof message];
+
+		/* A message that fills the buffer ends with '\n' and no terminator. */
+		message[sizeof message - 1] = '\0';
+		XwaText_ToUtf8(message, utf8, sizeof utf8);
+		Aeron_LogInfo("xwa.file", "%s", utf8);
+		Aeron_FatalError("OpenXWA", utf8);
+	}
 #else
+	Aeron_LogInfo("xwa.file", "%s", message);
 	Aeron_FatalError("X-Wing Alliance", message);
 #endif
 	g_fileFatalExitCode = exitCode;
@@ -3578,9 +3587,12 @@ void FeDiskIo_LoadResources(void) {
 					FlightNet_BroadcastStillLoadingPulse();
 #ifdef XWA_MODERN
 					if (modelHandle == 0) {
-						DebugPrintf("Failed to load required flight model '%s'", line);
+						/* The error message names FileName, the last file
+						   opened, which can be the list. It names the model. */
+						Aeron_LogError("xwa.models", "cannot load the flight model '%s'", line);
 						File_Close(stream);
 						g_stream = NULL;
+						snprintf(FileName, sizeof FileName, "%s", line);
 						FeDiskIo_FatalError(1);
 						return;
 					}
@@ -3588,11 +3600,12 @@ void FeDiskIo_LoadResources(void) {
 					texLevel = (TexLevel*)Memory_LockHandle(modelHandle);
 #ifdef XWA_MODERN
 					if (texLevel == NULL) {
-						DebugPrintf("Failed to lock required flight model '%s' handle %u", line,
-									(unsigned int)modelHandle);
+						Aeron_LogError("xwa.models", "cannot lock the flight model '%s' (handle %u)", line,
+									   (unsigned int)modelHandle);
 						OptModel_FreeHandle(modelHandle);
 						File_Close(stream);
 						g_stream = NULL;
+						snprintf(FileName, sizeof FileName, "%s", line);
 						FeDiskIo_FatalError(1);
 						return;
 					}

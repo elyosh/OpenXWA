@@ -8383,10 +8383,18 @@ uint16_t Mission_Init(char* fileName) {
 					}
 
 					if (g_missionFlightGroups[g_currentFlightGroupIdx].fg.specialCargo[0] != 0) {
+						/* Port deviation: the port keeps the C locale, which reads these numbers
+						 * with a '.' too. setlocale(LC_ALL, "") switches the whole program to
+						 * the system's locale, and with a decimal comma, the numbers that the port
+						 * reads after this, such as those of glTF models, come out wrong. */
+#ifndef XWA_MODERN
 						setlocale(LC_ALL, "English");
+#endif
 						sscanf(g_missionFlightGroups[g_currentFlightGroupIdx].fg.specialCargo, "%f",
 							   &backdropScale);
+#ifndef XWA_MODERN
 						setlocale(LC_ALL, g_emptyString);
+#endif
 						if (backdropScale == 15.5f) {
 							backdropScale = 1.0f;
 							g_backdropRecordsByRegion[0][flatIdx].flags |= 2;
@@ -8395,16 +8403,24 @@ uint16_t Mission_Init(char* fileName) {
 
 					if (backdropType != OBJ_DeathStarFireTextureGroup6250_Sprite000) {
 						if (g_missionFlightGroups[g_currentFlightGroupIdx].fg.cargo[0] != 0) {
+#ifndef XWA_MODERN
 							setlocale(LC_ALL, "English");
+#endif
 							sscanf(g_missionFlightGroups[g_currentFlightGroupIdx].fg.cargo, "%f",
 								   &backdropIntensity);
+#ifndef XWA_MODERN
 							setlocale(LC_ALL, g_emptyString);
+#endif
 						}
 						if (g_missionFlightGroups[g_currentFlightGroupIdx].fg.name[0] != 0) {
+#ifndef XWA_MODERN
 							setlocale(LC_ALL, "English");
+#endif
 							sscanf(g_missionFlightGroups[g_currentFlightGroupIdx].fg.name, "%f %f %f",
 								   &backdropR, &backdropG, &backdropB);
+#ifndef XWA_MODERN
 							setlocale(LC_ALL, g_emptyString);
+#endif
 						}
 					}
 
@@ -8481,10 +8497,14 @@ uint16_t Mission_Init(char* fileName) {
 					laser->nextTargetFlightGroupIndex = 0;
 
 					if (g_missionFlightGroups[g_currentFlightGroupIdx].fg.name[0] != 0) {
+#ifndef XWA_MODERN
 						setlocale(LC_ALL, "English");
+#endif
 						sscanf(g_missionFlightGroups[g_currentFlightGroupIdx].fg.name, "%f %f",
 							   &firstShotDelay, &repeatShotDelay);
+#ifndef XWA_MODERN
 						setlocale(LC_ALL, g_emptyString);
+#endif
 						laser->firstShotDelayTicks = -laser->warmupTicks - (int)(firstShotDelay * -236.0f);
 						laser->repeatShotDelayTicks = -laser->warmupTicks - (int)(repeatShotDelay * -236.0f);
 					}
