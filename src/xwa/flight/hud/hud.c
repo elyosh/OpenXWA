@@ -10694,8 +10694,14 @@ void Hud_DrawHudTargetInsetIfEnabled(int playerIdx) {
 		return;
 	}
 
+#ifdef XWA_MODERN
+	/* The exterior HUD uses the cockpit's HUD view state, so the CMD shows the
+	   target there too. */
+	if ((XwaExteriorHud_HudViewState(playerIdx) == 19 || XwaExteriorHud_HudViewState(playerIdx) == 0) &&
+#else
 	if ((g_players[playerIdx].viewState.hudStateLive == 19 ||
 		 g_players[playerIdx].viewState.hudStateLive == 0) &&
+#endif
 		(!g_players[playerIdx].mfd.enabled[0] || g_inHangarReady) &&
 		(g_players[playerIdx].currentTargetObjectIdx != 0xffffu || g_inHangarReady)) {
 		CraftData* craft;
@@ -15695,7 +15701,11 @@ void Hud_UpdateFlightMessagePanes(void) {
 										   1)) {
 				uint8_t hudStateLive;
 
+#ifdef XWA_MODERN
+				hudStateLive = (uint8_t)XwaExteriorHud_HudViewState(g_localPlayer);
+#else
 				hudStateLive = g_players[g_localPlayer].viewState.hudStateLive;
+#endif
 				if (hudStateLive == 19 || hudStateLive == 0 || hudStateLive == 20) {
 					g_targetDescriptionMessageId = msg_BuildTargetDescription(
 						g_players[g_localPlayer].currentTargetObjectIdx, g_localPlayer, 1, 0);

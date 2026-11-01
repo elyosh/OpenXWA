@@ -29,6 +29,12 @@ int XwaExteriorHud_HidesHud(int playerIdx);
 /* Whether the HUD is drawn: the player's hudEnabled, or the exterior HUD. */
 int XwaExteriorHud_HudVisible(int playerIdx);
 
+/* The HUD view state that decides what the HUD shows, such as the target
+   in the CMD. The exterior view sets the view state to 18, which hides the
+   HUD. When the exterior HUD is shown, this is the cockpit's view state,
+   saved when the player left the cockpit. */
+int XwaExteriorHud_HudViewState(int playerIdx);
+
 #ifdef __cplusplus
 }
 #endif

@@ -32,6 +32,7 @@
 #include "xwa/util/time.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/camera/exterior_hud.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/gunner_seats.h"
@@ -3130,9 +3131,15 @@ void Player_SetTarget(uint16_t newTargetObjIdx, unsigned int playerIdx) {
 			return;
 		}
 
+#ifdef XWA_MODERN
+		/* The exterior HUD uses the cockpit's HUD view state. */
+		if (XwaExteriorHud_HudViewState(playerIdx) == 19 || XwaExteriorHud_HudViewState(playerIdx) == 0 ||
+			XwaExteriorHud_HudViewState(g_localPlayer) == 20) {
+#else
 		if (g_players[playerIdx].viewState.hudStateLive == 19 ||
 			g_players[playerIdx].viewState.hudStateLive == 0 ||
 			g_players[g_localPlayer].viewState.hudStateLive == 20) {
+#endif
 			msg_BuildTargetDescription((int16_t)newTargetObjIdx, (int)playerIdx, 1, 0);
 		}
 	} else {

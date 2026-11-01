@@ -29,3 +29,9 @@ int XwaExteriorHud_HidesHud(int playerIdx) {
 int XwaExteriorHud_HudVisible(int playerIdx) {
 	return g_players[playerIdx].hudEnabled || XwaExteriorHud_Shown(playerIdx);
 }
+
+int XwaExteriorHud_HudViewState(int playerIdx) {
+	const PlayerViewState* viewState = &g_players[playerIdx].viewState;
+
+	return XwaExteriorHud_Shown(playerIdx) ? viewState->savedHudStateByte : viewState->hudStateLive;
+}
