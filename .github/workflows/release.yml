@@ -172,6 +172,17 @@ jobs:
             build/cache/macos-arm64/build/cooker-zstd
           key: macos-arm64-${{ steps.runner-image.outputs.version }}-deps-${{ hashFiles('packaging/macos/build-package.sh', 'packaging/common/shadercross-fsr3.patch') }}
 
+      - name: Determine ISPC version
+        id: ispc
+        run: echo "version=$(ispc --version | sed -n 's/.*ISPC), \([0-9.]*\).*/\1/p')" >> "$GITHUB_OUTPUT"
+
+      # The compiled ISPC kernel, which takes minutes to compile.
+      - name: Restore ISPC kernel cache
+        uses: actions/cache@v6
+        with:
+          path: build/cache/macos-arm64/ispc-kernel
+          key: macos-arm64-ispc-kernel-${{ steps.ispc.outputs.version }}-${{ hashFiles('aeron/third_party/ispc_texcomp/kernel.ispc', 'aeron/tools/imgbake/ispc_kernel.cmake') }}
+
       - name: Build package
         env:
           XWA_BUILD_TYPE: ${{ matrix.build-type }}

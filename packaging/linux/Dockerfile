@@ -184,6 +184,18 @@ RUN mkdir -p /opt/ispc \
     && tar -xzf /tmp/ispc.tar.gz -C /opt/ispc --strip-components=1 \
     && /opt/ispc/bin/ispc --version
 
+# The ISPC texture compressor kernel takes minutes to compile, and it only
+# changes with the two files copied here and the ISPC version. It has a stage
+# of its own, so the build cache keeps it while the rest of the source
+# changes.
+FROM ispc AS ispc-kernel
+
+COPY aeron/tools/imgbake/ispc_kernel.cmake /src/aeron/tools/imgbake/ispc_kernel.cmake
+COPY aeron/third_party/ispc_texcomp/kernel.ispc /src/aeron/third_party/ispc_texcomp/kernel.ispc
+
+RUN cmake -DISPC=/opt/ispc/bin/ispc -DSYSTEM=Linux -DPROCESSOR=x86_64 -DEXTENSION=.o \
+        -DOUT=/opt/ispc-kernel -P /src/aeron/tools/imgbake/ispc_kernel.cmake
+
 FROM build-base AS xwa-build
 
 ARG XWA_BUILD_TYPE=Release
@@ -196,7 +208,7 @@ COPY --from=sdl-build /deps/SDL/LICENSE.txt /opt/xwa-licenses/SDL3.txt
 COPY --from=zstd-build /deps/zstd/LICENSE /opt/xwa-licenses/zstd.txt
 COPY --from=ffmpeg-build /deps/FFmpeg/COPYING.LGPLv2.1 /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt
 COPY --from=shader-tools /opt/xwa-tools /opt/xwa-tools
-COPY --from=ispc /opt/ispc /opt/ispc
+COPY --from=ispc-kernel /opt/ispc-kernel /opt/ispc-kernel
 COPY CMakeLists.txt /src/CMakeLists.txt
 COPY README.md /src/README.md
 COPY aeron /src/aeron
@@ -218,7 +230,7 @@ RUN case "${XWA_BUILD_TYPE}" in \
         -DCMAKE_BUILD_TYPE="${XWA_BUILD_TYPE}" \
         -DCMAKE_PREFIX_PATH=/opt/xwa-linux \
         -DAERON_SHADERCROSS_EXECUTABLE=/opt/xwa-tools/bin/shadercross \
-        -DAERON_ISPC_EXECUTABLE=/opt/ispc/bin/ispc \
+        -DAERON_ISPC_KERNEL_DIR=/opt/ispc-kernel \
         -DXWA_BUILD_TOOLS=ON \
         -DXWA_ENABLE_DEBUG_UI="${xwa_debug_ui}" \
         -DXWA_VERSION="${XWA_VERSION}" \

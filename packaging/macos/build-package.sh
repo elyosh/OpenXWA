@@ -46,6 +46,7 @@ dmg_volume_name="OpenXWA"
 dmg_extras="${script_dir}/dmg"
 dsym_bundle=""
 cooker_prefix="${work_root}/cooker-dependencies"
+ispc_kernel_dir=""
 cooker_dir="${artifact_dir}/aeron_gltf_cook-macos"
 
 jobs=""
@@ -212,8 +213,29 @@ build_shadercross() {
     cmake --install "${build_root}/shadercross"
 }
 
+# The ISPC texture compressor kernel takes minutes to compile, and it only
+# changes with kernel.ispc, ispc_kernel.cmake and the ISPC version. It is
+# compiled into a folder named after them, which CI keeps between runs, and
+# the folders of other versions are deleted.
+build_ispc_kernel() {
+    local key
+    key="$({ cat "${repo_root}/aeron/third_party/ispc_texcomp/kernel.ispc" \
+        "${repo_root}/aeron/tools/imgbake/ispc_kernel.cmake"; ispc --version; } |
+        shasum -a 256 | cut -c1-16)"
+    ispc_kernel_dir="${work_root}/ispc-kernel/${key}"
+    if [[ ! -d "${ispc_kernel_dir}" ]]; then
+        cmake -E remove_directory "${ispc_kernel_dir}.partial"
+        cmake "-DISPC=$(command -v ispc)" -DSYSTEM=Darwin "-DPROCESSOR=${architecture}" \
+            -DEXTENSION=.o "-DOUT=${ispc_kernel_dir}.partial" \
+            -P "${repo_root}/aeron/tools/imgbake/ispc_kernel.cmake"
+        mv "${ispc_kernel_dir}.partial" "${ispc_kernel_dir}"
+    fi
+    find "${work_root}/ispc-kernel" -mindepth 1 -maxdepth 1 ! -name "${key}" -exec rm -rf {} +
+}
+
 # OpenXWA and the mod importer. The importer is built from the tool
-# libraries, so the tools are on, and their BC6H encoder needs ISPC.
+# libraries, so the tools are on, and their BC6H encoder needs the ISPC
+# kernel.
 build_application() {
     export PKG_CONFIG_PATH="${dependency_prefix}/lib/pkgconfig"
 
@@ -227,6 +249,7 @@ build_application() {
         "-DCMAKE_OSX_DEPLOYMENT_TARGET=${deployment_target}" \
         "-DCMAKE_OSX_SYSROOT=${sdk_path}" \
         "-DAERON_SHADERCROSS_EXECUTABLE=${build_root}/shadercross/shadercross" \
+        "-DAERON_ISPC_KERNEL_DIR=${ispc_kernel_dir}" \
         -DXWA_BUILD_TOOLS=ON \
         "-DXWA_ENABLE_DEBUG_UI=${debug_ui}" \
         "-DXWA_MACOS_BUILD_VERSION=${build_version}" \
@@ -393,6 +416,7 @@ main() {
 
     build_dependencies
     build_shadercross
+    build_ispc_kernel
     build_application
     if [[ "${cooker_enabled}" == 1 ]]; then
         build_cooker

@@ -206,8 +206,7 @@ RUN cmake -S /src/aeron -B /build/aeron-host -G Ninja \
     && cmake --install /build/aeron-host
 
 # The mod importer's BC6H encoder is compiled by ISPC. ISPC's Linux release
-# only writes Linux objects, so the Windows release runs under Wine. The
-# OpenXWA build runs in this stage, where Wine is installed.
+# only writes Linux objects, so the Windows release runs under Wine.
 FROM build-base AS ispc
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -234,7 +233,19 @@ RUN mkdir -p /tmp/ispc /opt/ispc \
     && chmod +x /usr/local/bin/ispc \
     && ispc --version
 
-FROM ispc AS xwa-build
+# The ISPC texture compressor kernel takes minutes to compile, and it only
+# changes with the two files copied here and the ISPC version. It has a stage
+# of its own, so the build cache keeps it while the rest of the source
+# changes.
+FROM ispc AS ispc-kernel
+
+COPY aeron/tools/imgbake/ispc_kernel.cmake /src/aeron/tools/imgbake/ispc_kernel.cmake
+COPY aeron/third_party/ispc_texcomp/kernel.ispc /src/aeron/third_party/ispc_texcomp/kernel.ispc
+
+RUN cmake -DISPC=/usr/local/bin/ispc -DSYSTEM=Windows -DPROCESSOR=x86_64 -DEXTENSION=.obj \
+        -DOUT=/opt/ispc-kernel -P /src/aeron/tools/imgbake/ispc_kernel.cmake
+
+FROM build-base AS xwa-build
 
 ARG XWA_BUILD_TYPE=Release
 ARG XWA_VERSION=0.0.0-dev
@@ -247,6 +258,7 @@ COPY --from=sdl-windows /deps/SDL/LICENSE.txt /opt/xwa-licenses/SDL3.txt
 COPY --from=zstd-windows /deps/zstd/LICENSE /opt/xwa-licenses/zstd.txt
 COPY --from=ffmpeg-windows /deps/FFmpeg/COPYING.LGPLv2.1 /opt/xwa-licenses/FFmpeg-LGPL-2.1.txt
 COPY --from=winpix-windows /opt/winpix /opt/winpix
+COPY --from=ispc-kernel /opt/ispc-kernel /opt/ispc-kernel
 COPY --from=winpix-windows /deps/winpix/license.txt /opt/xwa-licenses/WinPixEventRuntime.txt
 COPY --from=winpix-windows /deps/winpix/ThirdPartyNotices.txt /opt/xwa-licenses/WinPixEventRuntime-ThirdPartyNotices.txt
 COPY cmake/toolchains/mingw-w64-x86_64.cmake /opt/xwa-toolchain.cmake
@@ -271,7 +283,7 @@ RUN case "${XWA_BUILD_TYPE}" in \
         -DCMAKE_TOOLCHAIN_FILE=/opt/xwa-toolchain.cmake \
         -DAERON_FSR3_SHADERGEN_EXECUTABLE=/opt/xwa-host/bin/aeron_fsr3_shadergen \
         -DAERON_SHADERCROSS_EXECUTABLE=/opt/xwa-host/bin/shadercross \
-        -DAERON_ISPC_EXECUTABLE=/usr/local/bin/ispc \
+        -DAERON_ISPC_KERNEL_DIR=/opt/ispc-kernel \
         -DXWA_BUILD_TOOLS=ON \
         -DXWA_ENABLE_DEBUG_UI="${xwa_debug_ui}" \
         -DXWA_VERSION="${XWA_VERSION}" \

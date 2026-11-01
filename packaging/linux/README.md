@@ -5,7 +5,8 @@ OpenXWA and OpenXWA Mod Importer executables, application resources, private
 shared libraries, and Vulkan SPIR-V shaders. SDL3, zstd, FFmpeg, and
 SDL_shadercross are downloaded and built inside Docker; they are not required
 on the host. The ISPC release, which compiles the importer's BC6H encoder, is
-downloaded too.
+downloaded too. That kernel takes minutes to compile, so it has a stage of its
+own, which the build cache keeps until the kernel or the ISPC version changes.
 
 The package requires glibc 2.35 and the GCC 12 runtime or newer on the host
 (Ubuntu 22.04 era). It uses the Linux host's Vulkan driver, window system,

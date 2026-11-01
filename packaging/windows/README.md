@@ -5,7 +5,8 @@ MinGW-w64, with OpenXWA and the OpenXWA Mod Importer. SDL3, zstd, and the
 required FFmpeg components are downloaded and built inside Docker; they are
 not vendored in this repository or required on the host. ISPC's Windows release
 is downloaded too, and runs under Wine: it compiles the importer's BC6H
-encoder.
+encoder. That kernel takes minutes to compile, so it has a stage of its own,
+which the build cache keeps until the kernel or the ISPC version changes.
 
 The build requires the Docker Buildx plugin.
 
