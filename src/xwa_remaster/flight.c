@@ -27,6 +27,7 @@
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/skins.h"
 #include "xwa_remaster/sky_stars.h"
+#include "xwa_remaster/suns.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/model_source.h"
@@ -1086,6 +1087,10 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	if (!isfinite(s.glow_mark_emissive_strength) || s.glow_mark_emissive_strength < 1.0f) {
 		Aeron_LogError("xwa.remaster",
 					   "%s: effects.glow_mark_emissive_strength must be finite and at least 1", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	if (!XwaRemasterSuns_LoadFlareElements(cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -3144,15 +3149,17 @@ static void fl_derive_lens_flares(const XwaSnapshot* snap, XwaRemasterAssets* as
 	s.lens_ok = 0;
 	const XwaFlightCamera* cam = &snap->flight_camera;
 
-	if (authored) {
+	/* The procedural flare (fl_submit_sun_flare) replaces the suns' trains. */
+	const int sun_trains = !snap->suns.procedural_flare;
+	if (authored && sun_trains) {
 		fl_derive_authored_lens_sources(authored, flight_view);
 	}
 	/* Backdrop suns: direction sources at infinity (raw Q20 world
 	 * dirs; projection is magnitude-independent, the anchor's large
 	 * magnitude lands the depth reference at the far plane). An authored
 	 * sky replaces them. */
-	for (uint32_t i = 0; !authored && i < snap->backdrop_count && s.lens_src_count < FL_MAX_LENS_SOURCES;
-		 i++) {
+	for (uint32_t i = 0;
+		 sun_trains && !authored && i < snap->backdrop_count && s.lens_src_count < FL_MAX_LENS_SOURCES; i++) {
 		const XwaBackdrop* b = &snap->backdrops[i];
 		if (b->object_type < XWA_SNAP_TYPE_BACKDROP_SUN_FIRST ||
 			b->object_type > XWA_SNAP_TYPE_BACKDROP_SUN_LAST) {
@@ -4241,6 +4248,7 @@ static int fl_begin_scene(const AeronSceneCamera* camera) {
 		return 0;
 	}
 	fl_prepare_meshes();
+	XwaRemasterSuns_PrepareScene(s.scene, s.scene_serial, s.snap && s.snap->suns.procedural_flare);
 	return 1;
 }
 
@@ -5156,16 +5164,21 @@ static void fl_build_scene_lighting(const XwaSnapshot* snap, XwaRemasterAssets* 
 }
 
 /* The shadow-casting key: lights[key_index] when in range (an authored
- * primary), otherwise the recovered key selection. */
+ * primary), otherwise the recovered key selection. NULL without lights. */
+static const XwaRemasterDirLight* fl_key_light(const XwaRemasterDirLight* lights, uint32_t light_count,
+											   int32_t key_index) {
+	if (!lights || light_count == 0) {
+		return NULL;
+	}
+	return key_index >= 0 && (uint32_t)key_index < light_count
+			   ? &lights[key_index]
+			   : XwaRemasterShip_SelectKeyDirectionalLight(lights, light_count);
+}
+
 static int fl_key_directional_light(const XwaRemasterDirLight* lights, uint32_t light_count,
 									int32_t key_index, float out_direction[3]) {
-	if (!lights || !out_direction || light_count == 0) {
-		return 0;
-	}
-	const XwaRemasterDirLight* key = key_index >= 0 && (uint32_t)key_index < light_count
-										 ? &lights[key_index]
-										 : XwaRemasterShip_SelectKeyDirectionalLight(lights, light_count);
-	if (!key) {
+	const XwaRemasterDirLight* key = fl_key_light(lights, light_count, key_index);
+	if (!key || !out_direction) {
 		return 0;
 	}
 	memcpy(out_direction, key->world_dir, 3 * sizeof(float));
@@ -5178,6 +5191,70 @@ static int fl_key_directional_light(const XwaRemasterDirLight* lights, uint32_t 
 	out_direction[1] /= length;
 	out_direction[2] /= length;
 	return 1;
+}
+
+/* The procedural lens flare, from the sun that casts the shadows: the
+ * environment's primary light when the environment's lights replace the
+ * game's, if it asks for a flare; otherwise the backdrop sun that made the
+ * key light, on the quads it is drawn on this frame. The key light is
+ * chosen even when shadows are off. Without such a sun, no flare. */
+static void fl_submit_sun_flare(const XwaSnapshot* snap, const FlSceneLighting* lighting) {
+	if (!snap->suns.procedural_flare) {
+		return;
+	}
+	const XwaRemasterDirLight* key =
+		fl_key_light(lighting->lights, lighting->light_count, lighting->key_index);
+	if (!key) {
+		return;
+	}
+	float tint[3] = { 1.0f, 1.0f, 1.0f };
+	float tangent = 0.0f;
+	if (lighting->environment_lights) {
+		if (!lighting->environment || lighting->key_index < 0 ||
+			(uint32_t)lighting->key_index >= lighting->environment->light_count) {
+			return;
+		}
+		const AeronEnvironmentLight* light = &lighting->environment->lights[lighting->key_index];
+		if (!light->lens_flare) {
+			return;
+		}
+		/* The light's colour with its brightest channel at 1. */
+		const float* color = light->color_linear;
+		const float peak = fmaxf(color[0], fmaxf(color[1], color[2]));
+		for (int c = 0; c < 3 && peak > 0.0f; c++) {
+			tint[c] = XwaRemaster_LinearToSrgb(color[c] / peak);
+		}
+		tangent = tanf(light->angular_radius_degrees * (3.14159265f / 180.0f));
+		XwaRemasterSuns_SetFlare(s.scene, s.camera_local, light->direction_world, tangent, tint,
+								 snap->suns.flare_intensity);
+		return;
+	}
+	const int16_t source = key->source_backdrop_index;
+	if (source < 0 || (uint32_t)source >= snap->backdrop_count ||
+		!fl_backdrop_is_sun(&snap->backdrops[source])) {
+		return;
+	}
+	float corners[8][4][3];
+	float uvs[8][4][2];
+	uint32_t count = 0;
+	for (uint32_t i = 0; i < s.bd_count && count < 8; i++) {
+		const FlBackdropQuad* q = &s.bd_quads[i];
+		if (q->sun != source) {
+			continue;
+		}
+		memcpy(corners[count], q->corners, sizeof corners[0]);
+		memcpy(uvs[count], q->uvs, sizeof uvs[0]);
+		if (count == 0 && q->ref.has_light) {
+			memcpy(tint, q->ref.light, sizeof tint);
+		}
+		count++;
+	}
+	if (!XwaRemasterSuns_StarDiscRadius((const float (*)[4][3])corners, (const float (*)[4][2])uvs, count,
+										&tangent)) {
+		return;
+	}
+	XwaRemasterSuns_SetFlare(s.scene, s.camera_local, snap->backdrops[source].world_dir, tangent, tint,
+							 snap->suns.flare_intensity);
 }
 
 static void fl_mb_reset_timing(uint64_t host_time_us) {
@@ -6065,6 +6142,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	/* Lens-flare trains (LENS stage — the scene draws them after its
 	 * color passes with GPU anchor occlusion, before bloom). */
 	fl_submit_lens_flares(snap, &flight_view);
+	fl_submit_sun_flare(snap, &scene_lighting);
 
 	if (!AeronScene_Render(s.scene, cmd)) {
 		AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);

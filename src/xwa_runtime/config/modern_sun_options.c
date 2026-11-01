@@ -119,6 +119,10 @@ void XwaModernSunOptions_LoadMod(void) {
 		const AeronConfigNode* node = AeronConfigNode_MapValueAt(section, i);
 		size_t k;
 
+		/* The HD renderer reads the flare's elements. */
+		if (strcmp(name, "flare_elements") == 0) {
+			continue;
+		}
 		for (k = 0; k < SUN_KEY_COUNT && strcmp(g_sunOptionKeys[k].name, name) != 0; ++k) {
 		}
 		if (k == SUN_KEY_COUNT) {

@@ -21,7 +21,8 @@ extern "C" {
  *   3. the `suns` section of the player's config.yaml.
  * A key that a file leaves out keeps the value before it. The keys that
  * describe the look rather than a choice, such as brightness, aren't
- * read from the player's file. */
+ * read from the player's file. The flare's shape, `flare_elements`, is read
+ * by the HD renderer, from the shipped file and the mod's. */
 typedef struct XwaModernSunOptions {
 	/* Backdrop suns draw a procedural disc and corona in place of their
 	   image. */
