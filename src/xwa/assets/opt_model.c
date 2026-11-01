@@ -2117,7 +2117,7 @@ uint16_t OptModel_LoadHandle(const char* fileName) {
 		--meshCount;
 	}
 #ifdef XWA_MODERN
-	Aeron_LogInfo(
+	Aeron_LogVerbose(
 		"xwa.assets",
 		"Loaded OPT '%s' handle=%u public=0x%04x version=%d roots=%d meshes=%d hardware=%d source=%s",
 		fileName, (unsigned)modelHandle, (unsigned)(modelHandle | 0x8000), version,
@@ -2129,10 +2129,10 @@ uint16_t OptModel_LoadHandle(const char* fileName) {
 	 * calls. */
 	XwaSnapshot_NoteOptLoad((uint16_t)(modelHandle | 0x8000), fileName, (uint8_t)source);
 #else
-	Aeron_LogInfo("xwa.assets",
-				  "Loaded OPT '%s' handle=%u public=0x%04x version=%d roots=%d meshes=%d hardware=%d",
-				  fileName, (unsigned)modelHandle, (unsigned)(modelHandle | 0x8000), version,
-				  modelNative->model.rootNodeCount, meshCount, g_useHardware3D);
+	Aeron_LogVerbose("xwa.assets",
+					 "Loaded OPT '%s' handle=%u public=0x%04x version=%d roots=%d meshes=%d hardware=%d",
+					 fileName, (unsigned)modelHandle, (unsigned)(modelHandle | 0x8000), version,
+					 modelNative->model.rootNodeCount, meshCount, g_useHardware3D);
 #endif
 
 	Memory_UnlockHandle(tempHandle);

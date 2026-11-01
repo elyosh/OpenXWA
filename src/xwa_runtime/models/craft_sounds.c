@@ -215,7 +215,7 @@ void XwaCraftSounds_ReadModelSettings(unsigned int objectType, const char* path,
 	CraftSoundsSet* set;
 	const AeronConfigNode* node;
 
-	if (objectType >= OBJ_Count) {
+	if (objectType >= OBJ_Count || group == NULL) {
 		return;
 	}
 	if (AeronConfigNode_Type(group) != AERON_CONFIG_MAP) {

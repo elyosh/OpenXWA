@@ -174,7 +174,7 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 		if (!parsed) {
 			uint8_t* bytes = NULL;
 			size_t size = 0;
-			Aeron_LogInfo("xwa.remaster", "mesh: '%s' has no parsed model; reading '%s'", key, path);
+			Aeron_LogVerbose("xwa.remaster", "mesh: '%s' has no parsed model; reading '%s'", key, path);
 			if (!AeronVfs_ReadAll(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, 0, &bytes, &size)) {
 				Aeron_LogError("xwa.remaster", "mesh: cannot read GLB '%s'", path);
 				ship_set_failure(cmd, "Ship model '%s': cannot read '%s'", key, path);

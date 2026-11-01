@@ -1181,8 +1181,8 @@ static int CraftDefinitions_ApplyCraftTypeFile(const CraftTypeFile* file) {
 		return 0;
 	}
 	if (*mapped != (uint16_t)objectType) {
-		Aeron_LogInfo("xwa.craft", "craft type %d now is object type %d instead of %d", file->craftType,
-					  objectType, *mapped);
+		Aeron_LogVerbose("xwa.craft", "craft type %d now is object type %d instead of %d", file->craftType,
+						 objectType, *mapped);
 		*mapped = (uint16_t)objectType;
 	}
 	node = AeronConfigNode_MapGet(file->root, "ship_list");
@@ -1287,9 +1287,10 @@ static void CraftDefinitions_ApplyObjectTypes(const CraftFileNames* list) {
 						   file->path, s_listPaths[listIndex]);
 			continue;
 		}
-		Aeron_LogInfo("xwa.craft", "%s: object type %d: %s%s%s", file->path, file->objectType,
-					  info->textureGroup == CRAFT_NO_LIST ? "fills a reserved slot" : "changes a stock type",
-					  hasModel ? ", model " : "", hasModel ? model : "");
+		Aeron_LogVerbose("xwa.craft", "%s: object type %d: %s%s%s", file->path, file->objectType,
+						 info->textureGroup == CRAFT_NO_LIST ? "fills a reserved slot"
+															 : "changes a stock type",
+						 hasModel ? ", model " : "", hasModel ? model : "");
 
 		CraftDefinitions_ApplyObjectType(file);
 		if (hasModel && !CraftDefinitions_AddRow(listIndex, file->objectType, model, rowCounts[listIndex])) {

@@ -86,7 +86,7 @@ const char* XwaMissionSounds_Replace(const char* fileName) {
 		}
 		/* Only the first entry for a path counts. */
 		if (MissionSounds_Exists(to)) {
-			Aeron_LogInfo("xwa.audio", "%s: the mission loads %s instead", fileName, to);
+			Aeron_LogVerbose("xwa.audio", "%s: the mission loads %s instead", fileName, to);
 			return to;
 		}
 		Aeron_LogWarn("xwa.mission", "sounds: %s doesn't exist, so %s keeps its own sound", to, fileName);

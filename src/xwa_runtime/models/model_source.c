@@ -424,10 +424,10 @@ static int ModelSource_ProbeCraftKey(ModelSourceCraftKey* entry) {
 	entry->hasExteriorGlb =
 		(uint8_t)(strlen(exteriorKey) < XWA_MODEL_SOURCE_KEY_MAX && ModelSource_GlbExists(exteriorKey));
 	if (entry->hasGlb) {
-		Aeron_LogInfo("xwa.models", "replacement: %s", entry->key);
+		Aeron_LogVerbose("xwa.models", "replacement: %s", entry->key);
 	}
 	if (entry->hasExteriorGlb) {
-		Aeron_LogInfo("xwa.models", "replacement: %s", exteriorKey);
+		Aeron_LogVerbose("xwa.models", "replacement: %s", exteriorKey);
 	}
 	return entry->hasGlb + entry->hasExteriorGlb;
 }
@@ -481,7 +481,7 @@ void XwaModelSource_Init(void) {
 
 		entry->hasGlb = (uint8_t)ModelSource_GlbExists(entry->key);
 		if (entry->hasGlb) {
-			Aeron_LogInfo("xwa.models", "replacement: %s", entry->key);
+			Aeron_LogVerbose("xwa.models", "replacement: %s", entry->key);
 			++glbCount;
 		}
 	}
@@ -491,7 +491,7 @@ void XwaModelSource_Init(void) {
 		entry->hasGlb =
 			(uint8_t)(ModelSource_FindCockpitKey(entry->key) == NULL && ModelSource_GlbExists(entry->key));
 		if (entry->hasGlb) {
-			Aeron_LogInfo("xwa.models", "replacement: %s", entry->key);
+			Aeron_LogVerbose("xwa.models", "replacement: %s", entry->key);
 			++glbCount;
 		}
 	}
@@ -588,7 +588,7 @@ int XwaModelSource_AddKey(const char* key) {
 		return 0;
 	}
 	strcpy(s_addedKeys[s_addedKeyCount++], normalized);
-	Aeron_LogInfo("xwa.models", "replacement: %s (%s.glb, added)", normalized, normalized);
+	Aeron_LogVerbose("xwa.models", "replacement: %s (%s.glb, added)", normalized, normalized);
 	return 1;
 }
 

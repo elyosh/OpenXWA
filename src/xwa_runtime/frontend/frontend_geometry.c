@@ -553,13 +553,13 @@ static const XwaGeometryAtlas* geometry_find(const char* key, const char* video_
 	snprintf(entry->key, sizeof(entry->key), "%s", key);
 	entry->atlas = video_path != NULL ? geometry_read_video(video_path) : NULL;
 	if (entry->atlas != NULL) {
-		Aeron_LogInfo("xwa.frontend", "%s: video for %s, %d frames", video_path, key,
-					  entry->atlas->classic_frames);
+		Aeron_LogVerbose("xwa.frontend", "%s: video for %s, %d frames", video_path, key,
+						 entry->atlas->classic_frames);
 		return entry->atlas;
 	}
 	entry->atlas = geometry_read_atlas(path, needs_id);
 	if (entry->atlas != NULL) {
-		Aeron_LogInfo("xwa.frontend", "%s: game geometry, %d frames", path, entry->atlas->classic_frames);
+		Aeron_LogVerbose("xwa.frontend", "%s: game geometry, %d frames", path, entry->atlas->classic_frames);
 	}
 	return entry->atlas;
 }

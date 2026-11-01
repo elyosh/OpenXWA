@@ -548,11 +548,11 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 	synth->renderModel = model;
 	synth->hasRenderModel = 1;
 
-	Aeron_LogInfo("xwa.models",
-				  "replacement '%s': components=%u vertices=%u faces=%u image=%d bytes "
-				  "bvh_nodes=%u simulation=%s",
-				  key, synth->meshCount, vertexTotal, faceTotal, payloadSize, nodeTotal,
-				  cooked ? "cooked" : "built at load");
+	Aeron_LogVerbose("xwa.models",
+					 "replacement '%s': components=%u vertices=%u faces=%u image=%d bytes "
+					 "bvh_nodes=%u simulation=%s",
+					 key, synth->meshCount, vertexTotal, faceTotal, payloadSize, nodeTotal,
+					 cooked ? "cooked" : "built at load");
 	*outPayload = payload;
 	*outPayloadSize = payloadSize;
 	*outSynth = synth;
