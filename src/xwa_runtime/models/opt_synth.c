@@ -50,7 +50,7 @@ static const char* const s_articulationGroups[] = {
 static const char* const s_articulationBehaviors[] = { "swing", "random", "random_pause" };
 static const char* const s_articulationSettings[] = {
 	"step_ticks",         "sfoils.close_in_hyperspace", "sfoils.allow_fire_closed",
-	"sfoils.park_closed", "hangar_doors.distance",      "crew.update_all"
+	"sfoils.park_closed", "hangar_doors.distance",      "crew.always_animate"
 };
 
 static int OptSynth_IsKnownName(const char* name, const char* const* names, size_t count) {

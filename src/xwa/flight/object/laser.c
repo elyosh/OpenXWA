@@ -2594,19 +2594,18 @@ void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int pl
 							int dechargeRate;
 
 							/* A mod can change how much charge a player's shot
-							   takes. The stock game takes charge from every
-							   rack of a fighter, and a mod can limit this to
-							   laser racks. */
+							   takes. The stock game drains every rack of a
+							   fighter that fires, turret racks included. A mod
+							   can make the turret racks keep their charge. */
 							if (XwaWeaponRates_Decharge(shooterObjIdx, slotIdx, &dechargeRate)) {
 								if (g_curCraft->warheadData[slotIdx].weaponType < 4u) {
 									g_curCraft->warheadData[slotIdx].laserCharge =
 										(uint8_t)(g_curCraft->warheadData[slotIdx].laserCharge -
 												  dechargeRate);
 								}
-							} else if (XwaMissionSettings_PlayerDechargeLasersOnly() &&
+							} else if (XwaMissionSettings_PlayerTurretRacksKeepCharge() &&
 									   g_curCraft->warheadData[slotIdx].weaponType >= 4u) {
-								/* A rack that isn't a laser rack keeps its
-								   charge. */
+								/* A turret rack keeps its charge. */
 							} else
 #endif
 								if (g_objectTable[shooterObjIdx].genusId) {
@@ -3020,7 +3019,8 @@ void laser_fireplayerweapon(int playerIdx) {
 #ifdef XWA_MODERN
 			/* With a mod's rule, a seat fires warheads only when its cockpit
 			   has a warhead hardpoint. */
-			if (g_players[playerIdx].currentSeatIdx == 0 || !XwaMissionSettings_GunnerFiresWarheads() ||
+			if (g_players[playerIdx].currentSeatIdx == 0 ||
+				!XwaMissionSettings_GunnerWarheadsNeedCockpitHardpoint() ||
 				XwaGunnerSeats_CockpitHasHardpoint(
 					(uint16_t)XwaGunnerSeats_Value(
 						g_objectTable[objectIndex].objectType, g_players[playerIdx].currentSeatIdx - 1,

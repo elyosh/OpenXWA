@@ -1190,7 +1190,7 @@ static void flight_write_fonts_yaml(FlightContext* ctx) {
 		return;
 	}
 	fprintf(f,
-			"# Made by the OpenXWA mod importer from TextFontFamily in DDraw.cfg.\n"
+			"# Made by the OpenXWA mod importer.\n"
 			"version: 1\n"
 			"default: {file: %s, metrics: font}\n",
 			file);

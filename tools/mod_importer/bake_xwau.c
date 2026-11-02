@@ -47,9 +47,8 @@
 #include <strings.h>
 #include <sys/stat.h>
 
-/* Design pixels per 640x480 unit on the 2560x1440 design screen. */
-#define DESIGN_X 4.0
-#define DESIGN_Y 3.0
+#define DESIGN_X ((double)BAKE_XWAU_DESIGN_SCALE_X)
+#define DESIGN_Y ((double)BAKE_XWAU_DESIGN_SCALE_Y)
 
 /* A standard image this large is a screen background: its HD image sets the
  * layout of the screens that draw it (XWAU's IsBackgroundWide). TECHGLOBE is
@@ -823,8 +822,7 @@ static void write_video_yamls(XwauContext* ctx) {
 			continue;
 		}
 		fprintf(fp,
-				"# Made by the OpenXWA mod importer. Sizes are in design pixels. The video\n"
-				"# comes from XWAU's Resdata folder.\n"
+				"# Made by the OpenXWA mod importer. Sizes are in design pixels.\n"
 				"video: %s\nsize: ",
 				v->webm);
 		write_list(fp, size, 2);
@@ -1438,9 +1436,7 @@ static void write_layout_yaml(XwauContext* ctx) {
 		ctx->stats->failures++;
 		return;
 	}
-	fprintf(fp, "# Made by the OpenXWA mod importer from ConcourseDoors.txt, MedalsPositions.txt,\n"
-				"# the [hook_concourse] settings and the squadron logo files. Positions and sizes\n"
-				"# are in design pixels.\n"
+	fprintf(fp, "# Made by the OpenXWA mod importer. Positions and sizes are in design pixels.\n"
 				"version: 1\n");
 	fprintf(fp, "starfield: %s\n", HOOK_INT("DrawStarfield", 1) ? "true" : "false");
 	fprintf(fp, "planet: {left: %.0f, right: %.0f, top: %.0f, bottom: %.0f}\n",
@@ -1493,15 +1489,14 @@ static void write_layout_yaml(XwauContext* ctx) {
 	write_design_point(fp, DOOR("familyroom_mkeye_posX", 160), DOOR("familyroom_mkeye_posY", 200));
 	fprintf(fp, "\n  monitor: ");
 	write_design_point(fp, DOOR("familyroom_monitor_posX", 426), DOOR("familyroom_monitor_posY", 243));
-	fprintf(fp, "\n  lady_blue_mission: %d\n  cologne_mission: %d\n",
-			doors[0] ? read_key_int(doors, "familyroom_ladyblue_mission", 23) : 23,
-			doors[0] ? read_key_int(doors, "familyroom_cologne_mission", 9) : 9);
-	/* XWAU always draws its own linear progress bar. */
-	fprintf(fp, "loading_screen:\n  item: {left: %.0f, right: %.0f, height: %.0f}\n  progress: linear\n",
+	fprintf(fp, "\n");
+	/* XWAU always draws its own even progress bar. */
+	fprintf(fp, "loading_screen:\n  item: {left: %.0f, right: %.0f, height: %.0f}\n  progress_bar: even\n",
 			DOOR("briefing_review_item_left", 64) * DESIGN_X,
 			DOOR("briefing_review_item_right", 573) * DESIGN_X,
 			DOOR("briefing_review_item_height", 41) * DESIGN_Y);
-	fprintf(fp, "mission_selection_x: %.0f\n", DOOR("mission_selection_screen_posX", 230) * DESIGN_X);
+	fprintf(fp, "mission_selection:\n  panel_x: %.0f\n",
+			DOOR("mission_selection_screen_posX", 230) * DESIGN_X);
 
 	/* A squadron logo moves when it has a video and a position file
 	 * (Resdata\Squad<N>.txt) with a Width and Height. Its number in the
@@ -1552,7 +1547,7 @@ static void write_layout_yaml(XwauContext* ctx) {
 					   xwau_units(HOOK_INT("KalidorCrescentPositionY", 168)));
 	/* Award ceremony: images are placed by their centre, and texts are
 	 * offsets from where the stock game puts them. */
-	fprintf(fp, "\naward_ceremony:\n  zoom_texts: %s\n",
+	fprintf(fp, "\naward_ceremony:\n  show_names: %s\n",
 			doors[0] && read_key_int(doors, "draw_medalzoom_texts", 1) == 0 ? "false" : "true");
 	fprintf(fp, "  battle: {images: [");
 	write_design_point(fp, DOOR("battlezoom_image1_posX", 320), DOOR("battlezoom_image1_posY", 240));
@@ -1729,7 +1724,7 @@ static void write_fonts_yaml(XwauContext* ctx) {
 		ctx->stats->failures++;
 		return;
 	}
-	fprintf(fp, "# Made by the OpenXWA mod importer from HDConcourseTextFont.\n"
+	fprintf(fp, "# Made by the OpenXWA mod importer.\n"
 				"version: 1\n"
 				"default: {file: Inconsolata-Bold.ttf, metrics: font, spacing: 0.0498}\n");
 	fclose(fp);
@@ -1763,8 +1758,7 @@ static void write_movies_yaml(XwauContext* ctx) {
 		ctx->stats->failures++;
 		return;
 	}
-	fprintf(fp, "# Made by the OpenXWA mod importer from FilmPodMovie, SinglePodMovie and\n"
-				"# MultiPodMovie. The movies come from XWAU's Movies folder.\n");
+	fputs("# Made by the OpenXWA mod importer.\n", fp);
 	for (int i = 0; i < 3; ++i)
 		fprintf(fp, "%s: %s\n", rooms[i], movies[i]);
 	fclose(fp);
@@ -1853,9 +1847,8 @@ static void write_animations_yaml(XwauContext* ctx) {
 		return;
 	}
 	fprintf(fp,
-			"# Made by the OpenXWA mod importer from ConcourseAnimations.txt. Positions and\n"
-			"# sizes are in design pixels, delays in seconds. The videos come from\n"
-			"# XWAU's Resdata folder, and the sounds from its Sfx folder.\n"
+			"# Made by the OpenXWA mod importer. Positions and sizes are in design pixels,\n"
+			"# delays in seconds.\n"
 			"version: 1\n"
 			"groups:%s\n",
 			count ? "" : " []");
@@ -2069,8 +2062,8 @@ static void write_frontend_yaml(XwauContext* ctx) {
 				"# The screen the frontend art is drawn for. Positions and sizes in the\n"
 				"# frontend's files are pixels of this screen.\n"
 				"design: [2560, 1440]\n"
-				"# XWAU's look: translucent fills at 0.7, lines one screen pixel thick, and\n"
-				"# a pure red briefing grid.\n"
+				"# Translucent fills at 0.7, lines one screen pixel thick, and a pure red\n"
+				"# briefing grid.\n"
 				"paint:\n"
 				"  fill_alpha: 0.7\n"
 				"  line_width: pixel\n"

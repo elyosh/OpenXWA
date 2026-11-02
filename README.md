@@ -82,15 +82,15 @@ command line:
 OpenXWA --game-data /path/to/xwa-data
 ```
 
-Replacement assets, such as converted models, are read from a mod folder.
-By default it is the `mod` folder inside the game-data folder. To use another
-folder, set `paths.mod` in your `config.yaml` or pass it on the command line:
+Replacement assets, such as converted models, come from a mod. Choose one
+under **Mods** in the options; the change takes effect the next time OpenXWA
+starts. To use a mod folder for one launch only, pass it on the command line:
 
 ```sh
 OpenXWA --mod /path/to/mod
 ```
 
-The mod folder is optional. Without it, the game uses the original assets.
+Without a mod, the game uses the original assets.
 
 To compare the speed of two builds, play a film from the command line. The
 game starts the film directly, then quits when it ends and logs the frame

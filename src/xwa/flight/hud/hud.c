@@ -15937,9 +15937,8 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 			g_msgPtrs[0] = g_modelDefs[speciesIdx].longName;
 			g_msgPtrs[1] = g_missionFlightGroups[flightGroupIdx].fg.name;
 #ifdef XWA_MODERN
-			/* A mission that skips the hyperspace messages skips the "entering
-			   area" messages too. */
-			if (XwaMissionSettings_SkipHyperspacedMessages() > 0) {
+			/* A mission can hide the "entering area" messages. */
+			if (XwaMissionSettings_HideFriendlyArrivalMessages()) {
 				return;
 			}
 #endif
@@ -15953,7 +15952,7 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 		g_msgPtrs[1] = g_modelDefs[speciesIdx].longName;
 		g_msgPtrs[2] = g_missionFlightGroups[flightGroupIdx].fg.name;
 #ifdef XWA_MODERN
-		if (XwaMissionSettings_SkipHyperspacedMessages() > 0) {
+		if (XwaMissionSettings_HideFriendlyArrivalMessages()) {
 			return;
 		}
 #endif
@@ -15975,11 +15974,10 @@ void msg_emitCraftMessage(uint16_t objIdx, CraftData* craft, int16_t msgTemplate
 	int16_t craftNumber;
 
 #ifdef XWA_MODERN
-	/* A mission's choice to skip the hyperspace messages also decides whether
-	   message 143 is skipped. Without a choice, the stock rule skips it only in
-	   mission 49. */
-	if ((XwaMissionSettings_SkipHyperspacedMessages() >= 0
-			 ? !XwaMissionSettings_SkipHyperspacedMessages()
+	/* A mission can choose whether message 143 is hidden. Without a choice,
+	   the stock rule hides it only in mission 49. */
+	if ((XwaMissionSettings_HideHyperspaceExitMessages() >= 0
+			 ? !XwaMissionSettings_HideHyperspaceExitMessages()
 			 : g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 49) ||
 		msgTemplateId != 143 || g_objectTable[objIdx].genusId != 0) {
 #else

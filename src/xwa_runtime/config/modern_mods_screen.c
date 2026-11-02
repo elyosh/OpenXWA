@@ -15,19 +15,15 @@ enum {
 	XWA_MODS_NOTE_WIDTH = 560,
 };
 
-/* The next complete entry after `from` in the direction of `step`, with
- * wrap. Incomplete mods are skipped. */
+/* The next entry after `from` in the direction of `step`, with wrap. */
 static size_t XwaModernModsScreen_Next(size_t from, int step) {
 	const size_t count = XwaModernMods_Count();
-	size_t index = from < count ? from : 0;
+	const size_t index = from < count ? from : 0;
 
-	for (size_t walked = 0; walked < count; ++walked) {
-		index = step > 0 ? (index + 1) % count : (index + count - 1) % count;
-		if (XwaModernMods_Entry(index)->complete) {
-			return index;
-		}
+	if (!count) {
+		return from;
 	}
-	return from;
+	return step > 0 ? (index + 1) % count : (index + count - 1) % count;
 }
 
 /* Draws a centered note. A text too wide keeps its end, after "...", so a
@@ -75,6 +71,8 @@ int XwaModernModsScreen_Update(int menu_center_x, int* cursor_row) {
 		menu.y + 5, entry && entry->path[0] ? entry->path : "The original game, with no mod", g_colorGray);
 	if (XwaModernMods_LaunchOverride()) {
 		XwaModernModsScreen_DrawNote(menu.y + 22, "Set by the --mod option", g_colorGray);
+	} else if (entry && entry->problem) {
+		XwaModernModsScreen_DrawNote(menu.y + 22, entry->problem, g_colorRed);
 	} else if (XwaModernMods_Get() != XwaModernMods_Running()) {
 		XwaModernModsScreen_DrawNote(menu.y + 22, "Restart OpenXWA to use this mod.", g_colorGreen);
 	}

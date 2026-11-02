@@ -15,12 +15,20 @@
 static AeronConfigFile* s_file; /* the mission file, which holds the paths */
 static const AeronConfigNode* s_sounds;
 
-static char MissionSounds_Lower(char c) { return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c; }
+/* `c` in lower case, with '\' turned into '/'. */
+static char MissionSounds_Fold(char c) {
+	if (c == '\\') {
+		return '/';
+	}
+	return c >= 'A' && c <= 'Z' ? (char)(c - 'A' + 'a') : c;
+}
 
-/* Whether `a` and `b` are the same, ignoring the case of ASCII letters. */
+/* Whether paths `a` and `b` are the same, ignoring the case of ASCII letters.
+ * '/' and '\' count as the same, because the game builds most of its paths
+ * with '\'. */
 static int MissionSounds_SameText(const char* a, const char* b) {
 	for (; *a && *b; ++a, ++b) {
-		if (MissionSounds_Lower(*a) != MissionSounds_Lower(*b)) {
+		if (MissionSounds_Fold(*a) != MissionSounds_Fold(*b)) {
 			return 0;
 		}
 	}

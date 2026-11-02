@@ -1088,11 +1088,11 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 					g_flightGlobalCountdownTimers[2] = 15;
 #ifdef XWA_MODERN
 					/* In the hangar, every object whose model sets
-					   crew.update_all animates its crew, in any view. The stock
+					   crew.always_animate animates its crew, in any view. The stock
 					   game animates only the player's crew, and only in an
 					   external view. */
 					if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive &&
-						!XwaArticulation_CrewUpdatesAll(g_players[g_localPlayer].objectIndex)) {
+						!XwaArticulation_CrewAlwaysAnimates(g_players[g_localPlayer].objectIndex)) {
 						FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex,
 															  0);
 					}
@@ -1630,11 +1630,11 @@ int Hangar_EnterCraft(uint16_t fromObjIdx) {
 					g_flightGlobalCountdownTimers[2] = 15;
 #ifdef XWA_MODERN
 					/* In the hangar, every object whose model sets
-					   crew.update_all animates its crew, in any view. The stock
+					   crew.always_animate animates its crew, in any view. The stock
 					   game animates only the player's crew, and only in an
 					   external view. */
 					if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive &&
-						!XwaArticulation_CrewUpdatesAll(g_players[g_localPlayer].objectIndex)) {
+						!XwaArticulation_CrewAlwaysAnimates(g_players[g_localPlayer].objectIndex)) {
 						FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex,
 															  0);
 					}
@@ -6330,9 +6330,9 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 		}
 
 #ifdef XWA_MODERN
-		/* A droid model with crew.update_all moves through the crew update
-		   instead of this motion. */
-		if (XwaArticulation_CrewUpdatesAll(objectIdx)) {
+		/* A droid model with crew.always_animate moves with the crew
+		   animation instead of this motion. */
+		if (XwaArticulation_CrewAlwaysAnimates(objectIdx)) {
 		} else if (XwaModernFlightTiming_IsHighRate()) {
 			Hangar_ModernUpdateHangarDroidMesh(sceneIdx, objectIdx, dtTicks);
 		} else {

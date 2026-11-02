@@ -2334,12 +2334,12 @@ void FlightObject_UpdateSpecialBehavior(void) {
 			}
 
 #ifdef XWA_MODERN
-			/* A model with crew.update_all animates its crew for every object,
-			   in any view. Pilots keep their own call below. */
+			/* A model with crew.always_animate animates its crew on every
+			   object, in every view. Pilots keep their own call below. */
 			if ((g_objectTable[(uint16_t)objIdx].playerOwnerIdx != -1 && g_flightPlayerCount == 1 &&
 				 g_players[g_localPlayer].viewState.externalCameraActive) ||
 				(objectType != OBJ_RebelPilot && objectType != OBJ_ImperialPilot &&
-				 XwaArticulation_CrewUpdatesAll(objIdx))) {
+				 XwaArticulation_CrewAlwaysAnimates(objIdx))) {
 #else
 			if (g_objectTable[(uint16_t)objIdx].playerOwnerIdx != -1 && g_flightPlayerCount == 1 &&
 				g_players[g_localPlayer].viewState.externalCameraActive) {
@@ -4864,7 +4864,7 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					   interdicted plays the abort sound instead of the arrival
 					   sound. */
 					const int interdicted =
-						XwaMissionSettings_InterdictedRegion(g_players[playerIdx].regionIndex);
+						XwaMissionSettings_HyperspaceAbortSoundRegion(g_players[playerIdx].regionIndex);
 					const int endSlot =
 						XwaCraftSounds_HyperEnd(playerIdx, interdicted, interdicted ? 119 : 117);
 					if (endSlot != -1)

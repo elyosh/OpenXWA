@@ -39,7 +39,8 @@ typedef struct WeaponColorSet {
 
 typedef struct CraftWeaponsType {
 	WeaponColorSet colors;
-	int8_t switchByIff; /* 1 or 0, -1 when not set */
+	int hasSwitchByIff;
+	XwaWeaponIffSwap switchByIff;
 	uint16_t markingsCount;
 	uint8_t markings[256];
 	WeaponColorSet byMarkings[];
@@ -236,12 +237,14 @@ void XwaCraftWeapons_ReadModelSettings(unsigned int objectType, const char* path
 	if (type == NULL) {
 		return;
 	}
-	type->switchByIff = -1;
 	node = AeronConfigNode_MapGet(group, "switch_by_iff");
-	if (node != NULL && AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
-		Aeron_LogWarn("xwa.models", "%s: weapons.switch_by_iff must be true or false. It is ignored", path);
-	} else if (node != NULL) {
-		type->switchByIff = (int8_t)(AeronConfigNode_Bool(node, 0) != 0);
+	if (node != NULL) {
+		type->hasSwitchByIff =
+			XwaMissionSettings_ParseWeaponIffSwap(AeronConfigNode_String(node, NULL), &type->switchByIff);
+		if (!type->hasSwitchByIff) {
+			Aeron_LogWarn("xwa.models",
+						  "%s: weapons.switch_by_iff must be turrets, none or all. It is ignored", path);
+		}
 	}
 	CraftWeapons_ClearSet(&type->colors);
 	CraftWeapons_ReadSet(path, "weapons.colors", AeronConfigNode_MapGet(group, "colors"), &type->colors);
@@ -290,7 +293,7 @@ uint8_t XwaCraftWeapons_BoltMarkings(unsigned int objectType, uint8_t markings, 
 int XwaCraftWeapons_SwitchByIff(unsigned int objectType) {
 	const CraftWeaponsType* type = CraftWeapons_Type(objectType);
 
-	if (type != NULL && type->switchByIff >= 0) {
+	if (type != NULL && type->hasSwitchByIff) {
 		return type->switchByIff;
 	}
 	return XwaMissionSettings_WeaponIffSwap();

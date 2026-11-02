@@ -846,6 +846,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/snapshot/snapshot_hud.h
     src/xwa_runtime/compat/middleware_crt.h
     src/xwa_app/host_config.h
+    src/xwa_app/mod_format.h
     src/xwa_app/mod_list.h
     src/xwa_app/setup.h
     src/xwa/util/byte_order.h

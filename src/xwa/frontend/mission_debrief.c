@@ -2532,7 +2532,7 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 				rect.bottom = 375;
 #ifdef XWA_MODERN
 				XwaConcourseLayout_MoveRect(&rect, "award_ceremony.battle.text_offsets", 1);
-				if (XwaConcourseLayout_Bool("award_ceremony.zoom_texts", 1)) {
+				if (XwaConcourseLayout_Bool("award_ceremony.show_names", 1)) {
 					FrontendDraw_FillRectTranslucent(&rect, 0, 0, g_awardCeremonyLabelFillColor);
 					FrontendText_DrawCentered(12, g_frontendScratchBuffer, &rect, g_colorLightBlue);
 				}
@@ -2569,7 +2569,7 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 				++g_awardCeremonyFrameCounter;
 #ifdef XWA_MODERN
 				XwaConcourseLayout_MoveRect(&rect, "award_ceremony.kalidor.text_offsets", 1);
-				if (XwaConcourseLayout_Bool("award_ceremony.zoom_texts", 1)) {
+				if (XwaConcourseLayout_Bool("award_ceremony.show_names", 1)) {
 					FrontendText_DrawCenteredReveal(12, g_frontendScratchBuffer, &rect, g_colorLightBlue,
 													revealCount);
 				}
@@ -2629,7 +2629,7 @@ int MissionDebrief_ShowAwardCeremony(int frameCounter) {
 											awardId != 0 ? "award_ceremony.battle.text_offsets"
 														 : "award_ceremony.kalidor.text_offsets",
 											0);
-				if (XwaConcourseLayout_Bool("award_ceremony.zoom_texts", 1)) {
+				if (XwaConcourseLayout_Bool("award_ceremony.show_names", 1)) {
 					FrontendDraw_FillRectTranslucent(&rect, 0, 0, g_awardCeremonyLabelFillColor);
 					FrontendText_DrawCentered(15, g_frontendScratchBuffer, &rect, g_colorLightBlue);
 				}

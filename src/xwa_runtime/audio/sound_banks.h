@@ -9,7 +9,7 @@
  *     interior:                     # by object type
  *       count: 225
  *       sounds:
- *         1: {file: 'Wave\Sfx_Interior\EngineIntXW.wav', volume: 76, distance: 8192}
+ *         1: {file: 'Wave/Sfx_Interior/EngineIntXW.wav', volume: 76, distance: 8192}
  *     weapon:                       # 10 by object type
  *       count: 2230
  *       sounds:

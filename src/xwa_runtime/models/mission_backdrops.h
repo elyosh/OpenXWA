@@ -1,23 +1,27 @@
 #ifndef XWA_RUNTIME_MODELS_MISSION_BACKDROPS_H
 #define XWA_RUNTIME_MODELS_MISSION_BACKDROPS_H
 
-/* Backdrop ids past the stock table, for mods whose mission files use them.
+/* Extra backdrop ids, for mods whose missions use ids past the stock table.
  *
- * A backdrop flight group gives a backdrop id, and the stock table gives ids 0
- * to 103 an object type and flags. flight/flight.yaml can give ids 104 to 255
- * an image group each, which they draw as a planet:
+ * A backdrop flight group has a backdrop id. The stock table gives ids 0 to
+ * 103 an object type and flags. flight/flight.yaml can make ids 104 to 255
+ * draw planets, each with its own image group:
  *
  *   version: 1
  *   backdrops:
  *     extra_planets:
- *       - { ids: [104, 255], first_group: 6304 }
+ *       - { ids: [104, 255], image_groups: [6304, 6455] }
  *
- * An entry gives the ids from its first to its last, and the first id's image
- * group; each next id takes the next group. Each listed id gets its own
- * object type, after the stock ones (OBJ_FirstExtraPlanet + id - 104), which
- * is a copy of stock planet id 1 with the id's image group, and the flags of
- * stock planet id 1. The game reads the file once, at startup. Without it,
- * ids above 103 place nothing, as in the stock game. */
+ * Each entry has a range of ids and a range of image groups of the same
+ * length. The first id uses the first group, the second id the second
+ * group, and so on.
+ *
+ * Each listed id gets its own object type after the stock ones, at
+ * OBJ_FirstExtraPlanet + id - 104. It is a copy of stock planet id 1, with
+ * the id's image group.
+ *
+ * The game reads the file once, at startup. Without it, ids above 103 show
+ * nothing, as in the stock game. */
 
 #include "xwa/assets/object_type.h"
 

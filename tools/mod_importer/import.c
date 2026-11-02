@@ -18,6 +18,7 @@
 #include "import_internal.h"
 #include "material_checks.h"
 #include "stock_tables.h"
+#include "xwa_app/mod_format.h"
 #include "xwau_awards.h"
 #include "xwau_craft.h"
 #include "xwau_flight_settings.h"
@@ -385,7 +386,7 @@ static bool write_mod_yaml(ImportContext* ctx, bool complete) {
 	FILE* f = PathFormat(path, sizeof path, "%s/mod.yaml", options->mod) ? fopen(path, "w") : NULL;
 	if (!f)
 		return false;
-	fprintf(f, MOD_YAML_HEADER "\nversion: 1\nname: ");
+	fprintf(f, MOD_YAML_HEADER "\nversion: %d\nname: ", XWA_MOD_FORMAT_VERSION);
 	yaml_quoted(f, options->name && options->name[0] ? options->name : "Mod");
 	fprintf(f, "\ncomplete: %s\nsource: ", complete ? "true" : "false");
 	yaml_quoted(f, options->source);
@@ -611,7 +612,8 @@ static bool missions(ImportContext* ctx, bool* skyboxes) {
 		Import_Failed(ctx, "The missions can't be read.");
 		return false;
 	}
-	const bool ok = XwauMissionFiles_Write(options->source, loaded, options->game, out);
+	const int design_scale[2] = { BAKE_XWAU_DESIGN_SCALE_X, BAKE_XWAU_DESIGN_SCALE_Y };
+	const bool ok = XwauMissionFiles_Write(options->source, loaded, options->game, out, design_scale);
 	XwauMissions_Free(loaded);
 	if (!ok) {
 		Import_Failed(ctx, "The mission files couldn't be imported.");
