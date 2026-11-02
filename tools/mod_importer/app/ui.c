@@ -163,7 +163,7 @@ static void check_source(ImporterUi* app) {
 }
 
 static void check_game(ImporterUi* app) {
-	char normalized[PATH_CAP], error[512], exe[PATH_CAP];
+	char normalized[PATH_CAP], error[512];
 	app->game_ok = 0;
 	if (!app->game[0]) {
 		snprintf(app->game_message, sizeof app->game_message, "Choose your original X-Wing Alliance folder.");
@@ -173,11 +173,6 @@ static void check_game(ImporterUi* app) {
 								   sizeof error)) {
 		snprintf(app->game_message, sizeof app->game_message,
 				 "This isn't a complete X-Wing Alliance folder. %s", error);
-		return;
-	}
-	if (!XwaModImport_FindGameExe(app->game, exe, sizeof exe)) {
-		snprintf(app->game_message, sizeof app->game_message,
-				 "XWINGALLIANCE.EXE isn't in this folder or in its ALLIANCE folder.");
 		return;
 	}
 	app->game_ok = 1;

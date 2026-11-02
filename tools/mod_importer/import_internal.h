@@ -21,7 +21,6 @@ typedef struct ImportContext {
 	const XwaModImportOptions* options;
 	XwaModImportProgress* progress;
 	char work[IMPORT_PATH_CAP]; /* <mod>/.import */
-	char game_exe[IMPORT_PATH_CAP];
 	int cores;
 	uint64_t phase_start; /* in microseconds */
 } ImportContext;

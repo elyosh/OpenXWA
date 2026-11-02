@@ -34,7 +34,6 @@ extern "C" {
 typedef struct XwaModImportOptions {
 	const char* source;      /* the XWA Upgrade installation */
 	const char* game;        /* the original game's data folder */
-	const char* game_exe;    /* its XWINGALLIANCE.EXE; NULL: found in `game` */
 	const char* mod;         /* the mod folder */
 	const char* name;        /* the mod's name, for mod.yaml */
 	const char* authoring;   /* the authoring folder, or NULL */
@@ -110,10 +109,6 @@ typedef enum XwaModImportCheck {
  * top, FlightModels/ with at least one .opt, and Hooks.ini or
  * XWAUVersion.txt. Fills `info`, or writes the reason into `error`. */
 bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* error, size_t error_cap);
-
-/* Finds XWINGALLIANCE.EXE at the top of the game folder `game`, then in
- * ALLIANCE/, in any case. */
-bool XwaModImport_FindGameExe(const char* game, char* out, size_t cap);
 
 /* The folder of the mod `name` in the mods folder `mods`: <mods>/<name>, with
  * the name in lower case and other characters than letters, digits, '.' and

@@ -595,8 +595,16 @@ if(XWA_BUILD_MOD_IMPORTER)
         tools/mod_importer/import.c
         tools/mod_importer/log.c
         tools/mod_importer/models.c
+        tools/mod_importer/stock_model_defs.c
+        tools/mod_importer/stock_tables.c
+        # The game's craft tables, which the importer uses for its stock
+        # tables. The library is built without XWA_MODERN, so the tables have
+        # the stock sizes.
+        src/xwa/assets/object_type.c
+        src/xwa/assets/object_type_info.c
     )
     target_include_directories(xwa_mod_import_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools/mod_importer)
+    target_include_directories(xwa_mod_import_lib PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(xwa_mod_import_lib
         PUBLIC aeron_tool_log xwau_files aeron_yaml_json aeron
         PRIVATE xwa_asset_bake_lib opt2gltf_tool xwau_import_lib aeron_gltf_cook_tool aeron_effect_library

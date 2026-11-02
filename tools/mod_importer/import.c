@@ -17,6 +17,7 @@
 #include "envmap.h"
 #include "import_internal.h"
 #include "material_checks.h"
+#include "stock_tables.h"
 #include "xwau_awards.h"
 #include "xwau_craft.h"
 #include "xwau_flight_settings.h"
@@ -248,13 +249,6 @@ bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* er
 	return true;
 }
 
-bool XwaModImport_FindGameExe(const char* game, char* out, size_t cap) {
-	char alliance[IMPORT_PATH_CAP];
-	return Import_FindNoCase(game, "XWINGALLIANCE.EXE", false, out, cap) ||
-		   (Import_FindNoCase(game, "ALLIANCE", true, alliance, sizeof alliance) &&
-			Import_FindNoCase(alliance, "XWINGALLIANCE.EXE", false, out, cap));
-}
-
 bool XwaModImport_ModFolder(const char* mods, const char* name, char* out, size_t cap) {
 	char folder[256];
 	LowerCopy(folder, sizeof folder, name);
@@ -309,11 +303,6 @@ XwaModImportCheck XwaModImport_Check(const XwaModImportOptions* options, char* e
 	if (!options->game || !IsDir(options->game) ||
 		!Import_FindNoCase(options->game, "FlightModels", true, path, sizeof path)) {
 		snprintf(error, error_cap, "Original game: this isn't an X-Wing Alliance folder.");
-		return XWA_MOD_IMPORT_CHECK_INVALID;
-	}
-	if (options->game_exe ? !IsFile(options->game_exe)
-						  : !XwaModImport_FindGameExe(options->game, path, sizeof path)) {
-		snprintf(error, error_cap, "Original game: XWINGALLIANCE.EXE isn't there.");
 		return XWA_MOD_IMPORT_CHECK_INVALID;
 	}
 	if (!options->resources || !PathFormat(path, sizeof path, "%s/assets/fonts", options->resources) ||
@@ -425,10 +414,6 @@ static bool prepare(ImportContext* ctx) {
 		Import_Failed(ctx, "%s", error);
 		return false;
 	}
-	if (options->game_exe)
-		snprintf(ctx->game_exe, sizeof ctx->game_exe, "%s", options->game_exe);
-	else
-		XwaModImport_FindGameExe(options->game, ctx->game_exe, sizeof ctx->game_exe);
 	if (folder_state(options->mod) == FOLDER_IMPORTED) {
 		ToolLog_Write(TOOL_LOG_INFO, "Deleting the mod in %s", options->mod);
 		if (!clear_folder(options->mod)) {
@@ -582,11 +567,17 @@ static void craft(ImportContext* ctx) {
 		!PathFormat(strings, sizeof strings, "%s/text/strings.yaml", options->mod) ||
 		!PathFormat(game_files, sizeof game_files, "%s/game", options->mod))
 		return;
+	XwauGameTables* stock = ImportStockTables_Create(options->game);
+	if (!stock) {
+		Import_Failed(ctx, "The original game's ship lists couldn't be read.");
+		return;
+	}
 	XwauLines cockpits = { 0 };
 	XwauTextIds moved = { 0 };
 	bool ok = XwauCraft_Write(options->source, flight, &cockpits);
-	ok = XwauObjects_Write(options->source, options->game, flight, &moved) &&
-		 XwauGunnerSeats_WriteCockpits(options->source, options->game, flight, &cockpits) && ok;
+	ok = XwauObjects_Write(options->source, options->game, stock, flight, &moved) &&
+		 XwauGunnerSeats_WriteCockpits(options->source, stock, flight, &cockpits) && ok;
+	XwauGameTables_Free(stock);
 	XwauLines_Free(&cockpits);
 	ok = XwauText_Write(options->source, options->game, strings, &moved) && ok;
 	ok = XwauSoundBanks_Write(options->source, flight, game_files) && ok;
@@ -803,8 +794,10 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 	}
 	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_HANGARS, 0);
-		if (!XwauHangars_Write(options->source, ctx->game_exe, NULL, options->game, options->mod))
+		XwauGameTables* stock = ImportStockTables_Create(options->game);
+		if (!stock || !XwauHangars_Write(options->source, stock, options->game, options->mod))
 			Import_Failed(ctx, "The hangars couldn't be imported.");
+		XwauGameTables_Free(stock);
 	}
 	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_FRONTEND, 0);
