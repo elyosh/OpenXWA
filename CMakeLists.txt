@@ -13,6 +13,18 @@ set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # glibc only declares POSIX functions such as strdup when asked to, and
+    # the targets build without GNU extensions. C then takes them as functions
+    # that return int, and cuts the pointers they return to 32 bits.
+    add_compile_definitions(_DEFAULT_SOURCE)
+endif()
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    # GCC before 14 only warns about these.
+    add_compile_options($<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
+                        $<$<COMPILE_LANGUAGE:C>:-Werror=int-conversion>)
+endif()
+
 # Emit compile_commands.json in every build dir so clangd/LSP can resolve flags.
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
