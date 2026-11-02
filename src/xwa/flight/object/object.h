@@ -405,6 +405,12 @@ typedef struct MobileObject {
 	WarheadGuidanceState* pWarheadGuidance;
 	CraftData* pCraft;
 	MobileObjectCharData* pCharData;
+#ifdef XWA_MODERN
+	/* Fractional projectile displacement follows legacy members to preserve their offsets. */
+	uint16_t projectileMoveFractionX;
+	uint16_t projectileMoveFractionY;
+	uint16_t projectileMoveFractionZ;
+#endif
 } MobileObject;
 
 struct ObjectRecord {
