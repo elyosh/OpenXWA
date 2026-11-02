@@ -145,6 +145,23 @@ static void configure_mods(const XwaLaunchOptions* launch, const XwaHostConfig* 
 	XwaModList_Free(&list);
 }
 
+/* Shows a setup error that the player can fix themselves, so it doesn't ask
+ * for the logs like Aeron_FatalError. */
+static void show_setup_error(const char* message) {
+	static const AeronMessageBoxButton buttons[] = {
+		{ 0, "OK", 1, 1 },
+	};
+	const AeronMessageBoxOptions options = {
+		.kind = AERON_MESSAGE_BOX_ERROR,
+		.title = "OpenXWA",
+		.message = message,
+		.buttons = buttons,
+		.button_count = sizeof buttons / sizeof buttons[0],
+	};
+
+	Aeron_ShowMessageBox(&options, NULL);
+}
+
 static int show_first_launch_prompt(int* cancelled, char* error, size_t error_size) {
 	static const AeronMessageBoxButton buttons[] = {
 		{ XWA_SETUP_CHOOSE_FOLDER, "Choose Game Folder", 1, 0 },
@@ -371,7 +388,7 @@ int main(int argc, char** argv) {
 		snprintf(message, sizeof message, "%s\nConfiguration path: %s/config.yaml", config_error,
 				 Aeron_UserPath());
 		Aeron_LogError("xwa.config", "%s", message);
-		Aeron_FatalError("OpenXWA", message);
+		show_setup_error(message);
 		Aeron_Shutdown();
 		return 1;
 	}
@@ -383,7 +400,7 @@ int main(int argc, char** argv) {
 						   &setup_cancelled, config_error, sizeof config_error)) {
 		if (!setup_cancelled) {
 			Aeron_LogError("xwa.config", "%s", config_error);
-			Aeron_FatalError("OpenXWA", config_error);
+			show_setup_error(config_error);
 		}
 		Aeron_Shutdown();
 		return setup_cancelled ? 0 : 1;
@@ -392,7 +409,7 @@ int main(int argc, char** argv) {
 		!XwaHostConfig_SaveGameDataPath(Aeron_GetVfs(), selected_game_data, config_error,
 										sizeof config_error)) {
 		Aeron_LogError("xwa.config", "%s", config_error);
-		Aeron_FatalError("OpenXWA", config_error);
+		show_setup_error(config_error);
 		Aeron_Shutdown();
 		return 1;
 	}
@@ -405,7 +422,7 @@ int main(int argc, char** argv) {
 	if (!XwaSetup_SetModRoot(Aeron_GetVfs(), &launch, &host_config, selected_mod, sizeof selected_mod,
 							 config_error, sizeof config_error)) {
 		Aeron_LogError("xwa.config", "%s", config_error);
-		Aeron_FatalError("OpenXWA", config_error);
+		show_setup_error(config_error);
 		Aeron_Shutdown();
 		return 1;
 	}
@@ -464,8 +481,7 @@ int main(int argc, char** argv) {
 		.video_options_override_mask = host_config.video_options_override_mask,
 	};
 	if (!XwaRemaster_Init(&remaster_options)) {
-		Aeron_FatalError("OpenXWA",
-						 "Required remaster resources could not be loaded. See the log for details.");
+		Aeron_FatalError("OpenXWA", "Required remaster resources could not be loaded.");
 		XwaRemaster_Shutdown();
 		Aeron_Shutdown();
 		return 1;
