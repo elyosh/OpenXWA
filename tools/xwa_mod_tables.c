@@ -473,10 +473,11 @@ static void WriteWeaponTypeTable(FILE* page) {
 			continue;
 		}
 		const int index = type - OBJ_LaserRebel;
-		/* The life in ticks of 4 ms, as the game computes it. */
+		/* The life in ticks of 4 ms, computed the same way as the game. */
 		const unsigned life_ticks = 236u * g_projectileLifetimeSecondsByType[index] +
 									MATH2_fraction(g_projectileLifetimeFracQ16ByType[index], 236u);
-		/* A speed unit is 1/2.25 MGLT. Two decimals give back the speed. */
+		/* A speed unit is 1/2.25 MGLT. Two decimals are enough to get the
+		   exact speed back. */
 		const double mglt = round(g_projectileSpeedByType[index] / 2.25 * 100.0) / 100.0;
 		fprintf(page, "| %d | `%s` | %g | %d | %u | %u |\n", type, name, mglt,
 				g_projectileDamageByType[index], life_ticks * 4,

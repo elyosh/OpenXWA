@@ -13,9 +13,10 @@
 
 /* Modern port module; no original counterpart. */
 
-/* Each value's group (NULL for a key of `warhead_lock` itself), key, unit
-   in the file, and limits in the game's unit: game units for the ranges and
-   ticks for the times. */
+/* The keys of the group. `group` is the map that holds the key, or NULL for
+   a key of `warhead_lock` itself. `unit` is the unit in the file. `min` and
+   `max` are in the game's units: game units for the ranges and ticks for
+   the times. */
 static const struct {
 	const char* group;
 	const char* key;

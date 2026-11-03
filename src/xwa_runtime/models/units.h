@@ -2,13 +2,13 @@
 #define XWA_RUNTIME_MODELS_UNITS_H
 
 /* Mod files use common units: metres, milliseconds, MGLT, degrees and
- * percents. The game keeps its own units: game units of length, 40.96 to the
+ * percents. The game uses its own units: game units of length, 40.96 to the
  * metre; ticks of 4 ms; speed units, 2.25 to the MGLT; angle units, 65536 to
- * the turn; and Q16 values, where 65536 is the whole. A reader turns a value
- * into the game's unit once, when it reads the file, and rounds it to the
- * nearest whole unit. So a value written with three decimals gives back the
- * game value it was written from, and the simulation sees the same numbers
- * as before. */
+ * the turn; and Q16 values, where 65536 is the whole. A reader converts each
+ * value to the game's unit when it reads the file, and rounds it to the
+ * nearest whole unit. A value written with three decimals converts back to
+ * the exact game value, so the simulation sees the same numbers as
+ * before. */
 
 #include <stdint.h>
 

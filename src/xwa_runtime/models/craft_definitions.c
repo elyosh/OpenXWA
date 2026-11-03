@@ -108,8 +108,9 @@ typedef enum CraftFieldKind {
 	CRAFT_FIELD_LASER_KIND,
 } CraftFieldKind;
 
-/* A key of the file. A number field with a unit holds the game's value, and
-   the file holds it in `unit`. */
+/* A key of the file and the field that it sets. When `unit` isn't
+   XWA_UNIT_NONE, the file gives the value in that unit, and the field holds
+   it in the game's unit. */
 typedef struct CraftField {
 	const char* key;
 	size_t offset;
