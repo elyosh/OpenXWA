@@ -210,6 +210,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/camera/camera_motion.c
     src/xwa_runtime/camera/exterior_hud.c
     src/xwa_runtime/config/modern_controller_options_screen.c
+    src/xwa_runtime/config/modern_head_tracking_screen.c
     src/xwa_runtime/config/modern_input_options_screen.c
     src/xwa_runtime/config/modern_options_menu.c
     src/xwa_runtime/config/modern_pilot_profiles_screen.c
@@ -276,6 +277,8 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/craft_sounds.c
     src/xwa_runtime/models/opt_synth.c
     src/xwa_runtime/models/mission_art.c
+    src/xwa_runtime/input/trackir.c
+    src/xwa_runtime/input/opentrack_udp.c
     src/xwa_runtime/runtime/flight_pause_task.c
     src/xwa_runtime/runtime/flight_task.c
     src/xwa_runtime/runtime/frontend_task.c
@@ -307,6 +310,11 @@ target_include_directories(xwa_input_options PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/
 target_link_libraries(xwa_input_options PUBLIC aeron)
 
 add_library(xwa_core ${XWA_RECOVERED_SOURCES} ${XWA_RUNTIME_SOURCES})
+if(WIN32)
+    # NPClient is loaded at runtime from the existing TrackIR installation.
+    # Only the Windows registry API is linked; no TrackIR SDK is bundled.
+    target_link_libraries(xwa_core PRIVATE advapi32 ws2_32)
+endif()
 
 # The recovered sources reproduce MSVC 5.0-era code, which reinterprets one
 # struct pointer type as another (iMUSE passes ImStreamZone*/ImTrack* lists
@@ -729,6 +737,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/config/modern_camera_options.h
     src/xwa_runtime/config/modern_input_options.h
     src/xwa_runtime/config/modern_controller_options_screen.h
+    src/xwa_runtime/config/modern_head_tracking_screen.h
     src/xwa_runtime/config/modern_input_options_screen.h
     src/xwa_runtime/config/modern_options_menu.h
     src/xwa_runtime/config/modern_pilot_profiles_screen.h
@@ -835,6 +844,8 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/input/winmm_joystick_provider.h
     src/xwa_runtime/input/controller_mapping.h
     src/xwa_runtime/input/mouse_flight.h
+    src/xwa_runtime/input/trackir.h
+    src/xwa_runtime/input/opentrack_udp.h
     src/xwa_runtime/timing/modern_flight_timing.h
     src/xwa_runtime/runtime/movie_task.h
     src/xwa_runtime/hooks/orientation_hook.h

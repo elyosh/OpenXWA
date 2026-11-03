@@ -67,6 +67,26 @@ typedef struct XwaControllerOptions {
 	XwaControllerProfile joystick;
 } XwaControllerOptions;
 
+enum {
+	XWA_HEAD_TRACK_SOURCE_TRACKIR = 0,
+	XWA_HEAD_TRACK_SOURCE_OPENTRACK_UDP = 1,
+	XWA_HEAD_TRACK_AXIS_YAW = 0,
+	XWA_HEAD_TRACK_AXIS_PITCH,
+	XWA_HEAD_TRACK_AXIS_ROLL,
+	XWA_HEAD_TRACK_AXIS_X,
+	XWA_HEAD_TRACK_AXIS_Y,
+	XWA_HEAD_TRACK_AXIS_Z,
+	XWA_HEAD_TRACK_AXIS_COUNT
+};
+
+typedef struct XwaHeadTrackingOptions {
+	int enabled;
+	/* Enumeration deliberately kept separate from the runtime TrackIR ABI,
+	 * so future head-tracking providers can share the same menu. */
+	int source;
+	int invert[XWA_HEAD_TRACK_AXIS_COUNT];
+} XwaHeadTrackingOptions;
+
 typedef struct XwaModernInputOptions {
 	int mouse_flight_enabled;
 	XwaModernMouseMode mouse_mode;
@@ -76,6 +96,7 @@ typedef struct XwaModernInputOptions {
 	int mouse_sensitivity;
 	int mouse_invert_y;
 	XwaControllerOptions controller;
+	XwaHeadTrackingOptions head_tracking;
 } XwaModernInputOptions;
 
 typedef void (*XwaModernInputOptionsApplyFn)(const XwaModernInputOptions* options);

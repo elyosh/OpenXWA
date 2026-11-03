@@ -43,6 +43,7 @@
 #include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
+#include "xwa_runtime/input/trackir.h"
 #endif
 #include "xwa/render/effects.h"
 #include "xwa/render/renderer_internal.h"
@@ -3450,6 +3451,17 @@ void Hud_SetupReticle(void) {
 				centerY = g_reticleCenterY;
 				deltaX = (float)(screenX - centerX);
 				deltaY = (float)(screenY - centerY);
+#ifdef XWA_MODERN
+				/* Weapon indicators retain their ship-relative layout during head tracking. */
+				if (XwaTrackIR_CurrentPose(NULL)) {
+					const ModelWeaponHardpoint* point =
+						&g_modelDefs[craft->modelDefIndex].weaponHardpoints[reticleSlot];
+					if (point->x || point->z) {
+						deltaX = (float)point->x;
+						deltaY = -(float)point->z;
+					}
+				}
+#endif
 				g_reticleLaserAimPoints[reticleSlot].x =
 					centerX +
 					(int)(g_reticleAimPointDistanceBias *
@@ -6924,6 +6936,18 @@ void Hud_DrawReticle3D(void) {
 	uint8_t inRange;
 	uint16_t lockRange;
 	unsigned int lockRangeDivisor;
+	int16_t effectiveLookYaw = g_players[g_localPlayer].lookYawOffset;
+	int16_t effectiveLookPitch = g_players[g_localPlayer].lookPitchOffset;
+	int projectReticle = HUD_RETICLE_PROJECTED();
+#ifdef XWA_MODERN
+	XwaTrackIRPose head;
+	const int trackirLook = XwaTrackIR_CurrentPose(&head) && (head.yaw_q16 || head.pitch_q16);
+	if (trackirLook) {
+		effectiveLookYaw = (int16_t)(effectiveLookYaw + head.yaw_q16);
+		effectiveLookPitch = (int16_t)(effectiveLookPitch + head.pitch_q16);
+		projectReticle = 1;
+	}
+#endif
 
 	g_reticleDrawX = g_reticleCenterX;
 	g_reticleDrawY = g_reticleCenterY;
@@ -6966,22 +6990,31 @@ void Hud_DrawReticle3D(void) {
 #endif
 	lockRangeDivisor = lockRange / 200;
 
-	if (Hud_AbsLookDegreesFromOffset(g_players[g_localPlayer].lookYawOffset) >= 45 ||
-		Hud_AbsLookDegreesFromOffset(g_players[g_localPlayer].lookPitchOffset) >= 45) {
+	if (Hud_AbsLookDegreesFromOffset(effectiveLookYaw) >= 45 ||
+		Hud_AbsLookDegreesFromOffset(effectiveLookPitch) >= 45) {
 		return;
 	}
 
-	if (HUD_RETICLE_PROJECTED()) {
+	if (projectReticle) {
 		int worldZ;
-
-		pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_players[g_localPlayer].objectIndex], 0, 0,
+#ifdef XWA_MODERN
+		if (trackirLook && g_players[g_localPlayer].currentSeatIdx > 0) {
+			/* The gun's existing Q15 firing vector is independent of head look. */
+			g_camRelWorldX = Xwa_Q15Mul(1000000, g_players[g_localPlayer].turretCamMat[0]);
+			g_camRelWorldY = Xwa_Q15Mul(1000000, g_players[g_localPlayer].turretCamMat[1]);
+			g_camRelWorldZ = Xwa_Q15Mul(1000000, g_players[g_localPlayer].turretCamMat[2]);
+		} else
+#endif
+		{
+			pai_RotateLocalVectorToWorldScratch(&g_objectTable[g_players[g_localPlayer].objectIndex], 0, 0,
 											1000000);
-		g_camRelWorldX = g_objectTable[g_players[g_localPlayer].objectIndex].world_x + g_rotatedX;
-		g_camRelWorldY = g_objectTable[g_players[g_localPlayer].objectIndex].world_y + g_rotatedY;
-		worldZ = g_objectTable[g_players[g_localPlayer].objectIndex].world_z + g_rotatedZ;
-		g_camRelWorldX -= g_players[g_localPlayer].viewState.savedTargetX;
-		g_camRelWorldY -= g_players[g_localPlayer].viewState.savedTargetY;
-		g_camRelWorldZ = worldZ - g_players[g_localPlayer].viewState.savedTargetZ;
+			g_camRelWorldX = g_objectTable[g_players[g_localPlayer].objectIndex].world_x + g_rotatedX;
+			g_camRelWorldY = g_objectTable[g_players[g_localPlayer].objectIndex].world_y + g_rotatedY;
+			worldZ = g_objectTable[g_players[g_localPlayer].objectIndex].world_z + g_rotatedZ;
+			g_camRelWorldX -= g_players[g_localPlayer].viewState.savedTargetX;
+			g_camRelWorldY -= g_players[g_localPlayer].viewState.savedTargetY;
+			g_camRelWorldZ = worldZ - g_players[g_localPlayer].viewState.savedTargetZ;
+		}
 		viewX = TRANSFM2_CamMatDotRow0(g_camRelWorldX, g_camRelWorldY, g_camRelWorldZ);
 		viewY = TRANSFM2_CamMatDotRow1(g_camRelWorldX, g_camRelWorldY, g_camRelWorldZ);
 		viewZ = TRANSFM2_CamMatDotRow2(g_camRelWorldX, g_camRelWorldY, g_camRelWorldZ);
@@ -7032,7 +7065,7 @@ void Hud_DrawReticle3D(void) {
 					}
 				}
 
-				if (HUD_RETICLE_PROJECTED()) {
+	if (projectReticle) {
 					int aimX;
 					int drawX;
 
@@ -7114,7 +7147,7 @@ void Hud_DrawReticle3D(void) {
 
 	quad.screenX = g_reticleCenterX;
 	quad.screenY = g_screenHeight - g_reticleCenterY;
-	if (HUD_RETICLE_PROJECTED()) {
+	if (projectReticle) {
 		quad.screenX = g_reticleDrawX;
 		quad.screenY = g_screenHeight - g_reticleDrawY;
 	}

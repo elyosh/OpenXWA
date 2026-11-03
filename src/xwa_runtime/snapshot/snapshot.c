@@ -24,6 +24,7 @@
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/models/surfaces.h"
 #include "xwa_runtime/snapshot/snapshot_camera.h"
+#include "xwa_runtime/input/trackir.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/host_clock.h"
@@ -1838,7 +1839,17 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->world_pos[0] = vs->savedTargetX;
 	c->world_pos[1] = vs->savedTargetY;
 	c->world_pos[2] = vs->savedTargetZ;
-	XwaSnapshotCamera_PositionFraction(c->world_pos, c->world_pos_fraction);
+	float trackir_world_offset[3] = {0};
+	int32_t untracked_pos[3];
+	XwaTrackIR_GetCameraOffset(trackir_world_offset);
+	for (int axis = 0; axis < 3; ++axis) {
+		/* Lookup the existing camera fraction using its pre-TrackIR position. */
+		untracked_pos[axis] = c->world_pos[axis] - (int32_t)lroundf(trackir_world_offset[axis]);
+	}
+	XwaSnapshotCamera_PositionFraction(untracked_pos, c->world_pos_fraction);
+	for (int axis = 0; axis < 3; ++axis) {
+		c->world_pos_fraction[axis] += trackir_world_offset[axis] - roundf(trackir_world_offset[axis]);
+	}
 	FVIEW_CopyRenderCameraRows(c->rows);
 	c->view_pitch = vs->viewPitch;
 	c->view_yaw = vs->viewYaw;
@@ -1970,6 +1981,7 @@ void XwaSnapshot_CaptureFlight(void) {
 			k->stick_axis[0] = g_replayInputs[g_localPlayer].axisX;
 			k->stick_axis[1] = g_replayInputs[g_localPlayer].axisY;
 			k->stick_axis[2] = g_replayInputs[g_localPlayer].axisR;
+			XwaTrackIR_GetCameraOffset(k->trackir_head_offset);
 			const char* name = XwaSnapshotExport_OptHandleName(handle);
 			if (name != NULL) {
 				snprintf(k->model_name, sizeof k->model_name, "%s", name);

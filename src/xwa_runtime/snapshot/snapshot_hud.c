@@ -1,3 +1,4 @@
+#include "xwa_runtime/input/trackir.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 
 #include "xwa/assets/flight_model.h"
@@ -475,7 +476,19 @@ static void hud_capture_direct_state(XwaHudState* out) {
 	out->reticle.missile_lock_state = player->missileLockState;
 	out->reticle.look_yaw = player->lookYawOffset;
 	out->reticle.look_pitch = player->lookPitchOffset;
+	XwaTrackIRPose head;
+	const int trackirLook = XwaTrackIR_CurrentPose(&head) && (head.yaw_q16 || head.pitch_q16);
+	if (trackirLook) {
+		out->reticle.look_yaw = (int16_t)(out->reticle.look_yaw + head.yaw_q16);
+		out->reticle.look_pitch = (int16_t)(out->reticle.look_pitch + head.pitch_q16);
+	}
 	out->reticle.seat = (uint8_t)player->currentSeatIdx;
+	out->reticle.turret_aim_valid = (uint8_t)(trackirLook && player->currentSeatIdx > 0);
+	if (out->reticle.turret_aim_valid) {
+		for (int axis = 0; axis < 3; ++axis) {
+			out->reticle.turret_aim_world[axis] = (float)player->turretCamMat[axis] * (1.0f / 32768.0f);
+		}
+	}
 	out->reticle.stick_marker = 0;
 	if (!g_padlockMouseLookEnabled) {
 		int stick_marker_x;

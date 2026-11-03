@@ -112,6 +112,8 @@ int XwaModernInputOptions_Validate(const XwaModernInputOptions* options) {
 		options->mouse_mode > XWA_MODERN_MOUSE_MODE_RATE ||
 		options->controller.rumble_strength < XWA_CONTROLLER_RUMBLE_STRENGTH_MIN ||
 		options->controller.rumble_strength > XWA_CONTROLLER_RUMBLE_STRENGTH_MAX ||
+		(options->head_tracking.source != XWA_HEAD_TRACK_SOURCE_TRACKIR &&
+		 options->head_tracking.source != XWA_HEAD_TRACK_SOURCE_OPENTRACK_UDP) ||
 		options->controller.device.ordinal < 0 ||
 		options->controller.device.ordinal > XWA_CONTROLLER_DEVICE_ORDINAL_MAX ||
 		!memchr(options->controller.device.guid, '\0', sizeof(options->controller.device.guid)) ||
@@ -145,6 +147,16 @@ static void XwaModernInputOptions_Normalize(XwaModernInputOptions* options) {
 	options->mouse_invert_y = options->mouse_invert_y != 0;
 	options->controller.roll_enabled = options->controller.roll_enabled != 0;
 	options->controller.rumble_enabled = options->controller.rumble_enabled != 0;
+	options->head_tracking.enabled = options->head_tracking.enabled != 0;
+#ifndef _WIN32
+	/* The shipped defaults name native TrackIR for Windows. On other hosts,
+	 * normalize the effective selection to the only available UDP provider,
+	 * even when the user enables tracking without opening the settings menu. */
+	options->head_tracking.source = XWA_HEAD_TRACK_SOURCE_OPENTRACK_UDP;
+#endif
+	for (i = 0; i < XWA_HEAD_TRACK_AXIS_COUNT; ++i) {
+		options->head_tracking.invert[i] = options->head_tracking.invert[i] != 0;
+	}
 	options->controller.gamepad.pov_source = options->controller.gamepad.pov_source != 0;
 	for (i = 0; i < XWA_CONTROLLER_LOGICAL_AXIS_COUNT; ++i) {
 		options->controller.gamepad.axes[i].invert = options->controller.gamepad.axes[i].invert != 0;
@@ -204,6 +216,10 @@ static int XwaModernInputOptions_AreEqual(const XwaModernInputOptions* lhs,
 										  const XwaModernInputOptions* rhs) {
 	return lhs->mouse_flight_enabled == rhs->mouse_flight_enabled && lhs->mouse_mode == rhs->mouse_mode &&
 		   lhs->mouse_sensitivity == rhs->mouse_sensitivity && lhs->mouse_invert_y == rhs->mouse_invert_y &&
+		   lhs->head_tracking.enabled == rhs->head_tracking.enabled &&
+		   lhs->head_tracking.source == rhs->head_tracking.source &&
+		   memcmp(lhs->head_tracking.invert, rhs->head_tracking.invert,
+				  sizeof(lhs->head_tracking.invert)) == 0 &&
 		   XwaControllerOptions_AreEqual(&lhs->controller, &rhs->controller);
 }
 

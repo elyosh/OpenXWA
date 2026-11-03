@@ -1,3 +1,4 @@
+#include "xwa_runtime/input/trackir.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa/flight/hangar.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
@@ -1951,6 +1952,7 @@ void XwaFlightTask_Tick(void) {
 }
 
 int XwaFlightTask_Shutdown(void) {
+	XwaTrackIR_Shutdown();
 	XwaFlightPauseTask_Shutdown();
 	XwaModernFlightTiming_EndSession();
 	if (!g_xwaFlightTaskActive && !g_xwaFlightTaskComplete) {
