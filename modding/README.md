@@ -96,3 +96,20 @@ OpenXWA --mod "/path/to/my-first-mod"
 
 The pages without a link aren't written yet.
 
+## Reference
+
+- [Object types](reference/object_types.md): the name and number of each
+  object type, with its model, genus, family and flags.
+- [Craft types](reference/craft_types.md): the number of each craft type,
+  with its ship list name, object type and category.
+- [Weapons](reference/weapons.md): weapon types, warheads, laser groups,
+  weapon sound groups, ranks and difficulties.
+- [Model values](reference/model_values.md): hardpoint types, mesh types,
+  explosion flags, cockpit screens, HUD areas and reticle parts.
+- [States and tags](reference/states_and_tags.md): flipbook states, and the
+  tags of parts, cockpit controls, materials and lights.
+- [Sound banks](reference/sound_banks.md): the banks of `sounds.yaml` and
+  when each one plays.
+- [Image groups](reference/image_groups.md): what each image group holds.
+- [Frontend screens](reference/frontend_screens.md): the screens that can
+  have a layout.

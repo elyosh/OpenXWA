@@ -172,8 +172,9 @@ the keys that switch to classic graphics do nothing.
   `frontend/frontend.yaml`. The default is 640 × 480, the size of the
   original screens. An atlas file can use the game's own units instead.
 - **Names** are used for game values, such as object types, weapons and
-  hardpoint types: `rebel_laser`, not a number. The reference pages list
-  the accepted names, with the numbers that the community tools show.
+  hardpoint types: `rebel_laser`, not a number. The
+  [reference pages](README.md#reference) list the accepted names, with the
+  numbers that the community tools show.
 - **Colours** are written in one of two ways. A list `[r, g, b]`, where 1 is
   full brightness, is linear unless the key's description says it is sRGB.
   A hex number such as `0xFF0000` is used where the game itself stores the
