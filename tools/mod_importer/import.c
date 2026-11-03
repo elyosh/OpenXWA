@@ -21,6 +21,7 @@
 #include "xwa_app/mod_format.h"
 #include "xwau_awards.h"
 #include "xwau_craft.h"
+#include "xwau_cube_faces.h"
 #include "xwau_flight_settings.h"
 #include "xwau_game_files.h"
 #include "xwau_gunner_seats.h"
@@ -668,28 +669,39 @@ static void bake_skyboxes(ImportContext* ctx) {
 			PathFormat(diffuse, sizeof diffuse, "%s/diffuse.ktx2", textures) &&
 			PathFormat(specular, sizeof specular, "%s/specular.ktx2", textures) &&
 			PathFormat(overlay, sizeof overlay, "%s/overlay.ktx2", textures) && MakeDirs(textures)) {
+			const bool is_overlay = strcmp(fields[0], "overlay") == 0;
+			const char* folder = strrchr(fields[3], '/') ? strrchr(fields[3], '/') + 1 : fields[3];
+			/* The bake reads the XWAU faces in its own face layout. */
+			XwauCubeFaces faces;
+			char err[512];
+			const bool read = XwauCubeFaces_Read(fields[1], &faces, err, sizeof err);
+			if (!read)
+				ToolLog_Write(TOOL_LOG_ERROR, "%s", err);
+			const CubeFacePixels pixels = { fields[1],
+											faces.size,
+											{ faces.rgba[0], faces.rgba[1], faces.rgba[2], faces.rgba[3],
+											  faces.rgba[4], faces.rgba[5] } };
 			EnvBakeOptions bake;
 			EnvBake_DefaultOptions(&bake);
-			const bool is_overlay = strcmp(fields[0], "overlay") == 0;
+			bake.face_pixels = &pixels;
 			if (is_overlay) {
-				bake.overlay_faces_dir = fields[1];
 				bake.overlay_out = overlay;
 			} else {
-				bake.faces_dir = fields[1];
 				bake.name = fields[2];
 				bake.radiance_out = radiance;
 				bake.diffuse_out = diffuse;
 				bake.specular_out = specular;
 				bake.jobs = jobs;
 			}
-			const char* folder = strrchr(fields[3], '/') ? strrchr(fields[3], '/') + 1 : fields[3];
-			if ((is_overlay ? EnvBake_Overlay(&bake) : EnvBake_Sky(&bake)) == ENV_BAKE_OK)
+			if (read && (is_overlay ? EnvBake_Overlay(&bake) : EnvBake_Sky(&bake)) == ENV_BAKE_OK)
 				baked++;
 			else
 				Import_Failed(ctx,
 							  is_overlay ? "The overlay %s couldn't be converted."
 										 : "The skybox %s couldn't be converted.",
 							  folder);
+			if (read)
+				XwauCubeFaces_Free(&faces);
 		} else if (line[0])
 			Import_Failed(ctx, "The skybox list has a line that can't be read: \"%s\"", line);
 		Import_Advance(ctx, 1, -1);
