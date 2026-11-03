@@ -6,7 +6,7 @@
  *
  *   flight_groups:
  *     1: { name: "Red", craft: xwing, markings: 4 }
- *     5: { name: "Gold", craft: ywing, iff: 2, pilot_voice: "Rebel_Pilot3" }
+ *     5: { name: "Gold", craft: ywing, iff: 2, pilot_voice: "RP3" }
  *     26: { name: "Red", craft: xwing, craft_markings: { 0: 0, 1: 1 } }
  *     0: { name: "Alpha", craft: tie_fighter, warheads: { missile: 80 } }
  *
