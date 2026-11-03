@@ -90,7 +90,8 @@ starts. To use a mod folder for one launch only, pass it on the command line:
 OpenXWA --mod /path/to/mod
 ```
 
-Without a mod, the game uses the original assets.
+Without a mod, the game uses the original assets. To make a mod, see
+[Making mods for OpenXWA](modding/README.md).
 
 To compare the speed of two builds, play a film from the command line. The
 game starts the film directly, then quits when it ends and logs the frame
