@@ -206,7 +206,7 @@ flight_groups:
 | `warheads` | The warheads that the flight group has for the whole mission. See below. |
 | `weapon_profile` | The `stats` weapon profile of the flight group. |
 | `warhead_profile` | The `warhead_capacity_percent` profile of the flight group. |
-| `energy_profile` | The `energy_speed_q16` profile of the flight group. |
+| `energy_profile` | The `energy_speed_percent` profile of the flight group. |
 | `linking_profile` | The `linking` profile of the flight group. |
 
 A key that is missing keeps the value of the `.TIE` file. A value out of

@@ -20,21 +20,28 @@ Without these files, every craft is the craft of the original game.
 
 ## Units
 
-Lengths and ranges are in metres. Most other values use the game's own
-units, so that they match the values that the community tools show.
+Lengths, times, speeds, angles and parts of a whole use common units.
+Hull, shields, damage and laser charge use the game's own points. A few
+other values, such as `max_push_rate`, are the game's own numbers.
 
 | Unit | Meaning |
 |-|-|
-| metres | Lengths and ranges. The game measures them in game units, 40.96 to the metre, and rounds a value in metres to the nearest game unit. |
-| ticks | Times. A tick is 4 ms. The game counts its own seconds, such as the mission clock, as 236 ticks, which is 0.944 real seconds. |
-| speed units | Speeds of craft and shots. One MGLT is 2.25 speed units, and a craft at 1 MGLT moves about 1 metre in one game second. A top speed of 225 is 100 MGLT. |
-| angle units | Turn rates. 65536 is a full turn, so 16384 is 90 degrees. |
+| metres | Lengths and ranges. |
+| milliseconds | Times. The game counts time in ticks of 4 ms, so it rounds a time to a multiple of 4 ms. |
+| MGLT | Speeds of craft and shots. A craft at 1 MGLT moves about 1 metre in one game second. |
+| degrees | Angles and turn rates. |
+| percent | Parts of a whole, such as how much a craft banks in a turn. |
 | points | Hull, shields and the damage of shots all use the same points. |
 
-"Per second" below means per game second of 236 ticks.
+The game keeps its own units inside, and converts each value when it reads
+the file. Three decimals are always enough to give an exact value of the
+original game.
 
-Keys that use metres, degrees, MGLT or percent say so in their name, such
-as `position_m` or `min_speed_mglt`.
+"Per second" below means per game second. The game counts its own seconds,
+such as the mission clock, as 236 ticks, which is 0.944 real seconds.
+
+Keys with a unit say so in their name, such as `position_m`,
+`cooldown_ms`, `speed_mglt` or `yaw_rate_degrees`.
 
 ## Object type files
 
@@ -49,7 +56,7 @@ name:
 object_type: awing
 name: a_wing_interceptor
 craft_record:
-  acceleration: 47
+  acceleration_mglt: 21
   hull: 1470
 names: {long: 'A-Wing', plural: 'A-Wings', gender: m}
 beam_allowed: true
@@ -154,11 +161,11 @@ optional. A key that the map leaves out keeps the game's value.
 
 ```yaml
 craft_record:
-  speed: 198
-  acceleration: 25
-  deceleration: 29
-  roll_rate: 8448
-  pitch_rate: 3328
+  speed_mglt: 88
+  acceleration_mglt: 11
+  deceleration_mglt: 13
+  roll_rate_degrees: 46.4
+  pitch_rate_degrees: 18.3
   hull: 6930
   shields: 5000
   lasers:
@@ -182,14 +189,14 @@ original X-wing, to compare with.
 
 | Key | Values | X-wing | Meaning |
 |-|-|-|-|
-| `speed` | 0 to 65535 | 225 | The top speed, in speed units. 225 is 100 MGLT. |
-| `acceleration` | 0 to 65535 | 36 | How fast the craft speeds up, in speed units per second. The craft gets a quarter of it at zero throttle and all of it at full throttle. |
-| `deceleration` | 0 to 65535 | 60 | How fast the craft slows down, in speed units per second. The craft gets all of it at zero throttle and a quarter of it at full throttle. |
-| `yaw_rate` | -32768 to 32767 | 10240 | How fast an AI craft turns left and right, in angle units per second. |
-| `pitch_rate` | -32768 to 32767 | 5120 | How fast the craft turns up and down, in angle units per second. |
-| `roll_rate` | -32768 to 32767 | 9216 | How fast the craft rolls, in angle units per second. When a player flies the craft, it also sets how fast it turns left and right. |
-| `auto_bank` | 0 to 65535 | 49152 | How much the craft rolls when it turns left or right. 65536 would be as much as it turns. |
-| `max_tumble_angle` | 0 to 65535 | 24575 | Limits how fast the craft spins when it breaks apart. |
+| `speed_mglt` | 0 to 29126.667 | 100 | The top speed, in MGLT. |
+| `acceleration_mglt` | 0 to 29126.667 | 16 | How fast the craft speeds up, in MGLT per second. The craft gets a quarter of it at zero throttle and all of it at full throttle. |
+| `deceleration_mglt` | 0 to 29126.667 | 26.667 | How fast the craft slows down, in MGLT per second. The craft gets all of it at zero throttle and a quarter of it at full throttle. |
+| `yaw_rate_degrees` | -180 to 179.995 | 56.25 | How fast an AI craft turns left and right, in degrees per second. |
+| `pitch_rate_degrees` | -180 to 179.995 | 28.125 | How fast the craft turns up and down, in degrees per second. |
+| `roll_rate_degrees` | -180 to 179.995 | 50.625 | How fast the craft rolls, in degrees per second. When a player flies the craft, it also sets how fast it turns left and right. |
+| `auto_bank_percent` | 0 to 99.998 | 75 | How much the craft rolls when it turns left or right. 100 would be as much as it turns. |
+| `max_tumble_angle_degrees` | 0 to 359.995 | 134.995 | Limits how fast the craft spins when it breaks apart. |
 | `max_push_rate` | 0 to 65535 | 600 | How fast an AI craft can slide sideways, for example when it dodges. |
 | `hull` | whole number | 2100 | The hull points. The craft is destroyed when the damage reaches them. |
 | `shields` | whole number | 2500 | The shield points of each side, front and back. A side can charge up to twice this value. |
@@ -216,7 +223,7 @@ A value out of range, or of the wrong kind, is ignored, and the log says so.
 | `count` | The number of cannons in the group, from 0 to 255. |
 | `kind` | The [laser group kind](reference/weapons.md#laser-group-kinds): `laser_cannon`, `ion_cannon`, `turret` or `long_range_turret`. |
 | `range_m` | The range of the group's turrets, in metres. 0 uses the default: 2000 m, or twice that for `long_range_turret`. |
-| `cooldown` | The time between two shots of the group's turrets, in ticks. 0 uses the default: 118 for `turret`, and 236 for the other kinds. AI craft wait two to four times longer, by skill. |
+| `cooldown_ms` | The time between two shots of the group's turrets, in milliseconds. 0 uses the default: 472 for `turret`, and 944 for the other kinds. AI craft wait two to four times longer, by skill. |
 
 `lasers` replaces every group. A group that the list leaves out is emptied,
 and a key that a group leaves out is 0. So list every group the craft has,
@@ -530,14 +537,14 @@ weapons:
     energy_bars: {laser_high: 0xffff0000, laser_low: 0xff9b1e00}
   by_markings:
     1: {variant: {default: 2}, impact: {rebel_laser: 0x3333ff}}
-  rates: {decharge: 4, recharge: 2, cooldown: 47}
+  rates: {decharge: 4, recharge: 2, cooldown_ms: 188}
   energy_transfer: {rate: 4, penalty: 0, laser_limit: 100, shield_limit: 800}
   ai_torpedoes: {per_pass: 6, per_target: 16}
   impact_spin: {enabled: true, speed_percent: 100, angle_percent: 100}
   system_damage: {max: 1000, ion_cannon: 1, ion_cannon_turbo: 2}
   stats:
     default:
-      rebel_laser: {power: 350, fire_rate: 47}
+      rebel_laser: {power: 350, fire_rate_ms: 188}
   hardpoint_kinds: {custom_1: laser}
 ```
 
@@ -575,14 +582,15 @@ the time between shots.
 | Key | Meaning |
 |-|-|
 | `decharge` | The charge that a player's shot uses. The original game uses 3 for the TIE Fighter, the TIE Bomber and every craft that isn't a fighter, and 4 for the other fighters. |
-| `recharge` | The charge that comes back at each power update. The original game uses 3 for the TIE Fighter and the TIE Bomber, and 2 for the others. |
-| `cooldown` | The time between two laser shots, in ticks. 47 in the original game. |
+| `recharge` | The charge that comes back each game second. The original game uses 3 for the TIE Fighter and the TIE Bomber, and 2 for the others. |
+| `cooldown_ms` | The time between two laser shots, in milliseconds. 188 in the original game. |
 | `decharge_percent` | Scales `decharge`. 100 by default. |
 | `recharge_percent` | Scales `recharge`. 100 by default. |
 
-All values are whole numbers of 0 or more. The decharge rate only applies
-to the player's shots of laser and ion cannons. AI shots use 1 charge, as in the
-original game. The cooldown applies to every craft. The rates are only used
+All values are 0 or more, and `decharge` and `recharge` are whole numbers.
+The decharge rate only applies to the player's shots of laser and ion
+cannons. AI shots use 1 charge, as in the original game. The cooldown
+applies to every craft. The rates are only used
 when the model has `rates`, or when `flight/flight.yaml` has `rates` or a
 global percent. Otherwise the original rules apply.
 
@@ -624,7 +632,7 @@ flight group. Four groups hold profiles, and each group has its own:
 |-|-|-|
 | `stats` | the stats of each weapon type | `weapon_profile` |
 | `warhead_capacity_percent` | how many warheads the craft loads | `warhead_profile` |
-| `energy_speed_q16` | how much speed an energy step to the engines gives | `energy_profile` |
+| `energy_speed_percent` | how much speed an energy step to the engines gives | `energy_profile` |
 | `linking` | the laser link mode and the linking rules | `linking_profile` |
 
 Each key of the group is a profile name, of up to 47 characters. The game
@@ -643,10 +651,10 @@ the flight group uses `default`.
 weapons:
   stats:
     default:
-      rebel_laser: {range_m: 1600, fire_ratio: 236, precise: false, spread_mask: 63}
+      rebel_laser: {range_m: 1600, fire_ratio_ms: 944, precise: false, spread_mask: 63}
       imperial_laser:
-        fire_rate: 47
-        player_easy: {fire_rate: 39, power: 350}
+        fire_rate_ms: 188
+        player_easy: {fire_rate_ms: 156, power: 350}
     devastator:
       turbolaser_green_light: {power: 900, range_m: 5000}
 ```
@@ -655,8 +663,9 @@ weapons:
 [Weapons](reference/weapons.md#weapon-types) gives the values of the
 original game.
 
-Stats are whole numbers, except `precise`. A weapon type can also have stats
-for the player, for one difficulty, or for both, in the maps `player`,
+Stats with a unit in their name can have decimals. The other stats are
+whole numbers, except `precise`. A weapon type can also have stats for the
+player, for one difficulty, or for both, in the maps `player`,
 `easy`, `medium`, `hard`, `player_easy`, `player_medium` and `player_hard`.
 For each stat, the game tries these maps first, then the plain value. Each
 time, it tries the model's value first, then the value in
@@ -671,7 +680,7 @@ The other profile groups:
 | Group | Keys | Meaning |
 |-|-|-|
 | `warhead_capacity_percent` | [warhead](reference/weapons.md#warheads) names | The percent of each launcher's capacity that the craft loads with that warhead. The original percents go from 25 to 100. A craft always gets at least 1 warhead. |
-| `energy_speed_q16` | `all`, `player` | How much speed the craft gains or loses for each step of energy that it moves to or from its engines, where 65536 is its top speed. `player` is for the player's craft and `all` for every craft. The original game uses 4096 for the TIE Bomber, 12288 for the TIE Fighter with spare engine power, and 8192 for the others. |
+| `energy_speed_percent` | `all`, `player` | How much speed the craft gains or loses for each step of energy that it moves to or from its engines, in percent of its top speed, from 0 to 100. `player` is for the player's craft and `all` for every craft. The original game uses 6.25 for the TIE Bomber, 18.75 for the TIE Fighter with spare engine power, and 12.5 for the others. |
 | `linking` | `laser_link` | The laser link mode that the craft always uses: 1 fires one cannon at a time, 2 fires half of the cannons together, and 3 fires all of them together. Other values make the craft fire wrongly. |
 | | `prevent_ai_lasers_ion_when_disabling` | `true`: the AI doesn't fire lasers while it disables its target. |
 | | `prevent_ai_ion_when_not_disabling` | `true`: the AI doesn't fire ion cannons when it doesn't disable its target. |
@@ -681,8 +690,8 @@ The other profile groups:
 weapons:
   warhead_capacity_percent:
     default: {space_bomb: 50, heavy_rocket: 50}
-  energy_speed_q16:
-    default: {all: 8192, player: 7864}
+  energy_speed_percent:
+    default: {all: 12.5, player: 12}
   linking:
     default: {laser_link: 2, prevent_player_linked_lasers_ion: true}
 ```
@@ -714,10 +723,10 @@ picks a variant for the difficulty and for players.
 
 ```yaml
 stats_profiles:
-  default: {speed: 86, acceleration: 9, deceleration: 20, hull: 3045, shields: 3000}
-  default_easy: {speed: 86, hull: 4000, shields: 4000}
-  default_player: {speed: 90, hull: 3500, shields: 3500}
-  escort: {speed: 70, hull: 6000, shields: 5000}
+  default: {speed_mglt: 38, acceleration_mglt: 4, deceleration_mglt: 9, hull: 3045, shields: 3000}
+  default_easy: {speed_mglt: 38, hull: 4000, shields: 4000}
+  default_player: {speed_mglt: 40, hull: 3500, shields: 3500}
+  escort: {speed_mglt: 31, hull: 6000, shields: 5000}
 ```
 
 Each key is a profile name, of up to 63 characters. The game ignores case.
@@ -725,13 +734,13 @@ These keys can be in a profile:
 
 | Key | Meaning |
 |-|-|
-| `speed`, `acceleration`, `deceleration` | As in `craft_record`. |
-| `pitch_rate`, `roll_rate`, `yaw_rate` | As in `craft_record`. |
+| `speed_mglt`, `acceleration_mglt`, `deceleration_mglt` | As in `craft_record`. |
+| `pitch_rate_degrees`, `roll_rate_degrees`, `yaw_rate_degrees` | As in `craft_record`. |
 | `hull`, `shields` | As in `craft_record`. |
 | `system_strength`, `system_damage_hull_threshold` | As in `craft_record`. |
 | `has_shields`, `has_hyperdrive` | `true` or `false`, as in `craft_record`. |
-| `speed_increment` | The speed that the craft gains at each small step while it speeds up. 1 by default. |
-| `speed_decrement` | The speed that the craft loses at each small step while it slows down. 1 by default. |
+| `speed_increment_mglt` | The speed that the craft gains at each small step while it speeds up, in MGLT. 0.444 by default. |
+| `speed_decrement_mglt` | The speed that the craft loses at each small step while it slows down, in MGLT. 0.444 by default. |
 | `warhead_collision_damage` | `false`: the warheads that the craft carries don't add to the damage when it hits another craft. `true` by default. |
 
 The values use the units of the craft record. A key that the profile leaves
@@ -763,7 +772,7 @@ shield: {per_generator_rate: 5, player_rate: 40, delay_seconds: 30}
 
 | Key | Meaning |
 |-|-|
-| `rate` | The recharge rate of the craft. |
+| `rate` | The recharge rate of the craft: the shield points that come back each game second, for each step of shield power above the middle setting. |
 | `per_generator_rate` | The recharge rate for each shield generator part that is still intact. With this key, `rate` is ignored. |
 | `player_rate` | The rate when a player flies the craft. Without it, a player's craft uses the model's rate, or 20. |
 | `delay_seconds` | After the craft's shields fall to 0, its flight group doesn't recharge for this many seconds of mission time. |
@@ -906,10 +915,10 @@ the beam system part follows the yaw.
 ```yaml
 warhead_lock:
   lock_range_m: {small: 2500, big: 5965.14, transport: 2485.47}
-  lock_ticks: 354
-  ticks_per_homing_level: 118
+  lock_time_ms: 1416
+  homing_level_time_ms: 472
   ai_lock_range_m: {small: 2500, big: 5965.14, big_top_tier: 2485.47}
-  ai_lock_ticks_per_tier: 472
+  ai_lock_time_per_tier_ms: 1888
 ```
 
 | Key | Default | Meaning |
@@ -917,12 +926,12 @@ warhead_lock:
 | `lock_range_m.small` | 2485.47 | How close the player's target must be for a lock, in metres, for targets that aren't big or transports. |
 | `lock_range_m.big` | 5965.14 | The same for starships, platforms, containers and freighters. |
 | `lock_range_m.transport` | 3976.76 | The same for transports. |
-| `lock_ticks` | 708, or 354 for the Missile Boat | How long the player's lock takes, in ticks, from 200 to 32767. It only changes the HUD and the lock tone. |
-| `ticks_per_homing_level` | 236 | A warhead's homing level is the craft's lock ticks divided by this value, up to 6. From 1 to 32767. It applies to players and to the AI. |
+| `lock_time_ms` | 2832, or 1416 for the Missile Boat | How long the player's lock takes, in milliseconds, from 800 to 131068. It only changes the HUD and the lock tone. |
+| `homing_level_time_ms` | 944 | A warhead's homing level is the craft's lock time divided by this value, up to 6. From 4 to 131068 milliseconds. It applies to players and to the AI. |
 | `ai_lock_range_m.small` | 2485.47 | How close the AI's target must be for the AI to fire a warhead, in metres, for targets that aren't big. |
 | `ai_lock_range_m.big` | 4970.95 | The same for starships, platforms, freighters, containers, weapon emplacements and, in newer missions, transports. |
 | `ai_lock_range_m.big_top_tier` | 5965.14 | Replaces `big` for the AI of the top skill tier. |
-| `ai_lock_ticks_per_tier` | 472 | The AI needs this many lock ticks for each skill tier, plus one, before it fires. From 0 to 65535. |
+| `ai_lock_time_per_tier_ms` | 1888 | The AI needs this lock time for each skill tier, plus one, before it fires. From 0 to 262140 milliseconds. |
 
 The ranges are 0 or more.
 
@@ -1028,12 +1037,12 @@ model: vwing
 genus: fighter
 family: craft
 craft_record:
-  speed: 270
-  acceleration: 45
-  deceleration: 60
-  yaw_rate: 12288
-  pitch_rate: 6656
-  roll_rate: 11776
+  speed_mglt: 120
+  acceleration_mglt: 20
+  deceleration_mglt: 26.7
+  yaw_rate_degrees: 67.5
+  pitch_rate_degrees: 36.6
+  roll_rate_degrees: 64.7
   hull: 1500
   shields: 2000
   has_shields: true

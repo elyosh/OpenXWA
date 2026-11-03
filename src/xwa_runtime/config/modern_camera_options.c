@@ -15,7 +15,7 @@ static const XwaModernCameraOptionKey g_cameraOptionKeys[] = {
 	CAMERA_NUMBER(exterior_tilt, -30.0f, 30.0f),
 	CAMERA_SWITCH(cockpit_sway),
 	CAMERA_NUMBER(cockpit_sway_strength_m, 0.0f, 0.5f),
-	CAMERA_NUMBER(cockpit_speed_sway_m, 0.0f, 0.025f),
+	CAMERA_NUMBER(cockpit_speed_sway_m, 0.0f, 0.05f),
 	CAMERA_NUMBER(cockpit_sway_max_m, 0.0f, 0.25f),
 	CAMERA_NUMBER(lag_time, 0.05f, 2.0f),
 	CAMERA_SWITCH(exterior_hud),

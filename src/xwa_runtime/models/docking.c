@@ -4,8 +4,8 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
-#include "xwa_runtime/models/metres.h"
 #include "xwa_runtime/models/model_settings.h"
+#include "xwa_runtime/models/units.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -98,7 +98,7 @@ void XwaDocking_ReadModelSettings(unsigned int objectType, const char* path, con
 			Aeron_LogWarn("xwa.models", "%s: docking.%s isn't a setting. It is ignored", path, key);
 			continue;
 		}
-		if (!XwaMetres_Read(node, INT32_MIN, INT32_MAX, &units)) {
+		if (!XwaUnits_Read(node, XWA_UNIT_METRES, INT32_MIN, INT32_MAX, &units)) {
 			Aeron_LogWarn("xwa.models",
 						  "%s: docking.approach_height_m must be a number of metres. It is ignored", path);
 			continue;

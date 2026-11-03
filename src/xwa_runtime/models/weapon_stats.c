@@ -10,9 +10,9 @@
 #include "xwa/flight/object/object.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/render/renderer.h"
-#include "xwa_runtime/models/metres.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/names.h"
+#include "xwa_runtime/models/units.h"
 
 #include <ctype.h>
 #include <stdint.h>
@@ -47,7 +47,7 @@ enum {
 };
 
 static const char* const s_groups[WEAPON_STATS_GROUPS] = { "stats", "warhead_capacity_percent",
-														   "energy_speed_q16", "linking" };
+														   "energy_speed_percent", "linking" };
 /* The keys that a flight group's entry uses to pick a profile in each group. */
 static const char* const s_profileKeys[WEAPON_STATS_GROUPS] = { "weapon_profile", "warhead_profile",
 																"energy_profile", "linking_profile" };
@@ -56,18 +56,28 @@ static const char* const s_stats[XWA_WEAPON_STATS] = {
 	"duration_seconds",
 	"duration_fraction",
 	"score",
-	"speed",
+	"speed_mglt",
 	"power",
 	"power_speed_percent",
-	"fire_rate",
-	"duration_offset",
-	"fire_ratio",
+	"fire_rate_ms",
+	"duration_offset_ms",
+	"fire_ratio_ms",
 	"range_m",
 	"precise",
 	"spread_mask",
 	"decharge_rate",
 	"recharge_rate",
 	"high_power_charge",
+};
+
+/* The unit of each stat in the file. The reader converts these stats to the
+   game's units. The stats that aren't listed are the game's own values. */
+static const XwaUnit s_statUnits[XWA_WEAPON_STATS] = {
+	[XWA_WEAPON_STAT_SPEED] = XWA_UNIT_MGLT,
+	[XWA_WEAPON_STAT_FIRE_RATE] = XWA_UNIT_MILLISECONDS,
+	[XWA_WEAPON_STAT_DURATION_OFFSET] = XWA_UNIT_MILLISECONDS,
+	[XWA_WEAPON_STAT_FIRE_RATIO] = XWA_UNIT_MILLISECONDS,
+	[XWA_WEAPON_STAT_RANGE] = XWA_UNIT_METRES,
 };
 
 /* The forms of a stat: plain, for the player, for one difficulty, or for
@@ -238,9 +248,10 @@ static void WeaponStats_ReadForm(const char* path, const char* where, const Aero
 			continue;
 		}
 		snprintf(name, sizeof name, "%s.%s", where, key);
-		if (stat == XWA_WEAPON_STAT_RANGE) {
-			if (!XwaMetres_Read(value, INT32_MIN, INT32_MAX, &read)) {
-				Aeron_LogWarn("xwa.models", "%s: %s must be a number of metres. It is ignored", path, name);
+		if (s_statUnits[stat] != XWA_UNIT_NONE) {
+			if (!XwaUnits_Read(value, s_statUnits[stat], INT32_MIN, INT32_MAX, &read)) {
+				Aeron_LogWarn("xwa.models", "%s: %s must be a number of %s. It is ignored", path, name,
+							  XwaUnits_Name(s_statUnits[stat]));
 				continue;
 			}
 			form->value[stat] = read;
@@ -324,10 +335,9 @@ static void WeaponStats_ReadProfile(const char* path, const char* where, int gro
 			case WEAPON_STATS_GROUP_ENERGY:
 				if ((at = WeaponStats_Find(key, s_energyKeys, 2)) < 0) {
 					Aeron_LogWarn("xwa.models", "%s: %s isn't 'all' or 'player'. It is ignored", path, name);
-				} else if (WeaponStats_ReadInt(path, name, value, &profile->energy[at]) &&
-						   (profile->energy[at] < 0 || profile->energy[at] > 0x10000)) {
-					Aeron_LogWarn("xwa.models", "%s: %s must be from 0 to 65536. It is ignored", path, name);
-					profile->energy[at] = -1;
+				} else if (!XwaUnits_Read(value, XWA_UNIT_PERCENT_Q16, 0, 0x10000, &profile->energy[at])) {
+					Aeron_LogWarn("xwa.models", "%s: %s must be a percent from 0 to 100. It is ignored", path,
+								  name);
 				}
 				break;
 			default: {

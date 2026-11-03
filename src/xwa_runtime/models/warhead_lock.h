@@ -7,8 +7,10 @@
  * out keeps the stock value that the caller passes.
  *
  * The values belong to the model that an object type loads in the mission,
- * so a swapped model has its own. lock_ticks only changes the HUD and the
- * sounds. The other values change the simulation. */
+ * so a swapped model has its own. The file has the ranges in metres and
+ * the times in milliseconds, and the values here are in game units and
+ * ticks. lock_time_ms only changes the HUD and the sounds. The other values
+ * change the simulation. */
 
 #ifdef __cplusplus
 extern "C" {

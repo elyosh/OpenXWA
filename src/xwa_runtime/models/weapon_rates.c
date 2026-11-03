@@ -10,6 +10,7 @@
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/names.h"
+#include "xwa_runtime/models/units.h"
 #include "xwa_runtime/models/weapon_stats.h"
 
 #include <limits.h>
@@ -69,7 +70,7 @@ typedef struct WeaponRatesKey {
 static const WeaponRatesKey s_keys[WEAPON_RATES_KEYS] = {
 	{ WEAPON_RATES_GROUP_RATES, "decharge", 0 },
 	{ WEAPON_RATES_GROUP_RATES, "recharge", 0 },
-	{ WEAPON_RATES_GROUP_RATES, "cooldown", 0 },
+	{ WEAPON_RATES_GROUP_RATES, "cooldown_ms", 0 },
 	{ WEAPON_RATES_GROUP_RATES, "decharge_percent", 0 },
 	{ WEAPON_RATES_GROUP_RATES, "recharge_percent", 0 },
 	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "rate", 0 },
@@ -154,6 +155,12 @@ static void WeaponRates_ReadSet(const char* path, const AeronConfigNode* weapons
 				Aeron_LogWarn("xwa.models", "%s: %s must be true or false. It is ignored", path, name);
 			} else {
 				set->value[key] = AeronConfigNode_Bool(node, 0) != 0;
+			}
+		} else if (key == WEAPON_RATES_COOLDOWN) {
+			if (!XwaUnits_Read(node, XWA_UNIT_MILLISECONDS, 0, INT32_MAX, &set->value[key])) {
+				Aeron_LogWarn("xwa.models",
+							  "%s: %s must be a number of milliseconds of 0 or more. It is ignored", path,
+							  name);
 			}
 		} else {
 			WeaponRates_ReadInt(path, name, node, &set->value[key]);

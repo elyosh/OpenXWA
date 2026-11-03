@@ -28,8 +28,7 @@ typedef struct XwaModernCameraOptions {
 	int cockpit_sway;
 	/* Metres that the eye moves for each radian of lag. */
 	float cockpit_sway_strength_m;
-	/* Metres that the eye moves back for each unit of speed change, in the
-	   unit of MobileObject.speed. */
+	/* Metres that the eye moves back for each MGLT of speed change. */
 	float cockpit_speed_sway_m;
 	/* Metres, on each axis. */
 	float cockpit_sway_max_m;

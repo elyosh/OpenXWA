@@ -9,9 +9,9 @@
 #include "xwa/assets/object_type_info.h"
 #include "xwa/assets/string_table.h"
 #include "xwa_runtime/models/gunner_seats.h"
-#include "xwa_runtime/models/metres.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/names.h"
+#include "xwa_runtime/models/units.h"
 #include "xwa_runtime/text/text_overrides.h"
 
 #include <ctype.h>
@@ -106,53 +106,56 @@ typedef enum CraftFieldKind {
 	CRAFT_FIELD_WEAPON,
 	/* An 8-bit laser group kind, written as its name. */
 	CRAFT_FIELD_LASER_KIND,
-	/* A 32-bit distance in game units, written in metres. */
-	CRAFT_FIELD_METRES,
 } CraftFieldKind;
 
+/* A key of the file. A number field with a unit holds the game's value, and
+   the file holds it in `unit`. */
 typedef struct CraftField {
 	const char* key;
 	size_t offset;
 	CraftFieldKind kind;
+	XwaUnit unit;
 } CraftField;
 
 /* The craft_record keys of single values. */
 static const CraftField s_recordFields[] = {
-	{ "speed", offsetof(ModelDef, maxSpeed), CRAFT_FIELD_U16 },
-	{ "acceleration", offsetof(ModelDef, accelRate), CRAFT_FIELD_U16 },
-	{ "deceleration", offsetof(ModelDef, decelRate), CRAFT_FIELD_U16 },
-	{ "yaw_rate", offsetof(ModelDef, yawRate), CRAFT_FIELD_I16 },
-	{ "roll_rate", offsetof(ModelDef, rollRate), CRAFT_FIELD_I16 },
-	{ "pitch_rate", offsetof(ModelDef, pitchRate), CRAFT_FIELD_I16 },
-	{ "auto_bank", offsetof(ModelDef, autoBankFactor), CRAFT_FIELD_U16 },
-	{ "max_tumble_angle", offsetof(ModelDef, maxTumbleAngle), CRAFT_FIELD_U16 },
-	{ "max_push_rate", offsetof(ModelDef, maxPushRate), CRAFT_FIELD_U16 },
-	{ "hull", offsetof(ModelDef, hullStrength), CRAFT_FIELD_I32 },
-	{ "shields", offsetof(ModelDef, shieldStrength), CRAFT_FIELD_I32 },
-	{ "has_shields", offsetof(ModelDef, hasShields), CRAFT_FIELD_BOOL },
-	{ "has_hyperdrive", offsetof(ModelDef, hasHyperdrive), CRAFT_FIELD_BOOL },
-	{ "system_strength", offsetof(ModelDef, systemStrength), CRAFT_FIELD_U16 },
-	{ "system_damage_hull_threshold", offsetof(ModelDef, systemDamageHullThreshold), CRAFT_FIELD_I32 },
-	{ "component_max_hp", offsetof(ModelDef, componentMaxHp), CRAFT_FIELD_U8 },
-	{ "rating_weight", offsetof(ModelDef, ratingWeight), CRAFT_FIELD_U16 },
-	{ "laser_converge_mode", offsetof(ModelDef, laserConvergeMode), CRAFT_FIELD_U8 },
-	{ "countermeasures", offsetof(ModelDef, countermeasureCount), CRAFT_FIELD_U8 },
-	{ "gunsight_offset_y", offsetof(ModelDef, gunsightOffsetY), CRAFT_FIELD_I32 },
-	{ "ai_hits_to_evade", offsetof(ModelDef, field_13), CRAFT_FIELD_U8 },
+	{ "speed_mglt", offsetof(ModelDef, maxSpeed), CRAFT_FIELD_U16, XWA_UNIT_MGLT },
+	{ "acceleration_mglt", offsetof(ModelDef, accelRate), CRAFT_FIELD_U16, XWA_UNIT_MGLT },
+	{ "deceleration_mglt", offsetof(ModelDef, decelRate), CRAFT_FIELD_U16, XWA_UNIT_MGLT },
+	{ "yaw_rate_degrees", offsetof(ModelDef, yawRate), CRAFT_FIELD_I16, XWA_UNIT_DEGREES },
+	{ "roll_rate_degrees", offsetof(ModelDef, rollRate), CRAFT_FIELD_I16, XWA_UNIT_DEGREES },
+	{ "pitch_rate_degrees", offsetof(ModelDef, pitchRate), CRAFT_FIELD_I16, XWA_UNIT_DEGREES },
+	{ "auto_bank_percent", offsetof(ModelDef, autoBankFactor), CRAFT_FIELD_U16, XWA_UNIT_PERCENT_Q16 },
+	{ "max_tumble_angle_degrees", offsetof(ModelDef, maxTumbleAngle), CRAFT_FIELD_U16, XWA_UNIT_DEGREES },
+	{ "max_push_rate", offsetof(ModelDef, maxPushRate), CRAFT_FIELD_U16, XWA_UNIT_NONE },
+	{ "hull", offsetof(ModelDef, hullStrength), CRAFT_FIELD_I32, XWA_UNIT_NONE },
+	{ "shields", offsetof(ModelDef, shieldStrength), CRAFT_FIELD_I32, XWA_UNIT_NONE },
+	{ "has_shields", offsetof(ModelDef, hasShields), CRAFT_FIELD_BOOL, XWA_UNIT_NONE },
+	{ "has_hyperdrive", offsetof(ModelDef, hasHyperdrive), CRAFT_FIELD_BOOL, XWA_UNIT_NONE },
+	{ "system_strength", offsetof(ModelDef, systemStrength), CRAFT_FIELD_U16, XWA_UNIT_NONE },
+	{ "system_damage_hull_threshold", offsetof(ModelDef, systemDamageHullThreshold), CRAFT_FIELD_I32,
+	  XWA_UNIT_NONE },
+	{ "component_max_hp", offsetof(ModelDef, componentMaxHp), CRAFT_FIELD_U8, XWA_UNIT_NONE },
+	{ "rating_weight", offsetof(ModelDef, ratingWeight), CRAFT_FIELD_U16, XWA_UNIT_NONE },
+	{ "laser_converge_mode", offsetof(ModelDef, laserConvergeMode), CRAFT_FIELD_U8, XWA_UNIT_NONE },
+	{ "countermeasures", offsetof(ModelDef, countermeasureCount), CRAFT_FIELD_U8, XWA_UNIT_NONE },
+	{ "gunsight_offset_y", offsetof(ModelDef, gunsightOffsetY), CRAFT_FIELD_I32, XWA_UNIT_NONE },
+	{ "ai_hits_to_evade", offsetof(ModelDef, field_13), CRAFT_FIELD_U8, XWA_UNIT_NONE },
 };
 
 /* The keys of one entry of `lasers`, and of `warheads`. */
 static const CraftField s_laserFields[] = {
-	{ "type", offsetof(ModelDef, laserGroupWeaponType), CRAFT_FIELD_WEAPON },
-	{ "count", offsetof(ModelDef, laserGroupSlotCount), CRAFT_FIELD_U8 },
-	{ "kind", offsetof(ModelDef, laserGroupWeaponKind), CRAFT_FIELD_LASER_KIND },
-	{ "range_m", offsetof(ModelDef, laserGroupFireRange), CRAFT_FIELD_METRES },
-	{ "cooldown", offsetof(ModelDef, laserGroupFireCooldownTicks), CRAFT_FIELD_U16 },
+	{ "type", offsetof(ModelDef, laserGroupWeaponType), CRAFT_FIELD_WEAPON, XWA_UNIT_NONE },
+	{ "count", offsetof(ModelDef, laserGroupSlotCount), CRAFT_FIELD_U8, XWA_UNIT_NONE },
+	{ "kind", offsetof(ModelDef, laserGroupWeaponKind), CRAFT_FIELD_LASER_KIND, XWA_UNIT_NONE },
+	{ "range_m", offsetof(ModelDef, laserGroupFireRange), CRAFT_FIELD_I32, XWA_UNIT_METRES },
+	{ "cooldown_ms", offsetof(ModelDef, laserGroupFireCooldownTicks), CRAFT_FIELD_U16,
+	  XWA_UNIT_MILLISECONDS },
 };
 static const CraftField s_warheadFields[] = {
-	{ "type", offsetof(ModelDef, warheadLauncherType), CRAFT_FIELD_WEAPON },
-	{ "count", offsetof(ModelDef, warheadLauncherSlotCount), CRAFT_FIELD_U8 },
-	{ "capacity", offsetof(ModelDef, warheadLauncherCapacity), CRAFT_FIELD_U8 },
+	{ "type", offsetof(ModelDef, warheadLauncherType), CRAFT_FIELD_WEAPON, XWA_UNIT_NONE },
+	{ "count", offsetof(ModelDef, warheadLauncherSlotCount), CRAFT_FIELD_U8, XWA_UNIT_NONE },
+	{ "capacity", offsetof(ModelDef, warheadLauncherCapacity), CRAFT_FIELD_U8, XWA_UNIT_NONE },
 };
 
 /* The keys of a `turrets` entry. They are the gunner seat keys, plus
@@ -299,7 +302,6 @@ static int64_t CraftDefinitions_GetField(const uint8_t* base, CraftFieldKind kin
 			return value;
 		}
 		case CRAFT_FIELD_I32:
-		case CRAFT_FIELD_METRES:
 		default: {
 			int32_t value;
 
@@ -312,7 +314,8 @@ static int64_t CraftDefinitions_GetField(const uint8_t* base, CraftFieldKind kin
 /* Reads the value of `node` for a field of `kind`, checks its range and
    writes it at `base`. */
 static void CraftDefinitions_SetField(const char* path, int record, const char* what,
-									  const AeronConfigNode* node, uint8_t* base, CraftFieldKind kind) {
+									  const AeronConfigNode* node, uint8_t* base, CraftFieldKind kind,
+									  XwaUnit unit) {
 	static const int64_t mins[] = { 0, 0, 0, INT16_MIN, INT32_MIN };
 	static const int64_t maxes[] = { UINT8_MAX, 1, UINT16_MAX, INT16_MAX, INT32_MAX };
 	const int64_t old = CraftDefinitions_GetField(base, kind);
@@ -341,16 +344,17 @@ static void CraftDefinitions_SetField(const char* path, int record, const char* 
 			return;
 		}
 		value = named;
-	} else if (kind == CRAFT_FIELD_METRES) {
-		int32_t units;
+	} else if (unit != XWA_UNIT_NONE) {
+		int32_t game;
 
-		if (!XwaMetres_Read(node, INT32_MIN, INT32_MAX, &units)) {
-			Aeron_LogError("xwa.craft", "%s:%d: %s needs a number of metres from %.2f to %.2f. It is ignored",
-						   path, AeronConfigNode_Line(node), what, XwaMetres_FromUnits((double)INT32_MIN),
-						   XwaMetres_FromUnits((double)INT32_MAX));
+		if (!XwaUnits_Read(node, unit, mins[kind], maxes[kind], &game)) {
+			Aeron_LogError("xwa.craft", "%s:%d: %s needs a number of %s from %.3f to %.3f. It is ignored",
+						   path, AeronConfigNode_Line(node), what, XwaUnits_Name(unit),
+						   XwaUnits_FromGame(unit, (double)mins[kind]),
+						   XwaUnits_FromGame(unit, (double)maxes[kind]));
 			return;
 		}
-		value = units;
+		value = game;
 	} else if (!CraftDefinitions_ReadInt(path, node, what, mins[kind], maxes[kind], &value)) {
 		return;
 	}
@@ -373,8 +377,7 @@ static void CraftDefinitions_SetField(const char* path, int record, const char* 
 			memcpy(base, &stored, sizeof stored);
 			break;
 		}
-		case CRAFT_FIELD_I32:
-		case CRAFT_FIELD_METRES: {
+		case CRAFT_FIELD_I32: {
 			const int32_t stored = (int32_t)value;
 
 			memcpy(base, &stored, sizeof stored);
@@ -394,7 +397,6 @@ static size_t CraftDefinitions_FieldSize(CraftFieldKind kind) {
 		case CRAFT_FIELD_WEAPON:
 			return 2;
 		case CRAFT_FIELD_I32:
-		case CRAFT_FIELD_METRES:
 			return 4;
 		default:
 			return 1;
@@ -435,7 +437,7 @@ static void CraftDefinitions_SetGroups(const char* path, int record, const char*
 			if (value == NULL) {
 				memset(base, 0, CraftDefinitions_FieldSize(fields[f].kind));
 			} else {
-				CraftDefinitions_SetField(path, record, what, value, base, fields[f].kind);
+				CraftDefinitions_SetField(path, record, what, value, base, fields[f].kind, fields[f].unit);
 			}
 		}
 		if (entry != NULL) {
@@ -523,7 +525,7 @@ static void CraftDefinitions_SetArray(const char* path, int record, const char* 
 
 		snprintf(what, sizeof what, "%s[%zu]", key, i);
 		CraftDefinitions_SetField(path, record, what, AeronConfigNode_SequenceGet(node, i),
-								  base + i * CraftDefinitions_FieldSize(kind), kind);
+								  base + i * CraftDefinitions_FieldSize(kind), kind, XWA_UNIT_NONE);
 	}
 }
 
@@ -543,7 +545,8 @@ static void CraftDefinitions_ApplyRecord(const CraftFile* file, const AeronConfi
 		}
 		if (f < sizeof s_recordFields / sizeof s_recordFields[0]) {
 			CraftDefinitions_SetField(file->path, file->record, key, AeronConfigNode_MapValueAt(node, i),
-									  (uint8_t*)def + s_recordFields[f].offset, s_recordFields[f].kind);
+									  (uint8_t*)def + s_recordFields[f].offset, s_recordFields[f].kind,
+									  s_recordFields[f].unit);
 		} else if (!CraftDefinitions_InList(key, s_recordArrayKeys,
 											sizeof s_recordArrayKeys / sizeof s_recordArrayKeys[0])) {
 			Aeron_LogError("xwa.craft", "%s:%d: the file can't have the key craft_record.%s. It is ignored",

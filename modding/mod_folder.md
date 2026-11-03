@@ -43,14 +43,14 @@ Every file and folder is optional. A mod only needs the files it changes.
 ## mod.yaml
 
 ```yaml
-version: 7
+version: 8
 name: "Rebel Fleet Refit"
 complete: true
 ```
 
 | Key | Meaning |
 |-|-|
-| `version` | Required. The mod format version that the mod was made for. This OpenXWA reads version 7. |
+| `version` | Required. The mod format version that the mod was made for. This OpenXWA reads version 8. |
 | `name` | The name that the **Mods** screen shows. The default is the folder name. |
 | `complete` | `false` marks a mod that isn't ready to play. The default is `true`. |
 
@@ -163,12 +163,13 @@ the keys that switch to classic graphics do nothing.
 
 ## Units and conventions
 
-- **Lengths** are in metres and **angles** in degrees. Keys with a unit
-  usually say it in their name, such as `position_m` or `heading_degrees`.
-  The flight data of craft and weapons, such as speeds, times and turn
-  rates, keeps the game's own units. See [Craft](craft.md#units). A
-  model's `hangar_doors.distance` is still in game units, 40.96 to the
-  metre.
+- **Lengths** are in metres, **times** in milliseconds, **speeds** in MGLT
+  and **angles** in degrees. Keys with a unit say it in their name, such as
+  `position_m`, `cooldown_ms`, `speed_mglt` or `heading_degrees`. Hull,
+  shields and damage keep the game's own points. See
+  [Craft](craft.md#units). Two values of a model still use the game's
+  units: `hangar_doors.distance`, in game units of 1/40.96 metre, and
+  `step_ticks`, in ticks of 4 ms.
 - **Models** use the glTF axes: +Y is up and the nose points along +Z.
   Lengths are in metres.
 - **Screen positions and sizes** in the `frontend/` and `resdata/` files are

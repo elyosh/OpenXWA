@@ -23,6 +23,7 @@
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/names.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -473,7 +474,9 @@ static void WriteWeaponTypeTable(FILE* page) {
 		const int index = type - OBJ_LaserRebel;
 		const double life =
 			g_projectileLifetimeSecondsByType[index] + g_projectileLifetimeFracQ16ByType[index] / 65536.0;
-		fprintf(page, "| %d | `%s` | %u | %d | %g | %u |\n", type, name, g_projectileSpeedByType[index],
+		/* A speed unit is 1/2.25 MGLT. Two decimals give back the speed. */
+		const double mglt = round(g_projectileSpeedByType[index] / 2.25 * 100.0) / 100.0;
+		fprintf(page, "| %d | `%s` | %g | %d | %g | %u |\n", type, name, mglt,
 				g_projectileDamageByType[index], life, g_warheadProjectilePointValueByObjectType[type]);
 	}
 	fprintf(page, "\n");
@@ -492,10 +495,10 @@ static void WriteWeaponsPage(const char* folder) {
 	WriteParagraph(page,
 				   "The other columns give the stats of the original game, which the `stats` weapon "
 				   "profiles of `flight/flight.yaml` and of the model settings can change. **Speed** is in "
-				   "speed units: 2.25 is 1 MGLT, and a shot of a fighter adds the fighter's speed. "
-				   "**Power** is the damage of a shot, in the points of hull and shields. **Life** is "
-				   "how long a shot lives, in game seconds of 236 ticks. **Score** is the score of a "
-				   "warhead hit.");
+				   "MGLT, and a shot of a fighter adds the fighter's speed. **Power** is the damage of a "
+				   "shot, in the points of hull and shields. **Life** is how long a shot lives, in game "
+				   "seconds. A game second is 0.944 real seconds. **Score** is the score of a warhead "
+				   "hit.");
 	WriteWeaponTypeTable(page);
 
 	WriteHeading(page, "Warheads");

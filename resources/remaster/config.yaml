@@ -181,9 +181,9 @@ camera:
   cockpit_sway: true
   # The eye moves this many metres for each radian of lag, 0 to 0.5.
   cockpit_sway_strength_m: 0.122
-  # The eye moves back this many metres for each unit of speed change,
-  # 0 to 0.025.
-  cockpit_speed_sway_m: 0.00183
+  # The eye moves back this many metres for each MGLT of speed change,
+  # 0 to 0.05.
+  cockpit_speed_sway_m: 0.0041
   # The eye moves no more than this many metres on each axis, 0 to 0.25.
   cockpit_sway_max_m: 0.061
   # How fast the lag and the sway catch up, in seconds, 0.05 to 2.

@@ -3,8 +3,8 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
-#include "xwa_runtime/models/metres.h"
 #include "xwa_runtime/models/model_settings.h"
+#include "xwa_runtime/models/units.h"
 
 #include <stdint.h>
 #include <string.h>
@@ -88,13 +88,13 @@ void XwaJamming_ReadModelSettings(unsigned int objectType, const char* path, con
 			if (AeronConfigNode_Type(node) == AERON_CONFIG_STRING &&
 				strcmp(AeronConfigNode_String(node, ""), "none") == 0) {
 				model->rule.range = -1;
-			} else if (XwaMetres_Read(node, 0, INT32_MAX, &units)) {
+			} else if (XwaUnits_Read(node, XWA_UNIT_METRES, 0, INT32_MAX, &units)) {
 				model->rule.range = units;
 			} else {
 				Aeron_LogWarn(
 					"xwa.models",
 					"%s: jamming.range_m must be none or a distance from 0 to %.2f metres. It is ignored",
-					path, XwaMetres_FromUnits((double)INT32_MAX));
+					path, XwaUnits_FromGame(XWA_UNIT_METRES, (double)INT32_MAX));
 				continue;
 			}
 			model->set |= JAMMING_SET_RANGE;

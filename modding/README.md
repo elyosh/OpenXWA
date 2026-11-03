@@ -32,11 +32,11 @@ through.
 3. In `my-first-mod`, create `mod.yaml`:
 
    ```yaml
-   version: 7
+   version: 8
    name: "My first mod"
    ```
 
-   `version` is the mod format version. This OpenXWA reads version 7.
+   `version` is the mod format version. This OpenXWA reads version 8.
 
 4. In `my-first-mod`, create a folder named `text`, and in it a file named
    `strings.yaml`:

@@ -8,7 +8,7 @@
 #include "xwa/render/renderer.h"
 #include "xwa/util/time.h"
 #include "xwa_runtime/config/modern_camera_options.h"
-#include "xwa_runtime/models/metres.h"
+#include "xwa_runtime/models/units.h"
 
 #include <math.h>
 #include <string.h>
@@ -351,7 +351,7 @@ void XwaCameraMotion_CockpitSway(float out[3]) {
 	out[1] = 0.0f;
 	out[2] = 0.0f;
 	XwaModernCameraOptions_Get(&options);
-	limit = (float)XwaMetres_ToUnits(options.cockpit_sway_max_m);
+	limit = (float)XwaUnits_ToGame(XWA_UNIT_METRES, options.cockpit_sway_max_m);
 	if (!options.enabled || !options.cockpit_sway || limit <= 0.0f || !s_cameraMotion.valid ||
 		s_cameraMotion.objectIdx != player->objectIndex || player->viewState.externalCameraActive ||
 		player->viewState.cameraFocusObjIdx != player->objectIndex || player->mapCameraState ||
@@ -361,8 +361,11 @@ void XwaCameraMotion_CockpitSway(float out[3]) {
 
 	/* Each axis has a soft limit: close to the value while it is small, and
 	   never above `limit`. */
-	strength = (float)XwaMetres_ToUnits(options.cockpit_sway_strength_m);
-	speedSway = (float)XwaMetres_ToUnits(options.cockpit_speed_sway_m);
+	strength = (float)XwaUnits_ToGame(XWA_UNIT_METRES, options.cockpit_sway_strength_m);
+	/* The option is in metres for each MGLT, and the speed change is in
+	   speed units. */
+	speedSway = (float)(XwaUnits_ToGame(XWA_UNIT_METRES, options.cockpit_speed_sway_m) /
+						XwaUnits_ToGame(XWA_UNIT_MGLT, 1.0));
 	side = limit * tanhf(strength * s_cameraMotion.lagSide / limit);
 	up = limit * tanhf(strength * s_cameraMotion.lagUp / limit);
 	back = limit * tanhf(speedSway * s_cameraMotion.speedChange / limit);

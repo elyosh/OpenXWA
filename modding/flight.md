@@ -153,7 +153,7 @@ each value, the game uses the model's value first, then the value of
 ```yaml
 weapons:
   impact: {rebel_laser: 0xff0000, imperial_laser: 0x00ff00}
-  rates: {decharge: 4, recharge: 2, cooldown: 47}
+  rates: {decharge: 4, recharge: 2, cooldown_ms: 188}
   ai_torpedoes: {per_pass: 6, per_target: 16}
   fire_ratio_by_rank: {novice: 4, officer: 3, veteran: 2, ace: 2, top_ace: 1, super_ace: 1}
   damage_by_difficulty: {easy: 0.5, medium: 0.25, hard: 1}
@@ -173,7 +173,7 @@ weapons:
 | `damage_by_difficulty` | The damage that parts take through shields, by difficulty. |
 | `limit_linked_warhead_fire_rate` | Slows down linked warhead fire. |
 | `linking_rules` | When the AI and the player can fire lasers and ions together. |
-| `stats`, `warhead_capacity_percent`, `energy_speed_q16`, `linking` | Weapon profiles, which missions can pick for each flight group. |
+| `stats`, `warhead_capacity_percent`, `energy_speed_percent`, `linking` | Weapon profiles, which missions can pick for each flight group. |
 | `hardpoint_kinds` | Whether each hardpoint type fires lasers, warheads or nothing. |
 
 Weapon types are written as names, such as `rebel_laser`. See
@@ -194,21 +194,22 @@ variants and the colours of the charge bars. See [Craft](craft.md).
 
 ```yaml
 weapons:
-  rates: {decharge: 4, recharge: 2, cooldown: 47}
+  rates: {decharge: 4, recharge: 2, cooldown_ms: 188}
   recharge_percent: 150
 ```
 
 | Key | Meaning |
 |-|-|
 | `rates.decharge` | The charge that one shot of the player's lasers uses. The original values are 3 for the TIE Fighter and the TIE Bomber, 4 for other starfighters and 3 for other craft. |
-| `rates.recharge` | The charge that comes back to each laser at each power update. The original values are 3 for the TIE Fighter and the TIE Bomber, and 2 for other craft. |
-| `rates.cooldown` | The time that each laser fired adds before the group's next shot. The original value is 47, about 0.2 seconds. |
+| `rates.recharge` | The charge that comes back to each laser each game second. The original values are 3 for the TIE Fighter and the TIE Bomber, and 2 for other craft. |
+| `rates.cooldown_ms` | The time that each laser fired adds before the group's next shot, in milliseconds. The original value is 188. |
 | `rates.decharge_percent` | Scales the decharge rate, in percent. The default is 100. |
 | `rates.recharge_percent` | Scales the recharge rate, in percent. The default is 100. |
 | `decharge_percent` | Scales the decharge rate of every craft, after `rates.decharge_percent`. The default is 100. Only in `flight.yaml`. |
 | `recharge_percent` | Scales the recharge rate of every craft, after `rates.recharge_percent`. The default is 100. Only in `flight.yaml`. |
 
-All values are whole numbers of 0 or more.
+All values are 0 or more. The decharge and recharge values are whole
+numbers.
 
 The game uses these rates in place of the original ones when `flight.yaml`
 has `rates`, `decharge_percent` or `recharge_percent`, when the craft's
@@ -218,11 +219,12 @@ in `decharge_percent` turns the rates on.
 
 The decharge rate only applies to the player's laser shots. The racks of
 the player's turrets then keep their charge, where the original game drains
-them too. AI shots still use 1 charge, as in the original game. The cooldown applies to every craft.
+them too. AI shots still use 1 charge, as in the original game. The
+cooldown applies to every craft.
 
 A weapon profile can also set the decharge rate, the recharge rate and the
 cooldown of each weapon type, with `decharge_rate`, `recharge_rate` and
-`fire_rate`. See [Weapon profiles](#weapon-profiles). The percents still
+`fire_rate_ms`. See [Weapon profiles](#weapon-profiles). The percents still
 scale the profile's values.
 
 #### Energy transfer
@@ -342,23 +344,23 @@ map:
 |-|-|-|
 | `stats` | the stats of each weapon type | `weapon_profile` |
 | `warhead_capacity_percent` | how many warheads a craft loads | `warhead_profile` |
-| `energy_speed_q16` | the speed change for each step of engine energy | `energy_profile` |
+| `energy_speed_percent` | the speed change for each step of engine energy | `energy_profile` |
 | `linking` | the laser link mode and the linking rules | `linking_profile` |
 
 ```yaml
 weapons:
   stats:
     default:
-      rebel_laser: {range_m: 1600, fire_ratio: 236, precise: false, spread_mask: 63}
+      rebel_laser: {range_m: 1600, fire_ratio_ms: 944, precise: false, spread_mask: 63}
       imperial_laser:
-        fire_rate: 47
-        player_easy: {fire_rate: 39, power: 350}
+        fire_rate_ms: 188
+        player_easy: {fire_rate_ms: 156, power: 350}
     heavy_guns:
       turbolaser_green_light: {power: 900, range_m: 5000}
   warhead_capacity_percent:
     default: {space_bomb: 50, heavy_rocket: 50}
-  energy_speed_q16:
-    default: {all: 8192, player: 7864}
+  energy_speed_percent:
+    default: {all: 12.5, player: 12}
   linking:
     default: {laser_link: 2, prevent_player_linked_lasers_ion: true}
 ```
@@ -376,24 +378,24 @@ not the `default` profile's value.
 
 ##### stats
 
-Each `stats` profile maps weapon types to stats. All stats are whole
-numbers, except `precise`, which is `true` or `false`. Times are in ticks
-or game seconds, speeds in speed units and damage in points, as described
-in [Craft](craft.md#units). [Weapons](reference/weapons.md#weapon-types)
+Each `stats` profile maps weapon types to stats. Stats with a unit in their
+name can have decimals. The other stats are whole numbers, except
+`precise`, which is `true` or `false`. The units are described in
+[Craft](craft.md#units). [Weapons](reference/weapons.md#weapon-types)
 gives the speed, power, life and score of each weapon type in the original
 game.
 
 | Stat | Meaning |
 |-|-|
-| `speed` | The speed of a shot, in speed units. A shot of a fighter or of a player's craft also gets the speed of the craft that fires it. |
+| `speed_mglt` | The speed of a shot, in MGLT. A shot of a fighter or of a player's craft also gets the speed of the craft that fires it. |
 | `power` | The damage of a shot, in the points of hull and shields. The shield of the side that is hit takes the damage first, and only the rest goes on to the parts and the hull. A starship or a platform takes 1/16 of the damage, and a freighter or a container 1/4. |
 | `power_speed_percent` | The percent of the firing craft's speed added to the power of its shots. The original value is 100. Turret shots get no speed bonus. |
 | `duration_seconds` | How long a shot lives, in whole game seconds. |
 | `duration_fraction` | Adds a part of a game second to `duration_seconds`, where 65536 is a whole second. A shot lives at most about 277 game seconds. |
-| `duration_offset` | How long a turret shot lives after the time it needs to reach its target, in ticks. The original value is 59. |
+| `duration_offset_ms` | How long a turret shot lives after the time it needs to reach its target, in milliseconds. The original value is 236. |
 | `score` | The score that a warhead hit gives the player and the player's team. The score goes back down when the warhead runs out of time without a hit. |
-| `fire_rate` | Lasers: the wait after a volley, in ticks, for each cannon that fired, so that linked cannons wait longer. Warheads: the wait after each warhead. The original values are 47 for lasers and 472 for warheads. |
-| `fire_ratio` | The wait between two shots of a turret, in ticks. By default, the `cooldown` of the laser group in the craft record. AI turrets wait 2 to 4 times longer, by skill, or by `fire_ratio_by_rank`. |
+| `fire_rate_ms` | Lasers: the wait after a volley, in milliseconds, for each cannon that fired, so that linked cannons wait longer. Warheads: the wait after each warhead. The original values are 188 for lasers and 1888 for warheads. |
+| `fire_ratio_ms` | The wait between two shots of a turret, in milliseconds. By default, the `cooldown_ms` of the laser group in the craft record. AI turrets wait 2 to 4 times longer, by skill, or by `fire_ratio_by_rank`. |
 | `range_m` | The range of a turret, in metres. By default, the `range_m` of the laser group. |
 | `precise` | `false` makes the shots of AI turrets spread. In the original game, AI turrets aim exactly. A player's turret shots always spread. |
 | `spread_mask` | How far turret shots spread, in angle units where 65536 is a full turn. Use a value of the form 2ⁿ − 1, such as 255, about 1.4 degrees. The original value is 255. |
@@ -420,20 +422,19 @@ that a craft loads with that warhead. The original percents go from 25 to
 100. A craft always gets at least 1 warhead. The warhead names are in
 [Weapons](reference/weapons.md#warheads).
 
-##### energy_speed_q16
+##### energy_speed_percent
 
 Each profile sets how much speed a craft gains or loses for each step of
-energy moved to or from its engines. The value is a fraction of the craft's
-top speed, where 65536 is the whole top speed. The values go from 0 to
-65536.
+energy moved to or from its engines. The value is a percent of the craft's
+top speed, from 0 to 100.
 
 | Key | Meaning |
 |-|-|
 | `all` | The value for every craft. |
 | `player` | The value for the player's craft. Without it, the player's craft uses `all`. |
 
-The original value is 4096 for the TIE Bomber, 12288 for the TIE Fighter
-with spare engine power, and 8192 for other craft.
+The original value is 6.25 for the TIE Bomber, 18.75 for the TIE Fighter
+with spare engine power, and 12.5 for other craft.
 
 ##### linking
 
@@ -627,7 +628,7 @@ camera:
 | `exterior_tilt` | How far above the craft the exterior camera looks from, in degrees. | -30 to 30 | 10 |
 | `cockpit_sway` | The cockpit view sways with turns and speed changes. | `true` or `false` | `true` |
 | `cockpit_sway_strength_m` | How far the eye moves for each radian of lag, in metres. | 0 to 0.5 | 0.122 |
-| `cockpit_speed_sway_m` | How far the eye moves back for each speed unit of speed change, in metres. | 0 to 0.025 | 0.00183 |
+| `cockpit_speed_sway_m` | How far the eye moves back for each MGLT of speed change, in metres. | 0 to 0.05 | 0.0041 |
 | `cockpit_sway_max_m` | The most that the eye moves on each axis, in metres. | 0 to 0.25 | 0.061 |
 | `lag_time` | How fast the lag and the sway catch up, in seconds. | 0.05 to 2 | 0.32 |
 | `exterior_hud` | Shows the HUD and the reticle in the exterior view of the player's craft, in modern graphics. | `true` or `false` | `true` |
