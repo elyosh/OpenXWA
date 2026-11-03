@@ -26,13 +26,13 @@ typedef struct XwaModernCameraOptions {
 	/* Degrees above the craft. */
 	float exterior_tilt;
 	int cockpit_sway;
-	/* World units that the eye moves for each radian of lag. */
-	float cockpit_sway_strength;
-	/* World units that the eye moves back for each unit of speed change, in
-	   the unit of MobileObject.speed. */
-	float cockpit_speed_sway;
-	/* World units, on each axis. */
-	float cockpit_sway_max;
+	/* Metres that the eye moves for each radian of lag. */
+	float cockpit_sway_strength_m;
+	/* Metres that the eye moves back for each unit of speed change, in the
+	   unit of MobileObject.speed. */
+	float cockpit_speed_sway_m;
+	/* Metres, on each axis. */
+	float cockpit_sway_max_m;
 	/* Seconds. */
 	float lag_time;
 	int exterior_hud;

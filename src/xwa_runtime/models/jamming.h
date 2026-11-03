@@ -7,11 +7,11 @@
  *   jamming:
  *     enabled: true
  *     direction: down                 # all, up or down
- *     range: none                     # a distance, or none
+ *     range_m: none                   # a distance in metres, or none
  *     rule: hangar_and_jamming_points
  *
  *   - enabled: false turns jamming off for the model;
- *   - range: the player is jammed within this distance of the model's
+ *   - range_m: the player is jammed within this distance of the model's
  *     centre, whatever the other keys say. With none, `direction` and
  *     `rule` apply;
  *   - direction: up or down jams only above or below the model;
@@ -26,7 +26,7 @@
  *
  * A key that the group leaves out keeps the stock rule of the object type:
  *   - the Imperial Research Centre doesn't jam;
- *   - the Factory jams within 4096;
+ *   - the Factory jams within 100 metres;
  *   - the Imperial Star Destroyer, the Victory Star Destroyer and the
  *     Interdictor use hangar_and_jamming_points, and jam only below;
  *   - the Super Star Destroyer uses hangar_point. In the stock game, its

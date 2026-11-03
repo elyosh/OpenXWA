@@ -32,9 +32,10 @@
  * collision_face_groups. The other flags come from the original image files.
  *
  * Besides single values, `craft_record` has these lists:
- *   - lasers: up to 3 groups of {type, count, kind, range, cooldown}. `type`
- *     is a weapon type name, or none for an empty group. `kind` is
- *     laser_cannon, ion_cannon, turret or long_range_turret.
+ *   - lasers: up to 3 groups of {type, count, kind, range_m, cooldown}.
+ *     `type` is a weapon type name, or none for an empty group. `kind` is
+ *     laser_cannon, ion_cannon, turret or long_range_turret. `range_m` is
+ *     the range of the group's turrets, in metres.
  *   - warheads: up to 2 groups of {type, count, capacity}.
  *   - turrets: up to 2 seats. They use the gunner seat keys, plus
  *     `object_type`, the object type of the seat's cockpit.

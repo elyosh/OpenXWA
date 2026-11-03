@@ -8,6 +8,7 @@
 #include "xwa/render/renderer.h"
 #include "xwa/util/time.h"
 #include "xwa_runtime/config/modern_camera_options.h"
+#include "xwa_runtime/models/metres.h"
 
 #include <math.h>
 #include <string.h>
@@ -339,6 +340,8 @@ void XwaCameraMotion_CockpitSway(float out[3]) {
 	const PlayerData* player = &g_players[g_localPlayer];
 	XwaModernCameraOptions options;
 	float limit;
+	float strength;
+	float speedSway;
 	float side;
 	float up;
 	float back;
@@ -348,7 +351,7 @@ void XwaCameraMotion_CockpitSway(float out[3]) {
 	out[1] = 0.0f;
 	out[2] = 0.0f;
 	XwaModernCameraOptions_Get(&options);
-	limit = options.cockpit_sway_max;
+	limit = (float)XwaMetres_ToUnits(options.cockpit_sway_max_m);
 	if (!options.enabled || !options.cockpit_sway || limit <= 0.0f || !s_cameraMotion.valid ||
 		s_cameraMotion.objectIdx != player->objectIndex || player->viewState.externalCameraActive ||
 		player->viewState.cameraFocusObjIdx != player->objectIndex || player->mapCameraState ||
@@ -358,9 +361,11 @@ void XwaCameraMotion_CockpitSway(float out[3]) {
 
 	/* Each axis has a soft limit: close to the value while it is small, and
 	   never above `limit`. */
-	side = limit * tanhf(options.cockpit_sway_strength * s_cameraMotion.lagSide / limit);
-	up = limit * tanhf(options.cockpit_sway_strength * s_cameraMotion.lagUp / limit);
-	back = limit * tanhf(options.cockpit_speed_sway * s_cameraMotion.speedChange / limit);
+	strength = (float)XwaMetres_ToUnits(options.cockpit_sway_strength_m);
+	speedSway = (float)XwaMetres_ToUnits(options.cockpit_speed_sway_m);
+	side = limit * tanhf(strength * s_cameraMotion.lagSide / limit);
+	up = limit * tanhf(strength * s_cameraMotion.lagUp / limit);
+	back = limit * tanhf(speedSway * s_cameraMotion.speedChange / limit);
 	for (i = 0; i < 3; ++i) {
 		out[i] =
 			side * s_cameraMotion.right[i] + up * s_cameraMotion.up[i] - back * s_cameraMotion.forward[i];

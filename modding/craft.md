@@ -20,12 +20,12 @@ Without these files, every craft is the craft of the original game.
 
 ## Units
 
-Most values in these files use the game's own units, so that they match the
-values that the community tools show.
+Lengths and ranges are in metres. Most other values use the game's own
+units, so that they match the values that the community tools show.
 
 | Unit | Meaning |
 |-|-|
-| game units | Lengths and ranges. One metre is 40.96 game units, so 1 km is 40960. |
+| metres | Lengths and ranges. The game measures them in game units, 40.96 to the metre, and rounds a value in metres to the nearest game unit. |
 | ticks | Times. A tick is 4 ms. The game counts its own seconds, such as the mission clock, as 236 ticks, which is 0.944 real seconds. |
 | speed units | Speeds of craft and shots. One MGLT is 2.25 speed units, and a craft at 1 MGLT moves about 1 metre in one game second. A top speed of 225 is 100 MGLT. |
 | angle units | Turn rates. 65536 is a full turn, so 16384 is 90 degrees. |
@@ -215,7 +215,7 @@ A value out of range, or of the wrong kind, is ignored, and the log says so.
 | `type` | The [weapon type](reference/weapons.md#weapon-types) that the group fires, such as `rebel_laser`, or `none` for an empty group. |
 | `count` | The number of cannons in the group, from 0 to 255. |
 | `kind` | The [laser group kind](reference/weapons.md#laser-group-kinds): `laser_cannon`, `ion_cannon`, `turret` or `long_range_turret`. |
-| `range` | The range of the group's turrets, in game units. 0 uses the default: 81920 (2 km), or twice that for `long_range_turret`. |
+| `range_m` | The range of the group's turrets, in metres. 0 uses the default: 2000 m, or twice that for `long_range_turret`. |
 | `cooldown` | The time between two shots of the group's turrets, in ticks. 0 uses the default: 118 for `turret`, and 236 for the other kinds. AI craft wait two to four times longer, by skill. |
 
 `lasers` replaces every group. A group that the list leaves out is emptied,
@@ -642,12 +642,12 @@ the flight group uses `default`.
 weapons:
   stats:
     default:
-      rebel_laser: {range: 65536, fire_ratio: 236, precise: false, spread_mask: 63}
+      rebel_laser: {range_m: 1600, fire_ratio: 236, precise: false, spread_mask: 63}
       imperial_laser:
         fire_rate: 47
         player_easy: {fire_rate: 39, power: 350}
     devastator:
-      turbolaser_green_light: {power: 900, range: 204800}
+      turbolaser_green_light: {power: 900, range_m: 5000}
 ```
 
 [Flight settings](flight.md#stats) describes each stat, and
@@ -902,26 +902,26 @@ the beam system part follows the yaw.
 
 ```yaml
 warhead_lock:
-  lock_range: {small: 102400, big: 244332, transport: 101805}
+  lock_range_m: {small: 2500, big: 5965.14, transport: 2485.47}
   lock_ticks: 354
   ticks_per_homing_level: 118
-  ai_lock_range: {small: 102400, big: 244332, big_top_tier: 101805}
+  ai_lock_range_m: {small: 2500, big: 5965.14, big_top_tier: 2485.47}
   ai_lock_ticks_per_tier: 472
 ```
 
 | Key | Default | Meaning |
 |-|-|-|
-| `lock_range.small` | 101805 | How close the player's target must be for a lock, in game units, for targets that aren't big or transports. |
-| `lock_range.big` | 244332 | The same for starships, platforms, containers and freighters. |
-| `lock_range.transport` | 162888 | The same for transports. |
+| `lock_range_m.small` | 2485.47 | How close the player's target must be for a lock, in metres, for targets that aren't big or transports. |
+| `lock_range_m.big` | 5965.14 | The same for starships, platforms, containers and freighters. |
+| `lock_range_m.transport` | 3976.76 | The same for transports. |
 | `lock_ticks` | 708, or 354 for the Missile Boat | How long the player's lock takes, in ticks, from 200 to 32767. It only changes the HUD and the lock tone. |
 | `ticks_per_homing_level` | 236 | A warhead's homing level is the craft's lock ticks divided by this value, up to 6. From 1 to 32767. It applies to players and to the AI. |
-| `ai_lock_range.small` | 101805 | How close the AI's target must be for the AI to fire a warhead, for targets that aren't big. |
-| `ai_lock_range.big` | 203610 | The same for starships, platforms, freighters, containers, weapon emplacements and, in newer missions, transports. |
-| `ai_lock_range.big_top_tier` | 244332 | Replaces `big` for the AI of the top skill tier. |
+| `ai_lock_range_m.small` | 2485.47 | How close the AI's target must be for the AI to fire a warhead, in metres, for targets that aren't big. |
+| `ai_lock_range_m.big` | 4970.95 | The same for starships, platforms, freighters, containers, weapon emplacements and, in newer missions, transports. |
+| `ai_lock_range_m.big_top_tier` | 5965.14 | Replaces `big` for the AI of the top skill tier. |
 | `ai_lock_ticks_per_tier` | 472 | The AI needs this many lock ticks for each skill tier, plus one, before it fires. From 0 to 65535. |
 
-The ranges are whole numbers of 0 or more.
+The ranges are 0 or more.
 
 ### jamming
 
@@ -932,14 +932,14 @@ near it.
 jamming:
   enabled: true
   direction: down
-  range: none
+  range_m: none
   rule: hangar_and_jamming_points
 ```
 
 | Key | Meaning |
 |-|-|
 | `enabled` | `false` turns jamming off for the model. |
-| `range` | The player is jammed within this distance of the craft's centre, in game units, whatever the other keys say. `none` turns this off, so that `direction` and `rule` apply. |
+| `range_m` | The player is jammed within this distance of the craft's centre, in metres, whatever the other keys say. `none` turns this off, so that `direction` and `rule` apply. |
 | `direction` | `all`, `up` or `down`: jams everywhere, or only above or below the craft. |
 | `rule` | Where the craft jams. `none`: nowhere. `hangar_mesh_center`: near the centre of a hangar part, but not near the hangar point. `hangar_point`: near the hangar point, and not too far above or below it. `hangar_and_jamming_points`: near the hangar point or the jamming points of the model. |
 
@@ -947,7 +947,7 @@ A key that the group leaves out keeps the rule of the object type in the
 original game:
 
 - the Imperial Research Center doesn't jam;
-- the Factory jams within 4096;
+- the Factory jams within 100 m;
 - the Imperial Star Destroyer, the Victory Star Destroyer and the
   Interdictor use `hangar_and_jamming_points`, and jam only below;
 - the Super Star Destroyer uses `hangar_point`, but in the original game it
@@ -965,12 +965,12 @@ Jamming points are hardpoints of the model. The
 this craft.
 
 ```yaml
-docking: {approach_height: 0}
+docking: {approach_height_m: 0}
 ```
 
 | Key | Meaning |
 |-|-|
-| `approach_height` | The highest approach, in game units. Without it, 932, or 0 for `space_colony2`. |
+| `approach_height_m` | The highest approach, in metres. Without it, 22.75 m, or 0 for `space_colony2`. |
 
 The approach height is the smaller of this value and the gap between the
 target's dock point and the player's dock point. This group only applies

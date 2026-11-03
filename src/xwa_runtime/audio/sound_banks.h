@@ -7,7 +7,7 @@
  *   banks:
  *     interior:                     # keyed by object type
  *       sounds:
- *         xwing: {file: 'Wave/Sfx_Interior/EngineIntXW.wav', volume: 76, distance: 8192}
+ *         xwing: {file: 'Wave/Sfx_Interior/EngineIntXW.wav', volume: 76, distance_m: 200}
  *         awing: {silent: true}
  *     weapon:                       # keyed by object type, then weapon sound group
  *       unlisted: silent
@@ -24,12 +24,14 @@
  *         map_exit: {file: ...}
  *     weapon_range:                 # keyed by names that the mod chooses
  *       sounds:
- *         isd_turbolaser_near: {file: ..., distance: 2000}
+ *         isd_turbolaser_near: {file: ..., distance_m: 50}
  *
  * An entry is either a sound or `{silent: true}`. `volume` goes from 0 to
- * 255 and defaults to 127, which plays the file at its own level. Higher
- * values play it louder. `distance` is the 3D sound distance and defaults to
- * 8192. Both work like the columns of the game's .lst files.
+ * 255 and defaults to 127, which plays the file at its own level. Lower
+ * values play it quieter, and the game never plays a sound louder than its
+ * file. `distance_m` is the 3D sound distance in metres, from 0 to 1599.98,
+ * and defaults to 200. Both work like the columns of the game's .lst files,
+ * whose distance is in game units, 40.96 to the metre.
  *
  * `unlisted` sets what plays for an entry that the bank doesn't list.
  * `stock` is the default and plays the stock game's sound. `silent` plays

@@ -4,6 +4,7 @@
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/flight/object/object.h"
+#include "xwa_runtime/models/metres.h"
 #include "xwa_runtime/models/model_settings.h"
 
 #include <stdint.h>
@@ -13,22 +14,23 @@
 /* Modern port module; no original counterpart. */
 
 /* Each value's group (NULL for a key of `warhead_lock` itself), key and
-   limits. */
+   limits. The values of a group are distances, in metres in the file and
+   in game units here. */
 static const struct {
 	const char* group;
 	const char* key;
 	int64_t min;
 	int64_t max;
 } s_values[XWA_WARHEAD_LOCK_VALUES] = {
-	{ "lock_range", "small", 0, INT32_MAX },
-	{ "lock_range", "big", 0, INT32_MAX },
-	{ "lock_range", "transport", 0, INT32_MAX },
+	{ "lock_range_m", "small", 0, INT32_MAX },
+	{ "lock_range_m", "big", 0, INT32_MAX },
+	{ "lock_range_m", "transport", 0, INT32_MAX },
 	/* The HUD divides by lock_ticks / 200, and the lock ticks are 16-bit. */
 	{ NULL, "lock_ticks", 200, 32767 },
 	{ NULL, "ticks_per_homing_level", 1, 32767 },
-	{ "ai_lock_range", "small", 0, INT32_MAX },
-	{ "ai_lock_range", "big", 0, INT32_MAX },
-	{ "ai_lock_range", "big_top_tier", 0, INT32_MAX },
+	{ "ai_lock_range_m", "small", 0, INT32_MAX },
+	{ "ai_lock_range_m", "big", 0, INT32_MAX },
+	{ "ai_lock_range_m", "big_top_tier", 0, INT32_MAX },
 	{ NULL, "ai_lock_ticks_per_tier", 0, 65535 },
 };
 
@@ -45,7 +47,19 @@ void XwaWarheadLock_ClearModelSettings(void) { memset(s_models, 0, sizeof s_mode
 static void WarheadLock_ReadValue(unsigned int objectType, const char* path, const char* name,
 								  XwaWarheadLockValue value, const AeronConfigNode* node) {
 	const int64_t number = AeronConfigNode_Int(node, -1);
+	int32_t units;
 
+	if (s_values[value].group != NULL) {
+		if (!XwaMetres_Read(node, s_values[value].min, s_values[value].max, &units)) {
+			Aeron_LogWarn("xwa.models",
+						  "%s: warhead_lock.%s must be a distance from 0 to %.2f metres. It is ignored", path,
+						  name, XwaMetres_FromUnits((double)s_values[value].max));
+			return;
+		}
+		s_models[objectType].value[value] = units;
+		s_models[objectType].set[value] = 1;
+		return;
+	}
 	if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || number < s_values[value].min ||
 		number > s_values[value].max) {
 		Aeron_LogWarn("xwa.models", "%s: warhead_lock.%s must be a number from %lld to %lld. It is ignored",
@@ -68,7 +82,7 @@ static void WarheadLock_ReadMap(unsigned int objectType, const char* path, const
 		char name[64];
 		int value;
 
-		if (group == NULL && (strcmp(key, "lock_range") == 0 || strcmp(key, "ai_lock_range") == 0)) {
+		if (group == NULL && (strcmp(key, "lock_range_m") == 0 || strcmp(key, "ai_lock_range_m") == 0)) {
 			if (AeronConfigNode_Type(child) != AERON_CONFIG_MAP) {
 				Aeron_LogWarn("xwa.models", "%s: warhead_lock.%s isn't a map. It is ignored", path, key);
 				continue;

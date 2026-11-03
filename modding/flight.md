@@ -347,12 +347,12 @@ map:
 weapons:
   stats:
     default:
-      rebel_laser: {range: 65536, fire_ratio: 236, precise: false, spread_mask: 63}
+      rebel_laser: {range_m: 1600, fire_ratio: 236, precise: false, spread_mask: 63}
       imperial_laser:
         fire_rate: 47
         player_easy: {fire_rate: 39, power: 350}
     heavy_guns:
-      turbolaser_green_light: {power: 900, range: 204800}
+      turbolaser_green_light: {power: 900, range_m: 5000}
   warhead_capacity_percent:
     default: {space_bomb: 50, heavy_rocket: 50}
   energy_speed_q16:
@@ -392,7 +392,7 @@ game.
 | `score` | The score that a warhead hit gives the player and the player's team. The score goes back down when the warhead runs out of time without a hit. |
 | `fire_rate` | Lasers: the wait after a volley, in ticks, for each cannon that fired, so that linked cannons wait longer. Warheads: the wait after each warhead. The original values are 47 for lasers and 472 for warheads. |
 | `fire_ratio` | The wait between two shots of a turret, in ticks. By default, the `cooldown` of the laser group in the craft record. AI turrets wait 2 to 4 times longer, by skill, or by `fire_ratio_by_rank`. |
-| `range` | The range of a turret, in game units, 40.96 per metre. By default, the `range` of the laser group. |
+| `range_m` | The range of a turret, in metres. By default, the `range_m` of the laser group. |
 | `precise` | `false` makes the shots of AI turrets spread. In the original game, AI turrets aim exactly. A player's turret shots always spread. |
 | `spread_mask` | How far turret shots spread, in angle units where 65536 is a full turn. Use a value of the form 2ⁿ − 1, such as 255, about 1.4 degrees. The original value is 255. |
 | `decharge_rate` | The charge that a player's shot takes from its cannon. It replaces `rates.decharge`. A cannon holds up to 127 charge. |
@@ -534,9 +534,9 @@ original rule.
 With `player_approach_height`, the approach height is the smaller of the
 gap between the target's `dock_from_big` point and the player's
 `dock_to_big` point, and a limit from the target's model. A
-model sets the limit with `docking.approach_height` in its settings file
+model sets the limit with `docking.approach_height_m` in its settings file
 (see [Craft](craft.md)). Without it, the limit is 0 for `space_colony2`
-and 932 for other models. The original game approaches at twice the gap,
+and 22.75 m for other models. The original game approaches at twice the gap,
 and not at all for `space_colony2`.
 
 ### headlights
@@ -623,9 +623,9 @@ camera:
 | `exterior_lag_max` | The most that the exterior camera turns, in degrees. | 0 to 15 | 4.05 |
 | `exterior_tilt` | How far above the craft the exterior camera looks from, in degrees. | -30 to 30 | 10 |
 | `cockpit_sway` | The cockpit view sways with turns and speed changes. | `true` or `false` | `true` |
-| `cockpit_sway_strength` | How far the eye moves for each radian of lag, in world units. | 0 to 20 | 5 |
-| `cockpit_speed_sway` | How far the eye moves back for each unit of speed change, in world units. | 0 to 1 | 0.075 |
-| `cockpit_sway_max` | The most that the eye moves on each axis, in world units. | 0 to 10 | 2.5 |
+| `cockpit_sway_strength_m` | How far the eye moves for each radian of lag, in metres. | 0 to 0.5 | 0.122 |
+| `cockpit_speed_sway_m` | How far the eye moves back for each speed unit of speed change, in metres. | 0 to 0.025 | 0.00183 |
+| `cockpit_sway_max_m` | The most that the eye moves on each axis, in metres. | 0 to 0.25 | 0.061 |
 | `lag_time` | How fast the lag and the sway catch up, in seconds. | 0.05 to 2 | 0.32 |
 | `exterior_hud` | Shows the HUD and the reticle in the exterior view of the player's craft, in modern graphics. | `true` or `false` | `true` |
 
@@ -852,7 +852,7 @@ lists the banks and when each one plays.
 banks:
   interior:
     sounds:
-      xwing: {file: 'Wave/Custom/XwingEngine.wav', volume: 76, distance: 8192}
+      xwing: {file: 'Wave/Custom/XwingEngine.wav', volume: 76, distance_m: 200}
       awing: {silent: true}
   weapon:
     sounds:
@@ -869,7 +869,7 @@ banks:
       map_exit: {file: 'Wave/Custom/MapExit.wav', volume: 80}
   weapon_range:
     sounds:
-      isd_turbolaser_near: {file: 'Wave/Custom/IsdNear.wav', distance: 2000}
+      isd_turbolaser_near: {file: 'Wave/Custom/IsdNear.wav', distance_m: 50}
 ```
 
 The sound files in these examples are new files in the mod's
@@ -893,7 +893,7 @@ in the log and ignores the whole file.
 An entry is a sound or a silent entry:
 
 ```yaml
-xwing: {file: 'Wave/Custom/XwingEngine.wav', volume: 76, distance: 8192}
+xwing: {file: 'Wave/Custom/XwingEngine.wav', volume: 76, distance_m: 200}
 awing: {silent: true}
 ```
 
@@ -901,14 +901,14 @@ awing: {silent: true}
 |-|-|
 | `file` | The sound file, as a path in the game folder, such as `Wave/Custom/XwingLaser.wav`. |
 | `volume` | From 0 to 255. The default, 127, plays the file at its own level, and lower values play it quieter. The game never plays a sound louder than its file. Values above 127 keep a sound at full level when the player's volume settings or the distance would make it quieter. |
-| `distance` | How far the sound carries, in game units (40.96 per metre), from 0 to 65535. The default, 8192, is 200 m. See below. |
+| `distance_m` | How far the sound carries, in metres, from 0 to 1599.98. The default is 200. See below. |
 | `silent` | `true` makes the entry play nothing. A silent entry has no `file`. |
 
 The sounds of objects fade with the distance from the player. With 3D sound
 off, which is the game's default, a sound fades to a quarter of its volume
-at `distance`, plays at an eighth from twice `distance`, and is silent from
-four times `distance`. With 3D sound on, it is silent from twice
-`distance`.
+at `distance_m`, plays at an eighth from twice `distance_m`, and is silent
+from four times `distance_m`. With 3D sound on, it is silent from twice
+`distance_m`.
 
 To add a new sound, put it in the mod's `game/` folder under `WAVE/`,
 such as `game/WAVE/Custom/Alarm.wav`, and name it `Wave/Custom/Alarm.wav`.

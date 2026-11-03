@@ -9,6 +9,7 @@
 #include "xwa/config/game_config.h"
 #include "xwa/flight/flight.h"
 #include "xwa/frontend/frontend_mission.h"
+#include "xwa_runtime/models/metres.h"
 #include "xwa_runtime/models/names.h"
 
 #include <stdio.h>
@@ -199,9 +200,17 @@ static int SoundBanks_ReadEntry(XwaSoundBank bank, int index, const char* where,
 		SoundBanks_ReadInt("volume", value, 0, 255, &number)) {
 		entry->volume = (uint8_t)number;
 	}
-	if ((value = AeronConfigNode_MapGet(node, "distance")) != NULL &&
-		SoundBanks_ReadInt("distance", value, 0, 65535, &number)) {
-		entry->distance = (uint16_t)number;
+	if ((value = AeronConfigNode_MapGet(node, "distance_m")) != NULL) {
+		int32_t units;
+
+		if (XwaMetres_Read(value, 0, UINT16_MAX, &units)) {
+			entry->distance = (uint16_t)units;
+		} else {
+			Aeron_LogWarn("xwa.audio",
+						  SOUND_BANKS_YAML
+						  ":%d: distance_m must be a number of metres from 0 to %.2f. It is ignored",
+						  AeronConfigNode_Line(value), XwaMetres_FromUnits(UINT16_MAX));
+		}
 	}
 	return 1;
 }

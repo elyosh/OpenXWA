@@ -269,6 +269,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/weapon_rates.c
     src/xwa_runtime/models/warhead_launchers.c
     src/xwa_runtime/models/warhead_lock.c
+    src/xwa_runtime/models/metres.c
     src/xwa_runtime/models/jamming.c
     src/xwa_runtime/models/names.c
     src/xwa_runtime/models/weapon_stats.c

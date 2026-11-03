@@ -3,6 +3,7 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
+#include "xwa_runtime/models/metres.h"
 #include "xwa_runtime/models/model_settings.h"
 
 #include <stdint.h>
@@ -81,18 +82,19 @@ void XwaJamming_ReadModelSettings(unsigned int objectType, const char* path, con
 			}
 			model->rule.direction = (XwaJammingDirection)value;
 			model->set |= JAMMING_SET_DIRECTION;
-		} else if (strcmp(key, "range") == 0) {
-			const int64_t number = AeronConfigNode_Int(node, -1);
+		} else if (strcmp(key, "range_m") == 0) {
+			int32_t units;
 
 			if (AeronConfigNode_Type(node) == AERON_CONFIG_STRING &&
 				strcmp(AeronConfigNode_String(node, ""), "none") == 0) {
 				model->rule.range = -1;
-			} else if (AeronConfigNode_Type(node) == AERON_CONFIG_INT && number >= 0 && number <= INT32_MAX) {
-				model->rule.range = (int)number;
+			} else if (XwaMetres_Read(node, 0, INT32_MAX, &units)) {
+				model->rule.range = units;
 			} else {
-				Aeron_LogWarn("xwa.models",
-							  "%s: jamming.range must be none or a number from 0 to %d. It is ignored", path,
-							  INT32_MAX);
+				Aeron_LogWarn(
+					"xwa.models",
+					"%s: jamming.range_m must be none or a distance from 0 to %.2f metres. It is ignored",
+					path, XwaMetres_FromUnits((double)INT32_MAX));
 				continue;
 			}
 			model->set |= JAMMING_SET_RANGE;

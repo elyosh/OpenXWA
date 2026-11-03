@@ -30,11 +30,12 @@
  * The cap of the approach height comes from the `docking` group of the
  * target's model settings file:
  *
- *   docking: {approach_height: 0}
+ *   docking: {approach_height_m: 0}
  *
- * Without it, the cap is 0 for SpaceColony2 and 932 for other models. The
- * approach height is then the smaller of the cap and the gap above, rounded
- * toward 0 to an even number.
+ * The height is in metres. Without it, the cap is 0 for SpaceColony2 and
+ * 22.75 metres (932 game units) for other models. The approach height is
+ * then the smaller of the cap and the gap above, rounded toward 0 to an even
+ * number.
  *
  * The rules change the simulation. */
 

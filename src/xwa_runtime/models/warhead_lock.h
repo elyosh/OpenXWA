@@ -5,26 +5,28 @@
  * model settings file. All keys are optional:
  *
  *   warhead_lock:
- *     lock_range: {small: 102400, big: 244332, transport: 101805}
+ *     lock_range_m: {small: 2500, big: 5965, transport: 2485.47}
  *     lock_ticks: 354
  *     ticks_per_homing_level: 118
- *     ai_lock_range: {small: 102400, big: 244332, big_top_tier: 101805}
+ *     ai_lock_range_m: {small: 2500, big: 5965, big_top_tier: 2485.47}
  *     ai_lock_ticks_per_tier: 472
  *
- *   - lock_range: how close the player's target must be for a lock. `big`
- *     is for starships, platforms, containers and freighters, `transport`
- *     for transports, and `small` for other targets. The stock values are
- *     101805, 244332 and 162888;
+ *   - lock_range_m: how close the player's target must be for a lock, in
+ *     metres. `big` is for starships, platforms, containers and freighters,
+ *     `transport` for transports, and `small` for other targets. The stock
+ *     values are 2485.47, 5965.14 and 3976.76 (101805, 244332 and 162888
+ *     game units);
  *   - lock_ticks: how long the lock takes on the HUD and in the lock tone,
  *     in ticks. The stock value is 708, or 354 for the Missile Boat;
  *   - ticks_per_homing_level: a warhead's homing level is its craft's lock
  *     ticks divided by this value, up to 6. It applies to the player and to
  *     the AI. The stock value is 236;
- *   - ai_lock_range: how close the AI's target must be for the AI to fire a
- *     warhead. `big` is for starships, platforms, freighters, containers,
- *     weapon emplacements and, in newer missions, transports, `big_top_tier`
- *     replaces it for the AI of the top skill tier, and `small` is for
- *     other targets. The stock values are 101805, 203610 and 244332;
+ *   - ai_lock_range_m: how close the AI's target must be for the AI to fire
+ *     a warhead, in metres. `big` is for starships, platforms, freighters,
+ *     containers, weapon emplacements and, in newer missions, transports,
+ *     `big_top_tier` replaces it for the AI of the top skill tier, and
+ *     `small` is for other targets. The stock values are 2485.47, 4970.95
+ *     and 5965.14 (101805, 203610 and 244332 game units);
  *   - ai_lock_ticks_per_tier: the AI needs this many lock ticks for each
  *     skill tier, plus one, before it fires. The stock value is 472.
  *

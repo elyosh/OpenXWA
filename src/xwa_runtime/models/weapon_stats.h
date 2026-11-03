@@ -11,12 +11,12 @@
  *   weapons:
  *     stats:
  *       default:
- *         rebel_laser: {range: 65536, fire_ratio: 236, precise: false, spread_mask: 63}
+ *         rebel_laser: {range_m: 1600, fire_ratio: 236, precise: false, spread_mask: 63}
  *         imperial_laser:
  *           fire_rate: 47
  *           player_easy: {fire_rate: 39, power: 350}
  *       devastatorb7m2r:
- *         turbolaser_green_light: {power: 900, range: 204800}
+ *         turbolaser_green_light: {power: 900, range_m: 5000}
  *     warhead_capacity_percent:
  *       default: {space_bomb: 50, heavy_rocket: 50}
  *     energy_speed_q16:
@@ -51,8 +51,8 @@
  *     warheads;
  *   - duration_offset: how long a turret shot lives after it passes its
  *     target. The stock value is 59;
- *   - fire_ratio and range: the time between two shots of a turret, and its
- *     range. The stock values come from the craft record;
+ *   - fire_ratio and range_m: the time between two shots of a turret, and
+ *     its range in metres. The stock values come from the craft record;
  *   - precise and spread_mask: whether an AI turret aims exactly, and how
  *     far its shots spread when it doesn't. In the stock game, turrets aim
  *     exactly. A player's turret shots always spread;

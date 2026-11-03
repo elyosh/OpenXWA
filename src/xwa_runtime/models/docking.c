@@ -4,6 +4,7 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
+#include "xwa_runtime/models/metres.h"
 #include "xwa_runtime/models/model_settings.h"
 
 #include <stdint.h>
@@ -91,17 +92,18 @@ void XwaDocking_ReadModelSettings(unsigned int objectType, const char* path, con
 	for (index = 0; index < AeronConfigNode_MapCount(group); ++index) {
 		const char* key = AeronConfigNode_MapKeyAt(group, index);
 		const AeronConfigNode* node = AeronConfigNode_MapValueAt(group, index);
-		const int64_t value = AeronConfigNode_Int(node, 0);
+		int32_t units;
 
-		if (strcmp(key, "approach_height") != 0) {
+		if (strcmp(key, "approach_height_m") != 0) {
 			Aeron_LogWarn("xwa.models", "%s: docking.%s isn't a setting. It is ignored", path, key);
 			continue;
 		}
-		if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || value < INT32_MIN || value > INT32_MAX) {
-			Aeron_LogWarn("xwa.models", "%s: docking.approach_height must be a number. It is ignored", path);
+		if (!XwaMetres_Read(node, INT32_MIN, INT32_MAX, &units)) {
+			Aeron_LogWarn("xwa.models",
+						  "%s: docking.approach_height_m must be a number of metres. It is ignored", path);
 			continue;
 		}
-		s_approachHeight[objectType] = (int32_t)value;
+		s_approachHeight[objectType] = units;
 		s_hasApproachHeight[objectType] = 1;
 	}
 }

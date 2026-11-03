@@ -9,6 +9,7 @@
 #include "xwa/assets/object_type_info.h"
 #include "xwa/assets/string_table.h"
 #include "xwa_runtime/models/gunner_seats.h"
+#include "xwa_runtime/models/metres.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/names.h"
 #include "xwa_runtime/text/text_overrides.h"
@@ -105,6 +106,8 @@ typedef enum CraftFieldKind {
 	CRAFT_FIELD_WEAPON,
 	/* An 8-bit laser group kind, written as its name. */
 	CRAFT_FIELD_LASER_KIND,
+	/* A 32-bit distance in game units, written in metres. */
+	CRAFT_FIELD_METRES,
 } CraftFieldKind;
 
 typedef struct CraftField {
@@ -143,7 +146,7 @@ static const CraftField s_laserFields[] = {
 	{ "type", offsetof(ModelDef, laserGroupWeaponType), CRAFT_FIELD_WEAPON },
 	{ "count", offsetof(ModelDef, laserGroupSlotCount), CRAFT_FIELD_U8 },
 	{ "kind", offsetof(ModelDef, laserGroupWeaponKind), CRAFT_FIELD_LASER_KIND },
-	{ "range", offsetof(ModelDef, laserGroupFireRange), CRAFT_FIELD_I32 },
+	{ "range_m", offsetof(ModelDef, laserGroupFireRange), CRAFT_FIELD_METRES },
 	{ "cooldown", offsetof(ModelDef, laserGroupFireCooldownTicks), CRAFT_FIELD_U16 },
 };
 static const CraftField s_warheadFields[] = {
@@ -296,6 +299,7 @@ static int64_t CraftDefinitions_GetField(const uint8_t* base, CraftFieldKind kin
 			return value;
 		}
 		case CRAFT_FIELD_I32:
+		case CRAFT_FIELD_METRES:
 		default: {
 			int32_t value;
 
@@ -337,6 +341,16 @@ static void CraftDefinitions_SetField(const char* path, int record, const char* 
 			return;
 		}
 		value = named;
+	} else if (kind == CRAFT_FIELD_METRES) {
+		int32_t units;
+
+		if (!XwaMetres_Read(node, INT32_MIN, INT32_MAX, &units)) {
+			Aeron_LogError("xwa.craft", "%s:%d: %s needs a number of metres from %.2f to %.2f. It is ignored",
+						   path, AeronConfigNode_Line(node), what, XwaMetres_FromUnits((double)INT32_MIN),
+						   XwaMetres_FromUnits((double)INT32_MAX));
+			return;
+		}
+		value = units;
 	} else if (!CraftDefinitions_ReadInt(path, node, what, mins[kind], maxes[kind], &value)) {
 		return;
 	}
@@ -359,7 +373,8 @@ static void CraftDefinitions_SetField(const char* path, int record, const char* 
 			memcpy(base, &stored, sizeof stored);
 			break;
 		}
-		case CRAFT_FIELD_I32: {
+		case CRAFT_FIELD_I32:
+		case CRAFT_FIELD_METRES: {
 			const int32_t stored = (int32_t)value;
 
 			memcpy(base, &stored, sizeof stored);
@@ -379,6 +394,7 @@ static size_t CraftDefinitions_FieldSize(CraftFieldKind kind) {
 		case CRAFT_FIELD_WEAPON:
 			return 2;
 		case CRAFT_FIELD_I32:
+		case CRAFT_FIELD_METRES:
 			return 4;
 		default:
 			return 1;

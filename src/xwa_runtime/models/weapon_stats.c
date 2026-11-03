@@ -10,6 +10,7 @@
 #include "xwa/flight/object/object.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/render/renderer.h"
+#include "xwa_runtime/models/metres.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/names.h"
 
@@ -61,7 +62,7 @@ static const char* const s_stats[XWA_WEAPON_STATS] = {
 	"fire_rate",
 	"duration_offset",
 	"fire_ratio",
-	"range",
+	"range_m",
 	"precise",
 	"spread_mask",
 	"decharge_rate",
@@ -237,8 +238,15 @@ static void WeaponStats_ReadForm(const char* path, const char* where, const Aero
 			continue;
 		}
 		snprintf(name, sizeof name, "%s.%s", where, key);
-		if (stat == XWA_WEAPON_STAT_PRECISE ? WeaponStats_ReadBool(path, name, value, &read)
-											: WeaponStats_ReadInt(path, name, value, &read)) {
+		if (stat == XWA_WEAPON_STAT_RANGE) {
+			if (!XwaMetres_Read(value, INT32_MIN, INT32_MAX, &read)) {
+				Aeron_LogWarn("xwa.models", "%s: %s must be a number of metres. It is ignored", path, name);
+				continue;
+			}
+			form->value[stat] = read;
+			form->set |= (uint16_t)(1u << stat);
+		} else if (stat == XWA_WEAPON_STAT_PRECISE ? WeaponStats_ReadBool(path, name, value, &read)
+												   : WeaponStats_ReadInt(path, name, value, &read)) {
 			form->value[stat] = read;
 			form->set |= (uint16_t)(1u << stat);
 		}
