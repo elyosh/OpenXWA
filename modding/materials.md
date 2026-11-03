@@ -371,7 +371,7 @@ except `bar`:
 | Key | Meaning |
 |-|-|
 | `source` | The display that the rectangle shows. The [cockpit screen sources](reference/model_values.md#cockpit-screen-sources) page lists them. |
-| `dst` | `[u0, v0, u1, v1]`: the rectangle, in the material's texture coordinates. (u0, v0) gets the display's top left corner, and (u1, v1) its bottom right. `[0, 0, 1, 1]` fills the whole texture, upright. Swapping two values mirrors the display. |
+| `dst` | `[u0, v0, u1, v1]`: the rectangle, in the material's texture coordinates. (u0, v0) gets the display's top left corner, and (u1, v1) its bottom right. `[0, 0, 1, 1]` fills the whole texture, upright when the face shows its texture upright. Swapping two values mirrors the display: when a display shows upside down, swap v0 and v1. Values outside 0 to 1 are allowed. |
 | `bg` | The background colour, linear `[r, g, b]`. |
 | `highlight` | The background while the reticle is highlighted. |
 | `lock` | The background while a warhead lock is solid. |
