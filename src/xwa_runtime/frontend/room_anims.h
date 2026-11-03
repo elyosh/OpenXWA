@@ -6,7 +6,6 @@
  * These are videos played over a room's art, such as the ships passing the
  * concourse windows. The file lists groups of animations:
  *
- *   version: 1
  *   groups:
  *     - room: concourse
  *       repeat: random        # or same

@@ -2963,10 +2963,10 @@ int MissionSetup_DrawMissionDescriptionPanel(void) {
 	/* Mission_selection_x in frontend/concourse/layout.yaml moves the
 	   description panel for Tour of Duty and melee missions. */
 	if (g_pilotData.missionDirectoryId == MISSION_DIRECTORY_TOUR) {
-		xOffset = XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection_x", 230.0f));
+		xOffset = XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection.panel_x", 230.0f));
 	} else {
 		xOffset = g_pilotData.missionDirectoryId == MISSION_DIRECTORY_MELEE
-					  ? XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection_x", 230.0f))
+					  ? XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection.panel_x", 230.0f))
 					  : 0;
 	}
 #else

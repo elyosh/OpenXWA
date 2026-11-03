@@ -311,8 +311,7 @@ static void anims_free(void) {
 }
 
 static int anims_read(const AeronConfigNode* root) {
-	static const char* const keys[] = { "version", "groups", NULL };
-	const AeronConfigNode* version = AeronConfigNode_MapGet(root, "version");
+	static const char* const keys[] = { "groups", NULL };
 	const AeronConfigNode* groups = AeronConfigNode_MapGet(root, "groups");
 
 	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP) {
@@ -320,10 +319,6 @@ static int anims_read(const AeronConfigNode* root) {
 	}
 	if (!anims_check_keys(root, keys, "the file")) {
 		return 0;
-	}
-	if (version &&
-		(AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1)) {
-		return anims_error(version, "'version' must be 1");
 	}
 	if (AeronConfigNode_Type(groups) != AERON_CONFIG_SEQUENCE) {
 		return anims_error(groups ? groups : root, "the file needs 'groups', a list");

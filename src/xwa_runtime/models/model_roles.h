@@ -82,6 +82,15 @@ int XwaModelRole_Collect(unsigned short objectType, XwaModelRole role, int* comp
 /* For a replacement, writes the components carrying tag `tagName` to
    `components` (at most `capacity`) and returns how many there are. */
 int XwaModelRole_CollectTag(unsigned short objectType, const char* tagName, int* components, int capacity);
+/* Returns the part tag of `role`, such as "compactor.door.1", or NULL when
+   `role` isn't a role. */
+const char* XwaModelRole_Tag(XwaModelRole role);
+/* Returns the keys of the models that use `role`, as a NULL-terminated
+   list. The list is empty when `role` isn't a role. */
+const char* const* XwaModelRole_Models(XwaModelRole role);
+/* Returns whether a model can tag any number of parts with `role`. When it
+   returns 0, a model tags exactly one part. */
+int XwaModelRole_IsSet(XwaModelRole role);
 #define XWA_MODEL_ROLE(objectType, role, stockComponent)                                                     \
 	XwaModelRole_Resolve((unsigned short)(objectType), (role), (stockComponent))
 

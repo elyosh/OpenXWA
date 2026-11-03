@@ -44,13 +44,11 @@ extern "C" {
 typedef struct XwaRemasterAssets XwaRemasterAssets;
 struct XwaSnapshot;
 
-/* Resolved modern texture + frame UV sub-rect (0..1). w/h are the
- * frame's texel dims inside the texture — informational; draw
- * geometry must come from the record's classic dims, or for
- * type-bound frames from classic_w/classic_h: the frame's original
- * classic pixel dims (per-frame YAML key; falls back to the
- * atlas-level classic ratio for older YAMLs; 0 when neither is
- * available). */
+/* A loaded texture and the UV rect of a frame in it (0 to 1). w and h are
+ * the frame's size in pixels, for information only. Draws take their size
+ * from the record's classic size or, for frames bound to a type, from
+ * classic_w and classic_h: the frame's `size` in game units, else its size
+ * in pixels. */
 typedef struct XwaAssetRef {
 	AeronTexture* texture;
 	float u0, v0, u1, v1;

@@ -1088,11 +1088,11 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 					g_flightGlobalCountdownTimers[2] = 15;
 #ifdef XWA_MODERN
 					/* In the hangar, every object whose model sets
-					   crew.update_all animates its crew, in any view. The stock
+					   crew.always_animate animates its crew, in any view. The stock
 					   game animates only the player's crew, and only in an
 					   external view. */
 					if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive &&
-						!XwaArticulation_CrewUpdatesAll(g_players[g_localPlayer].objectIndex)) {
+						!XwaArticulation_CrewAlwaysAnimates(g_players[g_localPlayer].objectIndex)) {
 						FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex,
 															  0);
 					}
@@ -1630,11 +1630,11 @@ int Hangar_EnterCraft(uint16_t fromObjIdx) {
 					g_flightGlobalCountdownTimers[2] = 15;
 #ifdef XWA_MODERN
 					/* In the hangar, every object whose model sets
-					   crew.update_all animates its crew, in any view. The stock
+					   crew.always_animate animates its crew, in any view. The stock
 					   game animates only the player's crew, and only in an
 					   external view. */
 					if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive &&
-						!XwaArticulation_CrewUpdatesAll(g_players[g_localPlayer].objectIndex)) {
+						!XwaArticulation_CrewAlwaysAnimates(g_players[g_localPlayer].objectIndex)) {
 						FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex,
 															  0);
 					}
@@ -2806,7 +2806,12 @@ void Hangar_LaunchPlayerCraft(void) {
 		g_objectTable[newObjIdx].objectType == OBJ_BWing) {
 #endif
 		craft->sFoilState = (uint8_t)((craft->sFoilState ^ 2u) | 1u);
+#ifdef XWA_MODERN
+		fsfx_PlaySound(XwaCraftSounds_SFoil((unsigned int)g_localPlayer, 120), 0xffffu,
+					   (unsigned int)g_localPlayer);
+#else
 		fsfx_PlaySound(120, 0xffffu, (unsigned int)g_localPlayer);
+#endif
 		msg_emitInFlightMessage(MSG_SFOILS_OPENING, g_localPlayer);
 	}
 
@@ -5013,14 +5018,27 @@ shot_placed:
 }
 
 #ifdef XWA_MODERN
+static int Hangar_ModernHasCraft(int objectIdx) {
+	return objectIdx >= 0 && (uint32_t)objectIdx < g_regionObjectSlotEnd &&
+		   g_objectTable[objectIdx].objectType != OBJ_None && g_objectTable[objectIdx].mobj != NULL &&
+		   g_objectTable[objectIdx].mobj->pCraft != NULL;
+}
+
+/* A hangar laid out by the mod's hangar settings can have no crane arm.
+   g_hangarCraneObjIdx is then -1, and the crane code is skipped. */
+static int Hangar_ModernHasCraneArm(void) { return g_hangarCraneObjIdx >= 0; }
+
 static void Hangar_ModernResetCadenceSensitiveState(void) {
 	CraftData* craft;
 	int sceneIdx;
 
 	g_modernHangarLegacyCadenceTicks = 0;
 	g_modernHangarLegacyCadenceDue = 0;
-	craft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
-	g_modernHangarCraneRotationActive = (craft->meshRotation[HANGARCRANE_ARM] & 1u) != 0;
+	g_modernHangarCraneRotationActive = 0;
+	if (Hangar_ModernHasCraneArm()) {
+		craft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
+		g_modernHangarCraneRotationActive = (craft->meshRotation[HANGARCRANE_ARM] & 1u) != 0;
+	}
 	g_modernHangarCraneScaledStateActive = 0;
 
 	g_modernHangarPrimaryDroidRotation.decreasing = 0;
@@ -5046,18 +5064,12 @@ static void Hangar_ModernResetCadenceSensitiveState(void) {
 	}
 }
 
-static int Hangar_ModernHasCraft(int objectIdx) {
-	return objectIdx >= 0 && (uint32_t)objectIdx < g_regionObjectSlotEnd &&
-		   g_objectTable[objectIdx].objectType != OBJ_None && g_objectTable[objectIdx].mobj != NULL &&
-		   g_objectTable[objectIdx].mobj->pCraft != NULL;
-}
-
 void Hangar_ModernRestartCadence(void) {
 	int sceneIdx;
 
 	/* Without the scene (it is cleared or not built yet), the state is read
 	   again when the scene is set up. */
-	if (!Hangar_ModernHasCraft(g_hangarCraneObjIdx)) {
+	if (Hangar_ModernHasCraneArm() && !Hangar_ModernHasCraft(g_hangarCraneObjIdx)) {
 		return;
 	}
 	for (sceneIdx = 0; sceneIdx < g_hangarSceneObjectCount && sceneIdx < 10; ++sceneIdx) {
@@ -6330,9 +6342,9 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 		}
 
 #ifdef XWA_MODERN
-		/* A droid model with crew.update_all moves through the crew update
-		   instead of this motion. */
-		if (XwaArticulation_CrewUpdatesAll(objectIdx)) {
+		/* A droid model with crew.always_animate moves with the crew
+		   animation instead of this motion. */
+		if (XwaArticulation_CrewAlwaysAnimates(objectIdx)) {
 		} else if (XwaModernFlightTiming_IsHighRate()) {
 			Hangar_ModernUpdateHangarDroidMesh(sceneIdx, objectIdx, dtTicks);
 		} else {
@@ -6399,6 +6411,9 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 	}
 
 #ifdef XWA_MODERN
+	if (!Hangar_ModernHasCraneArm()) {
+		return;
+	}
 	if (XwaModernFlightTiming_IsHighRate()) {
 		Hangar_ModernUpdateCraneRotation(dtTicks, 0x300u);
 	} else {
@@ -6723,6 +6738,9 @@ void Hangar_UpdateFamilyBaseDroidTraffic(int dtTicks) {
 	}
 
 #ifdef XWA_MODERN
+	if (!Hangar_ModernHasCraneArm()) {
+		return;
+	}
 	if (XwaModernFlightTiming_IsHighRate()) {
 		Hangar_ModernUpdateCraneRotation(dtTicks, 0x390u);
 	} else {

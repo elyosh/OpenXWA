@@ -5,8 +5,10 @@
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
 #include "xwa_runtime/models/model_settings.h"
+#include "xwa_runtime/models/names.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -24,10 +26,14 @@ typedef struct CraftHudType {
 	uint16_t reticle[XWA_CRAFT_HUD_RETICLE_SLOTS];
 } CraftHudType;
 
+/* The icons from one hud.yaml map, indexed by object type. 0 means the
+   object type keeps its stock icon. */
 typedef struct CraftHudList {
-	uint16_t* values;
+	uint16_t values[OBJ_Count];
+	/* Whether the list gives the object type an icon. Otherwise it keeps its
+	   stock icon. */
+	uint8_t listed[OBJ_Count];
 	size_t count;
-	int present;
 } CraftHudList;
 
 static const char s_iconsPath[] = "flight/hud.yaml";
@@ -36,7 +42,7 @@ static CraftHudList s_hullIcons;
 static CraftHudList s_mapIcons;
 static XwaTargetDisplay s_targetDisplay;
 
-/* Loads a file from the mod folder and checks that it has "version: 1".
+/* Loads a file from the mod folder and checks that it is a map.
    Returns NULL when the file is missing. Other errors are logged. */
 static AeronConfigFile* CraftHud_LoadFile(const char* path) {
 	AeronConfigError error;
@@ -51,15 +57,18 @@ static AeronConfigFile* CraftHud_LoadFile(const char* path) {
 		return NULL;
 	}
 	root = AeronConfigFile_Root(file);
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1) {
-		Aeron_LogError("xwa.hud", "%s: the file needs 'version: 1'. It is ignored", path);
+	/* An empty file sets nothing. */
+	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP && AeronConfigNode_Type(root) != AERON_CONFIG_NULL) {
+		Aeron_LogError("xwa.hud", "%s: the file must be a map. It is ignored", path);
 		AeronConfigFile_Destroy(file);
 		return NULL;
 	}
 	return file;
 }
 
+/* Reads the hud.yaml map `key`, which maps object type names to image
+   numbers counted from 1, or to `none` for no icon. The game stores each
+   icon as the image number times 100, and no icon as 0. */
 static void CraftHud_ReadList(const AeronConfigNode* root, const char* key, CraftHudList* list) {
 	const AeronConfigNode* node = AeronConfigNode_MapGet(root, key);
 	size_t index;
@@ -67,27 +76,36 @@ static void CraftHud_ReadList(const AeronConfigNode* root, const char* key, Craf
 	if (node == NULL) {
 		return;
 	}
-	if (AeronConfigNode_Type(node) != AERON_CONFIG_SEQUENCE) {
-		Aeron_LogError("xwa.hud", "%s: '%s' isn't a list. The game uses its own table", s_iconsPath, key);
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.hud", "%s: %s must map object type names to image numbers. It is ignored",
+					   s_iconsPath, key);
 		return;
 	}
-	list->count = AeronConfigNode_SequenceCount(node);
-	list->values = (uint16_t*)calloc(list->count != 0 ? list->count : 1, sizeof *list->values);
-	if (list->values == NULL) {
-		list->count = 0;
-		return;
-	}
-	for (index = 0; index < list->count; ++index) {
-		const int64_t value = AeronConfigNode_Int(AeronConfigNode_SequenceGet(node, index), -1);
+	for (index = 0; index < AeronConfigNode_MapCount(node); ++index) {
+		const char* name = AeronConfigNode_MapKeyAt(node, index);
+		const AeronConfigNode* item = AeronConfigNode_MapValueAt(node, index);
+		const int64_t image = AeronConfigNode_Int(item, 0);
+		const int objectType = XwaNames_Find(&g_xwaObjectTypeNames, name);
+		const int none = AeronConfigNode_Type(item) == AERON_CONFIG_STRING &&
+						 strcmp(AeronConfigNode_String(item, ""), "none") == 0;
 
-		if (value < 0 || value > UINT16_MAX) {
-			Aeron_LogWarn("xwa.hud", "%s: entry %zu of '%s' isn't an image id. It is set to 0", s_iconsPath,
-						  index, key);
+		if (objectType < 0) {
+			XwaNames_LogUnknown(&g_xwaObjectTypeNames, s_iconsPath, AeronConfigNode_Line(item), key, name);
 			continue;
 		}
-		list->values[index] = (uint16_t)value;
+		if (!none &&
+			(AeronConfigNode_Type(item) != AERON_CONFIG_INT || image < 1 || image > UINT16_MAX / 100)) {
+			Aeron_LogWarn("xwa.hud",
+						  "%s:%d: %s.%s must be an image number from 1 to %d, or none. It is ignored",
+						  s_iconsPath, AeronConfigNode_Line(item), key, name, UINT16_MAX / 100);
+			continue;
+		}
+		if (!list->listed[objectType]) {
+			++list->count;
+		}
+		list->values[objectType] = none ? 0 : (uint16_t)(image * 100);
+		list->listed[objectType] = 1;
 	}
-	list->present = 1;
 }
 
 /* Reads `key` of the edges map, a list of three numbers of 0 or more.
@@ -226,28 +244,42 @@ static int CraftHud_ReadColor(const char* path, const AeronConfigNode* colors, c
 	return 1;
 }
 
-static void CraftHud_ReadCraft(const char* path, const AeronConfigNode* hud, CraftHudType* type) {
-	const AeronConfigNode* reticle;
-	const AeronConfigNode* colors;
+/* Reads the reticle map `node`. Nested maps add their key to `prefix`, so
+   the threat indicators get dotted names such as threats.laser_mode.turret. */
+static void CraftHud_ReadReticle(const char* path, const AeronConfigNode* node, const char* prefix,
+								 CraftHudType* type) {
 	size_t index;
 
-	reticle = AeronConfigNode_MapGet(hud, "reticle");
-	for (index = 0; index < AeronConfigNode_MapCount(reticle); ++index) {
-		const char* key = AeronConfigNode_MapKeyAt(reticle, index);
-		const int64_t value = AeronConfigNode_Int(AeronConfigNode_MapValueAt(reticle, index), 0);
-		char* end;
-		const long slot = strtol(key, &end, 10);
+	for (index = 0; index < AeronConfigNode_MapCount(node); ++index) {
+		const AeronConfigNode* item = AeronConfigNode_MapValueAt(node, index);
+		const int64_t value = AeronConfigNode_Int(item, 0);
+		char key[96];
+		int slot;
 
-		if (*key == '\0' || *end != '\0' || slot < 0 || slot >= XWA_CRAFT_HUD_RETICLE_SLOTS || value <= 0 ||
-			value > UINT16_MAX) {
-			Aeron_LogWarn(
-				"xwa.hud",
-				"%s: reticle.%s needs a slot from 0 to 22 and an image position above 0. It is ignored", path,
-				key);
+		snprintf(key, sizeof key, "%s%s", prefix, AeronConfigNode_MapKeyAt(node, index));
+		if (AeronConfigNode_Type(item) == AERON_CONFIG_MAP) {
+			strncat(key, ".", sizeof key - strlen(key) - 1);
+			CraftHud_ReadReticle(path, item, key, type);
+			continue;
+		}
+		slot = XwaNames_Find(&g_xwaReticleSlotNames, key);
+		if (slot < 0) {
+			XwaNames_LogUnknown(&g_xwaReticleSlotNames, path, AeronConfigNode_Line(item), "hud.reticle", key);
+			continue;
+		}
+		if (AeronConfigNode_Type(item) != AERON_CONFIG_INT || value <= 0 || value > UINT16_MAX) {
+			Aeron_LogWarn("xwa.hud", "%s:%d: hud.reticle.%s must be an image number above 0. It is ignored",
+						  path, AeronConfigNode_Line(item), key);
 			continue;
 		}
 		type->reticle[slot] = (uint16_t)value;
 	}
+}
+
+static void CraftHud_ReadCraft(const char* path, const AeronConfigNode* hud, CraftHudType* type) {
+	const AeronConfigNode* colors;
+
+	CraftHud_ReadReticle(path, AeronConfigNode_MapGet(hud, "reticle"), "", type);
 	colors = AeronConfigNode_MapGet(hud, "colors");
 	if (CraftHud_ReadColor(path, colors, "inner", &type->inner)) {
 		type->colorFlags |= CRAFT_HUD_HAS_INNER;
@@ -258,8 +290,6 @@ static void CraftHud_ReadCraft(const char* path, const AeronConfigNode* hud, Cra
 }
 
 void XwaCraftHud_Init(void) {
-	free(s_hullIcons.values);
-	free(s_mapIcons.values);
 	memset(&s_hullIcons, 0, sizeof s_hullIcons);
 	memset(&s_mapIcons, 0, sizeof s_mapIcons);
 	memset(&s_targetDisplay, 0, sizeof s_targetDisplay);
@@ -277,10 +307,7 @@ void XwaCraftHud_ReadModelSettings(unsigned int objectType, const char* path, co
 }
 
 static uint16_t CraftHud_Icon(const CraftHudList* list, unsigned int objectType, uint16_t stockId) {
-	if (!list->present) {
-		return stockId;
-	}
-	return objectType < list->count ? list->values[objectType] : 0;
+	return objectType < OBJ_Count && list->listed[objectType] ? list->values[objectType] : stockId;
 }
 
 uint16_t XwaCraftHud_HullIcon(unsigned int objectType, uint16_t stockId) {

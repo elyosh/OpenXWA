@@ -2992,7 +2992,7 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 #ifdef XWA_MODERN
 						/* A mission can make the proximity triggers skip
 						   objects without craft data, such as projectiles. */
-						(XwaMissionSettings_SkipProjectilesProximityCheck() &&
+						(XwaMissionSettings_ProximityTriggersCheckCraftOnly() &&
 						 (object->mobj == NULL || object->mobj->pCraft == NULL)) ||
 #endif
 						!Mission_ObjectMatchesTriggerVariableEx((uint16_t)objectIdx,
@@ -3010,7 +3010,7 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 					for (; scanObjIdx < scanObjEnd; ++scanObjIdx) {
 						if (g_objectTable[scanObjIdx].objectType == 0 ||
 #ifdef XWA_MODERN
-							(XwaMissionSettings_SkipProjectilesProximityCheck() &&
+							(XwaMissionSettings_ProximityTriggersCheckCraftOnly() &&
 							 (g_objectTable[scanObjIdx].mobj == NULL ||
 							  g_objectTable[scanObjIdx].mobj->pCraft == NULL)) ||
 #endif

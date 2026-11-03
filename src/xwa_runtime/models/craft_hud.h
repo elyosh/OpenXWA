@@ -1,26 +1,39 @@
 #ifndef XWA_RUNTIME_MODELS_CRAFT_HUD_H
 #define XWA_RUNTIME_MODELS_CRAFT_HUD_H
 
-/* Reads each craft's HUD settings and the hull and map icon lists from the
- * mod folder.
+/* Reads each craft's HUD settings and the hull and map icons from the mod
+ * folder.
  *
- * flight/hud.yaml replaces the game's icon tables. Each list gives the image
- * id for each object type:
+ * flight/hud.yaml changes the game's icon tables. Each map gives object types
+ * an icon, as an image number counted from 1, or `none` for no icon. Hull
+ * icons are in image group 26000 and map icons in group 14800. An object type
+ * that a map doesn't list keeps its stock icon.
  *
- *   version: 1
- *   hull_icons: [0, 2600, ...]
- *   map_icons: [0, 100, ...]
+ *   hull_icons: {xwing: 1, slot_33: 49, ywing: none}
+ *   map_icons: {xwing: 1}
  *
- * The `hud` group of a model settings file holds the craft's own HUD settings.
- * All keys are optional:
+ * The `hud` group of a model settings file holds the craft's own HUD
+ * settings. All keys are optional:
  *
  *   hud:
- *     reticle: {5: 135, 6: 136}
+ *     reticle:
+ *       laser: 135
+ *       laser_in_range: 136
+ *       threats:
+ *         laser_mode: {laser: 141, turret: 142, beam: 143, warhead: 144}
  *     colors: {inner: 0xff00ff00, border: 0xff008000}
  *
- * `reticle` maps a reticle slot to the image of group 12000 that it draws,
- * given as a 1-based position in the group. `colors` sets the HUD's inner and
- * border colours, as ARGB.
+ * `reticle` sets which image of HUD image group 12000 each part of the
+ * reticle draws, as a number counted from 1. The parts are:
+ *   - laser and laser_in_range: the laser reticle, and the overlay drawn
+ *     when the target is in range;
+ *   - warhead and warhead_lock: the warhead reticle, and the lock overlay;
+ *   - cannon_ready and cannon: the pip of each cannon when it is ready, and
+ *     when it isn't;
+ *   - threats.laser_mode and threats.warhead_mode: the threat indicators in
+ *     each weapon mode. Each mode has laser (incoming laser fire), turret (a
+ *     turret aiming at the player), beam and warhead (an incoming warhead).
+ * `colors` sets the HUD's inner and border colours, as ARGB.
  *
  * The `target_display` group of hud.yaml sets how the target display shows
  * the target:
@@ -86,16 +99,15 @@ void XwaCraftHud_ClearModelSettings(void);
 void XwaCraftHud_ReadModelSettings(unsigned int objectType, const char* path,
 								   const struct AeronConfigNode* group);
 
-/* Returns the image id of the hull icon for `objectType`. With a
-   `hull_icons` list, it returns the list's value, or 0 for a type past the
-   end of the list. Without a list, it returns `stockId`. */
+/* Returns the image id of the hull icon for `objectType`, or 0 for no icon.
+   When `hull_icons` doesn't list the object type, returns `stockId`. */
 uint16_t XwaCraftHud_HullIcon(unsigned int objectType, uint16_t stockId);
 /* Works like XwaCraftHud_HullIcon, for the map icons and the `map_icons`
    list. */
 uint16_t XwaCraftHud_MapIcon(unsigned int objectType, uint16_t stockId);
 /* Replaces colors[0] (inner) and colors[1] (border) with the colours that
-   the model settings file of `objectType`'s model sets. A colour that the file doesn't set
-   stays the same. */
+   the model settings file of `objectType`'s model sets. A colour that the
+   file doesn't set stays the same. */
 void XwaCraftHud_Colors(unsigned int objectType, uint32_t colors[2]);
 /* Returns the image that reticle slot `slot` draws for `objectType`, as a
    1-based position in group 12000. Returns 0 when the craft doesn't change

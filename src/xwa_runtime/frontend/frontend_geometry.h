@@ -30,16 +30,14 @@
  * The video loops for as long as the game draws the image, whichever frame
  * the game asks for.
  *
- * The `units` key sets the units of an atlas's values:
+ * Each frame has a `size`, and can have an `offset` (its anchor) and
+ * `bounds`. Without `size`, the frame's pixel size is divided by the
+ * atlas's `scale`. The `units` key sets the units of these values:
  *   design  The default. These are pixels of the screen size that
  *           `design: [w, h]` sets in frontend/frontend.yaml (640x480 by
- *           default). The game gets them converted to its 640x480 units.
- *           Frontend atlases use these units, with `size`, `offset` and
- *           `bounds` for each frame.
- *   game    The game's own pixels, with no conversion. Flight atlases use
- *           these units. xwa_asset_bake writes them, with `classic_w` and
- *           `classic_h` for each frame's size, and `origin_x` and `origin_y`
- *           for its anchor.
+ *           default). The game converts them to its 640x480 units.
+ *   game    The game's own units, with no conversion. The stock bake and
+ *           the flight atlases use them. `scale` can't be used with them.
  *
  * Each atlas is read once and kept. A missing atlas is remembered too, so it
  * is only looked for once. */
@@ -131,6 +129,12 @@ int XwaFrontendGeometry_UnitY(float y);
 /* Design pixels to 640x480 units, not rounded. */
 float XwaFrontendGeometry_UnitsX(float x);
 float XwaFrontendGeometry_UnitsY(float y);
+/* A value of `atlas` in 640x480 units: converted from design pixels, or as
+ * it is in an atlas with `units: game`. Rounded to whole units, or not. */
+int XwaFrontendGeometry_AtlasUnitX(const XwaGeometryAtlas* atlas, float x);
+int XwaFrontendGeometry_AtlasUnitY(const XwaGeometryAtlas* atlas, float y);
+float XwaFrontendGeometry_AtlasUnitsX(const XwaGeometryAtlas* atlas, float x);
+float XwaFrontendGeometry_AtlasUnitsY(const XwaGeometryAtlas* atlas, float y);
 
 /* The `paint` section of frontend/frontend.yaml. Missing keys keep the
  * original look. */

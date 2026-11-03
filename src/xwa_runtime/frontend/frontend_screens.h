@@ -48,6 +48,11 @@ int XwaFrontendScreens_TextScale256(void);
 
 void XwaFrontendScreens_Shutdown(void);
 
+/* Return the number of screens, and the name of screen `index` as the
+   `layouts` table writes it, such as "family_room.detail". */
+int XwaFrontendScreens_Count(void);
+const char* XwaFrontendScreens_Name(int index);
+
 #ifdef __cplusplus
 }
 #endif

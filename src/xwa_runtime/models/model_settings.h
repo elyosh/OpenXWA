@@ -4,7 +4,6 @@
 /* Reads the model settings files of the mod folder,
  * flight/models/<model key>.yaml, next to each model's GLB:
  *
- *   version: 1
  *   hud: {...}                # the reticle and HUD colours
  *   engine_glows: {...}       # glows that show by speed
  *   surfaces: {...}           # tagged surfaces and lights that show by state

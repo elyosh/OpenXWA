@@ -322,17 +322,12 @@ static int apply_atlas_frame(const AeronSpriteAtlas* atlas, int frame, XwaAssetR
 	if (out->has_light) {
 		memcpy(out->light, &atlas->light[frame * 3], sizeof out->light);
 	}
-	/* Classic dims: the per-frame YAML key is authoritative (each
-	 * frame's true original size — required once hand-authored frames
-	 * of arbitrary resolution mix into an atlas); the atlas-level
-	 * classic ratio covers older YAMLs (uniform machine upscale). */
-	if (atlas->classic_w && atlas->classic_h && atlas->classic_w[frame] > 0) {
-		out->classic_w = atlas->classic_w[frame];
-		out->classic_h = atlas->classic_h[frame];
-	} else if (atlas->classic_atlas_w > 0 && atlas->atlas_w > 0) {
-		const float inv = (float)atlas->classic_atlas_w / (float)atlas->atlas_w;
-		out->classic_w = (int)(r->w * inv + 0.5f);
-		out->classic_h = (int)(r->h * inv + 0.5f);
+	/* The classic size is the frame's `size` in game units, else its size
+	   in the page. */
+	if (atlas->size && atlas->size[frame * 2] > 0.0f) {
+		const float* size = &atlas->size[frame * 2];
+		out->classic_w = atlas->game_units ? (int)lroundf(size[0]) : XwaFrontendGeometry_UnitX(size[0]);
+		out->classic_h = atlas->game_units ? (int)lroundf(size[1]) : XwaFrontendGeometry_UnitY(size[1]);
 	} else {
 		out->classic_w = out->w;
 		out->classic_h = out->h;

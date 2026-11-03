@@ -7,6 +7,10 @@
 
 #include "bake_sprites.h"
 
+/* How many design pixels make one 640x480 unit, across and down. The
+ * importer makes the frontend files for a 2560x1440 screen. */
+enum { BAKE_XWAU_DESIGN_SCALE_X = 4, BAKE_XWAU_DESIGN_SCALE_Y = 3 };
+
 typedef struct BakeXwauOptions {
 	const BakeSpriteOptions* sprites; /* out_root, formats and BC7 quality */
 	const char* xwau_root;            /* the XWAU install */

@@ -182,8 +182,7 @@ typedef union ModelDefLocalOutputBuffer {
 
 // GLOBAL: XWA 0x5B30E0
 const uint8_t g_optHardpointWeaponGroupKindByType[40] = {
-	0, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+#include "hardpoint_weapon_kinds.inc"
 };
 
 // GLOBAL: XWA 0x5B2F78

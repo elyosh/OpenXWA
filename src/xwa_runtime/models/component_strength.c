@@ -1,5 +1,6 @@
 #include "xwa_runtime/models/component_strength.h"
 
+#include "aeron/asset/flight_names.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/model_mesh.h"
@@ -11,42 +12,7 @@
 
 /* Modern port module; no original counterpart. */
 
-#define COMPONENT_STRENGTH_MESH_TYPES 32
-
-static const char* const s_meshTypes[COMPONENT_STRENGTH_MESH_TYPES] = {
-	"default",
-	"main_hull",
-	"wing",
-	"fuselage",
-	"gun_turret",
-	"small_gun",
-	"engine",
-	"bridge",
-	"shield_generator",
-	"energy_generator",
-	"launcher",
-	"communication_system",
-	"beam_system",
-	"command_system",
-	"docking_platform",
-	"landing_platform",
-	"hangar",
-	"cargo_pod",
-	"misc_hull",
-	"antenna",
-	"rotary_wing",
-	"rotary_gun_turret",
-	"rotary_launcher",
-	"rotary_comm_system",
-	"rotary_beam_system",
-	"rotary_command_system",
-	"hatch",
-	"custom",
-	"weapon_system_1",
-	"weapon_system_2",
-	"power_regenerator",
-	"reactor",
-};
+#define COMPONENT_STRENGTH_MESH_TYPES AERON_FLIGHT_MESH_TYPE_COUNT
 
 /* The strength of each mesh type of an object type, plus 1. 0 means not
    set. */
@@ -73,14 +39,9 @@ void XwaComponentStrength_ReadModelSettings(unsigned int objectType, const char*
 		const char* key = AeronConfigNode_MapKeyAt(group, index);
 		const AeronConfigNode* node = AeronConfigNode_MapValueAt(group, index);
 		const int64_t value = AeronConfigNode_Int(node, -1);
-		int meshType;
+		const int meshType = Aeron_FlightNameFind(AERON_FLIGHT_MESH_TYPES, key);
 
-		for (meshType = 0; meshType < COMPONENT_STRENGTH_MESH_TYPES; ++meshType) {
-			if (strcmp(key, s_meshTypes[meshType]) == 0) {
-				break;
-			}
-		}
-		if (meshType == COMPONENT_STRENGTH_MESH_TYPES) {
+		if (meshType < 0) {
 			Aeron_LogWarn("xwa.models", "%s: component_strength: '%s' isn't a mesh type. It is ignored", path,
 						  key);
 			continue;

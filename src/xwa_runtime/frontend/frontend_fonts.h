@@ -5,7 +5,6 @@
  *
  * The file sets a TrueType or OpenType font for the frontend text:
  *
- *   version: 1
  *   default:                # for every font size without its own entry
  *     file: consolab.ttf    # in frontend/fonts/
  *     metrics: font         # game (the default) or font

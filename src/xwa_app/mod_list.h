@@ -1,18 +1,21 @@
 #ifndef XWA_APP_MOD_LIST_H
 #define XWA_APP_MOD_LIST_H
 
-/* The mods that OpenXWA can use:
+/* The list of mods:
  *   - the original game, with no mod;
- *   - each folder of the mods folder (paths.mods) that has a mod.yaml;
- *   - the configured mod folder (paths.mod), when it is somewhere else.
+ *   - each folder in the mods folder (paths.mods) that has a mod.yaml;
+ *   - the configured mod folder (paths.mod), if it is somewhere else and has
+ *     a mod.yaml.
  *
- * A mod.yaml gives the mod's name and whether its import finished:
+ * A folder without a mod.yaml is not a mod. mod.yaml looks like this:
  *
- *   name: "TFTC Reimagined 1.4"
- *   complete: true
+ *   version: 2                    # the mod format version it was made for
+ *   name: "TFTC Reimagined 1.4"   # default: the folder name
+ *   complete: true                # default: true
  *
- * A configured folder without one is named after the folder and counts as
- * complete. */
+ * A mod can be used only if its version is XWA_MOD_FORMAT_VERSION and it is
+ * complete. The importer also writes `source` and `imported`. A mod with
+ * `imported` was made by the importer. */
 
 #include "host_config.h"
 
@@ -22,13 +25,25 @@
 extern "C" {
 #endif
 
+typedef enum XwaModState {
+	XWA_MOD_READY,
+	XWA_MOD_UNFINISHED,    /* `complete: false`, such as an import that didn't finish */
+	XWA_MOD_OTHER_VERSION, /* made for another mod format version */
+	XWA_MOD_UNREADABLE,    /* its mod.yaml has an error */
+} XwaModState;
+
 typedef struct XwaModEntry {
 	char name[256];
 	/* The mod folder. Empty for the original game. */
 	char path[XWA_HOST_CONFIG_PATH_CAPACITY];
-	/* 0 when its import didn't finish: it can't be chosen. */
-	int complete;
+	XwaModState state;
+	/* Why the mod can't be used, for the player. Empty when it can. */
+	char problem[160];
 } XwaModEntry;
+
+/* Reads the mod.yaml of folder `path` into `out`. Returns 0 when the folder
+ * has none. A mod.yaml with an error gives XWA_MOD_UNREADABLE. */
+int XwaModList_Read(const char* path, XwaModEntry* out);
 
 typedef struct XwaModList {
 	XwaModEntry* entries;

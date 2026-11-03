@@ -95,6 +95,12 @@ static const XwaScreen k_screens[SCREEN_COUNT] = {
 	{ "joystick_action", Config_JoystickActionPickerUpdate, SCREEN_NONE, 1 },
 };
 
+int XwaFrontendScreens_Count(void) { return SCREEN_COUNT; }
+
+const char* XwaFrontendScreens_Name(int index) {
+	return index >= 0 && index < SCREEN_COUNT ? k_screens[index].name : NULL;
+}
+
 /* -1 for names that the table doesn't list. */
 static int g_screenLayouts[SCREEN_COUNT];
 static int g_screenDefault = -1;

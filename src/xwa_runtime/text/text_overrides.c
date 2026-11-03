@@ -207,9 +207,9 @@ void XwaText_Load(void) {
 		return;
 	}
 	root = AeronConfigFile_Root(file);
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1) {
-		Aeron_LogError("xwa.text", "%s: the file needs 'version: 1'. It is ignored", s_stringsPath);
+	/* An empty file sets nothing. */
+	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP && AeronConfigNode_Type(root) != AERON_CONFIG_NULL) {
+		Aeron_LogError("xwa.text", "%s: the file must be a map. It is ignored", s_stringsPath);
 		AeronConfigFile_Destroy(file);
 		return;
 	}

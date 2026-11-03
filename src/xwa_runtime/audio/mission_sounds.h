@@ -1,18 +1,18 @@
 #ifndef XWA_RUNTIME_AUDIO_MISSION_SOUNDS_H
 #define XWA_RUNTIME_AUDIO_MISSION_SOUNDS_H
 
-/* Sound replacements for one mission. A mission file can list sound files to
- * load instead of others during that mission:
+/* Sound replacements for one mission. A mission file can list sound files
+ * to load instead of others during the mission:
  *
  *   sounds:
- *     - ['Wave\Sfx_HangarAmbient\FamilyHangar0.wav', 'Wave\Custom\Evacuate.wav']
+ *     - ['Wave/Sfx_HangarAmbient/FamilyHangar0.wav', 'Wave/Custom/Evacuate.wav']
  *
- * When the game loads a sound effect from the first path, it loads the second
- * file instead, under the same effect name. The first path is compared with
- * the path that the game builds. Upper and lower case count as the same, but
- * '/' and '\' don't. If two entries have the same first path, the first entry
- * is used. If the replacement file doesn't exist, the original file loads and
- * a line is logged. Replacement files can be in the mod folder's game/
+ * When the game loads a sound from the first path, it loads the second file
+ * instead, under the same sound name. The game compares the first path with
+ * the path that it builds. Case doesn't matter, and '/' and '\' are the
+ * same. If two entries have the same first path, the game uses the first
+ * one. If the replacement file doesn't exist, the game loads the original
+ * file and logs a line. Replacement files can be in the mod's game/
  * folder. */
 
 #ifdef __cplusplus

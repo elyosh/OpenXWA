@@ -16,10 +16,9 @@
  *   <out>/resdata/atlas/group_<g>.{png,ktx2,yaml}                  DAT group
  *   <out>/resdata/atlas/group_<g>/frame_NN.{png,ktx2}              oversized
  *
- * Atlas layout YAML matches AeronSpriteAtlas: atlas{w,h,classic_w,
- * classic_h} + frames[{x,y,w,h,origin_x,origin_y}] (frame index is
- * positional: animation frame / DAT sprite id). origin_x/y carry the
- * DAT anchor in CLASSIC units.
+ * The atlas files are in game units. Each frame's `size` is its classic
+ * size, and its `offset` its DAT anchor. The frame index is the animation
+ * frame, and a DAT group's frames also have their sprite `id`.
  */
 
 #include "bake_sprites.h"
@@ -36,6 +35,7 @@
 #include "aeron/vfs.h"
 
 #include <errno.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -164,44 +164,129 @@ int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
 	return built;
 }
 
-/* AeronSpriteAtlas-compatible layout YAML. */
-int BakeSprites_WriteAtlasYaml(const char* path, const AeronAtlasImage* images, const BakeFrame* frames,
-							   const uint16_t* ids, int count, const AeronCpuAtlas* atlas, int classic_atlas_w,
-							   int classic_atlas_h, const char* header) {
+void BakeSprites_WriteNumberList(FILE* fp, const double* values, int count) {
+	fputc('[', fp);
+	for (int i = 0; i < count; ++i) {
+		if (i)
+			fputs(", ", fp);
+		if (values[i] == floor(values[i]))
+			fprintf(fp, "%.0f", values[i]);
+		else
+			fprintf(fp, "%.2f", values[i]);
+	}
+	fputc(']', fp);
+}
+
+/* Writes the atlas file `path`, which the game reads with
+ * Aeron_SpriteAtlasLoad and, with `game_geometry`, with its geometry
+ * reader. */
+static int write_atlas_yaml(const char* path, const BakeAtlasHeader* header, const BakeFrame* frames,
+							int count, const AeronAtlasImage* placed, const AeronCpuAtlas* pages) {
 	FILE* fp = fopen(path, "w");
-	if (!fp) {
+	if (!fp)
+		return 0;
+	if (header->comment)
+		fputs(header->comment, fp);
+	if (header->game_geometry)
+		fputs("game_geometry: true\n", fp);
+	if (header->game_units)
+		fputs("units: game\n", fp);
+	fprintf(fp, "atlas: {w: %d, h: %d}\n", pages->pages[0].width, pages->pages[0].height);
+	if (header->classic_frames)
+		fprintf(fp, "classic_frames: %d\n", header->classic_frames);
+	if (header->fps)
+		fprintf(fp, "fps: %d\n", header->fps);
+	if (header->tint)
+		fprintf(fp, "tint: %s\n", header->tint);
+	if (header->has_draw_adjust) {
+		fputs("draw_adjust: ", fp);
+		BakeSprites_WriteNumberList(fp, header->draw_adjust, 4);
+		fputc('\n', fp);
+	}
+	if (header->has_bounds) {
+		fputs("bounds: ", fp);
+		BakeSprites_WriteNumberList(fp, header->bounds, 4);
+		fputc('\n', fp);
+	}
+	if (header->region_count) {
+		fputs("regions:\n", fp);
+		for (int i = 0; i < header->region_count; ++i) {
+			fprintf(fp, "  - {type: %d, rect: ", header->regions[i].type);
+			BakeSprites_WriteNumberList(fp, header->regions[i].rect, 4);
+			fputs("}\n", fp);
+		}
+	}
+	if (header->extra)
+		fputs(header->extra, fp);
+	fputs("frames:\n", fp);
+	for (int i = 0; i < count; ++i) {
+		const BakeFrame* f = &frames[i];
+		fputs("  - {", fp);
+		if (f->has_id)
+			fprintf(fp, "id: %d, ", f->id);
+		if (pages->page_count > 1)
+			fprintf(fp, "page: %d, ", placed[i].page);
+		fprintf(fp, "x: %d, y: %d, w: %d, h: %d, size: ", placed[i].x, placed[i].y, f->w, f->h);
+		BakeSprites_WriteNumberList(fp, f->size, 2);
+		if (f->offset[0] != 0.0 || f->offset[1] != 0.0) {
+			fputs(", offset: ", fp);
+			BakeSprites_WriteNumberList(fp, f->offset, 2);
+		}
+		if (f->has_bounds) {
+			fputs(", bounds: ", fp);
+			BakeSprites_WriteNumberList(fp, f->bounds, 4);
+		}
+		if (f->keep_aspect)
+			fprintf(fp, ", keep_aspect: %s", f->keep_aspect);
+		if (f->fit)
+			fprintf(fp, ", fit: %s", f->fit);
+		if (f->has_light)
+			fprintf(fp, ", light: [%g, %g, %g]", f->light[0], f->light[1], f->light[2]);
+		fputs("}\n", fp);
+	}
+	return fclose(fp) == 0;
+}
+
+int BakeSprites_WriteAtlasFiles(const BakeSpriteOptions* opt, const char* dir, const char* base,
+								const BakeAtlasHeader* header, const BakeFrame* frames, int count,
+								const AeronAtlasImage* placed, const AeronCpuAtlas* pages) {
+	if (!BakeSprites_MakeDirs(dir))
+		return 0;
+	int ok = 1;
+	for (int page = 0; page < pages->page_count; ++page) {
+		char path[1200];
+		if (page == 0)
+			snprintf(path, sizeof path, "%s/%s", dir, base);
+		else
+			snprintf(path, sizeof path, "%s/%s_p%d", dir, base, page);
+		ok &= BakeSprites_EmitImage(opt, path, pages->pages[page].rgba, pages->pages[page].width,
+									pages->pages[page].height);
+	}
+	char yaml[1200];
+	snprintf(yaml, sizeof yaml, "%s/%s.yaml", dir, base);
+	return ok && write_atlas_yaml(yaml, header, frames, count, placed, pages);
+}
+
+int BakeSprites_PackAndWriteAtlas(const BakeSpriteOptions* opt, const char* dir, const char* base,
+								  const BakeAtlasHeader* header, const BakeFrame* frames, int count) {
+	AeronCpuAtlas pages = { 0 };
+	AeronAtlasImage* placed = NULL;
+	if (!BakeSprites_BuildAtlas(frames, count, 0, &placed, &pages)) {
+		ToolLog_Write(TOOL_LOG_ERROR, "bake: %s/%s could not be packed", dir, base);
 		return 0;
 	}
-	if (header)
-		fputs(header, fp);
-	fprintf(fp, "atlas: {w: %d, h: %d, classic_w: %d, classic_h: %d}\n", atlas->pages[0].width,
-			atlas->pages[0].height, classic_atlas_w, classic_atlas_h);
-	fprintf(fp, "frames:\n");
-	for (int i = 0; i < count; i++) {
-		const AeronAtlasImage* placement = &images[i];
-		const BakeFrame* frame = &frames[i];
-		fprintf(fp, "  - {");
-		if (ids)
-			fprintf(fp, "id: %u, ", ids[i]);
-		if (atlas->page_count > 1)
-			fprintf(fp, "page: %d, ", placement->page);
-		fprintf(fp,
-				"x: %d, y: %d, w: %d, h: %d, origin_x: %d, origin_y: %d, "
-				"classic_w: %d, classic_h: %d",
-				placement->x, placement->y, frame->w, frame->h, frame->origin_x, frame->origin_y,
-				frame->classic_w, frame->classic_h);
-		if (frame->has_light)
-			fprintf(fp, ", light: [%g, %g, %g]", frame->light[0], frame->light[1], frame->light[2]);
-		fprintf(fp, "}\n");
-	}
-	fclose(fp);
-	return 1;
+	const int ok = BakeSprites_WriteAtlasFiles(opt, dir, base, header, frames, count, placed, &pages);
+	if (pages.page_count > 1)
+		ToolLog_Write(TOOL_LOG_DETAIL, "  %s split across %d pages", base, pages.page_count);
+	free(placed);
+	Aeron_AtlasBuildFree(&pages);
+	return ok;
 }
 
 /* HD-upscale a decoded classic frame in place (unless disabled). */
 static int frame_upscale(const BakeSpriteOptions* opt, BakeFrame* f) {
-	f->classic_w = f->w;
-	f->classic_h = f->h;
+	f->size[0] = f->w;
+	f->size[1] = f->h;
 	if (!opt->scale) {
 		return 1;
 	}
@@ -234,22 +319,10 @@ static void emit_frames(const BakeSpriteOptions* opt, const char* bundle_dir, co
 	AeronCpuAtlas atlas = { 0 };
 	AeronAtlasImage* images = NULL;
 	if (BakeSprites_BuildAtlas(frames, n, 1, &images, &atlas)) {
+		const BakeAtlasHeader header = { .game_units = 1 };
 		char dir[1040];
 		snprintf(dir, sizeof dir, "%s/atlas", bundle_dir);
-		if (!BakeSprites_MakeDirs(dir)) {
-			free(images);
-			Aeron_AtlasBuildFree(&atlas);
-			stats->failures++;
-			return;
-		}
-		snprintf(base, sizeof base, "%s/%s", dir, name);
-		int ok = BakeSprites_EmitImage(opt, base, atlas.pages[0].rgba, atlas.pages[0].width, atlas.pages[0].height);
-		char yaml[1100];
-		snprintf(yaml, sizeof yaml, "%s.yaml", base);
-		const float inv_scale = opt->scale ? (1.0f / 4.5f) : 1.0f;
-		ok &= BakeSprites_WriteAtlasYaml(yaml, images, frames, NULL, n, &atlas,
-										 (int)(atlas.pages[0].width * inv_scale + 0.5f),
-										 (int)(atlas.pages[0].height * inv_scale + 0.5f), NULL);
+		const int ok = BakeSprites_WriteAtlasFiles(opt, dir, name, &header, frames, n, images, &atlas);
 		free(images);
 		Aeron_AtlasBuildFree(&atlas);
 		if (ok) {
@@ -334,7 +407,7 @@ static void bake_one_file(const BakeSpriteOptions* opt, AeronVfs* vfs, const cha
 			if (!frames[f].rgba) {
 				frames[f].rgba = (uint8_t*)calloc(1, 4);
 				frames[f].w = frames[f].h = 1;
-				frames[f].classic_w = frames[f].classic_h = 1;
+				frames[f].size[0] = frames[f].size[1] = 1;
 			}
 		}
 		emit_frames(opt, bundle_dir, base, frames, decoded.count, 0, stats);
@@ -345,56 +418,19 @@ static void bake_one_file(const BakeSpriteOptions* opt, AeronVfs* vfs, const cha
 
 /* ---- DAT (resdata) pass ---------------------------------------------- */
 
-/* Emit one DAT group as (possibly multi-page) atlas + id-keyed YAML.
- * Frames are DENSE (one per real sprite), each carrying its SPRITE ID
- * via the schema's optional `id` key — ids are sparse (frontend atlas
- * resources use base offsets like 4002); consumers look frames up
- * with Aeron_SpriteAtlasFindById. Content exceeding one atlas splits
- * across pages via the optional `page` key: page 0 = group_<g>.ktx2,
- * page N = group_<g>_p<N>.ktx2. */
-static void emit_group_atlas(const BakeSpriteOptions* opt, const char* resdata_dir,
-							 unsigned group, BakeFrame* frames, const uint16_t* ids, int n,
-							 BakeStats* stats) {
-	char dir[1040];
+/* Writes one DAT group as resdata/atlas/group_<g>, with as many pages as
+ * it needs. Each frame has its sprite id, which the game looks up with
+ * Aeron_SpriteAtlasFindById. */
+static void emit_group_atlas(const BakeSpriteOptions* opt, const char* resdata_dir, unsigned group,
+							 const BakeFrame* frames, int n, BakeStats* stats) {
+	const BakeAtlasHeader header = { .game_units = 1 };
+	char dir[1040], base[64];
 	snprintf(dir, sizeof dir, "%s/atlas", resdata_dir);
-	if (!BakeSprites_MakeDirs(dir)) {
-		stats->failures++;
-		return;
-	}
-	AeronCpuAtlas atlas = { 0 };
-	AeronAtlasImage* images = NULL;
-	if (!BakeSprites_BuildAtlas(frames, n, 0, &images, &atlas)) {
-		ToolLog_Write(TOOL_LOG_ERROR, "bake: group %u could not be packed within the atlas cap", group);
-		stats->failures++;
-		return;
-	}
-	int ok = 1;
-	for (int page = 0; page < atlas.page_count; page++) {
-		char base[1100];
-		if (page == 0) {
-			snprintf(base, sizeof base, "%s/group_%u", dir, group);
-		} else {
-			snprintf(base, sizeof base, "%s/group_%u_p%d", dir, group, page);
-		}
-		ok &= BakeSprites_EmitImage(opt, base, atlas.pages[page].rgba, atlas.pages[page].width,
-						 atlas.pages[page].height);
-	}
-	char yaml_path[1160];
-	snprintf(yaml_path, sizeof yaml_path, "%s/group_%u.yaml", dir, group);
-	const float inv_scale = opt->scale ? (1.0f / 4.5f) : 1.0f;
-	ok &= BakeSprites_WriteAtlasYaml(yaml_path, images, frames, ids, n, &atlas,
-									 (int)(atlas.pages[0].width * inv_scale + 0.5f),
-									 (int)(atlas.pages[0].height * inv_scale + 0.5f), NULL);
-	const int page_count = atlas.page_count;
-	free(images);
-	Aeron_AtlasBuildFree(&atlas);
-	if (ok) {
+	snprintf(base, sizeof base, "group_%u", group);
+	if (BakeSprites_PackAndWriteAtlas(opt, dir, base, &header, frames, n)) {
 		stats->atlases++;
 	} else {
 		stats->failures++;
-	}
-	if (page_count > 1) {
-		ToolLog_Write(TOOL_LOG_INFO, "  group %u split across %d pages", group, page_count);
 	}
 }
 
@@ -427,10 +463,7 @@ static void bake_dat_groups(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeSta
 		}
 
 		BakeFrame* frames = (BakeFrame*)calloc((size_t)decoded.count, sizeof *frames);
-		uint16_t* kept_ids = (uint16_t*)malloc((size_t)decoded.count * sizeof *kept_ids);
-		if (!frames || !kept_ids) {
-			free(frames);
-			free(kept_ids);
+		if (!frames) {
 			Xwa2dFrameSet_Free(&decoded);
 			stats->failures++;
 			continue;
@@ -442,8 +475,10 @@ static void bake_dat_groups(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeSta
 			bf->rgba = source->rgba;
 			bf->w = source->width;
 			bf->h = source->height;
-			bf->origin_x = source->anchor_x;
-			bf->origin_y = source->anchor_y;
+			bf->has_id = 1;
+			bf->id = source->sprite_id;
+			bf->offset[0] = source->anchor_x;
+			bf->offset[1] = source->anchor_y;
 			source->rgba = NULL;
 			if (!frame_upscale(opt, bf)) {
 				free(bf->rgba);
@@ -451,21 +486,18 @@ static void bake_dat_groups(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeSta
 				stats->failures++;
 				continue;
 			}
-			kept_ids[n] = (uint16_t)source->sprite_id;
 			n++;
 		}
 		Xwa2dFrameSet_Free(&decoded);
 		if (n == 0) {
 			free(frames);
-			free(kept_ids);
 			continue;
 		}
 
-		ToolLog_Write(TOOL_LOG_INFO, "resdata group %u: %d sprites (ids %u..%u)", group, n, kept_ids[0],
-					  kept_ids[n - 1]);
-		emit_group_atlas(opt, resdata_dir, group, frames, kept_ids, n, stats);
+		ToolLog_Write(TOOL_LOG_INFO, "resdata group %u: %d sprites (ids %d..%d)", group, n, frames[0].id,
+					  frames[n - 1].id);
+		emit_group_atlas(opt, resdata_dir, group, frames, n, stats);
 		frames_free(frames, n);
-		free(kept_ids);
 	}
 	BakeSource_FreeDatCatalog(&catalog);
 }

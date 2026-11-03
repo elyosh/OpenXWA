@@ -1,8 +1,8 @@
 #ifndef XWA_RUNTIME_MODELS_WEAPON_STATS_H
 #define XWA_RUNTIME_MODELS_WEAPON_STATS_H
 
-/* Weapon profiles let a mod change the stats of weapon types 280 to 307 for
- * each craft. They also change some other weapon values for each craft.
+/* Weapon profiles let a mod change the stats of the weapon types for each
+ * craft. They also change some other weapon values for each craft.
  *
  * A model settings file sets the values for the craft that use the model, in
  * its `weapons` group. The `weapons` section of flight/flight.yaml has the
@@ -11,19 +11,19 @@
  *   weapons:
  *     stats:
  *       default:
- *         280: {range: 65536, fire_ratio: 236, precise: false, spread_mask: 63}
- *         282:
+ *         rebel_laser: {range: 65536, fire_ratio: 236, precise: false, spread_mask: 63}
+ *         imperial_laser:
  *           fire_rate: 47
  *           player_easy: {fire_rate: 39, power: 350}
  *       devastatorb7m2r:
- *         303: {power: 900, range: 204800}
+ *         turbolaser_green_light: {power: 900, range: 204800}
  *     warhead_capacity_percent:
- *       default: {1: 50, 2: 50}
+ *       default: {space_bomb: 50, heavy_rocket: 50}
  *     energy_speed_q16:
  *       default: {all: 8192, player: 7864}
  *     linking:
  *       default: {laser_link: 2, prevent_player_linked_lasers_ion: true}
- *     hardpoint_kinds: [0, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1]
+ *     hardpoint_kinds: {custom_1: laser, custom_2: warhead}
  *
  * Each entry of `stats`, `warhead_capacity_percent`, `energy_speed_q16` and
  * `linking` is a profile. `default` is used when no profile is picked. A
@@ -31,7 +31,7 @@
  * the mission file:
  *
  *   flight_groups:
- *     13: { name: "Devastator", craft: 26, weapon_profile: devastatorb7m2r }
+ *     13: { name: "Devastator", craft: imperial_star_destroyer2, weapon_profile: devastatorb7m2r }
  *
  * `weapon_profile` picks a profile of `stats`, `warhead_profile` one of
  * `warhead_capacity_percent`, `energy_profile` one of `energy_speed_q16` and
@@ -68,42 +68,46 @@
  * value.
  *
  * The other groups:
- *   - warhead_capacity_percent: how much of a launcher's capacity a craft
- *     loads, in percent, for each warhead type of a flight group (1 to 11,
- *     like the warhead values of a mission). The stock percents go from 25
- *     to 100. A craft always gets at least 1 warhead;
+ *   - warhead_capacity_percent: maps warhead names to the percent of a
+ *     launcher's capacity that a craft loads with that warhead. The stock
+ *     percents go from 25 to 100. A craft always gets at least 1 warhead;
  *   - energy_speed_q16: how much speed a craft gains or loses for each step
  *     of energy moved to or from its engines, as a Q16 fraction of its top
  *     speed. `player` is for the player's craft, `all` for every craft. The
  *     stock value is 4096 for the TIE Bomber, 12288 for the TIE Fighter with
  *     spare engine power, and 8192 for other craft;
- *   - linking: `laser_link` sets the craft's laser link mode. The three
- *     rules stop the AI from firing lasers while it disables its target,
- *     stop the AI from firing ions when it doesn't, and stop the player from
- *     linking the lasers and the ions. `weapons.linking_rules` in
- *     flight/flight.yaml sets the rules for every profile;
- *   - hardpoint_kinds: whether each OPT hardpoint type, from 0 to 39, is a
- *     laser hardpoint (1) or a warhead hardpoint (2) when the model loads.
- *     Missing values are 0. The list replaces the stock table.
+ *   - linking: `laser_link` sets the craft's laser link mode: 1 fires one
+ *     cannon at a time, 2 fires half of them together, and 3 fires all of
+ *     them together. The three rules stop the AI from firing lasers while
+ *     it disables its target, stop the AI from firing ions when it doesn't,
+ *     and stop the player from linking the lasers and the ions.
+ *     `weapons.linking_rules` in flight/flight.yaml sets the rules for
+ *     every profile;
+ *   - hardpoint_kinds: maps hardpoint type names to laser, warhead or none,
+ *     the kind of weapon that hardpoints of that type fire. The hardpoint
+ *     type names are the same as the `type` names in the AERON_flight_model
+ *     extension.
+ *     A hardpoint type that the map leaves out uses the kind from
+ *     flight/flight.yaml, else the stock kind.
  *
  * flight/flight.yaml can also change these stock rules:
  *
  *   weapons:
- *     fire_ratio_by_rank: [4, 3, 2, 2, 1, 1]
- *     damage_by_difficulty: [0.5, 0.25, 1]
+ *     fire_ratio_by_rank: {novice: 4, officer: 3, veteran: 2, ace: 2, top_ace: 1, super_ace: 1}
+ *     damage_by_difficulty: {easy: 0.5, medium: 0.25, hard: 1}
  *     limit_linked_warhead_fire_rate: true
  *     linking_rules: {prevent_ai_lasers_ion_when_disabling: true,
  *                     prevent_ai_ion_when_not_disabling: true,
  *                     prevent_player_linked_lasers_ion: true}
  *
  *   - fire_ratio_by_rank: the time between two shots of an AI turret or
- *     launcher is multiplied by the factor of its flight group's rank, from
- *     novice to super ace. In the stock game, the factor depends on the AI's
+ *     launcher is multiplied by the factor of its flight group's rank. The
+ *     map needs every rank. In the stock game, the factor depends on the AI's
  *     skill: 4, 3, 1, 2, 2 or 2;
  *   - damage_by_difficulty: the damage that a craft's components take while
- *     its shields are up is multiplied by the factor of the difficulty: easy,
- *     medium and hard. In the stock game, the damage is halved on easy and
- *     divided by 4 on medium;
+ *     its shields are up is multiplied by the factor of the difficulty. The
+ *     map needs every difficulty. In the stock game, the damage is halved
+ *     on easy and divided by 4 on medium;
  *   - limit_linked_warhead_fire_rate: the time between two warhead shots is
  *     multiplied by the number of warheads fired.
  * The factors are float32 values. The game multiplies them in

@@ -10,6 +10,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/model_swaps.h"
+#include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/render_model.h"
 
 #include <math.h>
@@ -50,7 +51,7 @@ static const char* const s_articulationGroups[] = {
 static const char* const s_articulationBehaviors[] = { "swing", "random", "random_pause" };
 static const char* const s_articulationSettings[] = {
 	"step_ticks",         "sfoils.close_in_hyperspace", "sfoils.allow_fire_closed",
-	"sfoils.park_closed", "hangar_doors.distance",      "crew.update_all"
+	"sfoils.park_closed", "hangar_doors.distance",      "crew.always_animate"
 };
 
 static int OptSynth_IsKnownName(const char* name, const char* const* names, size_t count) {
@@ -81,6 +82,37 @@ static const char* OptSynth_TypeKey(const char* key) {
 	const char* source = XwaModelSwaps_SourceOf(key);
 
 	return source != NULL ? source : key;
+}
+
+void XwaRenderModel_ResolveScreens(AeronFlightModel* model, const char* label) {
+	AeronGltfModel* render = &model->render;
+	uint32_t i;
+
+	for (i = 0; i < render->screen_rect_count; ++i) {
+		AeronGltfScreenRect* rect = &render->screen_rects[i];
+		const int source = XwaNames_Find(&g_xwaScreenSourceNames, rect->source_name);
+
+		if (source < 0) {
+			Aeron_LogWarn("xwa.models",
+						  "%s: material %u: '%s' isn't a cockpit screen source. The rectangle shows nothing",
+						  label, rect->material, rect->source_name);
+			rect->source = 0;
+			rect->layers = 0;
+			continue;
+		}
+		rect->source = (uint32_t)source;
+	}
+	render->screen_hide_mask = 0;
+	for (i = 0; i < render->screen_hide_name_count; ++i) {
+		const int area = XwaNames_Find(&g_xwaHudAreaNames, render->screen_hide_names[i]);
+
+		if (area < 0) {
+			Aeron_LogWarn("xwa.models", "%s: screen hide list: '%s' isn't a HUD area. It is ignored", label,
+						  render->screen_hide_names[i]);
+			continue;
+		}
+		render->screen_hide_mask |= 1u << area;
+	}
 }
 
 static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model) {
@@ -479,6 +511,7 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 		return OptSynth_Fail(key, "invalid GLB or AERON_flight_model data");
 	}
 	free(glb);
+	XwaRenderModel_ResolveScreens(&model, path);
 	if (!OptSynth_ValidateModel(key, &model)) {
 		Aeron_FlightModelFree(&model);
 		return 0;

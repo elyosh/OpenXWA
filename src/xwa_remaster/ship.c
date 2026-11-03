@@ -187,6 +187,7 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 				ship_set_failure(cmd, "Ship model '%s': invalid GLB '%s'", key, path);
 				return NULL;
 			}
+			XwaRenderModel_ResolveScreens(&model, path);
 		}
 		/* A GLB with skin variants shows, per markings value, what its objects use. */
 		const AeronFlightModel* built = parsed ? parsed : &model;

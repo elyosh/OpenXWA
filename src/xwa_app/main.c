@@ -134,7 +134,7 @@ static void configure_mods(const XwaLaunchOptions* launch, const XwaHostConfig* 
 	for (size_t i = 0; i < list.count; ++i) {
 		entries[i].name = list.entries[i].name;
 		entries[i].path = list.entries[i].path;
-		entries[i].complete = list.entries[i].complete;
+		entries[i].problem = list.entries[i].problem[0] ? list.entries[i].problem : NULL;
 		if (XwaModList_SamePath(list.entries[i].path, selected_mod)) {
 			running = i;
 		}
@@ -145,14 +145,14 @@ static void configure_mods(const XwaLaunchOptions* launch, const XwaHostConfig* 
 	XwaModList_Free(&list);
 }
 
-/* Shows a setup error that the player can fix themselves, so it doesn't ask
- * for the logs like Aeron_FatalError. */
-static void show_setup_error(const char* message) {
+/* Shows a setup message about a problem that the player can fix. Unlike
+ * Aeron_FatalError, it doesn't ask for the logs. */
+static void show_setup_message(AeronMessageBoxKind kind, const char* message) {
 	static const AeronMessageBoxButton buttons[] = {
 		{ 0, "OK", 1, 1 },
 	};
 	const AeronMessageBoxOptions options = {
-		.kind = AERON_MESSAGE_BOX_ERROR,
+		.kind = kind,
 		.title = "OpenXWA",
 		.message = message,
 		.buttons = buttons,
@@ -161,6 +161,8 @@ static void show_setup_error(const char* message) {
 
 	Aeron_ShowMessageBox(&options, NULL);
 }
+
+static void show_setup_error(const char* message) { show_setup_message(AERON_MESSAGE_BOX_ERROR, message); }
 
 static int show_first_launch_prompt(int* cancelled, char* error, size_t error_size) {
 	static const AeronMessageBoxButton buttons[] = {
@@ -350,6 +352,7 @@ int main(int argc, char** argv) {
 	char selected_game_data[XWA_HOST_CONFIG_PATH_CAPACITY];
 	char selected_mod[XWA_HOST_CONFIG_PATH_CAPACITY];
 	char config_error[1024];
+	char mod_notice[1024 + XWA_HOST_CONFIG_PATH_CAPACITY];
 	XwaModernWindowMode initial_window_mode;
 	int exit_code;
 	int setup_cancelled;
@@ -413,26 +416,27 @@ int main(int argc, char** argv) {
 		Aeron_Shutdown();
 		return 1;
 	}
-	Aeron_SetFullscreen(initial_window_mode == XWA_MODERN_WINDOW_MODE_FULLSCREEN);
-	/* The setup dialogs above are separate OS windows; on some platforms
-	 * (macOS) closing them does not re-key the game window, which would start
-	 * the game inside its unfocused pause. Ask for input focus back. */
-	Aeron_RaiseWindow();
 	Aeron_LogInfo("xwa.config", "game data: %s", selected_game_data);
 	if (!XwaSetup_SetModRoot(Aeron_GetVfs(), &launch, &host_config, selected_mod, sizeof selected_mod,
-							 config_error, sizeof config_error)) {
+							 mod_notice, sizeof mod_notice, config_error, sizeof config_error)) {
 		Aeron_LogError("xwa.config", "%s", config_error);
 		show_setup_error(config_error);
 		Aeron_Shutdown();
 		return 1;
 	}
-	AeronFileInfo mod_info;
+	if (mod_notice[0]) {
+		Aeron_LogWarn("xwa.config", "%s", mod_notice);
+		show_setup_message(AERON_MESSAGE_BOX_WARNING, mod_notice);
+	}
+	Aeron_SetFullscreen(initial_window_mode == XWA_MODERN_WINDOW_MODE_FULLSCREEN);
+	/* The setup dialogs above are separate OS windows; on some platforms
+	 * (macOS) closing them does not re-key the game window, which would start
+	 * the game inside its unfocused pause. Ask for input focus back. */
+	Aeron_RaiseWindow();
 	if (!selected_mod[0]) {
 		Aeron_LogInfo("xwa.config", "mod: none, the original game");
-	} else if (AeronVfs_Stat(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, ".", &mod_info) && mod_info.is_directory) {
-		Aeron_LogInfo("xwa.config", "mod: %s", selected_mod);
 	} else {
-		Aeron_LogInfo("xwa.config", "mod: %s (not found, original assets only)", selected_mod);
+		Aeron_LogInfo("xwa.config", "mod: %s", selected_mod);
 	}
 	configure_mods(&launch, &host_config, selected_mod);
 	Aeron_LogInfo("xwa.config", "resources: %s", Aeron_ResourceRoot());

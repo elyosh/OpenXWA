@@ -10,7 +10,7 @@
  *
  *   skins:
  *     awing:
- *       0: "0|default_2,ace"
+ *       0: "default_2 + ace"
  *
  * The renderer creates each model's mesh with only the variants its objects
  * use. This module tells it, through the snapshot, the mission's selections
