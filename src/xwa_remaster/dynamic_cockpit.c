@@ -8,6 +8,7 @@
 #include "xwa_remaster/hud_fixed.h"
 #include "xwa_remaster/hud_layout.h"
 #include "xwa_remaster/hud_text.h"
+#include "xwa_runtime/models/names.h"
 
 #include <math.h>
 #include <string.h>
@@ -57,6 +58,9 @@ typedef struct DcRect {
 	float width, height, x0, y0, x1, y1;
 	const char* name;
 } DcRect;
+
+/* The rectangles follow the order of the screen source names. */
+typedef char dc_sources_check[(XWA_DC_SOURCE_COUNT == XWA_SCREEN_SOURCE_COUNT) ? 1 : -1];
 
 /* Dynamic_Cockpit_Internal_Areas.cfg source_def / screen_def lines in index
  * order, with four rectangles replaced by fixed values. Each anchor is the

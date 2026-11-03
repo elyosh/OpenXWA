@@ -1023,12 +1023,12 @@ int XwaArticulation_AnimateCrew(unsigned int objIdx, int resetToNeutral) {
 	return 1;
 }
 
-int XwaArticulation_CrewUpdatesAll(unsigned int objIdx) {
+int XwaArticulation_CrewAlwaysAnimates(unsigned int objIdx) {
 	ArticulationModel view;
 	const ArticulationModel* model = Articulation_Model(objIdx, &view);
 	uint32_t index;
 
-	if (model == NULL || Articulation_Setting(model, "crew.update_all", 0) == 0) {
+	if (model == NULL || Articulation_Setting(model, "crew.always_animate", 0) == 0) {
 		return 0;
 	}
 	for (index = 0; index < model->articulationCount; ++index) {
@@ -1043,7 +1043,7 @@ void XwaArticulation_StepHangarCrew(void) {
 	uint32_t objIdx;
 
 	for (objIdx = 0; g_objectTable != NULL && objIdx < g_objectTableSlotCount; ++objIdx) {
-		if (XwaArticulation_CrewUpdatesAll(objIdx)) {
+		if (XwaArticulation_CrewAlwaysAnimates(objIdx)) {
 			FlightObject_AnimateCrewMeshRotations((int)objIdx, 0);
 		}
 	}

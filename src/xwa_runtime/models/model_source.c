@@ -463,12 +463,6 @@ void XwaModelSource_Init(void) {
 		ModelSource_Reset();
 		return;
 	}
-	if (ModelSource_FileExists("flight/models/model_map.yaml")) {
-		Aeron_LogWarn("xwa.models",
-					  "flight/models/model_map.yaml is no longer read: an object type's file in "
-					  "flight/object_types gives it another model");
-	}
-
 	glbCount = 0;
 	for (i = 0; i < s_craftKeyCount; ++i) {
 		glbCount += ModelSource_ProbeCraftKey(&s_craftKeys[i]);

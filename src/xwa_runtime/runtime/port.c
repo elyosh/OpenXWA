@@ -162,6 +162,9 @@ int XwaPort_Init(void) {
 		Aeron_LogError("xwa", "Failed to create the film folder in the user folder");
 	}
 	XwaText_Load();
+	/* The object type files can rename object types, and the other mod files
+	   use the new names, so read them first. */
+	XwaCraftDefinitions_Apply();
 	XwaMissionBackdrops_Init();
 	XwaMissionSettings_Init();
 	XwaDocking_Init();
@@ -171,7 +174,6 @@ int XwaPort_Init(void) {
 	XwaModernSunOptions_LoadMod();
 	XwaCockpitAlertLights_Init();
 	XwaParticleLights_Init();
-	XwaCraftDefinitions_Apply();
 	XwaModelSource_Init();
 	XwaHangars_Init();
 	XwaCraftHud_Init();

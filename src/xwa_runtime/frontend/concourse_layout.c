@@ -18,7 +18,6 @@
 
 typedef enum XwaLayoutKind {
 	LAYOUT_SECTION, /* a map of other keys */
-	LAYOUT_INT,
 	LAYOUT_BOOL,
 	LAYOUT_X,         /* a position across, in design pixels */
 	LAYOUT_Y,         /* a position down */
@@ -26,7 +25,7 @@ typedef enum XwaLayoutKind {
 	LAYOUT_RECT,      /* [x, y, width, height] */
 	LAYOUT_POINTS,    /* [[x, y], ...] */
 	LAYOUT_POINT_MAP, /* {number: [x, y], ...} */
-	LAYOUT_PROGRESS,  /* linear or stock */
+	LAYOUT_PROGRESS,  /* even or original */
 } XwaLayoutKind;
 
 /* The keys the file can have. */
@@ -34,7 +33,6 @@ static const struct {
 	const char* key;
 	XwaLayoutKind kind;
 } k_layoutKeys[] = {
-	{ "version", LAYOUT_INT },
 	{ "starfield", LAYOUT_BOOL },
 	{ "planet", LAYOUT_SECTION },
 	{ "planet.left", LAYOUT_X },
@@ -62,15 +60,14 @@ static const struct {
 	{ "family_room.play_mission", LAYOUT_RECT },
 	{ "family_room.marko_eye", LAYOUT_POINT },
 	{ "family_room.monitor", LAYOUT_POINT },
-	{ "family_room.lady_blue_mission", LAYOUT_INT },
-	{ "family_room.cologne_mission", LAYOUT_INT },
 	{ "loading_screen", LAYOUT_SECTION },
 	{ "loading_screen.item", LAYOUT_SECTION },
 	{ "loading_screen.item.left", LAYOUT_X },
 	{ "loading_screen.item.right", LAYOUT_X },
 	{ "loading_screen.item.height", LAYOUT_Y },
-	{ "loading_screen.progress", LAYOUT_PROGRESS },
-	{ "mission_selection_x", LAYOUT_X },
+	{ "loading_screen.progress_bar", LAYOUT_PROGRESS },
+	{ "mission_selection", LAYOUT_SECTION },
+	{ "mission_selection.panel_x", LAYOUT_X },
 	{ "briefing", LAYOUT_SECTION },
 	{ "briefing.squad_logos", LAYOUT_POINT_MAP },
 	{ "create_pilot", LAYOUT_SECTION },
@@ -81,7 +78,7 @@ static const struct {
 	{ "medals.positions", LAYOUT_POINTS },
 	{ "medals.kalidor", LAYOUT_POINT },
 	{ "award_ceremony", LAYOUT_SECTION },
-	{ "award_ceremony.zoom_texts", LAYOUT_BOOL },
+	{ "award_ceremony.show_names", LAYOUT_BOOL },
 	{ "award_ceremony.battle", LAYOUT_SECTION },
 	{ "award_ceremony.battle.images", LAYOUT_POINTS },
 	{ "award_ceremony.battle.text_offsets", LAYOUT_POINTS },
@@ -112,8 +109,6 @@ static int layout_is_numbers(const AeronConfigNode* node, size_t count) {
 
 static int layout_check_value(const AeronConfigNode* node, XwaLayoutKind kind) {
 	switch (kind) {
-		case LAYOUT_INT:
-			return AeronConfigNode_Type(node) == AERON_CONFIG_INT;
 		case LAYOUT_BOOL:
 			return AeronConfigNode_Type(node) == AERON_CONFIG_BOOL;
 		case LAYOUT_X:
@@ -147,7 +142,7 @@ static int layout_check_value(const AeronConfigNode* node, XwaLayoutKind kind) {
 			return 1;
 		case LAYOUT_PROGRESS: {
 			const char* text = AeronConfigNode_String(node, "");
-			return strcmp(text, "linear") == 0 || strcmp(text, "stock") == 0;
+			return strcmp(text, "even") == 0 || strcmp(text, "original") == 0;
 		}
 		case LAYOUT_SECTION:
 			return AeronConfigNode_Type(node) == AERON_CONFIG_MAP;
@@ -165,7 +160,7 @@ static const char* const k_layoutKindText[] = {
 	"[x, y, width, height]",
 	"a list of [x, y]",
 	"a map of numbers to [x, y]",
-	"linear or stock",
+	"even or original",
 };
 
 /* Checks every key of the map `node`, whose path is `prefix`. */
@@ -272,17 +267,13 @@ float XwaConcourseLayout_Y(const char* key, float stock) {
 								  : stock;
 }
 
-int XwaConcourseLayout_Int(const char* key, int stock) {
-	const AeronConfigNode* node = layout_node(key);
-	return AeronConfigNode_Type(node) == AERON_CONFIG_INT ? (int)AeronConfigNode_Int(node, stock) : stock;
-}
-
 int XwaConcourseLayout_Bool(const char* key, int stock) {
 	return AeronConfigNode_Bool(layout_node(key), stock) != 0;
 }
 
-int XwaConcourseLayout_LinearProgress(void) {
-	return strcmp(AeronConfigNode_String(layout_node("loading_screen.progress"), "stock"), "linear") == 0;
+int XwaConcourseLayout_EvenProgressBar(void) {
+	return strcmp(AeronConfigNode_String(layout_node("loading_screen.progress_bar"), "original"), "even") ==
+		   0;
 }
 
 int XwaConcourseLayout_SquadLogo(int id, float* x, float* y) {
@@ -352,16 +343,6 @@ void XwaConcourseLayout_AssignMovedRect(FrontendRect* rect, const char* key, int
 	if (XwaConcourseLayout_HitPoint(key, &moved_x, &moved_y)) {
 		FrontendDraw_RectOffsetXY(rect, moved_x - x, moved_y - y);
 	}
-}
-
-int XwaConcourseLayout_UnlockMission(const char* key, int mission) {
-	const int value = XwaConcourseLayout_Int(key, mission);
-	return value < 0 || value >= 255 ? 0 : value;
-}
-
-int XwaConcourseLayout_Unlocked(const char* key, int mission) {
-	const int value = XwaConcourseLayout_UnlockMission(key, mission);
-	return value <= 0 || g_pilotData.tourOfDutyMissions[value - 1].completedCount != 0;
 }
 
 void XwaConcourseLayout_MedalPosition(int index, int* x, int* y) {

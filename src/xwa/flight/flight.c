@@ -2334,12 +2334,12 @@ void FlightObject_UpdateSpecialBehavior(void) {
 			}
 
 #ifdef XWA_MODERN
-			/* A model with crew.update_all animates its crew for every object,
-			   in any view. Pilots keep their own call below. */
+			/* A model with crew.always_animate animates its crew on every
+			   object, in every view. Pilots keep their own call below. */
 			if ((g_objectTable[(uint16_t)objIdx].playerOwnerIdx != -1 && g_flightPlayerCount == 1 &&
 				 g_players[g_localPlayer].viewState.externalCameraActive) ||
 				(objectType != OBJ_RebelPilot && objectType != OBJ_ImperialPilot &&
-				 XwaArticulation_CrewUpdatesAll(objIdx))) {
+				 XwaArticulation_CrewAlwaysAnimates(objIdx))) {
 #else
 			if (g_objectTable[(uint16_t)objIdx].playerOwnerIdx != -1 && g_flightPlayerCount == 1 &&
 				g_players[g_localPlayer].viewState.externalCameraActive) {
@@ -4864,7 +4864,7 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					   interdicted plays the abort sound instead of the arrival
 					   sound. */
 					const int interdicted =
-						XwaMissionSettings_InterdictedRegion(g_players[playerIdx].regionIndex);
+						XwaMissionSettings_HyperspaceAbortSoundRegion(g_players[playerIdx].regionIndex);
 					const int endSlot =
 						XwaCraftSounds_HyperEnd(playerIdx, interdicted, interdicted ? 119 : 117);
 					if (endSlot != -1)
@@ -5111,7 +5111,11 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 						po->mobj->pCraft->sFoilState ^= 2u;
 						g_objectTable[g_players[playerIdx].objectIndex].mobj->pCraft->sFoilState |= 1u;
 						if (playerIdx == (unsigned int)g_localPlayer) {
+#ifdef XWA_MODERN
+							fsfx_PlaySound(XwaCraftSounds_SFoil(playerIdx, 120), 0xFFFFu, playerIdx);
+#else
 							fsfx_PlaySound(120, 0xFFFFu, playerIdx);
+#endif
 							msg_emitInFlightMessage(MSG_SFOILS_OPENING, playerIdx);
 							Mission_SetActiveRegionObjectRanges(fromRegion);
 							return;
@@ -9766,7 +9770,12 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 							craft->sFoilState ^= 2u;
 							craft->sFoilState |= 1u;
 							if (currentPlayerIdx == (unsigned int)g_localPlayer) {
+#ifdef XWA_MODERN
+								fsfx_PlaySound(XwaCraftSounds_SFoil(currentPlayerIdx, 120), 0xffffu,
+											   currentPlayerIdx);
+#else
 								fsfx_PlaySound(120, 0xffffu, currentPlayerIdx);
+#endif
 							}
 							msg_emitInFlightMessage(
 								XwaArticulation_Message((uint16_t)objIdx, (craft->sFoilState & 2)
@@ -9786,7 +9795,12 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 						craft->sFoilState ^= 2u;
 						craft->sFoilState |= 1u;
 						if (currentPlayerIdx == (unsigned int)g_localPlayer) {
+#ifdef XWA_MODERN
+							fsfx_PlaySound(XwaCraftSounds_SFoil(currentPlayerIdx, 120), 0xffffu,
+										   currentPlayerIdx);
+#else
 							fsfx_PlaySound(120, 0xffffu, currentPlayerIdx);
+#endif
 						}
 						msg_emitInFlightMessage((craft->sFoilState & 2) ? MSG_SFOILS_CLOSING
 																		: MSG_SFOILS_OPENING,

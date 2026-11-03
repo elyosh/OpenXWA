@@ -126,11 +126,14 @@ typedef struct HudPoint {
 	int y;
 } HudPoint;
 
+/* The threat indicators, drawn in an arc above the reticle from left to
+   right: incoming laser fire, a turret aiming at the player, a beam, and an
+   incoming warhead. */
 typedef enum HudThreatIndicatorSlot {
-	HUD_THREAT_INDICATOR_CENTER = 0,
-	HUD_THREAT_INDICATOR_LEFT   = 1,
-	HUD_THREAT_INDICATOR_RIGHT  = 2,
-	HUD_THREAT_INDICATOR_BOTTOM = 3,
+	HUD_THREAT_INDICATOR_LASER = 0,
+	HUD_THREAT_INDICATOR_TURRET = 1,
+	HUD_THREAT_INDICATOR_BEAM = 2,
+	HUD_THREAT_INDICATOR_WARHEAD = 3,
 } HudThreatIndicatorSlot;
 
 typedef enum InFlightMessageId {
@@ -789,10 +792,10 @@ extern const uint32_t      argbColor[4];
 extern uint8_t             g_systemMessagePaneVisible;
 extern uint8_t             g_flightGroupMessagePaneVisible;
 extern uint8_t             g_readyMessagePaneVisible;
-extern const HudThreatIndicatorSlot g_hudThreatIndicatorSlotCenter;
-extern const HudThreatIndicatorSlot g_hudThreatIndicatorSlotLeft;
-extern const HudThreatIndicatorSlot g_hudThreatIndicatorSlotRight;
-extern const HudThreatIndicatorSlot g_hudThreatIndicatorSlotBottom;
+extern const HudThreatIndicatorSlot g_hudThreatIndicatorSlotLaser;
+extern const HudThreatIndicatorSlot g_hudThreatIndicatorSlotTurret;
+extern const HudThreatIndicatorSlot g_hudThreatIndicatorSlotBeam;
+extern const HudThreatIndicatorSlot g_hudThreatIndicatorSlotWarhead;
 extern uint8_t             g_incomingMissileWarningFlashActive;
 extern int                 g_panelLastLaserThreatVoiceTime;
 extern int                 g_panelLastBeamThreatVoiceTime;

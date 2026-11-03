@@ -267,9 +267,10 @@ static void FamilyTransportRoom_DrawNormalBackgroundLayer(void) {
 
 	FrontImage_DrawSpriteOpaque("background", 0, 0);
 #ifdef XWA_MODERN
-	/* Frontend/concourse/layout.yaml can set which missions unlock the cologne
-	   and Lady Blue, and so which award text they show. */
-	if (XwaConcourseLayout_Unlocked("family_room.cologne_mission", 9)) {
+	/* frontend/awards.yaml can change the missions that unlock the cologne
+	   and the Lady Blue. The detail view of each item shows the award text of
+	   its mission. */
+	if (XwaAwards_Unlocked(XWA_AWARDS_COLOGNE, 9)) {
 #else
 	if (g_pilotData.tourOfDutyMissions[8].completedCount) {
 #endif
@@ -323,7 +324,7 @@ static void FamilyTransportRoom_DrawNormalBackgroundLayer(void) {
 	}
 
 #ifdef XWA_MODERN
-	if (XwaConcourseLayout_Unlocked("family_room.lady_blue_mission", 23)) {
+	if (XwaAwards_Unlocked(XWA_AWARDS_LADY_BLUE, 23)) {
 #else
 	if (g_pilotData.tourOfDutyMissions[22].completedCount) {
 #endif
@@ -711,7 +712,7 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 			}
 
 #ifdef XWA_MODERN
-			if (XwaConcourseLayout_Unlocked("family_room.lady_blue_mission", 23)) {
+			if (XwaAwards_Unlocked(XWA_AWARDS_LADY_BLUE, 23)) {
 #else
 			if (g_pilotData.tourOfDutyMissions[22].completedCount) {
 #endif
@@ -737,7 +738,7 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 						 ++awardTextIndex) {
 #ifdef XWA_MODERN
 						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId ==
-							XwaConcourseLayout_UnlockMission("family_room.lady_blue_mission", 23)) {
+							XwaAwards_UnlockMission(XWA_AWARDS_LADY_BLUE, 23)) {
 #else
 						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId == 23) {
 #endif
@@ -749,7 +750,7 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 			}
 
 #ifdef XWA_MODERN
-			if (XwaConcourseLayout_Unlocked("family_room.cologne_mission", 9)) {
+			if (XwaAwards_Unlocked(XWA_AWARDS_COLOGNE, 9)) {
 #else
 			if (g_pilotData.tourOfDutyMissions[8].completedCount) {
 #endif
@@ -775,7 +776,7 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 						 ++awardTextIndex) {
 #ifdef XWA_MODERN
 						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId ==
-							XwaConcourseLayout_UnlockMission("family_room.cologne_mission", 9)) {
+							XwaAwards_UnlockMission(XWA_AWARDS_COLOGNE, 9)) {
 #else
 						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId == 9) {
 #endif

@@ -1,27 +1,40 @@
 #ifndef XWA_RUNTIME_MODELS_GUNNER_SEATS_H
 #define XWA_RUNTIME_MODELS_GUNNER_SEATS_H
 
-/* The gunner seats of a model, from the `gunner_seats` group of its model
+/* Reads a model's gunner seats from the `gunner_seats` group of its model
  * settings file:
  *
  *   gunner_seats:
  *     forward_fire: false
  *     seats:
- *       - {x: 0, y: 150, z: 65, mount_angle_a: 0, mount_angle_b: 0,
- *          aim_limit_a: 900, aim_limit_b: 32767, cockpit: ywingbgunner, inverted: false}
+ *       - {position_m: [0.464, 0, 6.104], mount_pitch_degrees: 90, mount_yaw_degrees: -90,
+ *          aim_limit_pitch_degrees: 66.138, aim_limit_yaw_degrees: 95.076,
+ *          cockpit: millenniumfalcon2gunner, inverted: false}
  *
  * In the stock game, only the Corellian transport, the Millennium Falcon and
- * the Family transport have gunner seats, and their craft records hold them.
- * With the group, any craft can have seats, and its list replaces the
- * record's seats. `seats: []` means no seat. A craft has at most 2 seats.
+ * the family transport have gunner seats, and their craft records hold them.
+ * With this group, any craft can have seats, and the list replaces the seats
+ * in the craft record. `seats: []` means no seats. A craft has at most 2
+ * seats.
  *
- * A seat has a position (x, y, z) and two mount angles and two aim limits,
- * as in the craft record (the `turrets` entries of an object type file).
- * `cockpit` is the model of the seat's cockpit: an object type with
- * `gunner_cockpit: true` that loads it, or the stock gunner cockpit
- * (corelliantransportgunner). `inverted` draws the cockpit upside down, as
- * the stock game does for its second seat. All keys but `cockpit` are
- * optional and default to 0 or false.
+ * Seat keys:
+ *   - position_m: the eye in the craft model, [right, forward, up] in
+ *     metres, in the same frame as the cockpit eye and the hardpoints;
+ *   - mount_pitch_degrees: turns the view about the craft's right axis.
+ *     Positive looks up, so a seat under the craft has -90;
+ *   - mount_yaw_degrees: turns the view about the craft's up axis, before
+ *     the pitch;
+ *   - aim_limit_pitch_degrees and aim_limit_yaw_degrees: how far the gunner
+ *     can aim from the mount direction, from 0 to 180. The shots and the
+ *     turret meshes follow the pitch, and the beam system mesh the yaw;
+ *   - cockpit: the model of the seat's cockpit. At startup, the game gives
+ *     each cockpit model that a seat uses its own hidden object type. The
+ *     stock cockpit is corelliantransportgunner;
+ *   - inverted: draws the cockpit upside down, as the stock game does for
+ *     its second seat.
+ * All keys except `cockpit` are optional and default to 0 or false. The
+ * `craft_record.turrets` entries of an object type file use the same keys,
+ * with `object_type` instead of `cockpit`.
  *
  * `forward_fire: false` stops the turret laser groups from also firing
  * forward when the pilot fires. It defaults to true, as in the stock game.
@@ -39,6 +52,9 @@ struct AeronConfigNode;
 
 #define XWA_GUNNER_SEAT_MAX 2
 
+/* The values of a seat, stored like in the craft record: x is right, y is
+   forward and z is up, in game units. Angles are 16-bit. A is the pitch and
+   B is the yaw. */
 typedef enum XwaGunnerSeatField {
 	XWA_GUNNER_SEAT_X,
 	XWA_GUNNER_SEAT_Y,
@@ -59,6 +75,19 @@ typedef enum XwaGunnerHardpoint {
 	XWA_GUNNER_HARDPOINT_ION,
 	XWA_GUNNER_HARDPOINT_WARHEAD
 } XwaGunnerHardpoint;
+
+/* Reads `position`, a list of three lengths in metres [right, forward, up],
+   and stores them in `out` in game units. `what` names the key in log
+   messages. If the list can't be used, logs a warning and returns 0. */
+int XwaGunnerSeats_ReadPosition(const char* path, const char* what, const struct AeronConfigNode* position,
+								int32_t* out);
+/* Reads `position_m` and the four angles of the seat in `node`. Converts them
+   to game units and 16-bit angles, and stores them in `value`, from
+   XWA_GUNNER_SEAT_X to XWA_GUNNER_SEAT_AIM_LIMIT_B. A missing key gives 0.
+   `what` identifies the seat in log messages. If a value can't be used,
+   logs a warning and returns 0. */
+int XwaGunnerSeats_ReadPlacement(const char* path, const char* what, const struct AeronConfigNode* node,
+								 int32_t* value);
 
 /* Drops the previous mission's seats. Called by the model settings reader. */
 void XwaGunnerSeats_ClearModelSettings(void);
@@ -82,8 +111,9 @@ int XwaGunnerSeats_ForwardFire(unsigned int objectType);
 /* Whether the loaded model of gunner cockpit `cockpitType` has a hardpoint
    of `kind`. */
 int XwaGunnerSeats_CockpitHasHardpoint(unsigned int cockpitType, XwaGunnerHardpoint kind);
-/* Writes the model file name of `objectType` ("<model>.opt") when it is a
-   gunner cockpit that an object type file adds, and returns 1. */
+/* If `objectType` is a gunner cockpit that the game added for a seat,
+   writes its model file name ("<model>.opt") and returns 1. Otherwise
+   returns 0. */
 int XwaGunnerSeats_CockpitFileName(unsigned int objectType, char* fileName, size_t fileNameSize);
 
 #ifdef __cplusplus

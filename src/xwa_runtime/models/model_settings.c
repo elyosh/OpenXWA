@@ -75,8 +75,8 @@ static void ModelSettings_Path(const char* key, char* path, size_t pathSize) {
 	snprintf(path, pathSize, "flight/models/%s.yaml", key);
 }
 
-/* Loads a model settings file and checks that it has "version: 1". Returns
-   NULL when the file is missing. Other errors are logged. */
+/* Loads a model settings file and checks that it is a map. Returns NULL
+   when the file is missing. Other errors are logged. */
 static AeronConfigFile* ModelSettings_LoadFile(const char* path) {
 	AeronConfigError error;
 	AeronConfigFile* file = NULL;
@@ -90,9 +90,9 @@ static AeronConfigFile* ModelSettings_LoadFile(const char* path) {
 		return NULL;
 	}
 	root = AeronConfigFile_Root(file);
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1) {
-		Aeron_LogError("xwa.models", "%s: the file needs 'version: 1'. It is ignored", path);
+	/* An empty file sets nothing. */
+	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP && AeronConfigNode_Type(root) != AERON_CONFIG_NULL) {
+		Aeron_LogError("xwa.models", "%s: the file must be a map. It is ignored", path);
 		AeronConfigFile_Destroy(file);
 		return NULL;
 	}

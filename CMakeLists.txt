@@ -270,6 +270,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/warhead_launchers.c
     src/xwa_runtime/models/warhead_lock.c
     src/xwa_runtime/models/jamming.c
+    src/xwa_runtime/models/names.c
     src/xwa_runtime/models/weapon_stats.c
     src/xwa_runtime/audio/sound_banks.c
     src/xwa_runtime/audio/mission_sounds.c
@@ -579,8 +580,18 @@ if(XWA_BUILD_TOOLS)
     add_executable(xwa_asset_bake tools/xwa_asset_bake/xwa_asset_bake.c)
     target_link_libraries(xwa_asset_bake PRIVATE xwa_asset_bake_lib)
 
+    # Builds an atlas of 2D images from PNG files and image.yaml, for mod
+    # authors.
+    add_executable(xwa_image_cook tools/xwa_image_cook/xwa_image_cook.c)
+    target_link_libraries(xwa_image_cook PRIVATE xwa_asset_bake_lib)
+
     add_executable(imc_decode tools/imc_decode.c)
     target_link_libraries(imc_decode PRIVATE xwa_core)
+
+    # Prints Markdown tables of the names that mod files use. It links the game
+    # libraries because the name tables are there.
+    add_executable(xwa_mod_tables tools/xwa_mod_tables.c)
+    target_link_libraries(xwa_mod_tables PRIVATE xwa_core xwa_remaster)
 endif()
 
 if(XWA_BUILD_MOD_IMPORTER)
@@ -602,6 +613,8 @@ if(XWA_BUILD_MOD_IMPORTER)
         # the stock sizes.
         src/xwa/assets/object_type.c
         src/xwa/assets/object_type_info.c
+        # The game's name tables. The importer writes these names in its files.
+        src/xwa_runtime/models/names.c
     )
     target_include_directories(xwa_mod_import_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/tools/mod_importer)
     target_include_directories(xwa_mod_import_lib PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -846,6 +859,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/snapshot/snapshot_hud.h
     src/xwa_runtime/compat/middleware_crt.h
     src/xwa_app/host_config.h
+    src/xwa_app/mod_format.h
     src/xwa_app/mod_list.h
     src/xwa_app/setup.h
     src/xwa/util/byte_order.h

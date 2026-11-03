@@ -428,7 +428,7 @@ static int env_empty_definitions(void) {
 
 /* Returns 1 when the manifest loads or does not exist, 0 on error. */
 static int env_load_manifest(AeronVfs* vfs) {
-	static const char* const fields[] = { "version", "environments", "xwa" };
+	static const char* const fields[] = { "environments", "xwa" };
 	const char* vfs_path = s_env.manifest_path;
 	s_env.default_reference = -1;
 	AeronConfigFile* manifest = NULL;
@@ -452,12 +452,6 @@ static int env_load_manifest(AeronVfs* vfs) {
 		AeronConfigNode_Type(root) == AERON_CONFIG_MAP ? 1 : env_node_error(root, "manifest must be a map");
 	if (ok) {
 		ok = env_check_fields(root, "manifest", fields, sizeof fields / sizeof fields[0]);
-	}
-	if (ok) {
-		const AeronConfigNode* version = AeronConfigNode_MapGet(root, "version");
-		if (AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1) {
-			ok = env_node_error(version ? version : root, "manifest: 'version' must be 1");
-		}
 	}
 	if (ok && !AeronEnvironment_ParseDefinitions(AeronConfigNode_MapGet(root, "environments"),
 												 &s_env.definitions, &error)) {
