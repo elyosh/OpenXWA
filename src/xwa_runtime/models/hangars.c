@@ -113,9 +113,9 @@ void XwaHangars_Init(void) {
 		return;
 	}
 	root = AeronConfigFile_Root(s_settings);
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1) {
-		Aeron_LogError("xwa.models", "%s: expected 'version: 1'; the hangars keep their stock layout",
+	/* An empty file sets nothing. */
+	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP && AeronConfigNode_Type(root) != AERON_CONFIG_NULL) {
+		Aeron_LogError("xwa.models", "%s: the file must be a map; the hangars keep their stock layout",
 					   s_settingsPath);
 		AeronConfigFile_Destroy(s_settings);
 		s_settings = NULL;

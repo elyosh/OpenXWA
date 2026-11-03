@@ -164,14 +164,13 @@ static const char* const s_turretKeys[] = {
 };
 
 static const char* const s_topKeys[] = {
-	"version", "object_type", "name",         "model",       "list",         "genus",
-	"family",  "flags",       "craft_record", "sounds_like", "beam_allowed", "names",
+	"object_type", "name",         "model",       "list",         "genus", "family",
+	"flags",       "craft_record", "sounds_like", "beam_allowed", "names",
 };
 static const char* const s_recordArrayKeys[] = { "lasers",        "warheads",     "turrets",
 												 "cockpit_eye_m", "cockpit_name", "mesh_attach" };
 static const char* const s_nameKeys[] = { "short", "long", "plural", "gender" };
-static const char* const s_craftTypeKeys[] = { "version", "craft_type", "object_type", "ship_list",
-											   "tech_room" };
+static const char* const s_craftTypeKeys[] = { "craft_type", "object_type", "ship_list", "tech_room" };
 static const char* const s_shipListKeys[] = { "name",     "category", "flyable", "known",
 											  "skirmish", "hidden",   "icon" };
 /* The tech room keys, their IDs and the size of their field in the tech room,
@@ -1019,8 +1018,8 @@ static void CraftDefinitions_FreeNames(CraftFileNames* list) {
 	list->count = 0;
 }
 
-/* Loads an object type file, checks its version and object type, and finds
-   the craft record that it writes. Returns 0 when the file can't be used. */
+/* Loads an object type file, checks its object type, and finds the craft
+   record that it writes. Returns 0 when the file can't be used. */
 static int CraftDefinitions_LoadFile(CraftFile* file) {
 	AeronConfigError error;
 	const AeronConfigNode* node;
@@ -1032,9 +1031,8 @@ static int CraftDefinitions_LoadFile(CraftFile* file) {
 		return 0;
 	}
 	file->root = AeronConfigFile_Root(file->file);
-	if (AeronConfigNode_Type(file->root) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(file->root, "version"), 0) != 1) {
-		Aeron_LogError("xwa.craft", "%s: the file needs 'version: 1'. It is ignored", file->path);
+	if (AeronConfigNode_Type(file->root) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.craft", "%s: the file must be a map. It is ignored", file->path);
 		return 0;
 	}
 	/* Renames apply only after all files are loaded, so `object_type` is
@@ -1300,8 +1298,8 @@ static void CraftDefinitions_ApplyRules(const CraftFile* file) {
 	}
 }
 
-/* Loads a craft type file and checks its version, craft type and object
-   type. Returns 0 when the file can't be used. */
+/* Loads a craft type file and checks its craft type and object type.
+   Returns 0 when the file can't be used. */
 static int CraftDefinitions_LoadCraftTypeFile(CraftTypeFile* file) {
 	AeronConfigError error;
 	const AeronConfigNode* node;
@@ -1313,9 +1311,8 @@ static int CraftDefinitions_LoadCraftTypeFile(CraftTypeFile* file) {
 		return 0;
 	}
 	file->root = AeronConfigFile_Root(file->file);
-	if (AeronConfigNode_Type(file->root) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(file->root, "version"), 0) != 1) {
-		Aeron_LogError("xwa.craft", "%s: the file needs 'version: 1'. It is ignored", file->path);
+	if (AeronConfigNode_Type(file->root) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.craft", "%s: the file must be a map. It is ignored", file->path);
 		return 0;
 	}
 	if (!CraftDefinitions_ReadInt(file->path, AeronConfigNode_MapGet(file->root, "craft_type"), "craft_type",

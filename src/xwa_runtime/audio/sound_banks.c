@@ -406,11 +406,8 @@ void XwaSoundBanks_Init(void) {
 	}
 	root = AeronConfigFile_Root(s_file);
 	banks = AeronConfigNode_MapGet(root, "banks");
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1 ||
-		AeronConfigNode_Type(banks) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.audio",
-					   SOUND_BANKS_YAML ": the file needs 'version: 1' and a 'banks' map. It is ignored");
+	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP || AeronConfigNode_Type(banks) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.audio", SOUND_BANKS_YAML ": the file needs a 'banks' map. It is ignored");
 		AeronConfigFile_Destroy(s_file);
 		s_file = NULL;
 		return;

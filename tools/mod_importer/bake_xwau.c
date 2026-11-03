@@ -1449,8 +1449,7 @@ static void write_layout_yaml(XwauContext* ctx) {
 		ctx->stats->failures++;
 		return;
 	}
-	fprintf(fp, "# Made by the OpenXWA mod importer. Positions and sizes are in design pixels.\n"
-				"version: 1\n");
+	fprintf(fp, "# Made by the OpenXWA mod importer. Positions and sizes are in design pixels.\n");
 	fprintf(fp, "starfield: %s\n", HOOK_INT("DrawStarfield", 1) ? "true" : "false");
 	fprintf(fp, "planet: {left: %.0f, right: %.0f, top: %.0f, bottom: %.0f}\n",
 			DOOR("planet_position_left", 0) * DESIGN_X, DOOR("planet_position_right", 640) * DESIGN_X,
@@ -1730,7 +1729,6 @@ static void write_fonts_yaml(XwauContext* ctx) {
 		return;
 	}
 	fprintf(fp, "# Made by the OpenXWA mod importer.\n"
-				"version: 1\n"
 				"default: {file: Inconsolata-Bold.ttf, metrics: font, spacing: 0.0498}\n");
 	fclose(fp);
 }
@@ -1853,7 +1851,6 @@ static void write_animations_yaml(XwauContext* ctx) {
 	fprintf(fp,
 			"# Made by the OpenXWA mod importer. Positions and sizes are in design pixels,\n"
 			"# delays in seconds.\n"
-			"version: 1\n"
 			"groups:%s\n",
 			count ? "" : " []");
 	/* Groups are written in the order of their first line. Group names are
@@ -2063,7 +2060,6 @@ static void write_frontend_yaml(XwauContext* ctx) {
 		return;
 	}
 	fprintf(fp, "# Made by the OpenXWA mod importer.\n"
-				"version: 1\n"
 				"# The screen the frontend art is drawn for. Positions and sizes in the\n"
 				"# frontend's files are pixels of this screen.\n"
 				"design: [2560, 1440]\n"

@@ -42,7 +42,7 @@ static CraftHudList s_hullIcons;
 static CraftHudList s_mapIcons;
 static XwaTargetDisplay s_targetDisplay;
 
-/* Loads a file from the mod folder and checks that it has "version: 1".
+/* Loads a file from the mod folder and checks that it is a map.
    Returns NULL when the file is missing. Other errors are logged. */
 static AeronConfigFile* CraftHud_LoadFile(const char* path) {
 	AeronConfigError error;
@@ -57,9 +57,9 @@ static AeronConfigFile* CraftHud_LoadFile(const char* path) {
 		return NULL;
 	}
 	root = AeronConfigFile_Root(file);
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1) {
-		Aeron_LogError("xwa.hud", "%s: the file needs 'version: 1'. It is ignored", path);
+	/* An empty file sets nothing. */
+	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP && AeronConfigNode_Type(root) != AERON_CONFIG_NULL) {
+		Aeron_LogError("xwa.hud", "%s: the file must be a map. It is ignored", path);
 		AeronConfigFile_Destroy(file);
 		return NULL;
 	}

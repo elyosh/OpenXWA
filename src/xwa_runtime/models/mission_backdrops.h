@@ -7,7 +7,6 @@
  * 103 an object type and flags. flight/flight.yaml can make ids 104 to 255
  * draw planets, each with its own image group:
  *
- *   version: 1
  *   backdrops:
  *     extra_planets:
  *       - { ids: [104, 255], image_groups: [6304, 6455] }

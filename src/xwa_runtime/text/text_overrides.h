@@ -10,7 +10,6 @@
  * through Linez_ResolveString, which returns the mod's text for the ID when
  * this file has one:
  *
- *   version: 1
  *   strings:
  *     MSG_LASERS_ARMED: '\03Primary cannons armed'
  *     STR_STATISTICS: 'Pilot Terminal'

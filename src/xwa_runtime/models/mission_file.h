@@ -5,7 +5,6 @@
  * extension>.yaml, lower case, which holds what the game reads at mission
  * load:
  *
- *   version: 1
  *   resdata: ...           # the mission's own art
  *   settings: ...          # mission settings
  *   flight_groups: ...     # changes to the flight groups of the .TIE
@@ -34,8 +33,7 @@ struct XwaFlightGroup;
 /* Loads the file of mission `missionPath` (for example
    "missions\1b1m5fg.tie"). Returns 1 with *out set (free it with
    AeronConfigFile_Destroy), 0 when the mission has no file, -1 when the file
-   is invalid or lacks "version: 1" (logged). `path` receives the file's
-   path for diagnostics. */
+   isn't a map (logged). `path` receives the file's path for diagnostics. */
 int XwaMissionFile_Load(const char* missionPath, struct AeronConfigFile** out, char* path, size_t pathSize);
 
 /* Returns the flight group index for entry `key` of a `flight_groups` map.

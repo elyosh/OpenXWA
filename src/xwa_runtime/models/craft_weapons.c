@@ -194,8 +194,7 @@ void XwaCraftWeapons_Init(void) {
 	}
 	root = AeronConfigFile_Root(file);
 	section = AeronConfigNode_MapGet(root, "weapons");
-	if (AeronConfigNode_Type(AeronConfigNode_MapGet(root, "version")) == AERON_CONFIG_INT &&
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) == 1 && section != NULL) {
+	if (section != NULL) {
 		CraftWeapons_ReadImpact(CRAFT_WEAPONS_FLIGHT_YAML, "weapons",
 								AeronConfigNode_MapGet(section, "impact"), s_globalImpact);
 	}

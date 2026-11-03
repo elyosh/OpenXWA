@@ -6,7 +6,6 @@
  * flight/object_types/<name>.yaml changes one object type of the game, or
  * fills a free slot:
  *
- *   version: 1
  *   object_type: victory_star_destroyer2
  *   name: victory_star_destroyer       # optional: a new name for the slot
  *   model: victorystardestroyer        # loads flight/models/victorystardestroyer.glb
@@ -47,7 +46,7 @@
  * record or the names of such an object type, the game gives that object type
  * an unused craft record, starting as a copy of the shared one.
  *
- * All keys except `version` and `object_type` are optional. A missing key
+ * All keys except `object_type` are optional. A missing key
  * keeps the game's value. With `model`, the object type gets its own list
  * row, in memory only, that loads the model. Other object types that used the
  * same stock row keep it. `names` changes the names in the object type's
@@ -58,7 +57,6 @@
  *
  * flight/craft_types/<name>.yaml changes one craft type:
  *
- *   version: 1
  *   craft_type: 214
  *   object_type: victory_star_destroyer  # optional: the craft type keeps its own
  *   ship_list: {name: '...', category: starship, flyable: false, known: true,

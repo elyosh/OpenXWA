@@ -261,8 +261,8 @@ static int awards_read_missions(const AeronConfigNode* map, const char* key, siz
 }
 
 static int awards_read(const AeronConfigNode* root, XwaAwards* awards) {
-	static const char* const keys[] = { "version",           "battle_medals", "kalidor", "rank_thresholds",
-										"rating_thresholds", "mementos",      NULL };
+	static const char* const keys[] = { "battle_medals",     "kalidor",  "rank_thresholds",
+										"rating_thresholds", "mementos", NULL };
 	static const char* const mementoKeys[] = { "images", "names", "lady_blue", "cologne", NULL };
 	static const char* const unlockKeys[] = { "mission", NULL };
 	const AeronConfigNode* node;
@@ -270,12 +270,6 @@ static int awards_read(const AeronConfigNode* root, XwaAwards* awards) {
 	int i;
 
 	if (!awards_keys(root, NULL, keys)) {
-		return 0;
-	}
-	node = AeronConfigNode_MapGet(root, "version");
-	if (node == NULL || AeronConfigNode_Type(node) != AERON_CONFIG_INT || AeronConfigNode_Int(node, 0) != 1) {
-		Aeron_LogError("xwa.frontend", "%s:%d: 'version' must be 1", XWA_AWARDS_PATH,
-					   AeronConfigNode_Line(node != NULL ? node : root));
 		return 0;
 	}
 	node = AeronConfigNode_MapGet(root, "battle_medals");

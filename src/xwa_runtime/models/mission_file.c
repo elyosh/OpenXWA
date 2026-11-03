@@ -56,10 +56,9 @@ int XwaMissionFile_Load(const char* missionPath, AeronConfigFile** out, char* pa
 		return -1;
 	}
 	root = AeronConfigFile_Root(*out);
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Type(AeronConfigNode_MapGet(root, "version")) != AERON_CONFIG_INT ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1) {
-		Aeron_LogError("xwa.models", "%s: expected 'version: 1'; its selections are ignored", path);
+	/* An empty file sets nothing. */
+	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP && AeronConfigNode_Type(root) != AERON_CONFIG_NULL) {
+		Aeron_LogError("xwa.models", "%s: the file must be a map; its selections are ignored", path);
 		AeronConfigFile_Destroy(*out);
 		*out = NULL;
 		return -1;

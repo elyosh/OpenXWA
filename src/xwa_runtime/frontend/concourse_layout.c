@@ -18,7 +18,6 @@
 
 typedef enum XwaLayoutKind {
 	LAYOUT_SECTION, /* a map of other keys */
-	LAYOUT_INT,
 	LAYOUT_BOOL,
 	LAYOUT_X,         /* a position across, in design pixels */
 	LAYOUT_Y,         /* a position down */
@@ -34,7 +33,6 @@ static const struct {
 	const char* key;
 	XwaLayoutKind kind;
 } k_layoutKeys[] = {
-	{ "version", LAYOUT_INT },
 	{ "starfield", LAYOUT_BOOL },
 	{ "planet", LAYOUT_SECTION },
 	{ "planet.left", LAYOUT_X },
@@ -111,8 +109,6 @@ static int layout_is_numbers(const AeronConfigNode* node, size_t count) {
 
 static int layout_check_value(const AeronConfigNode* node, XwaLayoutKind kind) {
 	switch (kind) {
-		case LAYOUT_INT:
-			return AeronConfigNode_Type(node) == AERON_CONFIG_INT;
 		case LAYOUT_BOOL:
 			return AeronConfigNode_Type(node) == AERON_CONFIG_BOOL;
 		case LAYOUT_X:
@@ -269,11 +265,6 @@ float XwaConcourseLayout_Y(const char* key, float stock) {
 	const AeronConfigNode* node = layout_node(key);
 	return layout_is_number(node) ? XwaFrontendGeometry_UnitsY((float)AeronConfigNode_Float(node, 0.0))
 								  : stock;
-}
-
-int XwaConcourseLayout_Int(const char* key, int stock) {
-	const AeronConfigNode* node = layout_node(key);
-	return AeronConfigNode_Type(node) == AERON_CONFIG_INT ? (int)AeronConfigNode_Int(node, stock) : stock;
 }
 
 int XwaConcourseLayout_Bool(const char* key, int stock) {

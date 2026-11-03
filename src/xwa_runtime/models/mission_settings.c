@@ -418,7 +418,6 @@ void XwaMissionSettings_Init(void) {
 	AeronConfigFile* file = NULL;
 	AeronConfigError error;
 	const AeronConfigNode* root;
-	const AeronConfigNode* version;
 	const AeronConfigNode* rules;
 	const AeronConfigNode* node;
 
@@ -457,11 +456,6 @@ void XwaMissionSettings_Init(void) {
 		return;
 	}
 	root = AeronConfigFile_Root(file);
-	version = AeronConfigNode_MapGet(root, "version");
-	if (AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1) {
-		AeronConfigFile_Destroy(file);
-		return;
-	}
 	rules = AeronConfigNode_MapGet(root, "rules");
 	if (rules != NULL && AeronConfigNode_Type(rules) != AERON_CONFIG_MAP) {
 		Aeron_LogError("xwa.mission", "%s:%d: rules must be a map; they are ignored", SETTINGS_FLIGHT_YAML,

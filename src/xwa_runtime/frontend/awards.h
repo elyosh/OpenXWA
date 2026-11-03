@@ -4,7 +4,6 @@
 /* Medals, Kalidor Crescent levels, promotion thresholds and family-room
  * mementos from frontend/awards.yaml.
  *
- *     version: 1
  *     battle_medals:            # names, in the order of medals.txt
  *       - { name: 'Medal of Redemption' }
  *     kalidor:                  # one entry per level

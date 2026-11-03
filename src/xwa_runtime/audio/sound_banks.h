@@ -4,7 +4,6 @@
 /* Sound banks let a mod give each object type its own sounds, such as engine
  * or weapon sounds. A mod lists them in flight/sounds.yaml:
  *
- *   version: 1
  *   banks:
  *     interior:                     # keyed by object type
  *       sounds:

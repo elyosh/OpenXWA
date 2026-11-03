@@ -479,9 +479,7 @@ void XwaWeaponStats_Init(void) {
 	}
 	root = AeronConfigFile_Root(file);
 	section = AeronConfigNode_MapGet(root, "weapons");
-	if (AeronConfigNode_Type(AeronConfigNode_MapGet(root, "version")) != AERON_CONFIG_INT ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1 ||
-		AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
+	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
 		AeronConfigFile_Destroy(file);
 		return;
 	}

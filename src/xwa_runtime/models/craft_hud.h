@@ -9,7 +9,6 @@
  * icons are in image group 26000 and map icons in group 14800. An object type
  * that a map doesn't list keeps its stock icon.
  *
- *   version: 1
  *   hull_icons: {xwing: 1, slot_33: 49, ywing: none}
  *   map_icons: {xwing: 1}
  *

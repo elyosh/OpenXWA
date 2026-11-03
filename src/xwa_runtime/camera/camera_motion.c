@@ -105,8 +105,7 @@ void XwaCameraMotion_Init(void) {
 	}
 	root = AeronConfigFile_Root(file);
 	section = AeronConfigNode_MapGet(root, "camera");
-	if (AeronConfigNode_Type(AeronConfigNode_MapGet(root, "version")) != AERON_CONFIG_INT ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1 || section == NULL) {
+	if (section == NULL) {
 		AeronConfigFile_Destroy(file);
 		return;
 	}

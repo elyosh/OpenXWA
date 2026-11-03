@@ -102,7 +102,6 @@ void XwaMissionBackdrops_Init(void) {
 	AeronConfigFile* file = NULL;
 	AeronConfigError error;
 	const AeronConfigNode* root;
-	const AeronConfigNode* version;
 	const AeronConfigNode* planets;
 	size_t entry;
 	int added = 0;
@@ -125,13 +124,6 @@ void XwaMissionBackdrops_Init(void) {
 		return;
 	}
 	root = AeronConfigFile_Root(file);
-	version = AeronConfigNode_MapGet(root, "version");
-	if (AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1) {
-		Aeron_LogError("xwa.mission", "%s: expected 'version: 1'; backdrop ids above %d place nothing",
-					   MISSION_BACKDROPS_PATH, XWA_EXTRA_BACKDROP_FIRST_ID - 1);
-		AeronConfigFile_Destroy(file);
-		return;
-	}
 	planets = AeronConfigNode_MapGet(AeronConfigNode_MapGet(root, "backdrops"), "extra_planets");
 	if (planets != NULL && AeronConfigNode_Type(planets) != AERON_CONFIG_SEQUENCE) {
 		Aeron_LogError(

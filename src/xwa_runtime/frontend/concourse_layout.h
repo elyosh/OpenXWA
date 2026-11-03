@@ -28,8 +28,6 @@ int XwaConcourseLayout_Rect(const char* key, float* x, float* y, float* width, f
  * "planet.top", in 640x480 units, not rounded. */
 float XwaConcourseLayout_X(const char* key, float stock);
 float XwaConcourseLayout_Y(const char* key, float stock);
-/* A plain number, such as "version". */
-int XwaConcourseLayout_Int(const char* key, int stock);
 /* A switch, such as "starfield". */
 int XwaConcourseLayout_Bool(const char* key, int stock);
 /* Whether `loading_screen.progress_bar` is `even`: the progress bar grows by
