@@ -11356,7 +11356,7 @@ static __inline void Flight_UpdateEntity_SendTypedMessage(unsigned int playerIdx
 	msg_emitInFlightMessage(MSG_MESSAGE_SENT, (int)playerIdx);
 }
 
-static __inline int16_t Flight_UpdateEntity_SmoothAxis(int16_t current, int target) {
+static __inline int16_t Flight_UpdateEntity_SmoothAxis(int16_t current, int target, uint16_t smoothingStepScale) {
 	int16_t delta = (int16_t)(target - current);
 	int16_t step;
 
@@ -11370,8 +11370,8 @@ static __inline int16_t Flight_UpdateEntity_SmoothAxis(int16_t current, int targ
 	if (step < 8) {
 		return (int16_t)(current + delta);
 	}
-	if (g_simStepScale > 4u) {
-		step = (int16_t)(step / (int)g_simStepScale);
+	if (smoothingStepScale > 4u) {
+		step = (int16_t)(step / (int)smoothingStepScale);
 		if (!step) {
 			step = 1;
 		}
@@ -12383,12 +12383,20 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 #endif
 
 		if (g_players[playerIdx].gap71_field16 == (int16_t)swappedControls) {
+			uint16_t smoothingStepScale = g_simStepScale;
+#ifdef XWA_MODERN
+			if (seatIdx >= 0 && !swappedControls && !g_players[playerIdx].viewState.externalCameraActive &&
+				XwaModernFlightTiming_IsHighRate()) {
+				/* Turret input is reset after aiming; retain the legacy eight-tick input response. */
+				smoothingStepScale = 236 / 8;
+			}
+#endif
 			g_players[playerIdx].smoothedInputYaw =
-				Flight_UpdateEntity_SmoothAxis(g_players[playerIdx].smoothedInputYaw, yawTarget);
+				Flight_UpdateEntity_SmoothAxis(g_players[playerIdx].smoothedInputYaw, yawTarget, smoothingStepScale);
 			g_players[playerIdx].smoothedInputPitch =
-				Flight_UpdateEntity_SmoothAxis(g_players[playerIdx].smoothedInputPitch, pitchTargetLocal);
+				Flight_UpdateEntity_SmoothAxis(g_players[playerIdx].smoothedInputPitch, pitchTargetLocal, smoothingStepScale);
 			g_players[playerIdx].smoothedInputRoll =
-				Flight_UpdateEntity_SmoothAxis(g_players[playerIdx].smoothedInputRoll, rollTarget);
+				Flight_UpdateEntity_SmoothAxis(g_players[playerIdx].smoothedInputRoll, rollTarget, smoothingStepScale);
 		} else {
 			g_players[playerIdx].smoothedInputYaw = 0;
 			g_players[playerIdx].smoothedInputRoll = 0;

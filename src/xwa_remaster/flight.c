@@ -2332,6 +2332,23 @@ static int fl_temporal_pose_changed(const XwaSnapshot* current, const XwaSnapsho
 		   memcmp(cockpit->camera_pan, prev_cockpit->camera_pan, sizeof cockpit->camera_pan) != 0;
 }
 
+/* Rotate inverted gunner cockpits about the model-local X axis,
+ * keeping the seat's eye point fixed relative to the camera. */
+static void fl_apply_inverted_cockpit_pivot(float basis[9], const XwaCockpit* cockpit,
+										   const float sway[3], const float camera_local[3], float position[3]) {
+	for (int axis = 0; axis < 3; ++axis) {
+		basis[3 + axis] = -basis[3 + axis];
+		basis[6 + axis] = -basis[6 + axis];
+	}
+	for (int axis = 0; axis < 3; ++axis) {
+		const float rotated_eye = basis[axis] * cockpit->seat_eye_local[0] +
+								  basis[3 + axis] * cockpit->seat_eye_local[1] +
+								  basis[6 + axis] * cockpit->seat_eye_local[2];
+		position[axis] = camera_local[axis] - cockpit->camera_pan[axis] * 0.0625f -
+						 sway[axis] - rotated_eye;
+	}
+}
+
 /* `sway` is XwaFlightCamera.sway. The camera at `camera_local` includes it, so
  * the cockpit is placed back by it, at the seat. */
 static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const float sway[3],
@@ -2356,43 +2373,14 @@ static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const float sway[3
 	}
 	float delta[3];
 	fl_world_to_view(camera_rows, eye_offset[0], eye_offset[1], eye_offset[2], delta);
-	if (cockpit->inverted) {
-		/* Classic gunner rear-turret flip about the seat's eye point. The flip acts
-		 * in eye space, so move the anchor basis there and back. */
-		float eye_basis[9];
-		for (int row = 0; row < 3; ++row) {
-			for (int col = 0; col < 3; ++col) {
-				eye_basis[row * 3 + col] = basis[row * 3 + 0] * camera_rows[col * 3 + 0] +
-										   basis[row * 3 + 1] * camera_rows[col * 3 + 1] +
-										   basis[row * 3 + 2] * camera_rows[col * 3 + 2];
-			}
-		}
-		float flipped[3];
-		for (int col = 0; col < 3; ++col) {
-			flipped[col] =
-				eye_basis[col] * delta[0] + eye_basis[3 + col] * delta[1] + eye_basis[6 + col] * delta[2];
-		}
-		flipped[1] = -flipped[1];
-		flipped[2] = -flipped[2];
-		for (int row = 0; row < 3; ++row) {
-			delta[row] = eye_basis[row * 3 + 0] * flipped[0] + eye_basis[row * 3 + 1] * flipped[1] +
-						 eye_basis[row * 3 + 2] * flipped[2];
-			eye_basis[row * 3 + 1] = -eye_basis[row * 3 + 1];
-			eye_basis[row * 3 + 2] = -eye_basis[row * 3 + 2];
-		}
-		for (int row = 0; row < 3; ++row) {
-			for (int col = 0; col < 3; ++col) {
-				basis[row * 3 + col] = eye_basis[row * 3 + 0] * camera_rows[0 * 3 + col] +
-									   eye_basis[row * 3 + 1] * camera_rows[1 * 3 + col] +
-									   eye_basis[row * 3 + 2] * camera_rows[2 * 3 + col];
-			}
-		}
-	}
 
 	float position[3];
 	for (int axis = 0; axis < 3; ++axis) {
 		position[axis] = camera_local[axis] + camera_rows[0 * 3 + axis] * delta[0] +
 						 camera_rows[1 * 3 + axis] * delta[1] + camera_rows[2 * 3 + axis] * delta[2];
+	}
+	if (cockpit->inverted) {
+		fl_apply_inverted_cockpit_pivot(basis, cockpit, sway, camera_local, position);
 	}
 	fl_model_matrix(basis, position, out);
 	return 1;
@@ -4506,36 +4494,13 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 			-(snap->cockpit.seat_eye_world_offset[a] + snap->cockpit.camera_pan[a] * 0.0625f + cam->sway[a]);
 	}
 	fl_world_to_view(s.crows, w[0], w[1], w[2], delta);
-	if (snap->cockpit.inverted) {
-		float be[9];
-		for (int i = 0; i < 3; i++) {
-			for (int j = 0; j < 3; j++) {
-				be[i * 3 + j] = bw[i * 3 + 0] * s.crows[j * 3 + 0] + bw[i * 3 + 1] * s.crows[j * 3 + 1] +
-								bw[i * 3 + 2] * s.crows[j * 3 + 2];
-			}
-		}
-		float e[3];
-		for (int c = 0; c < 3; c++) {
-			e[c] = be[c] * delta[0] + be[3 + c] * delta[1] + be[6 + c] * delta[2];
-		}
-		e[1] = -e[1];
-		e[2] = -e[2];
-		for (int r = 0; r < 3; r++) {
-			delta[r] = be[r * 3 + 0] * e[0] + be[r * 3 + 1] * e[1] + be[r * 3 + 2] * e[2];
-			be[r * 3 + 1] = -be[r * 3 + 1];
-			be[r * 3 + 2] = -be[r * 3 + 2];
-		}
-		for (int i = 0; i < 3; i++) {
-			for (int j = 0; j < 3; j++) {
-				bw[i * 3 + j] = be[i * 3 + 0] * s.crows[0 * 3 + j] + be[i * 3 + 1] * s.crows[1 * 3 + j] +
-								be[i * 3 + 2] * s.crows[2 * 3 + j];
-			}
-		}
-	}
 	float pw[3];
 	for (int j = 0; j < 3; j++) {
 		pw[j] = s.camera_local[j] + s.crows[0 * 3 + j] * delta[0] + s.crows[1 * 3 + j] * delta[1] +
 				s.crows[2 * 3 + j] * delta[2];
+	}
+	if (snap->cockpit.inverted) {
+		fl_apply_inverted_cockpit_pivot(bw, &snap->cockpit, cam->sway, s.camera_local, pw);
 	}
 	float m[16];
 	fl_model_matrix(bw, pw, m);
