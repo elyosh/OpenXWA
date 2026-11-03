@@ -820,35 +820,10 @@ static void flight_free_frames(BakeFrame* frames, int count) {
 }
 
 /* Packs `frames` and writes <atlas_dir>/<base>.yaml with its pages. */
-static int flight_write_atlas(FlightContext* ctx, const char* base, const BakeFrame* frames,
-							  const uint16_t* ids, int count, const char* header) {
-	AeronCpuAtlas pages = { 0 };
-	AeronAtlasImage* placed = NULL;
-	if (!BakeSprites_BuildAtlas(frames, count, 0, &placed, &pages)) {
-		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s could not be packed", base);
-		return 0;
-	}
-	if (!BakeSprites_MakeDirs(ctx->atlas_dir)) {
-		free(placed);
-		Aeron_AtlasBuildFree(&pages);
-		return 0;
-	}
-	int ok = 1;
-	for (int page = 0; page < pages.page_count; ++page) {
-		char path[1300];
-		if (page == 0)
-			snprintf(path, sizeof path, "%s/%s", ctx->atlas_dir, base);
-		else
-			snprintf(path, sizeof path, "%s/%s_p%d", ctx->atlas_dir, base, page);
-		ok &= BakeSprites_EmitImage(ctx->opt->sprites, path, pages.pages[page].rgba, pages.pages[page].width,
-									pages.pages[page].height);
-	}
-	char yaml[1300];
-	snprintf(yaml, sizeof yaml, "%s/%s.yaml", ctx->atlas_dir, base);
-	ok &= BakeSprites_WriteAtlasYaml(yaml, placed, frames, ids, count, &pages, pages.pages[0].width,
-									 pages.pages[0].height, header);
-	free(placed);
-	Aeron_AtlasBuildFree(&pages);
+static int flight_write_atlas(FlightContext* ctx, const char* base, const BakeFrame* frames, int count,
+							  const BakeAtlasHeader* header) {
+	const int ok =
+		BakeSprites_PackAndWriteAtlas(ctx->opt->sprites, ctx->atlas_dir, base, header, frames, count);
 	if (ok) {
 		ctx->stats->atlases++;
 		ctx->stats->images += count;
@@ -917,10 +892,10 @@ static int flight_fit(BakeFrame* frame, int max_width, int max_height) {
 }
 
 /* Converts the alternative sets of an explosion group's material into
- * atlases, and writes the `frame_sets` key that lists them into `header`.
+ * atlases, and writes the `frame_sets` key that lists them into `frame_sets`.
  * A set's images keep their order in the DAT file: XWAU finds the image for
  * a frame by its position. */
-static void flight_bake_frame_sets(FlightContext* ctx, int group, char* header, size_t header_size) {
+static void flight_bake_frame_sets(FlightContext* ctx, int group, char* frame_sets, size_t frame_sets_size) {
 	const FlightMaterialFile* file = flight_find_material(ctx, group, -1);
 	FlightMaterial material;
 	if (!file || !flight_read_material(file->path, &material))
@@ -936,8 +911,8 @@ static void flight_bake_frame_sets(FlightContext* ctx, int group, char* header, 
 		ReportUnsupported("XWAU's procedural explosions (ExplosionBlendMode)");
 		return;
 	}
-	size_t used = strlen(header);
-	used += (size_t)snprintf(header + used, header_size - used,
+	size_t used = strlen(frame_sets);
+	used += (size_t)snprintf(frame_sets + used, frame_sets_size - used,
 							 "frame_sets:\n  shuffle: explosions\n  reroll_seconds: %d\n  sets:\n",
 							 FLIGHT_REROLL_SECONDS);
 	for (int set = 0; set < FLIGHT_SET_COUNT; ++set) {
@@ -955,31 +930,32 @@ static void flight_bake_frame_sets(FlightContext* ctx, int group, char* header, 
 		const int* listed;
 		const int count = (int)XwauDat_ListGroup(dat, material.set_group[set], &listed);
 		BakeFrame* frames = (BakeFrame*)calloc(count > 0 ? (size_t)count : 1, sizeof *frames);
-		uint16_t* frame_ids = (uint16_t*)calloc(count > 0 ? (size_t)count : 1, sizeof *frame_ids);
-		int ok = count > 0 && frames && frame_ids;
-		for (int i = 0; ok && i < count; ++i)
-			frame_ids[i] = (uint16_t)listed[i];
+		int ok = count > 0 && frames;
 		for (int i = 0; ok && i < count; ++i) {
 			XwauDatImage image;
-			ok = XwauDat_LoadImageFrom(dat, material.set_group[set], frame_ids[i], &image, error,
-									   sizeof error);
+			ok = XwauDat_LoadImageFrom(dat, material.set_group[set], listed[i], &image, error, sizeof error);
 			if (!ok) {
 				ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s: %s", path, error);
 				break;
 			}
 			frames[i].rgba = image.rgba;
-			frames[i].w = frames[i].classic_w = (int)image.width;
-			frames[i].h = frames[i].classic_h = (int)image.height;
+			frames[i].w = (int)image.width;
+			frames[i].h = (int)image.height;
+			frames[i].has_id = 1;
+			frames[i].id = listed[i];
+			frames[i].size[0] = image.width;
+			frames[i].size[1] = image.height;
 		}
+		const BakeAtlasHeader header = { .game_units = 1 };
 		char base[64];
 		snprintf(base, sizeof base, "group_%d_%s", group, g_flightSetNames[set]);
-		if (ok && flight_write_atlas(ctx, base, frames, frame_ids, count, NULL)) {
+		if (ok && flight_write_atlas(ctx, base, frames, count, &header)) {
 			ctx->stats->frame_sets++;
-			used += (size_t)snprintf(header + used, header_size - used, "    - {atlas: %s", base);
+			used += (size_t)snprintf(frame_sets + used, frame_sets_size - used, "    - {atlas: %s", base);
 			if (set == FLIGHT_SET_COUNT - 1)
-				used += (size_t)snprintf(header + used, header_size - used, ", missions: [%d]",
+				used += (size_t)snprintf(frame_sets + used, frame_sets_size - used, ", missions: [%d]",
 										 FLIGHT_DEATH_STAR_MISSION_INDEX);
-			used += (size_t)snprintf(header + used, header_size - used, "}\n");
+			used += (size_t)snprintf(frame_sets + used, frame_sets_size - used, "}\n");
 			ToolLog_Write(TOOL_LOG_DETAIL, "resdata group %d: %s set, %d images", group,
 						  g_flightSetNames[set], count);
 		} else {
@@ -987,7 +963,6 @@ static void flight_bake_frame_sets(FlightContext* ctx, int group, char* header, 
 			ctx->stats->failures++;
 		}
 		flight_free_frames(frames, frames && count > 0 ? count : 0);
-		free(frame_ids);
 		XwauDat_Close(dat);
 	}
 }
@@ -1011,15 +986,18 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 		free(images);
 		return;
 	}
-	char header[4096];
-	snprintf(header, sizeof header, "game_geometry: true\nunits: game\n");
+	char frame_sets[4096] = "";
 	/* The alternative frame sets stay with the shared atlases. */
 	if (group >= FLIGHT_FIRST_EXPLOSION_GROUP && group <= FLIGHT_LAST_EXPLOSION_GROUP && !ctx->art_name)
-		flight_bake_frame_sets(ctx, group, header, sizeof header);
+		flight_bake_frame_sets(ctx, group, frame_sets, sizeof frame_sets);
+	const BakeAtlasHeader header = {
+		.game_geometry = 1,
+		.game_units = 1,
+		.extra = frame_sets[0] ? frame_sets : NULL,
+	};
 
 	BakeFrame* frames = (BakeFrame*)calloc((size_t)count, sizeof *frames);
-	uint16_t* ids = (uint16_t*)calloc((size_t)count, sizeof *ids);
-	int ok = frames && ids;
+	int ok = frames != NULL;
 	int resized = 0;
 	int fitted = 0;
 	char error[256];
@@ -1039,15 +1017,14 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 		frame->rgba = image.rgba;
 		frame->w = (int)image.width;
 		frame->h = (int)image.height;
-		frame->classic_w = flight_round(image.width * scale);
-		frame->classic_h = flight_round(image.height * scale);
-		if (frame->classic_w < 1)
-			frame->classic_w = 1;
-		if (frame->classic_h < 1)
-			frame->classic_h = 1;
-		frame->origin_x = flight_round(flight_offset(info.offset_x) * scale);
-		frame->origin_y = flight_round(flight_offset(info.offset_y) * scale);
-		ids[i] = (uint16_t)images[i].id;
+		const int width = flight_round(image.width * scale);
+		const int height = flight_round(image.height * scale);
+		frame->size[0] = width < 1 ? 1 : width;
+		frame->size[1] = height < 1 ? 1 : height;
+		frame->offset[0] = flight_round(flight_offset(info.offset_x) * scale);
+		frame->offset[1] = flight_round(flight_offset(info.offset_y) * scale);
+		frame->has_id = 1;
+		frame->id = images[i].id;
 		flight_image_light(ctx, group, images[i].id, frame);
 		if (flight_is_planet_group(group) && ctx->opt->planet_max > 0 && frame->w > ctx->opt->planet_max) {
 			ok = flight_fit(frame, ctx->opt->planet_max, 0);
@@ -1062,7 +1039,7 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 	}
 	char base[64];
 	snprintf(base, sizeof base, "group_%d", group);
-	if (ok && flight_write_atlas(ctx, base, frames, ids, count, header)) {
+	if (ok && flight_write_atlas(ctx, base, frames, count, &header)) {
 		ToolLog_Write(TOOL_LOG_DETAIL, "resdata %s%sgroup %d: %d images%s%s",
 					  ctx->art_name ? ctx->art_name : "", ctx->art_name ? " " : "", group, count,
 					  resized ? ", planets shrunk" : "", fitted ? ", scaled down to fit an atlas page" : "");
@@ -1071,7 +1048,6 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 		ctx->stats->failures++;
 	}
 	flight_free_frames(frames, frames ? count : 0);
-	free(ids);
 	free(images);
 }
 

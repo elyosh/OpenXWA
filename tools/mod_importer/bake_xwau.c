@@ -60,25 +60,8 @@
 #define CBM_DESCRIPTOR_BYTES 36
 #define CBM_FRAME_HEADER_BYTES 2084
 
-typedef struct XwauFrame {
-	uint8_t* rgba; /* straight alpha */
-	int w, h;
-	int id; /* DAT image id; -1 in a Frontres atlas */
-	double size[2];
-	double offset[2];
-	int has_bounds;
-	double bounds[4]; /* left, top, right, bottom, as the game stores them */
-	const char* keep_aspect;
-	const char* fit;
-} XwauFrame;
-
-typedef struct XwauRegion {
-	int type;
-	double rect[4];
-} XwauRegion;
-
 typedef struct XwauAtlas {
-	XwauFrame* frames;
+	BakeFrame* frames;
 	int count;
 	int classic_frames; /* 0 when equal to count */
 	int fps;
@@ -87,7 +70,7 @@ typedef struct XwauAtlas {
 	double draw_adjust[4];
 	int has_area;
 	double area[4];
-	const XwauRegion* regions;
+	const BakeRegion* regions;
 	int region_count;
 } XwauAtlas;
 
@@ -105,7 +88,7 @@ typedef struct XwauContext {
 	char resdata[1024];
 	int monitor_fps;
 	int rating_rect[4];  /* familyroom_rating_left, top, width, height */
-	XwauRegion* regions; /* map icon rectangles from SHIPLIST.TXT */
+	BakeRegion* regions; /* map icon rectangles from SHIPLIST.TXT */
 	int region_count;
 	char** wide_keys; /* ConcourseBackgroundsWide.txt entries set to 0 */
 	int wide_key_count;
@@ -269,7 +252,7 @@ static void read_ship_regions(XwauContext* ctx, const char* xwau_root) {
 	FILE* fp = fopen(path, "r");
 	if (!fp)
 		return;
-	ctx->regions = (XwauRegion*)calloc(256, sizeof *ctx->regions);
+	ctx->regions = (BakeRegion*)calloc(256, sizeof *ctx->regions);
 	char line[1024];
 	for (int type = 1; type < 255 && ctx->regions && fgets(line, sizeof line, fp); ++type) {
 		char* tokens[32];
@@ -283,7 +266,7 @@ static void read_ship_regions(XwauContext* ctx, const char* xwau_root) {
 			known |= strcmp(tokens[1], categories[c]) == 0;
 		if (!known)
 			continue;
-		XwauRegion* r = &ctx->regions[ctx->region_count++];
+		BakeRegion* r = &ctx->regions[ctx->region_count++];
 		r->type = type;
 		r->rect[0] = atoi(tokens[count - 4]) * DESIGN_X;
 		r->rect[1] = atoi(tokens[count - 3]) * DESIGN_Y;
@@ -377,127 +360,23 @@ static int same_aspect(int w0, int h0, int w1, int h1) {
 
 /* ---- output -------------------------------------------------------------- */
 
-static void write_number(FILE* fp, double v) {
-	if (v == floor(v))
-		fprintf(fp, "%.0f", v);
-	else
-		fprintf(fp, "%.2f", v);
-}
-
-static void write_list(FILE* fp, const double* values, int count) {
-	fputc('[', fp);
-	for (int i = 0; i < count; ++i) {
-		if (i)
-			fputs(", ", fp);
-		write_number(fp, values[i]);
-	}
-	fputc(']', fp);
-}
-
-static int write_atlas_yaml(const char* path, const XwauAtlas* atlas, const AeronAtlasImage* placed,
-							const AeronCpuAtlas* pages) {
-	FILE* fp = fopen(path, "w");
-	if (!fp)
-		return 0;
-	fprintf(fp, "# Made by the OpenXWA mod importer. Sizes, offsets and bounds are in\n"
-				"# design pixels; the game takes its geometry from this file.\n");
-	fprintf(fp, "game_geometry: true\n");
-	fprintf(fp, "atlas: {w: %d, h: %d}\n", pages->pages[0].width, pages->pages[0].height);
-	if (atlas->classic_frames)
-		fprintf(fp, "classic_frames: %d\n", atlas->classic_frames);
-	if (atlas->fps)
-		fprintf(fp, "fps: %d\n", atlas->fps);
-	if (atlas->tint)
-		fprintf(fp, "tint: %s\n", atlas->tint);
-	if (atlas->has_draw_adjust) {
-		fprintf(fp, "draw_adjust: ");
-		write_list(fp, atlas->draw_adjust, 4);
-		fputc('\n', fp);
-	}
-	if (atlas->has_area) {
-		fprintf(fp, "bounds: ");
-		write_list(fp, atlas->area, 4);
-		fputc('\n', fp);
-	}
-	if (atlas->region_count) {
-		fprintf(fp, "regions:\n");
-		for (int i = 0; i < atlas->region_count; ++i) {
-			fprintf(fp, "  - {type: %d, rect: ", atlas->regions[i].type);
-			write_list(fp, atlas->regions[i].rect, 4);
-			fprintf(fp, "}\n");
-		}
-	}
-	fprintf(fp, "frames:\n");
-	for (int i = 0; i < atlas->count; ++i) {
-		const XwauFrame* f = &atlas->frames[i];
-		fprintf(fp, "  - {");
-		if (f->id >= 0)
-			fprintf(fp, "id: %d, ", f->id);
-		if (pages->page_count > 1)
-			fprintf(fp, "page: %d, ", placed[i].page);
-		fprintf(fp, "x: %d, y: %d, w: %d, h: %d, size: ", placed[i].x, placed[i].y, f->w, f->h);
-		write_list(fp, f->size, 2);
-		if (f->offset[0] != 0.0 || f->offset[1] != 0.0) {
-			fprintf(fp, ", offset: ");
-			write_list(fp, f->offset, 2);
-		}
-		if (f->has_bounds) {
-			fprintf(fp, ", bounds: ");
-			write_list(fp, f->bounds, 4);
-		}
-		if (f->keep_aspect)
-			fprintf(fp, ", keep_aspect: %s", f->keep_aspect);
-		if (f->fit)
-			fprintf(fp, ", fit: %s", f->fit);
-		fprintf(fp, "}\n");
-	}
-	return fclose(fp) == 0;
-}
-
 /* Writes `dir`/`base`.yaml and its pages: `base`, then `base`_p<N>. */
 static void emit_atlas(XwauContext* ctx, const char* dir, const char* base, const XwauAtlas* atlas) {
-	BakeFrame* frames = (BakeFrame*)calloc((size_t)atlas->count, sizeof *frames);
-	if (!frames) {
-		ctx->stats->failures++;
-		return;
-	}
-	for (int i = 0; i < atlas->count; ++i) {
-		frames[i].rgba = atlas->frames[i].rgba;
-		frames[i].w = atlas->frames[i].w;
-		frames[i].h = atlas->frames[i].h;
-	}
-	AeronCpuAtlas pages = { 0 };
-	AeronAtlasImage* placed = NULL;
-	if (!BakeSprites_BuildAtlas(frames, atlas->count, 0, &placed, &pages)) {
-		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s/%s could not be packed", dir, base);
-		free(frames);
-		ctx->stats->failures++;
-		return;
-	}
-	if (!BakeSprites_MakeDirs(dir)) {
-		free(placed);
-		Aeron_AtlasBuildFree(&pages);
-		free(frames);
-		ctx->stats->failures++;
-		return;
-	}
-	int ok = 1;
-	for (int page = 0; page < pages.page_count; ++page) {
-		char path[1200];
-		if (page == 0)
-			snprintf(path, sizeof path, "%s/%s", dir, base);
-		else
-			snprintf(path, sizeof path, "%s/%s_p%d", dir, base, page);
-		ok &= BakeSprites_EmitImage(ctx->opt->sprites, path, pages.pages[page].rgba, pages.pages[page].width,
-									pages.pages[page].height);
-	}
-	char yaml[1200];
-	snprintf(yaml, sizeof yaml, "%s/%s.yaml", dir, base);
-	ok &= write_atlas_yaml(yaml, atlas, placed, &pages);
-	free(placed);
-	Aeron_AtlasBuildFree(&pages);
-	free(frames);
-	if (ok)
+	BakeAtlasHeader header = {
+		.comment = "# Made by the OpenXWA mod importer. Sizes, offsets and bounds are in\n"
+				   "# design pixels; the game takes its geometry from this file.\n",
+		.game_geometry = 1,
+		.classic_frames = atlas->classic_frames,
+		.fps = atlas->fps,
+		.tint = atlas->tint,
+		.has_draw_adjust = atlas->has_draw_adjust,
+		.has_bounds = atlas->has_area,
+		.regions = atlas->regions,
+		.region_count = atlas->region_count,
+	};
+	memcpy(header.draw_adjust, atlas->draw_adjust, sizeof header.draw_adjust);
+	memcpy(header.bounds, atlas->area, sizeof header.bounds);
+	if (BakeSprites_PackAndWriteAtlas(ctx->opt->sprites, dir, base, &header, atlas->frames, atlas->count))
 		ctx->stats->atlases++;
 	else
 		ctx->stats->failures++;
@@ -826,9 +705,9 @@ static void write_video_yamls(XwauContext* ctx) {
 				"# Made by the OpenXWA mod importer. Sizes are in design pixels.\n"
 				"video: %s\nsize: ",
 				v->webm);
-		write_list(fp, size, 2);
+		BakeSprites_WriteNumberList(fp, size, 2);
 		fprintf(fp, "\noffset: ");
-		write_list(fp, v->offset, 2);
+		BakeSprites_WriteNumberList(fp, v->offset, 2);
 		fprintf(fp, "\nclassic_frames: %d\nfps: 24\n", count);
 		if (fclose(fp) != 0)
 			ctx->stats->failures++;
@@ -931,13 +810,12 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 	const int icons = strcasecmp(dir_name, "icons") == 0;
 	XwauAtlas atlas = { 0 };
 	atlas.count = by_time ? hd.count : sd.count;
-	atlas.frames = (XwauFrame*)calloc((size_t)atlas.count, sizeof *atlas.frames);
+	atlas.frames = (BakeFrame*)calloc((size_t)atlas.count, sizeof *atlas.frames);
 	int new_image = 0;
 	for (int i = 0; i < atlas.count && atlas.frames; ++i) {
-		XwauFrame* f = &atlas.frames[i];
+		BakeFrame* f = &atlas.frames[i];
 		const int si = i < sd.count ? i : sd.count - 1;
 		const Xwa2dFrame* s = &sd.frames[si];
-		f->id = -1;
 		f->size[0] = s->width * DESIGN_X;
 		f->size[1] = s->height * DESIGN_Y;
 		if (cbm.bounds) {
@@ -1201,7 +1079,7 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 	qsort(order, (size_t)count, 2 * sizeof *order, compare_ints);
 
 	XwauAtlas atlas = { 0 };
-	atlas.frames = (XwauFrame*)calloc((size_t)count, sizeof *atlas.frames);
+	atlas.frames = (BakeFrame*)calloc((size_t)count, sizeof *atlas.frames);
 	char error[256];
 	int ok = atlas.frames != NULL;
 	for (int i = 0; i < count && ok; ++i) {
@@ -1209,9 +1087,10 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 		const XwauDatFile* file = &files[order[i * 2 + 1]];
 		XwauDatImageInfo sd_info, hd_info;
 		XwauDatImage image;
-		XwauFrame* f = &atlas.frames[atlas.count++];
+		BakeFrame* f = &atlas.frames[atlas.count++];
 		XwauDat_GetImageInfo(file->sd, group, id, &sd_info);
 		const int has_hd = file->hd && XwauDat_GetImageInfo(file->hd, group, id, &hd_info);
+		f->has_id = 1;
 		f->id = id;
 		f->size[0] = sd_info.width * DESIGN_X;
 		f->size[1] = sd_info.height * DESIGN_Y;
@@ -1415,12 +1294,12 @@ static double door_value(const char* doors, const char* key, int fallback) {
 
 static void write_design_point(FILE* fp, double x, double y) {
 	const double values[2] = { x * DESIGN_X, y * DESIGN_Y };
-	write_list(fp, values, 2);
+	BakeSprites_WriteNumberList(fp, values, 2);
 }
 
 static void write_design_rect(FILE* fp, double x, double y, double w, double h) {
 	const double values[4] = { x * DESIGN_X, y * DESIGN_Y, w * DESIGN_X, h * DESIGN_Y };
-	write_list(fp, values, 4);
+	BakeSprites_WriteNumberList(fp, values, 4);
 }
 
 /* Writes frontend/concourse/layout.yaml with every position that XWAU moves.
@@ -1867,7 +1746,7 @@ static void write_animations_yaml(XwauContext* ctx) {
 		if (anim_delay(a, &shortest, &longest)) {
 			const double delay[2] = { shortest, longest };
 			fprintf(fp, "    delay: ");
-			write_list(fp, delay, 2);
+			BakeSprites_WriteNumberList(fp, delay, 2);
 			fprintf(fp, "\n");
 		}
 		fprintf(fp, "    animations:\n");

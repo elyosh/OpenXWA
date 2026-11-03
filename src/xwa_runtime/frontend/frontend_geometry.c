@@ -151,48 +151,6 @@ static void geometry_free_atlas(XwaGeometryAtlas* atlas) {
 	}
 }
 
-/* Reads a frame's size and anchor in game units. The size comes from
- * `classic_w` and `classic_h`, which are required. The anchor comes from
- * `origin_x` and `origin_y`, which are 0 when missing. The keys in design
- * pixels are an error here, so that no value is read in the wrong units. */
-static int geometry_read_game_frame(const char* path, const AeronConfigNode* node, XwaGeometryFrame* frame) {
-	static const char* const design_keys[] = { "size", "offset", "bounds" };
-	const AeronConfigNode* width = AeronConfigNode_MapGet(node, "classic_w");
-	const AeronConfigNode* height = AeronConfigNode_MapGet(node, "classic_h");
-	const AeronConfigNode* origin[2] = { AeronConfigNode_MapGet(node, "origin_x"),
-										 AeronConfigNode_MapGet(node, "origin_y") };
-	const int line = AeronConfigNode_Line(node);
-
-	for (size_t i = 0; i < sizeof(design_keys) / sizeof(design_keys[0]); ++i) {
-		const AeronConfigNode* value = AeronConfigNode_MapGet(node, design_keys[i]);
-		if (value != NULL) {
-			Aeron_LogError("xwa.frontend", "%s:%d: %s is in design pixels, but this atlas uses game units",
-						   path, AeronConfigNode_Line(value), design_keys[i]);
-			return 0;
-		}
-	}
-	if (AeronConfigNode_Type(width) != AERON_CONFIG_INT || AeronConfigNode_Type(height) != AERON_CONFIG_INT ||
-		AeronConfigNode_Int(width, 0) <= 0 || AeronConfigNode_Int(height, 0) <= 0) {
-		Aeron_LogError("xwa.frontend", "%s:%d: a frame needs classic_w and classic_h, both above 0", path,
-					   line);
-		return 0;
-	}
-	frame->size[0] = (float)AeronConfigNode_Int(width, 0);
-	frame->size[1] = (float)AeronConfigNode_Int(height, 0);
-	for (int axis = 0; axis < 2; ++axis) {
-		if (origin[axis] == NULL) {
-			continue;
-		}
-		if (AeronConfigNode_Type(origin[axis]) != AERON_CONFIG_INT) {
-			Aeron_LogError("xwa.frontend", "%s:%d: %s must be a whole number", path,
-						   AeronConfigNode_Line(origin[axis]), axis == 0 ? "origin_x" : "origin_y");
-			return 0;
-		}
-		frame->offset[axis] = (float)AeronConfigNode_Int(origin[axis], 0);
-	}
-	return 1;
-}
-
 /* Reads one frame. Other keys, such as the texture rectangle, are for the
  * renderer and are skipped here. */
 static int geometry_read_frame(const char* path, const AeronConfigNode* node, float scale, int needs_id,
@@ -218,9 +176,6 @@ static int geometry_read_frame(const char* path, const AeronConfigNode* node, fl
 	} else if (needs_id) {
 		Aeron_LogError("xwa.frontend", "%s:%d: a frame of a DAT group needs an id", path, line);
 		return 0;
-	}
-	if (units == XWA_GEOMETRY_UNITS_GAME) {
-		return geometry_read_game_frame(path, node, frame);
 	}
 	value = AeronConfigNode_MapGet(node, "size");
 	if (value != NULL) {
@@ -690,11 +645,28 @@ const XwaFrontendPaint* XwaFrontendGeometry_Paint(void) {
 	return &g_geometryPaint;
 }
 
-static void geometry_unit_bounds(const float* bounds, int* left, int* top, int* right, int* bottom) {
-	*left = XwaFrontendGeometry_UnitX(bounds[0]);
-	*top = XwaFrontendGeometry_UnitY(bounds[1]);
-	*right = XwaFrontendGeometry_UnitX(bounds[2]);
-	*bottom = XwaFrontendGeometry_UnitY(bounds[3]);
+int XwaFrontendGeometry_AtlasUnitX(const XwaGeometryAtlas* atlas, float x) {
+	return atlas->units == XWA_GEOMETRY_UNITS_GAME ? (int)floorf(x + 0.5f) : XwaFrontendGeometry_UnitX(x);
+}
+
+int XwaFrontendGeometry_AtlasUnitY(const XwaGeometryAtlas* atlas, float y) {
+	return atlas->units == XWA_GEOMETRY_UNITS_GAME ? (int)floorf(y + 0.5f) : XwaFrontendGeometry_UnitY(y);
+}
+
+float XwaFrontendGeometry_AtlasUnitsX(const XwaGeometryAtlas* atlas, float x) {
+	return atlas->units == XWA_GEOMETRY_UNITS_GAME ? x : XwaFrontendGeometry_UnitsX(x);
+}
+
+float XwaFrontendGeometry_AtlasUnitsY(const XwaGeometryAtlas* atlas, float y) {
+	return atlas->units == XWA_GEOMETRY_UNITS_GAME ? y : XwaFrontendGeometry_UnitsY(y);
+}
+
+static void geometry_unit_bounds(const XwaGeometryAtlas* atlas, const float* bounds, int* left, int* top,
+								 int* right, int* bottom) {
+	*left = XwaFrontendGeometry_AtlasUnitX(atlas, bounds[0]);
+	*top = XwaFrontendGeometry_AtlasUnitY(atlas, bounds[1]);
+	*right = XwaFrontendGeometry_AtlasUnitX(atlas, bounds[2]);
+	*bottom = XwaFrontendGeometry_AtlasUnitY(atlas, bounds[3]);
 }
 
 ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* atlas) {
@@ -730,14 +702,14 @@ ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* 
 	desc->bounds.left = 0x7fffffff;
 	desc->bounds.top = 0x7fffffff;
 	if (atlas->has_bounds) {
-		atlasRight = XwaFrontendGeometry_UnitX(atlas->bounds[2]);
-		atlasBottom = XwaFrontendGeometry_UnitY(atlas->bounds[3]);
+		atlasRight = XwaFrontendGeometry_AtlasUnitX(atlas, atlas->bounds[2]);
+		atlasBottom = XwaFrontendGeometry_AtlasUnitY(atlas, atlas->bounds[3]);
 	}
 	for (int i = 0; i < desc->frameCount; ++i) {
 		const XwaGeometryFrame* frame = &atlas->frames[i];
 		ImageResource* image = &desc->image[i];
-		int width = XwaFrontendGeometry_UnitX(frame->size[0]);
-		int height = XwaFrontendGeometry_UnitY(frame->size[1]);
+		int width = XwaFrontendGeometry_AtlasUnitX(atlas, frame->size[0]);
+		int height = XwaFrontendGeometry_AtlasUnitY(atlas, frame->size[1]);
 
 		image->width = width > 0 ? width : 1;
 		image->height = height > 0 ? height : 1;
@@ -745,8 +717,8 @@ ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* 
 		   This is what FrontImage_ComputeImageBounds finds for an image with no
 		   transparent border. */
 		if (frame->has_bounds) {
-			geometry_unit_bounds(frame->bounds, &image->boundsLeft, &image->boundsTop, &image->boundsRight,
-								 &image->boundsBottom);
+			geometry_unit_bounds(atlas, frame->bounds, &image->boundsLeft, &image->boundsTop,
+								 &image->boundsRight, &image->boundsBottom);
 		} else {
 			image->boundsRight = image->width - 1;
 			image->boundsBottom = image->height - 1;
@@ -796,7 +768,7 @@ ResourceDescriptor* XwaFrontendGeometry_BuildDescriptor(const XwaGeometryAtlas* 
 		}
 	}
 	if (atlas->has_bounds) {
-		geometry_unit_bounds(atlas->bounds, &desc->bounds.left, &desc->bounds.top, &desc->bounds.right,
+		geometry_unit_bounds(atlas, atlas->bounds, &desc->bounds.left, &desc->bounds.top, &desc->bounds.right,
 							 &desc->bounds.bottom);
 	}
 	g_geometryDescriptors[g_geometryDescriptorCount++] = desc;
@@ -828,15 +800,6 @@ enum {
 
 static const XwaGeometryAtlas* g_geometrySortAtlas;
 
-/* Converts an atlas value to whole game units, rounded to the nearest unit. */
-static int geometry_atlas_unit_x(const XwaGeometryAtlas* atlas, float x) {
-	return atlas->units == XWA_GEOMETRY_UNITS_GAME ? (int)floorf(x + 0.5f) : XwaFrontendGeometry_UnitX(x);
-}
-
-static int geometry_atlas_unit_y(const XwaGeometryAtlas* atlas, float y) {
-	return atlas->units == XWA_GEOMETRY_UNITS_GAME ? (int)floorf(y + 0.5f) : XwaFrontendGeometry_UnitY(y);
-}
-
 static int geometry_compare_ids(const void* lhs, const void* rhs) {
 	const int a = g_geometrySortAtlas->frames[*(const int*)lhs].id;
 	const int b = g_geometrySortAtlas->frames[*(const int*)rhs].id;
@@ -854,7 +817,7 @@ int XwaFrontendGeometry_BuildSpriteGroup(int16_t group_id, SpriteGroup* group,
 		return 0;
 	}
 	for (int i = 0; i < atlas->frame_count; ++i) {
-		const int height = geometry_atlas_unit_y(atlas, atlas->frames[i].size[1]);
+		const int height = XwaFrontendGeometry_AtlasUnitY(atlas, atlas->frames[i].size[1]);
 		order[i] = i;
 		data_size += GEOMETRY_SPRITE_HEADER_SIZE + (int32_t)sizeof(SpritePayload) + (height > 0 ? height : 1);
 	}
@@ -877,8 +840,8 @@ int XwaFrontendGeometry_BuildSpriteGroup(int16_t group_id, SpriteGroup* group,
 	group->dataBase = group->hGlobal + group->indexSize;
 	for (int i = 0; i < atlas->frame_count; ++i) {
 		const XwaGeometryFrame* frame = &atlas->frames[order[i]];
-		const int width = geometry_atlas_unit_x(atlas, frame->size[0]);
-		const int height = geometry_atlas_unit_y(atlas, frame->size[1]);
+		const int width = XwaFrontendGeometry_AtlasUnitX(atlas, frame->size[0]);
+		const int height = XwaFrontendGeometry_AtlasUnitY(atlas, frame->size[1]);
 		const uint16_t rows = (uint16_t)(height > 0 ? height : 1);
 		const uint32_t payload_size = (uint32_t)sizeof(SpritePayload) + rows;
 		unsigned char* sprite = group->dataBase + data_used;
@@ -899,9 +862,9 @@ int XwaFrontendGeometry_BuildSpriteGroup(int16_t group_id, SpriteGroup* group,
 		ByteOrder_WriteU32Le(payload + offsetof(SpritePayload, rowDataOffset), sizeof(SpritePayload));
 		ByteOrder_WriteU32Le(payload + offsetof(SpritePayload, palette16Offset), payload_size);
 		ByteOrder_WriteU32Le(payload + offsetof(SpritePayload, anchorX),
-							 (uint32_t)geometry_atlas_unit_x(atlas, frame->offset[0]));
+							 (uint32_t)XwaFrontendGeometry_AtlasUnitX(atlas, frame->offset[0]));
 		ByteOrder_WriteU32Le(payload + offsetof(SpritePayload, anchorY),
-							 (uint32_t)geometry_atlas_unit_y(atlas, frame->offset[1]));
+							 (uint32_t)XwaFrontendGeometry_AtlasUnitY(atlas, frame->offset[1]));
 		/* Each row after the payload header is a run count of 0, already
 		   zeroed by calloc. */
 		ByteOrder_WriteU16Le(entry, (uint16_t)frame->id);

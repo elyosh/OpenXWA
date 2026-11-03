@@ -580,6 +580,11 @@ if(XWA_BUILD_TOOLS)
     add_executable(xwa_asset_bake tools/xwa_asset_bake/xwa_asset_bake.c)
     target_link_libraries(xwa_asset_bake PRIVATE xwa_asset_bake_lib)
 
+    # Builds an atlas of 2D images from PNG files and image.yaml, for mod
+    # authors.
+    add_executable(xwa_image_cook tools/xwa_image_cook/xwa_image_cook.c)
+    target_link_libraries(xwa_image_cook PRIVATE xwa_asset_bake_lib)
+
     add_executable(imc_decode tools/imc_decode.c)
     target_link_libraries(imc_decode PRIVATE xwa_core)
 

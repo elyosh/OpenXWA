@@ -298,15 +298,15 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	float dst_ux = (float)d->dst_x + (float)d->dst_frac_x / 256.0f;
 	float dst_uy = (float)d->dst_y + (float)d->dst_frac_y / 256.0f;
 	if (gframe) {
-		dst_ux += XwaFrontendGeometry_UnitsX(gframe->offset[0]);
-		dst_uy += XwaFrontendGeometry_UnitsY(gframe->offset[1]);
+		dst_ux += XwaFrontendGeometry_AtlasUnitsX(geo, gframe->offset[0]);
+		dst_uy += XwaFrontendGeometry_AtlasUnitsY(geo, gframe->offset[1]);
 		if (d->kind == XWA_DRAW2D_ATLAS_SPRITE) {
-			dst_ux -= (float)XwaFrontendGeometry_UnitX(gframe->offset[0]);
-			dst_uy -= (float)XwaFrontendGeometry_UnitY(gframe->offset[1]);
+			dst_ux -= (float)XwaFrontendGeometry_AtlasUnitX(geo, gframe->offset[0]);
+			dst_uy -= (float)XwaFrontendGeometry_AtlasUnitY(geo, gframe->offset[1]);
 		}
 		if (!d->has_src_rect) {
-			dst_cw = XwaFrontendGeometry_UnitsX(gframe->size[0]);
-			dst_ch = XwaFrontendGeometry_UnitsY(gframe->size[1]);
+			dst_cw = XwaFrontendGeometry_AtlasUnitsX(geo, gframe->size[0]);
+			dst_ch = XwaFrontendGeometry_AtlasUnitsY(geo, gframe->size[1]);
 		}
 	}
 	/* A tinted icon whose atlas keeps the aspect ratio by width is drawn
@@ -431,10 +431,10 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 			s.scissor = (AeronRectI) { 0, 0, 0, 0 };
 	} else if (geo && geo->has_draw_adjust) {
 		/* Only the drawing moves; the game's geometry doesn't change. */
-		s.dst_x += XwaFrontendGeometry_UnitsX(geo->draw_adjust[0]) * rm_scale_x();
-		s.dst_y += XwaFrontendGeometry_UnitsY(geo->draw_adjust[1]) * rm_scale_y();
-		s.dst_w += XwaFrontendGeometry_UnitsX(geo->draw_adjust[2]) * rm_scale_x();
-		s.dst_h += XwaFrontendGeometry_UnitsY(geo->draw_adjust[3]) * rm_scale_y();
+		s.dst_x += XwaFrontendGeometry_AtlasUnitsX(geo, geo->draw_adjust[0]) * rm_scale_x();
+		s.dst_y += XwaFrontendGeometry_AtlasUnitsY(geo, geo->draw_adjust[1]) * rm_scale_y();
+		s.dst_w += XwaFrontendGeometry_AtlasUnitsX(geo, geo->draw_adjust[2]) * rm_scale_x();
+		s.dst_h += XwaFrontendGeometry_AtlasUnitsY(geo, geo->draw_adjust[3]) * rm_scale_y();
 	}
 
 	if (d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED || d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED) {
