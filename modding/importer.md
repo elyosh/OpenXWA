@@ -72,6 +72,9 @@ Import finished in 4m 02s: 0 failures, 31 warnings
 
 These are warnings: the mod works without them.
 
+[XWAU and TFTC support](xwau_support.md) lists the features that OpenXWA
+supports.
+
 ## Keep authoring files
 
 **Keep authoring files** also saves the sources of the models and of the
