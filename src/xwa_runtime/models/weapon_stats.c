@@ -53,8 +53,9 @@ static const char* const s_profileKeys[WEAPON_STATS_GROUPS] = { "weapon_profile"
 																"energy_profile", "linking_profile" };
 
 static const char* const s_stats[XWA_WEAPON_STATS] = {
-	"duration_seconds",
-	"duration_fraction",
+	/* `duration_ms` sets both duration stats. The fraction has no key. */
+	"duration_ms",
+	"",
 	"score",
 	"speed_mglt",
 	"power",
@@ -241,14 +242,29 @@ static void WeaponStats_ReadForm(const char* path, const char* where, const Aero
 		char name[160];
 		int32_t read;
 
-		if (stat < 0) {
+		if (stat < 0 || stat == XWA_WEAPON_STAT_DURATION_FRACTION) {
 			if (!forms || WeaponStats_Find(key, s_forms + 1, WEAPON_STATS_FORMS - 1) < 0) {
 				Aeron_LogWarn("xwa.models", "%s: %s.%s isn't a weapon stat. It is ignored", path, where, key);
 			}
 			continue;
 		}
 		snprintf(name, sizeof name, "%s.%s", where, key);
-		if (s_statUnits[stat] != XWA_UNIT_NONE) {
+		if (stat == XWA_WEAPON_STAT_DURATION_SECONDS) {
+			int32_t ticks;
+
+			/* The game adds 236 ticks for each second and the fraction of a
+			   second, rounded to a tick, and keeps the sum in 16 bits. */
+			if (!XwaUnits_Read(value, XWA_UNIT_MILLISECONDS, 0, UINT16_MAX, &ticks)) {
+				Aeron_LogWarn("xwa.models",
+							  "%s: %s must be a number of milliseconds from 0 to %d. It is ignored", path,
+							  name, UINT16_MAX * 4);
+				continue;
+			}
+			form->value[XWA_WEAPON_STAT_DURATION_SECONDS] = ticks / 236;
+			form->value[XWA_WEAPON_STAT_DURATION_FRACTION] = (int32_t)(((ticks % 236) * 65536 + 118) / 236);
+			form->set |= (uint16_t)((1u << XWA_WEAPON_STAT_DURATION_SECONDS) |
+									(1u << XWA_WEAPON_STAT_DURATION_FRACTION));
+		} else if (s_statUnits[stat] != XWA_UNIT_NONE) {
 			if (!XwaUnits_Read(value, s_statUnits[stat], INT32_MIN, INT32_MAX, &read)) {
 				Aeron_LogWarn("xwa.models", "%s: %s must be a number of %s. It is ignored", path, name,
 							  XwaUnits_Name(s_statUnits[stat]));

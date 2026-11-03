@@ -17,6 +17,7 @@
 #include "xwa/assets/object_type.h"
 #include "xwa/assets/object_type_info.h"
 #include "xwa/flight/object/laser.h"
+#include "xwa/render/renderer.h"
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/models/model_roles.h"
@@ -472,12 +473,14 @@ static void WriteWeaponTypeTable(FILE* page) {
 			continue;
 		}
 		const int index = type - OBJ_LaserRebel;
-		const double life =
-			g_projectileLifetimeSecondsByType[index] + g_projectileLifetimeFracQ16ByType[index] / 65536.0;
+		/* The life in ticks of 4 ms, as the game computes it. */
+		const unsigned life_ticks = 236u * g_projectileLifetimeSecondsByType[index] +
+									MATH2_fraction(g_projectileLifetimeFracQ16ByType[index], 236u);
 		/* A speed unit is 1/2.25 MGLT. Two decimals give back the speed. */
 		const double mglt = round(g_projectileSpeedByType[index] / 2.25 * 100.0) / 100.0;
-		fprintf(page, "| %d | `%s` | %g | %d | %g | %u |\n", type, name, mglt,
-				g_projectileDamageByType[index], life, g_warheadProjectilePointValueByObjectType[type]);
+		fprintf(page, "| %d | `%s` | %g | %d | %u | %u |\n", type, name, mglt,
+				g_projectileDamageByType[index], life_ticks * 4,
+				g_warheadProjectilePointValueByObjectType[type]);
 	}
 	fprintf(page, "\n");
 }
@@ -496,9 +499,8 @@ static void WriteWeaponsPage(const char* folder) {
 				   "The other columns give the stats of the original game, which the `stats` weapon "
 				   "profiles of `flight/flight.yaml` and of the model settings can change. **Speed** is in "
 				   "MGLT, and a shot of a fighter adds the fighter's speed. **Power** is the damage of a "
-				   "shot, in the points of hull and shields. **Life** is how long a shot lives, in game "
-				   "seconds. A game second is 0.944 real seconds. **Score** is the score of a warhead "
-				   "hit.");
+				   "shot, in the points of hull and shields. **Life** is how long a shot lives, in "
+				   "milliseconds. **Score** is the score of a warhead hit.");
 	WriteWeaponTypeTable(page);
 
 	WriteHeading(page, "Warheads");

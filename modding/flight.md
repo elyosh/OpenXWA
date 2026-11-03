@@ -390,8 +390,7 @@ game.
 | `speed_mglt` | The speed of a shot, in MGLT. A shot of a fighter or of a player's craft also gets the speed of the craft that fires it. |
 | `power` | The damage of a shot, in the points of hull and shields. The shield of the side that is hit takes the damage first, and only the rest goes on to the parts and the hull. A starship or a platform takes 1/16 of the damage, and a freighter or a container 1/4. |
 | `power_speed_percent` | The percent of the firing craft's speed added to the power of its shots. The original value is 100. Turret shots get no speed bonus. |
-| `duration_seconds` | How long a shot lives, in whole game seconds. |
-| `duration_fraction` | Adds a part of a game second to `duration_seconds`, where 65536 is a whole second. A shot lives at most about 277 game seconds. |
+| `duration_ms` | How long a shot lives, in milliseconds, from 0 to 262140. A shot that a mine fires lives twice as long. |
 | `duration_offset_ms` | How long a turret shot lives after the time it needs to reach its target, in milliseconds. The original value is 236. |
 | `score` | The score that a warhead hit gives the player and the player's team. The score goes back down when the warhead runs out of time without a hit. |
 | `fire_rate_ms` | Lasers: the wait after a volley, in milliseconds, for each cannon that fired, so that linked cannons wait longer. Warheads: the wait after each warhead. The original values are 188 for lasers and 1888 for warheads. |

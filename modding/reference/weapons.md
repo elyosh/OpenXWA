@@ -6,37 +6,37 @@
 
 A weapon type is the object type of a shot, such as a laser bolt or a torpedo. Weapon types are object types 280 to 307, with the same names. Laser groups, weapon settings and weapon colours use them.
 
-The other columns give the stats of the original game, which the `stats` weapon profiles of `flight/flight.yaml` and of the model settings can change. **Speed** is in MGLT, and a shot of a fighter adds the fighter's speed. **Power** is the damage of a shot, in the points of hull and shields. **Life** is how long a shot lives, in game seconds. A game second is 0.944 real seconds. **Score** is the score of a warhead hit.
+The other columns give the stats of the original game, which the `stats` weapon profiles of `flight/flight.yaml` and of the model settings can change. **Speed** is in MGLT, and a shot of a fighter adds the fighter's speed. **Power** is the damage of a shot, in the points of hull and shields. **Life** is how long a shot lives, in milliseconds. **Score** is the score of a warhead hit.
 
 | Number | Name | Speed | Power | Life | Score |
 |---:|---|---:|---:|---:|---:|
-| 280 | `rebel_laser` | 888.89 | 250 | 1 | 0 |
-| 281 | `rebel_laser_turbo` | 888.89 | 500 | 1.5 | 0 |
-| 282 | `imperial_laser` | 800 | 200 | 1 | 0 |
-| 283 | `imperial_laser_turbo` | 800 | 400 | 1.5 | 0 |
-| 284 | `ion_cannon` | 622.22 | 200 | 1.5 | 0 |
-| 285 | `ion_cannon_turbo` | 711.11 | 400 | 2 | 0 |
-| 286 | `torpedo` | 111.11 | 10000 | 40 | 9 |
-| 287 | `missile` | 222.22 | 3000 | 25 | 6 |
-| 288 | `turbolaser_red` | 444.44 | 1500 | 3 | 0 |
-| 289 | `turbolaser_green` | 400 | 1600 | 3 | 0 |
-| 290 | `turbolaser_ion` | 177.78 | 800 | 5 | 0 |
-| 291 | `advanced_torpedo` | 133.33 | 15000 | 45 | 15 |
-| 292 | `advanced_missile` | 266.67 | 6000 | 25 | 15 |
-| 293 | `space_bomb` | 22.22 | 65000 | 120 | 45 |
-| 294 | `heavy_rocket` | 44.44 | 35000 | 90 | 24 |
-| 295 | `mag_pulse` | 266.67 | 3000 | 25 | 9 |
-| 296 | `ion_pulse` | 133.33 | 6000 | 40 | 9 |
-| 297 | `turbolaser_red_light` | 622.22 | 600 | 3 | 0 |
-| 298 | `flare` | 222.22 | 500 | 5 | 6 |
-| 299 | `spark_projectile` | 100 | 2000 | 10 | 0 |
+| 280 | `rebel_laser` | 888.89 | 250 | 944 | 0 |
+| 281 | `rebel_laser_turbo` | 888.89 | 500 | 1416 | 0 |
+| 282 | `imperial_laser` | 800 | 200 | 944 | 0 |
+| 283 | `imperial_laser_turbo` | 800 | 400 | 1416 | 0 |
+| 284 | `ion_cannon` | 622.22 | 200 | 1416 | 0 |
+| 285 | `ion_cannon_turbo` | 711.11 | 400 | 1888 | 0 |
+| 286 | `torpedo` | 111.11 | 10000 | 37760 | 9 |
+| 287 | `missile` | 222.22 | 3000 | 23600 | 6 |
+| 288 | `turbolaser_red` | 444.44 | 1500 | 2832 | 0 |
+| 289 | `turbolaser_green` | 400 | 1600 | 2832 | 0 |
+| 290 | `turbolaser_ion` | 177.78 | 800 | 4720 | 0 |
+| 291 | `advanced_torpedo` | 133.33 | 15000 | 42480 | 15 |
+| 292 | `advanced_missile` | 266.67 | 6000 | 23600 | 15 |
+| 293 | `space_bomb` | 22.22 | 65000 | 113280 | 45 |
+| 294 | `heavy_rocket` | 44.44 | 35000 | 84960 | 24 |
+| 295 | `mag_pulse` | 266.67 | 3000 | 23600 | 9 |
+| 296 | `ion_pulse` | 133.33 | 6000 | 37760 | 9 |
+| 297 | `turbolaser_red_light` | 622.22 | 600 | 2832 | 0 |
+| 298 | `flare` | 222.22 | 500 | 4720 | 6 |
+| 299 | `spark_projectile` | 100 | 2000 | 9440 | 0 |
 | 300 | `chaff` | 0 | 0 | 0 | 0 |
-| 301 | `turbolaser_red_medium` | 533.33 | 750 | 3 | 0 |
-| 302 | `turbolaser_red_heavy` | 444.44 | 1000 | 4.5 | 0 |
-| 303 | `turbolaser_green_light` | 555.56 | 750 | 3 | 0 |
-| 304 | `turbolaser_green_medium` | 488.89 | 1000 | 3 | 0 |
-| 305 | `turbolaser_green_heavy` | 400 | 1200 | 4.5 | 0 |
-| 306 | `death_star_laser` | 0 | 1000000 | 10 | 0 |
+| 301 | `turbolaser_red_medium` | 533.33 | 750 | 2832 | 0 |
+| 302 | `turbolaser_red_heavy` | 444.44 | 1000 | 4248 | 0 |
+| 303 | `turbolaser_green_light` | 555.56 | 750 | 2832 | 0 |
+| 304 | `turbolaser_green_medium` | 488.89 | 1000 | 2832 | 0 |
+| 305 | `turbolaser_green_heavy` | 400 | 1200 | 4248 | 0 |
+| 306 | `death_star_laser` | 0 | 1000000 | 9440 | 0 |
 | 307 | `custom_weapon` |  |  |  |  |
 
 ## Warheads
