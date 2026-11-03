@@ -2806,7 +2806,12 @@ void Hangar_LaunchPlayerCraft(void) {
 		g_objectTable[newObjIdx].objectType == OBJ_BWing) {
 #endif
 		craft->sFoilState = (uint8_t)((craft->sFoilState ^ 2u) | 1u);
+#ifdef XWA_MODERN
+		fsfx_PlaySound(XwaCraftSounds_SFoil((unsigned int)g_localPlayer, 120), 0xffffu,
+					   (unsigned int)g_localPlayer);
+#else
 		fsfx_PlaySound(120, 0xffffu, (unsigned int)g_localPlayer);
+#endif
 		msg_emitInFlightMessage(MSG_SFOILS_OPENING, g_localPlayer);
 	}
 

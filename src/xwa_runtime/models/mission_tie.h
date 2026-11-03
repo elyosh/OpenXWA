@@ -5,10 +5,10 @@
  * flight/missions/<mission>.yaml in the mod folder:
  *
  *   flight_groups:
- *     1: { name: "Red", craft: 1, markings: 4 }
- *     5: { name: "Gold", craft: 2, iff: 2, pilot_voice: "Rebel_Pilot3" }
- *     26: { name: "Red", craft: 1, craft_markings: { 0: 0, 1: 1 } }
- *     0: { name: "Alpha", craft: 5, warheads: { missiles: 80 } }
+ *     1: { name: "Red", craft: xwing, markings: 4 }
+ *     5: { name: "Gold", craft: ywing, iff: 2, pilot_voice: "Rebel_Pilot3" }
+ *     26: { name: "Red", craft: xwing, craft_markings: { 0: 0, 1: 1 } }
+ *     0: { name: "Alpha", craft: tie_fighter, warheads: { missile: 80 } }
  *
  * Each entry names a flight group by its position in the mission's .TIE,
  * with the optional `name` and `craft` checks of mission files. Its keys are

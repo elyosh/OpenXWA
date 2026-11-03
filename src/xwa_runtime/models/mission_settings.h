@@ -131,9 +131,11 @@
  *   - warhead_collision_bonus_any_target: when a craft hits another craft,
  *     its warheads always add to the damage. In the stock game, they add to
  *     it only when the target is a starship or a platform.
- *   - turbolaser_hardpoint_types: OPT hardpoint types 33 to 37 fire weapon
- *     types 301 to 305, and type 38 fires weapon type 307. In the stock game,
- *     hardpoint type N fires weapon type N + 279.
+ *   - turbolaser_hardpoint_types: hardpoint types custom_1 to custom_5 fire
+ *     the weapon types turbolaser_red_medium, turbolaser_red_heavy,
+ *     turbolaser_green_light, turbolaser_green_medium and
+ *     turbolaser_green_heavy, and custom_6 fires custom_weapon. In the stock
+ *     game, hardpoint type N fires weapon type N + 279.
  *   - gun_turret_hardpoints: the hardpoints of gun turret meshes follow the
  *     rules in turret_hardpoints.h. A gun turret mesh doesn't fire at targets
  *     behind it.

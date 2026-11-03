@@ -3,7 +3,9 @@
 #include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
+#include "xwa/assets/object_type.h"
 #include "xwa/frontend/frontend_mission.h"
+#include "xwa_runtime/models/names.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,12 +81,13 @@ int XwaMissionFile_FlightGroup(const char* path, const char* key, const AeronCon
 
 	if (key == NULL || end == key || *end != '\0' || fgIdx < 0 || fgIdx >= MISSION_FILE_FLIGHT_GROUPS ||
 		AeronConfigNode_Type(entry) != AERON_CONFIG_MAP) {
-		Aeron_LogWarn("xwa.models", "%s: '%s' is not a flight-group index with a map; ignored", path,
-					  key != NULL ? key : "");
+		Aeron_LogWarn("xwa.models", "%s:%d: '%s' must be a flight group number with a map. It is ignored",
+					  path, AeronConfigNode_Line(entry), key != NULL ? key : "");
 		return -1;
 	}
 	if (flightGroups == NULL || fgIdx >= count) {
-		Aeron_LogWarn("xwa.models", "%s: the mission has no flight group %s; selection ignored", path, key);
+		Aeron_LogWarn("xwa.models", "%s:%d: the mission has no flight group %s. The entry is ignored", path,
+					  AeronConfigNode_Line(entry), key);
 		return -1;
 	}
 	fg = (const XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)fgIdx * stride);
@@ -96,16 +99,28 @@ int XwaMissionFile_FlightGroup(const char* path, const char* key, const AeronCon
 			++length;
 		}
 		if (expected == NULL || strlen(expected) != length || memcmp(expected, fg->name, length) != 0) {
-			Aeron_LogWarn("xwa.models", "%s: flight group %s is '%.*s', not '%s'; selection ignored", path, key,
-						  (int)length, fg->name, expected != NULL ? expected : "");
+			Aeron_LogWarn("xwa.models", "%s:%d: flight group %s is '%.*s', not '%s'. The entry is ignored",
+						  path, AeronConfigNode_Line(name), key, (int)length, fg->name,
+						  expected != NULL ? expected : "");
 			return -1;
 		}
 	}
-	if (craft != NULL && (AeronConfigNode_Type(craft) != AERON_CONFIG_INT ||
-						  AeronConfigNode_Int(craft, -1) != (int64_t)fg->craftType)) {
-		Aeron_LogWarn("xwa.models", "%s: flight group %s has craft type %u, not %lld; selection ignored", path,
-					  key, (unsigned int)fg->craftType, (long long)AeronConfigNode_Int(craft, -1));
-		return -1;
+	if (craft != NULL) {
+		const int objectType = fg->craftType < XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT
+								   ? g_objectTypeTables.craftTypeToObjectType[fg->craftType]
+								   : -1;
+		int named;
+
+		if (!XwaNames_Read(&g_xwaObjectTypeNames, path, "craft", craft, &named)) {
+			return -1;
+		}
+		if (named != objectType) {
+			Aeron_LogWarn("xwa.models", "%s:%d: flight group %s is a %s, not a %s. The entry is ignored",
+						  path, AeronConfigNode_Line(craft), key,
+						  objectType >= 0 ? XwaNames_Name(&g_xwaObjectTypeNames, objectType) : "?",
+						  AeronConfigNode_String(craft, ""));
+			return -1;
+		}
 	}
 	return (int)fgIdx;
 }

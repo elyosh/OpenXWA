@@ -98,9 +98,26 @@ static void copy_movies(Copies* copies, const char* to) {
 	char** names = ListDir(movies, true, &count);
 	for (size_t i = 0; i < count; ++i) {
 		char path[IMPORT_PATH_CAP];
-		if (strcasecmp(names[i], "INTRO_FINAL.SUB") != 0 &&
-			PathFormat(path, sizeof path, "%s/%s", movies, names[i]) && IsFile(path))
+		if (!PathFormat(path, sizeof path, "%s/%s", movies, names[i]) || !IsFile(path))
+			continue;
+		if (strcasecmp(names[i], "INTRO_FINAL.SUB") != 0) {
 			copy_named(copies, movies, names[i], to);
+			continue;
+		}
+		/* The file isn't copied, so the original game's subtitles stay. A
+		   file that the mod changes would be lost. */
+		char stock_movies[IMPORT_PATH_CAP], stock[IMPORT_PATH_CAP];
+		size_t mod_size = 0, stock_size = 0;
+		char* mod_data = ReadWholeFile(path, &mod_size);
+		char* stock_data = Import_FindNoCase(copies->ctx->options->game, "Movies", true, stock_movies,
+											 sizeof stock_movies) &&
+								   Import_FindNoCase(stock_movies, names[i], false, stock, sizeof stock)
+							   ? ReadWholeFile(stock, &stock_size)
+							   : NULL;
+		if (!mod_data || !stock_data || mod_size != stock_size || memcmp(mod_data, stock_data, mod_size) != 0)
+			Report(path, "isn't copied, because the import keeps the original game's subtitles");
+		free(mod_data);
+		free(stock_data);
 	}
 	FreeList(names, count);
 }

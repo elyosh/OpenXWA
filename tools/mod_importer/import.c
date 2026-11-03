@@ -78,7 +78,7 @@ int XwaModImport_Overall(XwaModImportProgress* progress) {
 bool Import_Cancelled(ImportContext* ctx) { return Aeron_AtomicLoad(&ctx->progress->cancel) != 0; }
 
 bool Import_ShouldStop(ImportContext* ctx) {
-	return Import_Cancelled(ctx) || Aeron_AtomicLoad(&ctx->progress->failures) != 0;
+	return Import_Cancelled(ctx) || Aeron_AtomicLoad(&ctx->progress->failures) != 0 || ReportFatalMessage();
 }
 
 static void end_phase(ImportContext* ctx) {
@@ -573,15 +573,25 @@ static void craft(ImportContext* ctx) {
 		Import_Failed(ctx, "The original game's ship lists couldn't be read.");
 		return;
 	}
+	XwauGameTables* mod = XwauGameTables_Load(options->source);
+	/* Rename the object types first, because every mod file uses their
+	   names. */
+	if (!XwauObjects_Rename(options->source, options->game, stock, mod, &ctx->names)) {
+		XwauGameTables_Free(mod);
+		XwauGameTables_Free(stock);
+		Import_Failed(ctx, "The computer ran out of memory.");
+		return;
+	}
 	XwauLines cockpits = { 0 };
 	XwauTextIds moved = { 0 };
-	bool ok = XwauCraft_Write(options->source, flight, &cockpits);
-	ok = XwauObjects_Write(options->source, options->game, stock, flight, &moved) &&
-		 XwauGunnerSeats_WriteCockpits(options->source, stock, flight, &cockpits) && ok;
+	bool ok = XwauCraft_Write(options->source, flight, &ctx->names, &ctx->stock_values, &cockpits);
+	ok = XwauObjects_Write(options->source, options->game, stock, mod, &ctx->names, flight, &moved) && ok;
+	XwauGunnerSeats_CheckCockpits(options->source, flight, &cockpits);
+	XwauGameTables_Free(mod);
 	XwauGameTables_Free(stock);
 	XwauLines_Free(&cockpits);
 	ok = XwauText_Write(options->source, options->game, strings, &moved) && ok;
-	ok = XwauSoundBanks_Write(options->source, flight, game_files) && ok;
+	ok = XwauSoundBanks_Write(options->source, &ctx->names, flight, game_files) && ok;
 	XwauTextIds_Free(&moved);
 	if (!ok)
 		Import_Failed(ctx, "The craft settings couldn't be imported.");
@@ -603,7 +613,8 @@ static bool missions(ImportContext* ctx, bool* skyboxes) {
 		!PathFormat(folders, sizeof folders, "%s/skybox_folders.txt", ctx->work))
 		return true;
 	if (!XwauGameFiles_Copy(options->source, options->game, game_files) ||
-		!XwauFlightSettings_Write(options->source, flight) || !XwauAwards_Write(options->source, awards)) {
+		!XwauFlightSettings_Write(options->source, &ctx->names, &ctx->stock_values, flight) ||
+		!XwauAwards_Write(options->source, awards)) {
 		Import_Failed(ctx, "The mission files couldn't be imported.");
 		return true;
 	}
@@ -613,7 +624,8 @@ static bool missions(ImportContext* ctx, bool* skyboxes) {
 		return false;
 	}
 	const int design_scale[2] = { BAKE_XWAU_DESIGN_SCALE_X, BAKE_XWAU_DESIGN_SCALE_Y };
-	const bool ok = XwauMissionFiles_Write(options->source, loaded, options->game, out, design_scale);
+	const bool ok =
+		XwauMissionFiles_Write(options->source, loaded, options->game, out, &ctx->names, design_scale);
 	XwauMissions_Free(loaded);
 	if (!ok) {
 		Import_Failed(ctx, "The mission files couldn't be imported.");
@@ -797,7 +809,7 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_HANGARS, 0);
 		XwauGameTables* stock = ImportStockTables_Create(options->game);
-		if (!stock || !XwauHangars_Write(options->source, stock, options->game, options->mod))
+		if (!stock || !XwauHangars_Write(options->source, stock, &ctx->names, options->game, options->mod))
 			Import_Failed(ctx, "The hangars couldn't be imported.");
 		XwauGameTables_Free(stock);
 	}
@@ -825,6 +837,8 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 
 XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModImportProgress* progress) {
 	ImportContext ctx = { .options = options, .progress = progress };
+	ImportStockTables_Names(&ctx.names);
+	ImportStockTables_Values(&ctx.stock_values);
 	ImportAuthoring authoring = { 0 };
 	const uint64_t start = Aeron_NowUs();
 	ctx.phase_start = start;
@@ -832,8 +846,14 @@ XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModIm
 	if (ctx.cores < 1)
 		ctx.cores = 1;
 	ImportLog_Open(progress, options);
+	ClearReportFatal();
 
 	XwaModImportResult result = run_phases(&ctx, &authoring);
+	if (ReportFatalMessage()) {
+		Import_ListFailed(&ctx, "The mod can't be imported as it is: %s.", ReportFatalMessage());
+		Aeron_AtomicAdd(&progress->failures, 1);
+		result = XWA_MOD_IMPORT_STOPPED;
+	}
 	if (result == XWA_MOD_IMPORT_OK)
 		Import_Advance(&ctx, 0, 1000);
 	else if (result == XWA_MOD_IMPORT_STOPPED && Import_Cancelled(&ctx))
@@ -841,6 +861,7 @@ XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModIm
 	if (ctx.work[0] && !RemoveTree(ctx.work))
 		ToolLog_Write(TOOL_LOG_WARNING, "Can't delete %s", ctx.work);
 	ImportAuthoring_Free(&authoring);
+	XwauObjects_FreeRenames(&ctx.names);
 	end_phase(&ctx);
 	summary(&ctx, result, start);
 	SetReportProgram(NULL);

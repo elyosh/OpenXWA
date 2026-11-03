@@ -11,15 +11,16 @@
  *   weapons:
  *     switch_by_iff: all               # turrets, none or all
  *     colors:                          # for all markings
- *       variant: {default: 3, 284: 1}  # the bolts' markings, by weapon type
- *       impact: {280: 0xff0000}        # RGB; 0 keeps the stock white mark
+ *       variant: {default: 3, ion_cannon: 1}  # the bolts' markings, by weapon type
+ *       impact: {rebel_laser: 0xff0000}       # RGB; 0 keeps the stock white mark
  *       energy_bars: {laser_high: 0xffff0000, laser_low: 0xff9b1e00,
  *                     ion_high: 0xff00b4ff, ion_low: 0xff006992}  # ARGB
  *     by_markings:                     # changes for one markings value
- *       1: {variant: {default: 2}, impact: {280: 0x3333ff}}
+ *       1: {variant: {default: 2}, impact: {rebel_laser: 0x3333ff}}
  *
- * The weapon types are 280 to 307. The markings of a bolt fired by a craft
- * with markings m come from the first of these that is set:
+ * Weapon types are written as names, such as rebel_laser. When a craft with
+ * markings m fires, the bolt's markings come from the first of these that is
+ * set:
  *   1. `by_markings[m].variant` for the weapon type;
  *   2. `by_markings[m].variant.default`;
  *   3. `colors.variant` for the weapon type;
@@ -32,7 +33,7 @@
  * every craft:
  *
  *   weapons:
- *     impact: {280: 0xff0000, ...}
+ *     impact: {rebel_laser: 0xff0000, ...}
  *
  * Without a colour, or with 0, the mark stays white as in the stock game.
  * The charge bar colours come from `by_markings[m]`, then `colors`, then the
@@ -41,7 +42,7 @@
  * The colours only change drawing. Bolt markings are part of the world
  * state, but no simulation code reads them.
  *
- * Each projectile type from 280 to 306 belongs to the Rebel side, the
+ * Each weapon type except custom_weapon belongs to the Rebel side, the
  * Imperial side or neither, and each IFF counts as one of the two sides.
  * `switch_by_iff` decides which shots of the craft use the weapon of its
  * side. For example, an Imperial craft fires Imperial lasers instead of

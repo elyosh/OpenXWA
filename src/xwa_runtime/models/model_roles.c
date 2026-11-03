@@ -72,6 +72,20 @@ static const ModelRoleInfo s_roles[XWA_MODEL_ROLE_COUNT] = {
 	[XWA_ROLE_DSREACTORCORE_REACTOR] = { "dsreactorcore.reactor", MODEL_ROLE_SINGLE, s_dsReactorCoreKeys },
 };
 
+static int ModelRole_Valid(XwaModelRole role) { return (unsigned)role < XWA_MODEL_ROLE_COUNT; }
+
+const char* XwaModelRole_Tag(XwaModelRole role) { return ModelRole_Valid(role) ? s_roles[role].tag : NULL; }
+
+const char* const* XwaModelRole_Models(XwaModelRole role) {
+	static const char* const s_noModels[] = { NULL };
+
+	return ModelRole_Valid(role) ? s_roles[role].keys : s_noModels;
+}
+
+int XwaModelRole_IsSet(XwaModelRole role) {
+	return ModelRole_Valid(role) && s_roles[role].kind == MODEL_ROLE_SET;
+}
+
 static int ModelRole_AppliesTo(const ModelRoleInfo* info, const char* key) {
 	const char* const* cursor;
 

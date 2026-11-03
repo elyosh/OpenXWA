@@ -9,6 +9,7 @@
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_settings.h"
+#include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/skins.h"
 
 #include <stdio.h>
@@ -58,16 +59,11 @@ static void CraftWeapons_ClearSet(WeaponColorSet* set) {
 	memset(set->impact, 0xff, sizeof set->impact);
 }
 
-/* Returns the weapon index of map key `key` (280 to 307), or -1. */
+/* Returns the weapon index for the weapon type named `key`, or -1. */
 static int CraftWeapons_WeaponKey(const char* key) {
-	char* end;
-	const long type = strtol(key, &end, 10);
+	const int type = XwaNames_Find(&g_xwaWeaponTypeNames, key);
 
-	if (*key == '\0' || *end != '\0' || type < CRAFT_WEAPONS_FIRST ||
-		type >= CRAFT_WEAPONS_FIRST + CRAFT_WEAPONS_COUNT) {
-		return -1;
-	}
-	return (int)(type - CRAFT_WEAPONS_FIRST);
+	return type < 0 ? -1 : type - CRAFT_WEAPONS_FIRST;
 }
 
 /* Reads `impact`, a map from weapon type to an RGB colour, into `impact`. */
@@ -84,8 +80,9 @@ static void CraftWeapons_ReadImpact(const char* path, const char* where, const A
 		if (weapon < 0 || AeronConfigNode_Type(value) != AERON_CONFIG_INT || rgb < 0 || rgb > 0xffffff) {
 			Aeron_LogWarn(
 				"xwa.models",
-				"%s: %s.impact.%s needs a weapon type from 280 to 307 and an RGB colour. It is ignored", path,
-				where, key);
+				"%s:%d: %s.impact.%s: the key must be a weapon type name and the value an RGB colour. It "
+				"is ignored",
+				path, AeronConfigNode_Line(value), where, key);
 			continue;
 		}
 		impact[weapon] = (int32_t)rgb;
@@ -106,10 +103,11 @@ static void CraftWeapons_ReadSet(const char* path, const char* where, const Aero
 		const int weapon = strcmp(key, "default") == 0 ? CRAFT_WEAPONS_COUNT : CraftWeapons_WeaponKey(key);
 
 		if (weapon < 0 || AeronConfigNode_Type(value) != AERON_CONFIG_INT || markings < 0 || markings > 255) {
-			Aeron_LogWarn("xwa.models",
-						  "%s: %s.variant.%s needs 'default' or a weapon type from 280 to 307, and markings "
-						  "from 0 to 255. It is ignored",
-						  path, where, key);
+			Aeron_LogWarn(
+				"xwa.models",
+				"%s:%d: %s.variant.%s: the key must be 'default' or a weapon type name, and the value "
+				"markings from 0 to 255. It is ignored",
+				path, AeronConfigNode_Line(value), where, key);
 			continue;
 		}
 		if (weapon == CRAFT_WEAPONS_COUNT) {

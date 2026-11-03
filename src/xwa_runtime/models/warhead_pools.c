@@ -4,19 +4,16 @@
 #include "aeron/log.h"
 #include "xwa/flight/flight.h"
 #include "xwa/frontend/frontend_mission.h"
+#include "xwa_runtime/models/names.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
 
 #define WARHEAD_POOLS_FLIGHT_GROUPS XWA_WARHEAD_POOLS_FLIGHT_GROUPS
 #define WARHEAD_POOLS_TYPES XWA_WARHEAD_POOLS_TYPES
-
-static const char* const s_types[WARHEAD_POOLS_TYPES] = {
-	"space_bombs",        "heavy_rockets", "missiles",   "torpedoes",           "advanced_missiles",
-	"advanced_torpedoes", "mag_pulses",    "ion_pulses", "advanced_mag_pulses", "cluster_bombs",
-};
 
 /* The warheads left by flight group and type. -1 means no limit. They are
    only valid once a mission has cleared them. */
@@ -54,17 +51,13 @@ int XwaWarheadPools_ReadFlightGroup(const char* path, const char* fgKey, int fgI
 		const char* key = AeronConfigNode_MapKeyAt(warheads, index);
 		const AeronConfigNode* node = AeronConfigNode_MapValueAt(warheads, index);
 		int64_t value = AeronConfigNode_Int(node, -1);
-		int type;
+		/* Pool 0 is warhead 1. */
+		const int type = XwaNames_Find(&g_xwaWarheadNames, key) - 1;
+		char what[64];
 
-		for (type = 0; type < WARHEAD_POOLS_TYPES; ++type) {
-			if (strcmp(key, s_types[type]) == 0) {
-				break;
-			}
-		}
-		if (type == WARHEAD_POOLS_TYPES) {
-			Aeron_LogWarn("xwa.mission",
-						  "%s: flight group %s: warheads: '%s' isn't a warhead type; it is ignored", path,
-						  fgKey, key);
+		if (type < 0 || type >= WARHEAD_POOLS_TYPES) {
+			snprintf(what, sizeof what, "flight_groups.%s.warheads", fgKey);
+			XwaNames_LogUnknown(&g_xwaWarheadNames, path, AeronConfigNode_Line(node), what, key);
 			continue;
 		}
 		if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || value < 0 || value > INT32_MAX / 2) {
@@ -111,5 +104,5 @@ void XwaWarheadPools_Take(int fgIdx, int warheadType, int count) {
 	left = &s_left[fgIdx][warheadType - 1];
 	*left = *left > count ? *left - count : 0;
 	Aeron_LogInfo("xwa.mission", "flight group %d: %d %s taken from the pool, %d left", fgIdx, count,
-				  s_types[warheadType - 1], (int)*left);
+				  XwaNames_Name(&g_xwaWarheadNames, warheadType), (int)*left);
 }

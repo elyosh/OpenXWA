@@ -35,6 +35,7 @@
 #include "png_write.h"
 #include "tool_log.h"
 #include "upscale.h"
+#include "util.h"
 #include "xwa_2d.h"
 #include "xwau_dat.h"
 
@@ -613,6 +614,8 @@ static int load_frontres_hd(const char* dir, const char* base, Xwa2dFrameSet* ou
 		const int group_count = (int)XwauDat_ListGroups(dat, &group_ids);
 		int groups[64];
 		int gn = 0;
+		if (group_count > 64)
+			ReportFatal(path, "has %d image groups, but the import reads only 64", group_count);
 		for (int g = 0; g < group_count && gn < 64; ++g)
 			groups[gn++] = group_ids[g];
 		for (int a = 0; a < gn; ++a)
@@ -930,6 +933,11 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 						hd.count > sd.count;
 	const int map_icons = strcasecmp(dir_name, "mapicons") == 0;
 	const int icons = strcasecmp(dir_name, "icons") == 0;
+	if (!by_time && hd.count > sd.count)
+		ToolLog_Write(TOOL_LOG_INFO,
+					  "  note: frontres/%s/%s has %d HD frames and %d standard frames. XWAU never draws the "
+					  "HD frames past the standard count, so they are left out",
+					  dir_lower, base_lower, hd.count, sd.count);
 	XwauAtlas atlas = { 0 };
 	atlas.count = by_time ? hd.count : sd.count;
 	atlas.frames = (XwauFrame*)calloc((size_t)atlas.count, sizeof *atlas.frames);
@@ -1101,13 +1109,21 @@ static void bake_frontres(XwauContext* ctx) {
 		int count = 0;
 		DIR* sub = opendir(dir);
 		struct dirent* e;
-		while (files && sub && (e = readdir(sub)) != NULL && count < 1024) {
+		while (files && sub && (e = readdir(sub)) != NULL) {
 			if (!is_standard_image(e->d_name))
 				continue;
+			if (strlen(e->d_name) >= sizeof files[0]) {
+				ReportFatal(dir, "has the image %s, whose name is too long for the import", e->d_name);
+				continue;
+			}
 			const size_t base = (size_t)(strrchr(e->d_name, '.') - e->d_name);
 			int k = 0;
 			while (k < count && !(strncasecmp(files[k], e->d_name, base) == 0 && files[k][base] == '.'))
 				++k;
+			if (k == count && count == 1024) {
+				ReportFatal(dir, "has more than 1024 images, but the import reads only 1024");
+				break;
+			}
 			if (k == count)
 				snprintf(files[count++], sizeof files[0], "%s", e->d_name);
 			else if (strcasecmp(strrchr(e->d_name, '.'), ".cbm") == 0)
@@ -1326,7 +1342,7 @@ static void bake_resdata(XwauContext* ctx) {
 	XwauDatFile files[64];
 	int file_count = 0;
 	char line[512], error[256];
-	while (file_count < 64 && fgets(line, sizeof line, fp)) {
+	while (fgets(line, sizeof line, fp)) {
 		char* end = line + strlen(line);
 		while (end > line && isspace((unsigned char)end[-1]))
 			*--end = '\0';
@@ -1334,14 +1350,29 @@ static void bake_resdata(XwauContext* ctx) {
 		name = name ? name + 1 : line;
 		/* New battle images need new mission content and an exe patch,
 		 * which OpenXWA doesn't support. */
-		if (!name[0] || strcasecmp(name, "FrontEnd2_Battles.dat") == 0)
+		if (!name[0])
 			continue;
+		if (strcasecmp(name, "FrontEnd2_Battles.dat") == 0) {
+			Report(
+				list_path,
+				"lists %s, which isn't imported. Its new battle images need new mission content and an exe "
+				"patch that OpenXWA doesn't support",
+				name);
+			continue;
+		}
 		char path[1200];
-		if (!find_ci(ctx->resdata, name, path, sizeof path))
+		if (!find_ci(ctx->resdata, name, path, sizeof path)) {
+			ToolLog_Write(TOOL_LOG_INFO,
+						  "  note: RESDATA.TXT lists %s, which isn't in Resdata, so XWAU can't "
+						  "load it either",
+						  name);
 			continue;
+		}
 		XwauDat* sd = XwauDat_Open(path, error, sizeof error);
-		if (!sd)
+		if (!sd) {
+			ReportFatal(path, "can't be read: %s", error);
 			continue;
+		}
 		const int* groups;
 		const int group_count = (int)XwauDat_ListGroups(sd, &groups);
 		int frontend = 0;
@@ -1350,6 +1381,13 @@ static void bake_resdata(XwauContext* ctx) {
 		if (!frontend) {
 			XwauDat_Close(sd);
 			continue;
+		}
+		if (file_count == 64) {
+			ReportFatal(list_path,
+						"lists more than 64 DAT files with frontend images, but the import reads only "
+						"64");
+			XwauDat_Close(sd);
+			break;
 		}
 		XwauDatFile* file = &files[file_count++];
 		memset(file, 0, sizeof *file);
@@ -1633,10 +1671,11 @@ static int same_delay(const XwauAnimLine* a, const XwauAnimLine* b) {
  * missions. Otherwise, if the list has plain numbers, only those count.
  * If it only has ~ numbers, those are the missions to leave out. */
 static void write_missions(FILE* fp, const char* list) {
+	/* `list` has fewer than 512 characters, so it has at most 256 numbers. */
 	char text[512];
-	char* ids[128];
+	char* ids[256];
 	snprintf(text, sizeof text, "%s", list);
-	const int count = split(text, " \t", ids, 128);
+	const int count = split(text, " \t", ids, 256);
 	int plain = 0;
 	for (int i = 0; i < count; ++i) {
 		if (strcmp(ids[i], "-1") == 0)
@@ -1709,10 +1748,10 @@ static void write_fonts_yaml(XwauContext* ctx) {
 		return;
 	read_key_string(hooks, section, "HDConcourseTextFont", font, sizeof font);
 	if (strcasecmp(font, "consolas") != 0) {
-		ToolLog_Write(
-			TOOL_LOG_WARNING,
-			"xwau: HDConcourseTextFont = %s: the font's bold file isn't known, fonts.yaml isn't written",
-			font);
+		Report(hooks,
+			   "HDConcourseTextFont = %s names a font whose bold file the import doesn't know, so it isn't "
+			   "imported",
+			   font);
 		return;
 	}
 	char dir[1100], path[1200];
@@ -1785,8 +1824,12 @@ static void write_animations_yaml(XwauContext* ctx) {
 			break;
 		char* v[16];
 		const int n = split(t, ",;", v, 16);
-		if (n < 8)
+		if (n < 8) {
+			ToolLog_Write(TOOL_LOG_INFO,
+						  "  note: ConcourseAnimations.txt:%d has fewer than 8 values, so XWAU skips it",
+						  number);
 			continue;
+		}
 		/* Lines with 8 pieces, or 9 with a comment, have no size. */
 		const int k = n == 8 || n == 9 ? 0 : 2;
 		XwauAnimLine a;
@@ -1801,6 +1844,9 @@ static void write_animations_yaml(XwauContext* ctx) {
 		a.id = (int)strtol(v[3 + k], NULL, 0);
 		a.delay_min = (int)strtol(v[4 + k], NULL, 0);
 		a.delay_max = (int)strtol(v[5 + k], NULL, 0);
+		if (strlen(v[6 + k]) >= sizeof a.group || strlen(v[7 + k]) >= sizeof a.missions)
+			ReportFatal(list, "line %d has a group name or a mission list that is too long for the import",
+						number);
 		snprintf(a.group, sizeof a.group, "%s", v[6 + k]);
 		snprintf(a.missions, sizeof a.missions, "%s", v[7 + k]);
 		if (strcasecmp(v[0], "concourse") != 0) {
@@ -1814,21 +1860,21 @@ static void write_animations_yaml(XwauContext* ctx) {
 		char name[64], webm[1200];
 		snprintf(name, sizeof name, "concourse_anim_%d.webm", a.id);
 		if (!find_ci(ctx->resdata, name, webm, sizeof webm)) {
-			ToolLog_Write(
-				TOOL_LOG_WARNING,
-				"xwau: ConcourseAnimations.txt:%d: skipping concourse_anim_%d: it has no webm file, "
-				"and OpenXWA doesn't play DAT animations",
-				number, a.id);
+			Report(list,
+				   "line %d plays concourse_anim_%d, which has no webm file. OpenXWA doesn't play DAT "
+				   "animations, "
+				   "so the line is left out",
+				   number, a.id);
 			continue;
 		}
 		snprintf(a.video, sizeof a.video, "%s", strrchr(webm, '/') + 1);
 		if (!find_anim_sound(ctx, a.id, a.sound, sizeof a.sound))
 			a.sound[0] = '\0';
 		if (a.w == 0 || a.h == 0)
-			ToolLog_Write(
-				TOOL_LOG_WARNING,
-				"xwau: ConcourseAnimations.txt:%d: concourse_anim_%d has no size. XWAU draws one video "
-				"pixel per 640x480 unit, OpenXWA one per design pixel",
+			ReportFatal(
+				list,
+				"line %d gives concourse_anim_%d no size. XWAU draws one video pixel per 640x480 unit, "
+				"and OpenXWA draws one per design pixel",
 				number, a.id);
 		XwauAnimLine* grown = (XwauAnimLine*)realloc(lines, (size_t)(count + 1) * sizeof *lines);
 		if (!grown)
@@ -1878,17 +1924,17 @@ static void write_animations_yaml(XwauContext* ctx) {
 				continue;
 			}
 			if (!same_delay(a, b))
-				ToolLog_Write(
-					TOOL_LOG_WARNING,
-					"xwau: ConcourseAnimations.txt:%d: this delay differs from the one on line %d. OpenXWA "
-					"has one delay per group, so %s uses the delay from line %d",
-					b->line, a->line, a->group, a->line);
+				ReportFatal(
+					list,
+					"the delay on line %d differs from the one on line %d, but OpenXWA has one delay for "
+					"each group (%s)",
+					b->line, a->line, a->group);
 			if (apart == 1) {
-				ToolLog_Write(
-					TOOL_LOG_WARNING,
-					"xwau: ConcourseAnimations.txt:%d: the lines of %s are not together. OpenXWA draws the "
-					"whole group at its first line, so the order with other groups can differ",
-					b->line, a->group);
+				ReportFatal(
+					list,
+					"the lines of %s are not together (line %d). OpenXWA draws the whole group at its "
+					"first line, so the order with other groups can differ",
+					a->group, b->line);
 				apart = 2;
 			}
 			fprintf(fp, "      - {video: %s, at: ", b->video);
@@ -1989,8 +2035,9 @@ static const char* screen_layout(const XwauContext* ctx, const XwauScreen* scree
 			best = n;
 	for (int i = 0; i < count; ++i)
 		if (strcmp(layouts[i], names[best]) != 0)
-			ToolLog_Write(TOOL_LOG_WARNING, "  note: %s is %s, but its background %s is %s", screen->name,
-						  names[best], keys[i], layouts[i]);
+			ReportFatal(
+				NULL, "the screen %s gets the layout %s, but XWAU shows its background %s with the layout %s",
+				screen->name, names[best], keys[i], layouts[i]);
 	return names[best];
 }
 

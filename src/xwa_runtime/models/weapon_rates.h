@@ -32,9 +32,9 @@
  * in the stock game. The cooldown applies to every craft.
  *
  * Two rules of flight/flight.yaml also change when a craft can fire:
- *   - fire_needs_decharge_rate: a craft fires a base laser (types 280, 282
- *     and 284) only when the rack's charge is at least the craft's decharge
- *     rate, instead of above 0;
+ *   - fire_needs_decharge_rate: a craft fires a base laser (rebel_laser,
+ *     imperial_laser or ion_cannon) only when the rack's charge is at least
+ *     the craft's decharge rate, instead of above 0;
  *   - no_starship_fire_from_destroyed_racks: a freighter, starship,
  *     platform or satellite doesn't fire lasers or warheads from a rack
  *     whose mesh is destroyed.
@@ -47,7 +47,7 @@
  *     energy_transfer: {rate: 4, penalty: 0, laser_limit: 100, shield_limit: 800}
  *     ai_torpedoes: {per_pass: 6, per_target: 16}
  *     impact_spin: {enabled: true, speed_percent: 100, angle_percent: 100}
- *     system_damage: {max: 1000, 284: 1, 285: 2, 290: 4, 296: 30}
+ *     system_damage: {max: 1000, ion_cannon: 1, ion_cannon_turbo: 2, turbolaser_ion: 4, ion_pulse: 30}
  *
  *   - energy_transfer changes how the player moves energy between the lasers
  *     and the shields. `rate` is the shield energy that one unit of laser
@@ -63,8 +63,10 @@
  *     `angle_percent` scale the spin.
  *   - system_damage changes the damage that ion weapons do to a craft's
  *     systems. `max` is the most system damage that the craft can take. The
- *     weapon keys give the damage of one hit of weapon types 284, 285, 290
- *     and 296. They come from the model of the craft that fired.
+ *     keys ion_cannon, ion_cannon_turbo, turbolaser_ion and ion_pulse set the
+ *     damage of one hit of that weapon type. If the mod renames one of these
+ *     weapon types, its key is the new name. These values come from the
+ *     model of the craft that fired.
  *     With these values, or with the rates on, system damage stops at
  *     `max`. The stock game stops adding damage once it reaches 1000,
  *     but a hit can take it past 1000.

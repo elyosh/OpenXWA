@@ -6,6 +6,7 @@
 #include "xwa/assets/model_def.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/assets/object_type_info.h"
+#include "xwa_runtime/models/names.h"
 #include "xwau_config.h"
 
 /* The game's tables have the stock sizes because this code is built without
@@ -171,4 +172,56 @@ XwauGameTables* ImportStockTables_Create(const char* game) {
 		}
 	}
 	return tables;
+}
+
+/* The stock values. The game includes the same files. */
+static const uint16_t k_stockHullIcons[] = {
+#include "xwa/flight/hud/shield_silhouettes.inc"
+};
+static const uint16_t k_stockMapIcons[] = {
+#include "xwa/flight/flight_map_icons.inc"
+};
+static const uint8_t k_stockHardpointKinds[] = {
+#include "xwa/flight/hardpoint_weapon_kinds.inc"
+};
+/* The game's arrays have these sizes, so the copies must have them too. */
+typedef char stock_tables_check[(sizeof k_stockHullIcons / sizeof k_stockHullIcons[0] == 72 &&
+								 sizeof k_stockMapIcons / sizeof k_stockMapIcons[0] == OBJ_NoAsset_222 + 1 &&
+								 sizeof k_stockHardpointKinds == 40)
+									? 1
+									: -1];
+
+/* Wraps a game name table as an XwauNameList. */
+static XwauNameList list_of(const XwaNameTable* table) {
+	return (XwauNameList) { table->names, table->first, table->count };
+}
+
+void ImportStockTables_Names(XwauNames* out) {
+	memset(out, 0, sizeof *out);
+	out->object_types = list_of(&g_xwaObjectTypeNames);
+	out->weapon_types = list_of(&g_xwaWeaponTypeNames);
+	out->warheads = list_of(&g_xwaWarheadNames);
+	out->genus = list_of(&g_xwaGenusNames);
+	out->family = list_of(&g_xwaFamilyNames);
+	out->object_type_flags = list_of(&g_xwaObjectTypeFlagNames);
+	out->settable_object_type_flags = XWA_OBJECT_TYPE_SETTABLE_FLAGS;
+	out->ship_list_categories = list_of(&g_xwaShipListCategoryNames);
+	out->ship_list_category_texts = list_of(&g_xwaShipListCategoryTexts);
+	out->laser_kinds = list_of(&g_xwaLaserKindNames);
+	out->hardpoint_kinds = list_of(&g_xwaHardpointKindNames);
+	out->ranks = list_of(&g_xwaRankNames);
+	out->difficulties = list_of(&g_xwaDifficultyNames);
+	out->reticle_slots = list_of(&g_xwaReticleSlotNames);
+	out->sound_weapon_groups = list_of(&g_xwaSoundWeaponGroupNames);
+	out->screen_sources = list_of(&g_xwaScreenSourceNames);
+	out->hud_areas = list_of(&g_xwaHudAreaNames);
+}
+
+void ImportStockTables_Values(XwauStockValues* out) {
+	out->hull_icons = k_stockHullIcons;
+	out->hull_icon_count = sizeof k_stockHullIcons / sizeof k_stockHullIcons[0];
+	out->map_icons = k_stockMapIcons;
+	out->map_icon_count = sizeof k_stockMapIcons / sizeof k_stockMapIcons[0];
+	out->hardpoint_kinds = k_stockHardpointKinds;
+	out->hardpoint_kind_count = sizeof k_stockHardpointKinds / sizeof k_stockHardpointKinds[0];
 }

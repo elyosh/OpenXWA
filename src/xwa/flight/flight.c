@@ -5111,7 +5111,11 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 						po->mobj->pCraft->sFoilState ^= 2u;
 						g_objectTable[g_players[playerIdx].objectIndex].mobj->pCraft->sFoilState |= 1u;
 						if (playerIdx == (unsigned int)g_localPlayer) {
+#ifdef XWA_MODERN
+							fsfx_PlaySound(XwaCraftSounds_SFoil(playerIdx, 120), 0xFFFFu, playerIdx);
+#else
 							fsfx_PlaySound(120, 0xFFFFu, playerIdx);
+#endif
 							msg_emitInFlightMessage(MSG_SFOILS_OPENING, playerIdx);
 							Mission_SetActiveRegionObjectRanges(fromRegion);
 							return;
@@ -9766,7 +9770,12 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 							craft->sFoilState ^= 2u;
 							craft->sFoilState |= 1u;
 							if (currentPlayerIdx == (unsigned int)g_localPlayer) {
+#ifdef XWA_MODERN
+								fsfx_PlaySound(XwaCraftSounds_SFoil(currentPlayerIdx, 120), 0xffffu,
+											   currentPlayerIdx);
+#else
 								fsfx_PlaySound(120, 0xffffu, currentPlayerIdx);
+#endif
 							}
 							msg_emitInFlightMessage(
 								XwaArticulation_Message((uint16_t)objIdx, (craft->sFoilState & 2)
@@ -9786,7 +9795,12 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 						craft->sFoilState ^= 2u;
 						craft->sFoilState |= 1u;
 						if (currentPlayerIdx == (unsigned int)g_localPlayer) {
+#ifdef XWA_MODERN
+							fsfx_PlaySound(XwaCraftSounds_SFoil(currentPlayerIdx, 120), 0xffffu,
+										   currentPlayerIdx);
+#else
 							fsfx_PlaySound(120, 0xffffu, currentPlayerIdx);
+#endif
 						}
 						msg_emitInFlightMessage((craft->sFoilState & 2) ? MSG_SFOILS_CLOSING
 																		: MSG_SFOILS_OPENING,
