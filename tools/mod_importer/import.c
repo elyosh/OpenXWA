@@ -455,9 +455,9 @@ static void place_libraries(ImportContext* ctx, ImportAuthoring* authoring) {
 			continue;
 		const ImportAuthoringState state = ImportAuthoring_State(authoring, rel);
 		if (state == IMPORT_AUTHORING_EDITED)
-			ToolLog_Write(TOOL_LOG_INFO, "%s: edited since its import, kept", rel);
+			ToolLog_Write(TOOL_LOG_DETAIL, "%s: edited since its import, kept", rel);
 		else if (state == IMPORT_AUTHORING_AUTHORED)
-			ToolLog_Write(TOOL_LOG_INFO, "%s: not made by the importer, kept", rel);
+			ToolLog_Write(TOOL_LOG_DETAIL, "%s: not made by the importer, kept", rel);
 		else {
 			cJSON* files = ImportAuthoring_Place(authoring, staged, rel);
 			if (files)
@@ -863,6 +863,7 @@ XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModIm
 	ImportAuthoring_Free(&authoring);
 	XwauObjects_FreeRenames(&ctx.names);
 	end_phase(&ctx);
+	ReportUnsupportedSummary();
 	summary(&ctx, result, start);
 	SetReportProgram(NULL);
 	ImportLog_Close(progress);

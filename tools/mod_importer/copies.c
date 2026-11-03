@@ -105,7 +105,8 @@ static void copy_movies(Copies* copies, const char* to) {
 			continue;
 		}
 		/* The file isn't copied, so the original game's subtitles stay. A
-		   file that the mod changes would be lost. */
+		   file that the mod changes is counted as a feature that the import
+		   doesn't convert. */
 		char stock_movies[IMPORT_PATH_CAP], stock[IMPORT_PATH_CAP];
 		size_t mod_size = 0, stock_size = 0;
 		char* mod_data = ReadWholeFile(path, &mod_size);
@@ -115,7 +116,7 @@ static void copy_movies(Copies* copies, const char* to) {
 							   ? ReadWholeFile(stock, &stock_size)
 							   : NULL;
 		if (!mod_data || !stock_data || mod_size != stock_size || memcmp(mod_data, stock_data, mod_size) != 0)
-			Report(path, "isn't copied, because the import keeps the original game's subtitles");
+			ReportUnsupported("changed movie subtitles (INTRO_FINAL.SUB)");
 		free(mod_data);
 		free(stock_data);
 	}

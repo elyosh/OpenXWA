@@ -69,11 +69,10 @@ static bool list_opts(ImportContext* ctx, ImportModel** models, size_t* count) {
 		if (!EndsWithNoCase(names[i], ".opt") || !PathFormat(path, sizeof path, "%s/%s", dir, names[i]) ||
 			!SDL_GetPathInfo(path, &info) || info.type != SDL_PATHTYPE_FILE)
 			continue;
+		/* No object type can load an OPT without a name before .opt. */
 		const size_t base_length = strlen(names[i]) - 4;
-		if (base_length == 0) {
-			Report(path, "has no name before .opt, so no object type can load it. It is skipped");
+		if (base_length == 0)
 			continue;
-		}
 		if (base_length >= sizeof key) {
 			ReportFatal(path, "has a name longer than the %d characters that a model key can hold",
 						IMPORT_KEY_CAP - 1);
@@ -84,7 +83,6 @@ static bool list_opts(ImportContext* ctx, ImportModel** models, size_t* count) {
 		if (!wanted(ctx->options, key))
 			continue;
 		if (filter && !XwauUsedModels_Has(&used, key)) {
-			Report(path, "isn't imported, because the mod never loads it");
 			++unused;
 			continue;
 		}
@@ -104,7 +102,7 @@ static bool list_opts(ImportContext* ctx, ImportModel** models, size_t* count) {
 	FreeList(names, names_count);
 	XwauLines_Free(&used);
 	if (unused)
-		Report(NULL, "%zu models aren't imported, because the mod never loads them", unused);
+		ReportDetail(NULL, "%zu models aren't imported, because the mod never loads them", unused);
 	if (!ok)
 		Import_Failed(ctx, "The computer ran out of memory.");
 	return ok;
@@ -235,9 +233,9 @@ static bool place_authoring(Pool* pool, ImportModel* model, char* gltf, char* pr
 	}
 	model->state = model->opt ? ImportAuthoring_State(pool->authoring, rel) : IMPORT_AUTHORING_AUTHORED;
 	if (model->state == IMPORT_AUTHORING_EDITED)
-		ToolLog_Write(TOOL_LOG_INFO, "%s: edited since its import, kept", rel);
+		ToolLog_Write(TOOL_LOG_DETAIL, "%s: edited since its import, kept", rel);
 	else if (model->state == IMPORT_AUTHORING_AUTHORED)
-		ToolLog_Write(TOOL_LOG_INFO, "%s: not made by the importer, kept", rel);
+		ToolLog_Write(TOOL_LOG_DETAIL, "%s: not made by the importer, kept", rel);
 	else {
 		if (!convert(pool, model, staging)) {
 			RemoveTree(staging);
@@ -320,7 +318,7 @@ static void import_model(Pool* pool, ImportModel* model) {
 	}
 	model->seconds = (double)(Aeron_NowUs() - start) / 1e6;
 	if (model->cooked)
-		ToolLog_Write(TOOL_LOG_INFO, "%s: done in %.1f s", model->key, model->seconds);
+		ToolLog_Write(TOOL_LOG_DETAIL, "%s: done in %.1f s", model->key, model->seconds);
 }
 
 static int worker(void* user) {
@@ -390,7 +388,7 @@ bool ImportModels_Run(ImportContext* ctx, ImportModel* models, size_t count,
 		if ((size_t)workers > count)
 			workers = (int)count;
 		bc7_codec_set_max_threads((unsigned)(ctx->cores / workers > 1 ? ctx->cores / workers : 1));
-		ToolLog_Write(TOOL_LOG_INFO, "Converting %zu models on %d threads", count, workers);
+		ToolLog_Write(TOOL_LOG_DETAIL, "Converting %zu models on %d threads", count, workers);
 
 		AeronThread** threads = calloc((size_t)workers, sizeof *threads);
 		int started = 0;

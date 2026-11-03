@@ -5,7 +5,7 @@
  *
  * Usage:
  *   xwa_mod_import --source DIR --mod DIR [--game DIR] [--name TEXT]
- *                  [--authoring DIR] [--replace]
+ *                  [--authoring DIR] [--replace] [--details]
  *                  [--jobs N] [--zstd-level N] [--only KEY]...
  *
  *   --source DIR     the installation
@@ -18,6 +18,8 @@
  *                    DIR, and cook the mod from them. Entries edited there
  *                    since the last import are kept
  *   --replace        replace the mod in the mod folder
+ *   --details        also log the details of the work, such as a line for
+ *                    each converted model
  *   --jobs N         models converted at once (default: half the CPU cores)
  *   --zstd-level N   zstd level of the models' textures, 1 to 22 (default 9)
  *   --only KEY       only import this model, named by its OPT name in lower
@@ -39,12 +41,13 @@
 
 #include "aeron/sync.h"
 #include "import.h"
+#include "tool_log.h"
 #include "util.h"
 #include "yaml_json.h"
 
 static int usage(void) {
 	fprintf(stderr, "usage: xwa_mod_import --source DIR --mod DIR [--game DIR] [--name TEXT]\n"
-					"                      [--authoring DIR] [--replace]\n"
+					"                      [--authoring DIR] [--replace] [--details]\n"
 					"                      [--jobs N] [--zstd-level N] [--only KEY]...\n");
 	return 2;
 }
@@ -115,6 +118,10 @@ int main(int argc, char** argv) {
 		const char* value = i + 1 < argc ? argv[i + 1] : NULL;
 		if (strcmp(arg, "--replace") == 0) {
 			options.replace = true;
+			continue;
+		}
+		if (strcmp(arg, "--details") == 0) {
+			ToolLog_SetDetails(1);
 			continue;
 		}
 		if (!value) {

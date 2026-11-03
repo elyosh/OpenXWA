@@ -805,12 +805,10 @@ static void write_video_yamls(XwauContext* ctx) {
 		int count = 1, w = 0, h = 0;
 		const int has_image = standard_image(ctx, v->dir, v->base, &count, &w, &h);
 		double size[2] = { v->size[0], v->size[1] };
-		if (size[0] == 0 && !has_image) {
-			ToolLog_Write(TOOL_LOG_WARNING,
-						  "xwau: skipping %s: it has no size and %s/%s has no standard image", v->webm,
-						  v->dir, v->base);
+		/* Without a size and a standard image, the game never draws the
+		   image that the video replaces. */
+		if (size[0] == 0 && !has_image)
 			continue;
-		}
 		if (size[0] == 0) {
 			size[0] = w * DESIGN_X;
 			size[1] = h * DESIGN_Y;
@@ -892,8 +890,6 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 	if (!ok && bytes && !is_cbm && !has_hd) {
 		/* The game's BMP and FLC loaders only read the stock formats, so the game
 		 * can't use this file either. XU's 32-bit MAPICONS/LICON.BMP is source art. */
-		ToolLog_Write(TOOL_LOG_INFO, "  note: skipping frontres/%s/%s: %s. The game can't read it either",
-					  dir_lower, file_name, error);
 		Xwa2dFrameSet_Free(&sd);
 		return;
 	}
@@ -933,11 +929,6 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 						hd.count > sd.count;
 	const int map_icons = strcasecmp(dir_name, "mapicons") == 0;
 	const int icons = strcasecmp(dir_name, "icons") == 0;
-	if (!by_time && hd.count > sd.count)
-		ToolLog_Write(TOOL_LOG_INFO,
-					  "  note: frontres/%s/%s has %d HD frames and %d standard frames. XWAU never draws the "
-					  "HD frames past the standard count, so they are left out",
-					  dir_lower, base_lower, hd.count, sd.count);
 	XwauAtlas atlas = { 0 };
 	atlas.count = by_time ? hd.count : sd.count;
 	atlas.frames = (XwauFrame*)calloc((size_t)atlas.count, sizeof *atlas.frames);
@@ -998,7 +989,7 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 						px[3] = 0;
 				}
 			}
-			if (hd_dat && (icons || map_icons)) {
+			if (hd_dat && icons) {
 				/* On tinted draws, XWAU adds an icon's HD offset to its position
 				 * (NET/Main.cs FrontResDrawBlendColor). XWAU draws the HD image
 				 * over the standard image's bounds, and the offset moves it back
@@ -1006,16 +997,8 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 				XwauDatImageInfo info;
 				if (XwauDat_GetImageInfo(hd_dat, h->anchor_x, h->sprite_id, &info) &&
 					(info.offset_x || info.offset_y)) {
-					if (icons) {
-						f->offset[0] = info.offset_x * DESIGN_X;
-						f->offset[1] = info.offset_y * DESIGN_Y;
-					} else {
-						ToolLog_Write(
-							TOOL_LOG_INFO,
-							"  note: frontres/%s/%s frame %d has HD offset %d, %d, which XWAU ignores "
-							"for map icons",
-							dir_lower, base_lower, i, info.offset_x, info.offset_y);
-					}
+					f->offset[0] = info.offset_x * DESIGN_X;
+					f->offset[1] = info.offset_y * DESIGN_Y;
 				}
 			}
 		} else {
@@ -1316,7 +1299,7 @@ static void bake_group(XwauContext* ctx, const XwauDatFile* files, int file_coun
 		char out_dir[1100], base[64];
 		snprintf(out_dir, sizeof out_dir, "%s/resdata/atlas", ctx->opt->sprites->out_root);
 		snprintf(base, sizeof base, "group_%d", group);
-		ToolLog_Write(TOOL_LOG_INFO, "resdata group %d: %d images", group, atlas.count);
+		ToolLog_Write(TOOL_LOG_DETAIL, "resdata group %d: %d images", group, atlas.count);
 		emit_atlas(ctx, out_dir, base, &atlas);
 	} else {
 		ctx->stats->failures++;
@@ -1348,26 +1331,18 @@ static void bake_resdata(XwauContext* ctx) {
 			*--end = '\0';
 		const char* name = strrchr(line, '\\');
 		name = name ? name + 1 : line;
-		/* New battle images need new mission content and an exe patch,
-		 * which OpenXWA doesn't support. */
 		if (!name[0])
 			continue;
+		/* New battle images need new mission content and an exe patch,
+		 * which OpenXWA doesn't support. */
 		if (strcasecmp(name, "FrontEnd2_Battles.dat") == 0) {
-			Report(
-				list_path,
-				"lists %s, which isn't imported. Its new battle images need new mission content and an exe "
-				"patch that OpenXWA doesn't support",
-				name);
+			ReportUnsupported("the new battle images of FrontEnd2_Battles.dat");
 			continue;
 		}
+		/* XWAU can't load a file that isn't in Resdata either. */
 		char path[1200];
-		if (!find_ci(ctx->resdata, name, path, sizeof path)) {
-			ToolLog_Write(TOOL_LOG_INFO,
-						  "  note: RESDATA.TXT lists %s, which isn't in Resdata, so XWAU can't "
-						  "load it either",
-						  name);
+		if (!find_ci(ctx->resdata, name, path, sizeof path))
 			continue;
-		}
 		XwauDat* sd = XwauDat_Open(path, error, sizeof error);
 		if (!sd) {
 			ReportFatal(path, "can't be read: %s", error);
@@ -1715,26 +1690,20 @@ static int find_anim_sound(const XwauContext* ctx, int id, char* out, size_t out
 	fclose(fp);
 	if (!found)
 		return 0;
-	/* The path is relative to the install, with backslashes. */
-	char path[1400], listed[256];
+	/* The path is relative to the install, with backslashes. A file that
+	   doesn't exist plays no sound in XWAU either. */
+	char path[1400];
 	snprintf(path, sizeof path, "%s", ctx->opt->xwau_root);
-	snprintf(listed, sizeof listed, "%s", file);
 	for (char* part = strtok(file, "\\/"); part; part = strtok(NULL, "\\/")) {
 		char next[1400];
-		if (!find_ci(path, part, next, sizeof next)) {
-			ToolLog_Write(TOOL_LOG_WARNING, "xwau: Sfx.lst lists %s for %s, but the file is missing", listed,
-						  name);
+		if (!find_ci(path, part, next, sizeof next))
 			return 0;
-		}
 		snprintf(path, sizeof path, "%s", next);
 	}
 	snprintf(out, out_size, "%s", strrchr(path, '/') + 1);
 	return 1;
 }
 
-/* Writes frontend/animations.yaml from ConcourseAnimations.txt. Each XWAU
- * group becomes a group. A group whose name starts with + repeats the same
- * animation. Lines that OpenXWA can't play the same way are reported. */
 /* Writes frontend/fonts/fonts.yaml when XWAU draws the frontend text with a
  * system font (HDConcourseTextFont). XWAU draws it in Consolas Bold, which
  * can't be redistributed. The file names Inconsolata Bold instead, which
@@ -1748,10 +1717,7 @@ static void write_fonts_yaml(XwauContext* ctx) {
 		return;
 	read_key_string(hooks, section, "HDConcourseTextFont", font, sizeof font);
 	if (strcasecmp(font, "consolas") != 0) {
-		Report(hooks,
-			   "HDConcourseTextFont = %s names a font whose bold file the import doesn't know, so it isn't "
-			   "imported",
-			   font);
+		ReportUnsupported("the key HDConcourseTextFont with an unknown font");
 		return;
 	}
 	char dir[1100], path[1200];
@@ -1803,6 +1769,10 @@ static void write_movies_yaml(XwauContext* ctx) {
 	fclose(fp);
 }
 
+/* Writes frontend/animations.yaml from ConcourseAnimations.txt. Each XWAU
+ * group becomes a group. A group whose name starts with + repeats the same
+ * animation. A line without a webm file is counted as a feature that the
+ * import doesn't convert, because OpenXWA doesn't play DAT animations. */
 static void write_animations_yaml(XwauContext* ctx) {
 	char list[1100];
 	if (!find_ci(ctx->opt->xwau_root, "ConcourseAnimations.txt", list, sizeof list))
@@ -1824,12 +1794,9 @@ static void write_animations_yaml(XwauContext* ctx) {
 			break;
 		char* v[16];
 		const int n = split(t, ",;", v, 16);
-		if (n < 8) {
-			ToolLog_Write(TOOL_LOG_INFO,
-						  "  note: ConcourseAnimations.txt:%d has fewer than 8 values, so XWAU skips it",
-						  number);
+		/* XWAU skips a line with fewer than 8 values. */
+		if (n < 8)
 			continue;
-		}
 		/* Lines with 8 pieces, or 9 with a comment, have no size. */
 		const int k = n == 8 || n == 9 ? 0 : 2;
 		XwauAnimLine a;
@@ -1849,22 +1816,13 @@ static void write_animations_yaml(XwauContext* ctx) {
 						number);
 		snprintf(a.group, sizeof a.group, "%s", v[6 + k]);
 		snprintf(a.missions, sizeof a.missions, "%s", v[7 + k]);
-		if (strcasecmp(v[0], "concourse") != 0) {
-			ToolLog_Write(
-				TOOL_LOG_WARNING,
-				"xwau: ConcourseAnimations.txt:%d: skipping this %s line: XWAU only draws concourse "
-				"animations",
-				number, v[0]);
+		/* XWAU only draws concourse animations. */
+		if (strcasecmp(v[0], "concourse") != 0)
 			continue;
-		}
 		char name[64], webm[1200];
 		snprintf(name, sizeof name, "concourse_anim_%d.webm", a.id);
 		if (!find_ci(ctx->resdata, name, webm, sizeof webm)) {
-			Report(list,
-				   "line %d plays concourse_anim_%d, which has no webm file. OpenXWA doesn't play DAT "
-				   "animations, "
-				   "so the line is left out",
-				   number, a.id);
+			ReportUnsupported("concourse animations without a webm file");
 			continue;
 		}
 		snprintf(a.video, sizeof a.video, "%s", strrchr(webm, '/') + 1);

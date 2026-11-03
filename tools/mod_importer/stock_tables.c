@@ -159,11 +159,6 @@ XwauGameTables* ImportStockTables_Create(const char* game) {
 		pack_object_type(&g_objectTypes[t], tables->types[t]);
 	for (int c = 0; c < XWAU_GAME_CRAFT_TYPES; ++c)
 		tables->craft[c] = g_objectTypeTables.craftTypeToObjectType[c];
-	/* The table is packed, so the word after the craft types is the start of
-	   the backdrop descriptors. */
-	const uint8_t* past_end =
-		(const uint8_t*)&g_objectTypeTables + sizeof g_objectTypeTables.craftTypeToObjectType;
-	tables->craftPastEnd = (uint16_t)(past_end[0] | past_end[1] << 8);
 	for (int r = 0; r < XWAU_GAME_RECORDS; ++r) {
 		if (!pack_record(&g_modelDefs[r], tables->records[r])) {
 			Report(NULL, "the stock craft records don't have the layout of the game's");
