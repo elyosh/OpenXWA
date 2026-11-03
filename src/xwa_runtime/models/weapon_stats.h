@@ -76,11 +76,13 @@
  *     speed. `player` is for the player's craft, `all` for every craft. The
  *     stock value is 4096 for the TIE Bomber, 12288 for the TIE Fighter with
  *     spare engine power, and 8192 for other craft;
- *   - linking: `laser_link` sets the craft's laser link mode. The three
- *     rules stop the AI from firing lasers while it disables its target,
- *     stop the AI from firing ions when it doesn't, and stop the player from
- *     linking the lasers and the ions. `weapons.linking_rules` in
- *     flight/flight.yaml sets the rules for every profile;
+ *   - linking: `laser_link` sets the craft's laser link mode: 1 fires one
+ *     cannon at a time, 2 fires half of them together, and 3 fires all of
+ *     them together. The three rules stop the AI from firing lasers while
+ *     it disables its target, stop the AI from firing ions when it doesn't,
+ *     and stop the player from linking the lasers and the ions.
+ *     `weapons.linking_rules` in flight/flight.yaml sets the rules for
+ *     every profile;
  *   - hardpoint_kinds: maps hardpoint type names to laser, warhead or none,
  *     the kind of weapon that hardpoints of that type fire. The hardpoint
  *     type names are the same as the `type` names in the AERON_flight_model

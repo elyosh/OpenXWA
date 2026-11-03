@@ -326,8 +326,13 @@ static void WeaponStats_ReadProfile(const char* path, const char* where, int gro
 				int32_t read;
 
 				if (strcmp(key, "laser_link") == 0) {
-					if (WeaponStats_ReadInt(path, name, value, &read) && read >= 0) {
-						profile->laserLink = read;
+					if (WeaponStats_ReadInt(path, name, value, &read)) {
+						if (read >= 1 && read <= 3) {
+							profile->laserLink = read;
+						} else {
+							Aeron_LogWarn("xwa.models", "%s: %s must be 1, 2 or 3. It is ignored", path,
+										  name);
+						}
 					}
 				} else if ((at = WeaponStats_Find(key, s_linkingRuleNames, XWA_WEAPON_LINKING_RULES)) < 0) {
 					Aeron_LogWarn("xwa.models", "%s: %s isn't a linking key. It is ignored", path, name);
