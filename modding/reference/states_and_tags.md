@@ -4,7 +4,7 @@
 
 ## Flipbook states
 
-Values for the `state` of a flipbook in a model's material. The states are those of the player's craft, so flipbooks only play on the player's craft and cockpit.
+Values for the `state` of a flipbook in a model's material. The states are those of the player's craft, so most flipbooks only play on the player's craft and cockpit. A flipbook with `always` plays on every object.
 
 A material plays the first flipbook in its list whose state is on. When no state is on, it shows its normal texture. A flipbook starts again from its first frame each time its state comes on.
 

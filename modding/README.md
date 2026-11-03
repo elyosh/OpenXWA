@@ -75,23 +75,26 @@ OpenXWA --mod "/path/to/my-first-mod"
 - [The mod folder](mod_folder.md): the folder layout, `mod.yaml`, how the
   game finds mods and files, the units the files use, and how to test a
   mod.
-- Models: glTF models, with their parts, hardpoints, engine glows, lights,
-  moving parts, cockpits and collision.
-- Materials: materials, skins and markings, damage, cockpit screens,
-  animated materials and effects.
-- Craft: object types, craft types and the settings of each model.
-- Flight: `flight.yaml`, `hud.yaml` and `sounds.yaml`.
-- Environments: skies, lighting, suns and lens flares, backdrops.
-- Hangars: `hangars.yaml` and the hangar section of a mission.
-- Missions: mission files, mission settings, TIE missions, mission voices
-  and sound changes.
-- Images: the atlas format of 2D images, image groups, mission art and
-  fonts.
-- Frontend: menus, the concourse, briefings, medals, movies and room
-  animations.
-- Text: replacing the game's text.
-- Tools: the Blender add-on, the model cooker, the other tools, and the
-  steps to make common changes.
+- [Models](models.md): glTF models, with their parts, hardpoints, engine
+  glows, lights, moving parts, cockpits and collision.
+- [Materials](materials.md): materials, skins and markings, damage,
+  cockpit screens, animated materials and effects.
+- [Craft](craft.md): object types, craft types and the settings of each
+  model.
+- [Flight](flight.md): `flight.yaml`, `hud.yaml` and `sounds.yaml`.
+- [Environments](environments.md): skies, lighting, suns and lens flares,
+  backdrops.
+- [Hangars](hangars.md): `hangars.yaml` and the hangar section of a
+  mission.
+- [Missions](missions.md): mission files, mission settings, TIE missions,
+  mission voices and sound changes.
+- [Images](images.md): the atlas format of 2D images, image groups, mission
+  art and fonts.
+- [Frontend](frontend.md): menus, the concourse, briefings, medals, movies
+  and room animations.
+- [Text](text.md): replacing the game's text.
+- [Tools](tools.md): the Blender add-on, the model cooker, the other tools,
+  and the steps to make common changes.
 - Importer: turning a mod made for the original game into an OpenXWA mod.
 
 The pages without a link aren't written yet.

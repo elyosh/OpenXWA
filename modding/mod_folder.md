@@ -165,6 +165,8 @@ the keys that switch to classic graphics do nothing.
 
 - **Lengths** are in metres and **angles** in degrees. Keys with a unit
   usually say it in their name, such as `position_m` or `heading_degrees`.
+  The flight data of craft and weapons, such as speeds, ranges and rates,
+  keeps the game's own units. See [Craft](craft.md#units).
 - **Models** use the glTF axes: +Y is up and the nose points along +Z.
   Lengths are in metres.
 - **Screen positions and sizes** in the `frontend/` and `resdata/` files are

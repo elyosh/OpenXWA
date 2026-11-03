@@ -23,7 +23,7 @@ For the cockpit, fly-by, engine wash, take-off, hyperspace and weapon sounds, a 
 | `shuttle_shut_down` | object type | When the hangar shuttle lands and stops. |
 | `shuttle_take_off` | object type | When the hangar shuttle starts to leave. |
 | `sounds` | sound name | Single sounds, listed below. |
-| `starship_ambient` | object type | While the player's craft is close to another craft. Each craft plays the sound of its own object type. Needs the `starship_ambient_sounds` mission setting. |
+| `starship_ambient` | object type | While the player's craft is close to another craft. Each craft plays the sound of its own object type. Needs the `starship_ambient_sounds` rule of `flight/flight.yaml`. |
 | `take_off` | object type | When the player's craft launches from the hangar, and when the hangar shuttle starts to leave. |
 | `weapon` | object type, then weapon sound group | When a craft fires. The firing craft picks the entry, then the weapon sound group of the shot. |
 | `weapon_explosion` | object type, then a list of up to 8 sounds | When a shot hits or an object explodes. The craft that fired the shot, or the object that explodes, picks the list. |

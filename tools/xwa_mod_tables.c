@@ -16,6 +16,7 @@
 #include "aeron/vfs.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/assets/object_type_info.h"
+#include "xwa/flight/object/laser.h"
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/models/model_roles.h"
@@ -459,6 +460,25 @@ static const NameText kWeaponSoundGroupTexts[] = {
 	{ NULL, NULL },
 };
 
+/* Writes the weapon types with their stats in the original game. */
+static void WriteWeaponTypeTable(FILE* page) {
+	fprintf(page, "| Number | Name | Speed | Power | Life | Score |\n|---:|---|---:|---:|---:|---:|\n");
+	for (int type = g_xwaWeaponTypeNames.first;
+		 type < g_xwaWeaponTypeNames.first + g_xwaWeaponTypeNames.count; ++type) {
+		const char* name = XwaNames_StockName(&g_xwaWeaponTypeNames, type);
+		if (type > OBJ_LaserImperialDS) {
+			fprintf(page, "| %d | `%s` |  |  |  |  |\n", type, name);
+			continue;
+		}
+		const int index = type - OBJ_LaserRebel;
+		const double life =
+			g_projectileLifetimeSecondsByType[index] + g_projectileLifetimeFracQ16ByType[index] / 65536.0;
+		fprintf(page, "| %d | `%s` | %u | %d | %g | %u |\n", type, name, g_projectileSpeedByType[index],
+				g_projectileDamageByType[index], life, g_warheadProjectilePointValueByObjectType[type]);
+	}
+	fprintf(page, "\n");
+}
+
 static void WriteWeaponsPage(const char* folder) {
 	FILE* page = OpenPage(folder, "weapons.md", "Weapons");
 	if (page == NULL) {
@@ -469,7 +489,14 @@ static void WriteWeaponsPage(const char* folder) {
 				   "A weapon type is the object type of a shot, such as a laser bolt or a torpedo. Weapon "
 				   "types are object types 280 to 307, with the same names. Laser groups, weapon settings "
 				   "and weapon colours use them.");
-	WriteValueTable(page, "Number", ColumnOfNameTable(&g_xwaWeaponTypeNames));
+	WriteParagraph(page,
+				   "The other columns give the stats of the original game, which the `stats` weapon "
+				   "profiles of `flight/flight.yaml` and of the model settings can change. **Speed** is in "
+				   "speed units: 2.25 is 1 MGLT, and a shot of a fighter adds the fighter's speed. "
+				   "**Power** is the damage of a shot, in the points of hull and shields. **Life** is "
+				   "how long a shot lives, in game seconds of 236 ticks. **Score** is the score of a "
+				   "warhead hit.");
+	WriteWeaponTypeTable(page);
 
 	WriteHeading(page, "Warheads");
 	WriteParagraph(page, "The warheads that a mission can give a flight group. Mission files and "
@@ -761,8 +788,9 @@ static void WriteStatesAndTagsPage(const char* folder) {
 	}
 	WriteHeading(page, "Flipbook states");
 	WriteParagraph(page,
-				   "Values for the `state` of a flipbook in a model's material. The states are those of "
-				   "the player's craft, so flipbooks only play on the player's craft and cockpit.");
+				   "Values for the `state` of a flipbook in a model's material. The states are those "
+				   "of the player's craft, so most flipbooks only play on the player's craft and cockpit. "
+				   "A flipbook with `always` plays on every object.");
 	WriteParagraph(page,
 				   "A material plays the first flipbook in its list whose state is on. When no state is "
 				   "on, it shows its normal texture. A flipbook starts again from its first frame each "
@@ -830,8 +858,9 @@ static const NameText kSoundBankTexts[] = {
 	{ "shuttle_shut_down", "When the hangar shuttle lands and stops." },
 	{ "shuttle_take_off", "When the hangar shuttle starts to leave." },
 	{ "sounds", "Single sounds, listed below." },
-	{ "starship_ambient", "While the player's craft is close to another craft. Each craft plays the sound of "
-						  "its own object type. Needs the `starship_ambient_sounds` mission setting." },
+	{ "starship_ambient",
+	  "While the player's craft is close to another craft. Each craft plays the sound of "
+	  "its own object type. Needs the `starship_ambient_sounds` rule of `flight/flight.yaml`." },
 	{ "take_off", "When the player's craft launches from the hangar, and when the hangar shuttle starts to "
 				  "leave." },
 	{ "weapon", "When a craft fires. The firing craft picks the entry, then the weapon sound group of the "
