@@ -277,7 +277,7 @@ static int Hangars_IsText(const AeronConfigNode* node, const char* text) {
 }
 
 /* A length in metres, in game units (40.96 per metre). */
-static int Hangars_Metres(const AeronConfigNode* node, int32_t* out) {
+static int Hangars_ReadMetres(const AeronConfigNode* node, int32_t* out) {
 	double units;
 
 	if (!Hangars_IsNumber(node)) {
@@ -292,14 +292,14 @@ static int Hangars_Metres(const AeronConfigNode* node, int32_t* out) {
 }
 
 /* `count` lengths in metres. */
-static int Hangars_MetresList(const AeronConfigNode* node, size_t count, int32_t* out) {
+static int Hangars_ReadMetresList(const AeronConfigNode* node, size_t count, int32_t* out) {
 	size_t index;
 
 	if (AeronConfigNode_Type(node) != AERON_CONFIG_SEQUENCE || AeronConfigNode_SequenceCount(node) != count) {
 		return 0;
 	}
 	for (index = 0; index < count; ++index) {
-		if (!Hangars_Metres(AeronConfigNode_SequenceGet(node, index), &out[index])) {
+		if (!Hangars_ReadMetres(AeronConfigNode_SequenceGet(node, index), &out[index])) {
 			return 0;
 		}
 	}
@@ -307,7 +307,7 @@ static int Hangars_MetresList(const AeronConfigNode* node, size_t count, int32_t
 }
 
 /* An angle in degrees from -360 to 360, as a 16-bit angle. */
-static int Hangars_Degrees(const AeronConfigNode* node, int32_t* out) {
+static int Hangars_ReadDegrees(const AeronConfigNode* node, int32_t* out) {
 	const double degrees = AeronConfigNode_Float(node, 0.0);
 
 	if (!Hangars_IsNumber(node) || !(degrees >= -360.0 && degrees <= 360.0)) {
@@ -318,7 +318,7 @@ static int Hangars_Degrees(const AeronConfigNode* node, int32_t* out) {
 }
 
 /* An object type name. */
-static int Hangars_ObjectType(const AeronConfigNode* node, int32_t* out) {
+static int Hangars_ReadObjectType(const AeronConfigNode* node, int32_t* out) {
 	const int objectType = XwaNames_Find(&g_xwaObjectTypeNames, AeronConfigNode_String(node, ""));
 
 	if (objectType <= 0 || objectType >= OBJ_Count) {
@@ -328,7 +328,7 @@ static int Hangars_ObjectType(const AeronConfigNode* node, int32_t* out) {
 	return 1;
 }
 
-static int Hangars_Markings(const AeronConfigNode* node, int32_t* out) {
+static int Hangars_ReadMarkings(const AeronConfigNode* node, int32_t* out) {
 	const int64_t value = AeronConfigNode_Int(node, -1);
 
 	if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || value < 0 || value > 255) {
@@ -339,7 +339,8 @@ static int Hangars_Markings(const AeronConfigNode* node, int32_t* out) {
 }
 
 /* Finds the text of `node` in `names` and returns its index. */
-static int Hangars_Choice(const AeronConfigNode* node, const char* const* names, int count, int32_t* out) {
+static int Hangars_ReadChoice(const AeronConfigNode* node, const char* const* names, int count,
+							  int32_t* out) {
 	int index;
 
 	for (index = 0; index < count; ++index) {
@@ -351,31 +352,31 @@ static int Hangars_Choice(const AeronConfigNode* node, const char* const* names,
 	return 0;
 }
 
-static int Hangars_Floor(const AeronConfigNode* node, int32_t* out) {
+static int Hangars_ReadFloor(const AeronConfigNode* node, int32_t* out) {
 	static const char* const names[] = { "normal", "inverted" };
 
-	return Hangars_Choice(node, names, 2, out);
+	return Hangars_ReadChoice(node, names, 2, out);
 }
 
 /* ---- reading ------------------------------------------------------------ */
 
 /* Logs a value that can't be used. */
-static void Hangars_Invalid(const char* path, const AeronConfigNode* node, const char* where, const char* key,
-							const char* expected) {
+static void Hangars_WarnInvalidValue(const char* path, const AeronConfigNode* node, const char* where,
+									 const char* key, const char* expected) {
 	Aeron_LogWarn("xwa.models", "%s:%d: %s.%s must be %s. It is ignored", path, AeronConfigNode_Line(node),
 				  where, key, expected);
 }
 
-static void Hangars_Unknown(const char* path, const AeronConfigNode* node, const char* where,
-							const char* key) {
+static void Hangars_WarnUnknownKey(const char* path, const AeronConfigNode* node, const char* where,
+								   const char* key) {
 	Aeron_LogWarn("xwa.models", "%s:%d: %s.%s isn't a hangar setting. It is ignored", path,
 				  AeronConfigNode_Line(node), where, key);
 }
 
 /* Reads `node`, a list of object type names, or a map of object type names
    to `[x, y, z]` (`offsets`), and logs the entries that can't be used. */
-static void Hangars_CheckCraftList(const char* path, const AeronConfigNode* node, const char* where,
-								   const char* key, int offsets) {
+static void Hangars_WarnInvalidCraftEntries(const char* path, const AeronConfigNode* node, const char* where,
+											const char* key, int offsets) {
 	const size_t count = offsets ? AeronConfigNode_MapCount(node) : AeronConfigNode_SequenceCount(node);
 	size_t index;
 
@@ -387,8 +388,8 @@ static void Hangars_CheckCraftList(const char* path, const AeronConfigNode* node
 
 		if (XwaNames_Find(&g_xwaObjectTypeNames, name) <= 0) {
 			XwaNames_LogUnknown(&g_xwaObjectTypeNames, path, AeronConfigNode_Line(item), key, name);
-		} else if (offsets && !Hangars_MetresList(item, 3, value)) {
-			Hangars_Invalid(path, item, where, key, "a map of object types to [x, y, z] in metres");
+		} else if (offsets && !Hangars_ReadMetresList(item, 3, value)) {
+			Hangars_WarnInvalidValue(path, item, where, key, "a map of object types to [x, y, z] in metres");
 		}
 	}
 	if (count > HANGARS_LIST_MAX) {
@@ -414,23 +415,23 @@ static void Hangars_ReadValue(const char* path, const char* where, const Hangars
 			expected = "true or false";
 			break;
 		case KIND_FLOOR:
-			ok = Hangars_Floor(node, value->v);
+			ok = Hangars_ReadFloor(node, value->v);
 			expected = "normal or inverted";
 			break;
 		case KIND_METRES:
-			ok = Hangars_Metres(node, value->v);
+			ok = Hangars_ReadMetres(node, value->v);
 			expected = "a length in metres";
 			break;
 		case KIND_METRES_2:
-			ok = Hangars_MetresList(node, 2, value->v);
+			ok = Hangars_ReadMetresList(node, 2, value->v);
 			expected = "two lengths in metres";
 			break;
 		case KIND_METRES_3:
-			ok = Hangars_MetresList(node, 3, value->v);
+			ok = Hangars_ReadMetresList(node, 3, value->v);
 			expected = "[x, y, z] in metres";
 			break;
 		case KIND_DEGREES:
-			ok = Hangars_Degrees(node, value->v);
+			ok = Hangars_ReadDegrees(node, value->v);
 			expected = "an angle from -360 to 360 degrees";
 			break;
 		case KIND_TYPE:
@@ -438,18 +439,18 @@ static void Hangars_ReadValue(const char* path, const char* where, const Hangars
 			if (key->kind == KIND_SHUTTLE_TYPE && Hangars_IsText(node, "default")) {
 				ok = 1;
 				value->v[0] = 0;
-			} else if (!(ok = Hangars_ObjectType(node, value->v))) {
+			} else if (!(ok = Hangars_ReadObjectType(node, value->v))) {
 				XwaNames_LogUnknown(&g_xwaObjectTypeNames, path, AeronConfigNode_Line(node), key->name,
 									AeronConfigNode_String(node, ""));
 				return;
 			}
 			break;
 		case KIND_MARKINGS:
-			ok = Hangars_Markings(node, value->v);
+			ok = Hangars_ReadMarkings(node, value->v);
 			expected = "a number from 0 to 255";
 			break;
 		case KIND_HANGAR_MARKINGS:
-			ok = Hangars_IsText(node, "command_ship") || Hangars_Markings(node, value->v);
+			ok = Hangars_IsText(node, "command_ship") || Hangars_ReadMarkings(node, value->v);
 			if (Hangars_IsText(node, "command_ship")) {
 				value->v[0] = 0xFF;
 			}
@@ -461,17 +462,17 @@ static void Hangars_ReadValue(const char* path, const char* where, const Hangars
 			expected = "the name of an object profile";
 			break;
 		case KIND_EXIT_SIDE:
-			ok = Hangars_Choice(node, exitSides, 3, value->v);
+			ok = Hangars_ReadChoice(node, exitSides, 3, value->v);
 			expected = "right, top or bottom";
 			break;
 		case KIND_AXIS:
-			ok = Hangars_Choice(node, axes, 3, value->v);
+			ok = Hangars_ReadChoice(node, axes, 3, value->v);
 			expected = "x, y or z";
 			break;
 		case KIND_TYPE_LIST:
 			ok = AeronConfigNode_Type(node) == AERON_CONFIG_SEQUENCE;
 			if (ok) {
-				Hangars_CheckCraftList(path, node, where, key->name, 0);
+				Hangars_WarnInvalidCraftEntries(path, node, where, key->name, 0);
 			}
 			value->node = node;
 			expected = "a list of object types";
@@ -480,7 +481,7 @@ static void Hangars_ReadValue(const char* path, const char* where, const Hangars
 			ok = AeronConfigNode_Type(node) == AERON_CONFIG_MAP ||
 				 AeronConfigNode_Type(node) == AERON_CONFIG_NULL;
 			if (ok) {
-				Hangars_CheckCraftList(path, node, where, key->name, 1);
+				Hangars_WarnInvalidCraftEntries(path, node, where, key->name, 1);
 			}
 			value->node = node;
 			expected = "a map of object types to [x, y, z] in metres";
@@ -489,7 +490,7 @@ static void Hangars_ReadValue(const char* path, const char* where, const Hangars
 			return;
 	}
 	if (!ok) {
-		Hangars_Invalid(path, node, where, key->name, expected);
+		Hangars_WarnInvalidValue(path, node, where, key->name, expected);
 		memset(value, 0, sizeof *value);
 		return;
 	}
@@ -516,7 +517,7 @@ static void Hangars_ReadSection(const char* path, const AeronConfigNode* node, c
 		for (known = 0; known < keyCount && strcmp(keys[known].name, name) != 0; ++known) {
 		}
 		if (known == keyCount) {
-			Hangars_Unknown(path, value, where, name);
+			Hangars_WarnUnknownKey(path, value, where, name);
 		} else if (keys[known].kind == KIND_SECTION) {
 			char inner[160];
 
@@ -531,8 +532,8 @@ static void Hangars_ReadSection(const char* path, const AeronConfigNode* node, c
 }
 
 /* Reads a crane arm or a parked object. Returns 0 when it can't be used. */
-static int Hangars_ReadEntry(const char* path, const AeronConfigNode* node, const char* where,
-							 XwaHangarMapEntry* entry) {
+static int Hangars_ReadLayoutEntry(const char* path, const AeronConfigNode* node, const char* where,
+								   XwaHangarMapEntry* entry) {
 	static const char* const keys[] = { "type",          "markings", "position_m", "heading_degrees",
 										"pitch_degrees", "profile",  "floor" };
 	const AeronConfigNode* position = AeronConfigNode_MapGet(node, "position_m");
@@ -557,46 +558,47 @@ static int Hangars_ReadEntry(const char* path, const AeronConfigNode* node, cons
 		for (known = 0; known < (sizeof keys / sizeof keys[0]) && strcmp(keys[known], name) != 0; ++known) {
 		}
 		if (known == (sizeof keys / sizeof keys[0])) {
-			Hangars_Unknown(path, AeronConfigNode_MapValueAt(node, index), where, name);
+			Hangars_WarnUnknownKey(path, AeronConfigNode_MapValueAt(node, index), where, name);
 		}
 	}
 	item = AeronConfigNode_MapGet(node, "type");
 	if (item == NULL) {
-		Hangars_Invalid(path, node, where, "type", "an object type");
+		Hangars_WarnInvalidValue(path, node, where, "type", "an object type");
 		return 0;
 	}
-	if (!Hangars_ObjectType(item, &value)) {
+	if (!Hangars_ReadObjectType(item, &value)) {
 		XwaNames_LogUnknown(&g_xwaObjectTypeNames, path, AeronConfigNode_Line(item), "type",
 							AeronConfigNode_String(item, ""));
 		return 0;
 	}
 	entry->objectType = (uint16_t)value;
 	count = AeronConfigNode_SequenceCount(position);
-	if ((count != 2 && count != 3) || !Hangars_MetresList(position, count, entry->position)) {
-		Hangars_Invalid(path, position ? position : node, where, "position_m",
-						"[x, y] on the floor, or [x, y, z], in metres");
+	if ((count != 2 && count != 3) || !Hangars_ReadMetresList(position, count, entry->position)) {
+		Hangars_WarnInvalidValue(path, position ? position : node, where, "position_m",
+								 "[x, y] on the floor, or [x, y, z], in metres");
 		return 0;
 	}
 	if (count == 2) {
 		entry->position[2] = HANGARS_FLOOR;
 	}
 	if ((item = AeronConfigNode_MapGet(node, "markings")) != NULL) {
-		if (!Hangars_Markings(item, &value)) {
-			Hangars_Invalid(path, item, where, "markings", "a number from 0 to 255");
+		if (!Hangars_ReadMarkings(item, &value)) {
+			Hangars_WarnInvalidValue(path, item, where, "markings", "a number from 0 to 255");
 			return 0;
 		}
 		entry->markings = value;
 	}
 	if ((item = AeronConfigNode_MapGet(node, "heading_degrees")) != NULL) {
-		if (!Hangars_Degrees(item, &value)) {
-			Hangars_Invalid(path, item, where, "heading_degrees", "an angle from -360 to 360 degrees");
+		if (!Hangars_ReadDegrees(item, &value)) {
+			Hangars_WarnInvalidValue(path, item, where, "heading_degrees",
+									 "an angle from -360 to 360 degrees");
 			return 0;
 		}
 		entry->headingXY = (uint16_t)value;
 	}
 	if ((item = AeronConfigNode_MapGet(node, "pitch_degrees")) != NULL) {
-		if (!Hangars_Degrees(item, &value)) {
-			Hangars_Invalid(path, item, where, "pitch_degrees", "an angle from -360 to 360 degrees");
+		if (!Hangars_ReadDegrees(item, &value)) {
+			Hangars_WarnInvalidValue(path, item, where, "pitch_degrees", "an angle from -360 to 360 degrees");
 			return 0;
 		}
 		entry->headingZ = (uint16_t)value;
@@ -604,14 +606,14 @@ static int Hangars_ReadEntry(const char* path, const AeronConfigNode* node, cons
 	if ((item = AeronConfigNode_MapGet(node, "profile")) != NULL) {
 		profile = AeronConfigNode_String(item, "");
 		if (profile[0] == '\0' || strlen(profile) >= sizeof entry->objectProfile) {
-			Hangars_Invalid(path, item, where, "profile", "the name of an object profile");
+			Hangars_WarnInvalidValue(path, item, where, "profile", "the name of an object profile");
 			return 0;
 		}
 		strcpy(entry->objectProfile, profile);
 	}
 	if ((item = AeronConfigNode_MapGet(node, "floor")) != NULL) {
-		if (!Hangars_Floor(item, &value)) {
-			Hangars_Invalid(path, item, where, "floor", "normal or inverted");
+		if (!Hangars_ReadFloor(item, &value)) {
+			Hangars_WarnInvalidValue(path, item, where, "floor", "normal or inverted");
 			return 0;
 		}
 		entry->isFloorInverted = (int8_t)value;
@@ -630,13 +632,13 @@ static void Hangars_ReadLayout(const char* path, const AeronConfigNode* node, co
 	layout->present = craneArm != NULL || parked != NULL;
 	if (craneArm != NULL) {
 		snprintf(inner, sizeof inner, "%s.crane_arm", where);
-		layout->hasCraneArm = (uint8_t)Hangars_ReadEntry(path, craneArm, inner, &layout->craneArm);
+		layout->hasCraneArm = (uint8_t)Hangars_ReadLayoutEntry(path, craneArm, inner, &layout->craneArm);
 	}
 	if (parked == NULL) {
 		return;
 	}
 	if (AeronConfigNode_Type(parked) != AERON_CONFIG_SEQUENCE) {
-		Hangars_Invalid(path, parked, where, "parked", "a list");
+		Hangars_WarnInvalidValue(path, parked, where, "parked", "a list");
 		return;
 	}
 	layout->parked =
@@ -646,8 +648,8 @@ static void Hangars_ReadLayout(const char* path, const AeronConfigNode* node, co
 	}
 	for (index = 0; index < AeronConfigNode_SequenceCount(parked); ++index) {
 		snprintf(inner, sizeof inner, "%s.parked[%u]", where, (unsigned int)index);
-		if (Hangars_ReadEntry(path, AeronConfigNode_SequenceGet(parked, index), inner,
-							  &layout->parked[layout->parkedCount])) {
+		if (Hangars_ReadLayoutEntry(path, AeronConfigNode_SequenceGet(parked, index), inner,
+									&layout->parked[layout->parkedCount])) {
 			++layout->parkedCount;
 		}
 	}
@@ -662,7 +664,7 @@ static void Hangars_ReadCameras(const char* path, const AeronConfigNode* node, c
 		return;
 	}
 	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
-		Hangars_Invalid(path, node, where, "cameras", "a map");
+		Hangars_WarnInvalidValue(path, node, where, "cameras", "a map");
 		return;
 	}
 	for (index = 0; index < AeronConfigNode_MapCount(node); ++index) {
@@ -677,8 +679,8 @@ static void Hangars_ReadCameras(const char* path, const AeronConfigNode* node, c
 			!s_cameraKeys[family][key]) {
 			Aeron_LogWarn("xwa.models", "%s:%d: %s.%s isn't a camera key that can be set. It is ignored",
 						  path, AeronConfigNode_Line(offset), inner, name);
-		} else if (!Hangars_MetresList(offset, 3, layer->cameras[family][key])) {
-			Hangars_Invalid(path, offset, inner, name, "[x, y, z] in metres");
+		} else if (!Hangars_ReadMetresList(offset, 3, layer->cameras[family][key])) {
+			Hangars_WarnInvalidValue(path, offset, inner, name, "[x, y, z] in metres");
 		} else {
 			layer->cameraSet[family][key] = 1;
 		}
@@ -717,7 +719,7 @@ static HangarsLayer* Hangars_ReadLayer(const char* path, const AeronConfigNode* 
 			++extra;
 		}
 		if (known == (sizeof keys / sizeof keys[0]) && (extra == NULL || *extra == NULL)) {
-			Hangars_Unknown(path, AeronConfigNode_MapValueAt(node, index), where, name);
+			Hangars_WarnUnknownKey(path, AeronConfigNode_MapValueAt(node, index), where, name);
 		}
 	}
 	if ((section = AeronConfigNode_MapGet(node, "hangar")) != NULL) {
@@ -733,7 +735,7 @@ static HangarsLayer* Hangars_ReadLayer(const char* path, const AeronConfigNode* 
 	if ((section = AeronConfigNode_MapGet(node, "droids")) != NULL) {
 		if (AeronConfigNode_Type(section) != AERON_CONFIG_SEQUENCE ||
 			AeronConfigNode_SequenceCount(section) > 2) {
-			Hangars_Invalid(path, section, where, "droids", "a list of one or two droids");
+			Hangars_WarnInvalidValue(path, section, where, "droids", "a list of one or two droids");
 		} else {
 			for (index = 0; index < AeronConfigNode_SequenceCount(section); ++index) {
 				snprintf(inner, sizeof inner, "%s.droids[%u]", where, (unsigned int)index);
@@ -759,7 +761,7 @@ static HangarsLayer* Hangars_ReadLayer(const char* path, const AeronConfigNode* 
 	if ((section = AeronConfigNode_MapGet(node, "family_base")) != NULL) {
 		snprintf(inner, sizeof inner, "%s.family_base", where);
 		if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
-			Hangars_Invalid(path, section, where, "family_base", "a map");
+			Hangars_WarnInvalidValue(path, section, where, "family_base", "a map");
 		} else {
 			for (index = 0; index < AeronConfigNode_MapCount(section); ++index) {
 				const char* name = AeronConfigNode_MapKeyAt(section, index);
@@ -770,7 +772,7 @@ static HangarsLayer* Hangars_ReadLayer(const char* path, const AeronConfigNode* 
 					 ++known) {
 				}
 				if (known == (sizeof familyKeys / sizeof familyKeys[0])) {
-					Hangars_Unknown(path, AeronConfigNode_MapValueAt(section, index), inner, name);
+					Hangars_WarnUnknownKey(path, AeronConfigNode_MapValueAt(section, index), inner, name);
 				}
 			}
 			Hangars_ReadLayout(path, section, inner, &layer->layouts[1]);
@@ -812,11 +814,11 @@ static HangarsLayer* Hangars_ReadShip(const AeronConfigNode* node, const char* k
 	if (model != NULL) {
 		layer->hangarModel = AeronConfigNode_String(model, NULL);
 		if (layer->hangarModel == NULL) {
-			Hangars_Invalid(s_settingsPath, model, where, "hangar_model", "a model name");
+			Hangars_WarnInvalidValue(s_settingsPath, model, where, "hangar_model", "a model name");
 		}
 	}
 	if (iffs != NULL && AeronConfigNode_Type(iffs) != AERON_CONFIG_MAP) {
-		Hangars_Invalid(s_settingsPath, iffs, where, "by_iff", "a map");
+		Hangars_WarnInvalidValue(s_settingsPath, iffs, where, "by_iff", "a map");
 		return layer;
 	}
 	layer->iffs = (HangarsIffLayer*)calloc(AeronConfigNode_MapCount(iffs) + 1, sizeof *layer->iffs);
@@ -861,7 +863,7 @@ static void Hangars_ReadCraft(const AeronConfigNode* node, const char* key, Hang
 		const char* name = AeronConfigNode_MapKeyAt(node, index);
 
 		if (strcmp(name, "rest_height_m") != 0 && strcmp(name, "player_camera_m") != 0) {
-			Hangars_Unknown(s_settingsPath, AeronConfigNode_MapValueAt(node, index), where, name);
+			Hangars_WarnUnknownKey(s_settingsPath, AeronConfigNode_MapValueAt(node, index), where, name);
 		}
 	}
 	for (index = 0; index < AeronConfigNode_MapCount(rest); ++index) {
@@ -871,9 +873,9 @@ static void Hangars_ReadCraft(const AeronConfigNode* node, const char* key, Hang
 		for (slot = 0; slot < 2 && strcmp(floors[slot], name) != 0; ++slot) {
 		}
 		if (slot == 2) {
-			Hangars_Unknown(s_settingsPath, value, where, name);
-		} else if (!Hangars_Metres(value, &craft->rest[slot])) {
-			Hangars_Invalid(s_settingsPath, value, where, name, "a length in metres");
+			Hangars_WarnUnknownKey(s_settingsPath, value, where, name);
+		} else if (!Hangars_ReadMetres(value, &craft->rest[slot])) {
+			Hangars_WarnInvalidValue(s_settingsPath, value, where, name, "a length in metres");
 		} else {
 			craft->restSet[slot] = 1;
 		}
@@ -885,9 +887,9 @@ static void Hangars_ReadCraft(const AeronConfigNode* node, const char* key, Hang
 		for (slot = 0; slot < 4 && strcmp(cameras[slot], name) != 0; ++slot) {
 		}
 		if (slot == 4) {
-			Hangars_Unknown(s_settingsPath, value, where, name);
-		} else if (!Hangars_MetresList(value, 3, craft->camera[slot])) {
-			Hangars_Invalid(s_settingsPath, value, where, name, "[x, y, z] in metres");
+			Hangars_WarnUnknownKey(s_settingsPath, value, where, name);
+		} else if (!Hangars_ReadMetresList(value, 3, craft->camera[slot])) {
+			Hangars_WarnInvalidValue(s_settingsPath, value, where, name, "[x, y, z] in metres");
 		} else {
 			craft->cameraSet[slot] = 1;
 		}
@@ -895,7 +897,7 @@ static void Hangars_ReadCraft(const AeronConfigNode* node, const char* key, Hang
 }
 
 /* Makes the models a layer swaps in loadable. */
-static void Hangars_AddLayerKeys(const HangarsLayer* layer) {
+static void Hangars_MakeLayerModelsLoadable(const HangarsLayer* layer) {
 	const AeronConfigNode* swaps = layer != NULL ? layer->swaps : NULL;
 	size_t index;
 
@@ -969,7 +971,7 @@ void XwaHangars_Init(void) {
 		}
 	}
 	s_default = Hangars_ReadLayer(s_settingsPath, AeronConfigNode_MapGet(root, "default"), "default", NULL);
-	Hangars_AddLayerKeys(s_default);
+	Hangars_MakeLayerModelsLoadable(s_default);
 	ships = AeronConfigNode_MapGet(root, "ships");
 	s_ships = (HangarsShip*)calloc(AeronConfigNode_MapCount(ships) + 1, sizeof *s_ships);
 	for (index = 0; s_ships != NULL && index < AeronConfigNode_MapCount(ships); ++index) {
@@ -986,9 +988,9 @@ void XwaHangars_Init(void) {
 			Aeron_LogWarn("xwa.models", "hangar of '%s': no model '%s'; it uses the stock hangar", ship->key,
 						  ship->layer->hangarModel);
 		}
-		Hangars_AddLayerKeys(ship->layer);
+		Hangars_MakeLayerModelsLoadable(ship->layer);
 		for (iff = 0; iff < ship->layer->iffCount; ++iff) {
-			Hangars_AddLayerKeys(ship->layer->iffs[iff].layer);
+			Hangars_MakeLayerModelsLoadable(ship->layer->iffs[iff].layer);
 		}
 	}
 	crafts = AeronConfigNode_MapGet(root, "crafts");
@@ -1025,10 +1027,11 @@ void XwaHangars_LoadMission(const char* missionPath) {
 	s_mission = Hangars_ReadLayer(path, hangar, "hangar", extraKeys);
 	s_missionShips = AeronConfigNode_MapGet(hangar, "use_ship_settings");
 	if (s_missionShips != NULL && AeronConfigNode_Type(s_missionShips) != AERON_CONFIG_MAP) {
-		Hangars_Invalid(path, s_missionShips, "hangar", "use_ship_settings", "a map of models to models");
+		Hangars_WarnInvalidValue(path, s_missionShips, "hangar", "use_ship_settings",
+								 "a map of models to models");
 		s_missionShips = NULL;
 	}
-	Hangars_AddLayerKeys(s_mission);
+	Hangars_MakeLayerModelsLoadable(s_mission);
 }
 
 int XwaHangars_IsActive(void) { return s_settings != NULL; }
@@ -1038,8 +1041,8 @@ int XwaHangars_IsActive(void) { return s_settings != NULL; }
 /* Finds the mothership of flight group `fgIdx`. This is its arrival
    mothership when `arrivalFirst` is set and it arrives by one, else its
    departure mothership. */
-static int Hangars_Mothership(int fgIdx, int arrivalFirst, uint16_t* objectType, uint8_t* iff,
-							  uint8_t* markings) {
+static int Hangars_FindMothership(int fgIdx, int arrivalFirst, uint16_t* objectType, uint8_t* iff,
+								  uint8_t* markings) {
 	const XwaFlightGroup* fg;
 	const XwaFlightGroup* mothership;
 	int mothershipIdx;
@@ -1071,7 +1074,7 @@ static int Hangars_Mothership(int fgIdx, int arrivalFirst, uint16_t* objectType,
 /* Finds the hangar's command ship. This is the object of the player's
    pending dock action, else the arrival or departure mothership of the
    player's flight group. */
-static int Hangars_CommandShip(uint16_t* objectType, uint8_t* iff, uint8_t* markings) {
+static int Hangars_FindCommandShip(uint16_t* objectType, uint8_t* iff, uint8_t* markings) {
 	const PlayerData* player = &g_players[g_localPlayer];
 	int objIdx;
 
@@ -1083,18 +1086,18 @@ static int Hangars_CommandShip(uint16_t* objectType, uint8_t* iff, uint8_t* mark
 	}
 	objIdx = player->pendingActionId == 0 || player->pendingActionId == 2 ? player->pendingActionParam : 0;
 	if (objIdx == -1) {
-		return Hangars_Mothership(player->boundFlightGroupIdx, 0, objectType, iff, markings) &&
+		return Hangars_FindMothership(player->boundFlightGroupIdx, 0, objectType, iff, markings) &&
 			   *objectType != 0;
 	}
 	if (objIdx == 0) {
-		return Hangars_Mothership(player->boundFlightGroupIdx, 1, objectType, iff, markings) &&
+		return Hangars_FindMothership(player->boundFlightGroupIdx, 1, objectType, iff, markings) &&
 			   *objectType != 0;
 	}
 	if (objIdx < 0 || (uint32_t)objIdx >= g_objectTableSlotCount) {
 		return 0;
 	}
 	if (g_objectTable[objIdx].objectType == 0) {
-		return Hangars_Mothership(g_objectTable[objIdx].flightGroupIdx, 1, objectType, iff, markings) &&
+		return Hangars_FindMothership(g_objectTable[objIdx].flightGroupIdx, 1, objectType, iff, markings) &&
 			   *objectType != 0;
 	}
 	*objectType = g_objectTable[objIdx].objectType;
@@ -1109,7 +1112,7 @@ static int Hangars_CommandShip(uint16_t* objectType, uint8_t* iff, uint8_t* mark
 
 /* Returns the value of `field` from the first layer that sets it, or NULL
    when no layer sets it. */
-static const HangarsValue* Hangars_Field(int field) {
+static const HangarsValue* Hangars_FirstLayerValue(int field) {
 	int layer;
 
 	for (layer = 0; layer < s_layerCount; ++layer) {
@@ -1120,23 +1123,23 @@ static const HangarsValue* Hangars_Field(int field) {
 	return NULL;
 }
 
-static int Hangars_Int(int field, int axis, int defaultValue) {
-	const HangarsValue* value = Hangars_Field(field);
+static int Hangars_ResolvedInt(int field, int axis, int defaultValue) {
+	const HangarsValue* value = Hangars_FirstLayerValue(field);
 
 	return value != NULL ? value->v[axis] : defaultValue;
 }
 
 /* Gets a profile, or "Default" when no layer sets it. */
-static void Hangars_Profile(int field, char* profile) {
-	const HangarsValue* value = Hangars_Field(field);
+static void Hangars_ResolvedProfile(int field, char* profile) {
+	const HangarsValue* value = Hangars_FirstLayerValue(field);
 
 	snprintf(profile, XWA_HANGAR_PROFILE_MAX, "%s", value != NULL ? value->text : "Default");
 }
 
 /* Gets the object types of `player.inverted_floor_crafts` from the first
    layer that sets it. */
-static int Hangars_FloorInvertedTypes(uint16_t* types) {
-	const HangarsValue* value = Hangars_Field(FIELD_PLAYER_INVERTED_FLOOR_CRAFTS);
+static int Hangars_ResolveInvertedFloorCrafts(uint16_t* types) {
+	const HangarsValue* value = Hangars_FirstLayerValue(FIELD_PLAYER_INVERTED_FLOOR_CRAFTS);
 	size_t index;
 	int count = 0;
 
@@ -1145,7 +1148,7 @@ static int Hangars_FloorInvertedTypes(uint16_t* types) {
 		 ++index) {
 		int32_t objectType;
 
-		if (Hangars_ObjectType(AeronConfigNode_SequenceGet(value->node, index), &objectType)) {
+		if (Hangars_ReadObjectType(AeronConfigNode_SequenceGet(value->node, index), &objectType)) {
 			types[count++] = (uint16_t)objectType;
 		}
 	}
@@ -1154,8 +1157,8 @@ static int Hangars_FloorInvertedTypes(uint16_t* types) {
 
 /* Gets the crafts of `player.craft_offsets_m` from the first layer that
    sets it. */
-static int Hangars_CraftOffsets(XwaHangarPlayerCraft* crafts) {
-	const HangarsValue* value = Hangars_Field(FIELD_PLAYER_CRAFT_OFFSETS);
+static int Hangars_ResolveCraftOffsets(XwaHangarPlayerCraft* crafts) {
+	const HangarsValue* value = Hangars_FirstLayerValue(FIELD_PLAYER_CRAFT_OFFSETS);
 	size_t index;
 	int count = 0;
 
@@ -1167,7 +1170,7 @@ static int Hangars_CraftOffsets(XwaHangarPlayerCraft* crafts) {
 		int32_t offset[3];
 
 		if (objectType > 0 && objectType < OBJ_Count &&
-			Hangars_MetresList(AeronConfigNode_MapValueAt(value->node, index), 3, offset)) {
+			Hangars_ReadMetresList(AeronConfigNode_MapValueAt(value->node, index), 3, offset)) {
 			crafts[count].objectType = (uint16_t)objectType;
 			memcpy(crafts[count].offset, offset, sizeof crafts[count].offset);
 			++count;
@@ -1182,58 +1185,58 @@ static void Hangars_ResolveObjects(void) {
 	int axis;
 
 	memset(o, 0, sizeof *o);
-	o->loadShuttle = Hangars_Int(FIELD_SHUTTLE_ENABLED, 0, 1);
-	o->shuttleObjectType = (uint16_t)Hangars_Int(FIELD_SHUTTLE_TYPE, 0, 0);
-	o->shuttleMarkings = Hangars_Int(FIELD_SHUTTLE_MARKINGS, 0, 0);
-	Hangars_Profile(FIELD_SHUTTLE_PROFILE, o->shuttleObjectProfile);
-	o->shuttlePosition[0] = Hangars_Int(FIELD_SHUTTLE_POSITION, 0, 0x467);
-	o->shuttlePosition[1] = Hangars_Int(FIELD_SHUTTLE_POSITION, 1, 0x3BF);
-	o->shuttlePosition[2] = Hangars_Int(FIELD_SHUTTLE_HEIGHT, 0, 0);
-	o->shuttleOrientation = (uint16_t)Hangars_Int(FIELD_SHUTTLE_HEADING, 0, 0xA880);
-	o->isShuttleFloorInverted = Hangars_Int(FIELD_SHUTTLE_FLOOR, 0, 0);
+	o->loadShuttle = Hangars_ResolvedInt(FIELD_SHUTTLE_ENABLED, 0, 1);
+	o->shuttleObjectType = (uint16_t)Hangars_ResolvedInt(FIELD_SHUTTLE_TYPE, 0, 0);
+	o->shuttleMarkings = Hangars_ResolvedInt(FIELD_SHUTTLE_MARKINGS, 0, 0);
+	Hangars_ResolvedProfile(FIELD_SHUTTLE_PROFILE, o->shuttleObjectProfile);
+	o->shuttlePosition[0] = Hangars_ResolvedInt(FIELD_SHUTTLE_POSITION, 0, 0x467);
+	o->shuttlePosition[1] = Hangars_ResolvedInt(FIELD_SHUTTLE_POSITION, 1, 0x3BF);
+	o->shuttlePosition[2] = Hangars_ResolvedInt(FIELD_SHUTTLE_HEIGHT, 0, 0);
+	o->shuttleOrientation = (uint16_t)Hangars_ResolvedInt(FIELD_SHUTTLE_HEADING, 0, 0xA880);
+	o->isShuttleFloorInverted = Hangars_ResolvedInt(FIELD_SHUTTLE_FLOOR, 0, 0);
 	o->shuttleAnimation =
-		(XwaHangarShuttleAnimation)Hangars_Int(FIELD_SHUTTLE_EXIT_SIDE, 0, XWA_HANGAR_SHUTTLE_RIGHT);
-	o->shuttleAnimationStraightLine = Hangars_Int(FIELD_SHUTTLE_STRAIGHT, 0, 0);
-	o->shuttleAnimationElevation = Hangars_Int(FIELD_SHUTTLE_RISE, 0, 0);
+		(XwaHangarShuttleAnimation)Hangars_ResolvedInt(FIELD_SHUTTLE_EXIT_SIDE, 0, XWA_HANGAR_SHUTTLE_RIGHT);
+	o->shuttleAnimationStraightLine = Hangars_ResolvedInt(FIELD_SHUTTLE_STRAIGHT, 0, 0);
+	o->shuttleAnimationElevation = Hangars_ResolvedInt(FIELD_SHUTTLE_RISE, 0, 0);
 
 	for (droid = 0; droid < 2; ++droid) {
 		const int first = FIELD_DROIDS + droid * HANGARS_DROID_FIELDS;
 		XwaHangarDroid* settings = &o->droids[droid];
 
-		settings->load = Hangars_Int(first + DROID_ENABLED, 0, 1);
-		settings->positionZ = Hangars_Int(first + DROID_HEIGHT, 0, 0);
-		settings->isFloorInverted = Hangars_Int(first + DROID_FLOOR, 0, 0);
-		settings->update = settings->load && Hangars_Int(first + DROID_MOVES, 0, 1);
-		settings->objectType =
-			(uint16_t)Hangars_Int(first + DROID_TYPE, 0, droid == 0 ? OBJ_HangarDroid : OBJ_HangarDroid2);
-		settings->markings = Hangars_Int(first + DROID_MARKINGS, 0, 0);
-		Hangars_Profile(first + DROID_PROFILE, settings->objectProfile);
+		settings->load = Hangars_ResolvedInt(first + DROID_ENABLED, 0, 1);
+		settings->positionZ = Hangars_ResolvedInt(first + DROID_HEIGHT, 0, 0);
+		settings->isFloorInverted = Hangars_ResolvedInt(first + DROID_FLOOR, 0, 0);
+		settings->update = settings->load && Hangars_ResolvedInt(first + DROID_MOVES, 0, 1);
+		settings->objectType = (uint16_t)Hangars_ResolvedInt(first + DROID_TYPE, 0,
+															 droid == 0 ? OBJ_HangarDroid : OBJ_HangarDroid2);
+		settings->markings = Hangars_ResolvedInt(first + DROID_MARKINGS, 0, 0);
+		Hangars_ResolvedProfile(first + DROID_PROFILE, settings->objectProfile);
 	}
 
-	o->roofCranePosition[0] = Hangars_Int(FIELD_ROOF_CRANE_POSITION, 0, -1400);
-	o->roofCranePosition[1] = Hangars_Int(FIELD_ROOF_CRANE_POSITION, 1, 786);
-	o->roofCranePosition[2] = Hangars_Int(FIELD_ROOF_CRANE_POSITION, 2, -282);
-	o->roofCraneAxis = Hangars_Int(FIELD_ROOF_CRANE_AXIS, 0, 0);
-	o->roofCraneLowOffset = Hangars_Int(FIELD_ROOF_CRANE_TRAVEL, 0, 0);
-	o->roofCraneHighOffset = Hangars_Int(FIELD_ROOF_CRANE_TRAVEL, 1, 2800);
-	o->isHangarFloorInverted = Hangars_Int(FIELD_HANGAR_FLOOR, 0, 0);
-	o->hangarFloorInvertedHeight = Hangars_Int(FIELD_HANGAR_INVERTED_FLOOR_HEIGHT, 0, 0);
-	o->hangarIff = (uint8_t)Hangars_Int(FIELD_HANGAR_MARKINGS, 0, 0xFF);
-	o->playerAnimationElevation = Hangars_Int(FIELD_PLAYER_RISE, 0, 0);
+	o->roofCranePosition[0] = Hangars_ResolvedInt(FIELD_ROOF_CRANE_POSITION, 0, -1400);
+	o->roofCranePosition[1] = Hangars_ResolvedInt(FIELD_ROOF_CRANE_POSITION, 1, 786);
+	o->roofCranePosition[2] = Hangars_ResolvedInt(FIELD_ROOF_CRANE_POSITION, 2, -282);
+	o->roofCraneAxis = Hangars_ResolvedInt(FIELD_ROOF_CRANE_AXIS, 0, 0);
+	o->roofCraneLowOffset = Hangars_ResolvedInt(FIELD_ROOF_CRANE_TRAVEL, 0, 0);
+	o->roofCraneHighOffset = Hangars_ResolvedInt(FIELD_ROOF_CRANE_TRAVEL, 1, 2800);
+	o->isHangarFloorInverted = Hangars_ResolvedInt(FIELD_HANGAR_FLOOR, 0, 0);
+	o->hangarFloorInvertedHeight = Hangars_ResolvedInt(FIELD_HANGAR_INVERTED_FLOOR_HEIGHT, 0, 0);
+	o->hangarIff = (uint8_t)Hangars_ResolvedInt(FIELD_HANGAR_MARKINGS, 0, 0xFF);
+	o->playerAnimationElevation = Hangars_ResolvedInt(FIELD_PLAYER_RISE, 0, 0);
 	o->playerAnimationInvertedElevation =
-		Hangars_Int(FIELD_PLAYER_INVERTED_RISE, 0, o->playerAnimationElevation);
-	o->playerAnimationStraightLine = Hangars_Int(FIELD_PLAYER_STRAIGHT, 0, 0);
+		Hangars_ResolvedInt(FIELD_PLAYER_INVERTED_RISE, 0, o->playerAnimationElevation);
+	o->playerAnimationStraightLine = Hangars_ResolvedInt(FIELD_PLAYER_STRAIGHT, 0, 0);
 	for (axis = 0; axis < 3; ++axis) {
-		o->playerOffset[axis] = Hangars_Int(FIELD_PLAYER_OFFSET, axis, 0);
+		o->playerOffset[axis] = Hangars_ResolvedInt(FIELD_PLAYER_OFFSET, axis, 0);
 	}
 	for (axis = 0; axis < 3; ++axis) {
 		o->playerInvertedOffset[axis] =
-			Hangars_Int(FIELD_PLAYER_INVERTED_OFFSET, axis, o->playerOffset[axis]);
+			Hangars_ResolvedInt(FIELD_PLAYER_INVERTED_OFFSET, axis, o->playerOffset[axis]);
 	}
-	o->playerCraftCount = Hangars_CraftOffsets(s_playerCrafts);
+	o->playerCraftCount = Hangars_ResolveCraftOffsets(s_playerCrafts);
 	o->playerCrafts = s_playerCrafts;
-	o->isPlayerFloorInverted = Hangars_Int(FIELD_PLAYER_FLOOR, 0, 0);
-	o->playerFloorInvertedTypeCount = Hangars_FloorInvertedTypes(s_floorInvertedTypes);
+	o->isPlayerFloorInverted = Hangars_ResolvedInt(FIELD_PLAYER_FLOOR, 0, 0);
+	o->playerFloorInvertedTypeCount = Hangars_ResolveInvertedFloorCrafts(s_floorInvertedTypes);
 	o->playerFloorInvertedTypes = s_floorInvertedTypes;
 }
 
@@ -1301,7 +1304,7 @@ static const HangarsDefaultLine s_defaultFamilyMap[] = {
 /* The line of each stock layout that holds the crane arm. */
 static const int s_stockCraneLine[2] = { 1, 2 };
 
-static void Hangars_DefaultEntry(const HangarsDefaultLine* line, XwaHangarMapEntry* entry) {
+static void Hangars_StockLayoutEntry(const HangarsDefaultLine* line, XwaHangarMapEntry* entry) {
 	memset(entry, 0, sizeof *entry);
 	entry->objectType = line->objectType;
 	entry->position[0] = line->x;
@@ -1340,10 +1343,10 @@ static void Hangars_ResolveMap(int family) {
 		}
 		for (index = 0; index < count; ++index) {
 			if (index == s_stockCraneLine[family]) {
-				Hangars_DefaultEntry(&lines[index], &s_craneArms[family]);
+				Hangars_StockLayoutEntry(&lines[index], &s_craneArms[family]);
 				s_hasCraneArm[family] = 1;
 			} else {
-				Hangars_DefaultEntry(&lines[index], &s_maps[family][s_mapCounts[family]++]);
+				Hangars_StockLayoutEntry(&lines[index], &s_maps[family][s_mapCounts[family]++]);
 			}
 		}
 		return;
@@ -1425,7 +1428,7 @@ static const HangarsLayer* Hangars_FindShip(const char* key) {
 /* Builds the resolved tables for the command ship in s_shipKey and
    s_shipIff. s_shipIff is -1 when there is no command ship. `ship` is the
    ship layer that applies, or NULL. */
-static void Hangars_Build(const HangarsLayer* ship) {
+static void Hangars_BuildResolvedTables(const HangarsLayer* ship) {
 	int index;
 
 	/* The layers are searched in this order: mission, ship IFF, ship,
@@ -1475,7 +1478,7 @@ int XwaHangars_Resolve(void) {
 		return 0;
 	}
 	key[0] = '\0';
-	hasShip = !g_provingGroundsModeActive && Hangars_CommandShip(&objectType, &iff, &markings) &&
+	hasShip = !g_provingGroundsModeActive && Hangars_FindCommandShip(&objectType, &iff, &markings) &&
 			  XwaModelSource_TypeKey(objectType, key);
 	if (!hasShip) {
 		key[0] = '\0';
@@ -1499,7 +1502,7 @@ int XwaHangars_Resolve(void) {
 	strcpy(s_shipKey, key);
 	s_shipIff = hasShip ? iff : -1;
 	s_shipMarkings = markings;
-	Hangars_Build(ship);
+	Hangars_BuildResolvedTables(ship);
 	if (changed) {
 		Aeron_LogInfo(
 			"xwa.models", "hangar: ship '%s' IFF %d (%s), model '%s', %d layers, %d parked objects, %d swaps",
@@ -1533,7 +1536,7 @@ void XwaHangars_RestoreFlightState(const XwaHangarsFlightState* state) {
 	if (!s_resolved) {
 		return;
 	}
-	Hangars_Build(s_shipIff >= 0 ? Hangars_FindShip(s_shipKey) : NULL);
+	Hangars_BuildResolvedTables(s_shipIff >= 0 ? Hangars_FindShip(s_shipKey) : NULL);
 	if (s_inHangar) {
 		XwaHangars_ReapplyHangarModels();
 	}
@@ -1561,13 +1564,13 @@ int XwaHangars_CommandShipType(void) {
 	uint8_t iff;
 	uint8_t markings;
 
-	return Hangars_CommandShip(&objectType, &iff, &markings) && objectType != 0 ? objectType : -1;
+	return Hangars_FindCommandShip(&objectType, &iff, &markings) && objectType != 0 ? objectType : -1;
 }
 
 /* ---- models ------------------------------------------------------------- */
 
 /* The key the settings load for `objectType`; empty for the stock model. */
-static void Hangars_DesiredKey(uint16_t objectType, char* key) {
+static void Hangars_WantedModelKey(uint16_t objectType, char* key) {
 	HangarsKey typeKey;
 	int swap;
 
@@ -1594,7 +1597,7 @@ int XwaHangars_ModelFileName(uint16_t objectType, char* fileName, unsigned int f
 	HangarsKey key;
 	int written;
 
-	Hangars_DesiredKey(objectType, key);
+	Hangars_WantedModelKey(objectType, key);
 	if (key[0] == '\0') {
 		return 0;
 	}
@@ -1618,7 +1621,7 @@ void XwaHangars_ModelLoaded(uint16_t objectType, uint16_t handle) {
 		return;
 	}
 	s_loaded[objectType].handle = handle;
-	Hangars_DesiredKey(objectType, s_loaded[objectType].key);
+	Hangars_WantedModelKey(objectType, s_loaded[objectType].key);
 }
 
 void XwaHangars_ReleaseStaleModel(uint16_t objectType) {
@@ -1631,7 +1634,7 @@ void XwaHangars_ReleaseStaleModel(uint16_t objectType) {
 	}
 	/* If this module didn't see the handle load, it holds the stock model. */
 	loaded = s_loaded[objectType].handle == handle ? s_loaded[objectType].key : "";
-	Hangars_DesiredKey(objectType, desired);
+	Hangars_WantedModelKey(objectType, desired);
 	if (strcmp(loaded, desired) == 0) {
 		return;
 	}
@@ -1648,7 +1651,7 @@ void XwaHangars_ReleaseStaleModel(uint16_t objectType) {
    use. With `hangar` set, these are the types of the hangar's objects,
    else the types of the other objects of the mission. */
 
-static void Hangars_ReloadUsedTypes(int hangar) {
+static void Hangars_ReloadModelsInUse(int hangar) {
 	static uint8_t used[XWA_LOADED_MODEL_COUNT];
 	uint8_t hangarFlightGroup;
 	uint32_t objIdx;
@@ -1683,14 +1686,14 @@ static void Hangars_ReloadUsedTypes(int hangar) {
 	}
 }
 
-void XwaHangars_ReapplyHangarModels(void) { Hangars_ReloadUsedTypes(1); }
+void XwaHangars_ReapplyHangarModels(void) { Hangars_ReloadModelsInUse(1); }
 
 void XwaHangars_LeaveHangar(void) {
 	if (!s_inHangar) {
 		return;
 	}
 	s_inHangar = 0;
-	Hangars_ReloadUsedTypes(0);
+	Hangars_ReloadModelsInUse(0);
 }
 
 /* ---- placement ---------------------------------------------------------- */
@@ -1711,7 +1714,7 @@ int XwaHangars_CraftElevation(uint16_t objectType, int inverted) {
 	const HangarsCraft* craft = NULL;
 	HangarsKey key;
 
-	Hangars_DesiredKey(objectType, key);
+	Hangars_WantedModelKey(objectType, key);
 	if (s_settings != NULL && (key[0] != '\0' || XwaModelSource_TypeKey(objectType, key))) {
 		craft = Hangars_FindCraft(key);
 	}
