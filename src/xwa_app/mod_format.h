@@ -6,6 +6,6 @@
  * uses mods with this version. Every change to a mod file format raises it
  * by one. A mod made for another version can't be used until it is imported
  * again, or updated by its author. */
-enum { XWA_MOD_FORMAT_VERSION = 4 };
+enum { XWA_MOD_FORMAT_VERSION = 5 };
 
 #endif

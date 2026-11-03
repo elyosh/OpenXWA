@@ -5018,14 +5018,27 @@ shot_placed:
 }
 
 #ifdef XWA_MODERN
+static int Hangar_ModernHasCraft(int objectIdx) {
+	return objectIdx >= 0 && (uint32_t)objectIdx < g_regionObjectSlotEnd &&
+		   g_objectTable[objectIdx].objectType != OBJ_None && g_objectTable[objectIdx].mobj != NULL &&
+		   g_objectTable[objectIdx].mobj->pCraft != NULL;
+}
+
+/* A hangar laid out by the mod's hangar settings can have no crane arm.
+   g_hangarCraneObjIdx is then -1, and the crane code is skipped. */
+static int Hangar_ModernHasCraneArm(void) { return g_hangarCraneObjIdx >= 0; }
+
 static void Hangar_ModernResetCadenceSensitiveState(void) {
 	CraftData* craft;
 	int sceneIdx;
 
 	g_modernHangarLegacyCadenceTicks = 0;
 	g_modernHangarLegacyCadenceDue = 0;
-	craft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
-	g_modernHangarCraneRotationActive = (craft->meshRotation[HANGARCRANE_ARM] & 1u) != 0;
+	g_modernHangarCraneRotationActive = 0;
+	if (Hangar_ModernHasCraneArm()) {
+		craft = g_objectTable[g_hangarCraneObjIdx].mobj->pCraft;
+		g_modernHangarCraneRotationActive = (craft->meshRotation[HANGARCRANE_ARM] & 1u) != 0;
+	}
 	g_modernHangarCraneScaledStateActive = 0;
 
 	g_modernHangarPrimaryDroidRotation.decreasing = 0;
@@ -5051,18 +5064,12 @@ static void Hangar_ModernResetCadenceSensitiveState(void) {
 	}
 }
 
-static int Hangar_ModernHasCraft(int objectIdx) {
-	return objectIdx >= 0 && (uint32_t)objectIdx < g_regionObjectSlotEnd &&
-		   g_objectTable[objectIdx].objectType != OBJ_None && g_objectTable[objectIdx].mobj != NULL &&
-		   g_objectTable[objectIdx].mobj->pCraft != NULL;
-}
-
 void Hangar_ModernRestartCadence(void) {
 	int sceneIdx;
 
 	/* Without the scene (it is cleared or not built yet), the state is read
 	   again when the scene is set up. */
-	if (!Hangar_ModernHasCraft(g_hangarCraneObjIdx)) {
+	if (Hangar_ModernHasCraneArm() && !Hangar_ModernHasCraft(g_hangarCraneObjIdx)) {
 		return;
 	}
 	for (sceneIdx = 0; sceneIdx < g_hangarSceneObjectCount && sceneIdx < 10; ++sceneIdx) {
@@ -6404,6 +6411,9 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 	}
 
 #ifdef XWA_MODERN
+	if (!Hangar_ModernHasCraneArm()) {
+		return;
+	}
 	if (XwaModernFlightTiming_IsHighRate()) {
 		Hangar_ModernUpdateCraneRotation(dtTicks, 0x300u);
 	} else {
@@ -6728,6 +6738,9 @@ void Hangar_UpdateFamilyBaseDroidTraffic(int dtTicks) {
 	}
 
 #ifdef XWA_MODERN
+	if (!Hangar_ModernHasCraneArm()) {
+		return;
+	}
 	if (XwaModernFlightTiming_IsHighRate()) {
 		Hangar_ModernUpdateCraneRotation(dtTicks, 0x390u);
 	} else {
