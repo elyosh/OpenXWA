@@ -1,64 +1,21 @@
 #ifndef XWA_RUNTIME_MODELS_CRAFT_HUD_H
 #define XWA_RUNTIME_MODELS_CRAFT_HUD_H
 
-/* Reads each craft's HUD settings and the hull and map icons from the mod
- * folder.
+/* Reads each craft's HUD settings from the `hud` group of a model settings
+ * file, and the icon tables and the target display settings of the mod's
+ * HUD file. They set the reticle images, the HUD colours, the hull and map
+ * icons, and how the target display draws the target. The mod documentation
+ * describes the keys.
  *
- * flight/hud.yaml changes the game's icon tables. Each map gives object types
- * an icon, as an image number counted from 1, or `none` for no icon. Hull
- * icons are in image group 26000 and map icons in group 14800. An object type
- * that a map doesn't list keeps its stock icon.
+ * Hull icons are images of group 26000, map icons of group 14800 and reticle
+ * parts of group 12000. A mod file counts images from 1. An object type that
+ * the icon tables don't list keeps its stock icon.
  *
- *   hull_icons: {xwing: 1, slot_33: 49, ywing: none}
- *   map_icons: {xwing: 1}
+ * The edges style of the target display runs a Sobel filter on the luminance
+ * of the shaded display, in sRGB values.
  *
- * The `hud` group of a model settings file holds the craft's own HUD
- * settings. All keys are optional:
- *
- *   hud:
- *     reticle:
- *       laser: 135
- *       laser_in_range: 136
- *       threats:
- *         laser_mode: {laser: 141, turret: 142, beam: 143, warhead: 144}
- *     colors: {inner: 0xff00ff00, border: 0xff008000}
- *
- * `reticle` sets which image of HUD image group 12000 each part of the
- * reticle draws, as a number counted from 1. The parts are:
- *   - laser and laser_in_range: the laser reticle, and the overlay drawn
- *     when the target is in range;
- *   - warhead and warhead_lock: the warhead reticle, and the lock overlay;
- *   - cannon_ready and cannon: the pip of each cannon when it is ready, and
- *     when it isn't;
- *   - threats.laser_mode and threats.warhead_mode: the threat indicators in
- *     each weapon mode. Each mode has laser (incoming laser fire), turret (a
- *     turret aiming at the player), beam and warhead (an incoming warhead).
- * `colors` sets the HUD's inner and border colours, as ARGB.
- *
- * The `target_display` group of hud.yaml sets how the target display shows
- * the target:
- *
- *   target_display:
- *     style: edges            # or shaded, the default
- *     edges:
- *       luminance: [0.33, 0.5, 0.16]
- *       contrast: 3.0
- *       colors: iff           # or friend_foe
- *       iff: [[0.01, 0.45, 0.01], ...]   # six colours, by IFF 0 to 5
- *       friend: [0.01, 0.32, 0.01]
- *       foe: [0.32, 0.01, 0.01]
- *       other: [0.01, 0.01, 0.21]
- *
- * `shaded` shows the lit model. `edges` shows only its edges: a Sobel filter
- * on the luminance of the shaded display, in sRGB values, weighted by
- * `luminance` and scaled by `contrast`. The edges take the colour of the
- * target's IFF, or the friend or foe colour with `colors: friend_foe`.
- * `other` is the colour of a target without an IFF colour. Colours are
- * linear. With `edges`, every key is required, a 6-pixel border stays empty,
- * and the display is empty while the target is dying.
- *
- * The game reads hud.yaml once at startup. Without the files, the game uses
- * its own tables and colours. */
+ * The game reads the HUD file once at startup. Without the files, the game
+ * uses its own tables and colours. */
 
 #include <stddef.h>
 #include <stdint.h>

@@ -6,15 +6,9 @@
  * A GLB craft model can give its cockpit view a vertical field of view with
  * a perspective camera on its Cockpit hardpoint (type 31), the pilot eye.
  * The `cockpit_view` group of the craft's model settings file can give a
- * wide view too, in degrees:
- *
- *   cockpit_view: {wide_vertical_fov: 61.6}
- *
- * presentation.cockpit_fov in config.yaml picks the view:
- *   - cockpit: the camera's view (the default);
- *   - wide: the wide view, or the camera's view when the craft has none;
- *   - off: the stock view.
- * A craft without the view it needs keeps the stock view.
+ * wide view too. presentation.cockpit_fov in the player's configuration
+ * picks the camera's view, the wide view or the stock view. A craft without
+ * the view it needs keeps the stock view.
  *
  * The view sets the game's projection (g_projScale and the values that go
  * with it) at the height of the game's screen, each time the player's

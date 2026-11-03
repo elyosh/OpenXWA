@@ -3,41 +3,10 @@
 
 /* Weapon colours for each firing craft: the colour of its bolts, of the
  * impact marks they leave, and of the player's charge bars. Also which
- * shots of the craft use the weapon of its side.
- *
- * A model settings file sets these in its `weapons` group. All keys are
- * optional:
- *
- *   weapons:
- *     switch_by_iff: all               # turrets, none or all
- *     colors:                          # for all markings
- *       variant: {default: 3, ion_cannon: 1}  # the bolts' markings, by weapon type
- *       impact: {rebel_laser: 0xff0000}       # RGB; 0 keeps the stock white mark
- *       energy_bars: {laser_high: 0xffff0000, laser_low: 0xff9b1e00,
- *                     ion_high: 0xff00b4ff, ion_low: 0xff006992}  # ARGB
- *     by_markings:                     # changes for one markings value
- *       1: {variant: {default: 2}, impact: {rebel_laser: 0x3333ff}}
- *
- * Weapon types are written as names, such as rebel_laser. When a craft with
- * markings m fires, the bolt's markings come from the first of these that is
- * set:
- *   1. `by_markings[m].variant` for the weapon type;
- *   2. `by_markings[m].variant.default`;
- *   3. `colors.variant` for the weapon type;
- *   4. `colors.variant.default`;
- *   5. 0.
- * A bolt's markings pick the variant of the weapon model that it shows.
- *
- * The impact colour comes from `by_markings[m]`, then `colors`, then the
- * `weapons.impact` section of flight/flight.yaml, which sets colours for
- * every craft:
- *
- *   weapons:
- *     impact: {rebel_laser: 0xff0000, ...}
- *
- * Without a colour, or with 0, the mark stays white as in the stock game.
- * The charge bar colours come from `by_markings[m]`, then `colors`, then the
- * stock colours.
+ * shots of the craft use the weapon of its side. They come from the
+ * `weapons` group of a model settings file, and the impact colours also from
+ * the `weapons.impact` section of the mod's flight settings. The mod
+ * documentation describes the keys and the order of the lookups.
  *
  * The colours only change drawing. Bolt markings are part of the world
  * state, but no simulation code reads them.
@@ -45,14 +14,8 @@
  * Each weapon type except custom_weapon belongs to the Rebel side, the
  * Imperial side or neither, and each IFF counts as one of the two sides.
  * `switch_by_iff` decides which shots of the craft use the weapon of its
- * side. For example, an Imperial craft fires Imperial lasers instead of
- * Rebel lasers. The values are:
- *   - turrets: only shots from turret racks. This is what the stock game
- *     does;
- *   - none: no shots;
- *   - all: all shots.
- * Without the key, the `rules.weapon_iff_swap` value of flight/flight.yaml
- * applies. This changes the simulation. */
+ * side. `turrets` is what the stock game does. Without the key, the
+ * `rules.weapon_iff_swap` rule applies. This changes the simulation. */
 
 #include <stdint.h>
 

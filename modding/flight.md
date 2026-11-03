@@ -211,12 +211,14 @@ weapons:
 All values are whole numbers of 0 or more.
 
 The game uses these rates in place of the original ones when `flight.yaml`
-has `rates`, `decharge_percent` or `recharge_percent`, or when the craft's
-model has `rates`. Otherwise the original rules apply. Even a value of 100
+has `rates`, `decharge_percent` or `recharge_percent`, when the craft's
+model has `rates`, or when the craft's weapon profile sets `decharge_rate`
+or `recharge_rate`. Otherwise the original rules apply. Even a value of 100
 in `decharge_percent` turns the rates on.
 
-The decharge rate only applies to the player's laser shots. AI shots still
-use 1 charge, as in the original game. The cooldown applies to every craft.
+The decharge rate only applies to the player's laser shots. The racks of
+the player's turrets then keep their charge, where the original game drains
+them too. AI shots still use 1 charge, as in the original game. The cooldown applies to every craft.
 
 A weapon profile can also set the decharge rate, the recharge rate and the
 cooldown of each weapon type, with `decharge_rate`, `recharge_rate` and
@@ -503,7 +505,8 @@ With the section, the recharge rate of each craft is:
   recharge whenever the shields are below their maximum;
 - for an AI starship, its model rate when `starships` is on and the
   difficulty isn't easy or `starships_on_easy` is on, else 0;
-- for other AI craft, their model rate.
+- for other AI craft, their model rate. The AI only turns on their shield
+  recharge when the difficulty isn't easy or `starships_on_easy` is on.
 
 A model without shield settings has a rate of 20 for starfighters, 5 for
 each live shield generator on the Star Destroyers, the Interdictor and the
@@ -928,7 +931,7 @@ each bank with `unlisted: silent`.
 | `canopy_opening`, `engine_slowing`, `engine_wash`, `fly_by`, `hyper_abort`, `hyper_end`, `hyper_start`, `hyper_zoom`, `interior`, `s_foil`, `shuttle_blast_off`, `shuttle_shut_down`, `shuttle_take_off`, `starship_ambient`, `take_off` | object type | an entry |
 | `weapon` | object type of the craft that fires | a map from weapon sound group to entry |
 | `hangar_ambient` | object type of the hangar's command ship | a list of 1 to 10 entries |
-| `weapon_explosion` | object type | a list of 1 to 8 entries |
+| `weapon_explosion` | object type of the craft that fired the weapon that explodes | a list of 1 to 8 entries |
 | `sounds` | `player_targeted`, `map_enter`, `map_exit`, `turret_switch` or `target_select` | an entry |
 | `weapon_range` | names that you choose | an entry |
 

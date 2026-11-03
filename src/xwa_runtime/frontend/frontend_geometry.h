@@ -1,43 +1,24 @@
 #ifndef XWA_RUNTIME_FRONTEND_FRONTEND_GEOMETRY_H
 #define XWA_RUNTIME_FRONTEND_FRONTEND_GEOMETRY_H
 
-/* Image geometry from atlases in the mod folder, and the frontend's paint
- * settings.
+/* Image geometry from atlases and video files in the mod folder, and the
+ * frontend's paint settings. The mod documentation describes the keys.
  *
- * An atlas with `game_geometry: true` replaces an image's geometry: the game
+ * An atlas that sets the game geometry replaces an image's geometry: the game
  * takes the frame count, sizes, offsets and bounds from the atlas and doesn't
- * read the original file:
- *   frontend/frontres/<dir>/atlas/<base>.yaml  a Frontres file
- *   resdata/atlas/group_<g>.yaml               a DAT group, for the frontend
- *                                              and for flight
- *
+ * read the original file. This works for a Frontres file and for a DAT group.
  * The whole game uses a DAT group's atlas. In flight, the simulation uses its
  * frame counts (an animated object ends after its type's last frame), and the
  * drawing code uses its sizes. The flight font group can't use an atlas,
- * because the game copies pixels out of its glyphs (flight_text.c).
+ * because the game copies pixels out of its glyphs.
  *
  * A video can also replace a Frontres file. It always sets the image's
  * geometry, with the same values for every frame, and takes priority over an
- * atlas:
- *   frontend/frontres/<dir>/video/<base>.yaml
+ * atlas. The video loops for as long as the game draws the image, whichever
+ * frame the game asks for.
  *
- *   video: techdoor.webm   # next to this file
- *   size: [388, 333]       # the drawn size
- *   offset: [0, 0]         # optional: added to the game's draw position
- *   classic_frames: 60     # optional: the game's frame count, 1 by default
- *   fps: 24                # optional: frames per second; the file's rate by default
- *
- * The video loops for as long as the game draws the image, whichever frame
- * the game asks for.
- *
- * Each frame has a `size`, and can have an `offset` (its anchor) and
- * `bounds`. Without `size`, the frame's pixel size is divided by the
- * atlas's `scale`. The `units` key sets the units of these values:
- *   design  The default. These are pixels of the screen size that
- *           `design: [w, h]` sets in frontend/frontend.yaml (640x480 by
- *           default). The game converts them to its 640x480 units.
- *   game    The game's own units, with no conversion. The stock bake and
- *           the flight atlases use them. `scale` can't be used with them.
+ * Values in design units are converted to the game's 640x480 units. Values in
+ * game units are used as they are.
  *
  * Each atlas is read once and kept. A missing atlas is remembered too, so it
  * is only looked for once. */

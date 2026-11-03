@@ -1,28 +1,15 @@
 #ifndef XWA_RUNTIME_MODELS_MODEL_SETTINGS_H
 #define XWA_RUNTIME_MODELS_MODEL_SETTINGS_H
 
-/* Reads the model settings files of the mod folder,
- * flight/models/<model key>.yaml, next to each model's GLB:
+/* Reads the model settings files of the mod folder, one next to each
+ * model's GLB.
  *
- *   hud: {...}                # the reticle and HUD colours
- *   engine_glows: {...}       # glows that show by speed
- *   surfaces: {...}           # tagged surfaces and lights that show by state
- *   weapons: {...}            # weapon colours, rates and profiles
- *   stats_profiles: {...}     # speeds, rates, hull and shields
- *   shield: {...}             # shield recharge
- *   sound: {...}              # craft sounds
- *   component_strength: {...} # strength by mesh type
- *   gunner_seats: {...}       # gunner seats
- *   warhead_lock: {...}       # warhead lock ranges and times
- *   jamming: {...}            # jamming near the hangar
- *   docking: {...}            # the docking approach
- *   cockpit_view: {...}       # the wide cockpit view
- *
- * Each top-level key is a group that one module owns, except `weapons`,
- * whose `rates`, `energy_transfer`, `ai_torpedoes`, `impact_spin` and
- * `system_damage` belong to the weapon rates. This module reads the files and
- * hands each group to its module, which keeps the values it needs in a
- * table by object type.
+ * Each top-level key is a group that one module owns, such as `hud`,
+ * `sound` or `gunner_seats`, except `weapons`, whose `rates`,
+ * `energy_transfer`, `ai_torpedoes`, `impact_spin` and `system_damage`
+ * belong to the weapon rates. This module reads the files and hands each
+ * group to its module, which keeps the values it needs in a table by object
+ * type.
  *
  * The files are per model, but the game code only knows object types. Which
  * model an object type loads depends on the mission: its list row's model, or

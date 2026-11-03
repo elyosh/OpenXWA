@@ -1,41 +1,15 @@
 #ifndef XWA_RUNTIME_MODELS_DOCKING_H
 #define XWA_RUNTIME_MODELS_DOCKING_H
 
-/* A mod's docking rules, from the `docking` section of flight/flight.yaml:
+/* A mod's docking rules, from the `docking` section of its flight
+ * settings, and the cap of the approach height of each model, from the
+ * `docking` group of its model settings file. Every rule is off by default,
+ * which keeps the stock behaviour.
  *
- *   docking:
- *     dock_to_small_sets_big: true
- *     ai_offsets_own_dock_point: true
- *     carried_offsets_carrier_dock_point: true
- *     player_approach_height: true
- *     player_snaps_to_target_orientation: true
- *
- * Every key is optional and false by default, which keeps the stock rule:
- *   - dock_to_small_sets_big: a model's DockToSmall hardpoint also sets its
- *     DockToBig point. A DockToBig hardpoint that comes after it still sets
- *     its own;
- *   - ai_offsets_own_dock_point: an AI craft that boards or picks up a target
- *     lines up its own dock point with the target's. In the stock game, it
- *     only offsets by the target's dock point;
- *   - carried_offsets_carrier_dock_point: a carried craft sits at the
- *     carrier's dock point, less its own. In the stock game, only its own
- *     dock point counts;
- *   - player_approach_height: the player's craft approaches the target at a
- *     height capped by the target's model (see below). The stock game
- *     approaches at twice the gap between the target's DockFromBig point and
- *     the player's DockToBig point, and not at all for SpaceColony2;
- *   - player_snaps_to_target_orientation: once docked, the player's craft
- *     takes the target's yaw, pitch and roll.
- *
- * The cap of the approach height comes from the `docking` group of the
- * target's model settings file:
- *
- *   docking: {approach_height_m: 0}
- *
- * The height is in metres. Without it, the cap is 0 for SpaceColony2 and
- * 22.75 metres (932 game units) for other models. The approach height is
- * then the smaller of the cap and the gap above, rounded toward 0 to an even
- * number.
+ * The approach height is the smaller of the target model's cap and the gap
+ * between the target's DockFromBig point and the player's DockToBig point,
+ * rounded toward 0 to an even number. The stock game approaches at twice
+ * the gap, and not at all for SpaceColony2.
  *
  * The rules change the simulation. */
 

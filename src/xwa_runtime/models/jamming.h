@@ -2,38 +2,10 @@
 #define XWA_RUNTIME_MODELS_JAMMING_H
 
 /* How a model jams the weapons of an enemy player near its hangar, from the
- * `jamming` group of its model settings file. All keys are optional:
- *
- *   jamming:
- *     enabled: true
- *     direction: down                 # all, up or down
- *     range_m: none                   # a distance in metres, or none
- *     rule: hangar_and_jamming_points
- *
- *   - enabled: false turns jamming off for the model;
- *   - range_m: the player is jammed within this distance of the model's
- *     centre, whatever the other keys say. With none, `direction` and
- *     `rule` apply;
- *   - direction: up or down jams only above or below the model;
- *   - rule: where the model jams:
- *     - none: nowhere;
- *     - hangar_mesh_center: near the centre of a hangar mesh, but not near
- *       the hangar point;
- *     - hangar_point: near the hangar point, and not too far above or below
- *       it;
- *     - hangar_and_jamming_points: near the hangar point or the jamming
- *       points of the model.
- *
- * A key that the group leaves out keeps the stock rule of the object type:
- *   - the Imperial Research Centre doesn't jam;
- *   - the Factory jams within 100 metres;
- *   - the Imperial Star Destroyer, the Victory Star Destroyer and the
- *     Interdictor use hangar_and_jamming_points, and jam only below;
- *   - the Super Star Destroyer uses hangar_point. In the stock game, its
- *     test never jams, so it doesn't jam unless the model has the group, or
- *     flight/flight.yaml sets `rules.super_star_destroyer_jamming`;
- *   - the Repair Yard uses hangar_mesh_center;
- *   - the other types use hangar_and_jamming_points.
+ * `jamming` group of its model settings file. A key that the group leaves
+ * out keeps the stock rule of the object type. In the stock game, the Super
+ * Star Destroyer's test never jams, so it only jams when its model has the
+ * group or the flight settings turn on `rules.super_star_destroyer_jamming`.
  *
  * The values belong to the model that an object type loads in the mission,
  * so a swapped model has its own. They change the simulation. */

@@ -9,20 +9,14 @@ extern "C" {
 
 /* The sun options: the procedural sun and its lens flare. They come from
  * three places, and each one overrides the one before it:
- *   1. the `suns` section of the shipped remaster/config.yaml, which has
- *      every value, with both effects off;
- *   2. the `suns` section of the mod's flight/flight.yaml:
- *
- *        suns:
- *          procedural_sun: true
- *          procedural_flare: true
- *          flare_intensity: 3
- *
- *   3. the `suns` section of the player's config.yaml.
- * A key that a file leaves out keeps the value before it. The keys that
- * describe the look rather than a choice, such as brightness, aren't
- * read from the player's file. The flare's shape, `flare_elements`, is read
- * by the HD renderer, from the shipped file and the mod's. */
+ *   1. the `suns` section of the shipped settings, which has every value,
+ *      with both effects off;
+ *   2. the `suns` section of the mod's flight settings;
+ *   3. the `suns` section of the player's settings.
+ * A key that a place leaves out keeps the value before it. The keys that
+ * describe the look rather than a choice, such as brightness, aren't read
+ * from the player's settings. The HD renderer reads the flare's shape,
+ * `flare_elements`, from the shipped settings and the mod's. */
 typedef struct XwaModernSunOptions {
 	/* Backdrop suns draw a procedural disc and corona in place of their
 	   image. */

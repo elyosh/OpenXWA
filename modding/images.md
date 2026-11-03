@@ -110,6 +110,15 @@ frames have the same `id`, the game keeps the first one. For a group whose
 images are the frames of an animation, such as an explosion, list the
 frames in the order of their `id`.
 
+An image group's atlas with `game_geometry: true` applies to the whole
+game, flight included. The simulation uses its frame counts too, so an
+animation such as an explosion lasts as many frames as the atlas has.
+
+The image group of the flight font can't use an atlas, because the game
+reads the pixels of its characters. The log says so, and the game uses the
+original images. To change the flight font, use the files of
+[Fonts](#fonts).
+
 ### Frames that change over time
 
 The game picks the frame to draw. A door that opens, for example, goes

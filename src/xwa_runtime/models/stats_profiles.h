@@ -1,46 +1,16 @@
 #ifndef XWA_RUNTIME_MODELS_STATS_PROFILES_H
 #define XWA_RUNTIME_MODELS_STATS_PROFILES_H
 
-/* Stats profiles: values of a craft that replace those of its craft record,
- * chosen by mission, by markings, for players and by difficulty.
+/* Stats profiles: values of a craft that replace those of its craft
+ * record, chosen by mission, by markings, for players and by difficulty. A
+ * model settings file holds the model's profiles in its `stats_profiles`
+ * group. A mission file picks the profiles of its craft, and can scale some
+ * values of every craft, in its `stats_profiles` section.
  *
- * A model settings file holds the model's profiles, by name. Each profile is
- * whole: a variant doesn't take values from another one. The keys are those of
- * the object type files' `craft_record`, in the record's units, and all are
- * optional:
- *
- *   stats_profiles:
- *     default: {speed: 86, acceleration: 9, deceleration: 20, pitch_rate: 512,
- *               roll_rate: 256, yaw_rate: 1536, hull: 3045, shields: 3000,
- *               system_strength: 60, system_damage_hull_threshold: 1000,
- *               has_shields: true, has_hyperdrive: true,
- *               speed_increment: 1, speed_decrement: 1,
- *               warhead_collision_damage: false}
- *     default_easy: {...}
- *     default_player: {...}
- *     default_player_hard: {...}
- *
- * A mission file picks the profiles of its craft, by model key, and can scale
- * some values for every craft, in percent:
- *
- *   stats_profiles:
- *     models:
- *       escorttransport: {player: x1, markings: {2: etrmod}, all: rebel}
- *     percent: {hull: 120}
- *     player_percent: {hull: 400}
- *
- * The name of a craft's profile is its model's `player` value when a player
- * flies it, else the value for its markings, else `all`, else `default`.
- * The model is the one that the craft's object type loads in the mission,
- * a swap's target included. A name that the model has no profile for gives
- * no profile, even when the model has a `default` one. The profile is then
- * <name>_player_<difficulty>, else <name>_player for a player's craft, else
- * <name>_<difficulty>, else <name>. The difficulty is easy, medium or hard.
- *
- * `percent` scales speed, acceleration, deceleration, the three rates,
- * system_damage_hull_threshold, hull, system_strength and shields, after
- * the profile and also for craft without one. For a player's craft,
- * `player_percent`'s value replaces `percent`'s.
+ * The model is the one that the craft's object type loads in the mission, a
+ * swap's target included. A name that the model has no profile for gives no
+ * profile, even when the model has a `default` one. The percents apply
+ * after the profile, and also to craft without one.
  *
  * The values apply when a craft is made (XwaStatsProfiles_ApplyNewCraft),
  * and where the game reads its record for them. They change the

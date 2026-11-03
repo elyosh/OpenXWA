@@ -3,72 +3,18 @@
 
 /* Modern port: hangar settings for each command ship.
  *
- * flight/hangars.yaml in the mod folder holds the settings in layers.
- * Lengths are in metres and angles in degrees, and objects are object type
- * names:
- *
- *   default:                        # the layer that every hangar uses
- *     hangar: {floor: normal, inverted_floor_height_m: 0, markings: command_ship}
- *     shuttle:
- *       enabled: true
- *       type: default               # the stock shuttle, or an object type
- *       markings: 0
- *       profile: Default
- *       position_m: [27.515, 23.413]
- *       height_m: 0                 # above its floor
- *       heading_degrees: 236.953
- *       floor: normal
- *       path: {exit_side: right, straight_m: 0, rise_m: 0}
- *     droids:                       # the two droids, in order
- *       - {enabled: true, type: hangar_droid, markings: 0, profile: Default, height_m: 0,
- *          moves: true, floor: normal}
- *       - {type: hangar_droid2}
- *     roof_crane: {position_m: [-34.18, 19.189, -6.885], axis: x, travel_m: [0, 68.359]}
- *     player:
- *       offset_m: [0, 0, 0]
- *       inverted_offset_m: [0, 0, 0]
- *       rise_m: 0
- *       inverted_rise_m: 0
- *       straight_m: 0
- *       floor: normal
- *       inverted_floor_crafts: [xwing]
- *       craft_offsets_m: {xwing: [0, 0, 0]}
- *     swaps: {hangardroid: hangardroidr2q5}
- *     crane_arm: {type: hangar_crane, position_m: [17.7, -10.156], heading_degrees: 129.089}
- *     parked:
- *       - {type: hangar_monitor, position_m: [-25.854, 32.056], heading_degrees: 212.036}
- *       - {type: escort_shuttle, markings: 4, position_m: [-36.62, -104.98, -23.93],
- *          heading_degrees: 0, pitch_degrees: 0, profile: NoPilot, floor: inverted}
- *     cameras: {key_1: [27.588, -56.641, -7.324]}
- *     family_base: {crane_arm: ..., parked: [...], cameras: {...}}
- *   ships:                          # by the model of the command ship
- *     frigate2:
- *       hangar_model: frigate2hangar
- *       ...                         # the same keys as `default`
- *       by_iff:
- *         1: {...}                  # for a command ship of IFF 1
- *   crafts:                         # by the model of the player craft
- *     xwing:
- *       rest_height_m: {normal: 1.2, inverted: 1.2}
- *       player_camera_m: {hangar: [...], hangar_inverted: [...], family_base: [...],
- *                         family_base_inverted: [...]}
- *
- * A mission can add its own layer, `hangar` in its mission file. There,
- * `use_ship_settings: {frigate2: frigate2carrier}` makes a command ship use
- * the settings and hangar model of another model.
+ * The mod's hangar settings place the hangar model, the shuttle, the
+ * droids, the cranes, the parked objects, the player's craft and the camera
+ * shots, in layers. Lengths are read in metres and angles in degrees, and
+ * kept in game units. A mission adds its own layer, the `hangar` section of
+ * its mission file.
  *
  * For the command ship of the hangar, the layers are searched in this order:
  * mission, ship IFF, ship, default. Each setting comes from the first layer
  * that sets it, and each droid's settings are looked up separately.
  * `crane_arm` and `parked` come together from the first layer that has
- * either of them. The same applies to the family base's `crane_arm` and
- * `parked`. Each camera key comes from the first layer that sets it, else
- * the stock shot is used.
- *
- * `parked` objects with a position of two values stand on the floor. With a
- * third value, they are at that height from the hangar's origin. The crane
- * arm swings in time with the first droid. The first parked hangar_monitor
- * and hangar_generator are the droids' targets.
+ * either of them, and so do the family base's. Each camera key comes from
+ * the first layer that sets it, else the stock shot is used.
  *
  * While the settings are active (the file exists and model replacements are
  * on), the hangar code uses them instead of its stock layout. Otherwise it

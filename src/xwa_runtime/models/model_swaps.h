@@ -1,18 +1,12 @@
 #ifndef XWA_RUNTIME_MODELS_MODEL_SWAPS_H
 #define XWA_RUNTIME_MODELS_MODEL_SWAPS_H
 
-/* Model swaps: a mission can load another model in place of one, for every
- * object that loads it, in the `model_swaps` section of its mission file, keyed
- * by model key:
- *
- *   model_swaps:
- *     superstardestroyer: superstardestroyerrecentered
- *     millenniumfalcon2cockpit: minifalconcockpit
- *
- * The target must be a GLB of the mod folder (flight/models/<key>.glb).
- * OptModel_LoadHandle loads the target instead of the source, so the model
- * def, collision, hardpoints, skins and the HD renderer's mesh all come from
- * the target. The tech room gets no swaps. */
+/* Model swaps: a mission can load another model of the mod in place of one,
+ * for every object that loads it, from the `model_swaps` section of its
+ * mission file. OptModel_LoadHandle loads the target instead of the source,
+ * so the model def, collision, hardpoints, skins and the HD renderer's mesh
+ * all come from the target. The swaps change the simulation. The tech room
+ * gets no swaps. */
 
 #include <stddef.h>
 

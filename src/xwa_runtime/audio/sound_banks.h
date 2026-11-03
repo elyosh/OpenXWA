@@ -2,59 +2,10 @@
 #define XWA_RUNTIME_AUDIO_SOUND_BANKS_H
 
 /* Sound banks let a mod give each object type its own sounds, such as engine
- * or weapon sounds. A mod lists them in flight/sounds.yaml:
- *
- *   banks:
- *     interior:                     # keyed by object type
- *       sounds:
- *         xwing: {file: 'Wave/Sfx_Interior/EngineIntXW.wav', volume: 76, distance_m: 200}
- *         awing: {silent: true}
- *     weapon:                       # keyed by object type, then weapon sound group
- *       unlisted: silent
- *       sounds:
- *         xwing:
- *           rebel_laser: {file: ...}
- *           turbolaser_red: {file: ...}
- *     hangar_ambient:               # a list of sounds for each object type
- *       sounds:
- *         imperial_star_destroyer2:
- *           - {file: ...}
- *     sounds:                       # keyed by sound name
- *       sounds:
- *         map_exit: {file: ...}
- *     weapon_range:                 # keyed by names that the mod chooses
- *       sounds:
- *         isd_turbolaser_near: {file: ..., distance_m: 50}
- *
- * An entry is either a sound or `{silent: true}`. `volume` goes from 0 to
- * 255 and defaults to 127, which plays the file at its own level. Lower
- * values play it quieter, and the game never plays a sound louder than its
- * file. `distance_m` is the 3D sound distance in metres, from 0 to 1599.98,
- * and defaults to 200. Both work like the columns of the game's .lst files,
- * whose distance is in game units, 40.96 to the metre.
- *
- * `unlisted` sets what plays for an entry that the bank doesn't list.
- * `stock` is the default and plays the stock game's sound. `silent` plays
- * nothing.
- *
- * The banks:
- *   - canopy_opening, engine_slowing, engine_wash, fly_by, hyper_abort,
- *     hyper_end, hyper_start, hyper_zoom, interior, s_foil,
- *     shuttle_blast_off, shuttle_shut_down, shuttle_take_off,
- *     starship_ambient and take_off have one sound for each object type.
- *   - weapon is keyed by the object type of the craft that fires, then by
- *     weapon sound group. The turbolaser_red sound also plays for the light,
- *     medium and heavy red turbolasers, and turbolaser_green for the green
- *     ones.
- *   - hangar_ambient has a list of up to 10 sounds for each command ship
- *     object type. The game picks one at random.
- *   - weapon_explosion has a list of up to 8 sounds for each object type.
- *     The game picks one at random, and doesn't repeat a sound until half of
- *     them have played.
- *   - sounds has player_targeted, map_enter, map_exit, turret_switch and
- *     target_select.
- *   - weapon_range has sounds with names that the mod chooses. A model's
- *     `sound.weapon_ranges` setting uses these names.
+ * or weapon sounds. The mod lists them by bank in its sound settings. Each
+ * entry is a sound file, with a volume and a 3D sound distance that work
+ * like the columns of the game's .lst files, or a silent entry. A bank can
+ * also make the entries it doesn't list silent instead of stock.
  *
  * Each listed entry gets its own sound effect slot. These slots start at
  * 2872, after the game's own slots, so the game's sound functions can play

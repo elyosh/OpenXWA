@@ -3,19 +3,15 @@
 
 /* The list of mods:
  *   - the original game, with no mod;
- *   - each folder in the mods folder (paths.mods) that has a mod.yaml;
+ *   - each folder in the mods folder (paths.mods) that has a mod file at its
+ *     top;
  *   - the configured mod folder (paths.mod), if it is somewhere else and has
- *     a mod.yaml.
+ *     a mod file.
  *
- * A folder without a mod.yaml is not a mod. mod.yaml looks like this:
- *
- *   version: 2                    # the mod format version it was made for
- *   name: "TFTC Reimagined 1.4"   # default: the folder name
- *   complete: true                # default: true
- *
- * A mod can be used only if its version is XWA_MOD_FORMAT_VERSION and it is
- * complete. The importer also writes `source` and `imported`. A mod with
- * `imported` was made by the importer. */
+ * A folder without a mod file is not a mod. A mod can be used only if its
+ * file gives XWA_MOD_FORMAT_VERSION as the version and doesn't mark the mod
+ * as incomplete. A mod whose file has `imported` was made by the
+ * importer. */
 
 #include "host_config.h"
 

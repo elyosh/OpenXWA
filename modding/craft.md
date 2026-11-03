@@ -564,7 +564,8 @@ weapon type, `colors` `default`, then 0. The impact colour comes from
 The charge bar colours come from `by_markings`, then `colors`, then the
 colours of the original game.
 
-The colours only change what you see.
+The colours only change what you see. `switch_by_iff` changes which weapon
+a craft fires, so films and multiplayer games need the same mod.
 
 #### Laser rates
 
@@ -833,7 +834,9 @@ sound. The other values change the laser sounds:
 The ambient sound is the `starship_ambient` bank entry of the craft's object
 type. It needs the `starship_ambient_sounds` rule of `flight/flight.yaml`.
 The sound plays while the player's craft is inside an ellipsoid around the
-craft, and gets louder towards its centre.
+craft, and gets louder towards its centre. Only craft in the player's
+region play it. When several craft play the same sound, it plays once, at
+the volume of the nearest craft. Ambient sounds stop in the hangar.
 
 ### component_strength
 

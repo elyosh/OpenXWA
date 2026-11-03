@@ -2,13 +2,8 @@
 #define XWA_RUNTIME_MODELS_CRAFT_NAMES_H
 
 /* A mission's craft names: a mission can rename the craft of a model for its
- * length, in the `craft_names` section of its mission file, keyed by model key.
- * Every key is optional:
- *
- *   craft_names:
- *     containerbrick: { ship_list: "Imperial II Star Destroyer 70", name: "Spec",
- *                       short_name: "ISD", plural: "Imperial II Star Destroyers",
- *                       map_icon: [0, 0, 15, 15] }
+ * length, in the `craft_names` section of its mission file, keyed by model
+ * key. The mod documentation describes the keys.
  *
  * `name`, `short_name` and `plural` are the names of the model's craft
  * record (ModelDef.longName and shortName, g_strSpeciesNamesPlural), which
@@ -18,8 +13,10 @@
  * the model keys of the model source.
  *
  * The names are set at mission load and put back after the debriefing. The
- * briefing doesn't get them, except for `ship_list` in the order of
- * battle. */
+ * briefing doesn't get them, except for `ship_list` in the order of battle.
+ * The new map icon comes too late for the frontend screens that show it, so
+ * `map_icon` has no visible effect, and the mod documentation leaves it
+ * out. */
 
 #ifdef __cplusplus
 extern "C" {

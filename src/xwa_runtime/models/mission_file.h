@@ -1,24 +1,9 @@
 #ifndef XWA_RUNTIME_MODELS_MISSION_FILE_H
 #define XWA_RUNTIME_MODELS_MISSION_FILE_H
 
-/* A mission's file in the mod folder: flight/missions/<mission path without its
- * extension>.yaml, lower case, which holds what the game reads at mission
- * load:
- *
- *   resdata: ...           # the mission's own art
- *   settings: ...          # mission settings
- *   flight_groups: ...     # changes to the flight groups of the .TIE
- *   object_profiles: ...   # object profiles
- *   skins: ...             # skin selections
- *   articulations: ...     # articulated model settings
- *   hangar: ...            # the hangar
- *   model_swaps: ...       # models loaded in place of others
- *   stats_profiles: ...    # the stats profile choices
- *   craft_names: ...       # craft names
- *   concourse: ...         # the concourse planet
- *   headlights: true       # the craft headlights
- *   sounds: ...            # sound replacements
- */
+/* A mission's file in the mod folder, which holds the mod's changes to one
+ * mission. The game reads it each time it loads the mission, and the other
+ * modules read their sections from it. */
 
 #include <stddef.h>
 
