@@ -43,14 +43,14 @@ Every file and folder is optional. A mod only needs the files it changes.
 ## mod.yaml
 
 ```yaml
-version: 8
+version: 6
 name: "Rebel Fleet Refit"
 complete: true
 ```
 
 | Key | Meaning |
 |-|-|
-| `version` | Required. The mod format version that the mod was made for. This OpenXWA reads version 8. |
+| `version` | Required. The mod format version that the mod was made for. This OpenXWA reads version 6. |
 | `name` | The name that the **Mods** screen shows. The default is the folder name. |
 | `complete` | `false` marks a mod that isn't ready to play. The default is `true`. |
 
