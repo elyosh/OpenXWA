@@ -95,9 +95,8 @@ OpenXWA --mod "/path/to/my-first-mod"
 - [Text](text.md): replacing the game's text.
 - [Tools](tools.md): the Blender add-on, the model cooker, the other tools,
   and the steps to make common changes.
-- Importer: turning a mod made for the original game into an OpenXWA mod.
-
-The pages without a link aren't written yet.
+- [Importer](importer.md): turning a mod made for the original game into
+  an OpenXWA mod.
 
 ## Reference
 
