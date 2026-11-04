@@ -639,6 +639,17 @@ static bool missions(ImportContext* ctx, bool* skyboxes) {
 	return true;
 }
 
+enum { SKY_MAX_FACE_SIZE = 4096 };
+
+/* Returns the face size of a baked sky or overlay: the largest power of two
+ * that isn't larger than the source faces, up to SKY_MAX_FACE_SIZE. */
+static int sky_face_size(int source_size) {
+	int size = 16;
+	while (size * 2 <= source_size && size < SKY_MAX_FACE_SIZE)
+		size *= 2;
+	return size;
+}
+
 /* Converts each sky and overlay folder of the skybox list. Each line is
  * "sky" or "overlay", the source folder, the environment name ("-" for an
  * overlay) and the texture folder in the mod folder, separated by tabs. */
@@ -684,6 +695,7 @@ static void bake_skyboxes(ImportContext* ctx) {
 			EnvBakeOptions bake;
 			EnvBake_DefaultOptions(&bake);
 			bake.face_pixels = &pixels;
+			bake.radiance_size = sky_face_size(faces.size);
 			if (is_overlay) {
 				bake.overlay_out = overlay;
 			} else {
