@@ -114,9 +114,9 @@ models:
   force_opt: false
   # Classic emission (the OPTs' lit texels, projectiles, engine glows,
   # explosions, glow marks, cockpit screens) is shown at the radiance of a
-  # backdrop texel: classic_lighting.illuminance / pi. These strengths
+  # backdrop texel: classic_lighting.image_radiance. These strengths
   # multiply it.
-  opt_emissive_strength: 6.0
+  opt_emissive_strength: 3.0
   opt_projectile_emissive_strength: 20.0
   engine_emissive_strength: 10.0
 effects:
@@ -240,15 +240,15 @@ hangar_lighting:
   direction_x: 0.0
   direction_y: 0.0
   direction_z: 1.0
-  intensity: 50.0  # illuminance in W/m^2 (34,150 lux), up to 2000
+  intensity: 100.0  # illuminance in W/m^2 (34,150 lux), up to 2000
   color_r: 1.0
   color_g: 1.0
   color_b: 1.0
   # Ambient cube in W/m^2/sr, up to 1000: +Z ceiling fill, horizontal wall
   # bounce, -Z floor bounce. It takes the key light's hue.
-  ambient_ceiling: 0.4
-  ambient_sides: 0.6
-  ambient_floor: 0.5
+  ambient_ceiling: 1.0
+  ambient_sides: 1.3
+  ambient_floor: 1.0
 # Authored per-region HDR environments (sky, diffuse and specular lighting,
 # suns). The manifest path is relative to the mod folder. It holds the
 # `environments:` map and, under `xwa:`, the (mission, region) mapping and
@@ -258,6 +258,10 @@ hangar_lighting:
 environment_maps:
   enabled: true
   manifest: "flight/environments/environments.yaml"
+  # Multiplies the intensity of every environment: the sky and overlay
+  # that are drawn, and the diffuse light and reflections they give the
+  # models. The suns and the ambient fill stay the same. 0 to 10.
+  intensity_scale: 1.0
   # Largest radiance a sun disc is drawn with (its lighting is not capped).
   # A physical disc is far brighter than screen-space bloom resolves
   # cleanly; 1 to 60000.
@@ -336,7 +340,13 @@ classic_lighting:
   # This is the illuminance in W/m^2 of a classic light of brightness 1.
   # 186 makes the white sun the real sun at the Earth's distance
   # (127,000 lux). Above 0, up to 2000.
-  illuminance: 186.0
+  illuminance: 300.0
+  # The radiance in W/m^2/sr of a white pixel of the classic images
+  # (backdrops, lit texels, projectiles, glow marks, cockpit screens,
+  # stars). 59.2 makes it as bright as a white surface that faces a light
+  # of 186 W/m^2. Raise illuminance alone to make the lit models brighter
+  # than the images. Above 0, up to 1000.
+  image_radiance: 59.2056
 lighting:
   spec_geom_adapt: true
   # Ambient fill in W/m^2/sr, where no environment gives one. 5.9 gives a
@@ -360,22 +370,22 @@ exposure:
   # 0 = ev100, 1 = full metering. Partial keeps part of the difference
   # between scenes: a dim region still looks dimmer.
   metering: 0.6
-  min_ev100: 13.0
+  min_ev100: 13.5
   max_ev100: 16.0
   # Adaptation rate per second, in each direction. The gap in EV shrinks as
   # e^(-speed * t): at 1.5, 78% of it is closed after one second.
   brighten_speed: 1.5  # when the scene gets darker
-  darken_speed: 3.0    # when the scene gets brighter
+  darken_speed: 1.5    # when the scene gets brighter
   # The meter averages the EV of the weighted pixels between two
   # percentiles. The high one leaves out the sun disc and laser bolts.
   low_percent: 10.0
   high_percent: 90.0
   # Weight of pixels with no geometry (sky, backdrops, effects over empty
   # space), so that black space doesn't decide the exposure of a ship.
-  sky_weight: 0.2
+  sky_weight: 0.02
   # Weight of geometry nearer than near_distance metres: the cockpit, so
   # that its dark interior doesn't decide the exposure of the view outside.
-  near_weight: 0.1
+  near_weight: 0.05
   near_distance: 5.0
   edge_weight: 0.25    # weight at the screen's corners; 1 at the centre
   channel: "max" # luminance, or max: the largest of r, g and b
