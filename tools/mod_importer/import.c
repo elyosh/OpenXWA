@@ -753,7 +753,7 @@ static void bake_flight(ImportContext* ctx) {
 								  .group_filter = -1 };
 	const BakeXwauFlightOptions options = { .sprites = &sprites,
 											.xwau_root = ctx->options->source,
-											.planet_max = 2048 };
+											.planet_max = 0 };
 	BakeXwauFlightStats stats = { 0 };
 	const int ok = BakeXwau_RunFlight(&options, &stats);
 	ToolLog_Write(
