@@ -83,7 +83,7 @@ to 256 environments.
 | `diffuse_strength` | Multiplies the light of `diffuse`. 0 to 4. Give it with `diffuse`, and only with it. |
 | `specular` | The cube that models reflect. It needs `diffuse`. |
 | `specular_strength` | Multiplies the reflections of `specular`. 0 to 4. Give it with `specular`, and only with it. |
-| `ambient_fill` | Light that comes from every direction, `[r, g, b]` in the sky's units, 0 to 1000 each. The default is `[0, 0, 0]`. |
+| `ambient_fill` | Light that comes from every direction, `[r, g, b]` radiance in W/m²/sr, 0 to 1000 each. `intensity` doesn't scale it. The default is `[0, 0, 0]`. |
 | `rotation_degrees` | Turns the sky and its suns, `[yaw, pitch, roll]`. The default is `[0, 0, 0]`. See [Directions](#directions). |
 | `directional_lights` | The suns, up to four. See [Suns](#suns). It is required with `radiance`. Use `[]` for a sky without suns. |
 | `overlay` | A cube with transparency, drawn over the sky. See [Overlays](#overlays). It needs `radiance`. |

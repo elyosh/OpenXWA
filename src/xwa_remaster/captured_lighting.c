@@ -8,6 +8,7 @@
 #include "aeron/scene/environment_builder.h"
 #include "xwa_remaster/env_capture.h"
 #include "xwa_remaster/flight.h"
+#include "xwa_remaster/scene_lights.h"
 #include "xwa_remaster/sky_stars.h"
 
 #include <stdio.h>
@@ -65,9 +66,10 @@ static uint64_t cl_hash(uint64_t hash, const void* data, size_t size) {
 static uint64_t cl_hash_u32(uint64_t hash, uint32_t value) { return cl_hash(hash, &value, sizeof value); }
 
 /* Computes a signature of what the cubes show: the mission, the region, the
- * sky, the hide and show rules, and each backdrop's hidden flag. It leaves
- * out the backdrops' animation frames, so an animated backdrop does not
- * rebuild the cubes. */
+ * sky and its scaled intensity, the hide and show rules, each backdrop's
+ * hidden flag, and how bright the classic images are. It leaves out the
+ * backdrops' animation frames, so an animated backdrop does not rebuild the
+ * cubes. */
 static uint64_t cl_signature(const XwaSnapshot* snap, const XwaEnvironmentSelection* selection) {
 	uint64_t hash = 0xCBF29CE484222325ull;
 	char key[XWA_ENV_MISSION_KEY_MAX];
@@ -81,7 +83,8 @@ static uint64_t cl_signature(const XwaSnapshot* snap, const XwaEnvironmentSelect
 		const XwaEnvironmentBackdropRule* rule = selection->backdrops;
 		hash = cl_hash(hash, &sky->radiance, sizeof sky->radiance);
 		hash = cl_hash(hash, sky->world_to_cube, sizeof sky->world_to_cube);
-		hash = cl_hash(hash, &sky->settings.intensity, sizeof sky->settings.intensity);
+		const float intensity = sky->settings.intensity * XwaRemasterEnvironment_IntensityScale();
+		hash = cl_hash(hash, &intensity, sizeof intensity);
 		hash = cl_hash_u32(hash, (uint32_t)rule->hide_all | (uint32_t)rule->show_all << 1);
 		hash = cl_hash_u32(hash, rule->hide_count);
 		hash = cl_hash(hash, rule->hide, rule->hide_count * sizeof rule->hide[0]);
@@ -90,6 +93,8 @@ static uint64_t cl_signature(const XwaSnapshot* snap, const XwaEnvironmentSelect
 	} else {
 		hash = cl_hash_u32(hash, 0xFFFFFFFFu); /* the starfield */
 	}
+	const float classic_radiance = XwaRemaster_ClassicRadiance();
+	hash = cl_hash(hash, &classic_radiance, sizeof classic_radiance);
 	hash = cl_hash_u32(hash, snap->backdrop_count);
 	for (uint32_t i = 0; i < snap->backdrop_count; i++) {
 		hash = cl_hash_u32(hash, i << 1 | (snap->backdrops[i].hidden ? 1u : 0u));

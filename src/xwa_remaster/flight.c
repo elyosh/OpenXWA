@@ -634,6 +634,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"hyperspace_tunnel.cap_color_g",
 		"hyperspace_tunnel.cap_color_b",
 		"classic_lighting.illuminance",
+		"classic_lighting.image_radiance",
+		"environment_maps.intensity_scale",
 		"lighting.ambient_r",
 		"lighting.ambient_g",
 		"lighting.ambient_b",
@@ -1042,6 +1044,27 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	XwaRemaster_ConfigureClassicLightIlluminance(classic_light_illuminance);
+
+	const float classic_radiance =
+		(float)AeronConfigFile_GetFloat(cf, "classic_lighting.image_radiance", 0.0);
+	if (!isfinite(classic_radiance) || classic_radiance <= 0.0f || classic_radiance > FL_RADIANCE_MAX) {
+		Aeron_LogError("xwa.remaster", "%s: classic_lighting.image_radiance must be above 0 and at most %g",
+					   path, (double)FL_RADIANCE_MAX);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	XwaRemaster_ConfigureClassicRadiance(classic_radiance);
+
+	const float intensity_scale =
+		(float)AeronConfigFile_GetFloat(cf, "environment_maps.intensity_scale", -1.0);
+	if (!isfinite(intensity_scale) || intensity_scale < 0.0f ||
+		intensity_scale > XWA_ENV_INTENSITY_SCALE_MAX) {
+		Aeron_LogError("xwa.remaster", "%s: environment_maps.intensity_scale must be from 0 to %g", path,
+					   (double)XWA_ENV_INTENSITY_SCALE_MAX);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	XwaRemasterEnvironment_ConfigureIntensityScale(intensity_scale);
 
 	XwaShipPbrTuning pbr;
 	memset(&pbr, 0, sizeof pbr);
@@ -5349,7 +5372,8 @@ int XwaRemasterFlight_CaptureSetSky(AeronScene3D* scene, XwaRemasterSkyStars* st
 	}
 	if (sky) {
 		/* The overlay is not part of the captured sky. */
-		AeronPreparedEnvironment without_overlay = *sky;
+		AeronPreparedEnvironment without_overlay;
+		XwaRemasterEnvironment_ScaleIntensity(sky, &without_overlay);
 		without_overlay.overlay = NULL;
 		AeronScene_SetSkyEnvironment(scene, &without_overlay);
 		return 1;
@@ -5702,7 +5726,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * twinkle advances with the simulation clock (game_time_ticks), so it
 	 * is deterministic and pauses with the game. */
 	if (sky_environment) {
-		AeronScene_SetSkyEnvironment(s.scene, sky_environment);
+		AeronPreparedEnvironment scaled_sky;
+		AeronScene_SetSkyEnvironment(s.scene,
+									 XwaRemasterEnvironment_ScaleIntensity(sky_environment, &scaled_sky));
 		/* Kept backdrops bring their own suns. */
 		for (uint32_t i = 0; !keep_backdrops && i < sky_environment->light_count; i++) {
 			AeronScene_AddSkySun(s.scene, &sky_environment->lights[i]);
@@ -6011,7 +6037,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	if (scene_lighting.captured) {
 		AeronScene_SetPbrEnvironment(s.scene, &scene_lighting.captured_environment);
 	} else if (scene_lighting.environment) {
-		AeronScene_SetPbrPreparedEnvironment(s.scene, scene_lighting.environment);
+		AeronPreparedEnvironment scaled_environment;
+		AeronScene_SetPbrPreparedEnvironment(
+			s.scene, XwaRemasterEnvironment_ScaleIntensity(scene_lighting.environment, &scaled_environment));
 	}
 
 	/* Player cockpit (lit; classic runs the normal light setup). Gates

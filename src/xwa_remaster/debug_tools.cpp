@@ -66,6 +66,22 @@ static void xwa_tool_pbr(int* open, void* user) {
 	ImGui::TextDisabled("Illuminance of a classic light of brightness 1 (suns, the game's\n"
 						"lights): %.0f lux. 186 W/m^2 is the sun at the Earth's distance.",
 						(double)(classic_light * AERON_SCENE_LUMENS_PER_WATT));
+	float classic_radiance = XwaRemaster_ClassicRadiance();
+	if (ImGui::SliderFloat("Classic image radiance", &classic_radiance, 0.0f, 1000.0f, "%.1f W/m^2/sr",
+						   ImGuiSliderFlags_Logarithmic)) {
+		XwaRemaster_SetClassicRadiance(classic_radiance);
+	}
+	ImGui::TextDisabled("Radiance of a white pixel of the classic images (backdrops, lit\n"
+						"texels, screens): %.0f cd/m^2. 59.2 matches a white surface lit\n"
+						"by a classic light of 186 W/m^2.",
+						(double)(classic_radiance * AERON_SCENE_LUMENS_PER_WATT));
+	float intensity_scale = XwaRemasterEnvironment_IntensityScale();
+	if (ImGui::SliderFloat("Environment intensity scale", &intensity_scale, 0.0f,
+						   (float)XWA_ENV_INTENSITY_SCALE_MAX, "%.3f", ImGuiSliderFlags_Logarithmic)) {
+		XwaRemasterEnvironment_SetIntensityScale(intensity_scale);
+	}
+	ImGui::TextDisabled("Multiplies the environments' skies and overlays, and the light\n"
+						"they give the models. Captured lighting cubes are rebuilt.");
 	changed |=
 		ImGui::ColorEdit3("Ambient fill", t.ambient, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 	ImGui::TextDisabled("Ambient cube fill, radiance in W/m^2/sr.");
@@ -149,6 +165,8 @@ static void xwa_tool_pbr(int* open, void* user) {
 	if (ImGui::Button("Reset to defaults")) {
 		XwaRemasterShip_GetPbrTuningDefault(&t);
 		XwaRemaster_SetClassicLightIlluminance(XwaRemaster_ClassicLightIlluminanceDefault());
+		XwaRemaster_SetClassicRadiance(XwaRemaster_ClassicRadianceDefault());
+		XwaRemasterEnvironment_SetIntensityScale(XwaRemasterEnvironment_IntensityScaleDefault());
 		XwaRemasterShip_SetBackfaceFill(1);
 		changed = true;
 	}
