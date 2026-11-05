@@ -351,9 +351,9 @@ lighting:
   spec_geom_adapt: true
   # Ambient fill in W/m^2/sr, where no environment gives one. 5.9 gives a
   # surface 10% of the white sun's light.
-  ambient_r: 5.9
-  ambient_g: 5.9
-  ambient_b: 5.9
+  ambient_r: 1.0
+  ambient_g: 1.0
+  ambient_b: 1.0
   # Scale of all emitted light (illumination, screens, holograms, lasers,
   # glows, explosions). Emitters far brighter than lit surfaces are what
   # visibly glow through bloom.
