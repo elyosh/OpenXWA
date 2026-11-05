@@ -457,10 +457,11 @@ static void XwaRemaster_RequestViewMode(RmViewMode mode, int fade) {
 	XwaRemaster_SetViewMode(mode, fade);
 }
 
-/* GLB replacement models have no classic geometry, so the classic and split
- * views stay off while replacements are enabled; the HD view is the only one. */
+/* The classic renderer can't draw GLB replacement models. When at least one
+ * can be loaded, the classic and split views stay off and only the HD view
+ * is shown. */
 static void XwaRemaster_ToggleSplitView(void) {
-	if (XwaModelSource_ReplacementsEnabled()) {
+	if (XwaModelSource_HasReplacements()) {
 		return;
 	}
 	const RmViewMode selected_mode = g.pending_mode_valid ? g.pending_mode : g.mode;
@@ -469,7 +470,7 @@ static void XwaRemaster_ToggleSplitView(void) {
 }
 
 static void XwaRemaster_TogglePrimaryView(void) {
-	if (XwaModelSource_ReplacementsEnabled()) {
+	if (XwaModelSource_HasReplacements()) {
 		return;
 	}
 	const RmViewMode selected_mode = g.pending_mode_valid ? g.pending_mode : g.mode;

@@ -48,7 +48,13 @@ XwaModelSource XwaModelSource_Resolve(const char* fileName, char* glbPath, size_
    OPT, NULL for SUPPRESSED, and an open stream on the GLB for GLB. Callers
    keep their original close (or leak) of the returned stream. */
 XwaFile* XwaModelSource_OpenModelFile(const char* fileName);
+/* Whether replacements are turned on and XwaModelSource_Init set them up,
+   even when no GLB exists. */
 int XwaModelSource_ReplacementsEnabled(void);
+/* Whether at least one replacement GLB can be loaded. It counts the GLBs
+   found at XwaModelSource_Init and the ones XwaModelSource_AddKey added
+   since, so it can turn true later, but never turns false again. */
+int XwaModelSource_HasReplacements(void);
 /* Makes the GLB `key` loadable by its own name, for settings that name models
    no list has (a mothership's hangar, a hangar object swap). Returns 1 when
    the key now resolves to a GLB. */

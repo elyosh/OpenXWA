@@ -188,7 +188,7 @@ void XwaFilmState_Write(void) {
 
 	FilmState_PutU16(&cursor, FILM_STATE_VERSION);
 	FilmState_PutU16(&cursor, (uint16_t)XwaModernFlightTiming_StepTicks());
-	FilmState_PutU8(&cursor, (uint8_t)(XwaModelSource_ReplacementsEnabled() != 0));
+	FilmState_PutU8(&cursor, (uint8_t)(XwaModelSource_HasReplacements() != 0));
 	FilmState_PutU8(&cursor, (uint8_t)length);
 	FilmState_PutBytes(&cursor, s_modName, length);
 	for (i = 0; i < XWA_SHIELD_RECHARGE_FLIGHT_GROUPS; ++i) {
@@ -321,7 +321,7 @@ void XwaFilmState_Read(void) {
 					  "film: recorded with the mod '%s', played with '%s'; it can play differently", modName,
 					  s_modName);
 	}
-	if (replacements != (XwaModelSource_ReplacementsEnabled() != 0)) {
+	if (replacements != (XwaModelSource_HasReplacements() != 0)) {
 		Aeron_LogWarn("xwa.film", "film: recorded with the model replacements %s; it can play differently",
 					  replacements ? "on" : "off");
 	}
