@@ -2723,27 +2723,37 @@ static uint32_t fl_derive_backdrops(const XwaSnapshot* snap, const float crows[9
 }
 
 /* ---- scene billboards (state-derived) --------------------------------
- * Float mirrors of the classic billboard pipeline, driven entirely by
- * flight-object state (no draw capture):
- *   dispatch — the render walk's slot/genus routing (flight_view.c):
- *     MAIN slots billboard genus Explosion/Debris and flame genus
- *     SalvageJunk; TRANSIENT slots billboard any genus (chaff, sparks)
- *     with angleD forced 0, hiding GENUS_Debris in external view.
- *     STATIC-genus slots are intentionally NOT derived: the classic
- *     RenderNonCraftSceneObject passes the object TYPE as the queue's
- *     object-index field (original bug, verified at 0x4E40B0), so its
- *     queue entries alias whatever object occupies that low slot —
- *     garbage-dependent output not worth reproducing.
- *   geometry — SceneBillboard_QueueObjectTextured + flush laws: base
- *     size (instanceExtent<<8)/maxBounds (<<3 unless debris sprites;
- *     0xffff for SSD type-2006), projected size maxBounds*base/z
- *     clamped to 1024 (unclamped for type 2006 in the Death Star
- *     hangar), half extents (dim * projected) >> 9 px through the
- *     classic focal; type 2006 pulls the DEPTH in by typeSpecificWord
- *     while the screen position keeps the true-depth projection.
- *   Intentional deviations: no 32-entry queue cap, no int16 screen-
- *     projection rejects (free FOV renders what the classic screen-
- *     culled), continuous depth (no z>>8 quantization). */
+ * These follow the classic billboard code in floats. They are built from
+ * the flight objects' state, not from captured draws.
+ *
+ * Which objects get a billboard follows the render walk in flight_view.c:
+ *   - In the main slots, objects of the Explosion and Debris genus get one,
+ *     and SalvageJunk objects get a flame.
+ *   - In the transient slots, objects of any genus get one (chaff, sparks),
+ *     drawn with angleD set to 0. Debris is hidden in the external view.
+ *   - Objects in the static-genus slots get none. The classic
+ *     RenderNonCraftSceneObject passes the object type where the queue
+ *     expects the object index (an original bug, checked at 0x4E40B0), so
+ *     its entries point at whatever object is in that low slot. That output
+ *     depends on unrelated data and isn't worth reproducing.
+ *
+ * The size follows SceneBillboard_QueueObjectTextured and the queue flush:
+ *   - The base size is (instanceExtent << 8) / maxBounds, shifted left by 3
+ *     except for debris sprites, and 0xffff for a type 2006 explosion of an
+ *     SSD.
+ *   - The projected size is maxBounds * base / z. The half extents are
+ *     (dim * projected) >> 9 pixels at the classic focal length.
+ *   - A type 2006 explosion is drawn at a depth moved closer by
+ *     typeSpecificWord, but at the screen position of its true depth.
+ *
+ * Differences from the classic game, on purpose:
+ *   - The projected size has no cap. The classic game caps it (except for
+ *     type 2006 in Death Star missions), so sprites stop growing on screen
+ *     up close and seem to shrink.
+ *   - The queue has no limit of 32 entries.
+ *   - Nothing is rejected for falling outside the int16 screen range,
+ *     because the free field of view shows what the classic game culled.
+ *   - The depth isn't rounded to steps of 256 (z >> 8). */
 
 /* The classic billboard roll law: of the object-view rows R0 (object
  * right) and R1 (object -forward — the (R0, R2, R1) row order), take
@@ -2892,9 +2902,10 @@ static int fl_object_billboard_geometry(const XwaFlightObject* f, const XwaFligh
 		if (base == 0)
 			return 0;
 	}
-	float proj = (float)maxb * (float)base / z;
-	if (!(cam->death_star_mode && type == XWA_SNAP_TYPE_EXPLOSION_2006) && proj > 1024.0f)
-		proj = 1024.0f;
+	/* The classic game caps this, which keeps a sprite's screen size fixed up
+	 * close, so it looks like it shrinks as the camera gets closer. Without
+	 * the cap, the sprite keeps its size in the world. */
+	const float proj = (float)maxb * (float)base / z;
 	const float ps = cam->proj_scale > 0.0f ? cam->proj_scale : 512.0f;
 	const float px2vw = z / ps;
 	out->half_w = (float)w * proj * (1.0f / 512.0f) * px2vw;
