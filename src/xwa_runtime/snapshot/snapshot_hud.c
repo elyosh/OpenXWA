@@ -2,6 +2,7 @@
 
 #include "xwa/assets/flight_model.h"
 #include "xwa/assets/model_def.h"
+#include "xwa/assets/string_table.h"
 #include "xwa/flight/flight.h"
 #include "xwa/flight/hangar.h"
 #include "xwa/flight/hud/hud.h"
@@ -15,6 +16,7 @@
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/weapon_stats.h"
 
+#include <stdio.h>
 #include <string.h>
 
 typedef char hud_radar_blips_fit[XWA_SNAP_MAX_HUD_RADAR_BLIPS >= 2 * HUD_RADAR_MAX_BLIPS ? 1 : -1];
@@ -289,6 +291,33 @@ XwaHudTargetBoxLayer XwaSnapshotHud_SetTargetBoxLayer(XwaHudTargetBoxLayer layer
 void XwaSnapshotHud_NoteCrt(const XwaHudCrt* crt) {
 	if (g_hud_capture.building_active && crt)
 		g_hud_capture.building.crt = *crt;
+}
+
+void XwaSnapshotHud_NoteCmdTarget(int damage_shown) {
+	if (g_hud_capture.building_active) {
+		g_hud_capture.building.target.cmd_shown = 1;
+		g_hud_capture.building.target.damage_shown = (uint8_t)(damage_shown != 0);
+	}
+}
+
+void XwaSnapshotHud_NoteTargetComponentLine(uint16_t mesh_type, int show_percent, uint8_t percent) {
+	XwaHudTarget* target = &g_hud_capture.building.target;
+	const char* name;
+
+	if (!g_hud_capture.building_active ||
+		mesh_type >= sizeof g_strComponentStrings / sizeof g_strComponentStrings[0]) {
+		return;
+	}
+	name = g_strComponentStrings[mesh_type] ? g_strComponentStrings[mesh_type] : "";
+	/* The CMD pads the percent to 3 characters with spaces
+	   (FlightText_AppendScratchDecimalNumber with 3 and 1), and ends the line
+	   with a space, which is left out here. */
+	if (show_percent) {
+		snprintf(target->component_line, sizeof target->component_line, "%s %3u%%", name,
+				 (unsigned int)percent);
+	} else {
+		snprintf(target->component_line, sizeof target->component_line, "%s", name);
+	}
 }
 
 static uint32_t hud_capture_mode_flags(const PlayerData* player) {

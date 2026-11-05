@@ -2,10 +2,13 @@
 #define XWA_RUNTIME_MODELS_CRAFT_HUD_H
 
 /* Reads each craft's HUD settings from the `hud` group of a model settings
- * file, and the icon tables and the target display settings of the mod's
- * HUD file. They set the reticle images, the HUD colours, the hull and map
- * icons, and how the target display draws the target. The mod documentation
- * describes the keys.
+ * file. From the mod's HUD file, it reads the icon tables, the target display
+ * settings, the target box settings and the target readout settings. They set the reticle images, the
+ * HUD colours, the hull and map icons, how the target display draws the
+ * target, and the target readout next to the target's box. The mod
+ * documentation describes the keys.
+ *
+ * The target readout settings go to XwaModernTargetReadoutOptions_SetMod.
  *
  * Hull icons are images of group 26000, map icons of group 14800 and reticle
  * parts of group 12000. A mod file counts images from 1. An object type that
@@ -72,6 +75,9 @@ void XwaCraftHud_Colors(unsigned int objectType, uint32_t colors[2]);
 int XwaCraftHud_Reticle(unsigned int objectType, int slot);
 /* The `target_display` group of hud.yaml, or the default: shaded. */
 const XwaTargetDisplay* XwaCraftHud_TargetDisplay(void);
+/* `target_boxes.line_width` of hud.yaml, in points: 1/1080 of the 3D view's
+   height. 0, the default, keeps the original game's target boxes. */
+float XwaCraftHud_TargetBoxLineWidth(void);
 
 #ifdef __cplusplus
 }

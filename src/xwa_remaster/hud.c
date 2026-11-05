@@ -4,6 +4,7 @@
 #include "xwa_remaster/hud_cmd.h"
 #include "xwa_remaster/hud_fixed.h"
 #include "xwa_remaster/hud_layout.h"
+#include "xwa_remaster/hud_readout.h"
 #include "xwa_remaster/hud_text.h"
 
 #include "aeron/aeron.h"
@@ -194,7 +195,16 @@ int XwaRemasterHud_Init(AeronVfs* vfs) {
 		Aeron_LogError("xwa.hud", "pane-glyph draw list initialization failed");
 		return 0;
 	}
+	if (!XwaRemasterHudReadout_Init()) {
+		XwaRemasterHudText_Shutdown();
+		XwaRemasterHudCmd_Shutdown();
+		XwaRemasterHudBoxes_Shutdown();
+		XwaRemasterHudFixed_Shutdown();
+		Aeron_LogError("xwa.hud", "target readout draw list initialization failed");
+		return 0;
+	}
 	if (!XwaRemasterDc_Init()) {
+		XwaRemasterHudReadout_Shutdown();
 		XwaRemasterHudText_Shutdown();
 		XwaRemasterHudCmd_Shutdown();
 		XwaRemasterHudBoxes_Shutdown();
@@ -210,6 +220,7 @@ const XwaHudLayout* XwaRemasterHud_Layout(void) { return hud_initialized ? &hud_
 
 void XwaRemasterHud_Shutdown(void) {
 	XwaRemasterDc_Shutdown();
+	XwaRemasterHudReadout_Shutdown();
 	XwaRemasterHudText_Shutdown();
 	XwaRemasterHudCmd_Shutdown();
 	XwaRemasterHudBoxes_Shutdown();
@@ -396,6 +407,7 @@ void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* sna
 	XwaRemasterHudFixed_PrepareDrawList(cmd, target_w, target_h);
 	XwaRemasterHudCmd_PrepareDrawList(cmd, target_w, target_h);
 	XwaRemasterHudText_PrepareDrawList(cmd, assets, target_w, target_h);
+	XwaRemasterHudReadout_PrepareDrawList(cmd, target_w, target_h);
 }
 
 const XwaRemasterHudPreparedAssets* XwaRemasterHud_PreparedAssets(void) { return &hud_assets.prepared; }

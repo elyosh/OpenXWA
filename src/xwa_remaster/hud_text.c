@@ -7,8 +7,10 @@
 #include "xwa_remaster/hud_fixed.h"
 #include "xwa_remaster/hud_layout.h"
 #include "xwa_remaster/text.h"
+#include "xwa_runtime/config/modern_target_readout_options.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 typedef struct XwaHudPreparedText {
@@ -21,6 +23,8 @@ typedef struct XwaHudPreparedText {
 	uint8_t arrow_tier;
 	uint8_t reserved[3];
 	uint16_t arrow_glyph_count;
+	uint8_t readout_tier;
+	uint16_t readout_glyph_count;
 	XwaHudPane panes[XWA_SNAP_MAX_HUD_PANES];
 	XwaHudGlyph glyphs[XWA_SNAP_MAX_HUD_GLYPHS];
 	struct {
@@ -29,10 +33,19 @@ typedef struct XwaHudPreparedText {
 		float x_ref, y_ref, size_ref;
 		uint32_t argb;
 	} arrow_glyphs[512];
+	struct {
+		uint8_t ch;
+		float x_ref, y_ref, size_ref;
+		uint32_t argb;
+	} readout_glyphs[XWA_HUD_MAX_READOUT_GLYPHS];
 } XwaHudPreparedText;
 
 static AeronDrawList2D* text_list;
 static XwaHudPreparedText text_prepared;
+/* The target readout's glyphs, made by XwaRemasterHudText_PrepareDrawList
+   for XwaRemasterHudText_AddReadoutGlyphs. */
+static AeronDrawList2DSprite text_readout_sprites[XWA_HUD_MAX_READOUT_GLYPHS];
+static uint16_t text_readout_sprite_count;
 
 static XwaHudLayoutOrigin text_origin_for_pane(uint16_t pane) {
 	switch ((XwaHudPaneId)pane) {
@@ -319,6 +332,138 @@ static void text_build_target_arrow(const XwaSnapshot* snapshot, XwaHudProfileIn
 							distance_argb);
 }
 
+/* Makes a colour brighter and more saturated, on sRGB values. */
+static uint32_t text_brighten(uint32_t argb) {
+	float c[3] = { ((argb >> 16) & 255) / 255.0f, ((argb >> 8) & 255) / 255.0f, (argb & 255) / 255.0f };
+	const float v = (c[0] + c[1] + c[2]) / 3.0f;
+	uint32_t out = argb & 0xff000000u;
+
+	for (int i = 0; i < 3; i++) {
+		float value = 1.3f * (v + 1.3f * (c[i] - v));
+		value = value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);
+		out |= (uint32_t)lroundf(value * 255.0f) << (16 - 8 * i);
+	}
+	return out;
+}
+
+static uint32_t text_code_color(uint8_t code, int brighten) {
+	const uint32_t argb =
+		XwaSnapshotExport_FlightPaletteColor(XwaSnapshotExport_FlightColorCodePaletteIndex(code));
+	return brighten ? text_brighten(argb) : argb;
+}
+
+/* Adds `str` with its top left at (x, y). With `follow_codes`, the colour
+   codes change the colour, starting from `argb`. Otherwise the whole string
+   is in `argb`. */
+static void text_add_readout_string(const AeronFontAtlas* font, const XwaRemasterFlightFace* face,
+									const char* str, float x, float y, float size_ref, uint32_t argb,
+									int follow_codes, int brighten) {
+	for (const uint8_t* p = (const uint8_t*)str; *p; p++) {
+		if (*p == 0xfeu && p[1]) {
+			++p;
+			if (follow_codes)
+				argb = text_code_color(*p, brighten);
+			continue;
+		}
+		if (*p < 0x20u)
+			continue;
+		if (text_prepared.readout_glyph_count < XWA_HUD_MAX_READOUT_GLYPHS) {
+			const uint16_t i = text_prepared.readout_glyph_count++;
+			text_prepared.readout_glyphs[i].ch = *p;
+			text_prepared.readout_glyphs[i].x_ref = x;
+			text_prepared.readout_glyphs[i].y_ref = y;
+			text_prepared.readout_glyphs[i].size_ref = size_ref;
+			text_prepared.readout_glyphs[i].argb = argb;
+		}
+		x += XwaRemasterText_FlightAdvance(font, face, *p, size_ref);
+	}
+}
+
+/* The target readout's text: the name, the cargo and the distance above the
+   target's box, and the component line under the component's box. */
+static void text_build_target_readout(const XwaSnapshot* snapshot, XwaHudProfileIndex profile) {
+	const XwaHudPreparedBoxState* boxes = XwaRemasterHudBoxes_Prepared();
+	XwaModernTargetReadoutOptions options;
+	XwaModernTargetReadoutOptions_Get(&options);
+	if (!boxes || !boxes->valid || (!boxes->readout.valid && !boxes->readout.component_valid))
+		return;
+	const XwaHudLayoutProfile* active = XwaRemasterHudLayout_Profile(XwaRemasterHud_Layout(), profile);
+	if (!active)
+		return;
+	int out_x, out_y;
+	float output_scale;
+	XwaRemasterHudLayout_OutputTransform(active, boxes->target_w, boxes->target_h, &out_x, &out_y,
+										 &output_scale);
+	if (output_scale <= 0.0f)
+		return;
+	const XwaHudTarget* target = &snapshot->hud.target;
+	const int tier = options.text_size == XWA_TARGET_READOUT_TEXT_LARGE
+						 ? 0
+						 : (options.text_size == XWA_TARGET_READOUT_TEXT_MEDIUM ? 1 : 2);
+	const AeronFontAtlas* font = XwaRemasterHud_FlightFont(tier, NULL);
+	XwaRemasterFlightFace face_metrics;
+	const XwaRemasterFlightFace* face =
+		XwaRemasterText_FlightFaceMetrics(tier, &face_metrics) ? &face_metrics : NULL;
+	const float pt = boxes->readout.point_px / output_scale;
+	const float size_ref = XwaRemasterText_FlightTierFontSize(tier) * pt;
+	const float spacing = (tier == 0 ? 20.0f : 18.0f) * pt;
+	const int brighten = options.brighten_text != 0;
+	text_prepared.readout_tier = (uint8_t)tier;
+
+	/* The colour before the name's first code is the CMD's name colour. The
+	   cargo and the distance use the colour of the name's last code. */
+	uint8_t last_code = 0x43u;
+	for (const uint8_t* p = (const uint8_t*)target->name; *p; p++)
+		if (*p == 0xfeu && p[1])
+			last_code = *++p;
+	const uint32_t name_argb = text_code_color(0x43u, brighten);
+	const uint32_t line_argb = text_code_color(last_code, brighten);
+	const int follow_codes = options.name_colors == XWA_TARGET_READOUT_NAME_CMD;
+
+	char whole[4], fraction[4], distance[16];
+	text_format_decimal(target->distance_whole, 2, 1, whole);
+	text_format_decimal(target->distance_frac, 2, 2, fraction);
+	snprintf(distance, sizeof distance, "%s.%s km", whole[0] == ' ' ? whole + 1 : whole, fraction);
+	const char* lines[3];
+	int line_count = 0;
+	lines[line_count++] = target->name;
+	/* The CMD draws the cargo only with the damage values. */
+	if (target->damage_shown && target->status[0])
+		lines[line_count++] = target->status;
+	lines[line_count++] = distance;
+
+	if (boxes->readout.valid) {
+		const XwaHudPreparedBox* box = &boxes->boxes[boxes->readout.box];
+		const float center_x = box->x_ref + box->w_ref * 0.5f;
+		float top = box->y_ref;
+		/* A box smaller than 50 points places the text as a 50-point box. */
+		if (box->w_ref < 50.0f * pt)
+			top = box->y_ref + box->h_ref * 0.5f - 25.0f * pt;
+		/* The last line ends text_gap above the box. Each line is centred in
+		   its line spacing. */
+		const float first_line_top = top - options.text_gap * pt - line_count * spacing;
+		for (int i = 0; i < line_count; i++) {
+			const float width = XwaRemasterText_MeasureFlightString(font, face, lines[i], size_ref);
+			const float y = first_line_top + i * spacing + (spacing - size_ref) * 0.5f;
+			if (i == 0)
+				text_add_readout_string(font, face, lines[i], center_x - width * 0.5f, y, size_ref,
+										follow_codes ? name_argb : line_argb, follow_codes, brighten);
+			else
+				text_add_readout_string(font, face, lines[i], center_x - width * 0.5f, y, size_ref, line_argb,
+										0, brighten);
+		}
+	}
+
+	if (target->component_line[0] && boxes->readout.component_valid) {
+		const XwaHudPreparedBox* component = &boxes->boxes[boxes->readout.component_box];
+		const float width = XwaRemasterText_MeasureFlightString(font, face, target->component_line, size_ref);
+		text_add_readout_string(font, face, target->component_line,
+								component->x_ref + component->w_ref * 0.5f - width * 0.5f,
+								component->y_ref + component->h_ref + 10.0f * pt, size_ref,
+								text_code_color(0x52u, brighten), 0, brighten);
+	}
+}
+
 static void text_build_target_box_readouts(const XwaSnapshot* snapshot) {
 	const XwaHudPreparedBoxState* boxes = XwaRemasterHudBoxes_Prepared();
 	if (!boxes || !boxes->valid || !snapshot->hud.target.valid)
@@ -420,7 +565,9 @@ void XwaRemasterHudText_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex pr
 		   (size_t)text_prepared.glyph_count * sizeof text_prepared.glyphs[0]);
 	text_build_target_arrow(snapshot, profile);
 	text_build_target_box_readouts(snapshot);
-	if (text_prepared.glyph_count == 0 && text_prepared.arrow_glyph_count == 0)
+	text_build_target_readout(snapshot, profile);
+	if (text_prepared.glyph_count == 0 && text_prepared.arrow_glyph_count == 0 &&
+		text_prepared.readout_glyph_count == 0)
 		return;
 	text_prepared.valid = 1;
 }
@@ -450,6 +597,10 @@ static void text_prepare_faces(AeronCommandBuffer* cmd, XwaRemasterAssets* asset
 			}
 		}
 	}
+	/* The target readout's glyphs all have the same size. */
+	if (text_prepared.readout_glyph_count)
+		XwaRemasterText_PrepareFlightFace(cmd, assets, text_prepared.readout_tier,
+										  text_prepared.readout_glyphs[0].size_ref * output_scale);
 	last_size = -1.0f;
 	for (uint16_t i = 0; i < text_prepared.glyph_count; i++) {
 		const XwaHudGlyph* glyph = &text_prepared.glyphs[i];
@@ -502,6 +653,7 @@ static int text_bitmap_sprite(const AeronFontAtlas* font, uint8_t ch, float x, f
 
 void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, int target_w,
 										int target_h) {
+	text_readout_sprite_count = 0;
 	if (!cmd || !text_list || target_w <= 0 || target_h <= 0)
 		return;
 	AeronDrawList_Begin(text_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
@@ -549,6 +701,28 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 			 * the target: never captured by the cockpit's screens nor hidden
 			 * by the erased regions. */
 			AeronDrawList_AddSprite(text_list, &sprite);
+		}
+	}
+	if (text_prepared.readout_glyph_count) {
+		const int tier = text_prepared.readout_tier;
+		const AeronFontAtlas* font = XwaRemasterHud_FlightFont(tier, NULL);
+		XwaRemasterFlightFace face;
+		const float size_px = text_prepared.readout_glyphs[0].size_ref * output_scale;
+		const int has_face = XwaRemasterText_FlightFace(assets, tier, size_px, &face);
+		for (uint16_t i = 0; i < text_prepared.readout_glyph_count; i++) {
+			const uint8_t ch = text_prepared.readout_glyphs[i].ch;
+			const float x = out_x + text_prepared.readout_glyphs[i].x_ref * output_scale;
+			const float y = out_y + text_prepared.readout_glyphs[i].y_ref * output_scale;
+			AeronDrawList2DSprite* sprite = &text_readout_sprites[text_readout_sprite_count];
+			memset(sprite, 0, sizeof *sprite);
+			const int drawn = has_face ? XwaRemasterText_FlightFaceSprite(
+											 &face, ch, x, y,
+											 XwaRemasterText_FlightAdvance(font, &face, ch, size_px), sprite)
+									   : text_bitmap_sprite(font, ch, x, y, size_px, sprite);
+			if (!drawn)
+				continue;
+			text_set_tint(sprite, text_prepared.readout_glyphs[i].argb);
+			text_readout_sprite_count++;
 		}
 	}
 	for (uint16_t i = 0; i < text_prepared.glyph_count; i++) {
@@ -613,6 +787,15 @@ void XwaRemasterHudText_ForEachGlyph(int target_w, int target_h, XwaHudGlyphVisi
 								out_x + (mapped.x_ref + advance) * output_scale,
 								out_y + (mapped.y_ref + mapped.h_ref) * output_scale };
 		visit(context, glyph->pane, glyph->ch, rect);
+	}
+}
+
+void XwaRemasterHudText_AddReadoutGlyphs(AeronDrawList2D* list, const AeronRectI* scissor) {
+	for (uint16_t i = 0; list && i < text_readout_sprite_count; i++) {
+		AeronDrawList2DSprite sprite = text_readout_sprites[i];
+		if (scissor)
+			sprite.scissor = *scissor;
+		AeronDrawList_AddSprite(list, &sprite);
 	}
 }
 

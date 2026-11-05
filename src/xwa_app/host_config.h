@@ -5,6 +5,7 @@
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_sun_options.h"
+#include "xwa_runtime/config/modern_target_readout_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 
 #include <stddef.h>
@@ -59,6 +60,11 @@ typedef struct XwaHostConfig {
 	 * (XwaModernSunOptions_Keys). */
 	XwaModernSunOptions sun_player_options;
 	unsigned int sun_override_mask;
+	XwaModernTargetReadoutOptions target_readout_options;
+	/* The player's target readout values. Only the keys in
+	 * target_readout_override_mask are set (XwaModernTargetReadoutOptions_Keys). */
+	XwaModernTargetReadoutOptions target_readout_player_options;
+	unsigned int target_readout_override_mask;
 } XwaHostConfig;
 
 int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size);
@@ -78,6 +84,8 @@ int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* o
 								   size_t error_size);
 /* Saves camera.enabled, and no other camera key. */
 int XwaHostConfig_SaveCameraEnabled(AeronVfs* vfs, int enabled, char* error, size_t error_size);
+/* Saves only target_readout.enabled. */
+int XwaHostConfig_SaveTargetReadoutEnabled(AeronVfs* vfs, int enabled, char* error, size_t error_size);
 
 #ifdef __cplusplus
 }

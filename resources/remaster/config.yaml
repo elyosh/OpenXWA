@@ -190,6 +190,58 @@ camera:
   lag_time: 0.32
   # Shows the HUD and the reticle in the exterior view of the player's craft.
   exterior_hud: true
+# Shows the target's name, cargo, distance and damage bars next to its box
+# in the 3D view. A mod can change these values. The options screen only has
+# a Target Readout switch, which sets `enabled`.
+target_readout:
+  # Off keeps the original game's HUD.
+  enabled: false
+  # The text size: small, medium or large. They use the flight font's 10, 12
+  # and 16 point sizes.
+  text_size: medium
+  # The space between the last line of text and the top of the box, in
+  # points, 0 to 100.
+  text_gap: 9
+  # Makes the text brighter and more saturated than the CMD's.
+  brighten_text: true
+  # single draws the whole name in one colour, the colour of the flight
+  # group. cmd uses the CMD's colours: one for the craft type and another
+  # for the flight group.
+  name_colors: single
+  # Draws the shield, hull and system bars.
+  bars: true
+  # vertical puts the shield bar on the left of the box, the hull bar on the
+  # right and the system bar under it. horizontal puts all three bars under
+  # the box.
+  layout: vertical
+  # A bar is 70% of the box width, kept between these two lengths. In
+  # points, 1 to 1000.
+  bar_length_min: 16
+  bar_length_max: 140
+  # The bar thickness in points, 1 to 50.
+  bar_thickness: 7
+  # The space between the box and the bars, and between two bars, in points,
+  # 0 to 100.
+  bar_gap: 4
+  # The width of the bar outline in points, 0 to 10.
+  bar_frame: 0
+  # The colours are linear.
+  shield_color: [0.0134, 0.214, 1.0]
+  # The colour of the shields above 100%.
+  overshield_color: [0.205, 0.933, 1.0]
+  hull_color_full: [0.0, 1.0, 0.0]
+  hull_color_half: [1.0, 1.0, 0.0]
+  hull_color_low: [1.0, 0.0, 0.0]
+  system_color: [0.604, 0.214, 1.0]
+  # The smallest and largest size of the component box, in points, 0 to
+  # 1000. 0 means no limit.
+  component_box_min: 20
+  component_box_max: 150
+  # The component's box shrinks to 70% and jumps back, once a second.
+  component_pulse: true
+  # Hides the readout where the 3D scene is closer than this many metres,
+  # 0 to 1000. 25 hides it behind the cockpit. 0 turns this off.
+  hidden_within_m: 25
 # The procedural suns and their lens flare. A mod can change these values.
 suns:
   # Backdrop suns draw a procedural disc and corona in place of their image.

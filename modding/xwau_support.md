@@ -88,7 +88,8 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Reticles and HUD colours by craft | Implemented | | [Craft](craft.md#hud) |
 | Hull and map icons | Implemented | | [Flight](flight.md#hull-and-map-icons) |
 | Flight text font | Implemented | | [Images](images.md#fonts) |
-| Enhanced HUD | Not implemented | The bars of the target's shields, hull and systems next to the target brackets. | |
+| Enhanced HUD | Implemented | The dark box behind the text isn't drawn. | [Flight](flight.md#target-readout) |
+| Target boxes drawn by ddraw (`Radar2DRendererEnabled`) | Implemented | XWAU's lines are 2 pixels of the game's resolution. The importer sets them to 3 points. | [Flight](flight.md#target-boxes) |
 
 ## Skies, lighting and effects
 

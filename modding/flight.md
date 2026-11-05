@@ -6,7 +6,7 @@ flight:
 | File | What it changes |
 |-|-|
 | `flight/flight.yaml` | game rules, weapons, shields, docking, lights, object counts, the camera, extra backdrop planets and the procedural suns |
-| `flight/hud.yaml` | the hull and map icons of each object type, and the target display |
+| `flight/hud.yaml` | the hull and map icons of each object type, the target display, the target boxes and the target readout |
 | `flight/sounds.yaml` | the sounds of each object type: engines, weapons, explosions, hyperspace, hangar and a few interface sounds |
 
 The game reads the three files once, when it starts. Restart OpenXWA after
@@ -767,8 +767,8 @@ suns:
 
 ## hud.yaml
 
-`flight/hud.yaml` changes the icons of each object type and the target
-display.
+`flight/hud.yaml` changes the icons of each object type, the target
+display, the target boxes and the target readout.
 
 ```yaml
 hull_icons:
@@ -785,6 +785,8 @@ target_display:
 | `hull_icons` | The craft outline in the shield and hull display, by object type. |
 | `map_icons` | The icon of each object type on the map. |
 | `target_display` | How the target display shows the target. |
+| `target_boxes` | How the target boxes are drawn. |
+| `target_readout` | The target's name, cargo, distance and damage bars next to its box. |
 
 If the file can't be read, the game writes an error in the log and ignores
 the whole file.
@@ -842,6 +844,82 @@ Colours are linear, three numbers of 0 or more. With `edges`, a 6-pixel
 border of the display stays empty, and the display is empty while the
 target is dying. If a key is missing or wrong, the game writes an error in
 the log and the display stays shaded.
+
+### Target boxes
+
+`target_boxes` sets how the boxes around the targets are drawn in the 3D
+view, in modern graphics.
+
+```yaml
+target_boxes:
+  line_width: 4
+```
+
+| Key | Meaning | Range | Default |
+|-|-|-|-|
+| `line_width` | The width of the box lines, in points: 1/1080 of the height of the 3D view. 0 keeps the original game's boxes. | 0 to 20 | 0 |
+
+With a `line_width` above 0, the lines are centred on the box's edges, the
+corners are 1/8 of the box's size, and the four corners are the same. A
+very small box is drawn filled. The original game's boxes have lines of one
+pixel of the game's flight resolution, so they get thin in a large window.
+
+### Target readout
+
+`target_readout` shows the current target's name, cargo and distance above
+its box in the 3D view, and bars for its shields, hull and systems around
+the box. Under the box of a capital ship's targeted component, it shows the
+component's line from the CMD, such as `Shield Generator  75%`. It works in
+modern graphics only.
+
+```yaml
+target_readout:
+  text_size: large
+  layout: horizontal
+  overshield_color: [0.787, 0.319, 0.051]
+```
+
+Sizes are in points: 1/1080 of the height of the 3D view, so a point is one
+pixel at 1080 lines. Colours are linear, three numbers of 0 or more.
+
+| Key | Meaning | Range | Default |
+|-|-|-|-|
+| `enabled` | Turns the target readout on. | `true` or `false` | `true` |
+| `text_size` | The size of the text: the flight font at 10, 12 or 16 points. | `small`, `medium` or `large` | `medium` |
+| `text_gap` | The space between the last line of text and the top of the box, in points. | 0 to 100 | 9 |
+| `brighten_text` | Draws the text brighter and more saturated than in the CMD. | `true` or `false` | `true` |
+| `name_colors` | `single` draws the whole name in the colour of the flight group. `cmd` draws it in the CMD's colours: one for the craft type and another for the flight group. | `single` or `cmd` | `single` |
+| `bars` | Draws the shield, hull and system bars. | `true` or `false` | `true` |
+| `layout` | `vertical` puts the shield bar on the left of the box, the hull bar on the right and the system bar under it. `horizontal` puts all three under the box. | `vertical` or `horizontal` | `vertical` |
+| `bar_length_min`, `bar_length_max` | A bar is 70% of the box's width, but no shorter and no longer than these lengths, in points. | 1 to 1000 | 16, 140 |
+| `bar_thickness` | The thickness of a bar, in points. | 1 to 50 | 7 |
+| `bar_gap` | The space between the box and the bars, and between two bars, in points. | 0 to 100 | 4 |
+| `bar_frame` | The width of the outline around each bar, in points. 0 draws no outline. | 0 to 10 | 0 |
+| `shield_color` | The colour of the shield bar. | colour | `[0.0134, 0.214, 1]` |
+| `overshield_color` | The colour of the shields above 100%. | colour | `[0.205, 0.933, 1]` |
+| `hull_color_full`, `hull_color_half`, `hull_color_low` | The colour of the hull bar at 100%, 50% and 0%. The bar blends between them. | colour | green, yellow, red |
+| `system_color` | The colour of the system bar. | colour | `[0.604, 0.214, 1]` |
+| `component_box_min`, `component_box_max` | The smallest and largest size of the box of a capital ship's targeted component, in points. 0 means no limit. | 0 to 1000 | 20, 150 |
+| `component_pulse` | The box of a capital ship's targeted component shrinks to 70% and jumps back, once a second. | `true` or `false` | `true` |
+| `hidden_within_m` | Hides the readout where the 3D scene is closer than this many metres, such as behind the cockpit frame. 0 shows it over the cockpit. | 0 to 1000 | 25 |
+
+The readout shows only when the CMD shows the target. When the CMD is off,
+or a hit has knocked out the targeting computer, the readout goes away and
+the original game's HUD shows. Like the CMD, it shows the cargo, the bars
+and the component line only once the target is identified. The component
+line shows when the component's box is in view, even when the target's box
+isn't. The bars go
+away while the target is dying. The system bar shows only when the systems
+are damaged.
+
+Without the section, the target readout is off unless the player turns on
+**Target Readout** in the options. With the section, it is on, unless the
+section has `enabled: false`. A missing key keeps its default. A wrong value
+is ignored, with a warning in the log. When a maximum is below its minimum,
+the game uses the minimum for both.
+
+The player's choices win over the mod. If the player turns **Target
+Readout** on or off in the options, that choice counts.
 
 ## sounds.yaml
 

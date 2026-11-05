@@ -3,6 +3,7 @@
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/hud_fixed.h"
+#include "xwa_remaster/hud_readout.h"
 
 #include "aeron/aeron.h"
 #include "aeron/asset/opt_model.h"
@@ -4637,6 +4638,8 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 		Aeron_GpuDebugMarker(cmd, "HUD target boxes after fixed");
 		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
 										 XWA_HUD_TARGET_BOX_AFTER_FIXED);
+		Aeron_GpuDebugMarker(cmd, "HUD target readout");
+		XwaRemasterHudReadout_Render(cmd, pass, target, target_w, target_h, s.scene);
 	}
 	Aeron_GpuDebugMarker(cmd, "HUD CMD");
 	XwaRemasterHud_RenderCmd(cmd, pass, target, target_w, target_h);

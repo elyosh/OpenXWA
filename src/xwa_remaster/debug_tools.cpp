@@ -1221,6 +1221,8 @@ static void xwa_tool_hud_snapshot(int* open, void* user) {
 		ImGui::Text("target valid=%u id=%u:%u component=%u", h.target.valid, h.target.slot,
 					h.target.signature, h.target.selected_component);
 		ImGui::Text("name='%s' status='%s'", h.target.name, h.target.status);
+		ImGui::Text("CMD shown=%u damage=%u component='%s'", h.target.cmd_shown, h.target.damage_shown,
+					h.target.component_line);
 		ImGui::Text("distance=%u.%02u shield/system/hull=%u/%u/%u", h.target.distance_whole,
 					h.target.distance_frac, h.target.shield_pct, h.target.system_pct, h.target.hull_pct);
 		const XwaHudCrt& crt = h.crt;

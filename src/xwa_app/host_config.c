@@ -434,6 +434,39 @@ static int host_config_sun_options(const AeronConfigFile* config, int required, 
 	return 1;
 }
 
+/* Reads the target_readout section. With `required`, every key must be
+ * present, as in the shipped file. `override_mask` gets a bit for each key
+ * that the file sets. */
+static int host_config_target_readout_options(const AeronConfigFile* config, int required,
+											  XwaModernTargetReadoutOptions* out, unsigned int* override_mask,
+											  char* error, size_t error_size) {
+	size_t count;
+	const XwaModernTargetReadoutOptionKey* keys = XwaModernTargetReadoutOptions_Keys(&count);
+	char key[64];
+	char expected[128];
+
+	*override_mask = 0;
+	for (size_t i = 0; i < count; ++i) {
+		snprintf(key, sizeof key, "target_readout.%s", keys[i].name);
+		const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+		if (!node) {
+			if (required) {
+				return host_config_error(error, error_size,
+										 "missing required remaster/config.yaml setting '%s'", key);
+			}
+			continue;
+		}
+		if (!XwaModernTargetReadoutOptions_ReadKey(&keys[i], node, out, expected, sizeof expected)) {
+			if (error && error_size) {
+				snprintf(error, error_size, "invalid '%s': expected %s", key, expected);
+			}
+			return 0;
+		}
+		*override_mask |= 1u << i;
+	}
+	return 1;
+}
+
 static int host_config_remaster_options(const AeronConfigFile* config, int required, XwaHostConfig* out,
 										char* error, size_t error_size) {
 	return host_config_model_smoothing(config, required, &out->model_smooth_angle_degrees, error,
@@ -474,10 +507,13 @@ static int host_config_load_shipped_config(AeronVfs* vfs, XwaHostConfig* out, ch
 	}
 	unsigned int camera_mask;
 	unsigned int sun_mask;
+	unsigned int target_readout_mask;
 	valid = host_config_remaster_options(config, 1, out, error, error_size) &&
 			host_config_input_options(config, 1, &out->input_options, error, error_size) &&
 			host_config_camera_options(config, 1, &out->camera_options, &camera_mask, error, error_size) &&
-			host_config_sun_options(config, 1, &out->sun_options, &sun_mask, error, error_size);
+			host_config_sun_options(config, 1, &out->sun_options, &sun_mask, error, error_size) &&
+			host_config_target_readout_options(config, 1, &out->target_readout_options, &target_readout_mask,
+											   error, error_size);
 	if (valid) {
 		out->input_defaults = out->input_options;
 	}
@@ -1130,6 +1166,7 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		const AeronConfigNode* video = AeronConfigFile_GetNode(config, "video");
 		const AeronConfigNode* input = AeronConfigFile_GetNode(config, "input");
 		const AeronConfigNode* camera = AeronConfigFile_GetNode(config, "camera");
+		const AeronConfigNode* target_readout = AeronConfigFile_GetNode(config, "target_readout");
 		if (version &&
 			(AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1)) {
 			AeronConfigFile_Destroy(config);
@@ -1163,6 +1200,10 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 			AeronConfigFile_Destroy(config);
 			return host_config_error(error, error_size, "'camera' must be a mapping in %s", path);
 		}
+		if (target_readout && AeronConfigNode_Type(target_readout) != AERON_CONFIG_MAP) {
+			AeronConfigFile_Destroy(config);
+			return host_config_error(error, error_size, "'target_readout' must be a mapping in %s", path);
+		}
 	}
 	if (AeronConfigFile_GetNode(config, "paths.resources")) {
 		Aeron_LogWarn("xwa.config",
@@ -1185,7 +1226,9 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		host_config_camera_options(config, 0, &out->camera_player_options, &out->camera_override_mask, error,
 								   error_size) &&
 		host_config_sun_options(config, 0, &out->sun_player_options, &out->sun_override_mask, error,
-								error_size);
+								error_size) &&
+		host_config_target_readout_options(config, 0, &out->target_readout_player_options,
+										   &out->target_readout_override_mask, error, error_size);
 	AeronConfigFile_Destroy(config);
 	return valid;
 }
@@ -1601,6 +1644,25 @@ int XwaHostConfig_SaveCameraEnabled(AeronVfs* vfs, int enabled, char* error, siz
 		return 0;
 	}
 	if (!AeronConfigFile_SetBool(document, "camera.enabled", enabled != 0, &config_error)) {
+		AeronConfigFile_Destroy(document);
+		return host_config_error(error, error_size, "could not update user configuration: %s",
+								 config_error.message);
+	}
+	return host_config_save_user_document(vfs, document, error, error_size);
+}
+
+int XwaHostConfig_SaveTargetReadoutEnabled(AeronVfs* vfs, int enabled, char* error, size_t error_size) {
+	AeronConfigFile* document = NULL;
+	AeronConfigError config_error = { 0 };
+
+	if (!vfs) {
+		return host_config_error(error, error_size, "cannot save the target readout switch to %s",
+								 "config.yaml");
+	}
+	if (!host_config_prepare_user_document(vfs, &document, error, error_size)) {
+		return 0;
+	}
+	if (!AeronConfigFile_SetBool(document, "target_readout.enabled", enabled != 0, &config_error)) {
 		AeronConfigFile_Destroy(document);
 		return host_config_error(error, error_size, "could not update user configuration: %s",
 								 config_error.message);

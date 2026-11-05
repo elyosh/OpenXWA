@@ -13284,6 +13284,9 @@ void Hud_DrawCmdTargetComponentLine(void) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	XwaSnapshotHud_NoteTargetComponentLine(meshType, showPercent, componentPercent);
+#endif
 	if (g_useHardware3D) {
 		FlightText_SetRenderOffset((int16_t)g_hudCmdPanelOriginX, (int16_t)g_hudCmdPanelOriginY);
 	} else {
@@ -13388,6 +13391,9 @@ void Hud_UpdateCMDText(void) {
 					showTargetDamage = 0;
 				}
 			}
+#ifdef XWA_MODERN
+			XwaSnapshotHud_NoteCmdTarget(showTargetDamage);
+#endif
 
 			if (g_useHardware3D) {
 				FlightText_SetRenderOffset((uint16_t)g_hudCmdPanelOriginX, (uint16_t)g_hudCmdPanelOriginY);

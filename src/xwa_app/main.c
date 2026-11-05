@@ -99,6 +99,10 @@ static int persist_camera_enabled(int enabled, char* error, size_t error_size) {
 	return XwaHostConfig_SaveCameraEnabled(Aeron_GetVfs(), enabled, error, error_size);
 }
 
+static int persist_target_readout_enabled(int enabled, char* error, size_t error_size) {
+	return XwaHostConfig_SaveTargetReadoutEnabled(Aeron_GetVfs(), enabled, error, error_size);
+}
+
 /* paths.mod. It is kept when the original game is chosen, so the mod stays
  * in the list. */
 static char s_configured_mod[XWA_HOST_CONFIG_PATH_CAPACITY];
@@ -504,6 +508,9 @@ int main(int argc, char** argv) {
 									 host_config.camera_override_mask, persist_camera_enabled);
 	XwaModernSunOptions_Configure(&host_config.sun_options, &host_config.sun_player_options,
 								  host_config.sun_override_mask);
+	XwaModernTargetReadoutOptions_Configure(
+		&host_config.target_readout_options, &host_config.target_readout_player_options,
+		host_config.target_readout_override_mask, persist_target_readout_enabled);
 	Aeron_LogInfo(
 		"xwa.config", "mouse flight control: %s (%s mode, sensitivity %d, invert Y: %s)",
 		host_config.input_options.mouse_flight_enabled ? "on" : "off",

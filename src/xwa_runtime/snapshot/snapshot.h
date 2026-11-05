@@ -1050,6 +1050,13 @@ typedef struct XwaHudTarget {
 	uint16_t shield_pct, system_pct, hull_pct;
 	char name[30];
 	char status[30];
+	/* The CMD drew the target's text this frame. */
+	uint8_t cmd_shown;
+	/* The CMD showed the target's shields, hull, systems and component line
+	   (showTargetDamage in Hud_UpdateCMDText). */
+	uint8_t damage_shown;
+	/* The CMD's component line this frame, or "". */
+	char component_line[32];
 } XwaHudTarget;
 
 typedef struct XwaHudReticle {

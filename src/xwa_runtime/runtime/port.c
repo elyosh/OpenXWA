@@ -29,6 +29,7 @@
 #include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_sun_options.h"
+#include "xwa_runtime/config/modern_target_readout_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/concourse_layout.h"
@@ -462,6 +463,7 @@ void XwaPort_Shutdown(void) {
 	XwaModernVideoOptions_Flush();
 	XwaModernInputOptions_Flush();
 	XwaModernCameraOptions_Flush();
+	XwaModernTargetReadoutOptions_Flush();
 	/* TODO: Run recovered shutdown paths in original-compatible order. */
 	if (XwaFlightTask_IsActive()) {
 		XwaFlightTask_Shutdown();

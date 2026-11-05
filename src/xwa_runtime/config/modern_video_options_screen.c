@@ -4,12 +4,15 @@
 #include "xwa/assets/string_table.h"
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_options_menu.h"
+#include "xwa_runtime/config/modern_target_readout_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 
 #include <math.h>
 #include <stdint.h>
 
 int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
+	/* The rows under the title, Back included. */
+	enum { row_count = 13 };
 	static const char* const window_mode_texts[] = { "Windowed", "Fullscreen" };
 	static const char* const quality_texts[] = { "Off", "Low", "High" };
 	static const char* const shadow_quality_texts[] = { "Standard", "High" };
@@ -25,6 +28,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 													 "250 nits", "300 nits", "400 nits" };
 	XwaModernVideoOptions options;
 	XwaModernCameraOptions camera_options;
+	XwaModernTargetReadoutOptions target_readout_options;
 	XwaModernOptionsMenu menu;
 	uint8_t window_mode;
 	uint8_t ssao;
@@ -39,6 +43,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	uint8_t sdr_gamma;
 	uint8_t paper_white;
 	uint8_t enhanced_camera;
+	uint8_t target_readout;
 	int hdr_rows_disabled;
 	int motion_blur_amount_changed;
 	int changed;
@@ -63,8 +68,11 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	paper_white = (uint8_t)options.paper_white;
 	XwaModernCameraOptions_Get(&camera_options);
 	enhanced_camera = (uint8_t)(camera_options.enabled != 0);
+	XwaModernTargetReadoutOptions_Get(&target_readout_options);
+	target_readout = (uint8_t)(target_readout_options.enabled != 0);
 	changed = 0;
-	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 140, cursor_row, 12);
+	XwaModernOptionsMenu_Begin(&menu, menu_center_x, XwaModernOptionsMenu_CenteredY(row_count), cursor_row,
+							   row_count);
 	XwaModernOptionsMenu_DrawTitle(&menu, "OpenXWA Video Options");
 
 	changed |=
@@ -127,6 +135,11 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 										 0)) {
 		XwaModernCameraOptions_SetEnabled(enhanced_camera);
 	}
+	/* The target's name, cargo, distance and damage bars next to its box.
+	   Like Enhanced Camera, it follows the mod until the player changes it. */
+	if (XwaModernOptionsMenu_DrawCycleU8(&menu, &target_readout, "Target Readout", toggle_texts, 2, 71, 0)) {
+		XwaModernTargetReadoutOptions_SetEnabled(target_readout);
+	}
 
 	back = XwaModernOptionsMenu_DrawAction(&menu, FrontendString_Get(STR_BACK), 69, 0);
 	back |= XwaModernOptionsMenu_TakeEscape(&menu);
@@ -136,5 +149,6 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 
 	XwaModernVideoOptions_Flush();
 	XwaModernCameraOptions_Flush();
+	XwaModernTargetReadoutOptions_Flush();
 	return 1;
 }
