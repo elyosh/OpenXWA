@@ -1038,7 +1038,8 @@ uint32_t XwaRemasterShip_HiddenTagGroups(const AeronSceneMesh* mesh, const XwaFl
 }
 
 int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f) {
-	if (!mesh || !f || !f->has_craft) {
+	/* An object without craft data has meshes when its profile hides some. */
+	if (!mesh || !f || (!f->has_craft && f->mesh_count == 0)) {
 		return 0;
 	}
 	const uint32_t components = ship_state_components(mesh);
@@ -1059,7 +1060,7 @@ int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 
 int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,
 								   AeronSceneMeshTable* out) {
-	if (!mesh || !f || !out || !f->has_craft) {
+	if (!mesh || !f || !out || (!f->has_craft && f->mesh_count == 0)) {
 		return 0;
 	}
 	const uint32_t components = ship_state_components(mesh);

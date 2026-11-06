@@ -298,6 +298,26 @@ A profile that hides nothing, or that the model doesn't have, uses
 `Default`. Without `Default` either, the craft shows every part. Profiles
 only apply to the mod's models.
 
+`weapons` sets the profile of laser bolts and other objects that aren't
+craft, based on the type of craft that fires them. The first key is the
+object type of the craft that fires. The second key is the object type of
+what it fires:
+
+```yaml
+object_profiles:
+  weapons:
+    imperial_star_destroyer2:
+      turbolaser_green_medium: "ShowBeam"
+```
+
+In this example, the `turbolaser_green_medium` shots fired by
+`imperial_star_destroyer2` craft use the `ShowBeam` profile.
+
+When `weapons` doesn't set a profile, these objects use `Skirmish` in a
+quick start or a skirmish if the model has it, and `Default` otherwise. If
+the profile hides nothing, the object shows all its parts. Unlike craft, it
+doesn't fall back to `Default`.
+
 ## articulations
 
 `articulations` changes the moving parts of a flight group's craft:

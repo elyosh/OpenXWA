@@ -620,8 +620,8 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 		uint8_t weaponSlot;
 		int remainingGroups;
 #ifdef XWA_MODERN
-		/* A GLB replacement keeps up to 120 weapon slots, like X-Wing Alliance
-		   Upgrade. Other models keep the original 16. */
+		/* A GLB replacement keeps up to 120 weapon slots. Other models keep
+		   the original 16. */
 		const int weaponSlotLimit = XWA_MODEL_WEAPON_SLOT_LIMIT(modelSlot);
 #define FEDISKIO_WEAPON_SLOT_LIMIT weaponSlotLimit
 #else

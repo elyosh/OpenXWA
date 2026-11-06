@@ -16,8 +16,8 @@
 #define CAMERA_SECONDS_PER_TICK 0.004f
 /* A longer jump of the game time starts the lag again. */
 #define CAMERA_MAX_STEP_TICKS (250 / 4)
-/* The second speed filter is this many times as fast as the first one, as in
-   XWAU: its steps of 10% and 5% per frame give ln 0.9 / ln 0.95. */
+/* The second speed filter is this many times as fast as the first one:
+   steps of 10% and 5% per frame give ln 0.9 / ln 0.95. */
 #define CAMERA_SLOW_SPEED_RATE 2.05f
 
 #define CAMERA_PI 3.14159265358979323846f

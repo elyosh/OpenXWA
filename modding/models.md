@@ -665,6 +665,19 @@ The game picks the profile of each object in this order:
    value, such as `Default_2`;
 4. when that profile hides nothing, `Default`.
 
+Laser bolts, warheads and other objects that aren't craft can use profiles
+too. The game picks their profile in this order:
+
+1. the profile that the mission sets for this object when a given type of
+   craft fires it (see `object_profiles.weapons` on the
+   [missions page](missions.md#object_profiles));
+2. in a quick start or a skirmish, `Skirmish`, if the model has it;
+3. `Default`.
+
+For example, a bolt model can contain both a short bolt and a long beam, and
+its `Default` profile hides the beam. A mission can then show the beam only
+on the shots of one type of craft.
+
 ## Probes, light grid and reflection plane
 
 Probes give the inside of a model its own light and reflections: a hangar,

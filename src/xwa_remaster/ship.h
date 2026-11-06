@@ -75,7 +75,9 @@ void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissiv
  * articulations' in-between angles as mesh_angle; blown-off components
  * (componentState[slot] != 0 — the classic node-walk skip) hide. B-Wings
  * additionally rotate every mesh root by the Bridge slot rotation before
- * applying the root-local transform.
+ * applying the root-local transform. For an object without craft data,
+ * such as a projectile, the table only hides the components that its
+ * profile hides (XwaFlightObject.component_state).
  * Returns 1 when any slot rotates or hides (callers skip the table
  * bind otherwise). */
 int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,

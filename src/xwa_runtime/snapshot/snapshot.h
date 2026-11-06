@@ -431,7 +431,11 @@ typedef struct XwaFlightObject {
 	 * is 65536, with the articulated meshes drawn between their steps:
 	 * XwaArticulation_DrawnAngles). mesh_count is the model's mesh count;
 	 * read them with XwaFlightObject_ComponentState and
-	 * XwaFlightObject_MeshAngle, which return 0 past it. */
+	 * XwaFlightObject_MeshAngle, which return 0 past it.
+	 * An object without craft data, such as a projectile, only has meshes
+	 * here when its model's profile hides some of them
+	 * (XwaObjectProfiles_HideWithoutCraft). The hidden meshes have state 4,
+	 * and all angles are 0. */
 	const uint8_t* component_state;
 	const uint16_t* mesh_angle;
 	uint32_t mesh_offset; /* the capture's offset into the mesh areas */
