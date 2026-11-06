@@ -1928,6 +1928,18 @@ static int is_screen_background(const char* key, int width, int height) {
 	return strcmp(key, "medals/medalcase") == 0 || strcmp(key, "group/15000/3000") == 0;
 }
 
+/* Returns whether hook_concourse turns off the family missions: with
+ * SkipFirst7Missions, the hook patches the frontend's checks of the tour's
+ * first seven missions, so that they use the concourse instead of the family
+ * transport. XWAU only reads the setting with hook_concourse.dll. */
+static int skips_family_missions(const char* root) {
+	char hooks[1100], dll[1100];
+	const char* section;
+	return find_ci(root, "hook_concourse.dll", dll, sizeof dll) &&
+		   find_hook_settings(root, hooks, sizeof hooks, &section) &&
+		   read_section_key_int(hooks, section, "SkipFirst7Missions", 0) != 0;
+}
+
 static void write_frontend_yaml(XwauContext* ctx) {
 	char dir[1100], path[1200];
 	snprintf(dir, sizeof dir, "%s/frontend", ctx->opt->sprites->out_root);
@@ -1948,6 +1960,10 @@ static void write_frontend_yaml(XwauContext* ctx) {
 				"  fill_alpha: 0.7\n"
 				"  line_width: pixel\n"
 				"  grid_colours: [0xFF0000, 0xFF0000]\n");
+	if (skips_family_missions(ctx->opt->xwau_root))
+		fprintf(fp, "# The tour's first seven missions use the concourse, not the family\n"
+					"# transport.\n"
+					"family_missions: false\n");
 	write_layouts(ctx, fp);
 	if (fclose(fp) != 0)
 		ctx->stats->failures++;

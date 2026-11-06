@@ -10,6 +10,7 @@
 #include "xwa/frontend/frontend_text.h"
 #include <string.h>
 #ifdef XWA_MODERN
+#include "xwa_runtime/frontend/family_missions.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -203,7 +204,11 @@ int FrontendCursor_SetImageResourceForCurrentTheme(char* name, void* outBuffer) 
 
 	strcpy(themedName, "fam");
 	memset(themedName + 4, 0, 28);
+#ifdef XWA_MODERN
+	if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 	if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 		strcat(themedName, name);
 		FrontendCursor_SetImageFromResourceName(themedName, outBuffer);
 		return 1;

@@ -32,6 +32,8 @@
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/concourse_layout.h"
+#include "xwa_runtime/frontend/family_missions.h"
+#include "xwa_runtime/frontend/frontend_config.h"
 #include "xwa_runtime/frontend/frontend_fonts.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
@@ -473,6 +475,8 @@ void XwaPort_Shutdown(void) {
 	XwaSnapshot_Shutdown();
 	XwaFrontendGeometry_Shutdown();
 	XwaFrontendScreens_Shutdown();
+	XwaFamilyMissions_Shutdown();
+	XwaFrontendConfig_Shutdown();
 	XwaConcourseLayout_Shutdown();
 	XwaAwards_Shutdown();
 	XwaRoomAnims_Shutdown();

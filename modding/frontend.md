@@ -38,6 +38,7 @@ layouts:
 | `design` | `[width, height]`, the screen size that your menu art is made for. The positions and sizes in design pixels of every `frontend/` and `resdata/` file use it. The default is `[640, 480]`. |
 | `paint` | How the game draws its fills, lines and the briefing grid. See below. |
 | `layouts` | How each screen fits on a wide screen. See below. |
+| `family_missions` | `false` makes the tour's first seven missions use the concourse. See below. |
 
 When `design` has a wrong value, the log says so, and the design size is
 640 × 480.
@@ -75,6 +76,14 @@ screens](reference/frontend_screens.md) lists the names.
 
 When a name or a layout is wrong, the log says so, and the game ignores the
 whole table, so every screen is `classic`.
+
+### family_missions
+
+The original game plays the first seven missions of the tour from the
+family transport, so a new pilot starts in the family transport room.
+`family_missions: false` makes these missions use the concourse, for a
+campaign that starts on a big ship. The pilot statistics page then always
+shows "On leave". The default is `true`.
 
 ## Menu images
 

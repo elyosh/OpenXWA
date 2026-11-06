@@ -221,6 +221,8 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/frontend/awards.c
     src/xwa_runtime/frontend/concourse_layout.c
     src/xwa_runtime/frontend/concourse_planet.c
+    src/xwa_runtime/frontend/family_missions.c
+    src/xwa_runtime/frontend/frontend_config.c
     src/xwa_runtime/frontend/frontend_fonts.c
     src/xwa_runtime/frontend/frontend_geometry.c
     src/xwa_runtime/frontend/frontend_screens.c
@@ -847,6 +849,8 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/frontend/awards.h
     src/xwa_runtime/frontend/concourse_layout.h
     src/xwa_runtime/frontend/concourse_planet.h
+    src/xwa_runtime/frontend/family_missions.h
+    src/xwa_runtime/frontend/frontend_config.h
     src/xwa_runtime/frontend/frontend_geometry.h
     src/xwa_runtime/frontend/frontend_screens.h
     src/xwa_runtime/frontend/frontend_fonts.h

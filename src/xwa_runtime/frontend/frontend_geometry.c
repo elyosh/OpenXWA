@@ -8,6 +8,7 @@
 #include "xwa/assets/object_type_info.h"
 #include "xwa/util/byte_order.h"
 #include "xwa/util/memory.h"
+#include "xwa_runtime/frontend/frontend_config.h"
 #include "xwa_runtime/models/mission_art.h"
 
 #include <math.h>
@@ -16,7 +17,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define XWA_GEOMETRY_DESIGN_PATH "frontend/frontend.yaml"
 #define XWA_GEOMETRY_STARFIELD_MASK_PATH "frontend/concourse/starfield_mask.png"
 #define XWA_GEOMETRY_KEY_SIZE 64
 
@@ -79,7 +79,7 @@ static void geometry_read_paint(const AeronConfigNode* paint) {
 			g_geometryPaint.fill_alpha = alpha;
 		} else {
 			Aeron_LogError("xwa.frontend", "%s:%d: fill_alpha must be between 0 and 1",
-						   XWA_GEOMETRY_DESIGN_PATH, AeronConfigNode_Line(value));
+						   XWA_FRONTEND_CONFIG_PATH, AeronConfigNode_Line(value));
 		}
 	}
 	value = AeronConfigNode_MapGet(paint, "line_width");
@@ -89,7 +89,7 @@ static void geometry_read_paint(const AeronConfigNode* paint) {
 			g_geometryPaint.pixel_lines = strcmp(text, "pixel") == 0;
 		} else {
 			Aeron_LogError("xwa.frontend", "%s:%d: line_width must be unit or pixel",
-						   XWA_GEOMETRY_DESIGN_PATH, AeronConfigNode_Line(value));
+						   XWA_FRONTEND_CONFIG_PATH, AeronConfigNode_Line(value));
 		}
 	}
 	value = AeronConfigNode_MapGet(paint, "grid_colours");
@@ -104,14 +104,13 @@ static void geometry_read_paint(const AeronConfigNode* paint) {
 		} else {
 			Aeron_LogError("xwa.frontend",
 						   "%s:%d: grid_colours must be [major, minor], such as [0xFF0000, 0x800000]",
-						   XWA_GEOMETRY_DESIGN_PATH, AeronConfigNode_Line(value));
+						   XWA_FRONTEND_CONFIG_PATH, AeronConfigNode_Line(value));
 		}
 	}
 }
 
 static void geometry_load_design(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
+	const AeronConfigNode* root;
 	const AeronConfigNode* design;
 	float size[2];
 
@@ -119,28 +118,21 @@ static void geometry_load_design(void) {
 		return;
 	}
 	g_geometryDesignLoaded = 1;
-	memset(&error, 0, sizeof(error));
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, XWA_GEOMETRY_DESIGN_PATH, &file,
-									&error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.frontend", "%s:%d: %s; the design screen is 640x480",
-						   XWA_GEOMETRY_DESIGN_PATH, error.line,
-						   error.message[0] ? error.message : "cannot be read");
-		}
+	root = XwaFrontendConfig_Root();
+	if (root == NULL) {
 		return;
 	}
-	design = AeronConfigNode_MapGet(AeronConfigFile_Root(file), "design");
+	design = AeronConfigNode_MapGet(root, "design");
 	if (design != NULL) {
 		if (geometry_read_numbers(design, size, 2) && size[0] >= 1.0f && size[1] >= 1.0f) {
 			g_geometryDesignW = size[0];
 			g_geometryDesignH = size[1];
 		} else {
 			Aeron_LogError("xwa.frontend", "%s:%d: design must be [width, height] in pixels; using 640x480",
-						   XWA_GEOMETRY_DESIGN_PATH, AeronConfigNode_Line(design));
+						   XWA_FRONTEND_CONFIG_PATH, AeronConfigNode_Line(design));
 		}
 	}
-	geometry_read_paint(AeronConfigNode_MapGet(AeronConfigFile_Root(file), "paint"));
-	AeronConfigFile_Destroy(file);
+	geometry_read_paint(AeronConfigNode_MapGet(root, "paint"));
 }
 
 static void geometry_free_atlas(XwaGeometryAtlas* atlas) {

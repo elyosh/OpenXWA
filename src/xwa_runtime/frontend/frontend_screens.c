@@ -1,6 +1,5 @@
 #include "xwa_runtime/frontend/frontend_screens.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/config/game_config.h"
@@ -19,11 +18,11 @@
 #include "xwa/frontend/mission_debrief.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/frontend/tech_library.h"
+#include "xwa_runtime/frontend/family_missions.h"
+#include "xwa_runtime/frontend/frontend_config.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 
 #include <string.h>
-
-#define XWA_SCREENS_PATH "frontend/frontend.yaml"
 
 /* Screen and view ids, in k_screens order. */
 typedef enum XwaScreenId {
@@ -125,8 +124,6 @@ static int screens_parse_layout(const char* text) {
 /* Reads `layouts` once. If a name or value is wrong, the whole table is
  * ignored, so a typo can't leave a mod half wide. */
 static void screens_load(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* table;
 	int layouts[SCREEN_COUNT];
 	int defaultLayout = -1;
@@ -140,14 +137,10 @@ static void screens_load(void) {
 		g_screenLayouts[i] = -1;
 		layouts[i] = -1;
 	}
-	memset(&error, 0, sizeof(error));
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, XWA_SCREENS_PATH, &file, &error)) {
-		return; /* frontend_geometry.c reports errors in this file */
-	}
-	table = AeronConfigNode_MapGet(AeronConfigFile_Root(file), "layouts");
+	table = AeronConfigNode_MapGet(XwaFrontendConfig_Root(), "layouts");
 	if (table != NULL && AeronConfigNode_Type(table) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.frontend", "%s:%d: layouts must be a map of screens to layouts", XWA_SCREENS_PATH,
-					   AeronConfigNode_Line(table));
+		Aeron_LogError("xwa.frontend", "%s:%d: layouts must be a map of screens to layouts",
+					   XWA_FRONTEND_CONFIG_PATH, AeronConfigNode_Line(table));
 		ok = 0;
 	}
 	for (size_t i = 0; ok && i < AeronConfigNode_MapCount(table); i++) {
@@ -157,8 +150,8 @@ static void screens_load(void) {
 		int screen = 0;
 
 		if (layout < 0) {
-			Aeron_LogError("xwa.frontend", "%s:%d: '%s' must be wide, fill or classic", XWA_SCREENS_PATH,
-						   AeronConfigNode_Line(value), key);
+			Aeron_LogError("xwa.frontend", "%s:%d: '%s' must be wide, fill or classic",
+						   XWA_FRONTEND_CONFIG_PATH, AeronConfigNode_Line(value), key);
 			ok = 0;
 			break;
 		}
@@ -170,16 +163,16 @@ static void screens_load(void) {
 			screen++;
 		}
 		if (screen == SCREEN_COUNT) {
-			Aeron_LogError("xwa.frontend", "%s:%d: unknown screen '%s'", XWA_SCREENS_PATH,
+			Aeron_LogError("xwa.frontend", "%s:%d: unknown screen '%s'", XWA_FRONTEND_CONFIG_PATH,
 						   AeronConfigNode_Line(value), key);
 			ok = 0;
 			break;
 		}
 		layouts[screen] = layout;
 	}
-	AeronConfigFile_Destroy(file);
 	if (!ok) {
-		Aeron_LogError("xwa.frontend", "%s: ignoring layouts; every screen is classic", XWA_SCREENS_PATH);
+		Aeron_LogError("xwa.frontend", "%s: ignoring layouts; every screen is classic",
+					   XWA_FRONTEND_CONFIG_PATH);
 		return;
 	}
 	memcpy(g_screenLayouts, layouts, sizeof(layouts));
@@ -213,7 +206,7 @@ static XwaScreenId screens_view(XwaScreenId screen) {
 			}
 		case SCREEN_COMBAT_ROOM:
 			/* The same test CombatSimMenu_Update uses to show podopen. */
-			return g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u
+			return XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u
 					   ? SCREEN_COMBAT_ROOM_FAMILY
 					   : screen;
 		case SCREEN_BRIEFING_ROOM:

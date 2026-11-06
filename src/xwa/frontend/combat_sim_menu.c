@@ -1,6 +1,7 @@
 #include "xwa/frontend/combat_sim_menu.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/concourse_layout.h"
+#include "xwa_runtime/frontend/family_missions.h"
 #endif
 
 #include "xwa/assets/string_table.h"
@@ -58,7 +59,11 @@ int CombatSimMenu_Update(int frameCounter) {
 		g_combatSimMenuPendingTransition = 0;
 		g_activeTextFieldId = 0;
 
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 		if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 			if (g_filmFeatureEnabled) {
 				FrontendCursor_SetPos(320, 100);
 			} else {
@@ -68,7 +73,11 @@ int CombatSimMenu_Update(int frameCounter) {
 			FrontendCursor_SetPos(360, 260);
 		}
 
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 		if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 			FrontImage_RegisterResourceDefault("frontres\\combat\\podopen.bmp", "background");
 		} else {
 			FrontImage_RegisterResourceDefault("frontres\\combat\\combat.bmp", "background");
@@ -147,7 +156,11 @@ int CombatSimMenu_Update(int frameCounter) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 	if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 		textWidth = FrontendText_MeasureWidth(FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT), 15);
 		rect.left = 300 - (textWidth >> 1);
 		rect.right = textWidth + rect.left + 40;
@@ -195,7 +208,11 @@ int CombatSimMenu_Update(int frameCounter) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 	if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 		textWidth = FrontendText_MeasureWidth(FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT), 15);
 		rect.left = 300 - (textWidth >> 1);
 		rect.right = textWidth + rect.left + 40;
@@ -240,7 +257,11 @@ int CombatSimMenu_Update(int frameCounter) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u && g_filmFeatureEnabled) {
+#else
 	if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u && g_filmFeatureEnabled) {
+#endif
 		textWidth = FrontendText_MeasureWidth(FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT), 15);
 		rect.left = 300 - (textWidth >> 1);
 		rect.top = 260;
@@ -260,7 +281,11 @@ int CombatSimMenu_Update(int frameCounter) {
 		FrontendText_DrawCentered(15, FrontendString_Get(STR_CONCOURSE_FILM_ROOM), &rect, color);
 	}
 
+#ifdef XWA_MODERN
+	if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 	if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 		textWidth = FrontendText_MeasureWidth(FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT), 15);
 		rect.left = 300 - (textWidth >> 1);
 		rect.right = textWidth + rect.left + 40;
@@ -296,7 +321,11 @@ int CombatSimMenu_Update(int frameCounter) {
 			}
 			FrontImage_AdvanceSpriteFrame("doors", 0);
 
+#ifdef XWA_MODERN
+			if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 			if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 				textWidth = FrontendText_MeasureWidth(FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT), 15);
 			} else {
 				textWidth = FrontendText_MeasureWidth(FrontendString_Get(STR_BACK_TO_CONCOURSE), 15);
@@ -357,6 +386,8 @@ int MultiplayerSetup_Update(int frameCounter) {
 	(void)frameCounter;
 
 	/* TODO: Dependency stub for CombatSimMenu_Update. Reimplement MultiplayerSetup_Update @ 0x53C120. */
+	/* TODO: the check of g_frontendMissionLoaded at 0x53C6C6 reads XwaFamilyMissions_MissionLoaded()
+	   under XWA_MODERN, as the other family room checks do. */
 	return 0;
 }
 

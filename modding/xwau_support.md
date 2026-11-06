@@ -138,6 +138,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | HD concourse and wide rooms | Implemented | | [Frontend](frontend.md) |
 | Menu font | Implemented | OpenXWA can't ship Consolas, so the importer uses Inconsolata Bold. | [Images](images.md#fonts) |
 | Concourse layout (`ConcourseDoors.txt`) | Implemented | | [Frontend](frontend.md#concourse-layout) |
+| Concourse from the first mission (`SkipFirst7Missions`) | Implemented | | [Frontend](frontend.md#family-missions) |
 | Room animations (`ConcourseAnimations.txt`) | Partial | Animations that exist only in DAT files aren't played. TFTC has three. | [Frontend](frontend.md#room-animations) |
 | Videos in place of images | Implemented | The tech room door, the Death Star briefing and the squadron logos. | [Frontend](frontend.md#videos-in-place-of-images) |
 | HD movies | Implemented | | [Frontend](frontend.md#movies) |

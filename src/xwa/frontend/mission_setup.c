@@ -1,6 +1,7 @@
 #include "xwa/frontend/mission_setup.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/concourse_layout.h"
+#include "xwa_runtime/frontend/family_missions.h"
 #endif
 
 #include "xwa/assets/file_io.h"
@@ -7541,7 +7542,11 @@ int MissionSetup_Update(int frameCounter) {
 			Movie_Play("pod", 1);
 		}
 #endif
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded()) {
+#else
 		if (g_frontendMissionLoaded) {
+#endif
 			if ((unsigned int)g_currentMissionId < 7u) {
 				musicState = MUSIC_STATE_FRONTEND_1210;
 				if (g_gameConfig.datapadMusicEnabled) {
@@ -8407,9 +8412,16 @@ int MissionSetup_Update(int frameCounter) {
 			FrontendDraw_RectCopy(&rect, &g_frontendSidebarButtonRects[8]);
 		}
 		if (g_frontendRightBarAnimState == 1) {
+#ifdef XWA_MODERN
+			const char* backText =
+				(XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u)
+					? FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT)
+					: FrontendString_Get(STR_BACK_TO_CONCOURSE);
+#else
 			const char* backText = (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u)
 									   ? FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT)
 									   : FrontendString_Get(STR_BACK_TO_CONCOURSE);
+#endif
 			if (FrontendButton_DrawSpriteWithHoverText(
 					&rect, (char*)"back", (char*)"back", (void*)backText, (unsigned int)g_colorPaleBlue,
 					(unsigned int)g_colorLightBlue, 8, (char*)"buttonsound")) {
@@ -8431,7 +8443,11 @@ int MissionSetup_Update(int frameCounter) {
 		if (g_frontendRightBarAnimState == 1) {
 			const char* backText;
 			if (Net_IsHost()) {
+#ifdef XWA_MODERN
+				if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 				if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 					backText = FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT);
 				} else {
 					backText = FrontendString_Get(STR_BACK_TO_CONCOURSE);
@@ -8471,7 +8487,11 @@ int MissionSetup_Update(int frameCounter) {
 			} else {
 				if (!g_gameConfig.networkType) {
 					backText = FrontendString_Get(STR_RETURN_JOIN_GAME);
+#ifdef XWA_MODERN
+				} else if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 				} else if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 					backText = FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT);
 				} else {
 					backText = FrontendString_Get(STR_BACK_TO_CONCOURSE);

@@ -2,6 +2,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/concourse_layout.h"
+#include "xwa_runtime/frontend/family_missions.h"
 #endif
 
 #include "xwa/assets/file_io.h"
@@ -1104,7 +1105,11 @@ int FamilyTransportRoom_DrawPilotStatsPage(int statCategory) {
 		g_frontendFamilyPageResetPending = 0;
 	}
 
+#ifdef XWA_MODERN
+	if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 	if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 		sprintf(g_frontendScratchBuffer, "%s", g_pilotData.name);
 	} else {
 		sprintf(g_frontendScratchBuffer, "%c%s %c%s", 6,
@@ -1115,13 +1120,21 @@ int FamilyTransportRoom_DrawPilotStatsPage(int statCategory) {
 
 	y = 81;
 	visibleRows = 13;
+#ifdef XWA_MODERN
+	if (XwaFamilyMissions_MissionLoaded() &&
+#else
 	if (g_frontendMissionLoaded &&
+#endif
 		g_frontendMission->header.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		sprintf(g_frontendScratchBuffer, "%c%s: %c%s", 2, FrontendString_Get(STR_FAMILY_ASSIGNED_TO), 1,
 				FrontendString_Get((UIString)(g_frontendMission->header.briefingLogo + 727)));
 		FrontendText_Draw(12, g_frontendScratchBuffer, 65, 81, 0xffff);
 		y = 96;
+#ifdef XWA_MODERN
+	} else if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 	} else if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 		visibleRows = 14;
 	} else {
 		sprintf(g_frontendScratchBuffer, "%s", FrontendString_Get(STR_FAMILY_ON_LEAVE));
@@ -2149,7 +2162,11 @@ int FamilyTransportRoom_Update(int frameCounter) {
 
 		FrontendFamily_DrawEmailMonitor(screenTick);
 		isFamilyMission = 0;
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 		if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 			isFamilyMission = 1;
 		}
 

@@ -2,6 +2,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/concourse_layout.h"
 #include "xwa_runtime/frontend/concourse_planet.h"
+#include "xwa_runtime/frontend/family_missions.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/room_anims.h"
 #include "xwa_runtime/snapshot/snapshot.h"
@@ -565,7 +566,11 @@ int Concourse_Update(int frameCounter) {
 
 	frame = frameCounter;
 	if (!frameCounter) {
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded()) {
+#else
 		if (g_frontendMissionLoaded) {
+#endif
 			if ((unsigned int)g_currentMissionId < 7u) {
 				FrontendCursor_SetPos(172, 357);
 			} else if (g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
@@ -762,7 +767,11 @@ int Concourse_Update(int frameCounter) {
 		}
 
 		Concourse_LoadNextTourMission();
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 		if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 			FrontendScreen_SetCallbacks(FamilyTransportRoom_Update, FamilyTransportRoom_Exit);
 			return 0;
 		}
