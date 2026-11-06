@@ -4955,15 +4955,12 @@ static void fl_environment_light_to_dir_light(const AeronEnvironmentLight* light
 	memcpy(out->color, light->color_linear, sizeof out->color);
 }
 
-/* While an environment is bound it owns the ambient: its authored fill
- * replaces the game's ambient cube in every direction (the diffuse cube adds
- * the directional part). */
+/* While an environment is bound, it replaces the game's ambient. Its fill
+ * is the least light the diffuse cube gives: where the cube is dimmer, the
+ * shaders add part of the fill. */
 static void fl_set_ambient_fill(FlSceneLighting* out, const float fill[3]) {
-	float* const lobes[6] = { out->ambient_cube.pos_x, out->ambient_cube.neg_x, out->ambient_cube.pos_y,
-							  out->ambient_cube.neg_y, out->ambient_cube.pos_z, out->ambient_cube.neg_z };
-	for (int lobe = 0; lobe < 6; lobe++) {
-		memcpy(lobes[lobe], fill, 3 * sizeof(float));
-	}
+	memset(&out->ambient_cube, 0, sizeof out->ambient_cube);
+	memcpy(out->ambient_cube.minimum, fill, sizeof out->ambient_cube.minimum);
 	out->ambient = &out->ambient_cube;
 }
 

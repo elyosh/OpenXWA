@@ -235,7 +235,10 @@ int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float match_
 									float exposure, AeronSceneLight* out);
 
 /* Optional per-frame linear ambient cube. NULL selects the process-wide
- * uniform ambient value from XwaShipPbrTuning. */
+ * uniform ambient value from XwaShipPbrTuning. `minimum` is the least
+ * diffuse light from the environment: where the environment's light is
+ * dimmer, the shaders add some of `minimum` until the light is as bright
+ * as `minimum`. */
 typedef struct XwaShipAmbientCube {
 	float pos_x[3];
 	float neg_x[3];
@@ -243,6 +246,7 @@ typedef struct XwaShipAmbientCube {
 	float neg_y[3];
 	float pos_z[3];
 	float neg_z[3];
+	float minimum[3];
 } XwaShipAmbientCube;
 
 /* Fill every lobe with the current process-wide linear ambient tuning. */
