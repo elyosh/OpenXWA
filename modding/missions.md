@@ -266,8 +266,8 @@ more. A warhead type without a value has no limit.
 pick weapon profiles by name. The profiles are in the `weapons` group of
 the craft's model settings file, and in the `weapons` section of
 `flight/flight.yaml`. Names have up to 47 characters and can be written in
-any case. When neither file has the profile, the flight group uses
-`default`. [Flight settings](flight.md#weapon-profiles) and
+any case. When neither file has the profile, the flight group gets the
+original game's values, and the log says so. [Flight settings](flight.md#weapon-profiles) and
 [Craft](craft.md) describe the profiles.
 
 ## object_profiles

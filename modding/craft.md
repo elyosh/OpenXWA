@@ -660,7 +660,7 @@ profile.
 When a flight group uses a profile, only that profile counts. A key that the
 profile leaves out gets the value of the original game, not the `default`
 value. When neither the model file nor `flight/flight.yaml` has the profile,
-the flight group uses `default`.
+the flight group gets the original game's values, and the log says so.
 
 `stats` maps weapon types to their stats:
 

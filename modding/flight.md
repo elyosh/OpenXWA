@@ -372,10 +372,11 @@ profile. A flight group picks a profile in its entry of the mission file.
 See [Missions](missions.md).
 
 The game looks for the picked profile in the model settings file of the
-craft, then in `flight.yaml`. If neither has it, the flight group uses
-`default`. A flight group that uses a profile only gets that profile's
-values. A key that the profile doesn't set gets the original game's value,
-not the `default` profile's value.
+craft, then in `flight.yaml`. A flight group that uses a profile only gets
+that profile's values. A key that the profile doesn't set gets the original
+game's value, not the `default` profile's value. If neither file has the
+profile, the flight group gets the original game's values, and the log says
+so.
 
 ##### stats
 

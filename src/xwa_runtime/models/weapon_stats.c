@@ -134,6 +134,9 @@ typedef struct WeaponStatsSet {
 static WeaponStatsSet s_defaults;
 static WeaponStatsSet s_models[OBJ_Count];
 static char s_flightGroupProfiles[WEAPON_STATS_FLIGHT_GROUPS][WEAPON_STATS_GROUPS][WEAPON_STATS_NAME_MAX];
+/* Bit `group` is set once the log says that the flight group's profile of
+   that group doesn't exist. */
+static uint8_t s_missingProfileLogged[WEAPON_STATS_FLIGHT_GROUPS];
 static int s_hasRankFactors;
 static float s_rankFactors[WEAPON_STATS_RANKS];
 static int s_hasDifficultyFactors;
@@ -580,6 +583,7 @@ void XwaWeaponStats_ReadModelSettings(unsigned int objectType, const char* path,
 
 void XwaWeaponStats_ClearFlightGroups(void) {
 	memset(s_flightGroupProfiles, 0, sizeof s_flightGroupProfiles);
+	memset(s_missingProfileLogged, 0, sizeof s_missingProfileLogged);
 }
 
 int XwaWeaponStats_ReadFlightGroup(const char* path, const char* fgKey, int fgIdx,
@@ -636,7 +640,8 @@ static const WeaponStatsProfile* WeaponStats_FindProfile(const WeaponStatsSet* s
 
 /* Finds the profiles of group `group` for a craft of object type `objectType`
    and flight group `fgIdx`, in the model file and in flight/flight.yaml. If
-   neither has the flight group's profile, it uses `default`. */
+   neither has the flight group's profile, both are NULL, so the craft gets
+   the original game's values, and the log says so once. */
 static void WeaponStats_Profiles(unsigned int objectType, int fgIdx, int group,
 								 const WeaponStatsProfile** model, const WeaponStatsProfile** global) {
 	const WeaponStatsSet* set = WeaponStats_Model(objectType);
@@ -645,9 +650,13 @@ static void WeaponStats_Profiles(unsigned int objectType, int fgIdx, int group,
 
 	*model = WeaponStats_FindProfile(set, name, group);
 	*global = WeaponStats_FindProfile(&s_defaults, name, group);
-	if (name[0] != '\0' && *model == NULL && *global == NULL) {
-		*model = WeaponStats_FindProfile(set, "", group);
-		*global = WeaponStats_FindProfile(&s_defaults, "", group);
+	if (name[0] != '\0' && *model == NULL && *global == NULL &&
+		!(s_missingProfileLogged[fgIdx] & (1u << group))) {
+		s_missingProfileLogged[fgIdx] |= (uint8_t)(1u << group);
+		Aeron_LogWarn("xwa.mission",
+					  "flight group %d picks the %s profile '%s', which neither the model of %s nor "
+					  "flight/flight.yaml has. It gets the original game's values",
+					  fgIdx, s_groups[group], name, XwaNames_Name(&g_xwaObjectTypeNames, (int)objectType));
 	}
 }
 
