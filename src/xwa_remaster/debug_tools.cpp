@@ -452,9 +452,9 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 	ImGui::EndDisabled();
 	ImGui::Separator();
 	ImGui::TextUnformatted("Ambient cube (linear)");
-	changed |= ImGui::SliderFloat("Ceiling fill (+Z)", &p.ambient_ceiling, 0.0f, 1.0f, "%.3f");
-	changed |= ImGui::SliderFloat("Wall bounce", &p.ambient_sides, 0.0f, 1.0f, "%.3f");
-	changed |= ImGui::SliderFloat("Floor bounce (-Z)", &p.ambient_floor, 0.0f, 1.0f, "%.3f");
+	changed |= ImGui::SliderFloat("Ceiling fill (+Z)", &p.ambient_ceiling, 0.0f, 10.0f, "%.3f");
+	changed |= ImGui::SliderFloat("Wall bounce", &p.ambient_sides, 0.0f, 10.0f, "%.3f");
+	changed |= ImGui::SliderFloat("Floor bounce (-Z)", &p.ambient_floor, 0.0f, 10.0f, "%.3f");
 	if (!enabled) {
 		ImGui::EndDisabled();
 	}
