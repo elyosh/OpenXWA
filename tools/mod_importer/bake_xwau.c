@@ -1737,6 +1737,18 @@ static void write_animations_yaml(XwauContext* ctx) {
 	}
 	fclose(in);
 
+	/* XWAU draws the animations in the order of their lines, and OpenXWA
+	   draws a group at the place of its first line. When another group's
+	   line is between two lines of a group, every animation gets its line
+	   number as its layer, so that the order stays the same. */
+	int split = 0;
+	for (int i = 1; i < count && !split; ++i)
+		for (int j = i - 1; j >= 0; --j)
+			if (strcasecmp(lines[j].group, lines[i].group) == 0) {
+				split = j != i - 1;
+				break;
+			}
+
 	char path[1200];
 	snprintf(path, sizeof path, "%s/frontend/animations.yaml", ctx->opt->sprites->out_root);
 	FILE* fp = fopen(path, "w");
@@ -1768,27 +1780,10 @@ static void write_animations_yaml(XwauContext* ctx) {
 			fprintf(fp, "\n");
 		}
 		fprintf(fp, "    animations:\n");
-		int apart = 0;
 		for (int i = first; i < count; ++i) {
 			const XwauAnimLine* b = &lines[i];
-			if (strcasecmp(b->group, a->group) != 0) {
-				apart = 1;
+			if (strcasecmp(b->group, a->group) != 0)
 				continue;
-			}
-			if (!same_delay(a, b))
-				ReportFatal(
-					list,
-					"the delay on line %d differs from the one on line %d, but OpenXWA has one delay for "
-					"each group (%s)",
-					b->line, a->line, a->group);
-			if (apart == 1) {
-				ReportFatal(
-					list,
-					"the lines of %s are not together (line %d). OpenXWA draws the whole group at its "
-					"first line, so the order with other groups can differ",
-					a->group, b->line);
-				apart = 2;
-			}
 			fprintf(fp, "      - {video: %s, at: ", b->video);
 			write_design_point(fp, b->x, b->y);
 			if (b->w && b->h) {
@@ -1801,6 +1796,16 @@ static void write_animations_yaml(XwauContext* ctx) {
 			if (b->sound[0])
 				fprintf(fp, ", sound: %s", b->sound);
 			write_missions(fp, b->missions);
+			/* The group has the delay of its first line. An animation with
+			   another delay gets its own, which XWAU uses when it picks it. */
+			if (!same_delay(a, b)) {
+				double delay[2] = { 0, 0 };
+				anim_delay(b, &delay[0], &delay[1]);
+				fprintf(fp, ", delay: ");
+				BakeSprites_WriteNumberList(fp, delay, 2);
+			}
+			if (split)
+				fprintf(fp, ", layer: %d", b->line);
 			fprintf(fp, "}\n");
 		}
 	}

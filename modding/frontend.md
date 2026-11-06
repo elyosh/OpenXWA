@@ -212,6 +212,8 @@ one of its animations at a time.
 | `fps` | The frames per second to play at. The default is the video's own rate. |
 | `sound` | A WAV file in `frontend/animations/`, played at the start of each play. The name can have up to 43 characters. |
 | `missions` | The missions in which the animation can play: `all`, a list of mission numbers, or `{except: [...]}`. The default is `all`. |
+| `delay` | The wait before each play of this animation, in the same form as the group's `delay`. It replaces the group's delay when the group picks this animation. `0` is no wait. |
+| `layer` | A whole number. The animations are drawn from the lowest layer to the highest. Without it, the layer is the animation's place in the file: 1 for the first animation, 2 for the next one, and so on, across all the groups. |
 
 The mission numbers are the numbers of the missions in
 `MISSIONS/MISSION.LST`. The game checks them against the pilot's current
@@ -221,7 +223,8 @@ When the player enters the room, each group picks a random animation among
 those allowed in the current mission. Before each play, it waits for the
 `delay`. The videos play without their own sound. `sound` plays at the
 volume of the datapad sounds, again each time a looping video starts over.
-The groups are drawn in the order of the file.
+The game draws the animations in the order of their `layer`. Without
+`layer`, this is the order of the file.
 
 An unknown key or a wrong value is logged with its line, and the game
 ignores the whole file.
