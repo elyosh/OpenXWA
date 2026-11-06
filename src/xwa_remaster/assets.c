@@ -181,6 +181,8 @@ XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_origina
 	a->original_reader = XwaRemasterOriginal2d_Create(Aeron_GetVfs());
 	a->frontend_images = Aeron_ImageCacheCreate();
 	a->flight_images = Aeron_ImageCacheCreate();
+	/* The frontend blends sRGB values (frontend.c). */
+	Aeron_ImageCacheSetWithoutSrgb(a->frontend_images, true);
 	if (!a->frontend_images || !a->flight_images || !a->original_reader) {
 		Aeron_ImageCacheDestroy(a->frontend_images);
 		Aeron_ImageCacheDestroy(a->flight_images);
@@ -348,9 +350,10 @@ static int assets_runtime_frame(const AeronRuntimeAtlas* atlas, int frame, XwaAs
 	return apply_atlas_frame(&atlas->layout, frame, out);
 }
 
+/* Flight atlases are sRGB textures with mipmaps. Frontend atlases are UNORM
+   textures, because the frontend blends sRGB values (frontend.c). */
 static int assets_build_runtime_atlas(AeronRuntimeAtlas* atlas, AeronCommandBuffer* cmd,
-									  const Xwa2dFrameSet* source, int generate_mips,
-									  const char* debug_name) {
+									  const Xwa2dFrameSet* source, int flight, const char* debug_name) {
 	if (!atlas || !cmd || !source || !source->frames || source->count <= 0)
 		return 0;
 	AeronRuntimeAtlasFrame* frames = (AeronRuntimeAtlasFrame*)calloc((size_t)source->count, sizeof *frames);
@@ -368,10 +371,10 @@ static int assets_build_runtime_atlas(AeronRuntimeAtlas* atlas, AeronCommandBuff
 		};
 	}
 	const AeronRuntimeAtlasOptions options = {
-		.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
+		.format = flight ? AERON_TEXTURE_FORMAT_RGBA8_SRGB : AERON_TEXTURE_FORMAT_RGBA8_UNORM,
 		.color_space = AERON_COLOR_SPACE_SRGB,
 		.alpha_mode = AERON_IMAGE_ALPHA_STRAIGHT,
-		.generate_mips = generate_mips != 0,
+		.generate_mips = flight != 0,
 		.debug_name = debug_name,
 	};
 	const int built = Aeron_RuntimeAtlasBuild(atlas, cmd, frames, source->count, &options) ? 1 : 0;

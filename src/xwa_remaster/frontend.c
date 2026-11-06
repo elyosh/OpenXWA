@@ -117,20 +117,21 @@ static void rm_retire_target(AeronRenderTarget* target);
 
 /* ---- record translation --------------------------------------------- */
 
-/* The 2D compose domain is LINEAR (TIE invariant): sprite textures are
- * BC7_SRGB (hardware-decoded to linear on sample), the RTs are
- * RGBA8_SRGB (hardware-encoded on write), and the output layer is
- * declared LINEAR_DISPLAY so present encodes exactly once and may remap
- * the display gamma for HDR output. Solid engine colors are
- * sRGB-encoded and must be converted before entering the shader
- * domain. */
-/* Engine 16bpp color -> linear RGB floats (alpha separate). */
-static void rm_color_linear(uint32_t engine_color, float out_rgb[3]) {
+/* The frontend works on sRGB values, as the original game does. Its
+ * render targets are RGBA8_UNORM and store sRGB values, its textures are
+ * UNORM (assets.c), colours stay sRGB, and blending mixes sRGB values. So
+ * translucent art, the 50/50 translucent sprites and the translucent fills
+ * look as they do in the original. The draw list reads videos and model
+ * previews as sRGB values too (AeronDrawList_SetSrgbValues). The output
+ * and cursor layers are submitted as sRGB, and presentation converts them
+ * to linear once. */
+/* Engine 16bpp colour -> sRGB floats (alpha separate). */
+static void rm_color(uint32_t engine_color, float out_rgb[3]) {
 	uint8_t rgba[4];
 	XwaSnapshotExport_ColorToRgba(engine_color, rgba);
-	out_rgb[0] = XwaRemaster_SrgbToLinear((float)rgba[0] / 255.0f);
-	out_rgb[1] = XwaRemaster_SrgbToLinear((float)rgba[1] / 255.0f);
-	out_rgb[2] = XwaRemaster_SrgbToLinear((float)rgba[2] / 255.0f);
+	out_rgb[0] = (float)rgba[0] / 255.0f;
+	out_rgb[1] = (float)rgba[1] / 255.0f;
+	out_rgb[2] = (float)rgba[2] / 255.0f;
 }
 
 static float rm_scale_x(void) { return g.map_sx; }
@@ -342,7 +343,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		q.blend = AERON_BLIT2D_BLEND_PMA;
 		q.scissor = s.scissor;
 		if (d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED) {
-			rm_color_linear(d->tint_color, q.tint);
+			rm_color(d->tint_color, q.tint);
 			q.monochrome = 1.0f; /* see the tinted sprites below */
 		} else {
 			q.tint[0] = q.tint[1] = q.tint[2] = 1.0f;
@@ -447,7 +448,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 			/* FrontImage_BlitRectTinted draws a single colour: the tint,
 			 * scaled by each pixel's brightness. A per-channel multiply would
 			 * mix the tint with coloured art. */
-			rm_color_linear(d->tint_color, s.tint);
+			rm_color(d->tint_color, s.tint);
 			s.monochrome = 1.0f;
 		}
 		s.tint[3] = 1.0f;
@@ -463,7 +464,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		 * texture is transparent. Rebuild that lost color beneath the PMA
 		 * sprite; this also gives filtered HD edges the correct coverage. */
 		float fill[4];
-		rm_color_linear(d->opaque_fill_color, fill);
+		rm_color(d->opaque_fill_color, fill);
 		fill[3] = 1.0f;
 		const AeronRectI* scissor = s.scissor.width > 0 && s.scissor.height > 0 ? &s.scissor : NULL;
 		AeronDrawList_AddFill(list, s.dst_x, s.dst_y, s.dst_w, s.dst_h, fill, AERON_BLIT2D_BLEND_NONE,
@@ -474,7 +475,7 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 
 static void rm_add_paint(AeronDrawList2D* list, const XwaPaintCmd* p) {
 	float rgba[4];
-	rm_color_linear(p->color, rgba);
+	rm_color(p->color, rgba);
 	rgba[3] = 1.0f;
 	AeronRectI sc = rm_scissor(p->clip_left, p->clip_top, p->clip_right, p->clip_bottom);
 	const AeronRectI* scp = sc.width > 0 ? &sc : NULL;
@@ -487,9 +488,9 @@ static void rm_add_paint(AeronDrawList2D* list, const XwaPaintCmd* p) {
 	const int grid = p->role == XWA_PAINT_ROLE_GRID_MAJOR || p->role == XWA_PAINT_ROLE_GRID_MINOR;
 	if (grid && paint->has_grid_colours) {
 		const uint32_t rgb = p->role == XWA_PAINT_ROLE_GRID_MAJOR ? paint->grid_major : paint->grid_minor;
-		rgba[0] = XwaRemaster_SrgbToLinear((float)((rgb >> 16) & 0xffu) / 255.0f);
-		rgba[1] = XwaRemaster_SrgbToLinear((float)((rgb >> 8) & 0xffu) / 255.0f);
-		rgba[2] = XwaRemaster_SrgbToLinear((float)(rgb & 0xffu) / 255.0f);
+		rgba[0] = (float)((rgb >> 16) & 0xffu) / 255.0f;
+		rgba[1] = (float)((rgb >> 8) & 0xffu) / 255.0f;
+		rgba[2] = (float)(rgb & 0xffu) / 255.0f;
 	}
 	/* A grid line one pixel thick is centred in its row or column of units. */
 	const int grid_pixel = grid && paint->pixel_lines;
@@ -577,11 +578,10 @@ static void rm_blit_rt(AeronCommandBuffer* cmd, AeronRenderTarget* dst, AeronRen
 				   AERON_DRAWLIST2D_LOAD);
 }
 
-/* Full-surface engine colorfill. AddFill, not a pass clear value: the
- * fill shader applies the sRGB->linear conversion a clear would skip. */
+/* Fills the whole target with an engine colour. */
 static void rm_surface_clear(AeronCommandBuffer* cmd, AeronRenderTarget* rt, uint32_t engine_color) {
 	float rgba[4];
-	rm_color_linear(engine_color, rgba);
+	rm_color(engine_color, rgba);
 	rgba[3] = 1.0f;
 	AeronDrawList_Begin(g.list, rt, g.rt_width, g.rt_height, AERON_DRAWLIST2D_LOAD, NULL);
 	AeronDrawList_AddFill(g.list, 0.0f, 0.0f, (float)g.rt_width, (float)g.rt_height, rgba,
@@ -656,7 +656,7 @@ static void rm_push_save(AeronCommandBuffer* cmd, const XwaSurfaceEvent* e, int 
 	slot->rt =
 		Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = w,
 															.height = h,
-															.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
+															.format = AERON_TEXTURE_FORMAT_RGBA8_UNORM,
 															.debug_name = "xwa.frontend.saved_region" });
 	slot->left = e->left;
 	slot->top = e->top;
@@ -1140,7 +1140,7 @@ static void rm_reconstruct(AeronCommandBuffer* cmd, const XwaSnapshot* snap) {
 static AeronRenderTarget* rm_create_target(int width, int height, const char* debug_name) {
 	return Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = width,
 															   .height = height,
-															   .format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
+															   .format = AERON_TEXTURE_FORMAT_RGBA8_UNORM,
 															   .debug_name = debug_name });
 }
 
@@ -1259,6 +1259,7 @@ static int rm_ensure(AeronCommandBuffer* cmd, int width, int height) {
 			Aeron_LogError("xwa.remaster", "frontend draw-list initialization failed");
 			return 0;
 		}
+		AeronDrawList_SetSrgbValues(g.list, 1);
 	}
 	rm_release_retired_targets();
 	if ((!g.screen_rt || !g.output_rt || !g.external_rt || g.rt_width != width || g.rt_height != height) &&
@@ -1346,7 +1347,7 @@ static void rm_submit_cursor_layer(const RmCursorLayer* cursor, int left, int to
 		.logical_rect = { left, top, (int)lroundf((float)cursor->bounds.width * unit),
 						  (int)lroundf((float)cursor->bounds.height * unit) },
 		.blend_mode = AERON_LAYER_BLEND_PREMULTIPLIED,
-		.color_space = AERON_COLOR_SPACE_LINEAR_DISPLAY,
+		.color_space = AERON_COLOR_SPACE_SRGB,
 		.tint_enabled = 1,
 		.tint_rgba = { opacity, opacity, opacity, opacity },
 		.scissor = { frame.x, frame.y, frame.width, frame.height },

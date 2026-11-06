@@ -901,12 +901,12 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		.logical_rect = { pr.x, pr.y, pr.width, pr.height },
 		.blend_mode = AERON_LAYER_BLEND_PREMULTIPLIED,
 		/* Tonemapped flight output already carries its display model —
-		 * a LINEAR_DISPLAY remap would apply the display gamma twice
+		 * a display gamma remap would apply the display gamma twice
 		 * and make the texture path diverge from direct presentation
 		 * (visible when SPLIT view forces this path under HDR). The
-		 * remap is only for decoded sRGB art. */
-		.color_space =
-			g.scene_is_tonemapped ? AERON_COLOR_SPACE_LINEAR_SRGB : AERON_COLOR_SPACE_LINEAR_DISPLAY,
+		 * frontend's texture holds sRGB values (frontend.c); presentation
+		 * decodes it with the display gamma. */
+		.color_space = g.scene_is_tonemapped ? AERON_COLOR_SPACE_LINEAR_SRGB : AERON_COLOR_SPACE_SRGB,
 		.tint_enabled = 1,
 		.tint_rgba = { g.ramp.alpha, g.ramp.alpha, g.ramp.alpha, g.ramp.alpha },
 	};
