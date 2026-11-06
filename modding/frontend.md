@@ -77,6 +77,26 @@ screens](reference/frontend_screens.md) lists the names.
 When a name or a layout is wrong, the log says so, and the game ignores the
 whole table, so every screen is `classic`.
 
+### Background layouts
+
+A background image can also set the layout of its screen. Add `layout` to
+the image's atlas file or video file:
+
+```yaml
+layout: wide
+```
+
+While the screen shows that image as its background, the screen uses this
+layout. It comes before the layout in `layouts`. This helps in a view that
+shows different images. For example, the memento view of the family room
+shows the picture of the memento: a 16:9 picture can be `wide`, and a 4:3
+picture can be `fill`.
+
+Only the main image behind the screen counts, not the images that the game
+draws over it, such as doors and buttons. When a dialog such as the datapad
+is open, its own background counts. An image whose file has no `layout`
+keeps the layout of its screen.
+
 ### family_missions
 
 The original game plays the first seven missions of the tour from the
@@ -139,6 +159,7 @@ fps: 24
 | `offset` | `[x, y]` in design pixels, added to the position where the game draws the image. The default is `[0, 0]`. |
 | `classic_frames` | The number of frames that the game sees, from 1 to 4096. The default is 1. |
 | `fps` | The frames per second to play at. The default is the video's own rate. |
+| `layout` | `classic`, `wide` or `fill`: the layout of the screen while the video is its background. See [Background layouts](#background-layouts). |
 
 The video plays in a loop, with no sound, for as long as the game draws the
 image, whatever frame the game asks for. When the image disappears and

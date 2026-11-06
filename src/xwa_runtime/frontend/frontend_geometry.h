@@ -91,6 +91,9 @@ typedef struct XwaGeometryAtlas {
 	int region_count;
 	char video[160]; /* a video's path in the mod folder, or empty for an atlas */
 	uint8_t units;   /* XwaGeometryUnits */
+	/* The XwaFrontendLayout of the screen while the image is its background,
+	   or -1 to keep the screen's layout. */
+	int8_t layout;
 } XwaGeometryAtlas;
 
 /* The atlas with game geometry for a Frontres file, or NULL. `fileName` is

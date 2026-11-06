@@ -135,7 +135,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 
 | Feature | Status | Notes | See |
 |-|-|-|-|
-| HD concourse and wide rooms | Implemented | | [Frontend](frontend.md) |
+| HD concourse and wide rooms | Implemented | Each background image keeps its own layout, so a room that shows wide and 4:3 pictures, such as TFTC's memento view, works as in XWAU. | [Frontend](frontend.md#background-layouts) |
 | Menu font | Implemented | OpenXWA can't ship Consolas, so the importer uses Inconsolata Bold. | [Images](images.md#fonts) |
 | Concourse layout (`ConcourseDoors.txt`) | Implemented | | [Frontend](frontend.md#concourse-layout) |
 | Concourse from the first mission (`SkipFirst7Missions`) | Implemented | | [Frontend](frontend.md#family-missions) |

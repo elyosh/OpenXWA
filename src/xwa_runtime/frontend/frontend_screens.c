@@ -22,6 +22,7 @@
 #include "xwa_runtime/frontend/frontend_config.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 
+#include <stdio.h>
 #include <string.h>
 
 /* Screen and view ids, in k_screens order. */
@@ -109,11 +110,18 @@ static int g_screenRunIndex = -1; /* the stack index that ran last */
 static unsigned g_screenFrames;   /* the frontend frames run so far */
 static XwaScreenId g_screenLogged = SCREEN_NONE;
 static int g_screenLoggedLayout = -1;
+/* The layout that the background image sets, or -1, for the binding
+   generation g_backgroundGeneration. */
+static int g_backgroundLayout = -1;
+static const char* g_backgroundFile;
+static unsigned g_backgroundGeneration;
+static int g_backgroundKnown;
+static char g_loggedBackgroundFile[160];
 
 static const char* const k_layoutNames[] = { "classic", "wide", "fill" };
 
-static int screens_parse_layout(const char* text) {
-	for (int i = 0; i < 3; i++) {
+int XwaFrontendScreens_ParseLayout(const char* text) {
+	for (int i = 0; text != NULL && i < 3; i++) {
 		if (strcmp(text, k_layoutNames[i]) == 0) {
 			return i;
 		}
@@ -146,7 +154,7 @@ static void screens_load(void) {
 	for (size_t i = 0; ok && i < AeronConfigNode_MapCount(table); i++) {
 		const char* key = AeronConfigNode_MapKeyAt(table, i);
 		const AeronConfigNode* value = AeronConfigNode_MapValueAt(table, i);
-		const int layout = screens_parse_layout(AeronConfigNode_String(value, ""));
+		const int layout = XwaFrontendScreens_ParseLayout(AeronConfigNode_String(value, ""));
 		int screen = 0;
 
 		if (layout < 0) {
@@ -257,6 +265,42 @@ static int screens_stack_layout(int index, XwaScreenId* shown) {
 	return g_screenDefault;
 }
 
+/* The resource names that can hold a screen's background image, in the
+   order that they are checked. */
+static const char* const k_backgroundNames[] = {
+	"backname", "backconfig", "concourse", "background", "briefstart", "globe", "techroom", "cerecase",
+};
+
+/* The layout that the screen's background image sets, or -1. The background
+   is the image of the first name that holds one. When that image's atlas has
+   no layout, the other names aren't checked. */
+static int screens_background_layout(void) {
+	const unsigned generation = XwaSnapshot_BindingGeneration();
+
+	if (g_backgroundKnown && generation == g_backgroundGeneration) {
+		return g_backgroundLayout;
+	}
+	g_backgroundKnown = 1;
+	g_backgroundGeneration = generation;
+	g_backgroundLayout = -1;
+	g_backgroundFile = NULL;
+	for (size_t i = 0; i < sizeof k_backgroundNames / sizeof k_backgroundNames[0]; i++) {
+		const char* file = XwaSnapshot_BoundSourceFile(k_backgroundNames[i]);
+		const XwaGeometryAtlas* atlas;
+
+		if (file == NULL) {
+			continue;
+		}
+		atlas = XwaFrontendGeometry_FindFile(file);
+		if (atlas != NULL && atlas->layout >= 0) {
+			g_backgroundLayout = atlas->layout;
+			g_backgroundFile = file;
+		}
+		break;
+	}
+	return g_backgroundLayout;
+}
+
 void XwaFrontendScreens_NoteRun(void) {
 	g_screenRunIndex = g_screenStackTop;
 	g_screenFrames++;
@@ -267,6 +311,7 @@ unsigned XwaFrontendScreens_FrameCount(void) { return g_screenFrames; }
 XwaFrontendLayout XwaFrontendScreens_Layout(void) {
 	XwaScreenId shown = SCREEN_NONE;
 	int layout;
+	const int background = screens_background_layout();
 
 	screens_load();
 	/* The flight task draws the loading screen before the tick sets the scene
@@ -280,14 +325,27 @@ XwaFrontendLayout XwaFrontendScreens_Layout(void) {
 	} else {
 		layout = screens_stack_layout(g_screenRunIndex < 0 ? g_screenStackTop : g_screenRunIndex, &shown);
 	}
+	/* The background image's layout comes before the screen's. */
+	if (background >= 0) {
+		layout = background;
+	}
 	if (layout < 0) {
 		layout = XWA_FRONTEND_LAYOUT_CLASSIC;
 	}
-	if (shown != g_screenLogged || layout != g_screenLoggedLayout) {
+	if (shown != g_screenLogged || layout != g_screenLoggedLayout ||
+		(background >= 0 && strcmp(g_backgroundFile, g_loggedBackgroundFile) != 0)) {
 		g_screenLogged = shown;
 		g_screenLoggedLayout = layout;
-		Aeron_LogInfo("xwa.frontend", "screen %s: %s",
-					  shown != SCREEN_NONE ? k_screens[shown].name : "(none)", k_layoutNames[layout]);
+		snprintf(g_loggedBackgroundFile, sizeof g_loggedBackgroundFile, "%s",
+				 background >= 0 ? g_backgroundFile : "");
+		if (background >= 0) {
+			Aeron_LogInfo("xwa.frontend", "screen %s: %s, from its background %s",
+						  shown != SCREEN_NONE ? k_screens[shown].name : "(none)", k_layoutNames[layout],
+						  g_backgroundFile);
+		} else {
+			Aeron_LogInfo("xwa.frontend", "screen %s: %s",
+						  shown != SCREEN_NONE ? k_screens[shown].name : "(none)", k_layoutNames[layout]);
+		}
 	}
 	return (XwaFrontendLayout)layout;
 }
@@ -315,4 +373,8 @@ void XwaFrontendScreens_Shutdown(void) {
 	g_screenRunIndex = -1;
 	g_screenLogged = SCREEN_NONE;
 	g_screenLoggedLayout = -1;
+	g_backgroundKnown = 0;
+	g_backgroundLayout = -1;
+	g_backgroundFile = NULL;
+	g_loggedBackgroundFile[0] = '\0';
 }

@@ -44,6 +44,10 @@ int XwaFrontendScreens_TextScale256(void);
 
 void XwaFrontendScreens_Shutdown(void);
 
+/* The layout named `text`, "classic", "wide" or "fill", as an
+   XwaFrontendLayout. -1 for another text. */
+int XwaFrontendScreens_ParseLayout(const char* text);
+
 /* Return the number of screens, and the name of screen `index` as the
    `layouts` table writes it, such as "family_room.detail". */
 int XwaFrontendScreens_Count(void);

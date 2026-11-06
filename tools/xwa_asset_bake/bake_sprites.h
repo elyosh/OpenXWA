@@ -54,6 +54,7 @@ typedef struct BakeAtlasHeader {
 	int classic_frames; /* 0: not written */
 	int fps;            /* 0: not written */
 	const char* tint;   /* NULL: not written */
+	const char* layout; /* the screen's layout while the image is its background; NULL: not written */
 	int has_draw_adjust;
 	double draw_adjust[4];
 	int has_bounds;

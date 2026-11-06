@@ -623,6 +623,8 @@ typedef struct XwaResourceBinding {
 
 static XwaResourceBinding g_bindings[XWA_SNAP_MAX_BINDINGS];
 static int g_binding_count;
+/* Changes each time a name gets a file, changes its file or loses it. */
+static unsigned g_binding_generation;
 static int16_t g_frontend_active_groups[XWA_SNAP_MAX_SPRITE_GROUPS];
 static uint32_t g_frontend_active_group_count;
 
@@ -805,6 +807,7 @@ void XwaSnapshot_NoteResourceBinding(const char* fileName, const char* name, int
 				g_bindings[i].frame_count = frames;
 				g_bindings[i].active = 1;
 				g_bindings[i].video = binding_video(fileName);
+				g_binding_generation++;
 			}
 			return;
 		}
@@ -825,6 +828,7 @@ void XwaSnapshot_NoteResourceBinding(const char* fileName, const char* name, int
 	b->frame_count = frames;
 	b->active = 1;
 	b->video = binding_video(fileName);
+	g_binding_generation++;
 }
 
 void XwaSnapshot_NoteResourceFree(const char* name) {
@@ -838,10 +842,23 @@ void XwaSnapshot_NoteResourceFree(const char* name) {
 				XwaFrontendVideo_FreeImage(b->video->video);
 			}
 			b->active = 0;
+			g_binding_generation++;
 			return;
 		}
 	}
 }
+
+const char* XwaSnapshot_BoundSourceFile(const char* name) {
+	for (int i = 0; name != NULL && i < g_binding_count; i++) {
+		const XwaResourceBinding* b = &g_bindings[i];
+		if (b->active && strncmp(b->name, name, sizeof b->name) == 0) {
+			return b->source_file;
+		}
+	}
+	return NULL;
+}
+
+unsigned XwaSnapshot_BindingGeneration(void) { return g_binding_generation; }
 
 void XwaSnapshot_NoteSpriteGroupLoad(int16_t group) {
 	if (group < 0 ||

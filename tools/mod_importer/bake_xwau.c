@@ -72,6 +72,7 @@ typedef struct XwauAtlas {
 	double area[4];
 	const BakeRegion* regions;
 	int region_count;
+	const char* layout; /* for a background, the layout that XWAU gives it */
 } XwauAtlas;
 
 /* A background and the layout XWAU gives the screens that show it. Files
@@ -344,11 +345,18 @@ static void note_background(XwauContext* ctx, const char* key, const char* list_
 		b->layout = "wide";
 }
 
-static const char* background_layout(const XwauContext* ctx, const char* key) {
+/* The layout of the background `key`, or NULL when it isn't a background
+ * with an HD image. */
+static const char* noted_layout(const XwauContext* ctx, const char* key) {
 	for (int i = 0; i < ctx->background_count; ++i)
 		if (strcmp(ctx->backgrounds[i].key, key) == 0)
 			return ctx->backgrounds[i].layout;
-	return "classic";
+	return NULL;
+}
+
+static const char* background_layout(const XwauContext* ctx, const char* key) {
+	const char* layout = noted_layout(ctx, key);
+	return layout ? layout : "classic";
 }
 
 /* XWAU's tools store tenths of a unit as 8000 + 10 * value. */
@@ -369,6 +377,7 @@ static void emit_atlas(XwauContext* ctx, const char* dir, const char* base, cons
 		.classic_frames = atlas->classic_frames,
 		.fps = atlas->fps,
 		.tint = atlas->tint,
+		.layout = atlas->layout,
 		.has_draw_adjust = atlas->has_draw_adjust,
 		.has_bounds = atlas->has_area,
 		.regions = atlas->regions,
@@ -709,6 +718,11 @@ static void write_video_yamls(XwauContext* ctx) {
 		fprintf(fp, "\noffset: ");
 		BakeSprites_WriteNumberList(fp, v->offset, 2);
 		fprintf(fp, "\nclassic_frames: %d\nfps: 24\n", count);
+		char key[600];
+		snprintf(key, sizeof key, "%s/%s", v->dir, v->base);
+		const char* layout = noted_layout(ctx, key);
+		if (layout)
+			fprintf(fp, "layout: %s\n", layout);
 		if (fclose(fp) != 0)
 			ctx->stats->failures++;
 	}
@@ -845,8 +859,12 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 				snprintf(list_key, sizeof list_key, "frontres/%s/%s.cbm", dir_lower, base_lower);
 				if (i == 0 && !map_icons &&
 					((s->width >= BACKGROUND_MIN_W && s->height >= BACKGROUND_MIN_H) ||
-					 is_screen_background(key, s->width, s->height)))
+					 is_screen_background(key, s->width, s->height))) {
 					note_background(ctx, key, list_key, same_aspect(s->width, s->height, f->w, f->h));
+					/* XWAU picks the layout from the background that a screen
+					   shows, so the image's atlas keeps it. */
+					atlas.layout = noted_layout(ctx, key);
+				}
 			}
 			{
 				/* XWAU draws some images as backgrounds: as tall as the screen
@@ -1867,11 +1885,12 @@ static const char* screen_layout(const XwauContext* ctx, const XwauScreen* scree
 	for (int n = 1; n < 3; ++n)
 		if (votes[n] > votes[best])
 			best = n;
+	/* The atlas of each background keeps its own layout, which the game uses
+	   while it shows that background. */
 	for (int i = 0; i < count; ++i)
 		if (strcmp(layouts[i], names[best]) != 0)
-			ReportFatal(
-				NULL, "the screen %s gets the layout %s, but XWAU shows its background %s with the layout %s",
-				screen->name, names[best], keys[i], layouts[i]);
+			ReportDetail(NULL, "the screen %s is %s, and its background %s is %s", screen->name, names[best],
+						 keys[i], layouts[i]);
 	return names[best];
 }
 

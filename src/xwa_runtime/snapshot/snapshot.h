@@ -1501,6 +1501,11 @@ void XwaSnapshot_SetNextSpriteFraction(int frac_x, int frac_y);
  * subsequent sprite records for that name. */
 void XwaSnapshot_NoteResourceBinding(const char* fileName, const char* name, int frame_count);
 void XwaSnapshot_NoteResourceFree(const char* name);
+/* The raw path of the file that resource `name` holds now, or NULL. */
+const char* XwaSnapshot_BoundSourceFile(const char* name);
+/* A number that changes each time a resource name gets a file, changes its
+   file or loses it. */
+unsigned XwaSnapshot_BindingGeneration(void);
 
 void XwaSnapshot_EmitPaint(XwaPaintKind kind, int x0, int y0, int x1, int y1, int dx, int dy, uint32_t color);
 /* Horizontal and vertical lines emitted between these calls are briefing map

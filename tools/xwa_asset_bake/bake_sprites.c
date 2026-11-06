@@ -198,6 +198,8 @@ static int write_atlas_yaml(const char* path, const BakeAtlasHeader* header, con
 		fprintf(fp, "fps: %d\n", header->fps);
 	if (header->tint)
 		fprintf(fp, "tint: %s\n", header->tint);
+	if (header->layout)
+		fprintf(fp, "layout: %s\n", header->layout);
 	if (header->has_draw_adjust) {
 		fputs("draw_adjust: ", fp);
 		BakeSprites_WriteNumberList(fp, header->draw_adjust, 4);

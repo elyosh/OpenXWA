@@ -9,6 +9,7 @@
 #include "xwa/util/byte_order.h"
 #include "xwa/util/memory.h"
 #include "xwa_runtime/frontend/frontend_config.h"
+#include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/models/mission_art.h"
 
 #include <math.h>
@@ -133,6 +134,22 @@ static void geometry_load_design(void) {
 		}
 	}
 	geometry_read_paint(AeronConfigNode_MapGet(root, "paint"));
+}
+
+/* Reads the `layout` key of an atlas or video file into atlas->layout. A
+   wrong value is logged and ignored. */
+static void geometry_read_layout(const char* path, const AeronConfigNode* root, XwaGeometryAtlas* atlas) {
+	const AeronConfigNode* value = AeronConfigNode_MapGet(root, "layout");
+
+	atlas->layout = -1;
+	if (value == NULL) {
+		return;
+	}
+	atlas->layout = (int8_t)XwaFrontendScreens_ParseLayout(AeronConfigNode_String(value, NULL));
+	if (atlas->layout < 0) {
+		Aeron_LogError("xwa.frontend", "%s:%d: layout must be classic, wide or fill; it is ignored", path,
+					   AeronConfigNode_Line(value));
+	}
 }
 
 static void geometry_free_atlas(XwaGeometryAtlas* atlas) {
@@ -347,6 +364,7 @@ static XwaGeometryAtlas* geometry_read_atlas(const char* path, int needs_id) {
 			ok = 0;
 		}
 	}
+	geometry_read_layout(path, root, atlas);
 	value = AeronConfigNode_MapGet(root, "regions");
 	if (ok && value != NULL) {
 		atlas->region_count = (int)AeronConfigNode_SequenceCount(value);
@@ -377,7 +395,7 @@ static XwaGeometryAtlas* geometry_read_atlas(const char* path, int needs_id) {
 /* Reads a video's YAML file. Returns NULL when the file is missing or has an
  * error, which is logged. */
 static XwaGeometryAtlas* geometry_read_video(const char* path) {
-	static const char* const keys[] = { "video", "size", "offset", "classic_frames", "fps", NULL };
+	static const char* const keys[] = { "video", "size", "offset", "classic_frames", "fps", "layout", NULL };
 	AeronConfigFile* file = NULL;
 	AeronConfigError error;
 	const AeronConfigNode* root;
@@ -456,6 +474,9 @@ static XwaGeometryAtlas* geometry_read_video(const char* path) {
 						   AeronConfigNode_Line(value));
 			ok = 0;
 		}
+	}
+	if (ok) {
+		geometry_read_layout(path, root, atlas);
 	}
 	if (ok) {
 		atlas->frame_count = atlas->classic_frames;
