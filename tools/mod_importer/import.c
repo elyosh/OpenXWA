@@ -221,6 +221,24 @@ static size_t count_opts(const char* dir) {
 	return opts;
 }
 
+/* Reads the name of a TFTC release, such as "TFTC Reimagined 1.4.0": the variant
+ * from Modname.txt and the version from line 1 of Mod-version-TFTC-TFTC.txt,
+ * "1.4.0.0", without its last ".0". */
+static bool read_tftc_release_name(const char* dir, char* out, size_t cap) {
+	char variant[128], version[64];
+	if (!read_line(dir, "Mod-version-TFTC-TFTC.txt", 1, version, sizeof version) ||
+		!read_line(dir, "Modname.txt", 1, variant, sizeof variant))
+		return false;
+	size_t dots = 0;
+	for (const char* c = version; *c; ++c)
+		dots += *c == '.';
+	const size_t length = strlen(version);
+	if (dots == 3 && length > 2 && strcmp(version + length - 2, ".0") == 0)
+		version[length - 2] = '\0';
+	snprintf(out, cap, "%s %s", variant, version);
+	return true;
+}
+
 bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* error, size_t error_cap) {
 	char path[IMPORT_PATH_CAP];
 	memset(info, 0, sizeof *info);
@@ -237,7 +255,8 @@ bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* er
 				 "the FlightModels folder.");
 		return false;
 	}
-	if (!read_line(source, "TFTCVersion.txt", 1, info->name, sizeof info->name) &&
+	if (!read_tftc_release_name(source, info->name, sizeof info->name) &&
+		!read_line(source, "TFTCVersion.txt", 2, info->name, sizeof info->name) &&
 		!read_line(source, "mod-version-XWAU-XWAU.txt", 2, info->name, sizeof info->name) &&
 		!read_line(source, "XWAUVersion.txt", 1, info->name, sizeof info->name)) {
 		size_t length = strlen(source);
