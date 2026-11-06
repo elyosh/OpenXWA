@@ -306,9 +306,9 @@ hangar_lighting:
   color_b: 1.0
   # Ambient cube in W/m^2/sr, up to 1000: +Z ceiling fill, horizontal wall
   # bounce, -Z floor bounce. It takes the key light's hue.
-  ambient_ceiling: 1.0
-  ambient_sides: 1.3
-  ambient_floor: 1.0
+  ambient_ceiling: 3.0
+  ambient_sides: 3.0
+  ambient_floor: 3.0
 # Authored per-region HDR environments (sky, diffuse and specular lighting,
 # suns). The manifest path is relative to the mod folder. It holds the
 # `environments:` map and, under `xwa:`, the (mission, region) mapping and
