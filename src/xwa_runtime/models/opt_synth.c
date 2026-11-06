@@ -70,10 +70,6 @@ static int OptSynth_Fail(const char* key, const char* reason) {
 	return 0;
 }
 
-static int OptSynth_IsLaserHardpoint(int32_t type) {
-	return type == 0 || (type >= 1 && type <= 6) || (type >= 9 && type <= 11) || type == 18;
-}
-
 /* The key whose object type the checks below use: the key the mission swaps
    for `key`, else `key`. A swapped-in model, such as
    superstardestroyerrecentered, then gets the checks of the model it
@@ -166,33 +162,23 @@ static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model
 	}
 
 	if (XwaModelSource_KeyRequiresFloatHardpoints(OptSynth_TypeKey(key))) {
-		int hasLaser = 0;
 		int hasMainHull = 0;
 
 		for (component = 0; component < model->component_count; ++component) {
-			const AeronFlightComponent* item = &model->components[component];
-			uint32_t index;
-
-			hasMainHull |= item->mesh_type == MESH_MainHull;
-			for (index = 0; index < item->hardpoint_count; ++index) {
-				hasLaser |= OptSynth_IsLaserHardpoint(item->hardpoints[index].type);
-			}
+			hasMainHull |= model->components[component].mesh_type == MESH_MainHull;
 		}
-		/* The laser hardpoints become the model def's float hardpoints. Without
-		   any, the warhead launch point falls back to MainHull vertices, which
-		   reads out of range when there is no MainHull. */
-		if (!hasLaser) {
-			return OptSynth_Fail(key, "its object type needs a laser hardpoint (type 0-6, 9-11 or 18)");
-		}
-		/* The original code runs without a MainHull: hardpoints go to
-		   the nearest weapon-system mesh (root 0 when there is none), and only
-		   MainHull-keyed effects are lost. */
+		/* The original code runs without a MainHull. The laser hardpoints
+		   become the model def's float hardpoints, and each goes to the
+		   nearest weapon-system mesh, or to component 0 when there is none.
+		   Without laser hardpoints, shots leave from the nearest MainHull
+		   vertex, or from a vertex of component 0 when there is no MainHull.
+		   Every root of a synthesized model is a mesh with vertices, so that
+		   search always finds real vertices. Only MainHull effects are lost. */
 		if (!hasMainHull) {
-			Aeron_LogWarn(
-				"xwa.models",
-				"replacement '%s' has no MainHull component: no hull debris or forced hull "
-				"explosions, and float hardpoints without a weapon-system mesh belong to component 0",
-				key);
+			Aeron_LogWarn("xwa.models",
+						  "replacement '%s' has no MainHull component: no hull debris or forced hull "
+						  "explosions, and shots without a laser hardpoint leave from component 0",
+						  key);
 		}
 	}
 	return 1;
