@@ -1964,6 +1964,37 @@ static int skips_family_missions(const char* root) {
 		   read_section_key_int(hooks, section, "SkipFirst7Missions", 0) != 0;
 }
 
+/* Writes the screens where hook_concourse hides the side panels. Each
+ * DrawPanelsIn setting is 1 by default. XWAU only reads them with
+ * hook_concourse.dll. */
+static void write_side_panels(const char* root, FILE* fp) {
+	static const struct {
+		const char* setting;
+		const char* key;
+	} screens[] = {
+		{ "DrawPanelsInSimulator", "simulator" },
+		{ "DrawPanelsInTourOfDutyBriefing", "tour_briefing" },
+		{ "DrawPanelsInTourOfDutyDebriefing", "tour_debriefing" },
+		{ "DrawPanelsInFamilyMonitor", "family_monitor" },
+		{ "DrawPanelsInFilmRoom", "film_room" },
+	};
+	char hooks[1100], dll[1100];
+	const char* section;
+	int written = 0;
+	if (!find_ci(root, "hook_concourse.dll", dll, sizeof dll) ||
+		!find_hook_settings(root, hooks, sizeof hooks, &section))
+		return;
+	for (size_t i = 0; i < sizeof screens / sizeof screens[0]; ++i) {
+		if (read_section_key_int(hooks, section, screens[i].setting, 1) != 0)
+			continue;
+		if (!written)
+			fprintf(fp, "# The screens that don't show the side panels.\n"
+						"side_panels:\n");
+		fprintf(fp, "  %s: false\n", screens[i].key);
+		written = 1;
+	}
+}
+
 static void write_frontend_yaml(XwauContext* ctx) {
 	char dir[1100], path[1200];
 	snprintf(dir, sizeof dir, "%s/frontend", ctx->opt->sprites->out_root);
@@ -1988,6 +2019,7 @@ static void write_frontend_yaml(XwauContext* ctx) {
 		fprintf(fp, "# The tour's first seven missions use the concourse, not the family\n"
 					"# transport.\n"
 					"family_missions: false\n");
+	write_side_panels(ctx->opt->xwau_root, fp);
 	write_layouts(ctx, fp);
 	if (fclose(fp) != 0)
 		ctx->stats->failures++;

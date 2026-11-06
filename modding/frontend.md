@@ -39,6 +39,7 @@ layouts:
 | `paint` | How the game draws its fills, lines and the briefing grid. See below. |
 | `layouts` | How each screen fits on a wide screen. See below. |
 | `family_missions` | `false` makes the tour's first seven missions use the concourse. See below. |
+| `side_panels` | The screens that don't show the side panels. See below. |
 
 When `design` has a wrong value, the log says so, and the design size is
 640 × 480.
@@ -104,6 +105,31 @@ family transport, so a new pilot starts in the family transport room.
 `family_missions: false` makes these missions use the concourse, for a
 campaign that starts on a big ship. The pilot statistics page then always
 shows "On leave". The default is `true`.
+
+### side_panels
+
+Some screens have panels that slide in from the bottom corners, with
+buttons on them. They are the images `leftbar1` to `leftbar5` and
+`rightbar1` to `rightbar4` of group 15000. If your background already shows
+the buttons, you can hide the panels:
+
+```yaml
+side_panels:
+  simulator: false
+  film_room: false
+```
+
+| Key | Screens |
+|-|-|
+| `simulator` | Mission setup, multiplayer setup, and the briefing and debriefing of a mission outside the campaign. |
+| `tour_briefing` | The briefing of a campaign mission. |
+| `tour_debriefing` | The debriefing of a campaign mission. |
+| `family_monitor` | The monitor of the family room. |
+| `film_room` | The film room. |
+
+On a screen set to `false`, the game doesn't draw the panels or play their
+sound. The buttons work as usual and appear when the panels would have
+finished sliding in. The default for each screen is `true`.
 
 ## Menu images
 

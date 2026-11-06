@@ -39,6 +39,7 @@
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/frontend/room_anims.h"
+#include "xwa_runtime/frontend/side_panels.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/input_bridge.h"
 #include "xwa_runtime/input/mouse_flight.h"
@@ -476,6 +477,7 @@ void XwaPort_Shutdown(void) {
 	XwaFrontendGeometry_Shutdown();
 	XwaFrontendScreens_Shutdown();
 	XwaFamilyMissions_Shutdown();
+	XwaSidePanels_Shutdown();
 	XwaFrontendConfig_Shutdown();
 	XwaConcourseLayout_Shutdown();
 	XwaAwards_Shutdown();

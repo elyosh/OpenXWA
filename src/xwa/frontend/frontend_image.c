@@ -3,6 +3,7 @@
 #include "xwa/frontend/frontend_medals.h"
 #include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
+#include "xwa_runtime/frontend/side_panels.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -2276,6 +2277,11 @@ int FrontImage_DrawSprite(const char* name, int x, int y) {
 	ResourceDescriptor* desc;
 	int currentFrame;
 
+#ifdef XWA_MODERN
+	if (XwaSidePanels_HidesImage(name)) {
+		return 0;
+	}
+#endif
 	index = FrontImage_FindResourceByName(name);
 	if (index == -1) {
 		return 0;

@@ -228,6 +228,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/frontend/frontend_screens.c
     src/xwa_runtime/frontend/frontend_video.c
     src/xwa_runtime/frontend/room_anims.c
+    src/xwa_runtime/frontend/side_panels.c
     src/xwa_runtime/input/input_bridge.c
     src/xwa_runtime/input/controller_mapping.c
     src/xwa_runtime/input/rumble_provider.c

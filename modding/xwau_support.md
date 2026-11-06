@@ -149,7 +149,9 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | New battle images (`FrontEnd2_Battles.dat`) | Not implemented | | |
 | Craft pictures for new craft types | Not implemented | | |
 | 3D craft preview in skirmish (`SkirmishOpt*`, `[ViewConfiguration]`) | Not implemented | | |
-| Film room background and hidden side panels | Not implemented | | |
+| Hidden side panels (`DrawPanelsIn*`) | Implemented | | [Frontend](frontend.md#side_panels) |
+| Film room background | Not implemented | | |
+| Combat simulator buttons (`hook_tourmultiplayer`) | Not implemented | The mission setup screen doesn't have the hook's Load, Combat Engagements and Melee buttons. The hook's Combat mission folder isn't supported either. | |
 | Tech room holograms | Not implemented | The tech room shows the craft as a model. | |
 
 ## Camera and controls
