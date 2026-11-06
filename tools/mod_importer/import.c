@@ -585,7 +585,7 @@ static void craft(ImportContext* ctx) {
 	}
 	XwauLines cockpits = { 0 };
 	XwauTextIds moved = { 0 };
-	bool ok = XwauCraft_Write(options->source, flight, &ctx->names, &ctx->stock_values, &cockpits);
+	bool ok = XwauCraft_Write(options->source, flight, &ctx->names, &ctx->stock_values, stock, &cockpits);
 	ok = XwauObjects_Write(options->source, options->game, stock, mod, &ctx->names, flight, &moved) && ok;
 	XwauGunnerSeats_CheckCockpits(options->source, flight, &cockpits);
 	XwauGameTables_Free(mod);
