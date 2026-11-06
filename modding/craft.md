@@ -238,7 +238,7 @@ A value out of range, or of the wrong kind, is ignored, and the log says so.
 |-|-|
 | `type` | The [weapon type](reference/weapons.md#weapon-types) that the group fires, such as `rebel_laser`, or `none` for an empty group. |
 | `count` | The number of cannons in the group, from 0 to 255. |
-| `kind` | The [laser group kind](reference/weapons.md#laser-group-kinds): `laser_cannon`, `ion_cannon`, `turret` or `long_range_turret`. |
+| `kind` | The [laser group kind](reference/weapons.md#laser-group-kinds): `laser_cannon`, `ion_cannon`, `turret`, `long_range_turret` or `slow_turret`. |
 | `range_m` | The range of the group's turrets, in metres. 0 uses the default: 2000 m, or twice that for `long_range_turret`. |
 | `cooldown_ms` | The time between two shots of the group's turrets, in milliseconds. 0 uses the default: 472 for `turret`, and 944 for the other kinds. AI craft wait two to four times longer, by skill. |
 

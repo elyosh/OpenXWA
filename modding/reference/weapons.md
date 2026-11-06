@@ -67,6 +67,7 @@ Values for the `kind` of a laser group in `craft_record.lasers`.
 | `ion_cannon` | Ion cannons that the pilot fires. They are the second set of cannons. |
 | `turret` | Turrets that aim by themselves. They also shoot at incoming warheads. A gunner can fire them. |
 | `long_range_turret` | Turrets with twice the default range. They don't fire at close targets or at warheads. |
+| `slow_turret` | Turrets that fire half as often as `turret` and don't shoot at warheads. Unlike `long_range_turret`, they keep the default range and also fire at close targets. |
 
 ## Hardpoint kinds
 

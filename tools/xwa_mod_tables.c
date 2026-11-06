@@ -436,6 +436,8 @@ static const NameText kLaserKindTexts[] = {
 				"them." },
 	{ "long_range_turret", "Turrets with twice the default range. They don't fire at close targets or at "
 						   "warheads." },
+	{ "slow_turret", "Turrets that fire half as often as `turret` and don't shoot at warheads. Unlike "
+					 "`long_range_turret`, they keep the default range and also fire at close targets." },
 	{ NULL, NULL },
 };
 
