@@ -6,7 +6,7 @@ flight:
 | File | What it changes |
 |-|-|
 | `flight/flight.yaml` | game rules, weapons, shields, docking, lights, object counts, the camera, extra backdrop planets and the procedural suns |
-| `flight/hud.yaml` | the hull and map icons of each object type, the target display, the target boxes and the target readout |
+| `flight/hud.yaml` | the hull and map icons of each object type, the target display, the target boxes, the radar blips and the target readout |
 | `flight/sounds.yaml` | the sounds of each object type: engines, weapons, explosions, hyperspace, hangar and a few interface sounds |
 
 The game reads the three files once, when it starts. Restart OpenXWA after
@@ -797,7 +797,7 @@ mod.
 ## hud.yaml
 
 `flight/hud.yaml` changes the icons of each object type, the target
-display, the target boxes and the target readout.
+display, the target boxes, the radar blips and the target readout.
 
 ```yaml
 hull_icons:
@@ -815,6 +815,7 @@ target_display:
 | `map_icons` | The icon of each object type on the map. |
 | `target_display` | How the target display shows the target. |
 | `target_boxes` | How the target boxes are drawn. |
+| `radar` | How the blips on the radar scopes are drawn. |
 | `target_readout` | The target's name, cargo, distance and damage bars next to its box. |
 
 If the file can't be read, the game writes an error in the log and ignores
@@ -892,6 +893,27 @@ With a `line_width` above 0, the lines are centred on the box's edges, the
 corners are 1/8 of the box's size, and the four corners are the same. A
 very small box is drawn filled. The original game's boxes have lines of one
 pixel of the game's flight resolution, so they get thin in a large window.
+
+### Radar
+
+`radar` sets how the blips on the fore and aft radar scopes are drawn, in
+modern graphics. The cockpit screens that show the radars show the same
+blips.
+
+```yaml
+radar:
+  blip_size: 4
+  target_size: 8
+```
+
+| Key | Meaning | Range | Default |
+|-|-|-|-|
+| `blip_size` | The width of each blip, in points: 1/1080 of the height of the HUD. Above 0, each blip is a filled circle of its colour. 0 keeps the original game's blips. | 0 to 20 | 0 |
+| `target_size` | The width of the yellow circle drawn over the current target's blip, in points. It replaces the original game's small bracket. 0 keeps the bracket. | 0 to 20 | 0 |
+
+The original game's blips are about one pixel of the game's flight
+resolution, so they get small in a large window. A wrong value is ignored,
+with a warning in the log.
 
 ### Target readout
 

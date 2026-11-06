@@ -43,6 +43,7 @@ static CraftHudList s_hullIcons;
 static CraftHudList s_mapIcons;
 static XwaTargetDisplay s_targetDisplay;
 static float s_targetBoxLineWidth;
+static XwaRadarStyle s_radar;
 
 /* Loads a file from the mod folder and checks that it is a map.
    Returns NULL when the file is missing. Other errors are logged. */
@@ -214,33 +215,55 @@ static void CraftHud_ReadTargetDisplay(const AeronConfigNode* root) {
 	s_targetDisplay = display;
 }
 
-static void CraftHud_ReadTargetBoxes(const AeronConfigNode* root) {
-	const AeronConfigNode* group = AeronConfigNode_MapGet(root, "target_boxes");
-	const AeronConfigNode* width;
+/* Returns the map `name` of `root`, or NULL when it is missing or isn't a
+   map, which is logged. */
+static const AeronConfigNode* CraftHud_Group(const AeronConfigNode* root, const char* name) {
+	const AeronConfigNode* group = AeronConfigNode_MapGet(root, name);
+
+	if (group != NULL && AeronConfigNode_Type(group) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.hud", "%s:%d: %s must be a map. It is ignored", s_iconsPath,
+					   AeronConfigNode_Line(group), name);
+		return NULL;
+	}
+	return group;
+}
+
+/* Sets `out` from the key `key` of `group`, a size in points from 0 to 20.
+   A missing key leaves `out` unchanged. A wrong value is logged and
+   ignored. */
+static void CraftHud_ReadSize(const AeronConfigNode* group, const char* name, const char* key, float* out) {
+	const AeronConfigNode* node = AeronConfigNode_MapGet(group, key);
 	double value;
 
-	if (group == NULL) {
+	if (node == NULL) {
 		return;
 	}
-	if (AeronConfigNode_Type(group) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.hud", "%s:%d: target_boxes must be a map. It is ignored", s_iconsPath,
-					   AeronConfigNode_Line(group));
-		return;
-	}
-	width = AeronConfigNode_MapGet(group, "line_width");
-	if (width == NULL) {
-		return;
-	}
-	value = AeronConfigNode_Float(width, NAN);
-	if ((AeronConfigNode_Type(width) != AERON_CONFIG_INT &&
-		 AeronConfigNode_Type(width) != AERON_CONFIG_FLOAT) ||
+	value = AeronConfigNode_Float(node, NAN);
+	if ((AeronConfigNode_Type(node) != AERON_CONFIG_INT &&
+		 AeronConfigNode_Type(node) != AERON_CONFIG_FLOAT) ||
 		!(value >= 0.0 && value <= 20.0)) {
-		Aeron_LogWarn("xwa.hud",
-					  "%s:%d: target_boxes.line_width must be a number from 0 to 20. It is ignored",
-					  s_iconsPath, AeronConfigNode_Line(width));
+		Aeron_LogWarn("xwa.hud", "%s:%d: %s.%s must be a number from 0 to 20. It is ignored", s_iconsPath,
+					  AeronConfigNode_Line(node), name, key);
 		return;
 	}
-	s_targetBoxLineWidth = (float)value;
+	*out = (float)value;
+}
+
+static void CraftHud_ReadTargetBoxes(const AeronConfigNode* root) {
+	const AeronConfigNode* group = CraftHud_Group(root, "target_boxes");
+
+	if (group != NULL) {
+		CraftHud_ReadSize(group, "target_boxes", "line_width", &s_targetBoxLineWidth);
+	}
+}
+
+static void CraftHud_ReadRadar(const AeronConfigNode* root) {
+	const AeronConfigNode* group = CraftHud_Group(root, "radar");
+
+	if (group != NULL) {
+		CraftHud_ReadSize(group, "radar", "blip_size", &s_radar.blipSize);
+		CraftHud_ReadSize(group, "radar", "target_size", &s_radar.targetSize);
+	}
 }
 
 /* Reads the target_readout group over the shipped values (option_section.h). */
@@ -266,6 +289,7 @@ static void CraftHud_ReadIcons(void) {
 	CraftHud_ReadList(root, "map_icons", &s_mapIcons);
 	CraftHud_ReadTargetDisplay(root);
 	CraftHud_ReadTargetBoxes(root);
+	CraftHud_ReadRadar(root);
 	CraftHud_ReadTargetReadout(root);
 	AeronConfigFile_Destroy(file);
 	Aeron_LogInfo("xwa.hud", "%s: %zu hull icons, %zu map icons", s_iconsPath, s_hullIcons.count,
@@ -338,12 +362,15 @@ void XwaCraftHud_Init(void) {
 	memset(&s_mapIcons, 0, sizeof s_mapIcons);
 	memset(&s_targetDisplay, 0, sizeof s_targetDisplay);
 	s_targetBoxLineWidth = 0.0f;
+	memset(&s_radar, 0, sizeof s_radar);
 	CraftHud_ReadIcons();
 }
 
 const XwaTargetDisplay* XwaCraftHud_TargetDisplay(void) { return &s_targetDisplay; }
 
 float XwaCraftHud_TargetBoxLineWidth(void) { return s_targetBoxLineWidth; }
+
+const XwaRadarStyle* XwaCraftHud_Radar(void) { return &s_radar; }
 
 void XwaCraftHud_ClearModelSettings(void) { memset(s_types, 0, sizeof s_types); }
 

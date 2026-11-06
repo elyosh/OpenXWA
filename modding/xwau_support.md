@@ -90,6 +90,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Flight text font | Implemented | | [Images](images.md#fonts) |
 | Enhanced HUD | Implemented | The dark box behind the text isn't drawn. | [Flight](flight.md#target-readout) |
 | Target boxes drawn by ddraw (`Radar2DRendererEnabled`) | Implemented | XWAU's lines are 2 pixels of the game's resolution. The importer sets them to 3 points. | [Flight](flight.md#target-boxes) |
+| Radar blips drawn by ddraw (`Radar2DRendererEnabled`) | Implemented | XWAU's circles are 4 and 8 pixels of the game's resolution. The importer sets them to 4 and 8 points. | [Flight](flight.md#radar) |
 
 ## Skies, lighting and effects
 

@@ -74,15 +74,17 @@ void XwaRemasterDc_BeginFrame(const XwaSnapshot* snapshot, const AeronSceneMesh*
  * HUD's draw lists). */
 void XwaRemasterDc_PlaceFrame(int target_w, int target_h);
 /* A HUD record of `layer`, in place of AeronDrawList_AddSprite /
- * AddQuad4 / AddFill on `screen`: while active, onto `screen` outside the
- * erased regions and into the capture where it overlaps a source;
- * otherwise added to `screen` unchanged. */
+ * AddQuad4 / AddFill / AddRRect on `screen`: while active, onto `screen`
+ * outside the erased regions and into the capture where it overlaps a
+ * source; otherwise added to `screen` unchanged. */
 void XwaRemasterDc_AddSprite(AeronDrawList2D* screen, XwaRemasterDcLayer layer,
 							 const AeronDrawList2DSprite* sprite);
 void XwaRemasterDc_AddQuad4(AeronDrawList2D* screen, XwaRemasterDcLayer layer,
 							const AeronDrawList2DQuad4* quad);
 void XwaRemasterDc_AddFill(AeronDrawList2D* screen, XwaRemasterDcLayer layer, float x, float y, float w,
 						   float h, const float rgba[4], AeronBlit2DBlend blend, const AeronRectI* scissor);
+void XwaRemasterDc_AddRRect(AeronDrawList2D* screen, XwaRemasterDcLayer layer,
+							const AeronDrawList2DRRect* rrect);
 /* After XwaRemasterHud_PrepareFrame: renders the capture and prepares the
  * screen inputs. */
 void XwaRemasterDc_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot, int target_w, int target_h);

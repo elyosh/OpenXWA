@@ -2,11 +2,12 @@
 #define XWA_RUNTIME_MODELS_CRAFT_HUD_H
 
 /* Reads each craft's HUD settings from the `hud` group of a model settings
- * file. From the mod's HUD file, it reads the icon tables, the target display
- * settings, the target box settings and the target readout settings. They set the reticle images, the
- * HUD colours, the hull and map icons, how the target display draws the
- * target, and the target readout next to the target's box. The mod
- * documentation describes the keys.
+ * file. From the mod's HUD file, it reads the icon tables and the settings
+ * of the target display, the target boxes, the radar and the target
+ * readout. They set the reticle images, the HUD colours, the hull and map
+ * icons, how the target display draws the target, how the boxes and the
+ * radar blips look, and the target readout next to the target's box. The
+ * mod documentation describes the keys.
  *
  * The target readout settings go to the target readout options section.
  *
@@ -48,6 +49,16 @@ typedef struct XwaTargetDisplay {
 	float otherColor[3];
 } XwaTargetDisplay;
 
+/* The `radar` group of hud.yaml. The sizes are in points: 1/1080 of the
+   HUD's height. */
+typedef struct XwaRadarStyle {
+	/* The width of the round blips. 0 keeps the original game's blips. */
+	float blipSize;
+	/* The width of the yellow circle on the current target's blip. 0 keeps
+	   the original game's target marker. */
+	float targetSize;
+} XwaRadarStyle;
+
 /* Reads flight/hud.yaml. */
 void XwaCraftHud_Init(void);
 /* Drops the previous mission's HUD settings. Called by the model settings
@@ -78,6 +89,9 @@ const XwaTargetDisplay* XwaCraftHud_TargetDisplay(void);
 /* `target_boxes.line_width` of hud.yaml, in points: 1/1080 of the 3D view's
    height. 0, the default, keeps the original game's target boxes. */
 float XwaCraftHud_TargetBoxLineWidth(void);
+/* The `radar` group of hud.yaml, or the default: the original game's
+   blips and marker. */
+const XwaRadarStyle* XwaCraftHud_Radar(void);
 
 #ifdef __cplusplus
 }
