@@ -171,8 +171,8 @@ static const char* const s_turretKeys[] = {
 };
 
 static const char* const s_topKeys[] = {
-	"object_type", "name",         "model",       "list",         "genus", "family",
-	"flags",       "craft_record", "sounds_like", "beam_allowed", "names",
+	"object_type", "name",     "model",        "list",        "genus",        "family",
+	"flags",       "missions", "craft_record", "sounds_like", "beam_allowed", "names",
 };
 static const char* const s_recordArrayKeys[] = { "lasers",        "warheads",     "turrets",
 												 "cockpit_eye_m", "cockpit_name", "mesh_attach" };
@@ -1277,7 +1277,29 @@ static void CraftDefinitions_ApplyRenames(CraftFile* files, size_t count) {
 	}
 }
 
-/* Writes `genus`, `family` and `flags`. If CraftDefinitions_SplitRecords
+/* Writes `missions`: the mission types in which the game loads the model. */
+static void CraftDefinitions_ApplyMissions(const CraftFile* file, const AeronConfigNode* node,
+										   ObjectTypeInfo* info) {
+	const char* text = AeronConfigNode_String(node, "");
+	uint8_t flags;
+
+	if (strcmp(text, "all") == 0) {
+		flags = 0;
+	} else if (strcmp(text, "death_star") == 0) {
+		flags = OBJECT_TYPE_ASSET_DEATH_STAR_ONLY;
+	} else if (strcmp(text, "not_death_star") == 0) {
+		flags = OBJECT_TYPE_ASSET_NOT_DEATH_STAR;
+	} else {
+		Aeron_LogError("xwa.craft", "%s:%d: missions needs all, death_star or not_death_star. It is ignored",
+					   file->path, AeronConfigNode_Line(node));
+		return;
+	}
+	info->assetFlags = (uint8_t)((info->assetFlags &
+								  ~(OBJECT_TYPE_ASSET_DEATH_STAR_ONLY | OBJECT_TYPE_ASSET_NOT_DEATH_STAR)) |
+								 flags);
+}
+
+/* Writes `genus`, `family`, `flags` and `missions`. If CraftDefinitions_SplitRecords
    moved the object type to another craft record, copies the old record into
    it. */
 static void CraftDefinitions_ApplyObjectType(const CraftFile* file) {
@@ -1296,6 +1318,10 @@ static void CraftDefinitions_ApplyObjectType(const CraftFile* file) {
 	node = AeronConfigNode_MapGet(file->root, "flags");
 	if (node != NULL) {
 		CraftDefinitions_ApplyFlags(file, node, info);
+	}
+	node = AeronConfigNode_MapGet(file->root, "missions");
+	if (node != NULL) {
+		CraftDefinitions_ApplyMissions(file, node, info);
 	}
 	if (file->finalRecord != info->modelDefIndex) {
 		g_modelDefs[file->finalRecord] = g_modelDefs[info->modelDefIndex];

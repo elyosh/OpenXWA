@@ -71,6 +71,7 @@ beam_allowed: true
 | `genus` | The genus, such as `fighter` or `starship`. |
 | `family` | The family, such as `craft` or `weapon`. |
 | `flags` | The list of flags that are on. |
+| `missions` | The missions that load the model: `all`, `death_star` or `not_death_star`. See [Missions](#missions). |
 | `craft_record` | Changes to the craft record. See [The craft record](#the-craft-record). |
 | `names` | The names that the game shows for the craft. See [Craft names](#craft-names). |
 | `sounds_like` | Another object type whose stock engine and launch sounds this one uses. |
@@ -153,6 +154,22 @@ another name, the game ignores the whole `flags` key.
 ```yaml
 flags: [player_targetable, ai_targetable, float_hardpoints]
 ```
+
+### Missions
+
+The game only loads the models that a mission needs. `missions` also keeps
+a model out of some missions:
+
+| Value | The model loads in |
+|-|-|
+| `all` | every mission |
+| `death_star` | Death Star missions only |
+| `not_death_star` | every mission but the Death Star missions |
+
+Without `missions`, the object type keeps the original game's value. The
+original game uses `not_death_star` for some free slots and placeholders,
+such as `xwing_104`. When you put a craft in one of them and a Death Star
+mission uses it, set `missions: all`, or the craft has no model there.
 
 ### The craft record
 
