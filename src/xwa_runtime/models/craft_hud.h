@@ -2,10 +2,11 @@
 #define XWA_RUNTIME_MODELS_CRAFT_HUD_H
 
 /* Reads each craft's HUD settings from the `hud` group of a model settings
- * file. From the mod's HUD file, it reads the icon tables and the settings
- * of the target display, the target boxes, the radar and the target
- * readout. They set the reticle images, the HUD colours, the hull and map
- * icons, how the target display draws the target, how the boxes and the
+ * file. From the mod's HUD file, it reads the icon tables, the place of the
+ * ammo icons and the settings of the target display, the target boxes, the
+ * radar and the target readout. They set the reticle images, the HUD
+ * colours, the hull and map icons, where the warhead and countermeasure
+ * icons are, how the target display draws the target, how the boxes and the
  * radar blips look, and the target readout next to the target's box. The
  * mod documentation describes the keys.
  *
@@ -59,6 +60,14 @@ typedef struct XwaRadarStyle {
 	float targetSize;
 } XwaRadarStyle;
 
+/* The `ammo_icons` group of hud.yaml: the centres of the warhead and
+   countermeasure icons at the top of the HUD, in pixels of the original
+   game's 640x480 HUD, from its top left corner. */
+typedef struct XwaAmmoIcons {
+	float warheads[2];
+	float countermeasures[2];
+} XwaAmmoIcons;
+
 /* Reads flight/hud.yaml. */
 void XwaCraftHud_Init(void);
 /* Drops the previous mission's HUD settings. Called by the model settings
@@ -92,6 +101,10 @@ float XwaCraftHud_TargetBoxLineWidth(void);
 /* The `radar` group of hud.yaml, or the default: the original game's
    blips and marker. */
 const XwaRadarStyle* XwaCraftHud_Radar(void);
+/* The `ammo_icons` group of hud.yaml. A missing key keeps the original
+   game's place: 48 pixels left and 30 pixels right of the centre, 16 pixels
+   from the top. */
+const XwaAmmoIcons* XwaCraftHud_AmmoIcons(void);
 
 #ifdef __cplusplus
 }

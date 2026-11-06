@@ -181,16 +181,21 @@ static int fixed_compare_draw_records(const void* lhs, const void* rhs) {
 static void fixed_build_frames(const XwaHudState* h, const XwaRemasterHudVisibility* v) {
 	const uint32_t hud_color = h->hud_colors[0];
 	if (v->fixed_frames && fixed_element(h, 3)) {
+		/* The ammo icons are at the place that hud.yaml gives. The original
+		   game keeps them 48 and 30 pixels from the centre at every HUD
+		   scale, and only their size grows. Here the whole HUD scales, so a
+		   mod can place icons that were drawn for one HUD scale. */
+		const XwaAmmoIcons* icons = XwaCraftHud_AmmoIcons();
 		fixed_emit(XWA_HUD_WIDGET_FORE_RADAR_FRAME, OBJ_HudTextureGroup12000, 27, 206, 464, 256, hud_color,
 				   0);
 		if (!(h->mode_flags & XWA_HUD_MODE_PROVING_GROUND)) {
-			fixed_emit(XWA_HUD_WIDGET_FORE_RADAR_FRAME, OBJ_HudTextureGroup12000, 49, 272, 464, 256,
-					   0xffffffffu, 0);
+			fixed_emit(XWA_HUD_WIDGET_FORE_RADAR_FRAME, OBJ_HudTextureGroup12000, 49, icons->warheads[0],
+					   480.0f - icons->warheads[1], 256, 0xffffffffu, 0);
 		}
 		fixed_emit(XWA_HUD_WIDGET_AFT_RADAR_FRAME, OBJ_HudTextureGroup12000, 28, 434, 464, 256, hud_color, 0);
 		if (!(h->mode_flags & XWA_HUD_MODE_PROVING_GROUND)) {
-			fixed_emit(XWA_HUD_WIDGET_AFT_RADAR_FRAME, OBJ_HudTextureGroup12000, 50, 350, 464, 256,
-					   0xffffffffu, 0);
+			fixed_emit(XWA_HUD_WIDGET_AFT_RADAR_FRAME, OBJ_HudTextureGroup12000, 50, icons->countermeasures[0],
+					   480.0f - icons->countermeasures[1], 256, 0xffffffffu, 0);
 		}
 	}
 	if (v->radars) {

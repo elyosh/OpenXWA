@@ -6,7 +6,7 @@ flight:
 | File | What it changes |
 |-|-|
 | `flight/flight.yaml` | game rules, weapons, shields, docking, lights, object counts, the camera, extra backdrop planets and the procedural suns |
-| `flight/hud.yaml` | the hull and map icons of each object type, the target display, the target boxes, the radar blips and the target readout |
+| `flight/hud.yaml` | the hull and map icons of each object type, the place of the ammo icons, the target display, the target boxes, the radar blips and the target readout |
 | `flight/sounds.yaml` | the sounds of each object type: engines, weapons, explosions, hyperspace, hangar and a few interface sounds |
 
 The game reads the three files once, when it starts. Restart OpenXWA after
@@ -797,8 +797,9 @@ mod.
 
 ## hud.yaml
 
-`flight/hud.yaml` changes the icons of each object type, the target
-display, the target boxes, the radar blips and the target readout.
+`flight/hud.yaml` changes the icons of each object type, the place of the
+ammo icons, the target display, the target boxes, the radar blips and the
+target readout.
 
 ```yaml
 hull_icons:
@@ -814,6 +815,7 @@ target_display:
 |-|-|
 | `hull_icons` | The craft outline in the shield and hull display, by object type. |
 | `map_icons` | The icon of each object type on the map. |
+| `ammo_icons` | Where the warhead and countermeasure icons are, at the top of the HUD. |
 | `target_display` | How the target display shows the target. |
 | `target_boxes` | How the target boxes are drawn. |
 | `radar` | How the blips on the radar scopes are drawn. |
@@ -835,6 +837,32 @@ icon. An object type that the map doesn't list keeps its original icon.
 To add new icons, replace the image group with an atlas that has more
 images. See [Images](images.md) and
 [Image groups](reference/image_groups.md).
+
+### Ammo icons
+
+`ammo_icons` sets where the HUD draws the warhead and countermeasure icons.
+The icons are images 49 and 50 of image group 12000, counted from 1.
+
+```yaml
+ammo_icons:
+  warheads: [286.7, 11.1]
+  countermeasures: [340.8, 11.1]
+```
+
+| Key | Meaning | Default |
+|-|-|-|
+| `warheads` | The centre of the warhead icon. | `[272, 16]` |
+| `countermeasures` | The centre of the countermeasure icon. | `[350, 16]` |
+
+Each value is `[x, y]` in pixels of the original game's 640x480 HUD, from
+its top left corner. x goes from 0 to 640 and y from 0 to 480. OpenXWA
+scales this HUD to the window, so the icons keep their place in the HUD at
+every HUD size.
+
+In the original game, the icons stay 48 and 30 pixels from the centre of
+the screen and 16 pixels from the top at every resolution, and only their
+size grows. So the icons of XWAU and TFTC are drawn for XWAU's HUD scale
+of 1.44. The importer writes their place at that scale.
 
 ### Target display
 
