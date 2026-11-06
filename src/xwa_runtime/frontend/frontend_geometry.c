@@ -615,6 +615,19 @@ const XwaGeometryFrame* XwaFrontendGeometry_FindFrame(const XwaGeometryAtlas* at
 	return NULL;
 }
 
+int XwaFrontendGeometry_GroupIdSpan(int group, int first_id, int end_id) {
+	const XwaGeometryAtlas* atlas = XwaFrontendGeometry_FindGroup(group);
+	int highest = first_id - 1;
+
+	for (int i = 0; atlas != NULL && i < atlas->frame_count; ++i) {
+		const int id = atlas->frames[i].id;
+		if (id >= first_id && id < end_id && id > highest) {
+			highest = id;
+		}
+	}
+	return highest - first_id + 1;
+}
+
 const XwaGeometryRegion* XwaFrontendGeometry_FindRegion(const XwaGeometryAtlas* atlas, int type) {
 	if (atlas == NULL) {
 		return NULL;

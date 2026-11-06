@@ -2,6 +2,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/concourse_layout.h"
 #include "xwa_runtime/frontend/family_missions.h"
+#include "xwa_runtime/frontend/frontend_geometry.h"
 #endif
 
 #include "xwa/assets/file_io.h"
@@ -2133,12 +2134,28 @@ int MissionSetup_UnloadShipBmp(void) {
 	return 1;
 }
 
+#ifdef XWA_MODERN
+/* A mod's atlas for group 15210 can have more mission and battle pictures
+   than the original game. The count then goes up to the atlas's highest
+   image id in the range from `firstId` to `endId`. */
+static uint16_t MissionSetup_BattleSpriteCount(int firstId, int endId, int originalCount) {
+	const int span = XwaFrontendGeometry_GroupIdSpan(15210, firstId, endId);
+	return (uint16_t)(span > originalCount ? span : originalCount);
+}
+#endif
+
 // FUNCTION: XWA 0x55DD60
 int MissionSetup_LoadBattleSprites(void) {
 	SpriteResource_LoadGroup(15210);
+#ifdef XWA_MODERN
+	FrontImage_RegisterAtlasSprite("mislarge", 15210, 1, MissionSetup_BattleSpriteCount(1, 1000, 53));
+	FrontImage_RegisterAtlasSprite("missmall", 15210, 1000, MissionSetup_BattleSpriteCount(1000, 2000, 53));
+	FrontImage_RegisterAtlasSprite("battleback", 15210, 2000, MissionSetup_BattleSpriteCount(2000, 2100, 8));
+#else
 	FrontImage_RegisterAtlasSprite("mislarge", 15210, 1, 53);
 	FrontImage_RegisterAtlasSprite("missmall", 15210, 1000, 53);
 	FrontImage_RegisterAtlasSprite("battleback", 15210, 2000, 8);
+#endif
 	FrontImage_RegisterAtlasSprite("battle00", 15210, 2100, 1);
 	return 1;
 }

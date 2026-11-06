@@ -104,6 +104,10 @@ const XwaGeometryAtlas* XwaFrontendGeometry_FindFile(const char* fileName);
 const XwaGeometryAtlas* XwaFrontendGeometry_FindGroup(int group);
 /* The frame with DAT image id `id`, or NULL. */
 const XwaGeometryFrame* XwaFrontendGeometry_FindFrame(const XwaGeometryAtlas* atlas, int id);
+/* The number of DAT image ids from `first_id` to the highest id below
+ * `end_id` in the atlas with game geometry of group `group`. 0 when the
+ * group has no such atlas, or no image in that range. */
+int XwaFrontendGeometry_GroupIdSpan(int group, int first_id, int end_id);
 /* The region of type `type`, or NULL. */
 const XwaGeometryRegion* XwaFrontendGeometry_FindRegion(const XwaGeometryAtlas* atlas, int type);
 

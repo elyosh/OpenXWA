@@ -146,6 +146,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Film room and pod movies | Implemented | | [Frontend](frontend.md#room-movies) |
 | Movies on points, rank and rating | Not implemented | TFTC uses them for its points and rank movies. | |
 | Medals, Kalidor Crescent levels, mementos, rank and rating thresholds | Implemented | `MedalDetailListOrder.txt` isn't converted. No installation has it. | [Frontend](frontend.md#awards) |
+| More mission and battle pictures | Implemented | | [Image groups](reference/image_groups.md#mission-and-battle-pictures) |
 | New battle images (`FrontEnd2_Battles.dat`) | Not implemented | | |
 | Craft pictures for new craft types | Not implemented | | |
 | 3D craft preview in skirmish (`SkirmishOpt*`, `[ViewConfiguration]`) | Not implemented | | |

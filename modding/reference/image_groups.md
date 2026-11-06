@@ -68,6 +68,20 @@ text. Fonts in flight come from `flight/fonts/` instead.
 | 15900 | The pilot's awards: medals, ranks, ratings, Kalidor crescents, and the medal case. |
 | 20001 to 20230 | The picture of the chosen craft in the mission setup and combat screens. The group is 20000 plus the craft type. |
 
+### Mission and battle pictures
+
+Group 15210 holds three series of pictures:
+
+| Image ids | Pictures |
+|-|-|
+| 1 to 999 | The large picture of each mission. |
+| 1000 to 1999 | The small picture of each mission. |
+| 2000 to 2099 | The picture of each battle: 2000 plus the battle number in the mission file names, such as 8 in `1b8m1.tie`. |
+
+The original game has 53 mission pictures and 8 battle pictures. An atlas
+can have more. The game uses every id up to the highest id that the atlas
+has in each series.
+
 ## Groups that the game doesn't use
 
 The game files also have groups 14000, 14100, 14500, 17000, 17001 and
