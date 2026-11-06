@@ -266,7 +266,7 @@ static void CraftHud_ReadRadar(const AeronConfigNode* root) {
 	}
 }
 
-/* Reads the target_readout group over the shipped values (option_section.h). */
+/* Reads the target_readout group over the shipped values. */
 static void CraftHud_ReadTargetReadout(const AeronConfigNode* root) {
 	XwaModernTargetReadoutOptions options;
 

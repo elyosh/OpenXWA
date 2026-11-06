@@ -134,7 +134,7 @@ typedef struct WeaponStatsSet {
 static WeaponStatsSet s_defaults;
 static WeaponStatsSet s_models[OBJ_Count];
 static char s_flightGroupProfiles[WEAPON_STATS_FLIGHT_GROUPS][WEAPON_STATS_GROUPS][WEAPON_STATS_NAME_MAX];
-/* Bit `group` is set once the log says that the flight group's profile of
+/* Bit `group` is set after the log says that the flight group's profile for
    that group doesn't exist. */
 static uint8_t s_missingProfileLogged[WEAPON_STATS_FLIGHT_GROUPS];
 static int s_hasRankFactors;
@@ -654,8 +654,8 @@ static void WeaponStats_Profiles(unsigned int objectType, int fgIdx, int group,
 		!(s_missingProfileLogged[fgIdx] & (1u << group))) {
 		s_missingProfileLogged[fgIdx] |= (uint8_t)(1u << group);
 		Aeron_LogWarn("xwa.mission",
-					  "flight group %d picks the %s profile '%s', which neither the model of %s nor "
-					  "flight/flight.yaml has. It gets the original game's values",
+					  "flight group %d picks the %s profile '%s', but neither the model of %s nor "
+					  "flight/flight.yaml has it. The flight group gets the original game's values",
 					  fgIdx, s_groups[group], name, XwaNames_Name(&g_xwaObjectTypeNames, (int)objectType));
 	}
 }

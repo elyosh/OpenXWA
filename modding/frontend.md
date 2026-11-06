@@ -87,10 +87,10 @@ layout: wide
 ```
 
 While the screen shows that image as its background, the screen uses this
-layout. It comes before the layout in `layouts`. This helps in a view that
-shows different images. For example, the memento view of the family room
-shows the picture of the memento: a 16:9 picture can be `wide`, and a 4:3
-picture can be `fill`.
+layout. It replaces the layout that `layouts` gives the screen. This helps
+in a view that shows different images. For example, the memento view of
+the family room shows the picture of the memento: a 16:9 picture can be
+`wide`, and a 4:3 picture can be `fill`.
 
 Only the main image behind the screen counts, not the images that the game
 draws over it, such as doors and buttons. When a dialog such as the datapad

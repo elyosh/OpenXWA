@@ -110,8 +110,8 @@ static int g_screenRunIndex = -1; /* the stack index that ran last */
 static unsigned g_screenFrames;   /* the frontend frames run so far */
 static XwaScreenId g_screenLogged = SCREEN_NONE;
 static int g_screenLoggedLayout = -1;
-/* The layout that the background image sets, or -1, for the binding
-   generation g_backgroundGeneration. */
+/* The layout that the background image sets, or -1. It is up to date while
+   the binding generation is g_backgroundGeneration. */
 static int g_backgroundLayout = -1;
 static const char* g_backgroundFile;
 static unsigned g_backgroundGeneration;
@@ -325,7 +325,7 @@ XwaFrontendLayout XwaFrontendScreens_Layout(void) {
 	} else {
 		layout = screens_stack_layout(g_screenRunIndex < 0 ? g_screenStackTop : g_screenRunIndex, &shown);
 	}
-	/* The background image's layout comes before the screen's. */
+	/* The layout of the background image replaces the screen's layout. */
 	if (background >= 0) {
 		layout = background;
 	}

@@ -11,7 +11,7 @@ extern "C" {
  * cargo, distance and damage bars next to its box in the 3D view. The
  * options are read from the `target_readout` section of the shipped
  * remaster/config.yaml, the mod's flight/hud.yaml and the player's
- * config.yaml (option_section.h). The shipped file turns the readout off.
+ * config.yaml. The shipped file turns the readout off.
  * The options screen only turns it on or off. */
 
 typedef enum XwaTargetReadoutTextSize {

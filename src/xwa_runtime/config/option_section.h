@@ -9,16 +9,16 @@
 extern "C" {
 #endif
 
-/* A section of options, such as `camera`, read into a struct of the same
- * keys. The values come from three places, and each one overrides the one
- * before it:
+/* A section of options, such as `camera`. The game reads it into a struct
+ * that has a field for each key. The values come from three files, and each
+ * file overrides the one before it:
  *   1. the section in the shipped remaster/config.yaml, which has every key;
  *   2. the section in a mod file, such as flight/flight.yaml. When the mod
  *      has the section, `enabled` is on unless the section turns it off;
  *   3. the section in the player's config.yaml.
- * A key that a place leaves out keeps the value before it. A wrong value in
- * the shipped or the player's file is an error. A wrong value in the mod is
- * logged and ignored. */
+ * A key that a file leaves out keeps the value from the file before it. A
+ * wrong value in the shipped file or the player's file is an error. A wrong
+ * value in the mod is logged and ignored. */
 
 typedef enum XwaOptionKind {
 	/* true or false, stored as an int. */
@@ -68,15 +68,15 @@ struct XwaOptionSection {
 	/* At most 32 keys. */
 	const XwaOptionKey* keys;
 	size_t key_count;
-	/* Other keys of the mod's section, read by other code. They end with
-	   NULL. */
+	/* Other keys that the mod's section can have, which other code reads.
+	   The list ends with NULL. */
 	const char* const* other_keys;
 	/* The options struct: its size, and the module's three copies of it. */
 	size_t size;
 	void* shipped;
 	void* mod;
 	void* player;
-	/* Checks the values in use after each place is read, and logs what it
+	/* Checks the values in use after each file is read, and logs what it
 	   changes. Optional. */
 	void (*check)(const void* options);
 	/* Bit `i` is set when the player's file sets key `i`. */
@@ -92,13 +92,13 @@ struct XwaOptionSection {
 int XwaOptionKey_Read(const XwaOptionKey* key, const AeronConfigNode* node, void* out, char* expected,
 					  size_t expected_size);
 
-/* Reads the section of the shipped file, with `required`, which also resets
-   the section, or of the player's file. */
+/* Reads the section from the shipped file when `required` is set, and then
+   also resets the section. Otherwise reads it from the player's file. */
 int XwaOptionSection_ReadConfig(XwaOptionSection* section, const AeronConfigFile* config, int required,
 								char* error, size_t error_size);
 
-/* Reads the section from `root`, the root of the mod file, over the shipped
-   values. Returns 1 when the mod file has the section. */
+/* Reads the section from `root`, the root of the mod file. Its values
+   replace the shipped values. Returns 1 when the mod file has the section. */
 int XwaOptionSection_ReadMod(XwaOptionSection* section, const AeronConfigNode* root);
 /* Loads the mod file and reads the section from it. */
 void XwaOptionSection_LoadMod(XwaOptionSection* section);

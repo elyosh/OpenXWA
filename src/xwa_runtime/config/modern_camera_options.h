@@ -10,7 +10,7 @@ extern "C" {
 /* The camera options: the exterior camera's lag and tilt, the cockpit sway,
  * and the HUD in the exterior view. They are read from the `camera` section
  * of the shipped remaster/config.yaml, the mod's flight/flight.yaml and the
- * player's config.yaml (option_section.h). The shipped file turns them off.
+ * player's config.yaml. The shipped file turns them off.
  * The options screen only turns them on or off. */
 
 typedef struct XwaModernCameraOptions {

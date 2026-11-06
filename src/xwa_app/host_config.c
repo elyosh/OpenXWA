@@ -352,8 +352,8 @@ static int host_config_captured_lighting(const AeronConfigFile* config, int requ
 	return 1;
 }
 
-/* Reads the option sections (option_section.h): the shipped file's with
- * `required`, else the player's. */
+/* Reads the option sections: from the shipped file when `required` is set,
+ * else from the player's file. */
 static int host_config_option_sections(const AeronConfigFile* config, int required, char* error,
 									   size_t error_size) {
 	XwaOptionSection* const sections[] = {

@@ -9,8 +9,8 @@ extern "C" {
 
 /* The sun options: the procedural sun and its lens flare. They are read
  * from the `suns` section of the shipped remaster/config.yaml, the mod's
- * flight/flight.yaml and the player's config.yaml (option_section.h). The
- * shipped file turns both effects off. The player's file can't set the keys
+ * flight/flight.yaml and the player's config.yaml. The shipped file turns
+ * both effects off. The player's file can't set the keys
  * that describe the look, such as brightness. The HD renderer reads the
  * flare's shape, `flare_elements`, from the shipped settings and the mod's. */
 typedef struct XwaModernSunOptions {

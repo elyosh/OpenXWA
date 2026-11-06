@@ -13,7 +13,8 @@
 
 enum { OPTION_MAX_SECTIONS = 16, OPTION_MAX_KEYS = 32 };
 
-/* The sections read from the shipped file, which FlushAll saves. */
+/* The sections that were read from the shipped file. FlushAll saves their
+   switches. */
 static XwaOptionSection* s_sections[OPTION_MAX_SECTIONS];
 static size_t s_sectionCount;
 static XwaOptionPersistFn s_persist;

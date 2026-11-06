@@ -11,7 +11,7 @@ extern "C" {
  * around the camera, which show how fast the player's craft moves. The
  * options are read from the `speed_effect` section of the shipped
  * remaster/config.yaml, the mod's flight/flight.yaml and the player's
- * config.yaml (option_section.h). The shipped file turns the effect off. */
+ * config.yaml. The shipped file turns the effect off. */
 typedef struct XwaModernSpeedEffectOptions {
 	int enabled;
 	/* The streaks' brightness at full speed, from 0 to 1. */
