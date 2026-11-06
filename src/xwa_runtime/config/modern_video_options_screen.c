@@ -133,12 +133,12 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	   change the row, so until then the row follows the mod. */
 	if (XwaModernOptionsMenu_DrawCycleU8(&menu, &enhanced_camera, "Enhanced Camera", toggle_texts, 2, 70,
 										 0)) {
-		XwaModernCameraOptions_SetEnabled(enhanced_camera);
+		XwaOptionSection_SetEnabled(XwaModernCameraOptions_Section(), enhanced_camera);
 	}
 	/* The target's name, cargo, distance and damage bars next to its box.
 	   Like Enhanced Camera, it follows the mod until the player changes it. */
 	if (XwaModernOptionsMenu_DrawCycleU8(&menu, &target_readout, "Target Readout", toggle_texts, 2, 71, 0)) {
-		XwaModernTargetReadoutOptions_SetEnabled(target_readout);
+		XwaOptionSection_SetEnabled(XwaModernTargetReadoutOptions_Section(), target_readout);
 	}
 
 	back = XwaModernOptionsMenu_DrawAction(&menu, FrontendString_Get(STR_BACK), 69, 0);
@@ -148,7 +148,6 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	}
 
 	XwaModernVideoOptions_Flush();
-	XwaModernCameraOptions_Flush();
-	XwaModernTargetReadoutOptions_Flush();
+	XwaOptionSection_FlushAll();
 	return 1;
 }

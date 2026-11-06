@@ -243,48 +243,14 @@ static void CraftHud_ReadTargetBoxes(const AeronConfigNode* root) {
 	s_targetBoxLineWidth = (float)value;
 }
 
-/* Reads the target_readout group over the shipped values. A mod that has the
-   group turns the target readout on, unless the group sets `enabled: false`.
-   A wrong key keeps the shipped value. */
+/* Reads the target_readout group over the shipped values (option_section.h). */
 static void CraftHud_ReadTargetReadout(const AeronConfigNode* root) {
-	const AeronConfigNode* group = AeronConfigNode_MapGet(root, "target_readout");
-	const XwaModernTargetReadoutOptionKey* keys;
 	XwaModernTargetReadoutOptions options;
-	size_t keyCount;
-	size_t index;
 
-	if (group == NULL) {
+	if (!XwaOptionSection_ReadMod(XwaModernTargetReadoutOptions_Section(), root)) {
 		return;
 	}
-	/* `target_readout:` with nothing after it turns the readout on with the
-	   shipped values, like `target_readout: {}`. */
-	if (AeronConfigNode_Type(group) != AERON_CONFIG_MAP && AeronConfigNode_Type(group) != AERON_CONFIG_NULL) {
-		Aeron_LogError("xwa.hud", "%s:%d: target_readout must be a map. It is ignored", s_iconsPath,
-					   AeronConfigNode_Line(group));
-		return;
-	}
-	XwaModernTargetReadoutOptions_GetShipped(&options);
-	options.enabled = 1;
-	keys = XwaModernTargetReadoutOptions_Keys(&keyCount);
-	for (index = 0; index < AeronConfigNode_MapCount(group); ++index) {
-		const char* name = AeronConfigNode_MapKeyAt(group, index);
-		const AeronConfigNode* item = AeronConfigNode_MapValueAt(group, index);
-		char expected[128];
-		size_t k;
-
-		for (k = 0; k < keyCount && strcmp(keys[k].name, name) != 0; ++k) {
-		}
-		if (k == keyCount) {
-			Aeron_LogWarn("xwa.hud", "%s:%d: target_readout.%s isn't a target readout setting. It is ignored",
-						  s_iconsPath, AeronConfigNode_Line(item), name);
-			continue;
-		}
-		if (!XwaModernTargetReadoutOptions_ReadKey(&keys[k], item, &options, expected, sizeof expected)) {
-			Aeron_LogWarn("xwa.hud", "%s:%d: target_readout.%s must be %s. It is ignored", s_iconsPath,
-						  AeronConfigNode_Line(item), name, expected);
-		}
-	}
-	XwaModernTargetReadoutOptions_SetMod(&options);
+	XwaModernTargetReadoutOptions_Get(&options);
 	Aeron_LogInfo("xwa.hud", "%s: target readout %s", s_iconsPath, options.enabled ? "on" : "off");
 }
 

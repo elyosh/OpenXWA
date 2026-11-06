@@ -774,14 +774,13 @@ game's own space debris is still drawn.
 
 ```yaml
 speed_effect:
-  enabled: true
   brightness: 0.2
   particles: 256
 ```
 
 | Key | Meaning | Range | Default |
 |-|-|-|-|
-| `enabled` | Turns the effect on. | `true` or `false` | `false` |
+| `enabled` | Turns the effect on. | `true` or `false` | `true` |
 | `brightness` | The brightness of the streaks at full speed. | 0 to 1 | 0.2 |
 | `particles` | The number of streaks in the box of dust around the camera, which is 165 m wide. | 0 to 1024 | 256 |
 
@@ -790,8 +789,10 @@ The streaks appear just above speed 0 and are at full brightness from
 craft, in the cockpit or from outside, and not in the hangar. Ships and the
 cockpit hide them.
 
-A missing key keeps its default. Players can change these keys in their
-`config.yaml`, and their values win over the mod.
+Without the section, the effect is off. With the section, it is on, unless
+the section has `enabled: false`. A missing key keeps its default. Players
+can change these keys in their `config.yaml`, and their values win over the
+mod.
 
 ## hud.yaml
 

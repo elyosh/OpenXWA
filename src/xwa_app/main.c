@@ -9,6 +9,7 @@
 #include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/config/modern_mods.h"
+#include "xwa_runtime/config/option_section.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/model_source.h"
@@ -95,12 +96,8 @@ static int persist_modern_input_options(const XwaModernInputOptions* options, ch
 	return XwaHostConfig_SaveInputOptions(Aeron_GetVfs(), options, error, error_size);
 }
 
-static int persist_camera_enabled(int enabled, char* error, size_t error_size) {
-	return XwaHostConfig_SaveCameraEnabled(Aeron_GetVfs(), enabled, error, error_size);
-}
-
-static int persist_target_readout_enabled(int enabled, char* error, size_t error_size) {
-	return XwaHostConfig_SaveTargetReadoutEnabled(Aeron_GetVfs(), enabled, error, error_size);
+static int persist_option_switch(const char* key, int value, char* error, size_t error_size) {
+	return XwaHostConfig_SaveSwitch(Aeron_GetVfs(), key, value, error, error_size);
 }
 
 /* paths.mod. It is kept when the original game is chosen, so the mod stays
@@ -504,16 +501,7 @@ int main(int argc, char** argv) {
 	XwaModernInputOptions_Configure(&host_config.input_defaults, &host_config.input_options,
 									apply_modern_input_options, persist_modern_input_options);
 	apply_modern_input_options(&host_config.input_options);
-	XwaModernCameraOptions_Configure(&host_config.camera_options, &host_config.camera_player_options,
-									 host_config.camera_override_mask, persist_camera_enabled);
-	XwaModernSunOptions_Configure(&host_config.sun_options, &host_config.sun_player_options,
-								  host_config.sun_override_mask);
-	XwaModernSpeedEffectOptions_Configure(&host_config.speed_effect_options,
-										  &host_config.speed_effect_player_options,
-										  host_config.speed_effect_override_mask);
-	XwaModernTargetReadoutOptions_Configure(
-		&host_config.target_readout_options, &host_config.target_readout_player_options,
-		host_config.target_readout_override_mask, persist_target_readout_enabled);
+	XwaOptionSection_SetPersist(persist_option_switch);
 	Aeron_LogInfo(
 		"xwa.config", "mouse flight control: %s (%s mode, sensitivity %d, invert Y: %s)",
 		host_config.input_options.mouse_flight_enabled ? "on" : "off",

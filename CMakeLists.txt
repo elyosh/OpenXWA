@@ -297,14 +297,15 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/timing/modern_flight_timing.c
 )
 
-# Options used by both the game and its configuration: input, camera, sun and
-# target readout.
+# Options used by both the game and its configuration: input, and the option
+# sections (camera, sun, speed effect and target readout).
 set(XWA_INPUT_OPTIONS_SOURCES
     src/xwa_runtime/config/modern_camera_options.c
     src/xwa_runtime/config/modern_input_options.c
     src/xwa_runtime/config/modern_speed_effect_options.c
     src/xwa_runtime/config/modern_sun_options.c
     src/xwa_runtime/config/modern_target_readout_options.c
+    src/xwa_runtime/config/option_section.c
 )
 add_library(xwa_input_options STATIC ${XWA_INPUT_OPTIONS_SOURCES})
 target_include_directories(xwa_input_options PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -755,6 +756,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/config/modern_target_readout_options.h
     src/xwa_runtime/config/modern_video_options.h
     src/xwa_runtime/config/modern_video_options_screen.h
+    src/xwa_runtime/config/option_section.h
     src/xwa_runtime/config/modern_mods.h
     src/xwa_runtime/config/modern_mods_screen.h
     src/xwa/audio/cd_audio.h

@@ -8,7 +8,7 @@
  * target, and the target readout next to the target's box. The mod
  * documentation describes the keys.
  *
- * The target readout settings go to XwaModernTargetReadoutOptions_SetMod.
+ * The target readout settings go to the target readout options section.
  *
  * Hull icons are images of group 26000, map icons of group 14800 and reticle
  * parts of group 12000. A mod file counts images from 1. An object type that

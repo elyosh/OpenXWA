@@ -1,8 +1,5 @@
 #include "xwa_runtime/camera/camera_motion.h"
 
-#include "aeron/aeron.h"
-#include "aeron/config_file.h"
-#include "aeron/log.h"
 #include "xwa/flight/hangar.h"
 #include "xwa/flight/player/player.h"
 #include "xwa/render/renderer.h"
@@ -14,8 +11,6 @@
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
-
-#define CAMERA_FLIGHT_YAML "flight/flight.yaml"
 
 /* A tick of g_gameTime is 4 ms. */
 #define CAMERA_SECONDS_PER_TICK 0.004f
@@ -54,88 +49,9 @@ static struct {
 	float forward[3];
 } s_cameraMotion;
 
-/* Reads one key of the mod's `camera` section into `options`. Returns 0
-   (logged) when the value is wrong. */
-static int CameraMotion_ReadKey(const XwaModernCameraOptionKey* key, const AeronConfigNode* node,
-								XwaModernCameraOptions* options) {
-	char* field = (char*)options + key->offset;
-	const AeronConfigNodeType type = AeronConfigNode_Type(node);
-
-	if (key->is_switch) {
-		int value;
-
-		if (type != AERON_CONFIG_BOOL) {
-			Aeron_LogWarn("xwa.flight", "%s:%d: camera.%s must be true or false; it is ignored",
-						  CAMERA_FLIGHT_YAML, AeronConfigNode_Line(node), key->name);
-			return 0;
-		}
-		value = AeronConfigNode_Bool(node, 0) != 0;
-		memcpy(field, &value, sizeof value);
-	} else {
-		const double number = AeronConfigNode_Float(node, NAN);
-		float value;
-
-		if ((type != AERON_CONFIG_INT && type != AERON_CONFIG_FLOAT) ||
-			!(number >= key->min && number <= key->max)) {
-			Aeron_LogWarn("xwa.flight", "%s:%d: camera.%s must be a number from %g to %g; it is ignored",
-						  CAMERA_FLIGHT_YAML, AeronConfigNode_Line(node), key->name, (double)key->min,
-						  (double)key->max);
-			return 0;
-		}
-		value = (float)number;
-		memcpy(field, &value, sizeof value);
-	}
-	return 1;
-}
-
 void XwaCameraMotion_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
-	const AeronConfigNode* root;
-	const AeronConfigNode* section;
-	const XwaModernCameraOptionKey* keys;
-	XwaModernCameraOptions options;
-	size_t keyCount;
-	size_t i;
-
 	memset(&s_cameraMotion, 0, sizeof s_cameraMotion);
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, CAMERA_FLIGHT_YAML, &file, &error)) {
-		/* The backdrops code already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
-	section = AeronConfigNode_MapGet(root, "camera");
-	if (section == NULL) {
-		AeronConfigFile_Destroy(file);
-		return;
-	}
-	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.flight", "%s:%d: camera must be a map; it is ignored", CAMERA_FLIGHT_YAML,
-					   AeronConfigNode_Line(section));
-		AeronConfigFile_Destroy(file);
-		return;
-	}
-
-	XwaModernCameraOptions_GetShipped(&options);
-	options.enabled = 1;
-	keys = XwaModernCameraOptions_Keys(&keyCount);
-	for (i = 0; i < AeronConfigNode_MapCount(section); ++i) {
-		const char* name = AeronConfigNode_MapKeyAt(section, i);
-		const AeronConfigNode* node = AeronConfigNode_MapValueAt(section, i);
-		size_t k;
-
-		for (k = 0; k < keyCount && strcmp(keys[k].name, name) != 0; ++k) {
-		}
-		if (k == keyCount) {
-			Aeron_LogWarn("xwa.flight", "%s:%d: camera.%s isn't a camera setting; it is ignored",
-						  CAMERA_FLIGHT_YAML, AeronConfigNode_Line(node), name);
-			continue;
-		}
-		CameraMotion_ReadKey(&keys[k], node, &options);
-	}
-	XwaModernCameraOptions_SetMod(&options);
-	AeronConfigFile_Destroy(file);
+	XwaOptionSection_LoadMod(XwaModernCameraOptions_Section());
 }
 
 int XwaCameraMotion_Enabled(void) {
