@@ -302,6 +302,7 @@ set(XWA_RUNTIME_SOURCES
 set(XWA_INPUT_OPTIONS_SOURCES
     src/xwa_runtime/config/modern_camera_options.c
     src/xwa_runtime/config/modern_input_options.c
+    src/xwa_runtime/config/modern_speed_effect_options.c
     src/xwa_runtime/config/modern_sun_options.c
     src/xwa_runtime/config/modern_target_readout_options.c
 )
@@ -357,6 +358,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/opt_mesh.c
     src/xwa_remaster/original_2d.c
     src/xwa_remaster/sky_stars.c
+    src/xwa_remaster/speed_effect.c
     src/xwa_remaster/suns.c
     src/xwa_remaster/assets.c
     src/xwa_remaster/text.c
@@ -748,6 +750,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/config/modern_input_options_screen.h
     src/xwa_runtime/config/modern_options_menu.h
     src/xwa_runtime/config/modern_pilot_profiles_screen.h
+    src/xwa_runtime/config/modern_speed_effect_options.h
     src/xwa_runtime/config/modern_sun_options.h
     src/xwa_runtime/config/modern_target_readout_options.h
     src/xwa_runtime/config/modern_video_options.h

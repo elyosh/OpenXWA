@@ -4,6 +4,7 @@
 #include "aeron/vfs.h"
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
+#include "xwa_runtime/config/modern_speed_effect_options.h"
 #include "xwa_runtime/config/modern_sun_options.h"
 #include "xwa_runtime/config/modern_target_readout_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
@@ -60,6 +61,11 @@ typedef struct XwaHostConfig {
 	 * (XwaModernSunOptions_Keys). */
 	XwaModernSunOptions sun_player_options;
 	unsigned int sun_override_mask;
+	XwaModernSpeedEffectOptions speed_effect_options;
+	/* The player's speed effect values, for the keys that
+	 * speed_effect_override_mask has (XwaModernSpeedEffectOptions_Keys). */
+	XwaModernSpeedEffectOptions speed_effect_player_options;
+	unsigned int speed_effect_override_mask;
 	XwaModernTargetReadoutOptions target_readout_options;
 	/* The player's target readout values. Only the keys in
 	 * target_readout_override_mask are set (XwaModernTargetReadoutOptions_Keys). */

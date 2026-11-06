@@ -42,6 +42,7 @@ sections:
 | `particle_lights` | the lights of sparks, smoke and other effects on craft |
 | `backdrops` | extra planet backdrops for missions |
 | `suns` | the procedural suns and their lens flare |
+| `speed_effect` | streaks of dust that show the player's speed |
 
 If the file can't be read, for example because of a YAML error, the game
 writes an error in the log and uses none of its sections.
@@ -764,6 +765,33 @@ suns:
 | `flare_elements` | The shapes of the procedural flare. A list here replaces the whole default list. |
 
 [Environments](environments.md) describes these keys and the flare shapes.
+
+### speed_effect
+
+The `speed_effect` section draws small streaks of dust around the camera,
+in modern graphics. They show how fast the player's craft moves. The
+game's own space debris is still drawn.
+
+```yaml
+speed_effect:
+  enabled: true
+  brightness: 0.2
+  particles: 256
+```
+
+| Key | Meaning | Range | Default |
+|-|-|-|-|
+| `enabled` | Turns the effect on. | `true` or `false` | `false` |
+| `brightness` | The brightness of the streaks at full speed. | 0 to 1 | 0.2 |
+| `particles` | The number of streaks in the box of dust around the camera, which is 165 m wide. | 0 to 1024 | 256 |
+
+The streaks appear just above speed 0 and are at full brightness from
+16 MGLT. They only show when the camera views the player's
+craft, in the cockpit or from outside, and not in the hangar. Ships and the
+cockpit hide them.
+
+A missing key keeps its default. Players can change these keys in their
+`config.yaml`, and their values win over the mod.
 
 ## hud.yaml
 

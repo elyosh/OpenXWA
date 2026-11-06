@@ -508,6 +508,9 @@ int main(int argc, char** argv) {
 									 host_config.camera_override_mask, persist_camera_enabled);
 	XwaModernSunOptions_Configure(&host_config.sun_options, &host_config.sun_player_options,
 								  host_config.sun_override_mask);
+	XwaModernSpeedEffectOptions_Configure(&host_config.speed_effect_options,
+										  &host_config.speed_effect_player_options,
+										  host_config.speed_effect_override_mask);
 	XwaModernTargetReadoutOptions_Configure(
 		&host_config.target_readout_options, &host_config.target_readout_player_options,
 		host_config.target_readout_override_mask, persist_target_readout_enabled);

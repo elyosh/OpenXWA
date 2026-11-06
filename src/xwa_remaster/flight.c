@@ -28,6 +28,7 @@
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/skins.h"
 #include "xwa_remaster/sky_stars.h"
+#include "xwa_remaster/speed_effect.h"
 #include "xwa_remaster/suns.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/models/cockpit_view.h"
@@ -197,6 +198,7 @@ static struct {
 	XwaRemasterParticles* particles;
 	XwaRemasterHyperspace* hyperspace;
 	XwaRemasterSkyStars* sky_stars;
+	XwaRemasterSpeedEffect* speed_effect;
 	FlBeforeOpaqueMode before_opaque_mode;
 	int rt_w;
 	int rt_h;
@@ -1806,6 +1808,13 @@ static int fl_ensure(int target_w, int target_h) {
 		s.sky_stars = XwaRemasterSkyStars_Create();
 		if (!s.sky_stars) {
 			Aeron_LogError("xwa.remaster", "flight: starfield renderer create failed");
+			return 0;
+		}
+	}
+	if (!s.speed_effect) {
+		s.speed_effect = XwaRemasterSpeedEffect_Create();
+		if (!s.speed_effect) {
+			Aeron_LogError("xwa.remaster", "flight: speed effect create failed");
 			return 0;
 		}
 	}
@@ -6146,6 +6155,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * (OVERLAY stage, back-to-front; engine glows submit per instance
 	 * above, in the classic per-object order). */
 	fl_submit_billboards();
+	XwaRemasterSpeedEffect_Submit(s.speed_effect, s.scene, snap, &effect_view);
 	/* Lens-flare trains (LENS stage — the scene draws them after its
 	 * color passes with GPU anchor occlusion, before bloom). */
 	fl_submit_lens_flares(snap, &flight_view);
@@ -6177,6 +6187,8 @@ void XwaRemasterFlight_Shutdown(void) {
 	s.hyperspace = NULL;
 	XwaRemasterSkyStars_Destroy(s.sky_stars);
 	s.sky_stars = NULL;
+	XwaRemasterSpeedEffect_Destroy(s.speed_effect);
+	s.speed_effect = NULL;
 	XwaRemasterParticles_Destroy(s.particles);
 	s.particles = NULL;
 	XwaRemasterTrails_Destroy(s.trails);

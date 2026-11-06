@@ -281,6 +281,14 @@ suns:
     - { shape: hexagon, position: -0.768, offset: [-0.18, -0.18], size: 0.1, rotation: 0.7236, color: [0.0001, 0.0061, 0.0076] }
     - { shape: hexagon, position: -0.534, offset: [-0.18, -0.18], size: 0.1, rotation: 0.7236, color: [0.0089, 0.008, 0.0066] }
     - { shape: streak, position: 1, size: 0.001, power: 16, color: [0.0375, 0.0375, 0.0375], tinted: true }
+# Small streaks of dust around the camera that show the player's speed. A mod
+# can change these values.
+speed_effect:
+  enabled: false
+  # The streaks' brightness at full speed, 0 to 1.
+  brightness: 0.2
+  # The number of streaks in the 165 m box around the camera, 0 to 1024.
+  particles: 256
 texture_filtering:
   anisotropic: true
   max_anisotropy: 8.0

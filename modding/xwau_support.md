@@ -102,7 +102,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Ambient occlusion (SSAO) | Implemented | OpenXWA has its own, which players set in the video options. | |
 | Laser lights | Implemented | | |
 | Hyperspace effect | Not implemented | OpenXWA draws its own hyperspace tunnel, and doesn't show XWAU's hyperspace images. | |
-| Speed effect | Not implemented | The particles that show the craft's speed. | |
+| Speed effect (`enable_speed_shader`) | Implemented | Only the number of particles is converted. | [Flight](flight.md#speed_effect) |
 
 ## Missions
 
