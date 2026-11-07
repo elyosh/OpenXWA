@@ -74,8 +74,9 @@
  * the rest of the HUD as the resolution goes up. Its size is set to look as
  * it does in XWAU at 1080p, where the HUD scale is 1080 / 600. */
 #define FLIGHT_HULL_ICON_HUD_SCALE (1080.0 / 600.0)
-/* The largest image that fits in an atlas page with its gutters. */
-#define FLIGHT_MAX_IMAGE (BAKE_MAX_ATLAS_DIM - 2 * BAKE_HD_PAD)
+/* The largest image that fits in an atlas page of its own with its
+ * gutters. */
+#define FLIGHT_MAX_IMAGE (BAKE_MAX_OVERSIZE_DIM - 2 * BAKE_HD_PAD)
 /* XWAU's ddraw wrapper picks alternative explosions only for these groups
  * (Direct3DDevice.cpp: DATGroupId - 2000, MAX_XWA_EXPLOSIONS). */
 #define FLIGHT_FIRST_EXPLOSION_GROUP 2000
@@ -1030,8 +1031,9 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 			ok = flight_fit(frame, ctx->opt->planet_max, 0);
 			resized++;
 		}
-		/* An image larger than an atlas page is scaled down to fit, such as
-		   TFTC's galaxy and nebula backdrops, which are 8912 pixels wide. */
+		/* An image too large for an atlas page of its own is scaled down to
+		   fit one. TFTC's galaxy and nebula backdrops, which are 8912 pixels
+		   wide, each get a page of their own. */
 		if (ok && (frame->w > FLIGHT_MAX_IMAGE || frame->h > FLIGHT_MAX_IMAGE)) {
 			ok = flight_fit(frame, FLIGHT_MAX_IMAGE, FLIGHT_MAX_IMAGE);
 			fitted++;

@@ -97,10 +97,15 @@ int BakeSprites_EndQueue(void);
 /* The size of an atlas page, and the gutter between its frames. */
 #define BAKE_MAX_ATLAS_DIM 8192
 #define BAKE_HD_PAD        8
+/* The largest page that a frame too large for a BAKE_MAX_ATLAS_DIM page gets
+ * on its own. Every GPU that SDL's GPU API supports on D3D12 and Metal can
+ * create a texture of this size. */
+#define BAKE_MAX_OVERSIZE_DIM 16384
 
 /* Packs frames into pages of at most BAKE_MAX_ATLAS_DIM texels square, with a
- * BAKE_HD_PAD gutter. A frame must fit in a page with its gutter.
- * `max_pages` 0 allows any number of pages. */
+ * BAKE_HD_PAD gutter. A frame too large for such a page gets a page of its
+ * own, of at most BAKE_MAX_OVERSIZE_DIM. `max_pages` 0 allows any number of
+ * pages. */
 int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
 						   AeronAtlasImage** out_images, AeronCpuAtlas* out);
 /* Writes `dir`/`base`.yaml and the pages of an atlas that

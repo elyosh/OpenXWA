@@ -314,6 +314,7 @@ int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
 	const AeronAtlasBuildOptions options = {
 		.gutter = BAKE_HD_PAD,
 		.max_dimension = BAKE_MAX_ATLAS_DIM,
+		.oversize_dimension = BAKE_MAX_OVERSIZE_DIM,
 		.max_pages = max_pages,
 	};
 	const int built = Aeron_AtlasBuildRgba8(images, count, &options, out);
@@ -351,7 +352,15 @@ static int write_atlas_yaml(const char* path, const BakeAtlasHeader* header, con
 		fputs("game_geometry: true\n", fp);
 	if (header->game_units)
 		fputs("units: game\n", fp);
-	fprintf(fp, "atlas: {w: %d, h: %d}\n", pages->pages[0].width, pages->pages[0].height);
+	/* The loader checks every frame against this size, so it is the largest
+	   width and height of the pages. A frame with a page of its own can
+	   make a page other than the first the tallest. */
+	int width = 0, height = 0;
+	for (int page = 0; page < pages->page_count; ++page) {
+		width = pages->pages[page].width > width ? pages->pages[page].width : width;
+		height = pages->pages[page].height > height ? pages->pages[page].height : height;
+	}
+	fprintf(fp, "atlas: {w: %d, h: %d}\n", width, height);
 	if (header->classic_frames)
 		fprintf(fp, "classic_frames: %d\n", header->classic_frames);
 	if (header->fps)
