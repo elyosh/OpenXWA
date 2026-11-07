@@ -869,6 +869,15 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		return;
 	}
 
+	/* A movie without a fade started in this tick. Its frontend frame was
+	 * replayed above, so the persistent surface and the save stack are up to
+	 * date, but it isn't shown: with nothing submitted, the screen keeps the
+	 * last frame until the movie's first frame. */
+	if (snap->hold_presentation &&
+		(snap->scene_kind == XWA_SCENE_FRONTEND || snap->scene_kind == XWA_SCENE_FRONTEND_MODAL)) {
+		return;
+	}
+
 	/* Only view switches drive the fade. Missing output falls back to classic
 	 * below without fading down HD, so the first ready HD frame is opaque. */
 	const float target = g.mode != RM_VIEW_CLASSIC ? 1.0f : 0.0f;

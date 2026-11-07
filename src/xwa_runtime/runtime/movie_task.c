@@ -17,6 +17,7 @@
 #include "xwa_runtime/runtime/frontend_task.h"
 #include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/runtime/presentation.h"
+#include "xwa_runtime/snapshot/snapshot.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -293,6 +294,11 @@ int XwaMovieTask_Begin(const char* name, int noFade) {
 		return 0;
 	}
 	g_xwaMovieTask.active = 1;
+	if (g_xwaMovieTask.no_fade) {
+		/* Keep the room's last frame on screen until the movie's first frame
+		   is decoded. This tick has nothing new to show. */
+		XwaSnapshot_HoldPresentation();
+	}
 	Aeron_LogInfo("xwa.movie", "Playing '%s' from %s (%s)", name, g_xwaMovieTask.path,
 				  g_xwaMovieTask.is_replacement ? "mod" : "original");
 	return 1;

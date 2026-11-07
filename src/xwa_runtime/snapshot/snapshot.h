@@ -1322,6 +1322,11 @@ typedef struct XwaSnapshot {
 	 * keep its last output. Used while the loading screen is held, because its
 	 * detach presents a black frame. */
 	uint8_t retain_frame;
+	/* Set when a movie without a fade starts in this tick. The driver
+	 * replays the tick as usual but doesn't show it, so the screen keeps
+	 * the last frame until the movie's first frame. The original
+	 * Movie_Play blocks, so this tick's present never reaches the screen. */
+	uint8_t hold_presentation;
 
 	XwaDraw2D draws_2d[XWA_SNAP_MAX_DRAWS_2D];
 	uint32_t draw_2d_count;
@@ -1470,6 +1475,8 @@ void XwaSnapshot_SetSceneKind(XwaSceneKind kind);
 XwaSceneKind XwaSnapshot_SceneKind(void);
 /* Sets retain_frame for the current tick. */
 void XwaSnapshot_RetainFrame(void);
+/* Sets hold_presentation for the current tick. */
+void XwaSnapshot_HoldPresentation(void);
 
 /* FrontendDraw_Begin/EndExternalSurface routing tag. */
 void XwaSnapshot_SetEmitTarget(XwaEmitTarget target);
