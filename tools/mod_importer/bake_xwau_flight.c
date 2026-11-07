@@ -57,6 +57,7 @@
 #include "xwau_dat.h"
 
 #include "aeron/image.h"
+#include "envmap.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -980,6 +981,32 @@ static void flight_image_light(const FlightContext* ctx, int group, int id, Bake
 	}
 }
 
+/* An image of a group, decoded on its own thread. */
+typedef struct FlightDecoded {
+	XwauDatImageInfo info;
+	XwauDatImage image;
+	int ok; /* 0: `error` says why */
+	char error[256];
+} FlightDecoded;
+
+typedef struct FlightDecode {
+	const FlightContext* ctx;
+	int group;
+	const FlightImage* images;
+	FlightDecoded* decoded;
+} FlightDecode;
+
+/* The DAT files are in memory and are only read, so their images can be
+   decoded on several threads. */
+static void flight_decode_task(void* context, int index) {
+	const FlightDecode* decode = (const FlightDecode*)context;
+	const XwauDat* dat = decode->ctx->dats[decode->images[index].dat].dat;
+	FlightDecoded* out = &decode->decoded[index];
+	out->ok = XwauDat_GetImageInfo(dat, decode->group, decode->images[index].id, &out->info) &&
+			  XwauDat_LoadImageFrom(dat, decode->group, decode->images[index].id, &out->image, out->error,
+									sizeof out->error);
+}
+
 static void flight_bake_group(FlightContext* ctx, int group) {
 	int count = 0;
 	FlightImage* images = flight_group_images(ctx, group, &count);
@@ -998,21 +1025,25 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 	};
 
 	BakeFrame* frames = (BakeFrame*)calloc((size_t)count, sizeof *frames);
-	int ok = frames != NULL;
+	const int threads = ctx->opt->threads > 1 ? ctx->opt->threads : 1;
+	FlightDecode decode = { ctx, group, images,
+							(FlightDecoded*)calloc((size_t)count, sizeof *decode.decoded) };
+	int ok = frames != NULL && decode.decoded != NULL;
 	int resized = 0;
 	int fitted = 0;
-	char error[256];
+	if (ok)
+		envmap_parallel_for(count, threads, flight_decode_task, &decode);
 	for (int i = 0; ok && i < count; ++i) {
-		const XwauDat* dat = ctx->dats[images[i].dat].dat;
-		XwauDatImageInfo info;
-		XwauDatImage image;
-		ok = XwauDat_GetImageInfo(dat, group, images[i].id, &info) &&
-			 XwauDat_LoadImageFrom(dat, group, images[i].id, &image, error, sizeof error);
+		FlightDecoded* decoded = &decode.decoded[i];
+		ok = decoded->ok;
 		if (!ok) {
 			ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s: group %d image %d can't be decoded: %s",
-						  ctx->dats[images[i].dat].name, group, images[i].id, error);
+						  ctx->dats[images[i].dat].name, group, images[i].id, decoded->error);
 			break;
 		}
+		const XwauDatImageInfo info = decoded->info;
+		const XwauDatImage image = decoded->image;
+		decoded->image.rgba = NULL;
 		BakeFrame* frame = &frames[i];
 		const double scale = flight_scale(ctx, group, i) / 256.0;
 		frame->rgba = image.rgba;
@@ -1050,6 +1081,9 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 		ctx->stats->failures++;
 	}
 	flight_free_frames(frames, frames ? count : 0);
+	for (int i = 0; decode.decoded && i < count; ++i)
+		XwauDat_FreeImage(&decode.decoded[i].image);
+	free(decode.decoded);
 	free(images);
 }
 

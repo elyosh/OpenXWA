@@ -773,9 +773,9 @@ static void bake_flight(ImportContext* ctx) {
 								  .scale = true,
 								  .bc7_quality = KTX2_BC7_QUALITY_MED,
 								  .group_filter = -1 };
-	const BakeXwauFlightOptions options = { .sprites = &sprites,
-											.xwau_root = ctx->options->source,
-											.planet_max = 0 };
+	const BakeXwauFlightOptions options = {
+		.sprites = &sprites, .xwau_root = ctx->options->source, .planet_max = 0, .threads = ctx->cores
+	};
 	BakeXwauFlightStats stats = { 0 };
 	BakeSprites_BeginQueue(ctx->cores);
 	const int baked = BakeXwau_RunFlight(&options, &stats);
