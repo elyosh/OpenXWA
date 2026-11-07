@@ -16,6 +16,8 @@
 
 #include "aeron/vfs.h"
 
+#include <SDL3/SDL_cpuinfo.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -150,7 +152,10 @@ int main(int argc, char** argv) {
 	}
 
 	BakeStats stats;
+	BakeSprites_BeginQueue(SDL_GetNumLogicalCPUCores());
 	int ok = BakeSprites_Run(&opt, vfs, &stats);
+	stats.failures += BakeSprites_EndQueue();
+	ok = ok && stats.failures == 0;
 	printf("bake done: %d sprites, %d atlases, %d frame dirs, %d skipped, %d failures\n", stats.sprites,
 		   stats.atlases, stats.frame_dirs, stats.skipped, stats.failures);
 	AeronVfs_Destroy(vfs);

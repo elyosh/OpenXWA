@@ -1287,12 +1287,14 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 	}
 	if (group_count > 1)
 		qsort(groups, (size_t)group_count, sizeof *groups, flight_compare_ints);
-	/* The bake stops at the first failure. */
-	for (int g = 0; g < group_count && stats->failures == 0; ++g)
+	/* The bake stops at the first failure, which can be an image of the encode
+	   queue. */
+	for (int g = 0; g < group_count && stats->failures == 0 && BakeSprites_QueueFailures() == 0; ++g)
 		flight_bake_group(&ctx, groups[g]);
-	for (int k = 0; k < ctx.mission_art_count && stats->failures == 0; ++k)
+	for (int k = 0; k < ctx.mission_art_count && stats->failures == 0 && BakeSprites_QueueFailures() == 0;
+		 ++k)
 		flight_bake_mission_art(&ctx, &ctx.mission_art[k]);
-	if (stats->failures == 0 &&
+	if (stats->failures == 0 && BakeSprites_QueueFailures() == 0 &&
 		(opt->sprites->group_filter < 0 || opt->sprites->group_filter == FLIGHT_FONT_GROUP)) {
 		flight_bake_fonts(&ctx);
 		flight_write_fonts_yaml(&ctx);

@@ -77,9 +77,23 @@ int BakeSprites_Run(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeStats* stat
 
 /* Helpers shared with the font bakes and the mod importer's frontend art. */
 int BakeSprites_MakeDirs(const char* path);
-/* Writes `base_path`.png and/or .ktx2 (BC7, sRGB, premultiplied) per `opt`. */
+/* Writes `base_path`.png and/or .ktx2 (BC7, sRGB, premultiplied) per `opt`.
+ * While the encode queue is on, it copies the image for the queue's threads
+ * and returns 1 at once. BakeSprites_EndQueue then reports the images that
+ * failed. */
 int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba, int w,
 						  int h);
+/* Turns the encode queue on, with `threads` threads. Each image is then
+ * encoded and written on one of them. With fewer than 2 threads, the images
+ * are still written at once. Call it and BakeSprites_EndQueue from one
+ * thread, which is the only one that emits images in between. */
+void BakeSprites_BeginQueue(int threads);
+/* The number of queued images that have failed so far. A bake that stops at
+ * its first failure checks it. */
+int BakeSprites_QueueFailures(void);
+/* Waits for the queued images, turns the queue off, and returns the number
+ * of images that failed. */
+int BakeSprites_EndQueue(void);
 /* The size of an atlas page, and the gutter between its frames. */
 #define BAKE_MAX_ATLAS_DIM 8192
 #define BAKE_HD_PAD        8

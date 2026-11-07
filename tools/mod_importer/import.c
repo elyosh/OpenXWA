@@ -753,7 +753,10 @@ static void bake_frontend(ImportContext* ctx) {
 									  .xwau_root = ctx->options->source,
 									  .stock_root = ctx->options->game };
 	BakeXwauStats stats = { 0 };
-	const int ok = BakeXwau_RunFrontend(&options, &stats);
+	BakeSprites_BeginQueue(ctx->cores);
+	const int baked = BakeXwau_RunFrontend(&options, &stats);
+	stats.failures += BakeSprites_EndQueue();
+	const int ok = baked && stats.failures == 0;
 	ToolLog_Write(
 		TOOL_LOG_INFO,
 		"Frontend art: %d atlases, %d HD frames, %d frames upscaled from standard images, %d files left "
@@ -774,7 +777,10 @@ static void bake_flight(ImportContext* ctx) {
 											.xwau_root = ctx->options->source,
 											.planet_max = 0 };
 	BakeXwauFlightStats stats = { 0 };
-	const int ok = BakeXwau_RunFlight(&options, &stats);
+	BakeSprites_BeginQueue(ctx->cores);
+	const int baked = BakeXwau_RunFlight(&options, &stats);
+	stats.failures += BakeSprites_EndQueue();
+	const int ok = baked && stats.failures == 0;
 	ToolLog_Write(
 		TOOL_LOG_INFO,
 		"Flight art: %d atlases with %d images, %d alternative frame sets, %d mission art folders, %d "
