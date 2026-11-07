@@ -177,10 +177,7 @@ uint16_t Object_AllocSlotForGenus(uint16_t genusId) {
 
 #ifdef XWA_MODERN
 		if (genusId == GENUS_NpcProjectile) {
-			MobileObject* projectile = g_objectTable[candidateObjIdx].mobj;
-			projectile->projectileMoveFractionX = 0;
-			projectile->projectileMoveFractionY = 0;
-			projectile->projectileMoveFractionZ = 0;
+			Object_ResetProjectileMoveFraction(g_objectTable[candidateObjIdx].mobj);
 		}
 #endif
 		collide_ResetObjectProximityForSlot(candidateObjIdx);
@@ -1373,10 +1370,16 @@ static __inline void Object_DecayVelocityOverride(MobileObject* mobj) {
 	mobj->velocityOverrideElapsed = newElapsed;
 }
 
-/* Preserve the fractional portion of a projectile's per-axis Q15 displacement.
- * The legacy integer-only step drops it every frame; slow weapons consequently
- * drift when modern flight simulation uses short steps. */
 #ifdef XWA_MODERN
+void Object_ResetProjectileMoveFraction(MobileObject* projectile) {
+	projectile->projectileMoveFractionX = 0;
+	projectile->projectileMoveFractionY = 0;
+	projectile->projectileMoveFractionZ = 0;
+}
+
+/* Keeps the fraction of a projectile's per-axis Q15 step. The original
+ * integer-only step drops it every frame, so slow weapons drift when modern
+ * flight simulation uses short steps. */
 static int Object_ProjectileStepQ15(int16_t direction, uint16_t scalar, uint16_t* fraction) {
 	int64_t moved = (int64_t)direction * scalar + *fraction;
 	*fraction = (uint16_t)(moved & 0x7fff);
@@ -1386,9 +1389,12 @@ static int Object_ProjectileStepQ15(int16_t direction, uint16_t scalar, uint16_t
 
 static void Object_ComputeProjectileForwardMove(MobileObject* projectile, uint16_t scalar) {
 #ifdef XWA_MODERN
-	trig2_xmovedist = Object_ProjectileStepQ15(projectile->moveX, scalar, &projectile->projectileMoveFractionX);
-	trig2_ymovedist = Object_ProjectileStepQ15(projectile->moveY, scalar, &projectile->projectileMoveFractionY);
-	trig2_zmovedist = Object_ProjectileStepQ15(projectile->moveZ, scalar, &projectile->projectileMoveFractionZ);
+	trig2_xmovedist =
+		Object_ProjectileStepQ15(projectile->moveX, scalar, &projectile->projectileMoveFractionX);
+	trig2_ymovedist =
+		Object_ProjectileStepQ15(projectile->moveY, scalar, &projectile->projectileMoveFractionY);
+	trig2_zmovedist =
+		Object_ProjectileStepQ15(projectile->moveZ, scalar, &projectile->projectileMoveFractionZ);
 #else
 	trig2_xmovedist = Xwa_Q15Mul((int16_t)projectile->moveX, scalar);
 	trig2_ymovedist = Xwa_Q15Mul((int16_t)projectile->moveY, scalar);
