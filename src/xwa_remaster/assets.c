@@ -167,14 +167,13 @@ struct XwaRemasterAssets {
 	uint32_t frame_set_updates; /* counts XwaRemasterAssets_UpdateFrameSets calls */
 };
 
-XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d, int smooth_menu_fonts) {
+XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d) {
 	XwaRemasterAssets* a = (XwaRemasterAssets*)calloc(1, sizeof *a);
 	if (!a) {
 		return NULL;
 	}
 	snprintf(a->root, sizeof a->root, "%s", root ? root : "");
 	a->prefer_original_2d = prefer_original_2d != 0;
-	a->smooth_menu_fonts = smooth_menu_fonts != 0;
 	a->mission_index = -1;
 	/* The frame sets use their own random numbers, so they don't change the
 	   game's rand() sequence. */
@@ -1517,11 +1516,9 @@ static AssetLoadStatus assets_load_original_frontend_font(XwaRemasterAssets* a, 
 		Xwa2dFontAtlas_Free(&font);
 		return ASSET_LOAD_FAILED;
 	}
-	/* Preload both variants so the menu can switch immediately. A failure of
-	 * the optional 1x atlas must not hide the original 4x font. */
+	/* Load both variants so the menu can switch at once. The 1x atlas is
+	   optional: when it fails, the 4x font is still used. */
 	if (!assets_init_original_font(cmd, &font, 1, 0, "XWA smooth frontend font", &slot->smooth_atlas)) {
-		AeronFontAtlas_Release(&slot->smooth_atlas);
-		memset(&slot->smooth_atlas, 0, sizeof slot->smooth_atlas);
 		Aeron_LogWarn("xwa.remaster", "frontend font %d: optional smooth atlas unavailable", font_size);
 	}
 	Xwa2dFontAtlas_Free(&font);
@@ -1681,7 +1678,7 @@ const AeronFontAtlas* XwaRemasterAssets_FrontendFont(XwaRemasterAssets* a, int f
 				return &slot->smooth_atlas;
 			}
 			if (out_atlas_scale)
-				*out_atlas_scale = (float)XWA_ORIGINAL_FONT_SCALE;
+				*out_atlas_scale = 4.0f;
 			return slot->atlas.loaded ? &slot->atlas : NULL;
 		}
 	}

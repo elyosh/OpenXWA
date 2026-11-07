@@ -84,8 +84,8 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 												shadow_quality_texts, 2, 62, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &fsr, "FSR Upscaling", fsr_texts, 5, 63, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &msaa, "MSAA", msaa_texts, 4, 64, 0);
-	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &smooth_menu_fonts, "Smooth Menu Fonts",
-										 toggle_texts, 2, 72, 0);
+	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &smooth_menu_fonts, "Smooth Menu Fonts", toggle_texts,
+												2, 72, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &motion_blur_quality, "Motion Blur", motion_blur_texts,
 												3, 65, 0);
 	motion_blur_amount_changed =

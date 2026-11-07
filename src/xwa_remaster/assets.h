@@ -62,7 +62,7 @@ typedef struct XwaAssetRef {
 
 /* `root` is the mod folder. `prefer_original_2d` changes
  * source order; the alternate source is selected only when the first is absent. */
-XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d, int smooth_menu_fonts);
+XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d);
 void XwaRemasterAssets_Destroy(XwaRemasterAssets* a);
 /* Select a resident original frontend atlas without reloading GPU resources. */
 void XwaRemasterAssets_SetSmoothMenuFonts(XwaRemasterAssets* a, int enabled);
