@@ -242,8 +242,54 @@ typedef struct XwaFlightHyperspaceTunnelParams {
 void XwaRemasterFlight_GetHyperspaceTunnel(XwaFlightHyperspaceTunnelParams* out);
 void XwaRemasterFlight_SetHyperspaceTunnel(const XwaFlightHyperspaceTunnelParams* in);
 void XwaRemasterFlight_GetHyperspaceTunnelDefault(XwaFlightHyperspaceTunnelParams* out);
-void XwaRemasterFlight_SetHyperspaceTunnelPreview(int enabled);
-int XwaRemasterFlight_HyperspaceTunnelPreviewEnabled(void);
+
+/* Star streaks of the hyperspace entry and exit (docs/hd_hyperspace_jump.md),
+ * loaded from the `hyperspace_jump` section of remaster/config.yaml and
+ * live-editable through the debug inspector. */
+typedef struct XwaFlightHyperspaceJumpParams {
+	int star_count;
+	float streak_brightness;
+	float whiteout_brightness;
+	float brightness_range;
+	float streak_width_px;
+	float width_from_brightness;
+	float width_variation;
+	float head_widening;
+	float radial_widening;
+	float tail_taper;
+	float head_taper;
+	float taper_variation;
+	float glow_strength;
+	float glow_width;
+	float tail_brightness;
+	float tail_color[3];
+	float stretch_scale;
+	float white_fade_seconds;
+	float tunnel_entry_brightness;
+	float tunnel_settle_seconds;
+	float mesh_light_strength;
+	float mesh_light_start;
+	float mesh_light_curve;
+	float tint[3];
+} XwaFlightHyperspaceJumpParams;
+
+void XwaRemasterFlight_GetHyperspaceJump(XwaFlightHyperspaceJumpParams* out);
+void XwaRemasterFlight_SetHyperspaceJump(const XwaFlightHyperspaceJumpParams* in);
+void XwaRemasterFlight_GetHyperspaceJumpDefault(XwaFlightHyperspaceJumpParams* out);
+
+/* The debug preview of hyperspace. It replaces what the flight scene shows,
+ * never the simulation state. Map mode and real hyperspace come first. */
+typedef enum XwaFlightHyperspacePreview {
+	XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF = 0,
+	XWA_FLIGHT_HYPERSPACE_PREVIEW_TUNNEL = 1,     /* the tunnel alone */
+	XWA_FLIGHT_HYPERSPACE_PREVIEW_JUMP_CYCLE = 2, /* entry, tunnel, exit, normal flight, on a loop */
+} XwaFlightHyperspacePreview;
+
+void XwaRemasterFlight_SetHyperspacePreview(XwaFlightHyperspacePreview mode);
+XwaFlightHyperspacePreview XwaRemasterFlight_GetHyperspacePreview(void);
+/* Playback speed of the preview, 0.05 to 1. */
+void XwaRemasterFlight_SetHyperspacePreviewSpeed(float speed);
+float XwaRemasterFlight_GetHyperspacePreviewSpeed(void);
 
 /* FSR controls exposed by the debug inspector. The user menu persists only
  * the mode; sharpness and debug visualization remain session-only. */

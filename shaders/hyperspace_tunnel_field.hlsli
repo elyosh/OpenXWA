@@ -6,14 +6,14 @@
 #endif
 
 cbuffer HyperspacePS : XWA_HYPERSPACE_UNIFORM_BINDING {
-	/* x/y render size, z/w transition-flare center in screen UV. */
+	/* x/y render size, z/w unused. */
 	float4 view;
 	/* x/y tan(horizontal/vertical half-FOV), z/w projection offsets. */
 	float4 projection;
 	/* x simulation time, y axial speed, z angular speed, w simplex frequency scale. */
 	float4 motion;
-	/* x overall HDR brightness, y highlight strength, z transition alpha,
-	 * w nonzero for the transition flare. */
+	/* x overall HDR brightness, y highlight strength, z opacity during the
+	 * jump's fades, w unused. */
 	float4 appearance;
 	/* x focal length, y axial twist, z cap radius, w cap falloff. */
 	float4 geometry;

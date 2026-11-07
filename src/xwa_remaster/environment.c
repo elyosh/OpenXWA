@@ -755,7 +755,9 @@ static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection*
 static void env_resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	out->region = cam->mission_region;
-	if (cam->hyperspace_phase) {
+	/* The jump's entry and exit are drawn over the region's own scene; only
+	 * the tunnel replaces it. */
+	if (cam->hyperspace_phase == XWA_HYPERSPACE_TUNNEL) {
 		env_select(out, XWA_ENV_MODE_HYPERSPACE, XWA_ENV_FALLBACK_NONE, -1);
 		return;
 	}

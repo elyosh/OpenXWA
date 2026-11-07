@@ -618,23 +618,29 @@ static void xwa_tool_motion_blur(int* open, void* user) {
 
 static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 	(void)user;
-	ImGui::SetNextWindowSize(ImVec2(460, 620), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(460, 760), ImGuiCond_FirstUseEver);
 	bool b = *open != 0;
 	if (!ImGui::Begin("Hyperspace Tunnel", &b)) {
 		ImGui::End();
 		if (!b) {
-			XwaRemasterFlight_SetHyperspaceTunnelPreview(0);
+			XwaRemasterFlight_SetHyperspacePreview(XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF);
 		}
 		*open = b ? 1 : 0;
 		return;
 	}
 
-	bool preview = XwaRemasterFlight_HyperspaceTunnelPreviewEnabled() != 0;
-	if (ImGui::Checkbox("Preview in flight", &preview)) {
-		XwaRemasterFlight_SetHyperspaceTunnelPreview(preview ? 1 : 0);
+	static const char* const preview_modes[] = { "Off", "Tunnel", "Jump cycle" };
+	int preview = (int)XwaRemasterFlight_GetHyperspacePreview();
+	if (ImGui::Combo("Preview in flight", &preview, preview_modes, IM_ARRAYSIZE(preview_modes))) {
+		XwaRemasterFlight_SetHyperspacePreview((XwaFlightHyperspacePreview)preview);
 	}
-	ImGui::TextDisabled("Replaces the normal 3D flight scene without changing simulation state.\n"
-						"Map mode and real hyperspace retain precedence; the cockpit remains visible.");
+	float preview_speed = XwaRemasterFlight_GetHyperspacePreviewSpeed();
+	if (ImGui::SliderFloat("Preview speed", &preview_speed, 0.05f, 1.0f, "%.2f")) {
+		XwaRemasterFlight_SetHyperspacePreviewSpeed(preview_speed);
+	}
+	ImGui::TextDisabled("Shows hyperspace in place of the flight scene. The simulation doesn't change.\n"
+						"Jump cycle: entry, 2 s of tunnel, exit, then 1 s of normal flight.\n"
+						"Map mode and real hyperspace come first. The cockpit stays visible.");
 
 	ImGui::Separator();
 	XwaFlightHyperspaceTunnelParams p;
@@ -720,14 +726,120 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 					  (double)p.cap_color[1], (double)p.cap_color[2]);
 		ImGui::SetClipboardText(yaml);
 	}
-	ImGui::TextDisabled("Edits apply immediately and are not persisted.");
+	ImGui::TextDisabled("Edits apply immediately and are not saved.");
 	if (changed) {
 		XwaRemasterFlight_SetHyperspaceTunnel(&p);
 	}
 
+	ImGui::Separator();
+	ImGui::TextUnformatted("Jump streaks");
+	XwaFlightHyperspaceJumpParams j;
+	XwaRemasterFlight_GetHyperspaceJump(&j);
+	bool jump_changed = false;
+	jump_changed |=
+		ImGui::SliderInt("Star count", &j.star_count, 1000, 262144, "%d", ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("Streak brightness", &j.streak_brightness, 0.0f, 16.0f, "%.2f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("White-out brightness", &j.whiteout_brightness, 1.0f, 128.0f, "%.1f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("Brightness range", &j.brightness_range, 1.0f, 1000.0f, "%.1f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("Streak width (1080p px)", &j.streak_width_px, 0.5f, 8.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Width from brightness", &j.width_from_brightness, 0.0f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Width variation", &j.width_variation, 1.0f, 4.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Head widening", &j.head_widening, 1.0f, 16.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Radial widening", &j.radial_widening, 0.0f, 4.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Tail taper", &j.tail_taper, 0.0f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Head taper", &j.head_taper, 0.0f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Taper variation", &j.taper_variation, 0.0f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Glow strength", &j.glow_strength, 0.0f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Glow width", &j.glow_width, 1.0f, 16.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Tail brightness", &j.tail_brightness, 0.0f, 1.0f, "%.2f");
+	jump_changed |=
+		ImGui::ColorEdit3("Tail colour", j.tail_color, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+	jump_changed |= ImGui::SliderFloat("Stretch scale", &j.stretch_scale, 0.25f, 4.0f, "%.2f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("White fade (s)", &j.white_fade_seconds, 0.05f, 0.5f, "%.3f");
+	jump_changed |=
+		ImGui::SliderFloat("Tunnel entry brightness", &j.tunnel_entry_brightness, 1.0f, 16.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Tunnel settle (s)", &j.tunnel_settle_seconds, 0.05f, 2.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Cockpit light", &j.mesh_light_strength, 0.0f, 16.0f, "%.2f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("Cockpit light start (s)", &j.mesh_light_start, 0.0f, 2.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Cockpit light curve", &j.mesh_light_curve, 0.25f, 8.0f, "%.2f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::ColorEdit3("Streak tint", j.tint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+	ImGui::TextDisabled("White-out brightness multiplies the streaks at the peak of the entry.\n"
+						"Brightness range is the ratio between the brightest and faintest stars.\n"
+						"Width from brightness: 0 = same width, 1 = width follows brightness.\n"
+						"Width variation is a random width factor, from 1/x to x.\n"
+						"Head widening is the largest width factor from perspective and radial\n"
+						"widening together.\n"
+						"Radial widening widens streaks with distance from the vanishing point.\n"
+						"Tapers are fades over shares of a streak's 3D length; variation spreads\n"
+						"them per star.\n"
+						"Glow is a soft skirt around the core; its width is in core widths.\n"
+						"Tail brightness and colour: the streak goes from these to the head's.\n"
+						"Cockpit light: the streaks' light on the cockpit at the white peak, in\n"
+						"white classic pixels. It rises from its start time to the peak; the\n"
+						"curve is the rise's exponent (1 = straight, higher = later).");
+	if (ImGui::Button("Reset jump to YAML defaults")) {
+		XwaRemasterFlight_GetHyperspaceJumpDefault(&j);
+		jump_changed = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Copy jump YAML")) {
+		char yaml[1536];
+		std::snprintf(yaml, sizeof yaml,
+					  "hyperspace_jump:\n"
+					  "  star_count: %d\n"
+					  "  streak_brightness: %.4g\n"
+					  "  whiteout_brightness: %.4g\n"
+					  "  brightness_range: %.4g\n"
+					  "  streak_width_px: %.4g\n"
+					  "  width_from_brightness: %.4g\n"
+					  "  width_variation: %.4g\n"
+					  "  head_widening: %.4g\n"
+					  "  radial_widening: %.4g\n"
+					  "  tail_taper: %.4g\n"
+					  "  head_taper: %.4g\n"
+					  "  taper_variation: %.4g\n"
+					  "  glow_strength: %.4g\n"
+					  "  glow_width: %.4g\n"
+					  "  tail_brightness: %.4g\n"
+					  "  tail_color_r: %.4g\n"
+					  "  tail_color_g: %.4g\n"
+					  "  tail_color_b: %.4g\n"
+					  "  stretch_scale: %.4g\n"
+					  "  white_fade_seconds: %.4g\n"
+					  "  tunnel_entry_brightness: %.4g\n"
+					  "  tunnel_settle_seconds: %.4g\n"
+					  "  mesh_light_strength: %.4g\n"
+					  "  mesh_light_start: %.4g\n"
+					  "  mesh_light_curve: %.4g\n"
+					  "  tint_r: %.4g\n"
+					  "  tint_g: %.4g\n"
+					  "  tint_b: %.4g\n",
+					  j.star_count, (double)j.streak_brightness, (double)j.whiteout_brightness,
+					  (double)j.brightness_range, (double)j.streak_width_px, (double)j.width_from_brightness,
+					  (double)j.width_variation, (double)j.head_widening, (double)j.radial_widening,
+					  (double)j.tail_taper, (double)j.head_taper, (double)j.taper_variation,
+					  (double)j.glow_strength, (double)j.glow_width, (double)j.tail_brightness,
+					  (double)j.tail_color[0], (double)j.tail_color[1], (double)j.tail_color[2],
+					  (double)j.stretch_scale,
+					  (double)j.white_fade_seconds, (double)j.tunnel_entry_brightness,
+					  (double)j.tunnel_settle_seconds, (double)j.mesh_light_strength,
+					  (double)j.mesh_light_start, (double)j.mesh_light_curve, (double)j.tint[0],
+					  (double)j.tint[1], (double)j.tint[2]);
+		ImGui::SetClipboardText(yaml);
+	}
+	if (jump_changed) {
+		XwaRemasterFlight_SetHyperspaceJump(&j);
+	}
+
 	ImGui::End();
 	if (!b) {
-		XwaRemasterFlight_SetHyperspaceTunnelPreview(0);
+		XwaRemasterFlight_SetHyperspacePreview(XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF);
 	}
 	*open = b ? 1 : 0;
 }

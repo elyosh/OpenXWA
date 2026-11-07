@@ -577,7 +577,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	if (!snap) {
 		return;
 	}
-	const int hyperspace_preview = XwaRemasterFlight_HyperspaceTunnelPreviewEnabled();
+	const int hyperspace_preview = XwaRemasterFlight_GetHyperspacePreview() != XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF;
 	const int hyperspace_preview_visible = hyperspace_preview && snap->scene_kind == XWA_SCENE_FLIGHT &&
 										   snap->flight_camera_valid && !snap->flight_camera.map_mode &&
 										   !snap->flight_camera.hyperspace_phase;

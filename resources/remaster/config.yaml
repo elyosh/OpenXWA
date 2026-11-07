@@ -356,7 +356,7 @@ hyperspace_tunnel:
   travel_speed: 13.0      # forward rate; 8 matches the reference shader
   rotation_speed: -2.3   # radians per second around the tunnel axis
   noise_scale: 0.5       # multiplier for all simplex octave frequencies
-  brightness: 1.0        # tunnel brightness, at the classic radiance
+  brightness: 0.6        # tunnel brightness, at the classic radiance
   highlight_strength: 3.0 # cyan-white noise highlights and cap light; independent of the blue body
   focal_length: 0.9     # tunnel perspective; larger values narrow the apparent opening
   twist: 0.1       # reference angular shear: 1.25 / (2 * pi)
@@ -377,6 +377,36 @@ hyperspace_tunnel:
   cap_color_r: 0.09       # linear HDR color of the distant additive light
   cap_color_g: 0.28
   cap_color_b: 1.0
+hyperspace_jump:
+  # Star streaks of the hyperspace entry and exit (docs/hd_hyperspace_jump.md).
+  star_count: 65536           # stars over the whole sphere; about a tenth are on screen
+  streak_brightness: 0.4      # brightness of the stars at the start, at the classic radiance
+  whiteout_brightness: 24.0   # brightness factor at the peak of the white-out
+  brightness_range: 100      # ratio between the brightest and faintest stars
+  streak_width_px: 0.9        # streak width at 1080p
+  width_from_brightness: 0.0 # 0 = same width for all stars, 1 = width follows brightness
+  width_variation: 1.3        # random width factor per star, from 1/x to x
+  head_widening: 1.15          # largest width factor from perspective and radial widening together
+  radial_widening: 0.3        # extra width per screen half-height from the vanishing point
+  tail_taper: 0.35            # tail fade, as a share of the streak's 3D length
+  head_taper: 0.15             # head fade, as a share of the streak's 3D length
+  taper_variation: 0.5        # random spread of the fades per star, 0 to 1
+  glow_strength: 0.25         # brightness of the soft skirt around the core, 0 to 1
+  glow_width: 4.0             # width of the skirt, in core widths
+  tail_brightness: 0.35       # brightness at the tail, as a share of the head's
+  tail_color_r: 0.11          # colour at the tail; the head keeps the star's colour
+  tail_color_g: 0.24
+  tail_color_b: 1.00
+  stretch_scale: 0.8          # multiplies how far the stars travel
+  white_fade_seconds: 0.15    # fade between the white streak field and the tunnel
+  tunnel_entry_brightness: 2.0 # tunnel brightness factor at the fade
+  tunnel_settle_seconds: 0.15  # time for the tunnel to settle to its normal brightness
+  mesh_light_strength: 0.5    # streak light on the cockpit at the white peak, in white classic pixels
+  mesh_light_start: 0.1       # seconds into the entry when the cockpit light starts rising
+  mesh_light_curve: 2.0       # exponent of the rise: 1 = straight, higher = later and steeper
+  tint_r: 0.122                # colour the streaks move toward during the jump
+  tint_g: 0.3544
+  tint_b: 1.00
 point_lights:
   enabled: true
   cluster_depth_slices: 24
