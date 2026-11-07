@@ -34,6 +34,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/tech_ratings.h"
+#include "xwa_runtime/text/text_overrides.h"
 #endif
 
 #include <stdint.h>
@@ -375,10 +376,19 @@ int TechLibrary_LoadSpecTextTable(void) {
 			size_t length;
 
 			if (!File_ReadLine(stream, line, sizeof(line))) {
-				Aeron_LogError("xwa.assets", "Short tech library spec text table '%s' at entry %d field %d",
-							   path, entryIndex, fieldIndex);
-				File_Close(stream);
-				return 1;
+				/* The stock file ends at craft type 231, in entry 230. A craft
+				   type file can give texts to a later craft type, such as
+				   XWAU's craft type 232. The line is then only a mod text. */
+				static const char* const fieldIds[5] = { "NAME", "MANU", "SIDE", "DESC", "CREW" };
+
+				snprintf(line, sizeof(line), "!SPEC_%d_%s!", entryIndex + 1, fieldIds[fieldIndex]);
+				if (XwaText_Find(line + 1) == NULL) {
+					Aeron_LogError("xwa.assets",
+								   "Short tech library spec text table '%s' at entry %d field %d", path,
+								   entryIndex, fieldIndex);
+					File_Close(stream);
+					return 1;
+				}
 			}
 			line[255] = '\0';
 			if (line[0] == '/' && line[1] == '/') {

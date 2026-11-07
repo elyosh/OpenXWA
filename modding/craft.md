@@ -360,7 +360,7 @@ tech_room: {name: 'UT-60D U-Wing Starfighter', manufacturer: 'Incom Corporation'
 
 | Key | Meaning |
 |-|-|
-| `craft_type` | Required. The number of the craft type, from 1 to 231. The [craft types](reference/craft_types.md) page lists them. |
+| `craft_type` | Required. The number of the craft type, from 1 to 255. The [craft types](reference/craft_types.md) page lists them. Craft types 232 to 255 aren't in the original game, so their file needs an `object_type`, and a `ship_list` and `tech_room` to show them in the game's lists. |
 | `object_type` | The object type that the craft type uses. Without it, the craft type keeps its object type. |
 | `ship_list` | Changes to the ship list line. |
 | `tech_room` | The texts of the tech room entry. |

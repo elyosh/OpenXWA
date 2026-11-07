@@ -12,7 +12,8 @@
 /* The game's tables have the stock sizes because this code is built without
    XWA_MODERN. */
 typedef char stock_object_types_check[(XWAU_GAME_OBJECT_TYPES == OBJ_Count) ? 1 : -1];
-typedef char stock_craft_types_check[(XWAU_GAME_CRAFT_TYPES == XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT) ? 1 : -1];
+typedef char
+	stock_craft_types_check[(XWAU_GAME_STOCK_CRAFT_TYPES == XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT) ? 1 : -1];
 typedef char stock_records_check[(XWAU_GAME_RECORDS == XWA_MODEL_DEF_COUNT) ? 1 : -1];
 typedef char stock_weapon_slots_check[(XWA_CRAFT_WEAPON_SLOT_COUNT == XWA_STOCK_WEAPON_SLOT_COUNT) ? 1 : -1];
 typedef char
@@ -157,8 +158,11 @@ XwauGameTables* ImportStockTables_Create(const char* game) {
 		return NULL;
 	for (int t = 0; t < XWAU_GAME_OBJECT_TYPES; ++t)
 		pack_object_type(&g_objectTypes[t], tables->types[t]);
-	for (int c = 0; c < XWAU_GAME_CRAFT_TYPES; ++c)
+	for (int c = 0; c < XWAU_GAME_STOCK_CRAFT_TYPES; ++c)
 		tables->craft[c] = g_objectTypeTables.craftTypeToObjectType[c];
+	/* The game reads craft type 232 from the word after its table, which is
+	   the object type of backdrop 0. */
+	tables->craft[XWAU_GAME_STOCK_CRAFT_TYPES] = g_objectTypeTables.missionBackdropDescriptors[0].objectType;
 	for (int r = 0; r < XWAU_GAME_RECORDS; ++r) {
 		if (!pack_record(&g_modelDefs[r], tables->records[r])) {
 			Report(NULL, "the stock craft records don't have the layout of the game's");

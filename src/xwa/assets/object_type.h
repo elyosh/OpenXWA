@@ -589,7 +589,19 @@ typedef enum ObjectTypeId {
 enum {
 	/* The object types of the stock table. */
 	XWA_STOCK_OBJECT_TYPE_COUNT = 557,
-	XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT = 232,
+	/* The craft types of the stock table, 0 to 231. */
+	XWA_STOCK_CRAFT_TYPE_COUNT = 232,
+#ifdef XWA_MODERN
+	/* A flight group's craft type is a byte, so the modern build has an entry
+	   for each of its values. The game doesn't check the craft type. So it
+	   reads craft type 232 from the word after its table, the object type of
+	   backdrop 0, which is 0. XWAU writes object type 191 there to add craft
+	   type 232. Craft types 232 to 255 are 0 here, and craft type files can
+	   set them. */
+	XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT = 256,
+#else
+	XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT = XWA_STOCK_CRAFT_TYPE_COUNT,
+#endif
 	XWA_OBJECT_TYPE_TABLE_WORD_COUNT = 404,
 	XWA_MISSION_BACKDROP_DESCRIPTOR_COUNT = 104,
 	XWA_CRAFT_COMPANION_OBJECT_TYPE_PAIR_COUNT = 2,

@@ -8,12 +8,12 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/string.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#ifndef XWA_MODERN
-#include <stdio.h>
-#else
+#ifdef XWA_MODERN
 #include "xwa_runtime/frontend/frontend_geometry.h"
+#include "xwa_runtime/text/text_overrides.h"
 #endif
 
 // GLOBAL: XWA 0xABD22C
@@ -65,7 +65,13 @@ int ShipList_Load(void) {
 	for (i = 1; i < 0xffu; ++i) {
 #ifdef XWA_MODERN
 		if (!File_ReadLine(stream, g_frontendScratchBuffer, sizeof(g_frontendScratchBuffer))) {
-			break;
+			/* The stock file ends at craft type 231. A craft type file can
+			   give a line to a later craft type, such as XWAU's craft type
+			   232. The line is then only a mod text. */
+			snprintf(g_frontendScratchBuffer, sizeof(g_frontendScratchBuffer), "!SPECIES_%u!", i);
+			if (XwaText_Find(g_frontendScratchBuffer + 1) == NULL) {
+				continue;
+			}
 		}
 		token = g_frontendScratchBuffer;
 #else

@@ -170,8 +170,8 @@ typedef struct ModelList {
 
 /* The ship list line of each craft type. */
 typedef struct ShipList {
-	char names[XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT][MAX_TEXT];
-	char categories[XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT][MAX_TEXT];
+	char names[XWA_STOCK_CRAFT_TYPE_COUNT][MAX_TEXT];
+	char categories[XWA_STOCK_CRAFT_TYPE_COUNT][MAX_TEXT];
 } ShipList;
 
 typedef struct GameData {
@@ -227,7 +227,7 @@ static void AddShipListLine(void* data, char* line) {
 		return;
 	}
 	const long craft_type = strtol(line + 9, &end, 10);
-	if (*end != '!' || craft_type <= 0 || craft_type >= XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT) {
+	if (*end != '!' || craft_type <= 0 || craft_type >= XWA_STOCK_CRAFT_TYPE_COUNT) {
 		return;
 	}
 	char* name = end + 1;
@@ -402,7 +402,7 @@ static void WriteCraftTypesPage(const char* folder, const GameData* data) {
 	WriteParagraph(page, "Craft types have numbers, not names. A craft type file gives the number in "
 						 "`craft_type`. **Name** is the name in the original ship list.");
 	fprintf(page, "| Number | Name | Object type | Category |\n|---:|---|---|---|\n");
-	for (int craft_type = 1; craft_type < XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT; ++craft_type) {
+	for (int craft_type = 1; craft_type < XWA_STOCK_CRAFT_TYPE_COUNT; ++craft_type) {
 		const int object_type = g_objectTypeTables.craftTypeToObjectType[craft_type];
 		const char* object_name = XwaNames_StockName(&g_xwaObjectTypeNames, object_type);
 		fprintf(page, "| %d | %s | `%s` | ", craft_type, data->ships.names[craft_type],
@@ -411,6 +411,9 @@ static void WriteCraftTypesPage(const char* folder, const GameData* data) {
 		fprintf(page, " |\n");
 	}
 	fprintf(page, "\n");
+	WriteParagraph(page,
+				   "Craft types 232 to 255 aren't in the original game. They have the object type `none`, "
+				   "and a craft type file can give them one. XWAU adds craft type 232.");
 
 	WriteHeading(page, "Ship list categories");
 	WriteParagraph(page,
