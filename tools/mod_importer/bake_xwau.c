@@ -2050,8 +2050,8 @@ int BakeXwau_RunFrontend(const BakeXwauOptions* opt, BakeXwauStats* stats) {
 	read_wide_list(&ctx, opt->xwau_root);
 	find_videos(&ctx);
 
-	/* The bake stops at the first failure, which can be an image of the encode
-	   queue. */
+	/* The bake stops at the first failure, including an image that failed in
+	   the encode queue. */
 	bake_frontres(&ctx);
 	if (stats->failures == 0 && BakeSprites_QueueFailures() == 0)
 		bake_resdata(&ctx);

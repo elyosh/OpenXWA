@@ -143,8 +143,8 @@ static int emit_now(const BakeSpriteOptions* opt, const char* base_path, const u
 
 /* ---- encode queue ---------------------------------------------------- */
 
-/* The queued images take at most this much memory, unless one image is
- * larger on its own. */
+/* The most memory that the queued images can take. An image larger than this is
+ * still queued when the queue is empty. */
 #define QUEUE_BYTES ((size_t)1024 << 20)
 
 typedef struct EncodeJob {
@@ -235,8 +235,8 @@ static int queue_image(const BakeSpriteOptions* opt, const char* base_path, cons
 	job->h = h;
 	job->bytes = bytes;
 	SDL_LockMutex(s_queue.mutex);
-	/* An image that replaces a queued one waits for it, so that it is
-	   written last. */
+	/* If a queued image has the same path, wait until it is written, so that
+	   this newer image is written last. */
 	while ((s_queue.bytes && s_queue.bytes + bytes > QUEUE_BYTES) || queue_has(job->base))
 		SDL_WaitCondition(s_queue.changed, s_queue.mutex);
 	if (s_queue.tail)
@@ -264,7 +264,7 @@ void BakeSprites_BeginQueue(int threads) {
 				break;
 	s_queue.active = s_queue.thread_count > 0;
 	if (!s_queue.active) {
-		/* Without threads, the images are written at once. */
+		/* Without threads, the images are written right away. */
 		SDL_DestroyCondition(s_queue.changed);
 		SDL_DestroyMutex(s_queue.mutex);
 		free(s_queue.threads);
@@ -293,7 +293,7 @@ int BakeSprites_EndQueue(void) {
 
 int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba, int w,
 						  int h) {
-	/* An image that can't be queued is written at once. */
+	/* If the image can't be queued, it is written right away. */
 	if (s_queue.active && queue_image(opt, base_path, rgba, w, h))
 		return 1;
 	return emit_now(opt, base_path, rgba, w, h);
@@ -352,9 +352,10 @@ static int write_atlas_yaml(const char* path, const BakeAtlasHeader* header, con
 		fputs("game_geometry: true\n", fp);
 	if (header->game_units)
 		fputs("units: game\n", fp);
-	/* The loader checks every frame against this size, so it is the largest
-	   width and height of the pages. A frame with a page of its own can
-	   make a page other than the first the tallest. */
+	/* The loader checks every frame against this size, so it must be the
+	   largest width and the largest height of all the pages. Page 0 isn't
+	   always the largest: a frame on a page of its own can make a later page
+	   taller. */
 	int width = 0, height = 0;
 	for (int page = 0; page < pages->page_count; ++page) {
 		width = pages->pages[page].width > width ? pages->pages[page].width : width;
