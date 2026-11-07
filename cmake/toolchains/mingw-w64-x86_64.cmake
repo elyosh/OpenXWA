@@ -1,9 +1,10 @@
 set(CMAKE_SYSTEM_NAME Windows)
 set(CMAKE_SYSTEM_PROCESSOR x86_64)
 
-set(CMAKE_C_COMPILER x86_64-w64-mingw32-gcc)
-set(CMAKE_CXX_COMPILER x86_64-w64-mingw32-g++)
-set(CMAKE_RC_COMPILER x86_64-w64-mingw32-windres)
+# Debian's MinGW-w64 tools for UCRT, the C runtime of Windows 10 and later.
+set(CMAKE_C_COMPILER x86_64-w64-mingw32ucrt-gcc)
+set(CMAKE_CXX_COMPILER x86_64-w64-mingw32ucrt-g++)
+set(CMAKE_RC_COMPILER x86_64-w64-mingw32ucrt-windres)
 
 set(XWA_MINGW_PREFIX "/opt/xwa-windows" CACHE PATH
     "Prefix containing Windows dependencies built with MinGW-w64")

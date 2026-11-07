@@ -9,6 +9,7 @@
 #include "xwa_remaster/hud_cmd.h"
 #include "xwa_remaster/hud_layout.h"
 #include "xwa_remaster/hud_text.h"
+#include "xwa_runtime/models/craft_hud.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -122,14 +123,15 @@ static void fixed_emit(XwaHudWidgetId widget_id, int object_type, int frame, flo
 				   mirror_x);
 }
 
-static void fixed_emit_radar_record(XwaHudWidgetId widget_id, int frame, float center_x_ref,
-									float center_y_ref, float scale_ref, int screen_size, uint32_t argb) {
+static XwaHudDrawRecord* fixed_emit_radar_record(XwaHudWidgetId widget_id, int frame, float center_x_ref,
+												 float center_y_ref, float scale_ref, int screen_size,
+												 uint32_t argb) {
 	const XwaHudWidgetDesc* widget = fixed_widget(widget_id);
 	if (!widget)
-		return;
+		return NULL;
 	if (fixed_draws.record_count >= XWA_HUD_MAX_FIXED_DRAWS) {
 		fixed_draws.dropped_records++;
-		return;
+		return NULL;
 	}
 	XwaHudDrawRecord* record = &fixed_draws.records[fixed_draws.record_count++];
 	memset(record, 0, sizeof *record);
@@ -145,6 +147,17 @@ static void fixed_emit_radar_record(XwaHudWidgetId widget_id, int frame, float c
 	record->center_y_ref = center_y_ref;
 	record->scale_ref = scale_ref;
 	record->argb = argb;
+	return record;
+}
+
+/* A radar record that draws a filled circle `size` pixels wide
+   (radar.blip_size and radar.target_size of hud.yaml). */
+static void fixed_emit_radar_circle(XwaHudWidgetId widget_id, int frame, float center_x_ref,
+									float center_y_ref, float size, uint32_t argb) {
+	XwaHudDrawRecord* record =
+		fixed_emit_radar_record(widget_id, frame, center_x_ref, center_y_ref, size, 256, argb);
+	if (record)
+		record->circle = 1;
 }
 
 static int fixed_element(const XwaHudState* h, int index) {
@@ -168,16 +181,21 @@ static int fixed_compare_draw_records(const void* lhs, const void* rhs) {
 static void fixed_build_frames(const XwaHudState* h, const XwaRemasterHudVisibility* v) {
 	const uint32_t hud_color = h->hud_colors[0];
 	if (v->fixed_frames && fixed_element(h, 3)) {
+		/* The ammo icons are at the place that hud.yaml gives. The original
+		   game keeps them 48 and 30 pixels from the centre at every HUD
+		   scale, and only their size grows. Here the whole HUD scales, so a
+		   mod can place icons that were drawn for one HUD scale. */
+		const XwaAmmoIcons* icons = XwaCraftHud_AmmoIcons();
 		fixed_emit(XWA_HUD_WIDGET_FORE_RADAR_FRAME, OBJ_HudTextureGroup12000, 27, 206, 464, 256, hud_color,
 				   0);
 		if (!(h->mode_flags & XWA_HUD_MODE_PROVING_GROUND)) {
-			fixed_emit(XWA_HUD_WIDGET_FORE_RADAR_FRAME, OBJ_HudTextureGroup12000, 49, 272, 464, 256,
-					   0xffffffffu, 0);
+			fixed_emit(XWA_HUD_WIDGET_FORE_RADAR_FRAME, OBJ_HudTextureGroup12000, 49, icons->warheads[0],
+					   480.0f - icons->warheads[1], 256, 0xffffffffu, 0);
 		}
 		fixed_emit(XWA_HUD_WIDGET_AFT_RADAR_FRAME, OBJ_HudTextureGroup12000, 28, 434, 464, 256, hud_color, 0);
 		if (!(h->mode_flags & XWA_HUD_MODE_PROVING_GROUND)) {
-			fixed_emit(XWA_HUD_WIDGET_AFT_RADAR_FRAME, OBJ_HudTextureGroup12000, 50, 350, 464, 256,
-					   0xffffffffu, 0);
+			fixed_emit(XWA_HUD_WIDGET_AFT_RADAR_FRAME, OBJ_HudTextureGroup12000, 50, icons->countermeasures[0],
+					   480.0f - icons->countermeasures[1], 256, 0xffffffffu, 0);
 		}
 	}
 	if (v->radars) {
@@ -563,6 +581,8 @@ static void fixed_build_radar(const XwaHudState* h, const XwaRemasterHudVisibili
 	const XwaHudLayoutProfile* profile = fixed_profile((XwaHudProfileIndex)fixed_draws.profile);
 	if (!layout || !profile)
 		return;
+	const XwaRadarStyle* style = XwaCraftHud_Radar();
+	const float point_px = (float)fixed_target_h / 1080.0f;
 	int marker_present[2] = { 0, 0 };
 	float marker_x[2] = { 0.0f, 0.0f };
 	float marker_y[2] = { 0.0f, 0.0f };
@@ -591,8 +611,11 @@ static void fixed_build_radar(const XwaHudState* h, const XwaRemasterHudVisibili
 				continue;
 			const float x = center_ref_x + blip->local_x * scale_x;
 			const float y = center_ref_y + blip->local_y * scale_y;
-			fixed_emit_radar_record(blip_widget, 47, x, y, sprite_scale, 64,
-									XwaSnapshotExport_FlightPaletteColor(blip->color_index));
+			const uint32_t argb = XwaSnapshotExport_FlightPaletteColor(blip->color_index);
+			if (style->blipSize > 0.0f)
+				fixed_emit_radar_circle(blip_widget, 47, x, y, style->blipSize * point_px, argb);
+			else
+				fixed_emit_radar_record(blip_widget, 47, x, y, sprite_scale, 64, argb);
 		}
 		if (h->radar_target_marker_visible && h->radar_target_marker_radar == radar) {
 			marker_present[radar] = 1;
@@ -622,8 +645,12 @@ static void fixed_build_radar(const XwaHudState* h, const XwaRemasterHudVisibili
 			continue;
 		const XwaHudWidgetId marker_widget =
 			radar ? XWA_HUD_WIDGET_AFT_TARGET_MARKER : XWA_HUD_WIDGET_FORE_TARGET_MARKER;
-		fixed_emit_radar_record(marker_widget, 48, marker_x[radar], marker_y[radar], marker_scale[radar], 256,
-								0xffffffffu);
+		if (style->targetSize > 0.0f)
+			fixed_emit_radar_circle(marker_widget, 48, marker_x[radar], marker_y[radar],
+									style->targetSize * point_px, 0xffffff00u);
+		else
+			fixed_emit_radar_record(marker_widget, 48, marker_x[radar], marker_y[radar], marker_scale[radar],
+									256, 0xffffffffu);
 	}
 }
 
@@ -1052,9 +1079,13 @@ void XwaRemasterHudFixed_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 /* The quad a record's sprite covers in the target: x, y, w, h. */
 static void fixed_record_quad(const XwaHudDrawRecord* r, const XwaAssetRef* asset, int out_x, int out_y,
 							  float scale, float quad[4]) {
-	const float size_scale = (float)r->screen_size / 256.0f * r->scale_ref * scale;
-	quad[2] = asset->classic_w * size_scale;
-	quad[3] = asset->classic_h * size_scale;
+	if (r->circle) {
+		quad[2] = quad[3] = r->scale_ref * scale;
+	} else {
+		const float size_scale = (float)r->screen_size / 256.0f * r->scale_ref * scale;
+		quad[2] = asset->classic_w * size_scale;
+		quad[3] = asset->classic_h * size_scale;
+	}
 	quad[0] = out_x + r->center_x_ref * scale - quad[2] * 0.5f;
 	quad[1] = out_y + r->center_y_ref * scale - quad[3] * 0.5f;
 }
@@ -1063,8 +1094,8 @@ int XwaRemasterHudFixed_RecordQuad(const XwaHudDrawRecord* r, int target_w, int 
 	if (!r || !fixed_draws.valid || target_w <= 0 || target_h <= 0)
 		return 0;
 	const XwaHudLayoutProfile* profile = fixed_profile((XwaHudProfileIndex)fixed_draws.profile);
-	const XwaAssetRef* asset = XwaRemasterHud_AssetFrame(r->object_type, r->frame);
-	if (!profile || !asset || asset->classic_w <= 0 || asset->classic_h <= 0)
+	const XwaAssetRef* asset = r->circle ? NULL : XwaRemasterHud_AssetFrame(r->object_type, r->frame);
+	if (!profile || (!r->circle && (!asset || asset->classic_w <= 0 || asset->classic_h <= 0)))
 		return 0;
 	int out_x, out_y;
 	float scale;
@@ -1138,8 +1169,8 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 	XwaRemasterHud_BeginRenderPhase();
 	for (uint16_t i = 0; i < fixed_draws.record_count; i++) {
 		const XwaHudDrawRecord* r = &fixed_draws.records[i];
-		const XwaAssetRef* asset = XwaRemasterHud_AssetFrame(r->object_type, r->frame);
-		if (!asset || asset->classic_w <= 0 || asset->classic_h <= 0)
+		const XwaAssetRef* asset = r->circle ? NULL : XwaRemasterHud_AssetFrame(r->object_type, r->frame);
+		if (!r->circle && (!asset || asset->classic_w <= 0 || asset->classic_h <= 0))
 			continue;
 		const int region = fixed_dc_active ? fixed_panel_region(r) : -1;
 		if (region >= 0 && (fixed_dc_erased & (1u << region)))
@@ -1150,6 +1181,25 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 		const float w = quad[2];
 		const float h = quad[3];
 		const float a = ((r->argb >> 24) & 255) / 255.0f;
+		if (r->circle) {
+			AeronDrawList2DRRect circle = { 0 };
+			circle.dst_x = quad[0];
+			circle.dst_y = quad[1];
+			circle.dst_w = w;
+			circle.dst_h = h;
+			circle.radius_px = 0.5f * w;
+			circle.soft_px = 1.0f;
+			circle.fill_top[0] = XwaRemaster_SrgbToLinear(((r->argb >> 16) & 255) / 255.0f) * a;
+			circle.fill_top[1] = XwaRemaster_SrgbToLinear(((r->argb >> 8) & 255) / 255.0f) * a;
+			circle.fill_top[2] = XwaRemaster_SrgbToLinear((r->argb & 255) / 255.0f) * a;
+			circle.fill_top[3] = a;
+			memcpy(circle.fill_bottom, circle.fill_top, sizeof circle.fill_bottom);
+			if (panel)
+				AeronDrawList_AddRRect(fixed_list, &circle);
+			else
+				XwaRemasterDc_AddRRect(fixed_list, XWA_DC_LAYER_GRAPHICS, &circle);
+			continue;
+		}
 		AeronDrawList2DSprite sprite = { 0 };
 		sprite.texture = asset->texture;
 		sprite.src_u0 = r->mirror_x ? asset->u1 : asset->u0;

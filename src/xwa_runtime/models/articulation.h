@@ -94,12 +94,13 @@ void XwaArticulation_AiEnterHangarOrder(unsigned int objIdx);
    replacement without crew animates nothing. */
 int XwaArticulation_AnimateCrew(unsigned int objIdx, int resetToNeutral);
 
-/* Nonzero when the object's model lists crew and sets crew.update_all: its
-   crew animates for every object and in any view. */
-int XwaArticulation_CrewUpdatesAll(unsigned int objIdx);
+/* Nonzero when the object's model has crew and sets crew.always_animate.
+   The crew then animates on every object that uses the model, in every
+   view. */
+int XwaArticulation_CrewAlwaysAnimates(unsigned int objIdx);
 
 /* The hangar crew step for every object whose model sets
-   crew.update_all. */
+   crew.always_animate. */
 void XwaArticulation_StepHangarCrew(void);
 
 /* Every sim step: the crew meshes' drawn angles follow the crew animation's

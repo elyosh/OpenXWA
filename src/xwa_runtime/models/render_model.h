@@ -20,6 +20,12 @@ const AeronFlightModel* XwaRenderModel_Find(const char* key);
 /* Frees the render model of every loaded replacement for `key`, once the HD
    renderer holds a mesh for it. */
 void XwaRenderModel_Release(const char* key);
+/* Converts the names in the cockpit screens of `model` to the game's
+   numbers: the source of each rectangle, and the mask of HUD areas that the
+   screens hide. Logs unknown names with `label` and the material. A
+   rectangle with an unknown source shows nothing. Call it after each GLB
+   parse, before building a mesh from the model. */
+void XwaRenderModel_ResolveScreens(AeronFlightModel* model, const char* label);
 
 #ifdef __cplusplus
 }

@@ -281,7 +281,7 @@ int ImGetMap(ImDispatch* dispatch) {
 			return -1;
 		}
 
-		mapPtr = dispatch->map + 8;
+		mapPtr = (int*)(dispatch->map + 8);
 		if (*(int*)mapPtr != 0x46524d54) {
 			ImLog("ERR: expected 'FRMT' at start of map...");
 			return -1;

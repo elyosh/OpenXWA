@@ -75,7 +75,9 @@ void XwaRemasterShip_Configure(float opt_smooth_angle_degrees, float opt_emissiv
  * articulations' in-between angles as mesh_angle; blown-off components
  * (componentState[slot] != 0 — the classic node-walk skip) hide. B-Wings
  * additionally rotate every mesh root by the Bridge slot rotation before
- * applying the root-local transform.
+ * applying the root-local transform. For an object without craft data,
+ * such as a projectile, the table only hides the components that its
+ * profile hides (XwaFlightObject.component_state).
  * Returns 1 when any slot rotates or hides (callers skip the table
  * bind otherwise). */
 int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,
@@ -235,7 +237,10 @@ int XwaRemasterShip_ScenePointLight(const XwaShipPointLight* light, float match_
 									float exposure, AeronSceneLight* out);
 
 /* Optional per-frame linear ambient cube. NULL selects the process-wide
- * uniform ambient value from XwaShipPbrTuning. */
+ * uniform ambient value from XwaShipPbrTuning. `minimum` is the least
+ * diffuse light from the environment: where the environment's light is
+ * dimmer, the shaders add some of `minimum` until the light is as bright
+ * as `minimum`. */
 typedef struct XwaShipAmbientCube {
 	float pos_x[3];
 	float neg_x[3];
@@ -243,6 +248,7 @@ typedef struct XwaShipAmbientCube {
 	float neg_y[3];
 	float pos_z[3];
 	float neg_z[3];
+	float minimum[3];
 } XwaShipAmbientCube;
 
 /* Fill every lobe with the current process-wide linear ambient tuning. */

@@ -9,6 +9,8 @@
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_settings.h"
+#include "xwa_runtime/models/names.h"
+#include "xwa_runtime/models/units.h"
 #include "xwa_runtime/models/weapon_stats.h"
 
 #include <limits.h>
@@ -57,31 +59,34 @@ enum {
 static const char* const s_groups[WEAPON_RATES_GROUPS] = { "rates", "energy_transfer", "ai_torpedoes",
 														   "impact_spin", "system_damage" };
 
+/* A key of a group. The system damage keys of weapons have no fixed name.
+   They use the name of `weaponType`, which a mod can rename. */
 typedef struct WeaponRatesKey {
 	uint8_t group;
 	const char* name;
+	int weaponType;
 } WeaponRatesKey;
 
 static const WeaponRatesKey s_keys[WEAPON_RATES_KEYS] = {
-	{ WEAPON_RATES_GROUP_RATES, "decharge" },
-	{ WEAPON_RATES_GROUP_RATES, "recharge" },
-	{ WEAPON_RATES_GROUP_RATES, "cooldown" },
-	{ WEAPON_RATES_GROUP_RATES, "decharge_percent" },
-	{ WEAPON_RATES_GROUP_RATES, "recharge_percent" },
-	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "rate" },
-	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "penalty" },
-	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "laser_limit" },
-	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "shield_limit" },
-	{ WEAPON_RATES_GROUP_AI_TORPEDOES, "per_pass" },
-	{ WEAPON_RATES_GROUP_AI_TORPEDOES, "per_target" },
-	{ WEAPON_RATES_GROUP_IMPACT_SPIN, "enabled" },
-	{ WEAPON_RATES_GROUP_IMPACT_SPIN, "speed_percent" },
-	{ WEAPON_RATES_GROUP_IMPACT_SPIN, "angle_percent" },
-	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, "max" },
-	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, "284" },
-	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, "285" },
-	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, "290" },
-	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, "296" },
+	{ WEAPON_RATES_GROUP_RATES, "decharge", 0 },
+	{ WEAPON_RATES_GROUP_RATES, "recharge", 0 },
+	{ WEAPON_RATES_GROUP_RATES, "cooldown_ms", 0 },
+	{ WEAPON_RATES_GROUP_RATES, "decharge_percent", 0 },
+	{ WEAPON_RATES_GROUP_RATES, "recharge_percent", 0 },
+	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "rate", 0 },
+	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "penalty", 0 },
+	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "laser_limit", 0 },
+	{ WEAPON_RATES_GROUP_ENERGY_TRANSFER, "shield_limit", 0 },
+	{ WEAPON_RATES_GROUP_AI_TORPEDOES, "per_pass", 0 },
+	{ WEAPON_RATES_GROUP_AI_TORPEDOES, "per_target", 0 },
+	{ WEAPON_RATES_GROUP_IMPACT_SPIN, "enabled", 0 },
+	{ WEAPON_RATES_GROUP_IMPACT_SPIN, "speed_percent", 0 },
+	{ WEAPON_RATES_GROUP_IMPACT_SPIN, "angle_percent", 0 },
+	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, "max", 0 },
+	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, NULL, 284 },
+	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, NULL, 285 },
+	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, NULL, 290 },
+	{ WEAPON_RATES_GROUP_SYSTEM_DAMAGE, NULL, 296 },
 };
 
 /* The values of a model file or of flight/flight.yaml. -1 means not set.
@@ -131,23 +136,31 @@ static void WeaponRates_ReadSet(const char* path, const AeronConfigNode* weapons
 		set->group |= (uint8_t)(1u << group);
 	}
 	for (key = 0; key < WEAPON_RATES_KEYS; ++key) {
+		const char* keyName = s_keys[key].name != NULL
+								  ? s_keys[key].name
+								  : XwaNames_Name(&g_xwaObjectTypeNames, s_keys[key].weaponType);
 		const AeronConfigNode* node;
-		char name[64];
+		char name[96];
 
 		if (!(set->group & (1u << s_keys[key].group))) {
 			continue;
 		}
-		node = AeronConfigNode_MapGet(AeronConfigNode_MapGet(weapons, s_groups[s_keys[key].group]),
-									  s_keys[key].name);
+		node = AeronConfigNode_MapGet(AeronConfigNode_MapGet(weapons, s_groups[s_keys[key].group]), keyName);
 		if (node == NULL) {
 			continue;
 		}
-		snprintf(name, sizeof name, "weapons.%s.%s", s_groups[s_keys[key].group], s_keys[key].name);
+		snprintf(name, sizeof name, "weapons.%s.%s", s_groups[s_keys[key].group], keyName);
 		if (key == WEAPON_RATES_IMPACT_SPIN) {
 			if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
 				Aeron_LogWarn("xwa.models", "%s: %s must be true or false. It is ignored", path, name);
 			} else {
 				set->value[key] = AeronConfigNode_Bool(node, 0) != 0;
+			}
+		} else if (key == WEAPON_RATES_COOLDOWN) {
+			if (!XwaUnits_Read(node, XWA_UNIT_MILLISECONDS, 0, INT32_MAX, &set->value[key])) {
+				Aeron_LogWarn("xwa.models",
+							  "%s: %s must be a number of milliseconds of 0 or more. It is ignored", path,
+							  name);
 			}
 		} else {
 			WeaponRates_ReadInt(path, name, node, &set->value[key]);
@@ -175,8 +188,7 @@ void XwaWeaponRates_Init(void) {
 	}
 	root = AeronConfigFile_Root(file);
 	section = AeronConfigNode_MapGet(root, "weapons");
-	if (AeronConfigNode_Type(AeronConfigNode_MapGet(root, "version")) != AERON_CONFIG_INT ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1 || section == NULL) {
+	if (section == NULL) {
 		AeronConfigFile_Destroy(file);
 		return;
 	}

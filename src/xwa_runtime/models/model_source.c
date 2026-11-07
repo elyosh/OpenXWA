@@ -30,6 +30,8 @@ typedef struct ModelSourceCockpitKey {
 
 static int s_replacementsEnabled;
 static int s_initialized;
+/* The GLBs that XwaModelSource_Init found for the model lists' keys. */
+static int s_listGlbCount;
 /* Spacecraft0.LST keys by row; row r (1-based, as the loaders count it) is
    s_craftRows[r - 1]. Rows whose name cannot form a key are empty. */
 static ModelSourceKeyText* s_craftRows;
@@ -375,6 +377,7 @@ static void ModelSource_Reset(void) {
 	s_craftKeyCount = 0;
 	s_cockpitKeys = NULL;
 	s_cockpitKeyCount = 0;
+	s_listGlbCount = 0;
 	s_initialized = 0;
 }
 
@@ -463,12 +466,6 @@ void XwaModelSource_Init(void) {
 		ModelSource_Reset();
 		return;
 	}
-	if (ModelSource_FileExists("flight/models/model_map.yaml")) {
-		Aeron_LogWarn("xwa.models",
-					  "flight/models/model_map.yaml is no longer read: an object type's file in "
-					  "flight/object_types gives it another model");
-	}
-
 	glbCount = 0;
 	for (i = 0; i < s_craftKeyCount; ++i) {
 		glbCount += ModelSource_ProbeCraftKey(&s_craftKeys[i]);
@@ -495,6 +492,7 @@ void XwaModelSource_Init(void) {
 			++glbCount;
 		}
 	}
+	s_listGlbCount = glbCount;
 	s_initialized = 1;
 	Aeron_LogInfo("xwa.models",
 				  "model replacements: %d GLB (%d craft keys, %d cockpit-class keys, %d equipment keys, %d "
@@ -566,6 +564,10 @@ XwaFile* XwaModelSource_OpenModelFile(const char* fileName) {
 }
 
 int XwaModelSource_ReplacementsEnabled(void) { return s_replacementsEnabled && s_initialized; }
+
+int XwaModelSource_HasReplacements(void) {
+	return XwaModelSource_ReplacementsEnabled() && s_listGlbCount + s_addedKeyCount > 0;
+}
 
 int XwaModelSource_AddKey(const char* key) {
 	ModelSourceKeyText normalized;

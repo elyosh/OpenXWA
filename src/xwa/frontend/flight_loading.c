@@ -206,8 +206,8 @@ int FlightLoading_DrawProgressScreen(int progressStep) {
 	}
 
 #ifdef XWA_MODERN
-	if (XwaConcourseLayout_LinearProgress()) {
-		/* With `progress: linear`, the bar grows by the same amount at each
+	if (XwaConcourseLayout_EvenProgressBar()) {
+		/* With `progress_bar: even`, the bar grows by the same amount at each
 		   step and fits within the briefing lines. */
 		const int barLength = (itemRight - itemLeft) * 8 / 10 - 14;
 

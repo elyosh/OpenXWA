@@ -25,6 +25,9 @@ typedef struct XwaModernOptionsMenu {
 
 int XwaModernOptionsMenu_Begin(XwaModernOptionsMenu* menu, int center_x, int start_y, int* cursor_row,
 							   int row_count);
+/* The start_y that centres a title and `row_count` rows on the 480-pixel-high
+   screen. */
+int XwaModernOptionsMenu_CenteredY(int row_count);
 void XwaModernOptionsMenu_DrawTitle(XwaModernOptionsMenu* menu, const char* title);
 int XwaModernOptionsMenu_DrawAction(XwaModernOptionsMenu* menu, const char* text, int button_id,
 									int disabled);

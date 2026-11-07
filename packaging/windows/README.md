@@ -1,7 +1,9 @@
 # Windows build with GCC MinGW-w64
 
 This Docker build produces a self-contained x86-64 Windows package using GCC
-MinGW-w64, with OpenXWA and the OpenXWA Mod Importer. SDL3, zstd, and the
+MinGW-w64, with OpenXWA and the OpenXWA Mod Importer. It uses Debian 13's
+MinGW-w64 toolchain for UCRT, the C runtime of Windows 10 and later, so the
+package needs Windows 10 or later. SDL3, zstd, and the
 required FFmpeg components are downloaded and built inside Docker; they are
 not vendored in this repository or required on the host. ISPC's Windows release
 is downloaded too, and runs under Wine: it compiles the importer's BC6H

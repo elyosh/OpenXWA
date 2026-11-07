@@ -23,13 +23,14 @@
    from the hangar settings, with the same spawns as Hangar_SetupReadyScene,
    and places the objects and the player on the settings' floor. */
 
-/* The floor side of the map line spawning (-1: the hangar floor's). */
+/* Whether the layout object being placed is on the inverted floor, or -1 to
+   use the hangar floor's side. */
 static int s_spawnFloorInverted = -1;
-/* The player X/Y offset the launch reference holds. */
+/* The player's X/Y offset that is applied to the launch reference. */
 static int s_launchRefOffset[2];
 /* The re-entry start Y. */
 static int s_reentryStartY;
-/* Whether the scene has a shuttle (LoadShuttle, or the player needed one). */
+/* Whether the scene has a shuttle (`shuttle.enabled`, or the player needed one). */
 static int s_shuttleLoaded;
 
 /* The number of free slots in the craft range of the active region. */
@@ -54,10 +55,11 @@ static int HangarScene_UsesCraftSlots(uint16_t objectType) {
 	return range->next == craft->next && range->end == craft->end;
 }
 
-/* The craft slots that the scene still needs after the map: the family base's
-   work droid, or the hangar's droids, shuttle and roof crane, and then the
-   player's craft. */
-static int HangarScene_CraftSlotsAfterMap(int family) {
+/* Counts the craft slots that the scene still needs after the layout. In the
+   family base, these are for the work droid. In the hangar, they are for the
+   droids, the shuttle and the roof crane. Both also count the player's
+   craft. */
+static int HangarScene_CraftSlotsNeededAfterLayout(int family) {
 	const XwaHangarObjects* objects = XwaHangars_Objects();
 
 	if (family) {
@@ -66,82 +68,71 @@ static int HangarScene_CraftSlotsAfterMap(int family) {
 	return (objects->droids[0].load != 0) + (objects->droids[1].load != 0) + 3;
 }
 
-/* The layout, from the map section. Each line places an object with its
-   markings and object profile; the first four are the objects the droid and
-   crane traffic refer to. A line that places nothing keeps its place.
-   The map objects share the craft slots of the hangar's region with the rest
-   of the scene and the player's craft. When a map needs more slots than the
-   region has free, its last lines aren't placed, so that the player's craft
+/* Places a layout object with its markings and object profile, when the
+   craft slots allow it. Returns its object, or -1 when it isn't placed. */
+static int HangarScene_SpawnLayoutEntry(const XwaHangarMapEntry* entry, int* freeSlots, int* skipped) {
+	const int usesCraftSlots = HangarScene_UsesCraftSlots(entry->objectType);
+	uint16_t objIdx;
+
+	if (usesCraftSlots && *freeSlots <= 0) {
+		++*skipped;
+		return -1;
+	}
+	s_spawnFloorInverted = entry->isFloorInverted;
+	objIdx = (uint16_t)Hangar_SpawnObjectRelativeToLaunchRef(entry->objectType, entry->position[0],
+															 entry->position[1], entry->position[2],
+															 entry->headingXY, entry->headingZ);
+	s_spawnFloorInverted = -1;
+	if (objIdx == 0xffffu || objIdx == 0) {
+		return -1;
+	}
+	if (usesCraftSlots) {
+		--*freeSlots;
+	}
+	g_objectTable[objIdx].mobj->nodeSwitchIndex = (uint8_t)entry->markings;
+	XwaSkins_UseMarkings(entry->objectType, g_objectTable[objIdx].mobj->nodeSwitchIndex);
+	XwaObjectProfiles_ApplyNamed(entry->objectType, entry->objectProfile, g_objectTable[objIdx].mobj->pCraft);
+	return objIdx;
+}
+
+/* Spawns the layout: the crane arm first, then the parked objects. The first
+   parked hangar monitor and hangar generator become the droids' targets, like
+   these objects in the stock layout.
+   The layout shares the craft slots of the hangar's region with the rest of
+   the scene and the player's craft. When it needs more slots than the region
+   has free, its last objects aren't placed, so that the player's craft
    always gets a slot. */
-static void HangarScene_SpawnMap(int family) {
+static void HangarScene_SpawnLayout(int family) {
+	const XwaHangarMapEntry* craneArm = XwaHangars_CraneArm(family);
 	const XwaHangarMapEntry* map;
 	int count;
-	int line;
+	int index;
 	int freeSlots;
 	int skipped = 0;
 
 	map = XwaHangars_Map(family, &count);
-	freeSlots = HangarScene_FreeCraftSlots() - HangarScene_CraftSlotsAfterMap(family);
-	for (line = 0; map != NULL && line < count; ++line) {
-		const XwaHangarMapEntry* entry = &map[line];
-		uint16_t objIdx;
-		int usesCraftSlots;
+	freeSlots = HangarScene_FreeCraftSlots() - HangarScene_CraftSlotsNeededAfterLayout(family);
+	/* Without a crane arm, the hangar code skips the crane. */
+	g_hangarCraneObjIdx =
+		craneArm != NULL ? HangarScene_SpawnLayoutEntry(craneArm, &freeSlots, &skipped) : -1;
+	g_hangarDroidTargetObjIdx = -1;
+	g_hangarDroidRouteTargetObjIdx = -1;
+	g_unusedHangarWorkStandObjIdx = -1;
+	for (index = 0; map != NULL && index < count; ++index) {
+		const int objIdx = HangarScene_SpawnLayoutEntry(&map[index], &freeSlots, &skipped);
 
-		if (entry->objectType == 0) {
+		if (objIdx < 0) {
 			continue;
 		}
-		usesCraftSlots = HangarScene_UsesCraftSlots(entry->objectType);
-		if (usesCraftSlots && freeSlots <= 0) {
-			++skipped;
-			continue;
-		}
-		s_spawnFloorInverted = entry->isFloorInverted;
-		objIdx = (uint16_t)Hangar_SpawnObjectRelativeToLaunchRef(entry->objectType, entry->position[0],
-																 entry->position[1], entry->position[2],
-																 entry->headingXY, entry->headingZ);
-		s_spawnFloorInverted = -1;
-		if (objIdx != 0xffffu && objIdx != 0) {
-			if (usesCraftSlots) {
-				--freeSlots;
-			}
-			g_objectTable[objIdx].mobj->nodeSwitchIndex = (uint8_t)entry->markings;
-			XwaSkins_UseMarkings(entry->objectType, g_objectTable[objIdx].mobj->nodeSwitchIndex);
-			XwaObjectProfiles_ApplyNamed(entry->objectType, entry->objectProfile,
-										 g_objectTable[objIdx].mobj->pCraft);
-		}
-		switch (line) {
-			case 0:
-				if (family) {
-					g_unusedHangarWorkStandObjIdx = objIdx;
-					g_unusedHangarWorkStandObjIdxMirror = g_unusedHangarWorkStandObjIdx;
-				} else {
-					g_hangarDroidTargetObjIdx = objIdx;
-				}
-				break;
-			case 1:
-				if (family) {
-					g_hangarDroidTargetObjIdx = objIdx;
-				} else {
-					g_hangarCraneObjIdx = objIdx;
-				}
-				break;
-			case 2:
-				if (family) {
-					g_hangarCraneObjIdx = objIdx;
-				} else {
-					g_hangarDroidRouteTargetObjIdx = objIdx;
-				}
-				break;
-			case 3:
-				if (family) {
-					g_hangarDroidRouteTargetObjIdx = objIdx;
-				} else {
-					g_unusedHangarWorkStandObjIdx = objIdx;
-					g_unusedHangarWorkStandObjIdxMirror = g_unusedHangarWorkStandObjIdx;
-				}
-				break;
+		if (map[index].objectType == OBJ_HangarMonitor && g_hangarDroidTargetObjIdx < 0) {
+			g_hangarDroidTargetObjIdx = objIdx;
+		} else if (map[index].objectType == OBJ_HangarGenerator && g_hangarDroidRouteTargetObjIdx < 0) {
+			g_hangarDroidRouteTargetObjIdx = objIdx;
+		} else if (map[index].objectType == OBJ_HangarWorkStand && g_unusedHangarWorkStandObjIdx < 0) {
+			g_unusedHangarWorkStandObjIdx = objIdx;
 		}
 	}
+	g_unusedHangarWorkStandObjIdxMirror = g_unusedHangarWorkStandObjIdx;
 	if (skipped != 0) {
 		Aeron_LogWarn(
 			"xwa.models",
@@ -151,8 +142,8 @@ static void HangarScene_SpawnMap(int family) {
 	}
 }
 
-/* Spawns `objectType` on the floor (`inverted`: below the inverted floor),
-   `heightZ` higher. */
+/* Spawns `objectType` on the floor, or below the inverted floor when
+   `inverted` is set, then raises it by `heightZ`. */
 static uint16_t HangarScene_SpawnOnFloor(uint16_t objectType, int x, int y, int heightZ, uint16_t headingXY,
 										 int inverted) {
 	uint16_t objIdx;
@@ -168,7 +159,8 @@ static uint16_t HangarScene_SpawnOnFloor(uint16_t objectType, int x, int y, int 
 }
 
 /* Gives a spawned object its markings and object profile. */
-static void HangarScene_Dress(uint16_t objIdx, uint16_t objectType, int markings, const char* profile) {
+static void HangarScene_ApplyMarkingsAndProfile(uint16_t objIdx, uint16_t objectType, int markings,
+												const char* profile) {
 	if (objIdx != 0xffffu && objIdx != 0) {
 		g_objectTable[objIdx].mobj->nodeSwitchIndex = (uint8_t)markings;
 		XwaSkins_UseMarkings(objectType, g_objectTable[objIdx].mobj->nodeSwitchIndex);
@@ -176,7 +168,8 @@ static void HangarScene_Dress(uint16_t objIdx, uint16_t objectType, int markings
 	}
 }
 
-/* The shuttle, at its place on the floor, with its object profile. */
+/* Spawns the shuttle at its place on the floor, with its markings and object
+   profile. */
 static void HangarScene_SpawnShuttle(void) {
 	const XwaHangarObjects* objects = XwaHangars_Objects();
 	const uint16_t objectType = objects->shuttleObjectType != 0 ? objects->shuttleObjectType : OBJ_Shuttle;
@@ -185,20 +178,20 @@ static void HangarScene_SpawnShuttle(void) {
 		objectType, objects->shuttlePosition[0], objects->shuttlePosition[1], objects->shuttlePosition[2],
 		objects->shuttleOrientation, objects->isShuttleFloorInverted);
 	FlightObject_InitMeshAnimationDefaults(g_hangarShuttleState.objectIdx);
-	HangarScene_Dress((uint16_t)g_hangarShuttleState.objectIdx, objectType, objects->shuttleMarkings,
-					  objects->shuttleObjectProfile);
+	HangarScene_ApplyMarkingsAndProfile((uint16_t)g_hangarShuttleState.objectIdx, objectType,
+										objects->shuttleMarkings, objects->shuttleObjectProfile);
 	s_shuttleLoaded = 1;
 }
 
-/* The scene objects: the layout, then the hangar's droids, shuttle and roof
-   crane, or the family base's work droid, as Hangar_SetupReadyScene spawns
-   them (same random draws, in the same order). */
+/* Spawns the layout, then the hangar's droids, shuttle and roof crane, or the
+   family base's work droid. It draws the same random numbers in the same
+   order as Hangar_SetupReadyScene. */
 void XwaHangarScene_Spawn(int family) {
 	const XwaHangarObjects* objects = XwaHangars_Objects();
 	int sceneSlot;
 	int droid;
 
-	HangarScene_SpawnMap(family);
+	HangarScene_SpawnLayout(family);
 	if (family) {
 		sceneSlot = g_hangarSceneObjectCount;
 		g_hangarSceneObjects[sceneSlot].objectIdx =
@@ -214,8 +207,9 @@ void XwaHangarScene_Spawn(int family) {
 		return;
 	}
 
-	/* The droids: without LoadDroids no droid slot; a droid not loaded keeps
-	   its slot, with object 0 and no update. Droid 2 keeps its stock place. */
+	/* The droids: when neither droid is enabled, there are no droid slots. A
+	   droid that isn't enabled keeps its slot, with object 0 and no update.
+	   Both droids keep their stock places. */
 	if (objects->droids[0].load || objects->droids[1].load) {
 		static const int places[2][3] = { { 227, 351, 58736 }, { -70, 400, 0 } };
 
@@ -227,7 +221,8 @@ void XwaHangarScene_Spawn(int family) {
 				objIdx = HangarScene_SpawnOnFloor(settings->objectType, places[droid][0], places[droid][1],
 												  settings->positionZ, (uint16_t)places[droid][2],
 												  settings->isFloorInverted);
-				HangarScene_Dress(objIdx, settings->objectType, settings->markings, settings->objectProfile);
+				HangarScene_ApplyMarkingsAndProfile(objIdx, settings->objectType, settings->markings,
+													settings->objectProfile);
 			}
 			sceneSlot = g_hangarSceneObjectCount;
 			g_hangarSceneObjects[sceneSlot].objectIdx = objIdx;
@@ -239,8 +234,8 @@ void XwaHangarScene_Spawn(int family) {
 		}
 	}
 
-	/* The shuttle: without LoadShuttle no shuttle (object 0), but the same
-	   random draws. */
+	/* The shuttle: when `shuttle.enabled` is false, there is no shuttle
+	   (object 0), but the same random numbers are drawn. */
 	g_hangarShuttleState.objectIdx = 0;
 	s_shuttleLoaded = 0;
 	if (objects->loadShuttle) {
@@ -251,7 +246,7 @@ void XwaHangarScene_Spawn(int family) {
 	g_hangarShuttleState.moveSpeed = 0.0f;
 	g_hangarShuttleState.targetObjIdx = 0;
 
-	/* The roof crane, at its settings' place. */
+	/* The roof crane, at the place that the settings give. */
 	g_hangarRoofCraneState.objectIdx = (uint16_t)Hangar_SpawnObjectRelativeToLaunchRef(
 		0x13c, objects->roofCranePosition[0], objects->roofCranePosition[1], objects->roofCranePosition[2], 0,
 		0);
@@ -264,7 +259,8 @@ void XwaHangarScene_Spawn(int family) {
 	g_hangarRoofCraneState.targetObjIdx = 0;
 }
 
-/* The hangar shows the HangarIff markings, by default the command ship's. */
+/* Shows the markings of `hangar.markings` on the hangar. By default, these
+   are the command ship's markings. */
 void XwaHangarScene_SetHangarMarkings(void) {
 	const uint8_t hangarIff = XwaHangars_Objects()->hangarIff;
 
@@ -274,9 +270,9 @@ void XwaHangarScene_SetHangarMarkings(void) {
 						 g_objectTable[g_launchRefObjIdx].mobj->nodeSwitchIndex);
 }
 
-/* The hangar of another command ship. The hangar model
-   reloads in place, its floor at the new model's height, and moves for the
-   new player offset; the objects the last scene spawned are released and the
+/* Switches to the hangar of another command ship. The hangar model reloads in
+   place, the floor moves to the new model's height, and the hangar moves for
+   the new player offset. The objects of the last scene are released and the
    scene spawns again. */
 void XwaHangarScene_Rebuild(void) {
 	ObjectRecord* launchRef = &g_objectTable[g_launchRefObjIdx];
@@ -330,28 +326,29 @@ void XwaHangarScene_Rebuild(void) {
 
 /* ---- placement: elevations, the player's offset and its animations ------ */
 
-static int HangarScene_PlayerInverted(int objIdx) {
+static int HangarScene_PlayerOnInvertedFloor(int objIdx) {
 	return XwaHangars_PlayerFloorInverted(g_objectTable[objIdx].objectType);
 }
 
-/* The height above the floor of the player standing `elevation` off its
-   floor side, with its offset. */
+/* Returns the player's height above the floor when it is `elevation` away
+   from its own floor, including its offset. */
 static int HangarScene_PlayerHeight(int objIdx, int elevation) {
-	if (HangarScene_PlayerInverted(objIdx)) {
+	if (HangarScene_PlayerOnInvertedFloor(objIdx)) {
 		return XwaHangars_Objects()->hangarFloorInvertedHeight + XwaHangarScene_PlayerOffset(objIdx, 2) -
 			   elevation;
 	}
 	return XwaHangarScene_PlayerOffset(objIdx, 2) + elevation;
 }
 
-/* The floor sits below the player by the player's height at rest, so the
-   player rests on the floor at mission start, as in the stock game. */
+/* Puts the floor below the player by the player's height at rest. The player
+   then rests on the floor at mission start, as in the stock game. */
 int XwaHangarScene_FloorZ(int playerObjIdx) {
 	return g_objectTable[playerObjIdx].world_z -
 		   HangarScene_PlayerHeight(playerObjIdx, XwaHangarScene_PlayerRestElevation(playerObjIdx));
 }
 
-/* Moves the launch reference by the player's X/Y offset, kept for a rebuild. */
+/* Moves the launch reference by the player's X/Y offset, and keeps the
+   offset for a rebuild. */
 void XwaHangarScene_OffsetLaunchRef(int launchRefIdx, int playerObjIdx) {
 	s_launchRefOffset[0] = XwaHangarScene_PlayerOffset(playerObjIdx, 0);
 	s_launchRefOffset[1] = XwaHangarScene_PlayerOffset(playerObjIdx, 1);
@@ -359,7 +356,7 @@ void XwaHangarScene_OffsetLaunchRef(int launchRefIdx, int playerObjIdx) {
 	g_objectTable[launchRefIdx].world_y -= s_launchRefOffset[1];
 }
 
-/* The Z of an object of `objectType` on its floor side. */
+/* Returns the Z of an object of `objectType` that stands on its floor. */
 int XwaHangarScene_ObjectFloorZ(uint16_t objectType) {
 	const XwaHangarObjects* objects = XwaHangars_Objects();
 	const int inverted = s_spawnFloorInverted >= 0 ? s_spawnFloorInverted : objects->isHangarFloorInverted;
@@ -378,25 +375,26 @@ int XwaHangarScene_PlayerOffset(int objIdx, int axis) {
 }
 
 int XwaHangarScene_PlayerRestElevation(int objIdx) {
-	return XwaHangars_CraftElevation(g_objectTable[objIdx].objectType, HangarScene_PlayerInverted(objIdx));
+	return XwaHangars_CraftElevation(g_objectTable[objIdx].objectType,
+									 HangarScene_PlayerOnInvertedFloor(objIdx));
 }
 
 int XwaHangarScene_PlayerAnimationElevation(int objIdx, int elevation) {
 	const XwaHangarObjects* objects = XwaHangars_Objects();
 
-	return elevation + (HangarScene_PlayerInverted(objIdx) ? objects->playerAnimationInvertedElevation
-														   : objects->playerAnimationElevation);
+	return elevation + (HangarScene_PlayerOnInvertedFloor(objIdx) ? objects->playerAnimationInvertedElevation
+																  : objects->playerAnimationElevation);
 }
 
 int XwaHangarScene_PlayerAbove(int objIdx, int elevation) {
 	const int z =
 		g_objectTable[objIdx].world_z - (g_launchBaseZ + HangarScene_PlayerHeight(objIdx, elevation));
 
-	return HangarScene_PlayerInverted(objIdx) ? z < 0 : z > 0;
+	return HangarScene_PlayerOnInvertedFloor(objIdx) ? z < 0 : z > 0;
 }
 
 void XwaHangarScene_PlayerRise(int objIdx, int distance) {
-	g_objectTable[objIdx].world_z += HangarScene_PlayerInverted(objIdx) ? -distance : distance;
+	g_objectTable[objIdx].world_z += HangarScene_PlayerOnInvertedFloor(objIdx) ? -distance : distance;
 }
 
 /* Puts the player at its rest elevation over the floor. */
@@ -405,8 +403,9 @@ void XwaHangarScene_PlacePlayerAtRest(int objIdx) {
 		g_launchBaseZ + HangarScene_PlayerHeight(objIdx, XwaHangarScene_PlayerRestElevation(objIdx));
 }
 
-/* The re-entry start, after the stock X/Y: the player's offset, its straight
-   line and its animation elevation. */
+/* Moves the player to its re-entry start, after the stock code sets its X/Y.
+   It adds the player's offset and `player.straight_m`, and sets the height
+   from `player.rise_m` or `player.inverted_rise_m`. */
 void XwaHangarScene_PlaceReentryStart(int objIdx) {
 	ObjectRecord* object = &g_objectTable[objIdx];
 
@@ -418,8 +417,8 @@ void XwaHangarScene_PlaceReentryStart(int objIdx) {
 										  objIdx, XwaHangarScene_PlayerAnimationElevation(objIdx, 0x223));
 }
 
-/* Whether the re-entering player is still on its straight line: no descent
-   before the stock start. */
+/* Whether the re-entering player is still on its straight line. It doesn't
+   descend before it reaches the stock start. */
 int XwaHangarScene_ReentryStraight(int objIdx) {
 	return g_objectTable[objIdx].world_y > s_reentryStartY - XwaHangarScene_PlayerOffset(objIdx, 1) -
 											   XwaHangars_Objects()->playerAnimationStraightLine;
@@ -446,9 +445,9 @@ void XwaHangarScene_EnsureShuttle(void) {
 	}
 }
 
-/* The height above the floor of the shuttle `elevation` off its floor side,
-   plus ShuttlePositionZ. On the inverted side, HangarFloorInvertedHeight
-   counts both for its spawn and for its flight. */
+/* Returns the shuttle's height above the floor when it is `elevation` away
+   from its own floor, plus `shuttle.height_m`. On the inverted floor,
+   `inverted_floor_height_m` applies both when it spawns and when it flies. */
 static int HangarScene_ShuttleHeight(int elevation) {
 	const XwaHangarObjects* objects = XwaHangars_Objects();
 
@@ -487,7 +486,7 @@ int XwaHangarScene_ShuttleTurnOut(int dtTicks) {
 	return heading <= 0 || heading >= 0x10000;
 }
 
-/* Turns the shuttle toward ShuttleOrientation. Returns 1 when done. */
+/* Turns the shuttle toward `shuttle.heading_degrees`. Returns 1 when done. */
 int XwaHangarScene_ShuttleTurnIn(int dtTicks) {
 	ObjectRecord* shuttle = &g_objectTable[g_hangarShuttleState.objectIdx];
 	const int orientation =
@@ -499,8 +498,9 @@ int XwaHangarScene_ShuttleTurnIn(int dtTicks) {
 	return orientation >= 0x8000 ? heading >= orientation : heading <= orientation;
 }
 
-/* The leg off the landing place goes sideways (Right, banking) or up or
-   down (Top, Bottom: no bank). */
+/* Moves the shuttle `step` away from its landing place: sideways for
+   `right`, up for `top` and down for `bottom`. For `top` and `bottom`, it
+   also rolls the shuttle. */
 void XwaHangarScene_ShuttleSideStep(int step, int dtTicks) {
 	ObjectRecord* shuttle = &g_objectTable[g_hangarShuttleState.objectIdx];
 
@@ -519,7 +519,7 @@ void XwaHangarScene_ShuttleSideStep(int step, int dtTicks) {
 	}
 }
 
-/* The shuttle's re-entry start, after the stock placement. */
+/* Moves the shuttle to its re-entry start, after the stock placement. */
 void XwaHangarScene_PlaceShuttleReentry(int objIdx) {
 	const XwaHangarObjects* objects = XwaHangars_Objects();
 	ObjectRecord* object = &g_objectTable[objIdx];
@@ -534,30 +534,32 @@ int XwaHangarScene_DroidUpdates(int sceneIdx) {
 	return sceneIdx < 2 && XwaHangars_Objects()->droids[sceneIdx].update;
 }
 
-/* The roof crane's axis (HangarRoofCraneAxis; others are X). */
+/* Returns the roof crane's axis (`roof_crane.axis`). */
 static int HangarScene_CraneAxis(void) {
 	const int axis = XwaHangars_Objects()->roofCraneAxis;
 
 	return axis == 1 || axis == 2 ? axis : 0;
 }
 
-static int* HangarScene_Coordinate(ObjectRecord* object, int axis) {
+static int* HangarScene_AxisCoordinate(ObjectRecord* object, int axis) {
 	return axis == 1 ? &object->world_y : axis == 2 ? &object->world_z : &object->world_x;
 }
 
-/* The roof crane's coordinate along its axis. */
+/* Returns the roof crane's coordinate along its axis. */
 int* XwaHangarScene_CraneCoordinate(void) {
-	return HangarScene_Coordinate(&g_objectTable[g_hangarRoofCraneState.objectIdx], HangarScene_CraneAxis());
+	return HangarScene_AxisCoordinate(&g_objectTable[g_hangarRoofCraneState.objectIdx],
+									  HangarScene_CraneAxis());
 }
 
-/* The roof crane's next target: `offset` along the axis, turned back when it
-   leaves [low, high] off the crane's place and kept within it. */
+/* Returns the roof crane's next target, `offset` away along its axis. When
+   the target is outside the crane's travel, the step goes the other way, and
+   it is clamped to the travel. */
 int XwaHangarScene_CraneTarget(int offset) {
 	const XwaHangarObjects* objects = XwaHangars_Objects();
 	const int axis = HangarScene_CraneAxis();
 	const int current = *XwaHangarScene_CraneCoordinate();
-	const int place =
-		*HangarScene_Coordinate(&g_objectTable[g_launchRefObjIdx], axis) + objects->roofCranePosition[axis];
+	const int place = *HangarScene_AxisCoordinate(&g_objectTable[g_launchRefObjIdx], axis) +
+					  objects->roofCranePosition[axis];
 	const int low = place + objects->roofCraneLowOffset;
 	const int high = place + objects->roofCraneHighOffset;
 	int step = current + offset > high || current + offset < low ? -offset : offset;
@@ -597,10 +599,11 @@ static const int s_stockShots[2][10][3] = {
 	  { -13360, 35019, -6537 } },
 };
 
-/* A fixed shot: the camera section's key (a missing key is 0), else stock. */
-static void HangarScene_FixedShot(int family, int shot, int* x, int* y, int* z) {
+/* Places a fixed shot from the camera key of the settings, else from the
+   stock shot. */
+static void HangarScene_PlaceFixedShot(int family, int shot, int* x, int* y, int* z) {
 	const XwaHangarCamera* camera = XwaHangars_Camera(family);
-	const int* offset = camera->present ? camera->offsets[shot] : s_stockShots[family][shot];
+	const int* offset = camera->set[shot] ? camera->offsets[shot] : s_stockShots[family][shot];
 	const ObjectRecord* launchRef = &g_objectTable[g_launchRefObjIdx];
 
 	*x = launchRef->world_x + offset[0];
@@ -608,8 +611,9 @@ static void HangarScene_FixedShot(int family, int shot, int* x, int* y, int* z) 
 	*z = launchRef->world_z + offset[2];
 }
 
-/* The player craft's own camera; 0 without one (the stock per-type shot). */
-static int HangarScene_PlayerShot(int family, int* x, int* y, int* z) {
+/* Places the player craft's own camera. Returns 0 when the craft has none,
+   and the caller then uses the stock shot for its type. */
+static int HangarScene_PlacePlayerCraftShot(int family, int* x, int* y, int* z) {
 	const ObjectRecord* player = &g_objectTable[g_hangarPlayerObjIdx];
 	int offset[3];
 
@@ -634,13 +638,14 @@ int XwaHangarScene_CameraShot(int shotIndex, int* x, int* y, int* z) {
 			case 3:
 			case 6:
 			case 9:
-				HangarScene_FixedShot(0, shot, x, y, z);
+				HangarScene_PlaceFixedShot(0, shot, x, y, z);
 				return 1;
 			case 4:
 			case 5:
-				/* A droid not loaded gives key 3. */
+				/* When the droid isn't loaded, the shot of key 3 is used. */
+
 				if (!XwaHangars_Objects()->droids[shot - 4].load) {
-					HangarScene_FixedShot(0, 3, x, y, z);
+					HangarScene_PlaceFixedShot(0, 3, x, y, z);
 					return 1;
 				}
 				g_hangarCamFocusObj = g_hangarSceneObjects[shot - 4].objectIdx;
@@ -650,10 +655,10 @@ int XwaHangarScene_CameraShot(int shotIndex, int* x, int* y, int* z) {
 				return 1;
 			case 7:
 				if (g_hangarPlayerObjIdx == 0xffff || g_launchSeqPhase) {
-					HangarScene_FixedShot(0, 3, x, y, z);
+					HangarScene_PlaceFixedShot(0, 3, x, y, z);
 					return 1;
 				}
-				return HangarScene_PlayerShot(0, x, y, z);
+				return HangarScene_PlacePlayerCraftShot(0, x, y, z);
 			case 8:
 				/* Above the crane, wherever it travels. */
 				g_hangarCamFocusObj = g_hangarRoofCraneState.objectIdx;
@@ -673,14 +678,14 @@ int XwaHangarScene_CameraShot(int shotIndex, int* x, int* y, int* z) {
 		case 7:
 		case 8:
 		case 9:
-			HangarScene_FixedShot(1, shot, x, y, z);
+			HangarScene_PlaceFixedShot(1, shot, x, y, z);
 			return 1;
 		case 5:
 			if (g_hangarPlayerObjIdx == 0xffff) {
-				HangarScene_FixedShot(1, 3, x, y, z);
+				HangarScene_PlaceFixedShot(1, 3, x, y, z);
 				return 1;
 			}
-			return HangarScene_PlayerShot(1, x, y, z);
+			return HangarScene_PlacePlayerCraftShot(1, x, y, z);
 		default:
 			return 0;
 	}

@@ -1,27 +1,23 @@
 #include "xwa_runtime/camera/camera_motion.h"
 
-#include "aeron/aeron.h"
-#include "aeron/config_file.h"
-#include "aeron/log.h"
 #include "xwa/flight/hangar.h"
 #include "xwa/flight/player/player.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/time.h"
 #include "xwa_runtime/config/modern_camera_options.h"
+#include "xwa_runtime/models/units.h"
 
 #include <math.h>
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
 
-#define CAMERA_FLIGHT_YAML "flight/flight.yaml"
-
 /* A tick of g_gameTime is 4 ms. */
 #define CAMERA_SECONDS_PER_TICK 0.004f
 /* A longer jump of the game time starts the lag again. */
 #define CAMERA_MAX_STEP_TICKS (250 / 4)
-/* The second speed filter is this many times as fast as the first one, as in
-   XWAU: its steps of 10% and 5% per frame give ln 0.9 / ln 0.95. */
+/* The second speed filter is this many times as fast as the first one:
+   steps of 10% and 5% per frame give ln 0.9 / ln 0.95. */
 #define CAMERA_SLOW_SPEED_RATE 2.05f
 
 #define CAMERA_PI 3.14159265358979323846f
@@ -53,89 +49,9 @@ static struct {
 	float forward[3];
 } s_cameraMotion;
 
-/* Reads one key of the mod's `camera` section into `options`. Returns 0
-   (logged) when the value is wrong. */
-static int CameraMotion_ReadKey(const XwaModernCameraOptionKey* key, const AeronConfigNode* node,
-								XwaModernCameraOptions* options) {
-	char* field = (char*)options + key->offset;
-	const AeronConfigNodeType type = AeronConfigNode_Type(node);
-
-	if (key->is_switch) {
-		int value;
-
-		if (type != AERON_CONFIG_BOOL) {
-			Aeron_LogWarn("xwa.flight", "%s:%d: camera.%s must be true or false; it is ignored",
-						  CAMERA_FLIGHT_YAML, AeronConfigNode_Line(node), key->name);
-			return 0;
-		}
-		value = AeronConfigNode_Bool(node, 0) != 0;
-		memcpy(field, &value, sizeof value);
-	} else {
-		const double number = AeronConfigNode_Float(node, NAN);
-		float value;
-
-		if ((type != AERON_CONFIG_INT && type != AERON_CONFIG_FLOAT) ||
-			!(number >= key->min && number <= key->max)) {
-			Aeron_LogWarn("xwa.flight", "%s:%d: camera.%s must be a number from %g to %g; it is ignored",
-						  CAMERA_FLIGHT_YAML, AeronConfigNode_Line(node), key->name, (double)key->min,
-						  (double)key->max);
-			return 0;
-		}
-		value = (float)number;
-		memcpy(field, &value, sizeof value);
-	}
-	return 1;
-}
-
 void XwaCameraMotion_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
-	const AeronConfigNode* root;
-	const AeronConfigNode* section;
-	const XwaModernCameraOptionKey* keys;
-	XwaModernCameraOptions options;
-	size_t keyCount;
-	size_t i;
-
 	memset(&s_cameraMotion, 0, sizeof s_cameraMotion);
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, CAMERA_FLIGHT_YAML, &file, &error)) {
-		/* The backdrops code already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
-	section = AeronConfigNode_MapGet(root, "camera");
-	if (AeronConfigNode_Type(AeronConfigNode_MapGet(root, "version")) != AERON_CONFIG_INT ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1 || section == NULL) {
-		AeronConfigFile_Destroy(file);
-		return;
-	}
-	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.flight", "%s:%d: camera must be a map; it is ignored", CAMERA_FLIGHT_YAML,
-					   AeronConfigNode_Line(section));
-		AeronConfigFile_Destroy(file);
-		return;
-	}
-
-	XwaModernCameraOptions_GetShipped(&options);
-	options.enabled = 1;
-	keys = XwaModernCameraOptions_Keys(&keyCount);
-	for (i = 0; i < AeronConfigNode_MapCount(section); ++i) {
-		const char* name = AeronConfigNode_MapKeyAt(section, i);
-		const AeronConfigNode* node = AeronConfigNode_MapValueAt(section, i);
-		size_t k;
-
-		for (k = 0; k < keyCount && strcmp(keys[k].name, name) != 0; ++k) {
-		}
-		if (k == keyCount) {
-			Aeron_LogWarn("xwa.flight", "%s:%d: camera.%s isn't a camera setting; it is ignored",
-						  CAMERA_FLIGHT_YAML, AeronConfigNode_Line(node), name);
-			continue;
-		}
-		CameraMotion_ReadKey(&keys[k], node, &options);
-	}
-	XwaModernCameraOptions_SetMod(&options);
-	AeronConfigFile_Destroy(file);
+	XwaOptionSection_LoadMod(XwaModernCameraOptions_Section());
 }
 
 int XwaCameraMotion_Enabled(void) {
@@ -340,6 +256,8 @@ void XwaCameraMotion_CockpitSway(float out[3]) {
 	const PlayerData* player = &g_players[g_localPlayer];
 	XwaModernCameraOptions options;
 	float limit;
+	float strength;
+	float speedSway;
 	float side;
 	float up;
 	float back;
@@ -349,7 +267,7 @@ void XwaCameraMotion_CockpitSway(float out[3]) {
 	out[1] = 0.0f;
 	out[2] = 0.0f;
 	XwaModernCameraOptions_Get(&options);
-	limit = options.cockpit_sway_max;
+	limit = (float)XwaUnits_ToGame(XWA_UNIT_METRES, options.cockpit_sway_max_m);
 	if (!options.enabled || !options.cockpit_sway || limit <= 0.0f || !s_cameraMotion.valid ||
 		s_cameraMotion.objectIdx != player->objectIndex || player->viewState.externalCameraActive ||
 		player->viewState.cameraFocusObjIdx != player->objectIndex || player->mapCameraState ||
@@ -359,9 +277,14 @@ void XwaCameraMotion_CockpitSway(float out[3]) {
 
 	/* Each axis has a soft limit: close to the value while it is small, and
 	   never above `limit`. */
-	side = limit * tanhf(options.cockpit_sway_strength * s_cameraMotion.lagSide / limit);
-	up = limit * tanhf(options.cockpit_sway_strength * s_cameraMotion.lagUp / limit);
-	back = limit * tanhf(options.cockpit_speed_sway * s_cameraMotion.speedChange / limit);
+	strength = (float)XwaUnits_ToGame(XWA_UNIT_METRES, options.cockpit_sway_strength_m);
+	/* The option is in metres for each MGLT, and the speed change is in
+	   speed units. */
+	speedSway = (float)(XwaUnits_ToGame(XWA_UNIT_METRES, options.cockpit_speed_sway_m) /
+						XwaUnits_ToGame(XWA_UNIT_MGLT, 1.0));
+	side = limit * tanhf(strength * s_cameraMotion.lagSide / limit);
+	up = limit * tanhf(strength * s_cameraMotion.lagUp / limit);
+	back = limit * tanhf(speedSway * s_cameraMotion.speedChange / limit);
 	for (i = 0; i < 3; ++i) {
 		out[i] =
 			side * s_cameraMotion.right[i] + up * s_cameraMotion.up[i] - back * s_cameraMotion.forward[i];

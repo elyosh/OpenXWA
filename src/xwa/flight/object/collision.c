@@ -3610,7 +3610,7 @@ void collide_ApplyHostileProximityWeaponDisruption(int ownerObjIdx, int hostileO
 	XwaJammingRule rule;
 	int hasModelRule;
 
-	if (!XwaMissionSettings_HangarJamming()) {
+	if (!XwaMissionSettings_PlayerWeaponJamming()) {
 		return;
 	}
 #endif

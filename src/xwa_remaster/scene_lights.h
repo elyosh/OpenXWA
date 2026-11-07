@@ -27,21 +27,26 @@ typedef struct XwaRemasterDirLight {
 	int16_t source_backdrop_index;
 } XwaRemasterDirLight;
 
-/* The classic light calibration (remaster/config.yaml classic_lighting):
- * the illuminance in W/m^2 of a classic light of brightness 1. It converts
- * every classic light, directional and point. The debug inspector changes
- * it; Configure also sets the value the inspector resets to. */
+/* The classic light calibration (remaster/config.yaml
+ * classic_lighting.illuminance): the illuminance in W/m^2 of a classic light
+ * of brightness 1. It converts every classic light, directional and point.
+ * The debug inspector changes it; Configure also sets the value the
+ * inspector resets to. */
 float XwaRemaster_ClassicLightIlluminance(void);
 void XwaRemaster_SetClassicLightIlluminance(float illuminance);
 void XwaRemaster_ConfigureClassicLightIlluminance(float illuminance);
 float XwaRemaster_ClassicLightIlluminanceDefault(void);
 
-/* The radiance in W/m^2/sr of a classic image value of 1: a backdrop
- * texel, an emissive texel, a cockpit screen. These images have no unit and
- * were drawn next to models lit by the classic lights. A texel is taken as
- * the reflectance of a surface lit by a classic light of brightness 1, so
- * its radiance is the classic light calibration divided by pi. */
+/* The radiance in W/m^2/sr of a classic image value of 1
+ * (classic_lighting.image_radiance): a backdrop texel, an emissive texel, a
+ * cockpit screen. These images have no unit. The value doesn't depend on the
+ * light calibration, so the lit models can be brighter than the images
+ * without making the images too bright. The debug inspector changes it;
+ * Configure also sets the value the inspector resets to. */
 float XwaRemaster_ClassicRadiance(void);
+void XwaRemaster_SetClassicRadiance(float radiance);
+void XwaRemaster_ConfigureClassicRadiance(float radiance);
+float XwaRemaster_ClassicRadianceDefault(void);
 
 /* Reads the game's directional lights as illuminance into `out`, which
  * holds XWA_SNAP_MAX_DIR_LIGHTS lights, and returns their count.

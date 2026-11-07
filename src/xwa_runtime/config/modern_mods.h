@@ -15,7 +15,9 @@ extern "C" {
 typedef struct XwaModernModEntry {
 	const char* name;
 	const char* path; /* empty for the original game */
-	int complete;     /* 0 when its import didn't finish: it can't be chosen */
+	/* Why the mod can't be used, or NULL if it can. The list shows a mod
+	   that can't be used, but it can't be saved as the choice. */
+	const char* problem;
 } XwaModernModEntry;
 
 /* Saves the choice: `path` is empty for the original game. */
@@ -33,8 +35,10 @@ size_t XwaModernMods_Get(void);
 /* The entry of the mod in use, or SIZE_MAX. */
 size_t XwaModernMods_Running(void);
 int XwaModernMods_LaunchOverride(void);
-/* Chooses entry `index`, which must be complete. */
+/* Chooses entry `index`. */
 int XwaModernMods_Set(size_t index);
+/* Saves the last chosen mod that can be used. If the chosen mod can't be
+   used, that mod becomes the choice again. */
 int XwaModernMods_Flush(void);
 
 #ifdef __cplusplus

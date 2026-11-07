@@ -10,6 +10,8 @@
 #include "cJSON.h"
 #include "import.h"
 #include "util.h"
+#include "xwau_game_tables.h"
+#include "xwau_names.h"
 
 #define IMPORT_PATH_CAP 4096
 #define IMPORT_KEY_CAP 256
@@ -23,12 +25,18 @@ typedef struct ImportContext {
 	char work[IMPORT_PATH_CAP]; /* <mod>/.import */
 	int cores;
 	uint64_t phase_start; /* in microseconds */
+	/* The game's names. The craft phase adds the mod's object type
+	   renames. */
+	XwauNames names;
+	/* Stock values. The writers only write values that differ from them. */
+	XwauStockValues stock_values;
 } ImportContext;
 
 /* Whether the import was cancelled. */
 bool Import_Cancelled(ImportContext* ctx);
 
-/* Whether the import should stop: it was cancelled, or something failed. */
+/* Whether the import should stop: it was cancelled, something failed, or a
+   ReportFatal was made. */
 bool Import_ShouldStop(ImportContext* ctx);
 
 /* Starts a phase with `total` items (0: no count). */

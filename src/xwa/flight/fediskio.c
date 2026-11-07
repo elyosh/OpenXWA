@@ -182,8 +182,7 @@ typedef union ModelDefLocalOutputBuffer {
 
 // GLOBAL: XWA 0x5B30E0
 const uint8_t g_optHardpointWeaponGroupKindByType[40] = {
-	0, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 2, 2, 2, 1, 0,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+#include "hardpoint_weapon_kinds.inc"
 };
 
 // GLOBAL: XWA 0x5B2F78
@@ -621,8 +620,8 @@ int FeDiskIo_BuildModelDef(uint16_t modelEntryIdx, uint16_t loadedModelSlot) {
 		uint8_t weaponSlot;
 		int remainingGroups;
 #ifdef XWA_MODERN
-		/* A GLB replacement keeps up to 120 weapon slots, like X-Wing Alliance
-		   Upgrade. Other models keep the original 16. */
+		/* A GLB replacement keeps up to 120 weapon slots. Other models keep
+		   the original 16. */
 		const int weaponSlotLimit = XWA_MODEL_WEAPON_SLOT_LIMIT(modelSlot);
 #define FEDISKIO_WEAPON_SLOT_LIMIT weaponSlotLimit
 #else
@@ -1166,7 +1165,7 @@ void FeDiskIo_FreeTexturesForType(uint16_t objectType) {
 		for (; levelIndex < levelCount * frameCount; ++levelIndex) {
 			if (texLevels[levelIndex].image != NULL) {
 				if (g_useHardware3D) {
-					std3D_DeleteTextureSurface(texLevels[levelIndex].image);
+					std3D_DeleteTextureSurface((struct Std3DTextureSurface*)texLevels[levelIndex].image);
 				} else {
 					Memory_FreeTagged(MODEL_TEXTURE_RESOURCEITEM_TAG, texLevels[levelIndex].image);
 				}

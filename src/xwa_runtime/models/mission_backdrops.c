@@ -30,22 +30,28 @@ static int MissionBackdrops_ReadInt(const AeronConfigNode* node, int64_t* value)
 	return 1;
 }
 
+/* Reads `node` as a [first, last] pair of numbers. */
+static int MissionBackdrops_ReadRange(const AeronConfigNode* node, int64_t* first, int64_t* last) {
+	return AeronConfigNode_Type(node) == AERON_CONFIG_SEQUENCE && AeronConfigNode_SequenceCount(node) == 2 &&
+		   MissionBackdrops_ReadInt(AeronConfigNode_SequenceGet(node, 0), first) &&
+		   MissionBackdrops_ReadInt(AeronConfigNode_SequenceGet(node, 1), last);
+}
+
 /* Reads one entry of extra_planets. Returns 0, logged, when it is invalid. */
 static int MissionBackdrops_ReadEntry(const AeronConfigNode* entry, int* firstId, int* lastId,
 									  int* firstGroup) {
-	const AeronConfigNode* ids = AeronConfigNode_MapGet(entry, "ids");
 	int64_t first;
 	int64_t last;
 	int64_t group;
+	int64_t lastGroup;
 	const int line = AeronConfigNode_Line(entry);
 
 	if (AeronConfigNode_Type(entry) != AERON_CONFIG_MAP ||
-		AeronConfigNode_Type(ids) != AERON_CONFIG_SEQUENCE || AeronConfigNode_SequenceCount(ids) != 2 ||
-		!MissionBackdrops_ReadInt(AeronConfigNode_SequenceGet(ids, 0), &first) ||
-		!MissionBackdrops_ReadInt(AeronConfigNode_SequenceGet(ids, 1), &last) ||
-		!MissionBackdrops_ReadInt(AeronConfigNode_MapGet(entry, "first_group"), &group)) {
+		!MissionBackdrops_ReadRange(AeronConfigNode_MapGet(entry, "ids"), &first, &last) ||
+		!MissionBackdrops_ReadRange(AeronConfigNode_MapGet(entry, "image_groups"), &group, &lastGroup)) {
 		Aeron_LogError("xwa.mission",
-					   "%s:%d: an extra planet needs ids: [first, last] and first_group; it is ignored",
+					   "%s:%d: an extra planet needs ids: [first, last] and image_groups: [first, last]; it "
+					   "is ignored",
 					   MISSION_BACKDROPS_PATH, line);
 		return 0;
 	}
@@ -56,7 +62,15 @@ static int MissionBackdrops_ReadEntry(const AeronConfigNode* entry, int* firstId
 					   XWA_EXTRA_BACKDROP_FIRST_ID, XWA_EXTRA_BACKDROP_LAST_ID);
 		return 0;
 	}
-	if (group < 0 || group + (last - first) > MISSION_BACKDROPS_LAST_GROUP) {
+	if (lastGroup - group != last - first) {
+		Aeron_LogError("xwa.mission",
+					   "%s:%d: image_groups [%lld, %lld] must have as many groups as ids [%lld, %lld]; they "
+					   "are ignored",
+					   MISSION_BACKDROPS_PATH, line, (long long)group, (long long)lastGroup, (long long)first,
+					   (long long)last);
+		return 0;
+	}
+	if (group < 0 || lastGroup > MISSION_BACKDROPS_LAST_GROUP) {
 		Aeron_LogError(
 			"xwa.mission", "%s:%d: image groups must be from 0 to %d; ids [%lld, %lld] are ignored",
 			MISSION_BACKDROPS_PATH, line, MISSION_BACKDROPS_LAST_GROUP, (long long)first, (long long)last);
@@ -88,7 +102,6 @@ void XwaMissionBackdrops_Init(void) {
 	AeronConfigFile* file = NULL;
 	AeronConfigError error;
 	const AeronConfigNode* root;
-	const AeronConfigNode* version;
 	const AeronConfigNode* planets;
 	size_t entry;
 	int added = 0;
@@ -111,13 +124,6 @@ void XwaMissionBackdrops_Init(void) {
 		return;
 	}
 	root = AeronConfigFile_Root(file);
-	version = AeronConfigNode_MapGet(root, "version");
-	if (AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1) {
-		Aeron_LogError("xwa.mission", "%s: expected 'version: 1'; backdrop ids above %d place nothing",
-					   MISSION_BACKDROPS_PATH, XWA_EXTRA_BACKDROP_FIRST_ID - 1);
-		AeronConfigFile_Destroy(file);
-		return;
-	}
 	planets = AeronConfigNode_MapGet(AeronConfigNode_MapGet(root, "backdrops"), "extra_planets");
 	if (planets != NULL && AeronConfigNode_Type(planets) != AERON_CONFIG_SEQUENCE) {
 		Aeron_LogError(

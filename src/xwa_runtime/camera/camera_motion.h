@@ -6,16 +6,10 @@
  * craft has turned and sped up lately. The exterior camera and the cockpit
  * use it to trail the craft.
  *
- * A mod sets the camera in the `camera` section of flight/flight.yaml:
- *
- *   camera:
- *     exterior_tilt: 10.0
- *     cockpit_sway: false
- *
- * The keys are those of the `camera` section of remaster/config.yaml. Every
- * key is optional, and a missing key keeps the shipped value. A mod that has
- * the section turns the feature on, unless the section has `enabled: false`.
- * The player's config.yaml still wins over the mod. */
+ * The values come from the `camera` section of the shipped settings, then
+ * of the mod's flight settings, then of the player's settings. A mod that
+ * has the section turns the feature on, unless the section turns it off.
+ * The player's choice still wins over the mod. */
 
 #include <stdint.h>
 

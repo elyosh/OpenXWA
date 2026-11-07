@@ -3,6 +3,7 @@
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/hud_fixed.h"
+#include "xwa_remaster/hud_readout.h"
 
 #include "aeron/aeron.h"
 #include "aeron/asset/opt_model.h"
@@ -27,6 +28,7 @@
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/skins.h"
 #include "xwa_remaster/sky_stars.h"
+#include "xwa_remaster/speed_effect.h"
 #include "xwa_remaster/suns.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/models/cockpit_view.h"
@@ -196,6 +198,7 @@ static struct {
 	XwaRemasterParticles* particles;
 	XwaRemasterHyperspace* hyperspace;
 	XwaRemasterSkyStars* sky_stars;
+	XwaRemasterSpeedEffect* speed_effect;
 	FlBeforeOpaqueMode before_opaque_mode;
 	int rt_w;
 	int rt_h;
@@ -634,6 +637,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"hyperspace_tunnel.cap_color_g",
 		"hyperspace_tunnel.cap_color_b",
 		"classic_lighting.illuminance",
+		"classic_lighting.image_radiance",
+		"environment_maps.intensity_scale",
 		"lighting.ambient_r",
 		"lighting.ambient_g",
 		"lighting.ambient_b",
@@ -1042,6 +1047,27 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	XwaRemaster_ConfigureClassicLightIlluminance(classic_light_illuminance);
+
+	const float classic_radiance =
+		(float)AeronConfigFile_GetFloat(cf, "classic_lighting.image_radiance", 0.0);
+	if (!isfinite(classic_radiance) || classic_radiance <= 0.0f || classic_radiance > FL_RADIANCE_MAX) {
+		Aeron_LogError("xwa.remaster", "%s: classic_lighting.image_radiance must be above 0 and at most %g",
+					   path, (double)FL_RADIANCE_MAX);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	XwaRemaster_ConfigureClassicRadiance(classic_radiance);
+
+	const float intensity_scale =
+		(float)AeronConfigFile_GetFloat(cf, "environment_maps.intensity_scale", -1.0);
+	if (!isfinite(intensity_scale) || intensity_scale < 0.0f ||
+		intensity_scale > XWA_ENV_INTENSITY_SCALE_MAX) {
+		Aeron_LogError("xwa.remaster", "%s: environment_maps.intensity_scale must be from 0 to %g", path,
+					   (double)XWA_ENV_INTENSITY_SCALE_MAX);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	XwaRemasterEnvironment_ConfigureIntensityScale(intensity_scale);
 
 	XwaShipPbrTuning pbr;
 	memset(&pbr, 0, sizeof pbr);
@@ -1782,6 +1808,13 @@ static int fl_ensure(int target_w, int target_h) {
 		s.sky_stars = XwaRemasterSkyStars_Create();
 		if (!s.sky_stars) {
 			Aeron_LogError("xwa.remaster", "flight: starfield renderer create failed");
+			return 0;
+		}
+	}
+	if (!s.speed_effect) {
+		s.speed_effect = XwaRemasterSpeedEffect_Create();
+		if (!s.speed_effect) {
+			Aeron_LogError("xwa.remaster", "flight: speed effect create failed");
 			return 0;
 		}
 	}
@@ -4603,6 +4636,8 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 		Aeron_GpuDebugMarker(cmd, "HUD target boxes after fixed");
 		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
 										 XWA_HUD_TARGET_BOX_AFTER_FIXED);
+		Aeron_GpuDebugMarker(cmd, "HUD target readout");
+		XwaRemasterHudReadout_Render(cmd, pass, target, target_w, target_h, s.scene);
 	}
 	Aeron_GpuDebugMarker(cmd, "HUD CMD");
 	XwaRemasterHud_RenderCmd(cmd, pass, target, target_w, target_h);
@@ -4909,15 +4944,12 @@ static void fl_environment_light_to_dir_light(const AeronEnvironmentLight* light
 	memcpy(out->color, light->color_linear, sizeof out->color);
 }
 
-/* While an environment is bound it owns the ambient: its authored fill
- * replaces the game's ambient cube in every direction (the diffuse cube adds
- * the directional part). */
+/* While an environment is bound, it replaces the game's ambient. Its fill
+ * is the least light the diffuse cube gives: where the cube is dimmer, the
+ * shaders add part of the fill. */
 static void fl_set_ambient_fill(FlSceneLighting* out, const float fill[3]) {
-	float* const lobes[6] = { out->ambient_cube.pos_x, out->ambient_cube.neg_x, out->ambient_cube.pos_y,
-							  out->ambient_cube.neg_y, out->ambient_cube.pos_z, out->ambient_cube.neg_z };
-	for (int lobe = 0; lobe < 6; lobe++) {
-		memcpy(lobes[lobe], fill, 3 * sizeof(float));
-	}
+	memset(&out->ambient_cube, 0, sizeof out->ambient_cube);
+	memcpy(out->ambient_cube.minimum, fill, sizeof out->ambient_cube.minimum);
 	out->ambient = &out->ambient_cube;
 }
 
@@ -5349,7 +5381,8 @@ int XwaRemasterFlight_CaptureSetSky(AeronScene3D* scene, XwaRemasterSkyStars* st
 	}
 	if (sky) {
 		/* The overlay is not part of the captured sky. */
-		AeronPreparedEnvironment without_overlay = *sky;
+		AeronPreparedEnvironment without_overlay;
+		XwaRemasterEnvironment_ScaleIntensity(sky, &without_overlay);
 		without_overlay.overlay = NULL;
 		AeronScene_SetSkyEnvironment(scene, &without_overlay);
 		return 1;
@@ -5702,7 +5735,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * twinkle advances with the simulation clock (game_time_ticks), so it
 	 * is deterministic and pauses with the game. */
 	if (sky_environment) {
-		AeronScene_SetSkyEnvironment(s.scene, sky_environment);
+		AeronPreparedEnvironment scaled_sky;
+		AeronScene_SetSkyEnvironment(s.scene,
+									 XwaRemasterEnvironment_ScaleIntensity(sky_environment, &scaled_sky));
 		/* Kept backdrops bring their own suns. */
 		for (uint32_t i = 0; !keep_backdrops && i < sky_environment->light_count; i++) {
 			AeronScene_AddSkySun(s.scene, &sky_environment->lights[i]);
@@ -6011,7 +6046,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	if (scene_lighting.captured) {
 		AeronScene_SetPbrEnvironment(s.scene, &scene_lighting.captured_environment);
 	} else if (scene_lighting.environment) {
-		AeronScene_SetPbrPreparedEnvironment(s.scene, scene_lighting.environment);
+		AeronPreparedEnvironment scaled_environment;
+		AeronScene_SetPbrPreparedEnvironment(
+			s.scene, XwaRemasterEnvironment_ScaleIntensity(scene_lighting.environment, &scaled_environment));
 	}
 
 	/* Player cockpit (lit; classic runs the normal light setup). Gates
@@ -6104,6 +6141,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * (OVERLAY stage, back-to-front; engine glows submit per instance
 	 * above, in the classic per-object order). */
 	fl_submit_billboards();
+	XwaRemasterSpeedEffect_Submit(s.speed_effect, s.scene, snap, &effect_view);
 	/* Lens-flare trains (LENS stage — the scene draws them after its
 	 * color passes with GPU anchor occlusion, before bloom). */
 	fl_submit_lens_flares(snap, &flight_view);
@@ -6135,6 +6173,8 @@ void XwaRemasterFlight_Shutdown(void) {
 	s.hyperspace = NULL;
 	XwaRemasterSkyStars_Destroy(s.sky_stars);
 	s.sky_stars = NULL;
+	XwaRemasterSpeedEffect_Destroy(s.speed_effect);
+	s.speed_effect = NULL;
 	XwaRemasterParticles_Destroy(s.particles);
 	s.particles = NULL;
 	XwaRemasterTrails_Destroy(s.trails);

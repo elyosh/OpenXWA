@@ -82,6 +82,15 @@ int XwaModelRole_Collect(unsigned short objectType, XwaModelRole role, int* comp
 /* For a replacement, writes the components carrying tag `tagName` to
    `components` (at most `capacity`) and returns how many there are. */
 int XwaModelRole_CollectTag(unsigned short objectType, const char* tagName, int* components, int capacity);
+/* Returns the part tag of `role`, such as "compactor.door.1", or NULL when
+   `role` isn't a role. */
+const char* XwaModelRole_Tag(XwaModelRole role);
+/* Returns the keys of the models that use `role`, as a NULL-terminated
+   list. The list is empty when `role` isn't a role. */
+const char* const* XwaModelRole_Models(XwaModelRole role);
+/* Returns whether a model can tag any number of parts with `role`. When it
+   returns 0, a model tags exactly one part. */
+int XwaModelRole_IsSet(XwaModelRole role);
 #define XWA_MODEL_ROLE(objectType, role, stockComponent)                                                     \
 	XwaModelRole_Resolve((unsigned short)(objectType), (role), (stockComponent))
 
@@ -91,9 +100,9 @@ struct AeronFlightModel;
    stock component number. Always returns 1; `reason` is unused. */
 int XwaModelRole_Validate(const char* key, const struct AeronFlightModel* model, char* reason,
 						  unsigned int reasonSize);
-/* The number of weapon slots a model def keeps: 120 (the X-Wing Alliance
-   Upgrade limit) for GLB replacements, and the original 16 for stock OPTs. 17
-   stock OPTs have more weapon hardpoints than 16 and rely on that cut. */
+/* The number of weapon slots a model def keeps: 120 for GLB replacements,
+   and the original 16 for stock OPTs. 17 stock OPTs have more than 16 weapon
+   hardpoints and rely on that cut. */
 #define XWA_MODEL_WEAPON_SLOT_LIMIT(objectType)                                                              \
 	(XwaModelRole_IsReplacement((unsigned short)(objectType)) ? XWA_CRAFT_WEAPON_SLOT_COUNT                  \
 															  : XWA_STOCK_WEAPON_SLOT_COUNT)

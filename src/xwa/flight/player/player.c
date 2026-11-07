@@ -1154,7 +1154,11 @@ void Player_HandleHyperspaceCommand(CraftData* craft, unsigned int playerIdx, ch
 #endif
 				craft->sFoilState = (uint8_t)(craft->sFoilState | 3u);
 				if ((int)playerIdx == g_localPlayer) {
+#ifdef XWA_MODERN
+					fsfx_PlaySound(XwaCraftSounds_SFoil(playerIdx, 120), 0xffffu, playerIdx);
+#else
 					fsfx_PlaySound(120, 0xffffu, playerIdx);
+#endif
 				}
 			}
 		}

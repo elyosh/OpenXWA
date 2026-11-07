@@ -8,14 +8,25 @@
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/model_source.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
 
-static const char* const s_keys[XWA_GUNNER_SEAT_FIELDS] = {
-	"x", "y", "z", "mount_angle_a", "mount_angle_b", "aim_limit_a", "aim_limit_b", "cockpit", "inverted",
+/* Game units per metre. */
+static const double s_unitsPerMetre = 40.96;
+
+/* The keys that a seat can have. */
+static const char* const s_seatKeys[] = {
+	"position_m",
+	"mount_pitch_degrees",
+	"mount_yaw_degrees",
+	"aim_limit_pitch_degrees",
+	"aim_limit_yaw_degrees",
+	"cockpit",
+	"inverted",
 };
 
 typedef struct GunnerSeatsModel {
@@ -48,53 +59,139 @@ static unsigned int GunnerSeats_CockpitType(const char* key) {
 	return 0;
 }
 
-/* Reads seat `node` into `value`. Returns 0, logged, when it can't be
-   used. */
-static int GunnerSeats_ReadSeat(const char* path, size_t index, const AeronConfigNode* node, int32_t* value) {
-	int field;
+/* Reads the angle in degrees at `key` in `node`, and converts it to a signed
+   16-bit angle in `out`. Angles wrap around, so 270 degrees gives the same
+   value as -90 degrees. A missing key gives 0. If the value isn't a number
+   from `min` to `max`, logs a warning and returns 0. */
+static int GunnerSeats_ReadAngle(const char* path, const char* what, const AeronConfigNode* node,
+								 const char* key, double min, double max, int32_t* out) {
+	const AeronConfigNode* item = AeronConfigNode_MapGet(node, key);
+	const AeronConfigNodeType type = AeronConfigNode_Type(item);
+	const double degrees = AeronConfigNode_Float(item, 0.0);
+	long steps;
 
-	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
-		Aeron_LogWarn("xwa.models", "%s: gunner_seats.seats[%zu] isn't a map. The seats are ignored", path,
-					  index);
+	*out = 0;
+	if (item == NULL) {
+		return 1;
+	}
+	if ((type != AERON_CONFIG_INT && type != AERON_CONFIG_FLOAT) || !(degrees >= min && degrees <= max)) {
+		Aeron_LogWarn("xwa.models", "%s: %s.%s must be a number of degrees from %g to %g", path, what, key,
+					  min, max);
 		return 0;
 	}
-	for (field = 0; field < XWA_GUNNER_SEAT_FIELDS; ++field) {
-		const AeronConfigNode* item = AeronConfigNode_MapGet(node, s_keys[field]);
-		const int64_t number = AeronConfigNode_Int(item, 0);
+	steps = lround(degrees * 65536.0 / 360.0);
+	*out = (int16_t)(uint16_t)(steps & 0xFFFF);
+	return 1;
+}
 
-		value[field] = 0;
-		if (field == XWA_GUNNER_SEAT_COCKPIT) {
-			const char* key = AeronConfigNode_String(item, NULL);
+/* Reads the aim limit in degrees at `key` in `node`, from 0 to 180. The game
+   reads a limit as a signed 16-bit angle, so 180 degrees becomes the largest
+   value, one step less. */
+static int GunnerSeats_ReadAimLimit(const char* path, const char* what, const AeronConfigNode* node,
+									const char* key, int32_t* out) {
+	if (!GunnerSeats_ReadAngle(path, what, node, key, 0.0, 180.0, out)) {
+		return 0;
+	}
+	if (*out < 0) {
+		*out = INT16_MAX;
+	}
+	return 1;
+}
 
-			value[field] =
-				AeronConfigNode_Type(item) == AERON_CONFIG_STRING ? (int32_t)GunnerSeats_CockpitType(key) : 0;
-			if (value[field] == 0) {
-				Aeron_LogWarn("xwa.models",
-							  "%s: gunner_seats.seats[%zu].cockpit isn't the model of a gunner cockpit. The "
-							  "seats are ignored",
-							  path, index);
-				return 0;
-			}
-		} else if (field == XWA_GUNNER_SEAT_INVERTED) {
-			if (item != NULL && AeronConfigNode_Type(item) != AERON_CONFIG_BOOL) {
-				Aeron_LogWarn("xwa.models", "%s: gunner_seats.seats[%zu].inverted must be true or false",
-							  path, index);
-			}
-			value[field] = AeronConfigNode_Bool(item, 0) != 0;
-		} else if (item != NULL) {
-			/* The record's fields are 16 bits. Angles can be written from 0 to
-			   65535 too. */
-			if (AeronConfigNode_Type(item) != AERON_CONFIG_INT || number < INT16_MIN || number > UINT16_MAX) {
-				Aeron_LogWarn(
-					"xwa.models",
-					"%s: gunner_seats.seats[%zu].%s must be a number from -32768 to 65535. The seats "
-					"are ignored",
-					path, index, s_keys[field]);
-				return 0;
-			}
-			value[field] = (int16_t)number;
+int XwaGunnerSeats_ReadPosition(const char* path, const char* what, const AeronConfigNode* position,
+								int32_t* out) {
+	int axis;
+
+	if (AeronConfigNode_Type(position) != AERON_CONFIG_SEQUENCE ||
+		AeronConfigNode_SequenceCount(position) != 3) {
+		Aeron_LogWarn("xwa.models", "%s: %s must be [right, forward, up] in metres", path, what);
+		return 0;
+	}
+	for (axis = 0; axis < 3; ++axis) {
+		const AeronConfigNode* item = AeronConfigNode_SequenceGet(position, (size_t)axis);
+		const AeronConfigNodeType type = AeronConfigNode_Type(item);
+		const long units = lround(AeronConfigNode_Float(item, 0.0) * s_unitsPerMetre);
+
+		if ((type != AERON_CONFIG_INT && type != AERON_CONFIG_FLOAT) || units < INT16_MIN ||
+			units > INT16_MAX) {
+			Aeron_LogWarn("xwa.models", "%s: %s must be three numbers from %.3f to %.3f metres", path, what,
+						  INT16_MIN / s_unitsPerMetre, INT16_MAX / s_unitsPerMetre);
+			return 0;
+		}
+		out[axis] = (int32_t)units;
+	}
+	return 1;
+}
+
+int XwaGunnerSeats_ReadPlacement(const char* path, const char* what, const AeronConfigNode* node,
+								 int32_t* value) {
+	const AeronConfigNode* position = AeronConfigNode_MapGet(node, "position_m");
+	int axis;
+
+	for (axis = 0; axis < 3; ++axis) {
+		value[XWA_GUNNER_SEAT_X + axis] = 0;
+	}
+	if (position != NULL) {
+		char where[96];
+
+		snprintf(where, sizeof where, "%s.position_m", what);
+		if (!XwaGunnerSeats_ReadPosition(path, where, position, &value[XWA_GUNNER_SEAT_X])) {
+			return 0;
 		}
 	}
+	return GunnerSeats_ReadAngle(path, what, node, "mount_pitch_degrees", -360.0, 360.0,
+								 &value[XWA_GUNNER_SEAT_MOUNT_ANGLE_A]) &&
+		   GunnerSeats_ReadAngle(path, what, node, "mount_yaw_degrees", -360.0, 360.0,
+								 &value[XWA_GUNNER_SEAT_MOUNT_ANGLE_B]) &&
+		   GunnerSeats_ReadAimLimit(path, what, node, "aim_limit_pitch_degrees",
+									&value[XWA_GUNNER_SEAT_AIM_LIMIT_A]) &&
+		   GunnerSeats_ReadAimLimit(path, what, node, "aim_limit_yaw_degrees",
+									&value[XWA_GUNNER_SEAT_AIM_LIMIT_B]);
+}
+
+/* Reads seat `node` into `value`. If the seat can't be used, logs a warning
+   and returns 0. */
+static int GunnerSeats_ReadSeat(const char* path, size_t index, const AeronConfigNode* node, int32_t* value) {
+	const AeronConfigNode* item;
+	char what[48];
+	size_t i;
+
+	snprintf(what, sizeof what, "gunner_seats.seats[%zu]", index);
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogWarn("xwa.models", "%s: %s isn't a map. The seats are ignored", path, what);
+		return 0;
+	}
+	for (i = 0; i < AeronConfigNode_MapCount(node); ++i) {
+		const char* key = AeronConfigNode_MapKeyAt(node, i);
+		size_t known;
+
+		for (known = 0;
+			 known < sizeof s_seatKeys / sizeof s_seatKeys[0] && strcmp(key, s_seatKeys[known]) != 0;
+			 ++known) {
+		}
+		if (known == sizeof s_seatKeys / sizeof s_seatKeys[0]) {
+			Aeron_LogWarn("xwa.models", "%s: %s.%s isn't a valid seat key. It is ignored", path, what, key);
+		}
+	}
+	if (!XwaGunnerSeats_ReadPlacement(path, what, node, value)) {
+		Aeron_LogWarn("xwa.models", "%s: the seats are ignored", path);
+		return 0;
+	}
+	item = AeronConfigNode_MapGet(node, "cockpit");
+	value[XWA_GUNNER_SEAT_COCKPIT] =
+		AeronConfigNode_Type(item) == AERON_CONFIG_STRING
+			? (int32_t)GunnerSeats_CockpitType(AeronConfigNode_String(item, NULL))
+			: 0;
+	if (value[XWA_GUNNER_SEAT_COCKPIT] == 0) {
+		Aeron_LogWarn("xwa.models", "%s: %s.cockpit isn't a gunner cockpit model. The seats are ignored",
+					  path, what);
+		return 0;
+	}
+	item = AeronConfigNode_MapGet(node, "inverted");
+	if (item != NULL && AeronConfigNode_Type(item) != AERON_CONFIG_BOOL) {
+		Aeron_LogWarn("xwa.models", "%s: %s.inverted must be true or false", path, what);
+	}
+	value[XWA_GUNNER_SEAT_INVERTED] = AeronConfigNode_Bool(item, 0) != 0;
 	return 1;
 }
 

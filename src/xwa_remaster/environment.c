@@ -53,13 +53,41 @@ static struct {
 	int authored;
 	int enabled;
 	float sun_max_radiance; /* 0 = Aeron's default */
+	float intensity_scale;
+	float intensity_scale_default;
 	char manifest[sizeof s_env.manifest_path];
-} s_env_options = { .authored = 1 };
+} s_env_options = { .authored = 1, .intensity_scale = 1.0f, .intensity_scale_default = 1.0f };
 
 void XwaRemasterEnvironment_Configure(int enabled, const char* manifest, float sun_max_radiance) {
 	s_env_options.enabled = enabled != 0;
 	s_env_options.sun_max_radiance = sun_max_radiance;
 	snprintf(s_env_options.manifest, sizeof s_env_options.manifest, "%s", manifest ? manifest : "");
+}
+
+float XwaRemasterEnvironment_IntensityScale(void) { return s_env_options.intensity_scale; }
+
+void XwaRemasterEnvironment_SetIntensityScale(float scale) {
+	if (isfinite(scale) && scale >= 0.0f && scale <= XWA_ENV_INTENSITY_SCALE_MAX) {
+		s_env_options.intensity_scale = scale;
+	}
+}
+
+void XwaRemasterEnvironment_ConfigureIntensityScale(float scale) {
+	XwaRemasterEnvironment_SetIntensityScale(scale);
+	s_env_options.intensity_scale_default = s_env_options.intensity_scale;
+}
+
+float XwaRemasterEnvironment_IntensityScaleDefault(void) { return s_env_options.intensity_scale_default; }
+
+const AeronPreparedEnvironment*
+XwaRemasterEnvironment_ScaleIntensity(const AeronPreparedEnvironment* environment,
+									  AeronPreparedEnvironment* out) {
+	if (!environment || !out) {
+		return NULL;
+	}
+	*out = *environment;
+	out->settings.intensity *= s_env_options.intensity_scale;
+	return out;
 }
 
 static int env_node_error(const AeronConfigNode* node, const char* format, ...) {
@@ -428,7 +456,7 @@ static int env_empty_definitions(void) {
 
 /* Returns 1 when the manifest loads or does not exist, 0 on error. */
 static int env_load_manifest(AeronVfs* vfs) {
-	static const char* const fields[] = { "version", "environments", "xwa" };
+	static const char* const fields[] = { "environments", "xwa" };
 	const char* vfs_path = s_env.manifest_path;
 	s_env.default_reference = -1;
 	AeronConfigFile* manifest = NULL;
@@ -452,12 +480,6 @@ static int env_load_manifest(AeronVfs* vfs) {
 		AeronConfigNode_Type(root) == AERON_CONFIG_MAP ? 1 : env_node_error(root, "manifest must be a map");
 	if (ok) {
 		ok = env_check_fields(root, "manifest", fields, sizeof fields / sizeof fields[0]);
-	}
-	if (ok) {
-		const AeronConfigNode* version = AeronConfigNode_MapGet(root, "version");
-		if (AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1) {
-			ok = env_node_error(version ? version : root, "manifest: 'version' must be 1");
-		}
 	}
 	if (ok && !AeronEnvironment_ParseDefinitions(AeronConfigNode_MapGet(root, "environments"),
 												 &s_env.definitions, &error)) {

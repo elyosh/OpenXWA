@@ -1,5 +1,7 @@
 #include "setup.h"
 
+#include "mod_list.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -184,21 +186,47 @@ int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normal
 }
 
 int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaHostConfig* host_config,
-						char* selected, size_t selected_capacity, char* error, size_t error_size) {
+						char* selected, size_t selected_capacity, char* notice, size_t notice_size,
+						char* error, size_t error_size) {
+	const int from_launch = launch->mod_path[0] != 0;
+	const char* problem = NULL;
+	XwaModEntry mod;
 	int length;
 
-	if (launch->mod_path[0]) {
+	if (notice_size) {
+		notice[0] = '\0';
+	}
+	if (selected_capacity) {
+		selected[0] = '\0';
+	}
+	if (from_launch) {
 		length = snprintf(selected, selected_capacity, "%s", launch->mod_path);
 	} else if (host_config->use_mod && host_config->mod_path[0]) {
 		length = snprintf(selected, selected_capacity, "%s", host_config->mod_path);
 	} else {
-		if (selected_capacity) {
-			selected[0] = '\0';
-		}
 		return 1;
 	}
-	if (length < 0 || (size_t)length >= selected_capacity ||
-		!AeronVfs_SetRoot(vfs, AERON_VFS_ROOT_MOD, selected) ||
+	if (length < 0 || (size_t)length >= selected_capacity) {
+		return setup_error(error, error_size, "could not use mod folder: %s", selected);
+	}
+	if (!XwaModList_Read(selected, &mod)) {
+		snprintf(mod.name, sizeof mod.name, "%s", selected);
+		problem = "Its folder has no mod.yaml, so it isn't a mod.";
+	} else if (mod.state != XWA_MOD_UNFINISHED || !from_launch) {
+		problem = mod.problem[0] ? mod.problem : NULL;
+	}
+	if (problem && from_launch) {
+		snprintf(error, error_size, "--mod %s: %s", selected, problem);
+		return 0;
+	}
+	if (problem) {
+		snprintf(notice, notice_size,
+				 "The mod \"%s\" can't be used. %s\n\nOpenXWA starts with the original game.", mod.name,
+				 problem);
+		selected[0] = '\0';
+		return 1;
+	}
+	if (!AeronVfs_SetRoot(vfs, AERON_VFS_ROOT_MOD, selected) ||
 		!AeronVfs_SetRootOptions(vfs, AERON_VFS_ROOT_MOD, AERON_VFS_ROOT_OPTION_CASE_INSENSITIVE_LOOKUP)) {
 		return setup_error(error, error_size, "could not use mod folder: %s", selected);
 	}

@@ -5,17 +5,13 @@
  *
  * Each screen is an update function on the screen stack (g_screenStates).
  * Each screen has a name, such as "concourse". A view inside a screen has a
- * dotted name, such as "family_room.rank". The `layouts` table of
- * frontend/frontend.yaml sets the layout of each screen to classic, wide or
- * fill:
- *
- *   layouts:
- *     default: wide
- *     datapad: fill
+ * dotted name, such as "family_room.rank". The mod's layout table sets the
+ * layout of each screen to classic, wide or fill.
  *
  * A view that the table doesn't list uses its screen's layout, and a screen
- * that it doesn't list uses `default`. A dialog that it doesn't list uses the
- * layout of the screen below it. Without the table, every screen is classic. */
+ * that it doesn't list uses the default layout. A dialog that it doesn't list
+ * uses the layout of the screen below it. Without the table, every screen is
+ * classic. */
 
 #include "xwa_runtime/snapshot/snapshot.h"
 
@@ -47,6 +43,15 @@ float XwaFrontendScreens_TextWidthScale(void);
 int XwaFrontendScreens_TextScale256(void);
 
 void XwaFrontendScreens_Shutdown(void);
+
+/* The layout named `text`, "classic", "wide" or "fill", as an
+   XwaFrontendLayout. -1 for another text. */
+int XwaFrontendScreens_ParseLayout(const char* text);
+
+/* Return the number of screens, and the name of screen `index` as the
+   `layouts` table writes it, such as "family_room.detail". */
+int XwaFrontendScreens_Count(void);
+const char* XwaFrontendScreens_Name(int index);
 
 #ifdef __cplusplus
 }

@@ -187,6 +187,7 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 				ship_set_failure(cmd, "Ship model '%s': invalid GLB '%s'", key, path);
 				return NULL;
 			}
+			XwaRenderModel_ResolveScreens(&model, path);
 		}
 		/* A GLB with skin variants shows, per markings value, what its objects use. */
 		const AeronFlightModel* built = parsed ? parsed : &model;
@@ -571,8 +572,9 @@ typedef struct PbrLightFS {
 	 * the classic sums plain Lambert per light). */
 	float extra_dir[3][4];
 	float extra_col[3][4];
-	/* Reserved: formerly the point-light knobs. */
-	float reserved_point[4];
+	/* The ambient minimum (XwaShipAmbientCube.minimum): rgb, and the inverse
+	 * of its luminance in w (0 when the minimum is 0). */
+	float ambient_minimum[4];
 	/* Reserved: the environment moved to Aeron's scene lighting block
 	 * (AeronScene_SetPbrEnvironment). Left zero. */
 	float reserved_environment[4][4];
@@ -626,6 +628,7 @@ void XwaRemasterShip_GetAmbientCube(XwaShipAmbientCube* out) {
 		out->pos_x[channel] = out->neg_x[channel] = ambient;
 		out->pos_y[channel] = out->neg_y[channel] = ambient;
 		out->pos_z[channel] = out->neg_z[channel] = ambient;
+		out->minimum[channel] = 0.0f;
 	}
 }
 
@@ -714,6 +717,10 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* l
 		memcpy(env.amb_neg_y, ambient_cube->neg_y, sizeof env.amb_neg_y);
 		memcpy(env.amb_pos_z, ambient_cube->pos_z, sizeof env.amb_pos_z);
 		memcpy(env.amb_neg_z, ambient_cube->neg_z, sizeof env.amb_neg_z);
+		memcpy(env.ambient_minimum, ambient_cube->minimum, sizeof ambient_cube->minimum);
+		const float luminance = 0.2126f * ambient_cube->minimum[0] + 0.7152f * ambient_cube->minimum[1] +
+								0.0722f * ambient_cube->minimum[2];
+		env.ambient_minimum[3] = luminance > 0.0f ? 1.0f / luminance : 0.0f;
 	} else {
 		for (int c = 0; c < 3; c++) {
 			const float amb = g_pbr_tuning.ambient[c];
@@ -1031,7 +1038,8 @@ uint32_t XwaRemasterShip_HiddenTagGroups(const AeronSceneMesh* mesh, const XwaFl
 }
 
 int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f) {
-	if (!mesh || !f || !f->has_craft) {
+	/* An object without craft data has meshes when its profile hides some. */
+	if (!mesh || !f || (!f->has_craft && f->mesh_count == 0)) {
 		return 0;
 	}
 	const uint32_t components = ship_state_components(mesh);
@@ -1052,7 +1060,7 @@ int XwaRemasterShip_NeedsMeshTable(const AeronSceneMesh* mesh, const XwaFlightOb
 
 int XwaRemasterShip_BuildMeshTable(const AeronSceneMesh* mesh, const XwaFlightObject* f,
 								   AeronSceneMeshTable* out) {
-	if (!mesh || !f || !out || !f->has_craft) {
+	if (!mesh || !f || !out || (!f->has_craft && f->mesh_count == 0)) {
 		return 0;
 	}
 	const uint32_t components = ship_state_components(mesh);

@@ -2984,7 +2984,8 @@ void Backdrop_BuildCoordinateBuffers(void) {
 						 ++frameIdx) {
 						if (usedFrameBitmap[frameIdx] == 0 && texLevels[frameIdx].image != NULL) {
 							if (g_useHardware3D) {
-								std3D_DeleteTextureSurface(texLevels[frameIdx].image);
+								std3D_DeleteTextureSurface(
+									(struct Std3DTextureSurface*)texLevels[frameIdx].image);
 							} else {
 								Memory_FreeTagged("RESOURCEITEM", texLevels[frameIdx].image);
 							}

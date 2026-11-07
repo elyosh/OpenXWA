@@ -3,60 +3,22 @@
 
 /* Picks the sounds that a mod gives each craft: engine, fly-by, wash,
  * take-off, weapon, explosion and hyperspace sounds, and four interface
- * sounds.
+ * sounds. They come from the `sound` group of a model settings file and from
+ * the sound banks. The mod documentation describes the keys.
  *
- * A model settings file can choose some of the game's own
- * sounds for its craft. All keys are optional:
- *
- *   sound:
- *     interior: awing        # the engine sound in the cockpit: xwing, ywing,
- *                            # awing, tie, gunboat, corellian or falcon
- *     fly_by: awing          # the same names, and slave (slots 129 and 130)
- *     fly_by_mode: 2d        # 2d or 3d: always that variant of the fly-by
- *     engine_wash: starship  # normal or starship
- *     take_off: falcon       # gear or falcon
- *     weapons: empire        # see below
- *     weapon_ranges:         # by weapon type: a random sound of the
- *       283: {first: 2, count: 3}  # weapon_range bank
- *     hyper: rebel           # rebel, imperial or imperial_zoom
- *     ambient:               # the starship ambient sound's ellipsoid
- *       offset_m: [0, 300, 0]      # its centre: right, up, forward
- *       distance_m: 1000           # its radius, or [right, up, forward]
- *
- * For each sound, the game first uses the value from the craft's model file.
- * If there is none, it uses the entry for the craft's object type in the
- * sound bank. If the mod has no such bank, it plays the
- * stock sound. When the mod has the bank but the object type is past the
- * bank's count, the craft is silent, like an entry without a sound. The
- * take-off and wash sounds are exceptions: they fall back to the landing gear
- * and the normal wash.
- *
- * Setting `weapons` makes the craft use the game's own weapon sounds instead
- * of the bank and the ranges. With `plain`, each weapon type plays its own
- * sound, whatever the craft. The other values change the laser sounds:
- * corellian_transport, tie_fighter, tie_fighter_with_ion, rebel,
- * rebel_turbo, empire, empire_turbo, falcon, falcon_turbo, ion and
- * ion_turbo.
+ * For each sound, the game first uses the value of the craft's model. Then
+ * it uses the bank entry for the craft's object type. When the bank doesn't
+ * list the object type, the bank's `unlisted` setting picks the stock sound
+ * or no sound.
  *
  * A weapon's sound depends on the object type that fired it. An explosion's
- * sound depends on the object type that fired the exploding object. The
- * weapon_explosion bank has 8 sounds for each object type. They are picked at
- * random, and a sound doesn't repeat until 4 sounds have played. The
- * interface sounds come from the `sounds` bank.
+ * sound depends on the object type that fired the exploding object.
  *
- * Starship ambient sounds need the starship_ambient_sounds rule. A craft in
- * the player's region plays the starship_ambient entry of its object type
- * while the player's craft is inside an ellipsoid around it.
- * `ambient.offset_m` moves the centre of the ellipsoid along the craft's
- * axes. `ambient.distance_m` sets its radius;
- * the default is the craft's size, and a null in the list keeps the default
- * for that axis. The sound gets louder towards the centre. If several craft
- * use the same sound, it plays once, at the volume of the nearest craft. The
- * ambient sounds stop in the hangar.
- *
- * The hangar ambience comes from the hangar_ambient bank, which has 10
- * sounds for each object type. The hangar uses the sounds of its command
- * ship's object type.
+ * A craft in the player's region plays its starship ambient sound while the
+ * player's craft is inside an ellipsoid around it. If several craft use the
+ * same sound, it plays once, at the volume of the nearest craft. The ambient
+ * sounds stop in the hangar. The hangar ambience plays the sounds listed for
+ * its command ship.
  *
  * Random picks use this module's own random numbers, not the game's. This
  * way the simulation stays the same with sound on or off. */
@@ -113,8 +75,12 @@ int XwaCraftSounds_HyperZoom(unsigned int playerIdx, int stockSlot);
    abort sound. */
 int XwaCraftSounds_HyperEnd(unsigned int playerIdx, int interdicted, int stockSlot);
 
-/* Returns the slot of hangar ambience sound `index` (0 to 9). This is the
-   command ship's bank entry if the mod has one, else slot 151 + index. */
+/* Returns the slot of the S-foil sound for player `playerIdx`'s craft: the
+   s_foil bank entry if there is one, else `stockSlot`. */
+int XwaCraftSounds_SFoil(unsigned int playerIdx, int stockSlot);
+
+/* Returns the slot of hangar ambience sound `index` (0 to 9). This is a bank
+   sound of the command ship if the mod has some, else slot 151 + index. */
 int XwaCraftSounds_HangarAmbient(unsigned int index);
 
 /* Starts, changes and stops the starship ambient sounds for the local

@@ -1,6 +1,7 @@
 #ifndef XWA_ASSETS_MODEL_MESH_H
 #define XWA_ASSETS_MODEL_MESH_H
 
+#include "aeron/asset/flight_names.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/assets/opt_model.h"
 #include "xwa/render/renderer.h"
@@ -101,6 +102,13 @@ typedef enum OptHardpointType {
 	OPT_HARDPOINT_Custom6 = 38,
 	OPT_HARDPOINT_JammingPoint = 39,
 } OptHardpointType;
+
+/* The AERON_flight_model extension has a name for each of these values, so
+   the counts must match. */
+typedef char mesh_type_names_check[(MESH_Reactor + 1 == AERON_FLIGHT_MESH_TYPE_COUNT) ? 1 : -1];
+typedef char hardpoint_type_names_check[(OPT_HARDPOINT_JammingPoint + 1 == AERON_FLIGHT_HARDPOINT_TYPE_COUNT)
+											? 1
+											: -1];
 
 typedef struct MeshDescriptor {
 	MeshType meshType;

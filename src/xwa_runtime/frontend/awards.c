@@ -6,6 +6,7 @@
 #include "xwa/assets/string_table.h"
 #include "xwa/assets/ui_string.h"
 #include "xwa/frontend/frontend_medals.h"
+#include "xwa/frontend/mission_setup.h"
 #include "xwa_runtime/text/text_overrides.h"
 
 #include <stdlib.h>
@@ -47,7 +48,15 @@ typedef struct XwaAwards {
 	char* mementoImages[AWARDS_MAX_MEMENTOS];
 	char* mementoNames[AWARDS_MAX_MEMENTOS];
 	int mementoSprites;
+	int hasUnlockMission[XWA_AWARDS_UNLOCK_ITEMS];
+	int unlockMission[XWA_AWARDS_UNLOCK_ITEMS];
 } XwaAwards;
+
+/* The `mementos` key of each XwaAwardsUnlockItem, and the full key path
+   used in log lines. */
+static const char* const k_unlockItems[XWA_AWARDS_UNLOCK_ITEMS] = { "lady_blue", "cologne" };
+static const char* const k_unlockPaths[XWA_AWARDS_UNLOCK_ITEMS] = { "mementos.lady_blue",
+																	"mementos.cologne" };
 
 static XwaAwards g_awards;
 static int g_awardsLoaded;
@@ -252,20 +261,15 @@ static int awards_read_missions(const AeronConfigNode* map, const char* key, siz
 }
 
 static int awards_read(const AeronConfigNode* root, XwaAwards* awards) {
-	static const char* const keys[] = { "version",           "battle_medals", "kalidor", "rank_thresholds",
-										"rating_thresholds", "mementos",      NULL };
-	static const char* const mementoKeys[] = { "images", "names", NULL };
+	static const char* const keys[] = { "battle_medals",     "kalidor",  "rank_thresholds",
+										"rating_thresholds", "mementos", NULL };
+	static const char* const mementoKeys[] = { "images", "names", "lady_blue", "cologne", NULL };
+	static const char* const unlockKeys[] = { "mission", NULL };
 	const AeronConfigNode* node;
 	int64_t values[AWARDS_MAX_RATINGS];
 	int i;
 
 	if (!awards_keys(root, NULL, keys)) {
-		return 0;
-	}
-	node = AeronConfigNode_MapGet(root, "version");
-	if (node == NULL || AeronConfigNode_Type(node) != AERON_CONFIG_INT || AeronConfigNode_Int(node, 0) != 1) {
-		Aeron_LogError("xwa.frontend", "%s:%d: 'version' must be 1", XWA_AWARDS_PATH,
-					   AeronConfigNode_Line(node != NULL ? node : root));
 		return 0;
 	}
 	node = AeronConfigNode_MapGet(root, "battle_medals");
@@ -309,6 +313,22 @@ static int awards_read(const AeronConfigNode* root, XwaAwards* awards) {
 			return 0;
 		}
 		awards->hasMementoImages = images != NULL;
+		for (i = 0; i < XWA_AWARDS_UNLOCK_ITEMS; i++) {
+			const AeronConfigNode* item = AeronConfigNode_MapGet(node, k_unlockItems[i]);
+			const AeronConfigNode* mission = AeronConfigNode_MapGet(item, "mission");
+
+			if (item == NULL) {
+				continue;
+			}
+			if (!awards_keys(item, k_unlockPaths[i], unlockKeys)) {
+				return 0;
+			}
+			if (mission == NULL || AeronConfigNode_Type(mission) != AERON_CONFIG_INT) {
+				return awards_error(item, k_unlockPaths[i], "needs a mission number");
+			}
+			awards->hasUnlockMission[i] = 1;
+			awards->unlockMission[i] = (int)AeronConfigNode_Int(mission, 0);
+		}
 	}
 	return 1;
 }
@@ -403,6 +423,17 @@ const char* XwaAwards_MementoImage(int mission) {
 }
 
 int XwaAwards_MementoSprites(void) { return awards_get()->mementoSprites; }
+
+int XwaAwards_UnlockMission(XwaAwardsUnlockItem item, int stock) {
+	const XwaAwards* awards = awards_get();
+	const int value = awards->hasUnlockMission[item] ? awards->unlockMission[item] : stock;
+	return value < 0 || value >= 255 ? 0 : value;
+}
+
+int XwaAwards_Unlocked(XwaAwardsUnlockItem item, int stock) {
+	const int mission = XwaAwards_UnlockMission(item, stock);
+	return mission <= 0 || g_pilotData.tourOfDutyMissions[mission - 1].completedCount != 0;
+}
 
 void XwaAwards_Shutdown(void) {
 	awards_free(&g_awards);

@@ -11,6 +11,7 @@
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/model_swaps.h"
+#include "xwa_runtime/models/units.h"
 
 #include <ctype.h>
 #include <stdio.h>
@@ -24,6 +25,36 @@
 #define STATS_CACHE_UNSET (-2)
 
 static const char* const s_fieldKeys[XWA_STATS_FIELDS] = {
+	"speed_mglt",
+	"acceleration_mglt",
+	"deceleration_mglt",
+	"pitch_rate_degrees",
+	"roll_rate_degrees",
+	"yaw_rate_degrees",
+	"system_damage_hull_threshold",
+	"hull",
+	"system_strength",
+	"shields",
+	"speed_increment_mglt",
+	"speed_decrement_mglt",
+	"has_shields",
+	"has_hyperdrive",
+	"warhead_collision_damage",
+};
+
+/* The unit of each field in a profile. The reader converts these fields to
+   the game's units. The fields that aren't listed are the game's own
+   values. */
+static const XwaUnit s_fieldUnits[XWA_STATS_FIELDS] = {
+	[XWA_STATS_SPEED] = XWA_UNIT_MGLT,           [XWA_STATS_ACCELERATION] = XWA_UNIT_MGLT,
+	[XWA_STATS_DECELERATION] = XWA_UNIT_MGLT,    [XWA_STATS_PITCH_RATE] = XWA_UNIT_DEGREES,
+	[XWA_STATS_ROLL_RATE] = XWA_UNIT_DEGREES,    [XWA_STATS_YAW_RATE] = XWA_UNIT_DEGREES,
+	[XWA_STATS_SPEED_INCREMENT] = XWA_UNIT_MGLT, [XWA_STATS_SPEED_DECREMENT] = XWA_UNIT_MGLT,
+};
+
+/* The keys of `percent` and `player_percent` in a mission file, by field.
+   A percent scales the field, so its key has no unit. */
+static const char* const s_percentKeys[XWA_STATS_PERCENT_FIELDS] = {
 	"speed",
 	"acceleration",
 	"deceleration",
@@ -34,11 +65,6 @@ static const char* const s_fieldKeys[XWA_STATS_FIELDS] = {
 	"hull",
 	"system_strength",
 	"shields",
-	"speed_increment",
-	"speed_decrement",
-	"has_shields",
-	"has_hyperdrive",
-	"warhead_collision_damage",
 };
 
 typedef struct StatsProfile {
@@ -82,6 +108,17 @@ static int StatsProfiles_Field(const char* key) {
 	return -1;
 }
 
+static int StatsProfiles_PercentField(const char* key) {
+	int field;
+
+	for (field = 0; field < XWA_STATS_PERCENT_FIELDS; ++field) {
+		if (strcmp(s_percentKeys[field], key) == 0) {
+			return field;
+		}
+	}
+	return -1;
+}
+
 /* Copies `text` in lower case into `out`. Returns 0 when it doesn't fit. */
 static int StatsProfiles_LowerName(const char* text, char out[STATS_NAME_MAX]) {
 	size_t i;
@@ -105,15 +142,16 @@ static void StatsProfiles_ReadProfile(const char* path, const char* name, const 
 		const AeronConfigNode* value = AeronConfigNode_MapValueAt(node, index);
 		const int field = StatsProfiles_Field(key);
 		const int isBool = field >= XWA_STATS_HAS_SHIELDS;
-		const int64_t number = isBool ? 0 : AeronConfigNode_Int(value, 0);
+		int32_t number = 0;
 
-		if (field < 0 || AeronConfigNode_Type(value) != (isBool ? AERON_CONFIG_BOOL : AERON_CONFIG_INT) ||
-			number < INT32_MIN || number > INT32_MAX) {
+		if (field < 0 ||
+			(isBool ? AeronConfigNode_Type(value) != AERON_CONFIG_BOOL
+					: !XwaUnits_Read(value, s_fieldUnits[field], INT32_MIN, INT32_MAX, &number))) {
 			Aeron_LogWarn("xwa.models", "%s: stats_profiles.%s.%s isn't a known key with a %s. It is ignored",
 						  path, name, key, isBool ? "true or false value" : "number");
 			continue;
 		}
-		profile->value[field] = isBool ? AeronConfigNode_Bool(value, 0) != 0 : (int32_t)number;
+		profile->value[field] = isBool ? AeronConfigNode_Bool(value, 0) != 0 : number;
 		profile->setMask |= 1u << field;
 	}
 }
@@ -200,11 +238,11 @@ static void StatsProfiles_ReadPercents(const char* path, const char* where, cons
 	for (index = 0; index < AeronConfigNode_MapCount(node); ++index) {
 		const char* key = AeronConfigNode_MapKeyAt(node, index);
 		const AeronConfigNode* value = AeronConfigNode_MapValueAt(node, index);
-		const int field = StatsProfiles_Field(key);
+		const int field = StatsProfiles_PercentField(key);
 		const int64_t number = AeronConfigNode_Int(value, -1);
 
-		if (field < 0 || field >= XWA_STATS_PERCENT_FIELDS ||
-			AeronConfigNode_Type(value) != AERON_CONFIG_INT || number < 0 || number > INT32_MAX) {
+		if (field < 0 || AeronConfigNode_Type(value) != AERON_CONFIG_INT || number < 0 ||
+			number > INT32_MAX) {
 			Aeron_LogWarn("xwa.mission",
 						  "%s:%d: stats_profiles.%s.%s needs a field that takes a percent and a "
 						  "percent of 0 or more; it is ignored",

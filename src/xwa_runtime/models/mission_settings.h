@@ -1,149 +1,37 @@
 #ifndef XWA_RUNTIME_MODELS_MISSION_SETTINGS_H
 #define XWA_RUNTIME_MODELS_MISSION_SETTINGS_H
 
-/* A mod's mission settings: rules that the stock game ties to some missions,
- * made data, and a few more. They come from the `settings` section of a
- * mission's file, over the `mission_settings` section of flight/flight.yaml,
- * which gives defaults for every mission. Both sections take the same keys, and
- * every key is optional:
+/* Mission settings and game rules for mods.
  *
- *   settings:
- *     red_alert: true                    # the hangar's red alert
- *     skip_hyperspaced_messages: true    # message 143 and "entering area"
- *     skip_arrival_messages_iff: 1       # an IFF, all or none
- *     force_player_in_turret: "0:00:08"  # the mission time, or false
- *     disable_player_lasers: true
- *     disable_player_warheads: true
- *     warhead_collision_damage: false
- *     damage_through_shields_on_hard: true
- *     target_key: { flight_groups: [5, 6], method: cycle, only_not_inspected: true }
- *     skip_projectiles_proximity_check: true
- *     order_of_battle:
- *       flight_groups: [3, 4]
- *       names: { 3: "Home One" }
- *       lines: ["Fleet Assignment: Admiral Thrawn", "", "Command Ship: Chimaera"]
- *       top: 140
- *     interdiction_regions: [2]
+ * Mission settings change things that the stock game hard-codes for some
+ * missions. They come from the `settings` section of a mission file, with
+ * defaults for every mission in the `mission_settings` section of the mod's
+ * flight settings. A key of the mission file wins. When neither sets a key,
+ * the game keeps the stock behaviour, which depends on the mission number:
+ *   - red alert in mission 20;
+ *   - message 143, shown when a fighter leaves by hyperspace, hidden in
+ *     mission 49;
+ *   - arrival messages of IFF 1 skipped in missions 49 to 52;
+ *   - the player put in the turret at 0:00:08 in mission 1.
  *
- * Without a value, the stock rule applies: the red alert of mission 20,
- * message 143 skipped in mission 49, the arrival messages of IFF 1 skipped
- * in missions 49 to 52, and the player put in the turret at 0:00:08 in
- * mission 1. Without the files, the game is stock.
+ * Rules come from the `rules` section of the mod's flight settings and apply
+ * to every mission. They are off by default, except player_weapon_jamming,
+ * and weapon_iff_swap, whose default is the stock `turrets`.
+ * classic_hide_destroyed_engine_glows only changes drawing. The other rules
+ * and the mission settings change the simulation.
  *
- * flight/flight.yaml can also change rules for every mission:
- *
- *   rules:
- *     reset_combat_music_at_mission_load: true
- *     hangar_red_alert_any_mothership: true
- *     classic_hide_destroyed_engine_glows: true
- *     weapon_iff_swap: false
- *     ai_attack_uses_max_speed_cache: true
- *     fire_needs_decharge_rate: true
- *     no_starship_fire_from_destroyed_racks: true
- *     starship_ambient_sounds: true
- *     no_player_warhead_slot_cap: true
- *     gunner_weapon_select_in_seat: true
- *     gunner_fires_selected_group: true
- *     gunner_fires_warheads: true
- *     no_fire_from_destroyed_hardpoints: true
- *     tie_fighter_energy_step_always_high: true
- *     player_decharge_lasers_only: true
- *     rearm_follows_both_statuses: true
- *     warhead_collision_bonus_any_target: true
- *     turbolaser_hardpoint_types: true
- *     gun_turret_hardpoints: true
- *     hangar_jamming: false
- *     super_star_destroyer_jamming: true
- *     two_launcher_fixes: true
- *     starship_missile_defense_any_warhead: true
- *     weapon_rack_count_from_record: true
- *     overlapping_fly_by_sounds: true
- *
- * classic_hide_destroyed_engine_glows only changes drawing: the classic
- * renderer doesn't draw the engine glows of a destroyed or hidden mesh, nor
- * their lights, as the HD renderer already does.
- *
- * weapon_iff_swap changes which weapon a craft fires. The stock game gives
- * starship and launcher fire the weapon of the firing craft's side, for
- * example Imperial lasers instead of Rebel lasers. With false, no fire
- * changes; with true, every shot changes. A model settings file can choose
- * for its craft.
- *
- * ai_attack_uses_max_speed_cache makes a craft under attack compare its own top
- * speed and its attacker's (aiFlight.maxSpeedCache), which stats profiles can
- * change, instead of their records' top speeds. It changes the simulation.
- *
- * fire_needs_decharge_rate and no_starship_fire_from_destroyed_racks change
- * when a craft can fire. They change the simulation.
- *
- * starship_ambient_sounds plays a craft's ambient sound from the sound bank
- * when the player is near it.
- *
- * no_player_warhead_slot_cap lets each warhead rack of a player's craft hold
- * more than 9 warheads, when the craft starts and when it reloads in the
- * hangar. The stock game only allows it for the Missile Boat. It changes the
- * simulation.
- *
- * The gunner rules change what a player can do in a gunner seat. They change
- * the simulation:
- *   - gunner_weapon_select_in_seat: the weapon key works in a seat, and a
- *     seat change keeps the selected weapon. In the stock game, the key is
- *     blocked and a seat change goes back to the lasers;
- *   - gunner_fires_selected_group: a seat fires the first turret laser group,
- *     or the first ion group when the player selected the ions, if the
- *     gunner cockpit has a hardpoint for it. In the stock game, it fires
- *     every turret laser group;
- *   - gunner_fires_warheads: a seat fires warheads only when the gunner
- *     cockpit has a warhead hardpoint.
- *
- * The weapon rules change how craft fire. They change the simulation:
- *   - no_fire_from_destroyed_hardpoints: a craft doesn't fire a laser or a
- *     warhead from a hardpoint whose mesh is destroyed;
- *   - tie_fighter_energy_step_always_high: the TIE Fighter always gets its
- *     larger speed step for each step of energy moved to or from its
- *     engines. In the stock game, it gets it only with spare engine power;
- *   - player_decharge_lasers_only: a player's shot only takes charge from a
- *     laser rack. In the stock game, a starfighter's shot takes charge from
- *     any rack that fires;
- *   - rearm_follows_both_statuses: when a supply craft rearms a craft, it
- *     reads both warhead statuses of the craft's flight group, like the other
- *     warhead loads do. In the stock game, it only reads the first status;
- *   - warhead_collision_bonus_any_target: when a craft hits another craft,
- *     its warheads add to the damage whatever the target is. In the stock
- *     game, they only add to it when the target is a starship or a platform;
- *   - turbolaser_hardpoint_types: OPT hardpoint types 33 to 37 are weapon
- *     types 301 to 305, and type 38 is weapon type 307. In the stock game,
- *     hardpoint type N is weapon type N + 279;
- *   - gun_turret_hardpoints: the rules for the hardpoints of gun turret
- *     meshes (turret_hardpoints.h). A gun turret mesh doesn't fire at
- *     targets behind it.
- *
- * The jamming rules change where a player's weapons are jammed near an
- * enemy starship or platform. They change the simulation:
- *   - hangar_jamming: false turns jamming off for every craft;
- *   - super_star_destroyer_jamming: the Super Star Destroyer jams near its
- *     hangar. In the stock game, it never jams.
- *
- * The warhead rules change how craft load and fire warheads. They change the
- * simulation:
- *   - two_launcher_fixes: fixes for craft with two warhead launchers. The
- *     hangar menu offers the second launcher for any such craft, not only the
- *     Missile Boat, and lists its warheads. Loading a launcher keeps both
- *     launchers counted, and the second launcher gets the number of warheads
- *     of the warhead that it loads. A supply craft reloads the warhead that
- *     each launcher holds, not the flight group's. The weapon key skips an
- *     empty launcher;
- *   - starship_missile_defense_any_warhead: a starship's missile defense fires
- *     any warhead. In the stock game, it only fires missiles and advanced
- *     missiles;
- *   - weapon_rack_count_from_record: a craft's rack count (laserSlotCount)
- *     covers the racks of every laser group and warhead launcher of its craft
- *     record. In the stock game, it adds up the racks of the laser groups, and
- *     the turret racks of craft that fire from float hardpoints.
- *
- * overlapping_fly_by_sounds lets the fly-by sounds of several craft play at
- * once, and the engine wash sounds too. In the stock game, fsfx_PlaySound
- * doesn't start one of these sounds while it is already playing. */
+ * Some rules replace a stock value or call:
+ *   - ai_attack_uses_max_speed_cache compares top speeds with
+ *     aiFlight.maxSpeedCache, which stats profiles change, in place of the
+ *     speeds of the craft records;
+ *   - gun_turret_hardpoints turns on the turret hardpoint rules
+ *     (XwaTurretHardpoints_*);
+ *   - weapon_rack_count_from_record counts laserSlotCount from every laser
+ *     group and warhead launcher of the craft record. The stock game counts
+ *     the laser groups, plus the turret racks of craft that fire from float
+ *     hardpoints;
+ *   - overlapping_fly_by_sounds lets fsfx_PlaySound start a fly-by or engine
+ *     wash sound while it is already playing. */
 
 #include <stdint.h>
 
@@ -171,9 +59,18 @@ void XwaMissionSettings_RestoreFlightState(const int32_t* lastTarget);
 int XwaMissionSettings_ResetCombatMusicAtMissionLoad(void);
 int XwaMissionSettings_HangarRedAlertAnyMothership(void);
 int XwaMissionSettings_ClassicHideDestroyedEngineGlows(void);
-/* 1 or 0 when flight/flight.yaml sets weapon_iff_swap, -1 for the stock
-   rule. */
-int XwaMissionSettings_WeaponIffSwap(void);
+/* Which shots switch to the weapon of the firing craft's side. Used by
+   weapon_iff_swap and by a model's weapons.switch_by_iff. */
+typedef enum XwaWeaponIffSwap {
+	XWA_WEAPON_IFF_SWAP_TURRETS = -1, /* the stock rule: only turret racks switch */
+	XWA_WEAPON_IFF_SWAP_NONE = 0,
+	XWA_WEAPON_IFF_SWAP_ALL = 1,
+} XwaWeaponIffSwap;
+
+/* Reads `turrets`, `none` or `all` into `out`. Returns 0 for any other
+   text, or NULL. */
+int XwaMissionSettings_ParseWeaponIffSwap(const char* text, XwaWeaponIffSwap* out);
+XwaWeaponIffSwap XwaMissionSettings_WeaponIffSwap(void);
 int XwaMissionSettings_AiAttackUsesMaxSpeedCache(void);
 int XwaMissionSettings_FireNeedsDechargeRate(void);
 int XwaMissionSettings_NoStarshipFireFromDestroyedRacks(void);
@@ -181,16 +78,16 @@ int XwaMissionSettings_StarshipAmbientSounds(void);
 int XwaMissionSettings_NoPlayerWarheadSlotCap(void);
 int XwaMissionSettings_GunnerWeaponSelectInSeat(void);
 int XwaMissionSettings_GunnerFiresSelectedGroup(void);
-int XwaMissionSettings_GunnerFiresWarheads(void);
+int XwaMissionSettings_GunnerWarheadsNeedCockpitHardpoint(void);
 int XwaMissionSettings_NoFireFromDestroyedHardpoints(void);
 int XwaMissionSettings_TieFighterEnergyStepAlwaysHigh(void);
-int XwaMissionSettings_PlayerDechargeLasersOnly(void);
+int XwaMissionSettings_PlayerTurretRacksKeepCharge(void);
 int XwaMissionSettings_RearmFollowsBothStatuses(void);
 int XwaMissionSettings_WarheadCollisionBonusAnyTarget(void);
 int XwaMissionSettings_TurbolaserHardpointTypes(void);
 int XwaMissionSettings_GunTurretHardpoints(void);
-/* 1 unless flight/flight.yaml sets hangar_jamming to false. */
-int XwaMissionSettings_HangarJamming(void);
+/* 1 unless flight/flight.yaml sets player_weapon_jamming to false. */
+int XwaMissionSettings_PlayerWeaponJamming(void);
 int XwaMissionSettings_SuperStarDestroyerJamming(void);
 int XwaMissionSettings_TwoLauncherFixes(void);
 int XwaMissionSettings_StarshipMissileDefenseAnyWarhead(void);
@@ -199,7 +96,9 @@ int XwaMissionSettings_OverlappingFlyBySounds(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);
-int XwaMissionSettings_SkipHyperspacedMessages(void);
+int XwaMissionSettings_HideHyperspaceExitMessages(void);
+/* 1 when the mission hides the "entering area" messages. */
+int XwaMissionSettings_HideFriendlyArrivalMessages(void);
 /* Whether the arrival messages of a flight group of `iff` are skipped. */
 int XwaMissionSettings_SkipArrivalMessages(int iff);
 /* Whether the player is put in the turret at this mission time. */
@@ -210,9 +109,9 @@ int XwaMissionSettings_PlayerLasersDisabled(void);
 int XwaMissionSettings_PlayerWarheadsDisabled(void);
 int XwaMissionSettings_WarheadCollisionDamage(void);
 int XwaMissionSettings_DamageThroughShieldsOnHard(void);
-int XwaMissionSettings_SkipProjectilesProximityCheck(void);
+int XwaMissionSettings_ProximityTriggersCheckCraftOnly(void);
 /* Whether a hyperspace jump to `region` plays the abort sound. */
-int XwaMissionSettings_InterdictedRegion(int region);
+int XwaMissionSettings_HyperspaceAbortSoundRegion(int region);
 
 /* The O key, outside the proving grounds: when the mission lists flight
    groups for it, targets a craft of them for player `playerIdx` and returns

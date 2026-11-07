@@ -26,6 +26,12 @@ void XwaSnapshotHud_NoteTargetBox(uint16_t slot, uint16_t signature, uint16_t co
 								  int selected, int extent);
 XwaHudTargetBoxLayer XwaSnapshotHud_SetTargetBoxLayer(XwaHudTargetBoxLayer layer);
 void XwaSnapshotHud_NoteCrt(const XwaHudCrt* crt);
+/* The CMD draws the current target's text. `damage_shown` is
+   showTargetDamage in Hud_UpdateCMDText. */
+void XwaSnapshotHud_NoteCmdTarget(int damage_shown);
+/* The CMD draws the component line of Hud_DrawCmdTargetComponentLine, from
+   the same values. */
+void XwaSnapshotHud_NoteTargetComponentLine(uint16_t mesh_type, int show_percent, uint8_t percent);
 void XwaSnapshotHud_PushPane(XwaHudPaneId pane, int origin_x, int origin_y, int width, int height);
 void XwaSnapshotHud_PushRelativePane(XwaHudPaneId pane, int origin_x, int origin_y, int width, int height);
 void XwaSnapshotHud_PopPane(void);

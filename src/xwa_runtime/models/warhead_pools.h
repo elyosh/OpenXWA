@@ -1,17 +1,17 @@
 #ifndef XWA_RUNTIME_MODELS_WARHEAD_POOLS_H
 #define XWA_RUNTIME_MODELS_WARHEAD_POOLS_H
 
-/* The warheads that a flight group has in its hangar for the whole mission.
- * They come from the `warheads` key of the flight group's entry in the
- * mission file:
+/* A warhead pool is the number of warheads that a flight group has in its
+ * hangar for the whole mission. A mission file sets the pools with the
+ * `warheads` key of the flight group's entry:
  *
  *   flight_groups:
- *     0: { name: "Alpha", craft: 5, warheads: { missiles: 80, torpedoes: 40 } }
+ *     0: { name: "Alpha", craft: tie_fighter, warheads: { missile: 80, torpedo: 40 } }
  *
- * The keys are the warhead types of the mission's flight groups: space_bombs,
- * heavy_rockets, missiles, torpedoes, advanced_missiles, advanced_torpedoes,
- * mag_pulses, ion_pulses, advanced_mag_pulses and cluster_bombs. The last two
- * load missiles in the game. A warhead type without a value has no limit.
+ * The keys are warhead names: space_bomb, heavy_rocket, missile, torpedo,
+ * advanced_missile, advanced_torpedo, mag_pulse, ion_pulse,
+ * advanced_mag_pulse and cluster_bomb. The game loads missiles for the last
+ * two. A warhead type without a value has no limit.
  * The flight group's double and half warhead statuses double or halve the
  * values.
  *

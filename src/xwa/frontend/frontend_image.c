@@ -3,6 +3,7 @@
 #include "xwa/frontend/frontend_medals.h"
 #include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
+#include "xwa_runtime/frontend/side_panels.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 
@@ -2276,6 +2277,11 @@ int FrontImage_DrawSprite(const char* name, int x, int y) {
 	ResourceDescriptor* desc;
 	int currentFrame;
 
+#ifdef XWA_MODERN
+	if (XwaSidePanels_HidesImage(name)) {
+		return 0;
+	}
+#endif
 	index = FrontImage_FindResourceByName(name);
 	if (index == -1) {
 		return 0;
@@ -2605,14 +2611,14 @@ int FrontImage_GetAtlasSpriteBounds(FrontendRect* out, int groupId, uint16_t ind
 	{
 		/* In an atlas with game geometry, a frame can set its own bounds, for
 		   example a tooltip area larger than the image. */
-		const XwaGeometryFrame* frame =
-			XwaFrontendGeometry_FindFrame(XwaFrontendGeometry_FindGroup(groupId), index);
+		const XwaGeometryAtlas* atlas = XwaFrontendGeometry_FindGroup(groupId);
+		const XwaGeometryFrame* frame = XwaFrontendGeometry_FindFrame(atlas, index);
 
 		if (frame != NULL && frame->has_bounds) {
-			out->left = XwaFrontendGeometry_UnitX(frame->bounds[0]);
-			out->top = XwaFrontendGeometry_UnitY(frame->bounds[1]);
-			out->right = XwaFrontendGeometry_UnitX(frame->bounds[2]);
-			out->bottom = XwaFrontendGeometry_UnitY(frame->bounds[3]);
+			out->left = XwaFrontendGeometry_AtlasUnitX(atlas, frame->bounds[0]);
+			out->top = XwaFrontendGeometry_AtlasUnitY(atlas, frame->bounds[1]);
+			out->right = XwaFrontendGeometry_AtlasUnitX(atlas, frame->bounds[2]);
+			out->bottom = XwaFrontendGeometry_AtlasUnitY(atlas, frame->bounds[3]);
 		}
 	}
 #endif
@@ -6514,7 +6520,8 @@ int FrontImage_LoadBmpFile(char* fileName, ImageResource* image, int makePalette
 
 		if (bpp == 4) {
 			FrontImage_ReadBmpPalette(stream, (char*)palette, 16);
-			result = FrontImage_DecodeBmp4bpp(stream, pixels, fileHeader, infoHeader);
+			result = FrontImage_DecodeBmp4bpp(stream, pixels, (const FrontImageBmpFileHeader*)fileHeader,
+											  infoHeader);
 		} else if (bpp == 8) {
 			FrontImage_ReadBmpPalette(stream, (char*)palette, 256);
 			result = FrontImage_DecodeBmp8bpp(stream, pixels, fileHeader, infoHeader);

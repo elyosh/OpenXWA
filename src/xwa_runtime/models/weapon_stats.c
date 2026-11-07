@@ -1,6 +1,7 @@
 #include "xwa_runtime/models/weapon_stats.h"
 
 #include "aeron/aeron.h"
+#include "aeron/asset/flight_names.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
@@ -10,6 +11,8 @@
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/models/model_settings.h"
+#include "xwa_runtime/models/names.h"
+#include "xwa_runtime/models/units.h"
 
 #include <ctype.h>
 #include <stdint.h>
@@ -20,15 +23,19 @@
 /* Modern port module; no original counterpart. */
 
 #define WEAPON_STATS_FLIGHT_YAML "flight/flight.yaml"
-#define WEAPON_STATS_FIRST_WEAPON 280
-#define WEAPON_STATS_WEAPONS 28
-#define WEAPON_STATS_WARHEADS 12
-#define WEAPON_STATS_HARDPOINT_TYPES 40
-/* g_missionFlightGroups holds 192. */
-#define WEAPON_STATS_FLIGHT_GROUPS 192
-#define WEAPON_STATS_NAME_MAX 48
-#define WEAPON_STATS_RANKS 6
-#define WEAPON_STATS_DIFFICULTIES 3
+enum {
+	WEAPON_STATS_FIRST_WEAPON = 280,
+	WEAPON_STATS_WEAPONS = 28,
+	WEAPON_STATS_WARHEADS = 11,
+	/* Marks a hardpoint type that keeps its stock kind. */
+	WEAPON_STATS_STOCK_KIND = 0xFF,
+	WEAPON_STATS_HARDPOINT_TYPES = 40,
+	/* g_missionFlightGroups holds 192. */
+	WEAPON_STATS_FLIGHT_GROUPS = 192,
+	WEAPON_STATS_NAME_MAX = 48,
+	WEAPON_STATS_RANKS = 6,
+	WEAPON_STATS_DIFFICULTIES = 3,
+};
 
 /* The groups of the `weapons` section that have profiles. */
 enum {
@@ -40,27 +47,39 @@ enum {
 };
 
 static const char* const s_groups[WEAPON_STATS_GROUPS] = { "stats", "warhead_capacity_percent",
-														   "energy_speed_q16", "linking" };
+														   "energy_speed_percent", "linking" };
 /* The keys that a flight group's entry uses to pick a profile in each group. */
 static const char* const s_profileKeys[WEAPON_STATS_GROUPS] = { "weapon_profile", "warhead_profile",
 																"energy_profile", "linking_profile" };
 
 static const char* const s_stats[XWA_WEAPON_STATS] = {
-	"duration_seconds",
-	"duration_fraction",
+	/* `duration_ms` sets both parts of the duration, so the fraction has no
+	   key of its own. */
+	"duration_ms",
+	"",
 	"score",
-	"speed",
+	"speed_mglt",
 	"power",
 	"power_speed_percent",
-	"fire_rate",
-	"duration_offset",
-	"fire_ratio",
-	"range",
+	"fire_rate_ms",
+	"duration_offset_ms",
+	"fire_ratio_ms",
+	"range_m",
 	"precise",
 	"spread_mask",
 	"decharge_rate",
 	"recharge_rate",
 	"high_power_charge",
+};
+
+/* The unit of each stat in the file. The reader converts these stats to the
+   game's units. The stats that aren't listed are the game's own values. */
+static const XwaUnit s_statUnits[XWA_WEAPON_STATS] = {
+	[XWA_WEAPON_STAT_SPEED] = XWA_UNIT_MGLT,
+	[XWA_WEAPON_STAT_FIRE_RATE] = XWA_UNIT_MILLISECONDS,
+	[XWA_WEAPON_STAT_DURATION_OFFSET] = XWA_UNIT_MILLISECONDS,
+	[XWA_WEAPON_STAT_FIRE_RATIO] = XWA_UNIT_MILLISECONDS,
+	[XWA_WEAPON_STAT_RANGE] = XWA_UNIT_METRES,
 };
 
 /* The forms of a stat: plain, for the player, for one difficulty, or for
@@ -107,12 +126,17 @@ typedef struct WeaponStatsSet {
 	WeaponStatsProfile* profiles;
 	int profileCount;
 	int hasHardpointKinds;
+	/* The kind of each hardpoint type, or WEAPON_STATS_STOCK_KIND to keep the
+	   stock kind. */
 	uint8_t hardpointKinds[WEAPON_STATS_HARDPOINT_TYPES];
 } WeaponStatsSet;
 
 static WeaponStatsSet s_defaults;
 static WeaponStatsSet s_models[OBJ_Count];
 static char s_flightGroupProfiles[WEAPON_STATS_FLIGHT_GROUPS][WEAPON_STATS_GROUPS][WEAPON_STATS_NAME_MAX];
+/* Bit `group` is set after the log says that the flight group's profile for
+   that group doesn't exist. */
+static uint8_t s_missingProfileLogged[WEAPON_STATS_FLIGHT_GROUPS];
 static int s_hasRankFactors;
 static float s_rankFactors[WEAPON_STATS_RANKS];
 static int s_hasDifficultyFactors;
@@ -123,6 +147,7 @@ static int8_t s_linkingRules[XWA_WEAPON_LINKING_RULES];
 static void WeaponStats_FreeSet(WeaponStatsSet* set) {
 	free(set->profiles);
 	memset(set, 0, sizeof *set);
+	memset(set->hardpointKinds, WEAPON_STATS_STOCK_KIND, sizeof set->hardpointKinds);
 }
 
 /* Copies `name` into `out` in lower case. The files call the values without a
@@ -221,15 +246,38 @@ static void WeaponStats_ReadForm(const char* path, const char* where, const Aero
 		char name[160];
 		int32_t read;
 
-		if (stat < 0) {
+		if (stat < 0 || stat == XWA_WEAPON_STAT_DURATION_FRACTION) {
 			if (!forms || WeaponStats_Find(key, s_forms + 1, WEAPON_STATS_FORMS - 1) < 0) {
 				Aeron_LogWarn("xwa.models", "%s: %s.%s isn't a weapon stat. It is ignored", path, where, key);
 			}
 			continue;
 		}
 		snprintf(name, sizeof name, "%s.%s", where, key);
-		if (stat == XWA_WEAPON_STAT_PRECISE ? WeaponStats_ReadBool(path, name, value, &read)
-											: WeaponStats_ReadInt(path, name, value, &read)) {
+		if (stat == XWA_WEAPON_STAT_DURATION_SECONDS) {
+			int32_t ticks;
+
+			/* The game counts 236 ticks for each second, adds the fraction
+			   rounded to a whole tick, and keeps the result in 16 bits. */
+			if (!XwaUnits_Read(value, XWA_UNIT_MILLISECONDS, 0, UINT16_MAX, &ticks)) {
+				Aeron_LogWarn("xwa.models",
+							  "%s: %s must be a number of milliseconds from 0 to %d. It is ignored", path,
+							  name, UINT16_MAX * 4);
+				continue;
+			}
+			form->value[XWA_WEAPON_STAT_DURATION_SECONDS] = ticks / 236;
+			form->value[XWA_WEAPON_STAT_DURATION_FRACTION] = (int32_t)(((ticks % 236) * 65536 + 118) / 236);
+			form->set |= (uint16_t)((1u << XWA_WEAPON_STAT_DURATION_SECONDS) |
+									(1u << XWA_WEAPON_STAT_DURATION_FRACTION));
+		} else if (s_statUnits[stat] != XWA_UNIT_NONE) {
+			if (!XwaUnits_Read(value, s_statUnits[stat], INT32_MIN, INT32_MAX, &read)) {
+				Aeron_LogWarn("xwa.models", "%s: %s must be a number of %s. It is ignored", path, name,
+							  XwaUnits_Name(s_statUnits[stat]));
+				continue;
+			}
+			form->value[stat] = read;
+			form->set |= (uint16_t)(1u << stat);
+		} else if (stat == XWA_WEAPON_STAT_PRECISE ? WeaponStats_ReadBool(path, name, value, &read)
+												   : WeaponStats_ReadInt(path, name, value, &read)) {
 			form->value[stat] = read;
 			form->set |= (uint16_t)(1u << stat);
 		}
@@ -262,18 +310,18 @@ static void WeaponStats_ReadWeapon(const char* path, const char* where, const Ae
 	}
 }
 
-/* Reads a key that must be a number from `first` to `first` + `count` - 1.
-   Returns the number minus `first`, or -1. */
-static int WeaponStats_NumberKey(const char* path, const char* where, const char* key, int first, int count) {
-	char* end;
-	const long value = strtol(key, &end, 10);
+/* Looks up the map key `key` in `table` and returns its value. If the name
+   isn't in the table, or its value is below `first`, logs a warning and
+   returns -1. */
+static int WeaponStats_ReadNameKey(const char* path, const char* where, const AeronConfigNode* node,
+								   const char* key, const XwaNameTable* table) {
+	const int value = XwaNames_Find(table, key);
 
-	if (*key == '\0' || *end != '\0' || value < first || value >= first + count) {
-		Aeron_LogWarn("xwa.models", "%s: %s.%s must be a number from %d to %d. It is ignored", path, where,
-					  key, first, first + count - 1);
+	if (value < 0) {
+		XwaNames_LogUnknown(table, path, AeronConfigNode_Line(node), where, key);
 		return -1;
 	}
-	return (int)(value - first);
+	return value;
 }
 
 /* Reads `node`, a profile of group `group`, into `profile`. */
@@ -291,13 +339,13 @@ static void WeaponStats_ReadProfile(const char* path, const char* where, int gro
 		snprintf(name, sizeof name, "%s.%s", where, key);
 		switch (group) {
 			case WEAPON_STATS_GROUP_STATS:
-				if ((at = WeaponStats_NumberKey(path, where, key, WEAPON_STATS_FIRST_WEAPON,
-												WEAPON_STATS_WEAPONS)) >= 0) {
-					WeaponStats_ReadWeapon(path, name, value, profile->weapons[at]);
+				if ((at = WeaponStats_ReadNameKey(path, where, value, key, &g_xwaWeaponTypeNames)) >= 0) {
+					WeaponStats_ReadWeapon(path, name, value,
+										   profile->weapons[at - WEAPON_STATS_FIRST_WEAPON]);
 				}
 				break;
 			case WEAPON_STATS_GROUP_WARHEADS:
-				if ((at = WeaponStats_NumberKey(path, where, key, 0, WEAPON_STATS_WARHEADS)) >= 0 &&
+				if ((at = WeaponStats_ReadNameKey(path, where, value, key, &g_xwaWarheadNames)) >= 0 &&
 					WeaponStats_ReadInt(path, name, value, &profile->warheadPercent[at]) &&
 					profile->warheadPercent[at] < 0) {
 					Aeron_LogWarn("xwa.models", "%s: %s must be 0 or more. It is ignored", path, name);
@@ -307,18 +355,22 @@ static void WeaponStats_ReadProfile(const char* path, const char* where, int gro
 			case WEAPON_STATS_GROUP_ENERGY:
 				if ((at = WeaponStats_Find(key, s_energyKeys, 2)) < 0) {
 					Aeron_LogWarn("xwa.models", "%s: %s isn't 'all' or 'player'. It is ignored", path, name);
-				} else if (WeaponStats_ReadInt(path, name, value, &profile->energy[at]) &&
-						   (profile->energy[at] < 0 || profile->energy[at] > 0x10000)) {
-					Aeron_LogWarn("xwa.models", "%s: %s must be from 0 to 65536. It is ignored", path, name);
-					profile->energy[at] = -1;
+				} else if (!XwaUnits_Read(value, XWA_UNIT_PERCENT_Q16, 0, 0x10000, &profile->energy[at])) {
+					Aeron_LogWarn("xwa.models", "%s: %s must be a percent from 0 to 100. It is ignored", path,
+								  name);
 				}
 				break;
 			default: {
 				int32_t read;
 
 				if (strcmp(key, "laser_link") == 0) {
-					if (WeaponStats_ReadInt(path, name, value, &read) && read >= 0) {
-						profile->laserLink = read;
+					if (WeaponStats_ReadInt(path, name, value, &read)) {
+						if (read >= 1 && read <= 3) {
+							profile->laserLink = read;
+						} else {
+							Aeron_LogWarn("xwa.models", "%s: %s must be 1, 2 or 3. It is ignored", path,
+										  name);
+						}
 					}
 				} else if ((at = WeaponStats_Find(key, s_linkingRuleNames, XWA_WEAPON_LINKING_RULES)) < 0) {
 					Aeron_LogWarn("xwa.models", "%s: %s isn't a linking key. It is ignored", path, name);
@@ -337,6 +389,7 @@ static void WeaponStats_ReadSet(const char* path, const AeronConfigNode* weapons
 	const AeronConfigNode* kinds = AeronConfigNode_MapGet(weapons, "hardpoint_kinds");
 	int group;
 
+	memset(set->hardpointKinds, WEAPON_STATS_STOCK_KIND, sizeof set->hardpointKinds);
 	for (group = 0; group < WEAPON_STATS_GROUPS; ++group) {
 		const AeronConfigNode* node = AeronConfigNode_MapGet(weapons, s_groups[group]);
 		size_t index;
@@ -373,56 +426,79 @@ static void WeaponStats_ReadSet(const char* path, const AeronConfigNode* weapons
 	if (kinds != NULL) {
 		size_t index;
 
-		if (AeronConfigNode_Type(kinds) != AERON_CONFIG_SEQUENCE ||
-			AeronConfigNode_SequenceCount(kinds) > WEAPON_STATS_HARDPOINT_TYPES) {
+		if (AeronConfigNode_Type(kinds) != AERON_CONFIG_MAP) {
 			Aeron_LogWarn("xwa.models",
-						  "%s: weapons.hardpoint_kinds must be a list of up to %d kinds. It is ignored", path,
-						  WEAPON_STATS_HARDPOINT_TYPES);
+						  "%s: weapons.hardpoint_kinds must map hardpoint types to kinds. It is ignored",
+						  path);
 			return;
 		}
-		memset(set->hardpointKinds, 0, sizeof set->hardpointKinds);
-		for (index = 0; index < AeronConfigNode_SequenceCount(kinds); ++index) {
-			const AeronConfigNode* node = AeronConfigNode_SequenceGet(kinds, index);
-			const int64_t kind = AeronConfigNode_Int(node, -1);
+		for (index = 0; index < AeronConfigNode_MapCount(kinds); ++index) {
+			const char* key = AeronConfigNode_MapKeyAt(kinds, index);
+			const AeronConfigNode* node = AeronConfigNode_MapValueAt(kinds, index);
+			const int type = Aeron_FlightNameFind(AERON_FLIGHT_HARDPOINT_TYPES, key);
+			int kind;
 
-			if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || kind < 0 || kind > 255) {
+			if (type < 0) {
 				Aeron_LogWarn("xwa.models",
-							  "%s: weapons.hardpoint_kinds[%d] must be a number from 0 to 255. It is 0", path,
-							  (int)index);
+							  "%s:%d: weapons.hardpoint_kinds.%s isn't a hardpoint type. It is ignored", path,
+							  AeronConfigNode_Line(node), key);
 				continue;
 			}
-			set->hardpointKinds[index] = (uint8_t)kind;
+			if (XwaNames_Read(&g_xwaHardpointKindNames, path, "weapons.hardpoint_kinds", node, &kind)) {
+				set->hardpointKinds[type] = (uint8_t)kind;
+				set->hasHardpointKinds = 1;
+			}
 		}
-		set->hasHardpointKinds = 1;
 	}
 }
 
-/* Reads a list of `count` float32 factors into `out`. Returns 0 when the node
-   isn't such a list. */
-static int WeaponStats_ReadFactors(const char* key, const AeronConfigNode* node, float* out, int count) {
-	int index;
+/* Reads a map from the names in `table` to float32 factors into `out`. The
+   map must have every name. Otherwise logs a warning and returns 0. */
+static int WeaponStats_ReadFactors(const char* key, const AeronConfigNode* node, const XwaNameTable* table,
+								   float* out) {
+	/* The ranks are the longest table that this reads. */
+	float read[WEAPON_STATS_RANKS];
+	int set = 0;
+	size_t index;
 
-	if (AeronConfigNode_Type(node) != AERON_CONFIG_SEQUENCE ||
-		AeronConfigNode_SequenceCount(node) != (size_t)count) {
-		Aeron_LogWarn("xwa.models", "%s: weapons.%s must be a list of %d numbers. It is ignored",
-					  WEAPON_STATS_FLIGHT_YAML, key, count);
+	if (table->count > WEAPON_STATS_RANKS) {
 		return 0;
 	}
-	for (index = 0; index < count; ++index) {
-		const AeronConfigNode* value = AeronConfigNode_SequenceGet(node, (size_t)index);
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogWarn("xwa.models", "%s: weapons.%s must map each %s to a number. It is ignored",
+					  WEAPON_STATS_FLIGHT_YAML, key, table->what);
+		return 0;
+	}
+	for (index = 0; index < AeronConfigNode_MapCount(node); ++index) {
+		const AeronConfigNode* value = AeronConfigNode_MapValueAt(node, index);
+		const int at = XwaNames_Find(table, AeronConfigNode_MapKeyAt(node, index));
+		char where[64];
 
+		snprintf(where, sizeof where, "weapons.%s", key);
+		if (at < 0) {
+			XwaNames_LogUnknown(table, WEAPON_STATS_FLIGHT_YAML, AeronConfigNode_Line(value), where,
+								AeronConfigNode_MapKeyAt(node, index));
+			return 0;
+		}
 		if (AeronConfigNode_Type(value) != AERON_CONFIG_INT &&
 			AeronConfigNode_Type(value) != AERON_CONFIG_FLOAT) {
-			Aeron_LogWarn("xwa.models", "%s: weapons.%s must be a list of %d numbers. It is ignored",
-						  WEAPON_STATS_FLIGHT_YAML, key, count);
+			Aeron_LogWarn("xwa.models", "%s:%d: weapons.%s.%s must be a number. It is ignored",
+						  WEAPON_STATS_FLIGHT_YAML, AeronConfigNode_Line(value), key,
+						  AeronConfigNode_MapKeyAt(node, index));
 			return 0;
 		}
 		/* The importer writes enough digits to get the exact float32 value
 		   back. */
-		out[index] = AeronConfigNode_Type(value) == AERON_CONFIG_INT
-						 ? (float)AeronConfigNode_Int(value, 0)
-						 : (float)AeronConfigNode_Float(value, 0.0);
+		read[at] = AeronConfigNode_Type(value) == AERON_CONFIG_INT ? (float)AeronConfigNode_Int(value, 0)
+																   : (float)AeronConfigNode_Float(value, 0.0);
+		set |= 1 << at;
 	}
+	if (set != (1 << table->count) - 1) {
+		Aeron_LogWarn("xwa.models", "%s: weapons.%s must have a number for every %s. It is ignored",
+					  WEAPON_STATS_FLIGHT_YAML, key, table->what);
+		return 0;
+	}
+	memcpy(out, read, (size_t)table->count * sizeof *out);
 	return 1;
 }
 
@@ -446,20 +522,18 @@ void XwaWeaponStats_Init(void) {
 	}
 	root = AeronConfigFile_Root(file);
 	section = AeronConfigNode_MapGet(root, "weapons");
-	if (AeronConfigNode_Type(AeronConfigNode_MapGet(root, "version")) != AERON_CONFIG_INT ||
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) != 1 ||
-		AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
+	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
 		AeronConfigFile_Destroy(file);
 		return;
 	}
 	WeaponStats_ReadSet(WEAPON_STATS_FLIGHT_YAML, section, &s_defaults);
 	if ((node = AeronConfigNode_MapGet(section, "fire_ratio_by_rank")) != NULL) {
 		s_hasRankFactors =
-			WeaponStats_ReadFactors("fire_ratio_by_rank", node, s_rankFactors, WEAPON_STATS_RANKS);
+			WeaponStats_ReadFactors("fire_ratio_by_rank", node, &g_xwaRankNames, s_rankFactors);
 	}
 	if ((node = AeronConfigNode_MapGet(section, "damage_by_difficulty")) != NULL) {
-		s_hasDifficultyFactors = WeaponStats_ReadFactors("damage_by_difficulty", node, s_difficultyFactors,
-														 WEAPON_STATS_DIFFICULTIES);
+		s_hasDifficultyFactors =
+			WeaponStats_ReadFactors("damage_by_difficulty", node, &g_xwaDifficultyNames, s_difficultyFactors);
 	}
 	if ((node = AeronConfigNode_MapGet(section, "limit_linked_warhead_fire_rate")) != NULL) {
 		int32_t value;
@@ -509,6 +583,7 @@ void XwaWeaponStats_ReadModelSettings(unsigned int objectType, const char* path,
 
 void XwaWeaponStats_ClearFlightGroups(void) {
 	memset(s_flightGroupProfiles, 0, sizeof s_flightGroupProfiles);
+	memset(s_missingProfileLogged, 0, sizeof s_missingProfileLogged);
 }
 
 int XwaWeaponStats_ReadFlightGroup(const char* path, const char* fgKey, int fgIdx,
@@ -565,7 +640,8 @@ static const WeaponStatsProfile* WeaponStats_FindProfile(const WeaponStatsSet* s
 
 /* Finds the profiles of group `group` for a craft of object type `objectType`
    and flight group `fgIdx`, in the model file and in flight/flight.yaml. If
-   neither has the flight group's profile, it uses `default`. */
+   neither has the flight group's profile, both are NULL, so the craft gets
+   the original game's values, and the log says so once. */
 static void WeaponStats_Profiles(unsigned int objectType, int fgIdx, int group,
 								 const WeaponStatsProfile** model, const WeaponStatsProfile** global) {
 	const WeaponStatsSet* set = WeaponStats_Model(objectType);
@@ -574,9 +650,13 @@ static void WeaponStats_Profiles(unsigned int objectType, int fgIdx, int group,
 
 	*model = WeaponStats_FindProfile(set, name, group);
 	*global = WeaponStats_FindProfile(&s_defaults, name, group);
-	if (name[0] != '\0' && *model == NULL && *global == NULL) {
-		*model = WeaponStats_FindProfile(set, "", group);
-		*global = WeaponStats_FindProfile(&s_defaults, "", group);
+	if (name[0] != '\0' && *model == NULL && *global == NULL &&
+		!(s_missingProfileLogged[fgIdx] & (1u << group))) {
+		s_missingProfileLogged[fgIdx] |= (uint8_t)(1u << group);
+		Aeron_LogWarn("xwa.mission",
+					  "flight group %d picks the %s profile '%s', but neither the model of %s nor "
+					  "flight/flight.yaml has it. The flight group gets the original game's values",
+					  fgIdx, s_groups[group], name, XwaNames_Name(&g_xwaObjectTypeNames, (int)objectType));
 	}
 }
 
@@ -724,14 +804,17 @@ int XwaWeaponStats_LinkingRule(unsigned int objIdx, XwaWeaponLinkingRule rule) {
 
 int XwaWeaponStats_HardpointKind(unsigned int objectType, int hardpointType, int stock) {
 	const WeaponStatsSet* model = WeaponStats_Model(objectType);
-	const WeaponStatsSet* set = model != NULL && model->hasHardpointKinds ? model : &s_defaults;
 
-	if (!set->hasHardpointKinds) {
+	if (hardpointType < 0 || hardpointType >= WEAPON_STATS_HARDPOINT_TYPES) {
 		return stock;
 	}
-	return hardpointType >= 0 && hardpointType < WEAPON_STATS_HARDPOINT_TYPES
-			   ? set->hardpointKinds[hardpointType]
-			   : 0;
+	if (model != NULL && model->hardpointKinds[hardpointType] != WEAPON_STATS_STOCK_KIND) {
+		return model->hardpointKinds[hardpointType];
+	}
+	if (s_defaults.hardpointKinds[hardpointType] != WEAPON_STATS_STOCK_KIND) {
+		return s_defaults.hardpointKinds[hardpointType];
+	}
+	return stock;
 }
 
 int XwaWeaponStats_HardpointWeaponType(int hardpointType) {

@@ -7,6 +7,8 @@
 
 static float s_classic_light_illuminance;
 static float s_classic_light_illuminance_default;
+static float s_classic_radiance;
+static float s_classic_radiance_default;
 
 float XwaRemaster_ClassicLightIlluminance(void) { return s_classic_light_illuminance; }
 
@@ -23,7 +25,20 @@ void XwaRemaster_ConfigureClassicLightIlluminance(float illuminance) {
 
 float XwaRemaster_ClassicLightIlluminanceDefault(void) { return s_classic_light_illuminance_default; }
 
-float XwaRemaster_ClassicRadiance(void) { return s_classic_light_illuminance / 3.14159265f; }
+float XwaRemaster_ClassicRadiance(void) { return s_classic_radiance; }
+
+void XwaRemaster_SetClassicRadiance(float radiance) {
+	if (isfinite(radiance) && radiance >= 0.0f) {
+		s_classic_radiance = radiance;
+	}
+}
+
+void XwaRemaster_ConfigureClassicRadiance(float radiance) {
+	XwaRemaster_SetClassicRadiance(radiance);
+	s_classic_radiance_default = s_classic_radiance;
+}
+
+float XwaRemaster_ClassicRadianceDefault(void) { return s_classic_radiance_default; }
 
 uint32_t XwaRemaster_ReadGameDirLights(const XwaDirLight* lights, uint32_t count, XwaRemasterDirLight* out) {
 	if (!lights || !out) {

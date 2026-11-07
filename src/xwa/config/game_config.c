@@ -38,7 +38,6 @@
 #include "xwa/util/time.h"
 
 #ifdef XWA_MODERN
-#include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_input_options_screen.h"
@@ -47,6 +46,7 @@
 #include "xwa_runtime/config/modern_pilot_profiles_screen.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/config/modern_video_options_screen.h"
+#include "xwa_runtime/config/option_section.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #endif
 
@@ -2635,7 +2635,7 @@ int Config_OptionsDatapadUpdate(int frameState) {
 #ifdef XWA_MODERN
 		XwaModernVideoOptions_Flush();
 		XwaModernInputOptions_Flush();
-		XwaModernCameraOptions_Flush();
+		XwaOptionSection_FlushAll();
 		XwaModernMods_Flush();
 		if (Movie_Play("dpclose", 1)) {
 			g_configOptionsDatapadClosingMovie = 1;

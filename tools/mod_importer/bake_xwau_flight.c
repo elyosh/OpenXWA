@@ -57,6 +57,7 @@
 #include "xwau_dat.h"
 
 #include "aeron/image.h"
+#include "envmap.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -74,8 +75,9 @@
  * the rest of the HUD as the resolution goes up. Its size is set to look as
  * it does in XWAU at 1080p, where the HUD scale is 1080 / 600. */
 #define FLIGHT_HULL_ICON_HUD_SCALE (1080.0 / 600.0)
-/* The largest image that fits in an atlas page with its gutters. */
-#define FLIGHT_MAX_IMAGE (BAKE_MAX_ATLAS_DIM - 2 * BAKE_HD_PAD)
+/* The largest image that fits in an atlas page of its own with its
+ * gutters. */
+#define FLIGHT_MAX_IMAGE (BAKE_MAX_OVERSIZE_DIM - 2 * BAKE_HD_PAD)
 /* XWAU's ddraw wrapper picks alternative explosions only for these groups
  * (Direct3DDevice.cpp: DATGroupId - 2000, MAX_XWA_EXPLOSIONS). */
 #define FLIGHT_FIRST_EXPLOSION_GROUP 2000
@@ -137,13 +139,6 @@ typedef struct FlightBackdrop {
 	int picks_frame;
 } FlightBackdrop;
 
-/* A DAT material file: Materials/dat-<group>.mat or dat-<group>-<id>.mat. */
-typedef struct FlightMaterialFile {
-	int group;
-	int image; /* the image id, or -1 for the whole group */
-	char path[1100];
-} FlightMaterialFile;
-
 /* The keys of a DAT material that this bake uses, from its [Default]
  * section. */
 typedef struct FlightMaterial {
@@ -154,6 +149,15 @@ typedef struct FlightMaterial {
 	char set_dat[FLIGHT_SET_COUNT][512]; /* the DAT path as written, such as ResData\ExplosionsAlt3.dat */
 	int set_group[FLIGHT_SET_COUNT];
 } FlightMaterial;
+
+/* A DAT material file: Materials/dat-<group>.mat or dat-<group>-<id>.mat. */
+typedef struct FlightMaterialFile {
+	int group;
+	int image; /* the image id, or -1 for the whole group */
+	char path[1100];
+	int readable; /* 0 if the file can't be read */
+	FlightMaterial material;
+} FlightMaterialFile;
 
 typedef struct FlightContext {
 	const BakeXwauFlightOptions* opt;
@@ -187,13 +191,12 @@ static const char* const g_flightSetNames[FLIGHT_SET_COUNT] = { "alt1", "alt2", 
 
 /* ---- XWAU files --------------------------------------------------------- */
 
-/* Opens a DAT once: a file listed twice keeps its first place. */
+/* Opens a DAT once: a file listed twice keeps its first place. A file that
+ * doesn't exist is skipped, because XWAU can't load it either. */
 static void flight_open_dat(FlightContext* ctx, const char* rel) {
 	char path[1100], error[256];
-	if (!Xwau_FindFile(ctx->opt->xwau_root, rel, path, sizeof path)) {
-		ToolLog_Write(TOOL_LOG_WARNING, "xwau: %s isn't in %s", rel, ctx->opt->xwau_root);
+	if (!Xwau_FindFile(ctx->opt->xwau_root, rel, path, sizeof path))
 		return;
-	}
 	const char* name = strrchr(path, '/');
 	name = name ? name + 1 : path;
 	for (int i = 0; i < ctx->dat_count; ++i) {
@@ -286,6 +289,27 @@ static void flight_read_mission_resdata(FlightContext* ctx, FlightDat** dats, in
 	XwauLines_Free(&lines);
 }
 
+/* Counts the backdrop scales that mission `base` sets in
+ * <base>_BackdropScales.txt or in the [BackdropScales] section of <base>.ini
+ * as a feature that the import doesn't convert. This bake only writes the
+ * shared atlases, so it can't convert them. */
+static void flight_check_mission_scales(FlightContext* ctx, const char* base) {
+	char rel[1200], path[1100];
+	XwauLines lines = { 0 };
+	snprintf(rel, sizeof rel, "%s_BackdropScales.txt", base);
+	XwauLines_Read(Xwau_FindFile(ctx->opt->xwau_root, rel, path, sizeof path) ? path : NULL, "",
+				   XWAU_RULES_CPP, &lines);
+	if (!lines.count) {
+		XwauLines_Free(&lines);
+		snprintf(rel, sizeof rel, "%s.ini", base);
+		XwauLines_Read(Xwau_FindFile(ctx->opt->xwau_root, rel, path, sizeof path) ? path : NULL,
+					   "BackdropScales", XWAU_RULES_CPP, &lines);
+	}
+	if (lines.count)
+		ReportUnsupported("mission backdrop scales ([BackdropScales])");
+	XwauLines_Free(&lines);
+}
+
 /* Whether a DAT of `dats` other than `self` has group `group`. */
 static int flight_others_have_group(const FlightDat* dats, int count, const XwauDat* self, int group) {
 	const int* images;
@@ -317,6 +341,7 @@ static void flight_open_mission_dats(FlightContext* ctx) {
 				continue;
 			snprintf(base, sizeof base, "%s/%.*s", dirs[d], (int)(len - 4), entries[i]);
 			flight_read_mission_resdata(ctx, &added, &added_count, base);
+			flight_check_mission_scales(ctx, base);
 		}
 		FreeList(entries, count);
 	}
@@ -343,7 +368,7 @@ static void flight_open_mission_dats(FlightContext* ctx) {
 			art = &ctx->mission_art[ctx->mission_art_count++];
 			art->file = added[m];
 			flight_art_name(added[m].name, art->name, sizeof art->name);
-			ToolLog_Write(TOOL_LOG_INFO,
+			ToolLog_Write(TOOL_LOG_DETAIL,
 						  "xwau: %s replaces images of other files, so it gets its own mission art, "
 						  "resdata/mission_art/%s",
 						  added[m].name, art->name);
@@ -352,7 +377,8 @@ static void flight_open_mission_dats(FlightContext* ctx) {
 			ctx->stats->failures++;
 		} else {
 			shared[shared_count++] = added[m];
-			ToolLog_Write(TOOL_LOG_INFO, "xwau: %s has groups of its own, so it goes into the shared atlases",
+			ToolLog_Write(TOOL_LOG_DETAIL,
+						  "xwau: %s has groups of its own, so it goes into the shared atlases",
 						  added[m].name);
 		}
 	}
@@ -401,7 +427,16 @@ static int flight_hull_icon_setting(const FlightContext* ctx, const char* key, i
 	XwauLines_Value(&lines, key, XWAU_RULES_CPP, value, sizeof value);
 	XwauLines_Free(&lines);
 	long long number;
-	return value[0] && Xwau_StoiAuto(value, &number) && number > 0 ? (int)number : fallback;
+	if (!value[0])
+		return fallback;
+	/* XWAU fails on a value that isn't a number. */
+	if (!Xwau_StoiAuto(value, &number))
+		return fallback;
+	if (number <= 0) {
+		ReportFatal(path, "%s = %s isn't above 0, and the import can't convert that scale", key, value);
+		return fallback;
+	}
+	return (int)number;
 }
 
 /* Reads Resdata/BackdropScales.txt as XWAU's backdrop hook does: each line is
@@ -425,12 +460,10 @@ static void flight_read_backdrop_scales(FlightContext* ctx) {
 				 Xwau_Stoi(tokens.items[2], &values[2]);
 		}
 		XwauLines_Free(&tokens);
-		if (!ok) {
-			ToolLog_Write(TOOL_LOG_WARNING,
-						  "xwau: %s: line '%s' isn't 'group, scale' or 'group, image, scale'", path,
-						  lines.items[i]);
+		/* XWAU skips or fails on a line that isn't 'group, scale' or
+		   'group, image, scale'. */
+		if (!ok)
 			continue;
-		}
 		int known = 0;
 		for (int k = 0; k < ctx->scale_count && !known; ++k)
 			known = ctx->scales[k].group == (int)values[0] && ctx->scales[k].image == (int)values[1];
@@ -521,9 +554,8 @@ static void flight_read_exe(FlightContext* ctx) {
 	if (scale)
 		memcpy(&value, scale, sizeof value);
 	if (!scale || !table || !(value > 0.0f && value <= 65536.0f)) {
-		ToolLog_Write(TOOL_LOG_WARNING,
-					  "xwau: %s isn't the expected game executable. Backdrops get the stock scale of 256",
-					  path);
+		ReportFatal(path, "isn't the expected game executable, so the import can't read its backdrop scale "
+						  "and groups");
 		free(exe);
 		return;
 	}
@@ -640,12 +672,11 @@ static int flight_read_material(const char* path, FlightMaterial* out) {
 		if (strcasecmp(param, "ExplosionBlendMode") == 0) {
 			out->blend_mode = (int)atof(svalue);
 		} else if (strcasecmp(param, "Light") == 0) {
+			/* XWAU ignores a Light without three numbers. */
 			float rgb[3];
 			if (sscanf(equals + 1, "%f, %f, %f", &rgb[0], &rgb[1], &rgb[2]) == 3) {
 				out->has_light = 1;
 				memcpy(out->light, rgb, sizeof rgb);
-			} else {
-				ToolLog_Write(TOOL_LOG_WARNING, "xwau: %s: Light needs three numbers", path);
 			}
 		} else {
 			for (int set = 0; set < FLIGHT_SET_COUNT; ++set) {
@@ -665,12 +696,11 @@ static int flight_read_material(const char* path, FlightMaterial* out) {
 							split = c;
 					}
 				}
+				/* XWAU can't use a value that isn't <file>.dat-<group>. */
 				char* group_end = NULL;
 				const long group = split ? strtol(split + 5, &group_end, 10) : 0;
-				if (!split || group_end == split + 5) {
-					ToolLog_Write(TOOL_LOG_WARNING, "xwau: %s: %s must be <file>.dat-<group>", path, param);
+				if (!split || group_end == split + 5)
 					break;
-				}
 				split[4] = '\0';
 				out->has_set[set] = 1;
 				snprintf(out->set_dat[set], sizeof out->set_dat[set], "%s", written);
@@ -681,6 +711,13 @@ static int flight_read_material(const char* path, FlightMaterial* out) {
 	}
 	fclose(fp);
 	return 1;
+}
+
+/* Reads each material file once. Many images share the same file. */
+static void flight_read_materials(FlightContext* ctx) {
+	for (int i = 0; i < ctx->material_count; ++i)
+		ctx->materials[i].readable =
+			flight_read_material(ctx->materials[i].path, &ctx->materials[i].material);
 }
 
 static const FlightMaterialFile* flight_find_material(const FlightContext* ctx, int group, int image) {
@@ -704,6 +741,50 @@ static int flight_is_baked_group(int group) {
 }
 
 static int flight_is_planet_group(int group) { return group >= 6000 && group <= 6999; }
+
+/* Counts the [Default] keys of the DAT materials of the baked groups that
+ * this bake doesn't convert. The lines are read as flight_read_material
+ * reads them. The effect libraries read the animation keys (such as
+ * frame_rand) of the image materials. */
+static void flight_check_material_keys(const FlightContext* ctx) {
+	for (int m = 0; m < ctx->material_count; ++m) {
+		const FlightMaterialFile* file = &ctx->materials[m];
+		if (!flight_is_baked_group(file->group))
+			continue;
+		const int explosion = file->image < 0 && file->group >= FLIGHT_FIRST_EXPLOSION_GROUP &&
+							  file->group <= FLIGHT_LAST_EXPLOSION_GROUP;
+		FILE* fp = fopen(file->path, "r");
+		if (!fp)
+			continue;
+		char line[1024];
+		int in_default = 0;
+		while (fgets(line, sizeof line, fp)) {
+			if (line[0] == ';' || line[0] == '#')
+				continue;
+			if (line[0] == '[') {
+				in_default = flight_is_default_section(line);
+				continue;
+			}
+			char param[128], svalue[512], lower[128];
+			if (!in_default || !strchr(line, '=') || sscanf(line, "%127s = %511s", param, svalue) < 2)
+				continue;
+			snprintf(lower, sizeof lower, "%s", param);
+			for (char* c = lower; *c; ++c)
+				*c = (char)tolower((unsigned char)*c);
+			int known = strcasecmp(param, "Light") == 0 ||
+						(strcasecmp(param, "ExplosionBlendMode") == 0 && (explosion || atof(svalue) == 0.0));
+			for (int set = 0; set < FLIGHT_SET_COUNT && !known; ++set)
+				known = explosion && strcasecmp(param, g_flightSetKeys[set]) == 0;
+			if (!known && file->image >= 0 && (strstr(lower, "_rand") || strstr(lower, "_seq")))
+				known = 1;
+			if (!known) {
+				ReportUnsupported("the DAT .mat key %s", param);
+				break;
+			}
+		}
+		fclose(fp);
+	}
+}
 
 /* The scale, where 256 means 1.0, at which XWAU draws the image at
  * `position` in `group`. */
@@ -750,35 +831,10 @@ static void flight_free_frames(BakeFrame* frames, int count) {
 }
 
 /* Packs `frames` and writes <atlas_dir>/<base>.yaml with its pages. */
-static int flight_write_atlas(FlightContext* ctx, const char* base, const BakeFrame* frames,
-							  const uint16_t* ids, int count, const char* header) {
-	AeronCpuAtlas pages = { 0 };
-	AeronAtlasImage* placed = NULL;
-	if (!BakeSprites_BuildAtlas(frames, count, 0, &placed, &pages)) {
-		ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s could not be packed", base);
-		return 0;
-	}
-	if (!BakeSprites_MakeDirs(ctx->atlas_dir)) {
-		free(placed);
-		Aeron_AtlasBuildFree(&pages);
-		return 0;
-	}
-	int ok = 1;
-	for (int page = 0; page < pages.page_count; ++page) {
-		char path[1300];
-		if (page == 0)
-			snprintf(path, sizeof path, "%s/%s", ctx->atlas_dir, base);
-		else
-			snprintf(path, sizeof path, "%s/%s_p%d", ctx->atlas_dir, base, page);
-		ok &= BakeSprites_EmitImage(ctx->opt->sprites, path, pages.pages[page].rgba, pages.pages[page].width,
-									pages.pages[page].height);
-	}
-	char yaml[1300];
-	snprintf(yaml, sizeof yaml, "%s/%s.yaml", ctx->atlas_dir, base);
-	ok &= BakeSprites_WriteAtlasYaml(yaml, placed, frames, ids, count, &pages, pages.pages[0].width,
-									 pages.pages[0].height, header);
-	free(placed);
-	Aeron_AtlasBuildFree(&pages);
+static int flight_write_atlas(FlightContext* ctx, const char* base, const BakeFrame* frames, int count,
+							  const BakeAtlasHeader* header) {
+	const int ok =
+		BakeSprites_PackAndWriteAtlas(ctx->opt->sprites, ctx->atlas_dir, base, header, frames, count);
 	if (ok) {
 		ctx->stats->atlases++;
 		ctx->stats->images += count;
@@ -847,29 +903,27 @@ static int flight_fit(BakeFrame* frame, int max_width, int max_height) {
 }
 
 /* Converts the alternative sets of an explosion group's material into
- * atlases, and writes the `frame_sets` key that lists them into `header`.
+ * atlases, and writes the `frame_sets` key that lists them into `frame_sets`.
  * A set's images keep their order in the DAT file: XWAU finds the image for
  * a frame by its position. */
-static void flight_bake_frame_sets(FlightContext* ctx, int group, char* header, size_t header_size) {
+static void flight_bake_frame_sets(FlightContext* ctx, int group, char* frame_sets, size_t frame_sets_size) {
 	const FlightMaterialFile* file = flight_find_material(ctx, group, -1);
-	FlightMaterial material;
-	if (!file || !flight_read_material(file->path, &material))
+	if (!file || !file->readable)
 		return;
+	const FlightMaterial material = file->material;
 	int any = 0;
 	for (int set = 0; set < FLIGHT_SET_COUNT; ++set)
 		any |= material.has_set[set];
 	if (!any)
 		return;
+	/* A blend mode other than 0 uses XWAU's procedural explosions, which
+	   OpenXWA doesn't have. */
 	if (material.blend_mode != 0) {
-		ToolLog_Write(
-			TOOL_LOG_WARNING,
-			"xwau: %s: ExplosionBlendMode %d uses XWAU's procedural explosions, which OpenXWA doesn't "
-			"have; its sets aren't converted",
-			file->path, material.blend_mode);
+		ReportUnsupported("XWAU's procedural explosions (ExplosionBlendMode)");
 		return;
 	}
-	size_t used = strlen(header);
-	used += (size_t)snprintf(header + used, header_size - used,
+	size_t used = strlen(frame_sets);
+	used += (size_t)snprintf(frame_sets + used, frame_sets_size - used,
 							 "frame_sets:\n  shuffle: explosions\n  reroll_seconds: %d\n  sets:\n",
 							 FLIGHT_REROLL_SECONDS);
 	for (int set = 0; set < FLIGHT_SET_COUNT; ++set) {
@@ -887,39 +941,39 @@ static void flight_bake_frame_sets(FlightContext* ctx, int group, char* header, 
 		const int* listed;
 		const int count = (int)XwauDat_ListGroup(dat, material.set_group[set], &listed);
 		BakeFrame* frames = (BakeFrame*)calloc(count > 0 ? (size_t)count : 1, sizeof *frames);
-		uint16_t* frame_ids = (uint16_t*)calloc(count > 0 ? (size_t)count : 1, sizeof *frame_ids);
-		int ok = count > 0 && frames && frame_ids;
-		for (int i = 0; ok && i < count; ++i)
-			frame_ids[i] = (uint16_t)listed[i];
+		int ok = count > 0 && frames;
 		for (int i = 0; ok && i < count; ++i) {
 			XwauDatImage image;
-			ok = XwauDat_LoadImageFrom(dat, material.set_group[set], frame_ids[i], &image, error,
-									   sizeof error);
+			ok = XwauDat_LoadImageFrom(dat, material.set_group[set], listed[i], &image, error, sizeof error);
 			if (!ok) {
 				ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s: %s", path, error);
 				break;
 			}
 			frames[i].rgba = image.rgba;
-			frames[i].w = frames[i].classic_w = (int)image.width;
-			frames[i].h = frames[i].classic_h = (int)image.height;
+			frames[i].w = (int)image.width;
+			frames[i].h = (int)image.height;
+			frames[i].has_id = 1;
+			frames[i].id = listed[i];
+			frames[i].size[0] = image.width;
+			frames[i].size[1] = image.height;
 		}
+		const BakeAtlasHeader header = { .game_units = 1 };
 		char base[64];
 		snprintf(base, sizeof base, "group_%d_%s", group, g_flightSetNames[set]);
-		if (ok && flight_write_atlas(ctx, base, frames, frame_ids, count, NULL)) {
+		if (ok && flight_write_atlas(ctx, base, frames, count, &header)) {
 			ctx->stats->frame_sets++;
-			used += (size_t)snprintf(header + used, header_size - used, "    - {atlas: %s", base);
+			used += (size_t)snprintf(frame_sets + used, frame_sets_size - used, "    - {atlas: %s", base);
 			if (set == FLIGHT_SET_COUNT - 1)
-				used += (size_t)snprintf(header + used, header_size - used, ", missions: [%d]",
+				used += (size_t)snprintf(frame_sets + used, frame_sets_size - used, ", missions: [%d]",
 										 FLIGHT_DEATH_STAR_MISSION_INDEX);
-			used += (size_t)snprintf(header + used, header_size - used, "}\n");
-			ToolLog_Write(TOOL_LOG_INFO, "resdata group %d: %s set, %d images", group, g_flightSetNames[set],
-						  count);
+			used += (size_t)snprintf(frame_sets + used, frame_sets_size - used, "}\n");
+			ToolLog_Write(TOOL_LOG_DETAIL, "resdata group %d: %s set, %d images", group,
+						  g_flightSetNames[set], count);
 		} else {
 			ToolLog_Write(TOOL_LOG_ERROR, "xwau: group %d: the %s set failed", group, g_flightSetNames[set]);
 			ctx->stats->failures++;
 		}
 		flight_free_frames(frames, frames && count > 0 ? count : 0);
-		free(frame_ids);
 		XwauDat_Close(dat);
 	}
 }
@@ -929,11 +983,36 @@ static void flight_image_light(const FlightContext* ctx, int group, int id, Bake
 	const FlightMaterialFile* file = flight_find_material(ctx, group, id);
 	if (!file)
 		file = flight_find_material(ctx, group, -1);
-	FlightMaterial material;
-	if (file && flight_read_material(file->path, &material) && material.has_light) {
+	if (file && file->readable && file->material.has_light) {
 		frame->has_light = 1;
-		memcpy(frame->light, material.light, sizeof frame->light);
+		memcpy(frame->light, file->material.light, sizeof frame->light);
 	}
+}
+
+/* An image of a group, decoded by one of the decode threads. */
+typedef struct FlightDecoded {
+	XwauDatImageInfo info;
+	XwauDatImage image;
+	int ok; /* 0: `error` says why */
+	char error[256];
+} FlightDecoded;
+
+typedef struct FlightDecode {
+	const FlightContext* ctx;
+	int group;
+	const FlightImage* images;
+	FlightDecoded* decoded;
+} FlightDecode;
+
+/* The DAT files are in memory and are only read, so their images can be
+   decoded on several threads. */
+static void flight_decode_task(void* context, int index) {
+	const FlightDecode* decode = (const FlightDecode*)context;
+	const XwauDat* dat = decode->ctx->dats[decode->images[index].dat].dat;
+	FlightDecoded* out = &decode->decoded[index];
+	out->ok = XwauDat_GetImageInfo(dat, decode->group, decode->images[index].id, &out->info) &&
+			  XwauDat_LoadImageFrom(dat, decode->group, decode->images[index].id, &out->image, out->error,
+									sizeof out->error);
 }
 
 static void flight_bake_group(FlightContext* ctx, int group) {
@@ -943,50 +1022,57 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 		free(images);
 		return;
 	}
-	char header[4096];
-	snprintf(header, sizeof header, "game_geometry: true\nunits: game\n");
+	char frame_sets[4096] = "";
 	/* The alternative frame sets stay with the shared atlases. */
 	if (group >= FLIGHT_FIRST_EXPLOSION_GROUP && group <= FLIGHT_LAST_EXPLOSION_GROUP && !ctx->art_name)
-		flight_bake_frame_sets(ctx, group, header, sizeof header);
+		flight_bake_frame_sets(ctx, group, frame_sets, sizeof frame_sets);
+	const BakeAtlasHeader header = {
+		.game_geometry = 1,
+		.game_units = 1,
+		.extra = frame_sets[0] ? frame_sets : NULL,
+	};
 
 	BakeFrame* frames = (BakeFrame*)calloc((size_t)count, sizeof *frames);
-	uint16_t* ids = (uint16_t*)calloc((size_t)count, sizeof *ids);
-	int ok = frames && ids;
+	const int threads = ctx->opt->threads > 1 ? ctx->opt->threads : 1;
+	FlightDecode decode = { ctx, group, images,
+							(FlightDecoded*)calloc((size_t)count, sizeof *decode.decoded) };
+	int ok = frames != NULL && decode.decoded != NULL;
 	int resized = 0;
 	int fitted = 0;
-	char error[256];
+	if (ok)
+		envmap_parallel_for(count, threads, flight_decode_task, &decode);
 	for (int i = 0; ok && i < count; ++i) {
-		const XwauDat* dat = ctx->dats[images[i].dat].dat;
-		XwauDatImageInfo info;
-		XwauDatImage image;
-		ok = XwauDat_GetImageInfo(dat, group, images[i].id, &info) &&
-			 XwauDat_LoadImageFrom(dat, group, images[i].id, &image, error, sizeof error);
+		FlightDecoded* decoded = &decode.decoded[i];
+		ok = decoded->ok;
 		if (!ok) {
 			ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s: group %d image %d can't be decoded: %s",
-						  ctx->dats[images[i].dat].name, group, images[i].id, error);
+						  ctx->dats[images[i].dat].name, group, images[i].id, decoded->error);
 			break;
 		}
+		const XwauDatImageInfo info = decoded->info;
+		const XwauDatImage image = decoded->image;
+		decoded->image.rgba = NULL;
 		BakeFrame* frame = &frames[i];
 		const double scale = flight_scale(ctx, group, i) / 256.0;
 		frame->rgba = image.rgba;
 		frame->w = (int)image.width;
 		frame->h = (int)image.height;
-		frame->classic_w = flight_round(image.width * scale);
-		frame->classic_h = flight_round(image.height * scale);
-		if (frame->classic_w < 1)
-			frame->classic_w = 1;
-		if (frame->classic_h < 1)
-			frame->classic_h = 1;
-		frame->origin_x = flight_round(flight_offset(info.offset_x) * scale);
-		frame->origin_y = flight_round(flight_offset(info.offset_y) * scale);
-		ids[i] = (uint16_t)images[i].id;
+		const int width = flight_round(image.width * scale);
+		const int height = flight_round(image.height * scale);
+		frame->size[0] = width < 1 ? 1 : width;
+		frame->size[1] = height < 1 ? 1 : height;
+		frame->offset[0] = flight_round(flight_offset(info.offset_x) * scale);
+		frame->offset[1] = flight_round(flight_offset(info.offset_y) * scale);
+		frame->has_id = 1;
+		frame->id = images[i].id;
 		flight_image_light(ctx, group, images[i].id, frame);
 		if (flight_is_planet_group(group) && ctx->opt->planet_max > 0 && frame->w > ctx->opt->planet_max) {
 			ok = flight_fit(frame, ctx->opt->planet_max, 0);
 			resized++;
 		}
-		/* An image larger than an atlas page is scaled down to fit, such as
-		   TFTC's galaxy and nebula backdrops, which are 8912 pixels wide. */
+		/* An image too large even for a page of its own is scaled down to fit.
+		   TFTC's 8912-pixel galaxy and nebula backdrops fit, so they each get a
+		   page of their own. */
 		if (ok && (frame->w > FLIGHT_MAX_IMAGE || frame->h > FLIGHT_MAX_IMAGE)) {
 			ok = flight_fit(frame, FLIGHT_MAX_IMAGE, FLIGHT_MAX_IMAGE);
 			fitted++;
@@ -994,8 +1080,8 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 	}
 	char base[64];
 	snprintf(base, sizeof base, "group_%d", group);
-	if (ok && flight_write_atlas(ctx, base, frames, ids, count, header)) {
-		ToolLog_Write(TOOL_LOG_INFO, "resdata %s%sgroup %d: %d images%s%s",
+	if (ok && flight_write_atlas(ctx, base, frames, count, &header)) {
+		ToolLog_Write(TOOL_LOG_DETAIL, "resdata %s%sgroup %d: %d images%s%s",
 					  ctx->art_name ? ctx->art_name : "", ctx->art_name ? " " : "", group, count,
 					  resized ? ", planets shrunk" : "", fitted ? ", scaled down to fit an atlas page" : "");
 	} else {
@@ -1003,7 +1089,9 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 		ctx->stats->failures++;
 	}
 	flight_free_frames(frames, frames ? count : 0);
-	free(ids);
+	for (int i = 0; decode.decoded && i < count; ++i)
+		XwauDat_FreeImage(&decode.decoded[i].image);
+	free(decode.decoded);
 	free(images);
 }
 
@@ -1169,17 +1257,12 @@ static void flight_write_fonts_yaml(FlightContext* ctx) {
 			file = g_flightFontFiles[i].file;
 	}
 	if (!file) {
-		ToolLog_Write(
-			TOOL_LOG_WARNING,
-			"xwau: TextFontFamily = %s: the font's file isn't known, so flight/fonts/fonts.yaml isn't "
-			"written",
-			family);
+		ReportUnsupported("the DDraw.cfg key TextFontFamily with an unknown font");
 		return;
 	}
+	/* The flight text uses the font's own widths. */
 	if (width_delta != 0)
-		ToolLog_Write(TOOL_LOG_WARNING,
-					  "xwau: TextWidthDelta = %d isn't converted. The flight text uses the font's own widths",
-					  width_delta);
+		ReportUnsupported("the DDraw.cfg key TextWidthDelta");
 	snprintf(dir, sizeof dir, "%s/flight/fonts", ctx->opt->sprites->out_root);
 	BakeSprites_MakeDirs(dir);
 	snprintf(path, sizeof path, "%s/fonts.yaml", dir);
@@ -1190,8 +1273,7 @@ static void flight_write_fonts_yaml(FlightContext* ctx) {
 		return;
 	}
 	fprintf(f,
-			"# Made by the OpenXWA mod importer from TextFontFamily in DDraw.cfg.\n"
-			"version: 1\n"
+			"# Made by the OpenXWA mod importer.\n"
 			"default: {file: %s, metrics: font}\n",
 			file);
 	fclose(f);
@@ -1219,8 +1301,10 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 	flight_read_backdrop_scales(&ctx);
 	flight_read_exe(&ctx);
 	flight_list_materials(&ctx);
+	flight_read_materials(&ctx);
+	flight_check_material_keys(&ctx);
 	ToolLog_Write(
-		TOOL_LOG_INFO,
+		TOOL_LOG_DETAIL,
 		"xwau: %d DAT files, %d backdrop scales, default backdrop scale %g for %d backdrop groups, %d DAT "
 		"materials, hull icon scale %d, map icon scale %d",
 		ctx.dat_count, ctx.scale_count, (double)ctx.backdrop_scale, ctx.backdrop_count, ctx.material_count,
@@ -1248,12 +1332,14 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 	}
 	if (group_count > 1)
 		qsort(groups, (size_t)group_count, sizeof *groups, flight_compare_ints);
-	/* The bake stops at the first failure. */
-	for (int g = 0; g < group_count && stats->failures == 0; ++g)
+	/* The bake stops at the first failure, including an image that failed in
+	   the encode queue. */
+	for (int g = 0; g < group_count && stats->failures == 0 && BakeSprites_QueueFailures() == 0; ++g)
 		flight_bake_group(&ctx, groups[g]);
-	for (int k = 0; k < ctx.mission_art_count && stats->failures == 0; ++k)
+	for (int k = 0; k < ctx.mission_art_count && stats->failures == 0 && BakeSprites_QueueFailures() == 0;
+		 ++k)
 		flight_bake_mission_art(&ctx, &ctx.mission_art[k]);
-	if (stats->failures == 0 &&
+	if (stats->failures == 0 && BakeSprites_QueueFailures() == 0 &&
 		(opt->sprites->group_filter < 0 || opt->sprites->group_filter == FLIGHT_FONT_GROUP)) {
 		flight_bake_fonts(&ctx);
 		flight_write_fonts_yaml(&ctx);
