@@ -1,13 +1,12 @@
 #include "suns.h"
 
-#include "aeron/aeron.h"
 #include "aeron/log.h"
 #include "aeron/scene/lens_flare.h"
+#include "xwa_runtime/models/flight_config.h"
 
 #include <math.h>
 #include <string.h>
 
-#define SUNS_FLIGHT_YAML "flight/flight.yaml"
 /* The flare's anchor is this far from the camera, as far as the backdrops'
  * directions, so its depth is behind every model. */
 #define SUNS_FLARE_DISTANCE 1048576.0f
@@ -23,11 +22,8 @@ static struct {
 
 /* Reads the mod's list, which replaces the shipped one. */
 static void suns_load_mod_elements(void) {
-	AeronConfigFile* file = NULL;
 	AeronConfigError error = { 0 };
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SUNS_FLIGHT_YAML, &file, &error))
-		return; /* the backdrops code already logs this error */
-	const AeronConfigNode* root = AeronConfigFile_Root(file);
+	const AeronConfigNode* root = XwaFlightConfig_Root();
 	const AeronConfigNode* list =
 		AeronConfigNode_MapGet(AeronConfigNode_MapGet(root, "suns"), "flare_elements");
 	AeronSceneLensFlareElement elements[AERON_SCENE_LENS_FLARE_MAX_ELEMENTS];
@@ -39,10 +35,9 @@ static void suns_load_mod_elements(void) {
 			s_suns.element_count = count;
 		} else {
 			Aeron_LogWarn("xwa.flight", "%s:%d: suns.flare_elements: %s; the default flare is used",
-						  SUNS_FLIGHT_YAML, error.line, error.message);
+						  XWA_FLIGHT_CONFIG_PATH, error.line, error.message);
 		}
 	}
-	AeronConfigFile_Destroy(file);
 }
 
 int XwaRemasterSuns_LoadFlareElements(const AeronConfigFile* shipped, const char* shipped_path) {

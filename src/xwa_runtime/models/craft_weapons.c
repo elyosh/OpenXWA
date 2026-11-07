@@ -1,12 +1,12 @@
 #include "xwa_runtime/models/craft_weapons.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/flight/object/laser.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/render/renderer.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/names.h"
@@ -17,8 +17,6 @@
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
-
-#define CRAFT_WEAPONS_FLIGHT_YAML "flight/flight.yaml"
 
 enum {
 	CRAFT_WEAPONS_FIRST = OBJ_LaserRebel,
@@ -180,25 +178,16 @@ static void CraftWeapons_UseBoltMarkings(const CraftWeaponsType* type) {
 }
 
 void XwaCraftWeapons_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* section;
 
 	memset(s_globalImpact, 0xff, sizeof s_globalImpact);
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, CRAFT_WEAPONS_FLIGHT_YAML, &file,
-									&error)) {
-		/* XwaFlightConfig_Root already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
+	root = XwaFlightConfig_Root();
 	section = AeronConfigNode_MapGet(root, "weapons");
 	if (section != NULL) {
-		CraftWeapons_ReadImpact(CRAFT_WEAPONS_FLIGHT_YAML, "weapons",
-								AeronConfigNode_MapGet(section, "impact"), s_globalImpact);
+		CraftWeapons_ReadImpact(XWA_FLIGHT_CONFIG_PATH, "weapons", AeronConfigNode_MapGet(section, "impact"),
+								s_globalImpact);
 	}
-	AeronConfigFile_Destroy(file);
 }
 
 void XwaCraftWeapons_ClearModelSettings(void) {

@@ -1,5 +1,7 @@
 #include "xwa_runtime/config/modern_sun_options.h"
 
+#include "xwa_runtime/models/flight_config.h"
+
 /* Modern port module; no original counterpart. */
 
 static const XwaOptionKey g_sunOptionKeys[] = {
@@ -17,7 +19,7 @@ static XwaModernSunOptions g_shipped, g_mod, g_player;
 
 static XwaOptionSection g_section = {
 	.name = "suns",
-	.mod_file = "flight/flight.yaml",
+	.mod_file = XWA_FLIGHT_CONFIG_PATH,
 	.log_channel = "xwa.flight",
 	.keys = g_sunOptionKeys,
 	.key_count = sizeof g_sunOptionKeys / sizeof g_sunOptionKeys[0],

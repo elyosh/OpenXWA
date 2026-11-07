@@ -1,12 +1,12 @@
 #include "xwa_runtime/models/weapon_rates.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/flight/object/laser.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/render/renderer.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/names.h"
@@ -20,8 +20,6 @@
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
-
-#define WEAPON_RATES_FLIGHT_YAML "flight/flight.yaml"
 
 enum {
 	WEAPON_RATES_DECHARGE,
@@ -169,8 +167,6 @@ static void WeaponRates_ReadSet(const char* path, const AeronConfigNode* weapons
 }
 
 void XwaWeaponRates_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* section;
 	const AeronConfigNode* node;
@@ -180,29 +176,21 @@ void XwaWeaponRates_Init(void) {
 	memset(s_defaults.value, 0xff, sizeof s_defaults.value);
 	s_dechargePercent = 100;
 	s_rechargePercent = 100;
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, WEAPON_RATES_FLIGHT_YAML, &file,
-									&error)) {
-		/* XwaFlightConfig_Root already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
+	root = XwaFlightConfig_Root();
 	section = AeronConfigNode_MapGet(root, "weapons");
 	if (section == NULL) {
-		AeronConfigFile_Destroy(file);
 		return;
 	}
-	WeaponRates_ReadSet(WEAPON_RATES_FLIGHT_YAML, section, &s_defaults);
+	WeaponRates_ReadSet(XWA_FLIGHT_CONFIG_PATH, section, &s_defaults);
 	s_active = (s_defaults.group & (1u << WEAPON_RATES_GROUP_RATES)) != 0;
 	if ((node = AeronConfigNode_MapGet(section, "decharge_percent")) != NULL) {
-		s_active |= WeaponRates_ReadInt(WEAPON_RATES_FLIGHT_YAML, "weapons.decharge_percent", node,
-										&s_dechargePercent);
+		s_active |=
+			WeaponRates_ReadInt(XWA_FLIGHT_CONFIG_PATH, "weapons.decharge_percent", node, &s_dechargePercent);
 	}
 	if ((node = AeronConfigNode_MapGet(section, "recharge_percent")) != NULL) {
-		s_active |= WeaponRates_ReadInt(WEAPON_RATES_FLIGHT_YAML, "weapons.recharge_percent", node,
-										&s_rechargePercent);
+		s_active |=
+			WeaponRates_ReadInt(XWA_FLIGHT_CONFIG_PATH, "weapons.recharge_percent", node, &s_rechargePercent);
 	}
-	AeronConfigFile_Destroy(file);
 }
 
 void XwaWeaponRates_ClearModelSettings(void) { memset(s_models, 0, sizeof s_models); }

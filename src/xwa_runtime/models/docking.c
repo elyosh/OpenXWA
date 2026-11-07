@@ -1,9 +1,9 @@
 #include "xwa_runtime/models/docking.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/units.h"
 
@@ -11,8 +11,6 @@
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
-
-#define DOCKING_FLIGHT_YAML "flight/flight.yaml"
 
 enum {
 	/* The approach height cap of a model without the setting. */
@@ -35,15 +33,13 @@ static void Docking_ReadBool(const AeronConfigNode* section, const char* key, in
 	}
 	if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
 		Aeron_LogWarn("xwa.models", "%s:%d: docking.%s must be true or false; it is ignored",
-					  DOCKING_FLIGHT_YAML, AeronConfigNode_Line(node), key);
+					  XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node), key);
 		return;
 	}
 	*out = AeronConfigNode_Bool(node, 0) != 0;
 }
 
 void XwaDocking_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* section;
 
@@ -52,21 +48,14 @@ void XwaDocking_Init(void) {
 	s_carriedOffsetsCarrierDockPoint = 0;
 	s_playerApproachHeight = 0;
 	s_playerSnapsToTargetOrientation = 0;
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, DOCKING_FLIGHT_YAML, &file, &error)) {
-		/* XwaFlightConfig_Root already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
+	root = XwaFlightConfig_Root();
 	section = AeronConfigNode_MapGet(root, "docking");
 	if (section == NULL) {
-		AeronConfigFile_Destroy(file);
 		return;
 	}
 	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.models", "%s:%d: docking must be a map; it is ignored", DOCKING_FLIGHT_YAML,
+		Aeron_LogError("xwa.models", "%s:%d: docking must be a map; it is ignored", XWA_FLIGHT_CONFIG_PATH,
 					   AeronConfigNode_Line(section));
-		AeronConfigFile_Destroy(file);
 		return;
 	}
 	Docking_ReadBool(section, "dock_to_small_sets_big", &s_dockToSmallSetsBig);
@@ -74,7 +63,6 @@ void XwaDocking_Init(void) {
 	Docking_ReadBool(section, "carried_offsets_carrier_dock_point", &s_carriedOffsetsCarrierDockPoint);
 	Docking_ReadBool(section, "player_approach_height", &s_playerApproachHeight);
 	Docking_ReadBool(section, "player_snaps_to_target_orientation", &s_playerSnapsToTargetOrientation);
-	AeronConfigFile_Destroy(file);
 }
 
 void XwaDocking_ClearModelSettings(void) { memset(s_hasApproachHeight, 0, sizeof s_hasApproachHeight); }

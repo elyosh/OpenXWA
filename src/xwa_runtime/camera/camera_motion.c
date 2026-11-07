@@ -5,6 +5,7 @@
 #include "xwa/render/renderer.h"
 #include "xwa/util/time.h"
 #include "xwa_runtime/config/modern_camera_options.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/units.h"
 
 #include <math.h>
@@ -51,7 +52,7 @@ static struct {
 
 void XwaCameraMotion_Init(void) {
 	memset(&s_cameraMotion, 0, sizeof s_cameraMotion);
-	XwaOptionSection_LoadMod(XwaModernCameraOptions_Section());
+	XwaOptionSection_ReadMod(XwaModernCameraOptions_Section(), XwaFlightConfig_Root());
 }
 
 int XwaCameraMotion_Enabled(void) {

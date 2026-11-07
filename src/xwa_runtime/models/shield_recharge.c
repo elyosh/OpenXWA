@@ -1,6 +1,5 @@
 #include "xwa_runtime/models/shield_recharge.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/flight_model.h"
@@ -9,14 +8,13 @@
 #include "xwa/flight/flight.h"
 #include "xwa/flight/mission/mission.h"
 #include "xwa/flight/object/object.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/model_settings.h"
 
 #include <stdint.h>
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
-
-#define SHIELD_RECHARGE_FLIGHT_YAML "flight/flight.yaml"
 
 typedef struct ShieldRechargeModel {
 	uint8_t set;
@@ -43,15 +41,13 @@ static void ShieldRecharge_ReadBool(const AeronConfigNode* section, const char* 
 	}
 	if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
 		Aeron_LogWarn("xwa.models", "%s:%d: shield_recharge.%s must be true or false; it is ignored",
-					  SHIELD_RECHARGE_FLIGHT_YAML, AeronConfigNode_Line(node), key);
+					  XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node), key);
 		return;
 	}
 	*out = AeronConfigNode_Bool(node, 0) != 0;
 }
 
 void XwaShieldRecharge_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* section;
 	const AeronConfigNode* percent;
@@ -61,22 +57,14 @@ void XwaShieldRecharge_Init(void) {
 	s_starshipsOnEasy = 0;
 	s_doubleStarfighterShields = 0;
 	s_ratePercent = 100;
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SHIELD_RECHARGE_FLIGHT_YAML, &file,
-									&error)) {
-		/* XwaFlightConfig_Root already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
+	root = XwaFlightConfig_Root();
 	section = AeronConfigNode_MapGet(root, "shield_recharge");
 	if (section == NULL) {
-		AeronConfigFile_Destroy(file);
 		return;
 	}
 	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
 		Aeron_LogError("xwa.models", "%s:%d: shield_recharge must be a map; it is ignored",
-					   SHIELD_RECHARGE_FLIGHT_YAML, AeronConfigNode_Line(section));
-		AeronConfigFile_Destroy(file);
+					   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(section));
 		return;
 	}
 	s_active = 1;
@@ -90,12 +78,11 @@ void XwaShieldRecharge_Init(void) {
 		if (AeronConfigNode_Type(percent) != AERON_CONFIG_INT || value < 0 || value > INT32_MAX) {
 			Aeron_LogWarn("xwa.models",
 						  "%s:%d: shield_recharge.rate_percent must be 0 or more; it is ignored",
-						  SHIELD_RECHARGE_FLIGHT_YAML, AeronConfigNode_Line(percent));
+						  XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(percent));
 		} else {
 			s_ratePercent = (int32_t)value;
 		}
 	}
-	AeronConfigFile_Destroy(file);
 }
 
 void XwaShieldRecharge_ClearModelSettings(void) { memset(s_models, 0, sizeof s_models); }

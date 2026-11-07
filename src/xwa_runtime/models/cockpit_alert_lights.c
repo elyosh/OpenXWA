@@ -1,16 +1,14 @@
 #include "xwa_runtime/models/cockpit_alert_lights.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <math.h>
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
-
-#define ALERT_LIGHTS_FLIGHT_YAML "flight/flight.yaml"
 
 /* The names of the game's light pulses, by slot. */
 static const char* const kAlertLightNames[XWA_SNAP_MAX_LIGHT_PULSES] = {
@@ -50,7 +48,7 @@ static int AlertLights_ReadVector(const AeronConfigNode* entry, const char* name
 			(nonNegative && AeronConfigNode_Float(item, 0.0) < 0.0)) {
 			Aeron_LogError("xwa.flight",
 						   "%s:%d: cockpit_alert_lights.%s: %s must be a list of three %snumbers",
-						   ALERT_LIGHTS_FLIGHT_YAML, AeronConfigNode_Line(node), name, key,
+						   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node), name, key,
 						   nonNegative ? "non-negative " : "");
 			return 0;
 		}
@@ -70,7 +68,7 @@ static int AlertLights_ReadLight(const AeronConfigNode* entry, const char* name,
 	int ok = 1;
 
 	if (AeronConfigNode_Type(entry) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.flight", "%s:%d: cockpit_alert_lights.%s must be a map", ALERT_LIGHTS_FLIGHT_YAML,
+		Aeron_LogError("xwa.flight", "%s:%d: cockpit_alert_lights.%s must be a map", XWA_FLIGHT_CONFIG_PATH,
 					   AeronConfigNode_Line(entry), name);
 		return 0;
 	}
@@ -81,37 +79,27 @@ static int AlertLights_ReadLight(const AeronConfigNode* entry, const char* name,
 	if (!(light->power > 0.0f) || !isfinite(light->power)) {
 		Aeron_LogError("xwa.flight",
 					   "%s:%d: cockpit_alert_lights.%s: power_w must be a number of watts above 0",
-					   ALERT_LIGHTS_FLIGHT_YAML, AeronConfigNode_Line(node != NULL ? node : entry), name);
+					   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node != NULL ? node : entry), name);
 		ok = 0;
 	}
 	return ok;
 }
 
 void XwaCockpitAlertLights_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* section;
 	size_t i;
 	int slot;
 
 	memset(s_lights, 0, sizeof s_lights);
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, ALERT_LIGHTS_FLIGHT_YAML, &file,
-									&error)) {
-		/* XwaFlightConfig_Root already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
+	root = XwaFlightConfig_Root();
 	section = AeronConfigNode_MapGet(root, "cockpit_alert_lights");
 	if (section == NULL) {
-		AeronConfigFile_Destroy(file);
 		return;
 	}
 	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
 		Aeron_LogError("xwa.flight", "%s:%d: cockpit_alert_lights must be a map; the game's lights are kept",
-					   ALERT_LIGHTS_FLIGHT_YAML, AeronConfigNode_Line(section));
-		AeronConfigFile_Destroy(file);
+					   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(section));
 		return;
 	}
 	for (i = 0; i < AeronConfigNode_MapCount(section); ++i) {
@@ -124,7 +112,7 @@ void XwaCockpitAlertLights_Init(void) {
 		}
 		if (slot == XWA_SNAP_MAX_LIGHT_PULSES) {
 			Aeron_LogWarn("xwa.flight", "%s:%d: cockpit_alert_lights: unknown light %s; it is ignored",
-						  ALERT_LIGHTS_FLIGHT_YAML,
+						  XWA_FLIGHT_CONFIG_PATH,
 						  AeronConfigNode_Line(AeronConfigNode_MapValueAt(section, i)),
 						  name != NULL ? name : "");
 			continue;
@@ -134,10 +122,9 @@ void XwaCockpitAlertLights_Init(void) {
 		} else {
 			memset(&s_lights[slot], 0, sizeof s_lights[slot]);
 			Aeron_LogError("xwa.flight", "%s: cockpit_alert_lights.%s: the game's light is kept",
-						   ALERT_LIGHTS_FLIGHT_YAML, name);
+						   XWA_FLIGHT_CONFIG_PATH, name);
 		}
 	}
-	AeronConfigFile_Destroy(file);
 }
 
 void XwaCockpitAlertLights_Capture(XwaSnapshot* snapshot) {

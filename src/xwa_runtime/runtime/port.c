@@ -178,8 +178,8 @@ int XwaPort_Init(void) {
 	XwaObjectLimits_Init();
 	XwaHeadlights_Init();
 	XwaCameraMotion_Init();
-	XwaOptionSection_LoadMod(XwaModernSunOptions_Section());
-	XwaOptionSection_LoadMod(XwaModernSpeedEffectOptions_Section());
+	XwaOptionSection_ReadMod(XwaModernSunOptions_Section(), XwaFlightConfig_Root());
+	XwaOptionSection_ReadMod(XwaModernSpeedEffectOptions_Section(), XwaFlightConfig_Root());
 	XwaCockpitAlertLights_Init();
 	XwaParticleLights_Init();
 	XwaModelSource_Init();
