@@ -117,6 +117,10 @@ int XwaSoundBanks_FindRange(const char* name);
 uint8_t XwaSoundBanks_Volume(unsigned int sfxSlot);
 uint16_t XwaSoundBanks_Distance(unsigned int sfxSlot);
 
+/* Whether `fileName` is a sound list line that means no sound: "none",
+   "none.wav", or a name that starts with "unused" or "not-used". */
+int XwaSoundBanks_IsPlaceholder(const char* fileName);
+
 #ifdef __cplusplus
 }
 #endif

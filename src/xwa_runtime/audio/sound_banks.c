@@ -9,9 +9,11 @@
 #include "xwa/config/game_config.h"
 #include "xwa/flight/flight.h"
 #include "xwa/frontend/frontend_mission.h"
+#include "xwa/util/string.h"
 #include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/units.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -490,8 +492,7 @@ void XwaSoundBanks_LoadFlight(const struct XwaFlightGroup* flightGroups, size_t 
 		const struct XwaFlightGroup* fg =
 			(const struct XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)index * stride);
 
-		if (fg->craftType < XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT &&
-			g_objectTypeTables.craftTypeToObjectType[fg->craftType] < OBJ_Count) {
+		if (g_objectTypeTables.craftTypeToObjectType[fg->craftType] < OBJ_Count) {
 			used[g_objectTypeTables.craftTypeToObjectType[fg->craftType]] = 1;
 		}
 	}
@@ -563,4 +564,27 @@ uint16_t XwaSoundBanks_Distance(unsigned int sfxSlot) {
 	return slot < (unsigned int)s_slotCount && s_entries[slot].file != NULL
 			   ? s_entries[slot].distance
 			   : (uint16_t)g_fsfxDefaultMinDistanceOrRolloff;
+}
+
+/* Whether `text` starts with `prefix`, ignoring case. `prefix` is lower case. */
+static int SoundBanks_StartsWith(const char* text, const char* prefix) {
+	for (; *prefix != '\0'; ++text, ++prefix) {
+		if (tolower((unsigned char)*text) != *prefix) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+int XwaSoundBanks_IsPlaceholder(const char* fileName) {
+	const char* name = fileName;
+	const char* c;
+
+	for (c = fileName; *c != '\0'; ++c) {
+		if (*c == '\\' || *c == '/') {
+			name = c + 1;
+		}
+	}
+	return Xwa_Stricmp(name, "none") == 0 || Xwa_Stricmp(name, "none.wav") == 0 ||
+		   SoundBanks_StartsWith(name, "unused") || SoundBanks_StartsWith(name, "not-used");
 }

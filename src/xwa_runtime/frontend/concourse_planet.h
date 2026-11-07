@@ -21,6 +21,10 @@ int XwaConcoursePlanet_Image(void);
    sets it. */
 void XwaConcoursePlanet_Center(int* x, int* y);
 
+/* Whether planet image group `group` exists, in an atlas or a DAT file. The
+   stock DAT files have no group for some backdrops. */
+int XwaConcoursePlanet_GroupExists(int group);
+
 #ifdef __cplusplus
 }
 #endif

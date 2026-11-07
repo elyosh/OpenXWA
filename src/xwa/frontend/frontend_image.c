@@ -4720,8 +4720,18 @@ int FrontImage_RegisterResourceDefault(const char* fileName, const char* name) {
 
 	if (FrontImage_FindResourceByName(name) != -1) {
 #ifdef XWA_MODERN
-		Aeron_LogWarn("xwa.assets", "Default frontend resource name '%s' is already registered from '%s'",
-					  name, fileName);
+		{
+			/* Some screens register their background again with the same
+			   file. That changes nothing, so it isn't logged. */
+			const char* registered = XwaSnapshot_BoundSourceFile(name);
+
+			if (registered == NULL || Xwa_CrtStricmp(registered, fileName) != 0) {
+				Aeron_LogWarn("xwa.assets",
+							  "Default frontend resource name '%s' is already registered from '%s', so '%s' "
+							  "isn't loaded",
+							  name, registered != NULL ? registered : "another file", fileName);
+			}
+		}
 #endif
 		return 0;
 	}

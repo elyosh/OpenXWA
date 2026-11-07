@@ -99,6 +99,14 @@ int Concourse_FreeBackground(void) {
 // FLAGS: /O2 /G6
 // FUNCTION: XWA 0x55DCA0
 int Concourse_LoadPlanetSprite(int planetId) {
+#ifdef XWA_MODERN
+	/* Some backdrops have no planet image, such as group 15016. The game
+	   then draws no planet. */
+	if (!XwaConcoursePlanet_GroupExists(planetId + CONCOURSE_PLANET_GROUP_ID_BASE)) {
+		g_concoursePlanetGroupId = planetId + CONCOURSE_PLANET_GROUP_ID_BASE;
+		return 1;
+	}
+#endif
 	SpriteResource_LoadGroup(planetId + CONCOURSE_PLANET_GROUP_ID_BASE);
 	g_concoursePlanetGroupId = planetId + CONCOURSE_PLANET_GROUP_ID_BASE;
 	FrontImage_RegisterAtlasSprite("planet", planetId + CONCOURSE_PLANET_GROUP_ID_BASE, 1, 1);

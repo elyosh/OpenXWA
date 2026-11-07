@@ -303,7 +303,9 @@ static int fonts_advance256(XwaFontSet* set, int font_size, unsigned char ch, in
 			}
 		} else {
 			*advance = -1;
-			if (!size->missing_logged) {
+			/* No font has a glyph for a control character, such as 0x7F
+			   (DEL). */
+			if (!size->missing_logged && (g_fontCodepoints[ch] < 0x7F || g_fontCodepoints[ch] > 0x9F)) {
 				size->missing_logged = 1;
 				Aeron_LogWarn(set->log, "%s has no glyph for byte 0x%02X, font size %d", size->settings.file,
 							  ch, font_size);

@@ -259,11 +259,10 @@ static int OptSynth_ValidateSimulation(const char* key, const AeronOptSimModel* 
 	return 1;
 }
 
-/* Warns once when a cockpit-class model is denser than any stock cockpit:
-   more faces makes the loose sweeps of the burn marks slower, and shorter
-   edges widen their near-miss tolerance. A collision mesh replaces the edge
-   concern for its component. */
-static void OptSynth_WarnDenseCockpit(const char* key, const AeronFlightModel* model) {
+/* Logs a detail line when a cockpit model has more faces than any stock
+   cockpit, which makes hits slower, or shorter edges without a collision
+   mesh, which makes burn marks less exact. */
+static void OptSynth_NoteDenseCockpit(const char* key, const AeronFlightModel* model) {
 	uint32_t component;
 	uint32_t faceTotal;
 	double smallestMeanEdge;
@@ -307,14 +306,14 @@ static void OptSynth_WarnDenseCockpit(const char* key, const AeronFlightModel* m
 		}
 	}
 	if (faceTotal > OPT_SYNTH_COCKPIT_MAX_FACES) {
-		Aeron_LogWarn(
+		Aeron_LogVerbose(
 			"xwa.models",
 			"replacement '%s': cockpit has %u faces (stock cockpits have at most 629); each player hit "
 			"sweeps all of them up to nine times",
 			key, faceTotal);
 	}
 	if (smallestComponent >= 0 && smallestMeanEdge < OPT_SYNTH_COCKPIT_MIN_MEAN_EDGE) {
-		Aeron_LogWarn(
+		Aeron_LogVerbose(
 			"xwa.models",
 			"replacement '%s': cockpit component %d has a mean edge of %.2f OPT units (stock cockpits "
 			"stay above 1.1) and no collision mesh; the burn marks of hits accept wide near misses",
@@ -551,7 +550,7 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 			cooked &= mesh->bvh_cooked;
 		}
 	}
-	OptSynth_WarnDenseCockpit(key, &model);
+	OptSynth_NoteDenseCockpit(key, &model);
 	OptSynth_WarnUnknownArticulations(key, &model);
 
 	Aeron_OptSimModelTrimToFaces(&simulation);
