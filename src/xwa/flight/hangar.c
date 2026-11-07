@@ -45,7 +45,7 @@
 #include "xwa/math/scalar.h"
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
-#include "xwa_runtime/input/trackir.h"
+#include "xwa_runtime/input/head_tracking.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_sounds.h"
@@ -2853,7 +2853,7 @@ void Hangar_RenderReadyScreen(void) {
 
 	if (g_hangarAutoCam) {
 #ifdef XWA_MODERN
-		XwaTrackIR_ClearPose();
+		XwaHeadTracking_ClearPose();
 		if (!g_filmPlaybackMode) {
 			player->viewState.savedTargetX = s_hangarCameraBase[0];
 			player->viewState.savedTargetY = s_hangarCameraBase[1];
@@ -2867,7 +2867,7 @@ void Hangar_RenderReadyScreen(void) {
 			s_hangarCameraBase[1] = player->viewState.savedTargetY;
 			s_hangarCameraBase[2] = player->viewState.savedTargetZ;
 			if (!g_filmRecording) {
-				FlightView_ApplyTrackIRToCurrentCamera(g_localPlayer);
+				FlightView_ApplyHeadTrackingToCurrentCamera(g_localPlayer);
 			}
 		}
 #endif

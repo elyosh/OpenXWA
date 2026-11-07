@@ -35,7 +35,7 @@ static OpenTrackSocket s_socket = OT_INVALID_SOCKET;
 static uint32_t s_next_attempt_ms;
 static uint32_t s_last_received_ms;
 static int s_last_pose_valid;
-static XwaTrackIRPose s_last_pose;
+static XwaHeadPose s_last_pose;
 #ifdef _WIN32
 static int s_winsock_started;
 #endif
@@ -119,7 +119,7 @@ static int16_t degrees_to_q16(double angle, int sign) {
 }
 
 static int decode_packet(const unsigned char* bytes, int size, const XwaHeadTrackingOptions* options,
-						 XwaTrackIRPose* pose) {
+						 XwaHeadPose* pose) {
 	double values[6];
 	if (!bytes || size != 48 || !options || !pose || sizeof(double) != 8)
 		return 0;
@@ -150,10 +150,10 @@ static int decode_packet(const unsigned char* bytes, int size, const XwaHeadTrac
 	return 1;
 }
 
-int XwaOpenTrackUdp_Poll(XwaTrackIRPose* pose, const XwaHeadTrackingOptions* options) {
+int XwaOpenTrackUdp_Poll(XwaHeadPose* pose, const XwaHeadTrackingOptions* options) {
 	uint32_t now = XwaTime_GetElapsedTicks();
 	unsigned char packet[49]; /* One extra byte detects oversized datagrams. */
-	XwaTrackIRPose latest;
+	XwaHeadPose latest;
 
 	if (!pose || !options)
 		return 0;

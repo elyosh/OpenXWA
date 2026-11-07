@@ -36,7 +36,7 @@
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/camera/exterior_hud.h"
-#include "xwa_runtime/input/trackir.h"
+#include "xwa_runtime/input/head_tracking.h"
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/object_limits.h"
@@ -3449,7 +3449,7 @@ void Hud_SetupReticle(void) {
 				deltaY = (float)(screenY - centerY);
 #ifdef XWA_MODERN
 				/* Weapon indicators retain their ship-relative layout during head tracking. */
-				if (XwaTrackIR_CurrentPose(NULL)) {
+				if (XwaHeadTracking_CurrentPose(NULL)) {
 					const ModelWeaponHardpoint* point =
 						&g_modelDefs[craft->modelDefIndex].weaponHardpoints[reticleSlot];
 					if (point->x || point->z) {
@@ -6935,13 +6935,12 @@ void Hud_DrawReticle3D(void) {
 #ifdef XWA_MODERN
 	/* Head look moves the view like the cockpit look offsets do, so the
 	   reticle follows the nose in the same way. */
-	XwaTrackIRPose head;
-	const int trackirLook = XwaTrackIR_CurrentPose(&head) && (head.yaw_q16 || head.pitch_q16);
-	const int16_t lookYaw =
-		(int16_t)(g_players[g_localPlayer].lookYawOffset + (trackirLook ? head.yaw_q16 : 0));
+	XwaHeadPose head;
+	const int headLook = XwaHeadTracking_CurrentPose(&head) && (head.yaw_q16 || head.pitch_q16);
+	const int16_t lookYaw = (int16_t)(g_players[g_localPlayer].lookYawOffset + (headLook ? head.yaw_q16 : 0));
 	const int16_t lookPitch =
-		(int16_t)(g_players[g_localPlayer].lookPitchOffset + (trackirLook ? head.pitch_q16 : 0));
-	const int projectReticle = trackirLook || HUD_RETICLE_PROJECTED();
+		(int16_t)(g_players[g_localPlayer].lookPitchOffset + (headLook ? head.pitch_q16 : 0));
+	const int projectReticle = headLook || HUD_RETICLE_PROJECTED();
 #endif
 
 	g_reticleDrawX = g_reticleCenterX;
@@ -7002,7 +7001,7 @@ void Hud_DrawReticle3D(void) {
 		int worldZ;
 
 #ifdef XWA_MODERN
-		if (trackirLook && g_players[g_localPlayer].currentSeatIdx > 0) {
+		if (headLook && g_players[g_localPlayer].currentSeatIdx > 0) {
 			/* The gun's existing Q15 firing vector is independent of head look. */
 			g_camRelWorldX = Xwa_Q15Mul(1000000, g_players[g_localPlayer].turretCamMat[0]);
 			g_camRelWorldY = Xwa_Q15Mul(1000000, g_players[g_localPlayer].turretCamMat[1]);

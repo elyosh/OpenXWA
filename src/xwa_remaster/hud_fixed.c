@@ -882,8 +882,8 @@ static int fixed_project_reticle(const XwaSnapshot* snapshot, XwaHudProfileIndex
 	if (!XwaRemasterFlight_ProjectView(flight_view, center_eye, &target_x, &target_y))
 		return 0;
 	if (h->reticle.seat > 0 && h->reticle.turret_aim_valid) {
-		/* Project the gun's actual pre-TrackIR aim direction through the
-		 * head-tracked camera. Projecting ship-forward here was incorrect
+		/* Project the gun's own aim direction, which head tracking does not
+		 * change, through the head-tracked camera. Projecting ship-forward here was incorrect
 		 * in turret seats, where the turret rotates independently. */
 		const XwaFlightCamera* camera = &snapshot->flight_camera;
 		float bore_view[3];

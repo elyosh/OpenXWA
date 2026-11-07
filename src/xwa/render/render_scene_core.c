@@ -6,7 +6,7 @@
 
 #ifdef XWA_MODERN
 #include "xwa/frontend/frontend_display.h" /* g_flightRenderToFrontend */
-#include "xwa_runtime/input/trackir.h"
+#include "xwa_runtime/input/head_tracking.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/opt_synth.h"
@@ -41,14 +41,14 @@ static int VirtualProtect(void* lpAddress, unsigned int dwSize, unsigned int flN
 
 #ifdef XWA_MODERN
 /* Classic model paths override the cockpit model's world-relative position
- * with its untracked seat hardpoint, losing TrackIR eye displacement. World
+ * with its untracked seat hardpoint, losing the head-tracked eye displacement. World
  * geometry is already shifted by the integer camera offset; the small
  * residual ensures fluid motion in classic F5 mode without filtering. */
-static void RenderScene_ApplyTrackIRTranslation(Vec3f* pos, int cockpit_active) {
+static void RenderScene_ApplyHeadTranslation(Vec3f* pos, int cockpit_active) {
 	float offset[3];
 	if (!pos)
 		return;
-	XwaTrackIR_GetCameraOffset(offset);
+	XwaHeadTracking_GetCameraOffset(offset);
 	if (cockpit_active) {
 		pos->x -= offset[0];
 		pos->y -= offset[1];
@@ -441,7 +441,7 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 		}
 #ifdef XWA_MODERN
 		/* Adjust the eye relative to the cockpit without moving the craft. */
-		RenderScene_ApplyTrackIRTranslation(&mesh.viewPos, g_cockpitViewActive);
+		RenderScene_ApplyHeadTranslation(&mesh.viewPos, g_cockpitViewActive);
 #endif
 
 		mesh.viewOrient[0] = g_viewMtx00;
@@ -837,7 +837,7 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 	}
 #ifdef XWA_MODERN
 	/* Adjust the eye relative to the cockpit without moving the craft. */
-	RenderScene_ApplyTrackIRTranslation(&mesh.viewPos, g_cockpitViewActive);
+	RenderScene_ApplyHeadTranslation(&mesh.viewPos, g_cockpitViewActive);
 #endif
 
 	viewMatrix.m[0] = g_viewMtx00;
@@ -1088,7 +1088,7 @@ void RenderScene_DrawNoAssetSourceModel(ObjectRecord* obj, int nodeSwitchIndex) 
 	}
 #ifdef XWA_MODERN
 	/* Adjust the eye relative to the cockpit without moving the craft. */
-	RenderScene_ApplyTrackIRTranslation(&mesh.viewPos, g_cockpitViewActive);
+	RenderScene_ApplyHeadTranslation(&mesh.viewPos, g_cockpitViewActive);
 #endif
 
 	mesh.viewOrient[0] = g_viewMtx00;

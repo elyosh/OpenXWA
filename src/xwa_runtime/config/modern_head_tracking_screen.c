@@ -3,7 +3,7 @@
 #include "xwa/assets/string_table.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_options_menu.h"
-#include "xwa_runtime/input/trackir.h"
+#include "xwa_runtime/input/head_tracking.h"
 
 #include <stdint.h>
 
@@ -69,7 +69,7 @@ int XwaModernHeadTrackingScreen_Update(int menu_center_x, int* cursor_row) {
 		if (XwaModernInputOptions_Set(&options) && previous_enabled && !enabled) {
 			/* Disconnect immediately, including when settings are changed
 			 * outside a mission and no subsequent camera poll is expected. */
-			XwaTrackIR_Shutdown();
+			XwaHeadTracking_Shutdown();
 		}
 	}
 

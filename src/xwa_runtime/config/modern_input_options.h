@@ -81,7 +81,7 @@ enum {
 
 typedef struct XwaHeadTrackingOptions {
 	int enabled;
-	/* Enumeration deliberately kept separate from the runtime TrackIR ABI,
+	/* Enumeration deliberately kept separate from the source ABIs,
 	 * so future head-tracking providers can share the same menu. */
 	int source;
 	int invert[XWA_HEAD_TRACK_AXIS_COUNT];

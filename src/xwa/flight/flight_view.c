@@ -19,7 +19,7 @@
 #include "xwa/flight/flight_debug.h"
 #include "xwa_runtime/camera/camera_motion.h"
 #include "xwa_runtime/hooks/orientation_hook.h"
-#include "xwa_runtime/input/trackir.h"
+#include "xwa_runtime/input/head_tracking.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/snapshot/snapshot_camera.h"
@@ -282,10 +282,10 @@ static void FVIEW_StoreCamShadow(const double m[9]) {
 	g_camShadowValid = 1;
 	FVIEW_CopyShadowToViewMtx();
 }
-/* TrackIR rolls the observer about the VIEW direction, not the ship.
+/* Head roll turns the observer about the VIEW direction, not the ship.
  * Keep the original Q15 camera and its smooth double-precision shadow in
  * agreement: the classic culler and remastered scene must see the same view. */
-static int FVIEW_TrackIRToQ15(double value) {
+static int FVIEW_HeadTrackingToQ15(double value) {
 	long scaled = lround(value * 32768.0);
 	if (scaled < -32767)
 		return -32767;
@@ -296,22 +296,22 @@ static int FVIEW_TrackIRToQ15(double value) {
 
 /* Writes the head-tracked rows to the Q15 camera and its double shadow. Roll
    leaves the forward row as it is. */
-static void FVIEW_StoreTrackIRCamera(const double rows[9], int forwardChanged) {
-	g_camMatR0_X = g_curMatR0_X = FVIEW_TrackIRToQ15(rows[0]);
-	g_camMatR0_Y = g_curMatR0_Y = FVIEW_TrackIRToQ15(rows[1]);
-	g_camMatR0_Z = g_curMatR0_Z = FVIEW_TrackIRToQ15(rows[2]);
-	g_camMatR1_X = g_curMatR1_X = FVIEW_TrackIRToQ15(rows[3]);
-	g_camMatR1_Y = g_curMatR1_Y = FVIEW_TrackIRToQ15(rows[4]);
-	g_camMatR1_Z = g_curMatR1_Z = FVIEW_TrackIRToQ15(rows[5]);
+static void FVIEW_StoreHeadTrackedCamera(const double rows[9], int forwardChanged) {
+	g_camMatR0_X = g_curMatR0_X = FVIEW_HeadTrackingToQ15(rows[0]);
+	g_camMatR0_Y = g_curMatR0_Y = FVIEW_HeadTrackingToQ15(rows[1]);
+	g_camMatR0_Z = g_curMatR0_Z = FVIEW_HeadTrackingToQ15(rows[2]);
+	g_camMatR1_X = g_curMatR1_X = FVIEW_HeadTrackingToQ15(rows[3]);
+	g_camMatR1_Y = g_curMatR1_Y = FVIEW_HeadTrackingToQ15(rows[4]);
+	g_camMatR1_Z = g_curMatR1_Z = FVIEW_HeadTrackingToQ15(rows[5]);
 	if (forwardChanged) {
-		g_camMatR2_X = g_curMatR2_X = FVIEW_TrackIRToQ15(rows[6]);
-		g_camMatR2_Y = g_curMatR2_Y = FVIEW_TrackIRToQ15(rows[7]);
-		g_camMatR2_Z = g_curMatR2_Z = FVIEW_TrackIRToQ15(rows[8]);
+		g_camMatR2_X = g_curMatR2_X = FVIEW_HeadTrackingToQ15(rows[6]);
+		g_camMatR2_Y = g_curMatR2_Y = FVIEW_HeadTrackingToQ15(rows[7]);
+		g_camMatR2_Z = g_curMatR2_Z = FVIEW_HeadTrackingToQ15(rows[8]);
 	}
 	FVIEW_StoreCamShadow(rows);
 }
 
-static void FVIEW_ApplyTrackIRRoll(int16_t rollQ16) {
+static void FVIEW_ApplyHeadRoll(int16_t rollQ16) {
 	float original[9];
 	double rows[9];
 	double angle;
@@ -330,14 +330,14 @@ static void FVIEW_ApplyTrackIRRoll(int16_t rollQ16) {
 		rows[i] = co * (double)original[i] + si * (double)original[i + 3];
 		rows[i + 3] = -si * (double)original[i] + co * (double)original[i + 3];
 	}
-	FVIEW_StoreTrackIRCamera(rows, 0);
+	FVIEW_StoreHeadTrackedCamera(rows, 0);
 }
 
 /* Apply look to an already positioned camera. External cameras establish
  * their own orbit and collision clearance, while hyperspace forces a special
  * orientation after the normal cockpit calculation. Head motion must be
  * overlaid AFTER both camera modes establish their final base view. */
-static void FVIEW_ApplyTrackIRLookToCamera(const XwaTrackIRPose* head) {
+static void FVIEW_ApplyHeadLookToCamera(const XwaHeadPose* head) {
 	float source[9];
 	double rows[9];
 	double up[3];
@@ -354,16 +354,15 @@ static void FVIEW_ApplyTrackIRLookToCamera(const XwaTrackIRPose* head) {
 	 * FVIEW_BuildCameraOrient's ordinary cockpit look offsets. */
 	FVIEW_ShadowRotateAxes(rows, rows[0], rows[1], rows[2], head->pitch_q16);
 	FVIEW_ShadowRotateAxes(rows, up[0], up[1], up[2], head->yaw_q16);
-	FVIEW_StoreTrackIRCamera(rows, 1);
-	FVIEW_ApplyTrackIRRoll(head->roll_q16);
+	FVIEW_StoreHeadTrackedCamera(rows, 1);
+	FVIEW_ApplyHeadRoll(head->roll_q16);
 }
 
 /* Transient visual translation. The original culler accepts only whole OPT
  * coordinates, but the render snapshot retains the original float offset
  * to reconstruct fractional movement. The basis is the view BEFORE
  * head rotation, so leaning is independent of where the user looks. */
-static void FVIEW_ApplyTrackIRTranslation(int playerIdx, const XwaTrackIRPose* head,
-										  const float baseRows[9]) {
+static void FVIEW_ApplyHeadTranslation(int playerIdx, const XwaHeadPose* head, const float baseRows[9]) {
 	const float scale = AERON_OPT_UNITS_PER_METER * 0.01f;
 	const float local[3] = { -head->left_cm, head->up_cm, -head->back_cm };
 	float worldOffset[3];
@@ -376,18 +375,18 @@ static void FVIEW_ApplyTrackIRTranslation(int playerIdx, const XwaTrackIRPose* h
 	g_players[playerIdx].viewState.savedTargetX += (int)lroundf(worldOffset[0]);
 	g_players[playerIdx].viewState.savedTargetY += (int)lroundf(worldOffset[1]);
 	g_players[playerIdx].viewState.savedTargetZ += (int)lroundf(worldOffset[2]);
-	XwaTrackIR_SetCameraOffset(worldOffset);
+	XwaHeadTracking_SetCameraOffset(worldOffset);
 }
 
 /* Overlay local head movement on a camera that already established its base pose. */
-void FlightView_ApplyTrackIRToCurrentCamera(int playerIdx) {
-	XwaTrackIRPose head;
+void FlightView_ApplyHeadTrackingToCurrentCamera(int playerIdx) {
+	XwaHeadPose head;
 	float baseRows[9];
-	if (playerIdx != g_localPlayer || !XwaTrackIR_Poll(&head))
+	if (playerIdx != g_localPlayer || !XwaHeadTracking_Poll(&head))
 		return;
 	FVIEW_CopyRenderCameraRows(baseRows);
-	FVIEW_ApplyTrackIRLookToCamera(&head);
-	FVIEW_ApplyTrackIRTranslation(playerIdx, &head, baseRows);
+	FVIEW_ApplyHeadLookToCamera(&head);
+	FVIEW_ApplyHeadTranslation(playerIdx, &head, baseRows);
 }
 
 #endif
@@ -1020,7 +1019,7 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 	XwaCameraMotion_Update(playerIdx);
 	/* Per-frame local head pose only. Other players, replay and maps remain unchanged. */
 	if (playerIdx == g_localPlayer)
-		XwaTrackIR_ClearPose();
+		XwaHeadTracking_ClearPose();
 #endif
 	if (g_players[playerIdx].mapCameraState) {
 		FlightMap_UpdateCamera(playerIdx);
@@ -1256,7 +1255,7 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 			}
 		} else {
 #ifdef XWA_MODERN
-			XwaTrackIRPose trackir = { 0 };
+			XwaHeadPose head = { 0 };
 			float seatRows[9] = { 0 };
 			int tracking = 0;
 			/* Track the local user's normal cockpit view (pilot OR gun turret).
@@ -1268,7 +1267,7 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 				((g_players[playerIdx].currentSeatIdx == 0 && g_players[playerIdx].cockpitLookAvailable) ||
 				 (g_players[playerIdx].currentSeatIdx > 0 && g_players[playerIdx].cockpitToggleAvailable)) &&
 				cameraFocusObjIdx == (unsigned int)g_players[playerIdx].objectIndex) {
-				tracking = XwaTrackIR_Poll(&trackir);
+				tracking = XwaHeadTracking_Poll(&head);
 			}
 #endif
 			g_players[playerIdx].viewState.viewRoll = g_objectTable[cameraFocusObjIdx].roll;
@@ -1303,8 +1302,8 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 				g_players[playerIdx].viewState.viewRoll, (int16_t)g_players[playerIdx].viewState.viewPitch,
 				(int16_t)g_players[playerIdx].viewState.viewYaw, g_players[playerIdx].viewState.viewAngleD,
 #ifdef XWA_MODERN
-				(int16_t)(g_players[playerIdx].viewState.hudAimX + (tracking ? trackir.pitch_q16 : 0)),
-				(int16_t)(g_players[playerIdx].viewState.hudAimY + (tracking ? trackir.yaw_q16 : 0)),
+				(int16_t)(g_players[playerIdx].viewState.hudAimX + (tracking ? head.pitch_q16 : 0)),
+				(int16_t)(g_players[playerIdx].viewState.hudAimY + (tracking ? head.yaw_q16 : 0)),
 #else
 				(int16_t)g_players[playerIdx].viewState.hudAimX,
 				(int16_t)g_players[playerIdx].viewState.hudAimY,
@@ -1312,7 +1311,7 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 				&g_objectTable[g_players[playerIdx].viewState.cameraFocusObjIdx], playerIdx);
 #ifdef XWA_MODERN
 			if (tracking)
-				FVIEW_ApplyTrackIRRoll(trackir.roll_q16);
+				FVIEW_ApplyHeadRoll(head.roll_q16);
 #endif
 			g_players[playerIdx].viewState.savedTargetX =
 				g_objectTable[g_players[playerIdx].viewState.cameraFocusObjIdx].world_x;
@@ -1334,7 +1333,7 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 				g_players[playerIdx].viewState.cameraPanDeltaZ >> 4;
 #ifdef XWA_MODERN
 			if (tracking) {
-				FVIEW_ApplyTrackIRTranslation(playerIdx, &trackir, seatRows);
+				FVIEW_ApplyHeadTranslation(playerIdx, &head, seatRows);
 			}
 #endif
 		}
@@ -1376,7 +1375,7 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 		(g_players[playerIdx].hyperspacePhase != PLAYER_HYPERSPACE_PHASE_NONE ||
 		 (g_players[playerIdx].viewState.externalCameraActive &&
 		  !g_players[playerIdx].viewState.playerInputBlocked))) {
-		FlightView_ApplyTrackIRToCurrentCamera(playerIdx);
+		FlightView_ApplyHeadTrackingToCurrentCamera(playerIdx);
 	}
 #endif
 }

@@ -15,7 +15,7 @@
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/frontend/frontend_video.h"
-#include "xwa_runtime/input/trackir.h"
+#include "xwa_runtime/input/head_tracking.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/cockpit_alert_lights.h"
 #include "xwa_runtime/models/cockpit_view.h"
@@ -1888,16 +1888,16 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->world_pos[0] = vs->savedTargetX;
 	c->world_pos[1] = vs->savedTargetY;
 	c->world_pos[2] = vs->savedTargetZ;
-	float trackir_world_offset[3] = { 0 };
+	float head_world_offset[3] = { 0 };
 	int32_t untracked_pos[3];
-	XwaTrackIR_GetCameraOffset(trackir_world_offset);
+	XwaHeadTracking_GetCameraOffset(head_world_offset);
 	for (int axis = 0; axis < 3; ++axis) {
-		/* Lookup the existing camera fraction using its pre-TrackIR position. */
-		untracked_pos[axis] = c->world_pos[axis] - (int32_t)lroundf(trackir_world_offset[axis]);
+		/* Lookup the existing camera fraction using its position before head tracking. */
+		untracked_pos[axis] = c->world_pos[axis] - (int32_t)lroundf(head_world_offset[axis]);
 	}
 	XwaSnapshotCamera_PositionFraction(untracked_pos, c->world_pos_fraction);
 	for (int axis = 0; axis < 3; ++axis) {
-		c->world_pos_fraction[axis] += trackir_world_offset[axis] - roundf(trackir_world_offset[axis]);
+		c->world_pos_fraction[axis] += head_world_offset[axis] - roundf(head_world_offset[axis]);
 	}
 	FVIEW_CopyRenderCameraRows(c->rows);
 	c->view_pitch = vs->viewPitch;
@@ -2030,7 +2030,7 @@ void XwaSnapshot_CaptureFlight(void) {
 			k->stick_axis[0] = g_replayInputs[g_localPlayer].axisX;
 			k->stick_axis[1] = g_replayInputs[g_localPlayer].axisY;
 			k->stick_axis[2] = g_replayInputs[g_localPlayer].axisR;
-			XwaTrackIR_GetCameraOffset(k->trackir_head_offset);
+			XwaHeadTracking_GetCameraOffset(k->head_offset);
 			const char* name = XwaSnapshotExport_OptHandleName(handle);
 			if (name != NULL) {
 				snprintf(k->model_name, sizeof k->model_name, "%s", name);

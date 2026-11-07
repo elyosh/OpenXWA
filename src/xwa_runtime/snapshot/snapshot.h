@@ -690,7 +690,7 @@ typedef struct XwaCockpit {
 	 * world axes (player.seatEyeWorldOffset*). */
 	float seat_eye_world_offset[3];
 	float camera_pan[3]; /* viewState.cameraPanDelta* (classic scales by 1/16) */
-	float trackir_head_offset[3]; /* transient observer translation, OPT units */
+	float head_offset[3]; /* transient observer translation, OPT units */
 	/* The same eye point in the CRAFT's model space (player.seatEyeLocal*,
 	 * FlightView_ComputeSeatEyeOffset): the cockpit eye, or the turret
 	 * seat's position. The classic anchors the weapon-fire pulse point
@@ -1081,7 +1081,7 @@ typedef struct XwaHudReticle {
 	int16_t look_yaw, look_pitch;
 	uint8_t seat;
 	uint8_t turret_auto_fire;
-	/* Transient direction of the turret boresight, before TrackIR rotates
+	/* Transient direction of the turret boresight, before head tracking rotates
 	 * the observer. Used only to draw the reticle in a turret seat. */
 	uint8_t turret_aim_valid;
 	float turret_aim_world[3];

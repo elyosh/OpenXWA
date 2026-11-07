@@ -282,8 +282,9 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/craft_sounds.c
     src/xwa_runtime/models/opt_synth.c
     src/xwa_runtime/models/mission_art.c
-    src/xwa_runtime/input/trackir.c
+    src/xwa_runtime/input/head_tracking.c
     src/xwa_runtime/input/opentrack_udp.c
+    src/xwa_runtime/input/trackir.c
     src/xwa_runtime/runtime/flight_pause_task.c
     src/xwa_runtime/runtime/flight_task.c
     src/xwa_runtime/runtime/frontend_task.c
@@ -871,8 +872,9 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/input/winmm_joystick_provider.h
     src/xwa_runtime/input/controller_mapping.h
     src/xwa_runtime/input/mouse_flight.h
-    src/xwa_runtime/input/trackir.h
+    src/xwa_runtime/input/head_tracking.h
     src/xwa_runtime/input/opentrack_udp.h
+    src/xwa_runtime/input/trackir.h
     src/xwa_runtime/timing/modern_flight_timing.h
     src/xwa_runtime/runtime/movie_task.h
     src/xwa_runtime/hooks/orientation_hook.h
