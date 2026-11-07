@@ -1947,7 +1947,7 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 #ifdef XWA_MODERN
 		/* Player projectile slots bypass Object_AllocSlotForGenus. */
 		if (playerIdx != -1) {
-			Object_ResetProjectileMoveFraction(g_objectTable[projectileObjIdx].mobj);
+			Object_ResetMoveFraction(g_objectTable[projectileObjIdx].mobj);
 		}
 #endif
 		g_objectTable[projectileObjIdx].mobj->sourceObjIdx = -1;
@@ -3407,7 +3407,7 @@ uint16_t laser_createprojectilefromstatic(uint16_t staticObjIdx, uint16_t shoote
 	projectileMobj = g_objectTable[projectileObjIdx].mobj;
 #ifdef XWA_MODERN
 	/* A static launcher can replace an occupied projectile if no free slot is available. */
-	Object_ResetProjectileMoveFraction(projectileMobj);
+	Object_ResetMoveFraction(projectileMobj);
 #endif
 	guidance = projectileMobj->pWarheadGuidance;
 #ifdef XWA_MODERN
@@ -3550,7 +3550,7 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 #ifdef XWA_MODERN
 		/* Player projectile slots bypass Object_AllocSlotForGenus. */
 		if (projectileGenus == GENUS_PlayerProjectile) {
-			Object_ResetProjectileMoveFraction(g_objectTable[resultObjIdx].mobj);
+			Object_ResetMoveFraction(g_objectTable[resultObjIdx].mobj);
 		}
 #endif
 
