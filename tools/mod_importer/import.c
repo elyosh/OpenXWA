@@ -20,6 +20,7 @@
 #include "stock_tables.h"
 #include "xwa_app/mod_format.h"
 #include "xwau_awards.h"
+#include "xwau_config.h"
 #include "xwau_craft.h"
 #include "xwau_cube_faces.h"
 #include "xwau_flight_settings.h"
@@ -896,6 +897,9 @@ XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModIm
 		ctx.cores = 1;
 	ImportLog_Open(progress, options);
 	ClearReportFatal();
+	/* The installation and the game folder don't change during the import,
+	   so each of their folders is read once. */
+	Xwau_SetFolderCache(true);
 
 	XwaModImportResult result = run_phases(&ctx, &authoring);
 	if (ReportFatalMessage()) {
@@ -907,6 +911,7 @@ XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModIm
 		Import_Advance(&ctx, 0, 1000);
 	else if (result == XWA_MOD_IMPORT_STOPPED && Import_Cancelled(&ctx))
 		result = XWA_MOD_IMPORT_CANCELLED;
+	Xwau_SetFolderCache(false);
 	if (ctx.work[0] && !RemoveTree(ctx.work))
 		ToolLog_Write(TOOL_LOG_WARNING, "Can't delete %s", ctx.work);
 	ImportAuthoring_Free(&authoring);

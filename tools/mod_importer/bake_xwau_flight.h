@@ -10,7 +10,7 @@ typedef struct BakeXwauFlightOptions {
 	const BakeSpriteOptions* sprites; /* out_root, formats, BC7 quality and group_filter */
 	const char* xwau_root;            /* the XWAU install */
 	int planet_max;                   /* scale planet images wider than this down to it; 0 keeps them */
-	int threads; /* threads that decode the images of a group; 0 or 1 decodes them here */
+	int threads; /* the threads that decode a group's images; 0 or 1 decodes them on the calling thread */
 } BakeXwauFlightOptions;
 
 typedef struct BakeXwauFlightStats {
