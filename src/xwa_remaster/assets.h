@@ -64,6 +64,8 @@ typedef struct XwaAssetRef {
  * source order; the alternate source is selected only when the first is absent. */
 XwaRemasterAssets* XwaRemasterAssets_Create(const char* root, int prefer_original_2d);
 void XwaRemasterAssets_Destroy(XwaRemasterAssets* a);
+/* Select a resident original frontend atlas without reloading GPU resources. */
+void XwaRemasterAssets_SetSmoothMenuFonts(XwaRemasterAssets* a, int enabled);
 
 /* Frontend residency mirrors the classic named-resource and DAT-group sets.
  * Sync performs all I/O/upload before reconstruction; sprite and font entry
@@ -112,7 +114,7 @@ const AeronFontAtlas* XwaRemasterAssets_FlightFont(XwaRemasterAssets* a, int tie
 uint32_t XwaRemasterAssets_Generation(const XwaRemasterAssets* a);
 
 /* Font atlas for a classic point size, or NULL when neither source loaded.
- * Both authored and runtime-original atlases use a 4x pixel scale.
+ * Authored fonts use 4x; original bitmap fonts may use native 1x scale.
  * Borrowed; owned by the resolver. */
 const AeronFontAtlas* XwaRemasterAssets_FrontendFont(XwaRemasterAssets* a, int font_size,
 													 float* out_atlas_scale);
