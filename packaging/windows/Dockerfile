@@ -1,15 +1,18 @@
 # Microsoft's Linux DXC release binaries are available for x86-64 only.
+# The Windows target uses Debian's GCC MinGW-w64 for UCRT, the C runtime of
+# Windows 10 and later. Its maths functions come from UCRT. They are much
+# faster than MinGW-w64's own versions, which the older MSVCRT target uses.
 ARG XWA_BUILD_PLATFORM=linux/amd64
 
-FROM --platform=${XWA_BUILD_PLATFORM} debian:bookworm-slim AS build-base
+FROM --platform=${XWA_BUILD_PLATFORM} debian:trixie-slim AS build-base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        binutils-mingw-w64-x86-64 \
+        binutils-mingw-w64-ucrt64 \
         build-essential \
         ca-certificates \
         cmake \
-        g++-mingw-w64-x86-64-posix \
-        gcc-mingw-w64-x86-64-posix \
+        g++-mingw-w64-ucrt64 \
+        gcc-mingw-w64-ucrt64 \
         git \
         libncurses-dev \
         libxml2-dev \
@@ -44,7 +47,8 @@ RUN git clone --branch "release-${SDL_VERSION}" --depth 1 \
 COPY packaging/common/shadercross-fsr3.patch /tmp/shadercross-fsr3.patch
 COPY packaging/common/shadercross-msl-bindings.patch /tmp/shadercross-msl-bindings.patch
 
-# DXC 1.9 requires glibc 2.38; keep the Debian 12-compatible 1.8 release.
+# The DXC release that compiles the shaders. Releases from 1.9 on need
+# glibc 2.38 or later.
 ARG DXC_VERSION=1.8.2502
 ARG DXC_LINUX_X64_ARCHIVE=linux_dxc_2025_02_20.x86_64.tar.gz
 ARG DXC_LINUX_X64_SHA256=e0580d90dbf6053a783ddd8d5153285f0606e5deaad17a7a6452f03acdf88c71
@@ -144,7 +148,7 @@ RUN git clone --branch "n${FFMPEG_VERSION}" --depth 1 \
         --prefix=/opt/xwa-windows \
         --target-os=mingw32 \
         --arch=x86_64 \
-        --cross-prefix=x86_64-w64-mingw32- \
+        --cross-prefix=x86_64-w64-mingw32ucrt- \
         --disable-autodetect \
         --disable-avdevice \
         --disable-avfilter \
@@ -304,9 +308,9 @@ RUN mkdir -p /build/package/openxwa-windows-x86_64/licenses \
         mkdir -p /build/symbols \
         && cd /build/package/openxwa-windows-x86_64 \
         && for program in OpenXWA.exe "OpenXWA Mod Importer.exe"; do \
-            x86_64-w64-mingw32-objcopy --only-keep-debug "$program" "/build/symbols/${program}.debug" \
+            x86_64-w64-mingw32ucrt-objcopy --only-keep-debug "$program" "/build/symbols/${program}.debug" \
             && cp "/build/symbols/${program}.debug" . \
-            && x86_64-w64-mingw32-objcopy --strip-debug --add-gnu-debuglink="${program}.debug" "$program" \
+            && x86_64-w64-mingw32ucrt-objcopy --strip-debug --add-gnu-debuglink="${program}.debug" "$program" \
             && rm "${program}.debug" \
             && cp "$program" /build/symbols/ \
             || exit 1; \
@@ -327,16 +331,16 @@ RUN mkdir -p /build/package/openxwa-windows-x86_64/licenses \
         /build/package/openxwa-windows-x86_64/licenses/ISPC-Texture-Compressor.txt \
     && cp /src/aeron/third_party/bcdec/LICENSE \
         /build/package/openxwa-windows-x86_64/licenses/bcdec.txt \
-    && cp -L /usr/share/doc/gcc-mingw-w64-x86-64-posix-runtime/copyright \
+    && cp -L /usr/share/doc/gcc-mingw-w64-ucrt64-runtime/copyright \
         /build/package/openxwa-windows-x86_64/licenses/GCC-MinGW-w64.txt \
-    && cp -L /usr/share/doc/mingw-w64-x86-64-dev/copyright \
+    && cp -L /usr/share/doc/mingw-w64-ucrt64-dev/copyright \
         /build/package/openxwa-windows-x86_64/licenses/MinGW-w64.txt \
     && cp /opt/xwa-windows/bin/*.dll /build/package/openxwa-windows-x86_64/ \
-    && cp "$(x86_64-w64-mingw32-g++ -print-file-name=libgcc_s_seh-1.dll)" \
+    && cp "$(x86_64-w64-mingw32ucrt-g++ -print-file-name=libgcc_s_seh-1.dll)" \
         /build/package/openxwa-windows-x86_64/ \
-    && cp "$(x86_64-w64-mingw32-g++ -print-file-name=libstdc++-6.dll)" \
+    && cp "$(x86_64-w64-mingw32ucrt-g++ -print-file-name=libstdc++-6.dll)" \
         /build/package/openxwa-windows-x86_64/ \
-    && cp "$(x86_64-w64-mingw32-g++ -print-file-name=libwinpthread-1.dll)" \
+    && cp "$(x86_64-w64-mingw32ucrt-g++ -print-file-name=libwinpthread-1.dll)" \
         /build/package/openxwa-windows-x86_64/ \
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
         cp /opt/winpix/bin/WinPixEventRuntime.dll \
@@ -351,10 +355,10 @@ RUN mkdir -p /build/package/openxwa-windows-x86_64/licenses \
     && if [ "${XWA_BUILD_TYPE}" = Release ]; then \
         cd /build/package/openxwa-windows-x86_64 \
         && for library in *.dll; do \
-            if x86_64-w64-mingw32-objdump -h "$library" | grep -q '\.debug_'; then \
-                x86_64-w64-mingw32-objcopy --only-keep-debug "$library" "/build/symbols/${library}.debug" \
+            if x86_64-w64-mingw32ucrt-objdump -h "$library" | grep -q '\.debug_'; then \
+                x86_64-w64-mingw32ucrt-objcopy --only-keep-debug "$library" "/build/symbols/${library}.debug" \
                 && cp "/build/symbols/${library}.debug" . \
-                && x86_64-w64-mingw32-objcopy --strip-debug --add-gnu-debuglink="${library}.debug" "$library" \
+                && x86_64-w64-mingw32ucrt-objcopy --strip-debug --add-gnu-debuglink="${library}.debug" "$library" \
                 && rm "${library}.debug" \
                 && cp "$library" /build/symbols/ \
                 || exit 1; \
@@ -373,31 +377,31 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
     && test -f /build/package/openxwa-windows-x86_64/resources/aeron/scene3d_defaults.yaml \
     && test -f /build/package/openxwa-windows-x86_64/resources/remaster/config.yaml \
     && test -f /build/package/openxwa-windows-x86_64/resources/assets/fonts/menu.fnt \
-    && x86_64-w64-mingw32-objdump -p \
+    && x86_64-w64-mingw32ucrt-objdump -p \
         /build/package/openxwa-windows-x86_64/OpenXWA.exe \
         | grep -Eq 'Subsystem[[:space:]]+00000002' \
-    && x86_64-w64-mingw32-objdump -p \
+    && x86_64-w64-mingw32ucrt-objdump -p \
         "/build/package/openxwa-windows-x86_64/OpenXWA Mod Importer.exe" \
         | grep -Eq 'Subsystem[[:space:]]+00000002' \
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
-        x86_64-w64-mingw32-objdump -h \
+        x86_64-w64-mingw32ucrt-objdump -h \
             /build/package/openxwa-windows-x86_64/OpenXWA.exe \
             | grep -q '\.debug_info' \
         && test -f /build/package/openxwa-windows-x86_64/WinPixEventRuntime.dll; \
     else \
         for program in OpenXWA.exe "OpenXWA Mod Importer.exe"; do \
-            ! x86_64-w64-mingw32-objdump -h \
+            ! x86_64-w64-mingw32ucrt-objdump -h \
                 "/build/package/openxwa-windows-x86_64/${program}" \
                 | grep -q '\.debug_info' \
-            && x86_64-w64-mingw32-objdump -h \
+            && x86_64-w64-mingw32ucrt-objdump -h \
                 "/build/package/openxwa-windows-x86_64/${program}" \
                 | grep -q '\.gnu_debuglink' \
-            && x86_64-w64-mingw32-objdump -h "/build/symbols/${program}.debug" \
+            && x86_64-w64-mingw32ucrt-objdump -h "/build/symbols/${program}.debug" \
                 | grep -q '\.debug_info' \
             || exit 1; \
         done \
         && for library in /build/package/openxwa-windows-x86_64/*.dll; do \
-            ! x86_64-w64-mingw32-objdump -h "$library" | grep -q '\.debug_' || exit 1; \
+            ! x86_64-w64-mingw32ucrt-objdump -h "$library" | grep -q '\.debug_' || exit 1; \
         done; \
     fi \
     && if [ "${XWA_BUILD_TYPE}" = Debug ]; then \
@@ -454,8 +458,8 @@ RUN cmake -S /src/aeron -B /build/cooker -G Ninja \
 
 # Only Windows' own DLLs: no SDL, zstd or MinGW runtime.
 RUN for tool in aeron_gltf_cook opt2gltf; do \
-        x86_64-w64-mingw32-objdump -p /build/artifacts/$tool.exe | grep 'DLL Name' \
-        && ! x86_64-w64-mingw32-objdump -p /build/artifacts/$tool.exe \
+        x86_64-w64-mingw32ucrt-objdump -p /build/artifacts/$tool.exe | grep 'DLL Name' \
+        && ! x86_64-w64-mingw32ucrt-objdump -p /build/artifacts/$tool.exe \
             | grep -iE 'DLL Name: (SDL|libzstd|libstdc|libgcc|libwinpthread)' \
         || exit 1; \
     done

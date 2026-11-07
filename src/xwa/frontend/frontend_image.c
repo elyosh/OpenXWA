@@ -6520,7 +6520,8 @@ int FrontImage_LoadBmpFile(char* fileName, ImageResource* image, int makePalette
 
 		if (bpp == 4) {
 			FrontImage_ReadBmpPalette(stream, (char*)palette, 16);
-			result = FrontImage_DecodeBmp4bpp(stream, pixels, fileHeader, infoHeader);
+			result = FrontImage_DecodeBmp4bpp(stream, pixels, (const FrontImageBmpFileHeader*)fileHeader,
+											  infoHeader);
 		} else if (bpp == 8) {
 			FrontImage_ReadBmpPalette(stream, (char*)palette, 256);
 			result = FrontImage_DecodeBmp8bpp(stream, pixels, fileHeader, infoHeader);

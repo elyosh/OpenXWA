@@ -1165,7 +1165,7 @@ void FeDiskIo_FreeTexturesForType(uint16_t objectType) {
 		for (; levelIndex < levelCount * frameCount; ++levelIndex) {
 			if (texLevels[levelIndex].image != NULL) {
 				if (g_useHardware3D) {
-					std3D_DeleteTextureSurface(texLevels[levelIndex].image);
+					std3D_DeleteTextureSurface((struct Std3DTextureSurface*)texLevels[levelIndex].image);
 				} else {
 					Memory_FreeTagged(MODEL_TEXTURE_RESOURCEITEM_TAG, texLevels[levelIndex].image);
 				}
