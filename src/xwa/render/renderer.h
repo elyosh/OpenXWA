@@ -1092,6 +1092,7 @@ void FVIEW_BuildCameraOrientNoTurret(int16_t rollQ16, int16_t pitchQ16, int16_t 
 int FVIEW_ComputeObjectViewMatrix(void);
 #ifdef XWA_MODERN
 void FVIEW_CopyRenderCameraRows(float rows[9]);
+void FlightView_ApplyHeadTrackingToCurrentCamera(int playerIdx);
 void FVIEW_SaveRenderCameraStateForViewport(void);
 void FVIEW_RestoreRenderCameraStateForViewport(void);
 #endif

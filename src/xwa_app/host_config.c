@@ -965,6 +965,42 @@ static int host_config_controller_options(const AeronConfigFile* config, int req
 										  error_size);
 }
 
+static int host_config_head_tracking(const AeronConfigFile* config, int required,
+									 XwaHeadTrackingOptions* head, char* error, size_t error_size) {
+	static const char* const axis_names[XWA_HEAD_TRACK_AXIS_COUNT] = {
+		"yaw", "pitch", "roll", "x", "y", "z"
+	};
+	const AeronConfigNode* source = AeronConfigFile_GetNode(config, "input.head_tracking.source");
+	const char* name;
+	char key[80];
+	int axis;
+
+	if (!host_config_input_bool(config, "input.head_tracking.enabled", required, &head->enabled, error,
+								error_size)) {
+		return 0;
+	}
+	if (!source) {
+		if (!host_config_input_missing(required, "input.head_tracking.source", error, error_size))
+			return 0;
+	} else {
+		name = AeronConfigNode_String(source, NULL);
+		if (name && strcmp(name, "trackir") == 0) {
+			head->source = XWA_HEAD_TRACK_SOURCE_TRACKIR;
+		} else if (name && strcmp(name, "opentrack_udp") == 0) {
+			head->source = XWA_HEAD_TRACK_SOURCE_OPENTRACK_UDP;
+		} else {
+			return host_config_error(error, error_size, "invalid head tracking source: expected %s",
+									 "'trackir' or 'opentrack_udp'");
+		}
+	}
+	for (axis = 0; axis < XWA_HEAD_TRACK_AXIS_COUNT; ++axis) {
+		snprintf(key, sizeof key, "input.head_tracking.invert.%s", axis_names[axis]);
+		if (!host_config_input_bool(config, key, required, &head->invert[axis], error, error_size))
+			return 0;
+	}
+	return 1;
+}
+
 static int host_config_input_options(const AeronConfigFile* config, int required, XwaModernInputOptions* out,
 									 char* error, size_t error_size) {
 	const AeronConfigNode* node;
@@ -976,7 +1012,8 @@ static int host_config_input_options(const AeronConfigFile* config, int required
 							   error_size) ||
 		!host_config_input_bool(config, "input.mouse_invert_y", required, &out->mouse_invert_y, error,
 								error_size) ||
-		!host_config_controller_options(config, required, &out->controller, error, error_size)) {
+		!host_config_controller_options(config, required, &out->controller, error, error_size) ||
+		!host_config_head_tracking(config, required, &out->head_tracking, error, error_size)) {
 		return 0;
 	}
 
@@ -1005,6 +1042,8 @@ static int host_config_input_options(const AeronConfigFile* config, int required
 
 static int host_config_validate_input_maps(const AeronConfigFile* config, char* error, size_t error_size) {
 	static const char* const map_paths[] = {
+		"input.head_tracking",
+		"input.head_tracking.invert",
 		"input.controller",
 		"input.controller.device",
 		"input.controller.gamepad",
@@ -1449,6 +1488,27 @@ static int host_config_set_controller_profile(AeronConfigFile* document, const c
 	return host_config_set_controller_actions(document, profile_name, profile->actions, error);
 }
 
+static int host_config_set_head_tracking(AeronConfigFile* document, const XwaHeadTrackingOptions* head,
+										 AeronConfigError* error) {
+	static const char* const axis_names[XWA_HEAD_TRACK_AXIS_COUNT] = {
+		"yaw", "pitch", "roll", "x", "y", "z"
+	};
+	char key[80];
+	int axis;
+	if (!AeronConfigFile_SetBool(document, "input.head_tracking.enabled", head->enabled, error) ||
+		!AeronConfigFile_SetString(
+			document, "input.head_tracking.source",
+			head->source == XWA_HEAD_TRACK_SOURCE_OPENTRACK_UDP ? "opentrack_udp" : "trackir", error)) {
+		return 0;
+	}
+	for (axis = 0; axis < XWA_HEAD_TRACK_AXIS_COUNT; ++axis) {
+		snprintf(key, sizeof key, "input.head_tracking.invert.%s", axis_names[axis]);
+		if (!AeronConfigFile_SetBool(document, key, head->invert[axis], error))
+			return 0;
+	}
+	return 1;
+}
+
 static int host_config_set_input_options(AeronConfigFile* document, const XwaModernInputOptions* options,
 										 AeronConfigError* error) {
 	static const char* const mode_names[] = { "position", "rate" };
@@ -1460,6 +1520,7 @@ static int host_config_set_input_options(AeronConfigFile* document, const XwaMod
 		   AeronConfigFile_SetString(document, "input.mouse_mode", mode_names[options->mouse_mode], error) &&
 		   AeronConfigFile_SetInt(document, "input.mouse_sensitivity", options->mouse_sensitivity, error) &&
 		   AeronConfigFile_SetBool(document, "input.mouse_invert_y", options->mouse_invert_y, error) &&
+		   host_config_set_head_tracking(document, &options->head_tracking, error) &&
 		   AeronConfigFile_SetString(document, "input.controller.device.guid",
 									 options->controller.device.guid, error) &&
 		   AeronConfigFile_SetString(document, "input.controller.device.path",

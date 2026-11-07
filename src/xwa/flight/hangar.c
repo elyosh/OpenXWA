@@ -45,6 +45,7 @@
 #include "xwa/math/scalar.h"
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/input/head_tracking.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_sounds.h"
@@ -323,6 +324,8 @@ int g_hangarInitialReadyEntryPending;
 // GLOBAL: XWA 0x9C6FB4
 int g_hangarHullDamageWarningPlayed;
 #ifdef XWA_MODERN
+/* Untracked anchor of hangar shot cameras; head translation must not accumulate. */
+static int s_hangarCameraBase[3];
 static GameConfig g_hangarOptionsModalOldConfig;
 static int g_hangarOptionsModalPending;
 #endif
@@ -2849,7 +2852,25 @@ void Hangar_RenderReadyScreen(void) {
 	Mission_SetActiveRegionObjectRanges(player->regionIndex);
 
 	if (g_hangarAutoCam) {
+#ifdef XWA_MODERN
+		XwaHeadTracking_ClearPose();
+		if (!g_filmPlaybackMode) {
+			player->viewState.savedTargetX = s_hangarCameraBase[0];
+			player->viewState.savedTargetY = s_hangarCameraBase[1];
+			player->viewState.savedTargetZ = s_hangarCameraBase[2];
+		}
+#endif
 		Hangar_UpdateReadyAutoCamera(player);
+#ifdef XWA_MODERN
+		if (!g_filmPlaybackMode) {
+			s_hangarCameraBase[0] = player->viewState.savedTargetX;
+			s_hangarCameraBase[1] = player->viewState.savedTargetY;
+			s_hangarCameraBase[2] = player->viewState.savedTargetZ;
+			if (!g_filmRecording) {
+				FlightView_ApplyHeadTrackingToCurrentCamera(g_localPlayer);
+			}
+		}
+#endif
 	} else {
 		FlightView_UpdatePlayerCamera(g_localPlayer);
 	}
@@ -4984,6 +5005,11 @@ shot_placed:
 	g_players[g_localPlayer].viewState.savedTargetX = worldX;
 	g_players[g_localPlayer].viewState.savedTargetY = worldY;
 	g_players[g_localPlayer].viewState.savedTargetZ = worldZ;
+#ifdef XWA_MODERN
+	s_hangarCameraBase[0] = worldX;
+	s_hangarCameraBase[1] = worldY;
+	s_hangarCameraBase[2] = worldZ;
+#endif
 	g_players[g_localPlayer].viewState.viewRoll = 0;
 	g_players[g_localPlayer].viewState.viewPitch = 0x4000;
 	g_players[g_localPlayer].viewState.viewYaw = 0;

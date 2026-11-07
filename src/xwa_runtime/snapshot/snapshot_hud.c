@@ -11,6 +11,7 @@
 #include "xwa/flight/player/player.h"
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/camera/exterior_hud.h"
+#include "xwa_runtime/input/head_tracking.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_weapons.h"
@@ -504,7 +505,19 @@ static void hud_capture_direct_state(XwaHudState* out) {
 	out->reticle.missile_lock_state = player->missileLockState;
 	out->reticle.look_yaw = player->lookYawOffset;
 	out->reticle.look_pitch = player->lookPitchOffset;
+	XwaHeadPose head;
+	const int headLook = XwaHeadTracking_CurrentPose(&head) && (head.yaw_q16 || head.pitch_q16);
+	if (headLook) {
+		out->reticle.look_yaw = (int16_t)(out->reticle.look_yaw + head.yaw_q16);
+		out->reticle.look_pitch = (int16_t)(out->reticle.look_pitch + head.pitch_q16);
+	}
 	out->reticle.seat = (uint8_t)player->currentSeatIdx;
+	out->reticle.turret_aim_valid = (uint8_t)(headLook && player->currentSeatIdx > 0);
+	if (out->reticle.turret_aim_valid) {
+		for (int axis = 0; axis < 3; ++axis) {
+			out->reticle.turret_aim_world[axis] = (float)player->turretCamMat[axis] * (1.0f / 32768.0f);
+		}
+	}
 	out->reticle.stick_marker = 0;
 	if (!g_padlockMouseLookEnabled) {
 		int stick_marker_x;

@@ -6,9 +6,11 @@
 
 #ifdef XWA_MODERN
 #include "xwa/frontend/frontend_display.h" /* g_flightRenderToFrontend */
+#include "xwa_runtime/input/head_tracking.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/opt_synth.h"
+#include <math.h>
 #endif
 
 #ifndef XWA_MODERN
@@ -34,6 +36,28 @@ static int VirtualProtect(void* lpAddress, unsigned int dwSize, unsigned int flN
 		*lpflOldProtect = 0x40u; /* PAGE_EXECUTE_READWRITE */
 	}
 	return 1;
+}
+#endif
+
+#ifdef XWA_MODERN
+/* Classic model paths override the cockpit model's world-relative position
+ * with its untracked seat hardpoint, losing the head-tracked eye displacement. World
+ * geometry is already shifted by the integer camera offset; the small
+ * residual ensures fluid motion in classic F5 mode without filtering. */
+static void RenderScene_ApplyHeadTranslation(Vec3f* pos, int cockpit_active) {
+	float offset[3];
+	if (!pos)
+		return;
+	XwaHeadTracking_GetCameraOffset(offset);
+	if (cockpit_active) {
+		pos->x -= offset[0];
+		pos->y -= offset[1];
+		pos->z -= offset[2];
+	} else {
+		pos->x -= offset[0] - roundf(offset[0]);
+		pos->y -= offset[1] - roundf(offset[1]);
+		pos->z -= offset[2] - roundf(offset[2]);
+	}
 }
 #endif
 
@@ -415,6 +439,10 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 			mesh.viewPos.z = -g_players[g_localPlayer].seatEyeWorldOffsetZ -
 							 g_players[g_localPlayer].viewState.cameraPanDeltaZ * g_cockpitPanPositionScale;
 		}
+#ifdef XWA_MODERN
+		/* Adjust the eye relative to the cockpit without moving the craft. */
+		RenderScene_ApplyHeadTranslation(&mesh.viewPos, g_cockpitViewActive);
+#endif
 
 		mesh.viewOrient[0] = g_viewMtx00;
 		mesh.viewOrient[1] = g_viewMtx10;
@@ -807,6 +835,10 @@ int RenderScene_DrawObjectModelHardware(ObjectRecord* obj) {
 		mesh.viewPos.z = -g_players[g_localPlayer].seatEyeWorldOffsetZ -
 						 g_players[g_localPlayer].viewState.cameraPanDeltaZ * g_cockpitPanPositionScale;
 	}
+#ifdef XWA_MODERN
+	/* Adjust the eye relative to the cockpit without moving the craft. */
+	RenderScene_ApplyHeadTranslation(&mesh.viewPos, g_cockpitViewActive);
+#endif
 
 	viewMatrix.m[0] = g_viewMtx00;
 	viewMatrix.m[1] = g_viewMtx10;
@@ -1054,6 +1086,10 @@ void RenderScene_DrawNoAssetSourceModel(ObjectRecord* obj, int nodeSwitchIndex) 
 		mesh.viewPos.z = -g_players[g_localPlayer].seatEyeWorldOffsetZ -
 						 (double)g_players[g_localPlayer].viewState.cameraPanDeltaZ * 0.0625;
 	}
+#ifdef XWA_MODERN
+	/* Adjust the eye relative to the cockpit without moving the craft. */
+	RenderScene_ApplyHeadTranslation(&mesh.viewPos, g_cockpitViewActive);
+#endif
 
 	mesh.viewOrient[0] = g_viewMtx00;
 	mesh.viewOrient[1] = g_viewMtx10;
