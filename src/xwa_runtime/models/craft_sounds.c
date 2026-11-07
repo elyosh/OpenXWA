@@ -15,6 +15,7 @@
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_settings.h"
+#include "xwa_runtime/models/names.h"
 
 #include <stdint.h>
 #include <stdlib.h>
@@ -23,8 +24,9 @@
 /* Modern port module; no original counterpart. */
 
 /* The weapon types of `weapon_ranges`: 280 to 307. */
-#define CRAFT_SOUNDS_FIRST_WEAPON 280
-#define CRAFT_SOUNDS_WEAPONS 28
+enum { CRAFT_SOUNDS_FIRST_WEAPON = 280, CRAFT_SOUNDS_WEAPONS = 28 };
+/* The maximum number of weapon_range sounds for one weapon type. */
+enum { CRAFT_SOUNDS_RANGE_MAX = 16 };
 
 enum { CRAFT_SOUNDS_FLY_BY_BOTH, CRAFT_SOUNDS_FLY_BY_2D, CRAFT_SOUNDS_FLY_BY_3D };
 
@@ -73,9 +75,10 @@ typedef struct CraftSoundsSet {
 	uint8_t takeOff;
 	uint8_t hyper;
 	uint8_t weapons;
+	/* The weapon_range entries for each weapon type. */
 	struct {
-		uint16_t first;
-		uint16_t count; /* 0 for no range */
+		uint16_t entries[CRAFT_SOUNDS_RANGE_MAX];
+		uint8_t count; /* 0 when the weapon type has no entries */
 	} ranges[CRAFT_SOUNDS_WEAPONS];
 	/* The centre and radii of the ambient sound, in metres, for each axis:
 	   right, up and forward. */
@@ -126,6 +129,8 @@ static void CraftSounds_ReadName(const char* path, const char* key, const AeronC
 				  AeronConfigNode_Line(node), key, value);
 }
 
+/* Reads `weapon_ranges`, which maps weapon type names to lists of
+   weapon_range entry names. */
 static void CraftSounds_ReadRanges(const char* path, const AeronConfigNode* node, CraftSoundsSet* set) {
 	size_t i;
 
@@ -136,26 +141,39 @@ static void CraftSounds_ReadRanges(const char* path, const AeronConfigNode* node
 	}
 	for (i = 0; i < AeronConfigNode_MapCount(node); ++i) {
 		const char* key = AeronConfigNode_MapKeyAt(node, i);
-		const AeronConfigNode* range = AeronConfigNode_MapValueAt(node, i);
-		const AeronConfigNode* first = AeronConfigNode_MapGet(range, "first");
-		const AeronConfigNode* count = AeronConfigNode_MapGet(range, "count");
-		char* end;
-		const long weapon = strtol(key, &end, 10) - CRAFT_SOUNDS_FIRST_WEAPON;
+		const AeronConfigNode* list = AeronConfigNode_MapValueAt(node, i);
+		const int weapon = XwaNames_Find(&g_xwaWeaponTypeNames, key);
+		size_t count = AeronConfigNode_SequenceCount(list);
+		size_t at;
 
-		if (*key == '\0' || *end != '\0' || weapon < 0 || weapon >= CRAFT_SOUNDS_WEAPONS ||
-			AeronConfigNode_Type(first) != AERON_CONFIG_INT ||
-			AeronConfigNode_Type(count) != AERON_CONFIG_INT || AeronConfigNode_Int(first, -1) < 0 ||
-			AeronConfigNode_Int(first, -1) > 0xffff || AeronConfigNode_Int(count, -1) < 1 ||
-			AeronConfigNode_Int(count, -1) > 0xffff) {
-			Aeron_LogWarn(
-				"xwa.models",
-				"%s:%d: sound.weapon_ranges: '%s' needs a weapon type from 280 to 307, a first sound "
-				"and a count of 1 or more. It is ignored",
-				path, AeronConfigNode_Line(range), key);
+		if (weapon < 0) {
+			XwaNames_LogUnknown(&g_xwaWeaponTypeNames, path, AeronConfigNode_Line(list),
+								"sound.weapon_ranges", key);
 			continue;
 		}
-		set->ranges[weapon].first = (uint16_t)AeronConfigNode_Int(first, 0);
-		set->ranges[weapon].count = (uint16_t)AeronConfigNode_Int(count, 0);
+		if (AeronConfigNode_Type(list) != AERON_CONFIG_SEQUENCE || count == 0 ||
+			count > CRAFT_SOUNDS_RANGE_MAX) {
+			Aeron_LogWarn(
+				"xwa.models",
+				"%s:%d: sound.weapon_ranges.%s must be a list of 1 to %d weapon_range sounds. It is ignored",
+				path, AeronConfigNode_Line(list), key, CRAFT_SOUNDS_RANGE_MAX);
+			continue;
+		}
+		for (at = 0; at < count; ++at) {
+			const AeronConfigNode* item = AeronConfigNode_SequenceGet(list, at);
+			const int entry = XwaSoundBanks_FindRange(AeronConfigNode_String(item, NULL));
+
+			if (entry < 0) {
+				Aeron_LogWarn(
+					"xwa.models",
+					"%s:%d: sound.weapon_ranges.%s: the weapon_range bank has no sound named '%s'. The list "
+					"is ignored",
+					path, AeronConfigNode_Line(item), key, AeronConfigNode_String(item, ""));
+				break;
+			}
+			set->ranges[weapon - CRAFT_SOUNDS_FIRST_WEAPON].entries[at] = (uint16_t)entry;
+		}
+		set->ranges[weapon - CRAFT_SOUNDS_FIRST_WEAPON].count = at == count ? (uint8_t)count : 0;
 	}
 }
 
@@ -265,12 +283,13 @@ static const CraftSoundsSet* CraftSounds_Model(unsigned int objectType) {
 void XwaCraftSounds_Interior(unsigned int objectType, int* engineSlot, int* baseFrequency,
 							 uint8_t* useHighQualityStep) {
 	const CraftSoundsSet* set = CraftSounds_Model(objectType);
+	int slot;
 
 	if (set != NULL && set->interior != 0) {
 		*engineSlot = s_interiorSlots[set->interior - 1];
 		*baseFrequency = s_interiorFrequencies[set->interior - 1];
-	} else if (XwaSoundBanks_Count(XWA_SOUND_BANK_INTERIOR) != 0) {
-		*engineSlot = XwaSoundBanks_Slot(XWA_SOUND_BANK_INTERIOR, objectType);
+	} else if ((slot = XwaSoundBanks_Slot(XWA_SOUND_BANK_INTERIOR, objectType)) != -1) {
+		*engineSlot = slot;
 		*baseFrequency = 11000;
 	} else {
 		return;
@@ -293,40 +312,36 @@ int XwaCraftSounds_FlyBy(unsigned int objectType, int stockSlot) {
 				return g_sound3DEnabled && g_sfxIds[slot + 1] != -1 ? slot + 1 : slot;
 		}
 	}
-	if (XwaSoundBanks_Count(XWA_SOUND_BANK_FLY_BY) != 0) {
-		return XwaSoundBanks_Slot(XWA_SOUND_BANK_FLY_BY, objectType);
-	}
-	return stockSlot;
+	slot = XwaSoundBanks_Slot(XWA_SOUND_BANK_FLY_BY, objectType);
+	return slot != -1 ? slot : stockSlot;
 }
 
 int XwaCraftSounds_Wash(unsigned int objectType, int stockSlot) {
 	const CraftSoundsSet* set = CraftSounds_Model(objectType);
 	int slot;
 
-	if ((set == NULL || set->wash == 0) && XwaSoundBanks_Count(XWA_SOUND_BANK_ENGINE_WASH) != 0 &&
+	if ((set == NULL || set->wash == 0) &&
 		(slot = XwaSoundBanks_Slot(XWA_SOUND_BANK_ENGINE_WASH, objectType)) != -1) {
 		return slot;
 	}
 	if (set != NULL && set->wash != 0) {
 		return set->wash == 2 ? SFX_ENGINE_WASH_CAPITAL : SFX_ENGINE_WASH_OTHER;
 	}
-	/* The type is past the bank's count: play the normal wash. */
-	return XwaSoundBanks_Count(XWA_SOUND_BANK_ENGINE_WASH) != 0 ? SFX_ENGINE_WASH_OTHER : stockSlot;
+	return stockSlot;
 }
 
 int XwaCraftSounds_TakeOff(unsigned int objectType, int stockSlot) {
 	const CraftSoundsSet* set = CraftSounds_Model(objectType);
 	int slot;
 
-	if ((set == NULL || set->takeOff == 0) && XwaSoundBanks_Count(XWA_SOUND_BANK_TAKE_OFF) != 0 &&
+	if ((set == NULL || set->takeOff == 0) &&
 		(slot = XwaSoundBanks_Slot(XWA_SOUND_BANK_TAKE_OFF, objectType)) != -1) {
 		return slot;
 	}
 	if (set != NULL && set->takeOff != 0) {
 		return set->takeOff == 2 ? 139 : 132;
 	}
-	/* The type is past the bank's count: play the landing gear sound. */
-	return XwaSoundBanks_Count(XWA_SOUND_BANK_TAKE_OFF) != 0 ? 132 : stockSlot;
+	return stockSlot;
 }
 
 int XwaCraftSounds_Hangar(XwaSoundBank bank, unsigned int objIdx, int stockSlot) {
@@ -341,24 +356,33 @@ int XwaCraftSounds_Hangar(XwaSoundBank bank, unsigned int objIdx, int stockSlot)
 int XwaCraftSounds_Explosion(unsigned int objIdx, int stockSlot) {
 	const MobileObject* mobj;
 	unsigned int objectType;
+	int length;
 	int slot;
 	int choice;
 
 	if (objIdx == 0xffffu || (mobj = g_objectTable[objIdx].mobj) == NULL ||
-		(objectType = mobj->sourceObjectType) == 0 || objectType >= OBJ_Count ||
-		(unsigned int)XwaSoundBanks_Count(XWA_SOUND_BANK_WEAPON_EXPLOSION) / 8 <= objectType) {
+		(objectType = mobj->sourceObjectType) == 0 || objectType >= OBJ_Count) {
 		return stockSlot;
 	}
+	length = XwaSoundBanks_ListLength(XWA_SOUND_BANK_WEAPON_EXPLOSION, objectType);
+	if (length == 0) {
+		slot =
+			XwaSoundBanks_Slot(XWA_SOUND_BANK_WEAPON_EXPLOSION, objectType * XWA_SOUND_BANKS_EXPLOSION_MAX);
+		return slot != -1 ? slot : stockSlot;
+	}
+	/* Like the game's picker, which has 8 sounds: a sound doesn't repeat
+	   until half of the sounds have played. */
 	if (s_explosionLeft[objectType] <= 0) {
-		s_explosionLeft[objectType] = 4;
+		s_explosionLeft[objectType] = length > 1 ? length / 2 : 1;
 		memset(s_explosionUsed[objectType], 0, sizeof s_explosionUsed[objectType]);
 	}
 	do {
-		choice = (int)(CraftSounds_Random() & 7);
-	} while (s_explosionUsed[objectType][choice] != 0);
+		choice = (int)(CraftSounds_Random() % (unsigned int)length);
+	} while (s_explosionUsed[objectType][choice] != 0 && length > 1);
 	s_explosionUsed[objectType][choice] = 1;
 	--s_explosionLeft[objectType];
-	slot = XwaSoundBanks_Slot(XWA_SOUND_BANK_WEAPON_EXPLOSION, objectType * 8 + (unsigned int)choice);
+	slot = XwaSoundBanks_Slot(XWA_SOUND_BANK_WEAPON_EXPLOSION,
+							  objectType * XWA_SOUND_BANKS_EXPLOSION_MAX + (unsigned int)choice);
 	return slot != -1 ? slot : stockSlot;
 }
 
@@ -510,6 +534,7 @@ int XwaCraftSounds_Weapon(unsigned int projectileObjIdx, int* sfxSlot) {
 	unsigned int shooter;
 	const CraftSoundsSet* set;
 	int entry;
+	int slot;
 
 	if (projectile->mobj == NULL) {
 		return 0;
@@ -525,21 +550,25 @@ int XwaCraftSounds_Weapon(unsigned int projectileObjIdx, int* sfxSlot) {
 	}
 	if (set != NULL && weapon >= CRAFT_SOUNDS_FIRST_WEAPON &&
 		weapon < CRAFT_SOUNDS_FIRST_WEAPON + CRAFT_SOUNDS_WEAPONS) {
-		const unsigned int first = set->ranges[weapon - CRAFT_SOUNDS_FIRST_WEAPON].first;
 		const unsigned int count = set->ranges[weapon - CRAFT_SOUNDS_FIRST_WEAPON].count;
 
-		if (count != 0 && first + count <= (unsigned int)XwaSoundBanks_Count(XWA_SOUND_BANK_WEAPON_RANGE)) {
-			*sfxSlot = XwaSoundBanks_Slot(XWA_SOUND_BANK_WEAPON_RANGE, first + CraftSounds_Random() % count);
+		if (count != 0) {
+			*sfxSlot = XwaSoundBanks_Slot(
+				XWA_SOUND_BANK_WEAPON_RANGE,
+				set->ranges[weapon - CRAFT_SOUNDS_FIRST_WEAPON].entries[CraftSounds_Random() % count]);
 			return 1;
 		}
 	}
 	entry = CraftSounds_WeaponEntry(weapon);
-	if (entry == -1 || XwaSoundBanks_Count(XWA_SOUND_BANK_WEAPON) == 0) {
+	if (entry == -1 || shooter >= OBJ_Count) {
 		return 0;
 	}
-	*sfxSlot = shooter < (unsigned int)XwaSoundBanks_Count(XWA_SOUND_BANK_WEAPON) / 10
-				   ? XwaSoundBanks_Slot(XWA_SOUND_BANK_WEAPON, shooter * 10 + (unsigned int)entry)
-				   : -1;
+	slot = XwaSoundBanks_Slot(XWA_SOUND_BANK_WEAPON,
+							  shooter * XWA_SOUND_BANKS_WEAPON_GROUPS + (unsigned int)entry);
+	if (slot == -1) {
+		return 0;
+	}
+	*sfxSlot = slot;
 	return 1;
 }
 
@@ -551,36 +580,39 @@ static const CraftSoundsSet* CraftSounds_PlayerModel(unsigned int playerIdx, uns
 int XwaCraftSounds_HyperStart(unsigned int playerIdx, int stockSlot) {
 	unsigned int objectType;
 	const CraftSoundsSet* set = CraftSounds_PlayerModel(playerIdx, &objectType);
+	int slot;
 
 	if (set != NULL && set->hyper != 0) {
 		return set->hyper == 1 ? 118 : 115;
 	}
-	if (XwaSoundBanks_Count(XWA_SOUND_BANK_HYPER_START) != 0) {
-		return XwaSoundBanks_Slot(XWA_SOUND_BANK_HYPER_START, objectType);
-	}
-	return stockSlot;
+	slot = XwaSoundBanks_Slot(XWA_SOUND_BANK_HYPER_START, objectType);
+	return slot != -1 ? slot : stockSlot;
 }
 
 int XwaCraftSounds_HyperZoom(unsigned int playerIdx, int stockSlot) {
 	unsigned int objectType;
 	const CraftSoundsSet* set = CraftSounds_PlayerModel(playerIdx, &objectType);
+	int slot;
 
 	if (set != NULL && set->hyper != 0) {
 		return set->hyper == 3 ? 116 : -1;
 	}
-	if (XwaSoundBanks_Count(XWA_SOUND_BANK_HYPER_ZOOM) != 0) {
-		return XwaSoundBanks_Slot(XWA_SOUND_BANK_HYPER_ZOOM, objectType);
-	}
-	return stockSlot;
+	slot = XwaSoundBanks_Slot(XWA_SOUND_BANK_HYPER_ZOOM, objectType);
+	return slot != -1 ? slot : stockSlot;
 }
 
 int XwaCraftSounds_HyperEnd(unsigned int playerIdx, int interdicted, int stockSlot) {
 	const XwaSoundBank bank = interdicted ? XWA_SOUND_BANK_HYPER_ABORT : XWA_SOUND_BANK_HYPER_END;
+	const int slot = XwaSoundBanks_Slot(bank, g_objectTable[g_players[playerIdx].objectIndex].objectType);
 
-	if (XwaSoundBanks_Count(bank) != 0) {
-		return XwaSoundBanks_Slot(bank, g_objectTable[g_players[playerIdx].objectIndex].objectType);
-	}
-	return stockSlot;
+	return slot != -1 ? slot : stockSlot;
+}
+
+int XwaCraftSounds_SFoil(unsigned int playerIdx, int stockSlot) {
+	const int slot =
+		XwaSoundBanks_Slot(XWA_SOUND_BANK_S_FOIL, g_objectTable[g_players[playerIdx].objectIndex].objectType);
+
+	return slot != -1 ? slot : stockSlot;
 }
 
 int XwaCraftSounds_WashPlaying(int sfxSlot) {
@@ -613,26 +645,36 @@ int XwaCraftSounds_TargetSelect(unsigned int playerIdx, int stockSlot) {
 
 int XwaCraftSounds_HangarAmbient(unsigned int index) {
 	const int objectType = XwaHangars_CommandShipType();
-	const int count = XwaSoundBanks_Count(XWA_SOUND_BANK_HANGAR_AMBIENT);
+	const int length = objectType >= 0
+						   ? XwaSoundBanks_ListLength(XWA_SOUND_BANK_HANGAR_AMBIENT, (unsigned int)objectType)
+						   : 0;
+	const unsigned int first =
+		objectType >= 0 ? (unsigned int)objectType * XWA_SOUND_BANKS_HANGAR_AMBIENT_MAX : 0;
+	const int slot = objectType >= 0
+						 ? XwaSoundBanks_Slot(XWA_SOUND_BANK_HANGAR_AMBIENT,
+											  first + (length != 0 ? index % (unsigned int)length : 0))
+						 : -1;
 
 	if (objectType != s_hangarAmbientType) {
 		s_hangarAmbientType = objectType;
 		if (objectType < 0) {
 			Aeron_LogInfo("xwa.audio", "hangar ambience: no command ship, so the stock sounds play");
-		} else if (objectType >= count / 10) {
+		} else if (slot == -1) {
+			Aeron_LogInfo(
+				"xwa.audio",
+				"hangar ambience: the bank has no sounds for command ship %s, so the stock sounds play",
+				XwaNames_Name(&g_xwaObjectTypeNames, objectType));
+		} else if (length == 0) {
 			Aeron_LogInfo("xwa.audio",
-						  "hangar ambience: command ship type %d has no bank entries, so the stock "
-						  "sounds play",
-						  objectType);
+						  "hangar ambience: the bank doesn't list command ship %s and unlisted is silent, so "
+						  "no sound plays",
+						  XwaNames_Name(&g_xwaObjectTypeNames, objectType));
 		} else {
-			Aeron_LogInfo("xwa.audio", "hangar ambience: the bank entries of command ship type %d",
-						  objectType);
+			Aeron_LogInfo("xwa.audio", "hangar ambience: playing the bank sounds of command ship %s",
+						  XwaNames_Name(&g_xwaObjectTypeNames, objectType));
 		}
 	}
-	if (objectType >= 0 && objectType < count / 10) {
-		return XwaSoundBanks_Slot(XWA_SOUND_BANK_HANGAR_AMBIENT, (unsigned int)objectType * 10 + index);
-	}
-	return 151 + (int)index;
+	return slot != -1 ? slot : 151 + (int)index;
 }
 
 /* Converts metres to game units (40.96 units per metre), rounding towards
@@ -683,7 +725,6 @@ static void CraftSounds_StopAmbient(int soundId) {
 
 void XwaCraftSounds_UpdateAmbient(void) {
 	const PlayerData* player = &g_players[g_localPlayer];
-	const int count = XwaSoundBanks_Count(XWA_SOUND_BANK_STARSHIP_AMBIENT);
 	const int playerObjIdx = player->mapCameraState ? player->altViewObjectIdx : player->objectIndex;
 	uint32_t first;
 	uint32_t end;
@@ -692,7 +733,8 @@ void XwaCraftSounds_UpdateAmbient(void) {
 	int touchedCount = 0;
 	int i;
 
-	if (!XwaMissionSettings_StarshipAmbientSounds() || count == 0 || !g_flightConfSfxEnabled) {
+	if (!XwaMissionSettings_StarshipAmbientSounds() || !XwaSoundBanks_Has(XWA_SOUND_BANK_STARSHIP_AMBIENT) ||
+		!g_flightConfSfxEnabled) {
 		return;
 	}
 	if ((playerObjIdx & 0xffff) == 0xffff || g_inHangarReady || g_missionRegionCount <= 0) {
@@ -715,7 +757,7 @@ void XwaCraftSounds_UpdateAmbient(void) {
 		int soundId;
 		float distance;
 
-		if (objectType == 0 || objectType >= (unsigned int)count || object->mobj == NULL ||
+		if (objectType == 0 || objectType >= OBJ_Count || object->mobj == NULL ||
 			object->regionIdx != player->regionIndex || object->playerOwnerIdx == g_localPlayer) {
 			continue;
 		}

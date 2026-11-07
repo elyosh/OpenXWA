@@ -8,6 +8,7 @@
 #include "xwa_remaster/hud_fixed.h"
 #include "xwa_remaster/hud_layout.h"
 #include "xwa_remaster/hud_text.h"
+#include "xwa_runtime/models/names.h"
 
 #include <math.h>
 #include <string.h>
@@ -57,6 +58,9 @@ typedef struct DcRect {
 	float width, height, x0, y0, x1, y1;
 	const char* name;
 } DcRect;
+
+/* The rectangles follow the order of the screen source names. */
+typedef char dc_sources_check[(XWA_DC_SOURCE_COUNT == XWA_SCREEN_SOURCE_COUNT) ? 1 : -1];
 
 /* Dynamic_Cockpit_Internal_Areas.cfg source_def / screen_def lines in index
  * order, with four rectangles replaced by fixed values. Each anchor is the
@@ -924,6 +928,28 @@ void XwaRemasterDc_AddFill(AeronDrawList2D* screen, XwaRemasterDcLayer layer, fl
 	const DcFill fill = { x, y, w, h, rgba, blend };
 	const float bounds[4] = { x, y, x + w, y + h };
 	dc_route(screen, layer, bounds, scissor, dc_emit_fill, &fill);
+}
+
+static void dc_emit_rrect(AeronDrawList2D* list, const void* record, int dx, int dy,
+						  const AeronRectI* scissor) {
+	AeronDrawList2DRRect rrect = *(const AeronDrawList2DRRect*)record;
+	rrect.dst_x += (float)dx;
+	rrect.dst_y += (float)dy;
+	rrect.scissor = dc_scissor_set(scissor) ? *scissor : (AeronRectI) { 0 };
+	AeronDrawList_AddRRect(list, &rrect);
+}
+
+void XwaRemasterDc_AddRRect(AeronDrawList2D* screen, XwaRemasterDcLayer layer,
+							const AeronDrawList2DRRect* rrect) {
+	if (!screen || !rrect)
+		return;
+	if (!dc_routing()) {
+		AeronDrawList_AddRRect(screen, rrect);
+		return;
+	}
+	const float bounds[4] = { rrect->dst_x, rrect->dst_y, rrect->dst_x + rrect->dst_w,
+							  rrect->dst_y + rrect->dst_h };
+	dc_route(screen, layer, bounds, &rrect->scissor, dc_emit_rrect, rrect);
 }
 
 /* ---- Frame end ----------------------------------------------------- */

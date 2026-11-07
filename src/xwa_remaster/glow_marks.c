@@ -56,8 +56,13 @@ static int blast_mark_frame(const XwaGlowMark* mark, const XwaSnapshot* snapshot
 		!frames_mode) {
 		return 0;
 	}
+	/* In effects.yaml, image n of blast mark group 3050 is blast_mark.<n>,
+	   counting from 1. */
 	char key[32];
-	snprintf(key, sizeof key, "%d-%d", group, mark->texture_frame - 1);
+	if (group != 3050) {
+		return 0;
+	}
+	snprintf(key, sizeof key, "blast_mark.%d", mark->texture_frame);
 	const int index = AeronEffectData_FindImage(effect_data, key);
 	if (index < 0) {
 		return 0;

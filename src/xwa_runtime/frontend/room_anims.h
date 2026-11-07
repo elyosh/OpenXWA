@@ -1,33 +1,14 @@
 #ifndef XWA_RUNTIME_FRONTEND_ROOM_ANIMS_H
 #define XWA_RUNTIME_FRONTEND_ROOM_ANIMS_H
 
-/* Room animations from frontend/animations.yaml.
+/* Room animations: videos that play over a room's art, such as the ships
+ * that pass the concourse windows. The mod documentation describes the keys.
  *
- * These are videos played over a room's art, such as the ships passing the
- * concourse windows. The file lists groups of animations:
- *
- *   version: 1
- *   groups:
- *     - room: concourse
- *       repeat: random        # or same
- *       delay: [0, 14.5]      # seconds before each play
- *       animations:
- *         - video: window.webm  # in frontend/animations/
- *           at: [0, 0]          # design pixels
- *           size: [2560, 300]   # optional
- *           fps: 24             # optional: frames per second; the file's rate by default
- *           sound: window.wav   # optional: in frontend/animations/, played at the start of each play
- *           missions: [7, 8]    # optional: all, a list, or {except: [...]}
- *
- * Each group plays one animation at a time. When the room is entered, each
- * group picks a random animation from those allowed in the current mission.
- * After each play, the group picks again (`repeat: random`, the default) or
- * plays the same one again (`repeat: same`). Before each play it waits for a
- * random time within `delay`, which can also be a single number of seconds.
- * By default there is no wait. Without `size`, a video is drawn at its pixel
- * size divided by `scale` (1 by default). Groups are drawn in file order. If
- * the file has an error, the error is logged with its line and the whole file
- * is ignored. */
+ * The animations come in groups, and each group plays one animation at a
+ * time. When the player enters the room, each group picks a random animation
+ * among those allowed in the current mission. After each play, the group
+ * picks again or plays the same one again, after a random wait. Groups are
+ * drawn in file order. A file with an error is ignored as a whole. */
 
 #ifdef __cplusplus
 extern "C" {

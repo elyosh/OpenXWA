@@ -3,6 +3,10 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "aeron/numeric.h"
+#include "xwa_runtime/config/modern_camera_options.h"
+#include "xwa_runtime/config/modern_speed_effect_options.h"
+#include "xwa_runtime/config/modern_sun_options.h"
+#include "xwa_runtime/config/modern_target_readout_options.h"
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
@@ -348,88 +352,21 @@ static int host_config_captured_lighting(const AeronConfigFile* config, int requ
 	return 1;
 }
 
-/* Reads the camera section. In the shipped file, `required` makes every key
- * required. `override_mask` gets a bit for each key that the file sets. */
-static int host_config_camera_options(const AeronConfigFile* config, int required,
-									  XwaModernCameraOptions* out, unsigned int* override_mask, char* error,
-									  size_t error_size) {
-	size_t count;
-	const XwaModernCameraOptionKey* keys = XwaModernCameraOptions_Keys(&count);
-	char key[64];
+/* Reads the option sections: from the shipped file when `required` is set,
+ * else from the player's file. */
+static int host_config_option_sections(const AeronConfigFile* config, int required, char* error,
+									   size_t error_size) {
+	XwaOptionSection* const sections[] = {
+		XwaModernCameraOptions_Section(),
+		XwaModernSunOptions_Section(),
+		XwaModernSpeedEffectOptions_Section(),
+		XwaModernTargetReadoutOptions_Section(),
+	};
 
-	*override_mask = 0;
-	for (size_t i = 0; i < count; ++i) {
-		snprintf(key, sizeof key, "camera.%s", keys[i].name);
-		const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
-		if (!node) {
-			if (required) {
-				return host_config_error(error, error_size,
-										 "missing required remaster/config.yaml setting '%s'", key);
-			}
-			continue;
+	for (size_t i = 0; i < sizeof sections / sizeof sections[0]; ++i) {
+		if (!XwaOptionSection_ReadConfig(sections[i], config, required, error, error_size)) {
+			return 0;
 		}
-		if (keys[i].is_switch) {
-			if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
-				return host_config_error(error, error_size, "invalid '%s': expected true or false", key);
-			}
-			*(int*)((char*)out + keys[i].offset) = AeronConfigNode_Bool(node, 0);
-		} else {
-			const double value = AeronConfigNode_Float(node, NAN);
-			if (!isfinite(value) || value < keys[i].min || value > keys[i].max) {
-				if (error && error_size) {
-					snprintf(error, error_size, "invalid '%s': expected a number from %g to %g", key,
-							 (double)keys[i].min, (double)keys[i].max);
-				}
-				return 0;
-			}
-			*(float*)((char*)out + keys[i].offset) = (float)value;
-		}
-		*override_mask |= 1u << i;
-	}
-	return 1;
-}
-
-/* Reads the suns section. In the shipped file, `required` makes every key
- * required. The player's file is read without `required`, and only for the
- * keys that the player can set. `override_mask` gets a bit for each key that
- * the file sets. */
-static int host_config_sun_options(const AeronConfigFile* config, int required, XwaModernSunOptions* out,
-								   unsigned int* override_mask, char* error, size_t error_size) {
-	size_t count;
-	const XwaModernSunOptionKey* keys = XwaModernSunOptions_Keys(&count);
-	char key[64];
-
-	*override_mask = 0;
-	for (size_t i = 0; i < count; ++i) {
-		if (!required && !keys[i].player) {
-			continue;
-		}
-		snprintf(key, sizeof key, "suns.%s", keys[i].name);
-		const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
-		if (!node) {
-			if (required) {
-				return host_config_error(error, error_size,
-										 "missing required remaster/config.yaml setting '%s'", key);
-			}
-			continue;
-		}
-		if (keys[i].is_switch) {
-			if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
-				return host_config_error(error, error_size, "invalid '%s': expected true or false", key);
-			}
-			*(int*)((char*)out + keys[i].offset) = AeronConfigNode_Bool(node, 0);
-		} else {
-			const double value = AeronConfigNode_Float(node, NAN);
-			if (!isfinite(value) || value < keys[i].min || value > keys[i].max) {
-				if (error && error_size) {
-					snprintf(error, error_size, "invalid '%s': expected a number from %g to %g", key,
-							 (double)keys[i].min, (double)keys[i].max);
-				}
-				return 0;
-			}
-			*(float*)((char*)out + keys[i].offset) = (float)value;
-		}
-		*override_mask |= 1u << i;
 	}
 	return 1;
 }
@@ -472,12 +409,9 @@ static int host_config_load_shipped_config(AeronVfs* vfs, XwaHostConfig* out, ch
 		AeronConfigFile_Destroy(config);
 		return host_config_error(error, error_size, "shipped configuration root must be a mapping: %s", path);
 	}
-	unsigned int camera_mask;
-	unsigned int sun_mask;
 	valid = host_config_remaster_options(config, 1, out, error, error_size) &&
 			host_config_input_options(config, 1, &out->input_options, error, error_size) &&
-			host_config_camera_options(config, 1, &out->camera_options, &camera_mask, error, error_size) &&
-			host_config_sun_options(config, 1, &out->sun_options, &sun_mask, error, error_size);
+			host_config_option_sections(config, 1, error, error_size);
 	if (valid) {
 		out->input_defaults = out->input_options;
 	}
@@ -1167,7 +1101,6 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		const AeronConfigNode* environment_maps = AeronConfigFile_GetNode(config, "environment_maps");
 		const AeronConfigNode* video = AeronConfigFile_GetNode(config, "video");
 		const AeronConfigNode* input = AeronConfigFile_GetNode(config, "input");
-		const AeronConfigNode* camera = AeronConfigFile_GetNode(config, "camera");
 		if (version &&
 			(AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1)) {
 			AeronConfigFile_Destroy(config);
@@ -1197,10 +1130,6 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 			AeronConfigFile_Destroy(config);
 			return host_config_error(error, error_size, "'input' must be a mapping in %s", path);
 		}
-		if (camera && AeronConfigNode_Type(camera) != AERON_CONFIG_MAP) {
-			AeronConfigFile_Destroy(config);
-			return host_config_error(error, error_size, "'camera' must be a mapping in %s", path);
-		}
 	}
 	if (AeronConfigFile_GetNode(config, "paths.resources")) {
 		Aeron_LogWarn("xwa.config",
@@ -1220,10 +1149,7 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 								  error_size) &&
 		host_config_validate_input_maps(config, error, error_size) &&
 		host_config_input_options(config, 0, &out->input_options, error, error_size) &&
-		host_config_camera_options(config, 0, &out->camera_player_options, &out->camera_override_mask, error,
-								   error_size) &&
-		host_config_sun_options(config, 0, &out->sun_player_options, &out->sun_override_mask, error,
-								error_size);
+		host_config_option_sections(config, 0, error, error_size);
 	AeronConfigFile_Destroy(config);
 	return valid;
 }
@@ -1648,17 +1574,17 @@ int XwaHostConfig_SaveVideoOptions(AeronVfs* vfs, const XwaModernVideoOptions* o
 	return host_config_save_user_document(vfs, document, error, error_size);
 }
 
-int XwaHostConfig_SaveCameraEnabled(AeronVfs* vfs, int enabled, char* error, size_t error_size) {
+int XwaHostConfig_SaveSwitch(AeronVfs* vfs, const char* key, int value, char* error, size_t error_size) {
 	AeronConfigFile* document = NULL;
 	AeronConfigError config_error = { 0 };
 
-	if (!vfs) {
-		return host_config_error(error, error_size, "cannot save the camera switch to %s", "config.yaml");
+	if (!vfs || !key) {
+		return host_config_error(error, error_size, "cannot save a switch to %s", "config.yaml");
 	}
 	if (!host_config_prepare_user_document(vfs, &document, error, error_size)) {
 		return 0;
 	}
-	if (!AeronConfigFile_SetBool(document, "camera.enabled", enabled != 0, &config_error)) {
+	if (!AeronConfigFile_SetBool(document, key, value != 0, &config_error)) {
 		AeronConfigFile_Destroy(document);
 		return host_config_error(error, error_size, "could not update user configuration: %s",
 								 config_error.message);

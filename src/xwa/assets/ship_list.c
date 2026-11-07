@@ -157,14 +157,19 @@ int ShipList_Load(void) {
 				   rectangles come from their atlas regions instead of
 				   SHIPLIST.TXT. All sheets share the same rectangles, so they
 				   are read from the grey sheet. */
-				const XwaGeometryRegion* region = XwaFrontendGeometry_FindRegion(
-					XwaFrontendGeometry_FindFile("frontres\\mapicons\\licons.bmp"), (int)i);
+				const XwaGeometryAtlas* atlas =
+					XwaFrontendGeometry_FindFile("frontres\\mapicons\\licons.bmp");
+				const XwaGeometryRegion* region = XwaFrontendGeometry_FindRegion(atlas, (int)i);
 
 				if (region != NULL) {
-					g_shipList[g_shipCount].iconRect.left = XwaFrontendGeometry_UnitX(region->rect[0]);
-					g_shipList[g_shipCount].iconRect.top = XwaFrontendGeometry_UnitY(region->rect[1]);
-					g_shipList[g_shipCount].iconRect.right = XwaFrontendGeometry_UnitX(region->rect[2]);
-					g_shipList[g_shipCount].iconRect.bottom = XwaFrontendGeometry_UnitY(region->rect[3]);
+					g_shipList[g_shipCount].iconRect.left =
+						XwaFrontendGeometry_AtlasUnitX(atlas, region->rect[0]);
+					g_shipList[g_shipCount].iconRect.top =
+						XwaFrontendGeometry_AtlasUnitY(atlas, region->rect[1]);
+					g_shipList[g_shipCount].iconRect.right =
+						XwaFrontendGeometry_AtlasUnitX(atlas, region->rect[2]);
+					g_shipList[g_shipCount].iconRect.bottom =
+						XwaFrontendGeometry_AtlasUnitY(atlas, region->rect[3]);
 				}
 			}
 #endif

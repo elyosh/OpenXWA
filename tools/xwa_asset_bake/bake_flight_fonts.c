@@ -89,7 +89,7 @@ static int bake_tier(const BakeFlightFontsOptions* opt, int tier, const Xwa2dFon
 		ok = write_fnt(path, font, scale);
 	}
 	if (ok)
-		ToolLog_Write(TOOL_LOG_INFO, "flight font tier %d -> %s.{ktx2,fnt}", tier, base);
+		ToolLog_Write(TOOL_LOG_DETAIL, "flight font tier %d -> %s.{ktx2,fnt}", tier, base);
 	return ok;
 }
 

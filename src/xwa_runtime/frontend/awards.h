@@ -1,38 +1,19 @@
 #ifndef XWA_RUNTIME_FRONTEND_AWARDS_H
 #define XWA_RUNTIME_FRONTEND_AWARDS_H
 
-/* Medals, Kalidor Crescent levels, promotion thresholds and family-room
- * mementos from frontend/awards.yaml.
+/* A mod's awards: the names of the battle medals, the Kalidor Crescent
+ * levels and their thresholds, the rank and rating thresholds, and the
+ * mementos of the family room. The mod documentation describes the keys.
  *
- *     version: 1
- *     battle_medals:            # names, by medal in medals.txt order
- *       - { name: 'Medal of Redemption' }
- *     kalidor:                  # one entry per level
- *       - { points: 5000, name: 'First Initiate' }
- *     rank_thresholds: [7500, 15000, 25000]
- *     rating_thresholds: [100, 200, 350]
- *     mementos:                 # by Tour of Duty mission index
- *       images: { 9: 'frontres\medals\tf.bmp' }
- *       names: { 9: 'TIE Fighter Model' }
- *
- * The file is read once. Keys are optional, and a missing key keeps the
- * stock behaviour. If the file has an error, the error is logged with its
- * line and the whole file is ignored.
- *
- * - `battle_medals` only names the medals. medals.txt still sets how many
- *   there are and which missions give them.
- * - `kalidor` sets the number of levels, up to 100, and each level's
- *   threshold in whole bonus points. A level without `points` keeps its
- *   stock threshold, so only the first 6 levels can leave it out.
- * - `rank_thresholds` (up to 8 values) and `rating_thresholds` (up to 25)
- *   replace the stock values in order. A shorter list keeps the stock values
- *   for the rest.
- * - `mementos.images` replaces the stock detail images. A mission that isn't
- *   listed then has no detail image and can't be clicked.
- *   `mementos.names` sets the tooltip and the title of the detail view.
- *
- * A name that the file doesn't set is the stock text when the game has one,
- * and empty otherwise. */
+ * The game reads the mod's awards file once. A missing key keeps the stock
+ * behaviour, and a file with an error is ignored as a whole. The medal list
+ * of the game still sets how many battle medals there are and which missions
+ * give them. A Kalidor level without a threshold keeps its stock one, so
+ * only the first 6 levels can leave it out. A threshold list shorter than
+ * the stock one keeps the stock values of the levels it doesn't reach. The
+ * Lady Blue and cologne missions are counted from 1. When the file doesn't
+ * name an award, the game uses its stock text if it has one, and an empty
+ * text otherwise. */
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,6 +48,19 @@ const char* XwaAwards_MementoImage(int mission);
 /* The number of memento sprites to load: the larger of 53 and the highest
  * mission in `mementos` plus one. */
 int XwaAwards_MementoSprites(void);
+
+/* The family-room items that a Tour of Duty mission unlocks. */
+typedef enum XwaAwardsUnlockItem {
+	XWA_AWARDS_LADY_BLUE,
+	XWA_AWARDS_COLOGNE,
+	XWA_AWARDS_UNLOCK_ITEMS,
+} XwaAwardsUnlockItem;
+
+/* The Tour of Duty mission, from 1, that unlocks `item`. `stock` is the
+ * stock mission. Returns 0 when the item is always unlocked. */
+int XwaAwards_UnlockMission(XwaAwardsUnlockItem item, int stock);
+/* Whether `item` is unlocked: its mission is completed or it has none. */
+int XwaAwards_Unlocked(XwaAwardsUnlockItem item, int stock);
 
 void XwaAwards_Shutdown(void);
 

@@ -265,11 +265,7 @@ uint8_t g_hudUseAlphaSpriteAtlas10100;
 int g_hudAlphaSpriteGroupOffset = 100;
 // GLOBAL: XWA 0x5A9608
 uint16_t g_shieldSilhouetteSpriteIdByObjectType[72] = {
-	0,    100,  200,  300,  400,  500,  600,  700,  800,  900,  1000, 1100, 1200, 1300, 1400,
-	1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600, 2700, 2800, 2900,
-	0,    3000, 3100, 0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,    0,
-	0,    0,    0,    0,    0,    3200, 3300, 3400, 3500, 3600, 3700, 3800, 3900, 4000, 4000,
-	4100, 4200, 4300, 4400, 4500, 4600, 0,    0,    0,    0,    0,    0,
+#include "shield_silhouettes.inc"
 };
 // GLOBAL: XWA 0x68C550
 int32_t g_reticleLaserHardpointCount;
@@ -378,13 +374,13 @@ int g_panelLastBeamThreatVoiceTime;
 // GLOBAL: XWA 0x68C968
 int g_incomingMissileWarningFlashFrame;
 // GLOBAL: XWA 0x5A96D4
-const HudThreatIndicatorSlot g_hudThreatIndicatorSlotCenter = HUD_THREAT_INDICATOR_CENTER;
+const HudThreatIndicatorSlot g_hudThreatIndicatorSlotLaser = HUD_THREAT_INDICATOR_LASER;
 // GLOBAL: XWA 0x5A96D8
-const HudThreatIndicatorSlot g_hudThreatIndicatorSlotLeft = HUD_THREAT_INDICATOR_LEFT;
+const HudThreatIndicatorSlot g_hudThreatIndicatorSlotTurret = HUD_THREAT_INDICATOR_TURRET;
 // GLOBAL: XWA 0x5A96DC
-const HudThreatIndicatorSlot g_hudThreatIndicatorSlotRight = HUD_THREAT_INDICATOR_RIGHT;
+const HudThreatIndicatorSlot g_hudThreatIndicatorSlotBeam = HUD_THREAT_INDICATOR_BEAM;
 // GLOBAL: XWA 0x5A96E0
-const HudThreatIndicatorSlot g_hudThreatIndicatorSlotBottom = HUD_THREAT_INDICATOR_BOTTOM;
+const HudThreatIndicatorSlot g_hudThreatIndicatorSlotWarhead = HUD_THREAT_INDICATOR_WARHEAD;
 // GLOBAL: XWA 0x68C568
 void* g_hudSystemMessagePaneSurface;
 // GLOBAL: XWA 0x68C56C
@@ -10354,21 +10350,21 @@ void Hud_UpdateThreatIndicators(void) {
 	}
 
 	if (g_useHardware3D) {
-		Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotCenter, laserThreatState);
-		Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotLeft, turretThreatState);
-		Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotRight, (uint16_t)beamThreatState);
+		Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotLaser, laserThreatState);
+		Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotTurret, turretThreatState);
+		Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotBeam, (uint16_t)beamThreatState);
 	} else {
-		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotCenter, laserThreatState);
-		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotLeft, turretThreatState);
-		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotRight, (uint16_t)beamThreatState);
+		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotLaser, laserThreatState);
+		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotTurret, turretThreatState);
+		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotBeam, (uint16_t)beamThreatState);
 	}
 
 	FlightLight_SetLocalPlayerPulseEnabled(2, (uint16_t)beamThreatState);
 	if (g_incomingMissileWarningFlashActive) {
 		if (g_useHardware3D) {
-			Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotBottom, 2);
+			Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotWarhead, 2);
 		} else {
-			Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotBottom, 2);
+			Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotWarhead, 2);
 		}
 
 		++g_incomingMissileWarningFlashFrame;
@@ -10377,9 +10373,9 @@ void Hud_UpdateThreatIndicators(void) {
 			g_incomingMissileWarningFlashActive = 0;
 		}
 	} else if (g_useHardware3D) {
-		Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotBottom, g_incomingMissileWarningState);
+		Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotWarhead, g_incomingMissileWarningState);
 	} else {
-		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotBottom, g_incomingMissileWarningState);
+		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotWarhead, g_incomingMissileWarningState);
 	}
 
 	FlightLight_SetLocalPlayerPulseEnabled(1, g_incomingMissileWarningState);
@@ -10421,7 +10417,7 @@ void Hud_DrawThreatIndicator2D(HudThreatIndicatorSlot indicatorSlot, int state) 
 	}
 
 	laserMode = player->selectedWeaponMode == 0;
-	if (indicatorSlot == g_hudThreatIndicatorSlotCenter) {
+	if (indicatorSlot == g_hudThreatIndicatorSlotLaser) {
 		frameOffset = state != 0 ? HUD_THREAT_2D_ALERT_FRAME_OFFSET : 0;
 		if (laserMode) {
 			Hud_DrawThreatIndicatorSprite((uint16_t)(10700 + frameOffset), -18, -28);
@@ -10430,7 +10426,7 @@ void Hud_DrawThreatIndicator2D(HudThreatIndicatorSlot indicatorSlot, int state) 
 		}
 	}
 
-	if (indicatorSlot == g_hudThreatIndicatorSlotLeft) {
+	if (indicatorSlot == g_hudThreatIndicatorSlotTurret) {
 		frameOffset = state != 0 ? HUD_THREAT_2D_ALERT_FRAME_OFFSET : 0;
 		if (laserMode) {
 			Hud_DrawThreatIndicatorSprite((uint16_t)(10900 + frameOffset), -8, -33);
@@ -10439,7 +10435,7 @@ void Hud_DrawThreatIndicator2D(HudThreatIndicatorSlot indicatorSlot, int state) 
 		}
 	}
 
-	if (indicatorSlot == g_hudThreatIndicatorSlotRight) {
+	if (indicatorSlot == g_hudThreatIndicatorSlotBeam) {
 		frameOffset = state != 0 ? HUD_THREAT_2D_ALERT_FRAME_OFFSET : 0;
 		if (laserMode) {
 			Hud_DrawThreatIndicatorSprite((uint16_t)(11100 + frameOffset), 9, -33);
@@ -10448,7 +10444,7 @@ void Hud_DrawThreatIndicator2D(HudThreatIndicatorSlot indicatorSlot, int state) 
 		}
 	}
 
-	if (indicatorSlot == g_hudThreatIndicatorSlotBottom) {
+	if (indicatorSlot == g_hudThreatIndicatorSlotWarhead) {
 		if (state == 0) {
 			frameOffset = 0;
 		} else if (state == 1) {
@@ -10468,19 +10464,19 @@ void Hud_DrawThreatIndicator2D(HudThreatIndicatorSlot indicatorSlot, int state) 
 // FUNCTION: XWA 0x477E50
 void Hud_DrawThreatIndicator3D(HudThreatIndicatorSlot indicatorSlot, int state) {
 	enum {
-		HUD_THREAT_LASER_CENTER_FRAME = 15,
-		HUD_THREAT_LASER_LEFT_FRAME = 16,
-		HUD_THREAT_LASER_RIGHT_FRAME = 17,
-		HUD_THREAT_LASER_BOTTOM_FRAME = 18,
-		HUD_THREAT_WARHEAD_CENTER_FRAME = 19,
-		HUD_THREAT_WARHEAD_LEFT_FRAME = 20,
-		HUD_THREAT_WARHEAD_RIGHT_FRAME = 21,
-		HUD_THREAT_WARHEAD_BOTTOM_FRAME = 22
+		HUD_THREAT_LASER_MODE_LASER_FRAME = 15,
+		HUD_THREAT_LASER_MODE_TURRET_FRAME = 16,
+		HUD_THREAT_LASER_MODE_BEAM_FRAME = 17,
+		HUD_THREAT_LASER_MODE_WARHEAD_FRAME = 18,
+		HUD_THREAT_WARHEAD_MODE_LASER_FRAME = 19,
+		HUD_THREAT_WARHEAD_MODE_TURRET_FRAME = 20,
+		HUD_THREAT_WARHEAD_MODE_BEAM_FRAME = 21,
+		HUD_THREAT_WARHEAD_MODE_WARHEAD_FRAME = 22
 	};
 
 	const int alertColor = (int)0xff10bc00u;
-	const int bottomWarnColor = (int)0xfffcd400u;
-	const int bottomLockColor = (int)0xffff0000u;
+	const int warheadWarnColor = (int)0xfffcd400u;
+	const int warheadLockColor = (int)0xffff0000u;
 	FlightTexQuad quad;
 	int localPlayer;
 	uint8_t laserMode;
@@ -10511,7 +10507,7 @@ void Hud_DrawThreatIndicator3D(HudThreatIndicatorSlot indicatorSlot, int state) 
 		return;
 	}
 
-	if (indicatorSlot == g_hudThreatIndicatorSlotCenter) {
+	if (indicatorSlot == g_hudThreatIndicatorSlotLaser) {
 		if (state == 0) {
 			color = (int)g_hudColors[0];
 		} else {
@@ -10520,16 +10516,16 @@ void Hud_DrawThreatIndicator3D(HudThreatIndicatorSlot indicatorSlot, int state) 
 		if (laserMode) {
 			quad.screenX = g_reticleDrawX - (uint16_t)g_hudLaserThreatSlot0OffsetX;
 			quad.screenY = g_screenHeight + (uint16_t)g_hudLaserThreatSlot0OffsetY - g_reticleDrawY;
-			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_LASER_CENTER_FRAME, 256);
+			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_LASER_MODE_LASER_FRAME, 256);
 		} else {
 			quad.screenX = g_reticleDrawX - (uint16_t)g_hudWarheadThreatSlot0OffsetX;
 			quad.screenY = g_screenHeight + (uint16_t)g_hudWarheadThreatSlot0OffsetY - g_reticleDrawY;
-			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_WARHEAD_CENTER_FRAME, 256);
+			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_WARHEAD_MODE_LASER_FRAME, 256);
 		}
 		RenderQuad_DrawModelTexture(OBJ_HudTextureGroup12000, &quad, color);
 	}
 
-	if (indicatorSlot == g_hudThreatIndicatorSlotLeft) {
+	if (indicatorSlot == g_hudThreatIndicatorSlotTurret) {
 		if (state == 0) {
 			color = (int)g_hudColors[0];
 		} else {
@@ -10538,16 +10534,16 @@ void Hud_DrawThreatIndicator3D(HudThreatIndicatorSlot indicatorSlot, int state) 
 		if (laserMode) {
 			quad.screenX = g_reticleDrawX - (uint16_t)g_hudLaserThreatSlot1OffsetX;
 			quad.screenY = g_screenHeight + (uint16_t)g_hudLaserThreatSlot1OffsetY - g_reticleDrawY;
-			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_LASER_LEFT_FRAME, 256);
+			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_LASER_MODE_TURRET_FRAME, 256);
 		} else {
 			quad.screenX = g_reticleDrawX - (uint16_t)g_hudWarheadThreatSlot1OffsetX;
 			quad.screenY = g_screenHeight + (uint16_t)g_hudWarheadThreatSlot1OffsetY - g_reticleDrawY;
-			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_WARHEAD_LEFT_FRAME, 256);
+			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_WARHEAD_MODE_TURRET_FRAME, 256);
 		}
 		RenderQuad_DrawModelTexture(OBJ_HudTextureGroup12000, &quad, color);
 	}
 
-	if (indicatorSlot == g_hudThreatIndicatorSlotRight) {
+	if (indicatorSlot == g_hudThreatIndicatorSlotBeam) {
 		if (state == 0) {
 			color = (int)g_hudColors[0];
 		} else {
@@ -10558,34 +10554,34 @@ void Hud_DrawThreatIndicator3D(HudThreatIndicatorSlot indicatorSlot, int state) 
 
 			quad.screenX = g_reticleDrawX + (uint16_t)g_hudLaserThreatSlot2OffsetX;
 			quad.screenY = g_screenHeight + (uint16_t)g_hudLaserThreatSlot2OffsetY - reticleY;
-			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_LASER_RIGHT_FRAME, 256);
+			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_LASER_MODE_BEAM_FRAME, 256);
 		} else {
 			quad.screenX = (uint16_t)g_hudWarheadThreatSlot2OffsetX;
 			quad.screenX += g_reticleDrawX;
 			quad.screenY = g_screenHeight + (uint16_t)g_hudWarheadThreatSlot2OffsetY - g_reticleDrawY;
-			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_WARHEAD_RIGHT_FRAME, 256);
+			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_WARHEAD_MODE_BEAM_FRAME, 256);
 		}
 		RenderQuad_DrawModelTexture(OBJ_HudTextureGroup12000, &quad, color);
 	}
 
-	if (indicatorSlot == g_hudThreatIndicatorSlotBottom) {
+	if (indicatorSlot == g_hudThreatIndicatorSlotWarhead) {
 		if (state == 0) {
 			color = (int)g_hudColors[0];
 		} else if (state == 1) {
-			color = bottomWarnColor;
+			color = warheadWarnColor;
 		} else {
-			color = bottomLockColor;
+			color = warheadLockColor;
 		}
 
 		if (laserMode) {
 			quad.screenX = (uint16_t)g_hudLaserThreatSlot3OffsetX;
 			quad.screenX += g_reticleDrawX;
 			quad.screenY = g_screenHeight + (uint16_t)g_hudLaserThreatSlot3OffsetY - g_reticleDrawY;
-			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_LASER_BOTTOM_FRAME, 256);
+			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_LASER_MODE_WARHEAD_FRAME, 256);
 		} else {
 			quad.screenX = g_reticleDrawX + (uint16_t)g_hudWarheadThreatSlot3OffsetX;
 			quad.screenY = g_screenHeight + (uint16_t)g_hudWarheadThreatSlot3OffsetY - g_reticleDrawY;
-			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_WARHEAD_BOTTOM_FRAME, 256);
+			FeDiskIo_SelectTextureFrame(OBJ_HudTextureGroup12000, HUD_THREAT_WARHEAD_MODE_WARHEAD_FRAME, 256);
 		}
 		RenderQuad_DrawModelTexture(OBJ_HudTextureGroup12000, &quad, color);
 	}
@@ -13321,6 +13317,9 @@ void Hud_DrawCmdTargetComponentLine(void) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	XwaSnapshotHud_NoteTargetComponentLine(meshType, showPercent, componentPercent);
+#endif
 	if (g_useHardware3D) {
 		FlightText_SetRenderOffset((int16_t)g_hudCmdPanelOriginX, (int16_t)g_hudCmdPanelOriginY);
 	} else {
@@ -13425,6 +13424,9 @@ void Hud_UpdateCMDText(void) {
 					showTargetDamage = 0;
 				}
 			}
+#ifdef XWA_MODERN
+			XwaSnapshotHud_NoteCmdTarget(showTargetDamage);
+#endif
 
 			if (g_useHardware3D) {
 				FlightText_SetRenderOffset((uint16_t)g_hudCmdPanelOriginX, (uint16_t)g_hudCmdPanelOriginY);
@@ -15970,9 +15972,8 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 			g_msgPtrs[0] = g_modelDefs[speciesIdx].longName;
 			g_msgPtrs[1] = g_missionFlightGroups[flightGroupIdx].fg.name;
 #ifdef XWA_MODERN
-			/* A mission that skips the hyperspace messages skips the "entering
-			   area" messages too. */
-			if (XwaMissionSettings_SkipHyperspacedMessages() > 0) {
+			/* A mission can hide the "entering area" messages. */
+			if (XwaMissionSettings_HideFriendlyArrivalMessages()) {
 				return;
 			}
 #endif
@@ -15986,7 +15987,7 @@ void msg_reportfgcreation(uint16_t flightGroupIdx, uint16_t speciesIdx) {
 		g_msgPtrs[1] = g_modelDefs[speciesIdx].longName;
 		g_msgPtrs[2] = g_missionFlightGroups[flightGroupIdx].fg.name;
 #ifdef XWA_MODERN
-		if (XwaMissionSettings_SkipHyperspacedMessages() > 0) {
+		if (XwaMissionSettings_HideFriendlyArrivalMessages()) {
 			return;
 		}
 #endif
@@ -16008,11 +16009,10 @@ void msg_emitCraftMessage(uint16_t objIdx, CraftData* craft, int16_t msgTemplate
 	int16_t craftNumber;
 
 #ifdef XWA_MODERN
-	/* A mission's choice to skip the hyperspace messages also decides whether
-	   message 143 is skipped. Without a choice, the stock rule skips it only in
-	   mission 49. */
-	if ((XwaMissionSettings_SkipHyperspacedMessages() >= 0
-			 ? !XwaMissionSettings_SkipHyperspacedMessages()
+	/* A mission can choose whether message 143 is hidden. Without a choice,
+	   the stock rule hides it only in mission 49. */
+	if ((XwaMissionSettings_HideHyperspaceExitMessages() >= 0
+			 ? !XwaMissionSettings_HideHyperspaceExitMessages()
 			 : g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 49) ||
 		msgTemplateId != 143 || g_objectTable[objIdx].genusId != 0) {
 #else

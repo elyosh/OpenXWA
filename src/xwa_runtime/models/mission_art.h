@@ -5,17 +5,12 @@
  *
  * A mod's mission can add image files (DATs) of its own. When such a file
  * replaces images that other files also have, the bake gives it a folder of
- * its own, resdata/mission_art/<name>/ in the mod folder, with an atlas for
- * each of its groups, next to the shared atlases in resdata/atlas. The
- * mission's file, flight/missions/<mission>.yaml, lists the files that the
- * mission adds, in its order:
- *
- *   resdata: ["planet2", "planetcustom", "backdrop_special"]
- *
- * A name with a folder in resdata/mission_art is the mission's own art. The
- * others are already in the shared atlases. While the mission plays, a group
- * is drawn from the first of its art folders that has it, and the other
- * groups from the shared atlases. */
+ * its own in the mod's mission art, with an atlas for each of its groups,
+ * next to the shared atlases. The `resdata` section of the mission file
+ * lists the files that the mission adds, in order. A name with a folder is
+ * the mission's own art. The others are already in the shared atlases.
+ * While the mission plays, a group is drawn from the first of its art
+ * folders that has it, and the other groups from the shared atlases. */
 
 #include <stdint.h>
 

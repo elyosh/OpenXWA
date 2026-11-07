@@ -1,80 +1,32 @@
 #ifndef XWA_RUNTIME_MODELS_WEAPON_RATES_H
 #define XWA_RUNTIME_MODELS_WEAPON_RATES_H
 
-/* Laser rates that a mod can set: how much charge a shot uses, how much
- * charge comes back at each power update, and the time between shots.
+/* Laser rates and other weapon values that a mod sets in the `weapons`
+ * section of its flight settings and in the `weapons` group of a model
+ * settings file: the laser charge rates and cooldown, the energy transfer,
+ * the AI torpedo limits, the impact spin and the ion system damage.
  *
- * The `weapons` section of flight/flight.yaml sets the rates for every
- * craft. A model settings file can change any of them for
- * its craft. All keys are optional:
+ * Each value comes from the craft's model first, then from the flight
+ * settings, then from the stock game. The rates replace the stock ones only
+ * when the flight settings have `rates` or a global percent, when the
+ * craft's model has `rates`, or when the craft's weapon profile sets the
+ * rate. Otherwise the stock code runs. The decharge rate only applies to the
+ * player's shots from laser racks of weapon types 1 to 3. AI shots still use
+ * 1 charge, as in the stock game. The cooldown applies to every craft.
  *
- *   weapons:
- *     rates: {decharge: 4, recharge: 2, cooldown: 47,
- *             decharge_percent: 100, recharge_percent: 100}
- *     decharge_percent: 100           # in flight/flight.yaml only
- *     recharge_percent: 100
+ * XwaWeaponRates_CanFire also applies two rules of the flight settings:
+ * fire_needs_decharge_rate and no_starship_fire_from_destroyed_racks.
  *
- * For each key, the game uses the value from the craft's model file. If
- * there is none, it uses the `rates` value from flight/flight.yaml, and if
- * that is missing too, the stock value:
- *   - decharge: 3 for the TIE Fighter and the TIE Bomber, 4 for other
- *     starfighters, 3 for other craft;
- *   - recharge: 3 for the TIE Fighter and the TIE Bomber, else 2;
- *   - cooldown: 47, about 0.2 seconds per laser fired;
- *   - the percents: 100.
- * The decharge rate is scaled by `rates.decharge_percent`, then by the
- * global `decharge_percent`. The recharge rate is scaled the same way.
+ * A weapon profile's rates take the place of the `rates` values, and the
+ * percents still scale them. A rack uses the rates of its weapon type, and
+ * the rates of its high-power type once its charge reaches the profile's
+ * high_power_charge.
  *
- * The rates replace the stock ones when flight/flight.yaml has `rates` or a
- * global percent, or when the craft's model file has `rates`. Otherwise the
- * stock code runs. The decharge rate only applies to the player's shots, and
- * only to laser racks of weapon types 1 to 3. AI shots still use 1 charge, as
- * in the stock game. The cooldown applies to every craft.
+ * With `system_damage`, or with the rates on, system damage stops at `max`.
+ * The stock game stops adding damage once it reaches 1000, but a hit can
+ * take it past 1000.
  *
- * Two rules of flight/flight.yaml also change when a craft can fire:
- *   - fire_needs_decharge_rate: a craft fires a base laser (types 280, 282
- *     and 284) only when the rack's charge is at least the craft's decharge
- *     rate, instead of above 0;
- *   - no_starship_fire_from_destroyed_racks: a freighter, starship,
- *     platform or satellite doesn't fire lasers or warheads from a rack
- *     whose mesh is destroyed.
- *
- * The same `weapons` section, in flight/flight.yaml or in a model file, has
- * other groups. They follow the same order: the model's value, then the value
- * of flight/flight.yaml, then the stock value. All keys are optional:
- *
- *   weapons:
- *     energy_transfer: {rate: 4, penalty: 0, laser_limit: 100, shield_limit: 800}
- *     ai_torpedoes: {per_pass: 6, per_target: 16}
- *     impact_spin: {enabled: true, speed_percent: 100, angle_percent: 100}
- *     system_damage: {max: 1000, 284: 1, 285: 2, 290: 4, 296: 30}
- *
- *   - energy_transfer changes how the player moves energy between the lasers
- *     and the shields. `rate` is the shield energy that one unit of laser
- *     charge is worth: 32 for the Missile Boat and 4 for other craft in the
- *     stock game. When the lasers charge the shields, each unit is worth
- *     `rate` minus `penalty`. `laser_limit` is the most laser charge that one
- *     key press moves, and `shield_limit` the most shield energy.
- *   - ai_torpedoes limits the warheads that an AI craft fires at a starship,
- *     a freighter, a platform or a similar target: `per_pass` in one attack
- *     run, and `per_target` homing on the target at once.
- *   - impact_spin decides whether a warhead hit spins the craft that it hits.
- *     The stock game uses the game option. `speed_percent` and
- *     `angle_percent` scale the spin.
- *   - system_damage changes the damage that ion weapons do to a craft's
- *     systems. `max` is the most system damage that the craft can take. The
- *     weapon keys give the damage of one hit of weapon types 284, 285, 290
- *     and 296. They come from the model of the craft that fired.
- *     With these values, or with the rates on, system damage stops at
- *     `max`. The stock game stops adding damage once it reaches 1000,
- *     but a hit can take it past 1000.
- * A weapon profile can set the decharge rate, the recharge rate and the
- * cooldown of each weapon type. Its values take the place of the `rates`
- * values, and the percents still scale them. A rack uses the rates of its
- * weapon type. Once its charge reaches the profile's high_power_charge, it
- * uses the rates of the next type, its high-power type.
- *
- * The rates and the rules change the simulation. So do the other groups. */
+ * Everything here changes the simulation. */
 
 #include <stdint.h>
 

@@ -561,13 +561,14 @@ static void scan_mods(ImporterUi* app) {
 			(entry->path[0] ? current[0] && XwaModList_SamePath(entry->path, current) : !current[0]);
 		if (in_use)
 			app->mod_in_use = i;
-		snprintf(app->mod_labels[i], sizeof app->mod_labels[i], "%s%s%s", entry->name,
-				 entry->complete ? "" : " (import not finished)", in_use ? " (in use)" : "");
+		const char* problem = entry->problem[0] ? entry->problem : NULL;
+		snprintf(app->mod_labels[i], sizeof app->mod_labels[i], "%s%s%s%s", entry->name, problem ? " - " : "",
+				 problem ? problem : "", in_use ? " (in use)" : "");
 		app->mod_items[i] = (AeronUiListItem) {
 			.id = i,
 			.label = app->mod_labels[i],
 			.detail = entry->path,
-			.flags = entry->complete ? AERON_UI_LIST_ITEM_NONE : AERON_UI_LIST_ITEM_DISABLED,
+			.flags = problem ? AERON_UI_LIST_ITEM_DISABLED : AERON_UI_LIST_ITEM_NONE,
 		};
 	}
 	if (app->mod_selected >= app->mods.count)
@@ -596,7 +597,7 @@ static void draw_mods(ImporterUi* app) {
 	AeronUi_BeginColumns(ui, 2, NULL);
 	const int selectable = app->config_ok && app->mod_selected < app->mods.count &&
 						   app->mod_selected != app->mod_in_use &&
-						   app->mods.entries[app->mod_selected].complete;
+						   app->mods.entries[app->mod_selected].state == XWA_MOD_READY;
 	if (AeronUi_ButtonEnabled(ui, "Use in OpenXWA", selectable))
 		use_mod(app, app->mods.entries[app->mod_selected].path, app->mods_message, sizeof app->mods_message);
 	AeronUi_NextColumn(ui);

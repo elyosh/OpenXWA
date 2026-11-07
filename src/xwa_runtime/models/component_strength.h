@@ -2,18 +2,8 @@
 #define XWA_RUNTIME_MODELS_COMPONENT_STRENGTH_H
 
 /* The strength of a model's components, from the `component_strength` group
- * of its model settings file:
- *
- *   component_strength: {gun_turret: 18, small_gun: 18, shield_generator: 36}
- *
- * The keys are mesh types, as in the MeshType enum: default, main_hull,
- * wing, fuselage, gun_turret, small_gun, engine, bridge, shield_generator,
- * energy_generator, launcher, communication_system, beam_system,
- * command_system, docking_platform, landing_platform, hangar, cargo_pod,
- * misc_hull, antenna, rotary_wing, rotary_gun_turret, rotary_launcher,
- * rotary_comm_system, rotary_beam_system, rotary_command_system, hatch,
- * custom, weapon_system_1, weapon_system_2, power_regenerator and reactor.
- * The values go from 0 to 255. A mesh type without a value keeps the game's
+ * of its model settings file. The keys are the mesh type names of the
+ * AERON_flight_model extension. A mesh type without a value keeps the game's
  * strength for that type.
  *
  * A new craft's components start with this strength, and the target display

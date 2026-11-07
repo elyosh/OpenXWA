@@ -18,8 +18,11 @@
 #include "import_internal.h"
 #include "material_checks.h"
 #include "stock_tables.h"
+#include "xwa_app/mod_format.h"
 #include "xwau_awards.h"
+#include "xwau_config.h"
 #include "xwau_craft.h"
+#include "xwau_cube_faces.h"
 #include "xwau_flight_settings.h"
 #include "xwau_game_files.h"
 #include "xwau_gunner_seats.h"
@@ -77,7 +80,7 @@ int XwaModImport_Overall(XwaModImportProgress* progress) {
 bool Import_Cancelled(ImportContext* ctx) { return Aeron_AtomicLoad(&ctx->progress->cancel) != 0; }
 
 bool Import_ShouldStop(ImportContext* ctx) {
-	return Import_Cancelled(ctx) || Aeron_AtomicLoad(&ctx->progress->failures) != 0;
+	return Import_Cancelled(ctx) || Aeron_AtomicLoad(&ctx->progress->failures) != 0 || ReportFatalMessage();
 }
 
 static void end_phase(ImportContext* ctx) {
@@ -219,6 +222,24 @@ static size_t count_opts(const char* dir) {
 	return opts;
 }
 
+/* Reads the name of a TFTC release, such as "TFTC Reimagined 1.4.0": the variant
+ * from Modname.txt and the version from line 1 of Mod-version-TFTC-TFTC.txt,
+ * "1.4.0.0", without its last ".0". */
+static bool read_tftc_release_name(const char* dir, char* out, size_t cap) {
+	char variant[128], version[64];
+	if (!read_line(dir, "Mod-version-TFTC-TFTC.txt", 1, version, sizeof version) ||
+		!read_line(dir, "Modname.txt", 1, variant, sizeof variant))
+		return false;
+	size_t dots = 0;
+	for (const char* c = version; *c; ++c)
+		dots += *c == '.';
+	const size_t length = strlen(version);
+	if (dots == 3 && length > 2 && strcmp(version + length - 2, ".0") == 0)
+		version[length - 2] = '\0';
+	snprintf(out, cap, "%s %s", variant, version);
+	return true;
+}
+
 bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* error, size_t error_cap) {
 	char path[IMPORT_PATH_CAP];
 	memset(info, 0, sizeof *info);
@@ -235,7 +256,8 @@ bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* er
 				 "the FlightModels folder.");
 		return false;
 	}
-	if (!read_line(source, "TFTCVersion.txt", 1, info->name, sizeof info->name) &&
+	if (!read_tftc_release_name(source, info->name, sizeof info->name) &&
+		!read_line(source, "TFTCVersion.txt", 2, info->name, sizeof info->name) &&
 		!read_line(source, "mod-version-XWAU-XWAU.txt", 2, info->name, sizeof info->name) &&
 		!read_line(source, "XWAUVersion.txt", 1, info->name, sizeof info->name)) {
 		size_t length = strlen(source);
@@ -385,7 +407,7 @@ static bool write_mod_yaml(ImportContext* ctx, bool complete) {
 	FILE* f = PathFormat(path, sizeof path, "%s/mod.yaml", options->mod) ? fopen(path, "w") : NULL;
 	if (!f)
 		return false;
-	fprintf(f, MOD_YAML_HEADER "\nversion: 1\nname: ");
+	fprintf(f, MOD_YAML_HEADER "\nversion: %d\nname: ", XWA_MOD_FORMAT_VERSION);
 	yaml_quoted(f, options->name && options->name[0] ? options->name : "Mod");
 	fprintf(f, "\ncomplete: %s\nsource: ", complete ? "true" : "false");
 	yaml_quoted(f, options->source);
@@ -454,9 +476,9 @@ static void place_libraries(ImportContext* ctx, ImportAuthoring* authoring) {
 			continue;
 		const ImportAuthoringState state = ImportAuthoring_State(authoring, rel);
 		if (state == IMPORT_AUTHORING_EDITED)
-			ToolLog_Write(TOOL_LOG_INFO, "%s: edited since its import, kept", rel);
+			ToolLog_Write(TOOL_LOG_DETAIL, "%s: edited since its import, kept", rel);
 		else if (state == IMPORT_AUTHORING_AUTHORED)
-			ToolLog_Write(TOOL_LOG_INFO, "%s: not made by the importer, kept", rel);
+			ToolLog_Write(TOOL_LOG_DETAIL, "%s: not made by the importer, kept", rel);
 		else {
 			cJSON* files = ImportAuthoring_Place(authoring, staged, rel);
 			if (files)
@@ -572,15 +594,25 @@ static void craft(ImportContext* ctx) {
 		Import_Failed(ctx, "The original game's ship lists couldn't be read.");
 		return;
 	}
+	XwauGameTables* mod = XwauGameTables_Load(options->source);
+	/* Rename the object types first, because every mod file uses their
+	   names. */
+	if (!XwauObjects_Rename(options->source, options->game, stock, mod, &ctx->names)) {
+		XwauGameTables_Free(mod);
+		XwauGameTables_Free(stock);
+		Import_Failed(ctx, "The computer ran out of memory.");
+		return;
+	}
 	XwauLines cockpits = { 0 };
 	XwauTextIds moved = { 0 };
-	bool ok = XwauCraft_Write(options->source, flight, &cockpits);
-	ok = XwauObjects_Write(options->source, options->game, stock, flight, &moved) &&
-		 XwauGunnerSeats_WriteCockpits(options->source, stock, flight, &cockpits) && ok;
+	bool ok = XwauCraft_Write(options->source, flight, &ctx->names, &ctx->stock_values, stock, &cockpits);
+	ok = XwauObjects_Write(options->source, options->game, stock, mod, &ctx->names, flight, &moved) && ok;
+	XwauGunnerSeats_CheckCockpits(options->source, flight, &cockpits);
+	XwauGameTables_Free(mod);
 	XwauGameTables_Free(stock);
 	XwauLines_Free(&cockpits);
 	ok = XwauText_Write(options->source, options->game, strings, &moved) && ok;
-	ok = XwauSoundBanks_Write(options->source, flight, game_files) && ok;
+	ok = XwauSoundBanks_Write(options->source, &ctx->names, flight, game_files) && ok;
 	XwauTextIds_Free(&moved);
 	if (!ok)
 		Import_Failed(ctx, "The craft settings couldn't be imported.");
@@ -602,7 +634,8 @@ static bool missions(ImportContext* ctx, bool* skyboxes) {
 		!PathFormat(folders, sizeof folders, "%s/skybox_folders.txt", ctx->work))
 		return true;
 	if (!XwauGameFiles_Copy(options->source, options->game, game_files) ||
-		!XwauFlightSettings_Write(options->source, flight) || !XwauAwards_Write(options->source, awards)) {
+		!XwauFlightSettings_Write(options->source, &ctx->names, &ctx->stock_values, flight) ||
+		!XwauAwards_Write(options->source, awards)) {
 		Import_Failed(ctx, "The mission files couldn't be imported.");
 		return true;
 	}
@@ -611,7 +644,9 @@ static bool missions(ImportContext* ctx, bool* skyboxes) {
 		Import_Failed(ctx, "The missions can't be read.");
 		return false;
 	}
-	const bool ok = XwauMissionFiles_Write(options->source, loaded, options->game, out);
+	const int design_scale[2] = { BAKE_XWAU_DESIGN_SCALE_X, BAKE_XWAU_DESIGN_SCALE_Y };
+	const bool ok =
+		XwauMissionFiles_Write(options->source, loaded, options->game, out, &ctx->names, design_scale);
 	XwauMissions_Free(loaded);
 	if (!ok) {
 		Import_Failed(ctx, "The mission files couldn't be imported.");
@@ -622,6 +657,17 @@ static bool missions(ImportContext* ctx, bool* skyboxes) {
 	else
 		*skyboxes = true;
 	return true;
+}
+
+enum { SKY_MAX_FACE_SIZE = 4096 };
+
+/* Returns the face size of a baked sky or overlay: the largest power of two
+ * that isn't larger than the source faces, up to SKY_MAX_FACE_SIZE. */
+static int sky_face_size(int source_size) {
+	int size = 16;
+	while (size * 2 <= source_size && size < SKY_MAX_FACE_SIZE)
+		size *= 2;
+	return size;
 }
 
 /* Converts each sky and overlay folder of the skybox list. Each line is
@@ -654,28 +700,40 @@ static void bake_skyboxes(ImportContext* ctx) {
 			PathFormat(diffuse, sizeof diffuse, "%s/diffuse.ktx2", textures) &&
 			PathFormat(specular, sizeof specular, "%s/specular.ktx2", textures) &&
 			PathFormat(overlay, sizeof overlay, "%s/overlay.ktx2", textures) && MakeDirs(textures)) {
+			const bool is_overlay = strcmp(fields[0], "overlay") == 0;
+			const char* folder = strrchr(fields[3], '/') ? strrchr(fields[3], '/') + 1 : fields[3];
+			/* The bake reads the XWAU faces in its own face layout. */
+			XwauCubeFaces faces;
+			char err[512];
+			const bool read = XwauCubeFaces_Read(fields[1], &faces, err, sizeof err);
+			if (!read)
+				ToolLog_Write(TOOL_LOG_ERROR, "%s", err);
+			const CubeFacePixels pixels = { fields[1],
+											faces.size,
+											{ faces.rgba[0], faces.rgba[1], faces.rgba[2], faces.rgba[3],
+											  faces.rgba[4], faces.rgba[5] } };
 			EnvBakeOptions bake;
 			EnvBake_DefaultOptions(&bake);
-			const bool is_overlay = strcmp(fields[0], "overlay") == 0;
+			bake.face_pixels = &pixels;
+			bake.radiance_size = sky_face_size(faces.size);
 			if (is_overlay) {
-				bake.overlay_faces_dir = fields[1];
 				bake.overlay_out = overlay;
 			} else {
-				bake.faces_dir = fields[1];
 				bake.name = fields[2];
 				bake.radiance_out = radiance;
 				bake.diffuse_out = diffuse;
 				bake.specular_out = specular;
 				bake.jobs = jobs;
 			}
-			const char* folder = strrchr(fields[3], '/') ? strrchr(fields[3], '/') + 1 : fields[3];
-			if ((is_overlay ? EnvBake_Overlay(&bake) : EnvBake_Sky(&bake)) == ENV_BAKE_OK)
+			if (read && (is_overlay ? EnvBake_Overlay(&bake) : EnvBake_Sky(&bake)) == ENV_BAKE_OK)
 				baked++;
 			else
 				Import_Failed(ctx,
 							  is_overlay ? "The overlay %s couldn't be converted."
 										 : "The skybox %s couldn't be converted.",
 							  folder);
+			if (read)
+				XwauCubeFaces_Free(&faces);
 		} else if (line[0])
 			Import_Failed(ctx, "The skybox list has a line that can't be read: \"%s\"", line);
 		Import_Advance(ctx, 1, -1);
@@ -696,7 +754,10 @@ static void bake_frontend(ImportContext* ctx) {
 									  .xwau_root = ctx->options->source,
 									  .stock_root = ctx->options->game };
 	BakeXwauStats stats = { 0 };
-	const int ok = BakeXwau_RunFrontend(&options, &stats);
+	BakeSprites_BeginQueue(ctx->cores);
+	const int baked = BakeXwau_RunFrontend(&options, &stats);
+	stats.failures += BakeSprites_EndQueue();
+	const int ok = baked && stats.failures == 0;
 	ToolLog_Write(
 		TOOL_LOG_INFO,
 		"Frontend art: %d atlases, %d HD frames, %d frames upscaled from standard images, %d files left "
@@ -713,11 +774,14 @@ static void bake_flight(ImportContext* ctx) {
 								  .scale = true,
 								  .bc7_quality = KTX2_BC7_QUALITY_MED,
 								  .group_filter = -1 };
-	const BakeXwauFlightOptions options = { .sprites = &sprites,
-											.xwau_root = ctx->options->source,
-											.planet_max = 2048 };
+	const BakeXwauFlightOptions options = {
+		.sprites = &sprites, .xwau_root = ctx->options->source, .planet_max = 0, .threads = ctx->cores
+	};
 	BakeXwauFlightStats stats = { 0 };
-	const int ok = BakeXwau_RunFlight(&options, &stats);
+	BakeSprites_BeginQueue(ctx->cores);
+	const int baked = BakeXwau_RunFlight(&options, &stats);
+	stats.failures += BakeSprites_EndQueue();
+	const int ok = baked && stats.failures == 0;
 	ToolLog_Write(
 		TOOL_LOG_INFO,
 		"Flight art: %d atlases with %d images, %d alternative frame sets, %d mission art folders, %d "
@@ -795,7 +859,7 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_HANGARS, 0);
 		XwauGameTables* stock = ImportStockTables_Create(options->game);
-		if (!stock || !XwauHangars_Write(options->source, stock, options->game, options->mod))
+		if (!stock || !XwauHangars_Write(options->source, stock, &ctx->names, options->game, options->mod))
 			Import_Failed(ctx, "The hangars couldn't be imported.");
 		XwauGameTables_Free(stock);
 	}
@@ -823,6 +887,8 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 
 XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModImportProgress* progress) {
 	ImportContext ctx = { .options = options, .progress = progress };
+	ImportStockTables_Names(&ctx.names);
+	ImportStockTables_Values(&ctx.stock_values);
 	ImportAuthoring authoring = { 0 };
 	const uint64_t start = Aeron_NowUs();
 	ctx.phase_start = start;
@@ -830,16 +896,28 @@ XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModIm
 	if (ctx.cores < 1)
 		ctx.cores = 1;
 	ImportLog_Open(progress, options);
+	ClearReportFatal();
+	/* The installation and the game folder don't change during the import,
+	   so each of their folders is read once. */
+	Xwau_SetFolderCache(true);
 
 	XwaModImportResult result = run_phases(&ctx, &authoring);
+	if (ReportFatalMessage()) {
+		Import_ListFailed(&ctx, "The mod can't be imported as it is: %s.", ReportFatalMessage());
+		Aeron_AtomicAdd(&progress->failures, 1);
+		result = XWA_MOD_IMPORT_STOPPED;
+	}
 	if (result == XWA_MOD_IMPORT_OK)
 		Import_Advance(&ctx, 0, 1000);
 	else if (result == XWA_MOD_IMPORT_STOPPED && Import_Cancelled(&ctx))
 		result = XWA_MOD_IMPORT_CANCELLED;
+	Xwau_SetFolderCache(false);
 	if (ctx.work[0] && !RemoveTree(ctx.work))
 		ToolLog_Write(TOOL_LOG_WARNING, "Can't delete %s", ctx.work);
 	ImportAuthoring_Free(&authoring);
+	XwauObjects_FreeRenames(&ctx.names);
 	end_phase(&ctx);
+	ReportUnsupportedSummary();
 	summary(&ctx, result, start);
 	SetReportProgram(NULL);
 	ImportLog_Close(progress);

@@ -10,6 +10,9 @@
 #include "xwa/frontend/frontend_wave_stream.h"
 #include "xwa/util/memory.h"
 #include "xwa/util/time.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/side_panels.h"
+#endif
 
 #include <stdint.h>
 #include <stdio.h>
@@ -786,6 +789,11 @@ int FrontendSound_PlayUISound(char* soundName, int allowRestartExisting, int loo
 	int loopFlag;
 	int playResult;
 
+#ifdef XWA_MODERN
+	if (XwaSidePanels_MutesSound(soundName)) {
+		return 0;
+	}
+#endif
 	if (g_frontendDirectSound == 0) {
 		return 0;
 	}

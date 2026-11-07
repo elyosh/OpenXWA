@@ -28,13 +28,12 @@ int XwaConcourseLayout_Rect(const char* key, float* x, float* y, float* width, f
  * "planet.top", in 640x480 units, not rounded. */
 float XwaConcourseLayout_X(const char* key, float stock);
 float XwaConcourseLayout_Y(const char* key, float stock);
-/* A plain number, such as "family_room.lady_blue_mission". */
-int XwaConcourseLayout_Int(const char* key, int stock);
 /* A switch, such as "starfield". */
 int XwaConcourseLayout_Bool(const char* key, int stock);
-/* Whether the loading screen's progress bar grows linearly
- * (`loading_screen.progress: linear`) instead of by the stock formula. */
-int XwaConcourseLayout_LinearProgress(void);
+/* Whether `loading_screen.progress_bar` is `even`: the progress bar grows by
+ * the same amount at each step. With `original`, the default, it grows like
+ * in the stock game. */
+int XwaConcourseLayout_EvenProgressBar(void);
 /* The squadron logo position for logo `id` ("briefing.squad_logos"). */
 int XwaConcourseLayout_SquadLogo(int id, float* x, float* y);
 
@@ -69,14 +68,6 @@ void XwaConcourseLayout_AssignRect(FrontendRect* rect, const char* key, int left
  * rectangle on the item drawn at that point. */
 void XwaConcourseLayout_AssignMovedRect(FrontendRect* rect, const char* key, int x, int y, int left, int top,
 										int right, int bottom);
-
-/* The Tour of Duty mission that unlocks an item when completed, such as
- * "family_room.lady_blue_mission". Missions start at 1, and `mission` is the
- * stock value. A value of 0 or less, or 255 or more, means always unlocked
- * and returns 0. */
-int XwaConcourseLayout_UnlockMission(const char* key, int mission);
-/* Whether the item is unlocked: its mission is completed or it has none. */
-int XwaConcourseLayout_Unlocked(const char* key, int mission);
 
 /* The medal case position of medal `index` from "medals.positions", in whole
  * units. If the list is too short for `index`, the position is (0, 0). Leaves

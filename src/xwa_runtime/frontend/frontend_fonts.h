@@ -1,25 +1,15 @@
 #ifndef XWA_RUNTIME_FRONTEND_FRONTEND_FONTS_H
 #define XWA_RUNTIME_FRONTEND_FRONTEND_FONTS_H
 
-/* Frontend fonts from frontend/fonts/fonts.yaml.
+/* Frontend fonts: a TrueType or OpenType font for the frontend text, for
+ * every font size or for single sizes. The mod documentation describes the
+ * keys.
  *
- * The file sets a TrueType or OpenType font for the frontend text:
- *
- *   version: 1
- *   default:                # for every font size without its own entry
- *     file: consolab.ttf    # in frontend/fonts/
- *     metrics: font         # game (the default) or font
- *     scale: 1.0            # optional: multiplies the font size
- *     spacing: 0.0          # optional: added to each advance with metrics: font, in em
- *     baseline: 0.0         # optional: moves the glyphs down, in em
- *   sizes:
- *     20: {scale: 0.95}     # the game's font size; missing keys come from default
- *
- * The game's font size is the em size in 640x480 units. With `metrics: game`
- * the text keeps the original layout, and each glyph is centred in the space
- * of the original glyph. With `metrics: font` the layout uses the font's
- * advances and line height. Game strings are Windows-1252. If the file has an
- * error, the error is logged with its line and the whole file is ignored.
+ * The game's font size is the em size in 640x480 units. With the game's
+ * metrics, the text keeps the original layout, and each glyph is centred in
+ * the space of the original glyph. With the font's metrics, the layout uses
+ * the font's advances and line height. Game strings are Windows-1252. A file
+ * with an error is ignored as a whole.
  *
  * Without the file, or for a size it doesn't set, the functions return the
  * original values. */

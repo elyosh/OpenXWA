@@ -1,51 +1,26 @@
 #ifndef XWA_RUNTIME_MODELS_CRAFT_HUD_H
 #define XWA_RUNTIME_MODELS_CRAFT_HUD_H
 
-/* Reads each craft's HUD settings and the hull and map icon lists from the
- * mod folder.
+/* Reads each craft's HUD settings from the `hud` group of a model settings
+ * file. From the mod's HUD file, it reads the icon tables, the place of the
+ * ammo icons and the settings of the target display, the target boxes, the
+ * radar and the target readout. They set the reticle images, the HUD
+ * colours, the hull and map icons, where the warhead and countermeasure
+ * icons are, how the target display draws the target, how the boxes and the
+ * radar blips look, and the target readout next to the target's box. The
+ * mod documentation describes the keys.
  *
- * flight/hud.yaml replaces the game's icon tables. Each list gives the image
- * id for each object type:
+ * The target readout settings go to the target readout options section.
  *
- *   version: 1
- *   hull_icons: [0, 2600, ...]
- *   map_icons: [0, 100, ...]
+ * Hull icons are images of group 26000, map icons of group 14800 and reticle
+ * parts of group 12000. A mod file counts images from 1. An object type that
+ * the icon tables don't list keeps its stock icon.
  *
- * The `hud` group of a model settings file holds the craft's own HUD settings.
- * All keys are optional:
+ * The edges style of the target display runs a Sobel filter on the luminance
+ * of the shaded display, in sRGB values.
  *
- *   hud:
- *     reticle: {5: 135, 6: 136}
- *     colors: {inner: 0xff00ff00, border: 0xff008000}
- *
- * `reticle` maps a reticle slot to the image of group 12000 that it draws,
- * given as a 1-based position in the group. `colors` sets the HUD's inner and
- * border colours, as ARGB.
- *
- * The `target_display` group of hud.yaml sets how the target display shows
- * the target:
- *
- *   target_display:
- *     style: edges            # or shaded, the default
- *     edges:
- *       luminance: [0.33, 0.5, 0.16]
- *       contrast: 3.0
- *       colors: iff           # or friend_foe
- *       iff: [[0.01, 0.45, 0.01], ...]   # six colours, by IFF 0 to 5
- *       friend: [0.01, 0.32, 0.01]
- *       foe: [0.32, 0.01, 0.01]
- *       other: [0.01, 0.01, 0.21]
- *
- * `shaded` shows the lit model. `edges` shows only its edges: a Sobel filter
- * on the luminance of the shaded display, in sRGB values, weighted by
- * `luminance` and scaled by `contrast`. The edges take the colour of the
- * target's IFF, or the friend or foe colour with `colors: friend_foe`.
- * `other` is the colour of a target without an IFF colour. Colours are
- * linear. With `edges`, every key is required, a 6-pixel border stays empty,
- * and the display is empty while the target is dying.
- *
- * The game reads hud.yaml once at startup. Without the files, the game uses
- * its own tables and colours. */
+ * The game reads the HUD file once at startup. Without the files, the game
+ * uses its own tables and colours. */
 
 #include <stddef.h>
 #include <stdint.h>
@@ -75,6 +50,24 @@ typedef struct XwaTargetDisplay {
 	float otherColor[3];
 } XwaTargetDisplay;
 
+/* The `radar` group of hud.yaml. The sizes are in points: 1/1080 of the
+   HUD's height. */
+typedef struct XwaRadarStyle {
+	/* The width of the round blips. 0 keeps the original game's blips. */
+	float blipSize;
+	/* The width of the yellow circle on the current target's blip. 0 keeps
+	   the original game's target marker. */
+	float targetSize;
+} XwaRadarStyle;
+
+/* The `ammo_icons` group of hud.yaml: the centres of the warhead and
+   countermeasure icons at the top of the HUD, in pixels of the original
+   game's 640x480 HUD, from its top left corner. */
+typedef struct XwaAmmoIcons {
+	float warheads[2];
+	float countermeasures[2];
+} XwaAmmoIcons;
+
 /* Reads flight/hud.yaml. */
 void XwaCraftHud_Init(void);
 /* Drops the previous mission's HUD settings. Called by the model settings
@@ -86,16 +79,15 @@ void XwaCraftHud_ClearModelSettings(void);
 void XwaCraftHud_ReadModelSettings(unsigned int objectType, const char* path,
 								   const struct AeronConfigNode* group);
 
-/* Returns the image id of the hull icon for `objectType`. With a
-   `hull_icons` list, it returns the list's value, or 0 for a type past the
-   end of the list. Without a list, it returns `stockId`. */
+/* Returns the image id of the hull icon for `objectType`, or 0 for no icon.
+   When `hull_icons` doesn't list the object type, returns `stockId`. */
 uint16_t XwaCraftHud_HullIcon(unsigned int objectType, uint16_t stockId);
 /* Works like XwaCraftHud_HullIcon, for the map icons and the `map_icons`
    list. */
 uint16_t XwaCraftHud_MapIcon(unsigned int objectType, uint16_t stockId);
 /* Replaces colors[0] (inner) and colors[1] (border) with the colours that
-   the model settings file of `objectType`'s model sets. A colour that the file doesn't set
-   stays the same. */
+   the model settings file of `objectType`'s model sets. A colour that the
+   file doesn't set stays the same. */
 void XwaCraftHud_Colors(unsigned int objectType, uint32_t colors[2]);
 /* Returns the image that reticle slot `slot` draws for `objectType`, as a
    1-based position in group 12000. Returns 0 when the craft doesn't change
@@ -103,6 +95,16 @@ void XwaCraftHud_Colors(unsigned int objectType, uint32_t colors[2]);
 int XwaCraftHud_Reticle(unsigned int objectType, int slot);
 /* The `target_display` group of hud.yaml, or the default: shaded. */
 const XwaTargetDisplay* XwaCraftHud_TargetDisplay(void);
+/* `target_boxes.line_width` of hud.yaml, in points: 1/1080 of the 3D view's
+   height. 0, the default, keeps the original game's target boxes. */
+float XwaCraftHud_TargetBoxLineWidth(void);
+/* The `radar` group of hud.yaml, or the default: the original game's
+   blips and marker. */
+const XwaRadarStyle* XwaCraftHud_Radar(void);
+/* The `ammo_icons` group of hud.yaml. A missing key keeps the original
+   game's place: 48 pixels left and 30 pixels right of the centre, 16 pixels
+   from the top. */
+const XwaAmmoIcons* XwaCraftHud_AmmoIcons(void);
 
 #ifdef __cplusplus
 }

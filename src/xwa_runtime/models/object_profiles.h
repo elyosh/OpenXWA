@@ -8,8 +8,10 @@
  * cockpit components past its own. A mission selects a profile per flight
  * group in its mission file (flight/missions/<mission path>.yaml in the mod
  * folder); Apply hides the selected
- * profile's components by marking them destroyed at spawn. The selections
- * are read at mission load, never when an object spawns. */
+ * profile's components by marking them destroyed at spawn. Objects without
+ * craft data, such as projectiles, have no component states to change:
+ * HideWithoutCraft gives the components to hide each time they are drawn.
+ * The selections are read at mission load, never when an object spawns. */
 
 #include <stddef.h>
 #include <stdint.h>
@@ -39,6 +41,16 @@ void XwaObjectProfiles_LoadMission(const char* missionPath, const struct XwaFlig
    selects nothing. No-op for stock models and a NULL craft. Reads no file. */
 void XwaObjectProfiles_Apply(uint16_t objectType, int flightGroupIdx, uint8_t markings,
 							 struct CraftData* craft);
+
+/* Hides the components of an object without craft data, such as a
+   projectile. For each component c below `count` that the object's profile
+   hides, sets `states[c]` to 4. Returns 1 if it hides at least one
+   component. The profile is the mission's object_profiles.weapons profile
+   for objects of type `objectType` fired by craft of type `sourceType`,
+   otherwise Skirmish in a quick start or skirmish if the model has it,
+   otherwise Default. Returns 0 for stock models and for models that aren't
+   loaded. Reads no file. */
+int XwaObjectProfiles_HideWithoutCraft(uint16_t objectType, uint16_t sourceType, uint8_t* states, int count);
 
 /* Shows every component, then hides those of profile `profile`. Used for
    hangar objects. A profile the model does not define hides nothing. No-op

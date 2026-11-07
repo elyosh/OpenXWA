@@ -187,8 +187,7 @@ static int fonts_add_size(XwaFontSet* set, const AeronConfigNode* node, int font
 }
 
 static int fonts_read(XwaFontSet* set, const AeronConfigNode* root) {
-	static const char* const keys[] = { "version", "default", "sizes", NULL };
-	const AeronConfigNode* version = AeronConfigNode_MapGet(root, "version");
+	static const char* const keys[] = { "default", "sizes", NULL };
 	const AeronConfigNode* defaults = AeronConfigNode_MapGet(root, "default");
 	const AeronConfigNode* sizes = AeronConfigNode_MapGet(root, "sizes");
 	XwaFontSettings base;
@@ -198,10 +197,6 @@ static int fonts_read(XwaFontSet* set, const AeronConfigNode* root) {
 	}
 	if (!fonts_check_keys(set, root, keys, "the file")) {
 		return 0;
-	}
-	if (version &&
-		(AeronConfigNode_Type(version) != AERON_CONFIG_INT || AeronConfigNode_Int(version, 0) != 1)) {
-		return fonts_error(set, version, "'version' must be 1");
 	}
 	memset(&base, 0, sizeof(base));
 	base.scale = 1.0f;

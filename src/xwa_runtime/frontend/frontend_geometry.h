@@ -1,45 +1,24 @@
 #ifndef XWA_RUNTIME_FRONTEND_FRONTEND_GEOMETRY_H
 #define XWA_RUNTIME_FRONTEND_FRONTEND_GEOMETRY_H
 
-/* Image geometry from atlases in the mod folder, and the frontend's paint
- * settings.
+/* Image geometry from atlases and video files in the mod folder, and the
+ * frontend's paint settings. The mod documentation describes the keys.
  *
- * An atlas with `game_geometry: true` replaces an image's geometry: the game
+ * An atlas that sets the game geometry replaces an image's geometry: the game
  * takes the frame count, sizes, offsets and bounds from the atlas and doesn't
- * read the original file:
- *   frontend/frontres/<dir>/atlas/<base>.yaml  a Frontres file
- *   resdata/atlas/group_<g>.yaml               a DAT group, for the frontend
- *                                              and for flight
- *
+ * read the original file. This works for a Frontres file and for a DAT group.
  * The whole game uses a DAT group's atlas. In flight, the simulation uses its
  * frame counts (an animated object ends after its type's last frame), and the
  * drawing code uses its sizes. The flight font group can't use an atlas,
- * because the game copies pixels out of its glyphs (flight_text.c).
+ * because the game copies pixels out of its glyphs.
  *
  * A video can also replace a Frontres file. It always sets the image's
  * geometry, with the same values for every frame, and takes priority over an
- * atlas:
- *   frontend/frontres/<dir>/video/<base>.yaml
+ * atlas. The video loops for as long as the game draws the image, whichever
+ * frame the game asks for.
  *
- *   video: techdoor.webm   # next to this file
- *   size: [388, 333]       # the drawn size
- *   offset: [0, 0]         # optional: added to the game's draw position
- *   classic_frames: 60     # optional: the game's frame count, 1 by default
- *   fps: 24                # optional: frames per second; the file's rate by default
- *
- * The video loops for as long as the game draws the image, whichever frame
- * the game asks for.
- *
- * The `units` key sets the units of an atlas's values:
- *   design  The default. These are pixels of the screen size that
- *           `design: [w, h]` sets in frontend/frontend.yaml (640x480 by
- *           default). The game gets them converted to its 640x480 units.
- *           Frontend atlases use these units, with `size`, `offset` and
- *           `bounds` for each frame.
- *   game    The game's own pixels, with no conversion. Flight atlases use
- *           these units. xwa_asset_bake writes them, with `classic_w` and
- *           `classic_h` for each frame's size, and `origin_x` and `origin_y`
- *           for its anchor.
+ * Values in design units are converted to the game's 640x480 units. Values in
+ * game units are used as they are.
  *
  * Each atlas is read once and kept. A missing atlas is remembered too, so it
  * is only looked for once. */
@@ -112,6 +91,9 @@ typedef struct XwaGeometryAtlas {
 	int region_count;
 	char video[160]; /* a video's path in the mod folder, or empty for an atlas */
 	uint8_t units;   /* XwaGeometryUnits */
+	/* The XwaFrontendLayout of the screen while the image is its background,
+	   or -1 to keep the screen's layout. */
+	int8_t layout;
 } XwaGeometryAtlas;
 
 /* The atlas with game geometry for a Frontres file, or NULL. `fileName` is
@@ -122,6 +104,10 @@ const XwaGeometryAtlas* XwaFrontendGeometry_FindFile(const char* fileName);
 const XwaGeometryAtlas* XwaFrontendGeometry_FindGroup(int group);
 /* The frame with DAT image id `id`, or NULL. */
 const XwaGeometryFrame* XwaFrontendGeometry_FindFrame(const XwaGeometryAtlas* atlas, int id);
+/* The number of DAT image ids from `first_id` to the highest id below
+ * `end_id` in the atlas with game geometry of group `group`. 0 when the
+ * group has no such atlas, or no image in that range. */
+int XwaFrontendGeometry_GroupIdSpan(int group, int first_id, int end_id);
 /* The region of type `type`, or NULL. */
 const XwaGeometryRegion* XwaFrontendGeometry_FindRegion(const XwaGeometryAtlas* atlas, int type);
 
@@ -131,6 +117,12 @@ int XwaFrontendGeometry_UnitY(float y);
 /* Design pixels to 640x480 units, not rounded. */
 float XwaFrontendGeometry_UnitsX(float x);
 float XwaFrontendGeometry_UnitsY(float y);
+/* A value of `atlas` in 640x480 units: converted from design pixels, or as
+ * it is in an atlas with `units: game`. Rounded to whole units, or not. */
+int XwaFrontendGeometry_AtlasUnitX(const XwaGeometryAtlas* atlas, float x);
+int XwaFrontendGeometry_AtlasUnitY(const XwaGeometryAtlas* atlas, float y);
+float XwaFrontendGeometry_AtlasUnitsX(const XwaGeometryAtlas* atlas, float x);
+float XwaFrontendGeometry_AtlasUnitsY(const XwaGeometryAtlas* atlas, float y);
 
 /* The `paint` section of frontend/frontend.yaml. Missing keys keep the
  * original look. */

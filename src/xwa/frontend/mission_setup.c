@@ -1,6 +1,8 @@
 #include "xwa/frontend/mission_setup.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/concourse_layout.h"
+#include "xwa_runtime/frontend/family_missions.h"
+#include "xwa_runtime/frontend/frontend_geometry.h"
 #endif
 
 #include "xwa/assets/file_io.h"
@@ -2132,12 +2134,28 @@ int MissionSetup_UnloadShipBmp(void) {
 	return 1;
 }
 
+#ifdef XWA_MODERN
+/* A mod's atlas for group 15210 can have more mission and battle pictures
+   than the original game. The count then goes up to the atlas's highest
+   image id in the range from `firstId` to `endId`. */
+static uint16_t MissionSetup_BattleSpriteCount(int firstId, int endId, int originalCount) {
+	const int span = XwaFrontendGeometry_GroupIdSpan(15210, firstId, endId);
+	return (uint16_t)(span > originalCount ? span : originalCount);
+}
+#endif
+
 // FUNCTION: XWA 0x55DD60
 int MissionSetup_LoadBattleSprites(void) {
 	SpriteResource_LoadGroup(15210);
+#ifdef XWA_MODERN
+	FrontImage_RegisterAtlasSprite("mislarge", 15210, 1, MissionSetup_BattleSpriteCount(1, 1000, 53));
+	FrontImage_RegisterAtlasSprite("missmall", 15210, 1000, MissionSetup_BattleSpriteCount(1000, 2000, 53));
+	FrontImage_RegisterAtlasSprite("battleback", 15210, 2000, MissionSetup_BattleSpriteCount(2000, 2100, 8));
+#else
 	FrontImage_RegisterAtlasSprite("mislarge", 15210, 1, 53);
 	FrontImage_RegisterAtlasSprite("missmall", 15210, 1000, 53);
 	FrontImage_RegisterAtlasSprite("battleback", 15210, 2000, 8);
+#endif
 	FrontImage_RegisterAtlasSprite("battle00", 15210, 2100, 1);
 	return 1;
 }
@@ -2963,10 +2981,10 @@ int MissionSetup_DrawMissionDescriptionPanel(void) {
 	/* Mission_selection_x in frontend/concourse/layout.yaml moves the
 	   description panel for Tour of Duty and melee missions. */
 	if (g_pilotData.missionDirectoryId == MISSION_DIRECTORY_TOUR) {
-		xOffset = XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection_x", 230.0f));
+		xOffset = XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection.panel_x", 230.0f));
 	} else {
 		xOffset = g_pilotData.missionDirectoryId == MISSION_DIRECTORY_MELEE
-					  ? XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection_x", 230.0f))
+					  ? XwaConcourseLayout_Round(XwaConcourseLayout_X("mission_selection.panel_x", 230.0f))
 					  : 0;
 	}
 #else
@@ -7541,7 +7559,11 @@ int MissionSetup_Update(int frameCounter) {
 			Movie_Play("pod", 1);
 		}
 #endif
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded()) {
+#else
 		if (g_frontendMissionLoaded) {
+#endif
 			if ((unsigned int)g_currentMissionId < 7u) {
 				musicState = MUSIC_STATE_FRONTEND_1210;
 				if (g_gameConfig.datapadMusicEnabled) {
@@ -8407,9 +8429,16 @@ int MissionSetup_Update(int frameCounter) {
 			FrontendDraw_RectCopy(&rect, &g_frontendSidebarButtonRects[8]);
 		}
 		if (g_frontendRightBarAnimState == 1) {
+#ifdef XWA_MODERN
+			const char* backText =
+				(XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u)
+					? FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT)
+					: FrontendString_Get(STR_BACK_TO_CONCOURSE);
+#else
 			const char* backText = (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u)
 									   ? FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT)
 									   : FrontendString_Get(STR_BACK_TO_CONCOURSE);
+#endif
 			if (FrontendButton_DrawSpriteWithHoverText(
 					&rect, (char*)"back", (char*)"back", (void*)backText, (unsigned int)g_colorPaleBlue,
 					(unsigned int)g_colorLightBlue, 8, (char*)"buttonsound")) {
@@ -8431,7 +8460,11 @@ int MissionSetup_Update(int frameCounter) {
 		if (g_frontendRightBarAnimState == 1) {
 			const char* backText;
 			if (Net_IsHost()) {
+#ifdef XWA_MODERN
+				if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 				if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 					backText = FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT);
 				} else {
 					backText = FrontendString_Get(STR_BACK_TO_CONCOURSE);
@@ -8471,7 +8504,11 @@ int MissionSetup_Update(int frameCounter) {
 			} else {
 				if (!g_gameConfig.networkType) {
 					backText = FrontendString_Get(STR_RETURN_JOIN_GAME);
+#ifdef XWA_MODERN
+				} else if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 				} else if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 					backText = FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT);
 				} else {
 					backText = FrontendString_Get(STR_BACK_TO_CONCOURSE);

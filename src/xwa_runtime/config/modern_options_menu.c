@@ -14,6 +14,9 @@ enum {
 	XWA_MODERN_MENU_KEY_UP = 0x26,
 	XWA_MODERN_MENU_KEY_DOWN = 0x28,
 	XWA_MODERN_MENU_ROW_HEIGHT = 20,
+	/* The height of a row's text. */
+	XWA_MODERN_MENU_TEXT_HEIGHT = 15,
+	XWA_MODERN_MENU_SCREEN_HEIGHT = 480,
 };
 
 static void XwaModernOptionsMenu_PlayMove(void) {
@@ -91,6 +94,12 @@ int XwaModernOptionsMenu_Begin(XwaModernOptionsMenu* menu, int center_x, int sta
 	menu->cursor_row = *cursor_row;
 	menu->key = key;
 	return 1;
+}
+
+int XwaModernOptionsMenu_CenteredY(int row_count) {
+	/* The title is one row high, and the last row ends with its text. */
+	const int height = row_count * XWA_MODERN_MENU_ROW_HEIGHT + XWA_MODERN_MENU_TEXT_HEIGHT;
+	return (XWA_MODERN_MENU_SCREEN_HEIGHT - height) / 2;
 }
 
 void XwaModernOptionsMenu_DrawTitle(XwaModernOptionsMenu* menu, const char* title) {

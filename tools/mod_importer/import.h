@@ -10,11 +10,12 @@
  * goes to <mod>/import.log, to the log lines of the progress, and to the
  * `echo` callback when there is one.
  *
- * The import stops at the first failure. The mod folder gets a mod.yaml. It
- * says `complete: false` until every phase has run, and the game doesn't
- * offer a mod that isn't complete. A folder that isn't empty is only cleared when its mod.yaml was
- * written by the importer and `replace` is set. The work files go in
- * <mod>/.import/, which is deleted at the end.
+ * The import stops at the first failure. The importer writes a mod.yaml with
+ * the mod format version (xwa_app/mod_format.h) and `complete: false` at the
+ * start, and sets `complete: true` when every phase has run. The game doesn't
+ * use a mod that isn't complete. The importer only clears a folder that
+ * isn't empty when its mod.yaml comes from the importer and `replace` is
+ * set. The work files go in <mod>/.import/, which is deleted at the end.
  *
  * With an authoring folder ("Keep authoring files"), the glTF models and the
  * effect library sources are kept there for editing, and the mod is cooked

@@ -9,6 +9,7 @@
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_settings.h"
+#include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/skins.h"
 
 #include <stdio.h>
@@ -39,7 +40,8 @@ typedef struct WeaponColorSet {
 
 typedef struct CraftWeaponsType {
 	WeaponColorSet colors;
-	int8_t switchByIff; /* 1 or 0, -1 when not set */
+	int hasSwitchByIff;
+	XwaWeaponIffSwap switchByIff;
 	uint16_t markingsCount;
 	uint8_t markings[256];
 	WeaponColorSet byMarkings[];
@@ -57,16 +59,11 @@ static void CraftWeapons_ClearSet(WeaponColorSet* set) {
 	memset(set->impact, 0xff, sizeof set->impact);
 }
 
-/* Returns the weapon index of map key `key` (280 to 307), or -1. */
+/* Returns the weapon index for the weapon type named `key`, or -1. */
 static int CraftWeapons_WeaponKey(const char* key) {
-	char* end;
-	const long type = strtol(key, &end, 10);
+	const int type = XwaNames_Find(&g_xwaWeaponTypeNames, key);
 
-	if (*key == '\0' || *end != '\0' || type < CRAFT_WEAPONS_FIRST ||
-		type >= CRAFT_WEAPONS_FIRST + CRAFT_WEAPONS_COUNT) {
-		return -1;
-	}
-	return (int)(type - CRAFT_WEAPONS_FIRST);
+	return type < 0 ? -1 : type - CRAFT_WEAPONS_FIRST;
 }
 
 /* Reads `impact`, a map from weapon type to an RGB colour, into `impact`. */
@@ -83,8 +80,9 @@ static void CraftWeapons_ReadImpact(const char* path, const char* where, const A
 		if (weapon < 0 || AeronConfigNode_Type(value) != AERON_CONFIG_INT || rgb < 0 || rgb > 0xffffff) {
 			Aeron_LogWarn(
 				"xwa.models",
-				"%s: %s.impact.%s needs a weapon type from 280 to 307 and an RGB colour. It is ignored", path,
-				where, key);
+				"%s:%d: %s.impact.%s: the key must be a weapon type name and the value an RGB colour. It "
+				"is ignored",
+				path, AeronConfigNode_Line(value), where, key);
 			continue;
 		}
 		impact[weapon] = (int32_t)rgb;
@@ -105,10 +103,11 @@ static void CraftWeapons_ReadSet(const char* path, const char* where, const Aero
 		const int weapon = strcmp(key, "default") == 0 ? CRAFT_WEAPONS_COUNT : CraftWeapons_WeaponKey(key);
 
 		if (weapon < 0 || AeronConfigNode_Type(value) != AERON_CONFIG_INT || markings < 0 || markings > 255) {
-			Aeron_LogWarn("xwa.models",
-						  "%s: %s.variant.%s needs 'default' or a weapon type from 280 to 307, and markings "
-						  "from 0 to 255. It is ignored",
-						  path, where, key);
+			Aeron_LogWarn(
+				"xwa.models",
+				"%s:%d: %s.variant.%s: the key must be 'default' or a weapon type name, and the value "
+				"markings from 0 to 255. It is ignored",
+				path, AeronConfigNode_Line(value), where, key);
 			continue;
 		}
 		if (weapon == CRAFT_WEAPONS_COUNT) {
@@ -195,8 +194,7 @@ void XwaCraftWeapons_Init(void) {
 	}
 	root = AeronConfigFile_Root(file);
 	section = AeronConfigNode_MapGet(root, "weapons");
-	if (AeronConfigNode_Type(AeronConfigNode_MapGet(root, "version")) == AERON_CONFIG_INT &&
-		AeronConfigNode_Int(AeronConfigNode_MapGet(root, "version"), 0) == 1 && section != NULL) {
+	if (section != NULL) {
 		CraftWeapons_ReadImpact(CRAFT_WEAPONS_FLIGHT_YAML, "weapons",
 								AeronConfigNode_MapGet(section, "impact"), s_globalImpact);
 	}
@@ -236,12 +234,14 @@ void XwaCraftWeapons_ReadModelSettings(unsigned int objectType, const char* path
 	if (type == NULL) {
 		return;
 	}
-	type->switchByIff = -1;
 	node = AeronConfigNode_MapGet(group, "switch_by_iff");
-	if (node != NULL && AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
-		Aeron_LogWarn("xwa.models", "%s: weapons.switch_by_iff must be true or false. It is ignored", path);
-	} else if (node != NULL) {
-		type->switchByIff = (int8_t)(AeronConfigNode_Bool(node, 0) != 0);
+	if (node != NULL) {
+		type->hasSwitchByIff =
+			XwaMissionSettings_ParseWeaponIffSwap(AeronConfigNode_String(node, NULL), &type->switchByIff);
+		if (!type->hasSwitchByIff) {
+			Aeron_LogWarn("xwa.models",
+						  "%s: weapons.switch_by_iff must be turrets, none or all. It is ignored", path);
+		}
 	}
 	CraftWeapons_ClearSet(&type->colors);
 	CraftWeapons_ReadSet(path, "weapons.colors", AeronConfigNode_MapGet(group, "colors"), &type->colors);
@@ -290,7 +290,7 @@ uint8_t XwaCraftWeapons_BoltMarkings(unsigned int objectType, uint8_t markings, 
 int XwaCraftWeapons_SwitchByIff(unsigned int objectType) {
 	const CraftWeaponsType* type = CraftWeapons_Type(objectType);
 
-	if (type != NULL && type->switchByIff >= 0) {
+	if (type != NULL && type->hasSwitchByIff) {
 		return type->switchByIff;
 	}
 	return XwaMissionSettings_WeaponIffSwap();

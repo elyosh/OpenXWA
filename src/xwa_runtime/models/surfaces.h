@@ -2,25 +2,16 @@
 #define XWA_RUNTIME_MODELS_SURFACES_H
 
 /* Surfaces that show by the craft's state, from the `surfaces` group of a
- * model settings file:
+ * model settings file. The keys are tags of the model's materials and
+ * lights. A tagged surface or light is hidden when any of its rules hides
+ * it. The mod documentation describes the rules.
  *
- *   surfaces:
- *     engine_glow:       {hidden_when_disabled: true}
- *     engine_glow_small: {hidden_when_disabled: true, min_throttle_percent: 99, min_ordered_speed_mglt: 11}
- *     forcefield:        {hidden_when_disabled: true}
- *
- * Keys are tags of the model's materials and lights. A tagged surface or
- * light is hidden when any of its rules hides it:
- *   - `hidden_when_disabled`: while no subsystem works
- *     (CraftData.workingSubsystems == 0, the game's "disabled" test);
- *   - `min_speed_percent`: while the speed is below this percent of the top
- *     speed (as in `engine_glows`);
- *   - `min_speed_mglt`: while the speed is below this many MGLT;
- *   - `min_throttle_percent`: while the throttle is below this percent;
- *   - `min_ordered_speed_mglt`: while the speed that the craft's orders set
- *     (CraftData.commandedSpeed) is below this many MGLT.
- * All the keys are optional. A model has at most XWA_SURFACES_MAX_RULES
- * rules. Objects without a craft record show every surface.
+ * `hidden_when_disabled` uses the game's "disabled" test,
+ * CraftData.workingSubsystems == 0. `min_speed_percent` works as in
+ * `engine_glows`. `min_ordered_speed_mglt` tests CraftData.commandedSpeed,
+ * the speed that the craft's orders set. A model has at most
+ * XWA_SURFACES_MAX_RULES rules. Objects without a craft record show every
+ * surface.
  *
  * The setting only changes drawing, through the snapshot. */
 

@@ -24,6 +24,7 @@
 !tools/*.c
 !tools/mod_importer/**
 !tools/xwa_asset_bake/**
+!tools/xwa_image_cook/**
 
 .git
 **/.git

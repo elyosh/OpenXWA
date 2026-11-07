@@ -431,7 +431,11 @@ typedef struct XwaFlightObject {
 	 * is 65536, with the articulated meshes drawn between their steps:
 	 * XwaArticulation_DrawnAngles). mesh_count is the model's mesh count;
 	 * read them with XwaFlightObject_ComponentState and
-	 * XwaFlightObject_MeshAngle, which return 0 past it. */
+	 * XwaFlightObject_MeshAngle, which return 0 past it.
+	 * An object without craft data, such as a projectile, only has meshes
+	 * here when its model's profile hides some of them
+	 * (XwaObjectProfiles_HideWithoutCraft). The hidden meshes have state 4,
+	 * and all angles are 0. */
 	const uint8_t* component_state;
 	const uint16_t* mesh_angle;
 	uint32_t mesh_offset; /* the capture's offset into the mesh areas */
@@ -1051,6 +1055,13 @@ typedef struct XwaHudTarget {
 	uint16_t shield_pct, system_pct, hull_pct;
 	char name[30];
 	char status[30];
+	/* The CMD drew the target's text this frame. */
+	uint8_t cmd_shown;
+	/* The CMD showed the target's shields, hull, systems and component line
+	   (showTargetDamage in Hud_UpdateCMDText). */
+	uint8_t damage_shown;
+	/* The CMD's component line this frame, or "". */
+	char component_line[32];
 } XwaHudTarget;
 
 typedef struct XwaHudReticle {
@@ -1499,6 +1510,11 @@ void XwaSnapshot_SetNextSpriteFraction(int frac_x, int frac_y);
  * subsequent sprite records for that name. */
 void XwaSnapshot_NoteResourceBinding(const char* fileName, const char* name, int frame_count);
 void XwaSnapshot_NoteResourceFree(const char* name);
+/* The raw path of the file that resource `name` holds now, or NULL. */
+const char* XwaSnapshot_BoundSourceFile(const char* name);
+/* A number that changes each time a resource name gets a file, changes its
+   file or loses it. */
+unsigned XwaSnapshot_BindingGeneration(void);
 
 void XwaSnapshot_EmitPaint(XwaPaintKind kind, int x0, int y0, int x1, int y1, int dx, int dy, uint32_t color);
 /* Horizontal and vertical lines emitted between these calls are briefing map

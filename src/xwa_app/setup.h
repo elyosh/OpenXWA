@@ -31,12 +31,20 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normalized,
 							  size_t normalized_capacity, char* error, size_t error_size);
 
-/* Sets the mod root to the --mod path, else to the paths.mod setting unless
- * paths.use_mod is false. Copies the path used to selected. Without a mod,
- * selected is empty, the mod root stays unset and the game uses its own
- * files only. The folder does not have to exist. */
+/* Sets the mod root to the --mod folder, or else to paths.mod when
+ * paths.use_mod is true. Copies the folder it uses to `selected`. Without a
+ * mod, `selected` is empty, the mod root stays unset and the game uses only
+ * its own files.
+ *
+ * The mod folder must have a mod.yaml with the current mod format version.
+ * The mod must also be complete, unless it comes from --mod.
+ *   - A --mod folder that doesn't pass these checks is an error.
+ *   - A paths.mod folder that doesn't pass them isn't used. The game starts
+ *     with its own files, and `notice` explains why.
+ * Otherwise, `notice` is empty. */
 int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaHostConfig* host_config,
-						char* selected, size_t selected_capacity, char* error, size_t error_size);
+						char* selected, size_t selected_capacity, char* notice, size_t notice_size,
+						char* error, size_t error_size);
 
 #ifdef __cplusplus
 }

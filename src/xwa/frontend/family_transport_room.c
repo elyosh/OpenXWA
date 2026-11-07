@@ -2,6 +2,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/concourse_layout.h"
+#include "xwa_runtime/frontend/family_missions.h"
 #endif
 
 #include "xwa/assets/file_io.h"
@@ -267,9 +268,10 @@ static void FamilyTransportRoom_DrawNormalBackgroundLayer(void) {
 
 	FrontImage_DrawSpriteOpaque("background", 0, 0);
 #ifdef XWA_MODERN
-	/* Frontend/concourse/layout.yaml can set which missions unlock the cologne
-	   and Lady Blue, and so which award text they show. */
-	if (XwaConcourseLayout_Unlocked("family_room.cologne_mission", 9)) {
+	/* frontend/awards.yaml can change the missions that unlock the cologne
+	   and the Lady Blue. The detail view of each item shows the award text of
+	   its mission. */
+	if (XwaAwards_Unlocked(XWA_AWARDS_COLOGNE, 9)) {
 #else
 	if (g_pilotData.tourOfDutyMissions[8].completedCount) {
 #endif
@@ -323,7 +325,7 @@ static void FamilyTransportRoom_DrawNormalBackgroundLayer(void) {
 	}
 
 #ifdef XWA_MODERN
-	if (XwaConcourseLayout_Unlocked("family_room.lady_blue_mission", 23)) {
+	if (XwaAwards_Unlocked(XWA_AWARDS_LADY_BLUE, 23)) {
 #else
 	if (g_pilotData.tourOfDutyMissions[22].completedCount) {
 #endif
@@ -711,7 +713,7 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 			}
 
 #ifdef XWA_MODERN
-			if (XwaConcourseLayout_Unlocked("family_room.lady_blue_mission", 23)) {
+			if (XwaAwards_Unlocked(XWA_AWARDS_LADY_BLUE, 23)) {
 #else
 			if (g_pilotData.tourOfDutyMissions[22].completedCount) {
 #endif
@@ -737,7 +739,7 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 						 ++awardTextIndex) {
 #ifdef XWA_MODERN
 						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId ==
-							XwaConcourseLayout_UnlockMission("family_room.lady_blue_mission", 23)) {
+							XwaAwards_UnlockMission(XWA_AWARDS_LADY_BLUE, 23)) {
 #else
 						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId == 23) {
 #endif
@@ -749,7 +751,7 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 			}
 
 #ifdef XWA_MODERN
-			if (XwaConcourseLayout_Unlocked("family_room.cologne_mission", 9)) {
+			if (XwaAwards_Unlocked(XWA_AWARDS_COLOGNE, 9)) {
 #else
 			if (g_pilotData.tourOfDutyMissions[8].completedCount) {
 #endif
@@ -775,7 +777,7 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 						 ++awardTextIndex) {
 #ifdef XWA_MODERN
 						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId ==
-							XwaConcourseLayout_UnlockMission("family_room.cologne_mission", 9)) {
+							XwaAwards_UnlockMission(XWA_AWARDS_COLOGNE, 9)) {
 #else
 						if (g_frontendFamilyAwardTexts[awardTextIndex].awardId == 9) {
 #endif
@@ -1103,7 +1105,11 @@ int FamilyTransportRoom_DrawPilotStatsPage(int statCategory) {
 		g_frontendFamilyPageResetPending = 0;
 	}
 
+#ifdef XWA_MODERN
+	if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 	if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 		sprintf(g_frontendScratchBuffer, "%s", g_pilotData.name);
 	} else {
 		sprintf(g_frontendScratchBuffer, "%c%s %c%s", 6,
@@ -1114,13 +1120,21 @@ int FamilyTransportRoom_DrawPilotStatsPage(int statCategory) {
 
 	y = 81;
 	visibleRows = 13;
+#ifdef XWA_MODERN
+	if (XwaFamilyMissions_MissionLoaded() &&
+#else
 	if (g_frontendMissionLoaded &&
+#endif
 		g_frontendMission->header.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 		sprintf(g_frontendScratchBuffer, "%c%s: %c%s", 2, FrontendString_Get(STR_FAMILY_ASSIGNED_TO), 1,
 				FrontendString_Get((UIString)(g_frontendMission->header.briefingLogo + 727)));
 		FrontendText_Draw(12, g_frontendScratchBuffer, 65, 81, 0xffff);
 		y = 96;
+#ifdef XWA_MODERN
+	} else if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 	} else if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 		visibleRows = 14;
 	} else {
 		sprintf(g_frontendScratchBuffer, "%s", FrontendString_Get(STR_FAMILY_ON_LEAVE));
@@ -2148,7 +2162,11 @@ int FamilyTransportRoom_Update(int frameCounter) {
 
 		FrontendFamily_DrawEmailMonitor(screenTick);
 		isFamilyMission = 0;
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 		if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 			isFamilyMission = 1;
 		}
 

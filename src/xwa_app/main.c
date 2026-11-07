@@ -9,6 +9,7 @@
 #include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/config/modern_mods.h"
+#include "xwa_runtime/config/option_section.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/model_source.h"
@@ -95,8 +96,8 @@ static int persist_modern_input_options(const XwaModernInputOptions* options, ch
 	return XwaHostConfig_SaveInputOptions(Aeron_GetVfs(), options, error, error_size);
 }
 
-static int persist_camera_enabled(int enabled, char* error, size_t error_size) {
-	return XwaHostConfig_SaveCameraEnabled(Aeron_GetVfs(), enabled, error, error_size);
+static int persist_option_switch(const char* key, int value, char* error, size_t error_size) {
+	return XwaHostConfig_SaveSwitch(Aeron_GetVfs(), key, value, error, error_size);
 }
 
 /* paths.mod. It is kept when the original game is chosen, so the mod stays
@@ -134,7 +135,7 @@ static void configure_mods(const XwaLaunchOptions* launch, const XwaHostConfig* 
 	for (size_t i = 0; i < list.count; ++i) {
 		entries[i].name = list.entries[i].name;
 		entries[i].path = list.entries[i].path;
-		entries[i].complete = list.entries[i].complete;
+		entries[i].problem = list.entries[i].problem[0] ? list.entries[i].problem : NULL;
 		if (XwaModList_SamePath(list.entries[i].path, selected_mod)) {
 			running = i;
 		}
@@ -145,14 +146,14 @@ static void configure_mods(const XwaLaunchOptions* launch, const XwaHostConfig* 
 	XwaModList_Free(&list);
 }
 
-/* Shows a setup error that the player can fix themselves, so it doesn't ask
- * for the logs like Aeron_FatalError. */
-static void show_setup_error(const char* message) {
+/* Shows a setup message about a problem that the player can fix. Unlike
+ * Aeron_FatalError, it doesn't ask for the logs. */
+static void show_setup_message(AeronMessageBoxKind kind, const char* message) {
 	static const AeronMessageBoxButton buttons[] = {
 		{ 0, "OK", 1, 1 },
 	};
 	const AeronMessageBoxOptions options = {
-		.kind = AERON_MESSAGE_BOX_ERROR,
+		.kind = kind,
 		.title = "OpenXWA",
 		.message = message,
 		.buttons = buttons,
@@ -161,6 +162,8 @@ static void show_setup_error(const char* message) {
 
 	Aeron_ShowMessageBox(&options, NULL);
 }
+
+static void show_setup_error(const char* message) { show_setup_message(AERON_MESSAGE_BOX_ERROR, message); }
 
 static int show_first_launch_prompt(int* cancelled, char* error, size_t error_size) {
 	static const AeronMessageBoxButton buttons[] = {
@@ -350,6 +353,7 @@ int main(int argc, char** argv) {
 	char selected_game_data[XWA_HOST_CONFIG_PATH_CAPACITY];
 	char selected_mod[XWA_HOST_CONFIG_PATH_CAPACITY];
 	char config_error[1024];
+	char mod_notice[1024 + XWA_HOST_CONFIG_PATH_CAPACITY];
 	XwaModernWindowMode initial_window_mode;
 	int exit_code;
 	int setup_cancelled;
@@ -413,26 +417,27 @@ int main(int argc, char** argv) {
 		Aeron_Shutdown();
 		return 1;
 	}
-	Aeron_SetFullscreen(initial_window_mode == XWA_MODERN_WINDOW_MODE_FULLSCREEN);
-	/* The setup dialogs above are separate OS windows; on some platforms
-	 * (macOS) closing them does not re-key the game window, which would start
-	 * the game inside its unfocused pause. Ask for input focus back. */
-	Aeron_RaiseWindow();
 	Aeron_LogInfo("xwa.config", "game data: %s", selected_game_data);
 	if (!XwaSetup_SetModRoot(Aeron_GetVfs(), &launch, &host_config, selected_mod, sizeof selected_mod,
-							 config_error, sizeof config_error)) {
+							 mod_notice, sizeof mod_notice, config_error, sizeof config_error)) {
 		Aeron_LogError("xwa.config", "%s", config_error);
 		show_setup_error(config_error);
 		Aeron_Shutdown();
 		return 1;
 	}
-	AeronFileInfo mod_info;
+	if (mod_notice[0]) {
+		Aeron_LogWarn("xwa.config", "%s", mod_notice);
+		show_setup_message(AERON_MESSAGE_BOX_WARNING, mod_notice);
+	}
+	Aeron_SetFullscreen(initial_window_mode == XWA_MODERN_WINDOW_MODE_FULLSCREEN);
+	/* The setup dialogs above are separate OS windows; on some platforms
+	 * (macOS) closing them does not re-key the game window, which would start
+	 * the game inside its unfocused pause. Ask for input focus back. */
+	Aeron_RaiseWindow();
 	if (!selected_mod[0]) {
 		Aeron_LogInfo("xwa.config", "mod: none, the original game");
-	} else if (AeronVfs_Stat(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, ".", &mod_info) && mod_info.is_directory) {
-		Aeron_LogInfo("xwa.config", "mod: %s", selected_mod);
 	} else {
-		Aeron_LogInfo("xwa.config", "mod: %s (not found, original assets only)", selected_mod);
+		Aeron_LogInfo("xwa.config", "mod: %s", selected_mod);
 	}
 	configure_mods(&launch, &host_config, selected_mod);
 	Aeron_LogInfo("xwa.config", "resources: %s", Aeron_ResourceRoot());
@@ -496,10 +501,7 @@ int main(int argc, char** argv) {
 	XwaModernInputOptions_Configure(&host_config.input_defaults, &host_config.input_options,
 									apply_modern_input_options, persist_modern_input_options);
 	apply_modern_input_options(&host_config.input_options);
-	XwaModernCameraOptions_Configure(&host_config.camera_options, &host_config.camera_player_options,
-									 host_config.camera_override_mask, persist_camera_enabled);
-	XwaModernSunOptions_Configure(&host_config.sun_options, &host_config.sun_player_options,
-								  host_config.sun_override_mask);
+	XwaOptionSection_SetPersist(persist_option_switch);
 	Aeron_LogInfo(
 		"xwa.config", "mouse flight control: %s (%s mode, sensitivity %d, invert Y: %s)",
 		host_config.input_options.mouse_flight_enabled ? "on" : "off",

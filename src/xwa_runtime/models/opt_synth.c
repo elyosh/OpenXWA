@@ -10,6 +10,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/model_swaps.h"
+#include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/render_model.h"
 
 #include <math.h>
@@ -50,7 +51,7 @@ static const char* const s_articulationGroups[] = {
 static const char* const s_articulationBehaviors[] = { "swing", "random", "random_pause" };
 static const char* const s_articulationSettings[] = {
 	"step_ticks",         "sfoils.close_in_hyperspace", "sfoils.allow_fire_closed",
-	"sfoils.park_closed", "hangar_doors.distance",      "crew.update_all"
+	"sfoils.park_closed", "hangar_doors.distance",      "crew.always_animate"
 };
 
 static int OptSynth_IsKnownName(const char* name, const char* const* names, size_t count) {
@@ -69,10 +70,6 @@ static int OptSynth_Fail(const char* key, const char* reason) {
 	return 0;
 }
 
-static int OptSynth_IsLaserHardpoint(int32_t type) {
-	return type == 0 || (type >= 1 && type <= 6) || (type >= 9 && type <= 11) || type == 18;
-}
-
 /* The key whose object type the checks below use: the key the mission swaps
    for `key`, else `key`. A swapped-in model, such as
    superstardestroyerrecentered, then gets the checks of the model it
@@ -81,6 +78,37 @@ static const char* OptSynth_TypeKey(const char* key) {
 	const char* source = XwaModelSwaps_SourceOf(key);
 
 	return source != NULL ? source : key;
+}
+
+void XwaRenderModel_ResolveScreens(AeronFlightModel* model, const char* label) {
+	AeronGltfModel* render = &model->render;
+	uint32_t i;
+
+	for (i = 0; i < render->screen_rect_count; ++i) {
+		AeronGltfScreenRect* rect = &render->screen_rects[i];
+		const int source = XwaNames_Find(&g_xwaScreenSourceNames, rect->source_name);
+
+		if (source < 0) {
+			Aeron_LogWarn("xwa.models",
+						  "%s: material %u: '%s' isn't a cockpit screen source. The rectangle shows nothing",
+						  label, rect->material, rect->source_name);
+			rect->source = 0;
+			rect->layers = 0;
+			continue;
+		}
+		rect->source = (uint32_t)source;
+	}
+	render->screen_hide_mask = 0;
+	for (i = 0; i < render->screen_hide_name_count; ++i) {
+		const int area = XwaNames_Find(&g_xwaHudAreaNames, render->screen_hide_names[i]);
+
+		if (area < 0) {
+			Aeron_LogWarn("xwa.models", "%s: screen hide list: '%s' isn't a HUD area. It is ignored", label,
+						  render->screen_hide_names[i]);
+			continue;
+		}
+		render->screen_hide_mask |= 1u << area;
+	}
 }
 
 static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model) {
@@ -134,33 +162,23 @@ static int OptSynth_ValidateModel(const char* key, const AeronFlightModel* model
 	}
 
 	if (XwaModelSource_KeyRequiresFloatHardpoints(OptSynth_TypeKey(key))) {
-		int hasLaser = 0;
 		int hasMainHull = 0;
 
 		for (component = 0; component < model->component_count; ++component) {
-			const AeronFlightComponent* item = &model->components[component];
-			uint32_t index;
-
-			hasMainHull |= item->mesh_type == MESH_MainHull;
-			for (index = 0; index < item->hardpoint_count; ++index) {
-				hasLaser |= OptSynth_IsLaserHardpoint(item->hardpoints[index].type);
-			}
+			hasMainHull |= model->components[component].mesh_type == MESH_MainHull;
 		}
-		/* The laser hardpoints become the model def's float hardpoints. Without
-		   any, the warhead launch point falls back to MainHull vertices, which
-		   reads out of range when there is no MainHull. */
-		if (!hasLaser) {
-			return OptSynth_Fail(key, "its object type needs a laser hardpoint (type 0-6, 9-11 or 18)");
-		}
-		/* The original code runs without a MainHull: hardpoints go to
-		   the nearest weapon-system mesh (root 0 when there is none), and only
-		   MainHull-keyed effects are lost. */
+		/* The original code runs without a MainHull. The laser hardpoints
+		   become the model def's float hardpoints, and each goes to the
+		   nearest weapon-system mesh, or to component 0 when there is none.
+		   Without laser hardpoints, shots leave from the nearest MainHull
+		   vertex, or from a vertex of component 0 when there is no MainHull.
+		   Every root of a synthesized model is a mesh with vertices, so that
+		   search always finds real vertices. Only MainHull effects are lost. */
 		if (!hasMainHull) {
-			Aeron_LogWarn(
-				"xwa.models",
-				"replacement '%s' has no MainHull component: no hull debris or forced hull "
-				"explosions, and float hardpoints without a weapon-system mesh belong to component 0",
-				key);
+			Aeron_LogWarn("xwa.models",
+						  "replacement '%s' has no MainHull component: no hull debris or forced hull "
+						  "explosions, and shots without a laser hardpoint leave from component 0",
+						  key);
 		}
 	}
 	return 1;
@@ -479,6 +497,7 @@ static int OptSynth_BuildPayload(const char* key, uint8_t** outPayload, int* out
 		return OptSynth_Fail(key, "invalid GLB or AERON_flight_model data");
 	}
 	free(glb);
+	XwaRenderModel_ResolveScreens(&model, path);
 	if (!OptSynth_ValidateModel(key, &model)) {
 		Aeron_FlightModelFree(&model);
 		return 0;

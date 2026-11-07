@@ -86,7 +86,6 @@ void XwaObjectLimits_Init(void) {
 	AeronConfigFile* file = NULL;
 	AeronConfigError error;
 	const AeronConfigNode* root;
-	const AeronConfigNode* version;
 
 	memset(&s_defaults, 0, sizeof s_defaults);
 	s_limits = s_defaults;
@@ -96,10 +95,7 @@ void XwaObjectLimits_Init(void) {
 		return;
 	}
 	root = AeronConfigFile_Root(file);
-	version = AeronConfigNode_MapGet(root, "version");
-	if (AeronConfigNode_Type(version) == AERON_CONFIG_INT && AeronConfigNode_Int(version, 0) == 1) {
-		ObjectLimits_Read(LIMITS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "object_limits"), &s_defaults);
-	}
+	ObjectLimits_Read(LIMITS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "object_limits"), &s_defaults);
 	s_limits = s_defaults;
 	AeronConfigFile_Destroy(file);
 }

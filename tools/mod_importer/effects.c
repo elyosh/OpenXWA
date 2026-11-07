@@ -162,7 +162,7 @@ void ImportEffects_Build(ImportContext* ctx, const char* const* gltfs, size_t co
 			workers = 1;
 		/* The BC7 encoder isn't limited: a large library built alone uses every
 		   core. */
-		ToolLog_Write(TOOL_LOG_INFO, "Building %zu effect libraries on %d threads", pool.count, workers);
+		ToolLog_Write(TOOL_LOG_DETAIL, "Building %zu effect libraries on %d threads", pool.count, workers);
 		AeronThread** threads = calloc((size_t)workers, sizeof *threads);
 		int started = 0;
 		for (; threads && started < workers; ++started)

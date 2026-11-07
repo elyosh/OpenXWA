@@ -66,6 +66,22 @@ static void xwa_tool_pbr(int* open, void* user) {
 	ImGui::TextDisabled("Illuminance of a classic light of brightness 1 (suns, the game's\n"
 						"lights): %.0f lux. 186 W/m^2 is the sun at the Earth's distance.",
 						(double)(classic_light * AERON_SCENE_LUMENS_PER_WATT));
+	float classic_radiance = XwaRemaster_ClassicRadiance();
+	if (ImGui::SliderFloat("Classic image radiance", &classic_radiance, 0.0f, 1000.0f, "%.1f W/m^2/sr",
+						   ImGuiSliderFlags_Logarithmic)) {
+		XwaRemaster_SetClassicRadiance(classic_radiance);
+	}
+	ImGui::TextDisabled("Radiance of a white pixel of the classic images (backdrops, lit\n"
+						"texels, screens): %.0f cd/m^2. 59.2 matches a white surface lit\n"
+						"by a classic light of 186 W/m^2.",
+						(double)(classic_radiance * AERON_SCENE_LUMENS_PER_WATT));
+	float intensity_scale = XwaRemasterEnvironment_IntensityScale();
+	if (ImGui::SliderFloat("Environment intensity scale", &intensity_scale, 0.0f,
+						   (float)XWA_ENV_INTENSITY_SCALE_MAX, "%.3f", ImGuiSliderFlags_Logarithmic)) {
+		XwaRemasterEnvironment_SetIntensityScale(intensity_scale);
+	}
+	ImGui::TextDisabled("Multiplies the environments' skies and overlays, and the light\n"
+						"they give the models. Captured lighting cubes are rebuilt.");
 	changed |=
 		ImGui::ColorEdit3("Ambient fill", t.ambient, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
 	ImGui::TextDisabled("Ambient cube fill, radiance in W/m^2/sr.");
@@ -149,6 +165,8 @@ static void xwa_tool_pbr(int* open, void* user) {
 	if (ImGui::Button("Reset to defaults")) {
 		XwaRemasterShip_GetPbrTuningDefault(&t);
 		XwaRemaster_SetClassicLightIlluminance(XwaRemaster_ClassicLightIlluminanceDefault());
+		XwaRemaster_SetClassicRadiance(XwaRemaster_ClassicRadianceDefault());
+		XwaRemasterEnvironment_SetIntensityScale(XwaRemasterEnvironment_IntensityScaleDefault());
 		XwaRemasterShip_SetBackfaceFill(1);
 		changed = true;
 	}
@@ -434,9 +452,9 @@ static void xwa_tool_hangar_lighting(int* open, void* user) {
 	ImGui::EndDisabled();
 	ImGui::Separator();
 	ImGui::TextUnformatted("Ambient cube (linear)");
-	changed |= ImGui::SliderFloat("Ceiling fill (+Z)", &p.ambient_ceiling, 0.0f, 1.0f, "%.3f");
-	changed |= ImGui::SliderFloat("Wall bounce", &p.ambient_sides, 0.0f, 1.0f, "%.3f");
-	changed |= ImGui::SliderFloat("Floor bounce (-Z)", &p.ambient_floor, 0.0f, 1.0f, "%.3f");
+	changed |= ImGui::SliderFloat("Ceiling fill (+Z)", &p.ambient_ceiling, 0.0f, 10.0f, "%.3f");
+	changed |= ImGui::SliderFloat("Wall bounce", &p.ambient_sides, 0.0f, 10.0f, "%.3f");
+	changed |= ImGui::SliderFloat("Floor bounce (-Z)", &p.ambient_floor, 0.0f, 10.0f, "%.3f");
 	if (!enabled) {
 		ImGui::EndDisabled();
 	}
@@ -1203,6 +1221,8 @@ static void xwa_tool_hud_snapshot(int* open, void* user) {
 		ImGui::Text("target valid=%u id=%u:%u component=%u", h.target.valid, h.target.slot,
 					h.target.signature, h.target.selected_component);
 		ImGui::Text("name='%s' status='%s'", h.target.name, h.target.status);
+		ImGui::Text("CMD shown=%u damage=%u component='%s'", h.target.cmd_shown, h.target.damage_shown,
+					h.target.component_line);
 		ImGui::Text("distance=%u.%02u shield/system/hull=%u/%u/%u", h.target.distance_whole,
 					h.target.distance_frac, h.target.shield_pct, h.target.system_pct, h.target.hull_pct);
 		const XwaHudCrt& crt = h.crt;

@@ -10,6 +10,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 
 typedef struct BakeSpriteOptions {
 	const char*    out_root;     /* output directory root */
@@ -23,14 +24,45 @@ typedef struct BakeSpriteOptions {
 	bool           dat_only;     /* skip the frontres pass */
 } BakeSpriteOptions;
 
+/* A frame of an atlas. `size`, `offset` and `bounds` are in the atlas's
+ * units (BakeAtlasHeader). */
 typedef struct BakeFrame {
-	uint8_t* rgba; /* HD (or classic when !scale) straight-alpha */
-	int      w, h;
-	int      classic_w, classic_h;
-	int      origin_x, origin_y; /* classic units (DAT anchors) */
-	int      has_light;          /* write `light: [r, g, b]` */
-	float    light[3];
+	uint8_t* rgba; /* straight alpha */
+	int w, h;      /* in pixels */
+	int has_id;
+	int id;           /* the DAT image id */
+	double size[2];   /* the draw size */
+	double offset[2]; /* the anchor */
+	int has_bounds;
+	double bounds[4];        /* left, top, right, bottom */
+	const char* keep_aspect; /* NULL, "height" or "width" */
+	const char* fit;         /* NULL or "screen_height" */
+	int has_light;
+	float light[3];
 } BakeFrame;
+
+typedef struct BakeRegion {
+	int type;
+	double rect[4];
+} BakeRegion;
+
+/* The keys of an atlas file apart from `atlas` and `frames`. */
+typedef struct BakeAtlasHeader {
+	const char* comment; /* lines that start with '#', or NULL */
+	int game_units;      /* `units: game`; else design units */
+	int game_geometry;
+	int classic_frames; /* 0: not written */
+	int fps;            /* 0: not written */
+	const char* tint;   /* NULL: not written */
+	const char* layout; /* the screen's layout while the image is its background; NULL: not written */
+	int has_draw_adjust;
+	double draw_adjust[4];
+	int has_bounds;
+	double bounds[4];
+	const BakeRegion* regions;
+	int region_count;
+	const char* extra; /* more keys, written as they are, such as `frame_sets` */
+} BakeAtlasHeader;
 
 typedef struct BakeStats {
 	int sprites;    /* single-frame outputs */
@@ -45,24 +77,46 @@ int BakeSprites_Run(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeStats* stat
 
 /* Helpers shared with the font bakes and the mod importer's frontend art. */
 int BakeSprites_MakeDirs(const char* path);
-/* Writes `base_path`.png and/or .ktx2 (BC7, sRGB, premultiplied) per `opt`. */
+/* Writes `base_path`.png and/or .ktx2 (BC7, sRGB, premultiplied) per `opt`.
+ * While the encode queue is on, it copies the image, queues it and returns 1
+ * right away. BakeSprites_EndQueue reports the images that failed. */
 int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba, int w,
 						  int h);
+/* Turns the encode queue on, with `threads` worker threads that encode and
+ * write the images. With fewer than 2 threads, the queue stays off and images
+ * are written right away. Call this and BakeSprites_EndQueue from the same
+ * thread, and emit images only from that thread in between. */
+void BakeSprites_BeginQueue(int threads);
+/* Returns the number of queued images that have failed so far. A bake that
+ * stops at its first failure can check it. */
+int BakeSprites_QueueFailures(void);
+/* Waits for the queued images, turns the queue off, and returns the number
+ * of images that failed. */
+int BakeSprites_EndQueue(void);
 /* The size of an atlas page, and the gutter between its frames. */
 #define BAKE_MAX_ATLAS_DIM 8192
 #define BAKE_HD_PAD        8
+/* The largest page for a frame that doesn't fit in a BAKE_MAX_ATLAS_DIM page.
+ * Such a frame gets a page of its own. Every GPU that SDL's GPU API supports on
+ * D3D12 and Metal can create a texture this large. */
+#define BAKE_MAX_OVERSIZE_DIM 16384
 
 /* Packs frames into pages of at most BAKE_MAX_ATLAS_DIM texels square, with a
- * BAKE_HD_PAD gutter. A frame must fit in a page with its gutter.
- * `max_pages` 0 allows any number of pages. */
+ * BAKE_HD_PAD gutter around each frame. A frame too large for such a page gets
+ * a page of its own, up to BAKE_MAX_OVERSIZE_DIM. `max_pages` 0 allows any
+ * number of pages. */
 int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
 						   AeronAtlasImage** out_images, AeronCpuAtlas* out);
-/* Writes the layout YAML of an atlas that BakeSprites_BuildAtlas packed:
- * each frame's id (when `ids` isn't NULL), page, rectangle, anchor and classic
- * size, and `light` for a frame with `has_light`. `header`, when not NULL, is
- * written first, as is. */
-int BakeSprites_WriteAtlasYaml(const char* path, const AeronAtlasImage* images, const BakeFrame* frames,
-							   const uint16_t* ids, int count, const AeronCpuAtlas* atlas, int classic_atlas_w,
-							   int classic_atlas_h, const char* header);
+/* Writes `dir`/`base`.yaml and the pages of an atlas that
+ * BakeSprites_BuildAtlas packed: `base`, then `base`_p<N>. */
+int BakeSprites_WriteAtlasFiles(const BakeSpriteOptions* opt, const char* dir, const char* base,
+								const BakeAtlasHeader* header, const BakeFrame* frames, int count,
+								const AeronAtlasImage* placed, const AeronCpuAtlas* pages);
+/* Packs `frames` into any number of pages and writes them with
+ * BakeSprites_WriteAtlasFiles. Returns 0 and logs the reason on failure. */
+int BakeSprites_PackAndWriteAtlas(const BakeSpriteOptions* opt, const char* dir, const char* base,
+								  const BakeAtlasHeader* header, const BakeFrame* frames, int count);
+/* Writes `[a, b, ...]`, with whole numbers without decimals. */
+void BakeSprites_WriteNumberList(FILE* fp, const double* values, int count);
 
 #endif /* XWA_BAKE_SPRITES_H */

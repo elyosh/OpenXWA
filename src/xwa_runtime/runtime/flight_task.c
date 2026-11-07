@@ -899,10 +899,10 @@ static void XwaFlightTask_RunHangarReadyFrame(void) {
 		}
 		if (fire) {
 			g_flightGlobalCountdownTimers[2] = 15;
-			/* Models with crew.update_all animate their crew in the hangar too,
-			   for every object and in any view. */
+			/* Models with crew.always_animate also animate their crew in the
+			   hangar, on every object and in every view. */
 			if (g_flightPlayerCount == 1 && g_players[g_localPlayer].viewState.externalCameraActive &&
-				!XwaArticulation_CrewUpdatesAll(g_players[g_localPlayer].objectIndex)) {
+				!XwaArticulation_CrewAlwaysAnimates(g_players[g_localPlayer].objectIndex)) {
 				FlightObject_AnimateCrewMeshRotations((uint16_t)g_players[g_localPlayer].objectIndex, 0);
 			}
 			XwaArticulation_StepHangarCrew();
