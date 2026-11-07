@@ -309,9 +309,6 @@ ships:
         shuttle: {type: escort_shuttle}
 ```
 
-When `hangar_model` names a model that doesn't exist, the log warns and the
-ship uses the hangar model `hangar`.
-
 ## Crafts
 
 Each key of `crafts` is a model, such as `xwing`.

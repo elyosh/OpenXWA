@@ -8,6 +8,7 @@
 #include "xwa/assets/object_type.h"
 #include "xwa/assets/object_type_info.h"
 #include "xwa/assets/string_table.h"
+#include "xwa/frontend/frontend_mission.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/names.h"
@@ -1835,4 +1836,26 @@ int XwaCraftDefinitions_NextAddedRow(int list, int* rowIndex, char* line, size_t
 		}
 	}
 	return 0;
+}
+
+int XwaCraftDefinitions_CheckMission(const char* missionPath, const struct XwaFlightGroup* flightGroups,
+									 size_t stride, int count) {
+	int index;
+
+	for (index = 0; index < count; ++index) {
+		const XwaFlightGroup* fg =
+			(const XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)index * stride);
+		char message[512];
+
+		if (g_objectTypeTables.craftTypeToObjectType[fg->craftType] != OBJ_None) {
+			continue;
+		}
+		snprintf(message, sizeof message,
+				 "The mission %s can't be loaded. Its flight group %d (\"%.*s\") has craft type %d, and "
+				 "that craft type has no object type.",
+				 missionPath, index, (int)sizeof fg->name, fg->name, fg->craftType);
+		File_PrintFatalMessageAndExit(message, 1);
+		return 0;
+	}
+	return 1;
 }

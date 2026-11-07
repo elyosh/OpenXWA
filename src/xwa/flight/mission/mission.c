@@ -8161,7 +8161,13 @@ uint16_t Mission_Init(char* fileName) {
 	/* The skins that the renderer loads depend on the flight groups' markings
 	   and on the markings that the mission gives single craft, and the model
 	   settings depend on the craft types. All are final once the loop above has
-	   set up the player groups. */
+	   set up the player groups. The craft types are then checked, before
+	   any object is created. */
+	if (!XwaCraftDefinitions_CheckMission(fileName, &g_missionFlightGroups[0].fg,
+										  sizeof g_missionFlightGroups[0],
+										  (int16_t)g_missionHeader.numFlightGroups)) {
+		return 0;
+	}
 	XwaSkins_SetFlightGroups(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 							 (int16_t)g_missionHeader.numFlightGroups);
 	XwaModelSettings_LoadMission(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],

@@ -3,6 +3,7 @@
 #include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
+#include "xwa/assets/file_io.h"
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/assets/object_type_info.h"
@@ -985,8 +986,8 @@ void XwaHangars_Init(void) {
 		}
 		++s_shipCount;
 		if (ship->layer->hangarModel != NULL && !XwaModelSource_AddKey(ship->layer->hangarModel)) {
-			Aeron_LogWarn("xwa.models", "hangar of '%s': no model '%s'; it uses the stock hangar", ship->key,
-						  ship->layer->hangarModel);
+			Aeron_LogError("xwa.models", "hangar of '%s': no model '%s'", ship->key,
+						   ship->layer->hangarModel);
 		}
 		Hangars_MakeLayerModelsLoadable(ship->layer);
 		for (iff = 0; iff < ship->layer->iffCount; ++iff) {
@@ -1062,9 +1063,6 @@ static int Hangars_FindMothership(int fgIdx, int arrivalFirst, uint16_t* objectT
 		return 0;
 	}
 	mothership = &g_missionFlightGroups[mothershipIdx].fg;
-	if (mothership->craftType >= XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT) {
-		return 0;
-	}
 	*objectType = g_objectTypeTables.craftTypeToObjectType[mothership->craftType];
 	*iff = mothership->iff;
 	*markings = mothership->markings;
@@ -1459,9 +1457,19 @@ static void Hangars_BuildResolvedTables(const HangarsLayer* ship) {
 	Hangars_ResolveCamera(1);
 	Hangars_ResolveSwaps();
 	s_hangarModel[0] = '\0';
-	if (ship != NULL && ship->hangarModel != NULL && strlen(ship->hangarModel) < sizeof s_hangarModel &&
-		XwaModelSource_AddKey(ship->hangarModel)) {
-		strcpy(s_hangarModel, ship->hangarModel);
+	if (ship != NULL && ship->hangarModel != NULL) {
+		if (strlen(ship->hangarModel) < sizeof s_hangarModel && XwaModelSource_AddKey(ship->hangarModel)) {
+			strcpy(s_hangarModel, ship->hangarModel);
+		} else {
+			/* The stock hangar would be the wrong hangar, so this is a fatal
+			   error. */
+			char message[256];
+
+			snprintf(message, sizeof message,
+					 "The hangar of %s can't be shown, because its model %s can't be loaded.", s_shipKey,
+					 ship->hangarModel);
+			File_PrintFatalMessageAndExit(message, 1);
+		}
 	}
 }
 
