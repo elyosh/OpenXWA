@@ -12,8 +12,9 @@ extern "C" {
 
 #define XWA_FLIGHT_CONFIG_PATH "flight/flight.yaml"
 
-/* The root of the file, or NULL when the mod has no file or it can't be
-   read. The first call loads the file and logs why it can't be read. */
+/* The root of the file, or NULL when the mod has no file or it is empty.
+   The first call loads the file. A file that can't be read stops the
+   game. */
 const AeronConfigNode* XwaFlightConfig_Root(void);
 
 /* Frees the file. The next call to XwaFlightConfig_Root loads it again. */

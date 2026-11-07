@@ -427,8 +427,8 @@ Names can only use the characters of the Latin-1 set. When the file
 doesn't name an award, the game uses its original name, or no name for an
 award that the original game doesn't have.
 
-When the file has an error, the log gives its line, and the game ignores
-the whole file.
+When a key or a value has an error, the log gives its line, and the game
+ignores the whole file.
 
 ### Award images
 
@@ -513,8 +513,8 @@ multiplayer_pod: Pod
 
 The values are movie names without an extension, up to 63 characters. The
 movie can be in the mod or in the game. Without a key, and when the movie
-isn't found, the room plays `pod`, as in the original game. When the file
-has an error, the log says so, and the game ignores the whole file.
+isn't found, the room plays `pod`, as in the original game. When a key or a
+value has an error, the log says so, and the game ignores the whole file.
 
 ### Subtitles
 

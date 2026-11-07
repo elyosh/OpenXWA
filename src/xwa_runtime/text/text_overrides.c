@@ -1,8 +1,8 @@
 #include "xwa_runtime/text/text_overrides.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
+#include "xwa_runtime/models/mod_files.h"
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -191,28 +191,17 @@ void XwaText_ToUtf8(const char* text, char* out, size_t outSize) {
 }
 
 void XwaText_Load(void) {
-	AeronConfigError error;
 	AeronConfigFile* file = NULL;
 	const AeronConfigNode* root;
 	const AeronConfigNode* strings;
 	size_t index;
 	size_t count = 0;
 
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, s_stringsPath, &file, &error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.text", "%s:%d: %s. The file is ignored", s_stringsPath, error.line,
-						   error.message);
-		}
+	/* An empty file sets nothing. */
+	if (XwaModFiles_Load(s_stringsPath, 1, &file) != XWA_MOD_FILE_LOADED) {
 		return;
 	}
 	root = AeronConfigFile_Root(file);
-	/* An empty file sets nothing. */
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP && AeronConfigNode_Type(root) != AERON_CONFIG_NULL) {
-		Aeron_LogError("xwa.text", "%s: the file must be a map. It is ignored", s_stringsPath);
-		AeronConfigFile_Destroy(file);
-		return;
-	}
 	strings = AeronConfigNode_MapGet(root, "strings");
 	if (strings != NULL && AeronConfigNode_Type(strings) != AERON_CONFIG_MAP) {
 		Aeron_LogError("xwa.text", "%s: 'strings' isn't a map of IDs to texts. It is ignored", s_stringsPath);

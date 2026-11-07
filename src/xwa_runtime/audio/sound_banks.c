@@ -1,6 +1,5 @@
 #include "xwa_runtime/audio/sound_banks.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
@@ -10,6 +9,7 @@
 #include "xwa/flight/flight.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/util/string.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/units.h"
 
@@ -394,7 +394,6 @@ static void SoundBanks_Free(void) {
 }
 
 void XwaSoundBanks_Init(void) {
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* banks;
 	int sounds = 0;
@@ -406,18 +405,12 @@ void XwaSoundBanks_Init(void) {
 	SoundBanks_Free();
 	memset(s_entries, 0, sizeof s_entries);
 	s_slotCount = 0;
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SOUND_BANKS_YAML, &s_file, &error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.audio", SOUND_BANKS_YAML ":%d: %s. The file is ignored", error.line,
-						   error.message);
-		}
-		s_file = NULL;
+	if (XwaModFiles_Load(SOUND_BANKS_YAML, 0, &s_file) != XWA_MOD_FILE_LOADED) {
 		return;
 	}
 	root = AeronConfigFile_Root(s_file);
 	banks = AeronConfigNode_MapGet(root, "banks");
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP || AeronConfigNode_Type(banks) != AERON_CONFIG_MAP) {
+	if (AeronConfigNode_Type(banks) != AERON_CONFIG_MAP) {
 		Aeron_LogError("xwa.audio", SOUND_BANKS_YAML ": the file needs a 'banks' map. It is ignored");
 		AeronConfigFile_Destroy(s_file);
 		s_file = NULL;

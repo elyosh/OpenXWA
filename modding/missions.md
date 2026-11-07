@@ -57,9 +57,8 @@ headlights: true
 ```
 
 Without a mission file, the mission plays as its `.TIE` file says. An empty
-file changes nothing. When the file isn't valid YAML, or isn't a map, the
-game logs an error and ignores the whole file. When a section has the wrong
-form, the game logs a warning and ignores that section.
+file changes nothing. When a section has the wrong form, the game logs a
+warning and ignores that section.
 
 The game reads the file each time it loads the mission. The briefing also
 reads it: the order of battle uses `settings` and `craft_names`, and the

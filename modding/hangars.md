@@ -7,10 +7,9 @@ settings in the `hangar` section of its mission file.
 
 The game uses `hangars.yaml` only while model replacements are on, which is
 the default. Without the file, the hangars keep the original game's layout,
-and the `hangar` section of the missions is ignored. A file that can't be
-read is logged, and the hangars keep the original layout. An empty file
-keeps the original layout too, because every key's default is the
-original game's value.
+and the `hangar` section of the missions is ignored. An empty file keeps
+the original layout too, because every key's default is the original
+game's value.
 
 Lengths are in metres and angles in degrees. Objects are named by their
 object type, such as `hangar_droid`, and models by their model name, such

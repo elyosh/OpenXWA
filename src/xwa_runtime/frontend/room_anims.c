@@ -9,6 +9,7 @@
 #include "xwa/frontend/frontend_sound.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_video.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/timing/host_clock.h"
 
 #include <stdarg.h>
@@ -367,7 +368,6 @@ static int anims_read(const AeronConfigNode* root) {
 
 static void anims_load(void) {
 	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 
 	if (g_animsLoaded) {
 		return;
@@ -378,13 +378,7 @@ static void anims_load(void) {
 	if (!Aeron_RandomBytes(&g_animRandom, sizeof(g_animRandom)) || !g_animRandom) {
 		g_animRandom = 0x2545f491u;
 	}
-	memset(&error, 0, sizeof(error));
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, XWA_ANIMS_PATH, &file, &error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.frontend", "%s:%d: %s", XWA_ANIMS_PATH, error.line,
-						   error.message[0] ? error.message : "cannot be read");
-			Aeron_LogError("xwa.frontend", "%s is ignored", XWA_ANIMS_PATH);
-		}
+	if (XwaModFiles_Load(XWA_ANIMS_PATH, 0, &file) != XWA_MOD_FILE_LOADED) {
 		return;
 	}
 	if (!anims_read(AeronConfigFile_Root(file))) {

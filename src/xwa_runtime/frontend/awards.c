@@ -1,12 +1,12 @@
 #include "xwa_runtime/frontend/awards.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/string_table.h"
 #include "xwa/assets/ui_string.h"
 #include "xwa/frontend/frontend_medals.h"
 #include "xwa/frontend/mission_setup.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/text/text_overrides.h"
 
 #include <stdlib.h>
@@ -336,18 +336,13 @@ static int awards_read(const AeronConfigNode* root, XwaAwards* awards) {
 static const XwaAwards* awards_get(void) {
 	if (!g_awardsLoaded) {
 		AeronConfigFile* file = NULL;
-		AeronConfigError error;
 
 		g_awardsLoaded = 1;
 		g_awards.mementoSprites = AWARDS_STOCK_MEMENTO_SPRITES;
-		memset(&error, 0, sizeof(error));
-		if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, XWA_AWARDS_PATH, &file, &error)) {
-			if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-				Aeron_LogError("xwa.frontend", "%s:%d: %s", XWA_AWARDS_PATH, error.line,
-							   error.message[0] ? error.message : "cannot be read");
-				Aeron_LogError("xwa.frontend", "%s is ignored", XWA_AWARDS_PATH);
-			}
-		} else if (!awards_read(AeronConfigFile_Root(file), &g_awards)) {
+		if (XwaModFiles_Load(XWA_AWARDS_PATH, 0, &file) != XWA_MOD_FILE_LOADED) {
+			return &g_awards;
+		}
+		if (!awards_read(AeronConfigFile_Root(file), &g_awards)) {
 			Aeron_LogError("xwa.frontend", "%s is ignored", XWA_AWARDS_PATH);
 			awards_free(&g_awards);
 			g_awards.mementoSprites = AWARDS_STOCK_MEMENTO_SPRITES;

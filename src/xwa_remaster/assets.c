@@ -18,6 +18,7 @@
 #include "xwa_remaster/original_2d.h"
 #include "xwa_runtime/frontend/frontend_fonts.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <errno.h>
@@ -602,8 +603,8 @@ static FrameSets* assets_read_frame_sets(const XwaRemasterAssets* a, int group) 
 	AeronConfigFile* file = NULL;
 	AeronConfigError error = { 0 };
 	snprintf(path, sizeof path, "resdata/atlas/group_%d.yaml", group);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, &file, &error))
-		return NULL; /* the atlas reader already reported it */
+	if (XwaModFiles_Load(path, 0, &file) != XWA_MOD_FILE_LOADED)
+		return NULL;
 	const AeronConfigNode* node = AeronConfigNode_MapGet(AeronConfigFile_Root(file), "frame_sets");
 	const AeronConfigNode* shuffle = AeronConfigNode_MapGet(node, "shuffle");
 	const AeronConfigNode* reroll = AeronConfigNode_MapGet(node, "reroll_seconds");

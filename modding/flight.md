@@ -47,9 +47,6 @@ sections:
 | `suns` | the procedural suns and their lens flare |
 | `speed_effect` | streaks of dust that show the player's speed |
 
-If the file can't be read, for example because of a YAML error, the game
-writes an error in the log and uses none of its sections.
-
 Check the spelling of section and key names. The game ignores a section
 that it doesn't know, and several sections, such as `rules`, `weapons`,
 `docking` and `shield_recharge`, ignore unknown keys without a warning.
@@ -876,9 +873,6 @@ target_display:
 | `radar` | How the blips on the radar scopes are drawn. |
 | `target_readout` | The target's name, cargo, distance and damage bars next to its box. |
 
-If the file can't be read, the game writes an error in the log and ignores
-the whole file.
-
 The HUD settings of one craft, such as its reticle and its HUD colours, are
 in its model settings file. See [Craft](craft.md).
 
@@ -1101,8 +1095,8 @@ bank has these keys:
 
 A bank that the file doesn't have plays the original game's sounds.
 
-If the file can't be read, or has no `banks` map, the game writes an error
-in the log and ignores the whole file.
+If the file has no `banks` map, the game writes an error in the log and
+ignores the whole file.
 
 ### Entries
 
