@@ -83,7 +83,7 @@ to 256 environments.
 | `diffuse_strength` | Multiplies the light of `diffuse`. 0 to 4. Give it with `diffuse`, and only with it. |
 | `specular` | The cube that models reflect. It needs `diffuse`. |
 | `specular_strength` | Multiplies the reflections of `specular`. 0 to 4. Give it with `specular`, and only with it. |
-| `ambient_fill` | Light that comes from every direction, `[r, g, b]` in the sky's units, 0 to 1000 each. The default is `[0, 0, 0]`. |
+| `ambient_fill` | The least soft light that models get, `[r, g, b]` radiance in W/m²/sr, 0 to 1000 each. Where the `diffuse` cube gives less light than this, the game adds some of the fill until the light is as bright as the fill. Where the cube is brighter, the fill does nothing. `intensity` doesn't scale it. The default is `[0, 0, 0]`. |
 | `rotation_degrees` | Turns the sky and its suns, `[yaw, pitch, roll]`. The default is `[0, 0, 0]`. See [Directions](#directions). |
 | `directional_lights` | The suns, up to four. See [Suns](#suns). It is required with `radiance`. Use `[]` for a sky without suns. |
 | `overlay` | A cube with transparency, drawn over the sky. See [Overlays](#overlays). It needs `radiance`. |
@@ -96,7 +96,8 @@ While a region uses an environment:
 
 - The environment's `ambient_fill` replaces the game's ambient light. The
   region has no other ambient light, so set a fill unless the cubes give
-  enough light.
+  enough light everywhere. Without a `diffuse` cube, the fill is all of the
+  ambient light.
 - The `diffuse` and `specular` cubes light the models.
 - With `radiance`, the sky replaces the starfield, the backdrop images
   (planets, nebulae, suns), the lights that the backdrops give and their
@@ -567,7 +568,7 @@ the game's own lights match.
 |-|-|-|
 | A sun's `intensity` | the light that falls on a surface facing the sun, in W/m² | 683 lux |
 | An environment's `intensity`, `sprite_strength` | multiplies the image's values to give the light that the sky sends, in W/m²/sr | 683 cd/m² for a pixel of 1 |
-| `ambient_fill` | the light that comes from every direction, in W/m²/sr | 683 cd/m² |
+| `ambient_fill` | the least light that comes from every direction, in W/m²/sr | 683 cd/m² |
 
 Use these values to start:
 

@@ -20,6 +20,7 @@
 #include "stock_tables.h"
 #include "xwa_app/mod_format.h"
 #include "xwau_awards.h"
+#include "xwau_config.h"
 #include "xwau_craft.h"
 #include "xwau_cube_faces.h"
 #include "xwau_flight_settings.h"
@@ -221,6 +222,24 @@ static size_t count_opts(const char* dir) {
 	return opts;
 }
 
+/* Reads the name of a TFTC release, such as "TFTC Reimagined 1.4.0": the variant
+ * from Modname.txt and the version from line 1 of Mod-version-TFTC-TFTC.txt,
+ * "1.4.0.0", without its last ".0". */
+static bool read_tftc_release_name(const char* dir, char* out, size_t cap) {
+	char variant[128], version[64];
+	if (!read_line(dir, "Mod-version-TFTC-TFTC.txt", 1, version, sizeof version) ||
+		!read_line(dir, "Modname.txt", 1, variant, sizeof variant))
+		return false;
+	size_t dots = 0;
+	for (const char* c = version; *c; ++c)
+		dots += *c == '.';
+	const size_t length = strlen(version);
+	if (dots == 3 && length > 2 && strcmp(version + length - 2, ".0") == 0)
+		version[length - 2] = '\0';
+	snprintf(out, cap, "%s %s", variant, version);
+	return true;
+}
+
 bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* error, size_t error_cap) {
 	char path[IMPORT_PATH_CAP];
 	memset(info, 0, sizeof *info);
@@ -237,7 +256,8 @@ bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* er
 				 "the FlightModels folder.");
 		return false;
 	}
-	if (!read_line(source, "TFTCVersion.txt", 1, info->name, sizeof info->name) &&
+	if (!read_tftc_release_name(source, info->name, sizeof info->name) &&
+		!read_line(source, "TFTCVersion.txt", 2, info->name, sizeof info->name) &&
 		!read_line(source, "mod-version-XWAU-XWAU.txt", 2, info->name, sizeof info->name) &&
 		!read_line(source, "XWAUVersion.txt", 1, info->name, sizeof info->name)) {
 		size_t length = strlen(source);
@@ -585,7 +605,7 @@ static void craft(ImportContext* ctx) {
 	}
 	XwauLines cockpits = { 0 };
 	XwauTextIds moved = { 0 };
-	bool ok = XwauCraft_Write(options->source, flight, &ctx->names, &ctx->stock_values, &cockpits);
+	bool ok = XwauCraft_Write(options->source, flight, &ctx->names, &ctx->stock_values, stock, &cockpits);
 	ok = XwauObjects_Write(options->source, options->game, stock, mod, &ctx->names, flight, &moved) && ok;
 	XwauGunnerSeats_CheckCockpits(options->source, flight, &cockpits);
 	XwauGameTables_Free(mod);
@@ -639,6 +659,17 @@ static bool missions(ImportContext* ctx, bool* skyboxes) {
 	return true;
 }
 
+enum { SKY_MAX_FACE_SIZE = 4096 };
+
+/* Returns the face size of a baked sky or overlay: the largest power of two
+ * that isn't larger than the source faces, up to SKY_MAX_FACE_SIZE. */
+static int sky_face_size(int source_size) {
+	int size = 16;
+	while (size * 2 <= source_size && size < SKY_MAX_FACE_SIZE)
+		size *= 2;
+	return size;
+}
+
 /* Converts each sky and overlay folder of the skybox list. Each line is
  * "sky" or "overlay", the source folder, the environment name ("-" for an
  * overlay) and the texture folder in the mod folder, separated by tabs. */
@@ -684,6 +715,7 @@ static void bake_skyboxes(ImportContext* ctx) {
 			EnvBakeOptions bake;
 			EnvBake_DefaultOptions(&bake);
 			bake.face_pixels = &pixels;
+			bake.radiance_size = sky_face_size(faces.size);
 			if (is_overlay) {
 				bake.overlay_out = overlay;
 			} else {
@@ -722,7 +754,10 @@ static void bake_frontend(ImportContext* ctx) {
 									  .xwau_root = ctx->options->source,
 									  .stock_root = ctx->options->game };
 	BakeXwauStats stats = { 0 };
-	const int ok = BakeXwau_RunFrontend(&options, &stats);
+	BakeSprites_BeginQueue(ctx->cores);
+	const int baked = BakeXwau_RunFrontend(&options, &stats);
+	stats.failures += BakeSprites_EndQueue();
+	const int ok = baked && stats.failures == 0;
 	ToolLog_Write(
 		TOOL_LOG_INFO,
 		"Frontend art: %d atlases, %d HD frames, %d frames upscaled from standard images, %d files left "
@@ -739,11 +774,14 @@ static void bake_flight(ImportContext* ctx) {
 								  .scale = true,
 								  .bc7_quality = KTX2_BC7_QUALITY_MED,
 								  .group_filter = -1 };
-	const BakeXwauFlightOptions options = { .sprites = &sprites,
-											.xwau_root = ctx->options->source,
-											.planet_max = 2048 };
+	const BakeXwauFlightOptions options = {
+		.sprites = &sprites, .xwau_root = ctx->options->source, .planet_max = 0, .threads = ctx->cores
+	};
 	BakeXwauFlightStats stats = { 0 };
-	const int ok = BakeXwau_RunFlight(&options, &stats);
+	BakeSprites_BeginQueue(ctx->cores);
+	const int baked = BakeXwau_RunFlight(&options, &stats);
+	stats.failures += BakeSprites_EndQueue();
+	const int ok = baked && stats.failures == 0;
 	ToolLog_Write(
 		TOOL_LOG_INFO,
 		"Flight art: %d atlases with %d images, %d alternative frame sets, %d mission art folders, %d "
@@ -859,6 +897,9 @@ XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModIm
 		ctx.cores = 1;
 	ImportLog_Open(progress, options);
 	ClearReportFatal();
+	/* The installation and the game folder don't change during the import,
+	   so each of their folders is read once. */
+	Xwau_SetFolderCache(true);
 
 	XwaModImportResult result = run_phases(&ctx, &authoring);
 	if (ReportFatalMessage()) {
@@ -870,6 +911,7 @@ XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModIm
 		Import_Advance(&ctx, 0, 1000);
 	else if (result == XWA_MOD_IMPORT_STOPPED && Import_Cancelled(&ctx))
 		result = XWA_MOD_IMPORT_CANCELLED;
+	Xwau_SetFolderCache(false);
 	if (ctx.work[0] && !RemoveTree(ctx.work))
 		ToolLog_Write(TOOL_LOG_WARNING, "Can't delete %s", ctx.work);
 	ImportAuthoring_Free(&authoring);

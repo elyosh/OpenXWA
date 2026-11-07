@@ -2,42 +2,18 @@
 #define XWA_RUNTIME_MODELS_GUNNER_SEATS_H
 
 /* Reads a model's gunner seats from the `gunner_seats` group of its model
- * settings file:
- *
- *   gunner_seats:
- *     forward_fire: false
- *     seats:
- *       - {position_m: [0.464, 0, 6.104], mount_pitch_degrees: 90, mount_yaw_degrees: -90,
- *          aim_limit_pitch_degrees: 66.138, aim_limit_yaw_degrees: 95.076,
- *          cockpit: millenniumfalcon2gunner, inverted: false}
+ * settings file. The mod documentation describes the keys.
  *
  * In the stock game, only the Corellian transport, the Millennium Falcon and
  * the family transport have gunner seats, and their craft records hold them.
  * With this group, any craft can have seats, and the list replaces the seats
- * in the craft record. `seats: []` means no seats. A craft has at most 2
- * seats.
- *
- * Seat keys:
- *   - position_m: the eye in the craft model, [right, forward, up] in
- *     metres, in the same frame as the cockpit eye and the hardpoints;
- *   - mount_pitch_degrees: turns the view about the craft's right axis.
- *     Positive looks up, so a seat under the craft has -90;
- *   - mount_yaw_degrees: turns the view about the craft's up axis, before
- *     the pitch;
- *   - aim_limit_pitch_degrees and aim_limit_yaw_degrees: how far the gunner
- *     can aim from the mount direction, from 0 to 180. The shots and the
- *     turret meshes follow the pitch, and the beam system mesh the yaw;
- *   - cockpit: the model of the seat's cockpit. At startup, the game gives
- *     each cockpit model that a seat uses its own hidden object type. The
- *     stock cockpit is corelliantransportgunner;
- *   - inverted: draws the cockpit upside down, as the stock game does for
- *     its second seat.
- * All keys except `cockpit` are optional and default to 0 or false. The
+ * in the craft record. A craft has at most 2 seats. The
  * `craft_record.turrets` entries of an object type file use the same keys,
- * with `object_type` instead of `cockpit`.
+ * without `inverted`, and with `object_type` instead of `cockpit`.
  *
- * `forward_fire: false` stops the turret laser groups from also firing
- * forward when the pilot fires. It defaults to true, as in the stock game.
+ * A seat's position is in the same frame as the cockpit eye and the
+ * hardpoints. At startup, the game gives each cockpit model that a seat uses
+ * its own hidden object type.
  *
  * The seats change the simulation. */
 

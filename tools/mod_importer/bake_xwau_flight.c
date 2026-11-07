@@ -57,6 +57,7 @@
 #include "xwau_dat.h"
 
 #include "aeron/image.h"
+#include "envmap.h"
 
 #include <ctype.h>
 #include <dirent.h>
@@ -74,8 +75,9 @@
  * the rest of the HUD as the resolution goes up. Its size is set to look as
  * it does in XWAU at 1080p, where the HUD scale is 1080 / 600. */
 #define FLIGHT_HULL_ICON_HUD_SCALE (1080.0 / 600.0)
-/* The largest image that fits in an atlas page with its gutters. */
-#define FLIGHT_MAX_IMAGE (BAKE_MAX_ATLAS_DIM - 2 * BAKE_HD_PAD)
+/* The largest image that fits in an atlas page of its own with its
+ * gutters. */
+#define FLIGHT_MAX_IMAGE (BAKE_MAX_OVERSIZE_DIM - 2 * BAKE_HD_PAD)
 /* XWAU's ddraw wrapper picks alternative explosions only for these groups
  * (Direct3DDevice.cpp: DATGroupId - 2000, MAX_XWA_EXPLOSIONS). */
 #define FLIGHT_FIRST_EXPLOSION_GROUP 2000
@@ -137,13 +139,6 @@ typedef struct FlightBackdrop {
 	int picks_frame;
 } FlightBackdrop;
 
-/* A DAT material file: Materials/dat-<group>.mat or dat-<group>-<id>.mat. */
-typedef struct FlightMaterialFile {
-	int group;
-	int image; /* the image id, or -1 for the whole group */
-	char path[1100];
-} FlightMaterialFile;
-
 /* The keys of a DAT material that this bake uses, from its [Default]
  * section. */
 typedef struct FlightMaterial {
@@ -154,6 +149,15 @@ typedef struct FlightMaterial {
 	char set_dat[FLIGHT_SET_COUNT][512]; /* the DAT path as written, such as ResData\ExplosionsAlt3.dat */
 	int set_group[FLIGHT_SET_COUNT];
 } FlightMaterial;
+
+/* A DAT material file: Materials/dat-<group>.mat or dat-<group>-<id>.mat. */
+typedef struct FlightMaterialFile {
+	int group;
+	int image; /* the image id, or -1 for the whole group */
+	char path[1100];
+	int readable; /* 0 if the file can't be read */
+	FlightMaterial material;
+} FlightMaterialFile;
 
 typedef struct FlightContext {
 	const BakeXwauFlightOptions* opt;
@@ -709,6 +713,13 @@ static int flight_read_material(const char* path, FlightMaterial* out) {
 	return 1;
 }
 
+/* Reads each material file once. Many images share the same file. */
+static void flight_read_materials(FlightContext* ctx) {
+	for (int i = 0; i < ctx->material_count; ++i)
+		ctx->materials[i].readable =
+			flight_read_material(ctx->materials[i].path, &ctx->materials[i].material);
+}
+
 static const FlightMaterialFile* flight_find_material(const FlightContext* ctx, int group, int image) {
 	for (int i = 0; i < ctx->material_count; ++i) {
 		if (ctx->materials[i].group == group && ctx->materials[i].image == image)
@@ -897,9 +908,9 @@ static int flight_fit(BakeFrame* frame, int max_width, int max_height) {
  * a frame by its position. */
 static void flight_bake_frame_sets(FlightContext* ctx, int group, char* frame_sets, size_t frame_sets_size) {
 	const FlightMaterialFile* file = flight_find_material(ctx, group, -1);
-	FlightMaterial material;
-	if (!file || !flight_read_material(file->path, &material))
+	if (!file || !file->readable)
 		return;
+	const FlightMaterial material = file->material;
 	int any = 0;
 	for (int set = 0; set < FLIGHT_SET_COUNT; ++set)
 		any |= material.has_set[set];
@@ -972,11 +983,36 @@ static void flight_image_light(const FlightContext* ctx, int group, int id, Bake
 	const FlightMaterialFile* file = flight_find_material(ctx, group, id);
 	if (!file)
 		file = flight_find_material(ctx, group, -1);
-	FlightMaterial material;
-	if (file && flight_read_material(file->path, &material) && material.has_light) {
+	if (file && file->readable && file->material.has_light) {
 		frame->has_light = 1;
-		memcpy(frame->light, material.light, sizeof frame->light);
+		memcpy(frame->light, file->material.light, sizeof frame->light);
 	}
+}
+
+/* An image of a group, decoded by one of the decode threads. */
+typedef struct FlightDecoded {
+	XwauDatImageInfo info;
+	XwauDatImage image;
+	int ok; /* 0: `error` says why */
+	char error[256];
+} FlightDecoded;
+
+typedef struct FlightDecode {
+	const FlightContext* ctx;
+	int group;
+	const FlightImage* images;
+	FlightDecoded* decoded;
+} FlightDecode;
+
+/* The DAT files are in memory and are only read, so their images can be
+   decoded on several threads. */
+static void flight_decode_task(void* context, int index) {
+	const FlightDecode* decode = (const FlightDecode*)context;
+	const XwauDat* dat = decode->ctx->dats[decode->images[index].dat].dat;
+	FlightDecoded* out = &decode->decoded[index];
+	out->ok = XwauDat_GetImageInfo(dat, decode->group, decode->images[index].id, &out->info) &&
+			  XwauDat_LoadImageFrom(dat, decode->group, decode->images[index].id, &out->image, out->error,
+									sizeof out->error);
 }
 
 static void flight_bake_group(FlightContext* ctx, int group) {
@@ -997,21 +1033,25 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 	};
 
 	BakeFrame* frames = (BakeFrame*)calloc((size_t)count, sizeof *frames);
-	int ok = frames != NULL;
+	const int threads = ctx->opt->threads > 1 ? ctx->opt->threads : 1;
+	FlightDecode decode = { ctx, group, images,
+							(FlightDecoded*)calloc((size_t)count, sizeof *decode.decoded) };
+	int ok = frames != NULL && decode.decoded != NULL;
 	int resized = 0;
 	int fitted = 0;
-	char error[256];
+	if (ok)
+		envmap_parallel_for(count, threads, flight_decode_task, &decode);
 	for (int i = 0; ok && i < count; ++i) {
-		const XwauDat* dat = ctx->dats[images[i].dat].dat;
-		XwauDatImageInfo info;
-		XwauDatImage image;
-		ok = XwauDat_GetImageInfo(dat, group, images[i].id, &info) &&
-			 XwauDat_LoadImageFrom(dat, group, images[i].id, &image, error, sizeof error);
+		FlightDecoded* decoded = &decode.decoded[i];
+		ok = decoded->ok;
 		if (!ok) {
 			ToolLog_Write(TOOL_LOG_ERROR, "xwau: %s: group %d image %d can't be decoded: %s",
-						  ctx->dats[images[i].dat].name, group, images[i].id, error);
+						  ctx->dats[images[i].dat].name, group, images[i].id, decoded->error);
 			break;
 		}
+		const XwauDatImageInfo info = decoded->info;
+		const XwauDatImage image = decoded->image;
+		decoded->image.rgba = NULL;
 		BakeFrame* frame = &frames[i];
 		const double scale = flight_scale(ctx, group, i) / 256.0;
 		frame->rgba = image.rgba;
@@ -1030,8 +1070,9 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 			ok = flight_fit(frame, ctx->opt->planet_max, 0);
 			resized++;
 		}
-		/* An image larger than an atlas page is scaled down to fit, such as
-		   TFTC's galaxy and nebula backdrops, which are 8912 pixels wide. */
+		/* An image too large even for a page of its own is scaled down to fit.
+		   TFTC's 8912-pixel galaxy and nebula backdrops fit, so they each get a
+		   page of their own. */
 		if (ok && (frame->w > FLIGHT_MAX_IMAGE || frame->h > FLIGHT_MAX_IMAGE)) {
 			ok = flight_fit(frame, FLIGHT_MAX_IMAGE, FLIGHT_MAX_IMAGE);
 			fitted++;
@@ -1048,6 +1089,9 @@ static void flight_bake_group(FlightContext* ctx, int group) {
 		ctx->stats->failures++;
 	}
 	flight_free_frames(frames, frames ? count : 0);
+	for (int i = 0; decode.decoded && i < count; ++i)
+		XwauDat_FreeImage(&decode.decoded[i].image);
+	free(decode.decoded);
 	free(images);
 }
 
@@ -1257,6 +1301,7 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 	flight_read_backdrop_scales(&ctx);
 	flight_read_exe(&ctx);
 	flight_list_materials(&ctx);
+	flight_read_materials(&ctx);
 	flight_check_material_keys(&ctx);
 	ToolLog_Write(
 		TOOL_LOG_DETAIL,
@@ -1287,12 +1332,14 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 	}
 	if (group_count > 1)
 		qsort(groups, (size_t)group_count, sizeof *groups, flight_compare_ints);
-	/* The bake stops at the first failure. */
-	for (int g = 0; g < group_count && stats->failures == 0; ++g)
+	/* The bake stops at the first failure, including an image that failed in
+	   the encode queue. */
+	for (int g = 0; g < group_count && stats->failures == 0 && BakeSprites_QueueFailures() == 0; ++g)
 		flight_bake_group(&ctx, groups[g]);
-	for (int k = 0; k < ctx.mission_art_count && stats->failures == 0; ++k)
+	for (int k = 0; k < ctx.mission_art_count && stats->failures == 0 && BakeSprites_QueueFailures() == 0;
+		 ++k)
 		flight_bake_mission_art(&ctx, &ctx.mission_art[k]);
-	if (stats->failures == 0 &&
+	if (stats->failures == 0 && BakeSprites_QueueFailures() == 0 &&
 		(opt->sprites->group_filter < 0 || opt->sprites->group_filter == FLIGHT_FONT_GROUP)) {
 		flight_bake_fonts(&ctx);
 		flight_write_fonts_yaml(&ctx);

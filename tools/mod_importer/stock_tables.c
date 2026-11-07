@@ -179,10 +179,20 @@ static const uint16_t k_stockMapIcons[] = {
 static const uint8_t k_stockHardpointKinds[] = {
 #include "xwa/flight/hardpoint_weapon_kinds.inc"
 };
+static const uint16_t k_stockLifetimeSeconds[] = {
+#include "xwa/flight/object/projectile_lifetime_seconds.inc"
+};
+static const uint16_t k_stockLifetimeFractions[] = {
+#include "xwa/flight/object/projectile_lifetime_fractions.inc"
+};
 /* The game's arrays have these sizes, so the copies must have them too. */
 typedef char stock_tables_check[(sizeof k_stockHullIcons / sizeof k_stockHullIcons[0] == 72 &&
 								 sizeof k_stockMapIcons / sizeof k_stockMapIcons[0] == OBJ_NoAsset_222 + 1 &&
-								 sizeof k_stockHardpointKinds == 40)
+								 sizeof k_stockHardpointKinds == 40 &&
+								 sizeof k_stockLifetimeSeconds / sizeof k_stockLifetimeSeconds[0] ==
+									 OBJ_LaserImperialDS - OBJ_LaserRebel + 1 &&
+								 sizeof k_stockLifetimeFractions / sizeof k_stockLifetimeFractions[0] ==
+									 OBJ_LaserImperialDS - OBJ_LaserRebel + 1)
 									? 1
 									: -1];
 
@@ -219,4 +229,7 @@ void ImportStockTables_Values(XwauStockValues* out) {
 	out->map_icon_count = sizeof k_stockMapIcons / sizeof k_stockMapIcons[0];
 	out->hardpoint_kinds = k_stockHardpointKinds;
 	out->hardpoint_kind_count = sizeof k_stockHardpointKinds / sizeof k_stockHardpointKinds[0];
+	out->lifetime_seconds = k_stockLifetimeSeconds;
+	out->lifetime_fractions = k_stockLifetimeFractions;
+	out->lifetime_count = sizeof k_stockLifetimeSeconds / sizeof k_stockLifetimeSeconds[0];
 }

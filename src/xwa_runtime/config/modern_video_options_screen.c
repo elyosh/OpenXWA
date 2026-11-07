@@ -4,12 +4,15 @@
 #include "xwa/assets/string_table.h"
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_options_menu.h"
+#include "xwa_runtime/config/modern_target_readout_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 
 #include <math.h>
 #include <stdint.h>
 
 int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
+	/* The rows under the title, Back included. */
+	enum { row_count = 14 };
 	static const char* const window_mode_texts[] = { "Windowed", "Fullscreen" };
 	static const char* const quality_texts[] = { "Off", "Low", "High" };
 	static const char* const shadow_quality_texts[] = { "Standard", "High" };
@@ -25,6 +28,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 													 "250 nits", "300 nits", "400 nits" };
 	XwaModernVideoOptions options;
 	XwaModernCameraOptions camera_options;
+	XwaModernTargetReadoutOptions target_readout_options;
 	XwaModernOptionsMenu menu;
 	uint8_t window_mode;
 	uint8_t ssao;
@@ -40,6 +44,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	uint8_t paper_white;
 	uint8_t smooth_menu_fonts;
 	uint8_t enhanced_camera;
+	uint8_t target_readout;
 	int hdr_rows_disabled;
 	int motion_blur_amount_changed;
 	int changed;
@@ -65,8 +70,11 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	smooth_menu_fonts = (uint8_t)options.smooth_menu_fonts;
 	XwaModernCameraOptions_Get(&camera_options);
 	enhanced_camera = (uint8_t)(camera_options.enabled != 0);
+	XwaModernTargetReadoutOptions_Get(&target_readout_options);
+	target_readout = (uint8_t)(target_readout_options.enabled != 0);
 	changed = 0;
-	XwaModernOptionsMenu_Begin(&menu, menu_center_x, 140, cursor_row, 13);
+	XwaModernOptionsMenu_Begin(&menu, menu_center_x, XwaModernOptionsMenu_CenteredY(row_count), cursor_row,
+							   row_count);
 	XwaModernOptionsMenu_DrawTitle(&menu, "OpenXWA Video Options");
 
 	changed |=
@@ -77,7 +85,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &fsr, "FSR Upscaling", fsr_texts, 5, 63, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &msaa, "MSAA", msaa_texts, 4, 64, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &smooth_menu_fonts, "Smooth Menu Fonts",
-										 toggle_texts, 2, 71, 0);
+										 toggle_texts, 2, 72, 0);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &motion_blur_quality, "Motion Blur", motion_blur_texts,
 												3, 65, 0);
 	motion_blur_amount_changed =
@@ -130,7 +138,12 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	   change the row, so until then the row follows the mod. */
 	if (XwaModernOptionsMenu_DrawCycleU8(&menu, &enhanced_camera, "Enhanced Camera", toggle_texts, 2, 70,
 										 0)) {
-		XwaModernCameraOptions_SetEnabled(enhanced_camera);
+		XwaOptionSection_SetEnabled(XwaModernCameraOptions_Section(), enhanced_camera);
+	}
+	/* The target's name, cargo, distance and damage bars next to its box.
+	   Like Enhanced Camera, it follows the mod until the player changes it. */
+	if (XwaModernOptionsMenu_DrawCycleU8(&menu, &target_readout, "Target Readout", toggle_texts, 2, 71, 0)) {
+		XwaOptionSection_SetEnabled(XwaModernTargetReadoutOptions_Section(), target_readout);
 	}
 
 	back = XwaModernOptionsMenu_DrawAction(&menu, FrontendString_Get(STR_BACK), 69, 0);
@@ -140,6 +153,6 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	}
 
 	XwaModernVideoOptions_Flush();
-	XwaModernCameraOptions_Flush();
+	XwaOptionSection_FlushAll();
 	return 1;
 }

@@ -2,27 +2,17 @@
 #define XWA_RUNTIME_MODELS_HEADLIGHTS_H
 
 /* Headlights: a light along the player craft's nose, for dark places such
- * as the Death Star. The `headlights` section of flight/flight.yaml gives
- * the light, and is read once at startup:
+ * as the Death Star. The `headlights` section of the mod's flight settings
+ * gives the light, and is read once at startup. A mission turns them on in
+ * its mission file. They are then on while the player isn't in the hangar.
+ * In the other missions, `auto_turn_on` turns them on while there is no
+ * directional light.
  *
- *   headlights:
- *     position_m: [0, 0, 20]      # from the craft's eye: X right, Y up, Z forward
- *     color: [0.944, 0.944, 1]    # linear
- *     power_w: 1314756
- *     angle_degrees: 25
- *     auto_turn_on: true
- *
- * The light points along the nose. Its colour and its power in watts are
- * those of a Blender area light, as for the lights of the GLB models: P
- * watts give P * 683 / pi candela straight ahead. `angle_degrees` (above 0,
- * at most 90) makes it a spot light that ends at that angle from the nose,
- * fading from the nose out. Without it, the light
- * is one-sided, with a cosine falloff. Without the section there are no
- * headlights. Every key but `power_w` is optional.
- *
- * A mission turns them on with `headlights: true` in its mission file: they are
- * then on while the player isn't in the hangar. In the other missions, with
- * `auto_turn_on`, they are on while there is no directional light. */
+ * The colour and the power in watts are those of a Blender area light, as
+ * for the lights of the GLB models: P watts give P * 683 / pi candela
+ * straight ahead. Without `angle_degrees`, the light is one-sided, with a
+ * cosine falloff. With it, the light is a spot light that fades from the
+ * nose out. */
 
 #ifdef __cplusplus
 extern "C" {

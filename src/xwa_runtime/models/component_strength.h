@@ -2,13 +2,9 @@
 #define XWA_RUNTIME_MODELS_COMPONENT_STRENGTH_H
 
 /* The strength of a model's components, from the `component_strength` group
- * of its model settings file:
- *
- *   component_strength: {gun_turret: 18, small_gun: 18, shield_generator: 36}
- *
- * The keys are the mesh type names of the AERON_flight_model extension, such
- * as main_hull or rotary_communication_system. The values go from 0 to 255.
- * A mesh type without a value keeps the game's strength for that type.
+ * of its model settings file. The keys are the mesh type names of the
+ * AERON_flight_model extension. A mesh type without a value keeps the game's
+ * strength for that type.
  *
  * A new craft's components start with this strength, and the target display
  * shows a component's health as a percent of it. The Super Star Destroyer's

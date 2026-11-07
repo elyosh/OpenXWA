@@ -209,13 +209,26 @@ void XwaRemasterText_PrepareFrontendFonts(AeronCommandBuffer* cmd, XwaRemasterAs
 	}
 }
 
+/* The tint of a frontend glyph of engine colour `color`: sRGB values for a
+ * list that works on sRGB values, such as the frontend's, else linear
+ * values. */
+static void text_glyph_tint(const AeronDrawList2D* list, uint32_t color, float tint[4]) {
+	const int srgb_values = AeronDrawList_UsesSrgbValues(list);
+	uint8_t rgba[4];
+	XwaSnapshotExport_ColorToRgba(color, rgba);
+	for (int i = 0; i < 3; i++) {
+		const float value = (float)rgba[i] / 255.0f;
+		tint[i] = srgb_values ? value : XwaRemaster_SrgbToLinear(value);
+	}
+	tint[3] = 1.0f;
+}
+
 /* A glyph of a font from frontend/fonts/fonts.yaml, drawn 1:1 at whole
  * pixels. It is centred in the advance the layout used. */
 static int text_add_face_glyph(AeronDrawList2D* list, const AeronFontAtlas* atlas,
 							   const XwaFrontendFont* font, const XwaGlyph2D* glyph,
 							   const XwaRemasterTextMapping* mapping) {
 	AeronDrawList2DSprite sprite = { 0 };
-	uint8_t rgba[4];
 	const float pen =
 		mapping->offset_x + ((float)glyph->x + (float)glyph->x_frac / 256.0f) * mapping->scale_x;
 	const float layout_advance = (float)glyph->advance256 / 256.0f * mapping->scale_x;
@@ -225,11 +238,7 @@ static int text_add_face_glyph(AeronDrawList2D* list, const AeronFontAtlas* atla
 		return 0;
 	}
 	sprite.scissor = text_scissor(glyph, mapping);
-	XwaSnapshotExport_ColorToRgba(glyph->color, rgba);
-	sprite.tint[0] = XwaRemaster_SrgbToLinear((float)rgba[0] / 255.0f);
-	sprite.tint[1] = XwaRemaster_SrgbToLinear((float)rgba[1] / 255.0f);
-	sprite.tint[2] = XwaRemaster_SrgbToLinear((float)rgba[2] / 255.0f);
-	sprite.tint[3] = 1.0f;
+	text_glyph_tint(list, glyph->color, sprite.tint);
 	AeronDrawList_AddSprite(list, &sprite);
 	return 1;
 }
@@ -250,7 +259,6 @@ int XwaRemasterText_AddFrontendGlyphMapped(AeronDrawList2D* list, XwaRemasterAss
 	const AeronFontAtlas* font;
 	const AeronFontGlyph* metrics;
 	AeronDrawList2DSprite sprite = { 0 };
-	uint8_t rgba[4];
 	float scale_y;
 
 	if (!list || !assets || !glyph || !mapping || mapping->scale_x <= 0.0f || mapping->scale_y <= 0.0f) {
@@ -292,11 +300,7 @@ int XwaRemasterText_AddFrontendGlyphMapped(AeronDrawList2D* list, XwaRemasterAss
 	sprite.dst_y = (float)glyph->y * scale_y;
 	sprite.dst_w = (float)metrics->atlas_w * scale_y / atlas_scale;
 	sprite.dst_h = (float)metrics->atlas_h * scale_y / atlas_scale;
-	XwaSnapshotExport_ColorToRgba(glyph->color, rgba);
-	sprite.tint[0] = XwaRemaster_SrgbToLinear((float)rgba[0] / 255.0f);
-	sprite.tint[1] = XwaRemaster_SrgbToLinear((float)rgba[1] / 255.0f);
-	sprite.tint[2] = XwaRemaster_SrgbToLinear((float)rgba[2] / 255.0f);
-	sprite.tint[3] = 1.0f;
+	text_glyph_tint(list, glyph->color, sprite.tint);
 	AeronDrawList_AddSprite(list, &sprite);
 	return 1;
 }

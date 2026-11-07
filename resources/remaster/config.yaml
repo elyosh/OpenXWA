@@ -114,9 +114,9 @@ models:
   force_opt: false
   # Classic emission (the OPTs' lit texels, projectiles, engine glows,
   # explosions, glow marks, cockpit screens) is shown at the radiance of a
-  # backdrop texel: classic_lighting.illuminance / pi. These strengths
+  # backdrop texel: classic_lighting.image_radiance. These strengths
   # multiply it.
-  opt_emissive_strength: 6.0
+  opt_emissive_strength: 3.0
   opt_projectile_emissive_strength: 20.0
   engine_emissive_strength: 10.0
 effects:
@@ -179,17 +179,69 @@ camera:
   exterior_tilt: 10.0
   # The cockpit sways with turns and speed changes.
   cockpit_sway: true
-  # The eye moves this many world units for each radian of lag, 0 to 20.
-  cockpit_sway_strength: 5.0
-  # The eye moves back this many world units for each unit of speed change,
-  # 0 to 1.
-  cockpit_speed_sway: 0.075
-  # The eye moves no more than this many world units on each axis, 0 to 10.
-  cockpit_sway_max: 2.5
+  # The eye moves this many metres for each radian of lag, 0 to 0.5.
+  cockpit_sway_strength_m: 0.122
+  # The eye moves back this many metres for each MGLT of speed change,
+  # 0 to 0.05.
+  cockpit_speed_sway_m: 0.0041
+  # The eye moves no more than this many metres on each axis, 0 to 0.25.
+  cockpit_sway_max_m: 0.061
   # How fast the lag and the sway catch up, in seconds, 0.05 to 2.
   lag_time: 0.32
   # Shows the HUD and the reticle in the exterior view of the player's craft.
   exterior_hud: true
+# Shows the target's name, cargo, distance and damage bars next to its box
+# in the 3D view. A mod can change these values. The options screen only has
+# a Target Readout switch, which sets `enabled`.
+target_readout:
+  # Off keeps the original game's HUD.
+  enabled: false
+  # The text size: small, medium or large. They use the flight font's 10, 12
+  # and 16 point sizes.
+  text_size: medium
+  # The space between the last line of text and the top of the box, in
+  # points, 0 to 100.
+  text_gap: 9
+  # Makes the text brighter and more saturated than the CMD's.
+  brighten_text: true
+  # single draws the whole name in one colour, the colour of the flight
+  # group. cmd uses the CMD's colours: one for the craft type and another
+  # for the flight group.
+  name_colors: single
+  # Draws the shield, hull and system bars.
+  bars: true
+  # vertical puts the shield bar on the left of the box, the hull bar on the
+  # right and the system bar under it. horizontal puts all three bars under
+  # the box.
+  layout: vertical
+  # A bar is 70% of the box width, kept between these two lengths. In
+  # points, 1 to 1000.
+  bar_length_min: 16
+  bar_length_max: 140
+  # The bar thickness in points, 1 to 50.
+  bar_thickness: 7
+  # The space between the box and the bars, and between two bars, in points,
+  # 0 to 100.
+  bar_gap: 4
+  # The width of the bar outline in points, 0 to 10.
+  bar_frame: 0
+  # The colours are linear.
+  shield_color: [0.0134, 0.214, 1.0]
+  # The colour of the shields above 100%.
+  overshield_color: [0.205, 0.933, 1.0]
+  hull_color_full: [0.0, 1.0, 0.0]
+  hull_color_half: [1.0, 1.0, 0.0]
+  hull_color_low: [1.0, 0.0, 0.0]
+  system_color: [0.604, 0.214, 1.0]
+  # The smallest and largest size of the component box, in points, 0 to
+  # 1000. 0 means no limit.
+  component_box_min: 20
+  component_box_max: 150
+  # The component's box shrinks to 70% and jumps back, once a second.
+  component_pulse: true
+  # Hides the readout where the 3D scene is closer than this many metres,
+  # 0 to 1000. 25 hides it behind the cockpit. 0 turns this off.
+  hidden_within_m: 25
 # The procedural suns and their lens flare. A mod can change these values.
 suns:
   # Backdrop suns draw a procedural disc and corona in place of their image.
@@ -229,6 +281,14 @@ suns:
     - { shape: hexagon, position: -0.768, offset: [-0.18, -0.18], size: 0.1, rotation: 0.7236, color: [0.0001, 0.0061, 0.0076] }
     - { shape: hexagon, position: -0.534, offset: [-0.18, -0.18], size: 0.1, rotation: 0.7236, color: [0.0089, 0.008, 0.0066] }
     - { shape: streak, position: 1, size: 0.001, power: 16, color: [0.0375, 0.0375, 0.0375], tinted: true }
+# Small streaks of dust around the camera that show the player's speed. A mod
+# can change these values.
+speed_effect:
+  enabled: false
+  # The streaks' brightness at full speed, 0 to 1.
+  brightness: 0.2
+  # The number of streaks in the 165 m box around the camera, 0 to 1024.
+  particles: 256
 texture_filtering:
   anisotropic: true
   max_anisotropy: 8.0
@@ -240,15 +300,15 @@ hangar_lighting:
   direction_x: 0.0
   direction_y: 0.0
   direction_z: 1.0
-  intensity: 50.0  # illuminance in W/m^2 (34,150 lux), up to 2000
+  intensity: 100.0  # illuminance in W/m^2 (34,150 lux), up to 2000
   color_r: 1.0
   color_g: 1.0
   color_b: 1.0
   # Ambient cube in W/m^2/sr, up to 1000: +Z ceiling fill, horizontal wall
   # bounce, -Z floor bounce. It takes the key light's hue.
-  ambient_ceiling: 0.4
-  ambient_sides: 0.6
-  ambient_floor: 0.5
+  ambient_ceiling: 3.0
+  ambient_sides: 3.0
+  ambient_floor: 3.0
 # Authored per-region HDR environments (sky, diffuse and specular lighting,
 # suns). The manifest path is relative to the mod folder. It holds the
 # `environments:` map and, under `xwa:`, the (mission, region) mapping and
@@ -258,6 +318,10 @@ hangar_lighting:
 environment_maps:
   enabled: true
   manifest: "flight/environments/environments.yaml"
+  # Multiplies the intensity of every environment: the sky and overlay
+  # that are drawn, and the diffuse light and reflections they give the
+  # models. The suns and the ambient fill stay the same. 0 to 10.
+  intensity_scale: 1.0
   # Largest radiance a sun disc is drawn with (its lighting is not capped).
   # A physical disc is far brighter than screen-space bloom resolves
   # cleanly; 1 to 60000.
@@ -336,14 +400,20 @@ classic_lighting:
   # This is the illuminance in W/m^2 of a classic light of brightness 1.
   # 186 makes the white sun the real sun at the Earth's distance
   # (127,000 lux). Above 0, up to 2000.
-  illuminance: 186.0
+  illuminance: 300.0
+  # The radiance in W/m^2/sr of a white pixel of the classic images
+  # (backdrops, lit texels, projectiles, glow marks, cockpit screens,
+  # stars). 59.2 makes it as bright as a white surface that faces a light
+  # of 186 W/m^2. Raise illuminance alone to make the lit models brighter
+  # than the images. Above 0, up to 1000.
+  image_radiance: 59.2056
 lighting:
   spec_geom_adapt: true
   # Ambient fill in W/m^2/sr, where no environment gives one. 5.9 gives a
   # surface 10% of the white sun's light.
-  ambient_r: 5.9
-  ambient_g: 5.9
-  ambient_b: 5.9
+  ambient_r: 1.0
+  ambient_g: 1.0
+  ambient_b: 1.0
   # Scale of all emitted light (illumination, screens, holograms, lasers,
   # glows, explosions). Emitters far brighter than lit surfaces are what
   # visibly glow through bloom.
@@ -360,29 +430,29 @@ exposure:
   # 0 = ev100, 1 = full metering. Partial keeps part of the difference
   # between scenes: a dim region still looks dimmer.
   metering: 0.6
-  min_ev100: 13.0
+  min_ev100: 13.5
   max_ev100: 16.0
   # Adaptation rate per second, in each direction. The gap in EV shrinks as
   # e^(-speed * t): at 1.5, 78% of it is closed after one second.
   brighten_speed: 1.5  # when the scene gets darker
-  darken_speed: 3.0    # when the scene gets brighter
+  darken_speed: 1.5    # when the scene gets brighter
   # The meter averages the EV of the weighted pixels between two
   # percentiles. The high one leaves out the sun disc and laser bolts.
   low_percent: 10.0
   high_percent: 90.0
   # Weight of pixels with no geometry (sky, backdrops, effects over empty
   # space), so that black space doesn't decide the exposure of a ship.
-  sky_weight: 0.2
+  sky_weight: 0.02
   # Weight of geometry nearer than near_distance metres: the cockpit, so
   # that its dark interior doesn't decide the exposure of the view outside.
-  near_weight: 0.1
+  near_weight: 0.05
   near_distance: 5.0
   edge_weight: 0.25    # weight at the screen's corners; 1 at the centre
   channel: "max" # luminance, or max: the largest of r, g and b
 bloom:
   # Fraction of the scene's light the bloom scatters (no threshold), 0 to 1.
   # The scattered light leaves its source, so lit surfaces do not brighten.
-  intensity: 0.2
+  intensity: 0.15
 temporal_upscaling:
   # off, native_aa, quality, balanced, or performance.
   mode: "off"

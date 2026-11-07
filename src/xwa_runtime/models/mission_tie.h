@@ -1,25 +1,13 @@
 #ifndef XWA_RUNTIME_MODELS_MISSION_TIE_H
 #define XWA_RUNTIME_MODELS_MISSION_TIE_H
 
-/* The [mission_tie] values of a mod's mission, from its mission file,
- * flight/missions/<mission>.yaml in the mod folder:
- *
- *   flight_groups:
- *     1: { name: "Red", craft: xwing, markings: 4 }
- *     5: { name: "Gold", craft: ywing, iff: 2, pilot_voice: "RP3" }
- *     26: { name: "Red", craft: xwing, craft_markings: { 0: 0, 1: 1 } }
- *     0: { name: "Alpha", craft: tie_fighter, warheads: { missile: 80 } }
- *
- * Each entry names a flight group by its position in the mission's .TIE,
- * with the optional `name` and `craft` checks of mission files. Its keys are
- * optional: `markings` and `iff` are numbers from 0 to 255, and
- * `pilot_voice` is the name of the pilot's voice, up to 19 characters.
- * `craft_markings` gives single craft their own markings, from 0 to 255. Its
- * keys are the craft's number in its wave, from 0, so the same craft of
- * every wave gets them. `warheads` gives the flight group's warhead pools
- * (XwaWarheadPools_ReadFlightGroup). `weapon_profile`, `warhead_profile`,
- * `energy_profile` and `linking_profile` pick the flight group's weapon
- * profiles. */
+/* The changes that a mod's mission makes to its flight groups, from the
+ * `flight_groups` section of its mission file: markings, the markings of
+ * single craft, IFF, pilot voice, warhead pools and weapon profiles. They
+ * are applied right after the .TIE file loads, so they change the
+ * simulation. Each entry names a flight group by its position in the
+ * mission's .TIE file. XwaWarheadPools_ReadFlightGroup reads the warhead
+ * pools. */
 
 #include <stddef.h>
 

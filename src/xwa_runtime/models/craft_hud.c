@@ -4,6 +4,7 @@
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
+#include "xwa_runtime/config/modern_target_readout_options.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/names.h"
 
@@ -41,6 +42,10 @@ static CraftHudType s_types[OBJ_Count];
 static CraftHudList s_hullIcons;
 static CraftHudList s_mapIcons;
 static XwaTargetDisplay s_targetDisplay;
+static float s_targetBoxLineWidth;
+static XwaRadarStyle s_radar;
+static XwaAmmoIcons s_ammoIcons;
+static const XwaAmmoIcons k_stockAmmoIcons = { { 272.0f, 16.0f }, { 350.0f, 16.0f } };
 
 /* Loads a file from the mod folder and checks that it is a map.
    Returns NULL when the file is missing. Other errors are logged. */
@@ -212,6 +217,97 @@ static void CraftHud_ReadTargetDisplay(const AeronConfigNode* root) {
 	s_targetDisplay = display;
 }
 
+/* Returns the map `name` of `root`, or NULL when it is missing or isn't a
+   map, which is logged. */
+static const AeronConfigNode* CraftHud_Group(const AeronConfigNode* root, const char* name) {
+	const AeronConfigNode* group = AeronConfigNode_MapGet(root, name);
+
+	if (group != NULL && AeronConfigNode_Type(group) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.hud", "%s:%d: %s must be a map. It is ignored", s_iconsPath,
+					   AeronConfigNode_Line(group), name);
+		return NULL;
+	}
+	return group;
+}
+
+/* Reads a size in points, from 0 to 20. If the key is missing or wrong,
+   `out` keeps its value. */
+static void CraftHud_ReadSize(const AeronConfigNode* group, const char* name, const char* key, float* out) {
+	const AeronConfigNode* node = AeronConfigNode_MapGet(group, key);
+	double value;
+
+	if (node == NULL) {
+		return;
+	}
+	value = AeronConfigNode_Float(node, NAN);
+	if ((AeronConfigNode_Type(node) != AERON_CONFIG_INT &&
+		 AeronConfigNode_Type(node) != AERON_CONFIG_FLOAT) ||
+		!(value >= 0.0 && value <= 20.0)) {
+		Aeron_LogWarn("xwa.hud", "%s:%d: %s.%s must be a number from 0 to 20. It is ignored", s_iconsPath,
+					  AeronConfigNode_Line(node), name, key);
+		return;
+	}
+	*out = (float)value;
+}
+
+static void CraftHud_ReadTargetBoxes(const AeronConfigNode* root) {
+	const AeronConfigNode* group = CraftHud_Group(root, "target_boxes");
+
+	if (group != NULL) {
+		CraftHud_ReadSize(group, "target_boxes", "line_width", &s_targetBoxLineWidth);
+	}
+}
+
+static void CraftHud_ReadRadar(const AeronConfigNode* root) {
+	const AeronConfigNode* group = CraftHud_Group(root, "radar");
+
+	if (group != NULL) {
+		CraftHud_ReadSize(group, "radar", "blip_size", &s_radar.blipSize);
+		CraftHud_ReadSize(group, "radar", "target_size", &s_radar.targetSize);
+	}
+}
+
+/* Reads an [x, y] point of the 640x480 HUD. If the key is missing or wrong,
+   `out` keeps its value. */
+static void CraftHud_ReadPoint(const AeronConfigNode* group, const char* name, const char* key, float out[2]) {
+	const AeronConfigNode* node = AeronConfigNode_MapGet(group, key);
+	double x, y;
+
+	if (node == NULL) {
+		return;
+	}
+	x = AeronConfigNode_Float(AeronConfigNode_SequenceGet(node, 0), NAN);
+	y = AeronConfigNode_Float(AeronConfigNode_SequenceGet(node, 1), NAN);
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_SEQUENCE || AeronConfigNode_SequenceCount(node) != 2 ||
+		!(x >= 0.0 && x <= 640.0) || !(y >= 0.0 && y <= 480.0)) {
+		Aeron_LogWarn("xwa.hud", "%s:%d: %s.%s must be [x, y], with x from 0 to 640 and y from 0 to 480. It is ignored",
+					  s_iconsPath, AeronConfigNode_Line(node), name, key);
+		return;
+	}
+	out[0] = (float)x;
+	out[1] = (float)y;
+}
+
+static void CraftHud_ReadAmmoIcons(const AeronConfigNode* root) {
+	const AeronConfigNode* group = CraftHud_Group(root, "ammo_icons");
+
+	if (group != NULL) {
+		CraftHud_ReadPoint(group, "ammo_icons", "warheads", s_ammoIcons.warheads);
+		CraftHud_ReadPoint(group, "ammo_icons", "countermeasures", s_ammoIcons.countermeasures);
+	}
+}
+
+/* Reads the target_readout group over the shipped values. */
+static void CraftHud_ReadTargetReadout(const AeronConfigNode* root) {
+	XwaModernTargetReadoutOptions options;
+
+	if (!XwaOptionSection_ReadMod(XwaModernTargetReadoutOptions_Section(), root)) {
+		return;
+	}
+	XwaModernTargetReadoutOptions_Get(&options);
+	Aeron_LogInfo("xwa.hud", "%s: target readout %s", s_iconsPath, options.enabled ? "on" : "off");
+}
+
 static void CraftHud_ReadIcons(void) {
 	AeronConfigFile* file = CraftHud_LoadFile(s_iconsPath);
 	const AeronConfigNode* root;
@@ -223,6 +319,10 @@ static void CraftHud_ReadIcons(void) {
 	CraftHud_ReadList(root, "hull_icons", &s_hullIcons);
 	CraftHud_ReadList(root, "map_icons", &s_mapIcons);
 	CraftHud_ReadTargetDisplay(root);
+	CraftHud_ReadTargetBoxes(root);
+	CraftHud_ReadRadar(root);
+	CraftHud_ReadAmmoIcons(root);
+	CraftHud_ReadTargetReadout(root);
 	AeronConfigFile_Destroy(file);
 	Aeron_LogInfo("xwa.hud", "%s: %zu hull icons, %zu map icons", s_iconsPath, s_hullIcons.count,
 				  s_mapIcons.count);
@@ -293,10 +393,19 @@ void XwaCraftHud_Init(void) {
 	memset(&s_hullIcons, 0, sizeof s_hullIcons);
 	memset(&s_mapIcons, 0, sizeof s_mapIcons);
 	memset(&s_targetDisplay, 0, sizeof s_targetDisplay);
+	s_targetBoxLineWidth = 0.0f;
+	memset(&s_radar, 0, sizeof s_radar);
+	s_ammoIcons = k_stockAmmoIcons;
 	CraftHud_ReadIcons();
 }
 
 const XwaTargetDisplay* XwaCraftHud_TargetDisplay(void) { return &s_targetDisplay; }
+
+float XwaCraftHud_TargetBoxLineWidth(void) { return s_targetBoxLineWidth; }
+
+const XwaRadarStyle* XwaCraftHud_Radar(void) { return &s_radar; }
+
+const XwaAmmoIcons* XwaCraftHud_AmmoIcons(void) { return &s_ammoIcons; }
 
 void XwaCraftHud_ClearModelSettings(void) { memset(s_types, 0, sizeof s_types); }
 

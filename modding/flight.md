@@ -6,7 +6,7 @@ flight:
 | File | What it changes |
 |-|-|
 | `flight/flight.yaml` | game rules, weapons, shields, docking, lights, object counts, the camera, extra backdrop planets and the procedural suns |
-| `flight/hud.yaml` | the hull and map icons of each object type, and the target display |
+| `flight/hud.yaml` | the hull and map icons of each object type, the place of the ammo icons, the target display, the target boxes, the radar blips and the target readout |
 | `flight/sounds.yaml` | the sounds of each object type: engines, weapons, explosions, hyperspace, hangar and a few interface sounds |
 
 The game reads the three files once, when it starts. Restart OpenXWA after
@@ -42,6 +42,7 @@ sections:
 | `particle_lights` | the lights of sparks, smoke and other effects on craft |
 | `backdrops` | extra planet backdrops for missions |
 | `suns` | the procedural suns and their lens flare |
+| `speed_effect` | streaks of dust that show the player's speed |
 
 If the file can't be read, for example because of a YAML error, the game
 writes an error in the log and uses none of its sections.
@@ -153,7 +154,7 @@ each value, the game uses the model's value first, then the value of
 ```yaml
 weapons:
   impact: {rebel_laser: 0xff0000, imperial_laser: 0x00ff00}
-  rates: {decharge: 4, recharge: 2, cooldown: 47}
+  rates: {decharge: 4, recharge: 2, cooldown_ms: 188}
   ai_torpedoes: {per_pass: 6, per_target: 16}
   fire_ratio_by_rank: {novice: 4, officer: 3, veteran: 2, ace: 2, top_ace: 1, super_ace: 1}
   damage_by_difficulty: {easy: 0.5, medium: 0.25, hard: 1}
@@ -173,7 +174,7 @@ weapons:
 | `damage_by_difficulty` | The damage that parts take through shields, by difficulty. |
 | `limit_linked_warhead_fire_rate` | Slows down linked warhead fire. |
 | `linking_rules` | When the AI and the player can fire lasers and ions together. |
-| `stats`, `warhead_capacity_percent`, `energy_speed_q16`, `linking` | Weapon profiles, which missions can pick for each flight group. |
+| `stats`, `warhead_capacity_percent`, `energy_speed_percent`, `linking` | Weapon profiles, which missions can pick for each flight group. |
 | `hardpoint_kinds` | Whether each hardpoint type fires lasers, warheads or nothing. |
 
 Weapon types are written as names, such as `rebel_laser`. See
@@ -194,33 +195,37 @@ variants and the colours of the charge bars. See [Craft](craft.md).
 
 ```yaml
 weapons:
-  rates: {decharge: 4, recharge: 2, cooldown: 47}
+  rates: {decharge: 4, recharge: 2, cooldown_ms: 188}
   recharge_percent: 150
 ```
 
 | Key | Meaning |
 |-|-|
 | `rates.decharge` | The charge that one shot of the player's lasers uses. The original values are 3 for the TIE Fighter and the TIE Bomber, 4 for other starfighters and 3 for other craft. |
-| `rates.recharge` | The charge that comes back to each laser at each power update. The original values are 3 for the TIE Fighter and the TIE Bomber, and 2 for other craft. |
-| `rates.cooldown` | The time that each laser fired adds before the group's next shot. The original value is 47, about 0.2 seconds. |
+| `rates.recharge` | The charge that comes back to each laser each game second. The original values are 3 for the TIE Fighter and the TIE Bomber, and 2 for other craft. |
+| `rates.cooldown_ms` | The time that each laser fired adds before the group's next shot, in milliseconds. The original value is 188. |
 | `rates.decharge_percent` | Scales the decharge rate, in percent. The default is 100. |
 | `rates.recharge_percent` | Scales the recharge rate, in percent. The default is 100. |
 | `decharge_percent` | Scales the decharge rate of every craft, after `rates.decharge_percent`. The default is 100. Only in `flight.yaml`. |
 | `recharge_percent` | Scales the recharge rate of every craft, after `rates.recharge_percent`. The default is 100. Only in `flight.yaml`. |
 
-All values are whole numbers of 0 or more.
+All values are 0 or more. The decharge and recharge values are whole
+numbers.
 
 The game uses these rates in place of the original ones when `flight.yaml`
-has `rates`, `decharge_percent` or `recharge_percent`, or when the craft's
-model has `rates`. Otherwise the original rules apply. Even a value of 100
+has `rates`, `decharge_percent` or `recharge_percent`, when the craft's
+model has `rates`, or when the craft's weapon profile sets `decharge_rate`
+or `recharge_rate`. Otherwise the original rules apply. Even a value of 100
 in `decharge_percent` turns the rates on.
 
-The decharge rate only applies to the player's laser shots. AI shots still
-use 1 charge, as in the original game. The cooldown applies to every craft.
+The decharge rate only applies to the player's laser shots. The racks of
+the player's turrets then keep their charge, where the original game drains
+them too. AI shots still use 1 charge, as in the original game. The
+cooldown applies to every craft.
 
 A weapon profile can also set the decharge rate, the recharge rate and the
 cooldown of each weapon type, with `decharge_rate`, `recharge_rate` and
-`fire_rate`. See [Weapon profiles](#weapon-profiles). The percents still
+`fire_rate_ms`. See [Weapon profiles](#weapon-profiles). The percents still
 scale the profile's values.
 
 #### Energy transfer
@@ -340,23 +345,23 @@ map:
 |-|-|-|
 | `stats` | the stats of each weapon type | `weapon_profile` |
 | `warhead_capacity_percent` | how many warheads a craft loads | `warhead_profile` |
-| `energy_speed_q16` | the speed change for each step of engine energy | `energy_profile` |
+| `energy_speed_percent` | the speed change for each step of engine energy | `energy_profile` |
 | `linking` | the laser link mode and the linking rules | `linking_profile` |
 
 ```yaml
 weapons:
   stats:
     default:
-      rebel_laser: {range: 65536, fire_ratio: 236, precise: false, spread_mask: 63}
+      rebel_laser: {range_m: 1600, fire_ratio_ms: 944, precise: false, spread_mask: 63}
       imperial_laser:
-        fire_rate: 47
-        player_easy: {fire_rate: 39, power: 350}
+        fire_rate_ms: 188
+        player_easy: {fire_rate_ms: 156, power: 350}
     heavy_guns:
-      turbolaser_green_light: {power: 900, range: 204800}
+      turbolaser_green_light: {power: 900, range_m: 5000}
   warhead_capacity_percent:
     default: {space_bomb: 50, heavy_rocket: 50}
-  energy_speed_q16:
-    default: {all: 8192, player: 7864}
+  energy_speed_percent:
+    default: {all: 12.5, player: 12}
   linking:
     default: {laser_link: 2, prevent_player_linked_lasers_ion: true}
 ```
@@ -367,32 +372,32 @@ profile. A flight group picks a profile in its entry of the mission file.
 See [Missions](missions.md).
 
 The game looks for the picked profile in the model settings file of the
-craft, then in `flight.yaml`. If neither has it, the flight group uses
-`default`. A flight group that uses a profile only gets that profile's
-values. A key that the profile doesn't set gets the original game's value,
-not the `default` profile's value.
+craft, then in `flight.yaml`. A flight group that uses a profile only gets
+that profile's values. A key that the profile doesn't set gets the original
+game's value, not the `default` profile's value. If neither file has the
+profile, the flight group gets the original game's values, and the log says
+so.
 
 ##### stats
 
-Each `stats` profile maps weapon types to stats. All stats are whole
-numbers, except `precise`, which is `true` or `false`. Times are in ticks
-or game seconds, speeds in speed units and damage in points, as described
-in [Craft](craft.md#units). [Weapons](reference/weapons.md#weapon-types)
+Each `stats` profile maps weapon types to stats. Stats with a unit in their
+name can have decimals. The other stats are whole numbers, except
+`precise`, which is `true` or `false`. The units are described in
+[Craft](craft.md#units). [Weapons](reference/weapons.md#weapon-types)
 gives the speed, power, life and score of each weapon type in the original
 game.
 
 | Stat | Meaning |
 |-|-|
-| `speed` | The speed of a shot, in speed units. A shot of a fighter or of a player's craft also gets the speed of the craft that fires it. |
+| `speed_mglt` | The speed of a shot, in MGLT. A shot of a fighter or of a player's craft also gets the speed of the craft that fires it. |
 | `power` | The damage of a shot, in the points of hull and shields. The shield of the side that is hit takes the damage first, and only the rest goes on to the parts and the hull. A starship or a platform takes 1/16 of the damage, and a freighter or a container 1/4. |
 | `power_speed_percent` | The percent of the firing craft's speed added to the power of its shots. The original value is 100. Turret shots get no speed bonus. |
-| `duration_seconds` | How long a shot lives, in whole game seconds. |
-| `duration_fraction` | Adds a part of a game second to `duration_seconds`, where 65536 is a whole second. A shot lives at most about 277 game seconds. |
-| `duration_offset` | How long a turret shot lives after the time it needs to reach its target, in ticks. The original value is 59. |
+| `duration_ms` | How long a shot lives, in milliseconds, from 0 to 262140. A shot that a mine fires lives twice as long. |
+| `duration_offset_ms` | How long a turret shot lives after the time it needs to reach its target, in milliseconds. The original value is 236. |
 | `score` | The score that a warhead hit gives the player and the player's team. The score goes back down when the warhead runs out of time without a hit. |
-| `fire_rate` | Lasers: the wait after a volley, in ticks, for each cannon that fired, so that linked cannons wait longer. Warheads: the wait after each warhead. The original values are 47 for lasers and 472 for warheads. |
-| `fire_ratio` | The wait between two shots of a turret, in ticks. By default, the `cooldown` of the laser group in the craft record. AI turrets wait 2 to 4 times longer, by skill, or by `fire_ratio_by_rank`. |
-| `range` | The range of a turret, in game units, 40.96 per metre. By default, the `range` of the laser group. |
+| `fire_rate_ms` | Lasers: the wait after a volley, in milliseconds, for each cannon that fired, so that linked cannons wait longer. Warheads: the wait after each warhead. The original values are 188 for lasers and 1888 for warheads. |
+| `fire_ratio_ms` | The wait between two shots of a turret, in milliseconds. By default, the `cooldown_ms` of the laser group in the craft record. AI turrets wait 2 to 4 times longer, by skill, or by `fire_ratio_by_rank`. |
+| `range_m` | The range of a turret, in metres. By default, the `range_m` of the laser group. |
 | `precise` | `false` makes the shots of AI turrets spread. In the original game, AI turrets aim exactly. A player's turret shots always spread. |
 | `spread_mask` | How far turret shots spread, in angle units where 65536 is a full turn. Use a value of the form 2ⁿ − 1, such as 255, about 1.4 degrees. The original value is 255. |
 | `decharge_rate` | The charge that a player's shot takes from its cannon. It replaces `rates.decharge`. A cannon holds up to 127 charge. |
@@ -418,20 +423,19 @@ that a craft loads with that warhead. The original percents go from 25 to
 100. A craft always gets at least 1 warhead. The warhead names are in
 [Weapons](reference/weapons.md#warheads).
 
-##### energy_speed_q16
+##### energy_speed_percent
 
 Each profile sets how much speed a craft gains or loses for each step of
-energy moved to or from its engines. The value is a fraction of the craft's
-top speed, where 65536 is the whole top speed. The values go from 0 to
-65536.
+energy moved to or from its engines. The value is a percent of the craft's
+top speed, from 0 to 100.
 
 | Key | Meaning |
 |-|-|
 | `all` | The value for every craft. |
 | `player` | The value for the player's craft. Without it, the player's craft uses `all`. |
 
-The original value is 4096 for the TIE Bomber, 12288 for the TIE Fighter
-with spare engine power, and 8192 for other craft.
+The original value is 6.25 for the TIE Bomber, 18.75 for the TIE Fighter
+with spare engine power, and 12.5 for other craft.
 
 ##### linking
 
@@ -503,7 +507,8 @@ With the section, the recharge rate of each craft is:
   recharge whenever the shields are below their maximum;
 - for an AI starship, its model rate when `starships` is on and the
   difficulty isn't easy or `starships_on_easy` is on, else 0;
-- for other AI craft, their model rate.
+- for other AI craft, their model rate. The AI only turns on their shield
+  recharge when the difficulty isn't easy or `starships_on_easy` is on.
 
 A model without shield settings has a rate of 20 for starfighters, 5 for
 each live shield generator on the Star Destroyers, the Interdictor and the
@@ -534,9 +539,9 @@ original rule.
 With `player_approach_height`, the approach height is the smaller of the
 gap between the target's `dock_from_big` point and the player's
 `dock_to_big` point, and a limit from the target's model. A
-model sets the limit with `docking.approach_height` in its settings file
+model sets the limit with `docking.approach_height_m` in its settings file
 (see [Craft](craft.md)). Without it, the limit is 0 for `space_colony2`
-and 932 for other models. The original game approaches at twice the gap,
+and 22.75 m for other models. The original game approaches at twice the gap,
 and not at all for `space_colony2`.
 
 ### headlights
@@ -623,9 +628,9 @@ camera:
 | `exterior_lag_max` | The most that the exterior camera turns, in degrees. | 0 to 15 | 4.05 |
 | `exterior_tilt` | How far above the craft the exterior camera looks from, in degrees. | -30 to 30 | 10 |
 | `cockpit_sway` | The cockpit view sways with turns and speed changes. | `true` or `false` | `true` |
-| `cockpit_sway_strength` | How far the eye moves for each radian of lag, in world units. | 0 to 20 | 5 |
-| `cockpit_speed_sway` | How far the eye moves back for each unit of speed change, in world units. | 0 to 1 | 0.075 |
-| `cockpit_sway_max` | The most that the eye moves on each axis, in world units. | 0 to 10 | 2.5 |
+| `cockpit_sway_strength_m` | How far the eye moves for each radian of lag, in metres. | 0 to 0.5 | 0.122 |
+| `cockpit_speed_sway_m` | How far the eye moves back for each MGLT of speed change, in metres. | 0 to 0.05 | 0.0041 |
+| `cockpit_sway_max_m` | The most that the eye moves on each axis, in metres. | 0 to 0.25 | 0.061 |
 | `lag_time` | How fast the lag and the sway catch up, in seconds. | 0.05 to 2 | 0.32 |
 | `exterior_hud` | Shows the HUD and the reticle in the exterior view of the player's craft, in modern graphics. | `true` or `false` | `true` |
 
@@ -762,10 +767,39 @@ suns:
 
 [Environments](environments.md) describes these keys and the flare shapes.
 
+### speed_effect
+
+The `speed_effect` section draws small streaks of dust around the camera,
+in modern graphics. They show how fast the player's craft moves. The
+game's own space debris is still drawn.
+
+```yaml
+speed_effect:
+  brightness: 0.2
+  particles: 256
+```
+
+| Key | Meaning | Range | Default |
+|-|-|-|-|
+| `enabled` | Turns the effect on. | `true` or `false` | `true` |
+| `brightness` | The brightness of the streaks at full speed. | 0 to 1 | 0.2 |
+| `particles` | The number of streaks in the box of dust around the camera, which is 165 m wide. | 0 to 1024 | 256 |
+
+The streaks appear just above speed 0 and are at full brightness from
+16 MGLT. They only show when the camera views the player's
+craft, in the cockpit or from outside, and not in the hangar. Ships and the
+cockpit hide them.
+
+Without the section, the effect is off. With the section, it is on, unless
+the section has `enabled: false`. A missing key keeps its default. Players
+can change these keys in their `config.yaml`, and their values win over the
+mod.
+
 ## hud.yaml
 
-`flight/hud.yaml` changes the icons of each object type and the target
-display.
+`flight/hud.yaml` changes the icons of each object type, the place of the
+ammo icons, the target display, the target boxes, the radar blips and the
+target readout.
 
 ```yaml
 hull_icons:
@@ -781,7 +815,11 @@ target_display:
 |-|-|
 | `hull_icons` | The craft outline in the shield and hull display, by object type. |
 | `map_icons` | The icon of each object type on the map. |
+| `ammo_icons` | Where the warhead and countermeasure icons are, at the top of the HUD. |
 | `target_display` | How the target display shows the target. |
+| `target_boxes` | How the target boxes are drawn. |
+| `radar` | How the blips on the radar scopes are drawn. |
+| `target_readout` | The target's name, cargo, distance and damage bars next to its box. |
 
 If the file can't be read, the game writes an error in the log and ignores
 the whole file.
@@ -799,6 +837,32 @@ icon. An object type that the map doesn't list keeps its original icon.
 To add new icons, replace the image group with an atlas that has more
 images. See [Images](images.md) and
 [Image groups](reference/image_groups.md).
+
+### Ammo icons
+
+`ammo_icons` sets where the HUD draws the warhead and countermeasure icons.
+The icons are images 49 and 50 of image group 12000, counted from 1.
+
+```yaml
+ammo_icons:
+  warheads: [286.7, 11.1]
+  countermeasures: [340.8, 11.1]
+```
+
+| Key | Meaning | Default |
+|-|-|-|
+| `warheads` | The centre of the warhead icon. | `[272, 16]` |
+| `countermeasures` | The centre of the countermeasure icon. | `[350, 16]` |
+
+Each value is `[x, y]` in pixels of the original game's 640x480 HUD, from
+its top left corner. x goes from 0 to 640 and y from 0 to 480. OpenXWA
+scales this HUD to the window, so the icons keep their place in the HUD at
+every HUD size.
+
+In the original game, the icons stay 48 and 30 pixels from the centre of
+the screen and 16 pixels from the top at every resolution, and only their
+size grows. So the icons of XWAU and TFTC are drawn for XWAU's HUD scale
+of 1.44. The importer writes their place at that scale.
 
 ### Target display
 
@@ -840,6 +904,103 @@ border of the display stays empty, and the display is empty while the
 target is dying. If a key is missing or wrong, the game writes an error in
 the log and the display stays shaded.
 
+### Target boxes
+
+`target_boxes` sets how the boxes around the targets are drawn in the 3D
+view, in modern graphics.
+
+```yaml
+target_boxes:
+  line_width: 4
+```
+
+| Key | Meaning | Range | Default |
+|-|-|-|-|
+| `line_width` | The width of the box lines, in points: 1/1080 of the height of the 3D view. 0 keeps the original game's boxes. | 0 to 20 | 0 |
+
+With a `line_width` above 0, the lines are centred on the box's edges, the
+corners are 1/8 of the box's size, and the four corners are the same. A
+very small box is drawn filled. The original game's boxes have lines of one
+pixel of the game's flight resolution, so they get thin in a large window.
+
+### Radar
+
+`radar` sets how the blips on the fore and aft radar scopes are drawn, in
+modern graphics. The cockpit screens that show the radars show the same
+blips.
+
+```yaml
+radar:
+  blip_size: 4
+  target_size: 8
+```
+
+| Key | Meaning | Range | Default |
+|-|-|-|-|
+| `blip_size` | The width of each blip, in points: 1/1080 of the height of the HUD. Above 0, each blip is a filled circle of its colour. 0 keeps the original game's blips. | 0 to 20 | 0 |
+| `target_size` | The width of the yellow circle drawn over the current target's blip, in points. It replaces the original game's small bracket. 0 keeps the bracket. | 0 to 20 | 0 |
+
+The original game's blips are about one pixel of the game's flight
+resolution, so they get small in a large window. A wrong value is ignored,
+with a warning in the log.
+
+### Target readout
+
+`target_readout` shows the current target's name, cargo and distance above
+its box in the 3D view, and bars for its shields, hull and systems around
+the box. Under the box of a capital ship's targeted component, it shows the
+component's line from the CMD, such as `Shield Generator  75%`. It works in
+modern graphics only.
+
+```yaml
+target_readout:
+  text_size: large
+  layout: horizontal
+  overshield_color: [0.787, 0.319, 0.051]
+```
+
+Sizes are in points: 1/1080 of the height of the 3D view, so a point is one
+pixel at 1080 lines. Colours are linear, three numbers of 0 or more.
+
+| Key | Meaning | Range | Default |
+|-|-|-|-|
+| `enabled` | Turns the target readout on. | `true` or `false` | `true` |
+| `text_size` | The size of the text: the flight font at 10, 12 or 16 points. | `small`, `medium` or `large` | `medium` |
+| `text_gap` | The space between the last line of text and the top of the box, in points. | 0 to 100 | 9 |
+| `brighten_text` | Draws the text brighter and more saturated than in the CMD. | `true` or `false` | `true` |
+| `name_colors` | `single` draws the whole name in the colour of the flight group. `cmd` draws it in the CMD's colours: one for the craft type and another for the flight group. | `single` or `cmd` | `single` |
+| `bars` | Draws the shield, hull and system bars. | `true` or `false` | `true` |
+| `layout` | `vertical` puts the shield bar on the left of the box, the hull bar on the right and the system bar under it. `horizontal` puts all three under the box. | `vertical` or `horizontal` | `vertical` |
+| `bar_length_min`, `bar_length_max` | A bar is 70% of the box's width, but no shorter and no longer than these lengths, in points. | 1 to 1000 | 16, 140 |
+| `bar_thickness` | The thickness of a bar, in points. | 1 to 50 | 7 |
+| `bar_gap` | The space between the box and the bars, and between two bars, in points. | 0 to 100 | 4 |
+| `bar_frame` | The width of the outline around each bar, in points. 0 draws no outline. | 0 to 10 | 0 |
+| `shield_color` | The colour of the shield bar. | colour | `[0.0134, 0.214, 1]` |
+| `overshield_color` | The colour of the shields above 100%. | colour | `[0.205, 0.933, 1]` |
+| `hull_color_full`, `hull_color_half`, `hull_color_low` | The colour of the hull bar at 100%, 50% and 0%. The bar blends between them. | colour | green, yellow, red |
+| `system_color` | The colour of the system bar. | colour | `[0.604, 0.214, 1]` |
+| `component_box_min`, `component_box_max` | The smallest and largest size of the box of a capital ship's targeted component, in points. 0 means no limit. | 0 to 1000 | 20, 150 |
+| `component_pulse` | The box of a capital ship's targeted component shrinks to 70% and jumps back, once a second. | `true` or `false` | `true` |
+| `hidden_within_m` | Hides the readout where the 3D scene is closer than this many metres, such as behind the cockpit frame. 0 shows it over the cockpit. | 0 to 1000 | 25 |
+
+The readout shows only when the CMD shows the target. When the CMD is off,
+or a hit has knocked out the targeting computer, the readout goes away and
+the original game's HUD shows. Like the CMD, it shows the cargo, the bars
+and the component line only once the target is identified. The component
+line shows when the component's box is in view, even when the target's box
+isn't. The bars go
+away while the target is dying. The system bar shows only when the systems
+are damaged.
+
+Without the section, the target readout is off unless the player turns on
+**Target Readout** in the options. With the section, it is on, unless the
+section has `enabled: false`. A missing key keeps its default. A wrong value
+is ignored, with a warning in the log. When a maximum is below its minimum,
+the game uses the minimum for both.
+
+The player's choices win over the mod. If the player turns **Target
+Readout** on or off in the options, that choice counts.
+
 ## sounds.yaml
 
 `flight/sounds.yaml` gives object types their own sounds, such as engine,
@@ -852,7 +1013,7 @@ lists the banks and when each one plays.
 banks:
   interior:
     sounds:
-      xwing: {file: 'Wave/Custom/XwingEngine.wav', volume: 76, distance: 8192}
+      xwing: {file: 'Wave/Custom/XwingEngine.wav', volume: 76, distance_m: 200}
       awing: {silent: true}
   weapon:
     sounds:
@@ -869,7 +1030,7 @@ banks:
       map_exit: {file: 'Wave/Custom/MapExit.wav', volume: 80}
   weapon_range:
     sounds:
-      isd_turbolaser_near: {file: 'Wave/Custom/IsdNear.wav', distance: 2000}
+      isd_turbolaser_near: {file: 'Wave/Custom/IsdNear.wav', distance_m: 50}
 ```
 
 The sound files in these examples are new files in the mod's
@@ -893,7 +1054,7 @@ in the log and ignores the whole file.
 An entry is a sound or a silent entry:
 
 ```yaml
-xwing: {file: 'Wave/Custom/XwingEngine.wav', volume: 76, distance: 8192}
+xwing: {file: 'Wave/Custom/XwingEngine.wav', volume: 76, distance_m: 200}
 awing: {silent: true}
 ```
 
@@ -901,14 +1062,14 @@ awing: {silent: true}
 |-|-|
 | `file` | The sound file, as a path in the game folder, such as `Wave/Custom/XwingLaser.wav`. |
 | `volume` | From 0 to 255. The default, 127, plays the file at its own level, and lower values play it quieter. The game never plays a sound louder than its file. Values above 127 keep a sound at full level when the player's volume settings or the distance would make it quieter. |
-| `distance` | How far the sound carries, in game units (40.96 per metre), from 0 to 65535. The default, 8192, is 200 m. See below. |
+| `distance_m` | How far the sound carries, in metres, from 0 to 1599.98. The default is 200. See below. |
 | `silent` | `true` makes the entry play nothing. A silent entry has no `file`. |
 
 The sounds of objects fade with the distance from the player. With 3D sound
 off, which is the game's default, a sound fades to a quarter of its volume
-at `distance`, plays at an eighth from twice `distance`, and is silent from
-four times `distance`. With 3D sound on, it is silent from twice
-`distance`.
+at `distance_m`, plays at an eighth from twice `distance_m`, and is silent
+from four times `distance_m`. With 3D sound on, it is silent from twice
+`distance_m`.
 
 To add a new sound, put it in the mod's `game/` folder under `WAVE/`,
 such as `game/WAVE/Custom/Alarm.wav`, and name it `Wave/Custom/Alarm.wav`.
@@ -928,7 +1089,7 @@ each bank with `unlisted: silent`.
 | `canopy_opening`, `engine_slowing`, `engine_wash`, `fly_by`, `hyper_abort`, `hyper_end`, `hyper_start`, `hyper_zoom`, `interior`, `s_foil`, `shuttle_blast_off`, `shuttle_shut_down`, `shuttle_take_off`, `starship_ambient`, `take_off` | object type | an entry |
 | `weapon` | object type of the craft that fires | a map from weapon sound group to entry |
 | `hangar_ambient` | object type of the hangar's command ship | a list of 1 to 10 entries |
-| `weapon_explosion` | object type | a list of 1 to 8 entries |
+| `weapon_explosion` | object type of the craft that fired the weapon that explodes | a list of 1 to 8 entries |
 | `sounds` | `player_targeted`, `map_enter`, `map_exit`, `turret_switch` or `target_select` | an entry |
 | `weapon_range` | names that you choose | an entry |
 

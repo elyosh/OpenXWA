@@ -1,16 +1,10 @@
 #ifndef XWA_RUNTIME_FRONTEND_CONCOURSE_PLANET_H
 #define XWA_RUNTIME_FRONTEND_CONCOURSE_PLANET_H
 
-/* The planet in the concourse window for a mission. The mission file sets
- * it in its `concourse` section (mission_file.h). All keys are optional:
- *
- *   concourse:
- *     front_planet: { position: [1276, 234], image: 15010 }
- *
- * - `image`: the image group to show, such as 15010. Without it, the game
- *   picks the planet.
- * - `position`: the centre of the planet, in design pixels
- *   (frontend/frontend.yaml `design`). Without it, the position is random.
+/* The planet in the concourse window for a mission, from the `concourse`
+ * section of the mission file (mission_file.h): its image group and the
+ * position of its centre, in design pixels. Without an image, the game picks
+ * the planet. Without a position, the position is random.
  *
  * The mission is the concourse's current mission: the entry of the mission
  * list with g_currentMissionId. The game reads its file again when the

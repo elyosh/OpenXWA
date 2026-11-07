@@ -100,9 +100,9 @@ struct AeronFlightModel;
    stock component number. Always returns 1; `reason` is unused. */
 int XwaModelRole_Validate(const char* key, const struct AeronFlightModel* model, char* reason,
 						  unsigned int reasonSize);
-/* The number of weapon slots a model def keeps: 120 (the X-Wing Alliance
-   Upgrade limit) for GLB replacements, and the original 16 for stock OPTs. 17
-   stock OPTs have more weapon hardpoints than 16 and rely on that cut. */
+/* The number of weapon slots a model def keeps: 120 for GLB replacements,
+   and the original 16 for stock OPTs. 17 stock OPTs have more than 16 weapon
+   hardpoints and rely on that cut. */
 #define XWA_MODEL_WEAPON_SLOT_LIMIT(objectType)                                                              \
 	(XwaModelRole_IsReplacement((unsigned short)(objectType)) ? XWA_CRAFT_WEAPON_SLOT_COUNT                  \
 															  : XWA_STOCK_WEAPON_SLOT_COUNT)

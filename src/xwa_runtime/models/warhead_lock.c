@@ -5,6 +5,7 @@
 #include "xwa/assets/object_type.h"
 #include "xwa/flight/object/object.h"
 #include "xwa_runtime/models/model_settings.h"
+#include "xwa_runtime/models/units.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -12,24 +13,28 @@
 
 /* Modern port module; no original counterpart. */
 
-/* Each value's group (NULL for a key of `warhead_lock` itself), key and
-   limits. */
+/* The keys of the group. `group` is the map that holds the key, or NULL for
+   a key of `warhead_lock` itself. `unit` is the unit in the file. `min` and
+   `max` are in the game's units: game units for the ranges and ticks for
+   the times. */
 static const struct {
 	const char* group;
 	const char* key;
+	XwaUnit unit;
 	int64_t min;
 	int64_t max;
 } s_values[XWA_WARHEAD_LOCK_VALUES] = {
-	{ "lock_range", "small", 0, INT32_MAX },
-	{ "lock_range", "big", 0, INT32_MAX },
-	{ "lock_range", "transport", 0, INT32_MAX },
-	/* The HUD divides by lock_ticks / 200, and the lock ticks are 16-bit. */
-	{ NULL, "lock_ticks", 200, 32767 },
-	{ NULL, "ticks_per_homing_level", 1, 32767 },
-	{ "ai_lock_range", "small", 0, INT32_MAX },
-	{ "ai_lock_range", "big", 0, INT32_MAX },
-	{ "ai_lock_range", "big_top_tier", 0, INT32_MAX },
-	{ NULL, "ai_lock_ticks_per_tier", 0, 65535 },
+	{ "lock_range_m", "small", XWA_UNIT_METRES, 0, INT32_MAX },
+	{ "lock_range_m", "big", XWA_UNIT_METRES, 0, INT32_MAX },
+	{ "lock_range_m", "transport", XWA_UNIT_METRES, 0, INT32_MAX },
+	/* The HUD divides by the lock ticks / 200, and the lock ticks are
+	   16-bit. */
+	{ NULL, "lock_time_ms", XWA_UNIT_MILLISECONDS, 200, 32767 },
+	{ NULL, "homing_level_time_ms", XWA_UNIT_MILLISECONDS, 1, 32767 },
+	{ "ai_lock_range_m", "small", XWA_UNIT_METRES, 0, INT32_MAX },
+	{ "ai_lock_range_m", "big", XWA_UNIT_METRES, 0, INT32_MAX },
+	{ "ai_lock_range_m", "big_top_tier", XWA_UNIT_METRES, 0, INT32_MAX },
+	{ NULL, "ai_lock_time_per_tier_ms", XWA_UNIT_MILLISECONDS, 0, 65535 },
 };
 
 typedef struct WarheadLockModel {
@@ -44,15 +49,17 @@ void XwaWarheadLock_ClearModelSettings(void) { memset(s_models, 0, sizeof s_mode
 /* Reads `value` from `node`, the key `name` of `group`. */
 static void WarheadLock_ReadValue(unsigned int objectType, const char* path, const char* name,
 								  XwaWarheadLockValue value, const AeronConfigNode* node) {
-	const int64_t number = AeronConfigNode_Int(node, -1);
+	const XwaUnit unit = s_values[value].unit;
+	int32_t game;
 
-	if (AeronConfigNode_Type(node) != AERON_CONFIG_INT || number < s_values[value].min ||
-		number > s_values[value].max) {
-		Aeron_LogWarn("xwa.models", "%s: warhead_lock.%s must be a number from %lld to %lld. It is ignored",
-					  path, name, (long long)s_values[value].min, (long long)s_values[value].max);
+	if (!XwaUnits_Read(node, unit, s_values[value].min, s_values[value].max, &game)) {
+		Aeron_LogWarn("xwa.models",
+					  "%s: warhead_lock.%s must be a number of %s from %.2f to %.2f. It is ignored", path,
+					  name, XwaUnits_Name(unit), XwaUnits_FromGame(unit, (double)s_values[value].min),
+					  XwaUnits_FromGame(unit, (double)s_values[value].max));
 		return;
 	}
-	s_models[objectType].value[value] = (int32_t)number;
+	s_models[objectType].value[value] = game;
 	s_models[objectType].set[value] = 1;
 }
 
@@ -68,7 +75,7 @@ static void WarheadLock_ReadMap(unsigned int objectType, const char* path, const
 		char name[64];
 		int value;
 
-		if (group == NULL && (strcmp(key, "lock_range") == 0 || strcmp(key, "ai_lock_range") == 0)) {
+		if (group == NULL && (strcmp(key, "lock_range_m") == 0 || strcmp(key, "ai_lock_range_m") == 0)) {
 			if (AeronConfigNode_Type(child) != AERON_CONFIG_MAP) {
 				Aeron_LogWarn("xwa.models", "%s: warhead_lock.%s isn't a map. It is ignored", path, key);
 				continue;

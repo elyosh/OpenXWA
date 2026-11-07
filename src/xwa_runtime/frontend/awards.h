@@ -1,44 +1,19 @@
 #ifndef XWA_RUNTIME_FRONTEND_AWARDS_H
 #define XWA_RUNTIME_FRONTEND_AWARDS_H
 
-/* Medals, Kalidor Crescent levels, promotion thresholds and family-room
- * mementos from frontend/awards.yaml.
+/* A mod's awards: the names of the battle medals, the Kalidor Crescent
+ * levels and their thresholds, the rank and rating thresholds, and the
+ * mementos of the family room. The mod documentation describes the keys.
  *
- *     battle_medals:            # names, in the order of medals.txt
- *       - { name: 'Medal of Redemption' }
- *     kalidor:                  # one entry per level
- *       - { points: 5000, name: 'First Initiate' }
- *     rank_thresholds: [7500, 15000, 25000]
- *     rating_thresholds: [100, 200, 350]
- *     mementos:                 # keyed by Tour of Duty mission index
- *       images: { 9: 'frontres\medals\tf.bmp' }
- *       names: { 9: 'TIE Fighter Model' }
- *       lady_blue: { mission: 23 }
- *       cologne: { mission: 9 }
- *
- * The game reads the file once. All keys are optional, and a missing key
- * keeps the stock behaviour. If the file has an error, the game logs it
- * with its line number and ignores the whole file.
- *
- * - `battle_medals` only names the medals. medals.txt still sets how many
- *   medals there are and which missions give them.
- * - `kalidor` sets the number of levels, up to 100, and the threshold of
- *   each level in whole bonus points. A level without `points` keeps its
- *   stock threshold, so only the first 6 levels can leave it out.
- * - `rank_thresholds` (up to 8 values) and `rating_thresholds` (up to 25)
- *   replace the stock values in order. If a list is shorter, the remaining
- *   values stay stock.
- * - `mementos.images` replaces the stock detail images. A mission that
- *   isn't listed has no detail image, and its memento can't be clicked.
- * - `mementos.names` sets the tooltip and the title of the detail view.
- * - `mementos.lady_blue.mission` and `mementos.cologne.mission` set the Tour
- *   of Duty mission that unlocks the Lady Blue and the cologne in the family
- *   room. Missions are counted from 1, and the stock missions are 23 and 9.
- *   A value of 0 or less, or 255 or more, unlocks the item from the start.
- *   The item's detail view shows the award text of that mission.
- *
- * When the file doesn't set a name, the game uses its stock text if it has
- * one, and an empty text otherwise. */
+ * The game reads the mod's awards file once. A missing key keeps the stock
+ * behaviour, and a file with an error is ignored as a whole. The medal list
+ * of the game still sets how many battle medals there are and which missions
+ * give them. A Kalidor level without a threshold keeps its stock one, so
+ * only the first 6 levels can leave it out. A threshold list shorter than
+ * the stock one keeps the stock values of the levels it doesn't reach. The
+ * Lady Blue and cologne missions are counted from 1. When the file doesn't
+ * name an award, the game uses its stock text if it has one, and an empty
+ * text otherwise. */
 
 #ifdef __cplusplus
 extern "C" {

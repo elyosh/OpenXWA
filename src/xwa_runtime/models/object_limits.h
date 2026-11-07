@@ -1,25 +1,12 @@
 #ifndef XWA_RUNTIME_MODELS_OBJECT_LIMITS_H
 #define XWA_RUNTIME_MODELS_OBJECT_LIMITS_H
 
-/* A mod's object counts, from the `object_limits` section of
- * flight/flight.yaml:
- *
- *   object_limits:
- *     craft_per_region: 3072
- *     player_projectiles: 128        # for each player
- *     ai_projectiles_per_region: 1024
- *     explosions_per_region: 256     # and as many debris slots
- *     radar_blips: 512               # on each scope
- *
- * A mission's file can have the same section, and its keys replace the ones
- * of flight/flight.yaml for that mission. Every key is optional. Without
- * one, the stock count stays: 96 craft, 12 projectiles for each player, 64
- * projectiles for the AI, 32 explosions and 32 debris objects in each region,
- * and 48 blips on each radar scope. The proving grounds keep their 224
- * salvage slots and their 36 craft slots. With hangar settings, the proving
- * grounds use craft_per_region like the other missions, because a hangar map
- * can need more than 36 slots. radar_blips can be at most
- * HUD_RADAR_MAX_BLIPS.
+/* A mod's object counts, from the `object_limits` section of its flight
+ * settings, which a mission file's section of the same name can replace
+ * key by key. Without a key, the stock count stays. The proving grounds
+ * keep their 224 salvage slots and their 36 craft slots, unless the mod has
+ * hangar settings, because a hangar map can need more than 36 slots.
+ * radar_blips can be at most HUD_RADAR_MAX_BLIPS.
  *
  * Each player searches its own block of player_projectiles slots for its
  * shots. Warheads use the slots from the ninth one of the block, as in the

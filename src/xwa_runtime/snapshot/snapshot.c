@@ -20,6 +20,7 @@
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/headlights.h"
+#include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/models/surfaces.h"
@@ -623,6 +624,8 @@ typedef struct XwaResourceBinding {
 
 static XwaResourceBinding g_bindings[XWA_SNAP_MAX_BINDINGS];
 static int g_binding_count;
+/* Changes each time a name gets a file, changes its file or loses it. */
+static unsigned g_binding_generation;
 static int16_t g_frontend_active_groups[XWA_SNAP_MAX_SPRITE_GROUPS];
 static uint32_t g_frontend_active_group_count;
 
@@ -805,6 +808,7 @@ void XwaSnapshot_NoteResourceBinding(const char* fileName, const char* name, int
 				g_bindings[i].frame_count = frames;
 				g_bindings[i].active = 1;
 				g_bindings[i].video = binding_video(fileName);
+				g_binding_generation++;
 			}
 			return;
 		}
@@ -825,6 +829,7 @@ void XwaSnapshot_NoteResourceBinding(const char* fileName, const char* name, int
 	b->frame_count = frames;
 	b->active = 1;
 	b->video = binding_video(fileName);
+	g_binding_generation++;
 }
 
 void XwaSnapshot_NoteResourceFree(const char* name) {
@@ -838,10 +843,23 @@ void XwaSnapshot_NoteResourceFree(const char* name) {
 				XwaFrontendVideo_FreeImage(b->video->video);
 			}
 			b->active = 0;
+			g_binding_generation++;
 			return;
 		}
 	}
 }
+
+const char* XwaSnapshot_BoundSourceFile(const char* name) {
+	for (int i = 0; name != NULL && i < g_binding_count; i++) {
+		const XwaResourceBinding* b = &g_bindings[i];
+		if (b->active && strncmp(b->name, name, sizeof b->name) == 0) {
+			return b->source_file;
+		}
+	}
+	return NULL;
+}
+
+unsigned XwaSnapshot_BindingGeneration(void) { return g_binding_generation; }
 
 void XwaSnapshot_NoteSpriteGroupLoad(int16_t group) {
 	if (group < 0 ||
@@ -1455,18 +1473,16 @@ static int snapshot_reserve_slot_index(XwaSnapshot* s, uint32_t count) {
 	return 1;
 }
 
-/* Copies the meshes of craft `cd` to the mesh areas of `s`, at its model's
- * mesh count. The entry gets its offset; XwaSnapshot_CaptureFlight sets its
- * pointers once the areas stop growing. */
-static void snapshot_capture_meshes(XwaSnapshot* s, XwaFlightObject* f, const ObjectRecord* o,
-									const CraftData* cd) {
-	int count = ModelMesh_GetObjectTypeMeshCount(o->objectType);
-	if (count <= 0) {
-		return;
-	}
-	if (count > XWA_SNAP_MAX_MESH_SLOTS) {
-		count = XWA_SNAP_MAX_MESH_SLOTS;
-	}
+/* The mesh count of object `o`'s model, at most XWA_SNAP_MAX_MESH_SLOTS. */
+static int snapshot_mesh_count(const ObjectRecord* o) {
+	const int count = ModelMesh_GetObjectTypeMeshCount(o->objectType);
+	return count > XWA_SNAP_MAX_MESH_SLOTS ? XWA_SNAP_MAX_MESH_SLOTS : count;
+}
+
+/* Makes room for `count` meshes in the mesh areas of `s`, and gives entry `f`
+ * its offset and mesh count. XwaSnapshot_CaptureFlight sets its pointers once
+ * the areas stop growing. Returns 0 when there is no memory. */
+static int snapshot_reserve_meshes(XwaSnapshot* s, XwaFlightObject* f, int count) {
 	if (s->flight_mesh_count + (uint32_t)count > s->flight_mesh_capacity) {
 		uint32_t capacity = s->flight_mesh_capacity ? s->flight_mesh_capacity : 4096;
 		while (capacity < s->flight_mesh_count + (uint32_t)count) {
@@ -1474,21 +1490,52 @@ static void snapshot_capture_meshes(XwaSnapshot* s, XwaFlightObject* f, const Ob
 		}
 		uint8_t* states = realloc(s->flight_component_states, capacity);
 		if (states == NULL) {
-			return;
+			return 0;
 		}
 		s->flight_component_states = states;
 		uint16_t* angles = realloc(s->flight_mesh_angles, (size_t)capacity * sizeof *angles);
 		if (angles == NULL) {
-			return;
+			return 0;
 		}
 		s->flight_mesh_angles = angles;
 		s->flight_mesh_capacity = capacity;
 	}
 	f->mesh_offset = s->flight_mesh_count;
 	f->mesh_count = (uint16_t)count;
+	s->flight_mesh_count += (uint32_t)count;
+	return 1;
+}
+
+/* Copies the meshes of craft `cd` to the mesh areas of `s`, at its model's
+ * mesh count. */
+static void snapshot_capture_meshes(XwaSnapshot* s, XwaFlightObject* f, const ObjectRecord* o,
+									const CraftData* cd) {
+	const int count = snapshot_mesh_count(o);
+	if (count <= 0 || !snapshot_reserve_meshes(s, f, count)) {
+		return;
+	}
 	memcpy(s->flight_component_states + f->mesh_offset, cd->componentState, (size_t)count);
 	XwaArticulation_DrawnAngles(o, s->flight_mesh_angles + f->mesh_offset, (size_t)count);
-	s->flight_mesh_count += (uint32_t)count;
+}
+
+/* An object without craft data, such as a projectile, has no component
+ * states, but its model's profile can still hide components
+ * (XwaObjectProfiles_HideWithoutCraft). This writes them to the mesh areas
+ * of `s` with the state of destroyed components. */
+static void snapshot_capture_profile_meshes(XwaSnapshot* s, XwaFlightObject* f, const ObjectRecord* o,
+											const MobileObject* m) {
+	uint8_t states[XWA_SNAP_MAX_MESH_SLOTS];
+	const int count = snapshot_mesh_count(o);
+	if (count <= 0) {
+		return;
+	}
+	memset(states, 0, (size_t)count);
+	if (!XwaObjectProfiles_HideWithoutCraft(o->objectType, m->sourceObjectType, states, count) ||
+		!snapshot_reserve_meshes(s, f, count)) {
+		return;
+	}
+	memcpy(s->flight_component_states + f->mesh_offset, states, (size_t)count);
+	memset(s->flight_mesh_angles + f->mesh_offset, 0, (size_t)count * sizeof *s->flight_mesh_angles);
 }
 
 static XwaFlightObjectList snapshot_object_list(const XwaFlightObject* f) {
@@ -1632,6 +1679,8 @@ static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_
 			XwaEngineGlows_HiddenMask(o->objectType, m->speed, (uint16_t)cd->aiFlight.maxSpeedCache,
 									  f->eg_hidden_mask);
 			f->surface_hidden_mask = XwaSurfaces_HiddenMask(o->objectType, cd, m->speed);
+		} else {
+			snapshot_capture_profile_meshes(s, f, o, m);
 		}
 	}
 }

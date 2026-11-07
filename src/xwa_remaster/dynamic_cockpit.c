@@ -930,6 +930,28 @@ void XwaRemasterDc_AddFill(AeronDrawList2D* screen, XwaRemasterDcLayer layer, fl
 	dc_route(screen, layer, bounds, scissor, dc_emit_fill, &fill);
 }
 
+static void dc_emit_rrect(AeronDrawList2D* list, const void* record, int dx, int dy,
+						  const AeronRectI* scissor) {
+	AeronDrawList2DRRect rrect = *(const AeronDrawList2DRRect*)record;
+	rrect.dst_x += (float)dx;
+	rrect.dst_y += (float)dy;
+	rrect.scissor = dc_scissor_set(scissor) ? *scissor : (AeronRectI) { 0 };
+	AeronDrawList_AddRRect(list, &rrect);
+}
+
+void XwaRemasterDc_AddRRect(AeronDrawList2D* screen, XwaRemasterDcLayer layer,
+							const AeronDrawList2DRRect* rrect) {
+	if (!screen || !rrect)
+		return;
+	if (!dc_routing()) {
+		AeronDrawList_AddRRect(screen, rrect);
+		return;
+	}
+	const float bounds[4] = { rrect->dst_x, rrect->dst_y, rrect->dst_x + rrect->dst_w,
+							  rrect->dst_y + rrect->dst_h };
+	dc_route(screen, layer, bounds, &rrect->scissor, dc_emit_rrect, rrect);
+}
+
 /* ---- Frame end ----------------------------------------------------- */
 
 void XwaRemasterDc_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot, int target_w, int target_h) {

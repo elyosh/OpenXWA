@@ -139,6 +139,27 @@ int XwaRemasterEnvironment_Enabled(void);
 void XwaRemasterEnvironment_SetAuthoredEnvironments(int enabled);
 int XwaRemasterEnvironment_AuthoredEnvironments(void);
 
+/* The largest environment intensity scale. */
+enum { XWA_ENV_INTENSITY_SCALE_MAX = 10 };
+
+/* Multiplies the intensity of every environment, from 0 to
+ * XWA_ENV_INTENSITY_SCALE_MAX (environment_maps.intensity_scale). It scales
+ * the sky and the overlay that are drawn, and the diffuse light and the
+ * reflections that the sky gives the models, so they all stay in step. It
+ * doesn't scale the suns, the ambient fill or the kept backdrops. The debug
+ * inspector changes it; Configure also sets the value the inspector resets
+ * to. */
+float XwaRemasterEnvironment_IntensityScale(void);
+void XwaRemasterEnvironment_SetIntensityScale(float scale);
+void XwaRemasterEnvironment_ConfigureIntensityScale(float scale);
+float XwaRemasterEnvironment_IntensityScaleDefault(void);
+
+/* Copies `environment` into `out` with its intensity multiplied by the
+ * intensity scale. Returns `out`, or NULL when `environment` is NULL. */
+const AeronPreparedEnvironment*
+XwaRemasterEnvironment_ScaleIntensity(const AeronPreparedEnvironment* environment,
+									  AeronPreparedEnvironment* out);
+
 /* Creates the environment library. Failures are logged, and the regions then
  * use the classic path. Returns 0 only on invalid arguments. */
 int XwaRemasterEnvironment_PrepareProcess(AeronCommandBuffer* cmd);

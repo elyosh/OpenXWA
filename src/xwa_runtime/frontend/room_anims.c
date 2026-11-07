@@ -12,6 +12,7 @@
 #include "xwa_runtime/timing/host_clock.h"
 
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,6 +42,12 @@ typedef struct XwaRoomAnim {
 	int sound_state; /* 0 not loaded, 1 loaded, -1 can't be loaded */
 	XwaAnimMissions missions;
 	int first_mission, mission_count; /* in g_animMissionIds */
+	/* The wait before each play of this animation, in seconds. It replaces
+	   the group's wait. */
+	int has_delay;
+	float delay_min, delay_max;
+	/* The drawing order: lower layers are drawn first. */
+	int64_t layer;
 } XwaRoomAnim;
 
 typedef struct XwaRoomAnimGroup {
@@ -63,6 +70,8 @@ static int* g_animMissionIds;
 static int g_animMissionIdCount;
 static XwaRoomAnimGroup* g_animGroups;
 static int g_animGroupCount;
+/* The groups in drawing order, rebuilt each frame. */
+static int* g_animGroupOrder;
 static int g_animsLoaded;
 static uint32_t g_animRandom;
 
@@ -165,8 +174,24 @@ static int anims_read_missions(const AeronConfigNode* node, XwaRoomAnim* anim) {
 	return anims_error(node, "'missions' must be all, a list of mission numbers, or {except: [...]}");
 }
 
+/* Reads a `delay`: a number of seconds, or [shortest, longest]. */
+static int anims_read_delay(const AeronConfigNode* delay, float* shortest, float* longest) {
+	int valid = 1;
+
+	if (anims_is_number(delay)) {
+		*shortest = *longest = anims_number(delay);
+	} else {
+		valid = anims_pair(delay, shortest, longest);
+	}
+	if (!valid || *shortest < 0.0f || *longest < *shortest) {
+		return anims_error(delay, "'delay' must be a number of seconds, or [shortest, longest]");
+	}
+	return 1;
+}
+
 static int anims_read_animation(const AeronConfigNode* node) {
-	static const char* const keys[] = { "video", "at", "size", "scale", "fps", "sound", "missions", NULL };
+	static const char* const keys[] = { "video", "at",       "size",  "scale", "fps",
+										"sound", "missions", "delay", "layer", NULL };
 	const AeronConfigNode* video = AeronConfigNode_MapGet(node, "video");
 	const AeronConfigNode* size = AeronConfigNode_MapGet(node, "size");
 	const AeronConfigNode* scale = AeronConfigNode_MapGet(node, "scale");
@@ -225,6 +250,21 @@ static int anims_read_animation(const AeronConfigNode* node) {
 	if (!anims_read_missions(AeronConfigNode_MapGet(node, "missions"), &anim)) {
 		return 0;
 	}
+	if (AeronConfigNode_MapGet(node, "delay")) {
+		if (!anims_read_delay(AeronConfigNode_MapGet(node, "delay"), &anim.delay_min, &anim.delay_max)) {
+			return 0;
+		}
+		anim.has_delay = 1;
+	}
+	/* Without `layer`, the layer is the animation's place in the file. */
+	anim.layer = g_animCount + 1;
+	if (AeronConfigNode_MapGet(node, "layer")) {
+		const AeronConfigNode* layer = AeronConfigNode_MapGet(node, "layer");
+		if (AeronConfigNode_Type(layer) != AERON_CONFIG_INT) {
+			return anims_error(layer, "'layer' must be a whole number");
+		}
+		anim.layer = AeronConfigNode_Int(layer, 0);
+	}
 	grown = (XwaRoomAnim*)realloc(g_anims, (size_t)(g_animCount + 1) * sizeof(*g_anims));
 	if (!grown) {
 		return anims_error(node, "out of memory");
@@ -267,16 +307,8 @@ static int anims_read_group(const AeronConfigNode* node) {
 			return anims_error(repeat, "'repeat' must be random or same");
 		}
 	}
-	if (delay) {
-		int valid = 1;
-		if (anims_is_number(delay)) {
-			group.delay_min = group.delay_max = anims_number(delay);
-		} else {
-			valid = anims_pair(delay, &group.delay_min, &group.delay_max);
-		}
-		if (!valid || group.delay_min < 0.0f || group.delay_max < group.delay_min) {
-			return anims_error(delay, "'delay' must be a number of seconds, or [shortest, longest]");
-		}
+	if (delay && !anims_read_delay(delay, &group.delay_min, &group.delay_max)) {
+		return 0;
 	}
 	if (AeronConfigNode_Type(animations) != AERON_CONFIG_SEQUENCE ||
 		AeronConfigNode_SequenceCount(animations) == 0) {
@@ -304,9 +336,11 @@ static void anims_free(void) {
 	free(g_anims);
 	free(g_animMissionIds);
 	free(g_animGroups);
+	free(g_animGroupOrder);
 	g_anims = NULL;
 	g_animMissionIds = NULL;
 	g_animGroups = NULL;
+	g_animGroupOrder = NULL;
 	g_animCount = g_animMissionIdCount = g_animGroupCount = 0;
 }
 
@@ -414,14 +448,16 @@ static void group_stop(XwaRoomAnimGroup* group) {
 	group->waiting = 0;
 }
 
-/* Sets up `anim` to play next, after the group's delay. */
+/* Sets up `anim` to play next. It waits for the animation's delay, or for
+   the group's delay when the animation has none. */
 static void group_start(XwaRoomAnimGroup* group, int anim, int candidates, uint64_t now_us) {
-	const float delay = group->delay_min +
-						(group->delay_max - group->delay_min) * (float)(anims_random() % 10001u) / 10000.0f;
+	const float shortest = g_anims[anim].has_delay ? g_anims[anim].delay_min : group->delay_min;
+	const float longest = g_anims[anim].has_delay ? g_anims[anim].delay_max : group->delay_max;
+	const float delay = shortest + (longest - shortest) * (float)(anims_random() % 10001u) / 10000.0f;
 	if (anim != group->current || !XwaFrontendVideo_Player(group->slot)) {
 		/* Without a delay, an animation that can only be followed by itself is
 		   opened looping, so there is no empty frame between plays. */
-		const int loop = group->delay_max <= 0.0f && (group->repeat_same || candidates == 1);
+		const int loop = longest <= 0.0f && (group->repeat_same || candidates == 1);
 		group_stop(group);
 		group->slot =
 			XwaFrontendVideo_Open(AERON_VFS_ROOT_MOD, g_anims[anim].path, loop, 0, g_anims[anim].fps);
@@ -487,20 +523,58 @@ static void anim_play_sound(XwaRoomAnim* anim) {
 	}
 }
 
+/* The layer of the animation that `group` plays or waits to play. */
+static int64_t group_layer(const XwaRoomAnimGroup* group) {
+	return group->current >= 0 ? g_anims[group->current].layer : INT64_MAX;
+}
+
+/* Fills g_animGroupOrder with the groups of `room`, sorted by the layer of
+ * their animation. Groups with the same layer keep the order of the file.
+ * Returns the number of groups, or 0 when out of memory. */
+static int anims_order_groups(const char* room) {
+	int count = 0;
+
+	if (!g_animGroupOrder && g_animGroupCount > 0) {
+		g_animGroupOrder = (int*)malloc((size_t)g_animGroupCount * sizeof(*g_animGroupOrder));
+		if (!g_animGroupOrder) {
+			return 0;
+		}
+	}
+	for (int i = 0; i < g_animGroupCount; i++) {
+		int at;
+
+		if (strcmp(g_animGroups[i].room, room) != 0) {
+			continue;
+		}
+		at = count++;
+		while (at > 0 &&
+			   group_layer(&g_animGroups[g_animGroupOrder[at - 1]]) > group_layer(&g_animGroups[i])) {
+			g_animGroupOrder[at] = g_animGroupOrder[at - 1];
+			at--;
+		}
+		g_animGroupOrder[at] = i;
+	}
+	return count;
+}
+
 void XwaRoomAnims_Draw(const char* room, int frame) {
 	const uint64_t now_us = XwaTime_GetElapsedUs();
+	int count;
 	anims_load();
+	/* Each group picks its animation first, so that the groups can be drawn
+	   in the order of the layers of their animations. */
 	for (int i = 0; i < g_animGroupCount; i++) {
 		XwaRoomAnimGroup* group = &g_animGroups[i];
+		if (strcmp(group->room, room) == 0 && (frame == 0 || !group->active)) {
+			group_enter(group, now_us);
+		}
+	}
+	count = anims_order_groups(room);
+	for (int i = 0; i < count; i++) {
+		XwaRoomAnimGroup* group = &g_animGroups[g_animGroupOrder[i]];
 		AeronVideoPlayer* player;
 		AeronVideoState state;
 
-		if (strcmp(group->room, room) != 0) {
-			continue;
-		}
-		if (frame == 0 || !group->active) {
-			group_enter(group, now_us);
-		}
 		player = XwaFrontendVideo_Player(group->slot);
 		if (!player) {
 			continue;

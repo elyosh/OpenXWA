@@ -8,6 +8,8 @@
 #include "xwa/assets/object_type_info.h"
 #include "xwa/util/byte_order.h"
 #include "xwa/util/memory.h"
+#include "xwa_runtime/frontend/frontend_config.h"
+#include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/models/mission_art.h"
 
 #include <math.h>
@@ -16,7 +18,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define XWA_GEOMETRY_DESIGN_PATH "frontend/frontend.yaml"
 #define XWA_GEOMETRY_STARFIELD_MASK_PATH "frontend/concourse/starfield_mask.png"
 #define XWA_GEOMETRY_KEY_SIZE 64
 
@@ -79,7 +80,7 @@ static void geometry_read_paint(const AeronConfigNode* paint) {
 			g_geometryPaint.fill_alpha = alpha;
 		} else {
 			Aeron_LogError("xwa.frontend", "%s:%d: fill_alpha must be between 0 and 1",
-						   XWA_GEOMETRY_DESIGN_PATH, AeronConfigNode_Line(value));
+						   XWA_FRONTEND_CONFIG_PATH, AeronConfigNode_Line(value));
 		}
 	}
 	value = AeronConfigNode_MapGet(paint, "line_width");
@@ -89,7 +90,7 @@ static void geometry_read_paint(const AeronConfigNode* paint) {
 			g_geometryPaint.pixel_lines = strcmp(text, "pixel") == 0;
 		} else {
 			Aeron_LogError("xwa.frontend", "%s:%d: line_width must be unit or pixel",
-						   XWA_GEOMETRY_DESIGN_PATH, AeronConfigNode_Line(value));
+						   XWA_FRONTEND_CONFIG_PATH, AeronConfigNode_Line(value));
 		}
 	}
 	value = AeronConfigNode_MapGet(paint, "grid_colours");
@@ -104,14 +105,13 @@ static void geometry_read_paint(const AeronConfigNode* paint) {
 		} else {
 			Aeron_LogError("xwa.frontend",
 						   "%s:%d: grid_colours must be [major, minor], such as [0xFF0000, 0x800000]",
-						   XWA_GEOMETRY_DESIGN_PATH, AeronConfigNode_Line(value));
+						   XWA_FRONTEND_CONFIG_PATH, AeronConfigNode_Line(value));
 		}
 	}
 }
 
 static void geometry_load_design(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
+	const AeronConfigNode* root;
 	const AeronConfigNode* design;
 	float size[2];
 
@@ -119,28 +119,37 @@ static void geometry_load_design(void) {
 		return;
 	}
 	g_geometryDesignLoaded = 1;
-	memset(&error, 0, sizeof(error));
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, XWA_GEOMETRY_DESIGN_PATH, &file,
-									&error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.frontend", "%s:%d: %s; the design screen is 640x480",
-						   XWA_GEOMETRY_DESIGN_PATH, error.line,
-						   error.message[0] ? error.message : "cannot be read");
-		}
+	root = XwaFrontendConfig_Root();
+	if (root == NULL) {
 		return;
 	}
-	design = AeronConfigNode_MapGet(AeronConfigFile_Root(file), "design");
+	design = AeronConfigNode_MapGet(root, "design");
 	if (design != NULL) {
 		if (geometry_read_numbers(design, size, 2) && size[0] >= 1.0f && size[1] >= 1.0f) {
 			g_geometryDesignW = size[0];
 			g_geometryDesignH = size[1];
 		} else {
 			Aeron_LogError("xwa.frontend", "%s:%d: design must be [width, height] in pixels; using 640x480",
-						   XWA_GEOMETRY_DESIGN_PATH, AeronConfigNode_Line(design));
+						   XWA_FRONTEND_CONFIG_PATH, AeronConfigNode_Line(design));
 		}
 	}
-	geometry_read_paint(AeronConfigNode_MapGet(AeronConfigFile_Root(file), "paint"));
-	AeronConfigFile_Destroy(file);
+	geometry_read_paint(AeronConfigNode_MapGet(root, "paint"));
+}
+
+/* Reads the `layout` key of an atlas or video file into atlas->layout. A
+   wrong value is logged and ignored. */
+static void geometry_read_layout(const char* path, const AeronConfigNode* root, XwaGeometryAtlas* atlas) {
+	const AeronConfigNode* value = AeronConfigNode_MapGet(root, "layout");
+
+	atlas->layout = -1;
+	if (value == NULL) {
+		return;
+	}
+	atlas->layout = (int8_t)XwaFrontendScreens_ParseLayout(AeronConfigNode_String(value, NULL));
+	if (atlas->layout < 0) {
+		Aeron_LogError("xwa.frontend", "%s:%d: layout must be classic, wide or fill; it is ignored", path,
+					   AeronConfigNode_Line(value));
+	}
 }
 
 static void geometry_free_atlas(XwaGeometryAtlas* atlas) {
@@ -355,6 +364,7 @@ static XwaGeometryAtlas* geometry_read_atlas(const char* path, int needs_id) {
 			ok = 0;
 		}
 	}
+	geometry_read_layout(path, root, atlas);
 	value = AeronConfigNode_MapGet(root, "regions");
 	if (ok && value != NULL) {
 		atlas->region_count = (int)AeronConfigNode_SequenceCount(value);
@@ -385,7 +395,7 @@ static XwaGeometryAtlas* geometry_read_atlas(const char* path, int needs_id) {
 /* Reads a video's YAML file. Returns NULL when the file is missing or has an
  * error, which is logged. */
 static XwaGeometryAtlas* geometry_read_video(const char* path) {
-	static const char* const keys[] = { "video", "size", "offset", "classic_frames", "fps", NULL };
+	static const char* const keys[] = { "video", "size", "offset", "classic_frames", "fps", "layout", NULL };
 	AeronConfigFile* file = NULL;
 	AeronConfigError error;
 	const AeronConfigNode* root;
@@ -464,6 +474,9 @@ static XwaGeometryAtlas* geometry_read_video(const char* path) {
 						   AeronConfigNode_Line(value));
 			ok = 0;
 		}
+	}
+	if (ok) {
+		geometry_read_layout(path, root, atlas);
 	}
 	if (ok) {
 		atlas->frame_count = atlas->classic_frames;
@@ -600,6 +613,19 @@ const XwaGeometryFrame* XwaFrontendGeometry_FindFrame(const XwaGeometryAtlas* at
 		}
 	}
 	return NULL;
+}
+
+int XwaFrontendGeometry_GroupIdSpan(int group, int first_id, int end_id) {
+	const XwaGeometryAtlas* atlas = XwaFrontendGeometry_FindGroup(group);
+	int highest = first_id - 1;
+
+	for (int i = 0; atlas != NULL && i < atlas->frame_count; ++i) {
+		const int id = atlas->frames[i].id;
+		if (id >= first_id && id < end_id && id > highest) {
+			highest = id;
+		}
+	}
+	return highest - first_id + 1;
 }
 
 const XwaGeometryRegion* XwaFrontendGeometry_FindRegion(const XwaGeometryAtlas* atlas, int type) {

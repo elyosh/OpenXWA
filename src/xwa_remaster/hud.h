@@ -26,7 +26,11 @@ typedef struct XwaHudDrawRecord {
 	uint16_t stable_order;
 	uint16_t sequence;
 	int16_t rotation_angle;
-	uint16_t reserved;
+	/* 1 draws a filled circle of the record's colour instead of its image.
+	   The circle is `scale_ref` wide. `object_type`, `frame` and
+	   `screen_size` don't change how it is drawn. */
+	uint8_t circle;
+	uint8_t reserved;
 	float center_x_ref;
 	float center_y_ref;
 	float scale_ref;

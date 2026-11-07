@@ -163,10 +163,13 @@ the keys that switch to classic graphics do nothing.
 
 ## Units and conventions
 
-- **Lengths** are in metres and **angles** in degrees. Keys with a unit
-  usually say it in their name, such as `position_m` or `heading_degrees`.
-  The flight data of craft and weapons, such as speeds, ranges and rates,
-  keeps the game's own units. See [Craft](craft.md#units).
+- **Lengths** are in metres, **times** in milliseconds, **speeds** in MGLT
+  and **angles** in degrees. Keys with a unit say it in their name, such as
+  `position_m`, `cooldown_ms`, `speed_mglt` or `heading_degrees`. Hull,
+  shields and damage keep the game's own points. See
+  [Craft](craft.md#units). Two values of a model still use the game's
+  units: `hangar_doors.distance`, in game units of 1/40.96 metre, and
+  `step_ticks`, in ticks of 4 ms.
 - **Models** use the glTF axes: +Y is up and the nose points along +Z.
   Lengths are in metres.
 - **Screen positions and sizes** in the `frontend/` and `resdata/` files are

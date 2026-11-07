@@ -206,7 +206,7 @@ flight_groups:
 | `warheads` | The warheads that the flight group has for the whole mission. See below. |
 | `weapon_profile` | The `stats` weapon profile of the flight group. |
 | `warhead_profile` | The `warhead_capacity_percent` profile of the flight group. |
-| `energy_profile` | The `energy_speed_q16` profile of the flight group. |
+| `energy_profile` | The `energy_speed_percent` profile of the flight group. |
 | `linking_profile` | The `linking` profile of the flight group. |
 
 A key that is missing keeps the value of the `.TIE` file. A value out of
@@ -266,8 +266,8 @@ more. A warhead type without a value has no limit.
 pick weapon profiles by name. The profiles are in the `weapons` group of
 the craft's model settings file, and in the `weapons` section of
 `flight/flight.yaml`. Names have up to 47 characters and can be written in
-any case. When neither file has the profile, the flight group uses
-`default`. [Flight settings](flight.md#weapon-profiles) and
+any case. When neither file has the profile, the flight group gets the
+original game's values, and the log says so. [Flight settings](flight.md#weapon-profiles) and
 [Craft](craft.md) describe the profiles.
 
 ## object_profiles
@@ -297,6 +297,26 @@ The game picks the profile of a craft in this order:
 A profile that hides nothing, or that the model doesn't have, uses
 `Default`. Without `Default` either, the craft shows every part. Profiles
 only apply to the mod's models.
+
+`weapons` sets the profile of laser bolts and other objects that aren't
+craft, based on the type of craft that fires them. The first key is the
+object type of the craft that fires. The second key is the object type of
+what it fires:
+
+```yaml
+object_profiles:
+  weapons:
+    imperial_star_destroyer2:
+      turbolaser_green_medium: "ShowBeam"
+```
+
+In this example, the `turbolaser_green_medium` shots fired by
+`imperial_star_destroyer2` craft use the `ShowBeam` profile.
+
+When `weapons` doesn't set a profile, these objects use `Skirmish` in a
+quick start or a skirmish if the model has it, and `Default` otherwise. If
+the profile hides nothing, the object shows all its parts. Unlike craft, it
+doesn't fall back to `Default`.
 
 ## articulations
 

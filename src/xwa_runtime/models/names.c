@@ -659,12 +659,13 @@ const XwaNameTable g_xwaShipListCategoryNames = { "ship list category", s_shipLi
 const XwaNameTable g_xwaShipListCategoryTexts = { "ship list category text", s_shipListCategoryTexts, 0, 11,
 												  NULL };
 
-/* Kind 0 is `none`, for example in an empty laser group. */
+/* Kind 0 is `none`, for example in an empty laser group. The game treats
+   every turret kind other than 4 and 5 like kind 6, `slow_turret`. */
 static const char* const s_laserKinds[] = {
-	"none", "laser_cannon", "ion_cannon", NULL, "turret", "long_range_turret",
+	"none", "laser_cannon", "ion_cannon", NULL, "turret", "long_range_turret", "slow_turret",
 };
-typedef char laser_kinds_check[(sizeof s_laserKinds / sizeof s_laserKinds[0] == 6) ? 1 : -1];
-const XwaNameTable g_xwaLaserKindNames = { "laser group kind", s_laserKinds, 0, 6, NULL };
+typedef char laser_kinds_check[(sizeof s_laserKinds / sizeof s_laserKinds[0] == 7) ? 1 : -1];
+const XwaNameTable g_xwaLaserKindNames = { "laser group kind", s_laserKinds, 0, 7, NULL };
 
 static const char* const s_hardpointKinds[] = { "none", "laser", "warhead" };
 typedef char hardpoint_kinds_check[(sizeof s_hardpointKinds / sizeof s_hardpointKinds[0] == 3) ? 1 : -1];

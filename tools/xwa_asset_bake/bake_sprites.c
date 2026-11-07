@@ -32,7 +32,10 @@
 #include "tool_log.h"
 #include "upscale.h"
 
+#include "aeron/sync.h"
 #include "aeron/vfs.h"
+
+#include <SDL3/SDL_mutex.h>
 
 #include <errno.h>
 #include <math.h>
@@ -112,9 +115,8 @@ static void frames_free(BakeFrame* f, int n) {
 	free(f);
 }
 
-/* Write one RGBA image as PNG and/or KTX2 per options. */
-int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba,
-					  int w, int h) {
+/* Writes one RGBA image as PNG and/or KTX2 per options. */
+static int emit_now(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba, int w, int h) {
 	char path[1100];
 	char err[256];
 	int  ok = 1;
@@ -139,6 +141,164 @@ int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, c
 	return ok;
 }
 
+/* ---- encode queue ---------------------------------------------------- */
+
+/* The most memory that the queued images can take. An image larger than this is
+ * still queued when the queue is empty. */
+#define QUEUE_BYTES ((size_t)1024 << 20)
+
+typedef struct EncodeJob {
+	BakeSpriteOptions opt;
+	char base[1100];
+	uint8_t* rgba;
+	int w, h;
+	size_t bytes;
+	int running;
+	struct EncodeJob* next;
+} EncodeJob;
+
+/* The jobs waiting or being encoded, oldest first. */
+static struct {
+	int active;
+	int stopping;
+	SDL_Mutex* mutex;
+	SDL_Condition* changed; /* a job was added or finished, or the queue stops */
+	EncodeJob* head;
+	EncodeJob* tail;
+	size_t bytes;
+	volatile int failures;
+	AeronThread** threads;
+	int thread_count;
+} s_queue;
+
+static int encode_worker(void* user) {
+	(void)user;
+	SDL_LockMutex(s_queue.mutex);
+	for (;;) {
+		EncodeJob* job = s_queue.head;
+		while (job && job->running)
+			job = job->next;
+		if (!job) {
+			if (s_queue.stopping)
+				break;
+			SDL_WaitCondition(s_queue.changed, s_queue.mutex);
+			continue;
+		}
+		job->running = 1;
+		SDL_UnlockMutex(s_queue.mutex);
+		if (!emit_now(&job->opt, job->base, job->rgba, job->w, job->h))
+			Aeron_AtomicAdd(&s_queue.failures, 1);
+		free(job->rgba);
+		SDL_LockMutex(s_queue.mutex);
+		EncodeJob** link = &s_queue.head;
+		EncodeJob* prev = NULL;
+		while (*link != job) {
+			prev = *link;
+			link = &(*link)->next;
+		}
+		*link = job->next;
+		if (s_queue.tail == job)
+			s_queue.tail = prev;
+		s_queue.bytes -= job->bytes;
+		free(job);
+		SDL_BroadcastCondition(s_queue.changed);
+	}
+	SDL_UnlockMutex(s_queue.mutex);
+	return 0;
+}
+
+/* Returns 1 if a job waiting or being encoded writes `base`. */
+static int queue_has(const char* base) {
+	for (const EncodeJob* job = s_queue.head; job; job = job->next)
+		if (strcmp(job->base, base) == 0)
+			return 1;
+	return 0;
+}
+
+/* Queues a copy of the image. Returns 0 if it can't be copied. */
+static int queue_image(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba, int w,
+					   int h) {
+	EncodeJob* job = (EncodeJob*)calloc(1, sizeof *job);
+	const size_t bytes = (size_t)w * h * 4u;
+	if (job)
+		job->rgba = (uint8_t*)malloc(bytes);
+	if (!job || !job->rgba ||
+		snprintf(job->base, sizeof job->base, "%s", base_path) >= (int)sizeof job->base) {
+		if (job)
+			free(job->rgba);
+		free(job);
+		return 0;
+	}
+	memcpy(job->rgba, rgba, bytes);
+	job->opt = *opt;
+	job->w = w;
+	job->h = h;
+	job->bytes = bytes;
+	SDL_LockMutex(s_queue.mutex);
+	/* If a queued image has the same path, wait until it is written, so that
+	   this newer image is written last. */
+	while ((s_queue.bytes && s_queue.bytes + bytes > QUEUE_BYTES) || queue_has(job->base))
+		SDL_WaitCondition(s_queue.changed, s_queue.mutex);
+	if (s_queue.tail)
+		s_queue.tail->next = job;
+	else
+		s_queue.head = job;
+	s_queue.tail = job;
+	s_queue.bytes += bytes;
+	SDL_BroadcastCondition(s_queue.changed);
+	SDL_UnlockMutex(s_queue.mutex);
+	return 1;
+}
+
+void BakeSprites_BeginQueue(int threads) {
+	if (s_queue.active || threads < 2)
+		return;
+	memset(&s_queue, 0, sizeof s_queue);
+	s_queue.mutex = SDL_CreateMutex();
+	s_queue.changed = SDL_CreateCondition();
+	s_queue.threads = (AeronThread**)calloc((size_t)threads, sizeof *s_queue.threads);
+	if (s_queue.mutex && s_queue.changed && s_queue.threads)
+		for (; s_queue.thread_count < threads; ++s_queue.thread_count)
+			if (!(s_queue.threads[s_queue.thread_count] =
+					  Aeron_ThreadCreate("image encode", encode_worker, NULL)))
+				break;
+	s_queue.active = s_queue.thread_count > 0;
+	if (!s_queue.active) {
+		/* Without threads, the images are written right away. */
+		SDL_DestroyCondition(s_queue.changed);
+		SDL_DestroyMutex(s_queue.mutex);
+		free(s_queue.threads);
+		memset(&s_queue, 0, sizeof s_queue);
+	}
+}
+
+int BakeSprites_QueueFailures(void) { return s_queue.active ? Aeron_AtomicLoad(&s_queue.failures) : 0; }
+
+int BakeSprites_EndQueue(void) {
+	if (!s_queue.active)
+		return 0;
+	SDL_LockMutex(s_queue.mutex);
+	s_queue.stopping = 1;
+	SDL_BroadcastCondition(s_queue.changed);
+	SDL_UnlockMutex(s_queue.mutex);
+	for (int i = 0; i < s_queue.thread_count; ++i)
+		Aeron_ThreadJoin(s_queue.threads[i]);
+	const int failures = Aeron_AtomicLoad(&s_queue.failures);
+	SDL_DestroyCondition(s_queue.changed);
+	SDL_DestroyMutex(s_queue.mutex);
+	free(s_queue.threads);
+	memset(&s_queue, 0, sizeof s_queue);
+	return failures;
+}
+
+int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba, int w,
+						  int h) {
+	/* If the image can't be queued, it is written right away. */
+	if (s_queue.active && queue_image(opt, base_path, rgba, w, h))
+		return 1;
+	return emit_now(opt, base_path, rgba, w, h);
+}
+
 int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
 					   AeronAtlasImage** out_images, AeronCpuAtlas* out) {
 	AeronAtlasImage* images = (AeronAtlasImage*)calloc((size_t)count, sizeof *images);
@@ -154,6 +314,7 @@ int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
 	const AeronAtlasBuildOptions options = {
 		.gutter = BAKE_HD_PAD,
 		.max_dimension = BAKE_MAX_ATLAS_DIM,
+		.oversize_dimension = BAKE_MAX_OVERSIZE_DIM,
 		.max_pages = max_pages,
 	};
 	const int built = Aeron_AtlasBuildRgba8(images, count, &options, out);
@@ -191,13 +352,24 @@ static int write_atlas_yaml(const char* path, const BakeAtlasHeader* header, con
 		fputs("game_geometry: true\n", fp);
 	if (header->game_units)
 		fputs("units: game\n", fp);
-	fprintf(fp, "atlas: {w: %d, h: %d}\n", pages->pages[0].width, pages->pages[0].height);
+	/* The loader checks every frame against this size, so it must be the
+	   largest width and the largest height of all the pages. Page 0 isn't
+	   always the largest: a frame on a page of its own can make a later page
+	   taller. */
+	int width = 0, height = 0;
+	for (int page = 0; page < pages->page_count; ++page) {
+		width = pages->pages[page].width > width ? pages->pages[page].width : width;
+		height = pages->pages[page].height > height ? pages->pages[page].height : height;
+	}
+	fprintf(fp, "atlas: {w: %d, h: %d}\n", width, height);
 	if (header->classic_frames)
 		fprintf(fp, "classic_frames: %d\n", header->classic_frames);
 	if (header->fps)
 		fprintf(fp, "fps: %d\n", header->fps);
 	if (header->tint)
 		fprintf(fp, "tint: %s\n", header->tint);
+	if (header->layout)
+		fprintf(fp, "layout: %s\n", header->layout);
 	if (header->has_draw_adjust) {
 		fputs("draw_adjust: ", fp);
 		BakeSprites_WriteNumberList(fp, header->draw_adjust, 4);

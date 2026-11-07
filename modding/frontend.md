@@ -38,6 +38,8 @@ layouts:
 | `design` | `[width, height]`, the screen size that your menu art is made for. The positions and sizes in design pixels of every `frontend/` and `resdata/` file use it. The default is `[640, 480]`. |
 | `paint` | How the game draws its fills, lines and the briefing grid. See below. |
 | `layouts` | How each screen fits on a wide screen. See below. |
+| `family_missions` | `false` makes the tour's first seven missions use the concourse. See below. |
+| `side_panels` | The screens that don't show the side panels. See below. |
 
 When `design` has a wrong value, the log says so, and the design size is
 640 × 480.
@@ -75,6 +77,59 @@ screens](reference/frontend_screens.md) lists the names.
 
 When a name or a layout is wrong, the log says so, and the game ignores the
 whole table, so every screen is `classic`.
+
+### Background layouts
+
+A background image can also set the layout of its screen. Add `layout` to
+the image's atlas file or video file:
+
+```yaml
+layout: wide
+```
+
+While the screen shows that image as its background, the screen uses this
+layout. It replaces the layout that `layouts` gives the screen. This helps
+in a view that shows different images. For example, the memento view of
+the family room shows the picture of the memento: a 16:9 picture can be
+`wide`, and a 4:3 picture can be `fill`.
+
+Only the main image behind the screen counts, not the images that the game
+draws over it, such as doors and buttons. When a dialog such as the datapad
+is open, its own background counts. An image whose file has no `layout`
+keeps the layout of its screen.
+
+### family_missions
+
+The original game plays the first seven missions of the tour from the
+family transport, so a new pilot starts in the family transport room.
+`family_missions: false` makes these missions use the concourse, for a
+campaign that starts on a big ship. The pilot statistics page then always
+shows "On leave". The default is `true`.
+
+### side_panels
+
+Some screens have panels that slide in from the bottom corners, with
+buttons on them. They are the images `leftbar1` to `leftbar5` and
+`rightbar1` to `rightbar4` of group 15000. If your background already shows
+the buttons, you can hide the panels:
+
+```yaml
+side_panels:
+  simulator: false
+  film_room: false
+```
+
+| Key | Screens |
+|-|-|
+| `simulator` | Mission setup, multiplayer setup, and the briefing and debriefing of a mission outside the campaign. |
+| `tour_briefing` | The briefing of a campaign mission. |
+| `tour_debriefing` | The debriefing of a campaign mission. |
+| `family_monitor` | The monitor of the family room. |
+| `film_room` | The film room. |
+
+On a screen set to `false`, the game doesn't draw the panels or play their
+sound. The buttons work as usual and appear when the panels would have
+finished sliding in. The default for each screen is `true`.
 
 ## Menu images
 
@@ -130,6 +185,7 @@ fps: 24
 | `offset` | `[x, y]` in design pixels, added to the position where the game draws the image. The default is `[0, 0]`. |
 | `classic_frames` | The number of frames that the game sees, from 1 to 4096. The default is 1. |
 | `fps` | The frames per second to play at. The default is the video's own rate. |
+| `layout` | `classic`, `wide` or `fill`: the layout of the screen while the video is its background. See [Background layouts](#background-layouts). |
 
 The video plays in a loop, with no sound, for as long as the game draws the
 image, whatever frame the game asks for. When the image disappears and
@@ -182,6 +238,8 @@ one of its animations at a time.
 | `fps` | The frames per second to play at. The default is the video's own rate. |
 | `sound` | A WAV file in `frontend/animations/`, played at the start of each play. The name can have up to 43 characters. |
 | `missions` | The missions in which the animation can play: `all`, a list of mission numbers, or `{except: [...]}`. The default is `all`. |
+| `delay` | The wait before each play of this animation, in the same form as the group's `delay`. It replaces the group's delay when the group picks this animation. `0` is no wait. |
+| `layer` | A whole number. The animations are drawn from the lowest layer to the highest. Without it, the layer is the animation's place in the file: 1 for the first animation, 2 for the next one, and so on, across all the groups. |
 
 The mission numbers are the numbers of the missions in
 `MISSIONS/MISSION.LST`. The game checks them against the pilot's current
@@ -191,7 +249,8 @@ When the player enters the room, each group picks a random animation among
 those allowed in the current mission. Before each play, it waits for the
 `delay`. The videos play without their own sound. `sound` plays at the
 volume of the datapad sounds, again each time a looping video starts over.
-The groups are drawn in the order of the file.
+The game draws the animations in the order of their `layer`. Without
+`layer`, this is the order of the file.
 
 An unknown key or a wrong value is logged with its line, and the game
 ignores the whole file.

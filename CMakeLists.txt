@@ -221,11 +221,14 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/frontend/awards.c
     src/xwa_runtime/frontend/concourse_layout.c
     src/xwa_runtime/frontend/concourse_planet.c
+    src/xwa_runtime/frontend/family_missions.c
+    src/xwa_runtime/frontend/frontend_config.c
     src/xwa_runtime/frontend/frontend_fonts.c
     src/xwa_runtime/frontend/frontend_geometry.c
     src/xwa_runtime/frontend/frontend_screens.c
     src/xwa_runtime/frontend/frontend_video.c
     src/xwa_runtime/frontend/room_anims.c
+    src/xwa_runtime/frontend/side_panels.c
     src/xwa_runtime/input/input_bridge.c
     src/xwa_runtime/input/controller_mapping.c
     src/xwa_runtime/input/rumble_provider.c
@@ -269,6 +272,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/weapon_rates.c
     src/xwa_runtime/models/warhead_launchers.c
     src/xwa_runtime/models/warhead_lock.c
+    src/xwa_runtime/models/units.c
     src/xwa_runtime/models/jamming.c
     src/xwa_runtime/models/names.c
     src/xwa_runtime/models/weapon_stats.c
@@ -296,12 +300,15 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/timing/modern_flight_timing.c
 )
 
-# The input, camera and sun options, which the game and its configuration both
-# use.
+# Options used by both the game and its configuration: input, and the option
+# sections (camera, sun, speed effect and target readout).
 set(XWA_INPUT_OPTIONS_SOURCES
     src/xwa_runtime/config/modern_camera_options.c
     src/xwa_runtime/config/modern_input_options.c
+    src/xwa_runtime/config/modern_speed_effect_options.c
     src/xwa_runtime/config/modern_sun_options.c
+    src/xwa_runtime/config/modern_target_readout_options.c
+    src/xwa_runtime/config/option_section.c
 )
 add_library(xwa_input_options STATIC ${XWA_INPUT_OPTIONS_SOURCES})
 target_include_directories(xwa_input_options PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
@@ -346,6 +353,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/hud_cmd_math.c
     src/xwa_remaster/hud_fixed.c
     src/xwa_remaster/hud_layout.c
+    src/xwa_remaster/hud_readout.c
     src/xwa_remaster/hud_text.c
     src/xwa_remaster/preview.c
     src/xwa_remaster/scene_lights.c
@@ -354,6 +362,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/opt_mesh.c
     src/xwa_remaster/original_2d.c
     src/xwa_remaster/sky_stars.c
+    src/xwa_remaster/speed_effect.c
     src/xwa_remaster/suns.c
     src/xwa_remaster/assets.c
     src/xwa_remaster/text.c
@@ -745,9 +754,12 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/config/modern_input_options_screen.h
     src/xwa_runtime/config/modern_options_menu.h
     src/xwa_runtime/config/modern_pilot_profiles_screen.h
+    src/xwa_runtime/config/modern_speed_effect_options.h
     src/xwa_runtime/config/modern_sun_options.h
+    src/xwa_runtime/config/modern_target_readout_options.h
     src/xwa_runtime/config/modern_video_options.h
     src/xwa_runtime/config/modern_video_options_screen.h
+    src/xwa_runtime/config/option_section.h
     src/xwa_runtime/config/modern_mods.h
     src/xwa_runtime/config/modern_mods_screen.h
     src/xwa/audio/cd_audio.h
@@ -838,6 +850,8 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/frontend/awards.h
     src/xwa_runtime/frontend/concourse_layout.h
     src/xwa_runtime/frontend/concourse_planet.h
+    src/xwa_runtime/frontend/family_missions.h
+    src/xwa_runtime/frontend/frontend_config.h
     src/xwa_runtime/frontend/frontend_geometry.h
     src/xwa_runtime/frontend/frontend_screens.h
     src/xwa_runtime/frontend/frontend_fonts.h

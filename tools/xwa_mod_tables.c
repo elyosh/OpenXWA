@@ -17,12 +17,14 @@
 #include "xwa/assets/object_type.h"
 #include "xwa/assets/object_type_info.h"
 #include "xwa/flight/object/laser.h"
+#include "xwa/render/renderer.h"
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/models/model_roles.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/names.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -434,6 +436,9 @@ static const NameText kLaserKindTexts[] = {
 				"them." },
 	{ "long_range_turret", "Turrets with twice the default range. They don't fire at close targets or at "
 						   "warheads." },
+	{ "slow_turret", "Turrets that fire half as often as `turret` and don't shoot at warheads. Unlike "
+					 "`long_range_turret`, their default range is 2000 m, and they also fire at close "
+					 "targets." },
 	{ NULL, NULL },
 };
 
@@ -471,10 +476,15 @@ static void WriteWeaponTypeTable(FILE* page) {
 			continue;
 		}
 		const int index = type - OBJ_LaserRebel;
-		const double life =
-			g_projectileLifetimeSecondsByType[index] + g_projectileLifetimeFracQ16ByType[index] / 65536.0;
-		fprintf(page, "| %d | `%s` | %u | %d | %g | %u |\n", type, name, g_projectileSpeedByType[index],
-				g_projectileDamageByType[index], life, g_warheadProjectilePointValueByObjectType[type]);
+		/* The life in ticks of 4 ms, computed the same way as the game. */
+		const unsigned life_ticks = 236u * g_projectileLifetimeSecondsByType[index] +
+									MATH2_fraction(g_projectileLifetimeFracQ16ByType[index], 236u);
+		/* A speed unit is 1/2.25 MGLT. Two decimals are enough to get the
+		   exact speed back. */
+		const double mglt = round(g_projectileSpeedByType[index] / 2.25 * 100.0) / 100.0;
+		fprintf(page, "| %d | `%s` | %g | %d | %u | %u |\n", type, name, mglt,
+				g_projectileDamageByType[index], life_ticks * 4,
+				g_warheadProjectilePointValueByObjectType[type]);
 	}
 	fprintf(page, "\n");
 }
@@ -492,10 +502,9 @@ static void WriteWeaponsPage(const char* folder) {
 	WriteParagraph(page,
 				   "The other columns give the stats of the original game, which the `stats` weapon "
 				   "profiles of `flight/flight.yaml` and of the model settings can change. **Speed** is in "
-				   "speed units: 2.25 is 1 MGLT, and a shot of a fighter adds the fighter's speed. "
-				   "**Power** is the damage of a shot, in the points of hull and shields. **Life** is "
-				   "how long a shot lives, in game seconds of 236 ticks. **Score** is the score of a "
-				   "warhead hit.");
+				   "MGLT, and a shot of a fighter adds the fighter's speed. **Power** is the damage of a "
+				   "shot, in the points of hull and shields. **Life** is how long a shot lives, in "
+				   "milliseconds. **Score** is the score of a warhead hit.");
 	WriteWeaponTypeTable(page);
 
 	WriteHeading(page, "Warheads");

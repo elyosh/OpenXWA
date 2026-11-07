@@ -79,12 +79,12 @@ model isn't loaded. A model is rejected when:
 - it has more than 8 hardpoints of the types `gunner` and
   `acceleration_end` together;
 - it has more than one `pilot_eye` hardpoint;
-- its object type has the `float_hardpoints` flag and the model has no
-  laser hardpoint (`none`, `rebel_laser`, `turbo_rebel_laser`,
+- its object type has the `float_hardpoints` flag and the model has too
+  many laser hardpoints (`none`, `rebel_laser`, `turbo_rebel_laser`,
   `empire_laser`, `turbo_empire_laser`, `ion_cannon`, `turbo_ion_cannon`,
   `super_rebel_laser`, `super_empire_laser`, `super_ion_cannon` or
-  `super_mag_pulse`), or too many of them. A laser hardpoint more than
-  6.25 m from the centre line counts twice, and the limit is 255;
+  `super_mag_pulse`). A laser hardpoint more than 6.25 m from the centre
+  line counts twice, and the limit is 255;
 - a position or vector isn't a finite number.
 
 The game also writes a warning, but loads the model, when:
@@ -92,7 +92,8 @@ The game also writes a warning, but loads the model, when:
 - a cockpit model has a `pilot_eye` hardpoint. The pilot eye belongs on the
   craft model;
 - an object type with the `float_hardpoints` flag has no `main_hull` part.
-  It then has no hull debris;
+  It then has no hull debris, and if it has no laser hardpoint, it fires
+  from points on its first part;
 - a cockpit model has more than 5000 faces, or a part with very short edges
   and no collision mesh. The game checks the burn marks of hits on the
   cockpit against its faces;
@@ -664,6 +665,19 @@ The game picks the profile of each object in this order:
 3. `Default_<markings>`, where `<markings>` is the object's markings
    value, such as `Default_2`;
 4. when that profile hides nothing, `Default`.
+
+Laser bolts, warheads and other objects that aren't craft can use profiles
+too. The game picks their profile in this order:
+
+1. the profile that the mission sets for this object when a given type of
+   craft fires it (see `object_profiles.weapons` on the
+   [missions page](missions.md#object_profiles));
+2. in a quick start or a skirmish, `Skirmish`, if the model has it;
+3. `Default`.
+
+For example, a bolt model can contain both a short bolt and a long beam, and
+its `Default` profile hides the beam. A mission can then show the beam only
+on the shots of one type of craft.
 
 ## Probes, light grid and reflection plane
 

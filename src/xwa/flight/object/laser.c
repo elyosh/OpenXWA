@@ -78,12 +78,12 @@ const uint16_t g_projectileLifetimeFracQ16ByObjectType[OBJ_LaserImperialDS + 1] 
 
 // GLOBAL: XWA 0x5B6560
 const uint16_t g_projectileLifetimeSecondsByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1] = {
-	1, 1, 1, 1, 1, 2, 40, 25, 3, 3, 5, 45, 25, 120, 90, 25, 40, 3, 5, 10, 0, 3, 4, 3, 3, 4, 10
+#include "projectile_lifetime_seconds.inc"
 };
 
 // GLOBAL: XWA 0x5B6598
 const uint16_t g_projectileLifetimeFracQ16ByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1] = {
-	0, 0x8000, 0, 0x8000, 0x8000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x8000, 0, 0, 0x8000, 0
+#include "projectile_lifetime_fractions.inc"
 };
 
 // GLOBAL: XWA 0x5B6528

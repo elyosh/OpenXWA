@@ -88,7 +88,9 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Reticles and HUD colours by craft | Implemented | | [Craft](craft.md#hud) |
 | Hull and map icons | Implemented | | [Flight](flight.md#hull-and-map-icons) |
 | Flight text font | Implemented | | [Images](images.md#fonts) |
-| Enhanced HUD | Not implemented | The bars of the target's shields, hull and systems next to the target brackets. | |
+| Enhanced HUD | Implemented | The dark box behind the text isn't drawn. | [Flight](flight.md#target-readout) |
+| Target boxes drawn by ddraw (`Radar2DRendererEnabled`) | Implemented | XWAU's lines are 2 pixels of the game's resolution. The importer sets them to 3 points. | [Flight](flight.md#target-boxes) |
+| Radar blips drawn by ddraw (`Radar2DRendererEnabled`) | Implemented | XWAU's circles are 4 and 8 pixels of the game's resolution. The importer sets them to 4 and 8 points. | [Flight](flight.md#radar) |
 
 ## Skies, lighting and effects
 
@@ -101,7 +103,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Ambient occlusion (SSAO) | Implemented | OpenXWA has its own, which players set in the video options. | |
 | Laser lights | Implemented | | |
 | Hyperspace effect | Not implemented | OpenXWA draws its own hyperspace tunnel, and doesn't show XWAU's hyperspace images. | |
-| Speed effect | Not implemented | The particles that show the craft's speed. | |
+| Speed effect (`enable_speed_shader`) | Implemented | Only the number of particles is converted. | [Flight](flight.md#speed_effect) |
 
 ## Missions
 
@@ -125,7 +127,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Feature | Status | Notes | See |
 |-|-|-|-|
 | Custom hangars | Implemented | Hangar models, objects, maps, cameras, family hangars, and the choice by ship and side. | [Hangars](hangars.md) |
-| A mission's hangar settings | Partial | The settings by ship and a mission's own hangar model aren't converted. | [Hangars](hangars.md#a-missions-hangar-section) |
+| A mission's hangar settings | Implemented | A mission's hangar sections for one command ship, such as `[HangarObjects_<ship>]`, and a mission's own hangar model, `<mission>_Hangar.opt`, aren't converted. | [Hangars](hangars.md#a-missions-hangar-section) |
 | Hangar ambient sounds | Implemented | | [Flight](flight.md#soundsyaml) |
 | Hangar lights and shadows | Implemented | OpenXWA lights the hangars in its own way. XWAU's light settings aren't needed. | [Hangars](hangars.md#hangar-lighting) |
 
@@ -133,9 +135,10 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 
 | Feature | Status | Notes | See |
 |-|-|-|-|
-| HD concourse and wide rooms | Implemented | | [Frontend](frontend.md) |
+| HD concourse and wide rooms | Implemented | Each background image keeps its own layout, so a room that shows wide and 4:3 pictures, such as TFTC's memento view, works as in XWAU. | [Frontend](frontend.md#background-layouts) |
 | Menu font | Implemented | OpenXWA can't ship Consolas, so the importer uses Inconsolata Bold. | [Images](images.md#fonts) |
 | Concourse layout (`ConcourseDoors.txt`) | Implemented | | [Frontend](frontend.md#concourse-layout) |
+| Concourse from the first mission (`SkipFirst7Missions`) | Implemented | | [Frontend](frontend.md#family-missions) |
 | Room animations (`ConcourseAnimations.txt`) | Partial | Animations that exist only in DAT files aren't played. TFTC has three. | [Frontend](frontend.md#room-animations) |
 | Videos in place of images | Implemented | The tech room door, the Death Star briefing and the squadron logos. | [Frontend](frontend.md#videos-in-place-of-images) |
 | HD movies | Implemented | | [Frontend](frontend.md#movies) |
@@ -143,10 +146,13 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Film room and pod movies | Implemented | | [Frontend](frontend.md#room-movies) |
 | Movies on points, rank and rating | Not implemented | TFTC uses them for its points and rank movies. | |
 | Medals, Kalidor Crescent levels, mementos, rank and rating thresholds | Implemented | `MedalDetailListOrder.txt` isn't converted. No installation has it. | [Frontend](frontend.md#awards) |
+| More mission and battle pictures | Implemented | | [Image groups](reference/image_groups.md#mission-and-battle-pictures) |
 | New battle images (`FrontEnd2_Battles.dat`) | Not implemented | | |
 | Craft pictures for new craft types | Not implemented | | |
 | 3D craft preview in skirmish (`SkirmishOpt*`, `[ViewConfiguration]`) | Not implemented | | |
-| Film room background and hidden side panels | Not implemented | | |
+| Hidden side panels (`DrawPanelsIn*`) | Implemented | | [Frontend](frontend.md#side_panels) |
+| Film room background | Not implemented | | |
+| Combat simulator buttons (`hook_tourmultiplayer`) | Not implemented | The mission setup screen doesn't have the hook's Load, Combat Engagements and Melee buttons. The hook's Combat mission folder isn't supported either. | |
 | Tech room holograms | Not implemented | The tech room shows the craft as a model. | |
 
 ## Camera and controls

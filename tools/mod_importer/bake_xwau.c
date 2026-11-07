@@ -72,6 +72,7 @@ typedef struct XwauAtlas {
 	double area[4];
 	const BakeRegion* regions;
 	int region_count;
+	const char* layout; /* for a background, the layout that XWAU gives it */
 } XwauAtlas;
 
 /* A background and the layout XWAU gives the screens that show it. Files
@@ -344,11 +345,18 @@ static void note_background(XwauContext* ctx, const char* key, const char* list_
 		b->layout = "wide";
 }
 
-static const char* background_layout(const XwauContext* ctx, const char* key) {
+/* The layout of the background `key`, or NULL when it isn't a background
+ * with an HD image. */
+static const char* noted_layout(const XwauContext* ctx, const char* key) {
 	for (int i = 0; i < ctx->background_count; ++i)
 		if (strcmp(ctx->backgrounds[i].key, key) == 0)
 			return ctx->backgrounds[i].layout;
-	return "classic";
+	return NULL;
+}
+
+static const char* background_layout(const XwauContext* ctx, const char* key) {
+	const char* layout = noted_layout(ctx, key);
+	return layout ? layout : "classic";
 }
 
 /* XWAU's tools store tenths of a unit as 8000 + 10 * value. */
@@ -369,6 +377,7 @@ static void emit_atlas(XwauContext* ctx, const char* dir, const char* base, cons
 		.classic_frames = atlas->classic_frames,
 		.fps = atlas->fps,
 		.tint = atlas->tint,
+		.layout = atlas->layout,
 		.has_draw_adjust = atlas->has_draw_adjust,
 		.has_bounds = atlas->has_area,
 		.regions = atlas->regions,
@@ -709,6 +718,11 @@ static void write_video_yamls(XwauContext* ctx) {
 		fprintf(fp, "\noffset: ");
 		BakeSprites_WriteNumberList(fp, v->offset, 2);
 		fprintf(fp, "\nclassic_frames: %d\nfps: 24\n", count);
+		char key[600];
+		snprintf(key, sizeof key, "%s/%s", v->dir, v->base);
+		const char* layout = noted_layout(ctx, key);
+		if (layout)
+			fprintf(fp, "layout: %s\n", layout);
 		if (fclose(fp) != 0)
 			ctx->stats->failures++;
 	}
@@ -845,8 +859,12 @@ static void bake_frontres_file(XwauContext* ctx, const char* dir_name, const cha
 				snprintf(list_key, sizeof list_key, "frontres/%s/%s.cbm", dir_lower, base_lower);
 				if (i == 0 && !map_icons &&
 					((s->width >= BACKGROUND_MIN_W && s->height >= BACKGROUND_MIN_H) ||
-					 is_screen_background(key, s->width, s->height)))
+					 is_screen_background(key, s->width, s->height))) {
 					note_background(ctx, key, list_key, same_aspect(s->width, s->height, f->w, f->h));
+					/* XWAU picks the layout from the background that a screen
+					   shows, so the image's atlas keeps it. */
+					atlas.layout = noted_layout(ctx, key);
+				}
 			}
 			{
 				/* XWAU draws some images as backgrounds: as tall as the screen
@@ -1719,6 +1737,18 @@ static void write_animations_yaml(XwauContext* ctx) {
 	}
 	fclose(in);
 
+	/* XWAU draws the animations in the order of their lines, and OpenXWA
+	   draws a group at the place of its first line. When another group's
+	   line is between two lines of a group, every animation gets its line
+	   number as its layer, so that the order stays the same. */
+	int split = 0;
+	for (int i = 1; i < count && !split; ++i)
+		for (int j = i - 1; j >= 0; --j)
+			if (strcasecmp(lines[j].group, lines[i].group) == 0) {
+				split = j != i - 1;
+				break;
+			}
+
 	char path[1200];
 	snprintf(path, sizeof path, "%s/frontend/animations.yaml", ctx->opt->sprites->out_root);
 	FILE* fp = fopen(path, "w");
@@ -1750,27 +1780,10 @@ static void write_animations_yaml(XwauContext* ctx) {
 			fprintf(fp, "\n");
 		}
 		fprintf(fp, "    animations:\n");
-		int apart = 0;
 		for (int i = first; i < count; ++i) {
 			const XwauAnimLine* b = &lines[i];
-			if (strcasecmp(b->group, a->group) != 0) {
-				apart = 1;
+			if (strcasecmp(b->group, a->group) != 0)
 				continue;
-			}
-			if (!same_delay(a, b))
-				ReportFatal(
-					list,
-					"the delay on line %d differs from the one on line %d, but OpenXWA has one delay for "
-					"each group (%s)",
-					b->line, a->line, a->group);
-			if (apart == 1) {
-				ReportFatal(
-					list,
-					"the lines of %s are not together (line %d). OpenXWA draws the whole group at its "
-					"first line, so the order with other groups can differ",
-					a->group, b->line);
-				apart = 2;
-			}
 			fprintf(fp, "      - {video: %s, at: ", b->video);
 			write_design_point(fp, b->x, b->y);
 			if (b->w && b->h) {
@@ -1783,6 +1796,16 @@ static void write_animations_yaml(XwauContext* ctx) {
 			if (b->sound[0])
 				fprintf(fp, ", sound: %s", b->sound);
 			write_missions(fp, b->missions);
+			/* The group has the delay of its first line. An animation with
+			   another delay gets its own, which XWAU uses when it picks it. */
+			if (!same_delay(a, b)) {
+				double delay[2] = { 0, 0 };
+				anim_delay(b, &delay[0], &delay[1]);
+				fprintf(fp, ", delay: ");
+				BakeSprites_WriteNumberList(fp, delay, 2);
+			}
+			if (split)
+				fprintf(fp, ", layer: %d", b->line);
 			fprintf(fp, "}\n");
 		}
 	}
@@ -1867,11 +1890,12 @@ static const char* screen_layout(const XwauContext* ctx, const XwauScreen* scree
 	for (int n = 1; n < 3; ++n)
 		if (votes[n] > votes[best])
 			best = n;
+	/* The atlas of each background keeps its own layout, which the game uses
+	   while it shows that background. */
 	for (int i = 0; i < count; ++i)
 		if (strcmp(layouts[i], names[best]) != 0)
-			ReportFatal(
-				NULL, "the screen %s gets the layout %s, but XWAU shows its background %s with the layout %s",
-				screen->name, names[best], keys[i], layouts[i]);
+			ReportDetail(NULL, "the screen %s is %s, and its background %s is %s", screen->name, names[best],
+						 keys[i], layouts[i]);
 	return names[best];
 }
 
@@ -1928,6 +1952,49 @@ static int is_screen_background(const char* key, int width, int height) {
 	return strcmp(key, "medals/medalcase") == 0 || strcmp(key, "group/15000/3000") == 0;
 }
 
+/* Returns whether hook_concourse turns off the family missions: with
+ * SkipFirst7Missions, the hook patches the frontend's checks of the tour's
+ * first seven missions, so that they use the concourse instead of the family
+ * transport. XWAU only reads the setting with hook_concourse.dll. */
+static int skips_family_missions(const char* root) {
+	char hooks[1100], dll[1100];
+	const char* section;
+	return find_ci(root, "hook_concourse.dll", dll, sizeof dll) &&
+		   find_hook_settings(root, hooks, sizeof hooks, &section) &&
+		   read_section_key_int(hooks, section, "SkipFirst7Missions", 0) != 0;
+}
+
+/* Writes the screens where hook_concourse hides the side panels. Each
+ * DrawPanelsIn setting is 1 by default. XWAU only reads them with
+ * hook_concourse.dll. */
+static void write_side_panels(const char* root, FILE* fp) {
+	static const struct {
+		const char* setting;
+		const char* key;
+	} screens[] = {
+		{ "DrawPanelsInSimulator", "simulator" },
+		{ "DrawPanelsInTourOfDutyBriefing", "tour_briefing" },
+		{ "DrawPanelsInTourOfDutyDebriefing", "tour_debriefing" },
+		{ "DrawPanelsInFamilyMonitor", "family_monitor" },
+		{ "DrawPanelsInFilmRoom", "film_room" },
+	};
+	char hooks[1100], dll[1100];
+	const char* section;
+	int written = 0;
+	if (!find_ci(root, "hook_concourse.dll", dll, sizeof dll) ||
+		!find_hook_settings(root, hooks, sizeof hooks, &section))
+		return;
+	for (size_t i = 0; i < sizeof screens / sizeof screens[0]; ++i) {
+		if (read_section_key_int(hooks, section, screens[i].setting, 1) != 0)
+			continue;
+		if (!written)
+			fprintf(fp, "# The screens that don't show the side panels.\n"
+						"side_panels:\n");
+		fprintf(fp, "  %s: false\n", screens[i].key);
+		written = 1;
+	}
+}
+
 static void write_frontend_yaml(XwauContext* ctx) {
 	char dir[1100], path[1200];
 	snprintf(dir, sizeof dir, "%s/frontend", ctx->opt->sprites->out_root);
@@ -1948,6 +2015,11 @@ static void write_frontend_yaml(XwauContext* ctx) {
 				"  fill_alpha: 0.7\n"
 				"  line_width: pixel\n"
 				"  grid_colours: [0xFF0000, 0xFF0000]\n");
+	if (skips_family_missions(ctx->opt->xwau_root))
+		fprintf(fp, "# The tour's first seven missions use the concourse, not the family\n"
+					"# transport.\n"
+					"family_missions: false\n");
+	write_side_panels(ctx->opt->xwau_root, fp);
 	write_layouts(ctx, fp);
 	if (fclose(fp) != 0)
 		ctx->stats->failures++;
@@ -1978,11 +2050,12 @@ int BakeXwau_RunFrontend(const BakeXwauOptions* opt, BakeXwauStats* stats) {
 	read_wide_list(&ctx, opt->xwau_root);
 	find_videos(&ctx);
 
-	/* The bake stops at the first failure. */
+	/* The bake stops at the first failure, including an image that failed in
+	   the encode queue. */
 	bake_frontres(&ctx);
-	if (stats->failures == 0)
+	if (stats->failures == 0 && BakeSprites_QueueFailures() == 0)
 		bake_resdata(&ctx);
-	if (stats->failures == 0) {
+	if (stats->failures == 0 && BakeSprites_QueueFailures() == 0) {
 		write_frontend_yaml(&ctx);
 		write_layout_yaml(&ctx);
 		write_animations_yaml(&ctx);

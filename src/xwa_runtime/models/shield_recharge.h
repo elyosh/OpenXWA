@@ -1,42 +1,19 @@
 #ifndef XWA_RUNTIME_MODELS_SHIELD_RECHARGE_H
 #define XWA_RUNTIME_MODELS_SHIELD_RECHARGE_H
 
-/* A mod's shield recharge rules, from the `shield_recharge` section of
- * flight/flight.yaml:
+/* A mod's shield recharge rules, from the `shield_recharge` section of its
+ * flight settings, and the recharge rate of each model, from the `shield`
+ * group of its model settings file.
  *
- *   shield_recharge:
- *     starships: true                  # starships recharge
- *     starships_on_easy: false         # also on easy difficulty
- *     double_starfighter_shields: false
- *     rate_percent: 100
+ * Without the section, the stock rules apply. With it, the AI also sets the
+ * shields of a craft with a recharge rate to recharge while they are below
+ * their maximum. Stock AI fighters only do this in one maneuver, or when
+ * they have no shields left. For craft other than starfighters, the AI only
+ * does it when the difficulty isn't easy or `starships_on_easy` is on. The
+ * rate is scaled by `rate_percent` last.
  *
- * Without the section, the stock rules apply. With it, the rate of each
- * craft at each periodic power update is:
- *   - for a player's craft, its model's `player_rate`, else its model rate,
- *     else 20;
- *   - for an AI starfighter, its model rate. The AI also sets its shields
- *     to recharge when they are below their maximum, which stock AI
- *     fighters only do in one maneuver or with no shields left;
- *   - for an AI starship, its model rate when `starships` is on and the
- *     difficulty isn't easy or `starships_on_easy` is on, else 0. The AI
- *     sets its shields to recharge under the same conditions;
- *   - for other AI craft, its model rate, and the AI sets its shields to
- *     recharge when the difficulty isn't easy or `starships_on_easy` is on.
- * The rate is then scaled by `rate_percent`. With
- * `double_starfighter_shields`, a starfighter's shields charge up to twice
- * the usual maximum.
- *
- * A model's rate comes from the `shield` group of its model settings file:
- *
- *   shield: {per_generator_rate: 5, player_rate: 40, delay_seconds: 30}
- *   shield: {rate: 20}
- *
- * `per_generator_rate` is given for each shield generator mesh that is
- * still alive, `rate` for the craft. Without the group, the model rate is
- * 20 for starfighters, 5 per live generator for the stock Star Destroyers,
- * the Interdictor and the Super Star Destroyer, 5 for other starships and 0
- * for the rest. After a craft's shields fall to 0, its flight group doesn't
- * recharge for `delay_seconds` of mission time.
+ * The delay after a craft's shields fall to 0 is kept for each flight
+ * group, and saved with the flight state.
  *
  * The rules change the simulation. */
 

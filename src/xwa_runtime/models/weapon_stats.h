@@ -1,120 +1,26 @@
 #ifndef XWA_RUNTIME_MODELS_WEAPON_STATS_H
 #define XWA_RUNTIME_MODELS_WEAPON_STATS_H
 
-/* Weapon profiles let a mod change the stats of the weapon types for each
- * craft. They also change some other weapon values for each craft.
+/* Weapon profiles, which change the stats of each weapon type and some
+ * other weapon values for each craft, and the weapon rules of the stock
+ * game that a mod can change. A mod sets them in the `weapons` section of
+ * its flight settings and in the `weapons` group of a model settings file.
+ * A mission picks a profile for each flight group in the flight group's
+ * entry of the mission file.
  *
- * A model settings file sets the values for the craft that use the model, in
- * its `weapons` group. The `weapons` section of flight/flight.yaml has the
- * same groups and sets the values for every craft. All keys are optional:
+ * For each stat, the game tries the player and difficulty forms first, then
+ * the plain value. Each time, it tries the model's profile first, then the
+ * profile in the flight settings. If none sets the stat, the stock value
+ * stays. A flight group that uses a profile only gets that profile's
+ * values: a key that the profile doesn't set gets the stock value, not the
+ * value of the `default` profile.
  *
- *   weapons:
- *     stats:
- *       default:
- *         rebel_laser: {range: 65536, fire_ratio: 236, precise: false, spread_mask: 63}
- *         imperial_laser:
- *           fire_rate: 47
- *           player_easy: {fire_rate: 39, power: 350}
- *       devastatorb7m2r:
- *         turbolaser_green_light: {power: 900, range: 204800}
- *     warhead_capacity_percent:
- *       default: {space_bomb: 50, heavy_rocket: 50}
- *     energy_speed_q16:
- *       default: {all: 8192, player: 7864}
- *     linking:
- *       default: {laser_link: 2, prevent_player_linked_lasers_ion: true}
- *     hardpoint_kinds: {custom_1: laser, custom_2: warhead}
+ * The factors of fire_ratio_by_rank and damage_by_difficulty are float32
+ * values. The game multiplies them in float32, which gives the same result
+ * on every platform.
  *
- * Each entry of `stats`, `warhead_capacity_percent`, `energy_speed_q16` and
- * `linking` is a profile. `default` is used when no profile is picked. A
- * mission picks a profile for a flight group in the flight group's entry of
- * the mission file:
- *
- *   flight_groups:
- *     13: { name: "Devastator", craft: imperial_star_destroyer2, weapon_profile: devastatorb7m2r }
- *
- * `weapon_profile` picks a profile of `stats`, `warhead_profile` one of
- * `warhead_capacity_percent`, `energy_profile` one of `energy_speed_q16` and
- * `linking_profile` one of `linking`. When a flight group uses a profile,
- * only that profile's values count. A key that the profile doesn't set gets
- * the stock value, not the `default` value. If neither the model file nor
- * flight/flight.yaml has the profile, the flight group uses `default`.
- *
- * The stats of a weapon type are:
- *   - duration_seconds and duration_fraction: how long a shot lives, in
- *     seconds plus a Q16 fraction of a second;
- *   - score: the points for a kill with the weapon;
- *   - speed and power: the speed of a shot and the damage it does;
- *   - power_speed_percent: how much of the firing craft's speed is added to
- *     the damage, in percent. The stock value is 100;
- *   - fire_rate: the time between two shots of a craft's lasers or
- *     warheads;
- *   - duration_offset: how long a turret shot lives after it passes its
- *     target. The stock value is 59;
- *   - fire_ratio and range: the time between two shots of a turret, and its
- *     range. The stock values come from the craft record;
- *   - precise and spread_mask: whether an AI turret aims exactly, and how
- *     far its shots spread when it doesn't. In the stock game, turrets aim
- *     exactly. A player's turret shots always spread;
- *   - decharge_rate and recharge_rate: the charge that a shot uses, and the
- *     charge that comes back. They take the place of the laser rates;
- *   - high_power_charge: the charge at which a laser fires its high-power
- *     shot. The stock value is 64.
- * A weapon type can also set stats for the player, for one difficulty, or
- * for both: `player`, `easy`, `medium`, `hard`, `player_easy`,
- * `player_medium` and `player_hard`. For each stat, the game tries these
- * first, then the plain value. Each time, it tries the model's value first,
- * then the value in flight/flight.yaml. If none is set, it uses the stock
- * value.
- *
- * The other groups:
- *   - warhead_capacity_percent: maps warhead names to the percent of a
- *     launcher's capacity that a craft loads with that warhead. The stock
- *     percents go from 25 to 100. A craft always gets at least 1 warhead;
- *   - energy_speed_q16: how much speed a craft gains or loses for each step
- *     of energy moved to or from its engines, as a Q16 fraction of its top
- *     speed. `player` is for the player's craft, `all` for every craft. The
- *     stock value is 4096 for the TIE Bomber, 12288 for the TIE Fighter with
- *     spare engine power, and 8192 for other craft;
- *   - linking: `laser_link` sets the craft's laser link mode: 1 fires one
- *     cannon at a time, 2 fires half of them together, and 3 fires all of
- *     them together. The three rules stop the AI from firing lasers while
- *     it disables its target, stop the AI from firing ions when it doesn't,
- *     and stop the player from linking the lasers and the ions.
- *     `weapons.linking_rules` in flight/flight.yaml sets the rules for
- *     every profile;
- *   - hardpoint_kinds: maps hardpoint type names to laser, warhead or none,
- *     the kind of weapon that hardpoints of that type fire. The hardpoint
- *     type names are the same as the `type` names in the AERON_flight_model
- *     extension.
- *     A hardpoint type that the map leaves out uses the kind from
- *     flight/flight.yaml, else the stock kind.
- *
- * flight/flight.yaml can also change these stock rules:
- *
- *   weapons:
- *     fire_ratio_by_rank: {novice: 4, officer: 3, veteran: 2, ace: 2, top_ace: 1, super_ace: 1}
- *     damage_by_difficulty: {easy: 0.5, medium: 0.25, hard: 1}
- *     limit_linked_warhead_fire_rate: true
- *     linking_rules: {prevent_ai_lasers_ion_when_disabling: true,
- *                     prevent_ai_ion_when_not_disabling: true,
- *                     prevent_player_linked_lasers_ion: true}
- *
- *   - fire_ratio_by_rank: the time between two shots of an AI turret or
- *     launcher is multiplied by the factor of its flight group's rank. The
- *     map needs every rank. In the stock game, the factor depends on the AI's
- *     skill: 4, 3, 1, 2, 2 or 2;
- *   - damage_by_difficulty: the damage that a craft's components take while
- *     its shields are up is multiplied by the factor of the difficulty. The
- *     map needs every difficulty. In the stock game, the damage is halved
- *     on easy and divided by 4 on medium;
- *   - limit_linked_warhead_fire_rate: the time between two warhead shots is
- *     multiplied by the number of warheads fired.
- * The factors are float32 values. The game multiplies them in
- * float32, which gives the same result on every platform.
- *
- * All of this changes the simulation. Without these settings, the stock code
- * runs. */
+ * All of this changes the simulation. Without these settings, the stock
+ * code runs. */
 
 #include <stdint.h>
 

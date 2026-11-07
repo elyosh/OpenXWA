@@ -12,6 +12,7 @@
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/names.h"
+#include "xwa_runtime/models/units.h"
 
 #include <ctype.h>
 #include <stdint.h>
@@ -46,27 +47,39 @@ enum {
 };
 
 static const char* const s_groups[WEAPON_STATS_GROUPS] = { "stats", "warhead_capacity_percent",
-														   "energy_speed_q16", "linking" };
+														   "energy_speed_percent", "linking" };
 /* The keys that a flight group's entry uses to pick a profile in each group. */
 static const char* const s_profileKeys[WEAPON_STATS_GROUPS] = { "weapon_profile", "warhead_profile",
 																"energy_profile", "linking_profile" };
 
 static const char* const s_stats[XWA_WEAPON_STATS] = {
-	"duration_seconds",
-	"duration_fraction",
+	/* `duration_ms` sets both parts of the duration, so the fraction has no
+	   key of its own. */
+	"duration_ms",
+	"",
 	"score",
-	"speed",
+	"speed_mglt",
 	"power",
 	"power_speed_percent",
-	"fire_rate",
-	"duration_offset",
-	"fire_ratio",
-	"range",
+	"fire_rate_ms",
+	"duration_offset_ms",
+	"fire_ratio_ms",
+	"range_m",
 	"precise",
 	"spread_mask",
 	"decharge_rate",
 	"recharge_rate",
 	"high_power_charge",
+};
+
+/* The unit of each stat in the file. The reader converts these stats to the
+   game's units. The stats that aren't listed are the game's own values. */
+static const XwaUnit s_statUnits[XWA_WEAPON_STATS] = {
+	[XWA_WEAPON_STAT_SPEED] = XWA_UNIT_MGLT,
+	[XWA_WEAPON_STAT_FIRE_RATE] = XWA_UNIT_MILLISECONDS,
+	[XWA_WEAPON_STAT_DURATION_OFFSET] = XWA_UNIT_MILLISECONDS,
+	[XWA_WEAPON_STAT_FIRE_RATIO] = XWA_UNIT_MILLISECONDS,
+	[XWA_WEAPON_STAT_RANGE] = XWA_UNIT_METRES,
 };
 
 /* The forms of a stat: plain, for the player, for one difficulty, or for
@@ -121,6 +134,9 @@ typedef struct WeaponStatsSet {
 static WeaponStatsSet s_defaults;
 static WeaponStatsSet s_models[OBJ_Count];
 static char s_flightGroupProfiles[WEAPON_STATS_FLIGHT_GROUPS][WEAPON_STATS_GROUPS][WEAPON_STATS_NAME_MAX];
+/* Bit `group` is set after the log says that the flight group's profile for
+   that group doesn't exist. */
+static uint8_t s_missingProfileLogged[WEAPON_STATS_FLIGHT_GROUPS];
 static int s_hasRankFactors;
 static float s_rankFactors[WEAPON_STATS_RANKS];
 static int s_hasDifficultyFactors;
@@ -230,15 +246,38 @@ static void WeaponStats_ReadForm(const char* path, const char* where, const Aero
 		char name[160];
 		int32_t read;
 
-		if (stat < 0) {
+		if (stat < 0 || stat == XWA_WEAPON_STAT_DURATION_FRACTION) {
 			if (!forms || WeaponStats_Find(key, s_forms + 1, WEAPON_STATS_FORMS - 1) < 0) {
 				Aeron_LogWarn("xwa.models", "%s: %s.%s isn't a weapon stat. It is ignored", path, where, key);
 			}
 			continue;
 		}
 		snprintf(name, sizeof name, "%s.%s", where, key);
-		if (stat == XWA_WEAPON_STAT_PRECISE ? WeaponStats_ReadBool(path, name, value, &read)
-											: WeaponStats_ReadInt(path, name, value, &read)) {
+		if (stat == XWA_WEAPON_STAT_DURATION_SECONDS) {
+			int32_t ticks;
+
+			/* The game counts 236 ticks for each second, adds the fraction
+			   rounded to a whole tick, and keeps the result in 16 bits. */
+			if (!XwaUnits_Read(value, XWA_UNIT_MILLISECONDS, 0, UINT16_MAX, &ticks)) {
+				Aeron_LogWarn("xwa.models",
+							  "%s: %s must be a number of milliseconds from 0 to %d. It is ignored", path,
+							  name, UINT16_MAX * 4);
+				continue;
+			}
+			form->value[XWA_WEAPON_STAT_DURATION_SECONDS] = ticks / 236;
+			form->value[XWA_WEAPON_STAT_DURATION_FRACTION] = (int32_t)(((ticks % 236) * 65536 + 118) / 236);
+			form->set |= (uint16_t)((1u << XWA_WEAPON_STAT_DURATION_SECONDS) |
+									(1u << XWA_WEAPON_STAT_DURATION_FRACTION));
+		} else if (s_statUnits[stat] != XWA_UNIT_NONE) {
+			if (!XwaUnits_Read(value, s_statUnits[stat], INT32_MIN, INT32_MAX, &read)) {
+				Aeron_LogWarn("xwa.models", "%s: %s must be a number of %s. It is ignored", path, name,
+							  XwaUnits_Name(s_statUnits[stat]));
+				continue;
+			}
+			form->value[stat] = read;
+			form->set |= (uint16_t)(1u << stat);
+		} else if (stat == XWA_WEAPON_STAT_PRECISE ? WeaponStats_ReadBool(path, name, value, &read)
+												   : WeaponStats_ReadInt(path, name, value, &read)) {
 			form->value[stat] = read;
 			form->set |= (uint16_t)(1u << stat);
 		}
@@ -316,10 +355,9 @@ static void WeaponStats_ReadProfile(const char* path, const char* where, int gro
 			case WEAPON_STATS_GROUP_ENERGY:
 				if ((at = WeaponStats_Find(key, s_energyKeys, 2)) < 0) {
 					Aeron_LogWarn("xwa.models", "%s: %s isn't 'all' or 'player'. It is ignored", path, name);
-				} else if (WeaponStats_ReadInt(path, name, value, &profile->energy[at]) &&
-						   (profile->energy[at] < 0 || profile->energy[at] > 0x10000)) {
-					Aeron_LogWarn("xwa.models", "%s: %s must be from 0 to 65536. It is ignored", path, name);
-					profile->energy[at] = -1;
+				} else if (!XwaUnits_Read(value, XWA_UNIT_PERCENT_Q16, 0, 0x10000, &profile->energy[at])) {
+					Aeron_LogWarn("xwa.models", "%s: %s must be a percent from 0 to 100. It is ignored", path,
+								  name);
 				}
 				break;
 			default: {
@@ -545,6 +583,7 @@ void XwaWeaponStats_ReadModelSettings(unsigned int objectType, const char* path,
 
 void XwaWeaponStats_ClearFlightGroups(void) {
 	memset(s_flightGroupProfiles, 0, sizeof s_flightGroupProfiles);
+	memset(s_missingProfileLogged, 0, sizeof s_missingProfileLogged);
 }
 
 int XwaWeaponStats_ReadFlightGroup(const char* path, const char* fgKey, int fgIdx,
@@ -601,7 +640,8 @@ static const WeaponStatsProfile* WeaponStats_FindProfile(const WeaponStatsSet* s
 
 /* Finds the profiles of group `group` for a craft of object type `objectType`
    and flight group `fgIdx`, in the model file and in flight/flight.yaml. If
-   neither has the flight group's profile, it uses `default`. */
+   neither has the flight group's profile, both are NULL, so the craft gets
+   the original game's values, and the log says so once. */
 static void WeaponStats_Profiles(unsigned int objectType, int fgIdx, int group,
 								 const WeaponStatsProfile** model, const WeaponStatsProfile** global) {
 	const WeaponStatsSet* set = WeaponStats_Model(objectType);
@@ -610,9 +650,13 @@ static void WeaponStats_Profiles(unsigned int objectType, int fgIdx, int group,
 
 	*model = WeaponStats_FindProfile(set, name, group);
 	*global = WeaponStats_FindProfile(&s_defaults, name, group);
-	if (name[0] != '\0' && *model == NULL && *global == NULL) {
-		*model = WeaponStats_FindProfile(set, "", group);
-		*global = WeaponStats_FindProfile(&s_defaults, "", group);
+	if (name[0] != '\0' && *model == NULL && *global == NULL &&
+		!(s_missingProfileLogged[fgIdx] & (1u << group))) {
+		s_missingProfileLogged[fgIdx] |= (uint8_t)(1u << group);
+		Aeron_LogWarn("xwa.mission",
+					  "flight group %d picks the %s profile '%s', but neither the model of %s nor "
+					  "flight/flight.yaml has it. The flight group gets the original game's values",
+					  fgIdx, s_groups[group], name, XwaNames_Name(&g_xwaObjectTypeNames, (int)objectType));
 	}
 }
 

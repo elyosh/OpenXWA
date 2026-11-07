@@ -52,6 +52,7 @@ are in the first KTX2 file, and the third is in the second file.
 | `classic_frames` | The number of frames that the game sees, from 1 to the number of frames. The default is the number of frames. |
 | `fps` | Atlases in `frontend/frontres` only. The frames change at this rate, in frames per second, and don't follow the game's frame. Must be above 0. |
 | `tint` | Which tints the game puts on the image when it draws it as a tinted icon in the menus: `all`, `none` or `highlights`. The default is `all`. |
+| `layout` | Atlases in `frontend/frontres` only. `classic`, `wide` or `fill`: the layout of the screen while the image is its background. See [Background layouts](frontend.md#background-layouts). A wrong value is logged, and the game ignores the key. |
 | `draw_adjust` | `[x, y, width, height]`, added to the rectangle where the image is drawn in the menus. The game's own geometry doesn't change. |
 | `bounds` | Atlases in `frontend/frontres` only. `[left, top, right, bottom]`, the bounds of the whole image. The default is the union of the frames' bounds. |
 | `regions` | A list of `{type: <number>, rect: [left, top, right, bottom]}`. Only used by the map icon sheet, see [Regions](#regions). |
@@ -109,6 +110,15 @@ In a group with `game_geometry: true`, every frame needs an `id`. When two
 frames have the same `id`, the game keeps the first one. For a group whose
 images are the frames of an animation, such as an explosion, list the
 frames in the order of their `id`.
+
+An image group's atlas with `game_geometry: true` applies to the whole
+game, flight included. The simulation uses its frame counts too, so an
+animation such as an explosion lasts as many frames as the atlas has.
+
+The image group of the flight font can't use an atlas, because the game
+reads the pixels of its characters. The log says so, and the game uses the
+original images. To change the flight font, use the files of
+[Fonts](#fonts).
 
 ### Frames that change over time
 

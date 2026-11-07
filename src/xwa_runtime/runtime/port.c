@@ -25,18 +25,21 @@
 #include "xwa/xwa_options.h"
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/camera/camera_motion.h"
-#include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
+#include "xwa_runtime/config/modern_speed_effect_options.h"
 #include "xwa_runtime/config/modern_sun_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/frontend/awards.h"
 #include "xwa_runtime/frontend/concourse_layout.h"
+#include "xwa_runtime/frontend/family_missions.h"
+#include "xwa_runtime/frontend/frontend_config.h"
 #include "xwa_runtime/frontend/frontend_fonts.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/frontend/room_anims.h"
+#include "xwa_runtime/frontend/side_panels.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/input_bridge.h"
 #include "xwa_runtime/input/mouse_flight.h"
@@ -171,7 +174,8 @@ int XwaPort_Init(void) {
 	XwaObjectLimits_Init();
 	XwaHeadlights_Init();
 	XwaCameraMotion_Init();
-	XwaModernSunOptions_LoadMod();
+	XwaOptionSection_LoadMod(XwaModernSunOptions_Section());
+	XwaOptionSection_LoadMod(XwaModernSpeedEffectOptions_Section());
 	XwaCockpitAlertLights_Init();
 	XwaParticleLights_Init();
 	XwaModelSource_Init();
@@ -461,7 +465,7 @@ void XwaPort_Shutdown(void) {
 	XwaPort_SetHostCursorVisible(1);
 	XwaModernVideoOptions_Flush();
 	XwaModernInputOptions_Flush();
-	XwaModernCameraOptions_Flush();
+	XwaOptionSection_FlushAll();
 	/* TODO: Run recovered shutdown paths in original-compatible order. */
 	if (XwaFlightTask_IsActive()) {
 		XwaFlightTask_Shutdown();
@@ -472,6 +476,9 @@ void XwaPort_Shutdown(void) {
 	XwaSnapshot_Shutdown();
 	XwaFrontendGeometry_Shutdown();
 	XwaFrontendScreens_Shutdown();
+	XwaFamilyMissions_Shutdown();
+	XwaSidePanels_Shutdown();
+	XwaFrontendConfig_Shutdown();
 	XwaConcourseLayout_Shutdown();
 	XwaAwards_Shutdown();
 	XwaRoomAnims_Shutdown();
