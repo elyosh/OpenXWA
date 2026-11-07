@@ -2379,8 +2379,8 @@ static void fl_apply_inverted_cockpit_pivot(float basis[9], const XwaCockpit* co
 		const float rotated_eye = basis[axis] * cockpit->seat_eye_local[0] +
 								  basis[3 + axis] * cockpit->seat_eye_local[1] +
 								  basis[6 + axis] * cockpit->seat_eye_local[2];
-		position[axis] = camera_local[axis] - cockpit->trackir_head_offset[axis] - cockpit->camera_pan[axis] * 0.0625f -
-						 sway[axis] - rotated_eye;
+		position[axis] = camera_local[axis] - cockpit->trackir_head_offset[axis] -
+						 cockpit->camera_pan[axis] * 0.0625f - sway[axis] - rotated_eye;
 	}
 }
 
@@ -2414,8 +2414,8 @@ static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const float sway[3
 		/* Camera motion is observer-only. The cockpit is anchored to the ship,
 		 * so remove the head displacement before constructing its world pose. */
 		position[axis] = camera_local[axis] - cockpit->trackir_head_offset[axis] +
-						 camera_rows[0 * 3 + axis] * delta[0] +
-						 camera_rows[1 * 3 + axis] * delta[1] + camera_rows[2 * 3 + axis] * delta[2];
+						 camera_rows[0 * 3 + axis] * delta[0] + camera_rows[1 * 3 + axis] * delta[1] +
+						 camera_rows[2 * 3 + axis] * delta[2];
 	}
 	if (cockpit->inverted) {
 		fl_apply_inverted_cockpit_pivot(basis, cockpit, sway, camera_local, position);
@@ -4537,9 +4537,8 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 		/* Head motion changes the observer, not the hyperspace cockpit.
 		 * As in normal flight, keep the cockpit anchored at the untracked
 		 * eye origin while the rendered camera translates around it. */
-		pw[j] = s.camera_local[j] - snap->cockpit.trackir_head_offset[j] +
-				s.crows[0 * 3 + j] * delta[0] + s.crows[1 * 3 + j] * delta[1] +
-				s.crows[2 * 3 + j] * delta[2];
+		pw[j] = s.camera_local[j] - snap->cockpit.trackir_head_offset[j] + s.crows[0 * 3 + j] * delta[0] +
+				s.crows[1 * 3 + j] * delta[1] + s.crows[2 * 3 + j] * delta[2];
 	}
 	if (snap->cockpit.inverted) {
 		fl_apply_inverted_cockpit_pivot(bw, &snap->cockpit, cam->sway, s.camera_local, pw);

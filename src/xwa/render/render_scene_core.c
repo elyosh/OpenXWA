@@ -6,10 +6,10 @@
 
 #ifdef XWA_MODERN
 #include "xwa/frontend/frontend_display.h" /* g_flightRenderToFrontend */
+#include "xwa_runtime/input/trackir.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/opt_synth.h"
-#include "xwa_runtime/input/trackir.h"
 #include <math.h>
 #endif
 
@@ -46,7 +46,8 @@ static int VirtualProtect(void* lpAddress, unsigned int dwSize, unsigned int flN
  * residual ensures fluid motion in classic F5 mode without filtering. */
 static void RenderScene_ApplyTrackIRTranslation(Vec3f* pos, int cockpit_active) {
 	float offset[3];
-	if (!pos) return;
+	if (!pos)
+		return;
 	XwaTrackIR_GetCameraOffset(offset);
 	if (cockpit_active) {
 		pos->x -= offset[0];
@@ -439,8 +440,8 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 							 g_players[g_localPlayer].viewState.cameraPanDeltaZ * g_cockpitPanPositionScale;
 		}
 #ifdef XWA_MODERN
-	/* Adjust the eye relative to the cockpit without moving the craft. */
-	RenderScene_ApplyTrackIRTranslation(&mesh.viewPos, g_cockpitViewActive);
+		/* Adjust the eye relative to the cockpit without moving the craft. */
+		RenderScene_ApplyTrackIRTranslation(&mesh.viewPos, g_cockpitViewActive);
 #endif
 
 		mesh.viewOrient[0] = g_viewMtx00;

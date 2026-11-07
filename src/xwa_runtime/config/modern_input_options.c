@@ -218,8 +218,8 @@ static int XwaModernInputOptions_AreEqual(const XwaModernInputOptions* lhs,
 		   lhs->mouse_sensitivity == rhs->mouse_sensitivity && lhs->mouse_invert_y == rhs->mouse_invert_y &&
 		   lhs->head_tracking.enabled == rhs->head_tracking.enabled &&
 		   lhs->head_tracking.source == rhs->head_tracking.source &&
-		   memcmp(lhs->head_tracking.invert, rhs->head_tracking.invert,
-				  sizeof(lhs->head_tracking.invert)) == 0 &&
+		   memcmp(lhs->head_tracking.invert, rhs->head_tracking.invert, sizeof(lhs->head_tracking.invert)) ==
+			   0 &&
 		   XwaControllerOptions_AreEqual(&lhs->controller, &rhs->controller);
 }
 

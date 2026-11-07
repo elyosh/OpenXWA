@@ -45,6 +45,7 @@
 #include "xwa/math/scalar.h"
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/input/trackir.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_sounds.h"
@@ -56,7 +57,6 @@
 #include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/warhead_pools.h"
 #include "xwa_runtime/models/weapon_stats.h"
-#include "xwa_runtime/input/trackir.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif

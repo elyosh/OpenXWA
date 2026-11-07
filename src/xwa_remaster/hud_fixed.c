@@ -888,10 +888,9 @@ static int fixed_project_reticle(const XwaSnapshot* snapshot, XwaHudProfileIndex
 		const XwaFlightCamera* camera = &snapshot->flight_camera;
 		float bore_view[3];
 		for (int row = 0; row < 3; ++row) {
-			bore_view[row] =
-				camera->rows[row * 3 + 0] * h->reticle.turret_aim_world[0] +
-				camera->rows[row * 3 + 1] * h->reticle.turret_aim_world[1] +
-				camera->rows[row * 3 + 2] * h->reticle.turret_aim_world[2];
+			bore_view[row] = camera->rows[row * 3 + 0] * h->reticle.turret_aim_world[0] +
+							 camera->rows[row * 3 + 1] * h->reticle.turret_aim_world[1] +
+							 camera->rows[row * 3 + 2] * h->reticle.turret_aim_world[2];
 		}
 		if (bore_view[2] <= 0.0f ||
 			!XwaRemasterFlight_ProjectView(flight_view, bore_view, &target_x, &target_y))

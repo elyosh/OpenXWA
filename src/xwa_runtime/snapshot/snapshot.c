@@ -15,6 +15,7 @@
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/frontend/frontend_video.h"
+#include "xwa_runtime/input/trackir.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/cockpit_alert_lights.h"
 #include "xwa_runtime/models/cockpit_view.h"
@@ -25,7 +26,6 @@
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/models/surfaces.h"
 #include "xwa_runtime/snapshot/snapshot_camera.h"
-#include "xwa_runtime/input/trackir.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #include "xwa_runtime/timing/host_clock.h"
@@ -1888,7 +1888,7 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->world_pos[0] = vs->savedTargetX;
 	c->world_pos[1] = vs->savedTargetY;
 	c->world_pos[2] = vs->savedTargetZ;
-	float trackir_world_offset[3] = {0};
+	float trackir_world_offset[3] = { 0 };
 	int32_t untracked_pos[3];
 	XwaTrackIR_GetCameraOffset(trackir_world_offset);
 	for (int axis = 0; axis < 3; ++axis) {

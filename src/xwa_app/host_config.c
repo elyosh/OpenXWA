@@ -966,7 +966,7 @@ static int host_config_controller_options(const AeronConfigFile* config, int req
 }
 
 static int host_config_head_tracking(const AeronConfigFile* config, int required,
-									XwaHeadTrackingOptions* head, char* error, size_t error_size) {
+									 XwaHeadTrackingOptions* head, char* error, size_t error_size) {
 	static const char* const axis_names[XWA_HEAD_TRACK_AXIS_COUNT] = {
 		"yaw", "pitch", "roll", "x", "y", "z"
 	};
@@ -976,11 +976,12 @@ static int host_config_head_tracking(const AeronConfigFile* config, int required
 	int axis;
 
 	if (!host_config_input_bool(config, "input.head_tracking.enabled", required, &head->enabled, error,
-								 error_size)) {
+								error_size)) {
 		return 0;
 	}
 	if (!source) {
-		if (!host_config_input_missing(required, "input.head_tracking.source", error, error_size)) return 0;
+		if (!host_config_input_missing(required, "input.head_tracking.source", error, error_size))
+			return 0;
 	} else {
 		name = AeronConfigNode_String(source, NULL);
 		if (name && strcmp(name, "trackir") == 0) {
@@ -988,14 +989,14 @@ static int host_config_head_tracking(const AeronConfigFile* config, int required
 		} else if (name && strcmp(name, "opentrack_udp") == 0) {
 			head->source = XWA_HEAD_TRACK_SOURCE_OPENTRACK_UDP;
 		} else {
-			return host_config_error(error, error_size,
-				"invalid head tracking source: expected %s",
-				"'trackir' or 'opentrack_udp'");
+			return host_config_error(error, error_size, "invalid head tracking source: expected %s",
+									 "'trackir' or 'opentrack_udp'");
 		}
 	}
 	for (axis = 0; axis < XWA_HEAD_TRACK_AXIS_COUNT; ++axis) {
 		snprintf(key, sizeof key, "input.head_tracking.invert.%s", axis_names[axis]);
-		if (!host_config_input_bool(config, key, required, &head->invert[axis], error, error_size)) return 0;
+		if (!host_config_input_bool(config, key, required, &head->invert[axis], error, error_size))
+			return 0;
 	}
 	return 1;
 }
@@ -1495,13 +1496,15 @@ static int host_config_set_head_tracking(AeronConfigFile* document, const XwaHea
 	char key[80];
 	int axis;
 	if (!AeronConfigFile_SetBool(document, "input.head_tracking.enabled", head->enabled, error) ||
-		!AeronConfigFile_SetString(document, "input.head_tracking.source",
+		!AeronConfigFile_SetString(
+			document, "input.head_tracking.source",
 			head->source == XWA_HEAD_TRACK_SOURCE_OPENTRACK_UDP ? "opentrack_udp" : "trackir", error)) {
 		return 0;
 	}
 	for (axis = 0; axis < XWA_HEAD_TRACK_AXIS_COUNT; ++axis) {
 		snprintf(key, sizeof key, "input.head_tracking.invert.%s", axis_names[axis]);
-		if (!AeronConfigFile_SetBool(document, key, head->invert[axis], error)) return 0;
+		if (!AeronConfigFile_SetBool(document, key, head->invert[axis], error))
+			return 0;
 	}
 	return 1;
 }

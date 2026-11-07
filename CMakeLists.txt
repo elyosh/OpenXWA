@@ -319,8 +319,8 @@ target_link_libraries(xwa_input_options PUBLIC aeron)
 
 add_library(xwa_core ${XWA_RECOVERED_SOURCES} ${XWA_RUNTIME_SOURCES})
 if(WIN32)
-    # NPClient is loaded at runtime from the existing TrackIR installation.
-    # Only the Windows registry API is linked; no TrackIR SDK is bundled.
+    # Head tracking: advapi32 finds the installed TrackIR NPClient, which is
+    # loaded at runtime (no TrackIR SDK is bundled); ws2_32 receives OpenTrack UDP.
     target_link_libraries(xwa_core PRIVATE advapi32 ws2_32)
 endif()
 

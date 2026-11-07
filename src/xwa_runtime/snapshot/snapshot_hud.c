@@ -1,4 +1,3 @@
-#include "xwa_runtime/input/trackir.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 
 #include "xwa/assets/flight_model.h"
@@ -13,6 +12,7 @@
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/camera/exterior_hud.h"
 #include "xwa_runtime/input/mouse_flight.h"
+#include "xwa_runtime/input/trackir.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/weapon_stats.h"
