@@ -54,7 +54,7 @@ void XwaDocking_Init(void) {
 	s_playerSnapsToTargetOrientation = 0;
 	memset(&error, 0, sizeof error);
 	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, DOCKING_FLIGHT_YAML, &file, &error)) {
-		/* The backdrops code already logs this error. */
+		/* XwaFlightConfig_Root already logs this error. */
 		return;
 	}
 	root = AeronConfigFile_Root(file);

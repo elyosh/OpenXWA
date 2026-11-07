@@ -72,7 +72,9 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Weapon colours | Implemented | By weapon, flight group and side, with the impact and light colours. | [Craft](craft.md#weapon-colours) |
 | Laser rates and energy transfer (`[WeaponRate]`) | Partial | The rates that a mission sets for a flight group aren't converted. | [Craft](craft.md#laser-rates) |
 | Weapon, warhead, energy and linking stats | Implemented | Including the mission's weapon profiles. | [Craft](craft.md#weapon-profiles) |
-| Warhead lock (`[WarheadLock]`) | Partial | The global section and the keys for object profiles aren't converted. | [Craft](craft.md#warhead_lock) |
+| Warhead lock (`[WarheadLock]`) | Partial | The keys for object profiles aren't converted. | [Craft](craft.md#warhead_lock), [Flight](flight.md#warhead_lock) |
+| AI attack ranges and dodging (`[AttackBreakDistance]`) | Implemented | | [Craft](craft.md#ai_attack), [Flight](flight.md#ai_attack) |
+| Mag pulse hits (`[WeaponLockBehaviors]`) | Implemented | | [Craft](craft.md#mag_pulse), [Flight](flight.md#mag_pulse) |
 | Jamming | Implemented | The section of `default.ini` isn't converted. | [Craft](craft.md#jamming) |
 | Two warhead launchers (`hook_weapon_type`) | Implemented | | [Craft](craft.md#warheads) |
 | Docking | Implemented | | [Craft](craft.md#docking), [Flight](flight.md#docking) |

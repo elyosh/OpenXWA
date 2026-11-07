@@ -1,15 +1,15 @@
 #include "xwa_runtime/models/mission_backdrops.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type_info.h"
+#include "xwa_runtime/models/flight_config.h"
 
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
 
-#define MISSION_BACKDROPS_PATH "flight/flight.yaml"
+#define MISSION_BACKDROPS_PATH XWA_FLIGHT_CONFIG_PATH
 #define MISSION_BACKDROPS_EXTRA_COUNT (XWA_EXTRA_BACKDROP_LAST_ID - XWA_EXTRA_BACKDROP_FIRST_ID + 1)
 /* The stock planet that the extra planets copy. */
 #define MISSION_BACKDROPS_TEMPLATE_ID 1
@@ -99,8 +99,6 @@ static void MissionBackdrops_AddPlanet(int id, int group) {
 }
 
 void XwaMissionBackdrops_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* planets;
 	size_t entry;
@@ -112,18 +110,7 @@ void XwaMissionBackdrops_Init(void) {
 		g_objectTypes[i] = g_objectTypes[OBJ_None];
 	}
 
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, MISSION_BACKDROPS_PATH, &file,
-									&error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.mission", "%s:%d: %s; backdrop ids above %d place nothing",
-						   MISSION_BACKDROPS_PATH, error.line,
-						   error.message[0] ? error.message : "cannot be read",
-						   XWA_EXTRA_BACKDROP_FIRST_ID - 1);
-		}
-		return;
-	}
-	root = AeronConfigFile_Root(file);
+	root = XwaFlightConfig_Root();
 	planets = AeronConfigNode_MapGet(AeronConfigNode_MapGet(root, "backdrops"), "extra_planets");
 	if (planets != NULL && AeronConfigNode_Type(planets) != AERON_CONFIG_SEQUENCE) {
 		Aeron_LogError(
@@ -156,7 +143,6 @@ void XwaMissionBackdrops_Init(void) {
 		}
 		added += lastId - firstId + 1;
 	}
-	AeronConfigFile_Destroy(file);
 	if (added != 0) {
 		Aeron_LogInfo("xwa.mission", "%s: %d extra planet backdrop ids", MISSION_BACKDROPS_PATH, added);
 	}

@@ -35,6 +35,9 @@ sections:
 | `weapons` | weapon colours, rates, stats, damage and linking |
 | `shield_recharge` | how fast shields come back |
 | `docking` | how craft dock and carry each other |
+| `ai_attack` | how close AI craft get before they break off, and from how far they fire lasers |
+| `mag_pulse` | what a mag pulse hit does to a craft |
+| `warhead_lock` | the AI's warhead lock ranges, by the genus of its craft |
 | `headlights` | a light on the nose of the player's craft |
 | `object_limits` | how many craft, shots, explosions and radar blips a mission can have |
 | `camera` | the lag and tilt of the exterior camera, the cockpit sway and the HUD in the exterior view |
@@ -58,8 +61,8 @@ Some of these settings can also be set for one mission or for one model:
   [Missions](missions.md).
 - A model settings file, `flight/models/<model>.yaml`, can set weapon
   colours, rates, stats and hardpoint kinds, shield rates, a docking
-  height and HUD settings for the craft that use the model. See
-  [Craft](craft.md).
+  height, AI attack ranges, mag pulse hits, warhead lock ranges and HUD
+  settings for the craft that use the model. See [Craft](craft.md).
 
 This page describes the game-wide form of each setting.
 
@@ -543,6 +546,58 @@ model sets the limit with `docking.approach_height_m` in its settings file
 (see [Craft](craft.md)). Without it, the limit is 0 for `space_colony2`
 and 22.75 m for other models. The original game approaches at twice the gap,
 and not at all for `space_colony2`.
+
+### ai_attack
+
+`ai_attack` takes the keys of the `ai_attack` group of a model settings
+file, for every craft. A key of the craft's model replaces the same key
+here. See [Craft](craft.md#ai_attack) for the keys.
+
+```yaml
+ai_attack:
+  break_range_m: {target_offset: {shipyard: 0}}
+  laser_range_m: {novice: 600, officer: 800, veteran: 1000, ace: 1000, top_ace: 1000, super_ace: 1000}
+```
+
+With `laser_range_m`, the laser range of every AI craft follows the rank of
+its flight group, and not the pilot's skill. A rank that you leave out keeps
+its original range.
+
+### mag_pulse
+
+`mag_pulse` sets what a mag pulse hit does to every craft. A model's
+`mag_pulse` group replaces it. See [Craft](craft.md#mag_pulse).
+
+```yaml
+mag_pulse:
+  drain_only: true
+  disable_time_ms: {small: 14160, large: 28320}
+```
+
+| Key | Meaning |
+|-|-|
+| `drain_only` | `true` makes a hit on a player's craft only drain the lasers. In the original game, it also knocks out the cannons when they work. |
+| `disable_time_ms.small` | How long a hit stops an AI fighter, transport, utility craft, pilot droid or weapon emplacement from firing. The default is 14160. |
+| `disable_time_ms.large` | The same for other AI craft. The default is 28320. |
+
+The times go from 0 to 262140 milliseconds.
+
+### warhead_lock
+
+`warhead_lock` sets the AI's warhead lock ranges against big targets, by
+the genus of the AI's own craft. A model's `warhead_lock` group replaces
+them. See [Craft](craft.md#warhead_lock).
+
+```yaml
+warhead_lock:
+  ai_lock_range_m:
+    starship: {big: 4970.95, big_top_tier: 5965.14}
+```
+
+`ai_lock_range_m` maps a [genus](reference/object_types.md#genus) to
+`big` and `big_top_tier`, in metres, as in a model's
+`warhead_lock.ai_lock_range_m`. In this example, AI starships fire
+warheads at big targets from these distances.
 
 ### headlights
 

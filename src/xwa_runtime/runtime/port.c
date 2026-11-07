@@ -45,19 +45,23 @@
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/input/rumble_provider.h"
 #include "xwa_runtime/input/winmm_joystick_provider.h"
+#include "xwa_runtime/models/ai_attack.h"
 #include "xwa_runtime/models/cockpit_alert_lights.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/docking.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/headlights.h"
+#include "xwa_runtime/models/mag_pulse.h"
 #include "xwa_runtime/models/mission_backdrops.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/shield_recharge.h"
+#include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
@@ -185,6 +189,9 @@ int XwaPort_Init(void) {
 	XwaShieldRecharge_Init();
 	XwaWeaponRates_Init();
 	XwaWeaponStats_Init();
+	XwaWarheadLock_Init();
+	XwaAiAttack_Init();
+	XwaMagPulse_Init();
 	XwaSoundBanks_Init();
 	if (SpriteResource_LoadCatalog("Resdata.txt") != 0) {
 		Aeron_LogError("xwa.assets", "Failed to load required sprite catalog 'Resdata.txt'");
@@ -479,6 +486,7 @@ void XwaPort_Shutdown(void) {
 	XwaFamilyMissions_Shutdown();
 	XwaSidePanels_Shutdown();
 	XwaFrontendConfig_Shutdown();
+	XwaFlightConfig_Shutdown();
 	XwaConcourseLayout_Shutdown();
 	XwaAwards_Shutdown();
 	XwaRoomAnims_Shutdown();

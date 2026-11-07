@@ -449,6 +449,8 @@ keeps the game's values for that subject.
 | [`warhead_lock`](#warhead_lock) | warhead lock ranges and times |
 | [`jamming`](#jamming) | where the craft jams the player's weapons |
 | [`docking`](#docking) | the approach height when the player docks |
+| [`ai_attack`](#ai_attack) | how close the AI gets before it breaks off, and from how far it fires lasers |
+| [`mag_pulse`](#mag_pulse) | what a mag pulse hit does to the craft |
 | [`cockpit_view`](#cockpit_view) | the wide field of view of the cockpit |
 
 The settings belong to the model, and every object type that loads the
@@ -952,6 +954,10 @@ warhead_lock:
 
 The ranges are 0 or more.
 
+The `warhead_lock` section of `flight/flight.yaml` can set
+`ai_lock_range_m.big` and `big_top_tier` for every craft of a genus. A
+model's own value replaces it.
+
 ### jamming
 
 `jamming` sets where the craft jams the weapons of an enemy player who is
@@ -1004,6 +1010,69 @@ docking: {approach_height_m: 0}
 The approach height is the smaller of this value and the gap between the
 target's dock point and the player's dock point. This group only applies
 with the `docking.player_approach_height` rule of `flight/flight.yaml`.
+
+### ai_attack
+
+`ai_attack` sets how an AI craft of this model attacks its target.
+
+```yaml
+ai_attack:
+  break_range_m:
+    warhead: 125
+    small: {novice: 125, officer: 125, veteran: 100, ace: 75, top_ace: 56.25, super_ace: 37.5}
+    big_max: 200
+    target_offset: {superstardestroyer: 800, repairyard: 800}
+  laser_range_m: {novice: 600, officer: 800, veteran: 1000, ace: 1000, top_ace: 1000, super_ace: 1000}
+  avoid_hits: false
+```
+
+An AI craft flies at its target until the target is closer than the break
+range. Then it ends the attack run and turns away.
+
+| Key | Default | Meaning |
+|-|-|-|
+| `break_range_m.warhead` | 125 | The break range when the target isn't a craft, such as a warhead. |
+| `break_range_m.small` | 125, 125, 100, 75, 56.25 and 37.5 | The break range against a craft that isn't a starship, platform, container or freighter, by the rank of the craft's flight group. It doubles when the two craft face more than 90° apart. 0 or more. |
+| `break_range_m.big_max` | 200 | Against a starship, platform, container or freighter, the break range is the size of the target, at most this value. When the craft aims at a part of the target, the range is half the size of the part, and this limit doesn't apply. |
+| `break_range_m.target_offset` | 800 for the Super Star Destroyer, the Repair Yard and the Shipyard, else 0 | A distance added to the break range against a starship, platform, container or freighter, by the name of the target's model. |
+| `laser_range_m` | See below | How far away the craft starts to fire its lasers, by the rank of its flight group. 0 or more. |
+| `avoid_hits` | `true` | `false` stops the craft from dodging warheads and attackers, and from firing flares or chaff at warheads. Freighters, containers and starships never dodge. |
+
+A break range of 0 or less means that the craft never breaks off because of
+the distance. The ranks are `novice`, `officer`, `veteran`, `ace`, `top_ace`
+and `super_ace`. A rank above super ace uses the `novice` value.
+
+**The laser range.** In the original game, the laser range follows the
+pilot's skill: 600 m for novices and officers, 800 m for veterans, and
+1000 m for aces and above. A turret that another craft controls uses the
+skill of that craft. When the model or `flight/flight.yaml` sets
+`laser_range_m`, the range follows the rank of the craft's flight group
+instead. A rank that neither file sets keeps its original range.
+
+The game then changes the range. Against a fast target, it is 400 m
+shorter when the target flies within 45° of the craft's heading, and 200 m
+shorter within 112.5°. It is 600 m longer against a starship or a platform.
+So with a range below 400 m, the craft fires from any distance at a fast
+target that flies the same way.
+
+The `ai_attack` section of `flight/flight.yaml` takes the same keys, for
+every craft. A key of the model replaces the same key of that section.
+
+### mag_pulse
+
+`mag_pulse` sets what a mag pulse hit does to a craft of this model.
+
+```yaml
+mag_pulse: {drain_only: true, disable_time_ms: 9440}
+```
+
+| Key | Default | Meaning |
+|-|-|-|
+| `drain_only` | `false` | For a player's craft. `true` makes a hit only drain the lasers. In the original game, a hit also knocks out the cannons for 20 seconds when they work. |
+| `disable_time_ms` | 14160 for fighters, transports, utility craft, pilot droids and weapon emplacements, else 28320 | For an AI craft. How long a hit stops the craft from firing, from 0 to 262140 milliseconds. Each hit adds this time. |
+
+The `mag_pulse` section of `flight/flight.yaml` sets the defaults for every
+craft.
 
 ### cockpit_view
 

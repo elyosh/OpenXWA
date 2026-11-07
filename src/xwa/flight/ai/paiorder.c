@@ -1,5 +1,6 @@
 #include "xwa/flight/ai/ai_internal.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/ai_attack.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/stats_profiles.h"
@@ -1115,6 +1116,9 @@ char paiorder_avoidhitorder(void) {
 
 	selfGenus = g_objectTable[g_paiContext.aiObjIdx].genusId;
 	if (selfGenus == GENUS_Freighter || selfGenus == GENUS_Container || selfGenus == GENUS_Starship ||
+#ifdef XWA_MODERN
+		!XwaAiAttack_Value(g_paiContext.aiObjIdx, XWA_AI_ATTACK_AVOID_HITS, 1) ||
+#endif
 		g_paiContext.aiController->maneuverMode != g_paiContext.aiPlanInitialManeuverId) {
 		return 0;
 	}

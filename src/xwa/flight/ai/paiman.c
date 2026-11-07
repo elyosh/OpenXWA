@@ -6,6 +6,7 @@
 #include "xwa/math/fixed.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/ai_attack.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/mission_settings.h"
@@ -1233,6 +1234,9 @@ static char paiman_attackmaneuver(void) {
 											(unsigned int)trig2_polardistance);
 		if (g_paiContext.aiController->targetObjIdx >= g_activeRegionCraftObjectSlotEnd) {
 			rangeLimit = 5120;
+#ifdef XWA_MODERN
+			rangeLimit = XwaAiAttack_Value(g_paiContext.aiObjIdx, XWA_AI_ATTACK_BREAK_WARHEAD, rangeLimit);
+#endif
 		} else {
 			ModelGenusId targetGenus;
 
@@ -1246,10 +1250,36 @@ static char paiman_attackmaneuver(void) {
 						2;
 				} else {
 					rangeLimit = ModelBounds_GetMaxExtent((uint16_t)g_objectTable[targetObjIdx].objectType);
+#ifdef XWA_MODERN
+					{
+						const int32_t cap =
+							XwaAiAttack_Value(g_paiContext.aiObjIdx, XWA_AI_ATTACK_BREAK_BIG_MAX, 0x2000);
+
+						if (rangeLimit >= cap) {
+							rangeLimit = cap;
+						}
+					}
+#else
 					if (rangeLimit >= 0x2000) {
 						rangeLimit = 0x2000;
 					}
+#endif
 				}
+#ifdef XWA_MODERN
+				{
+					const unsigned int targetType = g_objectTable[targetObjIdx].objectType;
+					const int32_t stockOffset = (targetType == OBJ_SuperStarDestroyer ||
+												 targetType == OBJ_RepairYard || targetType == OBJ_ShipYard)
+													? 0x8000
+													: 0;
+
+					const int32_t offset =
+						XwaAiAttack_TargetOffset(g_paiContext.aiObjIdx, targetObjIdx, stockOffset);
+
+					/* A mod's offset can be large, so the sum wraps around at 32 bits. */
+					rangeLimit = (int)((uint32_t)rangeLimit + (uint32_t)offset);
+				}
+#else
 				if (g_objectTable[targetObjIdx].objectType == OBJ_SuperStarDestroyer) {
 					rangeLimit += 0x8000;
 				}
@@ -1259,6 +1289,7 @@ static char paiman_attackmaneuver(void) {
 				if (g_objectTable[targetObjIdx].objectType == OBJ_ShipYard) {
 					rangeLimit += 0x8000;
 				}
+#endif
 			} else {
 				uint8_t groupAI;
 				uint16_t yawDelta;
@@ -1276,6 +1307,16 @@ static char paiman_attackmaneuver(void) {
 				} else {
 					rangeLimit = 5120;
 				}
+#ifdef XWA_MODERN
+				{
+					/* A rank above super ace uses the novice range. */
+					const unsigned int rank = groupAI < XWA_AI_ATTACK_RANKS ? groupAI : 0;
+
+					rangeLimit =
+						XwaAiAttack_Value(g_paiContext.aiObjIdx,
+										  (XwaAiAttackValue)(XWA_AI_ATTACK_BREAK_SMALL + rank), rangeLimit);
+				}
+#endif
 				yawDelta =
 					(uint16_t)(g_objectTable[g_paiContext.aiObjIdx].yaw - g_objectTable[targetObjIdx].yaw);
 				if (yawDelta >= 0x8000u) {

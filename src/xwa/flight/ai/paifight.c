@@ -1,5 +1,6 @@
 #include "xwa/flight/ai/ai_internal.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/ai_attack.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/warhead_lock.h"
@@ -2570,7 +2571,17 @@ char paifight_fightershootorder(void) {
 		goto clear_laser_link_modes;
 	}
 
+#ifdef XWA_MODERN
+	/* With laser ranges in the mod, the range follows the flight group's rank. */
+	if (!XwaAiAttack_LaserRange(
+			g_paiContext.aiObjIdx,
+			g_missionFlightGroups[g_paiContext.curOrderCoord.fields.flightGroupIdx].fg.groupAI,
+			&maxLaserRange)) {
+		maxLaserRange = g_aiFighterShootMaxRangeBySkill[g_paiContext.aiSkillTier];
+	}
+#else
 	maxLaserRange = g_aiFighterShootMaxRangeBySkill[g_paiContext.aiSkillTier];
+#endif
 	plan = &g_planTable[g_paiContext.aiController->currentPlanId];
 	if (strcmp(plan->name, "disableldr1pln") == 0) {
 		isDisablePlan = true;
