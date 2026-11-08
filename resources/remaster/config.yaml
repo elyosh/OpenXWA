@@ -407,7 +407,7 @@ hyperspace_jump:
   tint_r: 0.122                # colour the streaks move toward during the jump
   tint_g: 0.3544
   tint_b: 1.00
-  exit_forward: false         # true: on exit the streaks shrink toward the camera and the scene comes in toward it
+  exit_forward: true         # true: on exit the streaks shrink toward the camera and the scene comes in toward it
   # Scene warp: the scene zooms toward the camera and black opens from the
   # vanishing point. The exit plays it backward, or forward with exit_forward.
   warp_start: 0.0             # seconds into the entry when the scene starts moving
