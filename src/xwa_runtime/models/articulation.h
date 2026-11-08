@@ -103,6 +103,26 @@ int XwaArticulation_CrewAlwaysAnimates(unsigned int objIdx);
    crew.always_animate. */
 void XwaArticulation_StepHangarCrew(void);
 
+/* The motions of the parts of a hangar droid (its hangar_droid entries). */
+typedef enum XwaHangarDroidMotion {
+	XWA_HANGAR_DROID_NOD,   /* the HangarDroid nod, without its turn back */
+	XWA_HANGAR_DROID_SWING, /* the HangarDroid2 swing, in the second droid's direction */
+	XWA_HANGAR_DROID_SPIN   /* the HangarDroid2 spin, faster while the second droid drives */
+} XwaHangarDroidMotion;
+
+typedef struct XwaHangarDroidPart {
+	uint8_t component;
+	uint8_t motion; /* XwaHangarDroidMotion */
+} XwaHangarDroidPart;
+
+/* For the hangar_droid_parts_from_model rule: writes the parts that the
+   hangar droid `objIdx` moves to `parts`, in the order of its model's list.
+   Returns how many there are, at most `capacity`. They are the
+   `hangar_droid` entries of the model. An original OPT has none, except the
+   type's own models of HangarDroid (3 nods) and HangarDroid2 (1 swings, 2
+   spins) when the hangar doesn't swap them. */
+int XwaArticulation_HangarDroidParts(unsigned int objIdx, XwaHangarDroidPart* parts, int capacity);
+
 /* Every sim step: the crew meshes' drawn angles follow the crew animation's
    own steps (on the crew timer) at their speed. For one object, and in the
    hangar for every object. */

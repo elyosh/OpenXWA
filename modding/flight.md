@@ -107,6 +107,7 @@ is on by default.
 | `starship_missile_defense_any_warhead` | A starship's missile defense can fire any warhead. The original game fires only missiles and advanced missiles. |
 | `weapon_rack_count_from_record` | A craft's weapon count includes all laser groups and warhead launchers of its craft record. The original game counts the laser groups, plus the turrets of craft that fire from points over their hull. |
 | `overlapping_fly_by_sounds` | The fly-by and engine wash sounds of several craft can play at the same time. In the original game, one of these sounds doesn't start while it is already playing. |
+| `hangar_droid_parts_from_model` | Each of the two hangar droids moves the parts that its model lists in the [`hangar_droid` group](models.md#hangar-droids), and no others. In the original game, the first droid nods part 3 and the second droid swings part 1 and spins part 2, whatever model they use. |
 
 ### mission_settings
 

@@ -81,6 +81,7 @@ static int s_twoLauncherFixes;
 static int s_missileDefenseAnyWarhead;
 static int s_rackCountFromRecord;
 static int s_overlappingFlyBySounds;
+static int s_hangarDroidPartsFromModel;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -445,6 +446,7 @@ void XwaMissionSettings_Init(void) {
 	s_missileDefenseAnyWarhead = 0;
 	s_rackCountFromRecord = 0;
 	s_overlappingFlyBySounds = 0;
+	s_hangarDroidPartsFromModel = 0;
 	MissionSettings_ResetTargets();
 	root = XwaFlightConfig_Root();
 	rules = AeronConfigNode_MapGet(root, "rules");
@@ -553,6 +555,10 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "overlapping_fly_by_sounds", node,
 								 &s_overlappingFlyBySounds);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "hangar_droid_parts_from_model")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "hangar_droid_parts_from_model", node,
+								 &s_hangarDroidPartsFromModel);
+	}
 	MissionSettings_Read(XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_MapGet(root, "mission_settings"),
 						 &s_defaults);
 	s_settings = s_defaults;
@@ -638,6 +644,7 @@ int XwaMissionSettings_StarshipMissileDefenseAnyWarhead(void) { return s_missile
 int XwaMissionSettings_WeaponRackCountFromRecord(void) { return s_rackCountFromRecord; }
 
 int XwaMissionSettings_OverlappingFlyBySounds(void) { return s_overlappingFlyBySounds; }
+int XwaMissionSettings_HangarDroidPartsFromModel(void) { return s_hangarDroidPartsFromModel; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

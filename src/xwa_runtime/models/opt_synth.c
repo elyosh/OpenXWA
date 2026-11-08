@@ -46,9 +46,11 @@ enum {
    `variant.<name>.` may prefix any group but `crew`. */
 static const char* const s_articulationGroups[] = {
 	"sfoils",       "landing_gear",      "hangar_doors",       "hatches",
-	"warheads_bay", "cargo_clamps.open", "cargo_clamps.close", "crew"
+	"warheads_bay", "cargo_clamps.open", "cargo_clamps.close", "crew",
+	"hangar_droid"
 };
 static const char* const s_articulationBehaviors[] = { "swing", "random", "random_pause" };
+static const char* const s_hangarDroidBehaviors[] = { "nod", "swing", "spin" };
 static const char* const s_articulationSettings[] = {
 	"step_ticks",         "sfoils.close_in_hyperspace", "sfoils.allow_fire_closed",
 	"sfoils.park_closed", "hangar_doors.distance",      "crew.always_animate"
@@ -341,9 +343,19 @@ static void OptSynth_WarnUnknownArticulations(const char* key, const AeronFlight
 			Aeron_LogWarn("xwa.models", "replacement '%s': component %u has unknown articulation group '%s'",
 						  key, articulation->component, articulation->group);
 		}
-		if (articulation->behavior[0] != '\0' &&
-			!OptSynth_IsKnownName(articulation->behavior, s_articulationBehaviors,
-								  sizeof s_articulationBehaviors / sizeof s_articulationBehaviors[0])) {
+		if (strcmp(group, "hangar_droid") == 0) {
+			if (!OptSynth_IsKnownName(articulation->behavior, s_hangarDroidBehaviors,
+									  sizeof s_hangarDroidBehaviors / sizeof s_hangarDroidBehaviors[0])) {
+				Aeron_LogWarn(
+					"xwa.models",
+					"replacement '%s': component %u has unknown hangar droid behavior '%s'; it doesn't "
+					"move",
+					key, articulation->component, articulation->behavior);
+			}
+		} else if (articulation->behavior[0] != '\0' &&
+				   !OptSynth_IsKnownName(articulation->behavior, s_articulationBehaviors,
+										 sizeof s_articulationBehaviors /
+											 sizeof s_articulationBehaviors[0])) {
 			Aeron_LogWarn("xwa.models",
 						  "replacement '%s': component %u has unknown articulation behavior '%s'", key,
 						  articulation->component, articulation->behavior);

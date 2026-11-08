@@ -169,6 +169,13 @@ droids:
   - {enabled: false}
 ```
 
+As in the original game, the first droid nods part 3 of its model, and the
+second droid swings part 1 and spins part 2, whatever its `type`. With
+another type, the wrong parts can move. The
+`hangar_droid_parts_from_model` rule of [flight.yaml](flight.md#rules)
+makes each droid move the parts that its model lists instead. See
+[hangar droids](models.md#hangar-droids).
+
 ### roof_crane
 
 | Key | Meaning |

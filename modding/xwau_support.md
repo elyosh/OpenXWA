@@ -28,7 +28,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Levels of detail | Partial | The importer keeps only the most detailed level of an OPT. | [Models](models.md) |
 | Object profiles | Implemented | Including the choice by flight group in missions. | [Models](models.md#profiles), [Missions](missions.md#object_profiles) |
 | Skins | Implemented | Including skins by markings, and layers with opacity. | [Materials](materials.md#skins-and-markings) |
-| Moving parts | Implemented | S-foils, landing gears, hatches, hangar doors, cargo clamps, pilot heads and rotating parts, with their start states in missions. | [Models](models.md#moving-parts) |
+| Moving parts | Implemented | S-foils, landing gears, hatches, hangar doors, cargo clamps, pilot heads, hangar droid parts and rotating parts, with their start states in missions. | [Models](models.md#moving-parts) |
 | `[MeshesCollisions]` and `TargetableMeshes` | Implemented | | [Models](models.md#collision-meshes) |
 | `[EngineGlows]` by speed | Implemented | | [Craft](craft.md#engine_glows) |
 

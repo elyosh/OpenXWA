@@ -31,7 +31,11 @@
  *     the laser groups, plus the turret racks of craft that fire from float
  *     hardpoints;
  *   - overlapping_fly_by_sounds lets fsfx_PlaySound start a fly-by or engine
- *     wash sound while it is already playing. */
+ *     wash sound while it is already playing;
+ *   - hangar_droid_parts_from_model replaces the motion of the two hangar
+ *     droids in Hangar_UpdateHangarDroidTraffic. Each droid moves the
+ *     hangar_droid parts of its model, whatever its slot
+ *     (XwaArticulation_HangarDroidParts). */
 
 #include <stdint.h>
 
@@ -93,6 +97,7 @@ int XwaMissionSettings_TwoLauncherFixes(void);
 int XwaMissionSettings_StarshipMissileDefenseAnyWarhead(void);
 int XwaMissionSettings_WeaponRackCountFromRecord(void);
 int XwaMissionSettings_OverlappingFlyBySounds(void);
+int XwaMissionSettings_HangarDroidPartsFromModel(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);
