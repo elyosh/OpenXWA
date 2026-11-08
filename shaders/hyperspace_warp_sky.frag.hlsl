@@ -67,13 +67,12 @@ cbuffer HyperspaceWarpSky : register(b0, space3)
 static const float WARP_SKY_EDGE_FADE = 0.05f;
 
 /* The sky in the direction of `px`, which can be outside the screen, from the
- * cubes. `zoom` is the sample's log zoom, which sets the level to read. */
-float3 cube_sky(float2 px, float zoom)
+ * cubes. `minify` is the sample's zoom factor: a shrunk sky packs more texels
+ * into each pixel, which sets the level to read. */
+float3 sample_sky_cubes(float2 px, float minify)
 {
 	const float2 ndc = float2(px.x * size.z * 2.0f - 1.0f, 1.0f - px.y * size.w * 2.0f);
 	const float3 view = float3((ndc.x - projection.z) * projection.x, (projection.w - ndc.y) * projection.y, 1.0f);
-	/* A shrunk sky packs more texels into each pixel. */
-	const float minify = exp(-zoom);
 	const float3 sky_dir = float3(dot(sky_rows[0].xyz, view), dot(sky_rows[1].xyz, view), dot(sky_rows[2].xyz, view));
 	const float sky_level = clamp(log2(max(cube_level.x * minify, 1.0f)), 0.0f, cube_level.y);
 	float3 color = g_sky_cube.SampleLevel(g_sky_cube_sampler, sky_dir, sky_level).rgb * cube.x;
@@ -95,13 +94,18 @@ float4 main(float4 position : SV_Position) : SV_Target0
 	const bool first = zoom.w < 0.5f;
 	const bool last = zoom.w > 1.5f;
 	const bool scene_only = cube.w >= 1.0f;
+	/* Sample j is at the zoom factor exp(-(zoom.x + zoom.y * j)), so each
+	 * factor is the previous one times exp(-zoom.y). Its distance from the
+	 * vanishing point, for the reveal, is this pixel's times the factor. */
+	const float factor_step = exp(-zoom.y);
+	const float reveal_distance = length(from_vanishing) * vanishing.w;
+	float factor = exp(-zoom.x);
 	float4 sum = 0.0f;
 	float weight_sum = 0.0f;
 	[loop]
-	for (int j = 0; j < taps; ++j)
+	for (int j = 0; j < taps; ++j, factor *= factor_step)
 	{
-		const float sample_zoom = zoom.x + zoom.y * (float)j;
-		const float2 px = vanishing.xy + from_vanishing * exp(-sample_zoom);
+		const float2 px = vanishing.xy + from_vanishing * factor;
 		const float2 uv = px * size.zw;
 		/* The smear fades out over its older half. */
 		const float weight = last ? smoothstep(0.0f, 0.5f, ((float)j + 0.5f) / (float)taps) : 1.0f;
@@ -127,13 +131,19 @@ float4 main(float4 position : SV_Position) : SV_Target0
 			}
 			if (scene_only && scene_share <= 0.0f)
 				continue;
+			/* Where the reveal is black, the sample is black: nothing to
+			 * read. */
+			const float sample_reveal = reveal_visibility_at_distance(reveal_distance * factor, vanishing, reveal);
 			float3 color = 0.0f;
-			if (scene_share > 0.0f)
-				color = g_source.SampleLevel(g_source_sampler, uv, 0.0f).rgb * scene_share;
-			if (scene_share < 1.0f)
-				color += cube_sky(px, sample_zoom) * (1.0f - scene_share);
-			color = min(color * sky.y, HYPER_WARP_SKY_CLAMP) * warp_reveal(px, vanishing, reveal);
-			sample_value = float4(pow(max(color, 0.0f), sky.x), 1.0f);
+			if (sample_reveal > 0.0f)
+			{
+				if (scene_share > 0.0f)
+					color = g_source.SampleLevel(g_source_sampler, uv, 0.0f).rgb * scene_share;
+				if (scene_share < 1.0f)
+					color += sample_sky_cubes(px, factor) * (1.0f - scene_share);
+				color = min(color * sky.y, HYPER_WARP_SKY_CLAMP) * sample_reveal;
+			}
+			sample_value = float4(apply_highlight_power(max(color, 0.0f), sky.x), 1.0f);
 		}
 		else
 		{

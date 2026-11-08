@@ -79,7 +79,7 @@ static const uint WARP_VIEW_REVEAL = 3u;
 static const float WARP_SURFACE_BAND = 0.15f;
 
 /* `color` with the cockpit's screens over it. */
-float4 with_screens(float3 color, float2 uv, float alpha)
+float4 composite_screens_over(float3 color, float2 uv, float alpha)
 {
 	if (screens.x > 0.5f)
 	{
@@ -89,20 +89,20 @@ float4 with_screens(float3 color, float2 uv, float alpha)
 	return float4(color, alpha);
 }
 
-float scene_depth(float2 uv)
+float sample_scene_depth(float2 uv)
 {
 	return g_depth.SampleLevel(g_depth_sampler, uv, 0.0f).r;
 }
 
 /* The pixel's position in tangent units (x / z, y / z of its view ray). */
-float2 to_tangent(float2 px)
+float2 px_to_tangent(float2 px)
 {
 	const float2 ndc = float2(px.x * size.z * 2.0f - 1.0f, 1.0f - px.y * size.w * 2.0f);
 	return float2((ndc.x - projection.z) * projection.x, (projection.w - ndc.y) * projection.y);
 }
 
 /* How far a ray from `origin` along `direction` stays on screen, in px. */
-float screen_exit(float2 origin, float2 direction)
+float distance_to_screen_edge(float2 origin, float2 direction)
 {
 	float distance = 1.0e9f;
 	[unroll]
@@ -117,12 +117,12 @@ float screen_exit(float2 origin, float2 direction)
 }
 
 /* The warped sky at `uv`, in scene colour, and whether there was any. */
-float4 warped_sky(float2 uv)
+float4 sample_warped_sky(float2 uv)
 {
 	const float4 sky = g_sky.SampleLevel(g_sky_sampler, uv, 0.0f);
 	if (sky.a < 0.02f)
 		return 0.0f;
-	const float3 color = pow(max(sky.rgb / sky.a, 0.0f), 1.0f / reveal.w) * config.y;
+	const float3 color = remove_highlight_power(max(sky.rgb / sky.a, 0.0f), reveal.w) * config.y;
 	return float4(color, 1.0f);
 }
 
@@ -134,21 +134,24 @@ float4 main(float4 position : SV_Position) : SV_Target0
 	const uint view = (uint)config.z;
 
 	/* Keep mask: the nearest depth of the 2x2 render texels around q. */
-	const float2 half_texel = 0.5f * render.zw;
-	const float keep_depth = max(max(scene_depth(uv + float2(-half_texel.x, -half_texel.y)),
-									 scene_depth(uv + float2(half_texel.x, -half_texel.y))),
-								 max(scene_depth(uv + float2(-half_texel.x, half_texel.y)),
-									 scene_depth(uv + float2(half_texel.x, half_texel.y))));
+	const float4 around = g_depth.GatherRed(g_depth_sampler, uv);
+	const float keep_depth = max(max(around.x, around.y), max(around.z, around.w));
 	const bool keep = keep_depth >= motion.w;
 	if (view == WARP_VIEW_KEEP_MASK)
 		return float4(keep ? lerp(scene.rgb, float3(config.y, 0.0f, 0.0f), 0.6f) : scene.rgb, scene.a);
 	if (view == WARP_VIEW_REVEAL)
-		return float4(warp_reveal(q, vanishing, reveal) * config.y * float3(1.0f, 1.0f, 1.0f), scene.a);
+		return float4(reveal_visibility_at_px(q, vanishing, reveal) * config.y * float3(1.0f, 1.0f, 1.0f), scene.a);
 	if (keep)
-		return with_screens(scene.rgb, uv, scene.a);
+		return composite_screens_over(scene.rgb, uv, scene.a);
 
+	/* When the scene moves toward the camera (the entry, and the exit played
+	 * backward), every tap and sky sample lies between q and the vanishing
+	 * point, where the black reveal is at least as dark as at q. Where q is
+	 * black, they are all black. */
+	const bool black_here = reveal.z > 0.5f && config.w > 0.0f && forward.z > 1.0e-4f &&
+							reveal_visibility_at_px(q, vanishing, reveal) <= 0.0f;
 	float3 warped = scene.rgb;
-	if (reveal.z > 0.5f && reveal.x >= 1.0f)
+	if (reveal.z > 0.5f && (reveal.x >= 1.0f || black_here))
 	{
 		/* The reveal is complete: everything outside the keep mask is
 		 * black. */
@@ -163,12 +166,12 @@ float4 main(float4 position : SV_Position) : SV_Target0
 		 * other way. Distances below are counted along the move. */
 		const float3 f = forward.xyz;
 		const float direction = config.w < 0.0f ? -1.0f : 1.0f;
-		const float2 u = to_tangent(q) * f.z - f.xy;
+		const float2 u = px_to_tangent(q) * f.z - f.xy;
 		const float u_length = max(length(u), 1.0e-6f);
 		const float2 back = -direction * u / u_length;
 		/* Tangent units per px: the same on both axes. */
 		const float tangent_per_px = 2.0f * projection.y * size.w;
-		float walk = screen_exit(q, back);
+		float walk = distance_to_screen_edge(q, back);
 		if (f.z * direction > 1.0e-4f)
 			walk = min(walk, length(vanishing.xy - q));
 
@@ -177,8 +180,16 @@ float4 main(float4 position : SV_Position) : SV_Target0
 		const float s_min = min(s, s_old);
 		const float s_max = max(s, s_old);
 		const float near_z = motion.z;
-		const int taps = (int)config.x;
+		/* Tap 0 is q itself; the others spread from 1 px to the walk's end
+		 * on a log scale. Each is the previous one times `t_step`. */
+		const int taps = walk < 1.0f ? 1 : (int)config.x;
 		const float jitter = frac(52.9829189f * frac(dot(q, float2(0.06711056f, 0.00583715f))));
+		const float log_walk_step = log(max(walk, 1.0f)) / (float)max(taps - 1, 1);
+		const float t_step = exp(log_walk_step);
+		float t_next = exp(log_walk_step * jitter);
+		/* The world movement at which a tap's point crosses q is its view z
+		 * times this times its distance from q in px. */
+		const float s_per_z_px = tangent_per_px / u_length;
 
 		float3 surface = 0.0f;
 		float surface_weight = 0.0f;
@@ -189,24 +200,21 @@ float4 main(float4 position : SV_Position) : SV_Target0
 		[loop]
 		for (int i = 0; i < taps; ++i)
 		{
-			/* Tap 0 is q itself; the others spread from 1 px to the walk's
-			 * end on a log scale. */
 			float t = 0.0f;
 			if (i > 0)
 			{
-				if (walk < 1.0f)
-					break;
-				t = exp(log(walk) * ((float)(i - 1) + jitter) / (float)max(taps - 1, 1));
+				t = t_next;
+				t_next *= t_step;
 			}
 			const float2 px = q + back * t;
 			const float2 tap_uv = px * size.zw;
-			const float depth = scene_depth(tap_uv);
+			const float depth = sample_scene_depth(tap_uv);
 			if (depth <= 0.0f)
 			{
 				if (!sky_found)
 				{
 					first_sky = g_scene.SampleLevel(g_scene_sampler, tap_uv, 0.0f).rgb *
-								warp_reveal(px, vanishing, reveal);
+								reveal_visibility_at_px(px, vanishing, reveal);
 					sky_found = true;
 				}
 				continue;
@@ -216,13 +224,12 @@ float4 main(float4 position : SV_Position) : SV_Target0
 			/* The world movement at which the tap's point crosses q, give or
 			 * take half a pixel. */
 			const float z = near_z / depth;
-			const float t_tangent = t * tangent_per_px;
-			const float half_px = 0.5f * tangent_per_px;
-			const float s_low = z * max(t_tangent - half_px, 0.0f) / u_length;
-			const float s_high = z * (t_tangent + half_px) / u_length;
+			const float s_scale = z * s_per_z_px;
+			const float s_low = s_scale * max(t - 0.5f, 0.0f);
+			const float s_high = s_scale * (t + 0.5f);
 			if (s_high < s_min || s_low > s_max)
 				continue;
-			const float s_cross = clamp(z * t_tangent / u_length, s_min, s_max);
+			const float s_cross = clamp(s_scale * t, s_min, s_max);
 			const float moved_z = z - direction * s_cross * f.z;
 			if (moved_z <= near_z)
 				continue;
@@ -234,7 +241,7 @@ float4 main(float4 position : SV_Position) : SV_Target0
 			const float along = s != s_old ? saturate((s_head - s_old) / (s - s_old)) : 1.0f;
 			const float weight = smoothstep(0.0f, 0.5f, along);
 			const float3 color =
-				g_scene.SampleLevel(g_scene_sampler, tap_uv, 0.0f).rgb * warp_reveal(px, vanishing, reveal);
+				g_scene.SampleLevel(g_scene_sampler, tap_uv, 0.0f).rgb * reveal_visibility_at_px(px, vanishing, reveal);
 			if (moved_z < nearest * (1.0f - WARP_SURFACE_BAND))
 			{
 				nearest = moved_z;
@@ -250,7 +257,7 @@ float4 main(float4 position : SV_Position) : SV_Target0
 			}
 		}
 
-		const float4 sky = warped_sky(uv);
+		const float4 sky = sample_warped_sky(uv);
 		const float3 background = sky.a > 0.0f ? sky.rgb : first_sky;
 		if (view == WARP_VIEW_SKY)
 			return float4(background, scene.a);
@@ -259,9 +266,9 @@ float4 main(float4 position : SV_Position) : SV_Target0
 	}
 	else if (view == WARP_VIEW_SKY)
 	{
-		return float4(scene_depth(uv) > 0.0f ? float3(0.0f, 0.0f, 0.0f) : scene.rgb, scene.a);
+		return float4(sample_scene_depth(uv) > 0.0f ? float3(0.0f, 0.0f, 0.0f) : scene.rgb, scene.a);
 	}
 
 	const float4 layer = g_layer.SampleLevel(g_layer_sampler, uv, 0.0f);
-	return with_screens(layer.rgb + warped * (1.0f - layer.a), uv, scene.a);
+	return composite_screens_over(layer.rgb + warped * (1.0f - layer.a), uv, scene.a);
 }
