@@ -19749,6 +19749,17 @@ void Mfd_UpdateCommandMenuTargets(void) {
 				}
 			}
 
+#ifdef XWA_MODERN
+			/* The slot comes out negative for a craft of an older wave, or above
+			   6 for a craft numbered past the menu's slots. The game then reads
+			   and writes outside the slot arrays: on 32-bit x86 a negative slot
+			   wraps to the entries just before them. Such a craft gets no
+			   slot. */
+			if (targetSlot > 6) {
+				continue;
+			}
+#endif
+
 			if ((unsigned int)commandMenu->targetSlotValid[targetSlot] != 0xffffu) {
 				while (g_players[playerIdx].mfd.commandMenu.primaryTargetObjIdx[targetSlot] != 0xffff) {
 					if (targetSlot >= 6) {
