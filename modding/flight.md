@@ -383,7 +383,8 @@ so.
 
 Each `stats` profile maps weapon types to stats. Stats with a unit in their
 name can have decimals. The other stats are whole numbers, except
-`precise`, which is `true` or `false`. The units are described in
+`precise`, which is `true` or `false`, and `side` and `side_model`, which
+are names. The units are described in
 [Craft](craft.md#units). [Weapons](reference/weapons.md#weapon-types)
 gives the speed, power, life and score of each weapon type in the original
 game.
@@ -404,6 +405,8 @@ game.
 | `decharge_rate` | The charge that a player's shot takes from its cannon. It replaces `rates.decharge`. A cannon holds up to 127 charge. |
 | `recharge_rate` | The charge that comes back to a cannon each game second, for each step of the laser recharge setting above the middle. Below the middle, the cannons lose charge at the same rate. It replaces `rates.recharge`. |
 | `high_power_charge` | When a cannon's charge reaches this value, `rebel_laser`, `imperial_laser` and `ion_cannon` fire their turbo version. The original value is 64. |
+| `side` | Which side the weapon type belongs to: `rebel`, `imperial` or `none`. When the craft swaps weapons by IFF (see `weapon_iff_swap`) and its IFF is on the other side, it fires the `side_model` weapon instead. A weapon with `none` is never swapped. |
+| `side_model` | The weapon that the craft fires instead when it swaps this weapon, such as `imperial_laser` for `rebel_laser`. Set it to the weapon type itself to turn off the swap for this weapon. Without `side` and `side_model`, the original game's values apply. |
 
 A weapon type can also have stats for the player, for one difficulty, or
 for both, in the maps `player`, `easy`, `medium`, `hard`, `player_easy`,

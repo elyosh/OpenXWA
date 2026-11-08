@@ -69,7 +69,13 @@ static const char* const s_stats[XWA_WEAPON_STATS] = {
 	"decharge_rate",
 	"recharge_rate",
 	"high_power_charge",
+	"side",
+	"side_model",
 };
+
+static const char* const s_sideNames[3] = { "rebel", "imperial", "none" };
+static const int32_t s_sideValues[3] = { XWA_WEAPON_SIDE_REBEL, XWA_WEAPON_SIDE_IMPERIAL,
+										 XWA_WEAPON_SIDE_NONE };
 
 /* The unit of each stat in the file. The reader converts these stats to the
    game's units. The stats that aren't listed are the game's own values. */
@@ -104,7 +110,7 @@ static const char* const s_linkingRuleNames[XWA_WEAPON_LINKING_RULES] = {
 };
 
 typedef struct WeaponStatsForm {
-	uint16_t set; /* one bit for each stat that is set */
+	uint32_t set; /* one bit for each stat that is set */
 	int32_t value[XWA_WEAPON_STATS];
 } WeaponStatsForm;
 
@@ -265,8 +271,7 @@ static void WeaponStats_ReadForm(const char* path, const char* where, const Aero
 			}
 			form->value[XWA_WEAPON_STAT_DURATION_SECONDS] = ticks / 236;
 			form->value[XWA_WEAPON_STAT_DURATION_FRACTION] = (int32_t)(((ticks % 236) * 65536 + 118) / 236);
-			form->set |= (uint16_t)((1u << XWA_WEAPON_STAT_DURATION_SECONDS) |
-									(1u << XWA_WEAPON_STAT_DURATION_FRACTION));
+			form->set |= (1u << XWA_WEAPON_STAT_DURATION_SECONDS) | (1u << XWA_WEAPON_STAT_DURATION_FRACTION);
 		} else if (s_statUnits[stat] != XWA_UNIT_NONE) {
 			if (!XwaUnits_Read(value, s_statUnits[stat], INT32_MIN, INT32_MAX, &read)) {
 				Aeron_LogWarn("xwa.models", "%s: %s must be a number of %s. It is ignored", path, name,
@@ -274,11 +279,28 @@ static void WeaponStats_ReadForm(const char* path, const char* where, const Aero
 				continue;
 			}
 			form->value[stat] = read;
-			form->set |= (uint16_t)(1u << stat);
+			form->set |= 1u << stat;
+		} else if (stat == XWA_WEAPON_STAT_SIDE) {
+			const int side = WeaponStats_Find(AeronConfigNode_String(value, ""), s_sideNames, 3);
+
+			if (side < 0) {
+				Aeron_LogWarn("xwa.models", "%s: %s must be rebel, imperial or none. It is ignored", path,
+							  name);
+				continue;
+			}
+			form->value[stat] = s_sideValues[side];
+			form->set |= 1u << stat;
+		} else if (stat == XWA_WEAPON_STAT_SIDE_MODEL) {
+			int weapon;
+
+			if (XwaNames_Read(&g_xwaWeaponTypeNames, path, name, value, &weapon)) {
+				form->value[stat] = weapon;
+				form->set |= 1u << stat;
+			}
 		} else if (stat == XWA_WEAPON_STAT_PRECISE ? WeaponStats_ReadBool(path, name, value, &read)
 												   : WeaponStats_ReadInt(path, name, value, &read)) {
 			form->value[stat] = read;
-			form->set |= (uint16_t)(1u << stat);
+			form->set |= 1u << stat;
 		}
 	}
 }
@@ -662,6 +684,10 @@ static int WeaponStats_Cast(XwaWeaponStat stat, int32_t value) {
 			return value < 0 ? 0 : value;
 		case XWA_WEAPON_STAT_PRECISE:
 			return value != 0;
+		case XWA_WEAPON_STAT_SIDE:
+			return (uint8_t)value;
+		case XWA_WEAPON_STAT_SIDE_MODEL:
+			return (uint16_t)value;
 		default:
 			return value;
 	}

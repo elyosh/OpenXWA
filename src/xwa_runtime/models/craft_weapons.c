@@ -11,6 +11,7 @@
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/skins.h"
+#include "xwa_runtime/models/weapon_stats.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -285,17 +286,39 @@ int XwaCraftWeapons_SwitchByIff(unsigned int objectType) {
 	return XwaMissionSettings_WeaponIffSwap();
 }
 
-unsigned int XwaCraftWeapons_IffWeaponType(uint8_t iff, unsigned int weaponType) {
-	unsigned int index = weaponType - OBJ_LaserRebel;
+/* The stock side tables end at the Death Star laser. A profile can still
+   give the last weapon type a side. */
+static int CraftWeapons_HasStockSide(unsigned int weaponType) {
+	return weaponType >= OBJ_LaserRebel && weaponType <= OBJ_LaserImperialDS;
+}
+
+uint8_t XwaCraftWeapons_WeaponSide(int srcObjIdx, unsigned int weaponType) {
+	const int stock = CraftWeapons_HasStockSide(weaponType)
+						  ? g_projectileRequiredIffByType[weaponType - OBJ_LaserRebel]
+						  : XWA_WEAPON_SIDE_NONE;
+
+	return (uint8_t)XwaWeaponStats_Value(srcObjIdx, weaponType, XWA_WEAPON_STAT_SIDE, stock);
+}
+
+unsigned int XwaCraftWeapons_OtherSideWeaponType(int srcObjIdx, unsigned int weaponType) {
+	const int stock = CraftWeapons_HasStockSide(weaponType)
+						  ? g_projectileAlternateIffTypeByType[weaponType - OBJ_LaserRebel]
+						  : (int)weaponType;
+
+	return (unsigned int)XwaWeaponStats_Value(srcObjIdx, weaponType, XWA_WEAPON_STAT_SIDE_MODEL, stock);
+}
+
+unsigned int XwaCraftWeapons_IffWeaponType(int srcObjIdx, unsigned int weaponType) {
+	const uint8_t iff = (uint8_t)g_objectTable[srcObjIdx].mobj->iff;
 	uint8_t side;
 
-	if (weaponType < OBJ_LaserRebel || weaponType > OBJ_LaserImperialDS ||
+	if (weaponType < OBJ_LaserRebel || weaponType > OBJ_NoAsset_307 ||
 		iff >= sizeof g_projectileRequiredIffByShooterIff) {
 		return weaponType;
 	}
-	side = g_projectileRequiredIffByType[index];
-	if (side != 0xffu && g_projectileRequiredIffByShooterIff[iff] != side) {
-		return g_projectileAlternateIffTypeByType[index];
+	side = XwaCraftWeapons_WeaponSide(srcObjIdx, weaponType);
+	if (side != XWA_WEAPON_SIDE_NONE && g_projectileRequiredIffByShooterIff[iff] != side) {
+		return XwaCraftWeapons_OtherSideWeaponType(srcObjIdx, weaponType);
 	}
 	return weaponType;
 }

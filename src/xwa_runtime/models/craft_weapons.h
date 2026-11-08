@@ -54,10 +54,18 @@ uint8_t XwaCraftWeapons_BoltMarkings(unsigned int objectType, uint8_t markings, 
    of its side, as an XwaWeaponIffSwap: 1 for every shot, 0 for none, and -1
    for the stock rule, where only turret racks switch. */
 int XwaCraftWeapons_SwitchByIff(unsigned int objectType);
-/* Returns the projectile type that a craft of `iff` fires for
-   `weaponType`: the other side's type when the weapon belongs to the other
-   side, else `weaponType`. This is the stock test of starship fire. */
-unsigned int XwaCraftWeapons_IffWeaponType(uint8_t iff, unsigned int weaponType);
+/* Returns the weapon type that object `srcObjIdx` fires for `weaponType`.
+   When the weapon belongs to the side opposite the object's IFF, this is the
+   weapon that replaces it. Otherwise it is `weaponType`. This is the stock
+   test for starship fire. The object's weapon profile can change which side
+   the weapon belongs to and which weapon replaces it (`side` and
+   `side_model`). */
+unsigned int XwaCraftWeapons_IffWeaponType(int srcObjIdx, unsigned int weaponType);
+/* These return the side that `weaponType` belongs to when object `srcObjIdx`
+   fires it (XWA_WEAPON_SIDE_*), and the weapon that replaces it when the
+   object's IFF is on the other side. */
+uint8_t XwaCraftWeapons_WeaponSide(int srcObjIdx, unsigned int weaponType);
+unsigned int XwaCraftWeapons_OtherSideWeaponType(int srcObjIdx, unsigned int weaponType);
 /* Writes the RGB impact colour of a bolt of `weaponType` from a craft of
    `objectType` with `markings`. `markings` is -1 when the firing craft is
    gone. Returns 0 when the mark keeps its stock white. */
