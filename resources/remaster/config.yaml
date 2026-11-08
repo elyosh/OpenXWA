@@ -190,6 +190,12 @@ camera:
   lag_time: 0.32
   # Shows the HUD and the reticle in the exterior view of the player's craft.
   exterior_hud: true
+# The camera shake and jolt in hyperspace jumps, in modern graphics
+# (hyperspace_camera). A mod can change this value. The Camera Shake option
+# sets `enabled`.
+camera_shake:
+  # Off keeps the camera steady.
+  enabled: true
 # Shows the target's name, cargo, distance and damage bars next to its box
 # in the 3D view. A mod can change these values. The options screen only has
 # a Target Readout switch, which sets `enabled`.
@@ -421,14 +427,34 @@ hyperspace_jump:
   warp_taps: 24               # samples per pixel along the world's walk
   warp_sky_taps: 8            # samples per pixel in each of the three sky passes
   warp_sky_half_resolution: true # the sky passes run at half the output resolution
+# The camera in the player's hyperspace jumps, in modern graphics. A look
+# (hyperspace_looks) has its own camera group with the same keys. The look's
+# shake gradually replaces this one between its shake_start and shake_full,
+# and its jolt replaces this one. The Camera Shake option turns both off.
+# Fractions of the tunnel go from 0, when the tunnel appears, to 1, when it
+# ends.
+hyperspace_camera:
+  # The camera and the cockpit shake together, as if the pilot is rattled.
+  shake_degrees: 0.05   # how far it shakes at full strength, in degrees, 0 to 10
+  shake_speed: 0.3      # how fast it shakes, 0 to 4 (1 is the normal speed)
+  shake_start: 0.0      # when the shake starts, as a fraction of the tunnel
+  shake_full: 0.01      # when it reaches full strength
+  kick_rate: 0.0        # kicks per second, 0 to 8
+  # The camera jolts when the craft comes out of hyperspace, and settles
+  # before the exit ends.
+  jolt_degrees: 0.3     # how far the camera turns at the jolt's peak, in degrees, 0 to 20
+  jolt_delay: 0.15      # how long after the exit starts it hits, in seconds, 0 to 0.5
+  jolt_time: 0.2        # how fast it settles, in seconds, 0.05 to 0.8
 hyperspace_looks:
   # Other looks for the player's hyperspace jump. A mission picks one for
   # jumps to a given region (hyperspace_regions in its settings). A look only
-  # changes the tunnel and the exit. The start of the jump looks normal.
+  # changes the tunnel, the exit and the camera. The start of the jump looks
+  # normal.
   interdiction:
     # A jump that a gravity well cuts short. Red spreads through the tunnel
-    # from its far end toward the camera, the tunnel shakes, and the streaks
-    # are red when the player comes out of hyperspace.
+    # from its far end toward the camera. The camera shakes more and more,
+    # and jolts when the craft is pulled out. The streaks are red when the
+    # player comes out of hyperspace.
     tunnel:
       # The tunnel's colours where the red has reached it. They replace the
       # colours of hyperspace_tunnel.
@@ -464,8 +490,19 @@ hyperspace_looks:
     # of the time in the tunnel: 0 is when the tunnel appears, 1 when it ends.
     blend_start: 0.2
     blend_end: 0.55
-    shake_degrees: 6.0     # how far the tunnel sways at the end of the tunnel, in degrees
-    shake_speed: 1.5       # how fast it sways
+    camera:
+      # The same keys as hyperspace_camera. Between shake_start and
+      # shake_full, this shake gradually replaces the normal one, and it grows
+      # until the gravity well pulls the craft out. Then the camera jolts
+      # hard.
+      shake_degrees: 0.7
+      shake_speed: 0.7
+      shake_start: 0.18
+      shake_full: 1.0
+      kick_rate: 1.5
+      jolt_degrees: 4.0
+      jolt_delay: 0.1
+      jolt_time: 0.3
 point_lights:
   enabled: true
   cluster_depth_slices: 24

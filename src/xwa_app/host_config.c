@@ -4,6 +4,7 @@
 #include "aeron/log.h"
 #include "aeron/numeric.h"
 #include "xwa_runtime/config/modern_camera_options.h"
+#include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/config/modern_speed_effect_options.h"
 #include "xwa_runtime/config/modern_sun_options.h"
 #include "xwa_runtime/config/modern_target_readout_options.h"
@@ -358,6 +359,7 @@ static int host_config_option_sections(const AeronConfigFile* config, int requir
 									   size_t error_size) {
 	XwaOptionSection* const sections[] = {
 		XwaModernCameraOptions_Section(),
+		XwaModernCameraShakeOptions_Section(),
 		XwaModernSunOptions_Section(),
 		XwaModernSpeedEffectOptions_Section(),
 		XwaModernTargetReadoutOptions_Section(),

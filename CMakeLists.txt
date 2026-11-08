@@ -309,6 +309,7 @@ set(XWA_RUNTIME_SOURCES
 # sections (camera, sun, speed effect and target readout).
 set(XWA_INPUT_OPTIONS_SOURCES
     src/xwa_runtime/config/modern_camera_options.c
+    src/xwa_runtime/config/modern_camera_shake_options.c
     src/xwa_runtime/config/modern_input_options.c
     src/xwa_runtime/config/modern_speed_effect_options.c
     src/xwa_runtime/config/modern_sun_options.c
@@ -756,6 +757,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/camera/camera_motion.h
     src/xwa_runtime/camera/exterior_hud.h
     src/xwa_runtime/config/modern_camera_options.h
+    src/xwa_runtime/config/modern_camera_shake_options.h
     src/xwa_runtime/config/modern_input_options.h
     src/xwa_runtime/config/modern_controller_options_screen.h
     src/xwa_runtime/config/modern_input_options_screen.h

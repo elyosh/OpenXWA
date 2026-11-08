@@ -3,6 +3,7 @@
 #include "aeron/render.h"
 #include "xwa/assets/string_table.h"
 #include "xwa_runtime/config/modern_camera_options.h"
+#include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/config/modern_options_menu.h"
 #include "xwa_runtime/config/modern_target_readout_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
@@ -12,7 +13,7 @@
 
 int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	/* The rows under the title, Back included. */
-	enum { row_count = 13 };
+	enum { row_count = 14 };
 	static const char* const window_mode_texts[] = { "Windowed", "Fullscreen" };
 	static const char* const quality_texts[] = { "Off", "Low", "High" };
 	static const char* const shadow_quality_texts[] = { "Standard", "High" };
@@ -28,6 +29,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 													 "250 nits", "300 nits", "400 nits" };
 	XwaModernVideoOptions options;
 	XwaModernCameraOptions camera_options;
+	XwaModernCameraShakeOptions camera_shake_options;
 	XwaModernTargetReadoutOptions target_readout_options;
 	XwaModernOptionsMenu menu;
 	uint8_t window_mode;
@@ -43,6 +45,7 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	uint8_t sdr_gamma;
 	uint8_t paper_white;
 	uint8_t enhanced_camera;
+	uint8_t camera_shake;
 	uint8_t target_readout;
 	int hdr_rows_disabled;
 	int motion_blur_amount_changed;
@@ -68,6 +71,8 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	paper_white = (uint8_t)options.paper_white;
 	XwaModernCameraOptions_Get(&camera_options);
 	enhanced_camera = (uint8_t)(camera_options.enabled != 0);
+	XwaModernCameraShakeOptions_Get(&camera_shake_options);
+	camera_shake = (uint8_t)(camera_shake_options.enabled != 0);
 	XwaModernTargetReadoutOptions_Get(&target_readout_options);
 	target_readout = (uint8_t)(target_readout_options.enabled != 0);
 	changed = 0;
@@ -134,6 +139,11 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	if (XwaModernOptionsMenu_DrawCycleU8(&menu, &enhanced_camera, "Enhanced Camera", toggle_texts, 2, 70,
 										 0)) {
 		XwaOptionSection_SetEnabled(XwaModernCameraOptions_Section(), enhanced_camera);
+	}
+	/* The camera shake and jolt in hyperspace jumps.
+	   Like Enhanced Camera, it follows the mod until the player changes it. */
+	if (XwaModernOptionsMenu_DrawCycleU8(&menu, &camera_shake, "Camera Shake", toggle_texts, 2, 76, 0)) {
+		XwaOptionSection_SetEnabled(XwaModernCameraShakeOptions_Section(), camera_shake);
 	}
 	/* The target's name, cargo, distance and damage bars next to its box.
 	   Like Enhanced Camera, it follows the mod until the player changes it. */

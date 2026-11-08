@@ -27,6 +27,7 @@
 #include "xwa_runtime/camera/camera_motion.h"
 #include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
+#include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/config/modern_speed_effect_options.h"
 #include "xwa_runtime/config/modern_sun_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
@@ -183,6 +184,7 @@ int XwaPort_Init(void) {
 	XwaCameraMotion_Init();
 	XwaOptionSection_ReadMod(XwaModernSunOptions_Section(), XwaFlightConfig_Root());
 	XwaOptionSection_ReadMod(XwaModernSpeedEffectOptions_Section(), XwaFlightConfig_Root());
+	XwaOptionSection_ReadMod(XwaModernCameraShakeOptions_Section(), XwaFlightConfig_Root());
 	XwaCockpitAlertLights_Init();
 	XwaParticleLights_Init();
 	XwaModelSource_Init();

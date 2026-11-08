@@ -967,8 +967,8 @@ int FrontendMission_LoadCurrent(void) {
 		Aeron_LogError("xwa.frontend",
 					   "Cannot load current frontend mission: mission list for directory %d is missing",
 					   missionDirectoryId);
-		/* The original reads a missing list anyway and crashes. Stop with a
-		   message instead. */
+		/* The original game reads the missing list anyway and crashes. Show an
+		   error and quit instead. */
 		FrontendMission_ReportMissingMission(missionDirectoryId, 1);
 		return 0;
 #else
@@ -1007,9 +1007,10 @@ int FrontendMission_LoadCurrent(void) {
 					   g_pilotData.missionDescriptionIds[missionDirectoryId], missionDirectoryId);
 		/* This happens when the pilot file names a mission that the current
 		   mission.lst doesn't have, for example a pilot from the original game
-		   used with a mod that has other missions. The original reads past the
-		   end of the list. Callers still read the selected entry in this frame,
-		   so point it at a real entry, then stop with a message. */
+		   used with a mod that has other missions. The original game reads
+		   past the end of the list. Callers still read the selected entry in
+		   this frame, so point it at a real entry, then show an error and
+		   quit. */
 		g_selectedMissionListIndex = 0;
 		FrontendMission_ReportMissingMission(missionDirectoryId, 0);
 		return 0;

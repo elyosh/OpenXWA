@@ -7692,8 +7692,8 @@ int MissionSetup_Update(int frameCounter) {
 		g_pilotData.unk2 = 0;
 		FrontendMission_LoadCurrent();
 #ifdef XWA_MODERN
-		/* The pilot's mission is not in the mission list. The code below
-		   would read outside the list, and the game is quitting anyway. */
+		/* The pilot's mission couldn't be loaded, and the game is quitting.
+		   The code below would read outside the mission list. */
 		if (Aeron_FatalErrorRequested()) {
 			return 0;
 		}

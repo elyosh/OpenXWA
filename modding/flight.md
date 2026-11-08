@@ -42,6 +42,7 @@ sections:
 | `headlights` | a light on the nose of the player's craft |
 | `object_limits` | how many craft, shots, explosions and radar blips a mission can have |
 | `camera` | the lag and tilt of the exterior camera, the cockpit sway and the HUD in the exterior view |
+| `camera_shake` | the camera's shake and jolt in the player's hyperspace jumps |
 | `cockpit_alert_lights` | the blinking alert lights in the cockpit |
 | `particle_lights` | the lights of sparks, smoke and other effects on craft |
 | `backdrops` | extra planet backdrops for missions |
@@ -741,6 +742,26 @@ section has `enabled: false`. A missing key keeps its default.
 
 The player's choices win over the mod. If the player turns **Enhanced
 Camera** on or off in the options, that choice counts.
+
+### camera_shake
+
+The `camera_shake` section turns the camera shake of the player's
+hyperspace jumps on or off, in modern graphics. The camera shakes a little in
+the tunnel, and jolts when the craft comes out of hyperspace. A jump with the
+`interdiction` look shakes more and jolts harder (see
+[Missions](missions.md)).
+
+```yaml
+camera_shake:
+  enabled: false
+```
+
+| Key | Meaning | Range | Default |
+|-|-|-|-|
+| `enabled` | Turns the camera shake on. | `true` or `false` | `true` |
+
+Without the section, the camera shake is on. The player can turn it off with
+**Camera Shake** in the options. The player's choice wins over the mod.
 
 ### cockpit_alert_lights
 

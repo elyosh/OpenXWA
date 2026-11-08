@@ -294,12 +294,43 @@ void XwaRemasterFlight_GetHyperspaceJump(XwaFlightHyperspaceJumpParams* out);
 void XwaRemasterFlight_SetHyperspaceJump(const XwaFlightHyperspaceJumpParams* in);
 void XwaRemasterFlight_GetHyperspaceJumpDefault(XwaFlightHyperspaceJumpParams* out);
 
+/* The camera in the player's hyperspace jump (docs/hd_hyperspace_jump.md,
+ * Camera). The normal jump uses the `hyperspace_camera` section of
+ * remaster/config.yaml. A look has its own `camera` group. The look's shake
+ * gradually replaces the normal one between its shake_start and shake_full,
+ * and its jolt replaces the normal one. Fractions of the tunnel go from 0,
+ * when the tunnel appears, to 1, when it ends. */
+typedef struct XwaFlightHyperspaceCameraParams {
+	/* The camera shake in the tunnel. The cockpit moves with the camera.
+	   These are how far the camera turns at full strength, in degrees, how
+	   fast it shakes (1 is the normal speed), when the shake starts and when
+	   it reaches full strength. */
+	float shake_degrees;
+	float shake_speed;
+	float shake_start;
+	float shake_full;
+	/* The number of kicks per second. */
+	float kick_rate;
+	/* The jolt when the craft comes out of hyperspace. These are how far the
+	   camera turns at the jolt's peak, in degrees, how long after the start
+	   of the exit the jolt hits, and how fast it settles, in seconds. */
+	float jolt_degrees;
+	float jolt_delay;
+	float jolt_time;
+} XwaFlightHyperspaceCameraParams;
+
+void XwaRemasterFlight_GetHyperspaceCamera(XwaFlightHyperspaceCameraParams* out);
+void XwaRemasterFlight_SetHyperspaceCamera(const XwaFlightHyperspaceCameraParams* in);
+void XwaRemasterFlight_GetHyperspaceCameraDefault(XwaFlightHyperspaceCameraParams* out);
+
 /* Other looks of the player's jump, loaded from the `hyperspace_looks`
  * section of remaster/config.yaml and live-editable through the debug
  * inspector. A mission picks a look for jumps to a given region. In the
  * tunnel, the look's colours spread from the far end of the tunnel toward the
- * camera, behind an uneven glowing edge, and the tunnel sways. The exit uses
- * the look's colours, and the start of the jump looks normal. */
+ * camera, behind an uneven glowing edge. The exit uses the look's colours,
+ * and the start of the jump looks normal. In the tunnel, the look's camera
+ * shake gradually replaces the normal one. At the exit, its jolt replaces the
+ * normal one. */
 #define XWA_FLIGHT_HYPERSPACE_LOOKS_MAX 8
 #define XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX 32
 
@@ -327,10 +358,7 @@ typedef struct XwaFlightHyperspaceLookParams {
 	   when it ends. */
 	float blend_start;
 	float blend_end;
-	/* How far the tunnel sways at the end of the tunnel, in degrees, and how
-	   fast (1 is the normal speed). */
-	float shake_degrees;
-	float shake_speed;
+	XwaFlightHyperspaceCameraParams camera;
 } XwaFlightHyperspaceLookParams;
 
 int XwaRemasterFlight_HyperspaceLookCount(void);
@@ -359,8 +387,8 @@ float XwaRemasterFlight_GetHyperspacePreviewSpeed(void);
 void XwaRemasterFlight_SetHyperspacePreviewLook(int index);
 int XwaRemasterFlight_GetHyperspacePreviewLook(void);
 /* How far through the tunnel the tunnel preview is, from 0 to 1. That
-   preview never ends, so this sets how far the look has spread and how much
-   the tunnel sways. */
+   preview never ends, so this sets how far the look has spread and how strong
+   the camera shake is. */
 void XwaRemasterFlight_SetHyperspacePreviewLookBlend(float blend);
 float XwaRemasterFlight_GetHyperspacePreviewLookBlend(void);
 

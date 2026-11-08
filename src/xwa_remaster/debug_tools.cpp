@@ -616,6 +616,41 @@ static void xwa_tool_motion_blur(int* open, void* user) {
 
 /* ---- Hyperspace tunnel ---------------------------------------------- */
 
+/* The sliders of a hyperspace camera (hyperspace_camera, or a look's camera
+ * group). Returns true when one changed. */
+static bool xwa_hyperspace_camera_sliders(XwaFlightHyperspaceCameraParams* c) {
+	bool changed = false;
+	ImGui::TextDisabled("The camera and the cockpit shake together in the tunnel:");
+	changed |= ImGui::SliderFloat("Camera shake degrees", &c->shake_degrees, 0.0f, 10.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Camera shake speed", &c->shake_speed, 0.0f, 4.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Camera shake start", &c->shake_start, 0.0f, 1.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Camera shake full", &c->shake_full, 0.0f, 1.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Kicks per second", &c->kick_rate, 0.0f, 8.0f, "%.2f");
+	ImGui::TextDisabled("Start and full: when the shake starts and when it is at full strength, as\n"
+						"fractions of the time in the tunnel. Kicks go up to twice the shake degrees.");
+	ImGui::TextDisabled("The jolt when the craft comes out of hyperspace:");
+	changed |= ImGui::SliderFloat("Jolt degrees", &c->jolt_degrees, 0.0f, 20.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Jolt delay", &c->jolt_delay, 0.0f, 0.5f, "%.3f s");
+	changed |= ImGui::SliderFloat("Jolt time", &c->jolt_time, 0.05f, 0.8f, "%.3f s");
+	if (c->jolt_degrees > 0.0f && c->jolt_delay + 3.0f * c->jolt_time > 1.0f) {
+		ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f),
+						   "The exit ends 1 s after it starts, so the end of the jolt is cut short.");
+	}
+	return changed;
+}
+
+/* Writes the keys of a hyperspace camera, one per line, each line starting
+ * with `indent`. */
+static void xwa_hyperspace_camera_yaml(const XwaFlightHyperspaceCameraParams* c, const char* indent,
+									   char* out, size_t size) {
+	std::snprintf(out, size,
+				  "%sshake_degrees: %.4g\n%sshake_speed: %.4g\n%sshake_start: %.4g\n%sshake_full: %.4g\n"
+				  "%skick_rate: %.4g\n%sjolt_degrees: %.4g\n%sjolt_delay: %.4g\n%sjolt_time: %.4g\n",
+				  indent, (double)c->shake_degrees, indent, (double)c->shake_speed, indent,
+				  (double)c->shake_start, indent, (double)c->shake_full, indent, (double)c->kick_rate, indent,
+				  (double)c->jolt_degrees, indent, (double)c->jolt_delay, indent, (double)c->jolt_time);
+}
+
 static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 	(void)user;
 	ImGui::SetNextWindowSize(ImVec2(460, 760), ImGuiCond_FirstUseEver);
@@ -897,6 +932,39 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 	}
 
 	ImGui::Separator();
+	ImGui::TextUnformatted("Camera");
+	XwaFlightHyperspaceCameraParams camera;
+	XwaRemasterFlight_GetHyperspaceCamera(&camera);
+	ImGui::TextDisabled("The camera of the normal jump (hyperspace_camera). A look has its own\n"
+						"camera, below. The Camera Shake option turns all of it off.");
+	float tunnel_time = XwaRemasterFlight_GetHyperspacePreviewLookBlend();
+	if (ImGui::SliderFloat("Time in tunnel preview", &tunnel_time, 0.0f, 1.0f, "%.2f")) {
+		XwaRemasterFlight_SetHyperspacePreviewLookBlend(tunnel_time);
+	}
+	ImGui::TextDisabled("The jump cycle preview plays the whole jump, and shows the jolt. The tunnel\n"
+						"preview never ends, so this slider sets how far through the tunnel it shows,\n"
+						"from 0 (the tunnel appears) to 1 (it ends). That sets how strong the shake\n"
+						"is, and how far a look's colours have spread.");
+	ImGui::PushID("hyperspace_camera");
+	bool camera_changed = xwa_hyperspace_camera_sliders(&camera);
+	if (ImGui::Button("Reset camera to YAML defaults")) {
+		XwaRemasterFlight_GetHyperspaceCameraDefault(&camera);
+		camera_changed = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Copy camera YAML")) {
+		char keys[1024];
+		char yaml[1100];
+		xwa_hyperspace_camera_yaml(&camera, "  ", keys, sizeof keys);
+		std::snprintf(yaml, sizeof yaml, "hyperspace_camera:\n%s", keys);
+		ImGui::SetClipboardText(yaml);
+	}
+	ImGui::PopID();
+	if (camera_changed) {
+		XwaRemasterFlight_SetHyperspaceCamera(&camera);
+	}
+
+	ImGui::Separator();
 	ImGui::TextUnformatted("Looks");
 	const int look_count = XwaRemasterFlight_HyperspaceLookCount();
 	static int edited_look = 0;
@@ -918,14 +986,8 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 		if (ImGui::Checkbox("Preview this look", &preview_look)) {
 			XwaRemasterFlight_SetHyperspacePreviewLook(preview_look ? edited_look : -1);
 		}
-		float look_blend = XwaRemasterFlight_GetHyperspacePreviewLookBlend();
-		if (ImGui::SliderFloat("Time in tunnel preview", &look_blend, 0.0f, 1.0f, "%.2f")) {
-			XwaRemasterFlight_SetHyperspacePreviewLookBlend(look_blend);
-		}
-		ImGui::TextDisabled("The jump cycle preview plays the whole jump. The tunnel preview never ends, so\n"
-							"this slider sets how far through the tunnel it shows, from 0 (the tunnel\n"
-							"appears) to 1 (it ends). That sets how far the red has spread and how much\n"
-							"the tunnel shakes.");
+		ImGui::TextDisabled("Time in tunnel preview, under Camera, sets how far the look's colours have\n"
+							"spread in the tunnel preview.");
 
 		XwaFlightHyperspaceLookParams look;
 		XwaRemasterFlight_GetHyperspaceLook(edited_look, &look);
@@ -953,16 +1015,20 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 		look_changed |= ImGui::SliderFloat("Spread end", &look.blend_end, 0.0f, 1.0f, "%.2f");
 		ImGui::TextDisabled("When the red starts to spread and when it fills the tunnel, as fractions of\n"
 							"the time in the tunnel: 0 is when the tunnel appears, 1 when it ends.");
-		look_changed |= ImGui::SliderFloat("Shake degrees", &look.shake_degrees, 0.0f, 45.0f, "%.2f");
-		look_changed |= ImGui::SliderFloat("Shake speed", &look.shake_speed, 0.0f, 16.0f, "%.2f");
-		ImGui::TextDisabled("How far the tunnel sways at the end of the tunnel, and how fast.");
+		ImGui::TextDisabled("The look's camera. Its shake gradually replaces the normal one between its\n"
+							"start and full, and its jolt replaces the normal one:");
+		ImGui::PushID("look_camera");
+		look_changed |= xwa_hyperspace_camera_sliders(&look.camera);
+		ImGui::PopID();
 		if (ImGui::Button("Reset look to YAML defaults")) {
 			XwaRemasterFlight_GetHyperspaceLookDefault(edited_look, &look);
 			look_changed = true;
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Copy look YAML")) {
-			char yaml[2048];
+			char camera_keys[1024];
+			char yaml[3072];
+			xwa_hyperspace_camera_yaml(&look.camera, "      ", camera_keys, sizeof camera_keys);
 			std::snprintf(
 				yaml, sizeof yaml,
 				"  %s:\n"
@@ -995,8 +1061,8 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 				"      tail_color_b: %.4g\n"
 				"    blend_start: %.4g\n"
 				"    blend_end: %.4g\n"
-				"    shake_degrees: %.4g\n"
-				"    shake_speed: %.4g\n",
+				"    camera:\n"
+				"%s",
 				XwaRemasterFlight_HyperspaceLookName(edited_look), (double)look.dark_color[0],
 				(double)look.dark_color[1], (double)look.dark_color[2], (double)look.body_color[0],
 				(double)look.body_color[1], (double)look.body_color[2], (double)look.highlight_color[0],
@@ -1006,7 +1072,7 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 				(double)look.front_noise, (double)look.front_noise_scale, (double)look.front_warp,
 				(double)look.tint[0], (double)look.tint[1], (double)look.tint[2], (double)look.tail_color[0],
 				(double)look.tail_color[1], (double)look.tail_color[2], (double)look.blend_start,
-				(double)look.blend_end, (double)look.shake_degrees, (double)look.shake_speed);
+				(double)look.blend_end, camera_keys);
 			ImGui::SetClipboardText(yaml);
 		}
 		ImGui::TextDisabled("Copy writes the look's block of hyperspace_looks.");

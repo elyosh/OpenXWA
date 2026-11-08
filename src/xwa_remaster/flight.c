@@ -31,6 +31,7 @@
 #include "xwa_remaster/speed_effect.h"
 #include "xwa_remaster/suns.h"
 #include "xwa_remaster/xwa_remaster.h"
+#include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/presentation.h"
@@ -313,6 +314,8 @@ static struct {
 	XwaFlightHyperspaceTunnelParams hyperspace_params_default;
 	XwaFlightHyperspaceJumpParams hyperspace_jump;
 	XwaFlightHyperspaceJumpParams hyperspace_jump_default;
+	XwaFlightHyperspaceCameraParams hyperspace_camera;
+	XwaFlightHyperspaceCameraParams hyperspace_camera_default;
 	char hyperspace_look_names[XWA_FLIGHT_HYPERSPACE_LOOKS_MAX][XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX];
 	XwaFlightHyperspaceLookParams hyperspace_looks[XWA_FLIGHT_HYPERSPACE_LOOKS_MAX];
 	XwaFlightHyperspaceLookParams hyperspace_looks_default[XWA_FLIGHT_HYPERSPACE_LOOKS_MAX];
@@ -327,6 +330,11 @@ static struct {
 	 * was last advanced at. */
 	double hyperspace_preview_seconds;
 	uint64_t hyperspace_preview_host_us;
+	/* The camera rotation of the preview's last frame. The preview has no
+	 * previous snapshot to compute it from. */
+	float hyperspace_preview_rotation[9];
+	uint8_t hyperspace_preview_rotation_phase;
+	int hyperspace_preview_rotation_valid;
 	/* Set by the hyperspace scene: the exposure meter keeps its value. */
 	int exposure_hold;
 	/* The jump's entry or exit, drawn over the normal flight scene this
@@ -1027,6 +1035,87 @@ static int fl_look_color(const AeronConfigNode* look, const char* group, const c
 	return 1;
 }
 
+/* The keys of XwaFlightHyperspaceCameraParams and their ranges. */
+static const struct {
+	const char* key;
+	size_t offset;
+	float lo;
+	float hi;
+} fl_hyperspace_camera_keys[] = {
+	{ "shake_degrees", offsetof(XwaFlightHyperspaceCameraParams, shake_degrees), 0.0f, 10.0f },
+	{ "shake_speed", offsetof(XwaFlightHyperspaceCameraParams, shake_speed), 0.0f, 4.0f },
+	{ "shake_start", offsetof(XwaFlightHyperspaceCameraParams, shake_start), 0.0f, 1.0f },
+	{ "shake_full", offsetof(XwaFlightHyperspaceCameraParams, shake_full), 0.0f, 1.0f },
+	{ "kick_rate", offsetof(XwaFlightHyperspaceCameraParams, kick_rate), 0.0f, 8.0f },
+	{ "jolt_degrees", offsetof(XwaFlightHyperspaceCameraParams, jolt_degrees), 0.0f, 20.0f },
+	{ "jolt_delay", offsetof(XwaFlightHyperspaceCameraParams, jolt_delay), 0.0f, 0.5f },
+	{ "jolt_time", offsetof(XwaFlightHyperspaceCameraParams, jolt_time), 0.05f, 0.8f },
+};
+
+#define FL_HYPERSPACE_CAMERA_KEY_COUNT                                                                       \
+	(sizeof fl_hyperspace_camera_keys / sizeof fl_hyperspace_camera_keys[0])
+
+static float* fl_hyperspace_camera_field(XwaFlightHyperspaceCameraParams* p, size_t key) {
+	return (float*)((char*)p + fl_hyperspace_camera_keys[key].offset);
+}
+
+/* Reads the camera keys of `node` into `out`. `where` is the node's name in
+ * error messages, such as "hyperspace_camera". Logs an error and returns 0
+ * when a key is missing or out of range, or when shake_full is below
+ * shake_start. */
+static int fl_read_hyperspace_camera(const AeronConfigNode* node, const char* where, const char* config_path,
+									 XwaFlightHyperspaceCameraParams* out) {
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.remaster", "%s: %s must be a map", config_path, where);
+		return 0;
+	}
+	for (size_t i = 0; i < FL_HYPERSPACE_CAMERA_KEY_COUNT; i++) {
+		const AeronConfigNode* value_node = AeronConfigNode_MapGet(node, fl_hyperspace_camera_keys[i].key);
+		const AeronConfigNodeType type = AeronConfigNode_Type(value_node);
+		const double value = AeronConfigNode_Float(value_node, NAN);
+		const float lo = fl_hyperspace_camera_keys[i].lo;
+		const float hi = fl_hyperspace_camera_keys[i].hi;
+
+		if ((type != AERON_CONFIG_FLOAT && type != AERON_CONFIG_INT) || !isfinite(value) || value < lo ||
+			value > hi) {
+			Aeron_LogError("xwa.remaster", "%s: %s.%s must be a number from %g to %g", config_path, where,
+						   fl_hyperspace_camera_keys[i].key, (double)lo, (double)hi);
+			return 0;
+		}
+		*fl_hyperspace_camera_field(out, i) = (float)value;
+	}
+	if (out->shake_full < out->shake_start) {
+		Aeron_LogError("xwa.remaster", "%s: %s.shake_full must not be below shake_start", config_path, where);
+		return 0;
+	}
+	return 1;
+}
+
+/* Fixes the values of `p`. A value that isn't a number is replaced by its
+ * value in `d`, and the other values are clamped to their range. If
+ * shake_full is below shake_start, it is set to shake_start. */
+static void fl_sanitize_hyperspace_camera(XwaFlightHyperspaceCameraParams* p,
+										  const XwaFlightHyperspaceCameraParams* d) {
+	for (size_t i = 0; i < FL_HYPERSPACE_CAMERA_KEY_COUNT; i++) {
+		float* value = fl_hyperspace_camera_field(p, i);
+		*value = isfinite(*value)
+					 ? fl_clampf(*value, fl_hyperspace_camera_keys[i].lo, fl_hyperspace_camera_keys[i].hi)
+					 : *(const float*)((const char*)d + fl_hyperspace_camera_keys[i].offset);
+	}
+	if (p->shake_full < p->shake_start) {
+		p->shake_full = p->shake_start;
+	}
+}
+
+static int fl_load_hyperspace_camera_config(const AeronConfigFile* config, const char* config_path) {
+	if (!fl_read_hyperspace_camera(AeronConfigFile_GetNode(config, "hyperspace_camera"), "hyperspace_camera",
+								   config_path, &s.hyperspace_camera)) {
+		return 0;
+	}
+	s.hyperspace_camera_default = s.hyperspace_camera;
+	return 1;
+}
+
 static int fl_load_hyperspace_looks_config(const AeronConfigFile* config, const char* config_path) {
 	const AeronConfigNode* section = AeronConfigFile_GetNode(config, "hyperspace_looks");
 
@@ -1065,9 +1154,13 @@ static int fl_load_hyperspace_looks_config(const AeronConfigFile* config, const 
 			!fl_look_color(look, "jump", "tint", name, config_path, p->tint) ||
 			!fl_look_color(look, "jump", "tail_color", name, config_path, p->tail_color) ||
 			!fl_look_number(look, NULL, "blend_start", 0.0f, 1.0f, name, config_path, &p->blend_start) ||
-			!fl_look_number(look, NULL, "blend_end", 0.0f, 1.0f, name, config_path, &p->blend_end) ||
-			!fl_look_number(look, NULL, "shake_degrees", 0.0f, 45.0f, name, config_path, &p->shake_degrees) ||
-			!fl_look_number(look, NULL, "shake_speed", 0.0f, 16.0f, name, config_path, &p->shake_speed)) {
+			!fl_look_number(look, NULL, "blend_end", 0.0f, 1.0f, name, config_path, &p->blend_end)) {
+			return 0;
+		}
+		char camera_where[XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX + 32];
+		snprintf(camera_where, sizeof camera_where, "hyperspace_looks.%s.camera", name);
+		if (!fl_read_hyperspace_camera(AeronConfigNode_MapGet(look, "camera"), camera_where, config_path,
+									   &p->camera)) {
 			return 0;
 		}
 		if (p->blend_end < p->blend_start) {
@@ -1290,7 +1383,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	if (!fl_load_hyperspace_config(cf, path) || !fl_load_hyperspace_jump_config(cf, path) ||
-		!fl_load_hyperspace_looks_config(cf, path)) {
+		!fl_load_hyperspace_camera_config(cf, path) || !fl_load_hyperspace_looks_config(cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -2073,13 +2166,33 @@ void XwaRemasterFlight_SetHyperspaceLook(int index, const XwaFlightHyperspaceLoo
 	FL_LOOK_SANITIZE(front_warp, 0.0f, 4.0f);
 	FL_LOOK_SANITIZE(blend_start, 0.0f, 1.0f);
 	FL_LOOK_SANITIZE(blend_end, 0.0f, 1.0f);
-	FL_LOOK_SANITIZE(shake_degrees, 0.0f, 45.0f);
-	FL_LOOK_SANITIZE(shake_speed, 0.0f, 16.0f);
 #undef FL_LOOK_SANITIZE
 	if (p.blend_end < p.blend_start) {
 		p.blend_end = p.blend_start;
 	}
+	fl_sanitize_hyperspace_camera(&p.camera, &d->camera);
 	s.hyperspace_looks[index] = p;
+}
+
+void XwaRemasterFlight_GetHyperspaceCamera(XwaFlightHyperspaceCameraParams* out) {
+	if (out && fl_cfg_ensure()) {
+		*out = s.hyperspace_camera;
+	}
+}
+
+void XwaRemasterFlight_SetHyperspaceCamera(const XwaFlightHyperspaceCameraParams* in) {
+	if (!in || !fl_cfg_ensure()) {
+		return;
+	}
+	XwaFlightHyperspaceCameraParams p = *in;
+	fl_sanitize_hyperspace_camera(&p, &s.hyperspace_camera_default);
+	s.hyperspace_camera = p;
+}
+
+void XwaRemasterFlight_GetHyperspaceCameraDefault(XwaFlightHyperspaceCameraParams* out) {
+	if (out && fl_cfg_ensure()) {
+		*out = s.hyperspace_camera_default;
+	}
 }
 
 void XwaRemasterFlight_GetHyperspaceLookDefault(int index, XwaFlightHyperspaceLookParams* out) {
@@ -2378,8 +2491,11 @@ static void fl_quat_to_mat3(const float q[4], float m[9]) {
 	m[8] = 1.0f - 2.0f * (xx + yy);
 }
 
+/* If `view_rotation` isn't NULL, it turns the view: the eye-space
+ * coordinates of the built camera are `view_rotation` times those of `cam`.
+ * The hyperspace camera shake and jolt use it (fl_hyperspace_view_rotation). */
 static int fl_build_view_at_origin(const XwaFlightCamera* cam, const int32_t origin_world[3], int target_w,
-								   int target_h, XwaRemasterFlightView* out) {
+								   int target_h, const float view_rotation[9], XwaRemasterFlightView* out) {
 	if (!cam || !out || target_w <= 0 || target_h <= 0) {
 		return 0;
 	}
@@ -2417,7 +2533,19 @@ static int fl_build_view_at_origin(const XwaFlightCamera* cam, const int32_t ori
 	scene_camera->proj_x_offset = (cx - hw) / hw;
 	scene_camera->proj_y_offset = (hh - cy) / hh;
 	scene_camera->viewport = (AeronRectI) { 0, 0, target_w, target_h };
-	fl_rows_to_quat(cam->rows, scene_camera->ori);
+	if (view_rotation) {
+		float rows[9];
+		for (int row = 0; row < 3; row++) {
+			for (int column = 0; column < 3; column++) {
+				rows[row * 3 + column] = view_rotation[row * 3 + 0] * cam->rows[0 * 3 + column] +
+										 view_rotation[row * 3 + 1] * cam->rows[1 * 3 + column] +
+										 view_rotation[row * 3 + 2] * cam->rows[2 * 3 + column];
+			}
+		}
+		fl_rows_to_quat(rows, scene_camera->ori);
+	} else {
+		fl_rows_to_quat(cam->rows, scene_camera->ori);
+	}
 	out->viewport = scene_camera->viewport;
 	out->classic_pixel_scale = (float)target_h / source_h;
 	out->projection_pixel_scale = out->classic_pixel_scale / widen;
@@ -2427,7 +2555,7 @@ static int fl_build_view_at_origin(const XwaFlightCamera* cam, const int32_t ori
 
 int XwaRemasterFlight_BuildView(const XwaFlightCamera* cam, int target_w, int target_h,
 								XwaRemasterFlightView* out) {
-	return cam ? fl_build_view_at_origin(cam, cam->world_pos, target_w, target_h, out) : 0;
+	return cam ? fl_build_view_at_origin(cam, cam->world_pos, target_w, target_h, NULL, out) : 0;
 }
 
 int XwaRemasterFlight_ProjectLocal(const XwaRemasterFlightView* view, const float local[3], float* out_x,
@@ -5242,37 +5370,58 @@ static void fl_lerp3(float out[3], const float a[3], const float b[3], float w) 
 	}
 }
 
-/* Rotates `v`, a view-space direction, by `pitch` around the view's x axis,
- * then by `yaw` around its y axis, in radians. */
-static void fl_rotate_view_direction(float v[3], float pitch, float yaw) {
-	const float cp = cosf(pitch), sp = sinf(pitch), cy = cosf(yaw), sy = sinf(yaw);
-	const float y = v[1] * cp - v[2] * sp;
-	const float z = v[1] * sp + v[2] * cp;
-	const float x = v[0];
-	v[0] = x * cy + z * sy;
-	v[1] = y;
-	v[2] = -x * sy + z * cy;
+/* Returns the camera settings of the jump at `moment`: the look's settings
+ * if the jump has a look, otherwise the normal jump's. */
+static const XwaFlightHyperspaceCameraParams*
+fl_hyperspace_camera_for(const XwaRemasterHyperspaceMoment* moment) {
+	if (moment->look >= 0 && moment->look < s.hyperspace_look_count) {
+		return &s.hyperspace_looks[moment->look].camera;
+	}
+	return &s.hyperspace_camera;
 }
 
-/* Sets the effect's tunnel and streak settings for `moment`, with its look,
- * and sways `view` in the tunnel when the look asks for it. The entry keeps
- * the normal look. In the tunnel, the look spreads from the far end toward
- * the camera between blend_start and blend_end. The exit uses the look
- * fully. */
-static void fl_hyperspace_apply_look(const XwaRemasterHyperspaceMoment* moment,
-									 XwaRemasterHyperspaceTunnelView* view) {
+/* Returns 1 when the Camera Shake option (camera_shake) is on. */
+static int fl_hyperspace_camera_allowed(void) {
+	XwaModernCameraShakeOptions options;
+	XwaModernCameraShakeOptions_Get(&options);
+	return options.enabled != 0;
+}
+
+/* Returns how far through the tunnel `moment` is, from 0 to 1. The tunnel
+ * preview has no end, so the debug UI sets this value for it. */
+static float fl_hyperspace_tunnel_progress(const XwaRemasterHyperspaceMoment* moment) {
+	if (moment->tunnel_only) {
+		return s.hyperspace_preview_look_blend;
+	}
+	return moment->tunnel_ticks > 0.0f ? fl_clampf(moment->phase_ticks / moment->tunnel_ticks, 0.0f, 1.0f)
+									   : 0.0f;
+}
+
+/* Returns the strength of the shake at `progress`: 0 before `start`, 1 after
+ * `full`, and a straight line in between. */
+static float fl_hyperspace_camera_ramp(float start, float full, float progress) {
+	if (full <= start) {
+		return progress >= start ? 1.0f : 0.0f;
+	}
+	return fl_clampf((progress - start) / (full - start), 0.0f, 1.0f);
+}
+
+#define FL_DEGREES_TO_RADIANS (3.14159265f / 180.0f)
+#define FL_TWO_PI 6.28318531f
+
+/* Sets the effect's tunnel and streak settings for `moment`, with its look.
+ * The entry keeps the normal look. In the tunnel, the look spreads from the
+ * far end toward the camera between blend_start and blend_end. The exit uses
+ * the look fully. */
+static void fl_hyperspace_apply_look(const XwaRemasterHyperspaceMoment* moment) {
 	XwaFlightHyperspaceJumpParams jump = s.hyperspace_jump;
 	XwaRemasterHyperspaceFront front;
+	const float progress = fl_hyperspace_tunnel_progress(moment);
 
 	memset(&front, 0, sizeof front);
 
 	if (moment->look >= 0 && moment->look < s.hyperspace_look_count) {
 		const XwaFlightHyperspaceLookParams* look = &s.hyperspace_looks[moment->look];
-		/* The tunnel preview has no end, so the debug UI sets its progress. */
-		const float progress = moment->tunnel_only ? s.hyperspace_preview_look_blend
-							   : moment->tunnel_ticks > 0.0f
-								   ? fl_clampf(moment->phase_ticks / moment->tunnel_ticks, 0.0f, 1.0f)
-								   : 0.0f;
 		float weight = 0.0f;
 
 		if (moment->phase == XWA_HYPERSPACE_TUNNEL) {
@@ -5297,27 +5446,219 @@ static void fl_hyperspace_apply_look(const XwaRemasterHyperspaceMoment* moment,
 		}
 		fl_lerp3(jump.tint, jump.tint, look->tint, weight);
 		fl_lerp3(jump.tail_color, jump.tail_color, look->tail_color, weight);
-
-		if (moment->phase == XWA_HYPERSPACE_TUNNEL && look->shake_degrees > 0.0f && view) {
-			/* The sway starts a fifth of the way into the tunnel and grows until
-			   the tunnel ends. It is a slow sway with a small, fast tremble,
-			   mostly sideways. */
-			const float strength = fl_clampf((progress - 0.18f) / 0.82f, 0.0f, 1.0f);
-			const float amplitude = look->shake_degrees * strength * (3.14159265f / 180.0f);
-			const float seconds = moment->phase_ticks / 236.0f;
-			const float slow = look->shake_speed * 3.7f * seconds;
-			const float fast = 5.0f * slow;
-			const float pitch = amplitude * (-0.52f * cosf(slow) + 0.0725f * cosf(fast));
-			const float yaw = amplitude * (sinf(slow) + 0.0725f * sinf(fast));
-
-			fl_rotate_view_direction(view->right, pitch, yaw);
-			fl_rotate_view_direction(view->up, pitch, yaw);
-			fl_rotate_view_direction(view->forward, pitch, yaw);
-		}
 	}
 	XwaRemasterHyperspace_SetParams(s.hyperspace, &s.hyperspace_params);
 	XwaRemasterHyperspace_SetJumpParams(s.hyperspace, &jump);
 	XwaRemasterHyperspace_SetFront(s.hyperspace, &front);
+}
+
+/* ---- Hyperspace camera shake and jolt (docs/hd_hyperspace_jump.md, Camera)
+ * They depend only on the hyperspace moment and the settings, so the previous
+ * snapshot gives the previous frame's camera exactly. Angles are in radians:
+ * a positive pitch turns the view down, a positive yaw to the right and a
+ * positive roll clockwise. */
+
+static uint32_t fl_hash32(uint32_t x) {
+	x ^= x >> 16;
+	x *= 0x7feb352du;
+	x ^= x >> 15;
+	x *= 0x846ca68bu;
+	x ^= x >> 16;
+	return x;
+}
+
+/* Returns a pseudo-random number from 0 to 1 for `x`. */
+static float fl_hash_unit(uint32_t x) { return (float)(fl_hash32(x) >> 8) * (1.0f / 16777216.0f); }
+
+/* Writes a fast tremble at `seconds` to `out`, up to about 1 on each axis.
+ * Each axis is the sum of two sines at unrelated frequencies, and roll is
+ * half as strong. The seed picks the phases, so two jumps don't shake the
+ * same way. */
+static void fl_hyperspace_tremble(float seconds, float speed, uint32_t seed, float out[3]) {
+	static const float frequencies[3][2] = { { 7.3f, 11.9f }, { 6.1f, 13.7f }, { 4.3f, 9.1f } };
+	static const float weights[3] = { 1.0f, 1.0f, 0.5f };
+	for (int axis = 0; axis < 3; axis++) {
+		const float phase0 = fl_hash_unit(seed + 2u * (uint32_t)axis) * FL_TWO_PI;
+		const float phase1 = fl_hash_unit(seed + 2u * (uint32_t)axis + 1u) * FL_TWO_PI;
+		out[axis] =
+			weights[axis] * (0.6f * sinf(FL_TWO_PI * frequencies[axis][0] * speed * seconds + phase0) +
+							 0.4f * sinf(FL_TWO_PI * frequencies[axis][1] * speed * seconds + phase1));
+	}
+}
+
+/* How long a kick takes to reach its peak, and how long it can still be
+ * seen after it starts, in seconds. */
+#define FL_HYPERSPACE_KICK_RISE_S 0.08f
+#define FL_HYPERSPACE_KICK_LENGTH_S 0.5f
+
+/* Writes the kicks of the shake at `seconds` to `out`. Time is split into
+ * slots of 1 / `rate` seconds, with one kick in each slot. The seed and the
+ * slot number pick the kick's time and direction. A kick peaks at 1 after
+ * 80 ms and has almost faded after 0.4 s. */
+static void fl_hyperspace_kicks(float seconds, float rate, uint32_t seed, float out[3]) {
+	out[0] = out[1] = out[2] = 0.0f;
+	if (rate <= 0.0f || seconds <= 0.0f) {
+		return;
+	}
+	const int64_t last = (int64_t)floorf(seconds * rate);
+	int64_t first = (int64_t)floorf((seconds - FL_HYPERSPACE_KICK_LENGTH_S) * rate);
+	if (first < 0) {
+		first = 0;
+	}
+	for (int64_t slot = first; slot <= last; slot++) {
+		const uint32_t key = fl_hash32(seed ^ (uint32_t)slot * 0x9e3779b9u);
+		const float at = ((float)slot + 0.1f + 0.8f * fl_hash_unit(key)) / rate;
+		const float u = (seconds - at) / FL_HYPERSPACE_KICK_RISE_S;
+		if (u < 0.0f) {
+			continue;
+		}
+		const float shape = u * expf(1.0f - u);
+		const float pitch = fl_hash_unit(key + 1u) * 2.0f - 1.0f;
+		const float yaw = fl_hash_unit(key + 2u) * 2.0f - 1.0f;
+		const float roll = (fl_hash_unit(key + 3u) * 2.0f - 1.0f) * 0.5f;
+		const float length = sqrtf(pitch * pitch + yaw * yaw + roll * roll);
+		if (length < 1.0e-3f) {
+			continue;
+		}
+		out[0] += shape * pitch / length;
+		out[1] += shape * yaw / length;
+		out[2] += shape * roll / length;
+	}
+}
+
+/* Adds the camera shake of `camera` at `moment` to `out`, scaled by
+ * `weight`. The tremble goes up to shake_degrees, and the kicks up to twice
+ * that. */
+static void fl_hyperspace_add_shake(const XwaRemasterHyperspaceMoment* moment,
+									const XwaFlightHyperspaceCameraParams* camera, float weight,
+									float out[3]) {
+	const float amplitude = camera->shake_degrees * weight * FL_DEGREES_TO_RADIANS;
+	if (amplitude <= 0.0f) {
+		return;
+	}
+	const float seconds = moment->phase_ticks / 236.0f;
+	float tremble[3], kicks[3];
+	fl_hyperspace_tremble(seconds, camera->shake_speed, moment->seed, tremble);
+	fl_hyperspace_kicks(seconds, camera->kick_rate, moment->seed ^ 0x6a09e667u, kicks);
+	for (int axis = 0; axis < 3; axis++) {
+		out[axis] += amplitude * (tremble[axis] + 2.0f * kicks[axis]);
+	}
+}
+
+/* Writes the camera shake in the tunnel at `moment` to `out`. The normal
+ * jump's shake grows from its shake_start to its shake_full. With a look, the
+ * look's shake gradually replaces the normal one between the look's
+ * shake_start and shake_full, as the look's colours do. We mix the two
+ * shakes, not their speeds, so the tremble doesn't speed up or slow down. */
+static void fl_hyperspace_shake_angles(const XwaRemasterHyperspaceMoment* moment, float out[3]) {
+	const float progress = fl_hyperspace_tunnel_progress(moment);
+	const XwaFlightHyperspaceCameraParams* normal = &s.hyperspace_camera;
+	const XwaFlightHyperspaceCameraParams* look = fl_hyperspace_camera_for(moment);
+	const float look_weight =
+		look != normal ? fl_hyperspace_camera_ramp(look->shake_start, look->shake_full, progress) : 0.0f;
+	const float normal_weight = fl_hyperspace_camera_ramp(normal->shake_start, normal->shake_full, progress);
+
+	out[0] = out[1] = out[2] = 0.0f;
+	fl_hyperspace_add_shake(moment, normal, normal_weight * (1.0f - look_weight), out);
+	if (look != normal) {
+		fl_hyperspace_add_shake(moment, look, look_weight, out);
+	}
+}
+
+/* The jolt's swing frequency, and when the jolt fades out, in seconds from
+ * the start of the exit. The exit lasts 236 ticks (1 s). */
+#define FL_HYPERSPACE_JOLT_HZ 5.0f
+#define FL_HYPERSPACE_JOLT_FADE_START_S 0.7f
+#define FL_HYPERSPACE_JOLT_FADE_END_S 1.0f
+
+/* Writes the jolt at the exit at `moment` to `out`. The camera is kicked,
+ * mostly down, and swings back and forth like a struck spring until it
+ * settles. A small tremble fades out more slowly. The first swing is the
+ * largest and reaches jolt_degrees. The jolt is 0 before jolt_delay and at
+ * the end of the exit. */
+static void fl_hyperspace_jolt_angles(const XwaRemasterHyperspaceMoment* moment,
+									  const XwaFlightHyperspaceCameraParams* camera, float out[3]) {
+	out[0] = out[1] = out[2] = 0.0f;
+	const float amplitude = camera->jolt_degrees * FL_DEGREES_TO_RADIANS;
+	const float seconds = moment->phase_ticks / 236.0f;
+	const float u = seconds - camera->jolt_delay;
+	if (amplitude <= 0.0f || u <= 0.0f) {
+		return;
+	}
+	const float fade =
+		1.0f - fl_smoothstep(FL_HYPERSPACE_JOLT_FADE_START_S, FL_HYPERSPACE_JOLT_FADE_END_S, seconds);
+	const float omega = FL_TWO_PI * FL_HYPERSPACE_JOLT_HZ;
+	/* exp(-u / time) * sin(omega * u) peaks at u = atan(omega * time) / omega.
+	   Dividing by that peak makes the first swing reach jolt_degrees. */
+	const float peak_u = atanf(omega * camera->jolt_time) / omega;
+	const float peak = expf(-peak_u / camera->jolt_time) * sinf(omega * peak_u);
+	const float decay = expf(-u / camera->jolt_time);
+	const float kick = amplitude * fade * decay / peak;
+	const float swing = omega * u;
+	const float roll_sign = (moment->seed & 1u) ? 1.0f : -1.0f;
+	const float yaw_sign = (moment->seed & 2u) ? 1.0f : -1.0f;
+	float tremble[3];
+
+	fl_hyperspace_tremble(seconds, 1.0f, moment->seed, tremble);
+	/* The tremble fades in over 50 ms, so the camera doesn't jump when the
+	   jolt starts. */
+	const float shiver =
+		0.3f * amplitude * fade * fl_clampf(u / 0.05f, 0.0f, 1.0f) * expf(-u / (2.0f * camera->jolt_time));
+	out[0] = kick * sinf(swing) + shiver * tremble[0];
+	out[1] = kick * 0.2f * yaw_sign * sinf(swing * 0.9f) + shiver * tremble[1];
+	out[2] = kick * 0.35f * roll_sign * sinf(swing * 1.1f) + shiver * tremble[2];
+}
+
+/* Multiplies two 3x3 row-major matrices: out = a * b. `out` may not be `a`
+ * or `b`. */
+static void fl_mat3_mul(const float a[9], const float b[9], float out[9]) {
+	for (int row = 0; row < 3; row++) {
+		for (int column = 0; column < 3; column++) {
+			out[row * 3 + column] = a[row * 3 + 0] * b[0 * 3 + column] + a[row * 3 + 1] * b[1 * 3 + column] +
+									a[row * 3 + 2] * b[2 * 3 + column];
+		}
+	}
+}
+
+/* The view rotation of the hyperspace camera at `moment`, for
+ * fl_build_view_at_origin: the shake in the tunnel and the jolt at the exit.
+ * Writes the identity and returns 0 when there is none. */
+static int fl_hyperspace_view_rotation(const XwaRemasterHyperspaceMoment* moment, float out[9]) {
+	static const float identity[9] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+	float angles[3] = { 0.0f, 0.0f, 0.0f };
+
+	memcpy(out, identity, sizeof identity);
+	if (!fl_hyperspace_camera_allowed()) {
+		return 0;
+	}
+	const XwaFlightHyperspaceCameraParams* camera = fl_hyperspace_camera_for(moment);
+	if (moment->phase == XWA_HYPERSPACE_TUNNEL) {
+		fl_hyperspace_shake_angles(moment, angles);
+	} else if (moment->phase == XWA_HYPERSPACE_INBOUND) {
+		fl_hyperspace_jolt_angles(moment, camera, angles);
+	}
+	if (angles[0] == 0.0f && angles[1] == 0.0f && angles[2] == 0.0f) {
+		return 0;
+	}
+
+	/* The camera's axes, in the eye space of the steady camera (x right, y
+	   down, z forward), turn by C = pitch * yaw * roll. The eye-space
+	   coordinates of the turned camera are C^T times the steady ones. */
+	const float cp = cosf(angles[0]), sp = sinf(angles[0]);
+	const float cy = cosf(angles[1]), sy = sinf(angles[1]);
+	const float cr = cosf(angles[2]), sr = sinf(angles[2]);
+	const float pitch[9] = { 1.0f, 0.0f, 0.0f, 0.0f, cp, sp, 0.0f, -sp, cp };
+	const float yaw[9] = { cy, 0.0f, sy, 0.0f, 1.0f, 0.0f, -sy, 0.0f, cy };
+	const float roll[9] = { cr, -sr, 0.0f, sr, cr, 0.0f, 0.0f, 0.0f, 1.0f };
+	float pitch_yaw[9], turn[9];
+	fl_mat3_mul(pitch, yaw, pitch_yaw);
+	fl_mat3_mul(pitch_yaw, roll, turn);
+	for (int row = 0; row < 3; row++) {
+		for (int column = 0; column < 3; column++) {
+			out[row * 3 + column] = turn[column * 3 + row];
+		}
+	}
+	return 1;
 }
 
 /* The largest distance from the camera to any point of a model whose origin
@@ -5375,7 +5716,7 @@ static int fl_prepare_world_hyperspace(AeronCommandBuffer* cmd, const XwaSnapsho
 		render_w = s.rt_w;
 		render_h = s.rt_h;
 	}
-	fl_hyperspace_apply_look(&s.hyperspace_world_moment, &tunnel_view);
+	fl_hyperspace_apply_look(&s.hyperspace_world_moment);
 	if (!XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, render_w, render_h, &s.hyperspace_world_moment,
 									   &tunnel_view, 1)) {
 		return 0;
@@ -5519,7 +5860,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 		render_h = s.rt_h;
 	}
 	if (s.hyperspace) {
-		fl_hyperspace_apply_look(moment, &tunnel_view);
+		fl_hyperspace_apply_look(moment);
 	}
 	if (!s.hyperspace || !XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, render_w, render_h, moment,
 														&tunnel_view, 0)) {
@@ -6238,8 +6579,54 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	if (!fl_ensure(target_w, target_h)) {
 		return NULL;
 	}
+	const uint64_t host_time_us = XwaTime_GetElapsedUs();
+	/* Get the hyperspace moment first, because its camera shake or jolt turns
+	 * the view that everything else uses. The map view doesn't shake. */
+	XwaRemasterHyperspaceMoment hyperspace_moment;
+	int hyperspace = 0;
+	if (!cam->map_mode) {
+		if (cam->hyperspace_phase) {
+			hyperspace = fl_real_hyperspace_moment(snap, &hyperspace_moment);
+		} else if (s.hyperspace_preview != XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF) {
+			hyperspace = fl_preview_hyperspace_moment(snap, host_time_us, &hyperspace_moment);
+		}
+	}
+	float view_rotation[9];
+	const int view_rotated = hyperspace && fl_hyperspace_view_rotation(&hyperspace_moment, view_rotation);
+	/* The previous frame's rotation, for motion vectors. In a real jump, it is
+	 * computed from the previous snapshot. The preview runs on its own clock,
+	 * so it keeps the rotation of its last frame. When the preview's phase
+	 * changes, the previous rotation is set to the current one, so the cut
+	 * doesn't show up as camera motion. */
+	float previous_view_rotation[9];
+	const float* previous_rotation = NULL;
+	int preview_rotation_changed = 0;
+	const XwaSnapshot* prev = XwaSnapshot_Previous();
+	if (hyperspace && !cam->hyperspace_phase) {
+		if (s.hyperspace_preview_rotation_valid &&
+			s.hyperspace_preview_rotation_phase == hyperspace_moment.phase) {
+			memcpy(previous_view_rotation, s.hyperspace_preview_rotation, sizeof previous_view_rotation);
+		} else {
+			memcpy(previous_view_rotation, view_rotation, sizeof previous_view_rotation);
+		}
+		previous_rotation = previous_view_rotation;
+		preview_rotation_changed = memcmp(previous_view_rotation, view_rotation, sizeof view_rotation) != 0;
+		memcpy(s.hyperspace_preview_rotation, view_rotation, sizeof view_rotation);
+		s.hyperspace_preview_rotation_phase = hyperspace_moment.phase;
+		s.hyperspace_preview_rotation_valid = 1;
+	} else {
+		s.hyperspace_preview_rotation_valid = 0;
+		XwaRemasterHyperspaceMoment previous_moment;
+		if (prev && prev->flight_camera_valid && prev->flight_camera.hyperspace_phase &&
+			!prev->flight_camera.map_mode && fl_real_hyperspace_moment(prev, &previous_moment) &&
+			fl_hyperspace_view_rotation(&previous_moment, previous_view_rotation)) {
+			previous_rotation = previous_view_rotation;
+		}
+	}
+
 	XwaRemasterFlightView flight_view;
-	if (!XwaRemasterFlight_BuildView(cam, s.rt_w, s.rt_h, &flight_view)) {
+	if (!fl_build_view_at_origin(cam, cam->world_pos, s.rt_w, s.rt_h, view_rotated ? view_rotation : NULL,
+								 &flight_view)) {
 		return NULL;
 	}
 	memcpy(s.origin_world, flight_view.origin_world, sizeof s.origin_world);
@@ -6254,7 +6641,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	XwaRemasterHud_PrepareFrame(cmd, snap, assets, &flight_view, s.rt_w, s.rt_h);
 	XwaRemasterDc_Prepare(cmd, snap, s.rt_w, s.rt_h);
 	fl_quat_to_mat3(flight_view.camera.ori, s.crows);
-	const uint64_t host_time_us = XwaTime_GetElapsedUs();
 	if (cam->map_mode) {
 		s.suppress_hud = 0;
 		return fl_render_map(cmd, snap, assets, &flight_view, host_time_us, direct_present);
@@ -6266,13 +6652,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	s.exposure_hold = 0;
 	s.hyperspace_world_pending = 0;
 	s.hyperspace_in_world = 0;
-	XwaRemasterHyperspaceMoment hyperspace_moment;
-	int hyperspace = 0;
-	if (cam->hyperspace_phase) {
-		hyperspace = fl_real_hyperspace_moment(snap, &hyperspace_moment);
-	} else if (s.hyperspace_preview != XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF) {
-		hyperspace = fl_preview_hyperspace_moment(snap, host_time_us, &hyperspace_moment);
-	}
 	/* The tunnel has its own scene. The entry and the exit are drawn over the
 	 * normal flight scene, so it stays on screen until the white-out covers
 	 * it and comes back as the white fades. */
@@ -6300,7 +6679,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * teleported / the scene was re-entered and any velocity would be a
 	 * garbage smear, so prev falls back to curr (zero velocity, held
 	 * buffer invalidated via NULL prev_view_proj). */
-	const XwaSnapshot* prev = XwaSnapshot_Previous();
 	XwaRemasterFlightView previous_flight_view;
 	const int mb_on = s.mb_quality > 0 || s.fsr_mode != AERON_TEMPORAL_OFF;
 	s.mb_enabled = 0;
@@ -6311,14 +6689,15 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		if (pc->region == cam->region && pc->hyperspace_phase != XWA_HYPERSPACE_TUNNEL && !pc->map_mode &&
 			pc->in_hangar == cam->in_hangar && pc->external == cam->external &&
 			pc->film_overlay == cam->film_overlay && snap->game_time_ticks >= prev->game_time_ticks) {
-			fl_build_view_at_origin(pc, s.origin_world, s.rt_w, s.rt_h, &previous_flight_view);
+			fl_build_view_at_origin(pc, s.origin_world, s.rt_w, s.rt_h, previous_rotation,
+									&previous_flight_view);
 			memcpy(s.mb_prev_vp, previous_flight_view.view_proj, sizeof s.mb_prev_vp);
 			s.mb_enabled = 1;
 			/* Hold velocity while a paused snapshot is truly unchanged. Camera
 			 * panning and cockpit articulation can still change with frozen sim
 			 * time, and must regenerate velocity for both temporal consumers. */
 			paused = snap->game_time_ticks == prev->game_time_ticks;
-			mb_regen = !paused || fl_temporal_pose_changed(snap, prev);
+			mb_regen = !paused || fl_temporal_pose_changed(snap, prev) || preview_rotation_changed;
 			/* Prev lookup by stable identity: objectSignature is unique
 			 * per spawn (slot reuse bumps it), so signature + slot pins
 			 * the same live object across the pair. */
