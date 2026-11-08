@@ -5042,9 +5042,10 @@ static void fl_add_ambient_cube(XwaShipAmbientCube* base, const XwaShipAmbientCu
 	}
 }
 
-/* During the jump's entry and exit, the scene warp leaves everything nearer
- * than this as it is, and draws the streaks and the tunnel's fades over
- * everything farther: in cockpit views, only the cockpit stays. */
+/* During the jump's entry and exit, the scene warp doesn't touch anything
+ * nearer than the keep distance, and draws the streaks and the tunnel's
+ * fades over everything farther. This is the smallest keep distance, which
+ * covers the cockpit. It grows to cover the whole player craft. */
 #define FL_HYPERSPACE_KEEP_DISTANCE_M 5.0f
 
 /* The game's hyperspace light pulses (slots 3 to 5: outbound, tunnel,
@@ -5052,10 +5053,29 @@ static void fl_add_ambient_cube(XwaShipAmbientCube* base, const XwaShipAmbientCu
  * streaks' light. */
 #define FL_HYPERSPACE_PULSE_MASK ((1u << 3) | (1u << 4) | (1u << 5))
 
+/* The largest distance from the camera to any point of a model whose origin
+ * is at `origin` (camera-local, OPT units): the distance to the origin plus
+ * the distance from the origin to the farthest corner of the model's bounds,
+ * which are in meters. Returns 0 without a model. */
+static float fl_max_camera_distance_to_model(const AeronSceneMesh* mesh, const float origin[3]) {
+	if (!mesh) {
+		return 0.0f;
+	}
+	float corner = 0.0f, offset = 0.0f;
+	for (int axis = 0; axis < 3; axis++) {
+		const float c = fmaxf(fabsf(mesh->bound_min[axis]), fabsf(mesh->bound_max[axis]));
+		const float d = origin[axis] - s.camera_local[axis];
+		corner += c * c;
+		offset += d * d;
+	}
+	return sqrtf(offset) + sqrtf(corner) * AERON_OPT_UNITS_PER_METER;
+}
+
 /* Prepares the jump's entry or exit over the normal flight scene. Returns 0
  * when it draws nothing this frame. */
 static int fl_prepare_world_hyperspace(AeronCommandBuffer* cmd, const XwaSnapshot* snap,
-									   const XwaRemasterFlightView* flight_view) {
+									   const XwaRemasterFlightView* flight_view,
+									   const XwaFlightObject* cockpit_anchor) {
 	if (!s.hyperspace_world_pending || !s.hyperspace) {
 		return 0;
 	}
@@ -5066,22 +5086,21 @@ static int fl_prepare_world_hyperspace(AeronCommandBuffer* cmd, const XwaSnapsho
 						&player_found);
 	XwaRemasterHyperspaceTunnelView tunnel_view;
 	fl_hyper_build_tunnel_view(&flight_view->camera, player_bw, player_found, &tunnel_view);
-	/* The keep distance: in external views, out to the far side of the
-	 * player's craft, so the craft stays in place. */
+	/* The keep distance reaches past the far side of the player's craft and,
+	 * in cockpit views, of the cockpit model, so they stay in place. */
 	float keep_distance = FL_HYPERSPACE_KEEP_DISTANCE_M * AERON_OPT_UNITS_PER_METER;
-	if (snap->flight_camera.external && player_found && player_f) {
+	if (player_found && player_f) {
 		const AeronSceneMesh* mesh = XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(player_f->object_type));
-		float radius = 0.0f;
-		if (mesh) {
-			const float dx = mesh->bound_max[0] - mesh->bound_min[0];
-			const float dy = mesh->bound_max[1] - mesh->bound_min[1];
-			const float dz = mesh->bound_max[2] - mesh->bound_min[2];
-			radius = 0.5f * sqrtf(dx * dx + dy * dy + dz * dz);
+		keep_distance = fmaxf(keep_distance, fl_max_camera_distance_to_model(mesh, player_local));
+	}
+	if (fl_cockpit_drawn(snap, &snap->flight_camera) && cockpit_anchor) {
+		const AeronSceneMesh* mesh = XwaRemasterShip_MeshForName(snap->cockpit.model_name);
+		float m[16];
+		if (mesh && fl_cockpit_model_matrix(&snap->cockpit, snap->flight_camera.sway, cockpit_anchor, s.crows,
+											s.camera_local, m)) {
+			const float origin[3] = { m[3], m[7], m[11] };
+			keep_distance = fmaxf(keep_distance, fl_max_camera_distance_to_model(mesh, origin));
 		}
-		const float dx = player_local[0] - s.camera_local[0];
-		const float dy = player_local[1] - s.camera_local[1];
-		const float dz = player_local[2] - s.camera_local[2];
-		keep_distance = fmaxf(keep_distance, sqrtf(dx * dx + dy * dy + dz * dz) + radius);
 	}
 	int render_w = 0, render_h = 0;
 	AeronScene_RenderDims(s.scene, &render_w, &render_h);
@@ -6183,7 +6202,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	fl_set_temporal(host_time_us, 1);
 	fl_set_animation_time(snap);
 	/* Before the scene begins: it sets the exposure hold. */
-	s.hyperspace_in_world = fl_prepare_world_hyperspace(cmd, snap, &flight_view);
+	s.hyperspace_in_world = fl_prepare_world_hyperspace(cmd, snap, &flight_view, cockpit_anchor);
 	if (!fl_begin_scene(&flight_view.camera)) {
 		Aeron_CommandBufferSetFailure(cmd, "Flight scene initialization failed");
 		s.snap = NULL;
