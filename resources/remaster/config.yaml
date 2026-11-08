@@ -420,6 +420,7 @@ hyperspace_jump:
   warp_reveal_softness: 1.0   # width of the black's soft edge, as a share of the distance to the farthest corner
   warp_taps: 24               # samples per pixel along the world's walk
   warp_sky_taps: 8            # samples per pixel in each of the three sky passes
+  warp_sky_half_resolution: true # the sky passes run at half the output resolution
 point_lights:
   enabled: true
   cluster_depth_slices: 24

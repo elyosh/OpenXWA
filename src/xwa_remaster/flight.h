@@ -282,6 +282,8 @@ typedef struct XwaFlightHyperspaceJumpParams {
 	float warp_reveal_softness;
 	int warp_taps;
 	int warp_sky_taps;
+	/* 1: the sky passes run at half the output resolution. */
+	int warp_sky_half_resolution;
 	/* 0: the exit plays the entry backward. 1: the exit carries on forward,
 	   so the streaks shrink toward the camera and the scene comes in toward
 	   it. */

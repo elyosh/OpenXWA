@@ -142,12 +142,14 @@ struct XwaRemasterHyperspace {
 	AeronGraphicsPipeline* layer_tunnel_pipeline;
 	AeronGraphicsPipeline* warp_sky_pipeline;
 	AeronGraphicsPipeline* warp_pipeline;
-	/* The layer at render size; two output-size targets that the sky passes
-	 * go back and forth between, and that the composite writes into. */
+	/* The layer at render size. Two output-size targets: the composite
+	 * writes into one, and at full resolution the sky passes go back and
+	 * forth between them. At half resolution the sky passes use their own
+	 * two targets, and the second output-size target isn't needed. */
 	AeronRenderTarget* layer_rt;
 	AeronRenderTarget* warp_rt[2];
+	AeronRenderTarget* sky_rt[2];
 	int layer_w, layer_h;
-	int warp_w, warp_h;
 	AeronSampler* point_sampler;
 	AeronComputePipeline* environment_pipeline;
 	AeronTexture* environment_atlas;
@@ -268,12 +270,42 @@ static void hyper_release_warp_targets(XwaRemasterHyperspace* h) {
 		if (h->warp_rt[i])
 			Aeron_DestroyRenderTarget(h->warp_rt[i]);
 		h->warp_rt[i] = NULL;
+		if (h->sky_rt[i])
+			Aeron_DestroyRenderTarget(h->sky_rt[i]);
+		h->sky_rt[i] = NULL;
 	}
-	h->warp_w = h->warp_h = 0;
 }
 
-/* The layer at render size and the warp targets at output size, made at the
- * first jump and remade when a size changes. */
+/* Makes `*target` an RGBA16F target of `width` x `height`, and remakes it
+ * when its size changed. */
+static int hyper_ensure_target(AeronRenderTarget** target, int width, int height, const char* name) {
+	if (*target) {
+		const AeronTexture* texture = Aeron_RenderTargetGetTexture(*target);
+		if (texture && Aeron_TextureGetWidth(texture) == width && Aeron_TextureGetHeight(texture) == height) {
+			return 1;
+		}
+		Aeron_DestroyRenderTarget(*target);
+	}
+	*target = Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) {
+		.width = width,
+		.height = height,
+		.format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
+		.debug_name = name,
+	});
+	return *target != NULL;
+}
+
+/* The size of the sky passes' targets: the output size, or half of it. */
+static void hyper_sky_size(const XwaRemasterHyperspace* h, int output_w, int output_h, int* sky_w,
+						   int* sky_h) {
+	const int half = h->jump.warp_sky_half_resolution;
+	*sky_w = half ? (output_w + 1) / 2 : output_w;
+	*sky_h = half ? (output_h + 1) / 2 : output_h;
+}
+
+/* The layer at render size, the warp targets at output size and, at half
+ * resolution, the sky passes' targets. Made at the first jump and remade
+ * when a size changes. */
 static int hyper_ensure_warp_targets(XwaRemasterHyperspace* h, int render_w, int render_h, int output_w,
 									 int output_h) {
 	if (!h->layer_rt || h->layer_w != render_w || h->layer_h != render_h) {
@@ -288,24 +320,16 @@ static int hyper_ensure_warp_targets(XwaRemasterHyperspace* h, int render_w, int
 		h->layer_w = h->layer_rt ? render_w : 0;
 		h->layer_h = h->layer_rt ? render_h : 0;
 	}
-	if (!h->warp_rt[0] || !h->warp_rt[1] || h->warp_w != output_w || h->warp_h != output_h) {
-		static const char* const names[2] = { "xwa.hyperspace.warp_a", "xwa.hyperspace.warp_b" };
-		int ok = 1;
-		for (int i = 0; i < 2; i++) {
-			if (h->warp_rt[i])
-				Aeron_DestroyRenderTarget(h->warp_rt[i]);
-			h->warp_rt[i] = Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) {
-				.width = output_w,
-				.height = output_h,
-				.format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
-				.debug_name = names[i],
-			});
-			ok = ok && h->warp_rt[i];
-		}
-		h->warp_w = ok ? output_w : 0;
-		h->warp_h = ok ? output_h : 0;
+	if (!h->layer_rt || !hyper_ensure_target(&h->warp_rt[0], output_w, output_h, "xwa.hyperspace.warp_a")) {
+		return 0;
 	}
-	return h->layer_rt && h->warp_rt[0] && h->warp_rt[1];
+	if (!h->jump.warp_sky_half_resolution) {
+		return hyper_ensure_target(&h->warp_rt[1], output_w, output_h, "xwa.hyperspace.warp_b");
+	}
+	int sky_w, sky_h;
+	hyper_sky_size(h, output_w, output_h, &sky_w, &sky_h);
+	return hyper_ensure_target(&h->sky_rt[0], sky_w, sky_h, "xwa.hyperspace.sky_a") &&
+		   hyper_ensure_target(&h->sky_rt[1], sky_w, sky_h, "xwa.hyperspace.sky_b");
 }
 
 XwaRemasterHyperspace* XwaRemasterHyperspace_Create(const XwaFlightHyperspaceTunnelParams* tunnel,
@@ -1006,7 +1030,7 @@ static void hyper_cube_rows(const float view_to_cube[9], float rows[3][4]) {
  * cubes, and only in HYPER_WARP_ARRIVE. */
 static void hyper_set_sky_cube_uniform(HyperWarpSkyUniform* u, const XwaRemasterHyperspaceTunnelView* view,
 									   const XwaRemasterHyperspaceWarpInput* in, HyperWarpMotion motion,
-									   float log_zoom) {
+									   float log_zoom, int sky_h) {
 	u->projection[0] = view->tan_half_fov_x;
 	u->projection[1] = view->tan_half_fov_y;
 	u->projection[2] = view->proj_offset_x;
@@ -1022,7 +1046,7 @@ static void hyper_set_sky_cube_uniform(HyperWarpSkyUniform* u, const XwaRemaster
 	u->cube[0] = in->sky_scale;
 	/* Cube texels per pixel at zoom 1: a pixel spans 2 tan(half-FOV) /
 	 * height in tangent units, and a texel 2 / face size. */
-	const float texels_per_px = view->tan_half_fov_y / (float)in->output_h;
+	const float texels_per_px = view->tan_half_fov_y / (float)sky_h;
 	u->cube_level[0] = (float)Aeron_TextureGetWidth(in->sky_cube) * texels_per_px;
 	u->cube_level[1] = (float)in->sky_max_level;
 	hyper_cube_rows(in->sky_view_to_cube, u->sky_rows);
@@ -1035,13 +1059,18 @@ static void hyper_set_sky_cube_uniform(HyperWarpSkyUniform* u, const XwaRemaster
 }
 
 /* The sky passes: the zoom's log span, from the smear's old end to the
- * current zoom, split into taps^3 evenly spaced samples. Returns the target
- * holding the warped sky, or NULL on failure. */
+ * current zoom, split into taps^3 evenly spaced samples. They run at the
+ * size of hyper_sky_size, with the vanishing point at that size. Returns the
+ * target holding the warped sky, or NULL on failure. */
 static AeronRenderTarget* hyper_warp_sky(XwaRemasterHyperspace* h, AeronCommandBuffer* cmd,
 										 const XwaRemasterHyperspaceWarpInput* in, HyperWarpMotion motion,
-										 const float vanishing[4], const float reveal[4]) {
+										 const float reveal[4]) {
 	const XwaFlightHyperspaceJumpParams* jump = &h->jump;
 	const int taps = jump->warp_sky_taps;
+	int sky_w, sky_h;
+	hyper_sky_size(h, in->output_w, in->output_h, &sky_w, &sky_h);
+	float vanishing[4];
+	hyper_warp_vanishing(&h->warp_view, sky_w, sky_h, vanishing);
 	/* The zoom fades out in views that don't face the direction of travel.
 	 * In a forward exit the sky starts shrunk and grows back to its size;
 	 * with trails only it keeps its size, and the smear reaches back to
@@ -1055,14 +1084,15 @@ static AeronRenderTarget* hyper_warp_sky(XwaRemasterHyperspace* h, AeronCommandB
 		step /= (float)taps;
 	}
 	const float radiance = XwaRemaster_ClassicRadiance();
-	AeronRenderTarget* const targets[HYPER_WARP_SKY_PASSES] = { h->warp_rt[0], h->warp_rt[1], h->warp_rt[0] };
+	AeronRenderTarget* const* pair = jump->warp_sky_half_resolution ? h->sky_rt : h->warp_rt;
+	AeronRenderTarget* const targets[HYPER_WARP_SKY_PASSES] = { pair[0], pair[1], pair[0] };
 	static const char* const labels[HYPER_WARP_SKY_PASSES] = { "Hyperspace sky warp 1", "Hyperspace sky warp 2",
 																"Hyperspace sky warp 3" };
 	AeronTexture* source = in->scene;
 	for (int pass = 0; pass < HYPER_WARP_SKY_PASSES; pass++) {
 		HyperWarpSkyUniform u;
 		memset(&u, 0, sizeof u);
-		hyper_size_uniform(u.size, in->output_w, in->output_h);
+		hyper_size_uniform(u.size, sky_w, sky_h);
 		memcpy(u.vanishing, vanishing, sizeof u.vanishing);
 		u.reveal[0] = reveal[0];
 		u.reveal[1] = reveal[1];
@@ -1075,7 +1105,7 @@ static AeronRenderTarget* hyper_warp_sky(XwaRemasterHyperspace* h, AeronCommandB
 		u.zoom[3] = pass == 0 ? 0.0f : (pass == HYPER_WARP_SKY_PASSES - 1 ? 2.0f : 1.0f);
 		u.sky[0] = jump->warp_sky_highlights;
 		u.sky[1] = radiance > 0.0f ? 1.0f / radiance : 1.0f;
-		hyper_set_sky_cube_uniform(&u, &h->warp_view, in, motion, log_zoom);
+		hyper_set_sky_cube_uniform(&u, &h->warp_view, in, motion, log_zoom, sky_h);
 		/* Without a cube, the tunnel's cube fills the bindings; it isn't
 		 * read. */
 		const int cubes = motion == HYPER_WARP_ARRIVE;
@@ -1087,9 +1117,8 @@ static AeronRenderTarget* hyper_warp_sky(XwaRemasterHyperspace* h, AeronCommandB
 			h->environment_sampler, h->point_sampler, cubes ? in->sky_sampler : h->environment_sampler,
 			cubes && in->overlay_cube ? in->overlay_sampler : h->environment_sampler
 		};
-		if (!source || !hyper_fullscreen_pass(cmd, h->warp_sky_pipeline, targets[pass], in->output_w,
-											  in->output_h, textures, samplers, 4, &u, (uint32_t)sizeof u,
-											  labels[pass])) {
+		if (!source || !hyper_fullscreen_pass(cmd, h->warp_sky_pipeline, targets[pass], sky_w, sky_h,
+											  textures, samplers, 4, &u, (uint32_t)sizeof u, labels[pass])) {
 			return NULL;
 		}
 		source = Aeron_RenderTargetGetTexture(targets[pass]);
@@ -1126,15 +1155,17 @@ AeronTexture* XwaRemasterHyperspace_RenderWarp(XwaRemasterHyperspace* h, AeronCo
 
 	/* Before the warp starts and once the reveal is complete, the composite
 	 * doesn't read the sky; it is bound anyway. */
-	AeronRenderTarget* sky = h->warp_rt[0];
+	const int half = jump->warp_sky_half_resolution;
+	AeronRenderTarget* sky = half ? h->sky_rt[0] : h->warp_rt[0];
 	if (warp && progress < 1.0f) {
-		sky = hyper_warp_sky(h, cmd, in, motion, vanishing, reveal);
+		sky = hyper_warp_sky(h, cmd, in, motion, reveal);
 		if (!sky) {
 			Aeron_CommandBufferSetFailure(cmd, "Hyperspace sky warp recording failed");
 			return NULL;
 		}
 	}
-	AeronRenderTarget* out = sky == h->warp_rt[0] ? h->warp_rt[1] : h->warp_rt[0];
+	/* The composite writes into the output-size target the sky isn't in. */
+	AeronRenderTarget* out = half || sky != h->warp_rt[0] ? h->warp_rt[0] : h->warp_rt[1];
 
 	HyperWarpUniform u;
 	memset(&u, 0, sizeof u);

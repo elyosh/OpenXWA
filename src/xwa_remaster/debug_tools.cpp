@@ -791,6 +791,13 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 	jump_changed |= ImGui::SliderInt("World taps", &j.warp_taps, 8, 64);
 	jump_changed |= ImGui::SliderInt("Sky taps per pass", &j.warp_sky_taps, 4, 16);
 	{
+		bool half_resolution = j.warp_sky_half_resolution != 0;
+		if (ImGui::Checkbox("Sky at half resolution", &half_resolution)) {
+			j.warp_sky_half_resolution = half_resolution ? 1 : 0;
+			jump_changed = true;
+		}
+	}
+	{
 		static const char* const views[XWA_FLIGHT_HYPERSPACE_WARP_VIEW_COUNT] = { "Image", "Keep mask",
 																				  "Warped sky", "Reveal" };
 		int view = (int)XwaRemasterFlight_GetHyperspaceWarpView();
@@ -866,7 +873,8 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 					  "  warp_sky_highlights: %.4g\n"
 					  "  warp_reveal_softness: %.4g\n"
 					  "  warp_taps: %d\n"
-					  "  warp_sky_taps: %d\n",
+					  "  warp_sky_taps: %d\n"
+					  "  warp_sky_half_resolution: %s\n",
 					  j.star_count, (double)j.streak_brightness, (double)j.whiteout_brightness,
 					  (double)j.brightness_range, (double)j.streak_width_px, (double)j.width_from_brightness,
 					  (double)j.width_variation, (double)j.head_widening, (double)j.radial_widening,
@@ -880,7 +888,7 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 					  (double)j.tint[1], (double)j.tint[2], j.exit_forward ? "true" : "false", (double)j.warp_start, (double)j.warp_end,
 					  (double)j.warp_curve, (double)j.warp_distance_m, (double)j.warp_sky_zoom,
 					  (double)j.warp_smear, (double)j.warp_sky_highlights, (double)j.warp_reveal_softness,
-					  j.warp_taps, j.warp_sky_taps);
+					  j.warp_taps, j.warp_sky_taps, j.warp_sky_half_resolution ? "true" : "false");
 		ImGui::SetClipboardText(yaml);
 	}
 	if (jump_changed) {

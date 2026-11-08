@@ -712,11 +712,14 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"texture_filtering.max_anisotropy",
 	};
 	static const char* bools[] = {
-		"presentation.hdr_output",       "point_lights.enabled",        "point_lights.cluster_debug",
-		"motion_blur.camera_blur",       "motion_blur.pause_keep_blur", "motion_blur.velocity_viz",
-		"texture_filtering.anisotropic", "hangar_lighting.enabled",     "lighting.spec_geom_adapt",
-		"dynamic_cockpit.enabled",       "dynamic_cockpit.classic_hud", "dynamic_cockpit.holograms",
-		"point_lights.model_lights",     "presentation.latency_pacing", "hyperspace_jump.exit_forward",
+		"presentation.hdr_output",       "point_lights.enabled",
+		"point_lights.cluster_debug",    "motion_blur.camera_blur",
+		"motion_blur.pause_keep_blur",   "motion_blur.velocity_viz",
+		"texture_filtering.anisotropic", "hangar_lighting.enabled",
+		"lighting.spec_geom_adapt",      "dynamic_cockpit.enabled",
+		"dynamic_cockpit.classic_hud",   "dynamic_cockpit.holograms",
+		"point_lights.model_lights",     "presentation.latency_pacing",
+		"hyperspace_jump.exit_forward",  "hyperspace_jump.warp_sky_half_resolution",
 	};
 	static const char* strings[] = {
 		"presentation.cockpit_fov",
@@ -974,6 +977,8 @@ static int fl_load_hyperspace_jump_config(const AeronConfigFile* config, const c
 	p->warp_taps = (int)AeronConfigFile_GetInt(config, "hyperspace_jump.warp_taps", 0);
 	p->warp_sky_taps = (int)AeronConfigFile_GetInt(config, "hyperspace_jump.warp_sky_taps", 0);
 	p->exit_forward = AeronConfigFile_GetBool(config, "hyperspace_jump.exit_forward", 0) ? 1 : 0;
+	p->warp_sky_half_resolution =
+		AeronConfigFile_GetBool(config, "hyperspace_jump.warp_sky_half_resolution", 0) ? 1 : 0;
 	if (!fl_hyperspace_jump_valid(p)) {
 		Aeron_LogError("xwa.remaster", "%s: invalid hyperspace_jump settings", config_path);
 		return 0;
@@ -1906,6 +1911,7 @@ void XwaRemasterFlight_SetHyperspaceJump(const XwaFlightHyperspaceJumpParams* in
 	if (p.warp_start > p.warp_end - FL_JUMP_WARP_MIN_SECONDS)
 		p.warp_start = p.warp_end - FL_JUMP_WARP_MIN_SECONDS;
 	p.exit_forward = p.exit_forward ? 1 : 0;
+	p.warp_sky_half_resolution = p.warp_sky_half_resolution ? 1 : 0;
 	s.hyperspace_jump = p;
 	XwaRemasterHyperspace_SetJumpParams(s.hyperspace, &p);
 }
