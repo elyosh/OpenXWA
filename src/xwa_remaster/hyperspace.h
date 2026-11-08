@@ -78,6 +78,9 @@ typedef struct XwaRemasterHyperspaceWarpInput {
 	float keep_depth;      /* the depth at the keep distance; nearer is larger */
 	float units_per_meter; /* view units per metre */
 	int view;              /* XwaFlightHyperspaceWarpView */
+	/* The cockpit's screens at render size (AeronScene_ScreenLayer), drawn
+	 * over everything, or NULL. */
+	AeronTexture* screens;
 	/* The region's sky as a cube, without its suns, or NULL. The forward
 	 * exit reads the shrunk sky from it, since most of it lies outside the
 	 * screen. Without it, the forward exit only shows trails. */

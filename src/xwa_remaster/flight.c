@@ -5124,6 +5124,7 @@ static int fl_render_world_hyperspace(AeronCommandBuffer* cmd) {
 	input.keep_depth = s.hyperspace_keep_depth;
 	input.units_per_meter = AERON_OPT_UNITS_PER_METER;
 	input.view = (int)s.hyperspace_warp_view;
+	input.screens = AeronScene_ScreenLayer(s.scene);
 	s.present_scene_override = XwaRemasterHyperspace_RenderWarp(s.hyperspace, cmd, &input);
 	return s.present_scene_override != NULL;
 }
@@ -6595,6 +6596,10 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * vectors, so motion blur does not smear them with the view
 			 * behind. */
 			inst.velocity_stamp_screens = 1;
+			/* They write no depth, so the hyperspace scene warp would move
+			 * them with the sky behind. It draws them over the warped scene
+			 * instead. */
+			inst.screens_to_layer = s.hyperspace_in_world ? 1 : 0;
 			inst.anim = player_f ? fl_object_anim(player_f) : NULL;
 			AeronSceneMeshTable* tb = fl_table_peek();
 			XwaRemasterCockpitControls controls;

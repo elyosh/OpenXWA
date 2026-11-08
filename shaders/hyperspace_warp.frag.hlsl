@@ -22,6 +22,9 @@
  *     passes do for the sky.
  *   - Layer: the streaks and the tunnel's fades, drawn at render resolution
  *     with premultiplied alpha, go over the result.
+ *   - Screens: the cockpit's transparent screens and holograms, which the
+ *     scene left out, go over everything, the keep mask included. They
+ *     write no depth, so the warp would otherwise take them for sky.
  *
  * View space follows the streak shader: x right, y down, z forward.
  */
@@ -36,6 +39,8 @@ Texture2D<float4> g_sky : register(t2, space2);
 SamplerState g_sky_sampler : register(s2, space2);
 Texture2D<float4> g_layer : register(t3, space2);
 SamplerState g_layer_sampler : register(s3, space2);
+Texture2D<float4> g_screens : register(t4, space2);
+SamplerState g_screens_sampler : register(s4, space2);
 
 cbuffer HyperspaceWarp : register(b0, space3)
 {
@@ -61,6 +66,8 @@ cbuffer HyperspaceWarp : register(b0, space3)
 	float4 config;
 	/* xy render size in px, zw 1 / that size. */
 	float4 render;
+	/* x 1 when the screen layer is bound, yzw unused. */
+	float4 screens;
 };
 
 static const uint WARP_VIEW_KEEP_MASK = 1u;
@@ -70,6 +77,17 @@ static const uint WARP_VIEW_REVEAL = 3u;
 /* Taps within this share of the nearest covering tap's depth are part of
  * the same surface. */
 static const float WARP_SURFACE_BAND = 0.15f;
+
+/* `color` with the cockpit's screens over it. */
+float4 with_screens(float3 color, float2 uv, float alpha)
+{
+	if (screens.x > 0.5f)
+	{
+		const float4 screen = g_screens.SampleLevel(g_screens_sampler, uv, 0.0f);
+		color = screen.rgb + color * (1.0f - screen.a);
+	}
+	return float4(color, alpha);
+}
 
 float scene_depth(float2 uv)
 {
@@ -127,7 +145,7 @@ float4 main(float4 position : SV_Position) : SV_Target0
 	if (view == WARP_VIEW_REVEAL)
 		return float4(warp_reveal(q, vanishing, reveal) * config.y * float3(1.0f, 1.0f, 1.0f), scene.a);
 	if (keep)
-		return scene;
+		return with_screens(scene.rgb, uv, scene.a);
 
 	float3 warped = scene.rgb;
 	if (reveal.z > 0.5f && reveal.x >= 1.0f)
@@ -245,5 +263,5 @@ float4 main(float4 position : SV_Position) : SV_Target0
 	}
 
 	const float4 layer = g_layer.SampleLevel(g_layer_sampler, uv, 0.0f);
-	return float4(layer.rgb + warped * (1.0f - layer.a), scene.a);
+	return with_screens(layer.rgb + warped * (1.0f - layer.a), uv, scene.a);
 }

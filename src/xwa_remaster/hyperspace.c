@@ -80,8 +80,9 @@ typedef struct HyperWarpUniform {
 	float reveal[4];
 	float config[4];
 	float render[4];
+	float screens[4];
 } HyperWarpUniform;
-typedef char HyperWarpUniformSizeCheck[sizeof(HyperWarpUniform) == 128 ? 1 : -1];
+typedef char HyperWarpUniformSizeCheck[sizeof(HyperWarpUniform) == 144 ? 1 : -1];
 
 /* The sky warp's passes: the sky zoom is split into this many passes. */
 #define HYPER_WARP_SKY_PASSES 3
@@ -332,7 +333,7 @@ XwaRemasterHyperspace* XwaRemasterHyperspace_Create(const XwaFlightHyperspaceTun
 															 .uniform_buffer_count = 1 });
 	h->warp_fs = Aeron_CreateShader(&(AeronShaderDesc) { .name = "hyperspace_warp.frag",
 														 .stage = AERON_SHADER_STAGE_FRAGMENT,
-														 .sampler_count = 4,
+														 .sampler_count = 5,
 														 .uniform_buffer_count = 1 });
 	h->environment_pipeline = Aeron_CreateComputePipeline(&(AeronComputePipelineDesc) {
 		.name = "hyperspace_environment.comp",
@@ -1161,12 +1162,16 @@ AeronTexture* XwaRemasterHyperspace_RenderWarp(XwaRemasterHyperspace* h, AeronCo
 	u.config[2] = (float)in->view;
 	u.config[3] = side;
 	hyper_size_uniform(u.render, in->render_w, in->render_h);
-	AeronTexture* const textures[4] = { in->scene, in->depth, Aeron_RenderTargetGetTexture(sky),
-										Aeron_RenderTargetGetTexture(h->layer_rt) };
-	AeronSampler* const samplers[4] = { h->environment_sampler, h->point_sampler, h->environment_sampler,
-										h->environment_sampler };
+	u.screens[0] = in->screens ? 1.0f : 0.0f;
+	/* Without the screen layer, the scene fills its binding; it isn't
+	 * read. */
+	AeronTexture* const textures[5] = { in->scene, in->depth, Aeron_RenderTargetGetTexture(sky),
+										Aeron_RenderTargetGetTexture(h->layer_rt),
+										in->screens ? in->screens : in->scene };
+	AeronSampler* const samplers[5] = { h->environment_sampler, h->point_sampler, h->environment_sampler,
+										h->environment_sampler, h->environment_sampler };
 	if (!textures[2] || !textures[3] ||
-		!hyper_fullscreen_pass(cmd, h->warp_pipeline, out, in->output_w, in->output_h, textures, samplers, 4,
+		!hyper_fullscreen_pass(cmd, h->warp_pipeline, out, in->output_w, in->output_h, textures, samplers, 5,
 							   &u, (uint32_t)sizeof u, "Hyperspace warp composite")) {
 		Aeron_CommandBufferSetFailure(cmd, "Hyperspace warp composite recording failed");
 		return NULL;
