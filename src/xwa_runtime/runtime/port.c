@@ -68,6 +68,7 @@
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/frontend_task.h"
+#include "xwa_runtime/runtime/game_files.h"
 #include "xwa_runtime/runtime/movie_task.h"
 #include "xwa_runtime/runtime/presentation.h"
 #include "xwa_runtime/snapshot/snapshot.h"
@@ -169,6 +170,7 @@ int XwaPort_Init(void) {
 		Aeron_LogError("xwa", "Failed to create the film folder in the user folder");
 	}
 	XwaText_Load();
+	XwaGameFiles_Load();
 	/* The object type files can rename object types, and the other mod files
 	   use the new names, so read them first. */
 	XwaCraftDefinitions_Apply();

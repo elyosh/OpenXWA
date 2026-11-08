@@ -36,6 +36,7 @@ my-mod/
   text/
     strings.yaml        text replacements
   game/                 copies of original game files
+    files.yaml          original game files that the mod removes
 ```
 
 Every file and folder is optional. A mod only needs the files it changes.
@@ -145,6 +146,27 @@ These files can be replaced:
 
 Other files in `game/` are ignored. The other original files are changed
 through the mod's own formats, described in the other pages.
+
+### Removing original game files
+
+To remove original game files, list them in `game/files.yaml`. The game
+then works as if these files didn't exist. For example, if you remove a
+mission's briefing narration, the briefing officer says one of their usual
+lines instead:
+
+```yaml
+removed:
+  - Wave/FRONTEND/B0M3/N000301.WAV
+  - Wave/FRONTEND/N01ZL01.WAV
+```
+
+| Key | Meaning |
+|-|-|
+| `removed` | The files to remove. Write each path as you would in `game/`. You can only remove the files that `game/` can replace. If `game/` also has a copy of a file in this list, the copy isn't used either. |
+
+The importer writes this file for an installation that is missing some of
+the original sounds. TFTC, for example, removes some of the original
+briefing voices.
 
 ### Replacing models
 

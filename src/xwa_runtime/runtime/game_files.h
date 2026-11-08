@@ -24,9 +24,25 @@ extern "C" {
 	 the battle medals; MEDALS.LST, the medal images; and FAMILYAWARDS.TXT,
 	 the memento texts.
 
-   Returns 1 when the mod folder has a copy of game file `path`, and writes
-   the copy's path in the mod folder into `modPath`. Returns 0 otherwise. */
-int XwaGameFiles_Find(AeronVfs* vfs, const char* path, char* modPath, size_t modPathSize);
+   A mod can also remove game files. game/files.yaml lists them under
+   `removed`, and the game then works as if they didn't exist. Only the
+   files that a mod can replace can be removed. A listed file is removed
+   even when game/ has a copy of it.
+
+   XwaGameFiles_Load reads game/files.yaml. XwaGameFiles_Find says where to
+   read game file `path` from. For XWA_GAME_FILE_MOD, it writes the path of
+   the mod's copy into `modPath`. */
+typedef enum XwaGameFileSource {
+	/* The game folder's file, if it has one. */
+	XWA_GAME_FILE_ORIGINAL,
+	/* The mod's copy, at `modPath`. */
+	XWA_GAME_FILE_MOD,
+	/* The mod removes the file. */
+	XWA_GAME_FILE_REMOVED,
+} XwaGameFileSource;
+
+void XwaGameFiles_Load(void);
+XwaGameFileSource XwaGameFiles_Find(AeronVfs* vfs, const char* path, char* modPath, size_t modPathSize);
 
 #ifdef __cplusplus
 }

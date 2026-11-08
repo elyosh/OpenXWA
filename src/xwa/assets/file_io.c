@@ -123,13 +123,20 @@ XwaFile* File_Open(const char* fileName, const char* mode) {
 	openMode = File_OpenMode(mode);
 	file = NULL;
 #ifdef XWA_MODERN
-	/* A mod can replace some game files with its own copies: the mission files
-	   and mission lists, the voices and sound banks, the cutscene table and
-	   the medal files. Only files opened for reading are replaced. */
-	if (root == AERON_VFS_ROOT_ASSET && openMode == AERON_VFS_READ &&
-		XwaGameFiles_Find(g_fileVfs, fileName, modPath, sizeof modPath)) {
-		root = AERON_VFS_ROOT_MOD;
-		fileName = modPath;
+	/* A mod can replace or remove some game files: the mission files and
+	   lists, the voices and sound banks, the cutscene table and the medal
+	   files. Only files opened for reading are replaced or removed. */
+	if (root == AERON_VFS_ROOT_ASSET && openMode == AERON_VFS_READ) {
+		switch (XwaGameFiles_Find(g_fileVfs, fileName, modPath, sizeof modPath)) {
+			case XWA_GAME_FILE_MOD:
+				root = AERON_VFS_ROOT_MOD;
+				fileName = modPath;
+				break;
+			case XWA_GAME_FILE_REMOVED:
+				return NULL;
+			case XWA_GAME_FILE_ORIGINAL:
+				break;
+		}
 	}
 #endif
 	g_lastOpenedFileRoot = root;
