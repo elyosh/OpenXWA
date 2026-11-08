@@ -57,6 +57,7 @@
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
 #include "xwa_runtime/input/winmm_joystick_provider.h"
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/input/mouse_flight.h"
@@ -4860,11 +4861,11 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 				if (playerIdx == (unsigned int)g_localPlayer) {
 					int li;
 #ifdef XWA_MODERN
-					/* A jump into a region that the mission lists as
-					   interdicted plays the abort sound instead of the arrival
-					   sound. */
-					const int interdicted =
-						XwaMissionSettings_HyperspaceAbortSoundRegion(g_players[playerIdx].regionIndex);
+					/* A jump into a region whose rule asks for it plays the
+					   abort sound instead of the arrival sound. */
+					const XwaHyperspaceRegionRule* rule =
+						XwaMissionSettings_HyperspaceRegion(g_players[playerIdx].regionIndex);
+					const int interdicted = rule != NULL && rule->abortSound;
 					const int endSlot =
 						XwaCraftSounds_HyperEnd(playerIdx, interdicted, interdicted ? 119 : 117);
 					if (endSlot != -1)
@@ -5746,12 +5747,21 @@ void Flight_UpdateCraftSteeringAndSpeed(void) {
 					/* Fall through: these modes clear the same AI motion state as mode 6. */
 
 				case CRAFT_STATE_LEAVING_HYPERSPACE:
+#ifdef XWA_MODERN
+					/* An arrival at a set speed slows down to stop on its
+					   point. */
+					XwaCraftHyperspace_StepArrivalSpeed((uint16_t)slot);
+#endif
 					Flight_ResetAiMotionStates();
 					break;
 
 				case CRAFT_STATE_ENTERING_HYPERSPACE:
 					if (g_curCraft->workingSubsystems != 0) {
-						Flight_AccelerateHyperspaceSpeedInline((uint16_t)slot, 1500);
+#ifdef XWA_MODERN
+						/* A departure at a set speed has its own acceleration. */
+						if (!XwaCraftHyperspace_StepDeparture((uint16_t)slot))
+#endif
+							Flight_AccelerateHyperspaceSpeedInline((uint16_t)slot, 1500);
 					} else {
 						if (g_objectTable[(uint16_t)slot].mobj->speed > 0u) {
 							Flight_DecelerateHyperspaceSpeedInline((uint16_t)slot, 20);

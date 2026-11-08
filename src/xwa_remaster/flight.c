@@ -313,6 +313,14 @@ static struct {
 	XwaFlightHyperspaceTunnelParams hyperspace_params_default;
 	XwaFlightHyperspaceJumpParams hyperspace_jump;
 	XwaFlightHyperspaceJumpParams hyperspace_jump_default;
+	char hyperspace_look_names[XWA_FLIGHT_HYPERSPACE_LOOKS_MAX][XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX];
+	XwaFlightHyperspaceLookParams hyperspace_looks[XWA_FLIGHT_HYPERSPACE_LOOKS_MAX];
+	XwaFlightHyperspaceLookParams hyperspace_looks_default[XWA_FLIGHT_HYPERSPACE_LOOKS_MAX];
+	int hyperspace_look_count;
+	/* The last look name that no look has, logged once. */
+	char hyperspace_unknown_look[XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX];
+	int hyperspace_preview_look;
+	float hyperspace_preview_look_blend;
 	XwaFlightHyperspacePreview hyperspace_preview;
 	float hyperspace_preview_speed;
 	/* The preview's clock, in seconds of preview time, and the host time it
@@ -986,6 +994,91 @@ static int fl_load_hyperspace_jump_config(const AeronConfigFile* config, const c
 	return 1;
 }
 
+/* Reads `key` of a look, a number from `lo` to `hi`, into `out`. Logs and
+ * returns 0 when it is missing or out of range. */
+static int fl_look_number(const AeronConfigNode* look, const char* group, const char* key, float lo, float hi,
+						  const char* name, const char* config_path, float* out) {
+	const AeronConfigNode* parent = group ? AeronConfigNode_MapGet(look, group) : look;
+	const AeronConfigNode* node = AeronConfigNode_MapGet(parent, key);
+	const AeronConfigNodeType type = AeronConfigNode_Type(node);
+	const double value = AeronConfigNode_Float(node, NAN);
+
+	if ((type != AERON_CONFIG_FLOAT && type != AERON_CONFIG_INT) || !isfinite(value) || value < lo ||
+		value > hi) {
+		Aeron_LogError("xwa.remaster", "%s: hyperspace_looks.%s.%s%s%s must be a number from %g to %g",
+					   config_path, name, group ? group : "", group ? "." : "", key, (double)lo, (double)hi);
+		return 0;
+	}
+	*out = (float)value;
+	return 1;
+}
+
+/* Reads `<key>_r`, `_g` and `_b` of a look into `out`. */
+static int fl_look_color(const AeronConfigNode* look, const char* group, const char* key, const char* name,
+						 const char* config_path, float out[3]) {
+	static const char* const suffixes[3] = { "_r", "_g", "_b" };
+	for (int channel = 0; channel < 3; channel++) {
+		char channel_key[64];
+		snprintf(channel_key, sizeof channel_key, "%s%s", key, suffixes[channel]);
+		if (!fl_look_number(look, group, channel_key, 0.0f, 16.0f, name, config_path, &out[channel])) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static int fl_load_hyperspace_looks_config(const AeronConfigFile* config, const char* config_path) {
+	const AeronConfigNode* section = AeronConfigFile_GetNode(config, "hyperspace_looks");
+
+	s.hyperspace_look_count = 0;
+	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.remaster", "%s: hyperspace_looks must be a map of looks", config_path);
+		return 0;
+	}
+	if (AeronConfigNode_MapCount(section) > XWA_FLIGHT_HYPERSPACE_LOOKS_MAX) {
+		Aeron_LogError("xwa.remaster", "%s: hyperspace_looks can have at most %d looks", config_path,
+					   XWA_FLIGHT_HYPERSPACE_LOOKS_MAX);
+		return 0;
+	}
+	for (size_t i = 0; i < AeronConfigNode_MapCount(section); i++) {
+		const char* name = AeronConfigNode_MapKeyAt(section, i);
+		const AeronConfigNode* look = AeronConfigNode_MapValueAt(section, i);
+		XwaFlightHyperspaceLookParams* p = &s.hyperspace_looks[s.hyperspace_look_count];
+
+		if (strlen(name) >= XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX ||
+			AeronConfigNode_Type(look) != AERON_CONFIG_MAP) {
+			Aeron_LogError("xwa.remaster",
+						   "%s: hyperspace_looks.%s must be a map, with a name shorter than %d", config_path,
+						   name, XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX);
+			return 0;
+		}
+		if (!fl_look_color(look, "tunnel", "dark_color", name, config_path, p->dark_color) ||
+			!fl_look_color(look, "tunnel", "body_color", name, config_path, p->body_color) ||
+			!fl_look_color(look, "tunnel", "highlight_color", name, config_path, p->highlight_color) ||
+			!fl_look_color(look, "tunnel", "cap_color", name, config_path, p->cap_color) ||
+			!fl_look_color(look, "jump", "tint", name, config_path, p->tint) ||
+			!fl_look_color(look, "jump", "tail_color", name, config_path, p->tail_color) ||
+			!fl_look_number(look, NULL, "blend_start", 0.0f, 1.0f, name, config_path, &p->blend_start) ||
+			!fl_look_number(look, NULL, "blend_end", 0.0f, 1.0f, name, config_path, &p->blend_end) ||
+			!fl_look_number(look, NULL, "shake_degrees", 0.0f, 45.0f, name, config_path, &p->shake_degrees) ||
+			!fl_look_number(look, NULL, "shake_speed", 0.0f, 16.0f, name, config_path, &p->shake_speed)) {
+			return 0;
+		}
+		if (p->blend_end < p->blend_start) {
+			Aeron_LogError("xwa.remaster", "%s: hyperspace_looks.%s.blend_end must not be below blend_start",
+						   config_path, name);
+			return 0;
+		}
+		snprintf(s.hyperspace_look_names[s.hyperspace_look_count], XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX, "%s",
+				 name);
+		s.hyperspace_looks_default[s.hyperspace_look_count] = *p;
+		s.hyperspace_look_count++;
+	}
+	s.hyperspace_preview_look = -1;
+	s.hyperspace_preview_look_blend = 1.0f;
+	return 1;
+}
+
 static int fl_pbr_config_valid(const XwaShipPbrTuning* p) {
 	return isfinite(p->ambient[0]) && p->ambient[0] >= 0.0f && isfinite(p->ambient[1]) &&
 		   p->ambient[1] >= 0.0f && isfinite(p->ambient[2]) && p->ambient[2] >= 0.0f;
@@ -1190,7 +1283,8 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
-	if (!fl_load_hyperspace_config(cf, path) || !fl_load_hyperspace_jump_config(cf, path)) {
+	if (!fl_load_hyperspace_config(cf, path) || !fl_load_hyperspace_jump_config(cf, path) ||
+		!fl_load_hyperspace_looks_config(cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -1922,6 +2016,67 @@ void XwaRemasterFlight_GetHyperspaceJumpDefault(XwaFlightHyperspaceJumpParams* o
 	}
 }
 
+int XwaRemasterFlight_HyperspaceLookCount(void) { return fl_cfg_ensure() ? s.hyperspace_look_count : 0; }
+
+const char* XwaRemasterFlight_HyperspaceLookName(int index) {
+	if (!fl_cfg_ensure() || index < 0 || index >= s.hyperspace_look_count) {
+		return NULL;
+	}
+	return s.hyperspace_look_names[index];
+}
+
+int XwaRemasterFlight_FindHyperspaceLook(const char* name) {
+	if (!name || !fl_cfg_ensure()) {
+		return -1;
+	}
+	for (int i = 0; i < s.hyperspace_look_count; i++) {
+		if (strcmp(s.hyperspace_look_names[i], name) == 0) {
+			return i;
+		}
+	}
+	return -1;
+}
+
+void XwaRemasterFlight_GetHyperspaceLook(int index, XwaFlightHyperspaceLookParams* out) {
+	if (out && fl_cfg_ensure() && index >= 0 && index < s.hyperspace_look_count) {
+		*out = s.hyperspace_looks[index];
+	}
+}
+
+void XwaRemasterFlight_SetHyperspaceLook(int index, const XwaFlightHyperspaceLookParams* in) {
+	if (!in || !fl_cfg_ensure() || index < 0 || index >= s.hyperspace_look_count) {
+		return;
+	}
+	const XwaFlightHyperspaceLookParams* d = &s.hyperspace_looks_default[index];
+	XwaFlightHyperspaceLookParams p = *in;
+	/* A value that isn't a number goes back to its default; others are
+	 * clamped to their range. */
+#define FL_LOOK_SANITIZE(field, lo, hi) p.field = isfinite(p.field) ? fl_clampf(p.field, lo, hi) : d->field
+	for (int channel = 0; channel < 3; channel++) {
+		FL_LOOK_SANITIZE(dark_color[channel], 0.0f, 16.0f);
+		FL_LOOK_SANITIZE(body_color[channel], 0.0f, 16.0f);
+		FL_LOOK_SANITIZE(highlight_color[channel], 0.0f, 16.0f);
+		FL_LOOK_SANITIZE(cap_color[channel], 0.0f, 16.0f);
+		FL_LOOK_SANITIZE(tint[channel], 0.0f, 16.0f);
+		FL_LOOK_SANITIZE(tail_color[channel], 0.0f, 16.0f);
+	}
+	FL_LOOK_SANITIZE(blend_start, 0.0f, 1.0f);
+	FL_LOOK_SANITIZE(blend_end, 0.0f, 1.0f);
+	FL_LOOK_SANITIZE(shake_degrees, 0.0f, 45.0f);
+	FL_LOOK_SANITIZE(shake_speed, 0.0f, 16.0f);
+#undef FL_LOOK_SANITIZE
+	if (p.blend_end < p.blend_start) {
+		p.blend_end = p.blend_start;
+	}
+	s.hyperspace_looks[index] = p;
+}
+
+void XwaRemasterFlight_GetHyperspaceLookDefault(int index, XwaFlightHyperspaceLookParams* out) {
+	if (out && fl_cfg_ensure() && index >= 0 && index < s.hyperspace_look_count) {
+		*out = s.hyperspace_looks_default[index];
+	}
+}
+
 void XwaRemasterFlight_SetHyperspacePreview(XwaFlightHyperspacePreview mode) {
 	if (mode != XWA_FLIGHT_HYPERSPACE_PREVIEW_TUNNEL && mode != XWA_FLIGHT_HYPERSPACE_PREVIEW_JUMP_CYCLE) {
 		mode = XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF;
@@ -1943,6 +2098,18 @@ void XwaRemasterFlight_SetHyperspacePreviewSpeed(float speed) {
 float XwaRemasterFlight_GetHyperspacePreviewSpeed(void) {
 	return s.hyperspace_preview_speed > 0.0f ? s.hyperspace_preview_speed : 1.0f;
 }
+
+void XwaRemasterFlight_SetHyperspacePreviewLook(int index) {
+	s.hyperspace_preview_look = index >= 0 && index < s.hyperspace_look_count ? index : -1;
+}
+
+int XwaRemasterFlight_GetHyperspacePreviewLook(void) { return s.hyperspace_preview_look; }
+
+void XwaRemasterFlight_SetHyperspacePreviewLookBlend(float blend) {
+	s.hyperspace_preview_look_blend = isfinite(blend) ? fl_clampf(blend, 0.0f, 1.0f) : 1.0f;
+}
+
+float XwaRemasterFlight_GetHyperspacePreviewLookBlend(void) { return s.hyperspace_preview_look_blend; }
 
 void XwaRemasterFlight_SetHyperspaceWarpView(XwaFlightHyperspaceWarpView view) {
 	s.hyperspace_warp_view =
@@ -5053,6 +5220,81 @@ static void fl_add_ambient_cube(XwaShipAmbientCube* base, const XwaShipAmbientCu
  * streaks' light. */
 #define FL_HYPERSPACE_PULSE_MASK ((1u << 3) | (1u << 4) | (1u << 5))
 
+static float fl_smoothstep(float edge0, float edge1, float x) {
+	const float u = fl_clampf((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
+	return u * u * (3.0f - 2.0f * u);
+}
+
+static void fl_lerp3(float out[3], const float a[3], const float b[3], float w) {
+	for (int channel = 0; channel < 3; channel++) {
+		out[channel] = a[channel] + (b[channel] - a[channel]) * w;
+	}
+}
+
+/* Rotates `v`, a view-space direction, by `pitch` around the view's x axis,
+ * then by `yaw` around its y axis, in radians. */
+static void fl_rotate_view_direction(float v[3], float pitch, float yaw) {
+	const float cp = cosf(pitch), sp = sinf(pitch), cy = cosf(yaw), sy = sinf(yaw);
+	const float y = v[1] * cp - v[2] * sp;
+	const float z = v[1] * sp + v[2] * cp;
+	const float x = v[0];
+	v[0] = x * cy + z * sy;
+	v[1] = y;
+	v[2] = -x * sy + z * cy;
+}
+
+/* Gives the effect the tunnel and streak settings of `moment`, with its look
+ * blended in, and wobbles `view` in the tunnel when the look asks for it.
+ * The entry keeps the normal look, the tunnel fades it in between
+ * blend_start and blend_end, and the exit uses it fully. */
+static void fl_hyperspace_apply_look(const XwaRemasterHyperspaceMoment* moment,
+									 XwaRemasterHyperspaceTunnelView* view) {
+	XwaFlightHyperspaceTunnelParams tunnel = s.hyperspace_params;
+	XwaFlightHyperspaceJumpParams jump = s.hyperspace_jump;
+
+	if (moment->look >= 0 && moment->look < s.hyperspace_look_count) {
+		const XwaFlightHyperspaceLookParams* look = &s.hyperspace_looks[moment->look];
+		/* The tunnel preview has no end, so the debug UI sets its progress. */
+		const float progress = moment->tunnel_only ? s.hyperspace_preview_look_blend
+							   : moment->tunnel_ticks > 0.0f
+								   ? fl_clampf(moment->phase_ticks / moment->tunnel_ticks, 0.0f, 1.0f)
+								   : 0.0f;
+		float weight = 0.0f;
+
+		if (moment->phase == XWA_HYPERSPACE_TUNNEL) {
+			weight = look->blend_end > look->blend_start
+						 ? fl_smoothstep(look->blend_start, look->blend_end, progress)
+						 : (progress >= look->blend_start ? 1.0f : 0.0f);
+		} else if (moment->phase == XWA_HYPERSPACE_INBOUND) {
+			weight = 1.0f;
+		}
+		fl_lerp3(tunnel.dark_color, tunnel.dark_color, look->dark_color, weight);
+		fl_lerp3(tunnel.body_color, tunnel.body_color, look->body_color, weight);
+		fl_lerp3(tunnel.highlight_color, tunnel.highlight_color, look->highlight_color, weight);
+		fl_lerp3(tunnel.cap_color, tunnel.cap_color, look->cap_color, weight);
+		fl_lerp3(jump.tint, jump.tint, look->tint, weight);
+		fl_lerp3(jump.tail_color, jump.tail_color, look->tail_color, weight);
+
+		if (moment->phase == XWA_HYPERSPACE_TUNNEL && look->shake_degrees > 0.0f && view) {
+			/* The wobble starts a fifth into the tunnel and grows until its
+			   end: a slow sway with a small fast tremble, mostly sideways. */
+			const float strength = fl_clampf((progress - 0.18f) / 0.82f, 0.0f, 1.0f);
+			const float amplitude = look->shake_degrees * strength * (3.14159265f / 180.0f);
+			const float seconds = moment->phase_ticks / 236.0f;
+			const float slow = look->shake_speed * 3.7f * seconds;
+			const float fast = 5.0f * slow;
+			const float pitch = amplitude * (-0.52f * cosf(slow) + 0.0725f * cosf(fast));
+			const float yaw = amplitude * (sinf(slow) + 0.0725f * sinf(fast));
+
+			fl_rotate_view_direction(view->right, pitch, yaw);
+			fl_rotate_view_direction(view->up, pitch, yaw);
+			fl_rotate_view_direction(view->forward, pitch, yaw);
+		}
+	}
+	XwaRemasterHyperspace_SetParams(s.hyperspace, &tunnel);
+	XwaRemasterHyperspace_SetJumpParams(s.hyperspace, &jump);
+}
+
 /* The largest distance from the camera to any point of a model whose origin
  * is at `origin` (camera-local, OPT units): the distance to the origin plus
  * the distance from the origin to the farthest corner of the model's bounds,
@@ -5108,6 +5350,7 @@ static int fl_prepare_world_hyperspace(AeronCommandBuffer* cmd, const XwaSnapsho
 		render_w = s.rt_w;
 		render_h = s.rt_h;
 	}
+	fl_hyperspace_apply_look(&s.hyperspace_world_moment, &tunnel_view);
 	if (!XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, render_w, render_h, &s.hyperspace_world_moment,
 									   &tunnel_view, 1)) {
 		return 0;
@@ -5169,6 +5412,17 @@ static int fl_real_hyperspace_moment(const XwaSnapshot* snap, XwaRemasterHypersp
 	out->phase_ticks = (float)snap->hyperspace.phase_elapsed_ticks;
 	out->tunnel_ticks = (float)XWA_REMASTER_HYPERSPACE_TUNNEL_TICKS;
 	out->seed = fl_hyperspace_seed(snap, out->phase);
+	out->look = -1;
+	if (snap->hyperspace.look[0] != '\0') {
+		out->look = XwaRemasterFlight_FindHyperspaceLook(snap->hyperspace.look);
+		if (out->look < 0 && strcmp(s.hyperspace_unknown_look, snap->hyperspace.look) != 0) {
+			snprintf(s.hyperspace_unknown_look, sizeof s.hyperspace_unknown_look, "%s",
+					 snap->hyperspace.look);
+			Aeron_LogWarn("xwa.remaster",
+						  "the mission asks for the hyperspace look '%s', which the game doesn't have",
+						  snap->hyperspace.look);
+		}
+	}
 	return 1;
 }
 
@@ -5192,6 +5446,7 @@ static int fl_preview_hyperspace_moment(const XwaSnapshot* snap, uint64_t host_t
 	}
 	s.hyperspace_preview_host_us = host_time_us;
 	memset(out, 0, sizeof *out);
+	out->look = s.hyperspace_preview_look;
 	if (s.hyperspace_preview == XWA_FLIGHT_HYPERSPACE_PREVIEW_TUNNEL) {
 		out->phase = XWA_HYPERSPACE_TUNNEL;
 		out->phase_ticks = (float)(fmod(s.hyperspace_preview_seconds, 4096.0) * 236.0);
@@ -5237,6 +5492,9 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	if (render_w <= 0 || render_h <= 0) {
 		render_w = s.rt_w;
 		render_h = s.rt_h;
+	}
+	if (s.hyperspace) {
+		fl_hyperspace_apply_look(moment, &tunnel_view);
 	}
 	if (!s.hyperspace || !XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, render_w, render_h, moment,
 														&tunnel_view, 0)) {

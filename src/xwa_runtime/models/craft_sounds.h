@@ -74,6 +74,11 @@ int XwaCraftSounds_HyperZoom(unsigned int playerIdx, int stockSlot);
 /* Returns the slot of the arrival sound. Set `interdicted` to 1 for the
    abort sound. */
 int XwaCraftSounds_HyperEnd(unsigned int playerIdx, int interdicted, int stockSlot);
+/* When object `objIdx`, an AI craft, jumps away (`arriving` 0) or ends its
+   arrival (`arriving` 1) in the local player's region, plays its
+   enter_hyperspace or exit_hyperspace sound, without a position. The stock
+   game plays nothing then, so without the bank nothing plays. */
+void XwaCraftSounds_OtherCraftHyperspace(unsigned int objIdx, int arriving);
 
 /* Returns the slot of the S-foil sound for player `playerIdx`'s craft: the
    s_foil bank entry if there is one, else `stockSlot`. */

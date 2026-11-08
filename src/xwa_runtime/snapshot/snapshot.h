@@ -636,9 +636,15 @@ typedef enum XwaHyperspacePhase {
 	XWA_HYPERSPACE_TUNNEL = 4,
 } XwaHyperspacePhase;
 
+/* The longest name of a hyperspace look, with its terminating 0. */
+#define XWA_SNAP_HYPERSPACE_LOOK_MAX 32
+
 typedef struct XwaHyperspaceState {
 	uint8_t phase; /* XwaHyperspacePhase */
 	uint32_t phase_elapsed_ticks;
+	/* The look of the jump, from the mission's rule for its destination
+	   region; "" for the normal look. */
+	char look[XWA_SNAP_HYPERSPACE_LOOK_MAX];
 } XwaHyperspaceState;
 
 /* OPT mesh-type values the drivers dispatch on (mirrors MeshType —

@@ -33,6 +33,7 @@
 #include "xwa/util/random.h"
 #include "xwa/util/string.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "aeron/log.h"
@@ -7715,6 +7716,7 @@ uint16_t Mission_Init(char* fileName) {
 	XwaModelSwaps_LoadMission(fileName);
 	XwaStatsProfiles_LoadMission(fileName);
 	XwaShieldRecharge_LoadMission();
+	XwaCraftHyperspace_LoadMission();
 	XwaCraftNames_LoadMission(fileName);
 	XwaCraftNames_Apply();
 	XwaHeadlights_LoadMission(fileName);

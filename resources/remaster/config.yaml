@@ -421,6 +421,38 @@ hyperspace_jump:
   warp_taps: 24               # samples per pixel along the world's walk
   warp_sky_taps: 8            # samples per pixel in each of the three sky passes
   warp_sky_half_resolution: true # the sky passes run at half the output resolution
+hyperspace_looks:
+  # Looks of the player's jump, which a mission picks by its destination
+  # region (hyperspace_regions in its settings). Each look sets the colours
+  # of the tunnel and of the exit streaks; the other hyperspace_tunnel and
+  # hyperspace_jump values stay. The entry keeps the normal look.
+  interdiction:
+    # A jump that a gravity well pulls out of hyperspace: the tunnel turns
+    # red with yellow streaks and wobbles, and the exit streaks are red.
+    tunnel:
+      dark_color_r: 0.0
+      dark_color_g: 0.0
+      dark_color_b: 0.0
+      body_color_r: 0.79
+      body_color_g: 0.02
+      body_color_b: 0.02
+      highlight_color_r: 0.45
+      highlight_color_g: 0.38
+      highlight_color_b: 0.02
+      cap_color_r: 1.0
+      cap_color_g: 0.12
+      cap_color_b: 0.04
+    jump:                # the exit streaks
+      tint_r: 0.79
+      tint_g: 0.02
+      tint_b: 0.02
+      tail_color_r: 0.79
+      tail_color_g: 0.02
+      tail_color_b: 0.02
+    blend_start: 0.0     # share of the tunnel where the colours start to fade in
+    blend_end: 0.67      # share of the tunnel where they have replaced the normal ones
+    shake_degrees: 4.0   # the tunnel's wobble around the view at its strongest
+    shake_speed: 1.0     # how fast the wobble moves
 point_lights:
   enabled: true
   cluster_depth_slices: 24

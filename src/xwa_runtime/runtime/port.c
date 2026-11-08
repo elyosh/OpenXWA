@@ -49,6 +49,7 @@
 #include "xwa_runtime/models/cockpit_alert_lights.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/flight_config.h"
@@ -189,6 +190,7 @@ int XwaPort_Init(void) {
 	XwaCraftHud_Init();
 	XwaCraftWeapons_Init();
 	XwaShieldRecharge_Init();
+	XwaCraftHyperspace_Init();
 	XwaWeaponRates_Init();
 	XwaWeaponStats_Init();
 	XwaWarheadLock_Init();

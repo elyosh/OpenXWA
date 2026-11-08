@@ -115,8 +115,23 @@ int XwaMissionSettings_PlayerWarheadsDisabled(void);
 int XwaMissionSettings_WarheadCollisionDamage(void);
 int XwaMissionSettings_DamageThroughShieldsOnHard(void);
 int XwaMissionSettings_ProximityTriggersCheckCraftOnly(void);
-/* Whether a hyperspace jump to `region` plays the abort sound. */
-int XwaMissionSettings_HyperspaceAbortSoundRegion(int region);
+/* Whether AI craft use the hyperspace speeds of the flight settings and of
+   their models. 1 unless the mission sets use_hyperspace_speeds to false. */
+int XwaMissionSettings_UseHyperspaceSpeeds(void);
+
+/* The number of regions that hyperspace_regions can list. */
+#define XWA_HYPERSPACE_REGIONS 4
+/* The longest look name, with its terminating 0. */
+#define XWA_HYPERSPACE_LOOK_NAME_MAX 32
+
+/* What happens when the player jumps to a region. */
+typedef struct XwaHyperspaceRegionRule {
+	char look[XWA_HYPERSPACE_LOOK_NAME_MAX]; /* "" for the normal look */
+	int abortSound;                          /* the abort sound replaces the arrival sound */
+} XwaHyperspaceRegionRule;
+
+/* The rule of a jump to `region`, or NULL when the mission has none. */
+const XwaHyperspaceRegionRule* XwaMissionSettings_HyperspaceRegion(int region);
 
 /* The O key, outside the proving grounds: when the mission lists flight
    groups for it, targets a craft of them for player `playerIdx` and returns

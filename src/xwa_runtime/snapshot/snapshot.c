@@ -20,6 +20,7 @@
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/headlights.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/skins.h"
@@ -1718,6 +1719,16 @@ void XwaSnapshot_CaptureFlight(void) {
 			(uint32_t)(g_hyperspaceStarStreakCount < 0 ? 0 : g_hyperspaceStarStreakCount);
 		h->phase = player->hyperspacePhase;
 		h->phase_elapsed_ticks = player->hyperspaceRuntime.phaseElapsedTicks;
+		/* The destination is only written when a jump starts, so it holds
+		   until the exit ends. */
+		h->look[0] = '\0';
+		if (h->phase != XWA_HYPERSPACE_NONE) {
+			const XwaHyperspaceRegionRule* rule =
+				XwaMissionSettings_HyperspaceRegion(player->hyperspaceRuntime.targetRegionOrMode);
+			if (rule != NULL) {
+				snprintf(h->look, sizeof h->look, "%s", rule->look);
+			}
+		}
 		if (h->phase == PLAYER_HYPERSPACE_OUTBOUND || h->phase == PLAYER_HYPERSPACE_INBOUND) {
 			uint32_t count =
 				g_hyperspace_visible_streak_valid ? g_hyperspace_visible_streak_count : live_count;

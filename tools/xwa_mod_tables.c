@@ -855,12 +855,17 @@ static const NameText kSoundBankTexts[] = {
 						"the hangar shuttle lands." },
 	{ "engine_wash", "While the player's craft is in the engine wash of another craft. The craft that makes "
 					 "the wash picks the sound." },
+	{ "enter_hyperspace", "When an AI craft in the player's region jumps away. The craft picks the sound. It "
+						  "plays without a position, and nothing plays without the bank." },
+	{ "exit_hyperspace",
+	  "When an AI craft in the player's region ends its arrival from hyperspace. The craft "
+	  "picks the sound. It plays without a position, and nothing plays without the bank." },
 	{ "fly_by", "When a craft passes close to the player's craft. The passing craft picks the sound. Also "
 				"when the player's craft launches from the hangar." },
 	{ "hangar_ambient", "Now and then in the hangar, chosen at random. The command ship of the hangar picks "
 						"the list." },
-	{ "hyper_abort", "When the player's craft leaves hyperspace in a region that the mission marks as "
-					 "interdicted." },
+	{ "hyper_abort", "When the player's craft leaves hyperspace in a region whose `hyperspace_regions` rule "
+					 "asks for the abort sound." },
 	{ "hyper_end", "When the player's craft leaves hyperspace." },
 	{ "hyper_start", "When the player's craft starts a hyperspace jump." },
 	{ "hyper_zoom", "A moment after `hyper_start`, when the player's craft enters hyperspace." },

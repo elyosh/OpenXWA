@@ -26,6 +26,7 @@
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/weapon_stats.h"
@@ -1966,6 +1967,10 @@ void Object_UpdateLifetimeAndMovement(void) {
 				fwdScalar = 0;
 			}
 		}
+#ifdef XWA_MODERN
+		/* An arrival at a set speed stops exactly on its point. */
+		fwdScalar = XwaCraftHyperspace_LimitArrivalMove(objIdx, fwdScalar);
+#endif
 
 		switch (genus) {
 			case GENUS_Fighter:

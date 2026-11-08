@@ -78,8 +78,10 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Jamming | Implemented | The section of `default.ini` isn't converted. | [Craft](craft.md#jamming) |
 | Two warhead launchers (`hook_weapon_type`) | Implemented | | [Craft](craft.md#warheads) |
 | Docking | Implemented | | [Craft](craft.md#docking), [Flight](flight.md#docking) |
+| Interdictors (`[Interdictor]`) | Implemented | | [Craft](craft.md#hyperspace) |
+| Hyperspace speeds (`ShortHyperspaceEffect`, `[Hyperspace]`) | Implemented | OpenXWA lands an arriving craft exactly on its point, so `OutOfHyperspaceSetPosition` isn't needed, and wingmen stay in formation. A departing craft reaches its speed in about 0.1 s, whatever the frame rate. When a model's departure is looked up before its arrival, XWAU gives the arrival the departure speed; OpenXWA doesn't. | [Craft](craft.md#hyperspace), [Flight](flight.md#hyperspace) |
 | More craft, projectiles and explosions (`hook_crafts_count`) | Implemented | | [Flight](flight.md#object_limits) |
-| Craft sounds | Implemented | The hyperspace sound banks aren't converted. | [Craft](craft.md#sound), [Flight](flight.md#soundsyaml) |
+| Craft sounds | Implemented | | [Craft](craft.md#sound), [Flight](flight.md#soundsyaml) |
 
 ## HUD and flight art
 
@@ -120,7 +122,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | `[WeaponProfiles]` | Implemented | | [Missions](missions.md#weapon-profiles) |
 | `[StatsProfiles]` | Implemented | | [Missions](missions.md#stats_profiles) |
 | `[concourse]` planet | Implemented | | [Missions](missions.md#concourse) |
-| `[Interdiction]` | Partial | The abort sound plays when the player arrives in the listed regions. XWAU's hyperspace tunnel for an interdicted jump isn't implemented. | [Missions](missions.md#settings) |
+| `[Interdiction]` | Implemented | The abort sound plays when the player arrives in the listed regions. In modern graphics, the jump has OpenXWA's own interdiction look, not ddraw's colours and shake. | [Missions](missions.md#hyperspace_regions) |
 | `[Headlights]` | Implemented | | [Missions](missions.md#headlights) |
 | `[CraftsCount]` | Implemented | | [Missions](missions.md#object_limits) |
 

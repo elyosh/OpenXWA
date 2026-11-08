@@ -43,6 +43,7 @@ typedef struct XwaRemasterHyperspaceMoment {
 	float tunnel_ticks; /* the tunnel phase's length */
 	uint32_t seed;      /* picks the jump's stars */
 	uint8_t tunnel_only; /* the tunnel without end, and without the jump's brightening */
+	int look;            /* the jump's look (XwaRemasterFlight_HyperspaceLookName), or -1 */
 } XwaRemasterHyperspaceMoment;
 
 XwaRemasterHyperspace* XwaRemasterHyperspace_Create(const XwaFlightHyperspaceTunnelParams* tunnel,

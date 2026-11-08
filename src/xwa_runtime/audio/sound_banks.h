@@ -41,6 +41,8 @@ typedef enum XwaSoundBank {
 	XWA_SOUND_BANK_CANOPY_OPENING,    /* keyed by object type */
 	XWA_SOUND_BANK_ENGINE_SLOWING,    /* keyed by object type */
 	XWA_SOUND_BANK_ENGINE_WASH,       /* keyed by object type */
+	XWA_SOUND_BANK_ENTER_HYPERSPACE,  /* keyed by object type */
+	XWA_SOUND_BANK_EXIT_HYPERSPACE,   /* keyed by object type */
 	XWA_SOUND_BANK_FLY_BY,            /* keyed by object type */
 	XWA_SOUND_BANK_HANGAR_AMBIENT,    /* a list for each command ship type */
 	XWA_SOUND_BANK_HYPER_ABORT,       /* keyed by object type */

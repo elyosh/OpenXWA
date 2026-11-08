@@ -34,6 +34,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/camera/exterior_hud.h"
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/mission_settings.h"
@@ -1068,8 +1069,13 @@ void Player_HandleHyperspaceCommand(CraftData* craft, unsigned int playerIdx, ch
 
 		gravityWellActive = 0;
 		for (objIdx = g_activeRegionObjectSlotStart; objIdx < g_activeRegionCraftObjectSlotEnd; ++objIdx) {
+#ifdef XWA_MODERN
+			/* A model can have a gravity well, or lose its object type's. */
+			if (XwaCraftHyperspace_HasGravityWell(g_objectTable[objIdx].objectType)) {
+#else
 			if (g_objectTable[objIdx].objectType == OBJ_Interdictor2 ||
 				g_objectTable[objIdx].objectType == OBJ_ModStrikeCruiser) {
+#endif
 				MobileObject* mobj;
 
 				mobj = g_objectTable[objIdx].mobj;

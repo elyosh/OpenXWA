@@ -895,6 +895,101 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 		XwaRemasterFlight_SetHyperspaceJump(&j);
 	}
 
+	ImGui::Separator();
+	ImGui::TextUnformatted("Looks");
+	const int look_count = XwaRemasterFlight_HyperspaceLookCount();
+	static int edited_look = 0;
+	if (look_count <= 0) {
+		ImGui::TextDisabled("remaster/config.yaml has no hyperspace looks.");
+	} else {
+		if (edited_look >= look_count) {
+			edited_look = 0;
+		}
+		if (ImGui::BeginCombo("Look", XwaRemasterFlight_HyperspaceLookName(edited_look))) {
+			for (int i = 0; i < look_count; i++) {
+				if (ImGui::Selectable(XwaRemasterFlight_HyperspaceLookName(i), i == edited_look)) {
+					edited_look = i;
+				}
+			}
+			ImGui::EndCombo();
+		}
+		bool preview_look = XwaRemasterFlight_GetHyperspacePreviewLook() == edited_look;
+		if (ImGui::Checkbox("Preview this look", &preview_look)) {
+			XwaRemasterFlight_SetHyperspacePreviewLook(preview_look ? edited_look : -1);
+		}
+		float look_blend = XwaRemasterFlight_GetHyperspacePreviewLookBlend();
+		if (ImGui::SliderFloat("Tunnel preview progress", &look_blend, 0.0f, 1.0f, "%.2f")) {
+			XwaRemasterFlight_SetHyperspacePreviewLookBlend(look_blend);
+		}
+		ImGui::TextDisabled("The jump cycle preview shows the normal entry, the fade-in in the tunnel and\n"
+							"the coloured exit. The tunnel preview has no end, so the slider sets how far\n"
+							"into the tunnel it is: it drives the fade-in and the wobble.");
+
+		XwaFlightHyperspaceLookParams look;
+		XwaRemasterFlight_GetHyperspaceLook(edited_look, &look);
+		bool look_changed = false;
+		const ImGuiColorEditFlags color_flags = ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR;
+		look_changed |= ImGui::ColorEdit3("Tunnel dark color", look.dark_color, color_flags);
+		look_changed |= ImGui::ColorEdit3("Tunnel body color", look.body_color, color_flags);
+		look_changed |= ImGui::ColorEdit3("Tunnel highlight color", look.highlight_color, color_flags);
+		look_changed |= ImGui::ColorEdit3("Tunnel cap color", look.cap_color, color_flags);
+		look_changed |= ImGui::ColorEdit3("Exit streak tint", look.tint, color_flags);
+		look_changed |= ImGui::ColorEdit3("Exit streak tail color", look.tail_color, color_flags);
+		look_changed |= ImGui::SliderFloat("Blend start", &look.blend_start, 0.0f, 1.0f, "%.2f");
+		look_changed |= ImGui::SliderFloat("Blend end", &look.blend_end, 0.0f, 1.0f, "%.2f");
+		ImGui::TextDisabled("The shares of the tunnel where the colours start and end their fade.");
+		look_changed |= ImGui::SliderFloat("Shake degrees", &look.shake_degrees, 0.0f, 45.0f, "%.2f");
+		look_changed |= ImGui::SliderFloat("Shake speed", &look.shake_speed, 0.0f, 16.0f, "%.2f");
+		if (ImGui::Button("Reset look to YAML defaults")) {
+			XwaRemasterFlight_GetHyperspaceLookDefault(edited_look, &look);
+			look_changed = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Copy look YAML")) {
+			char yaml[1600];
+			std::snprintf(yaml, sizeof yaml,
+						  "  %s:\n"
+						  "    tunnel:\n"
+						  "      dark_color_r: %.4g\n"
+						  "      dark_color_g: %.4g\n"
+						  "      dark_color_b: %.4g\n"
+						  "      body_color_r: %.4g\n"
+						  "      body_color_g: %.4g\n"
+						  "      body_color_b: %.4g\n"
+						  "      highlight_color_r: %.4g\n"
+						  "      highlight_color_g: %.4g\n"
+						  "      highlight_color_b: %.4g\n"
+						  "      cap_color_r: %.4g\n"
+						  "      cap_color_g: %.4g\n"
+						  "      cap_color_b: %.4g\n"
+						  "    jump:\n"
+						  "      tint_r: %.4g\n"
+						  "      tint_g: %.4g\n"
+						  "      tint_b: %.4g\n"
+						  "      tail_color_r: %.4g\n"
+						  "      tail_color_g: %.4g\n"
+						  "      tail_color_b: %.4g\n"
+						  "    blend_start: %.4g\n"
+						  "    blend_end: %.4g\n"
+						  "    shake_degrees: %.4g\n"
+						  "    shake_speed: %.4g\n",
+						  XwaRemasterFlight_HyperspaceLookName(edited_look), (double)look.dark_color[0],
+						  (double)look.dark_color[1], (double)look.dark_color[2], (double)look.body_color[0],
+						  (double)look.body_color[1], (double)look.body_color[2],
+						  (double)look.highlight_color[0], (double)look.highlight_color[1],
+						  (double)look.highlight_color[2], (double)look.cap_color[0],
+						  (double)look.cap_color[1], (double)look.cap_color[2], (double)look.tint[0],
+						  (double)look.tint[1], (double)look.tint[2], (double)look.tail_color[0],
+						  (double)look.tail_color[1], (double)look.tail_color[2], (double)look.blend_start,
+						  (double)look.blend_end, (double)look.shake_degrees, (double)look.shake_speed);
+			ImGui::SetClipboardText(yaml);
+		}
+		ImGui::TextDisabled("Copy writes the look's block of hyperspace_looks.");
+		if (look_changed) {
+			XwaRemasterFlight_SetHyperspaceLook(edited_look, &look);
+		}
+	}
+
 	ImGui::End();
 	if (!b) {
 		XwaRemasterFlight_SetHyperspacePreview(XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF);

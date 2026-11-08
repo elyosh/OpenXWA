@@ -42,7 +42,9 @@ typedef struct MissionSettings {
 	int warheadCollisionDamage;
 	int damageThroughShields;
 	int proximityCraftOnly;
-	uint32_t abortSoundRegions; /* one bit per region */
+	int useHyperspaceSpeeds;
+	uint8_t hasRegionRule[XWA_HYPERSPACE_REGIONS];
+	XwaHyperspaceRegionRule regionRules[XWA_HYPERSPACE_REGIONS];
 	int hasTargetKey, targetCycle, targetOnlyNotInspected;
 	uint8_t targetFlightGroups[SETTINGS_FLIGHT_GROUPS / 8];
 	int hasOrderOfBattleList;
@@ -94,6 +96,7 @@ static void MissionSettings_Stock(MissionSettings* s) {
 	s->skipArrivalIff = SETTINGS_IFF_STOCK;
 	s->forceTurret = -1;
 	s->warheadCollisionDamage = 1;
+	s->useHyperspaceSpeeds = 1;
 	s->linesTop = -1;
 }
 
@@ -338,29 +341,88 @@ static void MissionSettings_ReadOrderOfBattle(const char* path, const AeronConfi
 	}
 }
 
-static void MissionSettings_ReadAbortSoundRegions(const char* path, const AeronConfigNode* node,
+/* Reads one region's rule of hyperspace_regions. Returns 0, logged, when it
+   isn't a valid rule. */
+static int MissionSettings_ReadRegionRule(const char* path, const AeronConfigNode* node,
+										  XwaHyperspaceRegionRule* rule) {
+	size_t i;
+
+	memset(rule, 0, sizeof *rule);
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogWarn("xwa.mission",
+					  "%s:%d: hyperspace_regions: a region's rule must be a map; it is ignored", path,
+					  AeronConfigNode_Line(node));
+		return 0;
+	}
+	for (i = 0; i < AeronConfigNode_MapCount(node); ++i) {
+		const char* key = AeronConfigNode_MapKeyAt(node, i);
+		const AeronConfigNode* value = AeronConfigNode_MapValueAt(node, i);
+		const char* text = AeronConfigNode_String(value, NULL);
+
+		if (strcmp(key, "look") == 0) {
+			size_t length = text != NULL ? strlen(text) : 0;
+			size_t c;
+			int valid = AeronConfigNode_Type(value) == AERON_CONFIG_STRING && length > 0 &&
+						length < XWA_HYPERSPACE_LOOK_NAME_MAX;
+
+			for (c = 0; valid && c < length; ++c) {
+				valid = (text[c] >= 'a' && text[c] <= 'z') || (text[c] >= '0' && text[c] <= '9') ||
+						text[c] == '_';
+			}
+			if (!valid) {
+				Aeron_LogWarn(
+					"xwa.mission",
+					"%s:%d: hyperspace_regions: look must be a name of lower-case letters, digits and "
+					"'_'; it is ignored",
+					path, AeronConfigNode_Line(value));
+				continue;
+			}
+			memcpy(rule->look, text, length + 1);
+		} else if (strcmp(key, "arrival_sound") == 0) {
+			if (AeronConfigNode_Type(value) != AERON_CONFIG_STRING ||
+				(strcmp(text, "abort") != 0 && strcmp(text, "normal") != 0)) {
+				Aeron_LogWarn(
+					"xwa.mission",
+					"%s:%d: hyperspace_regions: arrival_sound must be abort or normal; it is ignored", path,
+					AeronConfigNode_Line(value));
+				continue;
+			}
+			rule->abortSound = strcmp(text, "abort") == 0;
+		} else {
+			Aeron_LogWarn("xwa.mission",
+						  "%s:%d: hyperspace_regions: '%s' isn't a key of a region's rule; it is ignored",
+						  path, AeronConfigNode_Line(value), key);
+		}
+	}
+	return 1;
+}
+
+static void MissionSettings_ReadHyperspaceRegions(const char* path, const AeronConfigNode* node,
 												  MissionSettings* s) {
 	size_t i;
 
-	if (AeronConfigNode_Type(node) != AERON_CONFIG_SEQUENCE) {
-		Aeron_LogWarn("xwa.mission",
-					  "%s:%d: hyperspace_abort_sound_regions must be a list of regions; it is ignored", path,
-					  AeronConfigNode_Line(node));
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogWarn("xwa.mission", "%s:%d: hyperspace_regions must be a map of regions; it is ignored",
+					  path, AeronConfigNode_Line(node));
 		return;
 	}
-	s->abortSoundRegions = 0;
-	for (i = 0; i < AeronConfigNode_SequenceCount(node); ++i) {
-		const AeronConfigNode* item = AeronConfigNode_SequenceGet(node, i);
-		const int64_t region = AeronConfigNode_Int(item, -1);
+	memset(s->hasRegionRule, 0, sizeof s->hasRegionRule);
+	memset(s->regionRules, 0, sizeof s->regionRules);
+	for (i = 0; i < AeronConfigNode_MapCount(node); ++i) {
+		const char* key = AeronConfigNode_MapKeyAt(node, i);
+		const AeronConfigNode* value = AeronConfigNode_MapValueAt(node, i);
+		const int region =
+			key[0] >= '0' && key[0] < '0' + XWA_HYPERSPACE_REGIONS && key[1] == '\0' ? key[0] - '0' : -1;
 
-		if (AeronConfigNode_Type(item) != AERON_CONFIG_INT || region < 0 || region > 31) {
+		if (region < 0) {
 			Aeron_LogWarn("xwa.mission",
-						  "%s:%d: hyperspace_abort_sound_regions: regions are numbers from 0 to 31; one "
-						  "is ignored",
-						  path, AeronConfigNode_Line(item));
+						  "%s:%d: hyperspace_regions: '%s' isn't a region from 0 to %d; it is ignored", path,
+						  AeronConfigNode_Line(value), key, XWA_HYPERSPACE_REGIONS - 1);
 			continue;
 		}
-		s->abortSoundRegions |= 1u << region;
+		if (MissionSettings_ReadRegionRule(path, value, &s->regionRules[region])) {
+			s->hasRegionRule[region] = 1;
+		}
 	}
 }
 
@@ -405,8 +467,10 @@ static void MissionSettings_Read(const char* path, const AeronConfigNode* settin
 			MissionSettings_ReadBool(path, key, node, &s->proximityCraftOnly);
 		} else if (strcmp(key, "order_of_battle") == 0) {
 			MissionSettings_ReadOrderOfBattle(path, node, s);
-		} else if (strcmp(key, "hyperspace_abort_sound_regions") == 0) {
-			MissionSettings_ReadAbortSoundRegions(path, node, s);
+		} else if (strcmp(key, "use_hyperspace_speeds") == 0) {
+			MissionSettings_ReadBool(path, key, node, &s->useHyperspaceSpeeds);
+		} else if (strcmp(key, "hyperspace_regions") == 0) {
+			MissionSettings_ReadHyperspaceRegions(path, node, s);
 		} else {
 			Aeron_LogWarn("xwa.mission", "%s:%d: '%s' isn't a mission setting; it is ignored", path,
 						  AeronConfigNode_Line(node), key);
@@ -685,8 +749,13 @@ int XwaMissionSettings_DamageThroughShieldsOnHard(void) { return s_settings.dama
 
 int XwaMissionSettings_ProximityTriggersCheckCraftOnly(void) { return s_settings.proximityCraftOnly; }
 
-int XwaMissionSettings_HyperspaceAbortSoundRegion(int region) {
-	return region >= 0 && region < 32 && (s_settings.abortSoundRegions & (1u << region)) != 0;
+int XwaMissionSettings_UseHyperspaceSpeeds(void) { return s_settings.useHyperspaceSpeeds; }
+
+const XwaHyperspaceRegionRule* XwaMissionSettings_HyperspaceRegion(int region) {
+	if (region < 0 || region >= XWA_HYPERSPACE_REGIONS || !s_settings.hasRegionRule[region]) {
+		return NULL;
+	}
+	return &s_settings.regionRules[region];
 }
 
 /* Whether the O key may target object `objIdx` for player `player`: a craft

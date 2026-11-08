@@ -8,6 +8,7 @@
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/craft_hud.h"
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/docking.h"
@@ -55,6 +56,7 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "gunner_seats", XwaGunnerSeats_ClearModelSettings, XwaGunnerSeats_ReadModelSettings },
 	{ "warhead_lock", XwaWarheadLock_ClearModelSettings, XwaWarheadLock_ReadModelSettings },
 	{ "jamming", XwaJamming_ClearModelSettings, XwaJamming_ReadModelSettings },
+	{ "hyperspace", XwaCraftHyperspace_ClearModelSettings, XwaCraftHyperspace_ReadModelSettings },
 	{ "docking", XwaDocking_ClearModelSettings, XwaDocking_ReadModelSettings },
 	{ "ai_attack", XwaAiAttack_ClearModelSettings, XwaAiAttack_ReadModelSettings },
 	{ "mag_pulse", XwaMagPulse_ClearModelSettings, XwaMagPulse_ReadModelSettings },

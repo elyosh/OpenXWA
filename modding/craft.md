@@ -448,6 +448,7 @@ keeps the game's values for that subject.
 | [`gunner_seats`](#gunner_seats) | gunner seats |
 | [`warhead_lock`](#warhead_lock) | warhead lock ranges and times |
 | [`jamming`](#jamming) | where the craft jams the player's weapons |
+| [`hyperspace`](#hyperspace) | a gravity well, and how fast AI craft arrive and leave by hyperspace |
 | [`docking`](#docking) | the approach height when the player docks |
 | [`ai_attack`](#ai_attack) | how close the AI gets before it breaks off, and from how far it fires lasers |
 | [`mag_pulse`](#mag_pulse) | what a mag pulse hit does to the craft |
@@ -993,6 +994,35 @@ original game:
 
 Jamming points are hardpoints of the model. The
 [model values](reference/model_values.md#hardpoint-types) page lists them.
+
+### hyperspace
+
+`hyperspace` sets whether the craft has a gravity well, and how fast AI
+craft of this model arrive and leave by hyperspace.
+
+```yaml
+hyperspace:
+  gravity_well: true
+  arrival_speed_mglt: 4800
+  departure_speed_mglt: 4800
+```
+
+| Key | Meaning |
+|-|-|
+| `gravity_well` | `true`: while an enemy craft of this model has working systems in the player's region, the player can't jump to hyperspace. `false`: the craft never stops a jump. |
+| `arrival_speed_mglt` | How fast an arriving AI craft flies, from 0.444 to 14563 MGLT. |
+| `departure_speed_mglt` | The speed at which an AI craft jumps away, from 0.444 to 14563 MGLT. |
+
+Without `gravity_well`, the craft keeps the rule of its object type: in
+the original game, only the Interdictor and the Modified Strike Cruiser
+have a gravity well.
+
+Without a speed, the craft uses the speed of the `hyperspace` section of
+`flight/flight.yaml`, or else arrives and leaves as in the original game.
+[Flight settings](flight.md#hyperspace) describes how arrivals and
+departures work, and the other values that they use. The speeds only apply
+in missions where `use_hyperspace_speeds` isn't `false`. The player's own
+craft always keeps the original jump.
 
 ### docking
 

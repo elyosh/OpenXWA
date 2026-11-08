@@ -294,6 +294,43 @@ void XwaRemasterFlight_GetHyperspaceJump(XwaFlightHyperspaceJumpParams* out);
 void XwaRemasterFlight_SetHyperspaceJump(const XwaFlightHyperspaceJumpParams* in);
 void XwaRemasterFlight_GetHyperspaceJumpDefault(XwaFlightHyperspaceJumpParams* out);
 
+/* Named looks of the player's jump, loaded from the `hyperspace_looks`
+ * section of remaster/config.yaml and live-editable through the debug
+ * inspector. A mission picks a look for a jump by its destination region.
+ * The look's colours replace the normal ones: in the tunnel they fade in
+ * between blend_start and blend_end, the exit uses them fully, and the
+ * entry doesn't use them. The tunnel also wobbles around the view. */
+#define XWA_FLIGHT_HYPERSPACE_LOOKS_MAX 8
+#define XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX 32
+
+typedef struct XwaFlightHyperspaceLookParams {
+	/* The tunnel's colours (XwaFlightHyperspaceTunnelParams). */
+	float dark_color[3];
+	float body_color[3];
+	float highlight_color[3];
+	float cap_color[3];
+	/* The exit streaks' colours (XwaFlightHyperspaceJumpParams). */
+	float tint[3];
+	float tail_color[3];
+	/* Shares of the tunnel, 0 to 1, where the colours start and end their
+	   fade. */
+	float blend_start;
+	float blend_end;
+	/* The tunnel's wobble at its strongest, in degrees, and how fast it
+	   moves (1 is the reference speed). */
+	float shake_degrees;
+	float shake_speed;
+} XwaFlightHyperspaceLookParams;
+
+int XwaRemasterFlight_HyperspaceLookCount(void);
+/* The name of look `index`, or NULL. */
+const char* XwaRemasterFlight_HyperspaceLookName(int index);
+/* The index of the look named `name`, or -1. */
+int XwaRemasterFlight_FindHyperspaceLook(const char* name);
+void XwaRemasterFlight_GetHyperspaceLook(int index, XwaFlightHyperspaceLookParams* out);
+void XwaRemasterFlight_SetHyperspaceLook(int index, const XwaFlightHyperspaceLookParams* in);
+void XwaRemasterFlight_GetHyperspaceLookDefault(int index, XwaFlightHyperspaceLookParams* out);
+
 /* The debug preview of hyperspace. It replaces what the flight scene shows,
  * never the simulation state. Map mode and real hyperspace come first. */
 typedef enum XwaFlightHyperspacePreview {
@@ -307,6 +344,13 @@ XwaFlightHyperspacePreview XwaRemasterFlight_GetHyperspacePreview(void);
 /* Playback speed of the preview, 0.05 to 1. */
 void XwaRemasterFlight_SetHyperspacePreviewSpeed(float speed);
 float XwaRemasterFlight_GetHyperspacePreviewSpeed(void);
+/* The look that the preview draws, or -1 for the normal look. */
+void XwaRemasterFlight_SetHyperspacePreviewLook(int index);
+int XwaRemasterFlight_GetHyperspacePreviewLook(void);
+/* How far the look has faded in, 0 to 1, in the tunnel preview, which has
+   no end. */
+void XwaRemasterFlight_SetHyperspacePreviewLookBlend(float blend);
+float XwaRemasterFlight_GetHyperspacePreviewLookBlend(void);
 
 /* What the scene warp shows during the entry and the exit. The debug views
  * replace the image. */

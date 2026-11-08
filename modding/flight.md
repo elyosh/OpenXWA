@@ -38,6 +38,7 @@ sections:
 | `ai_attack` | how close AI craft get before they break off, and from how far they fire lasers |
 | `mag_pulse` | what a mag pulse hit does to a craft |
 | `warhead_lock` | the AI's warhead lock ranges, by the genus of its craft |
+| `hyperspace` | how fast AI craft arrive and leave by hyperspace |
 | `headlights` | a light on the nose of the player's craft |
 | `object_limits` | how many craft, shots, explosions and radar blips a mission can have |
 | `camera` | the lag and tilt of the exterior camera, the cockpit sway and the HUD in the exterior view |
@@ -59,7 +60,8 @@ Some of these settings can also be set for one mission or for one model:
 - A model settings file, `flight/models/<model>.yaml`, can set weapon
   colours, rates, stats and hardpoint kinds, shield rates, a docking
   height, AI attack ranges, mag pulse hits, warhead lock ranges and HUD
-  settings for the craft that use the model. See [Craft](craft.md).
+  settings for the craft that use the model. A model can also have a
+  gravity well, and its own hyperspace speeds. See [Craft](craft.md).
 
 This page describes the game-wide form of each setting.
 
@@ -137,7 +139,8 @@ mission_settings:
 | `target_key` | Makes the target key (O) target craft of chosen flight groups. |
 | `proximity_triggers_check_craft_only` | `true` makes proximity triggers ignore every object that isn't a craft. |
 | `order_of_battle` | The flight groups, names and text of the order of battle in the briefing. |
-| `hyperspace_abort_sound_regions` | A list of regions (0 to 31). A hyperspace arrival in one of them plays the abort sound. |
+| `use_hyperspace_speeds` | `false` keeps the original game's hyperspace arrivals and departures, even with the speeds of the `hyperspace` section. The default is `true`. |
+| `hyperspace_regions` | What happens when the player jumps to a region: the look of the jump, and the sound when the player arrives. |
 
 Without a value, the game keeps the original game's behaviour. The
 original game puts the hangar on red alert in mission 20, hides the
@@ -599,6 +602,48 @@ warhead_lock:
 `big` and `big_top_tier`, in metres, as in a model's
 `warhead_lock.ai_lock_range_m`. In this example, AI starships fire
 warheads at big targets from these distances.
+
+### hyperspace
+
+The `hyperspace` section sets how fast AI craft arrive and leave by
+hyperspace. A model's `hyperspace` group can set its own speeds. See
+[Craft](craft.md#hyperspace).
+
+```yaml
+hyperspace:
+  arrival_speed_mglt: 4800
+  arrival_braking_seconds: 0.5
+  departure_speed_mglt: 4800
+  departure_acceleration_mglt: 48000
+```
+
+| Key | Meaning | Default |
+|-|-|-|
+| `arrival_speed_mglt` | How fast an arriving craft flies, from 0.444 to 14563 MGLT. | none: the original arrival |
+| `arrival_braking_seconds` | How long an arriving craft takes to slow down to its normal speed, from 0 to 60 seconds. 0 stops it at once. | 0.5 |
+| `departure_speed_mglt` | The speed at which a craft jumps away, from 0.444 to 14563 MGLT. | 1600 |
+| `departure_acceleration_mglt` | How much speed a craft gains in each second while it jumps away, in MGLT. | 666.667 |
+
+Without the section, and without a model's speeds, craft arrive and leave
+as in the original game:
+
+- An arriving craft appears 12.8 km before its arrival point, flies at
+  1600 MGLT, slows down in steps over the last few seconds, and stops where
+  it passes closest to its point. The arrival takes about 11 seconds.
+- A craft that leaves speeds up by 666.667 MGLT each second, and jumps when
+  it reaches 1600 MGLT.
+
+With an arrival speed, the craft still appears 12.8 km before its point. It
+flies at that speed, slows down over `arrival_braking_seconds`, and stops
+exactly where it passes closest to its point: the point itself for a flight
+group leader, and its place in the formation for a wingman. With
+`departure_speed_mglt` or `departure_acceleration_mglt`, a craft that
+leaves speeds up at that rate and jumps when it reaches that speed. The
+player's own craft always keeps the original jump.
+
+A mission can turn the speeds off with `use_hyperspace_speeds: false` in its
+settings, and `mission_settings` can turn them off for every mission. See
+[mission_settings](#mission_settings).
 
 ### headlights
 
@@ -1139,7 +1184,7 @@ each bank with `unlisted: silent`.
 
 | Banks | Keys of `sounds` | Value |
 |-|-|-|
-| `canopy_opening`, `engine_slowing`, `engine_wash`, `fly_by`, `hyper_abort`, `hyper_end`, `hyper_start`, `hyper_zoom`, `interior`, `s_foil`, `shuttle_blast_off`, `shuttle_shut_down`, `shuttle_take_off`, `starship_ambient`, `take_off` | object type | an entry |
+| `canopy_opening`, `engine_slowing`, `engine_wash`, `enter_hyperspace`, `exit_hyperspace`, `fly_by`, `hyper_abort`, `hyper_end`, `hyper_start`, `hyper_zoom`, `interior`, `s_foil`, `shuttle_blast_off`, `shuttle_shut_down`, `shuttle_take_off`, `starship_ambient`, `take_off` | object type | an entry |
 | `weapon` | object type of the craft that fires | a map from weapon sound group to entry |
 | `hangar_ambient` | object type of the hangar's command ship | a list of 1 to 10 entries |
 | `weapon_explosion` | object type of the craft that fired the weapon that explodes | a list of 1 to 8 entries |

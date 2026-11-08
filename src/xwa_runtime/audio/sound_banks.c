@@ -50,6 +50,8 @@ static const SoundBankInfo s_banks[XWA_SOUND_BANK_COUNT] = {
 	{ "canopy_opening", "CanopyOpening", SOUND_BANKS_BY_TYPE, 1 },
 	{ "engine_slowing", "EngineSlowing", SOUND_BANKS_BY_TYPE, 1 },
 	{ "engine_wash", "EngineWash", SOUND_BANKS_BY_TYPE, 1 },
+	{ "enter_hyperspace", "EnterHyperspace", SOUND_BANKS_BY_TYPE, 1 },
+	{ "exit_hyperspace", "ExitHyperspace", SOUND_BANKS_BY_TYPE, 1 },
 	{ "fly_by", "FlyBy", SOUND_BANKS_BY_TYPE, 1 },
 	{ "hangar_ambient", "HangarAmbient", SOUND_BANKS_LIST, XWA_SOUND_BANKS_HANGAR_AMBIENT_MAX },
 	{ "hyper_abort", "HyperAbort", SOUND_BANKS_BY_TYPE, 1 },
