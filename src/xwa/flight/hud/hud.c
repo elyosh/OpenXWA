@@ -16613,25 +16613,37 @@ void Mfd_DrawMessageLogPage(int mfdSide, void* mfdSurface) {
 		uint8_t readyClockTick;
 		uint8_t readyClockMinute;
 		uint8_t readyClockHour;
+		const HudInFlightMessageRecord* record;
 
 		readyClockTick = g_readyMessagePaneQueue[0].clockTick;
 		readyClockMinute = g_readyMessagePaneQueue[0].clockMinute;
 		readyClockHour = g_readyMessagePaneQueue[0].clockHour;
 		do {
+#ifdef XWA_MODERN
+			/* The log keeps the latest 300 records in a ring: record n is in
+			   slot n % 300. The game reads slot n, which is past the buffer
+			   after 380 records. Older records have been overwritten, so the
+			   walk stops 300 records back. */
+			if (g_messageLogTotalCount > MFD_MESSAGE_LOG_MAX_RECORDS &&
+				drawCount <= g_messageLogTotalCount - MFD_MESSAGE_LOG_MAX_RECORDS) {
+				break;
+			}
+			record = &g_messageLogRecords[(drawCount - 1) % MFD_MESSAGE_LOG_MAX_RECORDS];
+#else
+			record = &g_messageLogRecords[drawCount - 1];
+#endif
 			if (g_missionTimeLimitActive) {
-				if (g_messageLogRecords[drawCount - 1].clockHour > readyClockHour ||
-					(g_messageLogRecords[drawCount - 1].clockHour == readyClockHour &&
-					 (g_messageLogRecords[drawCount - 1].clockMinute > readyClockMinute ||
-					  (g_messageLogRecords[drawCount - 1].clockMinute == readyClockMinute &&
-					   g_messageLogRecords[drawCount - 1].clockTick >= readyClockTick)))) {
+				if (record->clockHour > readyClockHour ||
+					(record->clockHour == readyClockHour &&
+					 (record->clockMinute > readyClockMinute ||
+					  (record->clockMinute == readyClockMinute && record->clockTick >= readyClockTick)))) {
 					break;
 				}
 			} else {
-				if (g_messageLogRecords[drawCount - 1].clockHour < readyClockHour ||
-					(g_messageLogRecords[drawCount - 1].clockHour == readyClockHour &&
-					 (g_messageLogRecords[drawCount - 1].clockMinute < readyClockMinute ||
-					  (g_messageLogRecords[drawCount - 1].clockMinute == readyClockMinute &&
-					   g_messageLogRecords[drawCount - 1].clockTick <= readyClockTick)))) {
+				if (record->clockHour < readyClockHour ||
+					(record->clockHour == readyClockHour &&
+					 (record->clockMinute < readyClockMinute ||
+					  (record->clockMinute == readyClockMinute && record->clockTick <= readyClockTick)))) {
 					break;
 				}
 			}
