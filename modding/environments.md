@@ -257,7 +257,7 @@ xwa:
 | Key | Meaning |
 |-|-|
 | `default` | The environment of every region that has no entry. Without it, these regions keep the game's own sky. It can't be `none`. |
-| `missions` | The regions of each mission, by mission path. Up to 128 missions. |
+| `missions` | The regions of each mission, by mission path. |
 
 The key of a mission is its path in the game folder, such as
 `missions/1b0m1fw.tie`. It can be written in any case, with `/` or `\`.
