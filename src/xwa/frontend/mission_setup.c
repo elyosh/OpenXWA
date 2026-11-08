@@ -1,4 +1,6 @@
 #include "xwa/frontend/mission_setup.h"
+
+#include "aeron/aeron.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/frontend/concourse_layout.h"
 #include "xwa_runtime/frontend/family_missions.h"
@@ -7689,6 +7691,13 @@ int MissionSetup_Update(int frameCounter) {
 		g_missionSetupLastHostBroadcastTick = GetTickCount();
 		g_pilotData.unk2 = 0;
 		FrontendMission_LoadCurrent();
+#ifdef XWA_MODERN
+		/* The pilot's mission is not in the mission list. The code below
+		   would read outside the list, and the game is quitting anyway. */
+		if (Aeron_FatalErrorRequested()) {
+			return 0;
+		}
+#endif
 		MissionSetup_LoadMissionDescText(g_briefingText);
 		MissionSetup_CountActiveTeams();
 		g_selectedMissionListIndex = 0;

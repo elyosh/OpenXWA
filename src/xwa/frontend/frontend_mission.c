@@ -1,5 +1,6 @@
 #include "xwa/frontend/frontend_mission.h"
 
+#include "aeron/aeron.h"
 #include "aeron/log.h"
 
 #include "xwa/assets/file_io.h"
@@ -925,6 +926,22 @@ int FrontendMission_LoadFile(char* fileName) {
 	return 1;
 }
 
+#ifdef XWA_MODERN
+/* Shows a fatal error when the pilot's current mission can't be found, and
+   asks the game to quit. */
+static void FrontendMission_ReportMissingMission(int missionDirectoryId, int listMissing) {
+	char message[512];
+
+	snprintf(message, sizeof(message),
+			 "Cannot load the pilot's current mission.\n\n%s\\mission.lst %s.\n\n"
+			 "The pilot file may come from the original game or from a mod with different missions. "
+			 "Use this pilot with the mod it was created with, or create a new pilot.",
+			 g_campaignDirNames[missionDirectoryId],
+			 listMissing ? "is missing or empty" : "doesn't list the mission that the pilot file selects");
+	Aeron_RequestFatalError("OpenXWA", message);
+}
+#endif
+
 // FUNCTION: XWA 0x566D90
 int FrontendMission_LoadCurrent(void) {
 	unsigned int missionListIndex;
@@ -950,6 +967,9 @@ int FrontendMission_LoadCurrent(void) {
 		Aeron_LogError("xwa.frontend",
 					   "Cannot load current frontend mission: mission list for directory %d is missing",
 					   missionDirectoryId);
+		/* The original reads a missing list anyway and crashes. Stop with a
+		   message instead. */
+		FrontendMission_ReportMissingMission(missionDirectoryId, 1);
 		return 0;
 #else
 		missionListIndex = (unsigned int)g_selectedMissionListIndex;
@@ -985,6 +1005,13 @@ int FrontendMission_LoadCurrent(void) {
 		Aeron_LogError("xwa.frontend",
 					   "Cannot load current frontend mission: mission id %d not found in directory %d",
 					   g_pilotData.missionDescriptionIds[missionDirectoryId], missionDirectoryId);
+		/* This happens when the pilot file names a mission that the current
+		   mission.lst doesn't have, for example a pilot from the original game
+		   used with a mod that has other missions. The original reads past the
+		   end of the list. Callers still read the selected entry in this frame,
+		   so point it at a real entry, then stop with a message. */
+		g_selectedMissionListIndex = 0;
+		FrontendMission_ReportMissingMission(missionDirectoryId, 0);
 		return 0;
 	}
 #endif
