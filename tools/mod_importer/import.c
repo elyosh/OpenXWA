@@ -307,6 +307,22 @@ static FolderState folder_state(const char* dir) {
 	return ours ? FOLDER_IMPORTED : FOLDER_OTHER;
 }
 
+bool XwaModImport_IsImported(const char* dir) { return folder_state(dir) == FOLDER_IMPORTED; }
+
+bool XwaModImport_Delete(const char* dir) {
+	char path[IMPORT_PATH_CAP];
+	if (folder_state(dir) != FOLDER_IMPORTED)
+		return false;
+	size_t count = 0;
+	char** names = ListDir(dir, false, &count);
+	bool ok = names != NULL;
+	for (size_t i = 0; i < count; ++i)
+		if (strcmp(names[i], "mod.yaml") != 0)
+			ok = PathFormat(path, sizeof path, "%s/%s", dir, names[i]) && RemoveTree(path) && ok;
+	FreeList(names, count);
+	return ok && PathFormat(path, sizeof path, "%s/mod.yaml", dir) && remove(path) == 0 && RemoveTree(dir);
+}
+
 /* Whether `path` is `dir` or inside it. */
 static bool inside(const char* path, const char* dir) {
 	size_t length = strlen(dir);

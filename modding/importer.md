@@ -30,9 +30,18 @@ Then:
 5. When the import succeeds, the importer makes OpenXWA use the new mod. Start
    OpenXWA to play it.
 
-The **Mods** tab of the importer lists the mods, and chooses the one that
-OpenXWA uses, like the **Mods** screen of the game. The change takes effect
-the next time OpenXWA starts.
+The **Mods** tab of the importer lists the mods in the mods folder, and
+chooses the one that OpenXWA uses, like the **Mods** screen of the game. The
+change takes effect the next time OpenXWA starts. In this tab you can also:
+
+- choose another mods folder. OpenXWA then lists the mods in that folder.
+- see the folder of the selected mod, and why it can't be used if it has a
+  problem.
+- click **Show Folder** to open the mod's folder in Explorer or Finder.
+- click **Delete...** to delete a mod that the importer made, with its
+  folder. You can import it again from its XWAU or TFTC installation. If
+  OpenXWA used the mod, it starts with the original game. Mods that you made
+  yourself can't be deleted here: use **Show Folder** and delete the folder.
 
 ## What the importer makes
 

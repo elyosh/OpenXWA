@@ -203,6 +203,20 @@ static AeronVfs* mod_list_vfs(const char* root) {
 	return AeronVfs_Create(&config);
 }
 
+int XwaModList_IsFolder(const char* path) {
+	AeronVfs* vfs;
+	AeronFileInfo info;
+	int found;
+
+	if (!path || !path[0]) {
+		return 0;
+	}
+	vfs = mod_list_vfs(path);
+	found = vfs && AeronVfs_Stat(vfs, AERON_VFS_ROOT_ASSET, ".", &info) && info.is_directory;
+	AeronVfs_Destroy(vfs);
+	return found;
+}
+
 int XwaModList_Read(const char* path, XwaModEntry* out) {
 	AeronVfs* vfs = mod_list_vfs(NULL);
 	int found;

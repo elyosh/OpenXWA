@@ -23,6 +23,9 @@
 /* The height of a row of buttons and the space above it, in reference
  * pixels. */
 #define BUTTON_ROWS_REF 90.0f
+/* How long the Mods tab waits after the last key in the mods folder field
+ * before it lists the mods of the new folder. */
+#define MODS_FOLDER_DELAY_US 700000u
 
 typedef enum Screen {
 	SCREEN_FORM,
@@ -36,6 +39,7 @@ typedef enum Browse {
 	BROWSE_GAME,
 	BROWSE_MODS,
 	BROWSE_AUTHORING,
+	BROWSE_MODS_LIST, /* the mods folder, from the Mods tab */
 } Browse;
 
 struct ImporterUi {
@@ -93,12 +97,21 @@ struct ImporterUi {
 
 	/* The Mods tab. */
 	XwaModList mods;
-	char (*mod_labels)[320];
 	AeronUiListItem* mod_items;
+	unsigned char* mod_imported; /* whether the importer made each mod */
 	size_t mod_in_use;
 	size_t mod_selected;
 	int mods_scanned;
 	char mods_message[512];
+	char mods_folder_message[512]; /* why the mods folder field isn't used */
+	char mods_notice[PATH_CAP + 160]; /* the mod that OpenXWA is set to use is missing */
+	uint64_t mods_folder_edit_us;    /* when the field was last typed in, or 0 */
+	/* Deleting a mod, on its own thread. */
+	int delete_open;
+	AeronThread* delete_thread;
+	volatile int delete_done, delete_ok;
+	char delete_path[PATH_CAP];
+	char delete_name[256];
 };
 
 /* ---- Configuration ------------------------------------------------------ */
@@ -126,6 +139,41 @@ static int mods_left_behind(const ImporterUi* app) {
 	const int found = list.count > 1;
 	XwaModList_Free(&list);
 	return found;
+}
+
+/* Makes OpenXWA list the mods of the mods folder field, if it names a
+   folder. */
+static void apply_mods_folder(ImporterUi* app) {
+	char error[512];
+	app->mods_folder_edit_us = 0;
+	app->mods_folder_message[0] = '\0';
+	if (!app->mods_folder[0]) {
+		snprintf(app->mods_folder_message, sizeof app->mods_folder_message,
+				 "Choose the folder that has your mods.");
+		return;
+	}
+	if (XwaModList_SamePath(app->mods_folder, app->saved_mods_folder))
+		return;
+	if (!XwaModList_IsFolder(app->mods_folder)) {
+		snprintf(app->mods_folder_message, sizeof app->mods_folder_message, "This folder doesn't exist.");
+		return;
+	}
+	if (!app->config_ok) {
+		snprintf(app->mods_folder_message, sizeof app->mods_folder_message,
+				 "OpenXWA's configuration can't be read, so the mods folder can't be changed.");
+		return;
+	}
+	if (!XwaHostConfig_SaveModsPath(Aeron_GetVfs(), app->mods_folder, error, sizeof error)) {
+		snprintf(app->mods_folder_message, sizeof app->mods_folder_message,
+				 "The mods folder can't be saved in OpenXWA's configuration: %s", error);
+		return;
+	}
+	load_config(app);
+	app->mods_scanned = 0;
+	app->mod_selected = SIZE_MAX;
+	app->mods_message[0] = '\0';
+	/* The Import tab's mod folder follows. */
+	app->checked = 0;
 }
 
 /* ---- Checking the form -------------------------------------------------- */
@@ -213,7 +261,7 @@ static void check_fields(ImporterUi* app) {
 static char* browse_field(ImporterUi* app, Browse browse) {
 	return browse == BROWSE_SOURCE ? app->source
 		   : browse == BROWSE_GAME ? app->game
-		   : browse == BROWSE_MODS ? app->mods_folder
+		   : browse == BROWSE_MODS || browse == BROWSE_MODS_LIST ? app->mods_folder
 								   : app->authoring;
 }
 
@@ -244,6 +292,8 @@ static void poll_dialog(ImporterUi* app) {
 		snprintf(browse_field(app, app->browse), PATH_CAP, "%s", path);
 		app->authoring_edited |= app->browse == BROWSE_AUTHORING;
 		app->checked = 0;
+		if (app->browse == BROWSE_MODS_LIST)
+			apply_mods_folder(app);
 	} else if (status == AERON_FOLDER_DIALOG_ERROR) {
 		snprintf(app->check_message, sizeof app->check_message, "The folder dialog failed: %s", error);
 	}
@@ -433,7 +483,7 @@ static void draw_form(ImporterUi* app) {
 		Aeron_RequestQuit();
 	AeronUi_NextColumn(ui);
 	const int ready = app->checked && app->source_ok && app->game_ok &&
-					  app->check != XWA_MOD_IMPORT_CHECK_INVALID && !app->dialog;
+					  app->check != XWA_MOD_IMPORT_CHECK_INVALID && !app->dialog && !app->delete_thread;
 	if (AeronUi_ButtonEnabled(ui, "Import", ready)) {
 		if (app->check == XWA_MOD_IMPORT_CHECK_REPLACE)
 			app->replace_open = 1;
@@ -536,22 +586,43 @@ static void draw_done(ImporterUi* app) {
 
 /* ---- The Mods tab ------------------------------------------------------- */
 
+/* The short status at the right of a mod's row. The details below the list
+   say the whole problem. */
+static const char* mod_status(const XwaModEntry* entry, int in_use) {
+	switch (entry->state) {
+	case XWA_MOD_UNFINISHED:
+		return "Unfinished";
+	case XWA_MOD_OTHER_VERSION:
+		return "Other version";
+	case XWA_MOD_UNREADABLE:
+		return "Broken mod.yaml";
+	case XWA_MOD_READY:
+		break;
+	}
+	return in_use ? "In use" : NULL;
+}
+
 static void scan_mods(ImporterUi* app) {
 	char current[PATH_CAP] = "";
 	XwaModList_Free(&app->mods);
-	free(app->mod_labels);
 	free(app->mod_items);
-	app->mod_labels = NULL;
+	free(app->mod_imported);
 	app->mod_items = NULL;
+	app->mod_imported = NULL;
 	app->mod_in_use = SIZE_MAX;
+	app->mods_notice[0] = '\0';
 	app->mods_scanned = 1;
 	if (!XwaModList_Scan(app->saved_mods_folder, app->config.mod_path, &app->mods)) {
 		snprintf(app->mods_message, sizeof app->mods_message, "The mods can't be listed. Try Refresh.");
 		return;
 	}
-	app->mod_labels = calloc(app->mods.count, sizeof *app->mod_labels);
 	app->mod_items = calloc(app->mods.count, sizeof *app->mod_items);
-	if (!app->mod_labels || !app->mod_items) {
+	app->mod_imported = calloc(app->mods.count, sizeof *app->mod_imported);
+	if (!app->mod_items || !app->mod_imported) {
+		free(app->mod_items);
+		free(app->mod_imported);
+		app->mod_items = NULL;
+		app->mod_imported = NULL;
 		XwaModList_Free(&app->mods);
 		return;
 	}
@@ -566,47 +637,146 @@ static void scan_mods(ImporterUi* app) {
 			(entry->path[0] ? current[0] && XwaModList_SamePath(entry->path, current) : !current[0]);
 		if (in_use)
 			app->mod_in_use = i;
-		const char* problem = entry->problem[0] ? entry->problem : NULL;
-		snprintf(app->mod_labels[i], sizeof app->mod_labels[i], "%s%s%s%s", entry->name, problem ? " - " : "",
-				 problem ? problem : "", in_use ? " (in use)" : "");
+		app->mod_imported[i] = entry->path[0] && XwaModImport_IsImported(entry->path);
 		app->mod_items[i] = (AeronUiListItem) {
 			.id = i,
-			.label = app->mod_labels[i],
-			.detail = entry->path,
-			.flags = problem ? AERON_UI_LIST_ITEM_DISABLED : AERON_UI_LIST_ITEM_NONE,
+			.label = entry->name,
+			.detail = mod_status(entry, in_use),
+			.flags = entry->problem[0] ? AERON_UI_LIST_ITEM_DIMMED : AERON_UI_LIST_ITEM_NONE,
 		};
 	}
+	/* The list leaves out a configured mod without a mod.yaml, such as one
+	   whose folder was deleted. */
+	if (current[0] && app->mod_in_use == SIZE_MAX)
+		snprintf(app->mods_notice, sizeof app->mods_notice,
+				 "OpenXWA is set to use the mod in %s, but that folder has no mod. OpenXWA starts with the "
+				 "original game until you choose another mod.",
+				 current);
 	if (app->mod_selected >= app->mods.count)
 		app->mod_selected = SIZE_MAX;
 }
 
+static int delete_thread(void* user) {
+	ImporterUi* app = user;
+	Aeron_AtomicStore(&app->delete_ok, XwaModImport_Delete(app->delete_path));
+	Aeron_AtomicStore(&app->delete_done, 1);
+	return 0;
+}
+
+static void start_delete(ImporterUi* app) {
+	const XwaModEntry* entry = &app->mods.entries[app->mod_selected];
+	snprintf(app->delete_path, sizeof app->delete_path, "%s", entry->path);
+	snprintf(app->delete_name, sizeof app->delete_name, "%s", entry->name);
+	Aeron_AtomicStore(&app->delete_done, 0);
+	Aeron_AtomicStore(&app->delete_ok, 0);
+	app->delete_thread = Aeron_ThreadCreate("mod delete", delete_thread, app);
+	if (app->delete_thread)
+		snprintf(app->mods_message, sizeof app->mods_message, "Deleting %s...", app->delete_name);
+	else
+		snprintf(app->mods_message, sizeof app->mods_message, "%s can't be deleted.", app->delete_name);
+}
+
+/* Joins the delete thread once it has finished. */
+static void finish_delete(ImporterUi* app) {
+	char error[512];
+	if (!app->delete_thread || !Aeron_AtomicLoad(&app->delete_done))
+		return;
+	Aeron_ThreadJoin(app->delete_thread);
+	app->delete_thread = NULL;
+	if (!Aeron_AtomicLoad(&app->delete_ok)) {
+		snprintf(app->mods_message, sizeof app->mods_message,
+				 "Some files of %s can't be deleted. Close OpenXWA if it is running and try again, or delete "
+				 "the folder yourself with Show Folder.",
+				 app->delete_name);
+	} else if (app->config_ok && XwaModList_SamePath(app->config.mod_path, app->delete_path)) {
+		/* OpenXWA would warn that the mod is missing at every start. */
+		if (XwaHostConfig_SaveModPath(Aeron_GetVfs(), "", 0, error, sizeof error)) {
+			snprintf(app->mods_message, sizeof app->mods_message,
+					 "%s was deleted. OpenXWA will start with the original game.", app->delete_name);
+			load_config(app);
+		} else {
+			snprintf(app->mods_message, sizeof app->mods_message, "%s was deleted, but %s", app->delete_name,
+					 error);
+		}
+	} else {
+		snprintf(app->mods_message, sizeof app->mods_message, "%s was deleted.", app->delete_name);
+	}
+	app->mods_scanned = 0;
+	app->mod_selected = SIZE_MAX;
+	/* The Import tab checks the mod folder again. */
+	app->checked = 0;
+}
+
 static void draw_mods(ImporterUi* app) {
 	AeronUiContext* ui = app->ui;
+	const AeronUiTheme* theme = AeronUi_GetTheme(ui);
+	if (app->mods_folder_edit_us && Aeron_NowUs() - app->mods_folder_edit_us >= MODS_FOLDER_DELAY_US)
+		apply_mods_folder(app);
 	if (!app->mods_scanned)
 		scan_mods(app);
 	if (app->config_message[0])
 		AeronUi_Error(ui, app->config_message);
 	AeronUi_Help(ui,
 				 "Choose the mod that OpenXWA uses. The change takes effect the next time OpenXWA starts.");
-	if (app->saved_mods_folder[0]) {
-		char text[PATH_CAP + 32];
-		snprintf(text, sizeof text, "Mods folder: %s", app->saved_mods_folder);
-		AeronUi_Help(ui, text);
+	if (path_row(app, "Mods folder", BROWSE_MODS_LIST, "Choose the mods folder")) {
+		app->mods_folder_edit_us = Aeron_NowUs();
+		app->mods_folder_message[0] = '\0';
+		app->checked = 0;
 	}
+	if (app->mods_folder_message[0])
+		AeronUi_Error(ui, app->mods_folder_message);
+	else
+		AeronUi_Help(ui, "OpenXWA lists the mods in this folder.");
+	if (app->mods_notice[0])
+		AeronUi_Error(ui, app->mods_notice);
+
+	/* Below the list: the name, folder and problem of the selected mod, and
+	   a message. A long folder takes more lines. */
+	const float line = AeronUi_MeasureHelpHeight(ui, "X", 0.0f) + theme->item_spacing;
+	const float details = theme->row_height + theme->item_spacing + 4.0f * line;
 	AeronUi_ListBox(ui, "Mods", app->mod_items, app->mod_items ? app->mods.count : 0, &app->mod_selected,
-					fmaxf(120.0f, AeronUi_AvailableHeight(ui) - BUTTON_ROWS_REF - 60.0f));
+					fmaxf(120.0f, AeronUi_AvailableHeight(ui) - BUTTON_ROWS_REF - details));
+	const XwaModEntry* selected =
+		app->mod_items && app->mod_selected < app->mods.count ? &app->mods.entries[app->mod_selected] : NULL;
+	/* The original game's folder is the game data folder. */
+	const char* folder = !selected ? "" : selected->path[0] ? selected->path : app->config.game_data_path;
+	if (selected) {
+		char text[PATH_CAP + 64];
+		AeronUi_Label(ui, selected->name);
+		if (selected->path[0])
+			snprintf(text, sizeof text, "Folder: %s", selected->path);
+		else if (folder[0])
+			snprintf(text, sizeof text, "The game without a mod, from %s.", folder);
+		else
+			snprintf(text, sizeof text, "The game without a mod.");
+		AeronUi_Help(ui, text);
+		if (selected->problem[0])
+			AeronUi_Error(ui, selected->problem);
+	} else if (app->mod_items) {
+		AeronUi_Help(ui, "Select a mod to see its folder.");
+	}
 	if (app->mods_message[0])
 		AeronUi_Help(ui, app->mods_message);
+
 	AeronUi_Spacer(ui, fmaxf(0.0f, AeronUi_AvailableHeight(ui) - BUTTON_ROWS_REF));
 	AeronUi_Separator(ui);
-	AeronUi_BeginColumns(ui, 2, NULL);
-	const int selectable = app->config_ok && app->mod_selected < app->mods.count &&
-						   app->mod_selected != app->mod_in_use &&
-						   app->mods.entries[app->mod_selected].state == XWA_MOD_READY;
-	if (AeronUi_ButtonEnabled(ui, "Use in OpenXWA", selectable))
-		use_mod(app, app->mods.entries[app->mod_selected].path, app->mods_message, sizeof app->mods_message);
+	AeronUi_BeginColumns(ui, 4, NULL);
+	const int idle = !app->delete_thread;
+	const int usable = idle && app->config_ok && selected && app->mod_selected != app->mod_in_use &&
+					   selected->state == XWA_MOD_READY;
+	if (AeronUi_ButtonEnabled(ui, "Use in OpenXWA", usable))
+		use_mod(app, selected->path, app->mods_message, sizeof app->mods_message);
 	AeronUi_NextColumn(ui);
-	if (AeronUi_Button(ui, "Refresh")) {
+	if (AeronUi_ButtonEnabled(ui, "Show Folder", idle && folder[0]) && !Aeron_OpenFolder(folder))
+		snprintf(app->mods_message, sizeof app->mods_message, "%s can't be opened.", folder);
+	AeronUi_NextColumn(ui);
+	/* Only a mod that the importer made, as it can be imported again. No
+	   import runs meanwhile, as it could be writing to the folder. */
+	const int deletable = idle && !app->thread && selected && app->mod_imported[app->mod_selected];
+	if (AeronUi_ButtonEnabled(ui, "Delete...", deletable))
+		app->delete_open = 1;
+	AeronUi_NextColumn(ui);
+	if (AeronUi_ButtonEnabled(ui, "Refresh", idle)) {
 		app->mods_message[0] = '\0';
 		app->mods_scanned = 0;
 	}
@@ -618,7 +788,7 @@ static void draw_mods(ImporterUi* app) {
 static void draw_modals(ImporterUi* app) {
 	AeronUiContext* ui = app->ui;
 	const AeronUiWindowDesc desc = { .width_ref = 900.0f, .centered = 1 };
-	char text[PATH_CAP + 128];
+	char text[PATH_CAP + 512];
 	if (app->replace_open && AeronUi_BeginModal(ui, "Replace the Mod", &app->replace_open, &desc)) {
 		snprintf(text, sizeof text,
 				 "%s already has a mod made by the importer. Importing again deletes it and makes a new one.",
@@ -631,6 +801,30 @@ static void draw_modals(ImporterUi* app) {
 		if (AeronUi_Button(ui, "Replace")) {
 			app->replace_open = 0;
 			start_import(app, true);
+		}
+		AeronUi_EndColumns(ui);
+		AeronUi_EndModal(ui);
+	}
+	if (app->delete_open && AeronUi_BeginModal(ui, "Delete the Mod", &app->delete_open, &desc)) {
+		/* The selection can't change while the modal is open. */
+		const XwaModEntry* entry =
+			app->mod_selected < app->mods.count ? &app->mods.entries[app->mod_selected] : NULL;
+		if (entry) {
+			snprintf(text, sizeof text,
+					 "This deletes %s and its folder, %s. To get it back, import it again from its XWAU or "
+					 "TFTC installation.",
+					 entry->name, entry->path);
+			AeronUi_Help(ui, text);
+			if (app->mod_selected == app->mod_in_use)
+				AeronUi_Help(ui, "OpenXWA uses this mod, so it will start with the original game.");
+		}
+		AeronUi_BeginColumns(ui, 2, NULL);
+		if (AeronUi_Button(ui, "Cancel"))
+			app->delete_open = 0;
+		AeronUi_NextColumn(ui);
+		if (AeronUi_ButtonEnabled(ui, "Delete", entry != NULL)) {
+			app->delete_open = 0;
+			start_delete(app);
 		}
 		AeronUi_EndColumns(ui);
 		AeronUi_EndModal(ui);
@@ -678,6 +872,7 @@ ImporterUiFrame ImporterUi_Frame(ImporterUi* app, float dt_seconds) {
 	}
 	poll_dialog(app);
 	finish_import(app);
+	finish_delete(app);
 	if (app->quit_after_import && app->screen != SCREEN_RUNNING)
 		return IMPORTER_UI_QUIT;
 	if (app->screen == SCREEN_FORM && !app->checked)
@@ -696,8 +891,13 @@ ImporterUiFrame ImporterUi_Frame(ImporterUi* app, float dt_seconds) {
 	if (AeronUi_BeginWindow(app->ui, "OpenXWA Mod Importer", &window)) {
 		const int previous = app->tab;
 		AeronUi_BeginTabBar(app->ui, "tabs", tabs, 2, &app->tab);
-		if (app->tab != previous)
+		if (app->tab != previous) {
 			app->mods_scanned = 0;
+			/* Both tabs show the same mods folder, so an edit in the Import
+			   tab changes the list too. */
+			if (app->tab == 1)
+				apply_mods_folder(app);
+		}
 		if (app->tab == 1)
 			draw_mods(app);
 		else if (app->screen == SCREEN_FORM)
@@ -763,14 +963,17 @@ void ImporterUi_Destroy(ImporterUi* app) {
 		Aeron_AtomicStore(&app->progress.cancel, 1);
 		Aeron_ThreadJoin(app->thread);
 	}
+	/* A deletion can't stop halfway, so it finishes first. */
+	if (app->delete_thread)
+		Aeron_ThreadJoin(app->delete_thread);
 	if (app->dialog)
 		Aeron_DestroyFolderDialog(app->dialog);
 	if (app->progress_ready)
 		XwaModImport_ProgressFree(&app->progress);
 	clear_log(app);
 	XwaModList_Free(&app->mods);
-	free(app->mod_labels);
 	free(app->mod_items);
+	free(app->mod_imported);
 	AeronUi_Destroy(app->ui);
 	AeronFontAtlas_Release(&app->font);
 	free(app);

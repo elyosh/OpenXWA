@@ -116,6 +116,15 @@ bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* er
  * '-' replaced by '-'. */
 bool XwaModImport_ModFolder(const char* mods, const char* name, char* out, size_t cap);
 
+/* Whether folder `dir` holds a mod that the importer made. */
+bool XwaModImport_IsImported(const char* dir);
+
+/* Deletes folder `dir` if it holds a mod that the importer made. Returns
+ * false when it doesn't, or when some files can't be deleted. mod.yaml is
+ * deleted last, so a folder that is only partly deleted is still a mod that
+ * can be deleted again, or replaced by an import. */
+bool XwaModImport_Delete(const char* dir);
+
 /* Checks the options before an import. Writes the reason into `error` when
  * it doesn't return XWA_MOD_IMPORT_CHECK_OK. */
 XwaModImportCheck XwaModImport_Check(const XwaModImportOptions* options, char* error, size_t error_cap);

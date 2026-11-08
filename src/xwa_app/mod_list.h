@@ -56,6 +56,9 @@ int XwaModList_Folder(const char* configured, char* out, size_t capacity);
 int XwaModList_Scan(const char* mods_folder, const char* configured_mod, XwaModList* out);
 void XwaModList_Free(XwaModList* list);
 
+/* Whether `path` is an existing folder. */
+int XwaModList_IsFolder(const char* path);
+
 /* Whether two folder paths are the same, ignoring a final separator. */
 int XwaModList_SamePath(const char* a, const char* b);
 
