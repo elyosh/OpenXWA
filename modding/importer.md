@@ -27,7 +27,8 @@ Then:
 3. Check **Mod name** and **Mods folder**. The importer saves the mod in a
    folder of the mods folder, named after the mod.
 4. Click **Import**. An import takes a few minutes.
-5. When it finishes, click **Use This Mod in OpenXWA**, and start OpenXWA.
+5. When the import succeeds, the importer makes OpenXWA use the new mod. Start
+   OpenXWA to play it.
 
 The **Mods** tab of the importer lists the mods, and chooses the one that
 OpenXWA uses, like the **Mods** screen of the game. The change takes effect

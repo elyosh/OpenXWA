@@ -321,28 +321,6 @@ static void start_import(ImporterUi* app, bool replace) {
 	app->screen = SCREEN_RUNNING;
 }
 
-/* Joins the import thread once the import has finished. */
-static void finish_import(ImporterUi* app) {
-	if (!app->thread || !Aeron_AtomicLoad(&app->progress.finished))
-		return;
-	Aeron_ThreadJoin(app->thread);
-	app->thread = NULL;
-	app->end_us = Aeron_NowUs();
-	app->result = (XwaModImportResult)Aeron_AtomicLoad(&app->progress.result);
-	XwaModImport_ReadLog(&app->progress, &app->next_line, add_log_line, app);
-	app->screen = SCREEN_DONE;
-	app->cancel_open = 0;
-	app->checked = 0;
-}
-
-static void format_time(char* out, size_t capacity, uint64_t us) {
-	const unsigned seconds = (unsigned)(us / 1000000u);
-	if (seconds >= 3600)
-		snprintf(out, capacity, "%uh %02um %02us", seconds / 3600, seconds / 60 % 60, seconds % 60);
-	else
-		snprintf(out, capacity, "%um %02us", seconds / 60, seconds % 60);
-}
-
 static void use_mod(ImporterUi* app, const char* path, char* message, size_t capacity) {
 	char error[512];
 	/* The original game keeps paths.mod, so the mod stays in the list. */
@@ -357,6 +335,36 @@ static void use_mod(ImporterUi* app, const char* path, char* message, size_t cap
 		snprintf(message, capacity, "%s", error);
 	}
 	app->mods_scanned = 0;
+}
+
+/* Joins the import thread once the import has finished. */
+static void finish_import(ImporterUi* app) {
+	if (!app->thread || !Aeron_AtomicLoad(&app->progress.finished))
+		return;
+	Aeron_ThreadJoin(app->thread);
+	app->thread = NULL;
+	app->end_us = Aeron_NowUs();
+	app->result = (XwaModImportResult)Aeron_AtomicLoad(&app->progress.result);
+	XwaModImport_ReadLog(&app->progress, &app->next_line, add_log_line, app);
+	/* A mod that was just imported is the one that the user wants to play. */
+	if (app->result == XWA_MOD_IMPORT_OK) {
+		if (app->config_ok)
+			use_mod(app, app->mod, app->done_message, sizeof app->done_message);
+		else
+			snprintf(app->done_message, sizeof app->done_message,
+					 "OpenXWA's configuration can't be changed, so choose this mod in OpenXWA's mod list.");
+	}
+	app->screen = SCREEN_DONE;
+	app->cancel_open = 0;
+	app->checked = 0;
+}
+
+static void format_time(char* out, size_t capacity, uint64_t us) {
+	const unsigned seconds = (unsigned)(us / 1000000u);
+	if (seconds >= 3600)
+		snprintf(out, capacity, "%uh %02um %02us", seconds / 3600, seconds / 60 % 60, seconds % 60);
+	else
+		snprintf(out, capacity, "%um %02us", seconds / 60, seconds % 60);
 }
 
 /* ---- The Import tab ----------------------------------------------------- */
@@ -517,10 +525,7 @@ static void draw_done(ImporterUi* app) {
 
 	AeronUi_Spacer(ui, fmaxf(0.0f, AeronUi_AvailableHeight(ui) - BUTTON_ROWS_REF));
 	AeronUi_Separator(ui);
-	AeronUi_BeginColumns(ui, 3, NULL);
-	if (AeronUi_ButtonEnabled(ui, "Use This Mod in OpenXWA", usable && app->config_ok))
-		use_mod(app, app->mod, app->done_message, sizeof app->done_message);
-	AeronUi_NextColumn(ui);
+	AeronUi_BeginColumns(ui, 2, NULL);
 	if (AeronUi_Button(ui, "Import Another"))
 		app->screen = SCREEN_FORM;
 	AeronUi_NextColumn(ui);
