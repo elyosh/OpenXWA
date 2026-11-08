@@ -104,14 +104,23 @@ FROM build-base AS sdl-windows
 
 COPY cmake/toolchains/mingw-w64-x86_64.cmake /opt/xwa-toolchain.cmake
 COPY packaging/common/sdl-gpu-d3d12-hdr.patch /tmp/sdl-gpu-d3d12-hdr.patch
+COPY packaging/common/sdl-gpu-d3d12-descriptor-heaps.patch /tmp/sdl-gpu-d3d12-descriptor-heaps.patch
 
 # SDL's D3D12 SDL_GPU backend queries HDR swapchain composition support against
 # the live SDR swapchain, which DXGI can never report scRGB as presentable on,
 # so HDR output is unreachable on that backend. Only the Windows target build
 # has a D3D12 backend, so the host SDL above is left unpatched.
+#
+# The same backend can write descriptors past the end of a shader-visible heap
+# when the heap is nearly full. When it does switch heaps, it leaves tables
+# that are already bound pointing into the old heaps. Both make shaders read
+# the wrong descriptors, which shows as blinking textures and can hang the GPU.
+# The second patch switches heaps before a bind when it does not fit, and then
+# binds every table again.
 RUN git clone --branch "release-${SDL_VERSION}" --depth 1 \
         https://github.com/libsdl-org/SDL.git /deps/SDL \
     && git -C /deps/SDL apply /tmp/sdl-gpu-d3d12-hdr.patch \
+    && git -C /deps/SDL apply /tmp/sdl-gpu-d3d12-descriptor-heaps.patch \
     && cmake -S /deps/SDL -B /build/sdl-windows -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/opt/xwa-windows \
