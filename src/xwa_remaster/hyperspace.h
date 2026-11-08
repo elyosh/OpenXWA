@@ -78,6 +78,20 @@ typedef struct XwaRemasterHyperspaceWarpInput {
 	float keep_depth;      /* the depth at the keep distance; nearer is larger */
 	float units_per_meter; /* view units per metre */
 	int view;              /* XwaFlightHyperspaceWarpView */
+	/* The region's sky as a cube, without its suns, or NULL. The forward
+	 * exit reads the shrunk sky from it, since most of it lies outside the
+	 * screen. Without it, the forward exit only shows trails. */
+	AeronTexture* sky_cube;
+	AeronSampler* sky_sampler;
+	float sky_view_to_cube[9]; /* row-major, from view space (x right, y down, z forward) */
+	float sky_scale;           /* multiplies the cube's colour */
+	int sky_max_level;         /* the highest mip level to read */
+	/* A cube with premultiplied alpha drawn over the sky, or NULL. */
+	AeronTexture* overlay_cube;
+	AeronSampler* overlay_sampler;
+	float overlay_view_to_cube[9];
+	float overlay_scale;
+	int overlay_max_level;
 } XwaRemasterHyperspaceWarpInput;
 
 /* Draws the entry or the exit prepared with `world_scene` over the finished

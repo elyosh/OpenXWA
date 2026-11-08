@@ -769,6 +769,13 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 	jump_changed |= ImGui::SliderFloat("Cockpit light curve", &j.mesh_light_curve, 0.25f, 8.0f, "%.2f",
 									   ImGuiSliderFlags_Logarithmic);
 	jump_changed |= ImGui::ColorEdit3("Streak tint", j.tint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+	{
+		bool exit_forward = j.exit_forward != 0;
+		if (ImGui::Checkbox("Forward exit", &exit_forward)) {
+			j.exit_forward = exit_forward ? 1 : 0;
+			jump_changed = true;
+		}
+	}
 	ImGui::TextUnformatted("Scene warp");
 	jump_changed |= ImGui::SliderFloat("Warp start (s)", &j.warp_start, 0.0f, 2.0f, "%.2f");
 	jump_changed |= ImGui::SliderFloat("Warp end (s)", &j.warp_end, 0.2f, 2.5f, "%.2f");
@@ -809,7 +816,9 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 						"camera by the world distance, the sky zooms in, and black opens from\n"
 						"the vanishing point. Smear is the length of the trails as a share of\n"
 						"the movement. Sky highlights keep stars bright in their trails.\n"
-						"Reveal softness is the width of the black's soft edge.");
+						"Reveal softness is the width of the black's soft edge.\n"
+						"Forward exit: on exit the streaks shrink toward the camera and the\n"
+						"scene comes in toward it, instead of the entry played backward.");
 	if (ImGui::Button("Reset jump to YAML defaults")) {
 		XwaRemasterFlight_GetHyperspaceJumpDefault(&j);
 		jump_changed = true;
@@ -847,6 +856,7 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 					  "  tint_r: %.4g\n"
 					  "  tint_g: %.4g\n"
 					  "  tint_b: %.4g\n"
+					  "  exit_forward: %s\n"
 					  "  warp_start: %.4g\n"
 					  "  warp_end: %.4g\n"
 					  "  warp_curve: %.4g\n"
@@ -867,7 +877,7 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 					  (double)j.white_fade_seconds, (double)j.tunnel_entry_brightness,
 					  (double)j.tunnel_settle_seconds, (double)j.mesh_light_strength,
 					  (double)j.mesh_light_start, (double)j.mesh_light_curve, (double)j.tint[0],
-					  (double)j.tint[1], (double)j.tint[2], (double)j.warp_start, (double)j.warp_end,
+					  (double)j.tint[1], (double)j.tint[2], j.exit_forward ? "true" : "false", (double)j.warp_start, (double)j.warp_end,
 					  (double)j.warp_curve, (double)j.warp_distance_m, (double)j.warp_sky_zoom,
 					  (double)j.warp_smear, (double)j.warp_sky_highlights, (double)j.warp_reveal_softness,
 					  j.warp_taps, j.warp_sky_taps);

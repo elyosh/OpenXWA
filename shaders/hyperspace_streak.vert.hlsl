@@ -19,7 +19,8 @@ cbuffer HyperspaceStreakVS : register(b0, space1)
 	float4 view;
 	/* x/y tan(horizontal/vertical half-FOV), z/w projection offsets. */
 	float4 projection;
-	/* The ship's right, up and forward axes in view space. */
+	/* The ship's right, up and forward axes in view space. ship_forward.w:
+	 * how far the stars move ahead along the forward axis. */
 	float4 ship_right;
 	float4 ship_up;
 	float4 ship_forward;
@@ -122,8 +123,8 @@ HyperStreakVaryings main(uint vertex_id : SV_VertexID)
 	const float sin_polar = sqrt(max(1.0f - cos_polar * cos_polar, 0.0f));
 	const float3 star_ship = float3(sin_polar * cos_azimuth, sin_polar * sin_azimuth, cos_polar) * distance;
 
-	const float head_travel = motion.x;
-	const float tail_travel = motion.x * motion.y;
+	const float head_travel = motion.x - ship_forward.w;
+	const float tail_travel = motion.x * motion.y - ship_forward.w;
 	float3 tail = ship_to_view(star_ship - float3(0.0f, 0.0f, tail_travel));
 	float3 head = ship_to_view(star_ship - float3(0.0f, 0.0f, head_travel));
 

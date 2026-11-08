@@ -282,6 +282,10 @@ typedef struct XwaFlightHyperspaceJumpParams {
 	float warp_reveal_softness;
 	int warp_taps;
 	int warp_sky_taps;
+	/* 0: the exit plays the entry backward. 1: the exit carries on forward,
+	   so the streaks shrink toward the camera and the scene comes in toward
+	   it. */
+	int exit_forward;
 } XwaFlightHyperspaceJumpParams;
 
 void XwaRemasterFlight_GetHyperspaceJump(XwaFlightHyperspaceJumpParams* out);

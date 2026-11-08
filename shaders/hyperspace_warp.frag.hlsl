@@ -7,6 +7,9 @@
  *   - World: the world moves a distance `s` toward the camera along the
  *     ship's forward axis `f`. Points move on lines through the vanishing
  *     point, so the content that reaches `q` comes from the line behind it.
+ *     In a forward exit the world comes in toward the camera from behind
+ *     its rest position: `s` is negative, and the content comes from the
+ *     other side of `q`.
  *     The walk samples that line, on a log scale of the distance from `q`.
  *     A tap's point, rebuilt from its depth, crosses `q` when the world has
  *     moved z * t / |u| (t the tap's distance from `q` and u the direction of
@@ -45,14 +48,16 @@ cbuffer HyperspaceWarp : register(b0, space3)
 	/* xy vanishing point in px, z how much the view faces the direction of
 	 * travel, w 1 / distance to the farthest screen corner. */
 	float4 vanishing;
-	/* x how far the world has moved (s), y s at the smear's old end, z near
-	 * plane, w depth at the keep distance (nearer is larger). All in view
-	 * units. */
+	/* x how far the world has moved (s, negative behind its rest position),
+	 * y s at the smear's old end, z near plane, w depth at the keep distance
+	 * (nearer is larger). All in view units. */
 	float4 motion;
 	/* x reveal progress, y reveal softness, z 1 when the warp runs, w sky
 	 * highlight power. */
 	float4 reveal;
-	/* x taps, y classic radiance, z debug view, w unused. */
+	/* x taps, y classic radiance, z debug view, w the side of its rest
+	 * position the world is on: 1 nearer the camera, -1 farther (forward
+	 * exit). */
 	float4 config;
 	/* xy render size in px, zw 1 / that size. */
 	float4 render;
@@ -135,19 +140,24 @@ float4 main(float4 position : SV_Position) : SV_Target0
 	}
 	else if (reveal.z > 0.5f)
 	{
-		/* Movement at q, in tangent units: points move along +u. */
+		/* Points are moved along +u at q, in tangent units, or along -u when
+		 * the world is farther than its rest position. The walk goes the
+		 * other way. Distances below are counted along the move. */
 		const float3 f = forward.xyz;
+		const float direction = config.w < 0.0f ? -1.0f : 1.0f;
 		const float2 u = to_tangent(q) * f.z - f.xy;
 		const float u_length = max(length(u), 1.0e-6f);
-		const float2 back = -u / u_length;
+		const float2 back = -direction * u / u_length;
 		/* Tangent units per px: the same on both axes. */
 		const float tangent_per_px = 2.0f * projection.y * size.w;
 		float walk = screen_exit(q, back);
-		if (f.z > 1.0e-4f)
+		if (f.z * direction > 1.0e-4f)
 			walk = min(walk, length(vanishing.xy - q));
 
-		const float s = motion.x;
-		const float s_old = motion.y;
+		const float s = motion.x * direction;
+		const float s_old = motion.y * direction;
+		const float s_min = min(s, s_old);
+		const float s_max = max(s, s_old);
 		const float near_z = motion.z;
 		const int taps = (int)config.x;
 		const float jitter = frac(52.9829189f * frac(dot(q, float2(0.06711056f, 0.00583715f))));
@@ -192,18 +202,18 @@ float4 main(float4 position : SV_Position) : SV_Target0
 			const float half_px = 0.5f * tangent_per_px;
 			const float s_low = z * max(t_tangent - half_px, 0.0f) / u_length;
 			const float s_high = z * (t_tangent + half_px) / u_length;
-			if (s_high < s_old || s_low > s)
+			if (s_high < s_min || s_low > s_max)
 				continue;
-			const float s_cross = clamp(z * t_tangent / u_length, s_old, s);
-			const float moved_z = z - s_cross * f.z;
+			const float s_cross = clamp(z * t_tangent / u_length, s_min, s_max);
+			const float moved_z = z - direction * s_cross * f.z;
 			if (moved_z <= near_z)
 				continue;
 			/* The smear fades out over its older half. The weight is taken
 			 * at the end of the pixel's footprint nearest the smear's head:
 			 * while the world has moved less than a pixel, the head is
 			 * inside the footprint and the pixel keeps its own content. */
-			const float s_head = min(s_high, s);
-			const float along = s > s_old ? saturate((s_head - s_old) / (s - s_old)) : 1.0f;
+			const float s_head = s > s_old ? min(s_high, s) : max(s_low, s);
+			const float along = s != s_old ? saturate((s_head - s_old) / (s - s_old)) : 1.0f;
 			const float weight = smoothstep(0.0f, 0.5f, along);
 			const float3 color =
 				g_scene.SampleLevel(g_scene_sampler, tap_uv, 0.0f).rgb * warp_reveal(px, vanishing, reveal);

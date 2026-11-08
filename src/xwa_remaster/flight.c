@@ -331,6 +331,9 @@ static struct {
 	float hyperspace_near_z;
 	float hyperspace_keep_depth;
 	XwaFlightHyperspaceWarpView hyperspace_warp_view;
+	/* The region's sky cube for the scene warp this frame
+	 * (fl_note_hyperspace_sky): only its sky and overlay fields are set. */
+	XwaRemasterHyperspaceWarpInput hyperspace_sky;
 	/* The scene warp's image, presented instead of the scene this frame. */
 	AeronTexture* present_scene_override;
 
@@ -713,7 +716,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"motion_blur.camera_blur",       "motion_blur.pause_keep_blur", "motion_blur.velocity_viz",
 		"texture_filtering.anisotropic", "hangar_lighting.enabled",     "lighting.spec_geom_adapt",
 		"dynamic_cockpit.enabled",       "dynamic_cockpit.classic_hud", "dynamic_cockpit.holograms",
-		"point_lights.model_lights",     "presentation.latency_pacing",
+		"point_lights.model_lights",     "presentation.latency_pacing", "hyperspace_jump.exit_forward",
 	};
 	static const char* strings[] = {
 		"presentation.cockpit_fov",
@@ -970,6 +973,7 @@ static int fl_load_hyperspace_jump_config(const AeronConfigFile* config, const c
 		(float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_reveal_softness", 0.0);
 	p->warp_taps = (int)AeronConfigFile_GetInt(config, "hyperspace_jump.warp_taps", 0);
 	p->warp_sky_taps = (int)AeronConfigFile_GetInt(config, "hyperspace_jump.warp_sky_taps", 0);
+	p->exit_forward = AeronConfigFile_GetBool(config, "hyperspace_jump.exit_forward", 0) ? 1 : 0;
 	if (!fl_hyperspace_jump_valid(p)) {
 		Aeron_LogError("xwa.remaster", "%s: invalid hyperspace_jump settings", config_path);
 		return 0;
@@ -1901,6 +1905,7 @@ void XwaRemasterFlight_SetHyperspaceJump(const XwaFlightHyperspaceJumpParams* in
 		p.warp_end = fminf(p.warp_start + FL_JUMP_WARP_MIN_SECONDS, 2.5f);
 	if (p.warp_start > p.warp_end - FL_JUMP_WARP_MIN_SECONDS)
 		p.warp_start = p.warp_end - FL_JUMP_WARP_MIN_SECONDS;
+	p.exit_forward = p.exit_forward ? 1 : 0;
 	s.hyperspace_jump = p;
 	XwaRemasterHyperspace_SetJumpParams(s.hyperspace, &p);
 }
@@ -5090,24 +5095,35 @@ static int fl_prepare_world_hyperspace(AeronCommandBuffer* cmd, const XwaSnapsho
 	return 1;
 }
 
+/* The matrix from the hyperspace view space (x right, y down, z forward) to
+ * a cube: the camera's view-to-world, then `world_to_cube`. */
+static void fl_view_to_cube(const float world_to_cube[9], float out[9]) {
+	for (int r = 0; r < 3; r++) {
+		for (int c = 0; c < 3; c++) {
+			out[r * 3 + c] = world_to_cube[r * 3 + 0] * s.crows[c * 3 + 0] +
+							 world_to_cube[r * 3 + 1] * s.crows[c * 3 + 1] +
+							 world_to_cube[r * 3 + 2] * s.crows[c * 3 + 2];
+		}
+	}
+}
+
 /* Draws the jump's entry or exit over the finished scene (the scene warp),
  * and has the result presented instead of the scene. */
 static int fl_render_world_hyperspace(AeronCommandBuffer* cmd) {
 	int render_w = 0, render_h = 0, output_w = 0, output_h = 0;
 	AeronScene_RenderDims(s.scene, &render_w, &render_h);
 	AeronScene_RtDims(s.scene, &output_w, &output_h);
-	const XwaRemasterHyperspaceWarpInput input = {
-		.scene = Aeron_RenderTargetGetTexture(AeronScene_SceneRt(s.scene)),
-		.depth = Aeron_DepthTargetGetTexture(AeronScene_DepthRt(s.scene)),
-		.output_w = output_w,
-		.output_h = output_h,
-		.render_w = render_w,
-		.render_h = render_h,
-		.near_z = s.hyperspace_near_z,
-		.keep_depth = s.hyperspace_keep_depth,
-		.units_per_meter = AERON_OPT_UNITS_PER_METER,
-		.view = (int)s.hyperspace_warp_view,
-	};
+	XwaRemasterHyperspaceWarpInput input = s.hyperspace_sky;
+	input.scene = Aeron_RenderTargetGetTexture(AeronScene_SceneRt(s.scene));
+	input.depth = Aeron_DepthTargetGetTexture(AeronScene_DepthRt(s.scene));
+	input.output_w = output_w;
+	input.output_h = output_h;
+	input.render_w = render_w;
+	input.render_h = render_h;
+	input.near_z = s.hyperspace_near_z;
+	input.keep_depth = s.hyperspace_keep_depth;
+	input.units_per_meter = AERON_OPT_UNITS_PER_METER;
+	input.view = (int)s.hyperspace_warp_view;
 	s.present_scene_override = XwaRemasterHyperspace_RenderWarp(s.hyperspace, cmd, &input);
 	return s.present_scene_override != NULL;
 }
@@ -5422,6 +5438,55 @@ static void fl_remove_hidden_backdrop_lights(const XwaSnapshot* snap, XwaRemaste
 		snprintf(logged_mission, sizeof logged_mission, "%s", snap->mission_path);
 		Aeron_LogInfo("xwa.remaster", "environment: region %d leaves out the lights of %u hidden backdrop(s)",
 					  region, dropped);
+	}
+}
+
+/* Keeps the frame's sky cube for the scene warp. A sky that keeps the
+ * mission's backdrops uses the captured cube, which has them, when there is
+ * one. Otherwise the environment's sky, then the captured cube of a region
+ * without an environment. The captured cube's level 0 is the sky itself;
+ * its other levels are blurred for reflections. */
+static void fl_note_hyperspace_sky(const AeronPreparedEnvironment* sky_environment, int keep_backdrops,
+								   const FlSceneLighting* lighting) {
+	XwaRemasterHyperspaceWarpInput* sky = &s.hyperspace_sky;
+	memset(sky, 0, sizeof *sky);
+	const AeronScenePbrEnvironment* captured =
+		lighting->captured && lighting->captured_environment.specular ? &lighting->captured_environment : NULL;
+	AeronPreparedEnvironment scaled;
+	const AeronPreparedEnvironment* environment =
+		sky_environment ? XwaRemasterEnvironment_ScaleIntensity(sky_environment, &scaled) : NULL;
+	if (captured && (keep_backdrops || !environment)) {
+		sky->sky_cube = captured->specular;
+		sky->sky_sampler = captured->sampler;
+		fl_view_to_cube(captured->world_to_local, sky->sky_view_to_cube);
+		sky->sky_scale = 1.0f;
+		sky->sky_max_level = 0;
+	} else if (environment) {
+		sky->sky_cube = environment->radiance;
+		sky->sky_sampler = environment->sampler;
+		fl_view_to_cube(environment->world_to_cube, sky->sky_view_to_cube);
+		sky->sky_scale = environment->settings.intensity;
+		sky->sky_max_level = Aeron_TextureGetMipCount(environment->radiance) - 1;
+	}
+	if (sky->sky_cube && environment && environment->overlay) {
+		sky->overlay_cube = environment->overlay;
+		sky->overlay_sampler = environment->sampler;
+		fl_view_to_cube(environment->overlay_world_to_cube, sky->overlay_view_to_cube);
+		sky->overlay_scale = environment->settings.intensity;
+		sky->overlay_max_level = Aeron_TextureGetMipCount(environment->overlay) - 1;
+	}
+	if (!sky->sky_sampler) {
+		sky->sky_cube = NULL;
+		sky->overlay_cube = NULL;
+	}
+	if (!sky->overlay_sampler) {
+		sky->overlay_cube = NULL;
+	}
+	if (sky->sky_max_level < 0) {
+		sky->sky_max_level = 0;
+	}
+	if (sky->overlay_max_level < 0) {
+		sky->overlay_max_level = 0;
 	}
 }
 
@@ -6073,6 +6138,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	XwaRemasterCapturedLighting_Update(cmd, snap, assets, &s.environment);
 	FlSceneLighting scene_lighting;
 	fl_build_scene_lighting(snap, assets, cam, &scene_lighting);
+	fl_note_hyperspace_sky(sky_environment, keep_backdrops, &scene_lighting);
 	float shadow_light_dir[3];
 	/* Preserve the classic directional fill inside the sealed Death Star,
 	 * but do not let its backdrop light cast exterior shadows in the tunnel.

@@ -62,8 +62,13 @@ typedef struct HyperWarpSkyUniform {
 	float reveal[4];
 	float zoom[4];
 	float sky[4];
+	float projection[4];
+	float cube[4];
+	float cube_level[4];
+	float sky_rows[3][4];
+	float overlay_rows[3][4];
 } HyperWarpSkyUniform;
-typedef char HyperWarpSkyUniformSizeCheck[sizeof(HyperWarpSkyUniform) == 80 ? 1 : -1];
+typedef char HyperWarpSkyUniformSizeCheck[sizeof(HyperWarpSkyUniform) == 224 ? 1 : -1];
 
 /* Mirrors HyperspaceWarp in hyperspace_warp.frag.hlsl. */
 typedef struct HyperWarpUniform {
@@ -80,6 +85,23 @@ typedef char HyperWarpUniformSizeCheck[sizeof(HyperWarpUniform) == 128 ? 1 : -1]
 
 /* The sky warp's passes: the sky zoom is split into this many passes. */
 #define HYPER_WARP_SKY_PASSES 3
+/* In a forward exit with a sky cube, the sky comes from the cube while it is
+ * shrunk to half its size or less, then blends to the scene as it grows
+ * back to full size. This is the log of that zoom. */
+#define HYPER_WARP_CUBE_LOG_ZOOM 0.6931472f
+
+/* How the warp moves the scene. */
+typedef enum HyperWarpMotion {
+	/* The scene moves toward the camera: the entry, and the exit played
+	 * backward. */
+	HYPER_WARP_TOWARD,
+	/* Forward exit: the scene comes in from beyond its rest position. The
+	 * shrunk sky comes from the region's sky cube. */
+	HYPER_WARP_ARRIVE,
+	/* Forward exit without a sky cube: the scene stays at its rest
+	 * position, and only its trails show the movement. */
+	HYPER_WARP_TRAILS,
+} HyperWarpMotion;
 
 typedef struct HyperEnvironmentUniform {
 	float roughness;
@@ -133,9 +155,11 @@ struct XwaRemasterHyperspace {
 	AeronSampleCount pipeline_samples;
 	uint32_t streak_vertex_count;
 	uint8_t draw_tunnel;
-	/* The warp's progress (0 to 1) this frame, and the view it uses. */
+	/* The warp's progress (0 to 1) this frame, the view it uses, and
+	 * whether the scene comes in toward the camera (forward exit). */
 	float warp_progress;
 	XwaRemasterHyperspaceTunnelView warp_view;
+	uint8_t warp_forward;
 	uint8_t world_scene;
 	uint8_t hold_exposure;
 	XwaFlightHyperspaceTunnelParams params;
@@ -304,7 +328,7 @@ XwaRemasterHyperspace* XwaRemasterHyperspace_Create(const XwaFlightHyperspaceTun
 		Aeron_CreateShader(&(AeronShaderDesc) { .name = "fullscreen.vert", .stage = AERON_SHADER_STAGE_VERTEX });
 	h->warp_sky_fs = Aeron_CreateShader(&(AeronShaderDesc) { .name = "hyperspace_warp_sky.frag",
 															 .stage = AERON_SHADER_STAGE_FRAGMENT,
-															 .sampler_count = 2,
+															 .sampler_count = 4,
 															 .uniform_buffer_count = 1 });
 	h->warp_fs = Aeron_CreateShader(&(AeronShaderDesc) { .name = "hyperspace_warp.frag",
 														 .stage = AERON_SHADER_STAGE_FRAGMENT,
@@ -573,6 +597,9 @@ typedef struct HyperTimeline {
 	float streak_fade;    /* 0 = no streaks */
 	float jump_seconds;
 	uint8_t hold_exposure;
+	/* The exit carries on forward (exit_forward): the streaks shrink toward
+	 * the camera and the scene comes in toward it. */
+	uint8_t forward;
 } HyperTimeline;
 
 /* The streaks fade in at the start of the entry and out at the end of the
@@ -636,6 +663,7 @@ static int hyper_timeline(const XwaFlightHyperspaceJumpParams* jump, const XwaRe
 			u = u < 0.0f ? 0.0f : (u > 1.0f ? 1.0f : u);
 			out->jump_seconds = hyper_white_peak_seconds(jump) * (1.0f - u);
 			out->hold_exposure = 1;
+			out->forward = jump->exit_forward ? 1 : 0;
 			return 1;
 		}
 		default:
@@ -742,7 +770,7 @@ static float hyper_streak_intensity(const XwaFlightHyperspaceJumpParams* jump, c
 
 static void hyper_set_streak_uniform(const XwaRemasterHyperspace* h, HyperStreakUniform* u,
 									 const XwaRemasterHyperspaceTunnelView* view, const HyperJumpCurves* curves,
-									 float intensity, uint32_t seed, int rt_w, int rt_h) {
+									 int forward, float intensity, uint32_t seed, int rt_w, int rt_h) {
 	const XwaFlightHyperspaceJumpParams* jump = &h->jump;
 	memset(u, 0, sizeof *u);
 	u->view[0] = (float)rt_w;
@@ -757,6 +785,9 @@ static void hyper_set_streak_uniform(const XwaRemasterHyperspace* h, HyperStreak
 	memcpy(u->ship_right, view->right, 3 * sizeof(float));
 	memcpy(u->ship_up, view->up, 3 * sizeof(float));
 	memcpy(u->ship_forward, view->forward, 3 * sizeof(float));
+	/* In a forward exit the stars move ahead by the head's travel, so the
+	 * heads stay on the stars and the tails come in to them. */
+	u->ship_forward[3] = forward ? curves->head_travel : 0.0f;
 	u->motion[0] = curves->head_travel;
 	u->motion[1] = curves->tail_share;
 	u->motion[2] = curves->visible_share;
@@ -804,6 +835,7 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 	h->hold_exposure = 0;
 	h->warp_progress = 0.0f;
 	h->warp_view = *tunnel_view;
+	h->warp_forward = 0;
 	memset(&h->lighting, 0, sizeof h->lighting);
 	HyperTimeline timeline;
 	if (!hyper_timeline(&h->jump, moment, &timeline)) {
@@ -826,13 +858,14 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 	}
 	if (world_scene) {
 		h->warp_progress = hyper_warp_progress(&h->jump, timeline.jump_seconds);
+		h->warp_forward = timeline.forward;
 	}
 	/* The streaks only show over the world scene, during the entry and the
 	 * exit. */
 	if (world_scene && timeline.streak_fade > 0.0f && h->jump.star_count > 0) {
 		HyperJumpCurves curves;
 		hyper_jump_curves(&h->jump, timeline.jump_seconds, &curves);
-		hyper_set_streak_uniform(h, &h->streak_uniform, tunnel_view, &curves,
+		hyper_set_streak_uniform(h, &h->streak_uniform, tunnel_view, &curves, timeline.forward,
 								 hyper_streak_intensity(&h->jump, &curves, timeline.streak_fade), moment->seed,
 								 rt_w, rt_h);
 		HyperStreakFragmentUniform* fu = &h->streak_fragment_uniform;
@@ -960,17 +993,62 @@ static void hyper_size_uniform(float out[4], int width, int height) {
 	out[3] = 1.0f / (float)height;
 }
 
+/* Rows of the matrix from view space to a cube, with a zero w. */
+static void hyper_cube_rows(const float view_to_cube[9], float rows[3][4]) {
+	for (int r = 0; r < 3; r++) {
+		memcpy(rows[r], &view_to_cube[r * 3], 3 * sizeof(float));
+		rows[r][3] = 0.0f;
+	}
+}
+
+/* Sets the cube settings of the sky passes. Only the first pass reads the
+ * cubes, and only in HYPER_WARP_ARRIVE. */
+static void hyper_set_sky_cube_uniform(HyperWarpSkyUniform* u, const XwaRemasterHyperspaceTunnelView* view,
+									   const XwaRemasterHyperspaceWarpInput* in, HyperWarpMotion motion,
+									   float log_zoom) {
+	u->projection[0] = view->tan_half_fov_x;
+	u->projection[1] = view->tan_half_fov_y;
+	u->projection[2] = view->proj_offset_x;
+	u->projection[3] = view->proj_offset_y;
+	/* The scene's share: all of it, unless the sky is shrunk. */
+	u->cube[3] = 1.0f;
+	if (motion != HYPER_WARP_ARRIVE) {
+		return;
+	}
+	float share = -log_zoom / HYPER_WARP_CUBE_LOG_ZOOM;
+	share = share < 0.0f ? 0.0f : (share > 1.0f ? 1.0f : share);
+	u->cube[3] = 1.0f - share * share * (3.0f - 2.0f * share);
+	u->cube[0] = in->sky_scale;
+	/* Cube texels per pixel at zoom 1: a pixel spans 2 tan(half-FOV) /
+	 * height in tangent units, and a texel 2 / face size. */
+	const float texels_per_px = view->tan_half_fov_y / (float)in->output_h;
+	u->cube_level[0] = (float)Aeron_TextureGetWidth(in->sky_cube) * texels_per_px;
+	u->cube_level[1] = (float)in->sky_max_level;
+	hyper_cube_rows(in->sky_view_to_cube, u->sky_rows);
+	if (in->overlay_cube) {
+		u->cube[1] = in->overlay_scale;
+		u->cube_level[2] = (float)Aeron_TextureGetWidth(in->overlay_cube) * texels_per_px;
+		u->cube_level[3] = (float)in->overlay_max_level;
+		hyper_cube_rows(in->overlay_view_to_cube, u->overlay_rows);
+	}
+}
+
 /* The sky passes: the zoom's log span, from the smear's old end to the
  * current zoom, split into taps^3 evenly spaced samples. Returns the target
  * holding the warped sky, or NULL on failure. */
 static AeronRenderTarget* hyper_warp_sky(XwaRemasterHyperspace* h, AeronCommandBuffer* cmd,
-										 const XwaRemasterHyperspaceWarpInput* in, const float vanishing[4],
-										 const float reveal[4]) {
+										 const XwaRemasterHyperspaceWarpInput* in, HyperWarpMotion motion,
+										 const float vanishing[4], const float reveal[4]) {
 	const XwaFlightHyperspaceJumpParams* jump = &h->jump;
 	const int taps = jump->warp_sky_taps;
-	/* The zoom fades out in views that don't face the direction of travel. */
-	const float log_zoom = h->warp_progress * vanishing[2] * logf(jump->warp_sky_zoom);
-	const float span = jump->warp_smear * log_zoom;
+	/* The zoom fades out in views that don't face the direction of travel.
+	 * In a forward exit the sky starts shrunk and grows back to its size;
+	 * with trails only it keeps its size, and the smear reaches back to
+	 * where it would have been. */
+	const float zoom_change = h->warp_progress * vanishing[2] * logf(jump->warp_sky_zoom);
+	const float log_zoom =
+		motion == HYPER_WARP_TOWARD ? zoom_change : (motion == HYPER_WARP_ARRIVE ? -zoom_change : 0.0f);
+	const float span = jump->warp_smear * zoom_change;
 	float step = span;
 	for (int pass = 0; pass < HYPER_WARP_SKY_PASSES; pass++) {
 		step /= (float)taps;
@@ -996,10 +1074,20 @@ static AeronRenderTarget* hyper_warp_sky(XwaRemasterHyperspace* h, AeronCommandB
 		u.zoom[3] = pass == 0 ? 0.0f : (pass == HYPER_WARP_SKY_PASSES - 1 ? 2.0f : 1.0f);
 		u.sky[0] = jump->warp_sky_highlights;
 		u.sky[1] = radiance > 0.0f ? 1.0f / radiance : 1.0f;
-		AeronTexture* const textures[2] = { source, in->depth };
-		AeronSampler* const samplers[2] = { h->environment_sampler, h->point_sampler };
+		hyper_set_sky_cube_uniform(&u, &h->warp_view, in, motion, log_zoom);
+		/* Without a cube, the tunnel's cube fills the bindings; it isn't
+		 * read. */
+		const int cubes = motion == HYPER_WARP_ARRIVE;
+		AeronTexture* const textures[4] = {
+			source, in->depth, cubes ? in->sky_cube : h->environment_cube,
+			cubes && in->overlay_cube ? in->overlay_cube : h->environment_cube
+		};
+		AeronSampler* const samplers[4] = {
+			h->environment_sampler, h->point_sampler, cubes ? in->sky_sampler : h->environment_sampler,
+			cubes && in->overlay_cube ? in->overlay_sampler : h->environment_sampler
+		};
 		if (!source || !hyper_fullscreen_pass(cmd, h->warp_sky_pipeline, targets[pass], in->output_w,
-											  in->output_h, textures, samplers, 2, &u, (uint32_t)sizeof u,
+											  in->output_h, textures, samplers, 4, &u, (uint32_t)sizeof u,
 											  labels[pass])) {
 			return NULL;
 		}
@@ -1032,12 +1120,14 @@ AeronTexture* XwaRemasterHyperspace_RenderWarp(XwaRemasterHyperspace* h, AeronCo
 	hyper_warp_vanishing(view, in->output_w, in->output_h, vanishing);
 	const float reveal[4] = { progress, jump->warp_reveal_softness, warp ? 1.0f : 0.0f,
 							  jump->warp_sky_highlights };
+	const HyperWarpMotion motion =
+		!h->warp_forward ? HYPER_WARP_TOWARD : (in->sky_cube ? HYPER_WARP_ARRIVE : HYPER_WARP_TRAILS);
 
 	/* Before the warp starts and once the reveal is complete, the composite
 	 * doesn't read the sky; it is bound anyway. */
 	AeronRenderTarget* sky = h->warp_rt[0];
 	if (warp && progress < 1.0f) {
-		sky = hyper_warp_sky(h, cmd, in, vanishing, reveal);
+		sky = hyper_warp_sky(h, cmd, in, motion, vanishing, reveal);
 		if (!sky) {
 			Aeron_CommandBufferSetFailure(cmd, "Hyperspace sky warp recording failed");
 			return NULL;
@@ -1054,15 +1144,22 @@ AeronTexture* XwaRemasterHyperspace_RenderWarp(XwaRemasterHyperspace* h, AeronCo
 	u.projection[3] = view->proj_offset_y;
 	memcpy(u.forward, view->forward, 3 * sizeof(float));
 	memcpy(u.vanishing, vanishing, sizeof u.vanishing);
+	/* In a forward exit the world comes in toward the camera from beyond its
+	 * rest position, so its distance is negative. With trails only it stays
+	 * at its rest position, and the smear reaches back to where it would
+	 * have been. */
 	const float distance = progress * jump->warp_distance_m * in->units_per_meter;
-	u.motion[0] = distance;
-	u.motion[1] = distance * (1.0f - jump->warp_smear);
+	const float moved = motion == HYPER_WARP_TOWARD ? distance : (motion == HYPER_WARP_ARRIVE ? -distance : 0.0f);
+	const float side = motion == HYPER_WARP_TOWARD ? 1.0f : -1.0f;
+	u.motion[0] = moved;
+	u.motion[1] = moved - jump->warp_smear * distance;
 	u.motion[2] = in->near_z;
 	u.motion[3] = in->keep_depth;
 	memcpy(u.reveal, reveal, sizeof u.reveal);
 	u.config[0] = (float)jump->warp_taps;
 	u.config[1] = XwaRemaster_ClassicRadiance();
 	u.config[2] = (float)in->view;
+	u.config[3] = side;
 	hyper_size_uniform(u.render, in->render_w, in->render_h);
 	AeronTexture* const textures[4] = { in->scene, in->depth, Aeron_RenderTargetGetTexture(sky),
 										Aeron_RenderTargetGetTexture(h->layer_rt) };
