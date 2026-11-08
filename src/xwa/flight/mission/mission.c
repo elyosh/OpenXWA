@@ -69,11 +69,11 @@
 #include <string.h>
 
 // GLOBAL: XWA 0x80DC80
-XwaMissionFlightGroup g_missionFlightGroups[192];
+XwaMissionFlightGroup g_missionFlightGroups[MISSION_FLIGHT_GROUP_SLOTS];
 // GLOBAL: XWA 0x8BF3A0
 XwaGlobalGoal g_missionGlobalGoals[10][7];
 // GLOBAL: XWA 0x7B7020
-MissionFgRuntimeStats g_missionFgStats[192];
+MissionFgRuntimeStats g_missionFgStats[MISSION_FLIGHT_GROUP_SLOTS];
 // GLOBAL: XWA 0x8D4460
 XwaTeam g_missionTeams[10];
 // GLOBAL: XWA 0x8D6BC0
@@ -4616,6 +4616,15 @@ void Mission_InitFlightRuntimeState(void) {
 	g_initialSpawnBindPlayerCraftSlots = 1;
 	g_nextObjectSignature = 2;
 	g_escapePodPilotFlightGroupIdx = -1;
+#ifdef XWA_MODERN
+	/* Clear the spare slots past the last mission flight group. The hangar
+	   objects of a mission with 190 or 191 flight groups then read an empty
+	   flight group, not data from an earlier mission. */
+	memset(&g_missionFlightGroups[MISSION_MAX_FLIGHT_GROUPS], 0,
+		   sizeof(g_missionFlightGroups[0]) * (MISSION_FLIGHT_GROUP_SLOTS - MISSION_MAX_FLIGHT_GROUPS));
+	memset(&g_missionFgStats[MISSION_MAX_FLIGHT_GROUPS], 0,
+		   sizeof(g_missionFgStats[0]) * (MISSION_FLIGHT_GROUP_SLOTS - MISSION_MAX_FLIGHT_GROUPS));
+#endif
 
 	// Clear all region hyperspace point validity flags.
 	{
