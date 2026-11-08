@@ -1,5 +1,6 @@
-/* HD rendering of XWA's three hyperspace phases: the jump's star streaks on
- * entry and exit (docs/hd_hyperspace_jump.md) and the analytic tunnel. */
+/* HD rendering of XWA's three hyperspace phases: the jump's star streaks and
+ * scene warp on entry and exit (docs/hd_hyperspace_jump.md) and the analytic
+ * tunnel. */
 
 #include "xwa_remaster/hyperspace.h"
 
@@ -54,6 +55,32 @@ typedef struct HyperStreakFragmentUniform {
 } HyperStreakFragmentUniform;
 typedef char HyperStreakFragmentUniformSizeCheck[sizeof(HyperStreakFragmentUniform) == 48 ? 1 : -1];
 
+/* Mirrors HyperspaceWarpSky in hyperspace_warp_sky.frag.hlsl. */
+typedef struct HyperWarpSkyUniform {
+	float size[4];
+	float vanishing[4];
+	float reveal[4];
+	float zoom[4];
+	float sky[4];
+} HyperWarpSkyUniform;
+typedef char HyperWarpSkyUniformSizeCheck[sizeof(HyperWarpSkyUniform) == 80 ? 1 : -1];
+
+/* Mirrors HyperspaceWarp in hyperspace_warp.frag.hlsl. */
+typedef struct HyperWarpUniform {
+	float size[4];
+	float projection[4];
+	float forward[4];
+	float vanishing[4];
+	float motion[4];
+	float reveal[4];
+	float config[4];
+	float render[4];
+} HyperWarpUniform;
+typedef char HyperWarpUniformSizeCheck[sizeof(HyperWarpUniform) == 128 ? 1 : -1];
+
+/* The sky warp's passes: the sky zoom is split into this many passes. */
+#define HYPER_WARP_SKY_PASSES 3
+
 typedef struct HyperEnvironmentUniform {
 	float roughness;
 	float _pad[3];
@@ -81,12 +108,24 @@ struct XwaRemasterHyperspace {
 	AeronShader* streak_fs;
 	AeronShader* tunnel_vs;
 	AeronShader* tunnel_fs;
-	/* The tunnel in its own scene, without a depth test. Over the world
-	 * scene, the streaks and the tunnel's fades are tested against the depth
-	 * plane in front of the world. */
+	AeronShader* fullscreen_vs;
+	AeronShader* warp_sky_fs;
+	AeronShader* warp_fs;
+	/* The tunnel in its own scene. */
 	AeronGraphicsPipeline* tunnel_pipeline;
-	AeronGraphicsPipeline* streak_pipeline;
-	AeronGraphicsPipeline* tunnel_front_pipeline;
+	/* Over the world scene: the streaks and the tunnel's fades into the
+	 * layer, the sky passes and the composite. */
+	AeronGraphicsPipeline* layer_streak_pipeline;
+	AeronGraphicsPipeline* layer_tunnel_pipeline;
+	AeronGraphicsPipeline* warp_sky_pipeline;
+	AeronGraphicsPipeline* warp_pipeline;
+	/* The layer at render size; two output-size targets that the sky passes
+	 * go back and forth between, and that the composite writes into. */
+	AeronRenderTarget* layer_rt;
+	AeronRenderTarget* warp_rt[2];
+	int layer_w, layer_h;
+	int warp_w, warp_h;
+	AeronSampler* point_sampler;
 	AeronComputePipeline* environment_pipeline;
 	AeronTexture* environment_atlas;
 	AeronTexture* environment_cube;
@@ -94,6 +133,9 @@ struct XwaRemasterHyperspace {
 	AeronSampleCount pipeline_samples;
 	uint32_t streak_vertex_count;
 	uint8_t draw_tunnel;
+	/* The warp's progress (0 to 1) this frame, and the view it uses. */
+	float warp_progress;
+	XwaRemasterHyperspaceTunnelView warp_view;
 	uint8_t world_scene;
 	uint8_t hold_exposure;
 	XwaFlightHyperspaceTunnelParams params;
@@ -101,9 +143,6 @@ struct XwaRemasterHyperspace {
 	HyperTunnelUniform tunnel_uniform;
 	HyperStreakUniform streak_uniform;
 	HyperStreakFragmentUniform streak_fragment_uniform;
-	/* The tunnel's depth: 0 in the tunnel scene, the depth plane in front
-	 * of the world otherwise. */
-	float tunnel_depth[4];
 	XwaRemasterHyperspaceLighting lighting;
 };
 
@@ -131,58 +170,117 @@ static AeronBlendStateDesc hyper_blend_pma(void) {
 	};
 }
 
-/* Both hyperspace draws make their geometry from SV_VertexID. With
- * `depth_test`, a fragment draws where the scene's geometry is no nearer than
- * the draw's depth (reversed Z). */
-static AeronGraphicsPipeline* hyper_create_pipeline(AeronShader* vs, AeronShader* fs, AeronBlendStateDesc blend,
-													int depth_test, AeronSampleCount sample_count) {
+/* The hyperspace draws make their geometry from SV_VertexID, without a
+ * depth test. `depth_attachment` matches a pass with the scene's depth. */
+static AeronGraphicsPipeline* hyper_create_pipeline(AeronShader* vs, AeronShader* fs, const AeronBlendStateDesc* blend,
+													int depth_attachment, AeronSampleCount sample_count) {
 	AeronColorTargetStateDesc target = {
 		.format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
-		.blend = blend,
 	};
+	if (blend) {
+		target.blend = *blend;
+	}
 	return Aeron_CreateGraphicsPipeline(&(AeronGraphicsPipelineDesc) {
 		.vertex_shader = vs,
 		.fragment_shader = fs,
 		.primitive_type = AERON_PRIMITIVE_TRIANGLES,
 		.cull_mode = AERON_CULL_NONE,
-		.depth_format = AERON_TEXTURE_FORMAT_D32_FLOAT,
-		.depth = { .depth_test = depth_test ? 1 : 0,
-				   .depth_write = 0,
-				   .compare = depth_test ? AERON_COMPARE_GREATER_EQUAL : AERON_COMPARE_ALWAYS },
+		.depth_format = depth_attachment ? AERON_TEXTURE_FORMAT_D32_FLOAT : AERON_TEXTURE_FORMAT_UNKNOWN,
+		.depth = { .depth_test = 0, .depth_write = 0, .compare = AERON_COMPARE_ALWAYS },
 		.color_target_count = 1,
 		.color_targets = &target,
 		.sample_count = sample_count,
 	});
 }
 
-static void hyper_destroy_pipelines(XwaRemasterHyperspace* h) {
-	AeronGraphicsPipeline** const pipelines[3] = { &h->tunnel_pipeline, &h->streak_pipeline,
-												   &h->tunnel_front_pipeline };
-	for (int i = 0; i < 3; i++) {
-		if (*pipelines[i])
-			Aeron_DestroyGraphicsPipeline(*pipelines[i]);
-		*pipelines[i] = NULL;
-	}
-	h->pipeline_samples = 0;
+static void hyper_destroy_pipeline(AeronGraphicsPipeline** pipeline) {
+	if (*pipeline)
+		Aeron_DestroyGraphicsPipeline(*pipeline);
+	*pipeline = NULL;
 }
 
 static int hyper_ensure_pipelines(XwaRemasterHyperspace* h, AeronSampleCount sample_count) {
-	if (h->pipeline_samples == sample_count && h->tunnel_pipeline && h->streak_pipeline &&
-		h->tunnel_front_pipeline) {
+	if (h->pipeline_samples == sample_count && h->tunnel_pipeline) {
 		return 1;
 	}
-	hyper_destroy_pipelines(h);
-	h->tunnel_pipeline = hyper_create_pipeline(h->tunnel_vs, h->tunnel_fs, hyper_blend_pma(), 0, sample_count);
-	h->streak_pipeline =
-		hyper_create_pipeline(h->streak_vs, h->streak_fs, hyper_blend_additive(), 1, sample_count);
-	h->tunnel_front_pipeline =
-		hyper_create_pipeline(h->tunnel_vs, h->tunnel_fs, hyper_blend_pma(), 1, sample_count);
-	if (!h->tunnel_pipeline || !h->streak_pipeline || !h->tunnel_front_pipeline) {
-		hyper_destroy_pipelines(h);
+	hyper_destroy_pipeline(&h->tunnel_pipeline);
+	h->pipeline_samples = 0;
+	const AeronBlendStateDesc pma = hyper_blend_pma();
+	h->tunnel_pipeline = hyper_create_pipeline(h->tunnel_vs, h->tunnel_fs, &pma, 1, sample_count);
+	if (!h->tunnel_pipeline) {
 		return 0;
 	}
 	h->pipeline_samples = sample_count;
 	return 1;
+}
+
+static int hyper_ensure_warp_pipelines(XwaRemasterHyperspace* h) {
+	if (h->layer_streak_pipeline && h->layer_tunnel_pipeline && h->warp_sky_pipeline && h->warp_pipeline) {
+		return 1;
+	}
+	const AeronBlendStateDesc additive = hyper_blend_additive();
+	const AeronBlendStateDesc pma = hyper_blend_pma();
+	if (!h->layer_streak_pipeline)
+		h->layer_streak_pipeline =
+			hyper_create_pipeline(h->streak_vs, h->streak_fs, &additive, 0, AERON_SAMPLE_COUNT_1);
+	if (!h->layer_tunnel_pipeline)
+		h->layer_tunnel_pipeline =
+			hyper_create_pipeline(h->tunnel_vs, h->tunnel_fs, &pma, 0, AERON_SAMPLE_COUNT_1);
+	if (!h->warp_sky_pipeline)
+		h->warp_sky_pipeline =
+			hyper_create_pipeline(h->fullscreen_vs, h->warp_sky_fs, NULL, 0, AERON_SAMPLE_COUNT_1);
+	if (!h->warp_pipeline)
+		h->warp_pipeline = hyper_create_pipeline(h->fullscreen_vs, h->warp_fs, NULL, 0, AERON_SAMPLE_COUNT_1);
+	return h->layer_streak_pipeline && h->layer_tunnel_pipeline && h->warp_sky_pipeline && h->warp_pipeline;
+}
+
+static void hyper_release_warp_targets(XwaRemasterHyperspace* h) {
+	if (h->layer_rt)
+		Aeron_DestroyRenderTarget(h->layer_rt);
+	h->layer_rt = NULL;
+	h->layer_w = h->layer_h = 0;
+	for (int i = 0; i < 2; i++) {
+		if (h->warp_rt[i])
+			Aeron_DestroyRenderTarget(h->warp_rt[i]);
+		h->warp_rt[i] = NULL;
+	}
+	h->warp_w = h->warp_h = 0;
+}
+
+/* The layer at render size and the warp targets at output size, made at the
+ * first jump and remade when a size changes. */
+static int hyper_ensure_warp_targets(XwaRemasterHyperspace* h, int render_w, int render_h, int output_w,
+									 int output_h) {
+	if (!h->layer_rt || h->layer_w != render_w || h->layer_h != render_h) {
+		if (h->layer_rt)
+			Aeron_DestroyRenderTarget(h->layer_rt);
+		h->layer_rt = Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) {
+			.width = render_w,
+			.height = render_h,
+			.format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
+			.debug_name = "xwa.hyperspace.layer",
+		});
+		h->layer_w = h->layer_rt ? render_w : 0;
+		h->layer_h = h->layer_rt ? render_h : 0;
+	}
+	if (!h->warp_rt[0] || !h->warp_rt[1] || h->warp_w != output_w || h->warp_h != output_h) {
+		static const char* const names[2] = { "xwa.hyperspace.warp_a", "xwa.hyperspace.warp_b" };
+		int ok = 1;
+		for (int i = 0; i < 2; i++) {
+			if (h->warp_rt[i])
+				Aeron_DestroyRenderTarget(h->warp_rt[i]);
+			h->warp_rt[i] = Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) {
+				.width = output_w,
+				.height = output_h,
+				.format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
+				.debug_name = names[i],
+			});
+			ok = ok && h->warp_rt[i];
+		}
+		h->warp_w = ok ? output_w : 0;
+		h->warp_h = ok ? output_h : 0;
+	}
+	return h->layer_rt && h->warp_rt[0] && h->warp_rt[1];
 }
 
 XwaRemasterHyperspace* XwaRemasterHyperspace_Create(const XwaFlightHyperspaceTunnelParams* tunnel,
@@ -199,9 +297,19 @@ XwaRemasterHyperspace* XwaRemasterHyperspace_Create(const XwaFlightHyperspaceTun
 	h->streak_fs = Aeron_CreateShader(&(AeronShaderDesc) {
 		.name = "hyperspace_streak.frag", .stage = AERON_SHADER_STAGE_FRAGMENT, .uniform_buffer_count = 1 });
 	h->tunnel_vs = Aeron_CreateShader(&(AeronShaderDesc) {
-		.name = "hyperspace_tunnel.vert", .stage = AERON_SHADER_STAGE_VERTEX, .uniform_buffer_count = 1 });
+		.name = "hyperspace_tunnel.vert", .stage = AERON_SHADER_STAGE_VERTEX });
 	h->tunnel_fs = Aeron_CreateShader(&(AeronShaderDesc) {
 		.name = "hyperspace_tunnel.frag", .stage = AERON_SHADER_STAGE_FRAGMENT, .uniform_buffer_count = 1 });
+	h->fullscreen_vs =
+		Aeron_CreateShader(&(AeronShaderDesc) { .name = "fullscreen.vert", .stage = AERON_SHADER_STAGE_VERTEX });
+	h->warp_sky_fs = Aeron_CreateShader(&(AeronShaderDesc) { .name = "hyperspace_warp_sky.frag",
+															 .stage = AERON_SHADER_STAGE_FRAGMENT,
+															 .sampler_count = 2,
+															 .uniform_buffer_count = 1 });
+	h->warp_fs = Aeron_CreateShader(&(AeronShaderDesc) { .name = "hyperspace_warp.frag",
+														 .stage = AERON_SHADER_STAGE_FRAGMENT,
+														 .sampler_count = 4,
+														 .uniform_buffer_count = 1 });
 	h->environment_pipeline = Aeron_CreateComputePipeline(&(AeronComputePipelineDesc) {
 		.name = "hyperspace_environment.comp",
 		.readwrite_storage_texture_count = 1,
@@ -233,8 +341,17 @@ XwaRemasterHyperspace* XwaRemasterHyperspace_Create(const XwaFlightHyperspaceTun
 		.address_v = AERON_ADDRESS_CLAMP_TO_EDGE,
 		.address_w = AERON_ADDRESS_CLAMP_TO_EDGE,
 	});
-	if (!h->streak_vs || !h->streak_fs || !h->tunnel_vs || !h->tunnel_fs || !h->environment_pipeline ||
-		!h->environment_atlas || !h->environment_cube || !h->environment_sampler) {
+	h->point_sampler = Aeron_CreateSampler(&(AeronSamplerDesc) {
+		.min_filter = AERON_FILTER_NEAREST,
+		.mag_filter = AERON_FILTER_NEAREST,
+		.mip_filter = AERON_FILTER_NEAREST,
+		.address_u = AERON_ADDRESS_CLAMP_TO_EDGE,
+		.address_v = AERON_ADDRESS_CLAMP_TO_EDGE,
+		.address_w = AERON_ADDRESS_CLAMP_TO_EDGE,
+	});
+	if (!h->streak_vs || !h->streak_fs || !h->tunnel_vs || !h->tunnel_fs || !h->fullscreen_vs ||
+		!h->warp_sky_fs || !h->warp_fs || !h->environment_pipeline || !h->environment_atlas ||
+		!h->environment_cube || !h->environment_sampler || !h->point_sampler) {
 		Aeron_LogError("xwa.remaster", "hyperspace: GPU resource creation failed");
 		XwaRemasterHyperspace_Destroy(h);
 		return NULL;
@@ -261,15 +378,20 @@ void XwaRemasterHyperspace_Destroy(XwaRemasterHyperspace* h) {
 	if (!h) {
 		return;
 	}
-	hyper_destroy_pipelines(h);
-	if (h->streak_vs)
-		Aeron_DestroyShader(h->streak_vs);
-	if (h->streak_fs)
-		Aeron_DestroyShader(h->streak_fs);
-	if (h->tunnel_vs)
-		Aeron_DestroyShader(h->tunnel_vs);
-	if (h->tunnel_fs)
-		Aeron_DestroyShader(h->tunnel_fs);
+	hyper_destroy_pipeline(&h->tunnel_pipeline);
+	hyper_destroy_pipeline(&h->layer_streak_pipeline);
+	hyper_destroy_pipeline(&h->layer_tunnel_pipeline);
+	hyper_destroy_pipeline(&h->warp_sky_pipeline);
+	hyper_destroy_pipeline(&h->warp_pipeline);
+	hyper_release_warp_targets(h);
+	AeronShader* const shaders[7] = { h->streak_vs,		h->streak_fs,	  h->tunnel_vs, h->tunnel_fs,
+									  h->fullscreen_vs, h->warp_sky_fs, h->warp_fs };
+	for (int i = 0; i < 7; i++) {
+		if (shaders[i])
+			Aeron_DestroyShader(shaders[i]);
+	}
+	if (h->point_sampler)
+		Aeron_DestroySampler(h->point_sampler);
 	if (h->environment_pipeline)
 		Aeron_DestroyComputePipeline(h->environment_pipeline);
 	if (h->environment_atlas)
@@ -620,7 +742,7 @@ static float hyper_streak_intensity(const XwaFlightHyperspaceJumpParams* jump, c
 
 static void hyper_set_streak_uniform(const XwaRemasterHyperspace* h, HyperStreakUniform* u,
 									 const XwaRemasterHyperspaceTunnelView* view, const HyperJumpCurves* curves,
-									 float intensity, float depth, uint32_t seed, int rt_w, int rt_h) {
+									 float intensity, uint32_t seed, int rt_w, int rt_h) {
 	const XwaFlightHyperspaceJumpParams* jump = &h->jump;
 	memset(u, 0, sizeof *u);
 	u->view[0] = (float)rt_w;
@@ -650,7 +772,6 @@ static void hyper_set_streak_uniform(const XwaRemasterHyperspace* h, HyperStreak
 	u->variation[3] = jump->taper_variation;
 	u->taper[0] = jump->tail_taper;
 	u->taper[1] = jump->head_taper;
-	u->taper[2] = depth;
 	hyper_vanishing_point(view, jump->radial_widening, rt_w, rt_h, u->vanishing);
 	u->glow[0] = jump->glow_strength;
 	u->glow[1] = jump->glow_width;
@@ -658,10 +779,22 @@ static void hyper_set_streak_uniform(const XwaRemasterHyperspace* h, HyperStreak
 	u->config[1] = seed;
 }
 
+/* The warp's progress on the entry's timeline: 0 before `warp_start`, 1 from
+ * `warp_end`, the power `warp_curve` of the share of the time elapsed in
+ * between. */
+static float hyper_warp_progress(const XwaFlightHyperspaceJumpParams* jump, float jump_seconds) {
+	const float span = jump->warp_end - jump->warp_start;
+	if (!(span > 0.0f)) {
+		return jump_seconds >= jump->warp_end ? 1.0f : 0.0f;
+	}
+	float ramp = (jump_seconds - jump->warp_start) / span;
+	ramp = ramp < 0.0f ? 0.0f : (ramp > 1.0f ? 1.0f : ramp);
+	return powf(ramp, jump->warp_curve);
+}
+
 int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* cmd, const float camera_rows[9],
 								  int rt_w, int rt_h, const XwaRemasterHyperspaceMoment* moment,
-								  const XwaRemasterHyperspaceTunnelView* tunnel_view, int world_scene,
-								  float front_depth) {
+								  const XwaRemasterHyperspaceTunnelView* tunnel_view, int world_scene) {
 	if (!h || !cmd || !camera_rows || !moment || !tunnel_view) {
 		return 0;
 	}
@@ -669,6 +802,8 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 	h->draw_tunnel = 0;
 	h->world_scene = world_scene ? 1 : 0;
 	h->hold_exposure = 0;
+	h->warp_progress = 0.0f;
+	h->warp_view = *tunnel_view;
 	memset(&h->lighting, 0, sizeof h->lighting);
 	HyperTimeline timeline;
 	if (!hyper_timeline(&h->jump, moment, &timeline)) {
@@ -676,12 +811,10 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 	}
 	h->hold_exposure = timeline.hold_exposure;
 	hyper_set_tunnel_uniform(h, tunnel_view, &timeline, rt_w, rt_h);
-	memset(h->tunnel_depth, 0, sizeof h->tunnel_depth);
 	if (timeline.tunnel_opacity > 0.0f) {
 		if (world_scene) {
 			/* The fades are short and under the white-out: an even fill is
 			 * enough for the cockpit. */
-			h->tunnel_depth[0] = front_depth;
 			hyper_build_tunnel_fill_lighting(h, timeline.tunnel_opacity, timeline.tunnel_boost);
 		} else {
 			if (h->params.mesh_ambient_strength > 0.0f && !hyper_generate_environment(h, cmd)) {
@@ -691,14 +824,17 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 		}
 		h->draw_tunnel = 1;
 	}
+	if (world_scene) {
+		h->warp_progress = hyper_warp_progress(&h->jump, timeline.jump_seconds);
+	}
 	/* The streaks only show over the world scene, during the entry and the
-	 * exit. They are drawn in front of everything but the cockpit. */
+	 * exit. */
 	if (world_scene && timeline.streak_fade > 0.0f && h->jump.star_count > 0) {
 		HyperJumpCurves curves;
 		hyper_jump_curves(&h->jump, timeline.jump_seconds, &curves);
 		hyper_set_streak_uniform(h, &h->streak_uniform, tunnel_view, &curves,
-								 hyper_streak_intensity(&h->jump, &curves, timeline.streak_fade), front_depth,
-								 moment->seed, rt_w, rt_h);
+								 hyper_streak_intensity(&h->jump, &curves, timeline.streak_fade), moment->seed,
+								 rt_w, rt_h);
 		HyperStreakFragmentUniform* fu = &h->streak_fragment_uniform;
 		memset(fu, 0, sizeof *fu);
 		fu->glow[0] = h->jump.glow_strength;
@@ -713,33 +849,20 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 	}
 	/* The cockpit's ambient light is set even when only the streaks draw. */
 	h->lighting.active = 1;
-	return h->draw_tunnel || h->streak_vertex_count != 0;
-}
-
-static int hyper_begin_draw(XwaRemasterHyperspace* h, AeronCommandBuffer* command_buffer, AeronRenderPass* pass,
-							int rt_w, int rt_h) {
-	if (!h || !pass) {
-		return 0;
-	}
-	if (!hyper_ensure_pipelines(h, Aeron_RenderPassGetSampleCount(pass))) {
-		Aeron_CommandBufferSetFailure(command_buffer, "Hyperspace pipeline preparation failed");
-		return 0;
-	}
-	Aeron_SetViewport(pass, &(AeronRectI) { 0, 0, rt_w, rt_h });
-	return 1;
+	return h->draw_tunnel || h->streak_vertex_count != 0 || h->warp_progress > 0.0f;
 }
 
 static void hyper_draw_tunnel(XwaRemasterHyperspace* h, AeronRenderPass* pass, AeronGraphicsPipeline* pipeline) {
 	Aeron_BindGraphicsPipeline(pass, pipeline);
-	Aeron_BindUniformData(pass, AERON_SHADER_STAGE_VERTEX, 0, h->tunnel_depth, (uint32_t)sizeof h->tunnel_depth);
 	Aeron_BindUniformData(pass, AERON_SHADER_STAGE_FRAGMENT, 0, &h->tunnel_uniform,
 						  (uint32_t)sizeof h->tunnel_uniform);
 	Aeron_Draw(pass, 3, 0);
 }
 
 static void hyper_draw_streaks(XwaRemasterHyperspace* h, AeronRenderPass* pass) {
-	Aeron_BindGraphicsPipeline(pass, h->streak_pipeline);
-	Aeron_BindUniformData(pass, AERON_SHADER_STAGE_VERTEX, 0, &h->streak_uniform, (uint32_t)sizeof h->streak_uniform);
+	Aeron_BindGraphicsPipeline(pass, h->layer_streak_pipeline);
+	Aeron_BindUniformData(pass, AERON_SHADER_STAGE_VERTEX, 0, &h->streak_uniform,
+						  (uint32_t)sizeof h->streak_uniform);
 	Aeron_BindUniformData(pass, AERON_SHADER_STAGE_FRAGMENT, 0, &h->streak_fragment_uniform,
 						  (uint32_t)sizeof h->streak_fragment_uniform);
 	Aeron_Draw(pass, h->streak_vertex_count, 0);
@@ -748,28 +871,208 @@ static void hyper_draw_streaks(XwaRemasterHyperspace* h, AeronRenderPass* pass) 
 void XwaRemasterHyperspace_Draw(AeronCommandBuffer* command_buffer, AeronRenderPass* pass, int rt_w, int rt_h,
 								void* user) {
 	XwaRemasterHyperspace* h = (XwaRemasterHyperspace*)user;
-	if (!h || h->world_scene || !h->draw_tunnel) {
+	if (!h || !pass || h->world_scene || !h->draw_tunnel) {
 		return;
 	}
-	if (!hyper_begin_draw(h, command_buffer, pass, rt_w, rt_h)) {
+	if (!hyper_ensure_pipelines(h, Aeron_RenderPassGetSampleCount(pass))) {
+		Aeron_CommandBufferSetFailure(command_buffer, "Hyperspace pipeline preparation failed");
 		return;
 	}
+	Aeron_SetViewport(pass, &(AeronRectI) { 0, 0, rt_w, rt_h });
 	hyper_draw_tunnel(h, pass, h->tunnel_pipeline);
 }
 
-void XwaRemasterHyperspace_DrawFront(AeronCommandBuffer* command_buffer, AeronRenderPass* pass, int rt_w, int rt_h,
-									 void* user) {
-	XwaRemasterHyperspace* h = (XwaRemasterHyperspace*)user;
-	if (!h || !h->world_scene || !(h->draw_tunnel || h->streak_vertex_count)) {
-		return;
+/* The streaks and the tunnel's fades, at render size, with premultiplied
+ * alpha. */
+static int hyper_draw_layer(XwaRemasterHyperspace* h, AeronCommandBuffer* cmd) {
+	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
+		.color_target = h->layer_rt,
+		.clear_color = 1,
+		.clear_color_rgba = { 0.0f, 0.0f, 0.0f, 0.0f },
+		.command_buffer = cmd,
+		.debug_label = "Hyperspace streak layer",
+	});
+	if (!pass) {
+		return 0;
 	}
-	if (!hyper_begin_draw(h, command_buffer, pass, rt_w, rt_h)) {
-		return;
-	}
+	Aeron_SetViewport(pass, &(AeronRectI) { 0, 0, h->layer_w, h->layer_h });
 	if (h->draw_tunnel) {
-		hyper_draw_tunnel(h, pass, h->tunnel_front_pipeline);
+		hyper_draw_tunnel(h, pass, h->layer_tunnel_pipeline);
 	}
 	if (h->streak_vertex_count) {
 		hyper_draw_streaks(h, pass);
 	}
+	Aeron_EndRenderPass(pass);
+	return 1;
+}
+
+static int hyper_fullscreen_pass(AeronCommandBuffer* cmd, AeronGraphicsPipeline* pipeline,
+								 AeronRenderTarget* target, int width, int height, AeronTexture* const* textures,
+								 AeronSampler* const* samplers, uint32_t texture_count, const void* uniform,
+								 uint32_t uniform_size, const char* label) {
+	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
+		.color_target = target,
+		.discard_color = 1,
+		.command_buffer = cmd,
+		.debug_label = label,
+	});
+	if (!pass) {
+		return 0;
+	}
+	Aeron_SetViewport(pass, &(AeronRectI) { 0, 0, width, height });
+	Aeron_BindGraphicsPipeline(pass, pipeline);
+	for (uint32_t i = 0; i < texture_count; i++) {
+		Aeron_BindTextureSampler(pass, AERON_SHADER_STAGE_FRAGMENT, i, textures[i], samplers[i]);
+	}
+	Aeron_BindUniformData(pass, AERON_SHADER_STAGE_FRAGMENT, 0, uniform, uniform_size);
+	Aeron_Draw(pass, 3, 0);
+	Aeron_EndRenderPass(pass);
+	return 1;
+}
+
+/* The vanishing point at output size (xy), how much the view faces the
+ * direction of travel (z), and 1 / the distance from the vanishing point to
+ * the farthest screen corner (w). */
+static void hyper_warp_vanishing(const XwaRemasterHyperspaceTunnelView* view, int width, int height,
+								 float out[4]) {
+	hyper_vanishing_point(view, 1.0f, width, height, out);
+	/* The ramp of the streaks' radial widening, on the signed forward
+	 * component: rear views don't face the direction of travel. */
+	float facing = (view->forward[2] - 0.05f) / 0.25f;
+	facing = facing < 0.0f ? 0.0f : (facing > 1.0f ? 1.0f : facing);
+	float farthest = 1.0f;
+	const float corners[4][2] = {
+		{ 0.0f, 0.0f }, { (float)width, 0.0f }, { 0.0f, (float)height }, { (float)width, (float)height }
+	};
+	for (int i = 0; i < 4; i++) {
+		const float dx = corners[i][0] - out[0];
+		const float dy = corners[i][1] - out[1];
+		farthest = fmaxf(farthest, sqrtf(dx * dx + dy * dy));
+	}
+	out[2] = facing;
+	out[3] = 1.0f / farthest;
+}
+
+static void hyper_size_uniform(float out[4], int width, int height) {
+	out[0] = (float)width;
+	out[1] = (float)height;
+	out[2] = 1.0f / (float)width;
+	out[3] = 1.0f / (float)height;
+}
+
+/* The sky passes: the zoom's log span, from the smear's old end to the
+ * current zoom, split into taps^3 evenly spaced samples. Returns the target
+ * holding the warped sky, or NULL on failure. */
+static AeronRenderTarget* hyper_warp_sky(XwaRemasterHyperspace* h, AeronCommandBuffer* cmd,
+										 const XwaRemasterHyperspaceWarpInput* in, const float vanishing[4],
+										 const float reveal[4]) {
+	const XwaFlightHyperspaceJumpParams* jump = &h->jump;
+	const int taps = jump->warp_sky_taps;
+	/* The zoom fades out in views that don't face the direction of travel. */
+	const float log_zoom = h->warp_progress * vanishing[2] * logf(jump->warp_sky_zoom);
+	const float span = jump->warp_smear * log_zoom;
+	float step = span;
+	for (int pass = 0; pass < HYPER_WARP_SKY_PASSES; pass++) {
+		step /= (float)taps;
+	}
+	const float radiance = XwaRemaster_ClassicRadiance();
+	AeronRenderTarget* const targets[HYPER_WARP_SKY_PASSES] = { h->warp_rt[0], h->warp_rt[1], h->warp_rt[0] };
+	static const char* const labels[HYPER_WARP_SKY_PASSES] = { "Hyperspace sky warp 1", "Hyperspace sky warp 2",
+																"Hyperspace sky warp 3" };
+	AeronTexture* source = in->scene;
+	for (int pass = 0; pass < HYPER_WARP_SKY_PASSES; pass++) {
+		HyperWarpSkyUniform u;
+		memset(&u, 0, sizeof u);
+		hyper_size_uniform(u.size, in->output_w, in->output_h);
+		memcpy(u.vanishing, vanishing, sizeof u.vanishing);
+		u.reveal[0] = reveal[0];
+		u.reveal[1] = reveal[1];
+		/* The first pass starts at the smear's old end, with its samples
+		 * centred in their spacing. Each later pass spaces its samples by
+		 * the span of all the passes before it. */
+		u.zoom[0] = pass == 0 ? log_zoom - span + 0.5f * step : 0.0f;
+		u.zoom[1] = step;
+		u.zoom[2] = (float)taps;
+		u.zoom[3] = pass == 0 ? 0.0f : (pass == HYPER_WARP_SKY_PASSES - 1 ? 2.0f : 1.0f);
+		u.sky[0] = jump->warp_sky_highlights;
+		u.sky[1] = radiance > 0.0f ? 1.0f / radiance : 1.0f;
+		AeronTexture* const textures[2] = { source, in->depth };
+		AeronSampler* const samplers[2] = { h->environment_sampler, h->point_sampler };
+		if (!source || !hyper_fullscreen_pass(cmd, h->warp_sky_pipeline, targets[pass], in->output_w,
+											  in->output_h, textures, samplers, 2, &u, (uint32_t)sizeof u,
+											  labels[pass])) {
+			return NULL;
+		}
+		source = Aeron_RenderTargetGetTexture(targets[pass]);
+		step *= (float)taps;
+	}
+	return targets[HYPER_WARP_SKY_PASSES - 1];
+}
+
+AeronTexture* XwaRemasterHyperspace_RenderWarp(XwaRemasterHyperspace* h, AeronCommandBuffer* cmd,
+											   const XwaRemasterHyperspaceWarpInput* in) {
+	if (!h || !cmd || !in || !in->scene || !in->depth || in->output_w <= 0 || in->output_h <= 0 ||
+		in->render_w <= 0 || in->render_h <= 0) {
+		return NULL;
+	}
+	if (!hyper_ensure_warp_pipelines(h) ||
+		!hyper_ensure_warp_targets(h, in->render_w, in->render_h, in->output_w, in->output_h)) {
+		Aeron_CommandBufferSetFailure(cmd, "Hyperspace warp preparation failed");
+		return NULL;
+	}
+	if (!hyper_draw_layer(h, cmd)) {
+		Aeron_CommandBufferSetFailure(cmd, "Hyperspace streak layer recording failed");
+		return NULL;
+	}
+	const XwaFlightHyperspaceJumpParams* jump = &h->jump;
+	const XwaRemasterHyperspaceTunnelView* view = &h->warp_view;
+	const float progress = h->warp_progress;
+	const int warp = progress > 0.0f;
+	float vanishing[4];
+	hyper_warp_vanishing(view, in->output_w, in->output_h, vanishing);
+	const float reveal[4] = { progress, jump->warp_reveal_softness, warp ? 1.0f : 0.0f,
+							  jump->warp_sky_highlights };
+
+	/* Before the warp starts and once the reveal is complete, the composite
+	 * doesn't read the sky; it is bound anyway. */
+	AeronRenderTarget* sky = h->warp_rt[0];
+	if (warp && progress < 1.0f) {
+		sky = hyper_warp_sky(h, cmd, in, vanishing, reveal);
+		if (!sky) {
+			Aeron_CommandBufferSetFailure(cmd, "Hyperspace sky warp recording failed");
+			return NULL;
+		}
+	}
+	AeronRenderTarget* out = sky == h->warp_rt[0] ? h->warp_rt[1] : h->warp_rt[0];
+
+	HyperWarpUniform u;
+	memset(&u, 0, sizeof u);
+	hyper_size_uniform(u.size, in->output_w, in->output_h);
+	u.projection[0] = view->tan_half_fov_x;
+	u.projection[1] = view->tan_half_fov_y;
+	u.projection[2] = view->proj_offset_x;
+	u.projection[3] = view->proj_offset_y;
+	memcpy(u.forward, view->forward, 3 * sizeof(float));
+	memcpy(u.vanishing, vanishing, sizeof u.vanishing);
+	const float distance = progress * jump->warp_distance_m * in->units_per_meter;
+	u.motion[0] = distance;
+	u.motion[1] = distance * (1.0f - jump->warp_smear);
+	u.motion[2] = in->near_z;
+	u.motion[3] = in->keep_depth;
+	memcpy(u.reveal, reveal, sizeof u.reveal);
+	u.config[0] = (float)jump->warp_taps;
+	u.config[1] = XwaRemaster_ClassicRadiance();
+	u.config[2] = (float)in->view;
+	hyper_size_uniform(u.render, in->render_w, in->render_h);
+	AeronTexture* const textures[4] = { in->scene, in->depth, Aeron_RenderTargetGetTexture(sky),
+										Aeron_RenderTargetGetTexture(h->layer_rt) };
+	AeronSampler* const samplers[4] = { h->environment_sampler, h->point_sampler, h->environment_sampler,
+										h->environment_sampler };
+	if (!textures[2] || !textures[3] ||
+		!hyper_fullscreen_pass(cmd, h->warp_pipeline, out, in->output_w, in->output_h, textures, samplers, 4,
+							   &u, (uint32_t)sizeof u, "Hyperspace warp composite")) {
+		Aeron_CommandBufferSetFailure(cmd, "Hyperspace warp composite recording failed");
+		return NULL;
+	}
+	return Aeron_RenderTargetGetTexture(out);
 }

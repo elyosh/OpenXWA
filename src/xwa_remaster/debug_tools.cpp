@@ -769,6 +769,28 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 	jump_changed |= ImGui::SliderFloat("Cockpit light curve", &j.mesh_light_curve, 0.25f, 8.0f, "%.2f",
 									   ImGuiSliderFlags_Logarithmic);
 	jump_changed |= ImGui::ColorEdit3("Streak tint", j.tint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+	ImGui::TextUnformatted("Scene warp");
+	jump_changed |= ImGui::SliderFloat("Warp start (s)", &j.warp_start, 0.0f, 2.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Warp end (s)", &j.warp_end, 0.2f, 2.5f, "%.2f");
+	jump_changed |=
+		ImGui::SliderFloat("Warp curve", &j.warp_curve, 0.25f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("World distance (m)", &j.warp_distance_m, 0.0f, 200000.0f, "%.0f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |=
+		ImGui::SliderFloat("Sky zoom", &j.warp_sky_zoom, 1.0f, 16.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("Smear", &j.warp_smear, 0.05f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Sky highlights", &j.warp_sky_highlights, 1.0f, 3.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Reveal softness", &j.warp_reveal_softness, 0.25f, 2.0f, "%.2f");
+	jump_changed |= ImGui::SliderInt("World taps", &j.warp_taps, 8, 64);
+	jump_changed |= ImGui::SliderInt("Sky taps per pass", &j.warp_sky_taps, 4, 16);
+	{
+		static const char* const views[XWA_FLIGHT_HYPERSPACE_WARP_VIEW_COUNT] = { "Image", "Keep mask",
+																				  "Warped sky", "Reveal" };
+		int view = (int)XwaRemasterFlight_GetHyperspaceWarpView();
+		if (ImGui::Combo("Warp view", &view, views, XWA_FLIGHT_HYPERSPACE_WARP_VIEW_COUNT)) {
+			XwaRemasterFlight_SetHyperspaceWarpView((XwaFlightHyperspaceWarpView)view);
+		}
+	}
 	ImGui::TextDisabled("White-out brightness multiplies the streaks at the peak of the entry.\n"
 						"Brightness range is the ratio between the brightest and faintest stars.\n"
 						"Width from brightness: 0 = same width, 1 = width follows brightness.\n"
@@ -782,14 +804,19 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 						"Tail brightness and colour: the streak goes from these to the head's.\n"
 						"Cockpit light: the streaks' light on the cockpit at the white peak, in\n"
 						"white classic pixels. It rises from its start time to the peak; the\n"
-						"curve is the rise's exponent (1 = straight, higher = later).");
+						"curve is the rise's exponent (1 = straight, higher = later).\n"
+						"Scene warp: from its start to its end, the world moves toward the\n"
+						"camera by the world distance, the sky zooms in, and black opens from\n"
+						"the vanishing point. Smear is the length of the trails as a share of\n"
+						"the movement. Sky highlights keep stars bright in their trails.\n"
+						"Reveal softness is the width of the black's soft edge.");
 	if (ImGui::Button("Reset jump to YAML defaults")) {
 		XwaRemasterFlight_GetHyperspaceJumpDefault(&j);
 		jump_changed = true;
 	}
 	ImGui::SameLine();
 	if (ImGui::Button("Copy jump YAML")) {
-		char yaml[1536];
+		char yaml[2048];
 		std::snprintf(yaml, sizeof yaml,
 					  "hyperspace_jump:\n"
 					  "  star_count: %d\n"
@@ -819,7 +846,17 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 					  "  mesh_light_curve: %.4g\n"
 					  "  tint_r: %.4g\n"
 					  "  tint_g: %.4g\n"
-					  "  tint_b: %.4g\n",
+					  "  tint_b: %.4g\n"
+					  "  warp_start: %.4g\n"
+					  "  warp_end: %.4g\n"
+					  "  warp_curve: %.4g\n"
+					  "  warp_distance_m: %.6g\n"
+					  "  warp_sky_zoom: %.4g\n"
+					  "  warp_smear: %.4g\n"
+					  "  warp_sky_highlights: %.4g\n"
+					  "  warp_reveal_softness: %.4g\n"
+					  "  warp_taps: %d\n"
+					  "  warp_sky_taps: %d\n",
 					  j.star_count, (double)j.streak_brightness, (double)j.whiteout_brightness,
 					  (double)j.brightness_range, (double)j.streak_width_px, (double)j.width_from_brightness,
 					  (double)j.width_variation, (double)j.head_widening, (double)j.radial_widening,
@@ -830,7 +867,10 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 					  (double)j.white_fade_seconds, (double)j.tunnel_entry_brightness,
 					  (double)j.tunnel_settle_seconds, (double)j.mesh_light_strength,
 					  (double)j.mesh_light_start, (double)j.mesh_light_curve, (double)j.tint[0],
-					  (double)j.tint[1], (double)j.tint[2]);
+					  (double)j.tint[1], (double)j.tint[2], (double)j.warp_start, (double)j.warp_end,
+					  (double)j.warp_curve, (double)j.warp_distance_m, (double)j.warp_sky_zoom,
+					  (double)j.warp_smear, (double)j.warp_sky_highlights, (double)j.warp_reveal_softness,
+					  j.warp_taps, j.warp_sky_taps);
 		ImGui::SetClipboardText(yaml);
 	}
 	if (jump_changed) {

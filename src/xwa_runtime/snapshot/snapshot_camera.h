@@ -26,6 +26,21 @@ void XwaSnapshotCamera_NoteExternalCamera(int playerIdx, int focusX, int focusY,
    for. */
 void XwaSnapshotCamera_PositionFraction(const int32_t position[3], float fraction[3]);
 
+/* During every hyperspace phase the game replaces the player's camera with a
+ * fixed one, looking along world +Y and moving along it, which its own
+ * hyperspace effect needs. The HD renderer draws the world during the jump,
+ * so it keeps the camera of ordinary flight instead. */
+
+/* Keeps `playerIdx`'s camera as the game has just placed it, before the
+   hyperspace override replaces it, with the seat's eye offset it was placed
+   with. The game's hyperspace cockpit draw recomputes that offset later with
+   the fixed orientation. */
+void XwaSnapshotCamera_NoteHyperspaceOverride(int playerIdx);
+/* The kept camera's rows (FVIEW_CopyRenderCameraRows order), position and
+   seat eye offset in world units. Returns 0 when the latest camera update had
+   no hyperspace override. */
+int XwaSnapshotCamera_OrdinaryCamera(float rows[9], int32_t position[3], float eye_offset[3]);
+
 #ifdef __cplusplus
 }
 #endif

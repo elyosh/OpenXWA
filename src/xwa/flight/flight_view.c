@@ -1186,6 +1186,9 @@ void FlightView_UpdatePlayerCamera(int playerIdx) {
 	}
 
 	if (g_players[playerIdx].hyperspacePhase != PLAYER_HYPERSPACE_PHASE_NONE) {
+#ifdef XWA_MODERN
+		XwaSnapshotCamera_NoteHyperspaceOverride(playerIdx);
+#endif
 		g_players[playerIdx].viewState.viewRoll = 0;
 		g_players[playerIdx].viewState.viewPitch = 0x4000;
 		g_players[playerIdx].viewState.viewYaw = 0;

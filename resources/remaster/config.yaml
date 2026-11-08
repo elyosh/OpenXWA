@@ -407,6 +407,18 @@ hyperspace_jump:
   tint_r: 0.122                # colour the streaks move toward during the jump
   tint_g: 0.3544
   tint_b: 1.00
+  # Scene warp: the scene zooms toward the camera and black opens from the
+  # vanishing point; the exit plays it backward.
+  warp_start: 0.0             # seconds into the entry when the scene starts moving
+  warp_end: 2.0               # seconds into the entry when only black remains
+  warp_curve: 3.0             # exponent of the progress: higher starts slower and ends faster
+  warp_distance_m: 10000.0    # how far the world moves toward the camera by warp_end, in metres
+  warp_sky_zoom: 8.0          # sky magnification at the vanishing point by warp_end; 1 = still
+  warp_smear: 1.0             # smear length, as a share of the movement (0.05 to 1)
+  warp_sky_highlights: 2.0    # how much bright sky samples count in the smear; 1 = plain average
+  warp_reveal_softness: 1.0   # width of the black's soft edge, as a share of the distance to the farthest corner
+  warp_taps: 24               # samples per pixel along the world's walk
+  warp_sky_taps: 8            # samples per pixel in each of the three sky passes
 point_lights:
   enabled: true
   cluster_depth_slices: 24

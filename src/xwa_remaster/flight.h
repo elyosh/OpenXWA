@@ -271,6 +271,17 @@ typedef struct XwaFlightHyperspaceJumpParams {
 	float mesh_light_start;
 	float mesh_light_curve;
 	float tint[3];
+	/* The scene warp (docs/hd_hyperspace_jump.md, Scene warp). */
+	float warp_start;
+	float warp_end;
+	float warp_curve;
+	float warp_distance_m;
+	float warp_sky_zoom;
+	float warp_smear;
+	float warp_sky_highlights;
+	float warp_reveal_softness;
+	int warp_taps;
+	int warp_sky_taps;
 } XwaFlightHyperspaceJumpParams;
 
 void XwaRemasterFlight_GetHyperspaceJump(XwaFlightHyperspaceJumpParams* out);
@@ -290,6 +301,19 @@ XwaFlightHyperspacePreview XwaRemasterFlight_GetHyperspacePreview(void);
 /* Playback speed of the preview, 0.05 to 1. */
 void XwaRemasterFlight_SetHyperspacePreviewSpeed(float speed);
 float XwaRemasterFlight_GetHyperspacePreviewSpeed(void);
+
+/* What the scene warp shows during the entry and the exit. The debug views
+ * replace the image. */
+typedef enum XwaFlightHyperspaceWarpView {
+	XWA_FLIGHT_HYPERSPACE_WARP_VIEW_IMAGE = 0,
+	XWA_FLIGHT_HYPERSPACE_WARP_VIEW_KEEP_MASK = 1, /* the keep mask in red over the image */
+	XWA_FLIGHT_HYPERSPACE_WARP_VIEW_SKY = 2,       /* the warped sky alone */
+	XWA_FLIGHT_HYPERSPACE_WARP_VIEW_REVEAL = 3,    /* the black reveal as grey levels */
+	XWA_FLIGHT_HYPERSPACE_WARP_VIEW_COUNT = 4,
+} XwaFlightHyperspaceWarpView;
+
+void XwaRemasterFlight_SetHyperspaceWarpView(XwaFlightHyperspaceWarpView view);
+XwaFlightHyperspaceWarpView XwaRemasterFlight_GetHyperspaceWarpView(void);
 
 /* FSR controls exposed by the debug inspector. The user menu persists only
  * the mode; sharpness and debug visualization remain session-only. */

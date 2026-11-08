@@ -35,8 +35,7 @@ cbuffer HyperspaceStreakVS : register(b0, space1)
 	/* x brightest-to-faintest ratio, y how much brightness widens a star,
 	 * z random width spread (a ratio), w random taper spread (0 to 1). */
 	float4 variation;
-	/* x tail taper, y head taper, as shares of the streak's 3D length; z depth
-	 * of the streaks: the depth plane in front of the world. */
+	/* x tail taper, y head taper, as shares of the streak's 3D length. */
 	float4 taper;
 	/* xy vanishing point in px, z radial widening, w 1 / screen half-height. */
 	float4 vanishing;
@@ -227,7 +226,7 @@ HyperStreakVaryings main(uint vertex_id : SV_VertexID)
 	const float temperature = warm_roll < 0.1f ? temperature_roll * 0.4f : 0.4f + 0.6f * temperature_roll;
 	/* Each star's tapers vary by up to the taper spread either way. */
 	const float spread = saturate(variation.w);
-	output.position = float4(px.x / view.x * 2.0f - 1.0f, 1.0f - px.y / view.y * 2.0f, taper.z, 1.0f);
+	output.position = float4(px.x / view.x * 2.0f - 1.0f, 1.0f - px.y / view.y * 2.0f, 0.0f, 1.0f);
 	output.ends = float4(clipped_tail, clipped_head);
 	output.path = float4(full_length * enter, full_length, tail_inverse_depth, head_inverse_depth);
 	output.star = float4(base_sigma, distance, intensity, 0.0f);

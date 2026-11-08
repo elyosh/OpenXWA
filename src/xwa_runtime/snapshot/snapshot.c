@@ -1623,6 +1623,13 @@ static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_
 		f->iff = m->iff;
 		f->node_switch = m->nodeSwitchIndex;
 		f->orient_dirty = m->orientMatrixDirty;
+		/* During hyperspace the game also writes its fixed hyperspace camera
+		 * into the craft's cached orientation
+		 * (XwaSnapshotCamera_NoteHyperspaceOverride): the renderer rebuilds
+		 * the orientation from the angles instead. */
+		if (i == (uint32_t)g_players[g_localPlayer].objectIndex && g_players[g_localPlayer].hyperspacePhase) {
+			f->orient_dirty = 1;
+		}
 		f->source_obj = m->sourceObjIdx;
 		f->speed = m->speed;
 		f->instance_extent = m->instanceExtent;
@@ -1903,6 +1910,14 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->external = (uint8_t)(vs->externalCameraActive != 0);
 	c->cockpit_visible = g_players[g_localPlayer].cockpitVisible;
 	c->hyperspace_phase = (uint8_t)g_players[g_localPlayer].hyperspacePhase;
+	/* During hyperspace the HD renderer gets the camera of ordinary flight
+	 * (XwaSnapshotCamera_NoteHyperspaceOverride). */
+	float hyperspace_eye_offset[3];
+	const int hyperspace_camera = c->hyperspace_phase &&
+								  XwaSnapshotCamera_OrdinaryCamera(c->rows, c->world_pos, hyperspace_eye_offset);
+	if (hyperspace_camera) {
+		XwaSnapshotCamera_PositionFraction(c->world_pos, c->world_pos_fraction);
+	}
 	c->region = g_players[g_localPlayer].regionIndex;
 	c->mission_region =
 		(uint8_t)(g_inHangarReady ? g_hangarSavedMissionRegionIdx : g_players[g_localPlayer].regionIndex);
@@ -2013,6 +2028,13 @@ void XwaSnapshot_CaptureFlight(void) {
 			k->seat_eye_world_offset[0] = g_players[g_localPlayer].seatEyeWorldOffsetX;
 			k->seat_eye_world_offset[1] = g_players[g_localPlayer].seatEyeWorldOffsetY;
 			k->seat_eye_world_offset[2] = g_players[g_localPlayer].seatEyeWorldOffsetZ;
+			/* The offset the kept hyperspace camera was placed with, not the
+			 * one the game's hyperspace cockpit draw recomputed. */
+			if (hyperspace_camera) {
+				for (int axis = 0; axis < 3; axis++) {
+					k->seat_eye_world_offset[axis] = hyperspace_eye_offset[axis];
+				}
+			}
 			k->seat_eye_local[0] = g_players[g_localPlayer].seatEyeLocalX;
 			k->seat_eye_local[1] = g_players[g_localPlayer].seatEyeLocalY;
 			k->seat_eye_local[2] = g_players[g_localPlayer].seatEyeLocalZ;

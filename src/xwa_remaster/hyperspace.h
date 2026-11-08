@@ -54,20 +54,40 @@ void XwaRemasterHyperspace_SetJumpParams(XwaRemasterHyperspace* hyperspace,
 										 const XwaFlightHyperspaceJumpParams* params);
 
 /* Builds the tunnel and streak state for `moment`. Must run before
- * AeronScene_Render opens its render passes. Returns 0 for a phase that
- * draws nothing.
+ * AeronScene_Render opens its render passes. `rt_w` and `rt_h` are the
+ * scene's render size. Returns 0 for a phase that draws nothing.
  *
  * With `world_scene`, the effect is drawn over the normal flight scene (the
- * entry and the exit): the streaks and the tunnel's fades are drawn in front
- * of everything farther than `front_depth` in the scene's depth buffer, so
- * only the cockpit stays in front of them. Without it, the effect is the
- * background of the dedicated hyperspace scene (the tunnel alone), and the
- * tunnel's lighting cube is generated. */
+ * entry and the exit) by XwaRemasterHyperspace_RenderWarp, after the scene.
+ * Without it, the effect is the background of the dedicated hyperspace scene
+ * (the tunnel alone), and the tunnel's lighting cube is generated. */
 int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* hyperspace, AeronCommandBuffer* command_buffer,
 								  const float camera_rows[9], int rt_w, int rt_h,
 								  const XwaRemasterHyperspaceMoment* moment,
-								  const XwaRemasterHyperspaceTunnelView* tunnel_view, int world_scene,
-								  float front_depth);
+								  const XwaRemasterHyperspaceTunnelView* tunnel_view, int world_scene);
+
+/* What the scene warp reads from the finished flight scene. */
+typedef struct XwaRemasterHyperspaceWarpInput {
+	AeronTexture* scene; /* the finished scene, at output size */
+	AeronTexture* depth; /* the scene's reversed-Z depth, at render size */
+	int output_w;
+	int output_h;
+	int render_w;
+	int render_h;
+	float near_z;          /* the camera's near plane, in view units */
+	float keep_depth;      /* the depth at the keep distance; nearer is larger */
+	float units_per_meter; /* view units per metre */
+	int view;              /* XwaFlightHyperspaceWarpView */
+} XwaRemasterHyperspaceWarpInput;
+
+/* Draws the entry or the exit prepared with `world_scene` over the finished
+ * scene: the streaks and the tunnel's fades into their layer, the sky
+ * passes, then the composite (docs/hd_hyperspace_jump.md, Scene warp).
+ * Returns the image to present instead of the scene, or NULL after a
+ * failure, which is recorded on the command buffer. */
+AeronTexture* XwaRemasterHyperspace_RenderWarp(XwaRemasterHyperspace* hyperspace,
+											   AeronCommandBuffer* command_buffer,
+											   const XwaRemasterHyperspaceWarpInput* input);
 
 /* Whether the exposure meter should keep its value this frame, so it doesn't
  * darken the white-out or the bright start and end of the tunnel. Set by the
@@ -81,11 +101,6 @@ int XwaRemasterHyperspace_GetPreparedLighting(const XwaRemasterHyperspace* hyper
 /* AeronScene BEFORE_OPAQUE hook, in the dedicated scene only: the tunnel. */
 void XwaRemasterHyperspace_Draw(AeronCommandBuffer* command_buffer, AeronRenderPass* render_pass, int rt_w,
 								int rt_h, void* user);
-
-/* AeronScene AFTER_OPAQUE hook, in the world scene only: the tunnel's fades
- * and the streaks. */
-void XwaRemasterHyperspace_DrawFront(AeronCommandBuffer* command_buffer, AeronRenderPass* render_pass, int rt_w,
-									 int rt_h, void* user);
 
 #ifdef __cplusplus
 }

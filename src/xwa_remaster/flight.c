@@ -326,6 +326,13 @@ static struct {
 	int hyperspace_world_pending;
 	XwaRemasterHyperspaceMoment hyperspace_world_moment;
 	int hyperspace_in_world;
+	/* The scene warp's view-space near plane and keep depth this frame, and
+	 * its debug view. */
+	float hyperspace_near_z;
+	float hyperspace_keep_depth;
+	XwaFlightHyperspaceWarpView hyperspace_warp_view;
+	/* The scene warp's image, presented instead of the scene this frame. */
+	AeronTexture* present_scene_override;
 
 	const XwaSnapshot* snap;
 	/* Camera world->eye rows re-derived from the quaternion the scene
@@ -501,14 +508,6 @@ static void fl_draw_before_opaque(AeronCommandBuffer* command_buffer, AeronRende
 	}
 }
 
-static void fl_draw_after_opaque(AeronCommandBuffer* command_buffer, AeronRenderPass* render_pass, int rt_w,
-								 int rt_h, void* user) {
-	(void)user;
-	if (s.hyperspace_in_world) {
-		XwaRemasterHyperspace_DrawFront(command_buffer, render_pass, rt_w, rt_h, s.hyperspace);
-	}
-}
-
 static void fl_request_fsr_reset(uint32_t reasons) {
 	s.fsr_reset_pending = 1;
 	s.fsr_reset_reasons |= reasons ? reasons : FL_FSR_RESET_UNSPECIFIED;
@@ -598,6 +597,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 	static const char* ints[] = {
 		"presentation.vsync_divisor", "presentation.frames_in_flight",     "presentation.msaa_samples",
 		"motion_blur.quality",        "point_lights.cluster_depth_slices", "hyperspace_jump.star_count",
+		"hyperspace_jump.warp_taps",  "hyperspace_jump.warp_sky_taps",
 	};
 	static const char* floats[] = {
 		"presentation.cockpit_fov_min_aspect",
@@ -684,6 +684,14 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"hyperspace_jump.tint_r",
 		"hyperspace_jump.tint_g",
 		"hyperspace_jump.tint_b",
+		"hyperspace_jump.warp_start",
+		"hyperspace_jump.warp_end",
+		"hyperspace_jump.warp_curve",
+		"hyperspace_jump.warp_distance_m",
+		"hyperspace_jump.warp_sky_zoom",
+		"hyperspace_jump.warp_smear",
+		"hyperspace_jump.warp_sky_highlights",
+		"hyperspace_jump.warp_reveal_softness",
 		"classic_lighting.illuminance",
 		"classic_lighting.image_radiance",
 		"environment_maps.intensity_scale",
@@ -875,6 +883,12 @@ static int fl_load_hyperspace_config(const AeronConfigFile* config, const char* 
 /* The limits of the hyperspace_jump settings (docs/hd_hyperspace_jump.md). */
 #define FL_JUMP_STAR_COUNT_MIN 1000
 #define FL_JUMP_STAR_COUNT_MAX 262144
+#define FL_JUMP_WARP_TAPS_MIN 8
+#define FL_JUMP_WARP_TAPS_MAX 64
+#define FL_JUMP_WARP_SKY_TAPS_MIN 4
+#define FL_JUMP_WARP_SKY_TAPS_MAX 16
+/* The warp's end comes at least this long after its start. */
+#define FL_JUMP_WARP_MIN_SECONDS 0.1f
 
 static float fl_clampf(float value, float lo, float hi) { return fminf(fmaxf(value, lo), hi); }
 
@@ -890,7 +904,14 @@ static int fl_hyperspace_jump_valid(const XwaFlightHyperspaceJumpParams* p) {
 		  fl_in_range(p->stretch_scale, 0.25f, 4.0f) && fl_in_range(p->white_fade_seconds, 0.05f, 0.5f) &&
 		  fl_in_range(p->tunnel_entry_brightness, 1.0f, 16.0f) &&
 		  fl_in_range(p->tunnel_settle_seconds, 0.05f, 2.0f) && fl_in_range(p->mesh_light_strength, 0.0f, 16.0f) &&
-		  fl_in_range(p->mesh_light_start, 0.0f, 2.0f) && fl_in_range(p->mesh_light_curve, 0.25f, 8.0f))) {
+		  fl_in_range(p->mesh_light_start, 0.0f, 2.0f) && fl_in_range(p->mesh_light_curve, 0.25f, 8.0f) &&
+		  fl_in_range(p->warp_start, 0.0f, 2.0f) && fl_in_range(p->warp_end, 0.2f, 2.5f) &&
+		  p->warp_end >= p->warp_start + FL_JUMP_WARP_MIN_SECONDS && fl_in_range(p->warp_curve, 0.25f, 8.0f) &&
+		  fl_in_range(p->warp_distance_m, 0.0f, 200000.0f) && fl_in_range(p->warp_sky_zoom, 1.0f, 16.0f) &&
+		  fl_in_range(p->warp_smear, 0.05f, 1.0f) && fl_in_range(p->warp_sky_highlights, 1.0f, 3.0f) &&
+		  fl_in_range(p->warp_reveal_softness, 0.25f, 2.0f) && p->warp_taps >= FL_JUMP_WARP_TAPS_MIN &&
+		  p->warp_taps <= FL_JUMP_WARP_TAPS_MAX && p->warp_sky_taps >= FL_JUMP_WARP_SKY_TAPS_MIN &&
+		  p->warp_sky_taps <= FL_JUMP_WARP_SKY_TAPS_MAX)) {
 		return 0;
 	}
 	for (int channel = 0; channel < 3; channel++) {
@@ -938,6 +959,17 @@ static int fl_load_hyperspace_jump_config(const AeronConfigFile* config, const c
 	for (int channel = 0; channel < 3; channel++) {
 		p->tint[channel] = (float)AeronConfigFile_GetFloat(config, tint_paths[channel], 0.0);
 	}
+	p->warp_start = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_start", 0.0);
+	p->warp_end = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_end", 0.0);
+	p->warp_curve = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_curve", 0.0);
+	p->warp_distance_m = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_distance_m", 0.0);
+	p->warp_sky_zoom = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_sky_zoom", 0.0);
+	p->warp_smear = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_smear", 0.0);
+	p->warp_sky_highlights = (float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_sky_highlights", 0.0);
+	p->warp_reveal_softness =
+		(float)AeronConfigFile_GetFloat(config, "hyperspace_jump.warp_reveal_softness", 0.0);
+	p->warp_taps = (int)AeronConfigFile_GetInt(config, "hyperspace_jump.warp_taps", 0);
+	p->warp_sky_taps = (int)AeronConfigFile_GetInt(config, "hyperspace_jump.warp_sky_taps", 0);
 	if (!fl_hyperspace_jump_valid(p)) {
 		Aeron_LogError("xwa.remaster", "%s: invalid hyperspace_jump settings", config_path);
 		return 0;
@@ -1845,11 +1877,30 @@ void XwaRemasterFlight_SetHyperspaceJump(const XwaFlightHyperspaceJumpParams* in
 	FL_JUMP_SANITIZE(tint[0], 0.0f, 16.0f);
 	FL_JUMP_SANITIZE(tint[1], 0.0f, 16.0f);
 	FL_JUMP_SANITIZE(tint[2], 0.0f, 16.0f);
+	FL_JUMP_SANITIZE(warp_start, 0.0f, 2.0f);
+	FL_JUMP_SANITIZE(warp_end, 0.2f, 2.5f);
+	FL_JUMP_SANITIZE(warp_curve, 0.25f, 8.0f);
+	FL_JUMP_SANITIZE(warp_distance_m, 0.0f, 200000.0f);
+	FL_JUMP_SANITIZE(warp_sky_zoom, 1.0f, 16.0f);
+	FL_JUMP_SANITIZE(warp_smear, 0.05f, 1.0f);
+	FL_JUMP_SANITIZE(warp_sky_highlights, 1.0f, 3.0f);
+	FL_JUMP_SANITIZE(warp_reveal_softness, 0.25f, 2.0f);
 #undef FL_JUMP_SANITIZE
 	if (p.star_count < FL_JUMP_STAR_COUNT_MIN)
 		p.star_count = FL_JUMP_STAR_COUNT_MIN;
 	if (p.star_count > FL_JUMP_STAR_COUNT_MAX)
 		p.star_count = FL_JUMP_STAR_COUNT_MAX;
+	p.warp_taps = p.warp_taps < FL_JUMP_WARP_TAPS_MIN ? FL_JUMP_WARP_TAPS_MIN
+					: (p.warp_taps > FL_JUMP_WARP_TAPS_MAX ? FL_JUMP_WARP_TAPS_MAX : p.warp_taps);
+	p.warp_sky_taps = p.warp_sky_taps < FL_JUMP_WARP_SKY_TAPS_MIN
+						  ? FL_JUMP_WARP_SKY_TAPS_MIN
+						  : (p.warp_sky_taps > FL_JUMP_WARP_SKY_TAPS_MAX ? FL_JUMP_WARP_SKY_TAPS_MAX
+																		 : p.warp_sky_taps);
+	/* The end stays after the start: a start moved past it pushes it. */
+	if (p.warp_end < p.warp_start + FL_JUMP_WARP_MIN_SECONDS)
+		p.warp_end = fminf(p.warp_start + FL_JUMP_WARP_MIN_SECONDS, 2.5f);
+	if (p.warp_start > p.warp_end - FL_JUMP_WARP_MIN_SECONDS)
+		p.warp_start = p.warp_end - FL_JUMP_WARP_MIN_SECONDS;
 	s.hyperspace_jump = p;
 	XwaRemasterHyperspace_SetJumpParams(s.hyperspace, &p);
 }
@@ -1881,6 +1932,13 @@ void XwaRemasterFlight_SetHyperspacePreviewSpeed(float speed) {
 float XwaRemasterFlight_GetHyperspacePreviewSpeed(void) {
 	return s.hyperspace_preview_speed > 0.0f ? s.hyperspace_preview_speed : 1.0f;
 }
+
+void XwaRemasterFlight_SetHyperspaceWarpView(XwaFlightHyperspaceWarpView view) {
+	s.hyperspace_warp_view =
+		view >= 0 && view < XWA_FLIGHT_HYPERSPACE_WARP_VIEW_COUNT ? view : XWA_FLIGHT_HYPERSPACE_WARP_VIEW_IMAGE;
+}
+
+XwaFlightHyperspaceWarpView XwaRemasterFlight_GetHyperspaceWarpView(void) { return s.hyperspace_warp_view; }
 
 float XwaRemasterFlight_GetCockpitFovMinAspect(void) { return s.cockpit_fov_min_aspect; }
 
@@ -4909,7 +4967,9 @@ void XwaRemasterFlight_InvalidateHistory(void) {
  * AeronScene_Render complete. Bloom remains in the scene command buffer; the
  * final draws are either deferred to Aeron_Present or recorded into present_rt. */
 static AeronTexture* fl_present(AeronCommandBuffer* cmd, int direct_present) {
-	s.present_scene_tex = Aeron_RenderTargetGetTexture(AeronScene_SceneRt(s.scene));
+	s.present_scene_tex = s.present_scene_override ? s.present_scene_override
+												   : Aeron_RenderTargetGetTexture(AeronScene_SceneRt(s.scene));
+	s.present_scene_override = NULL;
 	s.present_bloom_tex = NULL;
 	if (!s.present_scene_tex) {
 		s.direct_ready = 0;
@@ -4971,10 +5031,10 @@ static void fl_add_ambient_cube(XwaShipAmbientCube* base, const XwaShipAmbientCu
 	}
 }
 
-/* During the jump's entry and exit, the streaks and the tunnel's fades are
- * drawn in front of everything farther than this, so only the cockpit stays
- * in front of them. */
-#define FL_HYPERSPACE_FRONT_DISTANCE_M 5.0f
+/* During the jump's entry and exit, the scene warp leaves everything nearer
+ * than this as it is, and draws the streaks and the tunnel's fades over
+ * everything farther: in cockpit views, only the cockpit stays. */
+#define FL_HYPERSPACE_KEEP_DISTANCE_M 5.0f
 
 /* The game's hyperspace light pulses (slots 3 to 5: outbound, tunnel,
  * inbound). The HD renderer replaces them with the tunnel's and the
@@ -4995,16 +5055,61 @@ static int fl_prepare_world_hyperspace(AeronCommandBuffer* cmd, const XwaSnapsho
 						&player_found);
 	XwaRemasterHyperspaceTunnelView tunnel_view;
 	fl_hyper_build_tunnel_view(&flight_view->camera, player_bw, player_found, &tunnel_view);
-	/* Reversed Z with an infinite far plane: depth = near / distance, both in
-	 * view units (OPT units). */
-	const float front_distance = FL_HYPERSPACE_FRONT_DISTANCE_M / AERON_OPT_METERS_PER_UNIT;
-	const float near_z = flight_view->camera.near_z > 0.0f ? flight_view->camera.near_z : 0.001f;
-	if (!XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, s.rt_w, s.rt_h, &s.hyperspace_world_moment,
-									   &tunnel_view, 1, near_z / front_distance)) {
+	/* The keep distance: in external views, out to the far side of the
+	 * player's craft, so the craft stays in place. */
+	float keep_distance = FL_HYPERSPACE_KEEP_DISTANCE_M * AERON_OPT_UNITS_PER_METER;
+	if (snap->flight_camera.external && player_found && player_f) {
+		const AeronSceneMesh* mesh = XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(player_f->object_type));
+		float radius = 0.0f;
+		if (mesh) {
+			const float dx = mesh->bound_max[0] - mesh->bound_min[0];
+			const float dy = mesh->bound_max[1] - mesh->bound_min[1];
+			const float dz = mesh->bound_max[2] - mesh->bound_min[2];
+			radius = 0.5f * sqrtf(dx * dx + dy * dy + dz * dz);
+		}
+		const float dx = player_local[0] - s.camera_local[0];
+		const float dy = player_local[1] - s.camera_local[1];
+		const float dz = player_local[2] - s.camera_local[2];
+		keep_distance = fmaxf(keep_distance, sqrtf(dx * dx + dy * dy + dz * dz) + radius);
+	}
+	int render_w = 0, render_h = 0;
+	AeronScene_RenderDims(s.scene, &render_w, &render_h);
+	if (render_w <= 0 || render_h <= 0) {
+		render_w = s.rt_w;
+		render_h = s.rt_h;
+	}
+	if (!XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, render_w, render_h, &s.hyperspace_world_moment,
+									   &tunnel_view, 1)) {
 		return 0;
 	}
+	s.hyperspace_near_z = flight_view->camera.near_z > 0.0f ? flight_view->camera.near_z : 0.001f;
+	/* Reversed Z with an infinite far plane: depth = near / distance, both in
+	 * view units (OPT units). */
+	s.hyperspace_keep_depth = s.hyperspace_near_z / keep_distance;
 	s.exposure_hold = XwaRemasterHyperspace_HoldsExposure(s.hyperspace);
 	return 1;
+}
+
+/* Draws the jump's entry or exit over the finished scene (the scene warp),
+ * and has the result presented instead of the scene. */
+static int fl_render_world_hyperspace(AeronCommandBuffer* cmd) {
+	int render_w = 0, render_h = 0, output_w = 0, output_h = 0;
+	AeronScene_RenderDims(s.scene, &render_w, &render_h);
+	AeronScene_RtDims(s.scene, &output_w, &output_h);
+	const XwaRemasterHyperspaceWarpInput input = {
+		.scene = Aeron_RenderTargetGetTexture(AeronScene_SceneRt(s.scene)),
+		.depth = Aeron_DepthTargetGetTexture(AeronScene_DepthRt(s.scene)),
+		.output_w = output_w,
+		.output_h = output_h,
+		.render_w = render_w,
+		.render_h = render_h,
+		.near_z = s.hyperspace_near_z,
+		.keep_depth = s.hyperspace_keep_depth,
+		.units_per_meter = AERON_OPT_UNITS_PER_METER,
+		.view = (int)s.hyperspace_warp_view,
+	};
+	s.present_scene_override = XwaRemasterHyperspace_RenderWarp(s.hyperspace, cmd, &input);
+	return s.present_scene_override != NULL;
 }
 
 /* Picks the jump's stars: each region and each direction gets its own. */
@@ -5085,9 +5190,14 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	XwaRemasterHyperspaceTunnelView tunnel_view;
 	fl_hyper_build_tunnel_view(&flight_view->camera, player_bw, player_found, &tunnel_view);
 
-	if (!s.hyperspace ||
-		!XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, s.rt_w, s.rt_h, moment, &tunnel_view, 0,
-									   0.0f)) {
+	int render_w = 0, render_h = 0;
+	AeronScene_RenderDims(s.scene, &render_w, &render_h);
+	if (render_w <= 0 || render_h <= 0) {
+		render_w = s.rt_w;
+		render_h = s.rt_h;
+	}
+	if (!s.hyperspace || !XwaRemasterHyperspace_Prepare(s.hyperspace, cmd, s.crows, render_w, render_h, moment,
+														&tunnel_view, 0)) {
 		return NULL;
 	}
 	s.exposure_hold = XwaRemasterHyperspace_HoldsExposure(s.hyperspace);
@@ -6082,8 +6192,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, fl_draw_before_opaque, NULL);
 	}
 
-	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_AFTER_OPAQUE,
-						   s.hyperspace_in_world ? fl_draw_after_opaque : NULL, NULL);
 
 	/* Backdrops — classic draws them first with depth compare and write
 	 * both OFF (states 0x612/0x2612); the SKY stage's far-depth GE test
@@ -6476,19 +6584,18 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	fl_submit_lens_flares(snap, &flight_view);
 	fl_submit_sun_flare(snap, &scene_lighting);
 
-	if (!AeronScene_Render(s.scene, cmd)) {
-		AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
-		AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_AFTER_OPAQUE, NULL, NULL);
-		s.before_opaque_mode = FL_BEFORE_OPAQUE_NONE;
-		s.hyperspace_in_world = 0;
-		s.snap = NULL;
+	const int rendered = AeronScene_Render(s.scene, cmd);
+	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
+	s.before_opaque_mode = FL_BEFORE_OPAQUE_NONE;
+	s.snap = NULL; /* hooks must not outlive the snapshot */
+	const int hyperspace_in_world = s.hyperspace_in_world;
+	s.hyperspace_in_world = 0;
+	if (!rendered) {
 		return NULL;
 	}
-	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
-	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_AFTER_OPAQUE, NULL, NULL);
-	s.before_opaque_mode = FL_BEFORE_OPAQUE_NONE;
-	s.hyperspace_in_world = 0;
-	s.snap = NULL; /* hooks must not outlive the snapshot */
+	if (hyperspace_in_world && !fl_render_world_hyperspace(cmd)) {
+		return NULL;
+	}
 	return fl_present(cmd, direct_present);
 }
 

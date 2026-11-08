@@ -1,11 +1,5 @@
 /* Fullscreen triangle for the analytic hyperspace tunnel. */
 
-cbuffer HyperspaceTunnelVS : register(b0, space1) {
-	/* x depth of the triangle: 0 in the tunnel scene, the depth plane in
-	 * front of the world during the jump's fades. */
-	float4 depth;
-};
-
 struct VertexOutput {
 	float4 position : SV_Position;
 };
@@ -18,6 +12,6 @@ VertexOutput main(uint vertex_id : SV_VertexID) {
 	};
 
 	VertexOutput output;
-	output.position = float4(positions[vertex_id], depth.x, 1.0f);
+	output.position = float4(positions[vertex_id], 0.0f, 1.0f);
 	return output;
 }
