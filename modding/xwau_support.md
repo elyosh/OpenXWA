@@ -79,7 +79,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Two warhead launchers (`hook_weapon_type`) | Implemented | | [Craft](craft.md#warheads) |
 | Docking | Implemented | | [Craft](craft.md#docking), [Flight](flight.md#docking) |
 | Interdictors (`[Interdictor]`) | Implemented | | [Craft](craft.md#hyperspace) |
-| Hyperspace speeds (`ShortHyperspaceEffect`, `[Hyperspace]`) | Implemented | OpenXWA lands an arriving craft exactly on its point, so `OutOfHyperspaceSetPosition` isn't needed, and wingmen stay in formation. A departing craft reaches its speed in about 0.1 s, whatever the frame rate. When a model's departure is looked up before its arrival, XWAU gives the arrival the departure speed; OpenXWA doesn't. | [Craft](craft.md#hyperspace), [Flight](flight.md#hyperspace) |
+| Hyperspace speeds (`ShortHyperspaceEffect`, `[Hyperspace]`) | Implemented | OpenXWA lands an arriving craft exactly on its point, so `OutOfHyperspaceSetPosition` isn't needed, and wingmen stay in formation. A departing craft reaches its speed in about 0.1 s, whatever the frame rate. XWAU sometimes gives an arriving craft its model's departure speed. OpenXWA always uses the arrival speed. | [Craft](craft.md#hyperspace), [Flight](flight.md#hyperspace) |
 | More craft, projectiles and explosions (`hook_crafts_count`) | Implemented | | [Flight](flight.md#object_limits) |
 | Craft sounds | Implemented | | [Craft](craft.md#sound), [Flight](flight.md#soundsyaml) |
 

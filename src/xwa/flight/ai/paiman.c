@@ -5778,7 +5778,8 @@ static char paiman_outofhyperspacemaneuver(void) {
 	aiController = g_paiContext.aiController;
 	reached = 0;
 #ifdef XWA_MODERN
-	/* An arrival at a set speed sets its own speed and stops on its point. */
+	/* An arrival at a set speed controls its own speed and stops exactly on
+	   its point. */
 	if (!XwaCraftHyperspace_AiOutOfHyperspaceStep(g_paiContext.aiObjIdx, &reached))
 #endif
 	{

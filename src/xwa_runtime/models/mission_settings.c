@@ -341,8 +341,8 @@ static void MissionSettings_ReadOrderOfBattle(const char* path, const AeronConfi
 	}
 }
 
-/* Reads one region's rule of hyperspace_regions. Returns 0, logged, when it
-   isn't a valid rule. */
+/* Reads the rule of one region in hyperspace_regions. Logs a warning and
+   returns 0 when the rule isn't valid. */
 static int MissionSettings_ReadRegionRule(const char* path, const AeronConfigNode* node,
 										  XwaHyperspaceRegionRule* rule) {
 	size_t i;

@@ -57,10 +57,11 @@ int XwaCraftHyperspace_ArrivalBrakingTicks(void);
    stock departure applies. */
 int XwaCraftHyperspace_DepartureSpeed(unsigned int objectType, int* speed, int* acceleration);
 
-/* Flight_UpdateCraftSteeringAndSpeed, for a craft entering hyperspace with
-   working systems: speeds up an AI craft whose departure has a set speed,
-   by its acceleration, up to that speed, and returns 1. Returns 0 for the
-   stock acceleration, which a player's craft always keeps. */
+/* Called by Flight_UpdateCraftSteeringAndSpeed for a craft that enters
+   hyperspace with working systems. When it is an AI craft whose departure
+   has a set speed, speeds it up by its acceleration, up to that speed, and
+   returns 1. Returns 0 for the stock acceleration, which a player's craft
+   always keeps. */
 int XwaCraftHyperspace_StepDeparture(unsigned int objIdx);
 /* The speed at which object `objIdx` jumps away: 3600, or the set speed of
    an AI craft's departure. */
@@ -80,7 +81,7 @@ int XwaCraftHyperspace_DepartureJumpSpeed(unsigned int objIdx);
    `aim` (world units), ending at `endSpeed`. Sets the craft's speed. Returns
    0 when too many craft are arriving; the stock arrival then runs. */
 int XwaCraftHyperspace_BeginArrival(unsigned int objIdx, int cruise, int endSpeed, const int aim[3]);
-/* Nonzero while `objIdx` has an arrival of this module. */
+/* Nonzero while `objIdx` arrives at a set speed. */
 int XwaCraftHyperspace_ArrivalActive(unsigned int objIdx);
 /* Nonzero once the arrival of `objIdx` has reached its point. */
 int XwaCraftHyperspace_ArrivalFinished(unsigned int objIdx);
@@ -96,16 +97,17 @@ void XwaCraftHyperspace_StepArrivalSpeed(unsigned int objIdx);
    can have. The step that reaches the point finishes the arrival and sets
    the end speed. */
 int XwaCraftHyperspace_LimitArrivalMove(unsigned int objIdx, int scalar);
-/* paiman_initoutofhyperspacemaneuver, for the AI craft `objIdx` (the AI
-   context's): starts its arrival at a set speed when its model or the
-   flight settings have one. The craft ends at the speed of the plan that
-   follows, picked as the end of paiman_outofhyperspacemaneuver picks it. The
-   maneuver timer then counts down the ticks left, so the S-foils open about
-   as long before the craft stops as in the stock arrival. */
+/* Called by paiman_initoutofhyperspacemaneuver for the AI craft `objIdx`,
+   the craft of the AI context. When its model or the flight settings have an
+   arrival speed, starts an arrival at that speed. The craft ends at the
+   speed of its next plan, which is picked the same way as at the end of
+   paiman_outofhyperspacemaneuver. The maneuver timer then counts down the
+   ticks left, so the S-foils open about as long before the craft stops as in
+   the stock arrival. */
 void XwaCraftHyperspace_AiOutOfHyperspaceInit(unsigned int objIdx);
-/* paiman_outofhyperspacemaneuver: returns 0 when `objIdx` has the stock
-   arrival. Otherwise sets `*reached` when the arrival is over, and then drops
-   it. */
+/* Called by paiman_outofhyperspacemaneuver. Returns 0 when `objIdx` has the
+   stock arrival. Otherwise sets `*reached` when the arrival is over, and then
+   drops the arrival. */
 int XwaCraftHyperspace_AiOutOfHyperspaceStep(unsigned int objIdx, char* reached);
 /* Starts a mission with no arrivals. */
 void XwaCraftHyperspace_LoadMission(void);

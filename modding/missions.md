@@ -157,7 +157,7 @@ The game has one look:
 
 | Look | What it shows |
 |-|-|
-| `interdiction` | A jump that a gravity well pulls out of hyperspace. The tunnel turns red, with yellow streaks, and shakes more and more. The streaks of the exit are red. The jump's start looks normal. |
+| `interdiction` | A jump that a gravity well pulls out of hyperspace. Red spreads through the tunnel from its far end toward the camera, behind an uneven glowing edge, and the tunnel shakes more and more. The streaks are red when the player comes out of hyperspace. The start of the jump looks normal. |
 
 The regions that the key doesn't list keep the normal jump. A
 `hyperspace_regions` key in a mission replaces the whole list of

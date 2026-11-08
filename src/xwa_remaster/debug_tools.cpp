@@ -638,9 +638,10 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 	if (ImGui::SliderFloat("Preview speed", &preview_speed, 0.05f, 1.0f, "%.2f")) {
 		XwaRemasterFlight_SetHyperspacePreviewSpeed(preview_speed);
 	}
-	ImGui::TextDisabled("Shows hyperspace in place of the flight scene. The simulation doesn't change.\n"
-						"Jump cycle: entry, 2 s of tunnel, exit, then 1 s of normal flight.\n"
-						"Map mode and real hyperspace come first. The cockpit stays visible.");
+	ImGui::TextDisabled(
+		"Shows hyperspace in place of the flight scene. The simulation doesn't change.\n"
+		"Jump cycle: entry, tunnel and exit, as long as in the game, then 1 s of normal flight.\n"
+		"Map mode and real hyperspace come first. The cockpit stays visible.");
 
 	ImGui::Separator();
 	XwaFlightHyperspaceTunnelParams p;
@@ -918,70 +919,94 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 			XwaRemasterFlight_SetHyperspacePreviewLook(preview_look ? edited_look : -1);
 		}
 		float look_blend = XwaRemasterFlight_GetHyperspacePreviewLookBlend();
-		if (ImGui::SliderFloat("Tunnel preview progress", &look_blend, 0.0f, 1.0f, "%.2f")) {
+		if (ImGui::SliderFloat("Time in tunnel preview", &look_blend, 0.0f, 1.0f, "%.2f")) {
 			XwaRemasterFlight_SetHyperspacePreviewLookBlend(look_blend);
 		}
-		ImGui::TextDisabled("The jump cycle preview shows the normal entry, the fade-in in the tunnel and\n"
-							"the coloured exit. The tunnel preview has no end, so the slider sets how far\n"
-							"into the tunnel it is: it drives the fade-in and the wobble.");
+		ImGui::TextDisabled("The jump cycle preview plays the whole jump. The tunnel preview never ends, so\n"
+							"this slider sets how far through the tunnel it shows, from 0 (the tunnel\n"
+							"appears) to 1 (it ends). That sets how far the red has spread and how much\n"
+							"the tunnel shakes.");
 
 		XwaFlightHyperspaceLookParams look;
 		XwaRemasterFlight_GetHyperspaceLook(edited_look, &look);
 		bool look_changed = false;
 		const ImGuiColorEditFlags color_flags = ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR;
+		ImGui::TextDisabled("The tunnel's colours where the red has reached it:");
 		look_changed |= ImGui::ColorEdit3("Tunnel dark color", look.dark_color, color_flags);
 		look_changed |= ImGui::ColorEdit3("Tunnel body color", look.body_color, color_flags);
 		look_changed |= ImGui::ColorEdit3("Tunnel highlight color", look.highlight_color, color_flags);
 		look_changed |= ImGui::ColorEdit3("Tunnel cap color", look.cap_color, color_flags);
+		ImGui::TextDisabled("The edge of the red area, a thin glowing line:");
+		look_changed |= ImGui::ColorEdit3("Edge color", look.edge_color, color_flags);
+		look_changed |= ImGui::SliderFloat("Edge thickness", &look.edge_width, 0.01f, 4.0f, "%.3f",
+										   ImGuiSliderFlags_Logarithmic);
+		look_changed |= ImGui::SliderFloat("Edge unevenness", &look.front_noise, 0.0f, 8.0f, "%.2f");
+		look_changed |= ImGui::SliderFloat("Edge bump count", &look.front_noise_scale, 0.05f, 16.0f, "%.2f",
+										   ImGuiSliderFlags_Logarithmic);
+		look_changed |= ImGui::SliderFloat("Edge curl", &look.front_warp, 0.0f, 4.0f, "%.2f");
+		ImGui::TextDisabled("Unevenness: how far the edge's bumps reach ahead. Bump count: higher gives\n"
+							"more, smaller bumps. Curl: how much the bumps twist.");
+		ImGui::TextDisabled("The colours of the streaks when the player comes out of hyperspace:");
 		look_changed |= ImGui::ColorEdit3("Exit streak tint", look.tint, color_flags);
 		look_changed |= ImGui::ColorEdit3("Exit streak tail color", look.tail_color, color_flags);
-		look_changed |= ImGui::SliderFloat("Blend start", &look.blend_start, 0.0f, 1.0f, "%.2f");
-		look_changed |= ImGui::SliderFloat("Blend end", &look.blend_end, 0.0f, 1.0f, "%.2f");
-		ImGui::TextDisabled("The shares of the tunnel where the colours start and end their fade.");
+		look_changed |= ImGui::SliderFloat("Spread start", &look.blend_start, 0.0f, 1.0f, "%.2f");
+		look_changed |= ImGui::SliderFloat("Spread end", &look.blend_end, 0.0f, 1.0f, "%.2f");
+		ImGui::TextDisabled("When the red starts to spread and when it fills the tunnel, as fractions of\n"
+							"the time in the tunnel: 0 is when the tunnel appears, 1 when it ends.");
 		look_changed |= ImGui::SliderFloat("Shake degrees", &look.shake_degrees, 0.0f, 45.0f, "%.2f");
 		look_changed |= ImGui::SliderFloat("Shake speed", &look.shake_speed, 0.0f, 16.0f, "%.2f");
+		ImGui::TextDisabled("How far the tunnel sways at the end of the tunnel, and how fast.");
 		if (ImGui::Button("Reset look to YAML defaults")) {
 			XwaRemasterFlight_GetHyperspaceLookDefault(edited_look, &look);
 			look_changed = true;
 		}
 		ImGui::SameLine();
 		if (ImGui::Button("Copy look YAML")) {
-			char yaml[1600];
-			std::snprintf(yaml, sizeof yaml,
-						  "  %s:\n"
-						  "    tunnel:\n"
-						  "      dark_color_r: %.4g\n"
-						  "      dark_color_g: %.4g\n"
-						  "      dark_color_b: %.4g\n"
-						  "      body_color_r: %.4g\n"
-						  "      body_color_g: %.4g\n"
-						  "      body_color_b: %.4g\n"
-						  "      highlight_color_r: %.4g\n"
-						  "      highlight_color_g: %.4g\n"
-						  "      highlight_color_b: %.4g\n"
-						  "      cap_color_r: %.4g\n"
-						  "      cap_color_g: %.4g\n"
-						  "      cap_color_b: %.4g\n"
-						  "    jump:\n"
-						  "      tint_r: %.4g\n"
-						  "      tint_g: %.4g\n"
-						  "      tint_b: %.4g\n"
-						  "      tail_color_r: %.4g\n"
-						  "      tail_color_g: %.4g\n"
-						  "      tail_color_b: %.4g\n"
-						  "    blend_start: %.4g\n"
-						  "    blend_end: %.4g\n"
-						  "    shake_degrees: %.4g\n"
-						  "    shake_speed: %.4g\n",
-						  XwaRemasterFlight_HyperspaceLookName(edited_look), (double)look.dark_color[0],
-						  (double)look.dark_color[1], (double)look.dark_color[2], (double)look.body_color[0],
-						  (double)look.body_color[1], (double)look.body_color[2],
-						  (double)look.highlight_color[0], (double)look.highlight_color[1],
-						  (double)look.highlight_color[2], (double)look.cap_color[0],
-						  (double)look.cap_color[1], (double)look.cap_color[2], (double)look.tint[0],
-						  (double)look.tint[1], (double)look.tint[2], (double)look.tail_color[0],
-						  (double)look.tail_color[1], (double)look.tail_color[2], (double)look.blend_start,
-						  (double)look.blend_end, (double)look.shake_degrees, (double)look.shake_speed);
+			char yaml[2048];
+			std::snprintf(
+				yaml, sizeof yaml,
+				"  %s:\n"
+				"    tunnel:\n"
+				"      dark_color_r: %.4g\n"
+				"      dark_color_g: %.4g\n"
+				"      dark_color_b: %.4g\n"
+				"      body_color_r: %.4g\n"
+				"      body_color_g: %.4g\n"
+				"      body_color_b: %.4g\n"
+				"      highlight_color_r: %.4g\n"
+				"      highlight_color_g: %.4g\n"
+				"      highlight_color_b: %.4g\n"
+				"      cap_color_r: %.4g\n"
+				"      cap_color_g: %.4g\n"
+				"      cap_color_b: %.4g\n"
+				"      edge_color_r: %.4g\n"
+				"      edge_color_g: %.4g\n"
+				"      edge_color_b: %.4g\n"
+				"      edge_width: %.4g\n"
+				"      front_noise: %.4g\n"
+				"      front_noise_scale: %.4g\n"
+				"      front_warp: %.4g\n"
+				"    jump:\n"
+				"      tint_r: %.4g\n"
+				"      tint_g: %.4g\n"
+				"      tint_b: %.4g\n"
+				"      tail_color_r: %.4g\n"
+				"      tail_color_g: %.4g\n"
+				"      tail_color_b: %.4g\n"
+				"    blend_start: %.4g\n"
+				"    blend_end: %.4g\n"
+				"    shake_degrees: %.4g\n"
+				"    shake_speed: %.4g\n",
+				XwaRemasterFlight_HyperspaceLookName(edited_look), (double)look.dark_color[0],
+				(double)look.dark_color[1], (double)look.dark_color[2], (double)look.body_color[0],
+				(double)look.body_color[1], (double)look.body_color[2], (double)look.highlight_color[0],
+				(double)look.highlight_color[1], (double)look.highlight_color[2], (double)look.cap_color[0],
+				(double)look.cap_color[1], (double)look.cap_color[2], (double)look.edge_color[0],
+				(double)look.edge_color[1], (double)look.edge_color[2], (double)look.edge_width,
+				(double)look.front_noise, (double)look.front_noise_scale, (double)look.front_warp,
+				(double)look.tint[0], (double)look.tint[1], (double)look.tint[2], (double)look.tail_color[0],
+				(double)look.tail_color[1], (double)look.tail_color[2], (double)look.blend_start,
+				(double)look.blend_end, (double)look.shake_degrees, (double)look.shake_speed);
 			ImGui::SetClipboardText(yaml);
 		}
 		ImGui::TextDisabled("Copy writes the look's block of hyperspace_looks.");

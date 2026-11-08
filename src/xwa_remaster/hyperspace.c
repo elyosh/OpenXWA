@@ -27,6 +27,13 @@ typedef struct HyperTunnelUniform {
 	float body_color[4];
 	float highlight_color[4];
 	float cap_color[4];
+	float front[4];
+	float front_shape[4];
+	float look_dark_color[4];
+	float look_body_color[4];
+	float look_highlight_color[4];
+	float look_cap_color[4];
+	float front_edge_color[4];
 } HyperTunnelUniform;
 
 /* Mirrors HyperspaceStreakVS in hyperspace_streak.vert.hlsl. */
@@ -167,6 +174,7 @@ struct XwaRemasterHyperspace {
 	uint8_t hold_exposure;
 	XwaFlightHyperspaceTunnelParams params;
 	XwaFlightHyperspaceJumpParams jump;
+	XwaRemasterHyperspaceFront front;
 	HyperTunnelUniform tunnel_uniform;
 	HyperStreakUniform streak_uniform;
 	HyperStreakFragmentUniform streak_fragment_uniform;
@@ -423,6 +431,44 @@ void XwaRemasterHyperspace_SetJumpParams(XwaRemasterHyperspace* h, const XwaFlig
 	}
 }
 
+void XwaRemasterHyperspace_SetFront(XwaRemasterHyperspace* h, const XwaRemasterHyperspaceFront* front) {
+	if (!h) {
+		return;
+	}
+	if (front && front->active) {
+		h->front = *front;
+	} else {
+		memset(&h->front, 0, sizeof h->front);
+	}
+}
+
+/* The tunnel depth, in log2, that the front reaches at the start and at the
+ * end of its travel. At 2^6, the front is a small ball around the end of the
+ * tunnel; the screen's corners are shallower than 2^-1. */
+#define HYPER_FRONT_FAR_DEPTH 6.0f
+#define HYPER_FRONT_NEAR_DEPTH (-1.0f)
+/* How far the front must have travelled, from 0 to 1, for the cap to have
+ * the look's full colour. */
+#define HYPER_FRONT_CAP_SHARE 0.12f
+
+/* How much of the look's colour the cap has. */
+static float hyper_front_cap_weight(const XwaRemasterHyperspace* h) {
+	if (!h->front.active) {
+		return 0.0f;
+	}
+	const float weight = h->front.progress / HYPER_FRONT_CAP_SHARE;
+	return weight < 0.0f ? 0.0f : (weight > 1.0f ? 1.0f : weight);
+}
+
+/* The tunnel's cap colour, with the front's look blended in. */
+static void hyper_cap_color(const XwaRemasterHyperspace* h, float out[3]) {
+	const float weight = hyper_front_cap_weight(h);
+	for (int channel = 0; channel < 3; channel++) {
+		out[channel] = h->params.cap_color[channel] +
+					   (h->front.cap_color[channel] - h->params.cap_color[channel]) * weight;
+	}
+}
+
 void XwaRemasterHyperspace_Destroy(XwaRemasterHyperspace* h) {
 	if (!h) {
 		return;
@@ -493,8 +539,9 @@ static void hyper_build_tunnel_fill_lighting(XwaRemasterHyperspace* h, float opa
 		return;
 	}
 	float color[3];
+	hyper_cap_color(h, color);
 	for (int channel = 0; channel < 3; channel++) {
-		color[channel] = h->params.cap_color[channel] * scale;
+		color[channel] *= scale;
 	}
 	hyper_add_uniform_ambient(&h->lighting.ambient_add, color);
 	h->lighting.active = 1;
@@ -584,8 +631,10 @@ static void hyper_build_tunnel_lighting(XwaRemasterHyperspace* h, const float ca
 	float peak = 0.0f;
 	const float key_scale = h->params.brightness * h->params.highlight_strength *
 							h->params.mesh_key_strength * XwaRemaster_ClassicRadiance() * scale * boost;
+	float cap[3];
+	hyper_cap_color(h, cap);
 	for (int channel = 0; channel < 3; channel++) {
-		h->lighting.key.color[channel] = h->params.cap_color[channel] * key_scale;
+		h->lighting.key.color[channel] = cap[channel] * key_scale;
 		peak = fmaxf(peak, h->lighting.key.color[channel]);
 	}
 	if (hyper_normalize(h->lighting.key.world_dir) && isfinite(peak) && peak > 0.0f) {
@@ -749,6 +798,29 @@ static void hyper_set_tunnel_uniform(XwaRemasterHyperspace* h, const XwaRemaster
 	memcpy(u->body_color, h->params.body_color, 3 * sizeof(float));
 	memcpy(u->highlight_color, h->params.highlight_color, 3 * sizeof(float));
 	memcpy(u->cap_color, h->params.cap_color, 3 * sizeof(float));
+	if (h->front.active) {
+		const float progress =
+			h->front.progress < 0.0f ? 0.0f : (h->front.progress > 1.0f ? 1.0f : h->front.progress);
+		/* Near the end of its travel, the front is past the screen's corners
+		   by its noise and its edge. At the end it covers every direction,
+		   so the cockpit's light, which also sees the walls beside and
+		   behind the camera, has the look's colours too. */
+		const float near_depth = HYPER_FRONT_NEAR_DEPTH - h->front.noise - 1.5f * h->front.edge_width;
+		u->front[0] = progress >= 1.0f
+						  ? -64.0f
+						  : HYPER_FRONT_FAR_DEPTH + (near_depth - HYPER_FRONT_FAR_DEPTH) * progress;
+		u->front[1] = h->front.edge_width;
+		u->front[2] = h->front.noise;
+		u->front[3] = 1.0f;
+		u->front_shape[0] = h->front.noise_scale;
+		u->front_shape[1] = h->front.warp;
+		u->front_shape[2] = hyper_front_cap_weight(h);
+		memcpy(u->look_dark_color, h->front.dark_color, 3 * sizeof(float));
+		memcpy(u->look_body_color, h->front.body_color, 3 * sizeof(float));
+		memcpy(u->look_highlight_color, h->front.highlight_color, 3 * sizeof(float));
+		memcpy(u->look_cap_color, h->front.cap_color, 3 * sizeof(float));
+		memcpy(u->front_edge_color, h->front.edge_color, 3 * sizeof(float));
+	}
 }
 
 /* The point the streaks run from, in px: where the ship's forward axis, or

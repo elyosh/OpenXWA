@@ -1070,7 +1070,8 @@ void Player_HandleHyperspaceCommand(CraftData* craft, unsigned int playerIdx, ch
 		gravityWellActive = 0;
 		for (objIdx = g_activeRegionObjectSlotStart; objIdx < g_activeRegionCraftObjectSlotEnd; ++objIdx) {
 #ifdef XWA_MODERN
-			/* A model can have a gravity well, or lose its object type's. */
+			/* A model can add a gravity well, or remove the one that its
+			   object type has. */
 			if (XwaCraftHyperspace_HasGravityWell(g_objectTable[objIdx].objectType)) {
 #else
 			if (g_objectTable[objIdx].objectType == OBJ_Interdictor2 ||

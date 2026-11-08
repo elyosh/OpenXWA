@@ -317,7 +317,7 @@ static struct {
 	XwaFlightHyperspaceLookParams hyperspace_looks[XWA_FLIGHT_HYPERSPACE_LOOKS_MAX];
 	XwaFlightHyperspaceLookParams hyperspace_looks_default[XWA_FLIGHT_HYPERSPACE_LOOKS_MAX];
 	int hyperspace_look_count;
-	/* The last look name that no look has, logged once. */
+	/* The last unknown look name, so that it is only logged once. */
 	char hyperspace_unknown_look[XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX];
 	int hyperspace_preview_look;
 	float hyperspace_preview_look_blend;
@@ -1056,6 +1056,12 @@ static int fl_load_hyperspace_looks_config(const AeronConfigFile* config, const 
 			!fl_look_color(look, "tunnel", "body_color", name, config_path, p->body_color) ||
 			!fl_look_color(look, "tunnel", "highlight_color", name, config_path, p->highlight_color) ||
 			!fl_look_color(look, "tunnel", "cap_color", name, config_path, p->cap_color) ||
+			!fl_look_color(look, "tunnel", "edge_color", name, config_path, p->edge_color) ||
+			!fl_look_number(look, "tunnel", "edge_width", 0.01f, 4.0f, name, config_path, &p->edge_width) ||
+			!fl_look_number(look, "tunnel", "front_noise", 0.0f, 8.0f, name, config_path, &p->front_noise) ||
+			!fl_look_number(look, "tunnel", "front_noise_scale", 0.05f, 16.0f, name, config_path,
+							&p->front_noise_scale) ||
+			!fl_look_number(look, "tunnel", "front_warp", 0.0f, 4.0f, name, config_path, &p->front_warp) ||
 			!fl_look_color(look, "jump", "tint", name, config_path, p->tint) ||
 			!fl_look_color(look, "jump", "tail_color", name, config_path, p->tail_color) ||
 			!fl_look_number(look, NULL, "blend_start", 0.0f, 1.0f, name, config_path, &p->blend_start) ||
@@ -2057,9 +2063,14 @@ void XwaRemasterFlight_SetHyperspaceLook(int index, const XwaFlightHyperspaceLoo
 		FL_LOOK_SANITIZE(body_color[channel], 0.0f, 16.0f);
 		FL_LOOK_SANITIZE(highlight_color[channel], 0.0f, 16.0f);
 		FL_LOOK_SANITIZE(cap_color[channel], 0.0f, 16.0f);
+		FL_LOOK_SANITIZE(edge_color[channel], 0.0f, 16.0f);
 		FL_LOOK_SANITIZE(tint[channel], 0.0f, 16.0f);
 		FL_LOOK_SANITIZE(tail_color[channel], 0.0f, 16.0f);
 	}
+	FL_LOOK_SANITIZE(edge_width, 0.01f, 4.0f);
+	FL_LOOK_SANITIZE(front_noise, 0.0f, 8.0f);
+	FL_LOOK_SANITIZE(front_noise_scale, 0.05f, 16.0f);
+	FL_LOOK_SANITIZE(front_warp, 0.0f, 4.0f);
 	FL_LOOK_SANITIZE(blend_start, 0.0f, 1.0f);
 	FL_LOOK_SANITIZE(blend_end, 0.0f, 1.0f);
 	FL_LOOK_SANITIZE(shake_degrees, 0.0f, 45.0f);
@@ -5243,14 +5254,17 @@ static void fl_rotate_view_direction(float v[3], float pitch, float yaw) {
 	v[2] = -x * sy + z * cy;
 }
 
-/* Gives the effect the tunnel and streak settings of `moment`, with its look
- * blended in, and wobbles `view` in the tunnel when the look asks for it.
- * The entry keeps the normal look, the tunnel fades it in between
- * blend_start and blend_end, and the exit uses it fully. */
+/* Sets the effect's tunnel and streak settings for `moment`, with its look,
+ * and sways `view` in the tunnel when the look asks for it. The entry keeps
+ * the normal look. In the tunnel, the look spreads from the far end toward
+ * the camera between blend_start and blend_end. The exit uses the look
+ * fully. */
 static void fl_hyperspace_apply_look(const XwaRemasterHyperspaceMoment* moment,
 									 XwaRemasterHyperspaceTunnelView* view) {
-	XwaFlightHyperspaceTunnelParams tunnel = s.hyperspace_params;
 	XwaFlightHyperspaceJumpParams jump = s.hyperspace_jump;
+	XwaRemasterHyperspaceFront front;
+
+	memset(&front, 0, sizeof front);
 
 	if (moment->look >= 0 && moment->look < s.hyperspace_look_count) {
 		const XwaFlightHyperspaceLookParams* look = &s.hyperspace_looks[moment->look];
@@ -5268,16 +5282,26 @@ static void fl_hyperspace_apply_look(const XwaRemasterHyperspaceMoment* moment,
 		} else if (moment->phase == XWA_HYPERSPACE_INBOUND) {
 			weight = 1.0f;
 		}
-		fl_lerp3(tunnel.dark_color, tunnel.dark_color, look->dark_color, weight);
-		fl_lerp3(tunnel.body_color, tunnel.body_color, look->body_color, weight);
-		fl_lerp3(tunnel.highlight_color, tunnel.highlight_color, look->highlight_color, weight);
-		fl_lerp3(tunnel.cap_color, tunnel.cap_color, look->cap_color, weight);
+		if (moment->phase != XWA_HYPERSPACE_OUTBOUND) {
+			front.active = 1;
+			front.progress = weight;
+			memcpy(front.dark_color, look->dark_color, sizeof front.dark_color);
+			memcpy(front.body_color, look->body_color, sizeof front.body_color);
+			memcpy(front.highlight_color, look->highlight_color, sizeof front.highlight_color);
+			memcpy(front.cap_color, look->cap_color, sizeof front.cap_color);
+			memcpy(front.edge_color, look->edge_color, sizeof front.edge_color);
+			front.edge_width = look->edge_width;
+			front.noise = look->front_noise;
+			front.noise_scale = look->front_noise_scale;
+			front.warp = look->front_warp;
+		}
 		fl_lerp3(jump.tint, jump.tint, look->tint, weight);
 		fl_lerp3(jump.tail_color, jump.tail_color, look->tail_color, weight);
 
 		if (moment->phase == XWA_HYPERSPACE_TUNNEL && look->shake_degrees > 0.0f && view) {
-			/* The wobble starts a fifth into the tunnel and grows until its
-			   end: a slow sway with a small fast tremble, mostly sideways. */
+			/* The sway starts a fifth of the way into the tunnel and grows until
+			   the tunnel ends. It is a slow sway with a small, fast tremble,
+			   mostly sideways. */
 			const float strength = fl_clampf((progress - 0.18f) / 0.82f, 0.0f, 1.0f);
 			const float amplitude = look->shake_degrees * strength * (3.14159265f / 180.0f);
 			const float seconds = moment->phase_ticks / 236.0f;
@@ -5291,8 +5315,9 @@ static void fl_hyperspace_apply_look(const XwaRemasterHyperspaceMoment* moment,
 			fl_rotate_view_direction(view->forward, pitch, yaw);
 		}
 	}
-	XwaRemasterHyperspace_SetParams(s.hyperspace, &tunnel);
+	XwaRemasterHyperspace_SetParams(s.hyperspace, &s.hyperspace_params);
 	XwaRemasterHyperspace_SetJumpParams(s.hyperspace, &jump);
+	XwaRemasterHyperspace_SetFront(s.hyperspace, &front);
 }
 
 /* The largest distance from the camera to any point of a model whose origin
@@ -5427,13 +5452,13 @@ static int fl_real_hyperspace_moment(const XwaSnapshot* snap, XwaRemasterHypersp
 }
 
 /* The debug preview's moment, on its own clock. The jump cycle is the
- * entry, a 2 s tunnel, the exit, then 1 s of normal flight, for which this
- * returns 0. */
+ * entry, the tunnel and the exit, as long as in the game, then 1 s of normal
+ * flight, for which this returns 0. */
 static int fl_preview_hyperspace_moment(const XwaSnapshot* snap, uint64_t host_time_us,
 										XwaRemasterHyperspaceMoment* out) {
 	enum {
 		FL_PREVIEW_OUTBOUND_TICKS = 590,
-		FL_PREVIEW_TUNNEL_TICKS = 472,
+		FL_PREVIEW_TUNNEL_TICKS = XWA_REMASTER_HYPERSPACE_TUNNEL_TICKS,
 		FL_PREVIEW_INBOUND_TICKS = 237,
 		FL_PREVIEW_NORMAL_TICKS = 236,
 	};

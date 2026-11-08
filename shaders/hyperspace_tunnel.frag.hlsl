@@ -2,6 +2,7 @@
  * (docs/hd_hyperspace_jump.md) it is drawn with partial opacity over the
  * black clear, before the additive streaks. */
 
+#define XWA_HYPERSPACE_FRAGMENT
 #include "hyperspace_tunnel_field.hlsli"
 
 float4 main(float4 position : SV_Position) : SV_Target0 {

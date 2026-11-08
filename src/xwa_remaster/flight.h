@@ -294,30 +294,41 @@ void XwaRemasterFlight_GetHyperspaceJump(XwaFlightHyperspaceJumpParams* out);
 void XwaRemasterFlight_SetHyperspaceJump(const XwaFlightHyperspaceJumpParams* in);
 void XwaRemasterFlight_GetHyperspaceJumpDefault(XwaFlightHyperspaceJumpParams* out);
 
-/* Named looks of the player's jump, loaded from the `hyperspace_looks`
+/* Other looks of the player's jump, loaded from the `hyperspace_looks`
  * section of remaster/config.yaml and live-editable through the debug
- * inspector. A mission picks a look for a jump by its destination region.
- * The look's colours replace the normal ones: in the tunnel they fade in
- * between blend_start and blend_end, the exit uses them fully, and the
- * entry doesn't use them. The tunnel also wobbles around the view. */
+ * inspector. A mission picks a look for jumps to a given region. In the
+ * tunnel, the look's colours spread from the far end of the tunnel toward the
+ * camera, behind an uneven glowing edge, and the tunnel sways. The exit uses
+ * the look's colours, and the start of the jump looks normal. */
 #define XWA_FLIGHT_HYPERSPACE_LOOKS_MAX 8
 #define XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX 32
 
 typedef struct XwaFlightHyperspaceLookParams {
-	/* The tunnel's colours (XwaFlightHyperspaceTunnelParams). */
+	/* The tunnel's colours where the look has spread, as in
+	   XwaFlightHyperspaceTunnelParams. */
 	float dark_color[3];
 	float body_color[3];
 	float highlight_color[3];
 	float cap_color[3];
-	/* The exit streaks' colours (XwaFlightHyperspaceJumpParams). */
+	/* The edge of the area that the look's colours have reached: its colour,
+	   its thickness, how far its bumps reach ahead, how many bumps there are,
+	   and how much they twist. */
+	float edge_color[3];
+	float edge_width;
+	float front_noise;
+	float front_noise_scale;
+	float front_warp;
+	/* The colours of the streaks when the player comes out of hyperspace, as
+	   in XwaFlightHyperspaceJumpParams. */
 	float tint[3];
 	float tail_color[3];
-	/* Shares of the tunnel, 0 to 1, where the colours start and end their
-	   fade. */
+	/* When the look's colours start to spread and when they fill the tunnel,
+	   as fractions of the time in the tunnel: 0 when the tunnel appears, 1
+	   when it ends. */
 	float blend_start;
 	float blend_end;
-	/* The tunnel's wobble at its strongest, in degrees, and how fast it
-	   moves (1 is the reference speed). */
+	/* How far the tunnel sways at the end of the tunnel, in degrees, and how
+	   fast (1 is the normal speed). */
 	float shake_degrees;
 	float shake_speed;
 } XwaFlightHyperspaceLookParams;
@@ -347,8 +358,9 @@ float XwaRemasterFlight_GetHyperspacePreviewSpeed(void);
 /* The look that the preview draws, or -1 for the normal look. */
 void XwaRemasterFlight_SetHyperspacePreviewLook(int index);
 int XwaRemasterFlight_GetHyperspacePreviewLook(void);
-/* How far the look has faded in, 0 to 1, in the tunnel preview, which has
-   no end. */
+/* How far through the tunnel the tunnel preview is, from 0 to 1. That
+   preview never ends, so this sets how far the look has spread and how much
+   the tunnel sways. */
 void XwaRemasterFlight_SetHyperspacePreviewLookBlend(float blend);
 float XwaRemasterFlight_GetHyperspacePreviewLookBlend(void);
 

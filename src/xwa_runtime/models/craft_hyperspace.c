@@ -42,8 +42,9 @@ static int32_t s_departureAcceleration; /* 0: the stock acceleration */
 static int s_brakingTicks;
 static XwaCraftHyperspaceArrival s_arrivals[XWA_CRAFT_HYPERSPACE_ARRIVALS];
 
-/* Reads `key` of `group`, a speed in MGLT, into `out`. Logs and keeps `out`
-   when the value isn't a speed from 1 game unit to the highest one. */
+/* Reads `key` of `group`, a speed in MGLT, into `out`. When the value isn't a
+   speed from 1 game unit to `max`, logs a warning and leaves `out` as it
+   is. */
 static void Hyperspace_ReadSpeed(const char* path, const char* where, const AeronConfigNode* group,
 								 const char* key, int32_t max, int32_t* out) {
 	const AeronConfigNode* node = AeronConfigNode_MapGet(group, key);
@@ -284,9 +285,9 @@ void XwaCraftHyperspace_EndArrival(unsigned int objIdx) {
 	}
 }
 
-/* The arrival of `objIdx` while its craft leaves hyperspace. An arrival
-   whose craft no longer does, such as a craft destroyed on its way, is
-   dropped. */
+/* Returns the arrival of `objIdx` while its craft is leaving hyperspace.
+   When the craft is no longer leaving hyperspace, for example because it was
+   destroyed on its way, drops the arrival and returns NULL. */
 static XwaCraftHyperspaceArrival* Hyperspace_LiveArrival(unsigned int objIdx) {
 	XwaCraftHyperspaceArrival* arrival = Hyperspace_FindArrival(objIdx);
 	const MobileObject* mobj;
@@ -342,7 +343,8 @@ int XwaCraftHyperspace_LimitArrivalMove(unsigned int objIdx, int scalar) {
 	}
 	distance = Hyperspace_DistanceLeft(arrival);
 	if (distance > HYPERSPACE_ARRIVAL_DONE_UNITS && scalar < distance) {
-		/* A long step moves the craft less; the next one measures again. */
+		/* A long step moves the craft less than its speed would; the next
+		   step measures the distance again. */
 		return scalar > HYPERSPACE_MAX_STEP_UNITS ? HYPERSPACE_MAX_STEP_UNITS : scalar;
 	}
 	if (distance > HYPERSPACE_MAX_STEP_UNITS) {
@@ -364,10 +366,10 @@ void XwaCraftHyperspace_RestoreFlightState(
 	memcpy(s_arrivals, arrivals, sizeof s_arrivals);
 }
 
-/* The speed that `craft`, the AI context's, has when its arrival ends.
-   paiman_outofhyperspacemaneuver picks the next plan when the arrival ends,
-   and gives the craft 0 for a null or stationary plan, else its top speed.
-   This picks the plan the same way. */
+/* The speed of `craft` when its arrival ends. `craft` is the craft of the AI
+   context. When the arrival ends, paiman_outofhyperspacemaneuver picks the
+   next plan, and gives the craft a speed of 0 for a null or stationary plan,
+   else its top speed. This function picks the plan in the same way. */
 static int Hyperspace_AiArrivalEndSpeed(const CraftData* craft) {
 	uint8_t planId;
 	const PlanRecord* plan;

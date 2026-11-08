@@ -54,6 +54,40 @@ void XwaRemasterHyperspace_SetParams(XwaRemasterHyperspace* hyperspace,
 void XwaRemasterHyperspace_SetJumpParams(XwaRemasterHyperspace* hyperspace,
 										 const XwaFlightHyperspaceJumpParams* params);
 
+/* A look whose colours spread through the tunnel from its far end toward the
+ * camera. The edge between the two sets of colours is the front.
+ *
+ * The shader measures how deep into the tunnel a point of the walls is by
+ * how far it is along the tunnel's axis for each unit of distance from the
+ * axis. That depth is about 0.5 at the screen's corners and grows toward the
+ * far end of the tunnel. The front's position, edge thickness and bumps are
+ * measured in log2 of the depth: a step of 1 moves the front about halfway to
+ * or from the centre of the screen. */
+typedef struct XwaRemasterHyperspaceFront {
+	int active;
+	/* How far the front has come, from 0 (a small area at the far end) to 1
+	   (the whole tunnel). */
+	float progress;
+	/* The look's colours, where the front has passed. */
+	float dark_color[3];
+	float body_color[3];
+	float highlight_color[3];
+	float cap_color[3];
+	/* The edge: its colour, half its thickness, how far its bumps reach
+	   ahead, how many bumps there are (the scale of their noise), and how
+	   much they twist. */
+	float edge_color[3];
+	float edge_width;
+	float noise;
+	float noise_scale;
+	float warp;
+} XwaRemasterHyperspaceFront;
+
+/* Sets the front that the tunnel draws, or turns it off when `front` is
+   NULL or not active. */
+void XwaRemasterHyperspace_SetFront(XwaRemasterHyperspace* hyperspace,
+									const XwaRemasterHyperspaceFront* front);
+
 /* Builds the tunnel and streak state for `moment`. Must run before
  * AeronScene_Render opens its render passes. `rt_w` and `rt_h` are the
  * scene's render size. Returns 0 for a phase that draws nothing.

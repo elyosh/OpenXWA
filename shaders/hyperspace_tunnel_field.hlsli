@@ -24,6 +24,25 @@ cbuffer HyperspacePS : XWA_HYPERSPACE_UNIFORM_BINDING {
 	float4 body_color;
 	float4 highlight_color;
 	float4 cap_color;
+	/* The front of a look whose colours spread from the far end of the tunnel
+	 * toward the camera. XwaRemasterHyperspaceFront explains the depth.
+	 * x: the front's position, in log2 of the depth. Deeper walls have the
+	 * look's colours.
+	 * y: half the edge's thickness.
+	 * z: how far the edge's bumps reach.
+	 * w: 1 when the front is on, else 0. */
+	float4 front;
+	/* x: the size of the edge's noise.
+	 * y: how much the edge curls.
+	 * z: how much of the look's colour the cap has.
+	 * w: unused. */
+	float4 front_shape;
+	float4 look_dark_color;
+	float4 look_body_color;
+	float4 look_highlight_color;
+	float4 look_cap_color;
+	/* The colour of the front's edge, in rgb. */
+	float4 front_edge_color;
 };
 
 static const float HYPER_TWO_PI = 6.28318530718f;
@@ -67,6 +86,40 @@ float hyper_fbm3(float3 p, float frequency_scale) {
 	return min(sum, 1.0f);
 }
 
+/* Three octaves of simplex noise, from about -1 to 1. */
+float hyper_front_noise(float3 p) {
+	return hyper_simplex_noise(p) * 0.6f + hyper_simplex_noise(p * 2.03f) * 0.3f +
+		   hyper_simplex_noise(p * 4.01f) * 0.15f;
+}
+
+/* How far a point of the walls is behind the front, in log2 of the tunnel
+ * depth: positive where the look's colours have arrived. The noise is laid
+ * out by the angle around the tunnel (its cosine and sine, so it has no seam)
+ * and the logarithm of the depth. On screen these change at about the same
+ * rate, so the noise makes round lobes and curling fingers rather than
+ * spikes. It drifts slowly toward the camera. */
+float hyper_front_distance(float depth, float angle) {
+	float log_depth = log2(max(depth, 1.0f / 64.0f));
+	float3 wall = float3(cos(angle), sin(angle), log_depth * 0.6931472f - motion.x * 0.4f) * front_shape.x;
+	float3 warp = float3(hyper_simplex_noise(wall + float3(5.2f, 1.3f, 0.0f)),
+						 hyper_simplex_noise(wall + float3(1.7f, 9.2f, 0.0f)),
+						 hyper_simplex_noise(wall + float3(8.3f, 2.8f, 0.0f)));
+	float reach = hyper_front_noise(wall + warp * front_shape.y);
+#ifndef XWA_HYPERSPACE_FRAGMENT
+	/* The lighting cube also sees the walls beside and behind the camera.
+	   They light most of the cockpit, but they are shallower than any wall
+	   on screen, so the front would only reach them when it ends. Here the
+	   depths from 2^-6 to 2^6 are squeezed into 2^-1 to 2^6: the walls at
+	   60 degrees from the tunnel's axis turn about halfway through the
+	   spread, and those beside and behind the camera when the screen's
+	   corners do. The cockpit's light then warms up as the red grows. */
+	if (log_depth < 6.0f) {
+		log_depth = -1.0f + (log_depth + 6.0f) * (7.0f / 12.0f);
+	}
+#endif
+	return log_depth - front.x + reach * front.z;
+}
+
 /* Evaluate the tunnel's linear HDR radiance for an arbitrary view-space ray. */
 float3 hyperspace_tunnel_radiance(float3 ray) {
 	float3 axis = normalize(tunnel_forward.xyz);
@@ -89,13 +142,35 @@ float3 hyperspace_tunnel_radiance(float3 ray) {
 					   hyper_fbm3(noise_coord, motion.w), seam_blend);
 	broad = saturate(0.45f + 0.55f * broad);
 
-	float3 color = lerp(dark_color.rgb, body_color.rgb, broad);
-	color += highlight_color.rgb * (smoothstep(0.55f, 1.0f, broad) * 0.65f * appearance.y);
-	color = saturate(color);
+	float highlight = smoothstep(0.55f, 1.0f, broad) * 0.65f * appearance.y;
+	float3 color = saturate(lerp(dark_color.rgb, body_color.rgb, broad) + highlight_color.rgb * highlight);
+	float3 cap = cap_color.rgb;
+
+	if (front.w > 0.0f) {
+		/* Behind the front the walls have the look's colours, and a band of
+		   the edge colour glows along the front itself. The two sets of
+		   colours only mix inside this band, where the edge colour mostly
+		   hides them. */
+		float depth = axial_rate * projection_scale / radial_rate;
+		float behind = hyper_front_distance(depth, angle);
+		float width = front.y;
+#ifdef XWA_HYPERSPACE_FRAGMENT
+		/* Near the end of the tunnel the depth changes fast across a pixel;
+		   the edge stays at least as wide as a pixel so that it doesn't
+		   shimmer. */
+		width = max(width, fwidth(behind) * 1.5f);
+#endif
+		float reached = smoothstep(-width, width, behind);
+		float3 look = saturate(lerp(look_dark_color.rgb, look_body_color.rgb, broad) +
+							   look_highlight_color.rgb * highlight);
+		float edge = saturate(1.0f - abs(behind) / (width * 1.5f));
+		color = lerp(lerp(color, look, reached), front_edge_color.rgb, edge * edge * 0.8f);
+		cap = lerp(cap, look_cap_color.rgb, front_shape.z);
+	}
 
 	float axis_distance = radial_length / (max(abs(axial_rate), 1.0e-4f) * projection_scale);
 	float cap_light = exp(-max(axis_distance - geometry.z, 0.0f) * geometry.w);
-	color += cap_color.rgb * (cap_light * appearance.y);
+	color += cap * (cap_light * appearance.y);
 	return color * appearance.x;
 }
 

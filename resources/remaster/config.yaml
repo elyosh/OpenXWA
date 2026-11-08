@@ -422,37 +422,50 @@ hyperspace_jump:
   warp_sky_taps: 8            # samples per pixel in each of the three sky passes
   warp_sky_half_resolution: true # the sky passes run at half the output resolution
 hyperspace_looks:
-  # Looks of the player's jump, which a mission picks by its destination
-  # region (hyperspace_regions in its settings). Each look sets the colours
-  # of the tunnel and of the exit streaks; the other hyperspace_tunnel and
-  # hyperspace_jump values stay. The entry keeps the normal look.
+  # Other looks for the player's hyperspace jump. A mission picks one for
+  # jumps to a given region (hyperspace_regions in its settings). A look only
+  # changes the tunnel and the exit. The start of the jump looks normal.
   interdiction:
-    # A jump that a gravity well pulls out of hyperspace: the tunnel turns
-    # red with yellow streaks and wobbles, and the exit streaks are red.
+    # A jump that a gravity well cuts short. Red spreads through the tunnel
+    # from its far end toward the camera, the tunnel shakes, and the streaks
+    # are red when the player comes out of hyperspace.
     tunnel:
+      # The tunnel's colours where the red has reached it. They replace the
+      # colours of hyperspace_tunnel.
       dark_color_r: 0.0
       dark_color_g: 0.0
       dark_color_b: 0.0
-      body_color_r: 0.79
-      body_color_g: 0.02
-      body_color_b: 0.02
+      body_color_r: 0.38
+      body_color_g: 0.01
+      body_color_b: 0.01
       highlight_color_r: 0.45
       highlight_color_g: 0.38
       highlight_color_b: 0.02
       cap_color_r: 1.0
       cap_color_g: 0.12
       cap_color_b: 0.04
-    jump:                # the exit streaks
+      # The edge of the red area, a thin glowing line.
+      edge_color_r: 1.0
+      edge_color_g: 0.45
+      edge_color_b: 0.06
+      edge_width: 0.12       # how thick the edge is
+      front_noise: 0.5       # how uneven the edge is: how far its bumps reach ahead
+      front_noise_scale: 0.7 # how many bumps there are: higher gives more, smaller bumps
+      front_warp: 0.3        # how much the bumps twist into curls
+    jump:
+      # The colours of the streaks when the player comes out of hyperspace.
       tint_r: 0.79
       tint_g: 0.02
       tint_b: 0.02
       tail_color_r: 0.79
       tail_color_g: 0.02
       tail_color_b: 0.02
-    blend_start: 0.0     # share of the tunnel where the colours start to fade in
-    blend_end: 0.67      # share of the tunnel where they have replaced the normal ones
-    shake_degrees: 4.0   # the tunnel's wobble around the view at its strongest
-    shake_speed: 1.0     # how fast the wobble moves
+    # When the red starts to spread and when it fills the tunnel, as fractions
+    # of the time in the tunnel: 0 is when the tunnel appears, 1 when it ends.
+    blend_start: 0.2
+    blend_end: 0.55
+    shake_degrees: 6.0     # how far the tunnel sways at the end of the tunnel, in degrees
+    shake_speed: 1.5       # how fast it sways
 point_lights:
   enabled: true
   cluster_depth_slices: 24
