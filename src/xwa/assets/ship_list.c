@@ -66,8 +66,8 @@ int ShipList_Load(void) {
 #ifdef XWA_MODERN
 		if (!File_ReadLine(stream, g_frontendScratchBuffer, sizeof(g_frontendScratchBuffer))) {
 			/* The stock file ends at craft type 231. A craft type file can
-			   give a line to a later craft type, such as XWAU's craft type
-			   232. The line is then only a mod text. */
+			   give a line to a later craft type, such as 232. The line is
+			   then only a mod text. */
 			snprintf(g_frontendScratchBuffer, sizeof(g_frontendScratchBuffer), "!SPECIES_%u!", i);
 			if (XwaText_Find(g_frontendScratchBuffer + 1) == NULL) {
 				continue;

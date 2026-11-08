@@ -378,7 +378,7 @@ int TechLibrary_LoadSpecTextTable(void) {
 			if (!File_ReadLine(stream, line, sizeof(line))) {
 				/* The stock file ends at craft type 231, in entry 230. A craft
 				   type file can give texts to a later craft type, such as
-				   XWAU's craft type 232. The line is then only a mod text. */
+				   232. The line is then only a mod text. */
 				static const char* const fieldIds[5] = { "NAME", "MANU", "SIDE", "DESC", "CREW" };
 
 				snprintf(line, sizeof(line), "!SPEC_%d_%s!", entryIndex + 1, fieldIds[fieldIndex]);
