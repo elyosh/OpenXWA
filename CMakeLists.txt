@@ -681,7 +681,7 @@ if(XWA_BUILD_MOD_IMPORTER)
             "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/Inconsolata-Bold.ttf"
             "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/Inconsolata-OFL.txt"
             "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.fnt"
-            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.png")
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.ktx2")
         target_sources(xwa_mod_importer PRIVATE ${XWA_MOD_IMPORTER_FONTS})
         set_source_files_properties(${XWA_MOD_IMPORTER_FONTS} PROPERTIES
             HEADER_FILE_ONLY TRUE

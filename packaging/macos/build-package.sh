@@ -431,6 +431,7 @@ main() {
     plutil -lint "${application}/Contents/Info.plist"
     test -x "${importer}/Contents/MacOS/OpenXWA Mod Importer"
     test -f "${importer}/Contents/Resources/resources/assets/fonts/menu.fnt"
+    test -f "${importer}/Contents/Resources/resources/assets/fonts/menu.ktx2"
     test -f "${importer}/Contents/Resources/shaders/fullscreen.frag.msl"
     plutil -lint "${importer}/Contents/Info.plist"
     if [[ "${build_type}" == Debug ]]; then

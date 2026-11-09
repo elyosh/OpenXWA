@@ -301,6 +301,7 @@ RUN test -f /build/package/openxwa-linux-x86_64/shaders/hyperspace_streak.vert.s
     && test -f /build/package/openxwa-linux-x86_64/resources/aeron/scene3d_defaults.yaml \
     && test -f /build/package/openxwa-linux-x86_64/resources/remaster/config.yaml \
     && test -f /build/package/openxwa-linux-x86_64/resources/assets/fonts/menu.fnt \
+    && test -f /build/package/openxwa-linux-x86_64/resources/assets/fonts/menu.ktx2 \
     && for program in OpenXWA "OpenXWA Mod Importer"; do \
         file "/build/package/openxwa-linux-x86_64/${program}" \
         && env -u LD_LIBRARY_PATH ldd "/build/package/openxwa-linux-x86_64/${program}" \

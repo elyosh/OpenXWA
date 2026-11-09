@@ -386,6 +386,7 @@ RUN test -f /build/package/openxwa-windows-x86_64/shaders/hyperspace_streak.vert
     && test -f /build/package/openxwa-windows-x86_64/resources/aeron/scene3d_defaults.yaml \
     && test -f /build/package/openxwa-windows-x86_64/resources/remaster/config.yaml \
     && test -f /build/package/openxwa-windows-x86_64/resources/assets/fonts/menu.fnt \
+    && test -f /build/package/openxwa-windows-x86_64/resources/assets/fonts/menu.ktx2 \
     && x86_64-w64-mingw32ucrt-objdump -p \
         /build/package/openxwa-windows-x86_64/OpenXWA.exe \
         | grep -Eq 'Subsystem[[:space:]]+00000002' \

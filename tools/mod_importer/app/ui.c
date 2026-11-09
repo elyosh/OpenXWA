@@ -946,11 +946,11 @@ ImporterUi* ImporterUi_Create(char* error, size_t error_capacity) {
 		free(app);
 		return NULL;
 	}
-	if (!AeronFontAtlas_LoadVfs(&app->font, command, Aeron_GetVfs(), AERON_VFS_ROOT_RESOURCE,
-								"assets/fonts/menu", 64u * 1024u * 1024u)) {
+	if (!AeronFontAtlas_LoadKtx2Vfs(&app->font, command, Aeron_GetVfs(), AERON_VFS_ROOT_RESOURCE,
+									"assets/fonts/menu", 64u * 1024u * 1024u)) {
 		Aeron_CancelCommandBuffer(command);
 		snprintf(error, error_capacity,
-				 "The importer's font, assets/fonts/menu.fnt and menu.png, is missing from %s. Reinstall "
+				 "The importer's font, assets/fonts/menu.fnt and menu.ktx2, is missing from %s. Reinstall "
 				 "OpenXWA.",
 				 Aeron_ResourceRoot());
 		free(app);
