@@ -124,8 +124,8 @@ XwaFile* File_Open(const char* fileName, const char* mode) {
 	file = NULL;
 #ifdef XWA_MODERN
 	/* A mod can replace or remove some game files: the mission files and
-	   lists, the voices and sound banks, the cutscene table and the medal
-	   files. Only files opened for reading are replaced or removed. */
+	   lists, the voices and sound banks, the music, the cutscene table and
+	   the medal files. Only files opened for reading are replaced or removed. */
 	if (root == AERON_VFS_ROOT_ASSET && openMode == AERON_VFS_READ) {
 		switch (XwaGameFiles_Find(g_fileVfs, fileName, modPath, sizeof modPath)) {
 			case XWA_GAME_FILE_MOD:

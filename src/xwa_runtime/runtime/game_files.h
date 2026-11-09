@@ -19,6 +19,7 @@ extern "C" {
    - the mission lists, <same folders>/MISSION.LST, and MISSIONS/EMAIL.TXT;
    - the sounds, WAVE/...: the mission voices, the briefing, debriefing and
 	 concourse voices, and the sound banks;
+   - the music, MUSIC/<name>.IMC;
    - the cutscene table, FRONTRES/CUTSCENE/CUTSCENE.TXT;
    - the medal files in FRONTRES/MEDALS/: MEDALS.TXT, the missions that give
 	 the battle medals; MEDALS.LST, the medal images; and FAMILYAWARDS.TXT,

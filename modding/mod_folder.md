@@ -139,6 +139,7 @@ These files can be replaced:
 | `MISSIONS/MISSION.LST`, `MELEE/MISSION.LST`, `COMBAT/MISSION.LST` | mission lists |
 | `MISSIONS/EMAIL.TXT` | the e-mails in the concourse |
 | `WAVE/...` | any sound: voices, briefing and concourse sounds, sound effects, and new sounds that other mod files name, such as `Wave/Custom/Alarm.wav` |
+| `MUSIC/*.IMC` | the music |
 | `FRONTRES/CUTSCENE/CUTSCENE.TXT` | the cutscenes that follow missions |
 | `FRONTRES/MEDALS/MEDALS.TXT` | the missions that give the battle medals |
 | `FRONTRES/MEDALS/MEDALS.LST` | the medal images |

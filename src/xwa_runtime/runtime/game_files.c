@@ -46,6 +46,9 @@ static int GameFiles_IsModFile(const char* path) {
 		strcmp(path, "frontres/medals/familyawards.txt") == 0) {
 		return 1;
 	}
+	if (strncmp(path, "music/", 6) == 0 && strchr(path + 6, '/') == NULL && GameFiles_EndsWith(path, ".imc")) {
+		return 1;
+	}
 	return strncmp(path, "wave/", 5) == 0;
 }
 

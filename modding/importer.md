@@ -53,7 +53,7 @@ The import is a complete mod, with `mod.yaml` and the folders that
 | Models | `flight/models/<key>.glb`, for each model that the installation uses, and the settings of each model in `flight/models/<key>.yaml` |
 | Effects | the effect libraries of the models' animated materials, and `effects.yaml`, in `flight/effects/` |
 | Craft | `flight/object_types/`, `flight/craft_types/`, `flight/hud.yaml` and `flight/sounds.yaml` |
-| Missions | the mission files in `flight/missions/`, the `.TIE` files, mission lists and sounds in `game/`, the list of removed original sounds in `game/files.yaml`, and `flight/flight.yaml` |
+| Missions | the mission files in `flight/missions/`, the `.TIE` files, mission lists, sounds and music in `game/`, the list of removed original sounds in `game/files.yaml`, and `flight/flight.yaml` |
 | Skies | the cube images and `flight/environments/environments.yaml` |
 | Hangars | `flight/hangars.yaml` |
 | Menus | the menu art, room animations, movies, fonts and awards in `frontend/` |
