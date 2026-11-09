@@ -963,6 +963,11 @@ ImporterUi* ImporterUi_Create(char* error, size_t error_capacity) {
 		return NULL;
 	}
 	AeronUi_SetFonts(app->ui, &(AeronUiFontSet) { .regular = &app->font });
+	/* The text is drawn 2 to 5 times smaller than the font atlas. A
+	   negative bias reads a larger mip level, which keeps it sharper. */
+	AeronUiTheme theme = *AeronUi_GetTheme(app->ui);
+	theme.text_mip_bias = -0.75f;
+	AeronUi_SetTheme(app->ui, &theme);
 	snprintf(app->resources, sizeof app->resources, "%s", Aeron_ResourceRoot());
 	load_config(app);
 	if (app->config_ok)
