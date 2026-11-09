@@ -1477,9 +1477,22 @@ static int snapshot_reserve_slot_index(XwaSnapshot* s, uint32_t count) {
 	return 1;
 }
 
-/* The mesh count of object `o`'s model, at most XWA_SNAP_MAX_MESH_SLOTS. */
+/* The mesh count of object `o`'s model, at most XWA_SNAP_MAX_MESH_SLOTS.
+ * The cockpit and exterior models of the player's craft are drawn with the
+ * craft's states, and can have more meshes than its model. An object
+ * profile can hide those extra meshes. So the player's object gets the
+ * largest of the three counts. */
 static int snapshot_mesh_count(const ObjectRecord* o) {
-	const int count = ModelMesh_GetObjectTypeMeshCount(o->objectType);
+	int count = ModelMesh_GetObjectTypeMeshCount(o->objectType);
+	const int playerObjIdx = g_players[g_localPlayer].objectIndex;
+	if (g_objectTable != NULL && playerObjIdx >= 0 && o == &g_objectTable[playerObjIdx]) {
+		if (g_cockpitModel != 0 && g_cockpitModelMeshCache.meshCount > count) {
+			count = g_cockpitModelMeshCache.meshCount;
+		}
+		if (g_exteriorModel != 0 && g_exteriorModelMeshCache.meshCount > count) {
+			count = g_exteriorModelMeshCache.meshCount;
+		}
+	}
 	return count > XWA_SNAP_MAX_MESH_SLOTS ? XWA_SNAP_MAX_MESH_SLOTS : count;
 }
 
