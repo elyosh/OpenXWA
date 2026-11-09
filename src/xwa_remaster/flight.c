@@ -6557,7 +6557,11 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	AeronScene_SetDirectionalShadow(s.scene, NULL);
 
 	FlMapSubmitContext submit_context = { .cmd = cmd, .assets = assets };
-	if (!XwaRemasterFlightMap_Prepare(cmd, s.scene, snap, assets, view, s.crows, fl_map_submit_object,
+	/* The map's overlays use the classic palette colours. The present pass
+	 * multiplies the scene by the map's fixed exposure, so they are drawn
+	 * at 1 / exposure to keep those colours. */
+	if (!XwaRemasterFlightMap_Prepare(cmd, s.scene, snap, assets, view, s.crows,
+									  1.0f / XwaRemasterFlight_Exposure(), fl_map_submit_object,
 									  &submit_context)) {
 		s.snap = NULL;
 		return NULL;

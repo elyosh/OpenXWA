@@ -38,6 +38,8 @@ static struct {
 	uint8_t icon_valid[MAP_ICON_CACHE_SIZE];
 	uint32_t icon_generation;
 	float world_to_eye[9];
+	/* Multiplies the overlay colours. See XwaRemasterFlightMap_Prepare. */
+	float overlay_scale;
 } map_state;
 
 static uint8_t map_palette_for_iff(uint8_t iff) {
@@ -76,11 +78,14 @@ static uint32_t map_color_argb(uint8_t color_code) {
 	return XwaSnapshotExport_FlightPaletteColor(XwaSnapshotExport_FlightColorCodePaletteIndex(color_code));
 }
 
+/* The premultiplied linear colour of an overlay drawn into the scene. The
+   colour is multiplied by overlay_scale, and the alpha isn't. */
 static void map_argb_linear(uint32_t argb, float out[4]) {
 	const float a = (float)((argb >> 24) & 255u) / 255.0f;
-	out[0] = XwaRemaster_SrgbToLinear((float)((argb >> 16) & 255u) / 255.0f) * a;
-	out[1] = XwaRemaster_SrgbToLinear((float)((argb >> 8) & 255u) / 255.0f) * a;
-	out[2] = XwaRemaster_SrgbToLinear((float)(argb & 255u) / 255.0f) * a;
+	const float scale = a * map_state.overlay_scale;
+	out[0] = XwaRemaster_SrgbToLinear((float)((argb >> 16) & 255u) / 255.0f) * scale;
+	out[1] = XwaRemaster_SrgbToLinear((float)((argb >> 8) & 255u) / 255.0f) * scale;
+	out[2] = XwaRemaster_SrgbToLinear((float)(argb & 255u) / 255.0f) * scale;
 	out[3] = a;
 }
 
@@ -358,12 +363,13 @@ void XwaRemasterFlightMap_Shutdown(void) {
 
 int XwaRemasterFlightMap_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scene, const XwaSnapshot* snapshot,
 								 XwaRemasterAssets* assets, const XwaRemasterFlightView* view,
-								 const float world_to_eye[9],
+								 const float world_to_eye[9], float overlay_scale,
 								 XwaRemasterFlightMapSubmitObjectFn submit_object, void* submit_user) {
 	if (!cmd || !scene || !snapshot || !assets || !view || !world_to_eye || !submit_object ||
 		!snapshot->flight_map.active || !XwaRemasterFlightMap_Init())
 		return 0;
 	memcpy(map_state.world_to_eye, world_to_eye, sizeof map_state.world_to_eye);
+	map_state.overlay_scale = isfinite(overlay_scale) && overlay_scale > 0.0f ? overlay_scale : 1.0f;
 	map_state.object_count = 0;
 	for (int i = 0; i < 2; i++)
 		AeronDrawList_Begin(map_state.annotations[i], NULL, view->viewport.width, view->viewport.height,
