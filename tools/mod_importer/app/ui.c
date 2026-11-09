@@ -417,6 +417,20 @@ static void format_time(char* out, size_t capacity, uint64_t us) {
 		snprintf(out, capacity, "%um %02us", seconds / 60, seconds % 60);
 }
 
+/* Formats the estimated time left, in whole minutes, so that it doesn't
+   change on every frame. `us` is -1 when there is no estimate yet. */
+static void format_remaining(char* out, size_t capacity, long long us) {
+	const long long minutes = (us + 30000000) / 60000000;
+	if (us < 0)
+		snprintf(out, capacity, "estimating");
+	else if (minutes < 1)
+		snprintf(out, capacity, "less than a minute");
+	else if (minutes < 60)
+		snprintf(out, capacity, "about %lld min", minutes);
+	else
+		snprintf(out, capacity, "about %lldh %02lldm", minutes / 60, minutes % 60);
+}
+
 /* ---- The Import tab ----------------------------------------------------- */
 
 static void draw_form(ImporterUi* app) {
@@ -506,8 +520,12 @@ static void draw_running(ImporterUi* app) {
 		snprintf(line, sizeof line, "%s", XwaModImport_PhaseName(phase));
 	AeronUi_Header(ui, line);
 	AeronUi_PercentageMeter(ui, "Progress", (float)XwaModImport_Overall(&app->progress) / 1000.0f);
-	format_time(elapsed, sizeof elapsed, Aeron_NowUs() - app->start_us);
+	const uint64_t elapsed_us = Aeron_NowUs() - app->start_us;
+	format_time(elapsed, sizeof elapsed, elapsed_us);
 	snprintf(line, sizeof line, "Elapsed: %s", elapsed);
+	AeronUi_Label(ui, line);
+	format_remaining(elapsed, sizeof elapsed, XwaModImport_Remaining(&app->progress, elapsed_us));
+	snprintf(line, sizeof line, "Time left: %s", elapsed);
 	AeronUi_Label(ui, line);
 	const int cancelling = Aeron_AtomicLoad(&app->progress.cancel) != 0;
 	if (cancelling)

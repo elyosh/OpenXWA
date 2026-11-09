@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,6 +7,7 @@
 #include <strings.h>
 
 #include <SDL3/SDL_cpuinfo.h>
+#include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_time.h>
 
 #include "aeron/sync.h"
@@ -37,13 +39,26 @@
 
 #define MOD_YAML_HEADER "# Made by the OpenXWA mod importer."
 
-/* How much of the overall progress each phase takes, in percent: the share
- * of each phase in the times of TFTC-R and XWAU2025 imports. */
-static const int kPhaseWeights[XWA_MOD_IMPORT_PHASE_COUNT] = {
-	[XWA_MOD_IMPORT_MODELS] = 19,  [XWA_MOD_IMPORT_EFFECTS] = 20,  [XWA_MOD_IMPORT_CRAFT] = 1,
-	[XWA_MOD_IMPORT_MISSIONS] = 1, [XWA_MOD_IMPORT_SKYBOXES] = 21, [XWA_MOD_IMPORT_FRONTEND] = 10,
-	[XWA_MOD_IMPORT_FLIGHT] = 27,  [XWA_MOD_IMPORT_COPIES] = 1,
+/* How long the phases take, in ms, for each unit of work. They were measured
+ * on the TFTC-R and XWAU2025 imports. Only the ratios between them change the
+ * progress bar, so they also work on other computers. The import log shows
+ * each phase's estimate next to its time. */
+enum {
+	COST_MODEL_MS = 113,     /* models phase, per model */
+	COST_EFFECTS_MS = 36,    /* effects phase, per model */
+	COST_SKYBOX_MS = 3050,   /* per line of the skybox list (one sky or overlay) */
+	COST_MENU_ART_MS = 41,   /* per MB of the .dat files of Frontres */
+	COST_FLIGHT_ART_MS = 9,  /* per MB of the .dat files of Resdata */
+	COST_CRAFT_MS = 500,     /* the whole phase */
+	COST_MISSIONS_MS = 4000, /* the whole phase */
+	COST_HANGARS_MS = 500,   /* the whole phase */
+	COST_COPIES_MS = 1500,   /* the whole phase */
 };
+
+/* XwaModImport_Remaining gives no estimate before 2% of the import, or
+   before 10 seconds. */
+#define REMAINING_MIN_FRACTION 0.02
+#define REMAINING_MIN_US 10000000u
 
 static const char* const kPhaseNames[XWA_MOD_IMPORT_PHASE_COUNT] = {
 	[XWA_MOD_IMPORT_PREPARE] = "Preparing",
@@ -63,16 +78,32 @@ const char* XwaModImport_PhaseName(XwaModImportPhase phase) {
 	return phase >= 0 && phase < XWA_MOD_IMPORT_PHASE_COUNT ? kPhaseNames[phase] : "";
 }
 
-int XwaModImport_Overall(XwaModImportProgress* progress) {
+/* Returns the overall progress, from 0 to 1. */
+static double overall_fraction(XwaModImportProgress* progress) {
 	if (Aeron_AtomicLoad(&progress->finished))
-		return 1000;
+		return 1.0;
 	const int phase = Aeron_AtomicLoad(&progress->phase);
-	int done = 0;
-	for (int i = 0; i < phase && i < XWA_MOD_IMPORT_PHASE_COUNT; ++i)
-		done += kPhaseWeights[i] * 10;
-	if (phase >= 0 && phase < XWA_MOD_IMPORT_PHASE_COUNT)
-		done += kPhaseWeights[phase] * Aeron_AtomicLoad(&progress->weight) / 100;
-	return done < 1000 ? done : 1000;
+	long long total = 0, done = 0;
+	for (int i = 0; i < XWA_MOD_IMPORT_PHASE_COUNT; ++i) {
+		const long long cost = Aeron_AtomicLoad(&progress->phase_cost[i]);
+		total += cost;
+		if (i < phase)
+			done += cost;
+		else if (i == phase)
+			done += cost * Aeron_AtomicLoad(&progress->weight) / 1000;
+	}
+	/* The costs are 0 until the models phase starts. */
+	return total > 0 ? (double)done / (double)total : 0.0;
+}
+
+int XwaModImport_Overall(XwaModImportProgress* progress) { return (int)(overall_fraction(progress) * 1000.0); }
+
+long long XwaModImport_Remaining(XwaModImportProgress* progress, uint64_t elapsed_us) {
+	const double fraction = overall_fraction(progress);
+	/* Early on, a few seconds of work give a poor estimate. */
+	if (fraction < REMAINING_MIN_FRACTION || elapsed_us < REMAINING_MIN_US)
+		return -1;
+	return (long long)((double)elapsed_us * (1.0 - fraction) / fraction);
 }
 
 /* ---- Shared helpers ----------------------------------------------------- */
@@ -634,20 +665,15 @@ static void craft(ImportContext* ctx) {
 		Import_Failed(ctx, "The craft settings couldn't be imported.");
 }
 
-/* The missions' files and settings, the awards, and the skybox list. Returns
- * false when the missions can't be loaded. */
-static bool missions(ImportContext* ctx, bool* skyboxes) {
+/* The missions' files and settings, and the awards. Returns false when the
+ * missions can't be loaded. */
+static bool missions(ImportContext* ctx) {
 	const XwaModImportOptions* options = ctx->options;
 	char game_files[IMPORT_PATH_CAP], flight[IMPORT_PATH_CAP], awards[IMPORT_PATH_CAP], out[IMPORT_PATH_CAP];
-	char environments[IMPORT_PATH_CAP], manifest[IMPORT_PATH_CAP], folders[IMPORT_PATH_CAP];
-	*skyboxes = false;
 	if (!PathFormat(game_files, sizeof game_files, "%s/game", options->mod) ||
 		!PathFormat(flight, sizeof flight, "%s/flight/flight.yaml", options->mod) ||
 		!PathFormat(awards, sizeof awards, "%s/frontend/awards.yaml", options->mod) ||
-		!PathFormat(out, sizeof out, "%s/flight/missions", options->mod) ||
-		!PathFormat(environments, sizeof environments, "%s/flight/environments", options->mod) ||
-		!PathFormat(manifest, sizeof manifest, "%s/environments.yaml", environments) ||
-		!PathFormat(folders, sizeof folders, "%s/skybox_folders.txt", ctx->work))
+		!PathFormat(out, sizeof out, "%s/flight/missions", options->mod))
 		return true;
 	if (!XwauGameFiles_Copy(options->source, options->game, game_files) ||
 		!XwauFlightSettings_Write(options->source, &ctx->names, &ctx->stock_values, flight) ||
@@ -664,15 +690,88 @@ static bool missions(ImportContext* ctx, bool* skyboxes) {
 	const bool ok =
 		XwauMissionFiles_Write(options->source, loaded, options->game, out, &ctx->names, design_scale);
 	XwauMissions_Free(loaded);
-	if (!ok) {
+	if (!ok)
 		Import_Failed(ctx, "The mission files couldn't be imported.");
-		return true;
-	}
-	if (!MakeDirs(environments) || !XwauSkyboxes_Write(options->source, options->game, manifest, folders))
-		Import_Failed(ctx, "The skybox list couldn't be imported.");
-	else
-		*skyboxes = true;
 	return true;
+}
+
+/* Writes the skyboxes' environments.yaml and the list of folders that the
+ * skyboxes phase converts. It only reads the installation and the original
+ * game, so it runs before the models phase, and the progress bar knows the
+ * size of the skyboxes phase from the start. Returns false when there is no
+ * list. */
+static bool skybox_list(ImportContext* ctx) {
+	const XwaModImportOptions* options = ctx->options;
+	char environments[IMPORT_PATH_CAP], manifest[IMPORT_PATH_CAP], folders[IMPORT_PATH_CAP];
+	if (!PathFormat(environments, sizeof environments, "%s/flight/environments", options->mod) ||
+		!PathFormat(manifest, sizeof manifest, "%s/environments.yaml", environments) ||
+		!PathFormat(folders, sizeof folders, "%s/skybox_folders.txt", ctx->work))
+		return false;
+	if (!MakeDirs(environments) || !XwauSkyboxes_Write(options->source, options->game, manifest, folders)) {
+		Import_Failed(ctx, "The skybox list couldn't be imported.");
+		return false;
+	}
+	return true;
+}
+
+/* Returns the number of lines of `text`. */
+static int count_lines(const char* text) {
+	int lines = 0;
+	for (const char* c = text; c && *c; ++c)
+		lines += *c == '\n';
+	return lines;
+}
+
+/* Returns the bytes of the .dat files in folder `dir`, and in its subfolders
+ * when `recursive` is true. */
+static long long dat_bytes(const char* dir, bool recursive) {
+	size_t count = 0;
+	char** names = ListDir(dir, false, &count);
+	long long bytes = 0;
+	for (size_t i = 0; i < count; ++i) {
+		char path[IMPORT_PATH_CAP];
+		SDL_PathInfo info;
+		if (!PathFormat(path, sizeof path, "%s/%s", dir, names[i]) || !SDL_GetPathInfo(path, &info))
+			continue;
+		const char* dot = strrchr(names[i], '.');
+		if (info.type == SDL_PATHTYPE_DIRECTORY && recursive)
+			bytes += dat_bytes(path, true);
+		else if (info.type == SDL_PATHTYPE_FILE && dot && strcasecmp(dot, ".dat") == 0)
+			bytes += (long long)info.size;
+	}
+	FreeList(names, count);
+	return bytes;
+}
+
+/* Sets the estimated cost of each phase, from the number of models, the
+ * skybox list, and the size of the art files. See the COST_ rates. */
+static void estimate_costs(ImportContext* ctx, size_t model_count, bool skyboxes) {
+	const char* source = ctx->options->source;
+	char path[IMPORT_PATH_CAP];
+	int skybox_lines = 0;
+	if (skyboxes && PathFormat(path, sizeof path, "%s/skybox_folders.txt", ctx->work)) {
+		size_t size = 0;
+		char* text = ReadWholeFile(path, &size);
+		skybox_lines = count_lines(text);
+		free(text);
+	}
+	const long long menu_mb =
+		Xwau_FindDir(source, "Frontres", path, sizeof path) ? dat_bytes(path, true) / 1000000 : 0;
+	const long long flight_mb =
+		Xwau_FindDir(source, "Resdata", path, sizeof path) ? dat_bytes(path, false) / 1000000 : 0;
+	const long long costs[XWA_MOD_IMPORT_PHASE_COUNT] = {
+		[XWA_MOD_IMPORT_MODELS] = (long long)model_count * COST_MODEL_MS,
+		[XWA_MOD_IMPORT_EFFECTS] = (long long)model_count * COST_EFFECTS_MS,
+		[XWA_MOD_IMPORT_CRAFT] = COST_CRAFT_MS,
+		[XWA_MOD_IMPORT_MISSIONS] = COST_MISSIONS_MS,
+		[XWA_MOD_IMPORT_SKYBOXES] = (long long)skybox_lines * COST_SKYBOX_MS,
+		[XWA_MOD_IMPORT_HANGARS] = COST_HANGARS_MS,
+		[XWA_MOD_IMPORT_FRONTEND] = menu_mb * COST_MENU_ART_MS,
+		[XWA_MOD_IMPORT_FLIGHT] = flight_mb * COST_FLIGHT_ART_MS,
+		[XWA_MOD_IMPORT_COPIES] = COST_COPIES_MS,
+	};
+	for (int i = 0; i < XWA_MOD_IMPORT_PHASE_COUNT; ++i)
+		Aeron_AtomicStore(&ctx->progress->phase_cost[i], costs[i] < INT_MAX ? (int)costs[i] : INT_MAX);
 }
 
 enum { SKY_MAX_FACE_SIZE = 4096 };
@@ -694,10 +793,8 @@ static void bake_skyboxes(ImportContext* ctx) {
 	size_t size = 0;
 	char* text =
 		PathFormat(path, sizeof path, "%s/skybox_folders.txt", ctx->work) ? ReadWholeFile(path, &size) : NULL;
-	int total = 0, baked = 0;
-	for (const char* c = text; c && *c; ++c)
-		total += *c == '\n';
-	Aeron_AtomicStore(&ctx->progress->total, total);
+	int baked = 0;
+	Aeron_AtomicStore(&ctx->progress->total, count_lines(text));
 	const int jobs = ctx->cores < ENVMAP_MAX_JOBS ? ctx->cores : ENVMAP_MAX_JOBS;
 	for (char* line = text; line && *line && !Import_ShouldStop(ctx);) {
 		char* end = strchr(line, '\n');
@@ -759,6 +856,9 @@ static void bake_skyboxes(ImportContext* ctx) {
 	ToolLog_Write(TOOL_LOG_INFO, "Converted %d skybox and overlay folders", baked);
 }
 
+/* Sets how far the menu art or flight art phase is. */
+static void bake_progress(void* user, int permille) { Import_Advance(user, 0, permille); }
+
 static void bake_frontend(ImportContext* ctx) {
 	BakeSpriteOptions sprites = { .out_root = ctx->options->mod,
 								  .write_ktx2 = true,
@@ -768,7 +868,9 @@ static void bake_frontend(ImportContext* ctx) {
 								  .group_filter = -1 };
 	const BakeXwauOptions options = { .sprites = &sprites,
 									  .xwau_root = ctx->options->source,
-									  .stock_root = ctx->options->game };
+									  .stock_root = ctx->options->game,
+									  .progress = bake_progress,
+									  .progress_user = ctx };
 	BakeXwauStats stats = { 0 };
 	BakeSprites_BeginQueue(ctx->cores);
 	const int baked = BakeXwau_RunFrontend(&options, &stats);
@@ -790,9 +892,12 @@ static void bake_flight(ImportContext* ctx) {
 								  .scale = true,
 								  .bc7_quality = KTX2_BC7_QUALITY_MED,
 								  .group_filter = -1 };
-	const BakeXwauFlightOptions options = {
-		.sprites = &sprites, .xwau_root = ctx->options->source, .planet_max = 0, .threads = ctx->cores
-	};
+	const BakeXwauFlightOptions options = { .sprites = &sprites,
+											.xwau_root = ctx->options->source,
+											.planet_max = 0,
+											.threads = ctx->cores,
+											.progress = bake_progress,
+											.progress_user = ctx };
 	BakeXwauFlightStats stats = { 0 };
 	BakeSprites_BeginQueue(ctx->cores);
 	const int baked = BakeXwau_RunFlight(&options, &stats);
@@ -815,9 +920,14 @@ static void summary(ImportContext* ctx, XwaModImportResult result, uint64_t star
 	static const char* const results[] = { "Import finished", "Import cancelled", "Import stopped" };
 	ToolLog_Write(TOOL_LOG_INFO, "%s in %dm %02ds: %d failures, %d warnings", results[result], seconds / 60,
 				  seconds % 60, Aeron_AtomicLoad(&progress->failures), Aeron_AtomicLoad(&progress->warnings));
-	for (int i = 0; i < XWA_MOD_IMPORT_PHASE_COUNT; ++i)
-		if (progress->phase_ms[i])
+	for (int i = 0; i < XWA_MOD_IMPORT_PHASE_COUNT; ++i) {
+		const int cost = Aeron_AtomicLoad(&progress->phase_cost[i]);
+		if (progress->phase_ms[i] && cost)
+			ToolLog_Write(TOOL_LOG_INFO, "  %s: %.1f s (estimated %.1f s)", kPhaseNames[i],
+						  progress->phase_ms[i] / 1000.0, cost / 1000.0);
+		else if (progress->phase_ms[i])
 			ToolLog_Write(TOOL_LOG_INFO, "  %s: %.1f s", kPhaseNames[i], progress->phase_ms[i] / 1000.0);
+	}
 	if (progress->failed_count)
 		ToolLog_Write(TOOL_LOG_INFO, "Failed:");
 	for (size_t i = 0; i < progress->failed_count; ++i)
@@ -832,6 +942,13 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 	if (!prepare(ctx) || (options->authoring && !ImportAuthoring_Load(authoring, options->authoring)) ||
 		!ImportModels_List(ctx, &models, &count))
 		return XWA_MOD_IMPORT_STOPPED;
+	SetReportProgram("xwau");
+	const bool skyboxes = skybox_list(ctx);
+	if (Import_ShouldStop(ctx)) {
+		ImportModels_Free(models, count);
+		return XWA_MOD_IMPORT_STOPPED;
+	}
+	estimate_costs(ctx, count, skyboxes);
 
 	Import_BeginPhase(ctx, XWA_MOD_IMPORT_MODELS, (int)count);
 	const bool converted = ImportModels_Run(ctx, models, count, options->authoring ? authoring : NULL);
@@ -856,7 +973,6 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 	if (!converted)
 		return XWA_MOD_IMPORT_STOPPED;
 
-	bool skyboxes = false;
 	SetReportProgram("xwau");
 	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_CRAFT, 0);
@@ -864,7 +980,7 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 	}
 	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_MISSIONS, 0);
-		if (!missions(ctx, &skyboxes))
+		if (!missions(ctx))
 			return XWA_MOD_IMPORT_STOPPED;
 	}
 	if (!Import_ShouldStop(ctx)) {

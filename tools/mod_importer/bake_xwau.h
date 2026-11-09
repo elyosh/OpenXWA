@@ -15,6 +15,10 @@ typedef struct BakeXwauOptions {
 	const BakeSpriteOptions* sprites; /* out_root, formats and BC7 quality */
 	const char* xwau_root;            /* the XWAU install */
 	const char* stock_root;           /* the stock ALLIANCE folder */
+	/* Called with how far the bake is, from 0 to 1000, on the calling
+	   thread. Can be NULL. */
+	void (*progress)(void* user, int permille);
+	void* progress_user;
 } BakeXwauOptions;
 
 typedef struct BakeXwauStats {

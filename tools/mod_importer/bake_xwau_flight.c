@@ -1332,10 +1332,25 @@ int BakeXwau_RunFlight(const BakeXwauFlightOptions* opt, BakeXwauFlightStats* st
 	}
 	if (group_count > 1)
 		qsort(groups, (size_t)group_count, sizeof *groups, flight_compare_ints);
+	/* Each group's share of the progress is its pixel count. A few groups,
+	   such as the planets, are much larger than the others. */
+	uint64_t* group_pixels = (uint64_t*)calloc((size_t)group_count + 1, sizeof *group_pixels);
+	uint64_t total_pixels = 0, done_pixels = 0;
+	for (int g = 0; group_pixels && g < group_count; ++g) {
+		for (int f = 0; f < ctx.dat_count; ++f)
+			group_pixels[g] += XwauDat_GroupPixels(ctx.dats[f].dat, groups[g]);
+		total_pixels += group_pixels[g];
+	}
 	/* The bake stops at the first failure, including an image that failed in
 	   the encode queue. */
-	for (int g = 0; g < group_count && stats->failures == 0 && BakeSprites_QueueFailures() == 0; ++g)
+	for (int g = 0; g < group_count && stats->failures == 0 && BakeSprites_QueueFailures() == 0; ++g) {
 		flight_bake_group(&ctx, groups[g]);
+		if (opt->progress && group_pixels && total_pixels) {
+			done_pixels += group_pixels[g];
+			opt->progress(opt->progress_user, (int)(done_pixels * 1000 / total_pixels));
+		}
+	}
+	free(group_pixels);
 	for (int k = 0; k < ctx.mission_art_count && stats->failures == 0 && BakeSprites_QueueFailures() == 0;
 		 ++k)
 		flight_bake_mission_art(&ctx, &ctx.mission_art[k]);
