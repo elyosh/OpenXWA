@@ -707,10 +707,11 @@ typedef struct XwaCockpit {
 	int8_t stick_axis[3];
 } XwaCockpit;
 
-/* A cockpit light (g_cockpitLights): one of the six blinking point lights
- * at the eye of the player's seat (XwaCockpit.seat_eye_local). The HUD
- * warnings and the hyperspace code turn them on and off. The renderer
- * replays the classic blink cycle and fade from game_time_ticks. */
+/* A cockpit light (g_cockpitLights): one of the blinking warning lights
+ * at the eye of the player's seat (XwaCockpit.seat_eye_local):
+ * hull_critical, warhead_lock and beam_warning. The HUD warnings turn them
+ * on and off. The renderer replays the classic blink cycle and fade from
+ * game_time_ticks. */
 typedef struct XwaCockpitLight {
 	uint8_t enabled;
 	int32_t start_time; /* g_gameTime base */
@@ -733,7 +734,7 @@ typedef struct XwaCockpitLight {
 	float mod_color[3];
 	float mod_power_w;
 } XwaCockpitLight;
-#define XWA_SNAP_COCKPIT_LIGHT_COUNT 6
+#define XWA_SNAP_COCKPIT_LIGHT_COUNT 3
 
 /* The player craft's headlight (headlights.h): a one-sided light along the
  * nose, from the seat's eye plus `position_m` along the craft's axes (X

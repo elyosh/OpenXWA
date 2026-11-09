@@ -537,12 +537,6 @@ point_lights:
       power_w: 40
     beam_warning:
       power_w: 50
-    hyperspace_jump:
-      power_w: 1024
-    hyperspace_transfer:
-      power_w: 128
-    hyperspace_arrival:
-      power_w: 1024
 classic_lighting:
   # Converts the classic game's lights (suns and other backdrops, the game's
   # lights in the hangar, lasers, explosions, engines), which have no unit.

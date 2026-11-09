@@ -1,15 +1,15 @@
 #ifndef XWA_RUNTIME_MODELS_COCKPIT_LIGHTS_H
 #define XWA_RUNTIME_MODELS_COCKPIT_LIGHTS_H
 
-/* Cockpit lights: the game blinks six coloured lights at the eye of
- * the player's seat (FlightLight_InitCockpitLights). The HD renderer
- * shows each one as a Blender point light: P watts give P * 683 / (4 pi)
+/* Cockpit lights: the game blinks warning lights at the eye of the
+ * player's seat (FlightLight_InitCockpitLights). The HD renderer shows
+ * each one as a Blender point light: P watts give P * 683 / (4 pi)
  * candela in every direction. The default values are in
- * `point_lights.cockpit_lights` of resources/remaster/config.yaml.
- * A mod can change them in the `cockpit_lights` section of its flight
- * settings. Each key that the mod sets replaces the default. The section is
- * read once at startup. The game still decides when a light is on and how
- * it blinks. The game's own code and the classic renderers still use the
+ * `point_lights.cockpit_lights` of resources/remaster/config.yaml. A mod
+ * can change them in the `cockpit_lights` section of its flight settings.
+ * Each key that the mod sets replaces the default. The section is read
+ * once at startup. The game still decides when a light is on and how it
+ * blinks. The game's own code and the classic renderers still use the
  * game's lights, so these settings only change what the HD renderer
  * shows. */
 

@@ -766,7 +766,7 @@ Without the section, the camera shake is on. The player can turn it off with
 
 ### cockpit_lights
 
-The game blinks six coloured lights in the cockpit, at the pilot's eye.
+The game blinks three warning lights in the cockpit, at the pilot's eye.
 Modern graphics show each one as a point light. OpenXWA has default values
 for these lights, and this section changes them. The game still decides
 when each light is on and how it blinks.
@@ -789,9 +789,6 @@ The lights are:
 | `hull_critical` | The shields are down and less than a third of the hull is left. |
 | `warhead_lock` | An enemy locks a warhead on the craft. |
 | `beam_warning` | A tractor beam or a jamming beam targets the craft. |
-| `hyperspace_jump` | The jump to hyperspace starts. |
-| `hyperspace_transfer` | The jump between regions. |
-| `hyperspace_arrival` | The craft leaves hyperspace. |
 
 Each light can have these keys:
 

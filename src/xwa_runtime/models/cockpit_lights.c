@@ -12,8 +12,9 @@
 
 /* The names of the cockpit lights, by slot. */
 static const char* const kCockpitLightNames[XWA_SNAP_COCKPIT_LIGHT_COUNT] = {
-	"hull_critical",   "warhead_lock",        "beam_warning",
-	"hyperspace_jump", "hyperspace_transfer", "hyperspace_arrival",
+	"hull_critical",
+	"warhead_lock",
+	"beam_warning",
 };
 
 /* The values that the mod sets for a light. The renderer uses its

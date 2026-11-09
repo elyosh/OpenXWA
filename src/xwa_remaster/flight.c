@@ -845,15 +845,15 @@ static int fl_read_cockpit_light_vector(const AeronConfigNode* entry, const char
 	return 1;
 }
 
-/* Reads the default values of the six cockpit lights from
-   point_lights.cockpit_lights. All six lights must be there, each
+/* Reads the default values of the cockpit lights from
+   point_lights.cockpit_lights. All three lights must be there, each
    with power_w. Logs an error and returns 0 when the section is wrong. */
 static int fl_load_cockpit_lights_config(const AeronConfigFile* cf, const char* path) {
 	const AeronConfigNode* section = AeronConfigFile_GetNode(cf, "point_lights.cockpit_lights");
 	uint32_t found = 0;
 	memset(s.plight.cockpit_lights, 0, sizeof s.plight.cockpit_lights);
 	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.remaster", "%s: point_lights.cockpit_lights must be a map of the six lights",
+		Aeron_LogError("xwa.remaster", "%s: point_lights.cockpit_lights must be a map of the three lights",
 					   path);
 		return 0;
 	}
@@ -4363,8 +4363,7 @@ static void fl_seat_eye_transform(const XwaSnapshot* snap, const float player_bw
 /* Adds the cockpit lights. Each one blinks with the classic cycle and fade
  * (FlightLight_AppendCockpitLights), replayed from the simulation clock. It
  * sits at the eye of the player's seat, and the player's basis carries it
- * to the world. Callers can leave out the slots in `excluded_slots`, when a
- * dedicated HD scene replaces them.
+ * to the world.
  *
  * When model lights are on, each light is a Blender point light of P watts,
  * which gives P * 683 / (4 pi) candela. Its values come from
@@ -4372,7 +4371,7 @@ static void fl_seat_eye_transform(const XwaSnapshot* snap, const float player_bw
  * (XwaCockpitLight.mod_*) replaces the default. The pool always keeps these
  * lights. When model lights are off, each light is the game's light. */
 static void fl_add_cockpit_lights(const XwaSnapshot* snap, const float player_bw[9],
-								  const float player_pos[3], uint32_t excluded_slots) {
+								  const float player_pos[3]) {
 	if (!s.plight.enabled || !snap->cockpit_lights_active || !player_bw) {
 		return;
 	}
@@ -4380,9 +4379,6 @@ static void fl_add_cockpit_lights(const XwaSnapshot* snap, const float player_bw
 	fl_seat_eye_transform(snap, player_bw, player_pos, transform);
 	const float world[3] = { transform[3], transform[7], transform[11] };
 	for (int p = 0; p < XWA_SNAP_COCKPIT_LIGHT_COUNT; p++) {
-		if (excluded_slots & (1u << (uint32_t)p)) {
-			continue;
-		}
 		const XwaCockpitLight* pl = &snap->cockpit_lights[p];
 		if (!pl->enabled) {
 			continue;
@@ -5479,11 +5475,6 @@ static void fl_add_ambient_cube(XwaShipAmbientCube* base, const XwaShipAmbientCu
  * covers the cockpit. It grows to cover the whole player craft. */
 #define FL_HYPERSPACE_KEEP_DISTANCE_M 5.0f
 
-/* The hyperspace cockpit lights (slots 3 to 5: jump, transfer and
- * arrival). The HD hyperspace scene replaces them with the light of the
- * tunnel and the streaks. */
-#define FL_HYPERSPACE_COCKPIT_LIGHTS ((1u << 3) | (1u << 4) | (1u << 5))
-
 static float fl_smoothstep(float edge0, float edge1, float x) {
 	const float u = fl_clampf((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
 	return u * u * (3.0f - 2.0f * u);
@@ -6035,7 +6026,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	AeronScene_SetMotionContext(s.scene, NULL, 1);
 
 	if (player_found && player_f) {
-		fl_add_cockpit_lights(snap, player_bw, player_local, FL_HYPERSPACE_COCKPIT_LIGHTS);
+		fl_add_cockpit_lights(snap, player_bw, player_local);
 	}
 	fl_finalize_point_lights();
 	if (!fl_configure_clustered_lights(s.scene)) {
@@ -7331,8 +7322,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * the walk), then the finalized candidates into the light pool
 	 * (submitted with the cockpit's lights) + the lit PBR env. */
 	if (player_found && player_f) {
-		fl_add_cockpit_lights(snap, player_bw, player_local,
-							  cam->hyperspace_phase ? FL_HYPERSPACE_COCKPIT_LIGHTS : 0u);
+		fl_add_cockpit_lights(snap, player_bw, player_local);
 		fl_add_headlight(snap, player_bw, player_local);
 	}
 	fl_finalize_point_lights();
