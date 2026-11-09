@@ -38,12 +38,14 @@ void XwaRemasterSkins_Free(XwaRemasterSkinModel* skin);
    their count. */
 uint32_t XwaRemasterSkins_MarkingsVariants(const XwaRemasterSkinModel* skin, const XwaSnapshot* snapshot,
 										   uint32_t variants[XWA_REMASTER_MAX_MARKINGS]);
-/* A hash of `count` markings variants, to tell when a mesh's change. */
+/* A hash of `count` markings variants, to tell when the variants of a mesh
+   change. */
 uint64_t XwaRemasterSkins_MarkingsVariantsHash(const uint32_t* variants, uint32_t count);
 
-/* Misses: an instance whose markings value its mesh was not created for
-   shows the highest one's variant; the first per mesh is logged, to find
-   markings values the uses missed. */
+/* Misses: an instance with markings that its mesh wasn't created for shows
+   the variant of the highest markings value instead. The first miss of each
+   mesh is logged, to find markings values that the uses missed. The check
+   costs one comparison, and only a miss searches the table. */
 void XwaRemasterSkins_NoteMesh(const AeronSceneMesh* mesh, const char* key, uint32_t markings_count);
 void XwaRemasterSkins_ForgetMesh(const AeronSceneMesh* mesh);
 void XwaRemasterSkins_CheckMarkings(const AeronSceneMesh* mesh, uint32_t markings);

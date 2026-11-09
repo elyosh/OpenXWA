@@ -175,7 +175,13 @@ void XwaRemasterSkins_ForgetMesh(const AeronSceneMesh* mesh) {
 }
 
 void XwaRemasterSkins_CheckMarkings(const AeronSceneMesh* mesh, uint32_t markings) {
-	for (uint32_t i = 0; mesh && i < SKINS_MAX_MESHES; i++) {
+	/* A mesh with skins was created for markings 0 to variant_rows - 1, and
+	   a mesh without skins has variant_count 0. So only a miss needs the
+	   table, for the model name and the flag that logs it once. */
+	if (!mesh || mesh->variant_count == 0 || markings < mesh->variant_rows) {
+		return;
+	}
+	for (uint32_t i = 0; i < SKINS_MAX_MESHES; i++) {
 		SkinsMesh* entry = &s_meshes[i];
 		if (entry->mesh == mesh) {
 			if (markings >= entry->markings_count && !entry->miss_logged) {
