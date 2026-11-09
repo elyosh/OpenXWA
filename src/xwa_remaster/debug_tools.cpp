@@ -32,6 +32,7 @@
 #include "aeron/time.h"
 #include "xwa/flight/flight_debug.h"
 #include "xwa_runtime/models/cockpit_eye.h"
+#include "xwa_runtime/models/cockpit_lights.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
@@ -533,6 +534,16 @@ static void xwa_tool_point_lights(int* open, void* user) {
 	}
 	ImGui::TextDisabled("Multiplies the models' lights (not the headlight), to find their\n"
 						"calibration by eye. Not saved.");
+	if (ImGui::TreeNode("Cockpit lights")) {
+		for (int slot = 0; slot < XWA_SNAP_COCKPIT_LIGHT_COUNT; slot++) {
+			const char* name = XwaCockpitLights_Name(slot);
+			changed |= ImGui::SliderFloat(name ? name : "?", &p.cockpit_lights[slot].power_w, 0.0f, 100000.0f,
+										  "%.1f W", ImGuiSliderFlags_Logarithmic);
+		}
+		ImGui::TextDisabled("The default power of each light. It is used when\n"
+							"model lights are on. A mod's power_w replaces it.");
+		ImGui::TreePop();
+	}
 
 	ImGui::Separator();
 	if (ImGui::Button("Reset to defaults")) {

@@ -43,7 +43,7 @@ sections:
 | `object_limits` | how many craft, shots, explosions and radar blips a mission can have |
 | `camera` | the lag and tilt of the exterior camera, the cockpit sway and the HUD in the exterior view |
 | `camera_shake` | the camera's shake and jolt in the player's hyperspace jumps |
-| `cockpit_alert_lights` | the blinking alert lights in the cockpit |
+| `cockpit_lights` | the lights that blink in the cockpit |
 | `particle_lights` | the lights of sparks, smoke and other effects on craft |
 | `backdrops` | extra planet backdrops for missions |
 | `suns` | the procedural suns and their lens flare |
@@ -764,14 +764,15 @@ camera_shake:
 Without the section, the camera shake is on. The player can turn it off with
 **Camera Shake** in the options. The player's choice wins over the mod.
 
-### cockpit_alert_lights
+### cockpit_lights
 
 The game blinks six coloured lights in the cockpit, at the pilot's eye.
-This section replaces those lights in modern graphics. The game still
-decides when each light is on and how it blinks.
+Modern graphics show each one as a point light. OpenXWA has default values
+for these lights, and this section changes them. The game still decides
+when each light is on and how it blinks.
 
 ```yaml
-cockpit_alert_lights:
+cockpit_lights:
   hull_critical:
     position_m: [0, 0.3, 0.6]
     color: [1, 0, 0]
@@ -792,17 +793,17 @@ The lights are:
 | `hyperspace_transfer` | The jump between regions. |
 | `hyperspace_arrival` | The craft leaves hyperspace. |
 
-Each light has these keys:
+Each light can have these keys:
 
 | Key | Meaning |
 |-|-|
-| `position_m` | Where the light is, in metres from the pilot's eye: X right, Y up, Z forward. The default is the eye. |
-| `color` | The light's colour, linear, with no value below 0. The default is the game's colour. |
-| `power_w` | Required. The light's power in watts, above 0, as for a Blender point light. |
+| `position_m` | Where the light is, in metres from the pilot's eye: X right, Y up, Z forward. |
+| `color` | The light's colour, as three linear values of 0 or more. |
+| `power_w` | The light's power in watts, as for a Blender point light. 0 turns the light off. |
 
-A light that the section doesn't list keeps the game's light. A light with
-a wrong value also keeps the game's light, and the game writes an error in
-the log.
+All the keys are optional. When you leave a key out, the light uses
+OpenXWA's default value for it. If a light has a wrong value, the game
+ignores all the keys of that light and writes an error in the log.
 
 ### particle_lights
 

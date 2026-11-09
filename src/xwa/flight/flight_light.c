@@ -40,9 +40,9 @@ int g_scenePointLightCount;
 // GLOBAL: XWA 0x7FA360
 PointLight g_scenePointLights[XWA_SCENE_POINT_LIGHT_COUNT];
 // GLOBAL: XWA 0x7CA224
-int g_localPlayerLightPulseActive;
+int g_cockpitLightsActive;
 // GLOBAL: XWA 0x91ABA0
-LocalPlayerLightPulse g_localPlayerLightPulses[XWA_LOCAL_PLAYER_LIGHT_PULSE_COUNT];
+CockpitLight g_cockpitLights[COCKPIT_LIGHT_COUNT];
 // GLOBAL: XWA 0x63D098
 ObjectRecord* g_swFaceLightCachedObject;
 // GLOBAL: XWA 0x63D0A0
@@ -334,86 +334,86 @@ unsigned int FlightLight_AddCurrentRegionBackdropLights(void) {
 }
 
 // FUNCTION: XWA 0x4F3670
-void FlightLight_InitLocalPlayerPulses(void) {
-	g_localPlayerLightPulseActive = 0;
+void FlightLight_InitCockpitLights(void) {
+	g_cockpitLightsActive = 0;
 
-	g_localPlayerLightPulses[0].startTime = 0;
-	g_localPlayerLightPulses[0].enabled = 0;
-	g_localPlayerLightPulses[0].cycleTicks = 236.0f;
-	g_localPlayerLightPulses[0].invCycleTicks = 0.0042372881f;
-	g_localPlayerLightPulses[0].fadeTicks = 0.75f;
-	g_localPlayerLightPulses[0].field12 = 1.0f;
-	g_localPlayerLightPulses[0].colorR = 1.0f;
-	g_localPlayerLightPulses[0].colorG = 0.0f;
-	g_localPlayerLightPulses[0].colorB = 0.0f;
-	g_localPlayerLightPulses[0].intensity = 50.0f;
-	g_localPlayerLightPulses[0].cullRadius = 256.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].startTime = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].cycleTicks = 236.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].invCycleTicks = 0.0042372881f;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].fadeTicks = 0.75f;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].field12 = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].colorR = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].colorG = 0.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].colorB = 0.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].intensity = 50.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].cullRadius = 256.0f;
 
-	g_localPlayerLightPulses[1].startTime = 0;
-	g_localPlayerLightPulses[1].enabled = 0;
-	g_localPlayerLightPulses[1].cycleTicks = 177.0f;
-	g_localPlayerLightPulses[1].invCycleTicks = 0.0056497175f;
-	g_localPlayerLightPulses[1].fadeTicks = 0.25f;
-	g_localPlayerLightPulses[1].field12 = 1.0f;
-	g_localPlayerLightPulses[1].colorR = 0.69999999f;
-	g_localPlayerLightPulses[1].colorG = 0.80000001f;
-	g_localPlayerLightPulses[1].colorB = 0.1f;
-	g_localPlayerLightPulses[1].intensity = 40.0f;
-	g_localPlayerLightPulses[1].cullRadius = 256.0f;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].startTime = 0;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].cycleTicks = 177.0f;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].invCycleTicks = 0.0056497175f;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].fadeTicks = 0.25f;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].field12 = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].colorR = 0.69999999f;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].colorG = 0.80000001f;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].colorB = 0.1f;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].intensity = 40.0f;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].cullRadius = 256.0f;
 
-	g_localPlayerLightPulses[2].startTime = 0;
-	g_localPlayerLightPulses[2].enabled = 0;
-	g_localPlayerLightPulses[2].cycleTicks = 354.0f;
-	g_localPlayerLightPulses[2].invCycleTicks = 0.0028248588f;
-	g_localPlayerLightPulses[2].fadeTicks = 0.5f;
-	g_localPlayerLightPulses[2].field12 = 1.0f;
-	g_localPlayerLightPulses[2].colorR = 0.1f;
-	g_localPlayerLightPulses[2].colorG = 0.2f;
-	g_localPlayerLightPulses[2].colorB = 1.0f;
-	g_localPlayerLightPulses[2].intensity = 50.0f;
-	g_localPlayerLightPulses[2].cullRadius = 256.0f;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].startTime = 0;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].cycleTicks = 354.0f;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].invCycleTicks = 0.0028248588f;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].fadeTicks = 0.5f;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].field12 = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].colorR = 0.1f;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].colorG = 0.2f;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].colorB = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].intensity = 50.0f;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].cullRadius = 256.0f;
 
-	g_localPlayerLightPulses[3].startTime = 0;
-	g_localPlayerLightPulses[3].enabled = 0;
-	g_localPlayerLightPulses[3].cycleTicks = 1180.0f;
-	g_localPlayerLightPulses[3].invCycleTicks = 0.00084745762f;
-	g_localPlayerLightPulses[3].fadeTicks = 1.0f;
-	g_localPlayerLightPulses[3].field12 = 1.0f;
-	g_localPlayerLightPulses[3].colorR = 1.0f;
-	g_localPlayerLightPulses[3].colorG = 1.0f;
-	g_localPlayerLightPulses[3].colorB = 1.0f;
-	g_localPlayerLightPulses[3].intensity = 1024.0f;
-	g_localPlayerLightPulses[3].cullRadius = 256.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].startTime = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].cycleTicks = 1180.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].invCycleTicks = 0.00084745762f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].fadeTicks = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].field12 = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].colorR = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].colorG = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].colorB = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].intensity = 1024.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].cullRadius = 256.0f;
 
-	g_localPlayerLightPulses[4].startTime = 0;
-	g_localPlayerLightPulses[4].enabled = 0;
-	g_localPlayerLightPulses[4].cycleTicks = 35.400002f;
-	g_localPlayerLightPulses[4].invCycleTicks = 0.028248586f;
-	g_localPlayerLightPulses[4].fadeTicks = 0.25f;
-	g_localPlayerLightPulses[4].field12 = 1.0f;
-	g_localPlayerLightPulses[4].colorR = 0.0f;
-	g_localPlayerLightPulses[4].colorG = 0.1f;
-	g_localPlayerLightPulses[4].colorB = 1.0f;
-	g_localPlayerLightPulses[4].intensity = 128.0f;
-	g_localPlayerLightPulses[4].cullRadius = 256.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].startTime = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].cycleTicks = 35.400002f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].invCycleTicks = 0.028248586f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].fadeTicks = 0.25f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].field12 = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].colorR = 0.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].colorG = 0.1f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].colorB = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].intensity = 128.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].cullRadius = 256.0f;
 
-	g_localPlayerLightPulses[5].startTime = 0;
-	g_localPlayerLightPulses[5].enabled = 0;
-	g_localPlayerLightPulses[5].cycleTicks = 472.0f;
-	g_localPlayerLightPulses[5].invCycleTicks = 0.0021186441f;
-	g_localPlayerLightPulses[5].fadeTicks = 1.0f;
-	g_localPlayerLightPulses[5].field12 = 1.0f;
-	g_localPlayerLightPulses[5].colorR = 1.0f;
-	g_localPlayerLightPulses[5].colorG = 1.0f;
-	g_localPlayerLightPulses[5].colorB = 1.0f;
-	g_localPlayerLightPulses[5].intensity = 1024.0f;
-	g_localPlayerLightPulses[5].cullRadius = 256.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].startTime = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].cycleTicks = 472.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].invCycleTicks = 0.0021186441f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].fadeTicks = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].field12 = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].colorR = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].colorG = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].colorB = 1.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].intensity = 1024.0f;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].cullRadius = 256.0f;
 }
 
 // FUNCTION: XWA 0x4F38D0
-void FlightLight_AppendLocalPlayerPulses(void) {
+void FlightLight_AppendCockpitLights(void) {
 	int outLightCount;
-	int pulseIdx;
+	int lightIdx;
 	PointLight* pointLight;
 	double elapsedTicks;
 	double cyclePhaseDouble;
@@ -425,15 +425,14 @@ void FlightLight_AppendLocalPlayerPulses(void) {
 	int playerIdx;
 
 	outLightCount = g_objectPointLightCount;
-	for (pulseIdx = 0;
-		 pulseIdx < XWA_LOCAL_PLAYER_LIGHT_PULSE_COUNT && outLightCount != XWA_OBJECT_POINT_LIGHT_COUNT;
-		 ++pulseIdx) {
-		if (g_localPlayerLightPulses[pulseIdx].enabled != 0) {
-			invCycleTicks = g_localPlayerLightPulses[pulseIdx].invCycleTicks;
-			fadeTicks = g_localPlayerLightPulses[pulseIdx].fadeTicks;
-			elapsedTicks = (double)(g_gameTime - g_localPlayerLightPulses[pulseIdx].startTime);
+	for (lightIdx = 0; lightIdx < COCKPIT_LIGHT_COUNT && outLightCount != XWA_OBJECT_POINT_LIGHT_COUNT;
+		 ++lightIdx) {
+		if (g_cockpitLights[lightIdx].enabled != 0) {
+			invCycleTicks = g_cockpitLights[lightIdx].invCycleTicks;
+			fadeTicks = g_cockpitLights[lightIdx].fadeTicks;
+			elapsedTicks = (double)(g_gameTime - g_cockpitLights[lightIdx].startTime);
 			cyclePhaseDouble = elapsedTicks - (double)(int)(elapsedTicks * invCycleTicks) *
-												  g_localPlayerLightPulses[pulseIdx].cycleTicks;
+												  g_cockpitLights[lightIdx].cycleTicks;
 			cyclePhase = cyclePhaseDouble * invCycleTicks;
 
 			if (cyclePhase > 0.5f) {
@@ -462,17 +461,17 @@ void FlightLight_AppendLocalPlayerPulses(void) {
 			}
 
 			pointLight = &g_objectPointLights[outLightCount];
-			pointLight->intensity = g_localPlayerLightPulses[pulseIdx].intensity * fadeScale;
+			pointLight->intensity = g_cockpitLights[lightIdx].intensity * fadeScale;
 			if (!g_useHardware3D) {
 				pointLight->intensity *= 0.2f;
 			}
 
-			pointLight->cullRadius = (int)(g_localPlayerLightPulses[pulseIdx].cullRadius * fadeScale);
+			pointLight->cullRadius = (int)(g_cockpitLights[lightIdx].cullRadius * fadeScale);
 			playerIdx = g_localPlayer;
-			pointLight->field20 = g_localPlayerLightPulses[pulseIdx].field12;
-			pointLight->colorR = g_localPlayerLightPulses[pulseIdx].colorR;
-			pointLight->colorG = g_localPlayerLightPulses[pulseIdx].colorG;
-			pointLight->colorB = g_localPlayerLightPulses[pulseIdx].colorB;
+			pointLight->field20 = g_cockpitLights[lightIdx].field12;
+			pointLight->colorR = g_cockpitLights[lightIdx].colorR;
+			pointLight->colorG = g_cockpitLights[lightIdx].colorG;
+			pointLight->colorB = g_cockpitLights[lightIdx].colorB;
 
 			pointLight->fixed.x = (int)g_players[playerIdx].seatEyeLocalX;
 			pointLight->fixed.y = (int)g_players[playerIdx].seatEyeLocalY;
@@ -488,22 +487,24 @@ void FlightLight_AppendLocalPlayerPulses(void) {
 }
 
 // FUNCTION: XWA 0x4F35C0
-void FlightLight_SetLocalPlayerPulseEnabled(int pulseSlot, int enabled) {
+void FlightLight_SetCockpitLightEnabled(CockpitLightSlot slot, int enabled) {
 	int activeWasZero;
 
 	if (enabled) {
-		if (!g_localPlayerLightPulseActive) {
-			g_localPlayerLightPulseActive = 1;
+		if (!g_cockpitLightsActive) {
+			g_cockpitLightsActive = 1;
 		}
-		g_localPlayerLightPulses[pulseSlot].enabled = 1;
+		g_cockpitLights[slot].enabled = 1;
 	} else {
-		activeWasZero = g_localPlayerLightPulseActive == 0;
-		g_localPlayerLightPulses[pulseSlot].enabled = 0;
-		if (!activeWasZero && g_localPlayerLightPulses[0].enabled + g_localPlayerLightPulses[1].enabled +
-									  g_localPlayerLightPulses[2].enabled ==
-								  g_localPlayerLightPulses[3].enabled + g_localPlayerLightPulses[4].enabled +
-									  g_localPlayerLightPulses[5].enabled) {
-			g_localPlayerLightPulseActive = 0;
+		activeWasZero = g_cockpitLightsActive == 0;
+		g_cockpitLights[slot].enabled = 0;
+		if (!activeWasZero && g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].enabled +
+									  g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].enabled +
+									  g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].enabled ==
+								  g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].enabled +
+									  g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].enabled +
+									  g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].enabled) {
+			g_cockpitLightsActive = 0;
 		}
 	}
 }
@@ -1012,9 +1013,9 @@ void FlightLight_BuildObjectPointLights(ObjectRecord* obj) {
 
 		objectIndex = g_players[g_localPlayer].objectIndex;
 		g_objectPointLightCount = outLightCount;
-		if (obj == &g_objectTable[objectIndex] && g_localPlayerLightPulseActive &&
+		if (obj == &g_objectTable[objectIndex] && g_cockpitLightsActive &&
 			outLightCount != XWA_OBJECT_POINT_LIGHT_COUNT) {
-			FlightLight_AppendLocalPlayerPulses();
+			FlightLight_AppendCockpitLights();
 		}
 	}
 }

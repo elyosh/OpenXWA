@@ -698,8 +698,7 @@ typedef struct XwaCockpit {
 	float camera_pan[3]; /* viewState.cameraPanDelta* (classic scales by 1/16) */
 	/* The same eye point in the CRAFT's model space (player.seatEyeLocal*,
 	 * FlightView_ComputeSeatEyeOffset): the cockpit eye, or the turret
-	 * seat's position. The classic anchors the weapon-fire pulse point
-	 * lights here. */
+	 * seat's position. The cockpit lights are here. */
 	float seat_eye_local[3];
 	/* The stick input that the simulation applied to the local player
 	 * (g_replayInputs): X, Y and roll, about -127 to 127, with X+ right and
@@ -708,12 +707,11 @@ typedef struct XwaCockpit {
 	int8_t stick_axis[3];
 } XwaCockpit;
 
-/* Local-player weapon-fire light pulses (g_localPlayerLightPulses):
- * time-animated point lights at the eye point of the player's seat
- * (XwaCockpit.seat_eye_local), toggled by the
- * firing code. The driver replays the classic cycle/fade envelope
- * from game_time_ticks (deterministic). */
-typedef struct XwaLightPulse {
+/* A cockpit light (g_cockpitLights): one of the six blinking point lights
+ * at the eye of the player's seat (XwaCockpit.seat_eye_local). The HUD
+ * warnings and the hyperspace code turn them on and off. The renderer
+ * replays the classic blink cycle and fade from game_time_ticks. */
+typedef struct XwaCockpitLight {
 	uint8_t enabled;
 	int32_t start_time; /* g_gameTime base */
 	float cycle_ticks;
@@ -722,18 +720,20 @@ typedef struct XwaLightPulse {
 	float intensity;
 	float cull_radius;
 	float color[3];
-	/* The mod's light in place of this one (cockpit_alert_lights.h): a
-	 * Blender point light of `mod_power_w` watts, `mod_position_m` from
-	 * the seat's eye along the craft's axes (X right, Y up, Z forward).
-	 * `mod_color` is linear; without `mod_has_color`, the light has the
-	 * game's colour. */
-	uint8_t mod_defined;
+	/* The values that the mod's cockpit_lights section sets for this
+	 * light (cockpit_lights.h). Each one has a `mod_has_*` flag. The
+	 * HD renderer uses its defaults for the values that the mod doesn't
+	 * set. The light is a Blender point light of `mod_power_w` watts, at
+	 * `mod_position_m` from the seat's eye along the craft's axes (X right,
+	 * Y up, Z forward). `mod_color` is linear. */
+	uint8_t mod_has_position;
 	uint8_t mod_has_color;
+	uint8_t mod_has_power;
 	float mod_position_m[3];
 	float mod_color[3];
 	float mod_power_w;
-} XwaLightPulse;
-#define XWA_SNAP_MAX_LIGHT_PULSES 6
+} XwaCockpitLight;
+#define XWA_SNAP_COCKPIT_LIGHT_COUNT 6
 
 /* The player craft's headlight (headlights.h): a one-sided light along the
  * nose, from the seat's eye plus `position_m` along the craft's axes (X
@@ -1416,8 +1416,8 @@ typedef struct XwaSnapshot {
 	uint32_t hyperspace_streak_count;
 	XwaCockpit cockpit;
 	uint8_t cockpit_valid;
-	XwaLightPulse light_pulses[XWA_SNAP_MAX_LIGHT_PULSES];
-	uint8_t light_pulse_active;
+	XwaCockpitLight cockpit_lights[XWA_SNAP_COCKPIT_LIGHT_COUNT];
+	uint8_t cockpit_lights_active;
 	XwaHeadlight headlight;
 	XwaSunSettings suns;
 	XwaParticleLight particle_lights[XWA_PARTICLE_LIGHT_GROUP_COUNT];

@@ -10326,7 +10326,7 @@ void Hud_UpdateThreatIndicators(void) {
 		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotBeam, (uint16_t)beamThreatState);
 	}
 
-	FlightLight_SetLocalPlayerPulseEnabled(2, (uint16_t)beamThreatState);
+	FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_BEAM_WARNING, (uint16_t)beamThreatState);
 	if (g_incomingMissileWarningFlashActive) {
 		if (g_useHardware3D) {
 			Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotWarhead, 2);
@@ -10345,7 +10345,7 @@ void Hud_UpdateThreatIndicators(void) {
 		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotWarhead, g_incomingMissileWarningState);
 	}
 
-	FlightLight_SetLocalPlayerPulseEnabled(1, g_incomingMissileWarningState);
+	FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_WARHEAD_LOCK, g_incomingMissileWarningState);
 	{
 		CraftData* localCraft;
 		uint32_t hullDamageBucket;
@@ -10362,9 +10362,9 @@ void Hud_UpdateThreatIndicators(void) {
 		}
 
 		if (shieldTotal < 0x64u && hullDamageBucket == 2) {
-			FlightLight_SetLocalPlayerPulseEnabled(0, 1);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HULL_CRITICAL, 1);
 		} else {
-			FlightLight_SetLocalPlayerPulseEnabled(0, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HULL_CRITICAL, 0);
 		}
 	}
 }

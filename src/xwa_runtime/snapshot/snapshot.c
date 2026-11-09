@@ -16,7 +16,7 @@
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/models/articulation.h"
-#include "xwa_runtime/models/cockpit_alert_lights.h"
+#include "xwa_runtime/models/cockpit_lights.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/headlights.h"
@@ -1972,11 +1972,11 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->brightness_q8 = (uint16_t)g_flightBrightnessScaleQ8;
 	s->flight_camera_valid = 1;
 
-	/* Local-player weapon-fire light pulses (point-light channel). */
-	s->light_pulse_active = (uint8_t)(g_localPlayerLightPulseActive != 0);
-	for (int p = 0; p < XWA_SNAP_MAX_LIGHT_PULSES; p++) {
-		const LocalPlayerLightPulse* src = &g_localPlayerLightPulses[p];
-		XwaLightPulse* dst = &s->light_pulses[p];
+	/* The cockpit lights. */
+	s->cockpit_lights_active = (uint8_t)(g_cockpitLightsActive != 0);
+	for (int p = 0; p < XWA_SNAP_COCKPIT_LIGHT_COUNT; p++) {
+		const CockpitLight* src = &g_cockpitLights[p];
+		XwaCockpitLight* dst = &s->cockpit_lights[p];
 		dst->enabled = (uint8_t)(src->enabled != 0);
 		dst->start_time = src->startTime;
 		dst->cycle_ticks = src->cycleTicks;
@@ -1989,7 +1989,7 @@ void XwaSnapshot_CaptureFlight(void) {
 		dst->color[2] = src->colorB;
 	}
 
-	XwaCockpitAlertLights_Capture(s);
+	XwaCockpitLights_Capture(s);
 	XwaHeadlights_Capture(s);
 	{
 		XwaModernSunOptions sun_options;

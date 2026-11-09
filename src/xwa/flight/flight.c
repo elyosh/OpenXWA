@@ -4713,9 +4713,9 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 		if (craftState != CRAFT_STATE_ENTERING_HYPERSPACE) {
 			g_players[playerIdx].hyperspacePhase = PLAYER_HYPERSPACE_PHASE_NONE;
 			if (playerIdx == (unsigned int)g_localPlayer) {
-				FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-				FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-				FlightLight_SetLocalPlayerPulseEnabled(3, 0);
+				FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+				FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+				FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 0);
 			}
 		}
 	}
@@ -4801,9 +4801,9 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					Craft_ClearEffectiveAiObjectLink(craft);
 					g_players[playerIdx].hyperspacePhase = PLAYER_HYPERSPACE_PHASE_NONE;
 					if (playerIdx == (unsigned int)g_localPlayer) {
-						FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-						FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-						FlightLight_SetLocalPlayerPulseEnabled(3, 0);
+						FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+						FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+						FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 0);
 					}
 					Mission_ProcessFlightGroupWaveCompletion(flightGroupIdx);
 
@@ -4824,9 +4824,9 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 				} else {
 					// Transition into the inter-region transfer phase.
 					if (playerIdx == (unsigned int)g_localPlayer) {
-						FlightLight_SetLocalPlayerPulseEnabled(4, 1);
-						FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-						FlightLight_SetLocalPlayerPulseEnabled(3, 0);
+						FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 1);
+						FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+						FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 0);
 					}
 					g_players[playerIdx].hyperspacePhase = PLAYER_HYPERSPACE_REGION_TRANSFER;
 					g_players[playerIdx].hyperspaceRuntime.phaseElapsedTicks = 0;
@@ -4901,9 +4901,9 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 				g_objectTable[objIdx].mobj->moveVectorDirty = 1;
 				g_objectTable[objIdx].mobj->orientMatrixDirty = 1;
 				if (playerIdx == (unsigned int)g_localPlayer) {
-					FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-					FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-					FlightLight_SetLocalPlayerPulseEnabled(3, 0);
+					FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+					FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+					FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 0);
 				}
 				Flight_RecomputeCraftSpeedFromPowerSettings(objIdx);
 				g_players[playerIdx].smoothedInputYaw = 0;
@@ -5056,10 +5056,10 @@ void FlightObject_UpdatePlayerHyperspaceTransition(unsigned int playerIdx) {
 					g_players[playerIdx].currentTargetObjectIdx = 0xffffu;
 					if ((unsigned int)g_localPlayer == playerIdx) {
 						g_players[g_localPlayer].hyperspacePhase = PLAYER_HYPERSPACE_PHASE_NONE;
-						FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-						FlightLight_SetLocalPlayerPulseEnabled(5, 1);
-						g_localPlayerLightPulses[5].startTime = g_gameTime - 236;
-						FlightLight_SetLocalPlayerPulseEnabled(3, 0);
+						FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+						FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 1);
+						g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].startTime = g_gameTime - 236;
+						FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 0);
 						FlightView_UpdatePlayerCamera(g_localPlayer);
 						Flight_InitInboundHyperspaceStreaks();
 					}
@@ -6592,9 +6592,9 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 					Film_WriteBytesBuffered(&g_currentMusicState, sizeof(g_currentMusicState));
 					Film_WriteBytesBuffered(&g_musicCombatSeen, 1u);
 					Film_WriteBytesBuffered(&g_setMusicState, sizeof(g_setMusicState));
-					Film_WriteBytesBuffered(&g_hardpointOriginOffset[0], sizeof(g_hardpointOriginOffset[0]));
-					Film_WriteBytesBuffered(&g_hardpointOriginOffset[1], sizeof(g_hardpointOriginOffset[1]));
-					Film_WriteBytesBuffered(&g_hardpointOriginOffset[2], sizeof(g_hardpointOriginOffset[2]));
+					Film_WriteBytesBuffered(&g_seatEyeOffset[0], sizeof(g_seatEyeOffset[0]));
+					Film_WriteBytesBuffered(&g_seatEyeOffset[1], sizeof(g_seatEyeOffset[1]));
+					Film_WriteBytesBuffered(&g_seatEyeOffset[2], sizeof(g_seatEyeOffset[2]));
 					Film_WriteBytesBuffered(&g_projOffsetY, sizeof(g_projOffsetY));
 					Film_WriteBytesBuffered(&g_collisionSegmentStartWorldX,
 											sizeof(g_collisionSegmentStartWorldX));
@@ -6754,9 +6754,9 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 			g_currentMusicState = MUSIC_STATE_NONE;
 			Film_ReadBytes(&g_musicCombatSeen, 1u);
 			Film_ReadBytes(&g_setMusicState, sizeof(g_setMusicState));
-			Film_ReadBytes(&g_hardpointOriginOffset[0], sizeof(g_hardpointOriginOffset[0]));
-			Film_ReadBytes(&g_hardpointOriginOffset[1], sizeof(g_hardpointOriginOffset[1]));
-			Film_ReadBytes(&g_hardpointOriginOffset[2], sizeof(g_hardpointOriginOffset[2]));
+			Film_ReadBytes(&g_seatEyeOffset[0], sizeof(g_seatEyeOffset[0]));
+			Film_ReadBytes(&g_seatEyeOffset[1], sizeof(g_seatEyeOffset[1]));
+			Film_ReadBytes(&g_seatEyeOffset[2], sizeof(g_seatEyeOffset[2]));
 			Film_ReadBytes(&g_projOffsetY, sizeof(g_projOffsetY));
 			Film_ReadBytes(&g_collisionSegmentStartWorldX, sizeof(g_collisionSegmentStartWorldX));
 			Film_ReadBytes(&g_collisionSegmentStartWorldY, sizeof(g_collisionSegmentStartWorldY));

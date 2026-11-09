@@ -527,9 +527,9 @@ static void XwaFlightTask_ResetPlayersForMissionRestart(int playerCount) {
 	memset(g_inputFrameCount, 0, sizeof(g_inputFrameCount));
 }
 
-static void XwaFlightTask_ResetLocalLightPulses(void) {
-	for (int pulseIdx = 0; pulseIdx < 6; ++pulseIdx) {
-		g_localPlayerLightPulses[pulseIdx].enabled = 0;
+static void XwaFlightTask_ResetCockpitLights(void) {
+	for (int lightIdx = 0; lightIdx < COCKPIT_LIGHT_COUNT; ++lightIdx) {
+		g_cockpitLights[lightIdx].enabled = 0;
 	}
 }
 
@@ -1550,7 +1550,7 @@ void XwaFlightTask_Tick(void) {
 							XwaFlightFonts_WriteWidthTables();
 							Math_SetFpuSinglePrecisionMode();
 						}
-						FlightLight_InitLocalPlayerPulses();
+						FlightLight_InitCockpitLights();
 						Math_SetFpuSinglePrecisionMode();
 						FlightSurface_Lock();
 						Mission_InitFlightRuntimeState();
@@ -1630,7 +1630,7 @@ void XwaFlightTask_Tick(void) {
 					FlightText_DetectStretchBug();
 					RenderScene_End3D();
 				}
-				XwaFlightTask_ResetLocalLightPulses();
+				XwaFlightTask_ResetCockpitLights();
 				Math_SetFpuSinglePrecisionMode();
 				if (g_missionHeader.body.missionType == XWA_MISSION_TYPE_DEATH_STAR) {
 					skipHangarReady = 1;
@@ -1863,7 +1863,7 @@ void XwaFlightTask_Tick(void) {
 					FlightSurface_Lock();
 					Mission_InitFlightRuntimeState();
 					FlightSurface_Unlock();
-					XwaFlightTask_ResetLocalLightPulses();
+					XwaFlightTask_ResetCockpitLights();
 					FlightStarfield_Init();
 					Backdrop_BuildCoordinateBuffers();
 					Hud_FreeHUDResources();

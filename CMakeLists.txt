@@ -249,7 +249,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/hangar_scene.c
     src/xwa_runtime/models/hangars.c
     src/xwa_runtime/models/headlights.c
-    src/xwa_runtime/models/cockpit_alert_lights.c
+    src/xwa_runtime/models/cockpit_lights.c
     src/xwa_runtime/models/particle_lights.c
     src/xwa_runtime/models/mission_backdrops.c
     src/xwa_runtime/models/mission_file.c

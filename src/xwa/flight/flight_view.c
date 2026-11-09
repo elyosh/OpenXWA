@@ -38,7 +38,12 @@ static void OutputDebugStringA(const char* outputString) { DebugPrintf("%s", out
 #endif
 
 // GLOBAL: XWA 0x7712A4
-int g_hardpointOriginOffset[3];
+/* An offset that FlightView_ComputeSeatEyeOffset adds to the seat's eye
+   point. Slot 0 is added to X. The cockpit eye takes slot 2 for Y and slot 1
+   for Z, and a turret seat takes slot 1 for Y and slot 2 for Z. Films save
+   and load it, and a right click in the hangar resets it. Nothing else sets
+   it, so it is always 0. */
+int g_seatEyeOffset[3];
 
 // GLOBAL: XWA 0x5A94B8
 const float flt_5A94B8 = 0.000030518499f;
@@ -307,9 +312,9 @@ int FlightView_ComputeSeatEyeOffset(int playerIdx) {
 
 	seatTableIdx = g_players[playerIdx].currentSeatIdx - 1;
 	if (seatTableIdx == -1) {
-		vec.x = (float)(g_hardpointOriginOffset[0] + g_modelDefs[modelIndex].cockpitEyeX);
-		vec.y = (float)(g_hardpointOriginOffset[2] - g_modelDefs[modelIndex].cockpitEyeY);
-		vec.z = (float)(g_hardpointOriginOffset[1] + g_modelDefs[modelIndex].cockpitEyeZ);
+		vec.x = (float)(g_seatEyeOffset[0] + g_modelDefs[modelIndex].cockpitEyeX);
+		vec.y = (float)(g_seatEyeOffset[2] - g_modelDefs[modelIndex].cockpitEyeY);
+		vec.z = (float)(g_seatEyeOffset[1] + g_modelDefs[modelIndex].cockpitEyeZ);
 	} else {
 		CraftData* craft;
 		OptRotationScale* launcherRotScale;
@@ -327,13 +332,13 @@ int FlightView_ComputeSeatEyeOffset(int playerIdx) {
 		{
 			const unsigned int objectType = g_objectTable[objectIdx].objectType;
 
-			vec.x = (float)(g_hardpointOriginOffset[0] +
+			vec.x = (float)(g_seatEyeOffset[0] +
 							XwaGunnerSeats_Value(objectType, seatTableIdx, XWA_GUNNER_SEAT_X,
 												 g_modelDefs[modelIndex].turretSeatPosX[seatTableIdx]));
-			vec.y = (float)(g_hardpointOriginOffset[1] -
+			vec.y = (float)(g_seatEyeOffset[1] -
 							XwaGunnerSeats_Value(objectType, seatTableIdx, XWA_GUNNER_SEAT_Y,
 												 g_modelDefs[modelIndex].turretSeatPosY[seatTableIdx]));
-			vec.z = (float)(g_hardpointOriginOffset[2] +
+			vec.z = (float)(g_seatEyeOffset[2] +
 							XwaGunnerSeats_Value(objectType, seatTableIdx, XWA_GUNNER_SEAT_Z,
 												 g_modelDefs[modelIndex].turretSeatPosZ[seatTableIdx]));
 			turretObjectType =
@@ -341,9 +346,9 @@ int FlightView_ComputeSeatEyeOffset(int playerIdx) {
 											   g_modelDefs[modelIndex].turretObjectType[seatTableIdx]);
 		}
 #else
-		vec.x = (float)(g_hardpointOriginOffset[0] + g_modelDefs[modelIndex].turretSeatPosX[seatTableIdx]);
-		vec.y = (float)(g_hardpointOriginOffset[1] - g_modelDefs[modelIndex].turretSeatPosY[seatTableIdx]);
-		vec.z = (float)(g_hardpointOriginOffset[2] + g_modelDefs[modelIndex].turretSeatPosZ[seatTableIdx]);
+		vec.x = (float)(g_seatEyeOffset[0] + g_modelDefs[modelIndex].turretSeatPosX[seatTableIdx]);
+		vec.y = (float)(g_seatEyeOffset[1] - g_modelDefs[modelIndex].turretSeatPosY[seatTableIdx]);
+		vec.z = (float)(g_seatEyeOffset[2] + g_modelDefs[modelIndex].turretSeatPosZ[seatTableIdx]);
 
 		turretObjectType = g_modelDefs[modelIndex].turretObjectType[seatTableIdx];
 #endif

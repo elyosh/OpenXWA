@@ -658,12 +658,12 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 	}
 #endif
 
-	g_localPlayerLightPulses[0].enabled = 0;
-	g_localPlayerLightPulses[1].enabled = 0;
-	g_localPlayerLightPulses[2].enabled = 0;
-	g_localPlayerLightPulses[3].enabled = 0;
-	g_localPlayerLightPulses[4].enabled = 0;
-	g_localPlayerLightPulses[5].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].enabled = 0;
 	if (g_useHardware3D) {
 		Particle_FreeAllEffects();
 	}
@@ -1238,12 +1238,12 @@ int Hangar_EnterCraft(uint16_t fromObjIdx) {
 	int missionWasEnding = 0; // v56
 	int i;
 
-	g_localPlayerLightPulses[0].enabled = 0;
-	g_localPlayerLightPulses[1].enabled = 0;
-	g_localPlayerLightPulses[2].enabled = 0;
-	g_localPlayerLightPulses[3].enabled = 0;
-	g_localPlayerLightPulses[4].enabled = 0;
-	g_localPlayerLightPulses[5].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].enabled = 0;
 	if (g_useHardware3D) {
 		Particle_FreeAllEffects();
 	}
@@ -4762,9 +4762,9 @@ end:
 		if (rightButton) {
 			if (g_hangarAutoCam)
 				Hangar_SetCameraShot(0);
-			g_hardpointOriginOffset[0] = 0;
-			g_hardpointOriginOffset[1] = 0;
-			g_hardpointOriginOffset[2] = 0;
+			g_seatEyeOffset[0] = 0;
+			g_seatEyeOffset[1] = 0;
+			g_seatEyeOffset[2] = 0;
 		}
 	}
 }

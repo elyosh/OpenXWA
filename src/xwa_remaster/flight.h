@@ -147,6 +147,20 @@ int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out);
 struct XwaRemasterDirLight;
 float XwaRemasterFlight_LightMeterExposure(const struct XwaRemasterDirLight* lights, uint32_t count);
 
+/* The default values of a cockpit light, from
+ * point_lights.cockpit_lights. The light is a Blender point light of
+ * `power_w` watts, at `position_m` from the seat's eye along the craft's
+ * axes (X right, Y up, Z forward). `color` is linear. When `has_color` is 0,
+ * the light uses the game's colour. Each key that the mod's
+ * cockpit_lights section sets replaces the value here
+ * (XwaCockpitLight.mod_*). */
+typedef struct XwaFlightCockpitLight {
+	float position_m[3];
+	int has_color;
+	float color[3];
+	float power_w; /* 0 turns the light off */
+} XwaFlightCockpitLight;
+
 /* Point-light knobs (remaster/config.yaml `point_lights:` mapping + the debug
  * inspector). The classic SOURCE laws fix each light's color and classic
  * intensity; the scene evaluates them as physical sphere lights as bright
@@ -161,6 +175,9 @@ typedef struct XwaFlightPointLightParams {
 	/* Multiplies the lights authored in models, to find a calibration by
 	 * eye; debug only, not in the settings. 1 by default. */
 	float model_light_scale;
+	/* The cockpit lights, by slot. They are only used when
+	 * model_lights is on. When it is off, the game's own lights are used. */
+	XwaFlightCockpitLight cockpit_lights[XWA_SNAP_COCKPIT_LIGHT_COUNT];
 } XwaFlightPointLightParams;
 
 /* The game's light candidates, the models' lights, and those of both whose

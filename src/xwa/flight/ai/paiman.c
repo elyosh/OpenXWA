@@ -5159,10 +5159,10 @@ static char paiman_intohyperspacemaneuver(void) {
 					g_players[g_localPlayer].lookPitchOffset = 0;
 					Hud_ClearReadyMessageQueue();
 					Flight_InitOutboundHyperspaceStreaks();
-					FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-					FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-					FlightLight_SetLocalPlayerPulseEnabled(3, 1);
-					g_localPlayerLightPulses[3].startTime = g_gameTime;
+					FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+					FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+					FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 1);
+					g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].startTime = g_gameTime;
 				}
 
 				g_players[playerOwnerIdx].hyperspacePhase = PLAYER_HYPERSPACE_OUTBOUND;

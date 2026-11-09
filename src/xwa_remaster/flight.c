@@ -32,6 +32,7 @@
 #include "xwa_remaster/suns.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
+#include "xwa_runtime/models/cockpit_lights.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/presentation.h"
@@ -812,6 +813,102 @@ static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
 		   p->match_distance_m > 0.0f && isfinite(p->range_scale) && p->range_scale > 0.0f;
 }
 
+/* Reads the vector `key` of `entry`, the cockpit light `name`, into
+   `out`. Does nothing when the key isn't there. Logs an error and returns 0
+   when the value isn't a list of three numbers, or when `non_negative` is
+   set and a number is below 0. */
+static int fl_read_cockpit_light_vector(const AeronConfigNode* entry, const char* path, const char* name,
+										const char* key, int non_negative, float out[3], int* found) {
+	const AeronConfigNode* node = AeronConfigNode_MapGet(entry, key);
+	if (!node) {
+		return 1;
+	}
+	int ok = AeronConfigNode_Type(node) == AERON_CONFIG_SEQUENCE && AeronConfigNode_SequenceCount(node) == 3;
+	float values[3];
+	for (size_t i = 0; ok && i < 3; i++) {
+		const AeronConfigNode* item = AeronConfigNode_SequenceGet(node, i);
+		const AeronConfigNodeType type = AeronConfigNode_Type(item);
+		values[i] = (float)AeronConfigNode_Float(item, 0.0);
+		ok = (type == AERON_CONFIG_INT || type == AERON_CONFIG_FLOAT) && isfinite(values[i]) &&
+			 (!non_negative || values[i] >= 0.0f);
+	}
+	if (!ok) {
+		Aeron_LogError("xwa.remaster",
+					   "%s:%d: point_lights.cockpit_lights.%s.%s must be a list of three %snumbers", path,
+					   AeronConfigNode_Line(node), name, key, non_negative ? "non-negative " : "");
+		return 0;
+	}
+	memcpy(out, values, sizeof values);
+	if (found) {
+		*found = 1;
+	}
+	return 1;
+}
+
+/* Reads the default values of the six cockpit lights from
+   point_lights.cockpit_lights. All six lights must be there, each
+   with power_w. Logs an error and returns 0 when the section is wrong. */
+static int fl_load_cockpit_lights_config(const AeronConfigFile* cf, const char* path) {
+	const AeronConfigNode* section = AeronConfigFile_GetNode(cf, "point_lights.cockpit_lights");
+	uint32_t found = 0;
+	memset(s.plight.cockpit_lights, 0, sizeof s.plight.cockpit_lights);
+	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.remaster", "%s: point_lights.cockpit_lights must be a map of the six lights",
+					   path);
+		return 0;
+	}
+	for (size_t i = 0; i < AeronConfigNode_MapCount(section); i++) {
+		const char* name = AeronConfigNode_MapKeyAt(section, i);
+		const AeronConfigNode* entry = AeronConfigNode_MapValueAt(section, i);
+		const int slot = XwaCockpitLights_Find(name);
+		if (slot < 0) {
+			Aeron_LogError("xwa.remaster", "%s:%d: point_lights.cockpit_lights: unknown light %s", path,
+						   AeronConfigNode_Line(entry), name ? name : "");
+			return 0;
+		}
+		if (AeronConfigNode_Type(entry) != AERON_CONFIG_MAP) {
+			Aeron_LogError("xwa.remaster", "%s:%d: point_lights.cockpit_lights.%s must be a map", path,
+						   AeronConfigNode_Line(entry), name);
+			return 0;
+		}
+		for (size_t k = 0; k < AeronConfigNode_MapCount(entry); k++) {
+			const char* key = AeronConfigNode_MapKeyAt(entry, k);
+			if (!key || (strcmp(key, "position_m") != 0 && strcmp(key, "color") != 0 &&
+						 strcmp(key, "power_w") != 0)) {
+				Aeron_LogError("xwa.remaster", "%s:%d: point_lights.cockpit_lights.%s: unknown key %s", path,
+							   AeronConfigNode_Line(AeronConfigNode_MapValueAt(entry, k)), name,
+							   key ? key : "");
+				return 0;
+			}
+		}
+		XwaFlightCockpitLight* light = &s.plight.cockpit_lights[slot];
+		const AeronConfigNode* power = AeronConfigNode_MapGet(entry, "power_w");
+		const AeronConfigNodeType power_type = AeronConfigNode_Type(power);
+		light->power_w = (float)AeronConfigNode_Float(power, -1.0);
+		if ((power_type != AERON_CONFIG_INT && power_type != AERON_CONFIG_FLOAT) ||
+			!isfinite(light->power_w) || light->power_w < 0.0f) {
+			Aeron_LogError(
+				"xwa.remaster",
+				"%s:%d: point_lights.cockpit_lights.%s.power_w must be a number of watts, 0 or more", path,
+				AeronConfigNode_Line(power ? power : entry), name);
+			return 0;
+		}
+		if (!fl_read_cockpit_light_vector(entry, path, name, "position_m", 0, light->position_m, NULL) ||
+			!fl_read_cockpit_light_vector(entry, path, name, "color", 1, light->color, &light->has_color)) {
+			return 0;
+		}
+		found |= 1u << (uint32_t)slot;
+	}
+	for (int slot = 0; slot < XWA_SNAP_COCKPIT_LIGHT_COUNT; slot++) {
+		if (!(found & (1u << (uint32_t)slot))) {
+			Aeron_LogError("xwa.remaster", "%s: point_lights.cockpit_lights.%s is missing", path,
+						   XwaCockpitLights_Name(slot));
+			return 0;
+		}
+	}
+	return 1;
+}
+
 static int fl_sky_config_valid(void) {
 	return isfinite(s.sky_exposure) && s.sky_exposure >= 0.0f && isfinite(s.star_brightness) &&
 		   s.star_brightness >= 0.0f && isfinite(s.star_density) && s.star_density >= 0.0f &&
@@ -1362,6 +1459,10 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+	if (!fl_load_cockpit_lights_config(cf, path)) {
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
 	s.texture_filtering.anisotropic = AeronConfigFile_GetBool(cf, "texture_filtering.anisotropic", 0);
 	s.texture_filtering.max_anisotropy =
 		(float)AeronConfigFile_GetFloat(cf, "texture_filtering.max_anisotropy", 0.0);
@@ -1853,6 +1954,10 @@ void XwaRemasterFlight_SetPointLights(const XwaFlightPointLightParams* in) {
 		s.plight = *in;
 		s.plight.model_light_scale =
 			isfinite(in->model_light_scale) ? fminf(fmaxf(in->model_light_scale, 0.01f), 1000.0f) : 1.0f;
+		for (int p = 0; p < XWA_SNAP_COCKPIT_LIGHT_COUNT; p++) {
+			const float power = in->cockpit_lights[p].power_w;
+			s.plight.cockpit_lights[p].power_w = isfinite(power) ? fminf(fmaxf(power, 0.0f), 1.0e7f) : 0.0f;
+		}
 	}
 }
 
@@ -3920,9 +4025,8 @@ static void fl_submit_lens_flares(const XwaSnapshot* snap, const XwaRemasterFlig
  *     type switch + intensity tables), with the classic append gates;
  *   - capital engine glows via the HD mesh's engine glows (collected in
  *     the instance walk where mesh + articulation exist);
- *   - the local player's semantic pulses, including weapon fire and
- *     hyperspace effects (classic cycle/fade envelope replayed from
- *     game_time_ticks at the seat's eye point).
+ *   - the cockpit lights: the HUD warning lights and the hyperspace
+ *     lights, at the eye of the player's seat (fl_add_cockpit_lights).
  * The classic cull radii only selected lights per object and are not
  * used. The classic Local Lights config level is NOT honored (period
  * option). Aeron assigns the submitted sources to spatial light clusters.
@@ -4072,7 +4176,8 @@ static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* 
 	return 1;
 }
 
-/* Accessor-law sources (everything except engine glows + pulses). */
+/* Accessor-law sources (everything except engine glows and cockpit
+ * lights). */
 /* Whether a bolt's model has lights of its own, which replace the stock
  * bolt light. */
 static int fl_projectile_has_model_lights(const XwaFlightObject* f) {
@@ -4249,27 +4354,30 @@ static void fl_seat_eye_transform(const XwaSnapshot* snap, const float player_bw
 	transform[15] = 1.0f;
 }
 
-/* Local-player pulse lights: the classic cycle/fade envelope
- * (FlightLight_AppendLocalPlayerPulses) replayed from the sim clock;
- * position = the eye point of the player's seat in the craft's model space,
- * carried to world through the player basis. Callers may exclude semantic
- * slots whose visual role is replaced by a dedicated HD scene. A pulse the
- * mod replaces (XwaLightPulse.mod_defined) is a Blender point light of
- * P watts, P * 683 / (4 pi) candela, with the same envelope; the pool always
- * keeps it. Without model lights, it keeps the game's light. */
-static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_bw[9],
-								   const float player_pos[3], uint32_t excluded_slots) {
-	if (!s.plight.enabled || !snap->light_pulse_active || !player_bw) {
+/* Adds the cockpit lights. Each one blinks with the classic cycle and fade
+ * (FlightLight_AppendCockpitLights), replayed from the simulation clock. It
+ * sits at the eye of the player's seat, and the player's basis carries it
+ * to the world. Callers can leave out the slots in `excluded_slots`, when a
+ * dedicated HD scene replaces them.
+ *
+ * When model lights are on, each light is a Blender point light of P watts,
+ * which gives P * 683 / (4 pi) candela. Its values come from
+ * point_lights.cockpit_lights, and each key that the mod sets
+ * (XwaCockpitLight.mod_*) replaces the default. The pool always keeps these
+ * lights. When model lights are off, each light is the game's light. */
+static void fl_add_cockpit_lights(const XwaSnapshot* snap, const float player_bw[9],
+								  const float player_pos[3], uint32_t excluded_slots) {
+	if (!s.plight.enabled || !snap->cockpit_lights_active || !player_bw) {
 		return;
 	}
 	float transform[16];
 	fl_seat_eye_transform(snap, player_bw, player_pos, transform);
 	const float world[3] = { transform[3], transform[7], transform[11] };
-	for (int p = 0; p < XWA_SNAP_MAX_LIGHT_PULSES; p++) {
+	for (int p = 0; p < XWA_SNAP_COCKPIT_LIGHT_COUNT; p++) {
 		if (excluded_slots & (1u << (uint32_t)p)) {
 			continue;
 		}
-		const XwaLightPulse* pl = &snap->light_pulses[p];
+		const XwaCockpitLight* pl = &snap->cockpit_lights[p];
 		if (!pl->enabled) {
 			continue;
 		}
@@ -4293,17 +4401,24 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
 		} else {
 			fade = 1.0f;
 		}
-		if (pl->mod_defined && s.plight.model_lights) {
+		if (s.plight.model_lights) {
+			const XwaFlightCockpitLight* d = &s.plight.cockpit_lights[p];
+			const float power_w = pl->mod_has_power ? pl->mod_power_w : d->power_w;
+			const float* position_m = pl->mod_has_position ? pl->mod_position_m : d->position_m;
+			if (!(power_w > 0.0f)) {
+				continue;
+			}
 			AeronFlightLight light;
 			memset(&light, 0, sizeof light);
-			light.position.x = pl->mod_position_m[0];
-			light.position.y = pl->mod_position_m[1];
-			light.position.z = pl->mod_position_m[2];
+			light.position.x = position_m[0];
+			light.position.y = position_m[1];
+			light.position.z = position_m[2];
 			for (int c = 0; c < 3; c++) {
-				light.color[c] =
-					pl->mod_has_color ? pl->mod_color[c] : XwaRemaster_SrgbToLinear(pl->color[c]);
+				light.color[c] = pl->mod_has_color ? pl->mod_color[c]
+								 : d->has_color    ? d->color[c]
+												   : XwaRemaster_SrgbToLinear(pl->color[c]);
 			}
-			light.intensity = pl->mod_power_w * 683.0f / (4.0f * 3.14159265f) * fade;
+			light.intensity = power_w * 683.0f / (4.0f * 3.14159265f) * fade;
 			light.shape = AERON_FLIGHT_LIGHT_POINT;
 			AeronSceneLight scene_light;
 			if (AeronScene_FlightLight(&light, transform, AERON_OPT_UNITS_PER_METER,
@@ -4326,8 +4441,8 @@ static void fl_derive_pulse_lights(const XwaSnapshot* snap, const float player_b
  * P * 683 / pi candela straight ahead, which the scene takes at 683 lm/W
  * (AERON_SCENE_LUMENS_PER_WATT). With an angle, it is a spot light
  * with the same intensity straight ahead, which fades from the nose out to
- * the angle. It starts at the seat's eye in every view, as the pulse lights
- * do, and points along the nose. The pool always keeps it. The hyperspace
+ * the angle. It starts at the seat's eye in every view, as the cockpit
+ * lights do, and points along the nose. The pool always keeps it. The hyperspace
  * tunnel doesn't add it. */
 static void fl_add_headlight(const XwaSnapshot* snap, const float player_bw[9], const float player_pos[3]) {
 	const XwaHeadlight* h = &snap->headlight;
@@ -5354,10 +5469,10 @@ static void fl_add_ambient_cube(XwaShipAmbientCube* base, const XwaShipAmbientCu
  * covers the cockpit. It grows to cover the whole player craft. */
 #define FL_HYPERSPACE_KEEP_DISTANCE_M 5.0f
 
-/* The game's hyperspace light pulses (slots 3 to 5: outbound, tunnel,
- * inbound). The HD renderer replaces them with the tunnel's and the
- * streaks' light. */
-#define FL_HYPERSPACE_PULSE_MASK ((1u << 3) | (1u << 4) | (1u << 5))
+/* The hyperspace cockpit lights (slots 3 to 5: jump, transfer and
+ * arrival). The HD hyperspace scene replaces them with the light of the
+ * tunnel and the streaks. */
+#define FL_HYPERSPACE_COCKPIT_LIGHTS ((1u << 3) | (1u << 4) | (1u << 5))
 
 static float fl_smoothstep(float edge0, float edge1, float x) {
 	const float u = fl_clampf((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
@@ -5910,7 +6025,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	AeronScene_SetMotionContext(s.scene, NULL, 1);
 
 	if (player_found && player_f) {
-		fl_derive_pulse_lights(snap, player_bw, player_local, FL_HYPERSPACE_PULSE_MASK);
+		fl_add_cockpit_lights(snap, player_bw, player_local, FL_HYPERSPACE_COCKPIT_LIGHTS);
 	}
 	fl_finalize_point_lights();
 	if (!fl_configure_clustered_lights(s.scene)) {
@@ -6774,7 +6889,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	/* Derive billboard/backdrop/lens-flare quads and resolve their
 	 * frames (atlas uploads happen before the scene's render passes
 	 * open); point-light candidates start with the accessor-law
-	 * sources (glow lights + pulses append during/after the walk). */
+	 * sources (glow lights and cockpit lights append during/after the
+	 * walk). */
 	fl_derive_billboards(snap, assets, billboard_history_cam, billboard_history_crows);
 	/* An environment with a sky replaces all of these together: its sky,
 	 * suns, lights and flares replace the starfield, the recovered
@@ -7196,12 +7312,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		AeronScene_AddMeshInstance(s.scene, &s.bolts[bi]);
 	}
 
-	/* Local-player pulse lights and headlight (player basis known after
+	/* Cockpit lights and headlight (player basis known after
 	 * the walk), then the finalized candidates into the light pool
 	 * (submitted with the cockpit's lights) + the lit PBR env. */
 	if (player_found && player_f) {
-		fl_derive_pulse_lights(snap, player_bw, player_local,
-							   cam->hyperspace_phase ? FL_HYPERSPACE_PULSE_MASK : 0u);
+		fl_add_cockpit_lights(snap, player_bw, player_local,
+							  cam->hyperspace_phase ? FL_HYPERSPACE_COCKPIT_LIGHTS : 0u);
 		fl_add_headlight(snap, player_bw, player_local);
 	}
 	fl_finalize_point_lights();

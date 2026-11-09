@@ -515,11 +515,34 @@ point_lights:
   # Multiplies the distance where a light falls under 1/250 of a unit of
   # illuminance after the exposure, and ends.
   range_scale: 1.0
-  # Lights authored in models (such as the converted cockpits' interior
-  # light), the headlight, and the mod's cockpit alert lights and particle
-  # lights. They are in candela. Without them, the alert lights and the
-  # particle lights are the game's.
+  # Turns on the lights that are set in candela: the lights in models (such
+  # as the interior light of the converted cockpits), the headlight, the
+  # cockpit lights below and the mod's particle lights. When this is off,
+  # the game's own cockpit lights and particle lights are used instead.
   model_lights: true
+  # The lights that the game blinks in the cockpit, such as the red light
+  # when the hull is low. Each one works like a Blender point light:
+  #   power_w: the power in watts. 0 turns the light off.
+  #   position_m: where the light is, in metres from the pilot's eye
+  #     (X right, Y up, Z forward). The default is the eye.
+  #   color: the colour, as linear values. The default is the game's colour.
+  # A mod can change these lights in the cockpit_lights section of its
+  # flight/flight.yaml. Each key that the mod sets replaces the one here.
+  # The game's own lights aren't used, because the match_distance_m
+  # conversion makes them far too bright this close to the cockpit.
+  cockpit_lights:
+    hull_critical:
+      power_w: 50
+    warhead_lock:
+      power_w: 40
+    beam_warning:
+      power_w: 50
+    hyperspace_jump:
+      power_w: 1024
+    hyperspace_transfer:
+      power_w: 128
+    hyperspace_arrival:
+      power_w: 1024
 classic_lighting:
   # Converts the classic game's lights (suns and other backdrops, the game's
   # lights in the hangar, lasers, explosions, engines), which have no unit.

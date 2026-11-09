@@ -25,9 +25,9 @@
 #include "xwa/xwa_options.h"
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/camera/camera_motion.h"
+#include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
-#include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/config/modern_speed_effect_options.h"
 #include "xwa_runtime/config/modern_sun_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
@@ -47,7 +47,7 @@
 #include "xwa_runtime/input/rumble_provider.h"
 #include "xwa_runtime/input/winmm_joystick_provider.h"
 #include "xwa_runtime/models/ai_attack.h"
-#include "xwa_runtime/models/cockpit_alert_lights.h"
+#include "xwa_runtime/models/cockpit_lights.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/models/craft_hyperspace.h"
@@ -186,7 +186,7 @@ int XwaPort_Init(void) {
 	XwaOptionSection_ReadMod(XwaModernSunOptions_Section(), XwaFlightConfig_Root());
 	XwaOptionSection_ReadMod(XwaModernSpeedEffectOptions_Section(), XwaFlightConfig_Root());
 	XwaOptionSection_ReadMod(XwaModernCameraShakeOptions_Section(), XwaFlightConfig_Root());
-	XwaCockpitAlertLights_Init();
+	XwaCockpitLights_Init();
 	XwaParticleLights_Init();
 	XwaModelSource_Init();
 	XwaHangars_Init();
