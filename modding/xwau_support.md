@@ -73,6 +73,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Laser rates and energy transfer (`[WeaponRate]`) | Partial | The rates that a mission sets for a flight group aren't converted. | [Craft](craft.md#laser-rates) |
 | Weapon, warhead, energy and linking stats | Implemented | Including the mission's weapon profiles. | [Craft](craft.md#weapon-profiles) |
 | Turret target blocks (`Weapon<N>_TargetBlock`) | Implemented | The names `PlayerProjectile` and `People` aren't converted. | [Craft](craft.md#turret-targets) |
+| Weapon models (`[OptReplace]`) | Implemented | Models outside `FlightModels` aren't converted. | [Craft](craft.md#weapon-models) |
 | Warhead lock (`[WarheadLock]`) | Partial | The keys for object profiles aren't converted. | [Craft](craft.md#warhead_lock), [Flight](flight.md#warhead_lock) |
 | AI attack ranges and dodging (`[AttackBreakDistance]`) | Implemented | | [Craft](craft.md#ai_attack), [Flight](flight.md#ai_attack) |
 | Mag pulse hits (`[WeaponLockBehaviors]`) | Implemented | | [Craft](craft.md#mag_pulse), [Flight](flight.md#mag_pulse) |

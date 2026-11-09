@@ -24,6 +24,7 @@
 #include "xwa_runtime/models/surfaces.h"
 #include "xwa_runtime/models/turret_ignore.h"
 #include "xwa_runtime/models/warhead_lock.h"
+#include "xwa_runtime/models/weapon_models.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
 
@@ -51,6 +52,7 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "weapons", XwaWeaponRates_ClearModelSettings, XwaWeaponRates_ReadModelSettings },
 	{ "weapons", XwaWeaponStats_ClearModelSettings, XwaWeaponStats_ReadModelSettings },
 	{ "weapons", XwaTurretIgnore_ClearModelSettings, XwaTurretIgnore_ReadModelSettings },
+	{ "weapons", XwaWeaponModels_ClearModelSettings, XwaWeaponModels_ReadModelSettings },
 	{ "stats_profiles", XwaStatsProfiles_ClearModelSettings, XwaStatsProfiles_ReadModelSettings },
 	{ "shield", XwaShieldRecharge_ClearModelSettings, XwaShieldRecharge_ReadModelSettings },
 	{ "sound", XwaCraftSounds_ClearModelSettings, XwaCraftSounds_ReadModelSettings },

@@ -1589,6 +1589,10 @@ int XwaSnapshotExport_ComponentTargetGeometry(int object_type, int component, fl
  * craft name. NULL when the type has no model. The driver keys its HD
  * meshes with it. */
 const char* XwaSnapshotExport_ModelName(int object_type);
+/* Returns the name of the model to draw for a shot of `object_type` fired by
+ * a craft of type `source_object_type`. This is the weapon model set in the
+ * craft's settings (XwaWeaponModels), or else XwaSnapshotExport_ModelName. */
+const char* XwaSnapshotExport_ShotModelName(int object_type, int source_object_type);
 
 /* Engine-side OPT-loader observers. They update only snapshot-side state;
  * recovered simulation/render behavior never branches on the registry. */

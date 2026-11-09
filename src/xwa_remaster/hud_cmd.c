@@ -176,8 +176,12 @@ static int cmd_projectile(const XwaFlightObject* object) {
 		   object->genus == XWA_SNAP_GENUS_NPC_PROJECTILE;
 }
 
+/* A shot can use a weapon model from the settings of the craft that fired
+   it, as in the world view. */
 static AeronSceneMesh* cmd_mesh(const XwaFlightObject* object, uint8_t* out_source) {
-	const char* name = XwaSnapshotExport_ModelName(object->object_type);
+	const char* name = cmd_projectile(object)
+						   ? XwaSnapshotExport_ShotModelName(object->object_type, object->source_object_type)
+						   : XwaSnapshotExport_ModelName(object->object_type);
 	return name ? XwaRemasterShip_MeshForNameWithSource(name, out_source) : NULL;
 }
 

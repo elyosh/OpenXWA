@@ -9,6 +9,7 @@
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/opt_synth.h"
+#include "xwa_runtime/models/weapon_models.h"
 #endif
 
 #ifndef XWA_MODERN
@@ -396,6 +397,19 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 	}
 
 	modelHandle = g_loadedModels.byObjectType[(uint16_t)obj->objectType];
+#ifdef XWA_MODERN
+	/* A shot can use another model, set in the settings of the craft that
+	   fired it (XwaWeaponModels). sourceObjectType is the object type of
+	   that craft. */
+	if (mobj != NULL && (uint16_t)obj->objectType != 0 &&
+		(uint16_t)obj->objectType != mobj->sourceObjectType) {
+		const uint16_t shotHandle = XwaWeaponModels_Handle(mobj->sourceObjectType, (uint16_t)obj->objectType);
+
+		if (shotHandle != 0) {
+			modelHandle = shotHandle;
+		}
+	}
+#endif
 	result = modelHandle;
 	if (modelHandle) {
 

@@ -2870,6 +2870,14 @@ static int fl_object_is_projectile(const XwaFlightObject* object) {
 		   object->genus == XWA_SNAP_GENUS_NPC_PROJECTILE;
 }
 
+/* Returns the name of the model to draw for an object. A shot can use a
+ * weapon model from the settings of the craft that fired it. */
+static const char* fl_object_model_name(const XwaFlightObject* object) {
+	return fl_object_is_projectile(object)
+			   ? XwaSnapshotExport_ShotModelName(object->object_type, object->source_object_type)
+			   : XwaSnapshotExport_ModelName(object->object_type);
+}
+
 static int fl_object_in_render_region(const XwaFlightObject* object, uint8_t region) {
 	return object->render_region == region && object->slot_class != XWA_SNAP_SLOT_OTHER;
 }
@@ -4141,8 +4149,7 @@ static XwaShipPointLight* fl_pl_push(const float pos[3], const float color_x_int
  * when the model is unavailable. */
 static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* f,
 								const int32_t camera_world[3], float center[3], float half_axis[3]) {
-	const AeronSceneMesh* mesh =
-		XwaRemasterShip_MeshForNameWithSource(XwaSnapshotExport_ModelName(f->object_type), NULL);
+	const AeronSceneMesh* mesh = XwaRemasterShip_MeshForNameWithSource(fl_object_model_name(f), NULL);
 	if (!mesh) {
 		return 0;
 	}
@@ -4181,8 +4188,7 @@ static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* 
 /* Whether a bolt's model has lights of its own, which replace the stock
  * bolt light. */
 static int fl_projectile_has_model_lights(const XwaFlightObject* f) {
-	const AeronSceneMesh* mesh =
-		XwaRemasterShip_MeshForNameWithSource(XwaSnapshotExport_ModelName(f->object_type), NULL);
+	const AeronSceneMesh* mesh = XwaRemasterShip_MeshForNameWithSource(fl_object_model_name(f), NULL);
 	return mesh && mesh->light_count > 0;
 }
 
@@ -5030,8 +5036,7 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 		return 1;
 	}
 
-	const char* model_name =
-		model_name_override ? model_name_override : XwaSnapshotExport_ModelName(object->object_type);
+	const char* model_name = model_name_override ? model_name_override : fl_object_model_name(object);
 	out->mesh = XwaRemasterShip_MeshForNameWithSource(model_name, &out->source);
 	if (!out->mesh) {
 		return 0;

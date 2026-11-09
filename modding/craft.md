@@ -440,7 +440,7 @@ keeps the game's values for that subject.
 | [`hud`](#hud) | the reticle and the HUD colours |
 | [`engine_glows`](#engine_glows) | engine glows that show by speed |
 | [`surfaces`](#surfaces) | tagged materials and lights that show by the craft's state |
-| [`weapons`](#weapons) | weapon colours, laser rates, weapon stats and other weapon values |
+| [`weapons`](#weapons) | weapon colours, laser rates, weapon stats, weapon models and other weapon values |
 | [`stats_profiles`](#stats_profiles) | speeds, rates, hull and shields, by mission, difficulty and player |
 | [`shield`](#shield) | shield recharge |
 | [`sound`](#sound) | the craft's sounds |
@@ -542,8 +542,8 @@ surfaces. This group only changes what you see.
 ### weapons
 
 `weapons` holds several groups. The `weapons` section of
-`flight/flight.yaml` has the same groups, except `switch_by_iff`, `colors`
-and `by_markings`, and sets their values for every craft. The
+`flight/flight.yaml` has the same groups, except `switch_by_iff`, `colors`,
+`by_markings` and `models`, and sets their values for every craft. The
 [flight page](flight.md) describes it. For each value, the game uses the
 model's value first, then the value in `flight/flight.yaml`, then the value
 of the original game.
@@ -565,6 +565,7 @@ weapons:
   turret_ignore:
     rebel_laser_turbo: [freighter, starship, platform]
     turbolaser_red_heavy: [fighter, transport, warhead]
+  models: {torpedo: capitaltorpedo}
   stats:
     default:
       rebel_laser: {power: 350, fire_rate_ms: 188}
@@ -681,6 +682,25 @@ the way.
 For each weapon type, the game uses the model's list first, then the list
 in the `weapons` section of `flight/flight.yaml`. An empty list ignores
 nothing, and the list of `flight/flight.yaml` then doesn't apply.
+
+#### Weapon models
+
+`models` gives the craft's shots of a weapon type another model. For
+example, a capital ship can fire bigger torpedoes than a fighter.
+
+```yaml
+weapons:
+  models: {torpedo: capitaltorpedo, heavy_rocket: capitalrocket}
+```
+
+Each key is a [weapon type](reference/weapons.md#weapon-types), and each
+value is the name of a model in the mod: `flight/models/<name>.glb`. When
+the craft fires that weapon type, its shots show that model instead of the
+weapon's own model. When the model is missing, the game stops with an
+error.
+
+Only the look of the shots changes. Their speed, damage and collisions stay
+those of the weapon type.
 
 #### Weapon profiles
 

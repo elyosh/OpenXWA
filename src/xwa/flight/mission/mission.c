@@ -59,6 +59,7 @@
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/warhead_pools.h"
+#include "xwa_runtime/models/weapon_models.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #endif
 
@@ -8183,6 +8184,9 @@ uint16_t Mission_Init(char* fileName) {
 							 (int16_t)g_missionHeader.numFlightGroups);
 	XwaModelSettings_LoadMission(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 								 (int16_t)g_missionHeader.numFlightGroups);
+	if (!XwaWeaponModels_LoadMission()) {
+		return 0;
+	}
 	XwaMissionTie_UseSkins();
 #endif
 
