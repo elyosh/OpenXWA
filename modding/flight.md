@@ -175,6 +175,7 @@ weapons:
 | `ai_torpedoes` | How many warheads the AI fires at a big target. |
 | `impact_spin` | Whether a warhead hit spins the craft that it hits. |
 | `system_damage` | The system damage that ion weapons do. |
+| `turret_ignore` | The kinds of objects that AI turrets ignore, by weapon type. See [Turret targets](craft.md#turret-targets). |
 | `fire_ratio_by_rank` | How fast AI turrets and launchers fire, by rank. |
 | `damage_by_difficulty` | The damage that parts take through shields, by difficulty. |
 | `limit_linked_warhead_fire_rate` | Slows down linked warhead fire. |

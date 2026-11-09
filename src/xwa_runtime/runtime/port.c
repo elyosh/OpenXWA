@@ -63,6 +63,7 @@
 #include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/shield_recharge.h"
+#include "xwa_runtime/models/turret_ignore.h"
 #include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
@@ -195,6 +196,7 @@ int XwaPort_Init(void) {
 	XwaCraftHyperspace_Init();
 	XwaWeaponRates_Init();
 	XwaWeaponStats_Init();
+	XwaTurretIgnore_Init();
 	XwaWarheadLock_Init();
 	XwaAiAttack_Init();
 	XwaMagPulse_Init();

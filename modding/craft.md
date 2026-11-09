@@ -562,6 +562,9 @@ weapons:
   ai_torpedoes: {per_pass: 6, per_target: 16}
   impact_spin: {enabled: true, speed_percent: 100, angle_percent: 100}
   system_damage: {max: 1000, ion_cannon: 1, ion_cannon_turbo: 2}
+  turret_ignore:
+    rebel_laser_turbo: [freighter, starship, platform]
+    turbolaser_red_heavy: [fighter, transport, warhead]
   stats:
     default:
       rebel_laser: {power: 350, fire_rate_ms: 188}
@@ -642,6 +645,42 @@ All values except `enabled` are whole numbers of 0 or more.
 is hit. The damage of each ion weapon comes from the model of the craft that
 fired. When the mod renames one of these weapon types, its key in
 `system_damage` is the new name.
+
+#### Turret targets
+
+`turret_ignore` lists, for each weapon type, the kinds of objects that the
+craft's AI turrets ignore. For example, a point defence cannon can ignore
+starships, and a heavy turbolaser can ignore fighters and missiles.
+
+```yaml
+weapons:
+  turret_ignore:
+    rebel_laser_turbo: [freighter, starship, platform]
+    turbolaser_red_heavy: [fighter, transport, warhead]
+    turbolaser_green: []
+```
+
+Each key is a [weapon type](reference/weapons.md#weapon-types). Each list has
+[genus](reference/object_types.md#genus) names, such as `fighter` or
+`asteroid`, and `warhead`. `warhead` means a projectile that the AI can aim
+at, such as a missile or a torpedo, so it turns off the point defence of
+that weapon type.
+
+The lists only change the laser groups of the turret kinds: `turret`,
+`long_range_turret` and `slow_turret`. They apply when the AI aims the
+turrets. This includes the turrets of the player's transport while the
+player flies it with turret auto-fire on. They don't change the guns that a
+pilot fires, the targets that an AI craft flies at, or a turret that the
+player aims.
+
+A turret doesn't aim at an object that its weapon type ignores. It also
+doesn't check whether such an object is in its line of fire, so a heavy
+turbolaser that ignores fighters fires even when a friendly fighter is in
+the way.
+
+For each weapon type, the game uses the model's list first, then the list
+in the `weapons` section of `flight/flight.yaml`. An empty list ignores
+nothing, and the list of `flight/flight.yaml` then doesn't apply.
 
 #### Weapon profiles
 
