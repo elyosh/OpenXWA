@@ -30,6 +30,9 @@ int main(int argc, char** argv) {
 	};
 	if (!Aeron_Init(&config))
 		return 1;
+	/* The window keeps the logical size's aspect when it is resized, so the
+	   UI doesn't get bars on its sides or above and below. */
+	Aeron_SetWindowAspectRatio(config.logical_width, config.logical_height);
 	char error[512];
 	ImporterUi* app = ImporterUi_Create(error, sizeof error);
 	if (!app) {
