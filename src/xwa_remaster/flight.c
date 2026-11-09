@@ -4587,10 +4587,12 @@ static uint8_t fl_probe_set_owner(uint32_t i) {
  * `skip_baked` leaves out the lights baked into the model's probes, while
  * its probe set is placed. `variant` is the instance's variant index: a
  * light that names variants shines only with them. Lights in the instance's
- * `hidden_tag_groups` are left out. */
+ * `hidden_tag_groups` are left out. With `one_light`, only the first light
+ * that shines is added. Projectiles use it: a battle can have hundreds of
+ * them, so each one gets a single light. */
 static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transform[16],
 								const AeronSceneMeshTable* table, uint32_t variant,
-								uint32_t hidden_tag_groups, int keep, int skip_baked) {
+								uint32_t hidden_tag_groups, int keep, int skip_baked, int one_light) {
 	if (!s.plight.enabled || !s.plight.model_lights) {
 		return;
 	}
@@ -4605,6 +4607,9 @@ static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transfor
 								 exposure, &light)) {
 			s.pl_model_count++;
 			fl_pool_add(&light, 1, keep);
+			if (one_light) {
+				return;
+			}
 		}
 	}
 }
@@ -5237,7 +5242,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 		s.table_pool.used++;
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
-	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0);
+	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
 	if (player_f) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 										  inst.mesh_table, s.glow_mark_emissive_strength);
@@ -7273,14 +7278,15 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			inst.cull_mode = AERON_CULL_NONE;
 			inst.velocity_stamp = 1;
 			fl_push_bolt(&inst);
-			/* A bolt model with lights is lit by them, for the colour it
-			 * shows, instead of the stock light (fl_derive_point_lights). */
+			/* A bolt model with lights is lit by its first light that
+			 * shines, for the colour it shows, instead of the stock light
+			 * (fl_derive_point_lights). */
 			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant,
-								inst.hidden_tag_groups, 0, 0);
+								inst.hidden_tag_groups, 0, 0, 1);
 		} else {
 			AeronScene_AddMeshInstance(s.scene, &inst);
 			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant,
-								inst.hidden_tag_groups, 0, inst.probe_set_owner != 0);
+								inst.hidden_tag_groups, 0, inst.probe_set_owner != 0, 0);
 			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, prepared.mesh, model_matrix,
 											  inst.mesh_table, s.glow_mark_emissive_strength);
 			/* State-derived engine glows for this craft (classic scale
@@ -7424,7 +7430,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				}
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
-			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0);
+			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
 			if (player_f) {
 				XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 												  inst.mesh_table, s.glow_mark_emissive_strength);
