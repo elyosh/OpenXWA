@@ -444,7 +444,7 @@ void XwaSnapshot_Commit(void) {
 	s->scene_kind = g_scene_kind;
 	s->game_time_ticks = g_gameTime; /* sim clock; see header */
 	s->host_time_us = XwaTime_GetElapsedUs();
-	s->frontend_layout = (uint8_t)XwaFrontendScreens_Layout();
+	s->frontend_layout = (uint8_t)XwaFrontendScreens_TakeFrameLayout();
 	s->offscreen_restore_enabled = g_offscreenRestoreEnabled;
 	snapshot_capture_frontend_assets(s);
 	XwaSnapshotExport_CaptureOptAssets(s);

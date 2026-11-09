@@ -107,6 +107,10 @@ static int g_screenDefault = -1;
 static int g_screensLoaded;
 
 static int g_screenRunIndex = -1; /* the stack index that ran last */
+/* The update function that ran last. It can switch the stack entry to the
+   next screen. */
+static FrontendScreenUpdateFn g_screenRunUpdate;
+static int g_drawnLayout = -1; /* from NoteDrawn, until the tick ends */
 static unsigned g_screenFrames;   /* the frontend frames run so far */
 static XwaScreenId g_screenLogged = SCREEN_NONE;
 static int g_screenLoggedLayout = -1;
@@ -250,7 +254,9 @@ static int screens_listed_layout(XwaScreenId screen) {
  * below them. */
 static int screens_stack_layout(int index, XwaScreenId* shown) {
 	for (; index >= 0; index--) {
-		const XwaScreenId screen = screens_find(g_screenStates[index].updateFn);
+		const XwaScreenId screen = screens_find(index == g_screenRunIndex && g_screenRunUpdate
+													? g_screenRunUpdate
+													: g_screenStates[index].updateFn);
 		int layout;
 
 		if (screen == SCREEN_NONE) {
@@ -303,7 +309,17 @@ static int screens_background_layout(void) {
 
 void XwaFrontendScreens_NoteRun(void) {
 	g_screenRunIndex = g_screenStackTop;
+	g_screenRunUpdate = g_screenStates[g_screenStackTop].updateFn;
 	g_screenFrames++;
+}
+
+void XwaFrontendScreens_NoteDrawn(void) { g_drawnLayout = (int)XwaFrontendScreens_Layout(); }
+
+XwaFrontendLayout XwaFrontendScreens_TakeFrameLayout(void) {
+	const int layout = g_drawnLayout;
+
+	g_drawnLayout = -1;
+	return layout >= 0 ? (XwaFrontendLayout)layout : XwaFrontendScreens_Layout();
 }
 
 unsigned XwaFrontendScreens_FrameCount(void) { return g_screenFrames; }
@@ -371,6 +387,8 @@ void XwaFrontendScreens_Shutdown(void) {
 	g_screensLoaded = 0;
 	g_screenDefault = -1;
 	g_screenRunIndex = -1;
+	g_screenRunUpdate = NULL;
+	g_drawnLayout = -1;
 	g_screenLogged = SCREEN_NONE;
 	g_screenLoggedLayout = -1;
 	g_backgroundKnown = 0;

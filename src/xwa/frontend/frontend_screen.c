@@ -419,6 +419,9 @@ int FrontendScreen_RunFrame(void) {
 	XwaFrontendScreens_NoteRun();
 #endif
 	result = state->updateFn(g_frameCounter);
+#ifdef XWA_MODERN
+	XwaFrontendScreens_NoteDrawn();
+#endif
 	if (g_screenCallbacksDirty == 1 || result == 1) {
 		g_screenCallbacksDirty = 0;
 		if (exitFn != 0) {
