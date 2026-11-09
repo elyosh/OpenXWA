@@ -122,6 +122,8 @@ models:
 effects:
   explosion_genus_emissive_strength: 10.0
   glow_mark_emissive_strength: 20.0
+  # The same, for the hit marks on the cockpit model. 0 hides them.
+  cockpit_glow_mark_emissive_strength: 4.0
 dynamic_cockpit:
   # Cockpit displays that show the HUD, from the screens of the cockpit
   # models.

@@ -247,6 +247,7 @@ static struct {
 	float explosion_genus_emissive_strength;
 	float glow_mark_emissive_strength;
 	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
+	float cockpit_glow_mark_emissive_strength;
 	 * window narrower than this aspect gets a wider view, so that the
 	 * horizontal field of view stays the one at this aspect. 0 turns it
 	 * off. */
@@ -723,6 +724,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"effects.explosion_genus_emissive_strength",
 		"effects.glow_mark_emissive_strength",
 		"dynamic_cockpit.display_emissive_strength",
+		"effects.cockpit_glow_mark_emissive_strength",
 		"dynamic_cockpit.hologram_emissive_strength",
 		"motion_blur.shutter",
 		"temporal_upscaling.sharpness",
@@ -1642,6 +1644,14 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.hyperspace_jump_default = s.hyperspace_jump;
 	s.hyperspace_preview_speed = 1.0f;
 	fl_request_fsr_reset(FL_FSR_RESET_INITIAL);
+	s.cockpit_glow_mark_emissive_strength =
+		(float)AeronConfigFile_GetFloat(cf, "effects.cockpit_glow_mark_emissive_strength", 0.0);
+	if (!isfinite(s.cockpit_glow_mark_emissive_strength) || s.cockpit_glow_mark_emissive_strength < 0.0f) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: effects.cockpit_glow_mark_emissive_strength must be a number, 0 or more", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
 	AeronConfigFile_Destroy(cf);
 	s.config_loaded = 1;
 	Aeron_LogInfo("xwa.remaster",
@@ -5244,9 +5254,9 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
 	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
-	if (player_f) {
+	if (player_f && s.cockpit_glow_mark_emissive_strength > 0.0f) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
-										  inst.mesh_table, s.glow_mark_emissive_strength);
+										  inst.mesh_table, s.cockpit_glow_mark_emissive_strength);
 	}
 	if (s.glow_ok && player_f) {
 		XwaRemasterShip_SubmitEngineGlows(s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER,
@@ -7430,9 +7440,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
 			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
-			if (player_f) {
+			if (player_f && s.cockpit_glow_mark_emissive_strength > 0.0f) {
 				XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
-												  inst.mesh_table, s.glow_mark_emissive_strength);
+												  inst.mesh_table, s.cockpit_glow_mark_emissive_strength);
 			}
 			/* Cockpit-model engine glows (classic: the cockpit glow set
 			 * when internal + cockpit visible), scale/knockouts from
