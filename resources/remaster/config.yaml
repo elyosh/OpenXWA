@@ -573,6 +573,11 @@ lighting:
   ambient_r: 1.0
   ambient_g: 1.0
   ambient_b: 1.0
+  # The least ambient light on the in-flight map, so that the craft can be
+  # seen in dim regions.
+  map_ambient_min_r: 5.0
+  map_ambient_min_g: 5.0
+  map_ambient_min_b: 5.0
   # Scale of all emitted light (illumination, screens, holograms, lasers,
   # glows, explosions). Emitters far brighter than lit surfaces are what
   # visibly glow through bloom.

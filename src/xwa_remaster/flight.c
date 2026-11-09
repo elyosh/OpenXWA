@@ -248,6 +248,7 @@ static struct {
 	float explosion_genus_emissive_strength;
 	float glow_mark_emissive_strength;
 	float cockpit_glow_mark_emissive_strength;
+	float map_ambient_min[3]; /* lighting.map_ambient_min_* */
 	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
 	 * window narrower than this aspect gets a wider view, so that the
 	 * horizontal field of view stays the one at this aspect. 0 turns it
@@ -720,6 +721,9 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"lighting.ambient_r",
 		"lighting.ambient_g",
 		"lighting.ambient_b",
+		"lighting.map_ambient_min_r",
+		"lighting.map_ambient_min_g",
+		"lighting.map_ambient_min_b",
 		"lighting.emissive_scale",
 		"bloom.intensity",
 		"effects.explosion_genus_emissive_strength",
@@ -1609,6 +1613,16 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		return 0;
 	}
 	XwaRemasterShip_ConfigurePbrTuning(&pbr);
+	static const char* const map_ambient_keys[3] = { "lighting.map_ambient_min_r", "lighting.map_ambient_min_g",
+													 "lighting.map_ambient_min_b" };
+	for (int c = 0; c < 3; c++) {
+		s.map_ambient_min[c] = (float)AeronConfigFile_GetFloat(cf, map_ambient_keys[c], 0.0);
+		if (!isfinite(s.map_ambient_min[c]) || s.map_ambient_min[c] < 0.0f) {
+			Aeron_LogError("xwa.remaster", "%s: %s must be a number, 0 or more", path, map_ambient_keys[c]);
+			AeronConfigFile_Destroy(cf);
+			return 0;
+		}
+	}
 	const float emissive_scale = (float)AeronConfigFile_GetFloat(cf, "lighting.emissive_scale", 0.0);
 	if (!isfinite(emissive_scale) || emissive_scale < 0.0f) {
 		Aeron_LogError("xwa.remaster", "%s: lighting.emissive_scale must be finite and non-negative", path);
@@ -6648,7 +6662,16 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	XwaRemasterDirLight lights[XWA_SNAP_MAX_DIR_LIGHTS];
 	const uint32_t light_count =
 		XwaRemaster_ReadGameDirLights(snap->dir_lights, snap->dir_light_count, lights);
-	XwaRemasterShip_SetPbrEnv(s.scene, lights, light_count, -1, NULL, s.camera_local, NULL, NULL, NULL,
+	XwaShipAmbientCube ambient;
+	XwaRemasterShip_GetAmbientCube(&ambient);
+	float* const faces[6] = { ambient.pos_x, ambient.neg_x, ambient.pos_y,
+							  ambient.neg_y, ambient.pos_z, ambient.neg_z };
+	for (int f = 0; f < 6; f++) {
+		for (int c = 0; c < 3; c++) {
+			faces[f][c] = fmaxf(faces[f][c], s.map_ambient_min[c]);
+		}
+	}
+	XwaRemasterShip_SetPbrEnv(s.scene, lights, light_count, -1, NULL, s.camera_local, NULL, &ambient, NULL,
 							  -1.0f);
 	if (!AeronScene_Render(s.scene, cmd)) {
 		s.snap = NULL;
