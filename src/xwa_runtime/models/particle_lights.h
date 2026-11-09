@@ -4,15 +4,12 @@
 /* Particle lights: the game gives every particle effect attached to an
  * object, except type 1, a light of intensity 125 and colour (1, 1, 0.75)
  * at its emitter, for the whole life of the effect
- * (Particle_AppendObjectEffectPointLights). The `particle_lights` section
- * of the mod's flight settings replaces these lights in the HD renderer, by
- * group, and is read once at startup. Effect 4 is `cockpit_sparks`, effect 2
- * `cockpit_smoke`, and the other effects are `craft_damage`.
- *
- * Each light is a Blender point light: P watts give P * 683 / (4 pi)
- * candela all around. A group that isn't in the section keeps the game's
- * light. The game's own code and the classic renderers keep the game's
- * lights, so the section only changes the display. */
+ * (Particle_AppendObjectEffectPointLights). The HD renderer replaces these
+ * lights by group: effect 4 is `cockpit_sparks`, effect 2 `cockpit_smoke`,
+ * and the other effects are `craft_damage`. The defaults are in
+ * `point_lights.particle_lights` of resources/remaster/config.yaml, and
+ * each key of the mod's `particle_lights` section replaces one. The classic
+ * renderers keep the game's lights. */
 
 #ifdef __cplusplus
 extern "C" {
@@ -20,10 +17,17 @@ extern "C" {
 
 struct XwaSnapshot;
 
+/* Returns the group called `name`, or -1. */
+int XwaParticleLights_Find(const char* name);
+
+/* Returns the name of `group`, or NULL. */
+const char* XwaParticleLights_Name(int group);
+
 /* Reads the `particle_lights` section of flight/flight.yaml. */
 void XwaParticleLights_Init(void);
 
-/* Writes the groups' settings into the snapshot. */
+/* Writes the values that the mod sets into the snapshot's particle
+   lights. */
 void XwaParticleLights_Capture(struct XwaSnapshot* snapshot);
 
 #ifdef __cplusplus

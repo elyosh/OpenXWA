@@ -33,6 +33,7 @@
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/models/cockpit_lights.h"
+#include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/presentation.h"
@@ -246,8 +247,8 @@ static struct {
 	XwaFlightPointLightParams plight_default;
 	float explosion_genus_emissive_strength;
 	float glow_mark_emissive_strength;
-	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
 	float cockpit_glow_mark_emissive_strength;
+	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
 	 * window narrower than this aspect gets a wider view, so that the
 	 * horizontal field of view stays the one at this aspect. 0 turns it
 	 * off. */
@@ -723,8 +724,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"bloom.intensity",
 		"effects.explosion_genus_emissive_strength",
 		"effects.glow_mark_emissive_strength",
-		"dynamic_cockpit.display_emissive_strength",
 		"effects.cockpit_glow_mark_emissive_strength",
+		"dynamic_cockpit.display_emissive_strength",
 		"dynamic_cockpit.hologram_emissive_strength",
 		"motion_blur.shutter",
 		"temporal_upscaling.sharpness",
@@ -815,12 +816,10 @@ static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
 		   p->match_distance_m > 0.0f && isfinite(p->range_scale) && p->range_scale > 0.0f;
 }
 
-/* Reads the vector `key` of `entry`, the cockpit light `name`, into
-   `out`. Does nothing when the key isn't there. Logs an error and returns 0
-   when the value isn't a list of three numbers, or when `non_negative` is
-   set and a number is below 0. */
-static int fl_read_cockpit_light_vector(const AeronConfigNode* entry, const char* path, const char* name,
-										const char* key, int non_negative, float out[3], int* found) {
+/* Reads the three numbers at `key` of `entry` into `out`, if the key is
+   there. Logs an error and returns 0 when the value is wrong. */
+static int fl_read_light_vector(const AeronConfigNode* entry, const char* path, const char* section,
+								const char* name, const char* key, int non_negative, float out[3], int* found) {
 	const AeronConfigNode* node = AeronConfigNode_MapGet(entry, key);
 	if (!node) {
 		return 1;
@@ -835,9 +834,8 @@ static int fl_read_cockpit_light_vector(const AeronConfigNode* entry, const char
 			 (!non_negative || values[i] >= 0.0f);
 	}
 	if (!ok) {
-		Aeron_LogError("xwa.remaster",
-					   "%s:%d: point_lights.cockpit_lights.%s.%s must be a list of three %snumbers", path,
-					   AeronConfigNode_Line(node), name, key, non_negative ? "non-negative " : "");
+		Aeron_LogError("xwa.remaster", "%s:%d: point_lights.%s.%s.%s must be a list of three %snumbers", path,
+					   AeronConfigNode_Line(node), section, name, key, non_negative ? "non-negative " : "");
 		return 0;
 	}
 	memcpy(out, values, sizeof values);
@@ -895,8 +893,10 @@ static int fl_load_cockpit_lights_config(const AeronConfigFile* cf, const char* 
 				AeronConfigNode_Line(power ? power : entry), name);
 			return 0;
 		}
-		if (!fl_read_cockpit_light_vector(entry, path, name, "position_m", 0, light->position_m, NULL) ||
-			!fl_read_cockpit_light_vector(entry, path, name, "color", 1, light->color, &light->has_color)) {
+		if (!fl_read_light_vector(entry, path, "cockpit_lights", name, "position_m", 0, light->position_m,
+								  NULL) ||
+			!fl_read_light_vector(entry, path, "cockpit_lights", name, "color", 1, light->color,
+								  &light->has_color)) {
 			return 0;
 		}
 		found |= 1u << (uint32_t)slot;
@@ -905,6 +905,76 @@ static int fl_load_cockpit_lights_config(const AeronConfigFile* cf, const char* 
 		if (!(found & (1u << (uint32_t)slot))) {
 			Aeron_LogError("xwa.remaster", "%s: point_lights.cockpit_lights.%s is missing", path,
 						   XwaCockpitLights_Name(slot));
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/* Every group needs power_w. Logs an error and returns 0 when the section
+   is wrong. */
+static int fl_load_particle_lights_config(const AeronConfigFile* cf, const char* path) {
+	const AeronConfigNode* section = AeronConfigFile_GetNode(cf, "point_lights.particle_lights");
+	uint32_t found = 0;
+	memset(s.plight.particle_lights, 0, sizeof s.plight.particle_lights);
+	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.remaster", "%s: point_lights.particle_lights must be a map of the three groups",
+					   path);
+		return 0;
+	}
+	for (size_t i = 0; i < AeronConfigNode_MapCount(section); i++) {
+		const char* name = AeronConfigNode_MapKeyAt(section, i);
+		const AeronConfigNode* entry = AeronConfigNode_MapValueAt(section, i);
+		const int group = XwaParticleLights_Find(name);
+		if (group < 0) {
+			Aeron_LogError("xwa.remaster", "%s:%d: point_lights.particle_lights: unknown group %s", path,
+						   AeronConfigNode_Line(entry), name ? name : "");
+			return 0;
+		}
+		if (AeronConfigNode_Type(entry) != AERON_CONFIG_MAP) {
+			Aeron_LogError("xwa.remaster", "%s:%d: point_lights.particle_lights.%s must be a map", path,
+						   AeronConfigNode_Line(entry), name);
+			return 0;
+		}
+		for (size_t k = 0; k < AeronConfigNode_MapCount(entry); k++) {
+			const char* key = AeronConfigNode_MapKeyAt(entry, k);
+			if (!key ||
+				(strcmp(key, "color") != 0 && strcmp(key, "power_w") != 0 && strcmp(key, "fade") != 0)) {
+				Aeron_LogError("xwa.remaster", "%s:%d: point_lights.particle_lights.%s: unknown key %s", path,
+							   AeronConfigNode_Line(AeronConfigNode_MapValueAt(entry, k)), name,
+							   key ? key : "");
+				return 0;
+			}
+		}
+		XwaFlightParticleLight* light = &s.plight.particle_lights[group];
+		const AeronConfigNode* power = AeronConfigNode_MapGet(entry, "power_w");
+		const AeronConfigNodeType power_type = AeronConfigNode_Type(power);
+		light->power_w = (float)AeronConfigNode_Float(power, -1.0);
+		if ((power_type != AERON_CONFIG_INT && power_type != AERON_CONFIG_FLOAT) ||
+			!isfinite(light->power_w) || light->power_w < 0.0f) {
+			Aeron_LogError(
+				"xwa.remaster",
+				"%s:%d: point_lights.particle_lights.%s.power_w must be a number of watts, 0 or more", path,
+				AeronConfigNode_Line(power ? power : entry), name);
+			return 0;
+		}
+		const AeronConfigNode* fade = AeronConfigNode_MapGet(entry, "fade");
+		if (fade && AeronConfigNode_Type(fade) != AERON_CONFIG_BOOL) {
+			Aeron_LogError("xwa.remaster", "%s:%d: point_lights.particle_lights.%s.fade must be true or false",
+						   path, AeronConfigNode_Line(fade), name);
+			return 0;
+		}
+		light->fade = AeronConfigNode_Bool(fade, 0);
+		if (!fl_read_light_vector(entry, path, "particle_lights", name, "color", 1, light->color,
+								  &light->has_color)) {
+			return 0;
+		}
+		found |= 1u << (uint32_t)group;
+	}
+	for (int group = 0; group < XWA_PARTICLE_LIGHT_GROUP_COUNT; group++) {
+		if (!(found & (1u << (uint32_t)group))) {
+			Aeron_LogError("xwa.remaster", "%s: point_lights.particle_lights.%s is missing", path,
+						   XwaParticleLights_Name(group));
 			return 0;
 		}
 	}
@@ -1461,7 +1531,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
-	if (!fl_load_cockpit_lights_config(cf, path)) {
+	if (!fl_load_cockpit_lights_config(cf, path) || !fl_load_particle_lights_config(cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -1574,6 +1644,14 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+	s.cockpit_glow_mark_emissive_strength =
+		(float)AeronConfigFile_GetFloat(cf, "effects.cockpit_glow_mark_emissive_strength", 0.0);
+	if (!isfinite(s.cockpit_glow_mark_emissive_strength) || s.cockpit_glow_mark_emissive_strength < 0.0f) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: effects.cockpit_glow_mark_emissive_strength must be a number, 0 or more", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
 	if (!XwaRemasterSuns_LoadFlareElements(cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
@@ -1644,14 +1722,6 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.hyperspace_jump_default = s.hyperspace_jump;
 	s.hyperspace_preview_speed = 1.0f;
 	fl_request_fsr_reset(FL_FSR_RESET_INITIAL);
-	s.cockpit_glow_mark_emissive_strength =
-		(float)AeronConfigFile_GetFloat(cf, "effects.cockpit_glow_mark_emissive_strength", 0.0);
-	if (!isfinite(s.cockpit_glow_mark_emissive_strength) || s.cockpit_glow_mark_emissive_strength < 0.0f) {
-		Aeron_LogError("xwa.remaster",
-					   "%s: effects.cockpit_glow_mark_emissive_strength must be a number, 0 or more", path);
-		AeronConfigFile_Destroy(cf);
-		return 0;
-	}
 	AeronConfigFile_Destroy(cf);
 	s.config_loaded = 1;
 	Aeron_LogInfo("xwa.remaster",
@@ -1967,6 +2037,10 @@ void XwaRemasterFlight_SetPointLights(const XwaFlightPointLightParams* in) {
 		for (int p = 0; p < XWA_SNAP_COCKPIT_LIGHT_COUNT; p++) {
 			const float power = in->cockpit_lights[p].power_w;
 			s.plight.cockpit_lights[p].power_w = isfinite(power) ? fminf(fmaxf(power, 0.0f), 1.0e7f) : 0.0f;
+		}
+		for (int g = 0; g < XWA_PARTICLE_LIGHT_GROUP_COUNT; g++) {
+			const float power = in->particle_lights[g].power_w;
+			s.plight.particle_lights[g].power_w = isfinite(power) ? fminf(fmaxf(power, 0.0f), 1.0e7f) : 0.0f;
 		}
 	}
 }
@@ -4215,16 +4289,19 @@ static XwaParticleLightGroup fl_particle_light_group(const XwaParticleEffect* ef
  * With fade, it dims linearly over the effect's life. */
 int XwaRemasterFlight_ParticleLight(const XwaSnapshot* snapshot, const XwaParticleEffect* effect,
 									const float pos[3], float exposure, AeronSceneLight* out) {
-	const XwaParticleLight* group = &snapshot->particle_lights[fl_particle_light_group(effect)];
-	if (!group->defined || !s.plight.model_lights) {
+	if (!s.plight.model_lights) {
 		return -1;
 	}
+	const XwaParticleLightGroup index = fl_particle_light_group(effect);
+	const XwaParticleLight* mod = &snapshot->particle_lights[index];
+	const XwaFlightParticleLight* d = &s.plight.particle_lights[index];
+	const float power_w = mod->has_power ? mod->power_w : d->power_w;
 	float fade = 1.0f;
-	if (group->fade && effect->lifetime_ticks > 0) {
+	if ((mod->has_fade ? mod->fade : d->fade) && effect->lifetime_ticks > 0) {
 		fade = 1.0f - (float)effect->age_ticks / (float)effect->lifetime_ticks;
 		fade = fade < 0.0f ? 0.0f : (fade > 1.0f ? 1.0f : fade);
 	}
-	if (!(group->power_w > 0.0f) || !(fade > 0.0f)) {
+	if (!(power_w > 0.0f) || !(fade > 0.0f)) {
 		return 0;
 	}
 	const float u = AERON_OPT_UNITS_PER_METER;
@@ -4237,9 +4314,11 @@ int XwaRemasterFlight_ParticleLight(const XwaSnapshot* snapshot, const XwaPartic
 	AeronFlightLight light;
 	memset(&light, 0, sizeof light);
 	for (int c = 0; c < 3; c++) {
-		light.color[c] = group->has_color ? group->color[c] : XwaRemaster_SrgbToLinear(c < 2 ? 1.0f : 0.75f);
+		light.color[c] = mod->has_color ? mod->color[c]
+						 : d->has_color ? d->color[c]
+										: XwaRemaster_SrgbToLinear(c < 2 ? 1.0f : 0.75f);
 	}
-	light.intensity = group->power_w * 683.0f / (4.0f * 3.14159265f) * fade;
+	light.intensity = power_w * 683.0f / (4.0f * 3.14159265f) * fade;
 	light.shape = AERON_FLIGHT_LIGHT_POINT;
 	const float scale = 1.0f / AERON_SCENE_LUMENS_PER_WATT;
 	return AeronScene_FlightLight(&light, transform, u, scale, exposure, out) ? 1 : 0;
@@ -4322,13 +4401,9 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 			fl_pl_push(local, cxi);
 		}
 	}
-	/* Particle_AppendObjectEffectPointLights contributes one warm light at
-	 * each eligible object-attached emitter (effect type 1 is excluded).
-	 * The recovered classic helper stores receiver-relative coordinates;
-	 * at the HD boundary this becomes the intended world emitter position
-	 * and participates in the same frame-global PBR light selection. The
-	 * mod's light replaces it (XwaParticleLight), and the pool always keeps
-	 * the cockpit's. */
+	/* The lights of the particle effects on objects
+	 * (Particle_AppendObjectEffectPointLights). The pool always keeps the
+	 * cockpit sparks and smoke. */
 	const float exposure = XwaRemasterFlight_Exposure();
 	for (uint32_t i = 0; i < snap->particle_effect_count; i++) {
 		const XwaParticleEffect* effect = &snap->particle_effects[i];

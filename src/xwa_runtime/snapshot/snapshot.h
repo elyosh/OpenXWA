@@ -768,13 +768,13 @@ typedef enum XwaParticleLightGroup {
 	XWA_PARTICLE_LIGHT_GROUP_COUNT
 } XwaParticleLightGroup;
 
-/* The mod's light for a group of particle effects, in place of the game's:
- * a Blender point light of `power_w` watts at the emitter (0: no light).
- * `color` is linear; without `has_color`, the light has the game's colour.
- * With `fade`, it dims to nothing over the effect's life. */
+/* The values that the mod's particle_lights section sets for a group
+ * (particle_lights.h). The HD renderer uses its defaults for the values
+ * without a `has_*` flag. `color` is linear. */
 typedef struct XwaParticleLight {
-	uint8_t defined;
 	uint8_t has_color;
+	uint8_t has_power;
+	uint8_t has_fade;
 	uint8_t fade;
 	float color[3];
 	float power_w;

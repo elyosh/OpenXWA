@@ -161,6 +161,16 @@ typedef struct XwaFlightCockpitLight {
 	float power_w; /* 0 turns the light off */
 } XwaFlightCockpitLight;
 
+/* The default light of a particle effect group, from
+ * point_lights.particle_lights. The mod's values replace these
+ * (XwaParticleLight). Without `has_color`, the light has the game's colour. */
+typedef struct XwaFlightParticleLight {
+	int has_color;
+	float color[3];
+	float power_w; /* 0 turns the light off */
+	int fade;
+} XwaFlightParticleLight;
+
 /* Point-light knobs (remaster/config.yaml `point_lights:` mapping + the debug
  * inspector). The classic SOURCE laws fix each light's color and classic
  * intensity; the scene evaluates them as physical sphere lights as bright
@@ -178,6 +188,8 @@ typedef struct XwaFlightPointLightParams {
 	/* The cockpit lights, by slot. They are only used when
 	 * model_lights is on. When it is off, the game's own lights are used. */
 	XwaFlightCockpitLight cockpit_lights[XWA_SNAP_COCKPIT_LIGHT_COUNT];
+	/* By XwaParticleLightGroup. Only used when model_lights is on. */
+	XwaFlightParticleLight particle_lights[XWA_PARTICLE_LIGHT_GROUP_COUNT];
 } XwaFlightPointLightParams;
 
 /* The game's light candidates, the models' lights, and those of both whose
@@ -194,11 +206,9 @@ typedef struct XwaFlightPointLightStats {
 	AeronSceneClusteredLightStats scene;
 } XwaFlightPointLightStats;
 
-/* The mod's light for particle effect `effect` of `snapshot`
- * (XwaParticleLight), at `pos` in scene units, with its range for
- * `exposure`. Returns -1 when the mod doesn't replace the game's light (or
- * model lights are off), 0 when its light is off, 1 when `out` holds the
- * light. */
+/* The light of particle effect `effect` at `pos`, in scene units. Returns
+ * -1 when model lights are off and the game's light must be used, 0 when
+ * the light is off, and 1 when `out` holds it. */
 int XwaRemasterFlight_ParticleLight(const XwaSnapshot* snapshot, const XwaParticleEffect* effect,
 									const float pos[3], float exposure, AeronSceneLight* out);
 

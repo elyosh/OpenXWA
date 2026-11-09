@@ -805,8 +805,9 @@ ignores all the keys of that light and writes an error in the log.
 ### particle_lights
 
 The game gives the particle effects on objects, such as sparks and smoke,
-a yellow-white light at their emitter. This section replaces those lights
-in modern graphics, by group.
+a yellow-white light at their emitter. Modern graphics replace those lights
+by group. OpenXWA has default values for each group, and this section
+changes them.
 
 ```yaml
 particle_lights:
@@ -830,13 +831,13 @@ Each group has these keys:
 
 | Key | Meaning |
 |-|-|
-| `color` | The light's colour, linear, with no value below 0. The default is the game's colour. |
-| `power_w` | Required. The light's power in watts, 0 or more, as for a Blender point light. 0 gives no light. |
-| `fade` | `true` makes the light dim to nothing over the effect's life. Without it, the light stays at full strength until the effect ends, as in the original game. |
+| `color` | The light's colour, as three linear values of 0 or more. |
+| `power_w` | The light's power in watts, 0 or more, as for a Blender point light. 0 turns the light off. |
+| `fade` | `true` makes the light dim to nothing over the effect's life. `false` keeps it at full strength until the effect ends, as in the original game. |
 
-A group that the section doesn't list keeps the game's light. A group with
-a wrong value also keeps the game's light, and the game writes an error in
-the log.
+All the keys are optional. When you leave a key out, the light uses
+OpenXWA's default value for it. If a group has a wrong value, the game
+ignores all the keys of that group and writes an error in the log.
 
 ### backdrops
 

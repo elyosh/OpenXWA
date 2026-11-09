@@ -518,9 +518,9 @@ point_lights:
   # illuminance after the exposure, and ends.
   range_scale: 1.0
   # Turns on the lights that are set in candela: the lights in models (such
-  # as the interior light of the converted cockpits), the headlight, the
-  # cockpit lights below and the mod's particle lights. When this is off,
-  # the game's own cockpit lights and particle lights are used instead.
+  # as the interior light of the converted cockpits), the headlight, and the
+  # cockpit lights and particle lights below. When this is off, the game's
+  # own cockpit lights and particle lights are used instead.
   model_lights: true
   # The lights that the game blinks in the cockpit, such as the red light
   # when the hull is low. Each one works like a Blender point light:
@@ -534,11 +534,25 @@ point_lights:
   # conversion makes them far too bright this close to the cockpit.
   cockpit_lights:
     hull_critical:
-      power_w: 50
+      power_w: 500
     warhead_lock:
-      power_w: 40
+      power_w: 500
     beam_warning:
-      power_w: 50
+      power_w: 500
+  # The lights of the particle effects on craft. cockpit_sparks and
+  # cockpit_smoke are the sparks and smoke in the cockpit when a hit gets
+  # through the shields. craft_damage is every other effect. power_w and
+  # color work as above. fade: true dims the light over the effect's life.
+  # A mod can change them in the particle_lights section of its
+  # flight/flight.yaml. 158,000 W matches the game's light with the default
+  # match_distance_m and classic_lighting.illuminance.
+  particle_lights:
+    cockpit_sparks:
+      power_w: 500
+    cockpit_smoke:
+      power_w: 0
+    craft_damage:
+      power_w: 158000
 classic_lighting:
   # Converts the classic game's lights (suns and other backdrops, the game's
   # lights in the hangar, lasers, explosions, engines), which have no unit.
