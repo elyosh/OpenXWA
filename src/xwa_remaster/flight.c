@@ -2992,6 +2992,44 @@ static const char* fl_object_model_name(const XwaFlightObject* object) {
 			   : XwaSnapshotExport_ModelName(object->object_type);
 }
 
+/* The meshes found by model name in this frame, kept by name pointer. Every
+ * object and projectile looks up its mesh once or more per frame, and a name
+ * pointer from fl_object_model_name names the same model for the whole frame.
+ * An entry is valid for one frame and one mesh generation
+ * (XwaRemasterShip_MeshGeneration). */
+#define FL_MESH_MEMO_SIZE 128u
+
+typedef struct FlMeshMemo {
+	const char* name;
+	AeronSceneMesh* mesh;
+	uint64_t generation;
+	uint32_t frame;
+	uint8_t source;
+} FlMeshMemo;
+
+static FlMeshMemo s_mesh_memo[FL_MESH_MEMO_SIZE];
+static uint32_t s_mesh_memo_frame;
+
+/* Looks up a mesh like XwaRemasterShip_MeshForNameWithSource, through the
+ * frame's memo. */
+static AeronSceneMesh* fl_mesh_for_name(const char* name, uint8_t* out_source) {
+	if (!name) {
+		return XwaRemasterShip_MeshForNameWithSource(name, out_source);
+	}
+	const uint64_t generation = XwaRemasterShip_MeshGeneration();
+	FlMeshMemo* memo = &s_mesh_memo[((uintptr_t)name >> 3) & (FL_MESH_MEMO_SIZE - 1u)];
+	if (memo->name != name || memo->frame != s_mesh_memo_frame || memo->generation != generation) {
+		memo->name = name;
+		memo->mesh = XwaRemasterShip_MeshForNameWithSource(name, &memo->source);
+		memo->generation = generation;
+		memo->frame = s_mesh_memo_frame;
+	}
+	if (out_source) {
+		*out_source = memo->source;
+	}
+	return memo->mesh;
+}
+
 static int fl_object_in_render_region(const XwaFlightObject* object, uint8_t region) {
 	return object->render_region == region && object->slot_class != XWA_SNAP_SLOT_OTHER;
 }
@@ -4263,7 +4301,7 @@ static XwaShipPointLight* fl_pl_push(const float pos[3], const float color_x_int
  * when the model is unavailable. */
 static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* f,
 								const int32_t camera_world[3], float center[3], float half_axis[3]) {
-	const AeronSceneMesh* mesh = XwaRemasterShip_MeshForNameWithSource(fl_object_model_name(f), NULL);
+	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f), NULL);
 	if (!mesh) {
 		return 0;
 	}
@@ -4302,7 +4340,7 @@ static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* 
 /* Whether a bolt's model has lights of its own, which replace the stock
  * bolt light. */
 static int fl_projectile_has_model_lights(const XwaFlightObject* f) {
-	const AeronSceneMesh* mesh = XwaRemasterShip_MeshForNameWithSource(fl_object_model_name(f), NULL);
+	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f), NULL);
 	return mesh && mesh->light_count > 0;
 }
 
@@ -4731,10 +4769,65 @@ static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transfor
 	}
 }
 
-static int fl_pool_compare(const void* a, const void* b) {
-	const float sa = ((const FlPoolLight*)a)->score;
-	const float sb = ((const FlPoolLight*)b)->score;
-	return sa > sb ? -1 : (sa < sb ? 1 : 0);
+/* A pool light's score and index. These keys are sorted instead of the pool
+ * entries, which are large. */
+typedef struct FlPoolKey {
+	float score;
+	uint32_t index;
+} FlPoolKey;
+
+/* Whether `a` ranks before `b`: the higher score first, then the earlier pool
+ * entry, so that no two keys are equal. */
+static int fl_pool_key_before(const FlPoolKey* a, const FlPoolKey* b) {
+	if (a->score != b->score) {
+		return a->score > b->score;
+	}
+	return a->index < b->index;
+}
+
+/* Sorts `count` keys with fl_pool_key_before, using `scratch`, which holds as
+ * many keys: insertion sort of short runs, then merges. */
+static void fl_sort_pool_keys(FlPoolKey* keys, FlPoolKey* scratch, uint32_t count) {
+	enum { RUN = 16 };
+
+	for (uint32_t start = 0; start < count; start += RUN) {
+		const uint32_t end = start + RUN < count ? start + RUN : count;
+		for (uint32_t i = start + 1; i < end; i++) {
+			const FlPoolKey key = keys[i];
+			uint32_t j = i;
+			while (j > start && fl_pool_key_before(&key, &keys[j - 1])) {
+				keys[j] = keys[j - 1];
+				j--;
+			}
+			keys[j] = key;
+		}
+	}
+	FlPoolKey* from = keys;
+	FlPoolKey* to = scratch;
+	for (uint32_t width = RUN; width < count; width *= 2) {
+		for (uint32_t start = 0; start < count; start += 2 * width) {
+			const uint32_t middle = start + width < count ? start + width : count;
+			const uint32_t end = start + 2 * width < count ? start + 2 * width : count;
+			uint32_t a = start;
+			uint32_t b = middle;
+			uint32_t out = start;
+			while (a < middle && b < end) {
+				to[out++] = fl_pool_key_before(&from[b], &from[a]) ? from[b++] : from[a++];
+			}
+			while (a < middle) {
+				to[out++] = from[a++];
+			}
+			while (b < end) {
+				to[out++] = from[b++];
+			}
+		}
+		FlPoolKey* swap = from;
+		from = to;
+		to = swap;
+	}
+	if (from != keys) {
+		memcpy(keys, from, (size_t)count * sizeof *keys);
+	}
 }
 
 /* Submit the pool's best lights within the scene's capacity. When some
@@ -4742,26 +4835,33 @@ static int fl_pool_compare(const void* a, const void* b) {
  * one's score fades toward zero at it: scores change continuously as the
  * camera moves, so a light crossing the cut is already dark. */
 static void fl_submit_point_lights(void) {
-	uint32_t count = s.pl_pool_count;
-	if (count > AERON_SCENE_POINT_LIGHT_CAPACITY) {
-		qsort(s.pl_pool, count, sizeof s.pl_pool[0], fl_pool_compare);
-		count = AERON_SCENE_POINT_LIGHT_CAPACITY;
-		for (uint32_t i = count; i < s.pl_pool_count; i++) {
-			s.pl_dropped[s.pl_pool[i].model]++;
+	if (s.pl_pool_count <= AERON_SCENE_POINT_LIGHT_CAPACITY) {
+		for (uint32_t i = 0; i < s.pl_pool_count; ++i) {
+			AeronScene_AddLight(s.scene, &s.pl_pool[i].light);
 		}
-		const float cut = s.pl_pool[count].score;
-		for (uint32_t i = 0; i < count && isfinite(cut); i++) {
-			FlPoolLight* l = &s.pl_pool[i];
-			if (l->score < cut * FL_PL_FADE_BAND) {
-				const float fade = (l->score / cut - 1.0f) / (FL_PL_FADE_BAND - 1.0f);
-				for (int c = 0; c < 3; c++) {
-					l->light.color[c] *= fade;
-				}
+		return;
+	}
+	static FlPoolKey keys[FL_MAX_PL_POOL];
+	static FlPoolKey scratch[FL_MAX_PL_POOL];
+	for (uint32_t i = 0; i < s.pl_pool_count; i++) {
+		keys[i].score = s.pl_pool[i].score;
+		keys[i].index = i;
+	}
+	fl_sort_pool_keys(keys, scratch, s.pl_pool_count);
+	const uint32_t count = AERON_SCENE_POINT_LIGHT_CAPACITY;
+	for (uint32_t i = count; i < s.pl_pool_count; i++) {
+		s.pl_dropped[s.pl_pool[keys[i].index].model]++;
+	}
+	const float cut = s.pl_pool[keys[count].index].score;
+	for (uint32_t i = 0; i < count; i++) {
+		FlPoolLight* l = &s.pl_pool[keys[i].index];
+		if (isfinite(cut) && l->score < cut * FL_PL_FADE_BAND) {
+			const float fade = (l->score / cut - 1.0f) / (FL_PL_FADE_BAND - 1.0f);
+			for (int c = 0; c < 3; c++) {
+				l->light.color[c] *= fade;
 			}
 		}
-	}
-	for (uint32_t i = 0; i < count; ++i) {
-		AeronScene_AddLight(s.scene, &s.pl_pool[i].light);
+		AeronScene_AddLight(s.scene, &l->light);
 	}
 }
 
@@ -5148,7 +5248,7 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 	}
 
 	const char* model_name = model_name_override ? model_name_override : fl_object_model_name(object);
-	out->mesh = XwaRemasterShip_MeshForNameWithSource(model_name, &out->source);
+	out->mesh = fl_mesh_for_name(model_name, &out->source);
 	if (!out->mesh) {
 		return 0;
 	}
@@ -6822,6 +6922,11 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	if (!fl_ensure(target_w, target_h)) {
 		return NULL;
+	}
+	/* Starts a new frame for fl_mesh_for_name. 0 is never a frame, so the
+	 * empty entries never match. */
+	if (++s_mesh_memo_frame == 0) {
+		s_mesh_memo_frame = 1;
 	}
 	const uint64_t host_time_us = XwaTime_GetElapsedUs();
 	/* Get the hyperspace moment first, because its camera shake or jolt turns
