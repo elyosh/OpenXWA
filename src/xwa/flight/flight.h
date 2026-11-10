@@ -385,6 +385,8 @@ extern int g_flightNetClockLeadAllowanceMs;
 extern uint16_t g_actionKey;
 extern uint16_t g_currentActionKey;
 extern int g_inputTimestamp;
+/* The film time at the end of the last film step played. */
+extern int g_filmStepInputTimestamp;
 extern int g_flightHudUpdateElapsedTicks;
 extern uint16_t g_unusedFlightViewRenderHudWord;
 extern uint16_t g_flightInitialTextureCacheFlushPending;

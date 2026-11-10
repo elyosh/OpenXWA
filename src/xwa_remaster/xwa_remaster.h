@@ -50,6 +50,13 @@ void XwaRemaster_BeginFrame(const struct AeronInputSnapshot* input);
  * XwaPort_Tick/XwaPort_PausedFrame and before Aeron_Present. */
 void XwaRemaster_Frame(int32_t delta_us);
 
+/* Measures the GPU time of the current flight snapshot for --film-benchmark:
+ * renders it many times without presenting and logs the time per frame.
+ * Call after Aeron_Present of a frame that rendered the snapshot. Leaves the
+ * prepared presentation cleared, so the game quits afterwards. Returns 0 when
+ * the frame can't be measured, with the reason in the log. */
+int XwaRemaster_BenchmarkFlightFrames(void);
+
 void XwaRemaster_Shutdown(void);
 
 /* Debug-tool surface: desired HDR output (effective = desired AND the

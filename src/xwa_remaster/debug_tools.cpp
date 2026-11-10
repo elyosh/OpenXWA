@@ -34,6 +34,7 @@
 #include "xwa_runtime/models/cockpit_eye.h"
 #include "xwa_runtime/models/cockpit_lights.h"
 #include "xwa_runtime/models/cockpit_view.h"
+#include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <algorithm>
@@ -1685,6 +1686,58 @@ static void xwa_tool_flight_input(int* open, void* user) {
 	*open = b ? 1 : 0;
 }
 
+/* ---- Film benchmark ------------------------------------------------- */
+
+/* Finds the film time to measure with --film-pause-at and --film-benchmark. */
+static void xwa_tool_film_benchmark(int* open, void* user) {
+	(void)user;
+	ImGui::SetNextWindowSize(ImVec2(470, 170), ImGuiCond_FirstUseEver);
+	bool b = *open != 0;
+	if (!ImGui::Begin("Film Benchmark", &b)) {
+		ImGui::End();
+		*open = b ? 1 : 0;
+		return;
+	}
+
+	const bool playing = XwaFilmBenchmark_FilmPlaying() != 0;
+	if (!playing) {
+		ImGui::TextDisabled("No film is playing.");
+	} else {
+		const int ticks = (int)XwaFilmBenchmark_FilmTime();
+		const int ms = ticks * 4;
+		ImGui::Text("Film time: %d ticks (%d:%02d.%03d)", ticks, ms / 60000, ms / 1000 % 60, ms % 1000);
+	}
+
+	const bool frozen = XwaFilmBenchmark_IsFrozen() != 0;
+	ImGui::BeginDisabled(!playing);
+	if (ImGui::Button(frozen ? "Resume" : "Freeze")) {
+		if (frozen) {
+			XwaFilmBenchmark_Resume();
+		} else {
+			XwaFilmBenchmark_RequestFreeze();
+		}
+	}
+	ImGui::EndDisabled();
+
+	if (playing && frozen) {
+		char name[256];
+		char options[400];
+		XwaFilmBenchmark_FilmName(name, sizeof name);
+		/* Quoted: film names can hold spaces. */
+		std::snprintf(options, sizeof options, "--play-film \"%s\" --film-pause-at %d", name,
+					  (int)XwaFilmBenchmark_FilmTime());
+		ImGui::Separator();
+		ImGui::TextUnformatted(options);
+		if (ImGui::Button("Copy")) {
+			ImGui::SetClipboardText(options);
+		}
+		ImGui::TextDisabled("Add --film-benchmark to measure this frame and quit.");
+	}
+
+	ImGui::End();
+	*open = b ? 1 : 0;
+}
+
 /* ---- Cockpit eye ---------------------------------------------------- */
 
 static void xwa_tool_cockpit_eye(int* open, void* user) {
@@ -1963,6 +2016,7 @@ extern "C" void XwaRemasterDebugTools_Register(void) {
 	Aeron_DebugRegisterTool("HDR & Display", xwa_tool_hdr, nullptr);
 	Aeron_DebugRegisterTool("HUD Snapshot", xwa_tool_hud_snapshot, nullptr);
 	Aeron_DebugRegisterTool("Flight Input", xwa_tool_flight_input, nullptr);
+	Aeron_DebugRegisterTool("Film Benchmark", xwa_tool_film_benchmark, nullptr);
 	Aeron_DebugRegisterTool("Cockpit Eye", xwa_tool_cockpit_eye, nullptr);
 	Aeron_DebugRegisterTool("Dynamic Cockpit", xwa_tool_dynamic_cockpit, nullptr);
 	Aeron_DebugRegisterTool("Material Animation", xwa_tool_material_animation, nullptr);

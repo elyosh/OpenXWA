@@ -285,6 +285,7 @@ static struct {
 	 * spawn frame, zero velocity). */
 	int mb_enabled;
 	float mb_prev_vp[16];
+	float mb_prev_ori[4];
 	const XwaSnapshot* mb_prev_snap;
 	int32_t* mb_prev_index;
 	uint32_t mb_prev_index_capacity;
@@ -744,6 +745,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"dynamic_cockpit.classic_hud",   "dynamic_cockpit.holograms",
 		"point_lights.model_lights",     "presentation.latency_pacing",
 		"hyperspace_jump.exit_forward",  "hyperspace_jump.warp_sky_half_resolution",
+		"models.backface_fill",
 	};
 	static const char* strings[] = {
 		"presentation.cockpit_fov",
@@ -1666,6 +1668,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+	XwaRemasterShip_SetBackfaceFill(AeronConfigFile_GetBool(cf, "models.backface_fill", 1));
 	if (!XwaRemasterSuns_LoadFlareElements(cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
@@ -6122,7 +6125,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 									.ssao_sample_jitter = s.ssao.ssao_sample_jitter,
 									.mb_quality = 0,
 								});
-	AeronScene_SetMotionContext(s.scene, NULL, 1);
+	AeronScene_SetMotionContext(s.scene, NULL, NULL, 1);
 
 	if (player_found && player_f) {
 		fl_add_cockpit_lights(snap, player_bw, player_local);
@@ -6643,7 +6646,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	}
 	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
 	AeronScene_SetPost(s.scene, NULL);
-	AeronScene_SetMotionContext(s.scene, NULL, 1);
+	AeronScene_SetMotionContext(s.scene, NULL, NULL, 1);
 	AeronScene_SetDirectionalShadow(s.scene, NULL);
 
 	FlMapSubmitContext submit_context = { .cmd = cmd, .assets = assets };
@@ -6920,6 +6923,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			fl_build_view_at_origin(pc, s.origin_world, s.rt_w, s.rt_h, previous_rotation,
 									&previous_flight_view);
 			memcpy(s.mb_prev_vp, previous_flight_view.view_proj, sizeof s.mb_prev_vp);
+			memcpy(s.mb_prev_ori, previous_flight_view.camera.ori, sizeof s.mb_prev_ori);
 			s.mb_enabled = 1;
 			/* Hold velocity while a paused snapshot is truly unchanged. Camera
 			 * panning and cockpit articulation can still change with frozen sim
@@ -7215,7 +7219,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 									.mb_camera_blur = s.mb_camera_blur,
 									.mb_velocity_viz = s.mb_velocity_viz,
 								});
-	AeronScene_SetMotionContext(s.scene, s.mb_enabled ? s.mb_prev_vp : NULL, mb_regen);
+	AeronScene_SetMotionContext(s.scene, s.mb_enabled ? s.mb_prev_vp : NULL, s.mb_enabled ? s.mb_prev_ori : NULL,
+								mb_regen);
 
 	/* The lit PBR env is submitted AFTER the instance walk (frame
 	 * uniforms are copied at submit and bound inside Render) so the

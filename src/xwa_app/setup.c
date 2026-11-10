@@ -2,7 +2,9 @@
 
 #include "mod_list.h"
 
+#include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 static int setup_error(char* error, size_t error_size, const char* format, const char* detail) {
@@ -55,6 +57,7 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 		return setup_error(error, error_size, "%s", "invalid launch options");
 	}
 	memset(out, 0, sizeof *out);
+	out->film_pause_at = -1;
 	for (i = 1; i < argc; ++i) {
 		const char* value;
 		if (!pass_through && strcmp(argv[i], "--") == 0) {
@@ -130,11 +133,67 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			}
 			continue;
 		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--film-pause-at");
+		if (!pass_through && (value || strcmp(argv[i], "--film-pause-at") == 0)) {
+			char* end;
+			long ticks;
+
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, "%s requires a film time", "--film-pause-at");
+				}
+				value = argv[i];
+			}
+			ticks = strtol(value, &end, 10);
+			if (!value[0] || *end || ticks < 0 || ticks > INT_MAX) {
+				return setup_error(error, error_size, "%s requires a film time in game ticks, 0 or more",
+								   "--film-pause-at");
+			}
+			out->film_pause_at = (int)ticks;
+			continue;
+		}
+		if (!pass_through && strcmp(argv[i], "--film-benchmark") == 0) {
+			out->film_benchmark = 1;
+			continue;
+		}
+		if (!pass_through && (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0)) {
+			out->help = 1;
+			continue;
+		}
 		if (!setup_append_argument(out->game_command_line, sizeof out->game_command_line, argv[i])) {
 			return setup_error(error, error_size, "%s", "OpenXWA command line is too long");
 		}
 	}
+	if (out->help) {
+		return 1;
+	}
+	if (out->film_pause_at >= 0 && !out->play_film[0]) {
+		return setup_error(error, error_size, "%s requires --play-film", "--film-pause-at");
+	}
+	if (out->film_benchmark && out->film_pause_at < 0) {
+		return setup_error(error, error_size, "%s requires --film-pause-at", "--film-benchmark");
+	}
 	return 1;
+}
+
+const char* XwaLaunchOptions_Help(void) {
+	return "Usage: OpenXWA [options] [-- game options]\n"
+		   "\n"
+		   "  --game-data <folder>      the folder of the installed game's data\n"
+		   "  --resource-root <folder>  the folder that holds OpenXWA's resources folder,\n"
+		   "                            instead of the application's folder\n"
+		   "  --mod <folder>            play with the mod in this folder\n"
+		   "  --play-film <name>        play this film of the user folder's film folder,\n"
+		   "                            log the frame times, then quit\n"
+		   "  --benchmark-out <file>    with --play-film: also write the time of each frame\n"
+		   "                            to this CSV file of the user folder\n"
+		   "  --film-pause-at <ticks>   with --play-film: fast-forward to this film time,\n"
+		   "                            in 4 ms ticks, and freeze there\n"
+		   "  --film-benchmark          with --film-pause-at: measure the frozen frame's\n"
+		   "                            GPU time, then quit\n"
+		   "  -h, --help                print this help and quit\n"
+		   "\n"
+		   "Other arguments, and everything after --, go to the game's own command line.\n";
 }
 
 static int setup_check_required_files(AeronVfs* vfs, const char** missing) {

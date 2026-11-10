@@ -313,6 +313,7 @@ static void XwaPort_TickBody(int32_t delta_us) {
 
 	if (XwaFlightTask_IsActive()) {
 		const int wasPaused = XwaFlightPauseTask_IsActive();
+		int fastForwarding;
 		XwaSnapshot_SetSceneKind(XWA_SCENE_FLIGHT);
 		input = Aeron_InputSnapshot();
 		/* Capture this host frame's keyboard/mouse edges into the DirectInput shim so
@@ -359,8 +360,13 @@ static void XwaPort_TickBody(int32_t delta_us) {
 			const uint64_t tickStartUs = Aeron_NowUs();
 
 			XwaFlightTask_Tick();
+			fastForwarding = XwaFilmBenchmark_FastForward();
 			XwaFilmBenchmark_NoteFlight(XwaFlightTask_FramesRun() != framesBefore,
 										Aeron_NowUs() - tickStartUs);
+		}
+		if (fastForwarding) {
+			/* No snapshot: the remaster keeps showing the last frame. */
+			return;
 		}
 		if (wasPaused) {
 			/* Retain the complete paused view, including captured HUD draws.
@@ -408,6 +414,7 @@ static void XwaPort_TickBody(int32_t delta_us) {
 			XwaSnapshot_CaptureFlight();
 			XwaSnapshot_Commit();
 			XwaFilmBenchmark_NoteCapture(Aeron_NowUs() - captureStartUs);
+			XwaFilmBenchmark_NoteFlightCommit();
 			return;
 		}
 		XwaSnapshot_Commit();

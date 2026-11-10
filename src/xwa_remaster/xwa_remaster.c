@@ -32,6 +32,7 @@
 #include "xwa_remaster/ship.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/movie_task.h"
 #include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/runtime/presentation.h"
@@ -39,6 +40,7 @@
 
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define RM_KEY_SPLIT_VIEW (AERON_KEY_F1 + 1)   /* F2 */
@@ -588,6 +590,11 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		g.force_scene_render = 1;
 	}
 	g.hyperspace_preview_last = hyperspace_preview;
+	/* A frozen film renders its frame on every host frame, so that a GPU
+	 * capture, which ends at a present, gets one. */
+	if (XwaFilmBenchmark_IsFrozen() && snap->scene_kind == XWA_SCENE_FLIGHT) {
+		g.force_scene_render = 1;
+	}
 	if (g.force_scene_render && snap->scene_kind != XWA_SCENE_FLIGHT &&
 		snap->scene_kind != XWA_SCENE_CUTSCENE) {
 		g.force_scene_render = 0;
@@ -928,6 +935,126 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	if (g.scene_kind == XWA_SCENE_FRONTEND || g.scene_kind == XWA_SCENE_FRONTEND_MODAL ||
 		g.scene_kind == XWA_SCENE_LOADING)
 		XwaRemasterFrontend_PresentCursor(g.ramp.alpha, g.mode == RM_VIEW_SPLIT);
+}
+
+#define RM_BENCHMARK_WARMUP_RENDERS 30
+#define RM_BENCHMARK_SAMPLES 7
+#define RM_BENCHMARK_SAMPLE_RENDERS 60
+
+static int rm_benchmark_compare_double(const void* a, const void* b) {
+	const double x = *(const double*)a;
+	const double y = *(const double*)b;
+	return x < y ? -1 : x > y;
+}
+
+/* Renders the current snapshot `count` times with two renders in flight, as
+ * scene_capture's benchmark does. Returns the wall time and the CPU time
+ * spent recording, in microseconds. */
+static int rm_benchmark_run(const XwaSnapshot* snap, int count, uint64_t* wall_us, uint64_t* cpu_us) {
+	AeronGpuFence* pending[2] = { NULL, NULL };
+	const uint64_t start_us = Aeron_NowUs();
+	uint64_t cpu = 0;
+	int ok = 1;
+
+	for (int i = 0; i < count && ok; ++i) {
+		AeronGpuFence** slot = &pending[i % 2];
+		AeronGpuFence* retired = *slot;
+		if (retired && !Aeron_WaitForGpuFence(retired)) {
+			ok = 0;
+			break;
+		}
+		const uint64_t cpu_start_us = Aeron_NowUs();
+		XwaRemasterAssets_UpdateFrameSets(g.assets, snap);
+		AeronCommandBuffer* cmd = Aeron_AcquireCommandBuffer();
+		if (!cmd) {
+			ok = 0;
+			break;
+		}
+		Aeron_GpuDebugPush(cmd, "OpenXWA film benchmark frame");
+		AeronTexture* tex = XwaRemasterFlight_Render(cmd, snap, g.assets, g.render_pixel_width,
+													 g.render_pixel_height, /*direct_present=*/0);
+		Aeron_GpuDebugPop(cmd);
+		if (!tex) {
+			Aeron_CancelCommandBuffer(cmd);
+			ok = 0;
+			break;
+		}
+		AeronGpuFence* next = Aeron_SubmitCommandBufferAndAcquireFence(cmd);
+		if (!next) {
+			ok = 0;
+			break;
+		}
+		*slot = next;
+		/* Released after the next submit, as scene_capture does: SDL's Metal
+		 * backend retires a command buffer during the next submit. */
+		Aeron_ReleaseGpuFence(retired);
+		cpu += Aeron_NowUs() - cpu_start_us;
+	}
+	for (int i = 0; i < 2; ++i) {
+		if (pending[i] && !Aeron_WaitForGpuFence(pending[i])) {
+			ok = 0;
+		}
+	}
+	if (!Aeron_WaitForGpuIdle()) {
+		ok = 0;
+	}
+	for (int i = 0; i < 2; ++i) {
+		Aeron_ReleaseGpuFence(pending[i]);
+	}
+	*wall_us = Aeron_NowUs() - start_us;
+	*cpu_us = cpu;
+	return ok;
+}
+
+int XwaRemaster_BenchmarkFlightFrames(void) {
+	const XwaSnapshot* snap = XwaSnapshot_Current();
+	const char* reason = NULL;
+
+	if (!g.initialized || !g.assets) {
+		reason = "the HD renderer isn't running";
+	} else if (!snap || snap->scene_kind != XWA_SCENE_FLIGHT || !snap->flight_camera_valid) {
+		reason = "the frozen frame isn't a flight view";
+	} else if (XwaRemasterEnvCapture_Pending()) {
+		reason = "an environment capture is pending";
+	} else if (g.force_scene_render || g.last_tick != snap->tick_index || !g.scene_tex ||
+			   g.scene_kind != XWA_SCENE_FLIGHT) {
+		/* The frame's render didn't run: HD view off, or assets still loading. */
+		reason = "the HD renderer didn't draw the frozen frame";
+	}
+	if (reason) {
+		Aeron_LogError("xwa.benchmark", "film benchmark: can't measure: %s", reason);
+		return 0;
+	}
+
+	Aeron_LogInfo("xwa.benchmark", "film benchmark: measuring %d renders at %dx%d",
+				  RM_BENCHMARK_WARMUP_RENDERS + RM_BENCHMARK_SAMPLES * RM_BENCHMARK_SAMPLE_RENDERS,
+				  g.render_pixel_width, g.render_pixel_height);
+	uint64_t wall_us;
+	uint64_t cpu_us;
+	if (!Aeron_WaitForGpuIdle() || !rm_benchmark_run(snap, RM_BENCHMARK_WARMUP_RENDERS, &wall_us, &cpu_us)) {
+		Aeron_LogError("xwa.benchmark", "film benchmark: the warm-up renders failed");
+		return 0;
+	}
+	double frame_ms[RM_BENCHMARK_SAMPLES];
+	double cpu_ms[RM_BENCHMARK_SAMPLES];
+	for (int i = 0; i < RM_BENCHMARK_SAMPLES; ++i) {
+		if (!rm_benchmark_run(snap, RM_BENCHMARK_SAMPLE_RENDERS, &wall_us, &cpu_us)) {
+			Aeron_LogError("xwa.benchmark", "film benchmark: the renders of sample %d failed", i + 1);
+			return 0;
+		}
+		frame_ms[i] = (double)wall_us / 1000.0 / RM_BENCHMARK_SAMPLE_RENDERS;
+		cpu_ms[i] = (double)cpu_us / 1000.0 / RM_BENCHMARK_SAMPLE_RENDERS;
+		Aeron_LogInfo("xwa.benchmark", "film benchmark: sample %d: %.3f ms per frame, %.3f ms recording", i + 1,
+					  frame_ms[i], cpu_ms[i]);
+	}
+	qsort(frame_ms, RM_BENCHMARK_SAMPLES, sizeof frame_ms[0], rm_benchmark_compare_double);
+	qsort(cpu_ms, RM_BENCHMARK_SAMPLES, sizeof cpu_ms[0], rm_benchmark_compare_double);
+	Aeron_LogInfo("xwa.benchmark",
+				  "film benchmark: frame time: median %.3f ms, min %.3f ms, max %.3f ms; "
+				  "recording: median %.3f ms",
+				  frame_ms[RM_BENCHMARK_SAMPLES / 2], frame_ms[0], frame_ms[RM_BENCHMARK_SAMPLES - 1],
+				  cpu_ms[RM_BENCHMARK_SAMPLES / 2]);
+	return 1;
 }
 
 void XwaRemaster_Shutdown(void) {

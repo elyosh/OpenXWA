@@ -83,7 +83,8 @@ static float s_opt_projectile_emissive_strength;
 static float s_engine_emissive_strength;
 static XwaShipPbrTuning g_pbr_tuning_default;
 static XwaShipPbrTuning g_pbr_tuning;
-/* AeronScene_SetBackfaceFill; debug inspector toggle, not persisted. */
+/* AeronScene_SetBackfaceFill: models.backface_fill in remaster/config.yaml,
+   also set by the debug inspector. */
 static int g_backface_fill = 1;
 /* The key light's shadow on the probe light from its side whichever way
  * surfaces face; debug inspector toggle, not persisted. */
