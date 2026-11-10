@@ -248,6 +248,9 @@ static struct {
 	float explosion_genus_emissive_strength;
 	float glow_mark_emissive_strength;
 	float cockpit_glow_mark_emissive_strength;
+	/* small_objects in remaster/config.yaml, in pixels of a 1080-line view. */
+	float small_prepass_min_size;
+	float small_draw_min_size;
 	float map_ambient_min[3]; /* lighting.map_ambient_min_* */
 	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
 	 * window narrower than this aspect gets a wider view, so that the
@@ -733,6 +736,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"dynamic_cockpit.display_emissive_strength",
 		"dynamic_cockpit.hologram_emissive_strength",
 		"motion_blur.shutter",
+		"small_objects.prepass_min_size",
+		"small_objects.draw_min_size",
 		"temporal_upscaling.sharpness",
 		"texture_filtering.max_anisotropy",
 	};
@@ -1702,6 +1707,14 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.mb_shutter = (float)AeronConfigFile_GetFloat(cf, "motion_blur.shutter", 0.0);
 	if (!isfinite(s.mb_shutter) || s.mb_shutter < 0.0f) {
 		Aeron_LogError("xwa.remaster", "%s: motion_blur.shutter must be finite and non-negative", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	s.small_prepass_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.prepass_min_size", 0.0);
+	s.small_draw_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.draw_min_size", 0.0);
+	if (!isfinite(s.small_prepass_min_size) || s.small_prepass_min_size < 0.0f ||
+		!isfinite(s.small_draw_min_size) || s.small_draw_min_size < 0.0f) {
+		Aeron_LogError("xwa.remaster", "%s: small_objects sizes must be numbers, 0 or more", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -7576,7 +7589,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	fl_submit_lens_flares(snap, &flight_view);
 	fl_submit_sun_flare(snap, &scene_lighting);
 
+	/* Only the flight view: the map shows ships small on purpose. */
+	const float px_per_1080 = (float)s.rt_h / 1080.0f;
+	AeronScene_SetSmallInstanceCull(s.scene, s.small_prepass_min_size * px_per_1080,
+									s.small_draw_min_size * px_per_1080);
 	const int rendered = AeronScene_Render(s.scene, cmd);
+	AeronScene_SetSmallInstanceCull(s.scene, 0.0f, 0.0f);
 	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
 	s.before_opaque_mode = FL_BEFORE_OPAQUE_NONE;
 	s.snap = NULL; /* hooks must not outlive the snapshot */

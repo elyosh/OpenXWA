@@ -631,5 +631,13 @@ motion_blur:
   camera_blur: true
   pause_keep_blur: true
   velocity_viz: false
+small_objects:
+  # Objects smaller than these on screen are left out, by the larger side of
+  # their bounds, in pixels of a 1080-line view (scaled to the render
+  # height); 0 is off. Only with MSAA on and temporal upscaling off.
+  # Smaller ones aren't drawn in the depth prepass and cast no shadow.
+  prepass_min_size: 2.5
+  # Smaller ones aren't drawn at all, except laser bolts.
+  draw_min_size: 0.6
 shadows:
   receiver_local_near_distance_m: 1.5
