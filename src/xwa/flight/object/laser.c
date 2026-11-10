@@ -1030,7 +1030,7 @@ static __inline uint16_t laser_ComputeLauncherCooldownTicks(
 		unsigned int weapon = g_curCraft->warheadData[launcherIdx].projectileTypeId;
 
 		if (XwaCraftWeapons_SwitchByIff(g_objectTable[ownerObjIdx].objectType) == 1) {
-			weapon = XwaCraftWeapons_IffWeaponType((uint8_t)g_objectTable[ownerObjIdx].mobj->iff, weapon);
+			weapon = XwaCraftWeapons_IffWeaponType((int)ownerObjIdx, weapon);
 		}
 		cooldown =
 			(uint16_t)XwaWeaponStats_Value((int)ownerObjIdx, weapon, XWA_WEAPON_STAT_FIRE_RATIO, cooldown);
@@ -1083,7 +1083,6 @@ static __inline uint16_t laser_SelectWarheadLauncherProjectileType(ObjectRecord*
 		}
 		projectileType = (uint16_t)(OBJ_LaserIon + (isIonLauncherGroup != 0));
 	} else {
-		uint16_t typeIdx;
 		uint8_t requiredIff;
 
 		projectileType = g_curCraft->warheadData[launcherIdx].projectileTypeId;
@@ -1093,16 +1092,18 @@ static __inline uint16_t laser_SelectWarheadLauncherProjectileType(ObjectRecord*
 			return projectileType;
 		}
 #endif
-		typeIdx = (uint16_t)projectileType - OBJ_LaserRebel;
 #ifdef XWA_MODERN
-		requiredIff = g_projectileRequiredIffByType[typeIdx];
+		/* The craft's weapon profile can change which side the weapon
+		   belongs to, and which weapon replaces it. */
+		requiredIff = XwaCraftWeapons_WeaponSide((int)(ownerObj - g_objectTable), projectileType);
 #else
 		requiredIff = g_projectileRequiredIffByObjectType_BiasedBase[projectileType];
 #endif
 		if (requiredIff != 0xffu &&
 			g_projectileRequiredIffByShooterIff[(uint8_t)ownerObj->mobj->iff] != requiredIff) {
 #ifdef XWA_MODERN
-			projectileType = g_projectileAlternateIffTypeByType[typeIdx];
+			projectileType = (uint16_t)XwaCraftWeapons_OtherSideWeaponType((int)(ownerObj - g_objectTable),
+																		   projectileType);
 #else
 			projectileType = g_projectileAlternateIffTypeByObjectType_BiasedBase[projectileType];
 #endif
@@ -1944,6 +1945,12 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 	if (projectileObjIdx != 0xffffu) {
 
 		memset(g_objectTable[projectileObjIdx].mobj, 0, offsetof(MobileObject, pWarheadGuidance));
+#ifdef XWA_MODERN
+		/* Player projectile slots bypass Object_AllocSlotForGenus. */
+		if (playerIdx != -1) {
+			Object_ResetMoveFraction(g_objectTable[projectileObjIdx].mobj);
+		}
+#endif
 		g_objectTable[projectileObjIdx].mobj->sourceObjIdx = -1;
 		g_objectTable[projectileObjIdx].mobj->instanceExtent = 0;
 
@@ -1954,8 +1961,7 @@ int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTy
 		   craft's side. The player's projectile slot above was chosen with the
 		   original type. */
 		if (XwaCraftWeapons_SwitchByIff(firerObjectType) == 1) {
-			projectileType =
-				(ObjectTypeId)XwaCraftWeapons_IffWeaponType((uint8_t)firerObj->mobj->iff, projectileType);
+			projectileType = (ObjectTypeId)XwaCraftWeapons_IffWeaponType((int)firerObjIdx, projectileType);
 		}
 #endif
 
@@ -3399,6 +3405,10 @@ uint16_t laser_createprojectilefromstatic(uint16_t staticObjIdx, uint16_t shoote
 	g_objectTable[projectileObjIdx].angleD = 0;
 	g_objectTable[projectileObjIdx].yaw = 0;
 	projectileMobj = g_objectTable[projectileObjIdx].mobj;
+#ifdef XWA_MODERN
+	/* A static launcher can replace an occupied projectile if no free slot is available. */
+	Object_ResetMoveFraction(projectileMobj);
+#endif
 	guidance = projectileMobj->pWarheadGuidance;
 #ifdef XWA_MODERN
 	projectileMobj->speed =
@@ -3537,6 +3547,12 @@ int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId 
 		int resultObjIdx;
 
 		resultObjIdx = (uint16_t)projectileObjIdx;
+#ifdef XWA_MODERN
+		/* Player projectile slots bypass Object_AllocSlotForGenus. */
+		if (projectileGenus == GENUS_PlayerProjectile) {
+			Object_ResetMoveFraction(g_objectTable[resultObjIdx].mobj);
+		}
+#endif
 
 		ownerObj = &g_objectTable[ownerObjIdx];
 		ownerObjectType = ownerObj->objectType;

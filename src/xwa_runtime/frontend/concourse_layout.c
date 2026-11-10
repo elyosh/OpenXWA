@@ -1,12 +1,12 @@
 #include "xwa_runtime/frontend/concourse_layout.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/frontend/frontend_draw.h"
 #include "xwa/frontend/frontend_image.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <math.h>
@@ -194,20 +194,11 @@ static int layout_check_map(const AeronConfigNode* node, const char* prefix) {
 
 static const AeronConfigNode* layout_node(const char* key) {
 	if (!g_layoutLoaded) {
-		AeronConfigError error;
 
 		g_layoutLoaded = 1;
-		memset(&error, 0, sizeof(error));
-		if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, XWA_LAYOUT_PATH, &g_layoutFile,
-										&error)) {
-			if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-				Aeron_LogError("xwa.frontend", "%s:%d: %s", XWA_LAYOUT_PATH, error.line,
-							   error.message[0] ? error.message : "cannot be read");
-				Aeron_LogError("xwa.frontend", "%s is ignored", XWA_LAYOUT_PATH);
-			}
+		if (XwaModFiles_Load(XWA_LAYOUT_PATH, 0, &g_layoutFile) != XWA_MOD_FILE_LOADED) {
 			g_layoutFile = NULL;
-		} else if (AeronConfigNode_Type(AeronConfigFile_Root(g_layoutFile)) != AERON_CONFIG_MAP ||
-				   !layout_check_map(AeronConfigFile_Root(g_layoutFile), "")) {
+		} else if (!layout_check_map(AeronConfigFile_Root(g_layoutFile), "")) {
 			Aeron_LogError("xwa.frontend", "%s is ignored", XWA_LAYOUT_PATH);
 			AeronConfigFile_Destroy(g_layoutFile);
 			g_layoutFile = NULL;

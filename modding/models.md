@@ -528,7 +528,7 @@ turns one part:
 | `angleDegrees` | Required. The angle that the part turns to, in degrees, from −180 to 358.594. The model as built is at 0. |
 | `speedDegrees` | Required. How far the part turns toward the angle at each step, in degrees, from 0 to 358.594. |
 | `speedBackDegrees` | How far the part turns back toward 0 at each step. The default is `speedDegrees`. |
-| `behavior` | For `crew` only. See [crew](#crew). |
+| `behavior` | For `crew` and `hangar_droid` only. See [crew](#crew) and [hangar droids](#hangar-droids). |
 
 The game turns parts in steps of 1/256 of a turn, 1.40625 degrees. It
 rounds angles and speeds to the nearest step. A step lasts `step_ticks`
@@ -556,6 +556,7 @@ a moving part when you want this.
 | `cargo_clamps.close` | The cargo clamps, holding a load. |
 | `cargo_clamps.<model>` | The cargo clamps, holding the model `<model>`. The game uses this group instead of `cargo_clamps.close` when the model has it. |
 | `crew` | Heads and limbs of the crew. See [crew](#crew). |
+| `hangar_droid` | Parts of a hangar droid. See [hangar droids](#hangar-droids). |
 
 The S-foils and the landing gear get in each other's way. When a model has
 both, the landing gear only goes down while the S-foils are closed, and the
@@ -605,6 +606,38 @@ game does.
 ```json
 { "component": 23, "group": "crew", "angleDegrees": 11.25,
   "speedDegrees": 2.8125, "behavior": "random" }
+```
+
+### Hangar droids
+
+`hangar_droid` entries move the parts of the two droids in the hangar. The
+game only uses them with the `hangar_droid_parts_from_model` rule of
+[flight.yaml](flight.md#rules). With the rule, a droid moves the parts that
+its model lists, and no others, whether it is the first or the second
+droid. Without the rule, the first droid nods part 3 and the second droid
+swings part 1 and spins part 2, as in the original game.
+
+The game doesn't use `angleDegrees` and `speedDegrees` for these entries.
+Set them to 0. The `behavior` gives the motion:
+
+| Behaviour | Movement |
+|-|-|
+| `nod` | Stays near its start for a while, then tilts up by about 45 degrees. Then it turns down without stopping, all the way round. |
+| `swing` | Either stays still or turns backwards, and now and then switches between the two. Both droids use the direction of the second droid. |
+| `spin` | Turns all the time, four times faster while the second droid drives. |
+
+With the rule, an original model of the game (one without a `.glb` in the
+mod) moves these parts:
+- `hangardroid` nods part 3;
+- `hangardroid2` swings part 1 and spins part 2;
+- other models, and models that the hangar swaps in, move none.
+
+The `crew` entries of a droid's model move as usual, with or without the
+rule.
+
+```json
+{ "component": 1, "group": "hangar_droid", "angleDegrees": 0,
+  "speedDegrees": 0, "behavior": "swing" }
 ```
 
 ### Flight group variants

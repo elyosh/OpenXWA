@@ -978,7 +978,7 @@ extern float g_renderProjectionClampY1;
 extern float g_renderProjectionClampX0;
 extern float g_renderProjectionClampX1;
 extern int16_t g_renderProjectionYClampEnabled;
-extern int g_hardpointOriginOffset[3];
+extern int g_seatEyeOffset[3];
 extern int g_std3DZCmpMode;
 extern Std3DZBufferSurfaceBlock g_std3DZBufferSurface;
 extern uint8_t g_hwMipmapFilter;

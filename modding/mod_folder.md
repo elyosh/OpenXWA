@@ -36,6 +36,7 @@ my-mod/
   text/
     strings.yaml        text replacements
   game/                 copies of original game files
+    files.yaml          original game files that the mod removes
 ```
 
 Every file and folder is optional. A mod only needs the files it changes.
@@ -43,14 +44,14 @@ Every file and folder is optional. A mod only needs the files it changes.
 ## mod.yaml
 
 ```yaml
-version: 6
+version: 7
 name: "Rebel Fleet Refit"
 complete: true
 ```
 
 | Key | Meaning |
 |-|-|
-| `version` | Required. The mod format version that the mod was made for. This OpenXWA reads version 6. |
+| `version` | Required. The mod format version that the mod was made for. This OpenXWA reads version 7. |
 | `name` | The name that the **Mods** screen shows. The default is the folder name. |
 | `complete` | `false` marks a mod that isn't ready to play. The default is `true`. |
 
@@ -138,6 +139,7 @@ These files can be replaced:
 | `MISSIONS/MISSION.LST`, `MELEE/MISSION.LST`, `COMBAT/MISSION.LST` | mission lists |
 | `MISSIONS/EMAIL.TXT` | the e-mails in the concourse |
 | `WAVE/...` | any sound: voices, briefing and concourse sounds, sound effects, and new sounds that other mod files name, such as `Wave/Custom/Alarm.wav` |
+| `MUSIC/*.IMC` | the music |
 | `FRONTRES/CUTSCENE/CUTSCENE.TXT` | the cutscenes that follow missions |
 | `FRONTRES/MEDALS/MEDALS.TXT` | the missions that give the battle medals |
 | `FRONTRES/MEDALS/MEDALS.LST` | the medal images |
@@ -145,6 +147,27 @@ These files can be replaced:
 
 Other files in `game/` are ignored. The other original files are changed
 through the mod's own formats, described in the other pages.
+
+### Removing original game files
+
+To remove original game files, list them in `game/files.yaml`. The game
+then works as if these files didn't exist. For example, if you remove a
+mission's briefing narration, the briefing officer says one of their usual
+lines instead:
+
+```yaml
+removed:
+  - Wave/FRONTEND/B0M3/N000301.WAV
+  - Wave/FRONTEND/N01ZL01.WAV
+```
+
+| Key | Meaning |
+|-|-|
+| `removed` | The files to remove. Write each path as you would in `game/`. You can only remove the files that `game/` can replace. If `game/` also has a copy of a file in this list, the copy isn't used either. |
+
+The importer writes this file for an installation that is missing some of
+the original sounds. TFTC, for example, removes some of the original
+briefing voices.
 
 ### Replacing models
 

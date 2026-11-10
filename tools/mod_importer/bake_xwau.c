@@ -99,6 +99,16 @@ typedef struct XwauContext {
 	int video_count;
 } XwauContext;
 
+/* How much of the bake's progress the Frontres images take, out of 1000.
+ * The frontend groups of the Resdata DATs take the rest. This is about their
+ * share of the output pixels in the TFTC-R and XWAU2025 imports. */
+#define FRONTRES_PROGRESS 600
+
+static void report_progress(const XwauContext* ctx, int permille) {
+	if (ctx->opt->progress)
+		ctx->opt->progress(ctx->opt->progress_user, permille);
+}
+
 /* ---- host files ------------------------------------------------------- */
 
 static uint8_t* read_host_file(const char* path, size_t* size) {
@@ -970,51 +980,73 @@ static int is_standard_image(const char* name) {
 	return !(base >= 3 && strncasecmp(dot - 3, "_hd", 3) == 0);
 }
 
-static void bake_frontres(XwauContext* ctx) {
-	DIR* top = opendir(ctx->frontres);
-	if (!top) {
-		ToolLog_Write(TOOL_LOG_ERROR, "xwau: no Frontres folder in %s", ctx->opt->xwau_root);
-		ctx->stats->failures++;
-		return;
-	}
-	struct dirent* d;
-	while (ctx->stats->failures == 0 && (d = readdir(top)) != NULL) {
-		char dir[1300];
-		snprintf(dir, sizeof dir, "%s/%s", ctx->frontres, d->d_name);
-		if (d->d_name[0] == '.' || !is_directory(dir))
+/* Lists the images of Frontres folder `dir` into `files`, which holds 1024
+ * names, and returns their count. It keeps one image per base name, and the
+ * CBM wins because it is the game's cache. Problems are reported only when
+ * `report` is true. */
+static int list_frontres_images(const char* dir, char (*files)[256], bool report) {
+	int count = 0;
+	DIR* sub = opendir(dir);
+	struct dirent* e;
+	while (sub && (e = readdir(sub)) != NULL) {
+		if (!is_standard_image(e->d_name))
 			continue;
-		/* Keep one image per base name. The CBM wins because it is the game's cache. */
-		char (*files)[256] = calloc(1024, sizeof *files);
-		int count = 0;
-		DIR* sub = opendir(dir);
-		struct dirent* e;
-		while (files && sub && (e = readdir(sub)) != NULL) {
-			if (!is_standard_image(e->d_name))
-				continue;
-			if (strlen(e->d_name) >= sizeof files[0]) {
+		if (strlen(e->d_name) >= sizeof files[0]) {
+			if (report)
 				ReportFatal(dir, "has the image %s, whose name is too long for the import", e->d_name);
+			continue;
+		}
+		const size_t base = (size_t)(strrchr(e->d_name, '.') - e->d_name);
+		int k = 0;
+		while (k < count && !(strncasecmp(files[k], e->d_name, base) == 0 && files[k][base] == '.'))
+			++k;
+		if (k == count && count == 1024) {
+			if (report)
+				ReportFatal(dir, "has more than 1024 images, but the import reads only 1024");
+			break;
+		}
+		if (k == count)
+			snprintf(files[count++], sizeof files[0], "%s", e->d_name);
+		else if (strcasecmp(strrchr(e->d_name, '.'), ".cbm") == 0)
+			snprintf(files[k], sizeof files[0], "%s", e->d_name);
+	}
+	if (sub)
+		closedir(sub);
+	return count;
+}
+
+/* Bakes the images of the Frontres folders. The progress goes from 0 to
+ * FRONTRES_PROGRESS, one step per image. The folders are listed twice: first
+ * to count the images, then to bake them. */
+static void bake_frontres(XwauContext* ctx) {
+	char (*files)[256] = calloc(1024, sizeof *files);
+	int total = 0, done = 0;
+	for (int pass = 0; pass < 2 && files; ++pass) {
+		DIR* top = opendir(ctx->frontres);
+		if (!top) {
+			ToolLog_Write(TOOL_LOG_ERROR, "xwau: no Frontres folder in %s", ctx->opt->xwau_root);
+			ctx->stats->failures++;
+			break;
+		}
+		struct dirent* d;
+		while (ctx->stats->failures == 0 && (d = readdir(top)) != NULL) {
+			char dir[1300];
+			snprintf(dir, sizeof dir, "%s/%s", ctx->frontres, d->d_name);
+			if (d->d_name[0] == '.' || !is_directory(dir))
+				continue;
+			const int count = list_frontres_images(dir, files, pass == 1);
+			if (pass == 0) {
+				total += count;
 				continue;
 			}
-			const size_t base = (size_t)(strrchr(e->d_name, '.') - e->d_name);
-			int k = 0;
-			while (k < count && !(strncasecmp(files[k], e->d_name, base) == 0 && files[k][base] == '.'))
-				++k;
-			if (k == count && count == 1024) {
-				ReportFatal(dir, "has more than 1024 images, but the import reads only 1024");
-				break;
+			for (int i = 0; i < count && ctx->stats->failures == 0; ++i) {
+				bake_frontres_file(ctx, d->d_name, files[i]);
+				report_progress(ctx, ++done * FRONTRES_PROGRESS / total);
 			}
-			if (k == count)
-				snprintf(files[count++], sizeof files[0], "%s", e->d_name);
-			else if (strcasecmp(strrchr(e->d_name, '.'), ".cbm") == 0)
-				snprintf(files[k], sizeof files[0], "%s", e->d_name);
 		}
-		if (sub)
-			closedir(sub);
-		for (int i = 0; i < count && ctx->stats->failures == 0; ++i)
-			bake_frontres_file(ctx, d->d_name, files[i]);
-		free(files);
+		closedir(top);
 	}
-	closedir(top);
+	free(files);
 }
 
 /* ---- Resdata --------------------------------------------------------------- */
@@ -1291,8 +1323,10 @@ static void bake_resdata(XwauContext* ctx) {
 				groups[group_count++] = list[g];
 		}
 	}
-	for (int g = 0; g < group_count && ctx->stats->failures == 0; ++g)
+	for (int g = 0; g < group_count && ctx->stats->failures == 0; ++g) {
 		bake_group(ctx, files, file_count, groups[g]);
+		report_progress(ctx, FRONTRES_PROGRESS + (g + 1) * (1000 - FRONTRES_PROGRESS) / group_count);
+	}
 	for (int f = 0; f < file_count; ++f) {
 		XwauDat_Close(files[f].sd);
 		XwauDat_Close(files[f].hd);

@@ -1,25 +1,30 @@
 #include "xwa_runtime/models/model_settings.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/frontend/frontend_mission.h"
+#include "xwa_runtime/models/ai_attack.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/craft_hud.h"
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/jamming.h"
+#include "xwa_runtime/models/mag_pulse.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/model_swaps.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/surfaces.h"
+#include "xwa_runtime/models/turret_ignore.h"
 #include "xwa_runtime/models/warhead_lock.h"
+#include "xwa_runtime/models/weapon_models.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
 
@@ -46,6 +51,8 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "weapons", XwaCraftWeapons_ClearModelSettings, XwaCraftWeapons_ReadModelSettings },
 	{ "weapons", XwaWeaponRates_ClearModelSettings, XwaWeaponRates_ReadModelSettings },
 	{ "weapons", XwaWeaponStats_ClearModelSettings, XwaWeaponStats_ReadModelSettings },
+	{ "weapons", XwaTurretIgnore_ClearModelSettings, XwaTurretIgnore_ReadModelSettings },
+	{ "weapons", XwaWeaponModels_ClearModelSettings, XwaWeaponModels_ReadModelSettings },
 	{ "stats_profiles", XwaStatsProfiles_ClearModelSettings, XwaStatsProfiles_ReadModelSettings },
 	{ "shield", XwaShieldRecharge_ClearModelSettings, XwaShieldRecharge_ReadModelSettings },
 	{ "sound", XwaCraftSounds_ClearModelSettings, XwaCraftSounds_ReadModelSettings },
@@ -53,7 +60,10 @@ static const ModelSettingsGroup s_groups[] = {
 	{ "gunner_seats", XwaGunnerSeats_ClearModelSettings, XwaGunnerSeats_ReadModelSettings },
 	{ "warhead_lock", XwaWarheadLock_ClearModelSettings, XwaWarheadLock_ReadModelSettings },
 	{ "jamming", XwaJamming_ClearModelSettings, XwaJamming_ReadModelSettings },
+	{ "hyperspace", XwaCraftHyperspace_ClearModelSettings, XwaCraftHyperspace_ReadModelSettings },
 	{ "docking", XwaDocking_ClearModelSettings, XwaDocking_ReadModelSettings },
+	{ "ai_attack", XwaAiAttack_ClearModelSettings, XwaAiAttack_ReadModelSettings },
+	{ "mag_pulse", XwaMagPulse_ClearModelSettings, XwaMagPulse_ReadModelSettings },
 	{ "cockpit_view", XwaCockpitView_ClearModelSettings, XwaCockpitView_ReadModelSettings },
 };
 
@@ -75,27 +85,13 @@ static void ModelSettings_Path(const char* key, char* path, size_t pathSize) {
 	snprintf(path, pathSize, "flight/models/%s.yaml", key);
 }
 
-/* Loads a model settings file and checks that it is a map. Returns NULL
-   when the file is missing. Other errors are logged. */
+/* Loads a model settings file. Returns NULL when the file is missing, or
+   when it can't be read, which stops the game. An empty file sets
+   nothing. */
 static AeronConfigFile* ModelSettings_LoadFile(const char* path) {
-	AeronConfigError error;
 	AeronConfigFile* file = NULL;
-	const AeronConfigNode* root;
 
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, &file, &error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.models", "%s:%d: %s. The file is ignored", path, error.line, error.message);
-		}
-		return NULL;
-	}
-	root = AeronConfigFile_Root(file);
-	/* An empty file sets nothing. */
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP && AeronConfigNode_Type(root) != AERON_CONFIG_NULL) {
-		Aeron_LogError("xwa.models", "%s: the file must be a map. It is ignored", path);
-		AeronConfigFile_Destroy(file);
-		return NULL;
-	}
+	XwaModFiles_Load(path, 1, &file);
 	return file;
 }
 

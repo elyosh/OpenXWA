@@ -6,7 +6,10 @@
 #include "xwa/math/fixed.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/ai_attack.h"
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/craft_hyperspace.h"
+#include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/warhead_launchers.h"
@@ -1233,6 +1236,9 @@ static char paiman_attackmaneuver(void) {
 											(unsigned int)trig2_polardistance);
 		if (g_paiContext.aiController->targetObjIdx >= g_activeRegionCraftObjectSlotEnd) {
 			rangeLimit = 5120;
+#ifdef XWA_MODERN
+			rangeLimit = XwaAiAttack_Value(g_paiContext.aiObjIdx, XWA_AI_ATTACK_BREAK_WARHEAD, rangeLimit);
+#endif
 		} else {
 			ModelGenusId targetGenus;
 
@@ -1246,10 +1252,36 @@ static char paiman_attackmaneuver(void) {
 						2;
 				} else {
 					rangeLimit = ModelBounds_GetMaxExtent((uint16_t)g_objectTable[targetObjIdx].objectType);
+#ifdef XWA_MODERN
+					{
+						const int32_t cap =
+							XwaAiAttack_Value(g_paiContext.aiObjIdx, XWA_AI_ATTACK_BREAK_BIG_MAX, 0x2000);
+
+						if (rangeLimit >= cap) {
+							rangeLimit = cap;
+						}
+					}
+#else
 					if (rangeLimit >= 0x2000) {
 						rangeLimit = 0x2000;
 					}
+#endif
 				}
+#ifdef XWA_MODERN
+				{
+					const unsigned int targetType = g_objectTable[targetObjIdx].objectType;
+					const int32_t stockOffset = (targetType == OBJ_SuperStarDestroyer ||
+												 targetType == OBJ_RepairYard || targetType == OBJ_ShipYard)
+													? 0x8000
+													: 0;
+
+					const int32_t offset =
+						XwaAiAttack_TargetOffset(g_paiContext.aiObjIdx, targetObjIdx, stockOffset);
+
+					/* A mod's offset can be large, so the sum wraps around at 32 bits. */
+					rangeLimit = (int)((uint32_t)rangeLimit + (uint32_t)offset);
+				}
+#else
 				if (g_objectTable[targetObjIdx].objectType == OBJ_SuperStarDestroyer) {
 					rangeLimit += 0x8000;
 				}
@@ -1259,6 +1291,7 @@ static char paiman_attackmaneuver(void) {
 				if (g_objectTable[targetObjIdx].objectType == OBJ_ShipYard) {
 					rangeLimit += 0x8000;
 				}
+#endif
 			} else {
 				uint8_t groupAI;
 				uint16_t yawDelta;
@@ -1276,6 +1309,16 @@ static char paiman_attackmaneuver(void) {
 				} else {
 					rangeLimit = 5120;
 				}
+#ifdef XWA_MODERN
+				{
+					/* A rank above super ace uses the novice range. */
+					const unsigned int rank = groupAI < XWA_AI_ATTACK_RANKS ? groupAI : 0;
+
+					rangeLimit =
+						XwaAiAttack_Value(g_paiContext.aiObjIdx,
+										  (XwaAiAttackValue)(XWA_AI_ATTACK_BREAK_SMALL + rank), rangeLimit);
+				}
+#endif
 				yawDelta =
 					(uint16_t)(g_objectTable[g_paiContext.aiObjIdx].yaw - g_objectTable[targetObjIdx].yaw);
 				if (yawDelta >= 0x8000u) {
@@ -2060,6 +2103,8 @@ int paiman_initoutofhyperspacemaneuver(void) {
 	g_curCraft->aiFlight.objSignatures[0] = (uint16_t)g_paiContext.aiController->thinkInterval;
 	g_paiContext.aiController->thinkInterval = 29;
 #ifdef XWA_MODERN
+	/* A model or the flight settings can set the arrival speed. */
+	XwaCraftHyperspace_AiOutOfHyperspaceInit(g_paiContext.aiObjIdx);
 	{
 		/* An articulated craft may come out of hyperspace with its S-foils
 		   closed. */
@@ -5114,10 +5159,10 @@ static char paiman_intohyperspacemaneuver(void) {
 					g_players[g_localPlayer].lookPitchOffset = 0;
 					Hud_ClearReadyMessageQueue();
 					Flight_InitOutboundHyperspaceStreaks();
-					FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-					FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-					FlightLight_SetLocalPlayerPulseEnabled(3, 1);
-					g_localPlayerLightPulses[3].startTime = g_gameTime;
+					FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+					FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+					FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 1);
+					g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].startTime = g_gameTime;
 				}
 
 				g_players[playerOwnerIdx].hyperspacePhase = PLAYER_HYPERSPACE_OUTBOUND;
@@ -5188,15 +5233,28 @@ static char paiman_intohyperspacemaneuver(void) {
 				departState = 1;
 			}
 
+#ifdef XWA_MODERN
+			/* A departure at a set speed jumps when it reaches that speed. */
+			if (g_objectTable[g_paiContext.aiObjIdx].mobj->speed <
+					(unsigned int)XwaCraftHyperspace_DepartureJumpSpeed(g_paiContext.aiObjIdx) &&
+				departState != 1) {
+				return 0;
+			}
+#else
 			if (g_objectTable[g_paiContext.aiObjIdx].mobj->speed < 0xE10u && departState != 1) {
 				return 0;
 			}
+#endif
 
 			if (!departState) {
 				msg_emitCraftMessage(g_paiContext.aiObjIdx, g_curCraft, 143);
 			} else {
 				msg_emitCraftMessage(g_paiContext.aiObjIdx, g_curCraft, 532);
 			}
+#ifdef XWA_MODERN
+			/* A mod can give the craft a sound when it jumps away. */
+			XwaCraftSounds_OtherCraftHyperspace(g_paiContext.aiObjIdx, 0);
+#endif
 
 			if (mothershipDepart) {
 				CraftData* craft;
@@ -5718,34 +5776,45 @@ static char paiman_outofhyperspacemaneuver(void) {
 #endif
 	pai_GetEffectiveAIController(g_paiContext.aiTargetCraft);
 	aiController = g_paiContext.aiController;
-	if (g_paiContext.aiController->aiPlanState == 0) {
-		++g_paiContext.aiController->maneuverPhase;
-		if ((uint8_t)g_paiContext.aiController->maneuverPhase > 10) {
-			g_paiContext.aiController->maneuverPhase = 10;
-		}
-		g_objectTable[g_paiContext.aiObjIdx].mobj->speed =
-			g_aiCourseOrderSpeedByManeuverPhase[(uint8_t)g_paiContext.aiController->maneuverPhase];
-		g_paiContext.aiController->aiPlanState = 236;
-		aiController = g_paiContext.aiController;
-	}
-
 	reached = 0;
-	trig2_ctop(aiController->aimPointX - g_objectTable[g_paiContext.aiObjIdx].world_x,
-			   aiController->aimPointY - g_objectTable[g_paiContext.aiObjIdx].world_y,
-			   aiController->aimPointZ - g_objectTable[g_paiContext.aiObjIdx].world_z);
+#ifdef XWA_MODERN
+	/* An arrival at a set speed controls its own speed and stops exactly on
+	   its point. */
+	if (!XwaCraftHyperspace_AiOutOfHyperspaceStep(g_paiContext.aiObjIdx, &reached))
+#endif
+	{
+		if (g_paiContext.aiController->aiPlanState == 0) {
+			++g_paiContext.aiController->maneuverPhase;
+			if ((uint8_t)g_paiContext.aiController->maneuverPhase > 10) {
+				g_paiContext.aiController->maneuverPhase = 10;
+			}
+			g_objectTable[g_paiContext.aiObjIdx].mobj->speed =
+				g_aiCourseOrderSpeedByManeuverPhase[(uint8_t)g_paiContext.aiController->maneuverPhase];
+			g_paiContext.aiController->aiPlanState = 236;
+			aiController = g_paiContext.aiController;
+		}
 
-	if (g_objectTable[g_paiContext.aiObjIdx].objectType == OBJ_SuperStarDestroyer &&
-		trig2_polardistance > g_paiContext.aiController->maneuverDist &&
-		g_paiContext.aiController->maneuverPhase == 10) {
-		reached = 1;
-	} else if (trig2_polardistance < g_paiContext.aiController->maneuverDist ||
-			   trig2_polardistance > 0x10000) {
-		g_paiContext.aiController->maneuverDist = trig2_polardistance;
-	} else {
-		reached = 1;
+		trig2_ctop(aiController->aimPointX - g_objectTable[g_paiContext.aiObjIdx].world_x,
+				   aiController->aimPointY - g_objectTable[g_paiContext.aiObjIdx].world_y,
+				   aiController->aimPointZ - g_objectTable[g_paiContext.aiObjIdx].world_z);
+
+		if (g_objectTable[g_paiContext.aiObjIdx].objectType == OBJ_SuperStarDestroyer &&
+			trig2_polardistance > g_paiContext.aiController->maneuverDist &&
+			g_paiContext.aiController->maneuverPhase == 10) {
+			reached = 1;
+		} else if (trig2_polardistance < g_paiContext.aiController->maneuverDist ||
+				   trig2_polardistance > 0x10000) {
+			g_paiContext.aiController->maneuverDist = trig2_polardistance;
+		} else {
+			reached = 1;
+		}
 	}
 
 	if (reached) {
+#ifdef XWA_MODERN
+		/* A mod can give the craft a sound when it ends its arrival. */
+		XwaCraftSounds_OtherCraftHyperspace(g_paiContext.aiObjIdx, 1);
+#endif
 		if (strcmp(g_planTable[g_paiContext.aiController->currentPlanId].name, "homeviahyperspacepln") == 0) {
 			if (g_curCraft->leader_obj_idx == -1) {
 				planId = g_builtinPlanIdByNameIndex[47];

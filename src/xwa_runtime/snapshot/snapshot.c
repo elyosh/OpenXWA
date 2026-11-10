@@ -16,10 +16,11 @@
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/models/articulation.h"
-#include "xwa_runtime/models/cockpit_alert_lights.h"
+#include "xwa_runtime/models/cockpit_lights.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/engine_glows.h"
 #include "xwa_runtime/models/headlights.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/object_profiles.h"
 #include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/skins.h"
@@ -167,6 +168,7 @@ void XwaSnapshot_BeginTick(void) {
 	s->tick_index = g_tick_index;
 	s->scene_kind = g_scene_kind;
 	s->retain_frame = 0;
+	s->hold_presentation = 0;
 	s->draw_2d_count = 0;
 	s->paint_cmd_count = 0;
 	s->glyph_count = 0;
@@ -442,7 +444,7 @@ void XwaSnapshot_Commit(void) {
 	s->scene_kind = g_scene_kind;
 	s->game_time_ticks = g_gameTime; /* sim clock; see header */
 	s->host_time_us = XwaTime_GetElapsedUs();
-	s->frontend_layout = (uint8_t)XwaFrontendScreens_Layout();
+	s->frontend_layout = (uint8_t)XwaFrontendScreens_TakeFrameLayout();
 	s->offscreen_restore_enabled = g_offscreenRestoreEnabled;
 	snapshot_capture_frontend_assets(s);
 	XwaSnapshotExport_CaptureOptAssets(s);
@@ -568,6 +570,8 @@ void XwaSnapshot_SetSceneKind(XwaSceneKind kind) { g_scene_kind = kind; }
 XwaSceneKind XwaSnapshot_SceneKind(void) { return g_scene_kind; }
 
 void XwaSnapshot_RetainFrame(void) { wr()->retain_frame = 1; }
+
+void XwaSnapshot_HoldPresentation(void) { wr()->hold_presentation = 1; }
 
 void XwaSnapshot_SetEmitTarget(XwaEmitTarget target) { g_emit_target = target; }
 
@@ -1473,9 +1477,22 @@ static int snapshot_reserve_slot_index(XwaSnapshot* s, uint32_t count) {
 	return 1;
 }
 
-/* The mesh count of object `o`'s model, at most XWA_SNAP_MAX_MESH_SLOTS. */
+/* The mesh count of object `o`'s model, at most XWA_SNAP_MAX_MESH_SLOTS.
+ * The cockpit and exterior models of the player's craft are drawn with the
+ * craft's states, and can have more meshes than its model. An object
+ * profile can hide those extra meshes. So the player's object gets the
+ * largest of the three counts. */
 static int snapshot_mesh_count(const ObjectRecord* o) {
-	const int count = ModelMesh_GetObjectTypeMeshCount(o->objectType);
+	int count = ModelMesh_GetObjectTypeMeshCount(o->objectType);
+	const int playerObjIdx = g_players[g_localPlayer].objectIndex;
+	if (g_objectTable != NULL && playerObjIdx >= 0 && o == &g_objectTable[playerObjIdx]) {
+		if (g_cockpitModel != 0 && g_cockpitModelMeshCache.meshCount > count) {
+			count = g_cockpitModelMeshCache.meshCount;
+		}
+		if (g_exteriorModel != 0 && g_exteriorModelMeshCache.meshCount > count) {
+			count = g_exteriorModelMeshCache.meshCount;
+		}
+	}
 	return count > XWA_SNAP_MAX_MESH_SLOTS ? XWA_SNAP_MAX_MESH_SLOTS : count;
 }
 
@@ -1620,6 +1637,13 @@ static void snapshot_capture_object(XwaSnapshot* s, uint32_t i, uint32_t render_
 		f->iff = m->iff;
 		f->node_switch = m->nodeSwitchIndex;
 		f->orient_dirty = m->orientMatrixDirty;
+		/* During hyperspace the game also writes its fixed hyperspace camera
+		 * into the craft's cached orientation
+		 * (XwaSnapshotCamera_NoteHyperspaceOverride): the renderer rebuilds
+		 * the orientation from the angles instead. */
+		if (i == (uint32_t)g_players[g_localPlayer].objectIndex && g_players[g_localPlayer].hyperspacePhase) {
+			f->orient_dirty = 1;
+		}
 		f->source_obj = m->sourceObjIdx;
 		f->speed = m->speed;
 		f->instance_extent = m->instanceExtent;
@@ -1708,6 +1732,16 @@ void XwaSnapshot_CaptureFlight(void) {
 			(uint32_t)(g_hyperspaceStarStreakCount < 0 ? 0 : g_hyperspaceStarStreakCount);
 		h->phase = player->hyperspacePhase;
 		h->phase_elapsed_ticks = player->hyperspaceRuntime.phaseElapsedTicks;
+		/* The destination is only written when a jump starts, so it holds
+		   until the exit ends. */
+		h->look[0] = '\0';
+		if (h->phase != XWA_HYPERSPACE_NONE) {
+			const XwaHyperspaceRegionRule* rule =
+				XwaMissionSettings_HyperspaceRegion(player->hyperspaceRuntime.targetRegionOrMode);
+			if (rule != NULL) {
+				snprintf(h->look, sizeof h->look, "%s", rule->look);
+			}
+		}
 		if (h->phase == PLAYER_HYPERSPACE_OUTBOUND || h->phase == PLAYER_HYPERSPACE_INBOUND) {
 			uint32_t count =
 				g_hyperspace_visible_streak_valid ? g_hyperspace_visible_streak_count : live_count;
@@ -1900,6 +1934,14 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->external = (uint8_t)(vs->externalCameraActive != 0);
 	c->cockpit_visible = g_players[g_localPlayer].cockpitVisible;
 	c->hyperspace_phase = (uint8_t)g_players[g_localPlayer].hyperspacePhase;
+	/* During hyperspace the HD renderer gets the camera of ordinary flight
+	 * (XwaSnapshotCamera_NoteHyperspaceOverride). */
+	float hyperspace_eye_offset[3];
+	const int hyperspace_camera = c->hyperspace_phase &&
+								  XwaSnapshotCamera_OrdinaryCamera(c->rows, c->world_pos, hyperspace_eye_offset);
+	if (hyperspace_camera) {
+		XwaSnapshotCamera_PositionFraction(c->world_pos, c->world_pos_fraction);
+	}
 	c->region = g_players[g_localPlayer].regionIndex;
 	c->mission_region =
 		(uint8_t)(g_inHangarReady ? g_hangarSavedMissionRegionIdx : g_players[g_localPlayer].regionIndex);
@@ -1943,11 +1985,11 @@ void XwaSnapshot_CaptureFlight(void) {
 	c->brightness_q8 = (uint16_t)g_flightBrightnessScaleQ8;
 	s->flight_camera_valid = 1;
 
-	/* Local-player weapon-fire light pulses (point-light channel). */
-	s->light_pulse_active = (uint8_t)(g_localPlayerLightPulseActive != 0);
-	for (int p = 0; p < XWA_SNAP_MAX_LIGHT_PULSES; p++) {
-		const LocalPlayerLightPulse* src = &g_localPlayerLightPulses[p];
-		XwaLightPulse* dst = &s->light_pulses[p];
+	/* The cockpit lights. */
+	s->cockpit_lights_active = (uint8_t)(g_cockpitLightsActive != 0);
+	for (int p = 0; p < XWA_SNAP_COCKPIT_LIGHT_COUNT; p++) {
+		const CockpitLight* src = &g_cockpitLights[p];
+		XwaCockpitLight* dst = &s->cockpit_lights[p];
 		dst->enabled = (uint8_t)(src->enabled != 0);
 		dst->start_time = src->startTime;
 		dst->cycle_ticks = src->cycleTicks;
@@ -1960,7 +2002,7 @@ void XwaSnapshot_CaptureFlight(void) {
 		dst->color[2] = src->colorB;
 	}
 
-	XwaCockpitAlertLights_Capture(s);
+	XwaCockpitLights_Capture(s);
 	XwaHeadlights_Capture(s);
 	{
 		XwaModernSunOptions sun_options;
@@ -2010,6 +2052,13 @@ void XwaSnapshot_CaptureFlight(void) {
 			k->seat_eye_world_offset[0] = g_players[g_localPlayer].seatEyeWorldOffsetX;
 			k->seat_eye_world_offset[1] = g_players[g_localPlayer].seatEyeWorldOffsetY;
 			k->seat_eye_world_offset[2] = g_players[g_localPlayer].seatEyeWorldOffsetZ;
+			/* The offset the kept hyperspace camera was placed with, not the
+			 * one the game's hyperspace cockpit draw recomputed. */
+			if (hyperspace_camera) {
+				for (int axis = 0; axis < 3; axis++) {
+					k->seat_eye_world_offset[axis] = hyperspace_eye_offset[axis];
+				}
+			}
 			k->seat_eye_local[0] = g_players[g_localPlayer].seatEyeLocalX;
 			k->seat_eye_local[1] = g_players[g_localPlayer].seatEyeLocalY;
 			k->seat_eye_local[2] = g_players[g_localPlayer].seatEyeLocalZ;

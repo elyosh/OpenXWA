@@ -1,7 +1,9 @@
 #include "xwa/flight/ai/ai_internal.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/ai_attack.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/turret_ignore.h"
 #include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
@@ -689,6 +691,13 @@ int16_t paifight_FindNearestAttackerOfMatchingTarget(uint16_t target1Type, uint1
 	bestRangeScore = UINT32_MAX;
 	for (targetObjIdx = (uint16_t)g_activeRegionObjectSlotStart;
 		 (uint32_t)targetObjIdx < g_activeRegionCraftObjectSlotEnd; ++targetObjIdx) {
+#ifdef XWA_MODERN
+		/* A gunner order that looks for a turret target skips the objects
+		   that the turret's weapon ignores, here the objects to protect. */
+		if (XwaTurretIgnore_SkipsForCraft(g_paiContext.aiObjIdx, targetObjIdx)) {
+			continue;
+		}
+#endif
 		if (g_objectTable[targetObjIdx].objectType != OBJ_None) {
 			int16_t matchesTarget1;
 			int16_t matchesTarget2;
@@ -721,6 +730,11 @@ int16_t paifight_FindNearestAttackerOfMatchingTarget(uint16_t target1Type, uint1
 						ObjectRecord* projectileObject;
 						uint16_t projectileType;
 
+#ifdef XWA_MODERN
+						if (XwaTurretIgnore_SkipsForCraft(g_paiContext.aiObjIdx, projectileObjIdx)) {
+							continue;
+						}
+#endif
 						projectileType = g_objectTable[projectileObjIdx].objectType;
 						projectileObject = &g_objectTable[projectileObjIdx];
 						if (projectileType != OBJ_None && projectileObject->genusId != GENUS_Explosion &&
@@ -811,6 +825,11 @@ int16_t paifight_FindNearestAttackerOfMatchingTarget(uint16_t target1Type, uint1
 
 						for (attackerObjIdx = (uint16_t)g_activeRegionObjectSlotStart;
 							 (uint32_t)attackerObjIdx < g_activeRegionCraftObjectSlotEnd; ++attackerObjIdx) {
+#ifdef XWA_MODERN
+							if (XwaTurretIgnore_SkipsForCraft(g_paiContext.aiObjIdx, attackerObjIdx)) {
+								continue;
+							}
+#endif
 							if (g_objectTable[attackerObjIdx].objectType != OBJ_None) {
 								AiController* attackerAi;
 								int16_t maneuverMode;
@@ -1416,6 +1435,10 @@ char paifight_scanfortargetorder(void) {
 	uint8_t planId;
 	uint16_t targetObjIdx;
 
+#ifdef XWA_MODERN
+	/* This order looks for the craft's own target, not a turret target. */
+	XwaTurretIgnore_Clear();
+#endif
 	if (g_paiContext.aiController->maneuverMode == g_paiContext.aiPlanInitialManeuverId) {
 		candidateTargetIdx = g_paiContext.aiController->candidateTargetIdx;
 		if (candidateTargetIdx != 0xffffu && candidateTargetIdx != 251u) {
@@ -1939,6 +1962,11 @@ char paifight_gunneroffenseorder(void) {
 	state.laserSlot = 0;
 	if ((uint8_t)craft->laserSlotCount > 0) {
 		do {
+#ifdef XWA_MODERN
+			/* The target searches of this rack skip the objects that its
+			   weapon ignores. */
+			XwaTurretIgnore_Select(g_paiContext.aiObjIdx, state.laserSlot);
+#endif
 			if (craft->warheadData[state.laserSlot].weaponType >= 4u &&
 				craft->warheadData[state.laserSlot].turretTargetObjIdx == -1 &&
 				craft->warheadData[state.laserSlot].turretRetargetCooldownTimer <= 0) {
@@ -2570,7 +2598,17 @@ char paifight_fightershootorder(void) {
 		goto clear_laser_link_modes;
 	}
 
+#ifdef XWA_MODERN
+	/* With laser ranges in the mod, the range follows the flight group's rank. */
+	if (!XwaAiAttack_LaserRange(
+			g_paiContext.aiObjIdx,
+			g_missionFlightGroups[g_paiContext.curOrderCoord.fields.flightGroupIdx].fg.groupAI,
+			&maxLaserRange)) {
+		maxLaserRange = g_aiFighterShootMaxRangeBySkill[g_paiContext.aiSkillTier];
+	}
+#else
 	maxLaserRange = g_aiFighterShootMaxRangeBySkill[g_paiContext.aiSkillTier];
+#endif
 	plan = &g_planTable[g_paiContext.aiController->currentPlanId];
 	if (strcmp(plan->name, "disableldr1pln") == 0) {
 		isDisablePlan = true;
@@ -3119,6 +3157,11 @@ char paifight_gunnerselfdefenseorder(void) {
 				continue;
 			}
 
+#ifdef XWA_MODERN
+			/* The target searches of this rack skip the objects that its
+			   weapon ignores. */
+			XwaTurretIgnore_Select(g_paiContext.aiObjIdx, laserSlot);
+#endif
 			craft->warheadData[laserSlot].turretTargetObjIdx = -1;
 			g_curCraft->warheadData[laserSlot].count = 0;
 			g_curCraft->warheadData[laserSlot].lastFireMeshIdx = 0xffu;
@@ -3138,6 +3181,14 @@ char paifight_gunnerselfdefenseorder(void) {
 				if (pai_IsObjectTargetable(lastAttackerObjIdx)) {
 					uint32_t rangeScore;
 
+#ifdef XWA_MODERN
+					/* When the rack's weapon ignores the last attacker, the
+					   rack looks for warheads and other attackers. The craft
+					   keeps its last attacker. */
+					if (XwaTurretIgnore_Skips(lastAttackerObjIdx)) {
+						goto searchWarheadsAndAttackers;
+					}
+#endif
 					rangeScore = (uint32_t)collide_roughdistance3d(
 						g_objectTable[lastAttackerObjIdx].world_x - g_paifightSearchOriginX,
 						g_objectTable[lastAttackerObjIdx].world_y - g_paifightSearchOriginY,
@@ -3186,6 +3237,9 @@ char paifight_gunnerselfdefenseorder(void) {
 				}
 			}
 
+#ifdef XWA_MODERN
+		searchWarheadsAndAttackers:
+#endif
 			if (weaponType == 4u) {
 				uint16_t projectileCursor;
 				int16_t bestProjectileObjIdx;
@@ -3213,6 +3267,11 @@ char paifight_gunnerselfdefenseorder(void) {
 					ObjectRecord* projectileObj;
 					uint32_t rangeScore;
 
+#ifdef XWA_MODERN
+					if (XwaTurretIgnore_Skips(projectileObjIdx)) {
+						continue;
+					}
+#endif
 					projectileObj = &g_objectTable[projectileObjIdx];
 					if (projectileObj->objectType == OBJ_None || projectileObj->genusId == GENUS_Explosion ||
 						!paifight_IsWarheadClassProjectile(projectileObj->objectType) ||
@@ -3288,6 +3347,11 @@ char paifight_gunnerselfdefenseorder(void) {
 					uint32_t rangeScore;
 					ModelGenusId genusId;
 
+#ifdef XWA_MODERN
+					if (XwaTurretIgnore_Skips(candidateObjIdx)) {
+						continue;
+					}
+#endif
 					if (g_objectTable[candidateObjIdx].objectType == OBJ_None) {
 						continue;
 					}
@@ -3473,6 +3537,13 @@ int16_t paifight_FindNearestGunnerTargetInCandidateSet(uint16_t target1Type, uin
 		if (g_paifightGunnerTargetCandidateSet[2u * objectIdx + (uint32_t)candidateSetIdx] != 0) {
 			uint32_t rangeScore;
 
+#ifdef XWA_MODERN
+			/* Skip the candidates that the turret's weapon ignores. */
+			if (XwaTurretIgnore_Skips(objectIdx)) {
+				++objectIdx;
+				continue;
+			}
+#endif
 			rangeScore =
 				(uint32_t)collide_roughdistance3d(g_objectTable[objectIdx].world_x - g_paifightSearchOriginX,
 												  g_objectTable[objectIdx].world_y - g_paifightSearchOriginY,
@@ -3533,6 +3604,12 @@ int16_t paifight_FindNearestGunnerTargetInCandidateSet(uint16_t target1Type, uin
 
 	objectIdx = (uint16_t)g_objScanStart;
 	while ((uint32_t)objectIdx < g_regionStaticObjectSlotEnd) {
+#ifdef XWA_MODERN
+		if (XwaTurretIgnore_Skips(objectIdx)) {
+			++objectIdx;
+			continue;
+		}
+#endif
 		if (g_objectTable[objectIdx].objectType != OBJ_None &&
 			(g_objectTypes[(uint16_t)g_objectTable[objectIdx].objectType].flags & 2u) != 0) {
 			int matchesTarget1;
@@ -3605,6 +3682,14 @@ int16_t paifight_FindNearestGunnerTargetInCandidateSet(uint16_t target1Type, uin
 		savedCurCraft = g_curCraft;
 		blockerObjIdx = (uint16_t)g_activeRegionObjectSlotStart;
 		while ((uint32_t)blockerObjIdx < g_activeRegionCraftObjectSlotEnd) {
+#ifdef XWA_MODERN
+			/* An object that the turret's weapon ignores doesn't block the
+			   shot either. */
+			if (XwaTurretIgnore_Skips(blockerObjIdx)) {
+				++blockerObjIdx;
+				continue;
+			}
+#endif
 			if (g_objectTable[blockerObjIdx].objectType != OBJ_None && blockerObjIdx != bestObjIdx &&
 				blockerObjIdx != (uint16_t)g_paiContext.aiObjIdx) {
 				if (Object_IsFriendlyToTeam(blockerObjIdx, g_objectTable[g_paiContext.aiObjIdx].mobj->team)) {

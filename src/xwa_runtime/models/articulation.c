@@ -13,6 +13,7 @@
 #include "xwa/flight/player/player.h"
 #include "xwa/util/memory.h"
 #include "xwa/util/random.h"
+#include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_file.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/snapshot/snapshot.h"
@@ -1037,6 +1038,50 @@ int XwaArticulation_CrewAlwaysAnimates(unsigned int objIdx) {
 		}
 	}
 	return 0;
+}
+
+int XwaArticulation_HangarDroidParts(unsigned int objIdx, XwaHangarDroidPart* parts, int capacity) {
+	static const char* const motions[] = { "nod", "swing", "spin" };
+	ArticulationModel view;
+	const ArticulationModel* model;
+	int count = 0;
+	uint32_t index;
+
+	if (Articulation_IsOriginalOpt(objIdx)) {
+		const uint16_t objectType = (uint16_t)g_objectTable[objIdx].objectType;
+		char swapped[64];
+
+		/* Only the type's own model gets these parts, not a model that the
+		   hangar swaps in. */
+		if (XwaHangars_ModelFileName(objectType, swapped, sizeof swapped)) {
+			return 0;
+		}
+		if (objectType == OBJ_HangarDroid && capacity >= 1) {
+			parts[count++] = (XwaHangarDroidPart) { 3, XWA_HANGAR_DROID_NOD };
+		} else if (objectType == OBJ_HangarDroid2 && capacity >= 2) {
+			parts[count++] = (XwaHangarDroidPart) { 1, XWA_HANGAR_DROID_SWING };
+			parts[count++] = (XwaHangarDroidPart) { 2, XWA_HANGAR_DROID_SPIN };
+		}
+		return count;
+	}
+	model = Articulation_Model(objIdx, &view);
+	for (index = 0; model != NULL && index < model->articulationCount && count < capacity; ++index) {
+		const AeronFlightArticulation* articulation = &model->articulations[index];
+		int motion;
+
+		if (strcmp(articulation->group, "hangar_droid") != 0) {
+			continue;
+		}
+		for (motion = 0; motion < 3; ++motion) {
+			if (strcmp(articulation->behavior, motions[motion]) == 0) {
+				parts[count].component = articulation->component;
+				parts[count].motion = (uint8_t)motion;
+				++count;
+				break;
+			}
+		}
+	}
+	return count;
 }
 
 void XwaArticulation_StepHangarCrew(void) {

@@ -1,10 +1,10 @@
 #include "xwa_runtime/models/headlights.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/flight/flight_light.h"
 #include "xwa/flight/hangar.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/mission_file.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
@@ -12,8 +12,6 @@
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
-
-#define HEADLIGHTS_FLIGHT_YAML "flight/flight.yaml"
 
 static int s_defined;
 static int s_autoTurnOn;
@@ -43,7 +41,7 @@ static int Headlights_ReadVector(const AeronConfigNode* section, const char* key
 			(type != AERON_CONFIG_INT && type != AERON_CONFIG_FLOAT) ||
 			!isfinite(AeronConfigNode_Float(item, 0.0))) {
 			Aeron_LogError("xwa.flight", "%s:%d: headlights: %s must be a list of three numbers",
-						   HEADLIGHTS_FLIGHT_YAML, AeronConfigNode_Line(node), key);
+						   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node), key);
 			return 0;
 		}
 		values[i] = (float)AeronConfigNode_Float(item, 0.0);
@@ -55,8 +53,6 @@ static int Headlights_ReadVector(const AeronConfigNode* section, const char* key
 void XwaHeadlights_Init(void) {
 	static const float kPosition[3] = { 0.0f, 0.0f, 20.0f };
 	static const float kColor[3] = { 1.0f, 1.0f, 1.0f };
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* section;
 	const AeronConfigNode* node;
@@ -68,22 +64,14 @@ void XwaHeadlights_Init(void) {
 	memcpy(s_color, kColor, sizeof s_color);
 	s_power = 0.0f;
 	s_angle = 0.0f;
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, HEADLIGHTS_FLIGHT_YAML, &file,
-									&error)) {
-		/* The backdrops code already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
+	root = XwaFlightConfig_Root();
 	section = AeronConfigNode_MapGet(root, "headlights");
 	if (section == NULL) {
-		AeronConfigFile_Destroy(file);
 		return;
 	}
 	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
 		Aeron_LogError("xwa.flight", "%s:%d: headlights must be a map; there are no headlights",
-					   HEADLIGHTS_FLIGHT_YAML, AeronConfigNode_Line(section));
-		AeronConfigFile_Destroy(file);
+					   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(section));
 		return;
 	}
 	ok &= Headlights_ReadVector(section, "position_m", s_position);
@@ -92,7 +80,7 @@ void XwaHeadlights_Init(void) {
 	s_power = (float)AeronConfigNode_Float(node, -1.0);
 	if (!(s_power > 0.0f) || !isfinite(s_power)) {
 		Aeron_LogError("xwa.flight", "%s:%d: headlights: power_w must be a number of watts above 0",
-					   HEADLIGHTS_FLIGHT_YAML, AeronConfigNode_Line(node != NULL ? node : section));
+					   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node != NULL ? node : section));
 		ok = 0;
 	}
 	node = AeronConfigNode_MapGet(section, "angle_degrees");
@@ -101,22 +89,21 @@ void XwaHeadlights_Init(void) {
 		if (!(s_angle > 0.0f && s_angle <= 90.0f)) {
 			Aeron_LogError("xwa.flight",
 						   "%s:%d: headlights: angle_degrees must be a number above 0, at most 90",
-						   HEADLIGHTS_FLIGHT_YAML, AeronConfigNode_Line(node));
+						   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node));
 			ok = 0;
 		}
 	}
 	node = AeronConfigNode_MapGet(section, "auto_turn_on");
 	if (node != NULL && AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
 		Aeron_LogError("xwa.flight", "%s:%d: headlights: auto_turn_on must be true or false",
-					   HEADLIGHTS_FLIGHT_YAML, AeronConfigNode_Line(node));
+					   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node));
 		ok = 0;
 	}
 	s_autoTurnOn = AeronConfigNode_Bool(node, 1);
 	if (!ok) {
-		Aeron_LogError("xwa.flight", "%s: there are no headlights", HEADLIGHTS_FLIGHT_YAML);
+		Aeron_LogError("xwa.flight", "%s: there are no headlights", XWA_FLIGHT_CONFIG_PATH);
 	}
 	s_defined = ok;
-	AeronConfigFile_Destroy(file);
 }
 
 void XwaHeadlights_LoadMission(const char* missionPath) {

@@ -1,5 +1,7 @@
 #include "xwa_runtime/config/modern_speed_effect_options.h"
 
+#include "xwa_runtime/models/flight_config.h"
+
 /* Modern port module; no original counterpart. */
 
 static const XwaOptionKey g_speedEffectOptionKeys[] = {
@@ -12,7 +14,7 @@ static XwaModernSpeedEffectOptions g_shipped, g_mod, g_player;
 
 static XwaOptionSection g_section = {
 	.name = "speed_effect",
-	.mod_file = "flight/flight.yaml",
+	.mod_file = XWA_FLIGHT_CONFIG_PATH,
 	.log_channel = "xwa.flight",
 	.keys = g_speedEffectOptionKeys,
 	.key_count = sizeof g_speedEffectOptionKeys / sizeof g_speedEffectOptionKeys[0],

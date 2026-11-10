@@ -608,6 +608,20 @@ int XwaCraftSounds_HyperEnd(unsigned int playerIdx, int interdicted, int stockSl
 	return slot != -1 ? slot : stockSlot;
 }
 
+void XwaCraftSounds_OtherCraftHyperspace(unsigned int objIdx, int arriving) {
+	int slot;
+
+	if (objIdx >= XWA_MAX_OBJECTS || g_localPlayer < 0 ||
+		g_objectTable[objIdx].regionIdx != g_players[g_localPlayer].regionIndex) {
+		return;
+	}
+	slot = XwaSoundBanks_Slot(arriving ? XWA_SOUND_BANK_EXIT_HYPERSPACE : XWA_SOUND_BANK_ENTER_HYPERSPACE,
+							  g_objectTable[objIdx].objectType);
+	if (slot != -1) {
+		fsfx_PlaySound(slot, 0xFFFFu, g_localPlayer);
+	}
+}
+
 int XwaCraftSounds_SFoil(unsigned int playerIdx, int stockSlot) {
 	const int slot =
 		XwaSoundBanks_Slot(XWA_SOUND_BANK_S_FOIL, g_objectTable[g_players[playerIdx].objectIndex].objectType);

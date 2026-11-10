@@ -15,6 +15,10 @@
  * values: a key that the profile doesn't set gets the stock value, not the
  * value of the `default` profile.
  *
+ * `side` sets which side a weapon type belongs to. `side_model` sets the
+ * weapon that replaces it when the craft's IFF is on the other side
+ * (XwaCraftWeapons_IffWeaponType).
+ *
  * The factors of fire_ratio_by_rank and damage_by_difficulty are float32
  * values. The game multiplies them in float32, which gives the same result
  * on every platform.
@@ -47,8 +51,13 @@ typedef enum XwaWeaponStat {
 	XWA_WEAPON_STAT_DECHARGE_RATE,
 	XWA_WEAPON_STAT_RECHARGE_RATE,
 	XWA_WEAPON_STAT_HIGH_POWER_CHARGE,
+	XWA_WEAPON_STAT_SIDE,       /* XWA_WEAPON_SIDE_* */
+	XWA_WEAPON_STAT_SIDE_MODEL, /* a weapon type */
 	XWA_WEAPON_STATS
 } XwaWeaponStat;
+
+/* The values of XWA_WEAPON_STAT_SIDE, as in g_projectileRequiredIffByType. */
+enum { XWA_WEAPON_SIDE_REBEL = 0, XWA_WEAPON_SIDE_IMPERIAL = 1, XWA_WEAPON_SIDE_NONE = 0xff };
 
 typedef enum XwaWeaponLinkingRule {
 	XWA_WEAPON_LINKING_PREVENT_AI_LASERS_ION_WHEN_DISABLING,

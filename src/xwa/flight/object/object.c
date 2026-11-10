@@ -26,6 +26,7 @@
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/weapon_stats.h"
@@ -175,6 +176,9 @@ uint16_t Object_AllocSlotForGenus(uint16_t genusId) {
 			g_objectTable[candidateObjIdx].objectSignature = 1;
 		}
 
+#ifdef XWA_MODERN
+		Object_ResetMoveFraction(g_objectTable[candidateObjIdx].mobj);
+#endif
 		collide_ResetObjectProximityForSlot(candidateObjIdx);
 		return candidateObjIdx;
 	}
@@ -1365,6 +1369,70 @@ static __inline void Object_DecayVelocityOverride(MobileObject* mobj) {
 	mobj->velocityOverrideElapsed = newElapsed;
 }
 
+#ifdef XWA_MODERN
+void Object_ResetMoveFraction(MobileObject* mobj) {
+	mobj->moveFractionX = 0;
+	mobj->moveFractionY = 0;
+	mobj->moveFractionZ = 0;
+}
+
+/* Keeps the fraction of an object's per-axis Q15 step. The original
+ * integer-only step drops it every frame. That floors every small negative
+ * component to -1 while the matching positive one becomes 0, so slow objects
+ * drift toward negative world axes (craft sink at low speed) when modern
+ * flight simulation uses short steps. */
+static int Object_StepQ15(int16_t direction, uint16_t scalar, uint16_t* fraction) {
+	int64_t moved = (int64_t)direction * scalar + *fraction;
+	*fraction = (uint16_t)(moved & 0x7fff);
+	return (int)(moved >> 15);
+}
+
+/* Forward distance covered this step at the given speed. The original
+ * truncates elapsedTicks * unitsPerSecond / 236 on every step, so with short
+ * steps slow craft lose most of their movement and docking approaches crawl
+ * or stall. Measuring the step against the game clock's position within its
+ * 236-tick second keeps the remainder without per-object state: every second
+ * still covers exactly unitsPerSecond, whatever the step size. */
+static int Object_ForwardMoveScalar(uint16_t speed) {
+	uint64_t unitsPerSecond = (4660u * (uint32_t)speed + 128u) >> 8;
+	uint64_t start = (uint32_t)g_gameTime % 236u;
+	uint64_t end = start + (uint16_t)g_elapsedTicks;
+	return (int)(end * unitsPerSecond / 236u - start * unitsPerSecond / 236u);
+}
+#endif
+
+static void Object_AddForwardMove(MobileObject* mobj, uint16_t scalar) {
+#ifdef XWA_MODERN
+	trig2_xmovedist += Object_StepQ15(mobj->moveX, scalar, &mobj->moveFractionX);
+	trig2_ymovedist += Object_StepQ15(mobj->moveY, scalar, &mobj->moveFractionY);
+	trig2_zmovedist += Object_StepQ15(mobj->moveZ, scalar, &mobj->moveFractionZ);
+#else
+	trig2_xmovedist += Xwa_Q15Mul((int16_t)mobj->moveX, scalar);
+	trig2_ymovedist += Xwa_Q15Mul((int16_t)mobj->moveY, scalar);
+	trig2_zmovedist += Xwa_Q15Mul((int16_t)mobj->moveZ, scalar);
+#endif
+}
+
+static void Object_ComputeProjectileForwardMove(MobileObject* projectile, uint16_t scalar) {
+	trig2_xmovedist = 0;
+	trig2_ymovedist = 0;
+	trig2_zmovedist = 0;
+	Object_AddForwardMove(projectile, scalar);
+}
+
+/* Smallest push applied while a push accumulator drains. The original takes
+ * the sign of the halved clamp, which is 0 for an accumulator of +1: that
+ * pushes it to +2 and back forever, jittering the craft instead of settling. */
+static int Object_MinimumPushStep(int accumulator, int clamp) {
+#ifdef XWA_MODERN
+	(void)clamp;
+	return accumulator < 0 ? -1 : 1;
+#else
+	(void)accumulator;
+	return ((int16_t)clamp <= 0) ? -1 : 1;
+#endif
+}
+
 // Applies the movement scratch delta directly in the update loop, where the original code inlined
 // the world-bound clamp rather than calling Object_AddTrigMoveDeltaAndClampWorldPosition.
 static __inline void Object_ApplyTrigMoveDeltaAndClampWorldPosition(ObjectRecord* obj) {
@@ -1884,17 +1952,25 @@ void Object_UpdateLifetimeAndMovement(void) {
 
 		// Forward-move scalar for this step (LABEL_137).
 		fm = obj->mobj;
+#ifdef XWA_MODERN
+		fwdScalar = Object_ForwardMoveScalar(fm->speed);
+#else
 		if (fm->speed) {
 			fwdScalar = (uint16_t)g_elapsedTicks * ((4660 * fm->speed + 128) >> 8) / 236;
 		} else {
 			fwdScalar = 0;
 		}
+#endif
 		if (obj->playerOwnerIdx != -1) {
 			uint8_t inputDisabledFlag = g_players[obj->playerOwnerIdx].inputDisabledFlag;
 			if (inputDisabledFlag && inputDisabledFlag != 5) {
 				fwdScalar = 0;
 			}
 		}
+#ifdef XWA_MODERN
+		/* An arrival at a set speed stops exactly on its point. */
+		fwdScalar = XwaCraftHyperspace_LimitArrivalMove(objIdx, fwdScalar);
+#endif
 
 		switch (genus) {
 			case GENUS_Fighter:
@@ -1929,9 +2005,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 					}
 					nm = obj->mobj;
 					if (!nm->velocityOverrideActive || nm->velocityOverrideDuration) {
-						trig2_xmovedist += Xwa_Q15Mul((int16_t)nm->moveX, (uint16_t)fwdScalar);
-						trig2_ymovedist += Xwa_Q15Mul((int16_t)obj->mobj->moveY, (uint16_t)fwdScalar);
-						trig2_zmovedist += Xwa_Q15Mul((int16_t)obj->mobj->moveZ, (uint16_t)fwdScalar);
+						Object_AddForwardMove(nm, (uint16_t)fwdScalar);
 					}
 
 					if (mc->workingSubsystems) {
@@ -1971,7 +2045,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 							}
 							step = (uint16_t)g_elapsedTicks * (int16_t)clamp / 236;
 							if (!step) {
-								step = ((int16_t)clamp <= 0) ? -1 : 1;
+								step = Object_MinimumPushStep(pax, clamp);
 							}
 							mc->pushAccumX = pax - step;
 							trig2_xmovedist += step;
@@ -1987,7 +2061,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 							}
 							step = (uint16_t)g_elapsedTicks * (int16_t)clamp / 236;
 							if (!step) {
-								step = ((int16_t)clamp <= 0) ? -1 : 1;
+								step = Object_MinimumPushStep(pay, clamp);
 							}
 							mc->pushAccumY = pay - step;
 							trig2_ymovedist += step;
@@ -2005,7 +2079,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 							}
 							step = (uint16_t)g_elapsedTicks * (int16_t)clamp / 236;
 							if (!step) {
-								step = ((int16_t)clamp <= 0) ? -1 : 1;
+								step = Object_MinimumPushStep(paz, clamp);
 							}
 							if (aiCtrl->maneuverMode != 34) {
 								mc->pushAccumZ = paz - step;
@@ -2105,9 +2179,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 						// (no speed ramp during launch).
 						Object_ComputeVelocityOverrideMove(obj);
 						Object_ApplyTrigMoveDeltaAndClampWorldPosition(obj);
-						trig2_xmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveX, (uint16_t)fwdScalar);
-						trig2_ymovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveY, (uint16_t)fwdScalar);
-						trig2_zmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveZ, (uint16_t)fwdScalar);
+						Object_ComputeProjectileForwardMove(obj->mobj, (uint16_t)fwdScalar);
 						Object_ApplyTrigMoveDeltaAndClampWorldPosition(obj);
 						goto advance;
 					}
@@ -2136,9 +2208,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 								fm->velocityOverrideActive = 0;
 							}
 						}
-						trig2_xmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveX, (uint16_t)fwdScalar);
-						trig2_ymovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveY, (uint16_t)fwdScalar);
-						trig2_zmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveZ, (uint16_t)fwdScalar);
+						Object_ComputeProjectileForwardMove(obj->mobj, (uint16_t)fwdScalar);
 						Object_ApplyTrigMoveDeltaAndClampWorldPosition(obj);
 						goto advance;
 					}
@@ -2321,9 +2391,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 				if (obj->mobj->moveVectorDirty) {
 					FVIEW_calcrotatemove(obj->pitch, obj->yaw, obj);
 				}
-				trig2_xmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveX, (uint16_t)fwdScalar);
-				trig2_ymovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveY, (uint16_t)fwdScalar);
-				trig2_zmovedist = Xwa_Q15Mul((int16_t)obj->mobj->moveZ, (uint16_t)fwdScalar);
+				Object_ComputeProjectileForwardMove(obj->mobj, (uint16_t)fwdScalar);
 				Object_ApplyTrigMoveDeltaAndClampWorldPosition(obj);
 				goto advance;
 

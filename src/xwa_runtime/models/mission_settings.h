@@ -31,7 +31,11 @@
  *     the laser groups, plus the turret racks of craft that fire from float
  *     hardpoints;
  *   - overlapping_fly_by_sounds lets fsfx_PlaySound start a fly-by or engine
- *     wash sound while it is already playing. */
+ *     wash sound while it is already playing;
+ *   - hangar_droid_parts_from_model replaces the motion of the two hangar
+ *     droids in Hangar_UpdateHangarDroidTraffic. Each droid moves the
+ *     hangar_droid parts of its model, whatever its slot
+ *     (XwaArticulation_HangarDroidParts). */
 
 #include <stdint.h>
 
@@ -93,6 +97,7 @@ int XwaMissionSettings_TwoLauncherFixes(void);
 int XwaMissionSettings_StarshipMissileDefenseAnyWarhead(void);
 int XwaMissionSettings_WeaponRackCountFromRecord(void);
 int XwaMissionSettings_OverlappingFlyBySounds(void);
+int XwaMissionSettings_HangarDroidPartsFromModel(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);
@@ -110,8 +115,23 @@ int XwaMissionSettings_PlayerWarheadsDisabled(void);
 int XwaMissionSettings_WarheadCollisionDamage(void);
 int XwaMissionSettings_DamageThroughShieldsOnHard(void);
 int XwaMissionSettings_ProximityTriggersCheckCraftOnly(void);
-/* Whether a hyperspace jump to `region` plays the abort sound. */
-int XwaMissionSettings_HyperspaceAbortSoundRegion(int region);
+/* Whether AI craft use the hyperspace speeds of the flight settings and of
+   their models. 1 unless the mission sets use_hyperspace_speeds to false. */
+int XwaMissionSettings_UseHyperspaceSpeeds(void);
+
+/* The number of regions that hyperspace_regions can list. */
+#define XWA_HYPERSPACE_REGIONS 4
+/* The longest look name, with its terminating 0. */
+#define XWA_HYPERSPACE_LOOK_NAME_MAX 32
+
+/* What happens when the player jumps to a region. */
+typedef struct XwaHyperspaceRegionRule {
+	char look[XWA_HYPERSPACE_LOOK_NAME_MAX]; /* "" for the normal look */
+	int abortSound;                          /* the abort sound replaces the arrival sound */
+} XwaHyperspaceRegionRule;
+
+/* The rule of a jump to `region`, or NULL when the mission has none. */
+const XwaHyperspaceRegionRule* XwaMissionSettings_HyperspaceRegion(int region);
 
 /* The O key, outside the proving grounds: when the mission lists flight
    groups for it, targets a craft of them for player `playerIdx` and returns

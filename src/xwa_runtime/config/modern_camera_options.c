@@ -1,5 +1,7 @@
 #include "xwa_runtime/config/modern_camera_options.h"
 
+#include "xwa_runtime/models/flight_config.h"
+
 /* Modern port module; no original counterpart. */
 
 static const XwaOptionKey g_cameraOptionKeys[] = {
@@ -20,7 +22,7 @@ static XwaModernCameraOptions g_shipped, g_mod, g_player;
 
 static XwaOptionSection g_section = {
 	.name = "camera",
-	.mod_file = "flight/flight.yaml",
+	.mod_file = XWA_FLIGHT_CONFIG_PATH,
 	.log_channel = "xwa.flight",
 	.keys = g_cameraOptionKeys,
 	.key_count = sizeof g_cameraOptionKeys / sizeof g_cameraOptionKeys[0],

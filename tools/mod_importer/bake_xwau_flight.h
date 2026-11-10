@@ -11,6 +11,10 @@ typedef struct BakeXwauFlightOptions {
 	const char* xwau_root;            /* the XWAU install */
 	int planet_max;                   /* scale planet images wider than this down to it; 0 keeps them */
 	int threads; /* the threads that decode a group's images; 0 or 1 decodes them on the calling thread */
+	/* Called with how far the bake is, from 0 to 1000, on the calling
+	   thread. Can be NULL. */
+	void (*progress)(void* user, int permille);
+	void* progress_user;
 } BakeXwauFlightOptions;
 
 typedef struct BakeXwauFlightStats {

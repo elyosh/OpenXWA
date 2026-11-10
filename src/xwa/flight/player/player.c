@@ -34,6 +34,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/camera/exterior_hud.h"
 #include "xwa_runtime/models/articulation.h"
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/mission_settings.h"
@@ -1068,8 +1069,14 @@ void Player_HandleHyperspaceCommand(CraftData* craft, unsigned int playerIdx, ch
 
 		gravityWellActive = 0;
 		for (objIdx = g_activeRegionObjectSlotStart; objIdx < g_activeRegionCraftObjectSlotEnd; ++objIdx) {
+#ifdef XWA_MODERN
+			/* A model can add a gravity well, or remove the one that its
+			   object type has. */
+			if (XwaCraftHyperspace_HasGravityWell(g_objectTable[objIdx].objectType)) {
+#else
 			if (g_objectTable[objIdx].objectType == OBJ_Interdictor2 ||
 				g_objectTable[objIdx].objectType == OBJ_ModStrikeCruiser) {
+#endif
 				MobileObject* mobj;
 
 				mobj = g_objectTable[objIdx].mobj;
@@ -1102,10 +1109,10 @@ void Player_HandleHyperspaceCommand(CraftData* craft, unsigned int playerIdx, ch
 			}
 			Hud_ClearReadyMessageQueue();
 			Flight_InitOutboundHyperspaceStreaks();
-			FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-			FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-			FlightLight_SetLocalPlayerPulseEnabled(3, 1);
-			g_localPlayerLightPulses[3].startTime = g_gameTime;
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 1);
+			g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].startTime = g_gameTime;
 		}
 
 		msg_emitInFlightMessage(MSG_HYPER_PREPARE, (int)playerIdx);
@@ -1724,9 +1731,9 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 		g_players[playerIdx].currentSeatIdx = 1;
 	}
 	if (playerIdx == (unsigned int)g_localPlayer) {
-		FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-		FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-		FlightLight_SetLocalPlayerPulseEnabled(3, 0);
+		FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+		FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+		FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 0);
 		ForceFeedback_EnableEffects();
 	}
 	g_objPrevX[playerIdx] = g_objectTable[selectedObjIdx].world_x;
@@ -1828,9 +1835,9 @@ int Player_BindToAvailableCraft(unsigned int playerIdx, unsigned int previousObj
 			g_players[linkedPlayerIdx].currentSeatIdx = 1;
 		}
 		if (linkedPlayerIdx == g_localPlayer) {
-			FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-			FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-			FlightLight_SetLocalPlayerPulseEnabled(3, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 0);
 			ForceFeedback_EnableEffects();
 		}
 		g_objPrevX[linkedPlayerIdx] = g_objectTable[selectedObjIdx].world_x;
@@ -2029,9 +2036,9 @@ int Player_UnbindFromCurrentCraft(int playerIdx, int requireAnotherOwnedCraft, i
 		g_players[playerIdx].regionSessionId = 0;
 		g_players[playerIdx].hyperspacePhase = PLAYER_HYPERSPACE_PHASE_NONE;
 		if (playerIdx == g_localPlayer) {
-			FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-			FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-			FlightLight_SetLocalPlayerPulseEnabled(3, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 0);
 		}
 		g_players[playerIdx].missileLockState = 0;
 		g_players[playerIdx].gap71_field16 = 0;
@@ -2132,9 +2139,9 @@ int Player_UnbindFromCurrentCraft(int playerIdx, int requireAnotherOwnedCraft, i
 		g_players[playerIdx].regionSessionId = 0;
 		g_players[playerIdx].hyperspacePhase = PLAYER_HYPERSPACE_PHASE_NONE;
 		if (playerIdx == g_localPlayer) {
-			FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-			FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-			FlightLight_SetLocalPlayerPulseEnabled(3, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 0);
 		}
 		g_players[playerIdx].missileLockState = 0;
 		g_players[playerIdx].gap71_field16 = 0;
@@ -2158,9 +2165,9 @@ int Player_UnbindFromCurrentCraft(int playerIdx, int requireAnotherOwnedCraft, i
 	g_players[playerIdx].regionSessionId = 0;
 	g_players[playerIdx].hyperspacePhase = PLAYER_HYPERSPACE_PHASE_NONE;
 	if (playerIdx == g_localPlayer) {
-		FlightLight_SetLocalPlayerPulseEnabled(4, 0);
-		FlightLight_SetLocalPlayerPulseEnabled(5, 0);
-		FlightLight_SetLocalPlayerPulseEnabled(3, 0);
+		FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_TRANSFER, 0);
+		FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_ARRIVAL, 0);
+		FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HYPERSPACE_JUMP, 0);
 	}
 	g_players[playerIdx].missileLockState = 0;
 	g_players[playerIdx].gap71_field16 = 0;

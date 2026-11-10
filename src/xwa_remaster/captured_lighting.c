@@ -108,7 +108,8 @@ static int cl_applies(const XwaSnapshot* snap, const XwaEnvironmentSelection* se
 		return 0;
 	}
 	const XwaFlightCamera* cam = &snap->flight_camera;
-	if (cam->in_hangar || cam->death_star_mode || cam->hyperspace_phase || cam->map_mode) {
+	if (cam->in_hangar || cam->death_star_mode || cam->hyperspace_phase == XWA_HYPERSPACE_TUNNEL ||
+		cam->map_mode) {
 		return 0;
 	}
 	return selection->mode == XWA_ENV_MODE_CLASSIC || XwaRemasterEnvironment_KeepsBackdrops(selection);

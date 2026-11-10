@@ -1,4 +1,4 @@
-/* Fullscreen triangle for analytic hyperspace backgrounds. */
+/* Fullscreen triangle for the analytic hyperspace tunnel. */
 
 struct VertexOutput {
 	float4 position : SV_Position;

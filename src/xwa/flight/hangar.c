@@ -338,6 +338,9 @@ static int g_modernHangarCraneRotationActive;
 static int g_modernHangarCraneScaledStateActive;
 static ModernHangarPackedRotationState g_modernHangarPrimaryDroidRotation;
 static ModernHangarPackedRotationState g_modernFamilyDroidRotations[10][2];
+/* For hangar_droid_parts_from_model: the nod state of the parts of the two
+   hangar droids, by slot and component. */
+static ModernHangarPackedRotationState g_modernDroidPartRotations[2][XWA_CRAFT_MESH_SLOT_COUNT];
 
 static void Hangar_ModernBeginLegacyCadence(int dtTicks);
 #endif
@@ -655,12 +658,12 @@ static int Hangar_EnterCraftInternal(uint16_t fromObjIdx, int runReadyLoop) {
 	}
 #endif
 
-	g_localPlayerLightPulses[0].enabled = 0;
-	g_localPlayerLightPulses[1].enabled = 0;
-	g_localPlayerLightPulses[2].enabled = 0;
-	g_localPlayerLightPulses[3].enabled = 0;
-	g_localPlayerLightPulses[4].enabled = 0;
-	g_localPlayerLightPulses[5].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].enabled = 0;
 	if (g_useHardware3D) {
 		Particle_FreeAllEffects();
 	}
@@ -1235,12 +1238,12 @@ int Hangar_EnterCraft(uint16_t fromObjIdx) {
 	int missionWasEnding = 0; // v56
 	int i;
 
-	g_localPlayerLightPulses[0].enabled = 0;
-	g_localPlayerLightPulses[1].enabled = 0;
-	g_localPlayerLightPulses[2].enabled = 0;
-	g_localPlayerLightPulses[3].enabled = 0;
-	g_localPlayerLightPulses[4].enabled = 0;
-	g_localPlayerLightPulses[5].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HULL_CRITICAL].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_WARHEAD_LOCK].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_BEAM_WARNING].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_JUMP].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_TRANSFER].enabled = 0;
+	g_cockpitLights[COCKPIT_LIGHT_HYPERSPACE_ARRIVAL].enabled = 0;
 	if (g_useHardware3D) {
 		Particle_FreeAllEffects();
 	}
@@ -4759,9 +4762,9 @@ end:
 		if (rightButton) {
 			if (g_hangarAutoCam)
 				Hangar_SetCameraShot(0);
-			g_hardpointOriginOffset[0] = 0;
-			g_hardpointOriginOffset[1] = 0;
-			g_hardpointOriginOffset[2] = 0;
+			g_seatEyeOffset[0] = 0;
+			g_seatEyeOffset[1] = 0;
+			g_seatEyeOffset[2] = 0;
 		}
 	}
 }
@@ -5044,6 +5047,9 @@ static void Hangar_ModernResetCadenceSensitiveState(void) {
 	g_modernHangarPrimaryDroidRotation.decreasing = 0;
 	g_modernHangarPrimaryDroidRotation.scaledStateActive = 0;
 	memset(g_modernFamilyDroidRotations, 0, sizeof(g_modernFamilyDroidRotations));
+	/* The droid parts take their direction from the low bit of meshRotation
+	   on their first high-rate step. */
+	memset(g_modernDroidPartRotations, 0, sizeof(g_modernDroidPartRotations));
 	for (sceneIdx = 0; sceneIdx < g_hangarSceneObjectCount && sceneIdx < 10; ++sceneIdx) {
 		const int objectIdx = g_hangarSceneObjects[sceneIdx].objectIdx;
 		const uint16_t objectType = (uint16_t)g_objectTable[objectIdx].objectType;
@@ -5235,6 +5241,99 @@ static void Hangar_ModernUpdateFamilyDroidMesh(int sceneIdx, int objectIdx, int 
 									  &g_modernFamilyDroidRotations[sceneIdx][0]);
 	Hangar_ModernUpdatePackedRotation(g_curCraft, WORKDROID1_NOD_2(objectIdx), dtTicks, threshold,
 									  &g_modernFamilyDroidRotations[sceneIdx][1]);
+}
+
+/* hangar_droid_parts_from_model: moves the hangar droid in slot `sceneIdx`
+   (0 or 1) in place of the slot's own motion. The droid moves the parts that
+   its model lists (XwaArticulation_HangarDroidParts), whatever its slot, and
+   no others.
+
+   The second droid first draws a new direction, as the stock code does. The
+   swing and the spin of both droids use the second droid's direction and
+   move state.
+
+   The nod is the stock nod without its turn back: once the part reaches 33,
+   it keeps turning down, all the way round. Mods made for this rule expect
+   it.
+
+   In the high-rate mode, the steps scale with dtTicks as in
+   Hangar_ModernUpdateHangarDroidMesh, and the random draws come on the
+   legacy cadence. */
+static void Hangar_ModernUpdateDroidParts(int sceneIdx, int objectIdx, int dtTicks) {
+	XwaHangarDroidPart parts[XWA_CRAFT_MESH_SLOT_COUNT];
+	const int highRate = XwaModernFlightTiming_IsHighRate();
+	CraftData* craft;
+	int count;
+	int index;
+
+	craft = g_objectTable[objectIdx].mobj->pCraft;
+	g_curCraft = craft;
+	if (sceneIdx == 1 && (!highRate || g_modernHangarLegacyCadenceDue) && (GameRand() & 0xffff) % 100 < 4) {
+		g_hangarSceneObjects[1].meshRotationDir = (GameRand() & 1) - 1;
+	}
+	count = XwaArticulation_HangarDroidParts((unsigned int)objectIdx, parts, XWA_CRAFT_MESH_SLOT_COUNT);
+	for (index = 0; index < count; ++index) {
+		const int component = parts[index].component;
+		ModernHangarPackedRotationState* state = &g_modernDroidPartRotations[sceneIdx][component];
+		uint8_t rotation = craft->meshRotation[component];
+
+		switch (parts[index].motion) {
+			case XWA_HANGAR_DROID_NOD:
+				if (highRate) {
+					if (!state->scaledStateActive) {
+						state->decreasing = (rotation & 1u) != 0;
+						state->scaledStateActive = 1;
+					}
+					if (state->decreasing) {
+						rotation = (uint8_t)(rotation - dtTicks);
+					} else {
+						rotation = (uint8_t)(rotation + dtTicks);
+						if (g_modernHangarLegacyCadenceDue && rotation == 4u &&
+							(GameRand() & 0xffff) > 0x200) {
+							rotation = (uint8_t)(rotation - 2u);
+						}
+						if (rotation == 32u) {
+							rotation = 33u;
+							state->decreasing = 1;
+						}
+					}
+					break;
+				}
+				/* The low bit holds the direction again. */
+				if (state->scaledStateActive) {
+					if (((rotation & 1u) != 0) != state->decreasing) {
+						rotation ^= 1u;
+					}
+					state->scaledStateActive = 0;
+				}
+				if ((rotation & 1u) != 0) {
+					rotation = (uint8_t)(rotation - 2u);
+				} else {
+					rotation = (uint8_t)(rotation + 2u);
+					if (rotation == 4u && (uint16_t)GameRand() > 0x200u) {
+						rotation = (uint8_t)(rotation - 2u);
+					}
+					if (rotation == 32u) {
+						rotation = 33u;
+					}
+				}
+				break;
+			case XWA_HANGAR_DROID_SWING:
+				rotation = (uint8_t)(rotation + (highRate ? 2 * dtTicks : 4) *
+													(int)g_hangarSceneObjects[1].meshRotationDir);
+				break;
+			case XWA_HANGAR_DROID_SPIN:
+				if (g_hangarSceneObjects[1].moveState != 0) {
+					rotation = (uint8_t)(rotation + (highRate ? 2 * dtTicks : 4));
+				} else if (!highRate || g_modernHangarLegacyCadenceDue) {
+					++rotation;
+				}
+				break;
+			default:
+				break;
+		}
+		craft->meshRotation[component] = rotation;
+	}
 }
 #endif
 
@@ -6342,9 +6441,15 @@ void Hangar_UpdateHangarDroidTraffic(int dtTicks) {
 		}
 
 #ifdef XWA_MODERN
-		/* A droid model with crew.always_animate moves with the crew
-		   animation instead of this motion. */
-		if (XwaArticulation_CrewAlwaysAnimates(objectIdx)) {
+		/* With hangar_droid_parts_from_model, each droid moves the
+		   hangar_droid parts of its model instead of this motion. Otherwise, a
+		   droid model with crew.always_animate moves with the crew animation
+		   instead. */
+		if (XwaMissionSettings_HangarDroidPartsFromModel()) {
+			if (sceneIdx <= 1) {
+				Hangar_ModernUpdateDroidParts(sceneIdx, objectIdx, dtTicks);
+			}
+		} else if (XwaArticulation_CrewAlwaysAnimates(objectIdx)) {
 		} else if (XwaModernFlightTiming_IsHighRate()) {
 			Hangar_ModernUpdateHangarDroidMesh(sceneIdx, objectIdx, dtTicks);
 		} else {

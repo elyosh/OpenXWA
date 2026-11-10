@@ -1,10 +1,10 @@
 #include "xwa_runtime/models/mission_file.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/frontend/frontend_mission.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/models/names.h"
 
 #include <stdio.h>
@@ -41,29 +41,17 @@ static void MissionFile_Path(const char* missionPath, char* path, size_t pathSiz
 }
 
 int XwaMissionFile_Load(const char* missionPath, AeronConfigFile** out, char* path, size_t pathSize) {
-	AeronConfigError error;
-	const AeronConfigNode* root;
-
 	*out = NULL;
 	MissionFile_Path(missionPath, path, pathSize);
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, out, &error)) {
-		if (error.code == AERON_CONFIG_ERROR_NOT_FOUND) {
-			return 0;
-		}
-		Aeron_LogError("xwa.models", "%s:%d: %s; its selections are ignored", path, error.line,
-					   error.message);
-		return -1;
-	}
-	root = AeronConfigFile_Root(*out);
 	/* An empty file sets nothing. */
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP && AeronConfigNode_Type(root) != AERON_CONFIG_NULL) {
-		Aeron_LogError("xwa.models", "%s: the file must be a map; its selections are ignored", path);
-		AeronConfigFile_Destroy(*out);
-		*out = NULL;
-		return -1;
+	switch (XwaModFiles_Load(path, 1, out)) {
+		case XWA_MOD_FILE_LOADED:
+			return 1;
+		case XWA_MOD_FILE_MISSING:
+			return 0;
+		default:
+			return -1;
 	}
-	return 1;
 }
 
 /* g_missionFlightGroups and FrontendMission.flightGroups hold 192. */

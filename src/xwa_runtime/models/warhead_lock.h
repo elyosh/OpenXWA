@@ -10,7 +10,12 @@
  * so a swapped model has its own. The file has the ranges in metres and
  * the times in milliseconds, and the values here are in game units and
  * ticks. lock_time_ms only changes the HUD and the sounds. The other values
- * change the simulation. */
+ * change the simulation.
+ *
+ * The `warhead_lock` section of flight/flight.yaml can set the AI's ranges
+ * against big targets by the genus of the AI's own craft, as
+ * `ai_lock_range_m: {starship: {big: 5000, big_top_tier: 6000}}`. A model's
+ * own value replaces it. */
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,6 +36,9 @@ typedef enum XwaWarheadLockValue {
 	XWA_WARHEAD_LOCK_VALUES
 } XwaWarheadLockValue;
 
+/* Reads the `warhead_lock` section of flight/flight.yaml. Called once at
+   startup. */
+void XwaWarheadLock_Init(void);
 /* Drops the previous mission's values. Called by the model settings reader. */
 void XwaWarheadLock_ClearModelSettings(void);
 /* Reads the `warhead_lock` group of `objectType`'s model settings file, or

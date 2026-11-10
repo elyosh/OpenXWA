@@ -10326,7 +10326,7 @@ void Hud_UpdateThreatIndicators(void) {
 		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotBeam, (uint16_t)beamThreatState);
 	}
 
-	FlightLight_SetLocalPlayerPulseEnabled(2, (uint16_t)beamThreatState);
+	FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_BEAM_WARNING, (uint16_t)beamThreatState);
 	if (g_incomingMissileWarningFlashActive) {
 		if (g_useHardware3D) {
 			Hud_DrawThreatIndicator3D(g_hudThreatIndicatorSlotWarhead, 2);
@@ -10345,7 +10345,7 @@ void Hud_UpdateThreatIndicators(void) {
 		Hud_DrawThreatIndicator2D(g_hudThreatIndicatorSlotWarhead, g_incomingMissileWarningState);
 	}
 
-	FlightLight_SetLocalPlayerPulseEnabled(1, g_incomingMissileWarningState);
+	FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_WARHEAD_LOCK, g_incomingMissileWarningState);
 	{
 		CraftData* localCraft;
 		uint32_t hullDamageBucket;
@@ -10362,9 +10362,9 @@ void Hud_UpdateThreatIndicators(void) {
 		}
 
 		if (shieldTotal < 0x64u && hullDamageBucket == 2) {
-			FlightLight_SetLocalPlayerPulseEnabled(0, 1);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HULL_CRITICAL, 1);
 		} else {
-			FlightLight_SetLocalPlayerPulseEnabled(0, 0);
+			FlightLight_SetCockpitLightEnabled(COCKPIT_LIGHT_HULL_CRITICAL, 0);
 		}
 	}
 }
@@ -16613,25 +16613,37 @@ void Mfd_DrawMessageLogPage(int mfdSide, void* mfdSurface) {
 		uint8_t readyClockTick;
 		uint8_t readyClockMinute;
 		uint8_t readyClockHour;
+		const HudInFlightMessageRecord* record;
 
 		readyClockTick = g_readyMessagePaneQueue[0].clockTick;
 		readyClockMinute = g_readyMessagePaneQueue[0].clockMinute;
 		readyClockHour = g_readyMessagePaneQueue[0].clockHour;
 		do {
+#ifdef XWA_MODERN
+			/* The log keeps the latest 300 records in a ring: record n is in
+			   slot n % 300. The game reads slot n, which is past the buffer
+			   after 380 records. Older records have been overwritten, so the
+			   walk stops 300 records back. */
+			if (g_messageLogTotalCount > MFD_MESSAGE_LOG_MAX_RECORDS &&
+				drawCount <= g_messageLogTotalCount - MFD_MESSAGE_LOG_MAX_RECORDS) {
+				break;
+			}
+			record = &g_messageLogRecords[(drawCount - 1) % MFD_MESSAGE_LOG_MAX_RECORDS];
+#else
+			record = &g_messageLogRecords[drawCount - 1];
+#endif
 			if (g_missionTimeLimitActive) {
-				if (g_messageLogRecords[drawCount - 1].clockHour > readyClockHour ||
-					(g_messageLogRecords[drawCount - 1].clockHour == readyClockHour &&
-					 (g_messageLogRecords[drawCount - 1].clockMinute > readyClockMinute ||
-					  (g_messageLogRecords[drawCount - 1].clockMinute == readyClockMinute &&
-					   g_messageLogRecords[drawCount - 1].clockTick >= readyClockTick)))) {
+				if (record->clockHour > readyClockHour ||
+					(record->clockHour == readyClockHour &&
+					 (record->clockMinute > readyClockMinute ||
+					  (record->clockMinute == readyClockMinute && record->clockTick >= readyClockTick)))) {
 					break;
 				}
 			} else {
-				if (g_messageLogRecords[drawCount - 1].clockHour < readyClockHour ||
-					(g_messageLogRecords[drawCount - 1].clockHour == readyClockHour &&
-					 (g_messageLogRecords[drawCount - 1].clockMinute < readyClockMinute ||
-					  (g_messageLogRecords[drawCount - 1].clockMinute == readyClockMinute &&
-					   g_messageLogRecords[drawCount - 1].clockTick <= readyClockTick)))) {
+				if (record->clockHour < readyClockHour ||
+					(record->clockHour == readyClockHour &&
+					 (record->clockMinute < readyClockMinute ||
+					  (record->clockMinute == readyClockMinute && record->clockTick <= readyClockTick)))) {
 					break;
 				}
 			}
@@ -19736,6 +19748,17 @@ void Mfd_UpdateCommandMenuTargets(void) {
 														  .fg.globalUnit];
 				}
 			}
+
+#ifdef XWA_MODERN
+			/* The slot comes out negative for a craft of an older wave, or above
+			   6 for a craft numbered past the menu's slots. The game then reads
+			   and writes outside the slot arrays: on 32-bit x86 a negative slot
+			   wraps to the entries just before them. Such a craft gets no
+			   slot. */
+			if (targetSlot > 6) {
+				continue;
+			}
+#endif
 
 			if ((unsigned int)commandMenu->targetSlotValid[targetSlot] != 0xffffu) {
 				while (g_players[playerIdx].mfd.commandMenu.primaryTargetObjIdx[targetSlot] != 0xffff) {

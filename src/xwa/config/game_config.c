@@ -804,6 +804,11 @@ int Config_SoundOptionsScreen(void) {
 	y += 20;
 	++rowIndex;
 
+#ifdef XWA_MODERN
+	/* The sound quality is always high, so the option can't be changed. */
+	Config_DrawOptionCycleDisabled(&g_gameConfig.sfxQuality, STR_CONFIG_SFX_QUALITY, STR_CONFIG_NORMAL, 2, &y,
+								   &rowIndex, &keyState, 34);
+#else
 	if (g_configRestrictedOptionsModalActive) {
 		Config_DrawOptionCycleDisabled(&g_gameConfig.sfxQuality, STR_CONFIG_SFX_QUALITY, STR_CONFIG_NORMAL, 2,
 									   &y, &rowIndex, &keyState, 34);
@@ -811,6 +816,7 @@ int Config_SoundOptionsScreen(void) {
 		Config_DrawOptionCycle(&g_gameConfig.sfxQuality, STR_CONFIG_SFX_QUALITY, STR_CONFIG_NORMAL, 2, &y,
 							   &rowIndex, &keyState, 34);
 	}
+#endif
 	Config_DrawOptionSlider(&g_gameConfig.sfxExteriorVolume, STR_EXTERIOR_SFX, STR_CONFIG_VOL_OFF, 10, &y,
 							&rowIndex, &keyState, 25);
 	g_gameConfig.sfxExteriorEnabled = (g_gameConfig.sfxExteriorVolume != 0);
@@ -913,7 +919,12 @@ int Config_SoundOptionsScreen(void) {
 			g_gameConfig.sfxEngineVolume = 5;
 			g_gameConfig.datapadMusicVolume = 5;
 			g_gameConfig.sound3dEnabled = 0;
+#ifdef XWA_MODERN
+			/* The modern build always uses the high quality sounds. */
+			g_gameConfig.sfxQuality = 1;
+#else
 			g_gameConfig.sfxQuality = 0;
+#endif
 			if (g_gameConfig.performance) {
 				if (g_gameConfig.performance == 1) {
 					Config_SetDetailDefaultsMedium(64);
@@ -5443,7 +5454,12 @@ static void Config_SetInitialDefaults(void) {
 #endif
 	g_gameConfig.sound3dEnabled = 0;
 	g_gameConfig.numberOfSfx = 8;
+#ifdef XWA_MODERN
+	/* The modern build always uses the high quality sounds. */
+	g_gameConfig.sfxQuality = 1;
+#else
 	g_gameConfig.sfxQuality = 0;
+#endif
 	g_gameConfig.presetThrottle[0] = 100;
 	g_gameConfig.presetLaser[0] = 3;
 	g_gameConfig.presetShield[0] = 2;
@@ -5767,7 +5783,13 @@ static void Config_ApplyKeywordValue(int keyword, const char* value) {
 			g_gameConfig.tourUnlimitedAmmo = parsedU8;
 			break;
 		case CONFIG_KEY_SFX_QUALITY:
+#ifdef XWA_MODERN
+			/* The modern build always uses the high quality sounds, so the
+			   saved value is ignored. */
+			g_gameConfig.sfxQuality = 1;
+#else
 			g_gameConfig.sfxQuality = parsedU8;
+#endif
 			break;
 		case CONFIG_KEY_HARDWARE_MIPMAP1:
 		case CONFIG_KEY_HARDWARE_MIPMAP2:

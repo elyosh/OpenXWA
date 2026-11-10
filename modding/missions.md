@@ -57,9 +57,8 @@ headlights: true
 ```
 
 Without a mission file, the mission plays as its `.TIE` file says. An empty
-file changes nothing. When the file isn't valid YAML, or isn't a map, the
-game logs an error and ignores the whole file. When a section has the wrong
-form, the game logs a warning and ignores that section.
+file changes nothing. When a section has the wrong form, the game logs a
+warning and ignores that section.
 
 The game reads the file each time it loads the mission. The briefing also
 reads it: the order of battle uses `settings` and `craft_names`, and the
@@ -113,7 +112,8 @@ settings:
   skip_arrival_messages_iff: 1
   force_player_in_turret: "0:00:08"
   damage_through_shields_on_hard: true
-  hyperspace_abort_sound_regions: [2]
+  hyperspace_regions:
+    2: {look: interdiction, arrival_sound: abort}
 ```
 
 | Key | Meaning |
@@ -130,10 +130,38 @@ settings:
 | `target_key` | Makes the O key target craft of chosen flight groups. See below. |
 | `proximity_triggers_check_craft_only` | `true` makes proximity triggers ignore every object that isn't a craft. The default is `false`. |
 | `order_of_battle` | Changes the order of battle in the briefing. See below. |
-| `hyperspace_abort_sound_regions` | A list of regions, from 0 to 31. When the player arrives by hyperspace in one of them, the game plays the abort sound instead of the arrival sound. |
+| `use_hyperspace_speeds` | `false` keeps the original game's hyperspace arrivals and departures of AI craft in this mission, even when the mod sets hyperspace speeds. The default is `true`. See [Flight settings](flight.md#hyperspace). |
+| `hyperspace_regions` | What happens when the player jumps to a region. See below. |
 
 Regions are numbered from 0, as the game counts them. An unknown key is
 logged and ignored.
+
+### hyperspace_regions
+
+`hyperspace_regions` maps a region, from 0 to 3, to what happens when the
+player jumps to it by hyperspace.
+
+```yaml
+settings:
+  hyperspace_regions:
+    1: {look: interdiction, arrival_sound: abort}
+    3: {arrival_sound: abort}
+```
+
+| Key | Meaning |
+|-|-|
+| `look` | The look of the jump, in modern graphics. Without it, the jump has the normal look. |
+| `arrival_sound` | `abort` plays the abort sound instead of the arrival sound when the player arrives. `normal` keeps the arrival sound, which is the default. |
+
+The game has one look:
+
+| Look | What it shows |
+|-|-|
+| `interdiction` | A jump that a gravity well pulls out of hyperspace. Red spreads through the tunnel from its far end toward the camera, behind an uneven glowing edge. The camera shakes more and more, and jolts hard when the craft is pulled out. The streaks are red when the player comes out of hyperspace. The start of the jump looks normal. |
+
+The regions that the key doesn't list keep the normal jump. A
+`hyperspace_regions` key in a mission replaces the whole list of
+`mission_settings`.
 
 ### target_key
 

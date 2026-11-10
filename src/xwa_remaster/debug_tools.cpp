@@ -32,6 +32,7 @@
 #include "aeron/time.h"
 #include "xwa/flight/flight_debug.h"
 #include "xwa_runtime/models/cockpit_eye.h"
+#include "xwa_runtime/models/cockpit_lights.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
@@ -533,6 +534,16 @@ static void xwa_tool_point_lights(int* open, void* user) {
 	}
 	ImGui::TextDisabled("Multiplies the models' lights (not the headlight), to find their\n"
 						"calibration by eye. Not saved.");
+	if (ImGui::TreeNode("Cockpit lights")) {
+		for (int slot = 0; slot < XWA_SNAP_COCKPIT_LIGHT_COUNT; slot++) {
+			const char* name = XwaCockpitLights_Name(slot);
+			changed |= ImGui::SliderFloat(name ? name : "?", &p.cockpit_lights[slot].power_w, 0.0f, 100000.0f,
+										  "%.1f W", ImGuiSliderFlags_Logarithmic);
+		}
+		ImGui::TextDisabled("The default power of each light. It is used when\n"
+							"model lights are on. A mod's power_w replaces it.");
+		ImGui::TreePop();
+	}
 
 	ImGui::Separator();
 	if (ImGui::Button("Reset to defaults")) {
@@ -616,25 +627,67 @@ static void xwa_tool_motion_blur(int* open, void* user) {
 
 /* ---- Hyperspace tunnel ---------------------------------------------- */
 
+/* The sliders of a hyperspace camera (hyperspace_camera, or a look's camera
+ * group). Returns true when one changed. */
+static bool xwa_hyperspace_camera_sliders(XwaFlightHyperspaceCameraParams* c) {
+	bool changed = false;
+	ImGui::TextDisabled("The camera and the cockpit shake together in the tunnel:");
+	changed |= ImGui::SliderFloat("Camera shake degrees", &c->shake_degrees, 0.0f, 10.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Camera shake speed", &c->shake_speed, 0.0f, 4.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Camera shake start", &c->shake_start, 0.0f, 1.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Camera shake full", &c->shake_full, 0.0f, 1.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Kicks per second", &c->kick_rate, 0.0f, 8.0f, "%.2f");
+	ImGui::TextDisabled("Start and full: when the shake starts and when it is at full strength, as\n"
+						"fractions of the time in the tunnel. Kicks go up to twice the shake degrees.");
+	ImGui::TextDisabled("The jolt when the craft comes out of hyperspace:");
+	changed |= ImGui::SliderFloat("Jolt degrees", &c->jolt_degrees, 0.0f, 20.0f, "%.2f");
+	changed |= ImGui::SliderFloat("Jolt delay", &c->jolt_delay, 0.0f, 0.5f, "%.3f s");
+	changed |= ImGui::SliderFloat("Jolt time", &c->jolt_time, 0.05f, 0.8f, "%.3f s");
+	if (c->jolt_degrees > 0.0f && c->jolt_delay + 3.0f * c->jolt_time > 1.0f) {
+		ImGui::TextColored(ImVec4(1.0f, 0.75f, 0.2f, 1.0f),
+						   "The exit ends 1 s after it starts, so the end of the jolt is cut short.");
+	}
+	return changed;
+}
+
+/* Writes the keys of a hyperspace camera, one per line, each line starting
+ * with `indent`. */
+static void xwa_hyperspace_camera_yaml(const XwaFlightHyperspaceCameraParams* c, const char* indent,
+									   char* out, size_t size) {
+	std::snprintf(out, size,
+				  "%sshake_degrees: %.4g\n%sshake_speed: %.4g\n%sshake_start: %.4g\n%sshake_full: %.4g\n"
+				  "%skick_rate: %.4g\n%sjolt_degrees: %.4g\n%sjolt_delay: %.4g\n%sjolt_time: %.4g\n",
+				  indent, (double)c->shake_degrees, indent, (double)c->shake_speed, indent,
+				  (double)c->shake_start, indent, (double)c->shake_full, indent, (double)c->kick_rate, indent,
+				  (double)c->jolt_degrees, indent, (double)c->jolt_delay, indent, (double)c->jolt_time);
+}
+
 static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 	(void)user;
-	ImGui::SetNextWindowSize(ImVec2(460, 620), ImGuiCond_FirstUseEver);
+	ImGui::SetNextWindowSize(ImVec2(460, 760), ImGuiCond_FirstUseEver);
 	bool b = *open != 0;
 	if (!ImGui::Begin("Hyperspace Tunnel", &b)) {
 		ImGui::End();
 		if (!b) {
-			XwaRemasterFlight_SetHyperspaceTunnelPreview(0);
+			XwaRemasterFlight_SetHyperspacePreview(XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF);
 		}
 		*open = b ? 1 : 0;
 		return;
 	}
 
-	bool preview = XwaRemasterFlight_HyperspaceTunnelPreviewEnabled() != 0;
-	if (ImGui::Checkbox("Preview in flight", &preview)) {
-		XwaRemasterFlight_SetHyperspaceTunnelPreview(preview ? 1 : 0);
+	static const char* const preview_modes[] = { "Off", "Tunnel", "Jump cycle" };
+	int preview = (int)XwaRemasterFlight_GetHyperspacePreview();
+	if (ImGui::Combo("Preview in flight", &preview, preview_modes, IM_ARRAYSIZE(preview_modes))) {
+		XwaRemasterFlight_SetHyperspacePreview((XwaFlightHyperspacePreview)preview);
 	}
-	ImGui::TextDisabled("Replaces the normal 3D flight scene without changing simulation state.\n"
-						"Map mode and real hyperspace retain precedence; the cockpit remains visible.");
+	float preview_speed = XwaRemasterFlight_GetHyperspacePreviewSpeed();
+	if (ImGui::SliderFloat("Preview speed", &preview_speed, 0.05f, 1.0f, "%.2f")) {
+		XwaRemasterFlight_SetHyperspacePreviewSpeed(preview_speed);
+	}
+	ImGui::TextDisabled(
+		"Shows hyperspace in place of the flight scene. The simulation doesn't change.\n"
+		"Jump cycle: entry, tunnel and exit, as long as in the game, then 1 s of normal flight.\n"
+		"Map mode and real hyperspace come first. The cockpit stays visible.");
 
 	ImGui::Separator();
 	XwaFlightHyperspaceTunnelParams p;
@@ -720,14 +773,328 @@ static void xwa_tool_hyperspace_tunnel(int* open, void* user) {
 					  (double)p.cap_color[1], (double)p.cap_color[2]);
 		ImGui::SetClipboardText(yaml);
 	}
-	ImGui::TextDisabled("Edits apply immediately and are not persisted.");
+	ImGui::TextDisabled("Edits apply immediately and are not saved.");
 	if (changed) {
 		XwaRemasterFlight_SetHyperspaceTunnel(&p);
 	}
 
+	ImGui::Separator();
+	ImGui::TextUnformatted("Jump streaks");
+	XwaFlightHyperspaceJumpParams j;
+	XwaRemasterFlight_GetHyperspaceJump(&j);
+	bool jump_changed = false;
+	jump_changed |=
+		ImGui::SliderInt("Star count", &j.star_count, 1000, 262144, "%d", ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("Streak brightness", &j.streak_brightness, 0.0f, 16.0f, "%.2f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("White-out brightness", &j.whiteout_brightness, 1.0f, 128.0f, "%.1f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("Brightness range", &j.brightness_range, 1.0f, 1000.0f, "%.1f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("Streak width (1080p px)", &j.streak_width_px, 0.5f, 8.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Width from brightness", &j.width_from_brightness, 0.0f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Width variation", &j.width_variation, 1.0f, 4.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Head widening", &j.head_widening, 1.0f, 16.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Radial widening", &j.radial_widening, 0.0f, 4.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Tail taper", &j.tail_taper, 0.0f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Head taper", &j.head_taper, 0.0f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Taper variation", &j.taper_variation, 0.0f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Glow strength", &j.glow_strength, 0.0f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Glow width", &j.glow_width, 1.0f, 16.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Tail brightness", &j.tail_brightness, 0.0f, 1.0f, "%.2f");
+	jump_changed |=
+		ImGui::ColorEdit3("Tail colour", j.tail_color, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+	jump_changed |= ImGui::SliderFloat("Stretch scale", &j.stretch_scale, 0.25f, 4.0f, "%.2f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("White fade (s)", &j.white_fade_seconds, 0.05f, 0.5f, "%.3f");
+	jump_changed |=
+		ImGui::SliderFloat("Tunnel entry brightness", &j.tunnel_entry_brightness, 1.0f, 16.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Tunnel settle (s)", &j.tunnel_settle_seconds, 0.05f, 2.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Cockpit light", &j.mesh_light_strength, 0.0f, 16.0f, "%.2f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("Cockpit light start (s)", &j.mesh_light_start, 0.0f, 2.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Cockpit light curve", &j.mesh_light_curve, 0.25f, 8.0f, "%.2f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::ColorEdit3("Streak tint", j.tint, ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR);
+	{
+		bool exit_forward = j.exit_forward != 0;
+		if (ImGui::Checkbox("Forward exit", &exit_forward)) {
+			j.exit_forward = exit_forward ? 1 : 0;
+			jump_changed = true;
+		}
+	}
+	ImGui::TextUnformatted("Scene warp");
+	jump_changed |= ImGui::SliderFloat("Warp start (s)", &j.warp_start, 0.0f, 2.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Warp end (s)", &j.warp_end, 0.2f, 2.5f, "%.2f");
+	jump_changed |=
+		ImGui::SliderFloat("Warp curve", &j.warp_curve, 0.25f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("World distance (m)", &j.warp_distance_m, 0.0f, 200000.0f, "%.0f",
+									   ImGuiSliderFlags_Logarithmic);
+	jump_changed |=
+		ImGui::SliderFloat("Sky zoom", &j.warp_sky_zoom, 1.0f, 16.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
+	jump_changed |= ImGui::SliderFloat("Smear", &j.warp_smear, 0.05f, 1.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Sky highlights", &j.warp_sky_highlights, 1.0f, 3.0f, "%.2f");
+	jump_changed |= ImGui::SliderFloat("Reveal softness", &j.warp_reveal_softness, 0.25f, 2.0f, "%.2f");
+	jump_changed |= ImGui::SliderInt("World taps", &j.warp_taps, 8, 64);
+	jump_changed |= ImGui::SliderInt("Sky taps per pass", &j.warp_sky_taps, 4, 16);
+	{
+		bool half_resolution = j.warp_sky_half_resolution != 0;
+		if (ImGui::Checkbox("Sky at half resolution", &half_resolution)) {
+			j.warp_sky_half_resolution = half_resolution ? 1 : 0;
+			jump_changed = true;
+		}
+	}
+	{
+		static const char* const views[XWA_FLIGHT_HYPERSPACE_WARP_VIEW_COUNT] = { "Image", "Keep mask",
+																				  "Warped sky", "Reveal" };
+		int view = (int)XwaRemasterFlight_GetHyperspaceWarpView();
+		if (ImGui::Combo("Warp view", &view, views, XWA_FLIGHT_HYPERSPACE_WARP_VIEW_COUNT)) {
+			XwaRemasterFlight_SetHyperspaceWarpView((XwaFlightHyperspaceWarpView)view);
+		}
+	}
+	ImGui::TextDisabled("White-out brightness multiplies the streaks at the peak of the entry.\n"
+						"Brightness range is the ratio between the brightest and faintest stars.\n"
+						"Width from brightness: 0 = same width, 1 = width follows brightness.\n"
+						"Width variation is a random width factor, from 1/x to x.\n"
+						"Head widening is the largest width factor from perspective and radial\n"
+						"widening together.\n"
+						"Radial widening widens streaks with distance from the vanishing point.\n"
+						"Tapers are fades over shares of a streak's 3D length; variation spreads\n"
+						"them per star.\n"
+						"Glow is a soft skirt around the core; its width is in core widths.\n"
+						"Tail brightness and colour: the streak goes from these to the head's.\n"
+						"Cockpit light: the streaks' light on the cockpit at the white peak, in\n"
+						"white classic pixels. It rises from its start time to the peak; the\n"
+						"curve is the rise's exponent (1 = straight, higher = later).\n"
+						"Scene warp: from its start to its end, the world moves toward the\n"
+						"camera by the world distance, the sky zooms in, and black opens from\n"
+						"the vanishing point. Smear is the length of the trails as a share of\n"
+						"the movement. Sky highlights keep stars bright in their trails.\n"
+						"Reveal softness is the width of the black's soft edge.\n"
+						"Forward exit: on exit the streaks shrink toward the camera and the\n"
+						"scene comes in toward it, instead of the entry played backward.");
+	if (ImGui::Button("Reset jump to YAML defaults")) {
+		XwaRemasterFlight_GetHyperspaceJumpDefault(&j);
+		jump_changed = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Copy jump YAML")) {
+		char yaml[2048];
+		std::snprintf(yaml, sizeof yaml,
+					  "hyperspace_jump:\n"
+					  "  star_count: %d\n"
+					  "  streak_brightness: %.4g\n"
+					  "  whiteout_brightness: %.4g\n"
+					  "  brightness_range: %.4g\n"
+					  "  streak_width_px: %.4g\n"
+					  "  width_from_brightness: %.4g\n"
+					  "  width_variation: %.4g\n"
+					  "  head_widening: %.4g\n"
+					  "  radial_widening: %.4g\n"
+					  "  tail_taper: %.4g\n"
+					  "  head_taper: %.4g\n"
+					  "  taper_variation: %.4g\n"
+					  "  glow_strength: %.4g\n"
+					  "  glow_width: %.4g\n"
+					  "  tail_brightness: %.4g\n"
+					  "  tail_color_r: %.4g\n"
+					  "  tail_color_g: %.4g\n"
+					  "  tail_color_b: %.4g\n"
+					  "  stretch_scale: %.4g\n"
+					  "  white_fade_seconds: %.4g\n"
+					  "  tunnel_entry_brightness: %.4g\n"
+					  "  tunnel_settle_seconds: %.4g\n"
+					  "  mesh_light_strength: %.4g\n"
+					  "  mesh_light_start: %.4g\n"
+					  "  mesh_light_curve: %.4g\n"
+					  "  tint_r: %.4g\n"
+					  "  tint_g: %.4g\n"
+					  "  tint_b: %.4g\n"
+					  "  exit_forward: %s\n"
+					  "  warp_start: %.4g\n"
+					  "  warp_end: %.4g\n"
+					  "  warp_curve: %.4g\n"
+					  "  warp_distance_m: %.6g\n"
+					  "  warp_sky_zoom: %.4g\n"
+					  "  warp_smear: %.4g\n"
+					  "  warp_sky_highlights: %.4g\n"
+					  "  warp_reveal_softness: %.4g\n"
+					  "  warp_taps: %d\n"
+					  "  warp_sky_taps: %d\n"
+					  "  warp_sky_half_resolution: %s\n",
+					  j.star_count, (double)j.streak_brightness, (double)j.whiteout_brightness,
+					  (double)j.brightness_range, (double)j.streak_width_px, (double)j.width_from_brightness,
+					  (double)j.width_variation, (double)j.head_widening, (double)j.radial_widening,
+					  (double)j.tail_taper, (double)j.head_taper, (double)j.taper_variation,
+					  (double)j.glow_strength, (double)j.glow_width, (double)j.tail_brightness,
+					  (double)j.tail_color[0], (double)j.tail_color[1], (double)j.tail_color[2],
+					  (double)j.stretch_scale,
+					  (double)j.white_fade_seconds, (double)j.tunnel_entry_brightness,
+					  (double)j.tunnel_settle_seconds, (double)j.mesh_light_strength,
+					  (double)j.mesh_light_start, (double)j.mesh_light_curve, (double)j.tint[0],
+					  (double)j.tint[1], (double)j.tint[2], j.exit_forward ? "true" : "false", (double)j.warp_start, (double)j.warp_end,
+					  (double)j.warp_curve, (double)j.warp_distance_m, (double)j.warp_sky_zoom,
+					  (double)j.warp_smear, (double)j.warp_sky_highlights, (double)j.warp_reveal_softness,
+					  j.warp_taps, j.warp_sky_taps, j.warp_sky_half_resolution ? "true" : "false");
+		ImGui::SetClipboardText(yaml);
+	}
+	if (jump_changed) {
+		XwaRemasterFlight_SetHyperspaceJump(&j);
+	}
+
+	ImGui::Separator();
+	ImGui::TextUnformatted("Camera");
+	XwaFlightHyperspaceCameraParams camera;
+	XwaRemasterFlight_GetHyperspaceCamera(&camera);
+	ImGui::TextDisabled("The camera of the normal jump (hyperspace_camera). A look has its own\n"
+						"camera, below. The Camera Shake option turns all of it off.");
+	float tunnel_time = XwaRemasterFlight_GetHyperspacePreviewLookBlend();
+	if (ImGui::SliderFloat("Time in tunnel preview", &tunnel_time, 0.0f, 1.0f, "%.2f")) {
+		XwaRemasterFlight_SetHyperspacePreviewLookBlend(tunnel_time);
+	}
+	ImGui::TextDisabled("The jump cycle preview plays the whole jump, and shows the jolt. The tunnel\n"
+						"preview never ends, so this slider sets how far through the tunnel it shows,\n"
+						"from 0 (the tunnel appears) to 1 (it ends). That sets how strong the shake\n"
+						"is, and how far a look's colours have spread.");
+	ImGui::PushID("hyperspace_camera");
+	bool camera_changed = xwa_hyperspace_camera_sliders(&camera);
+	if (ImGui::Button("Reset camera to YAML defaults")) {
+		XwaRemasterFlight_GetHyperspaceCameraDefault(&camera);
+		camera_changed = true;
+	}
+	ImGui::SameLine();
+	if (ImGui::Button("Copy camera YAML")) {
+		char keys[1024];
+		char yaml[1100];
+		xwa_hyperspace_camera_yaml(&camera, "  ", keys, sizeof keys);
+		std::snprintf(yaml, sizeof yaml, "hyperspace_camera:\n%s", keys);
+		ImGui::SetClipboardText(yaml);
+	}
+	ImGui::PopID();
+	if (camera_changed) {
+		XwaRemasterFlight_SetHyperspaceCamera(&camera);
+	}
+
+	ImGui::Separator();
+	ImGui::TextUnformatted("Looks");
+	const int look_count = XwaRemasterFlight_HyperspaceLookCount();
+	static int edited_look = 0;
+	if (look_count <= 0) {
+		ImGui::TextDisabled("remaster/config.yaml has no hyperspace looks.");
+	} else {
+		if (edited_look >= look_count) {
+			edited_look = 0;
+		}
+		if (ImGui::BeginCombo("Look", XwaRemasterFlight_HyperspaceLookName(edited_look))) {
+			for (int i = 0; i < look_count; i++) {
+				if (ImGui::Selectable(XwaRemasterFlight_HyperspaceLookName(i), i == edited_look)) {
+					edited_look = i;
+				}
+			}
+			ImGui::EndCombo();
+		}
+		bool preview_look = XwaRemasterFlight_GetHyperspacePreviewLook() == edited_look;
+		if (ImGui::Checkbox("Preview this look", &preview_look)) {
+			XwaRemasterFlight_SetHyperspacePreviewLook(preview_look ? edited_look : -1);
+		}
+		ImGui::TextDisabled("Time in tunnel preview, under Camera, sets how far the look's colours have\n"
+							"spread in the tunnel preview.");
+
+		XwaFlightHyperspaceLookParams look;
+		XwaRemasterFlight_GetHyperspaceLook(edited_look, &look);
+		bool look_changed = false;
+		const ImGuiColorEditFlags color_flags = ImGuiColorEditFlags_Float | ImGuiColorEditFlags_HDR;
+		ImGui::TextDisabled("The tunnel's colours where the red has reached it:");
+		look_changed |= ImGui::ColorEdit3("Tunnel dark color", look.dark_color, color_flags);
+		look_changed |= ImGui::ColorEdit3("Tunnel body color", look.body_color, color_flags);
+		look_changed |= ImGui::ColorEdit3("Tunnel highlight color", look.highlight_color, color_flags);
+		look_changed |= ImGui::ColorEdit3("Tunnel cap color", look.cap_color, color_flags);
+		ImGui::TextDisabled("The edge of the red area, a thin glowing line:");
+		look_changed |= ImGui::ColorEdit3("Edge color", look.edge_color, color_flags);
+		look_changed |= ImGui::SliderFloat("Edge thickness", &look.edge_width, 0.01f, 4.0f, "%.3f",
+										   ImGuiSliderFlags_Logarithmic);
+		look_changed |= ImGui::SliderFloat("Edge unevenness", &look.front_noise, 0.0f, 8.0f, "%.2f");
+		look_changed |= ImGui::SliderFloat("Edge bump count", &look.front_noise_scale, 0.05f, 16.0f, "%.2f",
+										   ImGuiSliderFlags_Logarithmic);
+		look_changed |= ImGui::SliderFloat("Edge curl", &look.front_warp, 0.0f, 4.0f, "%.2f");
+		ImGui::TextDisabled("Unevenness: how far the edge's bumps reach ahead. Bump count: higher gives\n"
+							"more, smaller bumps. Curl: how much the bumps twist.");
+		ImGui::TextDisabled("The colours of the streaks when the player comes out of hyperspace:");
+		look_changed |= ImGui::ColorEdit3("Exit streak tint", look.tint, color_flags);
+		look_changed |= ImGui::ColorEdit3("Exit streak tail color", look.tail_color, color_flags);
+		look_changed |= ImGui::SliderFloat("Spread start", &look.blend_start, 0.0f, 1.0f, "%.2f");
+		look_changed |= ImGui::SliderFloat("Spread end", &look.blend_end, 0.0f, 1.0f, "%.2f");
+		ImGui::TextDisabled("When the red starts to spread and when it fills the tunnel, as fractions of\n"
+							"the time in the tunnel: 0 is when the tunnel appears, 1 when it ends.");
+		ImGui::TextDisabled("The look's camera. Its shake gradually replaces the normal one between its\n"
+							"start and full, and its jolt replaces the normal one:");
+		ImGui::PushID("look_camera");
+		look_changed |= xwa_hyperspace_camera_sliders(&look.camera);
+		ImGui::PopID();
+		if (ImGui::Button("Reset look to YAML defaults")) {
+			XwaRemasterFlight_GetHyperspaceLookDefault(edited_look, &look);
+			look_changed = true;
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Copy look YAML")) {
+			char camera_keys[1024];
+			char yaml[3072];
+			xwa_hyperspace_camera_yaml(&look.camera, "      ", camera_keys, sizeof camera_keys);
+			std::snprintf(
+				yaml, sizeof yaml,
+				"  %s:\n"
+				"    tunnel:\n"
+				"      dark_color_r: %.4g\n"
+				"      dark_color_g: %.4g\n"
+				"      dark_color_b: %.4g\n"
+				"      body_color_r: %.4g\n"
+				"      body_color_g: %.4g\n"
+				"      body_color_b: %.4g\n"
+				"      highlight_color_r: %.4g\n"
+				"      highlight_color_g: %.4g\n"
+				"      highlight_color_b: %.4g\n"
+				"      cap_color_r: %.4g\n"
+				"      cap_color_g: %.4g\n"
+				"      cap_color_b: %.4g\n"
+				"      edge_color_r: %.4g\n"
+				"      edge_color_g: %.4g\n"
+				"      edge_color_b: %.4g\n"
+				"      edge_width: %.4g\n"
+				"      front_noise: %.4g\n"
+				"      front_noise_scale: %.4g\n"
+				"      front_warp: %.4g\n"
+				"    jump:\n"
+				"      tint_r: %.4g\n"
+				"      tint_g: %.4g\n"
+				"      tint_b: %.4g\n"
+				"      tail_color_r: %.4g\n"
+				"      tail_color_g: %.4g\n"
+				"      tail_color_b: %.4g\n"
+				"    blend_start: %.4g\n"
+				"    blend_end: %.4g\n"
+				"    camera:\n"
+				"%s",
+				XwaRemasterFlight_HyperspaceLookName(edited_look), (double)look.dark_color[0],
+				(double)look.dark_color[1], (double)look.dark_color[2], (double)look.body_color[0],
+				(double)look.body_color[1], (double)look.body_color[2], (double)look.highlight_color[0],
+				(double)look.highlight_color[1], (double)look.highlight_color[2], (double)look.cap_color[0],
+				(double)look.cap_color[1], (double)look.cap_color[2], (double)look.edge_color[0],
+				(double)look.edge_color[1], (double)look.edge_color[2], (double)look.edge_width,
+				(double)look.front_noise, (double)look.front_noise_scale, (double)look.front_warp,
+				(double)look.tint[0], (double)look.tint[1], (double)look.tint[2], (double)look.tail_color[0],
+				(double)look.tail_color[1], (double)look.tail_color[2], (double)look.blend_start,
+				(double)look.blend_end, camera_keys);
+			ImGui::SetClipboardText(yaml);
+		}
+		ImGui::TextDisabled("Copy writes the look's block of hyperspace_looks.");
+		if (look_changed) {
+			XwaRemasterFlight_SetHyperspaceLook(edited_look, &look);
+		}
+	}
+
 	ImGui::End();
 	if (!b) {
-		XwaRemasterFlight_SetHyperspaceTunnelPreview(0);
+		XwaRemasterFlight_SetHyperspacePreview(XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF);
 	}
 	*open = b ? 1 : 0;
 }

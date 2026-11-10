@@ -14,8 +14,6 @@
 
 /* XWA keeps four regions per mission. */
 #define ENV_MAX_REGIONS 4
-#define ENV_MAX_MISSIONS 128
-#define ENV_MAX_REFERENCES (ENV_MAX_MISSIONS * ENV_MAX_REGIONS + 1) /* + xwa.default */
 /* A region whose value is `none`. */
 #define ENV_REFERENCE_NONE (-2)
 
@@ -29,11 +27,15 @@ typedef struct EnvState {
 	int enabled;
 	char manifest_path[256];
 	AeronEnvironmentDefinitionSet* definitions;
-	AeronEnvironmentReference references[ENV_MAX_REFERENCES];
-	XwaEnvironmentBackdropRule backdrops[ENV_MAX_REFERENCES]; /* per reference */
+	/* The references of the manifest with their backdrop rules, and its
+	 * missions. These tables grow while the manifest is read. */
+	AeronEnvironmentReference* references;
+	XwaEnvironmentBackdropRule* backdrops;
 	uint32_t reference_count;
-	EnvMission missions[ENV_MAX_MISSIONS];
+	uint32_t reference_capacity;
+	EnvMission* missions;
 	uint32_t mission_count;
+	uint32_t mission_capacity;
 	/* xwa.default: index into references, -1 = none. */
 	int32_t default_reference;
 	/* Environment library and the prepared reference set: indices as passed to
@@ -47,6 +49,32 @@ typedef struct EnvState {
 	char last_mission[sizeof(((XwaSnapshot*)0)->mission_path)];
 } EnvState;
 static EnvState s_env;
+
+/* Frees the references and missions of `state`. */
+static void env_free_tables(EnvState* state) {
+	free(state->references);
+	free(state->backdrops);
+	free(state->missions);
+	state->references = NULL;
+	state->backdrops = NULL;
+	state->missions = NULL;
+	state->reference_count = state->reference_capacity = 0;
+	state->mission_count = state->mission_capacity = 0;
+}
+
+/* Returns the new capacity of a full table that holds `capacity` elements. */
+static uint32_t env_next_capacity(uint32_t capacity) { return capacity ? capacity * 2 : 16; }
+
+/* Resizes `*items` to hold `capacity` elements of `size` bytes. When out of
+ * memory, returns 0 and leaves `*items` unchanged. */
+static int env_resize(void** items, uint32_t capacity, size_t size) {
+	void* grown = realloc(*items, (size_t)capacity * size);
+	if (!grown) {
+		return 0;
+	}
+	*items = grown;
+	return 1;
+}
 
 /* Host options and the debug switch; survive Shutdown, which clears s_env. */
 static struct {
@@ -332,6 +360,14 @@ static int env_add_reference(const AeronConfigNode* node, const char* what, int3
 	if (!definition) {
 		return env_node_error(name_node, "%s: unknown environment '%s'", what, name);
 	}
+	if (s_env.reference_count == s_env.reference_capacity) {
+		const uint32_t capacity = env_next_capacity(s_env.reference_capacity);
+		if (!env_resize((void**)&s_env.references, capacity, sizeof *s_env.references) ||
+			!env_resize((void**)&s_env.backdrops, capacity, sizeof *s_env.backdrops)) {
+			return env_node_error(node, "%s: out of memory", what);
+		}
+		s_env.reference_capacity = capacity;
+	}
 	AeronEnvironmentReference* reference = &s_env.references[s_env.reference_count];
 	memset(reference, 0, sizeof *reference);
 	snprintf(reference->environment, sizeof reference->environment, "%s", name);
@@ -350,8 +386,12 @@ static int env_parse_mission(const char* source, const AeronConfigNode* node) {
 	static const char* const fields[] = { "regions" };
 	char what[192];
 	snprintf(what, sizeof what, "xwa.missions '%s'", source);
-	if (s_env.mission_count >= ENV_MAX_MISSIONS) {
-		return env_node_error(node, "xwa.missions: at most %d missions are allowed", ENV_MAX_MISSIONS);
+	if (s_env.mission_count == s_env.mission_capacity) {
+		const uint32_t capacity = env_next_capacity(s_env.mission_capacity);
+		if (!env_resize((void**)&s_env.missions, capacity, sizeof *s_env.missions)) {
+			return env_node_error(node, "%s: out of memory", what);
+		}
+		s_env.mission_capacity = capacity;
 	}
 	EnvMission* mission = &s_env.missions[s_env.mission_count];
 	memset(mission, 0, sizeof *mission);
@@ -530,6 +570,7 @@ void XwaRemasterEnvironment_Shutdown(void) {
 	/* The library borrows the definitions. */
 	AeronEnvironmentLibrary_Destroy(s_env.library);
 	AeronEnvironmentDefinitionSet_Destroy(s_env.definitions);
+	env_free_tables(&s_env);
 	memset(&s_env, 0, sizeof s_env);
 	env_clear_prepared();
 }
@@ -642,15 +683,22 @@ static void env_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snap, int fo
 /* Reads the manifest again into a new state. If the manifest has errors,
  * keeps the loaded state and returns 0. */
 static int env_reload_manifest(void) {
-	static EnvState loaded;
-	loaded = s_env;
+	const EnvState loaded = s_env;
 	s_env.definitions = NULL;
-	s_env.reference_count = 0;
-	s_env.mission_count = 0;
+	s_env.references = NULL;
+	s_env.backdrops = NULL;
+	s_env.missions = NULL;
+	s_env.reference_count = s_env.reference_capacity = 0;
+	s_env.mission_count = s_env.mission_capacity = 0;
 	if (env_load_manifest(Aeron_GetVfs())) {
+		EnvState old = loaded;
+		env_free_tables(&old);
+		/* The last selection points into the old references. */
+		s_env.logged = 0;
 		return 1;
 	}
 	AeronEnvironmentDefinitionSet_Destroy(s_env.definitions);
+	env_free_tables(&s_env);
 	s_env = loaded;
 	Aeron_LogError("xwa.remaster", "environment reload: the manifest has errors; keeping the loaded one");
 	return 0;
@@ -755,7 +803,9 @@ static void env_resolve_region(const XwaSnapshot* snap, XwaEnvironmentSelection*
 static void env_resolve(const XwaSnapshot* snap, XwaEnvironmentSelection* out) {
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	out->region = cam->mission_region;
-	if (cam->hyperspace_phase) {
+	/* The jump's entry and exit are drawn over the region's own scene; only
+	 * the tunnel replaces it. */
+	if (cam->hyperspace_phase == XWA_HYPERSPACE_TUNNEL) {
 		env_select(out, XWA_ENV_MODE_HYPERSPACE, XWA_ENV_FALLBACK_NONE, -1);
 		return;
 	}

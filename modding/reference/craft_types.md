@@ -240,6 +240,8 @@ Craft types have numbers, not names. A craft type file gives the number in `craf
 | 230 | Imp Star Dest II | `imperial_star_destroyer2_150` | `starship` |
 | 231 | *DontUseMe | `none` | Planet/asteroid |
 
+Craft types 232 to 255 aren't in the original game. They have the object type `none`, and a craft type file can give them one. XWAU adds craft type 232.
+
 ## Ship list categories
 
 Values for `ship_list.category` in craft type files. **Shown as** is the text that the game shows. The original game also has the category Planet/asteroid, which a file can't set.

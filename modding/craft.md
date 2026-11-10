@@ -360,7 +360,7 @@ tech_room: {name: 'UT-60D U-Wing Starfighter', manufacturer: 'Incom Corporation'
 
 | Key | Meaning |
 |-|-|
-| `craft_type` | Required. The number of the craft type, from 1 to 231. The [craft types](reference/craft_types.md) page lists them. |
+| `craft_type` | Required. The number of the craft type, from 1 to 255. The [craft types](reference/craft_types.md) page lists them. Craft types 232 to 255 aren't in the original game, so their file needs an `object_type`, and a `ship_list` and `tech_room` to show them in the game's lists. |
 | `object_type` | The object type that the craft type uses. Without it, the craft type keeps its object type. |
 | `ship_list` | Changes to the ship list line. |
 | `tech_room` | The texts of the tech room entry. |
@@ -440,7 +440,7 @@ keeps the game's values for that subject.
 | [`hud`](#hud) | the reticle and the HUD colours |
 | [`engine_glows`](#engine_glows) | engine glows that show by speed |
 | [`surfaces`](#surfaces) | tagged materials and lights that show by the craft's state |
-| [`weapons`](#weapons) | weapon colours, laser rates, weapon stats and other weapon values |
+| [`weapons`](#weapons) | weapon colours, laser rates, weapon stats, weapon models and other weapon values |
 | [`stats_profiles`](#stats_profiles) | speeds, rates, hull and shields, by mission, difficulty and player |
 | [`shield`](#shield) | shield recharge |
 | [`sound`](#sound) | the craft's sounds |
@@ -448,7 +448,10 @@ keeps the game's values for that subject.
 | [`gunner_seats`](#gunner_seats) | gunner seats |
 | [`warhead_lock`](#warhead_lock) | warhead lock ranges and times |
 | [`jamming`](#jamming) | where the craft jams the player's weapons |
+| [`hyperspace`](#hyperspace) | a gravity well, and how fast AI craft arrive and leave by hyperspace |
 | [`docking`](#docking) | the approach height when the player docks |
+| [`ai_attack`](#ai_attack) | how close the AI gets before it breaks off, and from how far it fires lasers |
+| [`mag_pulse`](#mag_pulse) | what a mag pulse hit does to the craft |
 | [`cockpit_view`](#cockpit_view) | the wide field of view of the cockpit |
 
 The settings belong to the model, and every object type that loads the
@@ -539,8 +542,8 @@ surfaces. This group only changes what you see.
 ### weapons
 
 `weapons` holds several groups. The `weapons` section of
-`flight/flight.yaml` has the same groups, except `switch_by_iff`, `colors`
-and `by_markings`, and sets their values for every craft. The
+`flight/flight.yaml` has the same groups, except `switch_by_iff`, `colors`,
+`by_markings` and `models`, and sets their values for every craft. The
 [flight page](flight.md) describes it. For each value, the game uses the
 model's value first, then the value in `flight/flight.yaml`, then the value
 of the original game.
@@ -559,6 +562,10 @@ weapons:
   ai_torpedoes: {per_pass: 6, per_target: 16}
   impact_spin: {enabled: true, speed_percent: 100, angle_percent: 100}
   system_damage: {max: 1000, ion_cannon: 1, ion_cannon_turbo: 2}
+  turret_ignore:
+    rebel_laser_turbo: [freighter, starship, platform]
+    turbolaser_red_heavy: [fighter, transport, warhead]
+  models: {torpedo: capitaltorpedo}
   stats:
     default:
       rebel_laser: {power: 350, fire_rate_ms: 188}
@@ -639,6 +646,61 @@ All values except `enabled` are whole numbers of 0 or more.
 is hit. The damage of each ion weapon comes from the model of the craft that
 fired. When the mod renames one of these weapon types, its key in
 `system_damage` is the new name.
+
+#### Turret targets
+
+`turret_ignore` lists, for each weapon type, the kinds of objects that the
+craft's AI turrets ignore. For example, a point defence cannon can ignore
+starships, and a heavy turbolaser can ignore fighters and missiles.
+
+```yaml
+weapons:
+  turret_ignore:
+    rebel_laser_turbo: [freighter, starship, platform]
+    turbolaser_red_heavy: [fighter, transport, warhead]
+    turbolaser_green: []
+```
+
+Each key is a [weapon type](reference/weapons.md#weapon-types). Each list has
+[genus](reference/object_types.md#genus) names, such as `fighter` or
+`asteroid`, and `warhead`. `warhead` means a projectile that the AI can aim
+at, such as a missile or a torpedo, so it turns off the point defence of
+that weapon type.
+
+The lists only change the laser groups of the turret kinds: `turret`,
+`long_range_turret` and `slow_turret`. They apply when the AI aims the
+turrets. This includes the turrets of the player's transport while the
+player flies it with turret auto-fire on. They don't change the guns that a
+pilot fires, the targets that an AI craft flies at, or a turret that the
+player aims.
+
+A turret doesn't aim at an object that its weapon type ignores. It also
+doesn't check whether such an object is in its line of fire, so a heavy
+turbolaser that ignores fighters fires even when a friendly fighter is in
+the way.
+
+For each weapon type, the game uses the model's list first, then the list
+in the `weapons` section of `flight/flight.yaml`. An empty list ignores
+nothing, and the list of `flight/flight.yaml` then doesn't apply.
+
+#### Weapon models
+
+`models` gives the craft's shots of a weapon type another model. For
+example, a capital ship can fire bigger torpedoes than a fighter.
+
+```yaml
+weapons:
+  models: {torpedo: capitaltorpedo, heavy_rocket: capitalrocket}
+```
+
+Each key is a [weapon type](reference/weapons.md#weapon-types), and each
+value is the name of a model in the mod: `flight/models/<name>.glb`. When
+the craft fires that weapon type, its shots show that model instead of the
+weapon's own model. When the model is missing, the game stops with an
+error.
+
+Only the look of the shots changes. Their speed, damage and collisions stay
+those of the weapon type.
 
 #### Weapon profiles
 
@@ -952,6 +1014,10 @@ warhead_lock:
 
 The ranges are 0 or more.
 
+The `warhead_lock` section of `flight/flight.yaml` can set
+`ai_lock_range_m.big` and `big_top_tier` for every craft of a genus. A
+model's own value replaces it.
+
 ### jamming
 
 `jamming` sets where the craft jams the weapons of an enemy player who is
@@ -988,6 +1054,35 @@ original game:
 Jamming points are hardpoints of the model. The
 [model values](reference/model_values.md#hardpoint-types) page lists them.
 
+### hyperspace
+
+`hyperspace` sets whether the craft has a gravity well, and how fast AI
+craft of this model arrive and leave by hyperspace.
+
+```yaml
+hyperspace:
+  gravity_well: true
+  arrival_speed_mglt: 4800
+  departure_speed_mglt: 4800
+```
+
+| Key | Meaning |
+|-|-|
+| `gravity_well` | `true`: while an enemy craft of this model has working systems in the player's region, the player can't jump to hyperspace. `false`: the craft never stops a jump. |
+| `arrival_speed_mglt` | How fast an arriving AI craft flies, from 0.444 to 14563 MGLT. |
+| `departure_speed_mglt` | The speed at which an AI craft jumps away, from 0.444 to 14563 MGLT. |
+
+Without `gravity_well`, the craft keeps the rule of its object type: in
+the original game, only the Interdictor and the Modified Strike Cruiser
+have a gravity well.
+
+Without a speed, the craft uses the speed of the `hyperspace` section of
+`flight/flight.yaml`, or else arrives and leaves as in the original game.
+[Flight settings](flight.md#hyperspace) describes how arrivals and
+departures work, and the other values that they use. The speeds only apply
+in missions where `use_hyperspace_speeds` isn't `false`. The player's own
+craft always keeps the original jump.
+
 ### docking
 
 `docking` sets how high the player's craft approaches when it docks with
@@ -1004,6 +1099,69 @@ docking: {approach_height_m: 0}
 The approach height is the smaller of this value and the gap between the
 target's dock point and the player's dock point. This group only applies
 with the `docking.player_approach_height` rule of `flight/flight.yaml`.
+
+### ai_attack
+
+`ai_attack` sets how an AI craft of this model attacks its target.
+
+```yaml
+ai_attack:
+  break_range_m:
+    warhead: 125
+    small: {novice: 125, officer: 125, veteran: 100, ace: 75, top_ace: 56.25, super_ace: 37.5}
+    big_max: 200
+    target_offset: {superstardestroyer: 800, repairyard: 800}
+  laser_range_m: {novice: 600, officer: 800, veteran: 1000, ace: 1000, top_ace: 1000, super_ace: 1000}
+  avoid_hits: false
+```
+
+An AI craft flies at its target until the target is closer than the break
+range. Then it ends the attack run and turns away.
+
+| Key | Default | Meaning |
+|-|-|-|
+| `break_range_m.warhead` | 125 | The break range when the target isn't a craft, such as a warhead. |
+| `break_range_m.small` | 125, 125, 100, 75, 56.25 and 37.5 | The break range against a craft that isn't a starship, platform, container or freighter, by the rank of the craft's flight group. It doubles when the two craft face more than 90° apart. 0 or more. |
+| `break_range_m.big_max` | 200 | Against a starship, platform, container or freighter, the break range is the size of the target, at most this value. When the craft aims at a part of the target, the range is half the size of the part, and this limit doesn't apply. |
+| `break_range_m.target_offset` | 800 for the Super Star Destroyer, the Repair Yard and the Shipyard, else 0 | A distance added to the break range against a starship, platform, container or freighter, by the name of the target's model. |
+| `laser_range_m` | See below | How far away the craft starts to fire its lasers, by the rank of its flight group. 0 or more. |
+| `avoid_hits` | `true` | `false` stops the craft from dodging warheads and attackers, and from firing flares or chaff at warheads. Freighters, containers and starships never dodge. |
+
+A break range of 0 or less means that the craft never breaks off because of
+the distance. The ranks are `novice`, `officer`, `veteran`, `ace`, `top_ace`
+and `super_ace`. A rank above super ace uses the `novice` value.
+
+**The laser range.** In the original game, the laser range follows the
+pilot's skill: 600 m for novices and officers, 800 m for veterans, and
+1000 m for aces and above. A turret that another craft controls uses the
+skill of that craft. When the model or `flight/flight.yaml` sets
+`laser_range_m`, the range follows the rank of the craft's flight group
+instead. A rank that neither file sets keeps its original range.
+
+The game then changes the range. Against a fast target, it is 400 m
+shorter when the target flies within 45° of the craft's heading, and 200 m
+shorter within 112.5°. It is 600 m longer against a starship or a platform.
+So with a range below 400 m, the craft fires from any distance at a fast
+target that flies the same way.
+
+The `ai_attack` section of `flight/flight.yaml` takes the same keys, for
+every craft. A key of the model replaces the same key of that section.
+
+### mag_pulse
+
+`mag_pulse` sets what a mag pulse hit does to a craft of this model.
+
+```yaml
+mag_pulse: {drain_only: true, disable_time_ms: 9440}
+```
+
+| Key | Default | Meaning |
+|-|-|-|
+| `drain_only` | `false` | For a player's craft. `true` makes a hit only drain the lasers. In the original game, a hit also knocks out the cannons for 20 seconds when they work. |
+| `disable_time_ms` | 14160 for fighters, transports, utility craft, pilot droids and weapon emplacements, else 28320 | For an AI craft. How long a hit stops the craft from firing, from 0 to 262140 milliseconds. Each hit adds this time. |
+
+The `mag_pulse` section of `flight/flight.yaml` sets the defaults for every
+craft.
 
 ### cockpit_view
 

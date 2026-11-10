@@ -6,6 +6,7 @@
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa_runtime/models/mission_file.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <stdint.h>
@@ -61,6 +62,23 @@ static int s_registeredDirty = 1;
    linear probing, cleared at the start of each capture. */
 #define SKINS_USE_TABLE_SIZE (2 * XWA_SNAP_MAX_SKIN_USES)
 static uint16_t s_useTable[SKINS_USE_TABLE_SIZE];
+/* The capture builds the lists again only when something they come from
+   changes. s_listDirty is set when this module's own data changes. The other
+   inputs are compared with the values that the last build used: the model
+   names (through the snapshot's OPT asset generation), the player's cockpit
+   and exterior, and the previews. */
+static int s_listDirty = 1;
+static uint64_t s_builtOptGeneration;
+static char s_builtCockpit[40];
+static char s_builtExterior[40];
+typedef struct SkinsPreview {
+	char name[sizeof((XwaModelPreview*)0)->opt_name];
+	int32_t markings;
+} SkinsPreview;
+static uint32_t s_builtPreviewCount;
+static SkinsPreview s_builtPreviews[XWA_SNAP_MAX_MODEL_PREVIEWS];
+/* The flight frames run when Skins_RegisterShown last ran. */
+static uint32_t s_shownFrames;
 
 void XwaSkins_LoadMission(const char* missionPath) {
 	char path[300];
@@ -72,6 +90,7 @@ void XwaSkins_LoadMission(const char* missionPath) {
 	s_flightGroupCount = 0;
 	s_useCount = 0;
 	s_registeredDirty = 1;
+	s_listDirty = 1;
 	s_usesFullLogged = 0;
 	if (missionPath == NULL || XwaMissionFile_Load(missionPath, &config, path, sizeof path) <= 0) {
 		return;
@@ -131,6 +150,7 @@ void XwaSkins_SetFlightGroups(const struct XwaFlightGroup* flightGroups, size_t 
 
 	s_flightGroupCount = 0;
 	s_registeredDirty = 1;
+	s_listDirty = 1;
 	for (index = 0; index < count && index < SKINS_FLIGHT_GROUPS; ++index) {
 		const struct XwaFlightGroup* fg =
 			(const struct XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)index * stride);
@@ -218,6 +238,7 @@ static void Skins_Register(uint16_t objectType, int markings, int all) {
 	s_uses[s_useCount].markings = (uint8_t)markings;
 	s_uses[s_useCount++].all = (uint8_t)(all != 0);
 	s_registeredDirty = 1;
+	s_listDirty = 1;
 }
 
 void XwaSkins_UseMarkings(uint16_t objectType, int markings) {
@@ -238,6 +259,7 @@ void XwaSkins_UseCraftMarkings(int flightGroupIdx, int craft, int markings) {
 	Skins_Register(group->objectType, markings, 0);
 	if (group->player && group->playerCraft == craft) {
 		group->playerMarkings = (int16_t)markings;
+		s_listDirty = 1;
 	}
 }
 
@@ -341,7 +363,40 @@ static int Skins_CaptureChanged(const XwaSnapshot* snapshot) {
 	return 1;
 }
 
-void XwaSkins_Capture(XwaSnapshot* snapshot) {
+/* Whether an input of the lists that this module doesn't own has changed
+   since the last build, and if so remembers its new value. */
+static int Skins_InputsChanged(const XwaSnapshot* snapshot) {
+	int changed = 0;
+	uint32_t preview;
+
+	if (snapshot->opt_asset_generation != s_builtOptGeneration) {
+		s_builtOptGeneration = snapshot->opt_asset_generation;
+		changed = 1;
+	}
+	if (strcmp(snapshot->cockpit.model_name, s_builtCockpit) != 0 ||
+		strcmp(snapshot->cockpit.exterior_name, s_builtExterior) != 0) {
+		snprintf(s_builtCockpit, sizeof s_builtCockpit, "%s", snapshot->cockpit.model_name);
+		snprintf(s_builtExterior, sizeof s_builtExterior, "%s", snapshot->cockpit.exterior_name);
+		changed = 1;
+	}
+	for (preview = 0; !changed && preview < snapshot->model_preview_count; ++preview) {
+		changed = snapshot->model_previews[preview].node_switch_index != s_builtPreviews[preview].markings ||
+				  strcmp(snapshot->model_previews[preview].opt_name, s_builtPreviews[preview].name) != 0;
+	}
+	if (changed || snapshot->model_preview_count != s_builtPreviewCount) {
+		s_builtPreviewCount = snapshot->model_preview_count;
+		for (preview = 0; preview < snapshot->model_preview_count; ++preview) {
+			snprintf(s_builtPreviews[preview].name, sizeof s_builtPreviews[preview].name, "%s",
+					 snapshot->model_previews[preview].opt_name);
+			s_builtPreviews[preview].markings = snapshot->model_previews[preview].node_switch_index;
+		}
+		changed = 1;
+	}
+	return changed;
+}
+
+/* Builds the selections and uses of the snapshot. */
+static void Skins_BuildLists(XwaSnapshot* snapshot) {
 	int index;
 	uint32_t preview;
 
@@ -365,7 +420,6 @@ void XwaSkins_Capture(XwaSnapshot* snapshot) {
 			Skins_AddUse(snapshot, snapshot->cockpit.exterior_name, group->playerMarkings, 0);
 		}
 	}
-	Skins_RegisterShown(snapshot);
 	for (index = 0; index < s_useCount; ++index) {
 		Skins_AddUse(snapshot, XwaSnapshotExport_ModelName(s_uses[index].objectType), s_uses[index].markings,
 					 s_uses[index].all);
@@ -374,9 +428,33 @@ void XwaSkins_Capture(XwaSnapshot* snapshot) {
 		Skins_AddUse(snapshot, snapshot->model_previews[preview].opt_name,
 					 snapshot->model_previews[preview].node_switch_index, 0);
 	}
+}
 
-	if (Skins_CaptureChanged(snapshot)) {
-		++s_generation;
+void XwaSkins_Capture(XwaSnapshot* snapshot) {
+	const uint32_t frames = XwaFlightTask_FramesRun();
+
+	/* Objects only change their markings when the simulation runs, and a
+	   new mission is loaded with s_listDirty set. */
+	if (s_listDirty || frames != s_shownFrames) {
+		s_shownFrames = frames;
+		Skins_RegisterShown(snapshot);
+	}
+	/* Skins_InputsChanged runs first, so that it always remembers the
+	   values that the build uses. */
+	if (Skins_InputsChanged(snapshot) || s_listDirty || !s_captured) {
+		s_listDirty = 0;
+		Skins_BuildLists(snapshot);
+		if (Skins_CaptureChanged(snapshot)) {
+			++s_generation;
+		}
+	} else {
+		/* Each commit writes to another snapshot slot, so the slot gets the
+		   lists of the last build. */
+		memcpy(snapshot->skin_selections, s_capturedSelections,
+			   s_capturedSelectionCount * sizeof s_capturedSelections[0]);
+		snapshot->skin_selection_count = s_capturedSelectionCount;
+		memcpy(snapshot->skin_uses, s_capturedUses, s_capturedUseCount * sizeof s_capturedUses[0]);
+		snapshot->skin_use_count = s_capturedUseCount;
 	}
 	snapshot->skin_generation = s_generation;
 }

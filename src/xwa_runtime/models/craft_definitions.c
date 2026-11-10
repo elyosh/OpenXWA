@@ -1,6 +1,5 @@
 #include "xwa_runtime/models/craft_definitions.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/file_io.h"
@@ -8,7 +7,9 @@
 #include "xwa/assets/object_type.h"
 #include "xwa/assets/object_type_info.h"
 #include "xwa/assets/string_table.h"
+#include "xwa/frontend/frontend_mission.h"
 #include "xwa_runtime/models/gunner_seats.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/units.h"
@@ -1041,20 +1042,13 @@ static void CraftDefinitions_FreeNames(CraftFileNames* list) {
 /* Loads an object type file, checks its object type, and finds the craft
    record that it writes. Returns 0 when the file can't be used. */
 static int CraftDefinitions_LoadFile(CraftFile* file) {
-	AeronConfigError error;
 	const AeronConfigNode* node;
 	int objectType;
 
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, file->path, &file->file, &error)) {
-		Aeron_LogError("xwa.craft", "%s:%d: %s. The file is ignored", file->path, error.line, error.message);
+	if (XwaModFiles_Load(file->path, 0, &file->file) != XWA_MOD_FILE_LOADED) {
 		return 0;
 	}
 	file->root = AeronConfigFile_Root(file->file);
-	if (AeronConfigNode_Type(file->root) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.craft", "%s: the file must be a map. It is ignored", file->path);
-		return 0;
-	}
 	/* Renames apply only after all files are loaded, so `object_type` is
 	   always a stock name. */
 	node = AeronConfigNode_MapGet(file->root, "object_type");
@@ -1347,20 +1341,13 @@ static void CraftDefinitions_ApplyRules(const CraftFile* file) {
 /* Loads a craft type file and checks its craft type and object type.
    Returns 0 when the file can't be used. */
 static int CraftDefinitions_LoadCraftTypeFile(CraftTypeFile* file) {
-	AeronConfigError error;
 	const AeronConfigNode* node;
 	int64_t value;
 
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, file->path, &file->file, &error)) {
-		Aeron_LogError("xwa.craft", "%s:%d: %s. The file is ignored", file->path, error.line, error.message);
+	if (XwaModFiles_Load(file->path, 0, &file->file) != XWA_MOD_FILE_LOADED) {
 		return 0;
 	}
 	file->root = AeronConfigFile_Root(file->file);
-	if (AeronConfigNode_Type(file->root) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.craft", "%s: the file must be a map. It is ignored", file->path);
-		return 0;
-	}
 	if (!CraftDefinitions_ReadInt(file->path, AeronConfigNode_MapGet(file->root, "craft_type"), "craft_type",
 								  1, XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT - 1, &value)) {
 		Aeron_LogError("xwa.craft", "%s: the file needs a craft_type. It is ignored", file->path);
@@ -1644,7 +1631,7 @@ static void CraftDefinitions_AddGunnerCockpits(void) {
 		size_t seat;
 
 		snprintf(path, sizeof path, "flight/models/%s", files.names[i]);
-		if (!AeronConfigFile_LoadYaml(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, &file)) {
+		if (XwaModFiles_Load(path, 1, &file) != XWA_MOD_FILE_LOADED) {
 			continue;
 		}
 		seats = AeronConfigNode_MapGet(AeronConfigNode_MapGet(AeronConfigFile_Root(file), "gunner_seats"),
@@ -1835,4 +1822,26 @@ int XwaCraftDefinitions_NextAddedRow(int list, int* rowIndex, char* line, size_t
 		}
 	}
 	return 0;
+}
+
+int XwaCraftDefinitions_CheckMission(const char* missionPath, const struct XwaFlightGroup* flightGroups,
+									 size_t stride, int count) {
+	int index;
+
+	for (index = 0; index < count; ++index) {
+		const XwaFlightGroup* fg =
+			(const XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)index * stride);
+		char message[512];
+
+		if (g_objectTypeTables.craftTypeToObjectType[fg->craftType] != OBJ_None) {
+			continue;
+		}
+		snprintf(message, sizeof message,
+				 "The mission %s can't be loaded. Its flight group %d (\"%.*s\") has craft type %d, and "
+				 "that craft type has no object type.",
+				 missionPath, index, (int)sizeof fg->name, fg->name, fg->craftType);
+		File_PrintFatalMessageAndExit(message, 1);
+		return 0;
+	}
+	return 1;
 }

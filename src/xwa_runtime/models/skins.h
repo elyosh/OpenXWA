@@ -58,9 +58,12 @@ void XwaSkins_UseAllMarkings(uint16_t objectType);
    the player's craft. */
 void XwaSkins_UseCraftMarkings(int flightGroupIdx, int craft, int markings);
 
-/* Exports the selections and the markings values used into `snapshot`,
-   after its loaded models, cockpit and previews; skin_generation changes
-   when they do. */
+/* Writes the selections and the markings values used into `snapshot`. Call
+   it after the snapshot has its loaded models, cockpit and previews.
+   skin_generation changes when the lists change. The lists are only built
+   again when one of their inputs changes, and the objects' markings are only
+   checked after a simulation frame. Otherwise the lists of the last build
+   are copied. */
 void XwaSkins_Capture(struct XwaSnapshot* snapshot);
 
 #ifdef __cplusplus

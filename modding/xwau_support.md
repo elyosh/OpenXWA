@@ -28,7 +28,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Levels of detail | Partial | The importer keeps only the most detailed level of an OPT. | [Models](models.md) |
 | Object profiles | Implemented | Including the choice by flight group in missions. | [Models](models.md#profiles), [Missions](missions.md#object_profiles) |
 | Skins | Implemented | Including skins by markings, and layers with opacity. | [Materials](materials.md#skins-and-markings) |
-| Moving parts | Implemented | S-foils, landing gears, hatches, hangar doors, cargo clamps, pilot heads and rotating parts, with their start states in missions. | [Models](models.md#moving-parts) |
+| Moving parts | Implemented | S-foils, landing gears, hatches, hangar doors, cargo clamps, pilot heads, hangar droid parts and rotating parts, with their start states in missions. | [Models](models.md#moving-parts) |
 | `[MeshesCollisions]` and `TargetableMeshes` | Implemented | | [Models](models.md#collision-meshes) |
 | `[EngineGlows]` by speed | Implemented | | [Craft](craft.md#engine_glows) |
 
@@ -72,12 +72,18 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Weapon colours | Implemented | By weapon, flight group and side, with the impact and light colours. | [Craft](craft.md#weapon-colours) |
 | Laser rates and energy transfer (`[WeaponRate]`) | Partial | The rates that a mission sets for a flight group aren't converted. | [Craft](craft.md#laser-rates) |
 | Weapon, warhead, energy and linking stats | Implemented | Including the mission's weapon profiles. | [Craft](craft.md#weapon-profiles) |
-| Warhead lock (`[WarheadLock]`) | Partial | The global section and the keys for object profiles aren't converted. | [Craft](craft.md#warhead_lock) |
+| Turret target blocks (`Weapon<N>_TargetBlock`) | Implemented | The names `PlayerProjectile` and `People` aren't converted. | [Craft](craft.md#turret-targets) |
+| Weapon models (`[OptReplace]`) | Implemented | Models outside `FlightModels` aren't converted. | [Craft](craft.md#weapon-models) |
+| Warhead lock (`[WarheadLock]`) | Partial | The keys for object profiles aren't converted. | [Craft](craft.md#warhead_lock), [Flight](flight.md#warhead_lock) |
+| AI attack ranges and dodging (`[AttackBreakDistance]`) | Implemented | | [Craft](craft.md#ai_attack), [Flight](flight.md#ai_attack) |
+| Mag pulse hits (`[WeaponLockBehaviors]`) | Implemented | | [Craft](craft.md#mag_pulse), [Flight](flight.md#mag_pulse) |
 | Jamming | Implemented | The section of `default.ini` isn't converted. | [Craft](craft.md#jamming) |
 | Two warhead launchers (`hook_weapon_type`) | Implemented | | [Craft](craft.md#warheads) |
 | Docking | Implemented | | [Craft](craft.md#docking), [Flight](flight.md#docking) |
+| Interdictors (`[Interdictor]`) | Implemented | | [Craft](craft.md#hyperspace) |
+| Hyperspace speeds (`ShortHyperspaceEffect`, `[Hyperspace]`) | Implemented | OpenXWA lands an arriving craft exactly on its point, so `OutOfHyperspaceSetPosition` isn't needed, and wingmen stay in formation. A departing craft reaches its speed in about 0.1 s, whatever the frame rate. XWAU sometimes gives an arriving craft its model's departure speed. OpenXWA always uses the arrival speed. | [Craft](craft.md#hyperspace), [Flight](flight.md#hyperspace) |
 | More craft, projectiles and explosions (`hook_crafts_count`) | Implemented | | [Flight](flight.md#object_limits) |
-| Craft sounds | Implemented | The hyperspace sound banks aren't converted. | [Craft](craft.md#sound), [Flight](flight.md#soundsyaml) |
+| Craft sounds | Implemented | | [Craft](craft.md#sound), [Flight](flight.md#soundsyaml) |
 
 ## HUD and flight art
 
@@ -118,7 +124,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | `[WeaponProfiles]` | Implemented | | [Missions](missions.md#weapon-profiles) |
 | `[StatsProfiles]` | Implemented | | [Missions](missions.md#stats_profiles) |
 | `[concourse]` planet | Implemented | | [Missions](missions.md#concourse) |
-| `[Interdiction]` | Partial | The abort sound plays when the player arrives in the listed regions. XWAU's hyperspace tunnel for an interdicted jump isn't implemented. | [Missions](missions.md#settings) |
+| `[Interdiction]` | Implemented | The abort sound plays when the player arrives in the listed regions. In modern graphics, the jump has OpenXWA's own interdiction look, not ddraw's colours and shake. | [Missions](missions.md#hyperspace_regions) |
 | `[Headlights]` | Implemented | | [Missions](missions.md#headlights) |
 | `[CraftsCount]` | Implemented | | [Missions](missions.md#object_limits) |
 

@@ -25,6 +25,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include "tool_log.h"
 
@@ -86,6 +87,9 @@ typedef struct XwaModImportProgress {
 	volatile int errors;
 	volatile int finished;
 	volatile int result;                      /* XwaModImportResult */
+	/* How long each phase should take, in ms, estimated before the models
+	   phase starts. It doesn't change after that. */
+	volatile int phase_cost[XWA_MOD_IMPORT_PHASE_COUNT];
 	int phase_ms[XWA_MOD_IMPORT_PHASE_COUNT]; /* how long each phase took */
 	char** failed;                            /* what failed, one line each */
 	size_t failed_count;
@@ -116,6 +120,15 @@ bool XwaModImport_Detect(const char* source, XwaModImportInstall* info, char* er
  * '-' replaced by '-'. */
 bool XwaModImport_ModFolder(const char* mods, const char* name, char* out, size_t cap);
 
+/* Whether folder `dir` holds a mod that the importer made. */
+bool XwaModImport_IsImported(const char* dir);
+
+/* Deletes folder `dir` if it holds a mod that the importer made. Returns
+ * false when it doesn't, or when some files can't be deleted. mod.yaml is
+ * deleted last, so a folder that is only partly deleted is still a mod that
+ * can be deleted again, or replaced by an import. */
+bool XwaModImport_Delete(const char* dir);
+
 /* Checks the options before an import. Writes the reason into `error` when
  * it doesn't return XWA_MOD_IMPORT_CHECK_OK. */
 XwaModImportCheck XwaModImport_Check(const XwaModImportOptions* options, char* error, size_t error_cap);
@@ -128,8 +141,15 @@ void XwaModImport_ProgressFree(XwaModImportProgress* progress);
  * result. */
 XwaModImportResult XwaModImport_Run(const XwaModImportOptions* options, XwaModImportProgress* progress);
 
-/* The overall progress, from 0 to 1000. */
+/* The overall progress, from 0 to 1000: the estimated cost of the phases
+ * done so far, divided by the estimated cost of every phase. */
 int XwaModImport_Overall(XwaModImportProgress* progress);
+
+/* The estimated time left, in microseconds, from the time since the import
+ * started and the overall progress. The rates of the phase costs are only
+ * used for their ratios, so the estimate also works on slower or faster
+ * computers. Returns -1 when it is too early for an estimate. */
+long long XwaModImport_Remaining(XwaModImportProgress* progress, uint64_t elapsed_us);
 
 /* The phase's name for a progress line, such as "Converting models". */
 const char* XwaModImport_PhaseName(XwaModImportPhase phase);

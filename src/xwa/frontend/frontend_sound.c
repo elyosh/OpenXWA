@@ -11,6 +11,7 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/frontend/side_panels.h"
 #endif
 
@@ -378,7 +379,9 @@ static int DirectSound_LoadFileAndFindAudioData(int unused, char* fileName, DSWa
 #endif
 	if (stream == NULL) {
 #ifdef XWA_MODERN
-		Aeron_LogError("xwa.audio", "sound file not found: %s", fileName);
+		if (!XwaSoundBanks_IsPlaceholder(fileName)) {
+			Aeron_LogError("xwa.audio", "sound file not found: %s", fileName);
+		}
 #endif
 		return 0;
 	}

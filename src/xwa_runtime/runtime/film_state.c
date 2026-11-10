@@ -9,6 +9,7 @@
 #include "xwa/flight/player/player.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/byte_order.h"
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/hangar_scene.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_settings.h"
@@ -33,15 +34,18 @@
 	   u8 shuttle loaded,
 	 Death Star reactor: i32 random drift[3], drift remainders[3], cylinder
 	   yaw remainder, core drift speed remainder, core pitch remainder,
-	   f64 core directed drift remainders[3], u16 shockwave light value.
+	   f64 core directed drift remainders[3], u16 shockwave light value,
+	 since version 2: u8 hyperspace arrival count, then for each arrival
+	   i32 object, cruise speed, end speed, aim point[3], u8 finished.
    A newer block version is skipped. */
 
 enum {
-	FILM_STATE_VERSION = 1,
+	FILM_STATE_VERSION = 2,
 	FILM_STATE_MOD_NAME_MAX = 255,
 	FILM_STATE_MAX_SIZE = 2 + 2 + 1 + 1 + FILM_STATE_MOD_NAME_MAX + 4 * XWA_SHIELD_RECHARGE_FLIGHT_GROUPS +
 						  4 * XWA_WARHEAD_POOLS_FLIGHT_GROUPS * XWA_WARHEAD_POOLS_TYPES +
-						  4 * XWA_PLAYER_COUNT + 4 + 4 + 64 + 4 * 2 + 4 + 1 + 4 * 9 + 8 * 3 + 2,
+						  4 * XWA_PLAYER_COUNT + 4 + 4 + 64 + 4 * 2 + 4 + 1 + 4 * 9 + 8 * 3 + 2 + 1 +
+						  XWA_CRAFT_HYPERSPACE_ARRIVALS * (4 * 6 + 1),
 };
 
 static char s_modName[FILM_STATE_MOD_NAME_MAX + 1];
@@ -175,6 +179,8 @@ void XwaFilmState_Write(void) {
 	XwaHangarsFlightState hangars;
 	XwaHangarSceneFlightState scene;
 	DeathStarModernFlightState deathStar;
+	static XwaCraftHyperspaceArrival arrivals[XWA_CRAFT_HYPERSPACE_ARRIVALS];
+	uint8_t arrivalCount = 0;
 	size_t length = strlen(s_modName);
 	int i;
 	int j;
@@ -185,6 +191,7 @@ void XwaFilmState_Write(void) {
 	XwaHangars_SaveFlightState(&hangars);
 	XwaHangarScene_SaveFlightState(&scene);
 	DeathStar_ModernSaveFlightState(&deathStar);
+	XwaCraftHyperspace_SaveFlightState(arrivals);
 
 	FilmState_PutU16(&cursor, FILM_STATE_VERSION);
 	FilmState_PutU16(&cursor, (uint16_t)XwaModernFlightTiming_StepTicks());
@@ -225,6 +232,22 @@ void XwaFilmState_Write(void) {
 		FilmState_PutF64(&cursor, deathStar.reactorCoreDirectedDriftRemainder[i]);
 	}
 	FilmState_PutU16(&cursor, deathStar.shockwaveLightValue);
+	for (i = 0; i < XWA_CRAFT_HYPERSPACE_ARRIVALS; ++i) {
+		arrivalCount = (uint8_t)(arrivalCount + (arrivals[i].objIdx >= 0));
+	}
+	FilmState_PutU8(&cursor, arrivalCount);
+	for (i = 0; i < XWA_CRAFT_HYPERSPACE_ARRIVALS; ++i) {
+		if (arrivals[i].objIdx < 0) {
+			continue;
+		}
+		FilmState_PutI32(&cursor, arrivals[i].objIdx);
+		FilmState_PutI32(&cursor, arrivals[i].cruise);
+		FilmState_PutI32(&cursor, arrivals[i].endSpeed);
+		for (j = 0; j < 3; ++j) {
+			FilmState_PutI32(&cursor, arrivals[i].aim[j]);
+		}
+		FilmState_PutU8(&cursor, (uint8_t)arrivals[i].finished);
+	}
 
 	ByteOrder_WriteU32Le(buffer, (uint32_t)(cursor.at - 4));
 	Film_WriteBytesBuffered(buffer, cursor.at);
@@ -240,7 +263,9 @@ void XwaFilmState_Read(void) {
 	XwaHangarsFlightState hangars;
 	XwaHangarSceneFlightState scene;
 	DeathStarModernFlightState deathStar;
+	static XwaCraftHyperspaceArrival arrivals[XWA_CRAFT_HYPERSPACE_ARRIVALS];
 	char modName[FILM_STATE_MOD_NAME_MAX + 1];
+	uint16_t version;
 	uint32_t size;
 	uint32_t left;
 	int stepTicks;
@@ -267,7 +292,9 @@ void XwaFilmState_Read(void) {
 		}
 		left -= chunk;
 	}
-	if (FilmState_GetU16(&cursor) != FILM_STATE_VERSION || !cursor.ok) {
+	version = FilmState_GetU16(&cursor);
+	/* Version 1 is version 2 without the hyperspace arrivals. */
+	if ((version != 1 && version != FILM_STATE_VERSION) || !cursor.ok) {
 		Aeron_LogWarn("xwa.film", "film: the port's state block has another version; it is ignored");
 		return;
 	}
@@ -311,6 +338,26 @@ void XwaFilmState_Read(void) {
 		deathStar.reactorCoreDirectedDriftRemainder[i] = FilmState_GetF64(&cursor);
 	}
 	deathStar.shockwaveLightValue = FilmState_GetU16(&cursor);
+	for (i = 0; i < XWA_CRAFT_HYPERSPACE_ARRIVALS; ++i) {
+		memset(&arrivals[i], 0, sizeof arrivals[i]);
+		arrivals[i].objIdx = -1;
+	}
+	if (version >= 2) {
+		const int count = FilmState_GetU8(&cursor);
+
+		for (i = 0; i < count && i < XWA_CRAFT_HYPERSPACE_ARRIVALS; ++i) {
+			arrivals[i].objIdx = FilmState_GetI32(&cursor);
+			arrivals[i].cruise = FilmState_GetI32(&cursor);
+			arrivals[i].endSpeed = FilmState_GetI32(&cursor);
+			for (j = 0; j < 3; ++j) {
+				arrivals[i].aim[j] = FilmState_GetI32(&cursor);
+			}
+			arrivals[i].finished = FilmState_GetU8(&cursor);
+			if (arrivals[i].objIdx < 0 || arrivals[i].objIdx >= XWA_MAX_OBJECTS) {
+				cursor.ok = 0;
+			}
+		}
+	}
 	if (!cursor.ok) {
 		Aeron_LogWarn("xwa.film", "film: the port's state block is too short; it is ignored");
 		return;
@@ -332,6 +379,7 @@ void XwaFilmState_Read(void) {
 	XwaHangars_RestoreFlightState(&hangars);
 	XwaHangarScene_RestoreFlightState(&scene);
 	DeathStar_ModernRestoreFlightState(&deathStar);
+	XwaCraftHyperspace_RestoreFlightState(arrivals);
 }
 
 /* The table's layout: its slots, and the slots of its craft, projectile,

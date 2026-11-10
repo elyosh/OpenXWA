@@ -1,6 +1,5 @@
 #include "xwa_runtime/audio/sound_banks.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
@@ -9,9 +8,12 @@
 #include "xwa/config/game_config.h"
 #include "xwa/flight/flight.h"
 #include "xwa/frontend/frontend_mission.h"
+#include "xwa/util/string.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/units.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -48,6 +50,8 @@ static const SoundBankInfo s_banks[XWA_SOUND_BANK_COUNT] = {
 	{ "canopy_opening", "CanopyOpening", SOUND_BANKS_BY_TYPE, 1 },
 	{ "engine_slowing", "EngineSlowing", SOUND_BANKS_BY_TYPE, 1 },
 	{ "engine_wash", "EngineWash", SOUND_BANKS_BY_TYPE, 1 },
+	{ "enter_hyperspace", "EnterHyperspace", SOUND_BANKS_BY_TYPE, 1 },
+	{ "exit_hyperspace", "ExitHyperspace", SOUND_BANKS_BY_TYPE, 1 },
 	{ "fly_by", "FlyBy", SOUND_BANKS_BY_TYPE, 1 },
 	{ "hangar_ambient", "HangarAmbient", SOUND_BANKS_LIST, XWA_SOUND_BANKS_HANGAR_AMBIENT_MAX },
 	{ "hyper_abort", "HyperAbort", SOUND_BANKS_BY_TYPE, 1 },
@@ -392,7 +396,6 @@ static void SoundBanks_Free(void) {
 }
 
 void XwaSoundBanks_Init(void) {
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* banks;
 	int sounds = 0;
@@ -404,18 +407,12 @@ void XwaSoundBanks_Init(void) {
 	SoundBanks_Free();
 	memset(s_entries, 0, sizeof s_entries);
 	s_slotCount = 0;
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SOUND_BANKS_YAML, &s_file, &error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.audio", SOUND_BANKS_YAML ":%d: %s. The file is ignored", error.line,
-						   error.message);
-		}
-		s_file = NULL;
+	if (XwaModFiles_Load(SOUND_BANKS_YAML, 0, &s_file) != XWA_MOD_FILE_LOADED) {
 		return;
 	}
 	root = AeronConfigFile_Root(s_file);
 	banks = AeronConfigNode_MapGet(root, "banks");
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP || AeronConfigNode_Type(banks) != AERON_CONFIG_MAP) {
+	if (AeronConfigNode_Type(banks) != AERON_CONFIG_MAP) {
 		Aeron_LogError("xwa.audio", SOUND_BANKS_YAML ": the file needs a 'banks' map. It is ignored");
 		AeronConfigFile_Destroy(s_file);
 		s_file = NULL;
@@ -490,8 +487,7 @@ void XwaSoundBanks_LoadFlight(const struct XwaFlightGroup* flightGroups, size_t 
 		const struct XwaFlightGroup* fg =
 			(const struct XwaFlightGroup*)((const unsigned char*)flightGroups + (size_t)index * stride);
 
-		if (fg->craftType < XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT &&
-			g_objectTypeTables.craftTypeToObjectType[fg->craftType] < OBJ_Count) {
+		if (g_objectTypeTables.craftTypeToObjectType[fg->craftType] < OBJ_Count) {
 			used[g_objectTypeTables.craftTypeToObjectType[fg->craftType]] = 1;
 		}
 	}
@@ -563,4 +559,27 @@ uint16_t XwaSoundBanks_Distance(unsigned int sfxSlot) {
 	return slot < (unsigned int)s_slotCount && s_entries[slot].file != NULL
 			   ? s_entries[slot].distance
 			   : (uint16_t)g_fsfxDefaultMinDistanceOrRolloff;
+}
+
+/* Whether `text` starts with `prefix`, ignoring case. `prefix` is lower case. */
+static int SoundBanks_StartsWith(const char* text, const char* prefix) {
+	for (; *prefix != '\0'; ++text, ++prefix) {
+		if (tolower((unsigned char)*text) != *prefix) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+int XwaSoundBanks_IsPlaceholder(const char* fileName) {
+	const char* name = fileName;
+	const char* c;
+
+	for (c = fileName; *c != '\0'; ++c) {
+		if (*c == '\\' || *c == '/') {
+			name = c + 1;
+		}
+	}
+	return Xwa_Stricmp(name, "none") == 0 || Xwa_Stricmp(name, "none.wav") == 0 ||
+		   SoundBanks_StartsWith(name, "unused") || SoundBanks_StartsWith(name, "not-used");
 }

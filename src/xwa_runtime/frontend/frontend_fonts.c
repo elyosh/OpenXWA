@@ -5,6 +5,7 @@
 #include "aeron/log.h"
 #include "xwa/frontend/frontend_text.h"
 #include "xwa/render/renderer_internal.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/text/text_overrides.h"
 
 #include <errno.h>
@@ -247,7 +248,6 @@ static void fonts_free(XwaFontSet* set) {
 
 static void fonts_load(XwaFontSet* set) {
 	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 
 	if (set->loaded) {
 		return;
@@ -256,13 +256,7 @@ static void fonts_load(XwaFontSet* set) {
 	for (int i = 0; i < 256; i++) {
 		g_fontCodepoints[i] = XwaText_Codepoint((unsigned char)i);
 	}
-	memset(&error, 0, sizeof(error));
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, set->path, &file, &error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError(set->log, "%s:%d: %s", set->path, error.line,
-						   error.message[0] ? error.message : "cannot be read");
-			Aeron_LogError(set->log, "%s is ignored", set->path);
-		}
+	if (XwaModFiles_Load(set->path, 0, &file) != XWA_MOD_FILE_LOADED) {
 		return;
 	}
 	if (!fonts_read(set, AeronConfigFile_Root(file))) {
@@ -303,7 +297,9 @@ static int fonts_advance256(XwaFontSet* set, int font_size, unsigned char ch, in
 			}
 		} else {
 			*advance = -1;
-			if (!size->missing_logged) {
+			/* No font has a glyph for a control character, such as 0x7F
+			   (DEL). */
+			if (!size->missing_logged && (g_fontCodepoints[ch] < 0x7F || g_fontCodepoints[ch] > 0x9F)) {
 				size->missing_logged = 1;
 				Aeron_LogWarn(set->log, "%s has no glyph for byte 0x%02X, font size %d", size->settings.file,
 							  ch, font_size);

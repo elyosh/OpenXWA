@@ -100,8 +100,6 @@ int XwaOptionSection_ReadConfig(XwaOptionSection* section, const AeronConfigFile
 /* Reads the section from `root`, the root of the mod file. Its values
    replace the shipped values. Returns 1 when the mod file has the section. */
 int XwaOptionSection_ReadMod(XwaOptionSection* section, const AeronConfigNode* root);
-/* Loads the mod file and reads the section from it. */
-void XwaOptionSection_LoadMod(XwaOptionSection* section);
 
 /* Writes the values in use in `out`. */
 void XwaOptionSection_Get(const XwaOptionSection* section, void* out);

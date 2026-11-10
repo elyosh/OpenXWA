@@ -1,6 +1,5 @@
 #include "xwa_runtime/models/mission_settings.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/flight/ai/pai.h"
@@ -8,6 +7,7 @@
 #include "xwa/flight/object/object.h"
 #include "xwa/flight/player/player.h"
 #include "xwa/math/trig2.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/mission_file.h"
 
 #include <stdio.h>
@@ -16,7 +16,6 @@
 
 /* Modern port module; no original counterpart. */
 
-#define SETTINGS_FLIGHT_YAML "flight/flight.yaml"
 /* g_missionFlightGroups and FrontendMission.flightGroups hold 192. */
 #define SETTINGS_FLIGHT_GROUPS 192
 #define SETTINGS_NAMES_MAX 32
@@ -43,7 +42,9 @@ typedef struct MissionSettings {
 	int warheadCollisionDamage;
 	int damageThroughShields;
 	int proximityCraftOnly;
-	uint32_t abortSoundRegions; /* one bit per region */
+	int useHyperspaceSpeeds;
+	uint8_t hasRegionRule[XWA_HYPERSPACE_REGIONS];
+	XwaHyperspaceRegionRule regionRules[XWA_HYPERSPACE_REGIONS];
 	int hasTargetKey, targetCycle, targetOnlyNotInspected;
 	uint8_t targetFlightGroups[SETTINGS_FLIGHT_GROUPS / 8];
 	int hasOrderOfBattleList;
@@ -82,6 +83,7 @@ static int s_twoLauncherFixes;
 static int s_missileDefenseAnyWarhead;
 static int s_rackCountFromRecord;
 static int s_overlappingFlyBySounds;
+static int s_hangarDroidPartsFromModel;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -94,6 +96,7 @@ static void MissionSettings_Stock(MissionSettings* s) {
 	s->skipArrivalIff = SETTINGS_IFF_STOCK;
 	s->forceTurret = -1;
 	s->warheadCollisionDamage = 1;
+	s->useHyperspaceSpeeds = 1;
 	s->linesTop = -1;
 }
 
@@ -338,29 +341,88 @@ static void MissionSettings_ReadOrderOfBattle(const char* path, const AeronConfi
 	}
 }
 
-static void MissionSettings_ReadAbortSoundRegions(const char* path, const AeronConfigNode* node,
+/* Reads the rule of one region in hyperspace_regions. Logs a warning and
+   returns 0 when the rule isn't valid. */
+static int MissionSettings_ReadRegionRule(const char* path, const AeronConfigNode* node,
+										  XwaHyperspaceRegionRule* rule) {
+	size_t i;
+
+	memset(rule, 0, sizeof *rule);
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogWarn("xwa.mission",
+					  "%s:%d: hyperspace_regions: a region's rule must be a map; it is ignored", path,
+					  AeronConfigNode_Line(node));
+		return 0;
+	}
+	for (i = 0; i < AeronConfigNode_MapCount(node); ++i) {
+		const char* key = AeronConfigNode_MapKeyAt(node, i);
+		const AeronConfigNode* value = AeronConfigNode_MapValueAt(node, i);
+		const char* text = AeronConfigNode_String(value, NULL);
+
+		if (strcmp(key, "look") == 0) {
+			size_t length = text != NULL ? strlen(text) : 0;
+			size_t c;
+			int valid = AeronConfigNode_Type(value) == AERON_CONFIG_STRING && length > 0 &&
+						length < XWA_HYPERSPACE_LOOK_NAME_MAX;
+
+			for (c = 0; valid && c < length; ++c) {
+				valid = (text[c] >= 'a' && text[c] <= 'z') || (text[c] >= '0' && text[c] <= '9') ||
+						text[c] == '_';
+			}
+			if (!valid) {
+				Aeron_LogWarn(
+					"xwa.mission",
+					"%s:%d: hyperspace_regions: look must be a name of lower-case letters, digits and "
+					"'_'; it is ignored",
+					path, AeronConfigNode_Line(value));
+				continue;
+			}
+			memcpy(rule->look, text, length + 1);
+		} else if (strcmp(key, "arrival_sound") == 0) {
+			if (AeronConfigNode_Type(value) != AERON_CONFIG_STRING ||
+				(strcmp(text, "abort") != 0 && strcmp(text, "normal") != 0)) {
+				Aeron_LogWarn(
+					"xwa.mission",
+					"%s:%d: hyperspace_regions: arrival_sound must be abort or normal; it is ignored", path,
+					AeronConfigNode_Line(value));
+				continue;
+			}
+			rule->abortSound = strcmp(text, "abort") == 0;
+		} else {
+			Aeron_LogWarn("xwa.mission",
+						  "%s:%d: hyperspace_regions: '%s' isn't a key of a region's rule; it is ignored",
+						  path, AeronConfigNode_Line(value), key);
+		}
+	}
+	return 1;
+}
+
+static void MissionSettings_ReadHyperspaceRegions(const char* path, const AeronConfigNode* node,
 												  MissionSettings* s) {
 	size_t i;
 
-	if (AeronConfigNode_Type(node) != AERON_CONFIG_SEQUENCE) {
-		Aeron_LogWarn("xwa.mission",
-					  "%s:%d: hyperspace_abort_sound_regions must be a list of regions; it is ignored", path,
-					  AeronConfigNode_Line(node));
+	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+		Aeron_LogWarn("xwa.mission", "%s:%d: hyperspace_regions must be a map of regions; it is ignored",
+					  path, AeronConfigNode_Line(node));
 		return;
 	}
-	s->abortSoundRegions = 0;
-	for (i = 0; i < AeronConfigNode_SequenceCount(node); ++i) {
-		const AeronConfigNode* item = AeronConfigNode_SequenceGet(node, i);
-		const int64_t region = AeronConfigNode_Int(item, -1);
+	memset(s->hasRegionRule, 0, sizeof s->hasRegionRule);
+	memset(s->regionRules, 0, sizeof s->regionRules);
+	for (i = 0; i < AeronConfigNode_MapCount(node); ++i) {
+		const char* key = AeronConfigNode_MapKeyAt(node, i);
+		const AeronConfigNode* value = AeronConfigNode_MapValueAt(node, i);
+		const int region =
+			key[0] >= '0' && key[0] < '0' + XWA_HYPERSPACE_REGIONS && key[1] == '\0' ? key[0] - '0' : -1;
 
-		if (AeronConfigNode_Type(item) != AERON_CONFIG_INT || region < 0 || region > 31) {
+		if (region < 0) {
 			Aeron_LogWarn("xwa.mission",
-						  "%s:%d: hyperspace_abort_sound_regions: regions are numbers from 0 to 31; one "
-						  "is ignored",
-						  path, AeronConfigNode_Line(item));
+						  "%s:%d: hyperspace_regions: '%s' isn't a region from 0 to %d; it is ignored", path,
+						  AeronConfigNode_Line(value), key, XWA_HYPERSPACE_REGIONS - 1);
 			continue;
 		}
-		s->abortSoundRegions |= 1u << region;
+		if (MissionSettings_ReadRegionRule(path, value, &s->regionRules[region])) {
+			s->hasRegionRule[region] = 1;
+		}
 	}
 }
 
@@ -405,8 +467,10 @@ static void MissionSettings_Read(const char* path, const AeronConfigNode* settin
 			MissionSettings_ReadBool(path, key, node, &s->proximityCraftOnly);
 		} else if (strcmp(key, "order_of_battle") == 0) {
 			MissionSettings_ReadOrderOfBattle(path, node, s);
-		} else if (strcmp(key, "hyperspace_abort_sound_regions") == 0) {
-			MissionSettings_ReadAbortSoundRegions(path, node, s);
+		} else if (strcmp(key, "use_hyperspace_speeds") == 0) {
+			MissionSettings_ReadBool(path, key, node, &s->useHyperspaceSpeeds);
+		} else if (strcmp(key, "hyperspace_regions") == 0) {
+			MissionSettings_ReadHyperspaceRegions(path, node, s);
 		} else {
 			Aeron_LogWarn("xwa.mission", "%s:%d: '%s' isn't a mission setting; it is ignored", path,
 						  AeronConfigNode_Line(node), key);
@@ -415,8 +479,6 @@ static void MissionSettings_Read(const char* path, const AeronConfigNode* settin
 }
 
 void XwaMissionSettings_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* rules;
 	const AeronConfigNode* node;
@@ -448,121 +510,122 @@ void XwaMissionSettings_Init(void) {
 	s_missileDefenseAnyWarhead = 0;
 	s_rackCountFromRecord = 0;
 	s_overlappingFlyBySounds = 0;
+	s_hangarDroidPartsFromModel = 0;
 	MissionSettings_ResetTargets();
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, SETTINGS_FLIGHT_YAML, &file,
-									&error)) {
-		/* The backdrops code already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
+	root = XwaFlightConfig_Root();
 	rules = AeronConfigNode_MapGet(root, "rules");
 	if (rules != NULL && AeronConfigNode_Type(rules) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.mission", "%s:%d: rules must be a map; they are ignored", SETTINGS_FLIGHT_YAML,
+		Aeron_LogError("xwa.mission", "%s:%d: rules must be a map; they are ignored", XWA_FLIGHT_CONFIG_PATH,
 					   AeronConfigNode_Line(rules));
 		rules = NULL;
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "reset_combat_music_at_mission_load")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "reset_combat_music_at_mission_load", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "reset_combat_music_at_mission_load", node,
 								 &s_resetCombatMusic);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "hangar_red_alert_any_mothership")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "hangar_red_alert_any_mothership", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "hangar_red_alert_any_mothership", node,
 								 &s_redAlertAnyMothership);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "classic_hide_destroyed_engine_glows")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "classic_hide_destroyed_engine_glows", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "classic_hide_destroyed_engine_glows", node,
 								 &s_classicHideDestroyedEngineGlows);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "weapon_iff_swap")) != NULL &&
 		!XwaMissionSettings_ParseWeaponIffSwap(AeronConfigNode_String(node, NULL), &s_weaponIffSwap)) {
 		Aeron_LogWarn("xwa.mission", "%s:%d: weapon_iff_swap must be turrets, none or all; it is ignored",
-					  SETTINGS_FLIGHT_YAML, AeronConfigNode_Line(node));
+					  XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node));
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "ai_attack_uses_max_speed_cache")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "ai_attack_uses_max_speed_cache", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "ai_attack_uses_max_speed_cache", node,
 								 &s_aiAttackUsesMaxSpeedCache);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "fire_needs_decharge_rate")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "fire_needs_decharge_rate", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "fire_needs_decharge_rate", node,
 								 &s_fireNeedsDechargeRate);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "no_starship_fire_from_destroyed_racks")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "no_starship_fire_from_destroyed_racks", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_starship_fire_from_destroyed_racks", node,
 								 &s_noStarshipFireFromDestroyedRacks);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "starship_ambient_sounds")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "starship_ambient_sounds", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "starship_ambient_sounds", node,
 								 &s_starshipAmbientSounds);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "no_player_warhead_slot_cap")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "no_player_warhead_slot_cap", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_player_warhead_slot_cap", node,
 								 &s_noPlayerWarheadSlotCap);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "gunner_weapon_select_in_seat")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "gunner_weapon_select_in_seat", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "gunner_weapon_select_in_seat", node,
 								 &s_gunnerWeaponSelectInSeat);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "gunner_fires_selected_group")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "gunner_fires_selected_group", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "gunner_fires_selected_group", node,
 								 &s_gunnerFiresSelectedGroup);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "gunner_warheads_need_cockpit_hardpoint")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "gunner_warheads_need_cockpit_hardpoint", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "gunner_warheads_need_cockpit_hardpoint", node,
 								 &s_gunnerWarheadsNeedCockpitHardpoint);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "no_fire_from_destroyed_hardpoints")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "no_fire_from_destroyed_hardpoints", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_fire_from_destroyed_hardpoints", node,
 								 &s_noFireFromDestroyedHardpoints);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "tie_fighter_energy_step_always_high")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "tie_fighter_energy_step_always_high", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "tie_fighter_energy_step_always_high", node,
 								 &s_tieFighterEnergyStepAlwaysHigh);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "player_turret_racks_keep_charge")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "player_turret_racks_keep_charge", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "player_turret_racks_keep_charge", node,
 								 &s_playerTurretRacksKeepCharge);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "rearm_follows_both_statuses")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "rearm_follows_both_statuses", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "rearm_follows_both_statuses", node,
 								 &s_rearmFollowsBothStatuses);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "warhead_collision_bonus_any_target")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "warhead_collision_bonus_any_target", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "warhead_collision_bonus_any_target", node,
 								 &s_warheadCollisionBonusAnyTarget);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "turbolaser_hardpoint_types")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "turbolaser_hardpoint_types", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "turbolaser_hardpoint_types", node,
 								 &s_turbolaserHardpointTypes);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "gun_turret_hardpoints")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "gun_turret_hardpoints", node, &s_gunTurretHardpoints);
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "gun_turret_hardpoints", node,
+								 &s_gunTurretHardpoints);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "player_weapon_jamming")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "player_weapon_jamming", node, &s_playerWeaponJamming);
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "player_weapon_jamming", node,
+								 &s_playerWeaponJamming);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "super_star_destroyer_jamming")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "super_star_destroyer_jamming", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "super_star_destroyer_jamming", node,
 								 &s_superStarDestroyerJamming);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "two_launcher_fixes")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "two_launcher_fixes", node, &s_twoLauncherFixes);
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "two_launcher_fixes", node, &s_twoLauncherFixes);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "starship_missile_defense_any_warhead")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "starship_missile_defense_any_warhead", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "starship_missile_defense_any_warhead", node,
 								 &s_missileDefenseAnyWarhead);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "weapon_rack_count_from_record")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "weapon_rack_count_from_record", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "weapon_rack_count_from_record", node,
 								 &s_rackCountFromRecord);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "overlapping_fly_by_sounds")) != NULL) {
-		MissionSettings_ReadBool(SETTINGS_FLIGHT_YAML, "overlapping_fly_by_sounds", node,
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "overlapping_fly_by_sounds", node,
 								 &s_overlappingFlyBySounds);
 	}
-	MissionSettings_Read(SETTINGS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "mission_settings"), &s_defaults);
+	if ((node = AeronConfigNode_MapGet(rules, "hangar_droid_parts_from_model")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "hangar_droid_parts_from_model", node,
+								 &s_hangarDroidPartsFromModel);
+	}
+	MissionSettings_Read(XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_MapGet(root, "mission_settings"),
+						 &s_defaults);
 	s_settings = s_defaults;
-	AeronConfigFile_Destroy(file);
 }
 
 void XwaMissionSettings_LoadMission(const char* missionPath) {
@@ -645,6 +708,7 @@ int XwaMissionSettings_StarshipMissileDefenseAnyWarhead(void) { return s_missile
 int XwaMissionSettings_WeaponRackCountFromRecord(void) { return s_rackCountFromRecord; }
 
 int XwaMissionSettings_OverlappingFlyBySounds(void) { return s_overlappingFlyBySounds; }
+int XwaMissionSettings_HangarDroidPartsFromModel(void) { return s_hangarDroidPartsFromModel; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 
@@ -685,8 +749,13 @@ int XwaMissionSettings_DamageThroughShieldsOnHard(void) { return s_settings.dama
 
 int XwaMissionSettings_ProximityTriggersCheckCraftOnly(void) { return s_settings.proximityCraftOnly; }
 
-int XwaMissionSettings_HyperspaceAbortSoundRegion(int region) {
-	return region >= 0 && region < 32 && (s_settings.abortSoundRegions & (1u << region)) != 0;
+int XwaMissionSettings_UseHyperspaceSpeeds(void) { return s_settings.useHyperspaceSpeeds; }
+
+const XwaHyperspaceRegionRule* XwaMissionSettings_HyperspaceRegion(int region) {
+	if (region < 0 || region >= XWA_HYPERSPACE_REGIONS || !s_settings.hasRegionRule[region]) {
+		return NULL;
+	}
+	return &s_settings.regionRules[region];
 }
 
 /* Whether the O key may target object `objIdx` for player `player`: a craft

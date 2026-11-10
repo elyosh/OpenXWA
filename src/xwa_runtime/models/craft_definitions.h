@@ -54,6 +54,17 @@ int XwaCraftDefinitions_GunnerCockpit(unsigned int objectType);
    of rows before it, and returns 1. It returns 0 when there are no more. */
 int XwaCraftDefinitions_NextAddedRow(int list, int* rowIndex, char* line, size_t lineSize);
 
+struct XwaFlightGroup;
+
+/* Checks that the craft type of each flight group of mission `missionPath`
+   has an object type. The game creates nothing for a flight group without
+   one, and gives no message. A player group that launches from such a
+   flight group gets the stock hangar. So a flight group without an object
+   type is a fatal error, and the function returns 0 after it. Call it once
+   the player groups have their final craft types. */
+int XwaCraftDefinitions_CheckMission(const char* missionPath, const struct XwaFlightGroup* flightGroups,
+									 size_t stride, int count);
+
 #ifdef __cplusplus
 }
 #endif

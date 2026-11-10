@@ -165,10 +165,24 @@ typedef struct MissionFlightRuntimeState {
 	uint8_t teamReinforcementCalled[10];
 } MissionFlightRuntimeState;
 
+/* Missions hold at most 192 flight groups. The game also uses indexes past the
+   last flight group: numFlightGroups + 1 for the hangar objects and
+   numFlightGroups + 2 for ejected pilots. The ejection code stops below 192,
+   but the hangar code has no check, so a mission with 191 or 192 flight
+   groups gives the hangar objects index 192 or 193. The original exe then
+   reads and writes whatever globals come after these arrays. The modern build
+   adds two spare slots so the hangar index always falls inside the arrays. */
+#define MISSION_MAX_FLIGHT_GROUPS 192
+#ifdef XWA_MODERN
+#define MISSION_FLIGHT_GROUP_SLOTS (MISSION_MAX_FLIGHT_GROUPS + 2)
+#else
+#define MISSION_FLIGHT_GROUP_SLOTS MISSION_MAX_FLIGHT_GROUPS
+#endif
+
 extern XwaMissionHeader g_missionHeader;
-extern XwaMissionFlightGroup g_missionFlightGroups[192];
+extern XwaMissionFlightGroup g_missionFlightGroups[MISSION_FLIGHT_GROUP_SLOTS];
 extern XwaGlobalGoal g_missionGlobalGoals[10][7];
-extern MissionFgRuntimeStats g_missionFgStats[192];
+extern MissionFgRuntimeStats g_missionFgStats[MISSION_FLIGHT_GROUP_SLOTS];
 extern XwaTeam g_missionTeams[10];
 extern XwaMessage g_missionMessages[64];
 extern MissionFlightRuntimeState g_missionFlightRuntimeState;

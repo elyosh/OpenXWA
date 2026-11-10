@@ -424,8 +424,8 @@ characters of that set that your text uses. The log warns about a character
 that the font doesn't have.
 
 A file can use up to 8 font files, of up to 64 MB each. Without
-`fonts.yaml`, the game uses its own fonts. When the file has an error, the
-log gives its line, and the game ignores the whole file.
+`fonts.yaml`, the game uses its own fonts. When a key or a value has an
+error, the log gives its line, and the game ignores the whole file.
 
 ### Bitmap fonts
 

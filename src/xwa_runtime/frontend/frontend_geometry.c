@@ -11,6 +11,7 @@
 #include "xwa_runtime/frontend/frontend_config.h"
 #include "xwa_runtime/frontend/frontend_screens.h"
 #include "xwa_runtime/models/mission_art.h"
+#include "xwa_runtime/models/mod_files.h"
 
 #include <math.h>
 #include <stddef.h>
@@ -249,7 +250,6 @@ static int geometry_read_frame(const char* path, const AeronConfigNode* node, fl
  * `game_geometry: true`, or has an error, which is logged. */
 static XwaGeometryAtlas* geometry_read_atlas(const char* path, int needs_id) {
 	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* frames;
 	const AeronConfigNode* value;
@@ -257,12 +257,7 @@ static XwaGeometryAtlas* geometry_read_atlas(const char* path, int needs_id) {
 	float scale = 1.0f;
 	int ok = 1;
 
-	memset(&error, 0, sizeof(error));
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, &file, &error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.frontend", "%s:%d: %s", path, error.line,
-						   error.message[0] ? error.message : "cannot be read");
-		}
+	if (XwaModFiles_Load(path, 0, &file) != XWA_MOD_FILE_LOADED) {
 		return NULL;
 	}
 	root = AeronConfigFile_Root(file);
@@ -397,7 +392,6 @@ static XwaGeometryAtlas* geometry_read_atlas(const char* path, int needs_id) {
 static XwaGeometryAtlas* geometry_read_video(const char* path) {
 	static const char* const keys[] = { "video", "size", "offset", "classic_frames", "fps", "layout", NULL };
 	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* value;
 	const char* slash = strrchr(path, '/');
@@ -405,20 +399,14 @@ static XwaGeometryAtlas* geometry_read_video(const char* path) {
 	XwaGeometryFrame frame;
 	int ok = 1;
 
-	memset(&error, 0, sizeof(error));
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, path, &file, &error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.frontend", "%s:%d: %s", path, error.line,
-						   error.message[0] ? error.message : "cannot be read");
-		}
+	if (XwaModFiles_Load(path, 0, &file) != XWA_MOD_FILE_LOADED) {
 		return NULL;
 	}
 	root = AeronConfigFile_Root(file);
 	atlas = (XwaGeometryAtlas*)calloc(1, sizeof(*atlas));
 	memset(&frame, 0, sizeof(frame));
 	frame.id = -1;
-	if (atlas == NULL || AeronConfigNode_Type(root) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.frontend", "%s: the file must be a map", path);
+	if (atlas == NULL) {
 		ok = 0;
 	}
 	for (size_t i = 0; ok && i < AeronConfigNode_MapCount(root); ++i) {

@@ -1,24 +1,23 @@
 #include "xwa_runtime/models/craft_weapons.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/flight/object/laser.h"
 #include "xwa/flight/object/object.h"
 #include "xwa/render/renderer.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/skins.h"
+#include "xwa_runtime/models/weapon_stats.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
-
-#define CRAFT_WEAPONS_FLIGHT_YAML "flight/flight.yaml"
 
 enum {
 	CRAFT_WEAPONS_FIRST = OBJ_LaserRebel,
@@ -180,25 +179,16 @@ static void CraftWeapons_UseBoltMarkings(const CraftWeaponsType* type) {
 }
 
 void XwaCraftWeapons_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* section;
 
 	memset(s_globalImpact, 0xff, sizeof s_globalImpact);
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, CRAFT_WEAPONS_FLIGHT_YAML, &file,
-									&error)) {
-		/* The backdrops code already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
+	root = XwaFlightConfig_Root();
 	section = AeronConfigNode_MapGet(root, "weapons");
 	if (section != NULL) {
-		CraftWeapons_ReadImpact(CRAFT_WEAPONS_FLIGHT_YAML, "weapons",
-								AeronConfigNode_MapGet(section, "impact"), s_globalImpact);
+		CraftWeapons_ReadImpact(XWA_FLIGHT_CONFIG_PATH, "weapons", AeronConfigNode_MapGet(section, "impact"),
+								s_globalImpact);
 	}
-	AeronConfigFile_Destroy(file);
 }
 
 void XwaCraftWeapons_ClearModelSettings(void) {
@@ -296,17 +286,39 @@ int XwaCraftWeapons_SwitchByIff(unsigned int objectType) {
 	return XwaMissionSettings_WeaponIffSwap();
 }
 
-unsigned int XwaCraftWeapons_IffWeaponType(uint8_t iff, unsigned int weaponType) {
-	unsigned int index = weaponType - OBJ_LaserRebel;
+/* The stock side tables end at the Death Star laser. A profile can still
+   give the last weapon type a side. */
+static int CraftWeapons_HasStockSide(unsigned int weaponType) {
+	return weaponType >= OBJ_LaserRebel && weaponType <= OBJ_LaserImperialDS;
+}
+
+uint8_t XwaCraftWeapons_WeaponSide(int srcObjIdx, unsigned int weaponType) {
+	const int stock = CraftWeapons_HasStockSide(weaponType)
+						  ? g_projectileRequiredIffByType[weaponType - OBJ_LaserRebel]
+						  : XWA_WEAPON_SIDE_NONE;
+
+	return (uint8_t)XwaWeaponStats_Value(srcObjIdx, weaponType, XWA_WEAPON_STAT_SIDE, stock);
+}
+
+unsigned int XwaCraftWeapons_OtherSideWeaponType(int srcObjIdx, unsigned int weaponType) {
+	const int stock = CraftWeapons_HasStockSide(weaponType)
+						  ? g_projectileAlternateIffTypeByType[weaponType - OBJ_LaserRebel]
+						  : (int)weaponType;
+
+	return (unsigned int)XwaWeaponStats_Value(srcObjIdx, weaponType, XWA_WEAPON_STAT_SIDE_MODEL, stock);
+}
+
+unsigned int XwaCraftWeapons_IffWeaponType(int srcObjIdx, unsigned int weaponType) {
+	const uint8_t iff = (uint8_t)g_objectTable[srcObjIdx].mobj->iff;
 	uint8_t side;
 
-	if (weaponType < OBJ_LaserRebel || weaponType > OBJ_LaserImperialDS ||
+	if (weaponType < OBJ_LaserRebel || weaponType > OBJ_NoAsset_307 ||
 		iff >= sizeof g_projectileRequiredIffByShooterIff) {
 		return weaponType;
 	}
-	side = g_projectileRequiredIffByType[index];
-	if (side != 0xffu && g_projectileRequiredIffByShooterIff[iff] != side) {
-		return g_projectileAlternateIffTypeByType[index];
+	side = XwaCraftWeapons_WeaponSide(srcObjIdx, weaponType);
+	if (side != XWA_WEAPON_SIDE_NONE && g_projectileRequiredIffByShooterIff[iff] != side) {
+		return XwaCraftWeapons_OtherSideWeaponType(srcObjIdx, weaponType);
 	}
 	return weaponType;
 }

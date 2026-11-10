@@ -25,8 +25,7 @@ The file has one section, `strings`, which maps IDs to texts.
 - An ID that the game never asks for does nothing.
 
 The game reads the file once, at startup. Restart OpenXWA after a change.
-Without the file, the game shows its own texts. When the file isn't valid
-YAML, the game logs an error and ignores it.
+Without the file, the game shows its own texts.
 
 ### Escapes and codes
 

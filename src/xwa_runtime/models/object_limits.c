@@ -1,18 +1,16 @@
 #include "xwa_runtime/models/object_limits.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
 #include "xwa/flight/hud/hud.h"
 #include "xwa/flight/object/object.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_file.h"
 
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
-
-#define LIMITS_FLIGHT_YAML "flight/flight.yaml"
 
 enum {
 	LIMITS_STOCK_CRAFT = 96,
@@ -83,21 +81,13 @@ static void ObjectLimits_Read(const char* path, const AeronConfigNode* section, 
 }
 
 void XwaObjectLimits_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 
 	memset(&s_defaults, 0, sizeof s_defaults);
 	s_limits = s_defaults;
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, LIMITS_FLIGHT_YAML, &file, &error)) {
-		/* The backdrops code already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
-	ObjectLimits_Read(LIMITS_FLIGHT_YAML, AeronConfigNode_MapGet(root, "object_limits"), &s_defaults);
+	root = XwaFlightConfig_Root();
+	ObjectLimits_Read(XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_MapGet(root, "object_limits"), &s_defaults);
 	s_limits = s_defaults;
-	AeronConfigFile_Destroy(file);
 }
 
 static uint32_t ObjectLimits_Or(uint32_t value, uint32_t stock) { return value != 0 ? value : stock; }

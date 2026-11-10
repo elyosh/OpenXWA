@@ -636,9 +636,15 @@ typedef enum XwaHyperspacePhase {
 	XWA_HYPERSPACE_TUNNEL = 4,
 } XwaHyperspacePhase;
 
+/* The longest name of a hyperspace look, with its terminating 0. */
+#define XWA_SNAP_HYPERSPACE_LOOK_MAX 32
+
 typedef struct XwaHyperspaceState {
 	uint8_t phase; /* XwaHyperspacePhase */
 	uint32_t phase_elapsed_ticks;
+	/* The look of the jump, from the mission's rule for its destination
+	   region; "" for the normal look. */
+	char look[XWA_SNAP_HYPERSPACE_LOOK_MAX];
 } XwaHyperspaceState;
 
 /* OPT mesh-type values the drivers dispatch on (mirrors MeshType —
@@ -692,8 +698,7 @@ typedef struct XwaCockpit {
 	float camera_pan[3]; /* viewState.cameraPanDelta* (classic scales by 1/16) */
 	/* The same eye point in the CRAFT's model space (player.seatEyeLocal*,
 	 * FlightView_ComputeSeatEyeOffset): the cockpit eye, or the turret
-	 * seat's position. The classic anchors the weapon-fire pulse point
-	 * lights here. */
+	 * seat's position. The cockpit lights are here. */
 	float seat_eye_local[3];
 	/* The stick input that the simulation applied to the local player
 	 * (g_replayInputs): X, Y and roll, about -127 to 127, with X+ right and
@@ -702,12 +707,12 @@ typedef struct XwaCockpit {
 	int8_t stick_axis[3];
 } XwaCockpit;
 
-/* Local-player weapon-fire light pulses (g_localPlayerLightPulses):
- * time-animated point lights at the eye point of the player's seat
- * (XwaCockpit.seat_eye_local), toggled by the
- * firing code. The driver replays the classic cycle/fade envelope
- * from game_time_ticks (deterministic). */
-typedef struct XwaLightPulse {
+/* A cockpit light (g_cockpitLights): one of the blinking warning lights
+ * at the eye of the player's seat (XwaCockpit.seat_eye_local):
+ * hull_critical, warhead_lock and beam_warning. The HUD warnings turn them
+ * on and off. The renderer replays the classic blink cycle and fade from
+ * game_time_ticks. */
+typedef struct XwaCockpitLight {
 	uint8_t enabled;
 	int32_t start_time; /* g_gameTime base */
 	float cycle_ticks;
@@ -716,18 +721,20 @@ typedef struct XwaLightPulse {
 	float intensity;
 	float cull_radius;
 	float color[3];
-	/* The mod's light in place of this one (cockpit_alert_lights.h): a
-	 * Blender point light of `mod_power_w` watts, `mod_position_m` from
-	 * the seat's eye along the craft's axes (X right, Y up, Z forward).
-	 * `mod_color` is linear; without `mod_has_color`, the light has the
-	 * game's colour. */
-	uint8_t mod_defined;
+	/* The values that the mod's cockpit_lights section sets for this
+	 * light (cockpit_lights.h). Each one has a `mod_has_*` flag. The
+	 * HD renderer uses its defaults for the values that the mod doesn't
+	 * set. The light is a Blender point light of `mod_power_w` watts, at
+	 * `mod_position_m` from the seat's eye along the craft's axes (X right,
+	 * Y up, Z forward). `mod_color` is linear. */
+	uint8_t mod_has_position;
 	uint8_t mod_has_color;
+	uint8_t mod_has_power;
 	float mod_position_m[3];
 	float mod_color[3];
 	float mod_power_w;
-} XwaLightPulse;
-#define XWA_SNAP_MAX_LIGHT_PULSES 6
+} XwaCockpitLight;
+#define XWA_SNAP_COCKPIT_LIGHT_COUNT 3
 
 /* The player craft's headlight (headlights.h): a one-sided light along the
  * nose, from the seat's eye plus `position_m` along the craft's axes (X
@@ -761,13 +768,13 @@ typedef enum XwaParticleLightGroup {
 	XWA_PARTICLE_LIGHT_GROUP_COUNT
 } XwaParticleLightGroup;
 
-/* The mod's light for a group of particle effects, in place of the game's:
- * a Blender point light of `power_w` watts at the emitter (0: no light).
- * `color` is linear; without `has_color`, the light has the game's colour.
- * With `fade`, it dims to nothing over the effect's life. */
+/* The values that the mod's particle_lights section sets for a group
+ * (particle_lights.h). The HD renderer uses its defaults for the values
+ * without a `has_*` flag. `color` is linear. */
 typedef struct XwaParticleLight {
-	uint8_t defined;
 	uint8_t has_color;
+	uint8_t has_power;
+	uint8_t has_fade;
 	uint8_t fade;
 	float color[3];
 	float power_w;
@@ -1322,6 +1329,11 @@ typedef struct XwaSnapshot {
 	 * keep its last output. Used while the loading screen is held, because its
 	 * detach presents a black frame. */
 	uint8_t retain_frame;
+	/* Set when a movie without a fade starts in this tick. The driver
+	 * replays the tick as usual but doesn't show it, so the screen keeps
+	 * the last frame until the movie's first frame. The original
+	 * Movie_Play blocks, so this tick's present never reaches the screen. */
+	uint8_t hold_presentation;
 
 	XwaDraw2D draws_2d[XWA_SNAP_MAX_DRAWS_2D];
 	uint32_t draw_2d_count;
@@ -1405,8 +1417,8 @@ typedef struct XwaSnapshot {
 	uint32_t hyperspace_streak_count;
 	XwaCockpit cockpit;
 	uint8_t cockpit_valid;
-	XwaLightPulse light_pulses[XWA_SNAP_MAX_LIGHT_PULSES];
-	uint8_t light_pulse_active;
+	XwaCockpitLight cockpit_lights[XWA_SNAP_COCKPIT_LIGHT_COUNT];
+	uint8_t cockpit_lights_active;
 	XwaHeadlight headlight;
 	XwaSunSettings suns;
 	XwaParticleLight particle_lights[XWA_PARTICLE_LIGHT_GROUP_COUNT];
@@ -1470,6 +1482,8 @@ void XwaSnapshot_SetSceneKind(XwaSceneKind kind);
 XwaSceneKind XwaSnapshot_SceneKind(void);
 /* Sets retain_frame for the current tick. */
 void XwaSnapshot_RetainFrame(void);
+/* Sets hold_presentation for the current tick. */
+void XwaSnapshot_HoldPresentation(void);
 
 /* FrontendDraw_Begin/EndExternalSurface routing tag. */
 void XwaSnapshot_SetEmitTarget(XwaEmitTarget target);
@@ -1576,6 +1590,10 @@ int XwaSnapshotExport_ComponentTargetGeometry(int object_type, int component, fl
  * craft name. NULL when the type has no model. The driver keys its HD
  * meshes with it. */
 const char* XwaSnapshotExport_ModelName(int object_type);
+/* Returns the name of the model to draw for a shot of `object_type` fired by
+ * a craft of type `source_object_type`. This is the weapon model set in the
+ * craft's settings (XwaWeaponModels), or else XwaSnapshotExport_ModelName. */
+const char* XwaSnapshotExport_ShotModelName(int object_type, int source_object_type);
 
 /* Engine-side OPT-loader observers. They update only snapshot-side state;
  * recovered simulation/render behavior never branches on the registry. */

@@ -1,16 +1,14 @@
 #include "xwa_runtime/models/particle_lights.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 
 #include <math.h>
 #include <string.h>
 
 /* Modern port module; no original counterpart. */
-
-#define PARTICLE_LIGHTS_FLIGHT_YAML "flight/flight.yaml"
 
 /* The names of the groups, by XwaParticleLightGroup. */
 static const char* const kParticleLightNames[XWA_PARTICLE_LIGHT_GROUP_COUNT] = {
@@ -21,6 +19,21 @@ static const char* const kParticleLightNames[XWA_PARTICLE_LIGHT_GROUP_COUNT] = {
 
 static XwaParticleLight s_lights[XWA_PARTICLE_LIGHT_GROUP_COUNT];
 
+int XwaParticleLights_Find(const char* name) {
+	int group;
+
+	for (group = 0; name != NULL && group < XWA_PARTICLE_LIGHT_GROUP_COUNT; ++group) {
+		if (strcmp(name, kParticleLightNames[group]) == 0) {
+			return group;
+		}
+	}
+	return -1;
+}
+
+const char* XwaParticleLights_Name(int group) {
+	return group >= 0 && group < XWA_PARTICLE_LIGHT_GROUP_COUNT ? kParticleLightNames[group] : NULL;
+}
+
 /* Reads group `name` from `entry` into `light`. Returns 0 (logged) when the
    entry is invalid. */
 static int ParticleLights_ReadLight(const AeronConfigNode* entry, const char* name, XwaParticleLight* light) {
@@ -29,7 +42,7 @@ static int ParticleLights_ReadLight(const AeronConfigNode* entry, const char* na
 	int i;
 
 	if (AeronConfigNode_Type(entry) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.flight", "%s:%d: particle_lights.%s must be a map", PARTICLE_LIGHTS_FLIGHT_YAML,
+		Aeron_LogError("xwa.flight", "%s:%d: particle_lights.%s must be a map", XWA_FLIGHT_CONFIG_PATH,
 					   AeronConfigNode_Line(entry), name);
 		return 0;
 	}
@@ -46,7 +59,7 @@ static int ParticleLights_ReadLight(const AeronConfigNode* entry, const char* na
 				Aeron_LogError(
 					"xwa.flight",
 					"%s:%d: particle_lights.%s: color must be a list of three non-negative numbers",
-					PARTICLE_LIGHTS_FLIGHT_YAML, AeronConfigNode_Line(node), name);
+					XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node), name);
 				ok = 0;
 				break;
 			}
@@ -55,74 +68,66 @@ static int ParticleLights_ReadLight(const AeronConfigNode* entry, const char* na
 		light->has_color = 1;
 	}
 	node = AeronConfigNode_MapGet(entry, "power_w");
-	light->power_w = (float)AeronConfigNode_Float(node, -1.0);
-	if (!(light->power_w >= 0.0f) || !isfinite(light->power_w)) {
-		Aeron_LogError("xwa.flight",
-					   "%s:%d: particle_lights.%s: power_w must be a number of watts, 0 or more",
-					   PARTICLE_LIGHTS_FLIGHT_YAML, AeronConfigNode_Line(node != NULL ? node : entry), name);
-		ok = 0;
+	if (node != NULL) {
+		const AeronConfigNodeType type = AeronConfigNode_Type(node);
+
+		light->power_w = (float)AeronConfigNode_Float(node, -1.0);
+		light->has_power = 1;
+		if ((type != AERON_CONFIG_INT && type != AERON_CONFIG_FLOAT) || !(light->power_w >= 0.0f) ||
+			!isfinite(light->power_w)) {
+			Aeron_LogError("xwa.flight",
+						   "%s:%d: particle_lights.%s: power_w must be a number of watts, 0 or more",
+						   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node), name);
+			ok = 0;
+		}
 	}
 	node = AeronConfigNode_MapGet(entry, "fade");
-	if (node != NULL && AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
-		Aeron_LogError("xwa.flight", "%s:%d: particle_lights.%s: fade must be true or false",
-					   PARTICLE_LIGHTS_FLIGHT_YAML, AeronConfigNode_Line(node), name);
-		ok = 0;
+	if (node != NULL) {
+		light->has_fade = 1;
+		light->fade = (uint8_t)AeronConfigNode_Bool(node, 0);
+		if (AeronConfigNode_Type(node) != AERON_CONFIG_BOOL) {
+			Aeron_LogError("xwa.flight", "%s:%d: particle_lights.%s: fade must be true or false",
+						   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(node), name);
+			ok = 0;
+		}
 	}
-	light->fade = (uint8_t)AeronConfigNode_Bool(node, 0);
 	return ok;
 }
 
 void XwaParticleLights_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* section;
 	size_t i;
 	int group;
 
 	memset(s_lights, 0, sizeof s_lights);
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, PARTICLE_LIGHTS_FLIGHT_YAML, &file,
-									&error)) {
-		/* The backdrops code already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
+	root = XwaFlightConfig_Root();
 	section = AeronConfigNode_MapGet(root, "particle_lights");
 	if (section == NULL) {
-		AeronConfigFile_Destroy(file);
 		return;
 	}
 	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.flight", "%s:%d: particle_lights must be a map; the game's lights are kept",
-					   PARTICLE_LIGHTS_FLIGHT_YAML, AeronConfigNode_Line(section));
-		AeronConfigFile_Destroy(file);
+		Aeron_LogError("xwa.flight", "%s:%d: particle_lights must be a map. The default lights are used",
+					   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(section));
 		return;
 	}
 	for (i = 0; i < AeronConfigNode_MapCount(section); ++i) {
 		const char* name = AeronConfigNode_MapKeyAt(section, i);
 
-		for (group = 0; group < XWA_PARTICLE_LIGHT_GROUP_COUNT; ++group) {
-			if (name != NULL && strcmp(name, kParticleLightNames[group]) == 0) {
-				break;
-			}
-		}
-		if (group == XWA_PARTICLE_LIGHT_GROUP_COUNT) {
+		group = XwaParticleLights_Find(name);
+		if (group < 0) {
 			Aeron_LogWarn("xwa.flight", "%s:%d: particle_lights: unknown group %s; it is ignored",
-						  PARTICLE_LIGHTS_FLIGHT_YAML,
+						  XWA_FLIGHT_CONFIG_PATH,
 						  AeronConfigNode_Line(AeronConfigNode_MapValueAt(section, i)),
 						  name != NULL ? name : "");
 			continue;
 		}
-		if (ParticleLights_ReadLight(AeronConfigNode_MapValueAt(section, i), name, &s_lights[group])) {
-			s_lights[group].defined = 1;
-		} else {
+		if (!ParticleLights_ReadLight(AeronConfigNode_MapValueAt(section, i), name, &s_lights[group])) {
 			memset(&s_lights[group], 0, sizeof s_lights[group]);
-			Aeron_LogError("xwa.flight", "%s: particle_lights.%s: the game's light is kept",
-						   PARTICLE_LIGHTS_FLIGHT_YAML, name);
+			Aeron_LogError("xwa.flight", "%s: particle_lights.%s: the default light is used",
+						   XWA_FLIGHT_CONFIG_PATH, name);
 		}
 	}
-	AeronConfigFile_Destroy(file);
 }
 
 void XwaParticleLights_Capture(XwaSnapshot* snapshot) {

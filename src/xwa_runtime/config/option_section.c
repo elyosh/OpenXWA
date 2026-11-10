@@ -1,6 +1,5 @@
 #include "xwa_runtime/config/option_section.h"
 
-#include "aeron/aeron.h"
 #include "aeron/log.h"
 
 #include <math.h>
@@ -288,20 +287,6 @@ int XwaOptionSection_ReadMod(XwaOptionSection* section, const AeronConfigNode* r
 	section->has_mod = 1;
 	option_check(section);
 	return 1;
-}
-
-void XwaOptionSection_LoadMod(XwaOptionSection* section) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
-
-	section->has_mod = 0;
-	memset(&error, 0, sizeof error);
-	/* The code that reads the rest of the file logs its errors. */
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, section->mod_file, &file, &error)) {
-		return;
-	}
-	XwaOptionSection_ReadMod(section, AeronConfigFile_Root(file));
-	AeronConfigFile_Destroy(file);
 }
 
 void XwaOptionSection_Get(const XwaOptionSection* section, void* out) {

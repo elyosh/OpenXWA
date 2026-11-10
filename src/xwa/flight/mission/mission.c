@@ -33,6 +33,7 @@
 #include "xwa/util/random.h"
 #include "xwa/util/string.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "aeron/log.h"
@@ -58,6 +59,7 @@
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/warhead_pools.h"
+#include "xwa_runtime/models/weapon_models.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #endif
 
@@ -68,11 +70,11 @@
 #include <string.h>
 
 // GLOBAL: XWA 0x80DC80
-XwaMissionFlightGroup g_missionFlightGroups[192];
+XwaMissionFlightGroup g_missionFlightGroups[MISSION_FLIGHT_GROUP_SLOTS];
 // GLOBAL: XWA 0x8BF3A0
 XwaGlobalGoal g_missionGlobalGoals[10][7];
 // GLOBAL: XWA 0x7B7020
-MissionFgRuntimeStats g_missionFgStats[192];
+MissionFgRuntimeStats g_missionFgStats[MISSION_FLIGHT_GROUP_SLOTS];
 // GLOBAL: XWA 0x8D4460
 XwaTeam g_missionTeams[10];
 // GLOBAL: XWA 0x8D6BC0
@@ -4615,6 +4617,15 @@ void Mission_InitFlightRuntimeState(void) {
 	g_initialSpawnBindPlayerCraftSlots = 1;
 	g_nextObjectSignature = 2;
 	g_escapePodPilotFlightGroupIdx = -1;
+#ifdef XWA_MODERN
+	/* Clear the spare slots past the last mission flight group. The hangar
+	   objects of a mission with 190 or 191 flight groups then read an empty
+	   flight group, not data from an earlier mission. */
+	memset(&g_missionFlightGroups[MISSION_MAX_FLIGHT_GROUPS], 0,
+		   sizeof(g_missionFlightGroups[0]) * (MISSION_FLIGHT_GROUP_SLOTS - MISSION_MAX_FLIGHT_GROUPS));
+	memset(&g_missionFgStats[MISSION_MAX_FLIGHT_GROUPS], 0,
+		   sizeof(g_missionFgStats[0]) * (MISSION_FLIGHT_GROUP_SLOTS - MISSION_MAX_FLIGHT_GROUPS));
+#endif
 
 	// Clear all region hyperspace point validity flags.
 	{
@@ -7715,6 +7726,7 @@ uint16_t Mission_Init(char* fileName) {
 	XwaModelSwaps_LoadMission(fileName);
 	XwaStatsProfiles_LoadMission(fileName);
 	XwaShieldRecharge_LoadMission();
+	XwaCraftHyperspace_LoadMission();
 	XwaCraftNames_LoadMission(fileName);
 	XwaCraftNames_Apply();
 	XwaHeadlights_LoadMission(fileName);
@@ -8161,11 +8173,20 @@ uint16_t Mission_Init(char* fileName) {
 	/* The skins that the renderer loads depend on the flight groups' markings
 	   and on the markings that the mission gives single craft, and the model
 	   settings depend on the craft types. All are final once the loop above has
-	   set up the player groups. */
+	   set up the player groups. The craft types are then checked, before
+	   any object is created. */
+	if (!XwaCraftDefinitions_CheckMission(fileName, &g_missionFlightGroups[0].fg,
+										  sizeof g_missionFlightGroups[0],
+										  (int16_t)g_missionHeader.numFlightGroups)) {
+		return 0;
+	}
 	XwaSkins_SetFlightGroups(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 							 (int16_t)g_missionHeader.numFlightGroups);
 	XwaModelSettings_LoadMission(&g_missionFlightGroups[0].fg, sizeof g_missionFlightGroups[0],
 								 (int16_t)g_missionHeader.numFlightGroups);
+	if (!XwaWeaponModels_LoadMission()) {
+		return 0;
+	}
 	XwaMissionTie_UseSkins();
 #endif
 

@@ -1,6 +1,5 @@
 #include "xwa_runtime/models/weapon_stats.h"
 
-#include "aeron/aeron.h"
 #include "aeron/asset/flight_names.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
@@ -10,6 +9,7 @@
 #include "xwa/flight/object/object.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/render/renderer.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/model_settings.h"
 #include "xwa_runtime/models/names.h"
 #include "xwa_runtime/models/units.h"
@@ -22,7 +22,6 @@
 
 /* Modern port module; no original counterpart. */
 
-#define WEAPON_STATS_FLIGHT_YAML "flight/flight.yaml"
 enum {
 	WEAPON_STATS_FIRST_WEAPON = 280,
 	WEAPON_STATS_WEAPONS = 28,
@@ -70,7 +69,13 @@ static const char* const s_stats[XWA_WEAPON_STATS] = {
 	"decharge_rate",
 	"recharge_rate",
 	"high_power_charge",
+	"side",
+	"side_model",
 };
+
+static const char* const s_sideNames[3] = { "rebel", "imperial", "none" };
+static const int32_t s_sideValues[3] = { XWA_WEAPON_SIDE_REBEL, XWA_WEAPON_SIDE_IMPERIAL,
+										 XWA_WEAPON_SIDE_NONE };
 
 /* The unit of each stat in the file. The reader converts these stats to the
    game's units. The stats that aren't listed are the game's own values. */
@@ -105,7 +110,7 @@ static const char* const s_linkingRuleNames[XWA_WEAPON_LINKING_RULES] = {
 };
 
 typedef struct WeaponStatsForm {
-	uint16_t set; /* one bit for each stat that is set */
+	uint32_t set; /* one bit for each stat that is set */
 	int32_t value[XWA_WEAPON_STATS];
 } WeaponStatsForm;
 
@@ -266,8 +271,7 @@ static void WeaponStats_ReadForm(const char* path, const char* where, const Aero
 			}
 			form->value[XWA_WEAPON_STAT_DURATION_SECONDS] = ticks / 236;
 			form->value[XWA_WEAPON_STAT_DURATION_FRACTION] = (int32_t)(((ticks % 236) * 65536 + 118) / 236);
-			form->set |= (uint16_t)((1u << XWA_WEAPON_STAT_DURATION_SECONDS) |
-									(1u << XWA_WEAPON_STAT_DURATION_FRACTION));
+			form->set |= (1u << XWA_WEAPON_STAT_DURATION_SECONDS) | (1u << XWA_WEAPON_STAT_DURATION_FRACTION);
 		} else if (s_statUnits[stat] != XWA_UNIT_NONE) {
 			if (!XwaUnits_Read(value, s_statUnits[stat], INT32_MIN, INT32_MAX, &read)) {
 				Aeron_LogWarn("xwa.models", "%s: %s must be a number of %s. It is ignored", path, name,
@@ -275,11 +279,28 @@ static void WeaponStats_ReadForm(const char* path, const char* where, const Aero
 				continue;
 			}
 			form->value[stat] = read;
-			form->set |= (uint16_t)(1u << stat);
+			form->set |= 1u << stat;
+		} else if (stat == XWA_WEAPON_STAT_SIDE) {
+			const int side = WeaponStats_Find(AeronConfigNode_String(value, ""), s_sideNames, 3);
+
+			if (side < 0) {
+				Aeron_LogWarn("xwa.models", "%s: %s must be rebel, imperial or none. It is ignored", path,
+							  name);
+				continue;
+			}
+			form->value[stat] = s_sideValues[side];
+			form->set |= 1u << stat;
+		} else if (stat == XWA_WEAPON_STAT_SIDE_MODEL) {
+			int weapon;
+
+			if (XwaNames_Read(&g_xwaWeaponTypeNames, path, name, value, &weapon)) {
+				form->value[stat] = weapon;
+				form->set |= 1u << stat;
+			}
 		} else if (stat == XWA_WEAPON_STAT_PRECISE ? WeaponStats_ReadBool(path, name, value, &read)
 												   : WeaponStats_ReadInt(path, name, value, &read)) {
 			form->value[stat] = read;
-			form->set |= (uint16_t)(1u << stat);
+			form->set |= 1u << stat;
 		}
 	}
 }
@@ -466,7 +487,7 @@ static int WeaponStats_ReadFactors(const char* key, const AeronConfigNode* node,
 	}
 	if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
 		Aeron_LogWarn("xwa.models", "%s: weapons.%s must map each %s to a number. It is ignored",
-					  WEAPON_STATS_FLIGHT_YAML, key, table->what);
+					  XWA_FLIGHT_CONFIG_PATH, key, table->what);
 		return 0;
 	}
 	for (index = 0; index < AeronConfigNode_MapCount(node); ++index) {
@@ -476,14 +497,14 @@ static int WeaponStats_ReadFactors(const char* key, const AeronConfigNode* node,
 
 		snprintf(where, sizeof where, "weapons.%s", key);
 		if (at < 0) {
-			XwaNames_LogUnknown(table, WEAPON_STATS_FLIGHT_YAML, AeronConfigNode_Line(value), where,
+			XwaNames_LogUnknown(table, XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(value), where,
 								AeronConfigNode_MapKeyAt(node, index));
 			return 0;
 		}
 		if (AeronConfigNode_Type(value) != AERON_CONFIG_INT &&
 			AeronConfigNode_Type(value) != AERON_CONFIG_FLOAT) {
 			Aeron_LogWarn("xwa.models", "%s:%d: weapons.%s.%s must be a number. It is ignored",
-						  WEAPON_STATS_FLIGHT_YAML, AeronConfigNode_Line(value), key,
+						  XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(value), key,
 						  AeronConfigNode_MapKeyAt(node, index));
 			return 0;
 		}
@@ -495,7 +516,7 @@ static int WeaponStats_ReadFactors(const char* key, const AeronConfigNode* node,
 	}
 	if (set != (1 << table->count) - 1) {
 		Aeron_LogWarn("xwa.models", "%s: weapons.%s must have a number for every %s. It is ignored",
-					  WEAPON_STATS_FLIGHT_YAML, key, table->what);
+					  XWA_FLIGHT_CONFIG_PATH, key, table->what);
 		return 0;
 	}
 	memcpy(out, read, (size_t)table->count * sizeof *out);
@@ -503,8 +524,6 @@ static int WeaponStats_ReadFactors(const char* key, const AeronConfigNode* node,
 }
 
 void XwaWeaponStats_Init(void) {
-	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* section;
 	const AeronConfigNode* node;
@@ -514,19 +533,12 @@ void XwaWeaponStats_Init(void) {
 	s_hasDifficultyFactors = 0;
 	s_limitLinkedWarheadFireRate = 0;
 	memset(s_linkingRules, 0, sizeof s_linkingRules);
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, WEAPON_STATS_FLIGHT_YAML, &file,
-									&error)) {
-		/* The backdrops code already logs this error. */
-		return;
-	}
-	root = AeronConfigFile_Root(file);
+	root = XwaFlightConfig_Root();
 	section = AeronConfigNode_MapGet(root, "weapons");
 	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
-		AeronConfigFile_Destroy(file);
 		return;
 	}
-	WeaponStats_ReadSet(WEAPON_STATS_FLIGHT_YAML, section, &s_defaults);
+	WeaponStats_ReadSet(XWA_FLIGHT_CONFIG_PATH, section, &s_defaults);
 	if ((node = AeronConfigNode_MapGet(section, "fire_ratio_by_rank")) != NULL) {
 		s_hasRankFactors =
 			WeaponStats_ReadFactors("fire_ratio_by_rank", node, &g_xwaRankNames, s_rankFactors);
@@ -538,7 +550,7 @@ void XwaWeaponStats_Init(void) {
 	if ((node = AeronConfigNode_MapGet(section, "limit_linked_warhead_fire_rate")) != NULL) {
 		int32_t value;
 
-		if (WeaponStats_ReadBool(WEAPON_STATS_FLIGHT_YAML, "weapons.limit_linked_warhead_fire_rate", node,
+		if (WeaponStats_ReadBool(XWA_FLIGHT_CONFIG_PATH, "weapons.limit_linked_warhead_fire_rate", node,
 								 &value)) {
 			s_limitLinkedWarheadFireRate = value;
 		}
@@ -548,7 +560,7 @@ void XwaWeaponStats_Init(void) {
 
 		if (AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
 			Aeron_LogWarn("xwa.models", "%s: weapons.linking_rules isn't a map. It is ignored",
-						  WEAPON_STATS_FLIGHT_YAML);
+						  XWA_FLIGHT_CONFIG_PATH);
 		}
 		for (rule = 0; rule < XWA_WEAPON_LINKING_RULES; ++rule) {
 			const AeronConfigNode* value = AeronConfigNode_MapGet(node, s_linkingRuleNames[rule]);
@@ -556,12 +568,11 @@ void XwaWeaponStats_Init(void) {
 			int32_t read;
 
 			snprintf(name, sizeof name, "weapons.linking_rules.%s", s_linkingRuleNames[rule]);
-			if (value != NULL && WeaponStats_ReadBool(WEAPON_STATS_FLIGHT_YAML, name, value, &read)) {
+			if (value != NULL && WeaponStats_ReadBool(XWA_FLIGHT_CONFIG_PATH, name, value, &read)) {
 				s_linkingRules[rule] = (int8_t)read;
 			}
 		}
 	}
-	AeronConfigFile_Destroy(file);
 }
 
 void XwaWeaponStats_ClearModelSettings(void) {
@@ -673,6 +684,10 @@ static int WeaponStats_Cast(XwaWeaponStat stat, int32_t value) {
 			return value < 0 ? 0 : value;
 		case XWA_WEAPON_STAT_PRECISE:
 			return value != 0;
+		case XWA_WEAPON_STAT_SIDE:
+			return (uint8_t)value;
+		case XWA_WEAPON_STAT_SIDE_MODEL:
+			return (uint16_t)value;
 		default:
 			return value;
 	}

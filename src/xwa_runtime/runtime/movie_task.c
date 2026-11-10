@@ -13,9 +13,11 @@
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/movie/movie.h"
 #include "xwa/util/memory.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/runtime/frontend_task.h"
 #include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/runtime/presentation.h"
+#include "xwa_runtime/snapshot/snapshot.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -129,7 +131,6 @@ static int XwaMovieTask_MissionMovieName(const char* name, char* out, size_t siz
 static void XwaMovieTask_LoadRooms(void) {
 	char names[XWA_MOVIE_ROOM_COUNT][XWA_MOVIE_ROOM_NAME_SIZE];
 	AeronConfigFile* file = NULL;
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	int ok = 1;
 
@@ -137,14 +138,7 @@ static void XwaMovieTask_LoadRooms(void) {
 		return;
 	}
 	g_xwaMovieRoomsLoaded = 1;
-	memset(&error, 0, sizeof(error));
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, XWA_MOVIE_ROOMS_PATH, &file,
-									&error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.movie", "%s:%d: %s", XWA_MOVIE_ROOMS_PATH, error.line,
-						   error.message[0] ? error.message : "unavailable");
-			Aeron_LogError("xwa.movie", "%s is ignored", XWA_MOVIE_ROOMS_PATH);
-		}
+	if (XwaModFiles_Load(XWA_MOVIE_ROOMS_PATH, 0, &file) != XWA_MOD_FILE_LOADED) {
 		return;
 	}
 	memset(names, 0, sizeof(names));
@@ -300,6 +294,11 @@ int XwaMovieTask_Begin(const char* name, int noFade) {
 		return 0;
 	}
 	g_xwaMovieTask.active = 1;
+	if (g_xwaMovieTask.no_fade) {
+		/* Keep the room's last frame on screen until the movie's first frame
+		   is decoded. This tick has nothing new to show. */
+		XwaSnapshot_HoldPresentation();
+	}
 	Aeron_LogInfo("xwa.movie", "Playing '%s' from %s (%s)", name, g_xwaMovieTask.path,
 				  g_xwaMovieTask.is_replacement ? "mod" : "original");
 	return 1;

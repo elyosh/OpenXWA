@@ -42,6 +42,7 @@
 #include "xwa_runtime/models/gunner_seats.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/jamming.h"
+#include "xwa_runtime/models/mag_pulse.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/opt_synth.h"
 #include "xwa_runtime/models/stats_profiles.h"
@@ -5540,7 +5541,13 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 					for (i = 0; i < targetCraft->laserSlotCount; ++i) {
 						targetCraft->warheadData[i].laserCharge = 0;
 					}
+#ifdef XWA_MODERN
+					/* With drain_only, the hit only drains the lasers, and the cannons keep working. */
+					if ((targetCraft->workingSubsystems & 0x10) != 0 &&
+						!XwaMagPulse_DrainOnly(targetObjIdx)) {
+#else
 					if ((targetCraft->workingSubsystems & 0x10) != 0) {
+#endif
 						targetCraft->systemHealth[2] = 0;
 						targetCraft->workingSubsystems &= 0x3EF;
 						targetCraft->systemTimer[2] = g_subsystemRepairDuration[2];
@@ -5556,12 +5563,22 @@ void collide_laserhitcraft(unsigned int projectileObjIdx, unsigned int targetObj
 					}
 				} else {
 					ModelGenusId g = g_objectTable[targetObjIdx].genusId;
+#ifdef XWA_MODERN
+					const int small = g == GENUS_Fighter || g == GENUS_Transport ||
+									  g == GENUS_WeaponEmplacement || g == GENUS_PilotDroid ||
+									  g == GENUS_Utility;
+
+					targetCraft->weaponFireInhibitTimer =
+						(uint16_t)(oldInhibit +
+								   XwaMagPulse_DisableTicks(targetObjIdx, small, small ? 3540 : 7080));
+#else
 					if (g == GENUS_Fighter || g == GENUS_Transport || g == GENUS_WeaponEmplacement ||
 						g == GENUS_PilotDroid || g == GENUS_Utility) {
 						targetCraft->weaponFireInhibitTimer = (uint16_t)(oldInhibit + 3540);
 					} else {
 						targetCraft->weaponFireInhibitTimer = (uint16_t)(oldInhibit + 7080);
 					}
+#endif
 				}
 				if (oldInhibit > targetCraft->weaponFireInhibitTimer) {
 					targetCraft->weaponFireInhibitTimer = 0xFFFF;

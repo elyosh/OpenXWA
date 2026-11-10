@@ -2,6 +2,7 @@
 
 #include "aeron/config_file.h"
 #include "aeron/log.h"
+#include "xwa/assets/sprite_resource.h"
 #include "xwa/frontend/frontend_resources.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
@@ -139,4 +140,18 @@ void XwaConcoursePlanet_Center(int* x, int* y) {
 		*x = s_x;
 		*y = s_y;
 	}
+}
+
+int XwaConcoursePlanet_GroupExists(int group) {
+	int i;
+
+	if (XwaFrontendGeometry_FindGroup(group) != NULL) {
+		return 1;
+	}
+	for (i = 0; i < SPRITE_RESOURCE_MAX_CATALOG; ++i) {
+		if (g_spriteCatalog[i].groupId == (uint16_t)group) {
+			return 1;
+		}
+	}
+	return 0;
 }

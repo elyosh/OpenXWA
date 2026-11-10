@@ -405,6 +405,13 @@ typedef struct MobileObject {
 	WarheadGuidanceState* pWarheadGuidance;
 	CraftData* pCraft;
 	MobileObjectCharData* pCharData;
+#ifdef XWA_MODERN
+	/* Sub-unit forward displacement carried between steps. Follows the legacy
+	 * members to preserve their offsets. */
+	uint16_t moveFractionX;
+	uint16_t moveFractionY;
+	uint16_t moveFractionZ;
+#endif
 } MobileObject;
 
 struct ObjectRecord {
@@ -484,6 +491,10 @@ extern uint16_t g_nextObjectSignature;
 
 uint16_t Object_FindFreeMissionSlot(void);
 uint16_t Object_AllocSlotForGenus(uint16_t genusId);
+#ifdef XWA_MODERN
+/* Clears the sub-unit remainder an object carries between movement steps. */
+void Object_ResetMoveFraction(MobileObject* mobj);
+#endif
 uint16_t Object_AllocLocalTransientSlot(void);
 void Object_CopyStatePreservingStorage(unsigned int dstObjIdx, unsigned int srcObjIdx);
 uint16_t Object_SpawnDetachedComponent(uint16_t sourceObjIdx, uint8_t componentIdx);

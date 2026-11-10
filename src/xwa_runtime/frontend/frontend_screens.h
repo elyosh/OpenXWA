@@ -21,6 +21,11 @@ extern "C" {
 
 /* Called by FrontendScreen_RunFrame before it runs the top screen. */
 void XwaFrontendScreens_NoteRun(void);
+/* Called by FrontendScreen_RunFrame after the screen's update and before
+ * the exit function of a screen that it leaves. The update can switch to the
+ * next screen, and the exit frees the background, but what the update drew
+ * keeps the layout of the screen that drew it. */
+void XwaFrontendScreens_NoteDrawn(void);
 /* The number of frontend frames run so far, across all screens. It is never
  * reset. */
 unsigned XwaFrontendScreens_FrameCount(void);
@@ -28,6 +33,10 @@ unsigned XwaFrontendScreens_FrameCount(void);
 /* The layout of the screen that runs this tick, for the view it shows now.
  * The loading screen isn't on the stack; its name is "loading". */
 XwaFrontendLayout XwaFrontendScreens_Layout(void);
+
+/* The layout of this tick's frame: the one NoteDrawn saved, or Layout() when
+ * no screen ran. Called once per tick, when the snapshot is committed. */
+XwaFrontendLayout XwaFrontendScreens_TakeFrameLayout(void);
 
 /* The factor for text widths, so that text measured in 640x480 units
  * matches the text drawn with its normal shape: 0.75 on a wide 16:9 screen,

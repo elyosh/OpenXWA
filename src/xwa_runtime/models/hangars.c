@@ -1,8 +1,8 @@
 #include "xwa_runtime/models/hangars.h"
 
-#include "aeron/aeron.h"
 #include "aeron/config_file.h"
 #include "aeron/log.h"
+#include "xwa/assets/file_io.h"
 #include "xwa/assets/model_bounds.h"
 #include "xwa/assets/object_type.h"
 #include "xwa/assets/object_type_info.h"
@@ -14,6 +14,7 @@
 #include "xwa/flight/player/player.h"
 #include "xwa/math/scalar.h"
 #include "xwa_runtime/models/mission_file.h"
+#include "xwa_runtime/models/mod_files.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/names.h"
 
@@ -933,7 +934,6 @@ static void Hangars_FreeSettings(void) {
 
 void XwaHangars_Init(void) {
 	static const char* const keys[] = { "default", "ships", "crafts" };
-	AeronConfigError error;
 	const AeronConfigNode* root;
 	const AeronConfigNode* ships;
 	const AeronConfigNode* crafts;
@@ -944,24 +944,11 @@ void XwaHangars_Init(void) {
 	if (!XwaModelSource_ReplacementsEnabled()) {
 		return;
 	}
-	memset(&error, 0, sizeof error);
-	if (!AeronConfigFile_LoadYamlEx(Aeron_GetVfs(), AERON_VFS_ROOT_MOD, s_settingsPath, &s_settings,
-									&error)) {
-		if (error.code != AERON_CONFIG_ERROR_NOT_FOUND) {
-			Aeron_LogError("xwa.models", "%s:%d: %s; the hangars keep their stock layout", s_settingsPath,
-						   error.line, error.message);
-		}
-		s_settings = NULL;
+	/* An empty file sets nothing. */
+	if (XwaModFiles_Load(s_settingsPath, 1, &s_settings) != XWA_MOD_FILE_LOADED) {
 		return;
 	}
 	root = AeronConfigFile_Root(s_settings);
-	/* An empty file sets nothing. */
-	if (AeronConfigNode_Type(root) != AERON_CONFIG_MAP && AeronConfigNode_Type(root) != AERON_CONFIG_NULL) {
-		Aeron_LogError("xwa.models", "%s: the file must be a map; the hangars keep their stock layout",
-					   s_settingsPath);
-		Hangars_FreeSettings();
-		return;
-	}
 	for (index = 0; index < AeronConfigNode_MapCount(root); ++index) {
 		const char* name = AeronConfigNode_MapKeyAt(root, index);
 
@@ -985,8 +972,8 @@ void XwaHangars_Init(void) {
 		}
 		++s_shipCount;
 		if (ship->layer->hangarModel != NULL && !XwaModelSource_AddKey(ship->layer->hangarModel)) {
-			Aeron_LogWarn("xwa.models", "hangar of '%s': no model '%s'; it uses the stock hangar", ship->key,
-						  ship->layer->hangarModel);
+			Aeron_LogError("xwa.models", "hangar of '%s': no model '%s'", ship->key,
+						   ship->layer->hangarModel);
 		}
 		Hangars_MakeLayerModelsLoadable(ship->layer);
 		for (iff = 0; iff < ship->layer->iffCount; ++iff) {
@@ -1062,9 +1049,6 @@ static int Hangars_FindMothership(int fgIdx, int arrivalFirst, uint16_t* objectT
 		return 0;
 	}
 	mothership = &g_missionFlightGroups[mothershipIdx].fg;
-	if (mothership->craftType >= XWA_CRAFT_TYPE_TO_OBJECT_TYPE_COUNT) {
-		return 0;
-	}
 	*objectType = g_objectTypeTables.craftTypeToObjectType[mothership->craftType];
 	*iff = mothership->iff;
 	*markings = mothership->markings;
@@ -1459,9 +1443,19 @@ static void Hangars_BuildResolvedTables(const HangarsLayer* ship) {
 	Hangars_ResolveCamera(1);
 	Hangars_ResolveSwaps();
 	s_hangarModel[0] = '\0';
-	if (ship != NULL && ship->hangarModel != NULL && strlen(ship->hangarModel) < sizeof s_hangarModel &&
-		XwaModelSource_AddKey(ship->hangarModel)) {
-		strcpy(s_hangarModel, ship->hangarModel);
+	if (ship != NULL && ship->hangarModel != NULL) {
+		if (strlen(ship->hangarModel) < sizeof s_hangarModel && XwaModelSource_AddKey(ship->hangarModel)) {
+			strcpy(s_hangarModel, ship->hangarModel);
+		} else {
+			/* The stock hangar would be the wrong hangar, so this is a fatal
+			   error. */
+			char message[256];
+
+			snprintf(message, sizeof message,
+					 "The hangar of %s can't be shown, because its model %s can't be loaded.", s_shipKey,
+					 ship->hangarModel);
+			File_PrintFatalMessageAndExit(message, 1);
+		}
 	}
 }
 

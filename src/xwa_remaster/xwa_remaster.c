@@ -586,7 +586,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	if (!snap) {
 		return;
 	}
-	const int hyperspace_preview = XwaRemasterFlight_HyperspaceTunnelPreviewEnabled();
+	const int hyperspace_preview = XwaRemasterFlight_GetHyperspacePreview() != XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF;
 	const int hyperspace_preview_visible = hyperspace_preview && snap->scene_kind == XWA_SCENE_FLIGHT &&
 										   snap->flight_camera_valid && !snap->flight_camera.map_mode &&
 										   !snap->flight_camera.hyperspace_phase;
@@ -875,6 +875,15 @@ void XwaRemaster_Frame(int32_t delta_us) {
 			}
 			XwaMovieTask_SuppressClassicSubtitles();
 		}
+		return;
+	}
+
+	/* A movie without a fade started in this tick. Its frontend frame was
+	 * replayed above, so the persistent surface and the save stack are up to
+	 * date, but it isn't shown: with nothing submitted, the screen keeps the
+	 * last frame until the movie's first frame. */
+	if (snap->hold_presentation &&
+		(snap->scene_kind == XWA_SCENE_FRONTEND || snap->scene_kind == XWA_SCENE_FRONTEND_MODAL)) {
 		return;
 	}
 

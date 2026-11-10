@@ -20,6 +20,7 @@
 #include "xwa/render/renderer.h"           /* g_flightTextPalette */
 #include "xwa/render/renderer_internal.h"  /* g_flightCharToColorLut */
 #include "xwa_runtime/models/mission_art.h"
+#include "xwa_runtime/models/weapon_models.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -577,4 +578,14 @@ const char* XwaSnapshotExport_ModelName(int object_type) {
 		}
 	}
 	return NULL;
+}
+
+const char* XwaSnapshotExport_ShotModelName(int object_type, int source_object_type) {
+	const uint16_t handle =
+		object_type > 0 && source_object_type > 0
+			? XwaWeaponModels_Handle((unsigned int)source_object_type, (unsigned int)object_type)
+			: 0;
+	const char* name = handle != 0 ? XwaSnapshotExport_OptHandleName(handle) : NULL;
+
+	return name != NULL ? name : XwaSnapshotExport_ModelName(object_type);
 }

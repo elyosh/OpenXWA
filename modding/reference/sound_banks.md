@@ -11,9 +11,11 @@ For the cockpit, fly-by, engine wash, take-off, hyperspace and weapon sounds, a 
 | `canopy_opening` | object type | When the player's craft stops in the hangar after it lands. |
 | `engine_slowing` | object type | When the player's craft has turned around in the hangar after it lands, and when the hangar shuttle lands. |
 | `engine_wash` | object type | While the player's craft is in the engine wash of another craft. The craft that makes the wash picks the sound. |
+| `enter_hyperspace` | object type | When an AI craft in the player's region jumps away. The craft picks the sound. It plays without a position, and nothing plays without the bank. |
+| `exit_hyperspace` | object type | When an AI craft in the player's region ends its arrival from hyperspace. The craft picks the sound. It plays without a position, and nothing plays without the bank. |
 | `fly_by` | object type | When a craft passes close to the player's craft. The passing craft picks the sound. Also when the player's craft launches from the hangar. |
 | `hangar_ambient` | object type, then a list of up to 10 sounds | Now and then in the hangar, chosen at random. The command ship of the hangar picks the list. |
-| `hyper_abort` | object type | When the player's craft leaves hyperspace in a region that the mission marks as interdicted. |
+| `hyper_abort` | object type | When the player's craft leaves hyperspace in a region whose `hyperspace_regions` rule asks for the abort sound. |
 | `hyper_end` | object type | When the player's craft leaves hyperspace. |
 | `hyper_start` | object type | When the player's craft starts a hyperspace jump. |
 | `hyper_zoom` | object type | A moment after `hyper_start`, when the player's craft enters hyperspace. |

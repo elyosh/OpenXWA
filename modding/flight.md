@@ -35,17 +35,19 @@ sections:
 | `weapons` | weapon colours, rates, stats, damage and linking |
 | `shield_recharge` | how fast shields come back |
 | `docking` | how craft dock and carry each other |
+| `ai_attack` | how close AI craft get before they break off, and from how far they fire lasers |
+| `mag_pulse` | what a mag pulse hit does to a craft |
+| `warhead_lock` | the AI's warhead lock ranges, by the genus of its craft |
+| `hyperspace` | how fast AI craft arrive and leave by hyperspace |
 | `headlights` | a light on the nose of the player's craft |
 | `object_limits` | how many craft, shots, explosions and radar blips a mission can have |
 | `camera` | the lag and tilt of the exterior camera, the cockpit sway and the HUD in the exterior view |
-| `cockpit_alert_lights` | the blinking alert lights in the cockpit |
+| `camera_shake` | the camera's shake and jolt in the player's hyperspace jumps |
+| `cockpit_lights` | the lights that blink in the cockpit |
 | `particle_lights` | the lights of sparks, smoke and other effects on craft |
 | `backdrops` | extra planet backdrops for missions |
 | `suns` | the procedural suns and their lens flare |
 | `speed_effect` | streaks of dust that show the player's speed |
-
-If the file can't be read, for example because of a YAML error, the game
-writes an error in the log and uses none of its sections.
 
 Check the spelling of section and key names. The game ignores a section
 that it doesn't know, and several sections, such as `rules`, `weapons`,
@@ -58,8 +60,9 @@ Some of these settings can also be set for one mission or for one model:
   [Missions](missions.md).
 - A model settings file, `flight/models/<model>.yaml`, can set weapon
   colours, rates, stats and hardpoint kinds, shield rates, a docking
-  height and HUD settings for the craft that use the model. See
-  [Craft](craft.md).
+  height, AI attack ranges, mag pulse hits, warhead lock ranges and HUD
+  settings for the craft that use the model. A model can also have a
+  gravity well, and its own hyperspace speeds. See [Craft](craft.md).
 
 This page describes the game-wide form of each setting.
 
@@ -107,6 +110,7 @@ is on by default.
 | `starship_missile_defense_any_warhead` | A starship's missile defense can fire any warhead. The original game fires only missiles and advanced missiles. |
 | `weapon_rack_count_from_record` | A craft's weapon count includes all laser groups and warhead launchers of its craft record. The original game counts the laser groups, plus the turrets of craft that fire from points over their hull. |
 | `overlapping_fly_by_sounds` | The fly-by and engine wash sounds of several craft can play at the same time. In the original game, one of these sounds doesn't start while it is already playing. |
+| `hangar_droid_parts_from_model` | Each of the two hangar droids moves the parts that its model lists in the [`hangar_droid` group](models.md#hangar-droids), and no others. In the original game, the first droid nods part 3 and the second droid swings part 1 and spins part 2, whatever model they use. |
 
 ### mission_settings
 
@@ -136,7 +140,8 @@ mission_settings:
 | `target_key` | Makes the target key (O) target craft of chosen flight groups. |
 | `proximity_triggers_check_craft_only` | `true` makes proximity triggers ignore every object that isn't a craft. |
 | `order_of_battle` | The flight groups, names and text of the order of battle in the briefing. |
-| `hyperspace_abort_sound_regions` | A list of regions (0 to 31). A hyperspace arrival in one of them plays the abort sound. |
+| `use_hyperspace_speeds` | `false` keeps the original game's hyperspace arrivals and departures, even with the speeds of the `hyperspace` section. The default is `true`. |
+| `hyperspace_regions` | What happens when the player jumps to a region: the look of the jump, and the sound when the player arrives. |
 
 Without a value, the game keeps the original game's behaviour. The
 original game puts the hangar on red alert in mission 20, hides the
@@ -170,6 +175,7 @@ weapons:
 | `ai_torpedoes` | How many warheads the AI fires at a big target. |
 | `impact_spin` | Whether a warhead hit spins the craft that it hits. |
 | `system_damage` | The system damage that ion weapons do. |
+| `turret_ignore` | The kinds of objects that AI turrets ignore, by weapon type. See [Turret targets](craft.md#turret-targets). |
 | `fire_ratio_by_rank` | How fast AI turrets and launchers fire, by rank. |
 | `damage_by_difficulty` | The damage that parts take through shields, by difficulty. |
 | `limit_linked_warhead_fire_rate` | Slows down linked warhead fire. |
@@ -382,7 +388,8 @@ so.
 
 Each `stats` profile maps weapon types to stats. Stats with a unit in their
 name can have decimals. The other stats are whole numbers, except
-`precise`, which is `true` or `false`. The units are described in
+`precise`, which is `true` or `false`, and `side` and `side_model`, which
+are names. The units are described in
 [Craft](craft.md#units). [Weapons](reference/weapons.md#weapon-types)
 gives the speed, power, life and score of each weapon type in the original
 game.
@@ -403,6 +410,8 @@ game.
 | `decharge_rate` | The charge that a player's shot takes from its cannon. It replaces `rates.decharge`. A cannon holds up to 127 charge. |
 | `recharge_rate` | The charge that comes back to a cannon each game second, for each step of the laser recharge setting above the middle. Below the middle, the cannons lose charge at the same rate. It replaces `rates.recharge`. |
 | `high_power_charge` | When a cannon's charge reaches this value, `rebel_laser`, `imperial_laser` and `ion_cannon` fire their turbo version. The original value is 64. |
+| `side` | Which side the weapon type belongs to: `rebel`, `imperial` or `none`. When the craft swaps weapons by IFF (see `weapon_iff_swap`) and its IFF is on the other side, it fires the `side_model` weapon instead. A weapon with `none` is never swapped. |
+| `side_model` | The weapon that the craft fires instead when it swaps this weapon, such as `imperial_laser` for `rebel_laser`. Set it to the weapon type itself to turn off the swap for this weapon. Without `side` and `side_model`, the original game's values apply. |
 
 A weapon type can also have stats for the player, for one difficulty, or
 for both, in the maps `player`, `easy`, `medium`, `hard`, `player_easy`,
@@ -544,6 +553,100 @@ model sets the limit with `docking.approach_height_m` in its settings file
 and 22.75 m for other models. The original game approaches at twice the gap,
 and not at all for `space_colony2`.
 
+### ai_attack
+
+`ai_attack` takes the keys of the `ai_attack` group of a model settings
+file, for every craft. A key of the craft's model replaces the same key
+here. See [Craft](craft.md#ai_attack) for the keys.
+
+```yaml
+ai_attack:
+  break_range_m: {target_offset: {shipyard: 0}}
+  laser_range_m: {novice: 600, officer: 800, veteran: 1000, ace: 1000, top_ace: 1000, super_ace: 1000}
+```
+
+With `laser_range_m`, the laser range of every AI craft follows the rank of
+its flight group, and not the pilot's skill. A rank that you leave out keeps
+its original range.
+
+### mag_pulse
+
+`mag_pulse` sets what a mag pulse hit does to every craft. A model's
+`mag_pulse` group replaces it. See [Craft](craft.md#mag_pulse).
+
+```yaml
+mag_pulse:
+  drain_only: true
+  disable_time_ms: {small: 14160, large: 28320}
+```
+
+| Key | Meaning |
+|-|-|
+| `drain_only` | `true` makes a hit on a player's craft only drain the lasers. In the original game, it also knocks out the cannons when they work. |
+| `disable_time_ms.small` | How long a hit stops an AI fighter, transport, utility craft, pilot droid or weapon emplacement from firing. The default is 14160. |
+| `disable_time_ms.large` | The same for other AI craft. The default is 28320. |
+
+The times go from 0 to 262140 milliseconds.
+
+### warhead_lock
+
+`warhead_lock` sets the AI's warhead lock ranges against big targets, by
+the genus of the AI's own craft. A model's `warhead_lock` group replaces
+them. See [Craft](craft.md#warhead_lock).
+
+```yaml
+warhead_lock:
+  ai_lock_range_m:
+    starship: {big: 4970.95, big_top_tier: 5965.14}
+```
+
+`ai_lock_range_m` maps a [genus](reference/object_types.md#genus) to
+`big` and `big_top_tier`, in metres, as in a model's
+`warhead_lock.ai_lock_range_m`. In this example, AI starships fire
+warheads at big targets from these distances.
+
+### hyperspace
+
+The `hyperspace` section sets how fast AI craft arrive and leave by
+hyperspace. A model's `hyperspace` group can set its own speeds. See
+[Craft](craft.md#hyperspace).
+
+```yaml
+hyperspace:
+  arrival_speed_mglt: 4800
+  arrival_braking_seconds: 0.5
+  departure_speed_mglt: 4800
+  departure_acceleration_mglt: 48000
+```
+
+| Key | Meaning | Default |
+|-|-|-|
+| `arrival_speed_mglt` | How fast an arriving craft flies, from 0.444 to 14563 MGLT. | none: the original arrival |
+| `arrival_braking_seconds` | How long an arriving craft takes to slow down to its normal speed, from 0 to 60 seconds. 0 stops it at once. | 0.5 |
+| `departure_speed_mglt` | The speed at which a craft jumps away, from 0.444 to 14563 MGLT. | 1600 |
+| `departure_acceleration_mglt` | How much speed a craft gains in each second while it jumps away, in MGLT. | 666.667 |
+
+Without the section, and without a model's speeds, craft arrive and leave
+as in the original game:
+
+- An arriving craft appears 12.8 km before its arrival point, flies at
+  1600 MGLT, slows down in steps over the last few seconds, and stops where
+  it passes closest to its point. The arrival takes about 11 seconds.
+- A craft that leaves speeds up by 666.667 MGLT each second, and jumps when
+  it reaches 1600 MGLT.
+
+With an arrival speed, the craft still appears 12.8 km before its point. It
+flies at that speed, slows down over `arrival_braking_seconds`, and stops
+exactly where it passes closest to its point: the point itself for a flight
+group leader, and its place in the formation for a wingman. With
+`departure_speed_mglt` or `departure_acceleration_mglt`, a craft that
+leaves speeds up at that rate and jumps when it reaches that speed. The
+player's own craft always keeps the original jump.
+
+A mission can turn the speeds off with `use_hyperspace_speeds: false` in its
+settings, and `mission_settings` can turn them off for every mission. See
+[mission_settings](#mission_settings).
+
 ### headlights
 
 Headlights are a light along the nose of the player's craft, for dark
@@ -641,14 +744,35 @@ section has `enabled: false`. A missing key keeps its default.
 The player's choices win over the mod. If the player turns **Enhanced
 Camera** on or off in the options, that choice counts.
 
-### cockpit_alert_lights
+### camera_shake
 
-The game blinks six coloured lights in the cockpit, at the pilot's eye.
-This section replaces those lights in modern graphics. The game still
-decides when each light is on and how it blinks.
+The `camera_shake` section turns the camera shake of the player's
+hyperspace jumps on or off, in modern graphics. The camera shakes a little in
+the tunnel, and jolts when the craft comes out of hyperspace. A jump with the
+`interdiction` look shakes more and jolts harder (see
+[Missions](missions.md)).
 
 ```yaml
-cockpit_alert_lights:
+camera_shake:
+  enabled: false
+```
+
+| Key | Meaning | Range | Default |
+|-|-|-|-|
+| `enabled` | Turns the camera shake on. | `true` or `false` | `true` |
+
+Without the section, the camera shake is on. The player can turn it off with
+**Camera Shake** in the options. The player's choice wins over the mod.
+
+### cockpit_lights
+
+The game blinks three warning lights in the cockpit, at the pilot's eye.
+Modern graphics show each one as a point light. OpenXWA has default values
+for these lights, and this section changes them. The game still decides
+when each light is on and how it blinks.
+
+```yaml
+cockpit_lights:
   hull_critical:
     position_m: [0, 0.3, 0.6]
     color: [1, 0, 0]
@@ -665,27 +789,25 @@ The lights are:
 | `hull_critical` | The shields are down and less than a third of the hull is left. |
 | `warhead_lock` | An enemy locks a warhead on the craft. |
 | `beam_warning` | A tractor beam or a jamming beam targets the craft. |
-| `hyperspace_jump` | The jump to hyperspace starts. |
-| `hyperspace_transfer` | The jump between regions. |
-| `hyperspace_arrival` | The craft leaves hyperspace. |
 
-Each light has these keys:
+Each light can have these keys:
 
 | Key | Meaning |
 |-|-|
-| `position_m` | Where the light is, in metres from the pilot's eye: X right, Y up, Z forward. The default is the eye. |
-| `color` | The light's colour, linear, with no value below 0. The default is the game's colour. |
-| `power_w` | Required. The light's power in watts, above 0, as for a Blender point light. |
+| `position_m` | Where the light is, in metres from the pilot's eye: X right, Y up, Z forward. |
+| `color` | The light's colour, as three linear values of 0 or more. |
+| `power_w` | The light's power in watts, as for a Blender point light. 0 turns the light off. |
 
-A light that the section doesn't list keeps the game's light. A light with
-a wrong value also keeps the game's light, and the game writes an error in
-the log.
+All the keys are optional. When you leave a key out, the light uses
+OpenXWA's default value for it. If a light has a wrong value, the game
+ignores all the keys of that light and writes an error in the log.
 
 ### particle_lights
 
 The game gives the particle effects on objects, such as sparks and smoke,
-a yellow-white light at their emitter. This section replaces those lights
-in modern graphics, by group.
+a yellow-white light at their emitter. Modern graphics replace those lights
+by group. OpenXWA has default values for each group, and this section
+changes them.
 
 ```yaml
 particle_lights:
@@ -709,13 +831,13 @@ Each group has these keys:
 
 | Key | Meaning |
 |-|-|
-| `color` | The light's colour, linear, with no value below 0. The default is the game's colour. |
-| `power_w` | Required. The light's power in watts, 0 or more, as for a Blender point light. 0 gives no light. |
-| `fade` | `true` makes the light dim to nothing over the effect's life. Without it, the light stays at full strength until the effect ends, as in the original game. |
+| `color` | The light's colour, as three linear values of 0 or more. |
+| `power_w` | The light's power in watts, 0 or more, as for a Blender point light. 0 turns the light off. |
+| `fade` | `true` makes the light dim to nothing over the effect's life. `false` keeps it at full strength until the effect ends, as in the original game. |
 
-A group that the section doesn't list keeps the game's light. A group with
-a wrong value also keeps the game's light, and the game writes an error in
-the log.
+All the keys are optional. When you leave a key out, the light uses
+OpenXWA's default value for it. If a group has a wrong value, the game
+ignores all the keys of that group and writes an error in the log.
 
 ### backdrops
 
@@ -820,9 +942,6 @@ target_display:
 | `target_boxes` | How the target boxes are drawn. |
 | `radar` | How the blips on the radar scopes are drawn. |
 | `target_readout` | The target's name, cargo, distance and damage bars next to its box. |
-
-If the file can't be read, the game writes an error in the log and ignores
-the whole file.
 
 The HUD settings of one craft, such as its reticle and its HUD colours, are
 in its model settings file. See [Craft](craft.md).
@@ -1046,8 +1165,8 @@ bank has these keys:
 
 A bank that the file doesn't have plays the original game's sounds.
 
-If the file can't be read, or has no `banks` map, the game writes an error
-in the log and ignores the whole file.
+If the file has no `banks` map, the game writes an error in the log and
+ignores the whole file.
 
 ### Entries
 
@@ -1086,7 +1205,7 @@ each bank with `unlisted: silent`.
 
 | Banks | Keys of `sounds` | Value |
 |-|-|-|
-| `canopy_opening`, `engine_slowing`, `engine_wash`, `fly_by`, `hyper_abort`, `hyper_end`, `hyper_start`, `hyper_zoom`, `interior`, `s_foil`, `shuttle_blast_off`, `shuttle_shut_down`, `shuttle_take_off`, `starship_ambient`, `take_off` | object type | an entry |
+| `canopy_opening`, `engine_slowing`, `engine_wash`, `enter_hyperspace`, `exit_hyperspace`, `fly_by`, `hyper_abort`, `hyper_end`, `hyper_start`, `hyper_zoom`, `interior`, `s_foil`, `shuttle_blast_off`, `shuttle_shut_down`, `shuttle_take_off`, `starship_ambient`, `take_off` | object type | an entry |
 | `weapon` | object type of the craft that fires | a map from weapon sound group to entry |
 | `hangar_ambient` | object type of the hangar's command ship | a list of 1 to 10 entries |
 | `weapon_explosion` | object type of the craft that fired the weapon that explodes | a list of 1 to 8 entries |

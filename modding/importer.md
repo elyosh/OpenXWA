@@ -27,11 +27,21 @@ Then:
 3. Check **Mod name** and **Mods folder**. The importer saves the mod in a
    folder of the mods folder, named after the mod.
 4. Click **Import**. An import takes a few minutes.
-5. When it finishes, click **Use This Mod in OpenXWA**, and start OpenXWA.
+5. When the import succeeds, the importer makes OpenXWA use the new mod. Start
+   OpenXWA to play it.
 
-The **Mods** tab of the importer lists the mods, and chooses the one that
-OpenXWA uses, like the **Mods** screen of the game. The change takes effect
-the next time OpenXWA starts.
+The **Mods** tab of the importer lists the mods in the mods folder, and
+chooses the one that OpenXWA uses, like the **Mods** screen of the game. The
+change takes effect the next time OpenXWA starts. In this tab you can also:
+
+- choose another mods folder. OpenXWA then lists the mods in that folder.
+- see the folder of the selected mod, and why it can't be used if it has a
+  problem.
+- click **Show Folder** to open the mod's folder in Explorer or Finder.
+- click **Delete...** to delete a mod that the importer made, with its
+  folder. You can import it again from its XWAU or TFTC installation. If
+  OpenXWA used the mod, it starts with the original game. Mods that you made
+  yourself can't be deleted here: use **Show Folder** and delete the folder.
 
 ## What the importer makes
 
@@ -43,7 +53,7 @@ The import is a complete mod, with `mod.yaml` and the folders that
 | Models | `flight/models/<key>.glb`, for each model that the installation uses, and the settings of each model in `flight/models/<key>.yaml` |
 | Effects | the effect libraries of the models' animated materials, and `effects.yaml`, in `flight/effects/` |
 | Craft | `flight/object_types/`, `flight/craft_types/`, `flight/hud.yaml` and `flight/sounds.yaml` |
-| Missions | the mission files in `flight/missions/`, the `.TIE` files, mission lists and sounds in `game/`, and `flight/flight.yaml` |
+| Missions | the mission files in `flight/missions/`, the `.TIE` files, mission lists, sounds and music in `game/`, the list of removed original sounds in `game/files.yaml`, and `flight/flight.yaml` |
 | Skies | the cube images and `flight/environments/environments.yaml` |
 | Hangars | `flight/hangars.yaml` |
 | Menus | the menu art, room animations, movies, fonts and awards in `frontend/` |

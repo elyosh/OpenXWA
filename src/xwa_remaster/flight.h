@@ -147,6 +147,30 @@ int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out);
 struct XwaRemasterDirLight;
 float XwaRemasterFlight_LightMeterExposure(const struct XwaRemasterDirLight* lights, uint32_t count);
 
+/* The default values of a cockpit light, from
+ * point_lights.cockpit_lights. The light is a Blender point light of
+ * `power_w` watts, at `position_m` from the seat's eye along the craft's
+ * axes (X right, Y up, Z forward). `color` is linear. When `has_color` is 0,
+ * the light uses the game's colour. Each key that the mod's
+ * cockpit_lights section sets replaces the value here
+ * (XwaCockpitLight.mod_*). */
+typedef struct XwaFlightCockpitLight {
+	float position_m[3];
+	int has_color;
+	float color[3];
+	float power_w; /* 0 turns the light off */
+} XwaFlightCockpitLight;
+
+/* The default light of a particle effect group, from
+ * point_lights.particle_lights. The mod's values replace these
+ * (XwaParticleLight). Without `has_color`, the light has the game's colour. */
+typedef struct XwaFlightParticleLight {
+	int has_color;
+	float color[3];
+	float power_w; /* 0 turns the light off */
+	int fade;
+} XwaFlightParticleLight;
+
 /* Point-light knobs (remaster/config.yaml `point_lights:` mapping + the debug
  * inspector). The classic SOURCE laws fix each light's color and classic
  * intensity; the scene evaluates them as physical sphere lights as bright
@@ -161,6 +185,11 @@ typedef struct XwaFlightPointLightParams {
 	/* Multiplies the lights authored in models, to find a calibration by
 	 * eye; debug only, not in the settings. 1 by default. */
 	float model_light_scale;
+	/* The cockpit lights, by slot. They are only used when
+	 * model_lights is on. When it is off, the game's own lights are used. */
+	XwaFlightCockpitLight cockpit_lights[XWA_SNAP_COCKPIT_LIGHT_COUNT];
+	/* By XwaParticleLightGroup. Only used when model_lights is on. */
+	XwaFlightParticleLight particle_lights[XWA_PARTICLE_LIGHT_GROUP_COUNT];
 } XwaFlightPointLightParams;
 
 /* The game's light candidates, the models' lights, and those of both whose
@@ -177,11 +206,9 @@ typedef struct XwaFlightPointLightStats {
 	AeronSceneClusteredLightStats scene;
 } XwaFlightPointLightStats;
 
-/* The mod's light for particle effect `effect` of `snapshot`
- * (XwaParticleLight), at `pos` in scene units, with its range for
- * `exposure`. Returns -1 when the mod doesn't replace the game's light (or
- * model lights are off), 0 when its light is off, 1 when `out` holds the
- * light. */
+/* The light of particle effect `effect` at `pos`, in scene units. Returns
+ * -1 when model lights are off and the game's light must be used, 0 when
+ * the light is off, and 1 when `out` holds it. */
 int XwaRemasterFlight_ParticleLight(const XwaSnapshot* snapshot, const XwaParticleEffect* effect,
 									const float pos[3], float exposure, AeronSceneLight* out);
 
@@ -242,8 +269,168 @@ typedef struct XwaFlightHyperspaceTunnelParams {
 void XwaRemasterFlight_GetHyperspaceTunnel(XwaFlightHyperspaceTunnelParams* out);
 void XwaRemasterFlight_SetHyperspaceTunnel(const XwaFlightHyperspaceTunnelParams* in);
 void XwaRemasterFlight_GetHyperspaceTunnelDefault(XwaFlightHyperspaceTunnelParams* out);
-void XwaRemasterFlight_SetHyperspaceTunnelPreview(int enabled);
-int XwaRemasterFlight_HyperspaceTunnelPreviewEnabled(void);
+
+/* Star streaks of the hyperspace entry and exit (docs/hd_hyperspace_jump.md),
+ * loaded from the `hyperspace_jump` section of remaster/config.yaml and
+ * live-editable through the debug inspector. */
+typedef struct XwaFlightHyperspaceJumpParams {
+	int star_count;
+	float streak_brightness;
+	float whiteout_brightness;
+	float brightness_range;
+	float streak_width_px;
+	float width_from_brightness;
+	float width_variation;
+	float head_widening;
+	float radial_widening;
+	float tail_taper;
+	float head_taper;
+	float taper_variation;
+	float glow_strength;
+	float glow_width;
+	float tail_brightness;
+	float tail_color[3];
+	float stretch_scale;
+	float white_fade_seconds;
+	float tunnel_entry_brightness;
+	float tunnel_settle_seconds;
+	float mesh_light_strength;
+	float mesh_light_start;
+	float mesh_light_curve;
+	float tint[3];
+	/* The scene warp (docs/hd_hyperspace_jump.md, Scene warp). */
+	float warp_start;
+	float warp_end;
+	float warp_curve;
+	float warp_distance_m;
+	float warp_sky_zoom;
+	float warp_smear;
+	float warp_sky_highlights;
+	float warp_reveal_softness;
+	int warp_taps;
+	int warp_sky_taps;
+	/* 1: the sky passes run at half the output resolution. */
+	int warp_sky_half_resolution;
+	/* 0: the exit plays the entry backward. 1: the exit carries on forward,
+	   so the streaks shrink toward the camera and the scene comes in toward
+	   it. */
+	int exit_forward;
+} XwaFlightHyperspaceJumpParams;
+
+void XwaRemasterFlight_GetHyperspaceJump(XwaFlightHyperspaceJumpParams* out);
+void XwaRemasterFlight_SetHyperspaceJump(const XwaFlightHyperspaceJumpParams* in);
+void XwaRemasterFlight_GetHyperspaceJumpDefault(XwaFlightHyperspaceJumpParams* out);
+
+/* The camera in the player's hyperspace jump (docs/hd_hyperspace_jump.md,
+ * Camera). The normal jump uses the `hyperspace_camera` section of
+ * remaster/config.yaml. A look has its own `camera` group. The look's shake
+ * gradually replaces the normal one between its shake_start and shake_full,
+ * and its jolt replaces the normal one. Fractions of the tunnel go from 0,
+ * when the tunnel appears, to 1, when it ends. */
+typedef struct XwaFlightHyperspaceCameraParams {
+	/* The camera shake in the tunnel. The cockpit moves with the camera.
+	   These are how far the camera turns at full strength, in degrees, how
+	   fast it shakes (1 is the normal speed), when the shake starts and when
+	   it reaches full strength. */
+	float shake_degrees;
+	float shake_speed;
+	float shake_start;
+	float shake_full;
+	/* The number of kicks per second. */
+	float kick_rate;
+	/* The jolt when the craft comes out of hyperspace. These are how far the
+	   camera turns at the jolt's peak, in degrees, how long after the start
+	   of the exit the jolt hits, and how fast it settles, in seconds. */
+	float jolt_degrees;
+	float jolt_delay;
+	float jolt_time;
+} XwaFlightHyperspaceCameraParams;
+
+void XwaRemasterFlight_GetHyperspaceCamera(XwaFlightHyperspaceCameraParams* out);
+void XwaRemasterFlight_SetHyperspaceCamera(const XwaFlightHyperspaceCameraParams* in);
+void XwaRemasterFlight_GetHyperspaceCameraDefault(XwaFlightHyperspaceCameraParams* out);
+
+/* Other looks of the player's jump, loaded from the `hyperspace_looks`
+ * section of remaster/config.yaml and live-editable through the debug
+ * inspector. A mission picks a look for jumps to a given region. In the
+ * tunnel, the look's colours spread from the far end of the tunnel toward the
+ * camera, behind an uneven glowing edge. The exit uses the look's colours,
+ * and the start of the jump looks normal. In the tunnel, the look's camera
+ * shake gradually replaces the normal one. At the exit, its jolt replaces the
+ * normal one. */
+#define XWA_FLIGHT_HYPERSPACE_LOOKS_MAX 8
+#define XWA_FLIGHT_HYPERSPACE_LOOK_NAME_MAX 32
+
+typedef struct XwaFlightHyperspaceLookParams {
+	/* The tunnel's colours where the look has spread, as in
+	   XwaFlightHyperspaceTunnelParams. */
+	float dark_color[3];
+	float body_color[3];
+	float highlight_color[3];
+	float cap_color[3];
+	/* The edge of the area that the look's colours have reached: its colour,
+	   its thickness, how far its bumps reach ahead, how many bumps there are,
+	   and how much they twist. */
+	float edge_color[3];
+	float edge_width;
+	float front_noise;
+	float front_noise_scale;
+	float front_warp;
+	/* The colours of the streaks when the player comes out of hyperspace, as
+	   in XwaFlightHyperspaceJumpParams. */
+	float tint[3];
+	float tail_color[3];
+	/* When the look's colours start to spread and when they fill the tunnel,
+	   as fractions of the time in the tunnel: 0 when the tunnel appears, 1
+	   when it ends. */
+	float blend_start;
+	float blend_end;
+	XwaFlightHyperspaceCameraParams camera;
+} XwaFlightHyperspaceLookParams;
+
+int XwaRemasterFlight_HyperspaceLookCount(void);
+/* The name of look `index`, or NULL. */
+const char* XwaRemasterFlight_HyperspaceLookName(int index);
+/* The index of the look named `name`, or -1. */
+int XwaRemasterFlight_FindHyperspaceLook(const char* name);
+void XwaRemasterFlight_GetHyperspaceLook(int index, XwaFlightHyperspaceLookParams* out);
+void XwaRemasterFlight_SetHyperspaceLook(int index, const XwaFlightHyperspaceLookParams* in);
+void XwaRemasterFlight_GetHyperspaceLookDefault(int index, XwaFlightHyperspaceLookParams* out);
+
+/* The debug preview of hyperspace. It replaces what the flight scene shows,
+ * never the simulation state. Map mode and real hyperspace come first. */
+typedef enum XwaFlightHyperspacePreview {
+	XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF = 0,
+	XWA_FLIGHT_HYPERSPACE_PREVIEW_TUNNEL = 1,     /* the tunnel alone */
+	XWA_FLIGHT_HYPERSPACE_PREVIEW_JUMP_CYCLE = 2, /* entry, tunnel, exit, normal flight, on a loop */
+} XwaFlightHyperspacePreview;
+
+void XwaRemasterFlight_SetHyperspacePreview(XwaFlightHyperspacePreview mode);
+XwaFlightHyperspacePreview XwaRemasterFlight_GetHyperspacePreview(void);
+/* Playback speed of the preview, 0.05 to 1. */
+void XwaRemasterFlight_SetHyperspacePreviewSpeed(float speed);
+float XwaRemasterFlight_GetHyperspacePreviewSpeed(void);
+/* The look that the preview draws, or -1 for the normal look. */
+void XwaRemasterFlight_SetHyperspacePreviewLook(int index);
+int XwaRemasterFlight_GetHyperspacePreviewLook(void);
+/* How far through the tunnel the tunnel preview is, from 0 to 1. That
+   preview never ends, so this sets how far the look has spread and how strong
+   the camera shake is. */
+void XwaRemasterFlight_SetHyperspacePreviewLookBlend(float blend);
+float XwaRemasterFlight_GetHyperspacePreviewLookBlend(void);
+
+/* What the scene warp shows during the entry and the exit. The debug views
+ * replace the image. */
+typedef enum XwaFlightHyperspaceWarpView {
+	XWA_FLIGHT_HYPERSPACE_WARP_VIEW_IMAGE = 0,
+	XWA_FLIGHT_HYPERSPACE_WARP_VIEW_KEEP_MASK = 1, /* the keep mask in red over the image */
+	XWA_FLIGHT_HYPERSPACE_WARP_VIEW_SKY = 2,       /* the warped sky alone */
+	XWA_FLIGHT_HYPERSPACE_WARP_VIEW_REVEAL = 3,    /* the black reveal as grey levels */
+	XWA_FLIGHT_HYPERSPACE_WARP_VIEW_COUNT = 4,
+} XwaFlightHyperspaceWarpView;
+
+void XwaRemasterFlight_SetHyperspaceWarpView(XwaFlightHyperspaceWarpView view);
+XwaFlightHyperspaceWarpView XwaRemasterFlight_GetHyperspaceWarpView(void);
 
 /* FSR controls exposed by the debug inspector. The user menu persists only
  * the mode; sharpness and debug visualization remain session-only. */

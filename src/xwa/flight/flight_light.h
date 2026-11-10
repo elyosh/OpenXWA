@@ -39,7 +39,7 @@ typedef struct DirectionalLight {
 } DirectionalLight;
 
 #pragma pack(push, 1)
-typedef struct LocalPlayerLightPulse {
+typedef struct CockpitLight {
 	uint16_t enabled;
 	int startTime;
 	float cycleTicks;
@@ -51,8 +51,20 @@ typedef struct LocalPlayerLightPulse {
 	float colorB;
 	float intensity;
 	float cullRadius;
-} LocalPlayerLightPulse;
+} CockpitLight;
 #pragma pack(pop)
+
+/* The cockpit lights, by slot in g_cockpitLights. Slots 0 to 2 are the HUD
+ * warning lights, and slots 3 to 5 the hyperspace lights. */
+typedef enum CockpitLightSlot {
+	COCKPIT_LIGHT_HULL_CRITICAL = 0,
+	COCKPIT_LIGHT_WARHEAD_LOCK = 1,
+	COCKPIT_LIGHT_BEAM_WARNING = 2,
+	COCKPIT_LIGHT_HYPERSPACE_JUMP = 3,
+	COCKPIT_LIGHT_HYPERSPACE_TRANSFER = 4,
+	COCKPIT_LIGHT_HYPERSPACE_ARRIVAL = 5,
+	COCKPIT_LIGHT_COUNT = 6,
+} CockpitLightSlot;
 
 typedef struct PointLight {
 	Vec3i fixed;
@@ -70,10 +82,9 @@ typedef struct PointLight {
 enum {
 	XWA_OBJECT_POINT_LIGHT_COUNT = 8,
 	XWA_SCENE_POINT_LIGHT_COUNT = 128,
-	XWA_LOCAL_PLAYER_LIGHT_PULSE_COUNT = 6,
 };
 
-typedef char xwa_local_player_light_pulse_size[(sizeof(LocalPlayerLightPulse) == 0x2a) ? 1 : -1];
+typedef char xwa_cockpit_light_size[(sizeof(CockpitLight) == 0x2a) ? 1 : -1];
 typedef char xwa_point_light_size[(sizeof(PointLight) == 0x30) ? 1 : -1];
 
 extern int g_dirLightCount;
@@ -89,8 +100,8 @@ extern int g_objectPointLightCount;
 extern PointLight g_objectPointLights[XWA_OBJECT_POINT_LIGHT_COUNT];
 extern int g_scenePointLightCount;
 extern PointLight g_scenePointLights[XWA_SCENE_POINT_LIGHT_COUNT];
-extern int g_localPlayerLightPulseActive;
-extern LocalPlayerLightPulse g_localPlayerLightPulses[XWA_LOCAL_PLAYER_LIGHT_PULSE_COUNT];
+extern int g_cockpitLightsActive;
+extern CockpitLight g_cockpitLights[COCKPIT_LIGHT_COUNT];
 /* Point-light intensity tables (flight_light.c; consumed by the
  * classic append law and the remaster side accessor). */
 extern const int g_flightLightSparkIntensityBySubtype[16];
@@ -113,9 +124,9 @@ int FlightLight_AddDirectionalLight(int dx, int dy, int dz, float intensity, flo
 									float blue);
 void FlightLight_BlendDirectionalLightTargets(float blendFactor);
 unsigned int FlightLight_AddCurrentRegionBackdropLights(void);
-void FlightLight_InitLocalPlayerPulses(void);
-void FlightLight_AppendLocalPlayerPulses(void);
-void FlightLight_SetLocalPlayerPulseEnabled(int pulseSlot, int enabled);
+void FlightLight_InitCockpitLights(void);
+void FlightLight_AppendCockpitLights(void);
+void FlightLight_SetCockpitLightEnabled(CockpitLightSlot slot, int enabled);
 void FlightLight_AppendScenePointLightForObject(ObjectRecord* obj);
 void FlightLight_BuildObjectPointLights(ObjectRecord* obj);
 void FlightLight_SetupObjectLighting(ObjectRecord* obj);

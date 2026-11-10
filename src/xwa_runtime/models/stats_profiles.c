@@ -97,6 +97,16 @@ static int s_modelCount;
 static int32_t s_percent[XWA_STATS_PERCENT_FIELDS];
 static int32_t s_playerPercent[XWA_STATS_PERCENT_FIELDS];
 
+/* Marks every profile choice of `type` as not looked up yet. */
+static void StatsProfiles_ResetCache(StatsProfilesType* type) {
+	int16_t* entry = &type->cache[0][0];
+	size_t index;
+
+	for (index = 0; index < sizeof type->cache / sizeof type->cache[0][0]; ++index) {
+		entry[index] = STATS_CACHE_UNSET;
+	}
+}
+
 static int StatsProfiles_Field(const char* key) {
 	int field;
 
@@ -197,7 +207,7 @@ void XwaStatsProfiles_ReadModelSettings(unsigned int objectType, const char* pat
 		StatsProfiles_ReadProfile(path, name, node, profile);
 		type->profileCount++;
 	}
-	memset(type->cache, 0xfe, sizeof type->cache); /* STATS_CACHE_UNSET */
+	StatsProfiles_ResetCache(type);
 	s_types[objectType] = type;
 }
 
@@ -297,7 +307,7 @@ void XwaStatsProfiles_LoadMission(const char* missionPath) {
 	StatsProfiles_ClearMission();
 	for (objectType = 0; objectType < OBJ_Count; ++objectType) {
 		if (s_types[objectType] != NULL) {
-			memset(s_types[objectType]->cache, 0xfe, sizeof s_types[objectType]->cache);
+			StatsProfiles_ResetCache(s_types[objectType]);
 		}
 	}
 	if (missionPath == NULL || XwaMissionFile_Load(missionPath, &config, path, sizeof path) <= 0) {

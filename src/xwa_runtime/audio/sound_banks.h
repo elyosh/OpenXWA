@@ -41,6 +41,8 @@ typedef enum XwaSoundBank {
 	XWA_SOUND_BANK_CANOPY_OPENING,    /* keyed by object type */
 	XWA_SOUND_BANK_ENGINE_SLOWING,    /* keyed by object type */
 	XWA_SOUND_BANK_ENGINE_WASH,       /* keyed by object type */
+	XWA_SOUND_BANK_ENTER_HYPERSPACE,  /* keyed by object type */
+	XWA_SOUND_BANK_EXIT_HYPERSPACE,   /* keyed by object type */
 	XWA_SOUND_BANK_FLY_BY,            /* keyed by object type */
 	XWA_SOUND_BANK_HANGAR_AMBIENT,    /* a list for each command ship type */
 	XWA_SOUND_BANK_HYPER_ABORT,       /* keyed by object type */
@@ -116,6 +118,10 @@ int XwaSoundBanks_FindRange(const char* name);
 /* The volume and the distance of bank slot `sfxSlot`. */
 uint8_t XwaSoundBanks_Volume(unsigned int sfxSlot);
 uint16_t XwaSoundBanks_Distance(unsigned int sfxSlot);
+
+/* Whether `fileName` is a sound list line that means no sound: "none",
+   "none.wav", or a name that starts with "unused" or "not-used". */
+int XwaSoundBanks_IsPlaceholder(const char* fileName);
 
 #ifdef __cplusplus
 }

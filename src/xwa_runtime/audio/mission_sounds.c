@@ -76,8 +76,15 @@ static int MissionSounds_Exists(const char* fileName) {
 	AeronVfs* vfs = Aeron_GetVfs();
 	char modPath[XWA_GAME_FILES_PATH_SIZE];
 
-	return XwaGameFiles_Find(vfs, fileName, modPath, sizeof modPath) ||
-		   AeronVfs_Exists(vfs, AERON_VFS_ROOT_ASSET, fileName);
+	switch (XwaGameFiles_Find(vfs, fileName, modPath, sizeof modPath)) {
+		case XWA_GAME_FILE_MOD:
+			return 1;
+		case XWA_GAME_FILE_REMOVED:
+			return 0;
+		case XWA_GAME_FILE_ORIGINAL:
+			break;
+	}
+	return AeronVfs_Exists(vfs, AERON_VFS_ROOT_ASSET, fileName);
 }
 
 const char* XwaMissionSounds_Replace(const char* fileName) {

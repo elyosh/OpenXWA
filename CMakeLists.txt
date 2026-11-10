@@ -249,7 +249,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/hangar_scene.c
     src/xwa_runtime/models/hangars.c
     src/xwa_runtime/models/headlights.c
-    src/xwa_runtime/models/cockpit_alert_lights.c
+    src/xwa_runtime/models/cockpit_lights.c
     src/xwa_runtime/models/particle_lights.c
     src/xwa_runtime/models/mission_backdrops.c
     src/xwa_runtime/models/mission_file.c
@@ -263,15 +263,22 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/object_limits.c
     src/xwa_runtime/models/object_profiles.c
     src/xwa_runtime/models/shield_recharge.c
+    src/xwa_runtime/models/craft_hyperspace.c
     src/xwa_runtime/models/component_strength.c
     src/xwa_runtime/models/gunner_seats.c
     src/xwa_runtime/models/skins.c
     src/xwa_runtime/models/stats_profiles.c
     src/xwa_runtime/models/tech_ratings.c
     src/xwa_runtime/models/turret_hardpoints.c
+    src/xwa_runtime/models/turret_ignore.c
+    src/xwa_runtime/models/weapon_models.c
     src/xwa_runtime/models/weapon_rates.c
     src/xwa_runtime/models/warhead_launchers.c
     src/xwa_runtime/models/warhead_lock.c
+    src/xwa_runtime/models/ai_attack.c
+    src/xwa_runtime/models/flight_config.c
+    src/xwa_runtime/models/mod_files.c
+    src/xwa_runtime/models/mag_pulse.c
     src/xwa_runtime/models/units.c
     src/xwa_runtime/models/jamming.c
     src/xwa_runtime/models/names.c
@@ -304,6 +311,7 @@ set(XWA_RUNTIME_SOURCES
 # sections (camera, sun, speed effect and target readout).
 set(XWA_INPUT_OPTIONS_SOURCES
     src/xwa_runtime/config/modern_camera_options.c
+    src/xwa_runtime/config/modern_camera_shake_options.c
     src/xwa_runtime/config/modern_input_options.c
     src/xwa_runtime/config/modern_speed_effect_options.c
     src/xwa_runtime/config/modern_sun_options.c
@@ -392,6 +400,8 @@ aeron_compile_hlsl(XWA_SHADER_OUTPUTS ${CMAKE_BINARY_DIR}/shaders
 	${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_tunnel.vert.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_tunnel.frag.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_environment.comp.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_warp_sky.frag.hlsl
+    ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hyperspace_warp.frag.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/sky_stars.vert.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/sky_stars.frag.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/target_display_edges.frag.hlsl
@@ -671,7 +681,7 @@ if(XWA_BUILD_MOD_IMPORTER)
             "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/Inconsolata-Bold.ttf"
             "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/Inconsolata-OFL.txt"
             "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.fnt"
-            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.png")
+            "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.ktx2")
         target_sources(xwa_mod_importer PRIVATE ${XWA_MOD_IMPORTER_FONTS})
         set_source_files_properties(${XWA_MOD_IMPORTER_FONTS} PROPERTIES
             HEADER_FILE_ONLY TRUE
@@ -749,6 +759,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/camera/camera_motion.h
     src/xwa_runtime/camera/exterior_hud.h
     src/xwa_runtime/config/modern_camera_options.h
+    src/xwa_runtime/config/modern_camera_shake_options.h
     src/xwa_runtime/config/modern_input_options.h
     src/xwa_runtime/config/modern_controller_options_screen.h
     src/xwa_runtime/config/modern_input_options_screen.h

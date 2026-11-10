@@ -18,10 +18,14 @@ void XwaRemasterFlightMap_Shutdown(void);
 
 /* Builds and uploads all map-owned 2D records, and submits selected nearby
  * objects through the common flight object path. No asset residency changes
- * are permitted here; all asset lookups are against the synchronized mission set. */
+ * are permitted here; all asset lookups are against the synchronized mission set.
+ * The icons, lines and boxes are drawn into the scene, so the present pass
+ * multiplies them by the exposure. `overlay_scale` multiplies their colours
+ * to undo that: pass 1 / exposure. The labels are drawn after the present
+ * pass and don't use it. */
 int XwaRemasterFlightMap_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scene, const XwaSnapshot* snapshot,
 								 XwaRemasterAssets* assets, const XwaRemasterFlightView* view,
-								 const float world_to_eye[9],
+								 const float world_to_eye[9], float overlay_scale,
 								 XwaRemasterFlightMapSubmitObjectFn submit_object, void* submit_user);
 
 void XwaRemasterFlightMap_RenderDeferredText(AeronCommandBuffer* cmd, AeronRenderPass* pass,

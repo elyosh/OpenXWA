@@ -132,6 +132,7 @@ fails the build if a patch no longer applies.
 | `shadercross-fsr3.patch` | SDL_shadercross (host) | FSR3 shader generation support |
 | `shadercross-msl-bindings.patch` | SDL_shadercross (host) | Stable MSL storage-buffer slots when a graphics shader leaves a texture unused |
 | `sdl-gpu-d3d12-hdr.patch` | SDL3 (Windows target) | Lets the D3D12 SDL_GPU backend report and enable HDR swapchain compositions |
+| `sdl-gpu-d3d12-descriptor-heaps.patch` | SDL3 (Windows target) | Stops the D3D12 SDL_GPU backend from writing past a full descriptor heap and from leaving bound tables in an old heap after a switch (libsdl-org/SDL#16653) |
 
 SDL_shadercross is a build-host tool. The Dockerfile builds it for Linux and
 uses it to generate DXIL and SPIR-V while compiling OpenXWA and its runtime

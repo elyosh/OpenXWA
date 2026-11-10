@@ -122,6 +122,8 @@ models:
 effects:
   explosion_genus_emissive_strength: 10.0
   glow_mark_emissive_strength: 20.0
+  # The same, for the hit marks on the cockpit model. 0 hides them.
+  cockpit_glow_mark_emissive_strength: 4.0
 dynamic_cockpit:
   # Cockpit displays that show the HUD, from the screens of the cockpit
   # models.
@@ -190,6 +192,12 @@ camera:
   lag_time: 0.32
   # Shows the HUD and the reticle in the exterior view of the player's craft.
   exterior_hud: true
+# The camera shake and jolt in hyperspace jumps, in modern graphics
+# (hyperspace_camera). A mod can change this value. The Camera Shake option
+# sets `enabled`.
+camera_shake:
+  # Off keeps the camera steady.
+  enabled: true
 # Shows the target's name, cargo, distance and damage bars next to its box
 # in the 3D view. A mod can change these values. The options screen only has
 # a Target Readout switch, which sets `enabled`.
@@ -356,7 +364,7 @@ hyperspace_tunnel:
   travel_speed: 13.0      # forward rate; 8 matches the reference shader
   rotation_speed: -2.3   # radians per second around the tunnel axis
   noise_scale: 0.5       # multiplier for all simplex octave frequencies
-  brightness: 1.0        # tunnel brightness, at the classic radiance
+  brightness: 0.6        # tunnel brightness, at the classic radiance
   highlight_strength: 3.0 # cyan-white noise highlights and cap light; independent of the blue body
   focal_length: 0.9     # tunnel perspective; larger values narrow the apparent opening
   twist: 0.1       # reference angular shear: 1.25 / (2 * pi)
@@ -377,6 +385,126 @@ hyperspace_tunnel:
   cap_color_r: 0.09       # linear HDR color of the distant additive light
   cap_color_g: 0.28
   cap_color_b: 1.0
+hyperspace_jump:
+  # Star streaks of the hyperspace entry and exit (docs/hd_hyperspace_jump.md).
+  star_count: 65536           # stars over the whole sphere; about a tenth are on screen
+  streak_brightness: 0.4      # brightness of the stars at the start, at the classic radiance
+  whiteout_brightness: 24.0   # brightness factor at the peak of the white-out
+  brightness_range: 100      # ratio between the brightest and faintest stars
+  streak_width_px: 0.9        # streak width at 1080p
+  width_from_brightness: 0.0 # 0 = same width for all stars, 1 = width follows brightness
+  width_variation: 1.3        # random width factor per star, from 1/x to x
+  head_widening: 1.15          # largest width factor from perspective and radial widening together
+  radial_widening: 0.3        # extra width per screen half-height from the vanishing point
+  tail_taper: 0.35            # tail fade, as a share of the streak's 3D length
+  head_taper: 0.15             # head fade, as a share of the streak's 3D length
+  taper_variation: 0.5        # random spread of the fades per star, 0 to 1
+  glow_strength: 0.25         # brightness of the soft skirt around the core, 0 to 1
+  glow_width: 4.0             # width of the skirt, in core widths
+  tail_brightness: 0.35       # brightness at the tail, as a share of the head's
+  tail_color_r: 0.11          # colour at the tail; the head keeps the star's colour
+  tail_color_g: 0.24
+  tail_color_b: 1.00
+  stretch_scale: 0.8          # multiplies how far the stars travel
+  white_fade_seconds: 0.15    # fade between the white streak field and the tunnel
+  tunnel_entry_brightness: 2.0 # tunnel brightness factor at the fade
+  tunnel_settle_seconds: 0.15  # time for the tunnel to settle to its normal brightness
+  mesh_light_strength: 0.5    # streak light on the cockpit at the white peak, in white classic pixels
+  mesh_light_start: 0.1       # seconds into the entry when the cockpit light starts rising
+  mesh_light_curve: 2.0       # exponent of the rise: 1 = straight, higher = later and steeper
+  tint_r: 0.122                # colour the streaks move toward during the jump
+  tint_g: 0.3544
+  tint_b: 1.00
+  exit_forward: true         # true: on exit the streaks shrink toward the camera and the scene comes in toward it
+  # Scene warp: the scene zooms toward the camera and black opens from the
+  # vanishing point. The exit plays it backward, or forward with exit_forward.
+  warp_start: 0.0             # seconds into the entry when the scene starts moving
+  warp_end: 2.0               # seconds into the entry when only black remains
+  warp_curve: 3.0             # exponent of the progress: higher starts slower and ends faster
+  warp_distance_m: 10000.0    # how far the world moves toward the camera by warp_end, in metres
+  warp_sky_zoom: 8.0          # sky magnification at the vanishing point by warp_end; 1 = still
+  warp_smear: 1.0             # smear length, as a share of the movement (0.05 to 1)
+  warp_sky_highlights: 2.0    # how much bright sky samples count in the smear; 1 = plain average
+  warp_reveal_softness: 1.0   # width of the black's soft edge, as a share of the distance to the farthest corner
+  warp_taps: 24               # samples per pixel along the world's walk
+  warp_sky_taps: 8            # samples per pixel in each of the three sky passes
+  warp_sky_half_resolution: true # the sky passes run at half the output resolution
+# The camera in the player's hyperspace jumps, in modern graphics. A look
+# (hyperspace_looks) has its own camera group with the same keys. The look's
+# shake gradually replaces this one between its shake_start and shake_full,
+# and its jolt replaces this one. The Camera Shake option turns both off.
+# Fractions of the tunnel go from 0, when the tunnel appears, to 1, when it
+# ends.
+hyperspace_camera:
+  # The camera and the cockpit shake together, as if the pilot is rattled.
+  shake_degrees: 0.05   # how far it shakes at full strength, in degrees, 0 to 10
+  shake_speed: 0.3      # how fast it shakes, 0 to 4 (1 is the normal speed)
+  shake_start: 0.0      # when the shake starts, as a fraction of the tunnel
+  shake_full: 0.01      # when it reaches full strength
+  kick_rate: 0.0        # kicks per second, 0 to 8
+  # The camera jolts when the craft comes out of hyperspace, and settles
+  # before the exit ends.
+  jolt_degrees: 0.3     # how far the camera turns at the jolt's peak, in degrees, 0 to 20
+  jolt_delay: 0.15      # how long after the exit starts it hits, in seconds, 0 to 0.5
+  jolt_time: 0.2        # how fast it settles, in seconds, 0.05 to 0.8
+hyperspace_looks:
+  # Other looks for the player's hyperspace jump. A mission picks one for
+  # jumps to a given region (hyperspace_regions in its settings). A look only
+  # changes the tunnel, the exit and the camera. The start of the jump looks
+  # normal.
+  interdiction:
+    # A jump that a gravity well cuts short. Red spreads through the tunnel
+    # from its far end toward the camera. The camera shakes more and more,
+    # and jolts when the craft is pulled out. The streaks are red when the
+    # player comes out of hyperspace.
+    tunnel:
+      # The tunnel's colours where the red has reached it. They replace the
+      # colours of hyperspace_tunnel.
+      dark_color_r: 0.0
+      dark_color_g: 0.0
+      dark_color_b: 0.0
+      body_color_r: 0.38
+      body_color_g: 0.01
+      body_color_b: 0.01
+      highlight_color_r: 0.45
+      highlight_color_g: 0.38
+      highlight_color_b: 0.02
+      cap_color_r: 1.0
+      cap_color_g: 0.12
+      cap_color_b: 0.04
+      # The edge of the red area, a thin glowing line.
+      edge_color_r: 1.0
+      edge_color_g: 0.45
+      edge_color_b: 0.06
+      edge_width: 0.12       # how thick the edge is
+      front_noise: 0.5       # how uneven the edge is: how far its bumps reach ahead
+      front_noise_scale: 0.7 # how many bumps there are: higher gives more, smaller bumps
+      front_warp: 0.3        # how much the bumps twist into curls
+    jump:
+      # The colours of the streaks when the player comes out of hyperspace.
+      tint_r: 0.79
+      tint_g: 0.02
+      tint_b: 0.02
+      tail_color_r: 0.79
+      tail_color_g: 0.02
+      tail_color_b: 0.02
+    # When the red starts to spread and when it fills the tunnel, as fractions
+    # of the time in the tunnel: 0 is when the tunnel appears, 1 when it ends.
+    blend_start: 0.2
+    blend_end: 0.55
+    camera:
+      # The same keys as hyperspace_camera. Between shake_start and
+      # shake_full, this shake gradually replaces the normal one, and it grows
+      # until the gravity well pulls the craft out. Then the camera jolts
+      # hard.
+      shake_degrees: 0.7
+      shake_speed: 0.7
+      shake_start: 0.18
+      shake_full: 1.0
+      kick_rate: 1.5
+      jolt_degrees: 4.0
+      jolt_delay: 0.1
+      jolt_time: 0.3
 point_lights:
   enabled: true
   cluster_depth_slices: 24
@@ -389,11 +517,42 @@ point_lights:
   # Multiplies the distance where a light falls under 1/250 of a unit of
   # illuminance after the exposure, and ends.
   range_scale: 1.0
-  # Lights authored in models (such as the converted cockpits' interior
-  # light), the headlight, and the mod's cockpit alert lights and particle
-  # lights. They are in candela. Without them, the alert lights and the
-  # particle lights are the game's.
+  # Turns on the lights that are set in candela: the lights in models (such
+  # as the interior light of the converted cockpits), the headlight, and the
+  # cockpit lights and particle lights below. When this is off, the game's
+  # own cockpit lights and particle lights are used instead.
   model_lights: true
+  # The lights that the game blinks in the cockpit, such as the red light
+  # when the hull is low. Each one works like a Blender point light:
+  #   power_w: the power in watts. 0 turns the light off.
+  #   position_m: where the light is, in metres from the pilot's eye
+  #     (X right, Y up, Z forward). The default is the eye.
+  #   color: the colour, as linear values. The default is the game's colour.
+  # A mod can change these lights in the cockpit_lights section of its
+  # flight/flight.yaml. Each key that the mod sets replaces the one here.
+  # The game's own lights aren't used, because the match_distance_m
+  # conversion makes them far too bright this close to the cockpit.
+  cockpit_lights:
+    hull_critical:
+      power_w: 500
+    warhead_lock:
+      power_w: 500
+    beam_warning:
+      power_w: 500
+  # The lights of the particle effects on craft. cockpit_sparks and
+  # cockpit_smoke are the sparks and smoke in the cockpit when a hit gets
+  # through the shields. craft_damage is every other effect. power_w and
+  # color work as above. fade: true dims the light over the effect's life.
+  # A mod can change them in the particle_lights section of its
+  # flight/flight.yaml. 158,000 W matches the game's light with the default
+  # match_distance_m and classic_lighting.illuminance.
+  particle_lights:
+    cockpit_sparks:
+      power_w: 500
+    cockpit_smoke:
+      power_w: 0
+    craft_damage:
+      power_w: 158000
 classic_lighting:
   # Converts the classic game's lights (suns and other backdrops, the game's
   # lights in the hangar, lasers, explosions, engines), which have no unit.
@@ -414,6 +573,11 @@ lighting:
   ambient_r: 1.0
   ambient_g: 1.0
   ambient_b: 1.0
+  # The least ambient light on the in-flight map, so that the craft can be
+  # seen in dim regions.
+  map_ambient_min_r: 5.0
+  map_ambient_min_g: 5.0
+  map_ambient_min_b: 5.0
   # Scale of all emitted light (illumination, screens, holograms, lasers,
   # glows, explosions). Emitters far brighter than lit surfaces are what
   # visibly glow through bloom.

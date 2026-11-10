@@ -1,8 +1,10 @@
 #include "xwa/flight/ai/ai_internal.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/ai_attack.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/stats_profiles.h"
+#include "xwa_runtime/models/turret_ignore.h"
 #endif
 
 // GLOBAL: XWA 0x5B7670
@@ -1115,6 +1117,9 @@ char paiorder_avoidhitorder(void) {
 
 	selfGenus = g_objectTable[g_paiContext.aiObjIdx].genusId;
 	if (selfGenus == GENUS_Freighter || selfGenus == GENUS_Container || selfGenus == GENUS_Starship ||
+#ifdef XWA_MODERN
+		!XwaAiAttack_Value(g_paiContext.aiObjIdx, XWA_AI_ATTACK_AVOID_HITS, 1) ||
+#endif
 		g_paiContext.aiController->maneuverMode != g_paiContext.aiPlanInitialManeuverId) {
 		return 0;
 	}
@@ -2559,6 +2564,10 @@ char paiorder_orderswitchorder(void) {
 	uint8_t orderSlot;
 	uint16_t found;
 
+#ifdef XWA_MODERN
+	/* The searches that this order runs aren't turret target searches. */
+	XwaTurretIgnore_Clear();
+#endif
 	if (g_paiContext.curOrderCoord.fields.orderSlot == 0 ||
 		g_paiContext.aiController->orderScratch
 				.completionState[g_paiContext.curOrderCoord.fields.regionIdx]

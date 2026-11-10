@@ -41,6 +41,7 @@
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/geometry_textures.h"
+#include "xwa_runtime/models/weapon_models.h"
 #include "xwa_runtime/text/text_overrides.h"
 #endif
 #include "xwa_runtime/models/gunner_seats.h"
@@ -1772,6 +1773,9 @@ void FeDiskIo_FreeModelResources(void) {
 		g_exteriorModel = 0;
 	}
 
+#ifdef XWA_MODERN
+	XwaWeaponModels_FreeMission();
+#endif
 	Mission_FreeOverrideStringHandles();
 }
 

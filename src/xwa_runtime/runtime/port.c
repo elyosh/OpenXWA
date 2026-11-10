@@ -25,6 +25,7 @@
 #include "xwa/xwa_options.h"
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/camera/camera_motion.h"
+#include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_speed_effect_options.h"
@@ -45,25 +46,32 @@
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/input/rumble_provider.h"
 #include "xwa_runtime/input/winmm_joystick_provider.h"
-#include "xwa_runtime/models/cockpit_alert_lights.h"
+#include "xwa_runtime/models/ai_attack.h"
+#include "xwa_runtime/models/cockpit_lights.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_hud.h"
+#include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/docking.h"
+#include "xwa_runtime/models/flight_config.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/headlights.h"
+#include "xwa_runtime/models/mag_pulse.h"
 #include "xwa_runtime/models/mission_backdrops.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/shield_recharge.h"
+#include "xwa_runtime/models/turret_ignore.h"
+#include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/frontend_task.h"
+#include "xwa_runtime/runtime/game_files.h"
 #include "xwa_runtime/runtime/movie_task.h"
 #include "xwa_runtime/runtime/presentation.h"
 #include "xwa_runtime/snapshot/snapshot.h"
@@ -165,6 +173,7 @@ int XwaPort_Init(void) {
 		Aeron_LogError("xwa", "Failed to create the film folder in the user folder");
 	}
 	XwaText_Load();
+	XwaGameFiles_Load();
 	/* The object type files can rename object types, and the other mod files
 	   use the new names, so read them first. */
 	XwaCraftDefinitions_Apply();
@@ -174,17 +183,23 @@ int XwaPort_Init(void) {
 	XwaObjectLimits_Init();
 	XwaHeadlights_Init();
 	XwaCameraMotion_Init();
-	XwaOptionSection_LoadMod(XwaModernSunOptions_Section());
-	XwaOptionSection_LoadMod(XwaModernSpeedEffectOptions_Section());
-	XwaCockpitAlertLights_Init();
+	XwaOptionSection_ReadMod(XwaModernSunOptions_Section(), XwaFlightConfig_Root());
+	XwaOptionSection_ReadMod(XwaModernSpeedEffectOptions_Section(), XwaFlightConfig_Root());
+	XwaOptionSection_ReadMod(XwaModernCameraShakeOptions_Section(), XwaFlightConfig_Root());
+	XwaCockpitLights_Init();
 	XwaParticleLights_Init();
 	XwaModelSource_Init();
 	XwaHangars_Init();
 	XwaCraftHud_Init();
 	XwaCraftWeapons_Init();
 	XwaShieldRecharge_Init();
+	XwaCraftHyperspace_Init();
 	XwaWeaponRates_Init();
 	XwaWeaponStats_Init();
+	XwaTurretIgnore_Init();
+	XwaWarheadLock_Init();
+	XwaAiAttack_Init();
+	XwaMagPulse_Init();
 	XwaSoundBanks_Init();
 	if (SpriteResource_LoadCatalog("Resdata.txt") != 0) {
 		Aeron_LogError("xwa.assets", "Failed to load required sprite catalog 'Resdata.txt'");
@@ -479,6 +494,7 @@ void XwaPort_Shutdown(void) {
 	XwaFamilyMissions_Shutdown();
 	XwaSidePanels_Shutdown();
 	XwaFrontendConfig_Shutdown();
+	XwaFlightConfig_Shutdown();
 	XwaConcourseLayout_Shutdown();
 	XwaAwards_Shutdown();
 	XwaRoomAnims_Shutdown();

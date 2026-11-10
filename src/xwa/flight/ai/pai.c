@@ -260,6 +260,18 @@ void pai_ProcessPlan(void) {
 
 // FUNCTION: XWA 0x4A2BE0
 void pai_UpdateAimPointFromOrderTarget(void) {
+#ifdef XWA_MODERN
+	/* When a leader is lost, paiorder_leaderdeadorder copies the leader's
+	   target to the new leader, and that target can be 0xFFFF (no target).
+	   The original then reads it as waypoint 0x7FFB, far past the flight
+	   group array, and aims at junk. Valid refs are objects (below 0x8000),
+	   0x8000 for the current mission point, and 0x8001 to 0x800B for the 4
+	   mission points and 8 order waypoints. For any other ref, keep the
+	   current aim point. */
+	if (g_paiContext.aiController->targetObjIdx >= 0x8000u + 4u + 8u) {
+		return;
+	}
+#endif
 	Mission_ResolveObjectOrMissionPointWorldLoc(
 		g_paiContext.aiController->targetObjIdx, g_objectTable[g_paiContext.aiObjIdx].flightGroupIdx,
 		g_paiContext.curOrderCoord.fields.regionIdx, g_paiContext.curOrderCoord.fields.orderSlot);

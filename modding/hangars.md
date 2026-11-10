@@ -7,10 +7,9 @@ settings in the `hangar` section of its mission file.
 
 The game uses `hangars.yaml` only while model replacements are on, which is
 the default. Without the file, the hangars keep the original game's layout,
-and the `hangar` section of the missions is ignored. A file that can't be
-read is logged, and the hangars keep the original layout. An empty file
-keeps the original layout too, because every key's default is the
-original game's value.
+and the `hangar` section of the missions is ignored. An empty file keeps
+the original layout too, because every key's default is the original
+game's value.
 
 Lengths are in metres and angles in degrees. Objects are named by their
 object type, such as `hangar_droid`, and models by their model name, such
@@ -170,6 +169,13 @@ droids:
   - {enabled: false}
 ```
 
+As in the original game, the first droid nods part 3 of its model, and the
+second droid swings part 1 and spins part 2, whatever its `type`. With
+another type, the wrong parts can move. The
+`hangar_droid_parts_from_model` rule of [flight.yaml](flight.md#rules)
+makes each droid move the parts that its model lists instead. See
+[hangar droids](models.md#hangar-droids).
+
 ### roof_crane
 
 | Key | Meaning |
@@ -308,9 +314,6 @@ ships:
       1:
         shuttle: {type: escort_shuttle}
 ```
-
-When `hangar_model` names a model that doesn't exist, the log warns and the
-ship uses the hangar model `hangar`.
 
 ## Crafts
 
