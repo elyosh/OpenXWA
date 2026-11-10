@@ -515,7 +515,8 @@ int main(int argc, char** argv) {
 	XwaPort_SetCommandLine(launch.game_command_line);
 	XwaModernFlightTiming_Configure(host_config.flight_simulation_step_ticks);
 	XwaFilmState_Configure(selected_mod);
-	XwaFilmBenchmark_Configure(launch.play_film, launch.benchmark_out, launch.film_pause_at, launch.film_benchmark);
+	XwaFilmBenchmark_Configure(launch.play_film, launch.benchmark_out, launch.film_pause_at, launch.film_capture,
+							   launch.film_benchmark);
 	/* XwaRemaster_Init succeeded above, so the HD renderer is available. */
 	XwaModelSource_Configure(!host_config.force_opt_models);
 	XwaMovieTask_Configure(host_config.prefer_original_movies);
@@ -617,6 +618,9 @@ int main(int argc, char** argv) {
 				break;
 			}
 			XwaFilmBenchmark_NoteHostFrame(remaster_us, Aeron_NowUs() - frame_start_us);
+			if (XwaFilmBenchmark_CaptureDue()) {
+				XwaFilmBenchmark_CaptureDone(XwaRemaster_CaptureFlightFrame(XwaFilmBenchmark_CaptureName()));
+			}
 			if (XwaFilmBenchmark_MeasurementDue()) {
 				XwaFilmBenchmark_MeasurementDone(XwaRemaster_BenchmarkFlightFrames());
 			}

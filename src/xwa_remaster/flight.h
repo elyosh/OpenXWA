@@ -585,6 +585,18 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
  * between direct and texture-layer composition. */
 AeronTexture* XwaRemasterFlight_ResolvePresentation(AeronCommandBuffer* cmd, int direct_present);
 
+/* Returns the RGBA16F target of the composed presentation, or NULL before
+ * the first render. After XwaRemasterFlight_Render with direct_present 0,
+ * it holds the final image, with the HUD. */
+AeronRenderTarget* XwaRemasterFlight_ComposedTarget(void);
+
+/* Call after XwaRemasterFlight_Render. Records the rendered frame as the
+ * tonemap receives it into the target of the composed presentation: the
+ * scene with its bloom, multiplied by the exposure, without the HUD. The
+ * target then holds this image instead of the final image, until the next
+ * render. Returns 0 if there is no rendered frame. */
+int XwaRemasterFlight_RecordBeforeTonemap(AeronCommandBuffer* cmd);
+
 /* Queues the prepared direct frame into Aeron's swapchain pass. */
 int XwaRemasterFlight_SubmitDirectPresentation(void);
 

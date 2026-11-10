@@ -19,13 +19,20 @@ extern "C" {
    gets a record. At the end, the log gets a summary of each measure, and the
    CSV file, when one is asked for, gets the records. */
 
-/* `filmName` is a film of the user folder's film folder, with or without
-   .flm; empty for a normal start. `csvPath`, when not empty, is a file of the
-   user folder. `pauseAt`, when 0 or more, is the film time, in game ticks, at
-   which the film freezes (--film-pause-at); the film fast-forwards to it.
-   `measure` measures the GPU time of the frozen frame, then quits
-   (--film-benchmark). Call it before XwaPort_Init. */
-void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, int32_t pauseAt, int measure);
+/* Call before XwaPort_Init.
+   - `filmName`: a film in the film folder of the user folder, with or
+     without .flm. Empty for a normal start.
+   - `csvPath`: a CSV file in the user folder for the frame times, or empty.
+   - `pauseAt`: the film time, in game ticks, where the film freezes
+     (--film-pause-at), or -1. The film fast-forwards to it.
+   - `captureName`: when not empty, the frozen frame is saved to files with
+     this name in the user folder, then the game quits (--film-capture).
+   - `measure`: measure the GPU time of the frozen frame, then quit
+     (--film-benchmark).
+   When both a capture and a measurement are asked for, the capture runs
+   first. */
+void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, int32_t pauseAt,
+								const char* captureName, int measure);
 int XwaFilmBenchmark_IsRequested(void);
 
 /* The first screen when a film is asked for: it starts the film's flight. */
@@ -60,8 +67,15 @@ void XwaFilmBenchmark_NoteFlightCommit(void);
    this host frame. Returns 1 while the fast-forward runs: the host frame then
    commits no snapshot. */
 int XwaFilmBenchmark_FastForward(void);
-/* Whether --film-benchmark asks to measure now: the film is frozen and its
-   frame was presented. */
+/* Whether --film-capture should capture now: the film is frozen and its
+   frame was presented. XwaFilmBenchmark_CaptureName gives the file name. */
+int XwaFilmBenchmark_CaptureDue(void);
+const char* XwaFilmBenchmark_CaptureName(void);
+/* Call when the capture is done. The game then quits, unless a measurement
+   follows. The exit code is 1 if `ok` is 0. */
+void XwaFilmBenchmark_CaptureDone(int ok);
+/* Whether --film-benchmark should measure now: the film is frozen, its
+   frame was presented, and any capture is done. */
 int XwaFilmBenchmark_MeasurementDue(void);
 /* The measurement ended; the game quits, with exit code 1 when `ok` is 0. */
 void XwaFilmBenchmark_MeasurementDone(int ok);

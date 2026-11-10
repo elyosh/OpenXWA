@@ -57,6 +57,16 @@ void XwaRemaster_Frame(int32_t delta_us);
  * the frame can't be measured, with the reason in the log. */
 int XwaRemaster_BenchmarkFlightFrames(void);
 
+/* Captures the current flight snapshot for --film-capture. It renders the
+ * snapshot once and writes two files in the user folder:
+ * - `name`.png: the final image, with the HUD;
+ * - `name`.hdr: the image the tonemap receives, which is the scene with its
+ *   bloom, multiplied by the exposure, without the HUD.
+ * Call it after Aeron_Present of a frame that rendered the snapshot.
+ * Afterwards, the prepared presentation holds the HDR image until the next
+ * render. Returns 0 if the frame can't be captured, and logs the reason. */
+int XwaRemaster_CaptureFlightFrame(const char* name);
+
 void XwaRemaster_Shutdown(void);
 
 /* Debug-tool surface: desired HDR output (effective = desired AND the

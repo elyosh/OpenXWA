@@ -5533,13 +5533,10 @@ int XwaRemasterFlight_CanDirectPresent(int target_w, int target_h) {
 	return Aeron_CanRenderDirectToSwapchain(target_w, target_h) && fl_ensure_direct_present();
 }
 
-/* Shared tone-map + semantic-HUD draw sequence. The target can be the FP16
- * composition fallback or Aeron's borrowed swapchain target. */
-static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-							AeronScenePresentChain* chain, int target_w, int target_h) {
-	if (!cmd || !pass || !target || !chain || !s.present_scene_tex || !s.present_sampler) {
-		return;
-	}
+/* Draws the scene with its bloom and exposure over the whole target, with
+ * `chain` and its current debug view. */
+static void fl_draw_present_scene(AeronRenderPass* pass, AeronScenePresentChain* chain, int target_w,
+								  int target_h) {
 	const AeronRectI full_target = { 0, 0, target_w, target_h };
 	Aeron_SetViewport(pass, &full_target);
 	Aeron_SetScissor(pass, &full_target);
@@ -5547,6 +5544,20 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	/* The flight scene's exposure, on the GPU: metered from this frame. The
 	 * map keeps the CPU value. */
 	AeronTexture* const exposure_tex = s.map_present ? NULL : AeronScene_ExposureTexture(s.scene);
+	AeronScenePresentChain_Draw(chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
+								s.map_present ? 0.0f : AeronSceneBloom_Intensity(),
+								exposure_tex ? 1.0f : XwaRemasterFlight_Exposure(), exposure_tex, s.rt_w,
+								s.rt_h,
+								/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0);
+}
+
+/* Shared tone-map + semantic-HUD draw sequence. The target can be the FP16
+ * composition fallback or Aeron's borrowed swapchain target. */
+static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+							AeronScenePresentChain* chain, int target_w, int target_h) {
+	if (!cmd || !pass || !target || !chain || !s.present_scene_tex || !s.present_sampler) {
+		return;
+	}
 	/* The weight view needs the meter, which the map doesn't run. */
 	AeronScenePresentDebug debug = { .view = (AeronScenePresentDebugView)s.present_debug_view };
 	if (debug.view == AERON_SCENE_PRESENT_METER_WEIGHT &&
@@ -5554,11 +5565,7 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 		debug.view = AERON_SCENE_PRESENT_IMAGE;
 	}
 	AeronScenePresentChain_SetDebug(chain, &debug);
-	AeronScenePresentChain_Draw(chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
-								s.map_present ? 0.0f : AeronSceneBloom_Intensity(),
-								exposure_tex ? 1.0f : XwaRemasterFlight_Exposure(), exposure_tex, s.rt_w,
-								s.rt_h,
-								/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0);
+	fl_draw_present_scene(pass, chain, target_w, target_h);
 	if (s.suppress_hud) {
 		return;
 	}
@@ -5617,6 +5624,29 @@ AeronTexture* XwaRemasterFlight_ResolvePresentation(AeronCommandBuffer* cmd, int
 	fl_draw_present(cmd, pass, s.present_rt, s.present, s.rt_w, s.rt_h);
 	Aeron_EndRenderPass(pass);
 	return Aeron_RenderTargetGetTexture(s.present_rt);
+}
+
+AeronRenderTarget* XwaRemasterFlight_ComposedTarget(void) { return s.present_rt; }
+
+int XwaRemasterFlight_RecordBeforeTonemap(AeronCommandBuffer* cmd) {
+	if (!cmd || !s.present || !s.present_rt || !s.present_scene_tex || !s.present_sampler) {
+		return 0;
+	}
+	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
+		.color_target = s.present_rt,
+		.clear_color = 1,
+		.clear_color_rgba = { 0.0f, 0.0f, 0.0f, 0.0f },
+		.command_buffer = cmd,
+		.debug_label = "OpenXWA flight capture before tonemap",
+	});
+	if (!pass) {
+		return 0;
+	}
+	AeronScenePresentChain_SetDebug(s.present,
+									&(AeronScenePresentDebug) { .view = AERON_SCENE_PRESENT_BEFORE_TONEMAP });
+	fl_draw_present_scene(pass, s.present, s.rt_w, s.rt_h);
+	Aeron_EndRenderPass(pass);
+	return 1;
 }
 
 static void fl_direct_present_callback(AeronCommandBuffer* cmd, AeronRenderPass* pass,

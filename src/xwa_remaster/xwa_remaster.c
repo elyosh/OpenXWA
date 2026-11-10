@@ -18,6 +18,7 @@
 
 #include "aeron/aeron.h"
 #include "aeron/debug.h"
+#include "aeron/image.h"
 #include "aeron/scene/blend_ramp.h"
 #include "xwa_remaster/assets.h"
 #include "xwa_remaster/captured_lighting.h"
@@ -1006,36 +1007,51 @@ static int rm_benchmark_run(const XwaSnapshot* snap, int count, uint64_t* wall_u
 	return ok;
 }
 
+/* Returns why the film benchmark or capture can't render the frozen flight
+ * frame `snap` again, or NULL if it can. */
+static const char* rm_frozen_frame_problem(const XwaSnapshot* snap) {
+	if (!g.initialized || !g.assets) {
+		return "the HD renderer isn't running";
+	}
+	if (!snap || snap->scene_kind != XWA_SCENE_FLIGHT || !snap->flight_camera_valid) {
+		return "the frozen frame isn't a flight view";
+	}
+	if (XwaRemasterEnvCapture_Pending()) {
+		return "an environment capture is pending";
+	}
+	if (g.force_scene_render || g.last_tick != snap->tick_index || !g.scene_tex ||
+		g.scene_kind != XWA_SCENE_FLIGHT) {
+		/* The frame's render didn't run: HD view off, or assets still loading. */
+		return "the HD renderer didn't draw the frozen frame";
+	}
+	return NULL;
+}
+
+/* Writes the exposure of the last render into `out`, for the log. */
+static void rm_exposure_text(char* out, size_t size) {
+	AeronSceneExposureReadout exposure;
+	if (XwaRemasterFlight_GetExposureReadout(&exposure)) {
+		snprintf(out, size, "%.5g (metered EV100 %.3f)", (double)XwaRemasterFlight_Exposure(),
+				 (double)exposure.ev100);
+	} else {
+		snprintf(out, size, "%.5g (fixed)", (double)XwaRemasterFlight_Exposure());
+	}
+}
+
 int XwaRemaster_BenchmarkFlightFrames(void) {
 	const XwaSnapshot* snap = XwaSnapshot_Current();
-	const char* reason = NULL;
-
-	if (!g.initialized || !g.assets) {
-		reason = "the HD renderer isn't running";
-	} else if (!snap || snap->scene_kind != XWA_SCENE_FLIGHT || !snap->flight_camera_valid) {
-		reason = "the frozen frame isn't a flight view";
-	} else if (XwaRemasterEnvCapture_Pending()) {
-		reason = "an environment capture is pending";
-	} else if (g.force_scene_render || g.last_tick != snap->tick_index || !g.scene_tex ||
-			   g.scene_kind != XWA_SCENE_FLIGHT) {
-		/* The frame's render didn't run: HD view off, or assets still loading. */
-		reason = "the HD renderer didn't draw the frozen frame";
-	}
+	const char* reason = rm_frozen_frame_problem(snap);
 	if (reason) {
 		Aeron_LogError("xwa.benchmark", "film benchmark: can't measure: %s", reason);
 		return 0;
 	}
 
 	/* The exposure sets the range of the point lights, so it changes the cost. */
-	AeronSceneExposureReadout exposure;
-	char exposure_text[48] = "fixed";
-	if (XwaRemasterFlight_GetExposureReadout(&exposure)) {
-		snprintf(exposure_text, sizeof exposure_text, "metered EV100 %.3f", (double)exposure.ev100);
-	}
-	Aeron_LogInfo("xwa.benchmark", "film benchmark: measuring %d renders at %dx%d, exposure %.5g (%s)",
+	char exposure_text[64];
+	rm_exposure_text(exposure_text, sizeof exposure_text);
+	Aeron_LogInfo("xwa.benchmark", "film benchmark: measuring %d renders at %dx%d, exposure %s",
 				  RM_BENCHMARK_WARMUP_RENDERS + RM_BENCHMARK_SAMPLES * RM_BENCHMARK_SAMPLE_RENDERS,
-				  g.render_pixel_width, g.render_pixel_height, (double)XwaRemasterFlight_Exposure(),
-				  exposure_text);
+				  g.render_pixel_width, g.render_pixel_height, exposure_text);
 	uint64_t wall_us;
 	uint64_t cpu_us;
 	if (!Aeron_WaitForGpuIdle() || !rm_benchmark_run(snap, RM_BENCHMARK_WARMUP_RENDERS, &wall_us, &cpu_us)) {
@@ -1061,6 +1077,129 @@ int XwaRemaster_BenchmarkFlightFrames(void) {
 				  "recording: median %.3f ms",
 				  frame_ms[RM_BENCHMARK_SAMPLES / 2], frame_ms[0], frame_ms[RM_BENCHMARK_SAMPLES - 1],
 				  cpu_ms[RM_BENCHMARK_SAMPLES / 2]);
+	return 1;
+}
+
+static float rm_half_to_float(uint16_t half) {
+	const uint32_t exponent = (half >> 10) & 31u;
+	const uint32_t mantissa = half & 1023u;
+	if (exponent == 0) {
+		const float value = mantissa ? ldexpf((float)mantissa, -24) : 0.0f;
+		return (half & 0x8000u) ? -value : value;
+	}
+	const uint32_t bits = ((uint32_t)(half & 0x8000u) << 16) |
+						  (exponent == 31 ? 0x7f800000u : (exponent + 112u) << 23) | (mantissa << 13);
+	float value;
+	memcpy(&value, &bits, sizeof value);
+	return value;
+}
+
+/* Submits `cmd` and waits until the GPU has run it. */
+static int rm_submit_and_wait(AeronCommandBuffer* cmd) {
+	AeronGpuFence* fence = Aeron_SubmitCommandBufferAndAcquireFence(cmd);
+	if (!fence) {
+		return 0;
+	}
+	const int waited = Aeron_WaitForGpuFence(fence);
+	Aeron_ReleaseGpuFence(fence);
+	return waited;
+}
+
+/* Reads the RGBA16F target `target` of `width` x `height` back as RGB
+ * floats, top row first. Negative and non-finite values become 0. */
+static int rm_read_rgb(AeronRenderTarget* target, int width, int height, uint16_t* half, float* rgb) {
+	const size_t pixels = (size_t)width * (size_t)height;
+	AeronTexture* texture = target ? Aeron_RenderTargetGetTexture(target) : NULL;
+	if (!texture || Aeron_TextureGetWidth(texture) != width || Aeron_TextureGetHeight(texture) != height ||
+		Aeron_TextureGetFormat(texture) != AERON_TEXTURE_FORMAT_RGBA16_FLOAT ||
+		!Aeron_ReadRenderTargetRawPixels(target, half, pixels * 8u, (size_t)width * 8u)) {
+		return 0;
+	}
+	for (size_t i = 0; i < pixels; ++i) {
+		for (int c = 0; c < 3; ++c) {
+			const float value = rm_half_to_float(half[i * 4u + (size_t)c]);
+			rgb[i * 3u + (size_t)c] = value > 0.0f && isfinite(value) ? value : 0.0f;
+		}
+	}
+	return 1;
+}
+
+int XwaRemaster_CaptureFlightFrame(const char* name) {
+	const XwaSnapshot* snap = XwaSnapshot_Current();
+	const char* reason = rm_frozen_frame_problem(snap);
+	if (reason) {
+		Aeron_LogError("xwa.benchmark", "film capture: can't capture: %s", reason);
+		return 0;
+	}
+	const int width = g.render_pixel_width;
+	const int height = g.render_pixel_height;
+	const size_t pixels = (size_t)width * (size_t)height;
+	char png_path[1100];
+	char hdr_path[1100];
+	snprintf(png_path, sizeof png_path, "%s.png", name);
+	snprintf(hdr_path, sizeof hdr_path, "%s.hdr", name);
+	uint16_t* half = malloc(pixels * 8u);
+	float* rgb = malloc(pixels * 3u * sizeof *rgb);
+	uint8_t* bytes = malloc(pixels * 3u);
+	const char* failure = NULL;
+
+	if (!half || !rgb || !bytes) {
+		failure = "out of memory";
+	}
+	/* The final image, as the composed presentation shows it. */
+	if (!failure) {
+		AeronCommandBuffer* cmd = Aeron_AcquireCommandBuffer();
+		AeronTexture* texture = NULL;
+		if (cmd) {
+			XwaRemasterAssets_UpdateFrameSets(g.assets, snap);
+			Aeron_GpuDebugPush(cmd, "OpenXWA film capture frame");
+			texture = XwaRemasterFlight_Render(cmd, snap, g.assets, width, height, /*direct_present=*/0);
+			Aeron_GpuDebugPop(cmd);
+			if (!texture) {
+				Aeron_CancelCommandBuffer(cmd);
+			}
+		}
+		if (!texture || !rm_submit_and_wait(cmd) ||
+			!rm_read_rgb(XwaRemasterFlight_ComposedTarget(), width, height, half, rgb)) {
+			failure = "the frame's render failed";
+		}
+	}
+	if (!failure) {
+		/* The image holds linear display values. The PNG stores them in sRGB. */
+		for (size_t i = 0; i < pixels * 3u; ++i) {
+			const float value = fminf(rgb[i], 1.0f);
+			const float srgb = value <= 0.0031308f ? 12.92f * value : 1.055f * powf(value, 1.0f / 2.4f) - 0.055f;
+			bytes[i] = (uint8_t)(srgb * 255.0f + 0.5f);
+		}
+		if (!Aeron_ImageWritePngRgb8(Aeron_GetVfs(), AERON_VFS_ROOT_USER, png_path, width, height, bytes)) {
+			failure = "the PNG couldn't be written";
+		}
+	}
+	/* The same frame, before the tonemap. */
+	if (!failure) {
+		AeronCommandBuffer* cmd = Aeron_AcquireCommandBuffer();
+		const int recorded = cmd && XwaRemasterFlight_RecordBeforeTonemap(cmd);
+		if (cmd && !recorded) {
+			Aeron_CancelCommandBuffer(cmd);
+		}
+		if (!recorded || !rm_submit_and_wait(cmd) ||
+			!rm_read_rgb(XwaRemasterFlight_ComposedTarget(), width, height, half, rgb)) {
+			failure = "the render before the tonemap failed";
+		} else if (!Aeron_ImageWriteHdr(Aeron_GetVfs(), AERON_VFS_ROOT_USER, hdr_path, width, height, rgb)) {
+			failure = "the HDR image couldn't be written";
+		}
+	}
+	free(half);
+	free(rgb);
+	free(bytes);
+	if (failure) {
+		Aeron_LogError("xwa.benchmark", "film capture: %s", failure);
+		return 0;
+	}
+	char exposure_text[64];
+	rm_exposure_text(exposure_text, sizeof exposure_text);
+	Aeron_LogInfo("xwa.benchmark", "film capture: wrote %s and %s in the user folder, %dx%d, exposure %s",
+				  png_path, hdr_path, width, height, exposure_text);
 	return 1;
 }
 
