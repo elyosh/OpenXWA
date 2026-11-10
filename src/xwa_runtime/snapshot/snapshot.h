@@ -1316,8 +1316,9 @@ typedef struct XwaSnapshot {
 	uint64_t tick_index; /* monotonic host tick counter */
 	/* g_gameTime at commit — the SIM clock in game ticks of 4 ms
 	 * (XWA_SNAP_GAME_TICK_SECONDS; Time_GetFrameDelta counts
-	 * timeGetTime() >> 2). It freezes on pause, scales with time
-	 * compression and follows film replay.
+	 * timeGetTime() >> 2). It freezes on pause and scales with time
+	 * compression. While a film plays, it is the film's time after the
+	 * frame's step (g_filmStepInputTimestamp).
 	 * Drives driver-side animation pacing and the lerp-vs-snap decision
 	 * (equal across the pair = paused; non-monotonic = seek). The
 	 * tick's sim delta is the difference across the held pair. */
