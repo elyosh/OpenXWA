@@ -1026,9 +1026,16 @@ int XwaRemaster_BenchmarkFlightFrames(void) {
 		return 0;
 	}
 
-	Aeron_LogInfo("xwa.benchmark", "film benchmark: measuring %d renders at %dx%d",
+	/* The exposure sets the range of the point lights, so it changes the cost. */
+	AeronSceneExposureReadout exposure;
+	char exposure_text[48] = "fixed";
+	if (XwaRemasterFlight_GetExposureReadout(&exposure)) {
+		snprintf(exposure_text, sizeof exposure_text, "metered EV100 %.3f", (double)exposure.ev100);
+	}
+	Aeron_LogInfo("xwa.benchmark", "film benchmark: measuring %d renders at %dx%d, exposure %.5g (%s)",
 				  RM_BENCHMARK_WARMUP_RENDERS + RM_BENCHMARK_SAMPLES * RM_BENCHMARK_SAMPLE_RENDERS,
-				  g.render_pixel_width, g.render_pixel_height);
+				  g.render_pixel_width, g.render_pixel_height, (double)XwaRemasterFlight_Exposure(),
+				  exposure_text);
 	uint64_t wall_us;
 	uint64_t cpu_us;
 	if (!Aeron_WaitForGpuIdle() || !rm_benchmark_run(snap, RM_BENCHMARK_WARMUP_RENDERS, &wall_us, &cpu_us)) {
