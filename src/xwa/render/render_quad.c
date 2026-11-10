@@ -734,6 +734,16 @@ void RenderQuad_DrawGlow(int* corners5, int depthZ, Std3DTextureSurface* tex, in
 	float edgeBlue;
 	int nearFlag;
 
+#ifdef XWA_MODERN
+	/* Deviation: this glow only goes to the classic back buffer, so it is
+	   skipped when the classic frame won't be shown. The skip doesn't add the
+	   texture to the cache, set the clip scratch values or clear
+	   g_capVertexAlpha. */
+	if (XwaPort_IsClassicFlightFrameDiscarded()) {
+		return;
+	}
+#endif
+
 	cacheNode = &tex->cacheNode;
 	std3D_AddToTextureCache(tex);
 
