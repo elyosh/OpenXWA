@@ -2202,6 +2202,41 @@ const uint8_t g_missionConditionUsesCountByTriggerType[64] = {
 	1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 0,
 };
 
+#ifdef XWA_MODERN
+/* The slots of one region that a proximity trigger measures against, in slot
+   order: see the proximity branch of Mission_EvaluateCondition. The list is
+   kept while the next objects are in the same region, and dropped when a new
+   trigger is evaluated. Object slots never go past XWA_MAX_OBJECTS: other
+   tables indexed by slot have that size. */
+static uint16_t s_proximityTargets[XWA_MAX_OBJECTS];
+static uint32_t s_proximityTargetCount;
+static uint32_t s_proximityBase;
+static uint32_t s_proximityEnd;
+static int s_proximityValid;
+
+static const uint16_t* Mission_ProximityTargets(uint32_t base, uint32_t end, uint8_t targetFgIdx,
+												int craftOnly, uint32_t* count) {
+	if (!s_proximityValid || base != s_proximityBase || end != s_proximityEnd) {
+		uint32_t slot;
+
+		s_proximityTargetCount = 0;
+		for (slot = base; slot < end && s_proximityTargetCount < XWA_MAX_OBJECTS; ++slot) {
+			const ObjectRecord* object = &g_objectTable[slot];
+
+			if (object->objectType != 0 && object->flightGroupIdx == targetFgIdx &&
+				(!craftOnly || (object->mobj != NULL && object->mobj->pCraft != NULL))) {
+				s_proximityTargets[s_proximityTargetCount++] = (uint16_t)slot;
+			}
+		}
+		s_proximityBase = base;
+		s_proximityEnd = end;
+		s_proximityValid = 1;
+	}
+	*count = s_proximityTargetCount;
+	return s_proximityTargets;
+}
+#endif
+
 // FUNCTION: XWA 0x4D5AE0
 int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDepartedAsDestroyed,
 							  uint16_t teamOrVariable) {
@@ -2985,10 +3020,13 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 				targetFgIdx = (uint8_t)(trigger->parameter - 5);
 #ifdef XWA_MODERN
 				/* A mission can make the proximity triggers skip objects
-				   without craft data, such as projectiles. The setting is read
-				   once here because the inner loop runs for every slot of a
-				   region. */
+				   without craft data, such as projectiles. */
 				const int craftOnly = XwaMissionSettings_ProximityTriggersCheckCraftOnly();
+				const uint16_t* targets;
+				uint32_t targetCount;
+				uint32_t targetIndex;
+
+				s_proximityValid = 0;
 #endif
 				for (objectIdx = 0; objectIdx < g_regionObjectSlotEnd; ++objectIdx) {
 					ObjectRecord* object;
@@ -3013,14 +3051,21 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 					scanObjEnd = regionSlotBase +
 								 g_regionStaticObjectSlotsTotal / (uint32_t)g_missionRegionCount +
 								 g_regionMainObjectSlotsTotal / (uint32_t)g_missionRegionCount;
+#ifdef XWA_MODERN
+					/* The original scans every slot of the region for each
+					   matching object, and a battle can have hundreds of them.
+					   Instead, this walks the list of the region's slots that
+					   pass the same tests, in slot order. Nothing in the loop
+					   changes what the tests read, so the range checks run in
+					   the same order and give the same result. */
+					targets = Mission_ProximityTargets(scanObjIdx, scanObjEnd, targetFgIdx, craftOnly,
+													   &targetCount);
+					for (targetIndex = 0; targetIndex < targetCount; ++targetIndex) {
+						scanObjIdx = targets[targetIndex];
+#else
 					for (; scanObjIdx < scanObjEnd; ++scanObjIdx) {
 						if (g_objectTable[scanObjIdx].objectType == 0 ||
 							g_objectTable[scanObjIdx].flightGroupIdx != targetFgIdx) {
-							continue;
-						}
-#ifdef XWA_MODERN
-						if (craftOnly && (g_objectTable[scanObjIdx].mobj == NULL ||
-										  g_objectTable[scanObjIdx].mobj->pCraft == NULL)) {
 							continue;
 						}
 #endif

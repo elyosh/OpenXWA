@@ -1855,11 +1855,11 @@ void RenderBillboard_DrawObjectTrail(ObjectTrailEmitter* trail) {
 	float viewZ;
 
 #ifdef XWA_MODERN
-	/* Deviation: this ribbon only goes to the classic back buffer. The HD
-	   renderer draws trails from the emitters in the snapshot. So the ribbon
-	   is skipped when the classic frame won't be shown. The skip doesn't
-	   select the texture frame, set trail->curTexLevel, add the texture to the
-	   cache or set the clip scratch values. ObjectTrail_Update still runs. */
+	/* This ribbon only goes to the classic back buffer, and the HD renderer
+	   draws trails from the emitters in the snapshot, so the ribbon is skipped
+	   when the classic frame won't be shown. The skip doesn't select the
+	   texture frame, set trail->curTexLevel, add the texture to the cache or
+	   set the clip scratch values. ObjectTrail_Update still runs. */
 	if (XwaPort_IsClassicFlightFrameDiscarded()) {
 		return;
 	}

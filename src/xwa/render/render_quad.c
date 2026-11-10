@@ -458,12 +458,11 @@ int RenderQuad_DrawRotatedSprite(FlightTexQuad* quad, TexLevel* texLevel, int d3
 	float vScale;
 
 #ifdef XWA_MODERN
-	/* Deviation: this quad only goes to the classic back buffer, so it is
-	   skipped when the classic frame won't be shown because the HD renderer
-	   draws instead. No caller uses the return value. The skip doesn't add the
-	   texture to the cache, set the clip scratch values or clear
-	   g_capVertexAlpha. That flag is set again when the next hardware frame
-	   starts. */
+	/* This quad only goes to the classic back buffer, so it is skipped when
+	   the classic frame won't be shown because the HD renderer draws instead.
+	   No caller uses the return value. The skip doesn't add the texture to the
+	   cache, set the clip scratch values or clear g_capVertexAlpha. That flag
+	   is set again when the next hardware frame starts. */
 	if (XwaPort_IsClassicFlightFrameDiscarded()) {
 		return 0;
 	}
@@ -735,10 +734,9 @@ void RenderQuad_DrawGlow(int* corners5, int depthZ, Std3DTextureSurface* tex, in
 	int nearFlag;
 
 #ifdef XWA_MODERN
-	/* Deviation: this glow only goes to the classic back buffer, so it is
-	   skipped when the classic frame won't be shown. The skip doesn't add the
-	   texture to the cache, set the clip scratch values or clear
-	   g_capVertexAlpha. */
+	/* This glow only goes to the classic back buffer, so it is skipped when
+	   the classic frame won't be shown. The skip doesn't add the texture to
+	   the cache, set the clip scratch values or clear g_capVertexAlpha. */
 	if (XwaPort_IsClassicFlightFrameDiscarded()) {
 		return;
 	}
