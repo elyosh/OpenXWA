@@ -158,6 +158,13 @@ typedef struct FlEnergyState {
 	float start;
 } FlEnergyState;
 
+/* How long before now an effect starts when it was already showing when
+ * the object first appeared. A `once` effect is then over, and a loop is
+ * at some point of its cycle. */
+#define FL_ENERGY_SETTLED_SECONDS 3600.0f
+
+static uint32_t fl_energy(const XwaFlightObject* object);
+
 /* Elements in blocks that never move, so pointers to them stay valid while
  * the pool grows. A frame empties the pool and keeps its blocks. */
 typedef struct FlBlockPool {
@@ -428,6 +435,9 @@ static struct {
 	 * the classic HUD last drew them. */
 	FlStateOnsets player_states;
 	FlStateOnsets override_states;
+	/* The debug override's energy effect and when it started. */
+	uint32_t override_energy;
+	float override_energy_start;
 	float states_time;
 	uint8_t target_event;
 	uint8_t states_in_hangar;
@@ -493,7 +503,12 @@ static int fl_reserve_prev_index(uint32_t count) {
 }
 
 /* Gives the energy states one entry per slot of the snapshot's object table,
- * and clears them when the mission changes. */
+ * clears them when the mission changes, and updates them for every craft of
+ * the snapshot, drawn or not. An effect starts when a craft's effect
+ * changes. A craft seen for the first time, or after the clock went back,
+ * gets its current effect with a start long before now, so a craft that
+ * appears without shields doesn't flash. Updating twice for one snapshot
+ * changes nothing. */
 static void fl_prepare_energy_states(const XwaSnapshot* snap) {
 	if (strcmp(s.energy_mission, snap->mission_path) != 0) {
 		snprintf(s.energy_mission, sizeof s.energy_mission, "%s", snap->mission_path);
@@ -510,6 +525,24 @@ static void fl_prepare_energy_states(const XwaSnapshot* snap) {
 			   (size_t)(snap->flight_slot_count - s.energy_state_count) * sizeof *states);
 		s.energy_states = states;
 		s.energy_state_count = snap->flight_slot_count;
+	}
+	const float now = (float)((double)snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS);
+	const uint32_t* craft = snap->flight_lists[XWA_SNAP_LIST_CRAFT];
+	for (uint32_t i = 0; i < snap->flight_list_count[XWA_SNAP_LIST_CRAFT]; i++) {
+		const XwaFlightObject* object = &snap->flight_objects[craft[i]];
+		if (!object->has_craft || object->slot >= s.energy_state_count) {
+			continue;
+		}
+		FlEnergyState* state = &s.energy_states[object->slot];
+		const uint32_t energy = fl_energy(object);
+		if (!state->valid || state->signature != object->signature || now < state->start) {
+			state->start = now - FL_ENERGY_SETTLED_SECONDS;
+		} else if (energy != state->energy) {
+			state->start = now;
+		}
+		state->signature = object->signature;
+		state->energy = (uint8_t)energy;
+		state->valid = 1;
 	}
 }
 
@@ -4939,24 +4972,18 @@ static uint32_t fl_energy(const XwaFlightObject* object) {
 	return object->shield_front + object->shield_rear == 0 ? 1u : 0u;
 }
 
-/* When the object's current energy effect started, in animation seconds:
- * now when it changed, counting an object not seen before as showing none
- * (so a craft without shields flashes once when it appears), or when the
- * clock went back. */
-static float fl_energy_start(const XwaFlightObject* object, uint32_t energy) {
+/* When the object's current energy effect started, in animation seconds,
+ * from the states of fl_prepare_energy_states. An object without a state
+ * gets a start long before now. */
+static float fl_energy_start(const XwaFlightObject* object) {
 	const float now = s.snap ? (float)((double)s.snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS) : 0.0f;
-	if (object->slot >= s.energy_state_count) {
-		return now;
+	if (object->slot < s.energy_state_count) {
+		const FlEnergyState* state = &s.energy_states[object->slot];
+		if (state->valid && state->signature == object->signature) {
+			return state->start;
+		}
 	}
-	FlEnergyState* state = &s.energy_states[object->slot];
-	const uint32_t previous = state->valid && state->signature == object->signature ? state->energy : 0u;
-	if (energy != previous || !state->valid || state->signature != object->signature || now < state->start) {
-		state->start = now;
-	}
-	state->signature = object->signature;
-	state->energy = (uint8_t)energy;
-	state->valid = 1;
-	return state->start;
+	return now - FL_ENERGY_SETTLED_SECONDS;
 }
 
 /* The cannon-state bits (cannon.1 .. cannon.8) of hardpoints first to last. */
@@ -5059,12 +5086,14 @@ static void fl_state_onsets_update(FlStateOnsets* states, uint32_t mask, uint32_
  * target event (warhead lock over laser lock over a selected target, with
  * `target` set for any of them) and the hangar. A state fires when it
  * becomes set; `target` when the target event becomes "selected". The debug
- * override's states fire the same way. All of it starts over when the clock
- * goes back. Repeating the update for a snapshot changes nothing. */
+ * override's states fire the same way, and its energy effect starts when it
+ * changes. All of it starts over when the clock goes back. Repeating the
+ * update for a snapshot changes nothing. */
 static void fl_update_material_states(const XwaSnapshot* snap, float now) {
 	if (now < s.states_time) {
 		memset(&s.player_states, 0, sizeof s.player_states);
 		memset(&s.override_states, 0, sizeof s.override_states);
+		s.override_energy = 0;
 		memset(&s.threats, 0, sizeof s.threats);
 		s.target_event = FL_TARGET_NONE;
 	}
@@ -5116,6 +5145,11 @@ static void fl_update_material_states(const XwaSnapshot* snap, float now) {
 	fl_state_onsets_update(&s.player_states, mask, fired, now);
 	const uint32_t forced = s.anim_override.enabled ? s.anim_override.state_mask : 0u;
 	fl_state_onsets_update(&s.override_states, forced, forced & ~s.override_states.mask, now);
+	const uint32_t forced_energy = s.anim_override.enabled ? s.anim_override.energy : 0u;
+	if (forced_energy != s.override_energy) {
+		s.override_energy = forced_energy;
+		s.override_energy_start = now;
+	}
 }
 
 /* Begins the scene's frame with its exposure, fixed or metered, and with
@@ -5209,8 +5243,10 @@ static const AeronSceneMaterialAnim* fl_object_anim(const XwaFlightObject* objec
 		anim->energy = o->energy;
 		anim->state_mask = o->state_mask;
 		memcpy(anim->onset, s.override_states.onset, sizeof anim->onset);
+		anim->energy_start = s.override_energy_start;
+	} else {
+		anim->energy_start = fl_energy_start(object);
 	}
-	anim->energy_start = fl_energy_start(object, anim->energy);
 	return anim;
 }
 
