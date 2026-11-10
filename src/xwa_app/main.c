@@ -362,6 +362,10 @@ int main(int argc, char** argv) {
 		Aeron_LogError("xwa.config", "%s", config_error);
 		return 2;
 	}
+	if (launch.help) {
+		fputs(XwaLaunchOptions_Help(), stdout);
+		return 0;
+	}
 	memset(&config, 0, sizeof(config));
 	config.org_name = "TotallyOpen";
 	config.app_name = "OpenXWA";
@@ -511,7 +515,7 @@ int main(int argc, char** argv) {
 	XwaPort_SetCommandLine(launch.game_command_line);
 	XwaModernFlightTiming_Configure(host_config.flight_simulation_step_ticks);
 	XwaFilmState_Configure(selected_mod);
-	XwaFilmBenchmark_Configure(launch.play_film, launch.benchmark_out);
+	XwaFilmBenchmark_Configure(launch.play_film, launch.benchmark_out, launch.film_pause_at, launch.film_benchmark);
 	/* XwaRemaster_Init succeeded above, so the HD renderer is available. */
 	XwaModelSource_Configure(!host_config.force_opt_models);
 	XwaMovieTask_Configure(host_config.prefer_original_movies);
@@ -592,7 +596,9 @@ int main(int argc, char** argv) {
 			if (Aeron_QuitRequested() || XwaPort_ShouldQuit()) {
 				break;
 			}
-			if (paused || toggled) {
+			/* A frozen film runs no film steps either (film_benchmark.h). */
+			const int film_frozen = XwaFilmBenchmark_IsFrozen();
+			if (paused || toggled || film_frozen) {
 				XwaPort_PausedFrame();
 			} else {
 				XwaPort_Tick(delta_us);
@@ -611,8 +617,11 @@ int main(int argc, char** argv) {
 				break;
 			}
 			XwaFilmBenchmark_NoteHostFrame(remaster_us, Aeron_NowUs() - frame_start_us);
+			if (XwaFilmBenchmark_MeasurementDue()) {
+				XwaFilmBenchmark_MeasurementDone(XwaRemaster_BenchmarkFlightFrames());
+			}
 			uint64_t wake_us = presentation_interval_us();
-			if (!paused) {
+			if (!paused && !film_frozen) {
 				const uint64_t task_us = XwaPort_NextWakeDelayUs();
 				if (task_us < wake_us)
 					wake_us = task_us;

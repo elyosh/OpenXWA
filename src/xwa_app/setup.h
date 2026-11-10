@@ -19,10 +19,20 @@ typedef struct XwaLaunchOptions {
 	   folder, that gets its frame times. */
 	char play_film[256];
 	char benchmark_out[XWA_HOST_CONFIG_PATH_CAPACITY];
+	/* --film-pause-at: the film time, in game ticks, at which the film
+	   freezes; -1 without it. --film-benchmark: measure the frozen frame's
+	   GPU time, then quit. */
+	int film_pause_at;
+	int film_benchmark;
+	/* --help or -h: print the launch options and quit. */
+	int help;
 	char game_command_line[1024];
 } XwaLaunchOptions;
 
 int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* error, size_t error_size);
+
+/* The text that --help prints: every launch option, one line each. */
+const char* XwaLaunchOptions_Help(void);
 
 /* Applies a candidate asset root and validates the canonical install layout:
  * an installed game directory with the CD ALLIANCE contents merged into the

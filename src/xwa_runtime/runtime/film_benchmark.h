@@ -1,6 +1,7 @@
 #ifndef XWA_RUNTIME_FILM_BENCHMARK_H
 #define XWA_RUNTIME_FILM_BENCHMARK_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef __cplusplus
@@ -20,8 +21,11 @@ extern "C" {
 
 /* `filmName` is a film of the user folder's film folder, with or without
    .flm; empty for a normal start. `csvPath`, when not empty, is a file of the
-   user folder. Call it before XwaPort_Init. */
-void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath);
+   user folder. `pauseAt`, when 0 or more, is the film time, in game ticks, at
+   which the film freezes (--film-pause-at); the film fast-forwards to it.
+   `measure` measures the GPU time of the frozen frame, then quits
+   (--film-benchmark). Call it before XwaPort_Init. */
+void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, int32_t pauseAt, int measure);
 int XwaFilmBenchmark_IsRequested(void);
 
 /* The first screen when a film is asked for: it starts the film's flight. */
@@ -34,6 +38,33 @@ int XwaFilmBenchmark_IsPlaying(void);
 void XwaFilmBenchmark_FlightEnded(void);
 int XwaFilmBenchmark_ShouldQuit(void);
 int XwaFilmBenchmark_ExitCode(void);
+
+/* Freezing a film. A frozen film runs no film steps and commits no snapshots:
+   the current and previous snapshots stay two consecutive film steps, and the
+   remaster renders the current one on every host frame. */
+
+/* Whether a film is playing in flight, from --play-film or the film room. */
+int XwaFilmBenchmark_FilmPlaying(void);
+/* The film time at the end of the last film step played, in game ticks. */
+int32_t XwaFilmBenchmark_FilmTime(void);
+/* The playing film's name, without its folder and extension. */
+void XwaFilmBenchmark_FilmName(char* out, size_t size);
+int XwaFilmBenchmark_IsFrozen(void);
+/* Freezes the film after its next film step. */
+void XwaFilmBenchmark_RequestFreeze(void);
+void XwaFilmBenchmark_Resume(void);
+/* Call after each snapshot commit of a flight frame. Freezes the film when
+   its time reaches the target, or when a freeze was requested. */
+void XwaFilmBenchmark_NoteFlightCommit(void);
+/* Call after XwaFlightTask_Tick. Before the target, runs more film steps in
+   this host frame. Returns 1 while the fast-forward runs: the host frame then
+   commits no snapshot. */
+int XwaFilmBenchmark_FastForward(void);
+/* Whether --film-benchmark asks to measure now: the film is frozen and its
+   frame was presented. */
+int XwaFilmBenchmark_MeasurementDue(void);
+/* The measurement ended; the game quits, with exit code 1 when `ok` is 0. */
+void XwaFilmBenchmark_MeasurementDone(int ok);
 
 /* The times of this host frame, in microseconds: the flight task's tick when
    it ran a flight frame (`flightFrameRan`), and the snapshot capture and

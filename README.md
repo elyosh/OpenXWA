@@ -93,16 +93,6 @@ OpenXWA --mod /path/to/mod
 Without a mod, the game uses the original assets. To make a mod, see
 [Making mods for OpenXWA](modding/README.md).
 
-To compare the speed of two builds, play a film from the command line. The
-game starts the film directly, then quits when it ends and logs the frame
-times: the median, the 95th percentile and the worst frame. The film is a
-file of the `film` folder in your user folder. With `--benchmark-out`, the
-time of each frame is also written to a CSV file in the user folder:
-
-```sh
-OpenXWA --play-film battle --benchmark-out battle.csv
-```
-
 ## Supported platforms
 
 | Platform | Target | Graphics backend |

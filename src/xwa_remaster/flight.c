@@ -248,6 +248,9 @@ static struct {
 	float explosion_genus_emissive_strength;
 	float glow_mark_emissive_strength;
 	float cockpit_glow_mark_emissive_strength;
+	/* small_objects in remaster/config.yaml, in pixels of a 1080-line view. */
+	float small_prepass_min_size;
+	float small_draw_min_size;
 	float map_ambient_min[3]; /* lighting.map_ambient_min_* */
 	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
 	 * window narrower than this aspect gets a wider view, so that the
@@ -285,6 +288,7 @@ static struct {
 	 * spawn frame, zero velocity). */
 	int mb_enabled;
 	float mb_prev_vp[16];
+	float mb_prev_ori[4];
 	const XwaSnapshot* mb_prev_snap;
 	int32_t* mb_prev_index;
 	uint32_t mb_prev_index_capacity;
@@ -732,6 +736,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"dynamic_cockpit.display_emissive_strength",
 		"dynamic_cockpit.hologram_emissive_strength",
 		"motion_blur.shutter",
+		"small_objects.prepass_min_size",
+		"small_objects.draw_min_size",
 		"temporal_upscaling.sharpness",
 		"texture_filtering.max_anisotropy",
 	};
@@ -744,6 +750,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"dynamic_cockpit.classic_hud",   "dynamic_cockpit.holograms",
 		"point_lights.model_lights",     "presentation.latency_pacing",
 		"hyperspace_jump.exit_forward",  "hyperspace_jump.warp_sky_half_resolution",
+		"models.backface_fill",
 	};
 	static const char* strings[] = {
 		"presentation.cockpit_fov",
@@ -1666,6 +1673,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+	XwaRemasterShip_SetBackfaceFill(AeronConfigFile_GetBool(cf, "models.backface_fill", 1));
 	if (!XwaRemasterSuns_LoadFlareElements(cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
@@ -1699,6 +1707,14 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.mb_shutter = (float)AeronConfigFile_GetFloat(cf, "motion_blur.shutter", 0.0);
 	if (!isfinite(s.mb_shutter) || s.mb_shutter < 0.0f) {
 		Aeron_LogError("xwa.remaster", "%s: motion_blur.shutter must be finite and non-negative", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	s.small_prepass_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.prepass_min_size", 0.0);
+	s.small_draw_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.draw_min_size", 0.0);
+	if (!isfinite(s.small_prepass_min_size) || s.small_prepass_min_size < 0.0f ||
+		!isfinite(s.small_draw_min_size) || s.small_draw_min_size < 0.0f) {
+		Aeron_LogError("xwa.remaster", "%s: small_objects sizes must be numbers, 0 or more", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -6122,7 +6138,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 									.ssao_sample_jitter = s.ssao.ssao_sample_jitter,
 									.mb_quality = 0,
 								});
-	AeronScene_SetMotionContext(s.scene, NULL, 1);
+	AeronScene_SetMotionContext(s.scene, NULL, NULL, 1);
 
 	if (player_found && player_f) {
 		fl_add_cockpit_lights(snap, player_bw, player_local);
@@ -6643,7 +6659,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	}
 	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
 	AeronScene_SetPost(s.scene, NULL);
-	AeronScene_SetMotionContext(s.scene, NULL, 1);
+	AeronScene_SetMotionContext(s.scene, NULL, NULL, 1);
 	AeronScene_SetDirectionalShadow(s.scene, NULL);
 
 	FlMapSubmitContext submit_context = { .cmd = cmd, .assets = assets };
@@ -6920,6 +6936,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			fl_build_view_at_origin(pc, s.origin_world, s.rt_w, s.rt_h, previous_rotation,
 									&previous_flight_view);
 			memcpy(s.mb_prev_vp, previous_flight_view.view_proj, sizeof s.mb_prev_vp);
+			memcpy(s.mb_prev_ori, previous_flight_view.camera.ori, sizeof s.mb_prev_ori);
 			s.mb_enabled = 1;
 			/* Hold velocity while a paused snapshot is truly unchanged. Camera
 			 * panning and cockpit articulation can still change with frozen sim
@@ -7215,7 +7232,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 									.mb_camera_blur = s.mb_camera_blur,
 									.mb_velocity_viz = s.mb_velocity_viz,
 								});
-	AeronScene_SetMotionContext(s.scene, s.mb_enabled ? s.mb_prev_vp : NULL, mb_regen);
+	AeronScene_SetMotionContext(s.scene, s.mb_enabled ? s.mb_prev_vp : NULL, s.mb_enabled ? s.mb_prev_ori : NULL,
+								mb_regen);
 
 	/* The lit PBR env is submitted AFTER the instance walk (frame
 	 * uniforms are copied at submit and bound inside Render) so the
@@ -7571,7 +7589,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	fl_submit_lens_flares(snap, &flight_view);
 	fl_submit_sun_flare(snap, &scene_lighting);
 
+	/* Only the flight view: the map shows ships small on purpose. */
+	const float px_per_1080 = (float)s.rt_h / 1080.0f;
+	AeronScene_SetSmallInstanceCull(s.scene, s.small_prepass_min_size * px_per_1080,
+									s.small_draw_min_size * px_per_1080);
 	const int rendered = AeronScene_Render(s.scene, cmd);
+	AeronScene_SetSmallInstanceCull(s.scene, 0.0f, 0.0f);
 	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
 	s.before_opaque_mode = FL_BEFORE_OPAQUE_NONE;
 	s.snap = NULL; /* hooks must not outlive the snapshot */
