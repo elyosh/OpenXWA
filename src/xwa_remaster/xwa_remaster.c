@@ -249,7 +249,8 @@ static int XwaRemaster_VideoOptionsValid(const XwaModernVideoOptions* options) {
 		   options->motion_blur_amount <= 1.0f && options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 &&
 		   options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB &&
 		   options->paper_white >= XWA_MODERN_PAPER_WHITE_AUTO &&
-		   options->paper_white <= XWA_MODERN_PAPER_WHITE_400;
+		   options->paper_white <= XWA_MODERN_PAPER_WHITE_400 && isfinite(options->hud_scale) &&
+		   options->hud_scale >= XWA_MODERN_HUD_SCALE_MIN && options->hud_scale <= XWA_MODERN_HUD_SCALE_MAX;
 }
 
 void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
@@ -279,6 +280,7 @@ void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
 	out->hdr_output = XwaRemaster_GetHdrDesired();
 	out->sdr_gamma = XwaRemaster_SdrGammaFromDecode(Aeron_OutputSdrContentGamma());
 	out->paper_white = XwaRemaster_PaperWhiteFromNits(Aeron_OutputPaperWhiteNits());
+	out->hud_scale = XwaRemasterHud_UserScale();
 }
 
 void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
@@ -321,6 +323,7 @@ void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
 #endif
 
 	XwaRemaster_SetHdrDesired(options->hdr_output);
+	XwaRemasterHud_SetUserScale(options->hud_scale);
 }
 
 int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
@@ -390,6 +393,9 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	}
 	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_PAPER_WHITE) {
 		video_options.paper_white = options->video_options.paper_white;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_HUD_SCALE) {
+		video_options.hud_scale = options->video_options.hud_scale;
 	}
 	XwaRemaster_SetVideoOptions(&video_options);
 	g.hdr_apply_pending = 0;

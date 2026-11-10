@@ -414,10 +414,12 @@ The settings:
 
 The font size is the height of the font's em. In the menus, it is in units
 of the original 640 × 480 screen. The menus use the sizes 10, 12, 15 and
-20. In flight, it is in pixels of the flight screen, and flight uses the
-sizes 10, 12 and 16. In flight, `metrics: font` keeps the line height of
-the original font, and the widths of the characters are cut to whole
-pixels.
+20. In flight, it is in pixels of the game's 1920 × 1080 flight screen. Most
+HUD text uses size 16, and small text, such as the text next to the target
+arrow, uses size 12. The target readout uses 10, 12 and 16 for its small,
+medium and large text. In flight, `metrics: font` keeps the line height of
+the original font, and the widths of the characters are cut to whole pixels
+at the font size.
 
 The game's text uses the Windows-1252 character set. The font needs the
 characters of that set that your text uses. The log warns about a character
@@ -435,7 +437,7 @@ resolution, in the same folders:
 | Files | Font |
 |-|-|
 | `frontend/fonts/font<size>.fnt` and `font<size>.png` | The menu font of size 10, 12, 15 or 20, at 4 times the original size. |
-| `flight/fonts/font_tier_<n>.fnt` and `font_tier_<n>.ktx2` | The flight font: tier 0 for lines 16 pixels high, tier 1 for 12 and tier 2 for 10. |
+| `flight/fonts/font_tier_<n>.fnt` and `font_tier_<n>.ktx2` | The flight font: tier 0 for lines 16 pixels high, tier 1 for 12 and tier 2 for 10. Most HUD text uses tier 0 and small text tier 1. The target readout uses all three. |
 
 The `.fnt` file gives the place of each character in the image. A bitmap
 font only changes how the characters look: the game keeps the widths and

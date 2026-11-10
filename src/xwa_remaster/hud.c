@@ -9,6 +9,7 @@
 
 #include "aeron/aeron.h"
 #include "xwa/assets/object_type.h"
+#include "xwa_runtime/config/modern_video_options.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -72,6 +73,8 @@ static const XwaHudWidgetDesc hud_widgets[] = {
 
 static XwaHudLayout hud_layout;
 static int hud_initialized;
+/* The player's HUD scale (video.hud_scale). Shutdown doesn't reset it. */
+static float hud_user_scale = 1.0f;
 
 typedef struct HudCachedFrame {
 	int16_t object_type;
@@ -218,6 +221,13 @@ int XwaRemasterHud_Init(AeronVfs* vfs) {
 
 const XwaHudLayout* XwaRemasterHud_Layout(void) { return hud_initialized ? &hud_layout : NULL; }
 
+void XwaRemasterHud_SetUserScale(float scale) {
+	if (scale >= XWA_MODERN_HUD_SCALE_MIN && scale <= XWA_MODERN_HUD_SCALE_MAX)
+		hud_user_scale = scale;
+}
+
+float XwaRemasterHud_UserScale(void) { return hud_user_scale; }
+
 void XwaRemasterHud_Shutdown(void) {
 	XwaRemasterDc_Shutdown();
 	XwaRemasterHudReadout_Shutdown();
@@ -357,7 +367,8 @@ void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* sna
 	const XwaHudState* hud = snapshot ? &snapshot->hud : NULL;
 	if (!cmd || !assets || !hud_initialized)
 		return;
-	if (!XwaRemasterHudLayout_Resolve(&hud_layout, target_w, target_h))
+	const float classic_hud_scale = hud && hud->classic_hud_scale > 0.0f ? hud->classic_hud_scale : 1.0f;
+	if (!XwaRemasterHudLayout_Resolve(&hud_layout, target_w, target_h, hud_user_scale, classic_hud_scale))
 		return;
 	const uint32_t layout_generation = hud_layout.generation;
 	const uint32_t bundle_generation = XwaRemasterAssets_Generation(assets);

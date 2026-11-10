@@ -90,7 +90,7 @@ static void box_build_readout_bars(const XwaSnapshot* snapshot, const XwaModernT
 		object->craft_state == XWA_SNAP_CRAFT_STATE_DYING ||
 		object->craft_state == XWA_SNAP_CRAFT_STATE_DESTROYED)
 		return;
-	const float pt = readout->point_px;
+	const float pt = readout->hud_point_px;
 	float shield = target->shield_pct / 100.0f;
 	if (shield > 2.0f)
 		shield = 2.0f;
@@ -242,13 +242,13 @@ void XwaRemasterHudBoxes_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 		return;
 	const float screen_w = snapshot->flight_camera.screen_w ? snapshot->flight_camera.screen_w : 640.0f;
 	const float classic_pixel_px = flight_view->classic_pixel_scale;
-	const float classic_pixel_ref = classic_pixel_px / output_scale;
 	const float proj_scale =
 		snapshot->flight_camera.proj_scale > 0.0f ? snapshot->flight_camera.proj_scale : 512.0f;
 	const int max_box_size = (int)screen_w * 3 / 4;
 	XwaModernTargetReadoutOptions readout_options;
 	XwaModernTargetReadoutOptions_Get(&readout_options);
 	box_prepared.readout.point_px = (float)viewport.height / 1080.0f;
+	box_prepared.readout.hud_point_px = box_prepared.readout.point_px * layout_profile->scale.user;
 	box_prepared.line_px = XwaCraftHud_TargetBoxLineWidth() * box_prepared.readout.point_px;
 	int readout_component_box = -1;
 	for (uint16_t i = 0; i < snapshot->hud.target_box_count; i++) {
@@ -367,7 +367,6 @@ void XwaRemasterHudBoxes_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 		box->y_ref = (box->y_px - out_y) / output_scale;
 		box->w_ref = box->w_px / output_scale;
 		box->h_ref = box->h_px / output_scale;
-		box->classic_pixel_ref = classic_pixel_ref;
 		if (readout_component) {
 			readout_component_box = box_prepared.box_count - 1;
 			if (readout_options.component_pulse) {

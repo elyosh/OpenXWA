@@ -18,7 +18,6 @@ typedef struct XwaHudPreparedBox {
 	float edge_px, arm_x_px, arm_y_px;
 	/* With line_px above 0, the box is drawn filled. */
 	uint8_t fill;
-	float classic_pixel_ref;
 } XwaHudPreparedBox;
 
 enum { XWA_HUD_MAX_READOUT_FILLS = 12 };
@@ -43,6 +42,9 @@ typedef struct XwaHudPreparedReadout {
 	int16_t component_box;
 	/* Target pixels for each point: 1/1080 of the flight view's height. */
 	float point_px;
+	/* The size of a point of the readout's text and bars, in target pixels:
+	   point_px times the HUD scale. */
+	float hud_point_px;
 	uint16_t fill_count;
 	XwaHudReadoutFill fills[XWA_HUD_MAX_READOUT_FILLS];
 } XwaHudPreparedReadout;

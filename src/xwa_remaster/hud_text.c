@@ -61,9 +61,14 @@ static XwaHudLayoutOrigin text_origin_for_pane(uint16_t pane) {
 		case XWA_HUD_PANE_MFD_LEFT_BODY:
 			return XWA_HUD_LAYOUT_LEFT_BOTTOM;
 		case XWA_HUD_PANE_CMD:
-		case XWA_HUD_PANE_MESSAGE_FLIGHT_GROUP:
 		case XWA_HUD_PANE_FPS:
 			return XWA_HUD_LAYOUT_CENTER_BOTTOM;
+		/* Hud_InitHUD places the message panes at a fraction of the screen
+		   height. */
+		case XWA_HUD_PANE_MESSAGE_SYSTEM:
+		case XWA_HUD_PANE_MESSAGE_FLIGHT_GROUP:
+		case XWA_HUD_PANE_MESSAGE_READY:
+			return XWA_HUD_LAYOUT_CENTER_X_SCREEN_Y;
 		default:
 			return XWA_HUD_LAYOUT_CENTER_TOP;
 	}
@@ -134,17 +139,18 @@ int XwaRemasterHudText_MapGlyph(const XwaHudPane* pane, const XwaHudGlyph* glyph
 	const XwaHudLayoutProfile* profile = XwaRemasterHudLayout_Profile(layout, profile_id);
 	if (!profile)
 		return 0;
-	const float source_pixel_scale = (float)profile->reference_h / screen_h;
+	/* The pane's origin is placed with the pane's rule. The glyph's position
+	   in the pane and its size are in pixels of the game's HUD layout. */
+	const float classic_px = profile->scale.classic_px;
 	float x, y;
 	XwaRemasterHudLayout_MapPoint(text_origin_for_pane(pane->id), screen_w, screen_h, profile->reference_w,
-								  profile->reference_h, source_pixel_scale, pane->origin_x + glyph->x,
-								  pane->origin_y + glyph->y, &x, &y);
+								  profile->reference_h, classic_px, pane->origin_x, pane->origin_y, &x, &y);
 	out->pane = glyph->pane;
 	out->anchor = (uint16_t)anchor_id;
-	out->x_ref = x;
-	out->y_ref = y;
-	out->w_ref = glyph->scale * source_pixel_scale;
-	out->h_ref = glyph->scale * source_pixel_scale;
+	out->x_ref = x + glyph->x * classic_px;
+	out->y_ref = y + glyph->y * classic_px;
+	out->w_ref = glyph->scale * classic_px;
+	out->h_ref = glyph->scale * classic_px;
 	return 1;
 }
 
@@ -254,21 +260,25 @@ static void text_build_target_arrow(const XwaSnapshot* snapshot, XwaHudProfileIn
 	if (!active)
 		return;
 	const XwaHudLayoutRect* bounds = &active->anchors[XWA_HUD_ANCHOR_TARGET_EDGE_BOUNDS].rect;
-	const float screen_w = snapshot->flight_camera.screen_w ? snapshot->flight_camera.screen_w : 640.0f;
-	const float screen_h = snapshot->flight_camera.screen_h ? snapshot->flight_camera.screen_h : 480.0f;
-	const float px_x = (float)active->reference_h / screen_h;
-	const float px_y = (float)active->reference_h / screen_h;
+	/* In pixels of the game's HUD layout. The padding of 6 must match the
+	   arrow's padding in XwaRemasterHudFixed_ProjectTargetArrow. */
+	const float px_x = active->scale.classic_px;
+	const float px_y = active->scale.classic_px;
 	int font_scale = (int)(snapshot->hud.classic_hud_scale * 10.0f);
 	if (font_scale < 1)
 		font_scale = 1;
 	const int tier = font_scale < 12 ? 2 : (font_scale < 15 ? 1 : 0);
+	/* The game asks for a line font_scale pixels high
+	   (FlightText_SetFontTier(0)), but draws the glyphs at the size of the
+	   font it picks: 10, 12 or 16. */
+	const int glyph_size = XwaRemasterText_FlightTierFontSize(tier);
 	const AeronFontAtlas* font = XwaRemasterHud_FlightFont(tier, NULL);
 	XwaRemasterFlightFace face_metrics;
 	const XwaRemasterFlightFace* face =
 		XwaRemasterText_FlightFaceMetrics(tier, &face_metrics) ? &face_metrics : NULL;
 	text_prepared.arrow_tier = (uint8_t)tier;
-	const float size_ref = font_scale * px_y;
-	const float line_h = (font_scale - (font_scale >> 2)) * px_y;
+	const float size_ref = glyph_size * px_y;
+	const float line_h = (glyph_size - (glyph_size >> 2)) * px_y;
 	const float name_w = XwaRemasterText_MeasureFlightString(font, face, snapshot->hud.target.name, size_ref);
 	const float local_x = arrow.center_x_ref - bounds->x;
 	const float local_y = arrow.center_y_ref - bounds->y;
@@ -404,7 +414,10 @@ static void text_build_target_readout(const XwaSnapshot* snapshot, XwaHudProfile
 	XwaRemasterFlightFace face_metrics;
 	const XwaRemasterFlightFace* face =
 		XwaRemasterText_FlightFaceMetrics(tier, &face_metrics) ? &face_metrics : NULL;
-	const float pt = boxes->readout.point_px / output_scale;
+	/* Text sizes grow with the HUD scale. The 50-point box size below
+	   doesn't. */
+	const float pt = boxes->readout.hud_point_px / output_scale;
+	const float box_pt = boxes->readout.point_px / output_scale;
 	const float size_ref = XwaRemasterText_FlightTierFontSize(tier) * pt;
 	const float spacing = (tier == 0 ? 20.0f : 18.0f) * pt;
 	const int brighten = options.brighten_text != 0;
@@ -437,8 +450,8 @@ static void text_build_target_readout(const XwaSnapshot* snapshot, XwaHudProfile
 		const float center_x = box->x_ref + box->w_ref * 0.5f;
 		float top = box->y_ref;
 		/* A box smaller than 50 points places the text as a 50-point box. */
-		if (box->w_ref < 50.0f * pt)
-			top = box->y_ref + box->h_ref * 0.5f - 25.0f * pt;
+		if (box->w_ref < 50.0f * box_pt)
+			top = box->y_ref + box->h_ref * 0.5f - 25.0f * box_pt;
 		/* The last line ends text_gap above the box. Each line is centred in
 		   its line spacing. */
 		const float first_line_top = top - options.text_gap * pt - line_count * spacing;
@@ -464,14 +477,19 @@ static void text_build_target_readout(const XwaSnapshot* snapshot, XwaHudProfile
 	}
 }
 
-static void text_build_target_box_readouts(const XwaSnapshot* snapshot) {
+static void text_build_target_box_readouts(const XwaSnapshot* snapshot, XwaHudProfileIndex profile) {
 	const XwaHudPreparedBoxState* boxes = XwaRemasterHudBoxes_Prepared();
-	if (!boxes || !boxes->valid || !snapshot->hud.target.valid)
+	const XwaHudLayoutProfile* active = XwaRemasterHudLayout_Profile(XwaRemasterHud_Layout(), profile);
+	if (!boxes || !boxes->valid || !snapshot->hud.target.valid || !active)
 		return;
 	int font_scale = (int)(snapshot->hud.classic_hud_scale * 10.0f);
 	if (font_scale < 1)
 		font_scale = 1;
 	const int tier = font_scale < 12 ? 2 : (font_scale < 15 ? 1 : 0);
+	/* The game asks for a line font_scale pixels high
+	   (FlightText_SetFontTier(0)), but draws the glyphs at the size of the
+	   font it picks: 10, 12 or 16. */
+	const int glyph_size = XwaRemasterText_FlightTierFontSize(tier);
 	const AeronFontAtlas* font = XwaRemasterHud_FlightFont(tier, NULL);
 	XwaRemasterFlightFace face_metrics;
 	const XwaRemasterFlightFace* face =
@@ -485,9 +503,9 @@ static void text_build_target_box_readouts(const XwaSnapshot* snapshot) {
 		const XwaHudPreparedBox* box = &boxes->boxes[i];
 		if (!box->readout)
 			continue;
-		const float px = box->classic_pixel_ref;
-		const float size_ref = font_scale * px;
-		const float line_h = (font_scale - (font_scale >> 2)) * px;
+		const float px = active->scale.classic_px;
+		const float size_ref = glyph_size * px;
+		const float line_h = (glyph_size - (glyph_size >> 2)) * px;
 		const float center_x = box->x_ref + box->w_ref * 0.5f;
 		const float bottom_y = box->y_ref + box->h_ref;
 		float width = XwaRemasterText_MeasureFlightString(font, face, snapshot->hud.target.name, size_ref);
@@ -553,7 +571,7 @@ void XwaRemasterHudText_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex pr
 		if (pane->id == XWA_HUD_PANE_RETICLE_COUNTS) {
 			float center_x_ref, center_y_ref;
 			const XwaHudLayoutProfile* active = XwaRemasterHudLayout_Profile(layout, profile);
-			const float pixel_scale = (float)active->reference_h / text_prepared.screen_h;
+			const float pixel_scale = active->scale.classic_px;
 			if (XwaRemasterHudFixed_ReticleCenter(&center_x_ref, &center_y_ref) && pixel_scale > 0.0f) {
 				pane->origin_x = (int16_t)lroundf(text_prepared.screen_w * 0.5f +
 												  (center_x_ref - active->reference_w * 0.5f) / pixel_scale);
@@ -564,7 +582,7 @@ void XwaRemasterHudText_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex pr
 	memcpy(text_prepared.glyphs, snapshot->hud.glyphs,
 		   (size_t)text_prepared.glyph_count * sizeof text_prepared.glyphs[0]);
 	text_build_target_arrow(snapshot, profile);
-	text_build_target_box_readouts(snapshot);
+	text_build_target_box_readouts(snapshot, profile);
 	text_build_target_readout(snapshot, profile);
 	if (text_prepared.glyph_count == 0 && text_prepared.arrow_glyph_count == 0 &&
 		text_prepared.readout_glyph_count == 0)
@@ -579,12 +597,14 @@ static void text_prepare_faces(AeronCommandBuffer* cmd, XwaRemasterAssets* asset
 	XwaRemasterFlightFace face;
 	int last_tier = -1;
 	float last_size = -1.0f;
-	/* Each tier at its font size too, the size of most of its text, so that
-	 * the first text of a tier later in the flight doesn't wait for its
-	 * atlas. */
-	const float source_pixel_scale = (float)profile->reference_h / text_prepared.screen_h;
+	/* Also prepare each font at its own size, so that the first text in a
+	 * font later in the flight doesn't wait for its atlas. The game always
+	 * draws glyphs at the font's own size:
+	 * FlightText_SelectHardwareFontForLineHeight sets the line height to 10,
+	 * 12 or 16, and FlightText_SetFontTier uses it as the glyph size. */
 	for (int tier = 0; tier < 3; tier++) {
-		const float size_px = XwaRemasterText_FlightTierFontSize(tier) * source_pixel_scale * output_scale;
+		const float size_px =
+			XwaRemasterText_FlightTierFontSize(tier) * profile->scale.classic_px * output_scale;
 		XwaRemasterText_PrepareFlightFace(cmd, assets, tier, size_px);
 	}
 	if (text_prepared.arrow_glyph_count &&
