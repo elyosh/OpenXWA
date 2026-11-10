@@ -527,7 +527,9 @@ typedef struct XwaFlightMapObject {
 	uint8_t effective_iff;
 	uint8_t render_kind;
 	uint8_t cull_kind;
-	uint8_t label_visible;
+	/* Set when the map draws the line down to the grid, the movement line,
+	 * the label and the range. Projectiles have none of these. */
+	uint8_t annotations_visible;
 	uint8_t movement_visible;
 	uint8_t box_visible;
 	uint8_t box_color_index;
