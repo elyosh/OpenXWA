@@ -2983,6 +2983,13 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 				}
 
 				targetFgIdx = (uint8_t)(trigger->parameter - 5);
+#ifdef XWA_MODERN
+				/* A mission can make the proximity triggers skip objects
+				   without craft data, such as projectiles. The setting is read
+				   once here because the inner loop runs for every slot of a
+				   region. */
+				const int craftOnly = XwaMissionSettings_ProximityTriggersCheckCraftOnly();
+#endif
 				for (objectIdx = 0; objectIdx < g_regionObjectSlotEnd; ++objectIdx) {
 					ObjectRecord* object;
 					uint32_t regionSlotBase;
@@ -2992,10 +2999,7 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 					object = &g_objectTable[objectIdx];
 					if (object->objectType == 0 ||
 #ifdef XWA_MODERN
-						/* A mission can make the proximity triggers skip
-						   objects without craft data, such as projectiles. */
-						(XwaMissionSettings_ProximityTriggersCheckCraftOnly() &&
-						 (object->mobj == NULL || object->mobj->pCraft == NULL)) ||
+						(craftOnly && (object->mobj == NULL || object->mobj->pCraft == NULL)) ||
 #endif
 						!Mission_ObjectMatchesTriggerVariableEx((uint16_t)objectIdx,
 																(MissionTriggerVariableType)variableType,
@@ -3011,14 +3015,15 @@ int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDeparted
 								 g_regionMainObjectSlotsTotal / (uint32_t)g_missionRegionCount;
 					for (; scanObjIdx < scanObjEnd; ++scanObjIdx) {
 						if (g_objectTable[scanObjIdx].objectType == 0 ||
-#ifdef XWA_MODERN
-							(XwaMissionSettings_ProximityTriggersCheckCraftOnly() &&
-							 (g_objectTable[scanObjIdx].mobj == NULL ||
-							  g_objectTable[scanObjIdx].mobj->pCraft == NULL)) ||
-#endif
 							g_objectTable[scanObjIdx].flightGroupIdx != targetFgIdx) {
 							continue;
 						}
+#ifdef XWA_MODERN
+						if (craftOnly && (g_objectTable[scanObjIdx].mobj == NULL ||
+										  g_objectTable[scanObjIdx].mobj->pCraft == NULL)) {
+							continue;
+						}
+#endif
 
 						pai_ObjectRefUpdateApproxRangeScore(objectIdx, scanObjIdx);
 						if (condition == 49) {
