@@ -1351,12 +1351,22 @@ static void Articulation_CarriedGroup(const ArticulationModel* model, unsigned i
    release it, closing once it is gone. */
 static void Articulation_StepCargoClamps(unsigned int objIdx) {
 	ArticulationModel view;
-	const ArticulationModel* model = Articulation_Model(objIdx, &view);
+	const ArticulationModel* model;
 	CraftData* craft = Articulation_Craft(objIdx);
 	char group[AERON_FLIGHT_TAG_MAX];
 	int angle = -1;
 
-	if (craft == NULL || model == NULL) {
+	if (craft == NULL) {
+		return;
+	}
+	/* This runs for every craft on every sim step, and almost no craft is
+	   boarding or releasing, so check that before looking up the model. */
+	if (craft->aiController.maneuverMode != ARTICULATION_BOARD_MANEUVER &&
+		craft->aiController.maneuverMode != ARTICULATION_RELEASE_MANEUVER) {
+		return;
+	}
+	model = Articulation_Model(objIdx, &view);
+	if (model == NULL) {
 		return;
 	}
 	if (craft->aiController.maneuverMode == ARTICULATION_BOARD_MANEUVER &&
