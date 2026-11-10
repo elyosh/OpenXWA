@@ -2559,6 +2559,76 @@ int collide_CheckSweptModelCollision(unsigned int sourceObjIdx, uint16_t targetO
 	return g_collideSweepHitMeshOrdinal;
 }
 
+#ifdef XWA_MODERN
+/* The rotation data of the meshes that laser sweeps test, by object type and
+   mesh, with the matrix of the last rotation seen.
+   collide_TestSweepAgainstModelMeshes needs both for every rotated mesh of
+   every craft that every laser passes near. ModelMesh_GetRotScaleData
+   searches the model's node tree, and the matrix needs a sine and a cosine.
+
+   An entry is valid while no memory handle has been allocated or freed
+   (g_handleGeneration), because the rotation data is in the model's handle
+   memory, which never moves. The matrix is valid for the rotation it was
+   built for: Math3D_BuildAxisAngleMatrix gets the same axis and angle, so it
+   gives the same matrix. */
+#define COLLIDE_ROT_SCALE_CACHE_SIZE 4096u
+
+typedef struct CollideRotScaleEntry {
+	uint32_t generation; /* g_handleGeneration + 1, 0 for an empty entry */
+	uint16_t objectType;
+	uint16_t meshIndex;
+	MemoryHandle modelHandle;
+	uint8_t hasMatrix;
+	uint8_t matrixRotation;
+	OptRotationScale* rotScale;
+	Matrix3x3 matrix;
+} CollideRotScaleEntry;
+
+static CollideRotScaleEntry s_collideRotScaleCache[COLLIDE_ROT_SCALE_CACHE_SIZE];
+
+/* Returns the entry of `objectType` and `meshIndex`, which holds the
+   ModelMesh_GetRotScaleData result. Returns NULL when the model isn't loaded,
+   like that function. */
+static CollideRotScaleEntry* collide_RotScaleEntry(int objectType, int meshIndex) {
+	CollideRotScaleEntry* entry;
+	MemoryHandle modelHandle;
+
+	if (!(g_objectTypes[objectType].assetFlags & 1)) {
+		return NULL;
+	}
+	modelHandle = g_loadedModels.byObjectType[objectType];
+	entry = &s_collideRotScaleCache[((unsigned int)objectType * 61u + (unsigned int)meshIndex) &
+									(COLLIDE_ROT_SCALE_CACHE_SIZE - 1u)];
+	if (entry->generation != g_handleGeneration + 1u || entry->objectType != (uint16_t)objectType ||
+		entry->meshIndex != (uint16_t)meshIndex || entry->modelHandle != modelHandle) {
+		entry->generation = g_handleGeneration + 1u;
+		entry->objectType = (uint16_t)objectType;
+		entry->meshIndex = (uint16_t)meshIndex;
+		entry->modelHandle = modelHandle;
+		entry->hasMatrix = 0;
+		entry->rotScale = ModelMesh_GetRotScaleData(objectType, meshIndex);
+	}
+	return entry;
+}
+
+/* The rotation matrix of the entry's mesh at `meshRotation`, built as
+   collide_TestSweepAgainstModelMeshes builds it. */
+static const Matrix3x3* collide_RotScaleMatrix(CollideRotScaleEntry* entry, unsigned int meshRotation) {
+	if (!entry->hasMatrix || entry->matrixRotation != (uint8_t)meshRotation) {
+		float axisAngle[4];
+
+		axisAngle[0] = entry->rotScale->rotationAxis.x * g_collideQ15ToUnitScale;
+		axisAngle[1] = entry->rotScale->rotationAxis.y * g_collideQ15ToUnitScale;
+		axisAngle[2] = entry->rotScale->rotationAxis.z * g_collideQ15ToUnitScale;
+		axisAngle[3] = meshRotation * 0.024543673f;
+		Math3D_BuildAxisAngleMatrix(&entry->matrix, axisAngle);
+		entry->hasMatrix = 1;
+		entry->matrixRotation = (uint8_t)meshRotation;
+	}
+	return &entry->matrix;
+}
+#endif
+
 // FUNCTION: XWA 0x4DF130
 void collide_TestSweepAgainstModelMeshes(unsigned int sourceObjIdx, unsigned int targetObjIdx,
 										 OptimizedPolyObject* model) {
@@ -2687,11 +2757,23 @@ void collide_TestSweepAgainstModelMeshes(unsigned int sourceObjIdx, unsigned int
 					if (meshRotation != 0) {
 						OptRotationScale* rotScale;
 
+#ifdef XWA_MODERN
+						CollideRotScaleEntry* rotScaleEntry;
+
+						rotScaleEntry = collide_RotScaleEntry(targetObj->objectType,
+															  g_collideSweepCurrentMeshOrdinal - 1);
+						rotScale = rotScaleEntry != NULL ? rotScaleEntry->rotScale : NULL;
+#else
 						rotScale = ModelMesh_GetRotScaleData(targetObj->objectType,
 															 g_collideSweepCurrentMeshOrdinal - 1);
+#endif
 						if (rotScale != NULL) {
+#ifdef XWA_MODERN
+							Matrix3x3 matrix;
+#else
 							float axisAngle[4];
 							Matrix3x3 matrix;
+#endif
 
 							g_collideSweepWalkerStart.x -= rotScale->pivot.x;
 							g_collideSweepWalkerStart.y -= rotScale->pivot.y;
@@ -2700,11 +2782,15 @@ void collide_TestSweepAgainstModelMeshes(unsigned int sourceObjIdx, unsigned int
 							g_collideSweepWalkerEnd.y -= rotScale->pivot.y;
 							g_collideSweepWalkerEnd.z -= rotScale->pivot.z;
 
+#ifdef XWA_MODERN
+							matrix = *collide_RotScaleMatrix(rotScaleEntry, meshRotation);
+#else
 							axisAngle[0] = rotScale->rotationAxis.x * g_collideQ15ToUnitScale;
 							axisAngle[1] = rotScale->rotationAxis.y * g_collideQ15ToUnitScale;
 							axisAngle[2] = rotScale->rotationAxis.z * g_collideQ15ToUnitScale;
 							axisAngle[3] = g_collideCurrentMeshRotationAngle;
 							Math3D_BuildAxisAngleMatrix(&matrix, axisAngle);
+#endif
 							Math3D_RotateVec3(&g_collideSweepWalkerStart, &matrix);
 							Math3D_RotateVec3(&g_collideSweepWalkerEnd, &matrix);
 
