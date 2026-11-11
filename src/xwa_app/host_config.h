@@ -2,6 +2,7 @@
 #define XWA_APP_HOST_CONFIG_H
 
 #include "aeron/vfs.h"
+#include "install_paths.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 
@@ -11,17 +12,10 @@
 extern "C" {
 #endif
 
-#define XWA_HOST_CONFIG_PATH_CAPACITY 1024
 #define XWA_HOST_CONFIG_MANIFEST_CAPACITY 256
 
 typedef struct XwaHostConfig {
-	char game_data_path[XWA_HOST_CONFIG_PATH_CAPACITY];
-	/* paths.mod. Empty when not set. */
-	char mod_path[XWA_HOST_CONFIG_PATH_CAPACITY];
-	/* paths.mods: the folder that holds the mods. Empty when not set. */
-	char mods_path[XWA_HOST_CONFIG_PATH_CAPACITY];
-	/* paths.use_mod: 0 runs the original game with no mod. 1 by default. */
-	int use_mod;
+	XwaInstallPaths paths;
 	int flight_simulation_step_ticks;
 	float model_smooth_angle_degrees;
 	float model_opt_emissive_strength;
@@ -50,16 +44,6 @@ typedef struct XwaHostConfig {
 } XwaHostConfig;
 
 int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size);
-/* Reads only paths.game_data, paths.mod, paths.mods and paths.use_mod from the user's
- * config.yaml, without the shipped defaults. The rest of `out` is zero. For
- * programs that only change those paths, such as the mod importer. */
-int XwaHostConfig_LoadPaths(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size);
-int XwaHostConfig_SaveGameDataPath(AeronVfs* vfs, const char* game_data_path, char* error, size_t error_size);
-int XwaHostConfig_SaveModsPath(AeronVfs* vfs, const char* mods_path, char* error, size_t error_size);
-/* Saves paths.mod, removed when `mod_path` is NULL or empty, and
- * paths.use_mod. */
-int XwaHostConfig_SaveModPath(AeronVfs* vfs, const char* mod_path, int use_mod, char* error,
-							  size_t error_size);
 int XwaHostConfig_SaveVideoOptions(AeronVfs* vfs, const XwaModernVideoOptions* options, char* error,
 								   size_t error_size);
 int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* options, char* error,

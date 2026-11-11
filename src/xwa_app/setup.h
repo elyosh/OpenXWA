@@ -2,7 +2,7 @@
 #define XWA_APP_SETUP_H
 
 #include "aeron/vfs.h"
-#include "host_config.h"
+#include "install_paths.h"
 
 #include <stddef.h>
 
@@ -11,20 +11,20 @@ extern "C" {
 #endif
 
 typedef struct XwaLaunchOptions {
-	char game_data_path[XWA_HOST_CONFIG_PATH_CAPACITY];
-	char resource_root[XWA_HOST_CONFIG_PATH_CAPACITY];
-	char mod_path[XWA_HOST_CONFIG_PATH_CAPACITY];
+	char game_data_path[XWA_INSTALL_PATH_CAPACITY];
+	char resource_root[XWA_INSTALL_PATH_CAPACITY];
+	char mod_path[XWA_INSTALL_PATH_CAPACITY];
 	/* --play-film: a film of the user folder's film folder to play, after
 	   which the game quits. --benchmark-out: the CSV file, in the user
 	   folder, that gets its frame times. */
 	char play_film[256];
-	char benchmark_out[XWA_HOST_CONFIG_PATH_CAPACITY];
+	char benchmark_out[XWA_INSTALL_PATH_CAPACITY];
 	/* --film-pause-at: the film time, in game ticks, where the film freezes,
 	   or -1. --film-capture: the file name, in the user folder, for the
 	   capture of the frozen frame. --film-benchmark: measure the GPU time of
 	   the frozen frame, then quit. */
 	int film_pause_at;
-	char film_capture[XWA_HOST_CONFIG_PATH_CAPACITY];
+	char film_capture[XWA_INSTALL_PATH_CAPACITY];
 	int film_benchmark;
 	/* --help or -h: print the launch options and quit. */
 	int help;
@@ -35,13 +35,6 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 
 /* The text that --help prints: every launch option, one line each. */
 const char* XwaLaunchOptions_Help(void);
-
-/* Applies a candidate asset root and validates the canonical install layout:
- * an installed game directory with the CD ALLIANCE contents merged into the
- * root, plus the CD data directories (FLIGHTMODELS, MISSIONS, MOVIES, RESDATA,
- * WAVE). An unmerged CD copy is rejected with an explanatory error. */
-int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normalized,
-							  size_t normalized_capacity, char* error, size_t error_size);
 
 /* Sets the mod root to the --mod folder, or else to paths.mod when
  * paths.use_mod is true. Copies the folder it uses to `selected`. Without a
@@ -54,7 +47,7 @@ int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normal
  *   - A paths.mod folder that doesn't pass them isn't used. The game starts
  *     with its own files, and `notice` explains why.
  * Otherwise, `notice` is empty. */
-int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaHostConfig* host_config,
+int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaInstallPaths* paths,
 						char* selected, size_t selected_capacity, char* notice, size_t notice_size,
 						char* error, size_t error_size);
 

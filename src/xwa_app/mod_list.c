@@ -152,7 +152,7 @@ static int mod_list_add_folder(XwaModList* list, AeronVfs* vfs, const char* path
 /* Adds the mods of the mods folder, by folder name. */
 static int mod_list_scan_folder(XwaModList* list, AeronVfs* vfs, const char* mods_folder) {
 	ModFolders folders = { 0 };
-	char path[XWA_HOST_CONFIG_PATH_CAPACITY];
+	char path[XWA_INSTALL_PATH_CAPACITY];
 	int ok = 1;
 
 	AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, "", "*", AERON_VFS_GLOB_DIRECTORIES, mod_list_collect, &folders);
@@ -177,7 +177,7 @@ static int mod_list_scan_folder(XwaModList* list, AeronVfs* vfs, const char* mod
 }
 
 int XwaModList_Folder(const char* configured, char* out, size_t capacity) {
-	char local[XWA_HOST_CONFIG_PATH_CAPACITY];
+	char local[XWA_INSTALL_PATH_CAPACITY];
 	int length;
 
 	if (configured && configured[0]) {

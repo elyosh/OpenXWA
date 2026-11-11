@@ -13,12 +13,12 @@
 #include "aeron/scene/ui.h"
 #include "aeron/sync.h"
 #include "aeron/time.h"
-#include "host_config.h"
 #include "import.h"
+#include "install_check.h"
+#include "install_paths.h"
 #include "mod_list.h"
-#include "setup.h"
 
-#define PATH_CAP XWA_HOST_CONFIG_PATH_CAPACITY
+#define PATH_CAP XWA_INSTALL_PATH_CAPACITY
 #define LOG_LINES 2000
 /* The height of a row of buttons and the space above it, in reference
  * pixels. */
@@ -72,7 +72,7 @@ struct ImporterUi {
 	char check_message[512];
 	int replace_open;
 
-	XwaHostConfig config;
+	XwaInstallPaths config;
 	int config_ok;
 	char config_message[512];
 
@@ -118,13 +118,13 @@ struct ImporterUi {
 
 static void load_config(ImporterUi* app) {
 	char error[512];
-	app->config_ok = XwaHostConfig_LoadPaths(Aeron_GetVfs(), &app->config, error, sizeof error);
+	app->config_ok = XwaInstallPaths_Load(Aeron_GetVfs(), &app->config, error, sizeof error);
 	if (app->config_ok)
 		app->config_message[0] = '\0';
 	else
 		snprintf(app->config_message, sizeof app->config_message,
 				 "OpenXWA's configuration can't be read, so it can't be changed: %s", error);
-	if (!XwaModList_Folder(app->config.mods_path, app->saved_mods_folder, sizeof app->saved_mods_folder))
+	if (!XwaModList_Folder(app->config.mods, app->saved_mods_folder, sizeof app->saved_mods_folder))
 		app->saved_mods_folder[0] = '\0';
 }
 
@@ -163,7 +163,7 @@ static void apply_mods_folder(ImporterUi* app) {
 				 "OpenXWA's configuration can't be read, so the mods folder can't be changed.");
 		return;
 	}
-	if (!XwaHostConfig_SaveModsPath(Aeron_GetVfs(), app->mods_folder, error, sizeof error)) {
+	if (!XwaInstallPaths_SaveMods(Aeron_GetVfs(), app->mods_folder, error, sizeof error)) {
 		snprintf(app->mods_folder_message, sizeof app->mods_folder_message,
 				 "The mods folder can't be saved in OpenXWA's configuration: %s", error);
 		return;
@@ -217,8 +217,8 @@ static void check_game(ImporterUi* app) {
 		snprintf(app->game_message, sizeof app->game_message, "Choose your original X-Wing Alliance folder.");
 		return;
 	}
-	if (!XwaSetup_ValidateGameData(Aeron_GetVfs(), app->game, normalized, sizeof normalized, error,
-								   sizeof error)) {
+	if (!XwaInstall_ValidateGameData(Aeron_GetVfs(), app->game, normalized, sizeof normalized, error,
+									 sizeof error)) {
 		snprintf(app->game_message, sizeof app->game_message,
 				 "This isn't a complete X-Wing Alliance folder. %s", error);
 		return;
@@ -226,9 +226,9 @@ static void check_game(ImporterUi* app) {
 	app->game_ok = 1;
 	app->game_message[0] = '\0';
 	/* OpenXWA then uses the same folder. */
-	if (app->config_ok && strcmp(app->game, app->config.game_data_path) != 0) {
-		if (XwaHostConfig_SaveGameDataPath(Aeron_GetVfs(), app->game, error, sizeof error))
-			snprintf(app->config.game_data_path, sizeof app->config.game_data_path, "%s", app->game);
+	if (app->config_ok && strcmp(app->game, app->config.game_data) != 0) {
+		if (XwaInstallPaths_SaveGameData(Aeron_GetVfs(), app->game, error, sizeof error))
+			snprintf(app->config.game_data, sizeof app->config.game_data, "%s", app->game);
 		else
 			snprintf(app->game_message, sizeof app->game_message, "%s", error);
 	}
@@ -345,8 +345,8 @@ static int import_thread(void* user) {
 static void start_import(ImporterUi* app, bool replace) {
 	char error[512];
 	/* OpenXWA then lists the mods of this folder. */
-	if (app->config_ok && !XwaModList_SamePath(app->config.mods_path, app->mods_folder)) {
-		if (!XwaHostConfig_SaveModsPath(Aeron_GetVfs(), app->mods_folder, error, sizeof error)) {
+	if (app->config_ok && !XwaModList_SamePath(app->config.mods, app->mods_folder)) {
+		if (!XwaInstallPaths_SaveMods(Aeron_GetVfs(), app->mods_folder, error, sizeof error)) {
 			snprintf(app->check_message, sizeof app->check_message,
 					 "The mods folder can't be saved in OpenXWA's configuration: %s", error);
 			return;
@@ -374,9 +374,9 @@ static void start_import(ImporterUi* app, bool replace) {
 static void use_mod(ImporterUi* app, const char* path, char* message, size_t capacity) {
 	char error[512];
 	/* The original game keeps paths.mod, so the mod stays in the list. */
-	const int saved =
-		path[0] ? XwaHostConfig_SaveModPath(Aeron_GetVfs(), path, 1, error, sizeof error)
-				: XwaHostConfig_SaveModPath(Aeron_GetVfs(), app->config.mod_path, 0, error, sizeof error);
+	const int saved = path[0]
+						  ? XwaInstallPaths_SaveMod(Aeron_GetVfs(), path, 1, error, sizeof error)
+						  : XwaInstallPaths_SaveMod(Aeron_GetVfs(), app->config.mod, 0, error, sizeof error);
 	if (saved) {
 		snprintf(message, capacity, "OpenXWA will use %s the next time it starts.",
 				 path[0] ? "this mod" : "the original game");
@@ -630,7 +630,7 @@ static void scan_mods(ImporterUi* app) {
 	app->mod_in_use = SIZE_MAX;
 	app->mods_notice[0] = '\0';
 	app->mods_scanned = 1;
-	if (!XwaModList_Scan(app->saved_mods_folder, app->config.mod_path, &app->mods)) {
+	if (!XwaModList_Scan(app->saved_mods_folder, app->config.mod, &app->mods)) {
 		snprintf(app->mods_message, sizeof app->mods_message, "The mods can't be listed. Try Refresh.");
 		return;
 	}
@@ -647,7 +647,7 @@ static void scan_mods(ImporterUi* app) {
 	/* The mod that OpenXWA uses, as XwaSetup_SetModRoot picks it without
 	   --mod. */
 	if (app->config_ok && app->config.use_mod)
-		snprintf(current, sizeof current, "%s", app->config.mod_path);
+		snprintf(current, sizeof current, "%s", app->config.mod);
 	for (size_t i = 0; i < app->mods.count; ++i) {
 		const XwaModEntry* entry = &app->mods.entries[i];
 		const int in_use =
@@ -706,9 +706,9 @@ static void finish_delete(ImporterUi* app) {
 				 "Some files of %s can't be deleted. Close OpenXWA if it is running and try again, or delete "
 				 "the folder yourself with Show Folder.",
 				 app->delete_name);
-	} else if (app->config_ok && XwaModList_SamePath(app->config.mod_path, app->delete_path)) {
+	} else if (app->config_ok && XwaModList_SamePath(app->config.mod, app->delete_path)) {
 		/* OpenXWA would warn that the mod is missing at every start. */
-		if (XwaHostConfig_SaveModPath(Aeron_GetVfs(), "", 0, error, sizeof error)) {
+		if (XwaInstallPaths_SaveMod(Aeron_GetVfs(), "", 0, error, sizeof error)) {
 			snprintf(app->mods_message, sizeof app->mods_message,
 					 "%s was deleted. OpenXWA will start with the original game.", app->delete_name);
 			load_config(app);
@@ -757,7 +757,7 @@ static void draw_mods(ImporterUi* app) {
 	const XwaModEntry* selected =
 		app->mod_items && app->mod_selected < app->mods.count ? &app->mods.entries[app->mod_selected] : NULL;
 	/* The original game's folder is the game data folder. */
-	const char* folder = !selected ? "" : selected->path[0] ? selected->path : app->config.game_data_path;
+	const char* folder = !selected ? "" : selected->path[0] ? selected->path : app->config.game_data;
 	if (selected) {
 		char text[PATH_CAP + 64];
 		AeronUi_Label(ui, selected->name);
@@ -971,7 +971,7 @@ ImporterUi* ImporterUi_Create(char* error, size_t error_capacity) {
 	snprintf(app->resources, sizeof app->resources, "%s", Aeron_ResourceRoot());
 	load_config(app);
 	if (app->config_ok)
-		snprintf(app->game, sizeof app->game, "%s", app->config.game_data_path);
+		snprintf(app->game, sizeof app->game, "%s", app->config.game_data);
 	snprintf(app->mods_folder, sizeof app->mods_folder, "%s", app->saved_mods_folder);
 	app->log_selected = SIZE_MAX;
 	app->failure_selected = SIZE_MAX;

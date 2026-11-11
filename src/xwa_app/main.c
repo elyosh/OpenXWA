@@ -2,6 +2,8 @@
 #include "aeron/aeron.h"
 #include "aeron/time.h"
 #include "host_config.h"
+#include "install_check.h"
+#include "install_paths.h"
 #include "mod_list.h"
 #include "setup.h"
 #include "window_icon.h"
@@ -102,13 +104,13 @@ static int persist_option_switch(const char* key, int value, char* error, size_t
 
 /* paths.mod. It is kept when the original game is chosen, so the mod stays
  * in the list. */
-static char s_configured_mod[XWA_HOST_CONFIG_PATH_CAPACITY];
+static char s_configured_mod[XWA_INSTALL_PATH_CAPACITY];
 
 static int persist_mod_choice(const char* path, char* error, size_t error_size) {
 	if (!path[0]) {
-		return XwaHostConfig_SaveModPath(Aeron_GetVfs(), s_configured_mod, 0, error, error_size);
+		return XwaInstallPaths_SaveMod(Aeron_GetVfs(), s_configured_mod, 0, error, error_size);
 	}
-	return XwaHostConfig_SaveModPath(Aeron_GetVfs(), path, 1, error, error_size);
+	return XwaInstallPaths_SaveMod(Aeron_GetVfs(), path, 1, error, error_size);
 }
 
 /* Gives the options the mods and the one in use. A mod from --mod is listed
@@ -117,12 +119,12 @@ static void configure_mods(const XwaLaunchOptions* launch, const XwaHostConfig* 
 						   const char* selected_mod) {
 	XwaModList list;
 	XwaModernModEntry* entries;
-	const char* configured = launch->mod_path[0] ? selected_mod : host_config->mod_path;
-	char mods_folder[XWA_HOST_CONFIG_PATH_CAPACITY] = "";
+	const char* configured = launch->mod_path[0] ? selected_mod : host_config->paths.mod;
+	char mods_folder[XWA_INSTALL_PATH_CAPACITY] = "";
 	size_t running = SIZE_MAX;
 
-	snprintf(s_configured_mod, sizeof s_configured_mod, "%s", host_config->mod_path);
-	XwaModList_Folder(host_config->mods_path, mods_folder, sizeof mods_folder);
+	snprintf(s_configured_mod, sizeof s_configured_mod, "%s", host_config->paths.mod);
+	XwaModList_Folder(host_config->paths.mods, mods_folder, sizeof mods_folder);
 	if (!XwaModList_Scan(mods_folder, configured, &list)) {
 		Aeron_LogError("xwa.config", "the mods can't be listed");
 		return;
@@ -210,7 +212,7 @@ static int select_game_data(AeronVfs* vfs, char* selected, size_t selected_capac
 	for (;;) {
 		AeronFolderDialog* dialog = Aeron_ShowOpenFolderDialog(&options);
 		AeronFolderDialogStatus status;
-		char candidate[XWA_HOST_CONFIG_PATH_CAPACITY];
+		char candidate[XWA_INSTALL_PATH_CAPACITY];
 		char dialog_error[256];
 		char validation_error[512];
 
@@ -247,8 +249,8 @@ static int select_game_data(AeronVfs* vfs, char* selected, size_t selected_capac
 					 dialog_error[0] ? dialog_error : "unknown platform error");
 			return 0;
 		}
-		if (XwaSetup_ValidateGameData(vfs, candidate, selected, selected_capacity, validation_error,
-									  sizeof validation_error)) {
+		if (XwaInstall_ValidateGameData(vfs, candidate, selected, selected_capacity, validation_error,
+										sizeof validation_error)) {
 			return 1;
 		}
 		{
@@ -290,12 +292,12 @@ static int resolve_game_data(const XwaLaunchOptions* launch, const XwaHostConfig
 
 	*cancelled = 0;
 	if (launch->game_data_path[0]) {
-		return XwaSetup_ValidateGameData(vfs, launch->game_data_path, selected, selected_capacity, error,
-										 error_size);
+		return XwaInstall_ValidateGameData(vfs, launch->game_data_path, selected, selected_capacity, error,
+										   error_size);
 	}
-	if (host_config->game_data_path[0]) {
-		if (XwaSetup_ValidateGameData(vfs, host_config->game_data_path, selected, selected_capacity, error,
-									  error_size)) {
+	if (host_config->paths.game_data[0]) {
+		if (XwaInstall_ValidateGameData(vfs, host_config->paths.game_data, selected, selected_capacity, error,
+										error_size)) {
 			return 1;
 		}
 		Aeron_LogWarn("xwa.config", "saved game-data path is no longer valid: %s", error);
@@ -321,14 +323,14 @@ static int resolve_game_data(const XwaLaunchOptions* launch, const XwaHostConfig
 					 "Configured folder:\n%s\n\n"
 					 "%s\n\n"
 					 "The folder may have moved, or its drive may be disconnected.",
-					 host_config->game_data_path, error);
+					 host_config->paths.game_data, error);
 			if (!Aeron_ShowMessageBox(&options, &selected_button)) {
 				snprintf(error, error_size, "Could not show the saved game-data error.");
 				return 0;
 			}
 			if (selected_button == XWA_SETUP_TRY_AGAIN) {
-				if (XwaSetup_ValidateGameData(vfs, host_config->game_data_path, selected, selected_capacity,
-											  error, error_size)) {
+				if (XwaInstall_ValidateGameData(vfs, host_config->paths.game_data, selected,
+												selected_capacity, error, error_size)) {
 					return 1;
 				}
 				continue;
@@ -350,10 +352,10 @@ int main(int argc, char** argv) {
 	AeronConfig config;
 	XwaHostConfig host_config;
 	XwaLaunchOptions launch;
-	char selected_game_data[XWA_HOST_CONFIG_PATH_CAPACITY];
-	char selected_mod[XWA_HOST_CONFIG_PATH_CAPACITY];
+	char selected_game_data[XWA_INSTALL_PATH_CAPACITY];
+	char selected_mod[XWA_INSTALL_PATH_CAPACITY];
 	char config_error[1024];
-	char mod_notice[1024 + XWA_HOST_CONFIG_PATH_CAPACITY];
+	char mod_notice[1024 + XWA_INSTALL_PATH_CAPACITY];
 	XwaModernWindowMode initial_window_mode;
 	int exit_code;
 	int setup_cancelled;
@@ -413,16 +415,16 @@ int main(int argc, char** argv) {
 		Aeron_Shutdown();
 		return setup_cancelled ? 0 : 1;
 	}
-	if (strcmp(host_config.game_data_path, selected_game_data) != 0 &&
-		!XwaHostConfig_SaveGameDataPath(Aeron_GetVfs(), selected_game_data, config_error,
-										sizeof config_error)) {
+	if (strcmp(host_config.paths.game_data, selected_game_data) != 0 &&
+		!XwaInstallPaths_SaveGameData(Aeron_GetVfs(), selected_game_data, config_error,
+									  sizeof config_error)) {
 		Aeron_LogError("xwa.config", "%s", config_error);
 		show_setup_error(config_error);
 		Aeron_Shutdown();
 		return 1;
 	}
 	Aeron_LogInfo("xwa.config", "game data: %s", selected_game_data);
-	if (!XwaSetup_SetModRoot(Aeron_GetVfs(), &launch, &host_config, selected_mod, sizeof selected_mod,
+	if (!XwaSetup_SetModRoot(Aeron_GetVfs(), &launch, &host_config.paths, selected_mod, sizeof selected_mod,
 							 mod_notice, sizeof mod_notice, config_error, sizeof config_error)) {
 		Aeron_LogError("xwa.config", "%s", config_error);
 		show_setup_error(config_error);

@@ -216,55 +216,7 @@ const char* XwaLaunchOptions_Help(void) {
 		   "Other arguments, and everything after --, go to the game's own command line.\n";
 }
 
-static int setup_check_required_files(AeronVfs* vfs, const char** missing) {
-	/* Canonical install layout: the CD ALLIANCE directory contents merged into the
-	   root, as the original installer laid them out. RESDATA.TXT marks the merged
-	   ALLIANCE content; the movie/wave entries are unique to CD1 and CD2 so a
-	   one-disc tree cannot pass validation. */
-	static const char* required[] = {
-		"RESDATA.TXT",         "FLIGHTMODELS/SPACECRAFT0.LST", "MISSIONS/MISSION.LST",
-		"MOVIES/PROLOGUE.SNM", "MOVIES/BATTLE1.SNM",           "WAVE/FRONTEND/B1M1/N010101.WAV",
-	};
-	size_t i;
-
-	for (i = 0; i < sizeof required / sizeof required[0]; ++i) {
-		if (!AeronVfs_Exists(vfs, AERON_VFS_ROOT_ASSET, required[i])) {
-			*missing = required[i];
-			return 0;
-		}
-	}
-	return 1;
-}
-
-int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normalized,
-							  size_t normalized_capacity, char* error, size_t error_size) {
-	const char* missing = NULL;
-
-	if (!vfs || !candidate || !candidate[0] || !normalized || strlen(candidate) >= normalized_capacity) {
-		return setup_error(error, error_size, "It can't be used: %s", candidate);
-	}
-	if (!AeronVfs_SetRoot(vfs, AERON_VFS_ROOT_ASSET, candidate) ||
-		!AeronVfs_SetRootOptions(vfs, AERON_VFS_ROOT_ASSET, AERON_VFS_ROOT_OPTION_CASE_INSENSITIVE_LOOKUP)) {
-		return setup_error(error, error_size, "It can't be used: %s", candidate);
-	}
-	if (setup_check_required_files(vfs, &missing)) {
-		snprintf(normalized, normalized_capacity, "%s", candidate);
-		return 1;
-	}
-
-	/* A raw CD copy keeps the install files under ALLIANCE; the game expects them
-	   merged into the root. Detect it so the failure explains the fix. */
-	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_ASSET, "ALLIANCE/RESDATA.TXT")) {
-		return setup_error(error, error_size,
-						   "It looks like a copy of the CDs. Copy what is in its ALLIANCE folder into it. "
-						   "It has no %s.",
-						   missing);
-	}
-
-	return setup_error(error, error_size, "It has no %s.", missing);
-}
-
-int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaHostConfig* host_config,
+int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaInstallPaths* paths,
 						char* selected, size_t selected_capacity, char* notice, size_t notice_size,
 						char* error, size_t error_size) {
 	const int from_launch = launch->mod_path[0] != 0;
@@ -280,8 +232,8 @@ int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const Xwa
 	}
 	if (from_launch) {
 		length = snprintf(selected, selected_capacity, "%s", launch->mod_path);
-	} else if (host_config->use_mod && host_config->mod_path[0]) {
-		length = snprintf(selected, selected_capacity, "%s", host_config->mod_path);
+	} else if (paths->use_mod && paths->mod[0]) {
+		length = snprintf(selected, selected_capacity, "%s", paths->mod);
 	} else {
 		return 1;
 	}
