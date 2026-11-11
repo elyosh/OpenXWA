@@ -1964,15 +1964,23 @@ static void XwaFlightTask_TickPhases(int now) {
 }
 
 int XwaFlightTask_Shutdown(void) {
+	int frontendModalActive;
+
 	XwaFlightPauseTask_Shutdown();
 	XwaModernFlightTiming_EndSession();
 	if (!g_xwaFlightTaskActive && !g_xwaFlightTaskComplete) {
 		return g_xwaFlightTaskResult;
 	}
 
+	/* The original in-flight modals block until they close, but the port runs
+	 * them over several ticks, so quitting the game can end the session while
+	 * one is open. FlightDisplay_FreeSurfaces then closes it, and closing it
+	 * reads the keyboard. In that case keep DirectInput until the surfaces are
+	 * freed. */
+	frontendModalActive = FlightDisplay_IsFrontendModalActive();
 	g_sw3dSkipOddScanlines = 0;
 	Sound_Shutdown_Sound_Engine();
-	if (g_flightConfDirectInput) {
+	if (g_flightConfDirectInput && !frontendModalActive) {
 		DInput_Shutdown();
 	}
 	NetSession_Shutdown();
@@ -1988,6 +1996,9 @@ int XwaFlightTask_Shutdown(void) {
 		FlightLoading_DetachFrontendSurfaces();
 	}
 	FlightDisplay_FreeSurfaces();
+	if (g_flightConfDirectInput && frontendModalActive) {
+		DInput_Shutdown();
+	}
 
 	g_useHardware3D = 0;
 	g_flightRenderToFrontend = 1;
