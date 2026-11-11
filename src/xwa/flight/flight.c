@@ -223,6 +223,7 @@ void Flight_ModernResetHighRateIntegration(void) {
 	memset(g_modernMapCameraStepRemainders, 0, sizeof(g_modernMapCameraStepRemainders));
 	memset(g_modernJoystickInputSamples, 0, sizeof(g_modernJoystickInputSamples));
 	g_modernJoystickInputSampleCursor = 0;
+	Flight_ModernResetAiTurns();
 }
 #endif
 
@@ -5553,6 +5554,177 @@ static __inline void Flight_UpdateAiCraftOrientation(uint16_t objectIdx, AiContr
 	}
 }
 
+#ifdef XWA_MODERN
+/* Spreading AI turns in high-rate mode.
+ *
+ * In high-rate mode the AI runs every 8 ticks, with 8 ticks of elapsed time,
+ * but craft move on every step. Some maneuvers, such as
+ * paiman_followtargetmaneuver, turn the craft inside the AI step. So the
+ * craft turned once every 8 ticks and kept moving in between. From a turret
+ * on that craft, the world jumped one way at each AI step and slid back the
+ * other way on the steps in between.
+ *
+ * To fix this, Flight_ModernUpdateAllCraftAI undoes each turn the AI makes.
+ * Flight_ModernApplyAiTurn then applies it a little on each step after the
+ * AI step, together with any part of the last turn not applied yet. The turn
+ * is added to the current angles, so it combines with other code that turns
+ * the craft between AI steps, such as the roll after a hit.
+ *
+ * The AI steps are not always 8 ticks apart in the craft's own time. A sim
+ * step can last several ticks (a whole frame in unlocked mode), and the AI
+ * runs at most once per step. The player's craft also moves one input frame
+ * at a time, and its frame can end after the AI step. With steps of up to
+ * L ticks, the gap between two AI steps is between 8 - (L - 1) and
+ * 8 + (L - 1) ticks. So each turn is spread over 8 + (L - 1) ticks, where L
+ * is the craft's longest recent step. The next turn then always arrives
+ * before the craft stops turning, and the turn rate follows the real time
+ * between AI steps. With 1-tick steps, a turn is spread over exactly 8
+ * ticks.
+ *
+ * The AI itself runs the same way as before. It just sees the craft slightly
+ * behind, by the part of the turn not applied yet. */
+
+/* If an angle changes by more than this in one step, it was set, not
+ * turned. A normal AI turn is a few hundred at most over 8 ticks. When a
+ * pitch passes straight up or down, the AI flips the yaw and roll by 0x8000.
+ * An AI change this large is applied at once. If other code makes a change
+ * this large between AI steps, the rest of the AI turn is dropped. */
+#define FLIGHT_AI_TURN_JUMP 0x2000
+
+/* The AI turn of one object slot. The angles are in yaw, pitch, roll order.
+ * This isn't stored in MobileObject: films save each object's mobile object
+ * as an offset in the pool, so MobileObject must keep its size. */
+typedef struct ModernAiTurn {
+	int16_t turn[3];     /* the whole turn */
+	int16_t applied[3];  /* the part of the turn already applied */
+	int startTime;       /* the craft's game time at the AI step */
+	int lastTime;        /* the craft's game time after its last step */
+	uint16_t ticks;      /* the ticks to spread the turn over */
+	uint16_t elapsed;    /* the ticks of the turn already applied */
+	uint8_t active;      /* 0 when there is no turn */
+	uint8_t stepMax;     /* the craft's longest step since the last AI step */
+	uint8_t lastStepMax; /* its longest step between the two AI steps before */
+	uint16_t objectType; /* with `signature`, shows when a new craft takes the slot */
+	uint16_t signature;
+	Q16Angle expected[3]; /* the angles after the last step */
+} ModernAiTurn;
+
+static ModernAiTurn* g_modernAiTurns;
+static uint32_t g_modernAiTurnCount;
+
+void Flight_ModernResetAiTurns(void) {
+	if (g_modernAiTurns != NULL) {
+		memset(g_modernAiTurns, 0, sizeof(*g_modernAiTurns) * g_modernAiTurnCount);
+	}
+}
+
+/* Makes the turn table as large as the object table. Returns 0 if the table
+ * can't be allocated. */
+static int Flight_ModernReserveAiTurns(void) {
+	ModernAiTurn* turns;
+
+	if (g_modernAiTurnCount >= g_objectTableSlotCount) {
+		return g_modernAiTurns != NULL;
+	}
+	turns = (ModernAiTurn*)realloc(g_modernAiTurns, sizeof(*turns) * g_objectTableSlotCount);
+	if (turns == NULL) {
+		return 0;
+	}
+	memset(turns + g_modernAiTurnCount, 0, sizeof(*turns) * (g_objectTableSlotCount - g_modernAiTurnCount));
+	g_modernAiTurns = turns;
+	g_modernAiTurnCount = g_objectTableSlotCount;
+	return 1;
+}
+
+static Q16Angle* Flight_ModernAiTurnAngle(ObjectRecord* object, int axis) {
+	return axis == 0 ? &object->yaw : axis == 1 ? &object->pitch : &object->roll;
+}
+
+/* Returns the turn record of craft `slot`, or NULL if the table is too
+ * small. If a new craft has taken the slot, the record is cleared first. */
+static ModernAiTurn* Flight_ModernAiTurnRecord(uint16_t slot) {
+	ObjectRecord* object;
+	ModernAiTurn* turn;
+
+	if (slot >= g_modernAiTurnCount) {
+		return NULL;
+	}
+	object = &g_objectTable[slot];
+	turn = &g_modernAiTurns[slot];
+	if (turn->objectType != object->objectType || turn->signature != object->objectSignature) {
+		memset(turn, 0, sizeof(*turn));
+		turn->objectType = object->objectType;
+		turn->signature = object->objectSignature;
+	}
+	return turn;
+}
+
+/* Drops the turn if an angle changed by more than FLIGHT_AI_TURN_JUMP since
+ * the last step, which means that other code set it. */
+static void Flight_ModernCheckAiTurnJump(ObjectRecord* object, ModernAiTurn* turn) {
+	int axis;
+
+	for (axis = 0; axis < 3; ++axis) {
+		if (abs((int16_t)(*Flight_ModernAiTurnAngle(object, axis) - turn->expected[axis])) >
+			FLIGHT_AI_TURN_JUMP) {
+			turn->active = 0;
+			return;
+		}
+	}
+}
+
+/* Called when craft `slot` has moved to game time `time`. Records the length
+ * of the step, and applies the part of the AI turn that is due at that time.
+ * The part due depends only on the time, so it works however the craft is
+ * stepped. */
+static void Flight_ModernApplyAiTurn(uint16_t slot, int time) {
+	ObjectRecord* object;
+	ModernAiTurn* turn;
+	int step;
+	int elapsed;
+	int axis;
+
+	turn = Flight_ModernAiTurnRecord(slot);
+	if (turn == NULL) {
+		return;
+	}
+	object = &g_objectTable[slot];
+	step = time - turn->lastTime;
+	if (turn->lastTime != 0 && step > turn->stepMax && step <= UINT8_MAX) {
+		turn->stepMax = (uint8_t)step;
+	}
+	turn->lastTime = time;
+	if (!turn->active) {
+		return;
+	}
+	Flight_ModernCheckAiTurnJump(object, turn);
+	if (!turn->active) {
+		return;
+	}
+	/* Never undo part of the turn, even if a step goes back in time. */
+	elapsed = time - turn->startTime;
+	if (elapsed < turn->elapsed) {
+		elapsed = turn->elapsed;
+	} else if (elapsed > turn->ticks) {
+		elapsed = turn->ticks;
+	}
+	turn->elapsed = (uint16_t)elapsed;
+	for (axis = 0; axis < 3; ++axis) {
+		Q16Angle* angle;
+		int16_t due;
+
+		angle = Flight_ModernAiTurnAngle(object, axis);
+		due = (int16_t)(turn->turn[axis] * elapsed / turn->ticks);
+		*angle = (Q16Angle)(*angle + (int16_t)(due - turn->applied[axis]));
+		turn->applied[axis] = due;
+		turn->expected[axis] = *angle;
+	}
+	if (elapsed == turn->ticks) {
+		turn->active = 0;
+	}
+}
+#endif
+
 // FUNCTION: XWA 0x42BEA0
 void Flight_UpdateCraftSteeringAndSpeed(void) {
 	uint32_t savedSimStepScale;
@@ -5625,6 +5797,12 @@ void Flight_UpdateCraftSteeringAndSpeed(void) {
 			oldPitch = g_objectTable[(uint16_t)slot].pitch;
 			oldYaw = g_objectTable[(uint16_t)slot].yaw;
 			oldRoll = g_objectTable[(uint16_t)slot].roll;
+#ifdef XWA_MODERN
+			/* Apply the AI turn after the old angles are saved, so that the
+			   check below sees the change and marks the orientation and move
+			   vector as dirty. */
+			Flight_ModernApplyAiTurn((uint16_t)slot, g_gameTime + (uint16_t)savedElapsedTicksLow);
+#endif
 			g_curCraftModelIndex.words[0] = g_curCraft->modelDefIndex;
 			playerOwnerIdx = g_objectTable[(uint16_t)slot].playerOwnerIdx;
 			aiDriven = playerOwnerIdx == -1 || g_players[playerOwnerIdx].aiControlledFlag;
@@ -5933,9 +6111,38 @@ static void Flight_SetStepScaleFromDelta(uint16_t deltaTicks) {
 }
 
 #ifdef XWA_MODERN
+/* Runs the AI for `elapsedTicks` ticks, and spreads the turns it makes over
+ * the next steps. See "Spreading AI turns in high-rate mode" above. */
 static void Flight_ModernUpdateAllCraftAI(uint16_t elapsedTicks) {
 	uint16_t savedElapsedTicks;
 	uint16_t savedSimStepScale;
+	uint32_t slot;
+	int spread;
+	int axis;
+
+	spread = Flight_ModernReserveAiTurns();
+	if (spread) {
+		for (slot = g_activeRegionObjectSlotStart; slot < g_activeRegionCraftObjectSlotEnd; ++slot) {
+			ObjectRecord* object;
+			ModernAiTurn* turn;
+
+			object = &g_objectTable[slot];
+			if (object->objectType == OBJ_None || object->mobj == NULL) {
+				continue;
+			}
+			turn = Flight_ModernAiTurnRecord((uint16_t)slot);
+			if (turn->active) {
+				Flight_ModernCheckAiTurnJump(object, turn);
+			}
+			/* Keep the part of the last turn not applied yet. It is added to
+			   the next turn. */
+			for (axis = 0; axis < 3; ++axis) {
+				turn->turn[axis] = turn->active ? (int16_t)(turn->turn[axis] - turn->applied[axis]) : 0;
+				turn->applied[axis] = 0;
+				turn->expected[axis] = *Flight_ModernAiTurnAngle(object, axis);
+			}
+		}
+	}
 
 	savedElapsedTicks = g_elapsedTicks;
 	savedSimStepScale = g_simStepScale;
@@ -5944,6 +6151,61 @@ static void Flight_ModernUpdateAllCraftAI(uint16_t elapsedTicks) {
 	pai_UpdateAllCraftAI();
 	g_elapsedTicks = savedElapsedTicks;
 	g_simStepScale = savedSimStepScale;
+
+	if (!spread) {
+		return;
+	}
+	for (slot = g_activeRegionObjectSlotStart; slot < g_activeRegionCraftObjectSlotEnd; ++slot) {
+		ObjectRecord* object;
+		ModernAiTurn* turn;
+		int16_t turned[3];
+		int stepMax;
+		int ticks;
+		int any;
+
+		object = &g_objectTable[slot];
+		if (object->objectType == OBJ_None || object->mobj == NULL) {
+			continue;
+		}
+		/* The AI step can remove a craft or put a new one in the slot, so
+		   look up the record again. */
+		turn = Flight_ModernAiTurnRecord((uint16_t)slot);
+		stepMax = turn->stepMax > turn->lastStepMax ? turn->stepMax : turn->lastStepMax;
+		turn->lastStepMax = turn->stepMax;
+		turn->stepMax = 0;
+		any = 0;
+		for (axis = 0; axis < 3; ++axis) {
+			turned[axis] = (int16_t)(*Flight_ModernAiTurnAngle(object, axis) - turn->expected[axis]);
+			if (abs(turned[axis]) > FLIGHT_AI_TURN_JUMP) {
+				break;
+			}
+			any |= turned[axis] != 0 || turn->turn[axis] != 0;
+		}
+		if (axis < 3 || !any) {
+			/* No turn, or a jump that is applied at once. The AI's angles
+			   stay as they are, and the rest of the last turn is dropped. */
+			turn->active = 0;
+			continue;
+		}
+		/* Put the craft back to its angles before the AI step.
+		   Flight_UpdateCraftSteeringAndSpeed then turns it a little on each
+		   step, starting with this one. */
+		for (axis = 0; axis < 3; ++axis) {
+			*Flight_ModernAiTurnAngle(object, axis) = turn->expected[axis];
+			turn->turn[axis] = (int16_t)(turn->turn[axis] + turned[axis]);
+		}
+		ticks = elapsedTicks + (stepMax > 1 ? stepMax - 1 : 0);
+		if (ticks > 2 * elapsedTicks) {
+			ticks = 2 * elapsedTicks;
+		}
+		/* The player's craft is moved one input frame at a time, and has
+		   already reached its simStateTimestamp, which can be later than
+		   the AI step. Its turn starts from there. */
+		turn->startTime = object->mobj->simStateTimestamp != 0 ? object->mobj->simStateTimestamp : g_gameTime;
+		turn->ticks = (uint16_t)ticks;
+		turn->elapsed = 0;
+		turn->active = 1;
+	}
 }
 #endif
 

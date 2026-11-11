@@ -474,6 +474,8 @@ void Flight_AdvanceOneStep(int targetTimestamp);
 void Flight_StepSimToTime(int targetTimestamp);
 #ifdef XWA_MODERN
 void Flight_ModernResetHighRateIntegration(void);
+/* Drops the AI turns that high-rate mode still has to apply. */
+void Flight_ModernResetAiTurns(void);
 /* While the options menu is open, runs one more step of it and returns 1.
    Returns 0 when it isn't open. Flight timing resumes only after the menu
    closes. */
