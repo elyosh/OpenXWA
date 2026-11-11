@@ -5435,7 +5435,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	AeronScene_AddMeshInstance(s.scene, &instance);
 	if (!is_bolt && f->object_type != XWA_SNAP_TYPE_DEBRIS_CHUNK) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, context->cmd, context->assets, s.snap, f, prepared.mesh,
-										  model_matrix, prepared.table, 1.0f, 1.0f);
+										  model_matrix, prepared.table, 1.0f, 1.0f, 1);
 		if (map_object->render_kind == XWA_FLIGHT_MAP_RENDER_CRAFT)
 			fl_derive_wreck_flames(f, snapshot_index, context->assets, NULL, NULL);
 		if (s.glow_ok) {
@@ -5584,11 +5584,13 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
 	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
+	/* No blast marks on the cockpit: the game sizes a warhead's mark from the
+	 * whole craft, so it would cover most of the cockpit and the view. */
 	if (player_f && fl_is_player_craft(snap, player_f->slot, player_f->signature) &&
 		(s.cockpit_glow_mark_emissive_strength > 0.0f || s.cockpit_hit_flash_emissive_strength > 0.0f)) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 										  inst.mesh_table, s.cockpit_glow_mark_emissive_strength,
-										  s.cockpit_hit_flash_emissive_strength);
+										  s.cockpit_hit_flash_emissive_strength, 0);
 	}
 	if (s.glow_ok && player_f) {
 		XwaRemasterShip_SubmitEngineGlows(s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER,
@@ -7677,7 +7679,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 								inst.hidden_tag_groups, 0, inst.probe_set_owner != 0, 0);
 			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, prepared.mesh, model_matrix,
 											  inst.mesh_table, s.glow_mark_emissive_strength,
-											  s.glow_mark_emissive_strength);
+											  s.glow_mark_emissive_strength, 1);
 			/* State-derived engine glows for this craft (classic scale
 			 * gates — no craft / dead subsystems — return 0 and skip). */
 			if (s.glow_ok) {
@@ -7819,12 +7821,13 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
 			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
+			/* No blast marks on the cockpit (see fl_submit_hyperspace_cockpit). */
 			if (player_f && fl_is_player_craft(snap, player_f->slot, player_f->signature) &&
 				(s.cockpit_glow_mark_emissive_strength > 0.0f ||
 				 s.cockpit_hit_flash_emissive_strength > 0.0f)) {
 				XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
 												  inst.mesh_table, s.cockpit_glow_mark_emissive_strength,
-												  s.cockpit_hit_flash_emissive_strength);
+												  s.cockpit_hit_flash_emissive_strength, 0);
 			}
 			/* Cockpit-model engine glows (classic: the cockpit glow set
 			 * when internal + cockpit visible), scale/knockouts from

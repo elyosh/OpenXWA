@@ -256,7 +256,7 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 	AeronScene_AddMeshInstance(s_cmd.scene, &instance);
 	if (target_effects) {
 		XwaRemasterGlowMarks_SubmitObject(s_cmd.scene, cmd, assets, snapshot, object, mesh, transform,
-										  instance.mesh_table, 1.0f, 1.0f);
+										  instance.mesh_table, 1.0f, 1.0f, 1);
 		if (glow_ref) {
 			XwaRemasterShip_SubmitEngineGlows(
 				s_cmd.scene, mesh, transform, AERON_OPT_UNITS_PER_METER, instance.mesh_table,

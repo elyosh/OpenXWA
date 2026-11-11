@@ -731,11 +731,11 @@ point_lights:
   # conversion makes them far too bright this close to the cockpit.
   cockpit_lights:
     hull_critical:
-      power_w: 500
+      power_w: 400
     warhead_lock:
-      power_w: 500
+      power_w: 400
     beam_warning:
-      power_w: 500
+      power_w: 400
   # The lights of the particle effects on craft. cockpit_sparks and
   # cockpit_smoke are the sparks and smoke in the cockpit when a hit gets
   # through the shields. player_craft_damage is every other effect on the
