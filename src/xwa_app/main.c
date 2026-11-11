@@ -559,7 +559,10 @@ int main(int argc, char** argv) {
 									persist_modern_input_options);
 	apply_modern_input_options(&host_config.input_options);
 	if (host_config.input_upgraded) {
+		/* Saved now, so the notice shows only once. */
 		XwaModernInputOptions_MarkDirty();
+		XwaModernInputOptions_Flush();
+		XwaOptionsWindow_ShowControllerResetNotice();
 	}
 	XwaOptionSection_SetPersist(persist_option_switch);
 	Aeron_LogInfo(

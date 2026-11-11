@@ -23,4 +23,7 @@ bool XwaOptionsWindow_BeginFrame(const AeronInputSnapshot* input);
 /* Opens the window if the datapad asked for it. Returns whether it opened. */
 bool XwaOptionsWindow_ConsumeRuntimeRequest(void);
 void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds);
+/* Tells the player once that the controller settings from an earlier version
+ * were reset. */
+void XwaOptionsWindow_ShowControllerResetNotice(void);
 #endif

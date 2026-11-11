@@ -18,6 +18,8 @@ static struct {
 	AeronUiContext* ui;
 	XwaOptionsPageFn pages[OPTIONS_PAGE_COUNT];
 	bool open, close_requested, close_forced, captures_controller, ready;
+	/* The notice shown once after the controller settings were reset. */
+	bool notice_open;
 	int page;
 	char error[1024];
 	XwaControllerSettings controller;
@@ -102,7 +104,7 @@ void XwaOptionsWindow_CompleteClose(void) {
 	XwaControllerSettings_CancelCapture(&g_window.controller, g_window.ui);
 	AeronUi_CancelControllerCapture(g_window.ui);
 	g_window.open = g_window.close_requested = g_window.close_forced = g_window.captures_controller = false;
-	XwaPort_SetOptionsWindowOpen(0);
+	XwaPort_SetOptionsWindowOpen(g_window.notice_open);
 }
 
 void XwaOptionsWindow_ReportError(const char* error) {
@@ -110,9 +112,48 @@ void XwaOptionsWindow_ReportError(const char* error) {
 	g_window.close_requested = false;
 }
 
-void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds) {
-	if (!g_window.open || !input)
+void XwaOptionsWindow_ShowControllerResetNotice(void) {
+	if (!g_window.ui || g_window.notice_open)
 		return;
+	g_window.notice_open = true;
+	XwaInput_SetCaptured(true);
+	/* The game cursor is hidden as for the window. */
+	XwaPort_SetOptionsWindowOpen(1);
+	Aeron_SetHostCursorVisible(1);
+}
+
+static void XwaOptionsWindow_CloseNotice(void) {
+	g_window.notice_open = false;
+	if (!g_window.open)
+		XwaPort_SetOptionsWindowOpen(0);
+}
+
+static void XwaOptionsWindow_DrawNotice(const AeronInputSnapshot* input, float seconds) {
+	AeronUi_BeginFrame(g_window.ui, &(AeronUiFrameDesc) { .input = input, .dt_seconds = seconds });
+	if (AeronUi_BeginWindow(g_window.ui, "Controller Settings Reset",
+							&(AeronUiWindowDesc) { .width_ref = 720, .centered = 1 })) {
+		AeronUi_Help(g_window.ui,
+					 "Controller support was improved, and your controller settings were reset. Gamepads "
+					 "work right away with the default controls. To use a joystick, set it up again in "
+					 "OpenXWA Options.");
+		if (AeronUi_Button(g_window.ui, "OK"))
+			XwaOptionsWindow_CloseNotice();
+		AeronUi_EndWindow(g_window.ui);
+	}
+	AeronUiOutput output = AeronUi_EndFrame(g_window.ui);
+	if (output.cancel_pressed)
+		XwaOptionsWindow_CloseNotice();
+	AeronUi_Submit(g_window.ui);
+}
+
+void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds) {
+	if (!input)
+		return;
+	if (!g_window.open) {
+		if (g_window.notice_open)
+			XwaOptionsWindow_DrawNotice(input, seconds);
+		return;
+	}
 	static const char* pages[] = { "Controller", "Keyboard", "Mouse" };
 	AeronUi_BeginFrame(g_window.ui, &(AeronUiFrameDesc) { .input = input, .dt_seconds = seconds });
 	if (AeronUi_BeginWindow(g_window.ui, "OpenXWA Options",
@@ -147,7 +188,7 @@ void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds) {
 }
 
 bool XwaOptionsWindow_BeginFrame(const AeronInputSnapshot* input) {
-	bool was_open = g_window.open;
+	bool was_showing = g_window.open || g_window.notice_open;
 	if (g_window.open)
 		XwaControllerSettings_Discover(&g_window.controller, g_window.ui, input,
 									   XwaModernInputOptions_GamepadDefaults());
@@ -169,7 +210,8 @@ bool XwaOptionsWindow_BeginFrame(const AeronInputSnapshot* input) {
 		} else
 			XwaOptionsWindow_ReportError(error);
 	}
-	XwaInput_BeginCaptureFrame(input, was_open || g_window.open || !input || !input->has_focus);
+	XwaInput_BeginCaptureFrame(input, was_showing || g_window.open || g_window.notice_open || !input ||
+										  !input->has_focus);
 	XwaControllerMapping_Update(input);
 	return false;
 }
