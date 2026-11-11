@@ -160,6 +160,7 @@ static bool XwaControllerConfig_ParseDigitalSource(const AeronConfigNode* node, 
 		const AeronConfigNode* hat = AeronConfigNode_MapGet(node, "hat");
 		const AeronConfigNode* direction = AeronConfigNode_MapGet(node, "direction");
 		const AeronConfigNode* threshold = AeronConfigNode_MapGet(node, "threshold");
+		const AeronConfigNode* range = AeronConfigNode_MapGet(node, "range");
 		const char* direction_name;
 		int64_t index;
 		if (button) {
@@ -174,7 +175,8 @@ static bool XwaControllerConfig_ParseDigitalSource(const AeronConfigNode* node, 
 			return true;
 		}
 		if (axis) {
-			if (!direction || (AeronConfigNode_MapCount(node) != 2 && AeronConfigNode_MapCount(node) != 3))
+			if (!direction ||
+				AeronConfigNode_MapCount(node) != (size_t)(2 + (threshold != NULL) + (range != NULL)))
 				return XwaControllerConfig_ConfigError(error, capacity, "malformed digital axis source");
 			if (gamepad) {
 				AeronGamepadAxis gamepad_axis;
@@ -208,6 +210,17 @@ static bool XwaControllerConfig_ParseDigitalSource(const AeronConfigNode* node, 
 					return XwaControllerConfig_ConfigError(error, capacity,
 														   "axis threshold must be in (0, 1]");
 				out->threshold = (float)value;
+			}
+			/* range: full measures the threshold over the whole travel of a
+			 * joystick axis that rests at an end. */
+			if (range) {
+				const char* range_name = AeronConfigNode_String(range, NULL);
+				if (range_name && strcmp(range_name, "full") == 0 && !gamepad)
+					out->full_range = 1;
+				else if (!range_name || strcmp(range_name, "center") != 0)
+					return XwaControllerConfig_ConfigError(error, capacity,
+														   gamepad ? "gamepad axis range must be center"
+																   : "axis range must be center or full");
 			}
 			return true;
 		}
@@ -380,8 +393,8 @@ bool XwaControllerConfig_Parse(const AeronConfigFile* document, XwaControllerOpt
 
 typedef struct XwaControllerYamlScratch {
 	AeronConfigValue sources[XWA_CONTROLLER_BINDING_CAP];
-	AeronConfigValue fields[XWA_CONTROLLER_BINDING_CAP][3];
-	AeronConfigMapValue source_maps[XWA_CONTROLLER_BINDING_CAP][3];
+	AeronConfigValue fields[XWA_CONTROLLER_BINDING_CAP][4];
+	AeronConfigMapValue source_maps[XWA_CONTROLLER_BINDING_CAP][4];
 	AeronConfigValue action_values[XWA_INPUT_ACTION_COUNT - 1];
 	AeronConfigMapValue action_map[XWA_INPUT_ACTION_COUNT - 1];
 } XwaControllerYamlScratch;
@@ -421,6 +434,12 @@ static void XwaControllerConfig_ControllerSourceYaml(const AeronControllerDigita
 		map[1] = (AeronConfigMapValue) { "direction", &fields[1] };
 		map[2] = (AeronConfigMapValue) { "threshold", &fields[2] };
 		value->value.map.count = 3;
+		if (source->full_range) {
+			fields[3].type = AERON_CONFIG_STRING;
+			fields[3].value.string_value = "full";
+			map[3] = (AeronConfigMapValue) { "range", &fields[3] };
+			value->value.map.count = 4;
+		}
 		return;
 	}
 	fields[0].type = AERON_CONFIG_INT;

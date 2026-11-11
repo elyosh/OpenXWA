@@ -22,7 +22,7 @@ bool XwaControllerOptions_ProfileEqual(const XwaControllerProfile* left, const X
 		const XwaInputActionBinding* a = &left->bindings[index];
 		const XwaInputActionBinding* b = &right->bindings[index];
 		if (a->action != b->action || !XwaControllerOptions_SameSource(&a->source, &b->source) ||
-			a->source.threshold != b->source.threshold)
+			a->source.threshold != b->source.threshold || a->source.full_range != b->source.full_range)
 			return false;
 	}
 	return true;
@@ -85,6 +85,13 @@ bool XwaControllerOptions_ValidateProfile(const XwaControllerProfile* profile, A
 		if (!isfinite(source->threshold) || source->threshold <= 0.0f || source->threshold > 1.0f)
 			return XwaControllerOptions_ValidationError(error, capacity,
 														"controller digital threshold is invalid");
+		/* Only joystick axes can rest at an end; gamepad axes are measured
+		 * from the center. */
+		if (source->full_range && (source->full_range != 1 || kind != AERON_CONTROLLER_KIND_JOYSTICK ||
+								   (source->kind != AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE &&
+									source->kind != AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE)))
+			return XwaControllerOptions_ValidationError(error, capacity,
+														"only joystick axes can use the full range");
 		switch (source->kind) {
 			case AERON_CONTROLLER_DIGITAL_BUTTON:
 				if (source->index >= button_limit)

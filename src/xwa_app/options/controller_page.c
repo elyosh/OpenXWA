@@ -647,6 +647,9 @@ static void XwaControllerSettings_BindingDetailModal(XwaControllerSettings* sett
 				source->threshold = (float)threshold / 100.0f;
 				XwaControllerSettings_ApplyDraft(settings);
 			}
+			/* Uses the threshold's scale, so the player can see where it triggers. */
+			AeronUi_PercentageMeter(ui, "Axis Position",
+									Aeron_ControllerDigitalSourceAxisAmount(controller, source));
 		}
 		if (XwaBindingsEditor_Remove(ui)) {
 			XwaControllerSettings_RemoveBinding(profile, profile_index);
