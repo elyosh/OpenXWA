@@ -2,9 +2,9 @@
 #define XWA_APP_OPTIONS_WINDOW_H
 #include "ui.h"
 
-/* The OpenXWA Options window: the Controller, Keyboard and Mouse tabs. The
- * datapad opens it (XwaPort_RequestOptionsWindow). Controller and keyboard
- * edits are drafts until Close, which saves them. */
+/* The OpenXWA Options window: the Controller, Keyboard, Mouse and Head
+ * Tracking tabs. The datapad opens it (XwaPort_RequestOptionsWindow).
+ * Controller and keyboard edits are drafts until Close, which saves them. */
 bool XwaOptionsWindow_Init(XwaAppUi* ui, char* error, size_t capacity);
 void XwaOptionsWindow_Shutdown(void);
 void XwaOptionsWindow_FlushForExit(void);

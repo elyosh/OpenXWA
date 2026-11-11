@@ -452,6 +452,7 @@ set(XWA_APP_SOURCES
     src/xwa_app/keyboard_config.c
     src/xwa_app/options/bindings_editor.c
     src/xwa_app/options/controller_page.c
+    src/xwa_app/options/head_tracking_page.c
     src/xwa_app/options/keyboard_page.c
     src/xwa_app/options/mouse_page.c
     src/xwa_app/options/options_window.c
@@ -913,6 +914,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_app/keyboard_config.h
     src/xwa_app/options/bindings_editor.h
     src/xwa_app/options/controller_page.h
+    src/xwa_app/options/head_tracking_page.h
     src/xwa_app/options/keyboard_page.h
     src/xwa_app/options/mouse_page.h
     src/xwa_app/options/options_window.h
