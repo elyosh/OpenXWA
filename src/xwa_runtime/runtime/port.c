@@ -276,6 +276,35 @@ void XwaPort_ToggleMouseCapture(void) {
 
 int XwaPort_IsMouseCaptureSuspended(void) { return g_xwaPortMouseCaptureSuspended; }
 
+static int g_xwaPortOptionsWindowRequested;
+static int g_xwaPortOptionsWindowCloseRequested;
+static int g_xwaPortOptionsWindowOpen;
+static int g_xwaPortShortcutsCaptured;
+
+void XwaPort_RequestOptionsWindow(void) { g_xwaPortOptionsWindowRequested = 1; }
+
+int XwaPort_ConsumeOptionsWindowRequest(void) {
+	const int requested = g_xwaPortOptionsWindowRequested;
+	g_xwaPortOptionsWindowRequested = 0;
+	return requested;
+}
+
+void XwaPort_RequestOptionsWindowClose(void) { g_xwaPortOptionsWindowCloseRequested = 1; }
+
+int XwaPort_ConsumeOptionsWindowCloseRequest(void) {
+	const int requested = g_xwaPortOptionsWindowCloseRequested;
+	g_xwaPortOptionsWindowCloseRequested = 0;
+	return requested;
+}
+
+void XwaPort_SetOptionsWindowOpen(int open) { g_xwaPortOptionsWindowOpen = open != 0; }
+
+int XwaPort_OptionsWindowOpen(void) { return g_xwaPortOptionsWindowOpen; }
+
+void XwaPort_SetShortcutsCaptured(int captured) { g_xwaPortShortcutsCaptured = captured != 0; }
+
+int XwaPort_ShortcutsCaptured(void) { return g_xwaPortShortcutsCaptured; }
+
 static void XwaPort_TickBody(int32_t delta_us) {
 	const AeronInputSnapshot* input;
 	int flightResult;

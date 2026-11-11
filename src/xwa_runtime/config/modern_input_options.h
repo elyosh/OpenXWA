@@ -64,6 +64,8 @@ int XwaModernInputOptions_Set(const XwaModernInputOptions* options);
  * configuration upgrade. */
 void XwaModernInputOptions_MarkDirty(void);
 int XwaModernInputOptions_Flush(void);
+/* As Flush, but also gives the error. */
+int XwaModernInputOptions_FlushWithError(char* error, size_t error_size);
 int XwaModernInputOptions_IsDirty(void);
 
 #ifdef __cplusplus

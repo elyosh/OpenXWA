@@ -147,25 +147,34 @@ void XwaModernInputOptions_MarkDirty(void) {
 	}
 }
 
-int XwaModernInputOptions_Flush(void) {
-	char error[512];
-
+int XwaModernInputOptions_FlushWithError(char* error, size_t error_size) {
+	if (error && error_size) {
+		error[0] = '\0';
+	}
 	if (!g_modernInputOptions.configured || !g_modernInputOptions.dirty) {
 		return 1;
 	}
 	if (!g_modernInputOptions.persist) {
-		Aeron_LogWarn("xwa.config",
-					  "modern input options are dirty but no persistence callback is registered");
+		return XwaModernInputOptions_Error(
+			error, error_size, "modern input options are dirty but no persistence callback is registered");
+	}
+	if (!g_modernInputOptions.persist(&g_modernInputOptions.options, error, error_size)) {
+		if (error && error_size && !error[0]) {
+			snprintf(error, error_size, "could not persist modern input options to user configuration");
+		}
 		return 0;
 	}
-	error[0] = '\0';
-	if (!g_modernInputOptions.persist(&g_modernInputOptions.options, error, sizeof(error))) {
-		Aeron_LogError("xwa.config", "%s",
-					   error[0] ? error : "could not persist modern input options to user configuration");
-		return 0;
-	}
-
 	g_modernInputOptions.dirty = 0;
+	return 1;
+}
+
+int XwaModernInputOptions_Flush(void) {
+	char error[512];
+
+	if (!XwaModernInputOptions_FlushWithError(error, sizeof error)) {
+		Aeron_LogError("xwa.config", "%s", error);
+		return 0;
+	}
 	return 1;
 }
 

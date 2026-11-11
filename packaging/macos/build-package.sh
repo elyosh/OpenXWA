@@ -425,6 +425,8 @@ main() {
 
     test -x "${application}/Contents/MacOS/OpenXWA"
     test -f "${application}/Contents/Resources/resources/remaster/config.yaml"
+    test -f "${application}/Contents/Resources/resources/assets/fonts/menu.fnt"
+    test -f "${application}/Contents/Resources/resources/assets/fonts/menu.ktx2"
     test -f "${application}/Contents/Resources/shaders/hyperspace_streak.vert.msl"
     test -f "${application}/Contents/Resources/shaders/hyperspace_tunnel.vert.msl"
     test -f "${application}/Contents/Resources/shaders/hyperspace_tunnel.frag.msl"

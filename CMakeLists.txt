@@ -442,7 +442,13 @@ set(XWA_APP_SOURCES
     src/xwa_app/controller_config.c
     src/xwa_app/host_config.c
     src/xwa_app/keyboard_config.c
+    src/xwa_app/options/bindings_editor.c
+    src/xwa_app/options/controller_page.c
+    src/xwa_app/options/keyboard_page.c
+    src/xwa_app/options/mouse_page.c
+    src/xwa_app/options/options_window.c
     src/xwa_app/setup.c
+    src/xwa_app/ui.c
 )
 
 add_executable(xwa ${XWA_APP_SOURCES})
@@ -505,6 +511,15 @@ if(APPLE)
     set_source_files_properties("${XWA_AERON_SCENE3D_DEFAULTS}" PROPERTIES
         HEADER_FILE_ONLY TRUE
         MACOSX_PACKAGE_LOCATION Resources/resources/aeron)
+
+    # The font of the OpenXWA Options window.
+    set(XWA_MACOS_FONT_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.fnt"
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.ktx2")
+    target_sources(xwa PRIVATE ${XWA_MACOS_FONT_FILES})
+    set_source_files_properties(${XWA_MACOS_FONT_FILES} PROPERTIES
+        HEADER_FILE_ONLY TRUE
+        MACOSX_PACKAGE_LOCATION Resources/resources/assets/fonts)
 
     set(XWA_MACOS_SHADER_OUTPUTS ${AERON_SHADER_OUTPUTS} ${XWA_SHADER_OUTPUTS})
     target_sources(xwa PRIVATE ${XWA_MACOS_SHADER_OUTPUTS})
@@ -885,6 +900,12 @@ set(XWA_FORMAT_HEADERS
     src/xwa_app/host_config.h
     src/xwa_app/install_check.h
     src/xwa_app/keyboard_config.h
+    src/xwa_app/options/bindings_editor.h
+    src/xwa_app/options/controller_page.h
+    src/xwa_app/options/keyboard_page.h
+    src/xwa_app/options/mouse_page.h
+    src/xwa_app/options/options_window.h
+    src/xwa_app/ui.h
     src/xwa_app/install_paths.h
     src/xwa_app/mod_format.h
     src/xwa_app/mod_list.h

@@ -45,6 +45,7 @@
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/config/modern_video_options_screen.h"
 #include "xwa_runtime/config/option_section.h"
+#include "xwa_runtime/runtime/port.h"
 #endif
 
 #include <ctype.h>
@@ -91,6 +92,8 @@ int g_frontendSetupNeedsBaseRedraw;
 #ifdef XWA_MODERN
 static int g_configRestrictedOptionsModalRunActive;
 static int g_configExitConfirmPending;
+/* Screen 24 asked the host for the OpenXWA Options window. */
+static int g_configOptionsWindowRequested;
 #endif
 static int g_configOptionsDatapadInitialized;
 #ifdef XWA_MODERN
@@ -221,6 +224,30 @@ int Config_MainMenuScreen(void) {
 #endif
 
 	rowIndex = 0;
+#ifdef XWA_MODERN
+	/* The OpenXWA Options window: controllers, keyboard and mouse. */
+	text = "OpenXWA Options";
+	titleWidth = FrontendText_MeasureWidth(text, 20);
+	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
+	buttonPressed = FrontendButton_DrawMenuButton(textX, y, text, 20, g_colorPaleBlue, 32, 0, "settingsound");
+	if (g_menuCursorRow == rowIndex) {
+		FrontendText_Draw(20, text, textX, y, g_colorGreen);
+		if (keyState == CONFIG_KEY_ENTER) {
+			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
+			Keyboard_FlushCharBuffer();
+			keyState = 0;
+			buttonPressed = 1;
+		}
+	}
+	if (buttonPressed) {
+		g_pendingMenuScreen = 24;
+		g_menuCursorRow = 0;
+		g_configOptionsWindowRequested = 0;
+	}
+
+	y += 25;
+	++rowIndex;
+#endif
 	text = FrontendString_Get(STR_CONFIG_GENERAL_OPTIONS);
 	titleWidth = FrontendText_MeasureWidth(text, 20);
 	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
@@ -302,6 +329,7 @@ int Config_MainMenuScreen(void) {
 
 	y += 25;
 	++rowIndex;
+#ifndef XWA_MODERN
 	text = FrontendString_Get(STR_CONFIG_GAME_CONTROLLER_OPTIONS);
 	titleWidth = FrontendText_MeasureWidth(text, 20);
 	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
@@ -322,6 +350,7 @@ int Config_MainMenuScreen(void) {
 
 	y += 25;
 	++rowIndex;
+#endif
 	if (!g_configRestrictedOptionsModalActive) {
 		text = FrontendString_Get(STR_CONFIG_NETWORK_OPTIONS);
 		titleWidth = FrontendText_MeasureWidth(text, 20);
@@ -649,7 +678,11 @@ int Config_GeneralOptionsScreen(void) {
 	}
 	if (buttonPressed) {
 		g_pendingMenuScreen = 0;
+#ifdef XWA_MODERN
+		g_menuCursorRow = 1;
+#else
 		g_menuCursorRow = 0;
+#endif
 	}
 
 	if (restoreDefaults) {
@@ -887,7 +920,11 @@ int Config_SoundOptionsScreen(void) {
 	}
 	if (buttonPressed) {
 		g_pendingMenuScreen = 0;
+#ifdef XWA_MODERN
+		g_menuCursorRow = 4;
+#else
 		g_menuCursorRow = 3;
+#endif
 	}
 
 	if (restoreDefaults == 1) {
@@ -945,8 +982,8 @@ int Config_ControllerOptionsScreen(void) {
 #ifdef XWA_MODERN
 	/* The controller, keyboard and mouse options are in the OpenXWA Options
 	   window. */
-	g_pendingMenuScreen = 0;
-	g_menuCursorRow = 4;
+	g_pendingMenuScreen = 24;
+	g_configOptionsWindowRequested = 0;
 	return 0;
 #else
 	char keyState;
@@ -1088,8 +1125,8 @@ int Config_ControllerOptionsScreen(void) {
 // FUNCTION: XWA 0x51F870
 int Config_JoystickRemapScreen(void) {
 #ifdef XWA_MODERN
-	g_pendingMenuScreen = 0;
-	g_menuCursorRow = 4;
+	g_pendingMenuScreen = 24;
+	g_configOptionsWindowRequested = 0;
 	return 0;
 #else
 	unsigned int totalButtonRows;
@@ -2460,6 +2497,36 @@ static void Config_FinishOptionsDatapadClose(void) {
 #endif
 
 // FLAGS: /O2 /G6
+#ifdef XWA_MODERN
+/* Screen 24: the OpenXWA Options window, drawn by the host over the datapad.
+   The datapad redraws the current screen every frame inside its clip
+   rectangle, so it shows only the main menu title meanwhile. */
+static void Config_OpenXwaOptionsScreen(void) {
+	const int rowCount = g_configRestrictedOptionsModalActive ? 8 : 12;
+	const int y = 215 - ((25 * rowCount) >> 1);
+	const char* text;
+	unsigned int titleWidth;
+	FrontendRect rect;
+
+	if (!g_configOptionsWindowRequested) {
+		g_configOptionsWindowRequested = 1;
+		XwaPort_RequestOptionsWindow();
+	} else if (!XwaPort_OptionsWindowOpen()) {
+		g_configOptionsWindowRequested = 0;
+		g_pendingMenuScreen = 0;
+		g_menuCursorRow = 0;
+		return;
+	}
+	FrontendDraw_RectAssign(&rect, 0, y, 639, y + 15);
+	text = FrontendString_Get(STR_CONFIG_MAIN_MENU);
+	FrontendText_DrawCentered(20, text, &rect, g_colorLightBlue);
+	titleWidth = FrontendText_MeasureWidth(text, 20);
+	FrontendDraw_Line(g_configMenuCenterX - (int)(titleWidth >> 1), y + 17,
+					  g_configMenuCenterX - (int)(titleWidth >> 1) + (int)titleWidth, y + 17,
+					  g_colorLightBlue);
+}
+#endif
+
 // FUNCTION: XWA 0x51D100
 int Config_OptionsDatapadUpdate(int frameState) {
 	int done;
@@ -2581,6 +2648,10 @@ int Config_OptionsDatapadUpdate(int frameState) {
 			}
 			done = 0;
 			break;
+		case 24:
+			Config_OpenXwaOptionsScreen();
+			done = 0;
+			break;
 #endif
 		default:
 			done = 0;
@@ -2600,6 +2671,11 @@ int Config_OptionsDatapadUpdate(int frameState) {
 		Config_Write();
 		FrontendMouse_ClearClicks();
 #ifdef XWA_MODERN
+		/* The datapad can close under the options window, such as on a
+		   network dismiss. The window then commits and closes. */
+		if (XwaPort_OptionsWindowOpen()) {
+			XwaPort_RequestOptionsWindowClose();
+		}
 		XwaModernVideoOptions_Flush();
 		XwaModernInputOptions_Flush();
 		XwaOptionSection_FlushAll();
@@ -3356,7 +3432,11 @@ int Config_PerformanceOptionsScreen(void) {
 	}
 	if (buttonPressed) {
 		g_pendingMenuScreen = 0;
+#ifdef XWA_MODERN
+		g_menuCursorRow = 2;
+#else
 		g_menuCursorRow = 1;
+#endif
 	}
 
 	if (action == 1) {
@@ -3976,7 +4056,11 @@ int Config_VideoOptionsMenu(void) {
 	}
 	if (buttonPressed) {
 		g_pendingMenuScreen = 0;
+#ifdef XWA_MODERN
+		g_menuCursorRow = 3;
+#else
 		g_menuCursorRow = 2;
+#endif
 	}
 
 	return 0;

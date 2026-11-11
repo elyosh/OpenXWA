@@ -561,7 +561,7 @@ void XwaRemaster_BeginFrame(const AeronInputSnapshot* input) {
 
 	/* Grave, Ctrl+F5 and Ctrl+F2 are host shortcuts (keyboard_mapping.h).
 	 * Their keys stay suppressed until release, so the game never sees them. */
-	{
+	if (!XwaPort_ShortcutsCaptured()) {
 		const int debug_key = XwaKeyboardMapping_Trigger(input, XWA_KEYBOARD_SHORTCUT_DEBUG);
 		const int renderer_key = XwaKeyboardMapping_Trigger(input, XWA_KEYBOARD_SHORTCUT_RENDERER);
 		const int split_key = XwaKeyboardMapping_Trigger(input, XWA_KEYBOARD_SHORTCUT_SPLIT_VIEW);

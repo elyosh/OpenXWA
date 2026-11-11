@@ -36,6 +36,22 @@ int XwaPort_QueueMouseLookToggle(void);
  * click inside the window, or when the session leaves flight. */
 void XwaPort_ToggleMouseCapture(void);
 int XwaPort_IsMouseCaptureSuspended(void);
+
+/* The OpenXWA Options window, drawn by the host. Recovered code talks to it
+ * only through these functions. */
+/* Asks the host to open the window at the end of this host frame. */
+void XwaPort_RequestOptionsWindow(void);
+int XwaPort_ConsumeOptionsWindowRequest(void);
+/* Asks the host to commit and close the window, such as when the datapad
+ * closes under it. */
+void XwaPort_RequestOptionsWindowClose(void);
+int XwaPort_ConsumeOptionsWindowCloseRequest(void);
+void XwaPort_SetOptionsWindowOpen(int open);
+int XwaPort_OptionsWindowOpen(void);
+/* While the window captures a key for a binding, the host shortcuts are
+ * not run. */
+void XwaPort_SetShortcutsCaptured(int captured);
+int XwaPort_ShortcutsCaptured(void);
 /* Nonzero once the window has held input focus at least once since
  * XwaPort_Init. The frontend/movie focus pause is gated on this so a launch
  * where the OS never handed focus back does not begin as a silent freeze. */

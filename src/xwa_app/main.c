@@ -6,7 +6,9 @@
 #include "install_check.h"
 #include "install_paths.h"
 #include "mod_list.h"
+#include "options/options_window.h"
 #include "setup.h"
+#include "ui.h"
 #include "window_icon.h"
 #include "xwa/config/game_config.h"
 #include "xwa_remaster/dynamic_cockpit.h"
@@ -59,7 +61,8 @@ static int persist_modern_video_options(const XwaModernVideoOptions* options, ch
 /* Whether a host shortcut was pressed this frame. Its key stays suppressed
  * until release, so the game never sees it. */
 static int host_shortcut_pressed(const AeronInputSnapshot* in, XwaKeyboardShortcut shortcut) {
-	const int key = XwaKeyboardMapping_Trigger(in, shortcut);
+	/* The options window gets the keys while it captures a binding. */
+	const int key = XwaOptionsWindow_CapturesKeyboard() ? -1 : XwaKeyboardMapping_Trigger(in, shortcut);
 	if (key < 0) {
 		return 0;
 	}
@@ -100,7 +103,8 @@ static void apply_modern_input_options(const XwaModernInputOptions* options) {
 }
 
 /* Each host frame, new gamepad models get the shipped gamepad defaults, and
- * are saved at the next flush. */
+ * are saved at the next flush. While the options window is open, it does
+ * this in its draft. */
 static void discover_controllers(const AeronInputSnapshot* in) {
 	static char previous_error[512];
 	static XwaModernInputOptions current;
@@ -108,6 +112,9 @@ static void discover_controllers(const AeronInputSnapshot* in) {
 	char error[512] = { 0 };
 	int ok;
 
+	if (XwaOptionsWindow_Open()) {
+		return;
+	}
 	XwaModernInputOptions_Get(&current);
 	candidate = current;
 	ok = XwaControllerOptions_InitializeGamepads(
@@ -123,14 +130,6 @@ static void discover_controllers(const AeronInputSnapshot* in) {
 	snprintf(previous_error, sizeof previous_error, "%s", ok ? "" : error);
 }
 
-/* Starts the host frame's input: installs pending controller options,
- * captures the input while the window has no focus, and reads the
- * controllers. */
-static void begin_input_frame(const AeronInputSnapshot* in) {
-	XwaControllerMapping_ApplyPending();
-	XwaInput_BeginCaptureFrame(in, !in || !in->has_focus);
-	XwaControllerMapping_Update(in);
-}
 
 static int persist_modern_input_options(const XwaModernInputOptions* options, char* error,
 										size_t error_size) {
@@ -391,6 +390,7 @@ int main(int argc, char** argv) {
 	AeronConfig config;
 	XwaHostConfig host_config;
 	XwaLaunchOptions launch;
+	XwaAppUi app_ui;
 	char selected_game_data[XWA_INSTALL_PATH_CAPACITY];
 	char selected_mod[XWA_INSTALL_PATH_CAPACITY];
 	char config_error[1024];
@@ -536,6 +536,15 @@ int main(int argc, char** argv) {
 		Aeron_Shutdown();
 		return 1;
 	}
+	if (!XwaAppUi_Init(&app_ui, config_error, sizeof config_error) ||
+		!XwaOptionsWindow_Init(&app_ui, config_error, sizeof config_error)) {
+		Aeron_LogError("xwa.options", "%s", config_error);
+		Aeron_FatalError("OpenXWA", config_error);
+		XwaAppUi_Shutdown(&app_ui);
+		XwaRemaster_Shutdown();
+		Aeron_Shutdown();
+		return 1;
+	}
 	{
 		XwaModernVideoOptions effective_video_options;
 		XwaRemaster_GetVideoOptions(&effective_video_options);
@@ -568,6 +577,8 @@ int main(int argc, char** argv) {
 	XwaModelSource_Configure(!host_config.force_opt_models);
 	XwaMovieTask_Configure(host_config.prefer_original_movies);
 	if (!XwaPort_Init()) {
+		XwaOptionsWindow_Shutdown();
+		XwaAppUi_Shutdown(&app_ui);
 		XwaRemaster_Shutdown();
 		Aeron_Shutdown();
 		return 1;
@@ -601,7 +612,8 @@ int main(int argc, char** argv) {
 												  : XWA_MODERN_WINDOW_MODE_WINDOWED);
 			}
 			discover_controllers(in);
-			begin_input_frame(in);
+			int window_opened = XwaOptionsWindow_BeginFrame(in);
+			XwaPort_SetShortcutsCaptured(XwaOptionsWindow_CapturesKeyboard());
 			/* Host shortcuts (keyboard_mapping.h). Their keys can't be bound.
 			 * The toggle frame also skips the game tick. Cmd+Ctrl+F on macOS,
 			 * Alt+Enter elsewhere. */
@@ -649,11 +661,17 @@ int main(int argc, char** argv) {
 			if (Aeron_QuitRequested() || XwaPort_ShouldQuit()) {
 				break;
 			}
+			window_opened |= XwaOptionsWindow_ConsumeRuntimeRequest();
 			const uint64_t remaster_start_us = Aeron_NowUs();
 			XwaRemaster_Frame(delta_us);
 			const uint64_t remaster_us = Aeron_NowUs() - remaster_start_us;
 			if (Aeron_QuitRequested() || XwaPort_ShouldQuit()) {
 				break;
+			}
+			/* Drawn over the game. The frame that opens it only starts it, so the
+			 * input that opened it doesn't reach it. */
+			if (!window_opened) {
+				XwaOptionsWindow_Frame(in, (float)delta_us / 1000000.0f);
 			}
 			if (!Aeron_Present()) {
 				Aeron_RequestFatalRendererError("frame presentation");
@@ -677,6 +695,9 @@ int main(int argc, char** argv) {
 	}
 
 	exit_code = Aeron_FatalErrorRequested() ? 1 : XwaPort_GetExitCode();
+	XwaOptionsWindow_FlushForExit();
+	XwaOptionsWindow_Shutdown();
+	XwaAppUi_Shutdown(&app_ui);
 	XwaRemaster_Shutdown();
 	XwaPort_Shutdown();
 	Aeron_Shutdown();
