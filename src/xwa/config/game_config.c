@@ -1556,6 +1556,11 @@ int Config_SinglePlayerVideoOptionsScreen(void) {
 					break;
 				}
 			}
+#ifdef XWA_MODERN
+			/* The original turns 3D hardware on only for a Voodoo or 3dfx
+			   driver. OpenXWA has only the hardware renderer, so it stays on. */
+			g_gameConfig.use3dHardware[0] = 1;
+#endif
 
 			g_gameConfig.screenRes[0] = 0;
 			g_gameConfig.brightness[0] = 2;
@@ -1785,6 +1790,11 @@ int Config_MultiplayerVideoOptionsScreen(void) {
 					break;
 				}
 			}
+#ifdef XWA_MODERN
+			/* The original turns 3D hardware on only for a Voodoo or 3dfx
+			   driver. OpenXWA has only the hardware renderer, so it stays on. */
+			g_gameConfig.use3dHardware[1] = 1;
+#endif
 
 			g_gameConfig.screenRes[1] = 0;
 			g_gameConfig.brightness[1] = 2;
@@ -3747,7 +3757,13 @@ int Config_DrawVideoOptionRows(int profileIdx, int* y, int* rowIndex, char* keyS
 	drawY += 20;
 	++*rowIndex;
 	previousValue = g_gameConfig.use3dHardware[profileIdx];
+#ifdef XWA_MODERN
+	/* OpenXWA has only the hardware renderer, so the row is always greyed
+	   out, as in the restricted options. */
+	if (1) {
+#else
 	if (g_configRestrictedOptionsModalActive) {
+#endif
 		Config_DrawOptionCycleDisabled(&g_gameConfig.use3dHardware[profileIdx], STR_USE_3D_HARDWARE,
 									   STR_CONFIG_NO, 2, &drawY, rowIndex, keyState, 25);
 		if (previousValue != g_gameConfig.use3dHardware[profileIdx] &&
@@ -3777,7 +3793,14 @@ int Config_DrawVideoOptionRows(int profileIdx, int* y, int* rowIndex, char* keyS
 		}
 	}
 
+#ifdef XWA_MODERN
+	/* Flight always uses OpenXWA's flight screen and ignores this setting
+	   (XwaFlightTask_ApplyFlightResolution), so the row is always greyed out,
+	   as in the restricted options. */
+	if (1) {
+#else
 	if (g_configRestrictedOptionsModalActive) {
+#endif
 		label = FrontendString_Get(STR_SCREEN_RESOLUTION);
 		labelX = g_configMenuCenterX - FrontendText_MeasureWidth(label, 15) - 10;
 		if (g_menuCursorRow == *rowIndex) {
