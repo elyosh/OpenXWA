@@ -182,8 +182,9 @@ int Config_MainMenuScreen(void) {
 #endif
 
 #ifdef XWA_MODERN
-	/* Pilot Profiles, and outside flight, Mods. */
-	rowCount = g_configRestrictedOptionsModalActive ? 8 : 12;
+	/* OpenXWA Options and Pilot Profiles, and outside flight, Mods. General
+	   Performance Tuning and Game Controller Options are not shown. */
+	rowCount = g_configRestrictedOptionsModalActive ? 7 : 11;
 #else
 	rowCount = g_configRestrictedOptionsModalActive ? 7 : 10;
 #endif
@@ -269,6 +270,8 @@ int Config_MainMenuScreen(void) {
 
 	y += 25;
 	++rowIndex;
+	/* Not shown in the modern build: the modern renderer has its own settings. */
+#ifndef XWA_MODERN
 	text = FrontendString_Get(STR_CONFIG_PERFORMANCE_OPTIONS);
 	titleWidth = FrontendText_MeasureWidth(text, 20);
 	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
@@ -289,6 +292,7 @@ int Config_MainMenuScreen(void) {
 
 	y += 25;
 	++rowIndex;
+#endif
 	text = FrontendString_Get(STR_CONFIG_VIDEO_OPTIONS);
 	titleWidth = FrontendText_MeasureWidth(text, 20);
 	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
@@ -920,11 +924,7 @@ int Config_SoundOptionsScreen(void) {
 	}
 	if (buttonPressed) {
 		g_pendingMenuScreen = 0;
-#ifdef XWA_MODERN
-		g_menuCursorRow = 4;
-#else
 		g_menuCursorRow = 3;
-#endif
 	}
 
 	if (restoreDefaults == 1) {
@@ -2142,7 +2142,11 @@ int Config_CreditsScreen(void) {
 			}
 			FrontendCursor_Show();
 			g_pendingMenuScreen = 0;
+#ifdef XWA_MODERN
+			g_menuCursorRow = 5;
+#else
 			g_menuCursorRow = 6;
+#endif
 			FrontendDisplay_SetFrameRate(24);
 			if (g_gameConfig.datapadMusicEnabled) {
 				Music_PauseIfInitialized();
@@ -2408,7 +2412,11 @@ int Config_CutsceneViewerScreen(void) {
 					if (!backTextWidth) {
 						Keyboard_FlushCharBuffer();
 						g_pendingMenuScreen = zero;
+#ifdef XWA_MODERN
+						g_menuCursorRow = 6;
+#else
 						g_menuCursorRow = 7;
+#endif
 						return zero;
 					}
 				} while (1);
@@ -2439,7 +2447,11 @@ int Config_CutsceneViewerScreen(void) {
 	if (menuNavKey == CONFIG_KEY_ESCAPE || requiredDisk) {
 		Keyboard_FlushCharBuffer();
 		g_pendingMenuScreen = zero;
+#ifdef XWA_MODERN
+		g_menuCursorRow = 6;
+#else
 		g_menuCursorRow = 7;
+#endif
 	}
 
 	return zero;
@@ -2502,7 +2514,7 @@ static void Config_FinishOptionsDatapadClose(void) {
    The datapad redraws the current screen every frame inside its clip
    rectangle, so it shows only the main menu title meanwhile. */
 static void Config_OpenXwaOptionsScreen(void) {
-	const int rowCount = g_configRestrictedOptionsModalActive ? 8 : 12;
+	const int rowCount = g_configRestrictedOptionsModalActive ? 7 : 11;
 	const int y = 215 - ((25 * rowCount) >> 1);
 	const char* text;
 	unsigned int titleWidth;
@@ -2637,14 +2649,14 @@ int Config_OptionsDatapadUpdate(int frameState) {
 		case 19:
 			if (XwaModernPilotProfilesScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
 				g_pendingMenuScreen = 0;
-				g_menuCursorRow = g_configRestrictedOptionsModalActive ? 5 : 8;
+				g_menuCursorRow = g_configRestrictedOptionsModalActive ? 4 : 7;
 			}
 			done = 0;
 			break;
 		case 23:
 			if (XwaModernModsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
 				g_pendingMenuScreen = 0;
-				g_menuCursorRow = 9;
+				g_menuCursorRow = 8;
 			}
 			done = 0;
 			break;
@@ -3557,7 +3569,11 @@ int Config_NetworkOptionsScreen(void) {
 	}
 	if (buttonPressed) {
 		g_pendingMenuScreen = 0;
+#ifdef XWA_MODERN
+		g_menuCursorRow = 4;
+#else
 		g_menuCursorRow = 5;
+#endif
 		if (g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_NET_HOST) {
 			MissionSetup_BroadcastStatePacket(0);
 		}
@@ -4056,11 +4072,7 @@ int Config_VideoOptionsMenu(void) {
 	}
 	if (buttonPressed) {
 		g_pendingMenuScreen = 0;
-#ifdef XWA_MODERN
-		g_menuCursorRow = 3;
-#else
 		g_menuCursorRow = 2;
-#endif
 	}
 
 	return 0;
