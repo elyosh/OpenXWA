@@ -1,5 +1,6 @@
 #include "aeron/main.h"
 #include "aeron/aeron.h"
+#include "aeron/debug.h"
 #include "aeron/time.h"
 #include "host_config.h"
 #include "install_check.h"
@@ -12,7 +13,9 @@
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/config/modern_mods.h"
 #include "xwa_runtime/config/option_section.h"
+#include "xwa_runtime/input/capture.h"
 #include "xwa_runtime/input/controller_mapping.h"
+#include "xwa_runtime/input/keyboard_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
@@ -53,25 +56,15 @@ static int persist_modern_video_options(const XwaModernVideoOptions* options, ch
 	return XwaHostConfig_SaveVideoOptions(Aeron_GetVfs(), options, error, error_size);
 }
 
-/* Platform-conventional fullscreen toggle chord: Cmd+Ctrl+F on macOS,
- * Alt+Enter on Windows, Alt+Enter or F11 elsewhere. */
-static int fullscreen_hotkey_pressed(const AeronInputSnapshot* in) {
-	if (!in) {
+/* Whether a host shortcut was pressed this frame. Its key stays suppressed
+ * until release, so the game never sees it. */
+static int host_shortcut_pressed(const AeronInputSnapshot* in, XwaKeyboardShortcut shortcut) {
+	const int key = XwaKeyboardMapping_Trigger(in, shortcut);
+	if (key < 0) {
 		return 0;
 	}
-#if defined(__APPLE__)
-	return (in->key_down[AERON_KEY_LGUI] || in->key_down[AERON_KEY_RGUI]) &&
-		   (in->key_down[AERON_KEY_LCTRL] || in->key_down[AERON_KEY_RCTRL]) &&
-		   in->key_pressed[AERON_KEY_A + ('f' - 'a')];
-#else
-	const int alt = in->key_down[AERON_KEY_LALT] || in->key_down[AERON_KEY_RALT];
-	const int enter = in->key_pressed[AERON_KEY_RETURN] || in->key_pressed[AERON_KEY_KP_ENTER];
-#if defined(_WIN32)
-	return alt && enter;
-#else
-	return (alt && enter) || in->key_pressed[AERON_KEY_F11];
-#endif
-#endif
+	XwaInput_SuppressKey(key);
+	return 1;
 }
 
 /* Window-mode changes route through the video options module so the apply
@@ -86,11 +79,57 @@ static void set_window_mode_option(XwaModernWindowMode mode) {
 }
 
 static void apply_modern_input_options(const XwaModernInputOptions* options) {
-	XwaMouseFlight_SetOptions(options);
-	if (options) {
-		XwaControllerMapping_SetOptions(&options->controller);
-		Config_ApplyModernInputOptions(options);
+	/* Installing bindings releases the keys held, so only new bindings are
+	 * installed. */
+	static XwaKeyboardBindings installed_keyboard;
+	static int keyboard_installed;
+
+	if (!options) {
+		return;
 	}
+	XwaMouseFlight_SetOptions(options);
+	/* Installed at the next host frame. */
+	XwaControllerMapping_SetOptions(&options->controllers);
+	if (!keyboard_installed || !XwaKeyboardMapping_Equal(&installed_keyboard, &options->keyboard)) {
+		installed_keyboard = options->keyboard;
+		keyboard_installed = 1;
+		XwaKeyboardMapping_Install(&options->keyboard);
+	}
+	XwaControllerMapping_SetRumbleEnabled(options->rumble_enabled);
+	Config_ApplyModernInputOptions(options);
+}
+
+/* Each host frame, new gamepad models get the shipped gamepad defaults, and
+ * are saved at the next flush. */
+static void discover_controllers(const AeronInputSnapshot* in) {
+	static char previous_error[512];
+	static XwaModernInputOptions current;
+	static XwaModernInputOptions candidate;
+	char error[512] = { 0 };
+	int ok;
+
+	XwaModernInputOptions_Get(&current);
+	candidate = current;
+	ok = XwaControllerOptions_InitializeGamepads(
+		&candidate.controllers, XwaModernInputOptions_GamepadDefaults(), in, error, sizeof error);
+	if (!XwaControllerOptions_Equals(&candidate.controllers, &current.controllers) &&
+		!XwaModernInputOptions_Set(&candidate)) {
+		snprintf(error, sizeof error, "%s", "the new controller could not be added");
+		ok = 0;
+	}
+	if (!ok && strcmp(previous_error, error) != 0) {
+		Aeron_LogWarn("xwa.input", "%s", error);
+	}
+	snprintf(previous_error, sizeof previous_error, "%s", ok ? "" : error);
+}
+
+/* Starts the host frame's input: installs pending controller options,
+ * captures the input while the window has no focus, and reads the
+ * controllers. */
+static void begin_input_frame(const AeronInputSnapshot* in) {
+	XwaControllerMapping_ApplyPending();
+	XwaInput_BeginCaptureFrame(in, !in || !in->has_focus);
+	XwaControllerMapping_Update(in);
 }
 
 static int persist_modern_input_options(const XwaModernInputOptions* options, char* error,
@@ -504,9 +543,15 @@ int main(int argc, char** argv) {
 		XwaModernVideoOptions_Configure(&effective_video_options, apply_modern_video_options,
 										persist_modern_video_options);
 	}
-	XwaModernInputOptions_Configure(&host_config.input_defaults, &host_config.input_options,
-									apply_modern_input_options, persist_modern_input_options);
+	XwaKeyboardMapping_SetPolicy(Aeron_DebugUiAvailable() != 0);
+	XwaControllerMapping_Init(&host_config.input_options.controllers);
+	XwaModernInputOptions_Configure(&host_config.input_defaults, &host_config.gamepad_defaults,
+									&host_config.input_options, apply_modern_input_options,
+									persist_modern_input_options);
 	apply_modern_input_options(&host_config.input_options);
+	if (host_config.input_upgraded) {
+		XwaModernInputOptions_MarkDirty();
+	}
 	XwaOptionSection_SetPersist(persist_option_switch);
 	Aeron_LogInfo(
 		"xwa.config", "mouse flight control: %s (%s mode, sensitivity %d, invert Y: %s)",
@@ -555,15 +600,17 @@ int main(int argc, char** argv) {
 				set_window_mode_option(fullscreen ? XWA_MODERN_WINDOW_MODE_FULLSCREEN
 												  : XWA_MODERN_WINDOW_MODE_WINDOWED);
 			}
-			/* The toggle frame skips the game tick like the other host
-			 * chords so the Enter/F/F11 edge never reaches classic input. */
-			if (fullscreen_hotkey_pressed(in)) {
+			discover_controllers(in);
+			begin_input_frame(in);
+			/* Host shortcuts (keyboard_mapping.h). Their keys can't be bound.
+			 * The toggle frame also skips the game tick. Cmd+Ctrl+F on macOS,
+			 * Alt+Enter elsewhere. */
+			if (host_shortcut_pressed(in, XWA_KEYBOARD_SHORTCUT_FULLSCREEN)) {
 				set_window_mode_option(fullscreen ? XWA_MODERN_WINDOW_MODE_WINDOWED
 												  : XWA_MODERN_WINDOW_MODE_FULLSCREEN);
 				toggled = 1;
 			}
-			const int gui_mod = in && (in->key_down[AERON_KEY_LGUI] || in->key_down[AERON_KEY_RGUI]);
-			if (gui_mod && in->key_pressed[AERON_KEY_A + ('p' - 'a')]) {
+			if (host_shortcut_pressed(in, XWA_KEYBOARD_SHORTCUT_HOST_PAUSE)) {
 				paused = !paused;
 				toggled = 1;
 				Aeron_AudioSetPaused(paused);
@@ -571,27 +618,20 @@ int main(int argc, char** argv) {
 			}
 			/* Ctrl+Alt+L is a portable alias for the original Scroll Lock cockpit
 			 * mouse-look action. Queue the original action so its gameplay gates remain
-			 * authoritative, and skip this tick so the chord cannot leak into flight. */
-			if (in && (in->key_down[AERON_KEY_LCTRL] || in->key_down[AERON_KEY_RCTRL]) &&
-				(in->key_down[AERON_KEY_LALT] || in->key_down[AERON_KEY_RALT]) &&
-				in->key_pressed[AERON_KEY_A + ('l' - 'a')] && XwaPort_QueueMouseLookToggle()) {
+			 * authoritative. */
+			if (host_shortcut_pressed(in, XWA_KEYBOARD_SHORTCUT_MOUSE_LOOK) &&
+				XwaPort_QueueMouseLookToggle()) {
 				toggled = 1;
 			}
 			/* Ctrl+Alt+M releases the flight mouse capture back to the OS and
-			 * re-captures it. Handled here, and skipping the tick like the pause
-			 * toggle, so the M edge never reaches the classic input path. */
-			if (in && (in->key_down[AERON_KEY_LCTRL] || in->key_down[AERON_KEY_RCTRL]) &&
-				(in->key_down[AERON_KEY_LALT] || in->key_down[AERON_KEY_RALT]) &&
-				in->key_pressed[AERON_KEY_A + ('m' - 'a')]) {
+			 * re-captures it. */
+			if (host_shortcut_pressed(in, XWA_KEYBOARD_SHORTCUT_MOUSE)) {
 				XwaPort_ToggleMouseCapture();
 				toggled = 1;
 			}
 			/* Ctrl+H toggles the Dynamic Cockpit holograms while a cockpit
-			 * with screens is shown, skipping the tick so the chord (control
-			 * code 0x08, KEY_BACKSPACE) never reaches classic input. */
-			if (in && (in->key_down[AERON_KEY_LCTRL] || in->key_down[AERON_KEY_RCTRL]) &&
-				!(in->key_down[AERON_KEY_LALT] || in->key_down[AERON_KEY_RALT]) &&
-				in->key_pressed[AERON_KEY_A + ('h' - 'a')] && XwaRemasterDc_Active()) {
+			 * with screens is shown. */
+			if (XwaRemasterDc_Active() && host_shortcut_pressed(in, XWA_KEYBOARD_SHORTCUT_HOLOGRAMS)) {
 				XwaRemasterDc_ToggleHolograms();
 				toggled = 1;
 			}

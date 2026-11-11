@@ -1,9 +1,24 @@
 #include "xwa_runtime/input/input_bridge.h"
 
+#include "aeron/aeron.h"
+#include "aeron/compat/host.h"
+#include "aeron/debug.h"
+#include "xwa/flight/flight_display.h"
+#include "xwa/flight/hangar.h"
+#include "xwa/flight/player/player.h"
+#include "xwa/frontend/flight_loading.h"
 #include "xwa/frontend/frontend_cursor.h"
 #include "xwa/frontend/frontend_input.h"
+#include "xwa/render/renderer.h"
+#include "xwa_runtime/input/capture.h"
+#include "xwa_runtime/input/controller_mapping.h"
+#include "xwa_runtime/input/keyboard_mapping.h"
+#include "xwa_runtime/runtime/flight_pause_task.h"
+#include "xwa_runtime/runtime/flight_task.h"
+#include "xwa_runtime/runtime/movie_task.h"
 #include "xwa_runtime/runtime/presentation.h"
 
+#include <stdbool.h>
 #include <string.h>
 
 enum {
@@ -19,6 +34,61 @@ unsigned char g_mouseLeftDown = 0;
 // GLOBAL: XWA 0x9F6883
 unsigned char g_mouseRightDown = 0;
 
+static XwaKeyboardRoute g_keyboardRoute;
+static bool g_keyboardSuppressed;
+static uint64_t g_keyboardFrame = UINT64_MAX;
+
+XwaKeyboardRoute XwaInput_ReconcileKeyboard(void) {
+	const AeronInputSnapshot* input = Aeron_InputSnapshot();
+	XwaKeyboardRoute route = XWA_KEYBOARD_RAW;
+
+	if (g_keyboardSuppressed || !input || !input->has_focus || XwaInput_IsCaptured() ||
+		Aeron_DebugUiVisible()) {
+		route = XWA_KEYBOARD_BLOCKED;
+	} else if (XwaFlightTask_IsActive() && !FlightLoading_AreFrontendSurfacesAttached() &&
+			   !XwaFlightTask_IsHoldingLoadingScreen() && !FlightDisplay_IsFrontendModalActive() &&
+			   !XwaMovieTask_IsActive() && !XwaFlightPauseTask_IsActive() && !g_inHangarReady &&
+			   (unsigned)g_localPlayer < 8 && g_players[g_localPlayer].msgTypeId == 0 &&
+			   !g_filmPlaybackMode) {
+		route = XWA_KEYBOARD_GAMEPLAY;
+	}
+	if (route != g_keyboardRoute) {
+		/* Commands and text never cross a routing transition. Held keys must be released. */
+		XwaInput_FlushKeyboard();
+		g_keyboardRoute = route;
+	}
+	XwaKeyboardMapping_Enable(route == XWA_KEYBOARD_GAMEPLAY, input);
+	return route;
+}
+
+static void XwaInput_UpdateKeyboard(bool suppress) {
+	const AeronInputSnapshot* input = Aeron_InputSnapshot();
+	XwaKeyboardRoute route;
+
+	g_keyboardSuppressed = suppress;
+	route = XwaInput_ReconcileKeyboard();
+	if (!input || input->frame_id == g_keyboardFrame) {
+		return;
+	}
+	g_keyboardFrame = input->frame_id;
+	XwaKeyboardMapping_BeginFrame(input);
+	if (route == XWA_KEYBOARD_GAMEPLAY) {
+		for (uint16_t i = 0; !input->key_events_overflow && i < input->key_event_count; ++i) {
+			const AeronKeyEvent* event = &input->key_events[i];
+			XwaKeyboardMapping_Event(event, AeronCompat_IsKeySuppressed(event->chord.key) != 0);
+		}
+		/* DirectInput still serves raw consumers, but owns no gameplay backlog. */
+		XwaInput_FlushRawKeyboard();
+	} else if (route == XWA_KEYBOARD_BLOCKED) {
+		XwaInput_FlushRawKeyboard();
+	}
+}
+
+void XwaInput_UpdateFlight(int suppress) {
+	XwaInput_UpdateKeyboard(suppress != 0);
+	XwaControllerMapping_Update(Aeron_InputSnapshot());
+}
+
 void XwaInputBridge_UpdateFrontendMouse(const AeronInputSnapshot* input) {
 	uint32_t buttons;
 	uint32_t released;
@@ -31,11 +101,14 @@ void XwaInputBridge_UpdateFrontendMouse(const AeronInputSnapshot* input) {
 
 	insideClassic = XwaPresentation_ToClassic(input->mouse.x, input->mouse.y, &g_mouseX, &g_mouseY);
 
-	buttons = input->has_focus && input->mouse.inside_content && insideClassic ? input->mouse.buttons : 0;
-	released =
-		input->has_focus && input->mouse.inside_content && insideClassic ? input->mouse.released_buttons : 0;
+	buttons = input->has_focus && input->mouse.inside_content && insideClassic
+				  ? XwaInput_FilterMouseButtons(input->mouse.buttons)
+				  : 0;
+	released = input->has_focus && input->mouse.inside_content && insideClassic
+				   ? XwaInput_FilterMouseButtons(input->mouse.released_buttons)
+				   : 0;
 	doubleClicked = input->has_focus && input->mouse.inside_content && insideClassic
-						? input->mouse.double_clicked_buttons
+						? XwaInput_FilterMouseButtons(input->mouse.double_clicked_buttons)
 						: 0;
 
 	g_mouseLeftDown = (buttons & AERON_MOUSE_BUTTON_LEFT) != 0;
@@ -175,14 +248,14 @@ static void XwaInputBridge_UpdateFrontendKeyState(const AeronInputSnapshot* inpu
 	int key;
 
 	memset(KeyState, 0, sizeof(KeyState));
-	if (!input->has_focus) {
+	if (!input->has_focus || XwaInput_IsCaptured()) {
 		return;
 	}
 
 	for (key = 0; key < AERON_KEY_COUNT; ++key) {
 		unsigned int virtualKey;
 
-		if (!input->key_down[key]) {
+		if (!input->key_down[key] || AeronCompat_IsKeySuppressed(key)) {
 			continue;
 		}
 
@@ -201,7 +274,7 @@ static void XwaInputBridge_UpdateFrontendKeyState(const AeronInputSnapshot* inpu
 static void XwaInputBridge_AppendFrontendText(const AeronInputSnapshot* input) {
 	uint32_t i;
 
-	if (!input->has_focus) {
+	if (!input->has_focus || XwaInput_IsCaptured()) {
 		return;
 	}
 
@@ -214,19 +287,19 @@ static void XwaInputBridge_AppendFrontendText(const AeronInputSnapshot* input) {
 		}
 	}
 
-	if (input->key_pressed[AERON_KEY_BACKSPACE]) {
+	if (input->key_pressed[AERON_KEY_BACKSPACE] && !AeronCompat_IsKeySuppressed(AERON_KEY_BACKSPACE)) {
 		XwaInputBridge_AppendFrontendChar(XWA_KEY_BACKSPACE);
 	}
 
-	if (input->key_pressed[AERON_KEY_TAB]) {
+	if (input->key_pressed[AERON_KEY_TAB] && !AeronCompat_IsKeySuppressed(AERON_KEY_TAB)) {
 		XwaInputBridge_AppendFrontendChar(XWA_KEY_TAB);
 	}
 
-	if (input->key_pressed[AERON_KEY_RETURN]) {
+	if (input->key_pressed[AERON_KEY_RETURN] && !AeronCompat_IsKeySuppressed(AERON_KEY_RETURN)) {
 		XwaInputBridge_AppendFrontendChar(XWA_KEY_RETURN);
 	}
 
-	if (input->key_pressed[AERON_KEY_ESCAPE]) {
+	if (input->key_pressed[AERON_KEY_ESCAPE] && !AeronCompat_IsKeySuppressed(AERON_KEY_ESCAPE)) {
 		XwaInputBridge_AppendFrontendChar(XWA_KEY_ESCAPE);
 	}
 }
@@ -241,6 +314,7 @@ void XwaInputBridge_UpdateFrontendKeyboard(const AeronInputSnapshot* input) {
 }
 
 void XwaInputBridge_UpdateFrontend(const AeronInputSnapshot* input) {
+	XwaInput_ReconcileKeyboard();
 	XwaInputBridge_UpdateFrontendMouse(input);
 	XwaInputBridge_UpdateFrontendKeyboard(input);
 }

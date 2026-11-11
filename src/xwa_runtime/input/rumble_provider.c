@@ -7,12 +7,12 @@
 
 static int XwaRumble_HasRumble(void* user) {
 	(void)user;
-	return XwaControllerMapping_SelectedHasRumble();
+	return XwaControllerMapping_RumbleInstance() != 0;
 }
 
 static uint32_t XwaRumble_ControllerInstanceId(void* user) {
 	(void)user;
-	return XwaControllerMapping_SelectedInstanceId();
+	return XwaControllerMapping_RumbleInstance();
 }
 
 static int XwaRumble_Rumble(uint16_t low, uint16_t high, uint32_t duration_ms, void* user) {

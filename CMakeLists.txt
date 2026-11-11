@@ -211,9 +211,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/camera/exterior_hud.c
     src/xwa_runtime/config/modern_camera_options.c
     src/xwa_runtime/config/modern_camera_shake_options.c
-    src/xwa_runtime/config/modern_controller_options_screen.c
     src/xwa_runtime/config/modern_input_options.c
-    src/xwa_runtime/config/modern_input_options_screen.c
     src/xwa_runtime/config/modern_options_menu.c
     src/xwa_runtime/config/modern_pilot_profiles_screen.c
     src/xwa_runtime/config/modern_video_options.c
@@ -237,7 +235,9 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/frontend/room_anims.c
     src/xwa_runtime/frontend/side_panels.c
     src/xwa_runtime/input/actions.c
+    src/xwa_runtime/input/capture.c
     src/xwa_runtime/input/controller_options.c
+    src/xwa_runtime/input/flight_controls.c
     src/xwa_runtime/input/input_bridge.c
     src/xwa_runtime/input/keyboard_mapping.c
     src/xwa_runtime/input/controller_mapping.c
@@ -756,8 +756,6 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/config/modern_camera_options.h
     src/xwa_runtime/config/modern_camera_shake_options.h
     src/xwa_runtime/config/modern_input_options.h
-    src/xwa_runtime/config/modern_controller_options_screen.h
-    src/xwa_runtime/config/modern_input_options_screen.h
     src/xwa_runtime/config/modern_options_menu.h
     src/xwa_runtime/config/modern_pilot_profiles_screen.h
     src/xwa_runtime/config/modern_speed_effect_options.h
@@ -864,7 +862,9 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/frontend/frontend_video.h
     src/xwa_runtime/frontend/room_anims.h
     src/xwa_runtime/input/actions.h
+    src/xwa_runtime/input/capture.h
     src/xwa_runtime/input/controller_options.h
+    src/xwa_runtime/input/flight_controls.h
     src/xwa_runtime/input/input_bridge.h
     src/xwa_runtime/input/keyboard_mapping.h
     src/xwa_runtime/input/rumble_provider.h

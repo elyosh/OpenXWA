@@ -56,11 +56,10 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
-#include "xwa_runtime/input/winmm_joystick_provider.h"
 #include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
-#include "xwa_runtime/input/mouse_flight.h"
+#include "xwa_runtime/input/flight_controls.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/gunner_seats.h"
@@ -70,8 +69,8 @@
 #include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
-#include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/film_state.h"
+#include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
@@ -103,8 +102,6 @@ typedef struct ModernMapCameraStepRemainder {
 typedef struct ModernJoystickInputSample {
 	int timestamp;
 	int captured;
-	int joystickValid;
-	WinmmJoystickTraceSample bridge;
 	int16_t prePackX;
 	int16_t prePackY;
 	int16_t prePackR;
@@ -170,8 +167,6 @@ void FlightDebug_CaptureJoystickInputSample(int timestamp) {
 	memset(sample, 0, sizeof(*sample));
 	sample->timestamp = timestamp;
 	sample->captured = 1;
-	sample->joystickValid =
-		g_joystickEnabled != 0 && g_joystickActive && WinmmJoystick_GetLastTraceSample(&sample->bridge);
 	sample->prePackX = g_ctrlAxisX;
 	sample->prePackY = g_ctrlAxisY;
 	sample->prePackR = g_ctrlAxisR;
@@ -201,9 +196,6 @@ static void FlightDebug_LogJoystickIntegration(const ModernJoystickIntegrationTr
 
 	if (!sample) {
 		memset(&fallback, 0, sizeof(fallback));
-		fallback.bridge.sourceAxisX = -1;
-		fallback.bridge.sourceAxisY = -1;
-		fallback.bridge.sourceAxisR = -1;
 		fallback.prePackX = g_ctrlAxisX;
 		fallback.prePackY = g_ctrlAxisY;
 		fallback.prePackR = g_ctrlAxisR;
@@ -214,19 +206,16 @@ static void FlightDebug_LogJoystickIntegration(const ModernJoystickIntegrationTr
 	}
 
 	Aeron_LogInfo("xwa.input.trace",
-				  "JOYTRACE ts=%d dt=%u joy=%d sdl=%d:%d,%d:%d,%d:%d wm=%u,%u,%u xwa=%d,%d,%d "
+				  "JOYTRACE ts=%d dt=%u xwa=%d,%d,%d "
 				  "pk=%d,%d,%d sc_ypr=%d,%d,%d tgt_ypr=%d,%d,%d sm_ypr=%d,%d,%d step_ypr=%d,%d,%d "
 				  "ang_pyr=%u,%u,%u>%u,%u,%u",
-				  trace->timestamp, (unsigned int)trace->elapsedTicks, sample->joystickValid,
-				  sample->bridge.sourceAxisX, sample->bridge.sourceValueX, sample->bridge.sourceAxisY,
-				  sample->bridge.sourceValueY, sample->bridge.sourceAxisR, sample->bridge.sourceValueR,
-				  sample->bridge.winmmX, sample->bridge.winmmY, sample->bridge.winmmR, sample->prePackX,
-				  sample->prePackY, sample->prePackR, sample->packedX, sample->packedY, sample->packedR,
-				  trace->scaledYaw, trace->scaledPitch, trace->scaledRoll, trace->targetYaw,
-				  trace->targetPitch, trace->targetRoll, trace->smoothedYaw, trace->smoothedPitch,
-				  trace->smoothedRoll, trace->stepYaw, trace->stepPitch, trace->stepRoll,
-				  (unsigned int)trace->oldPitch, (unsigned int)trace->oldYaw, (unsigned int)trace->oldRoll,
-				  (unsigned int)trace->newPitch, (unsigned int)trace->newYaw, (unsigned int)trace->newRoll);
+				  trace->timestamp, (unsigned int)trace->elapsedTicks, sample->prePackX, sample->prePackY,
+				  sample->prePackR, sample->packedX, sample->packedY, sample->packedR, trace->scaledYaw,
+				  trace->scaledPitch, trace->scaledRoll, trace->targetYaw, trace->targetPitch,
+				  trace->targetRoll, trace->smoothedYaw, trace->smoothedPitch, trace->smoothedRoll,
+				  trace->stepYaw, trace->stepPitch, trace->stepRoll, (unsigned int)trace->oldPitch,
+				  (unsigned int)trace->oldYaw, (unsigned int)trace->oldRoll, (unsigned int)trace->newPitch,
+				  (unsigned int)trace->newYaw, (unsigned int)trace->newRoll);
 }
 
 void Flight_ModernResetHighRateIntegration(void) {
@@ -568,10 +557,13 @@ const uint16_t g_subsystemIdToFlag[10] = {
 	0x0040u, 0x0020u, 0x0010u, 0x0001u, 0x0004u, 0x0008u, 0x0100u, 0x0200u, 0x0002u, 0x0080u,
 };
 
+#ifndef XWA_MODERN
+/* The modern build reads the throttle lever through XwaFlightControls. */
 static const uint8_t g_throttleKeyByBucket[17] = {
 	0x08u, 0xe7u, 0xe6u, 0xe5u, 0xe4u, 0x5du, 0xe3u, 0xe2u, 0xe1u,
 	0xe0u, 0xdfu, 0x5bu, 0xdeu, 0xddu, 0xdcu, 0xdbu, 0x5cu,
 };
+#endif
 
 // GLOBAL: XWA 0x91AB86
 uint16_t g_keyMods;
@@ -1350,6 +1342,9 @@ void FlightInput_ResetRuntimeState(void) {
 	g_injectedKeyCount = 0;
 	g_joystickDetectResultWord = joystickActive;
 	g_joystickEnabled = joystickActive != 0;
+#ifdef XWA_MODERN
+	XwaFlightControls_Reset();
+#endif
 	g_throttleSmoothed = -1;
 
 	return;
@@ -2505,10 +2500,16 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 	uint16_t key;
 	int axisX;
 	int axisY;
+#ifndef XWA_MODERN
 	int throttleRaw;
+#endif
 	int axisR;
 	int keyMods;
+#ifdef XWA_MODERN
+	int fromKeyboard;
+#else
 	volatile int joystickButtons;
+#endif
 
 	if ((playerIdxOrSentinel == g_localPlayer || playerIdxOrSentinel == -2) && g_inHangarReady != 0 &&
 		g_filmPlaybackMode == 0) {
@@ -2518,38 +2519,23 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 	if (playerIdxOrSentinel < 0) {
 		axisX = 0;
 		axisY = 0;
+#ifndef XWA_MODERN
 		throttleRaw = 0;
+#endif
 		axisR = 0;
+#ifndef XWA_MODERN
 		joystickButtons = 0;
+#endif
 		keyMods = 0;
+#ifdef XWA_MODERN
+		/* The keyboard bindings, the controllers and the mouse. They are read
+		   before the input frame is packed, so films, replays and net lockstep
+		   see the same input whatever device it came from. */
+		XwaFlightControls_Sample(&axisX, &axisY, &axisR, &keyMods);
+		fromKeyboard = 0;
+#else
 		if (g_joystickEnabled != 0) {
 			joystickButtons = Joystick_PollRawAxesIfEnabled(&axisX, &axisY, &throttleRaw, &axisR, 0);
-		}
-
-#ifdef XWA_MODERN
-		/* Mouse flight control. It runs before the input frame is packed, so
-		   films, replays and net lockstep see the same input whether it came
-		   from the mouse or the joystick. The mouse replaces any axis it moves;
-		   the joystick keeps the others. While cockpit mouse look is on, mouse
-		   flight is suspended. */
-		if (g_padlockMouseLookEnabled) {
-			XwaMouseFlight_Suspend();
-		} else if (XwaMouseFlight_Sample()) {
-			int mouseAxisX;
-			int mouseAxisY;
-			int mouseAxisR;
-
-			XwaMouseFlight_GetAxes(&mouseAxisX, &mouseAxisY, &mouseAxisR);
-			if (mouseAxisX != 0) {
-				axisX = mouseAxisX;
-			}
-			if (mouseAxisY != 0) {
-				axisY = mouseAxisY;
-			}
-			if (mouseAxisR != 0) {
-				axisR = mouseAxisR;
-			}
-			joystickButtons |= XwaMouseFlight_ButtonsMask();
 		}
 #endif
 
@@ -2557,8 +2543,13 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 		if (g_injectedKeyCount != 0) {
 			key = g_injectedKeyStack[g_injectedKeyCount - 1];
 			--g_injectedKeyCount;
-		} else if (FlightInput_HasKeyReady()) {
+		}
+#ifdef XWA_MODERN
+		else if ((key = XwaFlightControls_ReadKey(&fromKeyboard)) != 0 && fromKeyboard) {
+#else
+		else if (FlightInput_HasKeyReady()) {
 			key = (uint16_t)FlightInput_GetNextKey();
+#endif
 			if (g_consoleEnabled == 0 || g_players[g_localPlayer].hudEnabled == 0 ||
 				g_players[g_localPlayer].viewState.externalCameraActive != 0 ||
 				g_players[g_localPlayer].mfd.consolePageAvailable == 0 ||
@@ -2568,15 +2559,12 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 		}
 
 #ifdef XWA_MODERN
-		/* A short right-button tap sends the target-in-sight key, like a tap of
-		   joystick button 2. A tap made while the player is typing a message is
-		   dropped, because KEY_ALT_1 would insert a taunt there. */
-		if (key == 0 && !g_padlockMouseLookEnabled && XwaMouseFlight_TakeTargetTap() &&
-			g_players[g_localPlayer].msgTypeId == 0) {
-			key = KEY_ALT_1;
+		/* A held controller look binding sends its key on every read, like the
+		   original joystick hat. */
+		if (key == 0) {
+			key = XwaFlightControls_ReadLookKey();
 		}
-#endif
-
+#else
 		{
 			int buttonBit;
 			unsigned int buttonIdx;
@@ -2671,6 +2659,7 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 				}
 			}
 		}
+#endif
 
 		g_ctrlAxisR = (int16_t)axisR;
 		g_ctrlAxisX = (int16_t)axisX;
@@ -2678,6 +2667,18 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 		g_ctrlAxisY = (int16_t)axisY;
 		g_keyMods = (uint16_t)keyMods;
 
+#ifdef XWA_MODERN
+		/* The roll actions force the roll axis, keypad 1 and 3 by default. */
+		if (XwaFlightControls_RollHeld(XWA_INPUT_ROLL_LEFT)) {
+			if (!XwaFlightControls_RollHeld(XWA_INPUT_ROLL_RIGHT)) {
+				g_ctrlAxisR = -127;
+			}
+		}
+		if (XwaFlightControls_RollHeld(XWA_INPUT_ROLL_RIGHT) &&
+			!XwaFlightControls_RollHeld(XWA_INPUT_ROLL_LEFT)) {
+			g_ctrlAxisR = 127;
+		}
+#else
 		if (g_dinputKeyboardState[0x4f] != 0) {
 			if (g_dinputKeyboardState[0x51] == 0) {
 				g_ctrlAxisR = -127;
@@ -2686,6 +2687,7 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 		if (g_dinputKeyboardState[0x51] != 0 && g_dinputKeyboardState[0x4f] == 0) {
 			g_ctrlAxisR = 127;
 		}
+#endif
 
 		return key;
 	} else {
@@ -11679,25 +11681,31 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 		}
 #endif
 		DInput_ReadKeyboardState();
+		/* The keyboard look actions, keypad 2, 4, 5, 6 and 8 by default. */
+#ifdef XWA_MODERN
+#define FLIGHT_LOOK_HELD(dik, look) XwaFlightControls_LookHeld(look)
+#else
+#define FLIGHT_LOOK_HELD(dik, look) g_dinputKeyboardState[dik]
+#endif
 		if (!g_players[playerIdx].viewState.externalCameraActive &&
 			g_players[playerIdx].hyperspacePhase == PLAYER_HYPERSPACE_PHASE_NONE &&
 			g_players[playerIdx].cockpitVisible && !g_players[playerIdx].currentSeatIdx &&
 			g_players[playerIdx].cockpitLookAvailable && g_flightPlayerCount == 1) {
-			if (g_dinputKeyboardState[0x4b] || g_currentActionKey == KEY_PAD_4) {
+			if (FLIGHT_LOOK_HELD(0x4b, XWA_INPUT_LOOK_LEFT) || g_currentActionKey == KEY_PAD_4) {
 #ifdef XWA_MODERN
 				g_players[playerIdx].lookYawOffset -= (int16_t)Flight_ModernScaleLegacyPerAdvanceValue(1200);
 #else
 				g_players[playerIdx].lookYawOffset -= 1200;
 #endif
 			}
-			if (g_dinputKeyboardState[0x4d] || g_currentActionKey == KEY_PAD_6) {
+			if (FLIGHT_LOOK_HELD(0x4d, XWA_INPUT_LOOK_RIGHT) || g_currentActionKey == KEY_PAD_6) {
 #ifdef XWA_MODERN
 				g_players[playerIdx].lookYawOffset += (int16_t)Flight_ModernScaleLegacyPerAdvanceValue(1200);
 #else
 				g_players[playerIdx].lookYawOffset += 1200;
 #endif
 			}
-			if (g_dinputKeyboardState[0x48] || g_currentActionKey == KEY_PAD_8) {
+			if (FLIGHT_LOOK_HELD(0x48, XWA_INPUT_LOOK_UP) || g_currentActionKey == KEY_PAD_8) {
 #ifdef XWA_MODERN
 				g_players[playerIdx].lookPitchOffset +=
 					(int16_t)Flight_ModernScaleLegacyPerAdvanceValue(1200);
@@ -11705,7 +11713,7 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 				g_players[playerIdx].lookPitchOffset += 1200;
 #endif
 			}
-			if (g_dinputKeyboardState[0x50] || g_currentActionKey == KEY_PAD_2) {
+			if (FLIGHT_LOOK_HELD(0x50, XWA_INPUT_LOOK_DOWN) || g_currentActionKey == KEY_PAD_2) {
 #ifdef XWA_MODERN
 				g_players[playerIdx].lookPitchOffset -=
 					(int16_t)Flight_ModernScaleLegacyPerAdvanceValue(1200);
@@ -11713,7 +11721,7 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 				g_players[playerIdx].lookPitchOffset -= 1200;
 #endif
 			}
-			if (g_dinputKeyboardState[0x4c] || g_currentActionKey == KEY_PAD_5) {
+			if (FLIGHT_LOOK_HELD(0x4c, XWA_INPUT_LOOK_CENTER) || g_currentActionKey == KEY_PAD_5) {
 				g_players[playerIdx].lookYawOffset = 0;
 				g_players[playerIdx].lookPitchOffset = 0;
 			}

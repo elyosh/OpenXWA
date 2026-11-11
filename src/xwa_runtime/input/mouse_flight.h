@@ -33,15 +33,18 @@ int XwaMouseFlight_Sample(void);
  * roll axis and yaw/pitch are suppressed. */
 void XwaMouseFlight_GetAxes(int* axisX, int* axisY, int* axisR);
 
-/* Held mouse buttons as virtual joystick button bits (bit 0 = left, bit 2 =
- * middle, bit 3 = X1) for the g_gameConfig.joyButtons bindings. The right
- * button is the roll-lock/tap modifier and is absent from this mask. */
+/* The held fire bit (1) while the left button is down. The right button is
+ * the roll-lock/tap modifier. */
 int XwaMouseFlight_ButtonsMask(void);
 
-/* Consumes a pending right-button tap (pressed and released within the
- * joystick button 2 tap window). The caller emits the target-in-sight
- * action key for it. */
-int XwaMouseFlight_TakeTargetTap(void);
+/* The next mouse command: a right-button tap (pressed and released within
+ * the joystick button 2 tap window) targets the craft in sights, the middle
+ * button targets the nearest fighter and the first side button toggles the
+ * padlock view. None while the player types a message. */
+uint16_t XwaMouseFlight_ReadKey(void);
+
+/* Drops pending motion and commands. */
+void XwaMouseFlight_DiscardPending(void);
 
 /* HUD virtual-stick marker: nonzero when it should be shown (position mode,
  * actively steering); fills the held deflection, each in [-127, 127]. */

@@ -2,7 +2,12 @@
 
 #include "aeron/aeron.h"
 #include "aeron/input.h"
+#include "aeron/log.h"
 #include "aeron/time.h"
+#include "xwa/flight/flight.h"
+#include "xwa/flight/player/player.h"
+#include "xwa_runtime/input/actions.h"
+#include "xwa_runtime/input/capture.h"
 
 #include <math.h>
 #include <stdint.h>
@@ -60,6 +65,8 @@ static struct {
 	 * target-in-sight action key. */
 	int target_tap;
 	int active;
+	uint16_t keys[16];
+	unsigned read_key, write_key;
 } g_mouseFlight;
 
 /* Doubling steps (1/16x..16x): raw relative deltas vary by more than an
@@ -68,23 +75,18 @@ static const float k_mouseFlightSensitivityScale[XWA_MODERN_MOUSE_SENSITIVITY_MA
 	0.0625f, 0.125f, 0.25f, 0.5f, 1.0f, 2.0f, 4.0f, 8.0f, 16.0f,
 };
 
-/* Joystick button bits in the recovered binding-table order (LEFT, -,
- * MIDDLE, X1; Aeron's own bit order differs). The right button is not
- * forwarded: it is the roll-lock/tap modifier, and forwarding it would
- * engage the joystick button 2 yaw/roll swap binding. */
-static int XwaMouseFlight_ButtonsFromAeron(uint32_t buttons) {
-	int mask = 0;
+static void XwaMouseFlight_QueueKey(uint16_t key) {
+	unsigned next = (g_mouseFlight.write_key + 1) % 16;
+	if (next == g_mouseFlight.read_key) {
+		Aeron_LogWarn("xwa.input", "Mouse command queue is full");
+		return;
+	}
+	g_mouseFlight.keys[g_mouseFlight.write_key] = key;
+	g_mouseFlight.write_key = next;
+}
 
-	if (buttons & AERON_MOUSE_BUTTON_LEFT) {
-		mask |= 1 << 0;
-	}
-	if (buttons & AERON_MOUSE_BUTTON_MIDDLE) {
-		mask |= 1 << 2;
-	}
-	if (buttons & AERON_MOUSE_BUTTON_X1) {
-		mask |= 1 << 3;
-	}
-	return mask;
+static int XwaMouseFlight_Typing(void) {
+	return (unsigned)g_localPlayer >= 8 || g_players[g_localPlayer].msgTypeId != 0;
 }
 
 static void XwaMouseFlight_ResetAxes(void) {
@@ -104,6 +106,7 @@ static void XwaMouseFlight_ResetAxes(void) {
 	g_mouseFlight.target_tap = 0;
 	g_mouseFlight.drain_time_us = 0;
 	g_mouseFlight.active = 0;
+	g_mouseFlight.read_key = g_mouseFlight.write_key = 0;
 }
 
 void XwaMouseFlight_SetOptions(const XwaModernInputOptions* options) {
@@ -131,6 +134,7 @@ void XwaMouseFlight_Suspend(void) {
 	g_mouseFlight.axis_y = 0;
 	g_mouseFlight.axis_r = 0;
 	g_mouseFlight.target_tap = 0;
+	g_mouseFlight.read_key = g_mouseFlight.write_key = 0;
 }
 
 static int XwaMouseFlight_TakeAxis(float* carry, float value) {
@@ -165,16 +169,16 @@ void XwaMouseFlight_Pump(void) {
 	g_mouseFlight.pumped_frame = in->frame_id;
 	/* Only a captured pointer belongs to flight controls: while the capture is
 	 * released to the OS, motion over the window must not steer the ship. */
-	if (!(in->has_focus && in->mouse.inside_content && Aeron_RelativeMouseMode())) {
+	if (!(in->has_focus && in->mouse.inside_content && Aeron_RelativeMouseMode()) || XwaInput_IsCaptured()) {
 		XwaMouseFlight_ResetAxes();
 		return;
 	}
 	g_mouseFlight.active = 1;
 	g_mouseFlight.pending_x += in->mouse.relative_x;
 	g_mouseFlight.pending_y += in->mouse.relative_y;
-	g_mouseFlight.buttons = XwaMouseFlight_ButtonsFromAeron(in->mouse.buttons);
+	g_mouseFlight.buttons = (XwaInput_FilterMouseButtons(in->mouse.buttons) & AERON_MOUSE_BUTTON_LEFT) != 0;
 	{
-		const int rmb = (in->mouse.buttons & AERON_MOUSE_BUTTON_RIGHT) != 0;
+		const int rmb = (XwaInput_FilterMouseButtons(in->mouse.buttons) & AERON_MOUSE_BUTTON_RIGHT) != 0;
 		const uint64_t now = Aeron_NowUs();
 
 		if (rmb && !g_mouseFlight.rmb_down) {
@@ -186,6 +190,24 @@ void XwaMouseFlight_Pump(void) {
 		g_mouseFlight.rmb_down = rmb;
 		g_mouseFlight.roll_lock = rmb && now - g_mouseFlight.rmb_press_time_us >= MOUSE_FLIGHT_TAP_US;
 	}
+	/* A tap made while the player types a message is dropped, because
+	 * KEY_ALT_1 would send a taunt there. */
+	if (!XwaMouseFlight_Typing() && !g_padlockMouseLookEnabled) {
+		const uint32_t pressed = XwaInput_FilterMouseButtons(in->mouse.pressed_buttons);
+
+		if (g_mouseFlight.target_tap) {
+			XwaMouseFlight_QueueKey(KEY_ALT_1);
+		}
+		if (pressed & AERON_MOUSE_BUTTON_MIDDLE) {
+			XwaMouseFlight_QueueKey(XwaInputActions_Key(XWA_INPUT_ACTION_TARGET_NEAREST_FIGHTER));
+		}
+		if (pressed & AERON_MOUSE_BUTTON_X1) {
+			XwaMouseFlight_QueueKey(XwaInputActions_Key(XWA_INPUT_ACTION_TOGGLE_PADLOCK));
+		}
+	} else {
+		g_mouseFlight.read_key = g_mouseFlight.write_key = 0;
+	}
+	g_mouseFlight.target_tap = 0;
 }
 
 static float XwaMouseFlight_ClampStick(float value) {
@@ -321,11 +343,27 @@ void XwaMouseFlight_GetAxes(int* axisX, int* axisY, int* axisR) {
 
 int XwaMouseFlight_ButtonsMask(void) { return g_mouseFlight.buttons; }
 
-int XwaMouseFlight_TakeTargetTap(void) {
-	const int tap = g_mouseFlight.target_tap;
+uint16_t XwaMouseFlight_ReadKey(void) {
+	uint16_t key;
 
+	if (!g_mouseFlight.options.mouse_flight_enabled || !g_mouseFlight.active || XwaMouseFlight_Typing()) {
+		g_mouseFlight.read_key = g_mouseFlight.write_key = 0;
+		return 0;
+	}
+	if (g_mouseFlight.read_key == g_mouseFlight.write_key) {
+		return 0;
+	}
+	key = g_mouseFlight.keys[g_mouseFlight.read_key];
+	g_mouseFlight.read_key = (g_mouseFlight.read_key + 1) % 16;
+	return key;
+}
+
+void XwaMouseFlight_DiscardPending(void) {
+	g_mouseFlight.pending_x = 0.0f;
+	g_mouseFlight.pending_y = 0.0f;
+	g_mouseFlight.read_key = g_mouseFlight.write_key = 0;
 	g_mouseFlight.target_tap = 0;
-	return tap && g_mouseFlight.options.mouse_flight_enabled && g_mouseFlight.active;
+	g_mouseFlight.drain_time_us = Aeron_NowUs();
 }
 
 int XwaMouseFlight_GetHudMarker(int* deflectionX, int* deflectionY) {

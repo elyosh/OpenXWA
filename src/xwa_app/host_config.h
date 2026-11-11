@@ -40,7 +40,12 @@ typedef struct XwaHostConfig {
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
 	XwaModernInputOptions input_defaults;
+	/* input.gamepad_defaults: the profile that new gamepad models get. */
+	XwaControllerProfile gamepad_defaults;
 	XwaModernInputOptions input_options;
+	/* The user file had version 1 input settings, upgraded in memory. The
+	 * input options must be saved. */
+	int input_upgraded;
 } XwaHostConfig;
 
 int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size);

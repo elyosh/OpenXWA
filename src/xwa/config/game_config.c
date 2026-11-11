@@ -38,16 +38,13 @@
 #include "xwa/util/time.h"
 
 #ifdef XWA_MODERN
-#include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
-#include "xwa_runtime/config/modern_input_options_screen.h"
 #include "xwa_runtime/config/modern_mods.h"
 #include "xwa_runtime/config/modern_mods_screen.h"
 #include "xwa_runtime/config/modern_pilot_profiles_screen.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/config/modern_video_options_screen.h"
 #include "xwa_runtime/config/option_section.h"
-#include "xwa_runtime/input/controller_mapping.h"
 #endif
 
 #include <ctype.h>
@@ -946,18 +943,10 @@ int Config_SoundOptionsScreen(void) {
 // FUNCTION: XWA 0x51F300
 int Config_ControllerOptionsScreen(void) {
 #ifdef XWA_MODERN
-	switch (XwaModernInputOptionsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
-		case 1:
-			g_pendingMenuScreen = 0;
-			g_menuCursorRow = 4;
-			break;
-		case 2:
-			g_pendingMenuScreen = 20;
-			g_menuCursorRow = 0;
-			break;
-		default:
-			break;
-	}
+	/* The controller, keyboard and mouse options are in the OpenXWA Options
+	   window. */
+	g_pendingMenuScreen = 0;
+	g_menuCursorRow = 4;
 	return 0;
 #else
 	char keyState;
@@ -1099,8 +1088,8 @@ int Config_ControllerOptionsScreen(void) {
 // FUNCTION: XWA 0x51F870
 int Config_JoystickRemapScreen(void) {
 #ifdef XWA_MODERN
-	g_pendingMenuScreen = 22;
-	g_menuCursorRow = 0;
+	g_pendingMenuScreen = 0;
+	g_menuCursorRow = 4;
 	return 0;
 #else
 	unsigned int totalButtonRows;
@@ -2582,39 +2571,6 @@ int Config_OptionsDatapadUpdate(int frameState) {
 			if (XwaModernPilotProfilesScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
 				g_pendingMenuScreen = 0;
 				g_menuCursorRow = g_configRestrictedOptionsModalActive ? 5 : 8;
-			}
-			done = 0;
-			break;
-		case 20:
-			switch (XwaModernControllerOptionsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
-				case XWA_MODERN_CONTROLLER_SCREEN_BACK:
-					g_pendingMenuScreen = 4;
-					g_menuCursorRow = 4;
-					break;
-				case XWA_MODERN_CONTROLLER_SCREEN_AXES:
-					g_pendingMenuScreen = 21;
-					g_menuCursorRow = 0;
-					break;
-				case XWA_MODERN_CONTROLLER_SCREEN_BUTTONS:
-					g_pendingMenuScreen = 22;
-					g_menuCursorRow = 0;
-					break;
-				default:
-					break;
-			}
-			done = 0;
-			break;
-		case 21:
-			if (XwaModernControllerAxesScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
-				g_pendingMenuScreen = 20;
-				g_menuCursorRow = 5;
-			}
-			done = 0;
-			break;
-		case 22:
-			if (XwaModernControllerButtonsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
-				g_pendingMenuScreen = 20;
-				g_menuCursorRow = 6;
 			}
 			done = 0;
 			break;
@@ -5351,7 +5307,6 @@ static void Config_SetInitialJoystickDefaults(void) {
 }
 #else
 void Config_ApplyModernInputOptions(const XwaModernInputOptions* options) {
-	static AeronControllerSelector previousDevice;
 	static int previousRumbleEnabled;
 	static int previousRumbleStrength;
 	static int configured;
@@ -5360,25 +5315,18 @@ void Config_ApplyModernInputOptions(const XwaModernInputOptions* options) {
 	if (!options) {
 		return;
 	}
-	reconfigureRumble = configured && (previousRumbleEnabled != options->controller.rumble_enabled ||
-									   strcmp(previousDevice.guid, options->controller.device.guid) != 0 ||
-									   strcmp(previousDevice.path, options->controller.device.path) != 0 ||
-									   previousDevice.ordinal != options->controller.device.ordinal);
-	g_gameConfig.rudderEnabled = (uint8_t)options->controller.roll_enabled;
-	/* The axes are inverted where the Aeron input becomes WinMM joystick
-	   values, so the game's own flip settings stay off. */
-	g_gameConfig.flipRudder = 0;
-	g_gameConfig.flipY = 0;
-	g_gameConfig.ffEnabled = (uint8_t)options->controller.rumble_enabled;
-	g_gameConfig.ffStrength = (uint8_t)options->controller.rumble_strength;
+	/* The controllers are read by XwaFlightControls, so the joystick table,
+	   rudder and flip settings are not used in flight. Only the force-feedback
+	   settings come from here. */
+	reconfigureRumble = configured && previousRumbleEnabled != options->rumble_enabled;
+	g_gameConfig.ffEnabled = (uint8_t)options->rumble_enabled;
+	g_gameConfig.ffStrength = (uint8_t)options->rumble_strength;
 	g_gameConfig.ffCenter = 0;
-	XwaControllerMapping_CopySelectedActions(g_gameConfig.joyButtons);
-	if (configured && previousRumbleStrength != options->controller.rumble_strength && !reconfigureRumble) {
-		ForceFeedback_SetStrength(1250u * (unsigned int)options->controller.rumble_strength);
+	if (configured && previousRumbleStrength != options->rumble_strength && !reconfigureRumble) {
+		ForceFeedback_SetStrength(1250u * (unsigned int)options->rumble_strength);
 	}
-	previousDevice = options->controller.device;
-	previousRumbleEnabled = options->controller.rumble_enabled;
-	previousRumbleStrength = options->controller.rumble_strength;
+	previousRumbleEnabled = options->rumble_enabled;
+	previousRumbleStrength = options->rumble_strength;
 	configured = 1;
 	if (reconfigureRumble) {
 		ForceFeedback_Reconfigure();

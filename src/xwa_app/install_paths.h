@@ -17,7 +17,7 @@ extern "C" {
 
 /* The newest config.yaml version this build reads and writes. Older
  * versions are accepted; newer ones are refused. */
-#define XWA_CONFIG_VERSION 1
+#define XWA_CONFIG_VERSION 2
 
 typedef struct XwaInstallPaths {
 	/* paths.game_data. Empty when not set. */

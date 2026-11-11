@@ -32,6 +32,8 @@
 #include "xwa_remaster/opt_mesh.h"
 #include "xwa_remaster/ship.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
+#include "xwa_runtime/input/capture.h"
+#include "xwa_runtime/input/keyboard_mapping.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/movie_task.h"
@@ -44,8 +46,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define RM_KEY_SPLIT_VIEW (AERON_KEY_F1 + 1)   /* F2 */
-#define RM_KEY_PRIMARY_VIEW (AERON_KEY_F1 + 4) /* F5 */
 #define RM_RESIZE_SETTLE_US 150000u
 #define RM_ASSET_UPLOAD_BYTE_BUDGET (64u * 1024u * 1024u)
 #define RM_ASSET_UPLOAD_COPY_BUDGET 4096u
@@ -559,14 +559,24 @@ void XwaRemaster_BeginFrame(const AeronInputSnapshot* input) {
 		}
 	}
 
-	if (input && input->key_pressed[AERON_KEY_GRAVE] && Aeron_DebugUiAvailable()) {
-		Aeron_DebugUiToggle();
-	}
+	/* Grave, Ctrl+F5 and Ctrl+F2 are host shortcuts (keyboard_mapping.h).
+	 * Their keys stay suppressed until release, so the game never sees them. */
+	{
+		const int debug_key = XwaKeyboardMapping_Trigger(input, XWA_KEYBOARD_SHORTCUT_DEBUG);
+		const int renderer_key = XwaKeyboardMapping_Trigger(input, XWA_KEYBOARD_SHORTCUT_RENDERER);
+		const int split_key = XwaKeyboardMapping_Trigger(input, XWA_KEYBOARD_SHORTCUT_SPLIT_VIEW);
 
-	if (input && input->key_pressed[RM_KEY_PRIMARY_VIEW]) {
-		XwaRemaster_TogglePrimaryView();
-	} else if (input && input->key_pressed[RM_KEY_SPLIT_VIEW]) {
-		XwaRemaster_ToggleSplitView();
+		if (debug_key >= 0 && Aeron_DebugUiAvailable()) {
+			Aeron_DebugUiToggle();
+			XwaInput_SuppressKey(debug_key);
+		}
+		if (renderer_key >= 0) {
+			XwaRemaster_TogglePrimaryView();
+			XwaInput_SuppressKey(renderer_key);
+		} else if (split_key >= 0) {
+			XwaRemaster_ToggleSplitView();
+			XwaInput_SuppressKey(split_key);
+		}
 	}
 
 	g.classic_suppressed_this_frame = XwaRemaster_CanSuppressClassicFlight() && !g.pending_mode_valid;

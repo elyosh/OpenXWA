@@ -6,107 +6,291 @@ input:
   mouse_mode: 'position'
   mouse_sensitivity: 5
   mouse_invert_y: true
-  controller:
-    device:
-      # Empty GUID selects the first connected controller.
-      guid: ''
-      path: ''
-      ordinal: 0
-    roll_enabled: true
-    rumble_enabled: true
-    rumble_strength: 6
-    gamepad:
-      axes:
-        yaw: { source: 'leftx', invert: false, deadzone: 0.08 }
-        pitch: { source: 'lefty', invert: true, deadzone: 0.08 }
-        throttle: { source: 'righttrigger', invert: false, deadzone: 0.0 }
-        roll: { source: 'rightx', invert: false, deadzone: 0.08 }
-      buttons:
-        '1': 'south'
-        '2': 'east'
-        '3': 'west'
-        '4': 'north'
-        '5': 'leftshoulder'
-        '6': 'rightshoulder'
-        '7': 'back'
-        '8': 'start'
-        '9': 'none'
-        '10': 'none'
-        '11': 'none'
-        '12': 'none'
-        '13': 'none'
-        '14': 'none'
-        '15': 'none'
-        '16': 'none'
-      pov: 'dpad'
-      # Button slots 1-16, then D-pad up, right, down, and left.
-      actions:
-        - 156
-        - 157
-        - 114
-        - 108
-        - 101
-        - 105
-        - 91
-        - 8
-        - 13
-        - 93
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 186
-        - 184
-        - 180
-        - 182
-    joystick:
-      axes:
-        yaw: { source: 0, invert: false, deadzone: 0.08 }
-        pitch: { source: 1, invert: true, deadzone: 0.08 }
-        throttle: { source: 2, invert: false, deadzone: 0.08 }
-        roll: { source: 3, invert: false, deadzone: 0.08 }
-      buttons:
-        '1': 0
-        '2': 1
-        '3': 2
-        '4': 3
-        '5': 4
-        '6': 5
-        '7': 6
-        '8': 7
-        '9': 8
-        '10': 9
-        '11': 10
-        '12': 11
-        '13': 12
-        '14': 13
-        '15': 14
-        '16': 15
-      pov_hat: 0
-      # Button slots 1-16, then hat up, right, down, and left.
-      actions:
-        - 156
-        - 157
-        - 114
-        - 108
-        - 101
-        - 105
-        - 91
-        - 8
-        - 13
-        - 93
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 0
-        - 186
-        - 184
-        - 180
-        - 182
+  rumble_enabled: true
+  rumble_strength: 6
+  # Saved controller models, one complete profile each. New gamepads get
+  # gamepad_defaults; joysticks start with nothing bound.
+  controllers: []
+  gamepad_defaults:
+    axes:
+      yaw: {source: leftx, invert: false, deadzone: 0.08}
+      pitch: {source: lefty, invert: false, deadzone: 0.08}
+      roll: {source: rightx, invert: false, deadzone: 0.08}
+      throttle: {source: none, invert: false}
+    buttons:
+      fire_weapon: [south]
+      target_roll_modifier: [east]
+      target_nearest_fighter: [west]
+      toggle_padlock: [north]
+      target_my_attackers: [leftshoulder]
+      target_incoming_warhead: [rightshoulder]
+      throttle_one_third: [back]
+      throttle_full: [start]
+      look_up: [dpadup]
+      look_right: [dpadright]
+      look_down: [dpaddown]
+      look_left: [dpadleft]
+  # Every action, with its keys. Escape always opens the options and can't
+  # be listed; options_menu can get other keys.
+  keyboard:
+    fire_weapon:
+      - {key: "2", modifiers: [alt]}
+    target_roll_modifier: []
+    cycle_weapon:
+      - {key: "W"}
+    cycle_firing_mode:
+      - {key: "X"}
+    laser_convergence_or_zoom_map_target:
+      - {key: "Z"}
+    toggle_beam:
+      - {key: "B"}
+    fire_countermeasure_or_center_map_target:
+      - {key: "C"}
+    toggle_auto_gunner:
+      - {key: "F"}
+    cycle_beam_recharge_rate:
+      - {key: "F8"}
+    cycle_laser_recharge_rate:
+      - {key: "F9"}
+    cycle_shield_recharge_rate:
+      - {key: "F10"}
+    cycle_shield_mode:
+      - {key: "S"}
+    xfer_shields_to_lasers:
+      - {key: ";"}
+      - {key: "F9", modifiers: [shift]}
+    xfer_lasers_to_shields:
+      - {key: "'"}
+      - {key: "F10", modifiers: [shift]}
+    xfer_all_lasers_to_shields:
+      - {key: "'", modifiers: [shift]}
+    target_in_sights:
+      - {key: "1", modifiers: [alt]}
+    target_next:
+      - {key: "T"}
+    target_prev:
+      - {key: "Y"}
+    target_nearest_fighter:
+      - {key: "R"}
+    target_attacker_of_target:
+      - {key: "A"}
+    target_my_attackers:
+      - {key: "E"}
+    target_newest:
+      - {key: "U"}
+    target_objective:
+      - {key: "O"}
+    target_nearest_player:
+      - {key: "P"}
+    target_next_player_craft:
+      - {key: "P", modifiers: [ctrl]}
+    target_incoming_warhead:
+      - {key: "I"}
+    target_next_buoy:
+      - {key: "N"}
+    target_next_friendly:
+      - {key: "F1"}
+    target_prev_friendly:
+      - {key: "F1", modifiers: [shift]}
+    target_next_neutral:
+      - {key: "F2"}
+    target_prev_neutral:
+      - {key: "F2", modifiers: [shift]}
+    target_next_enemy:
+      - {key: "F3"}
+    target_prev_enemy:
+      - {key: "F4"}
+      - {key: "F3", modifiers: [shift]}
+    target_component_next:
+      - {key: ","}
+    target_component_prev:
+      - {key: ",", modifiers: [shift]}
+    target_clear:
+      - {key: "C", modifiers: [alt]}
+    target_preset_recall_1:
+      - {key: "F5"}
+    target_preset_recall_2:
+      - {key: "F6"}
+    target_preset_recall_3:
+      - {key: "F7"}
+    target_preset_store_1:
+      - {key: "F5", modifiers: [shift]}
+    target_preset_store_2:
+      - {key: "F6", modifiers: [shift]}
+    target_preset_store_3:
+      - {key: "F7", modifiers: [shift]}
+    roll_left:
+      - {key: "Keypad 1"}
+    roll_right:
+      - {key: "Keypad 3"}
+    throttle_up:
+      - {key: "="}
+      - {key: "=", modifiers: [shift]}
+      - {key: "Keypad +"}
+    throttle_down:
+      - {key: "-"}
+    throttle_down_or_track_map_target:
+      - {key: "Keypad -"}
+    throttle_zero:
+      - {key: "\\"}
+    throttle_one_third:
+      - {key: "["}
+    throttle_two_thirds:
+      - {key: "]"}
+    throttle_full:
+      - {key: "Backspace"}
+    match_speed_or_type_message:
+      - {key: "Return"}
+    power_preset_recall_1:
+      - {key: "F11"}
+    power_preset_recall_2:
+      - {key: "F12"}
+    power_preset_store_1:
+      - {key: "F11", modifiers: [shift]}
+    power_preset_store_2:
+      - {key: "F12", modifiers: [shift]}
+    toggle_s_foils:
+      - {key: "V"}
+    toggle_landing_gear:
+      - {key: "L", modifiers: [ctrl]}
+    look_up:
+      - {key: "Keypad 8"}
+    look_down:
+      - {key: "Keypad 2"}
+    look_left:
+      - {key: "Keypad 4"}
+    look_right:
+      - {key: "Keypad 6"}
+    look_center:
+      - {key: "Keypad 5"}
+    toggle_cockpit:
+      - {key: "."}
+    toggle_padlock:
+      - {key: "L"}
+    toggle_mouse_look:
+      - {key: "ScrollLock"}
+    view_toggle_high_angle:
+      - {key: "Keypad 0"}
+    toggle_external_camera:
+      - {key: "/"}
+      - {key: "Keypad /"}
+    toggle_camera_control_or_map_view:
+      - {key: "Keypad *"}
+      - {key: "8", modifiers: [shift]}
+    flyby_camera:
+      - {key: "J", modifiers: [alt]}
+    missile_camera:
+      - {key: "N", modifiers: [alt]}
+    target_camera:
+      - {key: "U", modifiers: [alt]}
+    switch_seat:
+      - {key: "G"}
+      - {key: "W", modifiers: [alt]}
+    mfd_prev_page:
+      - {key: "Left"}
+    mfd_next_page:
+      - {key: "Right"}
+    mfd_up:
+      - {key: "Up"}
+    mfd_down:
+      - {key: "Down"}
+    mfd_select:
+      - {key: "Keypad Enter"}
+    toggle_left_mfd:
+      - {key: "Delete"}
+    toggle_right_mfd:
+      - {key: "PageDown"}
+    toggle_left_indicator:
+      - {key: "Insert"}
+    toggle_right_indicator:
+      - {key: "PageUp"}
+    toggle_center_indicators:
+      - {key: "Home"}
+    toggle_cmd:
+      - {key: "End"}
+    toggle_hud:
+      - {key: "End", modifiers: [ctrl]}
+    toggle_mfd_overlay:
+      - {key: ".", modifiers: [alt]}
+    map_mode:
+      - {key: "M"}
+    toggle_system_messages:
+      - {key: "S", modifiers: [alt]}
+    console_page:
+      - {key: "C", modifiers: [ctrl]}
+    wingman_command_page:
+      - {key: "Tab"}
+    command_option_1:
+      - {key: "1"}
+    command_option_2:
+      - {key: "2"}
+    command_option_3:
+      - {key: "3"}
+    command_option_4:
+      - {key: "4"}
+    command_option_5:
+      - {key: "5"}
+    command_option_6:
+      - {key: "6"}
+    command_option_7:
+      - {key: "7"}
+    command_option_9:
+      - {key: "9"}
+    command_menu_back:
+      - {key: "0"}
+    comm_attack_target:
+      - {key: "A", modifiers: [shift]}
+    comm_resupply:
+      - {key: "B", modifiers: [shift]}
+    comm_cover_me:
+      - {key: "C", modifiers: [shift]}
+    dock_with_target:
+      - {key: "D", modifiers: [shift]}
+    comm_evade:
+      - {key: "E", modifiers: [shift]}
+    comm_go:
+      - {key: "G", modifiers: [shift]}
+    comm_go_home:
+      - {key: "H", modifiers: [shift]}
+    comm_ignore_target:
+      - {key: "I", modifiers: [shift]}
+    pick_up_target:
+      - {key: "P", modifiers: [shift]}
+    release_cargo:
+      - {key: "R", modifiers: [shift]}
+    comm_reinforcements:
+      - {key: "S", modifiers: [shift]}
+    comm_report_in:
+      - {key: "U", modifiers: [shift]}
+    comm_wait:
+      - {key: "W", modifiers: [shift]}
+    taunt_1:
+      - {key: "1", modifiers: [shift]}
+    taunt_2:
+      - {key: "2", modifiers: [shift]}
+    taunt_3:
+      - {key: "3", modifiers: [shift]}
+    taunt_4:
+      - {key: "4", modifiers: [shift]}
+    confirm_or_switch_map_view:
+      - {key: "Space"}
+    options_menu: []
+    pause:
+      - {key: "P", modifiers: [alt]}
+    end_mission:
+      - {key: "Q"}
+    abort_mission:
+      - {key: "Q", modifiers: [alt]}
+    eject:
+      - {key: "E", modifiers: [alt]}
+    jump_craft:
+      - {key: "J"}
+    return_to_hangar_or_map_legend:
+      - {key: "H"}
+    film_recording:
+      - {key: "F", modifiers: [shift]}
+    cycle_force_feedback_strength:
+      - {key: "F", modifiers: [alt]}
 models:
   smooth_angle_degrees: 90
   # true: original OPT models for simulation and rendering.
