@@ -1,4 +1,5 @@
 #include "controller_config.h"
+#include "aeron/log.h"
 #include <ctype.h>
 #include <math.h>
 #include <stdarg.h>
@@ -327,8 +328,12 @@ bool XwaControllerConfig_ReadProfile(const AeronConfigFile* document, const char
 	for (size_t i = 0; i < AeronConfigNode_MapCount(map); ++i) {
 		const char* name = AeronConfigNode_MapKeyAt(map, i);
 		XwaInputAction action = XwaInputActions_FromName(name);
-		if (action == XWA_INPUT_ACTION_NONE)
-			return XwaControllerConfig_ConfigError(error, capacity, "unknown action '%s'", name);
+		/* An action from another version, such as a removed one, is skipped.
+		 * The next save drops it. */
+		if (action == XWA_INPUT_ACTION_NONE) {
+			Aeron_LogWarn("xwa.config", "unknown controller action '%s' is ignored", name);
+			continue;
+		}
 		if (!XwaControllerConfig_ParseBindingValue(
 				AeronConfigNode_MapValueAt(map, i), kind == AERON_CONTROLLER_KIND_GAMEPAD, action,
 				profile->bindings, &profile->binding_count, XWA_CONTROLLER_BINDING_CAP, error, capacity))

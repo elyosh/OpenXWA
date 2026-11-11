@@ -18,8 +18,8 @@ input:
       roll: {source: rightx, invert: false, deadzone: 0.08}
       throttle: {source: none, invert: false}
     buttons:
-      fire_weapon: [south]
-      target_roll_modifier: [east]
+      fire_weapon: [south, {axis: righttrigger, direction: positive, threshold: 0.5}]
+      target_roll_modifier: [east, {axis: lefttrigger, direction: positive, threshold: 0.5}]
       target_nearest_fighter: [west]
       toggle_padlock: [north]
       target_my_attackers: [leftshoulder]
@@ -194,8 +194,6 @@ input:
       - {key: "Up"}
     mfd_down:
       - {key: "Down"}
-    mfd_select:
-      - {key: "Keypad Enter"}
     toggle_left_mfd:
       - {key: "Delete"}
     toggle_right_mfd:

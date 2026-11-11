@@ -72,8 +72,12 @@ bool XwaKeyboardConfig_Read(const AeronConfigFile* document, XwaKeyboardBindings
 		const char* name = AeronConfigNode_MapKeyAt(map, i);
 		const XwaInputAction action = XwaInputActions_FromName(name);
 		const AeronConfigNode* value = AeronConfigNode_MapValueAt(map, i);
-		if (!XwaInputActions_KeyboardBindable(action))
-			return ConfigError(error, capacity, "unknown keyboard action '%s'", name);
+		/* An action from another version, such as a removed one, is skipped.
+		 * The next save drops it. */
+		if (!XwaInputActions_KeyboardBindable(action)) {
+			Aeron_LogWarn("xwa.config", "unknown keyboard action '%s' is ignored", name);
+			continue;
+		}
 		if (AeronConfigNode_Type(value) == AERON_CONFIG_STRING) {
 			AeronKey key;
 			const char* label = AeronConfigNode_String(value, NULL);

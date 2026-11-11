@@ -4,7 +4,6 @@
 #include "aeron/compat/host.h"
 #include "aeron/debug.h"
 #include "xwa/flight/flight_display.h"
-#include "xwa/flight/hangar.h"
 #include "xwa/flight/player/player.h"
 #include "xwa/frontend/flight_loading.h"
 #include "xwa/frontend/frontend_cursor.h"
@@ -48,9 +47,8 @@ XwaKeyboardRoute XwaInput_ReconcileKeyboard(void) {
 		route = XWA_KEYBOARD_BLOCKED;
 	} else if (XwaFlightTask_IsActive() && !FlightLoading_AreFrontendSurfacesAttached() &&
 			   !XwaFlightTask_IsHoldingLoadingScreen() && !FlightDisplay_IsFrontendModalActive() &&
-			   !XwaMovieTask_IsActive() && !XwaFlightPauseTask_IsActive() && !g_inHangarReady &&
-			   (unsigned)g_localPlayer < 8 && g_players[g_localPlayer].msgTypeId == 0 &&
-			   !g_filmPlaybackMode) {
+			   !XwaMovieTask_IsActive() && !XwaFlightPauseTask_IsActive() && (unsigned)g_localPlayer < 8 &&
+			   g_players[g_localPlayer].msgTypeId == 0 && !g_filmPlaybackMode) {
 		route = XWA_KEYBOARD_GAMEPLAY;
 	}
 	if (route != g_keyboardRoute) {

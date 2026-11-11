@@ -9,7 +9,7 @@ extern "C" {
 
 /* Where flight keys go. Gameplay: through the keyboard bindings. Raw: to the
  * original DirectInput readers (frontend, datapad, pause, message typing,
- * film playback, hangar). Blocked: nowhere (no focus, input captured, debug
+ * film playback). Blocked: nowhere (no focus, input captured, debug
  * UI). A route change drops queued keys and blocks held keys until
  * release. */
 typedef enum XwaKeyboardRoute {
