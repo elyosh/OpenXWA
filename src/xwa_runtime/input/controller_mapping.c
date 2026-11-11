@@ -294,8 +294,18 @@ static void SampleAnalog(size_t index, const AeronControllerSnapshot* device) {
 				++g_controller.generation;
 			}
 		} else {
+			/* The travel past the deadzone is rescaled to the full range, so the
+			 * axis grows from 0 at the deadzone edge instead of jumping to the
+			 * deadzone value. */
 			float normalized = (float)raw / 32768;
-			int value = fabsf(normalized) > binding.deadzone ? (int)(normalized * 127) : 0;
+			float magnitude = fabsf(normalized);
+			int value = 0;
+			if (magnitude > binding.deadzone && binding.deadzone < 1.0f) {
+				float scaled = (magnitude - binding.deadzone) / (1.0f - binding.deadzone);
+				if (scaled > 1.0f)
+					scaled = 1.0f;
+				value = (int)((normalized < 0.0f ? -scaled : scaled) * 127);
+			}
 			g_controller.axes[axis] =
 				XwaControllerOptions_EffectiveAxisInvert(model->kind, (XwaInputAxis)axis, binding.invert)
 					? -value
