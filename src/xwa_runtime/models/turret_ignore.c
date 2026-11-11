@@ -152,12 +152,15 @@ void XwaTurretIgnore_Clear(void) {
 
 int XwaTurretIgnore_Skips(unsigned int objIdx) {
 	const ObjectRecord* object;
-	const unsigned int genus = (unsigned int)g_objectTable[objIdx].genusId;
+	unsigned int genus;
 
+	/* The AI calls this for every candidate, so test the mask before reading
+	   the object. */
 	if (s_selectedMask == 0) {
 		return 0;
 	}
 	object = &g_objectTable[objIdx];
+	genus = (unsigned int)object->genusId;
 	if (object->objectType == OBJ_None) {
 		return 0;
 	}

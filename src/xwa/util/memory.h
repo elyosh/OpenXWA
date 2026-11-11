@@ -18,6 +18,9 @@ extern int g_handleAllocatorInitialized;
 extern int g_handleAllocatedCount;
 extern int g_handleAllocatedPeakCount;
 extern int g_handleAllocatedTotalBytes;
+#ifdef XWA_MODERN
+extern uint32_t g_handleGeneration;
+#endif
 
 void* Memory_AllocTagged(const char* tag, size_t size);
 void* Memory_CallocTagged(const char* tag, size_t count, size_t size);

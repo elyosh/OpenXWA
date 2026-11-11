@@ -528,6 +528,20 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 			*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_MOTION_BLUR_AMOUNT;
 		}
 	}
+	{
+		const char* hud_scale_key = "video.hud_scale";
+		const AeronConfigNode* hud_scale_node = AeronConfigFile_GetNode(config, hud_scale_key);
+		if (hud_scale_node) {
+			const double hud_scale = AeronConfigNode_Float(hud_scale_node, NAN);
+			if (!isfinite(hud_scale) || hud_scale < XWA_MODERN_HUD_SCALE_MIN ||
+				hud_scale > XWA_MODERN_HUD_SCALE_MAX) {
+				return host_config_error(error, error_size, "invalid 'video.hud_scale': expected a number %s",
+										 "from 0.5 to 2");
+			}
+			out->hud_scale = (float)hud_scale;
+			*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_HUD_SCALE;
+		}
+	}
 
 	hdr_node = AeronConfigFile_GetNode(config, hdr_key);
 	if (hdr_node) {
@@ -1232,7 +1246,8 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 		options->motion_blur_amount > 1.0f || options->sdr_gamma < XWA_MODERN_SDR_GAMMA_2_2 ||
 		options->sdr_gamma > XWA_MODERN_SDR_GAMMA_SRGB ||
 		options->paper_white < XWA_MODERN_PAPER_WHITE_AUTO ||
-		options->paper_white > XWA_MODERN_PAPER_WHITE_400 ||
+		options->paper_white > XWA_MODERN_PAPER_WHITE_400 || !isfinite(options->hud_scale) ||
+		options->hud_scale < XWA_MODERN_HUD_SCALE_MIN || options->hud_scale > XWA_MODERN_HUD_SCALE_MAX ||
 		(options->smooth_menu_fonts != 0 && options->smooth_menu_fonts != 1)) {
 		return 0;
 	}
@@ -1254,6 +1269,7 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 									 error) &&
 		   AeronConfigFile_SetString(document, "video.paper_white_nits",
 									 paper_white_names[options->paper_white], error) &&
+		   AeronConfigFile_SetFloat(document, "video.hud_scale", options->hud_scale, error) &&
 		   AeronConfigFile_SetBool(document, "video.smooth_menu_fonts", options->smooth_menu_fonts, error);
 }
 

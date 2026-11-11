@@ -1,4 +1,7 @@
 #include "xwa/render/renderer_internal.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/runtime/port.h"
+#endif
 
 // GLOBAL: XWA 0x5A9400
 const float g_renderQuadUnitFloat = 1.0f;
@@ -454,6 +457,17 @@ int RenderQuad_DrawRotatedSprite(FlightTexQuad* quad, TexLevel* texLevel, int d3
 	float uScale;
 	float vScale;
 
+#ifdef XWA_MODERN
+	/* This quad only goes to the classic back buffer, so it is skipped when
+	   the classic frame won't be shown because the HD renderer draws instead.
+	   No caller uses the return value. The skip doesn't add the texture to the
+	   cache, set the clip scratch values or clear g_capVertexAlpha. That flag
+	   is set again when the next hardware frame starts. */
+	if (XwaPort_IsClassicFlightFrameDiscarded()) {
+		return 0;
+	}
+#endif
+
 	textureSurface = (Std3DTextureSurface*)texLevel->image;
 	screenX = quad->screenX;
 	baseY = g_flightVpHeight - quad->screenY;
@@ -718,6 +732,15 @@ void RenderQuad_DrawGlow(int* corners5, int depthZ, Std3DTextureSurface* tex, in
 	float edgeGreen;
 	float edgeBlue;
 	int nearFlag;
+
+#ifdef XWA_MODERN
+	/* This glow only goes to the classic back buffer, so it is skipped when
+	   the classic frame won't be shown. The skip doesn't add the texture to
+	   the cache, set the clip scratch values or clear g_capVertexAlpha. */
+	if (XwaPort_IsClassicFlightFrameDiscarded()) {
+		return;
+	}
+#endif
 
 	cacheNode = &tex->cacheNode;
 	std3D_AddToTextureCache(tex);

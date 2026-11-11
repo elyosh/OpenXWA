@@ -21,8 +21,14 @@ static int fixed_dc_active;
 static uint32_t fixed_dc_erased;
 static XwaHudPreparedDrawState fixed_draws;
 static const XwaSnapshot* fixed_snapshot;
+/* Target pixels for one unit of the 640x480 HUD. */
 static float fixed_hud_unit_scale = 1.0f;
-static float fixed_classic_pixel_scale = 1.0f;
+/* Target pixels for one pixel of the game's HUD layout. */
+static float fixed_classic_px = 1.0f;
+static float fixed_hud_user_scale = 1.0f;
+/* Target pixels for one pixel of the game's flight screen. Positions tied to
+   the 3D view use it. */
+static float fixed_view_pixel_scale = 1.0f;
 static const XwaRemasterFlightView* fixed_flight_view;
 static int fixed_target_w, fixed_target_h;
 static float fixed_reticle_x_ref, fixed_reticle_y_ref;
@@ -582,7 +588,8 @@ static void fixed_build_radar(const XwaHudState* h, const XwaRemasterHudVisibili
 	if (!layout || !profile)
 		return;
 	const XwaRadarStyle* style = XwaCraftHud_Radar();
-	const float point_px = (float)fixed_target_h / 1080.0f;
+	/* hud.yaml sizes are in points, and grow with the HUD scale. */
+	const float point_px = (float)fixed_target_h / 1080.0f * fixed_hud_user_scale;
 	int marker_present[2] = { 0, 0 };
 	float marker_x[2] = { 0.0f, 0.0f };
 	float marker_y[2] = { 0.0f, 0.0f };
@@ -600,7 +607,7 @@ static void fixed_build_radar(const XwaHudState* h, const XwaRemasterHudVisibili
 		float center_ref_x, center_ref_y, ignored_scale;
 		fixed_point_ref(blip_widget, radar ? 579.0f : 61.0f, 45.0f, &center_ref_x, &center_ref_y,
 						&ignored_scale);
-		const float radius_x = h->radar_classic_radius * fixed_classic_pixel_scale;
+		const float radius_x = h->radar_classic_radius * fixed_classic_px;
 		const float radius_y = radius_x;
 		const float scale_x = radius_x / h->radar_classic_radius;
 		const float scale_y = radius_y / h->radar_classic_radius;
@@ -821,7 +828,9 @@ int XwaRemasterHudFixed_ProjectTargetArrow(const XwaSnapshot* snapshot, XwaHudPr
 		return 0;
 	const float projected_x = target_x - bounds_x;
 	const float projected_y = target_y - bounds_y;
-	const float padding = 6.0f * flight_view->classic_pixel_scale;
+	/* The arrow stays 6 game pixels from the edge. The arrow grows with the
+	   HUD scale, so this distance does too. */
+	const float padding = 6.0f * profile->scale.classic_px;
 	XwaHudProjectedArrow clamped = { 0 };
 	if (out->padlock)
 		fixed_clamp_padlock(projected_x, projected_y, width, height, padding, &clamped);
@@ -934,7 +943,7 @@ static void fixed_emit_reticle_group(XwaHudWidgetId widget_id, int frame, float 
 	const XwaHudWidgetDesc* widget = fixed_widget(widget_id);
 	if (!profile || !widget || !fixed_reticle_valid)
 		return;
-	const float offset_scale = density_scaled ? fixed_hud_unit_scale : fixed_classic_pixel_scale;
+	const float offset_scale = density_scaled ? fixed_hud_unit_scale : fixed_view_pixel_scale;
 	const float offset_x = dx * offset_scale;
 	const float offset_y = dy * offset_scale;
 	const float size_scale = fixed_hud_unit_scale;
@@ -1012,7 +1021,9 @@ void XwaRemasterHudFixed_Shutdown(void) {
 	fixed_dc_erased = 0;
 	fixed_snapshot = NULL;
 	fixed_hud_unit_scale = 1.0f;
-	fixed_classic_pixel_scale = 1.0f;
+	fixed_classic_px = 1.0f;
+	fixed_hud_user_scale = 1.0f;
+	fixed_view_pixel_scale = 1.0f;
 	fixed_flight_view = NULL;
 	fixed_target_w = fixed_target_h = 0;
 	fixed_reticle_valid = 0;
@@ -1027,7 +1038,9 @@ void XwaRemasterHudFixed_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 	memset(&fixed_target_arrow, 0, sizeof fixed_target_arrow);
 	fixed_reticle_valid = 0;
 	fixed_hud_unit_scale = 1.0f;
-	fixed_classic_pixel_scale = 1.0f;
+	fixed_classic_px = 1.0f;
+	fixed_hud_user_scale = 1.0f;
+	fixed_view_pixel_scale = 1.0f;
 	fixed_snapshot = snapshot;
 	fixed_flight_view = flight_view;
 	fixed_target_w = target_w;
@@ -1047,14 +1060,16 @@ void XwaRemasterHudFixed_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 	fixed_draws.bundle_generation = bundle_generation;
 	fixed_draws.profile = (uint8_t)profile;
 	fixed_draws.valid = 1;
-	/* The original uses screen edges or screen center for placement and
-	 * g_flightHudScaleFactor only for local offsets and size. Scale those
-	 * recovered HUD units by the output/source height ratio. */
+	/* The original places the HUD from the screen edges or centre, and uses
+	 * g_flightHudScaleFactor only for offsets and sizes. Here those come from
+	 * the layout's HUD scale (docs/hud_scale_plan.md). Positions tied to the
+	 * 3D view use the ratio of the output height to the game screen height. */
 	const float classic_screen_h =
 		snapshot->flight_camera.screen_h > 0 ? (float)snapshot->flight_camera.screen_h : 480.0f;
-	const float classic_hud_scale = hud->classic_hud_scale > 0.0f ? hud->classic_hud_scale : 1.0f;
-	fixed_classic_pixel_scale = target_h / classic_screen_h;
-	fixed_hud_unit_scale = classic_hud_scale * fixed_classic_pixel_scale;
+	fixed_view_pixel_scale = target_h / classic_screen_h;
+	fixed_hud_unit_scale = selected->scale.unit_px;
+	fixed_classic_px = selected->scale.classic_px;
+	fixed_hud_user_scale = selected->scale.user;
 	fixed_reticle_valid = fixed_project_reticle(snapshot, profile, flight_view, target_w, target_h,
 												&fixed_reticle_x_ref, &fixed_reticle_y_ref);
 	XwaRemasterHudVisibility visibility;
@@ -1070,7 +1085,9 @@ void XwaRemasterHudFixed_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 	qsort(fixed_draws.records, fixed_draws.record_count, sizeof fixed_draws.records[0],
 		  fixed_compare_draw_records);
 	fixed_hud_unit_scale = 1.0f;
-	fixed_classic_pixel_scale = 1.0f;
+	fixed_classic_px = 1.0f;
+	fixed_hud_user_scale = 1.0f;
+	fixed_view_pixel_scale = 1.0f;
 	fixed_snapshot = NULL;
 	fixed_flight_view = NULL;
 	fixed_target_w = fixed_target_h = 0;

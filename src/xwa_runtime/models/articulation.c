@@ -1351,12 +1351,22 @@ static void Articulation_CarriedGroup(const ArticulationModel* model, unsigned i
    release it, closing once it is gone. */
 static void Articulation_StepCargoClamps(unsigned int objIdx) {
 	ArticulationModel view;
-	const ArticulationModel* model = Articulation_Model(objIdx, &view);
+	const ArticulationModel* model;
 	CraftData* craft = Articulation_Craft(objIdx);
 	char group[AERON_FLIGHT_TAG_MAX];
 	int angle = -1;
 
-	if (craft == NULL || model == NULL) {
+	if (craft == NULL) {
+		return;
+	}
+	/* This runs for every craft on every sim step, and almost no craft is
+	   boarding or releasing, so check that before looking up the model. */
+	if (craft->aiController.maneuverMode != ARTICULATION_BOARD_MANEUVER &&
+		craft->aiController.maneuverMode != ARTICULATION_RELEASE_MANEUVER) {
+		return;
+	}
+	model = Articulation_Model(objIdx, &view);
+	if (model == NULL) {
 		return;
 	}
 	if (craft->aiController.maneuverMode == ARTICULATION_BOARD_MANEUVER &&
@@ -1394,10 +1404,38 @@ static int Articulation_Distance(const ObjectRecord* a, const ObjectRecord* b) {
 	return x / 4 + y / 4 + z;
 }
 
-/* A starship, freighter or platform opens its
-   hangar doors while a craft of its team is within the distance and no other
-   team's is. */
-static void Articulation_StepHangarDoors(unsigned int objIdx) {
+/* The craft that can open hangar doors (fighters, utility craft, transports
+   and pilot droids), in slot order. The list is built once per sim step, the
+   first time a ship with hangar doors needs it, so that these ships don't
+   each scan every slot. A door step only changes the articulation of its own
+   ship, so the list stays valid for the whole step. */
+typedef struct HangarDoorCraft {
+	uint16_t slots[XWA_MAX_OBJECTS];
+	uint32_t count;
+	int built;
+} HangarDoorCraft;
+
+static HangarDoorCraft s_hangarDoorCraft;
+
+static void Articulation_ListHangarDoorCraft(HangarDoorCraft* list) {
+	uint32_t other;
+
+	list->count = 0;
+	for (other = g_activeRegionObjectSlotStart; other < g_projectileObjectSlotStart; ++other) {
+		const ObjectRecord* craftObject = &g_objectTable[other];
+
+		if ((craftObject->genusId == GENUS_Fighter || craftObject->genusId == GENUS_Utility ||
+			 craftObject->genusId == GENUS_Transport || craftObject->genusId == GENUS_PilotDroid) &&
+			Articulation_Craft(other) != NULL && list->count < XWA_MAX_OBJECTS) {
+			list->slots[list->count++] = (uint16_t)other;
+		}
+	}
+	list->built = 1;
+}
+
+/* A starship, freighter or platform opens its hangar doors while a craft of
+   its own team is within the distance and no craft of another team is. */
+static void Articulation_StepHangarDoors(unsigned int objIdx, HangarDoorCraft* list) {
 	ArticulationModel view;
 	const ArticulationModel* model;
 	CraftData* craft = Articulation_Craft(objIdx);
@@ -1405,7 +1443,7 @@ static void Articulation_StepHangarDoors(unsigned int objIdx) {
 	int sameTeam = 0x7fffffff;
 	int otherTeams = 0x7fffffff;
 	int32_t doorsDistance;
-	uint32_t other;
+	uint32_t index;
 
 	if (craft == NULL) {
 		return;
@@ -1418,13 +1456,15 @@ static void Articulation_StepHangarDoors(unsigned int objIdx) {
 	if (!Articulation_HasGroup(model, "hangar_doors")) {
 		return;
 	}
-	for (other = g_activeRegionObjectSlotStart; other < g_projectileObjectSlotStart; ++other) {
+	if (!list->built) {
+		Articulation_ListHangarDoorCraft(list);
+	}
+	for (index = 0; index < list->count; ++index) {
+		const uint32_t other = list->slots[index];
 		const ObjectRecord* craftObject = &g_objectTable[other];
 		int distance;
 
-		if (other == objIdx || Articulation_Craft(other) == NULL || craftObject->regionIdx != object->regionIdx ||
-			(craftObject->genusId != GENUS_Fighter && craftObject->genusId != GENUS_Utility &&
-			 craftObject->genusId != GENUS_Transport && craftObject->genusId != GENUS_PilotDroid)) {
+		if (other == objIdx || craftObject->regionIdx != object->regionIdx) {
 			continue;
 		}
 		distance = Articulation_Distance(object, craftObject);
@@ -1450,8 +1490,9 @@ void XwaArticulation_StepWorld(void) {
 	for (objIdx = g_activeRegionObjectSlotStart; objIdx < g_projectileObjectSlotStart; ++objIdx) {
 		Articulation_StepCargoClamps(objIdx);
 	}
+	s_hangarDoorCraft.built = 0;
 	for (objIdx = g_activeRegionObjectSlotStart; objIdx < g_projectileObjectSlotStart; ++objIdx) {
-		Articulation_StepHangarDoors(objIdx);
+		Articulation_StepHangarDoors(objIdx, &s_hangarDoorCraft);
 	}
 }
 

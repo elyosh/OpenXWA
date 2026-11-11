@@ -66,8 +66,12 @@ static size_t s_recordCapacity;
 static uint32_t s_pendingFlightUs = FILM_BENCHMARK_NONE;
 static uint32_t s_pendingCaptureUs = FILM_BENCHMARK_NONE;
 
-/* The freeze target, -1 without one, and whether to measure the frozen frame. */
+/* The film time to freeze at (-1 for none), the file name for the capture
+   of the frozen frame (empty for none), and whether to measure the frozen
+   frame. */
 static int32_t s_pauseAt = -1;
+static char s_captureName[1024];
+static int s_captured;
 static int s_measure;
 static int s_measured;
 static int s_frozen;
@@ -85,7 +89,8 @@ static uint32_t FilmBenchmark_Clamp(uint64_t us) {
 	return us < FILM_BENCHMARK_NONE ? (uint32_t)us : FILM_BENCHMARK_NONE - 1;
 }
 
-void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, int32_t pauseAt, int measure) {
+void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, int32_t pauseAt,
+								const char* captureName, int measure) {
 	const size_t length = filmName != NULL ? strlen(filmName) : 0;
 	const int hasExtension = length >= 4 && (strcmp(filmName + length - 4, ".flm") == 0 ||
 											 strcmp(filmName + length - 4, ".FLM") == 0);
@@ -94,6 +99,7 @@ void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, int32
 	s_filmPath[0] = '\0';
 	s_csvPath[0] = '\0';
 	s_pauseAt = pauseAt >= 0 ? pauseAt : -1;
+	snprintf(s_captureName, sizeof s_captureName, "%s", captureName != NULL ? captureName : "");
 	s_measure = measure != 0;
 	if (length == 0) {
 		return;
@@ -427,8 +433,27 @@ int XwaFilmBenchmark_FastForward(void) {
 	return s_fastForwarding;
 }
 
+int XwaFilmBenchmark_CaptureDue(void) {
+	return s_captureName[0] != '\0' && !s_captured && s_frozen && s_frozenFramesPresented != 0;
+}
+
+const char* XwaFilmBenchmark_CaptureName(void) { return s_captureName; }
+
+void XwaFilmBenchmark_CaptureDone(int ok) {
+	s_captured = 1;
+	if (s_state != FILM_BENCHMARK_PLAYING) {
+		return;
+	}
+	if (!ok) {
+		FilmBenchmark_Fail("the capture failed");
+	} else if (!s_measure) {
+		s_state = FILM_BENCHMARK_DONE;
+	}
+}
+
 int XwaFilmBenchmark_MeasurementDue(void) {
-	return s_measure && !s_measured && s_frozen && s_frozenFramesPresented != 0;
+	return s_measure && !s_measured && s_frozen && s_frozenFramesPresented != 0 &&
+		   (s_captureName[0] == '\0' || s_captured);
 }
 
 void XwaFilmBenchmark_MeasurementDone(int ok) {

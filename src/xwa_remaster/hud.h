@@ -203,6 +203,11 @@ int XwaRemasterHud_ValidateWidgetRegistry(char* error, uint32_t error_size);
 uint32_t XwaRemasterHud_BuildAssetRequests(const XwaHudState* hud, uint8_t* out_font_mask);
 int XwaRemasterHud_Init(AeronVfs* vfs);
 const XwaHudLayout* XwaRemasterHud_Layout(void);
+/* The player's HUD scale (video.hud_scale). At 1, the HUD has the size that
+   the stock game gives it at most resolutions. SetUserScale ignores values
+   outside XWA_MODERN_HUD_SCALE_MIN to XWA_MODERN_HUD_SCALE_MAX. */
+void XwaRemasterHud_SetUserScale(float scale);
+float XwaRemasterHud_UserScale(void);
 void XwaRemasterHud_Shutdown(void);
 /* Resolves lightweight references from the mission-resident asset set, then
  * builds transient HUD draw data. It performs no I/O, upload, or residency work. */

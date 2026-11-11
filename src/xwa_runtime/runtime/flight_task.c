@@ -392,8 +392,23 @@ static void XwaFlightTask_ApplyFlightConfig(void) {
 	g_dirLightingEnabled = g_gameConfig.diffuse[configIndex] != 0;
 }
 
+/* OpenXWA's flight screen. Flight always uses the 1600x1200 slot of the
+   resolution table, changed to a 1920x1080 screen with a HUD scale of 1.44
+   and a projection of 1152 (1080 x 1.0666, which keeps the vertical field of
+   view of the stock modes). The modern renderer takes only the HUD layout,
+   the text sizes and the cockpit view offset from this screen, so they are
+   the same for every player. See docs/hud_scale_plan.md. */
+enum {
+	XWA_FLIGHT_SCREEN_WIDTH = 1920,
+	XWA_FLIGHT_SCREEN_HEIGHT = 1080,
+	XWA_FLIGHT_SCREEN_PROJ_SCALE = 1152,
+};
+#define XWA_FLIGHT_SCREEN_HUD_SCALE 1.44f
+
 static void XwaFlightTask_ApplyFlightResolution(void) {
-	g_flightResolutionMode = g_gameConfig.screenRes[NetSession_GetPlayerCount() > 1];
+	/* The original reads g_gameConfig.screenRes[NetSession_GetPlayerCount() > 1]
+	   here. OpenXWA ignores the setting and uses its flight screen. */
+	g_flightResolutionMode = FLIGHT_RES_1600x1200;
 	switch (g_flightResolutionMode) {
 		case FLIGHT_RES_800x600:
 			width = 800;
@@ -421,6 +436,8 @@ static void XwaFlightTask_ApplyFlightResolution(void) {
 			g_flightResolutionMode = FLIGHT_RES_640x480;
 			break;
 	}
+	width = XWA_FLIGHT_SCREEN_WIDTH;
+	height = XWA_FLIGHT_SCREEN_HEIGHT;
 
 	g_surfaceWidth = width;
 	g_surfaceHeight = height;
@@ -435,7 +452,8 @@ static void XwaFlightTask_StoreActualConfigAfterDisplayInit(void) {
 	int configIndex;
 
 	configIndex = NetSession_GetPlayerCount() > 1;
-	g_gameConfig.screenRes[configIndex] = (uint8_t)g_flightResolutionMode;
+	/* The original also stores g_flightResolutionMode in screenRes. OpenXWA
+	   doesn't, so the player's choice is kept. */
 	g_gameConfig.use3dHardware[configIndex] = (uint8_t)g_useHardware3D;
 	g_gameConfig.hitEffects[configIndex] = (uint8_t)g_hitEffectsEnabled;
 }
@@ -596,6 +614,10 @@ static void XwaFlightTask_InitProjectionAndPalette(void) {
 			g_projScaleHalfInt = 256;
 			break;
 	}
+	/* The point sprite scale keeps the slot's value. */
+	g_flightHudScaleFactor = XWA_FLIGHT_SCREEN_HUD_SCALE;
+	g_projScaleInt = XWA_FLIGHT_SCREEN_PROJ_SCALE;
+	g_projScaleHalfInt = XWA_FLIGHT_SCREEN_PROJ_SCALE / 2;
 	g_projScale = (float)(unsigned int)g_projScaleInt;
 	g_projScaleDiv512 = g_projScale * (1.0f / 512.0f);
 	XwaCockpitView_SaveStockProjection();

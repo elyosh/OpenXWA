@@ -712,7 +712,17 @@ int16_t RenderScene_DrawObjectModel(ObjectRecord* obj) {
 			}
 
 			if (drawMesh) {
+#ifdef XWA_MODERN
+				/* Only the asteroid test below uses the descriptor. The
+				   search has no side effects, so it is skipped for other
+				   objects. The original searches the node tree for every mesh
+				   it draws. */
+				descriptor = obj->objectType == OBJ_Asteroid03
+								 ? ModelMesh_FindDescriptorNodeRecursive(node, model)
+								 : NULL;
+#else
 				descriptor = ModelMesh_FindDescriptorNodeRecursive(node, model);
+#endif
 				if (obj->objectType == OBJ_Asteroid03 && descriptor) {
 					ObjectRecord* playerObj;
 

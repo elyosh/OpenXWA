@@ -18,6 +18,11 @@ typedef struct HudAnchorDefinition {
  * The rectangles describe immutable 640x480 HUD geometry. Their horizontal
  * origins reproduce the original screenWidth/2 and screenWidth-offset
  * formulas; they are not per-resolution authoring positions.
+ *
+ * The message anchors have the sizes of the original panes, 11 and 47 pixels
+ * high, which are too short for the hardware text. So they are scaled by
+ * h / 480 times the HUD scale, which leaves room for a line of text at every
+ * HUD scale. Their Y is a fraction of the screen height, as in Hud_InitHUD.
  */
 static const HudAnchorDefinition hud_anchor_definitions[XWA_HUD_ANCHOR_COUNT] = {
 	HUD_ANCHOR("reticle", 0, 0, 640, 480, XWA_HUD_LAYOUT_CENTER),
@@ -48,9 +53,9 @@ static const HudAnchorDefinition hud_anchor_definitions[XWA_HUD_ANCHOR_COUNT] = 
 	HUD_ANCHOR("top_proving_status", 285, 11, 130, 11, XWA_HUD_LAYOUT_CENTER_TOP),
 	HUD_ANCHOR("left_subsystem", 0, 0, 40, 200, XWA_HUD_LAYOUT_LEFT_TOP),
 	HUD_ANCHOR("right_subsystem", 600, 0, 40, 200, XWA_HUD_LAYOUT_RIGHT_TOP),
-	HUD_ANCHOR("message_system", 85, 64, 470, 11, XWA_HUD_LAYOUT_CENTER_TOP),
-	HUD_ANCHOR("message_flight_group", 130, 320, 380, 11, XWA_HUD_LAYOUT_CENTER_BOTTOM),
-	HUD_ANCHOR("message_ready", 110, 35, 420, 47, XWA_HUD_LAYOUT_CENTER_TOP),
+	HUD_ANCHOR("message_system", 85, 64, 470, 11, XWA_HUD_LAYOUT_CENTER_X_SCREEN_Y),
+	HUD_ANCHOR("message_flight_group", 130, 320, 380, 11, XWA_HUD_LAYOUT_CENTER_X_SCREEN_Y),
+	HUD_ANCHOR("message_ready", 110, 35, 420, 47, XWA_HUD_LAYOUT_CENTER_X_SCREEN_Y),
 	HUD_ANCHOR("network", 0, 0, 640, 480, XWA_HUD_LAYOUT_LEFT_TOP),
 	HUD_ANCHOR("film_recording", 120, 11, 50, 11, XWA_HUD_LAYOUT_CENTER_TOP),
 	HUD_ANCHOR("fps", 0, 0, 100, 20, XWA_HUD_LAYOUT_CENTER_BOTTOM),
@@ -59,6 +64,10 @@ static const HudAnchorDefinition hud_anchor_definitions[XWA_HUD_ANCHOR_COUNT] = 
 
 #undef HUD_RADAR
 #undef HUD_ANCHOR
+
+/* The window height, in units of the 640x480 HUD, at a HUD scale of 1. It
+   gives the HUD the size that the stock game gives it at most resolutions. */
+#define HUD_UNIT_HEIGHT 600.0f
 
 void XwaRemasterHudLayout_MapPoint(XwaHudLayoutOrigin origin, float source_w, float source_h, float target_w,
 								   float target_h, float scale, float source_x, float source_y, float* out_x,
@@ -69,6 +78,7 @@ void XwaRemasterHudLayout_MapPoint(XwaHudLayoutOrigin origin, float source_w, fl
 		case XWA_HUD_LAYOUT_CENTER_TOP:
 		case XWA_HUD_LAYOUT_CENTER_BOTTOM:
 		case XWA_HUD_LAYOUT_CENTER:
+		case XWA_HUD_LAYOUT_CENTER_X_SCREEN_Y:
 			x = target_w * 0.5f + (source_x - source_w * 0.5f) * scale;
 			break;
 		case XWA_HUD_LAYOUT_RIGHT_TOP:
@@ -92,6 +102,7 @@ void XwaRemasterHudLayout_MapPoint(XwaHudLayoutOrigin origin, float source_w, fl
 			y = target_h * 0.5f + (source_y - source_h * 0.5f) * scale;
 			break;
 		case XWA_HUD_LAYOUT_VIEWPORT:
+		case XWA_HUD_LAYOUT_CENTER_X_SCREEN_Y:
 			y = source_h > 0.0f ? source_y * target_h / source_h : 0.0f;
 			break;
 		case XWA_HUD_LAYOUT_LEFT_TOP:
@@ -122,20 +133,32 @@ void XwaRemasterHudLayout_Init(XwaHudLayout* out) {
 	strcpy(out->profiles[0].name, "logical");
 }
 
-int XwaRemasterHudLayout_Resolve(XwaHudLayout* layout, int target_w, int target_h) {
-	if (!layout || target_w <= 0 || target_h <= 0)
+int XwaRemasterHudLayout_Resolve(XwaHudLayout* layout, int target_w, int target_h, float user_scale,
+								 float classic_hud_scale) {
+	if (!layout || target_w <= 0 || target_h <= 0 || !(user_scale > 0.0f) || !(classic_hud_scale > 0.0f))
 		return 0;
 	XwaHudLayoutProfile* profile = &layout->profiles[0];
-	if (profile->valid && profile->reference_w == target_w && profile->reference_h == target_h)
+	if (profile->valid && profile->reference_w == target_w && profile->reference_h == target_h &&
+		profile->scale.user == user_scale && profile->classic_hud_scale == classic_hud_scale)
 		return 1;
 
-	const float scale = (float)target_h / XWA_HUD_CANONICAL_HEIGHT;
+	/* In a window narrower than 4:3, the width sets the size so that the 4:3
+	   HUD fits. */
+	const float fit =
+		fminf((float)target_h / HUD_UNIT_HEIGHT, (float)target_w / (HUD_UNIT_HEIGHT * 4.0f / 3.0f));
 	memset(profile->anchors, 0, sizeof profile->anchors);
 	profile->reference_w = target_w;
 	profile->reference_h = target_h;
+	profile->classic_hud_scale = classic_hud_scale;
+	profile->scale.user = user_scale;
+	profile->scale.unit_px = user_scale * fit;
+	profile->scale.classic_px = profile->scale.unit_px / classic_hud_scale;
+	profile->scale.message_px = user_scale * (float)target_h / XWA_HUD_CANONICAL_HEIGHT;
 	for (int i = 0; i < XWA_HUD_ANCHOR_COUNT; i++) {
 		const HudAnchorDefinition* definition = &hud_anchor_definitions[i];
 		XwaHudLayoutAnchor* anchor = &profile->anchors[i];
+		const float scale = definition->origin == XWA_HUD_LAYOUT_CENTER_X_SCREEN_Y ? profile->scale.message_px
+																				   : profile->scale.unit_px;
 		float x, y;
 		XwaRemasterHudLayout_MapPoint(definition->origin, XWA_HUD_CANONICAL_WIDTH, XWA_HUD_CANONICAL_HEIGHT,
 									  target_w, target_h, scale, definition->canonical.x,

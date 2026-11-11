@@ -259,8 +259,9 @@ static void map_add_object_annotations(const XwaSnapshot* snapshot, XwaRemasterA
 		return;
 	const uint8_t palette = map_palette_for_iff(map->effective_iff);
 	int32_t grid[3] = { object->world_pos[0], object->world_pos[1], MAP_PLANE_Z };
-	map_add_world_line(list, &snapshot->flight_camera, view, object->world_pos, grid, palette, stroke, 0);
-	if (map->movement_visible) {
+	if (map->annotations_visible)
+		map_add_world_line(list, &snapshot->flight_camera, view, object->world_pos, grid, palette, stroke, 0);
+	if (map->annotations_visible && map->movement_visible) {
 		int32_t movement[3] = { grid[0], grid[1], MAP_PLANE_Z };
 		movement[0] += map_q15_mul(0x100, map->move_x);
 		movement[1] += map_q15_mul(0x100, map->move_y);
@@ -285,7 +286,7 @@ static void map_add_object_text(const XwaFlightMapObject* map, const XwaFlightOb
 								const XwaRemasterFlightFace* face, const char* label, float screen_x,
 								float screen_y, float depth, float classic_width_px, float font_size,
 								float line_height, int show_range) {
-	if (!map->label_visible || (!font && !face) || depth <= 0.0f)
+	if (!map->annotations_visible || (!font && !face) || depth <= 0.0f)
 		return;
 	const float focal = (float)view->viewport.height * 0.5f / tanf(view->camera.v_half_rad);
 	float extent = focal * (float)(map->box_extent > 0 ? map->box_extent : 1) / depth;

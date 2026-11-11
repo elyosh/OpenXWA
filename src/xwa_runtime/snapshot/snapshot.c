@@ -442,7 +442,11 @@ static void snapshot_maybe_dump(const XwaSnapshot* s) {
 void XwaSnapshot_Commit(void) {
 	XwaSnapshot* s = wr();
 	s->scene_kind = g_scene_kind;
-	s->game_time_ticks = g_gameTime; /* sim clock; see header */
+	/* Sim clock; see the header. While a film plays, the flight task sets
+	   g_gameTime after the film's step to its own frame target, which can run
+	   ahead of the film and then go back. The film's time follows the steps.
+	   Mode 2 starts when the film's first step has read that time. */
+	s->game_time_ticks = g_filmPlaybackMode >= 2 ? g_filmStepInputTimestamp : g_gameTime;
 	s->host_time_us = XwaTime_GetElapsedUs();
 	s->frontend_layout = (uint8_t)XwaFrontendScreens_TakeFrameLayout();
 	s->offscreen_restore_enabled = g_offscreenRestoreEnabled;

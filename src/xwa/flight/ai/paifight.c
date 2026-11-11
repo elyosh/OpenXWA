@@ -3267,17 +3267,17 @@ char paifight_gunnerselfdefenseorder(void) {
 					ObjectRecord* projectileObj;
 					uint32_t rangeScore;
 
-#ifdef XWA_MODERN
-					if (XwaTurretIgnore_Skips(projectileObjIdx)) {
-						continue;
-					}
-#endif
 					projectileObj = &g_objectTable[projectileObjIdx];
 					if (projectileObj->objectType == OBJ_None || projectileObj->genusId == GENUS_Explosion ||
 						!paifight_IsWarheadClassProjectile(projectileObj->objectType) ||
 						projectileObj->mobj->pWarheadGuidance->targetObjIdx != g_paiContext.aiObjIdx) {
 						continue;
 					}
+#ifdef XWA_MODERN
+					if (XwaTurretIgnore_Skips(projectileObjIdx)) {
+						continue;
+					}
+#endif
 
 					rangeScore =
 						(uint32_t)collide_roughdistance3d(projectileObj->world_x - g_paifightSearchOriginX,
@@ -3347,14 +3347,16 @@ char paifight_gunnerselfdefenseorder(void) {
 					uint32_t rangeScore;
 					ModelGenusId genusId;
 
+					if (g_objectTable[candidateObjIdx].objectType == OBJ_None) {
+						continue;
+					}
 #ifdef XWA_MODERN
+					/* Must come before paifight_IsCraftAttackingSelf, which can
+					   clear the candidate's AI link. */
 					if (XwaTurretIgnore_Skips(candidateObjIdx)) {
 						continue;
 					}
 #endif
-					if (g_objectTable[candidateObjIdx].objectType == OBJ_None) {
-						continue;
-					}
 
 					candidateCraft = g_objectTable[candidateObjIdx].mobj->pCraft;
 					if (!paifight_IsCraftAttackingSelf(candidateObjIdx, candidateCraft)) {
@@ -3604,16 +3606,16 @@ int16_t paifight_FindNearestGunnerTargetInCandidateSet(uint16_t target1Type, uin
 
 	objectIdx = (uint16_t)g_objScanStart;
 	while ((uint32_t)objectIdx < g_regionStaticObjectSlotEnd) {
-#ifdef XWA_MODERN
-		if (XwaTurretIgnore_Skips(objectIdx)) {
-			++objectIdx;
-			continue;
-		}
-#endif
 		if (g_objectTable[objectIdx].objectType != OBJ_None &&
 			(g_objectTypes[(uint16_t)g_objectTable[objectIdx].objectType].flags & 2u) != 0) {
 			int matchesTarget1;
 			int matchesTarget2;
+#ifdef XWA_MODERN
+			if (XwaTurretIgnore_Skips(objectIdx)) {
+				++objectIdx;
+				continue;
+			}
+#endif
 			matchesTarget1 = Mission_ObjectMatchesTriggerVariable(objectIdx, target1Type, target1);
 			matchesTarget2 = Mission_ObjectMatchesTriggerVariable(objectIdx, target2Type, target2);
 			if (target1OrTarget2 == 1) {

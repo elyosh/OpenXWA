@@ -23,6 +23,12 @@ void* g_handlePtrTable[MEMORY_MAX_HANDLES];
 // GLOBAL: XWA 0x5AA020
 const int g_handleMask = 0x3fff;
 
+#ifdef XWA_MODERN
+/* Counts handle allocations and frees, so that a cache of pointers into
+   handle memory can tell when a handle was freed or reused. */
+uint32_t g_handleGeneration = 0;
+#endif
+
 static void Memory_InitHandleAllocatorIfNeeded(void) {
 	if (g_handleAllocatorInitialized) {
 		return;
@@ -114,6 +120,9 @@ MemoryHandle Memory_AllocHandleInternal(const char* tag, int size, int clearFlag
 	g_handleAllocatedTotalBytes += size;
 	g_handleSizeTable[i] = size;
 	g_handleLockCount[i] = 0;
+#ifdef XWA_MODERN
+	++g_handleGeneration;
+#endif
 	return (MemoryHandle)(i + 1);
 }
 
@@ -144,6 +153,9 @@ void Memory_FreeHandle(const char* tag, MemoryHandle handle) {
 	g_handleSizeTable[index] = 0;
 	g_handleLockCount[index] = 0;
 	g_handleAllocatedCount = result;
+#ifdef XWA_MODERN
+	++g_handleGeneration;
+#endif
 }
 
 // FUNCTION: XWA 0x50E2F0

@@ -184,7 +184,9 @@ int XwaCraftHyperspace_DepartureSpeed(unsigned int objectType, int* speed, int* 
    16-bit distance. */
 #define HYPERSPACE_MAX_STEP_UNITS 65535
 
-static XwaCraftHyperspaceArrival* Hyperspace_FindArrival(unsigned int objIdx) {
+/* Scans s_arrivals for the first entry of `objIdx`. Returns NULL if there is
+   none. With objIdx -1, returns the first free entry. */
+static XwaCraftHyperspaceArrival* Hyperspace_ScanArrival(unsigned int objIdx) {
 	int i;
 
 	for (i = 0; i < XWA_CRAFT_HYPERSPACE_ARRIVALS; ++i) {
@@ -195,6 +197,49 @@ static XwaCraftHyperspaceArrival* Hyperspace_FindArrival(unsigned int objIdx) {
 	return NULL;
 }
 
+/* For each object, the index + 1 of its first entry in s_arrivals, or 0 if it
+   has none. Every moving object looks up its arrival on every sim step, so
+   the lookup can't scan the table. Before the first mission, s_arrivals is
+   all zeros, so every entry belongs to object 0 and the lookup returns the
+   first one. */
+typedef char HyperspaceArrivalIndexFitsInAByte[XWA_CRAFT_HYPERSPACE_ARRIVALS < 256 ? 1 : -1];
+static uint8_t s_arrivalOf[XWA_MAX_OBJECTS] = { 1 };
+
+/* Updates the lookup for `objIdx` from s_arrivals. */
+static void Hyperspace_IndexArrival(unsigned int objIdx) {
+	const XwaCraftHyperspaceArrival* arrival = Hyperspace_ScanArrival(objIdx);
+
+	if (objIdx < XWA_MAX_OBJECTS) {
+		s_arrivalOf[objIdx] = arrival != NULL ? (uint8_t)(arrival - s_arrivals + 1) : 0;
+	}
+}
+
+/* Rebuilds the whole lookup from s_arrivals. */
+static void Hyperspace_IndexArrivals(void) {
+	int i;
+
+	memset(s_arrivalOf, 0, sizeof s_arrivalOf);
+	/* Go backwards, so that the lookup keeps the first entry of each object. */
+	for (i = XWA_CRAFT_HYPERSPACE_ARRIVALS - 1; i >= 0; --i) {
+		const int32_t objIdx = s_arrivals[i].objIdx;
+
+		if (objIdx >= 0 && objIdx < XWA_MAX_OBJECTS) {
+			s_arrivalOf[objIdx] = (uint8_t)(i + 1);
+		}
+	}
+}
+
+/* Returns the first entry of `objIdx`, or NULL if there is none. With
+   objIdx -1, returns the first free entry. */
+static XwaCraftHyperspaceArrival* Hyperspace_FindArrival(unsigned int objIdx) {
+	if (objIdx < XWA_MAX_OBJECTS) {
+		const unsigned int entry = s_arrivalOf[objIdx];
+
+		return entry != 0 ? &s_arrivals[entry - 1] : NULL;
+	}
+	return Hyperspace_ScanArrival(objIdx);
+}
+
 void XwaCraftHyperspace_LoadMission(void) {
 	int i;
 
@@ -202,6 +247,7 @@ void XwaCraftHyperspace_LoadMission(void) {
 	for (i = 0; i < XWA_CRAFT_HYPERSPACE_ARRIVALS; ++i) {
 		s_arrivals[i].objIdx = -1;
 	}
+	Hyperspace_IndexArrivals();
 }
 
 /* The distance that `arrival` has left along the craft's heading, in world
@@ -244,6 +290,7 @@ int XwaCraftHyperspace_BeginArrival(unsigned int objIdx, int cruise, int endSpee
 		return 0;
 	}
 	arrival->objIdx = (int32_t)objIdx;
+	Hyperspace_IndexArrival(objIdx);
 	arrival->cruise = cruise;
 	arrival->endSpeed = endSpeed < 0 ? 0 : (endSpeed > cruise ? cruise : endSpeed);
 	arrival->aim[0] = aim[0];
@@ -282,6 +329,7 @@ void XwaCraftHyperspace_EndArrival(unsigned int objIdx) {
 	if (arrival != NULL) {
 		memset(arrival, 0, sizeof *arrival);
 		arrival->objIdx = -1;
+		Hyperspace_IndexArrival(objIdx);
 	}
 }
 
@@ -364,6 +412,7 @@ void XwaCraftHyperspace_SaveFlightState(XwaCraftHyperspaceArrival arrivals[XWA_C
 void XwaCraftHyperspace_RestoreFlightState(
 	const XwaCraftHyperspaceArrival arrivals[XWA_CRAFT_HYPERSPACE_ARRIVALS]) {
 	memcpy(s_arrivals, arrivals, sizeof s_arrivals);
+	Hyperspace_IndexArrivals();
 }
 
 /* The speed of `craft` when its arrival ends. `craft` is the craft of the AI

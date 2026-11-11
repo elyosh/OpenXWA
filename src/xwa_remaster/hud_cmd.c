@@ -678,14 +678,11 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	const XwaHudLayoutAnchor* anchor = &profile->anchors[XWA_HUD_ANCHOR_CMD_CRT];
 	if (anchor->rect.w <= 0 || anchor->rect.h <= 0)
 		return;
-	const float screen_h =
-		snapshot->flight_camera.screen_h ? (float)snapshot->flight_camera.screen_h : 480.0f;
-	const float hud_scale = snapshot->hud.classic_hud_scale > 0.0f ? snapshot->hud.classic_hud_scale : 1.0f;
-	const float density = hud_scale * 480.0f / screen_h;
-	const float rect_w_ref = anchor->rect.w * density;
-	const float rect_h_ref = anchor->rect.h * density;
-	const float rect_x_ref = anchor->rect.x + 0.5f * (anchor->rect.w - rect_w_ref);
-	const float rect_y_ref = anchor->rect.y + anchor->rect.h - rect_h_ref;
+	/* The anchor grows with the HUD scale, like the CMD frame around it. */
+	const float rect_w_ref = (float)anchor->rect.w;
+	const float rect_h_ref = (float)anchor->rect.h;
+	const float rect_x_ref = (float)anchor->rect.x;
+	const float rect_y_ref = (float)anchor->rect.y;
 	float output_scale;
 	XwaRemasterHudLayout_OutputTransform(profile, target_w, target_h, NULL, NULL, &output_scale);
 	if (output_scale <= 0.0f)

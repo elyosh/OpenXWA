@@ -77,8 +77,15 @@ typedef struct XwaModernVideoOptions {
 	int hdr_output;
 	XwaModernSdrGamma sdr_gamma;
 	XwaModernPaperWhite paper_white;
+	/* The size of the modern HUD, from XWA_MODERN_HUD_SCALE_MIN to
+	   XWA_MODERN_HUD_SCALE_MAX. At 1, the HUD has the size that the stock
+	   game gives it at most resolutions, in any window. */
+	float hud_scale;
 	int smooth_menu_fonts; /* original frontend bitmap fonts only */
 } XwaModernVideoOptions;
+
+#define XWA_MODERN_HUD_SCALE_MIN 0.5f
+#define XWA_MODERN_HUD_SCALE_MAX 2.0f
 
 enum {
 	XWA_MODERN_VIDEO_OVERRIDE_SSAO = 1u << 0,
@@ -91,7 +98,8 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_PAPER_WHITE = 1u << 7,
 	XWA_MODERN_VIDEO_OVERRIDE_MOTION_BLUR_AMOUNT = 1u << 8,
 	XWA_MODERN_VIDEO_OVERRIDE_SHADOW_QUALITY = 1u << 9,
-	XWA_MODERN_VIDEO_OVERRIDE_SMOOTH_MENU_FONTS = 1u << 10,
+	XWA_MODERN_VIDEO_OVERRIDE_HUD_SCALE = 1u << 10,
+	XWA_MODERN_VIDEO_OVERRIDE_SMOOTH_MENU_FONTS = 1u << 11,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

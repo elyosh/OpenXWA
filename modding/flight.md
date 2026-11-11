@@ -1040,7 +1040,8 @@ target_boxes:
 With a `line_width` above 0, the lines are centred on the box's edges, the
 corners are 1/8 of the box's size, and the four corners are the same. A
 very small box is drawn filled. The original game's boxes have lines of one
-pixel of the game's flight resolution, so they get thin in a large window.
+pixel of the game's 1920 × 1080 flight screen, so they get thin in a large
+window.
 
 ### Radar
 
@@ -1056,11 +1057,11 @@ radar:
 
 | Key | Meaning | Range | Default |
 |-|-|-|-|
-| `blip_size` | The width of each blip, in points: 1/1080 of the height of the HUD. Above 0, each blip is a filled circle of its colour. 0 keeps the original game's blips. | 0 to 20 | 0 |
-| `target_size` | The width of the yellow circle drawn over the current target's blip, in points. It replaces the original game's small bracket. 0 keeps the bracket. | 0 to 20 | 0 |
+| `blip_size` | The width of each blip, in points: 1/1080 of the height of the HUD, times the player's HUD scale. Above 0, each blip is a filled circle of its colour. 0 keeps the original game's blips. | 0 to 20 | 0 |
+| `target_size` | The width of the yellow circle drawn over the current target's blip, in points times the player's HUD scale. It replaces the original game's small bracket. 0 keeps the bracket. | 0 to 20 | 0 |
 
-The original game's blips are about one pixel of the game's flight
-resolution, so they get small in a large window. A wrong value is ignored,
+The original game's blips are about one pixel of the game's 1920 × 1080
+flight screen, so they get small in a large window. A wrong value is ignored,
 with a warning in the log.
 
 ### Target readout
@@ -1079,7 +1080,9 @@ target_readout:
 ```
 
 Sizes are in points: 1/1080 of the height of the 3D view, so a point is one
-pixel at 1080 lines. Colours are linear, three numbers of 0 or more.
+pixel at 1080 lines. The text and bar sizes are also multiplied by the
+player's HUD scale. The component box sizes aren't, because the boxes follow
+the 3D view. Colours are linear, three numbers of 0 or more.
 
 | Key | Meaning | Range | Default |
 |-|-|-|-|

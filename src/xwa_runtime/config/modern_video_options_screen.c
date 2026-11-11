@@ -13,7 +13,7 @@
 
 int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	/* The rows under the title, Back included. */
-	enum { row_count = 14 };
+	enum { row_count = 16 };
 	static const char* const window_mode_texts[] = { "Windowed", "Fullscreen" };
 	static const char* const quality_texts[] = { "Off", "Low", "High" };
 	static const char* const shadow_quality_texts[] = { "Standard", "High" };
@@ -27,6 +27,13 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	static const char* const sdr_gamma_texts[] = { "2.2", "2.4", "sRGB" };
 	static const char* const paper_white_texts[] = { "Auto",     "100 nits", "150 nits", "200 nits",
 													 "250 nits", "300 nits", "400 nits" };
+	/* The values the HUD Scale row offers. config.yaml can hold any value
+	   from 0.5 to 2, and the row then shows the nearest one. */
+	static const float hud_scale_values[] = { 0.5f, 0.6f, 0.7f,  0.75f, 0.8f,  0.9f,
+											  1.0f, 1.1f, 1.25f, 1.5f,  1.75f, 2.0f };
+	static const char* const hud_scale_texts[] = { "50%",  "60%",  "70%",  "75%",  "80%",  "90%",
+												   "100%", "110%", "125%", "150%", "175%", "200%" };
+	enum { hud_scale_count = sizeof hud_scale_values / sizeof hud_scale_values[0] };
 	XwaModernVideoOptions options;
 	XwaModernCameraOptions camera_options;
 	XwaModernCameraShakeOptions camera_shake_options;
@@ -44,6 +51,8 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	uint8_t hdr;
 	uint8_t sdr_gamma;
 	uint8_t paper_white;
+	uint8_t hud_scale;
+	uint8_t original_hud_scale;
 	uint8_t smooth_menu_fonts;
 	uint8_t enhanced_camera;
 	uint8_t camera_shake;
@@ -70,6 +79,13 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 	hdr = (uint8_t)(options.hdr_output != 0);
 	sdr_gamma = (uint8_t)options.sdr_gamma;
 	paper_white = (uint8_t)options.paper_white;
+	hud_scale = 0;
+	for (uint8_t i = 1; i < hud_scale_count; i++) {
+		if (fabsf(hud_scale_values[i] - options.hud_scale) <
+			fabsf(hud_scale_values[hud_scale] - options.hud_scale))
+			hud_scale = i;
+	}
+	original_hud_scale = hud_scale;
 	smooth_menu_fonts = (uint8_t)options.smooth_menu_fonts;
 	XwaModernCameraOptions_Get(&camera_options);
 	enhanced_camera = (uint8_t)(camera_options.enabled != 0);
@@ -116,6 +132,8 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 												67, hdr_rows_disabled);
 	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &paper_white, "HDR Paper White", paper_white_texts, 7,
 												68, hdr_rows_disabled);
+	changed |= XwaModernOptionsMenu_DrawCycleU8(&menu, &hud_scale, "HUD Scale", hud_scale_texts,
+												hud_scale_count, 77, 0);
 
 	if (changed) {
 		if (msaa != original_msaa && msaa != XWA_MODERN_MSAA_OFF) {
@@ -135,6 +153,11 @@ int XwaModernVideoOptionsScreen_Update(int menu_center_x, int* cursor_row) {
 		options.hdr_output = hdr != 0;
 		options.sdr_gamma = (XwaModernSdrGamma)sdr_gamma;
 		options.paper_white = (XwaModernPaperWhite)paper_white;
+		/* Write the value only when the player changes the row, so that a
+		   config.yaml value the row doesn't offer is kept. */
+		if (hud_scale != original_hud_scale) {
+			options.hud_scale = hud_scale_values[hud_scale];
+		}
 		options.smooth_menu_fonts = smooth_menu_fonts;
 		XwaModernVideoOptions_Set(&options);
 	}

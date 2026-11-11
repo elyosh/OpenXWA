@@ -158,6 +158,13 @@ typedef struct FlEnergyState {
 	float start;
 } FlEnergyState;
 
+/* How long before now an effect starts when it was already showing when
+ * the object first appeared. A `once` effect is then over, and a loop is
+ * at some point of its cycle. */
+#define FL_ENERGY_SETTLED_SECONDS 3600.0f
+
+static uint32_t fl_energy(const XwaFlightObject* object);
+
 /* Elements in blocks that never move, so pointers to them stay valid while
  * the pool grows. A frame empties the pool and keeps its blocks. */
 typedef struct FlBlockPool {
@@ -428,6 +435,9 @@ static struct {
 	 * the classic HUD last drew them. */
 	FlStateOnsets player_states;
 	FlStateOnsets override_states;
+	/* The debug override's energy effect and when it started. */
+	uint32_t override_energy;
+	float override_energy_start;
 	float states_time;
 	uint8_t target_event;
 	uint8_t states_in_hangar;
@@ -493,7 +503,12 @@ static int fl_reserve_prev_index(uint32_t count) {
 }
 
 /* Gives the energy states one entry per slot of the snapshot's object table,
- * and clears them when the mission changes. */
+ * clears them when the mission changes, and updates them for every craft of
+ * the snapshot, drawn or not. An effect starts when a craft's effect
+ * changes. A craft seen for the first time, or after the clock went back,
+ * gets its current effect with a start long before now, so a craft that
+ * appears without shields doesn't flash. Updating twice for one snapshot
+ * changes nothing. */
 static void fl_prepare_energy_states(const XwaSnapshot* snap) {
 	if (strcmp(s.energy_mission, snap->mission_path) != 0) {
 		snprintf(s.energy_mission, sizeof s.energy_mission, "%s", snap->mission_path);
@@ -510,6 +525,24 @@ static void fl_prepare_energy_states(const XwaSnapshot* snap) {
 			   (size_t)(snap->flight_slot_count - s.energy_state_count) * sizeof *states);
 		s.energy_states = states;
 		s.energy_state_count = snap->flight_slot_count;
+	}
+	const float now = (float)((double)snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS);
+	const uint32_t* craft = snap->flight_lists[XWA_SNAP_LIST_CRAFT];
+	for (uint32_t i = 0; i < snap->flight_list_count[XWA_SNAP_LIST_CRAFT]; i++) {
+		const XwaFlightObject* object = &snap->flight_objects[craft[i]];
+		if (!object->has_craft || object->slot >= s.energy_state_count) {
+			continue;
+		}
+		FlEnergyState* state = &s.energy_states[object->slot];
+		const uint32_t energy = fl_energy(object);
+		if (!state->valid || state->signature != object->signature || now < state->start) {
+			state->start = now - FL_ENERGY_SETTLED_SECONDS;
+		} else if (energy != state->energy) {
+			state->start = now;
+		}
+		state->signature = object->signature;
+		state->energy = (uint8_t)energy;
+		state->valid = 1;
 	}
 }
 
@@ -2992,6 +3025,44 @@ static const char* fl_object_model_name(const XwaFlightObject* object) {
 			   : XwaSnapshotExport_ModelName(object->object_type);
 }
 
+/* The meshes found by model name in this frame, kept by name pointer. Every
+ * object and projectile looks up its mesh once or more per frame, and a name
+ * pointer from fl_object_model_name names the same model for the whole frame.
+ * An entry is valid for one frame and one mesh generation
+ * (XwaRemasterShip_MeshGeneration). */
+#define FL_MESH_MEMO_SIZE 128u
+
+typedef struct FlMeshMemo {
+	const char* name;
+	AeronSceneMesh* mesh;
+	uint64_t generation;
+	uint32_t frame;
+	uint8_t source;
+} FlMeshMemo;
+
+static FlMeshMemo s_mesh_memo[FL_MESH_MEMO_SIZE];
+static uint32_t s_mesh_memo_frame;
+
+/* Looks up a mesh like XwaRemasterShip_MeshForNameWithSource, through the
+ * frame's memo. */
+static AeronSceneMesh* fl_mesh_for_name(const char* name, uint8_t* out_source) {
+	if (!name) {
+		return XwaRemasterShip_MeshForNameWithSource(name, out_source);
+	}
+	const uint64_t generation = XwaRemasterShip_MeshGeneration();
+	FlMeshMemo* memo = &s_mesh_memo[((uintptr_t)name >> 3) & (FL_MESH_MEMO_SIZE - 1u)];
+	if (memo->name != name || memo->frame != s_mesh_memo_frame || memo->generation != generation) {
+		memo->name = name;
+		memo->mesh = XwaRemasterShip_MeshForNameWithSource(name, &memo->source);
+		memo->generation = generation;
+		memo->frame = s_mesh_memo_frame;
+	}
+	if (out_source) {
+		*out_source = memo->source;
+	}
+	return memo->mesh;
+}
+
 static int fl_object_in_render_region(const XwaFlightObject* object, uint8_t region) {
 	return object->render_region == region && object->slot_class != XWA_SNAP_SLOT_OTHER;
 }
@@ -4263,7 +4334,7 @@ static XwaShipPointLight* fl_pl_push(const float pos[3], const float color_x_int
  * when the model is unavailable. */
 static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* f,
 								const int32_t camera_world[3], float center[3], float half_axis[3]) {
-	const AeronSceneMesh* mesh = XwaRemasterShip_MeshForNameWithSource(fl_object_model_name(f), NULL);
+	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f), NULL);
 	if (!mesh) {
 		return 0;
 	}
@@ -4302,7 +4373,7 @@ static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* 
 /* Whether a bolt's model has lights of its own, which replace the stock
  * bolt light. */
 static int fl_projectile_has_model_lights(const XwaFlightObject* f) {
-	const AeronSceneMesh* mesh = XwaRemasterShip_MeshForNameWithSource(fl_object_model_name(f), NULL);
+	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f), NULL);
 	return mesh && mesh->light_count > 0;
 }
 
@@ -4731,10 +4802,65 @@ static void fl_add_model_lights(const AeronSceneMesh* mesh, const float transfor
 	}
 }
 
-static int fl_pool_compare(const void* a, const void* b) {
-	const float sa = ((const FlPoolLight*)a)->score;
-	const float sb = ((const FlPoolLight*)b)->score;
-	return sa > sb ? -1 : (sa < sb ? 1 : 0);
+/* A pool light's score and index. These keys are sorted instead of the pool
+ * entries, which are large. */
+typedef struct FlPoolKey {
+	float score;
+	uint32_t index;
+} FlPoolKey;
+
+/* Whether `a` ranks before `b`: the higher score first, then the earlier pool
+ * entry, so that no two keys are equal. */
+static int fl_pool_key_before(const FlPoolKey* a, const FlPoolKey* b) {
+	if (a->score != b->score) {
+		return a->score > b->score;
+	}
+	return a->index < b->index;
+}
+
+/* Sorts `count` keys with fl_pool_key_before, using `scratch`, which holds as
+ * many keys: insertion sort of short runs, then merges. */
+static void fl_sort_pool_keys(FlPoolKey* keys, FlPoolKey* scratch, uint32_t count) {
+	enum { RUN = 16 };
+
+	for (uint32_t start = 0; start < count; start += RUN) {
+		const uint32_t end = start + RUN < count ? start + RUN : count;
+		for (uint32_t i = start + 1; i < end; i++) {
+			const FlPoolKey key = keys[i];
+			uint32_t j = i;
+			while (j > start && fl_pool_key_before(&key, &keys[j - 1])) {
+				keys[j] = keys[j - 1];
+				j--;
+			}
+			keys[j] = key;
+		}
+	}
+	FlPoolKey* from = keys;
+	FlPoolKey* to = scratch;
+	for (uint32_t width = RUN; width < count; width *= 2) {
+		for (uint32_t start = 0; start < count; start += 2 * width) {
+			const uint32_t middle = start + width < count ? start + width : count;
+			const uint32_t end = start + 2 * width < count ? start + 2 * width : count;
+			uint32_t a = start;
+			uint32_t b = middle;
+			uint32_t out = start;
+			while (a < middle && b < end) {
+				to[out++] = fl_pool_key_before(&from[b], &from[a]) ? from[b++] : from[a++];
+			}
+			while (a < middle) {
+				to[out++] = from[a++];
+			}
+			while (b < end) {
+				to[out++] = from[b++];
+			}
+		}
+		FlPoolKey* swap = from;
+		from = to;
+		to = swap;
+	}
+	if (from != keys) {
+		memcpy(keys, from, (size_t)count * sizeof *keys);
+	}
 }
 
 /* Submit the pool's best lights within the scene's capacity. When some
@@ -4742,26 +4868,33 @@ static int fl_pool_compare(const void* a, const void* b) {
  * one's score fades toward zero at it: scores change continuously as the
  * camera moves, so a light crossing the cut is already dark. */
 static void fl_submit_point_lights(void) {
-	uint32_t count = s.pl_pool_count;
-	if (count > AERON_SCENE_POINT_LIGHT_CAPACITY) {
-		qsort(s.pl_pool, count, sizeof s.pl_pool[0], fl_pool_compare);
-		count = AERON_SCENE_POINT_LIGHT_CAPACITY;
-		for (uint32_t i = count; i < s.pl_pool_count; i++) {
-			s.pl_dropped[s.pl_pool[i].model]++;
+	if (s.pl_pool_count <= AERON_SCENE_POINT_LIGHT_CAPACITY) {
+		for (uint32_t i = 0; i < s.pl_pool_count; ++i) {
+			AeronScene_AddLight(s.scene, &s.pl_pool[i].light);
 		}
-		const float cut = s.pl_pool[count].score;
-		for (uint32_t i = 0; i < count && isfinite(cut); i++) {
-			FlPoolLight* l = &s.pl_pool[i];
-			if (l->score < cut * FL_PL_FADE_BAND) {
-				const float fade = (l->score / cut - 1.0f) / (FL_PL_FADE_BAND - 1.0f);
-				for (int c = 0; c < 3; c++) {
-					l->light.color[c] *= fade;
-				}
+		return;
+	}
+	static FlPoolKey keys[FL_MAX_PL_POOL];
+	static FlPoolKey scratch[FL_MAX_PL_POOL];
+	for (uint32_t i = 0; i < s.pl_pool_count; i++) {
+		keys[i].score = s.pl_pool[i].score;
+		keys[i].index = i;
+	}
+	fl_sort_pool_keys(keys, scratch, s.pl_pool_count);
+	const uint32_t count = AERON_SCENE_POINT_LIGHT_CAPACITY;
+	for (uint32_t i = count; i < s.pl_pool_count; i++) {
+		s.pl_dropped[s.pl_pool[keys[i].index].model]++;
+	}
+	const float cut = s.pl_pool[keys[count].index].score;
+	for (uint32_t i = 0; i < count; i++) {
+		FlPoolLight* l = &s.pl_pool[keys[i].index];
+		if (isfinite(cut) && l->score < cut * FL_PL_FADE_BAND) {
+			const float fade = (l->score / cut - 1.0f) / (FL_PL_FADE_BAND - 1.0f);
+			for (int c = 0; c < 3; c++) {
+				l->light.color[c] *= fade;
 			}
 		}
-	}
-	for (uint32_t i = 0; i < count; ++i) {
-		AeronScene_AddLight(s.scene, &s.pl_pool[i].light);
+		AeronScene_AddLight(s.scene, &l->light);
 	}
 }
 
@@ -4839,24 +4972,18 @@ static uint32_t fl_energy(const XwaFlightObject* object) {
 	return object->shield_front + object->shield_rear == 0 ? 1u : 0u;
 }
 
-/* When the object's current energy effect started, in animation seconds:
- * now when it changed, counting an object not seen before as showing none
- * (so a craft without shields flashes once when it appears), or when the
- * clock went back. */
-static float fl_energy_start(const XwaFlightObject* object, uint32_t energy) {
+/* When the object's current energy effect started, in animation seconds,
+ * from the states of fl_prepare_energy_states. An object without a state
+ * gets a start long before now. */
+static float fl_energy_start(const XwaFlightObject* object) {
 	const float now = s.snap ? (float)((double)s.snap->game_time_ticks * XWA_SNAP_GAME_TICK_SECONDS) : 0.0f;
-	if (object->slot >= s.energy_state_count) {
-		return now;
+	if (object->slot < s.energy_state_count) {
+		const FlEnergyState* state = &s.energy_states[object->slot];
+		if (state->valid && state->signature == object->signature) {
+			return state->start;
+		}
 	}
-	FlEnergyState* state = &s.energy_states[object->slot];
-	const uint32_t previous = state->valid && state->signature == object->signature ? state->energy : 0u;
-	if (energy != previous || !state->valid || state->signature != object->signature || now < state->start) {
-		state->start = now;
-	}
-	state->signature = object->signature;
-	state->energy = (uint8_t)energy;
-	state->valid = 1;
-	return state->start;
+	return now - FL_ENERGY_SETTLED_SECONDS;
 }
 
 /* The cannon-state bits (cannon.1 .. cannon.8) of hardpoints first to last. */
@@ -4959,12 +5086,14 @@ static void fl_state_onsets_update(FlStateOnsets* states, uint32_t mask, uint32_
  * target event (warhead lock over laser lock over a selected target, with
  * `target` set for any of them) and the hangar. A state fires when it
  * becomes set; `target` when the target event becomes "selected". The debug
- * override's states fire the same way. All of it starts over when the clock
- * goes back. Repeating the update for a snapshot changes nothing. */
+ * override's states fire the same way, and its energy effect starts when it
+ * changes. All of it starts over when the clock goes back. Repeating the
+ * update for a snapshot changes nothing. */
 static void fl_update_material_states(const XwaSnapshot* snap, float now) {
 	if (now < s.states_time) {
 		memset(&s.player_states, 0, sizeof s.player_states);
 		memset(&s.override_states, 0, sizeof s.override_states);
+		s.override_energy = 0;
 		memset(&s.threats, 0, sizeof s.threats);
 		s.target_event = FL_TARGET_NONE;
 	}
@@ -5016,6 +5145,11 @@ static void fl_update_material_states(const XwaSnapshot* snap, float now) {
 	fl_state_onsets_update(&s.player_states, mask, fired, now);
 	const uint32_t forced = s.anim_override.enabled ? s.anim_override.state_mask : 0u;
 	fl_state_onsets_update(&s.override_states, forced, forced & ~s.override_states.mask, now);
+	const uint32_t forced_energy = s.anim_override.enabled ? s.anim_override.energy : 0u;
+	if (forced_energy != s.override_energy) {
+		s.override_energy = forced_energy;
+		s.override_energy_start = now;
+	}
 }
 
 /* Begins the scene's frame with its exposure, fixed or metered, and with
@@ -5109,8 +5243,10 @@ static const AeronSceneMaterialAnim* fl_object_anim(const XwaFlightObject* objec
 		anim->energy = o->energy;
 		anim->state_mask = o->state_mask;
 		memcpy(anim->onset, s.override_states.onset, sizeof anim->onset);
+		anim->energy_start = s.override_energy_start;
+	} else {
+		anim->energy_start = fl_energy_start(object);
 	}
-	anim->energy_start = fl_energy_start(object, anim->energy);
 	return anim;
 }
 
@@ -5148,7 +5284,7 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 	}
 
 	const char* model_name = model_name_override ? model_name_override : fl_object_model_name(object);
-	out->mesh = XwaRemasterShip_MeshForNameWithSource(model_name, &out->source);
+	out->mesh = fl_mesh_for_name(model_name, &out->source);
 	if (!out->mesh) {
 		return 0;
 	}
@@ -5397,13 +5533,10 @@ int XwaRemasterFlight_CanDirectPresent(int target_w, int target_h) {
 	return Aeron_CanRenderDirectToSwapchain(target_w, target_h) && fl_ensure_direct_present();
 }
 
-/* Shared tone-map + semantic-HUD draw sequence. The target can be the FP16
- * composition fallback or Aeron's borrowed swapchain target. */
-static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-							AeronScenePresentChain* chain, int target_w, int target_h) {
-	if (!cmd || !pass || !target || !chain || !s.present_scene_tex || !s.present_sampler) {
-		return;
-	}
+/* Draws the scene with its bloom and exposure over the whole target, with
+ * `chain` and its current debug view. */
+static void fl_draw_present_scene(AeronRenderPass* pass, AeronScenePresentChain* chain, int target_w,
+								  int target_h) {
 	const AeronRectI full_target = { 0, 0, target_w, target_h };
 	Aeron_SetViewport(pass, &full_target);
 	Aeron_SetScissor(pass, &full_target);
@@ -5411,6 +5544,20 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	/* The flight scene's exposure, on the GPU: metered from this frame. The
 	 * map keeps the CPU value. */
 	AeronTexture* const exposure_tex = s.map_present ? NULL : AeronScene_ExposureTexture(s.scene);
+	AeronScenePresentChain_Draw(chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
+								s.map_present ? 0.0f : AeronSceneBloom_Intensity(),
+								exposure_tex ? 1.0f : XwaRemasterFlight_Exposure(), exposure_tex, s.rt_w,
+								s.rt_h,
+								/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0);
+}
+
+/* Shared tone-map + semantic-HUD draw sequence. The target can be the FP16
+ * composition fallback or Aeron's borrowed swapchain target. */
+static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+							AeronScenePresentChain* chain, int target_w, int target_h) {
+	if (!cmd || !pass || !target || !chain || !s.present_scene_tex || !s.present_sampler) {
+		return;
+	}
 	/* The weight view needs the meter, which the map doesn't run. */
 	AeronScenePresentDebug debug = { .view = (AeronScenePresentDebugView)s.present_debug_view };
 	if (debug.view == AERON_SCENE_PRESENT_METER_WEIGHT &&
@@ -5418,11 +5565,7 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 		debug.view = AERON_SCENE_PRESENT_IMAGE;
 	}
 	AeronScenePresentChain_SetDebug(chain, &debug);
-	AeronScenePresentChain_Draw(chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
-								s.map_present ? 0.0f : AeronSceneBloom_Intensity(),
-								exposure_tex ? 1.0f : XwaRemasterFlight_Exposure(), exposure_tex, s.rt_w,
-								s.rt_h,
-								/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0);
+	fl_draw_present_scene(pass, chain, target_w, target_h);
 	if (s.suppress_hud) {
 		return;
 	}
@@ -5481,6 +5624,29 @@ AeronTexture* XwaRemasterFlight_ResolvePresentation(AeronCommandBuffer* cmd, int
 	fl_draw_present(cmd, pass, s.present_rt, s.present, s.rt_w, s.rt_h);
 	Aeron_EndRenderPass(pass);
 	return Aeron_RenderTargetGetTexture(s.present_rt);
+}
+
+AeronRenderTarget* XwaRemasterFlight_ComposedTarget(void) { return s.present_rt; }
+
+int XwaRemasterFlight_RecordBeforeTonemap(AeronCommandBuffer* cmd) {
+	if (!cmd || !s.present || !s.present_rt || !s.present_scene_tex || !s.present_sampler) {
+		return 0;
+	}
+	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
+		.color_target = s.present_rt,
+		.clear_color = 1,
+		.clear_color_rgba = { 0.0f, 0.0f, 0.0f, 0.0f },
+		.command_buffer = cmd,
+		.debug_label = "OpenXWA flight capture before tonemap",
+	});
+	if (!pass) {
+		return 0;
+	}
+	AeronScenePresentChain_SetDebug(s.present,
+									&(AeronScenePresentDebug) { .view = AERON_SCENE_PRESENT_BEFORE_TONEMAP });
+	fl_draw_present_scene(pass, s.present, s.rt_w, s.rt_h);
+	Aeron_EndRenderPass(pass);
+	return 1;
 }
 
 static void fl_direct_present_callback(AeronCommandBuffer* cmd, AeronRenderPass* pass,
@@ -6822,6 +6988,11 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const XwaFlightCamera* cam = &snap->flight_camera;
 	if (!fl_ensure(target_w, target_h)) {
 		return NULL;
+	}
+	/* Starts a new frame for fl_mesh_for_name. 0 is never a frame, so the
+	 * empty entries never match. */
+	if (++s_mesh_memo_frame == 0) {
+		s_mesh_memo_frame = 1;
 	}
 	const uint64_t host_time_us = XwaTime_GetElapsedUs();
 	/* Get the hyperspace moment first, because its camera shake or jolt turns

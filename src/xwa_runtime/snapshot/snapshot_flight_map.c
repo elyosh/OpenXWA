@@ -324,9 +324,9 @@ void XwaSnapshotFlightMap_CaptureObject(XwaSnapshot* snapshot, uint32_t slot, ui
 		map->move_y = object->mobj->moveY;
 		map->movement_visible = (uint8_t)(object->mobj->state == 0);
 	}
-	map->label_visible =
+	map->annotations_visible =
 		(uint8_t)(slot < g_activeRegionCraftObjectSlotEnd || !object->mobj || object->mobj->pCraft != NULL);
-	if (map->label_visible && !(object->genusId == GENUS_Mine && !object->mobj)) {
+	if (map->annotations_visible && !(object->genusId == GENUS_Mine && !object->mobj)) {
 		char label[256];
 		const int length = map_format_label((uint16_t)slot, label, sizeof label);
 		if (length > 0 && (uint32_t)snapshot->flight_map.label_bytes + (uint32_t)length + 1u <=

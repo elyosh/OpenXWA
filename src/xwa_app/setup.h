@@ -19,10 +19,12 @@ typedef struct XwaLaunchOptions {
 	   folder, that gets its frame times. */
 	char play_film[256];
 	char benchmark_out[XWA_HOST_CONFIG_PATH_CAPACITY];
-	/* --film-pause-at: the film time, in game ticks, at which the film
-	   freezes; -1 without it. --film-benchmark: measure the frozen frame's
-	   GPU time, then quit. */
+	/* --film-pause-at: the film time, in game ticks, where the film freezes,
+	   or -1. --film-capture: the file name, in the user folder, for the
+	   capture of the frozen frame. --film-benchmark: measure the GPU time of
+	   the frozen frame, then quit. */
 	int film_pause_at;
+	char film_capture[XWA_HOST_CONFIG_PATH_CAPACITY];
 	int film_benchmark;
 	/* --help or -h: print the launch options and quit. */
 	int help;

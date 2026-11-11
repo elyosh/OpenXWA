@@ -152,6 +152,20 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			out->film_pause_at = (int)ticks;
 			continue;
 		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--film-capture");
+		if (!pass_through && (value || strcmp(argv[i], "--film-capture") == 0)) {
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, "%s requires a file name", "--film-capture");
+				}
+				value = argv[i];
+			}
+			if (!setup_copy_path(out->film_capture, sizeof out->film_capture, value, "--film-capture", error,
+								 error_size)) {
+				return 0;
+			}
+			continue;
+		}
 		if (!pass_through && strcmp(argv[i], "--film-benchmark") == 0) {
 			out->film_benchmark = 1;
 			continue;
@@ -169,6 +183,9 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 	}
 	if (out->film_pause_at >= 0 && !out->play_film[0]) {
 		return setup_error(error, error_size, "%s requires --play-film", "--film-pause-at");
+	}
+	if (out->film_capture[0] && out->film_pause_at < 0) {
+		return setup_error(error, error_size, "%s requires --film-pause-at", "--film-capture");
 	}
 	if (out->film_benchmark && out->film_pause_at < 0) {
 		return setup_error(error, error_size, "%s requires --film-pause-at", "--film-benchmark");
@@ -189,6 +206,9 @@ const char* XwaLaunchOptions_Help(void) {
 		   "                            to this CSV file of the user folder\n"
 		   "  --film-pause-at <ticks>   with --play-film: fast-forward to this film time,\n"
 		   "                            in 4 ms ticks, and freeze there\n"
+		   "  --film-capture <name>     with --film-pause-at: save the frozen frame to\n"
+		   "                            <name>.png, and the frame before the tonemap to\n"
+		   "                            <name>.hdr, in the user folder, then quit\n"
 		   "  --film-benchmark          with --film-pause-at: measure the frozen frame's\n"
 		   "                            GPU time, then quit\n"
 		   "  -h, --help                print this help and quit\n"

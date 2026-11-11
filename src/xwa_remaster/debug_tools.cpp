@@ -1572,6 +1572,10 @@ static void xwa_tool_hud_snapshot(int* open, void* user) {
 			ImGui::Text("layout ref=%dx%d source=original-logical default=%s generation=%u",
 						profile ? profile->reference_w : 0, profile ? profile->reference_h : 0,
 						profile ? profile->name : "<invalid>", layout->generation);
+			if (profile)
+				ImGui::Text("HUD scale=%.2f unit=%.3f px classic=%.3f px game HUD scale=%.2f",
+							(double)profile->scale.user, (double)profile->scale.unit_px,
+							(double)profile->scale.classic_px, (double)profile->classic_hud_scale);
 		}
 		ImGui::Text("MFD active=%u pages=%u/%u/%u enabled=%u/%u/%u", h.mfd_active, h.mfd_page[0],
 					h.mfd_page[1], h.mfd_page[2], h.mfd_enabled[0], h.mfd_enabled[1], h.mfd_enabled[2]);
