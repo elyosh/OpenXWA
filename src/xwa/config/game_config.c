@@ -5538,7 +5538,7 @@ static void Config_SetInitialDefaults(void) {
 
 #ifdef XWA_MODERN
 	{
-		XwaModernInputOptions options;
+		static XwaModernInputOptions options;
 		XwaModernInputOptions_Get(&options);
 		Config_ApplyModernInputOptions(&options);
 	}

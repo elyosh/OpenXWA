@@ -103,8 +103,9 @@ static void apply_modern_input_options(const XwaModernInputOptions* options) {
 }
 
 /* Each host frame, new gamepad models get the shipped gamepad defaults, and
- * are saved at the next flush. While the options window is open, it does
- * this in its draft. */
+ * the connected models move to the front of the list, which keeps it in the
+ * order of last use. While the options window is open, it adds the new
+ * gamepads in its draft. */
 static void discover_controllers(const AeronInputSnapshot* in) {
 	static char previous_error[512];
 	static XwaModernInputOptions current;
@@ -117,6 +118,7 @@ static void discover_controllers(const AeronInputSnapshot* in) {
 	}
 	XwaModernInputOptions_Get(&current);
 	candidate = current;
+	XwaControllerOptions_MoveConnectedFirst(&candidate.controllers, in);
 	ok = XwaControllerOptions_InitializeGamepads(
 		&candidate.controllers, XwaModernInputOptions_GamepadDefaults(), in, error, sizeof error);
 	if (!XwaControllerOptions_Equals(&candidate.controllers, &current.controllers) &&

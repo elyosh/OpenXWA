@@ -70,7 +70,7 @@ void XwaBindingsEditor_EndDetail(XwaBindingsEditor* editor, AeronUiContext* ui) 
 
 bool XwaBindingsEditor_Conflict(AeronUiContext* ui, int* open, const char* source, XwaInputAction previous,
 								XwaInputAction replacement) {
-	if (!AeronUi_BeginModal(ui, "CONTROL ALREADY BOUND", open, NULL))
+	if (!AeronUi_BeginModal(ui, "Control Already Bound", open, NULL))
 		return false;
 	char text[512];
 	snprintf(text, sizeof text, "%s is assigned to %s. Replace it with %s?", source,

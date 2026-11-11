@@ -1032,14 +1032,17 @@ int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* o
 	if (!host_config_prepare_user_document(vfs, &document, error, error_size)) {
 		return 0;
 	}
-	if (!host_config_set_input_options(document, options, &defaults, &config_error)) {
+	/* Controllers that still use the defaults aren't saved. Discovery gives
+	 * them the defaults again at the next start. */
+	expected = *options;
+	XwaControllerOptions_KeepConfigured(&expected.controllers);
+	if (!host_config_set_input_options(document, &expected, &defaults, &config_error)) {
 		AeronConfigFile_Destroy(document);
 		return host_config_error(error, error_size, "could not update user configuration: %s",
 								 config_error.message[0] ? config_error.message : "invalid input settings");
 	}
 	/* Read the updated document back as the next start will, and write it
 	 * only if it gives the same settings. */
-	expected = *options;
 	XwaKeyboardMapping_Sort(&expected.keyboard);
 	host_config_sort_controller_bindings(&expected.controllers);
 	if (!host_config_user_input(document, &defaults, &saved, detail, sizeof detail)) {

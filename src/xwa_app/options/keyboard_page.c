@@ -186,7 +186,7 @@ static void Detail(XwaKeyboardSettings* settings, AeronUiContext* ui) {
 }
 
 static void Restore(XwaKeyboardSettings* settings, AeronUiContext* ui) {
-	if (!AeronUi_BeginModal(ui, "RESTORE KEYBOARD DEFAULTS", &settings->restore_open, NULL))
+	if (!AeronUi_BeginModal(ui, "Restore Keyboard Defaults", &settings->restore_open, NULL))
 		return;
 	AeronUi_Help(ui, "Replace all keyboard bindings with the defaults?");
 	AeronUi_BeginColumns(ui, 2, NULL);

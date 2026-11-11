@@ -1,4 +1,6 @@
 #include "xwa_runtime/input/controller_options.h"
+
+#include "aeron/log.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -36,7 +38,7 @@ bool XwaControllerOptions_Equals(const XwaControllerOptions* left, const XwaCont
 	for (size_t i = 0; i < left->count; ++i) {
 		const XwaControllerModel *a = &left->models[i], *b = &right->models[i];
 		if (strcmp(a->guid, b->guid) || strcmp(a->name, b->name) || a->kind != b->kind ||
-			!XwaControllerOptions_ProfileEqual(&a->profile, &b->profile))
+			a->configured != b->configured || !XwaControllerOptions_ProfileEqual(&a->profile, &b->profile))
 			return false;
 	}
 	return true;
@@ -174,13 +176,47 @@ bool XwaControllerOptions_Validate(const XwaControllerOptions* options, char* er
 	return true;
 }
 
+static bool XwaControllerOptions_ModelConnected(const XwaControllerModel* model,
+												const AeronInputSnapshot* input) {
+	for (int slot = 0; input && slot < AERON_CONTROLLER_MAX; ++slot) {
+		const AeronControllerSnapshot* d = &input->controllers[slot];
+		if (d->connected && d->kind == model->kind && !strcmp(d->guid, model->guid))
+			return true;
+	}
+	return false;
+}
+
+static void XwaControllerOptions_RemoveModel(XwaControllerOptions* options, size_t index) {
+	memmove(&options->models[index], &options->models[index + 1],
+			(options->count - index - 1) * sizeof options->models[0]);
+	--options->count;
+}
+
+/* Frees one entry. A model that isn't configured goes first, since nothing
+ * is lost. Then the configured model that was connected the longest ago. */
+static bool XwaControllerOptions_MakeRoom(XwaControllerOptions* options, const AeronInputSnapshot* input) {
+	for (int pass = 0; pass < 2; ++pass) {
+		for (size_t i = options->count; i-- > 0;) {
+			const XwaControllerModel* m = &options->models[i];
+			if ((pass == 0 && m->configured) || XwaControllerOptions_ModelConnected(m, input))
+				continue;
+			if (m->configured)
+				Aeron_LogInfo("xwa.input",
+							  "forgetting the settings of '%s' to make room for a new controller", m->name);
+			XwaControllerOptions_RemoveModel(options, i);
+			return true;
+		}
+	}
+	return false;
+}
+
 bool XwaControllerOptions_AddModel(XwaControllerOptions* options, const AeronControllerSnapshot* device,
-								   char* error, size_t capacity) {
+								   const AeronInputSnapshot* input, char* error, size_t capacity) {
 	if (!device || !GuidValid(device->guid))
 		return XwaControllerOptions_ValidationError(error, capacity, "controller has no usable model GUID");
 	if (XwaControllerOptions_FindModel(options, device->guid) >= 0)
 		return true;
-	if (options->count >= XWA_CONTROLLER_MODEL_CAP)
+	if (options->count >= XWA_CONTROLLER_MODEL_CAP && !XwaControllerOptions_MakeRoom(options, input))
 		return XwaControllerOptions_ValidationError(error, capacity, "controller model capacity exceeded");
 	XwaControllerModel* m = &options->models[options->count++];
 	memset(m, 0, sizeof *m);
@@ -189,6 +225,24 @@ bool XwaControllerOptions_AddModel(XwaControllerOptions* options, const AeronCon
 	m->kind = device->kind;
 	XwaControllerOptions_ClearProfile(&m->profile, device->kind);
 	return true;
+}
+
+void XwaControllerOptions_MoveConnectedFirst(XwaControllerOptions* options, const AeronInputSnapshot* input) {
+	static XwaControllerOptions sorted;
+	size_t count = 0;
+	if (!input)
+		return;
+	for (int pass = 0; pass < 2; ++pass)
+		for (size_t i = 0; i < options->count; ++i)
+			if (XwaControllerOptions_ModelConnected(&options->models[i], input) == (pass == 0))
+				sorted.models[count++] = options->models[i];
+	memcpy(options->models, sorted.models, count * sizeof options->models[0]);
+}
+
+void XwaControllerOptions_KeepConfigured(XwaControllerOptions* options) {
+	for (size_t i = options->count; i-- > 0;)
+		if (!options->models[i].configured)
+			XwaControllerOptions_RemoveModel(options, i);
 }
 
 bool XwaControllerOptions_InitializeGamepads(XwaControllerOptions* options,
@@ -212,7 +266,7 @@ bool XwaControllerOptions_InitializeGamepads(XwaControllerOptions* options,
 	for (int i = 0; i < count; ++i) {
 		if (XwaControllerOptions_FindModel(options, sorted[i]->guid) >= 0)
 			continue;
-		if (!XwaControllerOptions_AddModel(options, sorted[i], error, capacity))
+		if (!XwaControllerOptions_AddModel(options, sorted[i], input, error, capacity))
 			return false;
 		XwaControllerProfile* p = &options->models[options->count - 1].profile;
 		*p = *defaults;

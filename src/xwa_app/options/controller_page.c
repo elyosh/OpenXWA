@@ -38,16 +38,21 @@ static const AeronControllerSnapshot* XwaControllerPage_SelectedController(XwaCo
 	return NULL;
 }
 
-static void XwaControllerSettings_ApplyDraft(XwaControllerSettings* settings) {
+/* configured is false only when the player restores the defaults, so the
+ * selected controller is no longer saved. */
+static void XwaControllerSettings_ApplyDraft(XwaControllerSettings* settings, bool configured) {
 	if (settings->selected_guid[0] &&
 		XwaControllerOptions_FindModel(&settings->draft, settings->selected_guid) < 0) {
 		const AeronControllerSnapshot* device =
 			XwaControllerPage_SelectedController(settings, Aeron_InputSnapshot());
-		if (!device ||
-			!XwaControllerOptions_AddModel(&settings->draft, device, settings->error, sizeof settings->error))
+		if (!device || !XwaControllerOptions_AddModel(&settings->draft, device, Aeron_InputSnapshot(),
+													  settings->error, sizeof settings->error))
 			return;
 		settings->draft.models[settings->draft.count - 1].profile = settings->unconfigured;
 	}
+	const int selected = XwaControllerOptions_FindModel(&settings->draft, settings->selected_guid);
+	if (selected >= 0)
+		settings->draft.models[selected].configured = configured;
 	settings->dirty = !XwaControllerOptions_Equals(&settings->draft, &settings->original);
 	if (!XwaControllerOptions_Validate(&settings->draft, settings->error, sizeof settings->error))
 		return;
@@ -375,10 +380,12 @@ static float XwaControllerSettings_ControllerAxisValue(const AeronControllerSnap
 static void XwaControllerSettings_InstallAxis(XwaControllerSettings* settings,
 											  const AeronControllerSnapshot* controller, XwaInputAxis axis,
 											  int source) {
-	XwaControllerOptions candidate = settings->draft;
+	static XwaControllerOptions candidate;
+	candidate = settings->draft;
 	int model = XwaControllerOptions_FindModel(&candidate, controller->guid);
 	if (model < 0) {
-		if (!XwaControllerOptions_AddModel(&candidate, controller, settings->error, sizeof settings->error))
+		if (!XwaControllerOptions_AddModel(&candidate, controller, Aeron_InputSnapshot(), settings->error,
+										   sizeof settings->error))
 			return;
 		model = (int)candidate.count - 1;
 		candidate.models[model].profile = settings->unconfigured;
@@ -393,7 +400,7 @@ static void XwaControllerSettings_InstallAxis(XwaControllerSettings* settings,
 	if (!XwaControllerOptions_Validate(&candidate, settings->error, sizeof settings->error))
 		return;
 	settings->draft = candidate;
-	XwaControllerSettings_ApplyDraft(settings);
+	XwaControllerSettings_ApplyDraft(settings, true);
 }
 
 static void XwaControllerSettings_AssignCapturedAxis(XwaControllerSettings* settings,
@@ -457,19 +464,19 @@ static void XwaControllerSettings_AxisEditor(XwaControllerSettings* settings, Ae
 	int invert = binding->invert;
 	if (AeronUi_Toggle(ui, "Invert", &invert)) {
 		binding->invert = invert != 0;
-		XwaControllerSettings_ApplyDraft(settings);
+		XwaControllerSettings_ApplyDraft(settings, true);
 	}
 	if (axis != XWA_INPUT_AXIS_THROTTLE) {
 		float deadzone_percent = binding->deadzone * 100.0f;
 		const float minimum = 0.0f;
 		if (AeronUi_SliderFloat(ui, "Deadzone", &deadzone_percent, minimum, 100.0f, 1.0f, "%.1f%%")) {
 			binding->deadzone = deadzone_percent / 100.0f;
-			XwaControllerSettings_ApplyDraft(settings);
+			XwaControllerSettings_ApplyDraft(settings, true);
 		}
 	}
 	if (AeronUi_ButtonEnabled(ui, "Clear Binding", binding->source >= 0)) {
 		binding->source = -1;
-		XwaControllerSettings_ApplyDraft(settings);
+		XwaControllerSettings_ApplyDraft(settings, true);
 	}
 	AeronUi_PopId(ui);
 }
@@ -498,7 +505,7 @@ static void XwaControllerSettings_AxisPage(XwaControllerSettings* settings, Aero
 
 static void XwaControllerSettings_AxisConflictModal(XwaControllerSettings* settings, AeronUiContext* ui,
 													const AeronControllerSnapshot* controller) {
-	if (!AeronUi_BeginModal(ui, "AXIS ALREADY ASSIGNED", &settings->axis_conflict_open, NULL))
+	if (!AeronUi_BeginModal(ui, "Axis Already Assigned", &settings->axis_conflict_open, NULL))
 		return;
 	char text[640];
 	snprintf(text, sizeof text, "Replace these assignments with %s: %s?",
@@ -562,7 +569,7 @@ static void XwaControllerSettings_AddCapturedBinding(XwaControllerSettings* sett
 	profile->bindings[profile->binding_count++] =
 		(XwaInputActionBinding) { .source = *source, .action = settings->editor.selected_action };
 	settings->editor.binding_selected = SIZE_MAX;
-	XwaControllerSettings_ApplyDraft(settings);
+	XwaControllerSettings_ApplyDraft(settings, true);
 }
 
 static void XwaControllerSettings_FindBindingCapture(XwaControllerSettings* settings, AeronUiContext* ui,
@@ -645,7 +652,7 @@ static void XwaControllerSettings_BindingDetailModal(XwaControllerSettings* sett
 			int threshold = (int)(source->threshold * 100.0f + 0.5f);
 			if (AeronUi_SliderInt(ui, "Axis Threshold", &threshold, 5, 100, 5, "%d%%")) {
 				source->threshold = (float)threshold / 100.0f;
-				XwaControllerSettings_ApplyDraft(settings);
+				XwaControllerSettings_ApplyDraft(settings, true);
 			}
 			/* Uses the threshold's scale, so the player can see where it triggers. */
 			AeronUi_PercentageMeter(ui, "Axis Position",
@@ -654,7 +661,7 @@ static void XwaControllerSettings_BindingDetailModal(XwaControllerSettings* sett
 		if (XwaBindingsEditor_Remove(ui)) {
 			XwaControllerSettings_RemoveBinding(profile, profile_index);
 			settings->editor.binding_selected = SIZE_MAX;
-			XwaControllerSettings_ApplyDraft(settings);
+			XwaControllerSettings_ApplyDraft(settings, true);
 		}
 	}
 	AeronUi_Separator(ui);
@@ -685,7 +692,7 @@ static void XwaControllerSettings_BindingConflictModal(XwaControllerSettings* se
 		if (existing != SIZE_MAX) {
 			profile->bindings[existing].action = settings->editor.selected_action;
 			settings->editor.binding_selected = SIZE_MAX;
-			XwaControllerSettings_ApplyDraft(settings);
+			XwaControllerSettings_ApplyDraft(settings, true);
 		}
 	}
 }
@@ -697,13 +704,15 @@ static void XwaControllerSettings_RestoreModal(XwaControllerSettings* settings, 
 		settings->restore_modal_open = 0;
 		return;
 	}
-	if (!AeronUi_BeginModal(ui, "RESTORE CONTROLLER DEFAULTS", &settings->restore_modal_open, NULL))
+	if (!AeronUi_BeginModal(ui, "Restore Controller Defaults", &settings->restore_modal_open, NULL))
 		return;
 	AeronUi_Help(ui, "Reset this model's bindings? Other controllers keep their assignments.");
 	AeronUi_BeginColumns(ui, 2, NULL);
-	if (AeronUi_Button(ui, "Reset to defaults")) {
-		XwaControllerOptions candidate = settings->draft;
-		if (XwaControllerOptions_AddModel(&candidate, device, settings->error, sizeof settings->error)) {
+	if (AeronUi_Button(ui, "Restore")) {
+		static XwaControllerOptions candidate;
+	candidate = settings->draft;
+		if (XwaControllerOptions_AddModel(&candidate, device, Aeron_InputSnapshot(), settings->error,
+										  sizeof settings->error)) {
 			int model = XwaControllerOptions_FindModel(&candidate, device->guid);
 			XwaControllerModel* selected = &candidate.models[model];
 			selected->kind = device->kind;
@@ -717,7 +726,7 @@ static void XwaControllerSettings_RestoreModal(XwaControllerSettings* settings, 
 								selected->profile.mapping.axes[axis].source = -1;
 			}
 			settings->draft = candidate;
-			XwaControllerSettings_ApplyDraft(settings);
+			XwaControllerSettings_ApplyDraft(settings, false);
 			XwaControllerSettings_ResetDeviceEditState(settings, ui);
 		}
 		settings->restore_modal_open = 0;

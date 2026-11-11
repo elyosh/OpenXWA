@@ -364,13 +364,19 @@ bool XwaControllerConfig_Parse(const AeronConfigFile* document, XwaControllerOpt
 		return false;
 	memset(options, 0, sizeof *options);
 	options->count = AeronConfigNode_SequenceCount(list);
-	if (options->count > XWA_CONTROLLER_MODEL_CAP)
-		return XwaControllerConfig_ConfigError(error, capacity, "controller model capacity exceeded");
+	/* The list is ordered by last use, so the extra controllers are the ones
+	 * used the longest ago. */
+	if (options->count > XWA_CONTROLLER_MODEL_CAP) {
+		Aeron_LogWarn("xwa.config", "only the first %d of %zu controllers are kept", XWA_CONTROLLER_MODEL_CAP,
+					  options->count);
+		options->count = XWA_CONTROLLER_MODEL_CAP;
+	}
 	for (size_t i = 0; i < options->count; ++i) {
 		const AeronConfigNode* node = AeronConfigNode_SequenceGet(list, i);
 		if (!Keys(node, keys, 5, error, capacity))
 			return false;
 		XwaControllerModel* m = &options->models[i];
+		m->configured = true;
 		char path[128], field[160];
 		snprintf(path, sizeof path, "input.controllers[%zu]", i);
 		snprintf(field, sizeof field, "%s.guid", path);
