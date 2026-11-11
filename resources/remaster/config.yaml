@@ -772,9 +772,9 @@ lighting:
   spec_geom_adapt: true
   # Ambient fill in W/m^2/sr, where no environment gives one. 5.9 gives a
   # surface 10% of the white sun's light.
-  ambient_r: 1.0
-  ambient_g: 1.0
-  ambient_b: 1.0
+  ambient_r: 3.0
+  ambient_g: 3.0
+  ambient_b: 3.0
   # The least ambient light on the in-flight map, so that the craft can be
   # seen in dim regions.
   map_ambient_min_r: 5.0
