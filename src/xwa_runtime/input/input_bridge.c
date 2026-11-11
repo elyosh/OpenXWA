@@ -100,6 +100,13 @@ void XwaInputBridge_UpdateFrontendMouse(const AeronInputSnapshot* input) {
 	if (input == 0) {
 		return;
 	}
+	/* While the options window has the input, the frontend cursor stays where
+	   it is, so nothing behind the window reacts to the mouse. */
+	if (XwaInput_IsCaptured()) {
+		g_mouseLeftDown = 0;
+		g_mouseRightDown = 0;
+		return;
+	}
 
 	insideClassic = XwaPresentation_ToClassic(input->mouse.x, input->mouse.y, &g_mouseX, &g_mouseY);
 

@@ -25,6 +25,7 @@
 #include "xwa_runtime/models/particle_lights.h"
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/models/surfaces.h"
+#include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/snapshot/snapshot_camera.h"
 #include "xwa_runtime/snapshot/snapshot_flight_map.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
@@ -489,7 +490,8 @@ void XwaSnapshot_Commit(void) {
 		s->dir_light_count = n;
 	}
 	/* Cursor state, sampled once per tick (read-only observers). */
-	s->cursor_visible = (uint8_t)(FrontendCursor_IsVisible() != 0);
+	/* The options window has its own cursor, the system one. */
+	s->cursor_visible = (uint8_t)(FrontendCursor_IsVisible() != 0 && !XwaPort_OptionsWindowOpen());
 	{
 		int cx = 0, cy = 0;
 		FrontendCursor_GetPos(&cx, &cy);
