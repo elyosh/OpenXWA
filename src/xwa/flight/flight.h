@@ -227,14 +227,29 @@ typedef struct FlightNetWorldStateChunkPacket {
 
 #pragma pack(push, 1)
 typedef struct FlightInputFrameRecord {
+#ifdef XWA_MODERN
+	/* The continuous throttle position, 0..65535, when keyMods has
+	   XWA_INPUT_THROTTLE_PRESENT, otherwise 0. The original never reads this
+	   field. */
+	uint16_t throttle;
+#else
 	uint16_t reserved0;
+#endif
 	uint16_t key;
 	int8_t axisX;
 	int8_t axisY;
 	int8_t axisR;
+	/* Bit 0: fire held. Bit 1: target/roll modifier held. */
 	uint8_t keyMods;
 } FlightInputFrameRecord;
 #pragma pack(pop)
+
+#ifdef XWA_MODERN
+/* keyMods bit: the record carries a throttle position. Every reader of
+   keyMods masks it with 3 or 0xf, so the original ignores it, and films keep
+   the original record size. */
+#define XWA_INPUT_THROTTLE_PRESENT 0x80u
+#endif
 
 typedef struct InputFrame {
 	int applied;

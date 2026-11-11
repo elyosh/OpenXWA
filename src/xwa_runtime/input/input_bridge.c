@@ -12,6 +12,7 @@
 #include "xwa/render/renderer.h"
 #include "xwa_runtime/input/capture.h"
 #include "xwa_runtime/input/controller_mapping.h"
+#include "xwa_runtime/input/flight_controls.h"
 #include "xwa_runtime/input/keyboard_mapping.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
@@ -87,6 +88,7 @@ static void XwaInput_UpdateKeyboard(bool suppress) {
 void XwaInput_UpdateFlight(int suppress) {
 	XwaInput_UpdateKeyboard(suppress != 0);
 	XwaControllerMapping_Update(Aeron_InputSnapshot());
+	XwaFlightControls_UpdateThrottleContext();
 }
 
 void XwaInputBridge_UpdateFrontendMouse(const AeronInputSnapshot* input) {

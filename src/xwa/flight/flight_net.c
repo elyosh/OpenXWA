@@ -13,6 +13,9 @@
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/util/debug.h"
 #include "xwa/util/time.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/input/flight_controls.h"
+#endif
 
 #include <stddef.h>
 #include <stdio.h>
@@ -1863,11 +1866,20 @@ int FlightNet_SampleAndSendInput(void) {
 
 	FlightInput_Read(-2);
 
+#ifdef XWA_MODERN
+	/* A record without a throttle command is all zeros there. */
+	memset(&g_currentInputFrame, 0, sizeof(g_currentInputFrame));
+#endif
 	g_currentInputFrame.key = g_actionKey;
 	g_currentInputFrame.axisX = (int8_t)((uint8_t)g_ctrlAxisX & 0xfeu);
 	g_currentInputFrame.axisY = (int8_t)((uint8_t)g_ctrlAxisY & 0xfeu);
 	g_currentInputFrame.axisR = (int8_t)((uint8_t)g_ctrlAxisR & 0xfeu);
 	g_currentInputFrame.keyMods = (uint8_t)g_keyMods & 3u;
+#ifdef XWA_MODERN
+	/* The throttle is sampled once per recorded frame. The packet below
+	   doesn't carry it. */
+	XwaFlightControls_SampleThrottle(&g_currentInputFrame);
+#endif
 	validFrame = 1;
 	g_flightNetScratchPacket[0] = (uint32_t)validFrame;
 	g_inputTimestamp += (int)Time_GetFrameDelta();

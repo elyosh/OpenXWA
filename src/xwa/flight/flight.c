@@ -7063,6 +7063,10 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 			if (sideEffectsAllowed && frame->timestamp <= savedGameTime) {
 				g_replayInputs[selectedPlayer].key = KEY_NONE;
 				g_replayInputs[selectedPlayer].keyMods = 0;
+#ifdef XWA_MODERN
+				/* A throttle position is a one-time command too. */
+				g_replayInputs[selectedPlayer].throttle = 0;
+#endif
 			}
 			if (g_flightPlayerCount > 1 && selectedPlayer == g_localPlayer) {
 				g_flightSfxSideEffectGate = 2;
@@ -11899,7 +11903,22 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 	}
 
 	if (!g_players[playerIdx].msgTypeId) {
+#ifdef XWA_MODERN
+		/* The record's throttle position applies after the actions, so it wins
+		   over a throttle key in the same record. A map, hyperspace or craft
+		   change during the actions drops it. */
+		const int throttleEligible = XwaFlightControls_ThrottleEligible(playerIdx);
+		const int throttleObject = g_players[playerIdx].objectIndex;
+		const unsigned int throttleSignature = g_players[playerIdx].boundObjectSignature;
+#endif
 		Flight_ProcessPlayerActions(playerIdx);
+#ifdef XWA_MODERN
+		if (throttleEligible && XwaFlightControls_ThrottleEligible(playerIdx) &&
+			g_players[playerIdx].objectIndex == throttleObject &&
+			g_players[playerIdx].boundObjectSignature == throttleSignature) {
+			XwaFlightControls_ApplyThrottle(playerIdx, &g_replayInputs[playerIdx]);
+		}
+#endif
 	} else {
 		switch (g_currentActionKey) {
 			case KEY_ESCAPE:
