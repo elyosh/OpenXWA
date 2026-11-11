@@ -42,6 +42,7 @@
 #include "xwa_runtime/models/stats_profiles.h"
 #include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_stats.h"
+#include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/snapshot/snapshot_hud.h"
 #endif
 #include "xwa/render/effects.h"
@@ -10780,7 +10781,9 @@ void Hud_Update3DCrt(uint16_t x, uint16_t y, uint16_t width, uint16_t height, in
 		capturedCrt.classic_viewport_w = width;
 		capturedCrt.classic_viewport_h = height;
 		capturedCrt.proj_aspect_y_q16 = g_projAspectY;
-		capturedCrt.proj_scale = g_projScaleInt;
+		/* The remaster draws the CMD with its own projection, not
+		   g_projScaleInt. See XWA_FLIGHT_SCREEN_CMD_PROJ_SCALE. */
+		capturedCrt.proj_scale = XWA_FLIGHT_SCREEN_CMD_PROJ_SCALE;
 		capturedCrt.camera_distance = g_hudCrtCameraDistance;
 		capturedCrt.camera_back_step[0] = worldlocx - g_players[g_localPlayer].viewState.savedTargetX;
 		capturedCrt.camera_back_step[1] = worldlocy - g_players[g_localPlayer].viewState.savedTargetY;

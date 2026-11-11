@@ -1144,6 +1144,9 @@ typedef struct XwaHudCrt {
 	uint16_t classic_viewport_w;
 	uint16_t classic_viewport_h;
 	uint16_t proj_aspect_y_q16;
+	/* The CMD view's projection, XWA_FLIGHT_SCREEN_CMD_PROJ_SCALE
+	 * (flight_task.h). It isn't g_projScaleInt, which the flight screen and
+	 * a craft's cockpit view change. */
 	int32_t proj_scale;
 	int32_t component_focus[3]; /* model-space target/fallback center in native OPT units */
 	/* Target-to-camera fit distance before projection through the
