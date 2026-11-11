@@ -47,7 +47,9 @@ OpenXWA adds mouse flight control in both Virtual Stick and Direct modes, with
 adjustable sensitivity and Y-axis inversion. Flight can be played with a mouse
 and keyboard, so a joystick or gamepad is no longer required. Modern gamepads
 and joysticks are also supported, with force-feedback effects translated to
-gamepad rumble.
+gamepad rumble. Several controllers can be used at once, such as a HOTAS
+stick, throttle and pedals. Keyboard keys and controller buttons can be
+rebound.
 
 ## Getting started
 
@@ -56,23 +58,23 @@ gamepad rumble.
 2. Extract or install the package and launch OpenXWA.
 3. Select the folder containing a complete *X-Wing Alliance* installation when
    prompted.
-4. To fly with a mouse, open **Game Controller Options** and enable
-   **Mouse Flight Control**.
+4. To fly with a mouse, open **OpenXWA Options** in the options datapad and
+   enable **Mouse Flight Control** in the **Mouse** tab.
 
 OpenXWA validates and remembers the selected installation. The folder must use
 the installed game layout found in a GOG or Steam installation. For a raw CD
 copy, first merge the contents of the `ALLIANCE` directory into the root.
 
 Open **Video Options**, then **OpenXWA Video Options**, to configure the
-renderer and display settings. Mouse and controller settings are available
-under **Game Controller Options**.
+renderer and display settings. Controller, keyboard and mouse settings are in
+**OpenXWA Options**, at the top of the options datapad.
 
 Useful shortcuts:
 
 | Key | Action |
 |---|---|
-| `F5` | Switch between modern and classic graphics |
-| `F2` | Switch between split comparison and the selected view |
+| `Ctrl`+`F5` | Switch between modern and classic graphics |
+| `Ctrl`+`F2` | Switch between split comparison and the selected view |
 | `Ctrl`+`Alt`+`M` | Release or recapture the mouse during flight |
 
 For unattended or development launches, pass the game-data folder on the
