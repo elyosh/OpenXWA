@@ -236,7 +236,10 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/frontend/frontend_video.c
     src/xwa_runtime/frontend/room_anims.c
     src/xwa_runtime/frontend/side_panels.c
+    src/xwa_runtime/input/actions.c
+    src/xwa_runtime/input/controller_options.c
     src/xwa_runtime/input/input_bridge.c
+    src/xwa_runtime/input/keyboard_mapping.c
     src/xwa_runtime/input/controller_mapping.c
     src/xwa_runtime/input/rumble_provider.c
     src/xwa_runtime/input/winmm_joystick_provider.c
@@ -436,7 +439,9 @@ target_link_libraries(xwa_install PUBLIC aeron)
 
 set(XWA_APP_SOURCES
     src/xwa_app/main.c
+    src/xwa_app/controller_config.c
     src/xwa_app/host_config.c
+    src/xwa_app/keyboard_config.c
     src/xwa_app/setup.c
 )
 
@@ -858,7 +863,10 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/frontend/frontend_fonts.h
     src/xwa_runtime/frontend/frontend_video.h
     src/xwa_runtime/frontend/room_anims.h
+    src/xwa_runtime/input/actions.h
+    src/xwa_runtime/input/controller_options.h
     src/xwa_runtime/input/input_bridge.h
+    src/xwa_runtime/input/keyboard_mapping.h
     src/xwa_runtime/input/rumble_provider.h
     src/xwa_runtime/input/winmm_joystick_provider.h
     src/xwa_runtime/input/controller_mapping.h
@@ -873,8 +881,10 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/snapshot/snapshot_flight_map.h
     src/xwa_runtime/snapshot/snapshot_hud.h
     src/xwa_runtime/compat/middleware_crt.h
+    src/xwa_app/controller_config.h
     src/xwa_app/host_config.h
     src/xwa_app/install_check.h
+    src/xwa_app/keyboard_config.h
     src/xwa_app/install_paths.h
     src/xwa_app/mod_format.h
     src/xwa_app/mod_list.h

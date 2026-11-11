@@ -7153,7 +7153,7 @@ int Pause_ProcessInput(void) {
 			}
 			break;
 
-		case 164:
+		case KEY_LEFT:
 			if (g_pauseState == 1) {
 				g_pauseState = 2;
 				fsfx_PlaySound(67, 0xffffu, (unsigned int)g_localPlayer);
@@ -9554,7 +9554,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 				}
 				break;
 			}
-			case KEY_FOWARD_SLASH:
+			case KEY_BACKSLASH:
 				if (!g_players[currentPlayerIdx].hasCheckpointFlag) {
 					craft->throttleSpeed = 0;
 					FlightAction_PlayEngineClick(currentPlayerIdx);
@@ -10177,10 +10177,10 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					craft->throttleSpeed = (uint16_t)((g_currentActionKey + 7) << 12);
 				}
 				break;
-			case KEY_THROTTLE_11:
 			case KEY_THROTTLE_12:
 			case KEY_THROTTLE_13:
 			case KEY_THROTTLE_14:
+			case KEY_THROTTLE_15:
 				if (!g_players[currentPlayerIdx].hasCheckpointFlag) {
 					craft->throttleSpeed = (uint16_t)((g_currentActionKey + 8) << 12);
 				}
@@ -10586,7 +10586,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 							 (int)currentPlayerIdx);
 			return;
 		case KEY_G:
-		case KEY_ALT_G:
+		case KEY_ALT_W:
 			if (g_players[currentPlayerIdx].viewState.externalCameraActive) {
 				Player_StepExtView((int)currentPlayerIdx);
 				Player_CycleGunnerSeat(currentPlayerIdx, NULL);
@@ -10770,7 +10770,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 		case KEY_ALT_N:
 			FlightAction_FocusNewestPlayerProjectile(currentPlayerIdx);
 			return;
-		case KEY_ABORT_MISSION:
+		case KEY_ALT_Q:
 			FlightAction_RequestAbortOrDisconnect(currentPlayerIdx);
 			return;
 		case KEY_ALT_U:
@@ -11230,7 +11230,7 @@ static __inline int Flight_UpdateEntity_HandleLocalHotkeys(unsigned int playerId
 				fsfx_PlaySound(68, 0xffffu, playerIdx);
 			}
 			break;
-		case 133: {
+		case KEY_ALT_F: {
 			unsigned int strength = ForceFeedback_GetStrength() + 1250;
 			if (strength > 10000u) {
 				strength = 0;
@@ -11562,7 +11562,7 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 			case 152:
 				g_flightRenderStatsDumpRequested = 1;
 				break;
-			case 133: {
+			case KEY_ALT_F: {
 				unsigned int strength = ForceFeedback_GetStrength() + 1250;
 				if (strength > 10000u) {
 					strength = 0;
@@ -11924,7 +11924,7 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 			case KEY_ALT_1:
 			case KEY_ALT_2:
 			case KEY_ALT_3:
-			case 158: {
+			case KEY_ALT_4: {
 				unsigned int tauntIdx = (unsigned int)g_currentActionKey - 155u;
 				g_players[playerIdx].msgText[g_players[playerIdx].msgLength] = '\0';
 				Flight_UpdateEntity_SendTypedMessage(playerIdx,
