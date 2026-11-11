@@ -698,6 +698,7 @@ typedef struct XwaCockpit {
 	 * world axes (player.seatEyeWorldOffset*). */
 	float seat_eye_world_offset[3];
 	float camera_pan[3]; /* viewState.cameraPanDelta* (classic scales by 1/16) */
+	float head_offset[3]; /* transient observer translation, OPT units */
 	/* The same eye point in the CRAFT's model space (player.seatEyeLocal*,
 	 * FlightView_ComputeSeatEyeOffset): the cockpit eye, or the turret
 	 * seat's position. The cockpit lights are here. */

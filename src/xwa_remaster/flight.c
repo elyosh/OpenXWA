@@ -3261,7 +3261,8 @@ static int fl_temporal_pose_changed(const XwaSnapshot* current, const XwaSnapsho
 		   cockpit->aim_angle_b != prev_cockpit->aim_angle_b ||
 		   memcmp(cockpit->seat_eye_world_offset, prev_cockpit->seat_eye_world_offset,
 				  sizeof cockpit->seat_eye_world_offset) != 0 ||
-		   memcmp(cockpit->camera_pan, prev_cockpit->camera_pan, sizeof cockpit->camera_pan) != 0;
+		   memcmp(cockpit->camera_pan, prev_cockpit->camera_pan, sizeof cockpit->camera_pan) != 0 ||
+		   memcmp(cockpit->head_offset, prev_cockpit->head_offset, sizeof cockpit->head_offset) != 0;
 }
 
 /* Rotate inverted gunner cockpits about the model-local X axis,
@@ -3276,8 +3277,8 @@ static void fl_apply_inverted_cockpit_pivot(float basis[9], const XwaCockpit* co
 		const float rotated_eye = basis[axis] * cockpit->seat_eye_local[0] +
 								  basis[3 + axis] * cockpit->seat_eye_local[1] +
 								  basis[6 + axis] * cockpit->seat_eye_local[2];
-		position[axis] = camera_local[axis] - cockpit->camera_pan[axis] * 0.0625f -
-						 sway[axis] - rotated_eye;
+		position[axis] = camera_local[axis] - cockpit->head_offset[axis] -
+						 cockpit->camera_pan[axis] * 0.0625f - sway[axis] - rotated_eye;
 	}
 }
 
@@ -3308,8 +3309,11 @@ static int fl_cockpit_model_matrix(const XwaCockpit* cockpit, const float sway[3
 
 	float position[3];
 	for (int axis = 0; axis < 3; ++axis) {
-		position[axis] = camera_local[axis] + camera_rows[0 * 3 + axis] * delta[0] +
-						 camera_rows[1 * 3 + axis] * delta[1] + camera_rows[2 * 3 + axis] * delta[2];
+		/* Camera motion is observer-only. The cockpit is anchored to the ship,
+		 * so remove the head displacement before constructing its world pose. */
+		position[axis] = camera_local[axis] - cockpit->head_offset[axis] +
+						 camera_rows[0 * 3 + axis] * delta[0] + camera_rows[1 * 3 + axis] * delta[1] +
+						 camera_rows[2 * 3 + axis] * delta[2];
 	}
 	if (cockpit->inverted) {
 		fl_apply_inverted_cockpit_pivot(basis, cockpit, sway, camera_local, position);
@@ -5557,8 +5561,11 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	fl_world_to_view(s.crows, w[0], w[1], w[2], delta);
 	float pw[3];
 	for (int j = 0; j < 3; j++) {
-		pw[j] = s.camera_local[j] + s.crows[0 * 3 + j] * delta[0] + s.crows[1 * 3 + j] * delta[1] +
-				s.crows[2 * 3 + j] * delta[2];
+		/* Head motion changes the observer, not the hyperspace cockpit.
+		 * As in normal flight, keep the cockpit anchored at the untracked
+		 * eye origin while the rendered camera translates around it. */
+		pw[j] = s.camera_local[j] - snap->cockpit.head_offset[j] + s.crows[0 * 3 + j] * delta[0] +
+				s.crows[1 * 3 + j] * delta[1] + s.crows[2 * 3 + j] * delta[2];
 	}
 	if (snap->cockpit.inverted) {
 		fl_apply_inverted_cockpit_pivot(bw, &snap->cockpit, cam->sway, s.camera_local, pw);
