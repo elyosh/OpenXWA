@@ -523,6 +523,13 @@ static void xwa_tool_point_lights(int* open, void* user) {
 		ImGui::SliderFloat("Range scale", &p.range_scale, 0.25f, 8.0f, "%.2f", ImGuiSliderFlags_Logarithmic);
 	ImGui::TextDisabled("Multiplies the distance where a light falls under\n"
 						"1/250 of a unit of illuminance after the exposure and ends.");
+	changed |= ImGui::SliderFloat("Cockpit explosion light scale", &p.cockpit_explosion_light_scale, 0.0f,
+								  1.0f, "%.3f", ImGuiSliderFlags_Logarithmic);
+	changed |= ImGui::SliderFloat("Cockpit explosion distance (m)", &p.cockpit_explosion_distance_m, 0.0f,
+								  20.0f, "%.1f");
+	ImGui::TextDisabled("While the cockpit is shown, multiplies the light of the\n"
+						"explosions this close to the eye, such as hits on the\n"
+						"player's craft. Back to 1 at twice the distance.");
 	bool model_lights = p.model_lights != 0;
 	if (ImGui::Checkbox("Model lights", &model_lights)) {
 		p.model_lights = model_lights ? 1 : 0;

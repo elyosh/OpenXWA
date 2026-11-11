@@ -308,7 +308,11 @@ effects:
   explosion_genus_emissive_strength: 10.0
   glow_mark_emissive_strength: 20.0
   # The same, for the hit marks on the cockpit model. 0 hides them.
-  cockpit_glow_mark_emissive_strength: 4.0
+  cockpit_glow_mark_emissive_strength: 1.0
+  # The same, for the flashes on the cockpit model when a hit lands on the
+  # shields or a warhead hits the craft. The game sizes these flashes to the
+  # whole craft, so they cover the whole cockpit. 0 hides them.
+  cockpit_hit_flash_emissive_strength: 0.2
 dynamic_cockpit:
   # Cockpit displays that show the HUD, from the screens of the cockpit
   # models.
@@ -702,6 +706,14 @@ point_lights:
   # Multiplies the distance where a light falls under 1/250 of a unit of
   # illuminance after the exposure, and ends.
   range_scale: 1.0
+  # A hit on the player's craft puts an explosion on the hull, a metre or
+  # two from the eye, and its light washes out the cockpit. While the
+  # cockpit is shown, the light of an explosion up to
+  # cockpit_explosion_distance_m from the eye is multiplied by
+  # cockpit_explosion_light_scale (0 to 1). From there to twice that
+  # distance, the scale goes back up to 1. A distance of 0 turns this off.
+  cockpit_explosion_light_scale: 0.02
+  cockpit_explosion_distance_m: 10.0
   # Turns on the lights that are set in candela: the lights in models (such
   # as the interior light of the converted cockpits), the headlight, and the
   # cockpit lights and particle lights below. When this is off, the game's
@@ -726,18 +738,23 @@ point_lights:
       power_w: 500
   # The lights of the particle effects on craft. cockpit_sparks and
   # cockpit_smoke are the sparks and smoke in the cockpit when a hit gets
-  # through the shields. craft_damage is every other effect. power_w and
-  # color work as above. fade: true dims the light over the effect's life.
-  # A mod can change them in the particle_lights section of its
-  # flight/flight.yaml. 158,000 W matches the game's light with the default
-  # match_distance_m and classic_lighting.illuminance.
+  # through the shields. player_craft_damage is every other effect on the
+  # player's craft, and craft_damage is every other effect on the other
+  # objects. power_w and color work as above. fade: true dims the light
+  # over the effect's life. A mod can change them in the particle_lights
+  # section of its flight/flight.yaml. 158,000 W matches the game's light
+  # with the default match_distance_m and classic_lighting.illuminance.
+  # On the player's craft, the light is about a metre from the eye in the
+  # cockpit, so that power would wash out the screen.
   particle_lights:
     cockpit_sparks:
-      power_w: 500
+      power_w: 30
     cockpit_smoke:
       power_w: 0
     craft_damage:
       power_w: 158000
+    player_craft_damage:
+      power_w: 400
 classic_lighting:
   # Converts the classic game's lights (suns and other backdrops, the game's
   # lights in the hangar, lasers, explosions, engines), which have no unit.

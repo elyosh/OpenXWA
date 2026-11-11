@@ -767,6 +767,8 @@ typedef enum XwaParticleLightGroup {
 	XWA_PARTICLE_LIGHT_COCKPIT_SPARKS, /* effect 4 */
 	XWA_PARTICLE_LIGHT_COCKPIT_SMOKE,  /* effect 2 */
 	XWA_PARTICLE_LIGHT_CRAFT_DAMAGE,   /* the other effects on objects */
+	/* The other effects on the local player's craft. */
+	XWA_PARTICLE_LIGHT_PLAYER_CRAFT_DAMAGE,
 	XWA_PARTICLE_LIGHT_GROUP_COUNT
 } XwaParticleLightGroup;
 

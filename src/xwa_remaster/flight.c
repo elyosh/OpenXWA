@@ -255,6 +255,9 @@ static struct {
 	float explosion_genus_emissive_strength;
 	float glow_mark_emissive_strength;
 	float cockpit_glow_mark_emissive_strength;
+	/* The same, for the marks in world segment mode on the cockpit model:
+	 * the shield and warhead hit flashes, which cover the whole cockpit. */
+	float cockpit_hit_flash_emissive_strength;
 	/* small_objects in remaster/config.yaml, in pixels of a 1080-line view. */
 	float small_prepass_min_size;
 	float small_draw_min_size;
@@ -686,6 +689,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"exposure.edge_weight",
 		"point_lights.match_distance_m",
 		"point_lights.range_scale",
+		"point_lights.cockpit_explosion_light_scale",
+		"point_lights.cockpit_explosion_distance_m",
 		"starfield.exposure",
 		"starfield.brightness",
 		"starfield.density",
@@ -766,6 +771,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"effects.explosion_genus_emissive_strength",
 		"effects.glow_mark_emissive_strength",
 		"effects.cockpit_glow_mark_emissive_strength",
+		"effects.cockpit_hit_flash_emissive_strength",
 		"dynamic_cockpit.display_emissive_strength",
 		"dynamic_cockpit.hologram_emissive_strength",
 		"motion_blur.shutter",
@@ -855,9 +861,14 @@ static int fl_exposure_config_valid(const XwaFlightExposureParams* p) {
 		   fl_in_range(p->edge_weight, 0.0f, 1.0f);
 }
 
+/* The largest point_lights.cockpit_explosion_distance_m, in metres. */
+#define FL_COCKPIT_EXPLOSION_DISTANCE_MAX 100.0f
+
 static int fl_point_lights_config_valid(const XwaFlightPointLightParams* p) {
 	return p->cluster_depth_slices >= 4 && p->cluster_depth_slices <= 64 && isfinite(p->match_distance_m) &&
-		   p->match_distance_m > 0.0f && isfinite(p->range_scale) && p->range_scale > 0.0f;
+		   p->match_distance_m > 0.0f && isfinite(p->range_scale) && p->range_scale > 0.0f &&
+		   fl_in_range(p->cockpit_explosion_light_scale, 0.0f, 1.0f) &&
+		   fl_in_range(p->cockpit_explosion_distance_m, 0.0f, FL_COCKPIT_EXPLOSION_DISTANCE_MAX);
 }
 
 /* Reads the three numbers at `key` of `entry` into `out`, if the key is
@@ -962,7 +973,7 @@ static int fl_load_particle_lights_config(const AeronConfigFile* cf, const char*
 	uint32_t found = 0;
 	memset(s.plight.particle_lights, 0, sizeof s.plight.particle_lights);
 	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
-		Aeron_LogError("xwa.remaster", "%s: point_lights.particle_lights must be a map of the three groups",
+		Aeron_LogError("xwa.remaster", "%s: point_lights.particle_lights must be a map of the four groups",
 					   path);
 		return 0;
 	}
@@ -1568,10 +1579,17 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
 	s.plight.match_distance_m = (float)AeronConfigFile_GetFloat(cf, "point_lights.match_distance_m", 0.0);
 	s.plight.range_scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.range_scale", 0.0);
+	s.plight.cockpit_explosion_light_scale =
+		(float)AeronConfigFile_GetFloat(cf, "point_lights.cockpit_explosion_light_scale", -1.0);
+	s.plight.cockpit_explosion_distance_m =
+		(float)AeronConfigFile_GetFloat(cf, "point_lights.cockpit_explosion_distance_m", -1.0);
 	s.plight.model_lights = AeronConfigFile_GetBool(cf, "point_lights.model_lights", 0);
 	s.plight.model_light_scale = 1.0f;
 	if (!fl_point_lights_config_valid(&s.plight)) {
-		Aeron_LogError("xwa.remaster", "%s: invalid point_lights settings", path);
+		Aeron_LogError("xwa.remaster",
+					   "%s: invalid point_lights settings. cockpit_explosion_light_scale must be from 0 to "
+					   "1, and cockpit_explosion_distance_m from 0 to %.0f",
+					   path, (double)FL_COCKPIT_EXPLOSION_DISTANCE_MAX);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -1703,6 +1721,14 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	if (!isfinite(s.cockpit_glow_mark_emissive_strength) || s.cockpit_glow_mark_emissive_strength < 0.0f) {
 		Aeron_LogError("xwa.remaster",
 					   "%s: effects.cockpit_glow_mark_emissive_strength must be a number, 0 or more", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	s.cockpit_hit_flash_emissive_strength =
+		(float)AeronConfigFile_GetFloat(cf, "effects.cockpit_hit_flash_emissive_strength", -1.0);
+	if (!isfinite(s.cockpit_hit_flash_emissive_strength) || s.cockpit_hit_flash_emissive_strength < 0.0f) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: effects.cockpit_hit_flash_emissive_strength must be a number, 0 or more", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -2097,6 +2123,14 @@ void XwaRemasterFlight_SetPointLights(const XwaFlightPointLightParams* in) {
 		s.plight = *in;
 		s.plight.model_light_scale =
 			isfinite(in->model_light_scale) ? fminf(fmaxf(in->model_light_scale, 0.01f), 1000.0f) : 1.0f;
+		s.plight.cockpit_explosion_light_scale =
+			isfinite(in->cockpit_explosion_light_scale)
+				? fminf(fmaxf(in->cockpit_explosion_light_scale, 0.0f), 1.0f)
+				: 1.0f;
+		s.plight.cockpit_explosion_distance_m =
+			isfinite(in->cockpit_explosion_distance_m)
+				? fminf(fmaxf(in->cockpit_explosion_distance_m, 0.0f), FL_COCKPIT_EXPLOSION_DISTANCE_MAX)
+				: 0.0f;
 		for (int p = 0; p < XWA_SNAP_COCKPIT_LIGHT_COUNT; p++) {
 			const float power = in->cockpit_lights[p].power_w;
 			s.plight.cockpit_lights[p].power_w = isfinite(power) ? fminf(fmaxf(power, 0.0f), 1.0e7f) : 0.0f;
@@ -4377,12 +4411,32 @@ static int fl_projectile_has_model_lights(const XwaFlightObject* f) {
 	return mesh && mesh->light_count > 0;
 }
 
+/* Whether the object in `slot` with `signature` is the craft that the local
+ * player flies. hud.player_slot is g_players[g_localPlayer].objectIndex, and
+ * it is 0xffff unless the object in that slot still has the player's
+ * boundObjectSignature. When the craft is destroyed, objectIndex keeps its
+ * slot, and that slot can then hold another object. The cockpit is drawn
+ * for the camera focus, and when the cockpit is visible, the focus is
+ * always this craft. */
+static int fl_is_player_craft(const XwaSnapshot* snap, uint16_t slot, uint16_t signature) {
+	return snap->hud.player_slot != 0xffffu && slot == snap->hud.player_slot &&
+		   signature == snap->hud.player_signature;
+}
+
 /* The group of a particle effect's light (XwaParticleLightGroup): only
  * the cockpit hits create effects 4 and 2. */
-static XwaParticleLightGroup fl_particle_light_group(const XwaParticleEffect* effect) {
-	return effect->effect_type == 4   ? XWA_PARTICLE_LIGHT_COCKPIT_SPARKS
-		   : effect->effect_type == 2 ? XWA_PARTICLE_LIGHT_COCKPIT_SMOKE
-									  : XWA_PARTICLE_LIGHT_CRAFT_DAMAGE;
+static XwaParticleLightGroup fl_particle_light_group(const XwaSnapshot* snap,
+													 const XwaParticleEffect* effect) {
+	if (effect->effect_type == 4) {
+		return XWA_PARTICLE_LIGHT_COCKPIT_SPARKS;
+	}
+	if (effect->effect_type == 2) {
+		return XWA_PARTICLE_LIGHT_COCKPIT_SMOKE;
+	}
+	return effect->source_kind == XWA_PARTICLE_SOURCE_OBJECT &&
+				   fl_is_player_craft(snap, effect->owner_slot, effect->owner_signature)
+			   ? XWA_PARTICLE_LIGHT_PLAYER_CRAFT_DAMAGE
+			   : XWA_PARTICLE_LIGHT_CRAFT_DAMAGE;
 }
 
 /* A group's light is a Blender point light: P watts give P * 683 / (4 pi)
@@ -4393,7 +4447,7 @@ int XwaRemasterFlight_ParticleLight(const XwaSnapshot* snapshot, const XwaPartic
 	if (!s.plight.model_lights) {
 		return -1;
 	}
-	const XwaParticleLightGroup index = fl_particle_light_group(effect);
+	const XwaParticleLightGroup index = fl_particle_light_group(snapshot, effect);
 	const XwaParticleLight* mod = &snapshot->particle_lights[index];
 	const XwaFlightParticleLight* d = &s.plight.particle_lights[index];
 	const float power_w = mod->has_power ? mod->power_w : d->power_w;
@@ -4425,11 +4479,35 @@ int XwaRemasterFlight_ParticleLight(const XwaSnapshot* snapshot, const XwaPartic
 	return AeronScene_FlightLight(&light, transform, u, scale, exposure, out) ? 1 : 0;
 }
 
+/* The scale of the light of an explosion at `local`. While the cockpit is
+ * drawn, an explosion up to point_lights.cockpit_explosion_distance_m from
+ * the eye gets point_lights.cockpit_explosion_light_scale, and from there to
+ * twice that distance the scale goes back up to 1. A hit on the player's
+ * craft puts its explosion on the hull, a metre or two from the eye, where
+ * the inverse-square light washes out the cockpit. */
+static float fl_cockpit_explosion_light_scale(int cockpit_drawn, const float local[3]) {
+	const float scale = s.plight.cockpit_explosion_light_scale;
+	const float near_m = s.plight.cockpit_explosion_distance_m;
+	if (!cockpit_drawn || !(scale < 1.0f) || !(near_m > 0.0f)) {
+		return 1.0f;
+	}
+	const float d[3] = { local[0] - s.pl_eye[0], local[1] - s.pl_eye[1], local[2] - s.pl_eye[2] };
+	const float distance_m = sqrtf(d[0] * d[0] + d[1] * d[1] + d[2] * d[2]) * AERON_OPT_METERS_PER_UNIT;
+	if (distance_m <= near_m) {
+		return scale;
+	}
+	if (distance_m >= 2.0f * near_m) {
+		return 1.0f;
+	}
+	return scale + (1.0f - scale) * (distance_m - near_m) / near_m;
+}
+
 static void fl_derive_point_lights(const XwaSnapshot* snap) {
 	if (!s.plight.enabled) {
 		return;
 	}
 	const XwaFlightCamera* cam = &snap->flight_camera;
+	const int cockpit_drawn = fl_cockpit_drawn(snap, cam);
 	/* Superlaser beam light (FlightView_Render's direct scene-light write:
 	 * green, intensity 100000, cull 0x4000 — appended FIRST like the
 	 * classic). With the beam's object available it lights along the
@@ -4499,7 +4577,15 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 			}
 		} else {
 			fl_object_local(f, local);
-			fl_pl_push(local, cxi);
+			const float scale = f->genus == XWA_SNAP_GENUS_EXPLOSION
+									? fl_cockpit_explosion_light_scale(cockpit_drawn, local)
+									: 1.0f;
+			if (scale > 0.0f) {
+				for (int c = 0; c < 3; c++) {
+					cxi[c] *= scale;
+				}
+				fl_pl_push(local, cxi);
+			}
 		}
 	}
 	/* The lights of the particle effects on objects
@@ -4518,7 +4604,10 @@ static void fl_derive_point_lights(const XwaSnapshot* snap) {
 		AeronSceneLight light;
 		const int mod_light = XwaRemasterFlight_ParticleLight(snap, effect, local, exposure, &light);
 		if (mod_light > 0) {
-			fl_pool_add(&light, 0, fl_particle_light_group(effect) != XWA_PARTICLE_LIGHT_CRAFT_DAMAGE);
+			const XwaParticleLightGroup group = fl_particle_light_group(snap, effect);
+			fl_pool_add(&light, 0,
+						group == XWA_PARTICLE_LIGHT_COCKPIT_SPARKS ||
+							group == XWA_PARTICLE_LIGHT_COCKPIT_SMOKE);
 		} else if (mod_light < 0) {
 			const float intensity = 125.0f;
 			const float cxi[3] = { intensity, intensity, XwaRemaster_SrgbToLinear(0.75f) * intensity };
@@ -5346,7 +5435,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	AeronScene_AddMeshInstance(s.scene, &instance);
 	if (!is_bolt && f->object_type != XWA_SNAP_TYPE_DEBRIS_CHUNK) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, context->cmd, context->assets, s.snap, f, prepared.mesh,
-										  model_matrix, prepared.table, 1.0f);
+										  model_matrix, prepared.table, 1.0f, 1.0f);
 		if (map_object->render_kind == XWA_FLIGHT_MAP_RENDER_CRAFT)
 			fl_derive_wreck_flames(f, snapshot_index, context->assets, NULL, NULL);
 		if (s.glow_ok) {
@@ -5495,9 +5584,11 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
 	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
-	if (player_f && s.cockpit_glow_mark_emissive_strength > 0.0f) {
+	if (player_f && fl_is_player_craft(snap, player_f->slot, player_f->signature) &&
+		(s.cockpit_glow_mark_emissive_strength > 0.0f || s.cockpit_hit_flash_emissive_strength > 0.0f)) {
 		XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
-										  inst.mesh_table, s.cockpit_glow_mark_emissive_strength);
+										  inst.mesh_table, s.cockpit_glow_mark_emissive_strength,
+										  s.cockpit_hit_flash_emissive_strength);
 	}
 	if (s.glow_ok && player_f) {
 		XwaRemasterShip_SubmitEngineGlows(s.scene, cockpit_mesh, m, AERON_OPT_UNITS_PER_METER,
@@ -7585,7 +7676,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			fl_add_model_lights(prepared.mesh, model_matrix, inst.mesh_table, inst.variant,
 								inst.hidden_tag_groups, 0, inst.probe_set_owner != 0, 0);
 			XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, f, prepared.mesh, model_matrix,
-											  inst.mesh_table, s.glow_mark_emissive_strength);
+											  inst.mesh_table, s.glow_mark_emissive_strength,
+											  s.glow_mark_emissive_strength);
 			/* State-derived engine glows for this craft (classic scale
 			 * gates — no craft / dead subsystems — return 0 and skip). */
 			if (s.glow_ok) {
@@ -7727,9 +7819,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
 			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
-			if (player_f && s.cockpit_glow_mark_emissive_strength > 0.0f) {
+			if (player_f && fl_is_player_craft(snap, player_f->slot, player_f->signature) &&
+				(s.cockpit_glow_mark_emissive_strength > 0.0f ||
+				 s.cockpit_hit_flash_emissive_strength > 0.0f)) {
 				XwaRemasterGlowMarks_SubmitObject(s.scene, cmd, assets, snap, player_f, cockpit_mesh, m,
-												  inst.mesh_table, s.cockpit_glow_mark_emissive_strength);
+												  inst.mesh_table, s.cockpit_glow_mark_emissive_strength,
+												  s.cockpit_hit_flash_emissive_strength);
 			}
 			/* Cockpit-model engine glows (classic: the cockpit glow set
 			 * when internal + cockpit visible), scale/knockouts from

@@ -181,6 +181,13 @@ typedef struct XwaFlightPointLightParams {
 	int cluster_debug;
 	float match_distance_m;      /* metres at which a light is as bright as the classic law */
 	float range_scale;           /* multiplies the derived falloff range */
+	/* While the cockpit is drawn, the light of an explosion up to
+	 * cockpit_explosion_distance_m from the eye is multiplied by
+	 * cockpit_explosion_light_scale. From there to twice that distance,
+	 * the scale goes back up to 1. These are the explosions of hits on the
+	 * player's craft, whose lights would wash out the cockpit. */
+	float cockpit_explosion_light_scale;
+	float cockpit_explosion_distance_m;
 	int model_lights;            /* lights authored in models, and the headlight */
 	/* Multiplies the lights authored in models, to find a calibration by
 	 * eye; debug only, not in the settings. 1 by default. */

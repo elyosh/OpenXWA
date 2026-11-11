@@ -825,7 +825,8 @@ The groups are:
 |-|-|
 | `cockpit_sparks` | Sparks from a hit through the shields. |
 | `cockpit_smoke` | Smoke from a hit through the shields. |
-| `craft_damage` | The other effects on objects. |
+| `player_craft_damage` | The other effects on the player's craft, such as sparks and fire where a hit lands on the hull. |
+| `craft_damage` | The other effects on all other objects. |
 
 Each group has these keys:
 
