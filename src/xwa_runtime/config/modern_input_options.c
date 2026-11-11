@@ -56,6 +56,14 @@ int XwaModernInputOptions_Validate(const XwaModernInputOptions* options, char* e
 		options->rumble_strength > XWA_MODERN_RUMBLE_STRENGTH_MAX) {
 		return XwaModernInputOptions_Error(error, error_size, "mouse or rumble setting is invalid");
 	}
+	if (options->head_tracking.source != XWA_HEAD_TRACK_SOURCE_TRACKIR &&
+		options->head_tracking.source != XWA_HEAD_TRACK_SOURCE_OPENTRACK_UDP) {
+		return XwaModernInputOptions_Error(error, error_size, "head tracking source is invalid");
+	}
+	if (options->head_tracking.udp_port < XWA_HEAD_TRACK_UDP_PORT_MIN ||
+		options->head_tracking.udp_port > XWA_HEAD_TRACK_UDP_PORT_MAX) {
+		return XwaModernInputOptions_Error(error, error_size, "head tracking UDP port is invalid");
+	}
 	return XwaControllerOptions_Validate(&options->controllers, error, error_size) &&
 		   XwaModernInputOptions_ValidateKeyboard(&options->keyboard, error, error_size);
 }
@@ -64,6 +72,16 @@ static void XwaModernInputOptions_Normalize(XwaModernInputOptions* options) {
 	options->mouse_flight_enabled = options->mouse_flight_enabled != 0;
 	options->mouse_invert_y = options->mouse_invert_y != 0;
 	options->rumble_enabled = options->rumble_enabled != 0;
+	options->head_tracking.enabled = options->head_tracking.enabled != 0;
+#ifndef _WIN32
+	/* The shipped defaults name native TrackIR for Windows. On other hosts,
+	 * normalize the effective selection to the only available UDP provider,
+	 * even when the user enables tracking without opening the settings page. */
+	options->head_tracking.source = XWA_HEAD_TRACK_SOURCE_OPENTRACK_UDP;
+#endif
+	for (int i = 0; i < XWA_HEAD_TRACK_AXIS_COUNT; ++i) {
+		options->head_tracking.invert[i] = options->head_tracking.invert[i] != 0;
+	}
 	XwaKeyboardMapping_Sort(&options->keyboard);
 }
 
@@ -71,6 +89,10 @@ int XwaModernInputOptions_Equal(const XwaModernInputOptions* a, const XwaModernI
 	return a->mouse_flight_enabled == b->mouse_flight_enabled && a->mouse_mode == b->mouse_mode &&
 		   a->mouse_sensitivity == b->mouse_sensitivity && a->mouse_invert_y == b->mouse_invert_y &&
 		   a->rumble_enabled == b->rumble_enabled && a->rumble_strength == b->rumble_strength &&
+		   a->head_tracking.enabled == b->head_tracking.enabled &&
+		   a->head_tracking.source == b->head_tracking.source &&
+		   a->head_tracking.udp_port == b->head_tracking.udp_port &&
+		   memcmp(a->head_tracking.invert, b->head_tracking.invert, sizeof(a->head_tracking.invert)) == 0 &&
 		   XwaControllerOptions_Equals(&a->controllers, &b->controllers) &&
 		   XwaKeyboardMapping_Equal(&a->keyboard, &b->keyboard);
 }
@@ -103,6 +125,12 @@ void XwaModernInputOptions_Configure(const XwaModernInputOptions* defaults,
 void XwaModernInputOptions_Get(XwaModernInputOptions* out) {
 	if (out) {
 		*out = g_modernInputOptions.options;
+	}
+}
+
+void XwaModernInputOptions_GetHeadTracking(XwaHeadTrackingOptions* out) {
+	if (out) {
+		*out = g_modernInputOptions.options.head_tracking;
 	}
 }
 

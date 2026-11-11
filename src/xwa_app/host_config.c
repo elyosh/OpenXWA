@@ -627,6 +627,58 @@ static int host_config_input_int(const AeronConfigFile* config, const char* key,
 	return 1;
 }
 
+static const char* const head_tracking_axis_names[XWA_HEAD_TRACK_AXIS_COUNT] = { "yaw", "pitch", "roll",
+																				 "x",   "y",     "z" };
+
+/* input.head_tracking: the master switch, the source, the OpenTrack UDP port
+ * and the six inversions. */
+static int host_config_head_tracking(const AeronConfigFile* config, int required, XwaHeadTrackingOptions* head,
+									 char* error, size_t error_size) {
+	static const char* const maps[] = { "input.head_tracking", "input.head_tracking.invert" };
+	const AeronConfigNode* source;
+	char key[80];
+	size_t i;
+	int axis;
+
+	for (i = 0; i < sizeof maps / sizeof maps[0]; ++i) {
+		const AeronConfigNode* node = AeronConfigFile_GetNode(config, maps[i]);
+		if (node && AeronConfigNode_Type(node) != AERON_CONFIG_MAP) {
+			return host_config_error(error, error_size, "'%s' must be a mapping", maps[i]);
+		}
+	}
+	if (!host_config_input_bool(config, "input.head_tracking.enabled", required, &head->enabled, error,
+								error_size)) {
+		return 0;
+	}
+	source = AeronConfigFile_GetNode(config, "input.head_tracking.source");
+	if (!source) {
+		if (!host_config_input_missing(required, "input.head_tracking.source", error, error_size)) {
+			return 0;
+		}
+	} else {
+		const char* name = AeronConfigNode_String(source, NULL);
+		if (name && strcmp(name, "trackir") == 0) {
+			head->source = XWA_HEAD_TRACK_SOURCE_TRACKIR;
+		} else if (name && strcmp(name, "opentrack_udp") == 0) {
+			head->source = XWA_HEAD_TRACK_SOURCE_OPENTRACK_UDP;
+		} else {
+			return host_config_error(error, error_size, "invalid 'input.head_tracking.source': expected %s",
+									 "'trackir' or 'opentrack_udp'");
+		}
+	}
+	if (!host_config_input_int(config, "input.head_tracking.udp_port", required, XWA_HEAD_TRACK_UDP_PORT_MIN,
+							   XWA_HEAD_TRACK_UDP_PORT_MAX, &head->udp_port, error, error_size)) {
+		return 0;
+	}
+	for (axis = 0; axis < XWA_HEAD_TRACK_AXIS_COUNT; ++axis) {
+		snprintf(key, sizeof key, "input.head_tracking.invert.%s", head_tracking_axis_names[axis]);
+		if (!host_config_input_bool(config, key, required, &head->invert[axis], error, error_size)) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
 static int host_config_input_scalars(const AeronConfigFile* config, int required, XwaModernInputOptions* out,
 									 char* error, size_t error_size) {
 	const AeronConfigNode* node;
@@ -641,7 +693,8 @@ static int host_config_input_scalars(const AeronConfigFile* config, int required
 		!host_config_input_bool(config, "input.rumble_enabled", required, &out->rumble_enabled, error,
 								error_size) ||
 		!host_config_input_int(config, "input.rumble_strength", required, XWA_MODERN_RUMBLE_STRENGTH_MIN,
-							   XWA_MODERN_RUMBLE_STRENGTH_MAX, &out->rumble_strength, error, error_size)) {
+							   XWA_MODERN_RUMBLE_STRENGTH_MAX, &out->rumble_strength, error, error_size) ||
+		!host_config_head_tracking(config, required, &out->head_tracking, error, error_size)) {
 		return 0;
 	}
 
@@ -935,6 +988,41 @@ static int host_config_set_input_int(AeronConfigFile* document, const char* key,
 							: AeronConfigFile_SetInt(document, key, value, error);
 }
 
+/* input.head_tracking is written whole when it differs from the shipped
+ * values, and removed when it matches them. */
+static int host_config_set_head_tracking(AeronConfigFile* document, const XwaHeadTrackingOptions* head,
+										 const XwaHeadTrackingOptions* shipped, AeronConfigError* error) {
+	char key[80];
+	int axis;
+
+	int same = (head->enabled != 0) == (shipped->enabled != 0);
+#ifdef _WIN32
+	/* Elsewhere the source is always OpenTrack UDP, so it isn't compared. */
+	same = same && head->source == shipped->source;
+#endif
+	same = same && head->udp_port == shipped->udp_port;
+	for (axis = 0; axis < XWA_HEAD_TRACK_AXIS_COUNT; ++axis) {
+		same = same && (head->invert[axis] != 0) == (shipped->invert[axis] != 0);
+	}
+	if (same) {
+		return host_config_remove_key(document, "input.head_tracking", error);
+	}
+	if (!AeronConfigFile_SetBool(document, "input.head_tracking.enabled", head->enabled != 0, error) ||
+		!AeronConfigFile_SetString(
+			document, "input.head_tracking.source",
+			head->source == XWA_HEAD_TRACK_SOURCE_OPENTRACK_UDP ? "opentrack_udp" : "trackir", error) ||
+		!AeronConfigFile_SetInt(document, "input.head_tracking.udp_port", head->udp_port, error)) {
+		return 0;
+	}
+	for (axis = 0; axis < XWA_HEAD_TRACK_AXIS_COUNT; ++axis) {
+		snprintf(key, sizeof key, "input.head_tracking.invert.%s", head_tracking_axis_names[axis]);
+		if (!AeronConfigFile_SetBool(document, key, head->invert[axis] != 0, error)) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
 static int host_config_set_input_options(AeronConfigFile* document, const XwaModernInputOptions* options,
 										 const XwaModernInputOptions* defaults, AeronConfigError* error) {
 	static const char* const mode_names[] = { "position", "rate" };
@@ -949,7 +1037,8 @@ static int host_config_set_input_options(AeronConfigFile* document, const XwaMod
 		 host_config_set_input_bool(document, "input.rumble_enabled", options->rumble_enabled,
 									defaults->rumble_enabled, error) &&
 		 host_config_set_input_int(document, "input.rumble_strength", options->rumble_strength,
-								   defaults->rumble_strength, error);
+								   defaults->rumble_strength, error) &&
+		 host_config_set_head_tracking(document, &options->head_tracking, &defaults->head_tracking, error);
 	if (ok) {
 		ok = options->mouse_mode == defaults->mouse_mode
 				 ? host_config_remove_key(document, "input.mouse_mode", error)

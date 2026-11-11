@@ -1,5 +1,6 @@
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa/flight/hangar.h"
+#include "xwa_runtime/input/head_tracking.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/port.h"
@@ -1966,6 +1967,7 @@ static void XwaFlightTask_TickPhases(int now) {
 int XwaFlightTask_Shutdown(void) {
 	int frontendModalActive;
 
+	XwaHeadTracking_Shutdown();
 	XwaFlightPauseTask_Shutdown();
 	XwaModernFlightTiming_EndSession();
 	if (!g_xwaFlightTaskActive && !g_xwaFlightTaskComplete) {
