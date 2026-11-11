@@ -487,6 +487,11 @@ int DInput_DrainKeyboardEvents(void) {
 	uint32_t flushCount;
 	int result;
 
+	/* Quitting the game with an in-flight menu open releases the menu's
+	 * surfaces after DInput_Shutdown, which has already freed the keyboard. */
+	if (!g_dinputKeyboardDevice) {
+		return 0;
+	}
 	/* Flush the buffered keyboard events (INFINITE), then refresh the immediate state
 	 * to recompute the cached Ctrl/Shift/Alt flags. */
 	flushCount = 0xFFFFFFFFu;
