@@ -755,6 +755,18 @@ point_lights:
       power_w: 158000
     player_craft_damage:
       power_w: 400
+  # The headlights of the player's craft. They are a Blender area light of
+  # power_w watts (0 turns them off), at position_m from the pilot's eye
+  # (X right, Y up, Z forward), pointing along the nose. color is linear.
+  # angle_degrees, up to 90, is where the cone ends. With 0, there is no
+  # cone, and the light fades towards the sides. The headlights section of
+  # a mod's flight/flight.yaml can change these values, and when the
+  # headlights turn on. Each key that the mod sets replaces the one here.
+  headlights:
+    position_m: [0, 0, 20]
+    color: [0.944, 0.944, 1]
+    power_w: 4000000
+    angle_degrees: 40
 classic_lighting:
   # Converts the classic game's lights (suns and other backdrops, the game's
   # lights in the hangar, lasers, explosions, engines), which have no unit.
@@ -780,6 +792,12 @@ lighting:
   map_ambient_min_r: 5.0
   map_ambient_min_g: 5.0
   map_ambient_min_b: 5.0
+  # The ambient fill inside the Death Star, in W/m^2/sr, when the region has
+  # no environment. It replaces the light of the mission's backdrop, which
+  # would light the tunnel like a sun, through the walls.
+  death_star_ambient_r: 3.0
+  death_star_ambient_g: 3.0
+  death_star_ambient_b: 3.0
   # Scale of all emitted light (illumination, screens, holograms, lasers,
   # glows, explosions). Emitters far brighter than lit surfaces are what
   # visibly glow through bloom.

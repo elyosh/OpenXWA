@@ -498,10 +498,10 @@ headlights: true
 ```
 
 `true` turns the headlights of the player's craft on for the whole mission,
-except in the hangar. The light itself is set in the `headlights` section
-of `flight/flight.yaml`. Without that section, there are no headlights.
-Without the key, or with `false`, the headlights follow the automatic rule
-of `flight.yaml`. See [Flight settings](flight.md#headlights).
+except in the hangar. The game has a default light, and the `headlights`
+section of `flight/flight.yaml` can change it. Without the key, or with
+`false`, the headlights follow the automatic rule of `flight.yaml`. See
+[Flight settings](flight.md#headlights).
 
 ## object_limits
 

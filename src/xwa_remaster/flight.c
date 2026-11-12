@@ -262,6 +262,7 @@ static struct {
 	float small_prepass_min_size;
 	float small_draw_min_size;
 	float map_ambient_min[3]; /* lighting.map_ambient_min_* */
+	float death_star_ambient[3]; /* lighting.death_star_ambient_* */
 	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
 	 * window narrower than this aspect gets a wider view, so that the
 	 * horizontal field of view stays the one at this aspect. 0 turns it
@@ -766,6 +767,9 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"lighting.map_ambient_min_r",
 		"lighting.map_ambient_min_g",
 		"lighting.map_ambient_min_b",
+		"lighting.death_star_ambient_r",
+		"lighting.death_star_ambient_g",
+		"lighting.death_star_ambient_b",
 		"lighting.emissive_scale",
 		"bloom.intensity",
 		"effects.explosion_genus_emissive_strength",
@@ -960,6 +964,81 @@ static int fl_load_cockpit_lights_config(const AeronConfigFile* cf, const char* 
 		if (!(found & (1u << (uint32_t)slot))) {
 			Aeron_LogError("xwa.remaster", "%s: point_lights.cockpit_lights.%s is missing", path,
 						   XwaCockpitLights_Name(slot));
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/* Reads the default headlight from point_lights.headlights, which needs
+   power_w. Logs an error and returns 0 when the section is wrong. */
+static int fl_load_headlight_config(const AeronConfigFile* cf, const char* path) {
+	static const char* const keys[] = { "position_m", "color", "power_w", "angle_degrees" };
+	static const char* const vector_keys[2] = { "position_m", "color" };
+	const AeronConfigNode* section = AeronConfigFile_GetNode(cf, "point_lights.headlights");
+	XwaFlightHeadlight* light = &s.plight.headlight;
+	float* const vectors[2] = { light->position_m, light->color };
+	memset(light, 0, sizeof *light);
+	light->position_m[2] = 20.0f;
+	light->color[0] = light->color[1] = light->color[2] = 1.0f;
+	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.remaster", "%s: point_lights.headlights must be a map", path);
+		return 0;
+	}
+	for (size_t k = 0; k < AeronConfigNode_MapCount(section); k++) {
+		const char* key = AeronConfigNode_MapKeyAt(section, k);
+		size_t i = 0;
+		while (key && i < sizeof keys / sizeof keys[0] && strcmp(key, keys[i]) != 0) {
+			i++;
+		}
+		if (!key || i == sizeof keys / sizeof keys[0]) {
+			Aeron_LogError("xwa.remaster", "%s:%d: point_lights.headlights: unknown key %s", path,
+						   AeronConfigNode_Line(AeronConfigNode_MapValueAt(section, k)), key ? key : "");
+			return 0;
+		}
+	}
+	for (int v = 0; v < 2; v++) {
+		const AeronConfigNode* node = AeronConfigNode_MapGet(section, vector_keys[v]);
+		if (!node) {
+			continue;
+		}
+		int ok =
+			AeronConfigNode_Type(node) == AERON_CONFIG_SEQUENCE && AeronConfigNode_SequenceCount(node) == 3;
+		float values[3];
+		for (size_t i = 0; ok && i < 3; i++) {
+			const AeronConfigNode* item = AeronConfigNode_SequenceGet(node, i);
+			const AeronConfigNodeType type = AeronConfigNode_Type(item);
+			values[i] = (float)AeronConfigNode_Float(item, 0.0);
+			ok = (type == AERON_CONFIG_INT || type == AERON_CONFIG_FLOAT) && isfinite(values[i]) &&
+				 (v == 0 || values[i] >= 0.0f);
+		}
+		if (!ok) {
+			Aeron_LogError("xwa.remaster",
+						   "%s:%d: point_lights.headlights.%s must be a list of three %snumbers", path,
+						   AeronConfigNode_Line(node), vector_keys[v], v == 0 ? "" : "non-negative ");
+			return 0;
+		}
+		memcpy(vectors[v], values, sizeof values);
+	}
+	const AeronConfigNode* power = AeronConfigNode_MapGet(section, "power_w");
+	const AeronConfigNodeType power_type = AeronConfigNode_Type(power);
+	light->power_w = (float)AeronConfigNode_Float(power, -1.0);
+	if ((power_type != AERON_CONFIG_INT && power_type != AERON_CONFIG_FLOAT) || !isfinite(light->power_w) ||
+		light->power_w < 0.0f) {
+		Aeron_LogError("xwa.remaster",
+					   "%s:%d: point_lights.headlights.power_w must be a number of watts, 0 or more", path,
+					   AeronConfigNode_Line(power ? power : section));
+		return 0;
+	}
+	const AeronConfigNode* angle = AeronConfigNode_MapGet(section, "angle_degrees");
+	if (angle) {
+		const AeronConfigNodeType angle_type = AeronConfigNode_Type(angle);
+		light->angle_degrees = (float)AeronConfigNode_Float(angle, -1.0);
+		if ((angle_type != AERON_CONFIG_INT && angle_type != AERON_CONFIG_FLOAT) ||
+			!fl_in_range(light->angle_degrees, 0.0f, 90.0f)) {
+			Aeron_LogError("xwa.remaster",
+						   "%s:%d: point_lights.headlights.angle_degrees must be from 0 to 90", path,
+						   AeronConfigNode_Line(angle));
 			return 0;
 		}
 	}
@@ -1593,7 +1672,8 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
-	if (!fl_load_cockpit_lights_config(cf, path) || !fl_load_particle_lights_config(cf, path)) {
+	if (!fl_load_cockpit_lights_config(cf, path) || !fl_load_particle_lights_config(cf, path) ||
+		!fl_load_headlight_config(cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -1677,6 +1757,18 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		s.map_ambient_min[c] = (float)AeronConfigFile_GetFloat(cf, map_ambient_keys[c], 0.0);
 		if (!isfinite(s.map_ambient_min[c]) || s.map_ambient_min[c] < 0.0f) {
 			Aeron_LogError("xwa.remaster", "%s: %s must be a number, 0 or more", path, map_ambient_keys[c]);
+			AeronConfigFile_Destroy(cf);
+			return 0;
+		}
+	}
+	static const char* const death_star_ambient_keys[3] = { "lighting.death_star_ambient_r",
+															"lighting.death_star_ambient_g",
+															"lighting.death_star_ambient_b" };
+	for (int c = 0; c < 3; c++) {
+		s.death_star_ambient[c] = (float)AeronConfigFile_GetFloat(cf, death_star_ambient_keys[c], 0.0);
+		if (!fl_in_range(s.death_star_ambient[c], 0.0f, 1000.0f)) {
+			Aeron_LogError("xwa.remaster", "%s: %s must be a number from 0 to 1000", path,
+						   death_star_ambient_keys[c]);
 			AeronConfigFile_Destroy(cf);
 			return 0;
 		}
@@ -2139,6 +2231,9 @@ void XwaRemasterFlight_SetPointLights(const XwaFlightPointLightParams* in) {
 			const float power = in->particle_lights[g].power_w;
 			s.plight.particle_lights[g].power_w = isfinite(power) ? fminf(fmaxf(power, 0.0f), 1.0e7f) : 0.0f;
 		}
+		const float headlight_power = in->headlight.power_w;
+		s.plight.headlight.power_w =
+			isfinite(headlight_power) ? fminf(fmaxf(headlight_power, 0.0f), 1.0e8f) : 0.0f;
 	}
 }
 
@@ -4713,31 +4808,39 @@ static void fl_add_cockpit_lights(const XwaSnapshot* snap, const float player_bw
 	}
 }
 
-/* The player craft's headlight (XwaHeadlight), converted as a light that a
- * GLB model authors in Blender: a one-sided light of P watts gives
- * P * 683 / pi candela straight ahead, which the scene takes at 683 lm/W
- * (AERON_SCENE_LUMENS_PER_WATT). With an angle, it is a spot light
- * with the same intensity straight ahead, which fades from the nose out to
- * the angle. It starts at the seat's eye in every view, as the cockpit
- * lights do, and points along the nose. The pool always keeps it. The hyperspace
- * tunnel doesn't add it. */
+/* Adds the player craft's headlight (XwaHeadlight). It works like a light
+ * of a GLB model made in Blender: a one-sided light of P watts gives
+ * P * 683 / pi candela straight ahead, and the scene takes 683 lm/W
+ * (AERON_SCENE_LUMENS_PER_WATT). With an angle, it is a spot light with the
+ * same intensity straight ahead, which fades out towards the angle. Each
+ * value that the mod sets (XwaHeadlight.mod_*) replaces the default from
+ * point_lights.headlights. The light starts at the seat's eye in every
+ * view, as the cockpit lights do, and points along the nose. The light pool
+ * never drops it. The hyperspace tunnel doesn't add it. */
 static void fl_add_headlight(const XwaSnapshot* snap, const float player_bw[9], const float player_pos[3]) {
 	const XwaHeadlight* h = &snap->headlight;
+	const XwaFlightHeadlight* d = &s.plight.headlight;
 	if (!s.plight.enabled || !s.plight.model_lights || !h->on || !player_bw) {
+		return;
+	}
+	const float power_w = h->mod_has_power ? h->mod_power_w : d->power_w;
+	const float* position_m = h->mod_has_position ? h->mod_position_m : d->position_m;
+	const float angle_degrees = h->mod_has_angle ? h->mod_angle_degrees : d->angle_degrees;
+	if (!(power_w > 0.0f)) {
 		return;
 	}
 	float transform[16];
 	fl_seat_eye_transform(snap, player_bw, player_pos, transform);
 	AeronFlightLight light;
 	memset(&light, 0, sizeof light);
-	light.position.x = h->position_m[0];
-	light.position.y = h->position_m[1];
-	light.position.z = h->position_m[2];
-	memcpy(light.color, h->color, sizeof light.color);
-	light.intensity = h->power_w * 683.0f / 3.14159265f;
+	light.position.x = position_m[0];
+	light.position.y = position_m[1];
+	light.position.z = position_m[2];
+	memcpy(light.color, h->mod_has_color ? h->mod_color : d->color, sizeof light.color);
+	light.intensity = power_w * 683.0f / 3.14159265f;
 	light.shape = AERON_FLIGHT_LIGHT_POINT;
 	light.direction.z = 1.0f;
-	light.spot_outer_angle = h->angle_degrees * (3.14159265f / 180.0f);
+	light.spot_outer_angle = angle_degrees * (3.14159265f / 180.0f);
 	AeronSceneLight scene_light;
 	if (AeronScene_FlightLight(&light, transform, AERON_OPT_UNITS_PER_METER,
 							   1.0f / AERON_SCENE_LUMENS_PER_WATT, XwaRemasterFlight_Exposure(),
@@ -6755,6 +6858,17 @@ static void fl_build_scene_lighting(const XwaSnapshot* snap, XwaRemasterAssets* 
 		fl_build_hangar_lighting(snap, out);
 		return;
 	}
+	/* The Death Star mission lights its interior with the light of a
+	 * backdrop that the game doesn't draw there. As a sun, it would reach
+	 * every surface from one direction, through the walls, since there are
+	 * no shadows in the tunnel. Without an environment, the interior gets an
+	 * ambient fill in place of that light. The tunnel's lights and the
+	 * headlights light the rest. */
+	if (cam->death_star_mode && s.environment.mode != XWA_ENV_MODE_AUTHORED) {
+		out->light_count = 0;
+		fl_set_ambient_fill(out, s.death_star_ambient);
+		return;
+	}
 	if (s.environment.mode == XWA_ENV_MODE_AUTHORED && s.environment.prepared) {
 		fl_apply_authored_lighting(snap, assets, s.environment.prepared, out);
 	}
@@ -7338,9 +7452,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	fl_build_scene_lighting(snap, assets, cam, &scene_lighting);
 	fl_note_hyperspace_sky(sky_environment, keep_backdrops, &scene_lighting);
 	float shadow_light_dir[3];
-	/* Preserve the classic directional fill inside the sealed Death Star,
-	 * but do not let its backdrop light cast exterior shadows in the tunnel.
-	 * Lights from a region environment follow its shadow policy. */
+	/* Inside the Death Star, only the lights of a region environment can
+	 * cast shadows, when the environment allows it. Without an environment,
+	 * there are no directional lights there (fl_build_scene_lighting). */
 	const int shadows_active = (!cam->death_star_mode || scene_lighting.environment_lights) &&
 							   s.shadows.enabled && scene_lighting.shadow_allowed &&
 							   fl_key_directional_light(scene_lighting.lights, scene_lighting.light_count,

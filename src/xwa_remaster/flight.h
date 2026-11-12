@@ -171,6 +171,19 @@ typedef struct XwaFlightParticleLight {
 	int fade;
 } XwaFlightParticleLight;
 
+/* The default headlight, from point_lights.headlights. It is a Blender
+ * area light of `power_w` watts, at `position_m` from the seat's eye along
+ * the craft's axes (X right, Y up, Z forward), pointing along the nose.
+ * `color` is linear. `angle_degrees` is where the cone ends, from the nose;
+ * 0 for a one-sided light. Each key that the mod's headlights section sets
+ * replaces the value here (XwaHeadlight.mod_*). */
+typedef struct XwaFlightHeadlight {
+	float position_m[3];
+	float color[3];
+	float power_w; /* 0 turns the light off */
+	float angle_degrees;
+} XwaFlightHeadlight;
+
 /* Point-light knobs (remaster/config.yaml `point_lights:` mapping + the debug
  * inspector). The classic SOURCE laws fix each light's color and classic
  * intensity; the scene evaluates them as physical sphere lights as bright
@@ -197,6 +210,8 @@ typedef struct XwaFlightPointLightParams {
 	XwaFlightCockpitLight cockpit_lights[XWA_SNAP_COCKPIT_LIGHT_COUNT];
 	/* By XwaParticleLightGroup. Only used when model_lights is on. */
 	XwaFlightParticleLight particle_lights[XWA_PARTICLE_LIGHT_GROUP_COUNT];
+	/* Only used when model_lights is on. */
+	XwaFlightHeadlight headlight;
 } XwaFlightPointLightParams;
 
 /* The game's light candidates, the models' lights, and those of both whose
