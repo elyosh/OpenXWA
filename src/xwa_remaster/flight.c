@@ -5526,6 +5526,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	if (is_bolt) {
 		instance.shadow_flags = AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_NO_RECEIVE_SHADOW;
 		instance.velocity_stamp = 1;
+		instance.emission_only = 1;
 	}
 	AeronScene_AddMeshInstance(s.scene, &instance);
 	if (!is_bolt && f->object_type != XWA_SNAP_TYPE_DEBRIS_CHUNK) {
@@ -7766,6 +7767,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * STAMP sweep instead. */
 			inst.cull_mode = AERON_CULL_NONE;
 			inst.velocity_stamp = 1;
+			/* The original game draws projectiles at full brightness, whatever
+			 * their materials. */
+			inst.emission_only = 1;
 			fl_push_bolt(&inst);
 			/* A bolt model with lights is lit by its first light that
 			 * shines, for the colour it shows, instead of the stock light

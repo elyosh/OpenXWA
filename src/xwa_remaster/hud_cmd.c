@@ -227,6 +227,7 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 	instance.variant = object->node_switch;
 	XwaRemasterSkins_CheckMarkings(instance.mesh, instance.variant);
 	instance.zero_velocity = 1;
+	instance.emission_only = cmd_projectile(object);
 	/* A mirrored view reverses the winding of every face it shows. */
 	instance.cull_mode = roll_align                ? AERON_CULL_NONE
 						 : cmd_rows_mirrored(rows) ? AERON_CULL_FRONT
