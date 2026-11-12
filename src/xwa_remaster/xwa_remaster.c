@@ -1160,8 +1160,8 @@ int XwaRemaster_CaptureFlightFrame(const char* name) {
 	const size_t pixels = (size_t)width * (size_t)height;
 	char png_path[1100];
 	char hdr_path[1100];
-	snprintf(png_path, sizeof png_path, "%s.png", name);
-	snprintf(hdr_path, sizeof hdr_path, "%s.hdr", name);
+	snprintf(png_path, sizeof png_path, "capture/%s.png", name);
+	snprintf(hdr_path, sizeof hdr_path, "capture/%s.hdr", name);
 	uint16_t* half = malloc(pixels * 8u);
 	float* rgb = malloc(pixels * 3u * sizeof *rgb);
 	uint8_t* bytes = malloc(pixels * 3u);
@@ -1169,6 +1169,8 @@ int XwaRemaster_CaptureFlightFrame(const char* name) {
 
 	if (!half || !rgb || !bytes) {
 		failure = "out of memory";
+	} else if (!AeronVfs_CreateDirectory(Aeron_GetVfs(), AERON_VFS_ROOT_USER, "capture")) {
+		failure = "the capture folder couldn't be created in the user folder";
 	}
 	/* The final image, as the composed presentation shows it. */
 	if (!failure) {
