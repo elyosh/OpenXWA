@@ -1265,6 +1265,10 @@ typedef struct XwaOptAsset {
 	uint16_t public_handle;
 	char name[XWA_SNAP_OPT_NAME_MAX]; /* basename, no extension */
 	uint8_t source;                   /* XwaModelSource the simulation loaded */
+	/* 1 when projectiles use the model: an object type with a projectile
+	   genus, or a craft's shots (weapons.models). When the remaster converts
+	   a game OPT for such a model, the whole model glows. */
+	uint8_t projectile;
 } XwaOptAsset;
 
 /* A mission's skin selection: model `model` (its GLB name) shows variant

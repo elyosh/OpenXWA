@@ -169,3 +169,17 @@ uint16_t XwaWeaponModels_Handle(unsigned int sourceObjectType, unsigned int weap
 	keyIndex = s_models[sourceObjectType][weapon];
 	return keyIndex != 0 ? s_keyHandles[keyIndex - 1] : 0;
 }
+
+int XwaWeaponModels_IsModel(uint16_t handle) {
+	int index;
+
+	if (handle == 0) {
+		return 0;
+	}
+	for (index = 0; index < s_loadedCount; ++index) {
+		if (s_loadedHandles[index] == handle) {
+			return 1;
+		}
+	}
+	return 0;
+}

@@ -3166,28 +3166,23 @@ typedef struct FlMeshMemo {
 	AeronSceneMesh* mesh;
 	uint64_t generation;
 	uint32_t frame;
-	uint8_t source;
 } FlMeshMemo;
 
 static FlMeshMemo s_mesh_memo[FL_MESH_MEMO_SIZE];
 static uint32_t s_mesh_memo_frame;
 
-/* Looks up a mesh like XwaRemasterShip_MeshForNameWithSource, through the
- * frame's memo. */
-static AeronSceneMesh* fl_mesh_for_name(const char* name, uint8_t* out_source) {
+/* Same as XwaRemasterShip_MeshForName, but cached for the frame. */
+static AeronSceneMesh* fl_mesh_for_name(const char* name) {
 	if (!name) {
-		return XwaRemasterShip_MeshForNameWithSource(name, out_source);
+		return XwaRemasterShip_MeshForName(name);
 	}
 	const uint64_t generation = XwaRemasterShip_MeshGeneration();
 	FlMeshMemo* memo = &s_mesh_memo[((uintptr_t)name >> 3) & (FL_MESH_MEMO_SIZE - 1u)];
 	if (memo->name != name || memo->frame != s_mesh_memo_frame || memo->generation != generation) {
 		memo->name = name;
-		memo->mesh = XwaRemasterShip_MeshForNameWithSource(name, &memo->source);
+		memo->mesh = XwaRemasterShip_MeshForName(name);
 		memo->generation = generation;
 		memo->frame = s_mesh_memo_frame;
-	}
-	if (out_source) {
-		*out_source = memo->source;
 	}
 	return memo->mesh;
 }
@@ -4463,7 +4458,7 @@ static XwaShipPointLight* fl_pl_push(const float pos[3], const float color_x_int
  * when the model is unavailable. */
 static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* f,
 								const int32_t camera_world[3], float center[3], float half_axis[3]) {
-	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f), NULL);
+	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f));
 	if (!mesh) {
 		return 0;
 	}
@@ -4502,7 +4497,7 @@ static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* 
 /* Whether a bolt's model has lights of its own, which replace the stock
  * bolt light. */
 static int fl_projectile_has_model_lights(const XwaFlightObject* f) {
-	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f), NULL);
+	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f));
 	return mesh && mesh->light_count > 0;
 }
 
@@ -5130,7 +5125,6 @@ typedef struct FlPreparedMesh {
 	AeronSceneMesh* mesh;
 	AeronSceneMeshTable* table;
 	const AeronSceneMaterialAnim* anim;
-	uint8_t source; /* XwaModelSource */
 } FlPreparedMesh;
 
 /* The hull-damage stage for a hull damage and maximum: 1 at or below 75 %
@@ -5476,7 +5470,7 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 	}
 
 	const char* model_name = model_name_override ? model_name_override : fl_object_model_name(object);
-	out->mesh = fl_mesh_for_name(model_name, &out->source);
+	out->mesh = fl_mesh_for_name(model_name);
 	if (!out->mesh) {
 		return 0;
 	}
@@ -5532,8 +5526,6 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	if (is_bolt) {
 		instance.shadow_flags = AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_NO_RECEIVE_SHADOW;
 		instance.velocity_stamp = 1;
-		if (prepared.source == XWA_MODEL_SOURCE_OPT)
-			instance.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
 	}
 	AeronScene_AddMeshInstance(s.scene, &instance);
 	if (!is_bolt && f->object_type != XWA_SNAP_TYPE_DEBRIS_CHUNK) {
@@ -7735,13 +7727,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		}
 		if (is_bolt) {
 			inst.shadow_flags |= AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_NO_RECEIVE_SHADOW;
-		}
-		if (is_bolt && prepared.source == XWA_MODEL_SOURCE_OPT) {
-			/* The original renderer makes both projectile genera fully
-			 * bright independently of the OPT palette. Runtime conversion
-			 * has no such semantic, so render its base texture as HDR
-			 * emission; authored GLBs retain their material-only path. */
-			inst.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
 		}
 		inst.cull_mode = AERON_CULL_BACK;
 		const XwaFlightObject* previous_f = fl_instance_motion(&inst, f, i, is_bolt);
