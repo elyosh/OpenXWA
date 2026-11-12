@@ -261,6 +261,10 @@ static struct {
 	/* small_objects in remaster/config.yaml, in pixels of a 1080-line view. */
 	float small_prepass_min_size;
 	float small_draw_min_size;
+	/* The projectiles settings, and their values in remaster/config.yaml,
+	 * which the debug UI's reset restores. */
+	XwaFlightProjectileParams projectiles;
+	XwaFlightProjectileParams projectiles_default;
 	float map_ambient_min[3]; /* lighting.map_ambient_min_* */
 	float death_star_ambient[3]; /* lighting.death_star_ambient_* */
 	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
@@ -781,6 +785,9 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"motion_blur.shutter",
 		"small_objects.prepass_min_size",
 		"small_objects.draw_min_size",
+		"projectiles.min_width_px",
+		"projectiles.fade_width_px",
+		"projectiles.fade_power",
 		"temporal_upscaling.sharpness",
 		"texture_filtering.max_anisotropy",
 	};
@@ -1861,6 +1868,17 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+	s.projectiles.min_width_px = (float)AeronConfigFile_GetFloat(cf, "projectiles.min_width_px", 0.0);
+	s.projectiles.fade_width_px = (float)AeronConfigFile_GetFloat(cf, "projectiles.fade_width_px", 0.0);
+	s.projectiles.fade_power = (float)AeronConfigFile_GetFloat(cf, "projectiles.fade_power", 0.0);
+	if (!isfinite(s.projectiles.min_width_px) || s.projectiles.min_width_px < 0.0f ||
+		!isfinite(s.projectiles.fade_width_px) || s.projectiles.fade_width_px < 0.0f ||
+		!isfinite(s.projectiles.fade_power) || s.projectiles.fade_power < 0.0f) {
+		Aeron_LogError("xwa.remaster", "%s: the projectiles settings must be numbers, 0 or more", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	s.projectiles_default = s.projectiles;
 	s.small_prepass_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.prepass_min_size", 0.0);
 	s.small_draw_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.draw_min_size", 0.0);
 	if (!isfinite(s.small_prepass_min_size) || s.small_prepass_min_size < 0.0f ||
@@ -2292,6 +2310,28 @@ static int fl_apply_texture_filtering(const XwaFlightTextureFilteringParams* in)
 	s.mesh_sampler_configured = 1;
 	s.texture_filtering = *in;
 	return 1;
+}
+
+void XwaRemasterFlight_GetProjectiles(XwaFlightProjectileParams* out) {
+	if (out && fl_cfg_ensure()) {
+		*out = s.projectiles;
+	}
+}
+
+void XwaRemasterFlight_SetProjectiles(const XwaFlightProjectileParams* in) {
+	if (!in || !fl_cfg_ensure())
+		return;
+	XwaFlightProjectileParams p = *in;
+	p.min_width_px = isfinite(p.min_width_px) && p.min_width_px > 0.0f ? p.min_width_px : 0.0f;
+	p.fade_width_px = isfinite(p.fade_width_px) && p.fade_width_px > 0.0f ? p.fade_width_px : 0.0f;
+	p.fade_power = isfinite(p.fade_power) && p.fade_power > 0.0f ? p.fade_power : 0.0f;
+	s.projectiles = p;
+}
+
+void XwaRemasterFlight_GetProjectilesDefault(XwaFlightProjectileParams* out) {
+	if (out && fl_cfg_ensure()) {
+		*out = s.projectiles_default;
+	}
 }
 
 void XwaRemasterFlight_GetTextureFiltering(XwaFlightTextureFilteringParams* out) {
@@ -7648,10 +7688,13 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		 * with d = camera - object, applied about the same axis the
 		 * Euler roll composes on (cur[2]; rotations about one axis
 		 * commute, so the post-rotation equals the classic full
-		 * recompose with the adjusted roll). NO minimum-size clamp:
-		 * the classic draws the model as-is (sub-pixel bolts flicker
-		 * in the original too, and at 4.5x the classic resolution
-		 * anything classic-visible covers >= 4.5 px here). */
+		 * recompose with the adjusted roll). The classic draws the model
+		 * as it is. The remaster differs on purpose for far bolts (the
+		 * projectiles settings): it widens the ones thinner than a pixel
+		 * into a steady line, because they break up and flicker
+		 * otherwise, and it fades thin ones. With HDR emission and bloom,
+		 * every bolt is many times brighter than white, and hundreds of
+		 * far ones flood the scene. */
 		const int is_bolt = fl_object_is_projectile(f);
 		float bw[9];
 		float object_local[3];
@@ -7965,8 +8008,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const float px_per_1080 = (float)s.rt_h / 1080.0f;
 	AeronScene_SetSmallInstanceCull(s.scene, s.small_prepass_min_size * px_per_1080,
 									s.small_draw_min_size * px_per_1080);
+	AeronScene_SetEmissionMinWidth(s.scene, s.projectiles.min_width_px);
+	AeronScene_SetEmissionFade(s.scene, s.projectiles.fade_width_px * px_per_1080, s.projectiles.fade_power);
 	const int rendered = AeronScene_Render(s.scene, cmd);
 	AeronScene_SetSmallInstanceCull(s.scene, 0.0f, 0.0f);
+	AeronScene_SetEmissionMinWidth(s.scene, 0.0f);
+	AeronScene_SetEmissionFade(s.scene, 0.0f, 0.0f);
 	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
 	s.before_opaque_mode = FL_BEFORE_OPAQUE_NONE;
 	s.snap = NULL; /* hooks must not outlive the snapshot */

@@ -122,6 +122,27 @@ static void xwa_tool_pbr(int* open, void* user) {
 	}
 
 	ImGui::Separator();
+	ImGui::TextUnformatted("Far laser bolts");
+	XwaFlightProjectileParams projectiles;
+	XwaRemasterFlight_GetProjectiles(&projectiles);
+	bool projectiles_changed = false;
+	projectiles_changed |=
+		ImGui::SliderFloat("Minimum width (px)", &projectiles.min_width_px, 0.0f, 4.0f, "%.2f");
+	projectiles_changed |=
+		ImGui::SliderFloat("Fade below width (px)", &projectiles.fade_width_px, 0.0f, 16.0f, "%.1f");
+	projectiles_changed |= ImGui::SliderFloat("Fade power", &projectiles.fade_power, 0.0f, 3.0f, "%.2f");
+	ImGui::TextDisabled("Bolts thinner than the minimum width are drawn that wide, as a steady line.\n"
+						"Bolts thinner than the fade width get dimmer. 0 turns either off.\n"
+						"Edits are not persisted; copy them into remaster/config.yaml.");
+	if (ImGui::Button("Reset far laser bolts")) {
+		XwaRemasterFlight_GetProjectilesDefault(&projectiles);
+		projectiles_changed = true;
+	}
+	if (projectiles_changed) {
+		XwaRemasterFlight_SetProjectiles(&projectiles);
+	}
+
+	ImGui::Separator();
 	static const char* isolate_names[] = {
 		"None",
 		"Base diffuse",

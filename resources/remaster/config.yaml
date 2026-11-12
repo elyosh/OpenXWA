@@ -856,5 +856,19 @@ small_objects:
   prepass_min_size: 2.5
   # Smaller ones aren't drawn at all, except laser bolts.
   draw_min_size: 0.6
+projectiles:
+  # Laser bolts thinner than this on screen, in pixels of the 3D view, are
+  # drawn this wide, with their light spread over the wider strip. A far
+  # bolt then shows as a steady line instead of broken pixels that flicker.
+  # It doesn't make it dimmer; fade_width_px does. Bolts wider than this
+  # don't change. 0 is off.
+  min_width_px: 1.0
+  # Laser bolts thinner than this on screen, in pixels of a 1080-line view
+  # (scaled to the render height), get dimmer as they get thinner: their
+  # emission is multiplied by (width / fade_width_px)^fade_power. Bolts
+  # wider than this don't change. A higher power fades them faster. 0 for
+  # either turns the fade off.
+  fade_width_px: 3.0
+  fade_power: 1.0
 shadows:
   receiver_local_near_distance_m: 1.5

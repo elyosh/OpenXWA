@@ -247,6 +247,24 @@ typedef struct XwaFlightTextureFilteringParams {
 	float max_anisotropy;
 } XwaFlightTextureFilteringParams;
 
+/* Settings for far laser bolts (`projectiles:` in remaster/config.yaml).
+ * The debug UI can change them while the game runs. */
+typedef struct XwaFlightProjectileParams {
+	/* Bolts thinner than this on screen, in render pixels, are drawn this
+	 * wide, with their light spread over the wider strip
+	 * (AeronScene_SetEmissionMinWidth). 0 is off. */
+	float min_width_px;
+	/* Bolts thinner than this on screen, in pixels of a 1080-line view,
+	 * are dimmed by (width / fade_width_px)^fade_power
+	 * (AeronScene_SetEmissionFade). 0 is off. */
+	float fade_width_px;
+	float fade_power;
+} XwaFlightProjectileParams;
+
+void XwaRemasterFlight_GetProjectiles(XwaFlightProjectileParams* out);
+void XwaRemasterFlight_SetProjectiles(const XwaFlightProjectileParams* in);
+void XwaRemasterFlight_GetProjectilesDefault(XwaFlightProjectileParams* out);
+
 void XwaRemasterFlight_GetTextureFiltering(XwaFlightTextureFilteringParams* out);
 void XwaRemasterFlight_SetTextureFiltering(const XwaFlightTextureFilteringParams* in);
 void XwaRemasterFlight_GetTextureFilteringDefault(XwaFlightTextureFilteringParams* out);
