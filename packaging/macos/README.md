@@ -192,7 +192,7 @@ the volume name remains `OpenXWA`.
 
 `.github/workflows/ci.yml` builds this package on GitHub-hosted Apple silicon
 runners with ad-hoc signing, caching the pinned dependency sources and build
-trees keyed on the build script and the shadercross patch. On version tags,
-`.github/workflows/release.yml` attaches the ad-hoc DMG to a draft GitHub
-release. Releases are then finalized locally with `sign-package.sh` as
-described above.
+trees keyed on the build script and aeron's dependency versions and patches.
+On version tags, `.github/workflows/release.yml` attaches the ad-hoc DMG to a
+draft GitHub release. Releases are then finalized locally with
+`sign-package.sh` as described above.

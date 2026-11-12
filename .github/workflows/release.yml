@@ -170,7 +170,7 @@ jobs:
             build/cache/macos-arm64/cooker-dependencies
             build/cache/macos-arm64/build/cooker-sdl
             build/cache/macos-arm64/build/cooker-zstd
-          key: macos-arm64-${{ steps.runner-image.outputs.version }}-deps-${{ hashFiles('packaging/macos/build-package.sh', 'packaging/common/shadercross-fsr3.patch') }}
+          key: macos-arm64-${{ steps.runner-image.outputs.version }}-deps-${{ hashFiles('packaging/macos/build-package.sh', 'aeron/packaging/dependencies/**') }}
 
       - name: Determine ISPC version
         id: ispc

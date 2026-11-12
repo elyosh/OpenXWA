@@ -131,7 +131,7 @@ jobs:
             build/cache/macos-arm64/build/zstd
             build/cache/macos-arm64/build/ffmpeg
             build/cache/macos-arm64/build/shadercross
-          key: macos-arm64-${{ steps.runner-image.outputs.version }}-deps-${{ hashFiles('packaging/macos/build-package.sh', 'packaging/common/shadercross-fsr3.patch') }}
+          key: macos-arm64-${{ steps.runner-image.outputs.version }}-deps-${{ hashFiles('packaging/macos/build-package.sh', 'aeron/packaging/dependencies/**') }}
 
       - name: Determine ISPC version
         id: ispc

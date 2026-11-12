@@ -107,8 +107,11 @@ llvm-symbolizer --obj=OpenXWA 0x2d9dbb
 
 ## Dependency versions
 
-Dependency and shader-tool revisions are pinned as Docker build arguments in
-the Dockerfile. Override a pin explicitly when testing an update:
+The versions of SDL, zstd, FFmpeg and SDL_shadercross, and the patches that
+SDL and SDL_shadercross need, are aeron's: see
+`aeron/packaging/dependencies/README.md`. The other dependency and
+shader-tool revisions are pinned as Docker build arguments in the Dockerfile.
+Set a build argument to test another version:
 
 ```sh
 docker buildx build \

@@ -25,15 +25,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-ARG SDL_VERSION=3.4.18
-ARG ZSTD_VERSION=1.5.7
-ARG FFMPEG_VERSION=8.0.1
-ARG SHADERCROSS_COMMIT=6b06e55c7c5d7e7a09a8a14f76e866dcfad5ab99
+# The versions and patches of aeron's dependencies come from
+# aeron/packaging/dependencies; set these to build another version.
+ARG SDL_VERSION=
+ARG ZSTD_VERSION=
+ARG FFMPEG_VERSION=
+ARG SHADERCROSS_COMMIT=
 
 FROM build-base AS host-tools
 
-RUN git clone --branch "release-${SDL_VERSION}" --depth 1 \
+COPY aeron/packaging/dependencies/apply-patches.sh /tmp/aeron/apply-patches.sh
+COPY aeron/packaging/dependencies/sdl /tmp/aeron/sdl
+
+RUN git clone --branch "release-${SDL_VERSION:-$(cat /tmp/aeron/sdl/version)}" --depth 1 \
         https://github.com/libsdl-org/SDL.git /deps/SDL \
+    && /tmp/aeron/apply-patches.sh /tmp/aeron/sdl /deps/SDL \
     && cmake -S /deps/SDL -B /build/sdl-host -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/opt/xwa-host \
@@ -44,8 +50,7 @@ RUN git clone --branch "release-${SDL_VERSION}" --depth 1 \
     && cmake --build /build/sdl-host --parallel \
     && cmake --install /build/sdl-host
 
-COPY packaging/common/shadercross-fsr3.patch /tmp/shadercross-fsr3.patch
-COPY packaging/common/shadercross-msl-bindings.patch /tmp/shadercross-msl-bindings.patch
+COPY aeron/packaging/dependencies/shadercross /tmp/aeron/shadercross
 
 # The DXC release that compiles the shaders. Releases from 1.9 on need
 # glibc 2.38 or later.
@@ -58,9 +63,8 @@ ADD --checksum=sha256:${DXC_LINUX_X64_SHA256} \
     /tmp/dxc.tar.gz
 
 RUN git clone https://github.com/libsdl-org/SDL_shadercross.git /deps/SDL_shadercross \
-    && git -C /deps/SDL_shadercross checkout "${SHADERCROSS_COMMIT}" \
-    && git -C /deps/SDL_shadercross apply /tmp/shadercross-fsr3.patch \
-    && git -C /deps/SDL_shadercross apply /tmp/shadercross-msl-bindings.patch \
+    && git -C /deps/SDL_shadercross checkout "${SHADERCROSS_COMMIT:-$(cat /tmp/aeron/shadercross/version)}" \
+    && /tmp/aeron/apply-patches.sh /tmp/aeron/shadercross /deps/SDL_shadercross \
     && git -C /deps/SDL_shadercross submodule update --init --depth 1 \
         external/SPIRV-Cross \
     && mkdir -p \
@@ -103,24 +107,15 @@ RUN git clone https://github.com/libsdl-org/SDL_shadercross.git /deps/SDL_shader
 FROM build-base AS sdl-windows
 
 COPY cmake/toolchains/mingw-w64-x86_64.cmake /opt/xwa-toolchain.cmake
-COPY packaging/common/sdl-gpu-d3d12-hdr.patch /tmp/sdl-gpu-d3d12-hdr.patch
-COPY packaging/common/sdl-gpu-d3d12-descriptor-heaps.patch /tmp/sdl-gpu-d3d12-descriptor-heaps.patch
 
-# SDL's D3D12 SDL_GPU backend queries HDR swapchain composition support against
-# the live SDR swapchain, which DXGI can never report scRGB as presentable on,
-# so HDR output is unreachable on that backend. Only the Windows target build
-# has a D3D12 backend, so the host SDL above is left unpatched.
-#
-# The same backend can write descriptors past the end of a shader-visible heap
-# when the heap is nearly full. When it does switch heaps, it leaves tables
-# that are already bound pointing into the old heaps. Both make shaders read
-# the wrong descriptors, which shows as blinking textures and can hang the GPU.
-# The second patch switches heaps before a bind when it does not fit, and then
-# binds every table again.
-RUN git clone --branch "release-${SDL_VERSION}" --depth 1 \
+# aeron's SDL patches fix the D3D12 backend: HDR swapchain compositions and
+# descriptor heap overflows (aeron/packaging/dependencies/README.md).
+COPY aeron/packaging/dependencies/apply-patches.sh /tmp/aeron/apply-patches.sh
+COPY aeron/packaging/dependencies/sdl /tmp/aeron/sdl
+
+RUN git clone --branch "release-${SDL_VERSION:-$(cat /tmp/aeron/sdl/version)}" --depth 1 \
         https://github.com/libsdl-org/SDL.git /deps/SDL \
-    && git -C /deps/SDL apply /tmp/sdl-gpu-d3d12-hdr.patch \
-    && git -C /deps/SDL apply /tmp/sdl-gpu-d3d12-descriptor-heaps.patch \
+    && /tmp/aeron/apply-patches.sh /tmp/aeron/sdl /deps/SDL \
     && cmake -S /deps/SDL -B /build/sdl-windows -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_INSTALL_PREFIX=/opt/xwa-windows \
@@ -135,7 +130,9 @@ FROM build-base AS zstd-windows
 
 COPY cmake/toolchains/mingw-w64-x86_64.cmake /opt/xwa-toolchain.cmake
 
-RUN git clone --branch "v${ZSTD_VERSION}" --depth 1 \
+COPY aeron/packaging/dependencies/zstd /tmp/aeron/zstd
+
+RUN git clone --branch "v${ZSTD_VERSION:-$(cat /tmp/aeron/zstd/version)}" --depth 1 \
         https://github.com/facebook/zstd.git /deps/zstd \
     && cmake -S /deps/zstd/build/cmake -B /build/zstd-windows -G Ninja \
         -DCMAKE_BUILD_TYPE=Release \
@@ -150,7 +147,9 @@ RUN git clone --branch "v${ZSTD_VERSION}" --depth 1 \
 
 FROM build-base AS ffmpeg-windows
 
-RUN git clone --branch "n${FFMPEG_VERSION}" --depth 1 \
+COPY aeron/packaging/dependencies/ffmpeg /tmp/aeron/ffmpeg
+
+RUN git clone --branch "n${FFMPEG_VERSION:-$(cat /tmp/aeron/ffmpeg/version)}" --depth 1 \
         https://github.com/FFmpeg/FFmpeg.git /deps/FFmpeg \
     && cd /deps/FFmpeg \
     && ./configure \
