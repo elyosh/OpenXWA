@@ -323,8 +323,8 @@ dynamic_cockpit:
   # Hologram displays visible; Ctrl+H toggles them in flight.
   holograms: true
   # Emissive multipliers of the display content and of holograms.
-  display_emissive_strength: 1.0
-  hologram_emissive_strength: 1.0
+  display_emissive_strength: 0.8
+  hologram_emissive_strength: 0.8
 assets:
   prefer_original_2d: false
   # Play the original movies even when the mod folder has replacements
@@ -868,7 +868,7 @@ projectiles:
   # emission is multiplied by (width / fade_width_px)^fade_power. Bolts
   # wider than this don't change. A higher power fades them faster. 0 for
   # either turns the fade off.
-  fade_width_px: 3.0
-  fade_power: 1.0
+  fade_width_px: 4.0
+  fade_power: 0.7
 shadows:
   receiver_local_near_distance_m: 1.5
