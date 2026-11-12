@@ -36,6 +36,10 @@ typedef struct XwaRemasterInitOptions {
 	XwaRemasterCapturedLightingOptions captured_lighting;
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
+	/* A fixed size for the 3D render, in pixels (--render-size), or 0 to
+	   follow the window. */
+	int render_width;
+	int render_height;
 } XwaRemasterInitOptions;
 
 /* Loads mandatory renderer resources and creates process-wide remaster state. */

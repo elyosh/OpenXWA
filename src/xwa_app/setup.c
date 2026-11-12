@@ -166,6 +166,37 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			}
 			continue;
 		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--render-size");
+		if (!pass_through && (value || strcmp(argv[i], "--render-size") == 0)) {
+			char* end;
+			long width;
+			long height = 0;
+
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, "%s requires a size such as 1920x1080", "--render-size");
+				}
+				value = argv[i];
+			}
+			width = strtol(value, &end, 10);
+			if (end != value && (*end == 'x' || *end == 'X')) {
+				const char* rest = end + 1;
+				height = strtol(rest, &end, 10);
+				if (end == rest) {
+					height = 0;
+				}
+			}
+			if (*end || width < 320 || height < 240 || width > 16384 || height > 16384 || (width & 1) ||
+				(height & 1)) {
+				return setup_error(error, error_size,
+								   "%s requires a size such as 1920x1080, with even numbers from 320x240 to "
+								   "16384x16384",
+								   "--render-size");
+			}
+			out->render_width = (int)width;
+			out->render_height = (int)height;
+			continue;
+		}
 		if (!pass_through && strcmp(argv[i], "--film-benchmark") == 0) {
 			out->film_benchmark = 1;
 			continue;
@@ -211,6 +242,9 @@ const char* XwaLaunchOptions_Help(void) {
 		   "                            <name>.hdr, in the user folder, then quit\n"
 		   "  --film-benchmark          with --film-pause-at: measure the frozen frame's\n"
 		   "                            GPU time, then quit\n"
+		   "  --render-size <W>x<H>     render the 3D view at this size in pixels,\n"
+		   "                            whatever the window's size, and fit it in the\n"
+		   "                            window\n"
 		   "  -h, --help                print this help and quit\n"
 		   "\n"
 		   "Other arguments, and everything after --, go to the game's own command line.\n";

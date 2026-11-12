@@ -26,6 +26,10 @@ typedef struct XwaLaunchOptions {
 	int film_pause_at;
 	char film_capture[XWA_INSTALL_PATH_CAPACITY];
 	int film_benchmark;
+	/* --render-size: the fixed size of the 3D render, in pixels, or 0 to
+	   follow the window. */
+	int render_width;
+	int render_height;
 	/* --help or -h: print the launch options and quit. */
 	int help;
 	char game_command_line[1024];
