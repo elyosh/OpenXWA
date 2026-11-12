@@ -113,8 +113,18 @@ XWA_MACOS_NOTARY_PROFILE=XWA_NOTARY \
 ./packaging/macos/build-package.sh
 ```
 
-For non-interactive environments such as CI, the credentials can be passed
-directly instead of through a stored keychain profile:
+Instead of a keychain profile, you can pass the credentials in the
+environment. Use either an App Store Connect API key:
+
+```sh
+XWA_MACOS_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" \
+XWA_MACOS_NOTARY_KEY=/path/to/AuthKey_KEYID.p8 \
+XWA_MACOS_NOTARY_KEY_ID="KEYID" \
+XWA_MACOS_NOTARY_ISSUER="issuer-uuid" \
+./packaging/macos/build-package.sh
+```
+
+or an Apple ID with an app-specific password:
 
 ```sh
 XWA_MACOS_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" \
@@ -131,31 +141,65 @@ so a copy dragged out of the disk image validates offline; the DMG built from
 the stapled applications is then signed, submitted, and stapled itself. The
 second submission is quick because its contents are already known to Apple.
 
-## Signing a CI-built package
+## Signing in the release workflow
 
-No signing material is stored on GitHub. The release workflow attaches an
-ad-hoc-signed DMG to a draft GitHub release; a maintainer then re-signs and
-notarizes that exact artifact locally and replaces the release asset:
+`.github/workflows/release.yml` builds the DMGs with an ad-hoc signature,
+then its `sign-macos` job runs `sign-package.sh` on them. Only that job can
+read the signing secrets, and it runs only after you approve it. It doesn't
+install Homebrew packages or restore caches, and its actions are pinned to
+commits, so no third-party code runs while the private key is on the runner.
+The DMGs are signed as they are: the application isn't rebuilt.
+
+### One-time setup
+
+1. Create a Developer ID Application certificate for CI on the Apple
+   Developer site, separate from the one you use locally, so that you can
+   revoke it on its own. Revoking a Developer ID certificate can stop
+   already-released builds signed with it from opening. Export it from
+   Keychain Access as a `.p12` file with its private key and a password.
+2. In App Store Connect, under Users and Access > Integrations > App Store
+   Connect API, create a team key with the Developer role. Note its key ID
+   and the issuer ID, and download the `.p8` file.
+3. In the repository settings, under Environments, create `macos-signing`:
+   - Required reviewers: yourself.
+   - Deployment branches and tags: selected branches and tags, with the tag
+     rule `v*`.
+   - Environment secrets:
+
+     | Secret | Value |
+     | --- | --- |
+     | `MACOS_CERTIFICATE_P12` | `base64 -i certificate.p12` |
+     | `MACOS_CERTIFICATE_PASSWORD` | the `.p12` password |
+     | `MACOS_NOTARY_KEY_P8` | the contents of the `.p8` file |
+     | `MACOS_NOTARY_KEY_ID` | the API key ID |
+     | `MACOS_NOTARY_ISSUER` | the issuer ID |
+
+   Don't add these as repository secrets: every job in every workflow can
+   read repository secrets.
+4. Under Rules > Rulesets, add a tag ruleset for `v*` that only you can
+   bypass, so nobody else can push a tag that can use the environment.
+5. Delete the local `.p12` and `.p8` files.
+
+When you push a `v*` tag, the run waits at "Sign macOS packages" until you
+approve it. The draft release then gets the notarized DMGs.
+
+### Signing a DMG by hand
+
+You can also sign a DMG on your Mac with the same script, for example a CI
+build from another workflow:
 
 ```sh
-gh release download v1.2.3 --pattern 'openxwa-*-macos-arm64-*.dmg' \
-  --dir /tmp/openxwa
 XWA_MACOS_SIGN_IDENTITY="Developer ID Application: Name (TEAMID)" \
 XWA_MACOS_NOTARY_PROFILE=XWA_NOTARY \
-XWA_MACOS_RELEASE_TAG=v1.2.3 \
-./packaging/macos/sign-package.sh /tmp/openxwa/openxwa-1.2.3-macos-arm64-release.dmg
+./packaging/macos/sign-package.sh openxwa-1.2.3-macos-arm64-release.dmg
 ```
 
-Run the same command per DMG when signing both variants; a debug-symbol
-bundle packaged in a Debug DMG is preserved.
-
-`sign-package.sh` mounts the disk image, extracts `OpenXWA.app` and
-`OpenXWA Mod Importer.app`, re-signs them with the hardened runtime, runs the same two-pass notarization and stapling as
-a local Developer ID build, and rebuilds the DMG in place. When
-`XWA_MACOS_RELEASE_TAG` is set it replaces the release asset with
-`gh release upload --clobber`; publish the draft release afterwards. The
-direct-credential notary variables work here as well. Signing does not rebuild
-the application, so the released binary is the one CI produced.
+The script mounts the DMG, copies out `OpenXWA.app` and
+`OpenXWA Mod Importer.app`, signs them with the hardened runtime, notarizes
+and staples them the same way as a local Developer ID build, and rebuilds the
+DMG in place. A debug-symbol bundle in a Debug DMG is kept. With
+`XWA_MACOS_RELEASE_TAG=v1.2.3`, it also replaces the DMG on that GitHub
+release with `gh release upload --clobber`.
 
 ## Icons
 
@@ -193,6 +237,5 @@ the volume name remains `OpenXWA`.
 `.github/workflows/ci.yml` builds this package on GitHub-hosted Apple silicon
 runners with ad-hoc signing, caching the pinned dependency sources and build
 trees keyed on the build script and aeron's dependency versions and patches.
-On version tags, `.github/workflows/release.yml` attaches the ad-hoc DMG to a
-draft GitHub release. Releases are then finalized locally with
-`sign-package.sh` as described above.
+On version tags, `.github/workflows/release.yml` signs and notarizes the DMGs
+and attaches them to a draft GitHub release, as described above.

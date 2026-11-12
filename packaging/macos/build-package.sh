@@ -24,6 +24,9 @@ notary_profile="${XWA_MACOS_NOTARY_PROFILE:-}"
 notary_apple_id="${XWA_MACOS_NOTARY_APPLE_ID:-}"
 notary_team_id="${XWA_MACOS_NOTARY_TEAM_ID:-}"
 notary_password="${XWA_MACOS_NOTARY_PASSWORD:-}"
+notary_key="${XWA_MACOS_NOTARY_KEY:-}"
+notary_key_id="${XWA_MACOS_NOTARY_KEY_ID:-}"
+notary_issuer="${XWA_MACOS_NOTARY_ISSUER:-}"
 
 # The Debug variant enables the in-game debug UI and packages an OpenXWA.dSYM
 # debug-symbol bundle beside the application. Dependencies are always built in
