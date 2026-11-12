@@ -24,6 +24,10 @@ int XwaModernFlightTiming_StepTicks(void);
 /* Uses `step_ticks` for the rest of the flight session: a film plays with
    the step that it was recorded with. Values outside 1 to 8 are ignored. */
 void XwaModernFlightTiming_UseFilmStepTicks(int step_ticks);
+/* Films recorded by the original game don't save a timing step. Their steps
+   ran the original code, so they play in compatibility timing, whatever the
+   player's setting. */
+void XwaModernFlightTiming_UseOriginalFilmTiming(void);
 int XwaModernFlightTiming_HangarStepTicks(void);
 int XwaModernFlightTiming_IsHighRate(void);
 

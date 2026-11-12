@@ -462,6 +462,16 @@ int Flight_ApplyWorldStateObjectPresenceMap(const uint8_t* presenceMap);
 int Flight_SaveWorldState(void);
 int Flight_ChecksumWorldState(int expectedChecksum, int serverTicks);
 void Flight_RestoreWorldState(void);
+#ifdef XWA_MODERN
+/* Write the world state's extension block. original_film.c uses them to
+   convert films from the original game. EncodeExtensionRecord writes the
+   record for `craft` in `objectSlot`. EncodeExtensionBlock writes the block
+   header, `count` records and an empty articulation list, and returns the
+   number of bytes written. */
+size_t FlightWorldState_ExtensionRecordSize(void);
+void FlightWorldState_EncodeExtensionRecord(uint8_t* dst, uint16_t objectSlot, const CraftData* craft);
+size_t FlightWorldState_EncodeExtensionBlock(uint8_t* dst, const uint8_t* records, uint16_t count);
+#endif
 int Flight_CheckMissionEndAndExitRequest(void);
 int Flight_ApplyConfigToRuntime(GameConfig* oldConfig, GameConfig* newConfig);
 void Flight_UpdateDynamicMusicState(void);

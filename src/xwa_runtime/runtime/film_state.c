@@ -14,6 +14,7 @@
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/model_source.h"
+#include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/warhead_pools.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
@@ -406,26 +407,25 @@ void XwaFilmState_WriteLayout(void) {
 	Film_WriteBytesBuffered(bytes, sizeof bytes);
 }
 
-int XwaFilmState_ReadLayout(int filmHasLayout) {
+void XwaFilmState_UseLayoutCounts(void) {
+	uint8_t bytes[4 * FILM_LAYOUT_VALUES];
+
+	Film_SeekPastEmbeddedMissionData();
+	if (!Film_ReadBytes(bytes, sizeof bytes)) {
+		return;
+	}
+	/* After the slot count: the craft, projectile, player projectile and
+	   explosion slot totals. */
+	XwaObjectLimits_UseFilmCounts(ByteOrder_ReadU32Le(bytes + 4), ByteOrder_ReadU32Le(bytes + 8),
+								  ByteOrder_ReadU32Le(bytes + 12), ByteOrder_ReadU32Le(bytes + 16));
+}
+
+int XwaFilmState_ReadLayout(void) {
 	uint8_t bytes[4 * FILM_LAYOUT_VALUES];
 	uint32_t values[FILM_LAYOUT_VALUES];
 	int i;
 
 	FilmState_Layout(values);
-	if (!filmHasLayout) {
-		/* Older films have the stock layout. */
-		if (g_craftObjectSlotsPerRegion == (g_provingGroundsModeActive ? 36u : 96u) &&
-			g_playerProjectileSlotsTotal == 12u * (uint32_t)g_flightPlayerCount &&
-			g_projectileObjectSlotsPerRegion ==
-				g_sharedPlayerProjectileSlotsPerRegion + g_playerProjectileSlotsTotal + 64u &&
-			g_explosionObjectSlotsTotal == 32u * (uint32_t)g_missionRegionCount) {
-			return 1;
-		}
-		Aeron_LogError("xwa.film",
-					   "film: recorded with the stock object counts, and the mod changes them; it "
-					   "can't play");
-		return 0;
-	}
 	if (!Film_ReadBytes(bytes, sizeof bytes)) {
 		return 0;
 	}

@@ -303,6 +303,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/runtime/frontend_task.c
     src/xwa_runtime/runtime/film_benchmark.c
     src/xwa_runtime/runtime/film_state.c
+    src/xwa_runtime/runtime/original_film.c
     src/xwa_runtime/runtime/game_files.c
     src/xwa_runtime/runtime/movie_task.c
     src/xwa_runtime/runtime/port.c

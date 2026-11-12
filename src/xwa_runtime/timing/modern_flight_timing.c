@@ -78,6 +78,10 @@ void XwaModernFlightTiming_UseFilmStepTicks(int step_ticks) {
 	g_effectiveStepTicks = step_ticks;
 }
 
+void XwaModernFlightTiming_UseOriginalFilmTiming(void) {
+	XwaModernFlightTiming_UseFilmStepTicks(XWA_MODERN_COMPATIBILITY_STEP_TICKS);
+}
+
 int XwaModernFlightTiming_HangarStepTicks(void) {
 	return XwaModernFlightTiming_IsHighRate() ? XWA_MODERN_HANGAR_STEP_TICKS : g_effectiveStepTicks;
 }

@@ -1,6 +1,8 @@
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa/flight/hangar.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
+#include "xwa_runtime/runtime/film_state.h"
+#include "xwa_runtime/runtime/original_film.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/port.h"
 
@@ -53,6 +55,7 @@
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/hangars.h"
+#include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/timing/host_clock.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 
@@ -448,6 +451,7 @@ static void XwaFlightTask_StoreActualConfigAfterDisplayInit(void) {
 static int XwaFlightTask_LoadFilmHeader(const char* filmFilePath) {
 	int16_t ignored;
 
+	XwaObjectLimits_ClearFilmCounts();
 	if (filmFilePath == 0 || filmFilePath[0] == '\0') {
 		return 1;
 	}
@@ -491,6 +495,17 @@ static int XwaFlightTask_LoadFilmHeader(const char* filmFilePath) {
 	} else {
 		Film_ReadBytes(&g_filmHeaderDifficulty, sizeof(g_filmHeaderDifficulty));
 		Film_ReadBytes(&g_filmHeaderCollisionsEnabled, sizeof(g_filmHeaderCollisionsEnabled));
+	}
+	/* Films save objects by slot index, so the object table must use the
+	   film's counts. Version 8 films store them in a layout block. Films
+	   from the original game store them at the end of the world state. */
+	if ((uint16_t)g_filmVersion >= 8u) {
+		XwaFilmState_UseLayoutCounts();
+	} else if ((uint16_t)g_filmVersion <= 5u && !XwaOriginalFilm_UseTailCounts()) {
+		g_filmPlaybackMode = 0;
+		File_Close(g_filmFile);
+		g_filmFile = 0;
+		return 0;
 	}
 	return 1;
 }

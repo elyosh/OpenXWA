@@ -70,6 +70,7 @@
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
+#include "xwa_runtime/runtime/original_film.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/frontend_task.h"
 #include "xwa_runtime/runtime/game_files.h"
@@ -186,6 +187,7 @@ int XwaPort_Init(void) {
 	XwaMissionSettings_Init();
 	XwaDocking_Init();
 	XwaObjectLimits_Init();
+	XwaOriginalFilm_Init();
 	XwaHeadlights_Init();
 	XwaCameraMotion_Init();
 	XwaOptionSection_ReadMod(XwaModernSunOptions_Section(), XwaFlightConfig_Root());
