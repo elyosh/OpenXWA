@@ -391,8 +391,6 @@ static void XwaControllerSettings_InstallAxis(XwaControllerSettings* settings,
 		candidate.models[model].profile = settings->unconfigured;
 	}
 	XwaControllerProfile* p = &candidate.models[model].profile;
-	for (size_t i = 0; i < candidate.count; ++i)
-		candidate.models[i].profile.mapping.axes[axis].source = -1;
 	for (int i = 0; i < XWA_INPUT_AXIS_COUNT; ++i)
 		if (p->mapping.axes[i].source == source)
 			p->mapping.axes[i].source = -1;
@@ -408,14 +406,7 @@ static void XwaControllerSettings_AssignCapturedAxis(XwaControllerSettings* sett
 													 XwaInputAxis axis, int source) {
 	settings->conflict_text[0] = 0;
 	const XwaControllerProfile* p = XwaControllerPage_ActiveProfileConst(settings, controller);
-	for (size_t i = 0; i < settings->draft.count; ++i) {
-		const XwaControllerModel* m = &settings->draft.models[i];
-		if (strcmp(m->guid, controller->guid) && m->profile.mapping.axes[axis].source >= 0) {
-			char text[192];
-			snprintf(text, sizeof text, "%s on %s", k_axis_names[axis], m->name);
-			XwaControllerSettings_AppendText(settings->conflict_text, sizeof settings->conflict_text, text);
-		}
-	}
+	/* Other controllers may bind the same axis: the mapping merges them. */
 	for (int i = 0; i < XWA_INPUT_AXIS_COUNT; ++i)
 		if (i != (int)axis && p->mapping.axes[i].source == source)
 			XwaControllerSettings_AppendText(settings->conflict_text, sizeof settings->conflict_text,
@@ -710,21 +701,15 @@ static void XwaControllerSettings_RestoreModal(XwaControllerSettings* settings, 
 	AeronUi_BeginColumns(ui, 2, NULL);
 	if (AeronUi_Button(ui, "Restore")) {
 		static XwaControllerOptions candidate;
-	candidate = settings->draft;
+		candidate = settings->draft;
 		if (XwaControllerOptions_AddModel(&candidate, device, Aeron_InputSnapshot(), settings->error,
 										  sizeof settings->error)) {
 			int model = XwaControllerOptions_FindModel(&candidate, device->guid);
 			XwaControllerModel* selected = &candidate.models[model];
 			selected->kind = device->kind;
 			XwaControllerOptions_ClearProfile(&selected->profile, device->kind);
-			if (device->kind == AERON_CONTROLLER_KIND_GAMEPAD) {
+			if (device->kind == AERON_CONTROLLER_KIND_GAMEPAD)
 				selected->profile = *XwaModernInputOptions_GamepadDefaults();
-				for (size_t i = 0; i < candidate.count; ++i)
-					if (i != (size_t)model)
-						for (int axis = 0; axis < XWA_INPUT_AXIS_COUNT; ++axis)
-							if (candidate.models[i].profile.mapping.axes[axis].source >= 0)
-								selected->profile.mapping.axes[axis].source = -1;
-			}
 			settings->draft = candidate;
 			XwaControllerSettings_ApplyDraft(settings, false);
 			XwaControllerSettings_ResetDeviceEditState(settings, ui);
@@ -757,20 +742,8 @@ void XwaControllerSettings_Draw(XwaControllerSettings* settings, AeronUiContext*
 		for (int i = 0; i < AERON_CONTROLLER_MAX; ++i)
 			if (input->controllers[i].connected && !strcmp(input->controllers[i].guid, controller->guid))
 				++matches;
-		if (matches > 1) {
+		if (matches > 1)
 			AeronUi_Help(ui, "Bindings shared by all controllers of this model.");
-			uint32_t preferred = XwaControllerMapping_AnalogInstance(controller->guid);
-			int model = XwaControllerOptions_FindModel(&settings->draft, controller->guid);
-			const AeronControllerSnapshot* analog =
-				model >= 0 ? XwaControllerMapping_Resolve(&settings->draft.models[model], input, preferred)
-						   : NULL;
-			for (int i = 0; analog && i < AERON_CONTROLLER_MAX; ++i)
-				if (analog == &input->controllers[i]) {
-					char text[160];
-					snprintf(text, sizeof text, "Analog input: %s #%d", analog->name, i + 1);
-					AeronUi_Help(ui, text);
-				}
-		}
 	}
 	int model = controller ? XwaControllerOptions_FindModel(&settings->draft, controller->guid) : -1;
 	bool compatible = !controller || model < 0 || settings->draft.models[model].kind == controller->kind;

@@ -53,7 +53,8 @@ typedef struct XwaControllerModel {
 
 /* The models are kept in the order they were last connected, most recent
  * first. When the list is full, AddModel() drops the last one that isn't
- * connected. */
+ * connected. Several models may bind the same flight axis
+ * (controller_mapping.c merges the connected ones). */
 typedef struct XwaControllerOptions {
 	XwaControllerModel models[XWA_CONTROLLER_MODEL_CAP];
 	size_t count;

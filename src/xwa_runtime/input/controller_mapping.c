@@ -9,6 +9,7 @@
 #include "xwa_runtime/runtime/flight_task.h"
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 enum { ACTION_QUEUE_CAPACITY = 256 };
@@ -24,8 +25,9 @@ typedef struct ControllerInstance {
 static struct {
 	XwaControllerOptions options, pending;
 	ControllerInstance instances[AERON_CONTROLLER_MAX];
-	uint32_t analog[XWA_CONTROLLER_MODEL_CAP];
 	bool pending_options, suspended, present, throttle_valid;
+	/* The model whose device gives the throttle this frame. */
+	size_t throttle_model;
 	bool present_reported, presence_changed;
 	bool resume;
 	int axes[3];
@@ -87,22 +89,10 @@ static void XwaControllerMapping_Dispatch(XwaInputAction action, bool pressed) {
 		XwaControllerMapping_DispatchAction(action);
 }
 
-const AeronControllerSnapshot* XwaControllerMapping_Resolve(const XwaControllerModel* model,
-															const AeronInputSnapshot* input,
-															uint32_t preferred) {
-	const AeronControllerSnapshot* best = NULL;
-	if (!input)
-		return NULL;
-	for (int i = 0; i < AERON_CONTROLLER_MAX; ++i) {
-		const AeronControllerSnapshot* d = &input->controllers[i];
-		if (!d->connected || strcmp(model->guid, d->guid) || d->kind != model->kind)
-			continue;
-		if (d->instance_id == preferred)
-			return d;
-		if (!best || d->instance_id < best->instance_id)
-			best = d;
-	}
-	return best;
+/* The model of a connected device, or -1. */
+static int XwaControllerMapping_DeviceModel(const AeronControllerSnapshot* device) {
+	int model = XwaControllerOptions_FindModel(&g_controller.options, device->guid);
+	return model >= 0 && g_controller.options.models[model].kind == device->kind ? model : -1;
 }
 
 static void ReleaseInstance(ControllerInstance* state) {
@@ -126,7 +116,6 @@ static void XwaControllerMapping_Install(const XwaControllerOptions* options) {
 	}
 	if (XwaControllerOptions_Equals(options, &g_controller.options))
 		return;
-	uint32_t analog[XWA_CONTROLLER_MODEL_CAP] = { 0 };
 	for (int i = 0; i < AERON_CONTROLLER_MAX; ++i) {
 		ControllerInstance* state = &g_controller.instances[i];
 		if (!state->id)
@@ -136,11 +125,6 @@ static void XwaControllerMapping_Install(const XwaControllerOptions* options) {
 		if (next < 0 || old->kind != options->models[next].kind ||
 			!XwaControllerOptions_ProfileEqual(&old->profile, &options->models[next].profile))
 			ReleaseInstance(state);
-	}
-	for (size_t i = 0; i < options->count; ++i) {
-		int old = XwaControllerOptions_FindModel(&g_controller.options, options->models[i].guid);
-		if (old >= 0 && options->models[i].kind == g_controller.options.models[old].kind)
-			analog[i] = g_controller.analog[old];
 	}
 	for (int i = 0; i < AERON_CONTROLLER_MAX; ++i) {
 		ControllerInstance* state = &g_controller.instances[i];
@@ -161,7 +145,6 @@ static void XwaControllerMapping_Install(const XwaControllerOptions* options) {
 			++g_controller.generation;
 	}
 	g_controller.options = *options;
-	memcpy(g_controller.analog, analog, sizeof analog);
 }
 
 void XwaControllerMapping_Init(const XwaControllerOptions* options) {
@@ -278,6 +261,10 @@ uint16_t XwaControllerMapping_ThrottlePosition(int16_t raw, AeronControllerKind 
 	return (uint16_t)(((position - end_tolerance) * UINT16_MAX + range / 2) / range);
 }
 
+/* Reads the axes the device's model binds. Several connected devices may bind
+ * the same axis: the one pushed the furthest drives yaw, pitch and roll, and
+ * the device of the first model in the list drives the throttle, a lever
+ * position. */
 static void SampleAnalog(size_t index, const AeronControllerSnapshot* device) {
 	const XwaControllerModel* model = &g_controller.options.models[index];
 	for (int axis = 0; axis < XWA_INPUT_AXIS_COUNT; ++axis) {
@@ -286,6 +273,9 @@ static void SampleAnalog(size_t index, const AeronControllerSnapshot* device) {
 			continue;
 		int16_t raw = Aeron_ControllerAxisValue(device, binding.source);
 		if (axis == XWA_INPUT_AXIS_THROTTLE) {
+			if (g_controller.throttle_valid && index >= g_controller.throttle_model)
+				continue;
+			g_controller.throttle_model = index;
 			g_controller.throttle =
 				XwaControllerMapping_ThrottlePosition(raw, model->kind, binding.source, binding.invert);
 			g_controller.throttle_valid = true;
@@ -306,6 +296,8 @@ static void SampleAnalog(size_t index, const AeronControllerSnapshot* device) {
 					scaled = 1.0f;
 				value = (int)((normalized < 0.0f ? -scaled : scaled) * 127);
 			}
+			if (abs(value) < abs(g_controller.axes[axis]))
+				continue;
 			g_controller.axes[axis] =
 				XwaControllerOptions_EffectiveAxisInvert(model->kind, (XwaInputAxis)axis, binding.invert)
 					? -value
@@ -314,27 +306,34 @@ static void SampleAnalog(size_t index, const AeronControllerSnapshot* device) {
 	}
 }
 
+/* The connected device of the model that can rumble, the one with the lowest
+ * instance id, or 0. */
+static uint32_t XwaControllerMapping_ModelRumbleInstance(size_t model, const AeronInputSnapshot* input) {
+	const XwaControllerModel* m = &g_controller.options.models[model];
+	uint32_t best = 0;
+	for (int j = 0; j < AERON_CONTROLLER_MAX; ++j) {
+		const AeronControllerSnapshot* d = &input->controllers[j];
+		if (d->connected && d->has_rumble && !strcmp(d->guid, m->guid) && d->kind == m->kind &&
+			(!best || d->instance_id < best))
+			best = d->instance_id;
+	}
+	return best;
+}
+
+/* The device that rumbles: one of the first model that binds pitch, then yaw,
+ * then of the first gamepad model. */
 static uint32_t XwaControllerMapping_FindRumbleInstance(const AeronInputSnapshot* input) {
 	static const XwaInputAxis owners[] = { XWA_INPUT_AXIS_PITCH, XWA_INPUT_AXIS_YAW };
+	uint32_t instance;
 	for (size_t i = 0; i < sizeof owners / sizeof owners[0]; ++i)
 		for (size_t model = 0; model < g_controller.options.count; ++model)
 			if (g_controller.options.models[model].profile.mapping.axes[owners[i]].source >= 0 &&
-				g_controller.analog[model] && Aeron_ControllerHasRumble(g_controller.analog[model]))
-				return g_controller.analog[model];
-	for (size_t model = 0; model < g_controller.options.count; ++model) {
-		const XwaControllerModel* m = &g_controller.options.models[model];
-		uint32_t best = 0;
-		if (m->kind != AERON_CONTROLLER_KIND_GAMEPAD)
-			continue;
-		for (int j = 0; j < AERON_CONTROLLER_MAX; ++j) {
-			const AeronControllerSnapshot* d = &input->controllers[j];
-			if (d->connected && d->has_rumble && !strcmp(d->guid, m->guid) && d->kind == m->kind &&
-				(!best || d->instance_id < best))
-				best = d->instance_id;
-		}
-		if (best)
-			return best;
-	}
+				(instance = XwaControllerMapping_ModelRumbleInstance(model, input)) != 0)
+				return instance;
+	for (size_t model = 0; model < g_controller.options.count; ++model)
+		if (g_controller.options.models[model].kind == AERON_CONTROLLER_KIND_GAMEPAD &&
+			(instance = XwaControllerMapping_ModelRumbleInstance(model, input)) != 0)
+			return instance;
 	return 0;
 }
 
@@ -363,46 +362,29 @@ void XwaControllerMapping_Update(const AeronInputSnapshot* input) {
 			ReleaseInstance(state);
 	}
 
-	for (size_t model = 0; model < g_controller.options.count; ++model) {
-		const AeronControllerSnapshot* analog = XwaControllerMapping_Resolve(
-			&g_controller.options.models[model], input, g_controller.analog[model]);
-		g_controller.analog[model] = analog ? analog->instance_id : 0;
-		if (analog) {
-			g_controller.present = true;
-			if (!g_controller.suspended)
-				SampleAnalog(model, analog);
-		}
+	/* Each connected device of a known model is read: its sticks merge with
+	 * the other devices' and its buttons are its own. */
+	for (int slot = 0; slot < AERON_CONTROLLER_MAX; ++slot) {
+		const AeronControllerSnapshot* d = &input->controllers[slot];
+		const int model = d->connected ? XwaControllerMapping_DeviceModel(d) : -1;
+		if (model < 0)
+			continue;
+		g_controller.present = true;
 		if (g_controller.suspended)
 			continue;
-		uint32_t previous = 0;
-		for (int n = 0; n < AERON_CONTROLLER_MAX; ++n) {
-			const AeronControllerSnapshot* d = NULL;
-			for (int j = 0; j < AERON_CONTROLLER_MAX; ++j) {
-				const AeronControllerSnapshot* candidate = &input->controllers[j];
-				if (candidate->connected && candidate->instance_id > previous &&
-					!strcmp(candidate->guid, g_controller.options.models[model].guid) &&
-					candidate->kind == g_controller.options.models[model].kind &&
-					(!d || candidate->instance_id < d->instance_id))
-					d = candidate;
+		SampleAnalog((size_t)model, d);
+		ControllerInstance* state = NULL;
+		for (int j = 0; j < AERON_CONTROLLER_MAX && !state; ++j)
+			if (g_controller.instances[j].id == d->instance_id)
+				state = &g_controller.instances[j];
+		for (int j = 0; j < AERON_CONTROLLER_MAX && !state; ++j)
+			if (!g_controller.instances[j].id) {
+				state = &g_controller.instances[j];
+				state->id = d->instance_id;
+				state->model = model;
 			}
-			if (!d)
-				break;
-			previous = d->instance_id;
-			ControllerInstance* state = NULL;
-			for (int j = 0; j < AERON_CONTROLLER_MAX; ++j)
-				if (g_controller.instances[j].id == d->instance_id)
-					state = &g_controller.instances[j];
-			if (!state)
-				for (int j = 0; j < AERON_CONTROLLER_MAX; ++j)
-					if (!g_controller.instances[j].id) {
-						state = &g_controller.instances[j];
-						state->id = d->instance_id;
-						state->model = (int)model;
-						break;
-					}
-			if (state)
-				SampleDigital(state, d);
-		}
+		if (state)
+			SampleDigital(state, d);
 	}
 	if (!g_controller.throttle_valid)
 		g_controller.throttle_instance = 0;
@@ -419,11 +401,6 @@ void XwaControllerMapping_Update(const AeronInputSnapshot* input) {
 		g_controller.rumble_instance = rumble;
 		g_controller.rumble_changed = true;
 	}
-}
-
-uint32_t XwaControllerMapping_AnalogInstance(const char* guid) {
-	int i = XwaControllerOptions_FindModel(&g_controller.options, guid);
-	return i < 0 ? 0 : g_controller.analog[i];
 }
 
 bool XwaControllerMapping_ThrottleSample(uint16_t* position, uint32_t* generation) {
