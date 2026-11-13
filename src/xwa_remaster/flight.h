@@ -259,6 +259,11 @@ typedef struct XwaFlightProjectileParams {
 	 * (AeronScene_SetEmissionFade). 0 is off. */
 	float fade_width_px;
 	float fade_power;
+	/* How bright projectiles are drawn, and how much light the bloom gets
+	 * from them, as multiples of their converted emission
+	 * (AeronScene_SetEmissionLight). */
+	float emission_scale;
+	float bloom_scale;
 } XwaFlightProjectileParams;
 
 void XwaRemasterFlight_GetProjectiles(XwaFlightProjectileParams* out);

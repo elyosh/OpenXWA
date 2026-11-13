@@ -869,6 +869,16 @@ projectiles:
   # wider than this don't change. A higher power fades them faster. 0 for
   # either turns the fade off.
   fade_width_px: 4.0
-  fade_power: 0.7
+  fade_power: 0.0
+  # How bright projectiles (laser bolts and warheads) are drawn, as a
+  # multiple of the emission of their model. At 1, a bolt's glow is many
+  # times brighter than white, so the tone mapping turns it white and every
+  # bolt looks the same. Lower values keep the colours of its texture.
+  emission_scale: 0.04
+  # How much light the bloom gets from projectiles, as a multiple of the
+  # emission of their model, whatever emission_scale is. 1 gives the glow
+  # of projectiles drawn at an emission_scale of 1. When it is higher than
+  # emission_scale, the difference goes into the bloom only.
+  bloom_scale: 0.7
 shadows:
   receiver_local_near_distance_m: 1.5

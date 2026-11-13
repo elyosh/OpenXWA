@@ -788,6 +788,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"projectiles.min_width_px",
 		"projectiles.fade_width_px",
 		"projectiles.fade_power",
+		"projectiles.emission_scale",
+		"projectiles.bloom_scale",
 		"temporal_upscaling.sharpness",
 		"texture_filtering.max_anisotropy",
 	};
@@ -1871,9 +1873,13 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.projectiles.min_width_px = (float)AeronConfigFile_GetFloat(cf, "projectiles.min_width_px", 0.0);
 	s.projectiles.fade_width_px = (float)AeronConfigFile_GetFloat(cf, "projectiles.fade_width_px", 0.0);
 	s.projectiles.fade_power = (float)AeronConfigFile_GetFloat(cf, "projectiles.fade_power", 0.0);
+	s.projectiles.emission_scale = (float)AeronConfigFile_GetFloat(cf, "projectiles.emission_scale", 1.0);
+	s.projectiles.bloom_scale = (float)AeronConfigFile_GetFloat(cf, "projectiles.bloom_scale", 1.0);
 	if (!isfinite(s.projectiles.min_width_px) || s.projectiles.min_width_px < 0.0f ||
 		!isfinite(s.projectiles.fade_width_px) || s.projectiles.fade_width_px < 0.0f ||
-		!isfinite(s.projectiles.fade_power) || s.projectiles.fade_power < 0.0f) {
+		!isfinite(s.projectiles.fade_power) || s.projectiles.fade_power < 0.0f ||
+		!isfinite(s.projectiles.emission_scale) || s.projectiles.emission_scale < 0.0f ||
+		!isfinite(s.projectiles.bloom_scale) || s.projectiles.bloom_scale < 0.0f) {
 		Aeron_LogError("xwa.remaster", "%s: the projectiles settings must be numbers, 0 or more", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
@@ -2325,6 +2331,8 @@ void XwaRemasterFlight_SetProjectiles(const XwaFlightProjectileParams* in) {
 	p.min_width_px = isfinite(p.min_width_px) && p.min_width_px > 0.0f ? p.min_width_px : 0.0f;
 	p.fade_width_px = isfinite(p.fade_width_px) && p.fade_width_px > 0.0f ? p.fade_width_px : 0.0f;
 	p.fade_power = isfinite(p.fade_power) && p.fade_power > 0.0f ? p.fade_power : 0.0f;
+	p.emission_scale = isfinite(p.emission_scale) && p.emission_scale > 0.0f ? p.emission_scale : 0.0f;
+	p.bloom_scale = isfinite(p.bloom_scale) && p.bloom_scale > 0.0f ? p.bloom_scale : 0.0f;
 	s.projectiles = p;
 }
 
@@ -5911,10 +5919,20 @@ void XwaRemasterFlight_InvalidateHistory(void) {
 	fl_request_fsr_reset(FL_FSR_RESET_RENDER_RESUMED);
 }
 
+/* Adds the extra bloom light of the scene's projectiles
+ * (AeronScene_DrawEmissionBloom). */
+static int fl_bloom_extra(AeronRenderPass* pass, int target_w, int target_h, void* userdata) {
+	(void)userdata;
+	return AeronScene_DrawEmissionBloom(s.scene, pass, target_w, target_h);
+}
+
 /* Both ordinary flight and the dedicated hyperspace scene arrive here with
  * AeronScene_Render complete. Bloom remains in the scene command buffer; the
  * final draws are either deferred to Aeron_Present or recorded into present_rt. */
 static AeronTexture* fl_present(AeronCommandBuffer* cmd, int direct_present) {
+	/* Add the projectiles' bloom only when the scene's own image is shown,
+	 * not when another image, such as the hyperspace warp, replaces it. */
+	const int own_scene = s.present_scene_override == NULL;
 	s.present_scene_tex = s.present_scene_override ? s.present_scene_override
 												   : Aeron_RenderTargetGetTexture(AeronScene_SceneRt(s.scene));
 	s.present_scene_override = NULL;
@@ -5924,7 +5942,8 @@ static AeronTexture* fl_present(AeronCommandBuffer* cmd, int direct_present) {
 		return NULL;
 	}
 	if (!s.map_present && s.bloom && AeronSceneBloom_Intensity() > 0.0f) {
-		if (!AeronSceneBloom_Apply(s.bloom, cmd, s.present_scene_tex, s.rt_w, s.rt_h, s.rt_h)) {
+		if (!AeronSceneBloom_Apply(s.bloom, cmd, s.present_scene_tex, s.rt_w, s.rt_h, s.rt_h,
+								   own_scene ? fl_bloom_extra : NULL, NULL)) {
 			Aeron_CommandBufferSetFailure(cmd, "Flight bloom recording failed");
 			return NULL;
 		}
@@ -8010,10 +8029,12 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 									s.small_draw_min_size * px_per_1080);
 	AeronScene_SetEmissionMinWidth(s.scene, s.projectiles.min_width_px);
 	AeronScene_SetEmissionFade(s.scene, s.projectiles.fade_width_px * px_per_1080, s.projectiles.fade_power);
+	AeronScene_SetEmissionLight(s.scene, s.projectiles.emission_scale, s.projectiles.bloom_scale);
 	const int rendered = AeronScene_Render(s.scene, cmd);
 	AeronScene_SetSmallInstanceCull(s.scene, 0.0f, 0.0f);
 	AeronScene_SetEmissionMinWidth(s.scene, 0.0f);
 	AeronScene_SetEmissionFade(s.scene, 0.0f, 0.0f);
+	AeronScene_SetEmissionLight(s.scene, 1.0f, 1.0f);
 	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
 	s.before_opaque_mode = FL_BEFORE_OPAQUE_NONE;
 	s.snap = NULL; /* hooks must not outlive the snapshot */
