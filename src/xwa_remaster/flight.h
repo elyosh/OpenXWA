@@ -264,6 +264,10 @@ typedef struct XwaFlightProjectileParams {
 	 * (AeronScene_SetEmissionLight). */
 	float emission_scale;
 	float bloom_scale;
+	/* Debug only, not in the config: draw projectiles at bloom_scale, so
+	 * that their bloom comes from the scene, as for any other light, and
+	 * not from the bloom draw of AeronScene_DrawEmissionBloom. */
+	int bloom_from_scene;
 } XwaFlightProjectileParams;
 
 void XwaRemasterFlight_GetProjectiles(XwaFlightProjectileParams* out);

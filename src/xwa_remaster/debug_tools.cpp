@@ -135,9 +135,15 @@ static void xwa_tool_pbr(int* open, void* user) {
 											  ImGuiSliderFlags_Logarithmic);
 	projectiles_changed |=
 		ImGui::SliderFloat("Bloom scale", &projectiles.bloom_scale, 0.0f, 4.0f, "%.3f", ImGuiSliderFlags_Logarithmic);
+	bool bloom_from_scene = projectiles.bloom_from_scene != 0;
+	if (ImGui::Checkbox("Bloom from the scene", &bloom_from_scene)) {
+		projectiles.bloom_from_scene = bloom_from_scene ? 1 : 0;
+		projectiles_changed          = true;
+	}
 	ImGui::TextDisabled("Bolts thinner than the minimum width are drawn that wide, as a steady line.\n"
 						"Bolts thinner than the fade width get dimmer. 0 turns either off.\n"
 						"Projectiles are drawn at the emission scale; the bloom gets the bloom scale.\n"
+						"Bloom from the scene draws them at the bloom scale, with no bloom draw of their own.\n"
 						"Edits are not persisted; copy them into remaster/config.yaml.");
 	if (ImGui::Button("Reset far laser bolts")) {
 		XwaRemasterFlight_GetProjectilesDefault(&projectiles);

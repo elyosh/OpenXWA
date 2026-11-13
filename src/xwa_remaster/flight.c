@@ -1884,6 +1884,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+	s.projectiles.bloom_from_scene = 0;
 	s.projectiles_default = s.projectiles;
 	s.small_prepass_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.prepass_min_size", 0.0);
 	s.small_draw_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.draw_min_size", 0.0);
@@ -2333,6 +2334,7 @@ void XwaRemasterFlight_SetProjectiles(const XwaFlightProjectileParams* in) {
 	p.fade_power = isfinite(p.fade_power) && p.fade_power > 0.0f ? p.fade_power : 0.0f;
 	p.emission_scale = isfinite(p.emission_scale) && p.emission_scale > 0.0f ? p.emission_scale : 0.0f;
 	p.bloom_scale = isfinite(p.bloom_scale) && p.bloom_scale > 0.0f ? p.bloom_scale : 0.0f;
+	p.bloom_from_scene = p.bloom_from_scene != 0;
 	s.projectiles = p;
 }
 
@@ -8029,7 +8031,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 									s.small_draw_min_size * px_per_1080);
 	AeronScene_SetEmissionMinWidth(s.scene, s.projectiles.min_width_px);
 	AeronScene_SetEmissionFade(s.scene, s.projectiles.fade_width_px * px_per_1080, s.projectiles.fade_power);
-	AeronScene_SetEmissionLight(s.scene, s.projectiles.emission_scale, s.projectiles.bloom_scale);
+	AeronScene_SetEmissionLight(s.scene,
+								s.projectiles.bloom_from_scene ? s.projectiles.bloom_scale : s.projectiles.emission_scale,
+								s.projectiles.bloom_scale);
 	const int rendered = AeronScene_Render(s.scene, cmd);
 	AeronScene_SetSmallInstanceCull(s.scene, 0.0f, 0.0f);
 	AeronScene_SetEmissionMinWidth(s.scene, 0.0f);
