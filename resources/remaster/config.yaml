@@ -869,7 +869,7 @@ projectiles:
   # wider than this don't change. A higher power fades them faster. 0 for
   # either turns the fade off.
   fade_width_px: 4.0
-  fade_power: 0.0
+  fade_power: 0.2
   # How bright projectiles (laser bolts and warheads) are drawn, as a
   # multiple of the emission of their model. At 1, a bolt's glow is many
   # times brighter than white, so the tone mapping turns it white and every
