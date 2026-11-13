@@ -849,13 +849,19 @@ motion_blur:
   pause_keep_blur: true
   velocity_viz: false
 small_objects:
-  # Objects smaller than these on screen are left out, by the larger side of
-  # their bounds, in pixels of a 1080-line view (scaled to the render
-  # height); 0 is off. Only with MSAA on and temporal upscaling off.
-  # Smaller ones aren't drawn in the depth prepass and cast no shadow.
+  # Sizes on screen, in pixels of a 1080-line view (scaled to the render
+  # height), measured on the larger side of an object's bounds. 0 is off.
+  # Objects smaller than this aren't drawn in the depth prepass and cast no
+  # shadow. Only with MSAA on and temporal upscaling off.
   prepass_min_size: 2.5
-  # Smaller ones aren't drawn at all, except laser bolts.
+  # Objects smaller than this aren't drawn at all, except laser bolts. Only
+  # with MSAA on and temporal upscaling off.
   draw_min_size: 0.6
+  # Objects smaller than this, seen from the sun, are left out of a shadow
+  # cascade. The size is measured at the distance of the nearest surface the
+  # cascade covers, where shadows look largest, so far cascades leave out
+  # more objects. Works with any MSAA and temporal upscaling setting.
+  shadow_min_size: 4.0
 projectiles:
   # Laser bolts thinner than this on screen, in pixels of the 3D view, are
   # drawn this wide, with their light spread over the wider strip. A far

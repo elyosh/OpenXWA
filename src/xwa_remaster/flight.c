@@ -261,6 +261,7 @@ static struct {
 	/* small_objects in remaster/config.yaml, in pixels of a 1080-line view. */
 	float small_prepass_min_size;
 	float small_draw_min_size;
+	float small_shadow_min_size;
 	/* The projectiles settings, and their values in remaster/config.yaml,
 	 * which the debug UI's reset restores. */
 	XwaFlightProjectileParams projectiles;
@@ -1888,8 +1889,10 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.projectiles_default = s.projectiles;
 	s.small_prepass_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.prepass_min_size", 0.0);
 	s.small_draw_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.draw_min_size", 0.0);
+	s.small_shadow_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.shadow_min_size", 0.0);
 	if (!isfinite(s.small_prepass_min_size) || s.small_prepass_min_size < 0.0f ||
-		!isfinite(s.small_draw_min_size) || s.small_draw_min_size < 0.0f) {
+		!isfinite(s.small_draw_min_size) || s.small_draw_min_size < 0.0f ||
+		!isfinite(s.small_shadow_min_size) || s.small_shadow_min_size < 0.0f) {
 		Aeron_LogError("xwa.remaster", "%s: small_objects sizes must be numbers, 0 or more", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
@@ -8029,6 +8032,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const float px_per_1080 = (float)s.rt_h / 1080.0f;
 	AeronScene_SetSmallInstanceCull(s.scene, s.small_prepass_min_size * px_per_1080,
 									s.small_draw_min_size * px_per_1080);
+	AeronScene_SetShadowCasterMinSize(s.scene, s.small_shadow_min_size * px_per_1080);
 	AeronScene_SetEmissionMinWidth(s.scene, s.projectiles.min_width_px);
 	AeronScene_SetEmissionFade(s.scene, s.projectiles.fade_width_px * px_per_1080, s.projectiles.fade_power);
 	AeronScene_SetEmissionLight(s.scene,
@@ -8036,6 +8040,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 								s.projectiles.bloom_scale);
 	const int rendered = AeronScene_Render(s.scene, cmd);
 	AeronScene_SetSmallInstanceCull(s.scene, 0.0f, 0.0f);
+	AeronScene_SetShadowCasterMinSize(s.scene, 0.0f);
 	AeronScene_SetEmissionMinWidth(s.scene, 0.0f);
 	AeronScene_SetEmissionFade(s.scene, 0.0f, 0.0f);
 	AeronScene_SetEmissionLight(s.scene, 1.0f, 1.0f);
