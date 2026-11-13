@@ -70,8 +70,8 @@ static int host_shortcut_pressed(const AeronInputSnapshot* in, XwaKeyboardShortc
 	return 1;
 }
 
-/* Window-mode changes route through the video options module so the apply
- * callback, the options screen, and config persistence stay in agreement. */
+/* Window mode changes go through the video options module, so the window,
+ * the Video tab of OpenXWA Options and config.yaml always agree. */
 static void set_window_mode_option(XwaModernWindowMode mode) {
 	XwaModernVideoOptions options;
 	XwaModernVideoOptions_Get(&options);

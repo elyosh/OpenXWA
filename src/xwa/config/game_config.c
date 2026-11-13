@@ -43,7 +43,6 @@
 #include "xwa_runtime/config/modern_mods_screen.h"
 #include "xwa_runtime/config/modern_pilot_profiles_screen.h"
 #include "xwa_runtime/config/modern_video_options.h"
-#include "xwa_runtime/config/modern_video_options_screen.h"
 #include "xwa_runtime/config/option_section.h"
 #include "xwa_runtime/runtime/port.h"
 #endif
@@ -1502,11 +1501,7 @@ int Config_SinglePlayerVideoOptionsScreen(void) {
 	}
 	if (buttonPressed) {
 		g_pendingMenuScreen = 2;
-#ifdef XWA_MODERN
-		g_menuCursorRow = 1;
-#else
 		g_menuCursorRow = 0;
-#endif
 	}
 
 	if (action == 1) {
@@ -2649,13 +2644,6 @@ int Config_OptionsDatapadUpdate(int frameState) {
 			done = Config_NetworkOptionsScreen();
 			break;
 #ifdef XWA_MODERN
-		case 18:
-			if (XwaModernVideoOptionsScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
-				g_pendingMenuScreen = 2;
-				g_menuCursorRow = 0;
-			}
-			done = 0;
-			break;
 		case 19:
 			if (XwaModernPilotProfilesScreen_Update(g_configMenuCenterX, &g_menuCursorRow)) {
 				g_pendingMenuScreen = 0;
@@ -3960,21 +3948,13 @@ int Config_VideoOptionsMenu(void) {
 		Keyboard_FlushCharBuffer();
 		keyState = 0;
 		if (--g_menuCursorRow < 0) {
-#ifdef XWA_MODERN
-			g_menuCursorRow = 3;
-#else
 			g_menuCursorRow = 2;
-#endif
 		}
 	} else if (keyState == CONFIG_KEY_VK_DOWN) {
 		FrontendSound_PlayUISound("configsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
 		Keyboard_FlushCharBuffer();
 		keyState = 0;
-#ifdef XWA_MODERN
-		if (++g_menuCursorRow >= 4) {
-#else
 		if (++g_menuCursorRow >= 3) {
-#endif
 			g_menuCursorRow = 0;
 		}
 	}
@@ -3985,41 +3965,13 @@ int Config_VideoOptionsMenu(void) {
 	titleX = g_configMenuCenterX - (int)(titleWidth >> 1);
 	FrontendDraw_Line(titleX, 195, titleX + (int)titleWidth, 195, g_colorLightBlue);
 
-#ifdef XWA_MODERN
-	text = "OpenXWA Video Options";
-	titleWidth = FrontendText_MeasureWidth(text, 20);
-	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
-	buttonPressed =
-		FrontendButton_DrawMenuButton(textX, 203, text, 20, g_colorPaleBlue, 20, 0, "settingsound");
-	if (g_menuCursorRow == 0) {
-		FrontendText_Draw(20, text, textX, 203, g_colorGreen);
-		if (keyState == CONFIG_KEY_ENTER) {
-			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
-			Keyboard_FlushCharBuffer();
-			keyState = 0;
-			buttonPressed |= 1;
-		}
-	}
-	if (buttonPressed) {
-		g_pendingMenuScreen = 18;
-		g_menuCursorRow = 0;
-	}
-#endif
-
 	text = FrontendString_Get(STR_CONFIG_VIDEO_SINGLE_PLAYER_OPTIONS);
 	titleWidth = FrontendText_MeasureWidth(text, 20);
 	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
-#ifdef XWA_MODERN
-	buttonPressed =
-		FrontendButton_DrawMenuButton(textX, 228, text, 20, g_colorPaleBlue, 21, 0, "settingsound");
-	if (g_menuCursorRow == 1) {
-		FrontendText_Draw(20, text, textX, 228, g_colorGreen);
-#else
 	buttonPressed =
 		FrontendButton_DrawMenuButton(textX, 203, text, 20, g_colorPaleBlue, 20, 0, "settingsound");
 	if (g_menuCursorRow == 0) {
 		FrontendText_Draw(20, text, textX, 203, g_colorGreen);
-#endif
 		if (keyState == CONFIG_KEY_ENTER) {
 			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
 			Keyboard_FlushCharBuffer();
@@ -4035,17 +3987,10 @@ int Config_VideoOptionsMenu(void) {
 	text = FrontendString_Get(STR_CONFIG_VIDEO_MULTIPLAYER_OPTIONS);
 	titleWidth = FrontendText_MeasureWidth(text, 20);
 	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
-#ifdef XWA_MODERN
-	buttonPressed =
-		FrontendButton_DrawMenuButton(textX, 253, text, 20, g_colorPaleBlue, 22, 0, "settingsound");
-	if (g_menuCursorRow == 2) {
-		FrontendText_Draw(20, text, textX, 253, g_colorGreen);
-#else
 	buttonPressed =
 		FrontendButton_DrawMenuButton(textX, 228, text, 20, g_colorPaleBlue, 21, 0, "settingsound");
 	if (g_menuCursorRow == 1) {
 		FrontendText_Draw(20, text, textX, 228, g_colorGreen);
-#endif
 		if (keyState == CONFIG_KEY_ENTER) {
 			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
 			Keyboard_FlushCharBuffer();
@@ -4058,22 +4003,6 @@ int Config_VideoOptionsMenu(void) {
 		g_menuCursorRow = 0;
 	}
 
-#ifdef XWA_MODERN
-	text = FrontendString_Get(STR_BACK);
-	titleWidth = FrontendText_MeasureWidth(text, 20);
-	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
-	buttonPressed =
-		FrontendButton_DrawMenuButton(textX, 278, text, 20, g_colorPaleBlue, 24, 0, "settingsound");
-	if (g_menuCursorRow == 3) {
-		FrontendText_Draw(20, text, textX, 278, g_colorGreen);
-		if (keyState == CONFIG_KEY_ENTER) {
-			FrontendSound_PlayUISound("settingsound", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
-			Keyboard_FlushCharBuffer();
-			keyState = 0;
-			buttonPressed |= 1;
-		}
-	}
-#else
 	text = FrontendString_Get(STR_BACK);
 	titleWidth = FrontendText_MeasureWidth(text, 20);
 	textX = g_configMenuCenterX - (int)(titleWidth >> 1);
@@ -4088,7 +4017,6 @@ int Config_VideoOptionsMenu(void) {
 			buttonPressed |= 1;
 		}
 	}
-#endif
 	if (keyState == CONFIG_KEY_ESCAPE) {
 		Keyboard_FlushCharBuffer();
 		buttonPressed = 1;

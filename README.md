@@ -69,9 +69,8 @@ OpenXWA validates and remembers the selected installation. The folder must use
 the installed game layout found in a GOG or Steam installation. For a raw CD
 copy, first merge the contents of the `ALLIANCE` directory into the root.
 
-Open **Video Options**, then **OpenXWA Video Options**, to configure the
-renderer and display settings. Controller, keyboard and mouse settings are in
-**OpenXWA Options**, at the top of the options datapad.
+Video, controller, keyboard and mouse settings are in **OpenXWA Options**, at
+the top of the options datapad.
 
 Useful shortcuts:
 

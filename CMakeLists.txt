@@ -217,7 +217,6 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/config/modern_video_options.c
     src/xwa_runtime/config/modern_mods.c
     src/xwa_runtime/config/modern_mods_screen.c
-    src/xwa_runtime/config/modern_video_options_screen.c
     src/xwa_runtime/config/modern_speed_effect_options.c
     src/xwa_runtime/config/modern_sun_options.c
     src/xwa_runtime/config/modern_target_readout_options.c
@@ -447,6 +446,7 @@ set(XWA_APP_SOURCES
     src/xwa_app/options/controller_page.c
     src/xwa_app/options/keyboard_page.c
     src/xwa_app/options/mouse_page.c
+    src/xwa_app/options/video_page.c
     src/xwa_app/options/options_window.c
     src/xwa_app/setup.c
     src/xwa_app/ui.c
@@ -778,7 +778,6 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/config/modern_sun_options.h
     src/xwa_runtime/config/modern_target_readout_options.h
     src/xwa_runtime/config/modern_video_options.h
-    src/xwa_runtime/config/modern_video_options_screen.h
     src/xwa_runtime/config/option_section.h
     src/xwa_runtime/config/modern_mods.h
     src/xwa_runtime/config/modern_mods_screen.h
@@ -905,6 +904,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_app/options/controller_page.h
     src/xwa_app/options/keyboard_page.h
     src/xwa_app/options/mouse_page.h
+    src/xwa_app/options/video_page.h
     src/xwa_app/options/options_window.h
     src/xwa_app/ui.h
     src/xwa_app/install_paths.h

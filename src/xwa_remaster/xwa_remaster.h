@@ -82,9 +82,9 @@ void XwaRemaster_SetHdrDesired(int want);
 int XwaRemaster_GetHdrDesired(void);
 AeronSampleCount XwaRemaster_MsaaSampleCount(void);
 
-/* Narrow bridge surface used by the original-style modern options screen.
- * Only user-facing selections are changed; advanced renderer tuning remains
- * owned by the flight renderer and its debug tools. */
+/* Get and set the video options that the player can change in OpenXWA
+ * Options. The flight renderer and its debug tools own the other renderer
+ * settings. */
 void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out);
 void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options);
 

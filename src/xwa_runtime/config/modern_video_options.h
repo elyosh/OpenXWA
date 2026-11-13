@@ -108,6 +108,9 @@ void XwaModernVideoOptions_Configure(const XwaModernVideoOptions* options, XwaMo
 									 XwaModernVideoOptionsPersistFn persist);
 void XwaModernVideoOptions_Get(XwaModernVideoOptions* out);
 int XwaModernVideoOptions_Set(const XwaModernVideoOptions* options);
+/* Save the options if they changed. On failure, FlushWithError writes the
+   reason in `error`, and Flush logs it. */
+int XwaModernVideoOptions_FlushWithError(char* error, size_t error_size);
 int XwaModernVideoOptions_Flush(void);
 int XwaModernVideoOptions_IsDirty(void);
 
