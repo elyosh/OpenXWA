@@ -287,7 +287,7 @@ int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const Xwa
 	}
 	if (problem) {
 		snprintf(notice, notice_size,
-				 "The mod \"%s\" can't be used. %s\n\nOpenXWA starts with the original game.", mod.name,
+				 "The mod \"%s\" can't be used. %s\n\nOpenXWA starts the original game instead.", mod.name,
 				 problem);
 		selected[0] = '\0';
 		return 1;
