@@ -856,7 +856,7 @@ small_objects:
   prepass_min_size: 2.5
   # Objects smaller than this aren't drawn at all, except laser bolts. Only
   # with MSAA on and temporal upscaling off.
-  draw_min_size: 0.6
+  draw_min_size: 2.0
   # Objects smaller than this, seen from the sun, are left out of a shadow
   # cascade. The size is measured at the distance of the nearest surface the
   # cascade covers, where shadows look largest, so far cascades leave out
