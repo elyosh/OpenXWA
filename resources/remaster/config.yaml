@@ -323,8 +323,8 @@ dynamic_cockpit:
   # Hologram displays visible; Ctrl+H toggles them in flight.
   holograms: true
   # Emissive multipliers of the display content and of holograms.
-  display_emissive_strength: 0.8
-  hologram_emissive_strength: 0.8
+  display_emissive_strength: 0.7
+  hologram_emissive_strength: 0.7
 assets:
   prefer_original_2d: false
   # Play the original movies even when the mod folder has replacements
