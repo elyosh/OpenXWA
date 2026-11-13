@@ -122,6 +122,23 @@ static void xwa_tool_pbr(int* open, void* user) {
 	}
 
 	ImGui::Separator();
+	ImGui::TextUnformatted("Levels of detail");
+	XwaFlightLodParams lod;
+	XwaRemasterFlight_GetLod(&lod);
+	bool lod_changed = ImGui::SliderFloat("Largest error (px at 1080p)", &lod.max_error, 0.0f, 4.0f, "%.2f");
+	bool lod_tint    = lod.tint != 0;
+	if (ImGui::Checkbox("Tint by level", &lod_tint)) {
+		lod.tint    = lod_tint ? 1 : 0;
+		lod_changed = true;
+	}
+	ImGui::TextDisabled("Models seen small draw simpler versions of themselves. 0 draws them in full.\n"
+						"The tint shows levels 1, 2 and 3 in green, yellow and red.\n"
+						"Edits are not persisted; copy them into remaster/config.yaml.");
+	if (lod_changed) {
+		XwaRemasterFlight_SetLod(&lod);
+	}
+
+	ImGui::Separator();
 	ImGui::TextUnformatted("Far laser bolts");
 	XwaFlightProjectileParams projectiles;
 	XwaRemasterFlight_GetProjectiles(&projectiles);

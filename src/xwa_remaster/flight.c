@@ -262,6 +262,10 @@ static struct {
 	float small_prepass_min_size;
 	float small_draw_min_size;
 	float small_shadow_min_size;
+	/* model_lod.max_error, in pixels of a 1080-line view, and the debug
+	 * UI's tint by level. */
+	float lod_max_error;
+	int   lod_tint;
 	/* The projectiles settings, and their values in remaster/config.yaml,
 	 * which the debug UI's reset restores. */
 	XwaFlightProjectileParams projectiles;
@@ -1897,6 +1901,12 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+	s.lod_max_error = (float)AeronConfigFile_GetFloat(cf, "model_lod.max_error", 0.0);
+	if (!isfinite(s.lod_max_error) || s.lod_max_error < 0.0f) {
+		Aeron_LogError("xwa.remaster", "%s: model_lod.max_error must be a number, 0 or more", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
 	s.mb_camera_blur = AeronConfigFile_GetBool(cf, "motion_blur.camera_blur", 0);
 	s.mb_pause_keep_blur = AeronConfigFile_GetBool(cf, "motion_blur.pause_keep_blur", 0);
 	s.mb_velocity_viz = AeronConfigFile_GetBool(cf, "motion_blur.velocity_viz", 0);
@@ -2188,6 +2198,37 @@ void XwaRemasterFlight_GetExposureDefault(XwaFlightExposureParams* out) {
 	if (out && fl_cfg_ensure()) {
 		*out = s.exposure_default;
 	}
+}
+
+void XwaRemasterFlight_GetLod(XwaFlightLodParams* out) {
+	if (out) {
+		out->max_error = s.lod_max_error;
+		out->tint      = s.lod_tint;
+	}
+}
+
+void XwaRemasterFlight_SetLod(const XwaFlightLodParams* in) {
+	if (in) {
+		s.lod_max_error = isfinite(in->max_error) && in->max_error > 0.0f ? in->max_error : 0.0f;
+		s.lod_tint      = in->tint != 0;
+	}
+}
+
+void XwaRemasterFlight_LogLodStats(void) {
+	if (!s.scene) {
+		return;
+	}
+	AeronSceneLodStats stats;
+	AeronScene_GetLodStats(s.scene, &stats);
+	unsigned long long k_triangles[4];
+	for (int level = 0; level < 4; level++) {
+		k_triangles[level] = (unsigned long long)(stats.triangles[level] / 1000);
+	}
+	Aeron_LogInfo("xwa.benchmark",
+				  "film benchmark: levels of detail 0/1/2/3 (max error %.2f px at 1080 lines): "
+				  "%u %u %u %u instances, %llu %llu %llu %llu k triangles",
+				  (double)s.lod_max_error, stats.instances[0], stats.instances[1], stats.instances[2],
+				  stats.instances[3], k_triangles[0], k_triangles[1], k_triangles[2], k_triangles[3]);
 }
 
 float XwaRemasterFlight_Exposure(void) {
@@ -8033,6 +8074,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	AeronScene_SetSmallInstanceCull(s.scene, s.small_prepass_min_size * px_per_1080,
 									s.small_draw_min_size * px_per_1080);
 	AeronScene_SetShadowCasterMinSize(s.scene, s.small_shadow_min_size * px_per_1080);
+	AeronScene_SetLodMaxError(s.scene, s.lod_max_error * px_per_1080);
+	AeronScene_SetLodTint(s.scene, s.lod_tint);
 	AeronScene_SetEmissionMinWidth(s.scene, s.projectiles.min_width_px);
 	AeronScene_SetEmissionFade(s.scene, s.projectiles.fade_width_px * px_per_1080, s.projectiles.fade_power);
 	AeronScene_SetEmissionLight(s.scene,
@@ -8041,6 +8084,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const int rendered = AeronScene_Render(s.scene, cmd);
 	AeronScene_SetSmallInstanceCull(s.scene, 0.0f, 0.0f);
 	AeronScene_SetShadowCasterMinSize(s.scene, 0.0f);
+	AeronScene_SetLodMaxError(s.scene, 0.0f);
+	AeronScene_SetLodTint(s.scene, 0);
 	AeronScene_SetEmissionMinWidth(s.scene, 0.0f);
 	AeronScene_SetEmissionFade(s.scene, 0.0f, 0.0f);
 	AeronScene_SetEmissionLight(s.scene, 1.0f, 1.0f);

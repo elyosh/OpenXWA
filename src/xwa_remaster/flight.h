@@ -133,6 +133,9 @@ void XwaRemasterFlight_GetExposureDefault(XwaFlightExposureParams* out);
  * (AeronScenePresent_ExposureFromEv100): the fixed one, or the newest the
  * meter read back. 1 before the configuration loads. */
 float XwaRemasterFlight_Exposure(void);
+/* Logs how many instances and triangles the last frame drew at each level
+ * of detail (the film benchmark). */
+void  XwaRemasterFlight_LogLodStats(void);
 /* The debug view drawn in place of the flight image
  * (AeronScenePresentDebugView): the image, false colour, or the meter's
  * weights. Debug only, not in the settings. */
@@ -269,6 +272,17 @@ typedef struct XwaFlightProjectileParams {
 	 * not from the bloom draw of AeronScene_DrawEmissionBloom. */
 	int bloom_from_scene;
 } XwaFlightProjectileParams;
+
+/* Levels of detail (debug UI): model_lod.max_error, in pixels of a
+ * 1080-line view, and the tint by level (AeronScene_SetLodTint). Edits
+ * aren't saved. */
+typedef struct XwaFlightLodParams {
+	float max_error;
+	int   tint;
+} XwaFlightLodParams;
+
+void XwaRemasterFlight_GetLod(XwaFlightLodParams* out);
+void XwaRemasterFlight_SetLod(const XwaFlightLodParams* in);
 
 void XwaRemasterFlight_GetProjectiles(XwaFlightProjectileParams* out);
 void XwaRemasterFlight_SetProjectiles(const XwaFlightProjectileParams* in);

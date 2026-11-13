@@ -862,6 +862,12 @@ small_objects:
   # cascade covers, where shadows look largest, so far cascades leave out
   # more objects. Works with any MSAA and temporal upscaling setting.
   shadow_min_size: 4.0
+model_lod:
+  # Models that are small on screen are drawn with simpler versions of
+  # themselves, called levels of detail, which the mod importer makes. This
+  # is the largest error a level may show, in pixels of a 1080-line view
+  # (scaled to the render height). 0 draws every model at full detail.
+  max_error: 1.0
 projectiles:
   # Laser bolts thinner than this on screen, in pixels of the 3D view, are
   # drawn this wide, with their light spread over the wider strip. A far

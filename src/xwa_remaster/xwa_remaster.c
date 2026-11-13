@@ -1082,6 +1082,7 @@ int XwaRemaster_BenchmarkFlightFrames(void) {
 		Aeron_LogError("xwa.benchmark", "film benchmark: the warm-up renders failed");
 		return 0;
 	}
+	XwaRemasterFlight_LogLodStats();
 	double frame_ms[RM_BENCHMARK_SAMPLES];
 	double cpu_ms[RM_BENCHMARK_SAMPLES];
 	for (int i = 0; i < RM_BENCHMARK_SAMPLES; ++i) {
