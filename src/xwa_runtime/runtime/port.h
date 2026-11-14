@@ -52,6 +52,13 @@ int XwaPort_OptionsWindowOpen(void);
  * network session. The host then runs XwaPort_PausedFrame instead of
  * XwaPort_Tick, as for its own pause, and pauses the audio. */
 int XwaPort_OptionsWindowPausesGame(void);
+/* Whether the game is in a network session, where the other players don't
+ * wait. */
+int XwaPort_InNetworkSession(void);
+/* Whether a flight runs, such as a mission. Quitting ends it. */
+int XwaPort_InFlight(void);
+/* Whether a pilot is loaded. */
+int XwaPort_HasPilot(void);
 /* While the window captures a key for a binding, the host shortcuts are
  * not run. */
 void XwaPort_SetShortcutsCaptured(int captured);

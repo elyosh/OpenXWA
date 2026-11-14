@@ -6,6 +6,7 @@
 #include "mod_update.h"
 #include "options/mods_page_internal.h"
 #include "options/options_window.h"
+#include "xwa_runtime/runtime/port.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -194,6 +195,7 @@ static void scan_mods(void) {
 	char current[XWA_MODS_PATH_CAP] = "";
 	free_list();
 	p->mod_chosen = SIZE_MAX;
+	p->mod_next = SIZE_MAX;
 	p->mod_running = SIZE_MAX;
 	p->mods_notice[0] = '\0';
 	p->mods_scanned = 1;
@@ -265,6 +267,29 @@ static void scan_mods(void) {
 	if (current[0] && p->mod_chosen == SIZE_MAX)
 		snprintf(p->mods_notice, sizeof p->mods_notice,
 				 "The chosen mod is missing from %s, so OpenXWA starts with the original game.", current);
+	/* As XwaSetup_SetModRoot does: the next start uses the chosen mod if it
+	   is ready, or if a complete new import replaces it. A mod marked for
+	   deletion is deleted first. Otherwise, it starts with the original
+	   game. */
+	p->mod_next = p->mod_chosen;
+	if (p->mod_chosen < p->mods.count) {
+		const XwaModEntry* chosen = &p->mods.entries[p->mod_chosen];
+		const unsigned flags = p->mod_flags[p->mod_chosen];
+		const int usable =
+			(chosen->state == XWA_MOD_READY || (flags & XWA_MODS_UPDATE)) && !(flags & XWA_MODS_MARKED);
+		if (!usable) {
+			p->mod_next = SIZE_MAX;
+			if (!(flags & XWA_MODS_MARKED))
+				snprintf(p->mods_notice, sizeof p->mods_notice,
+						 "The chosen mod, %s, can't be used. OpenXWA starts with the original game.",
+						 chosen->name);
+		}
+	}
+	if (p->mod_next == SIZE_MAX) {
+		for (size_t i = 0; i < p->mods.count; ++i)
+			if (!p->mods.entries[i].path[0])
+				p->mod_next = i;
+	}
 	/* The list opens on the mod in use. */
 	if (p->mod_selected >= p->mods.count)
 		p->mod_selected = p->mod_running;
@@ -379,16 +404,17 @@ static void draw_list(void) {
 		AeronUi_Error(ui, p->mods_notice);
 
 	/* Below the list: the name, folder, problem and advice of the selected
-	   mod, a note, the restart line and a message. A long folder takes more
-	   lines. */
+	   mod, a note, the restart line, the Restart Now button and a message. A
+	   long folder takes more lines. */
 	const float line = AeronUi_MeasureHelpHeight(ui, "X", 0.0f) + theme->item_spacing;
-	const float details = theme->row_height + theme->item_spacing + 6.0f * line;
+	const float details = 2.0f * (theme->row_height + theme->item_spacing) + 6.0f * line;
 	AeronUi_ListBox(ui, "Mods", p->mod_items, p->mod_items ? p->mods.count : 0, &p->mod_selected,
 					fmaxf(120.0f, XwaModsPage_ContentHeight() - XWA_MODS_BUTTON_ROWS_REF - details));
 	const XwaModEntry* selected =
 		p->mod_items && p->mod_selected < p->mods.count ? &p->mods.entries[p->mod_selected] : NULL;
 	/* The original game's folder is the game data folder. */
 	const char* folder = !selected ? "" : selected->path[0] ? selected->path : p->game;
+	int restart = 0;
 	if (selected) {
 		char text[XWA_MODS_PATH_CAP + 64];
 		const char* advice = XwaModList_Advice(selected, XWA_MOD_ADVICE_MODS_TAB);
@@ -403,10 +429,13 @@ static void draw_list(void) {
 		}
 		const unsigned flags = p->mod_flags[p->mod_selected];
 		const int running = p->mod_selected == p->mod_running;
-		if (flags & XWA_MODS_MARKED)
+		if (flags & XWA_MODS_MARKED) {
 			AeronUi_Error(ui, "Restart OpenXWA to delete it.");
-		else if ((flags & XWA_MODS_UPDATE) && running)
+			restart = 1;
+		} else if ((flags & XWA_MODS_UPDATE) && running) {
 			AeronUi_Error(ui, "Restart OpenXWA to play with the new import.");
+			restart = 1;
+		}
 		/* Why Delete is off: the next start with --mod would read the mod
 		   again before it could be deleted. */
 		if (running && p->launch_override && (flags & XWA_MODS_IMPORTED) && !(flags & XWA_MODS_MARKED))
@@ -415,18 +444,22 @@ static void draw_list(void) {
 	}
 	if (p->launch_override)
 		AeronUi_Help(ui, "OpenXWA was started with --mod, so you can't choose another mod here.");
-	/* The choice applies at the next start, so say so only when it changed.
-	   With --mod, the next start without it uses the choice. */
-	if (!p->launch_override && p->mod_chosen < p->mods.count && p->mod_chosen != p->mod_running) {
+	/* The choice applies at the next start, so say so only when the next
+	   start changes the mod. With --mod, the next start without it uses the
+	   choice. */
+	if (!p->launch_override && p->mod_next < p->mods.count && p->mod_next != p->mod_running) {
 		char text[320];
-		const XwaModEntry* chosen = &p->mods.entries[p->mod_chosen];
-		if (chosen->path[0])
-			snprintf(text, sizeof text, "Restart OpenXWA to play with %s.", chosen->name);
+		const XwaModEntry* next = &p->mods.entries[p->mod_next];
+		if (next->path[0])
+			snprintf(text, sizeof text, "Restart OpenXWA to play with %s.", next->name);
 		else
 			snprintf(text, sizeof text, "Restart OpenXWA to play the original game.");
 		/* In the accent color, like a mod's problem, so it isn't missed. */
 		AeronUi_Error(ui, text);
+		restart = 1;
 	}
+	if (restart)
+		XwaModsPage_RestartButton();
 	if (p->mods_message[0])
 		AeronUi_Help(ui, p->mods_message);
 
@@ -461,8 +494,21 @@ static void draw_list(void) {
 	const int usable = idle && p->config_ok && !p->launch_override && selected &&
 					   p->mod_selected != p->mod_chosen && selected->state == XWA_MOD_READY &&
 					   !(flags & XWA_MODS_MARKED);
-	if (AeronUi_ButtonEnabled(ui, "Use This Mod", usable))
-		XwaModsPage_UseMod(selected->path, p->mods_message, sizeof p->mods_message);
+	/* Another mod needs a restart, so the dialog offers one. Choosing the mod
+	   in use only clears a choice that the next start couldn't use. In a
+	   network game, Restart Now is off, and the restart line says so. */
+	if (AeronUi_ButtonEnabled(ui, "Use This Mod", usable) &&
+		XwaModsPage_UseMod(selected->path, p->mods_message, sizeof p->mods_message) &&
+		p->mod_selected != p->mod_running && !XwaPort_InNetworkSession()) {
+		if (selected->path[0])
+			snprintf(p->restart_question, sizeof p->restart_question, "Restart now to play with %s?",
+					 selected->name);
+		else
+			snprintf(p->restart_question, sizeof p->restart_question,
+					 "Restart now to play the original game?");
+		p->restart_message[0] = '\0';
+		p->restart_open = 1;
+	}
 	AeronUi_NextColumn(ui);
 	if (AeronUi_ButtonEnabled(ui, "Show Folder", folder[0] != '\0') && !Aeron_OpenFolder(folder))
 		snprintf(p->mods_message, sizeof p->mods_message, "Couldn't open %s.", folder);
@@ -484,6 +530,42 @@ static void draw_list(void) {
 		p->mods_scanned = 0;
 	}
 	AeronUi_EndColumns(ui);
+}
+
+/* ---- Restart Now --------------------------------------------------------- */
+
+void XwaModsPage_RestartButton(void) {
+	XwaModsPage* p = &g_xwaModsPage;
+	AeronUiContext* ui = p->ui;
+	/* A restart would drop the player from a network game. */
+	const int network = XwaPort_InNetworkSession();
+	AeronUi_BeginColumns(ui, 4, NULL);
+	if (AeronUi_ButtonEnabled(ui, "Restart Now", !XwaModsPage_Busy() && !network)) {
+		p->restart_message[0] = '\0';
+		if (XwaPort_InFlight()) {
+			p->restart_question[0] = '\0';
+			p->restart_open = 1;
+		} else {
+			p->restart_requested = true;
+		}
+	}
+	AeronUi_EndColumns(ui);
+	if (network)
+		AeronUi_Help(ui, "Leave the network game to restart OpenXWA.");
+	if (p->restart_message[0])
+		AeronUi_Error(ui, p->restart_message);
+}
+
+bool XwaModsPage_TakeRestartRequest(void) {
+	XwaModsPage* p = &g_xwaModsPage;
+	const bool requested = p->restart_requested;
+	p->restart_requested = false;
+	return requested;
+}
+
+void XwaModsPage_RestartFailed(void) {
+	snprintf(g_xwaModsPage.restart_message, sizeof g_xwaModsPage.restart_message, "%s",
+			 "OpenXWA can't restart by itself. Quit and start it again.");
 }
 
 /* ---- The page ----------------------------------------------------------- */
@@ -585,6 +667,27 @@ void XwaModsPage_DrawModals(void) {
 				mark_delete(p->mod_selected);
 			else
 				start_delete(p->mod_selected, XWA_MODS_DELETE_MOD);
+		}
+		AeronUi_EndColumns(ui);
+		AeronUi_EndModal(ui);
+	}
+	if (p->restart_open && AeronUi_BeginModal(ui, "Restart OpenXWA?", &p->restart_open, &desc)) {
+		const int asked = p->restart_question[0] != '\0';
+		if (asked)
+			AeronUi_Help(ui, p->restart_question);
+		if (XwaPort_InFlight())
+			AeronUi_Help(ui, "This ends your current mission, and you lose its progress.");
+		AeronUi_Spacer(ui, 12.0f);
+		AeronUi_BeginColumns(ui, 2, NULL);
+		/* After Use This Mod, the choice stays, and the restart line keeps
+		   its button. */
+		if (AeronUi_Button(ui, asked ? "Later" : "Cancel"))
+			p->restart_open = 0;
+		AeronUi_NextColumn(ui);
+		/* An import or a delete may have started under the modal. */
+		if (AeronUi_ButtonEnabled(ui, "Restart Now", !XwaModsPage_Busy())) {
+			p->restart_open = 0;
+			p->restart_requested = true;
 		}
 		AeronUi_EndColumns(ui);
 		AeronUi_EndModal(ui);

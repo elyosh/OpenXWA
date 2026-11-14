@@ -20,6 +20,7 @@
 #include "xwa/frontend/frontend_input.h"
 #include "xwa/frontend/frontend_mission_session.h"
 #include "xwa/frontend/frontend_resources.h"
+#include "xwa/frontend/mission_setup.h"
 #include "xwa/frontend/net_transport.h"
 #include "xwa/input/forcefeedback.h"
 #include "xwa/render/renderer.h"
@@ -307,13 +308,19 @@ void XwaPort_SetOptionsWindowOpen(int open) { g_xwaPortOptionsWindowOpen = open 
 
 int XwaPort_OptionsWindowOpen(void) { return g_xwaPortOptionsWindowOpen; }
 
-int XwaPort_OptionsWindowPausesGame(void) {
-	/* In a network session, the other players don't wait. */
-	const int network = g_netDirectPlayInterface != NULL ||
-						g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_NET_CLIENT ||
-						g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_NET_HOST;
-	return g_xwaPortOptionsWindowOpen && !network;
+int XwaPort_InNetworkSession(void) {
+	return g_netDirectPlayInterface != NULL ||
+		   g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_NET_CLIENT ||
+		   g_frontendMissionSessionMode == FRONTEND_MISSION_SESSION_NET_HOST;
 }
+
+int XwaPort_OptionsWindowPausesGame(void) {
+	return g_xwaPortOptionsWindowOpen && !XwaPort_InNetworkSession();
+}
+
+int XwaPort_InFlight(void) { return XwaFlightTask_IsActive(); }
+
+int XwaPort_HasPilot(void) { return g_pilotData.name[0] != '\0'; }
 
 void XwaPort_SetShortcutsCaptured(int captured) { g_xwaPortShortcutsCaptured = captured != 0; }
 
@@ -548,6 +555,12 @@ void XwaPort_Shutdown(void) {
 		XwaFlightTask_Shutdown();
 	}
 	XwaMovieTask_Shutdown();
+	/* As the original does when it quits (Frontend_SavePersistentState), but
+	   only once a pilot is loaded: before that, config.cfg may not be read
+	   yet, and writing it would lose the player's settings. */
+	if (XwaPort_HasPilot()) {
+		Config_Write();
+	}
 	Pilot_Save(0);
 	XwaFrontendTask_Shutdown();
 	XwaSnapshot_Shutdown();

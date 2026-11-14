@@ -147,6 +147,7 @@ static void start_import(bool replace) {
 	clear_log();
 	p->failure_selected = SIZE_MAX;
 	p->done_message[0] = '\0';
+	p->done_restart = 0;
 	p->start_us = Aeron_NowUs();
 	p->thread = p->progress_ready ? Aeron_ThreadCreate("mod import", import_thread, p) : NULL;
 	if (!p->thread) {
@@ -179,10 +180,16 @@ static void finish_import(void) {
 		if (!p->config_ok)
 			snprintf(p->done_message, sizeof p->done_message,
 					 "The mod is ready, but OpenXWA can't read config.yaml to select it.");
-		else if (XwaModsPage_UseMod(p->mod, p->done_message, sizeof p->done_message))
+		else if (XwaModsPage_UseMod(p->mod, p->done_message, sizeof p->done_message)) {
+			/* A restart keeps --mod, so it only plays this mod if --mod
+			   chose it. */
+			p->done_restart = (p->staged && running) || !p->launch_override;
 			snprintf(p->done_message, sizeof p->done_message, "%s",
 					 p->staged && running ? "Restart OpenXWA to play with the new import."
+					 : p->launch_override ? "OpenXWA was started with --mod. Start it without --mod to play "
+											"with this mod."
 										  : "Restart OpenXWA to play with this mod.");
+		}
 	}
 	p->view = XWA_MODS_VIEW_DONE;
 	p->cancel_open = 0;
@@ -356,6 +363,8 @@ static void draw_done(void) {
 	}
 	if (p->done_message[0])
 		AeronUi_Error(ui, p->done_message);
+	if (p->done_restart)
+		XwaModsPage_RestartButton();
 
 	AeronUi_Spacer(ui, fmaxf(0.0f, XwaModsPage_ContentHeight() - XWA_MODS_BUTTON_ROWS_REF));
 	AeronUi_Separator(ui);

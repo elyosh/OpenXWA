@@ -143,6 +143,25 @@ static int persist_option_switch(const char* key, int value, char* error, size_t
 	return XwaHostConfig_SaveSwitch(Aeron_GetVfs(), key, value, error, error_size);
 }
 
+/* Restart Now in the Mods tab. OpenXWA quits as usual, then Aeron_Shutdown
+ * starts it again with the same launch options. With a pilot, the new start
+ * skips the intro and opens the concourse. */
+static void request_restart(const XwaLaunchOptions* launch) {
+	XwaRelaunchArgs args;
+	char error[256];
+
+	if (!XwaLaunchOptions_RelaunchArgs(launch, XwaPort_HasPilot(), &args, error, sizeof error)) {
+		Aeron_LogError("xwa", "cannot restart: %s", error);
+		XwaModsPage_RestartFailed();
+		return;
+	}
+	if (!Aeron_RequestRelaunch(args.args, args.count)) {
+		XwaModsPage_RestartFailed();
+		return;
+	}
+	Aeron_LogInfo("xwa", "restarting");
+}
+
 /* Shows a setup message about a problem that the player can fix. Unlike
  * Aeron_FatalError, it doesn't ask for the logs. */
 static void show_setup_message(AeronMessageBoxKind kind, const char* message) {
@@ -668,6 +687,9 @@ int main(int argc, char** argv) {
 			 * input that opened it doesn't reach it. */
 			if (!window_opened) {
 				XwaOptionsWindow_Frame(in, (float)delta_us / 1000000.0f);
+			}
+			if (XwaModsPage_TakeRestartRequest()) {
+				request_restart(&launch);
 			}
 			if (!Aeron_Present()) {
 				Aeron_RequestFatalRendererError("frame presentation");

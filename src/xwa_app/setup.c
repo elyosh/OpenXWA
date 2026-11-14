@@ -1,5 +1,6 @@
 #include "setup.h"
 
+#include "aeron/paths.h"
 #include "mod_list.h"
 #include "mod_update.h"
 
@@ -221,6 +222,52 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 	}
 	if (out->film_benchmark && out->film_pause_at < 0) {
 		return setup_error(error, error_size, "%s requires --film-pause-at", "--film-benchmark");
+	}
+	return 1;
+}
+
+static int relaunch_path(XwaRelaunchArgs* out, const char* option, const char* path, char* storage,
+						 size_t capacity, char* error, size_t error_size) {
+	if (!path[0]) {
+		return 1;
+	}
+	if (!Aeron_AbsolutePath(path, storage, capacity)) {
+		return setup_error(error, error_size, "%s can't be made absolute", option);
+	}
+	out->args[out->count++] = option;
+	out->args[out->count++] = storage;
+	return 1;
+}
+
+int XwaLaunchOptions_RelaunchArgs(const XwaLaunchOptions* launch, int skip_intro, XwaRelaunchArgs* out,
+								  char* error, size_t error_size) {
+	if (!launch || !out) {
+		return setup_error(error, error_size, "%s", "invalid relaunch options");
+	}
+	memset(out, 0, sizeof *out);
+	if (!relaunch_path(out, "--game-data", launch->game_data_path, out->game_data, sizeof out->game_data,
+					   error, error_size) ||
+		!relaunch_path(out, "--resource-root", launch->resource_root, out->resource_root,
+					   sizeof out->resource_root, error, error_size) ||
+		!relaunch_path(out, "--mod", launch->mod_path, out->mod, sizeof out->mod, error, error_size)) {
+		return 0;
+	}
+	if (launch->render_width > 0) {
+		snprintf(out->render_size, sizeof out->render_size, "%dx%d", launch->render_width,
+				 launch->render_height);
+		out->args[out->count++] = "--render-size";
+		out->args[out->count++] = out->render_size;
+	}
+	/* The parser joins the game's arguments with spaces, so one argument gives
+	   it the same text back, quotes included. */
+	snprintf(out->game_command_line, sizeof out->game_command_line, "%s", launch->game_command_line);
+	if (skip_intro && !strstr(out->game_command_line, "skipintro") &&
+		!setup_append_argument(out->game_command_line, sizeof out->game_command_line, "skipintro")) {
+		return setup_error(error, error_size, "%s", "OpenXWA command line is too long");
+	}
+	if (out->game_command_line[0]) {
+		out->args[out->count++] = "--";
+		out->args[out->count++] = out->game_command_line;
 	}
 	return 1;
 }

@@ -37,6 +37,27 @@ typedef struct XwaLaunchOptions {
 
 int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* error, size_t error_size);
 
+/* The arguments of a new start of OpenXWA, without the program. */
+typedef struct XwaRelaunchArgs {
+	char game_data[XWA_INSTALL_PATH_CAPACITY];
+	char resource_root[XWA_INSTALL_PATH_CAPACITY];
+	char mod[XWA_INSTALL_PATH_CAPACITY];
+	char render_size[32];
+	/* The game's arguments of XwaLaunchOptions, and " skipintro". */
+	char game_command_line[1024 + sizeof " skipintro"];
+	const char* args[12];
+	int count;
+} XwaRelaunchArgs;
+
+/* Builds the arguments of a new start with the same launch options as
+ * `launch`. The paths are made absolute, since the new start can be in another
+ * folder (on macOS, it starts in "/"). The film options are dropped: they are
+ * for one test run. The game's arguments are passed after "--", and
+ * `skip_intro` adds "skipintro" to them. Returns 0 with `error` set when a
+ * path can't be made absolute or is too long. */
+int XwaLaunchOptions_RelaunchArgs(const XwaLaunchOptions* launch, int skip_intro, XwaRelaunchArgs* out,
+								  char* error, size_t error_size);
+
 /* The text that --help prints: every launch option, one line each. */
 const char* XwaLaunchOptions_Help(void);
 

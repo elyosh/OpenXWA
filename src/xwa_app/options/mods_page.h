@@ -47,5 +47,10 @@ void XwaModsPage_CancelImport(void);
  * During a delete, OpenXWA quits when it ends. Returns whether the page took
  * the request; otherwise the caller can quit at once. */
 bool XwaModsPage_RequestQuit(void);
+/* Whether the player pressed Restart Now since the last call. The caller
+ * then restarts OpenXWA. */
+bool XwaModsPage_TakeRestartRequest(void);
+/* Tells the player that OpenXWA can't restart by itself. */
+void XwaModsPage_RestartFailed(void);
 
 #endif

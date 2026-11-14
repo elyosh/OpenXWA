@@ -114,12 +114,14 @@ typedef struct XwaModsPage {
 	size_t failure_selected;
 	int cancel_open, quit_open, quit_after_import;
 	char done_message[512];
+	int done_restart; /* done_message asks for a restart that Restart Now does */
 
 	/* The list. */
 	XwaModList mods;
 	AeronUiListItem* mod_items;
 	unsigned char* mod_flags; /* XWA_MODS_IMPORTED and the others, for each mod */
-	size_t mod_chosen;        /* the mod that OpenXWA uses at its next start */
+	size_t mod_chosen;        /* the mod of config.yaml */
+	size_t mod_next;          /* the mod that the next start uses: mod_chosen, or the original game */
 	size_t mod_running;       /* the mod in use */
 	size_t mod_selected;
 	int mods_scanned;
@@ -135,6 +137,13 @@ typedef struct XwaModsPage {
 	int quit_after_delete;
 	char delete_path[XWA_MODS_PATH_CAP];
 	char delete_name[256];
+	/* Restart Now. The dialog, which asks after Use This Mod and confirms
+	   the button in a flight, the question after Use This Mod (or ""), the
+	   request that main.c takes, and why it failed. */
+	int restart_open;
+	char restart_question[320];
+	bool restart_requested;
+	char restart_message[256];
 } XwaModsPage;
 
 extern XwaModsPage g_xwaModsPage;
@@ -152,6 +161,8 @@ bool XwaModsPage_UseMod(const char* path, char* message, size_t capacity);
 int XwaModsPage_PathRow(const char* label, XwaModsBrowse browse, const char* title);
 /* The height left for the tab's content above the window's Close button. */
 float XwaModsPage_ContentHeight(void);
+/* The Restart Now button, under a line that asks for a restart. */
+void XwaModsPage_RestartButton(void);
 
 #if XWA_HAS_MOD_IMPORT
 /* mods_import.c */
