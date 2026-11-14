@@ -3189,6 +3189,16 @@ unsigned int fsfx_ComputeDistanceVolume(int dx, int dy, int dz, unsigned int sfx
 		if (distance > maxSound3DDistance) {
 			return 0;
 		}
+#ifdef XWA_MODERN
+		/* Sound_LoadEffectEx sets the max distance to this range, and the
+		   shim mutes a sound past it. The rough distance can be 13% below
+		   the true one, so a sound past the range on a diagonal would start
+		   silent and hold a voice slot. Check the true distance too. */
+		if (maxSound3DDistance != 0 && (double)dx * dx + (double)dy * dy + (double)dz * dz >=
+										   (double)maxSound3DDistance * maxSound3DDistance) {
+			return 0;
+		}
+#endif
 
 		remainingSound3DDistance = 2 * remainingSound3DDistance - distance;
 		*outPriority = baseVolume * remainingSound3DDistance / maxSound3DDistance;
