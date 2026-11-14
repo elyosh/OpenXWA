@@ -439,19 +439,20 @@ uint8_t Sound_LoadEffectEx(const char* fileName, const char* name, int create3DF
 											 (float)minDistanceOrRolloff * g_soundMinDistanceScale, 0);
 #ifdef XWA_MODERN
 		/* In 3D mode, fsfx_ComputeDistanceVolume doesn't start a sound beyond
-		   twice its distance value. The stock max distance of 131072 lets a
-		   sound that starts just inside play at -12 dB, so sounds appear and
-		   vanish with an audible step at that range. With the max distance at
-		   the same range, the shim fades the sound out over the last quarter
-		   of it instead (DSBCAPS_MUTE3DATMAXDISTANCE). A distance of 0 keeps
-		   the stock value, since a max distance of 0 would always mute.
+		   4 times its distance value, as in 2D (the stock 3D range is half of
+		   it). The stock max distance of 131072 lets a sound that starts just
+		   inside play at -18 dB, so sounds appear and vanish with an audible
+		   step at that range. With the max distance at the same range, the
+		   shim fades the sound out over the last quarter of it instead
+		   (DSBCAPS_MUTE3DATMAXDISTANCE). A distance of 0 keeps the stock
+		   value, since a max distance of 0 would always mute.
 
 		   The two ranges match for every positional sound: the lists of slots
 		   0 to 195 and the sound banks give the same distance here and to
 		   fsfx_ComputeDistanceVolume. Only voice lists load at slot 196 or
 		   later, and voices play without a position. */
 		def.buffer3D->lpVtbl->SetMaxDistance(
-			def.buffer3D, minDistanceOrRolloff != 0 ? 2.0f * (float)minDistanceOrRolloff : 131072.0f, 0);
+			def.buffer3D, minDistanceOrRolloff != 0 ? 4.0f * (float)minDistanceOrRolloff : 131072.0f, 0);
 #else
 		def.buffer3D->lpVtbl->SetMaxDistance(def.buffer3D, 131072.0f, 0);
 #endif

@@ -2664,6 +2664,10 @@ void fsfx_UpdateNearbyWeaponLoop(void) {
 
 				if (priority >= 125u) {
 					priority = 124;
+#ifdef XWA_MODERN
+				} else if (g_sound3DEnabled) {
+					/* The distance priority of fsfx_ComputeDistanceVolume. */
+#endif
 				} else {
 					priority = volume;
 				}
@@ -2905,6 +2909,10 @@ int fsfx_PlaySfxAtWorldPosition(unsigned int sfxSlot, float pitchScale, int worl
 		if (volume != 0) {
 			if ((unsigned int)playerIdx >= 125u) {
 				playerIdx = 124;
+#ifdef XWA_MODERN
+			} else if (g_sound3DEnabled) {
+				/* The distance priority of fsfx_ComputeDistanceVolume. */
+#endif
 			} else {
 				playerIdx = volume;
 			}
@@ -2959,6 +2967,11 @@ int fsfx_PlaySound(int sfxSlot, unsigned int sourceObjOrPointRef, unsigned int p
 		Sound_StopOldestInstance(g_sfxIds[sfxSlot]);
 	}
 
+	/* The original passes the playerIdx parameter's own slot as the priority
+	   output, and the 2D branches beyond the min distance don't write it. The
+	   slot then still holds the player index, below 125, so the priority
+	   below is the volume. */
+	priority = playerIdx;
 	volume = fsfx_ComputeSourceVolume(sourceRef, (unsigned int)sfxSlot, &priority);
 	if (volume == 0) {
 		return 1;
@@ -2971,6 +2984,11 @@ int fsfx_PlaySound(int sfxSlot, unsigned int sourceObjOrPointRef, unsigned int p
 
 	if (priority >= 125u) {
 		priority = 124;
+#ifdef XWA_MODERN
+	} else if (g_sound3DEnabled) {
+		/* The distance priority of fsfx_ComputeDistanceVolume, which the
+		   stock code replaces with the volume. */
+#endif
 	} else {
 		priority = volume;
 	}
@@ -3181,7 +3199,12 @@ unsigned int fsfx_ComputeDistanceVolume(int dx, int dy, int dz, unsigned int sfx
 		   distance table. Use minDistance for these slots. */
 		remainingSound3DDistance =
 			sfxSlot < 196u ? g_fsfxMinDistanceOrRolloffBySfxSlot[sfxSlot] : minDistance;
-		maxSound3DDistance = 2 * remainingSound3DDistance;
+		/* The stock 3D range is twice the table distance, half of the 2D
+		   range below: perhaps to save the few hardware 3D voices of the
+		   time. Both are at -12 dB there, with the 3D min distance at half
+		   the table distance. The modern build has 32 voices, so 3D reaches
+		   as far as 2D, at down to -18 dB, also as in 2D. */
+		maxSound3DDistance = 4 * remainingSound3DDistance;
 #else
 		maxSound3DDistance = 2 * g_fsfxMinDistanceOrRolloffBySfxSlot[sfxSlot];
 		remainingSound3DDistance = g_fsfxMinDistanceOrRolloffBySfxSlot[sfxSlot];
@@ -3200,15 +3223,31 @@ unsigned int fsfx_ComputeDistanceVolume(int dx, int dy, int dz, unsigned int sfx
 		}
 #endif
 
-		remainingSound3DDistance = 2 * remainingSound3DDistance - distance;
-		*outPriority = baseVolume * remainingSound3DDistance / maxSound3DDistance;
 #ifdef XWA_MODERN
+		/* The priority is the volume the 2D branch gives, so that far sounds
+		   lose their voices first, as in 2D. The stock code computes a
+		   priority that falls with distance here, but fsfx_PlaySound only
+		   checks it for 125 or more, and uses the volume: in 3D, the base
+		   volume, the same at any distance. The callers now use this one
+		   in 3D. */
+		if (minDistance == 0) {
+			*outPriority = baseVolume;
+		} else if ((distance >> 1) >= minDistance) {
+			*outPriority = baseVolume >> 3;
+		} else if (distance >= minDistance) {
+			*outPriority = baseVolume >> 2;
+		} else {
+			*outPriority = (baseVolume >> 2) + (minDistance - distance) * (baseVolume - (baseVolume >> 2)) /
+												   (minDistance - (minDistance >> 5));
+		}
 		/* The stock 3D path ignores the Exterior SFX volume, so only Off
-		   has an effect. Scale the volume as the 2D path does. The
-		   priority keeps the stock value. */
+		   has an effect. Scale the volume as the 2D path does. */
 		if (g_gameConfig.sfxExteriorVolume != 10) {
 			baseVolume = (unsigned int)g_gameConfig.sfxExteriorVolume * baseVolume / 10;
 		}
+#else
+		remainingSound3DDistance = 2 * remainingSound3DDistance - distance;
+		*outPriority = baseVolume * remainingSound3DDistance / maxSound3DDistance;
 #endif
 		return baseVolume;
 	}
