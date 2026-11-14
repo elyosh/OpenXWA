@@ -361,7 +361,7 @@ audio:
   # stereo, 5.1 or 7.1. A change applies the next time OpenXWA starts.
   speaker_layout: stereo
   # Distant sounds lose their high frequencies, as through air.
-  distance_filter: false
+  distance_filter: true
 # The camera lag and tilt, the cockpit sway and the HUD in the exterior view.
 # A mod can change these values. The options only offer Enhanced Camera,
 # which sets `enabled`.
