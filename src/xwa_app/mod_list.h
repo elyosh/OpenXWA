@@ -13,7 +13,7 @@
  * as incomplete. A mod whose file has `imported` was made by the
  * importer. */
 
-#include "host_config.h"
+#include "install_paths.h"
 
 #include <stddef.h>
 
@@ -31,7 +31,7 @@ typedef enum XwaModState {
 typedef struct XwaModEntry {
 	char name[256];
 	/* The mod folder. Empty for the original game. */
-	char path[XWA_HOST_CONFIG_PATH_CAPACITY];
+	char path[XWA_INSTALL_PATH_CAPACITY];
 	XwaModState state;
 	/* Why the mod can't be used, for the player. Empty when it can. */
 	char problem[160];

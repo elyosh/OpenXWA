@@ -271,7 +271,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	AeronTexture* bloom_tex = NULL;
 	const float bloom_intensity = AeronSceneBloom_Intensity();
 	if (bloom_intensity > 0.0f) {
-		if (!AeronSceneBloom_Apply(s.bloom, cmd, scene_tex, PREVIEW_RT_W, PREVIEW_RT_H, PREVIEW_RT_H)) {
+		if (!AeronSceneBloom_Apply(s.bloom, cmd, scene_tex, PREVIEW_RT_W, PREVIEW_RT_H, PREVIEW_RT_H, NULL, NULL)) {
 			Aeron_CommandBufferSetFailure(cmd, "Model-preview bloom recording failed");
 			return NULL;
 		}

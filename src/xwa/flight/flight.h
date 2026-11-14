@@ -81,7 +81,7 @@ typedef enum GameActionKey {
 	KEY_SHIFT_U = 0x055,
 	KEY_SHIFT_W = 0x057,
 	KEY_LEFT_BRACKET = 0x05b,
-	KEY_FOWARD_SLASH = 0x05c,
+	KEY_BACKSLASH = 0x05c,
 	KEY_RIGHT_BRACKET = 0x05d,
 	KEY_A = 0x061,
 	KEY_B = 0x062,
@@ -111,17 +111,23 @@ typedef enum GameActionKey {
 	KEY_ALT_C = 0x082,
 	KEY_ALT_D = 0x083,
 	KEY_ALT_E = 0x084,
+	KEY_ALT_F = 0x085,
 	KEY_ALT_J = 0x089,
 	KEY_ALT_N = 0x08d,
 	KEY_ALT_P = 0x08f,
-	KEY_ABORT_MISSION = 0x090,
+	KEY_ALT_Q = 0x090,
 	KEY_ALT_S = 0x092,
 	KEY_ALT_U = 0x094,
 	KEY_ALT_V = 0x095,
-	KEY_ALT_G = 0x096,
+	KEY_ALT_W = 0x096,
 	KEY_ALT_1 = 0x09b,
 	KEY_ALT_2 = 0x09c,
 	KEY_ALT_3 = 0x09d,
+	KEY_ALT_4 = 0x09e,
+	KEY_LEFT = 0x0a4,
+	KEY_RIGHT = 0x0a5,
+	KEY_UP = 0x0a6,
+	KEY_DOWN = 0x0a7,
 	KEY_INSERT = 0x0a8,
 	KEY_DELETE = 0x0a9,
 	KEY_HOME = 0x0aa,
@@ -143,6 +149,7 @@ typedef enum GameActionKey {
 	KEY_PAD_STAR = 0x0be,
 	KEY_PAD_MINUS = 0x0bf,
 	KEY_PAD_PLUS = 0x0c0,
+	KEY_PAD_ENTER = 0x0c1,
 	KEY_PAD_DOT = 0x0c2,
 	KEY_F1 = 0x0c3,
 	KEY_F2 = 0x0c4,
@@ -175,10 +182,10 @@ typedef enum GameActionKey {
 	KEY_THROTTLE_8 = 0x0e1,
 	KEY_THROTTLE_9 = 0x0e2,
 	KEY_THROTTLE_10 = 0x0e3,
-	KEY_THROTTLE_11 = 0x0e4,
-	KEY_THROTTLE_12 = 0x0e5,
-	KEY_THROTTLE_13 = 0x0e6,
-	KEY_THROTTLE_14 = 0x0e7,
+	KEY_THROTTLE_12 = 0x0e4,
+	KEY_THROTTLE_13 = 0x0e5,
+	KEY_THROTTLE_14 = 0x0e6,
+	KEY_THROTTLE_15 = 0x0e7,
 	KEY_MFD_OVERLAY = 0x12d,
 	KEY_HUD_TOGGLE = 0x12c,
 	KEY_CONSOLE_TOGGLE = 0x111,
@@ -220,14 +227,29 @@ typedef struct FlightNetWorldStateChunkPacket {
 
 #pragma pack(push, 1)
 typedef struct FlightInputFrameRecord {
+#ifdef XWA_MODERN
+	/* The continuous throttle position, 0..65535, when keyMods has
+	   XWA_INPUT_THROTTLE_PRESENT, otherwise 0. The original never reads this
+	   field. */
+	uint16_t throttle;
+#else
 	uint16_t reserved0;
+#endif
 	uint16_t key;
 	int8_t axisX;
 	int8_t axisY;
 	int8_t axisR;
+	/* Bit 0: fire held. Bit 1: target/roll modifier held. */
 	uint8_t keyMods;
 } FlightInputFrameRecord;
 #pragma pack(pop)
+
+#ifdef XWA_MODERN
+/* keyMods bit: the record carries a throttle position. Every reader of
+   keyMods masks it with 3 or 0xf, so the original ignores it, and films keep
+   the original record size. */
+#define XWA_INPUT_THROTTLE_PRESENT 0x80u
+#endif
 
 typedef struct InputFrame {
 	int applied;
@@ -440,6 +462,16 @@ int Flight_ApplyWorldStateObjectPresenceMap(const uint8_t* presenceMap);
 int Flight_SaveWorldState(void);
 int Flight_ChecksumWorldState(int expectedChecksum, int serverTicks);
 void Flight_RestoreWorldState(void);
+#ifdef XWA_MODERN
+/* Write the world state's extension block. original_film.c uses them to
+   convert films from the original game. EncodeExtensionRecord writes the
+   record for `craft` in `objectSlot`. EncodeExtensionBlock writes the block
+   header, `count` records and an empty articulation list, and returns the
+   number of bytes written. */
+size_t FlightWorldState_ExtensionRecordSize(void);
+void FlightWorldState_EncodeExtensionRecord(uint8_t* dst, uint16_t objectSlot, const CraftData* craft);
+size_t FlightWorldState_EncodeExtensionBlock(uint8_t* dst, const uint8_t* records, uint16_t count);
+#endif
 int Flight_CheckMissionEndAndExitRequest(void);
 int Flight_ApplyConfigToRuntime(GameConfig* oldConfig, GameConfig* newConfig);
 void Flight_UpdateDynamicMusicState(void);
@@ -452,6 +484,8 @@ void Flight_AdvanceOneStep(int targetTimestamp);
 void Flight_StepSimToTime(int targetTimestamp);
 #ifdef XWA_MODERN
 void Flight_ModernResetHighRateIntegration(void);
+/* Drops the AI turns that high-rate mode still has to apply. */
+void Flight_ModernResetAiTurns(void);
 /* While the options menu is open, runs one more step of it and returns 1.
    Returns 0 when it isn't open. Flight timing resumes only after the menu
    closes. */

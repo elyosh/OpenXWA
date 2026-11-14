@@ -1,6 +1,8 @@
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa/flight/hangar.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
+#include "xwa_runtime/runtime/film_state.h"
+#include "xwa_runtime/runtime/original_film.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/port.h"
 
@@ -53,6 +55,7 @@
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/cockpit_view.h"
 #include "xwa_runtime/models/hangars.h"
+#include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/timing/host_clock.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 
@@ -392,19 +395,6 @@ static void XwaFlightTask_ApplyFlightConfig(void) {
 	g_dirLightingEnabled = g_gameConfig.diffuse[configIndex] != 0;
 }
 
-/* OpenXWA's flight screen. Flight always uses the 1600x1200 slot of the
-   resolution table, changed to a 1920x1080 screen with a HUD scale of 1.44
-   and a projection of 1152 (1080 x 1.0666, which keeps the vertical field of
-   view of the stock modes). The modern renderer takes only the HUD layout,
-   the text sizes and the cockpit view offset from this screen, so they are
-   the same for every player. See docs/hud_scale_plan.md. */
-enum {
-	XWA_FLIGHT_SCREEN_WIDTH = 1920,
-	XWA_FLIGHT_SCREEN_HEIGHT = 1080,
-	XWA_FLIGHT_SCREEN_PROJ_SCALE = 1152,
-};
-#define XWA_FLIGHT_SCREEN_HUD_SCALE 1.44f
-
 static void XwaFlightTask_ApplyFlightResolution(void) {
 	/* The original reads g_gameConfig.screenRes[NetSession_GetPlayerCount() > 1]
 	   here. OpenXWA ignores the setting and uses its flight screen. */
@@ -461,6 +451,7 @@ static void XwaFlightTask_StoreActualConfigAfterDisplayInit(void) {
 static int XwaFlightTask_LoadFilmHeader(const char* filmFilePath) {
 	int16_t ignored;
 
+	XwaObjectLimits_ClearFilmCounts();
 	if (filmFilePath == 0 || filmFilePath[0] == '\0') {
 		return 1;
 	}
@@ -504,6 +495,17 @@ static int XwaFlightTask_LoadFilmHeader(const char* filmFilePath) {
 	} else {
 		Film_ReadBytes(&g_filmHeaderDifficulty, sizeof(g_filmHeaderDifficulty));
 		Film_ReadBytes(&g_filmHeaderCollisionsEnabled, sizeof(g_filmHeaderCollisionsEnabled));
+	}
+	/* Films save objects by slot index, so the object table must use the
+	   film's counts. Version 8 films store them in a layout block. Films
+	   from the original game store them at the end of the world state. */
+	if ((uint16_t)g_filmVersion >= 8u) {
+		XwaFilmState_UseLayoutCounts();
+	} else if ((uint16_t)g_filmVersion <= 5u && !XwaOriginalFilm_UseTailCounts()) {
+		g_filmPlaybackMode = 0;
+		File_Close(g_filmFile);
+		g_filmFile = 0;
+		return 0;
 	}
 	return 1;
 }
@@ -1977,15 +1979,23 @@ static void XwaFlightTask_TickPhases(int now) {
 }
 
 int XwaFlightTask_Shutdown(void) {
+	int frontendModalActive;
+
 	XwaFlightPauseTask_Shutdown();
 	XwaModernFlightTiming_EndSession();
 	if (!g_xwaFlightTaskActive && !g_xwaFlightTaskComplete) {
 		return g_xwaFlightTaskResult;
 	}
 
+	/* The original in-flight modals block until they close, but the port runs
+	 * them over several ticks, so quitting the game can end the session while
+	 * one is open. FlightDisplay_FreeSurfaces then closes it, and closing it
+	 * reads the keyboard. In that case keep DirectInput until the surfaces are
+	 * freed. */
+	frontendModalActive = FlightDisplay_IsFrontendModalActive();
 	g_sw3dSkipOddScanlines = 0;
 	Sound_Shutdown_Sound_Engine();
-	if (g_flightConfDirectInput) {
+	if (g_flightConfDirectInput && !frontendModalActive) {
 		DInput_Shutdown();
 	}
 	NetSession_Shutdown();
@@ -2001,6 +2011,9 @@ int XwaFlightTask_Shutdown(void) {
 		FlightLoading_DetachFrontendSurfaces();
 	}
 	FlightDisplay_FreeSurfaces();
+	if (g_flightConfDirectInput && frontendModalActive) {
+		DInput_Shutdown();
+	}
 
 	g_useHardware3D = 0;
 	g_flightRenderToFrontend = 1;

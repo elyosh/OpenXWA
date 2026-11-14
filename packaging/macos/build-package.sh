@@ -5,10 +5,13 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "${script_dir}/../.." && pwd)"
 
-sdl_version="${SDL_VERSION:-3.4.18}"
-zstd_version="${ZSTD_VERSION:-1.5.7}"
-ffmpeg_version="${FFMPEG_VERSION:-8.0.1}"
-shadercross_commit="${SHADERCROSS_COMMIT:-6b06e55c7c5d7e7a09a8a14f76e866dcfad5ab99}"
+# The versions and patches of aeron's dependencies; the variables build
+# another version.
+dependency_dir="${repo_root}/aeron/packaging/dependencies"
+sdl_version="${SDL_VERSION:-$(cat "${dependency_dir}/sdl/version")}"
+zstd_version="${ZSTD_VERSION:-$(cat "${dependency_dir}/zstd/version")}"
+ffmpeg_version="${FFMPEG_VERSION:-$(cat "${dependency_dir}/ffmpeg/version")}"
+shadercross_commit="${SHADERCROSS_COMMIT:-$(cat "${dependency_dir}/shadercross/version")}"
 deployment_target="${XWA_MACOS_DEPLOYMENT_TARGET:-13.0}"
 architecture="${XWA_MACOS_ARCHITECTURE:-$(uname -m)}"
 application_version="${XWA_VERSION:-0.0.0-dev}"
@@ -21,6 +24,9 @@ notary_profile="${XWA_MACOS_NOTARY_PROFILE:-}"
 notary_apple_id="${XWA_MACOS_NOTARY_APPLE_ID:-}"
 notary_team_id="${XWA_MACOS_NOTARY_TEAM_ID:-}"
 notary_password="${XWA_MACOS_NOTARY_PASSWORD:-}"
+notary_key="${XWA_MACOS_NOTARY_KEY:-}"
+notary_key_id="${XWA_MACOS_NOTARY_KEY_ID:-}"
+notary_issuer="${XWA_MACOS_NOTARY_ISSUER:-}"
 
 # The Debug variant enables the in-game debug UI and packages an OpenXWA.dSYM
 # debug-symbol bundle beside the application. Dependencies are always built in
@@ -72,9 +78,28 @@ clone_tag() {
     fi
 }
 
+# Applies aeron's patches for a dependency to its cached checkout. The
+# checkout is reset first, so that the patches always apply to the pristine
+# source; a stamp beside it records the patches, to skip this when they
+# haven't changed.
+apply_dependency_patches() {
+    local dependency="$1"
+    local destination="$2"
+    local stamp="${destination}.aeron-patches"
+    local key
+
+    key="$(cat "${dependency_dir}/${dependency}"/*.patch 2>/dev/null | shasum -a 256 | cut -d ' ' -f 1)"
+    if [[ -f "${stamp}" && "$(cat "${stamp}")" == "${key}" ]]; then
+        return
+    fi
+    git -C "${destination}" reset --hard --quiet
+    git -C "${destination}" clean -fd --quiet
+    "${dependency_dir}/apply-patches.sh" "${dependency_dir}/${dependency}" "${destination}"
+    echo "${key}" > "${stamp}"
+}
+
 prepare_shadercross() {
     local destination="${source_root}/SDL_shadercross"
-    local patch
     local checkout
 
     if [[ ! -d "${destination}/.git" ]]; then
@@ -92,16 +117,7 @@ prepare_shadercross() {
         exit 1
     fi
 
-    # In order: each patch applies on top of the previous ones.
-    for patch in "${repo_root}/packaging/common/shadercross-fsr3.patch" \
-        "${repo_root}/packaging/common/shadercross-msl-bindings.patch"; do
-        if git -C "${destination}" apply --check "${patch}" >/dev/null 2>&1; then
-            git -C "${destination}" apply "${patch}"
-        elif ! git -C "${destination}" apply --reverse --check "${patch}" >/dev/null 2>&1; then
-            echo "SDL_shadercross patch cannot be applied cleanly: ${patch}" >&2
-            exit 1
-        fi
-    done
+    apply_dependency_patches shadercross "${destination}"
 
     git -C "${destination}" submodule update --init --recursive
 }
@@ -117,6 +133,7 @@ build_dependencies() {
 
     clone_tag https://github.com/libsdl-org/SDL.git \
         "release-${sdl_version}" "${source_root}/SDL-${sdl_version}"
+    apply_dependency_patches sdl "${source_root}/SDL-${sdl_version}"
     clone_tag https://github.com/facebook/zstd.git \
         "v${zstd_version}" "${source_root}/zstd-${zstd_version}"
     clone_tag https://github.com/FFmpeg/FFmpeg.git \
@@ -425,6 +442,8 @@ main() {
 
     test -x "${application}/Contents/MacOS/OpenXWA"
     test -f "${application}/Contents/Resources/resources/remaster/config.yaml"
+    test -f "${application}/Contents/Resources/resources/assets/fonts/menu.fnt"
+    test -f "${application}/Contents/Resources/resources/assets/fonts/menu.ktx2"
     test -f "${application}/Contents/Resources/shaders/hyperspace_streak.vert.msl"
     test -f "${application}/Contents/Resources/shaders/hyperspace_tunnel.vert.msl"
     test -f "${application}/Contents/Resources/shaders/hyperspace_tunnel.frag.msl"

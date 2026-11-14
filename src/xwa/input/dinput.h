@@ -20,6 +20,7 @@ extern int           g_dinputShiftDown;
 extern int           g_dinputCtrlDown;
 extern int           g_dinputAltDown;
 extern void*         hwnd;
+extern IDirectInputDeviceA* g_dinputKeyboardDevice;
 
 /* Immediate mouse state, filled by DInput_PollMouseState via GetDeviceState. */
 extern DIMOUSESTATE g_dinputMouseState;

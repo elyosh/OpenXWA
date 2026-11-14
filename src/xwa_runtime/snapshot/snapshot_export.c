@@ -483,6 +483,18 @@ void XwaSnapshotExport_CaptureOptAssets(XwaSnapshot* snapshot) {
 	if (!snapshot) {
 		return;
 	}
+	/* Mark the models of the object types with a projectile genus. A
+	   craft's shot models (weapons.models) are checked in the loop below.
+	   The array is static to keep its 64 KiB off the stack. */
+	static uint8_t projectile[UINT16_MAX + 1];
+	memset(projectile, 0, sizeof projectile);
+	for (int type = 1; type < XWA_LOADED_MODEL_COUNT; type++) {
+		const uint8_t genus = g_objectTypes[type].genusId;
+		if ((genus == GENUS_PlayerProjectile || genus == GENUS_NpcProjectile) &&
+			g_loadedModels.byObjectType[type] != 0) {
+			projectile[g_loadedModels.byObjectType[type]] = 1;
+		}
+	}
 	snapshot->opt_asset_generation = g_optAssetGeneration;
 	snapshot->opt_asset_count = 0;
 	for (uint32_t i = 0; i < XWA_SNAP_MAX_OPT_ASSETS; i++) {
@@ -492,6 +504,8 @@ void XwaSnapshotExport_CaptureOptAssets(XwaSnapshot* snapshot) {
 		XwaOptAsset* asset = &snapshot->opt_assets[snapshot->opt_asset_count++];
 		asset->public_handle = g_optHandles[i].public_handle;
 		asset->source = g_optHandles[i].source;
+		asset->projectile =
+			projectile[asset->public_handle] || XwaWeaponModels_IsModel(asset->public_handle) ? 1 : 0;
 		/* The same bytes as snprintf "%s": the name and its zero. */
 		memcpy(asset->name, g_optHandles[i].name, strlen(g_optHandles[i].name) + 1);
 	}

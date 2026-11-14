@@ -45,6 +45,7 @@
 #include "xwa/math/scalar.h"
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/input/flight_controls.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_sounds.h"
@@ -1762,8 +1763,8 @@ int Hangar_EnterCraft(uint16_t fromObjIdx) {
 // backdrop traffic, input, ambient/engine SFX, mothership-status cockpit lighting, and
 // triggers the flight handoff / hangar exit. Returns g_flightExitRequest (or 0).
 //
-// The original's Sound_Update3DListenerAndSources() call is a DirectSound3D listener/source
-// update superseded by the Aeron audio path, so it is omitted at the port boundary.
+// The port leaves out the original's Sound_Update3DListenerAndSources() call. The hangar task
+// in flight_task.c calls it after this function, every 30 ms.
 int Hangar_UpdateLaunch(int dtMs) {
 	int clampedDtMs = dtMs;
 	int dtMsa;
@@ -2457,7 +2458,7 @@ int Hangar_UpdateLaunch(int dtMs) {
 
 	if (g_inputTimestamp - (unsigned)g_hangarLastSoundUpdateTimestamp > 0x1Du) {
 		g_hangarLastSoundUpdateTimestamp = (int)g_inputTimestamp;
-		// Sound_Update3DListenerAndSources() omitted: DirectSound3D listener path -> Aeron audio.
+		// Sound_Update3DListenerAndSources() is called by the hangar task instead.
 		if (((uint8_t)g_inputTimestamp & 0x40) != 0 && (GameRand2() & 0x3F) == 1) {
 			fsfx_PlaySound(69, (uint16_t)g_hangarPlayerObjIdx, g_localPlayer);
 		}
@@ -4174,8 +4175,17 @@ void Hangar_HandleInput(void) {
 
 	// --- Read (and film-record/replay) one key ---
 	if (!g_filmPlaybackMode) {
+#ifdef XWA_MODERN
+		/* The keyboard bindings and the controllers. Each action sends the code
+		   of its original key. */
+		{
+			int fromKeyboard;
+			key = XwaFlightControls_ReadKey(&fromKeyboard);
+		}
+#else
 		if (FlightInput_HasKeyReady())
 			key = FlightInput_GetNextKey();
+#endif
 		if (g_filmRecording == 2)
 			Film_WriteBytesBuffered(&key, 2);
 	} else if (g_filmPlaybackMode == 2) {

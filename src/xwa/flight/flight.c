@@ -56,11 +56,10 @@
 #include "xwa/util/memory.h"
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
-#include "xwa_runtime/input/winmm_joystick_provider.h"
 #include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
-#include "xwa_runtime/input/mouse_flight.h"
+#include "xwa_runtime/input/flight_controls.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/gunner_seats.h"
@@ -70,9 +69,10 @@
 #include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
-#include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/film_state.h"
+#include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
+#include "xwa_runtime/runtime/original_film.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -103,8 +103,6 @@ typedef struct ModernMapCameraStepRemainder {
 typedef struct ModernJoystickInputSample {
 	int timestamp;
 	int captured;
-	int joystickValid;
-	WinmmJoystickTraceSample bridge;
 	int16_t prePackX;
 	int16_t prePackY;
 	int16_t prePackR;
@@ -170,8 +168,6 @@ void FlightDebug_CaptureJoystickInputSample(int timestamp) {
 	memset(sample, 0, sizeof(*sample));
 	sample->timestamp = timestamp;
 	sample->captured = 1;
-	sample->joystickValid =
-		g_joystickEnabled != 0 && g_joystickActive && WinmmJoystick_GetLastTraceSample(&sample->bridge);
 	sample->prePackX = g_ctrlAxisX;
 	sample->prePackY = g_ctrlAxisY;
 	sample->prePackR = g_ctrlAxisR;
@@ -201,9 +197,6 @@ static void FlightDebug_LogJoystickIntegration(const ModernJoystickIntegrationTr
 
 	if (!sample) {
 		memset(&fallback, 0, sizeof(fallback));
-		fallback.bridge.sourceAxisX = -1;
-		fallback.bridge.sourceAxisY = -1;
-		fallback.bridge.sourceAxisR = -1;
 		fallback.prePackX = g_ctrlAxisX;
 		fallback.prePackY = g_ctrlAxisY;
 		fallback.prePackR = g_ctrlAxisR;
@@ -214,19 +207,16 @@ static void FlightDebug_LogJoystickIntegration(const ModernJoystickIntegrationTr
 	}
 
 	Aeron_LogInfo("xwa.input.trace",
-				  "JOYTRACE ts=%d dt=%u joy=%d sdl=%d:%d,%d:%d,%d:%d wm=%u,%u,%u xwa=%d,%d,%d "
+				  "JOYTRACE ts=%d dt=%u xwa=%d,%d,%d "
 				  "pk=%d,%d,%d sc_ypr=%d,%d,%d tgt_ypr=%d,%d,%d sm_ypr=%d,%d,%d step_ypr=%d,%d,%d "
 				  "ang_pyr=%u,%u,%u>%u,%u,%u",
-				  trace->timestamp, (unsigned int)trace->elapsedTicks, sample->joystickValid,
-				  sample->bridge.sourceAxisX, sample->bridge.sourceValueX, sample->bridge.sourceAxisY,
-				  sample->bridge.sourceValueY, sample->bridge.sourceAxisR, sample->bridge.sourceValueR,
-				  sample->bridge.winmmX, sample->bridge.winmmY, sample->bridge.winmmR, sample->prePackX,
-				  sample->prePackY, sample->prePackR, sample->packedX, sample->packedY, sample->packedR,
-				  trace->scaledYaw, trace->scaledPitch, trace->scaledRoll, trace->targetYaw,
-				  trace->targetPitch, trace->targetRoll, trace->smoothedYaw, trace->smoothedPitch,
-				  trace->smoothedRoll, trace->stepYaw, trace->stepPitch, trace->stepRoll,
-				  (unsigned int)trace->oldPitch, (unsigned int)trace->oldYaw, (unsigned int)trace->oldRoll,
-				  (unsigned int)trace->newPitch, (unsigned int)trace->newYaw, (unsigned int)trace->newRoll);
+				  trace->timestamp, (unsigned int)trace->elapsedTicks, sample->prePackX, sample->prePackY,
+				  sample->prePackR, sample->packedX, sample->packedY, sample->packedR, trace->scaledYaw,
+				  trace->scaledPitch, trace->scaledRoll, trace->targetYaw, trace->targetPitch,
+				  trace->targetRoll, trace->smoothedYaw, trace->smoothedPitch, trace->smoothedRoll,
+				  trace->stepYaw, trace->stepPitch, trace->stepRoll, (unsigned int)trace->oldPitch,
+				  (unsigned int)trace->oldYaw, (unsigned int)trace->oldRoll, (unsigned int)trace->newPitch,
+				  (unsigned int)trace->newYaw, (unsigned int)trace->newRoll);
 }
 
 void Flight_ModernResetHighRateIntegration(void) {
@@ -234,6 +224,7 @@ void Flight_ModernResetHighRateIntegration(void) {
 	memset(g_modernMapCameraStepRemainders, 0, sizeof(g_modernMapCameraStepRemainders));
 	memset(g_modernJoystickInputSamples, 0, sizeof(g_modernJoystickInputSamples));
 	g_modernJoystickInputSampleCursor = 0;
+	Flight_ModernResetAiTurns();
 }
 #endif
 
@@ -568,10 +559,13 @@ const uint16_t g_subsystemIdToFlag[10] = {
 	0x0040u, 0x0020u, 0x0010u, 0x0001u, 0x0004u, 0x0008u, 0x0100u, 0x0200u, 0x0002u, 0x0080u,
 };
 
+#ifndef XWA_MODERN
+/* The modern build reads the throttle lever through XwaFlightControls. */
 static const uint8_t g_throttleKeyByBucket[17] = {
 	0x08u, 0xe7u, 0xe6u, 0xe5u, 0xe4u, 0x5du, 0xe3u, 0xe2u, 0xe1u,
 	0xe0u, 0xdfu, 0x5bu, 0xdeu, 0xddu, 0xdcu, 0xdbu, 0x5cu,
 };
+#endif
 
 // GLOBAL: XWA 0x91AB86
 uint16_t g_keyMods;
@@ -641,6 +635,10 @@ uint8_t* g_worldStateDupBuffer;
 int worldStateSize;
 // GLOBAL: XWA 0x91AE78
 int g_worldStateSize;
+#ifdef XWA_MODERN
+/* The size of g_worldStateBuffer, for reading a film's world state. */
+static size_t g_worldStateBufferCapacity;
+#endif
 
 // GLOBAL: XWA 0x770E60
 int g_lastFrameTime;
@@ -1350,6 +1348,9 @@ void FlightInput_ResetRuntimeState(void) {
 	g_injectedKeyCount = 0;
 	g_joystickDetectResultWord = joystickActive;
 	g_joystickEnabled = joystickActive != 0;
+#ifdef XWA_MODERN
+	XwaFlightControls_Reset();
+#endif
 	g_throttleSmoothed = -1;
 
 	return;
@@ -2505,10 +2506,16 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 	uint16_t key;
 	int axisX;
 	int axisY;
+#ifndef XWA_MODERN
 	int throttleRaw;
+#endif
 	int axisR;
 	int keyMods;
+#ifdef XWA_MODERN
+	int fromKeyboard;
+#else
 	volatile int joystickButtons;
+#endif
 
 	if ((playerIdxOrSentinel == g_localPlayer || playerIdxOrSentinel == -2) && g_inHangarReady != 0 &&
 		g_filmPlaybackMode == 0) {
@@ -2518,38 +2525,23 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 	if (playerIdxOrSentinel < 0) {
 		axisX = 0;
 		axisY = 0;
+#ifndef XWA_MODERN
 		throttleRaw = 0;
+#endif
 		axisR = 0;
+#ifndef XWA_MODERN
 		joystickButtons = 0;
+#endif
 		keyMods = 0;
+#ifdef XWA_MODERN
+		/* The keyboard bindings, the controllers and the mouse. They are read
+		   before the input frame is packed, so films, replays and net lockstep
+		   see the same input whatever device it came from. */
+		XwaFlightControls_Sample(&axisX, &axisY, &axisR, &keyMods);
+		fromKeyboard = 0;
+#else
 		if (g_joystickEnabled != 0) {
 			joystickButtons = Joystick_PollRawAxesIfEnabled(&axisX, &axisY, &throttleRaw, &axisR, 0);
-		}
-
-#ifdef XWA_MODERN
-		/* Mouse flight control. It runs before the input frame is packed, so
-		   films, replays and net lockstep see the same input whether it came
-		   from the mouse or the joystick. The mouse replaces any axis it moves;
-		   the joystick keeps the others. While cockpit mouse look is on, mouse
-		   flight is suspended. */
-		if (g_padlockMouseLookEnabled) {
-			XwaMouseFlight_Suspend();
-		} else if (XwaMouseFlight_Sample()) {
-			int mouseAxisX;
-			int mouseAxisY;
-			int mouseAxisR;
-
-			XwaMouseFlight_GetAxes(&mouseAxisX, &mouseAxisY, &mouseAxisR);
-			if (mouseAxisX != 0) {
-				axisX = mouseAxisX;
-			}
-			if (mouseAxisY != 0) {
-				axisY = mouseAxisY;
-			}
-			if (mouseAxisR != 0) {
-				axisR = mouseAxisR;
-			}
-			joystickButtons |= XwaMouseFlight_ButtonsMask();
 		}
 #endif
 
@@ -2557,8 +2549,13 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 		if (g_injectedKeyCount != 0) {
 			key = g_injectedKeyStack[g_injectedKeyCount - 1];
 			--g_injectedKeyCount;
-		} else if (FlightInput_HasKeyReady()) {
+		}
+#ifdef XWA_MODERN
+		else if ((key = XwaFlightControls_ReadKey(&fromKeyboard)) != 0 && fromKeyboard) {
+#else
+		else if (FlightInput_HasKeyReady()) {
 			key = (uint16_t)FlightInput_GetNextKey();
+#endif
 			if (g_consoleEnabled == 0 || g_players[g_localPlayer].hudEnabled == 0 ||
 				g_players[g_localPlayer].viewState.externalCameraActive != 0 ||
 				g_players[g_localPlayer].mfd.consolePageAvailable == 0 ||
@@ -2568,15 +2565,12 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 		}
 
 #ifdef XWA_MODERN
-		/* A short right-button tap sends the target-in-sight key, like a tap of
-		   joystick button 2. A tap made while the player is typing a message is
-		   dropped, because KEY_ALT_1 would insert a taunt there. */
-		if (key == 0 && !g_padlockMouseLookEnabled && XwaMouseFlight_TakeTargetTap() &&
-			g_players[g_localPlayer].msgTypeId == 0) {
-			key = KEY_ALT_1;
+		/* A held controller look binding sends its key on every read, like the
+		   original joystick hat. */
+		if (key == 0) {
+			key = XwaFlightControls_ReadLookKey();
 		}
-#endif
-
+#else
 		{
 			int buttonBit;
 			unsigned int buttonIdx;
@@ -2671,6 +2665,7 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 				}
 			}
 		}
+#endif
 
 		g_ctrlAxisR = (int16_t)axisR;
 		g_ctrlAxisX = (int16_t)axisX;
@@ -2678,6 +2673,18 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 		g_ctrlAxisY = (int16_t)axisY;
 		g_keyMods = (uint16_t)keyMods;
 
+#ifdef XWA_MODERN
+		/* The roll actions force the roll axis, keypad 1 and 3 by default. */
+		if (XwaFlightControls_RollHeld(XWA_INPUT_ROLL_LEFT)) {
+			if (!XwaFlightControls_RollHeld(XWA_INPUT_ROLL_RIGHT)) {
+				g_ctrlAxisR = -127;
+			}
+		}
+		if (XwaFlightControls_RollHeld(XWA_INPUT_ROLL_RIGHT) &&
+			!XwaFlightControls_RollHeld(XWA_INPUT_ROLL_LEFT)) {
+			g_ctrlAxisR = 127;
+		}
+#else
 		if (g_dinputKeyboardState[0x4f] != 0) {
 			if (g_dinputKeyboardState[0x51] == 0) {
 				g_ctrlAxisR = -127;
@@ -2686,6 +2693,7 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 		if (g_dinputKeyboardState[0x51] != 0 && g_dinputKeyboardState[0x4f] == 0) {
 			g_ctrlAxisR = 127;
 		}
+#endif
 
 		return key;
 	} else {
@@ -2702,16 +2710,13 @@ uint16_t FlightInput_Read(int playerIdxOrSentinel) {
 	}
 }
 
+/* The world state's records, in the original's byte layout. The original
+ * copies ObjectRecord, MobileObject and the mission globals with memcpy, so
+ * these structs follow the field order of the original's memory (the IDB
+ * types), not of the port's structs. Films recorded by the original game
+ * use this layout. */
 #pragma pack(push, 1)
 typedef struct FlightSerializedObjectRecord {
-	uint16_t yaw;
-	uint16_t pitch;
-	uint16_t roll;
-	uint16_t angleD;
-	uint16_t typeSpecificWord;
-	uint8_t typeSpecificByte0;
-	uint8_t typeSpecificByte1;
-	uint32_t mobj;
 	uint16_t objectSignature;
 	uint16_t objectType;
 	uint8_t genusId;
@@ -2720,32 +2725,18 @@ typedef struct FlightSerializedObjectRecord {
 	int32_t world_x;
 	int32_t world_y;
 	int32_t world_z;
+	uint16_t yaw;
+	uint16_t pitch;
+	uint16_t roll;
+	uint16_t angleD;
+	uint16_t typeSpecificWord;
+	uint8_t typeSpecificByte0;
+	uint8_t typeSpecificByte1;
 	int32_t playerOwnerIdx;
+	uint32_t mobj;
 } FlightSerializedObjectRecord;
 
 typedef struct FlightSerializedMobileObject {
-	uint8_t proximityList[101];
-	uint16_t spinRateFrac;
-	uint16_t spinDecelRate;
-	uint16_t speed;
-	uint16_t speedRemainder;
-	uint16_t framesAlive;
-	uint16_t sourceObjectType;
-	uint8_t team;
-	uint8_t nodeSwitchIndex;
-	uint16_t ejectionSpawnCount;
-	uint8_t velocityOverrideActive;
-	uint16_t velocityOverrideSpeed;
-	uint16_t velocityOverrideElapsed;
-	uint16_t velocityOverrideDuration;
-	float spinAxisX;
-	float spinAxisY;
-	float spinAxisZ;
-	char moveVectorDirty;
-	uint8_t orientMatrixDirty;
-	uint32_t pWarheadGuidance;
-	uint32_t pCraft;
-	uint32_t pCharData;
 	uint8_t state;
 	uint8_t motionFlags;
 	int32_t instanceExtent;
@@ -2753,23 +2744,42 @@ typedef struct FlightSerializedMobileObject {
 	int32_t prevWorldX;
 	int32_t prevWorldY;
 	int32_t prevWorldZ;
+	uint8_t proximityList[101];
 	int16_t rollImpulseRate;
 	int16_t spinRate;
+	uint16_t spinRateFrac;
+	uint16_t spinDecelRate;
 	int16_t spinAngleQ16;
+	uint16_t speed;
+	uint16_t speedRemainder;
 	int32_t damageAmount;
 	int32_t lifetimeTimer;
+	uint16_t framesAlive;
 	int16_t sourceObjIdx;
+	uint16_t sourceObjectType;
 	int8_t iff;
+	uint8_t team;
+	uint8_t nodeSwitchIndex;
+	uint16_t ejectionSpawnCount;
 	int32_t collisionObjIdx;
+	uint8_t velocityOverrideActive;
+	uint16_t velocityOverrideSpeed;
+	uint16_t velocityOverrideElapsed;
+	uint16_t velocityOverrideDuration;
 	int16_t velocityOverrideDirX;
 	int16_t velocityOverrideDirY;
 	int16_t velocityOverrideDirZ;
 	int16_t renderOffsetX;
 	int16_t renderOffsetY;
 	int16_t renderOffsetZ;
+	float spinAxisX;
+	float spinAxisY;
+	float spinAxisZ;
+	char moveVectorDirty;
 	int16_t moveX;
 	int16_t moveY;
 	int16_t moveZ;
+	uint8_t orientMatrixDirty;
 	int16_t cachedFwdX;
 	int16_t cachedFwdY;
 	int16_t cachedFwdZ;
@@ -2779,6 +2789,9 @@ typedef struct FlightSerializedMobileObject {
 	int16_t cachedUpX;
 	int16_t cachedUpY;
 	int16_t cachedUpZ;
+	uint32_t pWarheadGuidance;
+	uint32_t pCraft;
+	uint32_t pCharData;
 } FlightSerializedMobileObject;
 
 typedef struct FlightSerializedCraftData {
@@ -2794,13 +2807,17 @@ typedef struct FlightSerializedMobileObjectCharData {
 } FlightSerializedMobileObjectCharData;
 
 typedef struct FlightSerializedProximityList {
-	uint16_t objIdx[16];
 	uint8_t count;
 	int32_t score[16];
+	uint16_t objIdx[16];
 	int32_t overflowScore;
 } FlightSerializedProximityList;
 
+/* The 0x2D32 bytes of globals from g_missionFormatVersion (XWA 0x8053E0) to
+ * g_stringDataHandle (0x808112), in address order. The middle part is
+ * g_missionFlightRuntimeState (0x80541E), whose port struct isn't packed. */
 typedef struct FlightSerializedMissionStateBlock {
+	int32_t missionFormatVersion;
 	uint8_t flightMissionEndPending;
 	uint8_t provingGroundsModeActive;
 	uint8_t missionStateByte8053E6;
@@ -2822,34 +2839,29 @@ typedef struct FlightSerializedMissionStateBlock {
 	uint8_t teamVictoryTimeLimitMinutes;
 	uint8_t teamVictoryTimeLimitStarted;
 	uint8_t craftImpactBounceEnabled;
-	uint16_t teamFullKillCount[10];
-	uint16_t teamSharedKillCount[10];
-	uint16_t teamAssistKillCount[10];
-	uint16_t teamCraftLossCount[10];
-	uint16_t teamFgInspectedCraftCount[10][192];
-	uint16_t teamFgTransferCounter[10][192];
+	int32_t connectedPlayerCount;
+	int32_t maxConnectedPlayerCountThisMission;
+	int32_t teamScores[TEAM_SCORE_KIND_COUNT][10];
+	uint16_t teamKillStats[TEAM_KILL_STAT_COUNT][10];
+	uint16_t teamFgCounters[TEAM_FG_COUNTER_COUNT][10][192];
 	uint8_t teamFgDesignationCode[10][192];
 	uint8_t globalPrimaryGoalStatus;
-	uint8_t globalGoalStatusUnusedBytes[2];
+	uint16_t globalGoalStatusUnused;
 	uint8_t globalBonusGoalStatus;
-	uint8_t teamGlobalGoalState[10][3];
-	uint8_t teamGoalStatus[10][3];
-	uint16_t globalGoalTriggerCurrentCount[10][4][3];
-	uint16_t globalGoalTriggerTotalCount[10][4][3];
+	uint8_t teamGlobalGoalState[10][TEAM_GOAL_KIND_COUNT];
+	uint8_t teamGoalStatus[10][TEAM_GOAL_KIND_COUNT];
+	uint16_t globalGoalTriggerCounts[GOAL_TRIGGER_COUNTER_COUNT][10][3][4];
+	int32_t teamMissionCompletionTimeSeconds[10];
 	uint8_t teamHasCountableCraft[10];
 	uint8_t teamActiveGoalSequence[10];
 	uint8_t teamReinforcementCalled[10];
 	uint8_t missionMessageTriggered[64];
-	int32_t missionGlobalUnitCraftCount[41];
-	MissionRegionHyperPointTables missionRegionHyperPoints;
-	int32_t missionFormatVersion;
-	int32_t connectedPlayerCount;
-	int32_t maxConnectedPlayerCountThisMission;
-	int32_t teamMissionBonusScoreTenths[10];
-	int32_t teamMissionScore[10];
-	int32_t teamMissionCompletionTimeSeconds[10];
+	/* 63 entries: the port's array has 64, but the original's 64th entry is
+	   g_missionGlobalUnitCraftCount[0]. */
 	int32_t missionMessageDelayCountdown[63];
+	int32_t missionGlobalUnitCraftCount[41];
 	int32_t activeMissionRegionCount;
+	MissionRegionHyperPointTables missionRegionHyperPoints;
 } FlightSerializedMissionStateBlock;
 #pragma pack(pop)
 
@@ -2865,23 +2877,106 @@ typedef char
 typedef char xwa_flight_serialized_mission_state_block_size
 	[(sizeof(FlightSerializedMissionStateBlock) == 0x2D32) ? 1 : -1];
 
+/* Offsets from the IDB types ObjectRecord, MobileObject,
+   MobileObjectProximityList and MissionFlightRuntimeState, and from the
+   addresses of the mission globals. */
+#define XWA_FLIGHT_SERIALIZED_OFFSET(type, field, offset)                                                    \
+	typedef char xwa_flight_serialized_offset_##type##_##field[(offsetof(type, field) == (offset)) ? 1 : -1]
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedObjectRecord, objectType, 0x02);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedObjectRecord, world_x, 0x07);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedObjectRecord, yaw, 0x13);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedObjectRecord, playerOwnerIdx, 0x1F);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedObjectRecord, mobj, 0x23);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, proximityList, 0x16);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, rollImpulseRate, 0x7B);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, speed, 0x85);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, damageAmount, 0x89);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, collisionObjIdx, 0x9C);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, velocityOverrideActive, 0xA0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, spinAxisX, 0xB3);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, moveX, 0xC0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, orientMatrixDirty, 0xC6);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, cachedUpZ, 0xD7);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, pWarheadGuidance, 0xD9);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, pCraft, 0xDD);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMobileObject, pCharData, 0xE1);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedProximityList, score, 0x01);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedProximityList, objIdx, 0x41);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedProximityList, overflowScore, 0x61);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, missionElapsedClock, 0x8053F4 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, nextObjectSignature, 0x805404 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, flightDifficulty, 0x80540A - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, craftImpactBounceEnabled, 0x805415 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, connectedPlayerCount, 0x805416 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, teamScores, 0x80541E - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, globalGoalStatusUnused,
+							 0x80541E + 0x2621 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, globalGoalTriggerCounts,
+							 0x80541E + 0x2660 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, teamReinforcementCalled,
+							 0x80541E + 0x287C - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, missionMessageTriggered, 0x807CA4 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, missionMessageDelayCountdown,
+							 0x807CE4 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, missionGlobalUnitCraftCount,
+							 0x807DE0 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, activeMissionRegionCount, 0x807E84 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, missionRegionHyperPoints, 0x807E88 - 0x8053E0);
+#undef XWA_FLIGHT_SERIALIZED_OFFSET
+
 static FlightSerializedMissionStateBlock g_flightSerializedMissionStateBlock;
 static uint8_t g_flightSerializedYardContextBlock[sizeof(YardContext)];
 
-static void* FlightWorldState_DecodeOffset(uint32_t encodedOffset, void* base) {
-	if (encodedOffset == 0) {
-		return NULL;
-	}
+/* The world state stores each pointer into a pool as a byte offset plus 1,
+ * or 0 for NULL. The offsets use the original's record sizes, which are
+ * smaller than the port's (ObjectRecord 39 bytes, MobileObject 229, CraftData
+ * 1017, WarheadGuidanceState 10, MobileObjectCharData 114). So an offset is
+ * the entry index times the original record size, not a port byte offset. */
+enum {
+	FLIGHT_ORIGINAL_OBJECT_RECORD_SIZE = 39,
+	FLIGHT_ORIGINAL_MOBILE_OBJECT_SIZE = 229,
+	FLIGHT_ORIGINAL_CRAFT_DATA_SIZE = 1017,
+	FLIGHT_ORIGINAL_WARHEAD_GUIDANCE_SIZE = 10,
+	FLIGHT_ORIGINAL_CHAR_DATA_SIZE = 114,
+};
 
-	return (uint8_t*)base + encodedOffset - 1u;
-}
-
-static uint32_t FlightWorldState_EncodeOffset(const void* ptr, const void* base) {
+static uint32_t FlightWorldState_EncodeEntry(const void* ptr, const void* base, size_t entrySize,
+											 uint32_t originalSize) {
 	if (ptr == NULL) {
 		return 0;
 	}
 
-	return (uint32_t)((const uint8_t*)ptr - (const uint8_t*)base + 1u);
+	return (uint32_t)((size_t)((const uint8_t*)ptr - (const uint8_t*)base) / entrySize * originalSize + 1u);
+}
+
+/* Returns NULL and logs an error when the offset doesn't point to one of the
+   pool's `count` entries. Only a damaged film, or one recorded with another
+   layout, does that. */
+static void* FlightWorldState_DecodeEntry(uint32_t encoded, void* base, size_t entrySize, uint32_t originalSize,
+										  size_t count, const char* pool) {
+	uint32_t index;
+
+	if (encoded == 0) {
+		return NULL;
+	}
+	index = (encoded - 1u) / originalSize;
+	if ((encoded - 1u) % originalSize != 0 || index >= count) {
+		Aeron_LogError("xwa.film", "world state: offset %u doesn't point to an entry of the %s pool (%u "
+								   "entries); using a null pointer",
+					   encoded - 1u, pool, (unsigned)count);
+		return NULL;
+	}
+	return (uint8_t*)base + (size_t)index * entrySize;
+}
+
+#define FLIGHT_ENCODE_ENTRY(ptr, base, originalSize) \
+	FlightWorldState_EncodeEntry((ptr), (base), sizeof(*(base)), (originalSize))
+#define FLIGHT_DECODE_ENTRY(encoded, base, originalSize, count, pool) \
+	FlightWorldState_DecodeEntry((encoded), (base), sizeof(*(base)), (originalSize), (count), (pool))
+
+/* The number of entries in the mobile object pool, as Mission_Init allocates it. */
+static size_t FlightWorldState_MobileObjectCount(void) {
+	return (size_t)g_localDebrisObjectSlotsTotal + g_localEffectObjectSlotsTotal + g_regionMainObjectSlotsTotal;
 }
 
 static void FlightWorldState_WriteU32(uint8_t* dst, uint32_t value) { memcpy(dst, &value, sizeof(value)); }
@@ -2909,7 +3004,7 @@ static void FlightWorldState_SerializeObjectRecord(FlightSerializedObjectRecord*
 	dst->typeSpecificByte0 = src->typeSpecificByte[0];
 	dst->typeSpecificByte1 = src->typeSpecificByte[1];
 	dst->playerOwnerIdx = src->playerOwnerIdx;
-	dst->mobj = FlightWorldState_EncodeOffset(src->mobj, g_mobileObjectPoolBase);
+	dst->mobj = FLIGHT_ENCODE_ENTRY(src->mobj, g_mobileObjectPoolBase, FLIGHT_ORIGINAL_MOBILE_OBJECT_SIZE);
 }
 
 static void FlightWorldState_SerializeProximityList(uint8_t dstBytes[101],
@@ -2977,9 +3072,10 @@ static void FlightWorldState_SerializeMobileObject(FlightSerializedMobileObject*
 	dst->cachedUpX = src->cachedUpX;
 	dst->cachedUpY = src->cachedUpY;
 	dst->cachedUpZ = src->cachedUpZ;
-	dst->pWarheadGuidance = FlightWorldState_EncodeOffset(src->pWarheadGuidance, g_warheadGuidancePoolBase);
-	dst->pCraft = FlightWorldState_EncodeOffset(src->pCraft, g_craftDataPoolBase);
-	dst->pCharData = FlightWorldState_EncodeOffset(src->pCharData, g_mobileObjectCharDataPool);
+	dst->pWarheadGuidance = FLIGHT_ENCODE_ENTRY(src->pWarheadGuidance, g_warheadGuidancePoolBase,
+												FLIGHT_ORIGINAL_WARHEAD_GUIDANCE_SIZE);
+	dst->pCraft = FLIGHT_ENCODE_ENTRY(src->pCraft, g_craftDataPoolBase, FLIGHT_ORIGINAL_CRAFT_DATA_SIZE);
+	dst->pCharData = FLIGHT_ENCODE_ENTRY(src->pCharData, g_mobileObjectCharDataPool, FLIGHT_ORIGINAL_CHAR_DATA_SIZE);
 }
 
 /* The 1017-byte CraftData record keeps the original layout. The modern
@@ -3032,7 +3128,7 @@ static void FlightWorldState_SerializeCraftData(FlightSerializedCraftData* dst, 
 		memcpy(&dst->bytes[wire->wireOffset], (const uint8_t*)src + wire->fieldOffset, wire->size);
 	}
 	dst->bytes[FLIGHT_SERIALIZED_CRAFT_ANIM_FRAME_OFFSET] = XWA_CRAFT_ANIM_FRAME(src);
-	encodedLink = FlightWorldState_EncodeOffset(src->effectiveAiObjectLink, g_objectTable);
+	encodedLink = FLIGHT_ENCODE_ENTRY(src->effectiveAiObjectLink, g_objectTable, FLIGHT_ORIGINAL_OBJECT_RECORD_SIZE);
 	FlightWorldState_WriteU32(&dst->bytes[FLIGHT_SERIALIZED_CRAFT_EFFECTIVE_LINK_OFFSET], encodedLink);
 }
 
@@ -3044,41 +3140,58 @@ static void FlightWorldState_SerializeWarheadGuidance(FlightSerializedWarheadGui
 }
 
 static void FlightWorldState_BuildMissionStateBlock(FlightSerializedMissionStateBlock* block) {
+	const MissionFlightRuntimeState* state = &g_missionFlightRuntimeState;
+
 	memset(block, 0, sizeof(*block));
 	block->missionFormatVersion = g_missionFormatVersion;
+	block->flightMissionEndPending = g_flightMissionEndPending;
 	block->provingGroundsModeActive = g_provingGroundsModeActive;
+	block->missionStateByte8053E6 = g_missionStateByte8053E6;
 	block->yardChallengeMode = g_yardChallengeMode;
+	block->unusedMissionInitStateWord[0] = g_unusedMissionInitStateWord0;
+	block->unusedMissionInitStateWord[1] = g_unusedMissionInitStateWord1;
+	block->unusedMissionInitStateWord[2] = g_unusedMissionInitStateWord2;
+	block->unusedMissionInitStateWord[3] = g_unusedMissionInitStateWord3;
+	block->unusedMissionInitStateWord[4] = g_unusedMissionInitStateWord4;
+	block->unusedMissionInitStateWord[5] = g_unusedMissionInitStateWord5;
 	block->missionElapsedClock = g_missionElapsedClock;
 	block->missionCountdownClock = g_missionCountdownClock;
-	block->missionTimeLimitActive = g_missionTimeLimitActive;
-	block->flightMissionEndPending = g_flightMissionEndPending;
-	block->teamVictoryTimeLimitMinutes = g_teamVictoryTimeLimitMinutes;
-	block->teamVictoryTimeLimitStarted = g_teamVictoryTimeLimitStarted;
+	block->nextObjectSignature = g_nextObjectSignature;
+	block->unusedMissionInitStateDword805406 = (uint32_t)g_unusedMissionInitStateDword805406;
 	block->flightDifficulty = g_flightDifficulty;
 	block->flightCollisionsEnabled = g_flightCollisionsEnabled;
-	block->nextObjectSignature = g_nextObjectSignature;
-	memcpy(block->teamMissionBonusScoreTenths,
-		   g_missionFlightRuntimeState.teamScores[TEAM_SCORE_BONUS_TENTHS],
-		   sizeof(g_missionFlightRuntimeState.teamScores[TEAM_SCORE_BONUS_TENTHS]));
-	memcpy(block->teamMissionScore, g_missionFlightRuntimeState.teamScores[TEAM_SCORE_MISSION],
-		   sizeof(g_missionFlightRuntimeState.teamScores[TEAM_SCORE_MISSION]));
-	memcpy(block->teamFullKillCount, g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_FULL],
-		   sizeof(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_FULL]));
-	memcpy(block->teamSharedKillCount, g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_SHARED],
-		   sizeof(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_SHARED]));
-	memcpy(block->teamAssistKillCount, g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_ASSIST],
-		   sizeof(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_ASSIST]));
-	memcpy(block->teamCraftLossCount, g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_LOSS],
-		   sizeof(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_LOSS]));
-	memcpy(block->teamFgInspectedCraftCount,
-		   g_missionFlightRuntimeState.teamFgCounters[TEAM_FG_COUNTER_INSPECTED],
-		   sizeof(g_missionFlightRuntimeState.teamFgCounters[TEAM_FG_COUNTER_INSPECTED]));
-	memcpy(block->teamFgTransferCounter, g_missionFlightRuntimeState.teamFgCounters[TEAM_FG_COUNTER_TRANSFER],
-		   sizeof(g_missionFlightRuntimeState.teamFgCounters[TEAM_FG_COUNTER_TRANSFER]));
-	memcpy(block->teamFgDesignationCode, g_missionFlightRuntimeState.teamFgDesignationCode,
-		   sizeof(g_missionFlightRuntimeState.teamFgDesignationCode));
+	block->flightCraftJumpingEnabled = g_flightCraftJumpingEnabled;
+	block->missionRandomVariationEnabled = g_missionRandomVariationEnabled;
+	block->flightLocatePlayersEnabled = g_flightLocatePlayersEnabled;
+	block->aiOpponentsEnabled = g_aiOpponentsEnabled;
+	block->playerFlightGroupWaveMode = g_playerFlightGroupWaveMode;
+	block->missionTimeLimitActive = g_missionTimeLimitActive;
+	block->teamVictoryTimeLimitMinutes = g_teamVictoryTimeLimitMinutes;
+	block->teamVictoryTimeLimitStarted = g_teamVictoryTimeLimitStarted;
+	block->craftImpactBounceEnabled = g_craftImpactBounceEnabled;
+	block->connectedPlayerCount = g_connectedPlayerCount;
+	block->maxConnectedPlayerCountThisMission = g_maxConnectedPlayerCountThisMission;
+	memcpy(block->teamScores, state->teamScores, sizeof(block->teamScores));
+	memcpy(block->teamKillStats, state->teamKillStats, sizeof(block->teamKillStats));
+	memcpy(block->teamFgCounters, state->teamFgCounters, sizeof(block->teamFgCounters));
+	memcpy(block->teamFgDesignationCode, state->teamFgDesignationCode, sizeof(block->teamFgDesignationCode));
+	block->globalPrimaryGoalStatus = state->globalPrimaryGoalStatus;
+	block->globalGoalStatusUnused = state->globalGoalStatusUnused;
+	block->globalBonusGoalStatus = state->globalBonusGoalStatus;
+	memcpy(block->teamGlobalGoalState, state->teamGlobalGoalState, sizeof(block->teamGlobalGoalState));
+	memcpy(block->teamGoalStatus, state->teamGoalStatus, sizeof(block->teamGoalStatus));
+	memcpy(block->globalGoalTriggerCounts, state->globalGoalTriggerCounts, sizeof(block->globalGoalTriggerCounts));
+	memcpy(block->teamMissionCompletionTimeSeconds, state->teamMissionCompletionTimeSeconds,
+		   sizeof(block->teamMissionCompletionTimeSeconds));
+	memcpy(block->teamHasCountableCraft, state->teamHasCountableCraft, sizeof(block->teamHasCountableCraft));
+	memcpy(block->teamActiveGoalSequence, state->teamActiveGoalSequence, sizeof(block->teamActiveGoalSequence));
+	memcpy(block->teamReinforcementCalled, state->teamReinforcementCalled,
+		   sizeof(block->teamReinforcementCalled));
+	memcpy(block->missionMessageTriggered, g_missionMessageTriggered, sizeof(block->missionMessageTriggered));
+	memcpy(block->missionMessageDelayCountdown, g_missionMessageDelayCountdown,
+		   sizeof(block->missionMessageDelayCountdown));
 	memcpy(block->missionGlobalUnitCraftCount, g_missionGlobalUnitCraftCount,
-		   sizeof(g_missionGlobalUnitCraftCount));
+		   sizeof(block->missionGlobalUnitCraftCount));
 	block->activeMissionRegionCount = g_activeMissionRegionCount;
 	memcpy(&block->missionRegionHyperPoints, &g_missionRegionHyperPoints, sizeof(g_missionRegionHyperPoints));
 }
@@ -3100,7 +3213,8 @@ static void FlightWorldState_RestoreObjectRecord(ObjectRecord* dst, const Flight
 	dst->typeSpecificByte[0] = src->typeSpecificByte0;
 	dst->typeSpecificByte[1] = src->typeSpecificByte1;
 	dst->playerOwnerIdx = src->playerOwnerIdx;
-	dst->mobj = (MobileObject*)FlightWorldState_DecodeOffset(src->mobj, g_mobileObjectPoolBase);
+	dst->mobj = (MobileObject*)FLIGHT_DECODE_ENTRY(src->mobj, g_mobileObjectPoolBase, FLIGHT_ORIGINAL_MOBILE_OBJECT_SIZE,
+													 FlightWorldState_MobileObjectCount(), "mobile object");
 }
 
 static void FlightWorldState_RestoreProximityList(MobileObjectProximityList* dst,
@@ -3167,11 +3281,15 @@ static void FlightWorldState_RestoreMobileObject(MobileObject* dst, const Flight
 	dst->cachedUpX = src->cachedUpX;
 	dst->cachedUpY = src->cachedUpY;
 	dst->cachedUpZ = src->cachedUpZ;
-	dst->pWarheadGuidance = (WarheadGuidanceState*)FlightWorldState_DecodeOffset(src->pWarheadGuidance,
-																				 g_warheadGuidancePoolBase);
-	dst->pCraft = (CraftData*)FlightWorldState_DecodeOffset(src->pCraft, g_craftDataPoolBase);
+	dst->pWarheadGuidance = (WarheadGuidanceState*)FLIGHT_DECODE_ENTRY(
+		src->pWarheadGuidance, g_warheadGuidancePoolBase, FLIGHT_ORIGINAL_WARHEAD_GUIDANCE_SIZE,
+		(size_t)g_projectileObjectSlotsTotal + 1, "warhead guidance");
+	dst->pCraft = (CraftData*)FLIGHT_DECODE_ENTRY(src->pCraft, g_craftDataPoolBase, FLIGHT_ORIGINAL_CRAFT_DATA_SIZE,
+												  g_craftObjectSlotsTotal, "craft");
 	dst->pCharData =
-		(MobileObjectCharData*)FlightWorldState_DecodeOffset(src->pCharData, g_mobileObjectCharDataPool);
+		(MobileObjectCharData*)FLIGHT_DECODE_ENTRY(src->pCharData, g_mobileObjectCharDataPool,
+												   FLIGHT_ORIGINAL_CHAR_DATA_SIZE, g_mobileObjectCharDataCount,
+												   "character data");
 }
 
 static uint32_t FlightWorldState_ReadU32(const uint8_t* src) {
@@ -3191,7 +3309,8 @@ static void FlightWorldState_RestoreCraftData(CraftData* dst, const FlightSerial
 	}
 	XWA_CRAFT_ANIM_FRAME(dst) = src->bytes[FLIGHT_SERIALIZED_CRAFT_ANIM_FRAME_OFFSET];
 	encodedLink = FlightWorldState_ReadU32(&src->bytes[FLIGHT_SERIALIZED_CRAFT_EFFECTIVE_LINK_OFFSET]);
-	dst->effectiveAiObjectLink = (ObjectRecord*)FlightWorldState_DecodeOffset(encodedLink, g_objectTable);
+	dst->effectiveAiObjectLink = (ObjectRecord*)FLIGHT_DECODE_ENTRY(encodedLink, g_objectTable, FLIGHT_ORIGINAL_OBJECT_RECORD_SIZE,
+																 g_objectTableSlotCount, "object");
 }
 
 #ifdef XWA_MODERN
@@ -3224,9 +3343,17 @@ typedef char xwa_flight_world_extension_articulation_record_size
 
 /* The largest extension block, for the world-state buffer. */
 static size_t FlightWorldState_ExtensionCapacity(void) {
-	return FLIGHT_WORLD_EXTENSION_HEADER_SIZE + 2 +
-		   (size_t)(FLIGHT_WORLD_EXTENSION_RECORD_SIZE + FLIGHT_WORLD_EXTENSION_ARTICULATION_RECORD_SIZE) *
-			   g_craftObjectSlotsTotal;
+	const size_t extension =
+		FLIGHT_WORLD_EXTENSION_HEADER_SIZE + 2 +
+		(size_t)(FLIGHT_WORLD_EXTENSION_RECORD_SIZE + FLIGHT_WORLD_EXTENSION_ARTICULATION_RECORD_SIZE) *
+			g_craftObjectSlotsTotal;
+	/* A film from the original game is read into this buffer before its craft
+	   records are converted, and those records can be larger (see
+	   original_film.h). */
+	const size_t originalFilm =
+		(size_t)(XwaOriginalFilm_CraftRecordSize() - FLIGHT_ORIGINAL_CRAFT_DATA_SIZE) * g_craftObjectSlotsTotal;
+
+	return extension > originalFilm ? extension : originalFilm;
 }
 
 typedef struct FlightWorldExtensionRange {
@@ -3277,6 +3404,37 @@ static int FlightWorldState_HasArticulation(const CraftData* craft) {
 	return 0;
 }
 
+/* One record of the extension block: the slot, then the craft's extension
+   ranges. */
+static void FlightWorldState_WriteExtensionRecord(uint8_t** cursor, uint16_t objectSlot, const CraftData* craft) {
+	size_t range;
+
+	FlightWorldState_WriteBlock(cursor, &objectSlot, sizeof objectSlot);
+	for (range = 0; range < sizeof g_flightWorldExtensionRanges / sizeof g_flightWorldExtensionRanges[0];
+		 ++range) {
+		FlightWorldState_WriteBlock(cursor, (const uint8_t*)craft + g_flightWorldExtensionRanges[range].fieldOffset,
+									g_flightWorldExtensionRanges[range].size);
+	}
+}
+
+size_t FlightWorldState_ExtensionRecordSize(void) { return FLIGHT_WORLD_EXTENSION_RECORD_SIZE; }
+
+void FlightWorldState_EncodeExtensionRecord(uint8_t* dst, uint16_t objectSlot, const CraftData* craft) {
+	FlightWorldState_WriteExtensionRecord(&dst, objectSlot, craft);
+}
+
+size_t FlightWorldState_EncodeExtensionBlock(uint8_t* dst, const uint8_t* records, uint16_t count) {
+	uint8_t* cursor = dst;
+	const uint16_t articulationCount = 0;
+
+	FlightWorldState_WriteBlock(&cursor, g_flightWorldExtensionMagic, sizeof g_flightWorldExtensionMagic);
+	*cursor++ = FLIGHT_WORLD_EXTENSION_VERSION;
+	FlightWorldState_WriteBlock(&cursor, &count, sizeof count);
+	FlightWorldState_WriteBlock(&cursor, records, (size_t)count * FLIGHT_WORLD_EXTENSION_RECORD_SIZE);
+	FlightWorldState_WriteBlock(&cursor, &articulationCount, sizeof articulationCount);
+	return (size_t)(cursor - dst);
+}
+
 static void FlightWorldState_WriteExtension(uint8_t** cursor) {
 	uint32_t slot;
 	uint16_t count = 0;
@@ -3304,19 +3462,11 @@ static void FlightWorldState_WriteExtension(uint8_t** cursor) {
 	FlightWorldState_WriteBlock(cursor, &count, sizeof count);
 	for (slot = 0; slot < g_regionObjectSlotEnd; ++slot) {
 		const CraftData* craft = FlightWorldState_SerializedCraft(slot);
-		const uint16_t objectSlot = (uint16_t)slot;
-		size_t range;
 
 		if (craft == NULL || !XwaModelRole_IsReplacement((unsigned short)g_objectTable[slot].objectType)) {
 			continue;
 		}
-		FlightWorldState_WriteBlock(cursor, &objectSlot, sizeof objectSlot);
-		for (range = 0; range < sizeof g_flightWorldExtensionRanges / sizeof g_flightWorldExtensionRanges[0];
-			 ++range) {
-			FlightWorldState_WriteBlock(
-				cursor, (const uint8_t*)craft + g_flightWorldExtensionRanges[range].fieldOffset,
-				g_flightWorldExtensionRanges[range].size);
-		}
+		FlightWorldState_WriteExtensionRecord(cursor, (uint16_t)slot, craft);
 	}
 	FlightWorldState_WriteBlock(cursor, &articulationCount, sizeof articulationCount);
 	for (slot = 0; slot < g_regionObjectSlotEnd; ++slot) {
@@ -3418,38 +3568,57 @@ static void FlightWorldState_RestoreWarheadGuidance(WarheadGuidanceState* dst,
 }
 
 static void FlightWorldState_ApplyMissionStateBlock(const FlightSerializedMissionStateBlock* block) {
+	MissionFlightRuntimeState* state = &g_missionFlightRuntimeState;
+
 	g_missionFormatVersion = block->missionFormatVersion;
+	g_flightMissionEndPending = block->flightMissionEndPending;
 	g_provingGroundsModeActive = block->provingGroundsModeActive;
+	g_missionStateByte8053E6 = block->missionStateByte8053E6;
 	g_yardChallengeMode = block->yardChallengeMode;
+	g_unusedMissionInitStateWord0 = block->unusedMissionInitStateWord[0];
+	g_unusedMissionInitStateWord1 = block->unusedMissionInitStateWord[1];
+	g_unusedMissionInitStateWord2 = block->unusedMissionInitStateWord[2];
+	g_unusedMissionInitStateWord3 = block->unusedMissionInitStateWord[3];
+	g_unusedMissionInitStateWord4 = block->unusedMissionInitStateWord[4];
+	g_unusedMissionInitStateWord5 = block->unusedMissionInitStateWord[5];
 	g_missionElapsedClock = block->missionElapsedClock;
 	g_missionCountdownClock = block->missionCountdownClock;
-	g_missionTimeLimitActive = block->missionTimeLimitActive;
-	g_flightMissionEndPending = block->flightMissionEndPending;
-	g_teamVictoryTimeLimitMinutes = block->teamVictoryTimeLimitMinutes;
-	g_teamVictoryTimeLimitStarted = block->teamVictoryTimeLimitStarted;
+	g_nextObjectSignature = block->nextObjectSignature;
+	g_unusedMissionInitStateDword805406 = (int)block->unusedMissionInitStateDword805406;
 	g_flightDifficulty = block->flightDifficulty;
 	g_flightCollisionsEnabled = block->flightCollisionsEnabled;
-	g_nextObjectSignature = block->nextObjectSignature;
-	memcpy(g_missionFlightRuntimeState.teamScores[TEAM_SCORE_BONUS_TENTHS],
-		   block->teamMissionBonusScoreTenths,
-		   sizeof(g_missionFlightRuntimeState.teamScores[TEAM_SCORE_BONUS_TENTHS]));
-	memcpy(g_missionFlightRuntimeState.teamScores[TEAM_SCORE_MISSION], block->teamMissionScore,
-		   sizeof(g_missionFlightRuntimeState.teamScores[TEAM_SCORE_MISSION]));
-	memcpy(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_FULL], block->teamFullKillCount,
-		   sizeof(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_FULL]));
-	memcpy(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_SHARED], block->teamSharedKillCount,
-		   sizeof(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_SHARED]));
-	memcpy(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_ASSIST], block->teamAssistKillCount,
-		   sizeof(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_ASSIST]));
-	memcpy(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_LOSS], block->teamCraftLossCount,
-		   sizeof(g_missionFlightRuntimeState.teamKillStats[TEAM_KILL_STAT_LOSS]));
-	memcpy(g_missionFlightRuntimeState.teamFgCounters[TEAM_FG_COUNTER_INSPECTED],
-		   block->teamFgInspectedCraftCount,
-		   sizeof(g_missionFlightRuntimeState.teamFgCounters[TEAM_FG_COUNTER_INSPECTED]));
-	memcpy(g_missionFlightRuntimeState.teamFgCounters[TEAM_FG_COUNTER_TRANSFER], block->teamFgTransferCounter,
-		   sizeof(g_missionFlightRuntimeState.teamFgCounters[TEAM_FG_COUNTER_TRANSFER]));
-	memcpy(g_missionFlightRuntimeState.teamFgDesignationCode, block->teamFgDesignationCode,
-		   sizeof(g_missionFlightRuntimeState.teamFgDesignationCode));
+	g_flightCraftJumpingEnabled = block->flightCraftJumpingEnabled;
+	g_missionRandomVariationEnabled = block->missionRandomVariationEnabled;
+	g_flightLocatePlayersEnabled = block->flightLocatePlayersEnabled;
+	g_aiOpponentsEnabled = block->aiOpponentsEnabled;
+	g_playerFlightGroupWaveMode = block->playerFlightGroupWaveMode;
+	g_missionTimeLimitActive = block->missionTimeLimitActive;
+	g_teamVictoryTimeLimitMinutes = block->teamVictoryTimeLimitMinutes;
+	g_teamVictoryTimeLimitStarted = block->teamVictoryTimeLimitStarted;
+	g_craftImpactBounceEnabled = block->craftImpactBounceEnabled;
+	g_connectedPlayerCount = block->connectedPlayerCount;
+	g_maxConnectedPlayerCountThisMission = block->maxConnectedPlayerCountThisMission;
+	memcpy(state->teamScores, block->teamScores, sizeof(block->teamScores));
+	memcpy(state->teamKillStats, block->teamKillStats, sizeof(block->teamKillStats));
+	memcpy(state->teamFgCounters, block->teamFgCounters, sizeof(block->teamFgCounters));
+	memcpy(state->teamFgDesignationCode, block->teamFgDesignationCode, sizeof(block->teamFgDesignationCode));
+	state->globalPrimaryGoalStatus = block->globalPrimaryGoalStatus;
+	state->globalGoalStatusUnused = block->globalGoalStatusUnused;
+	state->globalBonusGoalStatus = block->globalBonusGoalStatus;
+	memcpy(state->teamGlobalGoalState, block->teamGlobalGoalState, sizeof(block->teamGlobalGoalState));
+	memcpy(state->teamGoalStatus, block->teamGoalStatus, sizeof(block->teamGoalStatus));
+	memcpy(state->globalGoalTriggerCounts, block->globalGoalTriggerCounts, sizeof(block->globalGoalTriggerCounts));
+	memcpy(state->teamMissionCompletionTimeSeconds, block->teamMissionCompletionTimeSeconds,
+		   sizeof(block->teamMissionCompletionTimeSeconds));
+	memcpy(state->teamHasCountableCraft, block->teamHasCountableCraft, sizeof(block->teamHasCountableCraft));
+	memcpy(state->teamActiveGoalSequence, block->teamActiveGoalSequence, sizeof(block->teamActiveGoalSequence));
+	memcpy(state->teamReinforcementCalled, block->teamReinforcementCalled,
+		   sizeof(block->teamReinforcementCalled));
+	memcpy(g_missionMessageTriggered, block->missionMessageTriggered, sizeof(block->missionMessageTriggered));
+	memcpy(g_missionMessageDelayCountdown, block->missionMessageDelayCountdown,
+		   sizeof(block->missionMessageDelayCountdown));
+	memcpy(g_missionGlobalUnitCraftCount, block->missionGlobalUnitCraftCount,
+		   sizeof(block->missionGlobalUnitCraftCount));
 	g_activeMissionRegionCount = block->activeMissionRegionCount;
 	memcpy(&g_missionRegionHyperPoints, &block->missionRegionHyperPoints, sizeof(g_missionRegionHyperPoints));
 }
@@ -3488,6 +3657,9 @@ void Flight_AllocWorldStateBuffers(void) {
 #endif
 
 	g_worldStateHandle = Memory_AllocHandle("WORLDSTATEDATA", bufferSize);
+#ifdef XWA_MODERN
+	g_worldStateBufferCapacity = bufferSize;
+#endif
 	if (g_worldStateHandle == 0) {
 		FeDiskIo_FatalError(0);
 	}
@@ -5551,6 +5723,177 @@ static __inline void Flight_UpdateAiCraftOrientation(uint16_t objectIdx, AiContr
 	}
 }
 
+#ifdef XWA_MODERN
+/* Spreading AI turns in high-rate mode.
+ *
+ * In high-rate mode the AI runs every 8 ticks, with 8 ticks of elapsed time,
+ * but craft move on every step. Some maneuvers, such as
+ * paiman_followtargetmaneuver, turn the craft inside the AI step. So the
+ * craft turned once every 8 ticks and kept moving in between. From a turret
+ * on that craft, the world jumped one way at each AI step and slid back the
+ * other way on the steps in between.
+ *
+ * To fix this, Flight_ModernUpdateAllCraftAI undoes each turn the AI makes.
+ * Flight_ModernApplyAiTurn then applies it a little on each step after the
+ * AI step, together with any part of the last turn not applied yet. The turn
+ * is added to the current angles, so it combines with other code that turns
+ * the craft between AI steps, such as the roll after a hit.
+ *
+ * The AI steps are not always 8 ticks apart in the craft's own time. A sim
+ * step can last several ticks (a whole frame in unlocked mode), and the AI
+ * runs at most once per step. The player's craft also moves one input frame
+ * at a time, and its frame can end after the AI step. With steps of up to
+ * L ticks, the gap between two AI steps is between 8 - (L - 1) and
+ * 8 + (L - 1) ticks. So each turn is spread over 8 + (L - 1) ticks, where L
+ * is the craft's longest recent step. The next turn then always arrives
+ * before the craft stops turning, and the turn rate follows the real time
+ * between AI steps. With 1-tick steps, a turn is spread over exactly 8
+ * ticks.
+ *
+ * The AI itself runs the same way as before. It just sees the craft slightly
+ * behind, by the part of the turn not applied yet. */
+
+/* If an angle changes by more than this in one step, it was set, not
+ * turned. A normal AI turn is a few hundred at most over 8 ticks. When a
+ * pitch passes straight up or down, the AI flips the yaw and roll by 0x8000.
+ * An AI change this large is applied at once. If other code makes a change
+ * this large between AI steps, the rest of the AI turn is dropped. */
+#define FLIGHT_AI_TURN_JUMP 0x2000
+
+/* The AI turn of one object slot. The angles are in yaw, pitch, roll order.
+ * This isn't stored in MobileObject: films save each object's mobile object
+ * as an offset in the pool, so MobileObject must keep its size. */
+typedef struct ModernAiTurn {
+	int16_t turn[3];     /* the whole turn */
+	int16_t applied[3];  /* the part of the turn already applied */
+	int startTime;       /* the craft's game time at the AI step */
+	int lastTime;        /* the craft's game time after its last step */
+	uint16_t ticks;      /* the ticks to spread the turn over */
+	uint16_t elapsed;    /* the ticks of the turn already applied */
+	uint8_t active;      /* 0 when there is no turn */
+	uint8_t stepMax;     /* the craft's longest step since the last AI step */
+	uint8_t lastStepMax; /* its longest step between the two AI steps before */
+	uint16_t objectType; /* with `signature`, shows when a new craft takes the slot */
+	uint16_t signature;
+	Q16Angle expected[3]; /* the angles after the last step */
+} ModernAiTurn;
+
+static ModernAiTurn* g_modernAiTurns;
+static uint32_t g_modernAiTurnCount;
+
+void Flight_ModernResetAiTurns(void) {
+	if (g_modernAiTurns != NULL) {
+		memset(g_modernAiTurns, 0, sizeof(*g_modernAiTurns) * g_modernAiTurnCount);
+	}
+}
+
+/* Makes the turn table as large as the object table. Returns 0 if the table
+ * can't be allocated. */
+static int Flight_ModernReserveAiTurns(void) {
+	ModernAiTurn* turns;
+
+	if (g_modernAiTurnCount >= g_objectTableSlotCount) {
+		return g_modernAiTurns != NULL;
+	}
+	turns = (ModernAiTurn*)realloc(g_modernAiTurns, sizeof(*turns) * g_objectTableSlotCount);
+	if (turns == NULL) {
+		return 0;
+	}
+	memset(turns + g_modernAiTurnCount, 0, sizeof(*turns) * (g_objectTableSlotCount - g_modernAiTurnCount));
+	g_modernAiTurns = turns;
+	g_modernAiTurnCount = g_objectTableSlotCount;
+	return 1;
+}
+
+static Q16Angle* Flight_ModernAiTurnAngle(ObjectRecord* object, int axis) {
+	return axis == 0 ? &object->yaw : axis == 1 ? &object->pitch : &object->roll;
+}
+
+/* Returns the turn record of craft `slot`, or NULL if the table is too
+ * small. If a new craft has taken the slot, the record is cleared first. */
+static ModernAiTurn* Flight_ModernAiTurnRecord(uint16_t slot) {
+	ObjectRecord* object;
+	ModernAiTurn* turn;
+
+	if (slot >= g_modernAiTurnCount) {
+		return NULL;
+	}
+	object = &g_objectTable[slot];
+	turn = &g_modernAiTurns[slot];
+	if (turn->objectType != object->objectType || turn->signature != object->objectSignature) {
+		memset(turn, 0, sizeof(*turn));
+		turn->objectType = object->objectType;
+		turn->signature = object->objectSignature;
+	}
+	return turn;
+}
+
+/* Drops the turn if an angle changed by more than FLIGHT_AI_TURN_JUMP since
+ * the last step, which means that other code set it. */
+static void Flight_ModernCheckAiTurnJump(ObjectRecord* object, ModernAiTurn* turn) {
+	int axis;
+
+	for (axis = 0; axis < 3; ++axis) {
+		if (abs((int16_t)(*Flight_ModernAiTurnAngle(object, axis) - turn->expected[axis])) >
+			FLIGHT_AI_TURN_JUMP) {
+			turn->active = 0;
+			return;
+		}
+	}
+}
+
+/* Called when craft `slot` has moved to game time `time`. Records the length
+ * of the step, and applies the part of the AI turn that is due at that time.
+ * The part due depends only on the time, so it works however the craft is
+ * stepped. */
+static void Flight_ModernApplyAiTurn(uint16_t slot, int time) {
+	ObjectRecord* object;
+	ModernAiTurn* turn;
+	int step;
+	int elapsed;
+	int axis;
+
+	turn = Flight_ModernAiTurnRecord(slot);
+	if (turn == NULL) {
+		return;
+	}
+	object = &g_objectTable[slot];
+	step = time - turn->lastTime;
+	if (turn->lastTime != 0 && step > turn->stepMax && step <= UINT8_MAX) {
+		turn->stepMax = (uint8_t)step;
+	}
+	turn->lastTime = time;
+	if (!turn->active) {
+		return;
+	}
+	Flight_ModernCheckAiTurnJump(object, turn);
+	if (!turn->active) {
+		return;
+	}
+	/* Never undo part of the turn, even if a step goes back in time. */
+	elapsed = time - turn->startTime;
+	if (elapsed < turn->elapsed) {
+		elapsed = turn->elapsed;
+	} else if (elapsed > turn->ticks) {
+		elapsed = turn->ticks;
+	}
+	turn->elapsed = (uint16_t)elapsed;
+	for (axis = 0; axis < 3; ++axis) {
+		Q16Angle* angle;
+		int16_t due;
+
+		angle = Flight_ModernAiTurnAngle(object, axis);
+		due = (int16_t)(turn->turn[axis] * elapsed / turn->ticks);
+		*angle = (Q16Angle)(*angle + (int16_t)(due - turn->applied[axis]));
+		turn->applied[axis] = due;
+		turn->expected[axis] = *angle;
+	}
+	if (elapsed == turn->ticks) {
+		turn->active = 0;
+	}
+}
+#endif
+
 // FUNCTION: XWA 0x42BEA0
 void Flight_UpdateCraftSteeringAndSpeed(void) {
 	uint32_t savedSimStepScale;
@@ -5623,6 +5966,12 @@ void Flight_UpdateCraftSteeringAndSpeed(void) {
 			oldPitch = g_objectTable[(uint16_t)slot].pitch;
 			oldYaw = g_objectTable[(uint16_t)slot].yaw;
 			oldRoll = g_objectTable[(uint16_t)slot].roll;
+#ifdef XWA_MODERN
+			/* Apply the AI turn after the old angles are saved, so that the
+			   check below sees the change and marks the orientation and move
+			   vector as dirty. */
+			Flight_ModernApplyAiTurn((uint16_t)slot, g_gameTime + (uint16_t)savedElapsedTicksLow);
+#endif
 			g_curCraftModelIndex.words[0] = g_curCraft->modelDefIndex;
 			playerOwnerIdx = g_objectTable[(uint16_t)slot].playerOwnerIdx;
 			aiDriven = playerOwnerIdx == -1 || g_players[playerOwnerIdx].aiControlledFlag;
@@ -5931,9 +6280,38 @@ static void Flight_SetStepScaleFromDelta(uint16_t deltaTicks) {
 }
 
 #ifdef XWA_MODERN
+/* Runs the AI for `elapsedTicks` ticks, and spreads the turns it makes over
+ * the next steps. See "Spreading AI turns in high-rate mode" above. */
 static void Flight_ModernUpdateAllCraftAI(uint16_t elapsedTicks) {
 	uint16_t savedElapsedTicks;
 	uint16_t savedSimStepScale;
+	uint32_t slot;
+	int spread;
+	int axis;
+
+	spread = Flight_ModernReserveAiTurns();
+	if (spread) {
+		for (slot = g_activeRegionObjectSlotStart; slot < g_activeRegionCraftObjectSlotEnd; ++slot) {
+			ObjectRecord* object;
+			ModernAiTurn* turn;
+
+			object = &g_objectTable[slot];
+			if (object->objectType == OBJ_None || object->mobj == NULL) {
+				continue;
+			}
+			turn = Flight_ModernAiTurnRecord((uint16_t)slot);
+			if (turn->active) {
+				Flight_ModernCheckAiTurnJump(object, turn);
+			}
+			/* Keep the part of the last turn not applied yet. It is added to
+			   the next turn. */
+			for (axis = 0; axis < 3; ++axis) {
+				turn->turn[axis] = turn->active ? (int16_t)(turn->turn[axis] - turn->applied[axis]) : 0;
+				turn->applied[axis] = 0;
+				turn->expected[axis] = *Flight_ModernAiTurnAngle(object, axis);
+			}
+		}
+	}
 
 	savedElapsedTicks = g_elapsedTicks;
 	savedSimStepScale = g_simStepScale;
@@ -5942,6 +6320,61 @@ static void Flight_ModernUpdateAllCraftAI(uint16_t elapsedTicks) {
 	pai_UpdateAllCraftAI();
 	g_elapsedTicks = savedElapsedTicks;
 	g_simStepScale = savedSimStepScale;
+
+	if (!spread) {
+		return;
+	}
+	for (slot = g_activeRegionObjectSlotStart; slot < g_activeRegionCraftObjectSlotEnd; ++slot) {
+		ObjectRecord* object;
+		ModernAiTurn* turn;
+		int16_t turned[3];
+		int stepMax;
+		int ticks;
+		int any;
+
+		object = &g_objectTable[slot];
+		if (object->objectType == OBJ_None || object->mobj == NULL) {
+			continue;
+		}
+		/* The AI step can remove a craft or put a new one in the slot, so
+		   look up the record again. */
+		turn = Flight_ModernAiTurnRecord((uint16_t)slot);
+		stepMax = turn->stepMax > turn->lastStepMax ? turn->stepMax : turn->lastStepMax;
+		turn->lastStepMax = turn->stepMax;
+		turn->stepMax = 0;
+		any = 0;
+		for (axis = 0; axis < 3; ++axis) {
+			turned[axis] = (int16_t)(*Flight_ModernAiTurnAngle(object, axis) - turn->expected[axis]);
+			if (abs(turned[axis]) > FLIGHT_AI_TURN_JUMP) {
+				break;
+			}
+			any |= turned[axis] != 0 || turn->turn[axis] != 0;
+		}
+		if (axis < 3 || !any) {
+			/* No turn, or a jump that is applied at once. The AI's angles
+			   stay as they are, and the rest of the last turn is dropped. */
+			turn->active = 0;
+			continue;
+		}
+		/* Put the craft back to its angles before the AI step.
+		   Flight_UpdateCraftSteeringAndSpeed then turns it a little on each
+		   step, starting with this one. */
+		for (axis = 0; axis < 3; ++axis) {
+			*Flight_ModernAiTurnAngle(object, axis) = turn->expected[axis];
+			turn->turn[axis] = (int16_t)(turn->turn[axis] + turned[axis]);
+		}
+		ticks = elapsedTicks + (stepMax > 1 ? stepMax - 1 : 0);
+		if (ticks > 2 * elapsedTicks) {
+			ticks = 2 * elapsedTicks;
+		}
+		/* The player's craft is moved one input frame at a time, and has
+		   already reached its simStateTimestamp, which can be later than
+		   the AI step. Its turn starts from there. */
+		turn->startTime = object->mobj->simStateTimestamp != 0 ? object->mobj->simStateTimestamp : g_gameTime;
+		turn->ticks = (uint16_t)ticks;
+		turn->elapsed = 0;
+		turn->active = 1;
+	}
 }
 #endif
 
@@ -6415,8 +6848,10 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 #ifdef XWA_MODERN
 				/* Version 6: the port's state block follows the header
 				   (XwaFilmState_Write). Version 7: the object table's layout
-				   comes before the world state (XwaFilmState_WriteLayout). */
-				headerValue = 7;
+				   comes before the world state (XwaFilmState_WriteLayout).
+				   Version 8: the world state's records have the original's
+				   byte layout; versions 6 and 7 wrote them in another order. */
+				headerValue = 8;
 #else
 				headerValue = 5;
 #endif
@@ -6517,6 +6952,9 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 #endif
 
 						g_worldStateHandle = Memory_AllocHandle("WORLDSTATEDATA", bufferSize);
+#ifdef XWA_MODERN
+						g_worldStateBufferCapacity = bufferSize;
+#endif
 						if (g_worldStateHandle == 0) {
 							FeDiskIo_FatalError(0);
 						}
@@ -6660,6 +7098,9 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 #endif
 
 				g_worldStateHandle = Memory_AllocHandle("WORLDSTATEDATA", bufferSize);
+#ifdef XWA_MODERN
+				g_worldStateBufferCapacity = bufferSize;
+#endif
 				if (g_worldStateHandle == 0) {
 					FeDiskIo_FatalError(0);
 				}
@@ -6675,15 +7116,37 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 			/* A world state saved with another layout of the object table
 			   can't be restored into this one. The playback stops, and the
 			   film reads nothing more. */
-			if (!XwaFilmState_ReadLayout((uint16_t)g_filmVersion > 6u)) {
+			if ((uint16_t)g_filmVersion == 6u || (uint16_t)g_filmVersion == 7u) {
+				/* Versions 6 and 7 wrote the world state's records in an
+				   order of their own, which can't be restored. */
+				Aeron_LogError("xwa.film",
+							   "film: version %d was recorded by an older OpenXWA with another world state "
+							   "layout; record it again",
+							   (int)g_filmVersion);
+				g_filmPlaybackMode = 3;
+			} else if ((uint16_t)g_filmVersion >= 8u && !XwaFilmState_ReadLayout()) {
 				g_filmPlaybackMode = 3;
 			}
 			if (g_filmPlaybackMode != 3) {
 				Film_ReadBytes(&loopIdx, sizeof(loopIdx));
+				if (loopIdx > g_worldStateBufferCapacity) {
+					Aeron_LogError("xwa.film", "film: its world state of %u bytes doesn't fit the buffer of %u bytes",
+								   loopIdx, (unsigned)g_worldStateBufferCapacity);
+					g_filmPlaybackMode = 3;
+				}
+			}
+			if (g_filmPlaybackMode != 3) {
 				Film_ReadBytes(g_worldStateBuffer, loopIdx);
 				/* The restore reads the extension block up to this size. */
 				g_worldStateSize = (int)loopIdx;
-				Flight_RestoreWorldState();
+				/* A film from the original game can have larger craft records
+				   (XWAU's hook_opt_limit). Convert them to stock records first. */
+				if ((uint16_t)g_filmVersion <= 5u && !XwaOriginalFilm_ConvertWorldState(g_worldStateBuffer,
+																						 &g_worldStateSize)) {
+					g_filmPlaybackMode = 3;
+				} else {
+					Flight_RestoreWorldState();
+				}
 			}
 #else
 			Film_ReadBytes(&loopIdx, sizeof(loopIdx));
@@ -6782,6 +7245,8 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 #ifdef XWA_MODERN
 			if ((uint16_t)g_filmVersion > 5u) {
 				XwaFilmState_Read();
+			} else {
+				XwaModernFlightTiming_UseOriginalFilmTiming();
 			}
 #endif
 
@@ -7061,6 +7526,10 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 			if (sideEffectsAllowed && frame->timestamp <= savedGameTime) {
 				g_replayInputs[selectedPlayer].key = KEY_NONE;
 				g_replayInputs[selectedPlayer].keyMods = 0;
+#ifdef XWA_MODERN
+				/* A throttle position is a one-time command too. */
+				g_replayInputs[selectedPlayer].throttle = 0;
+#endif
 			}
 			if (g_flightPlayerCount > 1 && selectedPlayer == g_localPlayer) {
 				g_flightSfxSideEffectGate = 2;
@@ -7153,7 +7622,7 @@ int Pause_ProcessInput(void) {
 			}
 			break;
 
-		case 164:
+		case KEY_LEFT:
 			if (g_pauseState == 1) {
 				g_pauseState = 2;
 				fsfx_PlaySound(67, 0xffffu, (unsigned int)g_localPlayer);
@@ -9554,7 +10023,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 				}
 				break;
 			}
-			case KEY_FOWARD_SLASH:
+			case KEY_BACKSLASH:
 				if (!g_players[currentPlayerIdx].hasCheckpointFlag) {
 					craft->throttleSpeed = 0;
 					FlightAction_PlayEngineClick(currentPlayerIdx);
@@ -10177,10 +10646,10 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					craft->throttleSpeed = (uint16_t)((g_currentActionKey + 7) << 12);
 				}
 				break;
-			case KEY_THROTTLE_11:
 			case KEY_THROTTLE_12:
 			case KEY_THROTTLE_13:
 			case KEY_THROTTLE_14:
+			case KEY_THROTTLE_15:
 				if (!g_players[currentPlayerIdx].hasCheckpointFlag) {
 					craft->throttleSpeed = (uint16_t)((g_currentActionKey + 8) << 12);
 				}
@@ -10586,7 +11055,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 							 (int)currentPlayerIdx);
 			return;
 		case KEY_G:
-		case KEY_ALT_G:
+		case KEY_ALT_W:
 			if (g_players[currentPlayerIdx].viewState.externalCameraActive) {
 				Player_StepExtView((int)currentPlayerIdx);
 				Player_CycleGunnerSeat(currentPlayerIdx, NULL);
@@ -10770,7 +11239,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 		case KEY_ALT_N:
 			FlightAction_FocusNewestPlayerProjectile(currentPlayerIdx);
 			return;
-		case KEY_ABORT_MISSION:
+		case KEY_ALT_Q:
 			FlightAction_RequestAbortOrDisconnect(currentPlayerIdx);
 			return;
 		case KEY_ALT_U:
@@ -11230,7 +11699,7 @@ static __inline int Flight_UpdateEntity_HandleLocalHotkeys(unsigned int playerId
 				fsfx_PlaySound(68, 0xffffu, playerIdx);
 			}
 			break;
-		case 133: {
+		case KEY_ALT_F: {
 			unsigned int strength = ForceFeedback_GetStrength() + 1250;
 			if (strength > 10000u) {
 				strength = 0;
@@ -11562,7 +12031,7 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 			case 152:
 				g_flightRenderStatsDumpRequested = 1;
 				break;
-			case 133: {
+			case KEY_ALT_F: {
 				unsigned int strength = ForceFeedback_GetStrength() + 1250;
 				if (strength > 10000u) {
 					strength = 0;
@@ -11679,25 +12148,31 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 		}
 #endif
 		DInput_ReadKeyboardState();
+		/* The keyboard look actions, keypad 2, 4, 5, 6 and 8 by default. */
+#ifdef XWA_MODERN
+#define FLIGHT_LOOK_HELD(dik, look) XwaFlightControls_LookHeld(look)
+#else
+#define FLIGHT_LOOK_HELD(dik, look) g_dinputKeyboardState[dik]
+#endif
 		if (!g_players[playerIdx].viewState.externalCameraActive &&
 			g_players[playerIdx].hyperspacePhase == PLAYER_HYPERSPACE_PHASE_NONE &&
 			g_players[playerIdx].cockpitVisible && !g_players[playerIdx].currentSeatIdx &&
 			g_players[playerIdx].cockpitLookAvailable && g_flightPlayerCount == 1) {
-			if (g_dinputKeyboardState[0x4b] || g_currentActionKey == KEY_PAD_4) {
+			if (FLIGHT_LOOK_HELD(0x4b, XWA_INPUT_LOOK_LEFT) || g_currentActionKey == KEY_PAD_4) {
 #ifdef XWA_MODERN
 				g_players[playerIdx].lookYawOffset -= (int16_t)Flight_ModernScaleLegacyPerAdvanceValue(1200);
 #else
 				g_players[playerIdx].lookYawOffset -= 1200;
 #endif
 			}
-			if (g_dinputKeyboardState[0x4d] || g_currentActionKey == KEY_PAD_6) {
+			if (FLIGHT_LOOK_HELD(0x4d, XWA_INPUT_LOOK_RIGHT) || g_currentActionKey == KEY_PAD_6) {
 #ifdef XWA_MODERN
 				g_players[playerIdx].lookYawOffset += (int16_t)Flight_ModernScaleLegacyPerAdvanceValue(1200);
 #else
 				g_players[playerIdx].lookYawOffset += 1200;
 #endif
 			}
-			if (g_dinputKeyboardState[0x48] || g_currentActionKey == KEY_PAD_8) {
+			if (FLIGHT_LOOK_HELD(0x48, XWA_INPUT_LOOK_UP) || g_currentActionKey == KEY_PAD_8) {
 #ifdef XWA_MODERN
 				g_players[playerIdx].lookPitchOffset +=
 					(int16_t)Flight_ModernScaleLegacyPerAdvanceValue(1200);
@@ -11705,7 +12180,7 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 				g_players[playerIdx].lookPitchOffset += 1200;
 #endif
 			}
-			if (g_dinputKeyboardState[0x50] || g_currentActionKey == KEY_PAD_2) {
+			if (FLIGHT_LOOK_HELD(0x50, XWA_INPUT_LOOK_DOWN) || g_currentActionKey == KEY_PAD_2) {
 #ifdef XWA_MODERN
 				g_players[playerIdx].lookPitchOffset -=
 					(int16_t)Flight_ModernScaleLegacyPerAdvanceValue(1200);
@@ -11713,7 +12188,7 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 				g_players[playerIdx].lookPitchOffset -= 1200;
 #endif
 			}
-			if (g_dinputKeyboardState[0x4c] || g_currentActionKey == KEY_PAD_5) {
+			if (FLIGHT_LOOK_HELD(0x4c, XWA_INPUT_LOOK_CENTER) || g_currentActionKey == KEY_PAD_5) {
 				g_players[playerIdx].lookYawOffset = 0;
 				g_players[playerIdx].lookPitchOffset = 0;
 			}
@@ -11891,7 +12366,22 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 	}
 
 	if (!g_players[playerIdx].msgTypeId) {
+#ifdef XWA_MODERN
+		/* The record's throttle position applies after the actions, so it wins
+		   over a throttle key in the same record. A map, hyperspace or craft
+		   change during the actions drops it. */
+		const int throttleEligible = XwaFlightControls_ThrottleEligible(playerIdx);
+		const int throttleObject = g_players[playerIdx].objectIndex;
+		const unsigned int throttleSignature = g_players[playerIdx].boundObjectSignature;
+#endif
 		Flight_ProcessPlayerActions(playerIdx);
+#ifdef XWA_MODERN
+		if (throttleEligible && XwaFlightControls_ThrottleEligible(playerIdx) &&
+			g_players[playerIdx].objectIndex == throttleObject &&
+			g_players[playerIdx].boundObjectSignature == throttleSignature) {
+			XwaFlightControls_ApplyThrottle(playerIdx, &g_replayInputs[playerIdx]);
+		}
+#endif
 	} else {
 		switch (g_currentActionKey) {
 			case KEY_ESCAPE:
@@ -11924,7 +12414,7 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 			case KEY_ALT_1:
 			case KEY_ALT_2:
 			case KEY_ALT_3:
-			case 158: {
+			case KEY_ALT_4: {
 				unsigned int tauntIdx = (unsigned int)g_currentActionKey - 155u;
 				g_players[playerIdx].msgText[g_players[playerIdx].msgLength] = '\0';
 				Flight_UpdateEntity_SendTypedMessage(playerIdx,

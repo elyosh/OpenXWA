@@ -131,7 +131,7 @@ jobs:
             build/cache/macos-arm64/build/zstd
             build/cache/macos-arm64/build/ffmpeg
             build/cache/macos-arm64/build/shadercross
-          key: macos-arm64-${{ steps.runner-image.outputs.version }}-deps-${{ hashFiles('packaging/macos/build-package.sh', 'packaging/common/shadercross-fsr3.patch') }}
+          key: macos-arm64-${{ steps.runner-image.outputs.version }}-deps-${{ hashFiles('packaging/macos/build-package.sh', 'aeron/packaging/dependencies/**') }}
 
       - name: Determine ISPC version
         id: ispc
@@ -156,3 +156,78 @@ jobs:
           name: openxwa-macos-arm64-${{ matrix.build-type == 'Debug' && 'debug' || 'release' }}
           path: build/artifacts/*.dmg
           if-no-files-found: error
+
+  # Puts this build's packages on the "development" prerelease. The release is
+  # created once and then edited, so people who watch releases are notified
+  # only once. The new files are uploaded before the old ones are deleted, so
+  # there is always a complete build to download. CI runs on main don't overlap
+  # (see concurrency above), so an older build can't replace a newer one.
+  publish-development:
+    name: Publish development build
+    if: github.event_name == 'push'
+    needs: [linux, windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: openxwa-*
+          path: packages
+          merge-multiple: true
+
+      - name: Update development release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag=development
+          url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+          stable="$(gh release view --json tagName -q .tagName)"
+
+          # The tag still points to the previous build until the end of this step.
+          changes=""
+          if previous="$(gh api "repos/${GH_REPO}/git/ref/tags/${tag}" -q .object.sha 2>/dev/null)" &&
+              [[ "${previous}" != "${GITHUB_SHA}" ]]; then
+            compare="$(gh api "repos/${GH_REPO}/compare/${previous}...${GITHUB_SHA}?per_page=100")"
+            total="$(jq .total_commits <<<"${compare}")"
+            if (( total <= 100 )); then
+              changes="Changes since the previous build:"$'\n\n'"$(jq -r '.commits | reverse | .[] |
+                  "- \(.commit.message | split("\n")[0]) ([\(.sha[:7])](\(.html_url)))"' <<<"${compare}")"
+            else
+              changes="[${total} changes since the previous build](${url}/compare/${previous}...${GITHUB_SHA})"
+            fi
+          fi
+
+          notes="$(cat <<NOTES
+          Built on $(date -u '+%Y-%m-%d at %H:%M UTC') from commit [${GITHUB_SHA::7}](${url}/commit/${GITHUB_SHA}).
+          This build has features that aren't released yet and may have new bugs. A new build replaces it after every change. The latest stable version is [${stable}](${url}/releases/tag/${stable}).
+
+          ${changes}
+
+          [All changes since ${stable}](${url}/compare/${stable}...${GITHUB_SHA})
+
+          Download the \`-release\` file for your platform. The \`-debug\` and \`-symbols\` files are for diagnosing problems.
+
+          **macOS:** this build isn't signed by Apple, so macOS blocks it the first time you open it. To allow it, click **Open Anyway** in **System Settings** > **Privacy & Security**. Do this for both OpenXWA and the OpenXWA Mod Importer.
+          NOTES
+          )"
+
+          if ! gh release view "${tag}" >/dev/null 2>&1; then
+            gh release create "${tag}" --target "${GITHUB_SHA}" --prerelease --latest=false \
+                --title "OpenXWA development build" --notes "${notes}"
+          fi
+
+          old="$(gh release view "${tag}" --json assets -q '.assets[].name')"
+          gh release upload "${tag}" packages/* --clobber
+          for name in ${old}; do
+            if [[ ! -e "packages/${name}" ]]; then
+              gh release delete-asset "${tag}" "${name}" --yes
+            fi
+          done
+
+          # Move the tag and update the notes last, so they never describe files that aren't uploaded yet.
+          gh api -X PATCH "repos/${GH_REPO}/git/refs/tags/${tag}" -f sha="${GITHUB_SHA}" -F force=true >/dev/null
+          gh release edit "${tag}" --notes "${notes}"

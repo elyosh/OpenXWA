@@ -15,6 +15,7 @@ static const char* const kParticleLightNames[XWA_PARTICLE_LIGHT_GROUP_COUNT] = {
 	"cockpit_sparks",
 	"cockpit_smoke",
 	"craft_damage",
+	"player_craft_damage",
 };
 
 static XwaParticleLight s_lights[XWA_PARTICLE_LIGHT_GROUP_COUNT];

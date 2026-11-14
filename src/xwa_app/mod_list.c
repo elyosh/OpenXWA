@@ -80,9 +80,14 @@ static void mod_list_check(const AeronConfigFile* manifest, XwaModEntry* mod) {
 	mod->problem[0] = '\0';
 	if (version != XWA_MOD_FORMAT_VERSION) {
 		mod->state = XWA_MOD_OTHER_VERSION;
-		if (imported) {
+		if (imported && version < XWA_MOD_FORMAT_VERSION) {
 			snprintf(mod->problem, sizeof mod->problem,
-					 "Made for another version of OpenXWA. Import it again.");
+					 "It was imported by an older version of OpenXWA. Import it again with the "
+					 "OpenXWA Mod Importer.");
+		} else if (imported) {
+			snprintf(mod->problem, sizeof mod->problem,
+					 "It was imported by a newer version of OpenXWA. Update OpenXWA, or import it again "
+					 "with this version's OpenXWA Mod Importer.");
 		} else if (!AeronConfigFile_Has(manifest, "version")) {
 			snprintf(mod->problem, sizeof mod->problem,
 					 "Its mod.yaml has no version, and this OpenXWA needs version %d.",
@@ -95,7 +100,7 @@ static void mod_list_check(const AeronConfigFile* manifest, XwaModEntry* mod) {
 	} else if (!AeronConfigFile_GetBool(manifest, "complete", 1)) {
 		mod->state = XWA_MOD_UNFINISHED;
 		snprintf(mod->problem, sizeof mod->problem, "%s",
-				 imported ? "Its import didn't finish. Import it again."
+				 imported ? "Its import didn't finish. Import it again with the OpenXWA Mod Importer."
 						  : "Its mod.yaml says that it isn't complete.");
 	} else {
 		mod->state = XWA_MOD_READY;
@@ -152,7 +157,7 @@ static int mod_list_add_folder(XwaModList* list, AeronVfs* vfs, const char* path
 /* Adds the mods of the mods folder, by folder name. */
 static int mod_list_scan_folder(XwaModList* list, AeronVfs* vfs, const char* mods_folder) {
 	ModFolders folders = { 0 };
-	char path[XWA_HOST_CONFIG_PATH_CAPACITY];
+	char path[XWA_INSTALL_PATH_CAPACITY];
 	int ok = 1;
 
 	AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, "", "*", AERON_VFS_GLOB_DIRECTORIES, mod_list_collect, &folders);
@@ -177,7 +182,7 @@ static int mod_list_scan_folder(XwaModList* list, AeronVfs* vfs, const char* mod
 }
 
 int XwaModList_Folder(const char* configured, char* out, size_t capacity) {
-	char local[XWA_HOST_CONFIG_PATH_CAPACITY];
+	char local[XWA_INSTALL_PATH_CAPACITY];
 	int length;
 
 	if (configured && configured[0]) {

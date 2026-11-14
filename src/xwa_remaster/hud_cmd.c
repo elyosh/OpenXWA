@@ -19,7 +19,6 @@
 #include "xwa_remaster/skins.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/models/craft_hud.h"
-#include "xwa_runtime/models/model_source.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -178,11 +177,11 @@ static int cmd_projectile(const XwaFlightObject* object) {
 
 /* A shot can use a weapon model from the settings of the craft that fired
    it, as in the world view. */
-static AeronSceneMesh* cmd_mesh(const XwaFlightObject* object, uint8_t* out_source) {
+static AeronSceneMesh* cmd_mesh(const XwaFlightObject* object) {
 	const char* name = cmd_projectile(object)
 						   ? XwaSnapshotExport_ShotModelName(object->object_type, object->source_object_type)
 						   : XwaSnapshotExport_ModelName(object->object_type);
-	return name ? XwaRemasterShip_MeshForNameWithSource(name, out_source) : NULL;
+	return name ? XwaRemasterShip_MeshForName(name) : NULL;
 }
 
 static float cmd_engine_glow_scale(const XwaFlightObject* object, uint64_t tick_index) {
@@ -216,11 +215,10 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 		return 0;
 	if (out_transform)
 		memcpy(out_transform, transform, sizeof transform);
-	uint8_t source = XWA_MODEL_SOURCE_OPT;
 	AeronSceneMesh* mesh =
 		object->object_type == XWA_SNAP_TYPE_DEBRIS_CHUNK
 			? XwaRemasterShip_MeshForName(XwaSnapshotExport_ModelName(object->source_object_type))
-			: cmd_mesh(object, &source);
+			: cmd_mesh(object);
 	if (!mesh)
 		return 0;
 	AeronSceneMeshInstance instance;
@@ -229,9 +227,7 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 	instance.variant = object->node_switch;
 	XwaRemasterSkins_CheckMarkings(instance.mesh, instance.variant);
 	instance.zero_velocity = 1;
-	if (cmd_projectile(object) && source == XWA_MODEL_SOURCE_OPT) {
-		instance.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
-	}
+	instance.emission_only = cmd_projectile(object);
 	/* A mirrored view reverses the winding of every face it shows. */
 	instance.cull_mode = roll_align                ? AERON_CULL_NONE
 						 : cmd_rows_mirrored(rows) ? AERON_CULL_FRONT
@@ -256,7 +252,7 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 	AeronScene_AddMeshInstance(s_cmd.scene, &instance);
 	if (target_effects) {
 		XwaRemasterGlowMarks_SubmitObject(s_cmd.scene, cmd, assets, snapshot, object, mesh, transform,
-										  instance.mesh_table, 1.0f);
+										  instance.mesh_table, 1.0f, 1.0f, 1);
 		if (glow_ref) {
 			XwaRemasterShip_SubmitEngineGlows(
 				s_cmd.scene, mesh, transform, AERON_OPT_UNITS_PER_METER, instance.mesh_table,

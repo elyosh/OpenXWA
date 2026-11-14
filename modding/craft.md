@@ -72,6 +72,7 @@ beam_allowed: true
 | `family` | The family, such as `craft` or `weapon`. |
 | `flags` | The list of flags that are on. |
 | `missions` | The missions that load the model: `all`, `death_star` or `not_death_star`. See [Missions](#missions). |
+| `always_loaded` | `true` or `false`: whether every mission loads the model, even when no flight group uses it. See [Missions](#missions). |
 | `craft_record` | Changes to the craft record. See [The craft record](#the-craft-record). |
 | `names` | The names that the game shows for the craft. See [Craft names](#craft-names). |
 | `sounds_like` | Another object type whose stock engine and launch sounds this one uses. |
@@ -170,6 +171,21 @@ Without `missions`, the object type keeps the original game's value. The
 original game uses `not_death_star` for some free slots and placeholders,
 such as `xwing_104`. When you put a craft in one of them and a Death Star
 mission uses it, set `missions: all`, or the craft has no model there.
+
+Lasers, warheads and other projectiles are never in a flight group, so the
+original game loads their models in every mission. A new projectile needs
+`always_loaded: true`, or the game never loads its model. Some mods use
+`custom_weapon` (object type 307) for a new laser:
+
+```yaml
+object_type: custom_weapon
+model: auxturbolaser307
+list: equipment
+always_loaded: true
+```
+
+Without `always_loaded`, the object type keeps the original game's value.
+`missions` still applies to a model that is always loaded.
 
 ### The craft record
 

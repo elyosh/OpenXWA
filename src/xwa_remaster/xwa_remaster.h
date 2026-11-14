@@ -36,6 +36,10 @@ typedef struct XwaRemasterInitOptions {
 	XwaRemasterCapturedLightingOptions captured_lighting;
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
+	/* A fixed size for the 3D render, in pixels (--render-size), or 0 to
+	   follow the window. */
+	int render_width;
+	int render_height;
 } XwaRemasterInitOptions;
 
 /* Loads mandatory renderer resources and creates process-wide remaster state. */
@@ -78,9 +82,9 @@ void XwaRemaster_SetHdrDesired(int want);
 int XwaRemaster_GetHdrDesired(void);
 AeronSampleCount XwaRemaster_MsaaSampleCount(void);
 
-/* Narrow bridge surface used by the original-style modern options screen.
- * Only user-facing selections are changed; advanced renderer tuning remains
- * owned by the flight renderer and its debug tools. */
+/* Get and set the video options that the player can change in OpenXWA
+ * Options. The flight renderer and its debug tools own the other renderer
+ * settings. */
 void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out);
 void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options);
 

@@ -493,6 +493,8 @@ static void hud_capture_direct_state(XwaHudState* out) {
 	int player_slot;
 
 	out->valid = 0;
+	out->player_slot = 0xffffu;
+	out->player_signature = 0;
 	if (g_localPlayer < 0 || g_localPlayer >= XWA_PLAYER_COUNT) {
 		return;
 	}
@@ -537,8 +539,6 @@ static void hud_capture_direct_state(XwaHudState* out) {
 
 	memset(out->reticle.slot_frame, 0, sizeof out->reticle.slot_frame);
 	player_slot = player->objectIndex;
-	out->player_slot = 0xffffu;
-	out->player_signature = 0;
 	if (g_objectTable == NULL || player_slot < 0 || player_slot == 0xffff ||
 		(uint32_t)player_slot >= g_objectTableSlotCount) {
 		return;

@@ -12,7 +12,7 @@ extern "C" {
  * options are read from the `target_readout` section of the shipped
  * remaster/config.yaml, the mod's flight/hud.yaml and the player's
  * config.yaml. The shipped file turns the readout off.
- * The options screen only turns it on or off. */
+ * The Video tab of OpenXWA Options only turns it on or off. */
 
 typedef enum XwaTargetReadoutTextSize {
 	XWA_TARGET_READOUT_TEXT_SMALL = 0,

@@ -2,7 +2,6 @@
 
 #include "aeron/compat/mmsystem.h"
 #include "xwa/config/game_config.h"
-#include "xwa_runtime/input/winmm_joystick_provider.h"
 
 #include <string.h>
 
@@ -334,7 +333,6 @@ int Joystick_InitDevices(void) {
 }
 
 void Joystick_ReinitializeDevices(void) {
-	WinmmJoystick_ResetTrace();
 	memset(&g_joystickState, 0, sizeof(g_joystickState));
 	memset(g_joyCalibrated, 0, sizeof(g_joyCalibrated));
 	memset(g_joyDeviceId, 0, sizeof(g_joyDeviceId));

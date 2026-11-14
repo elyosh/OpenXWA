@@ -209,14 +209,18 @@ set(XWA_RECOVERED_SOURCES
 set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/camera/camera_motion.c
     src/xwa_runtime/camera/exterior_hud.c
-    src/xwa_runtime/config/modern_controller_options_screen.c
-    src/xwa_runtime/config/modern_input_options_screen.c
+    src/xwa_runtime/config/modern_camera_options.c
+    src/xwa_runtime/config/modern_camera_shake_options.c
+    src/xwa_runtime/config/modern_input_options.c
     src/xwa_runtime/config/modern_options_menu.c
     src/xwa_runtime/config/modern_pilot_profiles_screen.c
     src/xwa_runtime/config/modern_video_options.c
     src/xwa_runtime/config/modern_mods.c
     src/xwa_runtime/config/modern_mods_screen.c
-    src/xwa_runtime/config/modern_video_options_screen.c
+    src/xwa_runtime/config/modern_speed_effect_options.c
+    src/xwa_runtime/config/modern_sun_options.c
+    src/xwa_runtime/config/modern_target_readout_options.c
+    src/xwa_runtime/config/option_section.c
     src/xwa_runtime/hooks/orientation_hook.c
     src/xwa_runtime/frontend/awards.c
     src/xwa_runtime/frontend/concourse_layout.c
@@ -229,7 +233,12 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/frontend/frontend_video.c
     src/xwa_runtime/frontend/room_anims.c
     src/xwa_runtime/frontend/side_panels.c
+    src/xwa_runtime/input/actions.c
+    src/xwa_runtime/input/capture.c
+    src/xwa_runtime/input/controller_options.c
+    src/xwa_runtime/input/flight_controls.c
     src/xwa_runtime/input/input_bridge.c
+    src/xwa_runtime/input/keyboard_mapping.c
     src/xwa_runtime/input/controller_mapping.c
     src/xwa_runtime/input/rumble_provider.c
     src/xwa_runtime/input/winmm_joystick_provider.c
@@ -293,6 +302,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/runtime/frontend_task.c
     src/xwa_runtime/runtime/film_benchmark.c
     src/xwa_runtime/runtime/film_state.c
+    src/xwa_runtime/runtime/original_film.c
     src/xwa_runtime/runtime/game_files.c
     src/xwa_runtime/runtime/movie_task.c
     src/xwa_runtime/runtime/port.c
@@ -306,21 +316,6 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/timing/host_clock.c
     src/xwa_runtime/timing/modern_flight_timing.c
 )
-
-# Options used by both the game and its configuration: input, and the option
-# sections (camera, sun, speed effect and target readout).
-set(XWA_INPUT_OPTIONS_SOURCES
-    src/xwa_runtime/config/modern_camera_options.c
-    src/xwa_runtime/config/modern_camera_shake_options.c
-    src/xwa_runtime/config/modern_input_options.c
-    src/xwa_runtime/config/modern_speed_effect_options.c
-    src/xwa_runtime/config/modern_sun_options.c
-    src/xwa_runtime/config/modern_target_readout_options.c
-    src/xwa_runtime/config/option_section.c
-)
-add_library(xwa_input_options STATIC ${XWA_INPUT_OPTIONS_SOURCES})
-target_include_directories(xwa_input_options PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(xwa_input_options PUBLIC aeron)
 
 add_library(xwa_core ${XWA_RECOVERED_SOURCES} ${XWA_RUNTIME_SOURCES})
 
@@ -423,28 +418,38 @@ target_include_directories(xwa_core
 target_link_libraries(xwa_core
     PUBLIC
         aeron
-        xwa_input_options
         aeron_compat
         aeron_video
         aeron_flight_model
         aeron_collision
 )
 
-# OpenXWA's configuration, its game data and mod checks, and the mod list.
-# The game and the mod importer both link it.
-set(XWA_HOST_CONFIG_SOURCES
-    src/xwa_app/host_config.c
+# The paths.* keys of config.yaml, the game data check and the mod list.
+# The game and the mod importer both link it. It doesn't depend on the game.
+set(XWA_INSTALL_SOURCES
+    src/xwa_app/install_check.c
+    src/xwa_app/install_paths.c
     src/xwa_app/mod_list.c
-    src/xwa_app/setup.c
 )
-add_library(xwa_host_config STATIC ${XWA_HOST_CONFIG_SOURCES})
-target_include_directories(xwa_host_config PUBLIC
+add_library(xwa_install STATIC ${XWA_INSTALL_SOURCES})
+target_include_directories(xwa_install PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/src/xwa_app)
-target_link_libraries(xwa_host_config PUBLIC xwa_input_options aeron)
+target_link_libraries(xwa_install PUBLIC aeron)
 
 set(XWA_APP_SOURCES
     src/xwa_app/main.c
+    src/xwa_app/controller_config.c
+    src/xwa_app/host_config.c
+    src/xwa_app/keyboard_config.c
+    src/xwa_app/options/bindings_editor.c
+    src/xwa_app/options/controller_page.c
+    src/xwa_app/options/keyboard_page.c
+    src/xwa_app/options/mouse_page.c
+    src/xwa_app/options/video_page.c
+    src/xwa_app/options/options_window.c
+    src/xwa_app/setup.c
+    src/xwa_app/ui.c
 )
 
 add_executable(xwa ${XWA_APP_SOURCES})
@@ -453,7 +458,7 @@ set_target_properties(xwa PROPERTIES OUTPUT_NAME "OpenXWA")
 target_link_libraries(xwa
     PRIVATE
         xwa_core
-        xwa_host_config
+        xwa_install
         xwa_remaster
 )
 target_include_directories(xwa PRIVATE
@@ -507,6 +512,15 @@ if(APPLE)
     set_source_files_properties("${XWA_AERON_SCENE3D_DEFAULTS}" PROPERTIES
         HEADER_FILE_ONLY TRUE
         MACOSX_PACKAGE_LOCATION Resources/resources/aeron)
+
+    # The font of the OpenXWA Options window.
+    set(XWA_MACOS_FONT_FILES
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.fnt"
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/assets/fonts/menu.ktx2")
+    target_sources(xwa PRIVATE ${XWA_MACOS_FONT_FILES})
+    set_source_files_properties(${XWA_MACOS_FONT_FILES} PROPERTIES
+        HEADER_FILE_ONLY TRUE
+        MACOSX_PACKAGE_LOCATION Resources/resources/assets/fonts)
 
     set(XWA_MACOS_SHADER_OUTPUTS ${AERON_SHADER_OUTPUTS} ${XWA_SHADER_OUTPUTS})
     target_sources(xwa PRIVATE ${XWA_MACOS_SHADER_OUTPUTS})
@@ -659,7 +673,7 @@ if(XWA_BUILD_MOD_IMPORTER)
         tools/mod_importer/app/main.c
         tools/mod_importer/app/ui.c
     )
-    target_link_libraries(xwa_mod_importer PRIVATE xwa_mod_import_lib xwa_host_config)
+    target_link_libraries(xwa_mod_importer PRIVATE xwa_mod_import_lib xwa_install)
     target_compile_definitions(xwa_mod_importer PRIVATE OPENXWA_VERSION="${XWA_VERSION}")
     set_target_properties(xwa_mod_importer PROPERTIES
         OUTPUT_NAME "OpenXWA Mod Importer"
@@ -722,14 +736,11 @@ endif()
 if(MSVC)
     target_compile_options(xwa_core PRIVATE /W4)
     target_compile_options(xwa PRIVATE /W4)
-    target_compile_options(xwa_input_options PRIVATE /W4)
-    target_compile_options(xwa_host_config PRIVATE /W4)
+    target_compile_options(xwa_install PRIVATE /W4)
 else()
     target_compile_options(xwa_core PRIVATE -Wall -Wextra -Wpedantic -Wno-deprecated-declarations -fno-common)
     target_compile_options(xwa PRIVATE -Wall -Wextra -Wpedantic -Wno-deprecated-declarations -fno-common)
-    target_compile_options(xwa_input_options PRIVATE
-        -Wall -Wextra -Wpedantic -Wno-deprecated-declarations -fno-common)
-    target_compile_options(xwa_host_config PRIVATE
+    target_compile_options(xwa_install PRIVATE
         -Wall -Wextra -Wpedantic -Wno-deprecated-declarations -fno-common)
 endif()
 if(XWA_BUILD_TOOLS)
@@ -761,15 +772,12 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/config/modern_camera_options.h
     src/xwa_runtime/config/modern_camera_shake_options.h
     src/xwa_runtime/config/modern_input_options.h
-    src/xwa_runtime/config/modern_controller_options_screen.h
-    src/xwa_runtime/config/modern_input_options_screen.h
     src/xwa_runtime/config/modern_options_menu.h
     src/xwa_runtime/config/modern_pilot_profiles_screen.h
     src/xwa_runtime/config/modern_speed_effect_options.h
     src/xwa_runtime/config/modern_sun_options.h
     src/xwa_runtime/config/modern_target_readout_options.h
     src/xwa_runtime/config/modern_video_options.h
-    src/xwa_runtime/config/modern_video_options_screen.h
     src/xwa_runtime/config/option_section.h
     src/xwa_runtime/config/modern_mods.h
     src/xwa_runtime/config/modern_mods_screen.h
@@ -868,7 +876,12 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/frontend/frontend_fonts.h
     src/xwa_runtime/frontend/frontend_video.h
     src/xwa_runtime/frontend/room_anims.h
+    src/xwa_runtime/input/actions.h
+    src/xwa_runtime/input/capture.h
+    src/xwa_runtime/input/controller_options.h
+    src/xwa_runtime/input/flight_controls.h
     src/xwa_runtime/input/input_bridge.h
+    src/xwa_runtime/input/keyboard_mapping.h
     src/xwa_runtime/input/rumble_provider.h
     src/xwa_runtime/input/winmm_joystick_provider.h
     src/xwa_runtime/input/controller_mapping.h
@@ -883,7 +896,18 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/snapshot/snapshot_flight_map.h
     src/xwa_runtime/snapshot/snapshot_hud.h
     src/xwa_runtime/compat/middleware_crt.h
+    src/xwa_app/controller_config.h
     src/xwa_app/host_config.h
+    src/xwa_app/install_check.h
+    src/xwa_app/keyboard_config.h
+    src/xwa_app/options/bindings_editor.h
+    src/xwa_app/options/controller_page.h
+    src/xwa_app/options/keyboard_page.h
+    src/xwa_app/options/mouse_page.h
+    src/xwa_app/options/video_page.h
+    src/xwa_app/options/options_window.h
+    src/xwa_app/ui.h
+    src/xwa_app/install_paths.h
     src/xwa_app/mod_format.h
     src/xwa_app/mod_list.h
     src/xwa_app/setup.h
@@ -902,8 +926,7 @@ set(XWA_FORMAT_FILES
     ${XWA_FORMAT_HEADERS}
     ${XWA_RECOVERED_SOURCES}
     ${XWA_RUNTIME_SOURCES}
-    ${XWA_INPUT_OPTIONS_SOURCES}
-    ${XWA_HOST_CONFIG_SOURCES}
+    ${XWA_INSTALL_SOURCES}
     ${XWA_APP_SOURCES}
     ${XWA_TOOL_SOURCES}
 )

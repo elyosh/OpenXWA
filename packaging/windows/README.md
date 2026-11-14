@@ -103,8 +103,11 @@ llvm-symbolizer --obj=OpenXWA.exe 0x1402d9dbb
 
 ## Dependency versions
 
-Dependency and shader-tool revisions are pinned as Docker build arguments in
-the Dockerfile. Override a pin explicitly when testing an update:
+The versions of SDL, zstd, FFmpeg and SDL_shadercross, and the patches that
+SDL and SDL_shadercross need, are aeron's: see
+`aeron/packaging/dependencies/README.md`. The other dependency and
+shader-tool revisions are pinned as Docker build arguments in the Dockerfile.
+Set a build argument to test another version:
 
 ```sh
 docker buildx build \
@@ -123,16 +126,10 @@ regenerating icon assets from the master image.
 
 ## Applied dependency patches
 
-Patches under `packaging/common/` are applied to the cloned sources before the
-dependency builds. Re-verify them when a pinned revision changes; `git apply`
-fails the build if a patch no longer applies.
-
-| Patch | Applies to | Purpose |
-|-|-|-|
-| `shadercross-fsr3.patch` | SDL_shadercross (host) | FSR3 shader generation support |
-| `shadercross-msl-bindings.patch` | SDL_shadercross (host) | Stable MSL storage-buffer slots when a graphics shader leaves a texture unused |
-| `sdl-gpu-d3d12-hdr.patch` | SDL3 (Windows target) | Lets the D3D12 SDL_GPU backend report and enable HDR swapchain compositions |
-| `sdl-gpu-d3d12-descriptor-heaps.patch` | SDL3 (Windows target) | Stops the D3D12 SDL_GPU backend from writing past a full descriptor heap and from leaving bound tables in an old heap after a switch (libsdl-org/SDL#16653) |
+The SDL and SDL_shadercross patches are aeron's, applied to the cloned sources
+before the dependency builds; `aeron/packaging/dependencies/README.md` lists
+what each one fixes. `git apply` fails the build if a patch no longer applies
+to the version being built.
 
 SDL_shadercross is a build-host tool. The Dockerfile builds it for Linux and
 uses it to generate DXIL and SPIR-V while compiling OpenXWA and its runtime

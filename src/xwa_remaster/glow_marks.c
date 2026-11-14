@@ -386,14 +386,20 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 									   XwaRemasterAssets* assets, const XwaSnapshot* snapshot,
 									   const XwaFlightObject* object, const AeronSceneMesh* mesh,
 									   const float transform[16], const AeronSceneMeshTable* mesh_table,
-									   float emissive_strength) {
+									   float emissive_strength, float world_segment_emissive_strength,
+									   int draw_blast_marks) {
 	if (!scene || !command_buffer || !assets || !snapshot || !object || !mesh || !transform) {
 		return;
 	}
 	for (uint32_t glow_mark_index = 0; glow_mark_index < snapshot->glow_mark_count; glow_mark_index++) {
 		const XwaGlowMark* mark = &snapshot->glow_marks[glow_mark_index];
 		if (mark->owner_slot != object->slot || mark->owner_signature != object->signature ||
-			mark->texture_frame == 0 || mark->inv_scale_u == 0.0f || mark->inv_scale_v == 0.0f) {
+			mark->texture_frame == 0 || mark->inv_scale_u == 0.0f || mark->inv_scale_v == 0.0f ||
+			(mark->pool_kind == 1 && !draw_blast_marks)) {
+			continue;
+		}
+		const float strength = mark->world_segment_mode ? world_segment_emissive_strength : emissive_strength;
+		if (!(strength > 0.0f)) {
 			continue;
 		}
 		AeronTexture* blast_texture = NULL;
@@ -445,7 +451,7 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 		 * shade it as they shade the hull. */
 		overlay.lit = mark->pool_kind == 1;
 		overlay.color[0] = overlay.color[1] = overlay.color[2] =
-			overlay.lit ? 1.0f : emissive_strength * XwaRemaster_ClassicRadiance();
+			overlay.lit ? 1.0f : strength * XwaRemaster_ClassicRadiance();
 		overlay.color[3] = 1.0f;
 		/* The impact colour tints the glow marks. Blast marks keep their own
 		 * colours. */

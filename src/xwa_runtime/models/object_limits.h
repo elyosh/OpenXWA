@@ -37,6 +37,16 @@ void XwaObjectLimits_Init(void);
 void XwaObjectLimits_LoadMission(const char* missionPath, uint32_t regions, uint32_t players,
 								 int provingGrounds);
 
+/* Films save objects by slot index, so while a film plays, the object table
+   must have the same layout as when it was recorded. These totals (craft,
+   projectile, player projectile and explosion slots, for all regions)
+   replace the mod's and the mission's counts until
+   XwaObjectLimits_ClearFilmCounts. If they don't divide evenly between the
+   mission's regions and players, they are ignored and an error is logged. */
+void XwaObjectLimits_UseFilmCounts(uint32_t craftTotal, uint32_t projectileTotal, uint32_t playerProjectileTotal,
+								   uint32_t explosionTotal);
+void XwaObjectLimits_ClearFilmCounts(void);
+
 /* The counts of the mission that Mission_Init loaded last. */
 uint32_t XwaObjectLimits_CraftPerRegion(void);
 uint32_t XwaObjectLimits_PlayerProjectiles(void);

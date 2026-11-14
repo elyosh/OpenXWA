@@ -26,7 +26,6 @@
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/camera/camera_motion.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
-#include "xwa_runtime/config/modern_controller_options_screen.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_speed_effect_options.h"
 #include "xwa_runtime/config/modern_sun_options.h"
@@ -41,8 +40,10 @@
 #include "xwa_runtime/frontend/frontend_video.h"
 #include "xwa_runtime/frontend/room_anims.h"
 #include "xwa_runtime/frontend/side_panels.h"
+#include "xwa_runtime/input/capture.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/input_bridge.h"
+#include "xwa_runtime/input/keyboard_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
 #include "xwa_runtime/input/rumble_provider.h"
 #include "xwa_runtime/input/winmm_joystick_provider.h"
@@ -69,6 +70,7 @@
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
+#include "xwa_runtime/runtime/original_film.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/frontend_task.h"
 #include "xwa_runtime/runtime/game_files.h"
@@ -185,6 +187,7 @@ int XwaPort_Init(void) {
 	XwaMissionSettings_Init();
 	XwaDocking_Init();
 	XwaObjectLimits_Init();
+	XwaOriginalFilm_Init();
 	XwaHeadlights_Init();
 	XwaCameraMotion_Init();
 	XwaOptionSection_ReadMod(XwaModernSunOptions_Section(), XwaFlightConfig_Root());
@@ -275,6 +278,35 @@ void XwaPort_ToggleMouseCapture(void) {
 
 int XwaPort_IsMouseCaptureSuspended(void) { return g_xwaPortMouseCaptureSuspended; }
 
+static int g_xwaPortOptionsWindowRequested;
+static int g_xwaPortOptionsWindowCloseRequested;
+static int g_xwaPortOptionsWindowOpen;
+static int g_xwaPortShortcutsCaptured;
+
+void XwaPort_RequestOptionsWindow(void) { g_xwaPortOptionsWindowRequested = 1; }
+
+int XwaPort_ConsumeOptionsWindowRequest(void) {
+	const int requested = g_xwaPortOptionsWindowRequested;
+	g_xwaPortOptionsWindowRequested = 0;
+	return requested;
+}
+
+void XwaPort_RequestOptionsWindowClose(void) { g_xwaPortOptionsWindowCloseRequested = 1; }
+
+int XwaPort_ConsumeOptionsWindowCloseRequest(void) {
+	const int requested = g_xwaPortOptionsWindowCloseRequested;
+	g_xwaPortOptionsWindowCloseRequested = 0;
+	return requested;
+}
+
+void XwaPort_SetOptionsWindowOpen(int open) { g_xwaPortOptionsWindowOpen = open != 0; }
+
+int XwaPort_OptionsWindowOpen(void) { return g_xwaPortOptionsWindowOpen; }
+
+void XwaPort_SetShortcutsCaptured(int captured) { g_xwaPortShortcutsCaptured = captured != 0; }
+
+int XwaPort_ShortcutsCaptured(void) { return g_xwaPortShortcutsCaptured; }
+
 static void XwaPort_TickBody(int32_t delta_us) {
 	const AeronInputSnapshot* input;
 	int flightResult;
@@ -282,8 +314,9 @@ static void XwaPort_TickBody(int32_t delta_us) {
 	if (!g_xwaPortInitialized) {
 		return;
 	}
-	if (XwaControllerMapping_ConsumeSelectionChange()) {
-		XwaModernControllerOptionsScreen_ResetCapture();
+	/* The recovered joystick state only follows whether a saved controller is
+	 * connected, not each device change. */
+	if (XwaControllerMapping_ConsumePresenceChange()) {
 		Joystick_ReinitializeDevices();
 		if (XwaFlightTask_IsActive()) {
 			/* Flight normally detects a joystick only during initialization. */
@@ -291,7 +324,8 @@ static void XwaPort_TickBody(int32_t delta_us) {
 			g_joystickDetectResultWord = joystickActive;
 			g_joystickEnabled = joystickActive != 0;
 		}
-		XwaControllerMapping_CopySelectedActions(g_gameConfig.joyButtons);
+	}
+	if (XwaControllerMapping_ConsumeRumbleChange()) {
 		ForceFeedback_Reconfigure();
 	}
 	XwaPort_ApplyClassicFlightRenderingPolicy();
@@ -305,7 +339,7 @@ static void XwaPort_TickBody(int32_t delta_us) {
 
 	if (XwaMovieTask_IsActive()) {
 		Aeron_SetRelativeMouseMode(0);
-		XwaPort_SetHostCursorVisible(0);
+		XwaPort_SetHostCursorVisible(XwaInput_IsCaptured());
 		input = Aeron_InputSnapshot();
 		XwaInputBridge_UpdateFrontend(input);
 		XwaTime_AdvanceHostClock(delta_us);
@@ -326,11 +360,15 @@ static void XwaPort_TickBody(int32_t delta_us) {
 		/* Same for mouse flight: fold this host frame's mouse deltas into its
 		 * accumulator so motion on unsampled frames is not lost. */
 		XwaMouseFlight_Pump();
+		/* Run this frame's keys through the bindings, and drain the raw
+		 * DirectInput buffer while they are used. */
+		XwaInput_UpdateFlight(0);
 		if (FlightDisplay_IsFrontendModalActive()) {
 			Aeron_SetRelativeMouseMode(0);
 			/* The modal draws the frontend software cursor; keep the OS one hidden
-			 * even if the capture was released by hotkey before it opened. */
-			XwaPort_SetHostCursorVisible(0);
+			 * even if the capture was released by hotkey before it opened. It
+			 * stays visible while the options window has the input. */
+			XwaPort_SetHostCursorVisible(XwaInput_IsCaptured());
 			XwaInputBridge_UpdateFrontend(input);
 			XwaTime_AdvanceHostClock(delta_us);
 			XwaFrontendTask_ServiceFrameSystems();
@@ -350,7 +388,8 @@ static void XwaPort_TickBody(int32_t delta_us) {
 				g_xwaPortMouseCaptureSuspended = 0;
 				Aeron_LogInfo("xwa", "mouse captured");
 			}
-			const int capture = input != 0 && input->has_focus && !g_xwaPortMouseCaptureSuspended;
+			const int capture =
+				input != 0 && input->has_focus && !g_xwaPortMouseCaptureSuspended && !XwaInput_IsCaptured();
 			Aeron_SetRelativeMouseMode(capture);
 			XwaPort_SetHostCursorVisible(!capture);
 			/* Flight keyboard/mouse is served through the DirectInput compat shim,
@@ -428,7 +467,7 @@ static void XwaPort_TickBody(int32_t delta_us) {
 	Aeron_SetRelativeMouseMode(0);
 	/* The frontend draws its own software cursor and the capture release does not
 	 * carry across a flight session. */
-	XwaPort_SetHostCursorVisible(0);
+	XwaPort_SetHostCursorVisible(XwaInput_IsCaptured());
 	g_xwaPortMouseCaptureSuspended = 0;
 	input = Aeron_InputSnapshot();
 	XwaInputBridge_UpdateFrontend(input);
@@ -515,6 +554,9 @@ void XwaPort_Shutdown(void) {
 	FrontendDisplay_FreeSurfaces();
 	AeronDx5_Shutdown();
 	XwaPort_FreeStartupAssets();
+	XwaKeyboardMapping_Suspend();
+	XwaInput_ResetCapture();
+	XwaControllerMapping_Shutdown();
 	g_xwaPortInitialized = 0;
 	g_xwaPortShouldQuit = 0;
 	g_xwaPortHadFocus = 0;

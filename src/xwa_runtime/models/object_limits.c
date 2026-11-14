@@ -35,6 +35,10 @@ typedef struct ObjectLimits {
 static ObjectLimits s_defaults;
 static ObjectLimits s_limits;
 
+/* The totals of the film being played, when it saves them. */
+static int s_filmCountsSet;
+static uint32_t s_filmCraft, s_filmProjectiles, s_filmPlayerProjectiles, s_filmExplosions;
+
 static void ObjectLimits_ReadCount(const char* path, const AeronConfigNode* section, const char* key,
 								   uint32_t max, uint32_t* out) {
 	const AeronConfigNode* node = AeronConfigNode_MapGet(section, key);
@@ -92,6 +96,54 @@ void XwaObjectLimits_Init(void) {
 
 static uint32_t ObjectLimits_Or(uint32_t value, uint32_t stock) { return value != 0 ? value : stock; }
 
+/* Sets the counts from the film's totals. Returns 0, with a log, when the
+   totals don't fit `regions` regions and `players` players. */
+static int ObjectLimits_UseFilmCounts(uint32_t regions, uint32_t players, int provingGrounds) {
+	const uint32_t shared = players == 1 ? 16 : 32;
+	const uint32_t salvage = provingGrounds ? LIMITS_PROVING_SALVAGE : 0;
+	uint32_t projectilesPerRegion, perRegion;
+
+	if (s_filmCraft % regions != 0 || s_filmProjectiles % regions != 0 || s_filmExplosions % regions != 0 ||
+		s_filmPlayerProjectiles % players != 0 || s_filmPlayerProjectiles == 0) {
+		Aeron_LogError("xwa.film", "film: its object counts don't fit %u regions and %u players; the mod's "
+								   "counts are used", regions, players);
+		return 0;
+	}
+	projectilesPerRegion = s_filmProjectiles / regions;
+	if (projectilesPerRegion <= shared + s_filmPlayerProjectiles) {
+		Aeron_LogError("xwa.film", "film: its projectile slots are fewer than the shared and player slots; the mod's counts are used");
+		return 0;
+	}
+	perRegion = s_filmCraft / regions + salvage + projectilesPerRegion + 2 * (s_filmExplosions / regions) +
+				LIMITS_STATIC_PER_REGION;
+	if (perRegion > (XWA_MAX_OBJECTS - LIMITS_LOCAL_SLOTS) / regions) {
+		Aeron_LogError("xwa.film", "film: its object counts need more slots than the table has; the mod's "
+								   "counts are used");
+		return 0;
+	}
+	s_limits.craft = s_filmCraft / regions;
+	s_limits.playerProjectiles = s_filmPlayerProjectiles / players;
+	s_limits.aiProjectiles = projectilesPerRegion - shared - s_filmPlayerProjectiles;
+	s_limits.explosions = s_filmExplosions / regions;
+	s_limits.radarBlips = ObjectLimits_Or(s_limits.radarBlips, LIMITS_STOCK_RADAR_BLIPS);
+	Aeron_LogInfo("xwa.film",
+				  "film: using the film's object counts: %u craft and %u AI projectiles in each region, "
+				  "%u projectiles for each player and %u explosions in each region",
+				  s_limits.craft, s_limits.aiProjectiles, s_limits.playerProjectiles, s_limits.explosions);
+	return 1;
+}
+
+void XwaObjectLimits_UseFilmCounts(uint32_t craftTotal, uint32_t projectileTotal, uint32_t playerProjectileTotal,
+								   uint32_t explosionTotal) {
+	s_filmCountsSet = 1;
+	s_filmCraft = craftTotal;
+	s_filmProjectiles = projectileTotal;
+	s_filmPlayerProjectiles = playerProjectileTotal;
+	s_filmExplosions = explosionTotal;
+}
+
+void XwaObjectLimits_ClearFilmCounts(void) { s_filmCountsSet = 0; }
+
 void XwaObjectLimits_LoadMission(const char* missionPath, uint32_t regions, uint32_t players,
 								 int provingGrounds) {
 	AeronConfigFile* config = NULL;
@@ -113,6 +165,9 @@ void XwaObjectLimits_LoadMission(const char* missionPath, uint32_t regions, uint
 		s_limits.craft = LIMITS_PROVING_CRAFT;
 	}
 	if (regions == 0 || players == 0) {
+		return;
+	}
+	if (s_filmCountsSet && ObjectLimits_UseFilmCounts(regions, players, provingGrounds)) {
 		return;
 	}
 	s_limits.craft = ObjectLimits_Or(s_limits.craft, LIMITS_STOCK_CRAFT);

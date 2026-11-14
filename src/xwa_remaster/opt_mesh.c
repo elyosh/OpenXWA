@@ -191,6 +191,7 @@ static int opt_read_model(AeronVfs* vfs, const char* basename, char* resolved,
 
 bool XwaRemasterOptMesh_Build(AeronVfs* vfs, const char* basename,
 		float smooth_angle_degrees, float emissive_strength,
+		float projectile_strength,
 		AeronFlightModel* out, char* error, size_t error_size) {
 	if (out) memset(out, 0, sizeof *out);
 	if (error && error_size) error[0] = '\0';
@@ -219,6 +220,7 @@ bool XwaRemasterOptMesh_Build(AeronVfs* vfs, const char* basename,
 				.smooth_angle_degrees = smooth_angle_degrees,
 				.emissive_strength = emissive_strength,
 				.emissive = true,
+				.projectile_strength = projectile_strength,
 				.alpha_overrides = alpha_overrides,
 				.alpha_override_count = alpha_override_count,
 			},

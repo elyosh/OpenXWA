@@ -1,351 +1,491 @@
 #include "xwa_runtime/input/controller_mapping.h"
 
-#include "aeron/aeron.h"
-
+#include "aeron/debug.h"
+#include "aeron/log.h"
+#include "xwa/flight/player/player.h"
+#include "xwa/frontend/flight_loading.h"
+#include "xwa_runtime/input/capture.h"
+#include "xwa_runtime/runtime/flight_pause_task.h"
+#include "xwa_runtime/runtime/flight_task.h"
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-enum {
-	CONTROLLER_AXIS_RANGE = 65535,
-	CONTROLLER_AXIS_CENTER = 32768,
-};
+enum { ACTION_QUEUE_CAPACITY = 256 };
 
-typedef struct XwaControllerMappingState {
-	XwaControllerOptions options;
-	int configured;
-	uint32_t previous_instance_id;
-	uint32_t digital_axis_buttons;
-} XwaControllerMappingState;
+typedef struct ControllerInstance {
+	uint32_t id;
+	int model;
+	bool down[XWA_CONTROLLER_BINDING_CAP], armed[XWA_CONTROLLER_BINDING_CAP],
+		dispatched[XWA_CONTROLLER_BINDING_CAP];
+	bool primed;
+} ControllerInstance;
 
-static XwaControllerMappingState g_controllerMapping;
+static struct {
+	XwaControllerOptions options, pending;
+	ControllerInstance instances[AERON_CONTROLLER_MAX];
+	bool pending_options, suspended, present, throttle_valid;
+	/* The model whose device gives the throttle this frame. */
+	size_t throttle_model;
+	bool present_reported, presence_changed;
+	bool resume;
+	int axes[3];
+	uint16_t holds[XWA_INPUT_ACTION_COUNT], throttle;
+	uint32_t throttle_instance, generation;
+	uint32_t rumble_instance;
+	bool rumble_changed, rumble_enabled;
+	uint16_t queue[ACTION_QUEUE_CAPACITY];
+	unsigned read, write;
+	uint64_t frame;
+} g_controller;
 
-static int ControllerMapping_ProfileEqual(const XwaControllerProfile* lhs, const XwaControllerProfile* rhs) {
-	int i;
-
-	if (lhs->pov_source != rhs->pov_source) {
-		return 0;
-	}
-	for (i = 0; i < XWA_CONTROLLER_LOGICAL_AXIS_COUNT; ++i) {
-		if (lhs->axes[i].source != rhs->axes[i].source || lhs->axes[i].invert != rhs->axes[i].invert ||
-			lhs->axes[i].deadzone != rhs->axes[i].deadzone) {
-			return 0;
-		}
-	}
-	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
-		if (lhs->buttons[i].kind != rhs->buttons[i].kind || lhs->buttons[i].index != rhs->buttons[i].index ||
-			lhs->buttons[i].threshold != rhs->buttons[i].threshold) {
-			return 0;
-		}
-	}
-	return memcmp(lhs->actions, rhs->actions, sizeof(lhs->actions)) == 0;
-}
-
-static int ControllerMapping_OptionsEqual(const XwaControllerOptions* lhs, const XwaControllerOptions* rhs) {
-	return strcmp(lhs->device.guid, rhs->device.guid) == 0 &&
-		   strcmp(lhs->device.path, rhs->device.path) == 0 && lhs->device.ordinal == rhs->device.ordinal &&
-		   lhs->rumble_enabled == rhs->rumble_enabled &&
-		   ControllerMapping_ProfileEqual(&lhs->gamepad, &rhs->gamepad) &&
-		   ControllerMapping_ProfileEqual(&lhs->joystick, &rhs->joystick);
-}
-
-const AeronControllerSnapshot* XwaControllerMapping_SelectedController(void) {
-	const AeronInputSnapshot* input = Aeron_InputSnapshot();
-
-	if (!input || !g_controllerMapping.configured) {
-		return NULL;
-	}
-	return Aeron_SelectController(input, &g_controllerMapping.options.device);
-}
-
-static const XwaControllerProfile* ControllerMapping_Profile(const XwaControllerOptions* options,
-															 const AeronControllerSnapshot* controller) {
-	return controller->kind == AERON_CONTROLLER_KIND_GAMEPAD ? &options->gamepad : &options->joystick;
-}
-
-static int16_t ControllerMapping_AxisValue(const AeronControllerSnapshot* controller, int source) {
-	if (source < 0) {
-		return 0;
-	}
-	if (controller->kind == AERON_CONTROLLER_KIND_GAMEPAD) {
-		return source < AERON_GAMEPAD_AXIS_COUNT ? controller->gamepad_axes[source] : 0;
-	}
-	return source < controller->axis_count && source < AERON_CONTROLLER_AXIS_MAX
-			   ? controller->raw_axes[source]
-			   : 0;
-}
-
-static int ControllerMapping_IsTrigger(const AeronControllerSnapshot* controller, int source) {
-	return controller->kind == AERON_CONTROLLER_KIND_GAMEPAD &&
-		   (source == AERON_GAMEPAD_AXIS_LEFT_TRIGGER || source == AERON_GAMEPAD_AXIS_RIGHT_TRIGGER);
-}
-
-static uint32_t ControllerMapping_CenteredAxis(int16_t value, int invert, float deadzone) {
-	double normalized = value < 0 ? (double)value / 32768.0 : (double)value / 32767.0;
-	double magnitude;
-	uint32_t mapped;
-
-	magnitude = normalized < 0.0 ? -normalized : normalized;
-	if (magnitude <= deadzone) {
-		return CONTROLLER_AXIS_CENTER;
-	}
-	/* Shift SDL's complete signed range onto the complete WinMM range without
-	 * losing the negative endpoint. */
-	mapped = (uint32_t)((int32_t)value + CONTROLLER_AXIS_CENTER);
-	return invert ? CONTROLLER_AXIS_RANGE - mapped : mapped;
-}
-
-static uint32_t ControllerMapping_TriggerAxis(int16_t value, int invert, float deadzone) {
-	double normalized = (double)value / 32767.0;
-
-	if (normalized < 0.0) {
-		normalized = 0.0;
-	} else if (normalized > 1.0) {
-		normalized = 1.0;
-	}
-	if (normalized <= deadzone) {
-		normalized = 0.0;
-	}
-	if (invert) {
-		normalized = 1.0 - normalized;
-	}
-	return (uint32_t)(normalized * CONTROLLER_AXIS_RANGE);
-}
-
-static uint8_t ControllerMapping_Hat(const AeronControllerSnapshot* controller,
-									 const XwaControllerProfile* profile) {
-	uint8_t hat = AERON_CONTROLLER_HAT_CENTERED;
-
-	if (controller->kind == AERON_CONTROLLER_KIND_GAMEPAD) {
-		if (!profile->pov_source) {
-			return hat;
-		}
-		if (controller->gamepad_buttons & (1u << AERON_GAMEPAD_BUTTON_DPAD_UP)) {
-			hat |= AERON_CONTROLLER_HAT_UP;
-		}
-		if (controller->gamepad_buttons & (1u << AERON_GAMEPAD_BUTTON_DPAD_RIGHT)) {
-			hat |= AERON_CONTROLLER_HAT_RIGHT;
-		}
-		if (controller->gamepad_buttons & (1u << AERON_GAMEPAD_BUTTON_DPAD_DOWN)) {
-			hat |= AERON_CONTROLLER_HAT_DOWN;
-		}
-		if (controller->gamepad_buttons & (1u << AERON_GAMEPAD_BUTTON_DPAD_LEFT)) {
-			hat |= AERON_CONTROLLER_HAT_LEFT;
-		}
-		return hat;
-	}
-	if (profile->pov_source >= 0 && profile->pov_source < controller->hat_count &&
-		profile->pov_source < AERON_CONTROLLER_HAT_MAX) {
-		return controller->raw_hats[profile->pov_source];
-	}
-	return hat;
-}
-
-static int ControllerMapping_PovDirection(uint8_t hat) {
-	/* XWA has four POV actions. Vertical wins for diagonal hats. */
-	if (hat & AERON_CONTROLLER_HAT_UP) {
-		return 0;
-	}
-	if (hat & AERON_CONTROLLER_HAT_DOWN) {
-		return 2;
-	}
-	if (hat & AERON_CONTROLLER_HAT_RIGHT) {
-		return 1;
-	}
-	if (hat & AERON_CONTROLLER_HAT_LEFT) {
-		return 3;
-	}
-	return -1;
-}
-
-static int ControllerMapping_HasPov(const AeronControllerSnapshot* controller,
-									const XwaControllerProfile* profile) {
-	if (controller->kind == AERON_CONTROLLER_KIND_GAMEPAD) {
-		return profile->pov_source != 0;
-	}
-	return profile->pov_source >= 0 && profile->pov_source < controller->hat_count;
-}
-
-static void ControllerMapping_LogUnavailableSources(const AeronControllerSnapshot* controller) {
-	const XwaControllerProfile* profile;
-	int unavailable_axes = 0;
-	int unavailable_buttons = 0;
-	int unavailable_pov = 0;
-	int i;
-
-	if (!controller || controller->kind != AERON_CONTROLLER_KIND_JOYSTICK) {
+static void XwaControllerMapping_QueueKey(uint16_t key) {
+	unsigned next = (g_controller.write + 1) % ACTION_QUEUE_CAPACITY;
+	if (next == g_controller.read) {
+		Aeron_LogWarn("xwa.input", "Controller command queue is full");
 		return;
 	}
-	profile = &g_controllerMapping.options.joystick;
-	for (i = 0; i < XWA_CONTROLLER_LOGICAL_AXIS_COUNT; ++i) {
-		unavailable_axes += profile->axes[i].source >= controller->axis_count;
-	}
-	for (i = 0; i < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++i) {
-		const AeronControllerDigitalSource* binding = &profile->buttons[i];
-		if (binding->kind == AERON_CONTROLLER_DIGITAL_BUTTON) {
-			unavailable_buttons += binding->index >= controller->button_count;
-		} else if (binding->kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE ||
-				   binding->kind == AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
-			unavailable_axes += binding->index >= controller->axis_count;
-		}
-	}
-	unavailable_pov = profile->pov_source >= controller->hat_count;
-	if (unavailable_axes || unavailable_buttons || unavailable_pov) {
-		Aeron_LogWarn("xwa.input",
-					  "Controller '%s' mapping references unavailable controls (%d axes, %d buttons, "
-					  "invalid POV=%s)",
-					  controller->name, unavailable_axes, unavailable_buttons,
-					  unavailable_pov ? "yes" : "no");
-	}
+	g_controller.queue[g_controller.write] = key;
+	g_controller.write = next;
 }
 
-static void ControllerMapping_MapSnapshot(const XwaControllerOptions* options,
-										  const AeronControllerSnapshot* controller, int has_focus,
-										  uint32_t previous_axis_buttons, uint32_t* axis_buttons,
-										  XwaControllerLogicalState* state) {
-	const XwaControllerProfile* profile;
-	int logical;
+/* Commands reach the game only in flight, after loading. While the local
+ * player types a message they are dropped: the typing code would add their
+ * key codes to the message. */
+static bool XwaControllerMapping_CommandsAllowed(void) {
+	return XwaFlightTask_IsActive() && !FlightLoading_AreFrontendSurfacesAttached() &&
+		   !XwaFlightTask_IsHoldingLoadingScreen() && (unsigned)g_localPlayer < 8 &&
+		   g_players[g_localPlayer].msgTypeId == 0;
+}
 
-	if (axis_buttons) {
-		*axis_buttons = 0;
-	}
-	if (!state) {
+static void XwaControllerMapping_DispatchAction(XwaInputAction action) {
+	if (!XwaControllerMapping_CommandsAllowed())
+		return;
+	if (XwaInputActions_Kind(action) == XWA_INPUT_ACTION_KIND_PAUSE && XwaFlightPauseTask_IsActive()) {
+		g_controller.resume = true;
 		return;
 	}
-	memset(state, 0, sizeof(*state));
-	state->pov_direction = -1;
-	for (logical = 0; logical < XWA_CONTROLLER_LOGICAL_AXIS_COUNT; ++logical) {
-		state->axes[logical] = CONTROLLER_AXIS_CENTER;
-		state->source_axes[logical] = -1;
+	XwaControllerMapping_QueueKey(XwaInputActions_Key(action));
+}
+
+/* Held, look and roll actions count their presses, so another device's
+ * release doesn't end them. A held action sends its key once, on the first
+ * press, as a joystick button did in FlightInput_Read(). There is no release
+ * command. */
+static void XwaControllerMapping_Dispatch(XwaInputAction action, bool pressed) {
+	const XwaInputActionKind kind = XwaInputActions_Kind(action);
+	if (kind == XWA_INPUT_ACTION_KIND_HELD || kind == XWA_INPUT_ACTION_KIND_LOOK ||
+		kind == XWA_INPUT_ACTION_KIND_ROLL) {
+		if (!pressed) {
+			if (g_controller.holds[action])
+				--g_controller.holds[action];
+			return;
+		}
+		if (g_controller.holds[action]++ || kind != XWA_INPUT_ACTION_KIND_HELD)
+			return;
 	}
-	if (!options || !controller || !controller->connected) {
+	if (pressed)
+		XwaControllerMapping_DispatchAction(action);
+}
+
+/* The model of a connected device, or -1. */
+static int XwaControllerMapping_DeviceModel(const AeronControllerSnapshot* device) {
+	int model = XwaControllerOptions_FindModel(&g_controller.options, device->guid);
+	return model >= 0 && g_controller.options.models[model].kind == device->kind ? model : -1;
+}
+
+static void ReleaseInstance(ControllerInstance* state) {
+	if (state->id) {
+		const XwaControllerProfile* p = &g_controller.options.models[state->model].profile;
+		for (size_t i = 0; i < p->binding_count; ++i)
+			if (state->dispatched[i])
+				XwaControllerMapping_Dispatch(p->bindings[i].action, false);
+	}
+	memset(state, 0, sizeof *state);
+}
+
+static void XwaControllerMapping_Install(const XwaControllerOptions* options) {
+	static const XwaControllerOptions empty = { 0 };
+	if (!options)
+		options = &empty;
+	char error[128];
+	if (!XwaControllerOptions_Validate(options, error, sizeof error)) {
+		Aeron_LogWarn("xwa.input", "%s", error);
 		return;
 	}
-	profile = ControllerMapping_Profile(options, controller);
-	state->has_pov = ControllerMapping_HasPov(controller, profile);
-	for (logical = 0; logical < XWA_CONTROLLER_LOGICAL_AXIS_COUNT; ++logical) {
-		const XwaControllerAxisBinding* binding = &profile->axes[logical];
-		const int16_t value = ControllerMapping_AxisValue(controller, binding->source);
-		state->source_axes[logical] = (int8_t)binding->source;
-		state->source_axis_values[logical] = value;
-		if (!has_focus) {
+	if (XwaControllerOptions_Equals(options, &g_controller.options))
+		return;
+	for (int i = 0; i < AERON_CONTROLLER_MAX; ++i) {
+		ControllerInstance* state = &g_controller.instances[i];
+		if (!state->id)
 			continue;
-		}
-		state->axes[logical] =
-			ControllerMapping_IsTrigger(controller, binding->source)
-				? ControllerMapping_TriggerAxis(value, binding->invert, binding->deadzone)
-				: ControllerMapping_CenteredAxis(value, binding->invert, binding->deadzone);
+		const XwaControllerModel* old = &g_controller.options.models[state->model];
+		int next = XwaControllerOptions_FindModel(options, old->guid);
+		if (next < 0 || old->kind != options->models[next].kind ||
+			!XwaControllerOptions_ProfileEqual(&old->profile, &options->models[next].profile))
+			ReleaseInstance(state);
 	}
-	if (!has_focus) {
-		return;
+	for (int i = 0; i < AERON_CONTROLLER_MAX; ++i) {
+		ControllerInstance* state = &g_controller.instances[i];
+		if (state->id)
+			state->model =
+				XwaControllerOptions_FindModel(options, g_controller.options.models[state->model].guid);
 	}
-	for (logical = 0; logical < XWA_CONTROLLER_LOGICAL_BUTTON_COUNT; ++logical) {
-		const AeronControllerDigitalSource* binding = &profile->buttons[logical];
-		const uint32_t bit = 1u << logical;
-		if (Aeron_ControllerDigitalSourceDown(controller, binding, (previous_axis_buttons & bit) != 0)) {
-			state->buttons |= 1u << logical;
-			if (axis_buttons && binding->kind != AERON_CONTROLLER_DIGITAL_BUTTON) {
-				*axis_buttons |= bit;
-			}
-		}
+	/* Only changes to the effective throttle binding invalidate its movement baseline. */
+	for (size_t i = 0; i < g_controller.options.count; ++i) {
+		const XwaControllerModel* old = &g_controller.options.models[i];
+		const XwaInputAxisBinding* a = &old->profile.mapping.axes[XWA_INPUT_AXIS_THROTTLE];
+		if (a->source < 0)
+			continue;
+		int n = XwaControllerOptions_FindModel(options, old->guid);
+		if (n < 0 || old->kind != options->models[n].kind ||
+			a->source != options->models[n].profile.mapping.axes[XWA_INPUT_AXIS_THROTTLE].source ||
+			a->invert != options->models[n].profile.mapping.axes[XWA_INPUT_AXIS_THROTTLE].invert)
+			++g_controller.generation;
 	}
-	state->pov_direction = ControllerMapping_PovDirection(ControllerMapping_Hat(controller, profile));
+	g_controller.options = *options;
 }
 
-void XwaControllerMapping_MapSnapshot(const XwaControllerOptions* options,
-									  const AeronControllerSnapshot* controller, int has_focus,
-									  XwaControllerLogicalState* state) {
-	ControllerMapping_MapSnapshot(options, controller, has_focus, 0, NULL, state);
+void XwaControllerMapping_Init(const XwaControllerOptions* options) {
+	memset(&g_controller, 0, sizeof g_controller);
+	g_controller.frame = UINT64_MAX;
+	g_controller.rumble_enabled = true;
+	XwaControllerMapping_Install(options);
 }
 
 void XwaControllerMapping_SetOptions(const XwaControllerOptions* options) {
-	const uint32_t old_instance_id = XwaControllerMapping_SelectedInstanceId();
-	const uint32_t previous_instance_id = g_controllerMapping.previous_instance_id;
-
-	if (options && g_controllerMapping.configured &&
-		ControllerMapping_OptionsEqual(options, &g_controllerMapping.options)) {
+	char error[128];
+	if (!XwaControllerOptions_Validate(options, error, sizeof error)) {
+		Aeron_LogWarn("xwa.input", "%s", error);
 		return;
 	}
-	if (old_instance_id != 0) {
-		Aeron_RumbleController(old_instance_id, 0, 0, 0);
-	}
-	memset(&g_controllerMapping, 0, sizeof(g_controllerMapping));
-	/* Option changes must not masquerade as physical device changes. */
-	g_controllerMapping.previous_instance_id = previous_instance_id;
-	if (!options) {
+	g_controller.pending = *options;
+	g_controller.pending_options = true;
+}
+
+void XwaControllerMapping_ApplyPending(void) {
+	if (!g_controller.pending_options)
 		return;
+	XwaControllerMapping_Install(&g_controller.pending);
+	g_controller.pending_options = false;
+}
+
+const XwaControllerOptions* XwaControllerMapping_Options(void) { return &g_controller.options; }
+
+void XwaControllerMapping_Suspend(void) {
+	if (g_controller.suspended)
+		return;
+	/* Drop the entire route without dispatching synthetic gameplay releases. */
+	memset(g_controller.instances, 0, sizeof g_controller.instances);
+	memset(g_controller.holds, 0, sizeof g_controller.holds);
+	memset(g_controller.axes, 0, sizeof g_controller.axes);
+	g_controller.read = g_controller.write = 0;
+	g_controller.resume = false;
+	g_controller.throttle_valid = false;
+	g_controller.suspended = true;
+	++g_controller.generation;
+}
+
+static void XwaControllerMapping_Resume(void) { g_controller.suspended = false; }
+
+void XwaControllerMapping_Shutdown(void) {
+	if (g_controller.rumble_instance)
+		Aeron_RumbleController(g_controller.rumble_instance, 0, 0, 0);
+	memset(&g_controller, 0, sizeof g_controller);
+}
+
+static void LogUnavailableControls(const XwaControllerModel* model, const AeronControllerSnapshot* device) {
+	int missing = 0;
+	for (int axis = 0; axis < XWA_INPUT_AXIS_COUNT; ++axis) {
+		int source = model->profile.mapping.axes[axis].source;
+		if (source >= 0 && !Aeron_ControllerAxisAvailable(device, source))
+			++missing;
 	}
-	g_controllerMapping.options = *options;
-	g_controllerMapping.configured = 1;
-	if ((options->device.guid[0] || options->device.path[0]) && !XwaControllerMapping_SelectedController()) {
-		Aeron_LogWarn("xwa.input", "Configured controller is unavailable (GUID '%s', path '%s', ordinal %d)",
-					  options->device.guid, options->device.path, options->device.ordinal);
+	for (size_t i = 0; i < model->profile.binding_count; ++i) {
+		const AeronControllerDigitalSource* source = &model->profile.bindings[i].source;
+		bool available = false;
+		if (source->kind == AERON_CONTROLLER_DIGITAL_BUTTON)
+			available = model->kind == AERON_CONTROLLER_KIND_GAMEPAD
+							? (device->gamepad_available_buttons & (1u << source->index)) != 0
+							: source->index < device->button_count;
+		else if (source->kind == AERON_CONTROLLER_DIGITAL_HAT)
+			available = source->index < device->hat_count;
+		else
+			available = Aeron_ControllerAxisAvailable(device, source->index);
+		if (!available)
+			++missing;
+	}
+	if (missing || device->controls_truncated)
+		Aeron_LogWarn("xwa.input", "controller '%s': %d unavailable configured controls%s", device->name,
+					  missing, device->controls_truncated ? ", hardware controls truncated" : "");
+}
+
+static void SampleDigital(ControllerInstance* state, const AeronControllerSnapshot* device) {
+	const XwaControllerModel* model = &g_controller.options.models[state->model];
+	const XwaControllerProfile* profile = &model->profile;
+	if (!state->primed)
+		LogUnavailableControls(model, device);
+	for (size_t i = 0; i < profile->binding_count; ++i) {
+		bool down = Aeron_ControllerDigitalSourceDown(device, &profile->bindings[i].source, state->down[i]);
+		if (!state->primed)
+			state->armed[i] = !down;
+		else if (!down) {
+			if (state->dispatched[i])
+				XwaControllerMapping_Dispatch(profile->bindings[i].action, false);
+			state->dispatched[i] = false;
+			state->armed[i] = true;
+		} else if (state->armed[i] && !state->down[i]) {
+			XwaControllerMapping_Dispatch(profile->bindings[i].action, true);
+			state->dispatched[i] = true;
+		}
+		state->down[i] = down;
+	}
+	state->primed = true;
+}
+
+uint16_t XwaControllerMapping_ThrottlePosition(int16_t raw, AeronControllerKind kind, int source,
+											   bool invert) {
+	const uint32_t end_tolerance = (uint32_t)ceilf(0.5f * UINT16_MAX / 100.0f);
+	const uint32_t range = UINT16_MAX - 2 * end_tolerance;
+	uint32_t position = (int32_t)raw + 32768;
+	if (kind == AERON_CONTROLLER_KIND_GAMEPAD && source >= AERON_GAMEPAD_AXIS_LEFT_TRIGGER)
+		position = ((uint32_t)(raw < 0 ? 0 : raw) * UINT16_MAX + 16383u) / 32767u;
+	if (invert)
+		position = UINT16_MAX - position;
+	/* Saturate both endpoints and scale the remaining travel continuously. */
+	if (position <= end_tolerance)
+		return 0;
+	if (position >= UINT16_MAX - end_tolerance)
+		return UINT16_MAX;
+	return (uint16_t)(((position - end_tolerance) * UINT16_MAX + range / 2) / range);
+}
+
+/* Reads the axes the device's model binds. Several connected devices may bind
+ * the same axis: the one pushed the furthest drives yaw, pitch and roll, and
+ * the device of the first model in the list drives the throttle, a lever
+ * position. */
+static void SampleAnalog(size_t index, const AeronControllerSnapshot* device) {
+	const XwaControllerModel* model = &g_controller.options.models[index];
+	for (int axis = 0; axis < XWA_INPUT_AXIS_COUNT; ++axis) {
+		XwaInputAxisBinding binding = model->profile.mapping.axes[axis];
+		if (!Aeron_ControllerAxisAvailable(device, binding.source))
+			continue;
+		int16_t raw = Aeron_ControllerAxisValue(device, binding.source);
+		if (axis == XWA_INPUT_AXIS_THROTTLE) {
+			if (g_controller.throttle_valid && index >= g_controller.throttle_model)
+				continue;
+			g_controller.throttle_model = index;
+			g_controller.throttle =
+				XwaControllerMapping_ThrottlePosition(raw, model->kind, binding.source, binding.invert);
+			g_controller.throttle_valid = true;
+			if (g_controller.throttle_instance != device->instance_id) {
+				g_controller.throttle_instance = device->instance_id;
+				++g_controller.generation;
+			}
+		} else {
+			/* The travel past the deadzone is rescaled to the full range, so the
+			 * axis grows from 0 at the deadzone edge instead of jumping to the
+			 * deadzone value. */
+			float normalized = (float)raw / 32768;
+			float magnitude = fabsf(normalized);
+			int value = 0;
+			if (magnitude > binding.deadzone && binding.deadzone < 1.0f) {
+				float scaled = (magnitude - binding.deadzone) / (1.0f - binding.deadzone);
+				if (scaled > 1.0f)
+					scaled = 1.0f;
+				value = (int)((normalized < 0.0f ? -scaled : scaled) * 127);
+			}
+			if (abs(value) < abs(g_controller.axes[axis]))
+				continue;
+			g_controller.axes[axis] =
+				XwaControllerOptions_EffectiveAxisInvert(model->kind, (XwaInputAxis)axis, binding.invert)
+					? -value
+					: value;
+		}
 	}
 }
 
-uint32_t XwaControllerMapping_SelectedInstanceId(void) {
-	const AeronControllerSnapshot* controller = XwaControllerMapping_SelectedController();
-	return controller ? controller->instance_id : 0;
+/* The connected device of the model that can rumble, the one with the lowest
+ * instance id, or 0. */
+static uint32_t XwaControllerMapping_ModelRumbleInstance(size_t model, const AeronInputSnapshot* input) {
+	const XwaControllerModel* m = &g_controller.options.models[model];
+	uint32_t best = 0;
+	for (int j = 0; j < AERON_CONTROLLER_MAX; ++j) {
+		const AeronControllerSnapshot* d = &input->controllers[j];
+		if (d->connected && d->has_rumble && !strcmp(d->guid, m->guid) && d->kind == m->kind &&
+			(!best || d->instance_id < best))
+			best = d->instance_id;
+	}
+	return best;
 }
 
-int XwaControllerMapping_SelectedHasRumble(void) {
-	const AeronControllerSnapshot* controller = XwaControllerMapping_SelectedController();
-	return controller && controller->has_rumble;
+/* The device that rumbles: one of the first model that binds pitch, then yaw,
+ * then of the first gamepad model. */
+static uint32_t XwaControllerMapping_FindRumbleInstance(const AeronInputSnapshot* input) {
+	static const XwaInputAxis owners[] = { XWA_INPUT_AXIS_PITCH, XWA_INPUT_AXIS_YAW };
+	uint32_t instance;
+	for (size_t i = 0; i < sizeof owners / sizeof owners[0]; ++i)
+		for (size_t model = 0; model < g_controller.options.count; ++model)
+			if (g_controller.options.models[model].profile.mapping.axes[owners[i]].source >= 0 &&
+				(instance = XwaControllerMapping_ModelRumbleInstance(model, input)) != 0)
+				return instance;
+	for (size_t model = 0; model < g_controller.options.count; ++model)
+		if (g_controller.options.models[model].kind == AERON_CONTROLLER_KIND_GAMEPAD &&
+			(instance = XwaControllerMapping_ModelRumbleInstance(model, input)) != 0)
+			return instance;
+	return 0;
 }
+
+void XwaControllerMapping_Update(const AeronInputSnapshot* input) {
+	if (!input || input->frame_id == g_controller.frame)
+		return;
+	g_controller.frame = input->frame_id;
+	if (!input->has_focus || XwaInput_IsCaptured() || Aeron_DebugUiVisible())
+		XwaControllerMapping_Suspend();
+	else
+		XwaControllerMapping_Resume();
+	g_controller.present = false;
+	g_controller.throttle_valid = false;
+	memset(g_controller.axes, 0, sizeof g_controller.axes);
+	for (int i = 0; i < AERON_CONTROLLER_MAX; ++i) {
+		ControllerInstance* state = &g_controller.instances[i];
+		bool found = false;
+		for (int j = 0; j < AERON_CONTROLLER_MAX && state->id; ++j) {
+			const AeronControllerSnapshot* d = &input->controllers[j];
+			const XwaControllerModel* m = &g_controller.options.models[state->model];
+			if (d->connected && d->instance_id == state->id && !strcmp(d->guid, m->guid) &&
+				d->kind == m->kind)
+				found = true;
+		}
+		if (!found)
+			ReleaseInstance(state);
+	}
+
+	/* Each connected device of a known model is read: its sticks merge with
+	 * the other devices' and its buttons are its own. */
+	for (int slot = 0; slot < AERON_CONTROLLER_MAX; ++slot) {
+		const AeronControllerSnapshot* d = &input->controllers[slot];
+		const int model = d->connected ? XwaControllerMapping_DeviceModel(d) : -1;
+		if (model < 0)
+			continue;
+		g_controller.present = true;
+		if (g_controller.suspended)
+			continue;
+		SampleAnalog((size_t)model, d);
+		ControllerInstance* state = NULL;
+		for (int j = 0; j < AERON_CONTROLLER_MAX && !state; ++j)
+			if (g_controller.instances[j].id == d->instance_id)
+				state = &g_controller.instances[j];
+		for (int j = 0; j < AERON_CONTROLLER_MAX && !state; ++j)
+			if (!g_controller.instances[j].id) {
+				state = &g_controller.instances[j];
+				state->id = d->instance_id;
+				state->model = model;
+			}
+		if (state)
+			SampleDigital(state, d);
+	}
+	if (!g_controller.throttle_valid)
+		g_controller.throttle_instance = 0;
+	if (g_controller.present != g_controller.present_reported) {
+		g_controller.present_reported = g_controller.present;
+		g_controller.presence_changed = true;
+	}
+	uint32_t rumble = XwaControllerMapping_FindRumbleInstance(input);
+	if (rumble != g_controller.rumble_instance) {
+		if (g_controller.rumble_instance)
+			Aeron_RumbleController(g_controller.rumble_instance, 0, 0, 0);
+		Aeron_LogInfo("xwa.input", "Rumble controller changed from %u to %u", g_controller.rumble_instance,
+					  rumble);
+		g_controller.rumble_instance = rumble;
+		g_controller.rumble_changed = true;
+	}
+}
+
+bool XwaControllerMapping_ThrottleSample(uint16_t* position, uint32_t* generation) {
+	*position = g_controller.throttle;
+	*generation = g_controller.generation;
+	return g_controller.throttle_valid;
+}
+
+int XwaControllerMapping_Present(void) { return g_controller.present; }
+
+int XwaControllerMapping_ConsumePresenceChange(void) {
+	const bool changed = g_controller.presence_changed;
+	g_controller.presence_changed = false;
+	return changed;
+}
+
+int XwaControllerMapping_Axis(XwaInputAxis axis) { return (unsigned)axis < 3 ? g_controller.axes[axis] : 0; }
+
+uint16_t XwaControllerMapping_Modifiers(void) {
+	return (g_controller.holds[XWA_INPUT_ACTION_FIRE_WEAPON] ? 1 : 0) |
+		   (g_controller.holds[XWA_INPUT_ACTION_TARGET_ROLL_MODIFIER] ? 2 : 0);
+}
+
+uint16_t XwaControllerMapping_ReadKey(void) {
+	if (g_controller.read == g_controller.write)
+		return 0;
+	uint16_t key = g_controller.queue[g_controller.read];
+	g_controller.read = (g_controller.read + 1) % ACTION_QUEUE_CAPACITY;
+	return key;
+}
+
+uint16_t XwaControllerMapping_ReadLookKey(void) {
+	/* The order of the original default joystick table: up, right, down, left. */
+	static const XwaInputAction order[] = { XWA_INPUT_ACTION_LOOK_UP, XWA_INPUT_ACTION_LOOK_RIGHT,
+											XWA_INPUT_ACTION_LOOK_DOWN, XWA_INPUT_ACTION_LOOK_LEFT };
+	if (!XwaControllerMapping_CommandsAllowed())
+		return 0;
+	for (size_t i = 0; i < sizeof order / sizeof order[0]; ++i)
+		if (g_controller.holds[order[i]])
+			return XwaInputActions_Key(order[i]);
+	return 0;
+}
+
+int XwaControllerMapping_RollHeld(XwaInputRoll side) {
+	return side == XWA_INPUT_ROLL_LEFT    ? g_controller.holds[XWA_INPUT_ACTION_ROLL_LEFT] != 0
+		   : side == XWA_INPUT_ROLL_RIGHT ? g_controller.holds[XWA_INPUT_ACTION_ROLL_RIGHT] != 0
+										  : 0;
+}
+
+int XwaControllerMapping_TakeResume(void) {
+	const bool resume = g_controller.resume;
+	g_controller.resume = false;
+	return resume;
+}
+
+void XwaControllerMapping_ReleaseCommands(void) {
+	g_controller.read = g_controller.write = 0;
+	g_controller.resume = false;
+	memset(g_controller.holds, 0, sizeof g_controller.holds);
+	for (int i = 0; i < AERON_CONTROLLER_MAX; ++i) {
+		ControllerInstance* state = &g_controller.instances[i];
+		for (size_t j = 0; j < XWA_CONTROLLER_BINDING_CAP; ++j) {
+			state->dispatched[j] = false;
+			state->armed[j] = !state->down[j];
+		}
+	}
+}
+
+uint32_t XwaControllerMapping_RumbleInstance(void) { return g_controller.rumble_instance; }
+
+int XwaControllerMapping_ConsumeRumbleChange(void) {
+	const bool changed = g_controller.rumble_changed;
+	g_controller.rumble_changed = false;
+	return changed;
+}
+
+void XwaControllerMapping_SetRumbleEnabled(int enabled) { g_controller.rumble_enabled = enabled != 0; }
 
 int XwaControllerMapping_Rumble(uint16_t low_frequency_rumble, uint16_t high_frequency_rumble,
 								uint32_t duration_ms) {
-	const AeronControllerSnapshot* controller = XwaControllerMapping_SelectedController();
-	const int stopping = (low_frequency_rumble == 0 && high_frequency_rumble == 0) || duration_ms == 0;
-
-	if (!controller || !controller->has_rumble) {
-		if (!stopping) {
-			Aeron_LogWarn("xwa.input", "Rumble requested while the selected controller is %s",
-						  controller ? "unsupported" : "disconnected");
-		}
+	const uint32_t instance = g_controller.rumble_instance;
+	const bool stopping = (low_frequency_rumble == 0 && high_frequency_rumble == 0) || duration_ms == 0;
+	if (!instance)
 		return 0;
-	}
-	if (!stopping && !g_controllerMapping.options.rumble_enabled) {
+	if (!stopping && !g_controller.rumble_enabled)
 		return 0;
-	}
-	return Aeron_RumbleController(controller->instance_id, low_frequency_rumble, high_frequency_rumble,
-								  duration_ms);
-}
-
-int XwaControllerMapping_ConsumeSelectionChange(void) {
-	const uint32_t instance_id = XwaControllerMapping_SelectedInstanceId();
-	if (instance_id == g_controllerMapping.previous_instance_id) {
-		return 0;
-	}
-	if (g_controllerMapping.previous_instance_id != 0) {
-		Aeron_RumbleController(g_controllerMapping.previous_instance_id, 0, 0, 0);
-	}
-	Aeron_LogInfo("xwa.input", "Active controller changed from %u to %u",
-				  g_controllerMapping.previous_instance_id, instance_id);
-	g_controllerMapping.previous_instance_id = instance_id;
-	g_controllerMapping.digital_axis_buttons = 0;
-	ControllerMapping_LogUnavailableSources(XwaControllerMapping_SelectedController());
-	return 1;
-}
-
-int XwaControllerMapping_GetState(XwaControllerLogicalState* state) {
-	const AeronInputSnapshot* input = Aeron_InputSnapshot();
-	const AeronControllerSnapshot* controller = XwaControllerMapping_SelectedController();
-
-	ControllerMapping_MapSnapshot(&g_controllerMapping.options, controller, input && input->has_focus,
-								  g_controllerMapping.digital_axis_buttons,
-								  &g_controllerMapping.digital_axis_buttons, state);
-	return controller != NULL;
-}
-
-void XwaControllerMapping_CopySelectedActions(uint16_t actions[XWA_CONTROLLER_ACTION_COUNT]) {
-	const AeronControllerSnapshot* controller;
-	const XwaControllerProfile* profile;
-
-	if (!actions) {
-		return;
-	}
-	controller = XwaControllerMapping_SelectedController();
-	profile = controller && controller->kind == AERON_CONTROLLER_KIND_JOYSTICK
-				  ? &g_controllerMapping.options.joystick
-				  : &g_controllerMapping.options.gamepad;
-	memcpy(actions, profile->actions, sizeof(profile->actions));
+	return Aeron_RumbleController(instance, low_frequency_rumble, high_frequency_rumble, duration_ms);
 }

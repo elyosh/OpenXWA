@@ -10,6 +10,8 @@
 #include "xwa/input/dinput.h"
 #include "xwa/render/renderer_internal.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/input/controller_mapping.h"
+#include "xwa_runtime/input/flight_controls.h"
 #include "xwa_runtime/input/mouse_flight.h"
 
 typedef enum XwaFlightPausePhase {
@@ -60,6 +62,7 @@ static void XwaFlightPauseTask_Begin(void) {
 	FlightDisplay_Flip();
 	Sound_StopAllInstances();
 	Music_PauseIfInitialized();
+	XwaFlightControls_Recover();
 	g_flightPausePhase = XWA_FLIGHT_PAUSE_WAITING;
 }
 
@@ -79,7 +82,9 @@ int XwaFlightPauseTask_Tick(void) {
 	if (g_flightConfDirectInput) {
 		DInput_PollMouseState();
 	}
-	if (FlightInput_HasKeyReady() && FlightInput_GetNextKey() != 0) {
+	/* Any key resumes, and so does a controller pause binding. */
+	if ((FlightInput_HasKeyReady() && FlightInput_GetNextKey() != 0) || XwaControllerMapping_TakeResume()) {
+		XwaFlightControls_Recover();
 		Music_ResumeIfInitialized();
 		msg_emitInFlightMessage(MSG_MISSION_RESUMED, (int)g_flightPausePlayerIdx);
 		g_actionKey = KEY_NONE;

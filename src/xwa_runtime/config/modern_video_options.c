@@ -3,6 +3,7 @@
 #include "aeron/log.h"
 
 #include <math.h>
+#include <stdio.h>
 #include <string.h>
 
 static struct {
@@ -85,25 +86,36 @@ int XwaModernVideoOptions_Set(const XwaModernVideoOptions* options) {
 	return 1;
 }
 
-int XwaModernVideoOptions_Flush(void) {
-	char error[512];
-
+int XwaModernVideoOptions_FlushWithError(char* error, size_t error_size) {
+	if (error && error_size) {
+		error[0] = '\0';
+	}
 	if (!g_modernVideoOptions.configured || !g_modernVideoOptions.dirty) {
 		return 1;
 	}
 	if (!g_modernVideoOptions.persist) {
-		Aeron_LogWarn("xwa.config",
-					  "modern video options are dirty but no persistence callback is registered");
+		if (error && error_size) {
+			snprintf(error, error_size, "%s", "the video options changed, but nothing saves them");
+		}
 		return 0;
 	}
-	error[0] = '\0';
-	if (!g_modernVideoOptions.persist(&g_modernVideoOptions.options, error, sizeof error)) {
-		Aeron_LogError("xwa.config", "%s",
-					   error[0] ? error : "could not persist modern video options to user configuration");
+	if (!g_modernVideoOptions.persist(&g_modernVideoOptions.options, error, error_size)) {
+		if (error && error_size && !error[0]) {
+			snprintf(error, error_size, "%s", "could not save the video options to config.yaml");
+		}
 		return 0;
 	}
-
 	g_modernVideoOptions.dirty = 0;
+	return 1;
+}
+
+int XwaModernVideoOptions_Flush(void) {
+	char error[512];
+
+	if (!XwaModernVideoOptions_FlushWithError(error, sizeof error)) {
+		Aeron_LogError("xwa.config", "%s", error);
+		return 0;
+	}
 	return 1;
 }
 

@@ -5,8 +5,9 @@
  * object, except type 1, a light of intensity 125 and colour (1, 1, 0.75)
  * at its emitter, for the whole life of the effect
  * (Particle_AppendObjectEffectPointLights). The HD renderer replaces these
- * lights by group: effect 4 is `cockpit_sparks`, effect 2 `cockpit_smoke`,
- * and the other effects are `craft_damage`. The defaults are in
+ * lights by group: effect 4 is `cockpit_sparks`, effect 2 `cockpit_smoke`.
+ * The other effects are `player_craft_damage` on the local player's craft
+ * and `craft_damage` on every other object. The defaults are in
  * `point_lights.particle_lights` of resources/remaster/config.yaml, and
  * each key of the mod's `particle_lights` section replaces one. The classic
  * renderers keep the game's lights. */

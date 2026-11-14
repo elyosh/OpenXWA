@@ -166,6 +166,37 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			}
 			continue;
 		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--render-size");
+		if (!pass_through && (value || strcmp(argv[i], "--render-size") == 0)) {
+			char* end;
+			long width;
+			long height = 0;
+
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, "%s requires a size such as 1920x1080", "--render-size");
+				}
+				value = argv[i];
+			}
+			width = strtol(value, &end, 10);
+			if (end != value && (*end == 'x' || *end == 'X')) {
+				const char* rest = end + 1;
+				height = strtol(rest, &end, 10);
+				if (end == rest) {
+					height = 0;
+				}
+			}
+			if (*end || width < 320 || height < 240 || width > 16384 || height > 16384 || (width & 1) ||
+				(height & 1)) {
+				return setup_error(error, error_size,
+								   "%s requires a size such as 1920x1080, with even numbers from 320x240 to "
+								   "16384x16384",
+								   "--render-size");
+			}
+			out->render_width = (int)width;
+			out->render_height = (int)height;
+			continue;
+		}
 		if (!pass_through && strcmp(argv[i], "--film-benchmark") == 0) {
 			out->film_benchmark = 1;
 			continue;
@@ -208,63 +239,19 @@ const char* XwaLaunchOptions_Help(void) {
 		   "                            in 4 ms ticks, and freeze there\n"
 		   "  --film-capture <name>     with --film-pause-at: save the frozen frame to\n"
 		   "                            <name>.png, and the frame before the tonemap to\n"
-		   "                            <name>.hdr, in the user folder, then quit\n"
+		   "                            <name>.hdr, in the user folder's capture folder,\n"
+		   "                            then quit\n"
 		   "  --film-benchmark          with --film-pause-at: measure the frozen frame's\n"
 		   "                            GPU time, then quit\n"
+		   "  --render-size <W>x<H>     render the 3D view at this size in pixels,\n"
+		   "                            whatever the window's size, and fit it in the\n"
+		   "                            window\n"
 		   "  -h, --help                print this help and quit\n"
 		   "\n"
 		   "Other arguments, and everything after --, go to the game's own command line.\n";
 }
 
-static int setup_check_required_files(AeronVfs* vfs, const char** missing) {
-	/* Canonical install layout: the CD ALLIANCE directory contents merged into the
-	   root, as the original installer laid them out. RESDATA.TXT marks the merged
-	   ALLIANCE content; the movie/wave entries are unique to CD1 and CD2 so a
-	   one-disc tree cannot pass validation. */
-	static const char* required[] = {
-		"RESDATA.TXT",         "FLIGHTMODELS/SPACECRAFT0.LST", "MISSIONS/MISSION.LST",
-		"MOVIES/PROLOGUE.SNM", "MOVIES/BATTLE1.SNM",           "WAVE/FRONTEND/B1M1/N010101.WAV",
-	};
-	size_t i;
-
-	for (i = 0; i < sizeof required / sizeof required[0]; ++i) {
-		if (!AeronVfs_Exists(vfs, AERON_VFS_ROOT_ASSET, required[i])) {
-			*missing = required[i];
-			return 0;
-		}
-	}
-	return 1;
-}
-
-int XwaSetup_ValidateGameData(AeronVfs* vfs, const char* candidate, char* normalized,
-							  size_t normalized_capacity, char* error, size_t error_size) {
-	const char* missing = NULL;
-
-	if (!vfs || !candidate || !candidate[0] || !normalized || strlen(candidate) >= normalized_capacity) {
-		return setup_error(error, error_size, "It can't be used: %s", candidate);
-	}
-	if (!AeronVfs_SetRoot(vfs, AERON_VFS_ROOT_ASSET, candidate) ||
-		!AeronVfs_SetRootOptions(vfs, AERON_VFS_ROOT_ASSET, AERON_VFS_ROOT_OPTION_CASE_INSENSITIVE_LOOKUP)) {
-		return setup_error(error, error_size, "It can't be used: %s", candidate);
-	}
-	if (setup_check_required_files(vfs, &missing)) {
-		snprintf(normalized, normalized_capacity, "%s", candidate);
-		return 1;
-	}
-
-	/* A raw CD copy keeps the install files under ALLIANCE; the game expects them
-	   merged into the root. Detect it so the failure explains the fix. */
-	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_ASSET, "ALLIANCE/RESDATA.TXT")) {
-		return setup_error(error, error_size,
-						   "It looks like a copy of the CDs. Copy what is in its ALLIANCE folder into it. "
-						   "It has no %s.",
-						   missing);
-	}
-
-	return setup_error(error, error_size, "It has no %s.", missing);
-}
-
-int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaHostConfig* host_config,
+int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const XwaInstallPaths* paths,
 						char* selected, size_t selected_capacity, char* notice, size_t notice_size,
 						char* error, size_t error_size) {
 	const int from_launch = launch->mod_path[0] != 0;
@@ -280,8 +267,8 @@ int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const Xwa
 	}
 	if (from_launch) {
 		length = snprintf(selected, selected_capacity, "%s", launch->mod_path);
-	} else if (host_config->use_mod && host_config->mod_path[0]) {
-		length = snprintf(selected, selected_capacity, "%s", host_config->mod_path);
+	} else if (paths->use_mod && paths->mod[0]) {
+		length = snprintf(selected, selected_capacity, "%s", paths->mod);
 	} else {
 		return 1;
 	}
@@ -300,7 +287,7 @@ int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const Xwa
 	}
 	if (problem) {
 		snprintf(notice, notice_size,
-				 "The mod \"%s\" can't be used. %s\n\nOpenXWA starts with the original game.", mod.name,
+				 "The mod \"%s\" can't be used. %s\n\nOpenXWA starts the original game instead.", mod.name,
 				 problem);
 		selected[0] = '\0';
 		return 1;
