@@ -943,7 +943,12 @@ int Config_SoundOptionsScreen(void) {
 			g_gameConfig.voiceSpecialEnabled = 1;
 			g_gameConfig.musicEnabled = 1;
 			g_gameConfig.musicVolume = 5;
+#ifdef XWA_MODERN
+			/* Modern computers can play the most sounds at once. */
+			g_gameConfig.numberOfSfx = 32;
+#else
 			g_gameConfig.numberOfSfx = 12;
+#endif
 			g_gameConfig.sfxExteriorEnabled = 1;
 			g_gameConfig.sfxInteriorEnabled = 1;
 			g_gameConfig.sfxEngineEnabled = 1;
@@ -951,7 +956,13 @@ int Config_SoundOptionsScreen(void) {
 			g_gameConfig.datapadMusicEnabled = 1;
 			g_gameConfig.sfxEngineVolume = 5;
 			g_gameConfig.datapadMusicVolume = 5;
+#ifdef XWA_MODERN
+			/* 3D sound places each sound at its source and moves it with the
+			   source while it plays. */
+			g_gameConfig.sound3dEnabled = 1;
+#else
 			g_gameConfig.sound3dEnabled = 0;
+#endif
 #ifdef XWA_MODERN
 			/* The modern build always uses the high quality sounds. */
 			g_gameConfig.sfxQuality = 1;
@@ -5447,8 +5458,15 @@ static void Config_SetInitialDefaults(void) {
 	g_gameConfig.ffEnabled = (uint8_t)ForceFeedback_CheckDevice();
 	g_gameConfig.flipY = 0;
 #endif
+#ifdef XWA_MODERN
+	/* 3D sound places each sound at its source and moves it with the source
+	   while it plays. Modern computers can play the most sounds at once. */
+	g_gameConfig.sound3dEnabled = 1;
+	g_gameConfig.numberOfSfx = 32;
+#else
 	g_gameConfig.sound3dEnabled = 0;
 	g_gameConfig.numberOfSfx = 8;
+#endif
 #ifdef XWA_MODERN
 	/* The modern build always uses the high quality sounds. */
 	g_gameConfig.sfxQuality = 1;
