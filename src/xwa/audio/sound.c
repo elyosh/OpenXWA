@@ -449,10 +449,12 @@ uint8_t Sound_LoadEffectEx(const char* fileName, const char* name, int create3DF
 		   (DSBCAPS_MUTE3DATMAXDISTANCE). A distance of 0 keeps the stock
 		   value, since a max distance of 0 would always mute.
 
-		   The two ranges match for every positional sound: the lists of slots
-		   0 to 195 and the sound banks give the same distance here and to
-		   fsfx_ComputeDistanceVolume. Only voice lists load at slot 196 or
-		   later, and voices play without a position. */
+		   The two ranges match for every positional sound of the stock lists
+		   of slots 0 to 195, where a file has the same distance in each of its
+		   slots. A list that gave one file two distances would get the first
+		   one's here. The sound banks give each distance of a file its own
+		   effect (XwaSoundBanks). Only voice lists load at slot 196 or later,
+		   and voices play without a position. */
 		def.buffer3D->lpVtbl->SetMaxDistance(
 			def.buffer3D, minDistanceOrRolloff != 0 ? 4.0f * (float)minDistanceOrRolloff : 131072.0f, 0);
 #else
