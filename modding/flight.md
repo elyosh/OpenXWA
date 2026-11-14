@@ -41,6 +41,7 @@ sections:
 | `hyperspace` | how fast AI craft arrive and leave by hyperspace |
 | `headlights` | a light on the nose of the player's craft |
 | `object_limits` | how many craft, shots, explosions and radar blips a mission can have |
+| `hangar_crafts` | the craft that the player can switch to in the hangar |
 | `camera` | the lag and tilt of the exterior camera, the cockpit sway and the HUD in the exterior view |
 | `camera_shake` | the camera's shake and jolt in the player's hyperspace jumps |
 | `cockpit_lights` | the lights that blink in the cockpit |
@@ -710,6 +711,37 @@ with many regions or players have less room.
 
 The proving grounds keep their 36 craft slots, unless the mod has hangar
 settings. Then they use `craft_per_region` like the other missions.
+
+### hangar_crafts
+
+`hangar_crafts` sets the craft that the hangar's **Switch Craft** menu
+offers.
+
+```yaml
+hangar_crafts:
+  fighters: [tie_fighter, tie_interceptor, tie_bomber, tie_advanced]
+  all: [tie_fighter, tie_interceptor, tie_bomber, tie_advanced, assault_gunboat]
+```
+
+| Key | Used for | Default |
+|-|-|-|
+| `fighters` | Simulator missions, when the player's craft isn't in `transports`. Flight groups with optional craft category 2, "All Rebel Flyable" in mission editors. | X-wing, Y-wing, A-wing, B-wing, Z-95 |
+| `transports` | Simulator missions, when the player's craft is in `transports`. Flight groups with category 3, "All Imperial Flyable" in mission editors. | Corellian transport, family transport, Millennium Falcon |
+| `all` | Flight groups with category 1, "All Flyable" in mission editors. | the default fighters, then the default transports |
+
+Simulator missions are the missions outside the campaign and the Proving
+Ground. In the campaign and the Proving Ground, the optional craft category
+of the player's flight group picks the list. This is how the original game
+chooses. Despite their names in mission editors, categories 2 and 3 give
+the fighters and the transports, not the Rebel and Imperial craft.
+
+Each value is a list of object type names, in menu order. The player's
+current craft is always first in the menu, so the list skips it. A list
+can have at most 49 craft, and each one needs a craft record. A list that
+is left out keeps its default. An empty list, `[]`, offers only the
+player's current craft. These lists don't change categories 0 and 4:
+category 0 offers no other craft, and category 4 offers the flight group's
+own optional craft.
 
 ### camera
 

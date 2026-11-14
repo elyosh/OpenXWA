@@ -337,6 +337,9 @@ Where the player's craft stands in the hangar is set in
 [player](#player), with `offset_m`, `craft_offsets_m` and
 `inverted_floor_crafts`.
 
+The [`hangar_crafts`](flight.md#hangar_crafts) section of `flight.yaml`
+sets the craft that the player can switch to in the hangar.
+
 ## A mission's hangar section
 
 A mission can change the hangar in the `hangar` section of its mission

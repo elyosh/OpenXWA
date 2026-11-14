@@ -136,6 +136,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 |-|-|-|-|
 | Custom hangars | Implemented | Hangar models, objects, maps, cameras, family hangars, and the choice by ship and side. | [Hangars](hangars.md) |
 | A mission's hangar settings | Implemented | A mission's hangar sections for one command ship, such as `[HangarObjects_<ship>]`, and a mission's own hangar model, `<mission>_Hangar.opt`, aren't converted. | [Hangars](hangars.md#a-missions-hangar-section) |
+| Hangar craft selection (`CraftSelectionFighters.txt`, `CraftSelectionTransports.txt`, `CraftSelectionCrafts.txt`) | Implemented | | [Flight](flight.md#hangar_crafts) |
 | Hangar ambient sounds | Implemented | | [Flight](flight.md#soundsyaml) |
 | Hangar lights and shadows | Implemented | OpenXWA lights the hangars in its own way. XWAU's light settings aren't needed. | [Hangars](hangars.md#hangar-lighting) |
 

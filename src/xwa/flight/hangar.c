@@ -49,6 +49,7 @@
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_definitions.h"
 #include "xwa_runtime/models/craft_sounds.h"
+#include "xwa_runtime/models/hangar_crafts.h"
 #include "xwa_runtime/models/hangar_scene.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/mission_settings.h"
@@ -5416,6 +5417,19 @@ void Hangar_SetupReadyScene(void) {
 	g_hangarCraftList[0] = objectType;
 
 	if (!g_pilotData.campaignMode && !g_provingGroundsModeActive) {
+#ifdef XWA_MODERN
+		/* The mod's `hangar_crafts` lists replace the lists below. As in the
+		   original code, a player who flies one of the transports gets the
+		   transports list, and other players get the fighters list. */
+		if (XwaHangarCrafts_IsSet()) {
+			const XwaHangarCraftList list = XwaHangarCrafts_IsTransport(objectType)
+												? XWA_HANGAR_CRAFTS_TRANSPORTS
+												: XWA_HANGAR_CRAFTS_FIGHTERS;
+
+			craftCount = XwaHangarCrafts_Fill(list, objectType, g_hangarCraftList, craftCount);
+			goto lbl58;
+		}
+#endif
 		if (objectType != OBJ_CorellianTransport2) {
 			if (objectType != OBJ_FamilyTransport && objectType != OBJ_MilleniumFalcon2) {
 				if (objectType != OBJ_XWing) {
@@ -5454,6 +5468,19 @@ void Hangar_SetupReadyScene(void) {
 		}
 		goto lbl58;
 	}
+#ifdef XWA_MODERN
+	/* The mod's `hangar_crafts` lists replace the lists that the original
+	   code gives categories 1 (all), 2 (fighters) and 3 (transports). */
+	if (XwaHangarCrafts_IsSet() && optionalCraftCategory >= 1 && optionalCraftCategory <= 3) {
+		static const XwaHangarCraftList categoryLists[3] = { XWA_HANGAR_CRAFTS_ALL,
+															 XWA_HANGAR_CRAFTS_FIGHTERS,
+															 XWA_HANGAR_CRAFTS_TRANSPORTS };
+
+		craftCount = XwaHangarCrafts_Fill(categoryLists[optionalCraftCategory - 1], objectType,
+										  g_hangarCraftList, craftCount);
+		goto lbl58;
+	}
+#endif
 	if (optionalCraftCategory != 2) {
 		if (optionalCraftCategory != 3) {
 			if (optionalCraftCategory != 1) {

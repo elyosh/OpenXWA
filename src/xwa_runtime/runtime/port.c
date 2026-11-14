@@ -57,6 +57,7 @@
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/flight_config.h"
+#include "xwa_runtime/models/hangar_crafts.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/headlights.h"
 #include "xwa_runtime/models/mag_pulse.h"
@@ -199,6 +200,7 @@ int XwaPort_Init(void) {
 	XwaParticleLights_Init();
 	XwaModelSource_Init();
 	XwaHangars_Init();
+	XwaHangarCrafts_Init();
 	XwaCraftHud_Init();
 	XwaCraftWeapons_Init();
 	XwaShieldRecharge_Init();
