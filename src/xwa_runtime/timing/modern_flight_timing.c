@@ -69,6 +69,28 @@ void XwaModernFlightTiming_EndSession(void) {
 
 int XwaModernFlightTiming_StepTicks(void) { return g_effectiveStepTicks; }
 
+int XwaModernFlightTiming_SoundPriorityDecay(int game_time) {
+	static int lastGameTime;
+	static int pendingTicks;
+	int decay;
+
+	if (!XwaModernFlightTiming_IsHighRate()) {
+		lastGameTime = game_time;
+		pendingTicks = 0;
+		return 1;
+	}
+	/* A new flight starts its game time again. */
+	if (game_time < lastGameTime) {
+		lastGameTime = game_time;
+		pendingTicks = 0;
+	}
+	pendingTicks += game_time - lastGameTime;
+	lastGameTime = game_time;
+	decay = pendingTicks / XWA_MODERN_COMPATIBILITY_STEP_TICKS;
+	pendingTicks %= XWA_MODERN_COMPATIBILITY_STEP_TICKS;
+	return decay;
+}
+
 void XwaModernFlightTiming_UseFilmStepTicks(int step_ticks) {
 	if (step_ticks < XWA_MODERN_UNLOCKED_STEP_TICKS || step_ticks > XWA_MODERN_COMPATIBILITY_STEP_TICKS ||
 		step_ticks == g_effectiveStepTicks) {

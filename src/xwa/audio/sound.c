@@ -3,6 +3,7 @@
 #include "aeron/log.h"
 #include "xwa/assets/file_io.h"
 #include "xwa_runtime/audio/mission_sounds.h"
+#include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 #include "xwa/audio/fsfx.h"
 #include "xwa/audio/music.h"
@@ -1260,12 +1261,22 @@ uint8_t Sound_QueueEffectAtWorldPosition(int soundId, int param2, int loop, int 
 // FUNCTION: XWA 0x4DB440
 uint8_t Sound_FlushQueuedEffects(void) {
 	int index;
+#ifdef XWA_MODERN
+	/* Playing sounds lose 1 per 8 ticks of game time, the original's fixed
+	   flight step, not 1 per flush (XwaModernFlightTiming_SoundPriorityDecay). */
+	const int decay = XwaModernFlightTiming_SoundPriorityDecay(g_gameTime);
+#endif
 
 	for (index = 0; index < g_maxActiveSounds; ++index) {
 		if (g_activeSoundInstances[index].soundId != -1) {
 			int currentPriority = g_activeSoundInstances[index].priority;
 			if (currentPriority > 0 && currentPriority < 126) {
+#ifdef XWA_MODERN
+				g_activeSoundInstances[index].priority =
+					currentPriority > decay ? currentPriority - decay : 0;
+#else
 				g_activeSoundInstances[index].priority = currentPriority - 1;
+#endif
 			}
 		}
 	}
