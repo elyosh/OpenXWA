@@ -36,6 +36,7 @@
 #include "xwa/math/trig2.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/camera/exterior_hud.h"
+#include "xwa_runtime/input/head_tracking.h"
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/object_limits.h"
@@ -86,14 +87,25 @@ static int32_t g_hudCrtCameraDistance;
    reticle follows the craft's nose, as when the player looks around. */
 #define HUD_EXTERIOR_HIDES_HUD() XwaExteriorHud_HidesHud(g_localPlayer)
 #define HUD_VISIBLE() XwaExteriorHud_HudVisible(g_localPlayer)
+/* Head tracking turns the view like the cockpit look offsets do, so the
+   reticle follows the nose then as well. The pose is zero when not tracking. */
 #define HUD_RETICLE_PROJECTED()                                                                              \
 	(g_players[g_localPlayer].lookYawOffset || g_players[g_localPlayer].lookPitchOffset ||                   \
-	 XwaExteriorHud_Shown(g_localPlayer))
+	 XwaExteriorHud_Shown(g_localPlayer) || Hud_HeadLook().yaw_q16 || Hud_HeadLook().pitch_q16)
+#define HUD_LOOK_YAW() ((int16_t)(g_players[g_localPlayer].lookYawOffset + Hud_HeadLook().yaw_q16))
+#define HUD_LOOK_PITCH() ((int16_t)(g_players[g_localPlayer].lookPitchOffset + Hud_HeadLook().pitch_q16))
+static XwaHeadPose Hud_HeadLook(void) {
+	XwaHeadPose head;
+	XwaHeadTracking_CurrentPose(&head);
+	return head;
+}
 #else
 #define HUD_EXTERIOR_HIDES_HUD() g_players[g_localPlayer].viewState.externalCameraActive
 #define HUD_VISIBLE() g_players[g_localPlayer].hudEnabled
 #define HUD_RETICLE_PROJECTED()                                                                              \
 	(g_players[g_localPlayer].lookYawOffset || g_players[g_localPlayer].lookPitchOffset)
+#define HUD_LOOK_YAW() g_players[g_localPlayer].lookYawOffset
+#define HUD_LOOK_PITCH() g_players[g_localPlayer].lookPitchOffset
 #endif
 
 #ifndef XWA_MODERN
@@ -3447,6 +3459,17 @@ void Hud_SetupReticle(void) {
 				centerY = g_reticleCenterY;
 				deltaX = (float)(screenX - centerX);
 				deltaY = (float)(screenY - centerY);
+#ifdef XWA_MODERN
+				/* Weapon indicators retain their ship-relative layout during head tracking. */
+				if (XwaHeadTracking_CurrentPose(NULL)) {
+					const ModelWeaponHardpoint* point =
+						&g_modelDefs[craft->modelDefIndex].weaponHardpoints[reticleSlot];
+					if (point->x || point->z) {
+						deltaX = (float)point->x;
+						deltaY = -(float)point->z;
+					}
+				}
+#endif
 				g_reticleLaserAimPoints[reticleSlot].x =
 					centerX +
 					(int)(g_reticleAimPointDistanceBias *
@@ -6963,8 +6986,8 @@ void Hud_DrawReticle3D(void) {
 #endif
 	lockRangeDivisor = lockRange / 200;
 
-	if (Hud_AbsLookDegreesFromOffset(g_players[g_localPlayer].lookYawOffset) >= 45 ||
-		Hud_AbsLookDegreesFromOffset(g_players[g_localPlayer].lookPitchOffset) >= 45) {
+	if (Hud_AbsLookDegreesFromOffset(HUD_LOOK_YAW()) >= 45 ||
+		Hud_AbsLookDegreesFromOffset(HUD_LOOK_PITCH()) >= 45) {
 		return;
 	}
 
@@ -6979,6 +7002,15 @@ void Hud_DrawReticle3D(void) {
 		g_camRelWorldX -= g_players[g_localPlayer].viewState.savedTargetX;
 		g_camRelWorldY -= g_players[g_localPlayer].viewState.savedTargetY;
 		g_camRelWorldZ = worldZ - g_players[g_localPlayer].viewState.savedTargetZ;
+#ifdef XWA_MODERN
+		if ((Hud_HeadLook().yaw_q16 || Hud_HeadLook().pitch_q16) &&
+			g_players[g_localPlayer].currentSeatIdx > 0) {
+			/* In a turret seat, aim along the gun, which head look does not turn. */
+			g_camRelWorldX = Xwa_Q15Mul(1000000, g_players[g_localPlayer].turretCamMat[0]);
+			g_camRelWorldY = Xwa_Q15Mul(1000000, g_players[g_localPlayer].turretCamMat[1]);
+			g_camRelWorldZ = Xwa_Q15Mul(1000000, g_players[g_localPlayer].turretCamMat[2]);
+		}
+#endif
 		viewX = TRANSFM2_CamMatDotRow0(g_camRelWorldX, g_camRelWorldY, g_camRelWorldZ);
 		viewY = TRANSFM2_CamMatDotRow1(g_camRelWorldX, g_camRelWorldY, g_camRelWorldZ);
 		viewZ = TRANSFM2_CamMatDotRow2(g_camRelWorldX, g_camRelWorldY, g_camRelWorldZ);

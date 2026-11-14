@@ -1,6 +1,7 @@
 #include "options/options_window.h"
 
 #include "options/controller_page.h"
+#include "options/head_tracking_page.h"
 #include "options/keyboard_page.h"
 #include "options/mouse_page.h"
 #include "options/video_page.h"
@@ -20,6 +21,7 @@ enum {
 	OPTIONS_PAGE_CONTROLLER,
 	OPTIONS_PAGE_KEYBOARD,
 	OPTIONS_PAGE_MOUSE,
+	OPTIONS_PAGE_HEAD_TRACKING,
 	OPTIONS_PAGE_COUNT
 };
 
@@ -51,6 +53,7 @@ bool XwaOptionsWindow_Init(XwaAppUi* ui, char* error, size_t capacity) {
 	g_window.pages[OPTIONS_PAGE_CONTROLLER] = XwaOptionsWindow_DrawController;
 	g_window.pages[OPTIONS_PAGE_KEYBOARD] = XwaOptionsWindow_DrawKeyboard;
 	g_window.pages[OPTIONS_PAGE_MOUSE] = XwaMousePage_Draw;
+	g_window.pages[OPTIONS_PAGE_HEAD_TRACKING] = XwaHeadTrackingPage_Draw;
 	g_window.ready = g_window.ui != NULL;
 	if (!g_window.ready && error && capacity)
 		snprintf(error, capacity, "the options window has no UI context");
@@ -188,7 +191,7 @@ void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds) {
 			XwaOptionsWindow_DrawNotice(input, seconds);
 		return;
 	}
-	static const char* pages[] = { "Video", "Controller", "Keyboard", "Mouse" };
+	static const char* pages[] = { "Video", "Controller", "Keyboard", "Mouse", "Head Tracking" };
 	AeronUi_BeginFrame(g_window.ui, &(AeronUiFrameDesc) { .input = input, .dt_seconds = seconds });
 	if (AeronUi_BeginWindow(g_window.ui, "OpenXWA Options",
 							&(AeronUiWindowDesc) { .width_ref = 980, .height_ref = 1000, .centered = 1 })) {

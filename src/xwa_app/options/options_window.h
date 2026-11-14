@@ -2,10 +2,10 @@
 #define XWA_APP_OPTIONS_WINDOW_H
 #include "ui.h"
 
-/* The OpenXWA Options window: the Video, Controller, Keyboard and Mouse tabs.
- * The datapad opens it (XwaPort_RequestOptionsWindow). Video and mouse
- * changes apply at once. Controller and keyboard changes apply only on Close.
- * Close saves them all. */
+/* The OpenXWA Options window: the Video, Controller, Keyboard, Mouse and Head
+ * Tracking tabs. The datapad opens it (XwaPort_RequestOptionsWindow). Video and
+ * mouse changes apply at once. Controller and keyboard changes apply only on
+ * Close. Close saves them all. */
 bool XwaOptionsWindow_Init(XwaAppUi* ui, char* error, size_t capacity);
 void XwaOptionsWindow_Shutdown(void);
 void XwaOptionsWindow_FlushForExit(void);

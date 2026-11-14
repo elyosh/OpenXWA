@@ -8,6 +8,21 @@ input:
   mouse_invert_y: true
   rumble_enabled: true
   rumble_strength: 6
+  # Native TrackIR is Windows-only; OpenTrack UDP works on all platforms.
+  # Configure OpenTrack output to UDP over network -> 127.0.0.1 and udp_port
+  # (1024-65535, OpenTrack's default is 4242).
+  # Inversion is relative to OpenXWA's standard head-motion directions.
+  head_tracking:
+    enabled: false
+    source: 'trackir'
+    udp_port: 4242
+    invert:
+      yaw: false
+      pitch: false
+      roll: false
+      x: false
+      y: false
+      z: false
   # Saved controller models, one complete profile each. New gamepads get
   # gamepad_defaults; joysticks start with nothing bound.
   controllers: []

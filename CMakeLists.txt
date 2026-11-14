@@ -297,6 +297,9 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/craft_sounds.c
     src/xwa_runtime/models/opt_synth.c
     src/xwa_runtime/models/mission_art.c
+    src/xwa_runtime/input/head_tracking.c
+    src/xwa_runtime/input/opentrack_udp.c
+    src/xwa_runtime/input/trackir.c
     src/xwa_runtime/runtime/flight_pause_task.c
     src/xwa_runtime/runtime/flight_task.c
     src/xwa_runtime/runtime/frontend_task.c
@@ -318,6 +321,11 @@ set(XWA_RUNTIME_SOURCES
 )
 
 add_library(xwa_core ${XWA_RECOVERED_SOURCES} ${XWA_RUNTIME_SOURCES})
+if(WIN32)
+    # Head tracking: advapi32 finds the installed TrackIR NPClient, which is
+    # loaded at runtime (no TrackIR SDK is bundled); ws2_32 receives OpenTrack UDP.
+    target_link_libraries(xwa_core PRIVATE advapi32 ws2_32)
+endif()
 
 # The recovered sources reproduce MSVC 5.0-era code, which reinterprets one
 # struct pointer type as another (iMUSE passes ImStreamZone*/ImTrack* lists
@@ -444,6 +452,7 @@ set(XWA_APP_SOURCES
     src/xwa_app/keyboard_config.c
     src/xwa_app/options/bindings_editor.c
     src/xwa_app/options/controller_page.c
+    src/xwa_app/options/head_tracking_page.c
     src/xwa_app/options/keyboard_page.c
     src/xwa_app/options/mouse_page.c
     src/xwa_app/options/video_page.c
@@ -886,6 +895,9 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/input/winmm_joystick_provider.h
     src/xwa_runtime/input/controller_mapping.h
     src/xwa_runtime/input/mouse_flight.h
+    src/xwa_runtime/input/head_tracking.h
+    src/xwa_runtime/input/opentrack_udp.h
+    src/xwa_runtime/input/trackir.h
     src/xwa_runtime/timing/modern_flight_timing.h
     src/xwa_runtime/runtime/movie_task.h
     src/xwa_runtime/hooks/orientation_hook.h
@@ -902,6 +914,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_app/keyboard_config.h
     src/xwa_app/options/bindings_editor.h
     src/xwa_app/options/controller_page.h
+    src/xwa_app/options/head_tracking_page.h
     src/xwa_app/options/keyboard_page.h
     src/xwa_app/options/mouse_page.h
     src/xwa_app/options/video_page.h

@@ -890,9 +890,21 @@ static int fixed_project_reticle(const XwaSnapshot* snapshot, XwaHudProfileIndex
 	const float center_eye[3] = { 0.0f, 0.0f, 1.0f };
 	if (!XwaRemasterFlight_ProjectView(flight_view, center_eye, &target_x, &target_y))
 		return 0;
-	/* When the player looks around, and in the exterior HUD, the reticle
-	 * follows the craft's nose instead of the screen center. */
-	if (h->reticle.look_yaw || h->reticle.look_pitch || (h->mode_flags & XWA_HUD_MODE_EXTERIOR_HUD)) {
+	if (h->reticle.seat > 0 && h->reticle.turret_aim_valid) {
+		/* Project the gun's own aim direction, which head tracking does not
+		 * change, through the head-tracked camera. Projecting ship-forward here was incorrect
+		 * in turret seats, where the turret rotates independently. */
+		const XwaFlightCamera* camera = &snapshot->flight_camera;
+		float bore_view[3];
+		for (int row = 0; row < 3; ++row) {
+			bore_view[row] = camera->rows[row * 3 + 0] * h->reticle.turret_aim_world[0] +
+							 camera->rows[row * 3 + 1] * h->reticle.turret_aim_world[1] +
+							 camera->rows[row * 3 + 2] * h->reticle.turret_aim_world[2];
+		}
+		if (bore_view[2] <= 0.0f ||
+			!XwaRemasterFlight_ProjectView(flight_view, bore_view, &target_x, &target_y))
+			return 0;
+	} else if (h->reticle.look_yaw || h->reticle.look_pitch || (h->mode_flags & XWA_HUD_MODE_EXTERIOR_HUD)) {
 		const XwaFlightObject* player = fixed_player_object(snapshot, h);
 		if (player && player->has_mobj) {
 			float local[3];
