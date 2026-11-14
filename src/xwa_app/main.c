@@ -16,7 +16,6 @@
 #include "xwa/config/game_config.h"
 #include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/xwa_remaster.h"
-#include "xwa_runtime/audio/modern_audio.h"
 #include "xwa_runtime/config/option_section.h"
 #include "xwa_runtime/input/capture.h"
 #include "xwa_runtime/input/controller_mapping.h"
@@ -74,7 +73,6 @@ static void apply_modern_audio_options(const XwaModernAudioOptions* options) {
 																   : AERON_AUDIO_OUTPUT_SPEAKERS;
 	settings.air_absorption = options->distance_filter ? 1.0f : 0.0f;
 	Aeron_AudioSetSpatialSettings(&settings);
-	XwaModernAudio_SetDoppler(options->doppler);
 }
 
 static int persist_modern_audio_options(const XwaModernAudioOptions* options, char* error,
@@ -102,10 +100,9 @@ static void configure_modern_audio(void) {
 	}
 	XwaModernAudioOptions_Configure(apply_modern_audio_options, persist_modern_audio_options);
 	apply_modern_audio_options(&options);
-	Aeron_LogInfo("xwa.config", "audio: %s, %d output channels, distance filtering %s, doppler %s",
+	Aeron_LogInfo("xwa.config", "audio: %s, %d output channels, distance filtering %s",
 				  options.output == XWA_MODERN_AUDIO_HEADPHONES ? "headphones" : "speakers",
-				  Aeron_AudioOutputChannels(), options.distance_filter ? "on" : "off",
-				  options.doppler ? "on" : "off");
+				  Aeron_AudioOutputChannels(), options.distance_filter ? "on" : "off");
 }
 
 /* Whether a host shortcut was pressed this frame. Its key stays suppressed

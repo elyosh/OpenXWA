@@ -55,8 +55,6 @@ void XwaAudioPage_Draw(AeronUiContext* ui, const AeronInputSnapshot* input) {
 	AeronUi_Header(ui, "Effects");
 	changed |= AeronUi_Toggle(ui, "Distance Filtering", &options.distance_filter) != 0;
 	AeronUi_Help(ui, "Distant sounds lose their high frequencies, as through air.");
-	changed |= AeronUi_Toggle(ui, "Doppler Effect", &options.doppler) != 0;
-	AeronUi_Help(ui, "Sounds rise in pitch as they approach and fall as they move away.");
 
 	if (changed && !XwaModernAudioOptions_Set(&options))
 		XwaOptionsWindow_ReportError("Could not change the audio options.");

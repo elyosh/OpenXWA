@@ -34,7 +34,6 @@ typedef struct XwaModernAudioOptions {
 	   exist. */
 	int speaker_layout;
 	int distance_filter;
-	int doppler;
 } XwaModernAudioOptions;
 
 XwaOptionSection* XwaModernAudioOptions_Section(void);

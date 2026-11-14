@@ -14,7 +14,6 @@ static const XwaOptionKey s_keys[] = {
 	XWA_OPTION_CHOICE(XwaModernAudioOptions, output, s_outputs),
 	XWA_OPTION_CHOICE(XwaModernAudioOptions, speaker_layout, s_layouts),
 	XWA_OPTION_SWITCH(XwaModernAudioOptions, distance_filter),
-	XWA_OPTION_SWITCH(XwaModernAudioOptions, doppler),
 };
 
 static XwaModernAudioOptions s_shipped;
@@ -99,7 +98,6 @@ int XwaModernAudioOptions_Set(const XwaModernAudioOptions* options) {
 	}
 	normalized = *options;
 	normalized.distance_filter = normalized.distance_filter != 0;
-	normalized.doppler = normalized.doppler != 0;
 	if (memcmp(&normalized, &s_state.options, sizeof normalized) == 0) {
 		return 1;
 	}

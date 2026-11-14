@@ -362,8 +362,6 @@ audio:
   speaker_layout: stereo
   # Distant sounds lose their high frequencies, as through air.
   distance_filter: false
-  # Sounds rise in pitch as they approach and fall as they move away.
-  doppler: false
 # The camera lag and tilt, the cockpit sway and the HUD in the exterior view.
 # A mod can change these values. The options only offer Enhanced Camera,
 # which sets `enabled`.

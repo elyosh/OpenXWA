@@ -1080,7 +1080,10 @@ int XwaHostConfig_SaveAudioOptions(AeronVfs* vfs, const XwaModernAudioOptions* o
 								   &config_error) ||
 		!AeronConfigFile_SetBool(document, "audio.distance_filter", options->distance_filter,
 								 &config_error) ||
-		!AeronConfigFile_SetBool(document, "audio.doppler", options->doppler, &config_error)) {
+		/* An earlier version saved a doppler option, which no longer exists:
+		   doppler doesn't suit the game's supersonic laser bolts. */
+		(AeronConfigFile_Has(document, "audio.doppler") &&
+		 !AeronConfigFile_Remove(document, "audio.doppler", &config_error))) {
 		AeronConfigFile_Destroy(document);
 		return host_config_error(error, error_size, "could not update user configuration: %s",
 								 config_error.message[0] ? config_error.message : "invalid audio settings");
