@@ -1,10 +1,12 @@
 #include "options/options_window.h"
 
+#include "options/audio_page.h"
 #include "options/controller_page.h"
 #include "options/keyboard_page.h"
 #include "options/mods_page.h"
 #include "options/mouse_page.h"
 #include "options/video_page.h"
+#include "xwa_runtime/config/modern_audio_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
 #include "xwa_runtime/config/option_section.h"
@@ -18,6 +20,7 @@ typedef void (*XwaOptionsPageFn)(AeronUiContext* ui, const AeronInputSnapshot* i
 
 enum {
 	OPTIONS_PAGE_VIDEO,
+	OPTIONS_PAGE_AUDIO,
 	OPTIONS_PAGE_CONTROLLER,
 	OPTIONS_PAGE_KEYBOARD,
 	OPTIONS_PAGE_MOUSE,
@@ -56,6 +59,7 @@ bool XwaOptionsWindow_Init(XwaAppUi* ui, char* error, size_t capacity) {
 	memset(&g_window, 0, sizeof g_window);
 	g_window.ui = XwaAppUi_Context(ui);
 	g_window.pages[OPTIONS_PAGE_VIDEO] = XwaVideoPage_Draw;
+	g_window.pages[OPTIONS_PAGE_AUDIO] = XwaAudioPage_Draw;
 	g_window.pages[OPTIONS_PAGE_CONTROLLER] = XwaOptionsWindow_DrawController;
 	g_window.pages[OPTIONS_PAGE_KEYBOARD] = XwaOptionsWindow_DrawKeyboard;
 	g_window.pages[OPTIONS_PAGE_MOUSE] = XwaMousePage_Draw;
@@ -66,11 +70,12 @@ bool XwaOptionsWindow_Init(XwaAppUi* ui, char* error, size_t capacity) {
 	return g_window.ready;
 }
 
-/* Saves the options that apply at once: the mouse and video options and the
-   camera and HUD switches. */
+/* Saves the options that apply at once: the mouse, video and audio options
+   and the camera and HUD switches. */
 static bool XwaOptionsWindow_FlushApplied(char* error, size_t capacity) {
 	if (!XwaModernInputOptions_FlushWithError(error, capacity) ||
-		!XwaModernVideoOptions_FlushWithError(error, capacity))
+		!XwaModernVideoOptions_FlushWithError(error, capacity) ||
+		!XwaModernAudioOptions_FlushWithError(error, capacity))
 		return false;
 	if (!XwaOptionSection_FlushAll()) {
 		snprintf(error, capacity, "Could not save the camera and HUD switches. See the log for details.");
@@ -204,7 +209,7 @@ void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds) {
 			XwaOptionsWindow_DrawNotice(input, seconds);
 		return;
 	}
-	static const char* pages[] = { "Video", "Controller", "Keyboard", "Mouse", "Mods" };
+	static const char* pages[] = { "Video", "Audio", "Controller", "Keyboard", "Mouse", "Mods" };
 	/* AeronUi scales by the window's height / 1080, so the width it has in
 	   reference pixels depends on the window's shape: 1920 at 16:9, 1440 at
 	   4:3. */

@@ -215,6 +215,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/config/modern_options_menu.c
     src/xwa_runtime/config/modern_pilot_profiles_screen.c
     src/xwa_runtime/config/modern_video_options.c
+    src/xwa_runtime/config/modern_audio_options.c
     src/xwa_runtime/config/modern_speed_effect_options.c
     src/xwa_runtime/config/modern_sun_options.c
     src/xwa_runtime/config/modern_target_readout_options.c
@@ -449,6 +450,7 @@ set(XWA_APP_SOURCES
     src/xwa_app/options/mods_page.c
     src/xwa_app/options/mouse_page.c
     src/xwa_app/options/video_page.c
+    src/xwa_app/options/audio_page.c
     src/xwa_app/options/options_window.c
     src/xwa_app/setup.c
     src/xwa_app/ui.c

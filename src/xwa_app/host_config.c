@@ -5,6 +5,7 @@
 #include "aeron/numeric.h"
 #include "controller_config.h"
 #include "keyboard_config.h"
+#include "xwa_runtime/config/modern_audio_options.h"
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/config/modern_speed_effect_options.h"
@@ -323,6 +324,7 @@ static int host_config_captured_lighting(const AeronConfigFile* config, int requ
 static int host_config_option_sections(const AeronConfigFile* config, int required, char* error,
 									   size_t error_size) {
 	XwaOptionSection* const sections[] = {
+		XwaModernAudioOptions_Section(),
 		XwaModernCameraOptions_Section(),
 		XwaModernCameraShakeOptions_Section(),
 		XwaModernSunOptions_Section(),
@@ -1054,6 +1056,34 @@ int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* o
 		AeronConfigFile_Destroy(document);
 		return host_config_error(error, error_size, "the input settings would not load again: %s",
 								 "the saved values differ");
+	}
+	return host_config_save_user_document(vfs, document, error, error_size);
+}
+
+int XwaHostConfig_SaveAudioOptions(AeronVfs* vfs, const XwaModernAudioOptions* options, char* error,
+								   size_t error_size) {
+	static const char* const outputs[] = { "speakers", "headphones" };
+	static const char* const layouts[] = { "stereo", "5.1", "7.1" };
+	AeronConfigFile* document = NULL;
+	AeronConfigError config_error = { 0 };
+
+	if (!vfs || !options || options->output < 0 || options->output > 1 || options->speaker_layout < 0 ||
+		options->speaker_layout > 2) {
+		return host_config_error(error, error_size, "cannot save invalid audio settings to %s",
+								 "config.yaml");
+	}
+	if (!host_config_prepare_user_document(vfs, &document, error, error_size)) {
+		return 0;
+	}
+	if (!AeronConfigFile_SetString(document, "audio.output", outputs[options->output], &config_error) ||
+		!AeronConfigFile_SetString(document, "audio.speaker_layout", layouts[options->speaker_layout],
+								   &config_error) ||
+		!AeronConfigFile_SetBool(document, "audio.distance_filter", options->distance_filter,
+								 &config_error) ||
+		!AeronConfigFile_SetBool(document, "audio.doppler", options->doppler, &config_error)) {
+		AeronConfigFile_Destroy(document);
+		return host_config_error(error, error_size, "could not update user configuration: %s",
+								 config_error.message[0] ? config_error.message : "invalid audio settings");
 	}
 	return host_config_save_user_document(vfs, document, error, error_size);
 }

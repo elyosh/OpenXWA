@@ -1,5 +1,6 @@
 #include "aeron/main.h"
 #include "aeron/aeron.h"
+#include "aeron/audio.h"
 #include "aeron/debug.h"
 #include "aeron/time.h"
 #include "host_config.h"
@@ -15,6 +16,7 @@
 #include "xwa/config/game_config.h"
 #include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/xwa_remaster.h"
+#include "xwa_runtime/audio/modern_audio.h"
 #include "xwa_runtime/config/option_section.h"
 #include "xwa_runtime/input/capture.h"
 #include "xwa_runtime/input/controller_mapping.h"
@@ -57,6 +59,53 @@ static void apply_modern_video_options(const XwaModernVideoOptions* options) {
 static int persist_modern_video_options(const XwaModernVideoOptions* options, char* error,
 										size_t error_size) {
 	return XwaHostConfig_SaveVideoOptions(Aeron_GetVfs(), options, error, error_size);
+}
+
+/* The audio options that apply at once. The speaker layout applies at the
+ * next start (see configure_modern_audio). */
+static void apply_modern_audio_options(const XwaModernAudioOptions* options) {
+	AeronAudioSpatialSettings settings;
+
+	if (!options) {
+		return;
+	}
+	memset(&settings, 0, sizeof settings);
+	settings.mode = options->output == XWA_MODERN_AUDIO_HEADPHONES ? AERON_AUDIO_OUTPUT_HEADPHONES
+																   : AERON_AUDIO_OUTPUT_SPEAKERS;
+	settings.air_absorption = options->distance_filter ? 1.0f : 0.0f;
+	Aeron_AudioSetSpatialSettings(&settings);
+	XwaModernAudio_SetDoppler(options->doppler);
+}
+
+static int persist_modern_audio_options(const XwaModernAudioOptions* options, char* error,
+										size_t error_size) {
+	return XwaHostConfig_SaveAudioOptions(Aeron_GetVfs(), options, error, error_size);
+}
+
+/* Sets the output's channel count, which can only change while no sound
+ * exists (see XwaModernAudioOptions_OutputChannels). Then applies the other
+ * audio options. */
+static void configure_modern_audio(void) {
+	static const int layout_channels[] = { 2, 6, 8 };
+	XwaModernAudioOptions options;
+
+	XwaModernAudioOptions_Get(&options);
+	const int device = Aeron_AudioDeviceChannels();
+	const int channels = XwaModernAudioOptions_OutputChannels(&options, device);
+	if (options.output == XWA_MODERN_AUDIO_SPEAKERS && channels < layout_channels[options.speaker_layout]) {
+		Aeron_LogInfo("xwa.audio", "the audio device has %d channels, so the output has %d instead of %d",
+					  device, channels, layout_channels[options.speaker_layout]);
+	}
+	if (!Aeron_AudioSetOutputChannels(channels)) {
+		Aeron_LogWarn("xwa.audio", "the sound output stays at %d channels instead of %d",
+					  Aeron_AudioOutputChannels(), channels);
+	}
+	XwaModernAudioOptions_Configure(apply_modern_audio_options, persist_modern_audio_options);
+	apply_modern_audio_options(&options);
+	Aeron_LogInfo("xwa.config", "audio: %s, %d output channels, distance filtering %s, doppler %s",
+				  options.output == XWA_MODERN_AUDIO_HEADPHONES ? "headphones" : "speakers",
+				  Aeron_AudioOutputChannels(), options.distance_filter ? "on" : "off",
+				  options.doppler ? "on" : "off");
 }
 
 /* Whether a host shortcut was pressed this frame. Its key stays suppressed
@@ -537,6 +586,7 @@ int main(int argc, char** argv) {
 		XwaModernVideoOptions_Configure(&effective_video_options, apply_modern_video_options,
 										persist_modern_video_options);
 	}
+	configure_modern_audio();
 	XwaKeyboardMapping_SetPolicy(Aeron_DebugUiAvailable() != 0);
 	XwaControllerMapping_Init(&host_config.input_options.controllers);
 	XwaModernInputOptions_Configure(&host_config.input_defaults, &host_config.gamepad_defaults,

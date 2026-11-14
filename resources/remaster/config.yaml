@@ -353,6 +353,17 @@ presentation:
   # wider view, so that the horizontal field of view stays the one at this
   # aspect. 1.778 is 16:9. 0 turns it off.
   cockpit_fov_min_aspect: 1.778
+# Sound. The Audio tab of OpenXWA Options changes these settings.
+audio:
+  # speakers or headphones. On headphones, sounds also seem to come from
+  # above, below and behind.
+  output: speakers
+  # stereo, 5.1 or 7.1. A change applies the next time OpenXWA starts.
+  speaker_layout: stereo
+  # Distant sounds lose their high frequencies, as through air.
+  distance_filter: false
+  # Sounds rise in pitch as they approach and fall as they move away.
+  doppler: false
 # The camera lag and tilt, the cockpit sway and the HUD in the exterior view.
 # A mod can change these values. The options only offer Enhanced Camera,
 # which sets `enabled`.

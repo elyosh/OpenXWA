@@ -226,6 +226,10 @@ uint8_t Sound_Init_Sound_Engine(void* hwnd) {
 			if (result < 0) {
 				DebugPrintfChannel(1, "Unable to set 3ds doppler factor.\n");
 			}
+#ifdef XWA_MODERN
+			/* The Doppler Effect option of OpenXWA Options. */
+			XwaModernAudio_ApplyDoppler();
+#endif
 		}
 	}
 

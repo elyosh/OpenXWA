@@ -17,9 +17,12 @@ extern "C" {
 /* A velocity in the game's speed units, in units per second. */
 static inline float XwaModernAudio_UnitsPerSecond(float speed) { return speed * (4660.0f / 256.0f / 0.944f); }
 
-/* Turns doppler on, or off as in the stock game. Sound_Init_Sound_Engine sets
-   the stock doppler factor of 0, so call this after it. */
+/* Turns doppler on, or off as in the stock game. */
 void XwaModernAudio_SetDoppler(int enabled);
+/* Sets the doppler factor of the current 3D listener from the last
+   XwaModernAudio_SetDoppler. Sound_Init_Sound_Engine calls it after setting
+   the stock factor of 0. */
+void XwaModernAudio_ApplyDoppler(void);
 
 #ifdef __cplusplus
 }

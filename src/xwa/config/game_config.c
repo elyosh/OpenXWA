@@ -38,6 +38,7 @@
 #include "xwa/util/time.h"
 
 #ifdef XWA_MODERN
+#include "xwa_runtime/config/modern_audio_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_pilot_profiles_screen.h"
 #include "xwa_runtime/config/modern_video_options.h"
@@ -745,6 +746,11 @@ int Config_SoundOptionsScreen(void) {
 							&keyState, 22);
 	g_gameConfig.musicEnabled = (g_gameConfig.musicVolume != 0);
 
+#ifdef XWA_MODERN
+	/* Always on, so it can't be changed (see CONFIG_KEY_3D_SOUND_ENABLED). */
+	Config_DrawOptionCycleDisabled(&g_gameConfig.sound3dEnabled, STR_3D_SOUND_ENABLED,
+								   STR_CONFIG_3D_SOUND_OFF, 3, &y, &rowIndex, &keyState, 23);
+#else
 	if (g_configRestrictedOptionsModalActive) {
 		Config_DrawOptionCycleDisabled(&g_gameConfig.sound3dEnabled, STR_3D_SOUND_ENABLED,
 									   STR_CONFIG_3D_SOUND_OFF, 3, &y, &rowIndex, &keyState, 23);
@@ -752,8 +758,14 @@ int Config_SoundOptionsScreen(void) {
 		Config_DrawOptionCycle(&g_gameConfig.sound3dEnabled, STR_3D_SOUND_ENABLED, STR_CONFIG_3D_SOUND_OFF, 3,
 							   &y, &rowIndex, &keyState, 23);
 	}
+#endif
 
+#ifdef XWA_MODERN
+	/* Always 32, so it can't be changed (see CONFIG_KEY_NUMBER_OF_SFX). */
+	if (1) {
+#else
 	if (g_configRestrictedOptionsModalActive) {
+#endif
 		text = FrontendString_Get(STR_NUMBER_OF_CHANNELS);
 		textX = g_configMenuCenterX - FrontendText_MeasureWidth(text, 15) - 10;
 		if (g_menuCursorRow == rowIndex) {
@@ -2661,6 +2673,7 @@ int Config_OptionsDatapadUpdate(int frameState) {
 			XwaPort_RequestOptionsWindowClose();
 		}
 		XwaModernVideoOptions_Flush();
+		XwaModernAudioOptions_Flush();
 		XwaModernInputOptions_Flush();
 		XwaOptionSection_FlushAll();
 		if (Movie_Play("dpclose", 1)) {
@@ -5688,10 +5701,21 @@ static void Config_ApplyKeywordValue(int keyword, const char* value) {
 			break;
 #endif
 		case CONFIG_KEY_3D_SOUND_ENABLED:
+#ifdef XWA_MODERN
+			/* The modern build always uses 3D sound: the audio options of
+			   OpenXWA Options build on it. */
+			g_gameConfig.sound3dEnabled = 1;
+#else
 			g_gameConfig.sound3dEnabled = parsedU8;
+#endif
 			break;
 		case CONFIG_KEY_NUMBER_OF_SFX:
+#ifdef XWA_MODERN
+			/* The modern build always plays up to 32 sounds at once. */
+			g_gameConfig.numberOfSfx = 32;
+#else
 			g_gameConfig.numberOfSfx = parsedU8;
+#endif
 			break;
 		case CONFIG_KEY_HIT_EFFECTS1:
 		case CONFIG_KEY_HIT_EFFECTS2:

@@ -120,7 +120,14 @@ int XwaOptionKey_Read(const XwaOptionKey* key, const AeronConfigNode* node, void
 		case XWA_OPTION_KIND_CHOICE: {
 			const char* word =
 				AeronConfigNode_Type(node) == AERON_CONFIG_STRING ? AeronConfigNode_String(node, NULL) : NULL;
+			char number[32];
 			int i;
+
+			/* YAML reads a word such as 5.1 as a number when it has no quotes. */
+			if (!word && option_is_number(node)) {
+				snprintf(number, sizeof number, "%g", AeronConfigNode_Float(node, 0.0));
+				word = number;
+			}
 
 			for (i = 0; word && key->choices[i]; ++i) {
 				if (strcmp(word, key->choices[i]) == 0) {

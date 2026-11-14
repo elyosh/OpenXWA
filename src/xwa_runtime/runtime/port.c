@@ -28,6 +28,7 @@
 #include "xwa/xwa_options.h"
 #include "xwa_runtime/audio/sound_banks.h"
 #include "xwa_runtime/camera/camera_motion.h"
+#include "xwa_runtime/config/modern_audio_options.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_speed_effect_options.h"
@@ -548,6 +549,7 @@ void XwaPort_Shutdown(void) {
 	Aeron_SetRelativeMouseMode(0);
 	XwaPort_SetHostCursorVisible(1);
 	XwaModernVideoOptions_Flush();
+	XwaModernAudioOptions_Flush();
 	XwaModernInputOptions_Flush();
 	XwaOptionSection_FlushAll();
 	/* TODO: Run recovered shutdown paths in original-compatible order. */
