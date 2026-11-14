@@ -3,6 +3,7 @@
 #include "aeron/log.h"
 #include "xwa/assets/file_io.h"
 #include "xwa_runtime/audio/mission_sounds.h"
+#include "xwa_runtime/audio/modern_audio.h"
 #endif
 #include "xwa/audio/fsfx.h"
 #include "xwa/audio/music.h"
@@ -1167,7 +1168,14 @@ uint8_t Sound_PlayEffectNow(int soundId, int param2, int loop, int priority, int
 				posZ = (float)worldlocz;
 			}
 			buffer3D->lpVtbl->SetPosition(buffer3D, posX, posY, -posZ, 0);
+#ifdef XWA_MODERN
+			/* In units per second, for doppler (see modern_audio.h). */
+			buffer3D->lpVtbl->SetVelocity(buffer3D, XwaModernAudio_UnitsPerSecond(velX),
+										  XwaModernAudio_UnitsPerSecond(velY),
+										  -XwaModernAudio_UnitsPerSecond(velZ), 0);
+#else
 			buffer3D->lpVtbl->SetVelocity(buffer3D, velX, velY, -velZ, 0);
+#endif
 		} else {
 			if (hasWorldPosition) {
 				buffer3D->lpVtbl->SetPosition(buffer3D, (float)worldX, (float)worldY, -(float)worldZ, 0);
@@ -1342,7 +1350,13 @@ void Sound_Update3DListenerAndSources(void) {
 
 	if (g_sound3DEnabled) {
 		g_sound3DListener->lpVtbl->SetPosition(g_sound3DListener, posX, posY, -posZ, 1);
+#ifdef XWA_MODERN
+		g_sound3DListener->lpVtbl->SetVelocity(g_sound3DListener, XwaModernAudio_UnitsPerSecond(velX),
+											   XwaModernAudio_UnitsPerSecond(velY),
+											   -XwaModernAudio_UnitsPerSecond(velZ), 1);
+#else
 		g_sound3DListener->lpVtbl->SetVelocity(g_sound3DListener, velX, velY, -velZ, 1);
+#endif
 		g_sound3DListener->lpVtbl->SetOrientation(g_sound3DListener, fwdX, fwdY, -fwdZ, upX, upY, -upZ, 1);
 	}
 
@@ -1387,7 +1401,13 @@ void Sound_Update3DListenerAndSources(void) {
 			posZ = (float)worldlocz;
 		}
 		inst->buffer3D->lpVtbl->SetPosition(inst->buffer3D, posX, posY, -posZ, 1);
+#ifdef XWA_MODERN
+		inst->buffer3D->lpVtbl->SetVelocity(inst->buffer3D, XwaModernAudio_UnitsPerSecond(velX),
+											XwaModernAudio_UnitsPerSecond(velY),
+											-XwaModernAudio_UnitsPerSecond(velZ), 1);
+#else
 		inst->buffer3D->lpVtbl->SetVelocity(inst->buffer3D, velX, velY, -velZ, 1);
+#endif
 	}
 
 	g_sound3DListener->lpVtbl->CommitDeferredSettings(g_sound3DListener);
