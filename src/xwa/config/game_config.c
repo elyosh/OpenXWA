@@ -941,7 +941,7 @@ int Config_SoundOptionsScreen(void) {
 #ifdef XWA_MODERN
 			/* 3D sound places each sound at its source and moves it with the
 			   source while it plays. */
-			g_gameConfig.sound3dEnabled = 1;
+			g_gameConfig.sound3dEnabled = (uint8_t)XwaModernAudioOptions_Sound3D();
 #else
 			g_gameConfig.sound3dEnabled = 0;
 #endif
@@ -5436,7 +5436,7 @@ static void Config_SetInitialDefaults(void) {
 #ifdef XWA_MODERN
 	/* 3D sound places each sound at its source and moves it with the source
 	   while it plays. Modern computers can play the most sounds at once. */
-	g_gameConfig.sound3dEnabled = 1;
+	g_gameConfig.sound3dEnabled = (uint8_t)XwaModernAudioOptions_Sound3D();
 	g_gameConfig.numberOfSfx = 32;
 #else
 	g_gameConfig.sound3dEnabled = 0;
@@ -5704,7 +5704,7 @@ static void Config_ApplyKeywordValue(int keyword, const char* value) {
 #ifdef XWA_MODERN
 			/* The modern build always uses 3D sound: the audio options of
 			   OpenXWA Options build on it. */
-			g_gameConfig.sound3dEnabled = 1;
+			g_gameConfig.sound3dEnabled = (uint8_t)XwaModernAudioOptions_Sound3D();
 #else
 			g_gameConfig.sound3dEnabled = parsedU8;
 #endif

@@ -15,14 +15,16 @@ extern "C" {
    The game starts as with skipintro, plays the film as the film room does,
    and quits when the film ends, where the film room would play it again. It
    quits with exit code 0, or 1 when the film doesn't exist or there is no
-   active pilot. While the film plays, each host frame
-   gets a record. At the end, the log gets a summary of each measure, and the
-   CSV file, when one is asked for, gets the records. */
+   active pilot, or when the sound couldn't be recorded. While the film plays,
+   each host frame gets a record. At the end, the log gets a summary of each
+   measure, and the CSV file, when one is asked for, gets the records. */
 
 /* Call before XwaPort_Init.
    - `filmName`: a film in the film folder of the user folder, with or
      without .flm. Empty for a normal start.
    - `csvPath`: a CSV file in the user folder for the frame times, or empty.
+   - `recordPath`: a WAV file in the user folder for the sound of the film,
+     from its first flight frame to its end, or empty.
    - `pauseAt`: the film time, in game ticks, where the film freezes
      (--film-pause-at), or -1. The film fast-forwards to it.
    - `captureName`: when not empty, the frozen frame is saved to files with
@@ -31,8 +33,8 @@ extern "C" {
      (--film-benchmark).
    When both a capture and a measurement are asked for, the capture runs
    first. */
-void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, int32_t pauseAt,
-								const char* captureName, int measure);
+void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, const char* recordPath,
+								int32_t pauseAt, const char* captureName, int measure);
 int XwaFilmBenchmark_IsRequested(void);
 
 /* The first screen when a film is asked for: it starts the film's flight. */

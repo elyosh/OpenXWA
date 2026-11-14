@@ -584,6 +584,10 @@ int main(int argc, char** argv) {
 										persist_modern_video_options);
 	}
 	configure_modern_audio();
+	if (launch.classic_2d_sound) {
+		XwaModernAudioOptions_SetClassic2DSound(1);
+		Aeron_LogInfo("xwa.config", "3D sound is off for this run (--classic-2d-sound)");
+	}
 	XwaKeyboardMapping_SetPolicy(Aeron_DebugUiAvailable() != 0);
 	XwaControllerMapping_Init(&host_config.input_options.controllers);
 	XwaModernInputOptions_Configure(&host_config.input_defaults, &host_config.gamepad_defaults,
@@ -606,8 +610,8 @@ int main(int argc, char** argv) {
 	XwaPort_SetCommandLine(launch.game_command_line);
 	XwaModernFlightTiming_Configure(host_config.flight_simulation_step_ticks);
 	XwaFilmState_Configure(selected_mod);
-	XwaFilmBenchmark_Configure(launch.play_film, launch.benchmark_out, launch.film_pause_at, launch.film_capture,
-							   launch.film_benchmark);
+	XwaFilmBenchmark_Configure(launch.play_film, launch.benchmark_out, launch.record_audio,
+							   launch.film_pause_at, launch.film_capture, launch.film_benchmark);
 	/* XwaRemaster_Init succeeded above, so the HD renderer is available. */
 	XwaModelSource_Configure(!host_config.force_opt_models);
 	XwaMovieTask_Configure(host_config.prefer_original_movies);

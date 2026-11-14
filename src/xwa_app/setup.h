@@ -19,6 +19,9 @@ typedef struct XwaLaunchOptions {
 	   folder, that gets its frame times. */
 	char play_film[256];
 	char benchmark_out[XWA_INSTALL_PATH_CAPACITY];
+	/* --record-audio: the WAV file, in the user folder, that gets the film's
+	   sound. */
+	char record_audio[XWA_INSTALL_PATH_CAPACITY];
 	/* --film-pause-at: the film time, in game ticks, where the film freezes,
 	   or -1. --film-capture: the file name, in the user folder, for the
 	   capture of the frozen frame. --film-benchmark: measure the GPU time of
@@ -26,6 +29,9 @@ typedef struct XwaLaunchOptions {
 	int film_pause_at;
 	char film_capture[XWA_INSTALL_PATH_CAPACITY];
 	int film_benchmark;
+	/* --classic-2d-sound: the game's 3D sound is off for this run, as in the
+	   stock game by default. */
+	int classic_2d_sound;
 	/* --render-size: the fixed size of the 3D render, in pixels, or 0 to
 	   follow the window. */
 	int render_width;

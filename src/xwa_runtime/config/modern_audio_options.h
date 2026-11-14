@@ -38,6 +38,13 @@ typedef struct XwaModernAudioOptions {
 
 XwaOptionSection* XwaModernAudioOptions_Section(void);
 
+/* The game's 3D Sound option, which the modern build sets: always on, so the
+   option can't be changed. --classic-2d-sound turns it off for one run, to
+   compare with the stock game's 2D sound; set it before the game loads
+   config.cfg. */
+int XwaModernAudioOptions_Sound3D(void);
+void XwaModernAudioOptions_SetClassic2DSound(int classic);
+
 /* The channel count of the output for `options`: 2 for headphones, or the
  * speaker layout's. When the device has fewer channels, the largest layout
  * that fits it: a 5.1 output on a 2-channel device would only be mixed down

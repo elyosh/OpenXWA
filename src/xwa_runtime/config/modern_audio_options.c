@@ -42,6 +42,12 @@ static struct {
 
 XwaOptionSection* XwaModernAudioOptions_Section(void) { return &s_section; }
 
+static int s_classic2DSound;
+
+int XwaModernAudioOptions_Sound3D(void) { return !s_classic2DSound; }
+
+void XwaModernAudioOptions_SetClassic2DSound(int classic) { s_classic2DSound = classic != 0; }
+
 int XwaModernAudioOptions_LayoutsForDevice(int device_channels) {
 	if (device_channels <= 0 || device_channels >= 8) {
 		return 3;

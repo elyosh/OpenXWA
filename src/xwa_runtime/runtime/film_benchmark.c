@@ -84,13 +84,18 @@ static int s_fastForwardFrame;
 static uint32_t s_flightCommits;
 static int s_lastCommitValid;
 static int32_t s_lastCommitFilmTime;
+/* --record-audio: the WAV file in the user folder, whether the recording
+   started, and whether it failed. */
+static char s_recordPath[1024];
+static int s_recording;
+static int s_recordFailed;
 
 static uint32_t FilmBenchmark_Clamp(uint64_t us) {
 	return us < FILM_BENCHMARK_NONE ? (uint32_t)us : FILM_BENCHMARK_NONE - 1;
 }
 
-void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, int32_t pauseAt,
-								const char* captureName, int measure) {
+void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, const char* recordPath,
+								int32_t pauseAt, const char* captureName, int measure) {
 	const size_t length = filmName != NULL ? strlen(filmName) : 0;
 	const int hasExtension = length >= 4 && (strcmp(filmName + length - 4, ".flm") == 0 ||
 											 strcmp(filmName + length - 4, ".FLM") == 0);
@@ -98,6 +103,9 @@ void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, int32
 	s_state = FILM_BENCHMARK_OFF;
 	s_filmPath[0] = '\0';
 	s_csvPath[0] = '\0';
+	snprintf(s_recordPath, sizeof s_recordPath, "%s", recordPath != NULL ? recordPath : "");
+	s_recording = 0;
+	s_recordFailed = 0;
 	s_pauseAt = pauseAt >= 0 ? pauseAt : -1;
 	snprintf(s_captureName, sizeof s_captureName, "%s", captureName != NULL ? captureName : "");
 	s_measure = measure != 0;
@@ -308,6 +316,13 @@ void XwaFilmBenchmark_FlightEnded(void) {
 	if (s_csvPath[0]) {
 		FilmBenchmark_WriteCsv();
 	}
+	if (s_recording) {
+		s_recordFailed |= !Aeron_AudioRecordStop();
+		s_recording = 0;
+	}
+	if (s_recordFailed) {
+		s_state = FILM_BENCHMARK_FAILED;
+	}
 	free(s_records);
 	s_records = NULL;
 	s_recordCount = 0;
@@ -376,6 +391,12 @@ void XwaFilmBenchmark_NoteFlightCommit(void) {
 	}
 	if (s_flightCommits < 2) {
 		++s_flightCommits;
+	}
+	/* The recording starts with the film's first flight frame, after the
+	   mission has loaded. */
+	if (s_recordPath[0] && !s_recording && s_state == FILM_BENCHMARK_PLAYING) {
+		s_recording = 1;
+		s_recordFailed = !Aeron_AudioRecordStart(Aeron_GetVfs(), AERON_VFS_ROOT_USER, s_recordPath);
 	}
 	/* The renderer takes the motion vectors from the previous snapshot, so it
 	   must hold the film step before the current one. */

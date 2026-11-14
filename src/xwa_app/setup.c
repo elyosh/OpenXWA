@@ -135,6 +135,20 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			}
 			continue;
 		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--record-audio");
+		if (!pass_through && (value || strcmp(argv[i], "--record-audio") == 0)) {
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, "%s requires a path", "--record-audio");
+				}
+				value = argv[i];
+			}
+			if (!setup_copy_path(out->record_audio, sizeof out->record_audio, value, "--record-audio", error,
+								 error_size)) {
+				return 0;
+			}
+			continue;
+		}
 		value = pass_through ? NULL : setup_option_value(argv[i], "--film-pause-at");
 		if (!pass_through && (value || strcmp(argv[i], "--film-pause-at") == 0)) {
 			char* end;
@@ -199,6 +213,10 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			out->render_height = (int)height;
 			continue;
 		}
+		if (!pass_through && strcmp(argv[i], "--classic-2d-sound") == 0) {
+			out->classic_2d_sound = 1;
+			continue;
+		}
 		if (!pass_through && strcmp(argv[i], "--film-benchmark") == 0) {
 			out->film_benchmark = 1;
 			continue;
@@ -213,6 +231,12 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 	}
 	if (out->help) {
 		return 1;
+	}
+	if (out->record_audio[0] && !out->play_film[0]) {
+		return setup_error(error, error_size, "%s requires --play-film", "--record-audio");
+	}
+	if (out->record_audio[0] && out->film_pause_at >= 0) {
+		return setup_error(error, error_size, "%s can't be used with --film-pause-at", "--record-audio");
 	}
 	if (out->film_pause_at >= 0 && !out->play_film[0]) {
 		return setup_error(error, error_size, "%s requires --play-film", "--film-pause-at");
@@ -283,6 +307,8 @@ const char* XwaLaunchOptions_Help(void) {
 		   "                            log the frame times, then quit\n"
 		   "  --benchmark-out <file>    with --play-film: also write the time of each frame\n"
 		   "                            to this CSV file of the user folder\n"
+		   "  --record-audio <file>     with --play-film: record the film's sound to this\n"
+		   "                            WAV file of the user folder\n"
 		   "  --film-pause-at <ticks>   with --play-film: fast-forward to this film time,\n"
 		   "                            in 4 ms ticks, and freeze there\n"
 		   "  --film-capture <name>     with --film-pause-at: save the frozen frame to\n"
@@ -291,6 +317,8 @@ const char* XwaLaunchOptions_Help(void) {
 		   "                            then quit\n"
 		   "  --film-benchmark          with --film-pause-at: measure the frozen frame's\n"
 		   "                            GPU time, then quit\n"
+		   "  --classic-2d-sound        play this run with the game's 3D sound off, as the\n"
+		   "                            original game did by default\n"
 		   "  --render-size <W>x<H>     render the 3D view at this size in pixels,\n"
 		   "                            whatever the window's size, and fit it in the\n"
 		   "                            window\n"
