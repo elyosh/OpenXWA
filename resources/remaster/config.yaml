@@ -338,8 +338,8 @@ dynamic_cockpit:
   # Hologram displays visible; Ctrl+H toggles them in flight.
   holograms: true
   # Emissive multipliers of the display content and of holograms.
-  display_emissive_strength: 1.5
-  hologram_emissive_strength: 1.5
+  display_emissive_strength: 0.7
+  hologram_emissive_strength: 0.7
 assets:
   prefer_original_2d: false
   # Play the original movies even when the mod folder has replacements
@@ -770,6 +770,18 @@ point_lights:
       power_w: 158000
     player_craft_damage:
       power_w: 400
+  # The headlights of the player's craft. They are a Blender area light of
+  # power_w watts (0 turns them off), at position_m from the pilot's eye
+  # (X right, Y up, Z forward), pointing along the nose. color is linear.
+  # angle_degrees, up to 90, is where the cone ends. With 0, there is no
+  # cone, and the light fades towards the sides. The headlights section of
+  # a mod's flight/flight.yaml can change these values, and when the
+  # headlights turn on. Each key that the mod sets replaces the one here.
+  headlights:
+    position_m: [0, 0, 20]
+    color: [0.944, 0.944, 1]
+    power_w: 4000000
+    angle_degrees: 40
 classic_lighting:
   # Converts the classic game's lights (suns and other backdrops, the game's
   # lights in the hangar, lasers, explosions, engines), which have no unit.
@@ -787,14 +799,20 @@ lighting:
   spec_geom_adapt: true
   # Ambient fill in W/m^2/sr, where no environment gives one. 5.9 gives a
   # surface 10% of the white sun's light.
-  ambient_r: 1.0
-  ambient_g: 1.0
-  ambient_b: 1.0
+  ambient_r: 3.0
+  ambient_g: 3.0
+  ambient_b: 3.0
   # The least ambient light on the in-flight map, so that the craft can be
   # seen in dim regions.
   map_ambient_min_r: 5.0
   map_ambient_min_g: 5.0
   map_ambient_min_b: 5.0
+  # The ambient fill inside the Death Star, in W/m^2/sr, when the region has
+  # no environment. It replaces the light of the mission's backdrop, which
+  # would light the tunnel like a sun, through the walls.
+  death_star_ambient_r: 3.0
+  death_star_ambient_g: 3.0
+  death_star_ambient_b: 3.0
   # Scale of all emitted light (illumination, screens, holograms, lasers,
   # glows, explosions). Emitters far brighter than lit surfaces are what
   # visibly glow through bloom.
@@ -846,12 +864,48 @@ motion_blur:
   pause_keep_blur: true
   velocity_viz: false
 small_objects:
-  # Objects smaller than these on screen are left out, by the larger side of
-  # their bounds, in pixels of a 1080-line view (scaled to the render
-  # height); 0 is off. Only with MSAA on and temporal upscaling off.
-  # Smaller ones aren't drawn in the depth prepass and cast no shadow.
+  # Sizes on screen, in pixels of a 1080-line view (scaled to the render
+  # height), measured on the larger side of an object's bounds. 0 is off.
+  # Objects smaller than this aren't drawn in the depth prepass and cast no
+  # shadow. Only with MSAA on and temporal upscaling off.
   prepass_min_size: 2.5
-  # Smaller ones aren't drawn at all, except laser bolts.
-  draw_min_size: 0.6
+  # Objects smaller than this aren't drawn at all, except laser bolts. Only
+  # with MSAA on and temporal upscaling off.
+  draw_min_size: 2.0
+  # Objects smaller than this, seen from the sun, are left out of a shadow
+  # cascade. The size is measured at the distance of the nearest surface the
+  # cascade covers, where shadows look largest, so far cascades leave out
+  # more objects. Works with any MSAA and temporal upscaling setting.
+  shadow_min_size: 4.0
+model_lod:
+  # Models that are small on screen are drawn with simpler versions of
+  # themselves, called levels of detail, which the mod importer makes. This
+  # is the largest error a level may show, in pixels of a 1080-line view
+  # (scaled to the render height). 0 draws every model at full detail.
+  max_error: 1.0
+projectiles:
+  # Laser bolts thinner than this on screen, in pixels of the 3D view, are
+  # drawn this wide, with their light spread over the wider strip. A far
+  # bolt then shows as a steady line instead of broken pixels that flicker.
+  # It doesn't make it dimmer; fade_width_px does. Bolts wider than this
+  # don't change. 0 is off.
+  min_width_px: 1.0
+  # Laser bolts thinner than this on screen, in pixels of a 1080-line view
+  # (scaled to the render height), get dimmer as they get thinner: their
+  # emission is multiplied by (width / fade_width_px)^fade_power. Bolts
+  # wider than this don't change. A higher power fades them faster. 0 for
+  # either turns the fade off.
+  fade_width_px: 4.0
+  fade_power: 0.2
+  # How bright projectiles (laser bolts and warheads) are drawn, as a
+  # multiple of the emission of their model. At 1, a bolt's glow is many
+  # times brighter than white, so the tone mapping turns it white and every
+  # bolt looks the same. Lower values keep the colours of its texture.
+  emission_scale: 0.04
+  # How much light the bloom gets from projectiles, as a multiple of the
+  # emission of their model, whatever emission_scale is. 1 gives the glow
+  # of projectiles drawn at an emission_scale of 1. When it is higher than
+  # emission_scale, the difference goes into the bloom only.
+  bloom_scale: 0.7
 shadows:
   receiver_local_near_distance_m: 1.5

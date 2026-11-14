@@ -739,17 +739,24 @@ typedef struct XwaCockpitLight {
 } XwaCockpitLight;
 #define XWA_SNAP_COCKPIT_LIGHT_COUNT 3
 
-/* The player craft's headlight (headlights.h): a one-sided light along the
- * nose, from the seat's eye plus `position_m` along the craft's axes (X
- * right, Y up, Z forward). `color` is linear and `power_w` the power of a
- * Blender area light. */
+/* The player craft's headlight (headlights.h): whether it is on, and the
+ * values that the mod's `headlights` section sets. Each value has a
+ * `mod_has_*` flag. For a value that the mod doesn't set, the renderer
+ * uses the default from point_lights.headlights. The light starts at the
+ * seat's eye plus `mod_position_m` along the craft's axes (X right, Y up,
+ * Z forward). `mod_color` is linear, and `mod_power_w` is the power of a
+ * Blender area light. `mod_angle_degrees` is where the cone ends, from the
+ * nose; 0 for a one-sided light. */
 typedef struct XwaHeadlight {
 	uint8_t on;
-	float position_m[3];
-	float color[3];
-	float power_w;
-	/* Where the cone ends, from the nose; 0 for a one-sided light. */
-	float angle_degrees;
+	uint8_t mod_has_position;
+	uint8_t mod_has_color;
+	uint8_t mod_has_power;
+	uint8_t mod_has_angle;
+	float mod_position_m[3];
+	float mod_color[3];
+	float mod_power_w;
+	float mod_angle_degrees;
 } XwaHeadlight;
 
 /* The settings of the procedural suns (modern_sun_options.h). */
@@ -1263,6 +1270,10 @@ typedef struct XwaOptAsset {
 	uint16_t public_handle;
 	char name[XWA_SNAP_OPT_NAME_MAX]; /* basename, no extension */
 	uint8_t source;                   /* XwaModelSource the simulation loaded */
+	/* 1 when projectiles use the model: an object type with a projectile
+	   genus, or a craft's shots (weapons.models). When the remaster converts
+	   a game OPT for such a model, the whole model glows. */
+	uint8_t projectile;
 } XwaOptAsset;
 
 /* A mission's skin selection: model `model` (its GLB name) shows variant

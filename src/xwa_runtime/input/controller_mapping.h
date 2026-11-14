@@ -28,10 +28,6 @@ int XwaControllerMapping_RollHeld(XwaInputRoll side);
  * the game is paused. */
 int XwaControllerMapping_TakeResume(void);
 void XwaControllerMapping_ReleaseCommands(void);
-const AeronControllerSnapshot* XwaControllerMapping_Resolve(const XwaControllerModel* model,
-															const AeronInputSnapshot* input,
-															uint32_t preferred);
-uint32_t XwaControllerMapping_AnalogInstance(const char* guid);
 uint16_t XwaControllerMapping_ThrottlePosition(int16_t raw, AeronControllerKind kind, int source,
 											   bool invert);
 bool XwaControllerMapping_ThrottleSample(uint16_t* position, uint32_t* generation);
@@ -40,9 +36,9 @@ int XwaControllerMapping_Present(void);
 /* Returns 1 once after Present() changes. */
 int XwaControllerMapping_ConsumePresenceChange(void);
 
-/* Rumble goes to one device: the analog instance of the model that owns
- * pitch, else the one that owns yaw, else the first saved gamepad model, each
- * only if it can rumble. */
+/* Rumble goes to one device that can rumble: a connected device of the first
+ * model that binds pitch, else of the first that binds yaw, else of the first
+ * gamepad model, the one with the lowest instance id. */
 uint32_t XwaControllerMapping_RumbleInstance(void);
 /* Returns 1 once after the rumble device changes. */
 int XwaControllerMapping_ConsumeRumbleChange(void);

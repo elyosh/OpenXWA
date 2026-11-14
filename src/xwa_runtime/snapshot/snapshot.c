@@ -2040,27 +2040,32 @@ void XwaSnapshot_CaptureFlight(void) {
 	}
 	XwaParticleLights_Capture(s);
 
-	/* Player cockpit STATE (see XwaCockpit): model identity from the
-	 * loaded-handle registry (seat 0 = g_cockpitModel incl. the classic
-	 * Tie/CombatSim fallbacks; turret seats = the seat's turret model),
-	 * seat hardpoint + camera pan, aim, and the classic queue gates.
-	 * The driver derives the draw transform from the anchor object's
-	 * state basis + these fields. */
+	/* The player's cockpit (see XwaCockpit). The model comes from the
+	 * loaded model handles: seat 0 uses g_cockpitModel, which includes the
+	 * game's TIE and combat simulator fallbacks, and a gunner seat uses that
+	 * seat's turret model. We also copy the seat position, camera pan, turret
+	 * aim and the game's checks for whether the cockpit can be shown. The
+	 * renderer builds the cockpit transform from the player object's
+	 * orientation and these fields. */
 	{
 		XwaCockpit* k = &s->cockpit;
 		memset(k, 0, sizeof *k);
 		const int playerObjIdx = g_players[g_localPlayer].objectIndex;
 		if (g_objectTable != NULL && playerObjIdx >= 0) {
 			const ObjectRecord* pobj = &g_objectTable[playerObjIdx];
+			const ModelDefIndex modelIndex = GetModelDefIndexFromType((uint16_t)pobj->objectType);
 			uint16_t handle = 0;
 			k->seat = (uint8_t)g_players[g_localPlayer].currentSeatIdx;
 			if (k->seat == 0) {
 				handle = g_cockpitModel;
-			} else {
+			} else if (modelIndex != 0xffffu) {
+				/* When the player dies in a gunner seat, the player's object
+				 * becomes an explosion, which has no model def. The seat index
+				 * is not reset, so skip the turret fields in that case, like
+				 * the game does in its own turret camera code. */
 				const uint16_t turretType = (uint16_t)XwaGunnerSeats_Value(
 					pobj->objectType, k->seat - 1, XWA_GUNNER_SEAT_COCKPIT,
-					g_modelDefs[(uint16_t)GetModelDefIndexFromType((uint16_t)pobj->objectType)]
-						.turretObjectType[(k->seat - 1) & 1]);
+					g_modelDefs[modelIndex].turretObjectType[(k->seat - 1) & 1]);
 				k->inverted = (uint8_t)XwaGunnerSeats_Value(pobj->objectType, k->seat - 1,
 															XWA_GUNNER_SEAT_INVERTED, k->seat == 2);
 				if (turretType != 0) {

@@ -650,7 +650,8 @@ settings, and `mission_settings` can turn them off for every mission. See
 ### headlights
 
 Headlights are a light along the nose of the player's craft, for dark
-places such as the Death Star.
+places such as the Death Star. The game has a default light, and this
+section changes it. Each key that the mod sets replaces the default value.
 
 ```yaml
 headlights:
@@ -664,14 +665,14 @@ headlights:
 | Key | Meaning |
 |-|-|
 | `position_m` | Where the light is, in metres from the pilot's eye: X right, Y up, Z forward. The default is `[0, 0, 20]`. |
-| `color` | The light's colour, linear. The default is `[1, 1, 1]`. |
-| `power_w` | Required. The light's power in watts, above 0, as for a Blender area light. |
-| `angle_degrees` | Makes the light a spot light that ends at this angle from the nose, above 0 and at most 90. Without it, the light shines forward over a half sphere and fades towards the sides. |
-| `auto_turn_on` | `true` (the default) turns the headlights on in missions that have no directional light. |
+| `color` | The light's colour, linear. The default is `[0.944, 0.944, 1]`. |
+| `power_w` | The light's power in watts, as for a Blender area light. 0 turns the headlights off. The default is 4000000. |
+| `angle_degrees` | Makes the light a spot light that ends at this angle from the nose, at most 90. With 0, the light shines forward over a half sphere and fades towards the sides. The default is 40. |
+| `auto_turn_on` | `true` (the default) turns the headlights on in the Death Star mission and in regions with no directional light. |
 
-The light always points along the nose. Without the section, there are no
-headlights. If a value is wrong, the game writes an error in the log and
-there are no headlights.
+The light always points along the nose, and is never on in the hangar. If
+a value is wrong, the game writes an error in the log and there are no
+headlights.
 
 A mission file can turn the headlights on with `headlights: true`. They are
 then on while the player isn't in the hangar, whatever `auto_turn_on` says.

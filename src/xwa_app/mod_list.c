@@ -80,9 +80,14 @@ static void mod_list_check(const AeronConfigFile* manifest, XwaModEntry* mod) {
 	mod->problem[0] = '\0';
 	if (version != XWA_MOD_FORMAT_VERSION) {
 		mod->state = XWA_MOD_OTHER_VERSION;
-		if (imported) {
+		if (imported && version < XWA_MOD_FORMAT_VERSION) {
 			snprintf(mod->problem, sizeof mod->problem,
-					 "Made for another version of OpenXWA. Import it again.");
+					 "It was imported by an older version of OpenXWA. Import it again with the "
+					 "OpenXWA Mod Importer.");
+		} else if (imported) {
+			snprintf(mod->problem, sizeof mod->problem,
+					 "It was imported by a newer version of OpenXWA. Update OpenXWA, or import it again "
+					 "with this version's OpenXWA Mod Importer.");
 		} else if (!AeronConfigFile_Has(manifest, "version")) {
 			snprintf(mod->problem, sizeof mod->problem,
 					 "Its mod.yaml has no version, and this OpenXWA needs version %d.",
@@ -95,7 +100,7 @@ static void mod_list_check(const AeronConfigFile* manifest, XwaModEntry* mod) {
 	} else if (!AeronConfigFile_GetBool(manifest, "complete", 1)) {
 		mod->state = XWA_MOD_UNFINISHED;
 		snprintf(mod->problem, sizeof mod->problem, "%s",
-				 imported ? "Its import didn't finish. Import it again."
+				 imported ? "Its import didn't finish. Import it again with the OpenXWA Mod Importer."
 						  : "Its mod.yaml says that it isn't complete.");
 	} else {
 		mod->state = XWA_MOD_READY;

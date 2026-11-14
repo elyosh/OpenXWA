@@ -70,8 +70,8 @@ static int host_shortcut_pressed(const AeronInputSnapshot* in, XwaKeyboardShortc
 	return 1;
 }
 
-/* Window-mode changes route through the video options module so the apply
- * callback, the options screen, and config persistence stay in agreement. */
+/* Window mode changes go through the video options module, so the window,
+ * the Video tab of OpenXWA Options and config.yaml always agree. */
 static void set_window_mode_option(XwaModernWindowMode mode) {
 	XwaModernVideoOptions options;
 	XwaModernVideoOptions_Get(&options);
@@ -531,6 +531,8 @@ int main(int argc, char** argv) {
 			},
 		.video_options = host_config.video_options,
 		.video_options_override_mask = host_config.video_options_override_mask,
+		.render_width = launch.render_width,
+		.render_height = launch.render_height,
 	};
 	if (!XwaRemaster_Init(&remaster_options)) {
 		Aeron_FatalError("OpenXWA", "Required remaster resources could not be loaded.");
@@ -604,7 +606,11 @@ int main(int argc, char** argv) {
 			const int32_t delta_us = Aeron_BeginFrame();
 			const AeronInputSnapshot* in = Aeron_InputSnapshot();
 			int toggled = 0;
-			if (in) {
+			/* With a fixed render size, the 2D frame takes the render's shape,
+			   and the presentation fits it in the window. */
+			if (launch.render_width > 0) {
+				XwaPresentation_SyncToWindow(launch.render_width, launch.render_height);
+			} else if (in) {
 				XwaPresentation_SyncToWindow(in->window_width, in->window_height);
 			}
 			/* Reconcile OS-initiated fullscreen transitions (e.g. the macOS

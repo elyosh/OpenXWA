@@ -4,7 +4,10 @@
 #include "options/head_tracking_page.h"
 #include "options/keyboard_page.h"
 #include "options/mouse_page.h"
+#include "options/video_page.h"
 #include "xwa_runtime/config/modern_input_options.h"
+#include "xwa_runtime/config/modern_video_options.h"
+#include "xwa_runtime/config/option_section.h"
 #include "xwa_runtime/input/capture.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/runtime/port.h"
@@ -14,6 +17,7 @@
 typedef void (*XwaOptionsPageFn)(AeronUiContext* ui, const AeronInputSnapshot* input);
 
 enum {
+	OPTIONS_PAGE_VIDEO,
 	OPTIONS_PAGE_CONTROLLER,
 	OPTIONS_PAGE_KEYBOARD,
 	OPTIONS_PAGE_MOUSE,
@@ -45,6 +49,7 @@ static void XwaOptionsWindow_DrawKeyboard(AeronUiContext* ui, const AeronInputSn
 bool XwaOptionsWindow_Init(XwaAppUi* ui, char* error, size_t capacity) {
 	memset(&g_window, 0, sizeof g_window);
 	g_window.ui = XwaAppUi_Context(ui);
+	g_window.pages[OPTIONS_PAGE_VIDEO] = XwaVideoPage_Draw;
 	g_window.pages[OPTIONS_PAGE_CONTROLLER] = XwaOptionsWindow_DrawController;
 	g_window.pages[OPTIONS_PAGE_KEYBOARD] = XwaOptionsWindow_DrawKeyboard;
 	g_window.pages[OPTIONS_PAGE_MOUSE] = XwaMousePage_Draw;
@@ -53,6 +58,30 @@ bool XwaOptionsWindow_Init(XwaAppUi* ui, char* error, size_t capacity) {
 	if (!g_window.ready && error && capacity)
 		snprintf(error, capacity, "the options window has no UI context");
 	return g_window.ready;
+}
+
+/* Saves the options that apply at once: the mouse and video options and the
+   camera and HUD switches. */
+static bool XwaOptionsWindow_FlushApplied(char* error, size_t capacity) {
+	if (!XwaModernInputOptions_FlushWithError(error, capacity) ||
+		!XwaModernVideoOptions_FlushWithError(error, capacity))
+		return false;
+	if (!XwaOptionSection_FlushAll()) {
+		snprintf(error, capacity, "Could not save the camera and HUD switches. See the log for details.");
+		return false;
+	}
+	return true;
+}
+
+float XwaOptionsWindow_ScrollHeight(void) {
+	const AeronUiTheme* theme = AeronUi_GetTheme(g_window.ui);
+	/* Leaves room below the scroll area for the tab's bottom edge, the
+	   separator, the Close button and the gaps between them. */
+	float footer = 4.0f + 9.0f + theme->row_height + 3.0f * theme->item_spacing;
+	if (g_window.error[0])
+		footer += AeronUi_MeasureHelpHeight(g_window.ui, g_window.error, 0.0f) + theme->item_spacing;
+	float height = AeronUi_AvailableHeight(g_window.ui) - footer;
+	return height > 0.0f ? height : 1.0f;
 }
 
 void XwaOptionsWindow_FlushForExit(void) {
@@ -65,7 +94,7 @@ void XwaOptionsWindow_FlushForExit(void) {
 		if (!XwaControllerSettings_Commit(&g_window.controller, error, sizeof error))
 			Aeron_LogError("xwa.options", "%s", error);
 	}
-	if (!XwaModernInputOptions_FlushWithError(error, sizeof error))
+	if (!XwaOptionsWindow_FlushApplied(error, sizeof error))
 		Aeron_LogError("xwa.options", "%s", error);
 }
 
@@ -162,7 +191,7 @@ void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds) {
 			XwaOptionsWindow_DrawNotice(input, seconds);
 		return;
 	}
-	static const char* pages[] = { "Controller", "Keyboard", "Mouse", "Head Tracking" };
+	static const char* pages[] = { "Video", "Controller", "Keyboard", "Mouse", "Head Tracking" };
 	AeronUi_BeginFrame(g_window.ui, &(AeronUiFrameDesc) { .input = input, .dt_seconds = seconds });
 	if (AeronUi_BeginWindow(g_window.ui, "OpenXWA Options",
 							&(AeronUiWindowDesc) { .width_ref = 980, .height_ref = 1000, .centered = 1 })) {
@@ -210,7 +239,7 @@ bool XwaOptionsWindow_BeginFrame(const AeronInputSnapshot* input) {
 		char error[1024];
 		if (XwaControllerSettings_Commit(&g_window.controller, error, sizeof error) &&
 			XwaKeyboardSettings_Commit(&g_window.keyboard, error, sizeof error) &&
-			XwaModernInputOptions_FlushWithError(error, sizeof error))
+			XwaOptionsWindow_FlushApplied(error, sizeof error))
 			XwaOptionsWindow_CompleteClose();
 		else if (g_window.close_forced) {
 			Aeron_LogError("xwa.options", "%s", error);

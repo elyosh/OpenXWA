@@ -47,6 +47,9 @@ void XwaWeaponModels_FreeMission(void);
    a craft of type `sourceObjectType`. Returns 0 when the shot uses the
    weapon's own model. */
 uint16_t XwaWeaponModels_Handle(unsigned int sourceObjectType, unsigned int weaponType);
+/* Returns whether `handle` is one of the models that
+   XwaWeaponModels_LoadMission loaded. */
+int XwaWeaponModels_IsModel(uint16_t handle);
 
 #ifdef __cplusplus
 }

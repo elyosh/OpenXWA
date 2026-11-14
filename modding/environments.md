@@ -341,7 +341,8 @@ The groups of planets, nebulae, galaxies and suns are in
 ### Special cases
 
 - A Death Star region uses its own entry, like any other region. Without
-  one, it keeps the game's Death Star look. `default` doesn't apply there.
+  one, there is no sky, an even fill replaces the light of the mission's
+  backdrop, and the headlights are on. `default` doesn't apply there.
 - No environment is used during a hyperspace jump.
 - In a hangar, the game uses the environment of the region where the
   player entered the hangar, but only its sky. The hangar has its own

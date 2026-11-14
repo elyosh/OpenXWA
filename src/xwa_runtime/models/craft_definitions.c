@@ -33,6 +33,12 @@ enum {
 	   number (StringTable_GetModelDefIndexForSpeciesRecord). */
 	CRAFT_LAST_NAMED_RECORD = 217,
 	CRAFT_SHIP_LIST_LINE_MAX = 256,
+	/* Asset flag: every mission loads the model, as for the stock lasers and
+	   warheads. It is one of the two bits of
+	   OBJECT_TYPE_ASSET_TEXTURE_UNLOAD_CLASS_MASK. Without it, the model only
+	   loads when the mission and hangar code set the other bit, 0x10, for
+	   example for a flight group. */
+	CRAFT_ASSET_ALWAYS_LOADED = 0x08,
 };
 
 static const char s_objectTypesDir[] = "flight/object_types";
@@ -172,8 +178,8 @@ static const char* const s_turretKeys[] = {
 };
 
 static const char* const s_topKeys[] = {
-	"object_type", "name",     "model",        "list",        "genus",        "family",
-	"flags",       "missions", "craft_record", "sounds_like", "beam_allowed", "names",
+	"object_type", "name",          "model",        "list",        "genus",        "family", "flags",
+	"missions",    "always_loaded", "craft_record", "sounds_like", "beam_allowed", "names",
 };
 static const char* const s_recordArrayKeys[] = { "lasers",        "warheads",     "turrets",
 												 "cockpit_eye_m", "cockpit_name", "mesh_attach" };
@@ -984,6 +990,10 @@ static int CraftDefinitions_AddRow(int list, int objectType, const char* model, 
 	g_objectTypes[objectType].textureGroup = (uint16_t)list;
 	g_objectTypes[objectType].frameCount = (uint16_t)added->row;
 	g_objectTypes[objectType].recordFlags |= OBJECT_TYPE_RECORD_TEXTURE_BACKED;
+	/* Every list row is an OPT model. Some free slots, such as custom_weapon,
+	   don't have this flag in the stock table. Without it, the game loads
+	   the model but can't use it. */
+	g_objectTypes[objectType].assetFlags |= OBJECT_TYPE_ASSET_MODEL_LOADED;
 	return 1;
 }
 
@@ -1293,13 +1303,14 @@ static void CraftDefinitions_ApplyMissions(const CraftFile* file, const AeronCon
 								 flags);
 }
 
-/* Writes `genus`, `family`, `flags` and `missions`. If CraftDefinitions_SplitRecords
-   moved the object type to another craft record, copies the old record into
-   it. */
+/* Writes `genus`, `family`, `flags`, `missions` and `always_loaded`. If
+   CraftDefinitions_SplitRecords moved the object type to another craft
+   record, copies the old record into it. */
 static void CraftDefinitions_ApplyObjectType(const CraftFile* file) {
 	ObjectTypeInfo* info = &g_objectTypes[file->objectType];
 	const AeronConfigNode* node;
 	int value;
+	int flag;
 
 	node = AeronConfigNode_MapGet(file->root, "genus");
 	if (node != NULL && XwaNames_Read(&g_xwaGenusNames, file->path, "genus", node, &value)) {
@@ -1316,6 +1327,11 @@ static void CraftDefinitions_ApplyObjectType(const CraftFile* file) {
 	node = AeronConfigNode_MapGet(file->root, "missions");
 	if (node != NULL) {
 		CraftDefinitions_ApplyMissions(file, node, info);
+	}
+	node = AeronConfigNode_MapGet(file->root, "always_loaded");
+	if (node != NULL && CraftDefinitions_ReadBool(file->path, node, "always_loaded", &flag)) {
+		info->assetFlags = (uint8_t)(flag ? info->assetFlags | CRAFT_ASSET_ALWAYS_LOADED
+										  : info->assetFlags & ~CRAFT_ASSET_ALWAYS_LOADED);
 	}
 	if (file->finalRecord != info->modelDefIndex) {
 		g_modelDefs[file->finalRecord] = g_modelDefs[info->modelDefIndex];

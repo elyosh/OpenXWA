@@ -211,15 +211,84 @@ uint32_t DirectSound_GetPlayCursor(IDirectSoundBuffer* buffer) {
 
 // FUNCTION: XWA 0x5383D0
 int FrontendSound_ReleaseForFlight(void) {
-	/* TODO: Reimplement FrontendSound_ReleaseForFlight @ 0x5383D0. */
+	int i;
+
+	if (g_frontendDirectSound != NULL) {
+		FrontendSound_UnloadAllBuffers();
+		g_frontendPrimarySoundBuffer->lpVtbl->Release(g_frontendPrimarySoundBuffer);
+		if (g_frontendSoundBuffers) {
+			for (i = 0; i < 128; ++i) {
+				g_frontendSoundBuffers[i].buffer = NULL;
+				g_frontendSoundBuffers[i].name[0] = '\0';
+			}
+		}
+		if (g_frontendSoundVoices) {
+			for (i = 0; i < FRONTEND_SOUND_VOICE_COUNT; ++i) {
+				g_frontendSoundVoices[i].bufferIndex = -1;
+				g_frontendSoundVoices[i].playSerial = 0;
+				g_frontendSoundVoices[i].buffer = NULL;
+			}
+		}
+		g_frontendPrimarySoundBuffer = NULL;
+		g_frontendSoundPlaySerial = 0;
+	}
 	return 1;
 }
 
 // FUNCTION: XWA 0x538460
 int FrontendSound_RecreateAfterFlight(void* hwnd) {
-	(void)hwnd;
+	DSoundDeviceCaps deviceCaps;
+	DSBufferDesc primaryDesc;
+	DSWaveFormat primaryFormat;
+	int i;
 
-	/* TODO: Reimplement FrontendSound_RecreateAfterFlight @ 0x538460. */
+	if (g_frontendDirectSound != NULL) {
+		if (g_frontendSoundVoices == NULL)
+			return 0;
+		if (g_frontendSoundBuffers == NULL)
+			return 0;
+
+		for (i = 0; i < FRONTEND_SOUND_VOICE_COUNT; ++i) {
+			g_frontendSoundVoices[i].bufferIndex = -1;
+			g_frontendSoundVoices[i].playSerial = 0;
+			g_frontendSoundVoices[i].buffer = NULL;
+		}
+		g_frontendActiveVoiceCount = 0;
+		g_frontendSoundBufferCount = 0;
+		g_frontendSoundPlaySerial = 0;
+		for (i = 0; i < 128; ++i) {
+			g_frontendSoundBuffers[i].buffer = NULL;
+			g_frontendSoundBuffers[i].name[0] = '\0';
+		}
+
+		memset(&deviceCaps, 0, sizeof(deviceCaps));
+		deviceCaps.dwSize = sizeof(deviceCaps);
+		((IDirectSound*)g_frontendDirectSound)->lpVtbl->GetCaps(g_frontendDirectSound, &deviceCaps);
+
+		memset(&primaryDesc, 0, sizeof(primaryDesc));
+		primaryDesc.dwFlags = deviceCaps.dwMaxHw3DAllBuffers != 0 ? DSBCAPS_PRIMARYBUFFER | DSBCAPS_CTRL3D
+																  : DSBCAPS_PRIMARYBUFFER;
+		primaryDesc.dwSize = 20;
+		primaryDesc.dwBufferBytes = 0;
+		primaryDesc.lpwfxFormat = NULL;
+		if (((IDirectSound*)g_frontendDirectSound)
+					->lpVtbl->CreateSoundBuffer(g_frontendDirectSound, &primaryDesc,
+												&g_frontendPrimarySoundBuffer, NULL) != 0 ||
+			((IDirectSound*)g_frontendDirectSound)
+					->lpVtbl->SetCooperativeLevel(g_frontendDirectSound, hwnd, 2) != 0) {
+			FrontendSound_ShutdownDirectSound();
+			return 0;
+		}
+
+		memset(&primaryFormat, 0, sizeof(primaryFormat));
+		primaryFormat.wFormatTag = 1;
+		primaryFormat.nChannels = 2;
+		primaryFormat.nSamplesPerSec = 22050;
+		primaryFormat.wBitsPerSample = 16;
+		primaryFormat.nBlockAlign = 4;
+		primaryFormat.nAvgBytesPerSec = 88200;
+		g_frontendPrimarySoundBuffer->lpVtbl->SetFormat(g_frontendPrimarySoundBuffer, &primaryFormat);
+	}
 	return 1;
 }
 
@@ -738,6 +807,17 @@ int FrontendSound_ShutdownDirectSound(void) {
 	g_frontendPrimarySoundBuffer = NULL;
 	g_frontendSoundPlaySerial = 0;
 	return 1;
+}
+
+// FUNCTION: XWA 0x538780
+void FrontendSound_UnloadAllBuffers(void) {
+	int i;
+
+	/* Backward, because unloading removes the record from the sorted table and
+	   moves the records after it. */
+	for (i = 127; i >= 0; --i) {
+		FrontendSound_UnloadBufferByName(g_frontendSoundBuffers[i].name);
+	}
 }
 
 // FUNCTION: XWA 0x5387A0

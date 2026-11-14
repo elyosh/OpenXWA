@@ -133,6 +133,9 @@ void XwaRemasterFlight_GetExposureDefault(XwaFlightExposureParams* out);
  * (AeronScenePresent_ExposureFromEv100): the fixed one, or the newest the
  * meter read back. 1 before the configuration loads. */
 float XwaRemasterFlight_Exposure(void);
+/* Logs how many instances and triangles the last frame drew at each level
+ * of detail (the film benchmark). */
+void  XwaRemasterFlight_LogLodStats(void);
 /* The debug view drawn in place of the flight image
  * (AeronScenePresentDebugView): the image, false colour, or the meter's
  * weights. Debug only, not in the settings. */
@@ -171,6 +174,19 @@ typedef struct XwaFlightParticleLight {
 	int fade;
 } XwaFlightParticleLight;
 
+/* The default headlight, from point_lights.headlights. It is a Blender
+ * area light of `power_w` watts, at `position_m` from the seat's eye along
+ * the craft's axes (X right, Y up, Z forward), pointing along the nose.
+ * `color` is linear. `angle_degrees` is where the cone ends, from the nose;
+ * 0 for a one-sided light. Each key that the mod's headlights section sets
+ * replaces the value here (XwaHeadlight.mod_*). */
+typedef struct XwaFlightHeadlight {
+	float position_m[3];
+	float color[3];
+	float power_w; /* 0 turns the light off */
+	float angle_degrees;
+} XwaFlightHeadlight;
+
 /* Point-light knobs (remaster/config.yaml `point_lights:` mapping + the debug
  * inspector). The classic SOURCE laws fix each light's color and classic
  * intensity; the scene evaluates them as physical sphere lights as bright
@@ -197,6 +213,8 @@ typedef struct XwaFlightPointLightParams {
 	XwaFlightCockpitLight cockpit_lights[XWA_SNAP_COCKPIT_LIGHT_COUNT];
 	/* By XwaParticleLightGroup. Only used when model_lights is on. */
 	XwaFlightParticleLight particle_lights[XWA_PARTICLE_LIGHT_GROUP_COUNT];
+	/* Only used when model_lights is on. */
+	XwaFlightHeadlight headlight;
 } XwaFlightPointLightParams;
 
 /* The game's light candidates, the models' lights, and those of both whose
@@ -231,6 +249,44 @@ typedef struct XwaFlightTextureFilteringParams {
 	int anisotropic;
 	float max_anisotropy;
 } XwaFlightTextureFilteringParams;
+
+/* Settings for far laser bolts (`projectiles:` in remaster/config.yaml).
+ * The debug UI can change them while the game runs. */
+typedef struct XwaFlightProjectileParams {
+	/* Bolts thinner than this on screen, in render pixels, are drawn this
+	 * wide, with their light spread over the wider strip
+	 * (AeronScene_SetEmissionMinWidth). 0 is off. */
+	float min_width_px;
+	/* Bolts thinner than this on screen, in pixels of a 1080-line view,
+	 * are dimmed by (width / fade_width_px)^fade_power
+	 * (AeronScene_SetEmissionFade). 0 is off. */
+	float fade_width_px;
+	float fade_power;
+	/* How bright projectiles are drawn, and how much light the bloom gets
+	 * from them, as multiples of their converted emission
+	 * (AeronScene_SetEmissionLight). */
+	float emission_scale;
+	float bloom_scale;
+	/* Debug only, not in the config: draw projectiles at bloom_scale, so
+	 * that their bloom comes from the scene, as for any other light, and
+	 * not from the bloom draw of AeronScene_DrawEmissionBloom. */
+	int bloom_from_scene;
+} XwaFlightProjectileParams;
+
+/* Levels of detail (debug UI): model_lod.max_error, in pixels of a
+ * 1080-line view, and the tint by level (AeronScene_SetLodTint). Edits
+ * aren't saved. */
+typedef struct XwaFlightLodParams {
+	float max_error;
+	int   tint;
+} XwaFlightLodParams;
+
+void XwaRemasterFlight_GetLod(XwaFlightLodParams* out);
+void XwaRemasterFlight_SetLod(const XwaFlightLodParams* in);
+
+void XwaRemasterFlight_GetProjectiles(XwaFlightProjectileParams* out);
+void XwaRemasterFlight_SetProjectiles(const XwaFlightProjectileParams* in);
+void XwaRemasterFlight_GetProjectilesDefault(XwaFlightProjectileParams* out);
 
 void XwaRemasterFlight_GetTextureFiltering(XwaFlightTextureFilteringParams* out);
 void XwaRemasterFlight_SetTextureFiltering(const XwaFlightTextureFilteringParams* in);

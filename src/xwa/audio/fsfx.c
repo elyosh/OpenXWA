@@ -3192,6 +3192,14 @@ unsigned int fsfx_ComputeDistanceVolume(int dx, int dy, int dz, unsigned int sfx
 
 		remainingSound3DDistance = 2 * remainingSound3DDistance - distance;
 		*outPriority = baseVolume * remainingSound3DDistance / maxSound3DDistance;
+#ifdef XWA_MODERN
+		/* The stock 3D path ignores the Exterior SFX volume, so only Off
+		   has an effect. Scale the volume as the 2D path does. The
+		   priority keeps the stock value. */
+		if (g_gameConfig.sfxExteriorVolume != 10) {
+			baseVolume = (unsigned int)g_gameConfig.sfxExteriorVolume * baseVolume / 10;
+		}
+#endif
 		return baseVolume;
 	}
 

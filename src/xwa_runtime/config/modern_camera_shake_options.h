@@ -11,8 +11,8 @@ extern "C" {
  * the player's hyperspace jumps (docs/hd_hyperspace_jump.md, Camera). The
  * option is read from the `camera_shake` section of the shipped
  * remaster/config.yaml, the mod's flight/flight.yaml and the player's
- * config.yaml. The shipped file turns it on. The options screen turns it on
- * or off. */
+ * config.yaml. The shipped file turns it on. The Video tab of OpenXWA
+ * Options turns it on or off. */
 typedef struct XwaModernCameraShakeOptions {
 	int enabled;
 } XwaModernCameraShakeOptions;

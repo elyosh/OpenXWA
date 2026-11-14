@@ -26,6 +26,9 @@
 typedef struct ShipMeshAsset {
 	char key[XWA_SNAP_OPT_NAME_MAX];
 	uint8_t source; /* XwaModelSource the simulation loaded */
+	/* 1 when the mesh was converted from a game OPT as a projectile. Always
+	   0 for a GLB, whose materials come from the file. */
+	uint8_t projectile;
 	AeronSceneMesh* mesh;
 	int pending_new;
 	/* A GLB with skin variants (xwa_remaster/skins.h) and the hash of
@@ -37,6 +40,7 @@ typedef struct ShipMeshAsset {
 typedef struct ShipDesiredAsset {
 	char key[XWA_SNAP_OPT_NAME_MAX];
 	uint8_t source;
+	uint8_t projectile;
 } ShipDesiredAsset;
 
 static ShipMeshAsset s_meshes[XWA_SNAP_MAX_OPT_ASSETS];
@@ -156,7 +160,7 @@ static uint32_t ship_markings_variants(const XwaRemasterSkinModel* skin, const X
 }
 
 static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, uint8_t source,
-									  const XwaSnapshot* snapshot, XwaRemasterSkinModel** out_skin,
+									  uint8_t projectile, const XwaSnapshot* snapshot, XwaRemasterSkinModel** out_skin,
 									  uint64_t* out_markings_variants_hash) {
 	char path[512];
 	AeronFlightModel model;
@@ -232,12 +236,16 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 		return mesh;
 	}
 
-	/* The OPT's emission is classic, shown at the classic radiance. A mesh
-	 * keeps the radiance it was built with. */
+	/* The strengths are multiplied by the classic radiance when the mesh is
+	 * built, so a later change of the radiance doesn't affect existing
+	 * meshes. The original game draws projectiles at full brightness,
+	 * whatever their palette, so the whole projectile model glows. */
 	char opt_error[256];
+	const float radiance = XwaRemaster_ClassicRadiance();
 	if (!XwaRemasterOptMesh_Build(Aeron_GetVfs(), key, s_opt_smooth_angle_degrees,
-								  s_opt_emissive_strength * XwaRemaster_ClassicRadiance(), &model, opt_error,
-								  sizeof opt_error)) {
+								  s_opt_emissive_strength * radiance,
+								  projectile ? s_opt_projectile_emissive_strength * radiance : 0.0f, &model,
+								  opt_error, sizeof opt_error)) {
 		Aeron_LogWarn("xwa.remaster", "mesh: OPT load failed '%s': %s", key, opt_error);
 		ship_set_failure(cmd, "Ship model '%s': OPT load failed: %s", key, opt_error);
 		return NULL;
@@ -251,8 +259,11 @@ static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, 
 		ship_set_failure(cmd, "Ship model '%s': OPT resource creation failed (status %d)", key,
 						 (int)create_status);
 	} else {
-		Aeron_LogVerbose("xwa.remaster", "mesh: '%s' source=OPT smooth_angle=%.3g emissive_strength=%.3g",
-						 key, (double)s_opt_smooth_angle_degrees, (double)s_opt_emissive_strength);
+		Aeron_LogVerbose("xwa.remaster",
+						 "mesh: '%s' source=OPT smooth_angle=%.3g emissive_strength=%.3g projectile=%d", key,
+						 (double)s_opt_smooth_angle_degrees,
+						 (double)(projectile ? s_opt_projectile_emissive_strength : s_opt_emissive_strength),
+						 (int)projectile);
 	}
 	return mesh;
 }
@@ -316,6 +327,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 			continue;
 		}
 		const uint8_t source = snapshot->opt_assets[i].source;
+		/* The flag only matters when we convert a game OPT. */
+		const uint8_t projectile = source == XWA_MODEL_SOURCE_OPT && snapshot->opt_assets[i].projectile;
 		uint32_t found = desired_count;
 		for (uint32_t j = 0; j < desired_count; j++) {
 			if (strcmp(desired[j].key, key) == 0 && desired[j].source == source) {
@@ -324,10 +337,12 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 			}
 		}
 		if (found < desired_count) {
+			desired[found].projectile |= projectile;
 			continue;
 		}
 		snprintf(desired[desired_count].key, sizeof desired[desired_count].key, "%s", key);
 		desired[desired_count].source = source;
+		desired[desired_count].projectile = projectile;
 		desired_count++;
 	}
 
@@ -347,7 +362,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 		uint32_t found = s_pending_mesh_count;
 		for (uint32_t j = 0; j < s_pending_mesh_count; j++) {
 			if (strcmp(s_pending_meshes[j].key, desired[i].key) == 0 &&
-				s_pending_meshes[j].source == desired[i].source) {
+				s_pending_meshes[j].source == desired[i].source &&
+				s_pending_meshes[j].projectile == desired[i].projectile) {
 				found = j;
 				break;
 			}
@@ -363,7 +379,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 		}
 		ShipMeshAsset* asset = &s_pending_meshes[s_pending_mesh_count];
 		for (uint32_t j = 0; j < s_mesh_count; j++) {
-			if (strcmp(s_meshes[j].key, desired[i].key) == 0 && s_meshes[j].source == desired[i].source) {
+			if (strcmp(s_meshes[j].key, desired[i].key) == 0 && s_meshes[j].source == desired[i].source &&
+				s_meshes[j].projectile == desired[i].projectile) {
 				/* A skinned mesh whose markings variants changed is created again. */
 				if (s_meshes[j].skin) {
 					uint32_t variants[XWA_REMASTER_MAX_MARKINGS];
@@ -385,7 +402,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 		}
 		snprintf(asset->key, sizeof asset->key, "%s", desired[i].key);
 		asset->source = desired[i].source;
-		asset->mesh = ship_mesh_load(cmd, asset->key, asset->source, snapshot, &asset->skin,
+		asset->projectile = desired[i].projectile;
+		asset->mesh = ship_mesh_load(cmd, asset->key, asset->source, asset->projectile, snapshot, &asset->skin,
 									 &asset->markings_variants_hash);
 		if (!asset->mesh) {
 			memset(asset, 0, sizeof *asset);
@@ -405,7 +423,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 				uint32_t pending = s_pending_mesh_count;
 				for (uint32_t k = 0; k < s_pending_mesh_count; k++) {
 					if (strcmp(s_pending_meshes[k].key, desired[j].key) == 0 &&
-						s_pending_meshes[k].source == desired[j].source) {
+						s_pending_meshes[k].source == desired[j].source &&
+						s_pending_meshes[k].projectile == desired[j].projectile) {
 						pending = k;
 						break;
 					}
@@ -464,31 +483,17 @@ void XwaRemasterShip_CommitSyncBatch(void) {
 	s_batch_completes_generation = 0;
 }
 
-AeronSceneMesh* XwaRemasterShip_MeshForNameWithSource(const char* name, uint8_t* out_source) {
+AeronSceneMesh* XwaRemasterShip_MeshForName(const char* name) {
 	char key[XWA_SNAP_OPT_NAME_MAX];
-	if (out_source) {
-		*out_source = XWA_MODEL_SOURCE_OPT;
-	}
 	ship_mesh_key(name, key);
 	for (uint32_t slot = ship_mesh_lookup_slot(key); s_mesh_lookup[slot];
 		 slot = (slot + 1) & (SHIP_MESH_LOOKUP_SIZE - 1)) {
 		const ShipMeshAsset* asset = &s_meshes[s_mesh_lookup[slot] - 1];
 		if (strcmp(asset->key, key) == 0) {
-			if (out_source) {
-				*out_source = asset->source;
-			}
 			return asset->mesh;
 		}
 	}
 	return NULL;
-}
-
-AeronSceneMesh* XwaRemasterShip_MeshForName(const char* name) {
-	return XwaRemasterShip_MeshForNameWithSource(name, NULL);
-}
-
-float XwaRemasterShip_OptProjectileEmissiveStrength(void) {
-	return s_opt_projectile_emissive_strength * XwaRemaster_ClassicRadiance();
 }
 
 AeronEffectAtlas* XwaRemasterShip_EffectAtlas(void) {

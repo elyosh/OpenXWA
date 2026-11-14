@@ -122,6 +122,55 @@ static void xwa_tool_pbr(int* open, void* user) {
 	}
 
 	ImGui::Separator();
+	ImGui::TextUnformatted("Levels of detail");
+	XwaFlightLodParams lod;
+	XwaRemasterFlight_GetLod(&lod);
+	bool lod_changed = ImGui::SliderFloat("Largest error (px at 1080p)", &lod.max_error, 0.0f, 4.0f, "%.2f");
+	bool lod_tint    = lod.tint != 0;
+	if (ImGui::Checkbox("Tint by level", &lod_tint)) {
+		lod.tint    = lod_tint ? 1 : 0;
+		lod_changed = true;
+	}
+	ImGui::TextDisabled("Models seen small draw simpler versions of themselves. 0 draws them in full.\n"
+						"The tint shows levels 1, 2 and 3 in green, yellow and red.\n"
+						"Edits are not persisted; copy them into remaster/config.yaml.");
+	if (lod_changed) {
+		XwaRemasterFlight_SetLod(&lod);
+	}
+
+	ImGui::Separator();
+	ImGui::TextUnformatted("Far laser bolts");
+	XwaFlightProjectileParams projectiles;
+	XwaRemasterFlight_GetProjectiles(&projectiles);
+	bool projectiles_changed = false;
+	projectiles_changed |=
+		ImGui::SliderFloat("Minimum width (px)", &projectiles.min_width_px, 0.0f, 4.0f, "%.2f");
+	projectiles_changed |=
+		ImGui::SliderFloat("Fade below width (px)", &projectiles.fade_width_px, 0.0f, 16.0f, "%.1f");
+	projectiles_changed |= ImGui::SliderFloat("Fade power", &projectiles.fade_power, 0.0f, 3.0f, "%.2f");
+	projectiles_changed |= ImGui::SliderFloat("Emission scale", &projectiles.emission_scale, 0.0f, 1.0f, "%.4f",
+											  ImGuiSliderFlags_Logarithmic);
+	projectiles_changed |=
+		ImGui::SliderFloat("Bloom scale", &projectiles.bloom_scale, 0.0f, 4.0f, "%.3f", ImGuiSliderFlags_Logarithmic);
+	bool bloom_from_scene = projectiles.bloom_from_scene != 0;
+	if (ImGui::Checkbox("Bloom from the scene", &bloom_from_scene)) {
+		projectiles.bloom_from_scene = bloom_from_scene ? 1 : 0;
+		projectiles_changed          = true;
+	}
+	ImGui::TextDisabled("Bolts thinner than the minimum width are drawn that wide, as a steady line.\n"
+						"Bolts thinner than the fade width get dimmer. 0 turns either off.\n"
+						"Projectiles are drawn at the emission scale; the bloom gets the bloom scale.\n"
+						"Bloom from the scene draws them at the bloom scale, with no bloom draw of their own.\n"
+						"Edits are not persisted; copy them into remaster/config.yaml.");
+	if (ImGui::Button("Reset far laser bolts")) {
+		XwaRemasterFlight_GetProjectilesDefault(&projectiles);
+		projectiles_changed = true;
+	}
+	if (projectiles_changed) {
+		XwaRemasterFlight_SetProjectiles(&projectiles);
+	}
+
+	ImGui::Separator();
 	static const char* isolate_names[] = {
 		"None",
 		"Base diffuse",

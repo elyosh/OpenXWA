@@ -162,16 +162,10 @@ bool XwaControllerOptions_Validate(const XwaControllerOptions* options, char* er
 			return XwaControllerOptions_ValidationError(error, capacity, "invalid controller model identity");
 		if (!XwaControllerOptions_ValidateProfile(&m->profile, m->kind, error, capacity))
 			return false;
-		for (size_t j = 0; j < i; ++j) {
+		for (size_t j = 0; j < i; ++j)
 			if (!strcmp(m->guid, options->models[j].guid))
 				return XwaControllerOptions_ValidationError(error, capacity,
 															"duplicate controller model GUID");
-			for (int axis = 0; axis < XWA_INPUT_AXIS_COUNT; ++axis)
-				if (m->profile.mapping.axes[axis].source >= 0 &&
-					options->models[j].profile.mapping.axes[axis].source >= 0)
-					return XwaControllerOptions_ValidationError(error, capacity,
-																"logical axis has multiple model owners");
-		}
 	}
 	return true;
 }
@@ -268,12 +262,8 @@ bool XwaControllerOptions_InitializeGamepads(XwaControllerOptions* options,
 			continue;
 		if (!XwaControllerOptions_AddModel(options, sorted[i], input, error, capacity))
 			return false;
-		XwaControllerProfile* p = &options->models[options->count - 1].profile;
-		*p = *defaults;
-		for (size_t j = 0; j + 1 < options->count; ++j)
-			for (int axis = 0; axis < XWA_INPUT_AXIS_COUNT; ++axis)
-				if (options->models[j].profile.mapping.axes[axis].source >= 0)
-					p->mapping.axes[axis].source = -1;
+		/* Other models may bind the same axes; the mapping merges them. */
+		options->models[options->count - 1].profile = *defaults;
 	}
 	return true;
 }

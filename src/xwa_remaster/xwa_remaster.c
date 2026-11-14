@@ -89,6 +89,9 @@ static struct {
 	int render_pixel_height;
 	int observed_pixel_width;
 	int observed_pixel_height;
+	/* Set by --render-size: the render keeps its size when the window
+	   changes. */
+	int render_size_fixed;
 	uint64_t observed_size_since_us;
 	int force_scene_render;
 	int flight_render_suspended;
@@ -413,7 +416,12 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	g.last_tick = UINT64_MAX; /* Snapshot zero has not been rendered yet. */
 	g.mode = RM_VIEW_HD;
 	g.primary_mode = RM_VIEW_HD;
-	if (!Aeron_GetPresentationPixelSize(&g.render_pixel_width, &g.render_pixel_height)) {
+	if (options->render_width > 0 && options->render_height > 0) {
+		g.render_size_fixed = 1;
+		g.render_pixel_width = options->render_width;
+		g.render_pixel_height = options->render_height;
+		Aeron_LogInfo("xwa.remaster", "render size fixed at %dx%d", g.render_pixel_width, g.render_pixel_height);
+	} else if (!Aeron_GetPresentationPixelSize(&g.render_pixel_width, &g.render_pixel_height)) {
 		g.render_pixel_width = XWA_PRESENTATION_WIDTH;
 		g.render_pixel_height = XWA_PRESENTATION_HEIGHT;
 	}
@@ -512,7 +520,7 @@ static void XwaRemaster_FatalGpu(const char* operation) { Aeron_RequestFatalRend
 static void XwaRemaster_UpdateRenderSize(void) {
 	int width;
 	int height;
-	if (!Aeron_GetPresentationPixelSize(&width, &height)) {
+	if (g.render_size_fixed || !Aeron_GetPresentationPixelSize(&width, &height)) {
 		return;
 	}
 	const uint64_t now_us = Aeron_NowUs();
@@ -1074,6 +1082,7 @@ int XwaRemaster_BenchmarkFlightFrames(void) {
 		Aeron_LogError("xwa.benchmark", "film benchmark: the warm-up renders failed");
 		return 0;
 	}
+	XwaRemasterFlight_LogLodStats();
 	double frame_ms[RM_BENCHMARK_SAMPLES];
 	double cpu_ms[RM_BENCHMARK_SAMPLES];
 	for (int i = 0; i < RM_BENCHMARK_SAMPLES; ++i) {
@@ -1152,8 +1161,8 @@ int XwaRemaster_CaptureFlightFrame(const char* name) {
 	const size_t pixels = (size_t)width * (size_t)height;
 	char png_path[1100];
 	char hdr_path[1100];
-	snprintf(png_path, sizeof png_path, "%s.png", name);
-	snprintf(hdr_path, sizeof hdr_path, "%s.hdr", name);
+	snprintf(png_path, sizeof png_path, "capture/%s.png", name);
+	snprintf(hdr_path, sizeof hdr_path, "capture/%s.hdr", name);
 	uint16_t* half = malloc(pixels * 8u);
 	float* rgb = malloc(pixels * 3u * sizeof *rgb);
 	uint8_t* bytes = malloc(pixels * 3u);
@@ -1161,6 +1170,8 @@ int XwaRemaster_CaptureFlightFrame(const char* name) {
 
 	if (!half || !rgb || !bytes) {
 		failure = "out of memory";
+	} else if (!AeronVfs_CreateDirectory(Aeron_GetVfs(), AERON_VFS_ROOT_USER, "capture")) {
+		failure = "the capture folder couldn't be created in the user folder";
 	}
 	/* The final image, as the composed presentation shows it. */
 	if (!failure) {

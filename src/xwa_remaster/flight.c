@@ -261,7 +261,17 @@ static struct {
 	/* small_objects in remaster/config.yaml, in pixels of a 1080-line view. */
 	float small_prepass_min_size;
 	float small_draw_min_size;
+	float small_shadow_min_size;
+	/* model_lod.max_error, in pixels of a 1080-line view, and the debug
+	 * UI's tint by level. */
+	float lod_max_error;
+	int   lod_tint;
+	/* The projectiles settings, and their values in remaster/config.yaml,
+	 * which the debug UI's reset restores. */
+	XwaFlightProjectileParams projectiles;
+	XwaFlightProjectileParams projectiles_default;
 	float map_ambient_min[3]; /* lighting.map_ambient_min_* */
+	float death_star_ambient[3]; /* lighting.death_star_ambient_* */
 	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
 	 * window narrower than this aspect gets a wider view, so that the
 	 * horizontal field of view stays the one at this aspect. 0 turns it
@@ -766,6 +776,9 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"lighting.map_ambient_min_r",
 		"lighting.map_ambient_min_g",
 		"lighting.map_ambient_min_b",
+		"lighting.death_star_ambient_r",
+		"lighting.death_star_ambient_g",
+		"lighting.death_star_ambient_b",
 		"lighting.emissive_scale",
 		"bloom.intensity",
 		"effects.explosion_genus_emissive_strength",
@@ -777,6 +790,11 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"motion_blur.shutter",
 		"small_objects.prepass_min_size",
 		"small_objects.draw_min_size",
+		"projectiles.min_width_px",
+		"projectiles.fade_width_px",
+		"projectiles.fade_power",
+		"projectiles.emission_scale",
+		"projectiles.bloom_scale",
 		"temporal_upscaling.sharpness",
 		"texture_filtering.max_anisotropy",
 	};
@@ -960,6 +978,81 @@ static int fl_load_cockpit_lights_config(const AeronConfigFile* cf, const char* 
 		if (!(found & (1u << (uint32_t)slot))) {
 			Aeron_LogError("xwa.remaster", "%s: point_lights.cockpit_lights.%s is missing", path,
 						   XwaCockpitLights_Name(slot));
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/* Reads the default headlight from point_lights.headlights, which needs
+   power_w. Logs an error and returns 0 when the section is wrong. */
+static int fl_load_headlight_config(const AeronConfigFile* cf, const char* path) {
+	static const char* const keys[] = { "position_m", "color", "power_w", "angle_degrees" };
+	static const char* const vector_keys[2] = { "position_m", "color" };
+	const AeronConfigNode* section = AeronConfigFile_GetNode(cf, "point_lights.headlights");
+	XwaFlightHeadlight* light = &s.plight.headlight;
+	float* const vectors[2] = { light->position_m, light->color };
+	memset(light, 0, sizeof *light);
+	light->position_m[2] = 20.0f;
+	light->color[0] = light->color[1] = light->color[2] = 1.0f;
+	if (AeronConfigNode_Type(section) != AERON_CONFIG_MAP) {
+		Aeron_LogError("xwa.remaster", "%s: point_lights.headlights must be a map", path);
+		return 0;
+	}
+	for (size_t k = 0; k < AeronConfigNode_MapCount(section); k++) {
+		const char* key = AeronConfigNode_MapKeyAt(section, k);
+		size_t i = 0;
+		while (key && i < sizeof keys / sizeof keys[0] && strcmp(key, keys[i]) != 0) {
+			i++;
+		}
+		if (!key || i == sizeof keys / sizeof keys[0]) {
+			Aeron_LogError("xwa.remaster", "%s:%d: point_lights.headlights: unknown key %s", path,
+						   AeronConfigNode_Line(AeronConfigNode_MapValueAt(section, k)), key ? key : "");
+			return 0;
+		}
+	}
+	for (int v = 0; v < 2; v++) {
+		const AeronConfigNode* node = AeronConfigNode_MapGet(section, vector_keys[v]);
+		if (!node) {
+			continue;
+		}
+		int ok =
+			AeronConfigNode_Type(node) == AERON_CONFIG_SEQUENCE && AeronConfigNode_SequenceCount(node) == 3;
+		float values[3];
+		for (size_t i = 0; ok && i < 3; i++) {
+			const AeronConfigNode* item = AeronConfigNode_SequenceGet(node, i);
+			const AeronConfigNodeType type = AeronConfigNode_Type(item);
+			values[i] = (float)AeronConfigNode_Float(item, 0.0);
+			ok = (type == AERON_CONFIG_INT || type == AERON_CONFIG_FLOAT) && isfinite(values[i]) &&
+				 (v == 0 || values[i] >= 0.0f);
+		}
+		if (!ok) {
+			Aeron_LogError("xwa.remaster",
+						   "%s:%d: point_lights.headlights.%s must be a list of three %snumbers", path,
+						   AeronConfigNode_Line(node), vector_keys[v], v == 0 ? "" : "non-negative ");
+			return 0;
+		}
+		memcpy(vectors[v], values, sizeof values);
+	}
+	const AeronConfigNode* power = AeronConfigNode_MapGet(section, "power_w");
+	const AeronConfigNodeType power_type = AeronConfigNode_Type(power);
+	light->power_w = (float)AeronConfigNode_Float(power, -1.0);
+	if ((power_type != AERON_CONFIG_INT && power_type != AERON_CONFIG_FLOAT) || !isfinite(light->power_w) ||
+		light->power_w < 0.0f) {
+		Aeron_LogError("xwa.remaster",
+					   "%s:%d: point_lights.headlights.power_w must be a number of watts, 0 or more", path,
+					   AeronConfigNode_Line(power ? power : section));
+		return 0;
+	}
+	const AeronConfigNode* angle = AeronConfigNode_MapGet(section, "angle_degrees");
+	if (angle) {
+		const AeronConfigNodeType angle_type = AeronConfigNode_Type(angle);
+		light->angle_degrees = (float)AeronConfigNode_Float(angle, -1.0);
+		if ((angle_type != AERON_CONFIG_INT && angle_type != AERON_CONFIG_FLOAT) ||
+			!fl_in_range(light->angle_degrees, 0.0f, 90.0f)) {
+			Aeron_LogError("xwa.remaster",
+						   "%s:%d: point_lights.headlights.angle_degrees must be from 0 to 90", path,
+						   AeronConfigNode_Line(angle));
 			return 0;
 		}
 	}
@@ -1593,7 +1686,8 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
-	if (!fl_load_cockpit_lights_config(cf, path) || !fl_load_particle_lights_config(cf, path)) {
+	if (!fl_load_cockpit_lights_config(cf, path) || !fl_load_particle_lights_config(cf, path) ||
+		!fl_load_headlight_config(cf, path)) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -1677,6 +1771,18 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		s.map_ambient_min[c] = (float)AeronConfigFile_GetFloat(cf, map_ambient_keys[c], 0.0);
 		if (!isfinite(s.map_ambient_min[c]) || s.map_ambient_min[c] < 0.0f) {
 			Aeron_LogError("xwa.remaster", "%s: %s must be a number, 0 or more", path, map_ambient_keys[c]);
+			AeronConfigFile_Destroy(cf);
+			return 0;
+		}
+	}
+	static const char* const death_star_ambient_keys[3] = { "lighting.death_star_ambient_r",
+															"lighting.death_star_ambient_g",
+															"lighting.death_star_ambient_b" };
+	for (int c = 0; c < 3; c++) {
+		s.death_star_ambient[c] = (float)AeronConfigFile_GetFloat(cf, death_star_ambient_keys[c], 0.0);
+		if (!fl_in_range(s.death_star_ambient[c], 0.0f, 1000.0f)) {
+			Aeron_LogError("xwa.remaster", "%s: %s must be a number from 0 to 1000", path,
+						   death_star_ambient_keys[c]);
 			AeronConfigFile_Destroy(cf);
 			return 0;
 		}
@@ -1769,11 +1875,35 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+	s.projectiles.min_width_px = (float)AeronConfigFile_GetFloat(cf, "projectiles.min_width_px", 0.0);
+	s.projectiles.fade_width_px = (float)AeronConfigFile_GetFloat(cf, "projectiles.fade_width_px", 0.0);
+	s.projectiles.fade_power = (float)AeronConfigFile_GetFloat(cf, "projectiles.fade_power", 0.0);
+	s.projectiles.emission_scale = (float)AeronConfigFile_GetFloat(cf, "projectiles.emission_scale", 1.0);
+	s.projectiles.bloom_scale = (float)AeronConfigFile_GetFloat(cf, "projectiles.bloom_scale", 1.0);
+	if (!isfinite(s.projectiles.min_width_px) || s.projectiles.min_width_px < 0.0f ||
+		!isfinite(s.projectiles.fade_width_px) || s.projectiles.fade_width_px < 0.0f ||
+		!isfinite(s.projectiles.fade_power) || s.projectiles.fade_power < 0.0f ||
+		!isfinite(s.projectiles.emission_scale) || s.projectiles.emission_scale < 0.0f ||
+		!isfinite(s.projectiles.bloom_scale) || s.projectiles.bloom_scale < 0.0f) {
+		Aeron_LogError("xwa.remaster", "%s: the projectiles settings must be numbers, 0 or more", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	s.projectiles.bloom_from_scene = 0;
+	s.projectiles_default = s.projectiles;
 	s.small_prepass_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.prepass_min_size", 0.0);
 	s.small_draw_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.draw_min_size", 0.0);
+	s.small_shadow_min_size = (float)AeronConfigFile_GetFloat(cf, "small_objects.shadow_min_size", 0.0);
 	if (!isfinite(s.small_prepass_min_size) || s.small_prepass_min_size < 0.0f ||
-		!isfinite(s.small_draw_min_size) || s.small_draw_min_size < 0.0f) {
+		!isfinite(s.small_draw_min_size) || s.small_draw_min_size < 0.0f ||
+		!isfinite(s.small_shadow_min_size) || s.small_shadow_min_size < 0.0f) {
 		Aeron_LogError("xwa.remaster", "%s: small_objects sizes must be numbers, 0 or more", path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	s.lod_max_error = (float)AeronConfigFile_GetFloat(cf, "model_lod.max_error", 0.0);
+	if (!isfinite(s.lod_max_error) || s.lod_max_error < 0.0f) {
+		Aeron_LogError("xwa.remaster", "%s: model_lod.max_error must be a number, 0 or more", path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
@@ -2070,6 +2200,37 @@ void XwaRemasterFlight_GetExposureDefault(XwaFlightExposureParams* out) {
 	}
 }
 
+void XwaRemasterFlight_GetLod(XwaFlightLodParams* out) {
+	if (out) {
+		out->max_error = s.lod_max_error;
+		out->tint      = s.lod_tint;
+	}
+}
+
+void XwaRemasterFlight_SetLod(const XwaFlightLodParams* in) {
+	if (in) {
+		s.lod_max_error = isfinite(in->max_error) && in->max_error > 0.0f ? in->max_error : 0.0f;
+		s.lod_tint      = in->tint != 0;
+	}
+}
+
+void XwaRemasterFlight_LogLodStats(void) {
+	if (!s.scene) {
+		return;
+	}
+	AeronSceneLodStats stats;
+	AeronScene_GetLodStats(s.scene, &stats);
+	unsigned long long k_triangles[4];
+	for (int level = 0; level < 4; level++) {
+		k_triangles[level] = (unsigned long long)(stats.triangles[level] / 1000);
+	}
+	Aeron_LogInfo("xwa.benchmark",
+				  "film benchmark: levels of detail 0/1/2/3 (max error %.2f px at 1080 lines): "
+				  "%u %u %u %u instances, %llu %llu %llu %llu k triangles",
+				  (double)s.lod_max_error, stats.instances[0], stats.instances[1], stats.instances[2],
+				  stats.instances[3], k_triangles[0], k_triangles[1], k_triangles[2], k_triangles[3]);
+}
+
 float XwaRemasterFlight_Exposure(void) {
 	if (!fl_cfg_ensure()) {
 		return 1.0f;
@@ -2139,6 +2300,9 @@ void XwaRemasterFlight_SetPointLights(const XwaFlightPointLightParams* in) {
 			const float power = in->particle_lights[g].power_w;
 			s.plight.particle_lights[g].power_w = isfinite(power) ? fminf(fmaxf(power, 0.0f), 1.0e7f) : 0.0f;
 		}
+		const float headlight_power = in->headlight.power_w;
+		s.plight.headlight.power_w =
+			isfinite(headlight_power) ? fminf(fmaxf(headlight_power, 0.0f), 1.0e8f) : 0.0f;
 	}
 }
 
@@ -2197,6 +2361,31 @@ static int fl_apply_texture_filtering(const XwaFlightTextureFilteringParams* in)
 	s.mesh_sampler_configured = 1;
 	s.texture_filtering = *in;
 	return 1;
+}
+
+void XwaRemasterFlight_GetProjectiles(XwaFlightProjectileParams* out) {
+	if (out && fl_cfg_ensure()) {
+		*out = s.projectiles;
+	}
+}
+
+void XwaRemasterFlight_SetProjectiles(const XwaFlightProjectileParams* in) {
+	if (!in || !fl_cfg_ensure())
+		return;
+	XwaFlightProjectileParams p = *in;
+	p.min_width_px = isfinite(p.min_width_px) && p.min_width_px > 0.0f ? p.min_width_px : 0.0f;
+	p.fade_width_px = isfinite(p.fade_width_px) && p.fade_width_px > 0.0f ? p.fade_width_px : 0.0f;
+	p.fade_power = isfinite(p.fade_power) && p.fade_power > 0.0f ? p.fade_power : 0.0f;
+	p.emission_scale = isfinite(p.emission_scale) && p.emission_scale > 0.0f ? p.emission_scale : 0.0f;
+	p.bloom_scale = isfinite(p.bloom_scale) && p.bloom_scale > 0.0f ? p.bloom_scale : 0.0f;
+	p.bloom_from_scene = p.bloom_from_scene != 0;
+	s.projectiles = p;
+}
+
+void XwaRemasterFlight_GetProjectilesDefault(XwaFlightProjectileParams* out) {
+	if (out && fl_cfg_ensure()) {
+		*out = s.projectiles_default;
+	}
 }
 
 void XwaRemasterFlight_GetTextureFiltering(XwaFlightTextureFilteringParams* out) {
@@ -3071,28 +3260,23 @@ typedef struct FlMeshMemo {
 	AeronSceneMesh* mesh;
 	uint64_t generation;
 	uint32_t frame;
-	uint8_t source;
 } FlMeshMemo;
 
 static FlMeshMemo s_mesh_memo[FL_MESH_MEMO_SIZE];
 static uint32_t s_mesh_memo_frame;
 
-/* Looks up a mesh like XwaRemasterShip_MeshForNameWithSource, through the
- * frame's memo. */
-static AeronSceneMesh* fl_mesh_for_name(const char* name, uint8_t* out_source) {
+/* Same as XwaRemasterShip_MeshForName, but cached for the frame. */
+static AeronSceneMesh* fl_mesh_for_name(const char* name) {
 	if (!name) {
-		return XwaRemasterShip_MeshForNameWithSource(name, out_source);
+		return XwaRemasterShip_MeshForName(name);
 	}
 	const uint64_t generation = XwaRemasterShip_MeshGeneration();
 	FlMeshMemo* memo = &s_mesh_memo[((uintptr_t)name >> 3) & (FL_MESH_MEMO_SIZE - 1u)];
 	if (memo->name != name || memo->frame != s_mesh_memo_frame || memo->generation != generation) {
 		memo->name = name;
-		memo->mesh = XwaRemasterShip_MeshForNameWithSource(name, &memo->source);
+		memo->mesh = XwaRemasterShip_MeshForName(name);
 		memo->generation = generation;
 		memo->frame = s_mesh_memo_frame;
-	}
-	if (out_source) {
-		*out_source = memo->source;
 	}
 	return memo->mesh;
 }
@@ -4372,7 +4556,7 @@ static XwaShipPointLight* fl_pl_push(const float pos[3], const float color_x_int
  * when the model is unavailable. */
 static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* f,
 								const int32_t camera_world[3], float center[3], float half_axis[3]) {
-	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f), NULL);
+	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f));
 	if (!mesh) {
 		return 0;
 	}
@@ -4411,7 +4595,7 @@ static int fl_projectile_streak(const XwaSnapshot* snap, const XwaFlightObject* 
 /* Whether a bolt's model has lights of its own, which replace the stock
  * bolt light. */
 static int fl_projectile_has_model_lights(const XwaFlightObject* f) {
-	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f), NULL);
+	const AeronSceneMesh* mesh = fl_mesh_for_name(fl_object_model_name(f));
 	return mesh && mesh->light_count > 0;
 }
 
@@ -4717,31 +4901,39 @@ static void fl_add_cockpit_lights(const XwaSnapshot* snap, const float player_bw
 	}
 }
 
-/* The player craft's headlight (XwaHeadlight), converted as a light that a
- * GLB model authors in Blender: a one-sided light of P watts gives
- * P * 683 / pi candela straight ahead, which the scene takes at 683 lm/W
- * (AERON_SCENE_LUMENS_PER_WATT). With an angle, it is a spot light
- * with the same intensity straight ahead, which fades from the nose out to
- * the angle. It starts at the seat's eye in every view, as the cockpit
- * lights do, and points along the nose. The pool always keeps it. The hyperspace
- * tunnel doesn't add it. */
+/* Adds the player craft's headlight (XwaHeadlight). It works like a light
+ * of a GLB model made in Blender: a one-sided light of P watts gives
+ * P * 683 / pi candela straight ahead, and the scene takes 683 lm/W
+ * (AERON_SCENE_LUMENS_PER_WATT). With an angle, it is a spot light with the
+ * same intensity straight ahead, which fades out towards the angle. Each
+ * value that the mod sets (XwaHeadlight.mod_*) replaces the default from
+ * point_lights.headlights. The light starts at the seat's eye in every
+ * view, as the cockpit lights do, and points along the nose. The light pool
+ * never drops it. The hyperspace tunnel doesn't add it. */
 static void fl_add_headlight(const XwaSnapshot* snap, const float player_bw[9], const float player_pos[3]) {
 	const XwaHeadlight* h = &snap->headlight;
+	const XwaFlightHeadlight* d = &s.plight.headlight;
 	if (!s.plight.enabled || !s.plight.model_lights || !h->on || !player_bw) {
+		return;
+	}
+	const float power_w = h->mod_has_power ? h->mod_power_w : d->power_w;
+	const float* position_m = h->mod_has_position ? h->mod_position_m : d->position_m;
+	const float angle_degrees = h->mod_has_angle ? h->mod_angle_degrees : d->angle_degrees;
+	if (!(power_w > 0.0f)) {
 		return;
 	}
 	float transform[16];
 	fl_seat_eye_transform(snap, player_bw, player_pos, transform);
 	AeronFlightLight light;
 	memset(&light, 0, sizeof light);
-	light.position.x = h->position_m[0];
-	light.position.y = h->position_m[1];
-	light.position.z = h->position_m[2];
-	memcpy(light.color, h->color, sizeof light.color);
-	light.intensity = h->power_w * 683.0f / 3.14159265f;
+	light.position.x = position_m[0];
+	light.position.y = position_m[1];
+	light.position.z = position_m[2];
+	memcpy(light.color, h->mod_has_color ? h->mod_color : d->color, sizeof light.color);
+	light.intensity = power_w * 683.0f / 3.14159265f;
 	light.shape = AERON_FLIGHT_LIGHT_POINT;
 	light.direction.z = 1.0f;
-	light.spot_outer_angle = h->angle_degrees * (3.14159265f / 180.0f);
+	light.spot_outer_angle = angle_degrees * (3.14159265f / 180.0f);
 	AeronSceneLight scene_light;
 	if (AeronScene_FlightLight(&light, transform, AERON_OPT_UNITS_PER_METER,
 							   1.0f / AERON_SCENE_LUMENS_PER_WATT, XwaRemasterFlight_Exposure(),
@@ -5031,7 +5223,6 @@ typedef struct FlPreparedMesh {
 	AeronSceneMesh* mesh;
 	AeronSceneMeshTable* table;
 	const AeronSceneMaterialAnim* anim;
-	uint8_t source; /* XwaModelSource */
 } FlPreparedMesh;
 
 /* The hull-damage stage for a hull damage and maximum: 1 at or below 75 %
@@ -5377,7 +5568,7 @@ static int fl_prepare_object_mesh(const XwaFlightObject* object, const char* mod
 	}
 
 	const char* model_name = model_name_override ? model_name_override : fl_object_model_name(object);
-	out->mesh = fl_mesh_for_name(model_name, &out->source);
+	out->mesh = fl_mesh_for_name(model_name);
 	if (!out->mesh) {
 		return 0;
 	}
@@ -5433,8 +5624,7 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 	if (is_bolt) {
 		instance.shadow_flags = AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_NO_RECEIVE_SHADOW;
 		instance.velocity_stamp = 1;
-		if (prepared.source == XWA_MODEL_SOURCE_OPT)
-			instance.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
+		instance.emission_only = 1;
 	}
 	AeronScene_AddMeshInstance(s.scene, &instance);
 	if (!is_bolt && f->object_type != XWA_SNAP_TYPE_DEBRIS_CHUNK) {
@@ -5782,10 +5972,20 @@ void XwaRemasterFlight_InvalidateHistory(void) {
 	fl_request_fsr_reset(FL_FSR_RESET_RENDER_RESUMED);
 }
 
+/* Adds the extra bloom light of the scene's projectiles
+ * (AeronScene_DrawEmissionBloom). */
+static int fl_bloom_extra(AeronRenderPass* pass, int target_w, int target_h, void* userdata) {
+	(void)userdata;
+	return AeronScene_DrawEmissionBloom(s.scene, pass, target_w, target_h);
+}
+
 /* Both ordinary flight and the dedicated hyperspace scene arrive here with
  * AeronScene_Render complete. Bloom remains in the scene command buffer; the
  * final draws are either deferred to Aeron_Present or recorded into present_rt. */
 static AeronTexture* fl_present(AeronCommandBuffer* cmd, int direct_present) {
+	/* Add the projectiles' bloom only when the scene's own image is shown,
+	 * not when another image, such as the hyperspace warp, replaces it. */
+	const int own_scene = s.present_scene_override == NULL;
 	s.present_scene_tex = s.present_scene_override ? s.present_scene_override
 												   : Aeron_RenderTargetGetTexture(AeronScene_SceneRt(s.scene));
 	s.present_scene_override = NULL;
@@ -5795,7 +5995,8 @@ static AeronTexture* fl_present(AeronCommandBuffer* cmd, int direct_present) {
 		return NULL;
 	}
 	if (!s.map_present && s.bloom && AeronSceneBloom_Intensity() > 0.0f) {
-		if (!AeronSceneBloom_Apply(s.bloom, cmd, s.present_scene_tex, s.rt_w, s.rt_h, s.rt_h)) {
+		if (!AeronSceneBloom_Apply(s.bloom, cmd, s.present_scene_tex, s.rt_w, s.rt_h, s.rt_h,
+								   own_scene ? fl_bloom_extra : NULL, NULL)) {
 			Aeron_CommandBufferSetFailure(cmd, "Flight bloom recording failed");
 			return NULL;
 		}
@@ -6762,6 +6963,17 @@ static void fl_build_scene_lighting(const XwaSnapshot* snap, XwaRemasterAssets* 
 		fl_build_hangar_lighting(snap, out);
 		return;
 	}
+	/* The Death Star mission lights its interior with the light of a
+	 * backdrop that the game doesn't draw there. As a sun, it would reach
+	 * every surface from one direction, through the walls, since there are
+	 * no shadows in the tunnel. Without an environment, the interior gets an
+	 * ambient fill in place of that light. The tunnel's lights and the
+	 * headlights light the rest. */
+	if (cam->death_star_mode && s.environment.mode != XWA_ENV_MODE_AUTHORED) {
+		out->light_count = 0;
+		fl_set_ambient_fill(out, s.death_star_ambient);
+		return;
+	}
 	if (s.environment.mode == XWA_ENV_MODE_AUTHORED && s.environment.prepared) {
 		fl_apply_authored_lighting(snap, assets, s.environment.prepared, out);
 	}
@@ -7345,9 +7557,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	fl_build_scene_lighting(snap, assets, cam, &scene_lighting);
 	fl_note_hyperspace_sky(sky_environment, keep_backdrops, &scene_lighting);
 	float shadow_light_dir[3];
-	/* Preserve the classic directional fill inside the sealed Death Star,
-	 * but do not let its backdrop light cast exterior shadows in the tunnel.
-	 * Lights from a region environment follow its shadow policy. */
+	/* Inside the Death Star, only the lights of a region environment can
+	 * cast shadows, when the environment allows it. Without an environment,
+	 * there are no directional lights there (fl_build_scene_lighting). */
 	const int shadows_active = (!cam->death_star_mode || scene_lighting.environment_lights) &&
 							   s.shadows.enabled && scene_lighting.shadow_allowed &&
 							   fl_key_directional_light(scene_lighting.lights, scene_lighting.light_count,
@@ -7548,10 +7760,13 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		 * with d = camera - object, applied about the same axis the
 		 * Euler roll composes on (cur[2]; rotations about one axis
 		 * commute, so the post-rotation equals the classic full
-		 * recompose with the adjusted roll). NO minimum-size clamp:
-		 * the classic draws the model as-is (sub-pixel bolts flicker
-		 * in the original too, and at 4.5x the classic resolution
-		 * anything classic-visible covers >= 4.5 px here). */
+		 * recompose with the adjusted roll). The classic draws the model
+		 * as it is. The remaster differs on purpose for far bolts (the
+		 * projectiles settings): it widens the ones thinner than a pixel
+		 * into a steady line, because they break up and flicker
+		 * otherwise, and it fades thin ones. With HDR emission and bloom,
+		 * every bolt is many times brighter than white, and hundreds of
+		 * far ones flood the scene. */
 		const int is_bolt = fl_object_is_projectile(f);
 		float bw[9];
 		float object_local[3];
@@ -7629,13 +7844,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		if (is_bolt) {
 			inst.shadow_flags |= AERON_SCENE_INSTANCE_NO_CAST_SHADOW | AERON_SCENE_INSTANCE_NO_RECEIVE_SHADOW;
 		}
-		if (is_bolt && prepared.source == XWA_MODEL_SOURCE_OPT) {
-			/* The original renderer makes both projectile genera fully
-			 * bright independently of the OPT palette. Runtime conversion
-			 * has no such semantic, so render its base texture as HDR
-			 * emission; authored GLBs retain their material-only path. */
-			inst.base_color_emissive_strength = XwaRemasterShip_OptProjectileEmissiveStrength();
-		}
 		inst.cull_mode = AERON_CULL_BACK;
 		const XwaFlightObject* previous_f = fl_instance_motion(&inst, f, i, is_bolt);
 		if (fl_is_death_star_beam(snap, f) && s.mb_enabled) {
@@ -7674,6 +7882,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * STAMP sweep instead. */
 			inst.cull_mode = AERON_CULL_NONE;
 			inst.velocity_stamp = 1;
+			/* The original game draws projectiles at full brightness, whatever
+			 * their materials. */
+			inst.emission_only = 1;
 			fl_push_bolt(&inst);
 			/* A bolt model with lights is lit by its first light that
 			 * shines, for the colour it shows, instead of the stock light
@@ -7869,8 +8080,22 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const float px_per_1080 = (float)s.rt_h / 1080.0f;
 	AeronScene_SetSmallInstanceCull(s.scene, s.small_prepass_min_size * px_per_1080,
 									s.small_draw_min_size * px_per_1080);
+	AeronScene_SetShadowCasterMinSize(s.scene, s.small_shadow_min_size * px_per_1080);
+	AeronScene_SetLodMaxError(s.scene, s.lod_max_error * px_per_1080);
+	AeronScene_SetLodTint(s.scene, s.lod_tint);
+	AeronScene_SetEmissionMinWidth(s.scene, s.projectiles.min_width_px);
+	AeronScene_SetEmissionFade(s.scene, s.projectiles.fade_width_px * px_per_1080, s.projectiles.fade_power);
+	AeronScene_SetEmissionLight(s.scene,
+								s.projectiles.bloom_from_scene ? s.projectiles.bloom_scale : s.projectiles.emission_scale,
+								s.projectiles.bloom_scale);
 	const int rendered = AeronScene_Render(s.scene, cmd);
 	AeronScene_SetSmallInstanceCull(s.scene, 0.0f, 0.0f);
+	AeronScene_SetShadowCasterMinSize(s.scene, 0.0f);
+	AeronScene_SetLodMaxError(s.scene, 0.0f);
+	AeronScene_SetLodTint(s.scene, 0);
+	AeronScene_SetEmissionMinWidth(s.scene, 0.0f);
+	AeronScene_SetEmissionFade(s.scene, 0.0f, 0.0f);
+	AeronScene_SetEmissionLight(s.scene, 1.0f, 1.0f);
 	AeronScene_SetPassHook(s.scene, AERON_SCENE_HOOK_BEFORE_OPAQUE, NULL, NULL);
 	s.before_opaque_mode = FL_BEFORE_OPAQUE_NONE;
 	s.snap = NULL; /* hooks must not outlive the snapshot */
