@@ -57,6 +57,7 @@ int FrontendSound_LoadSoundFile(AeronVfsRoot root, char* fileName, char* soundNa
 int FrontendSound_LoadSound(char* fileName, char* soundName);
 int FrontendSound_LoadSoundFile(char* fileName, char* soundName, int create3DFlags);
 #endif
+void FrontendSound_UnloadAllBuffers(void);
 int FrontendSound_UnloadBufferByName(char* soundName);
 int FrontendSound_GetPlayingCount(char* name);
 int FrontendSound_PlayUISound(char* soundName, int allowRestartExisting, int loop, int priority,
