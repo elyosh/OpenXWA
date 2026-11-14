@@ -1,0 +1,34 @@
+name: Discord
+
+# Posts new commits on main to Discord. The repository webhook doesn't send
+# push events, because it can't skip tags: the development build moves the
+# "development" tag after every change, and Discord would show that as a
+# second copy of the same commits.
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  notify:
+    name: Post commits to Discord
+    runs-on: ubuntu-latest
+    steps:
+      # Sends the push event to Discord's GitHub-compatible endpoint, so the
+      # message looks the same as one from a webhook. DISCORD_WEBHOOK_URL ends
+      # in /github. Forks don't have the secret, so they skip this step.
+      - name: Send push event
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DISCORD_WEBHOOK_URL}" ]]; then
+            echo "DISCORD_WEBHOOK_URL isn't set, so nothing is posted."
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error --retry 3 \
+              -H "Content-Type: application/json" \
+              -H "X-GitHub-Event: push" \
+              --data-binary "@${GITHUB_EVENT_PATH}" \
+              "${DISCORD_WEBHOOK_URL}"
