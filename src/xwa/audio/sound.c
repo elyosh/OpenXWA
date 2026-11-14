@@ -3,6 +3,7 @@
 #include "aeron/log.h"
 #include "xwa/assets/file_io.h"
 #include "xwa_runtime/audio/mission_sounds.h"
+#include "xwa_runtime/audio/sound_slots.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 #include "xwa/audio/fsfx.h"
@@ -1020,14 +1021,32 @@ uint8_t Sound_PlayEffectNow(int soundId, int param2, int loop, int priority, int
 		if (slot == g_maxActiveSounds) {
 			int lowestPriority = priority;
 			int i;
+#ifdef XWA_MODERN
+			int inaudible;
+#endif
 			for (i = 0; i < g_maxActiveSounds; ++i) {
 				if (lowestPriority > g_activeSoundInstances[i].priority) {
 					slot = i;
 					lowestPriority = g_activeSoundInstances[i].priority;
 				}
 			}
+#ifdef XWA_MODERN
+			/* A sound that is silent past its max distance goes first, whatever
+			   its priority (XwaSoundSlots_FindInaudible). */
+			inaudible = XwaSoundSlots_FindInaudible();
+			if (inaudible >= 0) {
+				slot = inaudible;
+			}
+#endif
 			if (slot != g_maxActiveSounds) {
+#ifdef XWA_MODERN
+				/* A restart keeps the buffer's far position. The 3D update
+				   doesn't move a sound with a world position, so it would stay
+				   silent there. Replace it instead. */
+				if (g_activeSoundInstances[slot].soundId == soundId && slot != inaudible) {
+#else
 				if (g_activeSoundInstances[slot].soundId == soundId) {
+#endif
 					DebugPrintfChannel(128, "Restarting sound %d (%s) (priority).\n",
 									   g_activeSoundInstances[slot].soundId,
 									   g_soundDefs[g_activeSoundInstances[slot].soundId].name);

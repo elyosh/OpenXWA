@@ -44,8 +44,8 @@ typedef struct IDirectSound3DBufferVtbl {
 	void* GetConeOutsideVolume; /* 6 */
 	int (XWA_STDCALL* GetMaxDistance)(IDirectSound3DBuffer* self, float* distance); /* 7 */
 	int (XWA_STDCALL* GetMinDistance)(IDirectSound3DBuffer* self, float* distance); /* 8 */
-	void* GetMode;            /* 9 */
-	void* GetPosition;        /* 10 */
+	int (XWA_STDCALL* GetMode)(IDirectSound3DBuffer* self, uint32_t* mode);         /* 9 */
+	int (XWA_STDCALL* GetPosition)(IDirectSound3DBuffer* self, DS3DVector* position); /* 10 */
 	void* GetVelocity;        /* 11 */
 	void* SetAllParameters;   /* 12 */
 	void* SetConeAngles;      /* 13 */
@@ -71,7 +71,7 @@ typedef struct IDirectSound3DListenerVtbl {
 	void* GetDistanceFactor; /* 4 */
 	void* GetDopplerFactor;  /* 5 */
 	void* GetOrientation;    /* 6 */
-	void* GetPosition;       /* 7 */
+	int (XWA_STDCALL* GetPosition)(IDirectSound3DListener* self, DS3DVector* position); /* 7 */
 	void* GetRolloffFactor;  /* 8 */
 	void* GetVelocity;       /* 9 */
 	void* SetAllParameters;  /* 10 */
