@@ -51,6 +51,7 @@ static bool XwaVideoPage_Display(AeronUiContext* ui, XwaModernVideoOptions* opti
 		}
 	}
 #endif
+	changed |= AeronUi_Toggle(ui, "Smooth Menu Fonts", &options->smooth_menu_fonts);
 	return changed;
 }
 

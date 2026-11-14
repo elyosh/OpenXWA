@@ -31,7 +31,8 @@ static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 		   options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB &&
 		   options->paper_white >= XWA_MODERN_PAPER_WHITE_AUTO &&
 		   options->paper_white <= XWA_MODERN_PAPER_WHITE_400 && isfinite(options->hud_scale) &&
-		   options->hud_scale >= XWA_MODERN_HUD_SCALE_MIN && options->hud_scale <= XWA_MODERN_HUD_SCALE_MAX;
+		   options->hud_scale >= XWA_MODERN_HUD_SCALE_MIN && options->hud_scale <= XWA_MODERN_HUD_SCALE_MAX &&
+		   (options->smooth_menu_fonts == 0 || options->smooth_menu_fonts == 1);
 }
 
 static int XwaModernVideoOptions_AreEqual(const XwaModernVideoOptions* lhs,
@@ -41,7 +42,7 @@ static int XwaModernVideoOptions_AreEqual(const XwaModernVideoOptions* lhs,
 		   lhs->msaa == rhs->msaa && lhs->motion_blur_quality == rhs->motion_blur_quality &&
 		   lhs->motion_blur_amount == rhs->motion_blur_amount && lhs->hdr_output == rhs->hdr_output &&
 		   lhs->sdr_gamma == rhs->sdr_gamma && lhs->paper_white == rhs->paper_white &&
-		   lhs->hud_scale == rhs->hud_scale;
+		   lhs->hud_scale == rhs->hud_scale && lhs->smooth_menu_fonts == rhs->smooth_menu_fonts;
 }
 
 void XwaModernVideoOptions_Configure(const XwaModernVideoOptions* options, XwaModernVideoOptionsApplyFn apply,
