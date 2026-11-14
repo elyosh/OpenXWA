@@ -11,11 +11,12 @@
 /* The system's own spatial audio for headphones would process the sound a
    second time. */
 #if defined(_WIN32)
-#define XWA_AUDIO_PAGE_SYSTEM_SPATIAL "Turn off Windows Sonic or Dolby Atmos for Headphones."
+#define XWA_AUDIO_PAGE_SYSTEM_SPATIAL "If Windows Sonic or Dolby Atmos for Headphones is on, turn it off."
 #elif defined(__APPLE__)
-#define XWA_AUDIO_PAGE_SYSTEM_SPATIAL "Turn off Spatialize Stereo for your headphones in Control Center."
+#define XWA_AUDIO_PAGE_SYSTEM_SPATIAL                                                                        \
+	"If Spatialize Stereo is on for your headphones in Control Center, turn it off."
 #else
-#define XWA_AUDIO_PAGE_SYSTEM_SPATIAL "Turn off any system spatial audio for your headphones."
+#define XWA_AUDIO_PAGE_SYSTEM_SPATIAL "If your system adds spatial audio to your headphones, turn it off."
 #endif
 
 void XwaAudioPage_Draw(AeronUiContext* ui, const AeronInputSnapshot* input) {
