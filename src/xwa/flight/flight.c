@@ -8980,7 +8980,7 @@ static __inline uint16_t FlightAction_FindNearestLocatedHostilePlayerTarget(unsi
 			continue;
 		}
 
-		if (player->objectIndex == -1) {
+		if (player->objectIndex == 0xffff) {
 			Mission_ResolveObjectOrMissionPointWorldLoc(scanIdx, 0, 0, 0);
 			trig2_ctop(worldlocx - player->viewState.savedTargetX, worldlocy - player->viewState.savedTargetY,
 					   worldlocz - player->viewState.savedTargetZ);
@@ -9155,7 +9155,7 @@ static __inline void FlightAction_NotifySameTeamPlayersOfTarget(unsigned int pla
 		CraftData* otherCraft;
 		PlayerData* other = &g_players[otherIdx];
 		if (otherIdx == playerIdx || other->connectedFlag != 1 || other->playerIff != issuer->playerIff ||
-			other->objectIndex == -1 || other->objectIndex == issuer->currentTargetObjectIdx ||
+			other->objectIndex == 0xffff || other->objectIndex == issuer->currentTargetObjectIdx ||
 			other->pendingActionId != 0) {
 			continue;
 		}
@@ -9182,7 +9182,7 @@ static __inline void FlightAction_NotifySameTeamPlayersIgnoringTarget(unsigned i
 		CraftData* otherCraft;
 		PlayerData* other = &g_players[otherIdx];
 		if (otherIdx == playerIdx || other->connectedFlag != 1 || other->playerIff != issuer->playerIff ||
-			other->objectIndex == -1 || other->currentTargetObjectIdx != issuer->currentTargetObjectIdx ||
+			other->objectIndex == 0xffff || other->currentTargetObjectIdx != issuer->currentTargetObjectIdx ||
 			(uint16_t)other->currentTargetObjectIdx == (uint16_t)other->objectIndex ||
 			other->pendingActionId != 0) {
 			continue;
@@ -9395,7 +9395,7 @@ static __inline void FlightAction_ToggleFilmRecording(unsigned int playerIdx) {
 	}
 
 	playerObjIdx = g_players[playerIdx].objectIndex;
-	if (playerObjIdx == -1 || g_provingGroundsModeActive ||
+	if (playerObjIdx == 0xffff || g_provingGroundsModeActive ||
 		g_objectTable[(uint16_t)playerObjIdx].mobj->pCraft->craftState == CRAFT_STATE_DEATH_STAR_GUIDED) {
 		return;
 	}
