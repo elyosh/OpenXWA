@@ -10,6 +10,8 @@ extern "C" {
 #endif
 
 extern const uint16_t g_projectileLifetimeSecondsByObjectType[OBJ_LaserImperialDS + 1];
+extern const uint16_t g_warheadLeadErrorModulusByAiLevel[6];
+extern const uint16_t g_warheadFireChanceThresholdByAiLevel[6];
 extern const uint16_t g_projectileLifetimeFracQ16ByObjectType[OBJ_LaserImperialDS + 1];
 extern const uint16_t g_projectileLifetimeSecondsByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];
 extern const uint16_t g_projectileLifetimeFracQ16ByType[OBJ_LaserImperialDS - OBJ_LaserRebel + 1];

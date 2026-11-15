@@ -285,6 +285,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/warhead_launchers.c
     src/xwa_runtime/models/warhead_lock.c
     src/xwa_runtime/models/ai_attack.c
+    src/xwa_runtime/compat/rank_tables.c
     src/xwa_runtime/models/flight_config.c
     src/xwa_runtime/models/formations.c
     src/xwa_runtime/models/mod_files.c

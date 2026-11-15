@@ -27,6 +27,7 @@ struct ModelFloatHardpoint;
  * launcher. Flag-0x800 model defs collect type 0 and kind-1 hardpoints as
  * float hardpoints. */
 extern const uint8_t g_optHardpointWeaponGroupKindByType[40];
+extern const int g_pilotKillScoreBaseByAiLevel[7];
 extern MemoryHandle g_visibleObjectsHandle;
 extern MemoryHandle g_flightLog1BufferHandle;
 extern MemoryHandle g_flightTinyFontHandle;

@@ -257,6 +257,7 @@ extern MemoryHandle g_mobileObjectCharDataHandle;
 extern MemoryHandle g_craftDataPoolHandle;
 extern MemoryHandle g_warheadGuidancePoolHandle;
 extern const uint8_t g_genusConvert[12];
+extern const int g_defaultPilotRatingByAiLevel[6];
 extern const uint8_t g_familyConvert[4];
 
 int Mission_DecodeOrderTime(uint8_t encodedTime);

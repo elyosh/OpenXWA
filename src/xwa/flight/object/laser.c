@@ -27,6 +27,7 @@
 #include "xwa/util/random.h"
 #ifdef XWA_MODERN
 #include "xwa/util/time.h"
+#include "xwa_runtime/compat/rank_tables.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/craft_weapons.h"
@@ -1359,7 +1360,11 @@ static __inline void laser_ApplyWarheadLauncherAimError(ObjectRecord* ownerObj, 
 
 			fireRoll = GameRand();
 			groupAi = g_missionFlightGroups[ownerObj->flightGroupIdx].fg.groupAI;
+#ifdef XWA_MODERN
+			if (fireRoll >= XwaRankTables_WarheadFireChance(groupAi)) {
+#else
 			if (fireRoll >= g_warheadFireChanceThresholdByAiLevel[groupAi]) {
+#endif
 				return;
 			}
 		}
@@ -1604,7 +1609,11 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 			uint8_t groupAi;
 
 			groupAi = g_missionFlightGroups[ownerObj->flightGroupIdx].fg.groupAI;
+#ifdef XWA_MODERN
+			leadError = GameRandRange(XwaRankTables_WarheadLeadError(groupAi));
+#else
 			leadError = GameRandRange(g_warheadLeadErrorModulusByAiLevel[groupAi]);
+#endif
 			if ((GameRand() & 1) != 0) {
 				leadFrames = (uint16_t)(leadFrames + leadError);
 			} else {

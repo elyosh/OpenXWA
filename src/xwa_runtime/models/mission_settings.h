@@ -119,6 +119,9 @@ int XwaMissionSettings_SkirmishEjections(void);
    hits, as any weapon does, and no longer when paifight_fightershootorder
    launches it. */
 int XwaMissionSettings_AiWarheadsAttackOnHit(void);
+/* The difficulty doesn't change the AI ranks of the flight groups when
+   Mission_Init loads a mission. */
+int XwaMissionSettings_NoDifficultyRankChanges(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);

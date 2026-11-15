@@ -6,6 +6,7 @@
 #include "xwa/math/fixed.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/compat/rank_tables.h"
 #include "xwa_runtime/models/ai_attack.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_hyperspace.h"
@@ -505,9 +506,15 @@ void paiman_initavoidattackermaneuver(void) {
 	g_paiContext.aiController->maneuverTimer = 236 * ((GameRand() & 7) + 10);
 
 	groupAI = g_missionFlightGroups[g_paiContext.curOrderCoord.fields.flightGroupIdx].fg.groupAI;
+#ifdef XWA_MODERN
+	g_paiContext.aiController->aiPlanState =
+		(int)((uint16_t)MATH2_fraction(XwaRankTables_AvoidAttackerDelayFraction(groupAI), 0x00ecu) +
+			  236u * XwaRankTables_AvoidAttackerDelaySeconds(groupAI));
+#else
 	g_paiContext.aiController->aiPlanState =
 		(int)((uint16_t)MATH2_fraction(g_aiAvoidAttackerDelayFracQ16ByGroupAI[groupAI], 0x00ecu) +
 			  236u * g_aiAvoidAttackerDelaySecondsByGroupAI[groupAI]);
+#endif
 }
 
 // FUNCTION: XWA 0x4B8650
@@ -5958,9 +5965,15 @@ static char paiman_avoidattackermaneuver(void) {
 		}
 
 		groupAI = g_missionFlightGroups[g_paiContext.curOrderCoord.fields.flightGroupIdx].fg.groupAI;
+#ifdef XWA_MODERN
+		g_paiContext.aiController->aiPlanState =
+			(uint16_t)MATH2_fraction(XwaRankTables_AvoidAttackerDelayFraction(groupAI), 0xEC) +
+			236 * XwaRankTables_AvoidAttackerDelaySeconds(groupAI);
+#else
 		g_paiContext.aiController->aiPlanState =
 			(uint16_t)MATH2_fraction(g_aiAvoidAttackerDelayFracQ16ByGroupAI[groupAI], 0xEC) +
 			236 * g_aiAvoidAttackerDelaySecondsByGroupAI[groupAI];
+#endif
 		g_paiContext.aiController->aiPlanState += (uint16_t)MATH2_fraction(GameRand(), 0xEC);
 
 		if (groupAI >= 3 && (GameRand() & 7) == 7 && g_curCraft->cmTypeId == 2 && g_curCraft->cmAmmoCount &&
@@ -6596,6 +6609,10 @@ void paiman_RefreshDeathStarPlayerFollow(int objectIdx, int playerIdx) {
 	craft->followPlayerIdx = (uint8_t)playerIdx;
 	craft->followTimer = 16;
 	groupAI = g_missionFlightGroups[g_objectTable[objectIdx].flightGroupIdx].fg.groupAI;
+#ifdef XWA_MODERN
+	thinkInterval = XwaRankTables_ThinkInterval(groupAI);
+#else
 	thinkInterval = g_aiThinkIntervalByGroupAI[groupAI];
+#endif
 	craft->aiController.thinkInterval = thinkInterval;
 }

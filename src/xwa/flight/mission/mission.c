@@ -38,6 +38,7 @@
 #ifdef XWA_MODERN
 #include "aeron/log.h"
 #include "xwa_runtime/audio/mission_sounds.h"
+#include "xwa_runtime/compat/rank_tables.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/component_strength.h"
 #include "xwa_runtime/models/craft_definitions.h"
@@ -6389,7 +6390,11 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 	}
 	if (((uint16_t)existingObjIdx == 0xFFFF)) {
 		groupAiSaved = g_spawnGroupAI;
+#ifdef XWA_MODERN
+		g_curCraft->skillValue = XwaRankTables_SkillValue(g_spawnGroupAI);
+#else
 		g_curCraft->skillValue = g_aiSkillValueQ16ByLevel[g_spawnGroupAI];
+#endif
 	}
 
 	// Laser/cannon group setup.
@@ -7028,7 +7033,11 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			g_curCraft->aiController.targetXYAngle = 0;
 			g_curCraft->aiController.waypointIndex = 0;
 			g_curCraft->aiController.savedPlanId = 0;
+#ifdef XWA_MODERN
+			g_curCraft->aiController.thinkInterval = XwaRankTables_ThinkInterval(groupAiSaved);
+#else
 			g_curCraft->aiController.thinkInterval = g_aiThinkIntervalByGroupAI[groupAiSaved];
+#endif
 			{
 				int randomSeed = GameRand() ^ 0xBEEF;
 				g_curCraft->aiController.savedRandSeed = (int16_t)randomSeed;
@@ -8036,7 +8045,12 @@ uint16_t Mission_Init(char* fileName) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (g_flightDifficulty != 1 && g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 36 &&
+		!XwaMissionSettings_NoDifficultyRankChanges()) {
+#else
 	if (g_flightDifficulty != 1 && g_pilotData.missionDescriptionIds[g_pilotData.missionDirectoryId] != 36) {
+#endif
 		int playerIff;
 
 		playerIff = (uint16_t)g_players[0].playerIff;
@@ -8873,8 +8887,13 @@ void Mission_CreditDestructionDamageContributors(uint16_t sourceObjIdx, uint16_t
 			}
 
 			if (creditedOwnerIdx == -1) {
+#ifdef XWA_MODERN
+				creditedPilotRating =
+					XwaRankTables_DefaultPilotRating(g_missionFlightGroups[flightGroupIdx].fg.groupAI);
+#else
 				creditedPilotRating =
 					g_defaultPilotRatingByAiLevel[g_missionFlightGroups[flightGroupIdx].fg.groupAI];
+#endif
 			} else {
 				creditedPilotRating = g_players[creditedOwnerIdx].pilotRating;
 			}
