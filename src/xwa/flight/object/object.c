@@ -29,6 +29,7 @@
 #include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/docking.h"
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/weapon_stats.h"
 #include "xwa_runtime/timing/ai_lead.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
@@ -214,6 +215,11 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 	if (g_objectTable[sourceObjIdx].genusId == 0) {
 		int sourceIff;
 
+#ifdef XWA_MODERN
+		if (XwaMissionSettings_NoPilotEjections()) {
+			return 0xffffu;
+		}
+#endif
 		if (!g_flightConfNoPilot) {
 			sourceIff = (uint8_t)g_objectTable[sourceObjIdx].mobj->iff;
 			switch (sourceIff) {
@@ -232,6 +238,13 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 			return 0xffffu;
 		}
 	} else {
+#ifdef XWA_MODERN
+		/* Return before GameRand, so that turning pods off doesn't use up a
+		   random number. */
+		if (XwaMissionSettings_NoEscapePodEjections()) {
+			return 0xffffu;
+		}
+#endif
 		objectType = (ObjectTypeId)((GameRand() & 1u) + OBJ_EscapePod);
 		objectGenus = GENUS_Utility;
 		DebugPrintfChannel(512, "Ejecting escape pod..\n");
@@ -262,6 +275,11 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 			g_missionFlightGroups[g_objectTable[sourceObjIdx].flightGroupIdx].fg.iff;
 		g_missionFlightGroups[fgIdx].fg.team =
 			g_missionFlightGroups[g_objectTable[sourceObjIdx].flightGroupIdx].fg.team;
+#ifdef XWA_MODERN
+		if (XwaMissionSettings_EjectedCraftTeam9()) {
+			g_missionFlightGroups[fgIdx].fg.team = 9;
+		}
+#endif
 		for (i = 0; i < XWA_CRAFT_TYPE_REVERSE_SEARCH_COUNT; ++i) {
 			if (g_objectTypeTables.craftTypeToObjectType[i] == objectTypeId) {
 				g_missionFlightGroups[fgIdx].fg.craftType = (uint8_t)i;
@@ -306,6 +324,11 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 	g_objectTable[objIdx].mobj->ejectionSpawnCount = 0;
 	g_objectTable[objIdx].mobj->iff = g_objectTable[sourceObjIdx].mobj->iff;
 	g_objectTable[objIdx].mobj->team = g_objectTable[sourceObjIdx].mobj->team;
+#ifdef XWA_MODERN
+	if (XwaMissionSettings_EjectedCraftTeam9()) {
+		g_objectTable[objIdx].mobj->team = 9;
+	}
+#endif
 	g_objectTable[objIdx].mobj->nodeSwitchIndex = g_objectTable[sourceObjIdx].mobj->nodeSwitchIndex;
 	g_objectTable[objIdx].mobj->moveVectorDirty = 1;
 	g_objectTable[objIdx].mobj->orientMatrixDirty = 1;
@@ -647,6 +670,12 @@ int FlightObject_SpawnEscapePodOrPilot(int sourceObjIdx) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	/* Skips the switch below, which sets up pods and pilots. */
+	if (XwaMissionSettings_EjectedCraftSkipSetup()) {
+		return objIdx;
+	}
+#endif
 	switch (objectTypeId) {
 		case OBJ_RebelPilot:
 		case OBJ_ImperialPilot:

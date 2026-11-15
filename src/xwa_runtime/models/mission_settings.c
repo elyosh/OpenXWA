@@ -84,6 +84,11 @@ static int s_missileDefenseAnyWarhead;
 static int s_rackCountFromRecord;
 static int s_overlappingFlyBySounds;
 static int s_hangarDroidPartsFromModel;
+static int s_noPilotEjections;
+static int s_noEscapePodEjections;
+static int s_ejectedCraftTeam9;
+static int s_ejectedCraftSkipSetup;
+static int s_skirmishEjections;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -511,6 +516,11 @@ void XwaMissionSettings_Init(void) {
 	s_rackCountFromRecord = 0;
 	s_overlappingFlyBySounds = 0;
 	s_hangarDroidPartsFromModel = 0;
+	s_noPilotEjections = 0;
+	s_noEscapePodEjections = 0;
+	s_ejectedCraftTeam9 = 0;
+	s_ejectedCraftSkipSetup = 0;
+	s_skirmishEjections = 0;
 	MissionSettings_ResetTargets();
 	root = XwaFlightConfig_Root();
 	rules = AeronConfigNode_MapGet(root, "rules");
@@ -623,6 +633,23 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "hangar_droid_parts_from_model", node,
 								 &s_hangarDroidPartsFromModel);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_pilot_ejections")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_pilot_ejections", node, &s_noPilotEjections);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_escape_pod_ejections")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_escape_pod_ejections", node,
+								 &s_noEscapePodEjections);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "ejected_craft_team_9")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "ejected_craft_team_9", node, &s_ejectedCraftTeam9);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "ejected_craft_skip_setup")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "ejected_craft_skip_setup", node,
+								 &s_ejectedCraftSkipSetup);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "skirmish_ejections")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "skirmish_ejections", node, &s_skirmishEjections);
+	}
 	MissionSettings_Read(XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_MapGet(root, "mission_settings"),
 						 &s_defaults);
 	s_settings = s_defaults;
@@ -709,6 +736,11 @@ int XwaMissionSettings_WeaponRackCountFromRecord(void) { return s_rackCountFromR
 
 int XwaMissionSettings_OverlappingFlyBySounds(void) { return s_overlappingFlyBySounds; }
 int XwaMissionSettings_HangarDroidPartsFromModel(void) { return s_hangarDroidPartsFromModel; }
+int XwaMissionSettings_NoPilotEjections(void) { return s_noPilotEjections; }
+int XwaMissionSettings_NoEscapePodEjections(void) { return s_noEscapePodEjections; }
+int XwaMissionSettings_EjectedCraftTeam9(void) { return s_ejectedCraftTeam9; }
+int XwaMissionSettings_EjectedCraftSkipSetup(void) { return s_ejectedCraftSkipSetup; }
+int XwaMissionSettings_SkirmishEjections(void) { return s_skirmishEjections; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

@@ -112,6 +112,11 @@ is on by default.
 | `weapon_rack_count_from_record` | A craft's weapon count includes all laser groups and warhead launchers of its craft record. The original game counts the laser groups, plus the turrets of craft that fire from points over their hull. |
 | `overlapping_fly_by_sounds` | The fly-by and engine wash sounds of several craft can play at the same time. In the original game, one of these sounds doesn't start while it is already playing. |
 | `hangar_droid_parts_from_model` | Each of the two hangar droids moves the parts that its model lists in the [`hangar_droid` group](models.md#hangar-droids), and no others. In the original game, the first droid nods part 3 and the second droid swings part 1 and spins part 2, whatever model they use. |
+| `no_pilot_ejections` | No pilot ejects from a starfighter. In the original game, about one starfighter in eight can eject a pilot, when one of its systems is hit or when it is destroyed. |
+| `no_escape_pod_ejections` | No escape pod ejects from a transport, starship or platform. In the original game, each transport and platform can eject one pod, and each starship two. |
+| `ejected_craft_team_9` | Escape pods and pilots are on team 9 instead of the team of the craft they come from. Their IFF doesn't change. Each mission's team table says which teams are hostile to team 9, so whether the AI attacks the pods depends on the mission. |
+| `ejected_craft_skip_setup` | Escape pods don't get the AI plan that the original game gives them. Pilots keep the random speed and direction that every ejected craft starts with. In the original game, pilots then get a speed of 80 and a direction based on their craft's. |
+| `skirmish_ejections` | The craft of a skirmish mission can eject pilots and escape pods. In the original game, they can't. |
 
 ### mission_settings
 

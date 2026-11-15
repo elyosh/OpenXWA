@@ -12,6 +12,7 @@
 #include "xwa/math/scalar.h"
 #include "xwa/util/memory.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/tech_ratings.h"
 #endif
 
@@ -1848,7 +1849,9 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 
 		STATUS_START_IN_REGION = 9,
 		STATUS_SCENERY = 20,
-		STATUS2_ACTIVE = 22,
+		/* The craft of a flight group with this status can't eject
+		   (Mission_InitFlightGroupObjectSlot). */
+		STATUS2_NO_EJECTIONS = 22,
 		STATUS2_BUOY = 25,
 
 		NEUTRAL_IFF = 3,
@@ -2010,7 +2013,12 @@ int Skirmish_GenerateMission(const char* outMissionFile) {
 		g_frontendMission->flightGroups[fgIndex].countermeasures =
 			g_combatSimSlots[slotIndex].countermeasures;
 		g_frontendMission->flightGroups[fgIndex].beam = g_combatSimSlots[slotIndex].beam;
-		g_frontendMission->flightGroups[fgIndex].status2 = STATUS2_ACTIVE;
+#ifdef XWA_MODERN
+		g_frontendMission->flightGroups[fgIndex].status2 =
+			XwaMissionSettings_SkirmishEjections() ? 0 : STATUS2_NO_EJECTIONS;
+#else
+		g_frontendMission->flightGroups[fgIndex].status2 = STATUS2_NO_EJECTIONS;
+#endif
 
 		if (g_gameConfig.numberOfTeams <= 4u) {
 			g_frontendMission->flightGroups[fgIndex].iff = g_frontendMission->flightGroups[fgIndex].team;
