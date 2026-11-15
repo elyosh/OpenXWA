@@ -109,6 +109,20 @@ void XwaCraftHyperspace_AiOutOfHyperspaceInit(unsigned int objIdx);
    stock arrival. Otherwise sets `*reached` when the arrival is over, and then
    drops the arrival. */
 int XwaCraftHyperspace_AiOutOfHyperspaceStep(unsigned int objIdx, char* reached);
+/* The arrival test of the ai_arrival_stops_before_point rule, in place of
+   the stock test of paiman_outofhyperspacemaneuver. It runs on each think of
+   the arriving craft `objIdx`, like the stock test, and returns 1 when the
+   arrival is over:
+	 - the distance to the aim point is the exact distance, in single
+	   precision, not trig2_polardistance;
+	 - when the distance is below 3 times the craft's speed, the speed
+	   becomes a third of the distance;
+	 - the arrival is over when the distance minus the speed is 0 or less, or
+	   has stopped going down since the last think (maneuverDist). The speed
+	   then becomes 0. The Super Star Destroyer has no test of its own.
+   The file is built without floating-point contraction, so that the result
+   is the same on every compiler. */
+char XwaCraftHyperspace_AiArrivalStopsBeforePoint(unsigned int objIdx);
 /* Starts a mission with no arrivals. */
 void XwaCraftHyperspace_LoadMission(void);
 

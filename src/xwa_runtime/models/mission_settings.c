@@ -91,6 +91,7 @@ static int s_ejectedCraftSkipSetup;
 static int s_skirmishEjections;
 static int s_aiWarheadsAttackOnHit;
 static int s_noDifficultyRankChanges;
+static int s_aiArrivalStopsBeforePoint;
 /* The craft that the O key targeted last, per player, for the cycle
    method. */
 static int s_lastTargetObjIdx[XWA_PLAYER_COUNT];
@@ -525,6 +526,7 @@ void XwaMissionSettings_Init(void) {
 	s_skirmishEjections = 0;
 	s_aiWarheadsAttackOnHit = 0;
 	s_noDifficultyRankChanges = 0;
+	s_aiArrivalStopsBeforePoint = 0;
 	MissionSettings_ResetTargets();
 	root = XwaFlightConfig_Root();
 	rules = AeronConfigNode_MapGet(root, "rules");
@@ -662,6 +664,10 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_difficulty_rank_changes", node,
 								 &s_noDifficultyRankChanges);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "ai_arrival_stops_before_point")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "ai_arrival_stops_before_point", node,
+								 &s_aiArrivalStopsBeforePoint);
+	}
 	MissionSettings_Read(XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_MapGet(root, "mission_settings"),
 						 &s_defaults);
 	s_settings = s_defaults;
@@ -755,6 +761,7 @@ int XwaMissionSettings_EjectedCraftSkipSetup(void) { return s_ejectedCraftSkipSe
 int XwaMissionSettings_SkirmishEjections(void) { return s_skirmishEjections; }
 int XwaMissionSettings_AiWarheadsAttackOnHit(void) { return s_aiWarheadsAttackOnHit; }
 int XwaMissionSettings_NoDifficultyRankChanges(void) { return s_noDifficultyRankChanges; }
+int XwaMissionSettings_AiArrivalStopsBeforePoint(void) { return s_aiArrivalStopsBeforePoint; }
 
 int XwaMissionSettings_RedAlert(void) { return s_settings.redAlert; }
 

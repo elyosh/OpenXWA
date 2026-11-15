@@ -5772,9 +5772,14 @@ static char paiman_outofhyperspacemaneuver(void) {
 				   aiController->aimPointY - g_objectTable[g_paiContext.aiObjIdx].world_y,
 				   aiController->aimPointZ - g_objectTable[g_paiContext.aiObjIdx].world_z);
 
-		if (g_objectTable[g_paiContext.aiObjIdx].objectType == OBJ_SuperStarDestroyer &&
-			trig2_polardistance > g_paiContext.aiController->maneuverDist &&
-			g_paiContext.aiController->maneuverPhase == 10) {
+#ifdef XWA_MODERN
+		if (XwaMissionSettings_AiArrivalStopsBeforePoint()) {
+			reached = XwaCraftHyperspace_AiArrivalStopsBeforePoint(g_paiContext.aiObjIdx);
+		} else
+#endif
+			if (g_objectTable[g_paiContext.aiObjIdx].objectType == OBJ_SuperStarDestroyer &&
+				trig2_polardistance > g_paiContext.aiController->maneuverDist &&
+				g_paiContext.aiController->maneuverPhase == 10) {
 			reached = 1;
 		} else if (trig2_polardistance < g_paiContext.aiController->maneuverDist ||
 				   trig2_polardistance > 0x10000) {

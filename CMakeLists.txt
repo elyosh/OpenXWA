@@ -685,11 +685,14 @@ if(XWA_BUILD_MOD_IMPORTER)
     target_link_libraries(xwa PRIVATE xwa_mod_import_lib)
 endif()
 
-# Replacement-model simulation data must be bit-identical across compilers.
+# Replacement-model simulation data and the single-precision AI arrival test
+# must be bit-identical across compilers.
 if(MSVC)
-    set_source_files_properties(src/xwa_runtime/models/opt_synth.c PROPERTIES COMPILE_OPTIONS "/fp:precise")
+    set_source_files_properties(src/xwa_runtime/models/opt_synth.c src/xwa_runtime/models/craft_hyperspace.c
+        PROPERTIES COMPILE_OPTIONS "/fp:precise")
 else()
-    set_source_files_properties(src/xwa_runtime/models/opt_synth.c PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
+    set_source_files_properties(src/xwa_runtime/models/opt_synth.c src/xwa_runtime/models/craft_hyperspace.c
+        PROPERTIES COMPILE_OPTIONS "-ffp-contract=off")
 endif()
 
 if(MSVC)
