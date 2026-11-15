@@ -4,7 +4,8 @@
 /*
  * The importer compiles its own copy of some game tables without
  * XWA_MODERN, so that the tables keep their stock sizes. The files are
- * model_def_static_data.inc, object_type.c, object_type_info.c and names.c.
+ * model_def_static_data.inc, paiman_formation_tables.inc, object_type.c,
+ * object_type_info.c and names.c.
  *
  * The game compiles the same files with XWA_MODERN, and a mod can change its
  * tables while the game runs. To link both copies into one program, these
@@ -17,6 +18,12 @@
 
 /* model_def_static_data.inc */
 #define g_modelDefs g_stockModelDefs
+
+/* paiman_formation_tables.inc */
+#define g_formPosX g_stockFormPosX
+#define g_formPosY g_stockFormPosY
+#define g_formPosZ g_stockFormPosZ
+#define g_formationDivisor g_stockFormationDivisor
 
 /* object_type.c */
 #define g_objectTypeTables g_stockObjectTypeTables

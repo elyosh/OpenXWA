@@ -41,6 +41,7 @@ sections:
 | `hyperspace` | how fast AI craft arrive and leave by hyperspace |
 | `headlights` | a light on the nose of the player's craft |
 | `object_limits` | how many craft, shots, explosions and radar blips a mission can have |
+| `formations` | where the craft of a flight group fly in each formation |
 | `hangar_crafts` | the craft that the player can switch to in the hangar |
 | `camera` | the lag and tilt of the exterior camera, the cockpit sway and the HUD in the exterior view |
 | `camera_shake` | the camera's shake and jolt in the player's hyperspace jumps |
@@ -716,6 +717,42 @@ with many regions or players have less room.
 
 The proving grounds keep their 36 craft slots, unless the mod has hangar
 settings. Then they use `craft_per_region` like the other missions.
+
+### formations
+
+`formations` changes the formations that flight groups start and fly in.
+Each key is a formation number, from 0 to 33. Formation 1 is Finger Four,
+the formation of the wingman command of the same name.
+
+```yaml
+formations:
+  1:
+    slots: [[0, 0, 0], [-2, -2, -1], [4, -4, 2], [5, -5, 1], [-4, -4, 3], [-5, -5, 2]]
+    divisor: 1
+```
+
+| Key | Meaning |
+|-|-|
+| `slots` | The six slots of the formation, from the leader's to the sixth craft's. Each slot is three numbers: to the side (positive is right), forward and up. |
+| `divisor` | A number that the game divides the slot values by, other than 0. In the original game, most formations have 1 and Finger Four has 3. |
+
+Each key is optional, and a formation keeps its original slots or divisor
+when the key isn't there. The numbers are whole numbers from -32768 to
+32767.
+
+The slot values are sizes of the craft's model, not distances. The game
+multiplies a value to the side by the width of the model, a value forward by
+its length and a value up by its height. It then multiplies by the flight
+group's formation spacing plus 1. At a spacing of 0, it adds half a width,
+half a height, and a quarter of a length at the start of the mission or half
+a length in flight. Then it divides by the divisor. So at a spacing of 0 and
+with a divisor of 1, a value of 1 to the side is one and a half widths.
+
+In flight, a craft keeps its place relative to the leader's slot, measured
+with the size of the leader's model. At the start of the mission, each craft
+uses the size of its own model. A craft that drops off a flight group flies
+to the place of each slot to release a craft there, and for that place the
+game doesn't divide by the divisor.
 
 ### hangar_crafts
 

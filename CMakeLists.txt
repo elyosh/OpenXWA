@@ -286,6 +286,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/warhead_lock.c
     src/xwa_runtime/models/ai_attack.c
     src/xwa_runtime/models/flight_config.c
+    src/xwa_runtime/models/formations.c
     src/xwa_runtime/models/mod_files.c
     src/xwa_runtime/models/mag_pulse.c
     src/xwa_runtime/models/units.c
@@ -651,6 +652,7 @@ if(XWA_BUILD_MOD_IMPORTER)
         tools/mod_importer/import.c
         tools/mod_importer/log.c
         tools/mod_importer/models.c
+        tools/mod_importer/stock_formations.c
         tools/mod_importer/stock_model_defs.c
         tools/mod_importer/stock_tables.c
         # The importer's own copy of the game's craft and name tables. The

@@ -59,6 +59,7 @@
 #include "xwa_runtime/models/craft_weapons.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/flight_config.h"
+#include "xwa_runtime/models/formations.h"
 #include "xwa_runtime/models/hangar_crafts.h"
 #include "xwa_runtime/models/hangars.h"
 #include "xwa_runtime/models/headlights.h"
@@ -192,6 +193,7 @@ int XwaPort_Init(void) {
 	XwaMissionSettings_Init();
 	XwaDocking_Init();
 	XwaObjectLimits_Init();
+	XwaFormations_Init();
 	XwaOriginalFilm_Init();
 	XwaHeadlights_Init();
 	XwaCameraMotion_Init();

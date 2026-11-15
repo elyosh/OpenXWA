@@ -228,6 +228,11 @@ void ImportStockTables_Names(XwauNames* out) {
 	out->hud_areas = list_of(&g_xwaHudAreaNames);
 }
 
+extern int16_t g_formPosX[XWAU_GAME_FORMATIONS][XWAU_GAME_FORMATION_SLOTS];
+extern int16_t g_formPosY[XWAU_GAME_FORMATIONS][XWAU_GAME_FORMATION_SLOTS];
+extern int16_t g_formPosZ[XWAU_GAME_FORMATIONS][XWAU_GAME_FORMATION_SLOTS];
+extern int16_t g_formationDivisor[XWAU_GAME_FORMATIONS];
+
 void ImportStockTables_Values(XwauStockValues* out) {
 	out->hull_icons = k_stockHullIcons;
 	out->hull_icon_count = sizeof k_stockHullIcons / sizeof k_stockHullIcons[0];
@@ -238,4 +243,8 @@ void ImportStockTables_Values(XwauStockValues* out) {
 	out->lifetime_seconds = k_stockLifetimeSeconds;
 	out->lifetime_fractions = k_stockLifetimeFractions;
 	out->lifetime_count = sizeof k_stockLifetimeSeconds / sizeof k_stockLifetimeSeconds[0];
+	out->formation_positions[0] = g_formPosX[0];
+	out->formation_positions[1] = g_formPosY[0];
+	out->formation_positions[2] = g_formPosZ[0];
+	out->formation_divisors = g_formationDivisor;
 }
