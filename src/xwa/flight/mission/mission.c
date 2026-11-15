@@ -9516,14 +9516,14 @@ void Mission_RecordProjectileHitStats(unsigned int projectileObjIdx, char awardW
 				}
 				g_players[ownerPlayerIdx].missionStats.missionScore += XwaWeaponStats_Value(
 					ownerObjIdx, g_objectTable[projectileObjIdx].objectType, XWA_WEAPON_STAT_SCORE,
-					g_warheadProjectilePointValueByObjectType[g_objectTable[projectileObjIdx].objectType]);
+					g_projectileScoreByType[g_objectTable[projectileObjIdx].objectType - OBJ_LaserRebel]);
 			}
 			if (awardWarheadPoints) {
 				g_missionFlightRuntimeState
-					.teamScores[TEAM_SCORE_MISSION]
-							   [g_missionFlightGroups[flightGroupIdx].fg.team] += XwaWeaponStats_Value(
-					ownerObjIdx, g_objectTable[projectileObjIdx].objectType, XWA_WEAPON_STAT_SCORE,
-					g_warheadProjectilePointValueByObjectType[g_objectTable[projectileObjIdx].objectType]);
+					.teamScores[TEAM_SCORE_MISSION][g_missionFlightGroups[flightGroupIdx].fg.team] +=
+					XwaWeaponStats_Value(
+						ownerObjIdx, g_objectTable[projectileObjIdx].objectType, XWA_WEAPON_STAT_SCORE,
+						g_projectileScoreByType[g_objectTable[projectileObjIdx].objectType - OBJ_LaserRebel]);
 			}
 #else
 			if (projectileObjIdx < playerProjectileSlotEnd && ownerPlayerIdx != -1) {
@@ -9532,12 +9532,12 @@ void Mission_RecordProjectileHitStats(unsigned int projectileObjIdx, char awardW
 					return;
 				}
 				g_players[ownerPlayerIdx].missionStats.missionScore +=
-					g_warheadProjectilePointValueByObjectType[g_objectTable[projectileObjIdx].objectType];
+					g_projectileScoreByObjectType_BiasedBase[g_objectTable[projectileObjIdx].objectType];
 			}
 			if (awardWarheadPoints) {
 				g_missionFlightRuntimeState
 					.teamScores[TEAM_SCORE_MISSION][g_missionFlightGroups[flightGroupIdx].fg.team] +=
-					g_warheadProjectilePointValueByObjectType[g_objectTable[projectileObjIdx].objectType];
+					g_projectileScoreByObjectType_BiasedBase[g_objectTable[projectileObjIdx].objectType];
 			}
 #endif
 			break;
@@ -10065,7 +10065,7 @@ int Mission_ComputeCraftLoadoutPointValue(int craftType, int warheadType, int be
 				rounds = (uint8_t)MATH2_fraction(rounds, g_warheadAmmoCounts[3]);
 				if (rounds == 0)
 					rounds = 1;
-				loadoutPointValue += g_warheadProjectilePointValue[1] * rounds;
+				loadoutPointValue += g_projectileScoreByType[OBJ_WarheadMissile - OBJ_LaserRebel] * rounds;
 			}
 
 			if (((g_modelDefs[modelIndex].warheadLauncherType[1] != 0 && launcherIdx == 1) ||
@@ -10075,10 +10075,17 @@ int Mission_ComputeCraftLoadoutPointValue(int craftType, int warheadType, int be
 				rounds2 = (uint8_t)MATH2_fraction(rounds2, g_warheadAmmoCounts[warheadType]);
 				if (rounds2 == 0)
 					rounds2 = 1;
-				loadoutPointValue +=
-					(g_modelDefs[modelIndex].warheadLauncherLastSlot[launcherIdx] -
-					 g_modelDefs[modelIndex].warheadLauncherFirstSlot[launcherIdx] + 1) *
-					g_warheadProjectilePointValueByObjectType[g_warheadTypeIds[warheadType]] * rounds2;
+#ifdef XWA_MODERN
+				loadoutPointValue += (g_modelDefs[modelIndex].warheadLauncherLastSlot[launcherIdx] -
+									  g_modelDefs[modelIndex].warheadLauncherFirstSlot[launcherIdx] + 1) *
+									 g_projectileScoreByType[g_warheadTypeIds[warheadType] - OBJ_LaserRebel] *
+									 rounds2;
+#else
+				loadoutPointValue += (g_modelDefs[modelIndex].warheadLauncherLastSlot[launcherIdx] -
+									  g_modelDefs[modelIndex].warheadLauncherFirstSlot[launcherIdx] + 1) *
+									 g_projectileScoreByObjectType_BiasedBase[g_warheadTypeIds[warheadType]] *
+									 rounds2;
+#endif
 			}
 		}
 
@@ -10130,7 +10137,11 @@ unsigned int Mission_ComputeCraftPointValue(int objIdx) {
 		warheadCount =
 			craft->warheadData[g_modelDefs[modelIndex].warheadLauncherFirstSlot[launcherIdx]].count +
 			craft->warheadData[g_modelDefs[modelIndex].warheadLauncherLastSlot[launcherIdx]].count;
-		points += g_warheadProjectilePointValueByObjectType[projectileType] * warheadCount;
+#ifdef XWA_MODERN
+		points += g_projectileScoreByType[projectileType - OBJ_LaserRebel] * warheadCount;
+#else
+		points += g_projectileScoreByObjectType_BiasedBase[projectileType] * warheadCount;
+#endif
 	}
 
 	return points + g_beamTypePointValue[craft->beamTypeId] + g_countermeasureTypePointValue[craft->cmTypeId];

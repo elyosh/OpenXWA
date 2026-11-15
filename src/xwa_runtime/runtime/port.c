@@ -69,6 +69,7 @@
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/models/object_limits.h"
 #include "xwa_runtime/models/particle_lights.h"
+#include "xwa_runtime/models/projectiles.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/turret_ignore.h"
 #include "xwa_runtime/models/warhead_lock.h"
@@ -194,6 +195,7 @@ int XwaPort_Init(void) {
 	XwaDocking_Init();
 	XwaObjectLimits_Init();
 	XwaFormations_Init();
+	XwaProjectiles_Init();
 	XwaOriginalFilm_Init();
 	XwaHeadlights_Init();
 	XwaCameraMotion_Init();

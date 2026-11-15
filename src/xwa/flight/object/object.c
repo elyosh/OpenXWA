@@ -1726,10 +1726,10 @@ void Object_UpdateLifetimeAndMovement(void) {
 #ifdef XWA_MODERN
 									g_players[ownerPlayer].missionStats.missionScore -= XwaWeaponStats_Value(
 										obj->mobj->sourceObjIdx, obj->objectType, XWA_WEAPON_STAT_SCORE,
-										g_warheadProjectilePointValueByObjectType[obj->objectType]);
+										g_projectileScoreByType[obj->objectType - OBJ_LaserRebel]);
 #else
 									g_players[ownerPlayer].missionStats.missionScore -=
-										g_warheadProjectilePointValueByObjectType[obj->objectType];
+										g_projectileScoreByObjectType_BiasedBase[obj->objectType];
 #endif
 								}
 							}
@@ -2266,8 +2266,15 @@ void Object_UpdateLifetimeAndMovement(void) {
 
 					{
 						uint16_t tgtComp = pWG->targetComponentIdx;
+#ifdef XWA_MODERN
 						uint16_t profile =
-							(uint8_t)g_projectileHomingProfileBaseByObjectType[obj->objectType] + homingTier;
+							(uint8_t)g_projectileHomingProfileBaseByType[obj->objectType - OBJ_LaserRebel] +
+							homingTier;
+#else
+						uint16_t profile =
+							(uint8_t)g_projectileHomingProfileBaseByObjectType_BiasedBase[obj->objectType] +
+							homingTier;
+#endif
 						int targetIsActiveBeam = 0;
 
 						if (tgtIdx >= g_activeRegionObjectSlotStart &&

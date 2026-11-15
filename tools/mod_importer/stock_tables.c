@@ -185,20 +185,11 @@ static const uint16_t k_stockMapIcons[] = {
 static const uint8_t k_stockHardpointKinds[] = {
 #include "xwa/flight/hardpoint_weapon_kinds.inc"
 };
-static const uint16_t k_stockLifetimeSeconds[] = {
-#include "xwa/flight/object/projectile_lifetime_seconds.inc"
-};
-static const uint16_t k_stockLifetimeFractions[] = {
-#include "xwa/flight/object/projectile_lifetime_fractions.inc"
-};
 /* The game's arrays have these sizes, so the copies must have them too. */
 typedef char stock_tables_check[(sizeof k_stockHullIcons / sizeof k_stockHullIcons[0] == 72 &&
 								 sizeof k_stockMapIcons / sizeof k_stockMapIcons[0] == OBJ_NoAsset_222 + 1 &&
 								 sizeof k_stockHardpointKinds == 40 &&
-								 sizeof k_stockLifetimeSeconds / sizeof k_stockLifetimeSeconds[0] ==
-									 OBJ_LaserImperialDS - OBJ_LaserRebel + 1 &&
-								 sizeof k_stockLifetimeFractions / sizeof k_stockLifetimeFractions[0] ==
-									 OBJ_LaserImperialDS - OBJ_LaserRebel + 1)
+								 XWA_PROJECTILE_TYPE_COUNT == XWAU_GAME_PROJECTILE_TYPES)
 									? 1
 									: -1];
 
@@ -228,6 +219,20 @@ void ImportStockTables_Names(XwauNames* out) {
 	out->hud_areas = list_of(&g_xwaHudAreaNames);
 }
 
+/* The importer's copy of the projectile tables (stock_projectiles.c). */
+extern int g_projectileDamageByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileSpeedByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileLifetimeSecondsByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileLifetimeFracQ16ByType[XWA_PROJECTILE_TYPE_COUNT];
+extern int16_t g_projectileLaunchOffsetByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint8_t g_projectileWarheadClassByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileScoreByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint8_t g_projectileRequiredIffByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileAlternateIffTypeByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint8_t g_projectileHomingProfileBaseByType[XWA_PROJECTILE_TYPE_COUNT];
+extern uint16_t g_projectileHomingTurnRateByProfile[XWAU_GAME_HOMING_RATES];
+extern uint16_t g_projectileHomingSpeedAdjustRateByProfile[XWAU_GAME_HOMING_RATES];
+
 extern int16_t g_formPosX[XWAU_GAME_FORMATIONS][XWAU_GAME_FORMATION_SLOTS];
 extern int16_t g_formPosY[XWAU_GAME_FORMATIONS][XWAU_GAME_FORMATION_SLOTS];
 extern int16_t g_formPosZ[XWAU_GAME_FORMATIONS][XWAU_GAME_FORMATION_SLOTS];
@@ -240,9 +245,25 @@ void ImportStockTables_Values(XwauStockValues* out) {
 	out->map_icon_count = sizeof k_stockMapIcons / sizeof k_stockMapIcons[0];
 	out->hardpoint_kinds = k_stockHardpointKinds;
 	out->hardpoint_kind_count = sizeof k_stockHardpointKinds / sizeof k_stockHardpointKinds[0];
-	out->lifetime_seconds = k_stockLifetimeSeconds;
-	out->lifetime_fractions = k_stockLifetimeFractions;
-	out->lifetime_count = sizeof k_stockLifetimeSeconds / sizeof k_stockLifetimeSeconds[0];
+	static XwauProjectileTables projectiles;
+
+	for (int i = 0; i < XWAU_GAME_PROJECTILE_TYPES; ++i) {
+		projectiles.damage[i] = g_projectileDamageByType[i];
+		projectiles.speed[i] = g_projectileSpeedByType[i];
+		projectiles.lifetime_seconds[i] = g_projectileLifetimeSecondsByType[i];
+		projectiles.lifetime_fractions[i] = g_projectileLifetimeFracQ16ByType[i];
+		projectiles.launch_offset[i] = g_projectileLaunchOffsetByType[i];
+		projectiles.warhead_class[i] = g_projectileWarheadClassByType[i];
+		projectiles.score[i] = g_projectileScoreByType[i];
+		projectiles.side[i] = g_projectileRequiredIffByType[i];
+		projectiles.side_model[i] = g_projectileAlternateIffTypeByType[i];
+		projectiles.homing_profile[i] = g_projectileHomingProfileBaseByType[i];
+	}
+	memcpy(projectiles.homing_turn_rates, g_projectileHomingTurnRateByProfile,
+		   sizeof projectiles.homing_turn_rates);
+	memcpy(projectiles.homing_speed_rates, g_projectileHomingSpeedAdjustRateByProfile,
+		   sizeof projectiles.homing_speed_rates);
+	out->projectiles = &projectiles;
 	out->formation_positions[0] = g_formPosX[0];
 	out->formation_positions[1] = g_formPosY[0];
 	out->formation_positions[2] = g_formPosZ[0];

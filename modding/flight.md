@@ -42,6 +42,8 @@ sections:
 | `headlights` | a light on the nose of the player's craft |
 | `object_limits` | how many craft, shots, explosions and radar blips a mission can have |
 | `formations` | where the craft of a flight group fly in each formation |
+| `projectiles` | the original game's values of each weapon type: damage, speed, life, side, homing |
+| `homing_profiles` | how fast homing warheads turn and change speed |
 | `hangar_crafts` | the craft that the player can switch to in the hangar |
 | `camera` | the lag and tilt of the exterior camera, the cockpit sway and the HUD in the exterior view |
 | `camera_shake` | the camera's shake and jolt in the player's hyperspace jumps |
@@ -756,6 +758,49 @@ with the size of the leader's model. At the start of the mission, each craft
 uses the size of its own model. A craft that drops off a flight group flies
 to the place of each slot to release a craft there, and for that place the
 game doesn't divide by the divisor.
+
+### projectiles
+
+`projectiles` changes the values that the original game gives each weapon
+type, for every craft. Each key is a weapon type name. See
+[Weapons](reference/weapons.md#weapon-types) for the names and the original
+values.
+
+```yaml
+projectiles:
+  ion_pulse: {warhead_class: 2}
+  turbolaser_green_medium: {power: 3000, speed_mglt: 800}
+```
+
+| Key | Meaning |
+|-|-|
+| `power` | The damage of a shot. |
+| `speed_mglt` | The speed of a shot, in MGLT. |
+| `life_seconds` | How long a shot lives: the whole seconds. The game counts 236 ticks for each second and keeps the result in 16 bits, so a life longer than 277 seconds wraps around to a short one. |
+| `life_fraction` | The rest of the life, in 65536ths of a second. |
+| `launch_offset_m` | How far ahead of its launcher a shot starts, in metres. |
+| `warhead_class` | 0 for a laser. For a warhead, 2 makes the AI fire it at starships, platforms, freighters, containers, weapon emplacements and, in some missions, transports, and 1 at the other targets. |
+| `score` | The score that a warhead hit gives. |
+| `side` | `rebel`, `imperial` or `none`: the side whose craft fire this weapon type. |
+| `side_model` | The weapon type that a craft of the other side fires instead. |
+| `homing_profile` | The row of `homing_profiles` that a homing warhead uses, from 0 to 5. |
+
+Each key is optional. The stats of a weapon profile that set `power`,
+`speed_mglt`, `duration_ms`, `score`, `side` or `side_model` replace these
+values, as they replace the original ones. See
+[Weapon profiles](#weapon-profiles).
+
+### homing_profiles
+
+`homing_profiles` changes rows of the homing tables. Each key is a row from 0
+to 5, with two lists of 7 numbers: `turn_rates`, how fast a homing warhead
+turns, and `speed_rates`, how fast it changes speed. The warhead's homing
+level picks the number in the row.
+
+```yaml
+homing_profiles:
+  1: {turn_rates: [0, 512, 1024, 2048, 3072, 4608, 6144], speed_rates: [0, 25, 50, 100, 150, 200, 250]}
+```
 
 ### hangar_crafts
 

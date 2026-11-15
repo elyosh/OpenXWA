@@ -286,10 +286,8 @@ int XwaCraftWeapons_SwitchByIff(unsigned int objectType) {
 	return XwaMissionSettings_WeaponIffSwap();
 }
 
-/* The stock side tables end at the Death Star laser. A profile can still
-   give the last weapon type a side. */
 static int CraftWeapons_HasStockSide(unsigned int weaponType) {
-	return weaponType >= OBJ_LaserRebel && weaponType <= OBJ_LaserImperialDS;
+	return weaponType >= OBJ_LaserRebel && weaponType <= OBJ_NoAsset_307;
 }
 
 uint8_t XwaCraftWeapons_WeaponSide(int srcObjIdx, unsigned int weaponType) {

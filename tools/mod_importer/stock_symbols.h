@@ -4,8 +4,8 @@
 /*
  * The importer compiles its own copy of some game tables without
  * XWA_MODERN, so that the tables keep their stock sizes. The files are
- * model_def_static_data.inc, paiman_formation_tables.inc, object_type.c,
- * object_type_info.c and names.c.
+ * model_def_static_data.inc, paiman_formation_tables.inc,
+ * projectile_tables.inc, object_type.c, object_type_info.c and names.c.
  *
  * The game compiles the same files with XWA_MODERN, and a mod can change its
  * tables while the game runs. To link both copies into one program, these
@@ -18,6 +18,20 @@
 
 /* model_def_static_data.inc */
 #define g_modelDefs g_stockModelDefs
+
+/* projectile_tables.inc */
+#define g_projectileDamageByType g_stockProjectileDamageByType
+#define g_projectileSpeedByType g_stockProjectileSpeedByType
+#define g_projectileLifetimeSecondsByType g_stockProjectileLifetimeSecondsByType
+#define g_projectileLifetimeFracQ16ByType g_stockProjectileLifetimeFracQ16ByType
+#define g_projectileLaunchOffsetByType g_stockProjectileLaunchOffsetByType
+#define g_projectileWarheadClassByType g_stockProjectileWarheadClassByType
+#define g_projectileScoreByType g_stockProjectileScoreByType
+#define g_projectileRequiredIffByType g_stockProjectileRequiredIffByType
+#define g_projectileAlternateIffTypeByType g_stockProjectileAlternateIffTypeByType
+#define g_projectileHomingProfileBaseByType g_stockProjectileHomingProfileBaseByType
+#define g_projectileHomingTurnRateByProfile g_stockProjectileHomingTurnRateByProfile
+#define g_projectileHomingSpeedAdjustRateByProfile g_stockProjectileHomingSpeedAdjustRateByProfile
 
 /* paiman_formation_tables.inc */
 #define g_formPosX g_stockFormPosX

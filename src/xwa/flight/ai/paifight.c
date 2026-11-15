@@ -739,7 +739,7 @@ int16_t paifight_FindNearestAttackerOfMatchingTarget(uint16_t target1Type, uint1
 						projectileObject = &g_objectTable[projectileObjIdx];
 						if (projectileType != OBJ_None && projectileObject->genusId != GENUS_Explosion &&
 #ifdef XWA_MODERN
-							projectileType >= OBJ_LaserRebel && projectileType <= OBJ_LaserImperialDS &&
+							projectileType >= OBJ_LaserRebel && projectileType <= OBJ_NoAsset_307 &&
 							g_projectileWarheadClassByType[projectileType - OBJ_LaserRebel] != 0 &&
 #else
 							g_projectileWarheadClassByType[projectileType - OBJ_LaserRebel] != 0 &&

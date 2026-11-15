@@ -3402,8 +3402,7 @@ void collide_RefreshMobileObjectProximityCandidates(MobileObjectProximityList* l
 				   globals next to it. Skip them before the lookup, since the
 				   port's table is bounded. */
 				if (candidateObjIdx >= g_projectileObjectSlotStart &&
-					((uint16_t)candidateType < OBJ_LaserRebel ||
-					 (uint16_t)candidateType > OBJ_LaserImperialDS)) {
+					((uint16_t)candidateType < OBJ_LaserRebel || (uint16_t)candidateType > OBJ_NoAsset_307)) {
 					continue;
 				}
 #endif
