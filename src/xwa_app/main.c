@@ -647,6 +647,9 @@ int main(int argc, char** argv) {
 		while (!Aeron_QuitRequested() && !XwaPort_ShouldQuit()) {
 			const uint64_t frame_start_us = Aeron_NowUs();
 			const int32_t delta_us = Aeron_BeginFrame();
+			/* The film benchmark times the parts of each frame. */
+			const int benchmark_frame = XwaFilmBenchmark_IsPlaying();
+			const uint64_t begin_us = benchmark_frame ? Aeron_NowUs() - frame_start_us : 0;
 			/* The window's close button or Cmd+Q during an import or a delete
 			   of the Mods tab: the tab asks first, or quits when the delete
 			   ends. */
@@ -719,11 +722,13 @@ int main(int argc, char** argv) {
 			}
 			/* A frozen film runs no film steps either (film_benchmark.h). */
 			const int film_frozen = XwaFilmBenchmark_IsFrozen();
+			const uint64_t tick_start_us = benchmark_frame ? Aeron_NowUs() : 0;
 			if (paused || toggled || film_frozen || options_paused) {
 				XwaPort_PausedFrame();
 			} else {
 				XwaPort_Tick(delta_us);
 			}
+			const uint64_t tick_us = benchmark_frame ? Aeron_NowUs() - tick_start_us : 0;
 			if (Aeron_QuitRequested() || XwaPort_ShouldQuit()) {
 				break;
 			}
@@ -742,11 +747,15 @@ int main(int argc, char** argv) {
 			if (XwaModsPage_TakeRestartRequest()) {
 				request_restart(&launch);
 			}
+			const uint64_t present_start_us = benchmark_frame ? Aeron_NowUs() : 0;
 			if (!Aeron_Present()) {
 				Aeron_RequestFatalRendererError("frame presentation");
 				break;
 			}
-			XwaFilmBenchmark_NoteHostFrame(remaster_us, Aeron_NowUs() - frame_start_us);
+			const uint64_t present_end_us = Aeron_NowUs();
+			XwaFilmBenchmark_NoteHostFrame(begin_us, tick_us, remaster_us,
+										   benchmark_frame ? present_end_us - present_start_us : 0,
+										   present_end_us - frame_start_us);
 			if (XwaFilmBenchmark_CaptureDue()) {
 				XwaFilmBenchmark_CaptureDone(XwaRemaster_CaptureFlightFrame(XwaFilmBenchmark_CaptureName()));
 			}

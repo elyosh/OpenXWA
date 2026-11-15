@@ -1863,7 +1863,13 @@ static void XwaFlightTask_TickPhases(int now) {
 				Backdrop_FreeCoordinateBuffers();
 				FlightStarfield_Shutdown();
 				/* A film plays again from the start when it ends. The film
-				   benchmark ends the flight instead. */
+				   benchmark ends the flight instead. At the end of the file a
+				   read fails, which can stop the playback with mode 3. The
+				   flight then asks for a restart (exit request 2), so clear it
+				   too. */
+				if (XwaFilmBenchmark_IsPlaying()) {
+					restartMission = 0;
+				}
 				if ((restartMission || g_filmPlaybackMode == 3 || g_filmPlaybackMode == 2) &&
 					!XwaFilmBenchmark_IsPlaying()) {
 					int playerCount;

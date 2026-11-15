@@ -87,9 +87,11 @@ void XwaFilmBenchmark_MeasurementDone(int ok);
    commit when it ran. */
 void XwaFilmBenchmark_NoteFlight(int flightFrameRan, uint64_t flightUs);
 void XwaFilmBenchmark_NoteCapture(uint64_t captureUs);
-/* Ends the host frame's record with the remaster's frame and the whole host
-   frame without the wait. */
-void XwaFilmBenchmark_NoteHostFrame(uint64_t remasterUs, uint64_t hostFrameUs);
+/* Ends the host frame's record with Aeron_BeginFrame, the whole port tick,
+   the remaster's frame, the present, and the whole host frame without the
+   wait. */
+void XwaFilmBenchmark_NoteHostFrame(uint64_t beginUs, uint64_t tickUs, uint64_t remasterUs, uint64_t presentUs,
+									uint64_t hostFrameUs);
 
 #ifdef __cplusplus
 }
