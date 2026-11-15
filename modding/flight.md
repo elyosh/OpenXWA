@@ -118,6 +118,7 @@ is on by default.
 | `ejected_craft_team_9` | Escape pods and pilots are on team 9 instead of the team of the craft they come from. Their IFF doesn't change. Each mission's team table says which teams are hostile to team 9, so whether the AI attacks the pods depends on the mission. |
 | `ejected_craft_skip_setup` | Escape pods don't get the AI plan that the original game gives them. Pilots keep the random speed and direction that every ejected craft starts with. In the original game, pilots then get a speed of 80 and a direction based on their craft's. |
 | `skirmish_ejections` | The craft of a skirmish mission can eject pilots and escape pods. In the original game, they can't. |
+| `ai_warheads_attack_on_hit` | An AI craft's warhead marks its target as attacked when it hits, as other weapons do. In the original game, the launch marks it. That hit then isn't counted by the `attacked` trigger condition, and the target's "abort when attacked" order and the search for its attackers react at the launch. |
 
 ### mission_settings
 

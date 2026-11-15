@@ -3109,7 +3109,13 @@ char paifight_fightershootorder(void) {
 					}
 					laser_firerocketsystem(g_paiContext.aiObjIdx, launcherIdx);
 					++g_curCraft->aiFlight.maneuverCounter;
+#ifdef XWA_MODERN
+					if (!XwaMissionSettings_AiWarheadsAttackOnHit()) {
+						targetCraft->attackedByTeam[g_objectTable[g_paiContext.aiObjIdx].mobj->team] = 1;
+					}
+#else
 					targetCraft->attackedByTeam[g_objectTable[g_paiContext.aiObjIdx].mobj->team] = 1;
+#endif
 					firingCraft = g_curCraft;
 				}
 			}

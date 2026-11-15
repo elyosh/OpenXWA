@@ -115,6 +115,10 @@ int XwaMissionSettings_NoEscapePodEjections(void);
 int XwaMissionSettings_EjectedCraftTeam9(void);
 int XwaMissionSettings_EjectedCraftSkipSetup(void);
 int XwaMissionSettings_SkirmishEjections(void);
+/* An AI warhead marks its target as attacked by the shooter's team when it
+   hits, as any weapon does, and no longer when paifight_fightershootorder
+   launches it. */
+int XwaMissionSettings_AiWarheadsAttackOnHit(void);
 
 /* 1 or 0 when the mission sets the value, -1 for the stock rule. */
 int XwaMissionSettings_RedAlert(void);
