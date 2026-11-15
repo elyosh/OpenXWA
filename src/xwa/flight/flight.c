@@ -8819,8 +8819,7 @@ static __inline uint16_t FlightAction_FindIncomingWarheadTarget(unsigned int pla
 		ObjectRecord* obj = &g_objectTable[objIdx];
 		if (obj->objectType == OBJ_None ||
 			(obj->genusId != GENUS_PlayerProjectile && obj->genusId != GENUS_NpcProjectile) ||
-			obj->objectType < OBJ_LaserRebel || obj->objectType > OBJ_LaserImperialDS ||
-			g_projectileDamageByType[obj->objectType - OBJ_LaserRebel] == 0 || obj->mobj == NULL ||
+			g_projectileWarheadClassByType[obj->objectType - OBJ_LaserRebel] == 0 || obj->mobj == NULL ||
 			obj->mobj->pWarheadGuidance == NULL) {
 			continue;
 		}
@@ -8843,8 +8842,7 @@ static __inline uint16_t FlightAction_FindIncomingWarheadTarget(unsigned int pla
 		ObjectRecord* obj = &g_objectTable[objIdx];
 		if (obj->objectType == OBJ_None ||
 			(obj->genusId != GENUS_PlayerProjectile && obj->genusId != GENUS_NpcProjectile) ||
-			obj->objectType < OBJ_LaserRebel || obj->objectType > OBJ_LaserImperialDS ||
-			g_projectileDamageByType[obj->objectType - OBJ_LaserRebel] == 0 || obj->mobj == NULL ||
+			g_projectileWarheadClassByType[obj->objectType - OBJ_LaserRebel] == 0 || obj->mobj == NULL ||
 			obj->mobj->pWarheadGuidance == NULL) {
 			continue;
 		}

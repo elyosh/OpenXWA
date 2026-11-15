@@ -26,6 +26,7 @@
 #include "xwa/util/random.h"
 #include "xwa/util/time.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/compat/projectile_tables.h"
 #include "xwa_runtime/models/craft_hyperspace.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/docking.h"
@@ -2277,9 +2278,7 @@ void Object_UpdateLifetimeAndMovement(void) {
 					{
 						uint16_t tgtComp = pWG->targetComponentIdx;
 #ifdef XWA_MODERN
-						uint16_t profile =
-							(uint8_t)g_projectileHomingProfileBaseByType[obj->objectType - OBJ_LaserRebel] +
-							homingTier;
+						uint16_t profile = XwaProjectileTables_HomingProfileBase(obj->objectType) + homingTier;
 #else
 						uint16_t profile =
 							(uint8_t)g_projectileHomingProfileBaseByObjectType_BiasedBase[obj->objectType] +

@@ -1025,16 +1025,24 @@ uint16_t collide_targetinrange(int16_t shooterObjIdx, int16_t targetObjIdx, int1
 		++projectileType;
 	}
 
-	projectileSpeed =
-		(uint16_t)XwaWeaponStats_Value(shooterIdx, projectileType, XWA_WEAPON_STAT_SPEED,
-									   g_projectileSpeedByType[projectileType - OBJ_LaserRebel]);
-	lifetimeTicks = 236u * (uint32_t)(uint16_t)XwaWeaponStats_Value(
-							   shooterIdx, projectileType, XWA_WEAPON_STAT_DURATION_SECONDS,
-							   g_projectileLifetimeSecondsByType[projectileType - OBJ_LaserRebel]);
-	lifetimeTicks += (uint16_t)MATH2_fraction(
-		236u,
-		(uint16_t)XwaWeaponStats_Value(shooterIdx, projectileType, XWA_WEAPON_STAT_DURATION_FRACTION,
-									   g_projectileLifetimeFracQ16ByType[projectileType - OBJ_LaserRebel]));
+	/* Any charged laser type goes up by one, so a charged laser of the last
+	   weapon type is past the end of the tables. The original reads the
+	   next tables there. The port uses 0, which gives a range of 0. */
+	if (projectileType > OBJ_NoAsset_307) {
+		projectileSpeed = 0;
+		lifetimeTicks = 0;
+	} else {
+		projectileSpeed =
+			(uint16_t)XwaWeaponStats_Value(shooterIdx, projectileType, XWA_WEAPON_STAT_SPEED,
+										   g_projectileSpeedByType[projectileType - OBJ_LaserRebel]);
+		lifetimeTicks = 236u * (uint32_t)(uint16_t)XwaWeaponStats_Value(
+								   shooterIdx, projectileType, XWA_WEAPON_STAT_DURATION_SECONDS,
+								   g_projectileLifetimeSecondsByType[projectileType - OBJ_LaserRebel]);
+		lifetimeTicks += (uint16_t)MATH2_fraction(
+			236u, (uint16_t)XwaWeaponStats_Value(
+					  shooterIdx, projectileType, XWA_WEAPON_STAT_DURATION_FRACTION,
+					  g_projectileLifetimeFracQ16ByType[projectileType - OBJ_LaserRebel]));
+	}
 #else
 	if ((int8_t)shooterCraft->warheadData[(uint16_t)hardpointIndex].laserCharge >= 64) {
 		++projectileType;
