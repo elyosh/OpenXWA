@@ -492,6 +492,7 @@ static int cmd_configure_clustered_lights(void) {
 	const AeronSceneClusteredLightDesc desc = {
 		.depth_slices = (uint32_t)config.cluster_depth_slices,
 		.debug_view = config.cluster_debug,
+		.merge_spot_lights = config.merge_spot_lights,
 	};
 	return AeronScene_SetClusteredLights(s_cmd.scene, &desc);
 }

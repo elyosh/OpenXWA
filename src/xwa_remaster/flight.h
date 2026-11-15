@@ -195,6 +195,10 @@ typedef struct XwaFlightPointLightParams {
 	int enabled;
 	int cluster_depth_slices;
 	int cluster_debug;
+	/* Shade spot lights that point the same way close together, such as a
+	 * ship's engines, as one light far from them
+	 * (AeronSceneClusteredLightDesc.merge_spot_lights). */
+	int merge_spot_lights;
 	float match_distance_m;      /* metres at which a light is as bright as the classic law */
 	float range_scale;           /* multiplies the derived falloff range */
 	/* While the cockpit is drawn, the light of an explosion up to

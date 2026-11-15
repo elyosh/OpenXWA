@@ -807,7 +807,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"dynamic_cockpit.classic_hud",   "dynamic_cockpit.holograms",
 		"point_lights.model_lights",     "presentation.latency_pacing",
 		"hyperspace_jump.exit_forward",  "hyperspace_jump.warp_sky_half_resolution",
-		"models.backface_fill",
+		"models.backface_fill",          "point_lights.merge_spot_lights",
 	};
 	static const char* strings[] = {
 		"presentation.cockpit_fov",
@@ -1670,6 +1670,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.plight.enabled = AeronConfigFile_GetBool(cf, "point_lights.enabled", 0);
 	s.plight.cluster_depth_slices = (int)AeronConfigFile_GetInt(cf, "point_lights.cluster_depth_slices", 0);
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
+	s.plight.merge_spot_lights = AeronConfigFile_GetBool(cf, "point_lights.merge_spot_lights", 0);
 	s.plight.match_distance_m = (float)AeronConfigFile_GetFloat(cf, "point_lights.match_distance_m", 0.0);
 	s.plight.range_scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.range_scale", 0.0);
 	s.plight.cockpit_explosion_light_scale =
@@ -5183,6 +5184,7 @@ static int fl_configure_clustered_lights(AeronScene3D* scene) {
 	return AeronScene_SetClusteredLights(scene, &(AeronSceneClusteredLightDesc) {
 													.depth_slices = (uint32_t)s.plight.cluster_depth_slices,
 													.debug_view = s.plight.cluster_debug,
+													.merge_spot_lights = s.plight.merge_spot_lights,
 												});
 }
 

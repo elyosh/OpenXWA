@@ -551,6 +551,13 @@ static void xwa_tool_point_lights(int* open, void* user) {
 		changed = true;
 	}
 	changed |= ImGui::SliderInt("Depth slices", &p.cluster_depth_slices, 4, 64);
+	bool merge_spot_lights = p.merge_spot_lights != 0;
+	if (ImGui::Checkbox("Merge distant spot lights", &merge_spot_lights)) {
+		p.merge_spot_lights = merge_spot_lights ? 1 : 0;
+		changed = true;
+	}
+	ImGui::TextDisabled("Spot lights close together that point the same way, such as\n"
+						"a ship's engines, are shaded as one light away from them.");
 	XwaFlightPointLightStats stats;
 	XwaRemasterFlight_GetPointLightStats(&stats);
 	ImGui::Text("Candidates %u, valid %u, invalid %u, overflow %u", stats.generated_count, stats.valid_count,
@@ -560,6 +567,8 @@ static void xwa_tool_point_lights(int* open, void* user) {
 				stats.model_dropped_count);
 	ImGui::Text("Scene %u accepted, %u dropped", stats.scene.submitted_light_count,
 				stats.scene.dropped_light_count);
+	ImGui::Text("Spot lights: %u merged into %u", stats.scene.grouped_spot_light_count,
+				stats.scene.merged_spot_light_count);
 	ImGui::Text("%s, tile %u, grid %ux%ux%u (%.1f MiB)",
 				stats.scene.clustered_active ? "Clustered" : "No lights", stats.scene.effective_tile_size,
 				stats.scene.grid_x, stats.scene.grid_y, stats.scene.grid_z,

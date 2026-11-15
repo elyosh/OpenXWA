@@ -707,6 +707,10 @@ point_lights:
   enabled: true
   cluster_depth_slices: 24
   cluster_debug: false       # occupancy view; debug-UI builds only
+  # Spot lights close together that point the same way, such as a ship's
+  # engines, are shaded as one light away from them. Near them, they stay
+  # separate.
+  merge_spot_lights: true
   # The game's lights (lasers, explosions, engines) are physical
   # inverse-square sphere lights from the classic intensities. This many
   # metres away they give what the classic law gives, converted by
