@@ -90,6 +90,8 @@ static int s_ejectedCraftTeam9;
 static int s_ejectedCraftSkipSetup;
 static int s_skirmishEjections;
 static int s_aiWarheadsAttackOnHit;
+static int s_oneJammingBeamStopsTurrets;
+static int s_twoLauncherAdvancedMissiles;
 static int s_noDifficultyRankChanges;
 static int s_aiArrivalStopsBeforePoint;
 /* The craft that the O key targeted last, per player, for the cycle
@@ -525,6 +527,8 @@ void XwaMissionSettings_Init(void) {
 	s_ejectedCraftSkipSetup = 0;
 	s_skirmishEjections = 0;
 	s_aiWarheadsAttackOnHit = 0;
+	s_oneJammingBeamStopsTurrets = 0;
+	s_twoLauncherAdvancedMissiles = 0;
 	s_noDifficultyRankChanges = 0;
 	s_aiArrivalStopsBeforePoint = 0;
 	MissionSettings_ResetTargets();
@@ -660,6 +664,14 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "ai_warheads_attack_on_hit", node,
 								 &s_aiWarheadsAttackOnHit);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "one_jamming_beam_stops_turrets")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "one_jamming_beam_stops_turrets", node,
+								 &s_oneJammingBeamStopsTurrets);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "two_launcher_advanced_missiles")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "two_launcher_advanced_missiles", node,
+								 &s_twoLauncherAdvancedMissiles);
+	}
 	if ((node = AeronConfigNode_MapGet(rules, "no_difficulty_rank_changes")) != NULL) {
 		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_difficulty_rank_changes", node,
 								 &s_noDifficultyRankChanges);
@@ -760,6 +772,8 @@ int XwaMissionSettings_EjectedCraftTeam9(void) { return s_ejectedCraftTeam9; }
 int XwaMissionSettings_EjectedCraftSkipSetup(void) { return s_ejectedCraftSkipSetup; }
 int XwaMissionSettings_SkirmishEjections(void) { return s_skirmishEjections; }
 int XwaMissionSettings_AiWarheadsAttackOnHit(void) { return s_aiWarheadsAttackOnHit; }
+int XwaMissionSettings_OneJammingBeamStopsTurrets(void) { return s_oneJammingBeamStopsTurrets; }
+int XwaMissionSettings_TwoLauncherAdvancedMissiles(void) { return s_twoLauncherAdvancedMissiles; }
 int XwaMissionSettings_NoDifficultyRankChanges(void) { return s_noDifficultyRankChanges; }
 int XwaMissionSettings_AiArrivalStopsBeforePoint(void) { return s_aiArrivalStopsBeforePoint; }
 

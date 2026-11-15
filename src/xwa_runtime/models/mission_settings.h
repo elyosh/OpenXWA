@@ -119,6 +119,15 @@ int XwaMissionSettings_SkirmishEjections(void);
    hits, as any weapon does, and no longer when paifight_fightershootorder
    launches it. */
 int XwaMissionSettings_AiWarheadsAttackOnHit(void);
+/* A craft's turrets stop firing when one jamming beam is on it, instead of
+   three. Each beam adds 0xFFFF to the craft's jamming value, and
+   laser_firewarheadlauncher stops the turrets from 0xFFFF instead of
+   0x28000. */
+int XwaMissionSettings_OneJammingBeamStopsTurrets(void);
+/* Mission_InitFlightGroupObjectSlot loads advanced missiles instead of
+   missiles in the first launcher of a craft with two launcher types. The
+   launcher still gets the missile count. */
+int XwaMissionSettings_TwoLauncherAdvancedMissiles(void);
 /* The difficulty doesn't change the AI ranks of the flight groups when
    Mission_Init loads a mission. */
 int XwaMissionSettings_NoDifficultyRankChanges(void);

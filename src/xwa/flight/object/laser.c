@@ -1278,7 +1278,12 @@ void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, u
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (g_curCraft->beamEffectAccum[2] >=
+		(XwaMissionSettings_OneJammingBeamStopsTurrets() ? 0xffffu : 0x28000u)) {
+#else
 	if (g_curCraft->beamEffectAccum[2] >= 0x28000u) {
+#endif
 		return;
 	}
 	if (g_curCraft->beamEffectAccum[2] >= 0x18000u) {

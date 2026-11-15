@@ -208,12 +208,24 @@ char paiorder_checkhyperorder(void) {
 
 // FUNCTION: XWA 0x4BDD40
 char paiorder_componentgoneorder(void) {
+#ifdef XWA_MODERN
+	/* A target without a mobile object counts as gone. The original reads
+	   through a null pointer there. */
+	if (g_paiContext.aiController->targetObjIdx != 0xffff &&
+		g_paiContext.aiController->targetComponent != 0xffff &&
+		(g_objectTable[g_paiContext.aiController->targetObjIdx].mobj == NULL ||
+		 g_objectTable[g_paiContext.aiController->targetObjIdx]
+				 .mobj->pCraft->componentHp[g_paiContext.aiController->targetComponent] == 0)) {
+		return 1;
+	}
+#else
 	if (g_paiContext.aiController->targetObjIdx != 0xffff &&
 		g_paiContext.aiController->targetComponent != 0xffff &&
 		g_objectTable[g_paiContext.aiController->targetObjIdx]
 				.mobj->pCraft->componentHp[g_paiContext.aiController->targetComponent] == 0) {
 		return 1;
 	}
+#endif
 
 	return 0;
 }

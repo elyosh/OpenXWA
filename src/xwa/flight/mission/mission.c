@@ -6522,7 +6522,12 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			// Warhead launcher setup.
 			g_curCraft->warheadLauncherCount = 0;
 			if (g_modelDefs[modelIndex].warheadLauncherType[1]) {
+#ifdef XWA_MODERN
+				g_curCraft->warheadSlotTypeIds[0] =
+					XwaMissionSettings_TwoLauncherAdvancedMissiles() ? OBJ_WarheadAdvancedMissile : 287;
+#else
 				g_curCraft->warheadSlotTypeIds[0] = 287;
+#endif
 				g_curCraft->warheadSlotTypeIds[1] =
 					g_warheadTypeIds[g_missionFlightGroups[g_currentFlightGroupIdx].fg.warhead];
 			} else {
