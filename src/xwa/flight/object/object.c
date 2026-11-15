@@ -1491,6 +1491,16 @@ static __inline void Object_ApplyTrigMoveDeltaAndClampWorldPosition(ObjectRecord
 	}
 }
 
+/* How much the jolt of a hit (viewState.cameraPanDelta*) fades in this step:
+   64 a second. In the modern build it fades at that rate with any step size.
+   With steps of 1 to 3 ticks, the stock step is 0, so the jolt would never
+   fade and the camera would stay off the seat. */
+#ifdef XWA_MODERN
+#define OBJECT_CAMERA_PAN_DECAY XwaModernFlightTiming_ScaleStepTicks(g_gameTime, (uint16_t)g_elapsedTicks, 64, 236)
+#else
+#define OBJECT_CAMERA_PAN_DECAY (((uint16_t)g_elapsedTicks << 6) / 236)
+#endif
+
 #ifndef XWA_MODERN
 #pragma optimize("y", off)
 #endif
@@ -1773,12 +1783,12 @@ void Object_UpdateLifetimeAndMovement(void) {
 
 			if (vs->cameraPanDeltaX) {
 				if (vs->cameraPanDeltaX < 0) {
-					vs->cameraPanDeltaX += ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaX += OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaX > 0) {
 						vs->cameraPanDeltaX = 0;
 					}
 				} else {
-					vs->cameraPanDeltaX -= ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaX -= OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaX < 0) {
 						vs->cameraPanDeltaX = 0;
 					}
@@ -1786,12 +1796,12 @@ void Object_UpdateLifetimeAndMovement(void) {
 			}
 			if (vs->cameraPanDeltaY) {
 				if (vs->cameraPanDeltaY < 0) {
-					vs->cameraPanDeltaY += ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaY += OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaY > 0) {
 						vs->cameraPanDeltaY = 0;
 					}
 				} else {
-					vs->cameraPanDeltaY -= ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaY -= OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaY < 0) {
 						vs->cameraPanDeltaY = 0;
 					}
@@ -1799,12 +1809,12 @@ void Object_UpdateLifetimeAndMovement(void) {
 			}
 			if (vs->cameraPanDeltaZ) {
 				if (vs->cameraPanDeltaZ < 0) {
-					vs->cameraPanDeltaZ += ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaZ += OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaZ > 0) {
 						vs->cameraPanDeltaZ = 0;
 					}
 				} else {
-					vs->cameraPanDeltaZ -= ((uint16_t)g_elapsedTicks << 6) / 236;
+					vs->cameraPanDeltaZ -= OBJECT_CAMERA_PAN_DECAY;
 					if (vs->cameraPanDeltaZ < 0) {
 						vs->cameraPanDeltaZ = 0;
 					}
