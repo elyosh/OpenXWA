@@ -124,6 +124,7 @@ is on by default.
 | `ai_arrival_stops_before_point` | An AI craft arriving from hyperspace without an arrival speed of its own slows down near its point and stops before it. It slows to a third of the distance to its point when that distance is less than 3 times its speed, and stops when the distance minus its speed is 0 or less, or no longer goes down. In the original game, it stops once it has passed its point, if it's within 65536 units, and the Super Star Destroyer has a test of its own. |
 | `ai_warheads_attack_on_hit` | An AI craft's warhead marks its target as attacked when it hits, as other weapons do. In the original game, the launch marks it. That hit then isn't counted by the `attacked` trigger condition, and the target's "abort when attacked" order and the search for its attackers react at the launch. |
 | `one_jamming_beam_stops_turrets` | A craft's turrets stop firing when one player's jamming beam is on it. In the original game, it takes three beams on the same craft. One or two beams only slow down the turrets' fire. |
+| `no_turret_idle_spin` | A rotary gun turret without a target doesn't turn. In the original game, it turns back and forth, and changes direction at random. |
 | `two_launcher_advanced_missiles` | A craft with two warhead launcher types, such as the Missile Boat, loads advanced missiles in its first launcher. The launcher still gets as many as it would get missiles. In the original game, it loads missiles. |
 
 ### mission_settings

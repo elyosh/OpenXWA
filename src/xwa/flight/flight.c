@@ -2197,6 +2197,11 @@ void FlightObject_UpdateSpecialBehavior(void) {
 						continue;
 					}
 					if (g_curCraft->warheadData[slot].turretTargetObjIdx == -1) {
+#ifdef XWA_MODERN
+						if (XwaMissionSettings_NoTurretIdleSpin()) {
+							continue;
+						}
+#endif
 						uint8_t mr = g_curCraft->meshRotation[meshIdx];
 						g_curCraft->meshRotation[meshIdx] = (mr & 1) ? (uint8_t)(mr + 4) : (uint8_t)(mr - 4);
 						if ((uint16_t)GameRand() < 0x600u) {

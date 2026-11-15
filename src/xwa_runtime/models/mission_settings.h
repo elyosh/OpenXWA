@@ -128,6 +128,9 @@ int XwaMissionSettings_OneJammingBeamStopsTurrets(void);
    missiles in the first launcher of a craft with two launcher types. The
    launcher still gets the missile count. */
 int XwaMissionSettings_TwoLauncherAdvancedMissiles(void);
+/* FlightObject_UpdateSpecialBehavior leaves a rotary gun turret without a
+   target as it is: it doesn't turn it, and doesn't call GameRand for it. */
+int XwaMissionSettings_NoTurretIdleSpin(void);
 /* The difficulty doesn't change the AI ranks of the flight groups when
    Mission_Init loads a mission. */
 int XwaMissionSettings_NoDifficultyRankChanges(void);

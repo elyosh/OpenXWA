@@ -92,6 +92,7 @@ static int s_skirmishEjections;
 static int s_aiWarheadsAttackOnHit;
 static int s_oneJammingBeamStopsTurrets;
 static int s_twoLauncherAdvancedMissiles;
+static int s_noTurretIdleSpin;
 static int s_noDifficultyRankChanges;
 static int s_aiArrivalStopsBeforePoint;
 /* The craft that the O key targeted last, per player, for the cycle
@@ -529,6 +530,7 @@ void XwaMissionSettings_Init(void) {
 	s_aiWarheadsAttackOnHit = 0;
 	s_oneJammingBeamStopsTurrets = 0;
 	s_twoLauncherAdvancedMissiles = 0;
+	s_noTurretIdleSpin = 0;
 	s_noDifficultyRankChanges = 0;
 	s_aiArrivalStopsBeforePoint = 0;
 	MissionSettings_ResetTargets();
@@ -672,6 +674,9 @@ void XwaMissionSettings_Init(void) {
 		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "two_launcher_advanced_missiles", node,
 								 &s_twoLauncherAdvancedMissiles);
 	}
+	if ((node = AeronConfigNode_MapGet(rules, "no_turret_idle_spin")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_turret_idle_spin", node, &s_noTurretIdleSpin);
+	}
 	if ((node = AeronConfigNode_MapGet(rules, "no_difficulty_rank_changes")) != NULL) {
 		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "no_difficulty_rank_changes", node,
 								 &s_noDifficultyRankChanges);
@@ -774,6 +779,7 @@ int XwaMissionSettings_SkirmishEjections(void) { return s_skirmishEjections; }
 int XwaMissionSettings_AiWarheadsAttackOnHit(void) { return s_aiWarheadsAttackOnHit; }
 int XwaMissionSettings_OneJammingBeamStopsTurrets(void) { return s_oneJammingBeamStopsTurrets; }
 int XwaMissionSettings_TwoLauncherAdvancedMissiles(void) { return s_twoLauncherAdvancedMissiles; }
+int XwaMissionSettings_NoTurretIdleSpin(void) { return s_noTurretIdleSpin; }
 int XwaMissionSettings_NoDifficultyRankChanges(void) { return s_noDifficultyRankChanges; }
 int XwaMissionSettings_AiArrivalStopsBeforePoint(void) { return s_aiArrivalStopsBeforePoint; }
 
