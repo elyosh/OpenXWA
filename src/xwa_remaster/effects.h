@@ -28,6 +28,9 @@ typedef struct XwaRemasterEffectView {
 	float focal_y_px;
 	float classic_pixel_scale;
 	float near_z;
+	/* The views of the scene that draw the effects built for this camera,
+	 * one bit each. 0 is every view. */
+	uint32_t view_mask;
 } XwaRemasterEffectView;
 
 void XwaRemasterEffectView_Main(XwaRemasterEffectView* out, const XwaRemasterFlightView* view,

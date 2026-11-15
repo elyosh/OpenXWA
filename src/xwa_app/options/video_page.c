@@ -13,15 +13,18 @@
  * the OpenXW Video tab. */
 
 static bool XwaVideoPage_Display(AeronUiContext* ui, XwaModernVideoOptions* options) {
-	int fullscreen = options->window_mode == XWA_MODERN_WINDOW_MODE_FULLSCREEN;
+	static const char* const window_modes[] = { "Windowed", "Fullscreen", "Span Displays" };
+	int window_mode = (int)options->window_mode;
 	bool changed = false;
 
 	AeronUi_Header(ui, "Display");
-	if (AeronUi_Toggle(ui, "Fullscreen", &fullscreen)) {
-		options->window_mode =
-			fullscreen ? XWA_MODERN_WINDOW_MODE_FULLSCREEN : XWA_MODERN_WINDOW_MODE_WINDOWED;
+	if (AeronUi_Selector(ui, "Window Mode", &window_mode, window_modes, 3)) {
+		options->window_mode = (XwaModernWindowMode)window_mode;
 		changed = true;
 	}
+	if (options->window_mode == XWA_MODERN_WINDOW_MODE_SPAN)
+		AeronUi_Help(ui, "One window over the displays that are next to each other. It is fullscreen "
+						 "when the system doesn't allow it.");
 	changed |= AeronUi_Toggle(ui, "HDR Output", &options->hdr_output);
 	if (options->hdr_output && !Aeron_OutputHdrEnabled())
 		AeronUi_Help(ui, Aeron_OutputHdrStatusName(Aeron_OutputHdrStatus()));
@@ -51,6 +54,45 @@ static bool XwaVideoPage_Display(AeronUiContext* ui, XwaModernVideoOptions* opti
 		}
 	}
 #endif
+	return changed;
+}
+
+static bool XwaVideoPage_SurroundSize(AeronUiContext* ui, const char* label, float* value, float min,
+									  float max, int step, const char* format) {
+	int shown = (int)lroundf(*value);
+	if (!AeronUi_SliderInt(ui, label, &shown, (int)min, (int)max, step, format))
+		return false;
+	*value = (float)shown;
+	return true;
+}
+
+static bool XwaVideoPage_Surround(AeronUiContext* ui, XwaModernSurroundOptions* surround) {
+	bool changed = false;
+
+	AeronUi_Header(ui, "Surround Screens");
+	changed |= AeronUi_Toggle(ui, "Surround", &surround->enabled);
+	AeronUi_Help(ui, "Draws the flight view on three screens of the same size, side by side, each with "
+					 "its own perspective. The window must cover the three screens. FSR upscaling is "
+					 "off in this mode: use MSAA.");
+	if (!surround->enabled)
+		return changed;
+	changed |= XwaVideoPage_SurroundSize(ui, "Screen Width", &surround->screen_width_mm,
+										 XWA_MODERN_SURROUND_SIZE_MIN_MM, XWA_MODERN_SURROUND_SIZE_MAX_MM, 1,
+										 "%d mm");
+	changed |= XwaVideoPage_SurroundSize(ui, "Screen Height", &surround->screen_height_mm,
+										 XWA_MODERN_SURROUND_SIZE_MIN_MM, XWA_MODERN_SURROUND_SIZE_MAX_MM, 1,
+										 "%d mm");
+	AeronUi_Help(ui, "The size of one screen's picture, without its frame.");
+	changed |= XwaVideoPage_SurroundSize(ui, "Bezel", &surround->bezel_mm, 0.0f,
+										 XWA_MODERN_SURROUND_BEZEL_MAX_MM, 1, "%d mm");
+	AeronUi_Help(ui, "The width of a screen's frame at its side.");
+	changed |=
+		XwaVideoPage_SurroundSize(ui, "Distance", &surround->distance_mm, XWA_MODERN_SURROUND_DISTANCE_MIN_MM,
+								  XWA_MODERN_SURROUND_DISTANCE_MAX_MM, 10, "%d mm");
+	AeronUi_Help(ui, "From your eyes to the centre screen.");
+	changed |= XwaVideoPage_SurroundSize(ui, "Side Screen Angle", &surround->side_angle_deg, 0.0f,
+										 XWA_MODERN_SURROUND_SIDE_ANGLE_MAX_DEG, 1, "%d degrees");
+	AeronUi_Help(ui, "How far each side screen is turned toward you. 0 is flat.");
 	return changed;
 }
 
@@ -149,6 +191,7 @@ void XwaVideoPage_Draw(AeronUiContext* ui, const AeronInputSnapshot* input) {
 		return;
 	XwaModernVideoOptions_Get(&options);
 	changed = XwaVideoPage_Display(ui, &options);
+	changed |= XwaVideoPage_Surround(ui, &options.surround);
 	changed |= XwaVideoPage_FlightRendering(ui, &options);
 
 	AeronUi_Header(ui, "HUD");

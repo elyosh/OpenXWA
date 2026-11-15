@@ -419,9 +419,62 @@ static int host_config_named_value(const AeronConfigFile* config, const char* ke
 	return host_config_error(error, error_size, "invalid video setting '%s'", key);
 }
 
+/* Reads a number of the video section that must be from `min` to `max`. */
+static int host_config_video_float(const AeronConfigFile* config, const char* key, float min, float max,
+								   float* out, unsigned int override_bit, unsigned int* override_mask,
+								   char* error, size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	if (!node) {
+		return 1;
+	}
+	const double value = AeronConfigNode_Float(node, NAN);
+	if (!isfinite(value) || value < min || value > max) {
+		char message[160];
+		snprintf(message, sizeof message, "invalid '%s': expected a number from %g to %g", key, (double)min,
+				 (double)max);
+		return host_config_error(error, error_size, "%s", message);
+	}
+	*out = (float)value;
+	*override_mask |= override_bit;
+	return 1;
+}
+
+static int host_config_surround_options(const AeronConfigFile* config, XwaModernSurroundOptions* out,
+										unsigned int* override_mask, char* error, size_t error_size) {
+	static const char* const switch_names[] = { "off", "on" };
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, "video.surround");
+	if (node && AeronConfigNode_Type(node) == AERON_CONFIG_BOOL) {
+		out->enabled = AeronConfigNode_Bool(node, 0);
+		*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_SURROUND;
+	} else if (!host_config_named_value(config, "video.surround", switch_names, 2, &out->enabled,
+										XWA_MODERN_VIDEO_OVERRIDE_SURROUND, override_mask, error,
+										error_size)) {
+		return 0;
+	}
+	return host_config_video_float(config, "video.surround_screen_width_mm", XWA_MODERN_SURROUND_SIZE_MIN_MM,
+								   XWA_MODERN_SURROUND_SIZE_MAX_MM, &out->screen_width_mm,
+								   XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SCREEN_WIDTH, override_mask, error,
+								   error_size) &&
+		   host_config_video_float(config, "video.surround_screen_height_mm", XWA_MODERN_SURROUND_SIZE_MIN_MM,
+								   XWA_MODERN_SURROUND_SIZE_MAX_MM, &out->screen_height_mm,
+								   XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SCREEN_HEIGHT, override_mask, error,
+								   error_size) &&
+		   host_config_video_float(config, "video.surround_bezel_mm", 0.0f, XWA_MODERN_SURROUND_BEZEL_MAX_MM,
+								   &out->bezel_mm, XWA_MODERN_VIDEO_OVERRIDE_SURROUND_BEZEL, override_mask,
+								   error, error_size) &&
+		   host_config_video_float(config, "video.surround_distance_mm", XWA_MODERN_SURROUND_DISTANCE_MIN_MM,
+								   XWA_MODERN_SURROUND_DISTANCE_MAX_MM, &out->distance_mm,
+								   XWA_MODERN_VIDEO_OVERRIDE_SURROUND_DISTANCE, override_mask, error,
+								   error_size) &&
+		   host_config_video_float(config, "video.surround_side_angle_deg", 0.0f,
+								   XWA_MODERN_SURROUND_SIDE_ANGLE_MAX_DEG, &out->side_angle_deg,
+								   XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SIDE_ANGLE, override_mask, error,
+								   error_size);
+}
+
 static int host_config_video_options(const AeronConfigFile* config, XwaModernVideoOptions* out,
 									 unsigned int* override_mask, char* error, size_t error_size) {
-	static const char* const window_mode_names[] = { "windowed", "fullscreen" };
+	static const char* const window_mode_names[] = { "windowed", "fullscreen", "span" };
 	static const char* const quality_names[] = { "off", "low", "high" };
 	static const char* const shadow_quality_names[] = { "standard", "high" };
 	static const char* const fsr_names[] = { "off", "performance", "balanced", "quality", "native_aa" };
@@ -438,6 +491,9 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 		return 0;
 	}
 	out->window_mode = (XwaModernWindowMode)value;
+	if (!host_config_surround_options(config, &out->surround, override_mask, error, error_size)) {
+		return 0;
+	}
 
 	value = 0;
 	if (!host_config_named_value(config, "video.ssao_quality", quality_names,
@@ -872,7 +928,7 @@ static int host_config_save_user_document(AeronVfs* vfs, AeronConfigFile* docume
 
 static int host_config_set_video_options(AeronConfigFile* document, const XwaModernVideoOptions* options,
 										 AeronConfigError* error) {
-	static const char* const window_mode_names[] = { "windowed", "fullscreen" };
+	static const char* const window_mode_names[] = { "windowed", "fullscreen", "span" };
 	static const char* const quality_names[] = { "off", "low", "high" };
 	static const char* const shadow_quality_names[] = { "standard", "high" };
 	static const char* const fsr_names[] = { "off", "performance", "balanced", "quality", "native_aa" };
@@ -881,8 +937,9 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 	static const char* const paper_white_names[] = { "auto", "100", "150", "200", "250", "300", "400" };
 
 	if (!options || options->window_mode < XWA_MODERN_WINDOW_MODE_WINDOWED ||
-		options->window_mode > XWA_MODERN_WINDOW_MODE_FULLSCREEN ||
-		options->ssao_quality < XWA_MODERN_SSAO_OFF || options->ssao_quality > XWA_MODERN_SSAO_HIGH ||
+		options->window_mode > XWA_MODERN_WINDOW_MODE_SPAN ||
+		!XwaModernSurroundOptions_Valid(&options->surround) || options->ssao_quality < XWA_MODERN_SSAO_OFF ||
+		options->ssao_quality > XWA_MODERN_SSAO_HIGH ||
 		options->shadow_quality < XWA_MODERN_SHADOW_STANDARD ||
 		options->shadow_quality > XWA_MODERN_SHADOW_HIGH || options->fsr_upscaling < XWA_MODERN_FSR_OFF ||
 		options->fsr_upscaling > XWA_MODERN_FSR_NATIVE_AA || options->msaa < XWA_MODERN_MSAA_OFF ||
@@ -916,7 +973,17 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 									 error) &&
 		   AeronConfigFile_SetString(document, "video.paper_white_nits",
 									 paper_white_names[options->paper_white], error) &&
-		   AeronConfigFile_SetFloat(document, "video.hud_scale", options->hud_scale, error);
+		   AeronConfigFile_SetFloat(document, "video.hud_scale", options->hud_scale, error) &&
+		   AeronConfigFile_SetBool(document, "video.surround", options->surround.enabled, error) &&
+		   AeronConfigFile_SetFloat(document, "video.surround_screen_width_mm",
+									options->surround.screen_width_mm, error) &&
+		   AeronConfigFile_SetFloat(document, "video.surround_screen_height_mm",
+									options->surround.screen_height_mm, error) &&
+		   AeronConfigFile_SetFloat(document, "video.surround_bezel_mm", options->surround.bezel_mm, error) &&
+		   AeronConfigFile_SetFloat(document, "video.surround_distance_mm", options->surround.distance_mm,
+									error) &&
+		   AeronConfigFile_SetFloat(document, "video.surround_side_angle_deg",
+									options->surround.side_angle_deg, error);
 }
 
 static int host_config_remove_key(AeronConfigFile* document, const char* key, AeronConfigError* error) {

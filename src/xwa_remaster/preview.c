@@ -251,7 +251,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 			const float scale = (float)(0.60000002 - (double)(flick & 0xf) * 0.0024999999);
 			XwaRemasterShip_SubmitEngineGlows(s.scene, mesh, inst.transform, k, table,
 											  /*knockout_mask=*/NULL, /*hidden_mask=*/NULL, scale,
-											  /*crows=*/NULL, /*cam_pos=*/NULL, glow_tex);
+											  /*crows=*/NULL, /*cam_pos=*/NULL, /*view_mask=*/0, glow_tex);
 		}
 	}
 

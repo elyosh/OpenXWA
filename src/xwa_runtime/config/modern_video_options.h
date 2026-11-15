@@ -42,7 +42,37 @@ typedef enum XwaModernMotionBlurQuality {
 typedef enum XwaModernWindowMode {
 	XWA_MODERN_WINDOW_MODE_WINDOWED = 0,
 	XWA_MODERN_WINDOW_MODE_FULLSCREEN,
+	/* One borderless window over the displays that are next to each other. */
+	XWA_MODERN_WINDOW_MODE_SPAN,
 } XwaModernWindowMode;
+
+/* A surround setup: three screens of the same size side by side, the side
+ * screens turned toward the player. With it, the flight view is drawn once
+ * for each screen, with that screen's own perspective. The sizes are in
+ * millimetres, as the player measures them. */
+typedef struct XwaModernSurroundOptions {
+	int enabled;
+	/* The size of one screen's picture, without its frame. */
+	float screen_width_mm;
+	float screen_height_mm;
+	/* The width of a screen's frame at its side. */
+	float bezel_mm;
+	/* From the player's eyes to the centre screen. */
+	float distance_mm;
+	/* How far each side screen is turned toward the player. 0 is flat. */
+	float side_angle_deg;
+} XwaModernSurroundOptions;
+
+#define XWA_MODERN_SURROUND_SIZE_MIN_MM 100.0f
+#define XWA_MODERN_SURROUND_SIZE_MAX_MM 3000.0f
+#define XWA_MODERN_SURROUND_BEZEL_MAX_MM 100.0f
+#define XWA_MODERN_SURROUND_DISTANCE_MIN_MM 200.0f
+#define XWA_MODERN_SURROUND_DISTANCE_MAX_MM 3000.0f
+#define XWA_MODERN_SURROUND_SIDE_ANGLE_MAX_DEG 85.0f
+
+/* Fills `out` with a setup of three 27-inch 16:9 screens. */
+void XwaModernSurroundOptions_Default(XwaModernSurroundOptions* out);
+int XwaModernSurroundOptions_Valid(const XwaModernSurroundOptions* options);
 
 /* Decode gamma for SDR-authored content under HDR output. SRGB (the piecewise
  * curve) is last so the in-game cycle covers only 2.2/2.4: it is accepted from
@@ -81,6 +111,7 @@ typedef struct XwaModernVideoOptions {
 	   XWA_MODERN_HUD_SCALE_MAX. At 1, the HUD has the size that the stock
 	   game gives it at most resolutions, in any window. */
 	float hud_scale;
+	XwaModernSurroundOptions surround;
 } XwaModernVideoOptions;
 
 #define XWA_MODERN_HUD_SCALE_MIN 0.5f
@@ -98,6 +129,12 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_MOTION_BLUR_AMOUNT = 1u << 8,
 	XWA_MODERN_VIDEO_OVERRIDE_SHADOW_QUALITY = 1u << 9,
 	XWA_MODERN_VIDEO_OVERRIDE_HUD_SCALE = 1u << 10,
+	XWA_MODERN_VIDEO_OVERRIDE_SURROUND = 1u << 11,
+	XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SCREEN_WIDTH = 1u << 12,
+	XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SCREEN_HEIGHT = 1u << 13,
+	XWA_MODERN_VIDEO_OVERRIDE_SURROUND_BEZEL = 1u << 14,
+	XWA_MODERN_VIDEO_OVERRIDE_SURROUND_DISTANCE = 1u << 15,
+	XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SIDE_ANGLE = 1u << 16,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

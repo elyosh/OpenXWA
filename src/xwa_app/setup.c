@@ -213,6 +213,23 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			out->render_height = (int)height;
 			continue;
 		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--flight-views");
+		if (!pass_through && (value || strcmp(argv[i], "--flight-views") == 0)) {
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, "%s requires surround or stereo", "--flight-views");
+				}
+				value = argv[i];
+			}
+			if (strcmp(value, "surround") == 0) {
+				out->flight_views = 1;
+			} else if (strcmp(value, "stereo") == 0) {
+				out->flight_views = 2;
+			} else {
+				return setup_error(error, error_size, "%s requires surround or stereo", "--flight-views");
+			}
+			continue;
+		}
 		if (!pass_through && strcmp(argv[i], "--classic-2d-sound") == 0) {
 			out->classic_2d_sound = 1;
 			continue;
@@ -282,6 +299,10 @@ int XwaLaunchOptions_RelaunchArgs(const XwaLaunchOptions* launch, int skip_intro
 		out->args[out->count++] = "--render-size";
 		out->args[out->count++] = out->render_size;
 	}
+	if (launch->flight_views) {
+		out->args[out->count++] = "--flight-views";
+		out->args[out->count++] = launch->flight_views == 1 ? "surround" : "stereo";
+	}
 	/* The parser joins the game's arguments with spaces, so one argument gives
 	   it the same text back, quotes included. */
 	snprintf(out->game_command_line, sizeof out->game_command_line, "%s", launch->game_command_line);
@@ -322,6 +343,9 @@ const char* XwaLaunchOptions_Help(void) {
 		   "  --render-size <W>x<H>     render the 3D view at this size in pixels,\n"
 		   "                            whatever the window's size, and fit it in the\n"
 		   "                            window\n"
+		   "  --flight-views <kind>     for tests: draw the flight scene of this run as\n"
+		   "                            three surround screens (surround), or as the two\n"
+		   "                            eyes of a headset side by side (stereo)\n"
 		   "  -h, --help                print this help and quit\n"
 		   "\n"
 		   "Other arguments, and everything after --, go to the game's own command line.\n";

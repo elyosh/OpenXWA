@@ -1407,7 +1407,7 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 									   const float transform[16], float model_scale,
 									   const AeronSceneMeshTable* table, const uint32_t* knockout_mask,
 									   const uint32_t* hidden_mask, float scale, const float crows[9],
-									   const float cam_pos[3], const XwaAssetRef* tex) {
+									   const float cam_pos[3], uint32_t view_mask, const XwaAssetRef* tex) {
 	if (!scene || !mesh || !mesh->engine_glow_count || !transform || scale <= 0.0f ||
 		s_engine_emissive_strength <= 0.0f || !tex || !tex->texture) {
 		return;
@@ -1600,6 +1600,7 @@ void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh
 		d.texture = tex->texture;
 		d.blend = AERON_SCENE_BILLBOARD_BLEND_PMA;
 		d.stage = AERON_SCENE_BILLBOARD_STAGE_OVERLAY;
+		d.view_mask = view_mask;
 		d.center_color = core;
 		for (int v = 0; v < 4; v++) {
 			/* View corners -> submission space (inverse of the camera

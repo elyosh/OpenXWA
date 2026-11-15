@@ -40,6 +40,10 @@ typedef struct XwaRemasterInitOptions {
 	   follow the window. */
 	int render_width;
 	int render_height;
+	/* --flight-views: 1 draws the flight scene as a surround setup for this
+	   run, whatever the video options say, and 2 as the debug UI's stereo
+	   view with the head looking straight ahead. 0 follows the options. */
+	int flight_views;
 } XwaRemasterInitOptions;
 
 /* Loads mandatory renderer resources and creates process-wide remaster state. */
@@ -87,6 +91,32 @@ AeronSampleCount XwaRemaster_MsaaSampleCount(void);
  * settings. */
 void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out);
 void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options);
+
+/* The debug UI's stereo view: the flight scene drawn for the two eyes of a
+ * headset, side by side in the window, to test the multi-view renderer
+ * without a headset. The head's pose is set here, or follows the mouse. */
+typedef struct XwaRemasterDebugStereo {
+	int enabled;
+	/* The head turns with the mouse: the window's centre looks straight
+	 * ahead, and its edges look `mouse_yaw_deg` to the side and
+	 * `mouse_pitch_deg` up or down. */
+	int mouse_head;
+	float mouse_yaw_deg;
+	float mouse_pitch_deg;
+	float ipd_m;
+	/* The horizontal field of view of one eye. */
+	float fov_deg;
+	/* The head's pose when the mouse doesn't set it: degrees to the right,
+	 * up, and rolled clockwise. */
+	float yaw_deg;
+	float pitch_deg;
+	float roll_deg;
+	/* The head's position from the seat, in metres: right, up, forward. */
+	float position_m[3];
+} XwaRemasterDebugStereo;
+
+void XwaRemaster_GetDebugStereo(XwaRemasterDebugStereo* out);
+void XwaRemaster_SetDebugStereo(const XwaRemasterDebugStereo* in);
 
 #ifdef __cplusplus
 }

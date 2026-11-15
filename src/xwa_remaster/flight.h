@@ -25,6 +25,7 @@
 #include "aeron/render.h"
 #include "aeron/scene/scene3d.h"
 #include "aeron/scene/settings.h"
+#include "aeron/scene/view_rig.h"
 #include "aeron/vfs.h"
 #include "xwa_remaster/assets.h"
 #include "xwa_remaster/environment.h"
@@ -526,6 +527,10 @@ typedef struct XwaFlightTemporalStats {
 /* presentation.cockpit_fov_min_aspect, for the debug UI. */
 float XwaRemasterFlight_GetCockpitFovMinAspect(void);
 void XwaRemasterFlight_SetCockpitFovMinAspect(float aspect);
+/* presentation.debug_stereo_ipd_m and debug_stereo_fov_deg: the distance
+ * between the eyes and the horizontal field of view of the debug UI's
+ * stereo view. */
+void XwaRemasterFlight_GetDebugStereoDefaults(float* ipd_m, float* fov_deg);
 
 void XwaRemasterFlight_GetTemporal(XwaFlightTemporalParams* out);
 void XwaRemasterFlight_SetTemporal(const XwaFlightTemporalParams* in);
@@ -545,6 +550,12 @@ typedef struct XwaRemasterFlightView {
 	 * particle's. It is smaller than classic_pixel_scale when the view is
 	 * wider than the classic projection (presentation.cockpit_fov_min_aspect). */
 	float projection_pixel_scale;
+	/* Nonzero for a view of a view rig: its projection is the rig's, not
+	 * the game's. */
+	uint8_t rig_view;
+	/* Nonzero when the view turns with the player's head, so it doesn't
+	 * look where the game camera looks. */
+	uint8_t head_tracked;
 } XwaRemasterFlightView;
 
 int XwaRemasterFlight_BuildView(const XwaFlightCamera* camera, int target_w, int target_h,
@@ -555,6 +566,10 @@ int XwaRemasterFlight_ProjectWorldI32(const XwaRemasterFlightView* view, const i
 									  float* out_y, float* out_depth);
 int XwaRemasterFlight_ProjectView(const XwaRemasterFlightView* view, const float eye[3], float* out_x,
 								  float* out_y);
+/* Writes the position of a world point in the view's eye space: X right, Y
+ * down, Z forward. */
+void XwaRemasterFlight_WorldToEyeI32(const XwaRemasterFlightView* view, const int32_t world[3],
+									 float out_eye[3]);
 /* Clips an eye-space segment to the near plane (moving the endpoint behind
  * it) and projects both ends; returns 0 when it lies wholly behind. */
 int XwaRemasterFlight_ClipProjectLine(const XwaRemasterFlightView* view, float a[3], float b[3], float* ax,
@@ -640,6 +655,20 @@ int XwaRemasterFlight_CaptureBackdropHidden(const XwaSnapshot* snap, XwaRemaster
 uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float crows[9],
 											const XwaSnapshot* snap, XwaRemasterAssets* assets, int filter,
 											const XwaEnvironmentBackdropRule* hide, float* out_max_tan);
+
+/* Sets the views that the flight scene is rendered into, from the next
+ * XwaRemasterFlight_Render on. With NULL, or a rig of one view, there is one
+ * view that fills the target: the game camera. Otherwise the game camera is
+ * the rig's origin, each view is drawn into its rectangle of the target, and
+ * the HUD is drawn in the primary view. Views replace the temporal
+ * upscaler and the direct presentation, which need a single view. The map
+ * and the hyperspace tunnel are still drawn as one view, in the primary
+ * view's rectangle. */
+void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig);
+
+/* Writes the number of views of the rig, and the size of one view. Without
+ * a rig, the count is 1 and the size is the one of the last render. */
+void XwaRemasterFlight_GetViewLayout(int* count, int* width, int* height);
 
 /* Returns whether the current full-frame output can use Aeron's direct
  * swapchain render layer at the requested dimensions. */

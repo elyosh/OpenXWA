@@ -5,7 +5,8 @@
 /* Frame width bounds: at 4:3 (1440) the classic safe frame fills the whole
  * frame and Aeron letterboxes any narrower window; 32:9 (3840) bounds the
  * HUD edge spread and horizontal FOV on extreme ultrawide windows, with
- * Aeron pillarboxing the remainder. */
+ * Aeron pillarboxing the remainder. A surround setup has no maximum: its
+ * frame covers the three screens. */
 enum {
 	XWA_PRESENTATION_MIN_WIDTH = 4 * XWA_PRESENTATION_HEIGHT / 3,
 	XWA_PRESENTATION_MAX_WIDTH = 32 * XWA_PRESENTATION_HEIGHT / 9,
@@ -15,6 +16,11 @@ static XwaPresentationRect g_frame = { 0, 0, XWA_PRESENTATION_WIDTH, XWA_PRESENT
 static int g_frontendDesignWidth;
 static int g_frontendDesignHeight;
 static int g_frontendWide;
+/* The centre screen of a surround setup, as a part of g_surroundTotal. 0
+ * for the total means no surround. */
+static int g_surroundCenterX;
+static int g_surroundCenterWidth;
+static int g_surroundTotal;
 
 XwaPresentationRect XwaPresentation_AspectFit(int aspect_w, int aspect_h, XwaPresentationRect bounds) {
 	XwaPresentationRect out = bounds;
@@ -42,7 +48,7 @@ void XwaPresentation_SyncToWindow(int window_width, int window_height) {
 	if (width < XWA_PRESENTATION_MIN_WIDTH) {
 		width = XWA_PRESENTATION_MIN_WIDTH;
 	}
-	if (width > XWA_PRESENTATION_MAX_WIDTH) {
+	if (width > XWA_PRESENTATION_MAX_WIDTH && g_surroundTotal <= 0) {
 		width = XWA_PRESENTATION_MAX_WIDTH;
 	}
 	if (width == g_frame.width) {
@@ -54,8 +60,25 @@ void XwaPresentation_SyncToWindow(int window_width, int window_height) {
 
 XwaPresentationRect XwaPresentation_Frame(void) { return g_frame; }
 
+void XwaPresentation_SetSurround(int center_x, int center_width, int total_width) {
+	const int valid =
+		total_width > 0 && center_width > 0 && center_x >= 0 && center_x + center_width <= total_width;
+	g_surroundCenterX = valid ? center_x : 0;
+	g_surroundCenterWidth = valid ? center_width : 0;
+	g_surroundTotal = valid ? total_width : 0;
+}
+
+XwaPresentationRect XwaPresentation_Frame2D(void) {
+	XwaPresentationRect frame = g_frame;
+	if (g_surroundTotal > 0) {
+		frame.x += (int)((long long)g_frame.width * g_surroundCenterX / g_surroundTotal);
+		frame.width = (int)((long long)g_frame.width * g_surroundCenterWidth / g_surroundTotal);
+	}
+	return frame;
+}
+
 XwaPresentationRect XwaPresentation_ClassicSafeFrame(void) {
-	return XwaPresentation_AspectFit(4, 3, g_frame);
+	return XwaPresentation_AspectFit(4, 3, XwaPresentation_Frame2D());
 }
 
 void XwaPresentation_SetFrontendShape(int design_width, int design_height, int wide) {
@@ -69,7 +92,8 @@ XwaPresentationRect XwaPresentation_FrontendFrame(void) {
 	if (g_frontendDesignWidth <= 0) {
 		return XwaPresentation_ClassicSafeFrame();
 	}
-	return XwaPresentation_AspectFit(g_frontendDesignWidth, g_frontendDesignHeight, g_frame);
+	return XwaPresentation_AspectFit(g_frontendDesignWidth, g_frontendDesignHeight,
+									 XwaPresentation_Frame2D());
 }
 
 XwaPresentationRect XwaPresentation_ClassicContentRect(void) {

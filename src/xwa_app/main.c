@@ -47,11 +47,22 @@ static uint64_t presentation_interval_us(void) {
 	return (uint64_t)(1000000.0 / rate + 0.5);
 }
 
+static AeronWindowMode aeron_window_mode(XwaModernWindowMode mode) {
+	switch (mode) {
+		case XWA_MODERN_WINDOW_MODE_FULLSCREEN:
+			return AERON_WINDOW_FULLSCREEN;
+		case XWA_MODERN_WINDOW_MODE_SPAN:
+			return AERON_WINDOW_SPAN;
+		default:
+			return AERON_WINDOW_WINDOWED;
+	}
+}
+
 static void apply_modern_video_options(const XwaModernVideoOptions* options) {
 	if (!options) {
 		return;
 	}
-	Aeron_SetFullscreen(options->window_mode == XWA_MODERN_WINDOW_MODE_FULLSCREEN);
+	Aeron_SetWindowMode(aeron_window_mode(options->window_mode));
 	XwaRemaster_SetVideoOptions(options);
 }
 
@@ -496,7 +507,7 @@ int main(int argc, char** argv) {
 		Aeron_LogWarn("xwa.config", "%s", mod_notice);
 		show_setup_message(AERON_MESSAGE_BOX_WARNING, mod_notice);
 	}
-	Aeron_SetFullscreen(initial_window_mode == XWA_MODERN_WINDOW_MODE_FULLSCREEN);
+	Aeron_SetWindowMode(aeron_window_mode(initial_window_mode));
 	/* The setup dialogs above are separate OS windows; on some platforms
 	 * (macOS) closing them does not re-key the game window, which would start
 	 * the game inside its unfocused pause. Ask for input focus back. */
@@ -550,6 +561,7 @@ int main(int argc, char** argv) {
 			},
 		.video_options = host_config.video_options,
 		.video_options_override_mask = host_config.video_options_override_mask,
+		.flight_views = launch.flight_views,
 		.render_width = launch.render_width,
 		.render_height = launch.render_height,
 	};
@@ -643,7 +655,7 @@ int main(int argc, char** argv) {
 		/* The game also pauses while the options window is open, except in a
 		 * network session (XwaPort_OptionsWindowPausesGame). */
 		int options_paused = 0;
-		int last_fullscreen = Aeron_Fullscreen();
+		AeronWindowMode last_window_mode = Aeron_WindowMode();
 		while (!Aeron_QuitRequested() && !XwaPort_ShouldQuit()) {
 			const uint64_t frame_start_us = Aeron_NowUs();
 			const int32_t delta_us = Aeron_BeginFrame();
@@ -668,11 +680,21 @@ int main(int argc, char** argv) {
 			/* Reconcile OS-initiated fullscreen transitions (e.g. the macOS
 			 * green button) into the stored option. Edge-triggered on the
 			 * observed state so an in-flight transition is never fought. */
-			const int fullscreen = Aeron_Fullscreen();
-			if (fullscreen != last_fullscreen) {
-				last_fullscreen = fullscreen;
-				set_window_mode_option(fullscreen ? XWA_MODERN_WINDOW_MODE_FULLSCREEN
-												  : XWA_MODERN_WINDOW_MODE_WINDOWED);
+			const AeronWindowMode window_mode = Aeron_WindowMode();
+			const int fullscreen = window_mode == AERON_WINDOW_FULLSCREEN;
+			if (window_mode != last_window_mode) {
+				last_window_mode = window_mode;
+				XwaModernVideoOptions video_options;
+				XwaModernVideoOptions_Get(&video_options);
+				/* A span that couldn't be applied shows as fullscreen. The
+				   option stays on span, so that the window spans the displays
+				   again when they allow it. */
+				if (window_mode == AERON_WINDOW_SPAN) {
+					set_window_mode_option(XWA_MODERN_WINDOW_MODE_SPAN);
+				} else if (video_options.window_mode != XWA_MODERN_WINDOW_MODE_SPAN || !fullscreen) {
+					set_window_mode_option(fullscreen ? XWA_MODERN_WINDOW_MODE_FULLSCREEN
+													  : XWA_MODERN_WINDOW_MODE_WINDOWED);
+				}
 			}
 			discover_controllers(in);
 			int window_opened = XwaOptionsWindow_BeginFrame(in);

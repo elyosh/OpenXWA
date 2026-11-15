@@ -36,6 +36,9 @@ typedef struct XwaLaunchOptions {
 	   follow the window. */
 	int render_width;
 	int render_height;
+	/* --flight-views: draw the flight scene for this run as a surround
+	   setup (1) or as the two eyes of a headset (2), or 0. */
+	int flight_views;
 	/* --help or -h: print the launch options and quit. */
 	int help;
 	char game_command_line[1024];
@@ -51,7 +54,7 @@ typedef struct XwaRelaunchArgs {
 	char render_size[32];
 	/* The game's arguments of XwaLaunchOptions, and " skipintro". */
 	char game_command_line[1024 + sizeof " skipintro"];
-	const char* args[12];
+	const char* args[14];
 	int count;
 } XwaRelaunchArgs;
 

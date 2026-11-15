@@ -804,12 +804,18 @@ int XwaRemasterHudFixed_ProjectTargetArrow(const XwaSnapshot* snapshot, XwaHudPr
 		if (!target)
 			return 0;
 		const XwaFlightCamera* camera = &snapshot->flight_camera;
-		float delta[3];
-		AeronWorld_DeltaI32(target->world_pos, camera->world_pos, delta);
 		float view[3];
-		for (int row = 0; row < 3; row++)
-			view[row] = camera->rows[row * 3] * delta[0] + camera->rows[row * 3 + 1] * delta[1] +
-						camera->rows[row * 3 + 2] * delta[2];
+		if (flight_view->head_tracked) {
+			/* The HUD's view looks where the head looks, not where the game
+			   camera looks. */
+			XwaRemasterFlight_WorldToEyeI32(flight_view, target->world_pos, view);
+		} else {
+			float delta[3];
+			AeronWorld_DeltaI32(target->world_pos, camera->world_pos, delta);
+			for (int row = 0; row < 3; row++)
+				view[row] = camera->rows[row * 3] * delta[0] + camera->rows[row * 3 + 1] * delta[1] +
+							camera->rows[row * 3 + 2] * delta[2];
+		}
 		behind = view[2] < 0.0f;
 		if (behind) {
 			view[2] = -view[2];
@@ -891,8 +897,10 @@ static int fixed_project_reticle(const XwaSnapshot* snapshot, XwaHudProfileIndex
 	if (!XwaRemasterFlight_ProjectView(flight_view, center_eye, &target_x, &target_y))
 		return 0;
 	/* When the player looks around, and in the exterior HUD, the reticle
-	 * follows the craft's nose instead of the screen center. */
-	if (h->reticle.look_yaw || h->reticle.look_pitch || (h->mode_flags & XWA_HUD_MODE_EXTERIOR_HUD)) {
+	 * follows the craft's nose instead of the screen center. A view that
+	 * turns with the head looks around too. */
+	if (h->reticle.look_yaw || h->reticle.look_pitch || (h->mode_flags & XWA_HUD_MODE_EXTERIOR_HUD) ||
+		flight_view->head_tracked) {
 		const XwaFlightObject* player = fixed_player_object(snapshot, h);
 		if (player && player->has_mobj) {
 			float local[3];
@@ -1066,7 +1074,10 @@ void XwaRemasterHudFixed_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 	 * 3D view use the ratio of the output height to the game screen height. */
 	const float classic_screen_h =
 		snapshot->flight_camera.screen_h > 0 ? (float)snapshot->flight_camera.screen_h : 480.0f;
-	fixed_view_pixel_scale = target_h / classic_screen_h;
+	/* A rig's view isn't the game screen at another size: it has its own
+	 * size for a game pixel. */
+	fixed_view_pixel_scale =
+		flight_view && flight_view->rig_view ? flight_view->classic_pixel_scale : target_h / classic_screen_h;
 	fixed_hud_unit_scale = selected->scale.unit_px;
 	fixed_classic_px = selected->scale.classic_px;
 	fixed_hud_user_scale = selected->scale.user;

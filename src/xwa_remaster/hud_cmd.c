@@ -258,7 +258,7 @@ static int cmd_submit_model(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, 
 			XwaRemasterShip_SubmitEngineGlows(
 				s_cmd.scene, mesh, transform, AERON_OPT_UNITS_PER_METER, instance.mesh_table,
 				object->eg_knockout_mask, object->eg_hidden_mask,
-				cmd_engine_glow_scale(object, snapshot->tick_index), NULL, NULL, glow_ref);
+				cmd_engine_glow_scale(object, snapshot->tick_index), NULL, NULL, 0, glow_ref);
 		}
 		if (object->has_craft) {
 			const uint32_t remaining = CMD_MAX_POINT_CANDIDATES - s_cmd.point_candidate_count;

@@ -29,6 +29,7 @@ struct XwaRemasterTrails {
 	uint32_t count;
 	uint32_t capacity;
 	int dropped;
+	uint32_t view_mask; /* of the view the quads were prepared for */
 };
 
 typedef struct TrailEndpoint {
@@ -58,6 +59,7 @@ struct XwaRemasterParticles {
 	uint32_t count;
 	uint32_t capacity;
 	int dropped;
+	uint32_t view_mask; /* of the view the quads were prepared for */
 };
 
 void XwaRemasterEffectView_Main(XwaRemasterEffectView* out, const XwaRemasterFlightView* view,
@@ -312,6 +314,7 @@ void XwaRemasterParticles_Prepare(XwaRemasterParticles* particles, AeronCommandB
 	particles->dropped = 0;
 	if (!cmd || !snapshot || !assets || !view || view->focal_x_px <= 0.0f || view->focal_y_px <= 0.0f)
 		return;
+	particles->view_mask = view->view_mask;
 	for (uint32_t i = 0; i < snapshot->particle_effect_count; i++) {
 		const XwaParticleEffect* effect = &snapshot->particle_effects[i];
 		if (!particle_effect_range_valid(snapshot, effect))
@@ -376,12 +379,13 @@ static int particle_hidden_for_view(const PreparedParticleQuad* q, const XwaSnap
 		   (q->hide_owner_external && snapshot->flight_camera.external);
 }
 
-static void particle_submit(AeronScene3D* scene, const PreparedParticleQuad* q) {
+static void particle_submit(AeronScene3D* scene, const PreparedParticleQuad* q, uint32_t view_mask) {
 	AeronSceneBillboardDesc desc;
 	memset(&desc, 0, sizeof desc);
 	desc.texture = q->texture;
 	desc.blend = AERON_SCENE_BILLBOARD_BLEND_PMA;
 	desc.stage = AERON_SCENE_BILLBOARD_STAGE_OVERLAY;
+	desc.view_mask = view_mask;
 	memcpy(desc.corners, q->corners, sizeof desc.corners);
 	memcpy(desc.uv, q->uv, sizeof desc.uv);
 	for (int i = 0; i < 4; i++)
@@ -398,7 +402,7 @@ void XwaRemasterParticles_SubmitRegion(const XwaRemasterParticles* particles, Ae
 	for (uint32_t i = 0; i < particles->count; i++) {
 		const PreparedParticleQuad* q = &particles->quads[i];
 		if (q->render_region == region && !particle_hidden_for_view(q, snapshot))
-			particle_submit(scene, q);
+			particle_submit(scene, q, particles->view_mask);
 	}
 }
 
@@ -411,7 +415,7 @@ void XwaRemasterParticles_SubmitOwner(const XwaRemasterParticles* particles, Aer
 		const PreparedParticleQuad* q = &particles->quads[i];
 		if (q->source_kind == XWA_PARTICLE_SOURCE_OBJECT && q->owner_slot == owner_slot &&
 			q->owner_signature == owner_signature && !particle_hidden_for_view(q, snapshot))
-			particle_submit(scene, q);
+			particle_submit(scene, q, particles->view_mask);
 	}
 }
 
@@ -629,6 +633,7 @@ void XwaRemasterTrails_Prepare(XwaRemasterTrails* trails, AeronCommandBuffer* cm
 	trails->dropped = 0;
 	if (!cmd || !snapshot || !assets || !view)
 		return;
+	trails->view_mask = view->view_mask;
 	for (uint32_t i = 0; i < snapshot->trail_emitter_count; i++) {
 		const XwaTrailEmitter* emitter = &snapshot->trail_emitters[i];
 		if (emitter->first_point >= snapshot->trail_point_count ||
@@ -649,12 +654,13 @@ void XwaRemasterTrails_Prepare(XwaRemasterTrails* trails, AeronCommandBuffer* cm
 		Aeron_LogWarn("xwa.remaster", "prepared trail quad cap (%u) hit", EFFECT_MAX_TRAIL_QUADS);
 }
 
-static void trails_submit_quad(AeronScene3D* scene, const PreparedTrailQuad* q) {
+static void trails_submit_quad(AeronScene3D* scene, const PreparedTrailQuad* q, uint32_t view_mask) {
 	AeronSceneBillboardDesc desc;
 	memset(&desc, 0, sizeof desc);
 	desc.texture = q->texture;
 	desc.blend = AERON_SCENE_BILLBOARD_BLEND_PMA;
 	desc.stage = AERON_SCENE_BILLBOARD_STAGE_OVERLAY;
+	desc.view_mask = view_mask;
 	memcpy(desc.corners, q->corners, sizeof desc.corners);
 	memcpy(desc.uv, q->uv, sizeof desc.uv);
 	memcpy(desc.colors, q->colors, sizeof desc.colors);
@@ -670,7 +676,7 @@ void XwaRemasterTrails_SubmitRegion(const XwaRemasterTrails* trails, AeronScene3
 		return;
 	for (uint32_t i = 0; i < trails->count; i++)
 		if (trails->quads[i].render_region == region)
-			trails_submit_quad(scene, &trails->quads[i]);
+			trails_submit_quad(scene, &trails->quads[i], trails->view_mask);
 }
 
 void XwaRemasterTrails_SubmitOwner(const XwaRemasterTrails* trails, AeronScene3D* scene, uint16_t owner_slot,
@@ -680,6 +686,6 @@ void XwaRemasterTrails_SubmitOwner(const XwaRemasterTrails* trails, AeronScene3D
 	for (uint32_t i = 0; i < trails->count; i++) {
 		const PreparedTrailQuad* q = &trails->quads[i];
 		if (q->owner_slot == owner_slot && q->owner_signature == owner_signature)
-			trails_submit_quad(scene, q);
+			trails_submit_quad(scene, q, trails->view_mask);
 	}
 }

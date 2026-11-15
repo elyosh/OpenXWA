@@ -353,6 +353,11 @@ presentation:
   # wider view, so that the horizontal field of view stays the one at this
   # aspect. 1.778 is 16:9. 0 turns it off.
   cockpit_fov_min_aspect: 1.778
+  # The stereo view of the debug UI, which draws the two eyes of a headset
+  # side by side without a headset: the distance between the eyes in metres,
+  # and the horizontal field of view of one eye in degrees.
+  debug_stereo_ipd_m: 0.064
+  debug_stereo_fov_deg: 100
 # Sound. The Audio tab of OpenXWA Options changes these settings.
 audio:
   # speakers or headphones. On headphones, sounds also seem to come from

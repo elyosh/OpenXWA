@@ -111,7 +111,7 @@ static int g_xwaPortHostCursorVisible = -1;
  * 640x480 surfaces, 16:9 for the 1920x1080 flight screen. */
 static AeronDx5Rect XwaPort_Dx5PresentationRect(void* context, int surfaceWidth, int surfaceHeight) {
 	XwaPresentationRect rect =
-		XwaPresentation_AspectFit(surfaceWidth, surfaceHeight, XwaPresentation_Frame());
+		XwaPresentation_AspectFit(surfaceWidth, surfaceHeight, XwaPresentation_Frame2D());
 	(void)context;
 	if (rect.width <= 0 || rect.height <= 0) {
 		rect = XwaPresentation_ClassicSafeFrame();

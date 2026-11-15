@@ -1878,6 +1878,56 @@ static void xwa_tool_cockpit_eye(int* open, void* user) {
 
 /* ---- Dynamic cockpit ----------------------------------------------- */
 
+/* ---- Flight views ----------------------------------------------------- */
+
+static void xwa_tool_flight_views(int* open, void* user) {
+	(void)user;
+	ImGui::SetNextWindowSize(ImVec2(440, 380), ImGuiCond_FirstUseEver);
+	bool b = *open != 0;
+	if (!ImGui::Begin("Flight Views", &b)) {
+		ImGui::End();
+		*open = b ? 1 : 0;
+		return;
+	}
+	int count = 1, width = 0, height = 0;
+	XwaRemasterFlight_GetViewLayout(&count, &width, &height);
+	ImGui::Text("%d %s of %dx%d", count, count == 1 ? "view" : "views", width, height);
+	ImGui::Separator();
+	XwaRemasterDebugStereo stereo;
+	XwaRemaster_GetDebugStereo(&stereo);
+	bool enabled = stereo.enabled != 0, mouse = stereo.mouse_head != 0;
+	bool changed = ImGui::Checkbox("Stereo view", &enabled);
+	ImGui::TextWrapped("Draws the two eyes of a headset side by side, to test the renderer without a "
+					   "headset. The game camera is the seat, and the head moves from it.");
+	changed |= ImGui::SliderFloat("Eye distance (m)", &stereo.ipd_m, 0.0f, 0.2f, "%.3f");
+	changed |= ImGui::SliderFloat("Field of view (deg)", &stereo.fov_deg, 30.0f, 150.0f, "%.0f");
+	changed |= ImGui::Checkbox("The mouse turns the head", &mouse);
+	if (mouse) {
+		changed |=
+			ImGui::SliderFloat("Yaw at the window's edge", &stereo.mouse_yaw_deg, 0.0f, 180.0f, "%.0f");
+		changed |=
+			ImGui::SliderFloat("Pitch at the window's edge", &stereo.mouse_pitch_deg, 0.0f, 90.0f, "%.0f");
+	} else {
+		changed |= ImGui::SliderFloat("Yaw (deg, right)", &stereo.yaw_deg, -180.0f, 180.0f, "%.1f");
+		changed |= ImGui::SliderFloat("Pitch (deg, up)", &stereo.pitch_deg, -90.0f, 90.0f, "%.1f");
+	}
+	changed |= ImGui::SliderFloat("Roll (deg, clockwise)", &stereo.roll_deg, -90.0f, 90.0f, "%.1f");
+	changed |=
+		ImGui::SliderFloat3("Head position (m: right, up, forward)", stereo.position_m, -1.0f, 1.0f, "%.3f");
+	if (ImGui::Button("Centre the head")) {
+		stereo.yaw_deg = stereo.pitch_deg = stereo.roll_deg = 0.0f;
+		stereo.position_m[0] = stereo.position_m[1] = stereo.position_m[2] = 0.0f;
+		changed = true;
+	}
+	if (changed) {
+		stereo.enabled = enabled ? 1 : 0;
+		stereo.mouse_head = mouse ? 1 : 0;
+		XwaRemaster_SetDebugStereo(&stereo);
+	}
+	ImGui::End();
+	*open = b ? 1 : 0;
+}
+
 static void xwa_tool_dynamic_cockpit(int* open, void* user) {
 	(void)user;
 	ImGui::SetNextWindowSize(ImVec2(520, 520), ImGuiCond_FirstUseEver);
@@ -2088,5 +2138,6 @@ extern "C" void XwaRemasterDebugTools_Register(void) {
 	Aeron_DebugRegisterTool("Film Benchmark", xwa_tool_film_benchmark, nullptr);
 	Aeron_DebugRegisterTool("Cockpit Eye", xwa_tool_cockpit_eye, nullptr);
 	Aeron_DebugRegisterTool("Dynamic Cockpit", xwa_tool_dynamic_cockpit, nullptr);
+	Aeron_DebugRegisterTool("Flight Views", xwa_tool_flight_views, nullptr);
 	Aeron_DebugRegisterTool("Material Animation", xwa_tool_material_animation, nullptr);
 }

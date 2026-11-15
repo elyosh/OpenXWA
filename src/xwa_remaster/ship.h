@@ -342,12 +342,13 @@ float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f);
  * classic intensity scale (EngineGlowScale / the preview's fixed
  * ~0.6 flickered base; <= 0 skips everything). `crows`/`cam_pos`
  * convert space->view for the view-dependent parts (NULL/NULL =
- * identity camera, space == eye — preview PiP). */
+ * identity camera, space == eye — preview PiP). `view_mask` has one bit for
+ * each view of the scene that draws the glows; 0 is every view. */
 void XwaRemasterShip_SubmitEngineGlows(AeronScene3D* scene, const AeronSceneMesh* mesh,
 									   const float transform[16], float model_scale,
 									   const AeronSceneMeshTable* table, const uint32_t* knockout_mask,
 									   const uint32_t* hidden_mask, float scale, const float crows[9],
-									   const float cam_pos[3], const XwaAssetRef* tex);
+									   const float cam_pos[3], uint32_t view_mask, const XwaAssetRef* tex);
 
 #ifdef __cplusplus
 }

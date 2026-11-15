@@ -249,6 +249,7 @@ void XwaRemasterSpeedEffect_Submit(const XwaRemasterSpeedEffect* effect, AeronSc
 		desc.texture = effect->texture;
 		desc.blend = AERON_SCENE_BILLBOARD_BLEND_ADDITIVE;
 		desc.stage = AERON_SCENE_BILLBOARD_STAGE_OVERLAY;
+		desc.view_mask = view->view_mask;
 		const float head_value = radiance * fade * head_px / head_drawn_px;
 		const float tail_value = radiance * fade * tail_px / tail_drawn_px;
 		for (int c = 0; c < 4; c++) {
