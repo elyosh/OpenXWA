@@ -30,6 +30,7 @@
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/docking.h"
 #include "xwa_runtime/models/weapon_stats.h"
+#include "xwa_runtime/timing/ai_lead.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -1523,6 +1524,9 @@ void Object_UpdateLifetimeAndMovement(void) {
 			g_elapsedTicks = delta;
 			if (delta == 0) {
 				if (singleIdx == -1 && obj->playerOwnerIdx != -1) {
+#ifdef XWA_MODERN
+					XwaAiLead_AddMovement(objIdx);
+#endif
 					mobj->prevWorldX = obj->world_x;
 					mobj->prevWorldY = obj->world_y;
 					mobj->prevWorldZ = obj->world_z;
@@ -1726,6 +1730,9 @@ void Object_UpdateLifetimeAndMovement(void) {
 	movement:
 		// --- Movement (LABEL_55) ---
 		if (g_singleObjectUpdateOverrideIdx == -1) {
+#ifdef XWA_MODERN
+			XwaAiLead_AddMovement(objIdx);
+#endif
 			obj->mobj->prevWorldX = obj->world_x;
 			obj->mobj->prevWorldY = obj->world_y;
 			obj->mobj->prevWorldZ = obj->world_z;

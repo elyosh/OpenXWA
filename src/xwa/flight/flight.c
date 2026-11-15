@@ -73,6 +73,7 @@
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/original_film.h"
+#include "xwa_runtime/timing/ai_lead.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -225,6 +226,7 @@ void Flight_ModernResetHighRateIntegration(void) {
 	memset(g_modernJoystickInputSamples, 0, sizeof(g_modernJoystickInputSamples));
 	g_modernJoystickInputSampleCursor = 0;
 	Flight_ModernResetAiTurns();
+	XwaAiLead_Reset();
 }
 #endif
 
@@ -6312,6 +6314,8 @@ static void Flight_ModernUpdateAllCraftAI(uint16_t elapsedTicks) {
 			}
 		}
 	}
+
+	XwaAiLead_BeginAiStep(elapsedTicks);
 
 	savedElapsedTicks = g_elapsedTicks;
 	savedSimStepScale = g_simStepScale;

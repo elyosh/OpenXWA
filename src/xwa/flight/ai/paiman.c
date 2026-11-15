@@ -14,6 +14,7 @@
 #include "xwa_runtime/models/mission_settings.h"
 #include "xwa_runtime/models/warhead_launchers.h"
 #include "xwa_runtime/models/weapon_stats.h"
+#include "xwa_runtime/timing/ai_lead.h"
 #endif
 
 // GLOBAL: XWA 0x9AF178
@@ -1795,9 +1796,19 @@ void paiman_calcplanelead(int targetObjIdx) {
 		MobileObject* targetMobj;
 
 		targetMobj = g_objectTable[targetObjIdx].mobj;
+#ifdef XWA_MODERN
+		/* leadFrames counts 8-tick steps, but a high-rate step is shorter.
+		   See ai_lead.h. */
+		if (!XwaAiLead_Movement((uint32_t)targetObjIdx, &deltaX, &deltaY, &deltaZ)) {
+			deltaX = targetWorldX - targetMobj->prevWorldX;
+			deltaY = targetWorldY - targetMobj->prevWorldY;
+			deltaZ = targetWorldZ - targetMobj->prevWorldZ;
+		}
+#else
 		deltaX = targetWorldX - targetMobj->prevWorldX;
 		deltaY = targetWorldY - targetMobj->prevWorldY;
 		deltaZ = targetWorldZ - targetMobj->prevWorldZ;
+#endif
 		deltaX *= (int)leadFrames;
 		deltaY *= (int)leadFrames;
 		deltaZ *= (int)leadFrames;

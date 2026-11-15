@@ -314,6 +314,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/snapshot/snapshot_flight_map.c
     src/xwa_runtime/snapshot/snapshot_hud.c
     src/xwa_runtime/text/text_overrides.c
+    src/xwa_runtime/timing/ai_lead.c
     src/xwa_runtime/timing/host_clock.c
     src/xwa_runtime/timing/modern_flight_timing.c
 )
@@ -837,6 +838,7 @@ set(XWA_FORMAT_HEADERS
     src/xwa_runtime/input/winmm_joystick_provider.h
     src/xwa_runtime/input/controller_mapping.h
     src/xwa_runtime/input/mouse_flight.h
+    src/xwa_runtime/timing/ai_lead.h
     src/xwa_runtime/timing/modern_flight_timing.h
     src/xwa_runtime/runtime/movie_task.h
     src/xwa_runtime/hooks/orientation_hook.h
