@@ -6458,7 +6458,13 @@ ObjectIndex Mission_InitFlightGroupObjectSlot(uint16_t objectTypeOverride, uint1
 			}
 
 			// Laser convergence level.
+#ifdef XWA_MODERN
+			switch (XwaMissionSettings_NoPlayerLaserConvergence()
+						? 0
+						: g_modelDefs[modelIndex].laserConvergeMode) {
+#else
 			switch (g_modelDefs[modelIndex].laserConvergeMode) {
+#endif
 				case 0:
 					convergeLevel = 0;
 					break;

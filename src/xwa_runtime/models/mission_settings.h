@@ -131,6 +131,38 @@ int XwaMissionSettings_TwoLauncherAdvancedMissiles(void);
 /* FlightObject_UpdateSpecialBehavior leaves a rotary gun turret without a
    target as it is: it doesn't turn it, and doesn't call GameRand for it. */
 int XwaMissionSettings_NoTurretIdleSpin(void);
+/* paifight_fightershootorder doesn't fire both warheads of a launcher at once for a
+   damaged top-tier AI craft. Only Death Star missions still do. */
+int XwaMissionSettings_NoTopAiDualWarheads(void);
+/* paifight_gunnerselfdefenseorder doesn't aim turrets at the warheads locked
+   on their own craft. */
+int XwaMissionSettings_NoTurretWarheadSelfDefense(void);
+/* paifight_FindNearestAttackerOfMatchingTarget doesn't look for the warheads
+   locked on the craft that a gun turret's order protects. */
+int XwaMissionSettings_NoTurretWarheadEscortDefense(void);
+/* collide_ApplyProximityDamageFalloff does nothing: explosions don't damage
+   or push the objects around them. */
+int XwaMissionSettings_NoExplosionSplashDamage(void);
+/* collide_collisions doesn't check the engine wash of players. */
+int XwaMissionSettings_NoEngineWash(void);
+/* An AI fighter charges its shields to 2 times its shield strength (100%)
+   instead of 4 times (200%). */
+int XwaMissionSettings_AiShieldsChargeToFull(void);
+/* paifight_TargetHasAttackCapacity uses the limit for several candidates
+   when the target is a player, also when the order matches only one
+   object. */
+int XwaMissionSettings_PlayerAttackerLimitByDifficulty(void);
+/* A player's turn rates don't depend on the throttle. */
+int XwaMissionSettings_NoThrottleTurnRate(void);
+/* A player's turn rates don't depend on the laser and shield energy
+   settings. */
+int XwaMissionSettings_NoEnergyTurnRate(void);
+/* paifight_fightershootorder doesn't set the laser convergence level of an
+   attacking AI craft. */
+int XwaMissionSettings_NoAiLaserConvergence(void);
+/* Every craft starts with laser convergence level 0, and the player's
+   convergence key says that convergence isn't available. */
+int XwaMissionSettings_NoPlayerLaserConvergence(void);
 /* The difficulty doesn't change the AI ranks of the flight groups when
    Mission_Init loads a mission. */
 int XwaMissionSettings_NoDifficultyRankChanges(void);

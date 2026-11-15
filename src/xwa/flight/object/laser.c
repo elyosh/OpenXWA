@@ -347,10 +347,10 @@ static __inline void laser_UpdateAiPowerRedirects(uint16_t objectIdx, int* shiel
 			}
 
 #ifdef XWA_MODERN
-			shieldMax =
-				4 * XwaStatsProfiles_Value(
-						objectIdx, XWA_STATS_SHIELDS,
-						g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelDefIndex].shieldStrength);
+			shieldMax = (XwaMissionSettings_AiShieldsChargeToFull() ? 2 : 4) *
+						XwaStatsProfiles_Value(
+							objectIdx, XWA_STATS_SHIELDS,
+							g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelDefIndex].shieldStrength);
 #else
 			shieldMax = 4 * g_modelDefs[g_objectTable[objectIdx].mobj->pCraft->modelDefIndex].shieldStrength;
 #endif

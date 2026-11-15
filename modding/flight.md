@@ -125,6 +125,17 @@ is on by default.
 | `ai_warheads_attack_on_hit` | An AI craft's warhead marks its target as attacked when it hits, as other weapons do. In the original game, the launch marks it. That hit then isn't counted by the `attacked` trigger condition, and the target's "abort when attacked" order and the search for its attackers react at the launch. |
 | `one_jamming_beam_stops_turrets` | A craft's turrets stop firing when one player's jamming beam is on it. In the original game, it takes three beams on the same craft. One or two beams only slow down the turrets' fire. |
 | `no_turret_idle_spin` | A rotary gun turret without a target doesn't turn. In the original game, it turns back and forth, and changes direction at random. |
+| `no_top_ai_dual_warheads` | An AI craft of the top skill tier doesn't fire both warheads of a launcher at once when its hull is damaged. In the original game, it does once its hull damage reaches its system damage threshold, unless it's disabling its target. Craft in Death Star missions still fire both. |
+| `no_turret_warhead_self_defense` | Turrets don't shoot down the warheads locked on their own craft. In the original game, they do. |
+| `no_turret_warhead_escort_defense` | Gun turrets don't look for the warheads locked on the craft that their order protects. In the original game, they shoot them down. |
+| `no_explosion_splash_damage` | Explosions don't damage or push the objects around them. This includes the shockwave of the Death Star's reactor. |
+| `no_engine_wash` | The engines of starships don't damage players that fly behind them, and the engine wash sound doesn't play. |
+| `ai_shields_charge_to_full` | AI starfighters charge their shields up to 100%. In the original game, they charge them up to 200%. |
+| `player_attacker_limit_by_difficulty` | At most 2, 3 or 4 AI craft attack a player at once, on Easy, Medium and Hard. In the original game, when the AI's attack order matches only that player, the limits are 4, 8 and 100. |
+| `no_throttle_turn_rate` | A player's craft turns at its full rate at any throttle. In the original game, it turns fastest at 1/3 throttle, and slower above and below. |
+| `no_energy_turn_rate` | The laser and shield energy settings don't change how fast a player's craft turns. In the original game, low settings make it turn faster and high settings slower. |
+| `no_ai_laser_convergence` | AI craft don't converge their lasers when they attack. |
+| `no_player_laser_convergence` | Craft start with their lasers not converged, and players can't converge them: the convergence key says that it isn't available. |
 | `two_launcher_advanced_missiles` | A craft with two warhead launcher types, such as the Missile Boat, loads advanced missiles in its first launcher. The launcher still gets as many as it would get missiles. In the original game, it loads missiles. |
 
 ### mission_settings

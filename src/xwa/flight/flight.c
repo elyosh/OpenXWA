@@ -10485,6 +10485,11 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 			case KEY_Z:
 				if (!g_players[currentPlayerIdx].hasCheckpointFlag) {
 					uint8_t convergeMode = g_modelDefs[craft->modelDefIndex].laserConvergeMode;
+#ifdef XWA_MODERN
+					if (XwaMissionSettings_NoPlayerLaserConvergence()) {
+						convergeMode = 0;
+					}
+#endif
 					if (convergeMode == 1) {
 						craft->laserConvergeLevel = (uint8_t)((craft->laserConvergeLevel + 1) % 4);
 						msg_emitInFlightMessage(
@@ -12784,7 +12789,13 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 			if ((craft->workingSubsystems & 0x40) == 0) {
 				throttleScale = 0;
 			}
+#ifdef XWA_MODERN
+			if (XwaMissionSettings_NoThrottleTurnRate()) {
+				throttleScale = 0xffffu;
+			} else if (throttleScale < 0x5555u) {
+#else
 			if (throttleScale < 0x5555u) {
+#endif
 				throttleScale = (uint16_t)(2 * throttleScale + 0x5555u);
 			} else {
 				throttleScale = (uint16_t)(0xffff - (throttleScale - 0x5555) / 2);
@@ -12822,6 +12833,11 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 			powerMargin += craft->laserRedirect;
 		}
 		powerMargin = 4 - powerMargin;
+#ifdef XWA_MODERN
+		if (XwaMissionSettings_NoEnergyTurnRate()) {
+			powerMargin = 0;
+		}
+#endif
 		if (powerMargin < 0) {
 			powerScale = powerMargin * 62464;
 		} else {

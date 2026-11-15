@@ -5919,6 +5919,11 @@ int collide_ApplyProximityDamageFalloff(unsigned int sourceObjIdx, unsigned int 
 	MobileObject* sourceMobj;
 	unsigned int dmg;
 
+#ifdef XWA_MODERN
+	if (XwaMissionSettings_NoExplosionSplashDamage()) {
+		return g_activeRegionCraftObjectSlotEnd;
+	}
+#endif
 	sourceMobj = g_objectTable[sourceObjIdx].mobj;
 	sourceX = g_objectTable[sourceObjIdx].world_x;
 	sourceY = g_objectTable[sourceObjIdx].world_y;
@@ -7145,7 +7150,12 @@ void collide_collisions(void) {
 			if (g_players[playerOwnerIdx].hyperspacePhase == PLAYER_HYPERSPACE_OUTBOUND) {
 				continue;
 			}
+#ifdef XWA_MODERN
+			if (!XwaMissionSettings_NoEngineWash() &&
+				g_gameTime > g_players[playerOwnerIdx].impactDamageCooldownTime) {
+#else
 			if (g_gameTime > g_players[playerOwnerIdx].impactDamageCooldownTime) {
+#endif
 				collide_RefreshPlayerEngineWash(sourceObjIdx, playerOwnerIdx);
 			}
 
