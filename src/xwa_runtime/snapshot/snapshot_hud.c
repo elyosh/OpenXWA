@@ -484,6 +484,25 @@ static void hud_capture_instruments(XwaHudState* out, const ObjectRecord* object
 	memcpy(instruments->system_timer, craft->systemTimer, sizeof instruments->system_timer);
 }
 
+/* Opening the map unbinds the player from their craft
+   (Player_UnbindFromCurrentCraft), so objectIndex is 0xffff while the map is
+   open. Like the original game, this uses altViewObjectIdx to find the craft
+   that the player left, so the HUD on the map keeps that craft's colours. */
+static void hud_capture_map_colors(XwaHudState* out, const PlayerData* player) {
+	const int slot = player->altViewObjectIdx;
+	const ObjectRecord* object;
+
+	if (!player->mapCameraState || g_objectTable == NULL || slot < 0 || slot == 0xffff ||
+		(uint32_t)slot >= g_objectTableSlotCount) {
+		return;
+	}
+	object = &g_objectTable[slot];
+	if (object->objectType == OBJ_None || object->objectSignature != player->boundObjectSignature) {
+		return;
+	}
+	XwaCraftHud_Colors(object->objectType, out->hud_colors);
+}
+
 static void hud_capture_direct_state(XwaHudState* out) {
 	const PlayerData* player;
 	const ObjectRecord* object;
@@ -541,6 +560,7 @@ static void hud_capture_direct_state(XwaHudState* out) {
 	player_slot = player->objectIndex;
 	if (g_objectTable == NULL || player_slot < 0 || player_slot == 0xffff ||
 		(uint32_t)player_slot >= g_objectTableSlotCount) {
+		hud_capture_map_colors(out, player);
 		return;
 	}
 	object = &g_objectTable[player_slot];
