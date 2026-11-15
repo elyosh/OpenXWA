@@ -345,9 +345,11 @@ int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const Xwa
 		selected[0] = '\0';
 	}
 	/* Before any mod is read: the mods deleted while OpenXWA used them go to
-	   the trash. */
+	   the trash, and the new imports made while OpenXWA used their mods
+	   replace the old ones. */
 	if (XwaModList_Folder(paths->mods, mods_folder, sizeof mods_folder)) {
 		XwaModUpdate_DeletePending(mods_folder, paths->mod);
+		XwaModUpdate_ApplyPending(mods_folder, paths->mod);
 	}
 	if (from_launch) {
 		length = snprintf(selected, selected_capacity, "%s", launch->mod_path);

@@ -53,6 +53,12 @@ bool XwaModUpdate_IsMarkedDelete(const char* mod);
  * folder: the folders at the top of `mods_folder`, and `configured_mod`
  * (paths.mod). Call it at startup, before any mod is read. */
 void XwaModUpdate_DeletePending(const char* mods_folder, const char* configured_mod);
+/* Calls XwaModUpdate_Apply on each mod with a staging folder in
+ * `mods_folder`, and on `configured_mod` (paths.mod). Call it at startup,
+ * after XwaModUpdate_DeletePending and before any mod is read. This applies
+ * a new import made while its mod was in use, even when another mod is
+ * selected now. */
+void XwaModUpdate_ApplyPending(const char* mods_folder, const char* configured_mod);
 
 /* Deletes folder `dir` if its mod.yaml comes from the importer, or if it
  * holds no files. mod.yaml is deleted last, so a folder that is only partly

@@ -329,6 +329,31 @@ void XwaModUpdate_DeletePending(const char* mods_folder, const char* configured_
 		delete_if_marked(configured_mod);
 }
 
+/* ---- Updating at startup ------------------------------------------------ */
+
+void XwaModUpdate_ApplyPending(const char* mods_folder, const char* configured_mod) {
+	char path[MOD_UPDATE_PATH_CAP];
+	if (mods_folder && mods_folder[0]) {
+		/* Each staging folder has the same name as the mod it updates. Going
+		   through the staging folders also finds a mod whose folder is in the
+		   trash because a swap stopped halfway. */
+		AeronVfs* vfs = open_vfs(mods_folder);
+		NameList list = { 0 };
+		if (vfs && exists(vfs, STAGING_DIR) &&
+			AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, STAGING_DIR, "*", AERON_VFS_GLOB_DIRECTORIES,
+						  collect_folder, &list)) {
+			for (size_t i = 0; i < list.count; ++i)
+				if (join_path(path, sizeof path, mods_folder, list.names[i]))
+					XwaModUpdate_Apply(path);
+		}
+		free_names(&list);
+		AeronVfs_Destroy(vfs);
+	}
+	/* paths.mod can be outside the mods folder. */
+	if (configured_mod && configured_mod[0])
+		XwaModUpdate_Apply(configured_mod);
+}
+
 /* ---- The cleanup -------------------------------------------------------- */
 
 static struct {
