@@ -2232,6 +2232,30 @@ void XwaRemasterFlight_LogLodStats(void) {
 				  stats.instances[3], k_triangles[0], k_triangles[1], k_triangles[2], k_triangles[3]);
 }
 
+void XwaRemasterFlight_LogFrameStats(void) {
+	if (!s.scene) {
+		return;
+	}
+	AeronSceneFrameStats frame;
+	AeronSceneDirectionalShadowStats shadows;
+	AeronScene_GetFrameStats(s.scene, &frame);
+	AeronScene_GetDirectionalShadowStats(s.scene, &shadows);
+	unsigned casters = shadows.receiver_local_caster_count;
+	for (uint32_t cascade = 0; cascade < shadows.cascade_count && cascade < AERON_SCENE_SHADOW_MAX_CASCADES;
+		 cascade++) {
+		casters += shadows.caster_count[cascade];
+	}
+	Aeron_LogInfo("xwa.benchmark",
+				  "film benchmark: scene: %u instances, %u shadow-only casters, %u lights, %u billboards; "
+				  "shadows: %u casters in %u cascades, %u draws",
+				  frame.instances, frame.shadow_casters, frame.lights, frame.billboards, casters,
+				  shadows.cascade_count, frame.shadow_draws);
+	for (uint32_t view = 0; view < frame.view_count && view < AERON_MAX_VIEWS; view++) {
+		Aeron_LogInfo("xwa.benchmark", "film benchmark: view %u of %u: %u instances drawn, %u draws",
+					  view + 1, frame.view_count, frame.visible_instances[view], frame.view_draws[view]);
+	}
+}
+
 float XwaRemasterFlight_Exposure(void) {
 	if (!fl_cfg_ensure()) {
 		return 1.0f;
@@ -6638,7 +6662,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	}
 	const XwaShipEnvironmentMap* environment_map =
 		lighting_ready && hyperspace_lighting.environment.texture ? &hyperspace_lighting.environment : NULL;
-	XwaRemasterShip_SetPbrEnv(s.scene, directional_lights, directional_light_count, -1, NULL, s.camera_local,
+	XwaRemasterShip_SetPbrEnv(s.scene, directional_lights, directional_light_count, -1, NULL,
 							  ao_on ? &ao : NULL, &ambient, environment_map, -1.0f);
 	fl_submit_hyperspace_cockpit(cmd, assets, snap, &snap->flight_camera, anchor_bw, anchor_found, player_f);
 	fl_submit_point_lights();
@@ -7161,8 +7185,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 			faces[f][c] = fmaxf(faces[f][c], s.map_ambient_min[c]);
 		}
 	}
-	XwaRemasterShip_SetPbrEnv(s.scene, lights, light_count, -1, NULL, s.camera_local, NULL, &ambient, NULL,
-							  -1.0f);
+	XwaRemasterShip_SetPbrEnv(s.scene, lights, light_count, -1, NULL, NULL, &ambient, NULL, -1.0f);
 	if (!AeronScene_Render(s.scene, cmd)) {
 		s.snap = NULL;
 		return NULL;
@@ -7959,8 +7982,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		scene_ambient = &hyperspace_ambient;
 	}
 	XwaRemasterShip_SetPbrEnv(s.scene, scene_lighting.lights, scene_lighting.light_count,
-							  scene_lighting.key_index, NULL, s.camera_local, ao_on ? &ao : NULL, scene_ambient,
-							  NULL, hangar_probes ? hangar_probes->layout.key_light_shadow : -1.0f);
+							  scene_lighting.key_index, NULL, ao_on ? &ao : NULL, scene_ambient, NULL,
+							  hangar_probes ? hangar_probes->layout.key_light_shadow : -1.0f);
 	if (scene_lighting.captured) {
 		AeronScene_SetPbrEnvironment(s.scene, &scene_lighting.captured_environment);
 	} else if (scene_lighting.environment) {

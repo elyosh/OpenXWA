@@ -823,7 +823,7 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 		Aeron_CommandBufferSetFailure(cmd, "HUD CMD clustered-light configuration failed");
 		return;
 	}
-	XwaRemasterShip_SetPbrEnv(s_cmd.scene, lights, light_count, -1, rows, NULL, NULL, /*ambient_cube=*/NULL,
+	XwaRemasterShip_SetPbrEnv(s_cmd.scene, lights, light_count, -1, rows, NULL, /*ambient_cube=*/NULL,
 							  /*environment_map=*/NULL,
 							  /*key_probe_shadow=*/-1.0f);
 	if (!AeronScene_Render(s_cmd.scene, cmd)) {

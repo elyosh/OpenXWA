@@ -1088,12 +1088,33 @@ int XwaRemaster_BenchmarkFlightFrames(void) {
 		return 0;
 	}
 	XwaRemasterFlight_LogLodStats();
+	XwaRemasterFlight_LogFrameStats();
 	double frame_ms[RM_BENCHMARK_SAMPLES];
 	double cpu_ms[RM_BENCHMARK_SAMPLES];
 	for (int i = 0; i < RM_BENCHMARK_SAMPLES; ++i) {
+		/* The counters are only reset at the start of a host frame, and all
+		 * these renders are in one host frame. So the increase over the
+		 * first sample, divided by its renders, gives the counts for one
+		 * render. */
+		AeronRenderDataStats before;
+		Aeron_GetRenderDataStats(&before);
 		if (!rm_benchmark_run(snap, RM_BENCHMARK_SAMPLE_RENDERS, &wall_us, &cpu_us)) {
 			Aeron_LogError("xwa.benchmark", "film benchmark: the renders of sample %d failed", i + 1);
 			return 0;
+		}
+		if (i == 0) {
+			AeronRenderDataStats after;
+			Aeron_GetRenderDataStats(&after);
+			const double renders = RM_BENCHMARK_SAMPLE_RENDERS;
+			Aeron_LogInfo(
+				"xwa.benchmark",
+				"film benchmark: each render: %.0f draws in %.0f render passes, %.1f command buffers "
+				"submitted, %.1f KiB uploaded",
+				(double)(after.draw_count - before.draw_count) / renders,
+				(double)(after.render_pass_count - before.render_pass_count) / renders,
+				(double)(after.command_buffer_submission_count - before.command_buffer_submission_count) /
+					renders,
+				(double)(after.upload_staged_bytes - before.upload_staged_bytes) / renders / 1024.0);
 		}
 		frame_ms[i] = (double)wall_us / 1000.0 / RM_BENCHMARK_SAMPLE_RENDERS;
 		cpu_ms[i] = (double)cpu_us / 1000.0 / RM_BENCHMARK_SAMPLE_RENDERS;

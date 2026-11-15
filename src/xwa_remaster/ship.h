@@ -286,13 +286,15 @@ const XwaRemasterDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaRe
 
 /* Queue the shared PBR fragment environment (PbrLightFS b1, including
  * lighting tuning) as a scene frame uniform, built from WORLD-space linear
- * directional lights (scene_lights.h). The FS lights in the space the instances were submitted
- * in, so the env must match that convention:
- *   - world-space instances (flight driver): cam_rows = NULL (light
- *     dirs stay world-space), cam_pos = world camera position;
- *   - eye-space instances (preview PiP, identity camera): cam_rows =
- *     the view's g_camMat world->eye rows (lights rotate into eye
- *     space), cam_pos = NULL (camera at the origin).
+ * directional lights (scene_lights.h). The fragment shader computes
+ * lighting in the space of the instances, so the light directions must be
+ * in that space:
+ *   - world-space instances (the flight scene): pass cam_rows = NULL, and
+ *     the directions stay in world space;
+ *   - eye-space instances (the preview and the CMD view, whose cameras are
+ *     the identity): pass the view's world-to-eye rows (g_camMat), and the
+ *     directions are rotated into eye space.
+ * The shaders read the camera position from the scene.
  * `ao` carries the per-frame SSAO inputs the FS folds into the
  * ambient (and optionally direct-diffuse) term; NULL = AO off.
  * The key light is lights[key_index] when key_index is in range, otherwise
@@ -306,8 +308,8 @@ const XwaRemasterDirLight* XwaRemasterShip_SelectKeyDirectionalLight(const XwaRe
  * inside a probe grid it then only casts shadows, which remove that share
  * of the probe light; < 0 for a normal key light. */
 void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* lights, uint32_t light_count,
-							   int32_t key_index, const float cam_rows[9], const float cam_pos[3],
-							   const XwaShipAoParams* ao, const XwaShipAmbientCube* ambient_cube,
+							   int32_t key_index, const float cam_rows[9], const XwaShipAoParams* ao,
+							   const XwaShipAmbientCube* ambient_cube,
 							   const XwaShipEnvironmentMap* environment_map, float key_probe_shadow);
 
 /* Classic per-object engine-glow intensity scale — the float mirror

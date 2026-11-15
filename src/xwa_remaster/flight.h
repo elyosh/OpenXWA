@@ -136,6 +136,10 @@ float XwaRemasterFlight_Exposure(void);
 /* Logs how many instances and triangles the last frame drew at each level
  * of detail (the film benchmark). */
 void  XwaRemasterFlight_LogLodStats(void);
+/* Logs counts for the last flight render: the instances, shadow casters,
+ * lights and billboards of the scene, then the instances drawn and the draw
+ * calls of each view. */
+void XwaRemasterFlight_LogFrameStats(void);
 /* The debug view drawn in place of the flight image
  * (AeronScenePresentDebugView): the image, false colour, or the meter's
  * weights. Debug only, not in the settings. */

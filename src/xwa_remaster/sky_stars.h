@@ -26,8 +26,10 @@ typedef struct XwaRemasterSkyStarsParams {
 XwaRemasterSkyStars* XwaRemasterSkyStars_Create(void);
 void XwaRemasterSkyStars_Destroy(XwaRemasterSkyStars* stars);
 
-/* Captures the current scene transform after AeronScene_Begin. The public
- * jittered view-projection keeps stars aligned with temporally jittered meshes. */
+/* Prepares the stars for `scene`. Call it after AeronScene_Begin.
+ * XwaRemasterSkyStars_Draw reads the jittered view-projection of the scene's
+ * current view, so the stars stay aligned with jittered meshes. `scene` must
+ * stay valid until the last draw. */
 int XwaRemasterSkyStars_Prepare(XwaRemasterSkyStars* stars, const AeronScene3D* scene,
 								const float world_to_cube[9], const XwaRemasterSkyStarsParams* params);
 

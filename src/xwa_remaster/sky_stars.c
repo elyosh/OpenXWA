@@ -23,6 +23,11 @@ struct XwaRemasterSkyStars {
 	SkyStarsVsUniform vertex_uniform;
 	float fragment_uniform[4];
 	uint32_t vertex_count;
+	/* Set by XwaRemasterSkyStars_Prepare: the scene, and the matrix from the
+	 * star cube to the scene's world. XwaRemasterSkyStars_Draw multiplies the
+	 * matrix by the view-projection of the scene's current view. */
+	const AeronScene3D* scene;
+	float cube_to_world[16];
 };
 
 static void sky_stars_mat4_mul(float out[16], const float lhs[16], const float rhs[16]) {
@@ -115,18 +120,18 @@ int XwaRemasterSkyStars_Prepare(XwaRemasterSkyStars* stars, const AeronScene3D* 
 	if (!stars || !scene || !params || params->grid_n < 1.0f) {
 		return 0;
 	}
-	const float* view_proj = AeronScene_JitteredViewProj(scene);
-	if (!view_proj) {
+	stars->scene = NULL;
+	if (!AeronScene_JitteredViewProj(scene)) {
 		return 0;
 	}
 
 	static const float identity3[9] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 	const float* basis = world_to_cube ? world_to_cube : identity3;
-	float cube_to_world[16] = {
+	const float cube_to_world[16] = {
 		basis[0], basis[3], basis[6], 0.0f, basis[1], basis[4], basis[7], 0.0f,
 		basis[2], basis[5], basis[8], 0.0f, 0.0f,     0.0f,     0.0f,     1.0f,
 	};
-	sky_stars_mat4_mul(stars->vertex_uniform.cube_to_clip, view_proj, cube_to_world);
+	memcpy(stars->cube_to_world, cube_to_world, sizeof stars->cube_to_world);
 
 	int render_w, render_h, output_w, output_h;
 	AeronScene_RenderDims(scene, &render_w, &render_h);
@@ -155,6 +160,7 @@ int XwaRemasterSkyStars_Prepare(XwaRemasterSkyStars* stars, const AeronScene3D* 
 
 	const uint32_t grid_n = (uint32_t)params->grid_n;
 	stars->vertex_count = 36u * grid_n * grid_n;
+	stars->scene = scene;
 	return 1;
 }
 
@@ -163,9 +169,13 @@ void XwaRemasterSkyStars_Draw(AeronCommandBuffer* command_buffer, AeronRenderPas
 	(void)rt_w;
 	(void)rt_h;
 	XwaRemasterSkyStars* stars = (XwaRemasterSkyStars*)user;
-	if (!stars || !render_pass || stars->vertex_count == 0) {
+	if (!stars || !render_pass || stars->vertex_count == 0 || !stars->scene) {
 		return;
 	}
+	/* Use the jittered view-projection of the view the scene is rendering
+	 * now. */
+	sky_stars_mat4_mul(stars->vertex_uniform.cube_to_clip, AeronScene_JitteredViewProj(stars->scene),
+					   stars->cube_to_world);
 	if (!sky_stars_ensure_pipeline(stars, Aeron_RenderPassGetSampleCount(render_pass))) {
 		Aeron_CommandBufferSetFailure(command_buffer, "Procedural starfield pipeline preparation failed");
 		return;

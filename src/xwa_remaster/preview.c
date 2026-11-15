@@ -185,8 +185,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	/* The preview's exposure comes from its own light. */
 	const float exposure = XwaRemasterFlight_LightMeterExposure(linear_lights, linear_light_count);
 	AeronScene_SetExposure(s.scene, exposure);
-	XwaRemasterShip_SetPbrEnv(s.scene, linear_lights, linear_light_count, -1, p->cam_rows, NULL,
-							  ao_on ? &ao : NULL,
+	XwaRemasterShip_SetPbrEnv(s.scene, linear_lights, linear_light_count, -1, p->cam_rows, ao_on ? &ao : NULL,
 							  /*ambient_cube=*/NULL, /*environment_map=*/NULL, /*key_probe_shadow=*/-1.0f);
 
 	/* Model->eye ("world") instance. The engine consumes the captured
