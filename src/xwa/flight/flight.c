@@ -11114,7 +11114,7 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 						}
 					}
 				} else {
-					int mapTargetObjIdx;
+					uint16_t mapTargetObjIdx;
 					if (g_filmPlaybackMode && g_filmOverlayActive == 1) {
 						g_filmOverlayActive = 0;
 						Hud_SyncLocalSoftwareHudMasks(1);
@@ -11123,8 +11123,8 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					fsfx_UpdateIncomingMissileWarning(0);
 					fsfx_UpdateTargetingTone(0);
 					mapTargetObjIdx = g_players[currentPlayerIdx].currentTargetObjectIdx;
-					if (mapTargetObjIdx == -1) {
-						mapTargetObjIdx = g_players[currentPlayerIdx].objectIndex;
+					if (mapTargetObjIdx == 0xffff) {
+						mapTargetObjIdx = (uint16_t)g_players[currentPlayerIdx].objectIndex;
 					}
 					g_players[currentPlayerIdx].altViewObjectIdx = g_players[currentPlayerIdx].objectIndex;
 					Player_UnbindFromCurrentCraft(currentPlayerIdx, 0, 0);
@@ -11134,15 +11134,15 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 					g_players[currentPlayerIdx].viewState.externalCameraActive = 1;
 					g_players[currentPlayerIdx].viewState.transitionTimer = 0;
 					g_players[currentPlayerIdx].viewState.cameraDistance = 0x40000;
-					if (mapTargetObjIdx != -1) {
+					if (mapTargetObjIdx != 0xffff) {
 #ifdef XWA_MODERN
 						/* In this call, a mod's map enter sound replaces the
 						   target select sound. */
 						XwaCraftSounds_SetMapEnter(1);
-						Player_SetTarget((int16_t)mapTargetObjIdx, currentPlayerIdx);
+						Player_SetTarget(mapTargetObjIdx, currentPlayerIdx);
 						XwaCraftSounds_SetMapEnter(0);
 #else
-						Player_SetTarget((int16_t)mapTargetObjIdx, currentPlayerIdx);
+						Player_SetTarget(mapTargetObjIdx, currentPlayerIdx);
 #endif
 					}
 					g_players[currentPlayerIdx].viewState.cameraFocusObjIdx = 0xffff;
