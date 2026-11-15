@@ -554,13 +554,12 @@ surfaces:
 | `min_ordered_speed_mglt` | Hidden while the speed that the craft's orders give is below this many MGLT. |
 
 A tag is hidden when any of its keys hides it. The importer gives the tag
-`illumination` to the materials with an XWAU illumination, the texels that
-give out light, such as windows and running lights. It also gives the tag
-the `dark_when_disabled` rule, so these lights go dark on a disabled craft,
-as in XWAU. A tag can have lower-case letters, digits, `.` and `_`, and at
-most 63 characters. A model can have at
-most 32 tags in this group. Objects without a craft record show all their
-surfaces. This group only changes what you see.
+`illumination` to the materials that give out light, such as windows and
+running lights. It also gives the tag the `dark_when_disabled` rule, so
+these lights go dark on a disabled craft. A tag can have lower-case letters,
+digits, `.` and `_`, and at most 63 characters. A model can have at most 32
+tags in this group. Objects without a craft record show all their surfaces.
+This group only changes what you see.
 
 ### weapons
 
@@ -816,6 +815,43 @@ weapons:
 A hardpoint type that the map leaves out uses the kind from
 `flight/flight.yaml`, then the kind of the original game. This group isn't a
 profile: it applies to every craft that loads the model.
+
+#### Weapon factors
+
+`factors` multiplies some weapon stats of the model's craft. Which factors a
+craft gets depends on its flight group's rank and on whether a player flies
+it. The factors also apply to the original game's values, when no profile
+sets a stat.
+
+```yaml
+weapons:
+  factors:
+    veteran: {fire_rate: 0.5}
+    player: {power: 1.2}
+```
+
+Each key is a set of factors: `all`, `player`, a rank (`novice`, `officer`,
+`veteran`, `ace`, `top_ace` or `super_ace`), or `player_` and a rank, such as
+`player_veteran`. A craft uses only the first set that the model has:
+
+1. for a player's craft, `player_<rank>`, then `player`;
+2. `<rank>`;
+3. `all`.
+
+A craft without a flight group, or with a rank past `super_ace`, skips the
+rank sets. A set with no factors still counts, and gives every stat a factor
+of 1.
+
+The factors are `score`, `speed`, `power`, `power_speed_percent`,
+`fire_rate`, `fire_ratio`, `range`, `decharge_rate` and `recharge_rate`. A
+stat that the set leaves out has a factor of 1. The game multiplies the
+stat in float32 and drops the decimals. The charge rates are multiplied
+after `decharge_percent` and `recharge_percent`.
+
+When no profile sets `fire_ratio_ms` or `range_m`, the factor multiplies -1,
+which means "not set". A factor from 1 to just under 2 keeps
+the original value. A factor under 1 gives 0, and a factor of 2 or more
+gives -2 or less, which the game then uses as the value.
 
 ### stats_profiles
 
