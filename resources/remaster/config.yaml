@@ -358,6 +358,13 @@ presentation:
   # and the horizontal field of view of one eye in degrees.
   debug_stereo_ipd_m: 0.064
   debug_stereo_fov_deg: 100
+  # In VR, the menus, the briefings and the movies are shown on a flat
+  # screen in front of the player: its size in pixels, its distance from the
+  # head and its width, in metres. Read when the game starts.
+  vr_screen_width_px: 1920
+  vr_screen_height_px: 1080
+  vr_screen_distance_m: 2.0
+  vr_screen_width_m: 2.4
 # Sound. The Audio tab of OpenXWA Options changes these settings.
 audio:
   # speakers or headphones. On headphones, sounds also seem to come from

@@ -419,9 +419,10 @@ static int resolve_game_data(const XwaLaunchOptions* launch, const XwaHostConfig
 	return select_game_data(vfs, selected, selected_capacity, cancelled, error, error_size);
 }
 
-/* Aeron asks for the VR mode before it creates the window and the GPU device. */
+/* Aeron asks for the VR settings before it creates the window and the GPU
+ * device. */
 static void load_startup_options(AeronVfs* vfs, void* userdata, AeronStartupOptions* options) {
-	XwaHostConfig_LoadStartup(vfs, (const XwaLaunchOptions*)userdata, &options->xr_mode);
+	XwaHostConfig_LoadStartup(vfs, (const XwaLaunchOptions*)userdata, options);
 }
 
 int main(int argc, char** argv) {
@@ -604,6 +605,11 @@ int main(int argc, char** argv) {
 			(host_config.video_options_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_MODE)
 				? host_config.video_options.vr_mode
 				: XWA_MODERN_VR_OFF;
+		/* Nor the scale of the eye images. */
+		effective_video_options.vr_render_scale =
+			(host_config.video_options_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_RENDER_SCALE)
+				? host_config.video_options.vr_render_scale
+				: 1.0f;
 		XwaModernVideoOptions_Configure(&effective_video_options, apply_modern_video_options,
 										persist_modern_video_options);
 	}
@@ -745,6 +751,12 @@ int main(int argc, char** argv) {
 				XwaPort_ToggleMouseCapture();
 				toggled = 1;
 			}
+			/* Ctrl+Alt+R makes the direction the headset looks in straight
+			 * ahead. */
+			if (Aeron_XrEnabled() && host_shortcut_pressed(in, XWA_KEYBOARD_SHORTCUT_RECENTER)) {
+				Aeron_XrRecenter();
+				toggled = 1;
+			}
 			/* Ctrl+H toggles the Dynamic Cockpit holograms while a cockpit
 			 * with screens is shown. */
 			if (XwaRemasterDc_Active() && host_shortcut_pressed(in, XWA_KEYBOARD_SHORTCUT_HOLOGRAMS)) {
@@ -811,10 +823,13 @@ int main(int argc, char** argv) {
 			XwaFilmBenchmark_NoteHostFrame(begin_us, tick_us, remaster_us,
 										   benchmark_frame ? present_end_us - present_start_us : 0,
 										   present_end_us - frame_start_us);
-			if (XwaFilmBenchmark_CaptureDue()) {
+			/* The capture and the measurement need the frozen frame's
+			   render, which can wait for models or for the headset. */
+			const int frozen_frame_ready = !XwaRemaster_FrameWaits();
+			if (frozen_frame_ready && XwaFilmBenchmark_CaptureDue()) {
 				XwaFilmBenchmark_CaptureDone(XwaRemaster_CaptureFlightFrame(XwaFilmBenchmark_CaptureName()));
 			}
-			if (XwaFilmBenchmark_MeasurementDue()) {
+			if (frozen_frame_ready && XwaFilmBenchmark_MeasurementDue()) {
 				XwaFilmBenchmark_MeasurementDone(XwaRemaster_BenchmarkFlightFrames());
 			}
 			uint64_t wake_us = presentation_interval_us();

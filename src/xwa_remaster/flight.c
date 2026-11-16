@@ -250,6 +250,13 @@ static struct {
 	int rig_previous_valid;
 	/* Set while present_rt holds a frame composed from the rig's views. */
 	int rig_composed;
+	/* A headset's rig: each view is drawn into its own target, such as an
+	 * eye image, instead of a rectangle of present_rt. The targets are set
+	 * for one frame (XwaRemasterFlight_SetViewTargets). */
+	AeronRenderTarget* view_targets[AERON_MAX_VIEWS];
+	int view_targets_set;
+	/* The last render drew the rig's views into their own targets. */
+	int view_targets_rendered;
 	/* While set, a rig's frame is composed before the tonemap and without
 	 * the HUD, for film captures. */
 	int compose_before_tonemap;
@@ -287,6 +294,9 @@ static struct {
 	AeronScenePresentChain* present;
 	AeronScenePresentChain* present_direct;
 	AeronTextureFormat direct_present_format;
+	/* The chain that tone maps into the views' own targets. */
+	AeronScenePresentChain* present_views;
+	AeronTextureFormat present_views_format;
 	AeronRenderTarget* present_rt;
 	/* With a rig, the 2D HUD is drawn into this target of the view size,
 	 * with premultiplied alpha, and then over the primary view. */
@@ -756,6 +766,7 @@ static int fl_cfg_has_type(const AeronConfigFile* config, const char* path, Aero
 static int fl_cfg_validate(const AeronConfigFile* config, const char** error_path) {
 	static const char* ints[] = {
 		"presentation.vsync_divisor", "presentation.frames_in_flight",     "presentation.msaa_samples",
+		"presentation.vr_screen_width_px", "presentation.vr_screen_height_px",
 		"motion_blur.quality",        "point_lights.cluster_depth_slices", "hyperspace_jump.star_count",
 		"hyperspace_jump.warp_taps",  "hyperspace_jump.warp_sky_taps",
 	};
@@ -763,6 +774,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"presentation.cockpit_fov_min_aspect",
 		"presentation.debug_stereo_ipd_m",
 		"presentation.debug_stereo_fov_deg",
+		"presentation.vr_screen_distance_m",
+		"presentation.vr_screen_width_m",
 		"hangar_lighting.direction_x",
 		"hangar_lighting.direction_y",
 		"hangar_lighting.direction_z",
@@ -3119,7 +3132,25 @@ void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig) {
 		s.rig_previous_valid = 0;
 	}
 	s.rig_active = active;
+	s.view_targets_set = 0;
 }
+
+void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets) {
+	s.view_targets_set = 0;
+	if (!targets || !s.rig_active) {
+		return;
+	}
+	for (int i = 0; i < s.rig.count; i++) {
+		if (!targets[i] || Aeron_TextureGetWidth(Aeron_RenderTargetGetTexture(targets[i])) != s.rig.width ||
+			Aeron_TextureGetHeight(Aeron_RenderTargetGetTexture(targets[i])) != s.rig.height) {
+			return;
+		}
+		s.view_targets[i] = targets[i];
+	}
+	s.view_targets_set = 1;
+}
+
+int XwaRemasterFlight_ViewTargetsRendered(void) { return s.view_targets_rendered; }
 
 void XwaRemasterFlight_GetViewLayout(int* count, int* width, int* height) {
 	if (count) {
@@ -6354,9 +6385,9 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	}
 }
 
-/* Renders the 2D HUD into hud_rt, and prepares the list that draws it over
- * the primary view. */
-static int fl_render_rig_hud(AeronCommandBuffer* cmd) {
+/* Renders the 2D HUD into hud_rt, and prepares the list that draws it into
+ * `rect` of a target of `target_w` x `target_h` pixels. */
+static int fl_render_rig_hud(AeronCommandBuffer* cmd, AeronRectI rect, int target_w, int target_h) {
 	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
 		.color_target = s.hud_rt,
 		.clear_color = 1,
@@ -6371,8 +6402,7 @@ static int fl_render_rig_hud(AeronCommandBuffer* cmd) {
 	 * the view that was rendered last. */
 	fl_draw_hud(cmd, pass, s.hud_rt, s.rt_w, s.rt_h, NULL);
 	Aeron_EndRenderPass(pass);
-	const AeronRectI rect = s.rig.views[s.rig.primary].rect;
-	AeronDrawList_Begin(s.hud_composite, NULL, s.out_w, s.out_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_Begin(s.hud_composite, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	AeronDrawList_AddSprite(s.hud_composite, &(AeronDrawList2DSprite) {
 												 .texture = Aeron_RenderTargetGetTexture(s.hud_rt),
 												 .src_u1 = 1.0f,
@@ -6388,21 +6418,73 @@ static int fl_render_rig_hud(AeronCommandBuffer* cmd) {
 	return AeronDrawList_Prepare(s.hud_composite, cmd);
 }
 
-/* Tone maps the image to present into the rectangle of `view` in
- * present_rt, and draws the HUD over the primary view. `first` clears the
- * target: it is the first view of the frame. */
-static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first) {
+/* Returns the chain that tone maps into a view's own target, which has
+ * `format`. */
+static AeronScenePresentChain* fl_view_target_chain(AeronTextureFormat format) {
+	if (s.present_views && s.present_views_format == format) {
+		return s.present_views;
+	}
+	if (s.present_views) {
+		AeronScenePresentChain_Destroy(s.present_views);
+	}
+	s.present_views = AeronScenePresentChain_Create(format);
+	s.present_views_format = s.present_views ? format : AERON_TEXTURE_FORMAT_UNKNOWN;
+	return s.present_views;
+}
+
+/* Returns the largest rectangle with the shape of one view that fits in the
+ * middle of a target of `target_w` x `target_h` pixels. */
+static AeronRectI fl_fit_view_rect(int target_w, int target_h) {
+	AeronRectI rect = { 0, 0, target_w, target_h };
+	if (s.rt_w <= 0 || s.rt_h <= 0) {
+		return rect;
+	}
+	if ((int64_t)target_w * s.rt_h > (int64_t)target_h * s.rt_w) {
+		rect.width = (int)((int64_t)target_h * s.rt_w / s.rt_h);
+	} else {
+		rect.height = (int)((int64_t)target_w * s.rt_h / s.rt_w);
+	}
+	rect.x = (target_w - rect.width) / 2;
+	rect.y = (target_h - rect.height) / 2;
+	return rect;
+}
+
+/* Tone maps the image to present for `view`, and draws the HUD over the
+ * primary view. The image goes into the view's rectangle of present_rt;
+ * `first` then clears the target, for the first view of the frame. With
+ * `own_target`, a headset's view goes into its own target instead. The
+ * single view of a headset's map goes into the middle of present_rt, which
+ * the virtual screen shows. */
+static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int own_target) {
 	if (!cmd || !s.present || !s.present_rt || !s.hud_rt || !s.present_scene_tex) {
 		return 0;
 	}
+	AeronRenderTarget* target = s.present_rt;
+	AeronScenePresentChain* chain = s.present;
+	AeronRectI rect = s.rig.views[view].rect;
+	int target_w = s.out_w;
+	int target_h = s.out_h;
+	if (own_target) {
+		target = s.view_targets[view];
+		chain = fl_view_target_chain(Aeron_TextureGetFormat(Aeron_RenderTargetGetTexture(target)));
+		rect = (AeronRectI) { 0, 0, s.rt_w, s.rt_h };
+		target_w = s.rt_w;
+		target_h = s.rt_h;
+		first = 1;
+		if (!chain) {
+			return 0;
+		}
+	} else if (s.view_targets_set) {
+		rect = fl_fit_view_rect(s.out_w, s.out_h);
+	}
 	const int hud = view == s.rig.primary && !s.suppress_hud && !s.compose_before_tonemap;
-	if (hud && !fl_render_rig_hud(cmd)) {
+	if (hud && !fl_render_rig_hud(cmd, rect, target_w, target_h)) {
 		return 0;
 	}
 	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
-		.color_target = s.present_rt,
+		.color_target = target,
 		.clear_color = first,
-		.clear_color_rgba = { 0.0f, 0.0f, 0.0f, 0.0f },
+		.clear_color_rgba = { 0.0f, 0.0f, 0.0f, own_target ? 1.0f : 0.0f },
 		.command_buffer = cmd,
 		.debug_label = "OpenXWA flight view tonemap + bloom",
 	});
@@ -6411,20 +6493,49 @@ static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first) {
 	}
 	if (s.compose_before_tonemap) {
 		AeronScenePresentChain_SetDebug(
-			s.present, &(AeronScenePresentDebug) { .view = AERON_SCENE_PRESENT_BEFORE_TONEMAP });
+			chain, &(AeronScenePresentDebug) { .view = AERON_SCENE_PRESENT_BEFORE_TONEMAP });
 	} else {
-		fl_set_present_debug(s.present);
+		fl_set_present_debug(chain);
 	}
-	fl_draw_present_scene(pass, s.present, &s.rig.views[view].rect);
+	fl_draw_present_scene(pass, chain, &rect);
 	if (hud) {
-		const AeronRectI full_target = { 0, 0, s.out_w, s.out_h };
+		const AeronRectI full_target = { 0, 0, target_w, target_h };
 		Aeron_SetViewport(pass, &full_target);
 		Aeron_SetScissor(pass, &full_target);
-		AeronDrawList_RenderIntoPass(s.hud_composite, cmd, pass, s.present_rt);
+		AeronDrawList_RenderIntoPass(s.hud_composite, cmd, pass, target);
 	}
 	Aeron_EndRenderPass(pass);
-	s.rig_composed = 1;
+	if (!own_target) {
+		s.rig_composed = 1;
+	}
 	return 1;
+}
+
+
+/* The headset mirror: tone maps the view that was rendered last into the
+ * middle of the window. Aeron calls it while it draws the window, so the
+ * scene's image and its bloom are still the last view's. */
+static void fl_mirror_callback(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+							   int target_w, int target_h, void* userdata) {
+	(void)cmd;
+	(void)target;
+	(void)userdata;
+	if (!s.view_targets_rendered || !s.present_direct || !s.present_scene_tex || !s.present_sampler) {
+		return;
+	}
+	const AeronRectI rect = fl_fit_view_rect(target_w, target_h);
+	fl_set_present_debug(s.present_direct);
+	fl_draw_present_scene(pass, s.present_direct, &rect);
+}
+
+int XwaRemasterFlight_SubmitViewMirror(void) {
+	if (!s.view_targets_rendered || !fl_ensure_direct_present()) {
+		return 0;
+	}
+	return Aeron_XrSubmitMirror(&(AeronSwapchainRenderLayerDesc) {
+		.callback = fl_mirror_callback,
+		.debug_label = "OpenXWA headset mirror",
+	});
 }
 
 AeronTexture* XwaRemasterFlight_ResolvePresentation(AeronCommandBuffer* cmd, int direct_present) {
@@ -6571,22 +6682,26 @@ static AeronTexture* fl_present(AeronCommandBuffer* cmd, int direct_present) {
 		return NULL;
 	}
 	if (s.rig_active) {
-		return fl_compose_rig_view(cmd, s.rig.primary, 1) ? Aeron_RenderTargetGetTexture(s.present_rt) : NULL;
+		return fl_compose_rig_view(cmd, s.rig.primary, 1, 0) ? Aeron_RenderTargetGetTexture(s.present_rt)
+															 : NULL;
 	}
 	return XwaRemasterFlight_ResolvePresentation(cmd, direct_present);
 }
 
 /* Renders the frame's views one after the other, and tone maps each into
- * its rectangle of present_rt. The scene's targets hold one view at a time,
- * so a view is presented before the next one is rendered. */
+ * its rectangle of present_rt, or into its own target for a headset. The
+ * scene's targets hold one view at a time, so a view is presented before
+ * the next one is rendered. */
 static AeronTexture* fl_render_rig_views(AeronCommandBuffer* cmd) {
+	/* A capture reads present_rt, so its frame is composed there. */
+	const int own_targets = s.view_targets_set && !s.compose_before_tonemap;
 	int ok = AeronScene_PrepareFrame(s.scene, cmd);
 	for (int k = 0; ok && k < s.view_count; k++) {
 		/* The primary view first: it meters the exposure the others use. */
 		const int view = k == 0 ? s.primary_view : (k <= s.primary_view ? k - 1 : k);
 		ok = AeronScene_RenderView(s.scene, cmd, view) &&
 			 (!s.hyperspace_in_world || fl_render_world_hyperspace(cmd, view)) &&
-			 fl_prepare_present_image(cmd) && fl_compose_rig_view(cmd, view, k == 0);
+			 fl_prepare_present_image(cmd) && fl_compose_rig_view(cmd, view, k == 0, own_targets);
 	}
 	ok = ok && AeronScene_EndFrame(s.scene, cmd);
 	if (!ok) {
@@ -6595,6 +6710,7 @@ static AeronTexture* fl_render_rig_views(AeronCommandBuffer* cmd) {
 	/* The next frame's motion vectors start from these views. */
 	s.rig_previous = s.rig;
 	s.rig_previous_valid = 1;
+	s.view_targets_rendered = own_targets;
 	return Aeron_RenderTargetGetTexture(s.present_rt);
 }
 
@@ -6669,6 +6785,10 @@ fl_hyperspace_camera_for(const XwaRemasterHyperspaceMoment* moment) {
 /* Returns 1 when the Camera Shake option (camera_shake) is on. */
 static int fl_hyperspace_camera_allowed(void) {
 	XwaModernCameraShakeOptions options;
+	/* A headset's views follow the head only. */
+	if (s.view_targets_set) {
+		return 0;
+	}
 	XwaModernCameraShakeOptions_Get(&options);
 	return options.enabled != 0;
 }
@@ -8001,6 +8121,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const AeronViewRig* rig = s.rig_active && !cam->map_mode ? &s.rig : NULL;
 	fl_set_frame_views(cam, &flight_view, rig);
 	s.rig_composed = 0;
+	s.view_targets_rendered = 0;
 	/* A tracked rig renders a snapshot again when the head moved before the
 	 * next game tick. Nothing moved in the world then. */
 	const int snapshot_repeated =
@@ -8055,7 +8176,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * garbage smear, so prev falls back to curr (zero velocity, held
 	 * buffer invalidated via NULL prev_view_proj). */
 	XwaRemasterFlightView previous_flight_view;
-	const int mb_on = s.mb_quality > 0 || (!rig && s.fsr_mode != AERON_TEMPORAL_OFF);
+	/* A headset has no motion blur: the eyes follow what they look at. */
+	const int mb_on =
+		!s.view_targets_set && (s.mb_quality > 0 || (!rig && s.fsr_mode != AERON_TEMPORAL_OFF));
 	s.mb_enabled = 0;
 	int mb_regen = 0;
 	int paused = 0;
@@ -8817,6 +8940,9 @@ void XwaRemasterFlight_Shutdown(void) {
 	}
 	if (s.present_direct) {
 		AeronScenePresentChain_Destroy(s.present_direct);
+	}
+	if (s.present_views) {
+		AeronScenePresentChain_Destroy(s.present_views);
 	}
 	memset(&s, 0, sizeof s);
 }

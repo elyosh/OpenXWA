@@ -471,29 +471,66 @@ static int host_config_surround_options(const AeronConfigFile* config, XwaModern
 
 static const char* const host_config_vr_mode_names[] = { "off", "auto", "required" };
 
-void XwaHostConfig_LoadStartup(AeronVfs* vfs, const XwaLaunchOptions* launch, AeronXrMode* mode) {
+/* Reads the virtual screen's settings from the presentation section of
+ * the shipped remaster/config.yaml. A missing or bad value keeps Aeron's
+ * default; the flight renderer reports the file's problems later. */
+static void host_config_startup_screen(AeronVfs* vfs, AeronStartupOptions* options) {
+	AeronConfigFile* config = NULL;
+	AeronConfigError config_error = { 0 };
+
+	if (!AeronVfs_Exists(vfs, AERON_VFS_ROOT_RESOURCE, "remaster/config.yaml") ||
+		!AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_RESOURCE, "remaster/config.yaml", &config,
+									&config_error)) {
+		return;
+	}
+	const int width = (int)AeronConfigFile_GetInt(config, "presentation.vr_screen_width_px", 0);
+	const int height = (int)AeronConfigFile_GetInt(config, "presentation.vr_screen_height_px", 0);
+	const double distance = AeronConfigFile_GetFloat(config, "presentation.vr_screen_distance_m", 0.0);
+	const double width_m = AeronConfigFile_GetFloat(config, "presentation.vr_screen_width_m", 0.0);
+	if (width >= 640 && width <= 8192 && height >= 480 && height <= 8192) {
+		options->xr_screen_width = width;
+		options->xr_screen_height = height;
+	}
+	if (distance >= 0.5 && distance <= 20.0) {
+		options->xr_screen_distance_m = (float)distance;
+	}
+	if (width_m >= 0.5 && width_m <= 40.0) {
+		options->xr_screen_width_m = (float)width_m;
+	}
+	AeronConfigFile_Destroy(config);
+}
+
+void XwaHostConfig_LoadStartup(AeronVfs* vfs, const XwaLaunchOptions* launch, AeronStartupOptions* options) {
 	AeronConfigFile* config = NULL;
 	AeronConfigError config_error = { 0 };
 	unsigned int override_mask = 0;
 	char error[256];
 	int value = XWA_MODERN_VR_OFF;
+	float scale = 1.0f;
 
-	*mode = AERON_XR_OFF;
+	options->xr_mode = AERON_XR_OFF;
+	if (!vfs) {
+		return;
+	}
+	host_config_startup_screen(vfs, options);
+	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, "config.yaml") &&
+		AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_USER, "config.yaml", &config, &config_error)) {
+		if (host_config_named_value(config, "video.vr_mode", host_config_vr_mode_names, 3, &value, 1u,
+									&override_mask, error, sizeof error)) {
+			options->xr_mode = value == XWA_MODERN_VR_REQUIRED ? AERON_XR_REQUIRED
+							   : value == XWA_MODERN_VR_AUTO   ? AERON_XR_AUTO
+															   : AERON_XR_OFF;
+		}
+		if (host_config_video_float(config, "video.vr_render_scale", XWA_MODERN_VR_SCALE_MIN,
+									XWA_MODERN_VR_SCALE_MAX, &scale, 1u, &override_mask, error,
+									sizeof error)) {
+			options->xr_render_scale = scale;
+		}
+		AeronConfigFile_Destroy(config);
+	}
 	if (launch && launch->vr) {
-		*mode = launch->vr > 0 ? AERON_XR_REQUIRED : AERON_XR_OFF;
-		return;
+		options->xr_mode = launch->vr > 0 ? AERON_XR_REQUIRED : AERON_XR_OFF;
 	}
-	if (!vfs || !AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, "config.yaml") ||
-		!AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_USER, "config.yaml", &config, &config_error)) {
-		return;
-	}
-	if (host_config_named_value(config, "video.vr_mode", host_config_vr_mode_names, 3, &value, 1u,
-								&override_mask, error, sizeof error)) {
-		*mode = value == XWA_MODERN_VR_REQUIRED ? AERON_XR_REQUIRED
-				: value == XWA_MODERN_VR_AUTO   ? AERON_XR_AUTO
-												: AERON_XR_OFF;
-	}
-	AeronConfigFile_Destroy(config);
 }
 
 static int host_config_video_options(const AeronConfigFile* config, XwaModernVideoOptions* out,
@@ -524,6 +561,26 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 		return 0;
 	}
 	out->vr_mode = (XwaModernVrMode)value;
+	if (!host_config_video_float(config, "video.vr_render_scale", XWA_MODERN_VR_SCALE_MIN,
+								 XWA_MODERN_VR_SCALE_MAX, &out->vr_render_scale,
+								 XWA_MODERN_VIDEO_OVERRIDE_VR_RENDER_SCALE, override_mask, error, error_size) ||
+		!host_config_video_float(config, "video.vr_world_scale", XWA_MODERN_VR_SCALE_MIN,
+								 XWA_MODERN_VR_SCALE_MAX, &out->vr_world_scale,
+								 XWA_MODERN_VIDEO_OVERRIDE_VR_WORLD_SCALE, override_mask, error, error_size)) {
+		return 0;
+	}
+	{
+		static const char* const mirror_names[] = { "off", "on" };
+		const AeronConfigNode* mirror_node = AeronConfigFile_GetNode(config, "video.vr_mirror");
+		if (mirror_node && AeronConfigNode_Type(mirror_node) == AERON_CONFIG_BOOL) {
+			out->vr_mirror = AeronConfigNode_Bool(mirror_node, 1);
+			*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_VR_MIRROR;
+		} else if (!host_config_named_value(config, "video.vr_mirror", mirror_names, 2, &out->vr_mirror,
+											XWA_MODERN_VIDEO_OVERRIDE_VR_MIRROR, override_mask, error,
+											error_size)) {
+			return 0;
+		}
+	}
 
 	value = 0;
 	if (!host_config_named_value(config, "video.ssao_quality", quality_names,
@@ -969,7 +1026,10 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 	if (!options || options->window_mode < XWA_MODERN_WINDOW_MODE_WINDOWED ||
 		options->window_mode > XWA_MODERN_WINDOW_MODE_SPAN ||
 		!XwaModernSurroundOptions_Valid(&options->surround) || options->vr_mode < XWA_MODERN_VR_OFF ||
-		options->vr_mode > XWA_MODERN_VR_REQUIRED || options->ssao_quality < XWA_MODERN_SSAO_OFF ||
+		options->vr_mode > XWA_MODERN_VR_REQUIRED || !(options->vr_render_scale >= XWA_MODERN_VR_SCALE_MIN) ||
+		options->vr_render_scale > XWA_MODERN_VR_SCALE_MAX ||
+		!(options->vr_world_scale >= XWA_MODERN_VR_SCALE_MIN) ||
+		options->vr_world_scale > XWA_MODERN_VR_SCALE_MAX || options->ssao_quality < XWA_MODERN_SSAO_OFF ||
 		options->ssao_quality > XWA_MODERN_SSAO_HIGH ||
 		options->shadow_quality < XWA_MODERN_SHADOW_STANDARD ||
 		options->shadow_quality > XWA_MODERN_SHADOW_HIGH || options->fsr_upscaling < XWA_MODERN_FSR_OFF ||
@@ -1016,7 +1076,10 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 		   AeronConfigFile_SetFloat(document, "video.surround_side_angle_deg",
 									options->surround.side_angle_deg, error) &&
 		   AeronConfigFile_SetString(document, "video.vr_mode", host_config_vr_mode_names[options->vr_mode],
-									 error);
+									 error) &&
+		   AeronConfigFile_SetFloat(document, "video.vr_render_scale", options->vr_render_scale, error) &&
+		   AeronConfigFile_SetFloat(document, "video.vr_world_scale", options->vr_world_scale, error) &&
+		   AeronConfigFile_SetBool(document, "video.vr_mirror", options->vr_mirror, error);
 }
 
 static int host_config_remove_key(AeronConfigFile* document, const char* key, AeronConfigError* error) {

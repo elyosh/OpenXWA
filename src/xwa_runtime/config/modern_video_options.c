@@ -45,7 +45,10 @@ static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 	return options && options->window_mode >= XWA_MODERN_WINDOW_MODE_WINDOWED &&
 		   options->window_mode <= XWA_MODERN_WINDOW_MODE_SPAN &&
 		   XwaModernSurroundOptions_Valid(&options->surround) && options->vr_mode >= XWA_MODERN_VR_OFF &&
-		   options->vr_mode <= XWA_MODERN_VR_REQUIRED && options->ssao_quality >= XWA_MODERN_SSAO_OFF &&
+		   options->vr_mode <= XWA_MODERN_VR_REQUIRED &&
+		   surround_in_range(options->vr_render_scale, XWA_MODERN_VR_SCALE_MIN, XWA_MODERN_VR_SCALE_MAX) &&
+		   surround_in_range(options->vr_world_scale, XWA_MODERN_VR_SCALE_MIN, XWA_MODERN_VR_SCALE_MAX) &&
+		   options->ssao_quality >= XWA_MODERN_SSAO_OFF &&
 		   options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
 		   options->shadow_quality >= XWA_MODERN_SHADOW_STANDARD &&
 		   options->shadow_quality <= XWA_MODERN_SHADOW_HIGH &&
@@ -75,7 +78,9 @@ static int XwaModernVideoOptions_AreEqual(const XwaModernVideoOptions* lhs,
 		   lhs->surround.screen_height_mm == rhs->surround.screen_height_mm &&
 		   lhs->surround.bezel_mm == rhs->surround.bezel_mm &&
 		   lhs->surround.distance_mm == rhs->surround.distance_mm &&
-		   lhs->surround.side_angle_deg == rhs->surround.side_angle_deg && lhs->vr_mode == rhs->vr_mode;
+		   lhs->surround.side_angle_deg == rhs->surround.side_angle_deg && lhs->vr_mode == rhs->vr_mode &&
+		   lhs->vr_render_scale == rhs->vr_render_scale && lhs->vr_world_scale == rhs->vr_world_scale &&
+		   lhs->vr_mirror == rhs->vr_mirror;
 }
 
 void XwaModernVideoOptions_Configure(const XwaModernVideoOptions* options, XwaModernVideoOptionsApplyFn apply,
@@ -89,6 +94,7 @@ void XwaModernVideoOptions_Configure(const XwaModernVideoOptions* options, XwaMo
 	g_modernVideoOptions.options = *options;
 	g_modernVideoOptions.options.hdr_output = options->hdr_output != 0;
 	g_modernVideoOptions.options.surround.enabled = options->surround.enabled != 0;
+	g_modernVideoOptions.options.vr_mirror = options->vr_mirror != 0;
 	g_modernVideoOptions.apply = apply;
 	g_modernVideoOptions.persist = persist;
 	g_modernVideoOptions.configured = 1;
@@ -109,6 +115,7 @@ int XwaModernVideoOptions_Set(const XwaModernVideoOptions* options) {
 	normalized = *options;
 	normalized.hdr_output = normalized.hdr_output != 0;
 	normalized.surround.enabled = normalized.surround.enabled != 0;
+	normalized.vr_mirror = normalized.vr_mirror != 0;
 	if (XwaModernVideoOptions_AreEqual(&normalized, &g_modernVideoOptions.options)) {
 		return 1;
 	}

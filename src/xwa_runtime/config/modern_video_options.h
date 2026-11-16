@@ -123,7 +123,18 @@ typedef struct XwaModernVideoOptions {
 	float hud_scale;
 	XwaModernSurroundOptions surround;
 	XwaModernVrMode vr_mode;
+	/* The size of the headset's eye images: the size that the headset
+	   recommends, times this scale. It is read when the game starts. */
+	float vr_render_scale;
+	/* How far the view moves in the game's world when the head moves one
+	   metre, in metres. Above 1, the world looks smaller. */
+	float vr_world_scale;
+	/* Show what the headset shows in the window. */
+	int vr_mirror;
 } XwaModernVideoOptions;
+
+#define XWA_MODERN_VR_SCALE_MIN 0.5f
+#define XWA_MODERN_VR_SCALE_MAX 2.0f
 
 #define XWA_MODERN_HUD_SCALE_MIN 0.5f
 #define XWA_MODERN_HUD_SCALE_MAX 2.0f
@@ -147,6 +158,9 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_SURROUND_DISTANCE = 1u << 15,
 	XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SIDE_ANGLE = 1u << 16,
 	XWA_MODERN_VIDEO_OVERRIDE_VR_MODE = 1u << 17,
+	XWA_MODERN_VIDEO_OVERRIDE_VR_RENDER_SCALE = 1u << 18,
+	XWA_MODERN_VIDEO_OVERRIDE_VR_WORLD_SCALE = 1u << 19,
+	XWA_MODERN_VIDEO_OVERRIDE_VR_MIRROR = 1u << 20,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

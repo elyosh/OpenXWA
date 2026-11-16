@@ -666,6 +666,22 @@ uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float cro
  * view's rectangle. */
 void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig);
 
+/* For a headset: gives each view of the rig its own target, such as an eye
+ * image, for the next XwaRemasterFlight_Render. `targets` has one target of
+ * the view size for each view. The views are then tone mapped into these
+ * targets and not into the composed presentation, motion blur and the
+ * hyperspace camera shake are off, and the map is drawn in the middle of the
+ * composed presentation. Call it after XwaRemasterFlight_SetViewRig, which
+ * removes the targets. NULL removes them too. */
+void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets);
+/* Returns whether the last XwaRemasterFlight_Render drew the views into
+ * their own targets. It is 0 for the map, which is in the texture that the
+ * render returned. */
+int XwaRemasterFlight_ViewTargetsRendered(void);
+/* After a render into the views' own targets: asks Aeron to draw the view
+ * that was rendered last into the window, as the headset's mirror. */
+int XwaRemasterFlight_SubmitViewMirror(void);
+
 /* Writes the number of views of the rig, and the size of one view. Without
  * a rig, the count is 1 and the size is the one of the last render. */
 void XwaRemasterFlight_GetViewLayout(int* count, int* width, int* height);

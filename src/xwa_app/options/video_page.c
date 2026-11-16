@@ -110,13 +110,18 @@ bool XwaVideoPage_TakeRestartRequest(void) {
 static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) {
 	static const char* const modes[] = { "Off", "Automatic", "Required" };
 	static int started_mode = -1;
+	static int started_render_percent;
 	int mode = (int)options->vr_mode;
+	int render_percent = (int)lroundf(options->vr_render_scale * 100.0f);
+	int world_percent = (int)lroundf(options->vr_world_scale * 100.0f);
 	bool changed = false;
 
 	if (!Aeron_XrSupported())
 		return false;
-	if (started_mode < 0)
+	if (started_mode < 0) {
 		started_mode = mode;
+		started_render_percent = render_percent;
+	}
 	AeronUi_Header(ui, "Virtual Reality");
 	if (AeronUi_Selector(ui, "VR Headset", &mode, modes, 3)) {
 		options->vr_mode = (XwaModernVrMode)mode;
@@ -124,7 +129,26 @@ static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) 
 	}
 	AeronUi_Help(ui, "Automatic uses a headset when one is found. Required stops with a message when "
 					 "VR can't start. Applies the next time OpenXWA starts.");
-	if (mode != started_mode && AeronUi_Button(ui, "Restart Now"))
+	if (mode != XWA_MODERN_VR_OFF) {
+		if (AeronUi_SliderInt(ui, "Headset Render Scale", &render_percent,
+							  (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f), (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5,
+							  "%d%%")) {
+			options->vr_render_scale = (float)render_percent / 100.0f;
+			changed = true;
+		}
+		AeronUi_Help(ui, "The size of the headset's pictures, from the size the headset recommends. "
+						 "Applies the next time OpenXWA starts.");
+		if (AeronUi_SliderInt(ui, "World Scale", &world_percent, (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f),
+							  (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5, "%d%%")) {
+			options->vr_world_scale = (float)world_percent / 100.0f;
+			changed = true;
+		}
+		AeronUi_Help(ui, "How far the view moves when your head moves. Above 100%, the cockpit and the "
+						 "world look smaller.");
+		changed |= AeronUi_Toggle(ui, "Show Headset View in Window", &options->vr_mirror);
+	}
+	if ((mode != started_mode || (mode != XWA_MODERN_VR_OFF && render_percent != started_render_percent)) &&
+		AeronUi_Button(ui, "Restart Now"))
 		s_restart_requested = true;
 	return changed;
 }

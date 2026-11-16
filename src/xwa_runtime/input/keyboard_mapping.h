@@ -29,6 +29,7 @@ typedef enum XwaKeyboardShortcut {
 	XWA_KEYBOARD_SHORTCUT_HOLOGRAMS,  /* Ctrl+H without Alt: Dynamic Cockpit holograms */
 	XWA_KEYBOARD_SHORTCUT_HOST_PAUSE, /* GUI+P */
 	XWA_KEYBOARD_SHORTCUT_FULLSCREEN, /* GUI+Ctrl+F on macOS, Alt+Return elsewhere */
+	XWA_KEYBOARD_SHORTCUT_RECENTER,   /* Ctrl+Alt+R: recentre the headset's view */
 } XwaKeyboardShortcut;
 
 void XwaKeyboardMapping_SetPolicy(bool debug_available);

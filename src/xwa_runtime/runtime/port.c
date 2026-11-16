@@ -327,6 +327,12 @@ int XwaPort_InFlight(void) { return XwaFlightTask_IsActive(); }
 
 int XwaPort_HasPilot(void) { return g_pilotData.name[0] != '\0'; }
 
+static int g_xwaPortCockpitLookSuppressed;
+
+void XwaPort_SetCockpitLookSuppressed(int suppressed) { g_xwaPortCockpitLookSuppressed = suppressed != 0; }
+
+int XwaPort_CockpitLookSuppressed(void) { return g_xwaPortCockpitLookSuppressed; }
+
 void XwaPort_SetShortcutsCaptured(int captured) { g_xwaPortShortcutsCaptured = captured != 0; }
 
 int XwaPort_ShortcutsCaptured(void) { return g_xwaPortShortcutsCaptured; }

@@ -59,6 +59,11 @@ int XwaPort_InNetworkSession(void);
 int XwaPort_InFlight(void);
 /* Whether a pilot is loaded. */
 int XwaPort_HasPilot(void);
+/* While set, the cockpit view can't be turned with the look keys, the hat,
+ * the mouse look or the padlock, and the enhanced camera doesn't sway the
+ * cockpit view. A headset sets it: the player's head turns the view. */
+void XwaPort_SetCockpitLookSuppressed(int suppressed);
+int XwaPort_CockpitLookSuppressed(void);
 /* While the window captures a key for a binding, the host shortcuts are
  * not run. */
 void XwaPort_SetShortcutsCaptured(int captured);

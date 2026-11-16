@@ -60,7 +60,7 @@ typedef enum {
 } RmViewMode;
 
 /* What the flight scene is rendered into: one view, or a rig of views. */
-typedef enum { RM_RIG_NONE = 0, RM_RIG_SURROUND, RM_RIG_DEBUG_STEREO } RmRigKind;
+typedef enum { RM_RIG_NONE = 0, RM_RIG_SURROUND, RM_RIG_DEBUG_STEREO, RM_RIG_HEADSET } RmRigKind;
 
 static struct {
 	int initialized;
@@ -115,6 +115,20 @@ static struct {
 	/* The surround settings that couldn't be used, so the reason is logged
 	 * once and not on every frame. */
 	XwaModernSurroundOptions surround_refused;
+	/* The headset: how far the view moves for one metre of head movement,
+	 * and whether the window shows what the headset shows. */
+	float vr_world_scale;
+	int vr_mirror;
+	/* This frame has eye images from Aeron (Aeron_XrBeginViews). */
+	int xr_views_ready;
+	AeronViewRig headset_rig;
+	uint64_t headset_generation;
+	AeronRenderTarget* xr_targets[AERON_MAX_VIEWS];
+	/* The last flight frame went to the headset's eye images. */
+	int scene_is_headset;
+	/* The last frame could not be rendered yet: models are still loading,
+	 * or the headset gave no eye images. */
+	int frame_waits;
 	int surround_refused_width;
 	/* The mouse position in the window, from -1 at the left and top edges to
 	 * 1 at the right and bottom edges. */
@@ -262,6 +276,8 @@ static float XwaRemaster_PaperWhiteToNits(XwaModernPaperWhite paper_white) {
 
 static int XwaRemaster_VideoOptionsValid(const XwaModernVideoOptions* options) {
 	return options && XwaModernSurroundOptions_Valid(&options->surround) &&
+		   options->vr_world_scale >= XWA_MODERN_VR_SCALE_MIN &&
+		   options->vr_world_scale <= XWA_MODERN_VR_SCALE_MAX &&
 		   options->ssao_quality >= XWA_MODERN_SSAO_OFF && options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
 		   options->shadow_quality >= XWA_MODERN_SHADOW_STANDARD &&
 		   options->shadow_quality <= XWA_MODERN_SHADOW_HIGH &&
@@ -308,6 +324,12 @@ void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
 	out->paper_white = XwaRemaster_PaperWhiteFromNits(Aeron_OutputPaperWhiteNits());
 	out->hud_scale = XwaRemasterHud_UserScale();
 	out->surround = g.surround;
+	/* The mode and the eye images' scale apply at startup only, and the
+	 * application keeps them. */
+	out->vr_mode = XWA_MODERN_VR_OFF;
+	out->vr_render_scale = 1.0f;
+	out->vr_world_scale = g.vr_world_scale;
+	out->vr_mirror = g.vr_mirror;
 }
 
 void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
@@ -353,6 +375,8 @@ void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
 	XwaRemasterHud_SetUserScale(options->hud_scale);
 	g.surround = options->surround;
 	g.surround.enabled = options->surround.enabled != 0;
+	g.vr_world_scale = options->vr_world_scale;
+	g.vr_mirror = options->vr_mirror != 0;
 }
 
 int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
@@ -382,6 +406,8 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	}
 	XwaRemasterFlight_GetPresentationDefaults(&g.msaa_samples, &g.hdr_desired);
 	XwaModernSurroundOptions_Default(&g.surround);
+	g.vr_world_scale = 1.0f;
+	g.vr_mirror = 1;
 	XwaRemasterFlight_GetDebugStereoDefaults(&g.debug_stereo.ipd_m, &g.debug_stereo.fov_deg);
 	g.debug_stereo.mouse_yaw_deg = 90.0f;
 	g.debug_stereo.mouse_pitch_deg = 60.0f;
@@ -451,6 +477,12 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	}
 	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SIDE_ANGLE) {
 		video_options.surround.side_angle_deg = options->video_options.surround.side_angle_deg;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_WORLD_SCALE) {
+		video_options.vr_world_scale = options->video_options.vr_world_scale;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_MIRROR) {
+		video_options.vr_mirror = options->video_options.vr_mirror;
 	}
 	XwaRemaster_SetVideoOptions(&video_options);
 	g.hdr_apply_pending = 0;
@@ -669,12 +701,57 @@ static int XwaRemaster_BuildDebugStereoRig(AeronViewRig* rig) {
 	return AeronViewRig_DebugStereo(d->ipd_m, &fov, &head, view_width, view_height, rig);
 }
 
+/* Builds the headset's rig for a flight frame: asks Aeron for the eyes'
+ * poses and images. Returns 0 when no VR session runs. While a session runs
+ * and Aeron has no eye images for this frame, the last rig is kept, so the
+ * flight scene keeps its size, and g.xr_views_ready says that the frame
+ * can't be rendered for the headset. */
+static int XwaRemaster_BuildHeadsetRig(const XwaSnapshot* snap, AeronViewRig* rig) {
+	AeronXrFrame frame;
+
+	g.xr_views_ready = 0;
+	if (!Aeron_XrSessionRunning() || !snap || snap->scene_kind != XWA_SCENE_FLIGHT ||
+		!snap->flight_camera_valid) {
+		return 0;
+	}
+	if (!Aeron_XrBeginViews(&frame)) {
+		if (g.rig_kind != RM_RIG_HEADSET) {
+			return 0;
+		}
+		*rig = g.headset_rig;
+		return 1;
+	}
+	/* The head's movement in the game's world. */
+	for (int i = 0; i < frame.rig.count; i++) {
+		for (int axis = 0; axis < 3; axis++) {
+			frame.rig.views[i].pose.position_m[axis] *= g.vr_world_scale;
+		}
+		g.xr_targets[i] = frame.color[i];
+	}
+	for (int axis = 0; axis < 3; axis++) {
+		frame.rig.center.position_m[axis] *= g.vr_world_scale;
+	}
+	/* A recentre moves the views in one step. */
+	if (frame.rig.generation != g.headset_generation) {
+		g.headset_generation = frame.rig.generation;
+		g.rig_generation++;
+	}
+	*rig = frame.rig;
+	g.headset_rig = frame.rig;
+	g.xr_views_ready = 1;
+	return 1;
+}
+
 /* Chooses the views of the flight scene for this frame and gives them to the
  * flight renderer and to the presentation. */
 static void XwaRemaster_UpdateViewRig(const XwaSnapshot* snap) {
 	AeronViewRig rig;
 	RmRigKind kind = RM_RIG_NONE;
-	if (g.debug_stereo.enabled && XwaRemaster_BuildDebugStereoRig(&rig)) {
+	/* The head turns the view, so the cockpit look keys don't. */
+	XwaPort_SetCockpitLookSuppressed(Aeron_XrSessionRunning());
+	if (XwaRemaster_BuildHeadsetRig(snap, &rig)) {
+		kind = RM_RIG_HEADSET;
+	} else if (g.debug_stereo.enabled && XwaRemaster_BuildDebugStereoRig(&rig)) {
 		kind = RM_RIG_DEBUG_STEREO;
 	} else if ((g.surround.enabled || g.surround_forced) && XwaRemaster_BuildSurroundRig(&rig)) {
 		kind = RM_RIG_SURROUND;
@@ -691,8 +768,10 @@ static void XwaRemaster_UpdateViewRig(const XwaSnapshot* snap) {
 		}
 		if (kind != RM_RIG_NONE) {
 			Aeron_LogInfo("xwa.remaster", "flight views: %s, %d views of %dx%d",
-						  kind == RM_RIG_SURROUND ? "surround" : "debug stereo", rig.count, view_width,
-						  view_height);
+						  kind == RM_RIG_SURROUND       ? "surround"
+						  : kind == RM_RIG_DEBUG_STEREO ? "debug stereo"
+														: "headset",
+						  rig.count, view_width, view_height);
 			/* The comparison with the original renderer shows one view. */
 			g.pending_mode_valid = 0;
 			g.primary_mode = RM_VIEW_HD;
@@ -709,6 +788,7 @@ static void XwaRemaster_UpdateViewRig(const XwaSnapshot* snap) {
 		rig.generation = g.rig_generation;
 	}
 	XwaRemasterFlight_SetViewRig(kind != RM_RIG_NONE ? &rig : NULL);
+	XwaRemasterFlight_SetViewTargets(kind == RM_RIG_HEADSET && g.xr_views_ready ? g.xr_targets : NULL);
 	if (kind == RM_RIG_SURROUND) {
 		const AeronRectI center = rig.views[rig.primary].rect;
 		XwaPresentation_SetSurround(center.x, center.width, g.render_pixel_width);
@@ -900,7 +980,12 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		!retain_invalid_flight_frame &&
 		(frontend_assets_need_sync || ship_assets_need_sync || texture_assets_need_sync ||
 		 process_assets_need_prepare || environment_needs_prepare);
-	const int render_snapshot = snap->tick_index != g.last_tick || g.force_scene_render;
+	/* A headset's flight frame can only be rendered into this frame's eye
+	 * images. Without them, the frame is rendered on a later host frame. */
+	const int headset_waits =
+		g.rig_kind == RM_RIG_HEADSET && !g.xr_views_ready && snap->scene_kind == XWA_SCENE_FLIGHT;
+	const int render_snapshot =
+		!headset_waits && (snap->tick_index != g.last_tick || g.force_scene_render);
 	const int frontend_scene = snap->scene_kind == XWA_SCENE_FRONTEND ||
 							   snap->scene_kind == XWA_SCENE_FRONTEND_MODAL ||
 							   snap->scene_kind == XWA_SCENE_LOADING;
@@ -988,6 +1073,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		}
 	}
 
+	g.frame_waits = assets_pending || headset_waits;
 	/* Required classic output is re-submitted on idle game ticks. Opaque HD
 	 * flight frames omit that layer; the remaster texture below then owns the
 	 * complete presentation frame. */
@@ -996,6 +1082,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		AeronTexture* next_scene_tex = g.scene_tex;
 		int next_scene_is_direct = g.scene_is_direct;
 		int next_scene_is_tonemapped = g.scene_is_tonemapped;
+		int next_scene_is_headset = 0;
 		int render_output_required = retain_scene_frame;
 		/* A pending environment capture renders and reads back its own scenes
 		 * before this frame's command buffer exists; the frame then renders
@@ -1045,6 +1132,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 										 : NULL;
 					next_scene_is_direct = next_scene_tex && XwaRemasterFlight_DirectPresentationReady();
 					next_scene_is_tonemapped = next_scene_tex != NULL;
+					next_scene_is_headset = next_scene_tex && XwaRemasterFlight_ViewTargetsRendered();
 					Aeron_GpuDebugPop(cmd);
 					break;
 				case XWA_SCENE_CUTSCENE:
@@ -1089,6 +1177,16 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		}
 		g.scene_is_direct = next_scene_is_direct;
 		g.scene_is_tonemapped = next_scene_is_tonemapped;
+		g.scene_is_headset = next_scene_is_headset;
+		/* The command buffer that draws the eye images is submitted, so
+		 * Aeron can give them to the headset. */
+		if (next_scene_is_headset) {
+			Aeron_XrSubmitViews();
+			if (g.vr_mirror && !XwaRemasterFlight_SubmitViewMirror()) {
+				XwaRemaster_FatalGpu("headset mirror presentation");
+				return;
+			}
+		}
 		g.last_tick = snap->tick_index;
 		g.force_scene_render = 0;
 	} else if (!assets_pending && flight_render_needed && render_snapshot && retain_scene_frame) {
@@ -1136,6 +1234,11 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		}
 		return; /* classic only — submit nothing */
 	}
+	/* The flight frame is in the headset's eye images. Nothing of it goes on
+	 * the virtual screen. */
+	if (g.scene_is_headset && g.scene_kind == XWA_SCENE_FLIGHT) {
+		return;
+	}
 	if (g.scene_is_direct) {
 		if ((g.scene_kind != snap->scene_kind || direct_present) &&
 			!XwaRemasterFlight_SubmitDirectPresentation()) {
@@ -1179,6 +1282,8 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		!XwaPort_OptionsWindowOpen())
 		XwaRemasterFrontend_PresentCursor(g.ramp.alpha, g.mode == RM_VIEW_SPLIT);
 }
+
+int XwaRemaster_FrameWaits(void) { return g.frame_waits; }
 
 #define RM_BENCHMARK_WARMUP_RENDERS 30
 #define RM_BENCHMARK_SAMPLES 7
@@ -1395,6 +1500,10 @@ static int rm_read_rgb(AeronRenderTarget* target, int width, int height, uint16_
 int XwaRemaster_CaptureFlightFrame(const char* name) {
 	const XwaSnapshot* snap = XwaSnapshot_Current();
 	const char* reason = rm_frozen_frame_problem(snap);
+	/* A headset's frame is in the eye images, which can't be read back. */
+	if (!reason && g.rig_kind == RM_RIG_HEADSET) {
+		reason = "the frame is drawn for the headset; start with --no-vr to capture";
+	}
 	if (reason) {
 		Aeron_LogError("xwa.benchmark", "film capture: can't capture: %s", reason);
 		return 0;

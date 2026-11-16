@@ -51,6 +51,8 @@ XwaKeyboardShortcut XwaKeyboardMapping_Shortcut(AeronKeyChord source) {
 		return XWA_KEYBOARD_SHORTCUT_MOUSE;
 	if (source.key == AERON_KEY_A + ('l' - 'a') && ctrl && alt)
 		return XWA_KEYBOARD_SHORTCUT_MOUSE_LOOK;
+	if (source.key == AERON_KEY_A + ('r' - 'a') && ctrl && alt)
+		return XWA_KEYBOARD_SHORTCUT_RECENTER;
 	if (source.key == AERON_KEY_A + ('h' - 'a') && ctrl && !alt)
 		return XWA_KEYBOARD_SHORTCUT_HOLOGRAMS;
 	if (source.key == AERON_KEY_A + ('p' - 'a') && gui)

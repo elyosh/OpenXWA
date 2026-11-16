@@ -60,6 +60,7 @@
 #include "xwa_runtime/models/model_roles.h"
 #ifdef XWA_MODERN
 #include "xwa_runtime/input/flight_controls.h"
+#include "xwa_runtime/runtime/port.h"
 #include "xwa_runtime/models/articulation.h"
 #include "xwa_runtime/models/craft_sounds.h"
 #include "xwa_runtime/models/gunner_seats.h"
@@ -12314,6 +12315,14 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 				g_players[playerIdx].lookPitchOffset = (int16_t)(16380 - targetPitch);
 			}
 		}
+#ifdef XWA_MODERN
+		/* With a headset, the player's head turns the view, so the cockpit
+		 * look stays straight ahead. */
+		if (XwaPort_CockpitLookSuppressed()) {
+			g_players[playerIdx].lookYawOffset = 0;
+			g_players[playerIdx].lookPitchOffset = 0;
+		}
+#endif
 	}
 
 	if (g_flightRegionSessionGateMode > 1u && g_dormantFlightRegionSessionEarlyReturnFlag) {
