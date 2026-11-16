@@ -1443,13 +1443,22 @@ int XwaRemaster_CaptureFlightFrame(const char* name) {
 			failure = "the PNG couldn't be written";
 		}
 	}
-	/* The same frame, before the tonemap. With several views the scene's
-	 * image is only the last view's, so there is no such frame. */
+	/* The same frame, before the tonemap. With several views the scene only
+	 * holds its last view, so the frame is rendered again, with each view
+	 * composed before the tonemap. */
 	int view_count;
 	XwaRemasterFlight_GetViewLayout(&view_count, NULL, NULL);
-	if (!failure && view_count == 1) {
+	if (!failure) {
 		AeronCommandBuffer* cmd = Aeron_AcquireCommandBuffer();
-		const int recorded = cmd && XwaRemasterFlight_RecordBeforeTonemap(cmd);
+		int recorded = 0;
+		if (cmd && view_count > 1) {
+			XwaRemasterFlight_SetComposeBeforeTonemap(1);
+			recorded =
+				XwaRemasterFlight_Render(cmd, snap, g.assets, width, height, /*direct_present=*/0) != NULL;
+			XwaRemasterFlight_SetComposeBeforeTonemap(0);
+		} else if (cmd) {
+			recorded = XwaRemasterFlight_RecordBeforeTonemap(cmd);
+		}
 		if (cmd && !recorded) {
 			Aeron_CancelCommandBuffer(cmd);
 		}
@@ -1474,9 +1483,8 @@ int XwaRemaster_CaptureFlightFrame(const char* name) {
 					  png_path, hdr_path, width, height, exposure_text);
 	} else {
 		Aeron_LogInfo("xwa.benchmark",
-					  "film capture: wrote %s in the user folder, %dx%d with %d views, exposure %s; the "
-					  "image before the tonemap isn't written with several views",
-					  png_path, width, height, view_count, exposure_text);
+					  "film capture: wrote %s and %s in the user folder, %dx%d with %d views, exposure %s",
+					  png_path, hdr_path, width, height, view_count, exposure_text);
 	}
 	return 1;
 }

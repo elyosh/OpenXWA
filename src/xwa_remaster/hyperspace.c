@@ -170,6 +170,13 @@ struct XwaRemasterHyperspace {
 	float warp_progress;
 	XwaRemasterHyperspaceTunnelView warp_view;
 	uint8_t warp_forward;
+	/* The view given to Prepare: the centre view of the frame. Two values
+	 * are computed from it and used for every view, so that all views show
+	 * the same effect: how much the frame faces the direction of travel, and
+	 * the size of the warp's reveal. `render_w` and `render_h` are Prepare's
+	 * render size. */
+	XwaRemasterHyperspaceTunnelView frame_view;
+	int render_w, render_h;
 	uint8_t world_scene;
 	uint8_t hold_exposure;
 	XwaFlightHyperspaceTunnelParams params;
@@ -828,12 +835,15 @@ static void hyper_set_tunnel_uniform(XwaRemasterHyperspace* h, const XwaRemaster
  * streaks are nearly parallel and have no vanishing point on screen, so the
  * radial widening fades out. Writes xy the point, z the radial widening, w
  * 1 / screen half-height. */
-static void hyper_vanishing_point(const XwaRemasterHyperspaceTunnelView* view, float radial_widening, int rt_w,
-								  int rt_h, float out[4]) {
+/* `frame_forward_z` is the z of the forward axis in the frame's centre view.
+ * The weight of the radial widening comes from it, so the weight is the same
+ * in every view. */
+static void hyper_vanishing_point(const XwaRemasterHyperspaceTunnelView* view, float frame_forward_z,
+								  float radial_widening, int rt_w, int rt_h, float out[4]) {
 	const float forward_z = view->forward[2];
 	const float sign = forward_z >= 0.0f ? 1.0f : -1.0f;
 	const float z = fabsf(forward_z);
-	float weight = (z - 0.05f) / 0.25f;
+	float weight = (fabsf(frame_forward_z) - 0.05f) / 0.25f;
 	weight = weight < 0.0f ? 0.0f : (weight > 1.0f ? 1.0f : weight);
 	out[0] = 0.5f * (float)rt_w;
 	out[1] = 0.5f * (float)rt_h;
@@ -900,7 +910,7 @@ static void hyper_set_streak_uniform(const XwaRemasterHyperspace* h, HyperStreak
 	u->variation[3] = jump->taper_variation;
 	u->taper[0] = jump->tail_taper;
 	u->taper[1] = jump->head_taper;
-	hyper_vanishing_point(view, jump->radial_widening, rt_w, rt_h, u->vanishing);
+	hyper_vanishing_point(view, view->forward[2], jump->radial_widening, rt_w, rt_h, u->vanishing);
 	u->glow[0] = jump->glow_strength;
 	u->glow[1] = jump->glow_width;
 	u->config[0] = (uint32_t)jump->star_count;
@@ -932,6 +942,9 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 	h->hold_exposure = 0;
 	h->warp_progress = 0.0f;
 	h->warp_view = *tunnel_view;
+	h->frame_view = *tunnel_view;
+	h->render_w = rt_w;
+	h->render_h = rt_h;
 	h->warp_forward = 0;
 	memset(&h->lighting, 0, sizeof h->lighting);
 	HyperTimeline timeline;
@@ -971,7 +984,8 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 		fu->glow[1] = h->jump.glow_width;
 		fu->glow[2] = h->jump.tail_brightness;
 		fu->glow[3] = h->jump.head_widening;
-		hyper_vanishing_point(tunnel_view, h->jump.radial_widening, rt_w, rt_h, fu->vanishing);
+		hyper_vanishing_point(tunnel_view, tunnel_view->forward[2], h->jump.radial_widening, rt_w, rt_h,
+							  fu->vanishing);
 		memcpy(fu->tail_color, h->jump.tail_color, 3 * sizeof(float));
 		hyper_build_streak_lighting(
 			h, hyper_streak_light_level(&h->jump, timeline.jump_seconds, timeline.streak_fade));
@@ -980,6 +994,30 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 	/* The cockpit's ambient light is set even when only the streaks draw. */
 	h->lighting.active = 1;
 	return h->draw_tunnel || h->streak_vertex_count != 0 || h->warp_progress > 0.0f;
+}
+
+void XwaRemasterHyperspace_SetView(XwaRemasterHyperspace* h, const XwaRemasterHyperspaceTunnelView* view) {
+	if (!h || !view) {
+		return;
+	}
+	h->warp_view = *view;
+	const float projection[4] = { view->tan_half_fov_x, view->tan_half_fov_y, view->proj_offset_x,
+								  view->proj_offset_y };
+	HyperTunnelUniform* tunnel = &h->tunnel_uniform;
+	memcpy(tunnel->projection, projection, sizeof projection);
+	memcpy(tunnel->tunnel_right, view->right, 3 * sizeof(float));
+	memcpy(tunnel->tunnel_up, view->up, 3 * sizeof(float));
+	memcpy(tunnel->tunnel_forward, view->forward, 3 * sizeof(float));
+	HyperStreakUniform* streak = &h->streak_uniform;
+	memcpy(streak->projection, projection, sizeof projection);
+	memcpy(streak->ship_right, view->right, 3 * sizeof(float));
+	memcpy(streak->ship_up, view->up, 3 * sizeof(float));
+	memcpy(streak->ship_forward, view->forward, 3 * sizeof(float));
+	const float frame_forward_z = h->frame_view.forward[2];
+	hyper_vanishing_point(view, frame_forward_z, h->jump.radial_widening, h->render_w, h->render_h,
+						  streak->vanishing);
+	hyper_vanishing_point(view, frame_forward_z, h->jump.radial_widening, h->render_w, h->render_h,
+						  h->streak_fragment_uniform.vanishing);
 }
 
 static void hyper_draw_tunnel(XwaRemasterHyperspace* h, AeronRenderPass* pass, AeronGraphicsPipeline* pipeline) {
@@ -1060,23 +1098,27 @@ static int hyper_fullscreen_pass(AeronCommandBuffer* cmd, AeronGraphicsPipeline*
 	return 1;
 }
 
-/* The vanishing point at output size (xy), how much the view faces the
- * direction of travel (z), and 1 / the distance from the vanishing point to
- * the farthest screen corner (w). */
-static void hyper_warp_vanishing(const XwaRemasterHyperspaceTunnelView* view, int width, int height,
-								 float out[4]) {
-	hyper_vanishing_point(view, 1.0f, width, height, out);
+/* The vanishing point of the view being drawn, at output size (xy). The
+ * other two values come from the frame's centre view, so that all views
+ * show the same warp: how much the centre view faces the direction of travel
+ * (z), and 1 / the distance from the centre view's vanishing point to its
+ * farthest screen corner (w). */
+static void hyper_warp_vanishing(const XwaRemasterHyperspace* h, int width, int height, float out[4]) {
+	const XwaRemasterHyperspaceTunnelView* frame = &h->frame_view;
+	float frame_point[4];
+	hyper_vanishing_point(frame, frame->forward[2], 1.0f, width, height, frame_point);
+	hyper_vanishing_point(&h->warp_view, frame->forward[2], 1.0f, width, height, out);
 	/* The ramp of the streaks' radial widening, on the signed forward
 	 * component: rear views don't face the direction of travel. */
-	float facing = (view->forward[2] - 0.05f) / 0.25f;
+	float facing = (frame->forward[2] - 0.05f) / 0.25f;
 	facing = facing < 0.0f ? 0.0f : (facing > 1.0f ? 1.0f : facing);
 	float farthest = 1.0f;
 	const float corners[4][2] = {
 		{ 0.0f, 0.0f }, { (float)width, 0.0f }, { 0.0f, (float)height }, { (float)width, (float)height }
 	};
 	for (int i = 0; i < 4; i++) {
-		const float dx = corners[i][0] - out[0];
-		const float dy = corners[i][1] - out[1];
+		const float dx = corners[i][0] - frame_point[0];
+		const float dy = corners[i][1] - frame_point[1];
 		farthest = fmaxf(farthest, sqrtf(dx * dx + dy * dy));
 	}
 	out[2] = facing;
@@ -1142,7 +1184,7 @@ static AeronRenderTarget* hyper_warp_sky(XwaRemasterHyperspace* h, AeronCommandB
 	int sky_w, sky_h;
 	hyper_sky_size(h, in->output_w, in->output_h, &sky_w, &sky_h);
 	float vanishing[4];
-	hyper_warp_vanishing(&h->warp_view, sky_w, sky_h, vanishing);
+	hyper_warp_vanishing(h, sky_w, sky_h, vanishing);
 	/* The zoom fades out in views that don't face the direction of travel.
 	 * In a forward exit the sky starts shrunk and grows back to its size;
 	 * with trails only it keeps its size, and the smear reaches back to
@@ -1219,7 +1261,7 @@ AeronTexture* XwaRemasterHyperspace_RenderWarp(XwaRemasterHyperspace* h, AeronCo
 	const float progress = h->warp_progress;
 	const int warp = progress > 0.0f;
 	float vanishing[4];
-	hyper_warp_vanishing(view, in->output_w, in->output_h, vanishing);
+	hyper_warp_vanishing(h, in->output_w, in->output_h, vanishing);
 	const float reveal[4] = { progress, jump->warp_reveal_softness, warp ? 1.0f : 0.0f,
 							  jump->warp_sky_highlights };
 	const HyperWarpMotion motion =

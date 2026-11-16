@@ -23,12 +23,14 @@ typedef struct XwaProbeOutlineSet {
 	float model[16];
 } XwaProbeOutlineSet;
 
-/* Builds and uploads the outlines and sets the scene's after-meshes
- * callback. `world_to_eye` rotates scene units into the view's eye space.
- * Returns 0 when the list cannot be created or uploaded. */
+/* Builds and uploads the outlines for each of the frame's `view_count`
+ * views, and sets the scene's after-meshes callback, which draws the
+ * outlines of the view being rendered. `world_to_eye[v]` rotates scene
+ * units into the eye space of `views[v]`. Returns 0 when a list cannot be
+ * created or uploaded. */
 int XwaRemasterProbeOutlines_Prepare(AeronCommandBuffer* cmd, AeronScene3D* scene,
-									 const XwaRemasterFlightView* view, const float world_to_eye[9],
-									 const XwaProbeOutlineSet* sets, uint32_t count);
+									 const XwaRemasterFlightView* views, const float (*world_to_eye)[9],
+									 int view_count, const XwaProbeOutlineSet* sets, uint32_t count);
 void XwaRemasterProbeOutlines_Shutdown(void);
 
 #ifdef __cplusplus

@@ -694,8 +694,14 @@ AeronRenderTarget* XwaRemasterFlight_ComposedTarget(void);
  * tonemap receives it into the target of the composed presentation: the
  * scene with its bloom, multiplied by the exposure, without the HUD. The
  * target then holds this image instead of the final image, until the next
- * render. Returns 0 if there is no rendered frame. */
+ * render. Returns 0 if there is no rendered frame. It also returns 0 with a
+ * view rig, because the scene then only holds its last view. */
 int XwaRemasterFlight_RecordBeforeTonemap(AeronCommandBuffer* cmd);
+
+/* For a view rig. While enabled, XwaRemasterFlight_Render composes each view
+ * before the tonemap and without the HUD. The composed target then holds
+ * the image that XwaRemasterFlight_RecordBeforeTonemap gives for one view. */
+void XwaRemasterFlight_SetComposeBeforeTonemap(int enabled);
 
 /* Queues the prepared direct frame into Aeron's swapchain pass. */
 int XwaRemasterFlight_SubmitDirectPresentation(void);

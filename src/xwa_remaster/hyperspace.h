@@ -101,6 +101,15 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* hyperspace, AeronComman
 								  const XwaRemasterHyperspaceMoment* moment,
 								  const XwaRemasterHyperspaceTunnelView* tunnel_view, int world_scene);
 
+/* Sets the view that XwaRemasterHyperspace_Draw and
+ * XwaRemasterHyperspace_RenderWarp draw next, for a frame with several
+ * views. Call it after Prepare, which takes the frame's centre view; without
+ * this call, that view is drawn. The views share what Prepare worked out
+ * from the centre view: the timeline, the lighting, how much the frame
+ * faces the direction of travel, and the size of the warp's reveal. */
+void XwaRemasterHyperspace_SetView(XwaRemasterHyperspace* hyperspace,
+								   const XwaRemasterHyperspaceTunnelView* view);
+
 /* What the scene warp reads from the finished flight scene. */
 typedef struct XwaRemasterHyperspaceWarpInput {
 	AeronTexture* scene; /* the finished scene, at output size */
