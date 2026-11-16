@@ -45,7 +45,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # The versions and patches of aeron's dependencies come from
-# aeron/packaging/dependencies; set these to build another version.
+# aeron/packaging/dependencies; set these to build another version. With
+# another SDL_VERSION, aeron's CMake only warns that SDL is not the pinned one.
 ARG SDL_VERSION=
 ARG ZSTD_VERSION=
 ARG FFMPEG_VERSION=
@@ -56,21 +57,14 @@ ARG SHADERCROSS_COMMIT=
 
 FROM build-base AS sdl-build
 
+# build-sdl.sh clones SDL at aeron's pinned version, applies aeron's patches,
+# and builds and installs it. Every build of OpenXWA uses this script.
 COPY aeron/packaging/dependencies/apply-patches.sh /tmp/aeron/apply-patches.sh
+COPY aeron/packaging/dependencies/build-sdl.sh /tmp/aeron/build-sdl.sh
 COPY aeron/packaging/dependencies/sdl /tmp/aeron/sdl
 
-RUN git clone --branch "release-${SDL_VERSION:-$(cat /tmp/aeron/sdl/version)}" --depth 1 \
-        https://github.com/libsdl-org/SDL.git /deps/SDL \
-    && /tmp/aeron/apply-patches.sh /tmp/aeron/sdl /deps/SDL \
-    && cmake -S /deps/SDL -B /build/sdl -G Ninja \
-        -DCMAKE_BUILD_TYPE=Release \
-        -DCMAKE_INSTALL_PREFIX=/opt/xwa-linux \
-        -DSDL_INSTALL_DOCS=OFF \
-        -DSDL_SHARED=ON \
-        -DSDL_STATIC=OFF \
-        -DSDL_TESTS=OFF \
-    && cmake --build /build/sdl --parallel \
-    && cmake --install /build/sdl
+RUN SDL_VERSION="${SDL_VERSION}" /tmp/aeron/build-sdl.sh \
+        --source /deps/SDL --build /build/sdl /opt/xwa-linux
 
 FROM build-base AS zstd-build
 
@@ -236,6 +230,7 @@ RUN case "${XWA_BUILD_TYPE}" in \
         *) echo "XWA_BUILD_TYPE must be Release or Debug" >&2; exit 2 ;; \
     esac \
     && cmake -S /src -B /build/xwa -G Ninja \
+        -DAERON_ALLOW_OTHER_SDL="${SDL_VERSION:+ON}" \
         -DCMAKE_BUILD_TYPE="${XWA_BUILD_TYPE}" \
         -DCMAKE_PREFIX_PATH=/opt/xwa-linux \
         -DCMAKE_C_FLAGS_RELEASE="${xwa_release_flags}" \
@@ -404,6 +399,7 @@ COPY aeron /src/aeron
 ENV LD_LIBRARY_PATH=/opt/xwa-tools/lib:/opt/xwa-linux/lib
 
 RUN cmake -S /src/aeron -B /build/cooker -G Ninja \
+        -DAERON_ALLOW_OTHER_SDL="${SDL_VERSION:+ON}" \
         -DCMAKE_BUILD_TYPE=Release \
         -DCMAKE_PREFIX_PATH=/opt/xwa-linux \
         -DAERON_SHADERCROSS_EXECUTABLE=/opt/xwa-tools/bin/shadercross \

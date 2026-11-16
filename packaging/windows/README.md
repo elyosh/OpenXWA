@@ -103,12 +103,14 @@ The versions of SDL, zstd, FFmpeg and SDL_shadercross, and the patches that
 SDL and SDL_shadercross need, are aeron's: see
 `aeron/packaging/dependencies/README.md`. The other dependency and
 shader-tool revisions are pinned as Docker build arguments in the Dockerfile.
-Set a build argument to test another version:
+Set a build argument to test another version. `SDL_VERSION` takes a commit or
+a release. The build then only warns that SDL is not the pinned one, but that
+SDL must have the OpenXR API:
 
 ```sh
 docker buildx build \
   --file packaging/windows/Dockerfile \
-  --build-arg SDL_VERSION=3.4.18 \
+  --build-arg ZSTD_VERSION=1.5.6 \
   --target artifact \
   --output type=local,dest=build/artifacts \
   .
@@ -119,6 +121,13 @@ docker buildx build \
 `OpenXWA.exe` embeds `cmake/windows/openxwa.ico` and a `VERSIONINFO` resource
 generated from `cmake/windows/xwa.rc.in`. See `packaging/icons/README.md` for
 regenerating icon assets from the master image.
+
+## OpenXR loader
+
+The package ships `openxr_loader.dll`, which VR needs. It comes from the
+Khronos `OpenXR.Loader` NuGet package, pinned by the `OPENXR_LOADER_VERSION`
+and `OPENXR_LOADER_NUPKG_SHA256` build arguments. Keep the version equal to
+the OpenXR headers in `aeron/third_party/openxr`.
 
 ## Applied dependency patches
 

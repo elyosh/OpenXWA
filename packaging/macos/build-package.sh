@@ -130,25 +130,20 @@ build_dependencies() {
         "-DCMAKE_OSX_SYSROOT=${sdk_path}"
     )
 
-    clone_tag https://github.com/libsdl-org/SDL.git \
-        "release-${sdl_version}" "${source_root}/SDL-${sdl_version}"
-    apply_dependency_patches sdl "${source_root}/SDL-${sdl_version}"
     clone_tag https://github.com/facebook/zstd.git \
         "v${zstd_version}" "${source_root}/zstd-${zstd_version}"
     clone_tag https://github.com/FFmpeg/FFmpeg.git \
         "n${ffmpeg_version}" "${source_root}/FFmpeg-${ffmpeg_version}"
 
-    cmake -S "${source_root}/SDL-${sdl_version}" \
-        -B "${build_root}/sdl" \
+    # build-sdl.sh clones SDL at aeron's pinned version, applies aeron's
+    # patches, and builds and installs it.
+    SDL_VERSION="${sdl_version}" CMAKE_BUILD_PARALLEL_LEVEL="${jobs}" \
+        "${dependency_dir}/build-sdl.sh" \
+        --source "${source_root}/SDL-${sdl_version}" \
+        --build "${build_root}/sdl" \
+        "${dependency_prefix}" \
         "${common_cmake[@]}" \
-        "-DCMAKE_INSTALL_PREFIX=${dependency_prefix}" \
-        -DSDL_HIDAPI_LIBUSB=OFF \
-        -DSDL_INSTALL_DOCS=OFF \
-        -DSDL_SHARED=ON \
-        -DSDL_STATIC=OFF \
-        -DSDL_TESTS=OFF
-    cmake --build "${build_root}/sdl" --parallel "${jobs}"
-    cmake --install "${build_root}/sdl"
+        -DSDL_HIDAPI_LIBUSB=OFF
 
     cmake -S "${source_root}/zstd-${zstd_version}/build/cmake" \
         -B "${build_root}/zstd" \
@@ -258,6 +253,7 @@ build_application() {
     cmake -S "${repo_root}" \
         -B "${build_root}/xwa-${build_variant}" \
         -G Ninja \
+        "-DAERON_ALLOW_OTHER_SDL=${SDL_VERSION:+ON}" \
         "-DCMAKE_BUILD_TYPE=${build_type}" \
         "-DCMAKE_INSTALL_PREFIX=${stage_root}" \
         "-DCMAKE_PREFIX_PATH=${dependency_prefix}" \
@@ -300,16 +296,14 @@ build_cooker() {
     )
     local arch
 
-    cmake -S "${source_root}/SDL-${sdl_version}" \
-        -B "${build_root}/cooker-sdl" \
+    # The checkout is the one that build_dependencies made.
+    SDL_VERSION="${sdl_version}" CMAKE_BUILD_PARALLEL_LEVEL="${jobs}" \
+        "${dependency_dir}/build-sdl.sh" \
+        --source "${source_root}/SDL-${sdl_version}" \
+        --build "${build_root}/cooker-sdl" \
+        "${cooker_prefix}" \
         "${universal[@]}" \
-        -DSDL_HIDAPI_LIBUSB=OFF \
-        -DSDL_INSTALL_DOCS=OFF \
-        -DSDL_SHARED=ON \
-        -DSDL_STATIC=OFF \
-        -DSDL_TESTS=OFF
-    cmake --build "${build_root}/cooker-sdl" --parallel "${jobs}"
-    cmake --install "${build_root}/cooker-sdl"
+        -DSDL_HIDAPI_LIBUSB=OFF
 
     cmake -S "${source_root}/zstd-${zstd_version}/build/cmake" \
         -B "${build_root}/cooker-zstd" \
@@ -324,6 +318,7 @@ build_cooker() {
     cmake -S "${repo_root}/aeron" \
         -B "${build_root}/cooker" \
         "${universal[@]}" \
+        "-DAERON_ALLOW_OTHER_SDL=${SDL_VERSION:+ON}" \
         "-DCMAKE_PREFIX_PATH=${cooker_prefix}" \
         "-DAERON_SHADERCROSS_EXECUTABLE=${build_root}/shadercross/shadercross" \
         -DAERON_BUILD_TOOLS=ON \
