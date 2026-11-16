@@ -10,6 +10,7 @@
 #include "mod_update.h"
 #include "options/mods_page.h"
 #include "options/options_window.h"
+#include "options/video_page.h"
 #include "setup.h"
 #include "ui.h"
 #include "window_icon.h"
@@ -419,6 +420,11 @@ static int resolve_game_data(const XwaLaunchOptions* launch, const XwaHostConfig
 	return select_game_data(vfs, selected, selected_capacity, cancelled, error, error_size);
 }
 
+/* Aeron asks for the VR mode before it creates the window and the GPU device. */
+static void load_startup_options(AeronVfs* vfs, void* userdata, AeronStartupOptions* options) {
+	XwaHostConfig_LoadStartup(vfs, (const XwaLaunchOptions*)userdata, &options->xr_mode);
+}
+
 int main(int argc, char** argv) {
 	AeronConfig config;
 	XwaHostConfig host_config;
@@ -461,6 +467,8 @@ int main(int argc, char** argv) {
 	config.clear_color_rgba[1] = 0.0f;
 	config.clear_color_rgba[2] = 0.0f;
 	config.clear_color_rgba[3] = 1.0f;
+	config.startup_options = load_startup_options;
+	config.startup_userdata = &launch;
 
 	if (!Aeron_Init(&config)) {
 		return 1;
@@ -592,6 +600,11 @@ int main(int argc, char** argv) {
 		XwaModernVideoOptions effective_video_options;
 		XwaRemaster_GetVideoOptions(&effective_video_options);
 		effective_video_options.window_mode = initial_window_mode;
+		/* The remaster doesn't keep the VR mode: it only applies at startup. */
+		effective_video_options.vr_mode =
+			(host_config.video_options_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_MODE)
+				? host_config.video_options.vr_mode
+				: XWA_MODERN_VR_OFF;
 		XwaModernVideoOptions_Configure(&effective_video_options, apply_modern_video_options,
 										persist_modern_video_options);
 	}
@@ -767,6 +780,11 @@ int main(int argc, char** argv) {
 				XwaOptionsWindow_Frame(in, (float)delta_us / 1000000.0f);
 			}
 			if (XwaModsPage_TakeRestartRequest()) {
+				request_restart(&launch);
+			}
+			if (XwaVideoPage_TakeRestartRequest()) {
+				/* The new start reads the VR mode from the saved options. */
+				XwaModernVideoOptions_Flush();
 				request_restart(&launch);
 			}
 			const uint64_t present_start_us = benchmark_frame ? Aeron_NowUs() : 0;

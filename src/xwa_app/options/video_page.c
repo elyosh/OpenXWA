@@ -1,6 +1,7 @@
 #include "options/video_page.h"
 
 #include "aeron/render.h"
+#include "aeron/xr.h"
 #include "options/options_window.h"
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
@@ -93,6 +94,38 @@ static bool XwaVideoPage_Surround(AeronUiContext* ui, XwaModernSurroundOptions* 
 	changed |= XwaVideoPage_SurroundSize(ui, "Side Screen Angle", &surround->side_angle_deg, 0.0f,
 										 XWA_MODERN_SURROUND_SIDE_ANGLE_MAX_DEG, 1, "%d degrees");
 	AeronUi_Help(ui, "How far each side screen is turned toward you. 0 is flat.");
+	return changed;
+}
+
+/* Set by the Restart Now button, until main.c takes it. */
+static bool s_restart_requested;
+
+bool XwaVideoPage_TakeRestartRequest(void) {
+	const bool requested = s_restart_requested;
+	s_restart_requested = false;
+	return requested;
+}
+
+/* The VR mode is read when the game starts, so a change needs a restart. */
+static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) {
+	static const char* const modes[] = { "Off", "Automatic", "Required" };
+	static int started_mode = -1;
+	int mode = (int)options->vr_mode;
+	bool changed = false;
+
+	if (!Aeron_XrSupported())
+		return false;
+	if (started_mode < 0)
+		started_mode = mode;
+	AeronUi_Header(ui, "Virtual Reality");
+	if (AeronUi_Selector(ui, "VR Headset", &mode, modes, 3)) {
+		options->vr_mode = (XwaModernVrMode)mode;
+		changed = true;
+	}
+	AeronUi_Help(ui, "Automatic uses a headset when one is found. Required stops with a message when "
+					 "VR can't start. Applies the next time OpenXWA starts.");
+	if (mode != started_mode && AeronUi_Button(ui, "Restart Now"))
+		s_restart_requested = true;
 	return changed;
 }
 
@@ -192,6 +225,7 @@ void XwaVideoPage_Draw(AeronUiContext* ui, const AeronInputSnapshot* input) {
 	XwaModernVideoOptions_Get(&options);
 	changed = XwaVideoPage_Display(ui, &options);
 	changed |= XwaVideoPage_Surround(ui, &options.surround);
+	changed |= XwaVideoPage_Vr(ui, &options);
 	changed |= XwaVideoPage_FlightRendering(ui, &options);
 
 	AeronUi_Header(ui, "HUD");

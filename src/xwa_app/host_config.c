@@ -472,6 +472,33 @@ static int host_config_surround_options(const AeronConfigFile* config, XwaModern
 								   error_size);
 }
 
+static const char* const host_config_vr_mode_names[] = { "off", "auto", "required" };
+
+void XwaHostConfig_LoadStartup(AeronVfs* vfs, const XwaLaunchOptions* launch, AeronXrMode* mode) {
+	AeronConfigFile* config = NULL;
+	AeronConfigError config_error = { 0 };
+	unsigned int override_mask = 0;
+	char error[256];
+	int value = XWA_MODERN_VR_OFF;
+
+	*mode = AERON_XR_OFF;
+	if (launch && launch->vr) {
+		*mode = launch->vr > 0 ? AERON_XR_REQUIRED : AERON_XR_OFF;
+		return;
+	}
+	if (!vfs || !AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, "config.yaml") ||
+		!AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_USER, "config.yaml", &config, &config_error)) {
+		return;
+	}
+	if (host_config_named_value(config, "video.vr_mode", host_config_vr_mode_names, 3, &value, 1u,
+								&override_mask, error, sizeof error)) {
+		*mode = value == XWA_MODERN_VR_REQUIRED ? AERON_XR_REQUIRED
+				: value == XWA_MODERN_VR_AUTO   ? AERON_XR_AUTO
+												: AERON_XR_OFF;
+	}
+	AeronConfigFile_Destroy(config);
+}
+
 static int host_config_video_options(const AeronConfigFile* config, XwaModernVideoOptions* out,
 									 unsigned int* override_mask, char* error, size_t error_size) {
 	static const char* const window_mode_names[] = { "windowed", "fullscreen", "span" };
@@ -494,6 +521,12 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 	if (!host_config_surround_options(config, &out->surround, override_mask, error, error_size)) {
 		return 0;
 	}
+	value = XWA_MODERN_VR_OFF;
+	if (!host_config_named_value(config, "video.vr_mode", host_config_vr_mode_names, 3, &value,
+								 XWA_MODERN_VIDEO_OVERRIDE_VR_MODE, override_mask, error, error_size)) {
+		return 0;
+	}
+	out->vr_mode = (XwaModernVrMode)value;
 
 	value = 0;
 	if (!host_config_named_value(config, "video.ssao_quality", quality_names,
@@ -938,7 +971,8 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 
 	if (!options || options->window_mode < XWA_MODERN_WINDOW_MODE_WINDOWED ||
 		options->window_mode > XWA_MODERN_WINDOW_MODE_SPAN ||
-		!XwaModernSurroundOptions_Valid(&options->surround) || options->ssao_quality < XWA_MODERN_SSAO_OFF ||
+		!XwaModernSurroundOptions_Valid(&options->surround) || options->vr_mode < XWA_MODERN_VR_OFF ||
+		options->vr_mode > XWA_MODERN_VR_REQUIRED || options->ssao_quality < XWA_MODERN_SSAO_OFF ||
 		options->ssao_quality > XWA_MODERN_SSAO_HIGH ||
 		options->shadow_quality < XWA_MODERN_SHADOW_STANDARD ||
 		options->shadow_quality > XWA_MODERN_SHADOW_HIGH || options->fsr_upscaling < XWA_MODERN_FSR_OFF ||
@@ -983,7 +1017,9 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 		   AeronConfigFile_SetFloat(document, "video.surround_distance_mm", options->surround.distance_mm,
 									error) &&
 		   AeronConfigFile_SetFloat(document, "video.surround_side_angle_deg",
-									options->surround.side_angle_deg, error);
+									options->surround.side_angle_deg, error) &&
+		   AeronConfigFile_SetString(document, "video.vr_mode", host_config_vr_mode_names[options->vr_mode],
+									 error);
 }
 
 static int host_config_remove_key(AeronConfigFile* document, const char* key, AeronConfigError* error) {

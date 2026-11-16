@@ -44,8 +44,8 @@ int XwaModernSurroundOptions_Valid(const XwaModernSurroundOptions* options) {
 static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 	return options && options->window_mode >= XWA_MODERN_WINDOW_MODE_WINDOWED &&
 		   options->window_mode <= XWA_MODERN_WINDOW_MODE_SPAN &&
-		   XwaModernSurroundOptions_Valid(&options->surround) &&
-		   options->ssao_quality >= XWA_MODERN_SSAO_OFF && options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
+		   XwaModernSurroundOptions_Valid(&options->surround) && options->vr_mode >= XWA_MODERN_VR_OFF &&
+		   options->vr_mode <= XWA_MODERN_VR_REQUIRED && options->ssao_quality >= XWA_MODERN_SSAO_OFF && options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
 		   options->shadow_quality >= XWA_MODERN_SHADOW_STANDARD &&
 		   options->shadow_quality <= XWA_MODERN_SHADOW_HIGH &&
 		   options->fsr_upscaling >= XWA_MODERN_FSR_OFF &&
@@ -74,7 +74,7 @@ static int XwaModernVideoOptions_AreEqual(const XwaModernVideoOptions* lhs,
 		   lhs->surround.screen_height_mm == rhs->surround.screen_height_mm &&
 		   lhs->surround.bezel_mm == rhs->surround.bezel_mm &&
 		   lhs->surround.distance_mm == rhs->surround.distance_mm &&
-		   lhs->surround.side_angle_deg == rhs->surround.side_angle_deg;
+		   lhs->surround.side_angle_deg == rhs->surround.side_angle_deg && lhs->vr_mode == rhs->vr_mode;
 }
 
 void XwaModernVideoOptions_Configure(const XwaModernVideoOptions* options, XwaModernVideoOptionsApplyFn apply,

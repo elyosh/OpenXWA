@@ -46,6 +46,16 @@ typedef enum XwaModernWindowMode {
 	XWA_MODERN_WINDOW_MODE_SPAN,
 } XwaModernWindowMode;
 
+/* Whether the game starts in VR. It is read when the game starts, so a change
+ * applies at the next start. */
+typedef enum XwaModernVrMode {
+	XWA_MODERN_VR_OFF = 0,
+	/* VR when a headset is found, the window alone otherwise. */
+	XWA_MODERN_VR_AUTO,
+	/* VR, or an error message when it can't start. */
+	XWA_MODERN_VR_REQUIRED,
+} XwaModernVrMode;
+
 /* A surround setup: three screens of the same size side by side, the side
  * screens turned toward the player. With it, the flight view is drawn once
  * for each screen, with that screen's own perspective. The sizes are in
@@ -112,6 +122,7 @@ typedef struct XwaModernVideoOptions {
 	   game gives it at most resolutions, in any window. */
 	float hud_scale;
 	XwaModernSurroundOptions surround;
+	XwaModernVrMode vr_mode;
 } XwaModernVideoOptions;
 
 #define XWA_MODERN_HUD_SCALE_MIN 0.5f
@@ -135,6 +146,7 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_SURROUND_BEZEL = 1u << 14,
 	XWA_MODERN_VIDEO_OVERRIDE_SURROUND_DISTANCE = 1u << 15,
 	XWA_MODERN_VIDEO_OVERRIDE_SURROUND_SIDE_ANGLE = 1u << 16,
+	XWA_MODERN_VIDEO_OVERRIDE_VR_MODE = 1u << 17,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

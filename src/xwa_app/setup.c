@@ -230,6 +230,14 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			}
 			continue;
 		}
+		if (!pass_through && strcmp(argv[i], "--vr") == 0) {
+			out->vr = 1;
+			continue;
+		}
+		if (!pass_through && strcmp(argv[i], "--no-vr") == 0) {
+			out->vr = -1;
+			continue;
+		}
 		if (!pass_through && strcmp(argv[i], "--classic-2d-sound") == 0) {
 			out->classic_2d_sound = 1;
 			continue;
@@ -303,6 +311,9 @@ int XwaLaunchOptions_RelaunchArgs(const XwaLaunchOptions* launch, int skip_intro
 		out->args[out->count++] = "--flight-views";
 		out->args[out->count++] = launch->flight_views == 1 ? "surround" : "stereo";
 	}
+	if (launch->vr) {
+		out->args[out->count++] = launch->vr > 0 ? "--vr" : "--no-vr";
+	}
 	/* The parser joins the game's arguments with spaces, so one argument gives
 	   it the same text back, quotes included. */
 	snprintf(out->game_command_line, sizeof out->game_command_line, "%s", launch->game_command_line);
@@ -346,6 +357,9 @@ const char* XwaLaunchOptions_Help(void) {
 		   "  --flight-views <kind>     for tests: draw the flight scene of this run as\n"
 		   "                            three surround screens (surround), or as the two\n"
 		   "                            eyes of a headset side by side (stereo)\n"
+		   "  --vr                      start in VR, and stop with a message when VR\n"
+		   "                            can't start\n"
+		   "  --no-vr                   start without VR, whatever the settings say\n"
 		   "  -h, --help                print this help and quit\n"
 		   "\n"
 		   "Other arguments, and everything after --, go to the game's own command line.\n";

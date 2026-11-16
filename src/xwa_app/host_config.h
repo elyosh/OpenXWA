@@ -2,7 +2,9 @@
 #define XWA_APP_HOST_CONFIG_H
 
 #include "aeron/vfs.h"
+#include "aeron/xr.h"
 #include "install_paths.h"
+#include "setup.h"
 #include "xwa_runtime/config/modern_audio_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
@@ -49,6 +51,11 @@ typedef struct XwaHostConfig {
 	int input_upgraded;
 } XwaHostConfig;
 
+/* Reads the VR mode that the game starts with, before Aeron creates the
+ * window and the GPU device. --vr and --no-vr win. Otherwise the mode is
+ * video.vr_mode of the user's config.yaml. A missing or bad file gives "off"
+ * and reports nothing: XwaHostConfig_Load reports the problem later. */
+void XwaHostConfig_LoadStartup(AeronVfs* vfs, const XwaLaunchOptions* launch, AeronXrMode* mode);
 int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t error_size);
 int XwaHostConfig_SaveAudioOptions(AeronVfs* vfs, const XwaModernAudioOptions* options, char* error,
 								   size_t error_size);
