@@ -20,16 +20,16 @@ extern "C" {
    record. The mod describes that layout in the `original_films` section of
    flight/flight.yaml:
 
-     original_films:
-       craft_record_size: 3829
-       meshes: 255             # the entries of each moved array
-       engines: 255
-       weapon_racks: 128
-       component_state: 1017   # the offsets of the moved arrays
-       mesh_rotation: 1272
-       component_hp: 1527
-       engine_health: 1782
-       weapon_rack_data: 2037
+	 original_films:
+	   craft_record_size: 3829
+	   meshes: 255             # the entries of each moved array
+	   engines: 255
+	   weapon_racks: 128
+	   component_state: 1017   # the offsets of the moved arrays
+	   mesh_rotation: 1272
+	   component_hp: 1527
+	   engine_health: 1782
+	   weapon_rack_data: 2037
 
    Without the section, the craft records have the stock 1017 bytes. */
 

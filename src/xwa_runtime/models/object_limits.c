@@ -105,13 +105,16 @@ static int ObjectLimits_UseFilmCounts(uint32_t regions, uint32_t players, int pr
 
 	if (s_filmCraft % regions != 0 || s_filmProjectiles % regions != 0 || s_filmExplosions % regions != 0 ||
 		s_filmPlayerProjectiles % players != 0 || s_filmPlayerProjectiles == 0) {
-		Aeron_LogError("xwa.film", "film: its object counts don't fit %u regions and %u players; the mod's "
-								   "counts are used", regions, players);
+		Aeron_LogError("xwa.film",
+					   "film: its object counts don't fit %u regions and %u players; the mod's "
+					   "counts are used",
+					   regions, players);
 		return 0;
 	}
 	projectilesPerRegion = s_filmProjectiles / regions;
 	if (projectilesPerRegion <= shared + s_filmPlayerProjectiles) {
-		Aeron_LogError("xwa.film", "film: its projectile slots are fewer than the shared and player slots; the mod's counts are used");
+		Aeron_LogError("xwa.film", "film: its projectile slots are fewer than the shared and player slots; "
+								   "the mod's counts are used");
 		return 0;
 	}
 	perRegion = s_filmCraft / regions + salvage + projectilesPerRegion + 2 * (s_filmExplosions / regions) +
@@ -133,8 +136,8 @@ static int ObjectLimits_UseFilmCounts(uint32_t regions, uint32_t players, int pr
 	return 1;
 }
 
-void XwaObjectLimits_UseFilmCounts(uint32_t craftTotal, uint32_t projectileTotal, uint32_t playerProjectileTotal,
-								   uint32_t explosionTotal) {
+void XwaObjectLimits_UseFilmCounts(uint32_t craftTotal, uint32_t projectileTotal,
+								   uint32_t playerProjectileTotal, uint32_t explosionTotal) {
 	s_filmCountsSet = 1;
 	s_filmCraft = craftTotal;
 	s_filmProjectiles = projectileTotal;

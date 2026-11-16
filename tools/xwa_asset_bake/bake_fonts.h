@@ -8,7 +8,7 @@
 
 typedef struct BakeFontsOptions {
 	const char* out_root; /* bake output root (frontend/fonts/ appended) */
-	int         scale;    /* integer NN upscale factor (RM_SCALE; 1 = classic) */
+	int scale;            /* integer NN upscale factor (RM_SCALE; 1 = classic) */
 } BakeFontsOptions;
 
 /* Returns the number of font sizes baked (0 = nothing found/failed). */

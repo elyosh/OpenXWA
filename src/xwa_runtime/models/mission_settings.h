@@ -100,16 +100,16 @@ int XwaMissionSettings_OverlappingFlyBySounds(void);
 int XwaMissionSettings_HangarDroidPartsFromModel(void);
 /* The ejection rules. They change FlightObject_SpawnEscapePodOrPilot,
    except skirmish_ejections, which changes Skirmish_GenerateMission:
-     - no_pilot_ejections: no pilot ejects from a fighter;
-     - no_escape_pod_ejections: no escape pod ejects from a transport,
-       starship or platform;
-     - ejected_craft_team_9: pods and pilots are on team 9 instead of the
-       team of the craft they come from;
-     - ejected_craft_skip_setup: pods don't get their AI plan (plan 45), and
-       pilots keep the random speed and direction that every ejected craft
-       starts with, instead of a speed of 80 and a direction based on their
-       craft's;
-     - skirmish_ejections: the craft of a skirmish mission can eject. */
+	 - no_pilot_ejections: no pilot ejects from a fighter;
+	 - no_escape_pod_ejections: no escape pod ejects from a transport,
+	   starship or platform;
+	 - ejected_craft_team_9: pods and pilots are on team 9 instead of the
+	   team of the craft they come from;
+	 - ejected_craft_skip_setup: pods don't get their AI plan (plan 45), and
+	   pilots keep the random speed and direction that every ejected craft
+	   starts with, instead of a speed of 80 and a direction based on their
+	   craft's;
+	 - skirmish_ejections: the craft of a skirmish mission can eject. */
 int XwaMissionSettings_NoPilotEjections(void);
 int XwaMissionSettings_NoEscapePodEjections(void);
 int XwaMissionSettings_EjectedCraftTeam9(void);

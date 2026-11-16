@@ -160,8 +160,8 @@ static uint32_t ship_markings_variants(const XwaRemasterSkinModel* skin, const X
 }
 
 static AeronSceneMesh* ship_mesh_load(AeronCommandBuffer* cmd, const char* key, uint8_t source,
-									  uint8_t projectile, const XwaSnapshot* snapshot, XwaRemasterSkinModel** out_skin,
-									  uint64_t* out_markings_variants_hash) {
+									  uint8_t projectile, const XwaSnapshot* snapshot,
+									  XwaRemasterSkinModel** out_skin, uint64_t* out_markings_variants_hash) {
 	char path[512];
 	AeronFlightModel model;
 	*out_skin = NULL;
@@ -403,8 +403,8 @@ XwaRemasterShipSyncResult XwaRemasterShip_SyncAssets(AeronCommandBuffer* cmd, co
 		snprintf(asset->key, sizeof asset->key, "%s", desired[i].key);
 		asset->source = desired[i].source;
 		asset->projectile = desired[i].projectile;
-		asset->mesh = ship_mesh_load(cmd, asset->key, asset->source, asset->projectile, snapshot, &asset->skin,
-									 &asset->markings_variants_hash);
+		asset->mesh = ship_mesh_load(cmd, asset->key, asset->source, asset->projectile, snapshot,
+									 &asset->skin, &asset->markings_variants_hash);
 		if (!asset->mesh) {
 			memset(asset, 0, sizeof *asset);
 			return XWA_REMASTER_SHIP_SYNC_FAILED;

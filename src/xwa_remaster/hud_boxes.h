@@ -72,8 +72,8 @@ typedef struct XwaHudPreparedBoxState {
 int XwaRemasterHudBoxes_Init(void);
 void XwaRemasterHudBoxes_Shutdown(void);
 void XwaRemasterHudBoxes_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex profile,
-								   uint32_t bundle_generation, const XwaRemasterFlightView* flight_view,
-								   int target_w, int target_h);
+							   uint32_t bundle_generation, const XwaRemasterFlightView* flight_view,
+							   int target_w, int target_h);
 void XwaRemasterHudBoxes_PrepareDrawLists(AeronCommandBuffer* cmd, int target_w, int target_h);
 void XwaRemasterHudBoxes_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 								AeronRenderTarget* color_target, int target_w, int target_h,

@@ -109,7 +109,7 @@ void XwaRemasterFlight_GetHangarLightingDefault(XwaFlightHangarLightingParams* o
  * inspector). Fixed, the image is exposed at ev100 - compensation. Metered,
  * the flight scene meters it from its image (AeronScene_SetAutoExposure). */
 typedef struct XwaFlightExposureParams {
-	int   metered;
+	int metered;
 	float ev100;        /* fixed mode, and the anchor of partial metering */
 	float compensation; /* EV added to brightness */
 	float metering;     /* 0 = ev100, 1 = the metered EV */
@@ -123,8 +123,8 @@ typedef struct XwaFlightExposureParams {
 	float near_weight;   /* geometry nearer than near_distance: the cockpit */
 	float near_distance; /* metres */
 	float edge_weight;
-	int   max_channel; /* meter the largest of r, g and b instead of luminance */
-	int   freeze;      /* keep the current EV; debug only, not in the file */
+	int max_channel; /* meter the largest of r, g and b instead of luminance */
+	int freeze;      /* keep the current EV; debug only, not in the file */
 } XwaFlightExposureParams;
 
 void XwaRemasterFlight_GetExposure(XwaFlightExposureParams* out);
@@ -136,7 +136,7 @@ void XwaRemasterFlight_GetExposureDefault(XwaFlightExposureParams* out);
 float XwaRemasterFlight_Exposure(void);
 /* Logs how many instances and triangles the last frame drew at each level
  * of detail (the film benchmark). */
-void  XwaRemasterFlight_LogLodStats(void);
+void XwaRemasterFlight_LogLodStats(void);
 /* Logs counts for the last flight render: the instances, shadow casters,
  * lights and billboards of the scene, then the instances drawn and the draw
  * calls of each view. */
@@ -204,8 +204,8 @@ typedef struct XwaFlightPointLightParams {
 	 * ship's engines, as one light far from them
 	 * (AeronSceneClusteredLightDesc.merge_spot_lights). */
 	int merge_spot_lights;
-	float match_distance_m;      /* metres at which a light is as bright as the classic law */
-	float range_scale;           /* multiplies the derived falloff range */
+	float match_distance_m; /* metres at which a light is as bright as the classic law */
+	float range_scale;      /* multiplies the derived falloff range */
 	/* While the cockpit is drawn, the light of an explosion up to
 	 * cockpit_explosion_distance_m from the eye is multiplied by
 	 * cockpit_explosion_light_scale. From there to twice that distance,
@@ -213,7 +213,7 @@ typedef struct XwaFlightPointLightParams {
 	 * player's craft, whose lights would wash out the cockpit. */
 	float cockpit_explosion_light_scale;
 	float cockpit_explosion_distance_m;
-	int model_lights;            /* lights authored in models, and the headlight */
+	int model_lights; /* lights authored in models, and the headlight */
 	/* Multiplies the lights authored in models, to find a calibration by
 	 * eye; debug only, not in the settings. 1 by default. */
 	float model_light_scale;
@@ -287,7 +287,7 @@ typedef struct XwaFlightProjectileParams {
  * aren't saved. */
 typedef struct XwaFlightLodParams {
 	float max_error;
-	int   tint;
+	int tint;
 } XwaFlightLodParams;
 
 void XwaRemasterFlight_GetLod(XwaFlightLodParams* out);

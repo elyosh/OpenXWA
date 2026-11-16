@@ -1943,8 +1943,8 @@ void XwaSnapshot_CaptureFlight(void) {
 	/* During hyperspace the HD renderer gets the camera of ordinary flight
 	 * (XwaSnapshotCamera_NoteHyperspaceOverride). */
 	float hyperspace_eye_offset[3];
-	const int hyperspace_camera = c->hyperspace_phase &&
-								  XwaSnapshotCamera_OrdinaryCamera(c->rows, c->world_pos, hyperspace_eye_offset);
+	const int hyperspace_camera =
+		c->hyperspace_phase && XwaSnapshotCamera_OrdinaryCamera(c->rows, c->world_pos, hyperspace_eye_offset);
 	if (hyperspace_camera) {
 		XwaSnapshotCamera_PositionFraction(c->world_pos, c->world_pos_fraction);
 	}

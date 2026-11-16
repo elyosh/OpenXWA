@@ -96,7 +96,9 @@ static double overall_fraction(XwaModImportProgress* progress) {
 	return total > 0 ? (double)done / (double)total : 0.0;
 }
 
-int XwaModImport_Overall(XwaModImportProgress* progress) { return (int)(overall_fraction(progress) * 1000.0); }
+int XwaModImport_Overall(XwaModImportProgress* progress) {
+	return (int)(overall_fraction(progress) * 1000.0);
+}
 
 long long XwaModImport_Remaining(XwaModImportProgress* progress, uint64_t elapsed_us) {
 	const double fraction = overall_fraction(progress);

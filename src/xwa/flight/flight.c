@@ -2913,7 +2913,8 @@ XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedProximityList, overflowScore, 0x61)
 XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, missionElapsedClock, 0x8053F4 - 0x8053E0);
 XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, nextObjectSignature, 0x805404 - 0x8053E0);
 XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, flightDifficulty, 0x80540A - 0x8053E0);
-XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, craftImpactBounceEnabled, 0x805415 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, craftImpactBounceEnabled,
+							 0x805415 - 0x8053E0);
 XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, connectedPlayerCount, 0x805416 - 0x8053E0);
 XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, teamScores, 0x80541E - 0x8053E0);
 XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, globalGoalStatusUnused,
@@ -2927,8 +2928,10 @@ XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, missionMessageDe
 							 0x807CE4 - 0x8053E0);
 XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, missionGlobalUnitCraftCount,
 							 0x807DE0 - 0x8053E0);
-XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, activeMissionRegionCount, 0x807E84 - 0x8053E0);
-XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, missionRegionHyperPoints, 0x807E88 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, activeMissionRegionCount,
+							 0x807E84 - 0x8053E0);
+XWA_FLIGHT_SERIALIZED_OFFSET(FlightSerializedMissionStateBlock, missionRegionHyperPoints,
+							 0x807E88 - 0x8053E0);
 #undef XWA_FLIGHT_SERIALIZED_OFFSET
 
 static FlightSerializedMissionStateBlock g_flightSerializedMissionStateBlock;
@@ -2959,8 +2962,8 @@ static uint32_t FlightWorldState_EncodeEntry(const void* ptr, const void* base, 
 /* Returns NULL and logs an error when the offset doesn't point to one of the
    pool's `count` entries. Only a damaged film, or one recorded with another
    layout, does that. */
-static void* FlightWorldState_DecodeEntry(uint32_t encoded, void* base, size_t entrySize, uint32_t originalSize,
-										  size_t count, const char* pool) {
+static void* FlightWorldState_DecodeEntry(uint32_t encoded, void* base, size_t entrySize,
+										  uint32_t originalSize, size_t count, const char* pool) {
 	uint32_t index;
 
 	if (encoded == 0) {
@@ -2968,22 +2971,24 @@ static void* FlightWorldState_DecodeEntry(uint32_t encoded, void* base, size_t e
 	}
 	index = (encoded - 1u) / originalSize;
 	if ((encoded - 1u) % originalSize != 0 || index >= count) {
-		Aeron_LogError("xwa.film", "world state: offset %u doesn't point to an entry of the %s pool (%u "
-								   "entries); using a null pointer",
+		Aeron_LogError("xwa.film",
+					   "world state: offset %u doesn't point to an entry of the %s pool (%u "
+					   "entries); using a null pointer",
 					   encoded - 1u, pool, (unsigned)count);
 		return NULL;
 	}
 	return (uint8_t*)base + (size_t)index * entrySize;
 }
 
-#define FLIGHT_ENCODE_ENTRY(ptr, base, originalSize) \
+#define FLIGHT_ENCODE_ENTRY(ptr, base, originalSize)                                                         \
 	FlightWorldState_EncodeEntry((ptr), (base), sizeof(*(base)), (originalSize))
-#define FLIGHT_DECODE_ENTRY(encoded, base, originalSize, count, pool) \
+#define FLIGHT_DECODE_ENTRY(encoded, base, originalSize, count, pool)                                        \
 	FlightWorldState_DecodeEntry((encoded), (base), sizeof(*(base)), (originalSize), (count), (pool))
 
 /* The number of entries in the mobile object pool, as Mission_Init allocates it. */
 static size_t FlightWorldState_MobileObjectCount(void) {
-	return (size_t)g_localDebrisObjectSlotsTotal + g_localEffectObjectSlotsTotal + g_regionMainObjectSlotsTotal;
+	return (size_t)g_localDebrisObjectSlotsTotal + g_localEffectObjectSlotsTotal +
+		   g_regionMainObjectSlotsTotal;
 }
 
 static void FlightWorldState_WriteU32(uint8_t* dst, uint32_t value) { memcpy(dst, &value, sizeof(value)); }
@@ -3082,7 +3087,8 @@ static void FlightWorldState_SerializeMobileObject(FlightSerializedMobileObject*
 	dst->pWarheadGuidance = FLIGHT_ENCODE_ENTRY(src->pWarheadGuidance, g_warheadGuidancePoolBase,
 												FLIGHT_ORIGINAL_WARHEAD_GUIDANCE_SIZE);
 	dst->pCraft = FLIGHT_ENCODE_ENTRY(src->pCraft, g_craftDataPoolBase, FLIGHT_ORIGINAL_CRAFT_DATA_SIZE);
-	dst->pCharData = FLIGHT_ENCODE_ENTRY(src->pCharData, g_mobileObjectCharDataPool, FLIGHT_ORIGINAL_CHAR_DATA_SIZE);
+	dst->pCharData =
+		FLIGHT_ENCODE_ENTRY(src->pCharData, g_mobileObjectCharDataPool, FLIGHT_ORIGINAL_CHAR_DATA_SIZE);
 }
 
 /* The 1017-byte CraftData record keeps the original layout. The modern
@@ -3135,7 +3141,8 @@ static void FlightWorldState_SerializeCraftData(FlightSerializedCraftData* dst, 
 		memcpy(&dst->bytes[wire->wireOffset], (const uint8_t*)src + wire->fieldOffset, wire->size);
 	}
 	dst->bytes[FLIGHT_SERIALIZED_CRAFT_ANIM_FRAME_OFFSET] = XWA_CRAFT_ANIM_FRAME(src);
-	encodedLink = FLIGHT_ENCODE_ENTRY(src->effectiveAiObjectLink, g_objectTable, FLIGHT_ORIGINAL_OBJECT_RECORD_SIZE);
+	encodedLink =
+		FLIGHT_ENCODE_ENTRY(src->effectiveAiObjectLink, g_objectTable, FLIGHT_ORIGINAL_OBJECT_RECORD_SIZE);
 	FlightWorldState_WriteU32(&dst->bytes[FLIGHT_SERIALIZED_CRAFT_EFFECTIVE_LINK_OFFSET], encodedLink);
 }
 
@@ -3187,11 +3194,13 @@ static void FlightWorldState_BuildMissionStateBlock(FlightSerializedMissionState
 	block->globalBonusGoalStatus = state->globalBonusGoalStatus;
 	memcpy(block->teamGlobalGoalState, state->teamGlobalGoalState, sizeof(block->teamGlobalGoalState));
 	memcpy(block->teamGoalStatus, state->teamGoalStatus, sizeof(block->teamGoalStatus));
-	memcpy(block->globalGoalTriggerCounts, state->globalGoalTriggerCounts, sizeof(block->globalGoalTriggerCounts));
+	memcpy(block->globalGoalTriggerCounts, state->globalGoalTriggerCounts,
+		   sizeof(block->globalGoalTriggerCounts));
 	memcpy(block->teamMissionCompletionTimeSeconds, state->teamMissionCompletionTimeSeconds,
 		   sizeof(block->teamMissionCompletionTimeSeconds));
 	memcpy(block->teamHasCountableCraft, state->teamHasCountableCraft, sizeof(block->teamHasCountableCraft));
-	memcpy(block->teamActiveGoalSequence, state->teamActiveGoalSequence, sizeof(block->teamActiveGoalSequence));
+	memcpy(block->teamActiveGoalSequence, state->teamActiveGoalSequence,
+		   sizeof(block->teamActiveGoalSequence));
 	memcpy(block->teamReinforcementCalled, state->teamReinforcementCalled,
 		   sizeof(block->teamReinforcementCalled));
 	memcpy(block->missionMessageTriggered, g_missionMessageTriggered, sizeof(block->missionMessageTriggered));
@@ -3220,8 +3229,9 @@ static void FlightWorldState_RestoreObjectRecord(ObjectRecord* dst, const Flight
 	dst->typeSpecificByte[0] = src->typeSpecificByte0;
 	dst->typeSpecificByte[1] = src->typeSpecificByte1;
 	dst->playerOwnerIdx = src->playerOwnerIdx;
-	dst->mobj = (MobileObject*)FLIGHT_DECODE_ENTRY(src->mobj, g_mobileObjectPoolBase, FLIGHT_ORIGINAL_MOBILE_OBJECT_SIZE,
-													 FlightWorldState_MobileObjectCount(), "mobile object");
+	dst->mobj = (MobileObject*)FLIGHT_DECODE_ENTRY(src->mobj, g_mobileObjectPoolBase,
+												   FLIGHT_ORIGINAL_MOBILE_OBJECT_SIZE,
+												   FlightWorldState_MobileObjectCount(), "mobile object");
 }
 
 static void FlightWorldState_RestoreProximityList(MobileObjectProximityList* dst,
@@ -3291,12 +3301,11 @@ static void FlightWorldState_RestoreMobileObject(MobileObject* dst, const Flight
 	dst->pWarheadGuidance = (WarheadGuidanceState*)FLIGHT_DECODE_ENTRY(
 		src->pWarheadGuidance, g_warheadGuidancePoolBase, FLIGHT_ORIGINAL_WARHEAD_GUIDANCE_SIZE,
 		(size_t)g_projectileObjectSlotsTotal + 1, "warhead guidance");
-	dst->pCraft = (CraftData*)FLIGHT_DECODE_ENTRY(src->pCraft, g_craftDataPoolBase, FLIGHT_ORIGINAL_CRAFT_DATA_SIZE,
-												  g_craftObjectSlotsTotal, "craft");
-	dst->pCharData =
-		(MobileObjectCharData*)FLIGHT_DECODE_ENTRY(src->pCharData, g_mobileObjectCharDataPool,
-												   FLIGHT_ORIGINAL_CHAR_DATA_SIZE, g_mobileObjectCharDataCount,
-												   "character data");
+	dst->pCraft = (CraftData*)FLIGHT_DECODE_ENTRY(
+		src->pCraft, g_craftDataPoolBase, FLIGHT_ORIGINAL_CRAFT_DATA_SIZE, g_craftObjectSlotsTotal, "craft");
+	dst->pCharData = (MobileObjectCharData*)FLIGHT_DECODE_ENTRY(
+		src->pCharData, g_mobileObjectCharDataPool, FLIGHT_ORIGINAL_CHAR_DATA_SIZE,
+		g_mobileObjectCharDataCount, "character data");
 }
 
 static uint32_t FlightWorldState_ReadU32(const uint8_t* src) {
@@ -3316,8 +3325,8 @@ static void FlightWorldState_RestoreCraftData(CraftData* dst, const FlightSerial
 	}
 	XWA_CRAFT_ANIM_FRAME(dst) = src->bytes[FLIGHT_SERIALIZED_CRAFT_ANIM_FRAME_OFFSET];
 	encodedLink = FlightWorldState_ReadU32(&src->bytes[FLIGHT_SERIALIZED_CRAFT_EFFECTIVE_LINK_OFFSET]);
-	dst->effectiveAiObjectLink = (ObjectRecord*)FLIGHT_DECODE_ENTRY(encodedLink, g_objectTable, FLIGHT_ORIGINAL_OBJECT_RECORD_SIZE,
-																 g_objectTableSlotCount, "object");
+	dst->effectiveAiObjectLink = (ObjectRecord*)FLIGHT_DECODE_ENTRY(
+		encodedLink, g_objectTable, FLIGHT_ORIGINAL_OBJECT_RECORD_SIZE, g_objectTableSlotCount, "object");
 }
 
 #ifdef XWA_MODERN
@@ -3358,7 +3367,8 @@ static size_t FlightWorldState_ExtensionCapacity(void) {
 	   records are converted, and those records can be larger (see
 	   original_film.h). */
 	const size_t originalFilm =
-		(size_t)(XwaOriginalFilm_CraftRecordSize() - FLIGHT_ORIGINAL_CRAFT_DATA_SIZE) * g_craftObjectSlotsTotal;
+		(size_t)(XwaOriginalFilm_CraftRecordSize() - FLIGHT_ORIGINAL_CRAFT_DATA_SIZE) *
+		g_craftObjectSlotsTotal;
 
 	return extension > originalFilm ? extension : originalFilm;
 }
@@ -3413,13 +3423,15 @@ static int FlightWorldState_HasArticulation(const CraftData* craft) {
 
 /* One record of the extension block: the slot, then the craft's extension
    ranges. */
-static void FlightWorldState_WriteExtensionRecord(uint8_t** cursor, uint16_t objectSlot, const CraftData* craft) {
+static void FlightWorldState_WriteExtensionRecord(uint8_t** cursor, uint16_t objectSlot,
+												  const CraftData* craft) {
 	size_t range;
 
 	FlightWorldState_WriteBlock(cursor, &objectSlot, sizeof objectSlot);
 	for (range = 0; range < sizeof g_flightWorldExtensionRanges / sizeof g_flightWorldExtensionRanges[0];
 		 ++range) {
-		FlightWorldState_WriteBlock(cursor, (const uint8_t*)craft + g_flightWorldExtensionRanges[range].fieldOffset,
+		FlightWorldState_WriteBlock(cursor,
+									(const uint8_t*)craft + g_flightWorldExtensionRanges[range].fieldOffset,
 									g_flightWorldExtensionRanges[range].size);
 	}
 }
@@ -3614,11 +3626,13 @@ static void FlightWorldState_ApplyMissionStateBlock(const FlightSerializedMissio
 	state->globalBonusGoalStatus = block->globalBonusGoalStatus;
 	memcpy(state->teamGlobalGoalState, block->teamGlobalGoalState, sizeof(block->teamGlobalGoalState));
 	memcpy(state->teamGoalStatus, block->teamGoalStatus, sizeof(block->teamGoalStatus));
-	memcpy(state->globalGoalTriggerCounts, block->globalGoalTriggerCounts, sizeof(block->globalGoalTriggerCounts));
+	memcpy(state->globalGoalTriggerCounts, block->globalGoalTriggerCounts,
+		   sizeof(block->globalGoalTriggerCounts));
 	memcpy(state->teamMissionCompletionTimeSeconds, block->teamMissionCompletionTimeSeconds,
 		   sizeof(block->teamMissionCompletionTimeSeconds));
 	memcpy(state->teamHasCountableCraft, block->teamHasCountableCraft, sizeof(block->teamHasCountableCraft));
-	memcpy(state->teamActiveGoalSequence, block->teamActiveGoalSequence, sizeof(block->teamActiveGoalSequence));
+	memcpy(state->teamActiveGoalSequence, block->teamActiveGoalSequence,
+		   sizeof(block->teamActiveGoalSequence));
 	memcpy(state->teamReinforcementCalled, block->teamReinforcementCalled,
 		   sizeof(block->teamReinforcementCalled));
 	memcpy(g_missionMessageTriggered, block->missionMessageTriggered, sizeof(block->missionMessageTriggered));
@@ -7139,7 +7153,8 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 			if (g_filmPlaybackMode != 3) {
 				Film_ReadBytes(&loopIdx, sizeof(loopIdx));
 				if (loopIdx > g_worldStateBufferCapacity) {
-					Aeron_LogError("xwa.film", "film: its world state of %u bytes doesn't fit the buffer of %u bytes",
+					Aeron_LogError("xwa.film",
+								   "film: its world state of %u bytes doesn't fit the buffer of %u bytes",
 								   loopIdx, (unsigned)g_worldStateBufferCapacity);
 					g_filmPlaybackMode = 3;
 				}
@@ -7150,8 +7165,8 @@ void Flight_AdvanceOneStep(int targetTimestamp) {
 				g_worldStateSize = (int)loopIdx;
 				/* A film from the original game can have larger craft records
 				   (XWAU's hook_opt_limit). Convert them to stock records first. */
-				if ((uint16_t)g_filmVersion <= 5u && !XwaOriginalFilm_ConvertWorldState(g_worldStateBuffer,
-																						 &g_worldStateSize)) {
+				if ((uint16_t)g_filmVersion <= 5u &&
+					!XwaOriginalFilm_ConvertWorldState(g_worldStateBuffer, &g_worldStateSize)) {
 					g_filmPlaybackMode = 3;
 				} else {
 					Flight_RestoreWorldState();
@@ -11847,7 +11862,8 @@ static __inline void Flight_UpdateEntity_SendTypedMessage(unsigned int playerIdx
 	msg_emitInFlightMessage(MSG_MESSAGE_SENT, (int)playerIdx);
 }
 
-static __inline int16_t Flight_UpdateEntity_SmoothAxis(int16_t current, int target, uint16_t smoothingStepScale) {
+static __inline int16_t Flight_UpdateEntity_SmoothAxis(int16_t current, int target,
+													   uint16_t smoothingStepScale) {
 	int16_t delta = (int16_t)(target - current);
 	int16_t step;
 
@@ -12914,12 +12930,12 @@ void Flight_UpdateEntity(unsigned int playerIdx) {
 				smoothingStepScale = 236 / 8;
 			}
 #endif
-			g_players[playerIdx].smoothedInputYaw =
-				Flight_UpdateEntity_SmoothAxis(g_players[playerIdx].smoothedInputYaw, yawTarget, smoothingStepScale);
-			g_players[playerIdx].smoothedInputPitch =
-				Flight_UpdateEntity_SmoothAxis(g_players[playerIdx].smoothedInputPitch, pitchTargetLocal, smoothingStepScale);
-			g_players[playerIdx].smoothedInputRoll =
-				Flight_UpdateEntity_SmoothAxis(g_players[playerIdx].smoothedInputRoll, rollTarget, smoothingStepScale);
+			g_players[playerIdx].smoothedInputYaw = Flight_UpdateEntity_SmoothAxis(
+				g_players[playerIdx].smoothedInputYaw, yawTarget, smoothingStepScale);
+			g_players[playerIdx].smoothedInputPitch = Flight_UpdateEntity_SmoothAxis(
+				g_players[playerIdx].smoothedInputPitch, pitchTargetLocal, smoothingStepScale);
+			g_players[playerIdx].smoothedInputRoll = Flight_UpdateEntity_SmoothAxis(
+				g_players[playerIdx].smoothedInputRoll, rollTarget, smoothingStepScale);
 		} else {
 			g_players[playerIdx].smoothedInputYaw = 0;
 			g_players[playerIdx].smoothedInputRoll = 0;

@@ -59,18 +59,18 @@ static inline int laser_GetProjectileWarheadClass(ObjectTypeId objectType) {
 #endif
 
 uint16_t laser_GetProjectileLifetimeTicks(ObjectTypeId projectileObjectType);
-void     laser_weaponsfire(void);
-void     laser_UpdateMineWeaponFire(int mineObjIdx);
-int      laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTypeId projectileType,
-								int playerIdx);
-void     laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, uint16_t targetRef);
-int      laser_firemissile(int firerObjIdx, int warheadSlot, int projectileType, unsigned int fireMode);
-void     laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int playerIdx,
-							   uint16_t updateFireDelay);
-void     laser_firerocketsystem(int firerObjIdx, unsigned int fireMode);
-void     laser_fireplayerweapon(int playerIdx);
+void laser_weaponsfire(void);
+void laser_UpdateMineWeaponFire(int mineObjIdx);
+int laser_createprojectile(unsigned int firerObjIdx, int weaponSlotIdx, ObjectTypeId projectileType,
+						   int playerIdx);
+void laser_firewarheadlauncher(unsigned int ownerObjIdx, uint16_t launcherIdx, uint16_t targetRef);
+int laser_firemissile(int firerObjIdx, int warheadSlot, int projectileType, unsigned int fireMode);
+void laser_firelasersystem(unsigned int shooterObjIdx, int laserGroupIdx, int playerIdx,
+						   uint16_t updateFireDelay);
+void laser_firerocketsystem(int firerObjIdx, unsigned int fireMode);
+void laser_fireplayerweapon(int playerIdx);
 uint16_t laser_createprojectilefromstatic(uint16_t staticObjIdx, uint16_t shooterObjIdx);
-int      laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId projectileObjectType);
+int laser_createcountermeasureprojectile(unsigned int ownerObjIdx, ObjectTypeId projectileObjectType);
 
 #ifdef __cplusplus
 }

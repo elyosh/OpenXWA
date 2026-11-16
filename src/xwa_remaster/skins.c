@@ -70,8 +70,8 @@ XwaRemasterSkinModel* XwaRemasterSkins_Capture(const AeronGltfModel* model, cons
 	skin->variant_count = model->variant_count;
 	skin->variant_names = (char**)calloc(model->variant_count, sizeof *skin->variant_names);
 	skin->markings.markings_count = model->markings_count;
-	skin->markings.markings = (uint32_t*)calloc(model->markings_count ? model->markings_count : 1,
-												sizeof *skin->markings.markings);
+	skin->markings.markings =
+		(uint32_t*)calloc(model->markings_count ? model->markings_count : 1, sizeof *skin->markings.markings);
 	if (!skin->variant_names || !skin->markings.markings) {
 		XwaRemasterSkins_Free(skin);
 		return NULL;

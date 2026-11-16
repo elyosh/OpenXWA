@@ -1497,7 +1497,8 @@ static __inline void Object_ApplyTrigMoveDeltaAndClampWorldPosition(ObjectRecord
    With steps of 1 to 3 ticks, the stock step is 0, so the jolt would never
    fade and the camera would stay off the seat. */
 #ifdef XWA_MODERN
-#define OBJECT_CAMERA_PAN_DECAY XwaModernFlightTiming_ScaleStepTicks(g_gameTime, (uint16_t)g_elapsedTicks, 64, 236)
+#define OBJECT_CAMERA_PAN_DECAY                                                                              \
+	XwaModernFlightTiming_ScaleStepTicks(g_gameTime, (uint16_t)g_elapsedTicks, 64, 236)
 #else
 #define OBJECT_CAMERA_PAN_DECAY (((uint16_t)g_elapsedTicks << 6) / 236)
 #endif
@@ -2278,7 +2279,8 @@ void Object_UpdateLifetimeAndMovement(void) {
 					{
 						uint16_t tgtComp = pWG->targetComponentIdx;
 #ifdef XWA_MODERN
-						uint16_t profile = XwaProjectileTables_HomingProfileBase(obj->objectType) + homingTier;
+						uint16_t profile =
+							XwaProjectileTables_HomingProfileBase(obj->objectType) + homingTier;
 #else
 						uint16_t profile =
 							(uint8_t)g_projectileHomingProfileBaseByObjectType_BiasedBase[obj->objectType] +

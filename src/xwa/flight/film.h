@@ -21,10 +21,10 @@ char* FilmNamePrompt_Run(void);
 
 extern uint8_t* g_filmWriteBuffer;
 extern MemoryHandle g_filmWriteBufferHandle;
-extern int      g_filmWriteBufferSize;
-extern int      g_filmWriteBufferedBytes;
-extern int      g_filmNamePromptOverwriteConfirm;
-extern char     g_filmNamePromptName[128];
+extern int g_filmWriteBufferSize;
+extern int g_filmWriteBufferedBytes;
+extern int g_filmNamePromptOverwriteConfirm;
+extern char g_filmNamePromptName[128];
 
 #ifdef __cplusplus
 }

@@ -472,7 +472,8 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 		g.render_size_fixed = 1;
 		g.render_pixel_width = options->render_width;
 		g.render_pixel_height = options->render_height;
-		Aeron_LogInfo("xwa.remaster", "render size fixed at %dx%d", g.render_pixel_width, g.render_pixel_height);
+		Aeron_LogInfo("xwa.remaster", "render size fixed at %dx%d", g.render_pixel_width,
+					  g.render_pixel_height);
 	} else if (!Aeron_GetPresentationPixelSize(&g.render_pixel_width, &g.render_pixel_height)) {
 		g.render_pixel_width = XWA_PRESENTATION_WIDTH;
 		g.render_pixel_height = XWA_PRESENTATION_HEIGHT;
@@ -815,7 +816,8 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	if (!snap) {
 		return;
 	}
-	const int hyperspace_preview = XwaRemasterFlight_GetHyperspacePreview() != XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF;
+	const int hyperspace_preview =
+		XwaRemasterFlight_GetHyperspacePreview() != XWA_FLIGHT_HYPERSPACE_PREVIEW_OFF;
 	const int hyperspace_preview_visible = hyperspace_preview && snap->scene_kind == XWA_SCENE_FLIGHT &&
 										   snap->flight_camera_valid && !snap->flight_camera.map_mode &&
 										   !snap->flight_camera.hyperspace_phase;
@@ -1333,8 +1335,8 @@ int XwaRemaster_BenchmarkFlightFrames(void) {
 		}
 		frame_ms[i] = (double)wall_us / 1000.0 / RM_BENCHMARK_SAMPLE_RENDERS;
 		cpu_ms[i] = (double)cpu_us / 1000.0 / RM_BENCHMARK_SAMPLE_RENDERS;
-		Aeron_LogInfo("xwa.benchmark", "film benchmark: sample %d: %.3f ms per frame, %.3f ms recording", i + 1,
-					  frame_ms[i], cpu_ms[i]);
+		Aeron_LogInfo("xwa.benchmark", "film benchmark: sample %d: %.3f ms per frame, %.3f ms recording",
+					  i + 1, frame_ms[i], cpu_ms[i]);
 	}
 	qsort(frame_ms, RM_BENCHMARK_SAMPLES, sizeof frame_ms[0], rm_benchmark_compare_double);
 	qsort(cpu_ms, RM_BENCHMARK_SAMPLES, sizeof cpu_ms[0], rm_benchmark_compare_double);
@@ -1436,7 +1438,8 @@ int XwaRemaster_CaptureFlightFrame(const char* name) {
 		/* The image holds linear display values. The PNG stores them in sRGB. */
 		for (size_t i = 0; i < pixels * 3u; ++i) {
 			const float value = fminf(rgb[i], 1.0f);
-			const float srgb = value <= 0.0031308f ? 12.92f * value : 1.055f * powf(value, 1.0f / 2.4f) - 0.055f;
+			const float srgb =
+				value <= 0.0031308f ? 12.92f * value : 1.055f * powf(value, 1.0f / 2.4f) - 0.055f;
 			bytes[i] = (uint8_t)(srgb * 255.0f + 0.5f);
 		}
 		if (!Aeron_ImageWritePngRgb8(Aeron_GetVfs(), AERON_VFS_ROOT_USER, png_path, width, height, bytes)) {

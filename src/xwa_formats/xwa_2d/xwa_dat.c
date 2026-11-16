@@ -7,8 +7,8 @@ typedef struct DatEntry {
 } DatEntry;
 
 static int dat_directory(const uint8_t* bytes, size_t size, size_t* out_record_size,
-						 uint16_t* out_entry_count, const uint8_t** out_entries,
-						 char* error, size_t error_size) {
+						 uint16_t* out_entry_count, const uint8_t** out_entries, char* error,
+						 size_t error_size) {
 	if (!bytes || size < 10)
 		return xwa2d_fail(error, error_size, "invalid DAT input");
 	const size_t record_size = xwa2d_u16(bytes + 8) == 0 ? 12u : 24u;
@@ -23,8 +23,8 @@ static int dat_directory(const uint8_t* bytes, size_t size, size_t* out_record_s
 	return 1;
 }
 
-int Xwa2d_DatListGroups(const uint8_t* bytes, size_t size, uint16_t* groups, int capacity,
-						int* in_out_count, char* error, size_t error_size) {
+int Xwa2d_DatListGroups(const uint8_t* bytes, size_t size, uint16_t* groups, int capacity, int* in_out_count,
+						char* error, size_t error_size) {
 	if (!groups || !in_out_count || *in_out_count < 0 || *in_out_count > capacity)
 		return xwa2d_fail(error, error_size, "invalid DAT group output");
 	size_t record_size;

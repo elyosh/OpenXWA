@@ -22,8 +22,8 @@
  */
 
 #include "bake_sprites.h"
-#include "bake_source.h"
 #include "aeron/atlas_pack.h"
+#include "bake_source.h"
 #include "xwa_2d.h"
 
 #include "bc7_codec.h"
@@ -119,7 +119,7 @@ static void frames_free(BakeFrame* f, int n) {
 static int emit_now(const BakeSpriteOptions* opt, const char* base_path, const uint8_t* rgba, int w, int h) {
 	char path[1100];
 	char err[256];
-	int  ok = 1;
+	int ok = 1;
 	if (opt->write_png) {
 		snprintf(path, sizeof path, "%s.png", base_path);
 		if (!write_png_rgba_atomic(path, w, h, rgba, err, sizeof err)) {
@@ -299,8 +299,8 @@ int BakeSprites_EmitImage(const BakeSpriteOptions* opt, const char* base_path, c
 	return emit_now(opt, base_path, rgba, w, h);
 }
 
-int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
-					   AeronAtlasImage** out_images, AeronCpuAtlas* out) {
+int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages, AeronAtlasImage** out_images,
+						   AeronCpuAtlas* out) {
 	AeronAtlasImage* images = (AeronAtlasImage*)calloc((size_t)count, sizeof *images);
 	if (!images)
 		return 0;
@@ -559,7 +559,7 @@ static void bake_one_file(const BakeSpriteOptions* opt, AeronVfs* vfs, const cha
 	snprintf(bundle_dir, sizeof bundle_dir, "%s/frontend/frontres/%s", opt->out_root, dir_lower);
 
 	BakeFrame* frames = (BakeFrame*)calloc((size_t)decoded.count, sizeof *frames);
-	int        n      = 0;
+	int n = 0;
 	for (int f = 0; f < decoded.count; f++) {
 		BakeFrame* bf = &frames[f];
 		bf->rgba = decoded.frames[f].rgba;
@@ -640,7 +640,7 @@ static void bake_dat_groups(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeSta
 			stats->failures++;
 			continue;
 		}
-		int        n = 0;
+		int n = 0;
 		for (int i = 0; i < decoded.count; i++) {
 			Xwa2dFrame* source = &decoded.frames[i];
 			BakeFrame* bf = &frames[n];
@@ -676,16 +676,16 @@ static void bake_dat_groups(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeSta
 
 /* ---- source-file discovery --------------------------------------------- */
 
-#define BAKE_MAX_DIRS          64
+#define BAKE_MAX_DIRS 64
 #define BAKE_MAX_FILES_PER_DIR 512
 
 typedef struct FileDiscovery {
 	char dirs[BAKE_MAX_DIRS][256];
-	int  dir_count;
+	int dir_count;
 	/* Files of the directory currently being scanned, deduped by base
 	 * name (FOO.CBM is the cache of FOO.FLC/FOO.BMP — one asset). */
 	char files[BAKE_MAX_FILES_PER_DIR][256];
-	int  file_count;
+	int file_count;
 } FileDiscovery;
 
 static int glob_collect_dir(void* user, const AeronVfsEntry* e) {
@@ -702,14 +702,13 @@ static int base_len(const char* name) {
 }
 
 static int glob_collect_image(void* user, const AeronVfsEntry* e) {
-	FileDiscovery* d   = (FileDiscovery*)user;
-	size_t         len = strlen(e->name);
+	FileDiscovery* d = (FileDiscovery*)user;
+	size_t len = strlen(e->name);
 	if (e->is_directory || len < 5 || d->file_count >= BAKE_MAX_FILES_PER_DIR) {
 		return 1;
 	}
 	const char* ext = e->name + len - 4;
-	if (strcasecmp(ext, ".CBM") != 0 && strcasecmp(ext, ".BMP") != 0 &&
-		strcasecmp(ext, ".FLC") != 0) {
+	if (strcasecmp(ext, ".CBM") != 0 && strcasecmp(ext, ".BMP") != 0 && strcasecmp(ext, ".FLC") != 0) {
 		return 1;
 	}
 	const int bl = base_len(e->name);
@@ -736,8 +735,7 @@ int BakeSprites_Run(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeStats* stat
 	}
 	if (!opt->dat_only) {
 		AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, "FRONTRES", "*",
-					  AERON_VFS_GLOB_DIRECTORIES | AERON_VFS_GLOB_CASE_INSENSITIVE,
-					  glob_collect_dir, disc);
+					  AERON_VFS_GLOB_DIRECTORIES | AERON_VFS_GLOB_CASE_INSENSITIVE, glob_collect_dir, disc);
 		ToolLog_Write(TOOL_LOG_INFO, "bake: %d frontres directories discovered", disc->dir_count);
 	}
 
@@ -752,8 +750,7 @@ int BakeSprites_Run(const BakeSpriteOptions* opt, AeronVfs* vfs, BakeStats* stat
 		snprintf(sub, sizeof sub, "FRONTRES/%s", disc->dirs[i]);
 		disc->file_count = 0;
 		AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, sub, "*",
-					  AERON_VFS_GLOB_FILES | AERON_VFS_GLOB_CASE_INSENSITIVE, glob_collect_image,
-					  disc);
+					  AERON_VFS_GLOB_FILES | AERON_VFS_GLOB_CASE_INSENSITIVE, glob_collect_image, disc);
 		ToolLog_Write(TOOL_LOG_INFO, "frontres/%s: %d source images", disc->dirs[i], disc->file_count);
 		for (int f = 0; f < disc->file_count; f++) {
 			if (filter[0]) {

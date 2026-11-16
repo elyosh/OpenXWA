@@ -89,7 +89,7 @@ typedef struct XwaModImportProgress {
 	volatile int warnings;
 	volatile int errors;
 	volatile int finished;
-	volatile int result;                      /* XwaModImportResult */
+	volatile int result; /* XwaModImportResult */
 	/* How long each phase should take, in ms, estimated before the models
 	   phase starts. It doesn't change after that. */
 	volatile int phase_cost[XWA_MOD_IMPORT_PHASE_COUNT];

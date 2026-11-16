@@ -175,8 +175,8 @@ void XwaFilmBenchmark_NoteFlight(int flightFrameRan, uint64_t flightUs) {
 
 void XwaFilmBenchmark_NoteCapture(uint64_t captureUs) { s_pendingCaptureUs = FilmBenchmark_Clamp(captureUs); }
 
-void XwaFilmBenchmark_NoteHostFrame(uint64_t beginUs, uint64_t tickUs, uint64_t remasterUs, uint64_t presentUs,
-									uint64_t hostFrameUs) {
+void XwaFilmBenchmark_NoteHostFrame(uint64_t beginUs, uint64_t tickUs, uint64_t remasterUs,
+									uint64_t presentUs, uint64_t hostFrameUs) {
 	FilmBenchmarkRecord* record;
 	AeronPacingStats pacing;
 	const int fastForwardFrame = s_fastForwardFrame;
@@ -272,7 +272,8 @@ static void FilmBenchmark_AppendValue(char* line, size_t size, uint32_t value) {
 }
 
 static void FilmBenchmark_WriteCsv(void) {
-	static const char header[] = "frame,film_time,begin_us,tick_us,flight_us,capture_us,remaster_us,present_us,acquire_us,gpu_busy,host_frame_us\n";
+	static const char header[] = "frame,film_time,begin_us,tick_us,flight_us,capture_us,remaster_us,present_"
+								 "us,acquire_us,gpu_busy,host_frame_us\n";
 	char* text;
 	size_t used;
 	size_t i;

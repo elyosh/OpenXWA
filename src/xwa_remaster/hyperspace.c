@@ -214,8 +214,9 @@ static AeronBlendStateDesc hyper_blend_pma(void) {
 
 /* The hyperspace draws make their geometry from SV_VertexID, without a
  * depth test. `depth_attachment` matches a pass with the scene's depth. */
-static AeronGraphicsPipeline* hyper_create_pipeline(AeronShader* vs, AeronShader* fs, const AeronBlendStateDesc* blend,
-													int depth_attachment, AeronSampleCount sample_count) {
+static AeronGraphicsPipeline* hyper_create_pipeline(AeronShader* vs, AeronShader* fs,
+													const AeronBlendStateDesc* blend, int depth_attachment,
+													AeronSampleCount sample_count) {
 	AeronColorTargetStateDesc target = {
 		.format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
 	};
@@ -360,12 +361,12 @@ XwaRemasterHyperspace* XwaRemasterHyperspace_Create(const XwaFlightHyperspaceTun
 		.name = "hyperspace_streak.vert", .stage = AERON_SHADER_STAGE_VERTEX, .uniform_buffer_count = 1 });
 	h->streak_fs = Aeron_CreateShader(&(AeronShaderDesc) {
 		.name = "hyperspace_streak.frag", .stage = AERON_SHADER_STAGE_FRAGMENT, .uniform_buffer_count = 1 });
-	h->tunnel_vs = Aeron_CreateShader(&(AeronShaderDesc) {
-		.name = "hyperspace_tunnel.vert", .stage = AERON_SHADER_STAGE_VERTEX });
+	h->tunnel_vs = Aeron_CreateShader(
+		&(AeronShaderDesc) { .name = "hyperspace_tunnel.vert", .stage = AERON_SHADER_STAGE_VERTEX });
 	h->tunnel_fs = Aeron_CreateShader(&(AeronShaderDesc) {
 		.name = "hyperspace_tunnel.frag", .stage = AERON_SHADER_STAGE_FRAGMENT, .uniform_buffer_count = 1 });
-	h->fullscreen_vs =
-		Aeron_CreateShader(&(AeronShaderDesc) { .name = "fullscreen.vert", .stage = AERON_SHADER_STAGE_VERTEX });
+	h->fullscreen_vs = Aeron_CreateShader(
+		&(AeronShaderDesc) { .name = "fullscreen.vert", .stage = AERON_SHADER_STAGE_VERTEX });
 	h->warp_sky_fs = Aeron_CreateShader(&(AeronShaderDesc) { .name = "hyperspace_warp_sky.frag",
 															 .stage = AERON_SHADER_STAGE_FRAGMENT,
 															 .sampler_count = 4,
@@ -432,7 +433,8 @@ void XwaRemasterHyperspace_SetParams(XwaRemasterHyperspace* h,
 	}
 }
 
-void XwaRemasterHyperspace_SetJumpParams(XwaRemasterHyperspace* h, const XwaFlightHyperspaceJumpParams* params) {
+void XwaRemasterHyperspace_SetJumpParams(XwaRemasterHyperspace* h,
+										 const XwaFlightHyperspaceJumpParams* params) {
 	if (h && params) {
 		h->jump = *params;
 	}
@@ -486,7 +488,7 @@ void XwaRemasterHyperspace_Destroy(XwaRemasterHyperspace* h) {
 	hyper_destroy_pipeline(&h->warp_sky_pipeline);
 	hyper_destroy_pipeline(&h->warp_pipeline);
 	hyper_release_warp_targets(h);
-	AeronShader* const shaders[7] = { h->streak_vs,		h->streak_fs,	  h->tunnel_vs, h->tunnel_fs,
+	AeronShader* const shaders[7] = { h->streak_vs,     h->streak_fs,   h->tunnel_vs, h->tunnel_fs,
 									  h->fullscreen_vs, h->warp_sky_fs, h->warp_fs };
 	for (int i = 0; i < 7; i++) {
 		if (shaders[i])
@@ -540,8 +542,8 @@ static void hyper_add_uniform_ambient(XwaShipAmbientCube* cube, const float colo
 /* During the jump's fades in the world scene, the tunnel lights the cockpit
  * evenly in its cap colour. */
 static void hyper_build_tunnel_fill_lighting(XwaRemasterHyperspace* h, float opacity, float boost) {
-	const float scale = h->params.brightness * h->params.highlight_strength * h->params.mesh_ambient_strength *
-						opacity * boost * XwaRemaster_ClassicRadiance();
+	const float scale = h->params.brightness * h->params.highlight_strength *
+						h->params.mesh_ambient_strength * opacity * boost * XwaRemaster_ClassicRadiance();
 	if (!(scale > 0.0f) || !isfinite(scale)) {
 		return;
 	}
@@ -693,8 +695,8 @@ static float hyper_white_peak_seconds(const XwaFlightHyperspaceJumpParams* jump)
 	return HYPER_OUTBOUND_TICKS / HYPER_TICKS_PER_SECOND - jump->white_fade_seconds;
 }
 
-static int hyper_timeline(const XwaFlightHyperspaceJumpParams* jump, const XwaRemasterHyperspaceMoment* moment,
-						  HyperTimeline* out) {
+static int hyper_timeline(const XwaFlightHyperspaceJumpParams* jump,
+						  const XwaRemasterHyperspaceMoment* moment, HyperTimeline* out) {
 	memset(out, 0, sizeof *out);
 	const float seconds = fmaxf(moment->phase_ticks, 0.0f) / HYPER_TICKS_PER_SECOND;
 	const float fade = jump->white_fade_seconds;
@@ -709,8 +711,8 @@ static int hyper_timeline(const XwaFlightHyperspaceJumpParams* jump, const XwaRe
 			/* The tunnel's clock runs from before the phase change, so its
 			 * motion carries on through it. */
 			out->tunnel_seconds = seconds - entry_seconds;
-			out->streak_fade = (1.0f - out->tunnel_opacity) *
-							   hyper_smoothstep(0.0f, HYPER_STREAK_FADE_IN_SECONDS, seconds);
+			out->streak_fade =
+				(1.0f - out->tunnel_opacity) * hyper_smoothstep(0.0f, HYPER_STREAK_FADE_IN_SECONDS, seconds);
 			out->jump_seconds = seconds;
 			out->hold_exposure = 1;
 			return 1;
@@ -725,19 +727,19 @@ static int hyper_timeline(const XwaFlightHyperspaceJumpParams* jump, const XwaRe
 			float boost = 1.0f + (entry_boost - 1.0f) * (1.0f - hyper_smoothstep(0.0f, settle, seconds));
 			const float remaining = tunnel_seconds - seconds;
 			const float exit_boost =
-				1.0f + (entry_boost - 1.0f) * (1.0f - hyper_smoothstep(0.0f, HYPER_TUNNEL_EXIT_SECONDS, remaining));
+				1.0f +
+				(entry_boost - 1.0f) * (1.0f - hyper_smoothstep(0.0f, HYPER_TUNNEL_EXIT_SECONDS, remaining));
 			out->tunnel_boost = fmaxf(boost, exit_boost);
-			out->hold_exposure =
-				seconds < settle + 0.1f || remaining < HYPER_TUNNEL_EXIT_SECONDS + 0.05f;
+			out->hold_exposure = seconds < settle + 0.1f || remaining < HYPER_TUNNEL_EXIT_SECONDS + 0.05f;
 			return 1;
 		}
 		case XWA_HYPERSPACE_INBOUND: {
 			out->tunnel_opacity = 1.0f - hyper_smoothstep(0.0f, fade, seconds);
 			out->tunnel_boost = entry_boost;
 			out->tunnel_seconds = tunnel_seconds + seconds;
-			out->streak_fade =
-				(1.0f - out->tunnel_opacity) *
-				(1.0f - hyper_smoothstep(exit_seconds - HYPER_STREAK_FADE_OUT_SECONDS, exit_seconds, seconds));
+			out->streak_fade = (1.0f - out->tunnel_opacity) *
+							   (1.0f - hyper_smoothstep(exit_seconds - HYPER_STREAK_FADE_OUT_SECONDS,
+														exit_seconds, seconds));
 			/* Hold the white-out during the fade, then run the entry
 			 * backward: a fast snap back, then a slow settle into points. */
 			float u = (seconds - fade) / (exit_seconds - fade);
@@ -762,7 +764,8 @@ typedef struct HyperJumpCurves {
 	float width;
 } HyperJumpCurves;
 
-static void hyper_jump_curves(const XwaFlightHyperspaceJumpParams* jump, float seconds, HyperJumpCurves* out) {
+static void hyper_jump_curves(const XwaFlightHyperspaceJumpParams* jump, float seconds,
+							  HyperJumpCurves* out) {
 	const float peak = hyper_white_peak_seconds(jump);
 	/* Exponential travel: a gentle start and a violent end. */
 	out->head_travel = jump->stretch_scale * 0.025f * (expf(1.95f * seconds) - 1.0f);
@@ -860,7 +863,8 @@ static void hyper_vanishing_point(const XwaRemasterHyperspaceTunnelView* view, f
 /* The streaks' light on the cockpit, on the entry's timeline: it rises from
  * `mesh_light_start` to `mesh_light_strength` at the white peak, as a power
  * `mesh_light_curve` of the time elapsed, and follows the streaks' fades. */
-static float hyper_streak_light_level(const XwaFlightHyperspaceJumpParams* jump, float jump_seconds, float fade) {
+static float hyper_streak_light_level(const XwaFlightHyperspaceJumpParams* jump, float jump_seconds,
+									  float fade) {
 	const float peak = hyper_white_peak_seconds(jump);
 	const float start = fminf(jump->mesh_light_start, peak - 0.05f);
 	float ramp = (jump_seconds - start) / (peak - start);
@@ -876,8 +880,9 @@ static float hyper_streak_intensity(const XwaFlightHyperspaceJumpParams* jump, c
 }
 
 static void hyper_set_streak_uniform(const XwaRemasterHyperspace* h, HyperStreakUniform* u,
-									 const XwaRemasterHyperspaceTunnelView* view, const HyperJumpCurves* curves,
-									 int forward, float intensity, uint32_t seed, int rt_w, int rt_h) {
+									 const XwaRemasterHyperspaceTunnelView* view,
+									 const HyperJumpCurves* curves, int forward, float intensity,
+									 uint32_t seed, int rt_w, int rt_h) {
 	const XwaFlightHyperspaceJumpParams* jump = &h->jump;
 	memset(u, 0, sizeof *u);
 	u->view[0] = (float)rt_w;
@@ -930,8 +935,9 @@ static float hyper_warp_progress(const XwaFlightHyperspaceJumpParams* jump, floa
 	return powf(ramp, jump->warp_curve);
 }
 
-int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* cmd, const float camera_rows[9],
-								  int rt_w, int rt_h, const XwaRemasterHyperspaceMoment* moment,
+int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* cmd,
+								  const float camera_rows[9], int rt_w, int rt_h,
+								  const XwaRemasterHyperspaceMoment* moment,
 								  const XwaRemasterHyperspaceTunnelView* tunnel_view, int world_scene) {
 	if (!h || !cmd || !camera_rows || !moment || !tunnel_view) {
 		return 0;
@@ -976,8 +982,8 @@ int XwaRemasterHyperspace_Prepare(XwaRemasterHyperspace* h, AeronCommandBuffer* 
 		HyperJumpCurves curves;
 		hyper_jump_curves(&h->jump, timeline.jump_seconds, &curves);
 		hyper_set_streak_uniform(h, &h->streak_uniform, tunnel_view, &curves, timeline.forward,
-								 hyper_streak_intensity(&h->jump, &curves, timeline.streak_fade), moment->seed,
-								 rt_w, rt_h);
+								 hyper_streak_intensity(&h->jump, &curves, timeline.streak_fade),
+								 moment->seed, rt_w, rt_h);
 		HyperStreakFragmentUniform* fu = &h->streak_fragment_uniform;
 		memset(fu, 0, sizeof *fu);
 		fu->glow[0] = h->jump.glow_strength;
@@ -1020,7 +1026,8 @@ void XwaRemasterHyperspace_SetView(XwaRemasterHyperspace* h, const XwaRemasterHy
 						  h->streak_fragment_uniform.vanishing);
 }
 
-static void hyper_draw_tunnel(XwaRemasterHyperspace* h, AeronRenderPass* pass, AeronGraphicsPipeline* pipeline) {
+static void hyper_draw_tunnel(XwaRemasterHyperspace* h, AeronRenderPass* pass,
+							  AeronGraphicsPipeline* pipeline) {
 	Aeron_BindGraphicsPipeline(pass, pipeline);
 	Aeron_BindUniformData(pass, AERON_SHADER_STAGE_FRAGMENT, 0, &h->tunnel_uniform,
 						  (uint32_t)sizeof h->tunnel_uniform);
@@ -1075,9 +1082,10 @@ static int hyper_draw_layer(XwaRemasterHyperspace* h, AeronCommandBuffer* cmd) {
 }
 
 static int hyper_fullscreen_pass(AeronCommandBuffer* cmd, AeronGraphicsPipeline* pipeline,
-								 AeronRenderTarget* target, int width, int height, AeronTexture* const* textures,
-								 AeronSampler* const* samplers, uint32_t texture_count, const void* uniform,
-								 uint32_t uniform_size, const char* label) {
+								 AeronRenderTarget* target, int width, int height,
+								 AeronTexture* const* textures, AeronSampler* const* samplers,
+								 uint32_t texture_count, const void* uniform, uint32_t uniform_size,
+								 const char* label) {
 	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
 		.color_target = target,
 		.discard_color = 1,
@@ -1200,8 +1208,9 @@ static AeronRenderTarget* hyper_warp_sky(XwaRemasterHyperspace* h, AeronCommandB
 	const float radiance = XwaRemaster_ClassicRadiance();
 	AeronRenderTarget* const* pair = jump->warp_sky_half_resolution ? h->sky_rt : h->warp_rt;
 	AeronRenderTarget* const targets[HYPER_WARP_SKY_PASSES] = { pair[0], pair[1], pair[0] };
-	static const char* const labels[HYPER_WARP_SKY_PASSES] = { "Hyperspace sky warp 1", "Hyperspace sky warp 2",
-																"Hyperspace sky warp 3" };
+	static const char* const labels[HYPER_WARP_SKY_PASSES] = { "Hyperspace sky warp 1",
+															   "Hyperspace sky warp 2",
+															   "Hyperspace sky warp 3" };
 	AeronTexture* source = in->scene;
 	for (int pass = 0; pass < HYPER_WARP_SKY_PASSES; pass++) {
 		HyperWarpSkyUniform u;
@@ -1223,14 +1232,13 @@ static AeronRenderTarget* hyper_warp_sky(XwaRemasterHyperspace* h, AeronCommandB
 		/* Without a cube, the tunnel's cube fills the bindings; it isn't
 		 * read. */
 		const int cubes = motion == HYPER_WARP_ARRIVE;
-		AeronTexture* const textures[4] = {
-			source, in->depth, cubes ? in->sky_cube : h->environment_cube,
-			cubes && in->overlay_cube ? in->overlay_cube : h->environment_cube
-		};
-		AeronSampler* const samplers[4] = {
-			h->environment_sampler, h->point_sampler, cubes ? in->sky_sampler : h->environment_sampler,
-			cubes && in->overlay_cube ? in->overlay_sampler : h->environment_sampler
-		};
+		AeronTexture* const textures[4] = { source, in->depth, cubes ? in->sky_cube : h->environment_cube,
+											cubes && in->overlay_cube ? in->overlay_cube
+																	  : h->environment_cube };
+		AeronSampler* const samplers[4] = { h->environment_sampler, h->point_sampler,
+											cubes ? in->sky_sampler : h->environment_sampler,
+											cubes && in->overlay_cube ? in->overlay_sampler
+																	  : h->environment_sampler };
 		if (!source || !hyper_fullscreen_pass(cmd, h->warp_sky_pipeline, targets[pass], sky_w, sky_h,
 											  textures, samplers, 4, &u, (uint32_t)sizeof u, labels[pass])) {
 			return NULL;
@@ -1295,7 +1303,8 @@ AeronTexture* XwaRemasterHyperspace_RenderWarp(XwaRemasterHyperspace* h, AeronCo
 	 * at its rest position, and the smear reaches back to where it would
 	 * have been. */
 	const float distance = progress * jump->warp_distance_m * in->units_per_meter;
-	const float moved = motion == HYPER_WARP_TOWARD ? distance : (motion == HYPER_WARP_ARRIVE ? -distance : 0.0f);
+	const float moved =
+		motion == HYPER_WARP_TOWARD ? distance : (motion == HYPER_WARP_ARRIVE ? -distance : 0.0f);
 	const float side = motion == HYPER_WARP_TOWARD ? 1.0f : -1.0f;
 	u.motion[0] = moved;
 	u.motion[1] = moved - jump->warp_smear * distance;

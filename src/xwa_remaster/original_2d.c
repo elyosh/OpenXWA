@@ -36,9 +36,9 @@ static void original_normalize_path(const char* source, char* out, size_t capaci
 	out[count] = '\0';
 }
 
-static XwaRemasterOriginal2dLoadStatus
-original_read_candidate(XwaRemasterOriginal2d* reader, AeronVfsRoot root, const char* path,
-						uint8_t** out_bytes, size_t* out_size) {
+static XwaRemasterOriginal2dLoadStatus original_read_candidate(XwaRemasterOriginal2d* reader,
+															   AeronVfsRoot root, const char* path,
+															   uint8_t** out_bytes, size_t* out_size) {
 	if (!AeronVfs_Exists(reader->vfs, root, path))
 		return XWA_REMASTER_ORIGINAL_2D_LOAD_MISSING;
 	return AeronVfs_ReadAll(reader->vfs, root, path, ORIGINAL_2D_MAX_FILE_BYTES, out_bytes, out_size)
@@ -46,9 +46,9 @@ original_read_candidate(XwaRemasterOriginal2d* reader, AeronVfsRoot root, const 
 			   : XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
 }
 
-static XwaRemasterOriginal2dLoadStatus
-original_read_asset(XwaRemasterOriginal2d* reader, AeronVfsRoot root, const char* path,
-					uint8_t** out_bytes, size_t* out_size) {
+static XwaRemasterOriginal2dLoadStatus original_read_asset(XwaRemasterOriginal2d* reader, AeronVfsRoot root,
+														   const char* path, uint8_t** out_bytes,
+														   size_t* out_size) {
 	char normalized[ORIGINAL_2D_PATH_MAX];
 	XwaRemasterOriginal2dLoadStatus status;
 	original_normalize_path(path, normalized, sizeof normalized, 0);
@@ -97,9 +97,10 @@ XwaRemasterOriginal2d* XwaRemasterOriginal2d_Create(AeronVfs* vfs) {
 
 void XwaRemasterOriginal2d_Destroy(XwaRemasterOriginal2d* reader) { free(reader); }
 
-XwaRemasterOriginal2dLoadStatus
-XwaRemasterOriginal2d_LoadFrontend(XwaRemasterOriginal2d* reader, const char* source_path,
-								   Xwa2dFrameSet* out, char* error, size_t error_size) {
+XwaRemasterOriginal2dLoadStatus XwaRemasterOriginal2d_LoadFrontend(XwaRemasterOriginal2d* reader,
+																   const char* source_path,
+																   Xwa2dFrameSet* out, char* error,
+																   size_t error_size) {
 	if (!reader || !source_path || !source_path[0] || !out)
 		return XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
 	memset(out, 0, sizeof *out);
@@ -115,8 +116,7 @@ XwaRemasterOriginal2d_LoadFrontend(XwaRemasterOriginal2d* reader, const char* so
 	if (status == XWA_REMASTER_ORIGINAL_2D_LOAD_SUCCESS) {
 		int ok = Xwa2d_DecodeCbm(bytes, size, out, error, error_size);
 		free(bytes);
-		return ok ? XWA_REMASTER_ORIGINAL_2D_LOAD_SUCCESS
-				  : XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
+		return ok ? XWA_REMASTER_ORIGINAL_2D_LOAD_SUCCESS : XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
 	}
 	if (status != XWA_REMASTER_ORIGINAL_2D_LOAD_MISSING)
 		return status;
@@ -132,12 +132,11 @@ XwaRemasterOriginal2d_LoadFrontend(XwaRemasterOriginal2d* reader, const char* so
 				 ? Xwa2d_DecodeFlc(bytes, size, out, error, error_size)
 				 : Xwa2d_DecodeBmp(bytes, size, out, error, error_size);
 	free(bytes);
-	return ok ? XWA_REMASTER_ORIGINAL_2D_LOAD_SUCCESS
-			  : XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
+	return ok ? XWA_REMASTER_ORIGINAL_2D_LOAD_SUCCESS : XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
 }
 
-static XwaRemasterOriginal2dLoadStatus
-original_load_dat_paths(XwaRemasterOriginal2d* reader, char* error, size_t error_size) {
+static XwaRemasterOriginal2dLoadStatus original_load_dat_paths(XwaRemasterOriginal2d* reader, char* error,
+															   size_t error_size) {
 	if (reader->dat_paths_loaded)
 		return XWA_REMASTER_ORIGINAL_2D_LOAD_SUCCESS;
 	uint8_t* bytes = NULL;
@@ -175,9 +174,9 @@ original_load_dat_paths(XwaRemasterOriginal2d* reader, char* error, size_t error
 			return XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
 		}
 		char dat_error[128] = { 0 };
-		const int listed = Xwa2d_DatListGroups(dat_bytes, dat_size, dat_file->groups,
-											ORIGINAL_2D_MAX_DAT_GROUPS, &dat_file->group_count,
-											dat_error, sizeof dat_error);
+		const int listed =
+			Xwa2d_DatListGroups(dat_bytes, dat_size, dat_file->groups, ORIGINAL_2D_MAX_DAT_GROUPS,
+								&dat_file->group_count, dat_error, sizeof dat_error);
 		free(dat_bytes);
 		if (!listed) {
 			if (error && error_size)
@@ -210,14 +209,13 @@ static int original_dat_contains_group(const OriginalDatFile* file, uint16_t gro
 	return 0;
 }
 
-XwaRemasterOriginal2dLoadStatus
-XwaRemasterOriginal2d_LoadDatGroup(XwaRemasterOriginal2d* reader, int group, Xwa2dFrameSet* out,
-								   char* error, size_t error_size) {
+XwaRemasterOriginal2dLoadStatus XwaRemasterOriginal2d_LoadDatGroup(XwaRemasterOriginal2d* reader, int group,
+																   Xwa2dFrameSet* out, char* error,
+																   size_t error_size) {
 	if (!reader || !out || group < 0 || group > 0xffff)
 		return XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
 	memset(out, 0, sizeof *out);
-	XwaRemasterOriginal2dLoadStatus status =
-		original_load_dat_paths(reader, error, error_size);
+	XwaRemasterOriginal2dLoadStatus status = original_load_dat_paths(reader, error, error_size);
 	if (status != XWA_REMASTER_ORIGINAL_2D_LOAD_SUCCESS)
 		return status;
 	for (int i = 0; i < reader->dat_file_count; i++) {
@@ -247,9 +245,9 @@ XwaRemasterOriginal2d_LoadDatGroup(XwaRemasterOriginal2d* reader, int group, Xwa
 	return XWA_REMASTER_ORIGINAL_2D_LOAD_MISSING;
 }
 
-XwaRemasterOriginal2dLoadStatus
-XwaRemasterOriginal2d_LoadFrontendFont(XwaRemasterOriginal2d* reader, int point_size,
-									   Xwa2dFontAtlas* out, char* error, size_t error_size) {
+XwaRemasterOriginal2dLoadStatus XwaRemasterOriginal2d_LoadFrontendFont(XwaRemasterOriginal2d* reader,
+																	   int point_size, Xwa2dFontAtlas* out,
+																	   char* error, size_t error_size) {
 	if (!reader || !out || point_size <= 0 || point_size > 255)
 		return XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
 	char path[64];
@@ -266,6 +264,5 @@ XwaRemasterOriginal2d_LoadFrontendFont(XwaRemasterOriginal2d* reader, int point_
 	}
 	int ok = Xwa2d_DecodeAbpFont(bytes, size, out, error, error_size);
 	free(bytes);
-	return ok ? XWA_REMASTER_ORIGINAL_2D_LOAD_SUCCESS
-			  : XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
+	return ok ? XWA_REMASTER_ORIGINAL_2D_LOAD_SUCCESS : XWA_REMASTER_ORIGINAL_2D_LOAD_FAILED;
 }

@@ -1,10 +1,10 @@
 #ifndef XWA_REMASTER_GLOW_MARKS_H
 #define XWA_REMASTER_GLOW_MARKS_H
 
-#include "aeron/scene/scene3d.h"
 #include "aeron/scene/mesh.h"
-#include "xwa_runtime/snapshot/snapshot.h"
+#include "aeron/scene/scene3d.h"
 #include "xwa_remaster/assets.h"
+#include "xwa_runtime/snapshot/snapshot.h"
 
 /* Draws the hit marks of `object` on `mesh`. Glow marks are shown at
  * `emissive_strength` times the classic radiance. Marks in world segment

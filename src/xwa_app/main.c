@@ -191,7 +191,6 @@ static void discover_controllers(const AeronInputSnapshot* in) {
 	snprintf(previous_error, sizeof previous_error, "%s", ok ? "" : error);
 }
 
-
 static int persist_modern_input_options(const XwaModernInputOptions* options, char* error,
 										size_t error_size) {
 	return XwaHostConfig_SaveInputOptions(Aeron_GetVfs(), options, error, error_size);

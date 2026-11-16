@@ -35,7 +35,7 @@ int XwaRemasterHudFixed_RecordQuad(const XwaHudDrawRecord* record, int target_w,
  * region bits) not at all, and the other records go through
  * XwaRemasterDc_AddSprite / AddQuad4. */
 void XwaRemasterHudFixed_SetDynamicCockpit(int active, uint32_t erased_regions);
-void XwaRemasterHudFixed_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass,
-								AeronRenderTarget* target, int target_w, int target_h);
+void XwaRemasterHudFixed_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+								int target_w, int target_h);
 
 #endif

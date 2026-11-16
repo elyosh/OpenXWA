@@ -49,8 +49,8 @@ int Xwa2d_DatAppendGroup(const uint8_t* bytes, size_t size, uint16_t group, Xwa2
 						 char* error, size_t error_size);
 /* Appends unique DAT directory group IDs to `groups`; `in_out_count` is both
  * the initial count and resulting count. */
-int Xwa2d_DatListGroups(const uint8_t* bytes, size_t size, uint16_t* groups, int capacity,
-						int* in_out_count, char* error, size_t error_size);
+int Xwa2d_DatListGroups(const uint8_t* bytes, size_t size, uint16_t* groups, int capacity, int* in_out_count,
+						char* error, size_t error_size);
 
 int Xwa2d_DecodeAbpFont(const uint8_t* bytes, size_t size, Xwa2dFontAtlas* out, char* error,
 						size_t error_size);

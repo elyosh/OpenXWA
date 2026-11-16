@@ -1,9 +1,9 @@
 #ifndef XWA_FLIGHT_MISSION_MISSION_H
 #define XWA_FLIGHT_MISSION_MISSION_H
 
+#include "xwa/flight/object/object.h"
 #include "xwa/frontend/frontend_mission.h"
 #include "xwa/math/vec3i.h"
-#include "xwa/flight/object/object.h"
 #include "xwa/util/memory.h"
 
 #include <stdint.h>
@@ -269,9 +269,9 @@ void Mission_UpdateLogic(void);
 uint16_t Mission_FlightGroupMatchesTriggerVariable(uint16_t fgIdx, uint16_t variableType, uint16_t variable);
 int Mission_ObjectMatchesTriggerVariable(uint16_t objectIdx, uint16_t variableType, uint16_t variable);
 int Mission_ObjectMatchesTriggerVariableEx(uint16_t objectIdx, uint16_t variableType, uint16_t variable,
-											uint16_t contextFgIdx);
+										   uint16_t contextFgIdx);
 int Mission_EvaluateCondition(const XwaTrigger* trigger, uint8_t includeDepartedAsDestroyed,
-									  uint16_t teamOrVariable);
+							  uint16_t teamOrVariable);
 int Mission_EvaluateTriggerPair(const XwaTriggerPair* triggerPair, char includePending);
 void Mission_SetActiveRegionObjectRanges(int regionIdx);
 int Team_IsHostileToTeam(int otherTeamIdx, int teamIdx);

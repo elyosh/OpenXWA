@@ -38,10 +38,10 @@ typedef struct XwaRemasterHyperspaceLighting {
 /* The moment of the hyperspace sequence to draw. Real hyperspace takes it
  * from the snapshot; the debug preview makes it up. */
 typedef struct XwaRemasterHyperspaceMoment {
-	uint8_t phase;      /* XwaHyperspacePhase */
-	float phase_ticks;  /* ticks since the phase started; may have a fraction */
-	float tunnel_ticks; /* the tunnel phase's length */
-	uint32_t seed;      /* picks the jump's stars */
+	uint8_t phase;       /* XwaHyperspacePhase */
+	float phase_ticks;   /* ticks since the phase started; may have a fraction */
+	float tunnel_ticks;  /* the tunnel phase's length */
+	uint32_t seed;       /* picks the jump's stars */
 	uint8_t tunnel_only; /* the tunnel without end, and without the jump's brightening */
 	int look;            /* the jump's look (XwaRemasterFlight_HyperspaceLookName), or -1 */
 } XwaRemasterHyperspaceMoment;

@@ -190,7 +190,8 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 
 			if (!value) {
 				if (++i >= argc) {
-					return setup_error(error, error_size, "%s requires a size such as 1920x1080", "--render-size");
+					return setup_error(error, error_size, "%s requires a size such as 1920x1080",
+									   "--render-size");
 				}
 				value = argv[i];
 			}
@@ -421,10 +422,11 @@ int XwaSetup_SetModRoot(AeronVfs* vfs, const XwaLaunchOptions* launch, const Xwa
 		return 1;
 	}
 	if (update == XWA_MOD_UPDATE_FAILED) {
-		snprintf(notice, notice_size,
-				 "The new import of \"%s\" couldn't replace the old one, because a program is using its folder:\n"
-				 "%s\n\nOpenXWA starts with the old one, and tries again the next time it starts.",
-				 mod.name, selected);
+		snprintf(
+			notice, notice_size,
+			"The new import of \"%s\" couldn't replace the old one, because a program is using its folder:\n"
+			"%s\n\nOpenXWA starts with the old one, and tries again the next time it starts.",
+			mod.name, selected);
 	}
 	if (!AeronVfs_SetRoot(vfs, AERON_VFS_ROOT_MOD, selected) ||
 		!AeronVfs_SetRootOptions(vfs, AERON_VFS_ROOT_MOD, AERON_VFS_ROOT_OPTION_CASE_INSENSITIVE_LOOKUP)) {

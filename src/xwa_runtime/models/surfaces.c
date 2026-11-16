@@ -93,8 +93,8 @@ void XwaSurfaces_ReadModelSettings(unsigned int objectType, const char* path, co
 		}
 		if ((disabled != NULL && AeronConfigNode_Type(disabled) != AERON_CONFIG_BOOL) ||
 			(dark != NULL && AeronConfigNode_Type(dark) != AERON_CONFIG_BOOL)) {
-			Aeron_LogWarn("xwa.models",
-						  "%s: surfaces.%s.%s needs true or false. The rule is ignored", path, tag,
+			Aeron_LogWarn("xwa.models", "%s: surfaces.%s.%s needs true or false. The rule is ignored", path,
+						  tag,
 						  disabled != NULL && AeronConfigNode_Type(disabled) != AERON_CONFIG_BOOL
 							  ? "hidden_when_disabled"
 							  : "dark_when_disabled");

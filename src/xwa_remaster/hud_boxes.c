@@ -456,14 +456,13 @@ static void box_add_wide_box(AeronDrawList2D* list, const XwaHudPreparedBox* box
 						  AERON_BLIT2D_BLEND_PMA, scissor);
 }
 
-static void box_prepare_layer(AeronCommandBuffer* cmd, int target_w, int target_h,
-							  XwaHudTargetBoxLayer layer, AeronDrawList2D* box_list) {
+static void box_prepare_layer(AeronCommandBuffer* cmd, int target_w, int target_h, XwaHudTargetBoxLayer layer,
+							  AeronDrawList2D* box_list) {
 	if (!box_list || !cmd || target_w <= 0 || target_h <= 0 ||
 		(layer != XWA_HUD_TARGET_BOX_BEFORE_FIXED && layer != XWA_HUD_TARGET_BOX_AFTER_FIXED))
 		return;
 	AeronDrawList_Begin(box_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
-	if (!box_prepared.valid || box_prepared.target_w != target_w ||
-		box_prepared.target_h != target_h) {
+	if (!box_prepared.valid || box_prepared.target_w != target_w || box_prepared.target_h != target_h) {
 		(void)AeronDrawList_Prepare(box_list, cmd);
 		return;
 	}

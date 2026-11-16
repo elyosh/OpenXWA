@@ -13,15 +13,15 @@
 #include <stdio.h>
 
 typedef struct BakeSpriteOptions {
-	const char*    out_root;     /* output directory root */
-	bool           write_png;    /* straight-alpha PNG (artist source) */
-	bool           write_ktx2;   /* BC7 KTX2 (game input) */
-	bool           zstd;         /* KTX2 zstd supercompression */
-	bool           scale;        /* SVGA→4K HD upscale (off = classic 1:1) */
+	const char* out_root; /* output directory root */
+	bool write_png;       /* straight-alpha PNG (artist source) */
+	bool write_ktx2;      /* BC7 KTX2 (game input) */
+	bool zstd;            /* KTX2 zstd supercompression */
+	bool scale;           /* SVGA→4K HD upscale (off = classic 1:1) */
 	Ktx2Bc7Quality bc7_quality;
-	const char*    list_filter;  /* only frontres files matching this */
-	int            group_filter; /* only this DAT group (-1 = all) */
-	bool           dat_only;     /* skip the frontres pass */
+	const char* list_filter; /* only frontres files matching this */
+	int group_filter;        /* only this DAT group (-1 = all) */
+	bool dat_only;           /* skip the frontres pass */
 } BakeSpriteOptions;
 
 /* A frame of an atlas. `size`, `offset` and `bounds` are in the atlas's
@@ -95,7 +95,7 @@ int BakeSprites_QueueFailures(void);
 int BakeSprites_EndQueue(void);
 /* The size of an atlas page, and the gutter between its frames. */
 #define BAKE_MAX_ATLAS_DIM 8192
-#define BAKE_HD_PAD        8
+#define BAKE_HD_PAD 8
 /* The largest page for a frame that doesn't fit in a BAKE_MAX_ATLAS_DIM page.
  * Such a frame gets a page of its own. Every GPU that SDL's GPU API supports on
  * D3D12 and Metal can create a texture this large. */
@@ -105,8 +105,8 @@ int BakeSprites_EndQueue(void);
  * BAKE_HD_PAD gutter around each frame. A frame too large for such a page gets
  * a page of its own, up to BAKE_MAX_OVERSIZE_DIM. `max_pages` 0 allows any
  * number of pages. */
-int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages,
-						   AeronAtlasImage** out_images, AeronCpuAtlas* out);
+int BakeSprites_BuildAtlas(const BakeFrame* frames, int count, int max_pages, AeronAtlasImage** out_images,
+						   AeronCpuAtlas* out);
 /* Writes `dir`/`base`.yaml and the pages of an atlas that
  * BakeSprites_BuildAtlas packed: `base`, then `base`_p<N>. */
 int BakeSprites_WriteAtlasFiles(const BakeSpriteOptions* opt, const char* dir, const char* base,

@@ -21,16 +21,16 @@ extern "C" {
 
 /* Call before XwaPort_Init.
    - `filmName`: a film in the film folder of the user folder, with or
-     without .flm. Empty for a normal start.
+	 without .flm. Empty for a normal start.
    - `csvPath`: a CSV file in the user folder for the frame times, or empty.
    - `recordPath`: a WAV file in the user folder for the sound of the film,
-     from its first flight frame to its end, or empty.
+	 from its first flight frame to its end, or empty.
    - `pauseAt`: the film time, in game ticks, where the film freezes
-     (--film-pause-at), or -1. The film fast-forwards to it.
+	 (--film-pause-at), or -1. The film fast-forwards to it.
    - `captureName`: when not empty, the frozen frame is saved to files with
-     this name in the user folder, then the game quits (--film-capture).
+	 this name in the user folder, then the game quits (--film-capture).
    - `measure`: measure the GPU time of the frozen frame, then quit
-     (--film-benchmark).
+	 (--film-benchmark).
    When both a capture and a measurement are asked for, the capture runs
    first. */
 void XwaFilmBenchmark_Configure(const char* filmName, const char* csvPath, const char* recordPath,
@@ -90,8 +90,8 @@ void XwaFilmBenchmark_NoteCapture(uint64_t captureUs);
 /* Ends the host frame's record with Aeron_BeginFrame, the whole port tick,
    the remaster's frame, the present, and the whole host frame without the
    wait. */
-void XwaFilmBenchmark_NoteHostFrame(uint64_t beginUs, uint64_t tickUs, uint64_t remasterUs, uint64_t presentUs,
-									uint64_t hostFrameUs);
+void XwaFilmBenchmark_NoteHostFrame(uint64_t beginUs, uint64_t tickUs, uint64_t remasterUs,
+									uint64_t presentUs, uint64_t hostFrameUs);
 
 #ifdef __cplusplus
 }

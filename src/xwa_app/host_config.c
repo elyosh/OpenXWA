@@ -324,12 +324,9 @@ static int host_config_captured_lighting(const AeronConfigFile* config, int requ
 static int host_config_option_sections(const AeronConfigFile* config, int required, char* error,
 									   size_t error_size) {
 	XwaOptionSection* const sections[] = {
-		XwaModernAudioOptions_Section(),
-		XwaModernCameraOptions_Section(),
-		XwaModernCameraShakeOptions_Section(),
-		XwaModernSunOptions_Section(),
-		XwaModernSpeedEffectOptions_Section(),
-		XwaModernTargetReadoutOptions_Section(),
+		XwaModernAudioOptions_Section(),       XwaModernCameraOptions_Section(),
+		XwaModernCameraShakeOptions_Section(), XwaModernSunOptions_Section(),
+		XwaModernSpeedEffectOptions_Section(), XwaModernTargetReadoutOptions_Section(),
 	};
 
 	for (size_t i = 0; i < sizeof sections / sizeof sections[0]; ++i) {

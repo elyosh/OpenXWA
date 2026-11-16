@@ -210,7 +210,9 @@ static const XwaGeometryAtlas* rm_record_geometry(const XwaDraw2D* d, const XwaG
  * g_colorYellow, g_colorGreen). Engine colours are 16-bit, so the test allows
  * for rounding. */
 static int rm_is_highlight_tint(uint32_t engine_color) {
-	static const uint8_t highlights[3][3] = { { 0x60, 0x80, 0xff }, { 0xff, 0xff, 0x00 }, { 0x00, 0xff, 0x00 } };
+	static const uint8_t highlights[3][3] = { { 0x60, 0x80, 0xff },
+											  { 0xff, 0xff, 0x00 },
+											  { 0x00, 0xff, 0x00 } };
 	uint8_t rgba[4];
 	XwaSnapshotExport_ColorToRgba(engine_color, rgba);
 	for (int i = 0; i < 3; i++) {
@@ -413,7 +415,8 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 		s.dst_y -= rm_scale_y();
 		s.dst_w = (float)d->img_w * rm_scale_x();
 		s.dst_h = s.dst_w * (float)ref.h / (float)ref.w;
-	} else if (gframe && gframe->keep_aspect == XWA_GEOMETRY_KEEP_ASPECT_HEIGHT && !d->has_src_rect && ref.h > 0) {
+	} else if (gframe && gframe->keep_aspect == XWA_GEOMETRY_KEEP_ASPECT_HEIGHT && !d->has_src_rect &&
+			   ref.h > 0) {
 		/* Keep the game's height; the width comes from the image's aspect ratio. */
 		s.dst_w = s.dst_h * (float)ref.w / (float)ref.h;
 	}
@@ -441,9 +444,9 @@ static void rm_add_draw(AeronDrawList2D* list, const XwaDraw2D* d) {
 	if (d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED || d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED) {
 		/* An atlas can drop the tint of the game's tinted icons, for art that
 		 * has its own colours. Map icons keep their tint. */
-		const int keep_tint = !geo || d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED ||
-							  geo->tint == XWA_GEOMETRY_TINT_ALL ||
-							  (geo->tint == XWA_GEOMETRY_TINT_HIGHLIGHTS && rm_is_highlight_tint(d->tint_color));
+		const int keep_tint =
+			!geo || d->kind == XWA_DRAW2D_SPRITE_RECT_TINTED_ORIENTED || geo->tint == XWA_GEOMETRY_TINT_ALL ||
+			(geo->tint == XWA_GEOMETRY_TINT_HIGHLIGHTS && rm_is_highlight_tint(d->tint_color));
 		if (keep_tint) {
 			/* FrontImage_BlitRectTinted draws a single colour: the tint,
 			 * scaled by each pixel's brightness. A per-channel multiply would

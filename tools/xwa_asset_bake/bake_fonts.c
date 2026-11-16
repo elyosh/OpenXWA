@@ -98,15 +98,15 @@ static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_s
 	}
 
 	FontAtlasResult r = { 0 };
-	r.atlas_w         = atlas_w;
-	r.atlas_h         = atlas_h;
-	r.cell_w          = source.cell_width * scale;
-	r.cell_h          = source.cell_height * scale;
-	r.first_char      = source.first_char;
-	r.num_chars       = source.glyph_count;
-	r.baseline        = baseline;
-	r.rgba            = rgba;
-	r.glyphs          = glyphs;
+	r.atlas_w = atlas_w;
+	r.atlas_h = atlas_h;
+	r.cell_w = source.cell_width * scale;
+	r.cell_h = source.cell_height * scale;
+	r.first_char = source.first_char;
+	r.num_chars = source.glyph_count;
+	r.baseline = baseline;
+	r.rgba = rgba;
+	r.glyphs = glyphs;
 
 	char dir[1024];
 	snprintf(dir, sizeof dir, "%s/frontend/fonts", opt->out_root);
@@ -114,7 +114,7 @@ static int bake_one_font(const BakeFontsOptions* opt, AeronVfs* vfs, int point_s
 	char basename[1100];
 	snprintf(basename, sizeof basename, "%s/font%d", dir, point_size);
 	char err[256];
-	int  ok = font_atlas_write(&r, basename, err, sizeof err) ? 1 : 0;
+	int ok = font_atlas_write(&r, basename, err, sizeof err) ? 1 : 0;
 	if (!ok) {
 		ToolLog_Write(TOOL_LOG_ERROR, "bake: font %d write failed: %s", point_size, err);
 	} else {
@@ -147,8 +147,7 @@ static int glob_collect_abp(void* user, const AeronVfsEntry* e) {
 int BakeFonts_Run(const BakeFontsOptions* opt, AeronVfs* vfs) {
 	FontDiscovery disc = { 0 };
 	AeronVfs_Glob(vfs, AERON_VFS_ROOT_ASSET, ".", "TIMES*.ABP",
-				  AERON_VFS_GLOB_FILES | AERON_VFS_GLOB_CASE_INSENSITIVE, glob_collect_abp,
-				  &disc);
+				  AERON_VFS_GLOB_FILES | AERON_VFS_GLOB_CASE_INSENSITIVE, glob_collect_abp, &disc);
 	ToolLog_Write(TOOL_LOG_INFO, "bake: %d frontend fonts discovered", disc.count);
 	int baked = 0;
 	for (int i = 0; i < disc.count; i++) {

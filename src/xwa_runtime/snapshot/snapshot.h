@@ -596,7 +596,7 @@ typedef struct XwaFlightCamera {
 	/* ---- classic projection (resolution-dependent focal): screen =
 	 * vp_center + proj_scale * xy/z, y down (TRANSFM2_ProjectScreen*).
 	 * Screen-space records (billboards) unproject through these. */
-	float proj_scale;      /* g_projScale (512 at 640x480) */
+	float proj_scale; /* g_projScale (512 at 640x480) */
 	/* 1 when proj_scale comes from the field of view of the player's craft
 	 * (cockpit_view.h) rather than the stock view. */
 	uint8_t cockpit_fov;

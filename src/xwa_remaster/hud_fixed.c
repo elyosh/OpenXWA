@@ -200,8 +200,8 @@ static void fixed_build_frames(const XwaHudState* h, const XwaRemasterHudVisibil
 		}
 		fixed_emit(XWA_HUD_WIDGET_AFT_RADAR_FRAME, OBJ_HudTextureGroup12000, 28, 434, 464, 256, hud_color, 0);
 		if (!(h->mode_flags & XWA_HUD_MODE_PROVING_GROUND)) {
-			fixed_emit(XWA_HUD_WIDGET_AFT_RADAR_FRAME, OBJ_HudTextureGroup12000, 50, icons->countermeasures[0],
-					   480.0f - icons->countermeasures[1], 256, 0xffffffffu, 0);
+			fixed_emit(XWA_HUD_WIDGET_AFT_RADAR_FRAME, OBJ_HudTextureGroup12000, 50,
+					   icons->countermeasures[0], 480.0f - icons->countermeasures[1], 256, 0xffffffffu, 0);
 		}
 	}
 	if (v->radars) {

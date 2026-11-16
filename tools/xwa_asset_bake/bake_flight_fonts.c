@@ -30,18 +30,14 @@ static int scaled_u16_fits(int value, int scale) {
 }
 
 static int write_fnt(const char* path, const Xwa2dFontAtlas* font, int scale) {
-	if (!font || !scaled_u16_fits(font->width, scale) ||
-		!scaled_u16_fits(font->height, scale) ||
-		!scaled_u16_fits(font->cell_width, scale) ||
-		!scaled_u16_fits(font->cell_height, scale) ||
+	if (!font || !scaled_u16_fits(font->width, scale) || !scaled_u16_fits(font->height, scale) ||
+		!scaled_u16_fits(font->cell_width, scale) || !scaled_u16_fits(font->cell_height, scale) ||
 		!scaled_u16_fits(font->baseline, scale))
 		return 0;
 	for (uint16_t glyph = 0; glyph < font->glyph_count; glyph++) {
 		const Xwa2dGlyph* metric = &font->glyphs[glyph];
-		if (!scaled_u16_fits(metric->x, scale) ||
-			!scaled_u16_fits(metric->y, scale) ||
-			!scaled_u16_fits(metric->width, scale) ||
-			!scaled_u16_fits(metric->height, scale) ||
+		if (!scaled_u16_fits(metric->x, scale) || !scaled_u16_fits(metric->y, scale) ||
+			!scaled_u16_fits(metric->width, scale) || !scaled_u16_fits(metric->height, scale) ||
 			!scaled_u16_fits(metric->advance, scale))
 			return 0;
 	}

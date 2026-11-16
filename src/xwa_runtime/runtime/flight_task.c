@@ -2,8 +2,8 @@
 #include "xwa/flight/hangar.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/film_state.h"
-#include "xwa_runtime/runtime/original_film.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
+#include "xwa_runtime/runtime/original_film.h"
 #include "xwa_runtime/runtime/port.h"
 
 #include "aeron/aeron.h"
@@ -2066,9 +2066,10 @@ void XwaFlightTask_Tick(void) { XwaFlightTask_TickPhases(0); }
 int XwaFlightTask_RunFrameNow(void) {
 	const uint32_t framesBefore = g_xwaFlightTaskFramesRun;
 
-	if (!g_xwaFlightTaskActive || g_xwaFlightTaskComplete || g_xwaFlightTaskPhase != XWA_FLIGHT_TASK_PHASE_FRAME ||
-		g_flightPlayerCount != 1 || g_filmPlaybackMode != 2 || g_flightMissionEndPending ||
-		XwaFlightPauseTask_IsActive() || FlightDisplay_IsFrontendModalActive()) {
+	if (!g_xwaFlightTaskActive || g_xwaFlightTaskComplete ||
+		g_xwaFlightTaskPhase != XWA_FLIGHT_TASK_PHASE_FRAME || g_flightPlayerCount != 1 ||
+		g_filmPlaybackMode != 2 || g_flightMissionEndPending || XwaFlightPauseTask_IsActive() ||
+		FlightDisplay_IsFrontendModalActive()) {
 		return 0;
 	}
 	XwaFlightTask_TickPhases(1);

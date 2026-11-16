@@ -45,7 +45,8 @@ static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 	return options && options->window_mode >= XWA_MODERN_WINDOW_MODE_WINDOWED &&
 		   options->window_mode <= XWA_MODERN_WINDOW_MODE_SPAN &&
 		   XwaModernSurroundOptions_Valid(&options->surround) && options->vr_mode >= XWA_MODERN_VR_OFF &&
-		   options->vr_mode <= XWA_MODERN_VR_REQUIRED && options->ssao_quality >= XWA_MODERN_SSAO_OFF && options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
+		   options->vr_mode <= XWA_MODERN_VR_REQUIRED && options->ssao_quality >= XWA_MODERN_SSAO_OFF &&
+		   options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
 		   options->shadow_quality >= XWA_MODERN_SHADOW_STANDARD &&
 		   options->shadow_quality <= XWA_MODERN_SHADOW_HIGH &&
 		   options->fsr_upscaling >= XWA_MODERN_FSR_OFF &&

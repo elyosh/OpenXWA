@@ -32,7 +32,7 @@ typedef struct MissionSettingsName {
 } MissionSettingsName;
 
 typedef struct MissionSettings {
-	int redAlert; /* -1: the stock rule */
+	int redAlert;                   /* -1: the stock rule */
 	int hideHyperspaceExitMessages; /* -1: the stock rule */
 	int hideFriendlyArrivalMessages;
 	int skipArrivalIff; /* an IFF, or SETTINGS_IFF_* */

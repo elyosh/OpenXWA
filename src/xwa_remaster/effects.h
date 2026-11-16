@@ -7,9 +7,9 @@
 
 #include "aeron/render.h"
 #include "aeron/scene/scene3d.h"
-#include "xwa_runtime/snapshot/snapshot.h"
 #include "xwa_remaster/assets.h"
 #include "xwa_remaster/flight.h"
+#include "xwa_runtime/snapshot/snapshot.h"
 
 #ifdef __cplusplus
 extern "C" {

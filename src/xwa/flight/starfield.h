@@ -12,14 +12,14 @@ extern "C" {
 
 typedef struct StarfieldPolarCoord {
 	float azimuthRad;
-	int   z;
-	int   xyRadius;
+	int z;
+	int xyRadius;
 } StarfieldPolarCoord;
 
 typedef struct StarPaletteCycle {
-	int       count;
+	int count;
 	uint16_t* colors;
-	int       frame;
+	int frame;
 } StarPaletteCycle;
 
 typedef struct StarfieldScreenCoord {
@@ -43,13 +43,13 @@ typedef char hyperspace_star_streak_size[(sizeof(HyperspaceStarStreak) == 0x1c) 
 
 extern StarPaletteCycle** g_starPaletteCycles;
 extern int16_t g_starAngularBinToIndex[128 * 128];
-extern int     g_starColorStep16;
+extern int g_starColorStep16;
 extern uint16_t g_starRedMask16;
-extern int      g_starPaletteLastCycleTime;
-extern Vec3i    g_starfieldVectors[2560];
-extern Vec3i*   g_starfieldVectorsPtr;
-extern Vec3i*   g_starfieldAngularVectorsPtr;
-extern uint8_t  g_starPaletteCycleIds[2560];
+extern int g_starPaletteLastCycleTime;
+extern Vec3i g_starfieldVectors[2560];
+extern Vec3i* g_starfieldVectorsPtr;
+extern Vec3i* g_starfieldAngularVectorsPtr;
+extern uint8_t g_starPaletteCycleIds[2560];
 extern uint16_t g_starPaletteCycleOffsets[2560];
 extern uint16_t g_starBrightnessJitter[2560];
 extern HyperspaceStarStreak g_hyperspaceStarStreaks[1024];
