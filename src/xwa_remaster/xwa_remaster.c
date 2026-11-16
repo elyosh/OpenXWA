@@ -19,6 +19,7 @@
 #include "aeron/aeron.h"
 #include "aeron/debug.h"
 #include "aeron/image.h"
+#include "aeron/asset/opt_model.h"
 #include "aeron/scene/blend_ramp.h"
 #include "aeron/scene/view_rig.h"
 #include "xwa_remaster/assets.h"
@@ -788,7 +789,8 @@ static void XwaRemaster_UpdateViewRig(const XwaSnapshot* snap) {
 		rig.generation = g.rig_generation;
 	}
 	XwaRemasterFlight_SetViewRig(kind != RM_RIG_NONE ? &rig : NULL);
-	XwaRemasterFlight_SetViewTargets(kind == RM_RIG_HEADSET && g.xr_views_ready ? g.xr_targets : NULL);
+	XwaRemasterFlight_SetViewTargets(kind == RM_RIG_HEADSET && g.xr_views_ready ? g.xr_targets : NULL,
+									 AERON_OPT_UNITS_PER_METER * g.vr_world_scale);
 	if (kind == RM_RIG_SURROUND) {
 		const AeronRectI center = rig.views[rig.primary].rect;
 		XwaPresentation_SetSurround(center.x, center.width, g.render_pixel_width);

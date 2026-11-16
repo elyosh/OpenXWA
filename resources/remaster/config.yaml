@@ -365,6 +365,16 @@ presentation:
   vr_screen_height_px: 1080
   vr_screen_distance_m: 2.0
   vr_screen_width_m: 2.4
+  # In VR, the flight HUD is drawn into images of this size, in pixels, and
+  # shown in two parts. The reticle, the target boxes and the arrows are
+  # shown far away, so they line up with what they point at. The radars, the
+  # gauges, the MFDs and the text are shown on a flat panel in front of the
+  # seat: its distance in metres, and its size, where 1 covers the same part
+  # of the view as the HUD does on a screen.
+  vr_hud_width_px: 1920
+  vr_hud_height_px: 1440
+  vr_hud_panel_distance_m: 0.8
+  vr_hud_panel_scale: 1.0
 # Sound. The Audio tab of OpenXWA Options changes these settings.
 audio:
   # speakers or headphones. On headphones, sounds also seem to come from

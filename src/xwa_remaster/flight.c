@@ -16,6 +16,7 @@
 #include "aeron/scene/scene3d.h"
 #include "aeron/scene/settings.h"
 #include "aeron/scene/view_rig.h"
+#include "xwa_remaster/hud_reproject_math.h"
 #include "aeron/scene/world.h"
 #include "xwa_remaster/captured_lighting.h"
 #include "xwa_remaster/color.h"
@@ -302,6 +303,31 @@ static struct {
 	 * with premultiplied alpha, and then over the primary view. */
 	AeronRenderTarget* hud_rt;
 	AeronDrawList2D* hud_composite;
+	/* A headset's HUD (hud.h): the world group is drawn into hud_world_rt
+	 * and shown at infinity, and the fixed group into hud_panel_rt and shown
+	 * on a panel in the cockpit. Both images have the size of
+	 * presentation.vr_hud_*_px and are laid out for hud_view: the seat's
+	 * view with the classic field of view. */
+	AeronRenderTarget* hud_world_rt;
+	AeronRenderTarget* hud_panel_rt;
+	XwaRemasterFlightView hud_view;
+	/* This frame draws the HUD as the two images, and they are drawn. */
+	int headset_hud;
+	int headset_hud_drawn;
+	AeronShader* hud_reproject_vs;
+	AeronShader* hud_reproject_fs;
+	AeronGraphicsPipeline* hud_reproject_pipeline;
+	AeronTextureFormat hud_reproject_format;
+	/* presentation.vr_hud_*: the images' size, and the panel's distance
+	 * from the seat's eye point in metres and its size, where 1 covers the
+	 * classic view. */
+	int vr_hud_width_px;
+	int vr_hud_height_px;
+	float vr_hud_panel_distance_m;
+	float vr_hud_panel_scale;
+	/* Scene units for one metre of the player's head movement
+	 * (XwaRemasterFlight_SetViewTargets). */
+	float head_units_per_meter;
 	AeronSampler* present_sampler;
 	AeronTexture* present_scene_tex;
 	AeronTexture* present_bloom_tex;
@@ -767,6 +793,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 	static const char* ints[] = {
 		"presentation.vsync_divisor", "presentation.frames_in_flight",     "presentation.msaa_samples",
 		"presentation.vr_screen_width_px", "presentation.vr_screen_height_px",
+		"presentation.vr_hud_width_px", "presentation.vr_hud_height_px",
 		"motion_blur.quality",        "point_lights.cluster_depth_slices", "hyperspace_jump.star_count",
 		"hyperspace_jump.warp_taps",  "hyperspace_jump.warp_sky_taps",
 	};
@@ -776,6 +803,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"presentation.debug_stereo_fov_deg",
 		"presentation.vr_screen_distance_m",
 		"presentation.vr_screen_width_m",
+		"presentation.vr_hud_panel_distance_m",
+		"presentation.vr_hud_panel_scale",
 		"hangar_lighting.direction_x",
 		"hangar_lighting.direction_y",
 		"hangar_lighting.direction_z",
@@ -1720,6 +1749,22 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		Aeron_LogError("xwa.remaster",
 					   "%s: presentation.debug_stereo_ipd_m must be between 0 and 0.2, and "
 					   "presentation.debug_stereo_fov_deg between 30 and 150",
+					   path);
+		AeronConfigFile_Destroy(cf);
+		return 0;
+	}
+	s.vr_hud_width_px = (int)AeronConfigFile_GetInt(cf, "presentation.vr_hud_width_px", 0);
+	s.vr_hud_height_px = (int)AeronConfigFile_GetInt(cf, "presentation.vr_hud_height_px", 0);
+	s.vr_hud_panel_distance_m =
+		(float)AeronConfigFile_GetFloat(cf, "presentation.vr_hud_panel_distance_m", 0.0);
+	s.vr_hud_panel_scale = (float)AeronConfigFile_GetFloat(cf, "presentation.vr_hud_panel_scale", 0.0);
+	if (s.vr_hud_width_px < 640 || s.vr_hud_width_px > 8192 || s.vr_hud_height_px < 480 ||
+		s.vr_hud_height_px > 8192 || !fl_in_range(s.vr_hud_panel_distance_m, 0.2f, 20.0f) ||
+		!fl_in_range(s.vr_hud_panel_scale, 0.2f, 2.0f)) {
+		Aeron_LogError("xwa.remaster",
+					   "%s: presentation.vr_hud_width_px must be between 640 and 8192, "
+					   "vr_hud_height_px between 480 and 8192, vr_hud_panel_distance_m between 0.2 and 20, "
+					   "and vr_hud_panel_scale between 0.2 and 2",
 					   path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
@@ -2940,6 +2985,14 @@ static void fl_destroy_sized_resources(void) {
 	if (s.hud_rt) {
 		Aeron_DestroyRenderTarget(s.hud_rt);
 	}
+	if (s.hud_world_rt) {
+		Aeron_DestroyRenderTarget(s.hud_world_rt);
+	}
+	if (s.hud_panel_rt) {
+		Aeron_DestroyRenderTarget(s.hud_panel_rt);
+	}
+	s.hud_world_rt = NULL;
+	s.hud_panel_rt = NULL;
 	if (s.bloom) {
 		AeronSceneBloom_Destroy(s.bloom);
 	}
@@ -3034,7 +3087,8 @@ static int fl_ensure(int target_w, int target_h) {
 	const int view_w = s.rig_active ? s.rig.width : target_w;
 	const int view_h = s.rig_active ? s.rig.height : target_h;
 	if (s.scene && s.rt_w == view_w && s.rt_h == view_h && s.out_w == target_w && s.out_h == target_h &&
-		(s.hud_rt != NULL) == (s.rig_active != 0) && s.scene_requested_samples == requested_samples) {
+		(s.hud_rt != NULL) == (s.rig_active != 0) && (s.hud_world_rt != NULL) == (s.view_targets_set != 0) &&
+		s.scene_requested_samples == requested_samples) {
 		return 1;
 	}
 	fl_destroy_sized_resources();
@@ -3090,7 +3144,20 @@ static int fl_ensure(int target_w, int target_h) {
 		Aeron_LogError("xwa.remaster", "flight: bloom create failed");
 		return 0;
 	}
-	if (!s.present_rt || (s.rig_active && !s.hud_rt)) {
+	if (s.view_targets_set) {
+		s.hud_world_rt =
+			Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = s.vr_hud_width_px,
+																.height = s.vr_hud_height_px,
+																.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
+																.debug_name = "xwa.flight.hud_world" });
+		s.hud_panel_rt =
+			Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = s.vr_hud_width_px,
+																.height = s.vr_hud_height_px,
+																.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
+																.debug_name = "xwa.flight.hud_panel" });
+	}
+	if (!s.present_rt || (s.rig_active && !s.hud_rt) ||
+		(s.view_targets_set && (!s.hud_world_rt || !s.hud_panel_rt))) {
 		Aeron_LogError("xwa.remaster", "flight: present target create failed");
 		return 0;
 	}
@@ -3135,8 +3202,9 @@ void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig) {
 	s.view_targets_set = 0;
 }
 
-void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets) {
+void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float head_units_per_meter) {
 	s.view_targets_set = 0;
+	s.head_units_per_meter = head_units_per_meter > 0.0f ? head_units_per_meter : AERON_OPT_UNITS_PER_METER;
 	if (!targets || !s.rig_active) {
 		return;
 	}
@@ -6340,31 +6408,38 @@ static void fl_set_present_debug(AeronScenePresentChain* chain) {
 
 /* Draws the 2D HUD into `pass`. `target` has the size that the HUD was
  * prepared for. `readout_scene` is the scene whose depth hides the target
- * readout behind near geometry, or NULL to draw the whole readout. */
+ * readout behind near geometry, or NULL to draw the whole readout. `group`
+ * is the part of a split HUD to draw (hud.h), or all of it. */
 static void fl_draw_hud(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-						int target_w, int target_h, AeronScene3D* readout_scene) {
+						int target_w, int target_h, AeronScene3D* readout_scene, XwaHudGroup group) {
+	const int world = group != XWA_HUD_GROUP_FIXED;
+	const int fixed = group != XWA_HUD_GROUP_WORLD;
 	/* With the Dynamic Cockpit active the HUD's lists already leave out
 	 * what the cockpit's screens show (XwaRemasterDc_AddSprite). */
-	if (!s.map_present) {
+	if (world && !s.map_present) {
 		Aeron_GpuDebugMarker(cmd, "HUD target boxes before fixed");
 		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
 										 XWA_HUD_TARGET_BOX_BEFORE_FIXED);
 	}
 	Aeron_GpuDebugMarker(cmd, "HUD fixed");
-	XwaRemasterHud_RenderFixed(cmd, pass, target, target_w, target_h);
-	if (!s.map_present) {
+	XwaRemasterHud_RenderFixed(cmd, pass, target, target_w, target_h, group);
+	if (world && !s.map_present) {
 		Aeron_GpuDebugMarker(cmd, "HUD target boxes after fixed");
 		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
 										 XWA_HUD_TARGET_BOX_AFTER_FIXED);
 		Aeron_GpuDebugMarker(cmd, "HUD target readout");
 		XwaRemasterHudReadout_Render(cmd, pass, target, target_w, target_h, readout_scene);
 	}
-	Aeron_GpuDebugMarker(cmd, "HUD CMD");
-	XwaRemasterHud_RenderCmd(cmd, pass, target, target_w, target_h);
+	if (fixed) {
+		Aeron_GpuDebugMarker(cmd, "HUD CMD");
+		XwaRemasterHud_RenderCmd(cmd, pass, target, target_w, target_h);
+	}
 	Aeron_GpuDebugMarker(cmd, "HUD text");
-	XwaRemasterHud_RenderText(cmd, pass, target, target_w, target_h);
-	XwaRemasterDc_RenderDebugOverlay(cmd, pass, target);
-	if (s.map_present) {
+	XwaRemasterHud_RenderText(cmd, pass, target, target_w, target_h, group);
+	if (fixed) {
+		XwaRemasterDc_RenderDebugOverlay(cmd, pass, target);
+	}
+	if (fixed && s.map_present) {
 		Aeron_GpuDebugMarker(cmd, "Flight map deferred text");
 		XwaRemasterFlightMap_RenderDeferredText(cmd, pass, target);
 	}
@@ -6381,7 +6456,7 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	const AeronRectI full_target = { 0, 0, target_w, target_h };
 	fl_draw_present_scene(pass, chain, &full_target);
 	if (!s.suppress_hud) {
-		fl_draw_hud(cmd, pass, target, target_w, target_h, s.scene);
+		fl_draw_hud(cmd, pass, target, target_w, target_h, s.scene, XWA_HUD_GROUP_ALL);
 	}
 }
 
@@ -6400,7 +6475,7 @@ static int fl_render_rig_hud(AeronCommandBuffer* cmd, AeronRectI rect, int targe
 	}
 	/* The readout isn't hidden by depth here: the scene's depth belongs to
 	 * the view that was rendered last. */
-	fl_draw_hud(cmd, pass, s.hud_rt, s.rt_w, s.rt_h, NULL);
+	fl_draw_hud(cmd, pass, s.hud_rt, s.rt_w, s.rt_h, NULL, XWA_HUD_GROUP_ALL);
 	Aeron_EndRenderPass(pass);
 	AeronDrawList_Begin(s.hud_composite, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	AeronDrawList_AddSprite(s.hud_composite, &(AeronDrawList2DSprite) {
@@ -6416,6 +6491,137 @@ static int fl_render_rig_hud(AeronCommandBuffer* cmd, AeronRectI rect, int targe
 												 .filter = AERON_BLIT2D_FILTER_NEAREST,
 											 });
 	return AeronDrawList_Prepare(s.hud_composite, cmd);
+}
+
+/* Draws the two groups of a headset's HUD into their images. */
+static int fl_render_headset_hud(AeronCommandBuffer* cmd) {
+	AeronRenderTarget* const targets[2] = { s.hud_world_rt, s.hud_panel_rt };
+	static const XwaHudGroup groups[2] = { XWA_HUD_GROUP_WORLD, XWA_HUD_GROUP_FIXED };
+	for (int i = 0; i < 2; i++) {
+		AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
+			.color_target = targets[i],
+			.clear_color = 1,
+			.clear_color_rgba = { 0.0f, 0.0f, 0.0f, 0.0f },
+			.command_buffer = cmd,
+			.debug_label = i == 0 ? "OpenXWA flight HUD at infinity" : "OpenXWA flight HUD panel",
+		});
+		if (!pass) {
+			return 0;
+		}
+		/* The readout isn't hidden by depth: the scene's depth belongs to
+		 * the view that was rendered last. */
+		fl_draw_hud(cmd, pass, targets[i], s.vr_hud_width_px, s.vr_hud_height_px, NULL, groups[i]);
+		Aeron_EndRenderPass(pass);
+	}
+	s.headset_hud_drawn = 1;
+	return 1;
+}
+
+/* Returns the pipeline that draws a HUD image into an eye image of
+ * `format` (shaders/hud_reproject.frag.hlsl). */
+static AeronGraphicsPipeline* fl_hud_reproject_pipeline(AeronTextureFormat format) {
+	if (s.hud_reproject_pipeline && s.hud_reproject_format == format) {
+		return s.hud_reproject_pipeline;
+	}
+	if (!s.hud_reproject_vs) {
+		s.hud_reproject_vs = Aeron_CreateShader(
+			&(AeronShaderDesc) { .name = "fullscreen.vert", .stage = AERON_SHADER_STAGE_VERTEX });
+	}
+	if (!s.hud_reproject_fs) {
+		s.hud_reproject_fs = Aeron_CreateShader(&(AeronShaderDesc) { .name = "hud_reproject.frag",
+																	 .stage = AERON_SHADER_STAGE_FRAGMENT,
+																	 .sampler_count = 1,
+																	 .uniform_buffer_count = 1 });
+	}
+	if (s.hud_reproject_pipeline) {
+		Aeron_DestroyGraphicsPipeline(s.hud_reproject_pipeline);
+		s.hud_reproject_pipeline = NULL;
+	}
+	s.hud_reproject_format = AERON_TEXTURE_FORMAT_UNKNOWN;
+	if (!s.hud_reproject_vs || !s.hud_reproject_fs) {
+		return NULL;
+	}
+	/* The HUD images have premultiplied alpha. */
+	const AeronColorTargetStateDesc target = {
+		.format = format,
+		.blend = {
+			.enabled = 1,
+			.src_color = AERON_BLEND_ONE,
+			.dst_color = AERON_BLEND_ONE_MINUS_SRC_ALPHA,
+			.color_op = AERON_BLEND_OP_ADD,
+			.src_alpha = AERON_BLEND_ONE,
+			.dst_alpha = AERON_BLEND_ONE_MINUS_SRC_ALPHA,
+			.alpha_op = AERON_BLEND_OP_ADD,
+		},
+	};
+	s.hud_reproject_pipeline = Aeron_CreateGraphicsPipeline(&(AeronGraphicsPipelineDesc) {
+		.vertex_shader = s.hud_reproject_vs,
+		.fragment_shader = s.hud_reproject_fs,
+		.primitive_type = AERON_PRIMITIVE_TRIANGLES,
+		.cull_mode = AERON_CULL_NONE,
+		.depth = { .depth_test = 0, .depth_write = 0, .compare = AERON_COMPARE_ALWAYS },
+		.color_target_count = 1,
+		.color_targets = &target,
+		.sample_count = AERON_SAMPLE_COUNT_1,
+	});
+	if (s.hud_reproject_pipeline) {
+		s.hud_reproject_format = format;
+	}
+	return s.hud_reproject_pipeline;
+}
+
+/* Draws one HUD image into the eye image of the open pass, with the matrix
+ * that takes an eye pixel to a point of the HUD image. */
+static void fl_draw_hud_image(AeronRenderPass* pass, AeronGraphicsPipeline* pipeline, AeronRenderTarget* image,
+							  const float matrix[9]) {
+	const struct {
+		float row_x[4];
+		float row_y[4];
+		float row_w[4];
+		float params[4];
+	} uniform = {
+		{ matrix[0], matrix[1], matrix[2], 0.0f },
+		{ matrix[3], matrix[4], matrix[5], 0.0f },
+		{ matrix[6], matrix[7], matrix[8], 0.0f },
+		{ 2.0f / (float)s.rt_w, 2.0f / (float)s.rt_h, 1.0f, 0.0f },
+	};
+	Aeron_BindGraphicsPipeline(pass, pipeline);
+	Aeron_BindTextureSampler(pass, AERON_SHADER_STAGE_FRAGMENT, 0, Aeron_RenderTargetGetTexture(image),
+							 s.present_sampler);
+	Aeron_BindUniformData(pass, AERON_SHADER_STAGE_FRAGMENT, 0, &uniform, sizeof uniform);
+	Aeron_Draw(pass, 3, 0);
+}
+
+/* Draws the headset's HUD over the eye image of `view`, in the open pass:
+ * the world group at infinity, then the fixed group on its panel. The panel
+ * is in front of the seat's eye point and faces it. At scale 1 it covers
+ * the HUD's view exactly as seen from the seat, so the HUD has its classic
+ * layout, and the two eyes see it at the panel's distance. */
+static int fl_draw_headset_hud(AeronRenderPass* pass, int view, AeronTextureFormat format) {
+	AeronGraphicsPipeline* pipeline = fl_hud_reproject_pipeline(format);
+	if (!pipeline) {
+		return 0;
+	}
+	float matrix[9];
+	if (XwaHudReproject_Infinity(s.views[view].view_proj, s.hud_view.view_proj, matrix)) {
+		fl_draw_hud_image(pass, pipeline, s.hud_world_rt, matrix);
+	}
+	const AeronSceneCamera* seat = &s.hud_view.camera;
+	float rows[9], center[3], half_right[3], half_up[3];
+	fl_quat_to_mat3(seat->ori, rows);
+	const float distance = s.vr_hud_panel_distance_m * s.head_units_per_meter;
+	const float half_w = distance * tanf(seat->h_half_rad) * s.vr_hud_panel_scale;
+	const float half_h = distance * tanf(seat->v_half_rad) * s.vr_hud_panel_scale;
+	for (int axis = 0; axis < 3; axis++) {
+		/* The rows are the view's right, down and forward axes. */
+		center[axis] = seat->pos[axis] + rows[6 + axis] * distance;
+		half_right[axis] = rows[axis] * half_w;
+		half_up[axis] = -rows[3 + axis] * half_h;
+	}
+	if (XwaHudReproject_Panel(s.views[view].view_proj, center, half_right, half_up, matrix)) {
+		fl_draw_hud_image(pass, pipeline, s.hud_panel_rt, matrix);
+	}
+	return 1;
 }
 
 /* Returns the chain that tone maps into a view's own target, which has
@@ -6477,7 +6683,13 @@ static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int
 	} else if (s.view_targets_set) {
 		rect = fl_fit_view_rect(s.out_w, s.out_h);
 	}
-	const int hud = view == s.rig.primary && !s.suppress_hud && !s.compose_before_tonemap;
+	/* A headset's HUD is in every eye, from its two images. Otherwise the
+	 * HUD is drawn flat over the primary view. */
+	const int headset_hud = own_target && s.headset_hud && !s.suppress_hud;
+	const int hud = !headset_hud && view == s.rig.primary && !s.suppress_hud && !s.compose_before_tonemap;
+	if (headset_hud && !s.headset_hud_drawn && !fl_render_headset_hud(cmd)) {
+		return 0;
+	}
 	if (hud && !fl_render_rig_hud(cmd, rect, target_w, target_h)) {
 		return 0;
 	}
@@ -6503,6 +6715,11 @@ static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int
 		Aeron_SetViewport(pass, &full_target);
 		Aeron_SetScissor(pass, &full_target);
 		AeronDrawList_RenderIntoPass(s.hud_composite, cmd, pass, target);
+	}
+	if (headset_hud &&
+		!fl_draw_headset_hud(pass, view, Aeron_TextureGetFormat(Aeron_RenderTargetGetTexture(target)))) {
+		Aeron_EndRenderPass(pass);
+		return 0;
 	}
 	Aeron_EndRenderPass(pass);
 	if (!own_target) {
@@ -8031,6 +8248,30 @@ uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float cro
  * over: the primary view. */
 static const XwaRemasterFlightView* fl_build_hud_view(void) { return &s.views[s.primary_view]; }
 
+/* Builds the view that a headset's HUD is laid out for: the seat's view,
+ * which doesn't turn with the head, with the field of view that the classic
+ * view has in an image of the HUD's size. `seat` is the game camera's view.
+ * The view is centred on the seat's axis, so the game's own shift of the
+ * horizon isn't in it. */
+static const XwaRemasterFlightView* fl_build_headset_hud_view(const XwaFlightCamera* cam,
+															  const XwaRemasterFlightView* seat,
+															  const float* view_rotation) {
+	XwaRemasterFlightView classic;
+	if (!fl_build_view_at_origin(cam, cam->world_pos, s.vr_hud_width_px, s.vr_hud_height_px, view_rotation,
+								 &classic)) {
+		return NULL;
+	}
+	const float h = classic.camera.h_half_rad;
+	const float v = classic.camera.v_half_rad;
+	const AeronViewFov fov = { -h, h, v, -v };
+	const AeronViewPose pose = { .orientation = { 0.0f, 0.0f, 0.0f, 1.0f } };
+	fl_build_rig_view(cam, seat, &pose, &fov, s.vr_hud_width_px, s.vr_hud_height_px, &s.hud_view);
+	/* The HUD's own projection isn't the game's: the reticle is placed
+	 * from the craft's nose, as in a view that turns with the head. */
+	s.hud_view.head_tracked = 1;
+	return &s.hud_view;
+}
+
 /* Gives the scene the frame's views, right after the scene began. Without
  * `several`, the scene keeps its one view: the camera it began with. */
 static int fl_set_scene_views(int several) {
@@ -8128,16 +8369,30 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		rig && rig->tracked && s.rendered_tick_valid && s.rendered_tick == snap->tick_index;
 	s.rendered_tick = snap->tick_index;
 	s.rendered_tick_valid = 1;
-	const XwaRemasterFlightView* hud_view = fl_build_hud_view();
+	/* A headset's HUD is two images of their own size (hud.h). The map has
+	 * the usual flat HUD, in the view's size. */
+	const XwaRemasterFlightView* hud_view = NULL;
+	s.headset_hud = rig && s.view_targets_set && s.hud_world_rt && s.hud_panel_rt && !s.compose_before_tonemap;
+	s.headset_hud_drawn = 0;
+	if (s.headset_hud) {
+		hud_view = fl_build_headset_hud_view(cam, &flight_view, view_rotated ? view_rotation : NULL);
+		s.headset_hud = hud_view != NULL;
+	}
+	if (!hud_view) {
+		hud_view = fl_build_hud_view();
+	}
+	const int hud_w = s.headset_hud ? s.vr_hud_width_px : s.rt_w;
+	const int hud_h = s.headset_hud ? s.vr_hud_height_px : s.rt_h;
+	XwaRemasterHud_SetWorldSplit(s.headset_hud);
 	/* Dynamic Cockpit: decided before the HUD prepares its lists (which
 	 * route through it), captured after. */
 	XwaRemasterDc_BeginFrame(snap,
 							 !cam->map_mode && fl_cockpit_drawn(snap, cam)
 								 ? XwaRemasterShip_MeshForName(snap->cockpit.model_name)
 								 : NULL,
-							 s.rt_w, s.rt_h);
-	XwaRemasterHud_PrepareFrame(cmd, snap, assets, hud_view, s.rt_w, s.rt_h);
-	XwaRemasterDc_Prepare(cmd, snap, s.rt_w, s.rt_h);
+							 hud_w, hud_h);
+	XwaRemasterHud_PrepareFrame(cmd, snap, assets, hud_view, hud_w, hud_h);
+	XwaRemasterDc_Prepare(cmd, snap, hud_w, hud_h);
 	if (cam->map_mode) {
 		s.suppress_hud = 0;
 		return fl_render_map(cmd, snap, assets, &flight_view, host_time_us, direct_present);
@@ -8943,6 +9198,15 @@ void XwaRemasterFlight_Shutdown(void) {
 	}
 	if (s.present_views) {
 		AeronScenePresentChain_Destroy(s.present_views);
+	}
+	if (s.hud_reproject_pipeline) {
+		Aeron_DestroyGraphicsPipeline(s.hud_reproject_pipeline);
+	}
+	if (s.hud_reproject_fs) {
+		Aeron_DestroyShader(s.hud_reproject_fs);
+	}
+	if (s.hud_reproject_vs) {
+		Aeron_DestroyShader(s.hud_reproject_vs);
 	}
 	memset(&s, 0, sizeof s);
 }

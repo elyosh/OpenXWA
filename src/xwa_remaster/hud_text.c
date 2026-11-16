@@ -41,6 +41,8 @@ typedef struct XwaHudPreparedText {
 } XwaHudPreparedText;
 
 static AeronDrawList2D* text_list;
+/* The text of the world group, when the HUD is split (hud.h). */
+static AeronDrawList2D* text_world_list;
 static XwaHudPreparedText text_prepared;
 /* The target readout's glyphs, made by XwaRemasterHudText_PrepareDrawList
    for XwaRemasterHudText_AddReadoutGlyphs. */
@@ -537,15 +539,20 @@ static void text_build_target_box_readouts(const XwaSnapshot* snapshot, XwaHudPr
 }
 
 int XwaRemasterHudText_Init(void) {
-	if (text_list)
+	if (text_list && text_world_list)
 		return 1;
-	text_list = AeronDrawList_Create(XWA_SNAP_MAX_HUD_GLYPHS + 512); /* + erase-clipped pieces */
-	return text_list != NULL;
+	if (!text_list)
+		text_list = AeronDrawList_Create(XWA_SNAP_MAX_HUD_GLYPHS + 512); /* + erase-clipped pieces */
+	if (!text_world_list)
+		text_world_list = AeronDrawList_Create(1024);
+	return text_list != NULL && text_world_list != NULL;
 }
 
 void XwaRemasterHudText_Shutdown(void) {
 	AeronDrawList_Destroy(text_list);
+	AeronDrawList_Destroy(text_world_list);
 	text_list = NULL;
+	text_world_list = NULL;
 	memset(&text_prepared, 0, sizeof text_prepared);
 }
 
@@ -671,31 +678,39 @@ static int text_bitmap_sprite(const AeronFontAtlas* font, uint8_t ch, float x, f
 	return 1;
 }
 
+static void text_prepare_lists(AeronCommandBuffer* cmd) {
+	(void)AeronDrawList_Prepare(text_list, cmd);
+	(void)AeronDrawList_Prepare(text_world_list, cmd);
+}
+
 void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, int target_w,
 										int target_h) {
 	text_readout_sprite_count = 0;
-	if (!cmd || !text_list || target_w <= 0 || target_h <= 0)
+	if (!cmd || !text_list || !text_world_list || target_w <= 0 || target_h <= 0)
 		return;
+	const int split = XwaRemasterHud_WorldSplit();
+	AeronDrawList2D* const world_list = split ? text_world_list : text_list;
 	AeronDrawList_Begin(text_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_Begin(text_world_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	if (!text_prepared.valid) {
-		(void)AeronDrawList_Prepare(text_list, cmd);
+		text_prepare_lists(cmd);
 		return;
 	}
 	const XwaHudLayout* layout = XwaRemasterHud_Layout();
 	if (!layout || text_prepared.layout_generation != layout->generation) {
-		(void)AeronDrawList_Prepare(text_list, cmd);
+		text_prepare_lists(cmd);
 		return;
 	}
 	const XwaHudLayoutProfile* profile = text_profile(layout);
 	if (!profile) {
-		(void)AeronDrawList_Prepare(text_list, cmd);
+		text_prepare_lists(cmd);
 		return;
 	}
 	int out_x, out_y;
 	float output_scale;
 	XwaRemasterHudLayout_OutputTransform(profile, target_w, target_h, &out_x, &out_y, &output_scale);
 	if (output_scale <= 0.0f) {
-		(void)AeronDrawList_Prepare(text_list, cmd);
+		text_prepare_lists(cmd);
 		return;
 	}
 	text_prepare_faces(cmd, assets, layout, profile, output_scale);
@@ -720,7 +735,7 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 			/* The text next to the target arrow and the target box follows
 			 * the target: never captured by the cockpit's screens nor hidden
 			 * by the erased regions. */
-			AeronDrawList_AddSprite(text_list, &sprite);
+			AeronDrawList_AddSprite(world_list, &sprite);
 		}
 	}
 	if (text_prepared.readout_glyph_count) {
@@ -773,10 +788,12 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 		if (!drawn)
 			continue;
 		text_set_tint(&sprite, glyph->argb);
-		XwaRemasterDc_AddSprite(text_list, XWA_DC_LAYER_TEXT, &sprite);
+		/* The counts next to the reticle go with it. */
+		XwaRemasterDc_AddSprite(glyph->pane == XWA_HUD_PANE_RETICLE_COUNTS ? world_list : text_list,
+								XWA_DC_LAYER_TEXT, &sprite);
 	}
 	XwaRemasterHud_EndRenderPhase();
-	(void)AeronDrawList_Prepare(text_list, cmd);
+	text_prepare_lists(cmd);
 }
 
 void XwaRemasterHudText_ForEachGlyph(int target_w, int target_h, XwaHudGlyphVisitor visit, void* context) {
@@ -820,8 +837,11 @@ void XwaRemasterHudText_AddReadoutGlyphs(AeronDrawList2D* list, const AeronRectI
 }
 
 void XwaRemasterHudText_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-							   int target_w, int target_h) {
+							   int target_w, int target_h, XwaHudGroup group) {
 	if (!cmd || !pass || !target || !text_list || !text_prepared.valid || target_w <= 0 || target_h <= 0)
 		return;
-	AeronDrawList_RenderIntoPass(text_list, cmd, pass, target);
+	if (group != XWA_HUD_GROUP_WORLD)
+		AeronDrawList_RenderIntoPass(text_list, cmd, pass, target);
+	if (group != XWA_HUD_GROUP_FIXED)
+		AeronDrawList_RenderIntoPass(text_world_list, cmd, pass, target);
 }

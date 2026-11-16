@@ -223,12 +223,31 @@ const XwaHudPreparedDrawState* XwaRemasterHud_PreparedDrawState(void);
 void XwaRemasterHud_RenderTargetBoxes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 									  AeronRenderTarget* target, int target_w, int target_h,
 									  XwaHudTargetBoxLayer layer);
+/* In a headset the HUD is drawn as two groups, each into its own image. The
+ * world group points at things outside: the target boxes and the target
+ * readout, the reticle with its readiness and threat marks and its counts,
+ * and the arrows to the target with their text. It is shown at infinity, so
+ * it lines up with far objects in both eyes. The fixed group is the rest:
+ * the radars, the gauges, the MFDs, the CMD and the text. It is shown on a
+ * panel in the cockpit.
+ *
+ * XwaRemasterHud_SetWorldSplit says whether the next XwaRemasterHud_PrepareFrame
+ * makes the two groups. Without the split, everything is in the fixed
+ * group's lists and in the order of the classic HUD. */
+typedef enum XwaHudGroup {
+	XWA_HUD_GROUP_ALL = 0,
+	XWA_HUD_GROUP_WORLD,
+	XWA_HUD_GROUP_FIXED,
+} XwaHudGroup;
+
+void XwaRemasterHud_SetWorldSplit(int split);
+int XwaRemasterHud_WorldSplit(void);
 void XwaRemasterHud_RenderFixed(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-								int target_w, int target_h);
+								int target_w, int target_h, XwaHudGroup group);
 void XwaRemasterHud_RenderCmd(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							  int target_w, int target_h);
 void XwaRemasterHud_RenderText(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-							   int target_w, int target_h);
+							   int target_w, int target_h, XwaHudGroup group);
 void XwaRemasterHud_Render2D(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							 int target_w, int target_h);
 

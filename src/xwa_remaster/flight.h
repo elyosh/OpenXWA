@@ -671,9 +671,13 @@ void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig);
  * the view size for each view. The views are then tone mapped into these
  * targets and not into the composed presentation, motion blur and the
  * hyperspace camera shake are off, and the map is drawn in the middle of the
- * composed presentation. Call it after XwaRemasterFlight_SetViewRig, which
- * removes the targets. NULL removes them too. */
-void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets);
+ * composed presentation. The HUD is then drawn in every view, as two
+ * groups: one at infinity and one on a panel in the cockpit (hud.h).
+ * `head_units_per_meter` is the number of scene units that one metre of the
+ * player's head movement covers; the panel's distance uses it. Call it after
+ * XwaRemasterFlight_SetViewRig, which removes the targets. NULL removes them
+ * too. */
+void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float head_units_per_meter);
 /* Returns whether the last XwaRemasterFlight_Render drew the views into
  * their own targets. It is 0 for the map, which is in the texture that the
  * render returned. */

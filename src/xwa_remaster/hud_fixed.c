@@ -16,6 +16,8 @@
 #include <string.h>
 
 static AeronDrawList2D* fixed_list;
+/* The widgets of the world group, when the HUD is split (hud.h). */
+static AeronDrawList2D* fixed_world_list;
 /* Dynamic Cockpit (XwaRemasterHudFixed_SetDynamicCockpit). */
 static int fixed_dc_active;
 static uint32_t fixed_dc_erased;
@@ -1019,12 +1021,16 @@ static void fixed_build_reticle_threats(const XwaHudState* h, const XwaRemasterH
 int XwaRemasterHudFixed_Init(void) {
 	if (!fixed_list)
 		fixed_list = AeronDrawList_Create(2 * XWA_HUD_MAX_FIXED_DRAWS); /* + erase-clipped pieces */
-	return fixed_list != NULL;
+	if (!fixed_world_list)
+		fixed_world_list = AeronDrawList_Create(XWA_HUD_MAX_FIXED_DRAWS);
+	return fixed_list != NULL && fixed_world_list != NULL;
 }
 
 void XwaRemasterHudFixed_Shutdown(void) {
 	AeronDrawList_Destroy(fixed_list);
+	AeronDrawList_Destroy(fixed_world_list);
 	fixed_list = NULL;
+	fixed_world_list = NULL;
 	fixed_dc_active = 0;
 	fixed_dc_erased = 0;
 	fixed_snapshot = NULL;
@@ -1172,12 +1178,24 @@ static int fixed_panel_region(const XwaHudDrawRecord* r) {
 	}
 }
 
-static void fixed_prepare_lists(AeronCommandBuffer* cmd) { (void)AeronDrawList_Prepare(fixed_list, cmd); }
+static void fixed_prepare_lists(AeronCommandBuffer* cmd) {
+	(void)AeronDrawList_Prepare(fixed_list, cmd);
+	(void)AeronDrawList_Prepare(fixed_world_list, cmd);
+}
+
+/* The widgets that point at things outside the cockpit. */
+static int fixed_world_widget(uint16_t widget) {
+	return widget == XWA_HUD_WIDGET_READINESS || widget == XWA_HUD_WIDGET_RETICLE ||
+		   widget == XWA_HUD_WIDGET_THREATS || widget == XWA_HUD_WIDGET_TARGET_ARROW ||
+		   widget == XWA_HUD_WIDGET_PADLOCK_ARROW;
+}
 
 void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, int target_h) {
-	if (!cmd || !fixed_list || target_w <= 0 || target_h <= 0)
+	if (!cmd || !fixed_list || !fixed_world_list || target_w <= 0 || target_h <= 0)
 		return;
+	const int split = XwaRemasterHud_WorldSplit();
 	AeronDrawList_Begin(fixed_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_Begin(fixed_world_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	if (!fixed_draws.valid) {
 		fixed_prepare_lists(cmd);
 		return;
@@ -1204,6 +1222,7 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 		if (region >= 0 && (fixed_dc_erased & (1u << region)))
 			continue;
 		const int panel = region >= 0;
+		AeronDrawList2D* const list = split && fixed_world_widget(r->widget) ? fixed_world_list : fixed_list;
 		float quad[4];
 		fixed_record_quad(r, asset, out_x, out_y, scale, quad);
 		const float w = quad[2];
@@ -1223,9 +1242,9 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 			circle.fill_top[3] = a;
 			memcpy(circle.fill_bottom, circle.fill_top, sizeof circle.fill_bottom);
 			if (panel)
-				AeronDrawList_AddRRect(fixed_list, &circle);
+				AeronDrawList_AddRRect(list, &circle);
 			else
-				XwaRemasterDc_AddRRect(fixed_list, XWA_DC_LAYER_GRAPHICS, &circle);
+				XwaRemasterDc_AddRRect(list, XWA_DC_LAYER_GRAPHICS, &circle);
 			continue;
 		}
 		AeronDrawList2DSprite sprite = { 0 };
@@ -1274,11 +1293,11 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 			/* The arrows follow the target across the screen, like the
 			 * target boxes: never captured by the cockpit's screens nor
 			 * hidden by the erased regions. */
-			AeronDrawList_AddQuad4(fixed_list, &quad);
+			AeronDrawList_AddQuad4(list, &quad);
 		} else if (panel) {
-			AeronDrawList_AddSprite(fixed_list, &sprite);
+			AeronDrawList_AddSprite(list, &sprite);
 		} else {
-			XwaRemasterDc_AddSprite(fixed_list, XWA_DC_LAYER_GRAPHICS, &sprite);
+			XwaRemasterDc_AddSprite(list, XWA_DC_LAYER_GRAPHICS, &sprite);
 		}
 	}
 	XwaRemasterHud_EndRenderPhase();
@@ -1286,10 +1305,13 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 }
 
 void XwaRemasterHudFixed_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-								int target_w, int target_h) {
+								int target_w, int target_h, XwaHudGroup group) {
 	if (!cmd || !pass || !target || !fixed_list || !fixed_draws.valid || target_w <= 0 || target_h <= 0)
 		return;
-	AeronDrawList_RenderIntoPass(fixed_list, cmd, pass, target);
+	if (group != XWA_HUD_GROUP_WORLD)
+		AeronDrawList_RenderIntoPass(fixed_list, cmd, pass, target);
+	if (group != XWA_HUD_GROUP_FIXED)
+		AeronDrawList_RenderIntoPass(fixed_world_list, cmd, pass, target);
 }
 
 const XwaHudPreparedDrawState* XwaRemasterHud_PreparedDrawState(void) { return &fixed_draws; }
@@ -1301,8 +1323,8 @@ void XwaRemasterHud_RenderTargetBoxes(AeronCommandBuffer* cmd, AeronRenderPass* 
 }
 
 void XwaRemasterHud_RenderFixed(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-								int target_w, int target_h) {
-	XwaRemasterHudFixed_Render(cmd, pass, target, target_w, target_h);
+								int target_w, int target_h, XwaHudGroup group) {
+	XwaRemasterHudFixed_Render(cmd, pass, target, target_w, target_h, group);
 }
 
 void XwaRemasterHud_RenderCmd(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
@@ -1311,13 +1333,13 @@ void XwaRemasterHud_RenderCmd(AeronCommandBuffer* cmd, AeronRenderPass* pass, Ae
 }
 
 void XwaRemasterHud_RenderText(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-							   int target_w, int target_h) {
-	XwaRemasterHudText_Render(cmd, pass, target, target_w, target_h);
+							   int target_w, int target_h, XwaHudGroup group) {
+	XwaRemasterHudText_Render(cmd, pass, target, target_w, target_h, group);
 }
 
 void XwaRemasterHud_Render2D(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							 int target_w, int target_h) {
-	XwaRemasterHud_RenderFixed(cmd, pass, target, target_w, target_h);
+	XwaRemasterHud_RenderFixed(cmd, pass, target, target_w, target_h, XWA_HUD_GROUP_ALL);
 	XwaRemasterHud_RenderCmd(cmd, pass, target, target_w, target_h);
-	XwaRemasterHud_RenderText(cmd, pass, target, target_w, target_h);
+	XwaRemasterHud_RenderText(cmd, pass, target, target_w, target_h, XWA_HUD_GROUP_ALL);
 }

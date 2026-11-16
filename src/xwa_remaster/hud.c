@@ -361,6 +361,12 @@ static int hud_cache_asset(XwaRemasterAssets* assets, XwaHudAssetId asset, const
 	return ok;
 }
 
+static int hud_world_split;
+
+void XwaRemasterHud_SetWorldSplit(int split) { hud_world_split = split != 0; }
+
+int XwaRemasterHud_WorldSplit(void) { return hud_world_split; }
+
 void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
 								 XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
 								 int target_w, int target_h) {
