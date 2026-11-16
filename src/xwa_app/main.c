@@ -667,6 +667,7 @@ int main(int argc, char** argv) {
 		/* The game also pauses while the options window is open, except in a
 		 * network session (XwaPort_OptionsWindowPausesGame). */
 		int options_paused = 0;
+		int headset_paused = 0;
 		AeronWindowMode last_window_mode = Aeron_WindowMode();
 		while (!Aeron_QuitRequested() && !XwaPort_ShouldQuit()) {
 			const uint64_t frame_start_us = Aeron_NowUs();
@@ -682,9 +683,15 @@ int main(int argc, char** argv) {
 			}
 			const AeronInputSnapshot* in = Aeron_InputSnapshot();
 			int toggled = 0;
-			/* With a fixed render size, the 2D frame takes the render's shape,
-			   and the presentation fits it in the window. */
-			if (launch.render_width > 0) {
+			/* In VR, the 2D frame takes the shape of the virtual screen: Aeron
+			   draws the layers into it, and shows a copy in the window. With
+			   a fixed render size, the 2D frame takes the render's shape, and
+			   the presentation fits it in the window. */
+			int screen_width = 0;
+			int screen_height = 0;
+			if (Aeron_XrEnabled() && Aeron_GetPresentationPixelSize(&screen_width, &screen_height)) {
+				XwaPresentation_SyncToWindow(screen_width, screen_height);
+			} else if (launch.render_width > 0) {
 				XwaPresentation_SyncToWindow(launch.render_width, launch.render_height);
 			} else if (in) {
 				XwaPresentation_SyncToWindow(in->window_width, in->window_height);
@@ -722,7 +729,7 @@ int main(int argc, char** argv) {
 			if (host_shortcut_pressed(in, XWA_KEYBOARD_SHORTCUT_HOST_PAUSE)) {
 				paused = !paused;
 				toggled = 1;
-				Aeron_AudioSetPaused(paused || options_paused);
+				Aeron_AudioSetPaused(paused || options_paused || headset_paused);
 				Aeron_LogInfo("xwa", "%s", paused ? "paused" : "resumed");
 			}
 			/* Ctrl+Alt+L is a portable alias for the original Scroll Lock cockpit
@@ -752,12 +759,21 @@ int main(int argc, char** argv) {
 			 * the frame that closes it runs, and the datapad sees it closed. */
 			if (XwaPort_OptionsWindowPausesGame() != options_paused) {
 				options_paused = !options_paused;
-				Aeron_AudioSetPaused(paused || options_paused);
+				Aeron_AudioSetPaused(paused || options_paused || headset_paused);
+			}
+			/* In VR, the game waits while the headset doesn't have the
+			   focus: the user took it off, or a system menu covers the
+			   game. A network session can't wait for one player. */
+			if ((Aeron_XrEnabled() && !Aeron_XrFocused() && !XwaPort_InNetworkSession()) != headset_paused) {
+				headset_paused = !headset_paused;
+				Aeron_AudioSetPaused(paused || options_paused || headset_paused);
+				Aeron_LogInfo("xwa", "%s", headset_paused ? "paused: the headset doesn't have the focus"
+														  : "resumed: the headset has the focus");
 			}
 			/* A frozen film runs no film steps either (film_benchmark.h). */
 			const int film_frozen = XwaFilmBenchmark_IsFrozen();
 			const uint64_t tick_start_us = benchmark_frame ? Aeron_NowUs() : 0;
-			if (paused || toggled || film_frozen || options_paused) {
+			if (paused || toggled || film_frozen || options_paused || headset_paused) {
 				XwaPort_PausedFrame();
 			} else {
 				XwaPort_Tick(delta_us);

@@ -210,12 +210,15 @@ void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds) {
 		return;
 	}
 	static const char* pages[] = { "Video", "Audio", "Controller", "Keyboard", "Mouse", "Mods" };
-	/* AeronUi scales by the window's height / 1080, so the width it has in
-	   reference pixels depends on the window's shape: 1920 at 16:9, 1440 at
-	   4:3. */
+	/* AeronUi scales by the picture's height / 1080, so the width it has in
+	   reference pixels depends on the picture's shape: 1920 at 16:9, 1440 at
+	   4:3. The picture has the shape of the logical frame: it fills the
+	   window, or in VR the virtual screen. */
 	float width = 1200.0f;
-	if (input->window_width > 0 && input->window_height > 0) {
-		const float available = 1080.0f * (float)input->window_width / (float)input->window_height - 80.0f;
+	int logical_width = 0;
+	int logical_height = 0;
+	if (Aeron_GetLogicalSize(&logical_width, &logical_height)) {
+		const float available = 1080.0f * (float)logical_width / (float)logical_height - 80.0f;
 		if (available < width)
 			width = available;
 	}
