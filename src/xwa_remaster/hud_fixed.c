@@ -783,10 +783,29 @@ int XwaRemasterHudFixed_ProjectTargetArrow(const XwaSnapshot* snapshot, XwaHudPr
 	int output_x, output_y;
 	float output_scale;
 	XwaRemasterHudLayout_OutputTransform(profile, target_w, target_h, &output_x, &output_y, &output_scale);
-	const float bounds_x = output_x + bounds->rect.x * output_scale;
-	const float bounds_y = output_y + bounds->rect.y * output_scale;
-	const float width = bounds->rect.w * output_scale;
-	const float height = bounds->rect.h * output_scale;
+	float bounds_x = output_x + bounds->rect.x * output_scale;
+	float bounds_y = output_y + bounds->rect.y * output_scale;
+	float width = bounds->rect.w * output_scale;
+	float height = bounds->rect.h * output_scale;
+	AeronRectI scene = flight_view->viewport;
+	if (flight_view->arrow_rect.width > 0 && flight_view->arrow_rect.height > 0 &&
+		flight_view->arrow_position > 0.0f && flight_view->arrow_view > 0.0f) {
+		/* A headset's view is larger than what one eye sees, so the arrow
+		   is placed from the part that both eyes see, not from the view's
+		   edge. */
+		const float half_w = 0.5f * (float)flight_view->arrow_rect.width;
+		const float half_h = 0.5f * (float)flight_view->arrow_rect.height;
+		const float center_x = (float)flight_view->arrow_rect.x + half_w;
+		const float center_y = (float)flight_view->arrow_rect.y + half_h;
+		width = 2.0f * half_w * flight_view->arrow_position;
+		height = 2.0f * half_h * flight_view->arrow_position;
+		bounds_x = center_x - 0.5f * width;
+		bounds_y = center_y - 0.5f * height;
+		scene.width = (int)(2.0f * half_w * flight_view->arrow_view);
+		scene.height = (int)(2.0f * half_h * flight_view->arrow_view);
+		scene.x = (int)(center_x - 0.5f * (float)scene.width);
+		scene.y = (int)(center_y - 0.5f * (float)scene.height);
+	}
 	if (width <= 0.0f || height <= 0.0f)
 		return 0;
 	const XwaHudState* h = &snapshot->hud;
@@ -830,7 +849,6 @@ int XwaRemasterHudFixed_ProjectTargetArrow(const XwaSnapshot* snapshot, XwaHudPr
 			return 0;
 		}
 	}
-	const AeronRectI scene = flight_view->viewport;
 	if (!behind && target_x >= scene.x && target_x < scene.x + scene.width && target_y >= scene.y &&
 		target_y < scene.y + scene.height)
 		return 0;

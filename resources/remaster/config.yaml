@@ -375,6 +375,13 @@ presentation:
   vr_hud_height_px: 1440
   vr_hud_panel_distance_m: 0.8
   vr_hud_panel_scale: 1.0
+  # In VR, the arrow that points to a target out of view. Both values are
+  # fractions of the part of the view that both eyes see, from its centre:
+  # 1 is the edge of that part. vr_hud_arrow_position is where the arrow is
+  # drawn. vr_hud_arrow_view is how far the target must be before the arrow
+  # shows; closer than that, the target is in view and has its box.
+  vr_hud_arrow_position: 0.85
+  vr_hud_arrow_view: 1.0
 # Sound. The Audio tab of OpenXWA Options changes these settings.
 audio:
   # speakers or headphones. On headphones, sounds also seem to come from

@@ -214,6 +214,14 @@ void XwaRemasterHud_Shutdown(void);
 void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
 								 XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
 								 int target_w, int target_h);
+/* For a headset, whose world group follows the head while the rest of the
+ * HUD stays with the cockpit. It prepares the world group's lists for
+ * `flight_view`, with the split on. Draw them (XWA_HUD_GROUP_WORLD) before
+ * XwaRemasterHud_PrepareFrame, which prepares every list again for the
+ * cockpit's view. */
+void XwaRemasterHud_PrepareWorldGroup(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
+									  XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
+									  int target_w, int target_h);
 const XwaRemasterHudPreparedAssets* XwaRemasterHud_PreparedAssets(void);
 void XwaRemasterHud_BeginRenderPhase(void);
 void XwaRemasterHud_EndRenderPhase(void);
@@ -227,7 +235,9 @@ void XwaRemasterHud_RenderTargetBoxes(AeronCommandBuffer* cmd, AeronRenderPass* 
  * world group points at things outside: the target boxes and the target
  * readout, the reticle with its readiness and threat marks and its counts,
  * and the arrows to the target with their text. It is shown at infinity, so
- * it lines up with far objects in both eyes. The fixed group is the rest:
+ * it lines up with far objects in both eyes, and it is laid out for a view
+ * that follows the head, so a box is on its ship wherever the player looks.
+ * The fixed group is the rest:
  * the radars, the gauges, the MFDs, the CMD and the text. It is shown on a
  * panel in the cockpit.
  *

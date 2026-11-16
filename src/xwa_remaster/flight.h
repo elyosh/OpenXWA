@@ -556,6 +556,16 @@ typedef struct XwaRemasterFlightView {
 	/* Nonzero when the view turns with the player's head, so it doesn't
 	 * look where the game camera looks. */
 	uint8_t head_tracked;
+	/* For a headset's HUD view, which is larger than what one eye sees.
+	 * `arrow_rect` is the part of the view that both eyes see, in the
+	 * view's pixels. When it isn't empty, the arrow to a target out of view
+	 * is placed from it and not from the edge of the view: the arrow is on
+	 * the rectangle scaled by `arrow_position` about its centre, and it
+	 * shows when the target is outside the rectangle scaled by
+	 * `arrow_view`. */
+	AeronRectI arrow_rect;
+	float arrow_position;
+	float arrow_view;
 } XwaRemasterFlightView;
 
 int XwaRemasterFlight_BuildView(const XwaFlightCamera* camera, int target_w, int target_h,
