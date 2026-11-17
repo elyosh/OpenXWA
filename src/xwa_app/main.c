@@ -583,6 +583,7 @@ int main(int argc, char** argv) {
 		.video_options = host_config.video_options,
 		.video_options_override_mask = host_config.video_options_override_mask,
 		.flight_views = launch.flight_views,
+		.stereo_head = { launch.stereo_head[0], launch.stereo_head[1], launch.stereo_head[2] },
 		.render_width = launch.render_width,
 		.render_height = launch.render_height,
 	};

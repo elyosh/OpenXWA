@@ -48,8 +48,10 @@ static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 		   options->vr_mode <= XWA_MODERN_VR_REQUIRED &&
 		   surround_in_range(options->vr_render_scale, XWA_MODERN_VR_SCALE_MIN, XWA_MODERN_VR_SCALE_MAX) &&
 		   surround_in_range(options->vr_world_scale, XWA_MODERN_VR_SCALE_MIN, XWA_MODERN_VR_SCALE_MAX) &&
-		   options->ssao_quality >= XWA_MODERN_SSAO_OFF &&
-		   options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
+		   surround_in_range(options->vr_panel_scale, XWA_MODERN_VR_PANEL_SCALE_MIN,
+							 XWA_MODERN_VR_PANEL_SCALE_MAX) &&
+		   surround_in_range(options->vr_screen_scale, XWA_MODERN_VR_SCALE_MIN, XWA_MODERN_VR_SCALE_MAX) &&
+		   options->ssao_quality >= XWA_MODERN_SSAO_OFF && options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
 		   options->shadow_quality >= XWA_MODERN_SHADOW_STANDARD &&
 		   options->shadow_quality <= XWA_MODERN_SHADOW_HIGH &&
 		   options->fsr_upscaling >= XWA_MODERN_FSR_OFF &&
@@ -80,7 +82,8 @@ static int XwaModernVideoOptions_AreEqual(const XwaModernVideoOptions* lhs,
 		   lhs->surround.distance_mm == rhs->surround.distance_mm &&
 		   lhs->surround.side_angle_deg == rhs->surround.side_angle_deg && lhs->vr_mode == rhs->vr_mode &&
 		   lhs->vr_render_scale == rhs->vr_render_scale && lhs->vr_world_scale == rhs->vr_world_scale &&
-		   lhs->vr_mirror == rhs->vr_mirror;
+		   lhs->vr_mirror == rhs->vr_mirror && lhs->vr_panel_scale == rhs->vr_panel_scale &&
+		   lhs->vr_screen_scale == rhs->vr_screen_scale;
 }
 
 void XwaModernVideoOptions_Configure(const XwaModernVideoOptions* options, XwaModernVideoOptionsApplyFn apply,

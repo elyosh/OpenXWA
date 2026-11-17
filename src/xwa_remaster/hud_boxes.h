@@ -1,6 +1,7 @@
 #ifndef XWA_REMASTER_HUD_BOXES_H
 #define XWA_REMASTER_HUD_BOXES_H
 
+#include "aeron/scene/draw_list2d.h"
 #include "aeron/scene/scene3d.h"
 #include "xwa_remaster/hud.h"
 
@@ -18,6 +19,10 @@ typedef struct XwaHudPreparedBox {
 	float edge_px, arm_x_px, arm_y_px;
 	/* With line_px above 0, the box is drawn filled. */
 	uint8_t fill;
+	/* In a headset: the box's plane, which faces the player from the
+	 * box's centre (hud_planes.h). The box is at the centre of the plane's
+	 * drawing. */
+	float plane[9];
 } XwaHudPreparedBox;
 
 enum { XWA_HUD_MAX_READOUT_FILLS = 12 };
@@ -56,7 +61,9 @@ typedef struct XwaHudPreparedBoxState {
 	uint16_t box_count, dropped_boxes;
 	uint8_t profile, valid;
 	uint8_t stick_marker_valid;
-	uint8_t reserved;
+	/* The boxes are on planes (XwaHudPreparedBox.plane), and the stick
+	 * marker on the reticle's. */
+	uint8_t on_planes;
 	/* Mouse flight virtual-stick marker: center and box size in target px. */
 	float stick_marker_x_px, stick_marker_y_px;
 	float stick_marker_size_px, stick_marker_edge_px;
@@ -78,6 +85,16 @@ void XwaRemasterHudBoxes_PrepareDrawLists(AeronCommandBuffer* cmd, int target_w,
 void XwaRemasterHudBoxes_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 								AeronRenderTarget* color_target, int target_w, int target_h,
 								XwaHudTargetBoxLayer layer);
+/* Draws a layer's boxes on their planes. */
+void XwaRemasterHudBoxes_RenderPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
+									  AeronRenderTarget* color_target, const float view[12],
+									  XwaHudTargetBoxLayer layer);
+/* In a headset, makes the records that are added to `list` after this call
+ * go on the plane of box `box`. `last` is the caller's own memory of the
+ * box that the list uses: start it at -1 for each list. Returns 0 when the
+ * boxes aren't on planes or the list can't take the plane; the caller then
+ * doesn't add the records. */
+int XwaRemasterHudBoxes_UsePlane(AeronDrawList2D* list, int box, int* last);
 const XwaHudPreparedBoxState* XwaRemasterHudBoxes_Prepared(void);
 const XwaHudPreparedBox* XwaRemasterHudBoxes_SelectedReadout(void);
 

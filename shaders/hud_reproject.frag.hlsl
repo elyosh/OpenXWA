@@ -1,11 +1,9 @@
 /*
- * Draws the HUD image into a headset's eye image.
+ * Draws the HUD's panel image into a headset's eye image.
  *
- * The HUD is drawn once into a flat image. This shader shows it somewhere
- * in the world: at infinity, so its boxes and its reticle line up with far
- * objects in both eyes, or on a flat panel in the cockpit. Both cases are
- * one matrix that takes an eye pixel to a point of the HUD image
- * (src/xwa_remaster/hud_reproject_math.h).
+ * The fixed group of the HUD is drawn once into a flat image. This shader
+ * shows it on a flat panel in the cockpit: one matrix takes an eye pixel to
+ * a point of the HUD image (src/xwa_remaster/hud_reproject_math.h).
  *
  * The HUD image has premultiplied alpha, and so has the output.
  */
@@ -21,11 +19,14 @@ cbuffer HudReproject : register(b0, space3)
 	float4 row_w;
 	/* xy 2 / the eye image's size in px, z the HUD's opacity. */
 	float4 params;
+	/* xy the eye image's upper left corner in its target, in px. */
+	float4 origin;
 };
 
 float4 main(float4 position : SV_Position) : SV_Target0
 {
-	float3 eye = float3(position.x * params.x - 1.0, 1.0 - position.y * params.y, 1.0);
+	float2 pixel = position.xy - origin.xy;
+	float3 eye = float3(pixel.x * params.x - 1.0, 1.0 - pixel.y * params.y, 1.0);
 	float w = dot(row_w.xyz, eye);
 	/* The HUD image is behind the eye. */
 	if (w <= 0.0)

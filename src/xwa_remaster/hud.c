@@ -367,11 +367,9 @@ void XwaRemasterHud_SetWorldSplit(int split) { hud_world_split = split != 0; }
 
 int XwaRemasterHud_WorldSplit(void) { return hud_world_split; }
 
-/* Prepares the HUD for a view and a target size. With `world_only`, only
- * the world group's lists are prepared: the CMD and the Dynamic Cockpit are
- * left as they are. */
-static void hud_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot, XwaRemasterAssets* assets,
-						const XwaRemasterFlightView* flight_view, int target_w, int target_h, int world_only) {
+void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
+								 XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
+								 int target_w, int target_h) {
 	const XwaHudState* hud = snapshot ? &snapshot->hud : NULL;
 	if (!cmd || !assets || !hud_initialized)
 		return;
@@ -415,40 +413,19 @@ static void hud_prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot, Xw
 	}
 	hud_assets.prepared.cache_entries = hud_assets.frame_count;
 	const XwaHudProfileIndex profile = hud_layout.default_profile;
-	if (!world_only)
-		XwaRemasterHudCmd_Prepare(cmd, snapshot, assets, profile, target_w, target_h);
+	XwaRemasterHudCmd_Prepare(cmd, snapshot, assets, profile, target_w, target_h);
 	XwaRemasterHudFixed_Build(snapshot, profile, bundle_generation, flight_view, target_w, target_h);
 	XwaRemasterHudBoxes_Build(snapshot, profile, bundle_generation, flight_view, target_w, target_h);
 	XwaRemasterHudText_Build(snapshot, profile, bundle_generation);
 	/* The Dynamic Cockpit's boxes come from the built HUD; its routing
-	 * (XwaRemasterDc_AddSprite) needs them as the lists are prepared. The
-	 * world group alone is laid out for another view than the cockpit's
-	 * screens, so it leaves them alone. */
-	if (world_only)
-		XwaRemasterDc_SetSuspended(1);
-	else
-		XwaRemasterDc_PlaceFrame(target_w, target_h);
+	 * (XwaRemasterDc_AddSprite) needs them as the lists are prepared. */
+	XwaRemasterDc_PlaceFrame(target_w, target_h);
 	XwaRemasterHudBoxes_PrepareDrawLists(cmd, target_w, target_h);
 	XwaRemasterHudFixed_PrepareDrawList(cmd, target_w, target_h);
-	if (!world_only)
-		XwaRemasterHudCmd_PrepareDrawList(cmd, target_w, target_h);
+	XwaRemasterHudCmd_PrepareDrawList(cmd, target_w, target_h);
 	XwaRemasterHudText_PrepareDrawList(cmd, assets, target_w, target_h);
 	XwaRemasterHudReadout_PrepareDrawList(cmd, target_w, target_h);
-	XwaRemasterDc_SetSuspended(0);
 }
-
-void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
-								 XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
-								 int target_w, int target_h) {
-	hud_prepare(cmd, snapshot, assets, flight_view, target_w, target_h, 0);
-}
-
-void XwaRemasterHud_PrepareWorldGroup(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
-									  XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
-									  int target_w, int target_h) {
-	hud_prepare(cmd, snapshot, assets, flight_view, target_w, target_h, 1);
-}
-
 
 const XwaRemasterHudPreparedAssets* XwaRemasterHud_PreparedAssets(void) { return &hud_assets.prepared; }
 

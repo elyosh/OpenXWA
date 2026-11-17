@@ -1,10 +1,12 @@
 #include "xwa_remaster/hud_boxes.h"
 
 #include "aeron/scene/draw_list2d.h"
+#include "aeron/scene/world.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/hud_fixed.h"
 #include "xwa_remaster/hud_layout.h"
+#include "xwa_remaster/hud_planes.h"
 #include "xwa_runtime/config/modern_target_readout_options.h"
 #include "xwa_runtime/models/craft_hud.h"
 #include "xwa_runtime/timing/host_clock.h"
@@ -13,6 +15,8 @@
 #include <string.h>
 
 static AeronDrawList2D* box_lists[2];
+/* Whether each list was prepared on planes. */
+static int box_list_on_planes[2];
 static XwaHudPreparedBoxState box_prepared;
 
 static const XwaFlightObject* box_find_object(const XwaSnapshot* snapshot, const XwaHudTargetBox* box) {
@@ -232,6 +236,10 @@ void XwaRemasterHudBoxes_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 	box_prepared.target_w = (uint16_t)(target_w > 0xffff ? 0xffff : target_w);
 	box_prepared.target_h = (uint16_t)(target_h > 0xffff ? 0xffff : target_h);
 	box_prepared.camera_viewport = flight_view->viewport;
+	/* In a headset, each box has a plane that faces the player from the
+	 * box's centre, and is at the centre of that plane's drawing. */
+	const XwaRemasterHudPlanes* planes = XwaRemasterHud_WorldSplit() ? flight_view->hud_planes : NULL;
+	box_prepared.on_planes = planes != NULL;
 	const AeronRectI viewport = box_prepared.camera_viewport;
 	if (viewport.width <= 0 || viewport.height <= 0)
 		return;
@@ -268,7 +276,18 @@ void XwaRemasterHudBoxes_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 			XwaRemasterFlight_TransformOptPoint(model, center_opt, local_point);
 		}
 		float center_x, center_y, depth;
-		if (source->component != 0xffffu) {
+		float plane[9];
+		if (planes) {
+			if (source->component == 0xffffu)
+				AeronWorld_LocalI32(flight_view->origin_world, object->world_pos, local_point);
+			/* The size comes from the real distance: the box's plane faces
+			 * the player, wherever the head looks. */
+			depth = XwaHudPlanes_AtPoint(planes, local_point, plane);
+			if (!(depth > 0.0f))
+				continue;
+			center_x = planes->center_x;
+			center_y = planes->center_y;
+		} else if (source->component != 0xffffu) {
 			if (!XwaRemasterFlight_ProjectLocal(flight_view, local_point, &center_x, &center_y, &depth))
 				continue;
 		} else if (!XwaRemasterFlight_ProjectWorldI32(flight_view, object->world_pos, &center_x, &center_y,
@@ -308,6 +327,8 @@ void XwaRemasterHudBoxes_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 		box->color_index = source->color_index;
 		box->selected = source->selected;
 		box->layer = source->layer;
+		if (planes)
+			memcpy(box->plane, plane, sizeof box->plane);
 		/* The box is centred on its projected centre. The game's corner is
 		   centre - size / 2 rounded down, so the box shifts by half a pixel
 		   when the size changes. */
@@ -461,6 +482,8 @@ static void box_prepare_layer(AeronCommandBuffer* cmd, int target_w, int target_
 	if (!box_list || !cmd || target_w <= 0 || target_h <= 0 ||
 		(layer != XWA_HUD_TARGET_BOX_BEFORE_FIXED && layer != XWA_HUD_TARGET_BOX_AFTER_FIXED))
 		return;
+	const int list_index = layer == XWA_HUD_TARGET_BOX_AFTER_FIXED ? 1 : 0;
+	box_list_on_planes[list_index] = 0;
 	AeronDrawList_Begin(box_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	if (!box_prepared.valid || box_prepared.target_w != target_w || box_prepared.target_h != target_h) {
 		(void)AeronDrawList_Prepare(box_list, cmd);
@@ -482,8 +505,20 @@ static void box_prepare_layer(AeronCommandBuffer* cmd, int target_w, int target_
 		(void)AeronDrawList_Prepare(box_list, cmd);
 		return;
 	}
-	const AeronRectI scissor = box_prepared.camera_viewport;
-	if (has_stick_marker) {
+	/* A drawing on a plane has no rectangle to be cut to. */
+	const AeronRectI viewport = box_prepared.camera_viewport;
+	const AeronRectI* const scissor = box_prepared.on_planes ? NULL : &viewport;
+	box_list_on_planes[list_index] = box_prepared.on_planes;
+	int stick_marker_plane = -1;
+	if (has_stick_marker && box_prepared.on_planes) {
+		/* The marker is drawn from the reticle's centre, on its plane. */
+		float plane[9];
+		if (XwaRemasterHudFixed_ReticlePlane(plane))
+			stick_marker_plane = AeronDrawList_AddPlane(box_list, plane, 0.0f);
+	}
+	if (has_stick_marker && (!box_prepared.on_planes || stick_marker_plane >= 0)) {
+		if (stick_marker_plane >= 0)
+			AeronDrawList_UsePlane(box_list, stick_marker_plane);
 		const uint32_t argb = box_prepared.stick_marker_argb;
 		const float a = ((argb >> 24) & 255) / 255.0f;
 		const float rgba[4] = {
@@ -496,11 +531,14 @@ static void box_prepare_layer(AeronCommandBuffer* cmd, int target_w, int target_
 
 		AeronDrawList_AddFrame(box_list, box_prepared.stick_marker_x_px - size * 0.5f,
 							   box_prepared.stick_marker_y_px - size * 0.5f, size, size,
-							   box_prepared.stick_marker_edge_px, rgba, AERON_BLIT2D_BLEND_PMA, &scissor);
+							   box_prepared.stick_marker_edge_px, rgba, AERON_BLIT2D_BLEND_PMA, scissor);
 	}
+	int plane_box = -1;
 	for (uint16_t i = 0; i < box_prepared.box_count; i++) {
 		const XwaHudPreparedBox* box = &box_prepared.boxes[i];
 		if (box->layer != (uint8_t)layer)
+			continue;
+		if (box_prepared.on_planes && !XwaRemasterHudBoxes_UsePlane(box_list, i, &plane_box))
 			continue;
 		const uint32_t argb = XwaSnapshotExport_FlightPaletteColor(box->color_index);
 		const float a = ((argb >> 24) & 255) / 255.0f;
@@ -511,26 +549,26 @@ static void box_prepare_layer(AeronCommandBuffer* cmd, int target_w, int target_
 			a,
 		};
 		if (box_prepared.line_px > 0.0f) {
-			box_add_wide_box(box_list, box, box_prepared.line_px, rgba, &scissor);
+			box_add_wide_box(box_list, box, box_prepared.line_px, rgba, scissor);
 			continue;
 		}
 		const float x = box->x_px, y = box->y_px, w = box->w_px, h = box->h_px;
 		const float ex = box->edge_px, ax = box->arm_x_px, ay = box->arm_y_px;
-		AeronDrawList_AddFill(box_list, x, y, ax, ex, rgba, AERON_BLIT2D_BLEND_PMA, &scissor);
-		AeronDrawList_AddFill(box_list, x + w - ax, y, ax, ex, rgba, AERON_BLIT2D_BLEND_PMA, &scissor);
-		AeronDrawList_AddFill(box_list, x, y + h, ax, ex, rgba, AERON_BLIT2D_BLEND_PMA, &scissor);
+		AeronDrawList_AddFill(box_list, x, y, ax, ex, rgba, AERON_BLIT2D_BLEND_PMA, scissor);
+		AeronDrawList_AddFill(box_list, x + w - ax, y, ax, ex, rgba, AERON_BLIT2D_BLEND_PMA, scissor);
+		AeronDrawList_AddFill(box_list, x, y + h, ax, ex, rgba, AERON_BLIT2D_BLEND_PMA, scissor);
 		/* Hud_DrawBoxOverlayHW gives only the lower-right horizontal
 		 * arm an inclusive right endpoint (right + 1). This is observable:
 		 * it covers the right vertical arm's pixel column at the join. */
 		AeronDrawList_AddFill(box_list, x + w - ax, y + h, ax + ex, ex, rgba, AERON_BLIT2D_BLEND_PMA,
-							  &scissor);
+							  scissor);
 		/* The classic hardware path does not shorten vertical arms by the
 		 * horizontal thickness: upper arms overlap and lower arms meet the
 		 * horizontal edge. Preserve that coverage at fractional HD density. */
-		AeronDrawList_AddFill(box_list, x, y, ex, ay, rgba, AERON_BLIT2D_BLEND_PMA, &scissor);
-		AeronDrawList_AddFill(box_list, x + w, y, ex, ay, rgba, AERON_BLIT2D_BLEND_PMA, &scissor);
-		AeronDrawList_AddFill(box_list, x, y + h - ay, ex, ay, rgba, AERON_BLIT2D_BLEND_PMA, &scissor);
-		AeronDrawList_AddFill(box_list, x + w, y + h - ay, ex, ay, rgba, AERON_BLIT2D_BLEND_PMA, &scissor);
+		AeronDrawList_AddFill(box_list, x, y, ex, ay, rgba, AERON_BLIT2D_BLEND_PMA, scissor);
+		AeronDrawList_AddFill(box_list, x + w, y, ex, ay, rgba, AERON_BLIT2D_BLEND_PMA, scissor);
+		AeronDrawList_AddFill(box_list, x, y + h - ay, ex, ay, rgba, AERON_BLIT2D_BLEND_PMA, scissor);
+		AeronDrawList_AddFill(box_list, x + w, y + h - ay, ex, ay, rgba, AERON_BLIT2D_BLEND_PMA, scissor);
 	}
 	(void)AeronDrawList_Prepare(box_list, cmd);
 }
@@ -547,7 +585,34 @@ void XwaRemasterHudBoxes_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 		(layer != XWA_HUD_TARGET_BOX_BEFORE_FIXED && layer != XWA_HUD_TARGET_BOX_AFTER_FIXED))
 		return;
 	const int index = layer == XWA_HUD_TARGET_BOX_AFTER_FIXED ? 1 : 0;
-	AeronDrawList_RenderIntoPass(box_lists[index], cmd, pass, color_target);
+	/* Boxes on planes are drawn by XwaRemasterHudBoxes_RenderPlanes. */
+	if (!box_list_on_planes[index])
+		AeronDrawList_RenderIntoPass(box_lists[index], cmd, pass, color_target);
+}
+
+void XwaRemasterHudBoxes_RenderPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
+									  AeronRenderTarget* color_target, const float view[12],
+									  XwaHudTargetBoxLayer layer) {
+	if (!cmd || !pass || !color_target || !view ||
+		(layer != XWA_HUD_TARGET_BOX_BEFORE_FIXED && layer != XWA_HUD_TARGET_BOX_AFTER_FIXED))
+		return;
+	const int index = layer == XWA_HUD_TARGET_BOX_AFTER_FIXED ? 1 : 0;
+	if (box_list_on_planes[index])
+		AeronDrawList_RenderPlanes(box_lists[index], cmd, pass, color_target, view, 1.0f);
+}
+
+int XwaRemasterHudBoxes_UsePlane(AeronDrawList2D* list, int box, int* last) {
+	if (!list || !box_prepared.on_planes || box < 0 || box >= box_prepared.box_count)
+		return 0;
+	if (last && *last == box)
+		return 1;
+	const int plane = AeronDrawList_AddPlane(list, box_prepared.boxes[box].plane, 1.0f);
+	if (plane < 0)
+		return 0;
+	AeronDrawList_UsePlane(list, plane);
+	if (last)
+		*last = box;
+	return 1;
 }
 
 const XwaHudPreparedBoxState* XwaRemasterHudBoxes_Prepared(void) { return &box_prepared; }

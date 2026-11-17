@@ -131,10 +131,19 @@ typedef struct XwaModernVideoOptions {
 	float vr_world_scale;
 	/* Show what the headset shows in the window. */
 	int vr_mirror;
+	/* How large the cockpit panel that shows the HUD looks in a headset. At
+	   1 it covers the same part of the view as the HUD does on a screen. */
+	float vr_panel_scale;
+	/* How large the flat screen that shows the menus, the briefings and the
+	   movies looks in a headset, from its size in the game's files. */
+	float vr_screen_scale;
 } XwaModernVideoOptions;
 
 #define XWA_MODERN_VR_SCALE_MIN 0.5f
 #define XWA_MODERN_VR_SCALE_MAX 2.0f
+
+#define XWA_MODERN_VR_PANEL_SCALE_MIN 0.25f
+#define XWA_MODERN_VR_PANEL_SCALE_MAX 2.0f
 
 #define XWA_MODERN_HUD_SCALE_MIN 0.5f
 #define XWA_MODERN_HUD_SCALE_MAX 2.0f
@@ -161,6 +170,8 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_VR_RENDER_SCALE = 1u << 18,
 	XWA_MODERN_VIDEO_OVERRIDE_VR_WORLD_SCALE = 1u << 19,
 	XWA_MODERN_VIDEO_OVERRIDE_VR_MIRROR = 1u << 20,
+	XWA_MODERN_VIDEO_OVERRIDE_VR_PANEL_SCALE = 1u << 21,
+	XWA_MODERN_VIDEO_OVERRIDE_VR_SCREEN_SCALE = 1u << 22,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

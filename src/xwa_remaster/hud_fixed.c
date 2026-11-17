@@ -8,6 +8,8 @@
 #include "xwa_remaster/hud_boxes.h"
 #include "xwa_remaster/hud_cmd.h"
 #include "xwa_remaster/hud_layout.h"
+#include "xwa_remaster/hud_planes.h"
+#include "xwa_remaster/hud_readout.h"
 #include "xwa_remaster/hud_text.h"
 #include "xwa_runtime/models/craft_hud.h"
 
@@ -32,6 +34,10 @@ static float fixed_hud_user_scale = 1.0f;
    the 3D view use it. */
 static float fixed_view_pixel_scale = 1.0f;
 static const XwaRemasterFlightView* fixed_flight_view;
+/* The planes of a headset's HUD, or NULL, and whether the world list was
+ * prepared on them. */
+static const XwaRemasterHudPlanes* fixed_planes;
+static int fixed_world_on_planes;
 static int fixed_target_w, fixed_target_h;
 static float fixed_reticle_x_ref, fixed_reticle_y_ref;
 static int fixed_reticle_valid;
@@ -867,6 +873,12 @@ int XwaRemasterHudFixed_ProjectTargetArrow(const XwaSnapshot* snapshot, XwaHudPr
 												&out->center_y_ref))
 		return 0;
 	out->rotation_angle = clamped.rotation_angle;
+	if (output_scale > 0.0f) {
+		out->bounds_x_ref = (bounds_x - (float)output_x) / output_scale;
+		out->bounds_y_ref = (bounds_y - (float)output_y) / output_scale;
+		out->bounds_w_ref = width / output_scale;
+		out->bounds_h_ref = height / output_scale;
+	}
 	out->visible = 1;
 	out->behind = (uint8_t)behind;
 	return 1;
@@ -875,10 +887,30 @@ int XwaRemasterHudFixed_ProjectTargetArrow(const XwaSnapshot* snapshot, XwaHudPr
 static void fixed_build_target_arrow(const XwaHudState* h, const XwaRemasterHudVisibility* v) {
 	if (!v->target_arrow || !h->target.valid || !(h->instruments.working_subsystems & 4u))
 		return;
+	/* In a headset the arrow is placed in the view that follows the head,
+	 * and drawn on a plane of its own, at its place in that view. */
+	const XwaRemasterFlightView* arrow_view = fixed_planes ? fixed_planes->head_view : fixed_flight_view;
 	if (!XwaRemasterHudFixed_ProjectTargetArrow(fixed_snapshot, (XwaHudProfileIndex)fixed_draws.profile,
-												fixed_flight_view, fixed_target_w, fixed_target_h,
+												arrow_view, fixed_target_w, fixed_target_h,
 												&fixed_target_arrow))
 		return;
+	fixed_target_arrow.draw_x_ref = fixed_target_arrow.center_x_ref;
+	fixed_target_arrow.draw_y_ref = fixed_target_arrow.center_y_ref;
+	if (fixed_planes) {
+		const XwaHudLayoutProfile* profile = fixed_profile((XwaHudProfileIndex)fixed_draws.profile);
+		int out_x, out_y;
+		float scale;
+		XwaRemasterHudLayout_OutputTransform(profile, fixed_target_w, fixed_target_h, &out_x, &out_y, &scale);
+		if (!profile || scale <= 0.0f) {
+			fixed_target_arrow.visible = 0;
+			return;
+		}
+		XwaHudPlanes_AtHeadPixel(fixed_planes, out_x + fixed_target_arrow.center_x_ref * scale,
+								 out_y + fixed_target_arrow.center_y_ref * scale, fixed_target_arrow.plane);
+		fixed_target_arrow.on_plane = 1;
+		fixed_target_arrow.draw_x_ref = (fixed_planes->center_x - out_x) / scale;
+		fixed_target_arrow.draw_y_ref = (fixed_planes->center_y - out_y) / scale;
+	}
 	const XwaHudProjectedArrow arrow = fixed_target_arrow;
 	const XwaHudWidgetId widget = arrow.padlock ? XWA_HUD_WIDGET_PADLOCK_ARROW : XWA_HUD_WIDGET_TARGET_ARROW;
 	const XwaHudWidgetDesc* desc = fixed_widget(widget);
@@ -897,8 +929,8 @@ static void fixed_build_target_arrow(const XwaHudState* h, const XwaRemasterHudV
 	record->stable_order = desc->stable_order;
 	record->sequence = fixed_draws.record_count - 1;
 	record->rotation_angle = arrow.rotation_angle;
-	record->center_x_ref = arrow.center_x_ref;
-	record->center_y_ref = arrow.center_y_ref;
+	record->center_x_ref = arrow.draw_x_ref;
+	record->center_y_ref = arrow.draw_y_ref;
 	record->scale_ref = fixed_hud_unit_scale;
 	record->argb = arrow.behind ? 0xffc8c800u : 0xffe6e600u;
 }
@@ -939,6 +971,24 @@ int XwaRemasterHudFixed_ReticleCenter(float* out_x_ref, float* out_y_ref) {
 		return 0;
 	*out_x_ref = fixed_reticle_x_ref;
 	*out_y_ref = fixed_reticle_y_ref;
+	return 1;
+}
+
+int XwaRemasterHudFixed_ReticlePlane(float out[9]) {
+	if (!fixed_planes || !out)
+		return 0;
+	/* The group keeps its place and grows or shrinks about the reticle's
+	 * centre, or about the middle of the drawing without a reticle. */
+	float x = fixed_planes->center_x, y = fixed_planes->center_y;
+	const XwaHudLayoutProfile* profile = fixed_profile((XwaHudProfileIndex)fixed_draws.profile);
+	int out_x, out_y;
+	float scale;
+	XwaRemasterHudLayout_OutputTransform(profile, fixed_target_w, fixed_target_h, &out_x, &out_y, &scale);
+	if (fixed_reticle_valid && profile && scale > 0.0f) {
+		x = out_x + fixed_reticle_x_ref * scale;
+		y = out_y + fixed_reticle_y_ref * scale;
+	}
+	XwaHudPlanes_Scale(fixed_planes->seat_plane, x, y, fixed_planes->reticle_scale, out);
 	return 1;
 }
 
@@ -1057,6 +1107,8 @@ void XwaRemasterHudFixed_Shutdown(void) {
 	fixed_hud_user_scale = 1.0f;
 	fixed_view_pixel_scale = 1.0f;
 	fixed_flight_view = NULL;
+	fixed_planes = NULL;
+	fixed_world_on_planes = 0;
 	fixed_target_w = fixed_target_h = 0;
 	fixed_reticle_valid = 0;
 	memset(&fixed_target_arrow, 0, sizeof fixed_target_arrow);
@@ -1075,6 +1127,7 @@ void XwaRemasterHudFixed_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 	fixed_view_pixel_scale = 1.0f;
 	fixed_snapshot = snapshot;
 	fixed_flight_view = flight_view;
+	fixed_planes = flight_view && XwaRemasterHud_WorldSplit() ? flight_view->hud_planes : NULL;
 	fixed_target_w = target_w;
 	fixed_target_h = target_h;
 	const XwaHudState* hud = snapshot ? &snapshot->hud : NULL;
@@ -1214,6 +1267,7 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 	const int split = XwaRemasterHud_WorldSplit();
 	AeronDrawList_Begin(fixed_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	AeronDrawList_Begin(fixed_world_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	fixed_world_on_planes = 0;
 	if (!fixed_draws.valid) {
 		fixed_prepare_lists(cmd);
 		return;
@@ -1230,6 +1284,17 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 		fixed_prepare_lists(cmd);
 		return;
 	}
+	/* In a headset, the world group's widgets are drawn on planes: the
+	 * reticle and its marks on the seat's, each arrow on its own. */
+	int reticle_plane = -1, arrow_plane = -1;
+	if (split && fixed_planes) {
+		float plane[9];
+		XwaRemasterHudFixed_ReticlePlane(plane);
+		reticle_plane = AeronDrawList_AddPlane(fixed_world_list, plane, 0.0f);
+		if (fixed_target_arrow.visible && fixed_target_arrow.on_plane)
+			arrow_plane = AeronDrawList_AddPlane(fixed_world_list, fixed_target_arrow.plane, 0.0f);
+		fixed_world_on_planes = reticle_plane >= 0;
+	}
 	XwaRemasterHud_BeginRenderPhase();
 	for (uint16_t i = 0; i < fixed_draws.record_count; i++) {
 		const XwaHudDrawRecord* r = &fixed_draws.records[i];
@@ -1240,7 +1305,16 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 		if (region >= 0 && (fixed_dc_erased & (1u << region)))
 			continue;
 		const int panel = region >= 0;
-		AeronDrawList2D* const list = split && fixed_world_widget(r->widget) ? fixed_world_list : fixed_list;
+		const int world = split && fixed_world_widget(r->widget);
+		const int arrow =
+			r->widget == XWA_HUD_WIDGET_TARGET_ARROW || r->widget == XWA_HUD_WIDGET_PADLOCK_ARROW;
+		AeronDrawList2D* const list = world ? fixed_world_list : fixed_list;
+		if (world && fixed_world_on_planes) {
+			const int plane = arrow ? arrow_plane : reticle_plane;
+			if (plane < 0)
+				continue;
+			AeronDrawList_UsePlane(fixed_world_list, plane);
+		}
 		float quad[4];
 		fixed_record_quad(r, asset, out_x, out_y, scale, quad);
 		const float w = quad[2];
@@ -1281,7 +1355,7 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 		sprite.tint[3] = a;
 		sprite.blend = AERON_BLIT2D_BLEND_PMA;
 		sprite.filter = AERON_BLIT2D_FILTER_LINEAR;
-		if (r->widget == XWA_HUD_WIDGET_TARGET_ARROW || r->widget == XWA_HUD_WIDGET_PADLOCK_ARROW) {
+		if (arrow) {
 			const float theta = r->rotation_angle * (2.0f * 3.14159265358979323846f / 65536.0f);
 			const float c = cosf(theta), s = sinf(theta), hw = w * 0.5f, hh = h * 0.5f;
 			const float cx = out_x + r->center_x_ref * scale;
@@ -1312,7 +1386,8 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 			 * target boxes: never captured by the cockpit's screens nor
 			 * hidden by the erased regions. */
 			AeronDrawList_AddQuad4(list, &quad);
-		} else if (panel) {
+		} else if (panel || world) {
+			/* The world group isn't shown on the cockpit's screens. */
 			AeronDrawList_AddSprite(list, &sprite);
 		} else {
 			XwaRemasterDc_AddSprite(list, XWA_DC_LAYER_GRAPHICS, &sprite);
@@ -1322,14 +1397,23 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 	fixed_prepare_lists(cmd);
 }
 
+/* The world list is empty unless the HUD is split, and is then drawn on
+ * planes (XwaRemasterHudFixed_RenderPlanes). */
 void XwaRemasterHudFixed_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-								int target_w, int target_h, XwaHudGroup group) {
+								int target_w, int target_h) {
 	if (!cmd || !pass || !target || !fixed_list || !fixed_draws.valid || target_w <= 0 || target_h <= 0)
 		return;
-	if (group != XWA_HUD_GROUP_WORLD)
-		AeronDrawList_RenderIntoPass(fixed_list, cmd, pass, target);
-	if (group != XWA_HUD_GROUP_FIXED)
-		AeronDrawList_RenderIntoPass(fixed_world_list, cmd, pass, target);
+	AeronDrawList_RenderIntoPass(fixed_list, cmd, pass, target);
+}
+
+float XwaRemasterHudFixed_EyePixelScale(void) {
+	return fixed_planes && fixed_planes->eye_pixel_scale > 0.0f ? fixed_planes->eye_pixel_scale : 1.0f;
+}
+
+void XwaRemasterHudFixed_RenderPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
+									  AeronRenderTarget* target, const float view[12]) {
+	if (cmd && pass && target && view && fixed_world_list && fixed_draws.valid && fixed_world_on_planes)
+		AeronDrawList_RenderPlanes(fixed_world_list, cmd, pass, target, view, 1.0f);
 }
 
 const XwaHudPreparedDrawState* XwaRemasterHud_PreparedDrawState(void) { return &fixed_draws; }
@@ -1341,8 +1425,8 @@ void XwaRemasterHud_RenderTargetBoxes(AeronCommandBuffer* cmd, AeronRenderPass* 
 }
 
 void XwaRemasterHud_RenderFixed(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-								int target_w, int target_h, XwaHudGroup group) {
-	XwaRemasterHudFixed_Render(cmd, pass, target, target_w, target_h, group);
+								int target_w, int target_h) {
+	XwaRemasterHudFixed_Render(cmd, pass, target, target_w, target_h);
 }
 
 void XwaRemasterHud_RenderCmd(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
@@ -1351,13 +1435,22 @@ void XwaRemasterHud_RenderCmd(AeronCommandBuffer* cmd, AeronRenderPass* pass, Ae
 }
 
 void XwaRemasterHud_RenderText(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-							   int target_w, int target_h, XwaHudGroup group) {
-	XwaRemasterHudText_Render(cmd, pass, target, target_w, target_h, group);
+							   int target_w, int target_h) {
+	XwaRemasterHudText_Render(cmd, pass, target, target_w, target_h);
+}
+
+void XwaRemasterHud_RenderWorldPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
+									  AeronRenderTarget* target, const float view[12]) {
+	XwaRemasterHudBoxes_RenderPlanes(cmd, pass, target, view, XWA_HUD_TARGET_BOX_BEFORE_FIXED);
+	XwaRemasterHudFixed_RenderPlanes(cmd, pass, target, view);
+	XwaRemasterHudBoxes_RenderPlanes(cmd, pass, target, view, XWA_HUD_TARGET_BOX_AFTER_FIXED);
+	XwaRemasterHudReadout_RenderPlanes(cmd, pass, target, view);
+	XwaRemasterHudText_RenderPlanes(cmd, pass, target, view);
 }
 
 void XwaRemasterHud_Render2D(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							 int target_w, int target_h) {
-	XwaRemasterHud_RenderFixed(cmd, pass, target, target_w, target_h, XWA_HUD_GROUP_ALL);
+	XwaRemasterHud_RenderFixed(cmd, pass, target, target_w, target_h);
 	XwaRemasterHud_RenderCmd(cmd, pass, target, target_w, target_h);
-	XwaRemasterHud_RenderText(cmd, pass, target, target_w, target_h, XWA_HUD_GROUP_ALL);
+	XwaRemasterHud_RenderText(cmd, pass, target, target_w, target_h);
 }

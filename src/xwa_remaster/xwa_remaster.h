@@ -44,6 +44,9 @@ typedef struct XwaRemasterInitOptions {
 	   run, whatever the video options say, and 2 as the debug UI's stereo
 	   view with the head looking straight ahead. 0 follows the options. */
 	int flight_views;
+	/* --stereo-head: the head's pose of that stereo view, in degrees: to
+	   the right, up, and rolled clockwise. */
+	float stereo_head[3];
 } XwaRemasterInitOptions;
 
 /* Loads mandatory renderer resources and creates process-wide remaster state. */

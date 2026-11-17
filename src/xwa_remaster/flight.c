@@ -16,7 +16,6 @@
 #include "aeron/scene/scene3d.h"
 #include "aeron/scene/settings.h"
 #include "aeron/scene/view_rig.h"
-#include "xwa_remaster/hud_reproject_math.h"
 #include "aeron/scene/world.h"
 #include "xwa_remaster/captured_lighting.h"
 #include "xwa_remaster/color.h"
@@ -25,6 +24,8 @@
 #include "xwa_remaster/flight_map.h"
 #include "xwa_remaster/glow_marks.h"
 #include "xwa_remaster/hud.h"
+#include "xwa_remaster/hud_planes.h"
+#include "xwa_remaster/hud_reproject_math.h"
 #include "xwa_remaster/hyperspace.h"
 #include "xwa_remaster/probe_outlines.h"
 #include "xwa_remaster/ship.h"
@@ -317,33 +318,33 @@ static struct {
 	 * with premultiplied alpha, and then over the primary view. */
 	AeronRenderTarget* hud_rt;
 	AeronDrawList2D* hud_composite;
-	/* A headset's HUD (hud.h). The world group is drawn into hud_world_rt
-	 * and shown at infinity. It is laid out for hud_world_view, which
-	 * follows the head and covers both eyes, so its image has about the
-	 * pixels of an eye image. The fixed group is drawn into hud_panel_rt
-	 * and shown on a panel in the cockpit. It is laid out for hud_view, the
-	 * seat's view with the classic field of view, in an image of
-	 * presentation.vr_hud_*_px. */
-	AeronRenderTarget* hud_world_rt;
+	/* A headset's HUD (hud.h), which the debug stereo view has too. It is
+	 * laid out for hud_view: the seat's view with the game camera's vertical
+	 * field of view, in an image of presentation.vr_hud_*_px. The fixed
+	 * group is drawn into hud_panel_rt and shown on a panel in the cockpit.
+	 * The world group is drawn into each eye on the planes of hud_planes
+	 * (hud_planes.h). hud_head_view follows the head and has no image: the
+	 * arrow to a target out of view is placed in it. */
 	AeronRenderTarget* hud_panel_rt;
 	XwaRemasterFlightView hud_view;
-	XwaRemasterFlightView hud_world_view;
-	int hud_world_w;
-	int hud_world_h;
-	/* This frame draws the HUD as the two images, and they are drawn. */
+	XwaRemasterFlightView hud_head_view;
+	XwaRemasterHudPlanes hud_planes;
+	/* This frame draws the headset's HUD, and the panel's image is drawn. */
 	int headset_hud;
 	int headset_hud_drawn;
 	AeronShader* hud_reproject_vs;
 	AeronShader* hud_reproject_fs;
 	AeronGraphicsPipeline* hud_reproject_pipeline;
 	AeronTextureFormat hud_reproject_format;
-	/* presentation.vr_hud_*: the images' size, and the panel's distance
-	 * from the seat's eye point in metres and its size, where 1 covers the
-	 * classic view. */
+	/* presentation.vr_hud_*: the image's size, and the panel's distance
+	 * from the seat's eye point in metres. vr_hud_panel_scale is the
+	 * panel's size, where 1 covers the HUD's view
+	 * (XwaRemasterFlight_SetHudPanelScale). */
 	int vr_hud_width_px;
 	int vr_hud_height_px;
 	float vr_hud_panel_distance_m;
 	float vr_hud_panel_scale;
+	float vr_hud_reticle_scale;
 	/* presentation.vr_hud_arrow_*: where the arrow to a target out of view
 	 * is, and when it shows, as fractions of what both eyes see
 	 * (XwaRemasterFlightView.arrow_rect). */
@@ -826,9 +827,9 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"presentation.debug_stereo_ipd_m",
 		"presentation.debug_stereo_fov_deg",
 		"presentation.vr_screen_distance_m",
-		"presentation.vr_screen_width_m",
+		"presentation.vr_screen_width_deg",
 		"presentation.vr_hud_panel_distance_m",
-		"presentation.vr_hud_panel_scale",
+		"presentation.vr_hud_reticle_scale",
 		"presentation.vr_hud_arrow_position",
 		"presentation.vr_hud_arrow_view",
 		"hangar_lighting.direction_x",
@@ -1783,7 +1784,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.vr_hud_height_px = (int)AeronConfigFile_GetInt(cf, "presentation.vr_hud_height_px", 0);
 	s.vr_hud_panel_distance_m =
 		(float)AeronConfigFile_GetFloat(cf, "presentation.vr_hud_panel_distance_m", 0.0);
-	s.vr_hud_panel_scale = (float)AeronConfigFile_GetFloat(cf, "presentation.vr_hud_panel_scale", 0.0);
+	s.vr_hud_reticle_scale = (float)AeronConfigFile_GetFloat(cf, "presentation.vr_hud_reticle_scale", 0.0);
 	s.vr_hud_arrow_position = (float)AeronConfigFile_GetFloat(cf, "presentation.vr_hud_arrow_position", 0.0);
 	s.vr_hud_arrow_view = (float)AeronConfigFile_GetFloat(cf, "presentation.vr_hud_arrow_view", 0.0);
 	if (!fl_in_range(s.vr_hud_arrow_position, 0.1f, 1.0f) ||
@@ -1797,11 +1798,11 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	}
 	if (s.vr_hud_width_px < 640 || s.vr_hud_width_px > 8192 || s.vr_hud_height_px < 480 ||
 		s.vr_hud_height_px > 8192 || !fl_in_range(s.vr_hud_panel_distance_m, 0.2f, 20.0f) ||
-		!fl_in_range(s.vr_hud_panel_scale, 0.2f, 2.0f)) {
+		!fl_in_range(s.vr_hud_reticle_scale, 0.3f, 1.5f)) {
 		Aeron_LogError("xwa.remaster",
 					   "%s: presentation.vr_hud_width_px must be between 640 and 8192, "
 					   "vr_hud_height_px between 480 and 8192, vr_hud_panel_distance_m between 0.2 and 20, "
-					   "and vr_hud_panel_scale between 0.2 and 2",
+					   "and vr_hud_reticle_scale between 0.3 and 1.5",
 					   path);
 		AeronConfigFile_Destroy(cf);
 		return 0;
@@ -3016,9 +3017,9 @@ void XwaRemasterFlight_GetTemporalStats(XwaFlightTemporalStats* out) {
 	out->profile_available = AeronScene_GetTemporalProfileInfo(s.scene, &out->profile);
 }
 
-/* The field of view of the view that a headset's world HUD group is laid
- * out for: it covers every eye of `rig`, with a small margin, because the
- * eyes of some headsets point a little apart. */
+/* The field of view of the view that follows the head of `rig`, in which
+ * the arrow to a target out of view is placed: it covers every eye, with a
+ * small margin, because the eyes of some headsets point a little apart. */
 static AeronViewFov fl_headset_world_fov(const AeronViewRig* rig) {
 	const float margin = 3.0f * (3.14159265f / 180.0f);
 	const float limit = 80.0f * (3.14159265f / 180.0f);
@@ -3036,10 +3037,10 @@ static AeronViewFov fl_headset_world_fov(const AeronViewRig* rig) {
 	return fov;
 }
 
-/* Returns the part of the world HUD group's view that every eye of `rig`
+/* Returns the part of the head's view `head_view` that every eye of `rig`
  * sees, in the view's pixels. The eyes' fields of view are taken as if the
  * eyes looked the same way as the head. */
-static AeronRectI fl_headset_shared_rect(const AeronViewRig* rig, const XwaRemasterFlightView* world_view) {
+static AeronRectI fl_headset_shared_rect(const AeronViewRig* rig, const XwaRemasterFlightView* head_view) {
 	AeronViewFov fov = rig->views[0].fov;
 	for (int i = 1; i < rig->count; i++) {
 		fov.angle_left = fmaxf(fov.angle_left, rig->views[i].fov.angle_left);
@@ -3052,24 +3053,11 @@ static AeronRectI fl_headset_shared_rect(const AeronViewRig* rig, const XwaRemas
 	const float bottom_right[3] = { tanf(fov.angle_right), -tanf(fov.angle_down), 1.0f };
 	float x0, y0, x1, y1;
 	AeronRectI rect = { 0, 0, 0, 0 };
-	if (XwaRemasterFlight_ProjectView(world_view, top_left, &x0, &y0) &&
-		XwaRemasterFlight_ProjectView(world_view, bottom_right, &x1, &y1) && x1 > x0 && y1 > y0) {
+	if (XwaRemasterFlight_ProjectView(head_view, top_left, &x0, &y0) &&
+		XwaRemasterFlight_ProjectView(head_view, bottom_right, &x1, &y1) && x1 > x0 && y1 > y0) {
 		rect = (AeronRectI) { (int)x0, (int)y0, (int)(x1 - x0), (int)(y1 - y0) };
 	}
 	return rect;
-}
-
-/* The size of the world HUD group's image: as many pixels for an angle at
- * its centre as an eye image has. */
-static void fl_headset_world_size(const AeronViewRig* rig, int* out_w, int* out_h) {
-	const AeronViewFov eye = rig->views[0].fov;
-	const AeronViewFov fov = fl_headset_world_fov(rig);
-	const float eye_span = tanf(eye.angle_up) - tanf(eye.angle_down);
-	const float focal_px = eye_span > 0.0f ? (float)rig->height / eye_span : (float)rig->height;
-	const int w = (int)ceilf(focal_px * (tanf(fov.angle_right) - tanf(fov.angle_left)));
-	const int h = (int)ceilf(focal_px * (tanf(fov.angle_up) - tanf(fov.angle_down)));
-	*out_w = w < 256 ? 256 : (w > 4096 ? 4096 : w);
-	*out_h = h < 256 ? 256 : (h > 4096 ? 4096 : h);
 }
 
 static void fl_destroy_sized_resources(void) {
@@ -3083,16 +3071,10 @@ static void fl_destroy_sized_resources(void) {
 	if (s.hud_rt) {
 		Aeron_DestroyRenderTarget(s.hud_rt);
 	}
-	if (s.hud_world_rt) {
-		Aeron_DestroyRenderTarget(s.hud_world_rt);
-	}
 	if (s.hud_panel_rt) {
 		Aeron_DestroyRenderTarget(s.hud_panel_rt);
 	}
-	s.hud_world_rt = NULL;
 	s.hud_panel_rt = NULL;
-	s.hud_world_w = 0;
-	s.hud_world_h = 0;
 	if (s.bloom) {
 		AeronSceneBloom_Destroy(s.bloom);
 	}
@@ -3186,13 +3168,11 @@ static int fl_ensure(int target_w, int target_h) {
 	 * one view. */
 	const int view_w = s.rig_active ? s.rig.width : target_w;
 	const int view_h = s.rig_active ? s.rig.height : target_h;
-	int world_w = 0;
-	int world_h = 0;
-	if (s.view_targets_set) {
-		fl_headset_world_size(&s.rig, &world_w, &world_h);
-	}
+	/* A rig that follows a head has the headset's HUD: a real headset, and
+	 * the debug stereo view, which tests it. */
+	const int tracked = s.rig_active && s.rig.tracked;
 	if (s.scene && s.rt_w == view_w && s.rt_h == view_h && s.out_w == target_w && s.out_h == target_h &&
-		(s.hud_rt != NULL) == (s.rig_active != 0) && s.hud_world_w == world_w && s.hud_world_h == world_h &&
+		(s.hud_rt != NULL) == (s.rig_active != 0) && (s.hud_panel_rt != NULL) == (tracked != 0) &&
 		s.scene_requested_samples == requested_samples) {
 		return 1;
 	}
@@ -3260,22 +3240,14 @@ static int fl_ensure(int target_w, int target_h) {
 		Aeron_LogError("xwa.remaster", "flight: bloom create failed");
 		return 0;
 	}
-	if (s.view_targets_set) {
-		s.hud_world_rt =
-			Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = world_w,
-																.height = world_h,
-																.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
-																.debug_name = "xwa.flight.hud_world" });
-		s.hud_world_w = world_w;
-		s.hud_world_h = world_h;
+	if (tracked) {
 		s.hud_panel_rt =
 			Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = s.vr_hud_width_px,
 																.height = s.vr_hud_height_px,
 																.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
 																.debug_name = "xwa.flight.hud_panel" });
 	}
-	if (!s.present_rt || (s.rig_active && !s.hud_rt) ||
-		(s.view_targets_set && (!s.hud_world_rt || !s.hud_panel_rt))) {
+	if (!s.present_rt || (s.rig_active && !s.hud_rt) || (tracked && !s.hud_panel_rt)) {
 		Aeron_LogError("xwa.remaster", "flight: present target create failed");
 		return 0;
 	}
@@ -3345,6 +3317,12 @@ void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float h
 		s.view_targets[i] = targets[i];
 	}
 	s.view_targets_set = 1;
+}
+
+void XwaRemasterFlight_SetHudPanelScale(float scale) {
+	if (scale > 0.0f) {
+		s.vr_hud_panel_scale = scale;
+	}
 }
 
 int XwaRemasterFlight_ViewTargetsRendered(void) { return s.view_targets_rendered; }
@@ -6547,40 +6525,35 @@ static void fl_set_present_debug(AeronScenePresentChain* chain) {
 	AeronScenePresentChain_SetDebug(chain, &debug);
 }
 
-/* Draws the 2D HUD into `pass`. `target` has the size that the HUD was
- * prepared for. `readout_scene` is the scene whose depth hides the target
- * readout behind near geometry, or NULL to draw the whole readout. `group`
- * is the part of a split HUD to draw (hud.h), or all of it. */
+/* Draws the 2D HUD into `pass`, flat. `target` has the size that the HUD
+ * was prepared for. `readout_scene` is the scene whose depth hides the
+ * target readout behind near geometry, or NULL to draw the whole readout.
+ * When the HUD is split (hud.h), this draws its fixed group: the world
+ * group is on planes, and fl_draw_headset_hud draws it. */
 static void fl_draw_hud(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-						int target_w, int target_h, AeronScene3D* readout_scene, XwaHudGroup group) {
-	const int world = group != XWA_HUD_GROUP_FIXED;
-	const int fixed = group != XWA_HUD_GROUP_WORLD;
+						int target_w, int target_h, AeronScene3D* readout_scene) {
 	/* With the Dynamic Cockpit active the HUD's lists already leave out
 	 * what the cockpit's screens show (XwaRemasterDc_AddSprite). */
-	if (world && !s.map_present) {
+	if (!s.map_present) {
 		Aeron_GpuDebugMarker(cmd, "HUD target boxes before fixed");
 		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
 										 XWA_HUD_TARGET_BOX_BEFORE_FIXED);
 	}
 	Aeron_GpuDebugMarker(cmd, "HUD fixed");
-	XwaRemasterHud_RenderFixed(cmd, pass, target, target_w, target_h, group);
-	if (world && !s.map_present) {
+	XwaRemasterHud_RenderFixed(cmd, pass, target, target_w, target_h);
+	if (!s.map_present) {
 		Aeron_GpuDebugMarker(cmd, "HUD target boxes after fixed");
 		XwaRemasterHud_RenderTargetBoxes(cmd, pass, target, target_w, target_h,
 										 XWA_HUD_TARGET_BOX_AFTER_FIXED);
 		Aeron_GpuDebugMarker(cmd, "HUD target readout");
 		XwaRemasterHudReadout_Render(cmd, pass, target, target_w, target_h, readout_scene);
 	}
-	if (fixed) {
-		Aeron_GpuDebugMarker(cmd, "HUD CMD");
-		XwaRemasterHud_RenderCmd(cmd, pass, target, target_w, target_h);
-	}
+	Aeron_GpuDebugMarker(cmd, "HUD CMD");
+	XwaRemasterHud_RenderCmd(cmd, pass, target, target_w, target_h);
 	Aeron_GpuDebugMarker(cmd, "HUD text");
-	XwaRemasterHud_RenderText(cmd, pass, target, target_w, target_h, group);
-	if (fixed) {
-		XwaRemasterDc_RenderDebugOverlay(cmd, pass, target);
-	}
-	if (fixed && s.map_present) {
+	XwaRemasterHud_RenderText(cmd, pass, target, target_w, target_h);
+	XwaRemasterDc_RenderDebugOverlay(cmd, pass, target);
+	if (s.map_present) {
 		Aeron_GpuDebugMarker(cmd, "Flight map deferred text");
 		XwaRemasterFlightMap_RenderDeferredText(cmd, pass, target);
 	}
@@ -6597,7 +6570,7 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	const AeronRectI full_target = { 0, 0, target_w, target_h };
 	fl_draw_present_scene(pass, chain, &full_target, NULL);
 	if (!s.suppress_hud) {
-		fl_draw_hud(cmd, pass, target, target_w, target_h, s.scene, XWA_HUD_GROUP_ALL);
+		fl_draw_hud(cmd, pass, target, target_w, target_h, s.scene);
 	}
 }
 
@@ -6616,7 +6589,7 @@ static int fl_render_rig_hud(AeronCommandBuffer* cmd, AeronRectI rect, int targe
 	}
 	/* The readout isn't hidden by depth here: the scene's depth belongs to
 	 * the view that was rendered last. */
-	fl_draw_hud(cmd, pass, s.hud_rt, s.flat_w, s.flat_h, NULL, XWA_HUD_GROUP_ALL);
+	fl_draw_hud(cmd, pass, s.hud_rt, s.flat_w, s.flat_h, NULL);
 	Aeron_EndRenderPass(pass);
 	AeronDrawList_Begin(s.hud_composite, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	AeronDrawList_AddSprite(s.hud_composite, &(AeronDrawList2DSprite) {
@@ -6634,34 +6607,20 @@ static int fl_render_rig_hud(AeronCommandBuffer* cmd, AeronRectI rect, int targe
 	return AeronDrawList_Prepare(s.hud_composite, cmd);
 }
 
-/* Draws one group of a headset's HUD into its image of `width` x `height`
- * pixels. The group's lists must be prepared for that size. */
-static int fl_render_hud_group(AeronCommandBuffer* cmd, AeronRenderTarget* target, int width, int height,
-							   XwaHudGroup group) {
+/* Draws the fixed group of a headset's HUD into the panel's image. */
+static int fl_render_headset_hud(AeronCommandBuffer* cmd) {
 	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
-		.color_target = target,
+		.color_target = s.hud_panel_rt,
 		.clear_color = 1,
 		.clear_color_rgba = { 0.0f, 0.0f, 0.0f, 0.0f },
 		.command_buffer = cmd,
-		.debug_label = group == XWA_HUD_GROUP_WORLD ? "OpenXWA flight HUD at infinity" : "OpenXWA flight HUD panel",
+		.debug_label = "OpenXWA flight HUD panel",
 	});
 	if (!pass) {
 		return 0;
 	}
-	/* The readout isn't hidden by depth: the scene's depth belongs to the
-	 * view that was rendered last. */
-	fl_draw_hud(cmd, pass, target, width, height, NULL, group);
+	fl_draw_hud(cmd, pass, s.hud_panel_rt, s.vr_hud_width_px, s.vr_hud_height_px, NULL);
 	Aeron_EndRenderPass(pass);
-	return 1;
-}
-
-/* Draws the fixed group of a headset's HUD into the panel's image. The
- * world group's image is drawn earlier, before the HUD is prepared for the
- * panel (XwaRemasterFlight_Render). */
-static int fl_render_headset_hud(AeronCommandBuffer* cmd) {
-	if (!fl_render_hud_group(cmd, s.hud_panel_rt, s.vr_hud_width_px, s.vr_hud_height_px, XWA_HUD_GROUP_FIXED)) {
-		return 0;
-	}
 	s.headset_hud_drawn = 1;
 	return 1;
 }
@@ -6721,18 +6680,20 @@ static AeronGraphicsPipeline* fl_hud_reproject_pipeline(AeronTextureFormat forma
 
 /* Draws one HUD image into the eye image of the open pass, with the matrix
  * that takes an eye pixel to a point of the HUD image. */
-static void fl_draw_hud_image(AeronRenderPass* pass, AeronGraphicsPipeline* pipeline, AeronRenderTarget* image,
-							  const float matrix[9]) {
+static void fl_draw_hud_image(AeronRenderPass* pass, AeronGraphicsPipeline* pipeline,
+							  AeronRenderTarget* image, const float matrix[9], const AeronRectI* rect) {
 	const struct {
 		float row_x[4];
 		float row_y[4];
 		float row_w[4];
 		float params[4];
+		float origin[4];
 	} uniform = {
 		{ matrix[0], matrix[1], matrix[2], 0.0f },
 		{ matrix[3], matrix[4], matrix[5], 0.0f },
 		{ matrix[6], matrix[7], matrix[8], 0.0f },
-		{ 2.0f / (float)s.rt_w, 2.0f / (float)s.rt_h, 1.0f, 0.0f },
+		{ 2.0f / (float)rect->width, 2.0f / (float)rect->height, 1.0f, 0.0f },
+		{ (float)rect->x, (float)rect->y, 0.0f, 0.0f },
 	};
 	Aeron_BindGraphicsPipeline(pass, pipeline);
 	Aeron_BindTextureSampler(pass, AERON_SHADER_STAGE_FRAGMENT, 0, Aeron_RenderTargetGetTexture(image),
@@ -6741,26 +6702,30 @@ static void fl_draw_hud_image(AeronRenderPass* pass, AeronGraphicsPipeline* pipe
 	Aeron_Draw(pass, 3, 0);
 }
 
-/* Draws the headset's HUD over the eye image of `view`, in the open pass:
- * the world group at infinity, then the fixed group on its panel. The panel
- * is in front of the seat's eye point and faces it. At scale 1 it covers
- * the HUD's view exactly as seen from the seat, so the HUD has its classic
- * layout, and the two eyes see it at the panel's distance. */
-static int fl_draw_headset_hud(AeronRenderPass* pass, int view, AeronTextureFormat format) {
-	AeronGraphicsPipeline* pipeline = fl_hud_reproject_pipeline(format);
+/* Draws the headset's HUD over the image of `view`, in the open pass, whose
+ * viewport is the view's rectangle `rect` of `target`: the world group on
+ * its planes, then the fixed group on its panel. The panel is in front of
+ * the seat's eye point and faces it. At scale 1 it covers the HUD's view
+ * exactly as seen from the seat, so the HUD has its classic layout, and the
+ * two eyes see it at the panel's distance. */
+static int fl_draw_headset_hud(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
+							   int view, const AeronRectI* rect) {
+	AeronGraphicsPipeline* pipeline =
+		fl_hud_reproject_pipeline(Aeron_TextureGetFormat(Aeron_RenderTargetGetTexture(target)));
 	if (!pipeline) {
 		return 0;
 	}
+	float view_rows[12];
+	XwaHudPlanes_ViewRows(s.views[view].view_proj, view_rows);
+	XwaRemasterHud_RenderWorldPlanes(cmd, pass, target, view_rows);
 	float matrix[9];
-	if (XwaHudReproject_Infinity(s.views[view].view_proj, s.hud_world_view.view_proj, matrix)) {
-		fl_draw_hud_image(pass, pipeline, s.hud_world_rt, matrix);
-	}
 	const AeronSceneCamera* seat = &s.hud_view.camera;
 	float rows[9], center[3], half_right[3], half_up[3];
 	fl_quat_to_mat3(seat->ori, rows);
 	const float distance = s.vr_hud_panel_distance_m * s.head_units_per_meter;
-	const float half_w = distance * tanf(seat->h_half_rad) * s.vr_hud_panel_scale;
-	const float half_h = distance * tanf(seat->v_half_rad) * s.vr_hud_panel_scale;
+	const float panel_scale = s.vr_hud_panel_scale > 0.0f ? s.vr_hud_panel_scale : 1.0f;
+	const float half_w = distance * tanf(seat->h_half_rad) * panel_scale;
+	const float half_h = distance * tanf(seat->v_half_rad) * panel_scale;
 	for (int axis = 0; axis < 3; axis++) {
 		/* The rows are the view's right, down and forward axes. */
 		center[axis] = seat->pos[axis] + rows[6 + axis] * distance;
@@ -6768,7 +6733,7 @@ static int fl_draw_headset_hud(AeronRenderPass* pass, int view, AeronTextureForm
 		half_up[axis] = -rows[3 + axis] * half_h;
 	}
 	if (XwaHudReproject_Panel(s.views[view].view_proj, center, half_right, half_up, matrix)) {
-		fl_draw_hud_image(pass, pipeline, s.hud_panel_rt, matrix);
+		fl_draw_hud_image(pass, pipeline, s.hud_panel_rt, matrix, rect);
 	}
 	return 1;
 }
@@ -6833,9 +6798,10 @@ static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int
 	} else if (s.view_targets_set) {
 		rect = fl_fit_view_rect(s.flat_w, s.flat_h, s.out_w, s.out_h);
 	}
-	/* A headset's HUD is in every eye, from its two images. Otherwise the
-	 * HUD is drawn flat over the primary view. */
-	const int headset_hud = own_target && s.headset_hud && !s.suppress_hud;
+	/* A headset's HUD is in every eye: its world group on planes and its
+	 * fixed group on the panel. Otherwise the HUD is drawn flat over the
+	 * primary view. */
+	const int headset_hud = s.headset_hud && !s.suppress_hud;
 	const int hud = !headset_hud && view == s.rig.primary && !s.suppress_hud && !s.compose_before_tonemap;
 	if (headset_hud && !s.headset_hud_drawn && !fl_render_headset_hud(cmd)) {
 		return 0;
@@ -6866,8 +6832,7 @@ static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int
 		Aeron_SetScissor(pass, &full_target);
 		AeronDrawList_RenderIntoPass(s.hud_composite, cmd, pass, target);
 	}
-	if (headset_hud &&
-		!fl_draw_headset_hud(pass, view, Aeron_TextureGetFormat(Aeron_RenderTargetGetTexture(target)))) {
+	if (headset_hud && !fl_draw_headset_hud(cmd, pass, target, view, &rect)) {
 		Aeron_EndRenderPass(pass);
 		return 0;
 	}
@@ -8399,27 +8364,77 @@ uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float cro
  * over: the primary view. */
 static const XwaRemasterFlightView* fl_build_hud_view(void) { return &s.views[s.primary_view]; }
 
-/* Builds the view that a headset's HUD is laid out for: the seat's view,
- * which doesn't turn with the head, with the field of view that the classic
- * view has in an image of the HUD's size. `seat` is the game camera's view.
- * The view is centred on the seat's axis, so the game's own shift of the
- * horizon isn't in it. */
+/* Builds the view that a headset's HUD is laid out for, and the planes that
+ * its world group is drawn on (hud_planes.h).
+ *
+ * The view is the seat's: it doesn't turn with the head. `seat` is the game
+ * camera's view. The view has the HUD's size, and its height shows the game
+ * camera's vertical field of view, as a window does. So the HUD's parts
+ * have the angular size they have on a screen. The wider view that a narrow
+ * window gets (presentation.cockpit_fov_min_aspect) isn't used: the HUD's
+ * image isn't a window. The view is centred on the seat's axis, so the
+ * game's own shift of the horizon isn't in it. */
 static const XwaRemasterFlightView* fl_build_headset_hud_view(const XwaFlightCamera* cam,
 															  const XwaRemasterFlightView* seat,
-															  const float* view_rotation) {
+															  const float* view_rotation,
+															  const AeronViewRig* rig) {
 	XwaRemasterFlightView classic;
 	if (!fl_build_view_at_origin(cam, cam->world_pos, s.vr_hud_width_px, s.vr_hud_height_px, view_rotation,
-								 &classic)) {
+								 &classic) ||
+		!(classic.projection_pixel_scale > 0.0f)) {
 		return NULL;
 	}
-	const float h = classic.camera.h_half_rad;
-	const float v = classic.camera.v_half_rad;
+	const float widen = classic.classic_pixel_scale / classic.projection_pixel_scale;
+	const float tan_v = tanf(classic.camera.v_half_rad) / widen;
+	const float tan_h = tan_v * (float)s.vr_hud_width_px / (float)s.vr_hud_height_px;
+	const float h = atanf(tan_h);
+	const float v = atanf(tan_v);
 	const AeronViewFov fov = { -h, h, v, -v };
 	const AeronViewPose pose = { .orientation = { 0.0f, 0.0f, 0.0f, 1.0f } };
 	fl_build_rig_view(cam, seat, &pose, &fov, s.vr_hud_width_px, s.vr_hud_height_px, &s.hud_view);
 	/* The HUD's own projection isn't the game's: the reticle is placed
 	 * from the craft's nose, as in a view that turns with the head. */
 	s.hud_view.head_tracked = 1;
+
+	XwaRemasterHudPlanes* planes = &s.hud_planes;
+	memset(planes, 0, sizeof *planes);
+	planes->focal_px = 0.5f * (float)s.vr_hud_height_px / tan_v;
+	planes->center_x = 0.5f * (float)s.vr_hud_width_px;
+	planes->center_y = 0.5f * (float)s.vr_hud_height_px;
+	planes->reticle_scale = s.vr_hud_reticle_scale;
+	const AeronViewFov eye_fov = rig->views[0].fov;
+	const float eye_span = tanf(eye_fov.angle_up) - tanf(eye_fov.angle_down);
+	planes->eye_pixel_scale = eye_span > 0.0f ? (float)rig->height / eye_span / planes->focal_px : 1.0f;
+	/* The seat's plane: a pixel of the seat's view to its direction. The
+	 * rows are the view's right, down and forward axes. */
+	float rows[9];
+	fl_quat_to_mat3(s.hud_view.camera.ori, rows);
+	for (int axis = 0; axis < 3; axis++) {
+		planes->seat_plane[axis * 3 + 0] = rows[axis] / planes->focal_px;
+		planes->seat_plane[axis * 3 + 1] = rows[3 + axis] / planes->focal_px;
+		planes->seat_plane[axis * 3 + 2] =
+			rows[6 + axis] -
+			(planes->center_x * rows[axis] + planes->center_y * rows[3 + axis]) / planes->focal_px;
+	}
+	/* The head: the rig's centre. Its view covers both eyes, with the HUD
+	 * image's pixels for an angle. */
+	const AeronViewFov head_fov = fl_headset_world_fov(rig);
+	const int head_w =
+		(int)ceilf(planes->focal_px * (tanf(head_fov.angle_right) - tanf(head_fov.angle_left)));
+	const int head_h = (int)ceilf(planes->focal_px * (tanf(head_fov.angle_up) - tanf(head_fov.angle_down)));
+	fl_build_rig_view(cam, seat, &rig->center, &head_fov, head_w, head_h, &s.hud_head_view);
+	s.hud_head_view.head_tracked = 1;
+	s.hud_head_view.arrow_rect = fl_headset_shared_rect(rig, &s.hud_head_view);
+	s.hud_head_view.arrow_position = s.vr_hud_arrow_position;
+	s.hud_head_view.arrow_view = s.vr_hud_arrow_view;
+	memcpy(planes->head_pos, s.hud_head_view.camera.pos, sizeof planes->head_pos);
+	fl_quat_to_mat3(s.hud_head_view.camera.ori, planes->head_rows);
+	planes->head_view = &s.hud_head_view;
+	const float axis[3] = { 0.0f, 0.0f, 1.0f };
+	if (!XwaRemasterFlight_ProjectView(&s.hud_head_view, axis, &planes->head_axis_x, &planes->head_axis_y)) {
+		return NULL;
+	}
+	s.hud_view.hud_planes = planes;
 	return &s.hud_view;
 }
 
@@ -8532,13 +8547,14 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		rig && rig->tracked && s.rendered_tick_valid && s.rendered_tick == snap->tick_index;
 	s.rendered_tick = snap->tick_index;
 	s.rendered_tick_valid = 1;
-	/* A headset's HUD is two images of their own size (hud.h). The map has
-	 * the usual flat HUD, in the view's size. */
+	/* A headset's HUD is laid out for the seat's own view (hud.h): its
+	 * fixed group goes on a panel and its world group on planes. The map
+	 * has the usual flat HUD, in the view's size. */
 	const XwaRemasterFlightView* hud_view = NULL;
-	s.headset_hud = rig && s.view_targets_set && s.hud_world_rt && s.hud_panel_rt && !s.compose_before_tonemap;
+	s.headset_hud = rig && rig->tracked && s.hud_panel_rt && !s.compose_before_tonemap;
 	s.headset_hud_drawn = 0;
 	if (s.headset_hud) {
-		hud_view = fl_build_headset_hud_view(cam, &flight_view, view_rotated ? view_rotation : NULL);
+		hud_view = fl_build_headset_hud_view(cam, &flight_view, view_rotated ? view_rotation : NULL, rig);
 		s.headset_hud = hud_view != NULL;
 	}
 	if (!hud_view) {
@@ -8547,23 +8563,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const int hud_w = s.headset_hud ? s.vr_hud_width_px : view_w;
 	const int hud_h = s.headset_hud ? s.vr_hud_height_px : view_h;
 	XwaRemasterHud_SetWorldSplit(s.headset_hud);
-	if (s.headset_hud) {
-		/* The world group follows the head: its view is where the head is,
-		 * and covers both eyes. It is drawn now, because the HUD's lists are
-		 * prepared again below for the cockpit's view. */
-		const AeronViewFov world_fov = fl_headset_world_fov(rig);
-		fl_build_rig_view(cam, &flight_view, &rig->center, &world_fov, s.hud_world_w, s.hud_world_h,
-						  &s.hud_world_view);
-		s.hud_world_view.head_tracked = 1;
-		s.hud_world_view.arrow_rect = fl_headset_shared_rect(rig, &s.hud_world_view);
-		s.hud_world_view.arrow_position = s.vr_hud_arrow_position;
-		s.hud_world_view.arrow_view = s.vr_hud_arrow_view;
-		s.map_present = 0;
-		XwaRemasterHud_PrepareWorldGroup(cmd, snap, assets, &s.hud_world_view, s.hud_world_w, s.hud_world_h);
-		if (!fl_render_hud_group(cmd, s.hud_world_rt, s.hud_world_w, s.hud_world_h, XWA_HUD_GROUP_WORLD)) {
-			return NULL;
-		}
-	}
 	/* Dynamic Cockpit: decided before the HUD prepares its lists (which
 	 * route through it), captured after. */
 	XwaRemasterDc_BeginFrame(snap,

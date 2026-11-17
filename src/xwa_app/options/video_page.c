@@ -114,6 +114,8 @@ static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) 
 	int mode = (int)options->vr_mode;
 	int render_percent = (int)lroundf(options->vr_render_scale * 100.0f);
 	int world_percent = (int)lroundf(options->vr_world_scale * 100.0f);
+	int panel_percent = (int)lroundf(options->vr_panel_scale * 100.0f);
+	int screen_percent = (int)lroundf(options->vr_screen_scale * 100.0f);
 	bool changed = false;
 
 	if (!Aeron_XrSupported())
@@ -145,6 +147,21 @@ static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) 
 		}
 		AeronUi_Help(ui, "How far the view moves when your head moves. Above 100%, the cockpit and the "
 						 "world look smaller.");
+		if (AeronUi_SliderInt(ui, "Cockpit Panel Size", &panel_percent,
+							  (int)(XWA_MODERN_VR_PANEL_SCALE_MIN * 100.0f),
+							  (int)(XWA_MODERN_VR_PANEL_SCALE_MAX * 100.0f), 5, "%d%%")) {
+			options->vr_panel_scale = (float)panel_percent / 100.0f;
+			changed = true;
+		}
+		AeronUi_Help(ui, "The size of the panel that shows the radars, the gauges and the text in the "
+						 "cockpit.");
+		if (AeronUi_SliderInt(ui, "Menu Screen Size", &screen_percent,
+							  (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f),
+							  (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5, "%d%%")) {
+			options->vr_screen_scale = (float)screen_percent / 100.0f;
+			changed = true;
+		}
+		AeronUi_Help(ui, "The size of the screen that shows the menus, the briefings and the movies.");
 		changed |= AeronUi_Toggle(ui, "Show Headset View in Window", &options->vr_mirror);
 	}
 	if ((mode != started_mode || (mode != XWA_MODERN_VR_OFF && render_percent != started_render_percent)) &&

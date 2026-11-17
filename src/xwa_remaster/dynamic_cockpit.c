@@ -847,13 +847,7 @@ static void dc_route(AeronDrawList2D* screen, XwaRemasterDcLayer layer, const fl
 	}
 }
 
-/* While set, the HUD's records go to their lists unchanged
- * (XwaRemasterDc_SetSuspended). */
-static int dc_suspended;
-
-void XwaRemasterDc_SetSuspended(int suspended) { dc_suspended = suspended != 0; }
-
-static int dc_routing(void) { return dc.active && dc.capture_open && !dc_suspended; }
+static int dc_routing(void) { return dc.active && dc.capture_open; }
 
 static void dc_emit_sprite(AeronDrawList2D* list, const void* record, int dx, int dy,
 						   const AeronRectI* scissor) {

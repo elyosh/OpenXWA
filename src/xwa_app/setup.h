@@ -39,6 +39,9 @@ typedef struct XwaLaunchOptions {
 	/* --flight-views: draw the flight scene for this run as a surround
 	   setup (1) or as the two eyes of a headset (2), or 0. */
 	int flight_views;
+	/* --stereo-head: the head's pose of --flight-views stereo, in degrees:
+	   to the right, up, and rolled clockwise. */
+	float stereo_head[3];
 	/* --vr: start in VR, and fail when it can't start (1). --no-vr: start
 	   without VR (-1). 0 follows video.vr_mode of the configuration. */
 	int vr;
@@ -55,9 +58,10 @@ typedef struct XwaRelaunchArgs {
 	char resource_root[XWA_INSTALL_PATH_CAPACITY];
 	char mod[XWA_INSTALL_PATH_CAPACITY];
 	char render_size[32];
+	char stereo_head[64];
 	/* The game's arguments of XwaLaunchOptions, and " skipintro". */
 	char game_command_line[1024 + sizeof " skipintro"];
-	const char* args[15];
+	const char* args[17];
 	int count;
 } XwaRelaunchArgs;
 

@@ -545,6 +545,8 @@ void XwaRemasterFlight_GetTemporalStats(XwaFlightTemporalStats* out);
 /* Renderer-owned main-flight view. HUD layouts never participate in its
  * construction. The captured classic projection supplies vertical framing;
  * the active viewport aspect supplies the horizontal field of view. */
+struct XwaRemasterHudPlanes;
+
 typedef struct XwaRemasterFlightView {
 	AeronSceneCamera camera;
 	float view_proj[16];
@@ -572,6 +574,9 @@ typedef struct XwaRemasterFlightView {
 	AeronRectI arrow_rect;
 	float arrow_position;
 	float arrow_view;
+	/* For the seat's HUD view of a headset: the planes that the HUD's world
+	 * group is drawn on (hud_planes.h). NULL draws the HUD flat. */
+	const struct XwaRemasterHudPlanes* hud_planes;
 } XwaRemasterFlightView;
 
 int XwaRemasterFlight_BuildView(const XwaFlightCamera* camera, int target_w, int target_h,
@@ -688,12 +693,16 @@ void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig);
  * targets and not into the composed presentation, motion blur and the
  * hyperspace camera shake are off, and the map is drawn in the middle of the
  * composed presentation. The HUD is then drawn in every view, as two
- * groups: one at infinity and one on a panel in the cockpit (hud.h).
+ * groups: one on planes in 3D and one on a panel in the cockpit (hud.h).
  * `head_units_per_meter` is the number of scene units that one metre of the
  * player's head movement covers; the panel's distance uses it. Call it after
  * XwaRemasterFlight_SetViewRig, which removes the targets. NULL removes them
  * too. */
 void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float head_units_per_meter);
+/* For a headset: how large the cockpit panel that shows the HUD's fixed
+ * group looks. At 1 it covers the HUD's view as seen from the seat. The
+ * panel keeps its distance. A value that isn't above 0 is ignored. */
+void XwaRemasterFlight_SetHudPanelScale(float scale);
 /* For a headset, after XwaRemasterFlight_SetViewTargets: gives each view's
  * hidden area, the part of the eye image that the lens never shows, and its
  * visible area, the rest (AeronXrAreaMesh). The scene shades no pixel under

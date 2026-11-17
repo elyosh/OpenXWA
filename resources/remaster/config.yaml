@@ -365,21 +365,27 @@ presentation:
   debug_stereo_fov_deg: 100
   # In VR, the menus, the briefings and the movies are shown on a flat
   # screen in front of the player: its size in pixels, its distance from the
-  # head and its width, in metres. Read when the game starts.
+  # head in metres, and the angle that its width covers, in degrees. With
+  # an angle, the screen looks as large at any distance. Read when the game
+  # starts. The player's video.vr_screen_scale multiplies the width.
   vr_screen_width_px: 1920
   vr_screen_height_px: 1080
   vr_screen_distance_m: 2.0
-  vr_screen_width_m: 2.4
-  # In VR, the flight HUD is drawn into images of this size, in pixels, and
-  # shown in two parts. The reticle, the target boxes and the arrows are
-  # shown far away, so they line up with what they point at. The radars, the
-  # gauges, the MFDs and the text are shown on a flat panel in front of the
-  # seat: its distance in metres, and its size, where 1 covers the same part
-  # of the view as the HUD does on a screen.
+  vr_screen_width_deg: 62
+  # In VR, the flight HUD is laid out for an image of this size, in pixels,
+  # and shown in two parts. The reticle, the target boxes and the arrows are
+  # drawn where the things they point at are, so they line up with them. The
+  # radars, the gauges, the MFDs and the text are drawn into that image and
+  # shown on a flat panel in front of the seat, at this distance in metres.
+  # The panel looks as large at any distance: the player's
+  # video.vr_panel_scale sets its size, where 1 covers the same part of the
+  # view as the HUD does on a screen.
   vr_hud_width_px: 1920
   vr_hud_height_px: 1440
   vr_hud_panel_distance_m: 0.8
-  vr_hud_panel_scale: 1.0
+  # In VR, the size of the reticle and of the marks and counts around it,
+  # where 1 is the size they have on a screen.
+  vr_hud_reticle_scale: 1.0
   # In VR, the arrow that points to a target out of view. Both values are
   # fractions of the part of the view that both eyes see, from its centre:
   # 1 is the edge of that part. vr_hud_arrow_position is where the arrow is

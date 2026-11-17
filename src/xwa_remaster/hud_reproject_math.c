@@ -29,38 +29,6 @@ static int reproject_invert3(const float m[9], float out[9]) {
 	return 1;
 }
 
-static void reproject_mul3(const float a[9], const float b[9], float out[9]) {
-	for (int row = 0; row < 3; row++) {
-		for (int col = 0; col < 3; col++) {
-			out[row * 3 + col] =
-				a[row * 3 + 0] * b[0 * 3 + col] + a[row * 3 + 1] * b[1 * 3 + col] + a[row * 3 + 2] * b[2 * 3 + col];
-		}
-	}
-}
-
-/* The part of a view-projection matrix that projects a direction: the clip
- * X, Y and W of a point at infinity. */
-static void reproject_direction_part(const float view_proj[16], float out[9]) {
-	static const int rows[3] = { 0, 1, 3 };
-	for (int row = 0; row < 3; row++) {
-		for (int col = 0; col < 3; col++) {
-			out[row * 3 + col] = view_proj[rows[row] * 4 + col];
-		}
-	}
-}
-
-int XwaHudReproject_Infinity(const float eye_view_proj[16], const float hud_view_proj[16], float out[9]) {
-	float eye[9], hud[9], eye_inverse[9];
-	reproject_direction_part(eye_view_proj, eye);
-	reproject_direction_part(hud_view_proj, hud);
-	/* The eye pixel's direction, then that direction in the HUD's view. */
-	if (!reproject_invert3(eye, eye_inverse)) {
-		return 0;
-	}
-	reproject_mul3(hud, eye_inverse, out);
-	return 1;
-}
-
 int XwaHudReproject_Panel(const float eye_view_proj[16], const float center[3], const float half_right[3],
 						  const float half_up[3], float out[9]) {
 	/* The panel point (u, v) is center + u * half_right + v * half_up. Its

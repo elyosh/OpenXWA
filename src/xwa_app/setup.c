@@ -231,6 +231,27 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			}
 			continue;
 		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--stereo-head");
+		if (!pass_through && (value || strcmp(argv[i], "--stereo-head") == 0)) {
+			static const char usage[] = "%s requires three angles in degrees, such as 30,0,-15";
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, usage, "--stereo-head");
+				}
+				value = argv[i];
+			}
+			const char* text = value;
+			for (int axis = 0; axis < 3; axis++) {
+				char* end = NULL;
+				const double angle = strtod(text, &end);
+				if (end == text || *end != (axis < 2 ? ',' : '\0') || !(angle >= -180.0 && angle <= 180.0)) {
+					return setup_error(error, error_size, usage, "--stereo-head");
+				}
+				out->stereo_head[axis] = (float)angle;
+				text = end + 1;
+			}
+			continue;
+		}
 		if (!pass_through && strcmp(argv[i], "--vr") == 0) {
 			out->vr = 1;
 			continue;
@@ -312,6 +333,12 @@ int XwaLaunchOptions_RelaunchArgs(const XwaLaunchOptions* launch, int skip_intro
 		out->args[out->count++] = "--flight-views";
 		out->args[out->count++] = launch->flight_views == 1 ? "surround" : "stereo";
 	}
+	if (launch->stereo_head[0] != 0.0f || launch->stereo_head[1] != 0.0f || launch->stereo_head[2] != 0.0f) {
+		snprintf(out->stereo_head, sizeof out->stereo_head, "%g,%g,%g", launch->stereo_head[0],
+				 launch->stereo_head[1], launch->stereo_head[2]);
+		out->args[out->count++] = "--stereo-head";
+		out->args[out->count++] = out->stereo_head;
+	}
 	if (launch->vr) {
 		out->args[out->count++] = launch->vr > 0 ? "--vr" : "--no-vr";
 	}
@@ -358,6 +385,8 @@ const char* XwaLaunchOptions_Help(void) {
 		   "  --flight-views <kind>     for tests: draw the flight scene of this run as\n"
 		   "                            three surround screens (surround), or as the two\n"
 		   "                            eyes of a headset side by side (stereo)\n"
+		   "  --stereo-head <y>,<p>,<r> with --flight-views stereo: the head's pose in\n"
+		   "                            degrees: to the right, up, and rolled clockwise\n"
 		   "  --vr                      start in VR, and stop with a message when VR\n"
 		   "                            can't start\n"
 		   "  --no-vr                   start without VR, whatever the settings say\n"

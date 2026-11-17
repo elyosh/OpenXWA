@@ -214,14 +214,6 @@ void XwaRemasterHud_Shutdown(void);
 void XwaRemasterHud_PrepareFrame(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
 								 XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
 								 int target_w, int target_h);
-/* For a headset, whose world group follows the head while the rest of the
- * HUD stays with the cockpit. It prepares the world group's lists for
- * `flight_view`, with the split on. Draw them (XWA_HUD_GROUP_WORLD) before
- * XwaRemasterHud_PrepareFrame, which prepares every list again for the
- * cockpit's view. */
-void XwaRemasterHud_PrepareWorldGroup(AeronCommandBuffer* cmd, const XwaSnapshot* snapshot,
-									  XwaRemasterAssets* assets, const XwaRemasterFlightView* flight_view,
-									  int target_w, int target_h);
 const XwaRemasterHudPreparedAssets* XwaRemasterHud_PreparedAssets(void);
 void XwaRemasterHud_BeginRenderPhase(void);
 void XwaRemasterHud_EndRenderPhase(void);
@@ -231,35 +223,36 @@ const XwaHudPreparedDrawState* XwaRemasterHud_PreparedDrawState(void);
 void XwaRemasterHud_RenderTargetBoxes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 									  AeronRenderTarget* target, int target_w, int target_h,
 									  XwaHudTargetBoxLayer layer);
-/* In a headset the HUD is drawn as two groups, each into its own image. The
- * world group points at things outside: the target boxes and the target
- * readout, the reticle with its readiness and threat marks and its counts,
- * and the arrows to the target with their text. It is shown at infinity, so
- * it lines up with far objects in both eyes, and it is laid out for a view
- * that follows the head, so a box is on its ship wherever the player looks.
- * The fixed group is the rest:
- * the radars, the gauges, the MFDs, the CMD and the text. It is shown on a
- * panel in the cockpit.
+/* In a headset the HUD is drawn as two groups. The world group points at
+ * things outside: the target boxes and the target readout, the reticle with
+ * its readiness and threat marks and its counts, and the arrows to the
+ * target with their text. It is drawn on planes in 3D, straight into each
+ * eye image (hud_planes.h, XwaRemasterHud_RenderWorldPlanes): the reticle on
+ * a plane that faces the craft's nose, each box on a plane that faces the
+ * player from its target, and the arrow on a plane of its own. The fixed
+ * group is the rest: the radars, the gauges, the MFDs, the CMD and the
+ * text. It is drawn flat, by the other Render functions, into an image that
+ * is shown on a panel in the cockpit.
  *
  * XwaRemasterHud_SetWorldSplit says whether the next XwaRemasterHud_PrepareFrame
- * makes the two groups. Without the split, everything is in the fixed
- * group's lists and in the order of the classic HUD. */
-typedef enum XwaHudGroup {
-	XWA_HUD_GROUP_ALL = 0,
-	XWA_HUD_GROUP_WORLD,
-	XWA_HUD_GROUP_FIXED,
-} XwaHudGroup;
-
+ * makes the two groups. The view it is given must then have its planes
+ * (XwaRemasterFlightView.hud_planes). Without the split, the whole HUD is
+ * drawn flat, in the order of the classic HUD. */
 void XwaRemasterHud_SetWorldSplit(int split);
 int XwaRemasterHud_WorldSplit(void);
 void XwaRemasterHud_RenderFixed(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-								int target_w, int target_h, XwaHudGroup group);
+								int target_w, int target_h);
 void XwaRemasterHud_RenderCmd(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							  int target_w, int target_h);
 void XwaRemasterHud_RenderText(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
-							   int target_w, int target_h, XwaHudGroup group);
+							   int target_w, int target_h);
 void XwaRemasterHud_Render2D(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							 int target_w, int target_h);
+/* Draws the world group of a split HUD on its planes, in the classic order.
+ * `view` has the rows x, y and w of the view-projection matrix of the view
+ * that `pass` draws (XwaHudPlanes_ViewRows). The pass's viewport is used. */
+void XwaRemasterHud_RenderWorldPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
+									  AeronRenderTarget* target, const float view[12]);
 
 #ifdef __cplusplus
 }

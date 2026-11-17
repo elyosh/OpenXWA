@@ -73,11 +73,6 @@ void XwaRemasterDc_BeginFrame(const XwaSnapshot* snapshot, const AeronSceneMesh*
  * target_h target and lays out this frame's capture (hud.c, before the
  * HUD's draw lists). */
 void XwaRemasterDc_PlaceFrame(int target_w, int target_h);
-/* While suspended, XwaRemasterDc_AddSprite and the other Add functions put
- * the records in their lists unchanged. A headset's HUD uses it for the part
- * that it lays out for another view than the cockpit's screens
- * (XwaRemasterHud_PrepareWorldGroup). */
-void XwaRemasterDc_SetSuspended(int suspended);
 /* Adds a HUD record of `layer`. Use these functions in place of
  * AeronDrawList_AddSprite, AddQuad4, AddFill and AddRRect on `screen`. While
  * the dynamic cockpit is active, the record goes to `screen` outside the

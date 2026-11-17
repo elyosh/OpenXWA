@@ -120,6 +120,10 @@ static struct {
 	 * and whether the window shows what the headset shows. */
 	float vr_world_scale;
 	int vr_mirror;
+	/* The headset: how large the HUD's cockpit panel and the virtual
+	 * screen look. */
+	float vr_panel_scale;
+	float vr_screen_scale;
 	/* This frame has eye images from Aeron (Aeron_XrBeginViews). */
 	int xr_views_ready;
 	AeronViewRig headset_rig;
@@ -281,6 +285,10 @@ static int XwaRemaster_VideoOptionsValid(const XwaModernVideoOptions* options) {
 	return options && XwaModernSurroundOptions_Valid(&options->surround) &&
 		   options->vr_world_scale >= XWA_MODERN_VR_SCALE_MIN &&
 		   options->vr_world_scale <= XWA_MODERN_VR_SCALE_MAX &&
+		   options->vr_panel_scale >= XWA_MODERN_VR_PANEL_SCALE_MIN &&
+		   options->vr_panel_scale <= XWA_MODERN_VR_PANEL_SCALE_MAX &&
+		   options->vr_screen_scale >= XWA_MODERN_VR_SCALE_MIN &&
+		   options->vr_screen_scale <= XWA_MODERN_VR_SCALE_MAX &&
 		   options->ssao_quality >= XWA_MODERN_SSAO_OFF && options->ssao_quality <= XWA_MODERN_SSAO_HIGH &&
 		   options->shadow_quality >= XWA_MODERN_SHADOW_STANDARD &&
 		   options->shadow_quality <= XWA_MODERN_SHADOW_HIGH &&
@@ -333,6 +341,8 @@ void XwaRemaster_GetVideoOptions(XwaModernVideoOptions* out) {
 	out->vr_render_scale = 1.0f;
 	out->vr_world_scale = g.vr_world_scale;
 	out->vr_mirror = g.vr_mirror;
+	out->vr_panel_scale = g.vr_panel_scale;
+	out->vr_screen_scale = g.vr_screen_scale;
 }
 
 void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
@@ -380,6 +390,10 @@ void XwaRemaster_SetVideoOptions(const XwaModernVideoOptions* options) {
 	g.surround.enabled = options->surround.enabled != 0;
 	g.vr_world_scale = options->vr_world_scale;
 	g.vr_mirror = options->vr_mirror != 0;
+	g.vr_panel_scale = options->vr_panel_scale;
+	g.vr_screen_scale = options->vr_screen_scale;
+	XwaRemasterFlight_SetHudPanelScale(g.vr_panel_scale);
+	Aeron_XrSetScreenScale(g.vr_screen_scale);
 }
 
 int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
@@ -411,6 +425,8 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	XwaModernSurroundOptions_Default(&g.surround);
 	g.vr_world_scale = 1.0f;
 	g.vr_mirror = 1;
+	g.vr_panel_scale = 1.0f;
+	g.vr_screen_scale = 1.0f;
 	XwaRemasterFlight_GetDebugStereoDefaults(&g.debug_stereo.ipd_m, &g.debug_stereo.fov_deg);
 	g.debug_stereo.mouse_yaw_deg = 90.0f;
 	g.debug_stereo.mouse_pitch_deg = 60.0f;
@@ -418,6 +434,9 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	/* A test run keeps the head still, so that its frames can be compared. */
 	g.debug_stereo.enabled = options->flight_views == 2;
 	g.debug_stereo.mouse_head = !g.debug_stereo.enabled;
+	g.debug_stereo.yaw_deg = options->stereo_head[0];
+	g.debug_stereo.pitch_deg = options->stereo_head[1];
+	g.debug_stereo.roll_deg = options->stereo_head[2];
 	if (!XwaRemasterHud_Init(Aeron_GetVfs())) {
 		return 0;
 	}
@@ -486,6 +505,12 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	}
 	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_MIRROR) {
 		video_options.vr_mirror = options->video_options.vr_mirror;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_PANEL_SCALE) {
+		video_options.vr_panel_scale = options->video_options.vr_panel_scale;
+	}
+	if (video_override_mask & XWA_MODERN_VIDEO_OVERRIDE_VR_SCREEN_SCALE) {
+		video_options.vr_screen_scale = options->video_options.vr_screen_scale;
 	}
 	XwaRemaster_SetVideoOptions(&video_options);
 	g.hdr_apply_pending = 0;

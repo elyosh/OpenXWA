@@ -5,10 +5,10 @@
 extern "C" {
 #endif
 
-/* The math that places the HUD in a headset's eye images. The HUD is drawn
- * once into a flat image, and each eye shows that image somewhere in the
- * world: at infinity, or on a flat panel. Both are a 3x3 matrix that takes
- * a pixel of the eye image to a point of the HUD image:
+/* The math that places the HUD's panel in a headset's eye images. The fixed
+ * group of the HUD is drawn once into a flat image, and each eye shows that
+ * image on a flat panel in the cockpit. That is a 3x3 matrix that takes a
+ * pixel of the eye image to a point of the HUD image:
  *
  *     (x, y, w) = M * (eye_ndc_x, eye_ndc_y, 1)
  *
@@ -16,14 +16,10 @@ extern "C" {
  * with Y up, like the eye's own coordinates. With w <= 0 the HUD image is
  * behind the eye. shaders/hud_reproject.frag.hlsl uses the matrix.
  *
- * The view-projection matrices are row-major and take column vectors, as
- * AeronScene_ComputeViewProj writes them. The matrices are row-major 3x3. */
-
-/* The HUD image at infinity: the HUD pixel that lies in the same direction
- * as the eye pixel. `hud_view_proj` is the view the HUD was laid out for.
- * Only the directions of the two views matter, not where they are. Returns
- * 0 when the eye's matrix can't be inverted. */
-int XwaHudReproject_Infinity(const float eye_view_proj[16], const float hud_view_proj[16], float out[9]);
+ * The view-projection matrix is row-major and takes column vectors, as
+ * AeronScene_ComputeViewProj writes it. The matrix is row-major 3x3.
+ *
+ * The HUD's world group isn't drawn this way: see hud_planes.h. */
 
 /* The HUD image on a flat panel. The panel's centre is `center`, and
  * `half_right` and `half_up` go from the centre to the middle of its right

@@ -362,6 +362,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/hud_cmd_math.c
     src/xwa_remaster/hud_fixed.c
     src/xwa_remaster/hud_layout.c
+    src/xwa_remaster/hud_planes.c
     src/xwa_remaster/hud_reproject_math.c
     src/xwa_remaster/hud_readout.c
     src/xwa_remaster/hud_text.c
