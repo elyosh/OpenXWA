@@ -52,7 +52,7 @@ const XwaVrHandConfig* XwaVrHands_Config(int hand);
 const XwaVrHandConfig* XwaVrHands_Defaults(int hand);
 
 /* Whether the mod's gloves are used when it has some (the "Use the Mod's
- * Gloves" option). When off, the game's own gloves are always shown. */
+ * Hands" option). When off, the game's own gloves are always shown. */
 void XwaVrHands_SetUseMod(int use_mod);
 int XwaVrHands_UseMod(void);
 

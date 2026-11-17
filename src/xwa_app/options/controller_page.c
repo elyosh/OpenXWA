@@ -505,9 +505,9 @@ static void XwaControllerSettings_Vr(AeronUiContext* ui) {
 	AeronUi_Spacer(ui, 8.0f);
 	AeronUi_Header(ui, "VR");
 	bool changed = AeronUi_Toggle(ui, "Show Hands", &options.vr_show_hands);
-	AeronUi_Help(ui, "Shows gloves in the cockpit where your VR controllers are.");
-	changed |= AeronUi_Toggle(ui, "Use the Mod's Gloves", &options.vr_mod_hands) != 0;
-	AeronUi_Help(ui, "When off, the game's own gloves are shown even if the mod has some.");
+	AeronUi_Help(ui, "Shows your hands in the cockpit, where your VR controllers are.");
+	changed |= AeronUi_Toggle(ui, "Use the Mod's Hands", &options.vr_mod_hands) != 0;
+	AeronUi_Help(ui, "When off, the game's own hands are shown even if the mod has some.");
 	if (changed && !XwaModernInputOptions_Set(&options))
 		XwaOptionsWindow_ReportError("The VR options are invalid.");
 }

@@ -48,6 +48,7 @@ sections:
 | `camera` | the lag and tilt of the exterior camera, the cockpit sway and the HUD in the exterior view |
 | `camera_shake` | the camera's shake and jolt in the player's hyperspace jumps |
 | `cockpit_lights` | the lights that blink in the cockpit |
+| `vr_hands` | the models of the player's hands in VR |
 | `particle_lights` | the lights of sparks, smoke and other effects on craft |
 | `backdrops` | extra planet backdrops for missions |
 | `suns` | the procedural suns and their lens flare |
@@ -938,6 +939,62 @@ Each light can have these keys:
 All the keys are optional. When you leave a key out, the light uses
 OpenXWA's default value for it. If a light has a wrong value, the game
 ignores all the keys of that light and writes an error in the log.
+
+### vr_hands
+
+In VR, the cockpit shows a hand where each of the player's controllers
+is. OpenXWA has its own hand models. A mod can replace them with its own,
+and this section says which models to use and how they sit on the player's
+hand.
+
+```yaml
+vr_hands:
+  left:
+    model: vr_hand_left
+    offset_m: [0, -0.03, -0.01]
+    rotation_deg: [-90, 0, 0]
+    tip_m: [0, 0, -0.096]
+  right:
+    model: vr_hand_right
+    offset_m: [0, -0.03, -0.01]
+    rotation_deg: [-90, 0, 0]
+    tip_m: [0, 0, -0.096]
+```
+
+Each hand, `left` and `right`, can have these keys:
+
+| Key | Meaning | Default |
+|-|-|-|
+| `model` | The start of the names of the hand's model files, without a folder or an extension. | `vr_hand_left`, `vr_hand_right` |
+| `offset_m` | Where the model's origin is on the hand, in metres, in the space of the grip pose. | `[0, 0, 0]` |
+| `rotation_deg` | How the model is turned before it is moved by `offset_m`: degrees around X, then Y, then Z. | `[0, 0, 0]` |
+| `tip_m` | The tip of the index finger of the pointing model, in metres, in the model's own space. | `[0, -0.128, -0.01]` |
+
+A hand has up to three models in `flight/models`, one for each pose:
+
+| File | When it is shown |
+|-|-|
+| `<model>_neutral.glb` | The hand is at rest. This file is required. |
+| `<model>_point.glb` | The player touches the trigger. Without the file, the neutral model is shown. |
+| `<model>_grasp.glb` | Not used yet. |
+
+Each file is a [model](models.md) with one part and no animation. A mod
+replaces a hand when it has the neutral model of that hand. The hand then
+uses the mod's models and the mod's keys. Without that file, the hand uses
+OpenXWA's own models and ignores this section.
+
+The grip pose is where the player holds the controller, as OpenXR defines
+it. Its origin is the middle of the closed hand. Its -Z axis goes through
+the closed fingers, from the little finger to the thumb. Its X axis is
+across the palm: into the palm on the right hand, and out of it on the left
+hand. The fingers of an open hand point along -Y. A model that is built in
+this space needs no `offset_m` and no `rotation_deg`.
+
+All the keys are optional. If a hand has a wrong value, the game ignores
+all the keys of that hand and writes an error in the log.
+
+The player can hide the hands with **Show Hands**, or keep OpenXWA's own
+hands by turning **Use the Mod's Hands** off, in the Controllers options.
 
 ### particle_lights
 
