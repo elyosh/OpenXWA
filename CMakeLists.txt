@@ -258,6 +258,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/models/hangars.c
     src/xwa_runtime/models/headlights.c
     src/xwa_runtime/models/cockpit_lights.c
+    src/xwa_runtime/models/vr_hands.c
     src/xwa_runtime/models/particle_lights.c
     src/xwa_runtime/models/mission_backdrops.c
     src/xwa_runtime/models/mission_file.c
@@ -375,6 +376,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/sky_stars.c
     src/xwa_remaster/speed_effect.c
     src/xwa_remaster/suns.c
+    src/xwa_remaster/vr_hands.c
     src/xwa_remaster/assets.c
     src/xwa_remaster/text.c
 )
@@ -659,6 +661,7 @@ if(XWA_BUILD_MOD_IMPORTER)
         tools/mod_importer/log.c
         tools/mod_importer/models.c
         tools/mod_importer/stock_formations.c
+        tools/mod_importer/vr_hands.c
         tools/mod_importer/stock_model_defs.c
         tools/mod_importer/stock_projectiles.c
         tools/mod_importer/stock_tables.c

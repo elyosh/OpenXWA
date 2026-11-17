@@ -991,6 +991,7 @@ static XwaModImportResult run_phases(ImportContext* ctx, ImportAuthoring* author
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_MISSIONS, 0);
 		if (!missions(ctx))
 			return XWA_MOD_IMPORT_STOPPED;
+		ImportVrHands_Run(ctx);
 	}
 	if (!Import_ShouldStop(ctx)) {
 		Import_BeginPhase(ctx, XWA_MOD_IMPORT_SKYBOXES, 0);

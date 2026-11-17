@@ -64,6 +64,8 @@ static void XwaModernInputOptions_Normalize(XwaModernInputOptions* options) {
 	options->mouse_flight_enabled = options->mouse_flight_enabled != 0;
 	options->mouse_invert_y = options->mouse_invert_y != 0;
 	options->rumble_enabled = options->rumble_enabled != 0;
+	options->vr_show_hands = options->vr_show_hands != 0;
+	options->vr_mod_hands = options->vr_mod_hands != 0;
 	XwaKeyboardMapping_Sort(&options->keyboard);
 }
 
@@ -71,6 +73,7 @@ int XwaModernInputOptions_Equal(const XwaModernInputOptions* a, const XwaModernI
 	return a->mouse_flight_enabled == b->mouse_flight_enabled && a->mouse_mode == b->mouse_mode &&
 		   a->mouse_sensitivity == b->mouse_sensitivity && a->mouse_invert_y == b->mouse_invert_y &&
 		   a->rumble_enabled == b->rumble_enabled && a->rumble_strength == b->rumble_strength &&
+		   a->vr_show_hands == b->vr_show_hands && a->vr_mod_hands == b->vr_mod_hands &&
 		   XwaControllerOptions_Equals(&a->controllers, &b->controllers) &&
 		   XwaKeyboardMapping_Equal(&a->keyboard, &b->keyboard);
 }

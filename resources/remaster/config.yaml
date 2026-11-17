@@ -8,6 +8,11 @@ input:
   mouse_invert_y: true
   rumble_enabled: true
   rumble_strength: 6
+  # Draw gloves in the cockpit where the VR controllers are.
+  vr_show_hands: true
+  # Use the mod's gloves when it has some. When false, the game's own
+  # gloves are always shown.
+  vr_mod_hands: true
   # Saved controller models, one complete profile each. New gamepads get
   # gamepad_defaults, and new VR controllers get vr_left_defaults or
   # vr_right_defaults. Joysticks start with nothing bound.

@@ -797,6 +797,10 @@ static int host_config_input_scalars(const AeronConfigFile* config, int required
 								error_size) ||
 		!host_config_input_bool(config, "input.rumble_enabled", required, &out->rumble_enabled, error,
 								error_size) ||
+		!host_config_input_bool(config, "input.vr_show_hands", required, &out->vr_show_hands, error,
+								error_size) ||
+		!host_config_input_bool(config, "input.vr_mod_hands", required, &out->vr_mod_hands, error,
+								error_size) ||
 		!host_config_input_int(config, "input.rumble_strength", required, XWA_MODERN_RUMBLE_STRENGTH_MIN,
 							   XWA_MODERN_RUMBLE_STRENGTH_MAX, &out->rumble_strength, error, error_size)) {
 		return 0;
@@ -1140,6 +1144,10 @@ static int host_config_set_input_options(AeronConfigFile* document, const XwaMod
 									defaults->mouse_invert_y, error) &&
 		 host_config_set_input_bool(document, "input.rumble_enabled", options->rumble_enabled,
 									defaults->rumble_enabled, error) &&
+		 host_config_set_input_bool(document, "input.vr_show_hands", options->vr_show_hands,
+									defaults->vr_show_hands, error) &&
+		 host_config_set_input_bool(document, "input.vr_mod_hands", options->vr_mod_hands,
+									defaults->vr_mod_hands, error) &&
 		 host_config_set_input_int(document, "input.rumble_strength", options->rumble_strength,
 								   defaults->rumble_strength, error);
 	if (ok) {

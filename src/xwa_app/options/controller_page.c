@@ -498,12 +498,27 @@ static void XwaControllerSettings_Rumble(AeronUiContext* ui) {
 		XwaOptionsWindow_ReportError("The rumble options are invalid.");
 }
 
+/* The VR options are global too. They apply at once and are saved on Close. */
+static void XwaControllerSettings_Vr(AeronUiContext* ui) {
+	static XwaModernInputOptions options;
+	XwaModernInputOptions_Get(&options);
+	AeronUi_Spacer(ui, 8.0f);
+	AeronUi_Header(ui, "VR");
+	bool changed = AeronUi_Toggle(ui, "Show Hands", &options.vr_show_hands);
+	AeronUi_Help(ui, "Shows gloves in the cockpit where your VR controllers are.");
+	changed |= AeronUi_Toggle(ui, "Use the Mod's Gloves", &options.vr_mod_hands) != 0;
+	AeronUi_Help(ui, "When off, the game's own gloves are shown even if the mod has some.");
+	if (changed && !XwaModernInputOptions_Set(&options))
+		XwaOptionsWindow_ReportError("The VR options are invalid.");
+}
+
 static void XwaControllerSettings_AxisPage(XwaControllerSettings* settings, AeronUiContext* ui,
 										   const AeronControllerSnapshot* controller) {
 	if (AeronUi_SegmentedSelector(ui, "Flight Axis", &settings->axis, k_axis_names, XWA_INPUT_AXIS_COUNT))
 		AeronUi_CancelControllerCapture(ui);
 	XwaControllerSettings_AxisEditor(settings, ui, controller, (XwaInputAxis)settings->axis);
 	XwaControllerSettings_Rumble(ui);
+	XwaControllerSettings_Vr(ui);
 }
 
 static void XwaControllerSettings_AxisConflictModal(XwaControllerSettings* settings, AeronUiContext* ui,

@@ -17,9 +17,9 @@
 #include "xwa_remaster/xwa_remaster.h"
 
 #include "aeron/aeron.h"
+#include "aeron/asset/opt_model.h"
 #include "aeron/debug.h"
 #include "aeron/image.h"
-#include "aeron/asset/opt_model.h"
 #include "aeron/scene/blend_ramp.h"
 #include "aeron/scene/view_rig.h"
 #include "xwa_remaster/assets.h"
@@ -33,6 +33,7 @@
 #include "xwa_remaster/hud.h"
 #include "xwa_remaster/opt_mesh.h"
 #include "xwa_remaster/ship.h"
+#include "xwa_remaster/vr_hands.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/input/capture.h"
 #include "xwa_runtime/input/keyboard_mapping.h"
@@ -851,6 +852,11 @@ static void XwaRemaster_UpdateViewRig(const XwaSnapshot* snap) {
 		rig.generation = g.rig_generation;
 	}
 	XwaRemasterFlight_SetViewRig(kind != RM_RIG_NONE ? &rig : NULL);
+	/* The hands follow the head: the headset's world scale moves both. The
+	 * debug stereo view has no world scale. */
+	AeronXrHand hands[2];
+	const int has_hands = kind != RM_RIG_NONE && rig.tracked && Aeron_XrHands(hands);
+	XwaRemasterVrHands_SetHands(has_hands ? hands : NULL, kind == RM_RIG_HEADSET ? g.vr_world_scale : 1.0f);
 	XwaRemasterFlight_SetViewTargets(kind == RM_RIG_HEADSET && g.xr_views_ready ? g.xr_targets : NULL,
 									 AERON_OPT_UNITS_PER_METER * g.vr_world_scale);
 	const int headset_areas = kind == RM_RIG_HEADSET && g.xr_views_ready;
@@ -1043,10 +1049,11 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	/* Authored environments are prepared when the mission key changes
 	 * (or a debug reload is pending), never from the flight render. */
 	const int environment_needs_prepare = flight_render_needed && XwaRemasterEnvironment_NeedsPrepare(snap);
+	const int hand_assets_need_sync = flight_render_needed && XwaRemasterVrHands_NeedSync();
 	const int assets_need_sync =
 		!retain_invalid_flight_frame &&
 		(frontend_assets_need_sync || ship_assets_need_sync || texture_assets_need_sync ||
-		 process_assets_need_prepare || environment_needs_prepare);
+		 hand_assets_need_sync || process_assets_need_prepare || environment_needs_prepare);
 	/* A headset's flight frame can only be rendered into this frame's eye
 	 * images. Without them, the frame is rendered on a later host frame. */
 	const int headset_waits =
@@ -1085,6 +1092,9 @@ void XwaRemaster_Frame(int32_t delta_us) {
 												   RM_ASSET_UPLOAD_COPY_BUDGET);
 			if (ship_sync == XWA_REMASTER_SHIP_SYNC_FAILED)
 				Aeron_CommandBufferSetFailure(upload_cmd, "Ship model asset preparation failed");
+		}
+		if (ship_sync == XWA_REMASTER_SHIP_SYNC_COMPLETE && hand_assets_need_sync) {
+			XwaRemasterVrHands_Sync(upload_cmd);
 		}
 		if (ship_sync == XWA_REMASTER_SHIP_SYNC_COMPLETE) {
 			if (!XwaRemasterAssets_SyncFlightTextures(g.assets, upload_cmd, snap)) {
@@ -1678,6 +1688,7 @@ void XwaRemaster_Shutdown(void) {
 	XwaRemasterFrontend_Shutdown();
 	XwaRemasterCapturedLighting_Shutdown();
 	XwaRemasterFlight_Shutdown();
+	XwaRemasterVrHands_Shutdown();
 	XwaRemasterShip_Shutdown();
 	if (g.assets) {
 		XwaRemasterAssets_Destroy(g.assets);

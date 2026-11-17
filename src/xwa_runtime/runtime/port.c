@@ -72,6 +72,7 @@
 #include "xwa_runtime/models/projectiles.h"
 #include "xwa_runtime/models/shield_recharge.h"
 #include "xwa_runtime/models/turret_ignore.h"
+#include "xwa_runtime/models/vr_hands.h"
 #include "xwa_runtime/models/warhead_lock.h"
 #include "xwa_runtime/models/weapon_rates.h"
 #include "xwa_runtime/models/weapon_stats.h"
@@ -203,6 +204,7 @@ int XwaPort_Init(void) {
 	XwaOptionSection_ReadMod(XwaModernSpeedEffectOptions_Section(), XwaFlightConfig_Root());
 	XwaOptionSection_ReadMod(XwaModernCameraShakeOptions_Section(), XwaFlightConfig_Root());
 	XwaCockpitLights_Init();
+	XwaVrHands_Init();
 	XwaParticleLights_Init();
 	XwaModelSource_Init();
 	XwaHangars_Init();

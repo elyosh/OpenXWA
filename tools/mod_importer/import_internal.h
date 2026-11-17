@@ -153,4 +153,10 @@ void ImportEffects_Build(ImportContext* ctx, const char* const* gltfs, size_t co
 /* Copies the videos, sounds, movies and fonts that the mod's files name. */
 void ImportCopies_Run(ImportContext* ctx);
 
+/* Converts XWAU's VR gloves into the mod's glove models, and adds the
+ * `vr_hands` section to the mod's flight settings, which must already be
+ * written (vr_hands.c). It does nothing for an installation without
+ * gloves. */
+void ImportVrHands_Run(ImportContext* ctx);
+
 #endif /* XWA_MOD_IMPORT_INTERNAL_H */

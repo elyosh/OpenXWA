@@ -33,6 +33,7 @@
 #include "xwa_remaster/sky_stars.h"
 #include "xwa_remaster/speed_effect.h"
 #include "xwa_remaster/suns.h"
+#include "xwa_remaster/vr_hands.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
 #include "xwa_runtime/models/cockpit_lights.h"
@@ -6399,6 +6400,29 @@ static void fl_hyper_build_views(const float player_bw[9], int player_found,
 	}
 }
 
+/* Draws the gloves of the VR hands. They are only drawn with the cockpit, in
+ * a view that follows the head. `cockpit_shadows` gives them the cockpit's
+ * shadow flags: they are then lit by the cockpit's lights and share its
+ * shadow map, so they must be added after the cockpit. */
+static void fl_submit_vr_hands(int cockpit_shadows) {
+	if (!s.rig_active || !s.rig.tracked) {
+		return;
+	}
+	for (int hand = 0; hand < 2; hand++) {
+		AeronSceneMeshInstance inst;
+		if (!XwaRemasterVrHands_Instance(hand, s.seat_crows, s.seat_view.camera.pos, &inst)) {
+			continue;
+		}
+		inst.cull_mode = AERON_CULL_BACK;
+		if (cockpit_shadows) {
+			inst.shadow_flags = AERON_SCENE_INSTANCE_USE_RECEIVER_LOCAL_SHADOW |
+								AERON_SCENE_INSTANCE_CAST_RECEIVER_LOCAL_ONLY |
+								AERON_SCENE_INSTANCE_SHADOW_DOUBLE_SIDED;
+		}
+		AeronScene_AddMeshInstance(s.scene, &inst);
+	}
+}
+
 static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAssets* assets,
 										 const XwaSnapshot* snap, const XwaFlightCamera* cam,
 										 const float anchor_bw[9], int anchor_found,
@@ -6448,6 +6472,7 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 		s.table_pool.used++;
 	}
 	AeronScene_AddMeshInstance(s.scene, &inst);
+	fl_submit_vr_hands(0);
 	fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
 	/* No blast marks on the cockpit: the game sizes a warhead's mark from the
 	 * whole craft, so it would cover most of the cockpit and the view. */
@@ -9330,6 +9355,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				}
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
+			fl_submit_vr_hands(1);
 			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
 			/* No blast marks on the cockpit (see fl_submit_hyperspace_cockpit). */
 			if (player_f && fl_is_player_craft(snap, player_f->slot, player_f->signature) &&

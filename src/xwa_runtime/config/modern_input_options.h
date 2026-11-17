@@ -38,6 +38,10 @@ typedef struct XwaModernInputOptions {
 	int mouse_invert_y;
 	int rumble_enabled;
 	int rumble_strength;
+	/* Draw gloves in the cockpit where the VR controllers are. */
+	int vr_show_hands;
+	/* Use the mod's gloves when it has some, and not the game's own. */
+	int vr_mod_hands;
 	XwaControllerOptions controllers;
 	/* Sorted with XwaKeyboardMapping_Sort. */
 	XwaKeyboardBindings keyboard;
