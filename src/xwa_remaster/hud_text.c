@@ -46,8 +46,8 @@ typedef struct XwaHudPreparedText {
 } XwaHudPreparedText;
 
 static AeronDrawList2D* text_list;
-/* The text of the world group, when the HUD is split (hud.h). */
-static AeronDrawList2D* text_world_list;
+/* The text of the markers, when they are prepared separately (hud.h). */
+static AeronDrawList2D* text_marker_list;
 static XwaHudPreparedText text_prepared;
 /* The target readout's glyphs, made by XwaRemasterHudText_PrepareDrawList
    for XwaRemasterHudText_AddReadoutGlyphs. */
@@ -57,8 +57,8 @@ static uint16_t text_readout_sprite_count;
 /* The box that the glyphs being built are drawn next to, or -1 for the
    target arrow. */
 static int16_t text_glyph_box = -1;
-/* Whether the world list was prepared on planes. */
-static int text_world_on_planes;
+/* Whether the marker list was prepared on planes. */
+static int text_markers_on_planes;
 
 static XwaHudLayoutOrigin text_origin_for_pane(uint16_t pane) {
 	switch ((XwaHudPaneId)pane) {
@@ -562,20 +562,20 @@ static void text_build_target_box_readouts(const XwaSnapshot* snapshot, XwaHudPr
 }
 
 int XwaRemasterHudText_Init(void) {
-	if (text_list && text_world_list)
+	if (text_list && text_marker_list)
 		return 1;
 	if (!text_list)
 		text_list = AeronDrawList_Create(XWA_SNAP_MAX_HUD_GLYPHS + 512); /* + erase-clipped pieces */
-	if (!text_world_list)
-		text_world_list = AeronDrawList_Create(1024);
-	return text_list != NULL && text_world_list != NULL;
+	if (!text_marker_list)
+		text_marker_list = AeronDrawList_Create(1024);
+	return text_list != NULL && text_marker_list != NULL;
 }
 
 void XwaRemasterHudText_Shutdown(void) {
 	AeronDrawList_Destroy(text_list);
-	AeronDrawList_Destroy(text_world_list);
+	AeronDrawList_Destroy(text_marker_list);
 	text_list = NULL;
-	text_world_list = NULL;
+	text_marker_list = NULL;
 	memset(&text_prepared, 0, sizeof text_prepared);
 }
 
@@ -688,7 +688,7 @@ static void text_prepare_faces(AeronCommandBuffer* cmd, XwaRemasterAssets* asset
 										 text_prepared.screen_h, &mapped) ||
 			!text_mapped_glyph_visible(layout, glyph, (XwaHudProfileIndex)text_prepared.profile, &mapped))
 			continue;
-		/* The counts next to the reticle are in the world group. */
+		/* The counts next to the reticle are markers. */
 		const float size_px =
 			mapped.h_ref * output_scale * (glyph->pane == XWA_HUD_PANE_RETICLE_COUNTS ? world_scale : 1.0f);
 		if (glyph->font_tier != last_tier || size_px != last_size) {
@@ -732,26 +732,25 @@ static int text_bitmap_sprite(const AeronFontAtlas* font, uint8_t ch, float x, f
 
 static void text_prepare_lists(AeronCommandBuffer* cmd) {
 	(void)AeronDrawList_Prepare(text_list, cmd);
-	(void)AeronDrawList_Prepare(text_world_list, cmd);
+	(void)AeronDrawList_Prepare(text_marker_list, cmd);
 }
 
 void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAssets* assets, int target_w,
 										int target_h) {
 	text_readout_sprite_count = 0;
-	if (!cmd || !text_list || !text_world_list || target_w <= 0 || target_h <= 0)
+	if (!cmd || !text_list || !text_marker_list || target_w <= 0 || target_h <= 0)
 		return;
-	const int split = XwaRemasterHud_WorldSplit();
-	AeronDrawList2D* const world_list = split ? text_world_list : text_list;
+	const int separate = XwaRemasterHud_SeparateMarkers();
+	AeronDrawList2D* const marker_list = separate ? text_marker_list : text_list;
 	AeronDrawList_Begin(text_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
-	AeronDrawList_Begin(text_world_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
-	/* In a headset the world group's text is drawn on planes: the arrow's
-	   text on the arrow's, a box's text on the box's, and the reticle's
-	   counts on the reticle's. `plane_box` is the box whose plane the list
-	   uses, or -1. */
+	AeronDrawList_Begin(text_marker_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	/* In a headset the markers' text is drawn on planes: the arrow's text on
+	   the arrow's, a box's text on the box's, and the reticle's counts on the
+	   reticle's. `plane_box` is the box whose plane the list uses, or -1. */
 	const XwaHudPreparedBoxState* boxes = XwaRemasterHudBoxes_Prepared();
-	const int planes = split && boxes && boxes->on_planes;
+	const int planes = separate && boxes && boxes->on_planes;
 	int arrow_plane = -1, reticle_plane = -1, plane_box = -1;
-	text_world_on_planes = planes;
+	text_markers_on_planes = planes;
 	if (!text_prepared.valid) {
 		text_prepare_lists(cmd);
 		return;
@@ -773,8 +772,8 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 		text_prepare_lists(cmd);
 		return;
 	}
-	/* The world group's text on planes: it uses the font atlases made for its
-	   size in an eye image. */
+	/* The markers' text on planes: it uses the font atlases made for its size
+	   in an eye image. */
 	const float world_scale = planes ? XwaRemasterHudFixed_EyePixelScale() : 1.0f;
 	text_prepare_faces(cmd, assets, layout, profile, output_scale, world_scale);
 	XwaRemasterHud_BeginRenderPhase();
@@ -797,22 +796,22 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 			if (planes) {
 				const int box = text_prepared.arrow_glyphs[i].box;
 				if (box >= 0) {
-					if (!XwaRemasterHudBoxes_UsePlane(world_list, box, &plane_box))
+					if (!XwaRemasterHudBoxes_UsePlane(marker_list, box, &plane_box))
 						continue;
 				} else {
 					const XwaHudProjectedArrow* arrow = XwaRemasterHudFixed_TargetArrow();
 					if (arrow_plane < 0 && arrow && arrow->on_plane)
-						arrow_plane = AeronDrawList_AddPlane(world_list, arrow->plane, 0.0f);
+						arrow_plane = AeronDrawList_AddPlane(marker_list, arrow->plane, 0.0f);
 					if (arrow_plane < 0)
 						continue;
-					AeronDrawList_UsePlane(world_list, arrow_plane);
+					AeronDrawList_UsePlane(marker_list, arrow_plane);
 					plane_box = -1;
 				}
 			}
 			/* The text next to the target arrow and the target box follows
 			 * the target: never captured by the cockpit's screens nor hidden
 			 * by the erased regions. */
-			AeronDrawList_AddSprite(world_list, &sprite);
+			AeronDrawList_AddSprite(marker_list, &sprite);
 		}
 	}
 	if (text_prepared.readout_glyph_count) {
@@ -863,16 +862,16 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 		if (planes && glyph->pane == XWA_HUD_PANE_RETICLE_COUNTS) {
 			float plane[9];
 			if (reticle_plane < 0 && XwaRemasterHudFixed_ReticlePlane(plane))
-				reticle_plane = AeronDrawList_AddPlane(world_list, plane, 0.0f);
+				reticle_plane = AeronDrawList_AddPlane(marker_list, plane, 0.0f);
 			if (reticle_plane < 0)
 				continue;
-			AeronDrawList_UsePlane(world_list, reticle_plane);
+			AeronDrawList_UsePlane(marker_list, reticle_plane);
 			plane_box = -1;
-			/* The world group isn't shown on the cockpit's screens. */
-			AeronDrawList_AddSprite(world_list, &sprite);
+			/* Markers aren't shown on the cockpit's screens. */
+			AeronDrawList_AddSprite(marker_list, &sprite);
 			continue;
 		}
-		XwaRemasterDc_AddSprite(glyph->pane == XWA_HUD_PANE_RETICLE_COUNTS ? world_list : text_list,
+		XwaRemasterDc_AddSprite(glyph->pane == XWA_HUD_PANE_RETICLE_COUNTS ? marker_list : text_list,
 								XWA_DC_LAYER_TEXT, &sprite);
 	}
 	XwaRemasterHud_EndRenderPhase();
@@ -927,12 +926,12 @@ void XwaRemasterHudText_AddReadoutGlyphs(AeronDrawList2D* list, const AeronRectI
 
 void XwaRemasterHudText_RenderPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 									 AeronRenderTarget* target, const float view[12]) {
-	if (cmd && pass && target && view && text_world_list && text_prepared.valid && text_world_on_planes)
-		AeronDrawList_RenderPlanes(text_world_list, cmd, pass, target, view, 1.0f);
+	if (cmd && pass && target && view && text_marker_list && text_prepared.valid && text_markers_on_planes)
+		AeronDrawList_RenderPlanes(text_marker_list, cmd, pass, target, view, 1.0f);
 }
 
-/* The world list is empty unless the HUD is split, and is then drawn on
-   planes (XwaRemasterHudText_RenderPlanes). */
+/* The marker list is empty unless the markers are prepared separately. It is
+   then drawn on planes (XwaRemasterHudText_RenderPlanes). */
 void XwaRemasterHudText_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							   int target_w, int target_h) {
 	if (!cmd || !pass || !target || !text_list || !text_prepared.valid || target_w <= 0 || target_h <= 0)

@@ -18,8 +18,8 @@
 #include <string.h>
 
 static AeronDrawList2D* fixed_list;
-/* The widgets of the world group, when the HUD is split (hud.h). */
-static AeronDrawList2D* fixed_world_list;
+/* The marker widgets, when they are prepared separately (hud.h). */
+static AeronDrawList2D* fixed_marker_list;
 /* Dynamic Cockpit (XwaRemasterHudFixed_SetDynamicCockpit). */
 static int fixed_dc_active;
 static uint32_t fixed_dc_erased;
@@ -34,10 +34,10 @@ static float fixed_hud_user_scale = 1.0f;
    the 3D view use it. */
 static float fixed_view_pixel_scale = 1.0f;
 static const XwaRemasterFlightView* fixed_flight_view;
-/* The planes of a headset's HUD, or NULL, and whether the world list was
+/* The planes of a headset's HUD, or NULL, and whether the marker list was
  * prepared on them. */
 static const XwaRemasterHudPlanes* fixed_planes;
-static int fixed_world_on_planes;
+static int fixed_markers_on_planes;
 static int fixed_target_w, fixed_target_h;
 static float fixed_reticle_x_ref, fixed_reticle_y_ref;
 static int fixed_reticle_valid;
@@ -1089,16 +1089,16 @@ static void fixed_build_reticle_threats(const XwaHudState* h, const XwaRemasterH
 int XwaRemasterHudFixed_Init(void) {
 	if (!fixed_list)
 		fixed_list = AeronDrawList_Create(2 * XWA_HUD_MAX_FIXED_DRAWS); /* + erase-clipped pieces */
-	if (!fixed_world_list)
-		fixed_world_list = AeronDrawList_Create(XWA_HUD_MAX_FIXED_DRAWS);
-	return fixed_list != NULL && fixed_world_list != NULL;
+	if (!fixed_marker_list)
+		fixed_marker_list = AeronDrawList_Create(XWA_HUD_MAX_FIXED_DRAWS);
+	return fixed_list != NULL && fixed_marker_list != NULL;
 }
 
 void XwaRemasterHudFixed_Shutdown(void) {
 	AeronDrawList_Destroy(fixed_list);
-	AeronDrawList_Destroy(fixed_world_list);
+	AeronDrawList_Destroy(fixed_marker_list);
 	fixed_list = NULL;
-	fixed_world_list = NULL;
+	fixed_marker_list = NULL;
 	fixed_dc_active = 0;
 	fixed_dc_erased = 0;
 	fixed_snapshot = NULL;
@@ -1108,7 +1108,7 @@ void XwaRemasterHudFixed_Shutdown(void) {
 	fixed_view_pixel_scale = 1.0f;
 	fixed_flight_view = NULL;
 	fixed_planes = NULL;
-	fixed_world_on_planes = 0;
+	fixed_markers_on_planes = 0;
 	fixed_target_w = fixed_target_h = 0;
 	fixed_reticle_valid = 0;
 	memset(&fixed_target_arrow, 0, sizeof fixed_target_arrow);
@@ -1127,7 +1127,7 @@ void XwaRemasterHudFixed_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 	fixed_view_pixel_scale = 1.0f;
 	fixed_snapshot = snapshot;
 	fixed_flight_view = flight_view;
-	fixed_planes = flight_view && XwaRemasterHud_WorldSplit() ? flight_view->hud_planes : NULL;
+	fixed_planes = flight_view && XwaRemasterHud_SeparateMarkers() ? flight_view->hud_planes : NULL;
 	fixed_target_w = target_w;
 	fixed_target_h = target_h;
 	const XwaHudState* hud = snapshot ? &snapshot->hud : NULL;
@@ -1251,23 +1251,23 @@ static int fixed_panel_region(const XwaHudDrawRecord* r) {
 
 static void fixed_prepare_lists(AeronCommandBuffer* cmd) {
 	(void)AeronDrawList_Prepare(fixed_list, cmd);
-	(void)AeronDrawList_Prepare(fixed_world_list, cmd);
+	(void)AeronDrawList_Prepare(fixed_marker_list, cmd);
 }
 
 /* The widgets that point at things outside the cockpit. */
-static int fixed_world_widget(uint16_t widget) {
+static int fixed_marker_widget(uint16_t widget) {
 	return widget == XWA_HUD_WIDGET_READINESS || widget == XWA_HUD_WIDGET_RETICLE ||
 		   widget == XWA_HUD_WIDGET_THREATS || widget == XWA_HUD_WIDGET_TARGET_ARROW ||
 		   widget == XWA_HUD_WIDGET_PADLOCK_ARROW;
 }
 
 void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, int target_h) {
-	if (!cmd || !fixed_list || !fixed_world_list || target_w <= 0 || target_h <= 0)
+	if (!cmd || !fixed_list || !fixed_marker_list || target_w <= 0 || target_h <= 0)
 		return;
-	const int split = XwaRemasterHud_WorldSplit();
+	const int separate = XwaRemasterHud_SeparateMarkers();
 	AeronDrawList_Begin(fixed_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
-	AeronDrawList_Begin(fixed_world_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
-	fixed_world_on_planes = 0;
+	AeronDrawList_Begin(fixed_marker_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	fixed_markers_on_planes = 0;
 	if (!fixed_draws.valid) {
 		fixed_prepare_lists(cmd);
 		return;
@@ -1284,16 +1284,16 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 		fixed_prepare_lists(cmd);
 		return;
 	}
-	/* In a headset, the world group's widgets are drawn on planes: the reticle
-	 * and its marks on the seat's plane, each arrow on its own plane. */
+	/* In a headset, the marker widgets are drawn on planes: the reticle and its
+	 * marks on the seat's plane, each arrow on its own plane. */
 	int reticle_plane = -1, arrow_plane = -1;
-	if (split && fixed_planes) {
+	if (separate && fixed_planes) {
 		float plane[9];
 		XwaRemasterHudFixed_ReticlePlane(plane);
-		reticle_plane = AeronDrawList_AddPlane(fixed_world_list, plane, 0.0f);
+		reticle_plane = AeronDrawList_AddPlane(fixed_marker_list, plane, 0.0f);
 		if (fixed_target_arrow.visible && fixed_target_arrow.on_plane)
-			arrow_plane = AeronDrawList_AddPlane(fixed_world_list, fixed_target_arrow.plane, 0.0f);
-		fixed_world_on_planes = reticle_plane >= 0;
+			arrow_plane = AeronDrawList_AddPlane(fixed_marker_list, fixed_target_arrow.plane, 0.0f);
+		fixed_markers_on_planes = reticle_plane >= 0;
 	}
 	XwaRemasterHud_BeginRenderPhase();
 	for (uint16_t i = 0; i < fixed_draws.record_count; i++) {
@@ -1305,15 +1305,15 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 		if (region >= 0 && (fixed_dc_erased & (1u << region)))
 			continue;
 		const int panel = region >= 0;
-		const int world = split && fixed_world_widget(r->widget);
+		const int marker = separate && fixed_marker_widget(r->widget);
 		const int arrow =
 			r->widget == XWA_HUD_WIDGET_TARGET_ARROW || r->widget == XWA_HUD_WIDGET_PADLOCK_ARROW;
-		AeronDrawList2D* const list = world ? fixed_world_list : fixed_list;
-		if (world && fixed_world_on_planes) {
+		AeronDrawList2D* const list = marker ? fixed_marker_list : fixed_list;
+		if (marker && fixed_markers_on_planes) {
 			const int plane = arrow ? arrow_plane : reticle_plane;
 			if (plane < 0)
 				continue;
-			AeronDrawList_UsePlane(fixed_world_list, plane);
+			AeronDrawList_UsePlane(fixed_marker_list, plane);
 		}
 		float quad[4];
 		fixed_record_quad(r, asset, out_x, out_y, scale, quad);
@@ -1386,8 +1386,8 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 			 * target boxes: never captured by the cockpit's screens nor
 			 * hidden by the erased regions. */
 			AeronDrawList_AddQuad4(list, &quad);
-		} else if (panel || world) {
-			/* The world group isn't shown on the cockpit's screens. */
+		} else if (panel || marker) {
+			/* Markers aren't shown on the cockpit's screens. */
 			AeronDrawList_AddSprite(list, &sprite);
 		} else {
 			XwaRemasterDc_AddSprite(list, XWA_DC_LAYER_GRAPHICS, &sprite);
@@ -1397,8 +1397,8 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 	fixed_prepare_lists(cmd);
 }
 
-/* The world list is empty unless the HUD is split, and is then drawn on
- * planes (XwaRemasterHudFixed_RenderPlanes). */
+/* The marker list is empty unless the markers are prepared separately. It is
+ * then drawn on planes (XwaRemasterHudFixed_RenderPlanes). */
 void XwaRemasterHudFixed_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 								int target_w, int target_h) {
 	if (!cmd || !pass || !target || !fixed_list || !fixed_draws.valid || target_w <= 0 || target_h <= 0)
@@ -1412,8 +1412,8 @@ float XwaRemasterHudFixed_EyePixelScale(void) {
 
 void XwaRemasterHudFixed_RenderPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 									  AeronRenderTarget* target, const float view[12]) {
-	if (cmd && pass && target && view && fixed_world_list && fixed_draws.valid && fixed_world_on_planes)
-		AeronDrawList_RenderPlanes(fixed_world_list, cmd, pass, target, view, 1.0f);
+	if (cmd && pass && target && view && fixed_marker_list && fixed_draws.valid && fixed_markers_on_planes)
+		AeronDrawList_RenderPlanes(fixed_marker_list, cmd, pass, target, view, 1.0f);
 }
 
 const XwaHudPreparedDrawState* XwaRemasterHud_PreparedDrawState(void) { return &fixed_draws; }
@@ -1439,8 +1439,8 @@ void XwaRemasterHud_RenderText(AeronCommandBuffer* cmd, AeronRenderPass* pass, A
 	XwaRemasterHudText_Render(cmd, pass, target, target_w, target_h);
 }
 
-void XwaRemasterHud_RenderWorldPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
-									  AeronRenderTarget* target, const float view[12]) {
+void XwaRemasterHud_RenderMarkerPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
+									   AeronRenderTarget* target, const float view[12]) {
 	XwaRemasterHudBoxes_RenderPlanes(cmd, pass, target, view, XWA_HUD_TARGET_BOX_BEFORE_FIXED);
 	XwaRemasterHudFixed_RenderPlanes(cmd, pass, target, view);
 	XwaRemasterHudBoxes_RenderPlanes(cmd, pass, target, view, XWA_HUD_TARGET_BOX_AFTER_FIXED);

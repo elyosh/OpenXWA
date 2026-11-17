@@ -45,7 +45,7 @@ int XwaRemasterHudFixed_ReticlePlane(float out[9]);
  * (XwaRemasterHudPlanes.eye_pixel_scale), or 1 when the HUD isn't drawn on
  * planes. */
 float XwaRemasterHudFixed_EyePixelScale(void);
-/* Draws the world group's widgets on their planes. */
+/* Draws the marker widgets on their planes. */
 void XwaRemasterHudFixed_RenderPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 									  AeronRenderTarget* target, const float view[12]);
 /* The quad (x, y, w, h in target pixels) a record of

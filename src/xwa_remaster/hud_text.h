@@ -30,7 +30,7 @@ void XwaRemasterHudText_ForEachGlyph(int target_w, int target_h, XwaHudGlyphVisi
 /* Adds the target readout's glyphs, made by XwaRemasterHudText_PrepareDrawList,
  * to `list`, clipped to `scissor`. */
 void XwaRemasterHudText_AddReadoutGlyphs(AeronDrawList2D* list, const AeronRectI* scissor);
-/* Draws the world group's text on its planes. */
+/* Draws the markers' text on its planes. */
 void XwaRemasterHudText_RenderPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 									 AeronRenderTarget* target, const float view[12]);
 void XwaRemasterHudText_Render(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,

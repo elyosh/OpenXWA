@@ -320,11 +320,11 @@ static struct {
 	AeronDrawList2D* hud_composite;
 	/* The headset HUD (hud.h), also used by the debug stereo view. It is laid
 	 * out for hud_view: the seat's view with the game camera's vertical field
-	 * of view, in an image of presentation.vr_hud_*_px. The fixed group is
-	 * drawn into hud_panel_rt and shown on a panel in the cockpit. The world
-	 * group is drawn into each eye on the planes of hud_planes (hud_planes.h).
-	 * hud_head_view follows the head and has no image. It is used to place the
-	 * arrow that points to a target out of view. */
+	 * of view, in an image of presentation.vr_hud_*_px. The markers (hud.h) are
+	 * drawn into each eye on the planes of hud_planes (hud_planes.h). The rest
+	 * of the HUD is drawn into hud_panel_rt and shown on a panel in the
+	 * cockpit. hud_head_view follows the head and has no image. It is used to
+	 * place the arrow that points to a target out of view. */
 	AeronRenderTarget* hud_panel_rt;
 	XwaRemasterFlightView hud_view;
 	XwaRemasterFlightView hud_head_view;
@@ -6529,9 +6529,9 @@ static void fl_set_present_debug(AeronScenePresentChain* chain) {
 
 /* Draws the 2D HUD into `pass`, flat. `target` has the size that the HUD was
  * prepared for. `readout_scene` is the scene whose depth hides the target
- * readout behind near geometry, or NULL to draw the whole readout. When the HUD
- * is split (hud.h), this draws only the fixed group. fl_draw_headset_hud draws
- * the world group on planes. */
+ * readout behind near geometry, or NULL to draw the whole readout. In a headset
+ * this doesn't draw the markers (hud.h). fl_draw_headset_hud draws them on
+ * planes. */
 static void fl_draw_hud(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 						int target_w, int target_h, AeronScene3D* readout_scene) {
 	/* With the Dynamic Cockpit active the HUD's lists already leave out
@@ -6609,7 +6609,7 @@ static int fl_render_rig_hud(AeronCommandBuffer* cmd, AeronRectI rect, int targe
 	return AeronDrawList_Prepare(s.hud_composite, cmd);
 }
 
-/* Draws the fixed group of a headset's HUD into the panel's image. */
+/* Draws a headset's HUD, without the markers, into the panel's image. */
 static int fl_render_headset_hud(AeronCommandBuffer* cmd) {
 	AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
 		.color_target = s.hud_panel_rt,
@@ -6705,8 +6705,8 @@ static void fl_draw_hud_image(AeronRenderPass* pass, AeronGraphicsPipeline* pipe
 }
 
 /* Draws the headset HUD over the image of `view`, in the open pass. The pass's
- * viewport is the view's rectangle `rect` in `target`. The world group is drawn
- * on its planes, then the fixed group on its panel. The panel is in front of
+ * viewport is the view's rectangle `rect` in `target`. The markers are drawn on
+ * their planes, then the rest of the HUD on its panel. The panel is in front of
  * the seat's eye point and faces it. At scale 1 it covers the HUD's view
  * exactly as seen from the seat, so the HUD keeps its classic layout, and both
  * eyes see it at the panel's distance. */
@@ -6719,7 +6719,7 @@ static int fl_draw_headset_hud(AeronCommandBuffer* cmd, AeronRenderPass* pass, A
 	}
 	float view_rows[12];
 	XwaHudPlanes_ViewRows(s.views[view].view_proj, view_rows);
-	XwaRemasterHud_RenderWorldPlanes(cmd, pass, target, view_rows);
+	XwaRemasterHud_RenderMarkerPlanes(cmd, pass, target, view_rows);
 	float matrix[9];
 	const AeronSceneCamera* seat = &s.hud_view.camera;
 	float rows[9], center[3], half_right[3], half_up[3];
@@ -6800,9 +6800,8 @@ static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int
 	} else if (s.view_targets_set) {
 		rect = fl_fit_view_rect(s.flat_w, s.flat_h, s.out_w, s.out_h);
 	}
-	/* The headset HUD is drawn in every eye: the world group on planes and the
-	 * fixed group on the panel. Otherwise the HUD is drawn flat over the
-	 * primary view. */
+	/* The headset HUD is drawn in every eye: the markers on planes and the rest
+	 * on the panel. Otherwise the HUD is drawn flat over the primary view. */
 	const int headset_hud = s.headset_hud && !s.suppress_hud;
 	const int hud = !headset_hud && view == s.rig.primary && !s.suppress_hud && !s.compose_before_tonemap;
 	if (headset_hud && !s.headset_hud_drawn && !fl_render_headset_hud(cmd)) {
@@ -8367,7 +8366,7 @@ uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float cro
 static const XwaRemasterFlightView* fl_build_hud_view(void) { return &s.views[s.primary_view]; }
 
 /* Builds the view that a headset's HUD is laid out for, and the planes that its
- * world group is drawn on (hud_planes.h).
+ * markers are drawn on (hud_planes.h).
  *
  * The view is fixed to the seat and doesn't turn with the head. `seat` is the
  * game camera's view. The view has the HUD's size, and its height covers the
@@ -8549,9 +8548,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		rig && rig->tracked && s.rendered_tick_valid && s.rendered_tick == snap->tick_index;
 	s.rendered_tick = snap->tick_index;
 	s.rendered_tick_valid = 1;
-	/* The headset HUD is laid out for the seat's own view (hud.h). Its fixed
-	 * group goes on a panel and its world group on planes. The map uses the
-	 * usual flat HUD, at the view's size. */
+	/* The headset HUD is laid out for the seat's own view (hud.h). Its markers
+	 * go on planes and the rest on a panel. The map uses the usual flat HUD, at
+	 * the view's size. */
 	const XwaRemasterFlightView* hud_view = NULL;
 	s.headset_hud = rig && rig->tracked && s.hud_panel_rt && !s.compose_before_tonemap;
 	s.headset_hud_drawn = 0;
@@ -8564,7 +8563,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	}
 	const int hud_w = s.headset_hud ? s.vr_hud_width_px : view_w;
 	const int hud_h = s.headset_hud ? s.vr_hud_height_px : view_h;
-	XwaRemasterHud_SetWorldSplit(s.headset_hud);
+	XwaRemasterHud_SetSeparateMarkers(s.headset_hud);
 	/* Dynamic Cockpit: decided before the HUD prepares its lists (which
 	 * route through it), captured after. */
 	XwaRemasterDc_BeginFrame(snap,

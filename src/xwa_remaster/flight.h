@@ -574,8 +574,8 @@ typedef struct XwaRemasterFlightView {
 	AeronRectI arrow_rect;
 	float arrow_position;
 	float arrow_view;
-	/* For the seat's HUD view of a headset: the planes that the HUD's world
-	 * group is drawn on (hud_planes.h). NULL draws the HUD flat. */
+	/* For the seat's HUD view of a headset: the planes that the HUD's markers
+	 * are drawn on (hud_planes.h). NULL draws the HUD flat. */
 	const struct XwaRemasterHudPlanes* hud_planes;
 } XwaRemasterFlightView;
 
@@ -699,9 +699,9 @@ void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig);
  * XwaRemasterFlight_SetViewRig, which removes the targets. NULL removes them
  * too. */
 void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float head_units_per_meter);
-/* For a headset: how large the cockpit panel that shows the HUD's fixed group
- * looks. At 1 it covers the HUD's view as seen from the seat. The panel's
- * distance doesn't change. Values of 0 or less are ignored. */
+/* For a headset: how large the cockpit panel that shows the HUD looks. At 1 it
+ * covers the HUD's view as seen from the seat. The panel's distance doesn't
+ * change. Values of 0 or less are ignored. */
 void XwaRemasterFlight_SetHudPanelScale(float scale);
 /* For a headset, after XwaRemasterFlight_SetViewTargets: gives each view's
  * hidden area, the part of the eye image that the lens never shows, and its

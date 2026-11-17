@@ -239,7 +239,7 @@ void XwaRemasterHudBoxes_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 	/* In a headset, each box has its own plane, placed at the box's centre and
 	 * facing the player. The box is drawn at the centre of that plane's
 	 * drawing. */
-	const XwaRemasterHudPlanes* planes = XwaRemasterHud_WorldSplit() ? flight_view->hud_planes : NULL;
+	const XwaRemasterHudPlanes* planes = XwaRemasterHud_SeparateMarkers() ? flight_view->hud_planes : NULL;
 	box_prepared.on_planes = planes != NULL;
 	const AeronRectI viewport = box_prepared.camera_viewport;
 	if (viewport.width <= 0 || viewport.height <= 0)

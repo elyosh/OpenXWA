@@ -223,23 +223,23 @@ const XwaHudPreparedDrawState* XwaRemasterHud_PreparedDrawState(void);
 void XwaRemasterHud_RenderTargetBoxes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 									  AeronRenderTarget* target, int target_w, int target_h,
 									  XwaHudTargetBoxLayer layer);
-/* In a headset the HUD is drawn as two groups. The world group points at
- * things outside: the target boxes and the target readout, the reticle with
- * its readiness and threat marks and its counts, and the arrows to the
- * target with their text. It is drawn on planes in 3D, straight into each
- * eye image (hud_planes.h, XwaRemasterHud_RenderWorldPlanes): the reticle on
- * a plane that faces the craft's nose, each box on a plane that faces the
- * player from its target, and the arrow on a plane of its own. The fixed
- * group is the rest: the radars, the gauges, the MFDs, the CMD and the
- * text. It is drawn flat, by the other Render functions, into an image that
- * is shown on a panel in the cockpit.
+/* In a headset the HUD is drawn in two parts. The markers are the elements
+ * that point at things outside the cockpit: the target boxes and the target
+ * readout, the reticle with its readiness and threat marks and its counts,
+ * and the arrows to the target with their text. They are drawn on planes in
+ * 3D, straight into each eye image (hud_planes.h,
+ * XwaRemasterHud_RenderMarkerPlanes): the reticle on a plane that faces the
+ * craft's nose, each box on a plane that faces the player from its target,
+ * and the arrow on a plane of its own. The rest of the HUD is the radars, the
+ * gauges, the MFDs, the CMD and the text. It is drawn flat, by the other
+ * Render functions, into an image that is shown on a panel in the cockpit.
  *
- * XwaRemasterHud_SetWorldSplit says whether the next XwaRemasterHud_PrepareFrame
- * makes the two groups. The view it is given must then have its planes
- * (XwaRemasterFlightView.hud_planes). Without the split, the whole HUD is
- * drawn flat, in the order of the classic HUD. */
-void XwaRemasterHud_SetWorldSplit(int split);
-int XwaRemasterHud_WorldSplit(void);
+ * XwaRemasterHud_SetSeparateMarkers says whether the next
+ * XwaRemasterHud_PrepareFrame prepares the markers separately. The view it is
+ * given must then have its planes (XwaRemasterFlightView.hud_planes).
+ * Otherwise the whole HUD is drawn flat, in the order of the classic HUD. */
+void XwaRemasterHud_SetSeparateMarkers(int separate);
+int XwaRemasterHud_SeparateMarkers(void);
 void XwaRemasterHud_RenderFixed(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 								int target_w, int target_h);
 void XwaRemasterHud_RenderCmd(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
@@ -248,11 +248,11 @@ void XwaRemasterHud_RenderText(AeronCommandBuffer* cmd, AeronRenderPass* pass, A
 							   int target_w, int target_h);
 void XwaRemasterHud_Render2D(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							 int target_w, int target_h);
-/* Draws the world group of a split HUD on its planes, in the classic order.
- * `view` has the rows x, y and w of the view-projection matrix of the view
- * that `pass` draws (XwaHudPlanes_ViewRows). The pass's viewport is used. */
-void XwaRemasterHud_RenderWorldPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
-									  AeronRenderTarget* target, const float view[12]);
+/* Draws the markers on their planes, in the classic order. `view` has the rows
+ * x, y and w of the view-projection matrix of the view that `pass` draws
+ * (XwaHudPlanes_ViewRows). The pass's viewport is used. */
+void XwaRemasterHud_RenderMarkerPlanes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
+									   AeronRenderTarget* target, const float view[12]);
 
 #ifdef __cplusplus
 }
