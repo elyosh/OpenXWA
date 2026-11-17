@@ -32,6 +32,7 @@ void XwaRemasterHudReadout_PrepareDrawList(AeronCommandBuffer* cmd, int target_w
 	if (!readout_list || !cmd || target_w <= 0 || target_h <= 0)
 		return;
 	AeronDrawList_Begin(readout_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_SetPlaneHardFills(readout_list, XwaRemasterHud_MarkersOnScreens());
 	if (boxes && boxes->valid && (boxes->readout.valid || boxes->readout.component_valid) &&
 		boxes->target_w == target_w && boxes->target_h == target_h) {
 		/* In a headset the bars are on the plane of the target's box, and

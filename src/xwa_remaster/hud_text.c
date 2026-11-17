@@ -744,6 +744,7 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 	AeronDrawList2D* const marker_list = separate ? text_marker_list : text_list;
 	AeronDrawList_Begin(text_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	AeronDrawList_Begin(text_marker_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_SetPlaneHardFills(text_marker_list, XwaRemasterHud_MarkersOnScreens());
 	/* In a headset the markers' text is drawn on planes: the arrow's text on
 	   the arrow's, a box's text on the box's, and the reticle's counts on the
 	   reticle's. `plane_box` is the box whose plane the list uses, or -1. */

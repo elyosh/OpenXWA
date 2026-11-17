@@ -223,23 +223,32 @@ const XwaHudPreparedDrawState* XwaRemasterHud_PreparedDrawState(void);
 void XwaRemasterHud_RenderTargetBoxes(AeronCommandBuffer* cmd, AeronRenderPass* pass,
 									  AeronRenderTarget* target, int target_w, int target_h,
 									  XwaHudTargetBoxLayer layer);
-/* In a headset the HUD is drawn in two parts. The markers are the elements
- * that point at things outside the cockpit: the target boxes and the target
- * readout, the reticle with its readiness and threat marks and its counts,
- * and the arrows to the target with their text. They are drawn on planes in
- * 3D, straight into each eye image (hud_planes.h,
- * XwaRemasterHud_RenderMarkerPlanes): the reticle on a plane that faces the
- * craft's nose, each box on a plane that faces the player from its target,
- * and the arrow on a plane of its own. The rest of the HUD is the radars, the
+/* In a headset and on surround screens the HUD is drawn in two parts. The
+ * markers are the elements that point at things outside the cockpit: the
+ * target boxes and the target readout, the reticle with its readiness and
+ * threat marks and its counts, and the arrows to the target with their text.
+ * They are drawn on planes in 3D, straight into each view's image
+ * (hud_planes.h, XwaRemasterHud_RenderMarkerPlanes), so every view shows them
+ * where the things they point at are. The rest of the HUD is the radars, the
  * gauges, the MFDs, the CMD and the text. It is drawn flat, by the other
- * Render functions, into an image that is shown on a panel in the cockpit.
+ * Render functions.
+ *
+ * In a headset the reticle is on a plane that faces the craft's nose, each
+ * box on a plane that faces the player from its target, and the arrow on a
+ * plane of its own. The rest of the HUD goes into an image that is shown on a
+ * panel in the cockpit.
+ *
+ * On surround screens (`on_screens`) the planes are parallel to the screens,
+ * so the markers cover the same pixels as a flat HUD's, with hard edges. The
+ * rest of the HUD is drawn over the centre screen.
  *
  * XwaRemasterHud_SetSeparateMarkers says whether the next
  * XwaRemasterHud_PrepareFrame prepares the markers separately. The view it is
  * given must then have its planes (XwaRemasterFlightView.hud_planes).
  * Otherwise the whole HUD is drawn flat, in the order of the classic HUD. */
-void XwaRemasterHud_SetSeparateMarkers(int separate);
+void XwaRemasterHud_SetSeparateMarkers(int separate, int on_screens);
 int XwaRemasterHud_SeparateMarkers(void);
+int XwaRemasterHud_MarkersOnScreens(void);
 void XwaRemasterHud_RenderFixed(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 								int target_w, int target_h);
 void XwaRemasterHud_RenderCmd(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,

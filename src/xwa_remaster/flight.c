@@ -333,6 +333,9 @@ static struct {
 	 * drawn. */
 	int headset_hud;
 	int headset_hud_drawn;
+	/* This frame draws the HUD's markers on planes in every surround screen
+	 * (hud.h). The rest of the HUD is flat, over the primary view. */
+	int surround_markers;
 	AeronShader* hud_reproject_vs;
 	AeronShader* hud_reproject_fs;
 	AeronGraphicsPipeline* hud_reproject_pipeline;
@@ -6833,6 +6836,14 @@ static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int
 		Aeron_SetScissor(pass, &full_target);
 		AeronDrawList_RenderIntoPass(s.hud_composite, cmd, pass, target);
 	}
+	if (s.surround_markers && !own_target && !s.suppress_hud && !s.compose_before_tonemap) {
+		/* The markers, in this screen's part of the target. */
+		float view_rows[12];
+		XwaHudPlanes_ViewRows(s.views[view].view_proj, view_rows);
+		Aeron_SetViewport(pass, &rect);
+		Aeron_SetScissor(pass, &rect);
+		XwaRemasterHud_RenderMarkerPlanes(cmd, pass, target, view_rows);
+	}
 	if (headset_hud && !fl_draw_headset_hud(cmd, pass, target, view, &rect)) {
 		Aeron_EndRenderPass(pass);
 		return 0;
@@ -8439,6 +8450,59 @@ static const XwaRemasterFlightView* fl_build_headset_hud_view(const XwaFlightCam
 	return &s.hud_view;
 }
 
+/* Builds the planes that the HUD's markers are drawn on for the surround
+ * screens of `rig` (hud_planes.h), and gives them to the primary view, which
+ * the HUD is laid out for. The planes' image is that view's, so a marker on
+ * the centre screen covers the pixels it has in a flat HUD. */
+static const XwaRemasterFlightView* fl_build_surround_hud_view(const AeronViewRig* rig) {
+	if (rig->count > XWA_HUD_PLANES_MAX_SCREENS || rig->width <= 0 || rig->height <= 0) {
+		return NULL;
+	}
+	XwaRemasterHudPlanes* planes = &s.hud_planes;
+	memset(planes, 0, sizeof *planes);
+	for (int i = 0; i < rig->count; i++) {
+		const AeronViewFov* fov = &rig->views[i].fov;
+		XwaRemasterHudScreen* screen = &planes->screens[i];
+		fl_quat_to_mat3(s.views[i].camera.ori, screen->rows);
+		/* The rows are right, down and forward, so up is negative. */
+		screen->tan_left = tanf(fov->angle_left);
+		screen->tan_right = tanf(fov->angle_right);
+		screen->tan_top = -tanf(fov->angle_up);
+		screen->tan_bottom = -tanf(fov->angle_down);
+		const float span_x = screen->tan_right - screen->tan_left;
+		const float span_y = screen->tan_bottom - screen->tan_top;
+		if (!(span_x > 0.0f) || !(span_y > 0.0f)) {
+			return NULL;
+		}
+		screen->focal_x_px = (float)rig->width / span_x;
+		screen->focal_y_px = (float)rig->height / span_y;
+	}
+	planes->screen_count = rig->count;
+	XwaRemasterFlightView* view = &s.views[s.primary_view];
+	const XwaRemasterHudScreen* center = &planes->screens[s.primary_view];
+	planes->focal_px = center->focal_y_px;
+	planes->center_x = -center->tan_left * center->focal_x_px;
+	planes->center_y = -center->tan_top * center->focal_y_px;
+	planes->reticle_scale = 1.0f;
+	planes->eye_pixel_scale = 1.0f;
+	/* The centre screen's plane, at infinity: a pixel of the primary view to
+	 * its direction. */
+	for (int axis = 0; axis < 3; axis++) {
+		planes->seat_plane[axis * 3 + 0] = center->rows[axis] / center->focal_x_px;
+		planes->seat_plane[axis * 3 + 1] = center->rows[3 + axis] / center->focal_y_px;
+		planes->seat_plane[axis * 3 + 2] = center->rows[6 + axis] -
+										   planes->center_x * planes->seat_plane[axis * 3 + 0] -
+										   planes->center_y * planes->seat_plane[axis * 3 + 1];
+	}
+	memcpy(planes->head_pos, view->camera.pos, sizeof planes->head_pos);
+	memcpy(planes->head_rows, center->rows, sizeof planes->head_rows);
+	planes->head_view = view;
+	planes->head_axis_x = planes->center_x;
+	planes->head_axis_y = planes->center_y;
+	view->hud_planes = planes;
+	return view;
+}
+
 /* Gives the scene the frame's views, right after the scene began. Without
  * `several`, the scene keeps its one view: the camera it began with. */
 static int fl_set_scene_views(int several) {
@@ -8558,12 +8622,19 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		hud_view = fl_build_headset_hud_view(cam, &flight_view, view_rotated ? view_rotation : NULL, rig);
 		s.headset_hud = hud_view != NULL;
 	}
+	/* On surround screens the HUD is laid out for the primary view. Its
+	 * markers go on planes in every screen, and the rest is flat. */
+	s.surround_markers = 0;
+	if (!hud_view && rig && !rig->tracked && rig->count > 1 && !s.compose_before_tonemap) {
+		hud_view = fl_build_surround_hud_view(rig);
+		s.surround_markers = hud_view != NULL;
+	}
 	if (!hud_view) {
 		hud_view = fl_build_hud_view();
 	}
 	const int hud_w = s.headset_hud ? s.vr_hud_width_px : view_w;
 	const int hud_h = s.headset_hud ? s.vr_hud_height_px : view_h;
-	XwaRemasterHud_SetSeparateMarkers(s.headset_hud);
+	XwaRemasterHud_SetSeparateMarkers(s.headset_hud || s.surround_markers, s.surround_markers);
 	/* Dynamic Cockpit: decided before the HUD prepares its lists (which
 	 * route through it), captured after. */
 	XwaRemasterDc_BeginFrame(snap,

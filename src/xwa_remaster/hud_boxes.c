@@ -486,6 +486,7 @@ static void box_prepare_layer(AeronCommandBuffer* cmd, int target_w, int target_
 	const int list_index = layer == XWA_HUD_TARGET_BOX_AFTER_FIXED ? 1 : 0;
 	box_list_on_planes[list_index] = 0;
 	AeronDrawList_Begin(box_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_SetPlaneHardFills(box_list, XwaRemasterHud_MarkersOnScreens());
 	if (!box_prepared.valid || box_prepared.target_w != target_w || box_prepared.target_h != target_h) {
 		(void)AeronDrawList_Prepare(box_list, cmd);
 		return;

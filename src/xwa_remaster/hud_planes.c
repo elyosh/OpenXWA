@@ -63,7 +63,84 @@ void XwaHudPlanes_AtHeadPixel(const XwaRemasterHudPlanes* planes, float x, float
 	planes_write(planes, right, down, forward, 1.0f, NULL, out);
 }
 
+/* The place of `point` on `screen`: its depth along the screen's axis, and
+ * how far outside the screen's edges it is, as a tangent. 0 is on the screen.
+ * Returns 0 when the point isn't in front of the screen. */
+static int planes_on_screen(const XwaRemasterHudPlanes* planes, const XwaRemasterHudScreen* screen,
+							const float point[3], float* depth, float* outside) {
+	const float d[3] = { point[0] - planes->head_pos[0], point[1] - planes->head_pos[1],
+						 point[2] - planes->head_pos[2] };
+	const float x = screen->rows[0] * d[0] + screen->rows[1] * d[1] + screen->rows[2] * d[2];
+	const float y = screen->rows[3] * d[0] + screen->rows[4] * d[1] + screen->rows[5] * d[2];
+	const float z = screen->rows[6] * d[0] + screen->rows[7] * d[1] + screen->rows[8] * d[2];
+	if (!(z > 0.0f)) {
+		return 0;
+	}
+	const float tx = x / z, ty = y / z;
+	float over = 0.0f;
+	over = fmaxf(over, screen->tan_left - tx);
+	over = fmaxf(over, tx - screen->tan_right);
+	over = fmaxf(over, screen->tan_top - ty);
+	over = fmaxf(over, ty - screen->tan_bottom);
+	*depth = z;
+	*outside = over;
+	return 1;
+}
+
+/* Returns the screen that shows `point`, or the nearest one that the point
+ * is in front of, with the point's depth on it. -1 when there is none. */
+static int planes_nearest_screen(const XwaRemasterHudPlanes* planes, const float point[3], float* depth,
+								 float* outside) {
+	int best = -1;
+	for (int i = 0; i < planes->screen_count; i++) {
+		float z, over;
+		if (planes_on_screen(planes, &planes->screens[i], point, &z, &over) &&
+			(best < 0 || over < *outside)) {
+			best = i;
+			*depth = z;
+			*outside = over;
+		}
+	}
+	return best;
+}
+
+int XwaHudPlanes_ScreenAt(const XwaRemasterHudPlanes* planes, const float point[3]) {
+	float depth = 0.0f, outside = 0.0f;
+	const int screen = planes_nearest_screen(planes, point, &depth, &outside);
+	return screen >= 0 && outside <= 0.0f ? screen : -1;
+}
+
 float XwaHudPlanes_AtPoint(const XwaRemasterHudPlanes* planes, const float point[3], float out[9]) {
+	if (planes->screen_count > 0) {
+		float depth = 0.0f, outside = 0.0f;
+		const int index = planes_nearest_screen(planes, point, &depth, &outside);
+		if (index < 0) {
+			return 0.0f;
+		}
+		const XwaRemasterHudScreen* screen = &planes->screens[index];
+		const float pixel_x = depth / screen->focal_x_px;
+		const float pixel_y = depth / screen->focal_y_px;
+		/* The drawing moves by less than a pixel, so that its pixels are the
+		 * screen's: text then stays sharp. */
+		float d[3], at[2];
+		for (int axis = 0; axis < 3; axis++) {
+			d[axis] = point[axis] - planes->head_pos[axis];
+		}
+		for (int row = 0; row < 2; row++) {
+			const float* r = &screen->rows[row * 3];
+			const float tangent = (r[0] * d[0] + r[1] * d[1] + r[2] * d[2]) / depth;
+			const float pixel = row == 0 ? (tangent - screen->tan_left) * screen->focal_x_px
+										 : (tangent - screen->tan_top) * screen->focal_y_px;
+			const float offset = pixel - (row == 0 ? planes->center_x : planes->center_y);
+			at[row] = (row == 0 ? planes->center_x : planes->center_y) + offset - roundf(offset);
+		}
+		for (int axis = 0; axis < 3; axis++) {
+			out[axis * 3 + 0] = screen->rows[axis] * pixel_x;
+			out[axis * 3 + 1] = screen->rows[3 + axis] * pixel_y;
+			out[axis * 3 + 2] = point[axis] - at[0] * out[axis * 3 + 0] - at[1] * out[axis * 3 + 1];
+		}
+		return depth;
+	}
 	float forward[3] = { point[0] - planes->head_pos[0], point[1] - planes->head_pos[1],
 						 point[2] - planes->head_pos[2] };
 	float right[3], down[3];

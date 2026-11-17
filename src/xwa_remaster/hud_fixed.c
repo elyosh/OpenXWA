@@ -888,7 +888,19 @@ static void fixed_build_target_arrow(const XwaHudState* h, const XwaRemasterHudV
 	if (!v->target_arrow || !h->target.valid || !(h->instruments.working_subsystems & 4u))
 		return;
 	/* In a headset the arrow is placed in the view that follows the head,
-	 * and drawn on a plane of its own, at its place in that view. */
+	 * and drawn on a plane of its own, at its place in that view. On surround
+	 * screens it is placed on the centre screen as in a flat HUD, and only
+	 * shows when no screen shows the target. */
+	const int screens = fixed_planes && fixed_planes->screen_count > 0;
+	if (screens && !h->target.padlock_active) {
+		const XwaFlightObject* target = fixed_target_object(fixed_snapshot, h);
+		float local[3];
+		if (target) {
+			AeronWorld_LocalI32(fixed_flight_view->origin_world, target->world_pos, local);
+			if (XwaHudPlanes_ScreenAt(fixed_planes, local) >= 0)
+				return;
+		}
+	}
 	const XwaRemasterFlightView* arrow_view = fixed_planes ? fixed_planes->head_view : fixed_flight_view;
 	if (!XwaRemasterHudFixed_ProjectTargetArrow(fixed_snapshot, (XwaHudProfileIndex)fixed_draws.profile,
 												arrow_view, fixed_target_w, fixed_target_h,
@@ -896,7 +908,10 @@ static void fixed_build_target_arrow(const XwaHudState* h, const XwaRemasterHudV
 		return;
 	fixed_target_arrow.draw_x_ref = fixed_target_arrow.center_x_ref;
 	fixed_target_arrow.draw_y_ref = fixed_target_arrow.center_y_ref;
-	if (fixed_planes) {
+	if (screens) {
+		memcpy(fixed_target_arrow.plane, fixed_planes->seat_plane, sizeof fixed_target_arrow.plane);
+		fixed_target_arrow.on_plane = 1;
+	} else if (fixed_planes) {
 		const XwaHudLayoutProfile* profile = fixed_profile((XwaHudProfileIndex)fixed_draws.profile);
 		int out_x, out_y;
 		float scale;
@@ -1267,6 +1282,7 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 	const int separate = XwaRemasterHud_SeparateMarkers();
 	AeronDrawList_Begin(fixed_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	AeronDrawList_Begin(fixed_marker_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
+	AeronDrawList_SetPlaneHardFills(fixed_marker_list, XwaRemasterHud_MarkersOnScreens());
 	fixed_markers_on_planes = 0;
 	if (!fixed_draws.valid) {
 		fixed_prepare_lists(cmd);
