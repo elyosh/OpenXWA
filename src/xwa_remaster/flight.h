@@ -615,6 +615,13 @@ int XwaRemasterFlight_ObjectModelMatrixForCameraDelta(const XwaFlightObject* obj
 /* Transform a model-space point in native OPT units through a mesh instance's
  * row-major affine matrix (model metres -> scene units). Works with both the
  * flight render-local and PiP eye-local transforms; translation is not rescaled. */
+/* The matrix that AeronDrawList_RenderPlanes wants for a view of a rig, for
+ * drawings placed in metres around the rig's origin and not in the flight
+ * scene: the points are in the rig's space with Y and Z negated, which is
+ * the eye space of a seat at the origin. `width` and `height` are the
+ * view's size in pixels. */
+void XwaRemasterFlight_RigViewPlaneRows(const AeronRigView* view, int width, int height, float out[12]);
+
 void XwaRemasterFlight_TransformOptPoint(const float model_meters_to_scene[16], const float point_opt[3],
 										 float out_scene[3]);
 

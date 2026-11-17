@@ -32,6 +32,7 @@
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/frontend.h"
 #include "xwa_remaster/hud.h"
+#include "xwa_remaster/menu_beam.h"
 #include "xwa_remaster/opt_mesh.h"
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/vr_hands.h"
@@ -128,6 +129,8 @@ static struct {
 	float vr_screen_scale;
 	/* This frame has eye images from Aeron (Aeron_XrBeginViews). */
 	int xr_views_ready;
+	/* The flight scene gave its eye images to the headset in this frame. */
+	int xr_views_submitted;
 	AeronViewRig headset_rig;
 	uint64_t headset_generation;
 	AeronRenderTarget* xr_targets[AERON_MAX_VIEWS];
@@ -956,10 +959,57 @@ void XwaRemaster_BeginFrame(const AeronInputSnapshot* input) {
 	XwaPort_SetClassicFlightRenderingEnabled(!g.classic_suppressed_this_frame);
 }
 
+/* Draws the beam of the hand that points at the virtual screen, in a frame
+ * whose eye images the flight scene didn't use: the menus, the map, a
+ * paused game, the options window. The headset shows these eye images over
+ * the screen. */
+static void XwaRemaster_RenderMenuBeam(void) {
+	if (g.xr_views_submitted || !XwaRemasterMenuBeam_Wanted()) {
+		return;
+	}
+	AeronViewRig rig;
+	AeronRenderTarget* targets[AERON_MAX_VIEWS];
+	if (g.xr_views_ready) {
+		/* The flight renderer asked for the eye images and left them, as
+		 * for the map. Its rig has the VR world scale. */
+		rig = g.headset_rig;
+		const float scale = g.vr_world_scale > 0.0f ? 1.0f / g.vr_world_scale : 1.0f;
+		for (int i = 0; i < rig.count; i++) {
+			for (int axis = 0; axis < 3; axis++) {
+				rig.views[i].pose.position_m[axis] *= scale;
+			}
+			targets[i] = g.xr_targets[i];
+		}
+		for (int axis = 0; axis < 3; axis++) {
+			rig.center.position_m[axis] *= scale;
+		}
+	} else {
+		AeronXrFrame frame;
+		if (!Aeron_XrBeginViews(&frame)) {
+			return;
+		}
+		rig = frame.rig;
+		for (int i = 0; i < rig.count; i++) {
+			targets[i] = frame.color[i];
+		}
+	}
+	if (XwaRemasterMenuBeam_Render(&rig, targets)) {
+		Aeron_XrSubmitViewsOver();
+	}
+}
+
+static void XwaRemaster_FrameScene(int32_t delta_us);
+
 void XwaRemaster_Frame(int32_t delta_us) {
 	if (!g.initialized || !g.assets) {
 		return;
 	}
+	g.xr_views_submitted = 0;
+	XwaRemaster_FrameScene(delta_us);
+	XwaRemaster_RenderMenuBeam();
+}
+
+static void XwaRemaster_FrameScene(int32_t delta_us) {
 	if (g.pending_mode_valid && XwaPort_GetClassicFlightFrameSerial() != g.pending_classic_frame_serial) {
 		XwaRemaster_SetViewMode(g.pending_mode, g.pending_mode_fade);
 		g.pending_mode_valid = 0;
@@ -1260,6 +1310,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		 * Aeron can give them to the headset. */
 		if (next_scene_is_headset) {
 			Aeron_XrSubmitViews();
+			g.xr_views_submitted = 1;
 			if (g.vr_mirror && !XwaRemasterFlight_SubmitViewMirror()) {
 				XwaRemaster_FatalGpu("headset mirror presentation");
 				return;
@@ -1691,6 +1742,7 @@ void XwaRemaster_Shutdown(void) {
 	XwaRemasterFlight_Shutdown();
 	XwaRemasterVrHands_Shutdown();
 	XwaRemasterCockpitButtons_Shutdown();
+	XwaRemasterMenuBeam_Shutdown();
 	XwaRemasterShip_Shutdown();
 	if (g.assets) {
 		XwaRemasterAssets_Destroy(g.assets);

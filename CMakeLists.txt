@@ -379,6 +379,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/suns.c
     src/xwa_remaster/vr_hands.c
     src/xwa_remaster/cockpit_buttons.c
+    src/xwa_remaster/menu_beam.c
     src/xwa_remaster/assets.c
     src/xwa_remaster/text.c
 )

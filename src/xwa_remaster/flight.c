@@ -3494,6 +3494,23 @@ static void fl_build_rig_view(const XwaFlightCamera* cam, const XwaRemasterFligh
 	AeronScene_ComputeViewProj(camera, out->view_proj);
 }
 
+void XwaRemasterFlight_RigViewPlaneRows(const AeronRigView* view, int width, int height, float out[12]) {
+	static const float seat_rows[9] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
+	static const float seat_pos[3] = { 0.0f, 0.0f, 0.0f };
+	AeronSceneCamera camera;
+	float rows[9], view_proj[16];
+	memset(&camera, 0, sizeof camera);
+	AeronViewPose_ComposeCamera(&view->pose, seat_rows, seat_pos, 1.0f, rows, camera.pos);
+	fl_rows_to_quat(rows, camera.ori);
+	AeronViewFov_ToCamera(&view->fov, &camera.h_half_rad, &camera.v_half_rad, &camera.proj_x_offset,
+						  &camera.proj_y_offset);
+	/* One unit is one metre here. */
+	camera.near_z = 0.02f;
+	camera.viewport = (AeronRectI) { 0, 0, width, height };
+	AeronScene_ComputeViewProj(&camera, view_proj);
+	XwaHudPlanes_ViewRows(view_proj, out);
+}
+
 /* Sets a build view's camera, and its history to the same camera. */
 static void fl_set_build_view(FlBuildView* build, const XwaRemasterFlightView* view,
 							  const XwaRemasterFlightView* seat, uint32_t view_mask, int rig_view) {
