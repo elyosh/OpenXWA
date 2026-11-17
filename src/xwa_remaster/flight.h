@@ -699,9 +699,9 @@ void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig);
  * XwaRemasterFlight_SetViewRig, which removes the targets. NULL removes them
  * too. */
 void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float head_units_per_meter);
-/* For a headset: how large the cockpit panel that shows the HUD's fixed
- * group looks. At 1 it covers the HUD's view as seen from the seat. The
- * panel keeps its distance. A value that isn't above 0 is ignored. */
+/* For a headset: how large the cockpit panel that shows the HUD's fixed group
+ * looks. At 1 it covers the HUD's view as seen from the seat. The panel's
+ * distance doesn't change. Values of 0 or less are ignored. */
 void XwaRemasterFlight_SetHudPanelScale(float scale);
 /* For a headset, after XwaRemasterFlight_SetViewTargets: gives each view's
  * hidden area, the part of the eye image that the lens never shows, and its

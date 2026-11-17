@@ -27,9 +27,9 @@ typedef struct XwaHudPreparedText {
 	uint16_t readout_glyph_count;
 	XwaHudPane panes[XWA_SNAP_MAX_HUD_PANES];
 	XwaHudGlyph glyphs[XWA_SNAP_MAX_HUD_GLYPHS];
-	/* `box` says what a glyph is drawn next to: a prepared box
-	   (XwaHudPreparedBoxState.boxes), or the target arrow with -1. In a
-	   headset the glyph goes on that box's plane or on the arrow's. */
+	/* `box` says what a glyph is drawn next to: the index of a prepared box
+	   (XwaHudPreparedBoxState.boxes), or -1 for the target arrow. In a headset
+	   the glyph goes on that box's plane or on the arrow's. */
 	struct {
 		uint8_t ch;
 		uint8_t reserved;
@@ -273,8 +273,8 @@ static void text_build_target_arrow(const XwaSnapshot* snapshot, XwaHudProfileIn
 	const XwaHudLayoutProfile* active = XwaRemasterHudLayout_Profile(layout, profile);
 	if (!active)
 		return;
-	/* The rectangle that the arrow is kept on. In a headset it is a part of
-	   the view that follows the head, not the layout's. */
+	/* The rectangle that the arrow is kept on. In a headset it is a part of the
+	   view that follows the head, not of the layout. */
 	const XwaHudLayoutRect arrow_bounds = { (int)arrow.bounds_x_ref, (int)arrow.bounds_y_ref,
 											(int)arrow.bounds_w_ref, (int)arrow.bounds_h_ref };
 	const XwaHudLayoutRect* bounds = &arrow_bounds;
@@ -773,7 +773,7 @@ void XwaRemasterHudText_PrepareDrawList(AeronCommandBuffer* cmd, XwaRemasterAsse
 		text_prepare_lists(cmd);
 		return;
 	}
-	/* The world group's text on planes: its font atlases are those of its
+	/* The world group's text on planes: it uses the font atlases made for its
 	   size in an eye image. */
 	const float world_scale = planes ? XwaRemasterHudFixed_EyePixelScale() : 1.0f;
 	text_prepare_faces(cmd, assets, layout, profile, output_scale, world_scale);

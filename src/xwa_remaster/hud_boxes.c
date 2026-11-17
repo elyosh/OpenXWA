@@ -236,8 +236,9 @@ void XwaRemasterHudBoxes_Build(const XwaSnapshot* snapshot, XwaHudProfileIndex p
 	box_prepared.target_w = (uint16_t)(target_w > 0xffff ? 0xffff : target_w);
 	box_prepared.target_h = (uint16_t)(target_h > 0xffff ? 0xffff : target_h);
 	box_prepared.camera_viewport = flight_view->viewport;
-	/* In a headset, each box has a plane that faces the player from the
-	 * box's centre, and is at the centre of that plane's drawing. */
+	/* In a headset, each box has its own plane, placed at the box's centre and
+	 * facing the player. The box is drawn at the centre of that plane's
+	 * drawing. */
 	const XwaRemasterHudPlanes* planes = XwaRemasterHud_WorldSplit() ? flight_view->hud_planes : NULL;
 	box_prepared.on_planes = planes != NULL;
 	const AeronRectI viewport = box_prepared.camera_viewport;
@@ -505,7 +506,7 @@ static void box_prepare_layer(AeronCommandBuffer* cmd, int target_w, int target_
 		(void)AeronDrawList_Prepare(box_list, cmd);
 		return;
 	}
-	/* A drawing on a plane has no rectangle to be cut to. */
+	/* Drawings on planes aren't clipped to a rectangle. */
 	const AeronRectI viewport = box_prepared.camera_viewport;
 	const AeronRectI* const scissor = box_prepared.on_planes ? NULL : &viewport;
 	box_list_on_planes[list_index] = box_prepared.on_planes;

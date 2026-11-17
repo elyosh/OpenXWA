@@ -485,8 +485,8 @@ static void host_config_startup_screen(AeronVfs* vfs, AeronStartupOptions* optio
 	}
 	const int width = (int)AeronConfigFile_GetInt(config, "presentation.vr_screen_width_px", 0);
 	const int height = (int)AeronConfigFile_GetInt(config, "presentation.vr_screen_height_px", 0);
-	/* The screen has a distance and an angle that it covers, so that
-	 * changing its distance doesn't change how large it looks. */
+	/* The screen's width is given as an angle, so changing the distance doesn't
+	 * change how large it looks. */
 	const double distance = AeronConfigFile_GetFloat(config, "presentation.vr_screen_distance_m", 0.0);
 	const double width_deg = AeronConfigFile_GetFloat(config, "presentation.vr_screen_width_deg", 0.0);
 	if (width >= 640 && width <= 8192 && height >= 480 && height <= 8192) {

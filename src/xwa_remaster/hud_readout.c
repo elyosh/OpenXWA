@@ -34,8 +34,8 @@ void XwaRemasterHudReadout_PrepareDrawList(AeronCommandBuffer* cmd, int target_w
 	AeronDrawList_Begin(readout_list, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	if (boxes && boxes->valid && (boxes->readout.valid || boxes->readout.component_valid) &&
 		boxes->target_w == target_w && boxes->target_h == target_h) {
-		/* In a headset the bars are on the plane of the target's box, and a
-		   drawing on a plane has no rectangle to be cut to. */
+		/* In a headset the bars are on the plane of the target's box, and
+		   drawings on planes aren't clipped to a rectangle. */
 		const AeronRectI viewport = boxes->camera_viewport;
 		const AeronRectI* const scissor = boxes->on_planes ? NULL : &viewport;
 		int plane_box = -1;

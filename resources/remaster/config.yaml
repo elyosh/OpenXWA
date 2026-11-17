@@ -365,9 +365,9 @@ presentation:
   debug_stereo_fov_deg: 100
   # In VR, the menus, the briefings and the movies are shown on a flat
   # screen in front of the player: its size in pixels, its distance from the
-  # head in metres, and the angle that its width covers, in degrees. With
-  # an angle, the screen looks as large at any distance. Read when the game
-  # starts. The player's video.vr_screen_scale multiplies the width.
+  # head in metres, and the angle that its width covers, in degrees. The
+  # screen looks the same size at any distance. Read when the game starts.
+  # The player's video.vr_screen_scale multiplies the width.
   vr_screen_width_px: 1920
   vr_screen_height_px: 1080
   vr_screen_distance_m: 2.0
@@ -377,7 +377,7 @@ presentation:
   # drawn where the things they point at are, so they line up with them. The
   # radars, the gauges, the MFDs and the text are drawn into that image and
   # shown on a flat panel in front of the seat, at this distance in metres.
-  # The panel looks as large at any distance: the player's
+  # The panel looks the same size at any distance. The player's
   # video.vr_panel_scale sets its size, where 1 covers the same part of the
   # view as the HUD does on a screen.
   vr_hud_width_px: 1920

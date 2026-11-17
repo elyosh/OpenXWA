@@ -243,11 +243,11 @@ static struct {
 	 * unless a rig is set. */
 	int out_w;
 	int out_h;
-	/* The size of the flat view: the one view, with the game camera, that
-	 * the map is drawn as. It is the view size, except in a headset: there
-	 * the flat view is shown on the virtual screen, so it has the shape of
-	 * present_rt, and it is drawn in the upper left part of the scene. The
-	 * flat HUD, hud_rt, has this size. */
+	/* The size of the flat view: the single view from the game camera that the
+	 * map uses. It is the view size, except in a headset. There the flat view
+	 * is shown on the virtual screen, so it has the shape of present_rt and is
+	 * drawn in the upper left part of the scene. The flat HUD, hud_rt, has this
+	 * size. */
 	int flat_w;
 	int flat_h;
 	/* This frame is a flat view that doesn't cover the whole scene. */
@@ -318,18 +318,19 @@ static struct {
 	 * with premultiplied alpha, and then over the primary view. */
 	AeronRenderTarget* hud_rt;
 	AeronDrawList2D* hud_composite;
-	/* A headset's HUD (hud.h), which the debug stereo view has too. It is
-	 * laid out for hud_view: the seat's view with the game camera's vertical
-	 * field of view, in an image of presentation.vr_hud_*_px. The fixed
-	 * group is drawn into hud_panel_rt and shown on a panel in the cockpit.
-	 * The world group is drawn into each eye on the planes of hud_planes
-	 * (hud_planes.h). hud_head_view follows the head and has no image: the
-	 * arrow to a target out of view is placed in it. */
+	/* The headset HUD (hud.h), also used by the debug stereo view. It is laid
+	 * out for hud_view: the seat's view with the game camera's vertical field
+	 * of view, in an image of presentation.vr_hud_*_px. The fixed group is
+	 * drawn into hud_panel_rt and shown on a panel in the cockpit. The world
+	 * group is drawn into each eye on the planes of hud_planes (hud_planes.h).
+	 * hud_head_view follows the head and has no image. It is used to place the
+	 * arrow that points to a target out of view. */
 	AeronRenderTarget* hud_panel_rt;
 	XwaRemasterFlightView hud_view;
 	XwaRemasterFlightView hud_head_view;
 	XwaRemasterHudPlanes hud_planes;
-	/* This frame draws the headset's HUD, and the panel's image is drawn. */
+	/* This frame draws the headset HUD, and the panel's image is already
+	 * drawn. */
 	int headset_hud;
 	int headset_hud_drawn;
 	AeronShader* hud_reproject_vs;
@@ -3017,9 +3018,10 @@ void XwaRemasterFlight_GetTemporalStats(XwaFlightTemporalStats* out) {
 	out->profile_available = AeronScene_GetTemporalProfileInfo(s.scene, &out->profile);
 }
 
-/* The field of view of the view that follows the head of `rig`, in which
- * the arrow to a target out of view is placed: it covers every eye, with a
- * small margin, because the eyes of some headsets point a little apart. */
+/* The field of view of the view that follows the head of `rig`. The arrow that
+ * points to a target out of view is placed in this view. It covers every eye
+ * with a small margin, because the eyes of some headsets point slightly
+ * apart. */
 static AeronViewFov fl_headset_world_fov(const AeronViewRig* rig) {
 	const float margin = 3.0f * (3.14159265f / 180.0f);
 	const float limit = 80.0f * (3.14159265f / 180.0f);
@@ -3168,8 +3170,8 @@ static int fl_ensure(int target_w, int target_h) {
 	 * one view. */
 	const int view_w = s.rig_active ? s.rig.width : target_w;
 	const int view_h = s.rig_active ? s.rig.height : target_h;
-	/* A rig that follows a head has the headset's HUD: a real headset, and
-	 * the debug stereo view, which tests it. */
+	/* A rig that follows a head uses the headset HUD: a real headset, or the
+	 * debug stereo view, which is used to test it. */
 	const int tracked = s.rig_active && s.rig.tracked;
 	if (s.scene && s.rt_w == view_w && s.rt_h == view_h && s.out_w == target_w && s.out_h == target_h &&
 		(s.hud_rt != NULL) == (s.rig_active != 0) && (s.hud_panel_rt != NULL) == (tracked != 0) &&
@@ -6525,11 +6527,11 @@ static void fl_set_present_debug(AeronScenePresentChain* chain) {
 	AeronScenePresentChain_SetDebug(chain, &debug);
 }
 
-/* Draws the 2D HUD into `pass`, flat. `target` has the size that the HUD
- * was prepared for. `readout_scene` is the scene whose depth hides the
- * target readout behind near geometry, or NULL to draw the whole readout.
- * When the HUD is split (hud.h), this draws its fixed group: the world
- * group is on planes, and fl_draw_headset_hud draws it. */
+/* Draws the 2D HUD into `pass`, flat. `target` has the size that the HUD was
+ * prepared for. `readout_scene` is the scene whose depth hides the target
+ * readout behind near geometry, or NULL to draw the whole readout. When the HUD
+ * is split (hud.h), this draws only the fixed group. fl_draw_headset_hud draws
+ * the world group on planes. */
 static void fl_draw_hud(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 						int target_w, int target_h, AeronScene3D* readout_scene) {
 	/* With the Dynamic Cockpit active the HUD's lists already leave out
@@ -6702,12 +6704,12 @@ static void fl_draw_hud_image(AeronRenderPass* pass, AeronGraphicsPipeline* pipe
 	Aeron_Draw(pass, 3, 0);
 }
 
-/* Draws the headset's HUD over the image of `view`, in the open pass, whose
- * viewport is the view's rectangle `rect` of `target`: the world group on
- * its planes, then the fixed group on its panel. The panel is in front of
+/* Draws the headset HUD over the image of `view`, in the open pass. The pass's
+ * viewport is the view's rectangle `rect` in `target`. The world group is drawn
+ * on its planes, then the fixed group on its panel. The panel is in front of
  * the seat's eye point and faces it. At scale 1 it covers the HUD's view
- * exactly as seen from the seat, so the HUD has its classic layout, and the
- * two eyes see it at the panel's distance. */
+ * exactly as seen from the seat, so the HUD keeps its classic layout, and both
+ * eyes see it at the panel's distance. */
 static int fl_draw_headset_hud(AeronCommandBuffer* cmd, AeronRenderPass* pass, AeronRenderTarget* target,
 							   int view, const AeronRectI* rect) {
 	AeronGraphicsPipeline* pipeline =
@@ -6798,7 +6800,7 @@ static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int
 	} else if (s.view_targets_set) {
 		rect = fl_fit_view_rect(s.flat_w, s.flat_h, s.out_w, s.out_h);
 	}
-	/* A headset's HUD is in every eye: its world group on planes and its
+	/* The headset HUD is drawn in every eye: the world group on planes and the
 	 * fixed group on the panel. Otherwise the HUD is drawn flat over the
 	 * primary view. */
 	const int headset_hud = s.headset_hud && !s.suppress_hud;
@@ -8364,16 +8366,16 @@ uint32_t XwaRemasterFlight_CaptureBackdrops(AeronScene3D* scene, const float cro
  * over: the primary view. */
 static const XwaRemasterFlightView* fl_build_hud_view(void) { return &s.views[s.primary_view]; }
 
-/* Builds the view that a headset's HUD is laid out for, and the planes that
- * its world group is drawn on (hud_planes.h).
+/* Builds the view that a headset's HUD is laid out for, and the planes that its
+ * world group is drawn on (hud_planes.h).
  *
- * The view is the seat's: it doesn't turn with the head. `seat` is the game
- * camera's view. The view has the HUD's size, and its height shows the game
- * camera's vertical field of view, as a window does. So the HUD's parts
- * have the angular size they have on a screen. The wider view that a narrow
- * window gets (presentation.cockpit_fov_min_aspect) isn't used: the HUD's
- * image isn't a window. The view is centred on the seat's axis, so the
- * game's own shift of the horizon isn't in it. */
+ * The view is fixed to the seat and doesn't turn with the head. `seat` is the
+ * game camera's view. The view has the HUD's size, and its height covers the
+ * game camera's vertical field of view, like a window. So the HUD's parts have
+ * the same angular size as on a screen. The wider view that a narrow window
+ * gets (presentation.cockpit_fov_min_aspect) isn't used, because the HUD's
+ * image isn't a window. The view is centred on the seat's axis, so it doesn't
+ * include the game's shift of the horizon. */
 static const XwaRemasterFlightView* fl_build_headset_hud_view(const XwaFlightCamera* cam,
 															  const XwaRemasterFlightView* seat,
 															  const float* view_rotation,
@@ -8405,7 +8407,7 @@ static const XwaRemasterFlightView* fl_build_headset_hud_view(const XwaFlightCam
 	const AeronViewFov eye_fov = rig->views[0].fov;
 	const float eye_span = tanf(eye_fov.angle_up) - tanf(eye_fov.angle_down);
 	planes->eye_pixel_scale = eye_span > 0.0f ? (float)rig->height / eye_span / planes->focal_px : 1.0f;
-	/* The seat's plane: a pixel of the seat's view to its direction. The
+	/* The seat's plane: it maps a pixel of the seat's view to a direction. The
 	 * rows are the view's right, down and forward axes. */
 	float rows[9];
 	fl_quat_to_mat3(s.hud_view.camera.ori, rows);
@@ -8416,8 +8418,8 @@ static const XwaRemasterFlightView* fl_build_headset_hud_view(const XwaFlightCam
 			rows[6 + axis] -
 			(planes->center_x * rows[axis] + planes->center_y * rows[3 + axis]) / planes->focal_px;
 	}
-	/* The head: the rig's centre. Its view covers both eyes, with the HUD
-	 * image's pixels for an angle. */
+	/* The head is the rig's centre. Its view covers both eyes, with the same
+	 * pixels per angle as the HUD image. */
 	const AeronViewFov head_fov = fl_headset_world_fov(rig);
 	const int head_w =
 		(int)ceilf(planes->focal_px * (tanf(head_fov.angle_right) - tanf(head_fov.angle_left)));
@@ -8547,9 +8549,9 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		rig && rig->tracked && s.rendered_tick_valid && s.rendered_tick == snap->tick_index;
 	s.rendered_tick = snap->tick_index;
 	s.rendered_tick_valid = 1;
-	/* A headset's HUD is laid out for the seat's own view (hud.h): its
-	 * fixed group goes on a panel and its world group on planes. The map
-	 * has the usual flat HUD, in the view's size. */
+	/* The headset HUD is laid out for the seat's own view (hud.h). Its fixed
+	 * group goes on a panel and its world group on planes. The map uses the
+	 * usual flat HUD, at the view's size. */
 	const XwaRemasterFlightView* hud_view = NULL;
 	s.headset_hud = rig && rig->tracked && s.hud_panel_rt && !s.compose_before_tonemap;
 	s.headset_hud_drawn = 0;

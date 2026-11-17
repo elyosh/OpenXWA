@@ -977,8 +977,8 @@ int XwaRemasterHudFixed_ReticleCenter(float* out_x_ref, float* out_y_ref) {
 int XwaRemasterHudFixed_ReticlePlane(float out[9]) {
 	if (!fixed_planes || !out)
 		return 0;
-	/* The group keeps its place and grows or shrinks about the reticle's
-	 * centre, or about the middle of the drawing without a reticle. */
+	/* The group stays in place and is scaled about the reticle's centre, or
+	 * about the middle of the drawing when there is no reticle. */
 	float x = fixed_planes->center_x, y = fixed_planes->center_y;
 	const XwaHudLayoutProfile* profile = fixed_profile((XwaHudProfileIndex)fixed_draws.profile);
 	int out_x, out_y;
@@ -1284,8 +1284,8 @@ void XwaRemasterHudFixed_PrepareDrawList(AeronCommandBuffer* cmd, int target_w, 
 		fixed_prepare_lists(cmd);
 		return;
 	}
-	/* In a headset, the world group's widgets are drawn on planes: the
-	 * reticle and its marks on the seat's, each arrow on its own. */
+	/* In a headset, the world group's widgets are drawn on planes: the reticle
+	 * and its marks on the seat's plane, each arrow on its own plane. */
 	int reticle_plane = -1, arrow_plane = -1;
 	if (split && fixed_planes) {
 		float plane[9];

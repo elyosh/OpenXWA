@@ -33,8 +33,8 @@ static struct {
 	int axes[3];
 	uint16_t holds[XWA_INPUT_ACTION_COUNT], throttle;
 	/* Presses of host actions that the host hasn't taken yet, and what
-	 * XwaControllerMapping_UpdateHostActions remembers of each device:
-	 * which one it is, and which of its bindings were down. */
+	 * XwaControllerMapping_UpdateHostActions remembers about each device: its
+	 * id, and which of its bindings were down. */
 	bool host_pressed[XWA_INPUT_ACTION_COUNT];
 	uint32_t host_id[AERON_CONTROLLER_MAX];
 	bool host_down[AERON_CONTROLLER_MAX][XWA_CONTROLLER_BINDING_CAP];
@@ -466,9 +466,10 @@ void XwaControllerMapping_UpdateHostActions(const AeronInputSnapshot* input) {
 	if (!input || input->frame_id == g_controller.host_frame)
 		return;
 	g_controller.host_frame = input->frame_id;
-	/* As for the flight bindings: nothing is read without the focus, or
-	 * while the options window or the debug UI has the input. A button
-	 * that is down when reading starts again doesn't count. */
+	/* The same rules as the flight bindings: nothing is read while the window
+	 * has no focus, or while the options window or the debug UI has the input.
+	 * A button that is already down when reading starts again doesn't count as
+	 * a press. */
 	if (!input->has_focus || XwaInput_IsCaptured() || Aeron_DebugUiVisible()) {
 		memset(g_controller.host_id, 0, sizeof g_controller.host_id);
 		return;

@@ -23,10 +23,10 @@ typedef struct XwaHudProjectedArrow {
 	/* The rectangle that the arrow is kept on, in the same view. */
 	float bounds_x_ref, bounds_y_ref, bounds_w_ref, bounds_h_ref;
 	int16_t rotation_angle;
-	/* Where the arrow is drawn. In a headset the arrow has a plane of its
-	 * own (`on_plane`, `plane`: hud_planes.h), at infinity, and is drawn at
-	 * the centre of that plane's drawing. Otherwise this is the place
-	 * above. */
+	/* Where the arrow is drawn. In a headset the arrow has a plane of its own
+	 * (`on_plane`, `plane`: hud_planes.h), at infinity, and is drawn at the
+	 * centre of that plane's drawing. Otherwise this is the same as the
+	 * position above. */
 	uint8_t on_plane;
 	float draw_x_ref;
 	float draw_y_ref;

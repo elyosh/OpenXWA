@@ -135,7 +135,8 @@ typedef struct XwaModernVideoOptions {
 	   1 it covers the same part of the view as the HUD does on a screen. */
 	float vr_panel_scale;
 	/* How large the flat screen that shows the menus, the briefings and the
-	   movies looks in a headset, from its size in the game's files. */
+	   movies looks in a headset, as a multiple of its size in the game's
+	   files. */
 	float vr_screen_scale;
 } XwaModernVideoOptions;
 

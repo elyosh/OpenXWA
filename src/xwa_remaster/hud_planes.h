@@ -29,9 +29,9 @@ typedef struct XwaRemasterHudPlanes {
 	float seat_plane[9];
 	/* The size of the reticle group, about the reticle's centre. */
 	float reticle_scale;
-	/* Pixels of an eye image for one pixel of a drawing, at the middle of
-	 * the eye image. Text on a plane uses a font atlas made for its size in
-	 * the eye image, which this gives. */
+	/* Pixels of an eye image for one pixel of a drawing, at the middle of the
+	 * eye image. Text on a plane uses this to pick the font atlas made for its
+	 * size in the eye image. */
 	float eye_pixel_scale;
 	/* The head: where it is, and its right, down and forward axes as rows. */
 	float head_pos[3];
@@ -50,8 +50,8 @@ void XwaHudPlanes_AtHeadPixel(const XwaRemasterHudPlanes* planes, float x, float
 
 /* The plane of a drawing whose centre is at `point`, facing the head and
  * upright for it. One pixel of the drawing covers the same angle as at
- * infinity. Returns the distance from the head to the point, or 0, with no
- * plane, when the point is at the head. */
+ * infinity. Returns the distance from the head to the point. Returns 0 and
+ * writes no plane when the point is at the head. */
 float XwaHudPlanes_AtPoint(const XwaRemasterHudPlanes* planes, const float point[3], float out[9]);
 
 /* The plane `plane` with its drawing made `scale` times as large about the

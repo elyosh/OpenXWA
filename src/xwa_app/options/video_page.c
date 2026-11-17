@@ -153,15 +153,14 @@ static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) 
 			options->vr_panel_scale = (float)panel_percent / 100.0f;
 			changed = true;
 		}
-		AeronUi_Help(ui, "The size of the panel that shows the radars, the gauges and the text in the "
-						 "cockpit.");
+		AeronUi_Help(ui, "The size of the HUD panel in the cockpit: the radars, the gauges and the text.");
 		if (AeronUi_SliderInt(ui, "Menu Screen Size", &screen_percent,
 							  (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f),
 							  (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5, "%d%%")) {
 			options->vr_screen_scale = (float)screen_percent / 100.0f;
 			changed = true;
 		}
-		AeronUi_Help(ui, "The size of the screen that shows the menus, the briefings and the movies.");
+		AeronUi_Help(ui, "The size of the flat screen that shows the menus, briefings and movies.");
 		changed |= AeronUi_Toggle(ui, "Show Headset View in Window", &options->vr_mirror);
 	}
 	if ((mode != started_mode || (mode != XWA_MODERN_VR_OFF && render_percent != started_render_percent)) &&

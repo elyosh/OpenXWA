@@ -39,8 +39,8 @@ typedef struct XwaLaunchOptions {
 	/* --flight-views: draw the flight scene for this run as a surround
 	   setup (1) or as the two eyes of a headset (2), or 0. */
 	int flight_views;
-	/* --stereo-head: the head's pose of --flight-views stereo, in degrees:
-	   to the right, up, and rolled clockwise. */
+	/* --stereo-head: the head's yaw, pitch and roll for --flight-views stereo,
+	   in degrees. Positive is right, up and clockwise. */
 	float stereo_head[3];
 	/* --vr: start in VR, and fail when it can't start (1). --no-vr: start
 	   without VR (-1). 0 follows video.vr_mode of the configuration. */
