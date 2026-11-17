@@ -26,6 +26,7 @@
 #include "aeron/scene/scene3d.h"
 #include "aeron/scene/settings.h"
 #include "aeron/scene/view_rig.h"
+#include "aeron/xr.h"
 #include "aeron/vfs.h"
 #include "xwa_remaster/assets.h"
 #include "xwa_remaster/environment.h"
@@ -148,6 +149,11 @@ int XwaRemasterFlight_PresentDebugView(void);
 void XwaRemasterFlight_SetPresentDebugView(int view);
 /* The flight scene's newest metering; 0 when there is none. */
 int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out);
+/* Returns whether the exposure is metered and the meter's values of the
+ * first render haven't come back from the GPU yet. They take two presented
+ * frames. Until then XwaRemasterFlight_Exposure gives the fixed exposure,
+ * which is not the one the frame was drawn with. */
+int XwaRemasterFlight_ExposureReadoutPending(void);
 /* The fixed exposure of a view lit by its own lights (the CMD display, the
  * model preview): its brightest directional light metered as incident
  * light, EV100 = log2(E * 100 / 250) with E in lux, minus the compensation.
@@ -688,6 +694,12 @@ void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig);
  * XwaRemasterFlight_SetViewRig, which removes the targets. NULL removes them
  * too. */
 void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float head_units_per_meter);
+/* For a headset, after XwaRemasterFlight_SetViewTargets: gives each view's
+ * hidden area, the part of the eye image that the lens never shows
+ * (AeronXrHiddenArea). The scene shades no pixel under it. `areas` has one
+ * entry for each view of the rig, and its meshes must stay valid until the
+ * next render. NULL removes them, and so does XwaRemasterFlight_SetViewRig. */
+void XwaRemasterFlight_SetViewHiddenAreas(const AeronXrHiddenArea* areas);
 /* Returns whether the last XwaRemasterFlight_Render drew the views into
  * their own targets. It is 0 for the map, which is in the texture that the
  * render returned. */

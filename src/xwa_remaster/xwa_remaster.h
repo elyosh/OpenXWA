@@ -115,9 +115,10 @@ typedef struct XwaRemasterDebugStereo {
 	float position_m[3];
 } XwaRemasterDebugStereo;
 
-/* Returns whether the last XwaRemaster_Frame could not render its frame
- * yet: models are still loading, or the headset gave no eye images. The
- * frame is rendered on a later host frame. */
+/* Returns whether the film capture and benchmark must wait for a later host
+ * frame: the last XwaRemaster_Frame could not render its frame yet (models
+ * are still loading, or the headset gave no eye images), or the exposure
+ * meter's values of the first render haven't come back from the GPU. */
 int XwaRemaster_FrameWaits(void);
 
 void XwaRemaster_GetDebugStereo(XwaRemasterDebugStereo* out);

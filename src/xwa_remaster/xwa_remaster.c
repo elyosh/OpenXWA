@@ -125,6 +125,7 @@ static struct {
 	AeronViewRig headset_rig;
 	uint64_t headset_generation;
 	AeronRenderTarget* xr_targets[AERON_MAX_VIEWS];
+	AeronXrHiddenArea xr_hidden_areas[AERON_MAX_VIEWS];
 	/* The last flight frame went to the headset's eye images. */
 	int scene_is_headset;
 	/* The last frame could not be rendered yet: models are still loading,
@@ -728,6 +729,7 @@ static int XwaRemaster_BuildHeadsetRig(const XwaSnapshot* snap, AeronViewRig* ri
 			frame.rig.views[i].pose.position_m[axis] *= g.vr_world_scale;
 		}
 		g.xr_targets[i] = frame.color[i];
+		g.xr_hidden_areas[i] = frame.hidden_area[i];
 	}
 	for (int axis = 0; axis < 3; axis++) {
 		frame.rig.center.position_m[axis] *= g.vr_world_scale;
@@ -791,6 +793,7 @@ static void XwaRemaster_UpdateViewRig(const XwaSnapshot* snap) {
 	XwaRemasterFlight_SetViewRig(kind != RM_RIG_NONE ? &rig : NULL);
 	XwaRemasterFlight_SetViewTargets(kind == RM_RIG_HEADSET && g.xr_views_ready ? g.xr_targets : NULL,
 									 AERON_OPT_UNITS_PER_METER * g.vr_world_scale);
+	XwaRemasterFlight_SetViewHiddenAreas(kind == RM_RIG_HEADSET && g.xr_views_ready ? g.xr_hidden_areas : NULL);
 	if (kind == RM_RIG_SURROUND) {
 		const AeronRectI center = rig.views[rig.primary].rect;
 		XwaPresentation_SetSurround(center.x, center.width, g.render_pixel_width);
@@ -1285,7 +1288,11 @@ void XwaRemaster_Frame(int32_t delta_us) {
 		XwaRemasterFrontend_PresentCursor(g.ramp.alpha, g.mode == RM_VIEW_SPLIT);
 }
 
-int XwaRemaster_FrameWaits(void) { return g.frame_waits; }
+int XwaRemaster_FrameWaits(void) {
+	/* The exposure in the capture's and the benchmark's logs is the meter's,
+	 * which comes back from the GPU two frames after the first render. */
+	return g.frame_waits || (g.scene_kind == XWA_SCENE_FLIGHT && XwaRemasterFlight_ExposureReadoutPending());
+}
 
 #define RM_BENCHMARK_WARMUP_RENDERS 30
 #define RM_BENCHMARK_SAMPLES 7

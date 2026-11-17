@@ -256,6 +256,10 @@ static struct {
 	 * for one frame (XwaRemasterFlight_SetViewTargets). */
 	AeronRenderTarget* view_targets[AERON_MAX_VIEWS];
 	int view_targets_set;
+	/* The part of each view's image that the headset's lens never shows
+	 * (XwaRemasterFlight_SetViewHiddenAreas). */
+	AeronXrHiddenArea view_hidden_areas[AERON_MAX_VIEWS];
+	int view_hidden_areas_set;
 	/* The last render drew the rig's views into their own targets. */
 	int view_targets_rendered;
 	/* While set, a rig's frame is composed before the tonemap and without
@@ -2485,6 +2489,11 @@ int XwaRemasterFlight_GetExposureReadout(AeronSceneExposureReadout* out) {
 	return out && s.scene && AeronScene_GetExposureReadout(s.scene, out);
 }
 
+int XwaRemasterFlight_ExposureReadoutPending(void) {
+	AeronSceneExposureReadout readout;
+	return s.exposure.metered && !s.map_present && s.scene && !AeronScene_GetExposureReadout(s.scene, &readout);
+}
+
 void XwaRemasterFlight_GetPointLights(XwaFlightPointLightParams* out) {
 	if (out) {
 		if (!fl_cfg_ensure())
@@ -3288,6 +3297,16 @@ void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig) {
 	}
 	s.rig_active = active;
 	s.view_targets_set = 0;
+	s.view_hidden_areas_set = 0;
+}
+
+void XwaRemasterFlight_SetViewHiddenAreas(const AeronXrHiddenArea* areas) {
+	s.view_hidden_areas_set = 0;
+	if (!areas || !s.rig_active || !s.view_targets_set) {
+		return;
+	}
+	memcpy(s.view_hidden_areas, areas, (size_t)s.rig.count * sizeof *areas);
+	s.view_hidden_areas_set = 1;
 }
 
 void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float head_units_per_meter) {
@@ -8381,6 +8400,11 @@ static int fl_set_scene_views(int several) {
 		if (s.mb_enabled) {
 			descs[i].prev_view_proj = s.previous_views[i].view_proj;
 			descs[i].prev_ori = s.previous_views[i].camera.ori;
+		}
+		if (s.view_hidden_areas_set && s.view_targets_set) {
+			descs[i].hidden_area_xy = s.view_hidden_areas[i].xy;
+			descs[i].hidden_area_vertex_count = s.view_hidden_areas[i].vertex_count;
+			descs[i].hidden_area_generation = s.view_hidden_areas[i].generation;
 		}
 	}
 	return AeronScene_SetViews(s.scene, descs, s.view_count, s.primary_view);
