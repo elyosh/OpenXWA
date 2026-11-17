@@ -18,12 +18,14 @@
 #include "xwa_remaster/cockpit_buttons.h"
 #include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/vr_hands.h"
+#include "xwa_remaster/vr_keyboard.h"
 #include "xwa_remaster/xwa_remaster.h"
 #include "xwa_runtime/config/option_section.h"
 #include "xwa_runtime/input/capture.h"
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/keyboard_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
+#include "xwa_runtime/input/vr_keyboard.h"
 #include "xwa_runtime/input/vr_stick.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
@@ -177,8 +179,10 @@ static void apply_modern_input_options(const XwaModernInputOptions* options) {
 	XwaControllerMapping_SetRumbleEnabled(options->rumble_enabled);
 	XwaRemasterVrHands_SetEnabled(options->vr_show_hands);
 	XwaVrHands_SetUseMod(options->vr_mod_hands);
+	XwaVrKeyboard_SetUseMod(options->vr_mod_keyboard);
 	XwaRemasterCockpitButtons_SetOptions(options->vr_cockpit_buttons, options->vr_button_ray_m,
 										 options->rumble_enabled);
+	XwaRemasterVrKeyboard_SetHaptics(options->rumble_enabled);
 	Config_ApplyModernInputOptions(options);
 }
 
@@ -236,6 +240,11 @@ static void mask_hand_sources(void) {
 				   (1u << AERON_VR_HAND_AXIS_THUMBSTICK_Y);
 		}
 		XwaVrStick_SourceMask(hand, &buttons, &axes);
+		/* On the virtual keyboard, the trigger presses a key. */
+		if (XwaRemasterVrKeyboard_HandOn(hand)) {
+			buttons |= (1u << AERON_VR_HAND_BUTTON_TRIGGER) | (1u << AERON_VR_HAND_BUTTON_SQUEEZE);
+			axes |= (1u << AERON_VR_HAND_AXIS_TRIGGER) | (1u << AERON_VR_HAND_AXIS_SQUEEZE);
+		}
 		/* On a cockpit button, the trigger presses the button. */
 		if (XwaRemasterCockpitButtons_OnButton(hand)) {
 			buttons |= 1u << AERON_VR_HAND_BUTTON_TRIGGER;
@@ -826,6 +835,12 @@ int main(int argc, char** argv) {
 			if (holograms && XwaRemasterDc_Active()) {
 				XwaRemasterDc_ToggleHolograms();
 				toggled |= holograms == 1;
+			}
+			/* The virtual keyboard of VR: a text field of the options window
+			 * opens it, and the player can open it for any other field. */
+			XwaVrKeyboard_SetUiTextEdit(XwaOptionsWindow_EditsText());
+			if (host_action_pressed(in, XWA_INPUT_ACTION_TOGGLE_VR_KEYBOARD) && Aeron_XrEnabled()) {
+				XwaVrKeyboard_Toggle();
 			}
 			XwaRemaster_BeginFrame(in);
 			if (Aeron_QuitRequested() || XwaPort_ShouldQuit()) {

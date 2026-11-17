@@ -57,6 +57,9 @@ typedef struct XwaModernInputOptions {
 	int vr_show_hands;
 	/* Use the mod's gloves when it has some, and not the game's own. */
 	int vr_mod_hands;
+	/* Use the mod's virtual keyboard when it has one, and not the game's
+	 * own. */
+	int vr_mod_keyboard;
 	XwaModernVrStickMode vr_stick;
 	/* The hand that holds the virtual stick: 0 is the left one, 1 the right
 	 * one. */

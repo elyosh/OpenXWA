@@ -243,6 +243,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/input/winmm_joystick_provider.c
     src/xwa_runtime/input/mouse_flight.c
     src/xwa_runtime/input/vr_stick.c
+    src/xwa_runtime/input/vr_keyboard.c
     src/xwa_runtime/models/cockpit_eye.c
     src/xwa_runtime/models/cockpit_view.c
     src/xwa_runtime/models/craft_definitions.c
@@ -380,6 +381,7 @@ add_library(xwa_remaster STATIC
     src/xwa_remaster/vr_hands.c
     src/xwa_remaster/cockpit_buttons.c
     src/xwa_remaster/menu_beam.c
+    src/xwa_remaster/vr_keyboard.c
     src/xwa_remaster/assets.c
     src/xwa_remaster/text.c
 )

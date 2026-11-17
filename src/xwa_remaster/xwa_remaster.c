@@ -36,6 +36,7 @@
 #include "xwa_remaster/opt_mesh.h"
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/vr_hands.h"
+#include "xwa_remaster/vr_keyboard.h"
 #include "xwa_runtime/frontend/frontend_geometry.h"
 #include "xwa_runtime/input/capture.h"
 #include "xwa_runtime/input/keyboard_mapping.h"
@@ -1006,6 +1007,7 @@ void XwaRemaster_Frame(int32_t delta_us) {
 	}
 	g.xr_views_submitted = 0;
 	XwaRemaster_FrameScene(delta_us);
+	XwaRemasterVrKeyboard_Frame(g.assets);
 	XwaRemaster_RenderMenuBeam();
 }
 
@@ -1743,6 +1745,7 @@ void XwaRemaster_Shutdown(void) {
 	XwaRemasterVrHands_Shutdown();
 	XwaRemasterCockpitButtons_Shutdown();
 	XwaRemasterMenuBeam_Shutdown();
+	XwaRemasterVrKeyboard_Shutdown();
 	XwaRemasterShip_Shutdown();
 	if (g.assets) {
 		XwaRemasterAssets_Destroy(g.assets);

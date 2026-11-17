@@ -13,6 +13,9 @@ input:
   # Use the mod's hand models when it has some. When false, the game's own
   # are always shown.
   vr_mod_hands: true
+  # Use the mod's virtual keyboard when it has one. When false, the game's
+  # own is always shown.
+  vr_mod_keyboard: true
   # The virtual stick of the VR controllers: hold the squeeze of the stick
   # hand and move the hand to steer. 'tilt' reads the hand's rotation, as on a
   # stick. 'slide' reads the hand's movement to the sides and forward, and the
@@ -267,6 +270,7 @@ input:
       - {key: "C", modifiers: [ctrl]}
     toggle_holograms:
       - {key: "H", modifiers: [ctrl]}
+    toggle_vr_keyboard: []
     wingman_command_page:
       - {key: "Tab"}
     command_option_1:

@@ -12,6 +12,8 @@ void XwaOptionsWindow_FlushForExit(void);
 bool XwaOptionsWindow_Open(void);
 bool XwaOptionsWindow_CapturesController(void);
 bool XwaOptionsWindow_CapturesKeyboard(void);
+/* Whether a text field of the window is being edited. */
+bool XwaOptionsWindow_EditsText(void);
 void XwaOptionsWindow_Show(void);
 void XwaOptionsWindow_RequestClose(void);
 bool XwaOptionsWindow_CloseRequested(void);

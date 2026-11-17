@@ -20,6 +20,9 @@
 #include "xwa/frontend/frontend_text.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/render/renderer.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/input/vr_keyboard.h"
+#endif
 
 #include <stdio.h>
 #include <string.h>
@@ -45,6 +48,10 @@ int FilmNamePrompt_Update(int frameCounter) {
 	XwaFile* existingFile;
 	int buttonPressed;
 
+#ifdef XWA_MODERN
+	/* The film's name is typed here: VR opens its keyboard. */
+	XwaVrKeyboard_NoteTextField();
+#endif
 	if (!frameCounter) {
 		g_activeTextFieldId = 0;
 		g_filmNamePromptOverwriteConfirm = 0;

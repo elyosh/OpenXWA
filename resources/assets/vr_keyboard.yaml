@@ -1,0 +1,70 @@
+# The virtual keyboard of VR. A mod replaces it with its own
+# frontend/vr_keyboard.yaml. See modding/frontend.md.
+width_m: 0.42
+font_size: 16
+colors:
+  key: [74, 90, 190]
+  action: [176, 52, 74]
+  confirm: [56, 140, 96]
+  dark: [36, 72, 100]
+  text: [255, 255, 255]
+  hover: [255, 255, 255, 60]
+rows:
+  - - {key: Escape, label: ESC, color: action}
+    - {key: "`", char: "`", shifted: "~"}
+    - {key: "1", char: "1", shifted: "!"}
+    - {key: "2", char: "2", shifted: "@"}
+    - {key: "3", char: "3", shifted: "#"}
+    - {key: "4", char: "4", shifted: "$"}
+    - {key: "5", char: "5", shifted: "%"}
+    - {key: "6", char: "6", shifted: "^"}
+    - {key: "7", char: "7", shifted: "&"}
+    - {key: "8", char: "8", shifted: "*"}
+    - {key: "9", char: "9", shifted: "("}
+    - {key: "0", char: "0", shifted: ")"}
+    - {key: "-", char: "-", shifted: "_"}
+    - {key: "=", char: "=", shifted: "+"}
+    - {key: Backspace, label: BACK, w: 2, color: action}
+  - - {key: Tab, label: TAB, w: 1.5, color: dark}
+    - {key: Q, char: q, shifted: Q}
+    - {key: W, char: w, shifted: W}
+    - {key: E, char: e, shifted: E}
+    - {key: R, char: r, shifted: R}
+    - {key: T, char: t, shifted: T}
+    - {key: Y, char: y, shifted: Y}
+    - {key: U, char: u, shifted: U}
+    - {key: I, char: i, shifted: I}
+    - {key: O, char: o, shifted: O}
+    - {key: P, char: p, shifted: P}
+    - {key: "[", char: "[", shifted: "{"}
+    - {key: "]", char: "]", shifted: "}"}
+    - {key: "\\", char: "\\", shifted: "|", w: 1.5}
+    - {key: Delete, label: DEL, color: action}
+  - - {key: Left Shift, label: SHIFT, w: 2, color: dark}
+    - {key: A, char: a, shifted: A}
+    - {key: S, char: s, shifted: S}
+    - {key: D, char: d, shifted: D}
+    - {key: F, char: f, shifted: F}
+    - {key: G, char: g, shifted: G}
+    - {key: H, char: h, shifted: H}
+    - {key: J, char: j, shifted: J}
+    - {key: K, char: k, shifted: K}
+    - {key: L, char: l, shifted: L}
+    - {key: ";", char: ";", shifted: ":"}
+    - {key: "'", char: "'", shifted: "\""}
+    - {key: Return, label: ENTER, w: 3, color: confirm}
+  - - {key: Left, label: "<", color: dark}
+    - {key: Right, label: ">", color: dark}
+    - {key: Z, char: z, shifted: Z}
+    - {key: X, char: x, shifted: X}
+    - {key: C, char: c, shifted: C}
+    - {key: V, char: v, shifted: V}
+    - {key: B, char: b, shifted: B}
+    - {key: N, char: n, shifted: N}
+    - {key: M, char: m, shifted: M}
+    - {key: ",", char: ",", shifted: "<"}
+    - {key: ".", char: ".", shifted: ">"}
+    - {key: "/", char: "/", shifted: "?"}
+    - {key: Space, char: " ", label: SPACE, w: 2, color: dark}
+    - {key: Up, label: "^", color: dark}
+    - {key: Down, label: "v", color: dark}

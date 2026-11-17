@@ -184,6 +184,8 @@ static const XwaActionDefinition g_actions[XWA_INPUT_ACTION_COUNT] = {
 	  XWA_INPUT_ACTION_KIND_COMMAND },
 	{ "toggle_holograms", "Toggle Cockpit Holograms", XWA_INPUT_ACTION_CATEGORY_HUD, KEY_NONE,
 	  XWA_INPUT_ACTION_KIND_HOST },
+	{ "toggle_vr_keyboard", "Toggle VR Keyboard", XWA_INPUT_ACTION_CATEGORY_HUD, KEY_NONE,
+	  XWA_INPUT_ACTION_KIND_HOST },
 	{ "wingman_command_page", "Toggle Wingman Command Page", XWA_INPUT_ACTION_CATEGORY_COMMUNICATIONS,
 	  KEY_TAB, XWA_INPUT_ACTION_KIND_COMMAND },
 	{ "command_option_1", "Command Option 1", XWA_INPUT_ACTION_CATEGORY_COMMUNICATIONS, KEY_1,

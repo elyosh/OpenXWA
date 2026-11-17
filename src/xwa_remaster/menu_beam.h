@@ -17,7 +17,7 @@ extern "C" {
 #endif
 
 /* Whether a beam is to be drawn in this frame: a hand points at the virtual
- * screen. */
+ * screen, or at the virtual keyboard. */
 int XwaRemasterMenuBeam_Wanted(void);
 
 /* Clears the eye images `targets` and draws the beam into them. `rig` has

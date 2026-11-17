@@ -11,6 +11,7 @@
  * the +Y side, and the origin is near the tip of the index finger. The
  * models keep these coordinates. */
 
+#include <ctype.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -20,6 +21,7 @@
 #include "cook_model.h"
 #include "import_internal.h"
 #include "ktx2_writer.h"
+#include "png_write.h"
 #include "tool_log.h"
 #include "xwau_active_cockpit.h"
 #include "xwau_config.h"
@@ -320,12 +322,12 @@ static char* glove_buttons(const char* settings_path, int hand, const XwauNames*
 /* Reads a glove's image, which Active_Cockpit.cfg names as
  * <DAT file>-<group>-<image>. Without the key, it is XWAU's own. */
 static bool glove_load_image(const char* source, const XwauLines* settings, const char* key,
-							 XwauDatImage* image) {
+							 const char* fallback, XwauDatImage* image) {
 	char value[512], path[IMPORT_PATH_CAP], error[256];
 	int group = 1, id = 0;
 	XwauLines_Value(settings, key, XWAU_RULES_CPP, value, sizeof value);
 	if (!value[0])
-		snprintf(value, sizeof value, "Effects\\ActiveCockpit\\Textures.dat-1-0");
+		snprintf(value, sizeof value, "%s", fallback);
 	/* The group and the image are the last two numbers. */
 	char* last = strrchr(value, '-');
 	if (last) {
@@ -369,7 +371,7 @@ static bool glove_convert_hand(ImportContext* ctx, const XwauLines* settings, co
 
 	snprintf(rel, sizeof rel, "Effects/ActiveCockpit/%sNeutral.obj", prefixes[hand]);
 	if (!Xwau_FindFile(source, rel, obj, sizeof obj) ||
-		!glove_load_image(source, settings, keys[hand], &image))
+		!glove_load_image(source, settings, keys[hand], "Effects\\ActiveCockpit\\Textures.dat-1-0", &image))
 		return false;
 	char* buttons = glove_buttons(settings_path, hand, &ctx->names);
 	for (int pose = 0; pose < 3 && !Import_ShouldStop(ctx); ++pose) {
@@ -412,6 +414,187 @@ static bool glove_convert_hand(ImportContext* ctx, const XwauLines* settings, co
 	return true;
 }
 
+/* A key of XWAU's keyboard picture: its name in Active_Cockpit.cfg, the
+ * name of the key in a layout file, and the characters it types without
+ * and with Shift (NULL for a key that types nothing). */
+typedef struct KeyboardName {
+	const char* xwau;
+	const char* key;
+	const char* text;
+	const char* shifted;
+} KeyboardName;
+
+static const KeyboardName kKeyboardNames[] = {
+	{ "ESC", "Escape", NULL, NULL },
+	{ "`", "`", "`", "~" },
+	{ "1", "1", "1", "!" },
+	{ "2", "2", "2", "@" },
+	{ "3", "3", "3", "#" },
+	{ "4", "4", "4", "$" },
+	{ "5", "5", "5", "%" },
+	{ "6", "6", "6", "^" },
+	{ "7", "7", "7", "&" },
+	{ "8", "8", "8", "*" },
+	{ "9", "9", "9", "(" },
+	{ "0", "0", "0", ")" },
+	{ "MINUS", "-", "-", "_" },
+	{ "PLUS", "=", "=", "+" },
+	{ "BACKSPACE", "Backspace", NULL, NULL },
+	{ "TAB", "Tab", NULL, NULL },
+	{ "[", "[", "[", "{" },
+	{ "]", "]", "]", "}" },
+	{ "\\", "\\", "\\", "|" },
+	{ ";", ";", ";", ":" },
+	{ "'", "'", "'", "\"" },
+	{ "ENTER", "Return", NULL, NULL },
+	{ "HOLD_SHIFT", "Left Shift", NULL, NULL },
+	{ "HOLD_CTRL", "Left Ctrl", NULL, NULL },
+	{ "HOLD_ALT", "Left Alt", NULL, NULL },
+	{ "COMMA", ",", ",", "<" },
+	{ "PERIOD", ".", ".", ">" },
+	{ "/", "/", "/", "?" },
+	{ "SPACE", "Space", " ", " " },
+	{ "LEFT_ARROW", "Left", NULL, NULL },
+	{ "RIGHT_ARROW", "Right", NULL, NULL },
+	{ "UP_ARROW", "Up", NULL, NULL },
+	{ "DOWN_ARROW", "Down", NULL, NULL },
+};
+
+/* Writes `text` as a YAML string in double quotes. */
+static void keyboard_quote(FILE* file, const char* text) {
+	fputc('"', file);
+	for (const char* c = text; *c; ++c) {
+		if (*c == '"' || *c == '\\')
+			fputc('\\', file);
+		fputc(*c, file);
+	}
+	fputc('"', file);
+}
+
+/* Writes one key of the layout. Returns false for a name that isn't a key
+ * of the game's keyboard, such as the keys that move XWAU's keyboard. */
+static bool keyboard_write_key(FILE* file, const char* name, const float rect[4]) {
+	char letter[2] = { 0, 0 }, upper[2] = { 0, 0 }, function[8];
+	const char* key = NULL;
+	const char* text = NULL;
+	const char* shifted = NULL;
+	int number = 0;
+	if (strlen(name) == 1 && isalpha((unsigned char)name[0])) {
+		upper[0] = (char)toupper((unsigned char)name[0]);
+		letter[0] = (char)tolower((unsigned char)name[0]);
+		key = upper;
+		text = letter;
+		shifted = upper;
+	} else if ((name[0] == 'F' || name[0] == 'f') && sscanf(name + 1, "%d", &number) == 1 && number >= 1 &&
+			   number <= 12) {
+		snprintf(function, sizeof function, "F%d", number);
+		key = function;
+	}
+	for (size_t i = 0; !key && i < sizeof kKeyboardNames / sizeof kKeyboardNames[0]; ++i) {
+		if (strcasecmp(name, kKeyboardNames[i].xwau) == 0) {
+			key = kKeyboardNames[i].key;
+			text = kKeyboardNames[i].text;
+			shifted = kKeyboardNames[i].shifted;
+		}
+	}
+	if (!key)
+		return false;
+	fputs("  - {key: ", file);
+	keyboard_quote(file, key);
+	if (text) {
+		fputs(", char: ", file);
+		keyboard_quote(file, text);
+		fputs(", shifted: ", file);
+		keyboard_quote(file, shifted);
+	}
+	fprintf(file, ", rect: [%g, %g, %g, %g]}\n", (double)rect[0], (double)rect[1], (double)rect[2],
+			(double)rect[3]);
+	return true;
+}
+
+/* Converts XWAU's keyboard: one picture of a DAT file, and a rectangle for
+ * each key in Active_Cockpit.cfg, after the `keyb_texture` line. The result
+ * is the mod's frontend/vr_keyboard.yaml, a layout with a picture. */
+static void keyboard_convert(ImportContext* ctx, const XwauLines* settings, const char* settings_path) {
+	const XwaModImportOptions* options = ctx->options;
+	char folder[IMPORT_PATH_CAP], layout[IMPORT_PATH_CAP], picture[IMPORT_PATH_CAP], line[512], param[128];
+	XwauDatImage image = { 0 };
+	float width_cm = 30.0f, size[2] = { 0.0f, 0.0f };
+	bool inside = false;
+	int keys = 0;
+
+	XwauLines_Value(settings, "keyb_texture", XWAU_RULES_CPP, line, sizeof line);
+	if (!settings_path[0] || !line[0] || !PathFormat(folder, sizeof folder, "%s/frontend", options->mod) ||
+		!PathFormat(layout, sizeof layout, "%s/vr_keyboard.yaml", folder) ||
+		!PathFormat(picture, sizeof picture, "%s/vr_keyboard.png", folder) || !MakeDirs(folder) ||
+		!glove_load_image(options->source, settings, "keyb_texture",
+						  "Effects\\ActiveCockpit\\Textures.dat-0-0", &image))
+		return;
+	FILE* in = fopen(settings_path, "rt");
+	FILE* out = in ? fopen(layout, "wb") : NULL;
+	if (!out || !write_png_rgba(picture, (int)image.width, (int)image.height, image.rgba)) {
+		Import_ListFailed(ctx, "The VR keyboard couldn't be written.");
+		if (in)
+			fclose(in);
+		if (out)
+			fclose(out);
+		XwauDat_FreeImage(&image);
+		return;
+	}
+	size[0] = (float)image.width;
+	size[1] = (float)image.height;
+	fputs("# XWAU's VR keyboard, converted by the OpenXWA mod importer.\nkeys:\n", out);
+	while (fgets(line, sizeof line, in)) {
+		const char* value = strchr(line, '=');
+		if (line[0] == ';' || line[0] == '#' || !value || sscanf(line, "%127[^= \t]", param) < 1)
+			continue;
+		value++;
+		if (strcasecmp(param, "keyb_texture") == 0) {
+			inside = true;
+		} else if (inside && strcasecmp(param, "keyb_texture_size") == 0) {
+			float w, h;
+			if (sscanf(value, "%f , %f", &w, &h) == 2 && w > 0.0f && h > 0.0f) {
+				size[0] = w;
+				size[1] = h;
+			}
+		} else if (inside && strcasecmp(param, "keyb_width_cms") == 0) {
+			const float cm = (float)atof(value);
+			if (cm >= 10.0f && cm <= 150.0f)
+				width_cm = cm;
+		} else if (inside && strcasecmp(param, "action") == 0) {
+			/* The name ends at the first comma: one key is named ";". */
+			char name[32];
+			float rect[4];
+			while (*value == ' ' || *value == '\t')
+				value++;
+			const char* comma = strchr(value, ',');
+			if (comma && comma > value && (size_t)(comma - value) < sizeof name &&
+				sscanf(comma + 1, "%f , %f , %f , %f", &rect[0], &rect[1], &rect[2], &rect[3]) == 4) {
+				memcpy(name, value, (size_t)(comma - value));
+				name[comma - value] = '\0';
+				for (char* end = name + strlen(name); end > name && isspace((unsigned char)end[-1]);)
+					*--end = '\0';
+				keys += keyboard_write_key(out, name, rect);
+			}
+		} else {
+			inside = false;
+		}
+	}
+	fprintf(out, "image: vr_keyboard.png\nimage_size: [%g, %g]\nwidth_m: %g\n", (double)size[0],
+			(double)size[1], (double)(width_cm / 100.0f));
+	const bool written = fclose(out) == 0;
+	fclose(in);
+	XwauDat_FreeImage(&image);
+	if (!written || keys == 0) {
+		remove(layout);
+		remove(picture);
+		if (!written)
+			Import_ListFailed(ctx, "The VR keyboard couldn't be written.");
+		return;
+	}
+	ToolLog_Write(TOOL_LOG_INFO, "VR keyboard: imported %d keys", keys);
+}
+
 void ImportVrHands_Run(ImportContext* ctx) {
 	const XwaModImportOptions* options = ctx->options;
 	char settings_path[IMPORT_PATH_CAP] = "", models[IMPORT_PATH_CAP], flight[IMPORT_PATH_CAP];
@@ -434,6 +617,7 @@ void ImportVrHands_Run(ImportContext* ctx) {
 	const bool right =
 		glove_convert_hand(ctx, &settings, settings_path, 1, &cook, entries[1], sizeof entries[1]);
 	ktx2_set_zstd_level(zstd_level);
+	keyboard_convert(ctx, &settings, settings_path);
 	XwauLines_Free(&settings);
 	if (!left && !right)
 		return;

@@ -128,6 +128,8 @@ bool XwaOptionsWindow_CapturesKeyboard(void) {
 	return g_window.open && AeronUi_KeyboardCaptureActive(g_window.ui);
 }
 
+bool XwaOptionsWindow_EditsText(void) { return g_window.open && AeronUi_TextEditActive(g_window.ui); }
+
 bool XwaOptionsWindow_CapturesController(void) { return g_window.open && g_window.captures_controller; }
 
 void XwaOptionsWindow_Show(void) {

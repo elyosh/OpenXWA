@@ -73,6 +73,7 @@ static void XwaModernInputOptions_Normalize(XwaModernInputOptions* options) {
 	options->rumble_enabled = options->rumble_enabled != 0;
 	options->vr_show_hands = options->vr_show_hands != 0;
 	options->vr_mod_hands = options->vr_mod_hands != 0;
+	options->vr_mod_keyboard = options->vr_mod_keyboard != 0;
 	options->vr_stick_hand = options->vr_stick_hand != 0;
 	options->vr_throttle = options->vr_throttle != 0;
 	options->vr_cockpit_buttons = options->vr_cockpit_buttons != 0;
@@ -84,9 +85,10 @@ int XwaModernInputOptions_Equal(const XwaModernInputOptions* a, const XwaModernI
 		   a->mouse_sensitivity == b->mouse_sensitivity && a->mouse_invert_y == b->mouse_invert_y &&
 		   a->rumble_enabled == b->rumble_enabled && a->rumble_strength == b->rumble_strength &&
 		   a->vr_show_hands == b->vr_show_hands && a->vr_mod_hands == b->vr_mod_hands &&
-		   a->vr_stick == b->vr_stick && a->vr_stick_hand == b->vr_stick_hand &&
-		   a->vr_throttle == b->vr_throttle && a->vr_stick_range == b->vr_stick_range &&
-		   a->vr_cockpit_buttons == b->vr_cockpit_buttons && a->vr_button_ray_m == b->vr_button_ray_m &&
+		   a->vr_mod_keyboard == b->vr_mod_keyboard && a->vr_stick == b->vr_stick &&
+		   a->vr_stick_hand == b->vr_stick_hand && a->vr_throttle == b->vr_throttle &&
+		   a->vr_stick_range == b->vr_stick_range && a->vr_cockpit_buttons == b->vr_cockpit_buttons &&
+		   a->vr_button_ray_m == b->vr_button_ray_m &&
 		   XwaControllerOptions_Equals(&a->controllers, &b->controllers) &&
 		   XwaKeyboardMapping_Equal(&a->keyboard, &b->keyboard);
 }
