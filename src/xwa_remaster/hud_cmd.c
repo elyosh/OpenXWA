@@ -843,7 +843,7 @@ void XwaRemasterHudCmd_Prepare(AeronCommandBuffer* cmd, const XwaSnapshot* snaps
 	static const float tint[4] = { 1, 1, 1, 1 };
 	AeronScenePresentChain_Draw(s_cmd.present, pass, scene_texture, s_cmd.sampler, NULL, 0.0f, s_cmd.exposure,
 								NULL, width, height, /*bar_y_uv=*/1.0f, tint,
-								/*src_coverage=*/1, NULL);
+								/*src_coverage=*/1, NULL, NULL);
 	Aeron_EndRenderPass(pass);
 	s_cmd.output = Aeron_RenderTargetGetTexture(s_cmd.present_rt);
 	/* With edges, the display shows the edges of the shaded image, and it is

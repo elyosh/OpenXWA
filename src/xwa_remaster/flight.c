@@ -242,6 +242,15 @@ static struct {
 	 * unless a rig is set. */
 	int out_w;
 	int out_h;
+	/* The size of the flat view: the one view, with the game camera, that
+	 * the map is drawn as. It is the view size, except in a headset: there
+	 * the flat view is shown on the virtual screen, so it has the shape of
+	 * present_rt, and it is drawn in the upper left part of the scene. The
+	 * flat HUD, hud_rt, has this size. */
+	int flat_w;
+	int flat_h;
+	/* This frame is a flat view that doesn't cover the whole scene. */
+	int flat_cropped;
 	/* The rig set by XwaRemasterFlight_SetViewRig, and whether it has
 	 * several views. `rig_previous` is the rig of the last rendered frame,
 	 * for the views' motion vectors. */
@@ -3192,6 +3201,16 @@ static int fl_ensure(int target_w, int target_h) {
 	s.rt_h = view_h;
 	s.out_w = target_w;
 	s.out_h = target_h;
+	s.flat_w = view_w;
+	s.flat_h = view_h;
+	if (s.view_targets_set) {
+		/* The largest part of the scene with the shape of present_rt. */
+		if ((int64_t)view_w * target_h > (int64_t)view_h * target_w) {
+			s.flat_w = (int)((int64_t)view_h * target_w / target_h);
+		} else {
+			s.flat_h = (int)((int64_t)view_w * target_h / target_w);
+		}
+	}
 	s.scene = AeronScene_Create(&(AeronScene3DDesc) {
 		.rt_width = view_w,
 		.rt_height = view_h,
@@ -3207,6 +3226,7 @@ static int fl_ensure(int target_w, int target_h) {
 		Aeron_LogError("xwa.remaster", "flight: scene create failed at %dx%d", view_w, view_h);
 		s.rt_w = s.rt_h = 0;
 		s.out_w = s.out_h = 0;
+		s.flat_w = s.flat_h = 0;
 		return 0;
 	}
 	s.scene_requested_samples = requested_samples;
@@ -3231,8 +3251,8 @@ static int fl_ensure(int target_w, int target_h) {
 		 * colour and alpha as premultiplied, so this target ends up with a
 		 * correct premultiplied image. */
 		s.hud_rt =
-			Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = view_w,
-																.height = view_h,
+			Aeron_CreateRenderTarget(&(AeronRenderTargetDesc) { .width = s.flat_w,
+																.height = s.flat_h,
 																.format = AERON_TEXTURE_FORMAT_RGBA8_SRGB,
 																.debug_name = "xwa.flight.hud" });
 	}
@@ -6506,11 +6526,14 @@ static void fl_draw_present_scene(AeronRenderPass* pass, AeronScenePresentChain*
 	/* The flight scene's exposure, on the GPU: metered from this frame. The
 	 * map keeps the CPU value. */
 	AeronTexture* const exposure_tex = s.map_present ? NULL : AeronScene_ExposureTexture(s.scene);
-	AeronScenePresentChain_Draw(chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
-								s.map_present ? 0.0f : AeronSceneBloom_Intensity(),
-								exposure_tex ? 1.0f : XwaRemasterFlight_Exposure(), exposure_tex, s.rt_w,
-								s.rt_h,
-								/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0, mesh);
+	/* A flat view in a headset is the upper left part of the scene. */
+	const float flat_source[4] = { 0.0f, 0.0f, s.rt_w > 0 ? (float)s.flat_w / (float)s.rt_w : 1.0f,
+								   s.rt_h > 0 ? (float)s.flat_h / (float)s.rt_h : 1.0f };
+	AeronScenePresentChain_Draw(
+		chain, pass, s.present_scene_tex, s.present_sampler, s.present_bloom_tex,
+		s.map_present ? 0.0f : AeronSceneBloom_Intensity(),
+		exposure_tex ? 1.0f : XwaRemasterFlight_Exposure(), exposure_tex, s.rt_w, s.rt_h,
+		/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0, mesh, s.flat_cropped ? flat_source : NULL);
 }
 
 /* Sets the chain's debug view from the flight settings. */
@@ -6593,7 +6616,7 @@ static int fl_render_rig_hud(AeronCommandBuffer* cmd, AeronRectI rect, int targe
 	}
 	/* The readout isn't hidden by depth here: the scene's depth belongs to
 	 * the view that was rendered last. */
-	fl_draw_hud(cmd, pass, s.hud_rt, s.rt_w, s.rt_h, NULL, XWA_HUD_GROUP_ALL);
+	fl_draw_hud(cmd, pass, s.hud_rt, s.flat_w, s.flat_h, NULL, XWA_HUD_GROUP_ALL);
 	Aeron_EndRenderPass(pass);
 	AeronDrawList_Begin(s.hud_composite, NULL, target_w, target_h, AERON_DRAWLIST2D_LOAD, NULL);
 	AeronDrawList_AddSprite(s.hud_composite, &(AeronDrawList2DSprite) {
@@ -6764,17 +6787,18 @@ static AeronScenePresentChain* fl_view_target_chain(AeronTextureFormat format) {
 	return s.present_views;
 }
 
-/* Returns the largest rectangle with the shape of one view that fits in the
- * middle of a target of `target_w` x `target_h` pixels. */
-static AeronRectI fl_fit_view_rect(int target_w, int target_h) {
+/* Returns the largest rectangle with the shape of a view of `view_w` x
+ * `view_h` pixels that fits in the middle of a target of `target_w` x
+ * `target_h` pixels. */
+static AeronRectI fl_fit_view_rect(int view_w, int view_h, int target_w, int target_h) {
 	AeronRectI rect = { 0, 0, target_w, target_h };
-	if (s.rt_w <= 0 || s.rt_h <= 0) {
+	if (view_w <= 0 || view_h <= 0) {
 		return rect;
 	}
-	if ((int64_t)target_w * s.rt_h > (int64_t)target_h * s.rt_w) {
-		rect.width = (int)((int64_t)target_h * s.rt_w / s.rt_h);
+	if ((int64_t)target_w * view_h > (int64_t)target_h * view_w) {
+		rect.width = (int)((int64_t)target_h * view_w / view_h);
 	} else {
-		rect.height = (int)((int64_t)target_w * s.rt_h / s.rt_w);
+		rect.height = (int)((int64_t)target_w * view_h / view_w);
 	}
 	rect.x = (target_w - rect.width) / 2;
 	rect.y = (target_h - rect.height) / 2;
@@ -6785,8 +6809,8 @@ static AeronRectI fl_fit_view_rect(int target_w, int target_h) {
  * primary view. The image goes into the view's rectangle of present_rt;
  * `first` then clears the target, for the first view of the frame. With
  * `own_target`, a headset's view goes into its own target instead. The
- * single view of a headset's map goes into the middle of present_rt, which
- * the virtual screen shows. */
+ * flat view of a headset's map fills present_rt, which the virtual screen
+ * shows. */
 static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int own_target) {
 	if (!cmd || !s.present || !s.present_rt || !s.hud_rt || !s.present_scene_tex) {
 		return 0;
@@ -6807,7 +6831,7 @@ static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int
 			return 0;
 		}
 	} else if (s.view_targets_set) {
-		rect = fl_fit_view_rect(s.out_w, s.out_h);
+		rect = fl_fit_view_rect(s.flat_w, s.flat_h, s.out_w, s.out_h);
 	}
 	/* A headset's HUD is in every eye, from its two images. Otherwise the
 	 * HUD is drawn flat over the primary view. */
@@ -6866,7 +6890,7 @@ static void fl_mirror_callback(AeronCommandBuffer* cmd, AeronRenderPass* pass, A
 	if (!s.view_targets_rendered || !s.present_direct || !s.present_scene_tex || !s.present_sampler) {
 		return;
 	}
-	const AeronRectI rect = fl_fit_view_rect(target_w, target_h);
+	const AeronRectI rect = fl_fit_view_rect(s.rt_w, s.rt_h, target_w, target_h);
 	fl_set_present_debug(s.present_direct);
 	fl_draw_present_scene(pass, s.present_direct, &rect, NULL);
 }
@@ -8224,7 +8248,7 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	/* The map's overlays use the classic palette colours. The present pass
 	 * multiplies the scene by the map's fixed exposure, so they are drawn
 	 * at 1 / exposure to keep those colours. */
-	if (!XwaRemasterFlightMap_Prepare(cmd, s.scene, snap, assets, view, s.crows,
+	if (!XwaRemasterFlightMap_Prepare(cmd, s.scene, snap, assets, view, s.rt_w, s.rt_h, s.crows,
 									  1.0f / XwaRemasterFlight_Exposure(), fl_map_submit_object,
 									  &submit_context)) {
 		s.snap = NULL;
@@ -8485,9 +8509,13 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		}
 	}
 
-	/* The game camera's view. With a rig it is the rig's origin: the seat. */
+	/* The game camera's view. With a rig it is the rig's origin: the seat.
+	 * The map is the flat view. */
 	XwaRemasterFlightView flight_view;
-	if (!fl_build_view_at_origin(cam, cam->world_pos, s.rt_w, s.rt_h, view_rotated ? view_rotation : NULL,
+	const int view_w = cam->map_mode ? s.flat_w : s.rt_w;
+	const int view_h = cam->map_mode ? s.flat_h : s.rt_h;
+	s.flat_cropped = view_w != s.rt_w || view_h != s.rt_h;
+	if (!fl_build_view_at_origin(cam, cam->world_pos, view_w, view_h, view_rotated ? view_rotation : NULL,
 								 &flight_view)) {
 		return NULL;
 	}
@@ -8516,8 +8544,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	if (!hud_view) {
 		hud_view = fl_build_hud_view();
 	}
-	const int hud_w = s.headset_hud ? s.vr_hud_width_px : s.rt_w;
-	const int hud_h = s.headset_hud ? s.vr_hud_height_px : s.rt_h;
+	const int hud_w = s.headset_hud ? s.vr_hud_width_px : view_w;
+	const int hud_h = s.headset_hud ? s.vr_hud_height_px : view_h;
 	XwaRemasterHud_SetWorldSplit(s.headset_hud);
 	if (s.headset_hud) {
 		/* The world group follows the head: its view is where the head is,

@@ -295,7 +295,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	static const float tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
 	AeronScenePresentChain_Draw(s.chain, pp, scene_tex, s.chain_sampler, bloom_tex, bloom_intensity, exposure,
 								NULL, PREVIEW_RT_W, PREVIEW_RT_H, /*bar_y_uv=*/1.0f, tint,
-								/*src_coverage=*/1, NULL);
+								/*src_coverage=*/1, NULL, NULL);
 	Aeron_EndRenderPass(pp);
 	return Aeron_RenderTargetGetTexture(s.present[slot]);
 }
