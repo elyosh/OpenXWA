@@ -74,7 +74,20 @@ bool XwaControllerOptions_AddModel(XwaControllerOptions* options, const AeronCon
 void XwaControllerOptions_MoveConnectedFirst(XwaControllerOptions* options, const AeronInputSnapshot* input);
 /* Removes the models that aren't configured. */
 void XwaControllerOptions_KeepConfigured(XwaControllerOptions* options);
-bool XwaControllerOptions_InitializeGamepads(XwaControllerOptions* options,
-											 const XwaControllerProfile* defaults,
+/* The profiles that new models get: one for gamepads and one for each VR
+ * hand. Joysticks start with nothing bound. */
+typedef struct XwaControllerDefaults {
+	XwaControllerProfile gamepad;
+	XwaControllerProfile vr_left;
+	XwaControllerProfile vr_right;
+} XwaControllerDefaults;
+
+/* The default profile for this device, or NULL when its kind has none. */
+const XwaControllerProfile* XwaControllerDefaults_ForDevice(const XwaControllerDefaults* defaults,
+															const AeronControllerSnapshot* device);
+/* Adds a model, with its default profile, for each connected gamepad and VR
+ * hand that has none. */
+bool XwaControllerOptions_InitializeDefaults(XwaControllerOptions* options,
+											 const XwaControllerDefaults* defaults,
 											 const AeronInputSnapshot* input, char* error, size_t capacity);
 #endif

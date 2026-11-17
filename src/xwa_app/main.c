@@ -174,10 +174,10 @@ static void apply_modern_input_options(const XwaModernInputOptions* options) {
 	Config_ApplyModernInputOptions(options);
 }
 
-/* Each host frame, new gamepad models get the shipped gamepad defaults, and
- * the connected models move to the front of the list, which keeps it in the
- * order of last use. While the options window is open, it adds the new
- * gamepads in its draft. */
+/* Each host frame, new gamepads and VR hands get a model with the shipped
+ * defaults, and the connected models move to the front of the list, which
+ * keeps it in the order of last use. While the options window is open, it
+ * adds the new devices in its draft. */
 static void discover_controllers(const AeronInputSnapshot* in) {
 	static char previous_error[512];
 	static XwaModernInputOptions current;
@@ -191,8 +191,8 @@ static void discover_controllers(const AeronInputSnapshot* in) {
 	XwaModernInputOptions_Get(&current);
 	candidate = current;
 	XwaControllerOptions_MoveConnectedFirst(&candidate.controllers, in);
-	ok = XwaControllerOptions_InitializeGamepads(
-		&candidate.controllers, XwaModernInputOptions_GamepadDefaults(), in, error, sizeof error);
+	ok = XwaControllerOptions_InitializeDefaults(
+		&candidate.controllers, XwaModernInputOptions_ControllerDefaults(), in, error, sizeof error);
 	if (!XwaControllerOptions_Equals(&candidate.controllers, &current.controllers) &&
 		!XwaModernInputOptions_Set(&candidate)) {
 		snprintf(error, sizeof error, "%s", "the new controller could not be added");
@@ -642,7 +642,7 @@ int main(int argc, char** argv) {
 	}
 	XwaKeyboardMapping_SetPolicy(Aeron_DebugUiAvailable() != 0);
 	XwaControllerMapping_Init(&host_config.input_options.controllers);
-	XwaModernInputOptions_Configure(&host_config.input_defaults, &host_config.gamepad_defaults,
+	XwaModernInputOptions_Configure(&host_config.input_defaults, &host_config.controller_defaults,
 									&host_config.input_options, apply_modern_input_options,
 									persist_modern_input_options);
 	apply_modern_input_options(&host_config.input_options);

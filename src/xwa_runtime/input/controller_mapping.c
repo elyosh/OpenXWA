@@ -19,6 +19,9 @@ typedef struct ControllerInstance {
 	int model;
 	bool down[XWA_CONTROLLER_BINDING_CAP], armed[XWA_CONTROLLER_BINDING_CAP],
 		dispatched[XWA_CONTROLLER_BINDING_CAP];
+	/* The binding's source was turned off by the source mask and hasn't been
+	 * released since. */
+	bool masked[XWA_CONTROLLER_BINDING_CAP];
 	bool primed;
 } ControllerInstance;
 
@@ -38,6 +41,9 @@ static struct {
 	bool host_pressed[XWA_INPUT_ACTION_COUNT];
 	uint32_t host_id[AERON_CONTROLLER_MAX];
 	bool host_down[AERON_CONTROLLER_MAX][XWA_CONTROLLER_BINDING_CAP];
+	bool host_masked[AERON_CONTROLLER_MAX][XWA_CONTROLLER_BINDING_CAP];
+	/* XwaControllerMapping_SetSourceMask, for each VR hand. */
+	uint32_t mask_buttons[2], mask_axes[2];
 	uint64_t host_frame;
 	uint32_t throttle_instance, generation;
 	uint32_t rumble_instance;
@@ -233,13 +239,38 @@ static void LogUnavailableControls(const XwaControllerModel* model, const AeronC
 					  missing, device->controls_truncated ? ", hardware controls truncated" : "");
 }
 
+void XwaControllerMapping_SetSourceMask(int hand, uint32_t buttons, uint32_t axes) {
+	if (hand < 0 || hand > 1)
+		return;
+	g_controller.mask_buttons[hand] = buttons;
+	g_controller.mask_axes[hand] = axes;
+}
+
+/* Reads a binding's source through the source mask. `masked` remembers that
+ * the mask turned the source off: it then stays off until it is released. */
+static bool SourceDown(const AeronControllerSnapshot* device, const AeronControllerDigitalSource* source,
+					   bool was_down, bool* masked) {
+	const bool down = Aeron_ControllerDigitalSourceDown(device, source, was_down || *masked);
+	if (device->kind == AERON_CONTROLLER_KIND_VR_HAND) {
+		const int hand = device->instance_id == AERON_VR_HAND_INSTANCE_RIGHT;
+		const uint32_t bits = source->kind == AERON_CONTROLLER_DIGITAL_BUTTON
+								  ? g_controller.mask_buttons[hand]
+								  : g_controller.mask_axes[hand];
+		if (bits & (1u << source->index))
+			*masked = true;
+	}
+	if (!down)
+		*masked = false;
+	return down && !*masked;
+}
+
 static void SampleDigital(ControllerInstance* state, const AeronControllerSnapshot* device) {
 	const XwaControllerModel* model = &g_controller.options.models[state->model];
 	const XwaControllerProfile* profile = &model->profile;
 	if (!state->primed)
 		LogUnavailableControls(model, device);
 	for (size_t i = 0; i < profile->binding_count; ++i) {
-		bool down = Aeron_ControllerDigitalSourceDown(device, &profile->bindings[i].source, state->down[i]);
+		bool down = SourceDown(device, &profile->bindings[i].source, state->down[i], &state->masked[i]);
 		if (!state->primed)
 			state->armed[i] = !down;
 		else if (!down) {
@@ -261,7 +292,9 @@ uint16_t XwaControllerMapping_ThrottlePosition(int16_t raw, AeronControllerKind 
 	const uint32_t end_tolerance = (uint32_t)ceilf(0.5f * UINT16_MAX / 100.0f);
 	const uint32_t range = UINT16_MAX - 2 * end_tolerance;
 	uint32_t position = (int32_t)raw + 32768;
-	if (kind == AERON_CONTROLLER_KIND_GAMEPAD && source >= AERON_GAMEPAD_AXIS_LEFT_TRIGGER)
+	/* A trigger goes from 0 to the full value, not from one end to the other. */
+	if ((kind == AERON_CONTROLLER_KIND_GAMEPAD && source >= AERON_GAMEPAD_AXIS_LEFT_TRIGGER) ||
+		(kind == AERON_CONTROLLER_KIND_VR_HAND && source <= AERON_VR_HAND_AXIS_SQUEEZE))
 		position = ((uint32_t)(raw < 0 ? 0 : raw) * UINT16_MAX + 16383u) / 32767u;
 	if (invert)
 		position = UINT16_MAX - position;
@@ -333,7 +366,7 @@ static uint32_t XwaControllerMapping_ModelRumbleInstance(size_t model, const Aer
 }
 
 /* The device that rumbles: one of the first model that binds pitch, then yaw,
- * then of the first gamepad model. */
+ * then of the first gamepad or VR hand model. */
 static uint32_t XwaControllerMapping_FindRumbleInstance(const AeronInputSnapshot* input) {
 	static const XwaInputAxis owners[] = { XWA_INPUT_AXIS_PITCH, XWA_INPUT_AXIS_YAW };
 	uint32_t instance;
@@ -343,7 +376,7 @@ static uint32_t XwaControllerMapping_FindRumbleInstance(const AeronInputSnapshot
 				(instance = XwaControllerMapping_ModelRumbleInstance(model, input)) != 0)
 				return instance;
 	for (size_t model = 0; model < g_controller.options.count; ++model)
-		if (g_controller.options.models[model].kind == AERON_CONTROLLER_KIND_GAMEPAD &&
+		if (g_controller.options.models[model].kind != AERON_CONTROLLER_KIND_JOYSTICK &&
 			(instance = XwaControllerMapping_ModelRumbleInstance(model, input)) != 0)
 			return instance;
 	return 0;
@@ -488,8 +521,10 @@ void XwaControllerMapping_UpdateHostActions(const AeronInputSnapshot* input) {
 			if (XwaInputActions_Kind(action) != XWA_INPUT_ACTION_KIND_HOST)
 				continue;
 			const bool was_down = known && g_controller.host_down[slot][i];
-			const bool down =
-				Aeron_ControllerDigitalSourceDown(device, &profile->bindings[i].source, was_down);
+			if (!known)
+				g_controller.host_masked[slot][i] = false;
+			const bool down = SourceDown(device, &profile->bindings[i].source, was_down,
+										 &g_controller.host_masked[slot][i]);
 			if (known && down && !was_down)
 				g_controller.host_pressed[action] = true;
 			g_controller.host_down[slot][i] = down;

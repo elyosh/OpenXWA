@@ -359,7 +359,8 @@ static int host_config_remaster_options(const AeronConfigFile* config, int requi
 }
 
 static int host_config_shipped_input(const AeronConfigFile* config, XwaModernInputOptions* out,
-									 XwaControllerProfile* gamepad_defaults, char* error, size_t error_size);
+									 XwaControllerDefaults* controller_defaults, char* error,
+									 size_t error_size);
 
 static int host_config_load_shipped_config(AeronVfs* vfs, XwaHostConfig* out, char* error,
 										   size_t error_size) {
@@ -375,10 +376,10 @@ static int host_config_load_shipped_config(AeronVfs* vfs, XwaHostConfig* out, ch
 		AeronConfigFile_Destroy(config);
 		return host_config_error(error, error_size, "shipped configuration root must be a mapping: %s", path);
 	}
-	valid =
-		host_config_remaster_options(config, 1, out, error, error_size) &&
-		host_config_shipped_input(config, &out->input_defaults, &out->gamepad_defaults, error, error_size) &&
-		host_config_option_sections(config, 1, error, error_size);
+	valid = host_config_remaster_options(config, 1, out, error, error_size) &&
+			host_config_shipped_input(config, &out->input_defaults, &out->controller_defaults, error,
+									  error_size) &&
+			host_config_option_sections(config, 1, error, error_size);
 	if (valid) {
 		out->input_options = out->input_defaults;
 	}
@@ -835,12 +836,17 @@ static int host_config_validate_input(const XwaModernInputOptions* options, cons
 
 /* The input section of the shipped file. Every key is required. */
 static int host_config_shipped_input(const AeronConfigFile* config, XwaModernInputOptions* out,
-									 XwaControllerProfile* gamepad_defaults, char* error, size_t error_size) {
+									 XwaControllerDefaults* controller_defaults, char* error,
+									 size_t error_size) {
 	memset(out, 0, sizeof *out);
 	return host_config_input_scalars(config, 1, out, error, error_size) &&
 		   XwaControllerConfig_Parse(config, &out->controllers, error, error_size) &&
 		   XwaControllerConfig_ReadProfile(config, "input.gamepad_defaults", AERON_CONTROLLER_KIND_GAMEPAD,
-										   gamepad_defaults, error, error_size) &&
+										   &controller_defaults->gamepad, error, error_size) &&
+		   XwaControllerConfig_ReadProfile(config, "input.vr_left_defaults", AERON_CONTROLLER_KIND_VR_HAND,
+										   &controller_defaults->vr_left, error, error_size) &&
+		   XwaControllerConfig_ReadProfile(config, "input.vr_right_defaults", AERON_CONTROLLER_KIND_VR_HAND,
+										   &controller_defaults->vr_right, error, error_size) &&
 		   XwaKeyboardConfig_Read(config, &out->keyboard, error, error_size) &&
 		   host_config_validate_input(out, "remaster/config.yaml", error, error_size);
 }
@@ -970,9 +976,13 @@ int XwaHostConfig_Load(AeronVfs* vfs, XwaHostConfig* out, char* error, size_t er
 		AeronConfigFile_Destroy(config);
 		return 0;
 	}
-	if (AeronConfigFile_Has(config, "input.gamepad_defaults")) {
-		Aeron_LogWarn("xwa.config",
-					  "'input.gamepad_defaults' in %s is ignored; it is read from the shipped file", path);
+	static const char* const shipped_only[] = { "input.gamepad_defaults", "input.vr_left_defaults",
+												"input.vr_right_defaults" };
+	for (size_t i = 0; i < sizeof shipped_only / sizeof shipped_only[0]; ++i) {
+		if (AeronConfigFile_Has(config, shipped_only[i])) {
+			Aeron_LogWarn("xwa.config", "'%s' in %s is ignored; it is read from the shipped file",
+						  shipped_only[i], path);
+		}
 	}
 	if (AeronConfigFile_GetNode(config, "paths.resources")) {
 		Aeron_LogWarn("xwa.config",
@@ -1190,7 +1200,7 @@ int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* o
 	static XwaModernInputOptions defaults;
 	static XwaModernInputOptions expected;
 	static XwaModernInputOptions saved;
-	XwaControllerProfile gamepad_defaults;
+	static XwaControllerDefaults controller_defaults;
 	AeronConfigFile* shipped = NULL;
 	AeronConfigFile* document = NULL;
 	AeronConfigError config_error = { 0 };
@@ -1206,7 +1216,7 @@ int XwaHostConfig_SaveInputOptions(AeronVfs* vfs, const XwaModernInputOptions* o
 								 "required shipped configuration unavailable or invalid: %s",
 								 "remaster/config.yaml");
 	}
-	valid = host_config_shipped_input(shipped, &defaults, &gamepad_defaults, error, error_size);
+	valid = host_config_shipped_input(shipped, &defaults, &controller_defaults, error, error_size);
 	AeronConfigFile_Destroy(shipped);
 	if (!valid) {
 		return 0;

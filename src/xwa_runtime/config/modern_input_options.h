@@ -47,10 +47,11 @@ typedef void (*XwaModernInputOptionsApplyFn)(const XwaModernInputOptions* option
 typedef int (*XwaModernInputOptionsPersistFn)(const XwaModernInputOptions* options, char* error,
 											  size_t error_size);
 
-/* `gamepad_defaults` is the profile that new gamepad models get
- * (input.gamepad_defaults in the shipped file). */
+/* `controller_defaults` holds the profiles that new gamepad and VR hand
+ * models get (input.gamepad_defaults, input.vr_left_defaults and
+ * input.vr_right_defaults in the shipped file). */
 void XwaModernInputOptions_Configure(const XwaModernInputOptions* defaults,
-									 const XwaControllerProfile* gamepad_defaults,
+									 const XwaControllerDefaults* controller_defaults,
 									 const XwaModernInputOptions* options, XwaModernInputOptionsApplyFn apply,
 									 XwaModernInputOptionsPersistFn persist);
 int XwaModernInputOptions_Validate(const XwaModernInputOptions* options, char* error, size_t error_size);
@@ -58,7 +59,7 @@ int XwaModernInputOptions_Validate(const XwaModernInputOptions* options, char* e
 int XwaModernInputOptions_Equal(const XwaModernInputOptions* a, const XwaModernInputOptions* b);
 void XwaModernInputOptions_Get(XwaModernInputOptions* out);
 void XwaModernInputOptions_GetDefaults(XwaModernInputOptions* out);
-const XwaControllerProfile* XwaModernInputOptions_GamepadDefaults(void);
+const XwaControllerDefaults* XwaModernInputOptions_ControllerDefaults(void);
 int XwaModernInputOptions_Set(const XwaModernInputOptions* options);
 /* The options must be saved even if they don't change, such as after the
  * configuration upgrade. */

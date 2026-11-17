@@ -43,9 +43,18 @@ int XwaControllerMapping_Present(void);
 /* Returns 1 once after Present() changes. */
 int XwaControllerMapping_ConsumePresenceChange(void);
 
+/* Turns some inputs of a VR hand off for the bindings: they read as not
+ * pressed. `hand` is 0 for the left hand and 1 for the right one. `buttons`
+ * has one bit for each AeronVrHandButton, and `axes` one bit for each
+ * AeronVrHandAxis; an axis bit covers the bindings that use the axis as a
+ * button. Something else uses these inputs meanwhile, such as a pointer that
+ * clicks with the trigger. An input that is still pressed when its bit is
+ * cleared stays off until it is released. */
+void XwaControllerMapping_SetSourceMask(int hand, uint32_t buttons, uint32_t axes);
+
 /* Rumble goes to one device that can rumble: a connected device of the first
  * model that binds pitch, else of the first that binds yaw, else of the first
- * gamepad model, the one with the lowest instance id. */
+ * gamepad or VR hand model, the one with the lowest instance id. */
 uint32_t XwaControllerMapping_RumbleInstance(void);
 /* Returns 1 once after the rumble device changes. */
 int XwaControllerMapping_ConsumeRumbleChange(void);

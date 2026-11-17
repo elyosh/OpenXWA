@@ -9,7 +9,8 @@ input:
   rumble_enabled: true
   rumble_strength: 6
   # Saved controller models, one complete profile each. New gamepads get
-  # gamepad_defaults; joysticks start with nothing bound.
+  # gamepad_defaults, and new VR controllers get vr_left_defaults or
+  # vr_right_defaults. Joysticks start with nothing bound.
   controllers: []
   gamepad_defaults:
     axes:
@@ -30,6 +31,29 @@ input:
       look_right: [dpadright]
       look_down: [dpaddown]
       look_left: [dpadleft]
+  # A VR controller's axes are trigger, squeeze, thumbstickx, thumbsticky,
+  # trackpadx and trackpady. Its buttons are trigger, squeeze, primary (A or
+  # X), secondary (B or Y), thumbstick_click, trackpad_click and menu.
+  vr_left_defaults:
+    axes:
+      roll: {source: thumbstickx, invert: false, deadzone: 0.15}
+    buttons:
+      target_in_sights: [trigger]
+      throttle_up: [{axis: thumbsticky, direction: positive, threshold: 0.5}]
+      throttle_down: [{axis: thumbsticky, direction: negative, threshold: 0.5}]
+      throttle_full: [thumbstick_click]
+      target_nearest_fighter: [primary]
+      target_my_attackers: [secondary]
+      options_menu: [menu]
+  vr_right_defaults:
+    axes:
+      yaw: {source: thumbstickx, invert: false, deadzone: 0.15}
+      pitch: {source: thumbsticky, invert: false, deadzone: 0.15}
+    buttons:
+      fire_weapon: [trigger]
+      recenter_headset: [thumbstick_click]
+      cycle_weapon: [primary]
+      cycle_firing_mode: [secondary]
   # Every action, with its keys. Escape always opens the options and can't
   # be listed; options_menu can get other keys.
   keyboard:

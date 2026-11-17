@@ -7,7 +7,7 @@
 
 static struct {
 	XwaModernInputOptions defaults;
-	XwaControllerProfile gamepad_defaults;
+	XwaControllerDefaults controller_defaults;
 	XwaModernInputOptions options;
 	XwaModernInputOptionsApplyFn apply;
 	XwaModernInputOptionsPersistFn persist;
@@ -76,22 +76,26 @@ int XwaModernInputOptions_Equal(const XwaModernInputOptions* a, const XwaModernI
 }
 
 void XwaModernInputOptions_Configure(const XwaModernInputOptions* defaults,
-									 const XwaControllerProfile* gamepad_defaults,
+									 const XwaControllerDefaults* controller_defaults,
 									 const XwaModernInputOptions* options, XwaModernInputOptionsApplyFn apply,
 									 XwaModernInputOptionsPersistFn persist) {
 	char error[256];
 
 	memset(&g_modernInputOptions, 0, sizeof(g_modernInputOptions));
 	if (!XwaModernInputOptions_Validate(defaults, error, sizeof error) ||
-		!XwaModernInputOptions_Validate(options, error, sizeof error) || !gamepad_defaults ||
-		!XwaControllerOptions_ValidateProfile(gamepad_defaults, AERON_CONTROLLER_KIND_GAMEPAD, error,
-											  sizeof error)) {
+		!XwaModernInputOptions_Validate(options, error, sizeof error) || !controller_defaults ||
+		!XwaControllerOptions_ValidateProfile(&controller_defaults->gamepad, AERON_CONTROLLER_KIND_GAMEPAD,
+											  error, sizeof error) ||
+		!XwaControllerOptions_ValidateProfile(&controller_defaults->vr_left, AERON_CONTROLLER_KIND_VR_HAND,
+											  error, sizeof error) ||
+		!XwaControllerOptions_ValidateProfile(&controller_defaults->vr_right, AERON_CONTROLLER_KIND_VR_HAND,
+											  error, sizeof error)) {
 		Aeron_LogError("xwa.config", "cannot configure invalid modern input options: %s", error);
 		return;
 	}
 
 	g_modernInputOptions.defaults = *defaults;
-	g_modernInputOptions.gamepad_defaults = *gamepad_defaults;
+	g_modernInputOptions.controller_defaults = *controller_defaults;
 	g_modernInputOptions.options = *options;
 	XwaModernInputOptions_Normalize(&g_modernInputOptions.defaults);
 	XwaModernInputOptions_Normalize(&g_modernInputOptions.options);
@@ -112,8 +116,8 @@ void XwaModernInputOptions_GetDefaults(XwaModernInputOptions* out) {
 	}
 }
 
-const XwaControllerProfile* XwaModernInputOptions_GamepadDefaults(void) {
-	return &g_modernInputOptions.gamepad_defaults;
+const XwaControllerDefaults* XwaModernInputOptions_ControllerDefaults(void) {
+	return &g_modernInputOptions.controller_defaults;
 }
 
 int XwaModernInputOptions_Set(const XwaModernInputOptions* options) {

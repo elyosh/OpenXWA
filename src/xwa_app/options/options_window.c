@@ -267,7 +267,7 @@ bool XwaOptionsWindow_BeginFrame(const AeronInputSnapshot* input) {
 	bool was_showing = g_window.open || g_window.notice_open;
 	if (g_window.open)
 		XwaControllerSettings_Discover(&g_window.controller, g_window.ui, input,
-									   XwaModernInputOptions_GamepadDefaults());
+									   XwaModernInputOptions_ControllerDefaults());
 	XwaControllerMapping_ApplyPending();
 	/* The datapad closed under the window. */
 	if (XwaPort_ConsumeOptionsWindowCloseRequest() && g_window.open) {

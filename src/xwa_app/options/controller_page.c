@@ -83,6 +83,24 @@ static const char* XwaControllerPage_GamepadButtonDisplay(int source) {
 	return source >= 0 && source < AERON_GAMEPAD_BUTTON_COUNT ? names[source] : NULL;
 }
 
+/* The name to show for an axis or a button of a gamepad or a VR hand, or
+ * NULL: a joystick's are shown by number. */
+static const char* XwaControllerPage_AxisDisplay(const AeronControllerSnapshot* controller, int source) {
+	if (controller->kind == AERON_CONTROLLER_KIND_GAMEPAD)
+		return XwaControllerPage_GamepadAxisDisplay(source);
+	if (controller->kind == AERON_CONTROLLER_KIND_VR_HAND)
+		return Aeron_VrHandAxisName(controller->instance_id == AERON_VR_HAND_INSTANCE_RIGHT, source);
+	return NULL;
+}
+
+static const char* XwaControllerPage_ButtonDisplay(const AeronControllerSnapshot* controller, int source) {
+	if (controller->kind == AERON_CONTROLLER_KIND_GAMEPAD)
+		return XwaControllerPage_GamepadButtonDisplay(source);
+	if (controller->kind == AERON_CONTROLLER_KIND_VR_HAND)
+		return Aeron_VrHandButtonName(controller->instance_id == AERON_VR_HAND_INSTANCE_RIGHT, source);
+	return NULL;
+}
+
 static bool XwaControllerSettings_SourceAvailable(const AeronControllerSnapshot* controller,
 												  const AeronControllerDigitalSource* source) {
 	if (!controller)
@@ -108,9 +126,7 @@ static void XwaControllerSettings_FormatAxisSource(char* buffer, size_t capacity
 		snprintf(buffer, capacity, "Not Bound");
 		return;
 	}
-	const char* name = controller->kind == AERON_CONTROLLER_KIND_GAMEPAD
-						   ? XwaControllerPage_GamepadAxisDisplay(source)
-						   : NULL;
+	const char* name = XwaControllerPage_AxisDisplay(controller, source);
 	const bool available =
 		controller->kind == AERON_CONTROLLER_KIND_GAMEPAD
 			? source < AERON_GAMEPAD_AXIS_COUNT && (controller->gamepad_available_axes & (1u << source))
@@ -139,18 +155,14 @@ static void XwaControllerSettings_FormatDigitalSource(char* buffer, size_t capac
 													  const AeronControllerSnapshot* controller) {
 	const char* name = NULL;
 	if (source->kind == AERON_CONTROLLER_DIGITAL_BUTTON) {
-		name = controller->kind == AERON_CONTROLLER_KIND_GAMEPAD
-				   ? XwaControllerPage_GamepadButtonDisplay(source->index)
-				   : NULL;
+		name = XwaControllerPage_ButtonDisplay(controller, source->index);
 		if (name)
 			snprintf(buffer, capacity, "%s", name);
 		else
 			snprintf(buffer, capacity, "Button %u", (unsigned)source->index);
 	} else if (source->kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE ||
 			   source->kind == AERON_CONTROLLER_DIGITAL_AXIS_NEGATIVE) {
-		name = controller->kind == AERON_CONTROLLER_KIND_GAMEPAD
-				   ? XwaControllerPage_GamepadAxisDisplay(source->index)
-				   : NULL;
+		name = XwaControllerPage_AxisDisplay(controller, source->index);
 		if (name)
 			snprintf(buffer, capacity, "%s %c", name,
 					 source->kind == AERON_CONTROLLER_DIGITAL_AXIS_POSITIVE ? '+' : '-');
@@ -260,8 +272,7 @@ static void XwaControllerSettings_DeviceSelector(XwaControllerSettings* settings
 	int count = 0, selected = -1;
 	for (int i = 0; i < AERON_CONTROLLER_MAX; ++i) {
 		const AeronControllerSnapshot* d = &input->controllers[i];
-		/* The VR hands have no bindings yet, so they aren't listed. */
-		if (!d->connected || d->kind == AERON_CONTROLLER_KIND_VR_HAND)
+		if (!d->connected)
 			continue;
 		bool duplicate_name = false;
 		for (int other = 0; other < AERON_CONTROLLER_MAX; ++other) {
@@ -305,9 +316,9 @@ static void XwaControllerSettings_DeviceSelector(XwaControllerSettings* settings
 }
 
 void XwaControllerSettings_Discover(XwaControllerSettings* settings, AeronUiContext* ui,
-									const AeronInputSnapshot* input, const XwaControllerProfile* defaults) {
+									const AeronInputSnapshot* input, const XwaControllerDefaults* defaults) {
 	size_t count = settings->draft.count;
-	bool ok = XwaControllerOptions_InitializeGamepads(&settings->draft, defaults, input, settings->error,
+	bool ok = XwaControllerOptions_InitializeDefaults(&settings->draft, defaults, input, settings->error,
 													  sizeof settings->error);
 	if (settings->draft.count != count) {
 		XwaControllerSettings_ResetDeviceEditState(settings, ui);
@@ -709,8 +720,10 @@ static void XwaControllerSettings_RestoreModal(XwaControllerSettings* settings, 
 			XwaControllerModel* selected = &candidate.models[model];
 			selected->kind = device->kind;
 			XwaControllerOptions_ClearProfile(&selected->profile, device->kind);
-			if (device->kind == AERON_CONTROLLER_KIND_GAMEPAD)
-				selected->profile = *XwaModernInputOptions_GamepadDefaults();
+			const XwaControllerProfile* defaults =
+				XwaControllerDefaults_ForDevice(XwaModernInputOptions_ControllerDefaults(), device);
+			if (defaults)
+				selected->profile = *defaults;
 			settings->draft = candidate;
 			XwaControllerSettings_ApplyDraft(settings, false);
 			XwaControllerSettings_ResetDeviceEditState(settings, ui);

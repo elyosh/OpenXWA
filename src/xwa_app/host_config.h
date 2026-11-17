@@ -43,8 +43,9 @@ typedef struct XwaHostConfig {
 	XwaModernVideoOptions video_options;
 	unsigned int video_options_override_mask;
 	XwaModernInputOptions input_defaults;
-	/* input.gamepad_defaults: the profile that new gamepad models get. */
-	XwaControllerProfile gamepad_defaults;
+	/* input.gamepad_defaults, input.vr_left_defaults and
+	   input.vr_right_defaults: the profiles that new models get. */
+	XwaControllerDefaults controller_defaults;
 	XwaModernInputOptions input_options;
 	/* The user file had version 1 input settings, upgraded in memory. The
 	 * input options must be saved. */

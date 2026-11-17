@@ -35,7 +35,7 @@ typedef struct XwaControllerSettings {
 } XwaControllerSettings;
 
 void XwaControllerSettings_Discover(XwaControllerSettings* settings, AeronUiContext* ui,
-									const AeronInputSnapshot* input, const XwaControllerProfile* defaults);
+									const AeronInputSnapshot* input, const XwaControllerDefaults* defaults);
 void XwaControllerSettings_Open(XwaControllerSettings* settings, const XwaModernInputOptions* options);
 void XwaControllerSettings_Draw(XwaControllerSettings* settings, AeronUiContext* ui,
 								const AeronInputSnapshot* input);
