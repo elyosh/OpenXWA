@@ -129,6 +129,19 @@ static int host_shortcut_pressed(const AeronInputSnapshot* in, XwaKeyboardShortc
 	return 1;
 }
 
+/* Returns 1 when a key bound to the host action `action` was pressed, 2 when
+ * a controller button was, 0 otherwise. */
+static int host_action_pressed(const AeronInputSnapshot* in, XwaInputAction action) {
+	const int button = XwaControllerMapping_TakeHostAction(action);
+	/* The options window gets the keys while it captures a binding. */
+	const int key = XwaOptionsWindow_CapturesKeyboard() ? -1 : XwaKeyboardMapping_ActionTrigger(in, action);
+	if (key >= 0) {
+		XwaInput_SuppressKey(key);
+		return 1;
+	}
+	return button ? 2 : 0;
+}
+
 /* Window mode changes go through the video options module, so the window,
  * the Video tab of OpenXWA Options and config.yaml always agree. */
 static void set_window_mode_option(XwaModernWindowMode mode) {
@@ -751,17 +764,21 @@ int main(int argc, char** argv) {
 				XwaPort_ToggleMouseCapture();
 				toggled = 1;
 			}
-			/* Ctrl+Alt+R makes the direction the headset looks in straight
-			 * ahead. */
-			if (Aeron_XrEnabled() && host_shortcut_pressed(in, XWA_KEYBOARD_SHORTCUT_RECENTER)) {
+			/* Host actions (actions.h): the keys and buttons bound to them.
+			 * A key press also skips the game tick, so the game doesn't
+			 * read the key. Recentring makes the direction the headset
+			 * looks in straight ahead; Ctrl+Alt+R by default. */
+			const int recenter = host_action_pressed(in, XWA_INPUT_ACTION_RECENTER_HEADSET);
+			if (recenter && Aeron_XrEnabled()) {
 				Aeron_XrRecenter();
-				toggled = 1;
+				toggled |= recenter == 1;
 			}
-			/* Ctrl+H toggles the Dynamic Cockpit holograms while a cockpit
-			 * with screens is shown. */
-			if (XwaRemasterDc_Active() && host_shortcut_pressed(in, XWA_KEYBOARD_SHORTCUT_HOLOGRAMS)) {
+			/* The Dynamic Cockpit holograms, while a cockpit with screens is
+			 * shown; Ctrl+H by default. */
+			const int holograms = host_action_pressed(in, XWA_INPUT_ACTION_TOGGLE_HOLOGRAMS);
+			if (holograms && XwaRemasterDc_Active()) {
 				XwaRemasterDc_ToggleHolograms();
-				toggled = 1;
+				toggled |= holograms == 1;
 			}
 			XwaRemaster_BeginFrame(in);
 			if (Aeron_QuitRequested() || XwaPort_ShouldQuit()) {

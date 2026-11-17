@@ -186,6 +186,8 @@ input:
     switch_seat:
       - {key: "G"}
       - {key: "W", modifiers: [alt]}
+    recenter_headset:
+      - {key: "R", modifiers: [ctrl, alt]}
     mfd_prev_page:
       - {key: "Left"}
     mfd_next_page:
@@ -216,6 +218,8 @@ input:
       - {key: "S", modifiers: [alt]}
     console_page:
       - {key: "C", modifiers: [ctrl]}
+    toggle_holograms:
+      - {key: "H", modifiers: [ctrl]}
     wingman_command_page:
       - {key: "Tab"}
     command_option_1:
@@ -320,7 +324,8 @@ dynamic_cockpit:
   # Keep the whole 2D HUD on screen; transparent displays
   # without always_visible are hidden and the throttle bar is not drawn.
   classic_hud: false
-  # Hologram displays visible; Ctrl+H toggles them in flight.
+  # Hologram displays visible. The toggle_holograms action (Ctrl+H by
+  # default) toggles them in flight.
   holograms: true
   # Emissive multipliers of the display content and of holograms.
   display_emissive_strength: 0.7

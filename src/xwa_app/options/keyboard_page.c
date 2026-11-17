@@ -37,10 +37,6 @@ static const char* ReservedShortcutMessage(XwaKeyboardShortcut shortcut) {
 			return "Ctrl+Alt+M releases or captures the mouse and can't be changed.";
 		case XWA_KEYBOARD_SHORTCUT_MOUSE_LOOK:
 			return "Ctrl+Alt+L turns cockpit mouse look on or off and can't be changed.";
-		case XWA_KEYBOARD_SHORTCUT_HOLOGRAMS:
-			return "Ctrl+H turns the cockpit holograms on or off and can't be changed.";
-		case XWA_KEYBOARD_SHORTCUT_RECENTER:
-			return "Ctrl+Alt+R recentres the VR headset's view and can't be changed.";
 #if defined(__APPLE__)
 		case XWA_KEYBOARD_SHORTCUT_HOST_PAUSE:
 			return "Command+P pauses the game and can't be changed.";

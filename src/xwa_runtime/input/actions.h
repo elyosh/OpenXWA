@@ -3,8 +3,10 @@
 
 /* The flight commands that keys and controller sources can be bound to. Each
  * action sends the game key code that the original DirectInput or joystick
- * tables produce, so the game keeps its own checks. The YAML name is the
- * lower-case enum name. Enum values are never saved, recorded or sent. */
+ * tables produce, so the game keeps its own checks. The host actions are the
+ * exception: they send no key, and the host does them (main.c). The YAML
+ * name is the lower-case enum name. Enum values are never saved, recorded or
+ * sent. */
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -92,6 +94,7 @@ typedef enum XwaInputAction {
 	XWA_INPUT_ACTION_MISSILE_CAMERA,
 	XWA_INPUT_ACTION_TARGET_CAMERA,
 	XWA_INPUT_ACTION_SWITCH_SEAT,
+	XWA_INPUT_ACTION_RECENTER_HEADSET,
 	/* HUD */
 	XWA_INPUT_ACTION_MFD_PREV_PAGE,
 	XWA_INPUT_ACTION_MFD_NEXT_PAGE,
@@ -108,6 +111,7 @@ typedef enum XwaInputAction {
 	XWA_INPUT_ACTION_MAP_MODE,
 	XWA_INPUT_ACTION_TOGGLE_SYSTEM_MESSAGES,
 	XWA_INPUT_ACTION_CONSOLE_PAGE,
+	XWA_INPUT_ACTION_TOGGLE_HOLOGRAMS,
 	/* Communications */
 	XWA_INPUT_ACTION_WINGMAN_COMMAND_PAGE,
 	XWA_INPUT_ACTION_COMMAND_OPTION_1,
@@ -177,6 +181,9 @@ typedef enum XwaInputActionKind {
 	XWA_INPUT_ACTION_KIND_PAUSE,
 	/* The key once per press. */
 	XWA_INPUT_ACTION_KIND_COMMAND,
+	/* No key. The host does the action once per press
+	 * (XwaKeyboardMapping_ActionTrigger, XwaControllerMapping_TakeHostAction). */
+	XWA_INPUT_ACTION_KIND_HOST,
 } XwaInputActionKind;
 
 /* The held states of the look actions, in that order. */
@@ -197,7 +204,7 @@ const char* XwaInputActions_DisplayName(XwaInputAction action);
 XwaInputActionCategory XwaInputActions_Category(XwaInputAction action);
 const char* XwaInputActions_CategoryName(XwaInputActionCategory category);
 bool XwaInputActions_KeyboardBindable(XwaInputAction action);
-/* The game key code the action sends. 0 for the roll actions. */
+/* The game key code the action sends. 0 for the roll and host actions. */
 uint16_t XwaInputActions_Key(XwaInputAction action);
 XwaInputActionKind XwaInputActions_Kind(XwaInputAction action);
 /* The look state of a look or look-center action, or -1. */

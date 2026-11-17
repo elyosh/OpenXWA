@@ -26,14 +26,16 @@ typedef enum XwaKeyboardShortcut {
 	XWA_KEYBOARD_SHORTCUT_SPLIT_VIEW, /* Ctrl+F2: split view */
 	XWA_KEYBOARD_SHORTCUT_MOUSE,      /* Ctrl+Alt+M: release or recapture the mouse */
 	XWA_KEYBOARD_SHORTCUT_MOUSE_LOOK, /* Ctrl+Alt+L: cockpit mouse look */
-	XWA_KEYBOARD_SHORTCUT_HOLOGRAMS,  /* Ctrl+H without Alt: Dynamic Cockpit holograms */
 	XWA_KEYBOARD_SHORTCUT_HOST_PAUSE, /* GUI+P */
 	XWA_KEYBOARD_SHORTCUT_FULLSCREEN, /* GUI+Ctrl+F on macOS, Alt+Return elsewhere */
-	XWA_KEYBOARD_SHORTCUT_RECENTER,   /* Ctrl+Alt+R: recentre the headset's view */
 } XwaKeyboardShortcut;
 
 void XwaKeyboardMapping_SetPolicy(bool debug_available);
 int XwaKeyboardMapping_Trigger(const AeronInputSnapshot* input, XwaKeyboardShortcut shortcut);
+/* Returns the key of a press in `input` that is bound to the host action
+ * `action`, or -1. It works in the menus too. Outside flight, where keys
+ * can be text, only a binding with Ctrl, Alt or the GUI key counts. */
+int XwaKeyboardMapping_ActionTrigger(const AeronInputSnapshot* input, XwaInputAction action);
 XwaKeyboardShortcut XwaKeyboardMapping_Shortcut(AeronKeyChord source);
 bool XwaKeyboardMapping_SourceValid(AeronKeyChord source);
 void XwaKeyboardMapping_FormatSource(char* text, size_t capacity, AeronKeyChord source);

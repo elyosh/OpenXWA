@@ -32,6 +32,8 @@ static struct {
 	bool resume;
 	int axes[3];
 	uint16_t holds[XWA_INPUT_ACTION_COUNT], throttle;
+	/* Presses of host actions that the host hasn't taken yet. */
+	bool host_pressed[XWA_INPUT_ACTION_COUNT];
 	uint32_t throttle_instance, generation;
 	uint32_t rumble_instance;
 	bool rumble_changed, rumble_enabled;
@@ -75,6 +77,11 @@ static void XwaControllerMapping_DispatchAction(XwaInputAction action) {
  * command. */
 static void XwaControllerMapping_Dispatch(XwaInputAction action, bool pressed) {
 	const XwaInputActionKind kind = XwaInputActions_Kind(action);
+	if (kind == XWA_INPUT_ACTION_KIND_HOST) {
+		if (pressed)
+			g_controller.host_pressed[action] = true;
+		return;
+	}
 	if (kind == XWA_INPUT_ACTION_KIND_HELD || kind == XWA_INPUT_ACTION_KIND_LOOK ||
 		kind == XWA_INPUT_ACTION_KIND_ROLL) {
 		if (!pressed) {
@@ -179,6 +186,7 @@ void XwaControllerMapping_Suspend(void) {
 	/* Drop the entire route without dispatching synthetic gameplay releases. */
 	memset(g_controller.instances, 0, sizeof g_controller.instances);
 	memset(g_controller.holds, 0, sizeof g_controller.holds);
+	memset(g_controller.host_pressed, 0, sizeof g_controller.host_pressed);
 	memset(g_controller.axes, 0, sizeof g_controller.axes);
 	g_controller.read = g_controller.write = 0;
 	g_controller.resume = false;
@@ -448,6 +456,13 @@ int XwaControllerMapping_RollHeld(XwaInputRoll side) {
 	return side == XWA_INPUT_ROLL_LEFT    ? g_controller.holds[XWA_INPUT_ACTION_ROLL_LEFT] != 0
 		   : side == XWA_INPUT_ROLL_RIGHT ? g_controller.holds[XWA_INPUT_ACTION_ROLL_RIGHT] != 0
 										  : 0;
+}
+
+int XwaControllerMapping_TakeHostAction(XwaInputAction action) {
+	if ((unsigned)action >= XWA_INPUT_ACTION_COUNT || !g_controller.host_pressed[action])
+		return 0;
+	g_controller.host_pressed[action] = false;
+	return 1;
 }
 
 int XwaControllerMapping_TakeResume(void) {

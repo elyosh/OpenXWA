@@ -27,6 +27,9 @@ int XwaControllerMapping_RollHeld(XwaInputRoll side);
 /* Returns and clears the latch set when a pause binding is pressed while
  * the game is paused. */
 int XwaControllerMapping_TakeResume(void);
+/* Returns 1 once for each press of a binding of the host action `action`.
+ * Controller bindings are read in flight only. */
+int XwaControllerMapping_TakeHostAction(XwaInputAction action);
 void XwaControllerMapping_ReleaseCommands(void);
 uint16_t XwaControllerMapping_ThrottlePosition(int16_t raw, AeronControllerKind kind, int source,
 											   bool invert);
