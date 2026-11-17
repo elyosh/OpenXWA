@@ -257,9 +257,10 @@ static struct {
 	AeronRenderTarget* view_targets[AERON_MAX_VIEWS];
 	int view_targets_set;
 	/* The part of each view's image that the headset's lens never shows
-	 * (XwaRemasterFlight_SetViewHiddenAreas). */
-	AeronXrHiddenArea view_hidden_areas[AERON_MAX_VIEWS];
-	int view_hidden_areas_set;
+	 * (XwaRemasterFlight_SetViewAreas). */
+	AeronXrAreaMesh view_hidden_areas[AERON_MAX_VIEWS];
+	AeronXrAreaMesh view_visible_areas[AERON_MAX_VIEWS];
+	int view_areas_set;
 	/* The last render drew the rig's views into their own targets. */
 	int view_targets_rendered;
 	/* While set, a rig's frame is composed before the tonemap and without
@@ -3297,16 +3298,17 @@ void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig) {
 	}
 	s.rig_active = active;
 	s.view_targets_set = 0;
-	s.view_hidden_areas_set = 0;
+	s.view_areas_set = 0;
 }
 
-void XwaRemasterFlight_SetViewHiddenAreas(const AeronXrHiddenArea* areas) {
-	s.view_hidden_areas_set = 0;
-	if (!areas || !s.rig_active || !s.view_targets_set) {
+void XwaRemasterFlight_SetViewAreas(const AeronXrAreaMesh* hidden, const AeronXrAreaMesh* visible) {
+	s.view_areas_set = 0;
+	if (!hidden || !visible || !s.rig_active || !s.view_targets_set) {
 		return;
 	}
-	memcpy(s.view_hidden_areas, areas, (size_t)s.rig.count * sizeof *areas);
-	s.view_hidden_areas_set = 1;
+	memcpy(s.view_hidden_areas, hidden, (size_t)s.rig.count * sizeof *hidden);
+	memcpy(s.view_visible_areas, visible, (size_t)s.rig.count * sizeof *visible);
+	s.view_areas_set = 1;
 }
 
 void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float head_units_per_meter) {
@@ -6487,8 +6489,17 @@ int XwaRemasterFlight_CanDirectPresent(int target_w, int target_h) {
 
 /* Draws the scene with its bloom and exposure into `rect` of the pass's
  * target, with `chain` and its current debug view. */
+/* What the full-screen passes draw for the view that the scene rendered
+ * last: the visible-area mesh of a headset's eye, so they skip the corners
+ * that the lens never shows. NULL, the whole image, without a headset. */
+static const AeronSceneFullscreenMesh* fl_view_fullscreen_mesh(void) {
+	return s.view_targets_set && s.view_areas_set ? AeronScene_FullscreenMesh(s.scene) : NULL;
+}
+
+/* `mesh` is what the tone map draws: NULL for the whole rectangle, or
+ * fl_view_fullscreen_mesh. */
 static void fl_draw_present_scene(AeronRenderPass* pass, AeronScenePresentChain* chain,
-								  const AeronRectI* rect) {
+								  const AeronRectI* rect, const AeronSceneFullscreenMesh* mesh) {
 	Aeron_SetViewport(pass, rect);
 	Aeron_SetScissor(pass, rect);
 	static const float present_tint[4] = { 1.0f, 1.0f, 1.0f, 1.0f };
@@ -6499,7 +6510,7 @@ static void fl_draw_present_scene(AeronRenderPass* pass, AeronScenePresentChain*
 								s.map_present ? 0.0f : AeronSceneBloom_Intensity(),
 								exposure_tex ? 1.0f : XwaRemasterFlight_Exposure(), exposure_tex, s.rt_w,
 								s.rt_h,
-								/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0);
+								/*bar_y_uv=*/1.0f, present_tint, /*src_coverage=*/0, mesh);
 }
 
 /* Sets the chain's debug view from the flight settings. */
@@ -6561,7 +6572,7 @@ static void fl_draw_present(AeronCommandBuffer* cmd, AeronRenderPass* pass, Aero
 	}
 	fl_set_present_debug(chain);
 	const AeronRectI full_target = { 0, 0, target_w, target_h };
-	fl_draw_present_scene(pass, chain, &full_target);
+	fl_draw_present_scene(pass, chain, &full_target, NULL);
 	if (!s.suppress_hud) {
 		fl_draw_hud(cmd, pass, target, target_w, target_h, s.scene, XWA_HUD_GROUP_ALL);
 	}
@@ -6824,7 +6835,7 @@ static int fl_compose_rig_view(AeronCommandBuffer* cmd, int view, int first, int
 	} else {
 		fl_set_present_debug(chain);
 	}
-	fl_draw_present_scene(pass, chain, &rect);
+	fl_draw_present_scene(pass, chain, &rect, own_target ? fl_view_fullscreen_mesh() : NULL);
 	if (hud) {
 		const AeronRectI full_target = { 0, 0, target_w, target_h };
 		Aeron_SetViewport(pass, &full_target);
@@ -6857,7 +6868,7 @@ static void fl_mirror_callback(AeronCommandBuffer* cmd, AeronRenderPass* pass, A
 	}
 	const AeronRectI rect = fl_fit_view_rect(target_w, target_h);
 	fl_set_present_debug(s.present_direct);
-	fl_draw_present_scene(pass, s.present_direct, &rect);
+	fl_draw_present_scene(pass, s.present_direct, &rect, NULL);
 }
 
 int XwaRemasterFlight_SubmitViewMirror(void) {
@@ -6926,7 +6937,7 @@ int XwaRemasterFlight_RecordBeforeTonemap(AeronCommandBuffer* cmd) {
 	AeronScenePresentChain_SetDebug(s.present,
 									&(AeronScenePresentDebug) { .view = AERON_SCENE_PRESENT_BEFORE_TONEMAP });
 	const AeronRectI full_target = { 0, 0, s.rt_w, s.rt_h };
-	fl_draw_present_scene(pass, s.present, &full_target);
+	fl_draw_present_scene(pass, s.present, &full_target, NULL);
 	Aeron_EndRenderPass(pass);
 	return 1;
 }
@@ -6976,7 +6987,7 @@ static int fl_bloom_extra(AeronRenderPass* pass, int target_w, int target_h, voi
 /* Sets the image to present from the scene's last rendered view, or from the
  * image that replaces it, and makes its bloom. Bloom remains in the scene
  * command buffer. */
-static int fl_prepare_present_image(AeronCommandBuffer* cmd) {
+static int fl_prepare_present_image(AeronCommandBuffer* cmd, const AeronSceneFullscreenMesh* mesh) {
 	/* Add the projectiles' bloom only when the scene's own image is shown,
 	 * not when another image, such as the hyperspace warp, replaces it. */
 	const int own_scene = s.present_scene_override == NULL;
@@ -6990,7 +7001,7 @@ static int fl_prepare_present_image(AeronCommandBuffer* cmd) {
 		return 0;
 	}
 	if (!s.map_present && s.bloom && AeronSceneBloom_Intensity() > 0.0f) {
-		if (!AeronSceneBloom_Apply(s.bloom, cmd, s.present_scene_tex, s.rt_w, s.rt_h, s.rt_h,
+		if (!AeronSceneBloom_Apply(s.bloom, cmd, s.present_scene_tex, s.rt_w, s.rt_h, s.rt_h, mesh,
 								   own_scene ? fl_bloom_extra : NULL, NULL)) {
 			Aeron_CommandBufferSetFailure(cmd, "Flight bloom recording failed");
 			return 0;
@@ -7010,7 +7021,7 @@ static int fl_prepare_present_image(AeronCommandBuffer* cmd) {
  * deferred to Aeron_Present or recorded into present_rt. With a rig, the
  * view is shown in the primary view's rectangle. */
 static AeronTexture* fl_present(AeronCommandBuffer* cmd, int direct_present) {
-	if (!fl_prepare_present_image(cmd)) {
+	if (!fl_prepare_present_image(cmd, NULL)) {
 		return NULL;
 	}
 	if (s.rig_active) {
@@ -7033,7 +7044,8 @@ static AeronTexture* fl_render_rig_views(AeronCommandBuffer* cmd) {
 		const int view = k == 0 ? s.primary_view : (k <= s.primary_view ? k - 1 : k);
 		ok = AeronScene_RenderView(s.scene, cmd, view) &&
 			 (!s.hyperspace_in_world || fl_render_world_hyperspace(cmd, view)) &&
-			 fl_prepare_present_image(cmd) && fl_compose_rig_view(cmd, view, k == 0, own_targets);
+			 fl_prepare_present_image(cmd, fl_view_fullscreen_mesh()) &&
+			 fl_compose_rig_view(cmd, view, k == 0, own_targets);
 	}
 	ok = ok && AeronScene_EndFrame(s.scene, cmd);
 	if (!ok) {
@@ -8401,10 +8413,13 @@ static int fl_set_scene_views(int several) {
 			descs[i].prev_view_proj = s.previous_views[i].view_proj;
 			descs[i].prev_ori = s.previous_views[i].camera.ori;
 		}
-		if (s.view_hidden_areas_set && s.view_targets_set) {
+		if (s.view_areas_set && s.view_targets_set) {
 			descs[i].hidden_area_xy = s.view_hidden_areas[i].xy;
 			descs[i].hidden_area_vertex_count = s.view_hidden_areas[i].vertex_count;
 			descs[i].hidden_area_generation = s.view_hidden_areas[i].generation;
+			descs[i].visible_area_xy = s.view_visible_areas[i].xy;
+			descs[i].visible_area_vertex_count = s.view_visible_areas[i].vertex_count;
+			descs[i].visible_area_generation = s.view_visible_areas[i].generation;
 		}
 	}
 	return AeronScene_SetViews(s.scene, descs, s.view_count, s.primary_view);

@@ -695,11 +695,13 @@ void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig);
  * too. */
 void XwaRemasterFlight_SetViewTargets(AeronRenderTarget* const* targets, float head_units_per_meter);
 /* For a headset, after XwaRemasterFlight_SetViewTargets: gives each view's
- * hidden area, the part of the eye image that the lens never shows
- * (AeronXrHiddenArea). The scene shades no pixel under it. `areas` has one
- * entry for each view of the rig, and its meshes must stay valid until the
- * next render. NULL removes them, and so does XwaRemasterFlight_SetViewRig. */
-void XwaRemasterFlight_SetViewHiddenAreas(const AeronXrHiddenArea* areas);
+ * hidden area, the part of the eye image that the lens never shows, and its
+ * visible area, the rest (AeronXrAreaMesh). The scene shades no pixel under
+ * the hidden area, and the full-screen passes only draw the visible area.
+ * Each array has one entry for each view of the rig, and the meshes must
+ * stay valid until the next render. NULL removes them, and so does
+ * XwaRemasterFlight_SetViewRig. */
+void XwaRemasterFlight_SetViewAreas(const AeronXrAreaMesh* hidden, const AeronXrAreaMesh* visible);
 /* Returns whether the last XwaRemasterFlight_Render drew the views into
  * their own targets. It is 0 for the map, which is in the texture that the
  * render returned. */
