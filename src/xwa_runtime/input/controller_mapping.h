@@ -35,6 +35,19 @@ void XwaControllerMapping_UpdateHostActions(const AeronInputSnapshot* input);
  * that XwaControllerMapping_UpdateHostActions saw. */
 int XwaControllerMapping_TakeHostAction(XwaInputAction action);
 void XwaControllerMapping_ReleaseCommands(void);
+
+/* Does a game action as a pressed binding would, for something that isn't a
+ * binding, such as a cockpit button. A press sends the action's key once,
+ * and holds the action for the held kinds (fire, look, roll) until the
+ * release. The key is only sent in flight, when the game isn't loading and
+ * the player isn't typing a message. PressAction returns a number to give
+ * back to ReleaseAction: a release does nothing when the holds were cleared
+ * meanwhile, as when the game pauses. Host actions are ignored here. */
+uint32_t XwaControllerMapping_PressAction(XwaInputAction action);
+void XwaControllerMapping_ReleaseAction(XwaInputAction action, uint32_t press);
+/* Presses a host action (actions.h): XwaControllerMapping_TakeHostAction
+ * then returns 1 for it once. Other actions are ignored. */
+void XwaControllerMapping_PressHostAction(XwaInputAction action);
 uint16_t XwaControllerMapping_ThrottlePosition(int16_t raw, AeronControllerKind kind, int source,
 											   bool invert);
 bool XwaControllerMapping_ThrottleSample(uint16_t* position, uint32_t* generation);

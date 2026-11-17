@@ -38,6 +38,13 @@ void XwaRemasterVrHands_Shutdown(void);
 int XwaRemasterVrHands_Instance(int hand, const float seat_rows[9], const float seat_pos[3],
 								AeronSceneMeshInstance* out);
 
+/* The ray that a hand points with, in the scene: it starts at the fingertip
+ * of the hand's model and follows the controller's aim. `direction` has a
+ * length of 1. `units_per_m` gets the scene units for one metre of the
+ * player's space. Returns 0 when the hand isn't drawn. */
+int XwaRemasterVrHands_Ray(int hand, const float seat_rows[9], const float seat_pos[3], float origin[3],
+						   float direction[3], float* units_per_m);
+
 #ifdef __cplusplus
 }
 #endif

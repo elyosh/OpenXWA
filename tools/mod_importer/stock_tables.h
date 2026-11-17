@@ -14,6 +14,10 @@ XwauGameTables* ImportStockTables_Create(const char* game);
  * names. */
 void ImportStockTables_Names(XwauNames* out);
 
+/* The game's default keyboard bindings (stock_keys.c). */
+extern const XwauKeyAction g_importStockKeys[];
+extern const int g_importStockKeyCount;
+
 /* Fills `out` with the stock hull icons, map icons and hardpoint kinds, from
  * the game's own tables. */
 void ImportStockTables_Values(XwauStockValues* out);

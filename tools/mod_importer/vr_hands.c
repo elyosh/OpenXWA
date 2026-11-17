@@ -15,11 +15,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "cook_model.h"
 #include "import_internal.h"
 #include "ktx2_writer.h"
 #include "tool_log.h"
+#include "xwau_active_cockpit.h"
 #include "xwau_config.h"
 #include "xwau_dat.h"
 
@@ -186,15 +188,20 @@ static bool glove_image(void* context, const char* uri, AeronGltfCookImageView* 
 }
 
 /* Cooks one glove into `glb`: a flight model with a root and one part. */
-static bool glove_cook(const GloveMesh* mesh, const char* name, const XwauDatImage* image, const char* glb,
-					   const AeronGltfCookOptions* options) {
+static bool glove_cook(const GloveMesh* mesh, const char* name, const XwauDatImage* image,
+					   const char* buttons, const char* glb, const AeronGltfCookOptions* options) {
 	const size_t vertex_bytes = mesh->vertex_count * sizeof(float);
 	const size_t index_bytes = (mesh->index_count * sizeof(uint16_t) + 3u) & ~(size_t)3u;
 	const size_t size = vertex_bytes * 8 + index_bytes;
 	uint8_t* bin = calloc(1, size);
-	char json[4096];
-	if (!bin)
+	/* `buttons` is the JSON text of the material's buttons, or NULL. */
+	const size_t json_size = 4096 + (buttons ? strlen(buttons) : 0);
+	char* json = malloc(json_size);
+	if (!bin || !json) {
+		free(bin);
+		free(json);
 		return false;
+	}
 	float* positions = (float*)bin;
 	float* normals = (float*)(bin + vertex_bytes * 3);
 	float* uvs = (float*)(bin + vertex_bytes * 6);
@@ -213,7 +220,7 @@ static bool glove_cook(const GloveMesh* mesh, const char* name, const XwauDatIma
 	}
 	memcpy(bin + vertex_bytes * 8, mesh->indices, mesh->index_count * sizeof(uint16_t));
 	const int written = snprintf(
-		json, sizeof json,
+		json, json_size,
 		"{\"asset\":{\"version\":\"2.0\",\"generator\":\"OpenXWA mod importer\"},"
 		"\"extensionsUsed\":[\"AERON_flight_model\"],\"scene\":0,\"scenes\":[{\"nodes\":[0]}],"
 		"\"nodes\":[{\"name\":\"%s\",\"children\":[1],"
@@ -223,7 +230,7 @@ static bool glove_cook(const GloveMesh* mesh, const char* name, const XwauDatIma
 		"\"meshes\":[{\"name\":\"glove\",\"primitives\":[{\"attributes\":"
 		"{\"POSITION\":0,\"NORMAL\":1,\"TEXCOORD_0\":2},\"indices\":3,\"material\":0}]}],"
 		"\"materials\":[{\"name\":\"glove\",\"pbrMetallicRoughness\":"
-		"{\"baseColorTexture\":{\"index\":0},\"metallicFactor\":0,\"roughnessFactor\":0.8}}],"
+		"{\"baseColorTexture\":{\"index\":0},\"metallicFactor\":0,\"roughnessFactor\":0.8}%s%s%s}],"
 		"\"samplers\":[{\"magFilter\":9729,\"minFilter\":9987}],"
 		"\"images\":[{\"name\":\"glove\",\"uri\":\"" GLOVE_IMAGE_URI "\",\"mimeType\":\"image/png\"}],"
 		"\"textures\":[{\"source\":0,\"sampler\":0}],"
@@ -239,12 +246,13 @@ static bool glove_cook(const GloveMesh* mesh, const char* name, const XwauDatIma
 		"{\"bufferView\":1,\"componentType\":5126,\"count\":%zu,\"type\":\"VEC3\"},"
 		"{\"bufferView\":2,\"componentType\":5126,\"count\":%zu,\"type\":\"VEC2\"},"
 		"{\"bufferView\":3,\"componentType\":5123,\"count\":%zu,\"type\":\"SCALAR\"}]}",
-		name, size, vertex_bytes * 3, vertex_bytes * 3, vertex_bytes * 3, vertex_bytes * 6, vertex_bytes * 2,
-		vertex_bytes * 8, index_bytes, mesh->vertex_count, (double)low[0], (double)low[1], (double)low[2],
-		(double)high[0], (double)high[1], (double)high[2], mesh->vertex_count, mesh->vertex_count,
-		mesh->index_count);
+		name, buttons ? ",\"extensions\":{\"AERON_flight_model\":{\"buttons\":" : "", buttons ? buttons : "",
+		buttons ? "}}" : "", size, vertex_bytes * 3, vertex_bytes * 3, vertex_bytes * 3, vertex_bytes * 6,
+		vertex_bytes * 2, vertex_bytes * 8, index_bytes, mesh->vertex_count, (double)low[0], (double)low[1],
+		(double)low[2], (double)high[0], (double)high[1], (double)high[2], mesh->vertex_count,
+		mesh->vertex_count, mesh->index_count);
 	bool cooked = false;
-	if (written > 0 && (size_t)written < sizeof json) {
+	if (written > 0 && (size_t)written < json_size) {
 		const AeronGltfCookInput input = {
 			.json = json,
 			.json_size = (size_t)written,
@@ -257,7 +265,56 @@ static bool glove_cook(const GloveMesh* mesh, const char* name, const XwauDatIma
 		cooked = aeron_gltf_cook_model_input(&input, glb, options, NULL);
 	}
 	free(bin);
+	free(json);
 	return cooked;
+}
+
+/* Reads the buttons of a glove from Active_Cockpit.cfg: the `action` lines
+ * that follow the hand's `<side>_glove_texture` line, up to the next key
+ * that isn't about that texture. Returns the JSON text of the buttons, owned
+ * by the caller, or NULL when the glove has none. */
+static char* glove_buttons(const char* settings_path, int hand, const XwauNames* names) {
+	static const char* const keys[2] = { "left_glove_texture", "right_glove_texture" };
+	static const char* const size_keys[2] = { "left_glove_texture_size", "right_glove_texture_size" };
+	XwauActiveCockpitButton buttons[XWAU_ACTIVE_COCKPIT_MAX_BUTTONS];
+	int count = 0;
+	bool inside = false;
+	float width = 1.0f, height = 1.0f;
+	char line[512], param[128];
+	FILE* file = settings_path[0] ? fopen(settings_path, "rt") : NULL;
+	if (!file)
+		return NULL;
+	while (fgets(line, sizeof line, file)) {
+		const char* value = strchr(line, '=');
+		if (line[0] == ';' || line[0] == '#' || !value || sscanf(line, "%127[^= \t]", param) < 1)
+			continue;
+		value++;
+		if (strcasecmp(param, keys[hand]) == 0) {
+			inside = true;
+		} else if (inside && strcasecmp(param, size_keys[hand]) == 0) {
+			float w, h;
+			if (sscanf(value, "%f , %f", &w, &h) == 2 && w > 0.0f && h > 0.0f) {
+				width = w;
+				height = h;
+			}
+		} else if (inside && strcasecmp(param, "action") == 0) {
+			char key[64];
+			/* XWAU compares these rectangles with the OBJ file's texture
+			   coordinates, which count V from the bottom of the image. */
+			const int result =
+				XwauActiveCockpit_ParseAction(value, width, height, true, names, &buttons[count], key);
+			if (result == 0)
+				ToolLog_Write(TOOL_LOG_INFO,
+							  "VR gloves: the key %s does no action in the game, so its button is left out",
+							  key);
+			else if (result > 0 && count < XWAU_ACTIVE_COCKPIT_MAX_BUTTONS - 1)
+				count++;
+		} else {
+			inside = false;
+		}
+	}
+	fclose(file);
+	return count ? XwauActiveCockpit_ButtonsJson(buttons, count) : NULL;
 }
 
 /* Reads a glove's image, which Active_Cockpit.cfg names as
@@ -296,8 +353,8 @@ static bool glove_load_image(const char* source, const XwauLines* settings, cons
 
 /* Converts one hand. Writes its `vr_hands` entry into `entry` and returns
  * true when the neutral pose, at least, was converted. */
-static bool glove_convert_hand(ImportContext* ctx, const XwauLines* settings, int hand,
-							   const AeronGltfCookOptions* options, char* entry, size_t entry_cap) {
+static bool glove_convert_hand(ImportContext* ctx, const XwauLines* settings, const char* settings_path,
+							   int hand, const AeronGltfCookOptions* options, char* entry, size_t entry_cap) {
 	static const char* const sides[2] = { "left", "right" };
 	static const char* const prefixes[2] = { "LGlove", "RGlove" };
 	static const char* const poses[3][2] = { { "Neutral", "neutral" },
@@ -314,6 +371,7 @@ static bool glove_convert_hand(ImportContext* ctx, const XwauLines* settings, in
 	if (!Xwau_FindFile(source, rel, obj, sizeof obj) ||
 		!glove_load_image(source, settings, keys[hand], &image))
 		return false;
+	char* buttons = glove_buttons(settings_path, hand, &ctx->names);
 	for (int pose = 0; pose < 3 && !Import_ShouldStop(ctx); ++pose) {
 		GloveMesh mesh;
 		snprintf(rel, sizeof rel, "Effects/ActiveCockpit/%s%s.obj", prefixes[hand], poses[pose][0]);
@@ -325,7 +383,7 @@ static bool glove_convert_hand(ImportContext* ctx, const XwauLines* settings, in
 			Import_ListFailed(ctx, "The VR glove %s couldn't be read.", rel);
 			continue;
 		}
-		if (!glove_cook(&mesh, name, &image, glb, options)) {
+		if (!glove_cook(&mesh, name, &image, buttons, glb, options)) {
 			Import_ListFailed(ctx, "The VR glove %s couldn't be prepared for the game.", rel);
 		} else {
 			converted = converted || pose == 0;
@@ -339,6 +397,7 @@ static bool glove_convert_hand(ImportContext* ctx, const XwauLines* settings, in
 		mesh_free(&mesh);
 	}
 	XwauDat_FreeImage(&image);
+	free(buttons);
 	if (!converted || !has_tip)
 		return false;
 	/* The game turns the model by -90 degrees around X: the fingers (-Z)
@@ -355,7 +414,7 @@ static bool glove_convert_hand(ImportContext* ctx, const XwauLines* settings, in
 
 void ImportVrHands_Run(ImportContext* ctx) {
 	const XwaModImportOptions* options = ctx->options;
-	char settings_path[IMPORT_PATH_CAP], models[IMPORT_PATH_CAP], flight[IMPORT_PATH_CAP];
+	char settings_path[IMPORT_PATH_CAP] = "", models[IMPORT_PATH_CAP], flight[IMPORT_PATH_CAP];
 	char entries[2][256] = { "", "" };
 	XwauLines settings = { 0 };
 	AeronGltfCookOptions cook;
@@ -370,8 +429,10 @@ void ImportVrHands_Run(ImportContext* ctx) {
 		cook.zstd_level = options->zstd_level;
 	const int zstd_level = ktx2_zstd_level();
 	ktx2_set_zstd_level(cook.zstd_level);
-	const bool left = glove_convert_hand(ctx, &settings, 0, &cook, entries[0], sizeof entries[0]);
-	const bool right = glove_convert_hand(ctx, &settings, 1, &cook, entries[1], sizeof entries[1]);
+	const bool left =
+		glove_convert_hand(ctx, &settings, settings_path, 0, &cook, entries[0], sizeof entries[0]);
+	const bool right =
+		glove_convert_hand(ctx, &settings, settings_path, 1, &cook, entries[1], sizeof entries[1]);
 	ktx2_set_zstd_level(zstd_level);
 	XwauLines_Free(&settings);
 	if (!left && !right)

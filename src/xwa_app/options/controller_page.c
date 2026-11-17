@@ -530,6 +530,8 @@ static void XwaControllerSettings_Vr(AeronUiContext* ui) {
 		changed = true;
 	}
 	AeronUi_Help(ui, "How far your hand moves for the stick's full travel.");
+	changed |= AeronUi_Toggle(ui, "Cockpit Buttons", &options.vr_cockpit_buttons) != 0;
+	AeronUi_Help(ui, "Point at a button of the cockpit and pull the trigger to press it.");
 	if (changed && !XwaModernInputOptions_Set(&options))
 		XwaOptionsWindow_ReportError("The VR options are invalid.");
 }

@@ -40,6 +40,8 @@ static struct {
 	 * XwaControllerMapping_UpdateHostActions remembers about each device: its
 	 * id, and which of its bindings were down. */
 	bool host_pressed[XWA_INPUT_ACTION_COUNT];
+	/* Changes each time the holds are cleared (XwaControllerMapping_PressAction). */
+	uint32_t hold_epoch;
 	uint32_t host_id[AERON_CONTROLLER_MAX];
 	bool host_down[AERON_CONTROLLER_MAX][XWA_CONTROLLER_BINDING_CAP];
 	bool host_masked[AERON_CONTROLLER_MAX][XWA_CONTROLLER_BINDING_CAP];
@@ -197,6 +199,7 @@ void XwaControllerMapping_Suspend(void) {
 	/* Drop the entire route without dispatching synthetic gameplay releases. */
 	memset(g_controller.instances, 0, sizeof g_controller.instances);
 	memset(g_controller.holds, 0, sizeof g_controller.holds);
+	++g_controller.hold_epoch;
 	memset(g_controller.host_pressed, 0, sizeof g_controller.host_pressed);
 	memset(g_controller.axes, 0, sizeof g_controller.axes);
 	g_controller.read = g_controller.write = 0;
@@ -563,6 +566,7 @@ void XwaControllerMapping_ReleaseCommands(void) {
 	g_controller.read = g_controller.write = 0;
 	g_controller.resume = false;
 	memset(g_controller.holds, 0, sizeof g_controller.holds);
+	++g_controller.hold_epoch;
 	for (int i = 0; i < AERON_CONTROLLER_MAX; ++i) {
 		ControllerInstance* state = &g_controller.instances[i];
 		for (size_t j = 0; j < XWA_CONTROLLER_BINDING_CAP; ++j) {
@@ -570,6 +574,23 @@ void XwaControllerMapping_ReleaseCommands(void) {
 			state->armed[j] = !state->down[j];
 		}
 	}
+}
+
+uint32_t XwaControllerMapping_PressAction(XwaInputAction action) {
+	if (XwaInputActions_KeyboardBindable(action) && !g_controller.suspended)
+		XwaControllerMapping_Dispatch(action, true);
+	return g_controller.hold_epoch;
+}
+
+void XwaControllerMapping_ReleaseAction(XwaInputAction action, uint32_t press) {
+	if (XwaInputActions_KeyboardBindable(action) && press == g_controller.hold_epoch)
+		XwaControllerMapping_Dispatch(action, false);
+}
+
+void XwaControllerMapping_PressHostAction(XwaInputAction action) {
+	if (XwaInputActions_KeyboardBindable(action) &&
+		XwaInputActions_Kind(action) == XWA_INPUT_ACTION_KIND_HOST && !g_controller.suspended)
+		g_controller.host_pressed[action] = true;
 }
 
 uint32_t XwaControllerMapping_RumbleInstance(void) { return g_controller.rumble_instance; }

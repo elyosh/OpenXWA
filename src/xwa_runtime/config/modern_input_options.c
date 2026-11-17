@@ -58,8 +58,10 @@ int XwaModernInputOptions_Validate(const XwaModernInputOptions* options, char* e
 	}
 	if (options->vr_stick < XWA_MODERN_VR_STICK_OFF || options->vr_stick >= XWA_MODERN_VR_STICK_MODE_COUNT ||
 		!(options->vr_stick_range >= XWA_MODERN_VR_STICK_RANGE_MIN) ||
-		options->vr_stick_range > XWA_MODERN_VR_STICK_RANGE_MAX) {
-		return XwaModernInputOptions_Error(error, error_size, "virtual stick setting is invalid");
+		options->vr_stick_range > XWA_MODERN_VR_STICK_RANGE_MAX ||
+		!(options->vr_button_ray_m >= XWA_MODERN_VR_BUTTON_RAY_MIN_M) ||
+		options->vr_button_ray_m > XWA_MODERN_VR_BUTTON_RAY_MAX_M) {
+		return XwaModernInputOptions_Error(error, error_size, "VR controller setting is invalid");
 	}
 	return XwaControllerOptions_Validate(&options->controllers, error, error_size) &&
 		   XwaModernInputOptions_ValidateKeyboard(&options->keyboard, error, error_size);
@@ -73,6 +75,7 @@ static void XwaModernInputOptions_Normalize(XwaModernInputOptions* options) {
 	options->vr_mod_hands = options->vr_mod_hands != 0;
 	options->vr_stick_hand = options->vr_stick_hand != 0;
 	options->vr_throttle = options->vr_throttle != 0;
+	options->vr_cockpit_buttons = options->vr_cockpit_buttons != 0;
 	XwaKeyboardMapping_Sort(&options->keyboard);
 }
 
@@ -83,6 +86,7 @@ int XwaModernInputOptions_Equal(const XwaModernInputOptions* a, const XwaModernI
 		   a->vr_show_hands == b->vr_show_hands && a->vr_mod_hands == b->vr_mod_hands &&
 		   a->vr_stick == b->vr_stick && a->vr_stick_hand == b->vr_stick_hand &&
 		   a->vr_throttle == b->vr_throttle && a->vr_stick_range == b->vr_stick_range &&
+		   a->vr_cockpit_buttons == b->vr_cockpit_buttons && a->vr_button_ray_m == b->vr_button_ray_m &&
 		   XwaControllerOptions_Equals(&a->controllers, &b->controllers) &&
 		   XwaKeyboardMapping_Equal(&a->keyboard, &b->keyboard);
 }

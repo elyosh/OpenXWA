@@ -15,6 +15,7 @@
 #include "ui.h"
 #include "window_icon.h"
 #include "xwa/config/game_config.h"
+#include "xwa_remaster/cockpit_buttons.h"
 #include "xwa_remaster/dynamic_cockpit.h"
 #include "xwa_remaster/vr_hands.h"
 #include "xwa_remaster/xwa_remaster.h"
@@ -176,6 +177,8 @@ static void apply_modern_input_options(const XwaModernInputOptions* options) {
 	XwaControllerMapping_SetRumbleEnabled(options->rumble_enabled);
 	XwaRemasterVrHands_SetEnabled(options->vr_show_hands);
 	XwaVrHands_SetUseMod(options->vr_mod_hands);
+	XwaRemasterCockpitButtons_SetOptions(options->vr_cockpit_buttons, options->vr_button_ray_m,
+										 options->rumble_enabled);
 	Config_ApplyModernInputOptions(options);
 }
 
@@ -220,7 +223,8 @@ static XwaRemasterStereoHand stereo_hand_option(const XwaLaunchStereoHand* from)
 /* Keeps the bindings away from the inputs of a hand that something else
  * uses. While a hand points at the virtual screen, its trigger and squeeze
  * click there and its thumbstick scrolls. The virtual stick and throttle use
- * the squeeze, and the trigger of the hand that holds the stick. */
+ * the squeeze, and the trigger of the hand that holds the stick. A hand that
+ * points at a cockpit button presses it with its trigger. */
 static void mask_hand_sources(void) {
 	const int pointer = Aeron_XrPointerHand();
 	for (int hand = 0; hand < 2; hand++) {
@@ -232,6 +236,11 @@ static void mask_hand_sources(void) {
 				   (1u << AERON_VR_HAND_AXIS_THUMBSTICK_Y);
 		}
 		XwaVrStick_SourceMask(hand, &buttons, &axes);
+		/* On a cockpit button, the trigger presses the button. */
+		if (XwaRemasterCockpitButtons_OnButton(hand)) {
+			buttons |= 1u << AERON_VR_HAND_BUTTON_TRIGGER;
+			axes |= 1u << AERON_VR_HAND_AXIS_TRIGGER;
+		}
 		XwaControllerMapping_SetSourceMask(hand, buttons, axes);
 	}
 }

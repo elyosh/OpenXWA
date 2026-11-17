@@ -18,6 +18,7 @@
 #include "aeron/scene/view_rig.h"
 #include "aeron/scene/world.h"
 #include "xwa_remaster/captured_lighting.h"
+#include "xwa_remaster/cockpit_buttons.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/effects.h"
 #include "xwa_remaster/environment.h"
@@ -6748,6 +6749,7 @@ static int fl_draw_headset_hud(AeronCommandBuffer* cmd, AeronRenderPass* pass, A
 	float view_rows[12];
 	XwaHudPlanes_ViewRows(s.views[view].view_proj, view_rows);
 	XwaRemasterHud_RenderMarkerPlanes(cmd, pass, target, view_rows);
+	XwaRemasterCockpitButtons_RenderMarkers(cmd, pass, target, view_rows);
 	float matrix[9];
 	const AeronSceneCamera* seat = &s.hud_view.camera;
 	float rows[9], center[3], half_right[3], half_up[3];
@@ -8668,6 +8670,11 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 								 : NULL,
 							 hud_w, hud_h);
 	XwaRemasterHud_PrepareFrame(cmd, snap, assets, hud_view, hud_w, hud_h);
+	/* The dots and labels of the cockpit buttons are drawn with the HUD's
+	 * markers, on planes in each eye's image. */
+	XwaRemasterCockpitButtons_PrepareMarkers(cmd, assets,
+											 s.headset_hud && hud_view ? hud_view->hud_planes : NULL,
+											 s.seat_crows, s.seat_view.camera.pos, hud_w, hud_h);
 	XwaRemasterDc_Prepare(cmd, snap, hud_w, hud_h);
 	if (cam->map_mode) {
 		s.suppress_hud = 0;
@@ -9355,6 +9362,11 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 				}
 			}
 			AeronScene_AddMeshInstance(s.scene, &inst);
+			/* Before the hands are added: a hand that points at a panel
+			 * shows its pointing model. */
+			if (s.rig_active && s.rig.tracked) {
+				XwaRemasterCockpitButtons_Update(&inst, s.seat_crows, s.seat_view.camera.pos);
+			}
 			fl_submit_vr_hands(1);
 			fl_add_model_lights(cockpit_mesh, m, inst.mesh_table, inst.variant, 0, 1, 0, 0);
 			/* No blast marks on the cockpit (see fl_submit_hyperspace_cockpit). */

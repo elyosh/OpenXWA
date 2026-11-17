@@ -26,6 +26,11 @@ input:
   # Multiplies how far the hand moves for the stick's full travel, from 0.5
   # to 2. At 1, that is 30 degrees of tilt, 40 degrees of twist and 12 cm.
   vr_stick_range: 1.0
+  # A VR hand can point at the buttons of a cockpit and press them with its
+  # trigger. A cockpit has buttons when its model gives some.
+  vr_cockpit_buttons: true
+  # How far a button can be from the fingertip, in metres.
+  vr_button_ray_m: 1.5
   # Saved controller models, one complete profile each. New gamepads get
   # gamepad_defaults, and new VR controllers get vr_left_defaults or
   # vr_right_defaults. Joysticks start with nothing bound.

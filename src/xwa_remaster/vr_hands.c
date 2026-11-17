@@ -4,6 +4,7 @@
 #include "aeron/asset/flight_model.h"
 #include "aeron/asset/opt_model.h"
 #include "aeron/scene/view_rig.h"
+#include "xwa_remaster/cockpit_buttons.h"
 #include "xwa_runtime/input/vr_stick.h"
 
 #include <math.h>
@@ -89,8 +90,13 @@ static int vr_hand_shown(const VrHandState* state) {
 
 /* A hand that holds the virtual stick or throttle is closed. */
 static XwaVrHandPose vr_hand_pose(const VrHandState* state) {
-	if (XwaVrStick_Held((int)(state - s.hands))) {
+	const int hand = (int)(state - s.hands);
+	if (XwaVrStick_Held(hand)) {
 		return XWA_VR_HAND_POSE_GRASP;
+	}
+	/* It points at a panel that has buttons. */
+	if (XwaRemasterCockpitButtons_OnPanel(hand)) {
+		return XWA_VR_HAND_POSE_POINT;
 	}
 	return state->hand.trigger >= VR_HAND_POINT_TRIGGER ? XWA_VR_HAND_POSE_POINT : XWA_VR_HAND_POSE_NEUTRAL;
 }
@@ -271,6 +277,36 @@ static void vr_hand_transform(const XwaVrHandConfig* config, const AeronXrHand* 
 	out[13] = 0.0f;
 	out[14] = 0.0f;
 	out[15] = 1.0f;
+}
+
+int XwaRemasterVrHands_Ray(int hand, const float seat_rows[9], const float seat_pos[3], float origin[3],
+						   float direction[3], float* units_per_m) {
+	if (hand < 0 || hand > 1) {
+		return 0;
+	}
+	const VrHandState* state = &s.hands[hand];
+	if (!vr_hand_shown(state) || !state->config || !state->models[XWA_VR_HAND_POSE_NEUTRAL].mesh) {
+		return 0;
+	}
+	/* The fingertip is a point of the model, so it goes through the model's
+	 * transform. The mesh holds (-x, -z, y) of the model's (x, y, z). */
+	float transform[16];
+	vr_hand_transform(state->config, &state->hand, seat_rows, seat_pos, transform);
+	const float tip[3] = { -state->config->tip_m[0], -state->config->tip_m[2], state->config->tip_m[1] };
+	for (int row = 0; row < 3; row++) {
+		origin[row] = transform[row * 4 + 0] * tip[0] + transform[row * 4 + 1] * tip[1] +
+					  transform[row * 4 + 2] * tip[2] + transform[row * 4 + 3];
+	}
+	/* A camera at the aim pose looks along the aim: its third row. */
+	AeronViewPose aim = state->hand.aim;
+	float rows[9], position[3];
+	for (int axis = 0; axis < 3; axis++) {
+		aim.position_m[axis] *= s.world_scale;
+	}
+	AeronViewPose_ComposeCamera(&aim, seat_rows, seat_pos, AERON_OPT_UNITS_PER_METER, rows, position);
+	memcpy(direction, &rows[6], 3 * sizeof direction[0]);
+	*units_per_m = AERON_OPT_UNITS_PER_METER * s.world_scale;
+	return 1;
 }
 
 int XwaRemasterVrHands_Instance(int hand, const float seat_rows[9], const float seat_pos[3],

@@ -24,6 +24,7 @@
 #include "aeron/scene/view_rig.h"
 #include "xwa_remaster/assets.h"
 #include "xwa_remaster/captured_lighting.h"
+#include "xwa_remaster/cockpit_buttons.h"
 #include "xwa_remaster/cutscene.h"
 #include "xwa_remaster/debug_tools.h"
 #include "xwa_remaster/env_capture.h"
@@ -1689,6 +1690,7 @@ void XwaRemaster_Shutdown(void) {
 	XwaRemasterCapturedLighting_Shutdown();
 	XwaRemasterFlight_Shutdown();
 	XwaRemasterVrHands_Shutdown();
+	XwaRemasterCockpitButtons_Shutdown();
 	XwaRemasterShip_Shutdown();
 	if (g.assets) {
 		XwaRemasterAssets_Destroy(g.assets);

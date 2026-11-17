@@ -20,6 +20,8 @@ enum {
 
 #define XWA_MODERN_VR_STICK_RANGE_MIN 0.5f
 #define XWA_MODERN_VR_STICK_RANGE_MAX 2.0f
+#define XWA_MODERN_VR_BUTTON_RAY_MIN_M 0.05f
+#define XWA_MODERN_VR_BUTTON_RAY_MAX_M 5.0f
 
 /* Position: mouse displacement sets a held virtual-stick deflection.
  * Rate: per-frame mouse velocity is the deflection (the TIE Fighter
@@ -64,6 +66,10 @@ typedef struct XwaModernInputOptions {
 	int vr_throttle;
 	/* Multiplies the hand travel that gives the stick's full deflection. */
 	float vr_stick_range;
+	/* A VR hand can point at the cockpit's buttons and press them, and how
+	 * far from the fingertip a button can be, in metres. */
+	int vr_cockpit_buttons;
+	float vr_button_ray_m;
 	XwaControllerOptions controllers;
 	/* Sorted with XwaKeyboardMapping_Sort. */
 	XwaKeyboardBindings keyboard;

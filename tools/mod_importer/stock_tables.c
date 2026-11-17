@@ -217,6 +217,8 @@ void ImportStockTables_Names(XwauNames* out) {
 	out->sound_weapon_groups = list_of(&g_xwaSoundWeaponGroupNames);
 	out->screen_sources = list_of(&g_xwaScreenSourceNames);
 	out->hud_areas = list_of(&g_xwaHudAreaNames);
+	out->key_actions = g_importStockKeys;
+	out->key_action_count = g_importStockKeyCount;
 }
 
 /* The importer's copy of the projectile tables (stock_projectiles.c). */

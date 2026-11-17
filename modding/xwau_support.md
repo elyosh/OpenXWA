@@ -55,7 +55,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | Feature | Status | Notes | See |
 |-|-|-|-|
 | Dynamic Cockpit | Implemented | Including the holograms. | [Materials](materials.md#cockpit-screens) |
-| Active Cockpit | Partial | The VR hands (XWAU's gloves) are imported. The cockpit buttons, the wrist buttons and the VR keyboard are not. | [Flight](flight.md#vr_hands) |
+| Active Cockpit | Partial | The cockpit buttons (`.ac` files), the VR hands (XWAU's gloves) and the buttons on their wrists are imported. A button does the action that its key has in the game's default key bindings; a key without one is left out. The VR keyboard is not imported. | [Materials](materials.md#cockpit-buttons), [Flight](flight.md#vr_hands) |
 | Moving stick, throttle and hyperspace levers | Implemented | Levers that slide or turn on a free axis are left out. No installation has them. | [Models](models.md#cockpit-controls) |
 | Cockpit field of view | Implemented | | [Craft](craft.md#cockpit_view) |
 | Target display edges (`enable_wireframe_CMD`) | Implemented | | [Flight](flight.md#target-display) |
