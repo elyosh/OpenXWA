@@ -5,6 +5,7 @@
 #include "aeron/xr.h"
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/flight.h"
+#include "xwa_remaster/menu_hands.h"
 #include "xwa_remaster/vr_keyboard.h"
 
 #include <math.h>
@@ -174,9 +175,12 @@ int XwaRemasterMenuBeam_Render(const AeronViewRig* rig, AeronRenderTarget* const
 	AeronDrawList_Begin(g_beamList, NULL, rig->width, rig->height, AERON_DRAWLIST2D_LOAD, NULL);
 	const int has_beam = beam_build(rig);
 	int ok = AeronDrawList_Prepare(g_beamList, cmd) != 0;
-	/* The eye images are cleared even without a beam: the headset shows them
-	 * over the screen, and an image that was never drawn has anything in it. */
+	/* The eye images are cleared even when nothing is drawn: the headset
+	 * shows them over the screen, and an image that was never drawn has
+	 * anything in it. */
 	for (int view = 0; ok && view < rig->count; view++) {
+		/* The hands are rendered in a scene of their own, before the pass. */
+		const int has_hands = XwaRemasterMenuHands_RenderView(cmd, rig, view);
 		AeronRenderPass* pass = Aeron_BeginRenderPass(&(AeronRenderPassDesc) {
 			.color_target = targets[view],
 			.clear_color = 1,
@@ -186,6 +190,9 @@ int XwaRemasterMenuBeam_Render(const AeronViewRig* rig, AeronRenderTarget* const
 		if (!pass) {
 			ok = 0;
 			break;
+		}
+		if (has_hands) {
+			XwaRemasterMenuHands_DrawView(pass, targets[view]);
 		}
 		if (has_beam) {
 			float rows[12];

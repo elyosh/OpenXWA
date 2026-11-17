@@ -620,6 +620,12 @@ int XwaRemasterFlight_ObjectModelMatrixForCameraDelta(const XwaFlightObject* obj
  * scene: the points are in the rig's space with Y and Z negated, which is
  * the eye space of a seat at the origin. `width` and `height` are the
  * view's size in pixels. */
+/* The scene camera of a view of a rig whose seat is at the scene's origin
+ * and looks along the scene's eye axes: for a small scene around the
+ * player, outside flight. `units_per_meter` is the scene's unit. `out_rows`,
+ * when given, gets the camera's world-to-eye rows. */
+void XwaRemasterFlight_RigViewCamera(const AeronRigView* view, int width, int height, float units_per_meter,
+									 float near_z, AeronSceneCamera* out, float out_rows[9]);
 void XwaRemasterFlight_RigViewPlaneRows(const AeronRigView* view, int width, int height, float out[12]);
 
 void XwaRemasterFlight_TransformOptPoint(const float model_meters_to_scene[16], const float point_opt[3],

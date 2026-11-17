@@ -33,6 +33,7 @@
 #include "xwa_remaster/frontend.h"
 #include "xwa_remaster/hud.h"
 #include "xwa_remaster/menu_beam.h"
+#include "xwa_remaster/menu_hands.h"
 #include "xwa_remaster/opt_mesh.h"
 #include "xwa_remaster/ship.h"
 #include "xwa_remaster/vr_hands.h"
@@ -860,7 +861,10 @@ static void XwaRemaster_UpdateViewRig(const XwaSnapshot* snap) {
 	/* The hands follow the head: the headset's world scale moves both. The
 	 * debug stereo view has no world scale. */
 	AeronXrHand hands[2];
-	const int has_hands = kind != RM_RIG_NONE && rig.tracked && Aeron_XrHands(hands);
+	/* Outside flight the headset has no rig, and the menus still show the
+	 * hands. */
+	const int has_hands =
+		((kind != RM_RIG_NONE && rig.tracked) || Aeron_XrSessionRunning()) && Aeron_XrHands(hands);
 	XwaRemasterVrHands_SetHands(has_hands ? hands : NULL, kind == RM_RIG_HEADSET ? g.vr_world_scale : 1.0f);
 	XwaRemasterFlight_SetViewTargets(kind == RM_RIG_HEADSET && g.xr_views_ready ? g.xr_targets : NULL,
 									 AERON_OPT_UNITS_PER_METER * g.vr_world_scale);
@@ -1745,6 +1749,7 @@ void XwaRemaster_Shutdown(void) {
 	XwaRemasterVrHands_Shutdown();
 	XwaRemasterCockpitButtons_Shutdown();
 	XwaRemasterMenuBeam_Shutdown();
+	XwaRemasterMenuHands_Shutdown();
 	XwaRemasterVrKeyboard_Shutdown();
 	XwaRemasterShip_Shutdown();
 	if (g.assets) {

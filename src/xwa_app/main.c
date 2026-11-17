@@ -17,6 +17,7 @@
 #include "xwa/config/game_config.h"
 #include "xwa_remaster/cockpit_buttons.h"
 #include "xwa_remaster/dynamic_cockpit.h"
+#include "xwa_remaster/menu_hands.h"
 #include "xwa_remaster/vr_hands.h"
 #include "xwa_remaster/vr_keyboard.h"
 #include "xwa_remaster/xwa_remaster.h"
@@ -180,6 +181,7 @@ static void apply_modern_input_options(const XwaModernInputOptions* options) {
 	XwaRemasterVrHands_SetEnabled(options->vr_show_hands);
 	XwaVrHands_SetUseMod(options->vr_mod_hands);
 	XwaVrKeyboard_SetUseMod(options->vr_mod_keyboard);
+	XwaRemasterMenuHands_SetControllers(options->vr_menu_controllers);
 	XwaRemasterCockpitButtons_SetOptions(options->vr_cockpit_buttons, options->vr_button_ray_m,
 										 options->rumble_enabled);
 	XwaRemasterVrKeyboard_SetHaptics(options->rumble_enabled);

@@ -3494,19 +3494,28 @@ static void fl_build_rig_view(const XwaFlightCamera* cam, const XwaRemasterFligh
 	AeronScene_ComputeViewProj(camera, out->view_proj);
 }
 
-void XwaRemasterFlight_RigViewPlaneRows(const AeronRigView* view, int width, int height, float out[12]) {
+void XwaRemasterFlight_RigViewCamera(const AeronRigView* view, int width, int height, float units_per_meter,
+									 float near_z, AeronSceneCamera* out, float out_rows[9]) {
 	static const float seat_rows[9] = { 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f };
 	static const float seat_pos[3] = { 0.0f, 0.0f, 0.0f };
+	float rows[9];
+	memset(out, 0, sizeof *out);
+	AeronViewPose_ComposeCamera(&view->pose, seat_rows, seat_pos, units_per_meter, rows, out->pos);
+	fl_rows_to_quat(rows, out->ori);
+	AeronViewFov_ToCamera(&view->fov, &out->h_half_rad, &out->v_half_rad, &out->proj_x_offset,
+						  &out->proj_y_offset);
+	out->near_z = near_z;
+	out->viewport = (AeronRectI) { 0, 0, width, height };
+	if (out_rows) {
+		memcpy(out_rows, rows, sizeof rows);
+	}
+}
+
+void XwaRemasterFlight_RigViewPlaneRows(const AeronRigView* view, int width, int height, float out[12]) {
 	AeronSceneCamera camera;
-	float rows[9], view_proj[16];
-	memset(&camera, 0, sizeof camera);
-	AeronViewPose_ComposeCamera(&view->pose, seat_rows, seat_pos, 1.0f, rows, camera.pos);
-	fl_rows_to_quat(rows, camera.ori);
-	AeronViewFov_ToCamera(&view->fov, &camera.h_half_rad, &camera.v_half_rad, &camera.proj_x_offset,
-						  &camera.proj_y_offset);
+	float view_proj[16];
 	/* One unit is one metre here. */
-	camera.near_z = 0.02f;
-	camera.viewport = (AeronRectI) { 0, 0, width, height };
+	XwaRemasterFlight_RigViewCamera(view, width, height, 1.0f, 0.02f, &camera, NULL);
 	AeronScene_ComputeViewProj(&camera, view_proj);
 	XwaHudPlanes_ViewRows(view_proj, out);
 }

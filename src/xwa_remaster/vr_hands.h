@@ -38,6 +38,13 @@ void XwaRemasterVrHands_Shutdown(void);
 int XwaRemasterVrHands_Instance(int hand, const float seat_rows[9], const float seat_pos[3],
 								AeronSceneMeshInstance* out);
 
+/* The transform of a model whose origin is at `pose`, a pose of the rig's
+ * space, for a model file that has the pose's axes: from the mesh to the
+ * scene, as for XwaRemasterVrHands_Instance. The headset's model of a
+ * controller is placed with it. */
+void XwaRemasterVrHands_PoseTransform(const AeronViewPose* pose, const float seat_rows[9],
+									  const float seat_pos[3], float out[16]);
+
 /* The ray that a hand points with, in the scene: it starts at the fingertip
  * of the hand's model and follows the controller's aim. `direction` has a
  * length of 1. `units_per_m` gets the scene units for one metre of the

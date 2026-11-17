@@ -845,6 +845,8 @@ static int host_config_input_scalars(const AeronConfigFile* config, int required
 								error_size) ||
 		!host_config_input_bool(config, "input.vr_mod_keyboard", required, &out->vr_mod_keyboard, error,
 								error_size) ||
+		!host_config_input_bool(config, "input.vr_menu_controllers", required, &out->vr_menu_controllers,
+								error, error_size) ||
 		!host_config_input_int(config, "input.rumble_strength", required, XWA_MODERN_RUMBLE_STRENGTH_MIN,
 							   XWA_MODERN_RUMBLE_STRENGTH_MAX, &out->rumble_strength, error, error_size)) {
 		return 0;
@@ -1212,6 +1214,8 @@ static int host_config_set_input_options(AeronConfigFile* document, const XwaMod
 									defaults->vr_mod_hands, error) &&
 		 host_config_set_input_bool(document, "input.vr_mod_keyboard", options->vr_mod_keyboard,
 									defaults->vr_mod_keyboard, error) &&
+		 host_config_set_input_bool(document, "input.vr_menu_controllers", options->vr_menu_controllers,
+									defaults->vr_menu_controllers, error) &&
 		 host_config_set_input_int(document, "input.rumble_strength", options->rumble_strength,
 								   defaults->rumble_strength, error);
 	if (ok) {

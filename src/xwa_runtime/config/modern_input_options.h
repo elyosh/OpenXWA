@@ -60,6 +60,9 @@ typedef struct XwaModernInputOptions {
 	/* Use the mod's virtual keyboard when it has one, and not the game's
 	 * own. */
 	int vr_mod_keyboard;
+	/* In the menus, draw the headset's own model of each controller where
+	 * it has one, and not the hands. */
+	int vr_menu_controllers;
 	XwaModernVrStickMode vr_stick;
 	/* The hand that holds the virtual stick: 0 is the left one, 1 the right
 	 * one. */

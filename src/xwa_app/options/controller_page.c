@@ -509,6 +509,9 @@ static void XwaControllerSettings_Vr(AeronUiContext* ui) {
 	AeronUi_Help(ui, "Shows your hands in the cockpit, where your VR controllers are.");
 	changed |= AeronUi_Toggle(ui, "Use the Mod's Hands", &options.vr_mod_hands) != 0;
 	AeronUi_Help(ui, "When off, the game's own hands are shown even if the mod has some.");
+	changed |= AeronUi_Toggle(ui, "Show Controllers in Menus", &options.vr_menu_controllers) != 0;
+	AeronUi_Help(ui, "In the menus, shows your controllers where the headset gives their models. When off, "
+					 "your hands are shown.");
 	changed |= AeronUi_Toggle(ui, "Use the Mod's Keyboard", &options.vr_mod_keyboard) != 0;
 	AeronUi_Help(ui, "When off, the game's own virtual keyboard is shown even if the mod has one.");
 	static const char* const stick_modes[] = { "Off", "Tilt", "Slide" };

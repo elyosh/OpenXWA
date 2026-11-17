@@ -279,6 +279,14 @@ static void vr_hand_transform(const XwaVrHandConfig* config, const AeronXrHand* 
 	out[15] = 1.0f;
 }
 
+void XwaRemasterVrHands_PoseTransform(const AeronViewPose* pose, const float seat_rows[9],
+									  const float seat_pos[3], float out[16]) {
+	static const XwaVrHandConfig no_fit = { 0 };
+	AeronXrHand hand = { 0 };
+	hand.grip = *pose;
+	vr_hand_transform(&no_fit, &hand, seat_rows, seat_pos, out);
+}
+
 int XwaRemasterVrHands_Ray(int hand, const float seat_rows[9], const float seat_pos[3], float origin[3],
 						   float direction[3], float* units_per_m) {
 	if (hand < 0 || hand > 1) {
