@@ -765,10 +765,11 @@ int main(int argc, char** argv) {
 				XwaPort_ToggleMouseCapture();
 				toggled = 1;
 			}
-			/* Host actions (actions.h): the keys and buttons bound to them.
-			 * A key press also skips the game tick, so the game doesn't
-			 * read the key. Recentring makes the direction the headset
+			/* Host actions (actions.h): the keys and buttons bound to them,
+			 * in flight and in the menus. A key press also skips the game
+			 * tick, so the game doesn't read the key. Recentring makes the direction the headset
 			 * looks in straight ahead; Ctrl+Alt+R by default. */
+			XwaControllerMapping_UpdateHostActions(in);
 			const int recenter = host_action_pressed(in, XWA_INPUT_ACTION_RECENTER_HEADSET);
 			if (recenter && Aeron_XrEnabled()) {
 				Aeron_XrRecenter();

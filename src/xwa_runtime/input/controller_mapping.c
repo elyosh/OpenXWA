@@ -32,8 +32,13 @@ static struct {
 	bool resume;
 	int axes[3];
 	uint16_t holds[XWA_INPUT_ACTION_COUNT], throttle;
-	/* Presses of host actions that the host hasn't taken yet. */
+	/* Presses of host actions that the host hasn't taken yet, and what
+	 * XwaControllerMapping_UpdateHostActions remembers of each device:
+	 * which one it is, and which of its bindings were down. */
 	bool host_pressed[XWA_INPUT_ACTION_COUNT];
+	uint32_t host_id[AERON_CONTROLLER_MAX];
+	bool host_down[AERON_CONTROLLER_MAX][XWA_CONTROLLER_BINDING_CAP];
+	uint64_t host_frame;
 	uint32_t throttle_instance, generation;
 	uint32_t rumble_instance;
 	bool rumble_changed, rumble_enabled;
@@ -77,11 +82,10 @@ static void XwaControllerMapping_DispatchAction(XwaInputAction action) {
  * command. */
 static void XwaControllerMapping_Dispatch(XwaInputAction action, bool pressed) {
 	const XwaInputActionKind kind = XwaInputActions_Kind(action);
-	if (kind == XWA_INPUT_ACTION_KIND_HOST) {
-		if (pressed)
-			g_controller.host_pressed[action] = true;
+	/* The host reads the buttons of its actions itself, in flight and
+	 * outside it (XwaControllerMapping_UpdateHostActions). */
+	if (kind == XWA_INPUT_ACTION_KIND_HOST)
 		return;
-	}
 	if (kind == XWA_INPUT_ACTION_KIND_HELD || kind == XWA_INPUT_ACTION_KIND_LOOK ||
 		kind == XWA_INPUT_ACTION_KIND_ROLL) {
 		if (!pressed) {
@@ -456,6 +460,41 @@ int XwaControllerMapping_RollHeld(XwaInputRoll side) {
 	return side == XWA_INPUT_ROLL_LEFT    ? g_controller.holds[XWA_INPUT_ACTION_ROLL_LEFT] != 0
 		   : side == XWA_INPUT_ROLL_RIGHT ? g_controller.holds[XWA_INPUT_ACTION_ROLL_RIGHT] != 0
 										  : 0;
+}
+
+void XwaControllerMapping_UpdateHostActions(const AeronInputSnapshot* input) {
+	if (!input || input->frame_id == g_controller.host_frame)
+		return;
+	g_controller.host_frame = input->frame_id;
+	/* As for the flight bindings: nothing is read without the focus, or
+	 * while the options window or the debug UI has the input. A button
+	 * that is down when reading starts again doesn't count. */
+	if (!input->has_focus || XwaInput_IsCaptured() || Aeron_DebugUiVisible()) {
+		memset(g_controller.host_id, 0, sizeof g_controller.host_id);
+		return;
+	}
+	for (int slot = 0; slot < AERON_CONTROLLER_MAX; ++slot) {
+		const AeronControllerSnapshot* device = &input->controllers[slot];
+		const int model = device->connected ? XwaControllerMapping_DeviceModel(device) : -1;
+		if (model < 0) {
+			g_controller.host_id[slot] = 0;
+			continue;
+		}
+		const XwaControllerProfile* profile = &g_controller.options.models[model].profile;
+		const bool known = g_controller.host_id[slot] == device->instance_id;
+		for (size_t i = 0; i < profile->binding_count; ++i) {
+			const XwaInputAction action = profile->bindings[i].action;
+			if (XwaInputActions_Kind(action) != XWA_INPUT_ACTION_KIND_HOST)
+				continue;
+			const bool was_down = known && g_controller.host_down[slot][i];
+			const bool down =
+				Aeron_ControllerDigitalSourceDown(device, &profile->bindings[i].source, was_down);
+			if (known && down && !was_down)
+				g_controller.host_pressed[action] = true;
+			g_controller.host_down[slot][i] = down;
+		}
+		g_controller.host_id[slot] = device->instance_id;
+	}
 }
 
 int XwaControllerMapping_TakeHostAction(XwaInputAction action) {
