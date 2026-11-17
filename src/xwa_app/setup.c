@@ -1,5 +1,6 @@
 #include "setup.h"
 
+#include "aeron/input.h"
 #include "aeron/paths.h"
 #include "mod_list.h"
 #include "mod_update.h"
@@ -49,6 +50,55 @@ static const char* setup_option_value(const char* argument, const char* option) 
 		return argument + length + 1;
 	}
 	return NULL;
+}
+
+/* The names of a VR hand's buttons in --stereo-hand-buttons, in the order of
+   AeronVrHandButton. */
+static const char* const g_stereoHandButtons[AERON_VR_HAND_BUTTON_COUNT] = {
+	"trigger", "squeeze", "primary", "secondary", "thumbstick", "trackpad", "menu",
+};
+
+/* Reads button names joined by "+", up to `end`. "none" and an empty
+   text mean no button. */
+static int setup_parse_hand_buttons(const char* text, const char* end, unsigned* out) {
+	*out = 0;
+	if (end == text || ((size_t)(end - text) == 4 && strncmp(text, "none", 4) == 0)) {
+		return 1;
+	}
+	while (text < end) {
+		const char* plus = memchr(text, '+', (size_t)(end - text));
+		const size_t length = (size_t)((plus ? plus : end) - text);
+		int button;
+		for (button = 0; button < AERON_VR_HAND_BUTTON_COUNT; button++) {
+			if (strlen(g_stereoHandButtons[button]) == length &&
+				strncmp(g_stereoHandButtons[button], text, length) == 0) {
+				break;
+			}
+		}
+		if (button == AERON_VR_HAND_BUTTON_COUNT) {
+			return 0;
+		}
+		*out |= 1u << button;
+		text += length + (plus ? 1 : 0);
+		if (plus && text == end) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+static void setup_format_hand_buttons(unsigned buttons, char* out, size_t capacity) {
+	size_t length = 0;
+	out[0] = '\0';
+	for (int button = 0; button < AERON_VR_HAND_BUTTON_COUNT; button++) {
+		if (buttons & (1u << button)) {
+			length += (size_t)snprintf(out + length, capacity - length, "%s%s", length ? "+" : "",
+									   g_stereoHandButtons[button]);
+		}
+	}
+	if (!length) {
+		snprintf(out, capacity, "none");
+	}
 }
 
 int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* error, size_t error_size) {
@@ -252,6 +302,63 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			}
 			continue;
 		}
+		{
+			static const char* const hand_options[2] = { "--stereo-hand-left", "--stereo-hand-right" };
+			static const char usage[] =
+				"%s requires a position in metres and three angles in degrees, such as 0.2,-0.3,0.4,0,0,0";
+			int hand;
+			for (hand = 0; hand < 2; hand++) {
+				value = pass_through ? NULL : setup_option_value(argv[i], hand_options[hand]);
+				if (!pass_through && (value || strcmp(argv[i], hand_options[hand]) == 0)) {
+					break;
+				}
+			}
+			if (hand < 2) {
+				XwaLaunchStereoHand* stereo_hand = &out->stereo_hands[hand];
+				if (!value) {
+					if (++i >= argc) {
+						return setup_error(error, error_size, usage, hand_options[hand]);
+					}
+					value = argv[i];
+				}
+				const char* text = value;
+				for (int field = 0; field < 6; field++) {
+					char* end = NULL;
+					const double number = strtod(text, &end);
+					const double limit = field < 3 ? 10.0 : 180.0;
+					if (end == text || *end != (field < 5 ? ',' : '\0') ||
+						!(number >= -limit && number <= limit)) {
+						return setup_error(error, error_size, usage, hand_options[hand]);
+					}
+					if (field < 3) {
+						stereo_hand->position_m[field] = (float)number;
+					} else {
+						stereo_hand->angles_deg[field - 3] = (float)number;
+					}
+					text = end + 1;
+				}
+				stereo_hand->set = 1;
+				continue;
+			}
+		}
+		value = pass_through ? NULL : setup_option_value(argv[i], "--stereo-hand-buttons");
+		if (!pass_through && (value || strcmp(argv[i], "--stereo-hand-buttons") == 0)) {
+			static const char usage[] =
+				"%s requires the buttons of the left hand, then of the right hand, such as trigger+squeeze,none";
+			if (!value) {
+				if (++i >= argc) {
+					return setup_error(error, error_size, usage, "--stereo-hand-buttons");
+				}
+				value = argv[i];
+			}
+			const char* comma = strchr(value, ',');
+			if (!comma || !setup_parse_hand_buttons(value, comma, &out->stereo_hands[0].buttons) ||
+				!setup_parse_hand_buttons(comma + 1, comma + 1 + strlen(comma + 1),
+										  &out->stereo_hands[1].buttons)) {
+				return setup_error(error, error_size, usage, "--stereo-hand-buttons");
+			}
+			continue;
+		}
 		if (!pass_through && strcmp(argv[i], "--vr") == 0) {
 			out->vr = 1;
 			continue;
@@ -339,6 +446,26 @@ int XwaLaunchOptions_RelaunchArgs(const XwaLaunchOptions* launch, int skip_intro
 		out->args[out->count++] = "--stereo-head";
 		out->args[out->count++] = out->stereo_head;
 	}
+	for (int hand = 0; hand < 2; hand++) {
+		const XwaLaunchStereoHand* stereo_hand = &launch->stereo_hands[hand];
+		if (!stereo_hand->set) {
+			continue;
+		}
+		snprintf(out->stereo_hands[hand], sizeof out->stereo_hands[hand], "%g,%g,%g,%g,%g,%g",
+				 stereo_hand->position_m[0], stereo_hand->position_m[1], stereo_hand->position_m[2],
+				 stereo_hand->angles_deg[0], stereo_hand->angles_deg[1], stereo_hand->angles_deg[2]);
+		out->args[out->count++] = hand == 0 ? "--stereo-hand-left" : "--stereo-hand-right";
+		out->args[out->count++] = out->stereo_hands[hand];
+	}
+	if (launch->stereo_hands[0].buttons || launch->stereo_hands[1].buttons) {
+		char left[64];
+		char right[64];
+		setup_format_hand_buttons(launch->stereo_hands[0].buttons, left, sizeof left);
+		setup_format_hand_buttons(launch->stereo_hands[1].buttons, right, sizeof right);
+		snprintf(out->stereo_hand_buttons, sizeof out->stereo_hand_buttons, "%s,%s", left, right);
+		out->args[out->count++] = "--stereo-hand-buttons";
+		out->args[out->count++] = out->stereo_hand_buttons;
+	}
 	if (launch->vr) {
 		out->args[out->count++] = launch->vr > 0 ? "--vr" : "--no-vr";
 	}
@@ -387,6 +514,15 @@ const char* XwaLaunchOptions_Help(void) {
 		   "                            eyes of a headset side by side (stereo)\n"
 		   "  --stereo-head <y>,<p>,<r> with --flight-views stereo: head yaw, pitch and\n"
 		   "                            roll in degrees (right, up, clockwise)\n"
+		   "  --stereo-hand-left <x>,<y>,<z>,<yaw>,<pitch>,<roll>\n"
+		   "  --stereo-hand-right <x>,<y>,<z>,<yaw>,<pitch>,<roll>\n"
+		   "                            with --flight-views stereo: a VR hand that\n"
+		   "                            stays still. Position in metres from the head\n"
+		   "                            (right, up, forward), then angles in degrees\n"
+		   "  --stereo-hand-buttons <left>,<right>\n"
+		   "                            buttons held down on each hand: none, or names\n"
+		   "                            joined by +. Names: trigger, squeeze, primary,\n"
+		   "                            secondary, thumbstick, trackpad, menu\n"
 		   "  --vr                      start in VR, and stop with a message when VR\n"
 		   "                            can't start\n"
 		   "  --no-vr                   start without VR, whatever the settings say\n"

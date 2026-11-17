@@ -260,7 +260,8 @@ static void XwaControllerSettings_DeviceSelector(XwaControllerSettings* settings
 	int count = 0, selected = -1;
 	for (int i = 0; i < AERON_CONTROLLER_MAX; ++i) {
 		const AeronControllerSnapshot* d = &input->controllers[i];
-		if (!d->connected)
+		/* The VR hands have no bindings yet, so they aren't listed. */
+		if (!d->connected || d->kind == AERON_CONTROLLER_KIND_VR_HAND)
 			continue;
 		bool duplicate_name = false;
 		for (int other = 0; other < AERON_CONTROLLER_MAX; ++other) {

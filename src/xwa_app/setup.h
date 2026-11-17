@@ -10,6 +10,18 @@
 extern "C" {
 #endif
 
+/* A fake VR hand for a test run. */
+typedef struct XwaLaunchStereoHand {
+	/* The option was given. */
+	int set;
+	/* Position in metres from the head: right, up and forward. */
+	float position_m[3];
+	/* Yaw, pitch and roll in degrees, as for --stereo-head. */
+	float angles_deg[3];
+	/* One bit for each AeronVrHandButton. */
+	unsigned buttons;
+} XwaLaunchStereoHand;
+
 typedef struct XwaLaunchOptions {
 	char game_data_path[XWA_INSTALL_PATH_CAPACITY];
 	char resource_root[XWA_INSTALL_PATH_CAPACITY];
@@ -42,6 +54,10 @@ typedef struct XwaLaunchOptions {
 	/* --stereo-head: the head's yaw, pitch and roll for --flight-views stereo,
 	   in degrees. Positive is right, up and clockwise. */
 	float stereo_head[3];
+	/* --stereo-hand-left and --stereo-hand-right: a VR hand that doesn't
+	   move, for --flight-views stereo. Index 0 is the left hand.
+	   --stereo-hand-buttons: the buttons that each hand holds down. */
+	XwaLaunchStereoHand stereo_hands[2];
 	/* --vr: start in VR, and fail when it can't start (1). --no-vr: start
 	   without VR (-1). 0 follows video.vr_mode of the configuration. */
 	int vr;
@@ -59,9 +75,11 @@ typedef struct XwaRelaunchArgs {
 	char mod[XWA_INSTALL_PATH_CAPACITY];
 	char render_size[32];
 	char stereo_head[64];
+	char stereo_hands[2][128];
+	char stereo_hand_buttons[128];
 	/* The game's arguments of XwaLaunchOptions, and " skipintro". */
 	char game_command_line[1024 + sizeof " skipintro"];
-	const char* args[17];
+	const char* args[23];
 	int count;
 } XwaRelaunchArgs;
 

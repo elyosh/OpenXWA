@@ -587,6 +587,14 @@ int main(int argc, char** argv) {
 		.render_width = launch.render_width,
 		.render_height = launch.render_height,
 	};
+	for (int hand = 0; hand < 2; hand++) {
+		const XwaLaunchStereoHand* from = &launch.stereo_hands[hand];
+		XwaRemasterStereoHand* to = &remaster_options.stereo_hands[hand];
+		to->set = from->set;
+		to->buttons = from->buttons;
+		memcpy(to->position_m, from->position_m, sizeof to->position_m);
+		memcpy(to->angles_deg, from->angles_deg, sizeof to->angles_deg);
+	}
 	if (!XwaRemaster_Init(&remaster_options)) {
 		Aeron_FatalError("OpenXWA", "Required remaster resources could not be loaded.");
 		XwaRemaster_Shutdown();
