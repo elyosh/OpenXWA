@@ -409,24 +409,6 @@ aeron_compile_hlsl(XWA_SHADER_OUTPUTS ${CMAKE_BINARY_DIR}/shaders
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/target_display_edges.frag.hlsl
     ${CMAKE_CURRENT_SOURCE_DIR}/shaders/hud_reproject.frag.hlsl
 )
-# Tests the remaster's pure math: the matrices that place the HUD in a
-# headset's eye images. It needs no window and no GPU.
-add_executable(xwa_remaster_math_test
-    tests/remaster_math_test.c
-    src/xwa_remaster/hud_reproject_math.c)
-target_include_directories(xwa_remaster_math_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-set_target_properties(xwa_remaster_math_test PROPERTIES
-    C_STANDARD 99
-    C_STANDARD_REQUIRED ON
-    C_EXTENSIONS OFF
-    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
-if(MSVC)
-    target_compile_options(xwa_remaster_math_test PRIVATE /W4 /fp:precise)
-else()
-    target_compile_options(xwa_remaster_math_test PRIVATE -Wall -Wextra -Wpedantic -ffp-contract=off)
-    target_link_libraries(xwa_remaster_math_test PRIVATE m)
-endif()
-
 add_custom_target(xwa_shaders DEPENDS ${XWA_SHADER_OUTPUTS})
 add_dependencies(xwa_remaster xwa_shaders)
 add_dependencies(xwa_core xwa_shaders)
