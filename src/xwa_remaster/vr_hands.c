@@ -4,6 +4,7 @@
 #include "aeron/asset/flight_model.h"
 #include "aeron/asset/opt_model.h"
 #include "aeron/scene/view_rig.h"
+#include "xwa_runtime/input/vr_stick.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -86,7 +87,11 @@ static int vr_hand_shown(const VrHandState* state) {
 		   Aeron_NowUs() - state->moved_us < VR_HAND_STILL_US;
 }
 
+/* A hand that holds the virtual stick or throttle is closed. */
 static XwaVrHandPose vr_hand_pose(const VrHandState* state) {
+	if (XwaVrStick_Held((int)(state - s.hands))) {
+		return XWA_VR_HAND_POSE_GRASP;
+	}
 	return state->hand.trigger >= VR_HAND_POINT_TRIGGER ? XWA_VR_HAND_POSE_POINT : XWA_VR_HAND_POSE_NEUTRAL;
 }
 

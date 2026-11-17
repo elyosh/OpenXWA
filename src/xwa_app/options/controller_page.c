@@ -4,6 +4,7 @@
 #include "options/options_window.h"
 #include "xwa_runtime/input/controller_mapping.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -508,6 +509,27 @@ static void XwaControllerSettings_Vr(AeronUiContext* ui) {
 	AeronUi_Help(ui, "Shows your hands in the cockpit, where your VR controllers are.");
 	changed |= AeronUi_Toggle(ui, "Use the Mod's Hands", &options.vr_mod_hands) != 0;
 	AeronUi_Help(ui, "When off, the game's own hands are shown even if the mod has some.");
+	static const char* const stick_modes[] = { "Off", "Tilt", "Slide" };
+	static const char* const hand_names[] = { "Left", "Right" };
+	int stick = (int)options.vr_stick;
+	if (AeronUi_Selector(ui, "Virtual Stick", &stick, stick_modes, XWA_MODERN_VR_STICK_MODE_COUNT)) {
+		options.vr_stick = (XwaModernVrStickMode)stick;
+		changed = true;
+	}
+	if (options.vr_stick == XWA_MODERN_VR_STICK_TILT)
+		AeronUi_Help(ui, "Hold the squeeze and tilt your hand to steer. Twist it to roll.");
+	else if (options.vr_stick == XWA_MODERN_VR_STICK_SLIDE)
+		AeronUi_Help(ui, "Hold the squeeze and move your hand to steer. Twist it to roll.");
+	changed |= AeronUi_Selector(ui, "Stick Hand", &options.vr_stick_hand, hand_names, 2) != 0;
+	changed |= AeronUi_Toggle(ui, "Virtual Throttle", &options.vr_throttle) != 0;
+	AeronUi_Help(ui, "Hold the squeeze of the other hand and move it forward or back.");
+	int range_percent = (int)lroundf(options.vr_stick_range * 100.0f);
+	if (AeronUi_SliderInt(ui, "Stick Range", &range_percent, (int)(XWA_MODERN_VR_STICK_RANGE_MIN * 100.0f),
+						  (int)(XWA_MODERN_VR_STICK_RANGE_MAX * 100.0f), 10, "%d%%")) {
+		options.vr_stick_range = (float)range_percent / 100.0f;
+		changed = true;
+	}
+	AeronUi_Help(ui, "How far your hand moves for the stick's full travel.");
 	if (changed && !XwaModernInputOptions_Set(&options))
 		XwaOptionsWindow_ReportError("The VR options are invalid.");
 }

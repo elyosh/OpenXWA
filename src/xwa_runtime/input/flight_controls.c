@@ -13,6 +13,7 @@
 #include "xwa_runtime/input/input_bridge.h"
 #include "xwa_runtime/input/keyboard_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
+#include "xwa_runtime/input/vr_stick.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include "xwa_runtime/runtime/movie_task.h"
@@ -74,12 +75,21 @@ void XwaFlightControls_SampleThrottle(FlightInputFrameRecord* record) {
 	record->keyMods &= (uint8_t)~XWA_INPUT_THROTTLE_PRESENT;
 	record->throttle = 0;
 	bool pause = record->key == KEY_ALT_P && g_flightPlayerCount == 1;
-	if (pause || !XwaFlightControls_LocalThrottleEligible() ||
-		!XwaControllerMapping_ThrottleSample(&position, &generation)) {
+	if (pause || !XwaFlightControls_LocalThrottleEligible()) {
 		XwaFlightControls_ResetThrottle();
 		return;
 	}
 	int object = g_players[g_localPlayer].objectIndex;
+	/* A hand that holds the virtual throttle replaces the lever. Its
+	 * generation changes at each grab and differs from the mapping's, so the
+	 * first sample of a grab, and the first one after it, only set the
+	 * baseline. */
+	if (!XwaVrStick_ThrottleSample(g_objectTable[object].mobj->pCraft->throttleSpeed, &position,
+								   &generation) &&
+		!XwaControllerMapping_ThrottleSample(&position, &generation)) {
+		XwaFlightControls_ResetThrottle();
+		return;
+	}
 	uint32_t signature = g_players[g_localPlayer].boundObjectSignature;
 	if (!g_throttleBaseline.valid || g_throttleBaseline.generation != generation ||
 		g_throttleBaseline.object != object || g_throttleBaseline.signature != signature) {
@@ -141,6 +151,22 @@ int XwaFlightControls_Sample(int* axisX, int* axisY, int* axisR, int* keyMods) {
 			*axisR = mouseAxisR;
 		}
 		*keyMods |= XwaMouseFlight_ButtonsMask();
+	}
+	/* So does the virtual stick of a VR hand. */
+	int handAxisX;
+	int handAxisY;
+	int handAxisR;
+	if (XwaVrStick_Sample(&handAxisX, &handAxisY, &handAxisR)) {
+		if (handAxisX != 0) {
+			*axisX = handAxisX;
+		}
+		if (handAxisY != 0) {
+			*axisY = handAxisY;
+		}
+		if (handAxisR != 0) {
+			*axisR = handAxisR;
+		}
+		*keyMods |= XwaVrStick_ButtonsMask();
 	}
 	return 1;
 }

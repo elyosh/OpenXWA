@@ -784,9 +784,33 @@ static int host_config_input_int(const AeronConfigFile* config, const char* key,
 	return 1;
 }
 
+static const char* const k_vr_stick_names[XWA_MODERN_VR_STICK_MODE_COUNT] = { "off", "tilt", "slide" };
+static const char* const k_vr_hand_names[] = { "left", "right" };
+
+/* Reads an input setting that is one of `count` names. */
+static int host_config_input_name(const AeronConfigFile* config, const char* key, int required,
+								  const char* const* names, int count, int* out, char* error,
+								  size_t error_size) {
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, key);
+	const char* value;
+
+	if (!node) {
+		return host_config_input_missing(required, key, error, error_size);
+	}
+	value = AeronConfigNode_String(node, NULL);
+	for (int i = 0; value && i < count; i++) {
+		if (strcmp(value, names[i]) == 0) {
+			*out = i;
+			return 1;
+		}
+	}
+	return host_config_error(error, error_size, "invalid input setting '%s'", key);
+}
+
 static int host_config_input_scalars(const AeronConfigFile* config, int required, XwaModernInputOptions* out,
 									 char* error, size_t error_size) {
 	const AeronConfigNode* node;
+	int stick = out->vr_stick;
 
 	if (!host_config_input_bool(config, "input.mouse_flight", required, &out->mouse_flight_enabled, error,
 								error_size) ||
@@ -804,6 +828,30 @@ static int host_config_input_scalars(const AeronConfigFile* config, int required
 		!host_config_input_int(config, "input.rumble_strength", required, XWA_MODERN_RUMBLE_STRENGTH_MIN,
 							   XWA_MODERN_RUMBLE_STRENGTH_MAX, &out->rumble_strength, error, error_size)) {
 		return 0;
+	}
+
+	if (!host_config_input_bool(config, "input.vr_throttle", required, &out->vr_throttle, error,
+								error_size) ||
+		!host_config_input_name(config, "input.vr_stick", required, k_vr_stick_names,
+								XWA_MODERN_VR_STICK_MODE_COUNT, &stick, error, error_size) ||
+		!host_config_input_name(config, "input.vr_stick_hand", required, k_vr_hand_names, 2,
+								&out->vr_stick_hand, error, error_size)) {
+		return 0;
+	}
+	out->vr_stick = (XwaModernVrStickMode)stick;
+	node = AeronConfigFile_GetNode(config, "input.vr_stick_range");
+	if (!node) {
+		if (!host_config_input_missing(required, "input.vr_stick_range", error, error_size)) {
+			return 0;
+		}
+	} else {
+		const double range = AeronConfigNode_Float(node, NAN);
+		if (!isfinite(range) || range < XWA_MODERN_VR_STICK_RANGE_MIN ||
+			range > XWA_MODERN_VR_STICK_RANGE_MAX) {
+			return host_config_error(error, error_size, "invalid 'input.vr_stick_range': expected %s",
+									 "a number from 0.5 to 2");
+		}
+		out->vr_stick_range = (float)range;
 	}
 
 	node = AeronConfigFile_GetNode(config, "input.mouse_mode");
@@ -1155,6 +1203,22 @@ static int host_config_set_input_options(AeronConfigFile* document, const XwaMod
 				 ? host_config_remove_key(document, "input.mouse_mode", error)
 				 : AeronConfigFile_SetString(document, "input.mouse_mode", mode_names[options->mouse_mode],
 											 error);
+	}
+	if (ok) {
+		ok = host_config_set_input_bool(document, "input.vr_throttle", options->vr_throttle,
+										defaults->vr_throttle, error) &&
+			 (options->vr_stick == defaults->vr_stick
+				  ? host_config_remove_key(document, "input.vr_stick", error)
+				  : AeronConfigFile_SetString(document, "input.vr_stick", k_vr_stick_names[options->vr_stick],
+											  error)) &&
+			 (options->vr_stick_hand == defaults->vr_stick_hand
+				  ? host_config_remove_key(document, "input.vr_stick_hand", error)
+				  : AeronConfigFile_SetString(document, "input.vr_stick_hand",
+											  k_vr_hand_names[options->vr_stick_hand], error)) &&
+			 (options->vr_stick_range == defaults->vr_stick_range
+				  ? host_config_remove_key(document, "input.vr_stick_range", error)
+				  : AeronConfigFile_SetFloat(document, "input.vr_stick_range", options->vr_stick_range,
+											 error));
 	}
 	/* input.controllers replaces the shipped list as a whole. */
 	if (ok) {

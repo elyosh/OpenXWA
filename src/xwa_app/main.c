@@ -23,6 +23,7 @@
 #include "xwa_runtime/input/controller_mapping.h"
 #include "xwa_runtime/input/keyboard_mapping.h"
 #include "xwa_runtime/input/mouse_flight.h"
+#include "xwa_runtime/input/vr_stick.h"
 #include "xwa_runtime/models/model_source.h"
 #include "xwa_runtime/runtime/film_benchmark.h"
 #include "xwa_runtime/runtime/film_state.h"
@@ -164,6 +165,7 @@ static void apply_modern_input_options(const XwaModernInputOptions* options) {
 		return;
 	}
 	XwaMouseFlight_SetOptions(options);
+	XwaVrStick_SetOptions(options);
 	/* Installed at the next host frame. */
 	XwaControllerMapping_SetOptions(&options->controllers);
 	if (!keyboard_installed || !XwaKeyboardMapping_Equal(&installed_keyboard, &options->keyboard)) {
@@ -215,17 +217,22 @@ static XwaRemasterStereoHand stereo_hand_option(const XwaLaunchStereoHand* from)
 	return to;
 }
 
-/* While a hand points at the virtual screen, its trigger and squeeze click
- * there and its thumbstick scrolls, so the bindings don't get them. */
-static void mask_pointer_hand(void) {
+/* Keeps the bindings away from the inputs of a hand that something else
+ * uses. While a hand points at the virtual screen, its trigger and squeeze
+ * click there and its thumbstick scrolls. The virtual stick and throttle use
+ * the squeeze, and the trigger of the hand that holds the stick. */
+static void mask_hand_sources(void) {
 	const int pointer = Aeron_XrPointerHand();
 	for (int hand = 0; hand < 2; hand++) {
-		const int masked = hand == pointer;
-		XwaControllerMapping_SetSourceMask(
-			hand, masked ? (1u << AERON_VR_HAND_BUTTON_TRIGGER) | (1u << AERON_VR_HAND_BUTTON_SQUEEZE) : 0,
-			masked ? (1u << AERON_VR_HAND_AXIS_TRIGGER) | (1u << AERON_VR_HAND_AXIS_SQUEEZE) |
-						 (1u << AERON_VR_HAND_AXIS_THUMBSTICK_Y)
-				   : 0);
+		uint32_t buttons = 0;
+		uint32_t axes = 0;
+		if (hand == pointer) {
+			buttons = (1u << AERON_VR_HAND_BUTTON_TRIGGER) | (1u << AERON_VR_HAND_BUTTON_SQUEEZE);
+			axes = (1u << AERON_VR_HAND_AXIS_TRIGGER) | (1u << AERON_VR_HAND_AXIS_SQUEEZE) |
+				   (1u << AERON_VR_HAND_AXIS_THUMBSTICK_Y);
+		}
+		XwaVrStick_SourceMask(hand, &buttons, &axes);
+		XwaControllerMapping_SetSourceMask(hand, buttons, axes);
 	}
 }
 
@@ -763,7 +770,8 @@ int main(int argc, char** argv) {
 				}
 			}
 			discover_controllers(in);
-			mask_pointer_hand();
+			XwaVrStick_Update(in);
+			mask_hand_sources();
 			int window_opened = XwaOptionsWindow_BeginFrame(in);
 			XwaPort_SetShortcutsCaptured(XwaOptionsWindow_CapturesKeyboard());
 			/* Host shortcuts (keyboard_mapping.h). Their keys can't be bound.

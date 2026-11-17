@@ -13,6 +13,19 @@ input:
   # Use the mod's hand models when it has some. When false, the game's own
   # are always shown.
   vr_mod_hands: true
+  # The virtual stick of the VR controllers: hold the squeeze of the stick
+  # hand and move the hand to steer. 'tilt' reads the hand's rotation, as on a
+  # stick. 'slide' reads the hand's movement to the sides and forward, and the
+  # twist for the roll. 'off' leaves the squeeze free for a binding.
+  vr_stick: 'tilt'
+  # The hand that holds the virtual stick: 'left' or 'right'.
+  vr_stick_hand: 'right'
+  # While the virtual stick is on, hold the squeeze of the other hand and move
+  # the hand forward and back to move the throttle.
+  vr_throttle: true
+  # Multiplies how far the hand moves for the stick's full travel, from 0.5
+  # to 2. At 1, that is 30 degrees of tilt, 40 degrees of twist and 12 cm.
+  vr_stick_range: 1.0
   # Saved controller models, one complete profile each. New gamepads get
   # gamepad_defaults, and new VR controllers get vr_left_defaults or
   # vr_right_defaults. Joysticks start with nothing bound.

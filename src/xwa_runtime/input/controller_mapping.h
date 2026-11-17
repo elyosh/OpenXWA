@@ -52,9 +52,9 @@ int XwaControllerMapping_ConsumePresenceChange(void);
  * cleared stays off until it is released. */
 void XwaControllerMapping_SetSourceMask(int hand, uint32_t buttons, uint32_t axes);
 
-/* Rumble goes to one device that can rumble: a connected device of the first
- * model that binds pitch, else of the first that binds yaw, else of the first
- * gamepad or VR hand model, the one with the lowest instance id. */
+/* Rumble goes to one device that can rumble: the VR hand that last held the
+ * virtual stick, else a connected device of the first model that binds pitch, else of the first that binds
+ * yaw, else of the first gamepad or VR hand model, the one with the lowest instance id. */
 uint32_t XwaControllerMapping_RumbleInstance(void);
 /* Returns 1 once after the rumble device changes. */
 int XwaControllerMapping_ConsumeRumbleChange(void);

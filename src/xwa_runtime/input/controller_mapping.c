@@ -5,6 +5,7 @@
 #include "xwa/flight/player/player.h"
 #include "xwa/frontend/flight_loading.h"
 #include "xwa_runtime/input/capture.h"
+#include "xwa_runtime/input/vr_stick.h"
 #include "xwa_runtime/runtime/flight_pause_task.h"
 #include "xwa_runtime/runtime/flight_task.h"
 #include <math.h>
@@ -365,11 +366,23 @@ static uint32_t XwaControllerMapping_ModelRumbleInstance(size_t model, const Aer
 	return best;
 }
 
-/* The device that rumbles: one of the first model that binds pitch, then yaw,
- * then of the first gamepad or VR hand model. */
+/* The device that rumbles: the hand that last held the virtual stick, then
+ * one of the first model that binds pitch, then yaw, then of the first
+ * gamepad or VR hand model. */
 static uint32_t XwaControllerMapping_FindRumbleInstance(const AeronInputSnapshot* input) {
 	static const XwaInputAxis owners[] = { XWA_INPUT_AXIS_PITCH, XWA_INPUT_AXIS_YAW };
 	uint32_t instance;
+	/* The virtual stick isn't a binding, so no model binds pitch for it. */
+	const int stick_hand = XwaVrStick_RumbleHand();
+	if (stick_hand >= 0) {
+		instance = stick_hand ? AERON_VR_HAND_INSTANCE_RIGHT : AERON_VR_HAND_INSTANCE_LEFT;
+		for (int j = 0; j < AERON_CONTROLLER_MAX; ++j) {
+			const AeronControllerSnapshot* d = &input->controllers[j];
+			if (d->connected && d->has_rumble && d->kind == AERON_CONTROLLER_KIND_VR_HAND &&
+				d->instance_id == instance)
+				return instance;
+		}
+	}
 	for (size_t i = 0; i < sizeof owners / sizeof owners[0]; ++i)
 		for (size_t model = 0; model < g_controller.options.count; ++model)
 			if (g_controller.options.models[model].profile.mapping.axes[owners[i]].source >= 0 &&

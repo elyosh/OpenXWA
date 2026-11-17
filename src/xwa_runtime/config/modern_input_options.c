@@ -56,6 +56,11 @@ int XwaModernInputOptions_Validate(const XwaModernInputOptions* options, char* e
 		options->rumble_strength > XWA_MODERN_RUMBLE_STRENGTH_MAX) {
 		return XwaModernInputOptions_Error(error, error_size, "mouse or rumble setting is invalid");
 	}
+	if (options->vr_stick < XWA_MODERN_VR_STICK_OFF || options->vr_stick >= XWA_MODERN_VR_STICK_MODE_COUNT ||
+		!(options->vr_stick_range >= XWA_MODERN_VR_STICK_RANGE_MIN) ||
+		options->vr_stick_range > XWA_MODERN_VR_STICK_RANGE_MAX) {
+		return XwaModernInputOptions_Error(error, error_size, "virtual stick setting is invalid");
+	}
 	return XwaControllerOptions_Validate(&options->controllers, error, error_size) &&
 		   XwaModernInputOptions_ValidateKeyboard(&options->keyboard, error, error_size);
 }
@@ -66,6 +71,8 @@ static void XwaModernInputOptions_Normalize(XwaModernInputOptions* options) {
 	options->rumble_enabled = options->rumble_enabled != 0;
 	options->vr_show_hands = options->vr_show_hands != 0;
 	options->vr_mod_hands = options->vr_mod_hands != 0;
+	options->vr_stick_hand = options->vr_stick_hand != 0;
+	options->vr_throttle = options->vr_throttle != 0;
 	XwaKeyboardMapping_Sort(&options->keyboard);
 }
 
@@ -74,6 +81,8 @@ int XwaModernInputOptions_Equal(const XwaModernInputOptions* a, const XwaModernI
 		   a->mouse_sensitivity == b->mouse_sensitivity && a->mouse_invert_y == b->mouse_invert_y &&
 		   a->rumble_enabled == b->rumble_enabled && a->rumble_strength == b->rumble_strength &&
 		   a->vr_show_hands == b->vr_show_hands && a->vr_mod_hands == b->vr_mod_hands &&
+		   a->vr_stick == b->vr_stick && a->vr_stick_hand == b->vr_stick_hand &&
+		   a->vr_throttle == b->vr_throttle && a->vr_stick_range == b->vr_stick_range &&
 		   XwaControllerOptions_Equals(&a->controllers, &b->controllers) &&
 		   XwaKeyboardMapping_Equal(&a->keyboard, &b->keyboard);
 }

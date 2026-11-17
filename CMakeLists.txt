@@ -242,6 +242,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/input/rumble_provider.c
     src/xwa_runtime/input/winmm_joystick_provider.c
     src/xwa_runtime/input/mouse_flight.c
+    src/xwa_runtime/input/vr_stick.c
     src/xwa_runtime/models/cockpit_eye.c
     src/xwa_runtime/models/cockpit_view.c
     src/xwa_runtime/models/craft_definitions.c

@@ -18,6 +18,9 @@ enum {
 	XWA_MODERN_RUMBLE_STRENGTH_MAX = 8,
 };
 
+#define XWA_MODERN_VR_STICK_RANGE_MIN 0.5f
+#define XWA_MODERN_VR_STICK_RANGE_MAX 2.0f
+
 /* Position: mouse displacement sets a held virtual-stick deflection.
  * Rate: per-frame mouse velocity is the deflection (the TIE Fighter
  * scheme). */
@@ -25,6 +28,16 @@ typedef enum XwaModernMouseMode {
 	XWA_MODERN_MOUSE_MODE_POSITION = 0,
 	XWA_MODERN_MOUSE_MODE_RATE,
 } XwaModernMouseMode;
+
+/* The virtual stick of the VR controllers: while the squeeze is held, the
+ * hand's movement steers the craft. Tilt reads the hand's rotation, and
+ * Slide its movement to the sides and forward. */
+typedef enum XwaModernVrStickMode {
+	XWA_MODERN_VR_STICK_OFF = 0,
+	XWA_MODERN_VR_STICK_TILT,
+	XWA_MODERN_VR_STICK_SLIDE,
+	XWA_MODERN_VR_STICK_MODE_COUNT,
+} XwaModernVrStickMode;
 
 /* The input section of config.yaml: mouse flight, rumble, the saved
  * controller models and the keyboard bindings. */
@@ -42,6 +55,15 @@ typedef struct XwaModernInputOptions {
 	int vr_show_hands;
 	/* Use the mod's gloves when it has some, and not the game's own. */
 	int vr_mod_hands;
+	XwaModernVrStickMode vr_stick;
+	/* The hand that holds the virtual stick: 0 is the left one, 1 the right
+	 * one. */
+	int vr_stick_hand;
+	/* The other hand's squeeze holds a virtual throttle, while the virtual
+	 * stick is on. */
+	int vr_throttle;
+	/* Multiplies the hand travel that gives the stick's full deflection. */
+	float vr_stick_range;
 	XwaControllerOptions controllers;
 	/* Sorted with XwaKeyboardMapping_Sort. */
 	XwaKeyboardBindings keyboard;
