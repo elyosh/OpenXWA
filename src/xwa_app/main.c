@@ -204,6 +204,28 @@ static void discover_controllers(const AeronInputSnapshot* in) {
 	snprintf(previous_error, sizeof previous_error, "%s", ok ? "" : error);
 }
 
+/* The fake VR hand of a launch option, as the remaster takes it. */
+static XwaRemasterStereoHand stereo_hand_option(const XwaLaunchStereoHand* from) {
+	XwaRemasterStereoHand to = { .set = from->set, .buttons = from->buttons };
+	memcpy(to.position_m, from->position_m, sizeof to.position_m);
+	memcpy(to.angles_deg, from->angles_deg, sizeof to.angles_deg);
+	return to;
+}
+
+/* While a hand points at the virtual screen, its trigger and squeeze click
+ * there and its thumbstick scrolls, so the bindings don't get them. */
+static void mask_pointer_hand(void) {
+	const int pointer = Aeron_XrPointerHand();
+	for (int hand = 0; hand < 2; hand++) {
+		const int masked = hand == pointer;
+		XwaControllerMapping_SetSourceMask(
+			hand, masked ? (1u << AERON_VR_HAND_BUTTON_TRIGGER) | (1u << AERON_VR_HAND_BUTTON_SQUEEZE) : 0,
+			masked ? (1u << AERON_VR_HAND_AXIS_TRIGGER) | (1u << AERON_VR_HAND_AXIS_SQUEEZE) |
+						 (1u << AERON_VR_HAND_AXIS_THUMBSTICK_Y)
+				   : 0);
+	}
+}
+
 static int persist_modern_input_options(const XwaModernInputOptions* options, char* error,
 										size_t error_size) {
 	return XwaHostConfig_SaveInputOptions(Aeron_GetVfs(), options, error, error_size);
@@ -584,17 +606,11 @@ int main(int argc, char** argv) {
 		.video_options_override_mask = host_config.video_options_override_mask,
 		.flight_views = launch.flight_views,
 		.stereo_head = { launch.stereo_head[0], launch.stereo_head[1], launch.stereo_head[2] },
+		.stereo_hands = { stereo_hand_option(&launch.stereo_hands[0]),
+						  stereo_hand_option(&launch.stereo_hands[1]) },
 		.render_width = launch.render_width,
 		.render_height = launch.render_height,
 	};
-	for (int hand = 0; hand < 2; hand++) {
-		const XwaLaunchStereoHand* from = &launch.stereo_hands[hand];
-		XwaRemasterStereoHand* to = &remaster_options.stereo_hands[hand];
-		to->set = from->set;
-		to->buttons = from->buttons;
-		memcpy(to->position_m, from->position_m, sizeof to->position_m);
-		memcpy(to->angles_deg, from->angles_deg, sizeof to->angles_deg);
-	}
 	if (!XwaRemaster_Init(&remaster_options)) {
 		Aeron_FatalError("OpenXWA", "Required remaster resources could not be loaded.");
 		XwaRemaster_Shutdown();
@@ -744,6 +760,7 @@ int main(int argc, char** argv) {
 				}
 			}
 			discover_controllers(in);
+			mask_pointer_hand();
 			int window_opened = XwaOptionsWindow_BeginFrame(in);
 			XwaPort_SetShortcutsCaptured(XwaOptionsWindow_CapturesKeyboard());
 			/* Host shortcuts (keyboard_mapping.h). Their keys can't be bound.
