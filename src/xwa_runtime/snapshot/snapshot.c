@@ -1490,7 +1490,8 @@ static int snapshot_reserve_slot_index(XwaSnapshot* s, uint32_t count) {
 static int snapshot_mesh_count(const ObjectRecord* o) {
 	int count = ModelMesh_GetObjectTypeMeshCount(o->objectType);
 	const int playerObjIdx = g_players[g_localPlayer].objectIndex;
-	if (g_objectTable != NULL && playerObjIdx >= 0 && o == &g_objectTable[playerObjIdx]) {
+	if (g_objectTable != NULL && playerObjIdx >= 0 && (uint32_t)playerObjIdx < g_objectTableSlotCount &&
+		o == &g_objectTable[playerObjIdx]) {
 		if (g_cockpitModel != 0 && g_cockpitModelMeshCache.meshCount > count) {
 			count = g_cockpitModelMeshCache.meshCount;
 		}
@@ -2034,8 +2035,12 @@ void XwaSnapshot_CaptureFlight(void) {
 		memset(k, 0, sizeof *k);
 		const int playerObjIdx = g_players[g_localPlayer].objectIndex;
 		if (g_objectTable != NULL && playerObjIdx >= 0) {
-			const ObjectRecord* pobj = &g_objectTable[playerObjIdx];
-			const ModelDefIndex modelIndex = GetModelDefIndexFromType((uint16_t)pobj->objectType);
+			/* The map takes the player out of the craft, so the object index
+			 * is 0xffff while it is open, which is past the object table. */
+			const ObjectRecord* pobj =
+				(uint32_t)playerObjIdx < g_objectTableSlotCount ? &g_objectTable[playerObjIdx] : NULL;
+			const ModelDefIndex modelIndex =
+				pobj != NULL ? GetModelDefIndexFromType((uint16_t)pobj->objectType) : (ModelDefIndex)0xffffu;
 			uint16_t handle = 0;
 			k->seat = (uint8_t)g_players[g_localPlayer].currentSeatIdx;
 			if (k->seat == 0) {
