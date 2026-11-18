@@ -29,10 +29,13 @@ int XwaControllerMapping_RollHeld(XwaInputRoll side);
 int XwaControllerMapping_TakeResume(void);
 /* Reads the buttons that are bound to host actions (actions.h). Call it
  * once for each host frame, in flight and outside it: the other bindings
- * are only read in flight. */
-void XwaControllerMapping_UpdateHostActions(const AeronInputSnapshot* input);
+ * are only read in flight. Outside flight (`in_flight` is 0) it also reads
+ * the buttons bound to options_menu, so that a player with only a
+ * controller can open the options and quit from the menus. */
+void XwaControllerMapping_UpdateHostActions(const AeronInputSnapshot* input, int in_flight);
 /* Returns 1 once for each press of a binding of the host action `action`
- * that XwaControllerMapping_UpdateHostActions saw. */
+ * that XwaControllerMapping_UpdateHostActions saw. Outside flight it does
+ * the same for XWA_INPUT_ACTION_OPTIONS_MENU. */
 int XwaControllerMapping_TakeHostAction(XwaInputAction action);
 void XwaControllerMapping_ReleaseCommands(void);
 

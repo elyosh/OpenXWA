@@ -7,7 +7,8 @@
  * virtual screen, the hand that points at the screen moves the mouse there.
  * The beam shows where it points: a thin line from the controller to the
  * pointer, drawn into eye images that hold nothing else and that the headset
- * shows over the screen. */
+ * shows over the screen. A hand that points beside the screen has a beam
+ * too, so that the player can bring it to the screen. */
 
 #include "aeron/render.h"
 #include "aeron/scene/view_rig.h"
@@ -17,7 +18,7 @@ extern "C" {
 #endif
 
 /* Whether a beam is to be drawn in this frame: a hand points at the virtual
- * screen, or at the virtual keyboard. */
+ * screen or at the virtual keyboard, or a hand moved in the last seconds. */
 int XwaRemasterMenuBeam_Wanted(void);
 
 /* Clears the eye images `targets` and draws the beam into them. `rig` has

@@ -45,6 +45,10 @@ int XwaRemasterVrHands_Instance(int hand, const float seat_rows[9], const float 
 void XwaRemasterVrHands_PoseTransform(const AeronViewPose* pose, const float seat_rows[9],
 									  const float seat_pos[3], float out[16]);
 
+/* Whether the hand is tracked and moved in the last seconds. A controller
+ * that lies on a desk hasn't. */
+int XwaRemasterVrHands_Moved(int hand);
+
 /* The ray that a hand points with, in the scene: it starts at the fingertip
  * of the hand's model and follows the controller's aim. `direction` has a
  * length of 1. `units_per_m` gets the scene units for one metre of the

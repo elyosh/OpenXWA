@@ -825,7 +825,20 @@ int main(int argc, char** argv) {
 			 * flight and in the menus. A key press also skips the game tick, so
 			 * the game doesn't read the key. Recentring makes the headset's
 			 * current direction straight ahead; Ctrl+Alt+R by default. */
-			XwaControllerMapping_UpdateHostActions(in);
+			XwaControllerMapping_UpdateHostActions(in, XwaPort_InFlight());
+			/* Outside flight, a button bound to options_menu is the Escape
+			 * key: it does what Escape does in each screen. In flight the
+			 * flight bindings handle it. The release follows a frame later. */
+			{
+				static int escape_down;
+				if (escape_down) {
+					Aeron_InjectKey(AERON_KEY_ESCAPE, 0, 0, 0, NULL);
+					escape_down = 0;
+				} else if (XwaControllerMapping_TakeHostAction(XWA_INPUT_ACTION_OPTIONS_MENU)) {
+					Aeron_InjectKey(AERON_KEY_ESCAPE, 1, 0, 0, NULL);
+					escape_down = 1;
+				}
+			}
 			const int recenter = host_action_pressed(in, XWA_INPUT_ACTION_RECENTER_HEADSET);
 			if (recenter && Aeron_XrEnabled()) {
 				Aeron_XrRecenter();

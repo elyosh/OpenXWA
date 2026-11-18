@@ -88,6 +88,14 @@ static int vr_hand_shown(const VrHandState* state) {
 		   Aeron_NowUs() - state->moved_us < VR_HAND_STILL_US;
 }
 
+int XwaRemasterVrHands_Moved(int hand) {
+	if (hand < 0 || hand > 1) {
+		return 0;
+	}
+	const VrHandState* state = &s.hands[hand];
+	return state->hand.active && state->moved_valid && Aeron_NowUs() - state->moved_us < VR_HAND_STILL_US;
+}
+
 /* A hand that holds the virtual stick or throttle is closed. */
 static XwaVrHandPose vr_hand_pose(const VrHandState* state) {
 	const int hand = (int)(state - s.hands);
@@ -246,6 +254,31 @@ static void vr_hand_rotation(const float degrees[3], float out[9]) {
  * negated. The model is first placed on the hand (rotation, then offset),
  * and the scene's loader has turned the model's (x, y, z) into
  * (-x, -z, y). The glove is scaled with the player. */
+/* Where a hand's model is placed: at the grip, and turned so that its
+ * index finger follows the controller's aim.
+ *
+ * The models are built on the grip pose as OpenXR defines it, with the
+ * fingers of an open hand along its -Y, at a right angle to the handle. A
+ * real controller doesn't point at a right angle to its handle: the aim is
+ * about 45 degrees from the handle's axis on a PSVR2 controller. A model
+ * placed with the grip's own rotation then points below the ray that the
+ * hand points with. So the rotation comes from the aim pose, turned a
+ * quarter turn around X: the model's -Y is the aim's -Z. */
+static AeronViewPose vr_hand_placement(const AeronXrHand* hand) {
+	static const float quarter[4] = { 0.70710678f, 0.0f, 0.0f, 0.70710678f };
+	const float* a = hand->aim.orientation;
+	AeronViewPose pose = hand->grip;
+	const float length2 = a[0] * a[0] + a[1] * a[1] + a[2] * a[2] + a[3] * a[3];
+	/* A hand without an aim pose keeps the grip's rotation. */
+	if (length2 > 0.5f) {
+		pose.orientation[0] = a[3] * quarter[0] + a[0] * quarter[3];
+		pose.orientation[1] = a[1] * quarter[3] + a[2] * quarter[0];
+		pose.orientation[2] = a[2] * quarter[3] - a[1] * quarter[0];
+		pose.orientation[3] = a[3] * quarter[3] - a[0] * quarter[0];
+	}
+	return pose;
+}
+
 static void vr_hand_transform(const XwaVrHandConfig* config, const AeronXrHand* pose,
 							  const float seat_rows[9], const float seat_pos[3], float out[16]) {
 	AeronViewPose grip = pose->grip;
@@ -299,7 +332,9 @@ int XwaRemasterVrHands_Ray(int hand, const float seat_rows[9], const float seat_
 	/* The fingertip is a point of the model, so it goes through the model's
 	 * transform. The mesh holds (-x, -z, y) of the model's (x, y, z). */
 	float transform[16];
-	vr_hand_transform(state->config, &state->hand, seat_rows, seat_pos, transform);
+	AeronXrHand placed = state->hand;
+	placed.grip = vr_hand_placement(&state->hand);
+	vr_hand_transform(state->config, &placed, seat_rows, seat_pos, transform);
 	const float tip[3] = { -state->config->tip_m[0], -state->config->tip_m[2], state->config->tip_m[1] };
 	for (int row = 0; row < 3; row++) {
 		origin[row] = transform[row * 4 + 0] * tip[0] + transform[row * 4 + 1] * tip[1] +
@@ -333,7 +368,9 @@ int XwaRemasterVrHands_Instance(int hand, const float seat_rows[9], const float 
 	if (!mesh || !state->config) {
 		return 0;
 	}
-	vr_hand_transform(state->config, &state->hand, seat_rows, seat_pos, state->transform);
+	AeronXrHand placed = state->hand;
+	placed.grip = vr_hand_placement(&state->hand);
+	vr_hand_transform(state->config, &placed, seat_rows, seat_pos, state->transform);
 	state->transform_valid = 1;
 	memset(out, 0, sizeof *out);
 	out->mesh = mesh;

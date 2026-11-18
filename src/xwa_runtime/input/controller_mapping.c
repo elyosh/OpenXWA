@@ -511,7 +511,7 @@ int XwaControllerMapping_RollHeld(XwaInputRoll side) {
 										  : 0;
 }
 
-void XwaControllerMapping_UpdateHostActions(const AeronInputSnapshot* input) {
+void XwaControllerMapping_UpdateHostActions(const AeronInputSnapshot* input, int in_flight) {
 	if (!input || input->frame_id == g_controller.host_frame)
 		return;
 	g_controller.host_frame = input->frame_id;
@@ -534,14 +534,18 @@ void XwaControllerMapping_UpdateHostActions(const AeronInputSnapshot* input) {
 		const bool known = g_controller.host_id[slot] == device->instance_id;
 		for (size_t i = 0; i < profile->binding_count; ++i) {
 			const XwaInputAction action = profile->bindings[i].action;
-			if (XwaInputActions_Kind(action) != XWA_INPUT_ACTION_KIND_HOST)
+			const bool host = XwaInputActions_Kind(action) == XWA_INPUT_ACTION_KIND_HOST;
+			/* In flight, the flight bindings open the options. The button is
+			 * followed there too, so that one held when the flight ends
+			 * isn't a press in the menus. */
+			if (!host && action != XWA_INPUT_ACTION_OPTIONS_MENU)
 				continue;
 			const bool was_down = known && g_controller.host_down[slot][i];
 			if (!known)
 				g_controller.host_masked[slot][i] = false;
 			const bool down = SourceDown(device, &profile->bindings[i].source, was_down,
 										 &g_controller.host_masked[slot][i]);
-			if (known && down && !was_down)
+			if (known && down && !was_down && (host || !in_flight))
 				g_controller.host_pressed[action] = true;
 			g_controller.host_down[slot][i] = down;
 		}

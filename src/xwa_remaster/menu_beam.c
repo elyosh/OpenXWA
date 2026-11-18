@@ -6,6 +6,7 @@
 #include "xwa_remaster/color.h"
 #include "xwa_remaster/flight.h"
 #include "xwa_remaster/menu_hands.h"
+#include "xwa_remaster/vr_hands.h"
 #include "xwa_remaster/vr_keyboard.h"
 
 #include <math.h>
@@ -18,6 +19,10 @@
  * screen. */
 #define BEAM_PIECES 12
 /* Two beams at most, each a strip and a dot. */
+/* The length of the beam of a hand that points away from the screen, and
+ * the longest beam to the screen's plane. */
+#define BEAM_FREE_M 1.0f
+#define BEAM_FREE_MAX_M 6.0f
 #define BEAM_ALPHA_NEAR 0.85f
 #define BEAM_ALPHA_FAR 0.20f
 
@@ -25,7 +30,8 @@ static AeronDrawList2D* g_beamList;
 
 int XwaRemasterMenuBeam_Wanted(void) {
 	return Aeron_XrSessionRunning() &&
-		   (Aeron_XrPointerHand() >= 0 || XwaRemasterVrKeyboard_HandOn(0) || XwaRemasterVrKeyboard_HandOn(1));
+		   (Aeron_XrPointerHand() >= 0 || XwaRemasterVrKeyboard_HandOn(0) ||
+			XwaRemasterVrKeyboard_HandOn(1) || XwaRemasterVrHands_Moved(0) || XwaRemasterVrHands_Moved(1));
 }
 
 static void beam_rotate(const float q[4], const float v[3], float out[3]) {
@@ -112,9 +118,43 @@ static int beam_add(const AeronViewRig* rig, const float start[3], const float e
 	return 1;
 }
 
+/* Adds the beam of a hand that points at nothing, so that the player sees
+ * where it points and can bring it to the screen. It ends on the plane of
+ * the virtual screen when the hand points towards it, and after
+ * BEAM_FREE_M otherwise. */
+static int beam_add_free(const AeronViewRig* rig, const AeronXrHand* hand, int has_screen,
+						 const AeronViewPose* screen) {
+	static const float across[3] = { 1.0f, 0.0f, 0.0f }, up[3] = { 0.0f, 1.0f, 0.0f };
+	static const float ahead[3] = { 0.0f, 0.0f, -1.0f }, back[3] = { 0.0f, 0.0f, 1.0f };
+	float direction[3], right[3], dot_up[3], end[3];
+	float length_m = BEAM_FREE_M;
+	beam_rotate(hand->aim.orientation, ahead, direction);
+	beam_rotate(hand->aim.orientation, across, right);
+	beam_rotate(hand->aim.orientation, up, dot_up);
+	if (has_screen) {
+		/* The screen faces its +Z. */
+		float normal[3];
+		beam_rotate(screen->orientation, back, normal);
+		float approach = 0.0f, distance = 0.0f;
+		for (int i = 0; i < 3; i++) {
+			approach -= direction[i] * normal[i];
+			distance += (hand->aim.position_m[i] - screen->position_m[i]) * normal[i];
+		}
+		if (approach > 1e-3f && distance > 0.0f && distance / approach < BEAM_FREE_MAX_M) {
+			length_m = distance / approach;
+			beam_rotate(screen->orientation, across, right);
+			beam_rotate(screen->orientation, up, dot_up);
+		}
+	}
+	for (int i = 0; i < 3; i++) {
+		end[i] = hand->aim.position_m[i] + direction[i] * length_m;
+	}
+	return beam_add(rig, hand->aim.position_m, end, right, dot_up);
+}
+
 /* Fills the list with the beams: the hand that points at the virtual
- * screen, and each hand that points at the keyboard. Returns 0 when there
- * is nothing to draw. */
+ * screen, each hand that points at the keyboard, and each other hand that
+ * moved lately. Returns 0 when there is nothing to draw. */
 static int beam_build(const AeronViewRig* rig) {
 	static const float across[3] = { 1.0f, 0.0f, 0.0f }, up[3] = { 0.0f, 1.0f, 0.0f };
 	AeronXrHand hands[2];
@@ -122,8 +162,10 @@ static int beam_build(const AeronViewRig* rig) {
 	if (!Aeron_XrHands(hands)) {
 		return 0;
 	}
+	int on_target[2] = { 0, 0 };
 	for (int hand = 0; hand < 2; hand++) {
 		float end[3];
+		on_target[hand] = XwaRemasterVrKeyboard_HandOn(hand);
 		/* The dot is small: the keyboard's tilt doesn't show on it. */
 		if (hands[hand].active && XwaRemasterVrKeyboard_HandPoint(hand, end)) {
 			any |= beam_add(rig, hands[hand].aim.position_m, end, across, up);
@@ -134,9 +176,10 @@ static int beam_build(const AeronViewRig* rig) {
 	int logical_w = 0, logical_h = 0;
 	const int hand = Aeron_XrPointerHand();
 	const AeronInputSnapshot* input = Aeron_InputSnapshot();
-	if (hand >= 0 && input && hands[hand].active && !XwaRemasterVrKeyboard_HandOn(hand) &&
-		Aeron_XrScreenQuad(&screen, &width_m, &height_m) && Aeron_GetLogicalSize(&logical_w, &logical_h) &&
-		logical_w > 0 && logical_h > 0) {
+	const int has_screen = Aeron_XrScreenQuad(&screen, &width_m, &height_m);
+	if (hand >= 0 && input && hands[hand].active && !XwaRemasterVrKeyboard_HandOn(hand) && has_screen &&
+		Aeron_GetLogicalSize(&logical_w, &logical_h) && logical_w > 0 && logical_h > 0) {
+		on_target[hand] = 1;
 		/* The beam ends where the mouse pointer is: the pointer is the hand's
 		 * ray on the screen, smoothed. */
 		const float u = ((float)input->mouse.x + 0.5f) / (float)logical_w;
@@ -149,6 +192,11 @@ static int beam_build(const AeronViewRig* rig) {
 					 screen_up[i] * (0.5f - v) * height_m;
 		}
 		any |= beam_add(rig, hands[hand].aim.position_m, end, screen_right, screen_up);
+	}
+	for (int other = 0; other < 2; other++) {
+		if (!on_target[other] && XwaRemasterVrHands_Moved(other)) {
+			any |= beam_add_free(rig, &hands[other], has_screen, &screen);
+		}
 	}
 	return any;
 }

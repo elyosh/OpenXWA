@@ -19,6 +19,8 @@
 
 /* The near plane of the hands' scene, in scene units: about 2 cm. */
 #define MENU_HANDS_NEAR_Z 1.0f
+/* The light from every side, as a part of the one light's illuminance. */
+#define MENU_HANDS_FILL 0.12f
 
 /* The headset's model of a hand's controller. */
 typedef struct MenuController {
@@ -30,6 +32,8 @@ typedef struct MenuController {
 	int node_index[AERON_XR_MODEL_NODE_MAX];
 	int node_count;
 	AeronSceneMeshTable table;
+	/* The model's first state was logged. */
+	int state_logged;
 } MenuController;
 
 static struct {
@@ -106,7 +110,19 @@ static void menu_controller_sync(AeronCommandBuffer* cmd, int hand) {
 	}
 	menu_controller_release(controller);
 	controller->generation = model.generation;
+	controller->state_logged = 0;
 	controller->nodes = (AeronPlainGltfNodes*)calloc(1, sizeof *controller->nodes);
+	/* AERON_XR_INPUT_LOG=1 also saves the runtime's file in the diagnostics
+	 * folder, to look at a model that doesn't load or show as it should. */
+	const char* log_input = getenv("AERON_XR_INPUT_LOG");
+	if (log_input && log_input[0] && log_input[0] != '0') {
+		char path[64];
+		snprintf(path, sizeof path, "diagnostics/vr_controller_%s.glb", hand ? "right" : "left");
+		if (AeronVfs_WriteAllAtomic(Aeron_GetVfs(), AERON_VFS_ROOT_USER, path, model.glb, model.glb_size)) {
+			Aeron_LogInfo("xwa.remaster", "menu hands: saved the %s controller's model as %s",
+						  hand ? "right" : "left", path);
+		}
+	}
 	AeronFlightModel flight;
 	char error[160], name[48];
 	snprintf(name, sizeof name, "vr_controller_%s", hand ? "right" : "left");
@@ -134,9 +150,14 @@ static void menu_controller_sync(AeronCommandBuffer* cmd, int hand) {
 			Aeron_LogWarn("xwa.remaster", "menu hands: the model has no node named %s", model.node_names[i]);
 		}
 	}
-	Aeron_LogInfo("xwa.remaster", "menu hands: the %s controller's model has %d parts, loaded in %.0f ms",
+	Aeron_LogInfo("xwa.remaster",
+				  "menu hands: the %s controller's model has %d parts, loaded in %.0f ms; its box is "
+				  "%.3f..%.3f, %.3f..%.3f, %.3f..%.3f m",
 				  hand ? "right" : "left", controller->nodes->component_count,
-				  (double)(Aeron_NowUs() - start) / 1000.0);
+				  (double)(Aeron_NowUs() - start) / 1000.0, (double)controller->mesh->bound_min[0],
+				  (double)controller->mesh->bound_max[0], (double)controller->mesh->bound_min[1],
+				  (double)controller->mesh->bound_max[1], (double)controller->mesh->bound_min[2],
+				  (double)controller->mesh->bound_max[2]);
 }
 
 /* Fills the scene instance of a hand's controller. Returns 0 when the hand
@@ -167,6 +188,38 @@ static int menu_controller_instance(int hand, const AeronXrHand* tracked, AeronS
 		}
 	}
 	AeronPlainGltf_Pose(controller->nodes, poses, hidden, &controller->table);
+	/* Once for each model: where the runtime puts it, and what it says of
+	 * its moving nodes. */
+	if (!controller->state_logged) {
+		controller->state_logged = 1;
+		int shown = 0;
+		for (int row = 0; row < controller->nodes->component_count; row++) {
+			shown += controller->table.visibility_packed[row >> 2][row & 3] >= 0.5f;
+		}
+		Aeron_LogInfo(
+			"xwa.remaster",
+			"menu hands: the %s controller's model is at %.3f, %.3f, %.3f m, turned %.3f, %.3f, %.3f, "
+			"%.3f; the hand's grip is at %.3f, %.3f, %.3f m; %d moving nodes have a state; %d of %d "
+			"parts are shown",
+			hand ? "right" : "left", (double)state.pose.position_m[0], (double)state.pose.position_m[1],
+			(double)state.pose.position_m[2], (double)state.pose.orientation[0],
+			(double)state.pose.orientation[1], (double)state.pose.orientation[2],
+			(double)state.pose.orientation[3], (double)tracked->grip.position_m[0],
+			(double)tracked->grip.position_m[1], (double)tracked->grip.position_m[2], state.node_count, shown,
+			controller->nodes->component_count);
+		for (int i = 0; i < state.node_count && i < controller->node_count; i++) {
+			const int node = controller->node_index[i];
+			Aeron_LogInfo(
+				"xwa.remaster",
+				"menu hands:   node %s: %s (%d), at %.4f, %.4f, %.4f, turned %.3f, %.3f, %.3f, %.3f",
+				node >= 0 ? controller->nodes->nodes[node].name : "(not in the file)",
+				state.node_visible[i] ? "shown" : "hidden", (int)state.node_visible[i],
+				(double)state.nodes[i].position_m[0], (double)state.nodes[i].position_m[1],
+				(double)state.nodes[i].position_m[2], (double)state.nodes[i].orientation[0],
+				(double)state.nodes[i].orientation[1], (double)state.nodes[i].orientation[2],
+				(double)state.nodes[i].orientation[3]);
+		}
+	}
 	memset(out, 0, sizeof *out);
 	out->mesh = controller->mesh;
 	out->mesh_table = &controller->table;
@@ -245,7 +298,20 @@ int XwaRemasterMenuHands_RenderView(AeronCommandBuffer* cmd, const AeronViewRig*
 	};
 	s.exposure = XwaRemasterFlight_LightMeterExposure(&light, 1);
 	AeronScene_SetExposure(s.scene, s.exposure);
-	XwaRemasterShip_SetPbrEnv(s.scene, &light, 1, -1, rows, NULL, NULL, NULL, -1.0f);
+	/* Light from every side too, more of it from above: the menus have a
+	 * black background, and a dark model with one light and nothing around
+	 * it can't be told from it. Many controllers are black. */
+	const float fill = illuminance * MENU_HANDS_FILL;
+	const XwaShipAmbientCube ambient = {
+		.pos_x = { fill, fill, fill },
+		.neg_x = { fill, fill, fill },
+		.pos_y = { fill * 0.5f, fill * 0.5f, fill * 0.5f },
+		.neg_y = { fill * 1.5f, fill * 1.5f, fill * 1.5f },
+		.pos_z = { fill, fill, fill },
+		.neg_z = { fill, fill, fill },
+		.minimum = { fill * 0.5f, fill * 0.5f, fill * 0.5f },
+	};
+	XwaRemasterShip_SetPbrEnv(s.scene, &light, 1, -1, rows, NULL, &ambient, NULL, -1.0f);
 	int drawn = 0;
 	for (int hand = 0; hand < 2; hand++) {
 		AeronSceneMeshInstance instance;
