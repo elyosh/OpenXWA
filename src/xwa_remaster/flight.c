@@ -261,6 +261,16 @@ static struct {
 	int rig_active;
 	AeronViewRig rig_previous;
 	int rig_previous_valid;
+	/* The head's pose set by XwaRemasterFlight_SetHeadPose, for a frame with
+	 * one view. `head_frame_pose` is the pose that the last rendered frame
+	 * used, when `head_frame_used` is set. `head_previous_pose` is the pose
+	 * of the frame before the current one, for the view's motion vectors:
+	 * the identity when that frame had no head pose. */
+	AeronViewPose head_pose;
+	int head_active;
+	AeronViewPose head_frame_pose;
+	int head_frame_used;
+	AeronViewPose head_previous_pose;
 	/* Set while present_rt holds a frame composed from the rig's views. */
 	int rig_composed;
 	/* A headset's rig: each view is drawn into its own target, such as an
@@ -3282,6 +3292,13 @@ static int fl_rig_usable(const AeronViewRig* rig) {
 	return 1;
 }
 
+void XwaRemasterFlight_SetHeadPose(const AeronViewPose* pose) {
+	s.head_active = pose != NULL;
+	if (pose) {
+		s.head_pose = *pose;
+	}
+}
+
 void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig) {
 	const int active = fl_rig_usable(rig);
 	if (active) {
@@ -3468,18 +3485,36 @@ int XwaRemasterFlight_BuildView(const XwaFlightCamera* cam, int target_w, int ta
 	return cam ? fl_build_view_at_origin(cam, cam->world_pos, target_w, target_h, NULL, out) : 0;
 }
 
+/* Copies `seat` to `out`, then moves and turns its camera by `pose`. `seat`
+ * is the game camera's view. The projection, the viewport and the pixel
+ * scales stay the seat's. The caller computes view_proj. */
+static void fl_place_view(const XwaRemasterFlightView* seat, const AeronViewPose* pose,
+						  XwaRemasterFlightView* out) {
+	float seat_rows[9], rows[9];
+	fl_quat_to_mat3(seat->camera.ori, seat_rows);
+	*out = *seat;
+	AeronViewPose_ComposeCamera(pose, seat_rows, seat->camera.pos, AERON_OPT_UNITS_PER_METER, rows,
+								out->camera.pos);
+	fl_rows_to_quat(rows, out->camera.ori);
+}
+
+/* Builds the one view of a frame with a head pose: the seat's view, moved and
+ * turned by the head, with the game's own projection. */
+static void fl_build_head_view(const XwaRemasterFlightView* seat, const AeronViewPose* pose,
+							   XwaRemasterFlightView* out) {
+	fl_place_view(seat, pose, out);
+	AeronScene_ComputeViewProj(&out->camera, out->view_proj);
+}
+
+static const AeronViewPose fl_identity_pose = { { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f, 1.0f } };
+
 /* Builds the view of a rig pose and field of view. `seat` is the game
  * camera's view: the rig's origin. The view is `width` x `height` pixels. */
 static void fl_build_rig_view(const XwaFlightCamera* cam, const XwaRemasterFlightView* seat,
 							  const AeronViewPose* pose, const AeronViewFov* fov, int width, int height,
 							  XwaRemasterFlightView* out) {
-	float seat_rows[9], rows[9];
-	fl_quat_to_mat3(seat->camera.ori, seat_rows);
-	*out = *seat;
+	fl_place_view(seat, pose, out);
 	AeronSceneCamera* camera = &out->camera;
-	AeronViewPose_ComposeCamera(pose, seat_rows, seat->camera.pos, AERON_OPT_UNITS_PER_METER, rows,
-								camera->pos);
-	fl_rows_to_quat(rows, camera->ori);
 	AeronViewFov_ToCamera(fov, &camera->h_half_rad, &camera->v_half_rad, &camera->proj_x_offset,
 						  &camera->proj_y_offset);
 	camera->viewport = (AeronRectI) { 0, 0, width, height };
@@ -3542,27 +3577,35 @@ static void fl_set_build_view(FlBuildView* build, const XwaRemasterFlightView* v
 }
 
 /* Sets the frame's cameras from the game camera's view `seat`. With `rig`,
- * the views are the rig's; otherwise the seat view is the only view. */
+ * the views are the rig's. Otherwise there is one view: the seat's view,
+ * moved and turned by `head` when there is a head pose. */
 static void fl_set_frame_views(const XwaFlightCamera* cam, const XwaRemasterFlightView* seat,
-							   const AeronViewRig* rig) {
+							   const AeronViewRig* rig, const AeronViewPose* head) {
 	s.seat_view = *seat;
 	fl_quat_to_mat3(seat->camera.ori, s.seat_crows);
+	/* Whether the views turn with the player's head. */
+	const uint8_t head_tracked = rig ? rig->tracked != 0 : head != NULL;
 	if (!rig) {
-		s.center_view = *seat;
-		s.views[0] = *seat;
+		if (head) {
+			fl_build_head_view(seat, head, &s.center_view);
+		} else {
+			s.center_view = *seat;
+		}
+		s.center_view.head_tracked = head_tracked;
+		s.views[0] = s.center_view;
 		s.view_count = 1;
 		s.primary_view = 0;
 		s.build_count = 1;
-		fl_set_build_view(&s.build[0], seat, seat, 0, 0);
+		fl_set_build_view(&s.build[0], &s.center_view, seat, 0, 0);
 	} else {
 		for (int i = 0; i < rig->count; i++) {
 			fl_build_rig_view(cam, seat, &rig->views[i].pose, &rig->views[i].fov, rig->width, rig->height,
 							  &s.views[i]);
-			s.views[i].head_tracked = rig->tracked != 0;
+			s.views[i].head_tracked = head_tracked;
 		}
 		fl_build_rig_view(cam, seat, &rig->center, &rig->views[rig->primary].fov, rig->width, rig->height,
 						  &s.center_view);
-		s.center_view.head_tracked = rig->tracked != 0;
+		s.center_view.head_tracked = head_tracked;
 		s.view_count = rig->count;
 		s.primary_view = rig->primary;
 		if (rig->shared_sprites) {
@@ -3587,13 +3630,19 @@ static void fl_set_frame_views(const XwaFlightCamera* cam, const XwaRemasterFlig
 
 /* Sets the views and the build views of the previous snapshot, for motion
  * vectors. `previous_seat` is the previous game camera's view, at this
- * frame's render origin. With `camera_blur`, sprites take the motion of
- * their build view; otherwise their history keeps the current camera. */
+ * frame's render origin. `previous_head` is the head pose of the last frame,
+ * for a frame with one view and a head pose, or NULL. With `camera_blur`,
+ * sprites take the motion of their build view; otherwise their history keeps
+ * the current camera. */
 static void fl_set_frame_history(const XwaFlightCamera* previous_cam,
 								 const XwaRemasterFlightView* previous_seat, const AeronViewRig* rig,
-								 int camera_blur) {
+								 const AeronViewPose* previous_head, int camera_blur) {
 	if (!rig) {
-		s.previous_views[0] = *previous_seat;
+		if (previous_head) {
+			fl_build_head_view(previous_seat, previous_head, &s.previous_views[0]);
+		} else {
+			s.previous_views[0] = *previous_seat;
+		}
 	} else {
 		/* Without the rig of the last frame, the head has no motion. */
 		const AeronViewRig* previous_rig = s.rig_previous_valid ? &s.rig_previous : rig;
@@ -3607,7 +3656,8 @@ static void fl_set_frame_history(const XwaFlightCamera* previous_cam,
 	}
 	for (uint32_t b = 0; b < s.build_count; b++) {
 		FlBuildView* build = &s.build[b];
-		XwaRemasterFlightView previous = *previous_seat;
+		/* With one view, the build view is that view. */
+		XwaRemasterFlightView previous = rig ? *previous_seat : s.previous_views[0];
 		if (rig && rig->shared_sprites) {
 			const AeronViewRig* previous_rig = s.rig_previous_valid ? &s.rig_previous : rig;
 			fl_build_rig_view(previous_cam, previous_seat, &previous_rig->center,
@@ -8656,7 +8706,16 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	/* The map is drawn as one view, with the game camera. */
 	const int tunnel = hyperspace && hyperspace_moment.phase == XWA_HYPERSPACE_TUNNEL;
 	const AeronViewRig* rig = s.rig_active && !cam->map_mode ? &s.rig : NULL;
-	fl_set_frame_views(cam, &flight_view, rig);
+	/* A head pose moves the one view of a frame without a rig. The map keeps
+	 * the game camera. */
+	const AeronViewPose* head = s.head_active && !s.rig_active && !cam->map_mode ? &s.head_pose : NULL;
+	s.head_previous_pose = s.head_frame_used ? s.head_frame_pose : fl_identity_pose;
+	s.head_frame_used = head != NULL;
+	if (head) {
+		s.head_frame_pose = *head;
+	}
+	const int head_moved = head && memcmp(head, &s.head_previous_pose, sizeof *head) != 0;
+	fl_set_frame_views(cam, &flight_view, rig, head);
 	s.rig_composed = 0;
 	s.view_targets_rendered = 0;
 	/* A tracked rig renders a snapshot again when the head moved before the
@@ -8753,14 +8812,21 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			pc->film_overlay == cam->film_overlay && snap->game_time_ticks >= prev->game_time_ticks) {
 			fl_build_view_at_origin(pc, s.origin_world, s.rt_w, s.rt_h, previous_rotation,
 									&previous_flight_view);
-			memcpy(s.mb_prev_vp, previous_flight_view.view_proj, sizeof s.mb_prev_vp);
-			memcpy(s.mb_prev_ori, previous_flight_view.camera.ori, sizeof s.mb_prev_ori);
+			/* The one view's previous camera. With a head pose, it is the
+			 * previous seat with the head pose of the last frame. */
+			XwaRemasterFlightView previous_view = previous_flight_view;
+			if (head) {
+				fl_build_head_view(&previous_flight_view, &s.head_previous_pose, &previous_view);
+			}
+			memcpy(s.mb_prev_vp, previous_view.view_proj, sizeof s.mb_prev_vp);
+			memcpy(s.mb_prev_ori, previous_view.camera.ori, sizeof s.mb_prev_ori);
 			s.mb_enabled = 1;
 			/* Hold velocity while a paused snapshot is truly unchanged. Camera
 			 * panning and cockpit articulation can still change with frozen sim
 			 * time, and must regenerate velocity for both temporal consumers. */
 			paused = snap->game_time_ticks == prev->game_time_ticks;
-			mb_regen = !paused || fl_temporal_pose_changed(snap, prev) || preview_rotation_changed;
+			mb_regen =
+				!paused || fl_temporal_pose_changed(snap, prev) || preview_rotation_changed || head_moved;
 			/* Prev lookup by stable identity: objectSignature is unique
 			 * per spawn (slot reuse bumps it), so signature + slot pins
 			 * the same live object across the pair. */
@@ -8791,7 +8857,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		 * faced. Object-only blur keeps both endpoints in the current
 		 * camera-facing basis so camera rotation does not leak into velocity. */
 		billboard_history_cam = s.mb_camera_blur ? &prev->flight_camera : cam;
-		fl_set_frame_history(&prev->flight_camera, &previous_flight_view, rig, s.mb_camera_blur);
+		fl_set_frame_history(&prev->flight_camera, &previous_flight_view, rig,
+							 head ? &s.head_previous_pose : NULL, s.mb_camera_blur);
 		previous_cockpit_anchor = fl_cockpit_anchor(prev, &prev->flight_camera);
 		cockpit_history_valid = cockpit_anchor && previous_cockpit_anchor && fl_cockpit_drawn(snap, cam) &&
 								fl_cockpit_drawn(prev, &prev->flight_camera) &&

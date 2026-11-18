@@ -55,9 +55,12 @@ typedef struct XwaRemasterInitOptions {
 	   run, whatever the video options say, and 2 as the debug UI's stereo
 	   view with the head looking straight ahead. 0 follows the options. */
 	int flight_views;
-	/* --stereo-head: the head's yaw, pitch and roll in that stereo view, in
-	   degrees. Positive is right, up and clockwise. */
-	float stereo_head[3];
+	/* --head-pose: the test head's yaw, pitch and roll in degrees, then its
+	   position in metres. Positive is right, up and clockwise, then right, up
+	   and forward. With flight_views 2, it is the head of the stereo view.
+	   Otherwise, when head_pose_set is nonzero, it moves the one view. */
+	float head_pose[6];
+	int head_pose_set;
 	/* --stereo-hand-left, --stereo-hand-right and --stereo-hand-buttons: the
 	   VR hands of that stereo view. Index 0 is the left hand. */
 	XwaRemasterStereoHand stereo_hands[2];
@@ -130,6 +133,9 @@ typedef struct XwaRemasterDebugStereo {
 	float roll_deg;
 	/* The head's position from the seat, in metres: right, up, forward. */
 	float position_m[3];
+	/* While the stereo view is off: the head moves the one view, as a head
+	 * tracker does. */
+	int flat_head;
 } XwaRemasterDebugStereo;
 
 /* Returns whether the film capture and benchmark must wait for a later host

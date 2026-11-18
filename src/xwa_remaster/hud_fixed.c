@@ -963,11 +963,21 @@ static int fixed_project_reticle(const XwaSnapshot* snapshot, XwaHudProfileIndex
 	const float center_eye[3] = { 0.0f, 0.0f, 1.0f };
 	if (!XwaRemasterFlight_ProjectView(flight_view, center_eye, &target_x, &target_y))
 		return 0;
-	/* When the player looks around, and in the exterior HUD, the reticle
-	 * follows the craft's nose instead of the screen center. A view that
-	 * turns with the head looks around too. */
-	if (h->reticle.look_yaw || h->reticle.look_pitch || (h->mode_flags & XWA_HUD_MODE_EXTERIOR_HUD) ||
-		flight_view->head_tracked) {
+	if (flight_view->head_tracked && !flight_view->rig_view && h->reticle.seat != 0) {
+		/* In a gunner seat, the game camera looks along the guns and not
+		 * along the craft's nose. A head tracker turns the view away from
+		 * the game camera, so the reticle goes where that camera looks. */
+		const XwaFlightCamera* camera = &snapshot->flight_camera;
+		float local[3];
+		AeronWorld_LocalI32(flight_view->origin_world, camera->world_pos, local);
+		for (int axis = 0; axis < 3; axis++)
+			local[axis] += camera->rows[6 + axis] * 1000000.0f;
+		XwaRemasterFlight_ProjectLocal(flight_view, local, &target_x, &target_y, NULL);
+	} else if (h->reticle.look_yaw || h->reticle.look_pitch || (h->mode_flags & XWA_HUD_MODE_EXTERIOR_HUD) ||
+			   flight_view->head_tracked) {
+		/* When the player looks around, and in the exterior HUD, the reticle
+		 * follows the craft's nose instead of the screen center. A view that
+		 * turns with the head looks around too. */
 		const XwaFlightObject* player = fixed_player_object(snapshot, h);
 		if (player && player->has_mobj) {
 			float local[3];

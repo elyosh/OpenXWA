@@ -281,25 +281,34 @@ int XwaLaunchOptions_Parse(int argc, char** argv, XwaLaunchOptions* out, char* e
 			}
 			continue;
 		}
-		value = pass_through ? NULL : setup_option_value(argv[i], "--stereo-head");
-		if (!pass_through && (value || strcmp(argv[i], "--stereo-head") == 0)) {
-			static const char usage[] = "%s requires three angles in degrees, such as 30,0,-15";
+		value = pass_through ? NULL : setup_option_value(argv[i], "--head-pose");
+		if (!pass_through && (value || strcmp(argv[i], "--head-pose") == 0)) {
+			static const char usage[] = "%s requires three angles in degrees, such as 30,0,-15, and can "
+										"have a position in metres after them, such as 30,0,-15,0.1,0,0";
 			if (!value) {
 				if (++i >= argc) {
-					return setup_error(error, error_size, usage, "--stereo-head");
+					return setup_error(error, error_size, usage, "--head-pose");
 				}
 				value = argv[i];
 			}
+			/* Three angles, or three angles and a position. */
 			const char* text = value;
-			for (int axis = 0; axis < 3; axis++) {
+			memset(out->head_pose, 0, sizeof out->head_pose);
+			for (int index = 0; index < 6; index++) {
 				char* end = NULL;
-				const double angle = strtod(text, &end);
-				if (end == text || *end != (axis < 2 ? ',' : '\0') || !(angle >= -180.0 && angle <= 180.0)) {
-					return setup_error(error, error_size, usage, "--stereo-head");
+				const double number = strtod(text, &end);
+				const double limit = index < 3 ? 180.0 : 1.0;
+				const int last = *end == '\0' && (index == 2 || index == 5);
+				if (end == text || (*end != ',' && !last) || !(number >= -limit && number <= limit)) {
+					return setup_error(error, error_size, usage, "--head-pose");
 				}
-				out->stereo_head[axis] = (float)angle;
+				out->head_pose[index] = (float)number;
+				if (last) {
+					break;
+				}
 				text = end + 1;
 			}
+			out->head_pose_set = 1;
 			continue;
 		}
 		{
@@ -440,11 +449,12 @@ int XwaLaunchOptions_RelaunchArgs(const XwaLaunchOptions* launch, int skip_intro
 		out->args[out->count++] = "--flight-views";
 		out->args[out->count++] = launch->flight_views == 1 ? "surround" : "stereo";
 	}
-	if (launch->stereo_head[0] != 0.0f || launch->stereo_head[1] != 0.0f || launch->stereo_head[2] != 0.0f) {
-		snprintf(out->stereo_head, sizeof out->stereo_head, "%g,%g,%g", launch->stereo_head[0],
-				 launch->stereo_head[1], launch->stereo_head[2]);
-		out->args[out->count++] = "--stereo-head";
-		out->args[out->count++] = out->stereo_head;
+	if (launch->head_pose_set) {
+		snprintf(out->head_pose, sizeof out->head_pose, "%g,%g,%g,%g,%g,%g", launch->head_pose[0],
+				 launch->head_pose[1], launch->head_pose[2], launch->head_pose[3], launch->head_pose[4],
+				 launch->head_pose[5]);
+		out->args[out->count++] = "--head-pose";
+		out->args[out->count++] = out->head_pose;
 	}
 	for (int hand = 0; hand < 2; hand++) {
 		const XwaLaunchStereoHand* stereo_hand = &launch->stereo_hands[hand];
@@ -512,8 +522,12 @@ const char* XwaLaunchOptions_Help(void) {
 		   "  --flight-views <kind>     for tests: draw the flight scene of this run as\n"
 		   "                            three surround screens (surround), or as the two\n"
 		   "                            eyes of a headset side by side (stereo)\n"
-		   "  --stereo-head <y>,<p>,<r> with --flight-views stereo: head yaw, pitch and\n"
-		   "                            roll in degrees (right, up, clockwise)\n"
+		   "  --head-pose <yaw>,<pitch>,<roll>[,<x>,<y>,<z>]\n"
+		   "                            for tests: a head that stays still and moves the\n"
+		   "                            flight view as a head tracker does, or the head\n"
+		   "                            of --flight-views stereo. Angles in degrees\n"
+		   "                            (right, up, clockwise), then the position in\n"
+		   "                            metres (right, up, forward)\n"
 		   "  --stereo-hand-left <x>,<y>,<z>,<yaw>,<pitch>,<roll>\n"
 		   "  --stereo-hand-right <x>,<y>,<z>,<yaw>,<pitch>,<roll>\n"
 		   "                            with --flight-views stereo: a VR hand that\n"

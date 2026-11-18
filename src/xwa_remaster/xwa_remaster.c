@@ -442,10 +442,14 @@ int XwaRemaster_Init(const XwaRemasterInitOptions* options) {
 	g.surround_forced = options->flight_views == 1;
 	/* A test run keeps the head still, so that its frames can be compared. */
 	g.debug_stereo.enabled = options->flight_views == 2;
-	g.debug_stereo.mouse_head = !g.debug_stereo.enabled;
-	g.debug_stereo.yaw_deg = options->stereo_head[0];
-	g.debug_stereo.pitch_deg = options->stereo_head[1];
-	g.debug_stereo.roll_deg = options->stereo_head[2];
+	g.debug_stereo.mouse_head = !g.debug_stereo.enabled && !options->head_pose_set;
+	g.debug_stereo.flat_head = !g.debug_stereo.enabled && options->head_pose_set;
+	g.debug_stereo.yaw_deg = options->head_pose[0];
+	g.debug_stereo.pitch_deg = options->head_pose[1];
+	g.debug_stereo.roll_deg = options->head_pose[2];
+	for (int axis = 0; axis < 3; axis++) {
+		g.debug_stereo.position_m[axis] = options->head_pose[3 + axis];
+	}
 	if (g.debug_stereo.enabled) {
 		XwaRemaster_SetFakeHands(options->stereo_hands);
 	}
@@ -722,6 +726,20 @@ static void XwaRemaster_SetFakeHands(const XwaRemasterStereoHand hands[2]) {
 	}
 }
 
+/* Gives the pose of the debug UI's test head: the one it sets, or one that
+ * follows the mouse. */
+static void XwaRemaster_DebugHeadPose(AeronViewPose* out) {
+	const XwaRemasterDebugStereo* d = &g.debug_stereo;
+	const float degrees = 3.14159265f / 180.0f;
+	const float yaw = (d->mouse_head ? g.mouse_x * d->mouse_yaw_deg : d->yaw_deg) * degrees;
+	const float pitch = (d->mouse_head ? -g.mouse_y * d->mouse_pitch_deg : d->pitch_deg) * degrees;
+	const float roll = d->roll_deg * degrees;
+	AeronViewPose_FromAngles(yaw, pitch, roll, out->orientation);
+	out->position_m[0] = d->position_m[0];
+	out->position_m[1] = d->position_m[1];
+	out->position_m[2] = -d->position_m[2];
+}
+
 /* Builds the debug UI's stereo rig: two eyes side by side in the render
  * target. */
 static int XwaRemaster_BuildDebugStereoRig(AeronViewRig* rig) {
@@ -736,14 +754,8 @@ static int XwaRemaster_BuildDebugStereoRig(AeronViewRig* rig) {
 	const float half_width = 0.5f * d->fov_deg * degrees;
 	const float half_height = atanf(tanf(half_width) * (float)view_height / (float)view_width);
 	const AeronViewFov fov = { -half_width, half_width, half_height, -half_height };
-	const float yaw = (d->mouse_head ? g.mouse_x * d->mouse_yaw_deg : d->yaw_deg) * degrees;
-	const float pitch = (d->mouse_head ? -g.mouse_y * d->mouse_pitch_deg : d->pitch_deg) * degrees;
-	const float roll = d->roll_deg * degrees;
 	AeronViewPose head;
-	AeronViewPose_FromAngles(yaw, pitch, roll, head.orientation);
-	head.position_m[0] = d->position_m[0];
-	head.position_m[1] = d->position_m[1];
-	head.position_m[2] = -d->position_m[2];
+	XwaRemaster_DebugHeadPose(&head);
 	return AeronViewRig_DebugStereo(d->ipd_m, &fov, &head, view_width, view_height, rig);
 }
 
@@ -836,6 +848,18 @@ static void XwaRemaster_UpdateViewRig(const XwaSnapshot* snap) {
 		rig.generation = g.rig_generation;
 	}
 	XwaRemasterFlight_SetViewRig(kind != RM_RIG_NONE ? &rig : NULL);
+	/* A head pose moves the one view of the HD renderer. The classic and the
+	 * split views show the game camera, so they get none. */
+	AeronViewPose head;
+	const int head_view = kind == RM_RIG_NONE && snap && snap->scene_kind == XWA_SCENE_FLIGHT &&
+						  snap->flight_camera_valid && g.mode == RM_VIEW_HD && !g.pending_mode_valid &&
+						  g.ramp.alpha >= 1.0f;
+	int has_head = 0;
+	if (head_view && g.debug_stereo.flat_head) {
+		XwaRemaster_DebugHeadPose(&head);
+		has_head = 1;
+	}
+	XwaRemasterFlight_SetHeadPose(has_head ? &head : NULL);
 	/* The hands follow the head: the headset's world scale moves both. The
 	 * debug stereo view has no world scale. */
 	AeronXrHand hands[2];

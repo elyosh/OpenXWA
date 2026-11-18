@@ -16,7 +16,7 @@ typedef struct XwaLaunchStereoHand {
 	int set;
 	/* Position in metres from the head: right, up and forward. */
 	float position_m[3];
-	/* Yaw, pitch and roll in degrees, as for --stereo-head. */
+	/* Yaw, pitch and roll in degrees, as for --head-pose. */
 	float angles_deg[3];
 	/* One bit for each AeronVrHandButton. */
 	unsigned buttons;
@@ -51,9 +51,12 @@ typedef struct XwaLaunchOptions {
 	/* --flight-views: draw the flight scene for this run as a surround
 	   setup (1) or as the two eyes of a headset (2), or 0. */
 	int flight_views;
-	/* --stereo-head: the head's yaw, pitch and roll for --flight-views stereo,
-	   in degrees. Positive is right, up and clockwise. */
-	float stereo_head[3];
+	/* --head-pose: the test head's yaw, pitch and roll in degrees, then its
+	   position in metres. Positive is right, up and clockwise, then right, up
+	   and forward. It is the head of --flight-views stereo, or it moves the
+	   one view. */
+	float head_pose[6];
+	int head_pose_set;
 	/* --stereo-hand-left and --stereo-hand-right: a VR hand that doesn't
 	   move, for --flight-views stereo. Index 0 is the left hand.
 	   --stereo-hand-buttons: the buttons that each hand holds down. */
@@ -74,7 +77,7 @@ typedef struct XwaRelaunchArgs {
 	char resource_root[XWA_INSTALL_PATH_CAPACITY];
 	char mod[XWA_INSTALL_PATH_CAPACITY];
 	char render_size[32];
-	char stereo_head[64];
+	char head_pose[128];
 	char stereo_hands[2][128];
 	char stereo_hand_buttons[128];
 	/* The game's arguments of XwaLaunchOptions, and " skipintro". */
