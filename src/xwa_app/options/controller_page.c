@@ -510,8 +510,8 @@ static void XwaControllerSettings_Vr(AeronUiContext* ui) {
 	changed |= AeronUi_Toggle(ui, "Use the Mod's Hands", &options.vr_mod_hands) != 0;
 	AeronUi_Help(ui, "When off, the game's own hands are shown even if the mod has some.");
 	changed |= AeronUi_Toggle(ui, "Show Controllers in Menus", &options.vr_menu_controllers) != 0;
-	AeronUi_Help(ui, "In the menus, shows your controllers where the headset gives their models. When off, "
-					 "your hands are shown.");
+	AeronUi_Help(ui, "In the menus, shows your controllers when the headset provides their models. "
+					 "Otherwise, your hands are shown.");
 	changed |= AeronUi_Toggle(ui, "Use the Mod's Keyboard", &options.vr_mod_keyboard) != 0;
 	AeronUi_Help(ui, "When off, the game's own virtual keyboard is shown even if the mod has one.");
 	static const char* const stick_modes[] = { "Off", "Tilt", "Slide" };
@@ -522,12 +522,13 @@ static void XwaControllerSettings_Vr(AeronUiContext* ui) {
 		changed = true;
 	}
 	if (options.vr_stick == XWA_MODERN_VR_STICK_TILT)
-		AeronUi_Help(ui, "Hold the squeeze and tilt your hand to steer. Twist it to roll.");
+		AeronUi_Help(ui, "Hold the grip and tilt your hand to steer. Twist it to roll.");
 	else if (options.vr_stick == XWA_MODERN_VR_STICK_SLIDE)
-		AeronUi_Help(ui, "Hold the squeeze and move your hand to steer. Twist it to roll.");
+		AeronUi_Help(
+			ui, "Hold the grip and move your hand sideways, forward or back to steer. Twist it to roll.");
 	changed |= AeronUi_Selector(ui, "Stick Hand", &options.vr_stick_hand, hand_names, 2) != 0;
 	changed |= AeronUi_Toggle(ui, "Virtual Throttle", &options.vr_throttle) != 0;
-	AeronUi_Help(ui, "Hold the squeeze of the other hand and move it forward or back.");
+	AeronUi_Help(ui, "Hold the grip of your other hand and move it forward or back.");
 	int range_percent = (int)lroundf(options.vr_stick_range * 100.0f);
 	if (AeronUi_SliderInt(ui, "Stick Range", &range_percent, (int)(XWA_MODERN_VR_STICK_RANGE_MIN * 100.0f),
 						  (int)(XWA_MODERN_VR_STICK_RANGE_MAX * 100.0f), 10, "%d%%")) {
@@ -536,7 +537,7 @@ static void XwaControllerSettings_Vr(AeronUiContext* ui) {
 	}
 	AeronUi_Help(ui, "How far your hand moves for the stick's full travel.");
 	changed |= AeronUi_Toggle(ui, "Cockpit Buttons", &options.vr_cockpit_buttons) != 0;
-	AeronUi_Help(ui, "Point at a button of the cockpit and pull the trigger to press it.");
+	AeronUi_Help(ui, "Point at a cockpit button and pull the trigger to press it.");
 	if (changed && !XwaModernInputOptions_Set(&options))
 		XwaOptionsWindow_ReportError("The VR options are invalid.");
 }

@@ -965,7 +965,7 @@ Each hand, `left` and `right`, can have these keys:
 
 | Key | Meaning | Default |
 |-|-|-|
-| `model` | The start of the names of the hand's model files, without a folder or an extension. | `vr_hand_left`, `vr_hand_right` |
+| `model` | The name that the hand's model files start with, without a folder or an extension. | `vr_hand_left`, `vr_hand_right` |
 | `offset_m` | Where the model's origin is on the hand, in metres, in the space of the grip pose. | `[0, 0, 0]` |
 | `rotation_deg` | How the model is turned before it is moved by `offset_m`: degrees around X, then Y, then Z. | `[0, 0, 0]` |
 | `tip_m` | The tip of the index finger of the pointing model, in metres, in the model's own space. | `[0, -0.128, -0.01]` |

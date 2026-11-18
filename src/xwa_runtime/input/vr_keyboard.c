@@ -198,7 +198,8 @@ static int VrKeyboard_ReadImage(const char* path, const AeronConfigNode* root, X
 		return VrKeyboard_Error(path, size ? size : root, "image_size must be [width, height] in pixels");
 	}
 	if (AeronConfigNode_Type(keys) != AERON_CONFIG_SEQUENCE) {
-		return VrKeyboard_Error(path, keys ? keys : root, "a keyboard with an image needs keys, a list");
+		return VrKeyboard_Error(path, keys ? keys : root,
+								"a keyboard with an image needs keys: a list of keys");
 	}
 	for (size_t k = 0; k < AeronConfigNode_SequenceCount(keys); k++) {
 		const AeronConfigNode* entry = AeronConfigNode_SequenceGet(keys, k);
@@ -215,7 +216,7 @@ static int VrKeyboard_ReadImage(const char* path, const AeronConfigNode* root, X
 			if (AeronConfigNode_SequenceCount(rect) != 4 ||
 				!VrKeyboard_Number(AeronConfigNode_SequenceGet(rect, c), &corners[c])) {
 				return VrKeyboard_Error(path, entry,
-										"a key of an image needs rect: [x0, y0, x1, y1] in pixels");
+										"a key on an image needs rect: [x0, y0, x1, y1] in pixels");
 			}
 		}
 		key->x = fminf(corners[0], corners[2]) / width;

@@ -24,8 +24,8 @@ static bool XwaVideoPage_Display(AeronUiContext* ui, XwaModernVideoOptions* opti
 		changed = true;
 	}
 	if (options->window_mode == XWA_MODERN_WINDOW_MODE_SPAN)
-		AeronUi_Help(ui, "One window over the displays that are next to each other. It is fullscreen "
-						 "when the system doesn't allow it.");
+		AeronUi_Help(ui, "Stretches one window across the displays that sit side by side. Uses "
+						 "fullscreen when the system doesn't allow it.");
 	changed |= AeronUi_Toggle(ui, "HDR Output", &options->hdr_output);
 	if (options->hdr_output && !Aeron_OutputHdrEnabled())
 		AeronUi_Help(ui, Aeron_OutputHdrStatusName(Aeron_OutputHdrStatus()));
@@ -72,9 +72,9 @@ static bool XwaVideoPage_Surround(AeronUiContext* ui, XwaModernSurroundOptions* 
 
 	AeronUi_Header(ui, "Surround Screens");
 	changed |= AeronUi_Toggle(ui, "Surround", &surround->enabled);
-	AeronUi_Help(ui, "Draws the flight view on three screens of the same size, side by side, each with "
-					 "its own perspective. The window must cover the three screens. FSR upscaling is "
-					 "off in this mode: use MSAA.");
+	AeronUi_Help(ui, "Draws the flight view across three screens of the same size, with the right "
+					 "perspective on each. The window must cover all three (see Span Displays). FSR "
+					 "upscaling is off in this mode, so use MSAA.");
 	if (!surround->enabled)
 		return changed;
 	changed |= XwaVideoPage_SurroundSize(ui, "Screen Width", &surround->screen_width_mm,
@@ -83,14 +83,14 @@ static bool XwaVideoPage_Surround(AeronUiContext* ui, XwaModernSurroundOptions* 
 	changed |= XwaVideoPage_SurroundSize(ui, "Screen Height", &surround->screen_height_mm,
 										 XWA_MODERN_SURROUND_SIZE_MIN_MM, XWA_MODERN_SURROUND_SIZE_MAX_MM, 1,
 										 "%d mm");
-	AeronUi_Help(ui, "The size of one screen's picture, without its frame.");
+	AeronUi_Help(ui, "The visible picture of one screen, without the bezel.");
 	changed |= XwaVideoPage_SurroundSize(ui, "Bezel", &surround->bezel_mm, 0.0f,
 										 XWA_MODERN_SURROUND_BEZEL_MAX_MM, 1, "%d mm");
-	AeronUi_Help(ui, "The width of a screen's frame at its side.");
+	AeronUi_Help(ui, "The width of the frame beside a screen's picture.");
 	changed |=
 		XwaVideoPage_SurroundSize(ui, "Distance", &surround->distance_mm, XWA_MODERN_SURROUND_DISTANCE_MIN_MM,
 								  XWA_MODERN_SURROUND_DISTANCE_MAX_MM, 10, "%d mm");
-	AeronUi_Help(ui, "From your eyes to the centre screen.");
+	AeronUi_Help(ui, "From your eyes to the center screen.");
 	changed |= XwaVideoPage_SurroundSize(ui, "Side Screen Angle", &surround->side_angle_deg, 0.0f,
 										 XWA_MODERN_SURROUND_SIDE_ANGLE_MAX_DEG, 1, "%d degrees");
 	AeronUi_Help(ui, "How far each side screen is turned toward you. 0 is flat.");
@@ -129,8 +129,8 @@ static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) 
 		options->vr_mode = (XwaModernVrMode)mode;
 		changed = true;
 	}
-	AeronUi_Help(ui, "Automatic uses a headset when one is found. Required stops with a message when "
-					 "VR can't start. Applies the next time OpenXWA starts.");
+	AeronUi_Help(ui, "Automatic uses a headset when one is ready. Required shows an error and quits "
+					 "when VR can't start. Applies the next time OpenXWA starts.");
 	if (mode != XWA_MODERN_VR_OFF) {
 		if (AeronUi_SliderInt(ui, "Headset Render Scale", &render_percent,
 							  (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f), (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5,
@@ -138,8 +138,8 @@ static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) 
 			options->vr_render_scale = (float)render_percent / 100.0f;
 			changed = true;
 		}
-		AeronUi_Help(ui, "The size of the headset's pictures, from the size the headset recommends. "
-						 "Applies the next time OpenXWA starts.");
+		AeronUi_Help(ui, "The resolution of the headset's picture. 100% is what the headset recommends, "
+						 "and lower is faster. Applies the next time OpenXWA starts.");
 		if (AeronUi_SliderInt(ui, "World Scale", &world_percent, (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f),
 							  (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5, "%d%%")) {
 			options->vr_world_scale = (float)world_percent / 100.0f;

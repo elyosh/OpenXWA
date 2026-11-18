@@ -307,7 +307,8 @@ static char* glove_buttons(const char* settings_path, int hand, const XwauNames*
 				XwauActiveCockpit_ParseAction(value, width, height, true, names, &buttons[count], key);
 			if (result == 0)
 				ToolLog_Write(TOOL_LOG_INFO,
-							  "VR gloves: the key %s does no action in the game, so its button is left out",
+							  "VR gloves: the key %s has no action in the game's default key bindings, so "
+							  "its button is left out",
 							  key);
 			else if (result > 0 && count < XWAU_ACTIVE_COCKPIT_MAX_BUTTONS - 1)
 				count++;

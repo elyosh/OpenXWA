@@ -104,9 +104,7 @@ The versions of SDL, zstd, FFmpeg and SDL_shadercross, and the patches that
 SDL and SDL_shadercross need, are aeron's: see
 `aeron/packaging/dependencies/README.md`. The other dependency and
 shader-tool revisions are pinned as Docker build arguments in the Dockerfile.
-Set a build argument to test another version. `SDL_VERSION` takes a commit or
-a release. The build then only warns that SDL is not the pinned one, but that
-SDL must have the OpenXR API:
+Set a build argument to test another version:
 
 ```sh
 docker buildx build \
@@ -117,3 +115,7 @@ docker buildx build \
   --output type=local,dest=build/artifacts \
   .
 ```
+
+`SDL_VERSION` takes a commit or a release. With an SDL that isn't the pinned
+one, the build only prints a warning, but that SDL must still have the OpenXR
+API.

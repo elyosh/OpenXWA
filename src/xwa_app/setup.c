@@ -523,7 +523,7 @@ const char* XwaLaunchOptions_Help(void) {
 		   "                            buttons held down on each hand: none, or names\n"
 		   "                            joined by +. Names: trigger, squeeze, primary,\n"
 		   "                            secondary, thumbstick, trackpad, menu\n"
-		   "  --vr                      start in VR, and stop with a message when VR\n"
+		   "  --vr                      start in VR, and quit with an error when VR\n"
 		   "                            can't start\n"
 		   "  --no-vr                   start without VR, whatever the settings say\n"
 		   "  -h, --help                print this help and quit\n"

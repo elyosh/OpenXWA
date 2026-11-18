@@ -437,8 +437,8 @@ button's label shows too, and the trigger presses it.
   cockpit in front of it blocks it. Glass and holograms don't.
 - Buttons work in the cockpit of the player's craft, and on the models of
   the [VR hands](flight.md#vr_hands), where the other hand can press them.
-- The player can turn the buttons off in the options (Controllers > VR >
-  Cockpit Buttons).
+- The player can turn the buttons off with **Cockpit Buttons** in the
+  Controllers options.
 
 The importer converts the Active Cockpit files of an XWAU mod
 (`DynamicCockpit/<Cockpit>.ac`) into buttons. See

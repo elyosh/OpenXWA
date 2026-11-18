@@ -17,25 +17,25 @@ input:
   # own is always shown.
   vr_mod_keyboard: true
   # In the menus, show the headset's own model of each VR controller, with
-  # its moving buttons, when the headset's software gives one (SteamVR
+  # its moving buttons, when the headset's software provides one (SteamVR
   # does). When false, or without a model, the hands are shown as in the
   # cockpit.
   vr_menu_controllers: true
-  # The virtual stick of the VR controllers: hold the squeeze of the stick
-  # hand and move the hand to steer. 'tilt' reads the hand's rotation, as on a
-  # stick. 'slide' reads the hand's movement to the sides and forward, and the
-  # twist for the roll. 'off' leaves the squeeze free for a binding.
+  # The virtual stick of the VR controllers: hold the grip of the stick hand
+  # and move the hand to steer. 'tilt' reads the hand's rotation, as on a
+  # stick. 'slide' reads the hand's movement sideways, forward and back, and
+  # its twist for the roll. 'off' leaves the grip free for a binding.
   vr_stick: 'tilt'
   # The hand that holds the virtual stick: 'left' or 'right'.
   vr_stick_hand: 'right'
-  # While the virtual stick is on, hold the squeeze of the other hand and move
+  # While the virtual stick is on, hold the grip of the other hand and move
   # the hand forward and back to move the throttle.
   vr_throttle: true
   # Multiplies how far the hand moves for the stick's full travel, from 0.5
   # to 2. At 1, that is 30 degrees of tilt, 40 degrees of twist and 12 cm.
   vr_stick_range: 1.0
   # A VR hand can point at the buttons of a cockpit and press them with its
-  # trigger. A cockpit has buttons when its model gives some.
+  # trigger. A cockpit has buttons when its model defines some.
   vr_cockpit_buttons: true
   # How far a button can be from the fingertip, in metres.
   vr_button_ray_m: 1.5
@@ -62,9 +62,10 @@ input:
       look_right: [dpadright]
       look_down: [dpaddown]
       look_left: [dpadleft]
-  # A VR controller's axes are trigger, squeeze, thumbstickx, thumbsticky,
-  # trackpadx and trackpady. Its buttons are trigger, squeeze, primary (A or
-  # X), secondary (B or Y), thumbstick_click, trackpad_click and menu.
+  # A VR controller's axes are trigger, squeeze (the grip), thumbstickx,
+  # thumbsticky, trackpadx and trackpady. Its buttons are trigger, squeeze,
+  # primary (A or X), secondary (B or Y), thumbstick_click, trackpad_click and
+  # menu.
   vr_left_defaults:
     axes:
       roll: {source: thumbstickx, invert: false, deadzone: 0.15}
@@ -430,9 +431,9 @@ presentation:
   vr_screen_width_deg: 62
   # In VR, the flight HUD is laid out for an image of this size, in pixels,
   # and shown in two parts. The reticle, the target boxes and the arrows are
-  # drawn where the things they point at are, so they line up with them. The
-  # radars, the gauges, the MFDs and the text are drawn into that image and
-  # shown on a flat panel in front of the seat, at this distance in metres.
+  # drawn in the scene, so they line up with what they point at. The radars,
+  # the gauges, the MFDs and the text are drawn into that image and shown on
+  # a flat panel in front of the seat, at this distance in metres.
   # The panel looks the same size at any distance. The player's
   # video.vr_panel_scale sets its size, where 1 covers the same part of the
   # view as the HUD does on a screen.
@@ -445,8 +446,9 @@ presentation:
   # In VR, the arrow that points to a target out of view. Both values are
   # fractions of the part of the view that both eyes see, from its centre:
   # 1 is the edge of that part. vr_hud_arrow_position is where the arrow is
-  # drawn. vr_hud_arrow_view is how far the target must be before the arrow
-  # shows; closer than that, the target is in view and has its box.
+  # drawn. vr_hud_arrow_view is how far from the centre the target must be
+  # for the arrow to show. Closer than that, the target is in view and has
+  # its box.
   vr_hud_arrow_position: 0.85
   vr_hud_arrow_view: 1.0
 # Sound. The Audio tab of OpenXWA Options changes these settings.

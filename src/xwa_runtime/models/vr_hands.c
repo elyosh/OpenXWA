@@ -71,8 +71,8 @@ static int VrHands_ReadHand(const AeronConfigNode* entry, const char* hand, XwaV
 		if (name == NULL || name[0] == '\0' || strlen(name) >= sizeof config->model ||
 			strpbrk(name, "/\\.") != NULL) {
 			Aeron_LogError("xwa.flight",
-						   "%s:%d: vr_hands.%s: model must be the start of a model file's name, without a "
-						   "folder or an extension",
+						   "%s:%d: vr_hands.%s: model must be the name that the model files start with, "
+						   "without a folder or an extension",
 						   XWA_FLIGHT_CONFIG_PATH, AeronConfigNode_Line(model), hand);
 			ok = 0;
 		} else {

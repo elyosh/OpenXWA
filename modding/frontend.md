@@ -585,9 +585,10 @@ keyboard is a flat panel in front of the player, below the screen. Each hand
 points at it, and the trigger presses the key under the hand's beam.
 
 `frontend/vr_keyboard.yaml` replaces the game's keyboard. Without it, the
-game uses its own layout. The player can also keep the game's keyboard with
-the "Use the Mod's Keyboard" option (Controllers > VR). A layout is either rows of keys that the game
-draws, or a picture with a rectangle for each key.
+game uses its own layout. The player can also keep the game's keyboard by
+turning **Use the Mod's Keyboard** off in the Controllers options. A layout
+is either rows of keys that the game draws, or a picture with a rectangle
+for each key.
 
 A layout that the game draws:
 
@@ -660,11 +661,11 @@ keys:
 Only the `hover` colour is used with a picture: it is drawn over the key
 that a hand points at, and over a key that is held.
 
-The keyboard opens by itself when the player creates a pilot, edits a text
-of the classic options, names a film, or edits a text field of the options
-window. For the other text fields, the player opens it with the
-`toggle_vr_keyboard` action, which can be bound to a controller button and
-used on a [cockpit button](materials.md#cockpit-buttons).
+The keyboard opens by itself when the player creates a pilot, names a film,
+or edits a text field in the classic options or in the options window. For
+the other text fields, the player opens it with the `toggle_vr_keyboard`
+action, which can be bound to a controller button and used on a
+[cockpit button](materials.md#cockpit-buttons).
 
 The importer converts the keyboard of an XWAU mod (the picture and the
 rectangles of `Active_Cockpit.cfg`) into a layout with a picture. The keys
