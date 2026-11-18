@@ -50,10 +50,8 @@ typedef enum XwaModernWindowMode {
  * applies at the next start. */
 typedef enum XwaModernVrMode {
 	XWA_MODERN_VR_OFF = 0,
-	/* VR when a headset is found, the window alone otherwise. */
-	XWA_MODERN_VR_AUTO,
-	/* VR, or an error message when it can't start. */
-	XWA_MODERN_VR_REQUIRED,
+	/* VR. When it can't start, the game says why and starts in the window. */
+	XWA_MODERN_VR_ON,
 } XwaModernVrMode;
 
 /* A surround setup: three screens of the same size side by side, the side

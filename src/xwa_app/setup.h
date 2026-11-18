@@ -58,8 +58,8 @@ typedef struct XwaLaunchOptions {
 	   move, for --flight-views stereo. Index 0 is the left hand.
 	   --stereo-hand-buttons: the buttons that each hand holds down. */
 	XwaLaunchStereoHand stereo_hands[2];
-	/* --vr: start in VR, and fail when it can't start (1). --no-vr: start
-	   without VR (-1). 0 follows video.vr_mode of the configuration. */
+	/* --vr: start in VR (1). --no-vr: start without VR (-1). 0 follows
+	   video.vr_mode of the configuration. */
 	int vr;
 	/* --help or -h: print the launch options and quit. */
 	int help;

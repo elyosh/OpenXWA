@@ -32,4 +32,6 @@ void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds);
 /* Tells the player once that the controller settings from an earlier version
  * were reset. */
 void XwaOptionsWindow_ShowControllerResetNotice(void);
+/* Tells the player that VR could not start, with the reason. */
+void XwaOptionsWindow_ShowVrStartNotice(const char* reason);
 #endif

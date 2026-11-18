@@ -698,6 +698,9 @@ int main(int argc, char** argv) {
 		XwaModernInputOptions_Flush();
 		XwaOptionsWindow_ShowControllerResetNotice();
 	}
+	if (Aeron_XrStartError()) {
+		XwaOptionsWindow_ShowVrStartNotice(Aeron_XrStartError());
+	}
 	XwaOptionSection_SetPersist(persist_option_switch);
 	Aeron_LogInfo(
 		"xwa.config", "mouse flight control: %s (%s mode, sensitivity %d, invert Y: %s)",

@@ -108,7 +108,6 @@ bool XwaVideoPage_TakeRestartRequest(void) {
 
 /* The VR mode is read when the game starts, so a change needs a restart. */
 static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) {
-	static const char* const modes[] = { "Off", "Automatic", "Required" };
 	static int started_mode = -1;
 	static int started_render_percent;
 	int mode = (int)options->vr_mode;
@@ -125,12 +124,11 @@ static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) 
 		started_render_percent = render_percent;
 	}
 	AeronUi_Header(ui, "Virtual Reality");
-	if (AeronUi_Selector(ui, "VR Headset", &mode, modes, 3)) {
-		options->vr_mode = (XwaModernVrMode)mode;
+	if (AeronUi_Toggle(ui, "VR Headset", &mode)) {
+		options->vr_mode = mode ? XWA_MODERN_VR_ON : XWA_MODERN_VR_OFF;
 		changed = true;
 	}
-	AeronUi_Help(ui, "Automatic uses a headset when one is ready. Required shows an error and quits "
-					 "when VR can't start. Applies the next time OpenXWA starts.");
+	AeronUi_Help(ui, "Applies the next time OpenXWA starts.");
 	if (mode != XWA_MODERN_VR_OFF) {
 		if (AeronUi_SliderInt(ui, "Headset Render Scale", &render_percent,
 							  (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f), (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5,

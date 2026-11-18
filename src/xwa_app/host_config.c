@@ -470,7 +470,30 @@ static int host_config_surround_options(const AeronConfigFile* config, XwaModern
 								   error_size);
 }
 
-static const char* const host_config_vr_mode_names[] = { "off", "auto", "required" };
+static const char* const host_config_vr_mode_names[] = { "off", "on" };
+
+/* Reads video.vr_mode: off or on, which YAML also reads as booleans. The
+ * names auto and required, which earlier builds wrote, mean on. */
+static int host_config_vr_mode(const AeronConfigFile* config, int* out, unsigned int override_bit,
+							   unsigned int* override_mask, char* error, size_t error_size) {
+	static const char* const names[] = { "off", "on", "auto", "required" };
+	const AeronConfigNode* node = AeronConfigFile_GetNode(config, "video.vr_mode");
+	int value = 0;
+
+	if (node && AeronConfigNode_Type(node) == AERON_CONFIG_BOOL) {
+		*out = AeronConfigNode_Bool(node, 0) ? XWA_MODERN_VR_ON : XWA_MODERN_VR_OFF;
+		*override_mask |= override_bit;
+		return 1;
+	}
+	if (!host_config_named_value(config, "video.vr_mode", names, sizeof names / sizeof names[0], &value,
+								 override_bit, override_mask, error, error_size)) {
+		return 0;
+	}
+	if (node) {
+		*out = value == 0 ? XWA_MODERN_VR_OFF : XWA_MODERN_VR_ON;
+	}
+	return 1;
+}
 
 /* Reads the virtual screen's settings from the presentation section of
  * the shipped remaster/config.yaml. A missing or bad value keeps Aeron's
@@ -517,11 +540,11 @@ void XwaHostConfig_LoadStartup(AeronVfs* vfs, const XwaLaunchOptions* launch, Ae
 	host_config_startup_screen(vfs, options);
 	if (AeronVfs_Exists(vfs, AERON_VFS_ROOT_USER, "config.yaml") &&
 		AeronConfigFile_LoadYamlEx(vfs, AERON_VFS_ROOT_USER, "config.yaml", &config, &config_error)) {
-		if (host_config_named_value(config, "video.vr_mode", host_config_vr_mode_names, 3, &value, 1u,
-									&override_mask, error, sizeof error)) {
-			options->xr_mode = value == XWA_MODERN_VR_REQUIRED ? AERON_XR_REQUIRED
-							   : value == XWA_MODERN_VR_AUTO   ? AERON_XR_AUTO
-															   : AERON_XR_OFF;
+		/* A build without VR ignores the setting, which its options window
+		   doesn't show. */
+		if (host_config_vr_mode(config, &value, 1u, &override_mask, error, sizeof error) &&
+			Aeron_XrSupported()) {
+			options->xr_mode = value == XWA_MODERN_VR_ON ? AERON_XR_ON : AERON_XR_OFF;
 		}
 		if (host_config_video_float(config, "video.vr_render_scale", XWA_MODERN_VR_SCALE_MIN,
 									XWA_MODERN_VR_SCALE_MAX, &scale, 1u, &override_mask, error,
@@ -531,7 +554,7 @@ void XwaHostConfig_LoadStartup(AeronVfs* vfs, const XwaLaunchOptions* launch, Ae
 		AeronConfigFile_Destroy(config);
 	}
 	if (launch && launch->vr) {
-		options->xr_mode = launch->vr > 0 ? AERON_XR_REQUIRED : AERON_XR_OFF;
+		options->xr_mode = launch->vr > 0 ? AERON_XR_ON : AERON_XR_OFF;
 	}
 }
 
@@ -558,8 +581,8 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 		return 0;
 	}
 	value = XWA_MODERN_VR_OFF;
-	if (!host_config_named_value(config, "video.vr_mode", host_config_vr_mode_names, 3, &value,
-								 XWA_MODERN_VIDEO_OVERRIDE_VR_MODE, override_mask, error, error_size)) {
+	if (!host_config_vr_mode(config, &value, XWA_MODERN_VIDEO_OVERRIDE_VR_MODE, override_mask, error,
+							 error_size)) {
 		return 0;
 	}
 	out->vr_mode = (XwaModernVrMode)value;
@@ -1115,7 +1138,7 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 	if (!options || options->window_mode < XWA_MODERN_WINDOW_MODE_WINDOWED ||
 		options->window_mode > XWA_MODERN_WINDOW_MODE_SPAN ||
 		!XwaModernSurroundOptions_Valid(&options->surround) || options->vr_mode < XWA_MODERN_VR_OFF ||
-		options->vr_mode > XWA_MODERN_VR_REQUIRED || !(options->vr_render_scale >= XWA_MODERN_VR_SCALE_MIN) ||
+		options->vr_mode > XWA_MODERN_VR_ON || !(options->vr_render_scale >= XWA_MODERN_VR_SCALE_MIN) ||
 		options->vr_render_scale > XWA_MODERN_VR_SCALE_MAX ||
 		!(options->vr_world_scale >= XWA_MODERN_VR_SCALE_MIN) ||
 		options->vr_world_scale > XWA_MODERN_VR_SCALE_MAX ||
