@@ -643,14 +643,6 @@ static int XwaRemaster_CanPresentFlightDirect(const XwaSnapshot* snap) {
 
 static void XwaRemaster_FatalGpu(const char* operation) { Aeron_RequestFatalRendererError(operation); }
 
-/* out = a * b, for quaternions stored as (x, y, z, w). */
-static void XwaRemaster_QuatMultiply(const float a[4], const float b[4], float out[4]) {
-	out[0] = a[3] * b[0] + a[0] * b[3] + a[1] * b[2] - a[2] * b[1];
-	out[1] = a[3] * b[1] - a[0] * b[2] + a[1] * b[3] + a[2] * b[0];
-	out[2] = a[3] * b[2] + a[0] * b[1] - a[1] * b[0] + a[2] * b[3];
-	out[3] = a[3] * b[3] - a[0] * b[0] - a[1] * b[1] - a[2] * b[2];
-}
-
 void XwaRemaster_GetDebugStereo(XwaRemasterDebugStereo* out) {
 	if (out) {
 		*out = g.debug_stereo;
@@ -707,20 +699,6 @@ static int XwaRemaster_BuildSurroundRig(AeronViewRig* rig) {
 	return 0;
 }
 
-/* Builds the orientation of a head or a hand from its yaw, pitch and roll, in
- * radians. The rig's axes are X right, Y up and -Z forward, so turning right
- * is a negative turn around Y, turning up a positive turn around X, and a
- * clockwise roll a negative turn around Z. The turns are around Y first,
- * then X, then Z: orientation = qy * qx * qz. */
-static void XwaRemaster_QuatFromAngles(float yaw, float pitch, float roll, float out[4]) {
-	const float qy[4] = { 0.0f, sinf(-0.5f * yaw), 0.0f, cosf(-0.5f * yaw) };
-	const float qx[4] = { sinf(0.5f * pitch), 0.0f, 0.0f, cosf(0.5f * pitch) };
-	const float qz[4] = { 0.0f, 0.0f, sinf(-0.5f * roll), cosf(-0.5f * roll) };
-	float qyx[4];
-	XwaRemaster_QuatMultiply(qy, qx, qyx);
-	XwaRemaster_QuatMultiply(qyx, qz, out);
-}
-
 /* Gives Aeron the hands of the debug stereo view. They stay where the
  * launch options put them. */
 static void XwaRemaster_SetFakeHands(const XwaRemasterStereoHand hands[2]) {
@@ -736,8 +714,8 @@ static void XwaRemaster_SetFakeHands(const XwaRemasterStereoHand hands[2]) {
 		fake[hand].pose.position_m[0] = hands[hand].position_m[0];
 		fake[hand].pose.position_m[1] = hands[hand].position_m[1];
 		fake[hand].pose.position_m[2] = -hands[hand].position_m[2];
-		XwaRemaster_QuatFromAngles(hands[hand].angles_deg[0] * degrees, hands[hand].angles_deg[1] * degrees,
-								   hands[hand].angles_deg[2] * degrees, fake[hand].pose.orientation);
+		AeronViewPose_FromAngles(hands[hand].angles_deg[0] * degrees, hands[hand].angles_deg[1] * degrees,
+								 hands[hand].angles_deg[2] * degrees, fake[hand].pose.orientation);
 	}
 	if (fake[0].active || fake[1].active) {
 		Aeron_XrSetFakeHands(fake);
@@ -762,7 +740,7 @@ static int XwaRemaster_BuildDebugStereoRig(AeronViewRig* rig) {
 	const float pitch = (d->mouse_head ? -g.mouse_y * d->mouse_pitch_deg : d->pitch_deg) * degrees;
 	const float roll = d->roll_deg * degrees;
 	AeronViewPose head;
-	XwaRemaster_QuatFromAngles(yaw, pitch, roll, head.orientation);
+	AeronViewPose_FromAngles(yaw, pitch, roll, head.orientation);
 	head.position_m[0] = d->position_m[0];
 	head.position_m[1] = d->position_m[1];
 	head.position_m[2] = -d->position_m[2];
