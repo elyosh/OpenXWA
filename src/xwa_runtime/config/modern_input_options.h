@@ -22,6 +22,8 @@ enum {
 #define XWA_MODERN_VR_STICK_RANGE_MAX 2.0f
 #define XWA_MODERN_VR_BUTTON_RAY_MIN_M 0.05f
 #define XWA_MODERN_VR_BUTTON_RAY_MAX_M 5.0f
+#define XWA_MODERN_HEAD_TRACKING_PORT_MIN 1024
+#define XWA_MODERN_HEAD_TRACKING_PORT_MAX 65535
 
 /* Position: mouse displacement sets a held virtual-stick deflection.
  * Rate: per-frame mouse velocity is the deflection (the TIE Fighter
@@ -41,8 +43,19 @@ typedef enum XwaModernVrStickMode {
 	XWA_MODERN_VR_STICK_MODE_COUNT,
 } XwaModernVrStickMode;
 
-/* The input section of config.yaml: mouse flight, rumble, the saved
- * controller models and the keyboard bindings. */
+/* Head tracking on a screen: the player's head moves the flight view.
+ * TrackIR reads the TrackIR software, or OpenTrack's "freetrack 2.0 Enhanced"
+ * output, and only works on Windows. OpenTrack reads OpenTrack's "UDP over
+ * network" output. */
+typedef enum XwaModernHeadTracking {
+	XWA_MODERN_HEAD_TRACKING_OFF = 0,
+	XWA_MODERN_HEAD_TRACKING_TRACKIR,
+	XWA_MODERN_HEAD_TRACKING_OPENTRACK,
+	XWA_MODERN_HEAD_TRACKING_COUNT,
+} XwaModernHeadTracking;
+
+/* The input section of config.yaml: mouse flight, rumble, head tracking, the
+ * saved controller models and the keyboard bindings. */
 typedef struct XwaModernInputOptions {
 	int mouse_flight_enabled;
 	XwaModernMouseMode mouse_mode;
@@ -53,6 +66,9 @@ typedef struct XwaModernInputOptions {
 	int mouse_invert_y;
 	int rumble_enabled;
 	int rumble_strength;
+	XwaModernHeadTracking head_tracking;
+	/* The UDP port that OpenTrack sends to. */
+	int head_tracking_port;
 	/* Draw gloves in the cockpit where the VR controllers are. */
 	int vr_show_hands;
 	/* Use the mod's gloves when it has some, and not the game's own. */

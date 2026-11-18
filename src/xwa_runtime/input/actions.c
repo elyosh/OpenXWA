@@ -153,7 +153,7 @@ static const XwaActionDefinition g_actions[XWA_INPUT_ACTION_COUNT] = {
 	  XWA_INPUT_ACTION_KIND_COMMAND },
 	{ "switch_seat", "Switch Pilot / Turret Seat", XWA_INPUT_ACTION_CATEGORY_VIEW, KEY_G,
 	  XWA_INPUT_ACTION_KIND_COMMAND },
-	{ "recenter_headset", "Recenter VR View", XWA_INPUT_ACTION_CATEGORY_VIEW, KEY_NONE,
+	{ "recenter_headset", "Recenter Head View", XWA_INPUT_ACTION_CATEGORY_VIEW, KEY_NONE,
 	  XWA_INPUT_ACTION_KIND_HOST },
 	{ "mfd_prev_page", "Previous MFD Page", XWA_INPUT_ACTION_CATEGORY_HUD, KEY_LEFT,
 	  XWA_INPUT_ACTION_KIND_COMMAND },

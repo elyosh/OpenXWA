@@ -499,6 +499,65 @@ static void XwaControllerSettings_Rumble(AeronUiContext* ui) {
 		XwaOptionsWindow_ReportError("The rumble options are invalid.");
 }
 
+/* Head tracking is global too. It applies at once and is saved on Close. */
+static void XwaControllerSettings_HeadTracking(AeronUiContext* ui) {
+	static XwaModernInputOptions options;
+	XwaModernInputOptions_Get(&options);
+	AeronUi_Spacer(ui, 8.0f);
+	AeronUi_Header(ui, "Head Tracking");
+	/* The choices that this build supports, and the setting for each. */
+	const char* names[XWA_MODERN_HEAD_TRACKING_COUNT];
+	XwaModernHeadTracking kinds[XWA_MODERN_HEAD_TRACKING_COUNT];
+	int count = 0;
+	names[count] = "Off";
+	kinds[count++] = XWA_MODERN_HEAD_TRACKING_OFF;
+	if (Aeron_HeadTrackerAvailable(AERON_HEAD_TRACKER_TRACKIR)) {
+		names[count] = "TrackIR";
+		kinds[count++] = XWA_MODERN_HEAD_TRACKING_TRACKIR;
+	}
+	names[count] = "OpenTrack";
+	kinds[count++] = XWA_MODERN_HEAD_TRACKING_OPENTRACK;
+	/* A saved choice that this build doesn't support shows as Off. */
+	int index = 0;
+	for (int i = 0; i < count; i++) {
+		if (kinds[i] == options.head_tracking)
+			index = i;
+	}
+	if (AeronUi_Selector(ui, "Head Tracking", &index, names, count)) {
+		options.head_tracking = kinds[index];
+		if (!XwaModernInputOptions_Set(&options))
+			XwaOptionsWindow_ReportError("The head tracking options are invalid.");
+	}
+	if (kinds[index] == XWA_MODERN_HEAD_TRACKING_TRACKIR) {
+		AeronUi_Help(ui, "Also works with OpenTrack's \"freetrack 2.0 Enhanced\" output.");
+	} else if (kinds[index] == XWA_MODERN_HEAD_TRACKING_OPENTRACK) {
+		char help[160];
+		snprintf(help, sizeof help,
+				 "In OpenTrack, choose the \"UDP over network\" output, with the address 127.0.0.1 and the "
+				 "port %d.",
+				 options.head_tracking_port);
+		AeronUi_Help(ui, help);
+	}
+	/* Shows whether the tracker is sending, so the player can check the setup
+	 * here. In VR the headset gives the head pose, and the tracker isn't
+	 * read. */
+	if (kinds[index] == XWA_MODERN_HEAD_TRACKING_OFF || Aeron_XrSessionRunning())
+		return;
+	switch (Aeron_HeadTrackerStatus()) {
+		case AERON_HEAD_TRACKER_TRACKING:
+			AeronUi_Help(ui, "Receiving your head movement.");
+			break;
+		case AERON_HEAD_TRACKER_WAITING:
+			AeronUi_Help(ui, "Not receiving any head movement.");
+			break;
+		case AERON_HEAD_TRACKER_FAILED:
+			AeronUi_Error(ui, Aeron_HeadTrackerError());
+			break;
+		default:
+			break;
+	}
+}
+
 /* The VR options are global too. They apply at once and are saved on Close. */
 static void XwaControllerSettings_Vr(AeronUiContext* ui) {
 	static XwaModernInputOptions options;
@@ -548,6 +607,7 @@ static void XwaControllerSettings_AxisPage(XwaControllerSettings* settings, Aero
 		AeronUi_CancelControllerCapture(ui);
 	XwaControllerSettings_AxisEditor(settings, ui, controller, (XwaInputAxis)settings->axis);
 	XwaControllerSettings_Rumble(ui);
+	XwaControllerSettings_HeadTracking(ui);
 	XwaControllerSettings_Vr(ui);
 }
 

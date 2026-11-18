@@ -702,7 +702,7 @@ void XwaRemasterFlight_SetViewRig(const AeronViewRig* rig);
 
 /* Gives the head's pose for the next XwaRemasterFlight_Render, in the space
  * of the seat, which is the game camera: X right, Y up, -Z forward, in
- * metres. The one view is then the seat's view moved and turned by the pose,
+ * metres. The view is then the seat's view moved and turned by the pose,
  * with the game's own projection. The cockpit stays on the seat, and the HUD
  * stays flat on the screen. NULL removes the pose. It is ignored with a view
  * rig and for the map. */

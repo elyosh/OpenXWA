@@ -1900,8 +1900,8 @@ static void xwa_tool_flight_views(int* open, void* user) {
 	bool changed = ImGui::Checkbox("Stereo view", &enabled);
 	ImGui::TextWrapped("Draws the two eyes of a headset side by side, to test the renderer without a "
 					   "headset. The game camera is the seat, and the head moves from it.");
-	changed |= ImGui::Checkbox("The head moves the one view", &flat);
-	ImGui::TextWrapped("While the stereo view is off: the head below moves the flight view, as a head "
+	changed |= ImGui::Checkbox("The head moves the flight view", &flat);
+	ImGui::TextWrapped("While the stereo view is off, the head below moves the flight view, as a head "
 					   "tracker does.");
 	changed |= ImGui::SliderFloat("Eye distance (m)", &stereo.ipd_m, 0.0f, 0.2f, "%.3f");
 	changed |= ImGui::SliderFloat("Field of view (deg)", &stereo.fov_deg, 30.0f, 150.0f, "%.0f");

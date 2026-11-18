@@ -63,6 +63,12 @@ int XwaModernInputOptions_Validate(const XwaModernInputOptions* options, char* e
 		options->vr_button_ray_m > XWA_MODERN_VR_BUTTON_RAY_MAX_M) {
 		return XwaModernInputOptions_Error(error, error_size, "VR controller setting is invalid");
 	}
+	if (options->head_tracking < XWA_MODERN_HEAD_TRACKING_OFF ||
+		options->head_tracking >= XWA_MODERN_HEAD_TRACKING_COUNT ||
+		options->head_tracking_port < XWA_MODERN_HEAD_TRACKING_PORT_MIN ||
+		options->head_tracking_port > XWA_MODERN_HEAD_TRACKING_PORT_MAX) {
+		return XwaModernInputOptions_Error(error, error_size, "head tracking setting is invalid");
+	}
 	return XwaControllerOptions_Validate(&options->controllers, error, error_size) &&
 		   XwaModernInputOptions_ValidateKeyboard(&options->keyboard, error, error_size);
 }
@@ -85,6 +91,7 @@ int XwaModernInputOptions_Equal(const XwaModernInputOptions* a, const XwaModernI
 	return a->mouse_flight_enabled == b->mouse_flight_enabled && a->mouse_mode == b->mouse_mode &&
 		   a->mouse_sensitivity == b->mouse_sensitivity && a->mouse_invert_y == b->mouse_invert_y &&
 		   a->rumble_enabled == b->rumble_enabled && a->rumble_strength == b->rumble_strength &&
+		   a->head_tracking == b->head_tracking && a->head_tracking_port == b->head_tracking_port &&
 		   a->vr_show_hands == b->vr_show_hands && a->vr_mod_hands == b->vr_mod_hands &&
 		   a->vr_mod_keyboard == b->vr_mod_keyboard && a->vr_menu_controllers == b->vr_menu_controllers &&
 		   a->vr_stick == b->vr_stick && a->vr_stick_hand == b->vr_stick_hand &&

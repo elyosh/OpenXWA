@@ -809,6 +809,8 @@ static int host_config_input_int(const AeronConfigFile* config, const char* key,
 
 static const char* const k_vr_stick_names[XWA_MODERN_VR_STICK_MODE_COUNT] = { "off", "tilt", "slide" };
 static const char* const k_vr_hand_names[] = { "left", "right" };
+static const char* const k_head_tracking_names[XWA_MODERN_HEAD_TRACKING_COUNT] = { "off", "trackir",
+																				   "opentrack" };
 
 /* Reads an input setting that is one of `count` names. */
 static int host_config_input_name(const AeronConfigFile* config, const char* key, int required,
@@ -884,6 +886,15 @@ static int host_config_input_scalars(const AeronConfigFile* config, int required
 		return 0;
 	}
 	out->vr_stick = (XwaModernVrStickMode)stick;
+	int head_tracking = out->head_tracking;
+	if (!host_config_input_name(config, "input.head_tracking", required, k_head_tracking_names,
+								XWA_MODERN_HEAD_TRACKING_COUNT, &head_tracking, error, error_size) ||
+		!host_config_input_int(config, "input.head_tracking_port", required,
+							   XWA_MODERN_HEAD_TRACKING_PORT_MIN, XWA_MODERN_HEAD_TRACKING_PORT_MAX,
+							   &out->head_tracking_port, error, error_size)) {
+		return 0;
+	}
+	out->head_tracking = (XwaModernHeadTracking)head_tracking;
 	if (!host_config_input_bool(config, "input.vr_cockpit_buttons", required, &out->vr_cockpit_buttons, error,
 								error_size) ||
 		!host_config_input_float(config, "input.vr_stick_range", required, XWA_MODERN_VR_STICK_RANGE_MIN,
@@ -1268,6 +1279,14 @@ static int host_config_set_input_options(AeronConfigFile* document, const XwaMod
 				  ? host_config_remove_key(document, "input.vr_stick_range", error)
 				  : AeronConfigFile_SetFloat(document, "input.vr_stick_range", options->vr_stick_range,
 											 error));
+	}
+	if (ok) {
+		ok = (options->head_tracking == defaults->head_tracking
+				  ? host_config_remove_key(document, "input.head_tracking", error)
+				  : AeronConfigFile_SetString(document, "input.head_tracking",
+											  k_head_tracking_names[options->head_tracking], error)) &&
+			 host_config_set_input_int(document, "input.head_tracking_port", options->head_tracking_port,
+									   defaults->head_tracking_port, error);
 	}
 	/* input.controllers replaces the shipped list as a whole. */
 	if (ok) {

@@ -178,6 +178,12 @@ static void apply_modern_input_options(const XwaModernInputOptions* options) {
 		XwaKeyboardMapping_Install(&options->keyboard);
 	}
 	XwaControllerMapping_SetRumbleEnabled(options->rumble_enabled);
+	/* Aeron treats a kind that this build doesn't support as none. */
+	Aeron_SetHeadTracker(
+		options->head_tracking == XWA_MODERN_HEAD_TRACKING_TRACKIR     ? AERON_HEAD_TRACKER_TRACKIR
+		: options->head_tracking == XWA_MODERN_HEAD_TRACKING_OPENTRACK ? AERON_HEAD_TRACKER_OPENTRACK
+																	   : AERON_HEAD_TRACKER_NONE,
+		options->head_tracking_port);
 	XwaRemasterVrHands_SetEnabled(options->vr_show_hands);
 	XwaVrHands_SetUseMod(options->vr_mod_hands);
 	XwaVrKeyboard_SetUseMod(options->vr_mod_keyboard);
@@ -847,6 +853,9 @@ int main(int argc, char** argv) {
 			const int recenter = host_action_pressed(in, XWA_INPUT_ACTION_RECENTER_HEADSET);
 			if (recenter && Aeron_XrEnabled()) {
 				Aeron_XrRecenter();
+				toggled |= recenter == 1;
+			} else if (recenter && Aeron_HeadTrackerStatus() == AERON_HEAD_TRACKER_TRACKING) {
+				Aeron_HeadTrackerRecenter();
 				toggled |= recenter == 1;
 			}
 			/* The Dynamic Cockpit holograms, while a cockpit with screens is

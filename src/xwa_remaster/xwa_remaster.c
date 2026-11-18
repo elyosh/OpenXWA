@@ -134,6 +134,11 @@ static struct {
 	/* The flight scene gave its eye images to the headset in this frame. */
 	int xr_views_submitted;
 	AeronViewRig headset_rig;
+	/* The head tracker's last pose, and how far the flight view follows it:
+	 * from 0, the centre, to 1. `head_time_us` is when it was last read. */
+	AeronViewPose head_tracker_pose;
+	float head_weight;
+	uint64_t head_time_us;
 	uint64_t headset_generation;
 	AeronRenderTarget* xr_targets[AERON_MAX_VIEWS];
 	AeronXrAreaMesh xr_hidden_areas[AERON_MAX_VIEWS];
@@ -740,6 +745,54 @@ static void XwaRemaster_DebugHeadPose(AeronViewPose* out) {
 	out->position_m[2] = -d->position_m[2];
 }
 
+/* How long the view takes to follow a head tracker that starts sending, and
+ * to go back to the centre when it stops. */
+#define RM_HEAD_BLEND_US 250000.0f
+
+/* Gives the head pose that moves the flight view: the debug UI's test head,
+ * or the head tracker's. Returns 0 when there is none. `shown` says
+ * whether this frame can use a head pose. When the tracker starts or stops,
+ * the view follows over a quarter of a second, so that it doesn't jump.
+ * Call it once per host frame. */
+static int XwaRemaster_HeadPose(int shown, AeronViewPose* out) {
+	const uint64_t now_us = Aeron_NowUs();
+	const float elapsed_us = g.head_time_us ? (float)(now_us - g.head_time_us) : 0.0f;
+	g.head_time_us = now_us;
+	if (!shown) {
+		g.head_weight = 0.0f;
+		return 0;
+	}
+	if (g.debug_stereo.flat_head && !g.debug_stereo.enabled) {
+		/* The test head is used as it is, without the blend, so that captures
+		 * can be compared. */
+		g.head_weight = 0.0f;
+		XwaRemaster_DebugHeadPose(out);
+		return 1;
+	}
+	const int tracking = Aeron_HeadTrackerPose(&g.head_tracker_pose);
+	const float step = elapsed_us / RM_HEAD_BLEND_US;
+	g.head_weight = tracking ? fminf(g.head_weight + step, 1.0f) : fmaxf(g.head_weight - step, 0.0f);
+	if (!(g.head_weight > 0.0f)) {
+		return 0;
+	}
+	/* Blend between the centre and the tracker's last pose. A quaternion and
+	 * its negative are the same orientation: the sign picks the one that is
+	 * closer to the centre, so the view turns the short way. */
+	const float* q = g.head_tracker_pose.orientation;
+	const float sign = q[3] < 0.0f ? -1.0f : 1.0f;
+	const float w = g.head_weight;
+	float blended[4] = { w * sign * q[0], w * sign * q[1], w * sign * q[2], (1.0f - w) + w * sign * q[3] };
+	const float length = sqrtf(blended[0] * blended[0] + blended[1] * blended[1] + blended[2] * blended[2] +
+							   blended[3] * blended[3]);
+	for (int i = 0; i < 4; i++) {
+		out->orientation[i] = length > 0.0f ? blended[i] / length : (i == 3 ? 1.0f : 0.0f);
+	}
+	for (int axis = 0; axis < 3; axis++) {
+		out->position_m[axis] = w * g.head_tracker_pose.position_m[axis];
+	}
+	return 1;
+}
+
 /* Builds the debug UI's stereo rig: two eyes side by side in the render
  * target. */
 static int XwaRemaster_BuildDebugStereoRig(AeronViewRig* rig) {
@@ -807,8 +860,6 @@ static int XwaRemaster_BuildHeadsetRig(const XwaSnapshot* snap, AeronViewRig* ri
 static void XwaRemaster_UpdateViewRig(const XwaSnapshot* snap) {
 	AeronViewRig rig;
 	RmRigKind kind = RM_RIG_NONE;
-	/* The head turns the view, so the cockpit look keys don't. */
-	XwaPort_SetCockpitLookSuppressed(Aeron_XrSessionRunning());
 	if (XwaRemaster_BuildHeadsetRig(snap, &rig)) {
 		kind = RM_RIG_HEADSET;
 	} else if (g.debug_stereo.enabled && XwaRemaster_BuildDebugStereoRig(&rig)) {
@@ -848,18 +899,16 @@ static void XwaRemaster_UpdateViewRig(const XwaSnapshot* snap) {
 		rig.generation = g.rig_generation;
 	}
 	XwaRemasterFlight_SetViewRig(kind != RM_RIG_NONE ? &rig : NULL);
-	/* A head pose moves the one view of the HD renderer. The classic and the
-	 * split views show the game camera, so they get none. */
+	/* A head pose moves the HD renderer's single view. The classic and split
+	 * views show the game camera, so they get no head pose. */
 	AeronViewPose head;
 	const int head_view = kind == RM_RIG_NONE && snap && snap->scene_kind == XWA_SCENE_FLIGHT &&
 						  snap->flight_camera_valid && g.mode == RM_VIEW_HD && !g.pending_mode_valid &&
 						  g.ramp.alpha >= 1.0f;
-	int has_head = 0;
-	if (head_view && g.debug_stereo.flat_head) {
-		XwaRemaster_DebugHeadPose(&head);
-		has_head = 1;
-	}
+	const int has_head = XwaRemaster_HeadPose(head_view, &head);
 	XwaRemasterFlight_SetHeadPose(has_head ? &head : NULL);
+	/* The head turns the view, so the cockpit look keys don't. */
+	XwaPort_SetCockpitLookSuppressed(Aeron_XrSessionRunning() || has_head);
 	/* The hands follow the head: the headset's world scale moves both. The
 	 * debug stereo view has no world scale. */
 	AeronXrHand hands[2];

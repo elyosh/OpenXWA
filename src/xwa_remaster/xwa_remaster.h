@@ -58,7 +58,7 @@ typedef struct XwaRemasterInitOptions {
 	/* --head-pose: the test head's yaw, pitch and roll in degrees, then its
 	   position in metres. Positive is right, up and clockwise, then right, up
 	   and forward. With flight_views 2, it is the head of the stereo view.
-	   Otherwise, when head_pose_set is nonzero, it moves the one view. */
+	   Otherwise, when head_pose_set is nonzero, it moves the flight view. */
 	float head_pose[6];
 	int head_pose_set;
 	/* --stereo-hand-left, --stereo-hand-right and --stereo-hand-buttons: the
@@ -133,7 +133,7 @@ typedef struct XwaRemasterDebugStereo {
 	float roll_deg;
 	/* The head's position from the seat, in metres: right, up, forward. */
 	float position_m[3];
-	/* While the stereo view is off: the head moves the one view, as a head
+	/* While the stereo view is off, the head moves the flight view, as a head
 	 * tracker does. */
 	int flat_head;
 } XwaRemasterDebugStereo;

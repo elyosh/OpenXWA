@@ -8,6 +8,13 @@ input:
   mouse_invert_y: true
   rumble_enabled: true
   rumble_strength: 6
+  # Head tracking on a screen: the player's head moves the flight view. One
+  # of 'off', 'trackir' or 'opentrack'. 'trackir' reads the TrackIR software,
+  # or OpenTrack's "freetrack 2.0 Enhanced" output, and only works on
+  # Windows. 'opentrack' reads OpenTrack's "UDP over network" output.
+  head_tracking: 'off'
+  # The UDP port that OpenTrack sends to, from 1024 to 65535.
+  head_tracking_port: 4242
   # Show the player's hands in the cockpit, where the VR controllers are.
   vr_show_hands: true
   # Use the mod's hand models when it has some. When false, the game's own

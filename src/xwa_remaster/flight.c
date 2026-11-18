@@ -3498,8 +3498,8 @@ static void fl_place_view(const XwaRemasterFlightView* seat, const AeronViewPose
 	fl_rows_to_quat(rows, out->camera.ori);
 }
 
-/* Builds the one view of a frame with a head pose: the seat's view, moved and
- * turned by the head, with the game's own projection. */
+/* Builds the view of a frame that has a head pose: the seat's view, moved
+ * and turned by the head, with the game's own projection. */
 static void fl_build_head_view(const XwaRemasterFlightView* seat, const AeronViewPose* pose,
 							   XwaRemasterFlightView* out) {
 	fl_place_view(seat, pose, out);
@@ -8706,7 +8706,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	/* The map is drawn as one view, with the game camera. */
 	const int tunnel = hyperspace && hyperspace_moment.phase == XWA_HYPERSPACE_TUNNEL;
 	const AeronViewRig* rig = s.rig_active && !cam->map_mode ? &s.rig : NULL;
-	/* A head pose moves the one view of a frame without a rig. The map keeps
+	/* Without a rig, a head pose moves the frame's single view. The map keeps
 	 * the game camera. */
 	const AeronViewPose* head = s.head_active && !s.rig_active && !cam->map_mode ? &s.head_pose : NULL;
 	s.head_previous_pose = s.head_frame_used ? s.head_frame_pose : fl_identity_pose;
@@ -8812,7 +8812,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			pc->film_overlay == cam->film_overlay && snap->game_time_ticks >= prev->game_time_ticks) {
 			fl_build_view_at_origin(pc, s.origin_world, s.rt_w, s.rt_h, previous_rotation,
 									&previous_flight_view);
-			/* The one view's previous camera. With a head pose, it is the
+			/* The view's previous camera. With a head pose, it is the
 			 * previous seat with the head pose of the last frame. */
 			XwaRemasterFlightView previous_view = previous_flight_view;
 			if (head) {

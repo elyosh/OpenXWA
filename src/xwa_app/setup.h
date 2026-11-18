@@ -54,7 +54,7 @@ typedef struct XwaLaunchOptions {
 	/* --head-pose: the test head's yaw, pitch and roll in degrees, then its
 	   position in metres. Positive is right, up and clockwise, then right, up
 	   and forward. It is the head of --flight-views stereo, or it moves the
-	   one view. */
+	   flight view. */
 	float head_pose[6];
 	int head_pose_set;
 	/* --stereo-hand-left and --stereo-hand-right: a VR hand that doesn't
