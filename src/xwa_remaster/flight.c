@@ -9506,8 +9506,16 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 
 	/* Only the flight view: the map shows ships small on purpose. */
 	const float px_per_1080 = (float)s.rt_h / 1080.0f;
-	AeronScene_SetSmallInstanceCull(s.scene, s.small_prepass_min_size * px_per_1080,
-									s.small_draw_min_size * px_per_1080);
+	/* The scene measures an object in render pixels. With temporal upscaling
+	 * the render is smaller than the picture, so these thresholds are scaled
+	 * to the render height. An object then disappears at the same size in the
+	 * picture as without upscaling. */
+	int small_render_w = 0;
+	int small_render_h = 0;
+	AeronScene_RenderDims(s.scene, &small_render_w, &small_render_h);
+	const float render_px_per_1080 = (float)small_render_h / 1080.0f;
+	AeronScene_SetSmallInstanceCull(s.scene, s.small_prepass_min_size * render_px_per_1080,
+									s.small_draw_min_size * render_px_per_1080);
 	AeronScene_SetShadowCasterMinSize(s.scene, s.small_shadow_min_size * px_per_1080);
 	AeronScene_SetLodMaxError(s.scene, s.lod_max_error * px_per_1080);
 	AeronScene_SetLodTint(s.scene, s.lod_tint);
