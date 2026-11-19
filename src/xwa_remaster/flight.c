@@ -982,6 +982,7 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"point_lights.model_lights",     "presentation.latency_pacing",
 		"hyperspace_jump.exit_forward",  "hyperspace_jump.warp_sky_half_resolution",
 		"models.backface_fill",          "point_lights.merge_spot_lights",
+		"point_lights.light_lists",
 	};
 	static const char* strings[] = {
 		"presentation.cockpit_fov",
@@ -1892,6 +1893,7 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 	s.plight.cluster_depth_slices = (int)AeronConfigFile_GetInt(cf, "point_lights.cluster_depth_slices", 0);
 	s.plight.cluster_debug = AeronConfigFile_GetBool(cf, "point_lights.cluster_debug", 0);
 	s.plight.merge_spot_lights = AeronConfigFile_GetBool(cf, "point_lights.merge_spot_lights", 0);
+	s.plight.light_lists = AeronConfigFile_GetBool(cf, "point_lights.light_lists", 0);
 	s.plight.match_distance_m = (float)AeronConfigFile_GetFloat(cf, "point_lights.match_distance_m", 0.0);
 	s.plight.range_scale = (float)AeronConfigFile_GetFloat(cf, "point_lights.range_scale", 0.0);
 	s.plight.cockpit_explosion_light_scale =
@@ -2473,8 +2475,10 @@ void XwaRemasterFlight_LogFrameStats(void) {
 				  frame.instances, frame.shadow_casters, frame.lights, frame.billboards, casters,
 				  shadows.cascade_count, frame.shadow_draws);
 	for (uint32_t view = 0; view < frame.view_count && view < AERON_MAX_VIEWS; view++) {
-		Aeron_LogInfo("xwa.benchmark", "film benchmark: view %u of %u: %u instances drawn, %u draws",
-					  view + 1, frame.view_count, frame.visible_instances[view], frame.view_draws[view]);
+		Aeron_LogInfo("xwa.benchmark",
+					  "film benchmark: view %u of %u: %u instances drawn, %u with a light list, %u draws",
+					  view + 1, frame.view_count, frame.visible_instances[view], frame.light_lists[view],
+					  frame.view_draws[view]);
 	}
 }
 
@@ -5910,6 +5914,7 @@ static int fl_configure_clustered_lights(AeronScene3D* scene) {
 													.depth_slices = (uint32_t)s.plight.cluster_depth_slices,
 													.debug_view = s.plight.cluster_debug,
 													.merge_spot_lights = s.plight.merge_spot_lights,
+													.light_lists = s.plight.light_lists,
 												});
 }
 

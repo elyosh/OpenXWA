@@ -816,6 +816,12 @@ point_lights:
   # engines, are shaded as one light away from them. Near them, they stay
   # separate.
   merge_spot_lights: true
+  # Makes large models faster to draw when only a few lights reach them,
+  # for example the cockpit lit by the engines of a far ship. The picture
+  # doesn't change, with one exception: on such a model, spot lights that
+  # merge_spot_lights groups are always drawn as one light. Turn this off
+  # to compare the speed with and without it.
+  light_lists: true
   # The game's lights (lasers, explosions, engines) are physical
   # inverse-square sphere lights from the classic intensities. This many
   # metres away they give what the classic law gives, converted by

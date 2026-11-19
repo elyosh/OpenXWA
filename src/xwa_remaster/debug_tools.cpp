@@ -560,6 +560,13 @@ static void xwa_tool_point_lights(int* open, void* user) {
 	}
 	ImGui::TextDisabled("Spot lights close together that point the same way, such as\n"
 						"a ship's engines, are shaded as one light away from them.");
+	bool light_lists = p.light_lists != 0;
+	if (ImGui::Checkbox("Light lists for large models", &light_lists)) {
+		p.light_lists = light_lists ? 1 : 0;
+		changed = true;
+	}
+	ImGui::TextDisabled("Draws a large model faster when only a few lights reach\n"
+						"it. The picture should not change.");
 	XwaFlightPointLightStats stats;
 	XwaRemasterFlight_GetPointLightStats(&stats);
 	ImGui::Text("Candidates %u, valid %u, invalid %u, overflow %u", stats.generated_count, stats.valid_count,

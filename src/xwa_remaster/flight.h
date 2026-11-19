@@ -210,6 +210,9 @@ typedef struct XwaFlightPointLightParams {
 	 * ship's engines, as one light far from them
 	 * (AeronSceneClusteredLightDesc.merge_spot_lights). */
 	int merge_spot_lights;
+	/* Draw large models faster when only a few lights reach them
+	 * (AeronSceneClusteredLightDesc.light_lists). */
+	int light_lists;
 	float match_distance_m; /* metres at which a light is as bright as the classic law */
 	float range_scale;      /* multiplies the derived falloff range */
 	/* While the cockpit is drawn, the light of an explosion up to
