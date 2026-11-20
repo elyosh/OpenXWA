@@ -716,7 +716,11 @@ Each e-mail is a block that ends with a line holding `*`:
 | 1 | The number of the mission, as in `MISSION.LST`, from which the e-mail is in the inbox. |
 | 2 | The sender, up to 63 characters. |
 | 3 | The subject, up to 127 characters. |
-| Next lines | The message, one line of text for each line of the file, up to 1023 characters in all. |
+| Next lines | The message, one line of text for each line of the file, up to 73,727 characters in all. A line of the file can have up to 65,534 characters. |
+
+A message with more lines than the box shows gets a scroll bar. The
+original game took up to 1023 characters, and showed only the start of a
+long message.
 
 Keep the e-mails in the order of their mission numbers. The game stops
 reading at the first e-mail for a mission that the player hasn't reached.

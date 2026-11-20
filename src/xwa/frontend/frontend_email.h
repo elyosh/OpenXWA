@@ -10,7 +10,13 @@ typedef struct FrontendEmailEntry {
 	int emailIndex;
 	char from[64];
 	char subject[128];
+#ifdef XWA_MODERN
+	/* The original body holds 1024 bytes. This one lets mods write long
+	   emails. */
+	char body[73728];
+#else
 	char body[1024];
+#endif
 } FrontendEmailEntry;
 
 extern int g_frontendFamilyHasNewEmail;

@@ -224,6 +224,7 @@ set(XWA_RUNTIME_SOURCES
     src/xwa_runtime/frontend/awards.c
     src/xwa_runtime/frontend/concourse_layout.c
     src/xwa_runtime/frontend/concourse_planet.c
+    src/xwa_runtime/frontend/email_body.c
     src/xwa_runtime/frontend/family_missions.c
     src/xwa_runtime/frontend/frontend_config.c
     src/xwa_runtime/frontend/frontend_fonts.c

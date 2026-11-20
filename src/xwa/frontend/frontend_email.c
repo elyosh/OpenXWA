@@ -20,6 +20,9 @@
 #include "xwa/frontend/frontend_text.h"
 #include "xwa/frontend/mission_setup.h"
 #include "xwa/util/memory.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/email_body.h"
+#endif
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -168,7 +171,13 @@ int FrontendEmail_SortEntries(void) {
 int FrontendEmail_LoadList(void) {
 	XwaFile* stream;
 	int count;
+#ifdef XWA_MODERN
+	/* The original reads lines of up to 1 KB, and splits a longer line in
+	   two. */
+	static char buffer[0x10000];
+#else
 	char buffer[1024];
+#endif
 
 	if (g_frontendEmailEntries != NULL) {
 		Mem_Free(g_frontendEmailEntries);
@@ -330,6 +339,9 @@ int FrontendEmail_DrawInbox(void) {
 		g_frontendEmailSelectedRow = 0;
 		g_frontendEmailScrollOffset = 0;
 		g_frontendFamilyPageResetPending = 0;
+#ifdef XWA_MODERN
+		XwaEmailBody_Reset();
+#endif
 	}
 
 	FrontendDraw_RectAssign(&rect, 70, 60, 570, 230);
@@ -447,8 +459,13 @@ int FrontendEmail_DrawInbox(void) {
 	FrontendDraw_RectOutline(&rect, 0, 0, (short)g_colorSlateBlue);
 	FrontendDraw_RectInsetXY(&rect, 2, 0);
 	if (g_frontendEmailSelectedRow < g_frontendEmailCount) {
+#ifdef XWA_MODERN
+		XwaEmailBody_Draw(g_frontendEmailEntries[g_frontendEmailSelectedRow].body,
+						  g_frontendEmailEntries[g_frontendEmailSelectedRow].emailIndex, &rect);
+#else
 		FrontendText_DrawWrappedClipped(12, g_frontendEmailEntries[g_frontendEmailSelectedRow].body, &rect,
 										g_colorLightBlue, 3, 0);
+#endif
 		g_pilotData.emailsStatus[g_frontendEmailEntries[g_frontendEmailSelectedRow].emailIndex] = 2;
 	}
 
