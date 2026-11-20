@@ -390,7 +390,8 @@ static XwaGeometryAtlas* geometry_read_atlas(const char* path, int needs_id) {
 /* Reads a video's YAML file. Returns NULL when the file is missing or has an
  * error, which is logged. */
 static XwaGeometryAtlas* geometry_read_video(const char* path) {
-	static const char* const keys[] = { "video", "size", "offset", "classic_frames", "fps", "layout", NULL };
+	static const char* const keys[] = { "video",       "size",   "offset", "classic_frames", "fps", "layout",
+										"keep_aspect", NULL };
 	AeronConfigFile* file = NULL;
 	const AeronConfigNode* root;
 	const AeronConfigNode* value;
@@ -459,6 +460,16 @@ static XwaGeometryAtlas* geometry_read_video(const char* path) {
 		atlas->fps = (float)AeronConfigNode_Float(value, 0.0);
 		if (atlas->fps <= 0.0f) {
 			Aeron_LogError("xwa.frontend", "%s:%d: fps must be a positive number", path,
+						   AeronConfigNode_Line(value));
+			ok = 0;
+		}
+	}
+	value = AeronConfigNode_MapGet(root, "keep_aspect");
+	if (ok && value != NULL) {
+		if (strcmp(AeronConfigNode_String(value, ""), "height") == 0) {
+			frame.keep_aspect = XWA_GEOMETRY_KEEP_ASPECT_HEIGHT;
+		} else {
+			Aeron_LogError("xwa.frontend", "%s:%d: keep_aspect must be height", path,
 						   AeronConfigNode_Line(value));
 			ok = 0;
 		}

@@ -194,6 +194,7 @@ fps: 24
 | `classic_frames` | The number of frames that the game sees, from 1 to 4096. The default is 1. |
 | `fps` | The frames per second to play at. The default is the video's own rate. |
 | `layout` | `classic`, `wide` or `fill`: the layout of the screen while the video is its background. See [Background layouts](#background-layouts). |
+| `keep_aspect` | `height` draws the video at the height of `size` and works out the width from the shape of the video's frames. Use it for a video that must not be squeezed on a `fill` or `classic` screen, where `size` is narrower on screen than on a `wide` screen. |
 
 The video plays in a loop, with no sound, for as long as the game draws the
 image, whatever frame the game asks for. When the image disappears and

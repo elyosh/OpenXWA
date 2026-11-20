@@ -32,8 +32,10 @@ AeronVideoPlayer* XwaFrontendVideo_Player(int slot);
  * recorded this tick. */
 void XwaFrontendVideo_Close(int slot);
 /* Adds a video record for the current frame of `slot`, stretched over x, y,
- * width, height in 640x480 units. */
-void XwaFrontendVideo_Draw(int slot, float x, float y, float width, float height);
+ * width, height in 640x480 units. With `keep_height`, the width is ignored:
+ * the video keeps its height, and its width comes from the shape of its
+ * frames, so it isn't squeezed on a screen whose units aren't square. */
+void XwaFrontendVideo_Draw(int slot, float x, float y, float width, float height, int keep_height);
 
 /* For the renderer: a texture with the current frame of `slot`. Returns NULL
  * when no frame is ready, or when the slot now holds a different player than
@@ -42,11 +44,13 @@ void XwaFrontendVideo_Draw(int slot, float x, float y, float width, float height
 AeronTexture* XwaFrontendVideo_Texture(int slot, unsigned serial, AeronCommandBuffer* cmd);
 
 /* Draws a video that replaces an image (see frontend_geometry.h), looping,
- * stretched over x, y, width, height in 640x480 units. `path` is the video's
- * path in the mod folder. The video opens the first time it is drawn. It
+ * stretched over x, y, width, height in 640x480 units, or drawn at its
+ * height with `keep_height`, as XwaFrontendVideo_Draw does. `path` is the
+ * video's path in the mod folder. The video opens the first time it is drawn. It
  * closes when a frontend frame passes without drawing it, or when the game
  * frees the image (XwaFrontendVideo_FreeImage). */
-void XwaFrontendVideo_DrawImage(const char* path, float fps, float x, float y, float width, float height);
+void XwaFrontendVideo_DrawImage(const char* path, float fps, float x, float y, float width, float height,
+								int keep_height);
 /* Closes the video at `path` when the game frees the image it replaces. */
 void XwaFrontendVideo_FreeImage(const char* path);
 

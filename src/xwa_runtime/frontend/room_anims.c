@@ -500,7 +500,7 @@ static void anim_draw(const XwaRoomAnim* anim, int slot, AeronVideoPlayer* playe
 		width = XwaFrontendGeometry_UnitsX((float)info.display_width / anim->scale);
 		height = XwaFrontendGeometry_UnitsY((float)info.display_height / anim->scale);
 	}
-	XwaFrontendVideo_Draw(slot, anim->x, anim->y, width, height);
+	XwaFrontendVideo_Draw(slot, anim->x, anim->y, width, height, 0);
 }
 
 /* Plays the animation's sound, at the volume of the game's datapad sounds. */

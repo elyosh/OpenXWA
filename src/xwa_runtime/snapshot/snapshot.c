@@ -1032,7 +1032,8 @@ static void snapshot_emit_image_video(const XwaGeometryAtlas* video, int dst_x, 
 	g_next_sprite_frac_x = 0;
 	g_next_sprite_frac_y = 0;
 	XwaFrontendVideo_DrawImage(video->video, video->fps, x, y, XwaFrontendGeometry_UnitsX(frame->size[0]),
-							   XwaFrontendGeometry_UnitsY(frame->size[1]));
+							   XwaFrontendGeometry_UnitsY(frame->size[1]),
+							   frame->keep_aspect == XWA_GEOMETRY_KEEP_ASPECT_HEIGHT);
 }
 
 void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, const int16_t src_ltrb[4],
@@ -1107,7 +1108,8 @@ void XwaSnapshot_EmitAtlasSprite(int group_id, int index, int x, int y, int img_
 	stamp_clip(&d->clip_left, &d->clip_top, &d->clip_right, &d->clip_bottom);
 }
 
-void XwaSnapshot_EmitVideo(int slot, unsigned serial, float x, float y, float width, float height) {
+void XwaSnapshot_EmitVideo(int slot, unsigned serial, float x, float y, float width, float height,
+							int keep_height) {
 	XwaSnapshot* s = wr();
 	if (s->draw_2d_count >= XWA_SNAP_MAX_DRAWS_2D) {
 		s->dropped_records++;
@@ -1126,6 +1128,7 @@ void XwaSnapshot_EmitVideo(int slot, unsigned serial, float x, float y, float wi
 	d->dst_frac_y = (int16_t)lroundf((y - (float)d->dst_y) * 256.0f);
 	d->video_w256 = (int32_t)lroundf(width * 256.0f);
 	d->video_h256 = (int32_t)lroundf(height * 256.0f);
+	d->video_keep_height = keep_height != 0;
 	stamp_clip(&d->clip_left, &d->clip_top, &d->clip_right, &d->clip_bottom);
 }
 

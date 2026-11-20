@@ -586,6 +586,8 @@ typedef struct XwauVideo {
 	char webm[64];          /* the video's name in Resdata */
 	double size[2];         /* design pixels; 0 means the standard image's size */
 	double offset[2];
+	int keep_height;  /* keep the height and the video's shape, as XWAU keeps the logo square */
+	double logo_x;    /* a squadron logo's PositionX in units, or -1 */
 } XwauVideo;
 
 static double door_value(const char* doors, const char* key, int fallback);
@@ -612,6 +614,8 @@ static void add_video(XwauContext* ctx, const char* dir, const char* base, const
 	v->size[1] = h;
 	v->offset[0] = x;
 	v->offset[1] = y;
+	v->keep_height = 0;
+	v->logo_x = -1;
 }
 
 /* Lists the images XWAU replaces with videos, and the size and offset of each video. */
@@ -648,9 +652,11 @@ static void find_videos(XwauContext* ctx) {
 		/* With Squad<N>.txt, XWAU draws the logo as a square on screen,
 		   Height units tall. Without it, the logo has the standard image's
 		   size. The position goes in layout.yaml. */
-		if (w && h)
+		if (w && h) {
 			add_video(ctx, "tour", base, strrchr(path, '/') + 1, h * DESIGN_Y, h * DESIGN_Y, 0, 0);
-		else
+			ctx->videos[ctx->video_count - 1].keep_height = 1;
+			ctx->videos[ctx->video_count - 1].logo_x = read_key_int(txt, "PositionX", 0);
+		} else
 			add_video(ctx, "tour", base, strrchr(path, '/') + 1, 0, 0, 0, 0);
 	}
 }
@@ -694,10 +700,19 @@ static int standard_image(const XwauContext* ctx, const char* dir, const char* b
 	return 0;
 }
 
+static const char* screen_layout_by_name(const XwauContext* ctx, const char* name);
+
 /* Writes frontend/frontres/<dir>/video/<base>.yaml for each image that XWAU
  * replaces with a video. The game keeps the standard image's frame count.
  * XWAU shows one video frame per frontend frame, at 24 frames a second. */
 static void write_video_yamls(XwauContext* ctx) {
+	/* XWAU places a squadron logo as if the briefing room were wide, even
+	   when its text stays in the middle 4:3 area. In a fill room, the game
+	   places it in that area, so the offset moves it back to XWAU's place:
+	   from margin + PositionX 4:3 units to PositionX wide units. A 4:3 unit
+	   is DESIGN_Y design pixels wide. */
+	const int fill_briefing = strcmp(screen_layout_by_name(ctx, "briefing_room"), "fill") == 0;
+	const double margin = (640 * DESIGN_X - 640 * DESIGN_Y) / 2;
 	for (int i = 0; i < ctx->video_count; ++i) {
 		const XwauVideo* v = &ctx->videos[i];
 		int count = 1, w = 0, h = 0;
@@ -720,14 +735,21 @@ static void write_video_yamls(XwauContext* ctx) {
 			ctx->stats->failures++;
 			continue;
 		}
+		double offset[2] = { v->offset[0], v->offset[1] };
+		if (v->logo_x >= 0 && fill_briefing) {
+			const double units = (v->logo_x * DESIGN_X - margin) / DESIGN_Y - v->logo_x;
+			offset[0] += units * DESIGN_X;
+		}
 		fprintf(fp,
 				"# Made by the OpenXWA mod importer. Sizes are in design pixels.\n"
 				"video: %s\nsize: ",
 				v->webm);
 		BakeSprites_WriteNumberList(fp, size, 2);
 		fprintf(fp, "\noffset: ");
-		BakeSprites_WriteNumberList(fp, v->offset, 2);
+		BakeSprites_WriteNumberList(fp, offset, 2);
 		fprintf(fp, "\nclassic_frames: %d\nfps: 24\n", count);
+		if (v->keep_height)
+			fprintf(fp, "keep_aspect: height\n");
 		char key[600];
 		snprintf(key, sizeof key, "%s/%s", v->dir, v->base);
 		const char* layout = noted_layout(ctx, key);
@@ -1894,10 +1916,11 @@ static int is_medal_view(const char* key, const char* prefix) {
 		   strncmp(base, "lkalidor", 8) != 0;
 }
 
-/* Returns the most common layout among a screen's backgrounds, and prints a
- * note for each background with another layout. Returns NULL when the screen
- * has no backgrounds. */
-static const char* screen_layout(const XwauContext* ctx, const XwauScreen* screen, int* image_count) {
+/* Returns the most common layout among a screen's backgrounds, and with
+ * `report`, prints a note for each background with another layout. Returns
+ * NULL when the screen has no backgrounds. */
+static const char* screen_layout(const XwauContext* ctx, const XwauScreen* screen, int* image_count,
+								 int report) {
 	static const char* const names[] = { "wide", "fill", "classic" };
 	const char* keys[256];
 	const char* layouts[256];
@@ -1926,11 +1949,25 @@ static const char* screen_layout(const XwauContext* ctx, const XwauScreen* scree
 			best = n;
 	/* The atlas of each background keeps its own layout, which the game uses
 	   while it shows that background. */
-	for (int i = 0; i < count; ++i)
+	for (int i = 0; report && i < count; ++i)
 		if (strcmp(layouts[i], names[best]) != 0)
 			ReportDetail(NULL, "the screen %s is %s, and its background %s is %s", screen->name, names[best],
 						 keys[i], layouts[i]);
 	return names[best];
+}
+
+/* The layout that write_layouts gives the screen `name`: its own, else
+ * `default: wide`. */
+static const char* screen_layout_by_name(const XwauContext* ctx, const char* name) {
+	for (size_t i = 0; i < SCREEN_COUNT; ++i) {
+		int count;
+		const char* layout;
+		if (strcmp(k_screens[i].name, name) != 0)
+			continue;
+		layout = screen_layout(ctx, &k_screens[i], &count, 0);
+		return layout ? layout : "wide";
+	}
+	return "wide";
 }
 
 /* Writes only the screens whose layout differs from their fallback. A view
@@ -1939,7 +1976,7 @@ static void write_layouts(const XwauContext* ctx, FILE* fp) {
 	const char* layouts[SCREEN_COUNT];
 	int counts[SCREEN_COUNT];
 	for (size_t i = 0; i < SCREEN_COUNT; ++i)
-		layouts[i] = screen_layout(ctx, &k_screens[i], &counts[i]);
+		layouts[i] = screen_layout(ctx, &k_screens[i], &counts[i], 1);
 	fprintf(fp, "# The layout of each screen: wide (the whole screen), fill (a background\n"
 				"# around the original screen's items), or classic (the original 4:3\n"
 				"# screen). Views such as family_room.rank fall back to their screen.\n"

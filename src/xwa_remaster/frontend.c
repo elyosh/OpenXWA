@@ -224,7 +224,7 @@ static int rm_is_highlight_tint(uint32_t engine_color) {
 }
 
 /* Draws a video record: the slot's current frame, stretched over the
- * record's rectangle. */
+ * record's rectangle, or at the record's height with the frame's shape. */
 static void rm_add_video(AeronDrawList2D* list, const XwaDraw2D* d) {
 	if (d->video_slot < 0 || d->video_slot >= XWA_FRONTEND_VIDEO_SLOTS || !g.video_tex[d->video_slot])
 		return;
@@ -239,6 +239,12 @@ static void rm_add_video(AeronDrawList2D* list, const XwaDraw2D* d) {
 	s.dst_y = ((float)d->dst_y + (float)d->dst_frac_y / 256.0f) * rm_scale_y();
 	s.dst_w = (float)d->video_w256 / 256.0f * rm_scale_x();
 	s.dst_h = (float)d->video_h256 / 256.0f * rm_scale_y();
+	if (d->video_keep_height) {
+		const int frame_w = Aeron_TextureGetWidth(s.texture);
+		const int frame_h = Aeron_TextureGetHeight(s.texture);
+		if (frame_w > 0 && frame_h > 0)
+			s.dst_w = s.dst_h * (float)frame_w / (float)frame_h;
+	}
 	s.scissor = rm_scissor(d->clip_left, d->clip_top, d->clip_right, d->clip_bottom);
 	AeronDrawList_AddSprite(list, &s);
 }

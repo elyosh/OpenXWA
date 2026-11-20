@@ -81,10 +81,10 @@ void XwaFrontendVideo_Close(int slot) {
 	}
 }
 
-void XwaFrontendVideo_Draw(int slot, float x, float y, float width, float height) {
+void XwaFrontendVideo_Draw(int slot, float x, float y, float width, float height, int keep_height) {
 	XwaFrontendVideoSlot* s = video_slot(slot);
 	if (s && !s->closed) {
-		XwaSnapshot_EmitVideo(slot, s->serial, x, y, width, height);
+		XwaSnapshot_EmitVideo(slot, s->serial, x, y, width, height, keep_height);
 	}
 }
 
@@ -99,7 +99,8 @@ static void image_video_close(XwaFrontendImageVideo* video) {
 	video->slot = -1;
 }
 
-void XwaFrontendVideo_DrawImage(const char* path, float fps, float x, float y, float width, float height) {
+void XwaFrontendVideo_DrawImage(const char* path, float fps, float x, float y, float width, float height,
+								int keep_height) {
 	XwaFrontendImageVideo* video = NULL;
 	AeronVideoPlayer* player;
 
@@ -124,7 +125,7 @@ void XwaFrontendVideo_DrawImage(const char* path, float fps, float x, float y, f
 	player = XwaFrontendVideo_Player(video->slot);
 	if (player) {
 		Aeron_VideoUpdate(player);
-		XwaFrontendVideo_Draw(video->slot, x, y, width, height);
+		XwaFrontendVideo_Draw(video->slot, x, y, width, height, keep_height);
 	}
 }
 

@@ -164,10 +164,13 @@ typedef struct XwaDraw2D {
 	int16_t clip_left, clip_top, clip_right, clip_bottom;
 	/* XWA_DRAW2D_VIDEO: the video slot, the serial of the player in it when
 	 * the record was made, and the size in 1/256 units. The position is
-	 * dst_x, dst_y plus their fractions. */
+	 * dst_x, dst_y plus their fractions. With video_keep_height, the width
+	 * is ignored: the video is drawn at its height, and its width comes
+	 * from the shape of the video's frames. */
 	int16_t video_slot;
 	uint16_t video_serial;
 	int32_t video_w256, video_h256;
+	uint8_t video_keep_height;
 } XwaDraw2D;
 
 typedef enum XwaPaintKind {
@@ -1529,7 +1532,8 @@ void XwaSnapshot_EmitSprite(XwaDraw2DKind kind, const char* name, int frame, con
 void XwaSnapshot_EmitAtlasSprite(int group_id, int index, int x, int y, int img_w, int img_h);
 /* Emits a frontend video record: the current frame of the player in `slot`,
  * stretched over the rectangle x, y, width, height in 640x480 units. */
-void XwaSnapshot_EmitVideo(int slot, unsigned serial, float x, float y, float width, float height);
+void XwaSnapshot_EmitVideo(int slot, unsigned serial, float x, float y, float width, float height,
+							int keep_height);
 /* Moves the next sprite record by `frac_x`, `frac_y` 1/256 units, the
  * fractional part of a position that the game rounds to whole units. */
 void XwaSnapshot_SetNextSpriteFraction(int frac_x, int frac_y);
