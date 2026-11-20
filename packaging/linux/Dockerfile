@@ -104,6 +104,7 @@ RUN git clone --branch "n${FFMPEG_VERSION:-$(cat /tmp/aeron/ffmpeg/version)}" --
         --enable-decoder=aac \
         --enable-decoder=adpcm_vima \
         --enable-decoder=h264 \
+        --enable-decoder=mp3float \
         --enable-decoder=sanm \
         --enable-decoder=vp9 \
         --enable-demuxer=matroska \
@@ -111,6 +112,7 @@ RUN git clone --branch "n${FFMPEG_VERSION:-$(cat /tmp/aeron/ffmpeg/version)}" --
         --enable-demuxer=smush \
         --enable-parser=aac \
         --enable-parser=h264 \
+        --enable-parser=mpegaudio \
         --enable-parser=vp9 \
         --enable-pic \
         --enable-pthreads \

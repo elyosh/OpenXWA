@@ -574,7 +574,7 @@ with a new name, such as one that `CUTSCENE.TXT` lists, still plays.
 
 | Use | Format |
 |-|-|
-| Movies, `frontend/movies/<name>.mp4` | MP4 with H.264 video and AAC sound |
+| Movies, `frontend/movies/<name>.mp4` | MP4 with H.264 video and AAC or MP3 sound |
 | Videos in place of images and room animations | WebM with VP9 video, with or without alpha, or MP4 with H.264 video |
 
 Videos in place of images and room animations play without sound.
