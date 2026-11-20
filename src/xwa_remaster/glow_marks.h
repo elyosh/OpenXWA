@@ -10,10 +10,10 @@
  * `emissive_strength` times the classic radiance. Marks in world segment
  * mode use `world_segment_emissive_strength` instead: the game makes them
  * from a hit's path and sizes them from the size of the whole craft, so on
- * the cockpit model they cover most of the cockpit. They are drawn on the
- * mesh's own triangles, and all those of one object that use the same
- * texture in one pass, after the object's other marks. A mark whose
- * strength is 0 isn't drawn. With `draw_blast_marks` 0, the blast marks
+ * the cockpit model they cover most of the cockpit. These marks are drawn
+ * on the mesh's own triangles, after the object's other marks. All of an
+ * object's marks of this kind that use the same texture are drawn in one
+ * pass. A mark whose strength is 0 isn't drawn. With `draw_blast_marks` 0, the blast marks
  * (the long-lived scorch marks) aren't drawn either. */
 void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* command_buffer,
 									   XwaRemasterAssets* assets, const XwaSnapshot* snapshot,
