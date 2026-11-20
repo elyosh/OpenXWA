@@ -115,6 +115,12 @@ int XwaMissionSettings_NoEscapePodEjections(void);
 int XwaMissionSettings_EjectedCraftTeam9(void);
 int XwaMissionSettings_EjectedCraftSkipSetup(void);
 int XwaMissionSettings_SkirmishEjections(void);
+/* A player who loses their craft takes the next craft of their flight group
+   in any mission, not only in a skirmish (Player_UpdateParticipationState). */
+int XwaMissionSettings_PlayerWavesAnyMission(void);
+/* The craft-jumping key works in any mission, not only in a quick start or a
+   skirmish (Flight_ProcessPlayerActions). */
+int XwaMissionSettings_CraftJumpingAnyMission(void);
 /* An AI warhead marks its target as attacked by the shooter's team when it
    hits, as any weapon does, and no longer when paifight_fightershootorder
    launches it. */

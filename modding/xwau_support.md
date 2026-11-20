@@ -161,6 +161,7 @@ import left out. See [Importer](importer.md#when-an-import-stops).
 | 3D craft preview in skirmish (`SkirmishOpt*`, `[ViewConfiguration]`) | Not implemented | | |
 | Hidden side panels (`DrawPanelsIn*`) | Implemented | | [Frontend](frontend.md#side_panels) |
 | Film room background | Not implemented | | |
+| Lives and craft jumping in any mission (`hook_tourmultiplayer`) | Implemented | The importer turns on both rules when the hook is turned on. | [Flight](flight.md#rules) |
 | Combat simulator buttons (`hook_tourmultiplayer`) | Not implemented | The mission setup screen doesn't have the hook's Load, Combat Engagements and Melee buttons. The hook's Combat mission folder isn't supported either. | |
 | Tech room holograms | Not implemented | The tech room shows the craft as a model. | |
 

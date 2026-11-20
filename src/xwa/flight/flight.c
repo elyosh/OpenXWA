@@ -10161,9 +10161,16 @@ void Flight_ProcessPlayerActions(unsigned int playerIdx) {
 				}
 				break;
 			case KEY_J:
+#ifdef XWA_MODERN
+				if (!g_flightSimSideEffectsSuppressed &&
+					(g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
+					 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH ||
+					 XwaMissionSettings_CraftJumpingAnyMission())) {
+#else
 				if (!g_flightSimSideEffectsSuppressed &&
 					(g_missionHeader.body.missionType == XWA_MISSION_TYPE_QUICK_START ||
 					 g_missionHeader.body.missionType == XWA_MISSION_TYPE_SKIRMISH)) {
+#endif
 					if (g_flightCraftJumpingEnabled) {
 						uint16_t oldObjIdx = objIdx;
 						if (Player_UnbindFromCurrentCraft((int)currentPlayerIdx, 1, 1)) {

@@ -89,6 +89,8 @@ static int s_noEscapePodEjections;
 static int s_ejectedCraftTeam9;
 static int s_ejectedCraftSkipSetup;
 static int s_skirmishEjections;
+static int s_playerWavesAnyMission;
+static int s_craftJumpingAnyMission;
 static int s_aiWarheadsAttackOnHit;
 static int s_oneJammingBeamStopsTurrets;
 static int s_twoLauncherAdvancedMissiles;
@@ -538,6 +540,8 @@ void XwaMissionSettings_Init(void) {
 	s_ejectedCraftTeam9 = 0;
 	s_ejectedCraftSkipSetup = 0;
 	s_skirmishEjections = 0;
+	s_playerWavesAnyMission = 0;
+	s_craftJumpingAnyMission = 0;
 	s_aiWarheadsAttackOnHit = 0;
 	s_oneJammingBeamStopsTurrets = 0;
 	s_twoLauncherAdvancedMissiles = 0;
@@ -683,6 +687,14 @@ void XwaMissionSettings_Init(void) {
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "skirmish_ejections")) != NULL) {
 		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "skirmish_ejections", node, &s_skirmishEjections);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "player_waves_any_mission")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "player_waves_any_mission", node,
+								 &s_playerWavesAnyMission);
+	}
+	if ((node = AeronConfigNode_MapGet(rules, "craft_jumping_any_mission")) != NULL) {
+		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "craft_jumping_any_mission", node,
+								 &s_craftJumpingAnyMission);
 	}
 	if ((node = AeronConfigNode_MapGet(rules, "ai_warheads_attack_on_hit")) != NULL) {
 		MissionSettings_ReadBool(XWA_FLIGHT_CONFIG_PATH, "ai_warheads_attack_on_hit", node,
@@ -840,6 +852,8 @@ int XwaMissionSettings_NoEscapePodEjections(void) { return s_noEscapePodEjection
 int XwaMissionSettings_EjectedCraftTeam9(void) { return s_ejectedCraftTeam9; }
 int XwaMissionSettings_EjectedCraftSkipSetup(void) { return s_ejectedCraftSkipSetup; }
 int XwaMissionSettings_SkirmishEjections(void) { return s_skirmishEjections; }
+int XwaMissionSettings_PlayerWavesAnyMission(void) { return s_playerWavesAnyMission; }
+int XwaMissionSettings_CraftJumpingAnyMission(void) { return s_craftJumpingAnyMission; }
 int XwaMissionSettings_AiWarheadsAttackOnHit(void) { return s_aiWarheadsAttackOnHit; }
 int XwaMissionSettings_OneJammingBeamStopsTurrets(void) { return s_oneJammingBeamStopsTurrets; }
 int XwaMissionSettings_TwoLauncherAdvancedMissiles(void) { return s_twoLauncherAdvancedMissiles; }

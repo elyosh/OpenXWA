@@ -3620,9 +3620,15 @@ void Player_UpdateParticipationState(void) {
 						if (g_objectTable[objectIndex].objectType == OBJ_None ||
 							pl->boundObjectSignature != g_objectTable[objectIndex].objectSignature) {
 							Mission_ProcessFlightGroupWaveCompletion(pl->boundFlightGroupIdx);
+#ifdef XWA_MODERN
+							if ((g_missionHeader.body.missionType != XWA_MISSION_TYPE_SKIRMISH &&
+								 !XwaMissionSettings_PlayerWavesAnyMission() && !g_provingGroundsModeActive) ||
+								Player_BindToAvailableCraft(p, 0xFFFFu, 0, 0)) {
+#else
 							if ((g_missionHeader.body.missionType != XWA_MISSION_TYPE_SKIRMISH &&
 								 !g_provingGroundsModeActive) ||
 								Player_BindToAvailableCraft(p, 0xFFFFu, 0, 0)) {
+#endif
 								Player_EndFlightParticipation(p);
 								if (p != g_localPlayer) {
 									int activePlayerCount;
