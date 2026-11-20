@@ -121,6 +121,12 @@ int Concourse_FreePlanetSprite(void) {
 	return 1;
 }
 
+#ifdef XWA_MODERN
+/* Where Concourse_DrawPlanet last drew the planet. */
+static int g_concoursePlanetDrawX;
+static int g_concoursePlanetDrawY;
+#endif
+
 // FUNCTION: XWA 0x53AB60
 int Concourse_DrawPlanet(void) {
 	FrontendRect out;
@@ -157,6 +163,8 @@ int Concourse_DrawPlanet(void) {
 		y = rand();
 		y = bottom > top ? top + y % (bottom - top) : top;
 		XwaConcoursePlanet_Center(&x, &y);
+		g_concoursePlanetDrawX = x - (width >> 1);
+		g_concoursePlanetDrawY = y - (height >> 1);
 	}
 #else
 	x = rand() % 640;
@@ -896,7 +904,23 @@ int Concourse_Update(int frameCounter) {
 	   at their exact, unrounded position. `starfield: false` hides the stars.
 	   They are still set up, so the random sequence stays the same. */
 	if (XwaConcourseLayout_Bool("starfield", 1)) {
+		/* The original game keeps the stars off the planet: it only places
+		   them on black pixels. An image with atlas geometry draws nothing
+		   on the draw surface, so that test can't see it. Each frame is
+		   then drawn in this order: black, the stars, the planet, the room.
+		   The frame is cleared first so that the translucent parts of the
+		   two images aren't blended twice. */
+		const int planetOverStars = XwaFrontendGeometry_ResourceHasGeometry("concourse") ||
+									XwaFrontendGeometry_ResourceHasGeometry("planet");
+
+		if (planetOverStars) {
+			FrontendDisplay_ClearBackBuffer();
+		}
 		Concourse_DrawStarfield(frame);
+		if (planetOverStars) {
+			FrontImage_DrawSprite("planet", g_concoursePlanetDrawX, g_concoursePlanetDrawY);
+			FrontImage_DrawSprite("concourse", 0, 0);
+		}
 	}
 	XwaConcourseLayout_DrawSpriteOpaque("tourdoor", "doors.tour", 231, 174);
 	XwaConcourseLayout_DrawSprite("mkanim", "doors.marko", 110, 358);

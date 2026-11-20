@@ -365,6 +365,11 @@ Without the mask, or when it has no white pixel in that band, the stars
 appear across the whole band, and the log says why. `starfield: false` in
 the [concourse layout](#concourse-layout) hides the stars.
 
+When the concourse background or the planet image gets its geometry from an
+atlas, the planet is drawn over the stars. Stars only show through the parts
+of the planet image that are transparent. A planet image that fills the
+window, such as a sky, hides every star.
+
 ## Awards
 
 `frontend/awards.yaml` changes the medals, the Kalidor crescent levels, the
