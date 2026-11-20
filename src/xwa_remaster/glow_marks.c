@@ -9,6 +9,7 @@
 #include "xwa_remaster/scene_lights.h"
 #include "xwa_remaster/ship.h"
 
+#include <float.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -382,6 +383,179 @@ static void build_projected_geometry(GlowGeometryCache* cache, const XwaGlowMark
 	cache->vertex_count = output_vertex_count;
 }
 
+/* How the UV that build_projected_geometry gives a vertex becomes the
+ * image's UV in the atlas: atlas = uv * uv_xform.zw + uv_xform.xy. */
+static void mark_uv_xform(const XwaGlowMark* mark, const XwaAssetRef* texture_frame, float uv_xform[4]) {
+	const float atlas_frame_width = texture_frame->u1 - texture_frame->u0;
+	const float atlas_frame_height = texture_frame->v1 - texture_frame->v0;
+	uv_xform[0] = texture_frame->u0 + 0.5f * atlas_frame_width;
+	uv_xform[1] = texture_frame->v0 + 0.5f * atlas_frame_height;
+	uv_xform[2] = mark->layer_uv_scale * atlas_frame_width;
+	uv_xform[3] = mark->layer_uv_scale * atlas_frame_height;
+}
+
+/* The colour that multiplies the mark's image. A glow mark is a classic
+ * image, shown at the classic radiance. A blast mark (`lit`) is part of the
+ * hull's colour, and the scene's lights shade it as they shade the hull. */
+static void mark_color(const XwaGlowMark* mark, int lit, float strength, float color[4]) {
+	color[0] = color[1] = color[2] = lit ? 1.0f : strength * XwaRemaster_ClassicRadiance();
+	color[3] = 1.0f;
+	/* The impact colour tints the glow marks. Blast marks keep their own
+	 * colours. */
+	if (mark->pool_kind == 0 && mark->tint != 0) {
+		for (int c = 0; c < 3; c++) {
+			color[c] *= XwaRemaster_SrgbToLinear((float)(mark->tint >> (16 - 8 * c) & 0xffu) / 255.0f);
+		}
+	}
+}
+
+/* A flash is a mark in world segment mode: the game sizes it from the whole
+ * craft, so its geometry would be nearly the whole mesh. It is drawn as a
+ * projected overlay instead (AeronScene_AddMeshProjectedOverlay): the scene
+ * draws the mesh's own triangles and works out the image's position in the
+ * shader, so nothing is built or uploaded here, and the flashes of one
+ * object that use the same texture are drawn in one pass over the mesh. */
+
+/* The textures that the flashes of one object can use before a group is
+ * drawn to make room. Flashes usually share one texture. */
+#define GLOW_FLASH_GROUPS 4
+
+/* The flashes of one object that use the same texture. */
+typedef struct FlashGroup {
+	AeronTexture* texture;
+	AeronSceneMeshProjection projections[AERON_SCENE_MESH_PROJECTIONS_MAX];
+	uint32_t count;
+} FlashGroup;
+
+/* Whether the mark is drawn as a flash. The shader tells the mesh-table
+ * rows apart up to row 255. */
+static int mark_is_flash(const XwaGlowMark* mark, const AeronSceneMesh* mesh, int blast) {
+	return mark->world_segment_mode && mark->pool_kind == 0 && !blast && mesh->vbo && mesh->ibo &&
+		   mesh->row_count <= 256;
+}
+
+/* Fills the projection of a flash. `uv_xform` and `uv_rect` are those of the
+ * mark's overlay: the image's UV in the atlas is uv * uv_xform.zw +
+ * uv_xform.xy, where uv is what build_projected_geometry gives a vertex in
+ * world segment mode. That uv is linear in the vertex's position, so it is
+ * written here as two rows that the shader applies to the position. */
+static void flash_projection(const XwaGlowMark* mark, const AeronSceneMesh* mesh, const float uv_xform[4],
+							 const float uv_rect[4], const float color[4], AeronSceneMeshProjection* out) {
+	memset(out, 0, sizeof *out);
+	const float* axes[2] = { mark->u_axis, mark->v_axis };
+	const float inv_scales[2] = { mark->inv_scale_u, mark->inv_scale_v };
+	float* rows[2] = { out->u_row, out->v_row };
+	for (int axis = 0; axis < 2; axis++) {
+		/* The axis without its part along the mark's normal: the position
+		 * is projected on the mark's plane first. */
+		const float along_normal = dot3(axes[axis], mark->normal);
+		double on_plane[3];
+		double center = 0.0;
+		for (int coordinate_axis = 0; coordinate_axis < 3; coordinate_axis++) {
+			on_plane[coordinate_axis] =
+				(double)axes[axis][coordinate_axis] - (double)along_normal * mark->normal[coordinate_axis];
+			center += (double)mark->center[coordinate_axis] * on_plane[coordinate_axis];
+		}
+		const double scale = (double)inv_scales[axis] * uv_xform[2 + axis];
+		/* The mesh's vertices are in metres, and the mark is in OPT units. */
+		for (int coordinate_axis = 0; coordinate_axis < 3; coordinate_axis++) {
+			rows[axis][coordinate_axis] = (float)(on_plane[coordinate_axis] * AERON_OPT_UNITS_PER_METER * scale);
+		}
+		rows[axis][3] = (float)(uv_xform[axis] - center * scale);
+	}
+	memcpy(out->uv_rect, uv_rect, sizeof out->uv_rect);
+	memcpy(out->color, color, sizeof out->color);
+	/* The rows whose triangles build_projected_geometry keeps: a vertex's
+	 * row is its component's, or a control's row past the components, which
+	 * stands for the control's component. */
+	int mesh_filtered = 0;
+	for (uint32_t word = 0; word < XWA_SNAP_GLOW_MARK_MESH_WORDS; word++) {
+		mesh_filtered |= mark->mesh_mask[word] != 0;
+	}
+	for (uint32_t row = 0; row < 256; row++) {
+		uint32_t mesh_index = row;
+		if (row >= mesh->component_count && row < mesh->row_count) {
+			mesh_index = mesh->controls[row - mesh->component_count].component;
+		}
+		if (mesh_index >= XWA_SNAP_MAX_MESH_SLOTS ||
+			(mesh_filtered && !(mark->mesh_mask[mesh_index / 64] & ((uint64_t)1 << (mesh_index % 64))))) {
+			continue;
+		}
+		out->rows[row / 32] |= 1u << (row % 32);
+	}
+}
+
+/* Whether the flash's image can show on the mesh: whether the mesh's bounds,
+ * turned into the image's UV, overlap the image. Other marks are in world
+ * segment mode too, such as the light of a laser bolt that flies past, and
+ * most of the time they are nowhere near the mesh. Without this test each
+ * of them would cost a pass over the whole mesh that draws nothing. */
+static int flash_reaches_mesh(const AeronSceneMeshProjection* projection, const AeronSceneMesh* mesh) {
+	float low[2] = { FLT_MAX, FLT_MAX };
+	float high[2] = { -FLT_MAX, -FLT_MAX };
+	const float* rows[2] = { projection->u_row, projection->v_row };
+	for (int corner = 0; corner < 8; corner++) {
+		const float position[3] = { (corner & 1) ? mesh->bound_max[0] : mesh->bound_min[0],
+									(corner & 2) ? mesh->bound_max[1] : mesh->bound_min[1],
+									(corner & 4) ? mesh->bound_max[2] : mesh->bound_min[2] };
+		for (int axis = 0; axis < 2; axis++) {
+			const float uv = dot3(rows[axis], position) + rows[axis][3];
+			low[axis] = fminf(low[axis], uv);
+			high[axis] = fmaxf(high[axis], uv);
+		}
+	}
+	return high[0] >= projection->uv_rect[0] && low[0] <= projection->uv_rect[2] &&
+		   high[1] >= projection->uv_rect[1] && low[1] <= projection->uv_rect[3];
+}
+
+/* Draws the group's flashes and empties it. */
+static void submit_flash_group(AeronScene3D* scene, FlashGroup* group, const AeronSceneMesh* mesh,
+							   const float transform[16], const AeronSceneMeshTable* mesh_table) {
+	if (group->count == 0) {
+		return;
+	}
+	AeronSceneMeshProjectedOverlayDesc overlay;
+	memset(&overlay, 0, sizeof overlay);
+	overlay.mesh = mesh;
+	overlay.texture = group->texture;
+	memcpy(overlay.transform, transform, sizeof overlay.transform);
+	overlay.mesh_table = mesh_table;
+	/* As the other marks: see XwaRemasterGlowMarks_SubmitObject. */
+	overlay.depth_bias_view = 0.05f;
+	overlay.cull_mode = AERON_CULL_BACK;
+	overlay.projections = group->projections;
+	overlay.projection_count = group->count;
+	AeronScene_AddMeshProjectedOverlay(scene, &overlay);
+	group->count = 0;
+}
+
+/* Adds a flash to the group of its texture. A full group is drawn first to
+ * make room; so is the oldest group when a flash has a new texture and every
+ * group is in use. */
+static void add_flash(AeronScene3D* scene, FlashGroup* groups, uint32_t* group_count, AeronTexture* texture,
+					  const AeronSceneMeshProjection* projection, const AeronSceneMesh* mesh,
+					  const float transform[16], const AeronSceneMeshTable* mesh_table) {
+	FlashGroup* group = NULL;
+	for (uint32_t index = 0; index < *group_count; index++) {
+		if (groups[index].texture == texture) {
+			group = &groups[index];
+		}
+	}
+	if (!group && *group_count < GLOW_FLASH_GROUPS) {
+		group = &groups[(*group_count)++];
+		group->count = 0;
+	}
+	if (!group) {
+		group = &groups[0];
+		submit_flash_group(scene, group, mesh, transform, mesh_table);
+	}
+	if (group->count == AERON_SCENE_MESH_PROJECTIONS_MAX) {
+		submit_flash_group(scene, group, mesh, transform, mesh_table);
+	}
+	group->texture = texture;
+	group->projections[group->count++] = *projection;
+}
+
 void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* command_buffer,
 									   XwaRemasterAssets* assets, const XwaSnapshot* snapshot,
 									   const XwaFlightObject* object, const AeronSceneMesh* mesh,
@@ -391,6 +565,8 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 	if (!scene || !command_buffer || !assets || !snapshot || !object || !mesh || !transform) {
 		return;
 	}
+	FlashGroup flash_groups[GLOW_FLASH_GROUPS];
+	uint32_t flash_group_count = 0;
 	for (uint32_t glow_mark_index = 0; glow_mark_index < snapshot->glow_mark_count; glow_mark_index++) {
 		const XwaGlowMark* mark = &snapshot->glow_marks[glow_mark_index];
 		if (mark->owner_slot != object->slot || mark->owner_signature != object->signature ||
@@ -420,13 +596,26 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 										  &texture_frame)) {
 			continue;
 		}
+		if (mark_is_flash(mark, mesh, blast)) {
+			float uv_xform[4], color[4];
+			const float uv_rect[4] = { texture_frame.u0, texture_frame.v0, texture_frame.u1,
+									   texture_frame.v1 };
+			mark_uv_xform(mark, &texture_frame, uv_xform);
+			mark_color(mark, 0, strength, color);
+			AeronSceneMeshProjection projection;
+			flash_projection(mark, mesh, uv_xform, uv_rect, color, &projection);
+			if (!flash_reaches_mesh(&projection, mesh)) {
+				continue;
+			}
+			add_flash(scene, flash_groups, &flash_group_count, texture_frame.texture, &projection, mesh,
+					  transform, mesh_table);
+			continue;
+		}
 		GlowGeometryCache* cached_geometry = find_or_allocate_geometry_cache(mark, mesh);
 		build_projected_geometry(cached_geometry, mark, mesh);
 		if (!cached_geometry->vertices || !cached_geometry->vertex_count) {
 			continue;
 		}
-		const float atlas_frame_width = texture_frame.u1 - texture_frame.u0;
-		const float atlas_frame_height = texture_frame.v1 - texture_frame.v0;
 		AeronSceneMeshOverlayDesc overlay;
 		memset(&overlay, 0, sizeof overlay);
 		overlay.vertices = cached_geometry->vertices;
@@ -437,30 +626,14 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 		overlay.texture_max_lod = blast_max_lod;
 		memcpy(overlay.transform, transform, sizeof overlay.transform);
 		overlay.mesh_table = mesh_table;
-		overlay.uv_xform[0] = texture_frame.u0 + 0.5f * atlas_frame_width;
-		overlay.uv_xform[1] = texture_frame.v0 + 0.5f * atlas_frame_height;
-		overlay.uv_xform[2] = mark->layer_uv_scale * atlas_frame_width;
-		overlay.uv_xform[3] = mark->layer_uv_scale * atlas_frame_height;
+		mark_uv_xform(mark, &texture_frame, overlay.uv_xform);
 		overlay.uv_rect[0] = blast ? blast_rect[0] : texture_frame.u0;
 		overlay.uv_rect[1] = blast ? blast_rect[1] : texture_frame.v0;
 		overlay.uv_rect[2] = blast ? blast_rect[2] : texture_frame.u1;
 		overlay.uv_rect[3] = blast ? blast_rect[3] : texture_frame.v1;
 		overlay.texture_clamp = (uint8_t)blast;
-		/* A glow mark is a classic image, shown at the classic radiance. A
-		 * blast mark is part of the hull's colour, and the scene's lights
-		 * shade it as they shade the hull. */
 		overlay.lit = mark->pool_kind == 1;
-		overlay.color[0] = overlay.color[1] = overlay.color[2] =
-			overlay.lit ? 1.0f : strength * XwaRemaster_ClassicRadiance();
-		overlay.color[3] = 1.0f;
-		/* The impact colour tints the glow marks. Blast marks keep their own
-		 * colours. */
-		if (mark->pool_kind == 0 && mark->tint != 0) {
-			for (int c = 0; c < 3; c++) {
-				overlay.color[c] *=
-					XwaRemaster_SrgbToLinear((float)(mark->tint >> (16 - 8 * c) & 0xffu) / 255.0f);
-			}
-		}
+		mark_color(mark, overlay.lit, strength, overlay.color);
 		/* The classic extra-texture pass reuses the hull's transformed
 		 * vertices exactly. Aeron's compact overlay uses a separate vertex
 		 * shader, so pull only its test depth slightly toward the camera to
@@ -471,6 +644,9 @@ void XwaRemasterGlowMarks_SubmitObject(AeronScene3D* scene, AeronCommandBuffer* 
 		overlay.blend = AERON_SCENE_MESH_OVERLAY_BLEND_PMA;
 		overlay.cull_mode = AERON_CULL_BACK;
 		AeronScene_AddMeshOverlay(scene, &overlay);
+	}
+	for (uint32_t index = 0; index < flash_group_count; index++) {
+		submit_flash_group(scene, &flash_groups[index], mesh, transform, mesh_table);
 	}
 }
 
