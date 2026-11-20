@@ -483,8 +483,9 @@ char ModelPreview_LoadModel(const char* modelName, int craftType) {
 	/* Hide the components that the selected object profile hides, as if they
 	   were destroyed. During a briefing, the profile is the one of the
 	   ship-info flight group. Otherwise no profile is selected, since the tech
-	   library has no mission. */
-	XwaObjectProfiles_Apply((uint16_t)g_modelPreviewObjectType,
+	   library has no mission. The model is in slot 0 of g_loadedModels, not
+	   in the slot of its object type. */
+	XwaObjectProfiles_Apply(0,
 							g_briefingPlaybackActive ? (int)(uint16_t)g_briefingMapPrimaryHighlightIconIndex
 													 : 0xFFFF,
 							0, &g_modelPreviewCraftData);

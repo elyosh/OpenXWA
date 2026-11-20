@@ -38,7 +38,9 @@ void XwaObjectProfiles_LoadMission(const char* missionPath, const struct XwaFlig
    profile is flight group `flightGroupIdx`'s selection, else Skirmish in a
    quick start or skirmish when the model has it, else Default_<markings>; a
    profile that hides nothing falls back to Default. Flight group 0xFFFF
-   selects nothing. No-op for stock models and a NULL craft. Reads no file. */
+   selects nothing. No-op for stock models and a NULL craft. Reads no file.
+   The model is the one in slot `objectType` of g_loadedModels. The model
+   preview loads its model in slot 0, so it passes 0. */
 void XwaObjectProfiles_Apply(uint16_t objectType, int flightGroupIdx, uint8_t markings,
 							 struct CraftData* craft);
 
