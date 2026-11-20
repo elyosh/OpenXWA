@@ -104,8 +104,15 @@ keeps the layout of its screen.
 The original game plays the first seven missions of the tour from the
 family transport, so a new pilot starts in the family transport room.
 `family_missions: false` makes these missions use the concourse, for a
-campaign that starts on a big ship. The pilot statistics page then always
-shows "On leave". The default is `true`.
+campaign that starts on a big ship. The default is `true`. With `false`:
+
+- the family transport room always shows the helmet, the jacket and the
+  rating item, and Emkay doesn't speak his idle lines there;
+- the pilot statistics and combat record pages always show the rank and
+  "On leave";
+- the simulator's briefing and the return from a flight play the usual
+  music instead of the family music, and the back button of the campaign's
+  briefing names the concourse instead of the family transport.
 
 ### side_panels
 

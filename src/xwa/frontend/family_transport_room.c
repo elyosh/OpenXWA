@@ -280,7 +280,11 @@ static void FamilyTransportRoom_DrawNormalBackgroundLayer(void) {
 													 12, g_colorLightBlue);
 	}
 
+#ifdef XWA_MODERN
+	if (!XwaFamilyMissions_MissionLoaded() || (unsigned int)g_currentMissionId >= 7u) {
+#else
 	if (!g_frontendMissionLoaded || (unsigned int)g_currentMissionId >= 7u) {
+#endif
 		FrontImage_DrawSprite("helmet", 0, 0);
 		FrontImage_DrawSprite("jacket", 0, 0);
 	}
@@ -303,7 +307,11 @@ static void FamilyTransportRoom_DrawNormalBackgroundLayer(void) {
 		}
 	}
 
+#ifdef XWA_MODERN
+	if (!XwaFamilyMissions_MissionLoaded() || (unsigned int)g_currentMissionId >= 7u) {
+#else
 	if (!g_frontendMissionLoaded || (unsigned int)g_currentMissionId >= 7u) {
+#endif
 		sprintf(buffer, "rating%d", (unsigned int)g_pilotData.pilotRating >> 2);
 		FrontImage_GetResourceRect(buffer, &rect);
 		FrontImage_SetSpriteFrame(buffer, g_pilotData.pilotRating & 3);
@@ -679,7 +687,11 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 				FrontendSound_PlayUISound("panelarm", 1, 0, 255, 12 * g_gameConfig.sfxDatapadVolume, 63);
 			}
 
+#ifdef XWA_MODERN
+			if (!XwaFamilyMissions_MissionLoaded() || (unsigned int)g_currentMissionId >= 7u) {
+#else
 			if (!g_frontendMissionLoaded || (unsigned int)g_currentMissionId >= 7u) {
+#endif
 				FrontImage_GetResourceRect("jacket", &rect);
 				if (FrontendDraw_PointInRect(&rect, outX, outY)) {
 					hotspotActive = 1;
@@ -702,7 +714,11 @@ int FrontendFamily_HandleTrophyHotspots(int unused) {
 				}
 			}
 
+#ifdef XWA_MODERN
+			if (!XwaFamilyMissions_MissionLoaded() || (unsigned int)g_currentMissionId >= 7u) {
+#else
 			if (!g_frontendMissionLoaded || (unsigned int)g_currentMissionId >= 7u) {
+#endif
 				sprintf(buffer, "rating%d", (unsigned int)g_pilotData.pilotRating >> 2);
 				FrontImage_GetResourceRect(buffer, &rect);
 				FrontImage_SetSpriteFrame(buffer, g_pilotData.pilotRating & 3);
@@ -961,7 +977,11 @@ int FrontendFamily_PlayEmkayVoiceLine(int allowMissionOrIdleLine) {
 		return 1;
 	}
 
+#ifdef XWA_MODERN
+	if (!XwaFamilyMissions_MissionLoaded()) {
+#else
 	if (!g_frontendMissionLoaded) {
+#endif
 		return 1;
 	}
 
@@ -1308,7 +1328,11 @@ int FamilyTransportRoom_DrawCombatSimulatorRecordPage(int statCategory) {
 		g_combatRecordScrollOffset = 0;
 		g_frontendFamilyPageResetPending = 0;
 		g_statsPageRowCount = 18;
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded() &&
+#else
 		if (g_frontendMissionLoaded &&
+#endif
 			g_frontendMission->header.missionType == XWA_MISSION_TYPE_FAMILY_CAMPAIGN &&
 			(unsigned int)g_currentMissionId < 7u) {
 			g_statsPageRowCount = 17;
@@ -1421,7 +1445,11 @@ int FamilyTransportRoom_DrawCombatSimulatorRecordPage(int statCategory) {
 	scrollOffset = g_combatRecordScrollOffset;
 	y = 66;
 	if (scrollOffset <= 0 && -scrollOffset < 22) {
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 		if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 			sprintf(g_frontendScratchBuffer, "%s", g_pilotData.name);
 		} else {
 			sprintf(g_frontendScratchBuffer, "%c%s %c%s", 6,
@@ -1437,7 +1465,11 @@ int FamilyTransportRoom_DrawCombatSimulatorRecordPage(int statCategory) {
 	if (row >= scrollOffset && row - scrollOffset < 22) {
 		const char* assignment;
 
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded()) {
+#else
 		if (g_frontendMissionLoaded) {
+#endif
 			if (g_frontendMission->header.missionType != XWA_MISSION_TYPE_FAMILY_CAMPAIGN) {
 				assignment = FrontendString_Get((UIString)(g_frontendMission->header.briefingLogo + 727));
 			} else if ((unsigned int)g_currentMissionId < 7u) {

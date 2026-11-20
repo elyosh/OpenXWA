@@ -1,4 +1,7 @@
 #include "xwa/frontend/frontend_flight.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/frontend/family_missions.h"
+#endif
 
 #include "xwa/assets/string_table.h"
 #include "xwa/assets/ui_string.h"
@@ -292,7 +295,11 @@ void FrontendFlight_CompleteLaunchSession(int flightResult) {
 	if (g_pilotData.missionDirectoryId == MISSION_DIRECTORY_TOUR) {
 		int state;
 
+#ifdef XWA_MODERN
+		if (XwaFamilyMissions_MissionLoaded()) {
+#else
 		if (g_frontendMissionLoaded) {
+#endif
 			if ((unsigned int)g_currentMissionId >= 7u) {
 				state = g_pilotData.campaignMode ? MUSIC_STATE_FRONTEND_1230 : MUSIC_STATE_FRONTEND_1240;
 			} else {
@@ -326,7 +333,11 @@ void FrontendFlight_CompleteLaunchSession(int flightResult) {
 	}
 
 	FrontendFlight_SetPostFlightCallbacks(MissionSetup_Update, MissionSetup_Exit);
+#ifdef XWA_MODERN
+	if (XwaFamilyMissions_MissionLoaded()) {
+#else
 	if (g_frontendMissionLoaded) {
+#endif
 		FrontendFlight_SetMusicAndShowCursor(
 			(unsigned int)g_currentMissionId < 7u ? MUSIC_STATE_FRONTEND_1210 : MUSIC_STATE_FRONTEND_1240);
 	} else {

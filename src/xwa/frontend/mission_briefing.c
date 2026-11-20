@@ -1,5 +1,6 @@
 #include "xwa/frontend/mission_briefing.h"
 #ifdef XWA_MODERN
+#include "xwa_runtime/frontend/family_missions.h"
 #include "xwa_runtime/snapshot/snapshot.h"
 #endif
 #include "xwa/flight/fediskio.h"
@@ -2138,7 +2139,11 @@ int MissionBriefing_Update(int frameCounter) {
 					Music_SetState(MUSIC_STATE_FRONTEND_1230);
 				}
 			}
+#ifdef XWA_MODERN
+		} else if (XwaFamilyMissions_MissionLoaded()) {
+#else
 		} else if (g_frontendMissionLoaded) {
+#endif
 			if ((unsigned int)g_currentMissionId < 7u) {
 				musicState = MUSIC_STATE_FRONTEND_1210;
 				if (g_gameConfig.datapadMusicEnabled) {
@@ -2602,7 +2607,11 @@ int MissionBriefing_Update(int frameCounter) {
 			int clicked;
 
 			if (g_pilotData.campaignMode) {
+#ifdef XWA_MODERN
+				if (XwaFamilyMissions_MissionLoaded() && (unsigned int)g_currentMissionId < 7u) {
+#else
 				if (g_frontendMissionLoaded && (unsigned int)g_currentMissionId < 7u) {
+#endif
 					clicked = FrontendButton_DrawSpriteWithHoverText(
 						&rect, "back", "back", (void*)FrontendString_Get(STR_BACK_TO_FAMILY_TRANSPORT),
 						(unsigned int)g_colorPaleBlue, (unsigned int)g_colorLightBlue, 8, "buttonsound");
