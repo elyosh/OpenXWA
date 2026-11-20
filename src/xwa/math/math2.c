@@ -4,6 +4,9 @@
 #include "xwa/math/trig2.h"
 #include "xwa/render/renderer.h"
 #include "xwa/util/time.h"
+#ifdef XWA_MODERN
+#include "xwa_runtime/timing/host_clock.h"
+#endif
 
 typedef union RandomSeedSlot {
 	int value;
@@ -127,7 +130,13 @@ uint32_t MATH2_percentage(uint32_t numerator, uint32_t denominator) {
 // FUNCTION: XWA 0x494D80
 void Math_SeedRandom(uint16_t seed) {
 	g_randSeed.lowWord = seed;
+#ifdef XWA_MODERN
+	/* The AI code calls this function each time a craft thinks. Each call
+	   seeds the second generator from the clock again. */
+	g_randSeed2.lowWord = (uint16_t)(seed + XwaTime_RandomSeedClock());
+#else
 	g_randSeed2.lowWord = (uint16_t)(seed + timeGetTime());
+#endif
 }
 
 // FUNCTION: XWA 0x494DA0

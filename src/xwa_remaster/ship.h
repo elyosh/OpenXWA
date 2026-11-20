@@ -312,17 +312,13 @@ void XwaRemasterShip_SetPbrEnv(AeronScene3D* scene, const XwaRemasterDirLight* l
 							   const XwaShipAmbientCube* ambient_cube,
 							   const XwaShipEnvironmentMap* environment_map, float key_probe_shadow);
 
-/* Classic per-object engine-glow intensity scale — the float mirror
- * of EngineGlow_RenderObjectGlows' scale derivation from the captured
- * eg_* craft state: the power-margin formula (16 - redirects,
- * engineOutputScale, throttle, min 0.35) for normal craft, the
- * speed-boost formula for craft entering or leaving
- * hyperspace. Includes the classic ~6%
- * flicker (driver-side randomness — the classic consumed its render
- * RNG here, which read-only capture must not). Returns 0 when the
- * classic draws no glows (no craft / no engine output / subsystems
- * dead). */
-float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f);
+/* Returns how bright a craft's engine glows are, from the eg_* craft state
+ * in the snapshot, with the formulas of EngineGlow_RenderObjectGlows. The
+ * result includes the classic flicker of about 6%, which changes once per
+ * game step: `game_time_ticks` is the snapshot's game time. Returns 0 when
+ * the original draws no glows: no craft, no engine output, or dead
+ * subsystems. */
+float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f, int32_t game_time_ticks);
 
 /* Derive + queue one model instance's engine glows as batched OVERLAY
  * scene billboards — the float mirror of EngineGlow_BuildProjectedQuad

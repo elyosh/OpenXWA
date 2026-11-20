@@ -2474,6 +2474,11 @@ void XwaRemasterFlight_LogFrameStats(void) {
 				  "shadows: %u casters in %u cascades, %u draws",
 				  frame.instances, frame.shadow_casters, frame.lights, frame.billboards, casters,
 				  shadows.cascade_count, frame.shadow_draws);
+	Aeron_LogInfo("xwa.benchmark",
+				  "film benchmark: settings: MSAA %dx, SSAO quality %d, motion blur quality %d, upscaling %s, "
+				  "light lists %s",
+				  (int)XwaRemaster_MsaaSampleCount(), s.ssao.ssao_quality, s.mb_quality,
+				  AeronTemporal_ModeName(s.fsr_mode), s.plight.light_lists ? "on" : "off");
 	for (uint32_t view = 0; view < frame.view_count && view < AERON_MAX_VIEWS; view++) {
 		Aeron_LogInfo("xwa.benchmark",
 					  "film benchmark: view %u of %u: %u instances drawn, %u with a light list, %u draws",
@@ -5957,6 +5962,7 @@ static void fl_submit_billboards(void) {
 typedef struct FlMapSubmitContext {
 	AeronCommandBuffer* cmd;
 	XwaRemasterAssets* assets;
+	int32_t game_time_ticks; /* the snapshot's game time, for the engine glow flicker */
 } FlMapSubmitContext;
 
 typedef struct FlPreparedMesh {
@@ -6375,7 +6381,8 @@ static int fl_map_submit_object(const XwaFlightMapObject* map_object, const XwaF
 			fl_derive_wreck_flames(&s.build[0], f, snapshot_index, context->assets, NULL);
 		if (s.glow_ok) {
 			fl_submit_engine_glows(prepared.mesh, model_matrix, prepared.table, f->eg_knockout_mask,
-								   f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(f));
+								   f->eg_hidden_mask,
+								   XwaRemasterShip_EngineGlowScale(f, context->game_time_ticks));
 		}
 	}
 	return 1;
@@ -6566,7 +6573,8 @@ static void fl_submit_hyperspace_cockpit(AeronCommandBuffer* cmd, XwaRemasterAss
 	}
 	if (s.glow_ok && player_f) {
 		fl_submit_engine_glows(cockpit_mesh, m, inst.mesh_table, player_f->eg_knockout_mask,
-							   player_f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(player_f));
+							   player_f->eg_hidden_mask,
+							   XwaRemasterShip_EngineGlowScale(player_f, snap->game_time_ticks));
 	}
 }
 
@@ -8329,7 +8337,9 @@ static AeronTexture* fl_render_map(AeronCommandBuffer* cmd, const XwaSnapshot* s
 	AeronScene_SetMotionContext(s.scene, NULL, NULL, 1);
 	AeronScene_SetDirectionalShadow(s.scene, NULL);
 
-	FlMapSubmitContext submit_context = { .cmd = cmd, .assets = assets };
+	FlMapSubmitContext submit_context = { .cmd = cmd,
+										  .assets = assets,
+										  .game_time_ticks = snap->game_time_ticks };
 	/* The map's overlays use the classic palette colours. The present pass
 	 * multiplies the scene by the map's fixed exposure, so they are drawn
 	 * at 1 / exposure to keep those colours. */
@@ -9322,7 +9332,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * gates — no craft / dead subsystems — return 0 and skip). */
 			if (s.glow_ok) {
 				fl_submit_engine_glows(prepared.mesh, model_matrix, inst.mesh_table, f->eg_knockout_mask,
-									   f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(f));
+									   f->eg_hidden_mask,
+									   XwaRemasterShip_EngineGlowScale(f, snap->game_time_ticks));
 			}
 			/* Capital engine glows double as point lights (the classic
 			 * modelIndex branch: raw dims over 2000 only). */
@@ -9480,7 +9491,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 			 * the PLAYER craft's state. */
 			if (s.glow_ok && player_f) {
 				fl_submit_engine_glows(cockpit_mesh, m, inst.mesh_table, player_f->eg_knockout_mask,
-									   player_f->eg_hidden_mask, XwaRemasterShip_EngineGlowScale(player_f));
+									   player_f->eg_hidden_mask,
+									   XwaRemasterShip_EngineGlowScale(player_f, snap->game_time_ticks));
 			}
 		}
 	}

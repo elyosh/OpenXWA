@@ -1,6 +1,8 @@
 #include "xwa_runtime/timing/host_clock.h"
 
+#include "xwa/flight/flight.h"
 #include "xwa/util/time.h"
+#include "xwa_runtime/runtime/film_benchmark.h"
 
 enum { XWA_LEGACY_TIMER_QUANTUM_US = 15625 };
 
@@ -29,6 +31,10 @@ uint64_t XwaTime_GetLegacyTimerIntervalUs(uint32_t intervalMs) {
 	   allowing the host scheduler to use Aeron's precise clock. */
 	return ((requestedUs + XWA_LEGACY_TIMER_QUANTUM_US - 1u) / XWA_LEGACY_TIMER_QUANTUM_US) *
 		   XWA_LEGACY_TIMER_QUANTUM_US;
+}
+
+uint32_t XwaTime_RandomSeedClock(void) {
+	return XwaFilmBenchmark_IsPlaying() ? (uint32_t)g_filmStepInputTimestamp : XwaTime_GetElapsedTicks();
 }
 
 uint32_t timeGetTime(void) { return XwaTime_GetElapsedTicks(); }

@@ -1788,6 +1788,8 @@ int XwaRemaster_CaptureFlightFrame(const char* name) {
 					  "film capture: wrote %s and %s in the user folder, %dx%d with %d views, exposure %s",
 					  png_path, hdr_path, width, height, view_count, exposure_text);
 	}
+	/* The same lines as a benchmark, so that the log says what was captured. */
+	XwaRemasterFlight_LogFrameStats();
 	return 1;
 }
 

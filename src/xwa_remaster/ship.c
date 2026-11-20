@@ -1360,18 +1360,22 @@ int XwaRemasterShip_BuildPreviousCockpitMeshTable(
 	return 1;
 }
 
-/* Small xorshift for the classic glow flicker — cosmetic randomness
- * that classically came from the render-side GameRand2 (which the
- * read-only snapshot capture must not consume). */
-static uint32_t ship_flicker_rand(void) {
-	static uint32_t st = 0x9E3779B9u;
-	st ^= st << 13;
-	st ^= st >> 17;
-	st ^= st << 5;
-	return st;
+/* The random number for the classic glow flicker. The original takes it from
+ * GameRand2 when it draws the glows. The port draws from a snapshot and must
+ * not change the game's random numbers, so it computes the number from the
+ * craft's slot and the game time. A frame then looks the same every time it
+ * is rendered. */
+static uint32_t ship_flicker_rand(const XwaFlightObject* f, int32_t game_time_ticks) {
+	uint32_t x = (uint32_t)f->slot * 0x9E3779B9u ^ (uint32_t)game_time_ticks * 0x85EBCA6Bu;
+	x ^= x >> 16;
+	x *= 0x7FEB352Du;
+	x ^= x >> 15;
+	x *= 0x846CA68Bu;
+	x ^= x >> 16;
+	return x;
 }
 
-float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f) {
+float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f, int32_t game_time_ticks) {
 	if (!f || !f->has_craft || !f->eg_output_scale || !f->eg_working) {
 		return 0.0f;
 	}
@@ -1385,7 +1389,8 @@ float XwaRemasterShip_EngineGlowScale(const XwaFlightObject* f) {
 		const float redirect =
 			(float)((double)margin * 0.0625 * ((double)f->eg_output_scale * 0.000015259022));
 		float s = (float)((double)f->eg_throttle * 0.00001525902189669642 *
-						  ((1.0 - (double)(ship_flicker_rand() & 0xf) * 0.0040000002) * (double)redirect));
+						  ((1.0 - (double)(ship_flicker_rand(f, game_time_ticks) & 0xf) * 0.0040000002) *
+						   (double)redirect));
 		if (s < 0.34999999f) {
 			s = 0.34999999f;
 		}

@@ -32,6 +32,7 @@
 #ifdef XWA_MODERN
 #include "xwa_runtime/models/skins.h"
 #include "xwa_runtime/models/weapon_stats.h"
+#include "xwa_runtime/timing/host_clock.h"
 #include "xwa_runtime/timing/modern_flight_timing.h"
 #endif
 
@@ -662,7 +663,11 @@ void DeathStar_Init(void) {
 	int objectType;
 	uint32_t objIdx;
 
+#ifdef XWA_MODERN
+	Math_SeedRandom((uint16_t)XwaTime_RandomSeedClock());
+#else
 	Math_SeedRandom((uint16_t)timeGetTime());
+#endif
 
 	g_deathStarPlayerObjIdx = g_players[g_localPlayer].objectIndex;
 	g_deathStarReactorCoreObjIdx = 0xffff;

@@ -1080,6 +1080,18 @@ static int XwaFlightTask_RunSinglePlayerFrame(void) {
 	g_serverTickTime = g_inputTimestamp;
 	g_xwaFlightTaskLastStepTargetTimestamp = g_inputTimestamp;
 	g_inputTimestamp = realInputTimestamp + g_inputTimestamp - targetTimestamp;
+	if (g_filmPlaybackMode == 2 && XwaFilmBenchmark_IsPlaying()) {
+		/* A film played with --play-film must show the same frames on every
+		   run. g_gameTime follows the real clock, and the render code reads
+		   it: trail points get their age from it. So the frame is rendered
+		   with the film's time. */
+		const int realGameTime = g_gameTime;
+
+		g_gameTime = g_filmStepInputTimestamp;
+		XwaFlightTask_RenderFrameAndAudio(&timing);
+		g_gameTime = realGameTime;
+		return 1;
+	}
 	XwaFlightTask_RenderFrameAndAudio(&timing);
 	return 1;
 }
@@ -1515,7 +1527,8 @@ static void XwaFlightTask_TickPhases(int now) {
 				g_craftImpactBounceEnabled = 1;
 				Math_SeedRandom(g_gameConfig.randomSeed);
 				GameRand_SetSavedSeed(0xACEDu);
-				GameRand_SetSecondarySeed((int16_t)(GameRand_GetPrimarySeed() + timeGetTime()));
+				/* The original adds timeGetTime(). */
+				GameRand_SetSecondarySeed((int16_t)(GameRand_GetPrimarySeed() + XwaTime_RandomSeedClock()));
 				XwaFlightTask_ResetPlayersForMissionStart(playerCount);
 				g_singleObjectUpdateOverrideIdx = -1;
 				g_flightNetBufferWorldMessagesUntilChecksum = 0;
