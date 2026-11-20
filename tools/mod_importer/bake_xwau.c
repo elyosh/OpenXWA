@@ -1465,7 +1465,8 @@ static void write_layout_yaml(XwauContext* ctx) {
 
 	/* A squadron logo moves when it has a video and a position file
 	 * (Resdata\Squad<N>.txt) with a Width and Height. Its number in the
-	 * mission is N + 3. */
+	 * mission is N + 3. The game also shows Squad1 for logos 0 to 2, and
+	 * XWAU moves it there too, because it goes by the file the game loads. */
 	int logos = 0;
 	for (int n = 1; n <= 99; ++n) {
 		char name[32], txt[1200], webm[1200];
@@ -1476,9 +1477,11 @@ static void write_layout_yaml(XwauContext* ctx) {
 		if (!find_ci(ctx->resdata, name, webm, sizeof webm) || read_key_int(txt, "Width", 0) == 0 ||
 			read_key_int(txt, "Height", 0) == 0)
 			continue;
-		fprintf(fp, logos++ ? ", " : "briefing:\n  squad_logos: {");
-		fprintf(fp, "%d: ", n + 3);
-		write_design_point(fp, read_key_int(txt, "PositionX", 0), read_key_int(txt, "PositionY", 0));
+		for (int logo = n == 1 ? 0 : n + 3; logo <= n + 3; ++logo) {
+			fprintf(fp, logos++ ? ", " : "briefing:\n  squad_logos: {");
+			fprintf(fp, "%d: ", logo);
+			write_design_point(fp, read_key_int(txt, "PositionX", 0), read_key_int(txt, "PositionY", 0));
+		}
 	}
 	if (logos)
 		fprintf(fp, "}\n");

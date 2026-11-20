@@ -319,7 +319,7 @@ A mission can also set the planet and its centre, see
 | `family_room.play_mission` | rectangle | The click area that goes to the briefing of the family mission. | `[103, 288, 131, 128]` |
 | `family_room.marko_eye` | point | Marko's eye while Marko speaks. | `[160, 200]` |
 | `family_room.monitor` | point | The e-mail monitor. | `[426, 243]` |
-| `briefing.squad_logos` | map of logo numbers to points | The squadron logo in the briefing room, for each logo number that a mission uses. The title and the order of battle move with it. | |
+| `briefing.squad_logos` | map of logo numbers to points | The squadron logo in the briefing room, for each logo number that a mission uses. The title and the order of battle move with it. Logo N shows `frontres/tour/squad<N - 3>`, and logos 0 to 2 show `squad1`. | |
 
 ### Other screens
 
