@@ -160,6 +160,7 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 	XwaRemasterFlight_GetSsao(&ssao);
 	AeronScene_SetPost(s.scene, &(AeronScenePostDesc) {
 									.ssao_quality = ssao.ssao_quality,
+									.ssao_method = ssao.ssao_method,
 									.ssao_intensity = ssao.ssao_intensity,
 									.ssao_power = ssao.ssao_power,
 									.ssao_radius_view = ssao.ssao_radius_view,
@@ -172,7 +173,8 @@ AeronTexture* XwaRemasterPreview_Render(AeronCommandBuffer* cmd, const XwaModelP
 								});
 	const XwaShipAoParams ao = {
 		.intensity = ssao.ssao_intensity,
-		.power = ssao.ssao_power,
+		/* GTAO applies the power in its own pass. */
+		.power = ssao.ssao_method == AERON_SCENE_SSAO_GTAO ? 1.0f : ssao.ssao_power,
 		.direct = ssao.ssao_direct,
 	};
 	const int ao_on = ssao.ssao_quality > 0 && ssao.ssao_intensity > 0.0f;

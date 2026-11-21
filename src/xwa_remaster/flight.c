@@ -7836,6 +7836,7 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	 * hyperspace effects encode their own motion in geometry and shader animation. */
 	AeronScene_SetPost(s.scene, &(AeronScenePostDesc) {
 									.ssao_quality = s.ssao.ssao_quality,
+									.ssao_method = s.ssao.ssao_method,
 									.ssao_intensity = s.ssao.ssao_intensity,
 									.ssao_power = s.ssao.ssao_power,
 									.ssao_radius_view = s.ssao.ssao_radius_view,
@@ -7855,7 +7856,8 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 	fl_finalize_point_lights();
 	const XwaShipAoParams ao = {
 		.intensity = s.ssao.ssao_intensity,
-		.power = s.ssao.ssao_power,
+		/* GTAO applies the power in its own pass. */
+		.power = s.ssao.ssao_method == AERON_SCENE_SSAO_GTAO ? 1.0f : s.ssao.ssao_power,
 		.direct = s.ssao.ssao_direct,
 	};
 	const int ao_on = s.ssao.ssao_quality > 0 && s.ssao.ssao_intensity > 0.0f;
@@ -8862,10 +8864,17 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	/* A headset has no motion blur: the eyes follow what they look at. */
 	const int mb_on =
 		!s.view_targets_set && (s.mb_quality > 0 || (!rig && s.fsr_mode != AERON_TEMPORAL_OFF));
+	/* GTAO averages its AO over frames when nothing else does (no temporal
+	 * upscaler) and the motion vectors include the camera's motion. It
+	 * needs the same motion data as motion blur. Not yet in a headset or
+	 * with several views. */
+	const int ao_history = s.ssao.ssao_method == AERON_SCENE_SSAO_GTAO && s.ssao.ssao_quality > 0 &&
+						   s.ssao.ssao_intensity > 0.0f && s.fsr_mode == AERON_TEMPORAL_OFF &&
+						   s.mb_camera_blur && !rig && !s.view_targets_set;
 	s.mb_enabled = 0;
 	int mb_regen = 0;
 	int paused = 0;
-	if (mb_on && prev && prev->flight_camera_valid) {
+	if ((mb_on || ao_history) && prev && prev->flight_camera_valid) {
 		const XwaFlightCamera* pc = &prev->flight_camera;
 		if (pc->region == cam->region && pc->hyperspace_phase != XWA_HYPERSPACE_TUNNEL && !pc->map_mode &&
 			pc->in_hangar == cam->in_hangar && pc->external == cam->external &&
@@ -9168,6 +9177,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	const float mb_shutter = mb_allow ? fl_mb_logical_frame_shutter() : 0.0f;
 	AeronScene_SetPost(s.scene, &(AeronScenePostDesc) {
 									.ssao_quality = s.ssao.ssao_quality,
+									.ssao_method = s.ssao.ssao_method,
 									.ssao_intensity = s.ssao.ssao_intensity,
 									.ssao_power = s.ssao.ssao_power,
 									.ssao_radius_view = s.ssao.ssao_radius_view,
@@ -9177,6 +9187,7 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 									.ssao_min_screen_frac = s.ssao.ssao_min_screen_frac,
 									.ssao_max_screen_frac = s.ssao.ssao_max_screen_frac,
 									.ssao_sample_jitter = s.ssao.ssao_sample_jitter,
+									.ssao_history = ao_history,
 									.mb_quality = mb_on ? s.mb_quality : 0,
 									.mb_shutter = mb_shutter,
 									.mb_camera_blur = s.mb_camera_blur,
@@ -9196,7 +9207,8 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 	 * walk can contribute the engine-glow point lights. */
 	const XwaShipAoParams ao = {
 		.intensity = s.ssao.ssao_intensity,
-		.power = s.ssao.ssao_power,
+		/* GTAO applies the power in its own pass. */
+		.power = s.ssao.ssao_method == AERON_SCENE_SSAO_GTAO ? 1.0f : s.ssao.ssao_power,
 		.direct = s.ssao.ssao_direct,
 	};
 	const int ao_on = s.ssao.ssao_quality > 0 && s.ssao.ssao_intensity > 0.0f;

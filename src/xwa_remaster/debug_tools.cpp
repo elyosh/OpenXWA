@@ -256,6 +256,14 @@ static void xwa_tool_ssao(int* open, void* user) {
 		p.ssao_quality = quality;
 		changed = true;
 	}
+	int method = p.ssao_method;
+	ImGui::RadioButton("Hemisphere", &method, AERON_SCENE_SSAO_HEMISPHERE);
+	ImGui::SameLine();
+	ImGui::RadioButton("GTAO", &method, AERON_SCENE_SSAO_GTAO);
+	if (method != p.ssao_method) {
+		p.ssao_method = method;
+		changed = true;
+	}
 
 	changed |= ImGui::SliderFloat("Intensity", &p.ssao_intensity, 0.0f, 1.0f, "%.2f");
 	changed |= ImGui::SliderFloat("Radius (view units)", &p.ssao_radius_view, 1.0f, 4096.0f, "%.1f",
