@@ -902,6 +902,11 @@ int main(int argc, char** argv) {
 			if (Aeron_QuitRequested() || XwaPort_ShouldQuit()) {
 				break;
 			}
+			/* In VR, the headset's frame begins after the game tick, so that
+			   the runtime doesn't count the tick as rendering time. */
+			if (!Aeron_XrBeginRendering()) {
+				break;
+			}
 			window_opened |= XwaOptionsWindow_ConsumeRuntimeRequest();
 			const uint64_t remaster_start_us = Aeron_NowUs();
 			XwaRemaster_Frame(delta_us);
