@@ -51,12 +51,16 @@ float XwaRemaster_ClassicRadianceDefault(void);
 /* Reads the game's directional lights as illuminance into `out`, which
  * holds XWA_SNAP_MAX_DIR_LIGHTS lights, and returns their count.
  *
- * A game light's colour times its brightness is decoded as one sRGB value,
- * then multiplied by the classic light calibration. The mission authors
+ * The colour is decoded from sRGB, and so is a brightness up to 1, then they
+ * are multiplied by the classic light calibration. The mission authors
  * chose these values on the classic renderer, which multiplies colour,
  * brightness and texture in gamma space. So a light of brightness 0.3 looks
- * like 0.07 of a light of brightness 1, not 0.3. The curve continues
- * above 1. */
+ * like 0.07 of a light of brightness 1, not 0.3.
+ *
+ * A brightness above 1 multiplies the light as it is. The classic renderer
+ * can't show more than full brightness, so these values only made more of
+ * the surface fully lit there. Decoding them from sRGB too would make a
+ * brightness of 15.5 (the original 1B2M5G) 640 times a brightness of 1. */
 uint32_t XwaRemaster_ReadGameDirLights(const XwaDirLight* lights, uint32_t count, XwaRemasterDirLight* out);
 
 #ifdef __cplusplus
