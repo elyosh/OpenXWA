@@ -312,6 +312,8 @@ static struct {
 	int rendered_tick_valid;
 	AeronSampleCount scene_requested_samples;
 	AeronSampleCount configured_msaa_samples;
+	/* presentation.msaa_depth_prepass: 0 auto, 1 on, 2 off. */
+	int msaa_depth_prepass;
 	int configured_hdr_output;
 
 	/* Tonemap + bloom present stage (the TIE model): the scene renders
@@ -985,9 +987,8 @@ static int fl_cfg_validate(const AeronConfigFile* config, const char** error_pat
 		"point_lights.light_lists",
 	};
 	static const char* strings[] = {
-		"presentation.cockpit_fov",
-		"temporal_upscaling.mode",
-		"exposure.mode",
+		"presentation.cockpit_fov", "presentation.msaa_depth_prepass",
+		"temporal_upscaling.mode",  "exposure.mode",
 		"exposure.channel",
 	};
 	for (size_t i = 0; i < sizeof ints / sizeof ints[0]; i++) {
@@ -1762,6 +1763,21 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 			AeronConfigFile_Destroy(cf);
 			return 0;
 	}
+	{
+		static const char* const names[] = { "auto", "on", "off" };
+		const char* name = AeronConfigFile_GetString(cf, "presentation.msaa_depth_prepass", NULL);
+		s.msaa_depth_prepass = -1;
+		for (int i = 0; i < 3; i++) {
+			if (name && strcmp(name, names[i]) == 0)
+				s.msaa_depth_prepass = i;
+		}
+		if (s.msaa_depth_prepass < 0) {
+			Aeron_LogError("xwa.remaster", "%s: presentation.msaa_depth_prepass must be auto, on or off",
+						   path);
+			AeronConfigFile_Destroy(cf);
+			return 0;
+		}
+	}
 	s.configured_hdr_output = AeronConfigFile_GetBool(cf, "presentation.hdr_output", 0);
 	{
 		static const char* const names[] = { "cockpit", "wide", "off" };
@@ -2474,11 +2490,13 @@ void XwaRemasterFlight_LogFrameStats(void) {
 				  "shadows: %u casters in %u cascades, %u draws",
 				  frame.instances, frame.shadow_casters, frame.lights, frame.billboards, casters,
 				  shadows.cascade_count, frame.shadow_draws);
-	Aeron_LogInfo("xwa.benchmark",
-				  "film benchmark: settings: MSAA %dx, SSAO quality %d, motion blur quality %d, upscaling %s, "
-				  "light lists %s",
-				  (int)XwaRemaster_MsaaSampleCount(), s.ssao.ssao_quality, s.mb_quality,
-				  AeronTemporal_ModeName(s.fsr_mode), s.plight.light_lists ? "on" : "off");
+	Aeron_LogInfo(
+		"xwa.benchmark",
+		"film benchmark: settings: MSAA %dx%s, SSAO quality %d, motion blur quality %d, upscaling %s, "
+		"light lists %s",
+		(int)XwaRemaster_MsaaSampleCount(), AeronScene_MsaaDepthPrepass(s.scene) ? " with depth prepass" : "",
+		s.ssao.ssao_quality, s.mb_quality, AeronTemporal_ModeName(s.fsr_mode),
+		s.plight.light_lists ? "on" : "off");
 	for (uint32_t view = 0; view < frame.view_count && view < AERON_MAX_VIEWS; view++) {
 		Aeron_LogInfo("xwa.benchmark",
 					  "film benchmark: view %u of %u: %u instances drawn, %u with a light list (%u with "
@@ -3224,6 +3242,8 @@ static int fl_ensure(int target_w, int target_h) {
 		.color_format = AERON_TEXTURE_FORMAT_RGBA16_FLOAT,
 		.with_normal_rt = 1, /* SSAO / motion-blur G-buffer */
 		.sample_count = requested_samples,
+		.msaa_depth_prepass =
+			s.msaa_depth_prepass == 1 || (s.msaa_depth_prepass == 0 && !Aeron_GpuRemovesHiddenSurfaces()),
 		/* The temporal upscaler works on one view. */
 		.temporal_mode = s.rig_active ? AERON_TEMPORAL_OFF : s.fsr_mode,
 		.temporal_sharpness = s.fsr_sharpness,

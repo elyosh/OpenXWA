@@ -412,6 +412,10 @@ presentation:
   latency_pacing: true
   # Required shipped baseline; user config.yaml may override both values.
   msaa_samples: 2
+  # With MSAA, draws the depth of the opaque models before shading them, so
+  # that the GPU only shades the surfaces in front. auto turns it on except
+  # on Apple GPUs, which already skip hidden surfaces by themselves.
+  msaa_depth_prepass: 'auto'
   hdr_output: true
   # The field of view of the player's craft, from its model:
   # cockpit: the view the model gives its pilot eye.
