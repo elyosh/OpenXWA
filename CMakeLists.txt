@@ -467,6 +467,7 @@ set(XWA_APP_SOURCES
     src/xwa_app/options/mods_page.c
     src/xwa_app/options/mouse_page.c
     src/xwa_app/options/video_page.c
+    src/xwa_app/options/vr_tracking_page.c
     src/xwa_app/options/audio_page.c
     src/xwa_app/options/options_window.c
     src/xwa_app/setup.c

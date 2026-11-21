@@ -4,7 +4,6 @@
 #include "options/options_window.h"
 #include "xwa_runtime/input/controller_mapping.h"
 
-#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -499,116 +498,12 @@ static void XwaControllerSettings_Rumble(AeronUiContext* ui) {
 		XwaOptionsWindow_ReportError("The rumble options are invalid.");
 }
 
-/* Head tracking is global too. It applies at once and is saved on Close. */
-static void XwaControllerSettings_HeadTracking(AeronUiContext* ui) {
-	static XwaModernInputOptions options;
-	XwaModernInputOptions_Get(&options);
-	AeronUi_Spacer(ui, 8.0f);
-	AeronUi_Header(ui, "Head Tracking");
-	/* The choices that this build supports, and the setting for each. */
-	const char* names[XWA_MODERN_HEAD_TRACKING_COUNT];
-	XwaModernHeadTracking kinds[XWA_MODERN_HEAD_TRACKING_COUNT];
-	int count = 0;
-	names[count] = "Off";
-	kinds[count++] = XWA_MODERN_HEAD_TRACKING_OFF;
-	if (Aeron_HeadTrackerAvailable(AERON_HEAD_TRACKER_TRACKIR)) {
-		names[count] = "TrackIR";
-		kinds[count++] = XWA_MODERN_HEAD_TRACKING_TRACKIR;
-	}
-	names[count] = "OpenTrack";
-	kinds[count++] = XWA_MODERN_HEAD_TRACKING_OPENTRACK;
-	/* A saved choice that this build doesn't support shows as Off. */
-	int index = 0;
-	for (int i = 0; i < count; i++) {
-		if (kinds[i] == options.head_tracking)
-			index = i;
-	}
-	if (AeronUi_Selector(ui, "Head Tracking", &index, names, count)) {
-		options.head_tracking = kinds[index];
-		if (!XwaModernInputOptions_Set(&options))
-			XwaOptionsWindow_ReportError("The head tracking options are invalid.");
-	}
-	if (kinds[index] == XWA_MODERN_HEAD_TRACKING_TRACKIR) {
-		AeronUi_Help(ui, "Also works with OpenTrack's \"freetrack 2.0 Enhanced\" output.");
-	} else if (kinds[index] == XWA_MODERN_HEAD_TRACKING_OPENTRACK) {
-		char help[160];
-		snprintf(help, sizeof help,
-				 "In OpenTrack, choose the \"UDP over network\" output, with the address 127.0.0.1 and the "
-				 "port %d.",
-				 options.head_tracking_port);
-		AeronUi_Help(ui, help);
-	}
-	/* Shows whether the tracker is sending, so the player can check the setup
-	 * here. In VR the headset gives the head pose, and the tracker isn't
-	 * read. */
-	if (kinds[index] == XWA_MODERN_HEAD_TRACKING_OFF || Aeron_XrSessionRunning())
-		return;
-	switch (Aeron_HeadTrackerStatus()) {
-		case AERON_HEAD_TRACKER_TRACKING:
-			AeronUi_Help(ui, "Receiving your head movement.");
-			break;
-		case AERON_HEAD_TRACKER_WAITING:
-			AeronUi_Help(ui, "Not receiving any head movement.");
-			break;
-		case AERON_HEAD_TRACKER_FAILED:
-			AeronUi_Error(ui, Aeron_HeadTrackerError());
-			break;
-		default:
-			break;
-	}
-}
-
-/* The VR options are global too. They apply at once and are saved on Close. */
-static void XwaControllerSettings_Vr(AeronUiContext* ui) {
-	static XwaModernInputOptions options;
-	XwaModernInputOptions_Get(&options);
-	AeronUi_Spacer(ui, 8.0f);
-	AeronUi_Header(ui, "VR");
-	bool changed = AeronUi_Toggle(ui, "Show Hands", &options.vr_show_hands);
-	AeronUi_Help(ui, "Shows your hands in the cockpit, where your VR controllers are.");
-	changed |= AeronUi_Toggle(ui, "Use the Mod's Hands", &options.vr_mod_hands) != 0;
-	AeronUi_Help(ui, "When off, the game's own hands are shown even if the mod has some.");
-	changed |= AeronUi_Toggle(ui, "Show Controllers in Menus", &options.vr_menu_controllers) != 0;
-	AeronUi_Help(ui, "In the menus, shows your controllers when the headset provides their models. "
-					 "Otherwise, your hands are shown.");
-	changed |= AeronUi_Toggle(ui, "Use the Mod's Keyboard", &options.vr_mod_keyboard) != 0;
-	AeronUi_Help(ui, "When off, the game's own virtual keyboard is shown even if the mod has one.");
-	static const char* const stick_modes[] = { "Off", "Tilt", "Slide" };
-	static const char* const hand_names[] = { "Left", "Right" };
-	int stick = (int)options.vr_stick;
-	if (AeronUi_Selector(ui, "Virtual Stick", &stick, stick_modes, XWA_MODERN_VR_STICK_MODE_COUNT)) {
-		options.vr_stick = (XwaModernVrStickMode)stick;
-		changed = true;
-	}
-	if (options.vr_stick == XWA_MODERN_VR_STICK_TILT)
-		AeronUi_Help(ui, "Hold the grip and tilt your hand to steer. Twist it to roll.");
-	else if (options.vr_stick == XWA_MODERN_VR_STICK_SLIDE)
-		AeronUi_Help(
-			ui, "Hold the grip and move your hand sideways, forward or back to steer. Twist it to roll.");
-	changed |= AeronUi_Selector(ui, "Stick Hand", &options.vr_stick_hand, hand_names, 2) != 0;
-	changed |= AeronUi_Toggle(ui, "Virtual Throttle", &options.vr_throttle) != 0;
-	AeronUi_Help(ui, "Hold the grip of your other hand and move it forward or back.");
-	int range_percent = (int)lroundf(options.vr_stick_range * 100.0f);
-	if (AeronUi_SliderInt(ui, "Stick Range", &range_percent, (int)(XWA_MODERN_VR_STICK_RANGE_MIN * 100.0f),
-						  (int)(XWA_MODERN_VR_STICK_RANGE_MAX * 100.0f), 10, "%d%%")) {
-		options.vr_stick_range = (float)range_percent / 100.0f;
-		changed = true;
-	}
-	AeronUi_Help(ui, "How far your hand moves for the stick's full travel.");
-	changed |= AeronUi_Toggle(ui, "Cockpit Buttons", &options.vr_cockpit_buttons) != 0;
-	AeronUi_Help(ui, "Point at a cockpit button and pull the trigger to press it.");
-	if (changed && !XwaModernInputOptions_Set(&options))
-		XwaOptionsWindow_ReportError("The VR options are invalid.");
-}
-
 static void XwaControllerSettings_AxisPage(XwaControllerSettings* settings, AeronUiContext* ui,
 										   const AeronControllerSnapshot* controller) {
 	if (AeronUi_SegmentedSelector(ui, "Flight Axis", &settings->axis, k_axis_names, XWA_INPUT_AXIS_COUNT))
 		AeronUi_CancelControllerCapture(ui);
 	XwaControllerSettings_AxisEditor(settings, ui, controller, (XwaInputAxis)settings->axis);
 	XwaControllerSettings_Rumble(ui);
-	XwaControllerSettings_HeadTracking(ui);
-	XwaControllerSettings_Vr(ui);
 }
 
 static void XwaControllerSettings_AxisConflictModal(XwaControllerSettings* settings, AeronUiContext* ui,

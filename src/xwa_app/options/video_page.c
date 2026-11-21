@@ -1,7 +1,6 @@
 #include "options/video_page.h"
 
 #include "aeron/render.h"
-#include "aeron/xr.h"
 #include "options/options_window.h"
 #include "xwa_runtime/config/modern_camera_options.h"
 #include "xwa_runtime/config/modern_camera_shake_options.h"
@@ -94,76 +93,6 @@ static bool XwaVideoPage_Surround(AeronUiContext* ui, XwaModernSurroundOptions* 
 	changed |= XwaVideoPage_SurroundSize(ui, "Side Screen Angle", &surround->side_angle_deg, 0.0f,
 										 XWA_MODERN_SURROUND_SIDE_ANGLE_MAX_DEG, 1, "%d degrees");
 	AeronUi_Help(ui, "How far each side screen is turned toward you. 0 is flat.");
-	return changed;
-}
-
-/* Set by the Restart Now button, until main.c takes it. */
-static bool s_restart_requested;
-
-bool XwaVideoPage_TakeRestartRequest(void) {
-	const bool requested = s_restart_requested;
-	s_restart_requested = false;
-	return requested;
-}
-
-/* The VR mode is read when the game starts, so a change needs a restart. */
-static bool XwaVideoPage_Vr(AeronUiContext* ui, XwaModernVideoOptions* options) {
-	static int started_mode = -1;
-	static int started_render_percent;
-	int mode = (int)options->vr_mode;
-	int render_percent = (int)lroundf(options->vr_render_scale * 100.0f);
-	int world_percent = (int)lroundf(options->vr_world_scale * 100.0f);
-	int panel_percent = (int)lroundf(options->vr_panel_scale * 100.0f);
-	int screen_percent = (int)lroundf(options->vr_screen_scale * 100.0f);
-	bool changed = false;
-
-	if (!Aeron_XrSupported())
-		return false;
-	if (started_mode < 0) {
-		started_mode = mode;
-		started_render_percent = render_percent;
-	}
-	AeronUi_Header(ui, "Virtual Reality");
-	if (AeronUi_Toggle(ui, "VR Headset", &mode)) {
-		options->vr_mode = mode ? XWA_MODERN_VR_ON : XWA_MODERN_VR_OFF;
-		changed = true;
-	}
-	AeronUi_Help(ui, "Applies the next time OpenXWA starts.");
-	if (mode != XWA_MODERN_VR_OFF) {
-		if (AeronUi_SliderInt(ui, "Headset Render Scale", &render_percent,
-							  (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f), (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5,
-							  "%d%%")) {
-			options->vr_render_scale = (float)render_percent / 100.0f;
-			changed = true;
-		}
-		AeronUi_Help(ui, "The resolution of the headset's picture. 100% is what the headset recommends, "
-						 "and lower is faster. Applies the next time OpenXWA starts.");
-		if (AeronUi_SliderInt(ui, "World Scale", &world_percent, (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f),
-							  (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5, "%d%%")) {
-			options->vr_world_scale = (float)world_percent / 100.0f;
-			changed = true;
-		}
-		AeronUi_Help(ui, "How far the view moves when your head moves. Above 100%, the cockpit and the "
-						 "world look smaller.");
-		if (AeronUi_SliderInt(ui, "Cockpit Panel Size", &panel_percent,
-							  (int)(XWA_MODERN_VR_PANEL_SCALE_MIN * 100.0f),
-							  (int)(XWA_MODERN_VR_PANEL_SCALE_MAX * 100.0f), 5, "%d%%")) {
-			options->vr_panel_scale = (float)panel_percent / 100.0f;
-			changed = true;
-		}
-		AeronUi_Help(ui, "The size of the HUD panel in the cockpit: the radars, the gauges and the text.");
-		if (AeronUi_SliderInt(ui, "Menu Screen Size", &screen_percent,
-							  (int)(XWA_MODERN_VR_SCALE_MIN * 100.0f),
-							  (int)(XWA_MODERN_VR_SCALE_MAX * 100.0f), 5, "%d%%")) {
-			options->vr_screen_scale = (float)screen_percent / 100.0f;
-			changed = true;
-		}
-		AeronUi_Help(ui, "The size of the flat screen that shows the menus, briefings and movies.");
-		changed |= AeronUi_Toggle(ui, "Show Headset View in Window", &options->vr_mirror);
-	}
-	if ((mode != started_mode || (mode != XWA_MODERN_VR_OFF && render_percent != started_render_percent)) &&
-		AeronUi_Button(ui, "Restart Now"))
-		s_restart_requested = true;
 	return changed;
 }
 
@@ -263,7 +192,6 @@ void XwaVideoPage_Draw(AeronUiContext* ui, const AeronInputSnapshot* input) {
 	XwaModernVideoOptions_Get(&options);
 	changed = XwaVideoPage_Display(ui, &options);
 	changed |= XwaVideoPage_Surround(ui, &options.surround);
-	changed |= XwaVideoPage_Vr(ui, &options);
 	changed |= XwaVideoPage_FlightRendering(ui, &options);
 
 	AeronUi_Header(ui, "HUD");

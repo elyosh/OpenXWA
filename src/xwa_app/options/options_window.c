@@ -6,6 +6,7 @@
 #include "options/mods_page.h"
 #include "options/mouse_page.h"
 #include "options/video_page.h"
+#include "options/vr_tracking_page.h"
 #include "xwa_runtime/config/modern_audio_options.h"
 #include "xwa_runtime/config/modern_input_options.h"
 #include "xwa_runtime/config/modern_video_options.h"
@@ -24,6 +25,7 @@ enum {
 	OPTIONS_PAGE_CONTROLLER,
 	OPTIONS_PAGE_KEYBOARD,
 	OPTIONS_PAGE_MOUSE,
+	OPTIONS_PAGE_VR_TRACKING,
 	OPTIONS_PAGE_MODS,
 	OPTIONS_PAGE_COUNT
 };
@@ -72,6 +74,7 @@ bool XwaOptionsWindow_Init(XwaAppUi* ui, char* error, size_t capacity) {
 	g_window.pages[OPTIONS_PAGE_CONTROLLER] = XwaOptionsWindow_DrawController;
 	g_window.pages[OPTIONS_PAGE_KEYBOARD] = XwaOptionsWindow_DrawKeyboard;
 	g_window.pages[OPTIONS_PAGE_MOUSE] = XwaMousePage_Draw;
+	g_window.pages[OPTIONS_PAGE_VR_TRACKING] = XwaVrTrackingPage_Draw;
 	g_window.pages[OPTIONS_PAGE_MODS] = XwaOptionsWindow_DrawMods;
 	g_window.ready = g_window.ui != NULL;
 	if (!g_window.ready && error && capacity)
@@ -242,7 +245,8 @@ void XwaOptionsWindow_Frame(const AeronInputSnapshot* input, float seconds) {
 			XwaOptionsWindow_DrawNotice(input, seconds);
 		return;
 	}
-	static const char* pages[] = { "Video", "Audio", "Controller", "Keyboard", "Mouse", "Mods" };
+	const char* pages[] = { "Video", "Audio", "Controller", "Keyboard", "Mouse", XwaVrTrackingPage_Title(),
+							"Mods" };
 	/* AeronUi scales by the picture's height / 1080, so the width it has in
 	   reference pixels depends on the picture's shape: 1920 at 16:9, 1440 at
 	   4:3. The picture has the shape of the logical frame: it fills the

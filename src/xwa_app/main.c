@@ -10,7 +10,7 @@
 #include "mod_update.h"
 #include "options/mods_page.h"
 #include "options/options_window.h"
-#include "options/video_page.h"
+#include "options/vr_tracking_page.h"
 #include "setup.h"
 #include "ui.h"
 #include "window_icon.h"
@@ -917,7 +917,7 @@ int main(int argc, char** argv) {
 			if (XwaModsPage_TakeRestartRequest()) {
 				request_restart(&launch);
 			}
-			if (XwaVideoPage_TakeRestartRequest()) {
+			if (XwaVrTrackingPage_TakeRestartRequest()) {
 				/* The new start reads the VR mode from the saved options. */
 				XwaModernVideoOptions_Flush();
 				request_restart(&launch);
