@@ -322,6 +322,15 @@ typedef struct XwaFlightMotionBlurParams {
 	int velocity_viz;    /* false-color velocity debug overlay */
 } XwaFlightMotionBlurParams;
 
+/* The bloom draws with bloom.intensity times the player's bloom amount
+ * (video.bloom_amount, 1 by default). The amount also scales the glow of
+ * projectiles, because their extra bloom light goes into the same bloom
+ * image. The debug inspector changes the intensity. */
+float XwaRemasterFlight_BloomAmount(void);
+void XwaRemasterFlight_SetBloomAmount(float amount);
+float XwaRemasterFlight_BloomIntensity(void);
+void XwaRemasterFlight_SetBloomIntensity(float intensity);
+
 void XwaRemasterFlight_GetMotionBlur(XwaFlightMotionBlurParams* out);
 void XwaRemasterFlight_SetMotionBlur(const XwaFlightMotionBlurParams* in);
 

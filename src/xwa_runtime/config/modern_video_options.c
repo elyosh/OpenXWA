@@ -61,7 +61,9 @@ static int XwaModernVideoOptions_IsValid(const XwaModernVideoOptions* options) {
 		   options->motion_blur_quality >= XWA_MODERN_MOTION_BLUR_OFF &&
 		   options->motion_blur_quality <= XWA_MODERN_MOTION_BLUR_HIGH &&
 		   isfinite(options->motion_blur_amount) && options->motion_blur_amount >= 0.0f &&
-		   options->motion_blur_amount <= 1.0f && options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 &&
+		   options->motion_blur_amount <= 1.0f && isfinite(options->bloom_amount) &&
+		   options->bloom_amount >= 0.0f && options->bloom_amount <= XWA_MODERN_BLOOM_AMOUNT_MAX &&
+		   options->sdr_gamma >= XWA_MODERN_SDR_GAMMA_2_2 &&
 		   options->sdr_gamma <= XWA_MODERN_SDR_GAMMA_SRGB &&
 		   options->paper_white >= XWA_MODERN_PAPER_WHITE_AUTO &&
 		   options->paper_white <= XWA_MODERN_PAPER_WHITE_400 && isfinite(options->hud_scale) &&
@@ -73,9 +75,10 @@ static int XwaModernVideoOptions_AreEqual(const XwaModernVideoOptions* lhs,
 	return lhs->window_mode == rhs->window_mode && lhs->ssao_quality == rhs->ssao_quality &&
 		   lhs->shadow_quality == rhs->shadow_quality && lhs->fsr_upscaling == rhs->fsr_upscaling &&
 		   lhs->msaa == rhs->msaa && lhs->motion_blur_quality == rhs->motion_blur_quality &&
-		   lhs->motion_blur_amount == rhs->motion_blur_amount && lhs->hdr_output == rhs->hdr_output &&
-		   lhs->sdr_gamma == rhs->sdr_gamma && lhs->paper_white == rhs->paper_white &&
-		   lhs->hud_scale == rhs->hud_scale && lhs->surround.enabled == rhs->surround.enabled &&
+		   lhs->motion_blur_amount == rhs->motion_blur_amount && lhs->bloom_amount == rhs->bloom_amount &&
+		   lhs->hdr_output == rhs->hdr_output && lhs->sdr_gamma == rhs->sdr_gamma &&
+		   lhs->paper_white == rhs->paper_white && lhs->hud_scale == rhs->hud_scale &&
+		   lhs->surround.enabled == rhs->surround.enabled &&
 		   lhs->surround.screen_width_mm == rhs->surround.screen_width_mm &&
 		   lhs->surround.screen_height_mm == rhs->surround.screen_height_mm &&
 		   lhs->surround.bezel_mm == rhs->surround.bezel_mm &&

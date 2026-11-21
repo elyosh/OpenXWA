@@ -112,6 +112,9 @@ typedef struct XwaModernVideoOptions {
 	XwaModernMsaa msaa;
 	XwaModernMotionBlurQuality motion_blur_quality;
 	float motion_blur_amount; /* normalized shutter: 0.5 = 180 degrees */
+	/* The strength of the bloom, from 0 to XWA_MODERN_BLOOM_AMOUNT_MAX. At 1,
+	   it is the shipped bloom. It also scales the glow of projectiles. */
+	float bloom_amount;
 	int hdr_output;
 	XwaModernSdrGamma sdr_gamma;
 	XwaModernPaperWhite paper_white;
@@ -147,6 +150,8 @@ typedef struct XwaModernVideoOptions {
 #define XWA_MODERN_HUD_SCALE_MIN 0.5f
 #define XWA_MODERN_HUD_SCALE_MAX 2.0f
 
+#define XWA_MODERN_BLOOM_AMOUNT_MAX 1.5f
+
 enum {
 	XWA_MODERN_VIDEO_OVERRIDE_SSAO = 1u << 0,
 	XWA_MODERN_VIDEO_OVERRIDE_FSR = 1u << 1,
@@ -171,6 +176,7 @@ enum {
 	XWA_MODERN_VIDEO_OVERRIDE_VR_MIRROR = 1u << 20,
 	XWA_MODERN_VIDEO_OVERRIDE_VR_PANEL_SCALE = 1u << 21,
 	XWA_MODERN_VIDEO_OVERRIDE_VR_SCREEN_SCALE = 1u << 22,
+	XWA_MODERN_VIDEO_OVERRIDE_BLOOM_AMOUNT = 1u << 23,
 };
 
 typedef void (*XwaModernVideoOptionsApplyFn)(const XwaModernVideoOptions* options);

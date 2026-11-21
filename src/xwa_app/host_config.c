@@ -675,6 +675,18 @@ static int host_config_video_options(const AeronConfigFile* config, XwaModernVid
 		}
 	}
 	{
+		const AeronConfigNode* bloom_node = AeronConfigFile_GetNode(config, "video.bloom_amount");
+		if (bloom_node) {
+			const double bloom = AeronConfigNode_Float(bloom_node, NAN);
+			if (!isfinite(bloom) || bloom < 0.0 || bloom > XWA_MODERN_BLOOM_AMOUNT_MAX) {
+				return host_config_error(
+					error, error_size, "invalid 'video.bloom_amount': expected a number %s", "from 0 to 1.5");
+			}
+			out->bloom_amount = (float)bloom;
+			*override_mask |= XWA_MODERN_VIDEO_OVERRIDE_BLOOM_AMOUNT;
+		}
+	}
+	{
 		const char* hud_scale_key = "video.hud_scale";
 		const AeronConfigNode* hud_scale_node = AeronConfigFile_GetNode(config, hud_scale_key);
 		if (hud_scale_node) {
@@ -1166,8 +1178,9 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 		options->motion_blur_quality < XWA_MODERN_MOTION_BLUR_OFF ||
 		options->motion_blur_quality > XWA_MODERN_MOTION_BLUR_HIGH ||
 		!isfinite(options->motion_blur_amount) || options->motion_blur_amount < 0.0f ||
-		options->motion_blur_amount > 1.0f || options->sdr_gamma < XWA_MODERN_SDR_GAMMA_2_2 ||
-		options->sdr_gamma > XWA_MODERN_SDR_GAMMA_SRGB ||
+		options->motion_blur_amount > 1.0f || !isfinite(options->bloom_amount) ||
+		options->bloom_amount < 0.0f || options->bloom_amount > XWA_MODERN_BLOOM_AMOUNT_MAX ||
+		options->sdr_gamma < XWA_MODERN_SDR_GAMMA_2_2 || options->sdr_gamma > XWA_MODERN_SDR_GAMMA_SRGB ||
 		options->paper_white < XWA_MODERN_PAPER_WHITE_AUTO ||
 		options->paper_white > XWA_MODERN_PAPER_WHITE_400 || !isfinite(options->hud_scale) ||
 		options->hud_scale < XWA_MODERN_HUD_SCALE_MIN || options->hud_scale > XWA_MODERN_HUD_SCALE_MAX) {
@@ -1186,6 +1199,7 @@ static int host_config_set_video_options(AeronConfigFile* document, const XwaMod
 									 quality_names[options->motion_blur_quality], error) &&
 		   AeronConfigFile_SetFloat(document, "video.motion_blur_amount", options->motion_blur_amount,
 									error) &&
+		   AeronConfigFile_SetFloat(document, "video.bloom_amount", options->bloom_amount, error) &&
 		   AeronConfigFile_SetBool(document, "video.hdr_output", options->hdr_output, error) &&
 		   AeronConfigFile_SetString(document, "video.sdr_content_gamma", sdr_gamma_names[options->sdr_gamma],
 									 error) &&

@@ -145,6 +145,14 @@ static bool XwaVideoPage_FlightRendering(AeronUiContext* ui, XwaModernVideoOptio
 			changed = true;
 		}
 	}
+	/* As for the motion blur amount, a config.yaml value between two steps
+	   is kept until the player moves the slider. */
+	int bloom = (int)lroundf(options->bloom_amount * 100.0f);
+	if (AeronUi_SliderInt(ui, "Bloom Amount", &bloom, 0, (int)lroundf(XWA_MODERN_BLOOM_AMOUNT_MAX * 100.0f),
+						  10, "%d%%")) {
+		options->bloom_amount = (float)bloom / 100.0f;
+		changed = true;
+	}
 	return changed;
 }
 

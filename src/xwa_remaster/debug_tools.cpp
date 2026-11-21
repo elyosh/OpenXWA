@@ -1511,11 +1511,13 @@ static void xwa_tool_hdr(int* open, void* user) {
 	if (new_bk != bk) {
 		AeronScenePresent_SetBloomKernel(new_bk);
 	}
-	float bloom_i = AeronSceneBloom_Intensity();
+	float bloom_i = XwaRemasterFlight_BloomIntensity();
 	if (ImGui::SliderFloat("Bloom intensity", &bloom_i, 0.0f, 0.25f, "%.3f")) {
-		AeronSceneBloom_SetIntensity(bloom_i);
+		XwaRemasterFlight_SetBloomIntensity(bloom_i);
 	}
-	ImGui::TextDisabled("Fraction of the light scattered; 0 disables bloom (chain is skipped entirely).");
+	ImGui::TextDisabled("Fraction of the light scattered, before the player's bloom amount (%.0f%%).\n"
+						"The bloom is skipped when either is 0.",
+						(double)(XwaRemasterFlight_BloomAmount() * 100.0f));
 	float emissive_scale = AeronScene_EmissiveScale();
 	if (ImGui::SliderFloat("Emissive scale", &emissive_scale, 0.25f, 32.0f, "%.2f",
 						   ImGuiSliderFlags_Logarithmic)) {

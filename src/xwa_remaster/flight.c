@@ -416,6 +416,10 @@ static struct {
 	 * which the debug UI's reset restores. */
 	XwaFlightProjectileParams projectiles;
 	XwaFlightProjectileParams projectiles_default;
+	/* bloom.intensity, and the player's bloom amount (video.bloom_amount)
+	 * that multiplies it. */
+	float bloom_intensity;
+	float bloom_amount;
 	float map_ambient_min[3];    /* lighting.map_ambient_min_* */
 	float death_star_ambient[3]; /* lighting.death_star_ambient_* */
 	/* presentation.cockpit_fov_min_aspect: with a craft's field of view, a
@@ -2046,6 +2050,8 @@ int XwaRemasterFlight_InitConfig(AeronVfs* vfs) {
 		AeronConfigFile_Destroy(cf);
 		return 0;
 	}
+	s.bloom_intensity = bloom_intensity;
+	s.bloom_amount = 1.0f;
 	AeronSceneBloom_SetIntensity(bloom_intensity);
 	s.explosion_genus_emissive_strength =
 		(float)AeronConfigFile_GetFloat(cf, "effects.explosion_genus_emissive_strength", 0.0);
@@ -2694,6 +2700,24 @@ void XwaRemasterFlight_SetTextureFiltering(const XwaFlightTextureFilteringParams
 void XwaRemasterFlight_GetTextureFilteringDefault(XwaFlightTextureFilteringParams* out) {
 	if (out && fl_cfg_ensure()) {
 		*out = s.texture_filtering_default;
+	}
+}
+
+float XwaRemasterFlight_BloomAmount(void) { return fl_cfg_ensure() ? s.bloom_amount : 1.0f; }
+
+void XwaRemasterFlight_SetBloomAmount(float amount) {
+	if (fl_cfg_ensure() && isfinite(amount) && amount >= 0.0f) {
+		s.bloom_amount = amount;
+		AeronSceneBloom_SetIntensity(s.bloom_intensity * amount);
+	}
+}
+
+float XwaRemasterFlight_BloomIntensity(void) { return fl_cfg_ensure() ? s.bloom_intensity : 0.0f; }
+
+void XwaRemasterFlight_SetBloomIntensity(float intensity) {
+	if (fl_cfg_ensure() && isfinite(intensity) && intensity >= 0.0f) {
+		s.bloom_intensity = intensity;
+		AeronSceneBloom_SetIntensity(intensity * s.bloom_amount);
 	}
 }
 
