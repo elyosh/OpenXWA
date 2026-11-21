@@ -6237,6 +6237,11 @@ static int fl_begin_scene(const AeronSceneCamera* camera) {
 	if (!AeronScene_Begin(s.scene, camera)) {
 		return 0;
 	}
+	/* Before the meshes are prepared: they only get their light list
+	 * pipelines when light lists are on. */
+	if (!fl_configure_clustered_lights(s.scene)) {
+		return 0;
+	}
 	fl_prepare_meshes();
 	XwaRemasterSuns_PrepareScene(s.scene, s.scene_serial, s.snap && s.snap->suns.procedural_flare);
 	return 1;
@@ -7804,11 +7809,6 @@ static AeronTexture* fl_render_hyperspace(AeronCommandBuffer* cmd, const XwaSnap
 		fl_add_cockpit_lights(snap, player_bw, player_local);
 	}
 	fl_finalize_point_lights();
-	if (!fl_configure_clustered_lights(s.scene)) {
-		Aeron_CommandBufferSetFailure(cmd, "Hyperspace clustered-light configuration failed");
-		s.snap = NULL;
-		return NULL;
-	}
 	const XwaShipAoParams ao = {
 		.intensity = s.ssao.ssao_intensity,
 		.power = s.ssao.ssao_power,
@@ -9365,11 +9365,6 @@ AeronTexture* XwaRemasterFlight_Render(AeronCommandBuffer* cmd, const XwaSnapsho
 		fl_add_headlight(snap, player_bw, player_local);
 	}
 	fl_finalize_point_lights();
-	if (!fl_configure_clustered_lights(s.scene)) {
-		Aeron_CommandBufferSetFailure(cmd, "Flight clustered-light configuration failed");
-		s.snap = NULL;
-		return NULL;
-	}
 	/* The configured ceiling light is baked into the hangar's probes. Its
 	 * shadow applies only where the probes apply, with the strength that
 	 * the probe set gives. */
